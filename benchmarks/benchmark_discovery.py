@@ -48,7 +48,7 @@ RELATED_BENCHMARK_BASES = {
 class DiscoveredBenchmark:
     group: str
     name: str
-    gscript: Path
+    leia: Path
     luajit: Path | None = None
     base: str | None = None
 
@@ -57,8 +57,8 @@ class DiscoveredBenchmark:
         return f"{self.group}/{self.name}"
 
     @property
-    def gscript_rel(self) -> str:
-        return f"benchmarks/{self.group}/{self.name}.gs"
+    def leia_rel(self) -> str:
+        return f"benchmarks/{self.group}/{self.name}.leia"
 
     @property
     def luajit_rel(self) -> str | None:
@@ -79,7 +79,7 @@ SpecT = TypeVar("SpecT", bound=SelectableSpec)
 
 def benchmark_id_from_selector(selector: str, allowed_groups: list[str] | tuple[str, ...] = GROUPS) -> str | None:
     text = selector.removeprefix("benchmarks/")
-    if text.endswith(".gs"):
+    if text.endswith(".leia"):
         text = text[:-3]
     parts = text.split("/")
     if len(parts) != 2:
@@ -179,9 +179,9 @@ def canonical_groups(groups: list[str], allowed_groups: list[str] | tuple[str, .
 
 def domain_specs(root: Path, group: str) -> list[DiscoveredBenchmark]:
     bench_dir = root / "benchmarks" / group
-    ordered = [name for name in DEFAULT_ORDER if (bench_dir / f"{name}.gs").exists()]
+    ordered = [name for name in DEFAULT_ORDER if (bench_dir / f"{name}.leia").exists()]
     ordered_set = set(ordered)
-    extras = sorted(path.stem for path in bench_dir.glob("*.gs") if path.stem not in ordered_set)
+    extras = sorted(path.stem for path in bench_dir.glob("*.leia") if path.stem not in ordered_set)
     specs: list[DiscoveredBenchmark] = []
     for name in [*ordered, *extras]:
         luajit = root / "benchmarks" / "lua_ref" / group / f"{name}.lua"
@@ -189,7 +189,7 @@ def domain_specs(root: Path, group: str) -> list[DiscoveredBenchmark]:
             DiscoveredBenchmark(
                 group,
                 name,
-                bench_dir / f"{name}.gs",
+                bench_dir / f"{name}.leia",
                 luajit if luajit.exists() else None,
                 RELATED_BENCHMARK_BASES.get(name),
             )
@@ -255,7 +255,7 @@ def resolve_script_path(root: Path, bench: str, groups: list[str] | tuple[str, .
     if benchmark_id is None:
         return None
     group, name = benchmark_id.split("/", 1)
-    path = root / "benchmarks" / group / f"{name}.gs"
+    path = root / "benchmarks" / group / f"{name}.leia"
     if path.exists():
         return path
     return None

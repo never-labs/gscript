@@ -19,14 +19,14 @@
 package methodjit
 
 import (
-	"github.com/never-labs/gscript/internal/testutil/vmtest"
+	"github.com/never-labs/leia/internal/testutil/vmtest"
 	"testing"
 
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/vm"
 )
 
 // TestTier2_IntOverflow_Loop_Matches_VM is the canonical R77 failing
-// test. Under current gscript, this test FAILS:
+// test. Under current leia, this test FAILS:
 //
 //	JIT overflow arithmetic in a main-loop diverges from VM.
 //
@@ -47,7 +47,7 @@ _ = string.format("trigger t2: %d", x)
 }
 
 // TestTier2_IntOverflow_JITProbe — log exact JIT result + tiering stats.
-// CLI `gscript ov_min.gs` prints -54999090331011 (int). If this test
+// CLI `leia ov_min.leia` prints -54999090331011 (int). If this test
 // shows float, the harness path diverges from CLI in terms of tiering.
 func TestTier2_IntOverflow_JITProbe(t *testing.T) {
 	src := `
@@ -81,7 +81,7 @@ result := x
 }
 
 // TestTier2_IntOverflow_VMProbe — verify VM's own output for this loop.
-// This is a sanity check: CLI `gscript -vm ov_min.gs` prints
+// This is a sanity check: CLI `leia -vm ov_min.leia` prints
 // 2154072997676319744. The harness should also see this via VM path.
 func TestTier2_IntOverflow_VMProbe(t *testing.T) {
 	src := `

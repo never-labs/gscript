@@ -1,11 +1,11 @@
-# GScript AI-Native Syntax Design
+# Leia AI-Native Syntax Design
 
 Status: accepted syntax proposal with a partial implementation in the current
 workspace. The implemented parser surface lowers to the existing LLM standard
 library; this document separates stable syntax decisions from current
 implementation status.
 
-GScript's AI layer is designed around one simple promise: a useful agent should
+Leia's AI layer is designed around one simple promise: a useful agent should
 be writable with almost no ceremony, while advanced users can still drop to a
 single-turn protocol primitive when they need exact control.
 
@@ -31,7 +31,7 @@ Current implementation snapshot:
   `llm.with_budget(config, func(){ ... })`; nested scopes intersect naturally,
   so every active frame must allow the next turn/tool call.
 - Tool declarations lower with the tool name, function body, parameter list,
-  Go-style doc comments, and `gscript:` directives for `description`,
+  Go-style doc comments, and `leia:` directives for `description`,
   `requires`, and `param_docs`.
 
 Current status is summarized in [Implementation Status](#24-implementation-status).
@@ -40,12 +40,12 @@ Current status is summarized in [Implementation Status](#24-implementation-statu
 
 The primary user-facing form is `agent`.
 
-```gscript
+```leia
 agent ask(q) {
     user: q
 }
 
-r, err := ask("What is GScript?")
+r, err := ask("What is Leia?")
 print(r.text)
 ```
 
@@ -94,7 +94,7 @@ the soft-keyword contract above.
 
 AI syntax uses ordinary list literals for ordered data:
 
-```gscript
+```leia
 tools: [search_docs, read_url]
 ```
 
@@ -103,11 +103,11 @@ for stable provider schemas, tracing, and tests.
 
 ## 4. Models
 
-Scripts can declare named models directly in GScript. This keeps the language
+Scripts can declare named models directly in Leia. This keeps the language
 self-contained: users do not need a separate TOML/JSON configuration format to
 use their LLM subscriptions.
 
-```gscript
+```leia
 models {
     default: "fast"
 
@@ -136,7 +136,7 @@ service's actual model identifier lives in `provider_model`.
 
 `models` entries can be aliases or provider configs:
 
-```gscript
+```leia
 models {
     default: "glm-fast"
     coding:  "openai-strong"
@@ -161,7 +161,7 @@ models {
 
 Lowering target:
 
-```gscript
+```leia
 llm.register_models({
     default: "glm-fast",
     coding: "openai-strong",
@@ -228,7 +228,7 @@ Repeated agent configuration should be factored once without wrapping normal
 code in a nested block. `agent defaults { ... }` is a module-scope declaration
 that supplies defaults for every agent in that module.
 
-```gscript
+```leia
 agent defaults {
     model: "strong"
     system: "Answer clearly and cite sources."
@@ -271,13 +271,13 @@ AgentDefaultsDecl = "agent" "defaults" AgentConfig ;
 
 ## 6. Tool Declarations
 
-Tools use Go-style documentation plus `gscript:` directives. There is no
+Tools use Go-style documentation plus `leia:` directives. There is no
 decorator/attribute syntax.
 
-```gscript
+```leia
 // search_docs searches indexed project documentation.
-//gscript:requires docs.read
-//gscript:param query natural-language search query
+//leia:requires docs.read
+//leia:param query natural-language search query
 tool search_docs(query) {
     return docs.search(query, {limit: 5}), nil
 }
@@ -291,8 +291,8 @@ ToolDecl = DocComment "tool" Ident "(" [ParamList] ")" Block ;
 
 Rules:
 
-- `gscript:requires` is required. Use `gscript:requires none` for pure tools.
-- `gscript:param <name> <description>` is optional.
+- `leia:requires` is required. Use `leia:requires none` for pure tools.
+- `leia:param <name> <description>` is optional.
 - The doc comment summary becomes the LLM-facing tool description.
 - Tool bodies return `(value, err)`.
 - Tool declarations bind a value with the declared name.
@@ -300,13 +300,13 @@ Rules:
 
 Implementation attaches only immediately-adjacent Go-style comments. The
 generated `llm.tool` options include `params`, `description`, `requires`, and
-`param_docs`. Validation rejects missing `gscript:requires`, malformed or
+`param_docs`. Validation rejects missing `leia:requires`, malformed or
 duplicate capability entries, `none` mixed with other capabilities, unknown
 parameter docs, and duplicate parameter docs.
 
 Lowering:
 
-```gscript
+```leia
 search_docs := llm.tool("search_docs", func(query) {
     return docs.search(query, {limit: 5}), nil
 }, {
@@ -325,7 +325,7 @@ Agents are first-class callable values, like functions.
 
 Named agent:
 
-```gscript
+```leia
 agent answer(q) {
     system: "Answer briefly."
     user: q
@@ -334,7 +334,7 @@ agent answer(q) {
 
 Anonymous agent assigned to a variable:
 
-```gscript
+```leia
 answer := agent(q) {
     system: "Answer briefly."
     user: q
@@ -343,15 +343,15 @@ answer := agent(q) {
 
 Anonymous no-arg agent, immediately invoked:
 
-```gscript
+```leia
 r, err := agent {
-    user: "What is GScript?"
+    user: "What is Leia?"
 }()
 ```
 
 Higher-order agent construction:
 
-```gscript
+```leia
 func make_agent(style) {
     return agent(q) {
         system: "Answer in this style: " .. style
@@ -360,7 +360,7 @@ func make_agent(style) {
 }
 
 brief := make_agent("brief")
-r, err := brief("Explain GScript")
+r, err := brief("Explain Leia")
 ```
 
 Grammar:
@@ -412,13 +412,13 @@ stream     = off
 
 The only required field for a no-arg agent expression is usually `user`.
 
-```gscript
+```leia
 agent { user: "Summarize this file: " .. text }()
 ```
 
 For named agents, `user` usually references a parameter:
 
-```gscript
+```leia
 agent summarize(text) {
     system: "Summarize clearly."
     user: text
@@ -429,8 +429,8 @@ agent summarize(text) {
 
 Calling an agent returns `(result, err)`.
 
-```gscript
-r, err := answer("What is GScript?")
+```leia
+r, err := answer("What is Leia?")
 ```
 
 Result shape:
@@ -477,7 +477,7 @@ The default strategy should be good enough for common tool-using agents.
 
 Text-shape hint:
 
-```gscript
+```leia
 agent classify(text) {
     system: "Classify sentiment."
     user: text
@@ -487,7 +487,7 @@ agent classify(text) {
 
 Structured output hint:
 
-```gscript
+```leia
 agent extract_contact(text) {
     system: "Extract contact information."
     user: text
@@ -532,7 +532,7 @@ Nested schema generation remains pending runtime work.
 
 The default syntax stays simple:
 
-```gscript
+```leia
 r, err := chat("How do I embed it?")
 ```
 
@@ -549,7 +549,7 @@ result.history is the updated history to save
 
 If the language later gains named call options, the intended surface is:
 
-```gscript
+```leia
 r, err := chat("How do I embed it?", history: session.history)
 session.history = r.history
 ```
@@ -562,7 +562,7 @@ stdlib may accept explicit option tables.
 Most agents should not need custom loop logic. When they do, an optional `flow`
 block takes over execution.
 
-```gscript
+```leia
 agent support(message) {
     system: "Support agent."
     tools: [refund, lookup_order]
@@ -617,7 +617,7 @@ Rules:
 `turn` is the low-level primitive for one model call. It is for advanced users
 and for `flow` blocks.
 
-```gscript
+```leia
 r, err := turn {
     model: "strong"
     messages: messages {
@@ -664,7 +664,7 @@ output         optional output hint, same meaning as agent output
 
 Lowering target:
 
-```gscript
+```leia
 r, err := llm.turn({...})
 ```
 
@@ -672,7 +672,7 @@ r, err := llm.turn({...})
 
 `messages` is a lightweight constructor for ordered message lists.
 
-```gscript
+```leia
 history := messages {
     system: "You are concise."
     user: "Hello"
@@ -683,7 +683,7 @@ history := messages {
 
 It lowers to:
 
-```gscript
+```leia
 [
     {role: "system", text: "You are concise."},
     {role: "user", text: "Hello"},
@@ -694,7 +694,7 @@ It lowers to:
 
 Advanced entries may still be raw tables:
 
-```gscript
+```leia
 history = append(history, [
     {role: "assistant", tool_call: c},
     {role: "tool", tool_use_id: c.id, value: v},
@@ -708,7 +708,7 @@ for common prompts. It is a data constructor, not a provider call.
 
 Budget is optional and does not include money in the first language surface.
 
-```gscript
+```leia
 budget {
     turns: 8
     calls: 16
@@ -721,7 +721,7 @@ budget {
 
 Agent-local budget:
 
-```gscript
+```leia
 agent research(q) {
     tools: [search_docs]
     user: q
@@ -748,8 +748,8 @@ enclosed `turn` / tool dispatch operations.
 
 Capabilities are strings:
 
-```gscript
-//gscript:requires docs.read net.http
+```leia
+//leia:requires docs.read net.http
 ```
 
 Built-in capability namespaces:
@@ -778,16 +778,16 @@ Rules:
 
 Memory and retrieval are stdlib namespaces, not syntax.
 
-```gscript
+```leia
 agent support(q) {
     memory: memory.window({tokens: 4000})
     user: q
 }
 ```
 
-```gscript
+```leia
 // search_docs searches project documentation.
-//gscript:requires docs.read
+//leia:requires docs.read
 tool search_docs(query) {
     return rag.search("project-docs", query, {limit: 5}), nil
 }
@@ -811,7 +811,7 @@ rag.cite(results)
 
 Agents can be exposed as tools explicitly:
 
-```gscript
+```leia
 agent summarize(text) {
     system: "Summarize in three bullets."
     user: text
@@ -827,7 +827,7 @@ summary_tool := toolof(summarize, {
 An agent value can also be placed directly in an agent `tools:` list for the
 common static case:
 
-```gscript
+```leia
 agent supervisor(q) {
     tools: [summarize]
     user: q
@@ -868,10 +868,10 @@ the cross-defaults check is skipped and runtime remains authoritative.
 
 Checks:
 
-- `tool` missing `gscript:requires`.
-- Malformed or duplicate `gscript:requires` entries, including `none` mixed
+- `tool` missing `leia:requires`.
+- Malformed or duplicate `leia:requires` entries, including `none` mixed
   with other capabilities.
-- Unknown or duplicate `gscript:param` docs.
+- Unknown or duplicate `leia:param` docs.
 - Duplicate statically named entries in literal `agent.tools` / `turn.tools`
   lists.
 - `agent.tools` references unknown/non-tool values when statically known.
@@ -904,18 +904,18 @@ runtime as the first lowering target.
 ## Tooling Status
 
 The current CLI tooling understands AI-native syntax through the same
-parser-backed path used by normal `.gs` files:
+parser-backed path used by normal `.leia` files:
 
-- `gscript fmt` accepts `tool`, `agent`, `turn`, `messages`, `models`, and
+- `leia fmt` accepts `tool`, `agent`, `turn`, `messages`, `models`, and
   `budget` syntax before rewriting bytes. It is still a narrow whitespace
   normalizer: CRLF/CR becomes LF, trailing spaces/tabs are trimmed, trailing
   blank lines are collapsed, brace-driven line indentation is normalized, and a
   final newline is ensured. It does not yet pretty-print expressions or rebuild
   source from AST nodes.
-- `gscript lint` reports lexer/parser failures, including AI-native syntax
-  errors, as `GS1001` diagnostics in text, JSON, or SARIF output. The broader
+- `leia lint` reports lexer/parser failures, including AI-native syntax
+  errors, as `LEIA1001` diagnostics in text, JSON, or SARIF output. The broader
   AI metadata/capability lint index is still pending.
-- `examples/ai_native_agent.gs` is a parser/tooling example that covers the
+- `examples/ai_native_agent.leia` is a parser/tooling example that covers the
   AI-native surface without requiring runtime changes.
 
 ## 21. Canonical Desugaring
@@ -925,9 +925,9 @@ must match these shapes.
 
 Tool:
 
-```gscript
+```leia
 // search_docs searches docs.
-//gscript:requires docs.read
+//leia:requires docs.read
 tool search_docs(query) {
     return docs.search(query), nil
 }
@@ -935,7 +935,7 @@ tool search_docs(query) {
 
 as if:
 
-```gscript
+```leia
 search_docs := llm.tool("search_docs", func(query) {
     return docs.search(query), nil
 }, {
@@ -947,7 +947,7 @@ search_docs := llm.tool("search_docs", func(query) {
 
 Simple agent:
 
-```gscript
+```leia
 agent answer(q) {
     system: "Answer briefly."
     user: q
@@ -956,7 +956,7 @@ agent answer(q) {
 
 as if:
 
-```gscript
+```leia
 answer := llm.agent("answer", func(q) {
     return {
         system: "Answer briefly.",
@@ -967,13 +967,13 @@ answer := llm.agent("answer", func(q) {
 
 Anonymous IIFE:
 
-```gscript
+```leia
 r, err := agent { user: "hello" }()
 ```
 
 as if:
 
-```gscript
+```leia
 r, err := llm.agent("", func() {
     return {user: "hello"}
 })()
@@ -981,7 +981,7 @@ r, err := llm.agent("", func() {
 
 Flow agent:
 
-```gscript
+```leia
 agent support(q) {
     tools: [refund]
     user: q
@@ -992,7 +992,7 @@ agent support(q) {
 
 as if:
 
-```gscript
+```leia
 support := llm.agent("support", func(q) {
     return {
         tools: [refund],
@@ -1019,7 +1019,7 @@ errors must remain equivalent.
 
 Agent defaults:
 
-```gscript
+```leia
 agent defaults {
     model: "strong"
     tools: [search_docs]
@@ -1032,7 +1032,7 @@ agent answer(q) {
 
 as if each agent in the module captured merged config:
 
-```gscript
+```leia
 answer := llm.agent("answer", func(q) {
     return {
         model: "strong",
@@ -1046,16 +1046,16 @@ answer := llm.agent("answer", func(q) {
 
 ### 22.1 One-Off Question
 
-```gscript
+```leia
 r, err := agent {
-    user: "What is GScript?"
+    user: "What is Leia?"
 }()
 print(r.text)
 ```
 
 ### 22.2 Named Assistant
 
-```gscript
+```leia
 agent answer(q) {
     system: "Answer in one short paragraph."
     user: q
@@ -1064,9 +1064,9 @@ agent answer(q) {
 
 ### 22.3 Tool-Using Agent
 
-```gscript
+```leia
 // search_docs searches project documentation.
-//gscript:requires docs.read
+//leia:requires docs.read
 tool search_docs(query) {
     return docs.search(query, {limit: 5}), nil
 }
@@ -1081,7 +1081,7 @@ agent answer_docs(q) {
 
 ### 22.4 Structured Extraction
 
-```gscript
+```leia
 agent extract_contact(text) {
     system: "Extract contact information."
     user: text
@@ -1094,7 +1094,7 @@ agent extract_contact(text) {
 
 ### 22.5 Module Defaults
 
-```gscript
+```leia
 agent defaults {
     model: "strong"
     system: "Use docs when useful. Cite sources."
@@ -1114,7 +1114,7 @@ agent explain_code(code) {
 
 ### 22.6 Custom Flow
 
-```gscript
+```leia
 agent manual(q) {
     tools: [search_docs]
     user: q
@@ -1136,12 +1136,12 @@ agent manual(q) {
 2. `agent` is a first-class callable value: named, anonymous, assignable,
    passable, returnable, and IIFE-callable.
 3. `react` is not a keyword. It remains a stdlib/default strategy concept.
-4. Tool metadata uses Go-style doc comments plus `gscript:` directives, not
+4. Tool metadata uses Go-style doc comments plus `leia:` directives, not
    decorators.
 5. `output` is an output example/shape hint, not an input example.
 6. `flow` is the advanced escape hatch for custom multi-turn logic.
 7. `turn` is the single-call low-level primitive.
-8. Model/provider binding can be declared in GScript `models {}` or injected by
+8. Model/provider binding can be declared in Leia `models {}` or injected by
    Go host code; plaintext API keys in source are forbidden.
 9. Budget does not include money in the first language surface.
 10. `agent defaults { ... }` provides module-scope default agent configuration
@@ -1156,7 +1156,7 @@ Done:
 - Parser accepts list literals (`[...]`) and AI-native list syntax lowers to
   array-table literals.
 - Parser preserves immediately-adjacent tool doc comments and extracts
-  `gscript:` directives for tool metadata.
+  `leia:` directives for tool metadata.
 - Parser accepts `tool` declarations and lowers to `llm.tool` with parameters,
   description, requires, and param-doc options.
 - Parser accepts named and anonymous `agent` values, including IIFE use.
@@ -1187,11 +1187,11 @@ Partial:
   integration remain host/tooling work.
 - Validation rejects duplicate `agent defaults`, non-module `agent defaults` /
   `models`, model alias cycles, literal model `api_key` strings,
-  missing/malformed/duplicate tool `gscript:requires`, unknown or duplicate
-  tool `gscript:param` docs, duplicate statically named tools in literal
+  missing/malformed/duplicate tool `leia:requires`, unknown or duplicate
+  tool `leia:param` docs, duplicate statically named tools in literal
   agent/defaults tool lists, and static capability coverage failures after
   applying module-level `agent defaults` to concrete agents.
-- `gscript fmt` and `gscript lint` accept AI-native source through the
+- `leia fmt` and `leia lint` accept AI-native source through the
   parser-backed tooling path. The formatter currently normalizes whitespace and
   brace-driven indentation; a full AST pretty printer for AI-native blocks and
   doc directives remains pending.
@@ -1202,7 +1202,7 @@ Partial:
   behavior, directive lowering, ambient budget behavior, and AI-native
   agent/turn record-replay through the existing LLM stdlib recorder/replay API.
   A gated real-provider smoke also covers AI-native `models {}` provider
-  construction and `turn {}` execution when `GSCRIPT_LLM_INTEGRATION=1` and the
+  construction and `turn {}` execution when `LEIA_LLM_INTEGRATION=1` and the
   Anthropic-compatible endpoint/model/key environment variables are present.
 
 Pending:

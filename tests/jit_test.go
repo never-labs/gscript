@@ -7,28 +7,28 @@ import (
 	"strings"
 	"testing"
 
-	gs "github.com/never-labs/gscript"
+	leia "github.com/never-labs/leia"
 )
 
 // captureOutput creates a VM with the given options and a print capture function.
 // Returns the VM and a pointer to the captured output slice.
-func captureOutput(opts ...gs.Option) (*gs.VM, *[]string) {
+func captureOutput(opts ...leia.Option) (*leia.VM, *[]string) {
 	var output []string
-	allOpts := append([]gs.Option{gs.WithPrint(func(args ...interface{}) {
+	allOpts := append([]leia.Option{leia.WithPrint(func(args ...interface{}) {
 		parts := make([]string, len(args))
 		for i, a := range args {
 			parts[i] = fmt.Sprint(a)
 		}
 		output = append(output, strings.Join(parts, "\t"))
 	})}, opts...)
-	vm := gs.New(allOpts...)
+	vm := leia.New(allOpts...)
 	return vm, &output
 }
 
 // runAndGet executes source on a VM with the given options and returns a named global.
-func runAndGet(t *testing.T, src, varName string, opts ...gs.Option) interface{} {
+func runAndGet(t *testing.T, src, varName string, opts ...leia.Option) interface{} {
 	t.Helper()
-	vm := gs.New(opts...)
+	vm := leia.New(opts...)
 	if err := vm.Exec(src); err != nil {
 		t.Fatalf("exec error: %v", err)
 	}
@@ -49,8 +49,8 @@ func fib(n) {
 }
 result := fib(15)
 `
-	vmResult := runAndGet(t, src, "result", gs.WithVM())
-	jitResult := runAndGet(t, src, "result", gs.WithJIT())
+	vmResult := runAndGet(t, src, "result", leia.WithVM())
+	jitResult := runAndGet(t, src, "result", leia.WithJIT())
 
 	expected := int64(610)
 	if vmResult != expected {
@@ -76,8 +76,8 @@ func sumN(n) {
 }
 result := sumN(10000)
 `
-	vmResult := runAndGet(t, src, "result", gs.WithVM())
-	jitResult := runAndGet(t, src, "result", gs.WithJIT())
+	vmResult := runAndGet(t, src, "result", leia.WithVM())
+	jitResult := runAndGet(t, src, "result", leia.WithJIT())
 
 	expected := int64(50005000)
 	if vmResult != expected {
@@ -120,8 +120,8 @@ r4 := add4(10, 20, 30, 40)
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			vmResult := runAndGet(t, src, tc.varName, gs.WithVM())
-			jitResult := runAndGet(t, src, tc.varName, gs.WithJIT())
+			vmResult := runAndGet(t, src, tc.varName, leia.WithVM())
+			jitResult := runAndGet(t, src, tc.varName, leia.WithJIT())
 
 			if vmResult != tc.expected {
 				t.Errorf("VM %s: got %v (%T), want %d", tc.varName, vmResult, vmResult, tc.expected)
@@ -147,8 +147,8 @@ func nestedSum(n) {
 }
 result := nestedSum(50)
 `
-	vmResult := runAndGet(t, src, "result", gs.WithVM())
-	jitResult := runAndGet(t, src, "result", gs.WithJIT())
+	vmResult := runAndGet(t, src, "result", leia.WithVM())
+	jitResult := runAndGet(t, src, "result", leia.WithJIT())
 
 	// sum(1..50) = 1275, nestedSum = 1275 * 1275 = 1625625
 	expected := int64(1625625)
@@ -177,8 +177,8 @@ func compute() {
 }
 result := compute()
 `
-	vmResult := runAndGet(t, src, "result", gs.WithVM())
-	jitResult := runAndGet(t, src, "result", gs.WithJIT())
+	vmResult := runAndGet(t, src, "result", leia.WithVM())
+	jitResult := runAndGet(t, src, "result", leia.WithJIT())
 
 	// a=10, b=3.5, c=13.5, d=27.0, e=26.0, f=26.0/3 = 8.666...
 	if vmResult != jitResult {
@@ -215,8 +215,8 @@ func intOps() {
 }
 result := intOps()
 `
-	vmResult := runAndGet(t, src, "result", gs.WithVM())
-	jitResult := runAndGet(t, src, "result", gs.WithJIT())
+	vmResult := runAndGet(t, src, "result", leia.WithVM())
+	jitResult := runAndGet(t, src, "result", leia.WithJIT())
 
 	// sum=107, diff=93, prod=700, quot=14 (int div), rem=2
 	// total = 107 + 93 + 700 + 14 + 2 = 916
@@ -235,8 +235,8 @@ func ack(m, n) {
 }
 result := ack(3, 4)
 `
-	vmResult := runAndGet(t, src, "result", gs.WithVM())
-	jitResult := runAndGet(t, src, "result", gs.WithJIT())
+	vmResult := runAndGet(t, src, "result", leia.WithVM())
+	jitResult := runAndGet(t, src, "result", leia.WithJIT())
 
 	// ack(3,4) = 125
 	expected := int64(125)
@@ -273,8 +273,8 @@ func matmul() {
 }
 result := matmul()
 `
-	vmResult := runAndGet(t, src, "result", gs.WithVM())
-	jitResult := runAndGet(t, src, "result", gs.WithJIT())
+	vmResult := runAndGet(t, src, "result", leia.WithVM())
+	jitResult := runAndGet(t, src, "result", leia.WithJIT())
 
 	// a[1][k] = 1+k, b[k][1] = k*1 = k
 	// sum = sum of (1+k)*k for k=1..10 = sum of k+k^2 = 55 + 385 = 440

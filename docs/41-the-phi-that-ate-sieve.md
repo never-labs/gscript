@@ -12,7 +12,7 @@ R31 started with a directive: stop grinding fib, start on sieve. Sieve of Eratos
 
 Fine. Sieve it is.
 
-The obvious theory, going in, was that the inner marking loop — `for j := i*i; j <= n; j := j+i { is_prime[j] = false }` — was paying for the SetTable validation tower on every iteration. The table is created once in an init loop and never reallocated. Its type, metatable, and array kind are loop-invariant. LuaJIT would hoist those checks out of the loop with its LOOP pass. GScript's LICM is supposed to do the same.
+The obvious theory, going in, was that the inner marking loop — `for j := i*i; j <= n; j := j+i { is_prime[j] = false }` — was paying for the SetTable validation tower on every iteration. The table is created once in an init loop and never reallocated. Its type, metatable, and array kind are loop-invariant. LuaJIT would hoist those checks out of the loop with its LOOP pass. Leia's LICM is supposed to do the same.
 
 So why isn't it?
 
@@ -106,7 +106,7 @@ And §3.2:
 
 The failure mode is called a **redundant-phi SCC**. When you have multiple phis in a cycle that all reference *each other* and one single outer value, no single phi is individually trivial — each one has an argument that is "not a self-reference and not the outer value, it's this other phi". `tryRemoveTrivialPhi` looks at v77 and sees args `[v74, v77]`. That works — it should collapse. But it doesn't, because the cleanup only re-runs on users of the phi that was just removed, and if the SCC has no removed users, the chain never reaches inside it. Braun knows this. Braun gives the fix. It's **Algorithm 5: `removeRedundantPhis`**. Tarjan SCC over the phi-induced subgraph, in topological order, and any SCC whose outer-value set has cardinality 1 collapses.
 
-GScript has `tryRemoveTrivialPhi`. GScript does not have `removeRedundantPhis`.
+Leia has `tryRemoveTrivialPhi`. Leia does not have `removeRedundantPhis`.
 
 That's the whole bug.
 
@@ -114,7 +114,7 @@ That's the whole bug.
 
 ## What production compilers do
 
-I checked what the grownups ship. LLVM has `SimplifyCFG` and `InstructionSimplify::simplifyPHINode` running as safety-net passes after every construction-style transform. V8 TurboFan has `CommonOperatorReducer::ReducePhi` folding uniform-input phis in its reducer stack. SpiderMonkey Ion has `EliminatePhis` in `IonAnalysis.cpp` as a direct Braun-style cleanup after MIR construction. Every production method JIT runs this pass as a basic hygiene step. GScript skipped it.
+I checked what the grownups ship. LLVM has `SimplifyCFG` and `InstructionSimplify::simplifyPHINode` running as safety-net passes after every construction-style transform. V8 TurboFan has `CommonOperatorReducer::ReducePhi` folding uniform-input phis in its reducer stack. SpiderMonkey Ion has `EliminatePhis` in `IonAnalysis.cpp` as a direct Braun-style cleanup after MIR construction. Every production method JIT runs this pass as a basic hygiene step. Leia skipped it.
 
 LuaJIT doesn't have this problem because it's a trace JIT — there are no merge points and therefore no phis to simplify. Its LOOP pass does synthetic unrolling, which inherently converts loop-carried values to plain uses from the peeled header. Different architecture, different tradeoff, same end state.
 

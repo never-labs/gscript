@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	stdlibllm "github.com/never-labs/gscript/internal/stdlib/llm"
+	stdlibllm "github.com/never-labs/leia/internal/stdlib/llm"
 )
 
 func BuildLLMLoopLib(call ScriptFunctionCaller, provider func() LLMProvider, maxHostResult func() int64, ctx func() context.Context, traces ...LLMTraceSink) *Table {

@@ -1,4 +1,4 @@
-package gscript_test
+package leia_test
 
 import (
 	"fmt"
@@ -7,12 +7,12 @@ import (
 	"sync"
 	"testing"
 
-	gs "github.com/never-labs/gscript"
+	leia "github.com/never-labs/leia"
 )
 
 func TestPool(t *testing.T) {
-	pool := gs.NewPool(5, func() *gs.VM {
-		return gs.New()
+	pool := leia.NewPool(5, func() *leia.VM {
+		return leia.New()
 	})
 
 	vm := pool.Get()
@@ -35,8 +35,8 @@ func TestPool(t *testing.T) {
 }
 
 func TestPool_concurrent(t *testing.T) {
-	pool := gs.NewPool(10, func() *gs.VM {
-		vm := gs.New()
+	pool := leia.NewPool(10, func() *leia.VM {
+		vm := leia.New()
 		vm.RegisterFunc("square", func(x int64) int64 { return x * x })
 		return vm
 	})
@@ -46,7 +46,7 @@ func TestPool_concurrent(t *testing.T) {
 		wg.Add(1)
 		go func(n int) {
 			defer wg.Done()
-			err := pool.Do(func(vm *gs.VM) error {
+			err := pool.Do(func(vm *leia.VM) error {
 				results, err := vm.Call("square", int64(n))
 				if err != nil {
 					return err
@@ -66,13 +66,13 @@ func TestPool_concurrent(t *testing.T) {
 }
 
 func TestPool_Do(t *testing.T) {
-	pool := gs.NewPool(2, func() *gs.VM {
-		vm := gs.New()
+	pool := leia.NewPool(2, func() *leia.VM {
+		vm := leia.New()
 		vm.RegisterFunc("inc", func(x int64) int64 { return x + 1 })
 		return vm
 	})
 
-	err := pool.Do(func(vm *gs.VM) error {
+	err := pool.Do(func(vm *leia.VM) error {
 		results, err := vm.Call("inc", 41)
 		if err != nil {
 			return err
@@ -92,8 +92,8 @@ func TestPool_Do(t *testing.T) {
 }
 
 func TestPoolPreservesStateByDefault(t *testing.T) {
-	pool := gs.NewPool(1, func() *gs.VM {
-		return gs.New()
+	pool := leia.NewPool(1, func() *leia.VM {
+		return leia.New()
 	})
 
 	vm := pool.Get()
@@ -113,9 +113,9 @@ func TestPoolPreservesStateByDefault(t *testing.T) {
 }
 
 func TestPoolWithResetClearsGlobalsBeforeReuse(t *testing.T) {
-	pool := gs.NewPoolWithReset(1, func() *gs.VM {
-		return gs.New()
-	}, func(vm *gs.VM) bool {
+	pool := leia.NewPoolWithReset(1, func() *leia.VM {
+		return leia.New()
+	}, func(vm *leia.VM) bool {
 		vm.Reset()
 		return true
 	})
@@ -138,14 +138,14 @@ func TestPoolWithResetClearsGlobalsBeforeReuse(t *testing.T) {
 
 func TestPoolWithResetCanDiscardVM(t *testing.T) {
 	created := 0
-	pool := gs.NewPoolWithReset(1, func() *gs.VM {
+	pool := leia.NewPoolWithReset(1, func() *leia.VM {
 		created++
-		vm := gs.New()
+		vm := leia.New()
 		if err := vm.Set("id", int64(created)); err != nil {
 			t.Fatal(err)
 		}
 		return vm
-	}, func(vm *gs.VM) bool {
+	}, func(vm *leia.VM) bool {
 		return false
 	})
 
@@ -166,12 +166,12 @@ func TestPoolWithResetCanDiscardVM(t *testing.T) {
 
 func TestVMResetClearsGlobalsAndModuleCache(t *testing.T) {
 	dir := t.TempDir()
-	modPath := filepath.Join(dir, "helper.gs")
+	modPath := filepath.Join(dir, "helper.leia")
 	if err := os.WriteFile(modPath, []byte(`return { value: 1 }`), 0644); err != nil {
 		t.Fatal(err)
 	}
 
-	vm := gs.New(gs.WithRequirePath(dir))
+	vm := leia.New(leia.WithRequirePath(dir))
 	if err := vm.Exec(`helper := require("helper"); extra := 99`); err != nil {
 		t.Fatal(err)
 	}

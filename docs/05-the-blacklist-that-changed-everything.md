@@ -29,7 +29,7 @@ The first order of business was native table operations. The profiling data from
 
 The problem: when the trace recorder hit `GETFIELD obj "x"`, it had no way to compile it. The instruction triggered an immediate side-exit. In nbody, with 12 field accesses per iteration, this meant 12 trace-enter/side-exit cycles per iteration. Catastrophic.
 
-The solution uses GScript's internal table representation. Tables with string keys store them in two parallel arrays: `skeys` (the key strings) and `svals` (the values). At *recording time*, the trace recorder knows exactly which table it's looking at and where the key lives in `skeys`. If "x" is at index 3, we can record that fact and compile the access as a direct load.
+The solution uses Leia's internal table representation. Tables with string keys store them in two parallel arrays: `skeys` (the key strings) and `svals` (the values). At *recording time*, the trace recorder knows exactly which table it's looking at and where the key lives in `skeys`. If "x" is at index 3, we can record that fact and compile the access as a direct load.
 
 The generated ARM64 looks roughly like this:
 
@@ -169,7 +169,7 @@ The implementation scans the IR linearly. For each pure instruction (arithmetic,
 
 ### Type-Specialized LOAD_ARRAY
 
-When a trace accesses `table[i]` where `i` is an integer, the standard codegen loads a full 32-byte GScript value (type tag + data + padding). But if the SSA type system knows the result is a float, we only need 8 bytes --- a direct `LDR D` from the array's float storage.
+When a trace accesses `table[i]` where `i` is an integer, the standard codegen loads a full 32-byte Leia value (type tag + data + padding). But if the SSA type system knows the result is a float, we only need 8 bytes --- a direct `LDR D` from the array's float storage.
 
 The type-specialized version emits a single `LDR` instead of loading the type tag, checking it, and then loading the data. Smaller code, fewer memory accesses, better cache behavior.
 

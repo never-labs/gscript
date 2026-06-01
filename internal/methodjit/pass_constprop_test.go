@@ -8,8 +8,8 @@ import (
 	"math"
 	"testing"
 
-	"github.com/never-labs/gscript/internal/runtime"
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/runtime"
+	"github.com/never-labs/leia/internal/vm"
 )
 
 // TestConstProp_AddConsts verifies that 1 + 2 is folded to 3.

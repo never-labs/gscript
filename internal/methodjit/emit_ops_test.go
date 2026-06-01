@@ -2,7 +2,7 @@
 
 // emit_ops_test.go tests extended ARM64 code generation: division, negation,
 // float arithmetic, function calls (via deopt), and globals (via deopt).
-// Each test compiles a GScript function, runs it through the Method JIT,
+// Each test compiles a Leia function, runs it through the Method JIT,
 // and compares the result with the VM interpreter.
 
 package methodjit
@@ -14,8 +14,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/never-labs/gscript/internal/runtime"
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/runtime"
+	"github.com/never-labs/leia/internal/vm"
 )
 
 // runVMByName compiles the source, executes the top-level, then calls a
@@ -98,7 +98,7 @@ func makeCallExitVMForTest(t *testing.T, src string) *vm.VM {
 	return v
 }
 
-// TestEmit_Div: division always returns float (GScript/Lua semantics).
+// TestEmit_Div: division always returns float (Leia/Lua semantics).
 // func f(a, b) { return a / b } — f(10, 3) ≈ 3.333...
 func TestEmit_Div(t *testing.T) {
 	src := `func f(a, b) { return a / b }`

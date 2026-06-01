@@ -1,19 +1,19 @@
 // feedback_test.go tests type feedback collection in the VM interpreter.
-// Each test compiles GScript source, enables feedback on the proto,
+// Each test compiles Leia source, enables feedback on the proto,
 // runs via VM, then inspects proto.Feedback to verify types match expectations.
 package vm
 
 import (
-	"github.com/never-labs/gscript/internal/testutil/vmtest"
+	"github.com/never-labs/leia/internal/testutil/vmtest"
 	"testing"
 	"unsafe"
 
-	"github.com/never-labs/gscript/internal/lexer"
-	"github.com/never-labs/gscript/internal/parser"
-	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/leia/internal/lexer"
+	"github.com/never-labs/leia/internal/parser"
+	"github.com/never-labs/leia/internal/runtime"
 )
 
-// compileProto compiles GScript source and returns the proto.
+// compileProto compiles Leia source and returns the proto.
 func compileProto(t *testing.T, src string) *FuncProto {
 	t.Helper()
 	tokens, err := lexer.New(src).Tokenize()

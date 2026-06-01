@@ -5,13 +5,13 @@ package methodjit
 import (
 	"encoding/json"
 	"errors"
-	"github.com/never-labs/gscript/internal/testutil/vmtest"
+	"github.com/never-labs/leia/internal/testutil/vmtest"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/vm"
 )
 
 func TestWarmDump_ProductionRunArtifacts(t *testing.T) {
@@ -156,7 +156,7 @@ b := sum(20)
 		t.Fatalf("read JIT symbols: %v", err)
 	}
 	if len(symbols) == 0 ||
-		!strings.Contains(string(symbols), "gscript_jit::sum") ||
+		!strings.Contains(string(symbols), "leia_jit::sum") ||
 		!strings.Contains(string(symbols), "proto=sum") ||
 		!strings.Contains(string(symbols), "ir=") ||
 		!strings.Contains(string(symbols), "bcop=") {

@@ -65,7 +65,7 @@ func TestReleaseMatrixConformanceCasesHaveStatusAndClassification(t *testing.T) 
 		t.Fatalf("MANIFEST current translated passing count = %d, but table contains %d cases", manifestCount, len(manifestCases))
 	}
 	if manifestCount != len(pairs) {
-		t.Fatalf("MANIFEST current translated passing count = %d, but language conformance directory contains %d paired .lua/.gs cases", manifestCount, len(pairs))
+		t.Fatalf("MANIFEST current translated passing count = %d, but language conformance directory contains %d paired .lua/.leia cases", manifestCount, len(pairs))
 	}
 
 	var missing []string

@@ -122,7 +122,7 @@ func MulNums(dst, a, b *Value) bool {
 }
 
 func DivNums(dst, a, b *Value) bool {
-	// DIV always returns float in Lua/GScript semantics (5/2 = 2.5).
+	// DIV always returns float in Lua/Leia semantics (5/2 = 2.5).
 	if a.IsInt() && b.IsInt() {
 		*dst = FloatValue(float64(a.Int()) / float64(b.Int()))
 		return true

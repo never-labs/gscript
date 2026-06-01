@@ -10,9 +10,9 @@ permalink: /01-from-interpreter-to-tracing-jit
 
 ## The Goal
 
-GScript is a scripting language with Go syntax and Lua semantics, implemented in Go. We wanted to make it fast — specifically, we wanted to approach LuaJIT-level performance on a Xiangqi (Chinese Chess) AI benchmark that does alpha-beta search with Zobrist hashing and transposition tables.
+Leia is a scripting language with Go syntax and Lua semantics, implemented in Go. We wanted to make it fast — specifically, we wanted to approach LuaJIT-level performance on a Xiangqi (Chinese Chess) AI benchmark that does alpha-beta search with Zobrist hashing and transposition tables.
 
-The benchmark: `chess_bench_parallel.gs`, a negamax search with iterative deepening, running single-threaded and parallel (6 workers) with a 10-second time budget.
+The benchmark: `chess_bench_parallel.leia`, a negamax search with iterative deepening, running single-threaded and parallel (6 workers) with a 10-second time budget.
 
 Baseline: depth 6 single-threaded, depth 4 parallel. ~23K nodes/second.
 
@@ -26,9 +26,9 @@ Over 22 commits, we built four layers of optimization:
 
 The biggest gains came from the simplest changes:
 
-**Inline call/return** eliminated Go stack growth per GScript function call. Previously, every `OP_CALL` went through `callValue()` → `call()` → `run()` — three Go function calls creating new stack frames. We inlined this: `OP_CALL` pushes a frame and updates cached locals directly in the `run()` loop. `OP_RETURN` pops and restores. This alone gave ~30% speedup on the chess benchmark.
+**Inline call/return** eliminated Go stack growth per Leia function call. Previously, every `OP_CALL` went through `callValue()` → `call()` → `run()` — three Go function calls creating new stack frames. We inlined this: `OP_CALL` pushes a frame and updates cached locals directly in the `run()` loop. `OP_RETURN` pops and restores. This alone gave ~30% speedup on the chess benchmark.
 
-**Global variable indexing** replaced `map[string]Value` with `[]Value` for globals. Every function call in GScript starts with `OP_GETGLOBAL` to fetch the function. With a string-keyed map, that's ~50ns per lookup (hash + compare). With an indexed array + lazy `GlobalCache` per FuncProto, it's ~2ns. The cache resolves the string name to an array index on first access; subsequent accesses are O(1).
+**Global variable indexing** replaced `map[string]Value` with `[]Value` for globals. Every function call in Leia starts with `OP_GETGLOBAL` to fetch the function. With a string-keyed map, that's ~50ns per lookup (hash + compare). With an indexed array + lazy `GlobalCache` per FuncProto, it's ~2ns. The cache resolves the string name to an array index on first access; subsequent accesses are O(1).
 
 **Compact Value (56→32 bytes)** merged `ival int64` and `fval float64` into a single `data uint64` field (floats stored via `math.Float64bits`). Every register copy, table lookup, and function argument is a Value copy — halving the size from 56 to 32 bytes reduced memory bandwidth across the board.
 

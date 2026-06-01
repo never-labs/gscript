@@ -1,12 +1,12 @@
-# GScript Production Roadmap
+# Leia Production Roadmap
 
-This roadmap tracks the work needed to make GScript viable both as an embedded
+This roadmap tracks the work needed to make Leia viable both as an embedded
 Go scripting language and as a standalone programming language. It is organized
 around release readiness rather than benchmark milestones.
 
 ## Release Goal
 
-GScript should become a small, predictable, embeddable language with:
+Leia should become a small, predictable, embeddable language with:
 
 - stable language semantics and documented intentional differences from Lua;
 - a public Go API that can be used without depending on `internal/*`;
@@ -22,11 +22,11 @@ GScript should become a small, predictable, embeddable language with:
 
 | Area | Primary doc | Release question |
 |---|---|---|
-| Language semantics | `docs/language-spec.md` | What does a valid GScript program mean, and where does it intentionally differ from Lua? |
+| Language semantics | `docs/language-spec.md` | What does a valid Leia program mean, and where does it intentionally differ from Lua? |
 | Go embedding API | `docs/embedding.md` | Can a Go host safely compile, run, call, bind, cancel, and sandbox scripts using stable public APIs? |
 | Standard library | `docs/stdlib.md` | Which host capabilities are available, what are their contracts, and how are errors represented? |
 | Security and isolation | `docs/security.md` | Can hosts bound CPU, memory, recursion, goroutines, IO, network, process execution, and module access? |
-| Tooling | `docs/tooling.md` | Can users format, lint, test, benchmark, diagnose, and package GScript projects? |
+| Tooling | `docs/tooling.md` | Can users format, lint, test, benchmark, diagnose, and package Leia projects? |
 | Performance and JIT | `docs/performance.md` | Are performance wins validated by correctness oracles and stable benchmark guardrails? |
 | Release engineering | `docs/release.md` | Can the project ship versioned artifacts with documented compatibility and support policy? |
 
@@ -54,7 +54,7 @@ The embedding API cannot be stable if the behavior underneath it is implicit;
 formatter/linter cannot be correct without grammar; sandboxing cannot be
 defined without a capability and behavior surface.
 
-- Maintain `docs/language-spec.md` as the source of truth for GScript grammar,
+- Maintain `docs/language-spec.md` as the source of truth for Leia grammar,
   operator precedence, statements, value behavior, errors, modules, tables,
   coroutines, channels, stdlib, and VM/JIT semantic gates.
 - Treat parser behavior that is not written in the spec as implementation
@@ -74,8 +74,8 @@ Exit criteria:
   to stable, and split detailed appendices only when the main spec becomes too
   large to review.
 - Define the public embedding surface before adding more host-facing features.
-- Convert the missing-capabilities ledger into GScript-native backlog items.
-- Make official translated tests and GScript-specific tests part of the same
+- Convert the missing-capabilities ledger into Leia-native backlog items.
+- Make official translated tests and Leia-specific tests part of the same
   correctness matrix.
 
 Exit criteria:
@@ -87,7 +87,7 @@ Exit criteria:
 
 ### Phase 2: Host API and Safety
 
-- Introduce stable `gscript` package APIs for engine creation, compilation,
+- Introduce stable `leia` package APIs for engine creation, compilation,
   function calls, value conversion, module loading, and host function binding.
 - Add context cancellation and resource budget plumbing that VM and JIT both
   honor.
@@ -98,13 +98,13 @@ Exit criteria:
 
 Exit criteria:
 
-- examples can embed GScript without importing internal packages;
+- examples can embed Leia without importing internal packages;
 - sandbox defaults deny filesystem/network/process unless explicitly granted;
 - timeout/cancel tests cover interpreter, VM, and JIT paths.
 
 ### Phase 3: Toolchain and Testability
 
-- Add a first-class test runner for `.gs` files with golden output and expected
+- Add a first-class test runner for `.leia` files with golden output and expected
   error support.
 - Add formatter/linter decisions, even if initial implementation is minimal.
 - Normalize benchmark harness timing sources and low-resolution handling.
@@ -145,7 +145,7 @@ Exit criteria:
 
 Exit criteria:
 
-- a new user can install, run, embed, test, and debug GScript from docs alone;
+- a new user can install, run, embed, test, and debug Leia from docs alone;
 - release notes identify compatibility changes and known limitations;
 - supported platforms and unsupported JIT platforms are explicit.
 

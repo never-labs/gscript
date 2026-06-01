@@ -5,7 +5,7 @@ package methodjit
 import (
 	"os"
 
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/vm"
 )
 
 // jitUnsupportedMultiReturn reports whether proto uses return forms that the
@@ -63,8 +63,8 @@ func jitTier2CallableGate(proto *vm.FuncProto) GateResult {
 }
 
 func jitSemanticGateEnabled() bool {
-	return os.Getenv("GSCRIPT_OFFICIAL_CHECK_JIT") == "1" ||
-		os.Getenv("GSCRIPT_JIT_SEMANTIC_GATE") == "1"
+	return os.Getenv("LEIA_OFFICIAL_CHECK_JIT") == "1" ||
+		os.Getenv("LEIA_JIT_SEMANTIC_GATE") == "1"
 }
 
 func jitUnsupportedClosureArithmetic(proto *vm.FuncProto) bool {

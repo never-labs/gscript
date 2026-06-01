@@ -1,0 +1,43 @@
+print("case:main_vm_loader_more")
+
+base := fs.tempfile(nil, "leia_loader_vm_")
+assert(type(base) == "string")
+fs.remove(base)
+assert(fs.mkdirAll(base))
+defer fs.removeAll(base)
+
+oldDir := script.setDir(base)
+defer script.setDir(oldDir)
+
+modulePath := path.join(base, "mod.leia")
+assert(fs.writefile(modulePath, `count = count + 1
+return {value: count}`))
+
+count := 40
+mod := require("mod")
+assert(mod.value == 41)
+assert(count == 41)
+assert(require("mod") == mod)
+assert(package.loaded.mod == mod)
+
+direct := dofile("mod.leia")
+assert(direct.value == 42)
+assert(count == 42)
+
+fn, err := load("return count + 1")
+assert(type(fn) == "function")
+assert(err == nil)
+assert(fn() == 43)
+
+loaded, loadErr := loadfile("mod.leia")
+assert(type(loaded) == "function")
+assert(loadErr == nil)
+again := loaded()
+assert(again.value == 43)
+assert(count == 43)
+
+missing, missingErr := loadfile("missing.leia")
+assert(missing == nil)
+assert(type(missingErr) == "string")
+
+print("ok")

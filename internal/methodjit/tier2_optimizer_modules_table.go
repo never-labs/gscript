@@ -1,6 +1,6 @@
 package methodjit
 
-import "github.com/never-labs/gscript/internal/vm"
+import "github.com/never-labs/leia/internal/vm"
 
 func init() {
 	RegisterModuleBuilder(Tier2PhaseTableObjectPrep, 50, func(ctx *Tier2OptimizerContext) []Tier2OptimizerModule {

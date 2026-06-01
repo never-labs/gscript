@@ -3,7 +3,7 @@ package methodjit
 import (
 	"testing"
 
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/vm"
 )
 
 func buildForParamTypeGuardTest(t *testing.T, src string) *Function {

@@ -5,7 +5,7 @@ usage() {
   cat <<'USAGE'
 Usage: scripts/release_artifacts.sh [--output-dir DIR] [--version VERSION] [--dry-run]
 
-Build the current-platform gscript CLI release artifact locally.
+Build the current-platform leia CLI release artifact locally.
 
 Options:
   -o, --output-dir DIR  Write artifacts under DIR instead of dist/
@@ -16,8 +16,8 @@ Options:
   -h, --help            Show this help
 
 Outputs:
-  DIR/gscript_<version>_<goos>_<goarch>[.exe]
-  DIR/gscript_<version>_<goos>_<goarch>_metadata.txt
+  DIR/leia_<version>_<goos>_<goarch>[.exe]
+  DIR/leia_<version>_<goos>_<goarch>_metadata.txt
   DIR/SHA256SUMS
 
 This script only writes local files. It does not tag, publish, or upload.
@@ -139,7 +139,7 @@ if [[ "$goos" == "windows" ]]; then
   exe_ext=".exe"
 fi
 
-artifact_base="gscript_${version}_${goos}_${goarch}"
+artifact_base="leia_${version}_${goos}_${goarch}"
 binary_name="${artifact_base}${exe_ext}"
 metadata_name="${artifact_base}_metadata.txt"
 binary_path="$out_dir/$binary_name"
@@ -178,7 +178,7 @@ if [[ "$dry_run" == "true" ]]; then
 fi
 
 echo "building $binary_name"
-go build -trimpath -ldflags="-s -w" -o "$binary_path" ./cmd/gscript
+go build -trimpath -ldflags="-s -w" -o "$binary_path" ./cmd/leia
 
 write_metadata >"$metadata_path"
 

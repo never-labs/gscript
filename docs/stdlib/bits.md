@@ -1,7 +1,7 @@
 # bits
 
 The `bits` library provides Go-style 64-bit integer bit operations. Inputs are
-converted to integers; results are returned as GScript integers.
+converted to integers; results are returned as Leia integers.
 
 ## Functions
 
@@ -75,7 +75,7 @@ Return the number of trailing zero bits in the `uint64` representation.
 
 ## Expression Syntax
 
-GScript also supports bitwise operators directly in expressions:
+Leia also supports bitwise operators directly in expressions:
 
 | Operator | Meaning |
 |----------|---------|

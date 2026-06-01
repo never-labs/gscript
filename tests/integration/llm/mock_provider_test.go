@@ -1,9 +1,9 @@
-package gscript_test
+package leia_test
 
 import (
 	"context"
 
-	"github.com/never-labs/gscript/llm"
+	"github.com/never-labs/leia/llm"
 )
 
 type mockLLMProvider struct {

@@ -8,12 +8,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/never-labs/gscript/internal/lexer"
-	"github.com/never-labs/gscript/internal/parser"
-	"github.com/never-labs/gscript/internal/stdlibrt"
+	"github.com/never-labs/leia/internal/lexer"
+	"github.com/never-labs/leia/internal/parser"
+	"github.com/never-labs/leia/internal/stdlibrt"
 )
 
-// runWithFSPath creates a temp dir and runs GScript source with the fs lib registered.
+// runWithFSPath creates a temp dir and runs Leia source with the fs lib registered.
 // Returns the interpreter and the temp dir path (caller should defer os.RemoveAll(tmpDir)).
 func runWithFSPath(t *testing.T, src string) (*Interpreter, string) {
 	t.Helper()
@@ -27,7 +27,7 @@ func runWithFSPath(t *testing.T, src string) (*Interpreter, string) {
 
 func runWithFSPathCaps(t *testing.T, src string, read, write bool) (*Interpreter, string, error) {
 	t.Helper()
-	tmpDir, err := os.MkdirTemp("", "gscript_fs_test_")
+	tmpDir, err := os.MkdirTemp("", "leia_fs_test_")
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
@@ -110,7 +110,7 @@ func TestFS_WriteCapabilityRequired(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tmpDir, err := os.MkdirTemp("", "gscript_fs_test_")
+			tmpDir, err := os.MkdirTemp("", "leia_fs_test_")
 			if err != nil {
 				t.Fatalf("failed to create temp dir: %v", err)
 			}

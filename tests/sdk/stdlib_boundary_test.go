@@ -1,4 +1,4 @@
-package gscript_test
+package leia_test
 
 import (
 	"go/ast"
@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/never-labs/gscript/internal/stdlib/catalog"
+	"github.com/never-labs/leia/internal/stdlib/catalog"
 )
 
 func TestInternalStdlibLayerStaysBelowRuntime(t *testing.T) {
@@ -31,8 +31,8 @@ func TestInternalStdlibLayerStaysBelowRuntime(t *testing.T) {
 	}
 	forEachGoFile(t, stdlibRoot, func(path string) {
 		for _, importPath := range parseImports(t, path) {
-			if importPath == "github.com/never-labs/gscript/internal/runtime" ||
-				strings.HasPrefix(importPath, "github.com/never-labs/gscript/internal/runtime/") {
+			if importPath == "github.com/never-labs/leia/internal/runtime" ||
+				strings.HasPrefix(importPath, "github.com/never-labs/leia/internal/runtime/") {
 				t.Fatalf("%s imports %s; internal/stdlib must stay pure and below runtime adapters", relativeToRoot(t, path), importPath)
 			}
 		}
@@ -47,9 +47,9 @@ func TestRuntimeDoesNotImportHostedProviderImplementations(t *testing.T) {
 			return
 		}
 		for _, importPath := range parseImports(t, path) {
-			if importPath == "github.com/never-labs/gscript/llm/openai" ||
-				importPath == "github.com/never-labs/gscript/llm/anthropic" ||
-				importPath == "github.com/never-labs/gscript/llm/command" {
+			if importPath == "github.com/never-labs/leia/llm/openai" ||
+				importPath == "github.com/never-labs/leia/llm/anthropic" ||
+				importPath == "github.com/never-labs/leia/llm/command" {
 				t.Fatalf("%s imports provider implementation %s; runtime should depend on protocol/adapter surfaces, not hosted provider packages", relativeToRoot(t, path), importPath)
 			}
 		}
@@ -64,8 +64,8 @@ func TestRuntimeDoesNotImportStdlibImplementations(t *testing.T) {
 			return
 		}
 		for _, importPath := range parseImports(t, path) {
-			if importPath == "github.com/never-labs/gscript/internal/stdlib" ||
-				strings.HasPrefix(importPath, "github.com/never-labs/gscript/internal/stdlib/") {
+			if importPath == "github.com/never-labs/leia/internal/stdlib" ||
+				strings.HasPrefix(importPath, "github.com/never-labs/leia/internal/stdlib/") {
 				t.Fatalf("%s imports %s; runtime must depend on shared substrates or stdlibrt adapters, not stdlib implementation packages", relativeToRoot(t, path), importPath)
 			}
 		}

@@ -11,7 +11,7 @@ import (
 	"testing"
 	"unsafe"
 
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/vm"
 )
 
 // R29 baseline: fib is currently regressed; this fixture sentinels the self-call
@@ -22,15 +22,15 @@ import (
 const fibTotalInsnBaseline = 639
 
 func TestDumpTier1_FibBody(t *testing.T) {
-	srcBytes, err := os.ReadFile("../../benchmarks/recursion/fib.gs")
+	srcBytes, err := os.ReadFile("../../benchmarks/recursion/fib.leia")
 	if err != nil {
-		t.Fatalf("read fib.gs: %v", err)
+		t.Fatalf("read fib.leia: %v", err)
 	}
 	top := compileTop(t, string(srcBytes))
 
 	target := findProtoByName(top, "fib")
 	if target == nil {
-		t.Fatalf("function 'fib' not found in fib.gs")
+		t.Fatalf("function 'fib' not found in fib.leia")
 	}
 	t.Logf("=== fib (numParams=%d, maxStack=%d, bytecode len=%d) ===",
 		target.NumParams, target.MaxStack, len(target.Code))
@@ -72,7 +72,7 @@ func TestDumpTier1_FibBody(t *testing.T) {
 	out := make([]byte, size)
 	copy(out, src)
 
-	outPath := "/tmp/gscript_fib_tier1.bin"
+	outPath := "/tmp/leia_fib_tier1.bin"
 	if err := os.WriteFile(outPath, out, 0o644); err != nil {
 		t.Fatalf("write %s: %v", outPath, err)
 	}

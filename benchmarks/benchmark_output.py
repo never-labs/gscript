@@ -66,9 +66,9 @@ def run_text_command(cmd: list[str], timeout: float, env: dict[str, str] | None 
     return TextCommandResult(proc.stdout, status, proc.returncode, wall)
 
 
-def build_gscript(root: Path, out: Path, failure_message: str | None = None) -> None:
+def build_leia(root: Path, out: Path, failure_message: str | None = None) -> None:
     proc = subprocess.run(
-        ["go", "build", "-o", str(out), "./cmd/gscript"],
+        ["go", "build", "-o", str(out), "./cmd/leia"],
         cwd=root,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
@@ -94,22 +94,22 @@ def markdown_section(title: str, header: str | None = None, separator: str | Non
     return lines
 
 
-def gscript_mode_command(mode: str, gscript_bin: Path, script: Path) -> tuple[list[str], dict[str, str]]:
+def leia_mode_command(mode: str, leia_bin: Path, script: Path) -> tuple[list[str], dict[str, str]]:
     env = os.environ.copy()
     if mode == "vm":
-        return [str(gscript_bin), "-vm", str(script)], env
+        return [str(leia_bin), "-vm", str(script)], env
     if mode == "default":
-        return [str(gscript_bin), "-jit", "-jit-stats", "-exit-stats", str(script)], env
+        return [str(leia_bin), "-jit", "-jit-stats", "-exit-stats", str(script)], env
     if mode == "no_filter":
-        env["GSCRIPT_TIER2_NO_FILTER"] = "1"
-        return [str(gscript_bin), "-jit", "-jit-stats", "-exit-stats", str(script)], env
+        env["LEIA_TIER2_NO_FILTER"] = "1"
+        return [str(leia_bin), "-jit", "-jit-stats", "-exit-stats", str(script)], env
     raise ValueError(f"unknown mode: {mode}")
 
 
 def benchmark_mode_command(
     mode: str,
-    gscript_bin: Path | None,
-    gscript_script: Path | None,
+    leia_bin: Path | None,
+    leia_script: Path | None,
     luajit_bin: str | None = None,
     luajit_script: Path | None = None,
 ) -> tuple[list[str] | None, dict[str, str] | None, str | None]:
@@ -120,7 +120,7 @@ def benchmark_mode_command(
             return None, None, "missing"
         return [luajit_bin, str(luajit_script)], None, None
 
-    if gscript_bin is None or gscript_script is None or not gscript_script.exists():
+    if leia_bin is None or leia_script is None or not leia_script.exists():
         return None, None, "missing"
-    cmd, env = gscript_mode_command(mode, gscript_bin, gscript_script)
+    cmd, env = leia_mode_command(mode, leia_bin, leia_script)
     return cmd, env, None

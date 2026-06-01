@@ -9,9 +9,9 @@ package methodjit
 import (
 	"unsafe"
 
-	"github.com/never-labs/gscript/internal/jit"
-	gruntime "github.com/never-labs/gscript/internal/runtime"
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/jit"
+	gruntime "github.com/never-labs/leia/internal/runtime"
+	"github.com/never-labs/leia/internal/vm"
 )
 
 const (

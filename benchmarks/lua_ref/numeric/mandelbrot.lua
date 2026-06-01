@@ -1,7 +1,7 @@
 -- Benchmark: Mandelbrot Set
 -- Tests: floating-point loops, conditional branching, nested iteration
 -- Counts pixels in the Mandelbrot set for an NxN grid
--- Lua reference implementation for the matching GScript benchmark.
+-- Lua reference implementation for the matching Leia benchmark.
 
 local function mandelbrot(size)
     local count = 0

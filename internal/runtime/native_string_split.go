@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"unsafe"
 
-	stdlibstring "github.com/never-labs/gscript/internal/support/stringlib"
+	stdlibstring "github.com/never-labs/leia/internal/support/stringlib"
 )
 
 // native_string_split.go holds runtime-owned native string.split helpers:

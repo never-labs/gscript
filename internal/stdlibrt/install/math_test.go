@@ -3,8 +3,8 @@ package install
 import (
 	"testing"
 
-	"github.com/never-labs/gscript/internal/runtime"
-	"github.com/never-labs/gscript/internal/stdlibrt"
+	"github.com/never-labs/leia/internal/runtime"
+	"github.com/never-labs/leia/internal/stdlibrt"
 )
 
 func TestInstallModulesRegistersMathFromStdlibrt(t *testing.T) {

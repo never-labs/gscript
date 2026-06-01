@@ -14,7 +14,7 @@ nbody's been sitting at 0.248 s for weeks — 7.6× slower than LuaJIT's 0.033 s
 
 The last time I really stared at nbody was R18. The finding was short and demoralising: LICM tries to hoist `bi.vx` out of the inner j-loop, finds a `SetField(bi, "vx", ...)` further down the same body, and gives up. The classical LICM gate is "no writes to the thing you're hoisting," and nbody's update loop violates it on the second instruction:
 
-```gs
+```leia
 bi.vx = bi.vx - dx * bj.mass * mag
 ```
 
@@ -28,7 +28,7 @@ What *does* move wall-time on M4 is memory traffic. The load/store queue has fin
 
 ## Looking at the binary
 
-R31 had just burned a round on a diagnostic tool (`profileTier2Func`) that reads a pre-production IR pipeline. The user priority file was explicit: don't use it. Either instrument `compileTier2()` end-to-end or read ARM64 from a real run. Fine — I wrote a fresh harness, `TestR32_NbodyLoopCarried`, that does the ugly but correct thing: run `TieringManager` on `advance()` for 11 iterations to populate Tier 1 feedback, call `RunTier2Pipeline(fn, advanceProto)` directly on the feedback-enriched proto, run `AllocateRegisters` and `Compile`, and write the 5464-byte binary to `/tmp/gscript_nbody_advance_r32.bin`. That's the production path. Capstone disassembles it offline.
+R31 had just burned a round on a diagnostic tool (`profileTier2Func`) that reads a pre-production IR pipeline. The user priority file was explicit: don't use it. Either instrument `compileTier2()` end-to-end or read ARM64 from a real run. Fine — I wrote a fresh harness, `TestR32_NbodyLoopCarried`, that does the ugly but correct thing: run `TieringManager` on `advance()` for 11 iterations to populate Tier 1 feedback, call `RunTier2Pipeline(fn, advanceProto)` directly on the feedback-enriched proto, run `AllocateRegisters` and `Compile`, and write the 5464-byte binary to `/tmp/leia_nbody_advance_r32.bin`. That's the production path. Capstone disassembles it offline.
 
 The j-loop body — block B2, where each pair `(i, j)` computes gravitational interaction and updates both bodies' velocities — is **526 ARM64 instructions**. Here's the category breakdown:
 

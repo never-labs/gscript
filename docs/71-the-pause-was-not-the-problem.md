@@ -50,7 +50,7 @@ That is not a typo. The method JIT was slightly slower than the VM on the
 benchmark that allocates and traverses millions of tiny `{left, right}` tables.
 
 The tempting explanation is Go GC. `binary_trees` is a classic allocation and
-collector benchmark. LuaJIT is good at it. GScript stores tables as Go objects,
+collector benchmark. LuaJIT is good at it. Leia stores tables as Go objects,
 wraps them in NaN-boxed values, and keeps hidden Go pointers alive through a
 root log. If anything should expose Go GC as a problem, it is this benchmark.
 
@@ -130,7 +130,7 @@ LuaJIT does not win `binary_trees` because it has a magic peephole for a
 recursive tree function. It wins because the object model, allocator, write
 barriers, collector, and machine code all belong to the same runtime.
 
-GScript currently has a split personality:
+Leia currently has a split personality:
 
 ```
 the JIT wants raw machine-level values

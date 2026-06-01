@@ -1,6 +1,6 @@
 package methodjit
 
-import "github.com/never-labs/gscript/internal/vm"
+import "github.com/never-labs/leia/internal/vm"
 
 // TableIntArraySpecializationPass recognizes small whole-region int-array specializations
 // whose scalar fallback remains present in the CFG. It handles the

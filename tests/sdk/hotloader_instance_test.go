@@ -1,15 +1,15 @@
-package gscript_test
+package leia_test
 
 import (
 	"path/filepath"
 	"testing"
 
-	gs "github.com/never-labs/gscript"
+	leia "github.com/never-labs/leia"
 )
 
 func TestHotInstanceReloadPreservesScalarStateAndReplacesFunction(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "logic.gs")
+	path := filepath.Join(dir, "logic.leia")
 	writeScript(t, path, `
 counter := 0
 func inc() {
@@ -18,7 +18,7 @@ func inc() {
 }
 `)
 
-	loader := gs.NewHotLoader()
+	loader := leia.NewHotLoader()
 	inst, err := loader.LoadInstance(path)
 	if err != nil {
 		t.Fatal(err)
@@ -45,7 +45,7 @@ func inc() {
 
 func TestHotInstanceReloadIfChangedDoesNotReplayTopLevel(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "logic.gs")
+	path := filepath.Join(dir, "logic.leia")
 	writeScript(t, path, `
 loaded := 0
 loaded += 1
@@ -54,7 +54,7 @@ func count_loaded() {
 }
 `)
 
-	inst, err := gs.NewHotLoader().LoadInstance(path)
+	inst, err := leia.NewHotLoader().LoadInstance(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -88,7 +88,7 @@ func count_loaded() {
 
 func TestHotInstanceReloadPreservesTableIdentity(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "logic.gs")
+	path := filepath.Join(dir, "logic.leia")
 	writeScript(t, path, `
 state := { total: 0 }
 func add(v) {
@@ -97,7 +97,7 @@ func add(v) {
 }
 `)
 
-	inst, err := gs.NewHotLoader().LoadInstance(path)
+	inst, err := leia.NewHotLoader().LoadInstance(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -118,7 +118,7 @@ func add(v) {
 
 func TestHotInstanceReloadMergesTableDefaultsAndMethods(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "logic.gs")
+	path := filepath.Join(dir, "logic.leia")
 	writeScript(t, path, `
 api := {
 	total: 0,
@@ -135,7 +135,7 @@ func get_bonus() {
 }
 `)
 
-	inst, err := gs.NewHotLoader().LoadInstance(path)
+	inst, err := leia.NewHotLoader().LoadInstance(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -166,7 +166,7 @@ func get_bonus() {
 
 func TestHotInstanceReloadAddsNewDefaultsWithoutResettingOldState(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "logic.gs")
+	path := filepath.Join(dir, "logic.leia")
 	writeScript(t, path, `
 counter := 0
 func inc() {
@@ -175,7 +175,7 @@ func inc() {
 }
 `)
 
-	inst, err := gs.NewHotLoader().LoadInstance(path)
+	inst, err := leia.NewHotLoader().LoadInstance(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -197,7 +197,7 @@ func inc() {
 
 func TestHotInstanceReloadSkipsUnchangedFunctionDeclarations(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "logic.gs")
+	path := filepath.Join(dir, "logic.leia")
 	writeScript(t, path, `
 seed := 0
 make_counter := func() {
@@ -213,7 +213,7 @@ func next_value() {
 }
 `)
 
-	inst, err := gs.NewHotLoader().LoadInstance(path)
+	inst, err := leia.NewHotLoader().LoadInstance(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -243,10 +243,10 @@ extra := 42
 
 func TestHotInstanceGenerationTracksAppliedInstanceOnly(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "logic.gs")
+	path := filepath.Join(dir, "logic.leia")
 	writeScript(t, path, `func answer() { return 1 }`)
 
-	loader := gs.NewHotLoader()
+	loader := leia.NewHotLoader()
 	inst, err := loader.LoadInstance(path)
 	if err != nil {
 		t.Fatal(err)
@@ -269,7 +269,7 @@ func TestHotInstanceGenerationTracksAppliedInstanceOnly(t *testing.T) {
 
 func TestHotInstanceReloadDoesNotDeleteMissingFunctions(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "logic.gs")
+	path := filepath.Join(dir, "logic.leia")
 	writeScript(t, path, `
 counter := 0
 func inc() {
@@ -278,7 +278,7 @@ func inc() {
 }
 `)
 
-	inst, err := gs.NewHotLoader().LoadInstance(path)
+	inst, err := leia.NewHotLoader().LoadInstance(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -298,7 +298,7 @@ extra := 5
 
 func TestHotInstanceReloadWorksWithBytecodeVM(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "logic.gs")
+	path := filepath.Join(dir, "logic.leia")
 	writeScript(t, path, `
 counter := 1
 func value() {
@@ -307,7 +307,7 @@ func value() {
 }
 `)
 
-	loader := gs.NewHotLoader(gs.WithHotLoaderVMOptions(gs.WithVM()))
+	loader := leia.NewHotLoader(leia.WithHotLoaderVMOptions(leia.WithVM()))
 	inst, err := loader.LoadInstance(path)
 	if err != nil {
 		t.Fatal(err)
@@ -329,7 +329,7 @@ func value() {
 
 func TestHotInstanceCallDoesNotReplayTopLevel(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "logic.gs")
+	path := filepath.Join(dir, "logic.leia")
 	writeScript(t, path, `
 loaded := 0
 loaded += 1
@@ -338,7 +338,7 @@ func count_loaded() {
 }
 `)
 
-	inst, err := gs.NewHotLoader().LoadInstance(path)
+	inst, err := leia.NewHotLoader().LoadInstance(path)
 	if err != nil {
 		t.Fatal(err)
 	}

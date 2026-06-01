@@ -1,4 +1,4 @@
-package gscript_test
+package leia_test
 
 import (
 	"context"
@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	gs "github.com/never-labs/gscript"
-	"github.com/never-labs/gscript/llm"
+	leia "github.com/never-labs/leia"
+	"github.com/never-labs/leia/llm"
 )
 
 func TestLLMRecorderAndReplay(t *testing.T) {
@@ -17,10 +17,10 @@ func TestLLMRecorderAndReplay(t *testing.T) {
 		Usage:  llm.TurnUsage{InputTokens: 5, OutputTokens: 6},
 	}}
 	var records []llm.Record
-	vm := gs.New(
-		gs.WithLibs(gs.LibString|gs.LibLLM),
-		gs.WithLLMProvider(provider),
-		gs.WithLLMRecorder(func(record llm.Record) {
+	vm := leia.New(
+		leia.WithLibs(leia.LibString|leia.LibLLM),
+		leia.WithLLMProvider(provider),
+		leia.WithLLMRecorder(func(record llm.Record) {
 			records = append(records, record)
 		}),
 	)
@@ -37,9 +37,9 @@ text := result.text
 	if len(records) != 1 || records[0].Request.Model != "mock-fast" || records[0].Result.Text != "recorded" {
 		t.Fatalf("records = %#v", records)
 	}
-	replay := gs.New(
-		gs.WithLibs(gs.LibString|gs.LibLLM),
-		gs.WithLLMReplay(records),
+	replay := leia.New(
+		leia.WithLibs(leia.LibString|leia.LibLLM),
+		leia.WithLLMReplay(records),
 	)
 	if err := replay.Exec(`
 result, err := llm.turn({
@@ -65,10 +65,10 @@ func TestLLMRecorderHelper(t *testing.T) {
 		Text:   "recorded",
 	}}
 	recorder := llm.NewRecorder()
-	vm := gs.New(
-		gs.WithLibs(gs.LibString|gs.LibLLM),
-		gs.WithLLMProvider(provider),
-		gs.WithLLMRecorder(recorder.Record),
+	vm := leia.New(
+		leia.WithLibs(leia.LibString|leia.LibLLM),
+		leia.WithLLMProvider(provider),
+		leia.WithLLMRecorder(recorder.Record),
 	)
 	if err := vm.Exec(`
 result, err := llm.turn({
@@ -113,7 +113,7 @@ func TestLLMReplayRejectsMismatchedRequest(t *testing.T) {
 		},
 		Result: llm.TurnResult{Status: "final_answer", Text: "ok"},
 	}}
-	vm := gs.New(gs.WithLibs(gs.LibString|gs.LibLLM), gs.WithLLMReplay(records))
+	vm := leia.New(leia.WithLibs(leia.LibString|leia.LibLLM), leia.WithLLMReplay(records))
 	if err := vm.Exec(`
 result, err := llm.turn({
     model: "mock-fast",
@@ -223,7 +223,7 @@ func TestLLMRecordJSONRoundTrip(t *testing.T) {
 			Calls: []llm.ToolCall{{
 				ID:   "call_1",
 				Tool: "lookup",
-				Args: map[string]any{"name": "gscript", "limit": int64(3)},
+				Args: map[string]any{"name": "leia", "limit": int64(3)},
 			}},
 		},
 	}}

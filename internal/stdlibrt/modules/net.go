@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	hosthttp "github.com/never-labs/gscript/internal/stdlib/http"
-	"github.com/never-labs/gscript/internal/stdlibrt"
+	hosthttp "github.com/never-labs/leia/internal/stdlib/http"
+	"github.com/never-labs/leia/internal/stdlibrt"
 )
 
 // BuildNet creates the "net" standard library table for HTTP client operations.
@@ -141,7 +141,7 @@ func BuildNet(opts stdlibrt.HostOptions) *Table {
 	return t
 }
 
-// netDoRequest performs an HTTP request and returns a GScript response table.
+// netDoRequest performs an HTTP request and returns a Leia response table.
 func netDoRequest(maxHostResult func() int64, method, url, body string, opts Value) ([]Value, error) {
 	// Build the request
 	var bodyReader io.Reader
@@ -228,7 +228,7 @@ func netDoRequest(maxHostResult func() int64, method, url, body string, opts Val
 			if err := json.Unmarshal(bodyBytes, &data); err != nil {
 				return []Value{NilValue(), StringValue(err.Error())}, nil
 			}
-			return []Value{goToGScript(data)}, nil
+			return []Value{goToLeia(data)}, nil
 		},
 	}))
 

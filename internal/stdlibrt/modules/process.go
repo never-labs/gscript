@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/never-labs/gscript/internal/runtime"
-	"github.com/never-labs/gscript/internal/stdlibrt"
-	"github.com/never-labs/gscript/internal/support"
+	"github.com/never-labs/leia/internal/runtime"
+	"github.com/never-labs/leia/internal/stdlibrt"
+	"github.com/never-labs/leia/internal/support"
 )
 
 // BuildProcessWithPolicy creates the "process" standard library table.

@@ -1,4 +1,4 @@
-package gscript_test
+package leia_test
 
 import (
 	"fmt"
@@ -7,11 +7,11 @@ import (
 	"strings"
 	"testing"
 
-	gs "github.com/never-labs/gscript"
+	leia "github.com/never-labs/leia"
 )
 
 func TestWithFilesystemFalseRemovesFilesystemGlobals(t *testing.T) {
-	vm := gs.New(gs.WithFilesystem(false))
+	vm := leia.New(leia.WithFilesystem(false))
 	for _, name := range []string{"fs", "dofile", "loadfile"} {
 		got, err := vm.Get(name)
 		if err != nil {
@@ -25,7 +25,7 @@ func TestWithFilesystemFalseRemovesFilesystemGlobals(t *testing.T) {
 
 func TestWithFilesystemFalseClearsRootEnabledFilesystem(t *testing.T) {
 	root := t.TempDir()
-	vm := gs.New(gs.WithFilesystemRoot(root), gs.WithFilesystem(false))
+	vm := leia.New(leia.WithFilesystemRoot(root), leia.WithFilesystem(false))
 	for _, name := range []string{"fs", "dofile", "loadfile"} {
 		got, err := vm.Get(name)
 		if err != nil {
@@ -40,17 +40,17 @@ func TestWithFilesystemFalseClearsRootEnabledFilesystem(t *testing.T) {
 func TestWithFilesystemWriteFalseBlocksOSFileMutation(t *testing.T) {
 	for _, tc := range []struct {
 		name string
-		opts []gs.Option
+		opts []leia.Option
 	}{
 		{name: "interpreter"},
-		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			opts := append([]gs.Option{
-				gs.WithLibs(gs.LibString | gs.LibOS),
-				gs.WithFilesystemWrite(false),
+			opts := append([]leia.Option{
+				leia.WithLibs(leia.LibString | leia.LibOS),
+				leia.WithFilesystemWrite(false),
 			}, tc.opts...)
-			vm := gs.New(opts...)
+			vm := leia.New(opts...)
 			for _, src := range []string{
 				`ok := os.remove("blocked.txt")`,
 				`ok := os.rename("old.txt", "new.txt")`,
@@ -68,22 +68,22 @@ func TestWithFilesystemWriteFalseBlocksOSFileMutation(t *testing.T) {
 func TestWithFilesystemCapabilitiesGateIOLibFiles(t *testing.T) {
 	for _, tc := range []struct {
 		name string
-		opts []gs.Option
+		opts []leia.Option
 	}{
 		{name: "interpreter"},
-		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			root := t.TempDir()
 			if err := os.WriteFile(filepath.Join(root, "in.txt"), []byte("hello"), 0644); err != nil {
 				t.Fatal(err)
 			}
-			readOnly := append([]gs.Option{
-				gs.WithLibs(gs.LibString | gs.LibIO),
-				gs.WithFilesystemRoot(root),
-				gs.WithFilesystemWrite(false),
+			readOnly := append([]leia.Option{
+				leia.WithLibs(leia.LibString | leia.LibIO),
+				leia.WithFilesystemRoot(root),
+				leia.WithFilesystemWrite(false),
 			}, tc.opts...)
-			vm := gs.New(readOnly...)
+			vm := leia.New(readOnly...)
 			if err := vm.Exec(`f := io.open("in.txt", "r"); data := f:read("a"); f:close()`); err != nil {
 				t.Fatalf("io.open read in read-only filesystem failed: %v", err)
 			}
@@ -105,12 +105,12 @@ func TestWithFilesystemCapabilitiesGateIOLibFiles(t *testing.T) {
 				}
 			}
 
-			writeOnly := append([]gs.Option{
-				gs.WithLibs(gs.LibString | gs.LibIO),
-				gs.WithFilesystemRoot(root),
-				gs.WithFilesystemRead(false),
+			writeOnly := append([]leia.Option{
+				leia.WithLibs(leia.LibString | leia.LibIO),
+				leia.WithFilesystemRoot(root),
+				leia.WithFilesystemRead(false),
 			}, tc.opts...)
-			vm = gs.New(writeOnly...)
+			vm = leia.New(writeOnly...)
 			if err := vm.Exec(`f := io.open("out.txt", "w"); f:write("ok"); f:close()`); err != nil {
 				t.Fatalf("io.open write in write-only filesystem failed: %v", err)
 			}
@@ -134,7 +134,7 @@ func TestWithFilesystemReadOnlyAllowsReadAndBlocksWrite(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vm := gs.New(gs.WithLibs(gs.LibString|gs.LibFS), gs.WithFilesystemRoot(root), gs.WithFilesystemWrite(false))
+	vm := leia.New(leia.WithLibs(leia.LibString|leia.LibFS), leia.WithFilesystemRoot(root), leia.WithFilesystemWrite(false))
 	if err := vm.Exec(`content := fs.readfile("inside.txt")`); err != nil {
 		t.Fatalf("readfile with read-only filesystem failed: %v", err)
 	}
@@ -153,7 +153,7 @@ func TestWithFilesystemReadOnlyAllowsReadAndBlocksWrite(t *testing.T) {
 
 func TestWithFilesystemWriteOnlyAllowsWriteAndBlocksRead(t *testing.T) {
 	root := t.TempDir()
-	vm := gs.New(gs.WithLibs(gs.LibString|gs.LibFS), gs.WithFilesystemRoot(root), gs.WithFilesystemRead(false))
+	vm := leia.New(leia.WithLibs(leia.LibString|leia.LibFS), leia.WithFilesystemRoot(root), leia.WithFilesystemRead(false))
 
 	if err := vm.Exec(`ok := fs.writefile("out.txt", "out")`); err != nil {
 		t.Fatalf("writefile with write-only filesystem failed: %v", err)
@@ -179,33 +179,33 @@ func TestWithFilesystemWriteOnlyAllowsWriteAndBlocksRead(t *testing.T) {
 func TestFilesystemReadCapabilityControlsBytecodeFileLoadGlobals(t *testing.T) {
 	tests := []struct {
 		name      string
-		opts      []gs.Option
+		opts      []leia.Option
 		wantFS    string
 		wantFiles string
 	}{
 		{
 			name:      "filesystem disabled",
-			opts:      []gs.Option{gs.WithFilesystem(false)},
+			opts:      []leia.Option{leia.WithFilesystem(false)},
 			wantFS:    "nil",
 			wantFiles: "nil",
 		},
 		{
 			name:      "read only",
-			opts:      []gs.Option{gs.WithFilesystemWrite(false)},
+			opts:      []leia.Option{leia.WithFilesystemWrite(false)},
 			wantFS:    "table",
 			wantFiles: "function",
 		},
 		{
 			name:      "write only",
-			opts:      []gs.Option{gs.WithFilesystemRead(false)},
+			opts:      []leia.Option{leia.WithFilesystemRead(false)},
 			wantFS:    "table",
 			wantFiles: "nil",
 		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			opts := append([]gs.Option{gs.WithVM()}, tc.opts...)
-			vm := gs.New(opts...)
+			opts := append([]leia.Option{leia.WithVM()}, tc.opts...)
+			vm := leia.New(opts...)
 			if err := vm.Exec(`probe := true`); err != nil {
 				t.Fatal(err)
 			}
@@ -226,22 +226,22 @@ func TestFilesystemReadCapabilityControlsBytecodeFileLoadGlobals(t *testing.T) {
 func TestMaxFilesystemReadBytesLimitsFSReadFile(t *testing.T) {
 	for _, tc := range []struct {
 		name string
-		opts []gs.Option
+		opts []leia.Option
 	}{
 		{name: "interpreter"},
-		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			root := t.TempDir()
 			if err := os.WriteFile(filepath.Join(root, "big.txt"), []byte("12345"), 0644); err != nil {
 				t.Fatal(err)
 			}
-			opts := append([]gs.Option{
-				gs.WithLibs(gs.LibString | gs.LibFS),
-				gs.WithFilesystemRoot(root),
-				gs.WithMaxFilesystemReadBytes(4),
+			opts := append([]leia.Option{
+				leia.WithLibs(leia.LibString | leia.LibFS),
+				leia.WithFilesystemRoot(root),
+				leia.WithMaxFilesystemReadBytes(4),
 			}, tc.opts...)
-			vm := gs.New(opts...)
+			vm := leia.New(opts...)
 			if err := vm.Exec(`content, readErr := fs.readfile("big.txt")`); err != nil {
 				t.Fatal(err)
 			}
@@ -266,19 +266,19 @@ func TestMaxFilesystemReadBytesLimitsFSReadFile(t *testing.T) {
 func TestMaxFilesystemWriteBytesLimitsFSWriteFile(t *testing.T) {
 	for _, tc := range []struct {
 		name string
-		opts []gs.Option
+		opts []leia.Option
 	}{
 		{name: "interpreter"},
-		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			root := t.TempDir()
-			opts := append([]gs.Option{
-				gs.WithLibs(gs.LibString | gs.LibFS),
-				gs.WithFilesystemRoot(root),
-				gs.WithMaxFilesystemWriteBytes(4),
+			opts := append([]leia.Option{
+				leia.WithLibs(leia.LibString | leia.LibFS),
+				leia.WithFilesystemRoot(root),
+				leia.WithMaxFilesystemWriteBytes(4),
 			}, tc.opts...)
-			vm := gs.New(opts...)
+			vm := leia.New(opts...)
 			if err := vm.Exec(`ok, writeErr := fs.writefile("big.txt", "12345")`); err != nil {
 				t.Fatal(err)
 			}
@@ -303,14 +303,14 @@ func TestMaxFilesystemWriteBytesLimitsFSWriteFile(t *testing.T) {
 	}
 }
 
-func publicAPIType(v gs.Value) string {
+func publicAPIType(v leia.Value) string {
 	if v.IsNil() {
 		return "nil"
 	}
-	if v.Kind() == gs.KindFunction {
+	if v.Kind() == leia.KindFunction {
 		return "function"
 	}
-	if v.Kind() == gs.KindTable {
+	if v.Kind() == leia.KindTable {
 		return "table"
 	}
 	encoded, err := v.Encode()

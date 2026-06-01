@@ -134,7 +134,7 @@ write_skip() {
 failures=0
 
 {
-    printf '# GScript Diagnostics Bundle\n\n'
+    printf '# Leia Diagnostics Bundle\n\n'
     printf '%s\n' "- Created: \`$(date -u +%Y-%m-%dT%H:%M:%SZ)\`"
     printf '%s\n' "- Output: \`$OUT_DIR\`"
     printf '%s\n\n' "- Root: \`$ROOT\`"
@@ -172,7 +172,7 @@ fi
 if [ "$RUN_GO_TESTS" -eq 1 ]; then
     if have_cmd go; then
         if ! run_logged "Quick Go Packages" "$OUT_DIR/go_test_quick_packages.log" \
-            "go test . ./cmd/gscript ./internal/lexer ./internal/parser ./internal/runtime ./internal/vm -count=1" \
+            "go test . ./cmd/leia ./internal/lexer ./internal/parser ./internal/runtime ./internal/vm -count=1" \
             "$OUT_DIR/go_test_quick_packages.status"; then
             failures=$((failures + 1))
         fi

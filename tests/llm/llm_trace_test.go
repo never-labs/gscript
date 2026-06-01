@@ -1,20 +1,20 @@
-package gscript_test
+package leia_test
 
 import (
 	"strings"
 	"testing"
 
-	gs "github.com/never-labs/gscript"
-	"github.com/never-labs/gscript/llm"
+	leia "github.com/never-labs/leia"
+	"github.com/never-labs/leia/llm"
 )
 
 func TestLLMTraceSinkReceivesTurnAndReactEvents(t *testing.T) {
 	for _, tc := range []struct {
 		name string
-		opts []gs.Option
+		opts []leia.Option
 	}{
 		{name: "interpreter"},
-		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			provider := &mockLLMProvider{results: []llm.TurnResult{
@@ -24,20 +24,20 @@ func TestLLMTraceSinkReceivesTurnAndReactEvents(t *testing.T) {
 					Calls: []llm.ToolCall{{
 						ID:   "call_1",
 						Tool: "lookup",
-						Args: map[string]any{"name": "gscript"},
+						Args: map[string]any{"name": "leia"},
 					}},
 				},
 				{Status: "final_answer", Text: "done", Usage: llm.TurnUsage{InputTokens: 3, OutputTokens: 4}},
 			}}
 			var events []llm.TraceEvent
-			opts := append([]gs.Option{
-				gs.WithLibs(gs.LibString | gs.LibLLM),
-				gs.WithLLMProvider(provider),
-				gs.WithLLMTrace(func(event llm.TraceEvent) {
+			opts := append([]leia.Option{
+				leia.WithLibs(leia.LibString | leia.LibLLM),
+				leia.WithLLMProvider(provider),
+				leia.WithLLMTrace(func(event llm.TraceEvent) {
 					events = append(events, event)
 				}),
 			}, tc.opts...)
-			vm := gs.New(opts...)
+			vm := leia.New(opts...)
 			if err := vm.Exec(`
 turn_result, turn_err := llm.turn({
     model: "mock-fast",
@@ -84,10 +84,10 @@ func TestLLMTraceRecorderHelper(t *testing.T) {
 		Usage:  llm.TurnUsage{InputTokens: 1, OutputTokens: 2},
 	}}
 	recorder := llm.NewTraceRecorder(llm.TraceEvent{Type: "seed"})
-	vm := gs.New(
-		gs.WithLibs(gs.LibString|gs.LibLLM),
-		gs.WithLLMProvider(provider),
-		gs.WithLLMTrace(recorder.Record),
+	vm := leia.New(
+		leia.WithLibs(leia.LibString|leia.LibLLM),
+		leia.WithLLMProvider(provider),
+		leia.WithLLMTrace(recorder.Record),
 	)
 	if err := vm.Exec(`
 result, err := llm.turn({

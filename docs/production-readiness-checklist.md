@@ -1,15 +1,15 @@
 # Production Readiness Checklist
 
 This checklist turns the production roadmap into release gates. It is intended
-to be run before a public tag, and to stay useful while GScript is still moving
+to be run before a public tag, and to stay useful while Leia is still moving
 quickly.
 
 ## Scope
 
-GScript is considered production-ready only when it is usable in both modes:
+Leia is considered production-ready only when it is usable in both modes:
 
-- as an embedded Go scripting runtime through the public `gscript` package;
-- as a standalone language through `cmd/gscript` and the surrounding toolchain.
+- as an embedded Go scripting runtime through the public `leia` package;
+- as a standalone language through `cmd/leia` and the surrounding toolchain.
 
 The checklist is grouped by release gate rather than implementation package.
 Each gate names the owning roadmap doc, the current command or artifact, and the
@@ -20,10 +20,10 @@ minimum condition for a release candidate.
 | Gate | Roadmap doc | Current evidence | Release condition |
 |---|---|---|---|
 | Language semantics | `docs/language-spec.md` | `tests/feature_matrix.json`, `tests/language/MANIFEST.md`, `tests/language/MISSING_CAPABILITIES.md` | Stable behavior is documented, intentional Lua differences are explicit, and known unsupported features have a decision. |
-| Go embedding API | `docs/embedding.md` | `gscript/*.go`, `gscript/gscript_test.go` | A Go host can compile, run, call functions, bind host functions, convert values, cancel execution, and configure libraries without importing `internal/*`. |
+| Go embedding API | `docs/embedding.md` | `leia/*.go`, `leia/leia_test.go` | A Go host can compile, run, call functions, bind host functions, convert values, cancel execution, and configure libraries without importing `internal/*`. |
 | Standard library | `docs/stdlib.md` | `internal/runtime/stdlib_*.go`, official translated stdlib cases | Each exported module has documented contracts, error behavior, permission requirements, and tests. |
 | Security and isolation | `docs/security.md` | sandbox options, timeout/cancel tests, permission tests | Untrusted scripts can be run with CPU, wall-time, memory, recursion, IO, network, process, and module access bounded by host policy. |
-| Tooling | `docs/tooling.md` | `cmd/gscript`, `cmd/dump`, `benchmarks/*.py`, test harnesses | Users have documented commands for run, test, format/lint decisions, benchmark, diagnose, and debug workflows. |
+| Tooling | `docs/tooling.md` | `cmd/leia`, `cmd/dump`, `benchmarks/*.py`, test harnesses | Users have documented commands for run, test, format/lint decisions, benchmark, diagnose, and debug workflows. |
 | Performance and JIT | `docs/performance.md` | `benchmarks/timing_compare.py`, `benchmarks/strict_guard.py`, benchmark history | Optimizations are guarded by correctness oracles, no benchmark-specific kernels are accepted, and release reports separate hot-loop timing from startup noise. |
 | Release engineering | `docs/release.md` | git tags, README, benchmark reports | Versioning, artifacts, compatibility policy, supported platforms, and release notes are complete. |
 
@@ -107,7 +107,7 @@ By default it dry-runs `scripts/release_artifacts.sh` and verifies the planned
 binary, metadata, checksum paths, and metadata fields without building or
 writing `dist/`. Before publishing a tag or release candidate, run it with
 `--build` to build into a temporary directory, verify the generated
-`SHA256SUMS`, and execute the built CLI against `tests/01_basic.gs`.
+`SHA256SUMS`, and execute the built CLI against `tests/01_basic.leia`.
 
 ### CI Quick Gates
 
@@ -115,7 +115,7 @@ The minimum CI gate is intentionally small and does not publish release
 artifacts:
 
 ```bash
-go test ./gscript ./cmd/gscript ./internal/lexer ./internal/parser ./internal/runtime ./internal/vm -count=1
+go test ./leia ./cmd/leia ./internal/lexer ./internal/parser ./internal/runtime ./internal/vm -count=1
 bash scripts/production_check.sh --quick
 go test ./tests -run 'TestFeatureMatrixSchema|TestReleaseMatrix' -count=1
 ```
@@ -171,7 +171,7 @@ go test ./tests -run 'TestFeatureMatrix|TestIntegration' -count=1
 Expected result:
 
 - `tests/feature_matrix.json` matches implemented language features;
-- integration `.gs` programs execute successfully;
+- integration `.leia` programs execute successfully;
 - changes to feature support are reflected in the matrix and docs.
 
 ### Official Lua Compatibility Surface
@@ -185,7 +185,7 @@ Expected result:
 - translated official cases pass or are listed in
   `tests/language/KNOWN_FAILURES.md`;
 - `tests/language/MISSING_CAPABILITIES.md` records deliberate
-  GScript differences and future host-language-shaped capabilities.
+  Leia differences and future host-language-shaped capabilities.
 
 ### Performance Gate
 
@@ -195,7 +195,7 @@ bash scripts/performance_gate.sh --full
 
 Expected result:
 
-- every release-gate benchmark has a comparable GScript cell;
+- every release-gate benchmark has a comparable Leia cell;
 - official hot cases do not report unexplained `low_resolution` results;
 - any wall-time fallback is marked as startup-sensitive, not hot-loop evidence;
 - LuaJIT gaps are triaged before release notes claim a performance win.
@@ -211,9 +211,9 @@ not run the performance gate.
 ### Release Smoke
 
 ```bash
-go run ./cmd/gscript tests/01_basic.gs
-go run ./cmd/gscript -jit benchmarks/table/table_field_access.gs
-go run ./cmd/dump_bytecode tests/01_basic.gs
+go run ./cmd/leia tests/01_basic.leia
+go run ./cmd/leia -jit benchmarks/table/table_field_access.leia
+go run ./cmd/dump_bytecode tests/01_basic.leia
 bash scripts/release_artifacts_check.sh --build
 ```
 
@@ -230,7 +230,7 @@ Expected result:
 
 Before a release candidate, confirm:
 
-- `README.md` states what GScript is, install/run commands, supported
+- `README.md` states what Leia is, install/run commands, supported
   platforms, and links to production docs;
 - `docs/language-spec.md` names intentional Lua differences and non-goals;
 - `docs/embedding.md` documents every stable public Go API;
@@ -243,7 +243,7 @@ Before a release candidate, confirm:
 
 ## API Checklist
 
-The public `gscript` package should expose production concepts with stable names:
+The public `leia` package should expose production concepts with stable names:
 
 - engine or VM construction with options;
 - compile and run APIs that accept source name and source text;
@@ -293,7 +293,7 @@ Before accepting a JIT optimization:
 
 These decisions should be closed before the next implementation-heavy phase:
 
-1. Which `gscript` package APIs become v1-stable?
+1. Which `leia` package APIs become v1-stable?
 2. What is the default sandbox profile for embedded execution?
 3. Which standard-library modules are enabled by default in standalone CLI vs
    embedded hosts?

@@ -1,4 +1,4 @@
-// Package modpkg implements local GScript module maintenance.
+// Package modpkg implements local Leia module maintenance.
 package modpkg
 
 import (
@@ -11,16 +11,16 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/never-labs/gscript/internal/ast"
-	"github.com/never-labs/gscript/internal/lexer"
-	"github.com/never-labs/gscript/internal/modfile"
-	"github.com/never-labs/gscript/internal/parser"
-	"github.com/never-labs/gscript/internal/stdlib/catalog"
-	"github.com/never-labs/gscript/internal/support/modresolve"
-	toolsource "github.com/never-labs/gscript/internal/support/source"
+	"github.com/never-labs/leia/internal/ast"
+	"github.com/never-labs/leia/internal/lexer"
+	"github.com/never-labs/leia/internal/modfile"
+	"github.com/never-labs/leia/internal/parser"
+	"github.com/never-labs/leia/internal/stdlib/catalog"
+	"github.com/never-labs/leia/internal/support/modresolve"
+	toolsource "github.com/never-labs/leia/internal/support/source"
 )
 
-const SumFileName = "gscript.sum"
+const SumFileName = "leia.sum"
 
 type GraphReport struct {
 	SchemaVersion int          `json:"schema_version"`
@@ -67,7 +67,7 @@ type ListReport struct {
 	OK            bool             `json:"ok"`
 	Manifest      string           `json:"manifest,omitempty"`
 	Module        string           `json:"module,omitempty"`
-	GS            string           `json:"gs,omitempty"`
+	Leia            string           `json:"leia,omitempty"`
 	Requires      []ListRequire    `json:"requires,omitempty"`
 	Replaces      []ListReplace    `json:"replaces,omitempty"`
 	Collections   []ListCollection `json:"collections,omitempty"`
@@ -179,7 +179,7 @@ func Init(opts InitOptions) (string, error) {
 	} else if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return path, err
 	}
-	data := modfile.Format(modfile.File{Module: module, GS: "0.1"})
+	data := modfile.Format(modfile.File{Module: module, Leia: "0.1"})
 	if err := os.WriteFile(path, data, 0644); err != nil {
 		return path, err
 	}
@@ -208,18 +208,18 @@ func Graph(path string) (GraphReport, error) {
 	abs, err := filepath.Abs(path)
 	report := GraphReport{SchemaVersion: 1, Root: abs}
 	if err != nil {
-		report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "GS9101", Message: err.Error()})
+		report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "LEIA9101", Message: err.Error()})
 		return report, err
 	}
 	files, err := toolsource.Files(abs)
 	if err != nil {
-		report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "GS9101", Message: err.Error()})
+		report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "LEIA9101", Message: err.Error()})
 		return report, err
 	}
 	for _, file := range files {
 		requires, err := ScanStaticRequires(file)
 		if err != nil {
-			report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "GS9102", Message: err.Error(), File: file})
+			report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "LEIA9102", Message: err.Error(), File: file})
 			continue
 		}
 		rel, relErr := filepath.Rel(abs, file)
@@ -437,20 +437,20 @@ func VerifyWithOptions(path string, opts VerifyOptions) VerifyReport {
 	abs, err := filepath.Abs(path)
 	report := VerifyReport{SchemaVersion: 1}
 	if err != nil {
-		report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "GS9101", Message: err.Error()})
+		report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "LEIA9101", Message: err.Error()})
 		return report
 	}
 	manifestPath := filepath.Join(abs, modfile.FileName)
 	report.Manifest = manifestPath
 	manifest, err := ReadFile(abs)
 	if err != nil {
-		report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "GS9103", Message: err.Error(), File: manifestPath})
+		report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "LEIA9103", Message: err.Error(), File: manifestPath})
 		report.Graph, _ = Graph(abs)
 		return report
 	}
 	report.Graph, _ = Graph(abs)
 	if strings.TrimSpace(manifest.Module) == "" {
-		report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "GS9104", Message: "module is required", File: manifestPath})
+		report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "LEIA9104", Message: "module is required", File: manifestPath})
 	}
 	report.Diagnostics = append(report.Diagnostics, report.Graph.Diagnostics...)
 	report.Diagnostics = append(report.Diagnostics, verifyDependencies(abs, manifest, report.Graph)...)
@@ -463,13 +463,13 @@ func Tidy(path string) TidyReport {
 	abs, err := filepath.Abs(path)
 	report := TidyReport{SchemaVersion: 1}
 	if err != nil {
-		report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "GS9101", Message: err.Error()})
+		report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "LEIA9101", Message: err.Error()})
 		return report
 	}
 	manifest, manifestPath, err := ReadFileWithPath(abs)
 	report.Manifest = manifestPath
 	if err != nil {
-		report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "GS9103", Message: err.Error(), File: manifestPath})
+		report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "LEIA9103", Message: err.Error(), File: manifestPath})
 		return report
 	}
 	graph, graphErr := Graph(abs)
@@ -497,7 +497,7 @@ func Tidy(path string) TidyReport {
 	sort.Strings(report.Missing)
 	if len(report.Missing) == 0 {
 		if err := WriteFile(manifestPath, manifest); err != nil {
-			report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "GS9105", Message: err.Error(), File: manifestPath})
+			report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "LEIA9105", Message: err.Error(), File: manifestPath})
 		}
 	}
 	report.OK = len(report.Diagnostics) == 0 && len(report.Missing) == 0
@@ -508,12 +508,12 @@ func Explain(path, module string) ExplainReport {
 	abs, err := filepath.Abs(path)
 	report := ExplainReport{SchemaVersion: 1, Module: module}
 	if err != nil {
-		report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "GS9101", Message: err.Error()})
+		report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "LEIA9101", Message: err.Error()})
 		return report
 	}
 	manifest, manifestPath, err := ReadFileWithPath(abs)
 	if err != nil {
-		report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "GS9103", Message: err.Error(), File: manifestPath})
+		report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "LEIA9103", Message: err.Error(), File: manifestPath})
 		return report
 	}
 	if isStdlibModule(module) {
@@ -538,17 +538,17 @@ func List(path string) ListReport {
 	abs, err := filepath.Abs(path)
 	report := ListReport{SchemaVersion: 1}
 	if err != nil {
-		report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "GS9101", Message: err.Error()})
+		report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "LEIA9101", Message: err.Error()})
 		return report
 	}
 	manifest, manifestPath, err := ReadFileWithPath(abs)
 	report.Manifest = manifestPath
 	if err != nil {
-		report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "GS9103", Message: err.Error(), File: manifestPath})
+		report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "LEIA9103", Message: err.Error(), File: manifestPath})
 		return report
 	}
 	report.Module = manifest.Module
-	report.GS = manifest.GS
+	report.Leia = manifest.Leia
 
 	collections := moduleCollections(abs, manifest)
 	replaces := moduleReplaces(abs, manifest)
@@ -597,13 +597,13 @@ func Capability(path string) CapabilityReport {
 	abs, err := filepath.Abs(path)
 	report := CapabilityReport{SchemaVersion: 1}
 	if err != nil {
-		report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "GS9101", Message: err.Error()})
+		report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "LEIA9101", Message: err.Error()})
 		return report
 	}
 	manifest, manifestPath, err := ReadFileWithPath(abs)
 	report.Manifest = manifestPath
 	if err != nil {
-		report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "GS9103", Message: err.Error(), File: manifestPath})
+		report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "LEIA9103", Message: err.Error(), File: manifestPath})
 		return report
 	}
 	report.Modules = append(report.Modules, CapabilityModule{
@@ -620,8 +620,8 @@ func Capability(path string) CapabilityReport {
 		if !ok {
 			report.Diagnostics = append(report.Diagnostics, Diagnostic{
 				Severity: "warning",
-				Code:     "GS9114",
-				Message:  fmt.Sprintf("%s@%s is not available locally; run gscript mod download or add a local replace/vendor copy", req.Path, req.Version),
+				Code:     "LEIA9114",
+				Message:  fmt.Sprintf("%s@%s is not available locally; run leia mod download or add a local replace/vendor copy", req.Path, req.Version),
 			})
 			report.Modules = append(report.Modules, module)
 			continue
@@ -633,7 +633,7 @@ func Capability(path string) CapabilityReport {
 		if err != nil {
 			report.Diagnostics = append(report.Diagnostics, Diagnostic{
 				Severity: "warning",
-				Code:     "GS9115",
+				Code:     "LEIA9115",
 				Message:  fmt.Sprintf("%s@%s manifest is unavailable: %v", req.Path, req.Version, err),
 				File:     depManifestPath,
 			})
@@ -685,7 +685,7 @@ func replacementRoot(root string, manifest modfile.File, req modfile.Require) (s
 		return "", false
 	}
 	repRoot := cleanLocalRoot(root, best.NewPath)
-	if filepath.Ext(repRoot) == ".gs" {
+	if filepath.Ext(repRoot) == ".leia" {
 		repRoot = filepath.Dir(repRoot)
 	}
 	return repRoot, true
@@ -772,13 +772,13 @@ func Lock(path string) SumReport {
 	abs, err := filepath.Abs(path)
 	report := SumReport{SchemaVersion: 1}
 	if err != nil {
-		report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "GS9101", Message: err.Error()})
+		report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "LEIA9101", Message: err.Error()})
 		return report
 	}
 	manifest, manifestPath, err := ReadFileWithPath(abs)
 	report.Sum = filepath.Join(abs, SumFileName)
 	if err != nil {
-		report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "GS9103", Message: err.Error(), File: manifestPath})
+		report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "LEIA9103", Message: err.Error(), File: manifestPath})
 		return report
 	}
 	entries, diags := sumEntries(abs, manifest)
@@ -786,7 +786,7 @@ func Lock(path string) SumReport {
 	report.Diagnostics = append(report.Diagnostics, diags...)
 	if len(report.Diagnostics) == 0 {
 		if err := writeSumFile(report.Sum, entries); err != nil {
-			report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "GS9108", Message: err.Error(), File: report.Sum})
+			report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "LEIA9108", Message: err.Error(), File: report.Sum})
 		}
 	}
 	report.OK = len(report.Diagnostics) == 0
@@ -800,7 +800,7 @@ func VerifySum(path string) []Diagnostic {
 func VerifySumWithOptions(path string, opts VerifyOptions) []Diagnostic {
 	abs, err := filepath.Abs(path)
 	if err != nil {
-		return []Diagnostic{{Severity: "error", Code: "GS9101", Message: err.Error()}}
+		return []Diagnostic{{Severity: "error", Code: "LEIA9101", Message: err.Error()}}
 	}
 	sumPath := filepath.Join(abs, SumFileName)
 	if _, err := os.Stat(sumPath); errors.Is(err, os.ErrNotExist) {
@@ -808,11 +808,11 @@ func VerifySumWithOptions(path string, opts VerifyOptions) []Diagnostic {
 	}
 	manifest, manifestPath, err := ReadFileWithPath(abs)
 	if err != nil {
-		return []Diagnostic{{Severity: "error", Code: "GS9103", Message: err.Error(), File: manifestPath}}
+		return []Diagnostic{{Severity: "error", Code: "LEIA9103", Message: err.Error(), File: manifestPath}}
 	}
 	want, err := readSumFile(sumPath)
 	if err != nil {
-		return []Diagnostic{{Severity: "error", Code: "GS9108", Message: err.Error(), File: sumPath}}
+		return []Diagnostic{{Severity: "error", Code: "LEIA9108", Message: err.Error(), File: sumPath}}
 	}
 	got, diags := sumEntriesWithCache(abs, manifest, opts.CacheDir)
 	if len(diags) > 0 {
@@ -826,11 +826,11 @@ func VerifySumWithOptions(path string, opts VerifyOptions) []Diagnostic {
 	for _, entry := range got {
 		prev, ok := wantMap[sumKey(entry)]
 		if !ok {
-			out = append(out, Diagnostic{Severity: "error", Code: "GS9109", Message: fmt.Sprintf("missing sum entry for %s", entry.Path)})
+			out = append(out, Diagnostic{Severity: "error", Code: "LEIA9109", Message: fmt.Sprintf("missing sum entry for %s", entry.Path)})
 			continue
 		}
 		if prev.Hash != entry.Hash {
-			out = append(out, Diagnostic{Severity: "error", Code: "GS9109", Message: fmt.Sprintf("checksum mismatch for %s", entry.Path)})
+			out = append(out, Diagnostic{Severity: "error", Code: "LEIA9109", Message: fmt.Sprintf("checksum mismatch for %s", entry.Path)})
 		}
 	}
 	gotMap := map[string]bool{}
@@ -839,7 +839,7 @@ func VerifySumWithOptions(path string, opts VerifyOptions) []Diagnostic {
 	}
 	for _, entry := range want {
 		if entry.Kind == "module" && !gotMap[sumKey(entry)] {
-			out = append(out, Diagnostic{Severity: "error", Code: "GS9109", Message: fmt.Sprintf("missing cached or vendored module for %s", entry.Path)})
+			out = append(out, Diagnostic{Severity: "error", Code: "LEIA9109", Message: fmt.Sprintf("missing cached or vendored module for %s", entry.Path)})
 		}
 	}
 	return out
@@ -917,25 +917,25 @@ func GenerateGoMod(path string, write bool) GoModReport {
 	abs, err := filepath.Abs(path)
 	report := GoModReport{SchemaVersion: 1}
 	if err != nil {
-		report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "GS9101", Message: err.Error()})
+		report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "LEIA9101", Message: err.Error()})
 		return report
 	}
 	manifest, manifestPath, err := ReadFileWithPath(abs)
 	report.Manifest = manifestPath
 	report.GoMod = filepath.Join(abs, "go.mod")
 	if err != nil {
-		report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "GS9103", Message: err.Error(), File: manifestPath})
+		report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "LEIA9103", Message: err.Error(), File: manifestPath})
 		return report
 	}
 	content, err := GoModContent(manifest)
 	if err != nil {
-		report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "GS9120", Message: err.Error(), File: manifestPath})
+		report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "LEIA9120", Message: err.Error(), File: manifestPath})
 		return report
 	}
 	report.Content = string(content)
 	if write {
 		if err := os.WriteFile(report.GoMod, content, 0644); err != nil {
-			report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "GS9121", Message: err.Error(), File: report.GoMod})
+			report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "LEIA9121", Message: err.Error(), File: report.GoMod})
 			return report
 		}
 		report.Written = true
@@ -1049,8 +1049,8 @@ func verifyDependencies(root string, manifest modfile.File, graph GraphReport) [
 		if !coveredByRequire(used, required) {
 			diags = append(diags, Diagnostic{
 				Severity: "error",
-				Code:     "GS9106",
-				Message:  fmt.Sprintf("missing require for %s; run gscript mod add %s@VERSION", used, used),
+				Code:     "LEIA9106",
+				Message:  fmt.Sprintf("missing require for %s; run leia mod add %s@VERSION", used, used),
 			})
 		}
 	}
@@ -1058,7 +1058,7 @@ func verifyDependencies(root string, manifest modfile.File, graph GraphReport) [
 		if err := verifyLocalPath(root, col.Path); err != nil {
 			diags = append(diags, Diagnostic{
 				Severity: "error",
-				Code:     "GS9107",
+				Code:     "LEIA9107",
 				Message:  fmt.Sprintf("collection %s path %s: %v", col.Name, col.Path, err),
 			})
 		}
@@ -1068,7 +1068,7 @@ func verifyDependencies(root string, manifest modfile.File, graph GraphReport) [
 			if err := verifyLocalPath(root, rep.NewPath); err != nil {
 				diags = append(diags, Diagnostic{
 					Severity: "error",
-					Code:     "GS9107",
+					Code:     "LEIA9107",
 					Message:  fmt.Sprintf("replace %s path %s: %v", rep.Path, rep.NewPath, err),
 				})
 			}
@@ -1123,7 +1123,7 @@ func sumEntriesWithCache(root string, manifest modfile.File, cacheDir string) ([
 		if err != nil {
 			diags = append(diags, Diagnostic{
 				Severity: "error",
-				Code:     "GS9108",
+				Code:     "LEIA9108",
 				Message:  fmt.Sprintf("collection %s path %s: %v", col.Name, col.Path, err),
 			})
 			continue
@@ -1143,7 +1143,7 @@ func sumEntriesWithCache(root string, manifest modfile.File, cacheDir string) ([
 		if err != nil {
 			diags = append(diags, Diagnostic{
 				Severity: "error",
-				Code:     "GS9108",
+				Code:     "LEIA9108",
 				Message:  fmt.Sprintf("replace %s path %s: %v", rep.Path, rep.NewPath, err),
 			})
 			continue
@@ -1180,7 +1180,7 @@ func remoteSumEntries(root string, manifest modfile.File, cacheDir string) ([]Su
 		var err error
 		cacheDir, err = ModuleCacheDir("")
 		if err != nil {
-			return nil, []Diagnostic{{Severity: "error", Code: "GS9110", Message: err.Error()}}
+			return nil, []Diagnostic{{Severity: "error", Code: "LEIA9110", Message: err.Error()}}
 		}
 	}
 	var entries []SumEntry
@@ -1198,7 +1198,7 @@ func remoteSumEntries(root string, manifest modfile.File, cacheDir string) ([]Su
 			if err != nil {
 				diags = append(diags, Diagnostic{
 					Severity: "error",
-					Code:     "GS9108",
+					Code:     "LEIA9108",
 					Message:  fmt.Sprintf("module %s@%s path %s: %v", req.Path, req.Version, moduleRoot, err),
 					File:     moduleRoot,
 				})
@@ -1336,7 +1336,7 @@ func hashModulePath(root, path string) (string, error) {
 			}
 			return nil
 		}
-		if filepath.Ext(p) != ".gs" && filepath.Base(p) != modfile.FileName {
+		if filepath.Ext(p) != ".leia" && filepath.Base(p) != modfile.FileName {
 			return nil
 		}
 		files = append(files, p)

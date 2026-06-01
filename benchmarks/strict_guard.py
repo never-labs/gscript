@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Strict benchmark harness for statistically meaningful GScript comparisons.
+"""Strict benchmark harness for statistically meaningful Leia comparisons.
 
 Runs domain benchmarks in VM, default JIT, no-filter JIT, and optional LuaJIT
 modes. Unlike regression_guard.py, this harness keeps timing quality explicit:
@@ -48,7 +48,7 @@ EXIT_TOTAL_RE = re.compile(r"^\s*total exits:\s*([0-9]+)\b", re.MULTILINE)
 class BenchmarkSpec:
     group: str
     name: str
-    gscript: Path
+    leia: Path
     luajit: Path | None = None
     base: str | None = None
 
@@ -411,13 +411,13 @@ def summarize_mode(samples: list[Sample], warmups: list[Sample], repeat: int) ->
 def mode_command(
     mode: str,
     spec: BenchmarkSpec,
-    gscript_bin: Path,
+    leia_bin: Path,
     luajit_bin: str | None,
 ) -> tuple[list[str] | None, dict[str, str] | None, str | None]:
     return benchmark_output.benchmark_mode_command(
         mode,
-        gscript_bin,
-        spec.gscript,
+        leia_bin,
+        spec.leia,
         luajit_bin=luajit_bin,
         luajit_script=spec.luajit,
     )
@@ -426,7 +426,7 @@ def mode_command(
 def run_mode(
     mode: str,
     spec: BenchmarkSpec,
-    gscript_bin: Path,
+    leia_bin: Path,
     luajit_bin: str | None,
     warmup_runs: int,
     measured_runs: int,
@@ -437,7 +437,7 @@ def run_mode(
     allow_wall_time: bool,
     repeat_override: int | None = None,
 ) -> ModeResult:
-    cmd, env, unavailable = mode_command(mode, spec, gscript_bin, luajit_bin)
+    cmd, env, unavailable = mode_command(mode, spec, leia_bin, luajit_bin)
     if unavailable:
         return ModeResult(status=unavailable, note=f"{mode} input unavailable")
     assert cmd is not None
@@ -466,8 +466,8 @@ def run_mode(
     return result
 
 
-def build_gscript(root: Path, out: Path) -> None:
-    benchmark_output.build_gscript(root, out)
+def build_leia(root: Path, out: Path) -> None:
+    benchmark_output.build_leia(root, out)
 
 
 def parse_repeat_overrides(values: list[str] | None) -> dict[tuple[str | None, str], int]:
@@ -510,14 +510,14 @@ def ratio(numer: float | None, denom: float | None) -> float | None:
 canonical_group = discovery.canonical_group
 def domain_specs(root: Path, group: str) -> list[BenchmarkSpec]:
     return [
-        BenchmarkSpec(spec.group, spec.name, spec.gscript, spec.luajit, spec.base)
+        BenchmarkSpec(spec.group, spec.name, spec.leia, spec.luajit, spec.base)
         for spec in discovery.domain_specs(root, group)
     ]
 
 
 def discover_specs(root: Path, groups: list[str]) -> list[BenchmarkSpec]:
     return [
-        BenchmarkSpec(spec.group, spec.name, spec.gscript, spec.luajit, spec.base)
+        BenchmarkSpec(spec.group, spec.name, spec.leia, spec.luajit, spec.base)
         for spec in discovery.discover_benchmarks(root, groups)
     ]
 
@@ -701,7 +701,7 @@ def print_brief(results: Iterable[BenchmarkResult], modes: list[str]) -> None:
 
 def dry_run_results(specs: list[BenchmarkSpec], modes: list[str], luajit_bin: str | None) -> list[BenchmarkResult]:
     rows: list[BenchmarkResult] = []
-    fake_bin = Path("gscript")
+    fake_bin = Path("leia")
     for spec in specs:
         row = BenchmarkResult(spec.name, spec.group, spec.base)
         for mode in modes:
@@ -761,7 +761,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--related-confirm-ratio", type=float, default=0.95)
     parser.add_argument("--json", type=Path, default=Path("benchmarks/data/strict_guard_latest.json"))
     parser.add_argument("--markdown", type=Path, default=Path("benchmarks/data/strict_guard_latest.md"))
-    parser.add_argument("--keep-bin", action="store_true", help="keep temporary gscript binary")
+    parser.add_argument("--keep-bin", action="store_true", help="keep temporary leia binary")
     args = parser.parse_args(argv)
 
     if args.warmup < 0:
@@ -782,14 +782,14 @@ def main(argv: list[str] | None = None) -> int:
         parser.error(str(exc))
 
     started = time.time()
-    tempdir = Path(tempfile.mkdtemp(prefix="gscript_strict_guard_"))
-    gscript_bin = tempdir / "gscript"
+    tempdir = Path(tempfile.mkdtemp(prefix="leia_strict_guard_"))
+    leia_bin = tempdir / "leia"
     results: list[BenchmarkResult]
     try:
         if args.dry_run:
             results = dry_run_results(specs, modes, luajit_bin)
         else:
-            build_gscript(root, gscript_bin)
+            build_leia(root, leia_bin)
             results = []
             for spec in specs:
                 row = BenchmarkResult(spec.name, spec.group, spec.base)
@@ -797,7 +797,7 @@ def main(argv: list[str] | None = None) -> int:
                     row.modes[mode] = run_mode(
                         mode,
                         spec,
-                        gscript_bin,
+                        leia_bin,
                         luajit_bin,
                         args.warmup,
                         args.runs,
@@ -828,7 +828,7 @@ def main(argv: list[str] | None = None) -> int:
                     "id": spec.benchmark_id,
                     "group": spec.group,
                     "name": spec.name,
-                    "gscript": str(spec.gscript.relative_to(root)),
+                    "leia": str(spec.leia.relative_to(root)),
                     "luajit": str(spec.luajit.relative_to(root)) if spec.luajit else "",
                     "base": spec.base or "",
                 }
@@ -857,7 +857,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1 if any(m.status in bad_statuses for r in results for m in r.modes.values()) else 0
     finally:
         if args.keep_bin:
-            print(f"Kept gscript binary: {gscript_bin}")
+            print(f"Kept leia binary: {leia_bin}")
         else:
             shutil.rmtree(tempdir, ignore_errors=True)
 

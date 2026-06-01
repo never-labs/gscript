@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/leia/internal/runtime"
 )
 
 func TestUnrollAndJam_FloatReductionUnrollsWithScalarTail(t *testing.T) {

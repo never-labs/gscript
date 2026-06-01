@@ -2,7 +2,7 @@ package runtime
 
 import (
 	"fmt"
-	stdlibstring "github.com/never-labs/gscript/internal/support/stringlib"
+	stdlibstring "github.com/never-labs/leia/internal/support/stringlib"
 	"regexp"
 	"strconv"
 	"strings"
@@ -943,7 +943,7 @@ func replaceSimpleLuaPatternRaw(s string, pattern *stdlibstring.SimplePattern, r
 
 func callSimpleReplacementFunction(s string, m stdlibstring.SimplePatternMatch, fn Value, caller ScriptFunctionCaller) (string, error) {
 	args := simpleReplacementFunctionArgsStack(s, m)
-	results, err := callGScriptFunction(fn, args, caller)
+	results, err := callLeiaFunction(fn, args, caller)
 	if err != nil {
 		return "", err
 	}
@@ -996,7 +996,7 @@ func simpleReplacementTableKey(s string, m stdlibstring.SimplePatternMatch) Valu
 }
 
 func callLuaReplacementFunction(s string, loc []int, prog luaPatternProgram, fn Value, caller ScriptFunctionCaller) (string, error) {
-	results, err := callGScriptFunction(fn, luaReplacementFunctionArgs(s, loc, prog), caller)
+	results, err := callLeiaFunction(fn, luaReplacementFunctionArgs(s, loc, prog), caller)
 	if err != nil {
 		return "", err
 	}
@@ -1014,7 +1014,7 @@ func callLuaReplacementFunction(s string, loc []int, prog luaPatternProgram, fn 
 	return "", fmt.Errorf("invalid replacement value (a %s)", val.TypeName())
 }
 
-func callGScriptFunction(fn Value, args []Value, caller ScriptFunctionCaller) ([]Value, error) {
+func callLeiaFunction(fn Value, args []Value, caller ScriptFunctionCaller) ([]Value, error) {
 	if caller != nil {
 		return caller(fn, args)
 	}

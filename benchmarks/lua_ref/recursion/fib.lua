@@ -1,6 +1,6 @@
 -- Benchmark: Fibonacci (Recursive) - warm loop
 -- Tests: recursive function call overhead, integer arithmetic
--- Matches GScript benchmark: fib(20) x 1000 reps
+-- Matches Leia benchmark: fib(20) x 1000 reps
 
 local function fib(n)
     if n < 2 then return n end

@@ -25,8 +25,8 @@ import (
 	"fmt"
 	"sync/atomic"
 
-	"github.com/never-labs/gscript/internal/jit"
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/jit"
+	"github.com/never-labs/leia/internal/vm"
 )
 
 // slotOff returns the byte offset for a VM register slot.
@@ -289,7 +289,7 @@ func emitBaselineDiv(asm *jit.Assembler, inst uint32) {
 	loadRK(asm, jit.X0, bidx)
 	loadRK(asm, jit.X1, cidx)
 
-	// DIV always returns float in GScript (5/2 = 2.5).
+	// DIV always returns float in Leia (5/2 = 2.5).
 	emitFloatArith(asm, jit.X0, jit.X1, "div")
 	storeSlot(asm, a, jit.X0)
 }

@@ -9,9 +9,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/never-labs/gscript/internal/ast"
-	"github.com/never-labs/gscript/internal/lexer"
-	"github.com/never-labs/gscript/internal/parser"
+	"github.com/never-labs/leia/internal/ast"
+	"github.com/never-labs/leia/internal/lexer"
+	"github.com/never-labs/leia/internal/parser"
 )
 
 // ====================================================================

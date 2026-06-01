@@ -6,8 +6,8 @@ import (
 	"sync"
 	"unsafe"
 
-	"github.com/never-labs/gscript/internal/runtime"
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/runtime"
+	"github.com/never-labs/leia/internal/vm"
 )
 
 var tier2ExecContextPool = sync.Pool{

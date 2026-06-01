@@ -1,0 +1,95 @@
+print("case:time_process_debug_edges_more")
+
+stamp := time.date(2024, 3, 15, 10, 30, 45)
+assert(time.format(stamp, "2006-01-02T15:04:05 MST") == "2024-03-15T10:30:45 UTC")
+assert(time.format(stamp, "literal %% percent") == "literal % percent")
+
+parsed, parseErr := time.parse("2024/03/15 10:30:45", "2006/01/02 15:04:05")
+assert(parseErr == nil)
+assert(parsed.year == 2024)
+assert(parsed.month == 3)
+assert(parsed.day == 15)
+assert(parsed.hour == 10)
+assert(parsed.min == 30)
+assert(parsed.sec == 45)
+assert(time.format(parsed, "%%") == "%")
+
+percentParsed, percentParseErr := time.parse("%", "%%")
+assert(percentParseErr == nil)
+assert(time.format(percentParsed, "%%") == "%")
+
+printfRun := process.run("printf string-command-ok")
+assert(printfRun.ok == true)
+assert(printfRun.code == 0)
+assert(printfRun.stdout == "string-command-ok")
+assert(printfRun.stderr == "")
+
+baseFile := fs.tempfile(nil, "leia_process_dir_")
+assert(type(baseFile) == "string" && baseFile != "")
+assert(fs.remove(baseFile))
+assert(fs.mkdirAll(baseFile))
+defer fs.removeAll(baseFile)
+
+pwdRun := process.run({"pwd"}, {dir: baseFile})
+assert(pwdRun.ok == true)
+assert(pwdRun.code == 0)
+assert(pwdRun.stderr == "")
+pwdOut := string.gsub(pwdRun.stdout, "\n$", "")
+assert(path.rel(baseFile, pwdOut) == ".")
+
+events := {}
+
+func emitHook(e) {
+  table.insert(events, e.type .. ":" .. e.kind .. ":" .. e.name)
+}
+func emitSink(e) {
+}
+
+debug.setHook(emitHook, {
+  emit: true,
+  call: false,
+  error: false,
+  script: false,
+  native: false,
+})
+debug.setSink(emitSink)
+gotHook, gotOpts := debug.getHook()
+assert(gotHook == emitHook)
+assert(gotOpts.emit == true)
+assert(gotOpts.call == false)
+assert(gotOpts["return"] == false)
+assert(gotOpts.error == false)
+assert(gotOpts.script == false)
+assert(gotOpts.native == false)
+assert(debug.emit("only_emit"))
+assert(#events == 1)
+assert(events[1] == "emit:diagnostic:only_emit")
+debug.setSink(nil)
+
+scriptEvents := {}
+func scriptHook(e) {
+  table.insert(scriptEvents, e.type .. ":" .. e.kind .. ":" .. e.name)
+}
+func targetForHook() {
+  return 12
+}
+
+debug.setHook(scriptHook, {
+  call: true,
+  emit: false,
+  error: false,
+  script: true,
+  native: false,
+})
+hookedValue := targetForHook()
+assert(hookedValue == 12)
+assert(#scriptEvents == 1)
+assert(scriptEvents[1] == "call:script:targetForHook")
+
+debug.setHook(nil)
+clearedHook := debug.getHook()
+assert(clearedHook == nil)
+targetForHook()
+assert(#scriptEvents == 1)
+
+print("ok")

@@ -372,7 +372,7 @@ def pprof_function_summary(rows: list[dict]) -> list[dict]:
         name = row.get("symbol")
         if not name:
             name = (
-                f"gscript_jit::{row.get('proto', '')};ir={row.get('ir_instr', '')};"
+                f"leia_jit::{row.get('proto', '')};ir={row.get('ir_instr', '')};"
                 f"op={row.get('ir_op', '')};bc={row.get('bytecode_pc', '')};"
                 f"bcop={row.get('bytecode_op', '')};pass={row.get('pass', '')}"
             )

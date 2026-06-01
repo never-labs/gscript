@@ -8,12 +8,12 @@ import (
 	"os"
 	"strings"
 
-	"github.com/never-labs/gscript/internal/runtime"
-	"github.com/never-labs/gscript/internal/stdlib/catalog"
-	tablelib "github.com/never-labs/gscript/internal/stdlib/table"
-	"github.com/never-labs/gscript/internal/stdlibrt"
-	stdlibinstall "github.com/never-labs/gscript/internal/stdlibrt/install"
-	"github.com/never-labs/gscript/internal/stdlibrt/modules"
+	"github.com/never-labs/leia/internal/runtime"
+	"github.com/never-labs/leia/internal/stdlib/catalog"
+	tablelib "github.com/never-labs/leia/internal/stdlib/table"
+	"github.com/never-labs/leia/internal/stdlibrt"
+	stdlibinstall "github.com/never-labs/leia/internal/stdlibrt/install"
+	"github.com/never-labs/leia/internal/stdlibrt/modules"
 )
 
 func (vm *VM) RestrictStdlib(allowed map[string]bool) {

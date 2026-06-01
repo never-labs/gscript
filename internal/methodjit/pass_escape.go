@@ -15,14 +15,14 @@
 //   - R163: bench + correctness.
 //
 // Design reference: TurboFan's src/compiler/escape-analysis.cc
-// (see docs-internal/decisions/adr-v8-alignment.md). GScript's MVP
+// (see docs-internal/decisions/adr-v8-alignment.md). Leia's MVP
 // omits V8's FrameState/ObjectState deopt materialization: we bail
 // on any allocation reaching a frame-state edge (= any Guard op,
 // since guards can deopt).
 
 package methodjit
 
-import "github.com/never-labs/gscript/internal/vm"
+import "github.com/never-labs/leia/internal/vm"
 
 var escapeAnalysisPassAllowedDomains = allowedDomainsForModule(analysisFacts(AnalysisFactFixedShapeTables), nil, nil, analysisFacts(AnalysisFactGlobals))
 

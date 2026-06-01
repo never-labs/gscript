@@ -15,9 +15,9 @@ go test ./tests -run TestLanguageConformanceTranslatedCases -count=1 -v
 The harness compares stdout from:
 
 1. Lua oracle: `*.lua`
-2. GScript VM: `gscript -vm *.gs`
+2. Leia VM: `leia -vm *.leia`
 
-Set `GSCRIPT_OFFICIAL_CHECK_JIT=1` to also compare `gscript -jit *.gs`.
+Set `LEIA_OFFICIAL_CHECK_JIT=1` to also compare `leia -jit *.leia`.
 
 Current translated passing cases: 441.
 
@@ -37,8 +37,8 @@ Current translated passing cases: 441.
 | `bits_go_host_more` | `bitwise.lua`, `bwcoercion.lua` | Go-host 64-bit `bits` helper operations, rotations, bit tests/mutations, counts, and invalid shift diagnostics. |
 | `base64_raw_url_edges_more` | `strings.lua`, `api.lua` | Base64 empty/binary round trips, standard padding, and raw URL-safe no-padding/error behavior. |
 | `container_sort_go_host_more` | `api.lua`, `sort.lua` | Go-host container set/queue/stack/heap helpers and `sort` namespace ordering/search helpers. |
-| `api_testkit_runtime_diagnostics` | `api.lua` | GScript `testkit` replacement for Lua's private C API test library: memory snapshots/checks, value inspection, protected calls, and function identity. |
-| `attrib_const_defer_gscript` | `locals.lua`, `constructs.lua` | GScript Go-style `const` readonly binding checks and `defer` LIFO cleanup on error; intentionally not Lua `<const>/<close>` syntax. |
+| `api_testkit_runtime_diagnostics` | `api.lua` | Leia `testkit` replacement for Lua's private C API test library: memory snapshots/checks, value inspection, protected calls, and function identity. |
+| `attrib_const_defer_leia` | `locals.lua`, `constructs.lua` | Leia Go-style `const` readonly binding checks and `defer` LIFO cleanup on error; intentionally not Lua `<const>/<close>` syntax. |
 | `attrib_require_builtin_modules_more` | `attrib.lua` | `require` returns cached builtin standard-library modules and exposes them through `package.loaded`. |
 | `attrib_require_go_host_modules_more` | `attrib.lua` | Go-host standard-library modules return their global table from `require` and share identity through `package.loaded`. |
 | `attrib_require_all_stdlib_more` | `attrib.lua` | Full Go-host stdlib require/package.loaded identity sweep across remaining module tables. |
@@ -127,8 +127,8 @@ Current translated passing cases: 441.
 | `gc_collectgarbage_more2` | `gc.lua` | Additional `collectgarbage` running-state, explicit collection, and mode transition return values. |
 | `gc_collectgarbage_protocol` | `gc.lua`, `gengc.lua` | `collectgarbage` collect/count/step/stop/restart/isrunning protocol basics. |
 | `gc_basic_more` | `gc.lua` | Basic `collectgarbage` running state, count, stop/restart, step result type, and explicit collection. |
-| `gc_stats_defer_cleanup` | `gc.lua`, `tracegc.lua` | GScript Go-host GC diagnostics via `collectgarbage("stats")`; deterministic cleanup is covered by runtime `defer` tests and docs. |
-| `literals_strings_basic` | `literals.lua`, `strings.lua` | Basic string literal behavior that maps to GScript escapes. |
+| `gc_stats_defer_cleanup` | `gc.lua`, `tracegc.lua` | Leia Go-host GC diagnostics via `collectgarbage("stats")`; deterministic cleanup is covered by runtime `defer` tests and docs. |
+| `literals_strings_basic` | `literals.lua`, `strings.lua` | Basic string literal behavior that maps to Leia escapes. |
 | `literals_long_brackets_more` | `literals.lua` | Long-bracket string delimiter edge cases translated to equivalent literal values. |
 | `literals_long_string_more` | `literals.lua` | Long string literal length and substring checks over a 960-byte literal. |
 | `literals_control_escapes_more` | `literals.lua` | Control-character, decimal, NUL, and hexadecimal string escape semantics translated to equivalent byte values. |
@@ -290,8 +290,8 @@ Current translated passing cases: 441.
 | `strings_rep_reverse_tostring` | `strings.lua` | `string.rep` separators, binary-safe `reverse`, repeated length checks, and `tostring` basics. |
 | `strings_rep_tostring_ascii_more` | `strings.lua` | Additional ASCII `upper`/`lower`, `rep` separator, empty reverse, repeated lengths, and primitive `tostring` checks. |
 | `strings_sub_find_len_ascii_more` | `strings.lua` | Additional ASCII `string.sub`, `string.find`, empty-find, and length boundary checks. |
-| `strings_string_pack_go_style` | `tpack.lua` | GScript string namespace binary pack/unpack/packsize compatibility using Go-style formats. |
-| `strings_string_pack_more` | `tpack.lua` | Additional pack/unpack integer, fixed-byte, endian, offset, and fixed-size coverage translated to GScript's Go-style binary formats. |
+| `strings_string_pack_go_style` | `tpack.lua` | Leia string namespace binary pack/unpack/packsize compatibility using Go-style formats. |
+| `strings_string_pack_more` | `tpack.lua` | Additional pack/unpack integer, fixed-byte, endian, offset, and fixed-size coverage translated to Leia's Go-style binary formats. |
 | `strings_sub_boundary_more` | `strings.lua` | `string.sub` omitted end, empty ranges, negative indices, and `math.mininteger`/`maxinteger` boundaries. |
 | `strings_table_concat_binary` | `strings.lua` | `table.concat` with NUL-containing strings and long repeated ranges. |
 | `strings_table_concat_empty_errors_more` | `strings.lua` | Additional `table.concat` empty ranges and bad argument/value errors. |
@@ -330,10 +330,10 @@ Recent audit-added coverage:
 
 | Case | Source area | Notes |
 |---|---|---|
-| `code_explicit_spread_more` | `code.lua`, `db.lua` | GScript explicit `spread(expr)` and `table.spread` expansion in call arguments and table constructors. |
+| `code_explicit_spread_more` | `code.lua`, `db.lua` | Leia explicit `spread(expr)` and `table.spread` expansion in call arguments and table constructors. |
 | `api_arith_metamethod_chain_more` | `api.lua`, `events.lua` | Arithmetic metamethod chaining for `__add`, `__mod`, and unary minus over wrapped table values. |
 | `big_generated_eval_env_more` | `big.lua` | Generated chunk/table execution with explicit environment mutation and large-enough array indexing. |
-| `binary_namespace_more` | `tpack.lua` | GScript `binary` namespace pack/unpack/size with Go-style endian and field tokens. |
+| `binary_namespace_more` | `tpack.lua` | Leia `binary` namespace pack/unpack/size with Go-style endian and field tokens. |
 | `binary_numeric_fields_more` | `tpack.lua`, `strings.lua` | Binary and string pack/unpack numeric field coverage across signed, unsigned, float, endian, alias, and error paths. |
 | `bytes_hash_base64_go_host_more` | `api.lua`, `strings.lua` | Go-host `bytes`, `hash`, and `base64` helpers for buffers, encodings, checksums, HMAC, and error returns. |
 | `bytes_numeric_buffer_more` | `api.lua`, `strings.lua` | Go-host bytes buffer numeric little-endian writes, byte/string reads, hex round trips, concat, and reset behavior. |
@@ -341,7 +341,7 @@ Recent audit-added coverage:
 | `coroutine_defer_xpcall_edges_more` | `coroutine.lua`, `errors.lua`, `attrib.lua` | Coroutine defer cleanup across yield/return/error plus xpcall handler ordering after protected defer drain. |
 | `csv_options_quotes_more` | `api.lua`, `strings.lua` | CSV comment/lazy-quote options and Go encoding/csv quoting for comma, quote, newline, and leading-space fields. |
 | `defer_loader_require_edges_more` | `attrib.lua`, `main.lua` | Defer argument evaluation timing, remaining stdlib require identities, and load source-name syntax diagnostics. |
-| `db_gscript_diagnostics_more` | `db.lua` | GScript diagnostic helpers for function metadata and value inspection in VM-translated file mode. |
+| `db_leia_diagnostics_more` | `db.lua` | Leia diagnostic helpers for function metadata and value inspection in VM-translated file mode. |
 | `debug_host_helpers_more` | `db.lua` | Go-host `debug.traceback`, `debug.stack`, `debug.globals`, `debug.info`, `debug.value`, and `debug.goStack` diagnostics. |
 | `db_vm_debug_parity_more` | `db.lua` | VM file-mode `debug.stack`, numeric `debug.info(level)`, source metadata, and hook/sink event observability. |
 | `files_file_lines_streams_more` | `files.lua` | File-handle `lines()` iterator, standard stream handles, and open/closed `io.type` results. |
@@ -350,7 +350,7 @@ Recent audit-added coverage:
 | `files_tmpfile_flush_type_more` | `files.lua` | `io.tmpfile`, `file:flush`, seek-to-start readback, and closed-file `io.type` reporting. |
 | `fs_path_go_host_more` | `files.lua`, `main.lua` | Go-host `fs` and `path` helpers for temp files, directory creation, path operations, copy/rename/read/write, and error returns. |
 | `fs_path_glob_cwd_more` | `files.lua`, `main.lua` | Go-host current-directory controls, globbing, temp dirs, and absolute/relative path helpers with cwd restoration. |
-| `goto_simple_paths_more` | `goto.lua` | Direct label/goto forward and backward paths plus function-local label chains translated to GScript label syntax. |
+| `goto_simple_paths_more` | `goto.lua` | Direct label/goto forward and backward paths plus function-local label chains translated to Leia label syntax. |
 | `go_channel_host_more` | `attrib.lua`, `api.lua` | Go-style channels and goroutines: buffered production, range over close, nil receive after close, and capacity/close error paths. |
 | `go_channel_edges_more` | `attrib.lua`, `api.lua` | Go-style unbuffered channel rendezvous, goroutine arguments, and send-on-closed diagnostics. |
 | `heavy_generated_concat_more` | `heavy.lua` | Bounded generated string-concatenation chunk mirroring the language heavy generated-program pressure pattern. |
@@ -376,15 +376,15 @@ Recent audit-added coverage:
 | `url_go_host_more` | `main.lua`, `strings.lua` | Go-host URL parse/build/query/escape/join helpers and invalid escape handling. |
 | `utf8_testkit_edges_more` | `utf8.lua`, `api.lua` | UTF-8 boundary helpers plus deterministic testkit diagnostic shapes and protected-call value capture. |
 | `xpcall_iterator_edges_more` | `errors.lua`, `nextvar.lua` | xpcall handler multi-return adjustment and generic-for nil-first termination with extra iterator values. |
-| `main_script_process_more` | `main.lua`, `code.lua` | GScript `script.eval`/`script.compile` environment options and host-controlled `process.args`/`process.entry`. |
-| `strings_go_helpers_more` | `strings.lua` | GScript Go-host string helpers: split, trim variants, replaceAll, join, title, padding, and numeric detection. |
+| `main_script_process_more` | `main.lua`, `code.lua` | Leia `script.eval`/`script.compile` environment options and host-controlled `process.args`/`process.entry`. |
+| `strings_go_helpers_more` | `strings.lua` | Leia Go-host string helpers: split, trim variants, replaceAll, join, title, padding, and numeric detection. |
 | `sort_callback_helpers_more` | `sort.lua`, `api.lua` | Go-host sort helpers invoking VM comparator/key callbacks, including callback error propagation through `pcall`. |
-| `table_go_helpers_more` | `sort.lua` | GScript Go-host table helpers: keys, values, contains, indexOf, copy, merge, count, unique, reverse, slice, and zip. |
-| `table_higher_order_vm_callbacks_more` | `sort.lua` | GScript table higher-order helpers `map`, `filter`, `reduce`, and `fromArray` with VM script callbacks. |
+| `table_go_helpers_more` | `sort.lua` | Leia Go-host table helpers: keys, values, contains, indexOf, copy, merge, count, unique, reverse, slice, and zip. |
+| `table_higher_order_vm_callbacks_more` | `sort.lua` | Leia table higher-order helpers `map`, `filter`, `reduce`, and `fromArray` with VM script callbacks. |
 | `table_proxy_concat_flatten_more` | `sort.lua`, `events.lua` | `table.concat` over proxy tables and `table.flatten` over inline nested table literals. |
 | `table_raw_helpers_more` | `sort.lua`, `api.lua` | Go-host table.toArray/table.unique plus rawget/rawset/rawlen/rawequal raw semantics and invalid-key diagnostics. |
 | `tracegc_stats_progress_more` | `tracegc.lua`, `gc.lua` | Go-host GC stats shape and explicit collection progress compared with Lua `collectgarbage` count/running observability. |
-| `utf8_go_helpers_more` | `utf8.lua` | GScript Go-host UTF-8 helpers: reverse, codepoint substring, Unicode case conversion, char classes, validate, and sanitize. |
+| `utf8_go_helpers_more` | `utf8.lua` | Leia Go-host UTF-8 helpers: reverse, codepoint substring, Unicode case conversion, char classes, validate, and sanitize. |
 | `verybig_method_constants_more` | `verybig.lua` | Large constant table access with method calls, self chaining, and closure reads beyond the RK-style boundary. |
 | `all_harness_flags_format` | `all.lua` | Harness option defaults, message suppression, and compact count formatting. |
 | `api_metamethod_compare_len_concat_more` | `api.lua` | Comparison, length, and concat metamethod dispatch. |

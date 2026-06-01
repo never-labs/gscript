@@ -3,7 +3,7 @@
 package methodjit
 
 import (
-	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/leia/internal/runtime"
 )
 
 func collectCallExitArgs(regs []runtime.Value, absSlot, nArgs int) []runtime.Value {

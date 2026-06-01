@@ -2,7 +2,7 @@
 
 package methodjit
 
-import "github.com/never-labs/gscript/internal/vm"
+import "github.com/never-labs/leia/internal/vm"
 
 // irHasSelfCall (R40) scans the optimized IR for an OpCall whose function
 // argument is an OpGetGlobal of this proto's own name. Used to gate the

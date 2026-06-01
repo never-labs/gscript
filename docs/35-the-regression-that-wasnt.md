@@ -23,7 +23,7 @@ That's when I stopped writing the plan and started running the benchmark.
 
 ## Fifteen runs, one distribution
 
-A diagnostic sub-agent ran `gscript -jit benchmarks/recursion/fibonacci_iterative.gs` fifteen times at HEAD (`6ba79c3`) and fifteen times at the R23 baseline (`df2e2ec`). Here's what came back:
+A diagnostic sub-agent ran `leia -jit benchmarks/recursion/fibonacci_iterative.leia` fifteen times at HEAD (`6ba79c3`) and fifteen times at the R23 baseline (`df2e2ec`). Here's what came back:
 
 ```
 HEAD     mean: 0.292s ± 0.008s
@@ -54,7 +54,7 @@ I went looking at `benchmarks/run_all.sh` and found what I expected:
 ```bash
 for bench in "${EXISTING_BENCHMARKS[@]}"; do
     echo "--- $bench (JIT) ---"
-    output=$(run_with_timeout "$TIMEOUT_SEC" "$GSCRIPT_BIN" -jit "benchmarks/suite/${bench}.gs" 2>&1)
+    output=$(run_with_timeout "$TIMEOUT_SEC" "$LEIA_BIN" -jit "benchmarks/suite/${bench}.leia" 2>&1)
     # ...
     time_line=$(echo "$output" | grep -i "Time:" | tail -1)
     JIT_RESULTS+=("$time_line")
@@ -72,7 +72,7 @@ So R25 isn't a perf round. It's a harness repair round. Three mandatory tasks, o
 1. **Median-of-N runner.** Wrap each suite benchmark in a 3-iteration loop, parse the `Time:` lines, sort, emit the median. Keep the output format byte-identical so the JSON writer keeps working.
 2. **Re-baseline.** Run the new tool at HEAD with `--runs=5`, copy `latest.json` to `baseline.json`. This is R26's starting anchor.
 3. **Document the pitfall.** Add Lesson 11 to `lessons-learned.md`. "Single-shot benchmarks produce false regressions."
-4. *(stretch)* **Fix the overflow deopt PC.** The research sub-agent found a related latent bug: `tier1_manager.go` catches `errIntSpecDeopt`, disables int-spec for the proto, recompiles, and re-enters at *pc=0*. Not at the PC where the guard fired. LuaJIT exits at the exact bytecode PC of the failing op (`lj_snap.c`); V8's SpeculativeNumberAdd lowers to Int32AddWithOverflow with a DeoptimizeIf that reconstructs the frame at the failing node. GScript restarts the whole function. If the overflow-causing ADD is preceded by a side-effecting CALL, that call replays. No current benchmark observes this, but it's a design trap.
+4. *(stretch)* **Fix the overflow deopt PC.** The research sub-agent found a related latent bug: `tier1_manager.go` catches `errIntSpecDeopt`, disables int-spec for the proto, recompiles, and re-enters at *pc=0*. Not at the PC where the guard fired. LuaJIT exits at the exact bytecode PC of the failing op (`lj_snap.c`); V8's SpeculativeNumberAdd lowers to Int32AddWithOverflow with a DeoptimizeIf that reconstructs the frame at the failing node. Leia restarts the whole function. If the overflow-causing ADD is preceded by a side-effecting CALL, that call replays. No current benchmark observes this, but it's a design trap.
 
 I'll take the first three no matter what. The fourth only if there's budget left.
 

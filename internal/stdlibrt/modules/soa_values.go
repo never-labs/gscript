@@ -3,7 +3,7 @@ package modules
 import (
 	"fmt"
 
-	stdsoa "github.com/never-labs/gscript/internal/stdlib/soa"
+	stdsoa "github.com/never-labs/leia/internal/stdlib/soa"
 )
 
 func requireSoAArg(name string, args []Value, index int) (*SoA, error) {

@@ -1,4 +1,4 @@
-package gscript_test
+package leia_test
 
 import (
 	"context"
@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	gs "github.com/never-labs/gscript"
-	"github.com/never-labs/gscript/llm"
-	"github.com/never-labs/gscript/llm/anthropic"
+	leia "github.com/never-labs/leia"
+	"github.com/never-labs/leia/llm"
+	"github.com/never-labs/leia/llm/anthropic"
 )
 
 const defaultGLMAnthropicCompatibleBaseURL = "https://open.bigmodel.cn/api/anthropic"
@@ -23,20 +23,20 @@ type glmSmokeConfig struct {
 
 func glmAnthropicCompatibleSmokeConfig(t *testing.T) glmSmokeConfig {
 	t.Helper()
-	if os.Getenv("GSCRIPT_LLM_INTEGRATION") == "" {
-		t.Skip("set GSCRIPT_LLM_INTEGRATION=1 to run real GLM provider smoke")
+	if os.Getenv("LEIA_LLM_INTEGRATION") == "" {
+		t.Skip("set LEIA_LLM_INTEGRATION=1 to run real GLM provider smoke")
 	}
-	endpoint := firstNonEmptyEnv("GSCRIPT_GLM_BASE_URL", "ANTHROPIC_BASE_URL")
+	endpoint := firstNonEmptyEnv("LEIA_GLM_BASE_URL", "ANTHROPIC_BASE_URL")
 	if endpoint == "" {
 		endpoint = defaultGLMAnthropicCompatibleBaseURL
 	}
-	apiKey := firstNonEmptyEnv("GSCRIPT_GLM_API_KEY", "SENTINEL_GLM_API_KEY", "GLM_API_KEY", "ANTHROPIC_AUTH_TOKEN")
-	model := firstNonEmptyEnv("GSCRIPT_GLM_MODEL", "GLM_MODEL", "ANTHROPIC_MODEL")
+	apiKey := firstNonEmptyEnv("LEIA_GLM_API_KEY", "SENTINEL_GLM_API_KEY", "GLM_API_KEY", "ANTHROPIC_AUTH_TOKEN")
+	model := firstNonEmptyEnv("LEIA_GLM_MODEL", "GLM_MODEL", "ANTHROPIC_MODEL")
 	if model == "" {
 		model = "glm-5.1"
 	}
 	if apiKey == "" {
-		t.Skip("set GSCRIPT_GLM_API_KEY, SENTINEL_GLM_API_KEY, or GLM_API_KEY; glm_cc uses SENTINEL_GLM_API_KEY/GLM_API_KEY")
+		t.Skip("set LEIA_GLM_API_KEY, SENTINEL_GLM_API_KEY, or GLM_API_KEY; glm_cc uses SENTINEL_GLM_API_KEY/GLM_API_KEY")
 	}
 	return glmSmokeConfig{Endpoint: endpoint, APIKey: apiKey, Model: model}
 }
@@ -73,7 +73,7 @@ func TestGLMAnthropicCompatibleLLMIntegration(t *testing.T) {
 	}
 
 	temperature := 0.0
-	prompt := "Reply with exactly: gscript glm smoke ok"
+	prompt := "Reply with exactly: leia glm smoke ok"
 	fmt.Printf("endpoint=%s\n", cfg.Endpoint)
 	fmt.Printf("model=%s\n", cfg.Model)
 	fmt.Printf("user=%q\n", prompt)
@@ -91,7 +91,7 @@ func TestGLMAnthropicCompatibleLLMIntegration(t *testing.T) {
 	fmt.Printf("status=%s reason=%s input_tokens=%d output_tokens=%d\n",
 		res.Status, res.Reason, res.Usage.InputTokens, res.Usage.OutputTokens)
 	fmt.Printf("text=%q\n", res.Text)
-	assertLLMSmokeText(t, res.Text, "gscript glm smoke ok")
+	assertLLMSmokeText(t, res.Text, "leia glm smoke ok")
 }
 
 // TestLLMSyntaxGLMIntegration verifies a real multi-turn GLM flow through
@@ -99,21 +99,21 @@ func TestGLMAnthropicCompatibleLLMIntegration(t *testing.T) {
 // env convention but never shells out to it.
 func TestLLMSyntaxGLMIntegration(t *testing.T) {
 	cfg := glmAnthropicCompatibleSmokeConfig(t)
-	t.Setenv("GSCRIPT_GLM_BASE_URL", cfg.Endpoint)
-	t.Setenv("GSCRIPT_GLM_API_KEY", cfg.APIKey)
-	t.Setenv("GSCRIPT_GLM_MODEL", cfg.Model)
+	t.Setenv("LEIA_GLM_BASE_URL", cfg.Endpoint)
+	t.Setenv("LEIA_GLM_API_KEY", cfg.APIKey)
+	t.Setenv("LEIA_GLM_MODEL", cfg.Model)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 	defer cancel()
-	vm := gs.New(gs.WithLibs(gs.LibString | gs.LibOS | gs.LibLLM))
+	vm := leia.New(leia.WithLibs(leia.LibString | leia.LibOS | leia.LibLLM))
 	if err := vm.ExecContext(ctx, `
 models {
     default: "glm-smoke"
     "glm-smoke": {
         protocol: "anthropic_compatible"
-        base_url: os.getenv("GSCRIPT_GLM_BASE_URL")
-        api_key: os.getenv("GSCRIPT_GLM_API_KEY")
-        provider_model: os.getenv("GSCRIPT_GLM_MODEL")
+        base_url: os.getenv("LEIA_GLM_BASE_URL")
+        api_key: os.getenv("LEIA_GLM_API_KEY")
+        provider_model: os.getenv("LEIA_GLM_MODEL")
     }
 }
 
@@ -232,21 +232,21 @@ if stored_err != nil {
 // the same way as the other GLM smokes and never invokes glm_cc.
 func TestLLMSyntaxGLMDirectAgentToolsIntegration(t *testing.T) {
 	cfg := glmAnthropicCompatibleSmokeConfig(t)
-	t.Setenv("GSCRIPT_GLM_BASE_URL", cfg.Endpoint)
-	t.Setenv("GSCRIPT_GLM_API_KEY", cfg.APIKey)
-	t.Setenv("GSCRIPT_GLM_MODEL", cfg.Model)
+	t.Setenv("LEIA_GLM_BASE_URL", cfg.Endpoint)
+	t.Setenv("LEIA_GLM_API_KEY", cfg.APIKey)
+	t.Setenv("LEIA_GLM_MODEL", cfg.Model)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
-	vm := gs.New(gs.WithLibs(gs.LibString | gs.LibOS | gs.LibLLM))
+	vm := leia.New(leia.WithLibs(leia.LibString | leia.LibOS | leia.LibLLM))
 	if err := vm.ExecContext(ctx, `
 models {
     default: "glm-smoke"
     "glm-smoke": {
         protocol: "anthropic_compatible"
-        base_url: os.getenv("GSCRIPT_GLM_BASE_URL")
-        api_key: os.getenv("GSCRIPT_GLM_API_KEY")
-        provider_model: os.getenv("GSCRIPT_GLM_MODEL")
+        base_url: os.getenv("LEIA_GLM_BASE_URL")
+        api_key: os.getenv("LEIA_GLM_API_KEY")
+        provider_model: os.getenv("LEIA_GLM_MODEL")
     }
 }
 

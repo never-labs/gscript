@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/never-labs/gscript/llm"
+	"github.com/never-labs/leia/llm"
 )
 
 type classifiedError string

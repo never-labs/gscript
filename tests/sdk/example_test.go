@@ -1,19 +1,19 @@
-package gscript_test
+package leia_test
 
 import (
 	"errors"
 	"fmt"
 
-	gs "github.com/never-labs/gscript"
+	leia "github.com/never-labs/leia"
 )
 
 func ExampleCompile() {
-	prog, err := gs.Compile(`result := 40 + 2`, gs.WithSourceName("calc.gs"))
+	prog, err := leia.Compile(`result := 40 + 2`, leia.WithSourceName("calc.leia"))
 	if err != nil {
 		panic(err)
 	}
 
-	vm := gs.New(gs.WithVM())
+	vm := leia.New(leia.WithVM())
 	if err := vm.Run(prog); err != nil {
 		panic(err)
 	}
@@ -25,12 +25,12 @@ func ExampleCompile() {
 	fmt.Println(prog.SourceName(), result)
 
 	// Output:
-	// calc.gs 42
+	// calc.leia 42
 }
 
 func ExampleValue() {
-	vm := gs.New()
-	if err := vm.Set("seed", gs.Int(21)); err != nil {
+	vm := leia.New()
+	if err := vm.Set("seed", leia.Int(21)); err != nil {
 		panic(err)
 	}
 	if err := vm.Exec(`answer := seed * 2`); err != nil {
@@ -41,14 +41,14 @@ func ExampleValue() {
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println(gs.Int(21).Kind(), answer)
+	fmt.Println(leia.Int(21).Kind(), answer)
 
 	// Output:
 	// int 42
 }
 
 func ExampleVM_RegisterFunc() {
-	vm := gs.New()
+	vm := leia.New()
 	if err := vm.RegisterFunc("double", func(v int64) int64 {
 		return v * 2
 	}); err != nil {
@@ -66,7 +66,7 @@ func ExampleVM_RegisterFunc() {
 }
 
 func ExampleWithSandbox() {
-	vm := gs.New(gs.WithSandbox())
+	vm := leia.New(leia.WithSandbox())
 	if err := vm.Exec(`answer := 40 + 2`); err != nil {
 		panic(err)
 	}
@@ -86,7 +86,7 @@ func ExampleWithSandbox() {
 }
 
 func ExampleWithMaxSteps() {
-	vm := gs.New(gs.WithMaxSteps(8))
+	vm := leia.New(leia.WithMaxSteps(8))
 	err := vm.Exec(`
 		i := 0
 		for {
@@ -94,7 +94,7 @@ func ExampleWithMaxSteps() {
 		}
 	`)
 
-	var budgetErr *gs.BudgetError
+	var budgetErr *leia.BudgetError
 	fmt.Println(errors.As(err, &budgetErr), budgetErr.Resource, budgetErr.Limit)
 
 	// Output:
@@ -103,7 +103,7 @@ func ExampleWithMaxSteps() {
 
 func ExampleError() {
 	sentinel := errors.New("host failed")
-	vm := gs.New()
+	vm := leia.New()
 	if err := vm.RegisterFunc("fail", func() error {
 		return sentinel
 	}); err != nil {
@@ -112,8 +112,8 @@ func ExampleError() {
 
 	err := vm.Exec(`fail()`)
 
-	var gsErr *gs.Error
-	var hostErr *gs.HostCallbackError
+	var gsErr *leia.Error
+	var hostErr *leia.HostCallbackError
 	fmt.Println(errors.As(err, &gsErr), gsErr.Kind)
 	fmt.Println(errors.As(err, &hostErr), hostErr.Name, errors.Is(err, sentinel))
 

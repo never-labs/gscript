@@ -275,7 +275,7 @@ func TestRandShuffleReturnsTable(t *testing.T) {
 	`)
 	v := interp.GetGlobal("same")
 	// Should return the same table reference (in-place shuffle)
-	// In GScript, table equality is reference equality
+	// In Leia, table equality is reference equality
 	// The shuffle function returns args[0] which is the same Value
 	if !v.IsBool() || !v.Bool() {
 		t.Error("shuffle should return the same table")

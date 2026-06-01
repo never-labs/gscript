@@ -1,7 +1,7 @@
 //go:build darwin && arm64
 
 // emit_tier2_correctness_test.go reproduces Tier 2 correctness failures found
-// in failing benchmarks. Each test runs the same GScript program twice: once
+// in failing benchmarks. Each test runs the same Leia program twice: once
 // via the VM interpreter (oracle) and once with TieringManager (Tier 2
 // promotion). Results are compared; any mismatch indicates a Tier 2 bug.
 
@@ -9,14 +9,14 @@ package methodjit
 
 import (
 	"context"
-	"github.com/never-labs/gscript/internal/testutil/vmtest"
+	"github.com/never-labs/leia/internal/testutil/vmtest"
 	"math"
 	"os"
 	"testing"
 	"time"
 
-	"github.com/never-labs/gscript/internal/runtime"
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/runtime"
+	"github.com/never-labs/leia/internal/vm"
 )
 
 // tier2TestTimeout is the per-test timeout. Tests that hang (indicating a
@@ -222,7 +222,7 @@ result := parse("a=0|v=123", 100)
 }
 
 func TestTier2_NoFilterInlinedLoadBoolSkipTableBuilder(t *testing.T) {
-	t.Setenv("GSCRIPT_TIER2_NO_FILTER", "1")
+	t.Setenv("LEIA_TIER2_NO_FILTER", "1")
 	src := `
 func make_doc(i) {
     return {active: i % 4 != 0, value: i}
@@ -498,15 +498,15 @@ for iter := 1; iter <= 5; iter++ {
 }
 
 func TestTier2_TableExitPreservesFPRValuesNoFilter(t *testing.T) {
-	old := os.Getenv("GSCRIPT_TIER2_NO_FILTER")
+	old := os.Getenv("LEIA_TIER2_NO_FILTER")
 	t.Cleanup(func() {
 		if old == "" {
-			os.Unsetenv("GSCRIPT_TIER2_NO_FILTER")
+			os.Unsetenv("LEIA_TIER2_NO_FILTER")
 		} else {
-			os.Setenv("GSCRIPT_TIER2_NO_FILTER", old)
+			os.Setenv("LEIA_TIER2_NO_FILTER", old)
 		}
 	})
-	os.Setenv("GSCRIPT_TIER2_NO_FILTER", "1")
+	os.Setenv("LEIA_TIER2_NO_FILTER", "1")
 
 	src := `
 func make_particle(x, y, z, vx, vy, vz) {

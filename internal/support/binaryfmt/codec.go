@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/never-labs/gscript/internal/support"
+	"github.com/never-labs/leia/internal/support"
 )
 
 const maxInt48 = (1 << 47) - 1

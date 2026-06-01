@@ -1,10 +1,10 @@
-# GScript Language Specification
+# Leia Language Specification
 
-本文定义 GScript 作为 Go-style scripting language 的生产级语义边界。它不是普通设计文档，而是 Phase 0 的硬产出：embedding API、formatter、linter、安全沙盒、VM、JIT、stdlib 和官方兼容测试都必须以这里写下来的语法和行为为基准。目标不是复刻 Lua 5.4 的每个表面行为，而是把已经依赖的 Lua 兼容项、故意不同项、仍需规范项和验证 gate 固定下来，避免 JIT、VM、解释器、stdlib 或 host API 在后续优化中漂移。
+本文定义 Leia 作为 Go-style scripting language 的生产级语义边界。它不是普通设计文档，而是 Phase 0 的硬产出：embedding API、formatter、linter、安全沙盒、VM、JIT、stdlib 和官方兼容测试都必须以这里写下来的语法和行为为基准。目标不是复刻 Lua 5.4 的每个表面行为，而是把已经依赖的 Lua 兼容项、故意不同项、仍需规范项和验证 gate 固定下来，避免 JIT、VM、解释器、stdlib 或 host API 在后续优化中漂移。
 
 当前语义基线：
 
-- 兼容 oracle：`tests/language/MANIFEST.md` 中 441 个 translated official Lua case，默认比较 Lua oracle 与 `gscript -vm` 输出；设置 `GSCRIPT_OFFICIAL_CHECK_JIT=1` 时还比较 `gscript -jit`。
+- 兼容 oracle：`tests/language/MANIFEST.md` 中 441 个 translated official Lua case，默认比较 Lua oracle 与 `leia -vm` 输出；设置 `LEIA_OFFICIAL_CHECK_JIT=1` 时还比较 `leia -jit`。
 - 能力 ledger：`tests/language/MISSING_CAPABILITIES.md`。它记录已覆盖能力、明确非目标和后续翻译官方 case 时新增的候选能力。
 - 覆盖矩阵：`docs/language-feature-checklist.md` 与 `tests/feature_matrix.json`。语言语义稳定项必须同时有 parser/bytecode/runtime/official gate 或明确标为 `semantic_only` / `not_applicable`。
 - 实现锚点：`internal/runtime` 是值模型、标准库、解释器、错误、表、协程和 channel 语义源；`internal/vm` 是文件模式 bytecode、JIT gate 与 VM parity 源。
@@ -15,7 +15,7 @@ Phase 0 不以“代码能跑”为完成条件，而以“语义可被引用、
 
 必须交付：
 
-1. 本文件包含 GScript 自己的 BNF/EBNF、词法边界、表达式优先级、语句语义、值模型、错误模型、模块模型和 host capability 边界。
+1. 本文件包含 Leia 自己的 BNF/EBNF、词法边界、表达式优先级、语句语义、值模型、错误模型、模块模型和 host capability 边界。
 2. 每个稳定语言特性都能回答三件事：语法是什么、运行时行为是什么、哪些测试锁定它。
 3. `docs/language-feature-checklist.md` 和 `tests/feature_matrix.json` 每一行都能映射到本文件某个章节或明确 non-goal。
 4. formatter/linter 只格式化/诊断本文件承诺的语法；不能从 parser 实现反推出未写入规范的用户承诺。
@@ -27,14 +27,14 @@ Phase 0 验收 gate：
 
 ```bash
 go test ./tests -run 'TestFeatureMatrix|TestLanguageConformanceTranslatedCases' -count=1
-go test ./internal/runtime ./internal/vm ./gscript -count=1
+go test ./internal/runtime ./internal/vm ./leia -count=1
 ```
 
 新增或修改语言行为时，必须先改本文件和矩阵，再改实现。
 
 ## Lexical Grammar
 
-GScript 源码是 UTF-8 文本。词法层当前按 byte 扫描标识符与操作符；标识符稳定承诺为 ASCII 字母、数字和 `_`，且首字符不能是数字。非 ASCII 标识符不是 Phase 0 承诺。
+Leia 源码是 UTF-8 文本。词法层当前按 byte 扫描标识符与操作符；标识符稳定承诺为 ASCII 字母、数字和 `_`，且首字符不能是数字。非 ASCII 标识符不是 Phase 0 承诺。
 
 空白包括空格、tab、换行和回车。换行本身不是语句分隔符；`;` 是可选分隔符，主要用于一行多个语句或 C-style `for`。文件以 EOF 结束。
 
@@ -217,7 +217,7 @@ recv_expr      = "<-" expr ;
 | 8 | unary `-` `!` `#` `^` `<-` | right | negate, logical not, length, bitwise not, receive |
 | 9 | `.` `[]` `()` `:` | left | field/index/call/method call |
 
-Unary `^` is bitwise not, while binary `^` is bitwise xor. This is an intentional GScript difference from Lua.
+Unary `^` is bitwise not, while binary `^` is bitwise xor. This is an intentional Leia difference from Lua.
 
 ## Core Behavioral Rules
 
@@ -252,7 +252,7 @@ Unary `^` is bitwise not, while binary `^` is bitwise xor. This is an intentiona
 - `for {}` is an infinite loop until `break`, `return`, `goto`, error, coroutine yield, or explicit host-backed cancellation logic observes a cancellation channel.
 - `for cond {}` tests `cond` before each iteration.
 - `for init; cond; post {}` executes `init` once, then `cond` before each iteration, then `post` after each normal iteration.
-- `for k := range expr {}` and `for k, v := range expr {}` use the GScript range protocol for tables/channels/iterables as implemented and tested; exact extension points must be written before new range sources become stable.
+- `for k := range expr {}` and `for k, v := range expr {}` use the Leia range protocol for tables/channels/iterables as implemented and tested; exact extension points must be written before new range sources become stable.
 - `break` and `continue` apply to the innermost loop.
 - `goto` is function-local. It may jump out of a block but must not jump into a deeper scope or over declarations whose lifetime would be skipped.
 
@@ -297,7 +297,7 @@ Unary `^` is bitwise not, while binary `^` is bitwise xor. This is an intentiona
 - 值类型集合：`nil`、`boolean`、`number`、`string`、`table`、`function`、`coroutine`、`channel`。
 - `number` 包含 integer 与 float 两个内部子类；`type(1)` 与 `type(1.0)` 都返回 `"number"`，`math.type` 暴露子类。
 - Lua 风格 truthiness：只有 `nil` 和 `false` 为 false。
-- 多返回、vararg、普通赋值、调用、表构造的尾部展开/非尾部单值调整；GScript 额外提供显式 `spread(expr)` / `table.spread(...)`。
+- 多返回、vararg、普通赋值、调用、表构造的尾部展开/非尾部单值调整；Leia 额外提供显式 `spread(expr)` / `table.spread(...)`。
 - lexical local、closure/upvalue、shadowing、loop-local capture、函数返回后 upvalue 存活。
 - `const` readonly binding 与 `defer` LIFO cleanup。
 - `label:` / `goto label` 的函数内跳转规则。
@@ -325,17 +325,17 @@ Unary `^` is bitwise not, while binary `^` is bitwise xor. This is an intentiona
 
 - JIT 是否为某段代码生成 native code。
 - table 内部 array/hash/shape/typed-array/dense-matrix/lazy-tree 表示。
-- GC 时间、对象扫描顺序、finalizer 行为。GScript 不承诺 Lua `__gc` 表 finalizer；资源清理由 `defer` 表达。
+- GC 时间、对象扫描顺序、finalizer 行为。Leia 不承诺 Lua `__gc` 表 finalizer；资源清理由 `defer` 表达。
 - exact error wording，除非 specific official case 或 runtime test 已锁定。稳定的是错误类别、抛/返回模型、source 坐标和错误对象可见值。
 - debug hook 的内部事件数量和 VM/JIT instruction 级位置。稳定的是 documented event surface。
 
 ## Lua-Compatible Surface
 
-GScript 保留 Lua 兼容项的原则：脚本语义兼容优先于文案兼容；用户可观察输出兼容优先于内部调度兼容；Lua 私有 C API 和 VM 调试协议不作为目标。
+Leia 保留 Lua 兼容项的原则：脚本语义兼容优先于文案兼容；用户可观察输出兼容优先于内部调度兼容；Lua 私有 C API 和 VM 调试协议不作为目标。
 
 已稳定兼容项：
 
-- literals：字符串 escape、NUL 字节、数字 literal、long-string translated cases。GScript 额外支持 Go-style raw string；Lua long bracket delimiter 不作为源语法承诺。
+- literals：字符串 escape、NUL 字节、数字 literal、long-string translated cases。Leia 额外支持 Go-style raw string；Lua long bracket delimiter 不作为源语法承诺。
 - locals/functions：local scope、shadowing、closures、upvalues、tail-style calls、anonymous invocation、method `:` self 调用。
 - control flow：`if`、loops、`break`、numeric for、generic for、short-circuit `and` / `or` value semantics。
 - calls：固定参数、extra args ignored、missing args nil-filled、多返回调整、vararg forwarding、nested call adjustment。
@@ -352,7 +352,7 @@ GScript 保留 Lua 兼容项的原则：脚本语义兼容优先于文案兼容�
 
 这些差异是语言设计，不是缺口。
 
-| Area | GScript contract | Rationale / compat mapping |
+| Area | Leia contract | Rationale / compat mapping |
 |---|---|---|
 | Local attributes | `const name := expr` / `const name = expr`; `defer call(...)` | 不支持 Lua `<const>` / `<close>` 语法。`const` 禁止重绑定但不冻结 table 内容；`defer` 是确定性 cleanup。 |
 | Environment | `script.env(table)` / `script.sandbox(table)` / script options | 不支持 Lua `_ENV` 隐式 upvalue 作为语言机制。loader/env 必须显式。 |
@@ -371,12 +371,12 @@ GScript 保留 Lua 兼容项的原则：脚本语义兼容优先于文案兼容�
 
 Stable rules:
 
-- Runtime error 是 Go `error` 层面的失败；script `error(value)` 使用 `LuaError{Value}` 包装，`Value` 可为任意 GScript 值。
+- Runtime error 是 Go `error` 层面的失败；script `error(value)` 使用 `LuaError{Value}` 包装，`Value` 可为任意 Leia 值。
 - `pcall(f, ...)` 成功返回 `true, ...results`；失败返回 `false, errValue`。如果错误不是 `LuaError` value，应返回稳定 string/diagnostic value。
 - `xpcall(f, handler, ...)` 对 protected error 调用 handler；handler 的多返回按 single result 调整，避免把 handler 多返回误当 protected results。
 - `assert(v, msg)` 当 `v` truthy 时返回原参数；当 falsey 时抛 `msg` 或默认错误。`msg` 不强制 string 化。
 - Compile/runtime diagnostics 通过 `SourceError` 增加 `SourceName`、`Line`、`Column`，并保留底层错误 unwrap。
-- Parser/lexer/token 错误文案可以 GScript 风格，但必须包含可定位 source 坐标；文件模式、`load`、`script.compile`、`script.eval` 要一致。
+- Parser/lexer/token 错误文案可以 Leia 风格，但必须包含可定位 source 坐标；文件模式、`load`、`script.compile`、`script.eval` 要一致。
 - 参数错误使用 `bad argument #N to 'name' (...)` 风格；exact text 只有被 official case 锁定时才是 breaking surface。
 - I/O、process、network 这类 host 操作的可恢复失败优先返回 `nil, err` 或结构化 result；类型错误、缺参、非法 option 抛 runtime error。
 - `defer` 在 normal return 与 error path 都必须 LIFO drain；defer 本身出错时，当前实现的 error propagation/order 必须由 official/runtime case 锁定后才能改。
@@ -492,7 +492,7 @@ Stable rules:
 - `tonumber(value, base)` supports bases 2..36 and returns nil for invalid forms.
 - NaN is never equal, and order comparisons involving NaN are false.
 - `math.random`/`math.randomseed` protocol is deterministic only under explicit seed; unseeded randomness is not stable.
-- `bit32` is 32-bit compatibility library; `bits` is Go-style 64-bit helper; direct bitwise operators are GScript syntax.
+- `bit32` is 32-bit compatibility library; `bits` is Go-style 64-bit helper; direct bitwise operators are Leia syntax.
 
 Open items:
 
@@ -508,7 +508,7 @@ Stable rules:
 - `string` library supports Lua-compatible byte/sub/char/format/rep/reverse/find/match/gmatch/gsub where translated official cases cover behavior.
 - `..` concatenates strings and numbers directly; other values require `__concat` or error.
 - Lazy concat and native string arena are invisible optimizations; materialized value must match eager concat.
-- `utf8` uses Go `unicode/utf8` rules for strict validation and exposes GScript helpers `validate`, `sanitize`, case conversion and codepoint operations.
+- `utf8` uses Go `unicode/utf8` rules for strict validation and exposes Leia helpers `validate`, `sanitize`, case conversion and codepoint operations.
 - `regexp` is Go RE2 style, separate from Lua pattern matching.
 
 Open items:
@@ -527,7 +527,7 @@ Stable stdlib rules:
 
 - Builtin modules are plain tables and can be monkey-patched unless protected by future explicit design.
 - Host wrappers use Go canonical behavior where documented: `path`/`fs`, `net/url`, `encoding/csv`, `regexp`, crypto, compression, time layouts.
-- JSON encoding treats array/sparse/mixed tables according to GScript Go-host JSON tests; NaN/Inf must be rejected.
+- JSON encoding treats array/sparse/mixed tables according to Leia Go-host JSON tests; NaN/Inf must be rejected.
 - Binary pack/unpack uses explicit endian and Go-style field tokens. `string.pack`/`unpack` may expose compatibility entry points but do not promise Lua format-string parity.
 - `io` file handles expose open/closed state; `file:read` supports `"a"`, `"l"`, `"L"`, `"n"`, `read(n)`, `read(0)` and multiple formats.
 
@@ -551,7 +551,7 @@ Language stability is owned by VM semantics. JIT is an optimization tier and mus
 Required gates:
 
 - `go test ./tests -run TestLanguageConformanceTranslatedCases -count=1 -v`
-- `GSCRIPT_OFFICIAL_CHECK_JIT=1 go test ./tests -run TestLanguageConformanceTranslatedCases -count=1 -v`
+- `LEIA_OFFICIAL_CHECK_JIT=1 go test ./tests -run TestLanguageConformanceTranslatedCases -count=1 -v`
 - Focused `internal/runtime` tests for new interpreter/runtime behavior.
 - Focused `internal/vm` tests for compiler/opcode/source-diagnostic/JIT-gate parity.
 - `tests/feature_matrix.json` row updated for any new language feature.
@@ -569,7 +569,7 @@ JIT must VM-fallback or gate when encountering:
 
 Before enabling a native path, add:
 
-1. Positive official case with `GSCRIPT_OFFICIAL_CHECK_JIT=1`.
+1. Positive official case with `LEIA_OFFICIAL_CHECK_JIT=1`.
 2. Negative/deopt case where guard fails after warmup.
 3. Source diagnostic case if the native op can throw.
 4. Side-effect replay case if fallback can happen after mutation/call/I/O.
@@ -607,7 +607,7 @@ Exit criteria:
 Deliverables:
 
 - Host API docs for creating interpreters, setting globals, loading files, script env/sandbox, process args/entry, output capture and error unwrapping.
-- Error object mapping: GScript value -> Go error -> `pcall` result.
+- Error object mapping: Leia value -> Go error -> `pcall` result.
 - Concurrency contract for channels and goroutines.
 
 Exit criteria:

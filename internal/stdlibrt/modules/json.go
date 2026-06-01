@@ -6,7 +6,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/leia/internal/runtime"
 )
 
 // BuildJSON creates the "json" standard library table.

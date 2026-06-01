@@ -10,9 +10,9 @@ package methodjit
 import (
 	"fmt"
 
-	"github.com/never-labs/gscript/internal/jit"
-	"github.com/never-labs/gscript/internal/runtime"
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/jit"
+	"github.com/never-labs/leia/internal/runtime"
+	"github.com/never-labs/leia/internal/vm"
 )
 
 // Suppress unused import warnings.
@@ -1007,7 +1007,7 @@ type emitContext struct {
 	instrCodeRanges []InstrCodeRange
 
 	// exitResumeCheck carries debug-only site metadata and enables shadow
-	// materialization writes when GSCRIPT_EXIT_RESUME_CHECK=1 at compile time.
+	// materialization writes when LEIA_EXIT_RESUME_CHECK=1 at compile time.
 	exitResumeCheck *exitResumeCheckMetadata
 
 	tier2BlockCounterIndex map[int]int

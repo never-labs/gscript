@@ -3,7 +3,7 @@ package modules
 import (
 	"fmt"
 
-	stdencoding "github.com/never-labs/gscript/internal/stdlib/encoding"
+	stdencoding "github.com/never-labs/leia/internal/stdlib/encoding"
 )
 
 // BuildEncoding creates the "encoding" standard library table.

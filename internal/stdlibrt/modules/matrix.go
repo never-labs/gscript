@@ -3,7 +3,7 @@ package modules
 import (
 	"fmt"
 
-	stdmatrix "github.com/never-labs/gscript/internal/stdlib/matrix"
+	stdmatrix "github.com/never-labs/leia/internal/stdlib/matrix"
 )
 
 // BuildMatrix creates the "matrix" standard library table.

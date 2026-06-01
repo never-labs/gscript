@@ -1,6 +1,6 @@
 -- Benchmark: Ackermann Function
 -- Tests: deep recursion, function call overhead, integer comparison
--- ack(3,4) = 125, matches GScript benchmark: ack(3,4) x 50000 reps
+-- ack(3,4) = 125, matches Leia benchmark: ack(3,4) x 50000 reps
 
 local function ack(m, n)
     if m == 0 then return n + 1 end

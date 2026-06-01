@@ -3,7 +3,7 @@ package methodjit
 import (
 	"fmt"
 
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/vm"
 )
 
 // FixedShapeTableFact describes a table SSA value whose hidden-class shape is

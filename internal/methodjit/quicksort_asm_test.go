@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/vm"
 )
 
 func TestQuicksortBytecode(t *testing.T) {

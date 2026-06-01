@@ -11,7 +11,7 @@ package methodjit
 import (
 	"testing"
 
-	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/leia/internal/runtime"
 )
 
 // TestTier2Emit_FusedBranch_IntCmp verifies that a loop with an integer

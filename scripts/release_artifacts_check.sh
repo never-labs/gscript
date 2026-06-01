@@ -12,7 +12,7 @@ Checks scripts/release_artifacts.sh without changing its implementation.
 Default mode runs a dry-run and verifies the planned artifact names and metadata.
 With --build, the script builds into a temporary output directory unless
 --output-dir is provided, then verifies SHA256SUMS and runs the built binary
-against tests/smoke/01_basic.gs.
+against tests/smoke/01_basic.leia.
 
 Options:
       --build           Run a real local build after the dry-run check
@@ -26,8 +26,8 @@ USAGE
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 repo_root="$(cd "$script_dir/.." && pwd -P)"
 release_script="$repo_root/scripts/release_artifacts.sh"
-smoke_script="tests/smoke/01_basic.gs"
-expected_module_path="github.com/never-labs/gscript"
+smoke_script="tests/smoke/01_basic.leia"
+expected_module_path="github.com/never-labs/leia"
 
 build="false"
 out_dir=""
@@ -169,12 +169,12 @@ if [[ "$goos" == "windows" ]]; then
   exe_ext=".exe"
 fi
 
-artifact_base="gscript_${version}_${goos}_${goarch}"
+artifact_base="leia_${version}_${goos}_${goarch}"
 binary_name="${artifact_base}${exe_ext}"
 metadata_name="${artifact_base}_metadata.txt"
 
-dry_run_dir="$(mktemp -d "${TMPDIR:-/tmp}/gscript-release-artifacts-check-dry-run.XXXXXX")"
-dry_run_log="$(mktemp "${TMPDIR:-/tmp}/gscript-release-artifacts-dry-run.XXXXXX")"
+dry_run_dir="$(mktemp -d "${TMPDIR:-/tmp}/leia-release-artifacts-check-dry-run.XXXXXX")"
+dry_run_log="$(mktemp "${TMPDIR:-/tmp}/leia-release-artifacts-dry-run.XXXXXX")"
 trap 'rm -f "$dry_run_log"' EXIT
 
 rmdir "$dry_run_dir"
@@ -204,7 +204,7 @@ fi
 
 created_tmp="false"
 if [[ -z "$out_dir" ]]; then
-  out_dir="$(mktemp -d "${TMPDIR:-/tmp}/gscript-release-artifacts-build.XXXXXX")"
+  out_dir="$(mktemp -d "${TMPDIR:-/tmp}/leia-release-artifacts-build.XXXXXX")"
   created_tmp="true"
 elif [[ "$out_dir" != /* ]]; then
   out_dir="$repo_root/$out_dir"

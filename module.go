@@ -1,4 +1,4 @@
-package gscript
+package leia
 
 import (
 	"fmt"
@@ -7,7 +7,7 @@ import (
 	"unicode/utf8"
 )
 
-// Module is a Go-backed namespace exposed to GScript through require(name).
+// Module is a Go-backed namespace exposed to Leia through require(name).
 // Values use the same reflection conversion rules as RegisterFunc and Set.
 type Module map[string]interface{}
 

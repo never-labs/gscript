@@ -331,7 +331,7 @@ func (ctx *aiValidationContext) validateAIMessageFields(fields []TableField) err
 
 func validateToolDecl(s *ToolDeclStmt) error {
 	if len(s.Requires) == 0 {
-		return fmt.Errorf("line %d: tool %s missing gscript:requires directive", s.P.Line, s.Name)
+		return fmt.Errorf("line %d: tool %s missing leia:requires directive", s.P.Line, s.Name)
 	}
 	if err := validateToolRequires(s); err != nil {
 		return err
@@ -343,15 +343,15 @@ func validateToolRequires(s *ToolDeclStmt) error {
 	seen := map[string]bool{}
 	for _, req := range s.Requires {
 		if !isValidCapabilityName(req) {
-			return fmt.Errorf("line %d: tool %s has invalid gscript:requires capability %q", s.P.Line, s.Name, req)
+			return fmt.Errorf("line %d: tool %s has invalid leia:requires capability %q", s.P.Line, s.Name, req)
 		}
 		if seen[req] {
-			return fmt.Errorf("line %d: tool %s has duplicate gscript:requires capability %q", s.P.Line, s.Name, req)
+			return fmt.Errorf("line %d: tool %s has duplicate leia:requires capability %q", s.P.Line, s.Name, req)
 		}
 		seen[req] = true
 	}
 	if len(s.Requires) > 1 && seen["none"] {
-		return fmt.Errorf("line %d: tool %s uses gscript:requires none with other capabilities", s.P.Line, s.Name)
+		return fmt.Errorf("line %d: tool %s uses leia:requires none with other capabilities", s.P.Line, s.Name)
 	}
 	return nil
 }
@@ -394,10 +394,10 @@ func validateToolParamDocs(s *ToolDeclStmt) error {
 	seen := map[string]bool{}
 	for _, d := range s.ParamDocEntries {
 		if !params[d.Name] {
-			return fmt.Errorf("line %d: tool %s has gscript:param for unknown parameter %q", s.P.Line, s.Name, d.Name)
+			return fmt.Errorf("line %d: tool %s has leia:param for unknown parameter %q", s.P.Line, s.Name, d.Name)
 		}
 		if seen[d.Name] {
-			return fmt.Errorf("line %d: tool %s has duplicate gscript:param for %q", s.P.Line, s.Name, d.Name)
+			return fmt.Errorf("line %d: tool %s has duplicate leia:param for %q", s.P.Line, s.Name, d.Name)
 		}
 		seen[d.Name] = true
 	}

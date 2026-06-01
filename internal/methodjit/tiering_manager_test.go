@@ -12,15 +12,15 @@
 package methodjit
 
 import (
-	"github.com/never-labs/gscript/internal/testutil/vmtest"
+	"github.com/never-labs/leia/internal/testutil/vmtest"
 	"os"
 	"testing"
 
-	"github.com/never-labs/gscript/internal/runtime"
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/runtime"
+	"github.com/never-labs/leia/internal/vm"
 )
 
-// runWithTieringManager compiles and runs GScript source with the TieringManager.
+// runWithTieringManager compiles and runs Leia source with the TieringManager.
 // Returns the VM and manager for inspection.
 func runWithTieringManager(t *testing.T, src string) (*vm.VM, *TieringManager) {
 	t.Helper()
@@ -65,15 +65,15 @@ for w := 1; w <= 4; w++ {
 }
 
 func TestTieringManager_TableFieldAccessPromotesAtCallBoundary(t *testing.T) {
-	old := os.Getenv("GSCRIPT_TIER2_NO_FILTER")
+	old := os.Getenv("LEIA_TIER2_NO_FILTER")
 	t.Cleanup(func() {
 		if old == "" {
-			os.Unsetenv("GSCRIPT_TIER2_NO_FILTER")
+			os.Unsetenv("LEIA_TIER2_NO_FILTER")
 		} else {
-			os.Setenv("GSCRIPT_TIER2_NO_FILTER", old)
+			os.Setenv("LEIA_TIER2_NO_FILTER", old)
 		}
 	})
-	os.Unsetenv("GSCRIPT_TIER2_NO_FILTER")
+	os.Unsetenv("LEIA_TIER2_NO_FILTER")
 
 	src := `
 func make_particles(n) {
@@ -1392,7 +1392,7 @@ result := acc()
 }
 
 func TestTieringManager_LoopFixedTableConstructorsCanPromote(t *testing.T) {
-	t.Setenv("GSCRIPT_TIER2_NO_FILTER", "")
+	t.Setenv("LEIA_TIER2_NO_FILTER", "")
 
 	src := `
 func make_document(i) {

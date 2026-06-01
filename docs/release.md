@@ -1,6 +1,6 @@
 # Release Engineering Roadmap
 
-This document defines the release process needed to ship GScript as a
+This document defines the release process needed to ship Leia as a
 production artifact while preserving language compatibility, JIT correctness,
 and performance visibility.
 
@@ -47,7 +47,7 @@ Compatibility has three layers:
 The VM remains the semantic oracle for JIT behavior. A release candidate must
 show that default JIT and no-filter JIT preserve VM-visible behavior on the
 benchmark and test surface. LuaJIT is a performance and cross-check reference
-for translated Lua benchmarks, not the final authority for GScript-only
+for translated Lua benchmarks, not the final authority for Leia-only
 features.
 
 Breaking changes require:
@@ -73,10 +73,10 @@ Minimum release matrix target:
 
 | Platform | Artifact | Expected support |
 |---|---|---|
-| `darwin/arm64` | tarball or zip with `gscript` binary | VM and ARM64 JIT |
-| `linux/amd64` | tarball with `gscript` binary | VM; JIT only if backend support exists |
-| `linux/arm64` | tarball with `gscript` binary | VM; JIT only if backend support exists |
-| `windows/amd64` | zip with `gscript.exe` | VM; JIT only if backend support exists |
+| `darwin/arm64` | tarball or zip with `leia` binary | VM and ARM64 JIT |
+| `linux/amd64` | tarball with `leia` binary | VM; JIT only if backend support exists |
+| `linux/arm64` | tarball with `leia` binary | VM; JIT only if backend support exists |
+| `windows/amd64` | zip with `leia.exe` | VM; JIT only if backend support exists |
 
 Release notes must state which artifacts include JIT support and which run in
 VM-only mode.
@@ -86,7 +86,7 @@ VM-only mode.
 Each tagged release should publish:
 
 - source archive from the tag;
-- platform binaries named `gscript_vX.Y.Z_<os>_<arch>.<ext>`;
+- platform binaries named `leia_vX.Y.Z_<os>_<arch>.<ext>`;
 - SHA256 checksums for every binary archive;
 - SBOM or dependency manifest when packaging becomes automated;
 - release notes with compatibility, migration, known issues, and performance
@@ -117,7 +117,7 @@ and does not create the output directory, compile the binary, or write files:
 
 ```bash
 bash scripts/release_artifacts.sh --version vX.Y.Z \
-  --output-dir /tmp/gscript-release-smoke \
+  --output-dir /tmp/leia-release-smoke \
   --dry-run
 ```
 
@@ -132,22 +132,22 @@ Use a temporary output directory for local smoke tests without touching `dist/`:
 
 ```bash
 bash scripts/release_artifacts.sh --version vX.Y.Z \
-  --output-dir /tmp/gscript-release-smoke
-/tmp/gscript-release-smoke/gscript_vX.Y.Z_<goos>_<goarch> -e 'print("ok")'
-cat /tmp/gscript-release-smoke/SHA256SUMS
+  --output-dir /tmp/leia-release-smoke
+/tmp/leia-release-smoke/leia_vX.Y.Z_<goos>_<goarch> -e 'print("ok")'
+cat /tmp/leia-release-smoke/SHA256SUMS
 ```
 
 For release-candidate evidence, run the same check with a real local build.
 When `--output-dir` is omitted, it builds into an auto-created temporary
 directory, verifies both `SHA256SUMS` entries against SHA256, and runs the built
-CLI on `tests/01_basic.gs`:
+CLI on `tests/01_basic.leia`:
 
 ```bash
 bash scripts/release_artifacts_check.sh --version vX.Y.Z --build
 ```
 
 When version metadata is wired into the binary, include tag, commit SHA, build
-date, and dirty-tree status in `gscript --version` or an equivalent command.
+date, and dirty-tree status in `leia --version` or an equivalent command.
 
 ## README And Examples
 
@@ -259,7 +259,7 @@ The required CI jobs are:
 
 | Job | Command | Purpose |
 |---|---|---|
-| `go test quick` | `go test ./gscript ./cmd/gscript ./internal/lexer ./internal/parser ./internal/runtime ./internal/vm -count=1` | Fast coverage for public API, CLI package, parser/runtime/VM, and core implementation packages. |
+| `go test quick` | `go test ./leia ./cmd/leia ./internal/lexer ./internal/parser ./internal/runtime ./internal/vm -count=1` | Fast coverage for public API, CLI package, parser/runtime/VM, and core implementation packages. |
 | `production_check --quick` | `bash scripts/production_check.sh --quick` | Repository-owned preflight that mirrors the quick production checklist. |
 | `release matrix gate` | `go test ./tests -run 'TestFeatureMatrixSchema|TestReleaseMatrix' -count=1` | Metadata gate for feature matrix coverage, release matrix refs, official-case ledgers, and stdlib contract linkage. |
 

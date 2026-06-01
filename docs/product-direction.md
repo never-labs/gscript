@@ -1,6 +1,6 @@
 # Product Direction
 
-GScript should present itself as an embeddable Go scripting language with two
+Leia should present itself as an embeddable Go scripting language with two
 clear differentiators:
 
 1. **AI-native automation**: agents, tools, model configuration, history,
@@ -11,19 +11,19 @@ clear differentiators:
    specialize numeric and record-heavy loops.
 
 This direction borrows from Odin's public clarity around data-oriented
-programming, but keeps GScript dynamic, embeddable, and Go-host friendly.
+programming, but keeps Leia dynamic, embeddable, and Go-host friendly.
 
 ## Positioning
 
 Short form:
 
-> GScript is an embeddable Go scripting language for AI-native automation and
+> Leia is an embeddable Go scripting language for AI-native automation and
 > data-oriented hot paths.
 
 What this means:
 
-- Go applications can embed GScript as a sandboxable runtime.
-- Users can run GScript as a standalone CLI language.
+- Go applications can embed Leia as a sandboxable runtime.
+- Users can run Leia as a standalone CLI language.
 - AI workflows are first-class enough to be readable in scripts, but still
   testable through provider injection, record/replay, and capability checks.
 - Data-oriented workloads can opt into dense/SOA storage without turning the
@@ -47,7 +47,7 @@ work:
 
 The initial language-level SOA rule is intentionally small:
 
-```gscript
+```leia
 points := soa.zip({
     x: []f64{1, 2, 3},
     y: []f64{10, 20, 30},
@@ -66,12 +66,12 @@ materialization.
 
 ## Tooling Direction
 
-`gscript test` should become the public script test runner rather than a hidden
+`leia test` should become the public script test runner rather than a hidden
 Go harness. The first stable primitives are:
 
 - stdout golden files through sibling `.out`;
 - `--list` for deterministic discovery and future CI sharding;
-- `--seed` for deterministic randomized tests through `GSCRIPT_TEST_SEED`;
+- `--seed` for deterministic randomized tests through `LEIA_TEST_SEED`;
 - JSON output for CI and editor integration.
 
 Future work should add a script-level `testing` module, per-test timeouts,

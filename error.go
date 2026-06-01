@@ -1,4 +1,4 @@
-package gscript
+package leia
 
 import (
 	"errors"
@@ -6,20 +6,20 @@ import (
 	"regexp"
 	"strconv"
 
-	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/leia/internal/runtime"
 )
 
-// ErrorKind identifies the phase of GScript execution that produced an error.
+// ErrorKind identifies the phase of Leia execution that produced an error.
 type ErrorKind string
 
 const (
 	ErrLex     ErrorKind = "lex"
 	ErrParse   ErrorKind = "parse"
 	ErrRuntime ErrorKind = "runtime"
-	ErrScript  ErrorKind = "script" // error() called from GScript
+	ErrScript  ErrorKind = "script" // error() called from Leia
 )
 
-// Error is a structured error from GScript execution.
+// Error is a structured error from Leia execution.
 type Error struct {
 	Kind    ErrorKind
 	Message string
@@ -28,8 +28,8 @@ type Error struct {
 	File    string
 	// Err holds the underlying cause, when one is available.
 	Err error
-	// Value holds the original GScript error value when Kind == ErrScript.
-	// It may be a string, table, or any GScript value converted to interface{}.
+	// Value holds the original Leia error value when Kind == ErrScript.
+	// It may be a string, table, or any Leia value converted to interface{}.
 	Value interface{}
 }
 

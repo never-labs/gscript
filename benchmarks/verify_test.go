@@ -3,15 +3,15 @@ package benchmarks
 import (
 	"testing"
 
-	gs "github.com/never-labs/gscript"
+	leia "github.com/never-labs/leia"
 	lua "github.com/yuin/gopher-lua"
 	"go.starlark.net/starlark"
 )
 
 // TestVerifyResults ensures all runtimes produce correct results.
 func TestVerifyResults(t *testing.T) {
-	// GScript tree-walker: fib(20)
-	vm := gs.New()
+	// Leia tree-walker: fib(20)
+	vm := leia.New()
 	if err := vm.Exec(`
 func fib(n) {
     if n < 2 { return n }
@@ -19,17 +19,17 @@ func fib(n) {
 }
 result := fib(20)
 `); err != nil {
-		t.Fatalf("GScript tree-walker error: %v", err)
+		t.Fatalf("Leia tree-walker error: %v", err)
 	}
 	r, _ := vm.Get("result")
 	if r != int64(6765) {
-		t.Errorf("GScript tree-walker: got %v (%T), want 6765", r, r)
+		t.Errorf("Leia tree-walker: got %v (%T), want 6765", r, r)
 	} else {
-		t.Logf("GScript tree-walker: fib(20) = %v  OK", r)
+		t.Logf("Leia tree-walker: fib(20) = %v  OK", r)
 	}
 
-	// GScript bytecode VM: fib(20)
-	vm2 := gs.New(gs.WithVM())
+	// Leia bytecode VM: fib(20)
+	vm2 := leia.New(leia.WithVM())
 	if err := vm2.Exec(`
 func fib(n) {
     if n < 2 { return n }
@@ -37,13 +37,13 @@ func fib(n) {
 }
 result := fib(20)
 `); err != nil {
-		t.Fatalf("GScript bytecode VM error: %v", err)
+		t.Fatalf("Leia bytecode VM error: %v", err)
 	}
 	r2, _ := vm2.Get("result")
 	if r2 != int64(6765) {
-		t.Errorf("GScript bytecode VM: got %v (%T), want 6765", r2, r2)
+		t.Errorf("Leia bytecode VM: got %v (%T), want 6765", r2, r2)
 	} else {
-		t.Logf("GScript bytecode VM: fib(20) = %v  OK", r2)
+		t.Logf("Leia bytecode VM: fib(20) = %v  OK", r2)
 	}
 
 	// gopher-lua: fib(20)

@@ -5,7 +5,7 @@ package tests_test
 import (
 	"testing"
 
-	gs "github.com/never-labs/gscript"
+	leia "github.com/never-labs/leia"
 )
 
 // TestCallExit_LoopWithExternalCall tests a for loop that calls an external function
@@ -26,8 +26,8 @@ func sumDoubles(n) {
 }
 result := sumDoubles(100)
 `
-	vmResult := runAndGet(t, src, "result", gs.WithVM())
-	jitResult := runAndGet(t, src, "result", gs.WithJIT())
+	vmResult := runAndGet(t, src, "result", leia.WithVM())
+	jitResult := runAndGet(t, src, "result", leia.WithJIT())
 
 	// sum of 2*i for i=1..100 = 2 * 5050 = 10100
 	expected := int64(10100)
@@ -56,8 +56,8 @@ func compute(n) {
 }
 result := compute(50)
 `
-	vmResult := runAndGet(t, src, "result", gs.WithVM())
-	jitResult := runAndGet(t, src, "result", gs.WithJIT())
+	vmResult := runAndGet(t, src, "result", leia.WithVM())
+	jitResult := runAndGet(t, src, "result", leia.WithJIT())
 
 	// a = 2*i, b = 2*i, sum of 4*i for i=1..50 = 4 * 1275 = 5100
 	expected := int64(5100)
@@ -89,8 +89,8 @@ func outer(n) {
 }
 result := outer(50)
 `
-	vmResult := runAndGet(t, src, "result", gs.WithVM())
-	jitResult := runAndGet(t, src, "result", gs.WithJIT())
+	vmResult := runAndGet(t, src, "result", leia.WithVM())
+	jitResult := runAndGet(t, src, "result", leia.WithJIT())
 
 	if vmResult != jitResult {
 		t.Errorf("VM and JIT results differ: VM=%v, JIT=%v", vmResult, jitResult)
@@ -117,8 +117,8 @@ func readGlobal() {
 }
 result := readGlobal()
 `
-	vmResult := runAndGet(t, src, "result", gs.WithVM())
-	jitResult := runAndGet(t, src, "result", gs.WithJIT())
+	vmResult := runAndGet(t, src, "result", leia.WithVM())
+	jitResult := runAndGet(t, src, "result", leia.WithJIT())
 
 	expected := int64(420)
 	if vmResult != expected {
@@ -142,8 +142,8 @@ func increment(n) {
 increment(100)
 result := counter
 `
-	vmResult := runAndGet(t, src, "result", gs.WithVM())
-	jitResult := runAndGet(t, src, "result", gs.WithJIT())
+	vmResult := runAndGet(t, src, "result", leia.WithVM())
+	jitResult := runAndGet(t, src, "result", leia.WithJIT())
 
 	expected := int64(100)
 	if vmResult != expected {
@@ -164,8 +164,8 @@ func sumOfSquares(a, b, c) {
 }
 result := sumOfSquares(3, 4, 5)
 `
-	vmResult := runAndGet(t, src, "result", gs.WithVM())
-	jitResult := runAndGet(t, src, "result", gs.WithJIT())
+	vmResult := runAndGet(t, src, "result", leia.WithVM())
+	jitResult := runAndGet(t, src, "result", leia.WithJIT())
 
 	expected := int64(50)
 	if vmResult != expected {
@@ -192,8 +192,8 @@ func sumAbs(n) {
 }
 result := sumAbs(50)
 `
-	vmResult := runAndGet(t, src, "result", gs.WithVM())
-	jitResult := runAndGet(t, src, "result", gs.WithJIT())
+	vmResult := runAndGet(t, src, "result", leia.WithVM())
+	jitResult := runAndGet(t, src, "result", leia.WithJIT())
 
 	// sum of |i| for i=-50..50 = 2 * sum(1..50) = 2 * 1275 = 2550
 	expected := int64(2550)
@@ -217,8 +217,8 @@ func recur(n) {
 }
 result := recur(10)
 `
-	vmResult := runAndGet(t, src, "result", gs.WithVM())
-	jitResult := runAndGet(t, src, "result", gs.WithJIT())
+	vmResult := runAndGet(t, src, "result", leia.WithVM())
+	jitResult := runAndGet(t, src, "result", leia.WithJIT())
 
 	// helper(n) = n+1, so sum of (i+1) for i=1..10 = sum(2..11) = 65
 	expected := int64(65)

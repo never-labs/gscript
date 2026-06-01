@@ -1,7 +1,7 @@
 title: "Beyond LuaJIT"
-description: "Building a JIT compiler for GScript"
+description: "Building a JIT compiler for Leia"
 url: "https://jxwr.github.io"
-baseurl: "/gscript"
+baseurl: "/leia"
 theme: jekyll-theme-cayman
 markdown: kramdown
 permalink: pretty

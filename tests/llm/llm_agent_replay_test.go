@@ -1,19 +1,19 @@
-package gscript_test
+package leia_test
 
 import (
 	"testing"
 
-	gs "github.com/never-labs/gscript"
-	"github.com/never-labs/gscript/llm"
+	leia "github.com/never-labs/leia"
+	"github.com/never-labs/leia/llm"
 )
 
 func TestLLMAgentTurnScenarioRecordReplay(t *testing.T) {
 	for _, tc := range []struct {
 		name string
-		opts []gs.Option
+		opts []leia.Option
 	}{
 		{name: "interpreter"},
-		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			source := `
@@ -54,12 +54,12 @@ final_text := out.final
 				{Status: "final_answer", Text: "final pass", Usage: llm.TurnUsage{InputTokens: 4, OutputTokens: 5}},
 			}}
 			recorder := llm.NewRecorder()
-			recordOpts := append([]gs.Option{
-				gs.WithLibs(gs.LibString | gs.LibLLM),
-				gs.WithLLMProvider(provider),
-				gs.WithLLMRecorder(recorder.Record),
+			recordOpts := append([]leia.Option{
+				leia.WithLibs(leia.LibString | leia.LibLLM),
+				leia.WithLLMProvider(provider),
+				leia.WithLLMRecorder(recorder.Record),
 			}, tc.opts...)
-			recordVM := gs.New(recordOpts...)
+			recordVM := leia.New(recordOpts...)
 
 			if err := recordVM.Exec(source); err != nil {
 				t.Fatalf("record Exec: %v", err)
@@ -82,11 +82,11 @@ final_text := out.final
 				t.Fatalf("second recorded request = %#v", records[1].Request)
 			}
 
-			replayOpts := append([]gs.Option{
-				gs.WithLibs(gs.LibString | gs.LibLLM),
-				gs.WithLLMReplay(records),
+			replayOpts := append([]leia.Option{
+				leia.WithLibs(leia.LibString | leia.LibLLM),
+				leia.WithLLMReplay(records),
 			}, tc.opts...)
-			replayVM := gs.New(replayOpts...)
+			replayVM := leia.New(replayOpts...)
 			if err := replayVM.Exec(source); err != nil {
 				t.Fatalf("replay Exec: %v", err)
 			}

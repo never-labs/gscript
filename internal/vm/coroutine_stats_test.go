@@ -1,12 +1,12 @@
 package vm
 
 import (
-	"github.com/never-labs/gscript/internal/testutil/vmtest"
+	"github.com/never-labs/leia/internal/testutil/vmtest"
 	"testing"
 
-	"github.com/never-labs/gscript/internal/lexer"
-	"github.com/never-labs/gscript/internal/parser"
-	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/leia/internal/lexer"
+	"github.com/never-labs/leia/internal/parser"
+	"github.com/never-labs/leia/internal/runtime"
 )
 
 func compileAndRunWithCoroutineStats(t *testing.T, src string) CoroutineStatsSnapshot {

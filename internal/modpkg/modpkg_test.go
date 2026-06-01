@@ -116,15 +116,15 @@ func TestVerifySumDetectsCollectionAndLocalReplaceChanges(t *testing.T) {
 		t.Fatalf("VerifySum diagnostics after lock = %#v, want none", diags)
 	}
 
-	writeFile(t, filepath.Join(dir, "vendor", "vendor.gs"), "print(\"changed vendor\")\n")
-	writeFile(t, filepath.Join(dir, "local", "lib", "lib.gs"), "print(\"changed lib\")\n")
+	writeFile(t, filepath.Join(dir, "vendor", "vendor.leia"), "print(\"changed vendor\")\n")
+	writeFile(t, filepath.Join(dir, "local", "lib", "lib.leia"), "print(\"changed lib\")\n")
 
 	diags := VerifySum(dir)
 	if len(diags) != 2 {
 		t.Fatalf("VerifySum diagnostics = %#v, want 2 checksum mismatches", diags)
 	}
-	assertDiagnostic(t, diags, "GS9109", "checksum mismatch for vendor")
-	assertDiagnostic(t, diags, "GS9109", "checksum mismatch for example.com/lib")
+	assertDiagnostic(t, diags, "LEIA9109", "checksum mismatch for vendor")
+	assertDiagnostic(t, diags, "LEIA9109", "checksum mismatch for example.com/lib")
 }
 
 func TestExplainResolvesStdlibCollectionReplaceAndModuleRoot(t *testing.T) {
@@ -138,9 +138,9 @@ func TestExplainResolvesStdlibCollectionReplaceAndModuleRoot(t *testing.T) {
 		wantSuffix string
 	}{
 		{name: "stdlib", module: "json", wantKind: "stdlib", wantPath: "json"},
-		{name: "collection", module: "vendor:tool", wantKind: "collection", wantPath: "vendor", wantSuffix: filepath.Join("vendor", "tool.gs")},
-		{name: "replace", module: "example.com/lib/sub", wantKind: "replace", wantPath: "example.com/lib", wantSuffix: filepath.Join("local", "lib", "sub.gs")},
-		{name: "module root", module: "example.com/app/local", wantKind: "module", wantPath: "example.com/app", wantSuffix: filepath.Join("example.com", "app", "local.gs")},
+		{name: "collection", module: "vendor:tool", wantKind: "collection", wantPath: "vendor", wantSuffix: filepath.Join("vendor", "tool.leia")},
+		{name: "replace", module: "example.com/lib/sub", wantKind: "replace", wantPath: "example.com/lib", wantSuffix: filepath.Join("local", "lib", "sub.leia")},
+		{name: "module root", module: "example.com/app/local", wantKind: "module", wantPath: "example.com/app", wantSuffix: filepath.Join("example.com", "app", "local.leia")},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -165,15 +165,15 @@ func TestListReportsManifestEntriesAndLocalResolution(t *testing.T) {
 	if !report.OK {
 		t.Fatalf("List OK = false, diagnostics = %#v", report.Diagnostics)
 	}
-	if report.Module != "example.com/app" || report.GS != "0.1" {
-		t.Fatalf("List module/gs = %q/%q, want example.com/app/0.1", report.Module, report.GS)
+	if report.Module != "example.com/app" || report.Leia != "0.1" {
+		t.Fatalf("List module/leia = %q/%q, want example.com/app/0.1", report.Module, report.Leia)
 	}
 	if len(report.Requires) != 0 {
 		t.Fatalf("List requires = %#v, want none before adding require", report.Requires)
 	}
-	writeFile(t, filepath.Join(dir, "gscript.mod"), strings.Join([]string{
+	writeFile(t, filepath.Join(dir, "leia.mod"), strings.Join([]string{
 		"module example.com/app",
-		"gs 0.1",
+		"leia 0.1",
 		"require example.com/lib v1.2.3",
 		"collection vendor ./vendor",
 		"replace example.com/lib v1.2.3 => ./local/lib",
@@ -191,7 +191,7 @@ func TestListReportsManifestEntriesAndLocalResolution(t *testing.T) {
 	if req.Path != "example.com/lib" || req.Version != "v1.2.3" || req.Kind != "replace" || req.Source != "example.com/lib" {
 		t.Fatalf("List require = %#v, want replace resolution", req)
 	}
-	if !strings.HasSuffix(req.File, filepath.Join("local", "lib.gs")) {
+	if !strings.HasSuffix(req.File, filepath.Join("local", "lib.leia")) {
 		t.Fatalf("List require file = %q, want local replace file", req.File)
 	}
 	if len(report.Replaces) != 1 || !report.Replaces[0].Local {
@@ -204,13 +204,13 @@ func TestListReportsManifestEntriesAndLocalResolution(t *testing.T) {
 
 func TestListReportsVendoredRequireResolution(t *testing.T) {
 	dir := t.TempDir()
-	writeFile(t, filepath.Join(dir, "gscript.mod"), strings.Join([]string{
+	writeFile(t, filepath.Join(dir, "leia.mod"), strings.Join([]string{
 		"module example.com/app",
-		"gs 0.1",
+		"leia 0.1",
 		"require github.com/acme/toolkit v1.2.3",
 		"",
 	}, "\n"))
-	writeFile(t, filepath.Join(dir, "vendor", "github.com", "acme", "toolkit@v1.2.3", "main.gs"), "return 1\n")
+	writeFile(t, filepath.Join(dir, "vendor", "github.com", "acme", "toolkit@v1.2.3", "main.leia"), "return 1\n")
 
 	report := List(dir)
 	if !report.OK {
@@ -226,18 +226,18 @@ func TestListReportsVendoredRequireResolution(t *testing.T) {
 
 func TestCapabilityReportsMainAndDirectDependencyCapabilities(t *testing.T) {
 	dir := t.TempDir()
-	writeFile(t, filepath.Join(dir, "gscript.mod"), strings.Join([]string{
+	writeFile(t, filepath.Join(dir, "leia.mod"), strings.Join([]string{
 		"module example.com/app",
-		"gs 0.1",
+		"leia 0.1",
 		"capability fs.read",
 		"cap net.client, tool.exec",
 		"require example.com/lib v1.2.3",
 		"replace example.com/lib v1.2.3 => ./local/lib",
 		"",
 	}, "\n"))
-	writeFile(t, filepath.Join(dir, "local", "lib", "gscript.mod"), strings.Join([]string{
+	writeFile(t, filepath.Join(dir, "local", "lib", "leia.mod"), strings.Join([]string{
 		"module example.com/lib",
-		"gs 0.1",
+		"leia 0.1",
 		"capability db.query",
 		"cap fs.read",
 		"",
@@ -263,9 +263,9 @@ func TestCapabilityReportsMainAndDirectDependencyCapabilities(t *testing.T) {
 
 func TestCapabilityWarnsForUnavailableDependency(t *testing.T) {
 	dir := t.TempDir()
-	writeFile(t, filepath.Join(dir, "gscript.mod"), strings.Join([]string{
+	writeFile(t, filepath.Join(dir, "leia.mod"), strings.Join([]string{
 		"module example.com/app",
-		"gs 0.1",
+		"leia 0.1",
 		"require example.com/missing v1.2.3",
 		"",
 	}, "\n"))
@@ -274,7 +274,7 @@ func TestCapabilityWarnsForUnavailableDependency(t *testing.T) {
 	if !report.OK {
 		t.Fatalf("Capability OK = false, diagnostics = %#v", report.Diagnostics)
 	}
-	if len(report.Diagnostics) != 1 || report.Diagnostics[0].Severity != "warning" || report.Diagnostics[0].Code != "GS9114" {
+	if len(report.Diagnostics) != 1 || report.Diagnostics[0].Severity != "warning" || report.Diagnostics[0].Code != "LEIA9114" {
 		t.Fatalf("Capability diagnostics = %#v, want unavailable dependency warning", report.Diagnostics)
 	}
 }
@@ -290,13 +290,13 @@ func containsModpkgString(values []string, want string) bool {
 
 func TestDownloadFetchesGitHubTagArchiveIntoCache(t *testing.T) {
 	dir := t.TempDir()
-	writeFile(t, filepath.Join(dir, "gscript.mod"), strings.Join([]string{
+	writeFile(t, filepath.Join(dir, "leia.mod"), strings.Join([]string{
 		"module example.com/app",
-		"gs 0.1",
+		"leia 0.1",
 		"require github.com/acme/toolkit/pkg v1.2.3",
 		"",
 	}, "\n"))
-	archive := testGitHubZip(t, "toolkit-1.2.3/main.gs", "return 1\n")
+	archive := testGitHubZip(t, "toolkit-1.2.3/main.leia", "return 1\n")
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/acme/toolkit/archive/refs/tags/v1.2.3.zip" {
 			t.Fatalf("download path = %q", r.URL.Path)
@@ -318,8 +318,8 @@ func TestDownloadFetchesGitHubTagArchiveIntoCache(t *testing.T) {
 	if got.Repo != "github.com/acme/toolkit" || got.Subdir != "pkg" || !got.Downloaded || !got.Extracted {
 		t.Fatalf("Download entry = %#v, want github repo/subdir downloaded and extracted", got)
 	}
-	if _, err := os.Stat(filepath.Join(got.ExtractDir, "main.gs")); err != nil {
-		t.Fatalf("extracted main.gs missing: %v", err)
+	if _, err := os.Stat(filepath.Join(got.ExtractDir, "main.leia")); err != nil {
+		t.Fatalf("extracted main.leia missing: %v", err)
 	}
 
 	again := Download(dir, DownloadOptions{CacheDir: cache, GitHubBaseURL: server.URL})
@@ -333,13 +333,13 @@ func TestDownloadFetchesGitHubTagArchiveIntoCache(t *testing.T) {
 
 func TestDownloadWritesRemoteModuleSumAndVerifyChecksCache(t *testing.T) {
 	dir := t.TempDir()
-	writeFile(t, filepath.Join(dir, "gscript.mod"), strings.Join([]string{
+	writeFile(t, filepath.Join(dir, "leia.mod"), strings.Join([]string{
 		"module example.com/app",
-		"gs 0.1",
+		"leia 0.1",
 		"require github.com/acme/toolkit v1.2.3",
 		"",
 	}, "\n"))
-	archive := testGitHubZip(t, "toolkit-1.2.3/main.gs", "return 1\n")
+	archive := testGitHubZip(t, "toolkit-1.2.3/main.leia", "return 1\n")
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write(archive)
 	}))
@@ -364,22 +364,22 @@ func TestDownloadWritesRemoteModuleSumAndVerifyChecksCache(t *testing.T) {
 		t.Fatalf("VerifySumWithOptions diagnostics = %#v, want none", diags)
 	}
 
-	writeFile(t, filepath.Join(cache, "extract", "github.com", "acme", "toolkit@v1.2.3", "main.gs"), "return 2\n")
+	writeFile(t, filepath.Join(cache, "extract", "github.com", "acme", "toolkit@v1.2.3", "main.leia"), "return 2\n")
 	diags := VerifySumWithOptions(dir, VerifyOptions{CacheDir: cache})
-	assertDiagnostic(t, diags, "GS9109", "checksum mismatch for github.com/acme/toolkit")
+	assertDiagnostic(t, diags, "LEIA9109", "checksum mismatch for github.com/acme/toolkit")
 }
 
 func TestDownloadRejectsNonGitHubModules(t *testing.T) {
 	dir := t.TempDir()
-	writeFile(t, filepath.Join(dir, "gscript.mod"), strings.Join([]string{
+	writeFile(t, filepath.Join(dir, "leia.mod"), strings.Join([]string{
 		"module example.com/app",
-		"gs 0.1",
+		"leia 0.1",
 		"require example.com/lib v1.0.0",
 		"",
 	}, "\n"))
 
 	report := Download(dir, DownloadOptions{CacheDir: filepath.Join(dir, "cache")})
-	if report.OK || len(report.Diagnostics) != 1 || report.Diagnostics[0].Code != "GS9111" {
+	if report.OK || len(report.Diagnostics) != 1 || report.Diagnostics[0].Code != "LEIA9111" {
 		t.Fatalf("Download = %#v, want unsupported github diagnostic", report)
 	}
 }
@@ -387,13 +387,13 @@ func TestDownloadRejectsNonGitHubModules(t *testing.T) {
 func TestVendorCopiesDownloadedModules(t *testing.T) {
 	dir := t.TempDir()
 	cache := filepath.Join(dir, "cache")
-	writeFile(t, filepath.Join(dir, "gscript.mod"), strings.Join([]string{
+	writeFile(t, filepath.Join(dir, "leia.mod"), strings.Join([]string{
 		"module example.com/app",
-		"gs 0.1",
+		"leia 0.1",
 		"require github.com/acme/toolkit v1.2.3",
 		"",
 	}, "\n"))
-	writeFile(t, filepath.Join(cache, "extract", "github.com", "acme", "toolkit@v1.2.3", "pkg", "util.gs"), "return 1\n")
+	writeFile(t, filepath.Join(cache, "extract", "github.com", "acme", "toolkit@v1.2.3", "pkg", "util.leia"), "return 1\n")
 
 	report := Vendor(dir, VendorOptions{CacheDir: cache})
 	if !report.OK {
@@ -402,7 +402,7 @@ func TestVendorCopiesDownloadedModules(t *testing.T) {
 	if len(report.Modules) != 1 {
 		t.Fatalf("Vendor modules = %#v, want one", report.Modules)
 	}
-	target := filepath.Join(dir, "vendor", "github.com", "acme", "toolkit@v1.2.3", "pkg", "util.gs")
+	target := filepath.Join(dir, "vendor", "github.com", "acme", "toolkit@v1.2.3", "pkg", "util.leia")
 	if data, err := os.ReadFile(target); err != nil || string(data) != "return 1\n" {
 		t.Fatalf("vendored file = %q, %v; want copied source", string(data), err)
 	}
@@ -412,25 +412,25 @@ func TestVendorCopiesDownloadedModules(t *testing.T) {
 
 	writeFile(t, target, "return 2\n")
 	diags := VerifySumWithOptions(dir, VerifyOptions{CacheDir: cache})
-	assertDiagnostic(t, diags, "GS9109", "checksum mismatch for github.com/acme/toolkit")
+	assertDiagnostic(t, diags, "LEIA9109", "checksum mismatch for github.com/acme/toolkit")
 }
 
 func TestVendorCopiesDownloadedGitHubSubdirModule(t *testing.T) {
 	dir := t.TempDir()
 	cache := filepath.Join(dir, "cache")
-	writeFile(t, filepath.Join(dir, "gscript.mod"), strings.Join([]string{
+	writeFile(t, filepath.Join(dir, "leia.mod"), strings.Join([]string{
 		"module example.com/app",
-		"gs 0.1",
+		"leia 0.1",
 		"require github.com/acme/toolkit/pkg v1.2.3",
 		"",
 	}, "\n"))
-	writeFile(t, filepath.Join(cache, "extract", "github.com", "acme", "toolkit@v1.2.3", "pkg", "util.gs"), "return 3\n")
+	writeFile(t, filepath.Join(cache, "extract", "github.com", "acme", "toolkit@v1.2.3", "pkg", "util.leia"), "return 3\n")
 
 	report := Vendor(dir, VendorOptions{CacheDir: cache})
 	if !report.OK {
 		t.Fatalf("Vendor OK = false, diagnostics = %#v", report.Diagnostics)
 	}
-	target := filepath.Join(dir, "vendor", "github.com", "acme", "toolkit", "pkg@v1.2.3", "util.gs")
+	target := filepath.Join(dir, "vendor", "github.com", "acme", "toolkit", "pkg@v1.2.3", "util.leia")
 	if data, err := os.ReadFile(target); err != nil || string(data) != "return 3\n" {
 		t.Fatalf("vendored subdir file = %q, %v; want copied source", string(data), err)
 	}
@@ -441,22 +441,22 @@ func TestVendorCopiesDownloadedGitHubSubdirModule(t *testing.T) {
 
 func TestVendorRequiresDownloadedCache(t *testing.T) {
 	dir := t.TempDir()
-	writeFile(t, filepath.Join(dir, "gscript.mod"), strings.Join([]string{
+	writeFile(t, filepath.Join(dir, "leia.mod"), strings.Join([]string{
 		"module example.com/app",
-		"gs 0.1",
+		"leia 0.1",
 		"require github.com/acme/toolkit v1.2.3",
 		"",
 	}, "\n"))
 
 	report := Vendor(dir, VendorOptions{CacheDir: filepath.Join(dir, "cache")})
-	if report.OK || len(report.Diagnostics) != 1 || report.Diagnostics[0].Code != "GS9113" {
+	if report.OK || len(report.Diagnostics) != 1 || report.Diagnostics[0].Code != "LEIA9113" {
 		t.Fatalf("Vendor = %#v, want missing download diagnostic", report)
 	}
 }
 
 func TestScanStaticRequiresUsesAST(t *testing.T) {
 	dir := t.TempDir()
-	file := filepath.Join(dir, "main.gs")
+	file := filepath.Join(dir, "main.leia")
 	writeFile(t, file, strings.Join([]string{
 		`literal := "require(\"ignored.string\")"`,
 		`// require("ignored.comment")`,
@@ -499,16 +499,16 @@ func newLockedModule(t *testing.T) string {
 	t.Helper()
 
 	dir := t.TempDir()
-	writeFile(t, filepath.Join(dir, "gscript.mod"), strings.Join([]string{
+	writeFile(t, filepath.Join(dir, "leia.mod"), strings.Join([]string{
 		"module example.com/app",
-		"gs 0.1",
+		"leia 0.1",
 		"collection vendor ./vendor",
 		"replace example.com/lib v1.2.3 => ./local/lib",
 		"",
 	}, "\n"))
-	writeFile(t, filepath.Join(dir, "main.gs"), "require(\"vendor:tool\")\nrequire(\"example.com/lib\")\n")
-	writeFile(t, filepath.Join(dir, "vendor", "vendor.gs"), "print(\"vendor\")\n")
-	writeFile(t, filepath.Join(dir, "local", "lib", "lib.gs"), "print(\"lib\")\n")
+	writeFile(t, filepath.Join(dir, "main.leia"), "require(\"vendor:tool\")\nrequire(\"example.com/lib\")\n")
+	writeFile(t, filepath.Join(dir, "vendor", "vendor.leia"), "print(\"vendor\")\n")
+	writeFile(t, filepath.Join(dir, "local", "lib", "lib.leia"), "print(\"lib\")\n")
 	return dir
 }
 

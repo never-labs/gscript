@@ -28,8 +28,8 @@ import (
 	"os"
 	"unsafe"
 
-	"github.com/never-labs/gscript/internal/runtime"
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/runtime"
+	"github.com/never-labs/leia/internal/vm"
 )
 
 // countOpHelper counts instructions of the given op (debug helper).
@@ -114,7 +114,7 @@ func InlinePassWith(config InlineConfig) PassFunc {
 			if err != nil {
 				return fn, err
 			}
-			if os.Getenv("GSCRIPT_INLINE_DEBUG") == "1" {
+			if os.Getenv("LEIA_INLINE_DEBUG") == "1" {
 				fmt.Fprintf(os.Stderr, "inline iter %d: inlined=%v calls=%d\n", i, inlined, countOpHelper(fn, OpCall))
 			}
 			if !inlined {

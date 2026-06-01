@@ -6,12 +6,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/leia/internal/runtime"
 )
 
 func recordPairwiseDriverLoopSource(t *testing.T, steps string) string {
 	t.Helper()
-	src, err := os.ReadFile(filepath.Join("..", "..", "benchmarks", "numeric", "nbody.gs"))
+	src, err := os.ReadFile(filepath.Join("..", "..", "benchmarks", "numeric", "nbody.leia"))
 	if err != nil {
 		t.Fatalf("read nbody benchmark: %v", err)
 	}
@@ -73,7 +73,7 @@ func TestRecordPairwiseCallSiteNoResultIgnoresBenchmarkMetadata(t *testing.T) {
 		t.Fatal("missing advance proto")
 	}
 	advance.Name = "shape_only_pairwise_update"
-	advance.Source = "host/generated/not-a-benchmark.gs"
+	advance.Source = "host/generated/not-a-benchmark.leia"
 	if !isRecordPairwiseNumericProto(advance) {
 		t.Fatalf("record pairwise numeric should recognize bytecode shape independent of name/source: code=%d const=%d maxstack=%d", len(advance.Code), len(advance.Constants), advance.MaxStack)
 	}
@@ -89,7 +89,7 @@ func TestRecordPairwiseDriverLoopIgnoresCalleeMetadata(t *testing.T) {
 		t.Fatal("missing advance proto")
 	}
 	advance.Name = "shape_only_pairwise_update"
-	advance.Source = "host/generated/not-a-benchmark.gs"
+	advance.Source = "host/generated/not-a-benchmark.leia"
 	globals := map[string]*FuncProto{"advance": advance}
 	requireRuntimeSpecializationInfo(t, RecognizedDriverLoopRuntimeSpecializations(top, globals), "record_pairwise_numeric_loop")
 }

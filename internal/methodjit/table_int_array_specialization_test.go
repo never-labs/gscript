@@ -3,12 +3,12 @@
 package methodjit
 
 import (
-	"github.com/never-labs/gscript/internal/testutil/vmtest"
+	"github.com/never-labs/leia/internal/testutil/vmtest"
 	"os"
 	"strings"
 	"testing"
 
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/vm"
 )
 
 func TestTableIntArraySpecialization_DiagnosticsRecognizesPrefixReverseLoop(t *testing.T) {
@@ -90,10 +90,10 @@ result := run()
 		t.Fatalf("execute warmup: %v", err)
 	}
 
-	if err := os.Setenv("GSCRIPT_TIER2_NO_FILTER", "1"); err != nil {
+	if err := os.Setenv("LEIA_TIER2_NO_FILTER", "1"); err != nil {
 		t.Fatalf("setenv: %v", err)
 	}
-	defer os.Unsetenv("GSCRIPT_TIER2_NO_FILTER")
+	defer os.Unsetenv("LEIA_TIER2_NO_FILTER")
 	art, err := NewTieringManager().CompileForDiagnostics(findProtoByName(top, "reverse_prefix"))
 	if err != nil {
 		t.Fatalf("CompileForDiagnostics(reverse_prefix): %v", err)

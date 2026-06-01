@@ -3,7 +3,7 @@ package modules
 import (
 	"fmt"
 
-	stdvec "github.com/never-labs/gscript/internal/stdlib/vec"
+	stdvec "github.com/never-labs/leia/internal/stdlib/vec"
 )
 
 // --------------------------------------------------------------------------

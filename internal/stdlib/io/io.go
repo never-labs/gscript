@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/never-labs/gscript/internal/support/hostpath"
+	"github.com/never-labs/leia/internal/support/hostpath"
 )
 
 type ReadFormat struct {

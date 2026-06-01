@@ -31,7 +31,7 @@ was about making the measurement system behave like a lab:
 one manifest of benchmark identity
 one timing comparison path
 one way to scale tiny programs into measurable hot runs
-one place to compare GScript, previous HEAD, and LuaJIT
+one place to compare Leia, previous HEAD, and LuaJIT
 one diagnostic path from timing row to exits, pprof, and warm dumps
 ```
 
@@ -43,7 +43,7 @@ That sounds less exciting than a 20x optimization. It is also what makes the
 The first change was conceptual. A benchmark is no longer just:
 
 ```text
-benchmarks/foo.gs
+benchmarks/foo.leia
 ```
 
 It is an entry with identity:
@@ -52,7 +52,7 @@ It is an entry with identity:
 id
 group
 name
-gscript_path
+leia_path
 lua_path
 scale parameters
 tags

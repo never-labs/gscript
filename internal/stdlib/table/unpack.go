@@ -2,7 +2,7 @@ package table
 
 import "fmt"
 
-// UnpackMaxResults is the explicit GScript host boundary for
+// UnpackMaxResults is the explicit Leia host boundary for
 // table.unpack/table.spread multi-return expansion.
 const UnpackMaxResults = 1_000_000
 

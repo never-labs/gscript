@@ -1,5 +1,5 @@
 // regalloc_test.go tests the forward-walk register allocator.
-// Each test compiles GScript source → bytecode → CFG SSA IR → register allocation,
+// Each test compiles Leia source → bytecode → CFG SSA IR → register allocation,
 // then verifies that every non-terminator instruction gets a register or spill slot,
 // that GPR/FPR assignments are within the allocatable ranges, and that no two
 // live values share the same physical register.

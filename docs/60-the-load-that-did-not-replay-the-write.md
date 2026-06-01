@@ -210,7 +210,7 @@ the miss returns the dynamic table result
 If the exit path replays the earlier write, `arr[1]` increases by 2. If it
 resumes at the wrong point, the return value or side effect count diverges. The
 test runs both the standalone compiled-function path and the production
-TieringManager path, with `GSCRIPT_EXIT_RESUME_CHECK=1` covering the precise
+TieringManager path, with `LEIA_EXIT_RESUME_CHECK=1` covering the precise
 state protocol.
 
 The lowering test also asserts the architectural decision directly:

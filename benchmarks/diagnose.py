@@ -174,7 +174,7 @@ def collect_effective_cpu_profile(
     last_repeat = 0
     for index in range(1, max_runs + 1):
         last_repeat = script_repeat
-        profile_script = out_dir / f"profile_repeat_{script_repeat:04d}.gs"
+        profile_script = out_dir / f"profile_repeat_{script_repeat:04d}.leia"
         profile_script.write_text(("\n\n").join(source for _ in range(script_repeat)) + "\n")
         cpu = out_dir / f"cpu_{index:03d}.pprof"
         proc = run([*base_cmd, "-cpuprofile", str(cpu), str(profile_script)], root, timeout)
@@ -633,7 +633,7 @@ def main() -> int:
     parser.add_argument("--timeout", type=positive_int, default=120)
     parser.add_argument("--runs", type=positive_int, default=5, help="timing_compare measured runs")
     parser.add_argument("--warmup", type=int, default=1, help="timing_compare warmup samples")
-    parser.add_argument("--scale", action="append", help="temporary GScript/Lua scale override")
+    parser.add_argument("--scale", action="append", help="temporary Leia/Lua scale override")
     parser.add_argument("--param", action="append", help="alias for --scale")
     parser.add_argument("--scale-profile", choices=("none", "hot"), default="none")
     parser.add_argument("--no-timing", action="store_true", help="skip timing_compare")
@@ -659,7 +659,7 @@ def main() -> int:
     root = Path(__file__).resolve().parents[1]
     groups = groups_for_args(args)
     specs = timing.select_specs(timing.discover_specs(root, groups), args.bench)
-    out_dir = args.out_dir or Path(tempfile.mkdtemp(prefix="gscript_diagnose_"))
+    out_dir = args.out_dir or Path(tempfile.mkdtemp(prefix="leia_diagnose_"))
     out_dir.mkdir(parents=True, exist_ok=True)
 
     scale_values = [*(args.scale or []), *(args.param or [])]
@@ -672,15 +672,15 @@ def main() -> int:
     profile_scale = timing.filter_scale_overrides_for_specs(specs, profile_scale)
     scale_overrides = [*profile_scale, *user_scale]
 
-    binary = out_dir / "gscript_diag"
-    timing.build_gscript(root, binary)
+    binary = out_dir / "leia_diag"
+    timing.build_leia(root, binary)
     run_timing_compare(root, specs, args, out_dir)
 
-    scale_tempdir = Path(tempfile.mkdtemp(prefix="gscript_diagnose_scale_"))
+    scale_tempdir = Path(tempfile.mkdtemp(prefix="leia_diagnose_scale_"))
     rows: list[DiagnosticRow] = []
     for spec in specs:
         overrides = timing.scale_overrides_for(spec, scale_overrides)
-        script, _changes = timing.scaled_path(root, spec.gscript_rel, spec, "diagnose", "gscript", scale_tempdir, overrides)
+        script, _changes = timing.scaled_path(root, spec.leia_rel, spec, "diagnose", "leia", scale_tempdir, overrides)
         if script is None:
             continue
         rows.append(

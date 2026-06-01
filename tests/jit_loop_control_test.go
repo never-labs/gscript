@@ -5,7 +5,7 @@ package tests_test
 import (
 	"testing"
 
-	gs "github.com/never-labs/gscript"
+	leia "github.com/never-labs/leia"
 )
 
 // TestJIT_ConditionalBranching tests various conditional patterns.
@@ -26,8 +26,8 @@ func classify(n) {
 }
 result := classify(100)
 `
-	vmResult := runAndGet(t, src, "result", gs.WithVM())
-	jitResult := runAndGet(t, src, "result", gs.WithJIT())
+	vmResult := runAndGet(t, src, "result", leia.WithVM())
+	jitResult := runAndGet(t, src, "result", leia.WithJIT())
 
 	if vmResult != jitResult {
 		t.Errorf("VM and JIT results differ: VM=%v, JIT=%v", vmResult, jitResult)
@@ -59,8 +59,8 @@ func collatzSteps(n) {
 }
 result := collatzSteps(27)
 `
-	vmResult := runAndGet(t, src, "result", gs.WithVM())
-	jitResult := runAndGet(t, src, "result", gs.WithJIT())
+	vmResult := runAndGet(t, src, "result", leia.WithVM())
+	jitResult := runAndGet(t, src, "result", leia.WithJIT())
 
 	// Collatz sequence for 27 takes 111 steps
 	expected := int64(111)
@@ -87,8 +87,8 @@ func fib(n) {
 }
 result := fib(30)
 `
-	vmResult := runAndGet(t, src, "result", gs.WithVM())
-	jitResult := runAndGet(t, src, "result", gs.WithJIT())
+	vmResult := runAndGet(t, src, "result", leia.WithVM())
+	jitResult := runAndGet(t, src, "result", leia.WithJIT())
 
 	expected := int64(832040)
 	if vmResult != expected {

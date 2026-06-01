@@ -42,7 +42,7 @@ func (p *Program) GetPos() Pos {
 	return Pos{Line: 1, Column: 1}
 }
 
-// FileDirective represents a file-level //gscript:<kind> directive.
+// FileDirective represents a file-level //leia:<kind> directive.
 type FileDirective struct {
 	P    Pos
 	Kind string

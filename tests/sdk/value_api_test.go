@@ -1,18 +1,18 @@
-package gscript_test
+package leia_test
 
 import (
 	"testing"
 
-	gs "github.com/never-labs/gscript"
+	leia "github.com/never-labs/leia"
 )
 
 func TestToValue_slice(t *testing.T) {
-	vm := gs.New()
+	vm := leia.New()
 	err := vm.Set("arr", []int{10, 20, 30})
 	if err != nil {
 		t.Fatal(err)
 	}
-	// GScript: arr is a 1-based table
+	// Leia: arr is a 1-based table
 	err = vm.Exec(`result := arr[1] + arr[2] + arr[3]`)
 	if err != nil {
 		t.Fatal(err)
@@ -27,7 +27,7 @@ func TestToValue_slice(t *testing.T) {
 }
 
 func TestToValue_map(t *testing.T) {
-	vm := gs.New()
+	vm := leia.New()
 	err := vm.Set("data", map[string]interface{}{
 		"name": "test",
 		"val":  42,
@@ -49,7 +49,7 @@ func TestToValue_map(t *testing.T) {
 }
 
 func TestToValue_func(t *testing.T) {
-	vm := gs.New()
+	vm := leia.New()
 	err := vm.Set("greet", func(name string) string {
 		return "Hello, " + name + "!"
 	})

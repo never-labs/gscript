@@ -12,7 +12,7 @@
 
 package methodjit
 
-import "github.com/never-labs/gscript/internal/jit"
+import "github.com/never-labs/leia/internal/jit"
 
 // emitUnboxInt48 sign-extends a NaN-boxed integer's low 48 bits in place,
 // emitting the single instruction:

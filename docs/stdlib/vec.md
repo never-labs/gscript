@@ -1,6 +1,6 @@
 # vec
 
-The `vec` library provides 2D and 3D vector types for GScript. Vectors are tables with metatables that enable operator overloading (`+`, `-`, `*`, `/`, unary `-`, `==`).
+The `vec` library provides 2D and 3D vector types for Leia. Vectors are tables with metatables that enable operator overloading (`+`, `-`, `*`, `/`, unary `-`, `==`).
 
 ## Vec2
 

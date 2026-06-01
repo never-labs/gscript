@@ -8,9 +8,9 @@ import (
 	"sync/atomic"
 	"unsafe"
 
-	"github.com/never-labs/gscript/internal/runtime"
-	"github.com/never-labs/gscript/internal/stdlib/catalog"
-	"github.com/never-labs/gscript/internal/support/modresolve"
+	"github.com/never-labs/leia/internal/runtime"
+	"github.com/never-labs/leia/internal/stdlib/catalog"
+	"github.com/never-labs/leia/internal/support/modresolve"
 )
 
 const (
@@ -1147,7 +1147,7 @@ func (vm *VM) Execute(proto *FuncProto) ([]runtime.Value, error) {
 	return vm.call(cl, nil, 0, 0)
 }
 
-// CallValue calls a function value with the given arguments (exported for gscript wrapper).
+// CallValue calls a function value with the given arguments (exported for leia wrapper).
 func (vm *VM) CallValue(fn runtime.Value, args []runtime.Value) ([]runtime.Value, error) {
 	vm.resetExecutionBudgets()
 	return vm.callValue(fn, args)
@@ -1305,7 +1305,7 @@ func wrapLineErr(frame *CallFrame, err error) error {
 }
 
 // run is the main execution loop. Handles inline call/return to avoid
-// Go stack growth for GScript function calls.
+// Go stack growth for Leia function calls.
 func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 	initialFC := vm.frameCount
 	coroutineChild := vm.currentCoroutine != nil

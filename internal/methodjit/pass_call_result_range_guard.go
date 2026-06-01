@@ -1,6 +1,6 @@
 package methodjit
 
-import "github.com/never-labs/gscript/internal/vm"
+import "github.com/never-labs/leia/internal/vm"
 
 const callResultRangeGuardMinCount uint32 = 4
 const observedParamRangeGuardMinCount uint32 = 2

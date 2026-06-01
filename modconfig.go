@@ -1,16 +1,16 @@
-package gscript
+package leia
 
 import (
 	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/never-labs/gscript/internal/modfile"
-	"github.com/never-labs/gscript/internal/modpkg"
-	"github.com/never-labs/gscript/internal/support/modresolve"
+	"github.com/never-labs/leia/internal/modfile"
+	"github.com/never-labs/leia/internal/modpkg"
+	"github.com/never-labs/leia/internal/support/modresolve"
 )
 
-// ModuleOptionsForScript discovers the nearest gscript.mod for script and
+// ModuleOptionsForScript discovers the nearest leia.mod for script and
 // returns module-loading options derived from it. It intentionally does not
 // fetch packages or mutate files.
 func ModuleOptionsForScript(script string) []Option {

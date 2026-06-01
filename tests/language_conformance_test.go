@@ -25,9 +25,9 @@ func TestLanguageConformanceTranslatedCases(t *testing.T) {
 		}
 	}
 
-	gscriptBin := filepath.Join(t.TempDir(), "gscript")
-	runCommand(t, root, 60*time.Second, "go", "build", "-o", gscriptBin, "./cmd/gscript")
-	checkJIT := os.Getenv("GSCRIPT_CONFORMANCE_CHECK_JIT") == "1" || os.Getenv("GSCRIPT_OFFICIAL_CHECK_JIT") == "1"
+	leiaBin := filepath.Join(t.TempDir(), "leia")
+	runCommand(t, root, 60*time.Second, "go", "build", "-o", leiaBin, "./cmd/leia")
+	checkJIT := os.Getenv("LEIA_CONFORMANCE_CHECK_JIT") == "1" || os.Getenv("LEIA_OFFICIAL_CHECK_JIT") == "1"
 
 	cases := readManifestConformanceCases(t, root)
 
@@ -37,15 +37,15 @@ func TestLanguageConformanceTranslatedCases(t *testing.T) {
 			t.Parallel()
 
 			want := normalizeProcessOutput(runCommand(t, root, 10*time.Second, luaBin, testCase.LuaPath))
-			vm := runCommandResult(root, 10*time.Second, gscriptBin, "-vm", testCase.GScriptPath)
+			vm := runCommandResult(root, 10*time.Second, leiaBin, "-vm", testCase.LeiaPath)
 
 			if !processOutputMatches(vm, want) {
-				t.Fatalf("VM output mismatch for %s\nLua:\n%s\nGScript -vm:\n%s", testCase.Name, want, vm.diagnostic())
+				t.Fatalf("VM output mismatch for %s\nLua:\n%s\nLeia -vm:\n%s", testCase.Name, want, vm.diagnostic())
 			}
 			if checkJIT {
-				jit := runCommandResult(root, 10*time.Second, gscriptBin, "-jit", testCase.GScriptPath)
+				jit := runCommandResult(root, 10*time.Second, leiaBin, "-jit", testCase.LeiaPath)
 				if !processOutputMatches(jit, want) {
-					t.Fatalf("JIT output mismatch for %s\nLua:\n%s\nGScript -jit:\n%s", testCase.Name, want, jit.diagnostic())
+					t.Fatalf("JIT output mismatch for %s\nLua:\n%s\nLeia -jit:\n%s", testCase.Name, want, jit.diagnostic())
 				}
 			}
 		})
@@ -54,7 +54,7 @@ func TestLanguageConformanceTranslatedCases(t *testing.T) {
 
 type manifestConformanceCase struct {
 	Name        string
-	GScriptPath string
+	LeiaPath string
 	LuaPath     string
 }
 
@@ -93,14 +93,14 @@ func readManifestConformanceCases(t *testing.T, root string) []manifestConforman
 		gsPath := filepath.Join(root, filepath.FromSlash(entry.Path))
 		luaPath := filepath.Join(root, filepath.FromSlash(entry.Reference.Path))
 		if _, err := os.Stat(gsPath); err != nil {
-			t.Fatalf("manifest case %s missing GScript file %s: %v", entry.ID, entry.Path, err)
+			t.Fatalf("manifest case %s missing Leia file %s: %v", entry.ID, entry.Path, err)
 		}
 		if _, err := os.Stat(luaPath); err != nil {
 			t.Fatalf("manifest case %s missing Lua oracle %s: %v", entry.ID, entry.Reference.Path, err)
 		}
 		cases = append(cases, manifestConformanceCase{
 			Name:        name,
-			GScriptPath: gsPath,
+			LeiaPath: gsPath,
 			LuaPath:     luaPath,
 		})
 	}

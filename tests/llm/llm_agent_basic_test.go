@@ -1,33 +1,33 @@
-package gscript_test
+package leia_test
 
 import (
 	goruntime "runtime"
 	"strings"
 	"testing"
 
-	gs "github.com/never-labs/gscript"
-	"github.com/never-labs/gscript/llm"
+	leia "github.com/never-labs/leia"
+	"github.com/never-labs/leia/llm"
 )
 
 func TestLLMDirectTurnMessagesReachProviderInVMJIT(t *testing.T) {
 	cases := []struct {
 		name string
-		opts []gs.Option
+		opts []leia.Option
 	}{
 		{name: "interpreter"},
-		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
 	}
 	if goruntime.GOOS == "darwin" && goruntime.GOARCH == "arm64" {
 		cases = append(cases, struct {
 			name string
-			opts []gs.Option
-		}{name: "jit", opts: []gs.Option{gs.WithJIT()}})
+			opts []leia.Option
+		}{name: "jit", opts: []leia.Option{leia.WithJIT()}})
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			provider := &mockLLMProvider{res: llm.TurnResult{Status: "final_answer", Text: "ok"}}
-			vm := gs.New(llmScenarioOptions(provider, tc.opts...)...)
+			vm := leia.New(llmScenarioOptions(provider, tc.opts...)...)
 
 			if err := vm.Exec(`
 history := messages {
@@ -62,14 +62,14 @@ result, err := turn {
 func TestLLMAgentScenarioSimpleDefaultsQuestionAnswer(t *testing.T) {
 	for _, tc := range []struct {
 		name string
-		opts []gs.Option
+		opts []leia.Option
 	}{
 		{name: "interpreter"},
-		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			provider := &mockLLMProvider{res: llm.TurnResult{Status: "final_answer", Text: "Paris"}}
-			vm := gs.New(llmScenarioOptions(provider, tc.opts...)...)
+			vm := leia.New(llmScenarioOptions(provider, tc.opts...)...)
 
 			if err := vm.Exec(`
 models {
@@ -121,10 +121,10 @@ answer_text := result.text
 func TestLLMAgentScenarioReactToolAutoDispatch(t *testing.T) {
 	for _, tc := range []struct {
 		name string
-		opts []gs.Option
+		opts []leia.Option
 	}{
 		{name: "interpreter"},
-		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			provider := &mockLLMProvider{results: []llm.TurnResult{
@@ -133,15 +133,15 @@ func TestLLMAgentScenarioReactToolAutoDispatch(t *testing.T) {
 					Calls: []llm.ToolCall{{
 						ID:   "call_lookup_1",
 						Tool: "lookup",
-						Args: map[string]any{"topic": "gscript"},
+						Args: map[string]any{"topic": "leia"},
 					}},
 				},
-				{Status: "final_answer", Text: "GScript docs found."},
+				{Status: "final_answer", Text: "Leia docs found."},
 			}}
-			vm := gs.New(llmScenarioOptions(provider, tc.opts...)...)
+			vm := leia.New(llmScenarioOptions(provider, tc.opts...)...)
 
 			if err := vm.Exec(`
-//gscript:requires none
+//leia:requires none
 tool lookup(topic) {
     return "doc:" .. topic, nil
 }
@@ -153,7 +153,7 @@ agent researcher(topic) {
     user: "Find docs for " .. topic
 }
 
-result, err := researcher("gscript")
+result, err := researcher("leia")
 status := result.status
 text := result.text
 history_len := #result.history
@@ -168,7 +168,7 @@ history_len := #result.history
 			if first.Model != "mock-react" || len(first.Tools) != 1 || first.Tools[0].Name != "lookup" {
 				t.Fatalf("first request = %#v", first)
 			}
-			if len(first.Messages) != 2 || first.Messages[0].Role != "system" || first.Messages[1].Text != "Find docs for gscript" {
+			if len(first.Messages) != 2 || first.Messages[0].Role != "system" || first.Messages[1].Text != "Find docs for leia" {
 				t.Fatalf("first messages = %#v", first.Messages)
 			}
 			second := provider.requests[1]
@@ -179,13 +179,13 @@ history_len := #result.history
 				second.Messages[2].Role != "assistant" || second.Messages[2].ToolCall == nil ||
 				second.Messages[2].ToolCall.Tool != "lookup" ||
 				second.Messages[3].Role != "tool" || second.Messages[3].ToolUseID != "call_lookup_1" ||
-				second.Messages[3].Value != "doc:gscript" {
+				second.Messages[3].Value != "doc:leia" {
 				t.Fatalf("second messages = %#v", second.Messages)
 			}
 			status, _ := vm.Get("status")
 			text, _ := vm.Get("text")
 			historyLen, _ := vm.Get("history_len")
-			if status != "done" || text != "GScript docs found." || historyLen != int64(4) {
+			if status != "done" || text != "Leia docs found." || historyLen != int64(4) {
 				t.Fatalf("status=%#v text=%#v history_len=%#v", status, text, historyLen)
 			}
 		})
@@ -195,10 +195,10 @@ history_len := #result.history
 func TestLLMAgentScenarioComplexFlowCustomTurns(t *testing.T) {
 	for _, tc := range []struct {
 		name string
-		opts []gs.Option
+		opts []leia.Option
 	}{
 		{name: "interpreter"},
-		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			provider := &mockLLMProvider{results: []llm.TurnResult{
@@ -212,10 +212,10 @@ func TestLLMAgentScenarioComplexFlowCustomTurns(t *testing.T) {
 				},
 				{Status: "final_answer", Text: "Agents need explicit history."},
 			}}
-			vm := gs.New(llmScenarioOptions(provider, tc.opts...)...)
+			vm := leia.New(llmScenarioOptions(provider, tc.opts...)...)
 
 			if err := vm.Exec(`
-//gscript:requires none
+//leia:requires none
 tool lookup(topic) {
     return "note:" .. topic, nil
 }

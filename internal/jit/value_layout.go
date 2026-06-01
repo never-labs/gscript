@@ -3,7 +3,7 @@ package jit
 import (
 	"unsafe"
 
-	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/leia/internal/runtime"
 )
 
 // Value memory layout constants for NaN-boxed 8-byte values.

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/leia/internal/runtime"
 )
 
 func spectralSource(t *testing.T, file string) string {
@@ -19,7 +19,7 @@ func spectralSource(t *testing.T, file string) string {
 }
 
 func TestSpectralRuntimeSpecializationDiagnostics(t *testing.T) {
-	top := compileProto(t, spectralSource(t, "spectral_norm.gs"))
+	top := compileProto(t, spectralSource(t, "spectral_norm.leia"))
 	multiplyAv := findTestProtoByName(top, "multiplyAv")
 	multiplyAtv := findTestProtoByName(top, "multiplyAtv")
 	multiplyAtAv := findTestProtoByName(top, "multiplyAtAv")
@@ -56,7 +56,7 @@ func TestSpectralRuntimeSpecializationDiagnostics(t *testing.T) {
 }
 
 func TestSpectralRuntimeSpecializationIgnoresBenchmarkMetadata(t *testing.T) {
-	top := compileProto(t, spectralSource(t, "spectral_norm.gs"))
+	top := compileProto(t, spectralSource(t, "spectral_norm.leia"))
 	multiplyAv := findTestProtoByName(top, "multiplyAv")
 	multiplyAtv := findTestProtoByName(top, "multiplyAtv")
 	multiplyAtAv := findTestProtoByName(top, "multiplyAtAv")
@@ -66,7 +66,7 @@ func TestSpectralRuntimeSpecializationIgnoresBenchmarkMetadata(t *testing.T) {
 
 	for _, proto := range []*FuncProto{multiplyAv, multiplyAtv, multiplyAtAv} {
 		proto.Name = "runtime_generated_coefficient_loop"
-		proto.Source = "host/generated/not-a-benchmark.gs"
+		proto.Source = "host/generated/not-a-benchmark.leia"
 	}
 
 	if !isSpectralAvProto(multiplyAv) {
@@ -81,7 +81,7 @@ func TestSpectralRuntimeSpecializationIgnoresBenchmarkMetadata(t *testing.T) {
 }
 
 func TestDenseSpectralRuntimeSpecializationDiagnostics(t *testing.T) {
-	top := compileProto(t, spectralSource(t, "spectral_norm_dense.gs"))
+	top := compileProto(t, spectralSource(t, "spectral_norm_dense.leia"))
 	multiplyAtAv := findTestProtoByName(top, "multiplyAtAv")
 	if multiplyAtAv == nil {
 		t.Fatal("missing dense multiplyAtAv proto")
@@ -101,13 +101,13 @@ func TestDenseSpectralRuntimeSpecializationDiagnostics(t *testing.T) {
 }
 
 func TestDenseSpectralRuntimeSpecializationIgnoresBenchmarkMetadata(t *testing.T) {
-	top := compileProto(t, spectralSource(t, "spectral_norm_dense.gs"))
+	top := compileProto(t, spectralSource(t, "spectral_norm_dense.leia"))
 	multiplyAtAv := findTestProtoByName(top, "multiplyAtAv")
 	if multiplyAtAv == nil {
 		t.Fatal("missing dense multiplyAtAv proto")
 	}
 	multiplyAtAv.Name = "runtime_generated_dense_coefficient_loop"
-	multiplyAtAv.Source = "host/generated/not-a-benchmark.gs"
+	multiplyAtAv.Source = "host/generated/not-a-benchmark.leia"
 
 	if !isDenseSpectralAtAvProto(multiplyAtAv) {
 		t.Fatal("dense_coefficient_matrix_ata_vector recognizer should depend on bytecode shape, not proto metadata")
@@ -121,7 +121,7 @@ func TestSpectralRuntimeSpecializationRecordsHit(t *testing.T) {
 	stats := runtime.EnableRuntimePathStats()
 	defer runtime.DisableRuntimePathStats()
 
-	src := spectralSource(t, "spectral_norm.gs")
+	src := spectralSource(t, "spectral_norm.leia")
 	src = strings.Replace(src, "N := 2000", "N := 32", 1)
 	globals := compileAndRun(t, src)
 	if v := globals["result"]; !v.IsNumber() {
@@ -136,7 +136,7 @@ func TestDenseSpectralRuntimeSpecializationRecordsHit(t *testing.T) {
 	stats := runtime.EnableRuntimePathStats()
 	defer runtime.DisableRuntimePathStats()
 
-	src := spectralSource(t, "spectral_norm_dense.gs")
+	src := spectralSource(t, "spectral_norm_dense.leia")
 	src = strings.Replace(src, "N := 1500", "N := 32", 1)
 	src = strings.Replace(src, "WARM_N := 64", "WARM_N := 16", 1)
 	globals := compileAndRun(t, src)

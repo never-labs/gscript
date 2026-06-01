@@ -2,7 +2,7 @@ package modules
 
 import (
 	"fmt"
-	stdlibllm "github.com/never-labs/gscript/internal/stdlib/llm"
+	stdlibllm "github.com/never-labs/leia/internal/stdlib/llm"
 )
 
 // BuildLLMMessageLib creates the spec-facing "msg" helper table. It is kept

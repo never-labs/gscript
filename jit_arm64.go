@@ -1,10 +1,10 @@
 //go:build darwin && arm64
 
-package gscript
+package leia
 
 import (
-	"github.com/never-labs/gscript/internal/methodjit"
-	bytecodevm "github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/methodjit"
+	bytecodevm "github.com/never-labs/leia/internal/vm"
 )
 
 func enableJIT(bvm *bytecodevm.VM) {

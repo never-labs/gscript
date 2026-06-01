@@ -62,7 +62,7 @@ func ResolveCollection(module string, collections []Collection) (Result, bool) {
 		if col.Name != prefix || col.Root == "" {
 			continue
 		}
-		rel := strings.ReplaceAll(module[idx+1:], ".", "/") + ".gs"
+		rel := strings.ReplaceAll(module[idx+1:], ".", "/") + ".leia"
 		return Result{Kind: "collection", Path: col.Name, Root: col.Root, Rel: rel, File: filepath.Join(col.Root, rel)}, true
 	}
 	return Result{}, false
@@ -85,14 +85,14 @@ func ResolveReplace(module string, replaces []Replace) (Result, bool) {
 		return Result{}, false
 	}
 	if module == best.Path {
-		if filepath.Ext(best.Root) == ".gs" {
+		if filepath.Ext(best.Root) == ".leia" {
 			return Result{Kind: "replace", Path: best.Path, Root: filepath.Dir(best.Root), Rel: filepath.Base(best.Root), File: best.Root}, true
 		}
-		file := best.Root + ".gs"
+		file := best.Root + ".leia"
 		return Result{Kind: "replace", Path: best.Path, Root: filepath.Dir(file), Rel: filepath.Base(file), File: file}, true
 	}
 	rel := strings.TrimPrefix(module[len(best.Path):], "/")
-	rel = strings.ReplaceAll(rel, ".", "/") + ".gs"
+	rel = strings.ReplaceAll(rel, ".", "/") + ".leia"
 	return Result{Kind: "replace", Path: best.Path, Root: best.Root, Rel: rel, File: filepath.Join(best.Root, rel)}, true
 }
 
@@ -119,7 +119,7 @@ func ResolveCache(module string, cacheModules []CacheModule) (Result, bool) {
 	if rel == "" {
 		rel = filepath.Base(best.Path)
 	}
-	rel = strings.ReplaceAll(rel, ".", "/") + ".gs"
+	rel = strings.ReplaceAll(rel, ".", "/") + ".leia"
 	kind := best.Kind
 	if kind == "" {
 		kind = "cache"
@@ -129,7 +129,7 @@ func ResolveCache(module string, cacheModules []CacheModule) (Result, bool) {
 
 func moduleFile(module string) string {
 	if strings.Contains(module, "/") || strings.HasPrefix(module, ".") {
-		return module + ".gs"
+		return module + ".leia"
 	}
-	return strings.ReplaceAll(module, ".", "/") + ".gs"
+	return strings.ReplaceAll(module, ".", "/") + ".leia"
 }

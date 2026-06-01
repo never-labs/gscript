@@ -1,11 +1,11 @@
-package gscript
+package leia
 
 import (
 	"os"
 	"path/filepath"
 	"testing"
 
-	"github.com/never-labs/gscript/internal/modpkg"
+	"github.com/never-labs/leia/internal/modpkg"
 )
 
 func TestModuleOptionsForScriptLoadsCollections(t *testing.T) {
@@ -14,13 +14,13 @@ func TestModuleOptionsForScriptLoadsCollections(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(vendor, "pkg"), 0755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "gscript.mod"), []byte("module example.com/app\ngs 0.1\ncollection vendor ./vendor\n"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "leia.mod"), []byte("module example.com/app\nleia 0.1\ncollection vendor ./vendor\n"), 0644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(vendor, "pkg", "util.gs"), []byte(`return { value: 42 }`), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(vendor, "pkg", "util.leia"), []byte(`return { value: 42 }`), 0644); err != nil {
 		t.Fatal(err)
 	}
-	mainPath := filepath.Join(dir, "main.gs")
+	mainPath := filepath.Join(dir, "main.leia")
 	if err := os.WriteFile(mainPath, []byte(`u := require("vendor:pkg.util"); result := u.value`), 0644); err != nil {
 		t.Fatal(err)
 	}
@@ -44,17 +44,17 @@ func TestModuleOptionsForScriptLoadsLocalReplace(t *testing.T) {
 	if err := os.MkdirAll(localLib, 0755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "gscript.mod"), []byte(`module example.com/app
-gs 0.1
+	if err := os.WriteFile(filepath.Join(dir, "leia.mod"), []byte(`module example.com/app
+leia 0.1
 require example.com/lib v0.1.0
 replace example.com/lib => ./local/lib
 `), 0644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(localLib, "foo.gs"), []byte(`return { value: 77 }`), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(localLib, "foo.leia"), []byte(`return { value: 77 }`), 0644); err != nil {
 		t.Fatal(err)
 	}
-	mainPath := filepath.Join(dir, "main.gs")
+	mainPath := filepath.Join(dir, "main.leia")
 	if err := os.WriteFile(mainPath, []byte(`u := require("example.com/lib/foo"); result := u.value`), 0644); err != nil {
 		t.Fatal(err)
 	}
@@ -83,20 +83,20 @@ replace example.com/lib => ./local/lib
 func TestModuleOptionsForScriptLoadsDownloadedGitHubCache(t *testing.T) {
 	dir := t.TempDir()
 	cache := filepath.Join(dir, "cache")
-	t.Setenv("GSCRIPT_CACHE", cache)
+	t.Setenv("LEIA_CACHE", cache)
 	if err := os.MkdirAll(filepath.Join(cache, "extract", "github.com", "acme", "toolkit@v1.2.3", "pkg"), 0755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(cache, "extract", "github.com", "acme", "toolkit@v1.2.3", "pkg", "util.gs"), []byte(`return { value: 91 }`), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(cache, "extract", "github.com", "acme", "toolkit@v1.2.3", "pkg", "util.leia"), []byte(`return { value: 91 }`), 0644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "gscript.mod"), []byte(`module example.com/app
-gs 0.1
+	if err := os.WriteFile(filepath.Join(dir, "leia.mod"), []byte(`module example.com/app
+leia 0.1
 require github.com/acme/toolkit v1.2.3
 `), 0644); err != nil {
 		t.Fatal(err)
 	}
-	mainPath := filepath.Join(dir, "main.gs")
+	mainPath := filepath.Join(dir, "main.leia")
 	if err := os.WriteFile(mainPath, []byte(`u := require("github.com/acme/toolkit/pkg/util"); result := u.value`), 0644); err != nil {
 		t.Fatal(err)
 	}
@@ -132,20 +132,20 @@ require github.com/acme/toolkit v1.2.3
 func TestModuleOptionsForScriptLoadsDownloadedGitHubSubdirCache(t *testing.T) {
 	dir := t.TempDir()
 	cache := filepath.Join(dir, "cache")
-	t.Setenv("GSCRIPT_CACHE", cache)
+	t.Setenv("LEIA_CACHE", cache)
 	if err := os.MkdirAll(filepath.Join(cache, "extract", "github.com", "acme", "toolkit@v1.2.3", "pkg"), 0755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(cache, "extract", "github.com", "acme", "toolkit@v1.2.3", "pkg", "util.gs"), []byte(`return { value: 92 }`), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(cache, "extract", "github.com", "acme", "toolkit@v1.2.3", "pkg", "util.leia"), []byte(`return { value: 92 }`), 0644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "gscript.mod"), []byte(`module example.com/app
-gs 0.1
+	if err := os.WriteFile(filepath.Join(dir, "leia.mod"), []byte(`module example.com/app
+leia 0.1
 require github.com/acme/toolkit/pkg v1.2.3
 `), 0644); err != nil {
 		t.Fatal(err)
 	}
-	mainPath := filepath.Join(dir, "main.gs")
+	mainPath := filepath.Join(dir, "main.leia")
 	if err := os.WriteFile(mainPath, []byte(`u := require("github.com/acme/toolkit/pkg/util"); result := u.value`), 0644); err != nil {
 		t.Fatal(err)
 	}
@@ -165,26 +165,26 @@ require github.com/acme/toolkit/pkg v1.2.3
 
 func TestModuleOptionsForScriptPrefersVendorOverCache(t *testing.T) {
 	dir := t.TempDir()
-	t.Setenv("GSCRIPT_CACHE", filepath.Join(dir, "cache"))
+	t.Setenv("LEIA_CACHE", filepath.Join(dir, "cache"))
 	if err := os.MkdirAll(filepath.Join(dir, "vendor", "github.com", "acme", "toolkit@v1.2.3", "pkg"), 0755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "vendor", "github.com", "acme", "toolkit@v1.2.3", "pkg", "util.gs"), []byte(`return { value: 123 }`), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "vendor", "github.com", "acme", "toolkit@v1.2.3", "pkg", "util.leia"), []byte(`return { value: 123 }`), 0644); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.MkdirAll(filepath.Join(dir, "cache", "extract", "github.com", "acme", "toolkit@v1.2.3", "pkg"), 0755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "cache", "extract", "github.com", "acme", "toolkit@v1.2.3", "pkg", "util.gs"), []byte(`return { value: 91 }`), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "cache", "extract", "github.com", "acme", "toolkit@v1.2.3", "pkg", "util.leia"), []byte(`return { value: 91 }`), 0644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "gscript.mod"), []byte(`module example.com/app
-gs 0.1
+	if err := os.WriteFile(filepath.Join(dir, "leia.mod"), []byte(`module example.com/app
+leia 0.1
 require github.com/acme/toolkit v1.2.3
 `), 0644); err != nil {
 		t.Fatal(err)
 	}
-	mainPath := filepath.Join(dir, "main.gs")
+	mainPath := filepath.Join(dir, "main.leia")
 	if err := os.WriteFile(mainPath, []byte(`u := require("github.com/acme/toolkit/pkg/util"); result := u.value`), 0644); err != nil {
 		t.Fatal(err)
 	}
@@ -204,20 +204,20 @@ require github.com/acme/toolkit v1.2.3
 
 func TestModuleOptionsForScriptModeVendorIgnoresCache(t *testing.T) {
 	dir := t.TempDir()
-	t.Setenv("GSCRIPT_CACHE", filepath.Join(dir, "cache"))
+	t.Setenv("LEIA_CACHE", filepath.Join(dir, "cache"))
 	if err := os.MkdirAll(filepath.Join(dir, "cache", "extract", "github.com", "acme", "toolkit@v1.2.3", "pkg"), 0755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "cache", "extract", "github.com", "acme", "toolkit@v1.2.3", "pkg", "util.gs"), []byte(`return { value: 91 }`), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "cache", "extract", "github.com", "acme", "toolkit@v1.2.3", "pkg", "util.leia"), []byte(`return { value: 91 }`), 0644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "gscript.mod"), []byte(`module example.com/app
-gs 0.1
+	if err := os.WriteFile(filepath.Join(dir, "leia.mod"), []byte(`module example.com/app
+leia 0.1
 require github.com/acme/toolkit v1.2.3
 `), 0644); err != nil {
 		t.Fatal(err)
 	}
-	mainPath := filepath.Join(dir, "main.gs")
+	mainPath := filepath.Join(dir, "main.leia")
 	if err := os.WriteFile(mainPath, []byte(`u := require("github.com/acme/toolkit/pkg/util"); result := u.value`), 0644); err != nil {
 		t.Fatal(err)
 	}

@@ -2,9 +2,9 @@ package modules
 
 import (
 	"fmt"
-	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/leia/internal/runtime"
 
-	basehash "github.com/never-labs/gscript/internal/stdlib/hash"
+	basehash "github.com/never-labs/leia/internal/stdlib/hash"
 )
 
 // buildHashLib creates the "hash" standard library table.

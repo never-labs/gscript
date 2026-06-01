@@ -9,8 +9,8 @@ import (
 	"math"
 	"testing"
 
-	"github.com/never-labs/gscript/internal/runtime"
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/runtime"
+	"github.com/never-labs/leia/internal/vm"
 )
 
 // TestTypeSpec_IntAdd verifies that OpAdd with two ConstInt args becomes OpAddInt.

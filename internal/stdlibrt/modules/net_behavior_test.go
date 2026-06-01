@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/never-labs/gscript/internal/stdlibrt"
+	"github.com/never-labs/leia/internal/stdlibrt"
 )
 
 // netInterp creates an interpreter with the net library manually registered.
@@ -290,7 +290,7 @@ func TestNetResponseJson(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(200)
-		data := map[string]interface{}{"name": "gscript", "version": 1.0}
+		data := map[string]interface{}{"name": "leia", "version": 1.0}
 		json.NewEncoder(w).Encode(data)
 	}))
 	defer ts.Close()
@@ -307,8 +307,8 @@ func TestNetResponseJson(t *testing.T) {
 		t.Errorf("expected nil error, got %v", interp.GetGlobal("err"))
 	}
 	name := interp.GetGlobal("name")
-	if name.Str() != "gscript" {
-		t.Errorf("expected name='gscript', got '%s'", name.Str())
+	if name.Str() != "leia" {
+		t.Errorf("expected name='leia', got '%s'", name.Str())
 	}
 }
 

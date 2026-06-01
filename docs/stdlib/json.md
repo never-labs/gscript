@@ -1,12 +1,12 @@
 # json
 
-The `json` library provides JSON encoding and decoding for GScript values.
+The `json` library provides JSON encoding and decoding for Leia values.
 
 ## Functions
 
 ### json.encode(value) -> string
 
-Converts a GScript value to a JSON string.
+Converts a Leia value to a JSON string.
 
 Type mappings:
 - `nil` -> `null`
@@ -28,7 +28,7 @@ json.encode({name: "test"})       -- "{\"name\":\"test\"}"
 
 ### json.decode(str) -> value [, error]
 
-Parses a JSON string and returns the corresponding GScript value.
+Parses a JSON string and returns the corresponding Leia value.
 
 Type mappings:
 - `null` -> `nil`
@@ -53,7 +53,7 @@ val, err := json.decode("bad")   -- nil, "invalid character..."
 
 ### json.pretty(value [, indent]) -> string
 
-Converts a GScript value to a pretty-printed JSON string with indentation.
+Converts a Leia value to a pretty-printed JSON string with indentation.
 
 - `indent` defaults to `"  "` (2 spaces) if not provided.
 

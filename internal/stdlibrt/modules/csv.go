@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"fmt"
 
-	"github.com/never-labs/gscript/internal/runtime"
-	stdcsv "github.com/never-labs/gscript/internal/stdlib/csv"
+	"github.com/never-labs/leia/internal/runtime"
+	stdcsv "github.com/never-labs/leia/internal/stdlib/csv"
 )
 
 // BuildCSV creates the "csv" standard library table.

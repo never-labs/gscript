@@ -9,7 +9,7 @@ import (
 	"unsafe"
 )
 
-// ValueType represents the type of a GScript value.
+// ValueType represents the type of a Leia value.
 type ValueType uint8
 
 const (
@@ -90,7 +90,7 @@ const (
 	ptrSubSoA         uint64 = 13 << ptrSubShift // *SoA
 )
 
-// Value is a NaN-boxed 8-byte representation of all GScript values.
+// Value is a NaN-boxed 8-byte representation of all Leia values.
 // Replaces the old 24-byte struct {typ, data, ptr}.
 type Value uint64
 

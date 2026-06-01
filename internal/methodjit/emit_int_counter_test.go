@@ -16,7 +16,7 @@ package methodjit
 import (
 	"testing"
 
-	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/leia/internal/runtime"
 )
 
 // fullPipelineBuild runs the full Tier 2 optimization pipeline on a proto.

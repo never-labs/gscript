@@ -4,7 +4,7 @@ import (
 	"math"
 	"testing"
 
-	gs "github.com/never-labs/gscript"
+	leia "github.com/never-labs/leia"
 )
 
 var precisionBenchSink []interface{}
@@ -20,7 +20,7 @@ type precisionBenchCase struct {
 
 type precisionBenchMode struct {
 	name string
-	opts []gs.Option
+	opts []leia.Option
 	warm int
 }
 
@@ -155,8 +155,8 @@ func precision_binary_trees(depth, iterations) {
 	}
 
 	modes := []precisionBenchMode{
-		{name: "VM", opts: []gs.Option{gs.WithVM()}},
-		{name: "JIT", opts: []gs.Option{gs.WithJIT()}, warm: 20},
+		{name: "VM", opts: []leia.Option{leia.WithVM()}},
+		{name: "JIT", opts: []leia.Option{leia.WithJIT()}, warm: 20},
 	}
 
 	for _, tc := range cases {
@@ -176,7 +176,7 @@ func runPrecisionBench(b *testing.B, tc precisionBenchCase, mode precisionBenchM
 	b.Helper()
 	b.ReportAllocs()
 
-	vm := gs.New(mode.opts...)
+	vm := leia.New(mode.opts...)
 	if err := vm.Exec(tc.source); err != nil {
 		b.Fatalf("%s setup failed: %v", tc.name, err)
 	}

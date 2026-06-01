@@ -5,9 +5,9 @@ package methodjit
 import (
 	"math"
 
-	"github.com/never-labs/gscript/internal/jit"
-	"github.com/never-labs/gscript/internal/runtime"
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/jit"
+	"github.com/never-labs/leia/internal/runtime"
+	"github.com/never-labs/leia/internal/vm"
 )
 
 func (ec *emitContext) emitDynamicStringGetTableCache(instr *Instr, doneLabel string) {

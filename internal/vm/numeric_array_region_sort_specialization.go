@@ -4,7 +4,7 @@ import (
 	"math"
 	"slices"
 
-	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/leia/internal/runtime"
 )
 
 func (vm *VM) runNumericArrayRegionSortRuntimeSpecialization(cl *Closure, args []runtime.Value) (bool, error) {

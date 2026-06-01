@@ -48,7 +48,7 @@ This run used:
 python3 benchmarks/timing_compare.py --all-groups --runs=9 --warmup=3 --sort luajit-gap
 ```
 
-Lower is better. `Cur/LJ` below `1.00x` means GScript is faster than the local
+Lower is better. `Cur/LJ` below `1.00x` means Leia is faster than the local
 LuaJIT reference on this machine.
 
 ```text
@@ -117,7 +117,7 @@ few milliseconds of total program time. That is not a useful JIT benchmark.
 The benchmark now runs one million repetitions:
 
 ```text
-GScript: F(25) = 16 (1000000 reps), Time: 0.030s
+Leia: F(25) = 16 (1000000 reps), Time: 0.030s
 LuaJIT:  F(25) = 16 (1000000 reps), Time: 4.457s
 ```
 
@@ -136,7 +136,7 @@ matmul_dense_unroll2:
   N=300 -> N=600
 ```
 
-The goal was not to inflate the benchmark suite until GScript won. The goal
+The goal was not to inflate the benchmark suite until Leia won. The goal
 was to remove rows where a two-millisecond fixed cost could look like a
 runtime architecture problem. After scaling, each row still runs the same
 program shape. The hot work is just large enough to dominate startup and timer
@@ -272,7 +272,7 @@ was short enough at `N=300` that it sometimes looked slightly behind LuaJIT.
 At `N=600`, the hot loop dominates:
 
 ```text
-GScript: 0.234s
+Leia: 0.234s
 LuaJIT:  0.240s
 ```
 
@@ -391,7 +391,7 @@ matmul_dense_unroll2:
   N=300 -> N=600
 ```
 
-Each GScript change has the matching Lua change. The manifest was updated so
+Each Leia change has the matching Lua change. The manifest was updated so
 the harness knows the real default parameters.
 
 This prevents a bad optimization loop:
@@ -427,7 +427,7 @@ What changed is more specific and more useful:
 ```text
 on this repository's comparable local benchmark set,
 on this machine,
-with the current GScript runtime and method JIT,
+with the current Leia runtime and method JIT,
 every measured row is now faster than the LuaJIT reference row
 ```
 

@@ -3,7 +3,7 @@ package stdlibrt
 import (
 	"context"
 
-	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/leia/internal/runtime"
 )
 
 type LLMOptions struct {

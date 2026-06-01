@@ -11,8 +11,8 @@ LIST_ONLY=0
 OUT_DIR=""
 ARTIFACT_PLAN=""
 ARTIFACT_COMMAND_LOG=""
-SMOKE_SCRIPT="tests/smoke/01_basic.gs"
-EXPECTED_MODULE_PATH="github.com/never-labs/gscript"
+SMOKE_SCRIPT="tests/smoke/01_basic.leia"
+EXPECTED_MODULE_PATH="github.com/never-labs/leia"
 
 usage() {
     cat <<'EOF'
@@ -221,17 +221,17 @@ add_release_smoke() {
         add_skip "Release Smoke" "missing $SMOKE_SCRIPT"
         return
     fi
-    if [ ! -f benchmarks/table/table_field_access.gs ]; then
-        add_skip "Release Smoke" "missing benchmarks/table/table_field_access.gs"
+    if [ ! -f benchmarks/table/table_field_access.leia ]; then
+        add_skip "Release Smoke" "missing benchmarks/table/table_field_access.leia"
         return
     fi
     add_run "Release Smoke" \
-        "go run ./cmd/gscript $SMOKE_SCRIPT && go run ./cmd/gscript -jit benchmarks/table/table_field_access.gs && go run ./cmd/gscript inspect bytecode $SMOKE_SCRIPT"
+        "go run ./cmd/leia $SMOKE_SCRIPT && go run ./cmd/leia -jit benchmarks/table/table_field_access.leia && go run ./cmd/leia inspect bytecode $SMOKE_SCRIPT"
 }
 
 build_quick_plan() {
     add_go_test "Core Go packages" \
-        "go test . ./cmd/gscript ./internal/lexer ./internal/parser ./internal/runtime ./internal/vm -count=1"
+        "go test . ./cmd/leia ./internal/lexer ./internal/parser ./internal/runtime ./internal/vm -count=1"
     add_go_test "Feature Matrix and Integration" \
         "go test ./tests -run 'TestFeatureMatrix|TestIntegration' -count=1"
     add_go_test "Release Matrix Metadata" \

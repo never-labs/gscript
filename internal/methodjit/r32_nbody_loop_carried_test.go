@@ -4,7 +4,7 @@
 // advance() j-loop. It:
 //   1. Runs advance() through TieringManager to collect real Tier 1 feedback.
 //   2. Compiles to native via RunTier2Pipeline + AllocateRegisters + Compile.
-//   3. Dumps the ARM64 binary to /tmp/gscript_nbody_advance_r32.bin.
+//   3. Dumps the ARM64 binary to /tmp/leia_nbody_advance_r32.bin.
 //   4. Counts loop-body GetField/SetField pairs (scalar promotion candidates).
 //   5. Reports field-name constant pool so field[N] can be mapped to names.
 
@@ -12,20 +12,20 @@ package methodjit
 
 import (
 	"fmt"
-	"github.com/never-labs/gscript/internal/testutil/vmtest"
+	"github.com/never-labs/leia/internal/testutil/vmtest"
 	"os"
 	"strings"
 	"testing"
 	"unsafe"
 
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/vm"
 )
 
 // Suppress unused import.
 var _ fmt.Stringer
 
 func TestR32_NbodyLoopCarried(t *testing.T) {
-	// Inline source to keep feedback identical to production nbody.gs
+	// Inline source to keep feedback identical to production nbody.leia
 	src := `
 bodies := {
     {name: "sun",     x: 0.0, y: 0.0, z: 0.0, vx: 0.0172, vy: 0.0, vz: 0.0, mass: 39.478},
@@ -231,7 +231,7 @@ for iter := 1; iter <= 10; iter++ {
 	outBytes := make([]byte, size)
 	copy(outBytes, src2)
 
-	outPath := "/tmp/gscript_nbody_advance_r32.bin"
+	outPath := "/tmp/leia_nbody_advance_r32.bin"
 	if err := os.WriteFile(outPath, outBytes, 0o644); err != nil {
 		t.Fatalf("write binary: %v", err)
 	}

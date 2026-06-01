@@ -3,7 +3,7 @@ package install
 import (
 	"testing"
 
-	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/leia/internal/runtime"
 )
 
 func TestInstallUsesStdlibrtHostIOModules(t *testing.T) {

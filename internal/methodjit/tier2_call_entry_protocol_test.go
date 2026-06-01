@@ -4,15 +4,15 @@ package methodjit
 
 import (
 	"encoding/binary"
-	"github.com/never-labs/gscript/internal/testutil/vmtest"
+	"github.com/never-labs/leia/internal/testutil/vmtest"
 	"math"
 	"os"
 	"strings"
 	"testing"
 	"unsafe"
 
-	"github.com/never-labs/gscript/internal/runtime"
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/runtime"
+	"github.com/never-labs/leia/internal/vm"
 )
 
 func TestTier2DirectEntryPtrPublishedAndCleared(t *testing.T) {
@@ -136,11 +136,11 @@ func caller(f, n) {
 }
 
 func TestTier1CallICNoFilterClosureBenchDoesNotCrash(t *testing.T) {
-	t.Setenv("GSCRIPT_TIER2_NO_FILTER", "1")
+	t.Setenv("LEIA_TIER2_NO_FILTER", "1")
 
-	src, err := os.ReadFile("../../benchmarks/calls/closure_bench.gs")
+	src, err := os.ReadFile("../../benchmarks/calls/closure_bench.leia")
 	if err != nil {
-		t.Fatalf("read closure_bench.gs: %v", err)
+		t.Fatalf("read closure_bench.leia: %v", err)
 	}
 	top := compileProto(t, string(src))
 	globals := vmtest.NewInterpreterGlobals()

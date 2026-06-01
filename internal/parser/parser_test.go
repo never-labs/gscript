@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/never-labs/gscript/internal/ast"
-	"github.com/never-labs/gscript/internal/lexer"
+	"github.com/never-labs/leia/internal/ast"
+	"github.com/never-labs/leia/internal/lexer"
 )
 
 // helper: lex and parse the source, fail the test on error
@@ -227,7 +227,7 @@ agent answer(q) {
     user: q
 }
 
-one := agent { user: "What is GScript?" }()
+one := agent { user: "What is Leia?" }()
 manual := agent(q) {
     tools: [search_docs]
     user: q
@@ -286,7 +286,7 @@ models {
 }
 
 // Lookup docs.
-//gscript:requires none
+//leia:requires none
 tool lookup(query) {
     return query, nil
 }
@@ -335,7 +335,7 @@ func TestLLMValidationReportsStaticToolListElementLine(t *testing.T) {
 		{
 			name: "unknown",
 			src: `
-//gscript:requires none
+//leia:requires none
 tool lookup(query) {
     return query, nil
 }
@@ -355,7 +355,7 @@ func f() {
 		{
 			name: "duplicate",
 			src: `
-//gscript:requires none
+//leia:requires none
 tool lookup(query) {
     return query, nil
 }
@@ -382,7 +382,7 @@ agent answer(q) {
 }
 
 func TestLLMExampleParses(t *testing.T) {
-	src, err := os.ReadFile("../../examples/llm/agent.gs")
+	src, err := os.ReadFile("../../examples/llm/agent.leia")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -395,9 +395,9 @@ func TestLLMExampleParses(t *testing.T) {
 func TestLLMToolCommentDirectivesParseAndDesugar(t *testing.T) {
 	prog := mustParse(t, `
 // Lookup docs.
-//gscript:requires docs.read, net.client
-//gscript:param query search query text
-//gscript:param limit: maximum result count
+//leia:requires docs.read, net.client
+//leia:param query search query text
+//leia:param limit: maximum result count
 tool search_docs(query, limit) {
     return query, nil
 }
@@ -452,10 +452,10 @@ tool search_docs(query, limit) {
 }
 
 func TestFileDirectivesParse(t *testing.T) {
-	prog := mustParse(t, `//gscript:build linux, darwin
-//gscript:test integration slow
-//gscript:cap docs.read,net.client
-//gscript:feature llm
+	prog := mustParse(t, `//leia:build linux, darwin
+//leia:test integration slow
+//leia:cap docs.read,net.client
+//leia:feature llm
 func main() {}
 `)
 	if len(prog.FileDirectives) != 4 {
@@ -482,9 +482,9 @@ func main() {}
 }
 
 func TestFileDirectiveBeforeToolDoesNotBecomeToolDoc(t *testing.T) {
-	prog := mustParse(t, `//gscript:build ai
+	prog := mustParse(t, `//leia:build ai
 // Tool docs.
-//gscript:requires none
+//leia:requires none
 tool lookup() {
     return nil
 }
@@ -505,8 +505,8 @@ tool lookup() {
 }
 
 func TestAtSyntaxFileDirectiveIgnored(t *testing.T) {
-	prog := mustParse(t, `//@gscript:build linux
-//gscript:cap fs.read
+	prog := mustParse(t, `//@leia:build linux
+//leia:cap fs.read
 func main() {}
 `)
 	if len(prog.FileDirectives) != 1 {

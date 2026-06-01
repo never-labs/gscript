@@ -5,7 +5,7 @@ package tests_test
 import (
 	"testing"
 
-	gs "github.com/never-labs/gscript"
+	leia "github.com/never-labs/leia"
 )
 
 func TestTraceExec_LoopDone_StoreBack(t *testing.T) {
@@ -116,8 +116,8 @@ func mixedOps(n) {
 }
 result := mixedOps(100)
 `
-	vmResult := runAndGet(t, src, "result", gs.WithVM())
-	jitResult := runAndGet(t, src, "result", gs.WithJIT())
+	vmResult := runAndGet(t, src, "result", leia.WithVM())
+	jitResult := runAndGet(t, src, "result", leia.WithJIT())
 
 	// 90 non-multiples of 10 contribute 90
 	// 10 multiples of 10 contribute 1000

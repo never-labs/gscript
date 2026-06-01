@@ -27,18 +27,18 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/vm"
 )
 
 // TestFPRResidencyReport compiles five float-heavy benchmarks through the
 // Tier 2 pipeline and logs FPR allocation statistics for every proto.
 func TestFPRResidencyReport(t *testing.T) {
 	benches := []string{
-		"numeric/mandelbrot.gs",
-		"numeric/spectral_norm.gs",
-		"numeric/math_intensive.gs",
-		"numeric/nbody.gs",
-		"numeric/matmul.gs",
+		"numeric/mandelbrot.leia",
+		"numeric/spectral_norm.leia",
+		"numeric/math_intensive.leia",
+		"numeric/nbody.leia",
+		"numeric/matmul.leia",
 	}
 
 	for _, bench := range benches {

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/vm"
 )
 
 func TestCallABIAnnotate_GCDBenchCallGetsDescriptor(t *testing.T) {

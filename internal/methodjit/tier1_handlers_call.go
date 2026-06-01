@@ -1,7 +1,7 @@
 //go:build darwin && arm64
 
 // tier1_handlers_call.go contains the Tier 1 baseline JIT exit handler for
-// OP_CALL and its supporting fast paths: GScript-closure direct dispatch,
+// OP_CALL and its supporting fast paths: Leia-closure direct dispatch,
 // native-function fast-arg paths, std-library call fusions, leaf-coroutine
 // fusion, and the call-result store helpers.
 // Pure code movement from tier1_handlers.go; no behavior change.
@@ -11,8 +11,8 @@ package methodjit
 import (
 	"fmt"
 
-	"github.com/never-labs/gscript/internal/runtime"
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/runtime"
+	"github.com/never-labs/leia/internal/vm"
 )
 
 // handleCall handles OP_CALL exit: execute the function call via the VM.
@@ -102,7 +102,7 @@ func (e *BaselineJITEngine) handleCall(ctx *ExecContext, regs []runtime.Value, b
 		}
 	}
 
-	// Fast path: GScript closure with compiled proto. Avoids heap-allocating
+	// Fast path: Leia closure with compiled proto. Avoids heap-allocating
 	// callArgs and bypasses CallValue → callValue → call dispatch.
 	if fnVal.IsFunction() {
 		if cl, ok := vmClosureFromValue(fnVal); ok && cl.Proto.MethodJITCallable() {

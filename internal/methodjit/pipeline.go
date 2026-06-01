@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/never-labs/gscript/internal/runtime"
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/runtime"
+	"github.com/never-labs/leia/internal/vm"
 )
 
 // PassFunc is the signature for an optimization pass.

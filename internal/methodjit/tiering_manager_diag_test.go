@@ -25,7 +25,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/vm"
 )
 
 // TestDiag_ProductionParity_Sieve asserts that CompileForDiagnostics remains
@@ -35,20 +35,20 @@ import (
 // Parity is enforced by construction (both paths call compileTier2Pipeline)
 // but this test catches any future refactor that drifts.
 func TestDiag_ProductionParity_Sieve(t *testing.T) {
-	runParity(t, "control/sieve.gs", "sieve")
+	runParity(t, "control/sieve.leia", "sieve")
 }
 
 // TestDiag_ProductionParity_ObjectCreation — same check on the benchmark
 // that R35 was trying to regress-fix. This exercises a GC-heavy path
 // instead of the arithmetic-heavy sieve path.
 func TestDiag_ProductionParity_ObjectCreation(t *testing.T) {
-	runParity(t, "calls/object_creation.gs", "new_vec3")
+	runParity(t, "calls/object_creation.leia", "new_vec3")
 }
 
 // TestDiag_ProductionParity_Mandelbrot — float-heavy path. Covers the
 // FP/SIMD classification branch in classifyARM64.
 func TestDiag_ProductionParity_Mandelbrot(t *testing.T) {
-	runParity(t, "numeric/mandelbrot.gs", "mandelbrot")
+	runParity(t, "numeric/mandelbrot.leia", "mandelbrot")
 }
 
 func runParity(t *testing.T, benchFile, fnName string) {
@@ -59,10 +59,10 @@ func runParity(t *testing.T, benchFile, fnName string) {
 	// independent of the promotion policy, and some previously-promoted
 	// protos (sieve) are now correctly rejected by production. The
 	// parity property we care about holds when both paths force-compile.
-	if err := os.Setenv("GSCRIPT_TIER2_NO_FILTER", "1"); err != nil {
+	if err := os.Setenv("LEIA_TIER2_NO_FILTER", "1"); err != nil {
 		t.Fatalf("setenv: %v", err)
 	}
-	defer os.Unsetenv("GSCRIPT_TIER2_NO_FILTER")
+	defer os.Unsetenv("LEIA_TIER2_NO_FILTER")
 
 	src, err := os.ReadFile("../../benchmarks/" + benchFile)
 	if err != nil {
@@ -149,9 +149,9 @@ func runParity(t *testing.T, benchFile, fnName string) {
 // TestDiag_ProtoTreeDiag_Sieve exercises the bulk diagnostic walk and
 // verifies that every Tier-2-promotable proto shows up in the output.
 func TestDiag_ProtoTreeDiag_Sieve(t *testing.T) {
-	src, err := os.ReadFile("../../benchmarks/control/sieve.gs")
+	src, err := os.ReadFile("../../benchmarks/control/sieve.leia")
 	if err != nil {
-		t.Fatalf("read sieve.gs: %v", err)
+		t.Fatalf("read sieve.leia: %v", err)
 	}
 	top := compileTop(t, string(src))
 

@@ -1,6 +1,6 @@
 -- Benchmark: Matrix Multiplication
 -- Tests: nested loops, 2D table-of-tables access, floating-point arithmetic
--- Note: uses 0-based indexing via offset to match GScript exactly
+-- Note: uses 0-based indexing via offset to match Leia exactly
 
 local function matgen(n)
     local m = {}

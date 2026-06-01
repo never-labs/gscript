@@ -10,7 +10,7 @@ permalink: /11-eight-bytes-that-change-everything
 
 ## Season 2 Begins
 
-This post marks a turning point. Everything before this --- ten blog posts, dozens of optimizations, two JIT compilers --- was Season 1. We pushed GScript from an interpreter to a tracing JIT that beats LuaJIT on fib and matches it on function calls. We learned SSA, register allocation, cold code splitting, sub-trace calling. But Season 1 hit a wall that no amount of code generation could break through.
+This post marks a turning point. Everything before this --- ten blog posts, dozens of optimizations, two JIT compilers --- was Season 1. We pushed Leia from an interpreter to a tracing JIT that beats LuaJIT on fib and matches it on function calls. We learned SSA, register allocation, cold code splitting, sub-trace calling. But Season 1 hit a wall that no amount of code generation could break through.
 
 The wall is 24 bytes.
 
@@ -26,7 +26,7 @@ So we changed the data.
 
 ## The 24-Byte Value: An Autopsy
 
-Before Season 2, every GScript value was a 24-byte struct:
+Before Season 2, every Leia value was a 24-byte struct:
 
 ```
 type Value struct {
@@ -46,7 +46,7 @@ Consider matmul's inner loop. The matrix is a table-of-tables, each row a `[]Val
 2. Load the element from `row.array[j]` --- another 24 bytes read, extract `data` at offset 8.
 3. For a 300x300 matrix, the array part alone is 300 * 300 * 24 = 2.16 MB.
 
-LuaJIT does the same in 300 * 300 * 8 = 720 KB. That is 1.44 MB less data through the cache hierarchy. On Apple M4 with 128 KB L1 data cache and 16 MB L2, GScript's matrix does not fit in L1; LuaJIT's does. The difference cascades: L1 misses (3-5 cycles each), L2 misses for larger matrices, TLB misses for multi-megabyte allocations.
+LuaJIT does the same in 300 * 300 * 8 = 720 KB. That is 1.44 MB less data through the cache hierarchy. On Apple M4 with 128 KB L1 data cache and 16 MB L2, Leia's matrix does not fit in L1; LuaJIT's does. The difference cascades: L1 misses (3-5 cycles each), L2 misses for larger matrices, TLB misses for multi-megabyte allocations.
 
 And that is just the read path. The write path is worse. Storing a value in the old layout required three separate writes:
 
@@ -70,7 +70,7 @@ The technique is called NaN-boxing. V8 uses a variant. JavaScriptCore uses it. L
 
 A `float64` is 64 bits: 1 sign, 11 exponent, 52 mantissa. A value is NaN (Not a Number) when all 11 exponent bits are 1 and the mantissa is nonzero. A *quiet* NaN (qNaN) additionally has the highest mantissa bit (bit 51) set. This means any 64-bit value with bits 51-62 all set to 1 is a valid qNaN --- and the remaining 51 bits of mantissa plus the sign bit are "free." Hardware floating-point operations produce only one specific NaN pattern (`0x7FF8000000000000`). The other 2^52 NaN patterns are ours to fill with whatever we want.
 
-GScript's NaN-boxing layout:
+Leia's NaN-boxing layout:
 
 ```
 Bit layout of an 8-byte NaN-boxed Value (uint64):
@@ -189,7 +189,7 @@ func (v Value) ptrPayload() unsafe.Pointer {
 
 NaN-boxed pointers live inside `uint64` values. Go's garbage collector cannot see them. If we store a `*Table` pointer as `uint64(tagPtr | uintptr(tablePtr))`, the GC has no idea the table is still in use. The next GC cycle collects it. The program crashes.
 
-The correct long-term solution is a custom heap: allocate all GScript objects via `mmap`, manage them with a custom mark-sweep collector, and never let Go's GC touch them. This is what LuaJIT, V8, and SpiderMonkey do. It is also a substantial project on its own --- Season 2.2.
+The correct long-term solution is a custom heap: allocate all Leia objects via `mmap`, manage them with a custom mark-sweep collector, and never let Go's GC touch them. This is what LuaJIT, V8, and SpiderMonkey do. It is also a substantial project on its own --- Season 2.2.
 
 For Season 2.1 (now), we use a simple but effective stopgap: a global root map.
 
@@ -443,7 +443,7 @@ The sieve result — from 10x behind LuaJIT to 2.3x behind — validates the ent
 
 ## What Season 2 Means
 
-Season 1 was about making the JIT generate good code. We succeeded: for pure computation, GScript's ARM64 output is competitive with LuaJIT.
+Season 1 was about making the JIT generate good code. We succeeded: for pure computation, Leia's ARM64 output is competitive with LuaJIT.
 
 Season 2 is about making the runtime move less data. NaN-boxing is the foundation --- the 24B-to-8B shrink that makes everything downstream possible. But it is only the foundation. The gcRoots map is a temporary fix. Go's GC still scans the Go heap. String allocation still creates Go objects. Table internals still use Go slices.
 
@@ -451,9 +451,9 @@ The roadmap:
 
 **Season 2.1 (done):** NaN-boxing. Value becomes `uint64`. JIT codegen adapted. GC safety via `gcRoots` map. Correctness verified.
 
-**Season 2.2 (next):** Custom heap. All GScript objects (tables, strings, closures) allocated via `mmap`. Bump allocator with size-class arenas. ~2-5ns per allocation instead of Go's ~25-50ns.
+**Season 2.2 (next):** Custom heap. All Leia objects (tables, strings, closures) allocated via `mmap`. Bump allocator with size-class arenas. ~2-5ns per allocation instead of Go's ~25-50ns.
 
-**Season 2.3:** Custom mark-sweep GC. Incremental tri-color marking. Write barriers. The `gcRoots` map is removed. Go's GC sees no GScript pointers --- zero pause time for GScript workloads.
+**Season 2.3:** Custom mark-sweep GC. Incremental tri-color marking. Write barriers. The `gcRoots` map is removed. Go's GC sees no Leia pointers --- zero pause time for Leia workloads.
 
 **Season 2.4:** JIT integration with the custom heap. Table field loads become direct pointer dereferences into mmap'd memory. No Go runtime calls, no interface assertions, no map lookups.
 

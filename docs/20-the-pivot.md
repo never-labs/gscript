@@ -45,7 +45,7 @@ The pattern is clear. Everything above the line is loop-dominated. Everything be
 
 The idea was simple: when the trace recorder encounters a CALL instruction, follow the execution into the callee. The callee's bytecode gets inlined into the trace, and when it returns, the recorder continues in the caller. LuaJIT does this.
 
-It failed because of store-back corruption. GScript's trace recorder uses a shared `regRegs` array that maps VM register slots to hardware registers. When the recorder follows a call at depth > 0, the callee's register assignments overwrite the caller's entries in `regRegs`. On side-exit, the snapshot tries to store back register values to the caller's frame, but the mapping is wrong — callee data gets written to caller slots.
+It failed because of store-back corruption. Leia's trace recorder uses a shared `regRegs` array that maps VM register slots to hardware registers. When the recorder follows a call at depth > 0, the callee's register assignments overwrite the caller's entries in `regRegs`. On side-exit, the snapshot tries to store back register values to the caller's frame, but the mapping is wrong — callee data gets written to caller slots.
 
 LuaJIT solves this with frame-aware snapshots: each snapshot knows which function frame it belongs to, and store-back respects frame boundaries. We do not have that infrastructure. Building it would mean redesigning the snapshot system, the register allocator, and the side-exit mechanism — essentially half the JIT.
 
@@ -153,7 +153,7 @@ The trace JIT rewrite was not wasted. It produced clean, modular infrastructure 
 
 ## What is different from V8
 
-GScript is not JavaScript, and this is an advantage.
+Leia is not JavaScript, and this is an advantage.
 
 **Simpler type system.** Lua semantics means only 6 value types: Int, Float, String, Bool, Table, Nil. No prototypes, no classes, no `this` binding, no closures-as-classes, no Symbols, no BigInt. The type feedback lattice is tiny compared to V8's, which must handle Smis, HeapNumbers, Strings, Symbols, BigInts, multiple object shapes, and prototype chains.
 

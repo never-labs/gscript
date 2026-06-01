@@ -19,7 +19,7 @@ import (
 	"testing"
 	"unsafe"
 
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/vm"
 )
 
 func TestObjectCreationDump(t *testing.T) {
@@ -113,9 +113,9 @@ func TestObjectCreationDump(t *testing.T) {
 	}
 
 	// Load benchmark source.
-	srcBytes, err := os.ReadFile("../../benchmarks/calls/object_creation.gs")
+	srcBytes, err := os.ReadFile("../../benchmarks/calls/object_creation.leia")
 	if err != nil {
-		t.Fatalf("read object_creation.gs: %v", err)
+		t.Fatalf("read object_creation.leia: %v", err)
 	}
 	top := compileTop(t, string(srcBytes))
 
@@ -138,7 +138,7 @@ func TestObjectCreationDump(t *testing.T) {
 		t.Run(bl.name, func(t *testing.T) {
 			proto := findProtoByName(top, bl.name)
 			if proto == nil {
-				t.Fatalf("function %q not found in object_creation.gs", bl.name)
+				t.Fatalf("function %q not found in object_creation.leia", bl.name)
 			}
 			proto.EnsureFeedback()
 

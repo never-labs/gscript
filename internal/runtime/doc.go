@@ -1,4 +1,4 @@
-// Package runtime implements the tree-walking runtime for GScript.
+// Package runtime implements the tree-walking runtime for Leia.
 //
 // It owns the dynamic value model, tables, closures, coroutines, host-facing
 // budgets, standard-library module implementations, and the interpreter that

@@ -1,13 +1,13 @@
 package vm
 
 import (
-	"github.com/never-labs/gscript/internal/testutil/vmtest"
+	"github.com/never-labs/leia/internal/testutil/vmtest"
 	"strings"
 	"testing"
 
-	"github.com/never-labs/gscript/internal/lexer"
-	"github.com/never-labs/gscript/internal/parser"
-	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/leia/internal/lexer"
+	"github.com/never-labs/leia/internal/parser"
+	"github.com/never-labs/leia/internal/runtime"
 )
 
 func TestVMDebugStackInfoSourceAndEvents(t *testing.T) {
@@ -66,11 +66,11 @@ debug.setSink(nil)
 
 eventCount := #events
 `
-	globals := compileAndRunWithSource(t, src, "vm_debug_fixture.gs")
+	globals := compileAndRunWithSource(t, src, "vm_debug_fixture.leia")
 	expectStringGlobal(t, globals, "topName", "leaf")
 	expectStringGlobal(t, globals, "info0Name", "leaf")
 	expectStringGlobal(t, globals, "info1Name", "parent")
-	expectStringGlobal(t, globals, "sourceName", "vm_debug_fixture.gs")
+	expectStringGlobal(t, globals, "sourceName", "vm_debug_fixture.leia")
 	if got := globals["lineNumber"].Int(); got <= 0 {
 		t.Fatalf("lineNumber = %d, want positive source line", got)
 	}
@@ -109,12 +109,12 @@ debug.setSink(nil)
 eventCount := #events
 firstEvent := events[1]
 `
-	globals := compileAndRunWithSource(t, src, "vm_go_error_fixture.gs")
+	globals := compileAndRunWithSource(t, src, "vm_go_error_fixture.leia")
 	if got := globals["eventCount"].Int(); got != 1 {
 		t.Fatalf("eventCount = %d, want 1 goroutine error event", got)
 	}
 	expectStringGlobal(t, globals, "firstEvent", "go-fail")
-	expectStringGlobal(t, globals, "stack", "vm_go_error_fixture.gs")
+	expectStringGlobal(t, globals, "stack", "vm_go_error_fixture.leia")
 }
 
 func compileAndRunWithSource(t *testing.T, src, sourceName string) map[string]runtime.Value {

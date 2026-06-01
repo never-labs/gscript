@@ -7,12 +7,12 @@
 package methodjit
 
 import (
-	"github.com/never-labs/gscript/internal/testutil/vmtest"
+	"github.com/never-labs/leia/internal/testutil/vmtest"
 	"os"
 	"testing"
 	"unsafe"
 
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/vm"
 )
 
 // TestSelfCall_ConstantsStrMoved verifies that the R28 Task 1 optimization
@@ -41,14 +41,14 @@ import (
 // below 3 (one per CALL site in ackermann), the optimization was reverted
 // or the STR was merged back into the shared join.
 func TestSelfCall_ConstantsStrMoved(t *testing.T) {
-	srcBytes, err := os.ReadFile("../../benchmarks/recursion/ackermann.gs")
+	srcBytes, err := os.ReadFile("../../benchmarks/recursion/ackermann.leia")
 	if err != nil {
-		t.Fatalf("read ackermann.gs: %v", err)
+		t.Fatalf("read ackermann.leia: %v", err)
 	}
 	top := compileTop(t, string(srcBytes))
 	target := findProtoByName(top, "ack")
 	if target == nil {
-		t.Fatalf("function 'ack' not found in ackermann.gs")
+		t.Fatalf("function 'ack' not found in ackermann.leia")
 	}
 
 	bf, err := CompileBaseline(target)

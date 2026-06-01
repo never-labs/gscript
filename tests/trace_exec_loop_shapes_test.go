@@ -5,7 +5,7 @@ package tests_test
 import (
 	"testing"
 
-	gs "github.com/never-labs/gscript"
+	leia "github.com/never-labs/leia"
 )
 
 func TestTraceExec_EmptyLoopBody(t *testing.T) {
@@ -21,8 +21,8 @@ result := emptyLoop(1000)
 `
 	// If the language leaks i from the for-loop, verify VM/JIT agree.
 	// Otherwise both will return nil/0.
-	vmResult := runAndGet(t, src, "result", gs.WithVM())
-	jitResult := runAndGet(t, src, "result", gs.WithJIT())
+	vmResult := runAndGet(t, src, "result", leia.WithVM())
+	jitResult := runAndGet(t, src, "result", leia.WithJIT())
 	// nil and int64(0) are both acceptable "undefined variable" results.
 	isFalsy := func(v interface{}) bool {
 		switch v := v.(type) {
@@ -136,8 +136,8 @@ func fillAndSum(n) {
 }
 result := fillAndSum(100)
 `
-	vmResult := runAndGet(t, src, "result", gs.WithVM())
-	jitResult := runAndGet(t, src, "result", gs.WithJIT())
+	vmResult := runAndGet(t, src, "result", leia.WithVM())
+	jitResult := runAndGet(t, src, "result", leia.WithJIT())
 
 	// sum of i^2 for i=1..100 = 100*101*201/6 = 338350
 	expected := int64(338350)
@@ -187,8 +187,8 @@ func countEven(n) {
 }
 result := countEven(1000)
 `
-	vmResult := runAndGet(t, src, "result", gs.WithVM())
-	jitResult := runAndGet(t, src, "result", gs.WithJIT())
+	vmResult := runAndGet(t, src, "result", leia.WithVM())
+	jitResult := runAndGet(t, src, "result", leia.WithJIT())
 
 	expected := int64(500)
 	if vmResult != expected {

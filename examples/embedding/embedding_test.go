@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	gs "github.com/never-labs/gscript"
-	"github.com/never-labs/gscript/llm"
+	leia "github.com/never-labs/leia"
+	"github.com/never-labs/leia/llm"
 )
 
 type exampleLLMProvider struct{}
@@ -26,7 +26,7 @@ func (exampleLLMProvider) Turn(_ context.Context, req llm.TurnRequest) (llm.Turn
 			Calls: []llm.ToolCall{{
 				ID:   "call_1",
 				Tool: req.Tools[0].Name,
-				Args: map[string]any{"name": "gscript"},
+				Args: map[string]any{"name": "leia"},
 			}},
 		}, nil
 	}
@@ -34,17 +34,17 @@ func (exampleLLMProvider) Turn(_ context.Context, req llm.TurnRequest) (llm.Turn
 }
 
 func Example_compileRun() {
-	prog, err := gs.Compile(`
+	prog, err := leia.Compile(`
 		func score(base, bonus) {
 			return base * 10 + bonus
 		}
 		result := score(4, 2)
-	`, gs.WithSourceName("score.gs"))
+	`, leia.WithSourceName("score.leia"))
 	if err != nil {
 		panic(err)
 	}
 
-	vm := gs.New()
+	vm := leia.New()
 	if err := vm.Run(prog); err != nil {
 		panic(err)
 	}
@@ -60,11 +60,11 @@ func Example_compileRun() {
 }
 
 func Example_value() {
-	vm := gs.New()
-	if err := vm.Set("name", gs.String("embedder")); err != nil {
+	vm := leia.New()
+	if err := vm.Set("name", leia.String("embedder")); err != nil {
 		panic(err)
 	}
-	if err := vm.Set("count", gs.Int(3)); err != nil {
+	if err := vm.Set("count", leia.Int(3)); err != nil {
 		panic(err)
 	}
 
@@ -76,13 +76,13 @@ func Example_value() {
 	if err != nil {
 		panic(err)
 	}
-	encoded, err := gs.String("ready").Encode()
+	encoded, err := leia.String("ready").Encode()
 	if err != nil {
 		panic(err)
 	}
 
 	fmt.Println(message)
-	fmt.Println(gs.Int(42).Kind(), gs.Int(42).Int())
+	fmt.Println(leia.Int(42).Kind(), leia.Int(42).Int())
 	fmt.Println(encoded)
 
 	// Output:
@@ -92,7 +92,7 @@ func Example_value() {
 }
 
 func Example_hostFunctionBinding() {
-	vm := gs.New()
+	vm := leia.New()
 	if err := vm.RegisterFunc("label", func(prefix string, id int64) string {
 		return fmt.Sprintf("%s-%03d", prefix, id)
 	}); err != nil {
@@ -114,8 +114,8 @@ func Example_hostFunctionBinding() {
 }
 
 func Example_hostModuleRequire() {
-	vm := gs.New(gs.WithSandbox(), gs.WithModuleLoading(false))
-	if err := vm.RegisterModule("go/strings", gs.Module{
+	vm := leia.New(leia.WithSandbox(), leia.WithModuleLoading(false))
+	if err := vm.RegisterModule("go/strings", leia.Module{
 		"upper": strings.ToUpper,
 	}); err != nil {
 		panic(err)
@@ -139,7 +139,7 @@ result := strings.upper("hello")
 }
 
 func Example_llmProvider() {
-	vm := gs.New(gs.WithLibs(gs.LibString|gs.LibLLM), gs.WithLLMProvider(exampleLLMProvider{}))
+	vm := leia.New(leia.WithLibs(leia.LibString|leia.LibLLM), leia.WithLLMProvider(exampleLLMProvider{}))
 	if err := vm.Exec(`
 lookup := llm.tool("lookup", func(name) {
     return "docs:" .. name, nil
@@ -162,22 +162,22 @@ answer := result.text
 	fmt.Println(answer)
 
 	// Output:
-	// docs:gscript
+	// docs:leia
 }
 
 func Example_hotLoader() {
-	dir, err := os.MkdirTemp("", "gscript-hotloader-*")
+	dir, err := os.MkdirTemp("", "leia-hotloader-*")
 	if err != nil {
 		panic(err)
 	}
 	defer os.RemoveAll(dir)
 
-	path := filepath.Join(dir, "logic.gs")
+	path := filepath.Join(dir, "logic.leia")
 	if err := os.WriteFile(path, []byte(`func answer() { return 1 }`), 0644); err != nil {
 		panic(err)
 	}
 
-	loader := gs.NewHotLoader()
+	loader := leia.NewHotLoader()
 	handle, err := loader.Load(path)
 	if err != nil {
 		panic(err)
@@ -190,7 +190,7 @@ func Example_hotLoader() {
 		panic(err)
 	}
 
-	result, err := handle.Call(gs.New(), "answer")
+	result, err := handle.Call(leia.New(), "answer")
 	if err != nil {
 		panic(err)
 	}
@@ -207,13 +207,13 @@ func Example_hotLoader() {
 }
 
 func Example_hotInstance() {
-	dir, err := os.MkdirTemp("", "gscript-hotinstance-*")
+	dir, err := os.MkdirTemp("", "leia-hotinstance-*")
 	if err != nil {
 		panic(err)
 	}
 	defer os.RemoveAll(dir)
 
-	path := filepath.Join(dir, "logic.gs")
+	path := filepath.Join(dir, "logic.leia")
 	if err := os.WriteFile(path, []byte(`
 counter := 0
 func inc() {
@@ -224,7 +224,7 @@ func inc() {
 		panic(err)
 	}
 
-	loader := gs.NewHotLoader()
+	loader := leia.NewHotLoader()
 	inst, err := loader.LoadInstance(path)
 	if err != nil {
 		panic(err)
@@ -253,7 +253,7 @@ func inc() {
 }
 
 func Example_sandboxAndMaxSteps() {
-	sandbox := gs.New(gs.WithSandbox())
+	sandbox := leia.New(leia.WithSandbox())
 	if err := sandbox.Exec(`safe := true`); err != nil {
 		panic(err)
 	}
@@ -263,14 +263,14 @@ func Example_sandboxAndMaxSteps() {
 	}
 	fmt.Println("sandbox fs", fsGlobal)
 
-	limited := gs.New(gs.WithMaxSteps(8))
+	limited := leia.New(leia.WithMaxSteps(8))
 	err = limited.Exec(`
 		i := 0
 		for {
 			i += 1
 		}
 	`)
-	var budgetErr *gs.BudgetError
+	var budgetErr *leia.BudgetError
 	fmt.Println("budget", errors.As(err, &budgetErr), budgetErr.Resource, budgetErr.Limit)
 
 	// Output:
@@ -280,7 +280,7 @@ func Example_sandboxAndMaxSteps() {
 
 func Example_structuredErrors() {
 	hostFailed := errors.New("host failed")
-	vm := gs.New()
+	vm := leia.New()
 	if err := vm.RegisterFunc("fail", func() error {
 		return hostFailed
 	}); err != nil {
@@ -289,8 +289,8 @@ func Example_structuredErrors() {
 
 	err := vm.Exec(`fail()`)
 
-	var scriptErr *gs.Error
-	var hostErr *gs.HostCallbackError
+	var scriptErr *leia.Error
+	var hostErr *leia.HostCallbackError
 	fmt.Println(errors.As(err, &scriptErr), scriptErr.Kind)
 	fmt.Println(errors.As(err, &hostErr), hostErr.Name, errors.Is(err, hostFailed))
 

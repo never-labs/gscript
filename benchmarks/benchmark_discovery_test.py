@@ -49,7 +49,7 @@ class BenchmarkDiscoveryTest(unittest.TestCase):
             bench_dir.mkdir(parents=True)
             lua_dir.mkdir(parents=True)
             for name in ("z_extra", "matmul", "a_extra", "matmul_row"):
-                (bench_dir / f"{name}.gs").write_text("-- test\n")
+                (bench_dir / f"{name}.leia").write_text("-- test\n")
             (lua_dir / "matmul.lua").write_text("-- ref\n")
 
             specs = discovery.domain_specs(root, "numeric")
@@ -79,7 +79,7 @@ class BenchmarkDiscoveryTest(unittest.TestCase):
 
     def test_selector_matches_spec_accepts_only_domain_selectors(self):
         self.assertTrue(discovery.selector_matches_spec("numeric/matmul", FakeSpec("numeric", "matmul")))
-        self.assertTrue(discovery.selector_matches_spec("benchmarks/numeric/matmul.gs", FakeSpec("numeric", "matmul")))
+        self.assertTrue(discovery.selector_matches_spec("benchmarks/numeric/matmul.leia", FakeSpec("numeric", "matmul")))
         self.assertFalse(discovery.selector_matches_spec("missing_domain/matmul", FakeSpec("numeric", "matmul")))
         self.assertFalse(discovery.selector_matches_spec("matmul", FakeSpec("numeric", "matmul")))
         self.assertFalse(
@@ -114,15 +114,15 @@ class BenchmarkDiscoveryTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             (root / "benchmarks" / "calls").mkdir(parents=True)
-            (root / "benchmarks" / "calls" / "closure_accumulator.gs").write_text("-- test\n")
+            (root / "benchmarks" / "calls" / "closure_accumulator.leia").write_text("-- test\n")
 
             self.assertEqual(
                 discovery.resolve_script_path(root, "calls/closure_accumulator"),
-                root / "benchmarks" / "calls" / "closure_accumulator.gs",
+                root / "benchmarks" / "calls" / "closure_accumulator.leia",
             )
             self.assertEqual(
-                discovery.resolve_script_path(root, "benchmarks/calls/closure_accumulator.gs"),
-                root / "benchmarks" / "calls" / "closure_accumulator.gs",
+                discovery.resolve_script_path(root, "benchmarks/calls/closure_accumulator.leia"),
+                root / "benchmarks" / "calls" / "closure_accumulator.leia",
             )
             self.assertIsNone(discovery.resolve_script_path(root, "old_group/closure_accumulator"))
             self.assertIsNone(discovery.resolve_script_path(root, "calls/closure_accumulator_unknown"))
@@ -132,11 +132,11 @@ class BenchmarkDiscoveryTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             (root / "benchmarks" / "table").mkdir(parents=True)
-            (root / "benchmarks" / "table" / "events_metamethod.gs").write_text("-- test\n")
+            (root / "benchmarks" / "table" / "events_metamethod.leia").write_text("-- test\n")
 
             self.assertEqual(
                 discovery.resolve_script_identity(root, "table/events_metamethod"),
-                ("table", "events_metamethod", root / "benchmarks" / "table" / "events_metamethod.gs"),
+                ("table", "events_metamethod", root / "benchmarks" / "table" / "events_metamethod.leia"),
             )
             self.assertIsNone(discovery.resolve_script_identity(root, "missing_domain/events_metamethod"))
 
@@ -145,7 +145,7 @@ class BenchmarkDiscoveryTest(unittest.TestCase):
             root = Path(td)
             for group, name in (("concurrency", "goroutine_sleep"), ("table", "events_metamethod")):
                 (root / "benchmarks" / group).mkdir(parents=True, exist_ok=True)
-                (root / "benchmarks" / group / f"{name}.gs").write_text("-- test\n")
+                (root / "benchmarks" / group / f"{name}.leia").write_text("-- test\n")
 
             self.assertEqual(
                 discovery.groups_for_selectors(
@@ -161,7 +161,7 @@ class BenchmarkDiscoveryTest(unittest.TestCase):
             root = Path(td)
             for group, name in (("concurrency", "goroutine_sleep"), ("table", "events_metamethod")):
                 (root / "benchmarks" / group).mkdir(parents=True, exist_ok=True)
-                (root / "benchmarks" / group / f"{name}.gs").write_text("-- test\n")
+                (root / "benchmarks" / group / f"{name}.leia").write_text("-- test\n")
 
             self.assertEqual(
                 discovery.groups_for_selectors(
@@ -177,7 +177,7 @@ class BenchmarkDiscoveryTest(unittest.TestCase):
             root = Path(td)
             for group, name in (("table", "events_metamethod"), ("data", "soa_dot")):
                 (root / "benchmarks" / group).mkdir(parents=True, exist_ok=True)
-                (root / "benchmarks" / group / f"{name}.gs").write_text("-- test\n")
+                (root / "benchmarks" / group / f"{name}.leia").write_text("-- test\n")
 
             self.assertEqual(
                 discovery.groups_for_selectors(
@@ -193,7 +193,7 @@ class BenchmarkDiscoveryTest(unittest.TestCase):
             root = Path(td)
             for group, name in (("data", "soa_dot"), ("concurrency", "goroutine_sleep")):
                 (root / "benchmarks" / group).mkdir(parents=True, exist_ok=True)
-                (root / "benchmarks" / group / f"{name}.gs").write_text("-- test\n")
+                (root / "benchmarks" / group / f"{name}.leia").write_text("-- test\n")
 
             self.assertEqual(
                 discovery.groups_for_selectors(

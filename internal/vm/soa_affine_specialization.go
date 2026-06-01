@@ -1,6 +1,6 @@
 package vm
 
-import "github.com/never-labs/gscript/internal/runtime"
+import "github.com/never-labs/leia/internal/runtime"
 
 type soaColumnAffineUpdateSpec struct {
 	srcName string

@@ -1,5 +1,5 @@
 // graph_builder_test.go tests the bytecode → CFG SSA graph builder.
-// Tests compile GScript source to bytecode, run BuildGraph, and verify
+// Tests compile Leia source to bytecode, run BuildGraph, and verify
 // the resulting IR structure (block count, instruction types, phi nodes,
 // terminator correctness, succ/pred consistency).
 
@@ -9,13 +9,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/never-labs/gscript/internal/lexer"
-	"github.com/never-labs/gscript/internal/parser"
-	"github.com/never-labs/gscript/internal/runtime"
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/lexer"
+	"github.com/never-labs/leia/internal/parser"
+	"github.com/never-labs/leia/internal/runtime"
+	"github.com/never-labs/leia/internal/vm"
 )
 
-// compile is a test helper that compiles GScript source and returns the
+// compile is a test helper that compiles Leia source and returns the
 // FuncProto for the first declared function. If the source has no inner
 // functions, it returns the top-level (main) proto.
 func compile(t *testing.T, src string) *vm.FuncProto {

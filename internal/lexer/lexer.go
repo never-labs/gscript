@@ -6,7 +6,7 @@ import (
 	"unicode/utf8"
 )
 
-// Lexer tokenizes GScript source code.
+// Lexer tokenizes Leia source code.
 type Lexer struct {
 	source          string
 	pos             int

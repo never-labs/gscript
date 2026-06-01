@@ -1,8 +1,8 @@
 package vmtest
 
 import (
-	"github.com/never-labs/gscript/internal/runtime"
-	"github.com/never-labs/gscript/internal/stdlibrt/install"
+	"github.com/never-labs/leia/internal/runtime"
+	"github.com/never-labs/leia/internal/stdlibrt/install"
 )
 
 // NewInterpreterGlobals returns globals for VM/JIT tests that need the full

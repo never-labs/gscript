@@ -331,7 +331,7 @@ func TestCommentOnly(t *testing.T) {
 }
 
 func TestLineCommentMetadata(t *testing.T) {
-	lex := New("// Lookup docs\n//gscript:requires docs.read\ntool lookup() {}")
+	lex := New("// Lookup docs\n//leia:requires docs.read\ntool lookup() {}")
 	tokens, err := lex.Tokenize()
 	if err != nil {
 		t.Fatalf("Tokenize error: %v", err)
@@ -343,7 +343,7 @@ func TestLineCommentMetadata(t *testing.T) {
 	if len(comments) != 2 {
 		t.Fatalf("leading comments = %#v, want 2", comments)
 	}
-	if comments[0].Text != " Lookup docs" || comments[1].Text != "gscript:requires docs.read" {
+	if comments[0].Text != " Lookup docs" || comments[1].Text != "leia:requires docs.read" {
 		t.Fatalf("leading comments = %#v", comments)
 	}
 }

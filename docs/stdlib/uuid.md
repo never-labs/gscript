@@ -54,7 +54,7 @@ info := uuid.parse("550e8400-e29b-41d4-a716-446655440000")
 
 Return the nil UUID: `"00000000-0000-0000-0000-000000000000"`.
 
-Note: Since `nil` is a keyword in GScript, use bracket notation to access this function.
+Note: Since `nil` is a keyword in Leia, use bracket notation to access this function.
 
 ```
 nilUUID := uuid["nil"]()

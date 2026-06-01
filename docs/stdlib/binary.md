@@ -1,6 +1,6 @@
 # binary
 
-The `binary` library packs GScript values into byte strings and unpacks byte
+The `binary` library packs Leia values into byte strings and unpacks byte
 strings back into values.
 
 ## Format Strings

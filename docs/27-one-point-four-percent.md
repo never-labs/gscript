@@ -99,5 +99,5 @@ Observation beats reasoning. The integration test passed because it ran through 
 
 *Previous: [22x and Counting](/26-22x-and-counting)*
 
-*This is post 27 in the [GScript JIT series](https://jxwr.github.io/gscript/).
+*This is post 27 in the [Leia JIT series](https://jxwr.github.io/leia/).
 All numbers from a single-thread ARM64 Apple Silicon machine.*

@@ -1,18 +1,18 @@
 package vm
 
 import (
-	"github.com/never-labs/gscript/internal/testutil/vmtest"
+	"github.com/never-labs/leia/internal/testutil/vmtest"
 	"strings"
 	"sync/atomic"
 	"testing"
 
-	"github.com/never-labs/gscript/internal/ast"
-	"github.com/never-labs/gscript/internal/lexer"
-	"github.com/never-labs/gscript/internal/parser"
-	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/leia/internal/ast"
+	"github.com/never-labs/leia/internal/lexer"
+	"github.com/never-labs/leia/internal/parser"
+	"github.com/never-labs/leia/internal/runtime"
 )
 
-// compileAndRun compiles GScript source to bytecode and runs it in the VM.
+// compileAndRun compiles Leia source to bytecode and runs it in the VM.
 // Returns the VM's globals map for inspection.
 func compileAndRun(t *testing.T, src string) map[string]runtime.Value {
 	t.Helper()

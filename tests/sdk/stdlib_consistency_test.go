@@ -1,15 +1,15 @@
-package gscript_test
+package leia_test
 
 import (
 	"sort"
 	"testing"
 
-	gs "github.com/never-labs/gscript"
-	"github.com/never-labs/gscript/internal/stdlib/catalog"
+	leia "github.com/never-labs/leia"
+	"github.com/never-labs/leia/internal/stdlib/catalog"
 )
 
 func TestStdlibCatalogMatchesPublicLibAll(t *testing.T) {
-	vm := gs.New(gs.WithLibs(gs.LibAll))
+	vm := leia.New(leia.WithLibs(leia.LibAll))
 	for _, name := range catalog.ModuleNames() {
 		t.Run(name, func(t *testing.T) {
 			if got := publicModuleType(t, vm, name); got != "table" {
@@ -20,7 +20,7 @@ func TestStdlibCatalogMatchesPublicLibAll(t *testing.T) {
 }
 
 func TestStdlibCatalogSafeDefaultMatchesPublicLibSafe(t *testing.T) {
-	vm := gs.New(gs.WithLibs(gs.LibSafe))
+	vm := leia.New(leia.WithLibs(leia.LibSafe))
 	for _, module := range catalog.Modules() {
 		t.Run(module.Name, func(t *testing.T) {
 			got := publicModuleType(t, vm, module.Name)
@@ -51,7 +51,7 @@ func TestStdlibCatalogHasUniqueModuleNames(t *testing.T) {
 	}
 }
 
-func publicModuleType(t *testing.T, vm *gs.VM, name string) string {
+func publicModuleType(t *testing.T, vm *leia.VM, name string) string {
 	t.Helper()
 	if err := vm.Exec(`result := type(package.loaded["` + name + `"])`); err != nil {
 		t.Fatalf("type(package.loaded[%q]): %v", name, err)

@@ -30,7 +30,7 @@ few remaining misses.
 
 ## The Current Median-Of-3 Run
 
-The run used median-of-3 timings for GScript default JIT and the local LuaJIT
+The run used median-of-3 timings for Leia default JIT and the local LuaJIT
 reference. Lower is better.
 
 A concise dated report is also in
@@ -41,29 +41,29 @@ means the benchmark completed below the harness display precision. Those rows
 should be read as "less than one millisecond as printed by this harness," not
 as zero-cost execution.
 
-| Benchmark | GScript JIT | LuaJIT | Read |
+| Benchmark | Leia JIT | LuaJIT | Read |
 | --- | ---: | ---: | --- |
 | fib | 0.000s | 0.025s | below timer precision |
 | fib_recursive | 0.000s | 0.324s | below timer precision |
-| sieve | 0.004s | 0.010s | GScript about 2.5x faster |
-| mandelbrot | 0.047s | 0.052s | GScript slightly faster |
+| sieve | 0.004s | 0.010s | Leia about 2.5x faster |
+| mandelbrot | 0.047s | 0.052s | Leia slightly faster |
 | ackermann | 0.000s | 0.006s | below timer precision |
-| matmul | 0.008s | 0.021s | GScript about 2.6x faster |
-| spectral_norm | 0.003s | 0.007s | GScript about 2.3x faster |
-| nbody | 0.026s | 0.033s | GScript about 1.3x faster |
-| fannkuch | 0.011s | 0.019s | GScript about 1.7x faster |
-| sort | 0.005s | 0.010s | GScript about 2.0x faster |
-| sum_primes | 0.001s | 0.002s | GScript about 2.0x faster |
-| mutual_recursion | 0.001s | 0.005s | GScript about 5.0x faster |
-| binary_trees | 0.003s | 0.166s | GScript about 55x faster |
+| matmul | 0.008s | 0.021s | Leia about 2.6x faster |
+| spectral_norm | 0.003s | 0.007s | Leia about 2.3x faster |
+| nbody | 0.026s | 0.033s | Leia about 1.3x faster |
+| fannkuch | 0.011s | 0.019s | Leia about 1.7x faster |
+| sort | 0.005s | 0.010s | Leia about 2.0x faster |
+| sum_primes | 0.001s | 0.002s | Leia about 2.0x faster |
+| mutual_recursion | 0.001s | 0.005s | Leia about 5.0x faster |
+| binary_trees | 0.003s | 0.166s | Leia about 55x faster |
 | table_field_access | 0.019s | 0.019s | parity |
-| table_array_access | 0.019s | 0.010s | GScript about 1.9x slower |
-| coroutine_bench | 0.019s | 0.009s | GScript about 2.1x slower |
-| closure_bench | 0.014s | 0.009s | GScript about 1.6x slower |
-| string_bench | 0.015s | 0.009s | GScript about 1.7x slower |
-| fibonacci_iterative | 0.024s | 0.026s | GScript slightly faster |
-| math_intensive | 0.048s | 0.062s | GScript about 1.3x faster |
-| object_creation | 0.003s | 0.008s | GScript about 2.7x faster |
+| table_array_access | 0.019s | 0.010s | Leia about 1.9x slower |
+| coroutine_bench | 0.019s | 0.009s | Leia about 2.1x slower |
+| closure_bench | 0.014s | 0.009s | Leia about 1.6x slower |
+| string_bench | 0.015s | 0.009s | Leia about 1.7x slower |
+| fibonacci_iterative | 0.024s | 0.026s | Leia slightly faster |
+| math_intensive | 0.048s | 0.062s | Leia about 1.3x faster |
+| object_creation | 0.003s | 0.008s | Leia about 2.7x faster |
 
 The important part is not one headline number. It is the distribution. Most of
 the original "close the LuaJIT gap" targets have crossed over:
@@ -129,7 +129,7 @@ floor and point in the same direction as the broader table.
 
 There is also a benchmarking-policy caveat. This is still a local
 Darwin/arm64 LuaJIT comparison, not a portable language shootout. LuaJIT and
-GScript are not compiling the same frontend, using the same object model, or
+Leia are not compiling the same frontend, using the same object model, or
 making the same tradeoffs. The comparison is valuable because it has guided the
 JIT work for this project, not because it proves a universal runtime ranking.
 
@@ -143,16 +143,16 @@ The remaining comparable gaps are narrower and more runtime-shaped:
 
 ```text
 table_array_access:
-  GScript 0.019s vs LuaJIT 0.010s
+  Leia 0.019s vs LuaJIT 0.010s
 
 coroutine_bench:
-  GScript 0.019s vs LuaJIT 0.009s
+  Leia 0.019s vs LuaJIT 0.009s
 
 closure_bench:
-  GScript 0.014s vs LuaJIT 0.009s
+  Leia 0.014s vs LuaJIT 0.009s
 
 string_bench:
-  GScript 0.015s vs LuaJIT 0.009s
+  Leia 0.015s vs LuaJIT 0.009s
 ```
 
 That list is useful because it is no longer dominated by the old numeric and
@@ -161,16 +161,16 @@ the next map sharper still:
 
 ```text
 app/mixed_inventory_sim:
-  best GScript 0.152s vs LuaJIT 0.022s
+  best Leia 0.152s vs LuaJIT 0.022s
 
 app/actors_dispatch_mutation:
-  best GScript 0.039s vs LuaJIT 0.011s
+  best Leia 0.039s vs LuaJIT 0.011s
 
 concurrency/producer_consumer_pipeline:
-  best GScript 0.127s vs LuaJIT 0.043s
+  best Leia 0.127s vs LuaJIT 0.043s
 
 table/json_table_walk:
-  best GScript 0.031s vs LuaJIT 0.017s
+  best Leia 0.031s vs LuaJIT 0.017s
 ```
 
 So the immediate performance frontier has moved from the old core numeric
@@ -213,7 +213,7 @@ history document.
 The current state is more precise:
 
 ```text
-GScript is ahead of the local LuaJIT reference on most of the measured core
+Leia is ahead of the local LuaJIT reference on most of the measured core
 suite, at parity on table_field_access, and still behind on array access,
 coroutine, closure, and string microbenchmarks. The largest current gaps are
 now in extended mixed table and dispatch workloads.

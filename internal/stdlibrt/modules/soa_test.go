@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/leia/internal/runtime"
 )
 
 func TestSOAZipShapeDirectAccessAndAggregates(t *testing.T) {

@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"sort"
 
-	stdsort "github.com/never-labs/gscript/internal/stdlib/sort"
-	"github.com/never-labs/gscript/internal/stdlibrt"
+	stdsort "github.com/never-labs/leia/internal/stdlib/sort"
+	"github.com/never-labs/leia/internal/stdlibrt"
 )
 
 func defaultValueLess(a, b Value) (bool, error) {

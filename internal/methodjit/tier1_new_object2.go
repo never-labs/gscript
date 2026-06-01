@@ -5,9 +5,9 @@ package methodjit
 import (
 	"unsafe"
 
-	"github.com/never-labs/gscript/internal/jit"
-	"github.com/never-labs/gscript/internal/runtime"
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/jit"
+	"github.com/never-labs/leia/internal/runtime"
+	"github.com/never-labs/leia/internal/vm"
 )
 
 func emitBaselineNewObject2(asm *jit.Assembler, inst uint32, pc int, proto *vm.FuncProto, caches []newTableCacheEntry) {

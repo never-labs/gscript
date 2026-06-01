@@ -2,9 +2,9 @@ package modules
 
 import (
 	"fmt"
-	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/leia/internal/runtime"
 
-	pathlib "github.com/never-labs/gscript/internal/stdlib/path"
+	pathlib "github.com/never-labs/leia/internal/stdlib/path"
 )
 
 // buildPathLib creates the "path" standard library table.

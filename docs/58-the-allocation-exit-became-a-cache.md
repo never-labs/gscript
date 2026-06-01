@@ -55,7 +55,7 @@ was a dense table allocation, but not enough machinery to allocate it in native
 code. So the native code exited, Go created a table, and the function resumed.
 Do that for every row and the exit counter looks catastrophic.
 
-The fix was not to pretend table allocation is pure. GScript tables are heap
+The fix was not to pretend table allocation is pure. Leia tables are heap
 objects with shapes, dirty-key state, array kind, typed array storage, optional
 hash fields, and GC-visible references. Native code should not start hand-making
 those structures unless the runtime contract is small and obvious. The safer
@@ -201,7 +201,7 @@ It is also not enough.
 LuaJIT is still around 0.021s on matmul. If removing hundreds of exits leaves
 the benchmark near 0.09s, the dominant gap is now inside the native success path:
 row table representation, array metadata loads, register pressure, bounds and
-kind guards, or simply the cost of building many GScript table objects even when
+kind guards, or simply the cost of building many Leia table objects even when
 the exit is batched. The next optimization round has to measure native code
 shape, not just exit count.
 

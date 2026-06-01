@@ -161,7 +161,7 @@ ARM64 Code Generation (from typed SSA, not from bytecode)
 
 ## The Key Optimization: Integer Unboxing
 
-Consider this GScript loop:
+Consider this Leia loop:
 
 ```go
 sum := 0

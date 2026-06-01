@@ -1,15 +1,15 @@
-package gscript_test
+package leia_test
 
 import (
 	"testing"
 
-	gs "github.com/never-labs/gscript"
-	"github.com/never-labs/gscript/llm"
+	leia "github.com/never-labs/leia"
+	"github.com/never-labs/leia/llm"
 )
 
 func TestLLMTurnRequestProviderOptions(t *testing.T) {
 	provider := &mockLLMProvider{res: llm.TurnResult{Status: "final_answer", Text: "done"}}
-	vm := gs.New(gs.WithLibs(gs.LibString|gs.LibLLM), gs.WithLLMProvider(provider))
+	vm := leia.New(leia.WithLibs(leia.LibString|leia.LibLLM), leia.WithLLMProvider(provider))
 	if err := vm.Exec(`
 result, err := llm.turn({
     model: "mock-fast",
@@ -52,7 +52,7 @@ result, err := llm.turn({
 
 func TestLLMToolMetadata(t *testing.T) {
 	provider := &mockLLMProvider{res: llm.TurnResult{Status: "final_answer", Text: "done"}}
-	vm := gs.New(gs.WithLibs(gs.LibString|gs.LibLLM), gs.WithLLMProvider(provider))
+	vm := leia.New(leia.WithLibs(leia.LibString|leia.LibLLM), leia.WithLLMProvider(provider))
 	if err := vm.Exec(`
 lookup := llm.tool("lookup", func(name) {
     return "docs:" .. name, nil
@@ -98,7 +98,7 @@ result, err := llm.turn({
 }
 
 func TestLLMToolCapabilities(t *testing.T) {
-	vm := gs.New(gs.WithLibs(gs.LibString | gs.LibLLM))
+	vm := leia.New(leia.WithLibs(leia.LibString | leia.LibLLM))
 	if err := vm.Exec(`
 read_docs := llm.tool("read_docs", func(name) {
     return "docs:" .. name, nil
@@ -142,7 +142,7 @@ missing_tool := missing_err.tool
 
 func TestLoopRequestProviderOptions(t *testing.T) {
 	provider := &mockLLMProvider{res: llm.TurnResult{Status: "final_answer", Text: "done"}}
-	vm := gs.New(gs.WithLibs(gs.LibString|gs.LibLLM), gs.WithLLMProvider(provider))
+	vm := leia.New(leia.WithLibs(leia.LibString|leia.LibLLM), leia.WithLLMProvider(provider))
 	if err := vm.Exec(`
 lookup := llm.tool("lookup", func(name) {
     return "docs:" .. name, nil

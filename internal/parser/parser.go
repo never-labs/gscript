@@ -5,11 +5,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/never-labs/gscript/internal/ast"
-	"github.com/never-labs/gscript/internal/lexer"
+	"github.com/never-labs/leia/internal/ast"
+	"github.com/never-labs/leia/internal/lexer"
 )
 
-// Parser implements a recursive descent parser for GScript.
+// Parser implements a recursive descent parser for Leia.
 type Parser struct {
 	tokens []lexer.Token
 	pos    int
@@ -291,7 +291,7 @@ func parseToolLeadingComments(tok lexer.Token) (string, []string, map[string]str
 	var paramDocEntries []ast.ToolParamDoc
 	for _, comment := range comments {
 		text := strings.TrimSpace(comment.Text)
-		name, rest, isDirective := parseGScriptDirective(text)
+		name, rest, isDirective := parseLeiaDirective(text)
 		if isDirective && isFileDirectiveKind(name) {
 			continue
 		}
@@ -315,23 +315,23 @@ func parseToolLeadingComments(tok lexer.Token) (string, []string, map[string]str
 }
 
 func directiveRest(text, directive string) (string, bool) {
-	name, rest, ok := parseGScriptDirective(text)
+	name, rest, ok := parseLeiaDirective(text)
 	if !ok {
 		return "", false
 	}
-	want := strings.TrimPrefix(directive, "gscript:")
+	want := strings.TrimPrefix(directive, "leia:")
 	if name != want {
 		return "", false
 	}
 	return rest, true
 }
 
-func parseGScriptDirective(text string) (string, string, bool) {
+func parseLeiaDirective(text string) (string, string, bool) {
 	text = strings.TrimSpace(text)
-	if !strings.HasPrefix(text, "gscript:") {
+	if !strings.HasPrefix(text, "leia:") {
 		return "", "", false
 	}
-	rest := text[len("gscript:"):]
+	rest := text[len("leia:"):]
 	if rest == "" {
 		return "", "", false
 	}
@@ -355,7 +355,7 @@ func (p *Parser) parseFileDirectives() []ast.FileDirective {
 	}
 	var directives []ast.FileDirective
 	for _, comment := range tok.LeadingComments {
-		name, rest, ok := parseGScriptDirective(comment.Text)
+		name, rest, ok := parseLeiaDirective(comment.Text)
 		if !ok || !isFileDirectiveKind(name) {
 			continue
 		}

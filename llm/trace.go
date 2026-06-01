@@ -3,7 +3,7 @@ package llm
 import "sync"
 
 // TraceRecorder is a thread-safe trace sink for tests, diagnostics, and
-// host-side observability. Pass recorder.Record to gscript.WithLLMTrace.
+// host-side observability. Pass recorder.Record to leia.WithLLMTrace.
 type TraceRecorder struct {
 	mu     sync.Mutex
 	events []TraceEvent

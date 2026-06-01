@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/never-labs/gscript/internal/runtime"
-	stdtime "github.com/never-labs/gscript/internal/stdlib/time"
-	"github.com/never-labs/gscript/internal/stdlibrt"
+	"github.com/never-labs/leia/internal/runtime"
+	stdtime "github.com/never-labs/leia/internal/stdlib/time"
+	"github.com/never-labs/leia/internal/stdlibrt"
 )
 
 // startTime is used by os.clock() to measure CPU time (approximated as wall time).
@@ -192,7 +192,7 @@ func BuildOSWithPolicy(opts stdlibrt.HostOptions) *Table {
 		if fsRoot() != "" {
 			dir = fsRoot()
 		}
-		f, err := os.CreateTemp(dir, "gscript_*")
+		f, err := os.CreateTemp(dir, "leia_*")
 		if err != nil {
 			return nil, err
 		}

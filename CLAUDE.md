@@ -1,4 +1,4 @@
-# GScript
+# Leia
 
 Dynamically-typed scripting language with Go syntax and Lua semantics. Three-tier execution on Apple Silicon ARM64: **interpreter → Tier 1 baseline JIT → Tier 2 optimizing JIT**.
 

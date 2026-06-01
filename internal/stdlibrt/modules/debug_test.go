@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/leia/internal/runtime"
 )
 
 func debugInterp(t *testing.T, src string) *runtime.Interpreter {

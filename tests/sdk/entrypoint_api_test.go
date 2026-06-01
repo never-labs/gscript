@@ -1,4 +1,4 @@
-package gscript_test
+package leia_test
 
 import (
 	"context"
@@ -10,12 +10,12 @@ import (
 	"testing"
 	"time"
 
-	gs "github.com/never-labs/gscript"
+	leia "github.com/never-labs/leia"
 )
 
 func TestExec(t *testing.T) {
 	var output []string
-	vm := gs.New(gs.WithPrint(func(args ...interface{}) {
+	vm := leia.New(leia.WithPrint(func(args ...interface{}) {
 		parts := make([]string, len(args))
 		for i, a := range args {
 			parts[i] = fmt.Sprint(a)
@@ -32,14 +32,14 @@ func TestExec(t *testing.T) {
 }
 
 func TestCompileRunProgram(t *testing.T) {
-	prog, err := gs.Compile(`result := 40 + 2`, gs.WithSourceName("calc.gs"))
+	prog, err := leia.Compile(`result := 40 + 2`, leia.WithSourceName("calc.leia"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if prog.SourceName() != "calc.gs" {
-		t.Fatalf("SourceName = %q, want calc.gs", prog.SourceName())
+	if prog.SourceName() != "calc.leia" {
+		t.Fatalf("SourceName = %q, want calc.leia", prog.SourceName())
 	}
-	vm := gs.New()
+	vm := leia.New()
 	if err := vm.Run(prog); err != nil {
 		t.Fatal(err)
 	}
@@ -53,11 +53,11 @@ func TestCompileRunProgram(t *testing.T) {
 }
 
 func TestCompileRunProgramWithVM(t *testing.T) {
-	prog, err := gs.Compile(`func add(a, b) { return a + b }`)
+	prog, err := leia.Compile(`func add(a, b) { return a + b }`)
 	if err != nil {
 		t.Fatal(err)
 	}
-	vm := gs.New(gs.WithVM())
+	vm := leia.New(leia.WithVM())
 	if err := vm.Run(prog); err != nil {
 		t.Fatal(err)
 	}
@@ -72,22 +72,22 @@ func TestCompileRunProgramWithVM(t *testing.T) {
 
 func TestCompileFileSetsSourceAndRequireDir(t *testing.T) {
 	dir := t.TempDir()
-	mainPath := filepath.Join(dir, "main.gs")
-	helperPath := filepath.Join(dir, "helper.gs")
+	mainPath := filepath.Join(dir, "main.leia")
+	helperPath := filepath.Join(dir, "helper.leia")
 	if err := os.WriteFile(helperPath, []byte(`return { value: 42 }`), 0644); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(mainPath, []byte(`helper := require("helper"); result := helper.value`), 0644); err != nil {
 		t.Fatal(err)
 	}
-	prog, err := gs.CompileFile(mainPath)
+	prog, err := leia.CompileFile(mainPath)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if prog.SourceName() != mainPath {
 		t.Fatalf("SourceName = %q, want %q", prog.SourceName(), mainPath)
 	}
-	vm := gs.New()
+	vm := leia.New()
 	if err := vm.Run(prog); err != nil {
 		t.Fatal(err)
 	}
@@ -103,11 +103,11 @@ func TestCompileFileSetsSourceAndRequireDir(t *testing.T) {
 func TestContextEntrypointsRespectCanceledContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	vm := gs.New()
+	vm := leia.New()
 	if err := vm.ExecContext(ctx, `x := 1`); !errors.Is(err, context.Canceled) {
 		t.Fatalf("ExecContext err = %v, want context.Canceled", err)
 	}
-	if _, err := gs.CompileContext(ctx, `x := 1`); !errors.Is(err, context.Canceled) {
+	if _, err := leia.CompileContext(ctx, `x := 1`); !errors.Is(err, context.Canceled) {
 		t.Fatalf("CompileContext err = %v, want context.Canceled", err)
 	}
 	if _, err := vm.CallContext(ctx, "missing"); !errors.Is(err, context.Canceled) {
@@ -118,7 +118,7 @@ func TestContextEntrypointsRespectCanceledContext(t *testing.T) {
 func TestExecContextCancelsInterpreterLoop(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond)
 	defer cancel()
-	vm := gs.New()
+	vm := leia.New()
 	err := vm.ExecContext(ctx, `for {}`)
 	if !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("ExecContext err = %v, want context deadline", err)
@@ -128,7 +128,7 @@ func TestExecContextCancelsInterpreterLoop(t *testing.T) {
 func TestExecContextCancelsBytecodeLoop(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond)
 	defer cancel()
-	vm := gs.New(gs.WithVM())
+	vm := leia.New(leia.WithVM())
 	err := vm.ExecContext(ctx, `for {}`)
 	if !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("ExecContext err = %v, want context deadline", err)
@@ -136,7 +136,7 @@ func TestExecContextCancelsBytecodeLoop(t *testing.T) {
 }
 
 func TestCallContextCancelsRunningFunction(t *testing.T) {
-	vm := gs.New()
+	vm := leia.New()
 	if err := vm.Exec(`func spin() { for {} }`); err != nil {
 		t.Fatal(err)
 	}
@@ -149,7 +149,7 @@ func TestCallContextCancelsRunningFunction(t *testing.T) {
 }
 
 func TestExecGoStyleNumberLiteralsWithVM(t *testing.T) {
-	vm := gs.New(gs.WithVM())
+	vm := leia.New(leia.WithVM())
 	if err := vm.Exec(`result := 0xFF + 0b1010 + 0o20 + 1_000`); err != nil {
 		t.Fatal(err)
 	}
@@ -163,22 +163,22 @@ func TestExecGoStyleNumberLiteralsWithVM(t *testing.T) {
 }
 
 func TestExecError(t *testing.T) {
-	vm := gs.New()
+	vm := leia.New()
 	err := vm.Exec(`x :=`)
 	if err == nil {
 		t.Fatal("expected parse error")
 	}
-	gsErr, ok := err.(*gs.Error)
+	gsErr, ok := err.(*leia.Error)
 	if !ok {
-		t.Fatalf("expected *gscript.Error, got %T", err)
+		t.Fatalf("expected *leia.Error, got %T", err)
 	}
-	if gsErr.Kind != gs.ErrParse {
+	if gsErr.Kind != leia.ErrParse {
 		t.Fatalf("expected ErrParse, got %s", gsErr.Kind)
 	}
 }
 
 func TestCall(t *testing.T) {
-	vm := gs.New()
+	vm := leia.New()
 	err := vm.Exec(`
 		func add(a, b) {
 			return a + b
@@ -194,14 +194,14 @@ func TestCall(t *testing.T) {
 	if len(results) != 1 {
 		t.Fatalf("expected 1 result, got %d", len(results))
 	}
-	// GScript int + int returns int
+	// Leia int + int returns int
 	if results[0] != int64(7) {
 		t.Fatalf("expected 7, got %v (%T)", results[0], results[0])
 	}
 }
 
 func TestCallPublicValueRoutesBytecodeClosures(t *testing.T) {
-	vm := gs.New(gs.WithVM())
+	vm := leia.New(leia.WithVM())
 	if err := vm.Exec(`
 		func add(a, b) {
 			return a + b
@@ -210,10 +210,10 @@ func TestCallPublicValueRoutesBytecodeClosures(t *testing.T) {
 		t.Fatal(err)
 	}
 	fn := vm.GetPublicValue("add")
-	if got := fn.Kind(); got != gs.KindFunction {
+	if got := fn.Kind(); got != leia.KindFunction {
 		t.Fatalf("add kind = %s, want function", got)
 	}
-	results, err := vm.CallPublicValue(fn, gs.Int(3), gs.Int(4))
+	results, err := vm.CallPublicValue(fn, leia.Int(3), leia.Int(4))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -223,8 +223,8 @@ func TestCallPublicValueRoutesBytecodeClosures(t *testing.T) {
 }
 
 func TestPublicValueGlobals(t *testing.T) {
-	vm := gs.New(gs.WithVM())
-	vm.SetPublicValue("answer", gs.Int(42))
+	vm := leia.New(leia.WithVM())
+	vm.SetPublicValue("answer", leia.Int(42))
 	if err := vm.Exec(`answer = answer + 1`); err != nil {
 		t.Fatal(err)
 	}
@@ -235,7 +235,7 @@ func TestPublicValueGlobals(t *testing.T) {
 }
 
 func TestCallNotFound(t *testing.T) {
-	vm := gs.New()
+	vm := leia.New()
 	_, err := vm.Call("nonexistent")
 	if err == nil {
 		t.Fatal("expected error calling nonexistent function")

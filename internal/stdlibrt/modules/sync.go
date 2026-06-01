@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/never-labs/gscript/internal/runtime"
-	"github.com/never-labs/gscript/internal/stdlibrt"
+	"github.com/never-labs/leia/internal/runtime"
+	"github.com/never-labs/leia/internal/stdlibrt"
 
-	stdlibsync "github.com/never-labs/gscript/internal/stdlib/sync"
+	stdlibsync "github.com/never-labs/leia/internal/stdlib/sync"
 )
 
 type scriptWaitGroup struct {

@@ -1,4 +1,4 @@
-package gscript
+package leia
 
 import (
 	"context"
@@ -6,14 +6,14 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/never-labs/gscript/internal/llmbridge"
-	"github.com/never-labs/gscript/internal/runtime"
-	stdlibinstall "github.com/never-labs/gscript/internal/stdlibrt/install"
-	"github.com/never-labs/gscript/internal/support/modresolve"
-	bytecodevm "github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/llmbridge"
+	"github.com/never-labs/leia/internal/runtime"
+	stdlibinstall "github.com/never-labs/leia/internal/stdlibrt/install"
+	"github.com/never-labs/leia/internal/support/modresolve"
+	bytecodevm "github.com/never-labs/leia/internal/vm"
 )
 
-// VM is a GScript virtual machine instance.
+// VM is a Leia virtual machine instance.
 // A VM is NOT goroutine-safe; use Pool for concurrent access.
 type VM struct {
 	interp          *runtime.Interpreter
@@ -22,7 +22,7 @@ type VM struct {
 	goImportAllowed map[string]bool
 }
 
-// New creates a new GScript VM with the given options.
+// New creates a new Leia VM with the given options.
 func New(opts ...Option) *VM {
 	o := vmOptions{
 		libs:          LibAll,
@@ -185,7 +185,7 @@ func newVM(o vmOptions) *VM {
 }
 
 // SetArgs updates the script entrypoint arguments on an existing VM. The
-// global arg table follows GScript's Lua-compatible convention: arg[0] is
+// global arg table follows Leia's Lua-compatible convention: arg[0] is
 // script and arg[1..n] are args.
 func (vm *VM) SetArgs(script string, args []string) {
 	if vm == nil {
@@ -201,12 +201,12 @@ func (vm *VM) SetArgs(script string, args []string) {
 	vm.opts.argsSet = true
 }
 
-// Exec compiles and executes a GScript source string.
+// Exec compiles and executes a Leia source string.
 func (vm *VM) Exec(src string) error {
 	return vm.ExecContext(context.Background(), src)
 }
 
-// ExecContext compiles and executes a GScript source string.
+// ExecContext compiles and executes a Leia source string.
 //
 // Context cancellation is checked before starting and after completion. Runtime
 // preemption for long-running scripts is a separate sandbox/resource-control
@@ -219,12 +219,12 @@ func (vm *VM) ExecContext(ctx context.Context, src string) error {
 	return vm.RunContext(ctx, prog)
 }
 
-// ExecFile reads and executes a GScript source file.
+// ExecFile reads and executes a Leia source file.
 func (vm *VM) ExecFile(path string) error {
 	return vm.ExecFileContext(context.Background(), path)
 }
 
-// ExecFileContext reads and executes a GScript source file.
+// ExecFileContext reads and executes a Leia source file.
 //
 // Context cancellation is checked before starting and after completion. Runtime
 // preemption for long-running scripts is a separate sandbox/resource-control
@@ -570,13 +570,13 @@ func (vm *VM) preserveHotReloadState(before map[string]runtime.Value, _ *Program
 	}
 }
 
-// Call calls a named GScript function with Go arguments and returns Go values.
+// Call calls a named Leia function with Go arguments and returns Go values.
 // Args and return values are automatically converted via reflection.
 func (vm *VM) Call(name string, args ...interface{}) ([]interface{}, error) {
 	return vm.CallContext(context.Background(), name, args...)
 }
 
-// CallContext calls a named GScript function with Go arguments and returns Go values.
+// CallContext calls a named Leia function with Go arguments and returns Go values.
 //
 // Context cancellation is checked before starting, after completion, and at VM
 // execution checkpoints while the call is running.
@@ -600,12 +600,12 @@ func (vm *VM) CallContext(ctx context.Context, name string, args ...interface{})
 	return results, nil
 }
 
-// CallValue calls a GScript function value (obtained via Get) with Go arguments.
+// CallValue calls a Leia function value (obtained via Get) with Go arguments.
 func (vm *VM) CallValue(fn interface{}, args ...interface{}) ([]interface{}, error) {
 	return vm.CallValueContext(context.Background(), fn, args...)
 }
 
-// CallValueContext calls a GScript function value with Go arguments.
+// CallValueContext calls a Leia function value with Go arguments.
 //
 // Context cancellation is checked before starting, after completion, and at VM
 // execution checkpoints while the call is running.
@@ -720,7 +720,7 @@ func (vm *VM) SetPublicValue(name string, val Value) {
 	}
 }
 
-// RegisterFunc registers a Go function as a GScript global.
+// RegisterFunc registers a Go function as a Leia global.
 // fn must be a func type. Args/returns are auto-converted via reflection.
 //
 // Example:
@@ -774,14 +774,14 @@ func (vm *VM) RegisterTable(name string, members map[string]interface{}) error {
 //
 // Go-backed host modules are explicit embedding capabilities: this API exposes
 // only the names the embedding application registers. Built-in stdlib modules
-// and filesystem-loaded .gs modules keep their existing controls. Registered
+// and filesystem-loaded .leia modules keep their existing controls. Registered
 // host modules remain available when filesystem module loading is disabled,
 // which makes them suitable for sandboxed embeddings that need a narrow Go API
 // surface.
 //
 // Example:
 //
-//	vm.RegisterModule("go/strings", gscript.Module{
+//	vm.RegisterModule("go/strings", leia.Module{
 //	    "upper": strings.ToUpper,
 //	    "trim":  strings.TrimSpace,
 //	})
@@ -814,10 +814,10 @@ func (vm *VM) RegisterModuleFrom(name string, source interface{}, opts ...Module
 	return vm.RegisterModule(name, members)
 }
 
-// BindStruct registers a Go struct type as a GScript class.
+// BindStruct registers a Go struct type as a Leia class.
 // proto should be a zero value or example of the struct (e.g. Vec2{} or &Vec2{}).
 //
-// This creates a GScript global named `name` with a .new() constructor
+// This creates a Leia global named `name` with a .new() constructor
 // and field/method access via metatable.
 //
 // Example:
@@ -827,7 +827,7 @@ func (vm *VM) RegisterModuleFrom(name string, source interface{}, opts ...Module
 //
 //	vm.BindStruct("Vec2", Vec2{})
 //
-//	// In GScript:
+//	// In Leia:
 //	v := Vec2.new(3, 4)
 //	print(v.Length())  // 5
 //	print(v.X)         // 3
@@ -837,7 +837,7 @@ func (vm *VM) BindStruct(name string, proto interface{}) error {
 }
 
 // BindStructWithConstructor is like BindStruct but uses a custom constructor function.
-// The constructor is called when GScript calls Name.new(args...).
+// The constructor is called when Leia calls Name.new(args...).
 func (vm *VM) BindStructWithConstructor(name string, proto interface{}, ctor interface{}) error {
 	return bindStructToInterp(vm.interp, name, proto, ctor)
 }

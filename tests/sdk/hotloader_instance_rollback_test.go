@@ -1,15 +1,15 @@
-package gscript_test
+package leia_test
 
 import (
 	"path/filepath"
 	"testing"
 
-	gs "github.com/never-labs/gscript"
+	leia "github.com/never-labs/leia"
 )
 
 func TestHotInstanceReloadFailureDoesNotAdvanceOrPolluteState(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "logic.gs")
+	path := filepath.Join(dir, "logic.leia")
 	writeScript(t, path, `
 counter := 0
 func inc() {
@@ -18,7 +18,7 @@ func inc() {
 }
 `)
 
-	inst, err := gs.NewHotLoader().LoadInstance(path)
+	inst, err := leia.NewHotLoader().LoadInstance(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -37,7 +37,7 @@ func inc() {
 
 func TestHotInstanceReloadRuntimeFailureDeepRollsBackTableMutation(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "logic.gs")
+	path := filepath.Join(dir, "logic.leia")
 	writeScript(t, path, `
 state := { total: 1, nested: { value: 2 } }
 func total() {
@@ -45,7 +45,7 @@ func total() {
 }
 `)
 
-	inst, err := gs.NewHotLoader().LoadInstance(path)
+	inst, err := leia.NewHotLoader().LoadInstance(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -67,7 +67,7 @@ func total() {
 
 func TestHotInstanceReloadRuntimeFailureRollsBackBindings(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "logic.gs")
+	path := filepath.Join(dir, "logic.leia")
 	writeScript(t, path, `
 counter := 0
 func inc() {
@@ -76,7 +76,7 @@ func inc() {
 }
 `)
 
-	inst, err := gs.NewHotLoader().LoadInstance(path)
+	inst, err := leia.NewHotLoader().LoadInstance(path)
 	if err != nil {
 		t.Fatal(err)
 	}

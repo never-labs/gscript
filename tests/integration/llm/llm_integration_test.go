@@ -1,4 +1,4 @@
-package gscript_test
+package leia_test
 
 import (
 	"context"
@@ -7,23 +7,23 @@ import (
 	"testing"
 	"time"
 
-	gs "github.com/never-labs/gscript"
-	"github.com/never-labs/gscript/llm"
-	"github.com/never-labs/gscript/llm/anthropic"
+	leia "github.com/never-labs/leia"
+	"github.com/never-labs/leia/llm"
+	"github.com/never-labs/leia/llm/anthropic"
 )
 
 // TestAnthropicCompatibleLLMIntegration is a gated real-provider smoke test.
 // It intentionally uses generic Anthropic-compatible configuration names so
-// local wrappers or vendor-specific credentials do not become GScript API.
+// local wrappers or vendor-specific credentials do not become Leia API.
 func TestAnthropicCompatibleLLMIntegration(t *testing.T) {
-	if os.Getenv("GSCRIPT_LLM_INTEGRATION") == "" {
-		t.Skip("set GSCRIPT_LLM_INTEGRATION=1 to run real Anthropic-compatible provider smoke")
+	if os.Getenv("LEIA_LLM_INTEGRATION") == "" {
+		t.Skip("set LEIA_LLM_INTEGRATION=1 to run real Anthropic-compatible provider smoke")
 	}
-	endpoint := os.Getenv("GSCRIPT_ANTHROPIC_COMPAT_BASE_URL")
-	apiKey := os.Getenv("GSCRIPT_ANTHROPIC_COMPAT_API_KEY")
-	model := os.Getenv("GSCRIPT_ANTHROPIC_COMPAT_MODEL")
+	endpoint := os.Getenv("LEIA_ANTHROPIC_COMPAT_BASE_URL")
+	apiKey := os.Getenv("LEIA_ANTHROPIC_COMPAT_API_KEY")
+	model := os.Getenv("LEIA_ANTHROPIC_COMPAT_MODEL")
 	if endpoint == "" || apiKey == "" || model == "" {
-		t.Skip("set GSCRIPT_ANTHROPIC_COMPAT_BASE_URL, GSCRIPT_ANTHROPIC_COMPAT_API_KEY, and GSCRIPT_ANTHROPIC_COMPAT_MODEL")
+		t.Skip("set LEIA_ANTHROPIC_COMPAT_BASE_URL, LEIA_ANTHROPIC_COMPAT_API_KEY, and LEIA_ANTHROPIC_COMPAT_MODEL")
 	}
 	provider := anthropic.Provider{
 		Endpoint:     endpoint,
@@ -44,7 +44,7 @@ func TestAnthropicCompatibleLLMIntegration(t *testing.T) {
 		{
 			name:      "exact_text",
 			system:    "You are a concise test assistant. Return plain text only.",
-			user:      "Reply with exactly: gscript llm native ok",
+			user:      "Reply with exactly: leia llm native ok",
 			maxTokens: 32,
 		},
 		{
@@ -56,7 +56,7 @@ func TestAnthropicCompatibleLLMIntegration(t *testing.T) {
 		{
 			name:      "json_answer",
 			system:    "Return only valid compact JSON. Do not wrap it in Markdown.",
-			user:      `Return {"language":"gscript","llm_native":true,"provider":"anthropic-compatible"}.`,
+			user:      `Return {"language":"leia","llm_native":true,"provider":"anthropic-compatible"}.`,
 			maxTokens: 96,
 		},
 	} {
@@ -90,34 +90,34 @@ func TestAnthropicCompatibleLLMIntegration(t *testing.T) {
 // models/turn syntax can construct the same gated real-provider adapter. It is
 // intentionally skipped unless all real-provider environment variables are set.
 func TestLLMSyntaxAnthropicCompatibleLLMIntegration(t *testing.T) {
-	if os.Getenv("GSCRIPT_LLM_INTEGRATION") == "" {
-		t.Skip("set GSCRIPT_LLM_INTEGRATION=1 to run real provider smoke")
+	if os.Getenv("LEIA_LLM_INTEGRATION") == "" {
+		t.Skip("set LEIA_LLM_INTEGRATION=1 to run real provider smoke")
 	}
-	endpoint := os.Getenv("GSCRIPT_ANTHROPIC_COMPAT_BASE_URL")
-	apiKey := os.Getenv("GSCRIPT_ANTHROPIC_COMPAT_API_KEY")
-	model := os.Getenv("GSCRIPT_ANTHROPIC_COMPAT_MODEL")
+	endpoint := os.Getenv("LEIA_ANTHROPIC_COMPAT_BASE_URL")
+	apiKey := os.Getenv("LEIA_ANTHROPIC_COMPAT_API_KEY")
+	model := os.Getenv("LEIA_ANTHROPIC_COMPAT_MODEL")
 	if endpoint == "" || apiKey == "" || model == "" {
-		t.Skip("set GSCRIPT_ANTHROPIC_COMPAT_BASE_URL, GSCRIPT_ANTHROPIC_COMPAT_API_KEY, and GSCRIPT_ANTHROPIC_COMPAT_MODEL")
+		t.Skip("set LEIA_ANTHROPIC_COMPAT_BASE_URL, LEIA_ANTHROPIC_COMPAT_API_KEY, and LEIA_ANTHROPIC_COMPAT_MODEL")
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 	defer cancel()
-	vm := gs.New(gs.WithLibs(gs.LibString | gs.LibOS | gs.LibLLM))
+	vm := leia.New(leia.WithLibs(leia.LibString | leia.LibOS | leia.LibLLM))
 	if err := vm.ExecContext(ctx, `
 models {
     default: "smoke"
     smoke: {
         protocol: "anthropic_compatible"
-        base_url: os.getenv("GSCRIPT_ANTHROPIC_COMPAT_BASE_URL")
-        api_key: os.getenv("GSCRIPT_ANTHROPIC_COMPAT_API_KEY")
-        provider_model: os.getenv("GSCRIPT_ANTHROPIC_COMPAT_MODEL")
+        base_url: os.getenv("LEIA_ANTHROPIC_COMPAT_BASE_URL")
+        api_key: os.getenv("LEIA_ANTHROPIC_COMPAT_API_KEY")
+        provider_model: os.getenv("LEIA_ANTHROPIC_COMPAT_MODEL")
     }
 }
 
 result, err := turn {
     messages: messages {
         system: "You are a concise test assistant. Return plain text only."
-        user: "Reply with exactly: gscript llm provider ok"
+        user: "Reply with exactly: leia llm provider ok"
     }
     max_tokens: 32
     temperature: 0

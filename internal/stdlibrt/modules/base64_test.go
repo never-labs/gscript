@@ -52,7 +52,7 @@ func TestBase64DecodeError(t *testing.T) {
 
 func TestBase64Roundtrip(t *testing.T) {
 	interp := base64Interp(t, `
-		original := "Hello, GScript!"
+		original := "Hello, Leia!"
 		encoded := base64.encode(original)
 		decoded := base64.decode(encoded)
 		result := decoded == original

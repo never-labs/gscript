@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/never-labs/gscript/llm"
+	"github.com/never-labs/leia/llm"
 )
 
 const defaultOpenAICompatibleEndpoint = "https://api.openai.com/v1/chat/completions"

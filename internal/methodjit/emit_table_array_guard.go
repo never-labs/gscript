@@ -7,7 +7,7 @@
 package methodjit
 
 import (
-	"github.com/never-labs/gscript/internal/jit"
+	"github.com/never-labs/leia/internal/jit"
 )
 
 func (ec *emitContext) emitTableArrayHeader(instr *Instr) {

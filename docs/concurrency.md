@@ -1,8 +1,8 @@
 # Concurrency
 
-GScript supports Go-style lightweight asynchronous work at the script level:
+Leia supports Go-style lightweight asynchronous work at the script level:
 
-```gscript
+```leia
 ch := make(chan, 4)
 
 go func() {

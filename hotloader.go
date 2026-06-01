@@ -1,4 +1,4 @@
-package gscript
+package leia
 
 import (
 	"context"
@@ -13,11 +13,11 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/never-labs/gscript/internal/ast"
-	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/leia/internal/ast"
+	"github.com/never-labs/leia/internal/runtime"
 )
 
-// HotLoader compiles GScript files into atomically swappable program handles.
+// HotLoader compiles Leia files into atomically swappable program handles.
 //
 // It intentionally does not start a filesystem watcher. Embedding applications
 // can call Reload from their own watcher, admin endpoint, or deployment hook.
@@ -54,7 +54,7 @@ func WithHotLoaderVMOptions(opts ...Option) HotLoaderOption {
 	}
 }
 
-// NewHotLoader creates a hot loader for GScript source files.
+// NewHotLoader creates a hot loader for Leia source files.
 func NewHotLoader(opts ...HotLoaderOption) *HotLoader {
 	loader := &HotLoader{
 		modules: make(map[string]*ModuleHandle),
@@ -240,7 +240,7 @@ func (loader *HotLoader) LoadInstanceContext(ctx context.Context, path string) (
 	return inst, nil
 }
 
-// ModuleHandle points to the latest compiled generation of one GScript file.
+// ModuleHandle points to the latest compiled generation of one Leia file.
 // Its atomic snapshot makes reload publication safe, but each Program must
 // still be run according to Program's concurrency contract.
 type ModuleHandle struct {
@@ -329,7 +329,7 @@ func (handle *ModuleHandle) CallContext(ctx context.Context, vm *VM, name string
 	return vm.CallContext(ctx, name, args...)
 }
 
-// HotInstance is a loaded GScript file with a persistent VM. Reloading an
+// HotInstance is a loaded Leia file with a persistent VM. Reloading an
 // instance keeps the VM and its existing non-function globals by default, so
 // ordinary script state survives code replacement without an explicit migration
 // hook. Running goroutines or externally saved old closures are not migrated.

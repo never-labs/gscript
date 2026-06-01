@@ -161,7 +161,7 @@ That narrowness is the point.
 
 There is a semantic trap here.
 
-In GScript, `fib` inside the function body is a global lookup. The function is
+In Leia, `fib` inside the function body is a global lookup. The function is
 not necessarily calling itself forever. A program can do this:
 
 ```
@@ -209,7 +209,7 @@ This is the kind of guard that matters more than a pretty benchmark number.
 
 The runtime representation still matters.
 
-GScript's integer fast paths use the NaN-boxed int48 range. If the recurrence
+Leia's integer fast paths use the NaN-boxed int48 range. If the recurrence
 produces a value outside that range, the protocol cannot silently wrap or
 pretend the result is still a valid boxed integer.
 

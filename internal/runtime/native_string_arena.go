@@ -21,7 +21,7 @@ var nativeStringArena struct {
 }
 
 // NativeStringArenaEnsure initializes the process-local arena used by native
-// string-format fast paths. The arena is intentionally lazy so ordinary gscript
+// string-format fast paths. The arena is intentionally lazy so ordinary leia
 // processes do not pay a fixed RSS cost when the fast path is never compiled.
 func NativeStringArenaEnsure() bool {
 	if atomic.LoadUintptr(&nativeStringArena.end) != 0 {

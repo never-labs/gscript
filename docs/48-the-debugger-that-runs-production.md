@@ -60,9 +60,9 @@ That produced six tools.
 The first tool is the production JIT timeline:
 
 ```bash
-gscript -jit \
+leia -jit \
   -jit-timeline trace.jsonl \
-  benchmarks/recursion/ackermann.gs
+  benchmarks/recursion/ackermann.leia
 ```
 
 It records tier events as they happen:
@@ -94,10 +94,10 @@ That difference is the gap between a tiering bug and a codegen bug.
 The second tool is the warm Tier 2 dump:
 
 ```bash
-gscript -jit \
+leia -jit \
   -jit-dump-warm /tmp/warm \
   -jit-dump-proto ack \
-  benchmarks/recursion/ackermann.gs
+  benchmarks/recursion/ackermann.leia
 ```
 
 The important word is "warm."
@@ -191,8 +191,8 @@ instruction that is hot.
 The fifth tool is the production exit profile:
 
 ```bash
-gscript -jit -exit-stats benchmarks/recursion/ackermann.gs
-gscript -jit -exit-stats-json benchmarks/recursion/ackermann.gs
+leia -jit -exit-stats benchmarks/recursion/ackermann.leia
+leia -jit -exit-stats-json benchmarks/recursion/ackermann.leia
 ```
 
 It records exits on the real `executeTier2` path and aggregates them by:
@@ -237,7 +237,7 @@ That is a different bug from a function that never entered Tier 2 at all.
 The sixth tool is the one I least wanted to need:
 
 ```bash
-GSCRIPT_EXIT_RESUME_CHECK=1 go test ./internal/methodjit -run TestExitResumeCheck
+LEIA_EXIT_RESUME_CHECK=1 go test ./internal/methodjit -run TestExitResumeCheck
 ```
 
 Exit-resume bugs are the worst kind of JIT bug. The generated code leaves to
@@ -276,13 +276,13 @@ for that class of work.
 The tools are separate, but they can run together:
 
 ```bash
-gscript -jit \
+leia -jit \
   -jit-timeline /tmp/trace.jsonl \
   -jit-dump-warm /tmp/warm \
   -jit-dump-proto ack \
   -exit-stats \
   -exit-stats-json \
-  benchmarks/recursion/ackermann.gs
+  benchmarks/recursion/ackermann.leia
 ```
 
 That command exercises the real program, writes the tier chronology, captures
@@ -333,19 +333,19 @@ For Ackermann, the first question is no longer "is Tier 2 faster than Tier 1?"
 It is:
 
 ```bash
-gscript -jit -exit-stats -jit-dump-warm /tmp/ack benchmarks/recursion/ackermann.gs
+leia -jit -exit-stats -jit-dump-warm /tmp/ack benchmarks/recursion/ackermann.leia
 ```
 
 For method dispatch, it is not "maybe inline methods." It is:
 
 ```bash
-gscript -jit -exit-stats benchmarks/calls/method_dispatch.gs
+leia -jit -exit-stats benchmarks/calls/method_dispatch.leia
 ```
 
 For a suspected regression, it is not "what pass changed recently?" It is:
 
 ```bash
-gscript -jit -jit-timeline trace.jsonl -exit-stats benchmark.gs
+leia -jit -jit-timeline trace.jsonl -exit-stats benchmark.leia
 ```
 
 and then reading what actually happened.

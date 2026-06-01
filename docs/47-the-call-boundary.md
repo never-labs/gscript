@@ -185,7 +185,7 @@ On this machine, the progression for the suite benchmark was:
 
 | Mode | Time |
 |------|-----:|
-| VM, `benchmarks/recursion/ackermann.gs` | ~0.287s |
+| VM, `benchmarks/recursion/ackermann.leia` | ~0.287s |
 | JIT before the `<main>` fix | ~0.41s |
 | JIT after boxed static self-call path | ~0.027-0.030s |
 | JIT after raw self ABI v1 | ~0.017-0.019s |
@@ -195,8 +195,8 @@ The Go benchmark tells the same story:
 
 | Benchmark | Time |
 |-----------|-----:|
-| `BenchmarkGScriptVMAckermannWarm` | ~573-577 us/op |
-| `BenchmarkGScriptJITAckermannWarm` | ~32.1-32.3 us/op |
+| `BenchmarkLeiaVMAckermannWarm` | ~573-577 us/op |
+| `BenchmarkLeiaJITAckermannWarm` | ~32.1-32.3 us/op |
 
 So Ackermann moved from "JIT slower than VM" to roughly 15-18x faster than the
 VM. The CLI gap to LuaJIT is now about 3x, not orders of magnitude.

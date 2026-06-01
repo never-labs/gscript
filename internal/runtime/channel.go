@@ -6,7 +6,7 @@ import (
 	"sync"
 )
 
-// Channel is GScript's channel type, wrapping a Go channel.
+// Channel is Leia's channel type, wrapping a Go channel.
 type Channel struct {
 	ch     chan Value
 	cap    int

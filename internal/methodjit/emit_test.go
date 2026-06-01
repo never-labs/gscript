@@ -1,7 +1,7 @@
 //go:build darwin && arm64
 
 // emit_test.go tests ARM64 code generation from CFG SSA IR.
-// Tests compile GScript functions to native code via the full pipeline
+// Tests compile Leia functions to native code via the full pipeline
 // (BuildGraph -> RegAlloc -> Compile), execute them, and compare results
 // with the VM interpreter.
 
@@ -10,7 +10,7 @@ package methodjit
 import (
 	"testing"
 
-	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/leia/internal/runtime"
 )
 
 // TestEmit_ReturnConst: func f() { return 42 } — compile, execute, verify returns 42.

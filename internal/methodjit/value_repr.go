@@ -2,7 +2,7 @@
 
 package methodjit
 
-import "github.com/never-labs/gscript/internal/jit"
+import "github.com/never-labs/leia/internal/jit"
 
 // valueRepr is the emitter's register-content lattice for SSA values whose
 // allocated register is active in the current block.

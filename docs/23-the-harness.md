@@ -117,4 +117,4 @@ The process is the product.
 
 *Previous: [What Makes a JIT Compiler Fast](/22-jit-optimization-techniques)*
 
-*This is post 23 in the [GScript JIT series](https://jxwr.github.io/gscript/). All numbers from a single-thread ARM64 Apple Silicon machine.*
+*This is post 23 in the [Leia JIT series](https://jxwr.github.io/leia/). All numbers from a single-thread ARM64 Apple Silicon machine.*

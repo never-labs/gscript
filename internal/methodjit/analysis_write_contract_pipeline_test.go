@@ -6,7 +6,7 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/vm"
 )
 
 // TestWriteContract_ProductionPipeline drives the real Tier 2 pipeline over the
@@ -17,10 +17,10 @@ import (
 // It ENFORCES by default: any module that mutates a modeled fact it did not
 // declare in Provides/Updates fails the test. The current corpus is clean, so
 // this locks the guarantee in as a regression guard. Set
-// GSCRIPT_ENFORCE_WRITE_CONTRACT=0 to downgrade to report-only while
+// LEIA_ENFORCE_WRITE_CONTRACT=0 to downgrade to report-only while
 // intentionally introducing a new fact whose contract is not yet wired.
 func TestWriteContract_ProductionPipeline(t *testing.T) {
-	enforce := os.Getenv("GSCRIPT_ENFORCE_WRITE_CONTRACT") != "0"
+	enforce := os.Getenv("LEIA_ENFORCE_WRITE_CONTRACT") != "0"
 
 	roots := []string{
 		"../../benchmarks/numeric",
@@ -35,7 +35,7 @@ func TestWriteContract_ProductionPipeline(t *testing.T) {
 	}
 	var files []string
 	for _, root := range roots {
-		matches, _ := filepath.Glob(filepath.Join(root, "*.gs"))
+		matches, _ := filepath.Glob(filepath.Join(root, "*.leia"))
 		files = append(files, matches...)
 	}
 	if len(files) == 0 {
@@ -69,7 +69,7 @@ func TestWriteContract_ProductionPipeline(t *testing.T) {
 	if len(agg.UnmodeledDomains) > 0 {
 		t.Logf("unmodeled fact domains (contract-coverage gaps): %v", agg.UnmodeledDomains)
 		if enforce {
-			t.Errorf("%d unmodeled fact domains; add AnalysisFact coverage or set GSCRIPT_ENFORCE_WRITE_CONTRACT=0 while wiring it", len(agg.UnmodeledDomains))
+			t.Errorf("%d unmodeled fact domains; add AnalysisFact coverage or set LEIA_ENFORCE_WRITE_CONTRACT=0 while wiring it", len(agg.UnmodeledDomains))
 		}
 	}
 	if len(agg.Violations) > 0 {

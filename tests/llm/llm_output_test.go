@@ -1,22 +1,22 @@
-package gscript_test
+package leia_test
 
 import (
-	gs "github.com/never-labs/gscript"
-	"github.com/never-labs/gscript/llm"
+	leia "github.com/never-labs/leia"
+	"github.com/never-labs/leia/llm"
 	"testing"
 )
 
 func TestLLMDirectTurnResponseFormatProviderRequest(t *testing.T) {
 	for _, tc := range []struct {
 		name string
-		opts []gs.Option
+		opts []leia.Option
 	}{
 		{name: "interpreter"},
-		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			provider := &mockLLMProvider{res: llm.TurnResult{Status: "final_answer", Text: `{"name":"Ada","email":"ada@example.com"}`}}
-			vm := gs.New(llmScenarioOptions(provider, tc.opts...)...)
+			vm := leia.New(llmScenarioOptions(provider, tc.opts...)...)
 
 			if err := vm.Exec(`
 result, err := turn {
@@ -96,14 +96,14 @@ text := result.text
 func TestLLMAgentOutputStructuredValue(t *testing.T) {
 	for _, tc := range []struct {
 		name string
-		opts []gs.Option
+		opts []leia.Option
 	}{
 		{name: "interpreter"},
-		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			provider := &mockLLMProvider{res: llm.TurnResult{Status: "final_answer", Text: `{"name":"Ada","email":"ada@example.com"}`}}
-			vm := gs.New(llmScenarioOptions(provider, tc.opts...)...)
+			vm := leia.New(llmScenarioOptions(provider, tc.opts...)...)
 
 			if err := vm.Exec(`
 agent extract_contact(text) {
@@ -151,14 +151,14 @@ email := result.value.email
 func TestLLMAgentOutputKeepsExplicitResponseFormat(t *testing.T) {
 	for _, tc := range []struct {
 		name string
-		opts []gs.Option
+		opts []leia.Option
 	}{
 		{name: "interpreter"},
-		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			provider := &mockLLMProvider{res: llm.TurnResult{Status: "final_answer", Text: `{"ok":true}`}}
-			vm := gs.New(llmScenarioOptions(provider, tc.opts...)...)
+			vm := leia.New(llmScenarioOptions(provider, tc.opts...)...)
 
 			if err := vm.Exec(`
 agent extract(text) {
@@ -195,14 +195,14 @@ ok := result.value.ok
 func TestLLMCustomFlowDoesNotAutoValidateOutput(t *testing.T) {
 	for _, tc := range []struct {
 		name string
-		opts []gs.Option
+		opts []leia.Option
 	}{
 		{name: "interpreter"},
-		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			provider := &mockLLMProvider{res: llm.TurnResult{Status: "final_answer", Text: `not json`}}
-			vm := gs.New(llmScenarioOptions(provider, tc.opts...)...)
+			vm := leia.New(llmScenarioOptions(provider, tc.opts...)...)
 
 			if err := vm.Exec(`
 agent extract(text) {

@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-// Frame describes one active runtime call in GScript-shaped terms.
+// Frame describes one active runtime call in Leia-shaped terms.
 type Frame struct {
 	Name       string
 	Kind       string
@@ -14,7 +14,7 @@ type Frame struct {
 	Column     int
 }
 
-// HookOptions describes the coarse-grained GScript debug hook filters.
+// HookOptions describes the coarse-grained Leia debug hook filters.
 type HookOptions struct {
 	Call   bool
 	Return bool

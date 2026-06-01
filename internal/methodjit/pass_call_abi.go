@@ -7,8 +7,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/never-labs/gscript/internal/runtime"
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/runtime"
+	"github.com/never-labs/leia/internal/vm"
 )
 
 // AnnotateCallABIsPass annotates stable raw-int callsite ABI facts after

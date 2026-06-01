@@ -1,8 +1,8 @@
-package gscript
+package leia
 
 import (
-	"github.com/never-labs/gscript/internal/support/modresolve"
-	"github.com/never-labs/gscript/llm"
+	"github.com/never-labs/leia/internal/support/modresolve"
+	"github.com/never-labs/leia/llm"
 )
 
 // LibFlags controls which standard libraries are loaded.
@@ -88,7 +88,7 @@ const (
 type CapabilityFlags uint64
 
 const (
-	CapModuleLoading    CapabilityFlags = 1 << iota // require() may load .gs files from the host filesystem
+	CapModuleLoading    CapabilityFlags = 1 << iota // require() may load .leia files from the host filesystem
 	CapFilesystemRead                               // script file APIs may read the host filesystem
 	CapFilesystemWrite                              // script file APIs may mutate the host filesystem
 	CapEnvironmentRead                              // script OS APIs may read host environment variables
@@ -177,7 +177,7 @@ type SecurityPolicy struct {
 type Option func(*vmOptions)
 
 // ModuleMode selects how module metadata is used when configuring runtime
-// require() resolution from gscript.mod.
+// require() resolution from leia.mod.
 type ModuleMode string
 
 const (
@@ -209,7 +209,7 @@ func ValidModuleMode(mode ModuleMode) bool {
 }
 
 // WithArgs sets the script entrypoint arguments. The global arg table follows
-// GScript's Lua-compatible convention: arg[0] is script and arg[1..n] are args.
+// Leia's Lua-compatible convention: arg[0] is script and arg[1..n] are args.
 func WithArgs(script string, args ...string) Option {
 	return func(o *vmOptions) {
 		o.argScript = script
@@ -231,7 +231,7 @@ func WithCapabilities(caps CapabilityFlags) Option {
 	return func(o *vmOptions) { o.capabilities = caps }
 }
 
-// WithModuleLoading controls whether require() may load .gs files from the
+// WithModuleLoading controls whether require() may load .leia files from the
 // host filesystem. Requiring enabled built-in standard libraries is still
 // allowed, because that is controlled by WithLibs.
 func WithModuleLoading(enabled bool) Option {
@@ -479,8 +479,8 @@ func WithRequirePath(path string) Option {
 }
 
 // WithModuleCollection maps a require collection prefix to a filesystem root.
-// require("vendor:pkg.util") resolves as ROOT/pkg/util.gs. This mirrors Odin's
-// collection-style package roots while keeping GScript module loading explicit.
+// require("vendor:pkg.util") resolves as ROOT/pkg/util.leia. This mirrors Odin's
+// collection-style package roots while keeping Leia module loading explicit.
 func WithModuleCollection(name, root string) Option {
 	return func(o *vmOptions) {
 		if name == "" {
@@ -494,8 +494,8 @@ func WithModuleCollection(name, root string) Option {
 }
 
 // WithModuleReplace maps a module path prefix to a local filesystem root.
-// require("example.com/lib/foo") resolves as ROOT/foo.gs when the prefix is
-// example.com/lib. This is the runtime side of gscript.mod replace directives.
+// require("example.com/lib/foo") resolves as ROOT/foo.leia when the prefix is
+// example.com/lib. This is the runtime side of leia.mod replace directives.
 func WithModuleReplace(path, root string) Option {
 	return func(o *vmOptions) {
 		if path == "" || root == "" {
@@ -509,7 +509,7 @@ func WithModuleReplace(path, root string) Option {
 }
 
 // WithModuleCache enables read-only module resolution from a module cache
-// populated by gscript mod download. It never downloads modules at runtime.
+// populated by leia mod download. It never downloads modules at runtime.
 func WithModuleCache(root string) Option {
 	return func(o *vmOptions) {
 		o.moduleCacheDir = root

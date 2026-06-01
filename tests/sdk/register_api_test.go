@@ -1,15 +1,15 @@
-package gscript_test
+package leia_test
 
 import (
 	"fmt"
 	"strings"
 	"testing"
 
-	gs "github.com/never-labs/gscript"
+	leia "github.com/never-labs/leia"
 )
 
 func TestRegisterFunc(t *testing.T) {
-	vm := gs.New()
+	vm := leia.New()
 	err := vm.RegisterFunc("square", func(x float64) float64 {
 		return x * x
 	})
@@ -29,7 +29,7 @@ func TestRegisterFunc(t *testing.T) {
 }
 
 func TestRegisterFunc_multiReturn(t *testing.T) {
-	vm := gs.New()
+	vm := leia.New()
 	err := vm.RegisterFunc("divmod", func(a, b int64) (int64, int64) {
 		return a / b, a % b
 	})
@@ -49,7 +49,7 @@ func TestRegisterFunc_multiReturn(t *testing.T) {
 }
 
 func TestRegisterFunc_error(t *testing.T) {
-	vm := gs.New()
+	vm := leia.New()
 	err := vm.RegisterFunc("fail", func() error {
 		return fmt.Errorf("something went wrong")
 	})
@@ -66,7 +66,7 @@ func TestRegisterFunc_error(t *testing.T) {
 }
 
 func TestRegisterFunc_panicReturnsError(t *testing.T) {
-	vm := gs.New()
+	vm := leia.New()
 	err := vm.RegisterFunc("explode", func() int64 {
 		panic("boom")
 	})
@@ -85,7 +85,7 @@ func TestRegisterFunc_panicReturnsError(t *testing.T) {
 }
 
 func TestRegisterFunc_panicFromScriptReturnsError(t *testing.T) {
-	vm := gs.New()
+	vm := leia.New()
 	err := vm.RegisterFunc("explodeFromScript", func() {
 		panic("script boom")
 	})
@@ -105,7 +105,7 @@ func TestRegisterFunc_panicFromScriptReturnsError(t *testing.T) {
 
 func TestRegisterFunc_fromScript(t *testing.T) {
 	var output []string
-	vm := gs.New(gs.WithPrint(func(args ...interface{}) {
+	vm := leia.New(leia.WithPrint(func(args ...interface{}) {
 		parts := make([]string, len(args))
 		for i, a := range args {
 			parts[i] = fmt.Sprint(a)
@@ -123,7 +123,7 @@ func TestRegisterFunc_fromScript(t *testing.T) {
 }
 
 func TestRegisterTable(t *testing.T) {
-	vm := gs.New()
+	vm := leia.New()
 	err := vm.RegisterTable("mymath", map[string]interface{}{
 		"add": func(a, b float64) float64 { return a + b },
 		"mul": func(a, b float64) float64 { return a * b },

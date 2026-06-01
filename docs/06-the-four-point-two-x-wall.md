@@ -64,7 +64,7 @@ The improvement was about 5%. Not the 2-3x we hoped for. The sub-trace spill/rel
 
 While stuck on the nested loop question, we turned to the interpreter side. The CPU profile showed `MulNums` and other boxed-float arithmetic consuming 12% of execution time. But another line item stood out: field access in nbody.
 
-GScript's `RawGetString` does a linear scan over the table's `skeys` slice:
+Leia's `RawGetString` does a linear scan over the table's `skeys` slice:
 
 ```go
 func (t *Table) RawGetString(key string) Value {
@@ -115,7 +115,7 @@ With sub-trace calling and the field cache in place, it was time for the compari
 I installed LuaJIT 2.1, ported mandelbrot to Lua (identical algorithm, identical constants, identical iteration count), and ran both side by side.
 
 ```
-GScript mandelbrot(1000):  0.236s    (trace JIT)
+Leia mandelbrot(1000):  0.236s    (trace JIT)
 LuaJIT  mandelbrot(1000):  0.056s    (trace JIT)
 
 Gap: 4.2x
@@ -123,7 +123,7 @@ Gap: 4.2x
 
 We are 6.3x faster than our own interpreter. We are 4.2x slower than LuaJIT.
 
-The 6.3x number felt good until we put it next to LuaJIT's. LuaJIT's trace JIT runs mandelbrot at roughly 27x its own interpreter speed. Our trace JIT runs it at 6.3x. Even accounting for the fact that our interpreter is slower than LuaJIT's (GScript values are 32 bytes vs LuaJIT's 8-byte NaN-boxed TValues), the JIT itself is generating significantly worse native code.
+The 6.3x number felt good until we put it next to LuaJIT's. LuaJIT's trace JIT runs mandelbrot at roughly 27x its own interpreter speed. Our trace JIT runs it at 6.3x. Even accounting for the fact that our interpreter is slower than LuaJIT's (Leia values are 32 bytes vs LuaJIT's 8-byte NaN-boxed TValues), the JIT itself is generating significantly worse native code.
 
 This is the wall. And understanding *why* it is the wall requires looking inside the inner loop.
 
@@ -279,22 +279,22 @@ As analyzed above. The frequency-based allocator wastes registers on equally-wei
 ### fib: 3x gap --- type-specialized function calls
 
 ```
-GScript fib(35):  0.072s    (method JIT)
+Leia fib(35):  0.072s    (method JIT)
 LuaJIT  fib(35):  0.024s
 ```
 
-fib is pure recursion, no loops. The method JIT compiles it, but every recursive call goes through the full GScript calling convention: box arguments into 32-byte Values, push a call frame, unbox at the callee, box the return value. LuaJIT's trace JIT records through recursive calls with type-specialized argument passing --- if it knows the argument is an integer, it passes the raw int64 without boxing.
+fib is pure recursion, no loops. The method JIT compiles it, but every recursive call goes through the full Leia calling convention: box arguments into 32-byte Values, push a call frame, unbox at the callee, box the return value. LuaJIT's trace JIT records through recursive calls with type-specialized argument passing --- if it knows the argument is an integer, it passes the raw int64 without boxing.
 
 Our method JIT does not specialize on argument types. Every call pays the boxing tax. For fib(35), that is 29 million function calls, each with 2-3 unnecessary boxing/unboxing round trips.
 
 ### Table operations: 7.5x gap --- Value representation
 
 ```
-GScript nbody(100k):  2.884s    (trace JIT)
+Leia nbody(100k):  2.884s    (trace JIT)
 LuaJIT  nbody(100k):  0.385s
 ```
 
-GScript's `Value` struct is 32 bytes:
+Leia's `Value` struct is 32 bytes:
 
 ```go
 type Value struct {
@@ -304,16 +304,16 @@ type Value struct {
 }
 ```
 
-LuaJIT's TValue is 8 bytes: a NaN-boxed double that encodes type information in the NaN payload bits. When nbody accesses `body.x`, GScript loads 32 bytes from the table's `svals` array. LuaJIT loads 8 bytes.
+LuaJIT's TValue is 8 bytes: a NaN-boxed double that encodes type information in the NaN payload bits. When nbody accesses `body.x`, Leia loads 32 bytes from the table's `svals` array. LuaJIT loads 8 bytes.
 
-But the cost goes deeper than memory bandwidth. GScript's `ptr` field is a Go `interface{}` --- reading it requires loading two words (type pointer + data pointer), and writing it creates a reference that the Go garbage collector must trace. Every table write is a potential GC root update. LuaJIT's Lua tables have no GC write barrier for numeric values because NaN-boxed doubles are plain bitpatterns with no pointers.
+But the cost goes deeper than memory bandwidth. Leia's `ptr` field is a Go `interface{}` --- reading it requires loading two words (type pointer + data pointer), and writing it creates a reference that the Go garbage collector must trace. Every table write is a potential GC root update. LuaJIT's Lua tables have no GC write barrier for numeric values because NaN-boxed doubles are plain bitpatterns with no pointers.
 
 The inline field cache we added in this cycle helps (nbody improved 8.8%), but it is optimizing the *lookup* path. The fundamental cost is the *value representation*. Changing Value from 32 bytes to 8 bytes would require NaN-boxing or a similar tagged-pointer scheme, and that means redesigning the entire runtime. It is the right thing to do eventually, but it is a multi-week project.
 
 ### Function calls: 9x gap --- inlining
 
 ```
-GScript call_overhead:  0.090s   (method JIT)
+Leia call_overhead:  0.090s   (method JIT)
 LuaJIT  call_overhead:  0.010s
 ```
 

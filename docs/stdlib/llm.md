@@ -9,9 +9,9 @@ or sandbox the AI runtime through the same library surface.
 Enable the library from Go with `LibLLM` and a provider:
 
 ```go
-vm := gscript.New(
-    gscript.WithLibs(gscript.LibString|gscript.LibLLM),
-    gscript.WithLLMProvider(provider),
+vm := leia.New(
+    leia.WithLibs(leia.LibString|leia.LibLLM),
+    leia.WithLLMProvider(provider),
 )
 ```
 
@@ -43,10 +43,10 @@ Matcher fields include `role`, `tool`, `tool_use_id`/`id`, `has_error`, and
 plain message fields such as `text`. `tool` matches assistant tool-call
 messages; tool result messages do not carry the tool name directly.
 
-```gscript
+```leia
 h := messages {
     user: "Find docs."
-    msg.assistant_call({id: "call_1", tool: "lookup", args: {query: "gscript"}})
+    msg.assistant_call({id: "call_1", tool: "lookup", args: {query: "leia"}})
     msg.tool_result("call_1", {summary: "docs"})
 }
 
@@ -61,7 +61,7 @@ history.append(h, msg.user("Summarize."))
 `llm.tool(name, fn [, opts])` creates a tool table from a script function.
 `opts` can include `description`, `params`, `requires`, and `schema`.
 
-```gscript
+```leia
 lookup := llm.tool("lookup", func(query) {
     return "docs:" .. query, nil
 }, {
@@ -74,7 +74,7 @@ lookup := llm.tool("lookup", func(query) {
 Agents can be exposed as tools explicitly with `toolof`, `llm.toolof`, or
 `llm.agent_as_tool`:
 
-```gscript
+```leia
 agent extract_research(topic) {
     model: "fast"
     user: "Research " .. topic
@@ -100,7 +100,7 @@ value; otherwise the wrapper returns the result text or raw result table.
 For the common static case, an agent value can appear directly in another
 agent's `tools:` list:
 
-```gscript
+```leia
 agent supervisor(question) {
     model: "fast"
     tools: [extract_research]
@@ -119,7 +119,7 @@ example-table shape used by `agent output:`. It returns `true, ""` on success
 or `false, message` on failure; malformed JSON is reported as a validation
 failure instead of raising.
 
-```gscript
+```leia
 ok, msg := llm.validate_output({summary: "docs"}, {summary: "example"})
 bad, why := llm.validate_output({summary: 1}, {summary: "example"})
 json_ok, _ := llm.validate_output('{"summary":"docs"}', {summary: "example"})

@@ -1,6 +1,6 @@
 package modules
 
-import "github.com/never-labs/gscript/internal/stdlibrt"
+import "github.com/never-labs/leia/internal/stdlibrt"
 
 func defaultTableOptions() stdlibrt.TableOptions {
 	return stdlibrt.TableOptions{

@@ -4,7 +4,7 @@
 // OpGetField (inline shape-guarded), OpSetField, OpNewTable (call-exit),
 // OpGetTable/OpSetTable (call-exit).
 //
-// Each test compiles a GScript function, runs it through both the Method JIT
+// Each test compiles a Leia function, runs it through both the Method JIT
 // and the VM interpreter, and verifies identical results.
 
 package methodjit
@@ -12,8 +12,8 @@ package methodjit
 import (
 	"testing"
 
-	"github.com/never-labs/gscript/internal/runtime"
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/runtime"
+	"github.com/never-labs/leia/internal/vm"
 )
 
 // TestEmitTable_GetField: create a table with field x=1, return t.x.
@@ -326,7 +326,7 @@ func runJITWithWarmCache(t *testing.T, src string, args []runtime.Value) []runti
 	return result
 }
 
-// runJITFull compiles a GScript function to native code via the full Method JIT
+// runJITFull compiles a Leia function to native code via the full Method JIT
 // pipeline and executes it. Falls back to VM on deopt.
 func runJITFull(t *testing.T, src string, args []runtime.Value) []runtime.Value {
 	t.Helper()

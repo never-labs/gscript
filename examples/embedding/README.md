@@ -1,7 +1,7 @@
 # Embedding Examples
 
-This directory contains executable Go examples for embedding GScript from the
-public `gscript` package. The examples live in
+This directory contains executable Go examples for embedding Leia from the
+public `leia` package. The examples live in
 [`embedding_test.go`](embedding_test.go), so `go test` keeps the snippets and
 their documented output in sync.
 
@@ -12,7 +12,7 @@ their documented output in sync.
 - `Example_value` covers public `Value` constructors, VM globals, value
   inspection, and encoding a Go value for script use.
 - `Example_hostFunctionBinding` covers registering a reflected Go function with
-  `RegisterFunc` and calling it from GScript.
+  `RegisterFunc` and calling it from Leia.
 - `Example_hostModuleRequire` covers `RegisterModule`, `require("go/...")`,
   and the distinction between explicit host modules and filesystem module
   loading.
@@ -29,7 +29,7 @@ their documented output in sync.
   dispatch through the `llm.react` helper.
 
 Package-level examples in `../../example_test.go` exercise the same
-public surface from the `gscript` package documentation.
+public surface from the `leia` package documentation.
 
 ## Running
 

@@ -1,8 +1,8 @@
 package modules
 
 import (
-	"github.com/never-labs/gscript/internal/runtime"
-	"github.com/never-labs/gscript/internal/stdlibrt"
+	"github.com/never-labs/leia/internal/runtime"
+	"github.com/never-labs/leia/internal/stdlibrt"
 )
 
 // InstallLLM registers the public LLM-facing standard-library bindings.

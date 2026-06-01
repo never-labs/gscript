@@ -1,4 +1,4 @@
-package gscript_test
+package leia_test
 
 import (
 	"go/ast"
@@ -11,11 +11,11 @@ import (
 	"strings"
 	"testing"
 
-	gs "github.com/never-labs/gscript"
+	leia "github.com/never-labs/leia"
 )
 
 func TestPublicSDKRecommendedAPISignaturesHideInternalRuntime(t *testing.T) {
-	vmType := reflect.TypeOf((*gs.VM)(nil))
+	vmType := reflect.TypeOf((*leia.VM)(nil))
 	for _, name := range []string{
 		"Exec",
 		"ExecContext",
@@ -47,23 +47,23 @@ func TestPublicSDKRecommendedAPISignaturesHideInternalRuntime(t *testing.T) {
 	}
 
 	for name, fn := range map[string]interface{}{
-		"New":         gs.New,
-		"Compile":     gs.Compile,
-		"CompileFile": gs.CompileFile,
-		"Decode":      gs.Decode,
-		"Encode":      gs.Encode,
-		"Nil":         gs.Nil,
-		"Bool":        gs.Bool,
-		"Int":         gs.Int,
-		"Float":       gs.Float,
-		"String":      gs.String,
+		"New":         leia.New,
+		"Compile":     leia.Compile,
+		"CompileFile": leia.CompileFile,
+		"Decode":      leia.Decode,
+		"Encode":      leia.Encode,
+		"Nil":         leia.Nil,
+		"Bool":        leia.Bool,
+		"Int":         leia.Int,
+		"Float":       leia.Float,
+		"String":      leia.String,
 	} {
 		assertNoInternalRuntimeType(t, name, reflect.TypeOf(fn))
 	}
 }
 
 func TestPublicSDKRawRuntimeMethodsAreNotExported(t *testing.T) {
-	vmType := reflect.TypeOf((*gs.VM)(nil))
+	vmType := reflect.TypeOf((*leia.VM)(nil))
 	for _, name := range []string{
 		"GetValue",
 		"SetValue",
@@ -117,7 +117,7 @@ func TestRootPackageLLMTypesStayFacadeAliases(t *testing.T) {
 			if isTypeAliasToLLMSubpackage(spec, imports) {
 				return true
 			}
-			t.Fatalf("%s defines root LLM type %s; put concrete LLM provider/replay/trace/helper types under github.com/never-labs/gscript/llm/... and keep root as a facade alias", filepath.Base(filename), spec.Name.Name)
+			t.Fatalf("%s defines root LLM type %s; put concrete LLM provider/replay/trace/helper types under github.com/never-labs/leia/llm/... and keep root as a facade alias", filepath.Base(filename), spec.Name.Name)
 			return true
 		})
 	}
@@ -140,17 +140,17 @@ func TestRootPackageLLMFacadeDoesNotReimplementHostedHelpers(t *testing.T) {
 				"os",
 				"os/exec",
 				"time":
-				t.Fatalf("%s imports %s; root LLM files should stay facade-only and delegate implementation to github.com/never-labs/gscript/llm/...", filepath.Base(filename), importPath)
+				t.Fatalf("%s imports %s; root LLM files should stay facade-only and delegate implementation to github.com/never-labs/leia/llm/...", filepath.Base(filename), importPath)
 			}
 		}
 	}
 }
 
 func TestPublicValueBoundaryWorksWithoutRawRuntimeTypes(t *testing.T) {
-	vm := gs.New(gs.WithVM())
+	vm := leia.New(leia.WithVM())
 
-	limit := gs.Int(40)
-	if limit.Kind() != gs.KindInt || limit.Int() != 40 {
+	limit := leia.Int(40)
+	if limit.Kind() != leia.KindInt || limit.Int() != 40 {
 		t.Fatalf("limit = %s/%d, want int/40", limit.Kind(), limit.Int())
 	}
 	if err := vm.Set("limit", limit); err != nil {
@@ -172,7 +172,7 @@ func TestPublicValueBoundaryWorksWithoutRawRuntimeTypes(t *testing.T) {
 		t.Fatalf("result = %v (%T), want int64(42)", got, got)
 	}
 
-	encoded, err := gs.String("answer").Encode()
+	encoded, err := leia.String("answer").Encode()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -180,17 +180,17 @@ func TestPublicValueBoundaryWorksWithoutRawRuntimeTypes(t *testing.T) {
 		t.Fatalf("encoded string = %v (%T), want answer", encoded, encoded)
 	}
 
-	decoded, err := gs.Decode(map[string]interface{}{
+	decoded, err := leia.Decode(map[string]interface{}{
 		"label": "answer",
 		"count": 42,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if decoded.Kind() != gs.KindTable {
+	if decoded.Kind() != leia.KindTable {
 		t.Fatalf("decoded kind = %s, want table", decoded.Kind())
 	}
-	roundTrip, err := gs.Encode(decoded)
+	roundTrip, err := leia.Encode(decoded)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -204,9 +204,9 @@ func TestPublicValueBoundaryWorksWithoutRawRuntimeTypes(t *testing.T) {
 }
 
 func TestPublicValueCanCallHostAndScriptBoundaries(t *testing.T) {
-	vm := gs.New(gs.WithVM())
-	if err := vm.RegisterFunc("scale", func(v gs.Value) int64 {
-		if v.Kind() != gs.KindInt {
+	vm := leia.New(leia.WithVM())
+	if err := vm.RegisterFunc("scale", func(v leia.Value) int64 {
+		if v.Kind() != leia.KindInt {
 			t.Fatalf("scale arg kind = %s, want int", v.Kind())
 		}
 		return v.Int() * 2
@@ -221,12 +221,12 @@ func TestPublicValueCanCallHostAndScriptBoundaries(t *testing.T) {
 	`); err != nil {
 		t.Fatal(err)
 	}
-	results, err := vm.Call("apply", func(v gs.Value) int64 {
-		if v.Kind() != gs.KindInt {
+	results, err := vm.Call("apply", func(v leia.Value) int64 {
+		if v.Kind() != leia.KindInt {
 			t.Fatalf("apply arg kind = %s, want int", v.Kind())
 		}
 		return v.Int() + 1
-	}, gs.Int(41))
+	}, leia.Int(41))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -270,9 +270,9 @@ func parseRootPackageFiles(t *testing.T) map[string]*ast.File {
 	if err != nil {
 		t.Fatalf("parse root package: %v", err)
 	}
-	files, ok := pkgs["gscript"]
+	files, ok := pkgs["leia"]
 	if !ok {
-		t.Fatal("root package gscript not found")
+		t.Fatal("root package leia not found")
 	}
 	return files.Files
 }
@@ -303,7 +303,7 @@ func isTypeAliasToLLMSubpackage(spec *ast.TypeSpec, imports map[string]string) b
 			return false
 		}
 		path := imports[ident.Name]
-		return path == "github.com/never-labs/gscript/llm" || strings.HasPrefix(path, "github.com/never-labs/gscript/llm/")
+		return path == "github.com/never-labs/leia/llm" || strings.HasPrefix(path, "github.com/never-labs/leia/llm/")
 	case *ast.Ident:
 		return typ.Name == "LLMProvider"
 	default:

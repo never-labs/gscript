@@ -3,8 +3,8 @@ package modules
 import (
 	"fmt"
 
-	"github.com/never-labs/gscript/internal/runtime"
-	stdlibstring "github.com/never-labs/gscript/internal/support/stringlib"
+	"github.com/never-labs/leia/internal/runtime"
+	stdlibstring "github.com/never-labs/leia/internal/support/stringlib"
 )
 
 // BuildString creates the "string" standard-library module.

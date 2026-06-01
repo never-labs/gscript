@@ -1,4 +1,4 @@
-package gscript_test
+package leia_test
 
 import (
 	"context"
@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	gs "github.com/never-labs/gscript"
-	"github.com/never-labs/gscript/llm"
+	leia "github.com/never-labs/leia"
+	"github.com/never-labs/leia/llm"
 )
 
 type mockLLMProvider struct {
@@ -38,10 +38,10 @@ func (p *mockLLMProvider) Turn(_ context.Context, req llm.TurnRequest) (llm.Turn
 func TestLLMTurnWithMockProvider(t *testing.T) {
 	for _, tc := range []struct {
 		name string
-		opts []gs.Option
+		opts []leia.Option
 	}{
 		{name: "interpreter"},
-		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			provider := &mockLLMProvider{res: llm.TurnResult{
@@ -49,15 +49,15 @@ func TestLLMTurnWithMockProvider(t *testing.T) {
 				Calls: []llm.ToolCall{{
 					ID:   "call_1",
 					Tool: "lookup",
-					Args: map[string]any{"query": "gscript"},
+					Args: map[string]any{"query": "leia"},
 				}},
 				Usage: llm.TurnUsage{InputTokens: 3, OutputTokens: 4},
 			}}
-			opts := append([]gs.Option{
-				gs.WithLibs(gs.LibString | gs.LibLLM),
-				gs.WithLLMProvider(provider),
+			opts := append([]leia.Option{
+				leia.WithLibs(leia.LibString | leia.LibLLM),
+				leia.WithLLMProvider(provider),
 			}, tc.opts...)
-			vm := gs.New(opts...)
+			vm := leia.New(opts...)
 			err := vm.Exec(`
 lookup := llm.tool("lookup", func(query) {
     return query, nil
@@ -67,7 +67,7 @@ value := nil
 dispatch_err := nil
 result, err := llm.turn({
     model: "mock-fast",
-    messages: {llm.system("Be concise."), llm.user("search gscript")},
+    messages: {llm.system("Be concise."), llm.user("search leia")},
     tools: tools,
     max_tokens: 64,
 })
@@ -79,7 +79,7 @@ value, dispatch_err = llm.dispatch(result.calls[1], tools)
 			if provider.last.Model != "mock-fast" {
 				t.Fatalf("model = %q", provider.last.Model)
 			}
-			if len(provider.last.Messages) != 2 || provider.last.Messages[0].Role != "system" || provider.last.Messages[1].Text != "search gscript" {
+			if len(provider.last.Messages) != 2 || provider.last.Messages[0].Role != "system" || provider.last.Messages[1].Text != "search leia" {
 				t.Fatalf("messages = %#v", provider.last.Messages)
 			}
 			if len(provider.last.Tools) != 1 || provider.last.Tools[0].Name != "lookup" || provider.last.Tools[0].Description != "lookup docs" {
@@ -89,7 +89,7 @@ value, dispatch_err = llm.dispatch(result.calls[1], tools)
 			if err != nil {
 				t.Fatalf("Get value: %v", err)
 			}
-			if got != "gscript" {
+			if got != "leia" {
 				rawDispatchErr, _ := vm.Get("dispatch_err")
 				t.Fatalf("value = %#v dispatch_err=%#v", got, rawDispatchErr)
 			}
@@ -105,7 +105,7 @@ value, dispatch_err = llm.dispatch(result.calls[1], tools)
 }
 
 func TestLLMTurnWithoutProviderReturnsError(t *testing.T) {
-	vm := gs.New(gs.WithLibs(gs.LibString | gs.LibLLM))
+	vm := leia.New(leia.WithLibs(leia.LibString | leia.LibLLM))
 	if err := vm.Exec(`
 result, err := llm.turn({messages: {llm.user("hi")}})
 kind := err.kind
@@ -124,23 +124,23 @@ kind := err.kind
 func TestLLMMessageHelpers(t *testing.T) {
 	for _, tc := range []struct {
 		name string
-		opts []gs.Option
+		opts []leia.Option
 	}{
 		{name: "interpreter"},
-		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			provider := &mockLLMProvider{res: llm.TurnResult{
 				Status: "final_answer",
 				Text:   "ok",
 			}}
-			opts := append([]gs.Option{
-				gs.WithLibs(gs.LibString | gs.LibLLM),
-				gs.WithLLMProvider(provider),
+			opts := append([]leia.Option{
+				leia.WithLibs(leia.LibString | leia.LibLLM),
+				leia.WithLLMProvider(provider),
 			}, tc.opts...)
-			vm := gs.New(opts...)
+			vm := leia.New(opts...)
 			if err := vm.Exec(`
-call := {id: "call_1", tool: "lookup", args: {name: "gscript"}}
+call := {id: "call_1", tool: "lookup", args: {name: "leia"}}
 messages := {
     msg.system("system text"),
     msg.user("user text"),
@@ -176,13 +176,13 @@ tool_id := messages[5].tool_use_id
 func TestChatHelpers(t *testing.T) {
 	for _, tc := range []struct {
 		name string
-		opts []gs.Option
+		opts []leia.Option
 	}{
 		{name: "interpreter"},
-		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			vm := gs.New(append([]gs.Option{gs.WithLibs(gs.LibString | gs.LibLLM)}, tc.opts...)...)
+			vm := leia.New(append([]leia.Option{leia.WithLibs(leia.LibString | leia.LibLLM)}, tc.opts...)...)
 			if err := vm.Exec(`
 history := {
     msg.system("You are concise."),

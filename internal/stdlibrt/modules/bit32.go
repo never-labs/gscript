@@ -3,7 +3,7 @@ package modules
 import (
 	"fmt"
 
-	bit32lib "github.com/never-labs/gscript/internal/stdlib/bit32"
+	bit32lib "github.com/never-labs/leia/internal/stdlib/bit32"
 )
 
 // BuildBit32 creates the "bit32" standard library table.

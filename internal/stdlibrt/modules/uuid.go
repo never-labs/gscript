@@ -3,8 +3,8 @@ package modules
 import (
 	"fmt"
 
-	"github.com/never-labs/gscript/internal/runtime"
-	uuidlib "github.com/never-labs/gscript/internal/stdlib/uuid"
+	"github.com/never-labs/leia/internal/runtime"
+	uuidlib "github.com/never-labs/leia/internal/stdlib/uuid"
 )
 
 // buildUUIDLib adapts the low-coupling uuid stdlib implementation to runtime values.

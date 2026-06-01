@@ -1,13 +1,13 @@
-package gscript_test
+package leia_test
 
 import (
 	"testing"
 
-	gs "github.com/never-labs/gscript"
+	leia "github.com/never-labs/leia"
 )
 
 func TestSetGet(t *testing.T) {
-	vm := gs.New()
+	vm := leia.New()
 	if err := vm.Set("x", 42); err != nil {
 		t.Fatal(err)
 	}
@@ -21,21 +21,21 @@ func TestSetGet(t *testing.T) {
 }
 
 func TestSetGet_string(t *testing.T) {
-	vm := gs.New()
-	if err := vm.Set("name", "gscript"); err != nil {
+	vm := leia.New()
+	if err := vm.Set("name", "leia"); err != nil {
 		t.Fatal(err)
 	}
 	val, err := vm.Get("name")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if val != "gscript" {
-		t.Fatalf("expected 'gscript', got %v", val)
+	if val != "leia" {
+		t.Fatalf("expected 'leia', got %v", val)
 	}
 }
 
 func TestSetGet_float(t *testing.T) {
-	vm := gs.New()
+	vm := leia.New()
 	if err := vm.Set("pi", 3.14); err != nil {
 		t.Fatal(err)
 	}
@@ -49,7 +49,7 @@ func TestSetGet_float(t *testing.T) {
 }
 
 func TestSetGet_bool(t *testing.T) {
-	vm := gs.New()
+	vm := leia.New()
 	if err := vm.Set("flag", true); err != nil {
 		t.Fatal(err)
 	}
@@ -63,7 +63,7 @@ func TestSetGet_bool(t *testing.T) {
 }
 
 func TestSetGet_nil(t *testing.T) {
-	vm := gs.New()
+	vm := leia.New()
 	if err := vm.Set("nothing", nil); err != nil {
 		t.Fatal(err)
 	}

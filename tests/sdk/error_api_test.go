@@ -1,36 +1,36 @@
-package gscript_test
+package leia_test
 
 import (
 	"errors"
 	"fmt"
 	"testing"
 
-	gs "github.com/never-labs/gscript"
+	leia "github.com/never-labs/leia"
 )
 
 func TestErrorAPI_parseAndRuntimeKinds(t *testing.T) {
-	vm := gs.New()
+	vm := leia.New()
 
 	parseErr := vm.Exec(`x :=`)
-	if !errors.Is(parseErr, &gs.Error{Kind: gs.ErrParse}) {
+	if !errors.Is(parseErr, &leia.Error{Kind: leia.ErrParse}) {
 		t.Fatalf("parse error is not identifiable as ErrParse: %T %v", parseErr, parseErr)
 	}
 
 	runtimeErr := vm.Exec(`x := 1 + "abc"`)
-	if !errors.Is(runtimeErr, &gs.Error{Kind: gs.ErrRuntime}) {
+	if !errors.Is(runtimeErr, &leia.Error{Kind: leia.ErrRuntime}) {
 		t.Fatalf("runtime error is not identifiable as ErrRuntime: %T %v", runtimeErr, runtimeErr)
 	}
 }
 
 func TestErrorAPI_scriptErrorValue(t *testing.T) {
-	vm := gs.New()
+	vm := leia.New()
 	err := vm.Exec(`error("boom")`)
-	if !errors.Is(err, &gs.Error{Kind: gs.ErrScript}) {
+	if !errors.Is(err, &leia.Error{Kind: leia.ErrScript}) {
 		t.Fatalf("script error is not identifiable as ErrScript: %T %v", err, err)
 	}
-	var gsErr *gs.Error
+	var gsErr *leia.Error
 	if !errors.As(err, &gsErr) {
-		t.Fatalf("expected *gscript.Error, got %T", err)
+		t.Fatalf("expected *leia.Error, got %T", err)
 	}
 	if gsErr.Value != "boom" {
 		t.Fatalf("script error value = %#v, want %q", gsErr.Value, "boom")
@@ -39,7 +39,7 @@ func TestErrorAPI_scriptErrorValue(t *testing.T) {
 
 func TestErrorAPI_hostCallbackReturnedError(t *testing.T) {
 	sentinel := errors.New("host failed")
-	vm := gs.New()
+	vm := leia.New()
 	if err := vm.RegisterFunc("fail", func() error {
 		return sentinel
 	}); err != nil {
@@ -47,7 +47,7 @@ func TestErrorAPI_hostCallbackReturnedError(t *testing.T) {
 	}
 
 	_, err := vm.Call("fail")
-	var hostErr *gs.HostCallbackError
+	var hostErr *leia.HostCallbackError
 	if !errors.As(err, &hostErr) {
 		t.Fatalf("expected HostCallbackError, got %T %v", err, err)
 	}
@@ -60,7 +60,7 @@ func TestErrorAPI_hostCallbackReturnedError(t *testing.T) {
 }
 
 func TestErrorAPI_hostCallbackPanic(t *testing.T) {
-	vm := gs.New()
+	vm := leia.New()
 	if err := vm.RegisterFunc("explode", func() {
 		panic("boom")
 	}); err != nil {
@@ -68,7 +68,7 @@ func TestErrorAPI_hostCallbackPanic(t *testing.T) {
 	}
 
 	err := vm.Exec(`explode()`)
-	var panicErr *gs.HostCallbackPanicError
+	var panicErr *leia.HostCallbackPanicError
 	if !errors.As(err, &panicErr) {
 		t.Fatalf("expected HostCallbackPanicError, got %T %v", err, err)
 	}
@@ -80,10 +80,10 @@ func TestErrorAPI_hostCallbackPanic(t *testing.T) {
 func TestErrorAPI_budgetError(t *testing.T) {
 	for _, tc := range []struct {
 		name string
-		vm   *gs.VM
+		vm   *leia.VM
 	}{
-		{name: "interpreter", vm: gs.New(gs.WithMaxSteps(8))},
-		{name: "bytecode", vm: gs.New(gs.WithVM(), gs.WithMaxSteps(8))},
+		{name: "interpreter", vm: leia.New(leia.WithMaxSteps(8))},
+		{name: "bytecode", vm: leia.New(leia.WithVM(), leia.WithMaxSteps(8))},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			err := tc.vm.Exec(`
@@ -92,14 +92,14 @@ func TestErrorAPI_budgetError(t *testing.T) {
 					i += 1
 				}
 			`)
-			var budgetErr *gs.BudgetError
+			var budgetErr *leia.BudgetError
 			if !errors.As(err, &budgetErr) {
 				t.Fatalf("expected BudgetError, got %T %v", err, err)
 			}
 			if budgetErr.Resource != "steps" || budgetErr.Limit != 8 {
 				t.Fatalf("budget = %s %d, want steps 8", budgetErr.Resource, budgetErr.Limit)
 			}
-			if !errors.Is(err, &gs.Error{Kind: gs.ErrRuntime}) {
+			if !errors.Is(err, &leia.Error{Kind: leia.ErrRuntime}) {
 				t.Fatalf("budget error should also be runtime error: %v", err)
 			}
 		})
@@ -108,7 +108,7 @@ func TestErrorAPI_budgetError(t *testing.T) {
 
 func TestErrorAPI_hostCallbackErrorFromScript(t *testing.T) {
 	sentinel := fmt.Errorf("script host failed")
-	vm := gs.New()
+	vm := leia.New()
 	if err := vm.RegisterFunc("failFromScript", func() error {
 		return sentinel
 	}); err != nil {
@@ -116,7 +116,7 @@ func TestErrorAPI_hostCallbackErrorFromScript(t *testing.T) {
 	}
 
 	err := vm.Exec(`failFromScript()`)
-	var hostErr *gs.HostCallbackError
+	var hostErr *leia.HostCallbackError
 	if !errors.As(err, &hostErr) {
 		t.Fatalf("expected HostCallbackError, got %T %v", err, err)
 	}

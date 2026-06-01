@@ -14,9 +14,9 @@ In [Post #7](07-the-day-we-beat-luajit), we beat LuaJIT on fib(20). 24us vs 26us
 
 Here is the full scoreboard as it stands:
 
-| Benchmark | GScript | LuaJIT | Ratio | Status |
+| Benchmark | Leia | LuaJIT | Ratio | Status |
 |-----------|---------|--------|-------|--------|
-| fib(20) | 24us | 26us | 0.92x | **GScript wins** |
+| fib(20) | 24us | 26us | 0.92x | **Leia wins** |
 | ackermann(3,11) | 17us | ~17us | ~1.0x | Tied |
 | callMany (fn calls) | 5.1us | 3us | 1.7x | LuaJIT leads |
 | mandelbrot(1000) | 0.23s | 0.056s | 4.0x | LuaJIT leads |
@@ -44,11 +44,11 @@ The insight is that most bytecode operations have a fixed structure with only a 
 
 CPython 3.13 shipped this as its [experimental JIT compiler](https://peps.python.org/pep-0744/). The WasmNow project used it to build a WebAssembly baseline compiler that is [5-6.5x faster at compilation than Chrome's Liftoff](https://github.com/sillycross/WasmNow) while generating code that runs 39-63% faster. It works.
 
-### What it could do for GScript
+### What it could do for Leia
 
 Three places where copy-and-patch could help immediately:
 
-**Guard sequences.** GScript's trace compiler emits multi-instruction sequences for guarded operations --- check the type tag, load the value, do the arithmetic, store it back. Each of these could be a pre-compiled stencil. Clang knows things about the Apple M-series pipeline that we do not: instruction fusion opportunities, optimal scheduling for the Firestorm cores, branch prediction interactions. A stencil compiled by Clang at `-O3` would probably schedule our guard sequences better than our hand-written assembler does.
+**Guard sequences.** Leia's trace compiler emits multi-instruction sequences for guarded operations --- check the type tag, load the value, do the arithmetic, store it back. Each of these could be a pre-compiled stencil. Clang knows things about the Apple M-series pipeline that we do not: instruction fusion opportunities, optimal scheduling for the Firestorm cores, branch prediction interactions. A stencil compiled by Clang at `-O3` would probably schedule our guard sequences better than our hand-written assembler does.
 
 **Prologue and epilogue code.** The 61-instruction sub-trace call prologue is a perfect stencil candidate. It is the same sequence every time, with different register offsets. Clang could reduce pipeline stalls in the spill/reload sequences that we might be missing.
 
@@ -56,11 +56,11 @@ Three places where copy-and-patch could help immediately:
 
 ### Where it breaks down
 
-The problem is that copy-and-patch is fundamentally a *per-operation* technique. It optimizes individual bytecode handlers in isolation. GScript's SSA pipeline already optimizes *across* operations --- common subexpression elimination, constant hoisting, and register allocation all work on the full trace, not on individual instructions. Stencils cannot cross operation boundaries.
+The problem is that copy-and-patch is fundamentally a *per-operation* technique. It optimizes individual bytecode handlers in isolation. Leia's SSA pipeline already optimizes *across* operations --- common subexpression elimination, constant hoisting, and register allocation all work on the full trace, not on individual instructions. Stencils cannot cross operation boundaries.
 
 This matters. When our SSA optimizer sees that the same type guard appears three times in a loop body, it eliminates the redundant checks. A stencil-based system would emit all three guard sequences because it cannot see across stencil boundaries.
 
-Register allocation is another conflict. Stencils assume fixed register conventions --- the stencil was compiled with specific registers in specific roles. GScript's linear-scan allocator assigns registers dynamically based on live ranges. To use stencils, we would either need parameterized register variants (explosion in stencil count) or a fixed register convention (losing the allocator's optimization).
+Register allocation is another conflict. Stencils assume fixed register conventions --- the stencil was compiled with specific registers in specific roles. Leia's linear-scan allocator assigns registers dynamically based on live ranges. To use stencils, we would either need parameterized register variants (explosion in stencil count) or a fixed register convention (losing the allocator's optimization).
 
 ### Verdict
 
@@ -82,11 +82,11 @@ The results are impressive. The "LuaJIT Remake" (LJR) built with Deegen has an i
 
 The short answer: architectural mismatch at every level.
 
-**Language.** Deegen requires bytecode semantics in C++. GScript's runtime is in Go. Using Deegen would mean rewriting the entire VM from scratch.
+**Language.** Deegen requires bytecode semantics in C++. Leia's runtime is in Go. Using Deegen would mean rewriting the entire VM from scratch.
 
-**Platform.** Deegen targets x86-64. GScript targets ARM64. The implementation includes x86-specific details in its stencil generation and calling conventions.
+**Platform.** Deegen targets x86-64. Leia targets ARM64. The implementation includes x86-specific details in its stencil generation and calling conventions.
 
-**JIT tier.** Deegen generates a *baseline* JIT --- method-level, no optimization beyond dispatch elimination and inline caching. GScript already has a *tracing* JIT with SSA optimization, type specialization, and register allocation. Deegen's output would be a step backward in code quality for our hot loops.
+**JIT tier.** Deegen generates a *baseline* JIT --- method-level, no optimization beyond dispatch elimination and inline caching. Leia already has a *tracing* JIT with SSA optimization, type specialization, and register allocation. Deegen's output would be a step backward in code quality for our hot loops.
 
 **Calling convention.** Deegen's continuation-passing interpreter needs GHC calling convention and tail call optimization --- features that Go does not provide.
 
@@ -94,7 +94,7 @@ The short answer: architectural mismatch at every level.
 
 The paper is still worth reading for two ideas:
 
-1. **Inline caching architecture.** Deegen decomposes inline cache operations into an idempotent computation phase and a cheap execution phase, then generates self-modifying JIT code for polymorphic inline caches. GScript has a VM-level inline field cache, but the Deegen approach of patching the JIT code itself to cache field offsets is more powerful. Worth exploring when we work on table operation performance.
+1. **Inline caching architecture.** Deegen decomposes inline cache operations into an idempotent computation phase and a cheap execution phase, then generates self-modifying JIT code for polymorphic inline caches. Leia has a VM-level inline field cache, but the Deegen approach of patching the JIT code itself to cache field offsets is more powerful. Worth exploring when we work on table operation performance.
 
 2. **Hot-cold splitting.** Deegen automatically separates hot paths from cold paths in generated code. This overlaps with the BOLT-style layout optimization we will discuss below.
 
@@ -112,15 +112,15 @@ Google deployed this in production for LLVM inlining decisions. The result: **0.
 
 ### Why it does not make sense for us
 
-The numbers tell the story. 0.3-1.5% improvement on Google-scale applications, where shaving half a percent off a fleet of millions of servers saves real money. For GScript, where the remaining gaps are measured in multiples, not percentages, this is a sledgehammer applied to a thumbtack.
+The numbers tell the story. 0.3-1.5% improvement on Google-scale applications, where shaving half a percent off a fleet of millions of servers saves real money. For Leia, where the remaining gaps are measured in multiples, not percentages, this is a sledgehammer applied to a thumbtack.
 
 Beyond the scale mismatch, there are practical barriers:
 
-**Decision space is tiny.** GScript's register allocator manages 5 integer registers (X20-X24) and 8 float registers (D4-D11). The decision space is so small that a linear scan with frequency heuristics already finds near-optimal solutions. ML shines when the decision space is enormous and the interactions are complex. Ours is not.
+**Decision space is tiny.** Leia's register allocator manages 5 integer registers (X20-X24) and 8 float registers (D4-D11). The decision space is so small that a linear scan with frequency heuristics already finds near-optimal solutions. ML shines when the decision space is enormous and the interactions are complex. Ours is not.
 
-**No training corpus.** MLGO requires compiling a large corpus of programs repeatedly with different policies. GScript has 8 benchmarks. Training on 8 programs would overfit catastrophically.
+**No training corpus.** MLGO requires compiling a large corpus of programs repeatedly with different policies. Leia has 8 benchmarks. Training on 8 programs would overfit catastrophically.
 
-**Latency budget.** MLGO is designed for ahead-of-time compilation where compile time is measured in seconds. GScript's JIT compiles traces in microseconds. Even lightweight ML inference would dominate compilation time.
+**Latency budget.** MLGO is designed for ahead-of-time compilation where compile time is measured in seconds. Leia's JIT compiles traces in microseconds. Even lightweight ML inference would dominate compilation time.
 
 **Marginal gains.** Even in the best case --- 5-15% improvement on trace selection heuristics --- the infrastructure cost is enormous. Building and maintaining a training pipeline, curating a program corpus, retraining when the compiler changes.
 
@@ -128,7 +128,7 @@ There is one practical takeaway: rather than full ML, systematic offline tuning 
 
 ### Verdict
 
-**Interesting but premature.** Revisit when three conditions hold: (1) GScript has a large user-written program corpus, (2) the remaining performance gaps are in single-digit percentages, and (3) simple heuristic improvements have been exhausted. We are nowhere near any of these conditions.
+**Interesting but premature.** Revisit when three conditions hold: (1) Leia has a large user-written program corpus, (2) the remaining performance gaps are in single-digit percentages, and (3) simple heuristic improvements have been exhausted. We are nowhere near any of these conditions.
 
 ## BOLT: Rearranging the Binary After the Fact
 
@@ -142,13 +142,13 @@ BOLT itself operates on static ELF binaries --- it cannot optimize JIT-generated
 
 ### What we can do right now
 
-**Hot/cold splitting of guard handlers.** This is the single most actionable idea from the entire survey. GScript traces currently have guard-failure handlers (side-exit stubs) interspersed with hot-path code. A type guard emits: compare, conditional branch to handler, handler code (restore state, jump to interpreter), then continue with the hot path. The handler is cold code that almost never executes, but it sits in the middle of the hot path, pushing subsequent hot instructions into the next cache line.
+**Hot/cold splitting of guard handlers.** This is the single most actionable idea from the entire survey. Leia traces currently have guard-failure handlers (side-exit stubs) interspersed with hot-path code. A type guard emits: compare, conditional branch to handler, handler code (restore state, jump to interpreter), then continue with the hot path. The handler is cold code that almost never executes, but it sits in the middle of the hot path, pushing subsequent hot instructions into the next cache line.
 
 The fix: emit all side-exit stubs *after* the main trace body. The hot path becomes a contiguous stream of instructions with only the conditional branches remaining (which the branch predictor handles well since guards almost always pass). The cold handlers cluster at the end, out of the icache's way. Implementation: a two-pass emission --- first pass emits the hot path with placeholder branches, second pass emits cold stubs and patches the branch targets. Estimated effort: 200-300 lines of code.
 
-**Cache-line alignment.** ARM64 benefits from aligning loop headers and trace entry points to 64-byte boundaries (Apple M-series cache line size). GScript's assembler does not currently do this. Adding NOP padding before trace entries is trivial --- 10-20 lines.
+**Cache-line alignment.** ARM64 benefits from aligning loop headers and trace entry points to 64-byte boundaries (Apple M-series cache line size). Leia's assembler does not currently do this. Adding NOP padding before trace entries is trivial --- 10-20 lines.
 
-**Trace adjacency.** When an outer trace calls an inner trace (as in mandelbrot), placing them contiguously in memory reduces icache misses at the call boundary. GScript's memory allocator currently places traces sequentially, which may or may not result in adjacency. Explicit co-location based on the call graph requires a smarter allocator --- about 100-200 lines.
+**Trace adjacency.** When an outer trace calls an inner trace (as in mandelbrot), placing them contiguously in memory reduces icache misses at the call boundary. Leia's memory allocator currently places traces sequentially, which may or may not result in adjacency. Explicit co-location based on the call graph requires a smarter allocator --- about 100-200 lines.
 
 ### Expected impact
 
@@ -171,7 +171,7 @@ The four techniques above are optimizations. They trim percentages. They smooth 
 
 This one does.
 
-GScript's `runtime.Value` is 32 bytes:
+Leia's `runtime.Value` is 32 bytes:
 
 ```go
 type Value struct {
@@ -208,7 +208,7 @@ V8 took a different but complementary approach in [Chrome 80](https://v8.dev/blo
 
 The result: up to [43% heap reduction](https://blog.platformatic.dev/we-cut-nodejs-memory-in-half), dramatically better cache utilization, meaningful speedups on real-world workloads.
 
-For GScript, pointer compression is the natural extension of NaN-boxing: if all script objects are allocated within a 4GB arena (via `mmap`), pointers need only 32 bits in the NaN payload, leaving 19 bits for type tags and metadata. This gives a very flexible encoding with room to spare.
+For Leia, pointer compression is the natural extension of NaN-boxing: if all script objects are allocated within a 4GB arena (via `mmap`), pointers need only 32 bits in the NaN payload, leaving 19 bits for type tags and metadata. This gives a very flexible encoding with room to spare.
 
 ### The Go problem
 
@@ -216,7 +216,7 @@ There is one major obstacle, and it is not algorithmic --- it is our host langua
 
 Go's garbage collector scans memory for pointers. NaN-boxed pointers are invisible to the GC because they are stored in `uint64` fields, not `unsafe.Pointer` fields. Go's `unsafe.Pointer` rules explicitly prohibit storing pointers in integer types --- the GC may collect objects it cannot see.
 
-This means GScript cannot simply NaN-box pointers into uint64 values and hope for the best. The GC will collect the objects those pointers reference. We need one of:
+This means Leia cannot simply NaN-box pointers into uint64 values and hope for the best. The GC will collect the objects those pointers reference. We need one of:
 
 1. **A global root set** --- maintain a Go-visible data structure that holds `unsafe.Pointer` references to all live script objects, updated by a write barrier. The NaN-boxed integers are the fast-path representation; the root set keeps the GC informed.
 
@@ -278,7 +278,7 @@ Here is what the size reduction buys:
 
 ### Verdict
 
-**This is the single most important optimization remaining for GScript.** Not because the implementation is easy --- it is the hardest thing on the list. But because it is the only technique that changes the fundamental constants of the system. Every other optimization trims overhead. NaN-boxing changes the data model.
+**This is the single most important optimization remaining for Leia.** Not because the implementation is easy --- it is the hardest thing on the list. But because it is the only technique that changes the fundamental constants of the system. Every other optimization trims overhead. NaN-boxing changes the data model.
 
 The 7.5x table-ops gap and the 4.0x mandelbrot gap both trace back to the same root: our Value is 4x bigger than LuaJIT's. Fix the Value, and everything downstream improves.
 
@@ -312,7 +312,7 @@ The plan, in order:
 
 The copy-and-patch ideas go on the shelf for now. When we eventually do NaN-boxing, Clang-optimized stencils for the NaN-box/unbox sequences could be valuable --- that is a natural synergy point. But it is not the priority today.
 
-MLGO and Deegen stay in the "interesting papers" pile. If GScript ever has a large enough user base to generate a training corpus, ML-guided heuristics might make sense. That day is not today.
+MLGO and Deegen stay in the "interesting papers" pile. If Leia ever has a large enough user base to generate a training corpus, ML-guided heuristics might make sense. That day is not today.
 
 ## What We Learned
 

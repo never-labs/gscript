@@ -116,7 +116,7 @@ n within the supported native bound
 ```
 
 When those guards hold, the kernel runs the permutation loop over Go integer
-slices and returns the normal GScript result table:
+slices and returns the normal Leia result table:
 
 ```text
 { maxFlips = ..., checksum = ... }

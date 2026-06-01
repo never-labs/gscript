@@ -23,7 +23,7 @@ class DiagnoseSummaryTest(unittest.TestCase):
         row = diagnose.DiagnosticRow(
             benchmark="sum",
             group="math",
-            script="benchmarks/math/sum.gs",
+            script="benchmarks/math/sum.leia",
             status="ok",
         )
 
@@ -36,7 +36,7 @@ class DiagnoseSummaryTest(unittest.TestCase):
         row = diagnose.DiagnosticRow(
             benchmark="events_metamethod",
             group="table",
-            script="benchmarks/table/events_metamethod.gs",
+            script="benchmarks/table/events_metamethod.leia",
             status="ok",
             time_seconds=0.1254,
             t2_attempted=5,
@@ -59,7 +59,7 @@ class DiagnoseSummaryTest(unittest.TestCase):
         row = diagnose.DiagnosticRow(
             benchmark="events_metamethod",
             group="table",
-            script="benchmarks/table/events_metamethod.gs",
+            script="benchmarks/table/events_metamethod.leia",
             status="ok",
             time_seconds=0.125,
             t2_attempted=5,
@@ -95,7 +95,7 @@ class DiagnoseSummaryTest(unittest.TestCase):
         row = diagnose.DiagnosticRow(
             benchmark="sum",
             group="math",
-            script="benchmarks/math/sum.gs",
+            script="benchmarks/math/sum.leia",
             status="ok",
             artifact_dir="out/math",
         )

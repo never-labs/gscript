@@ -1,6 +1,6 @@
 # utf8
 
-The `utf8` library provides Unicode-aware string operations. GScript strings are byte strings internally; this library provides codepoint-level access using Go's `unicode/utf8` package.
+The `utf8` library provides Unicode-aware string operations. Leia strings are byte strings internally; this library provides codepoint-level access using Go's `unicode/utf8` package.
 
 ## Constants
 
@@ -14,7 +14,7 @@ A string pattern that matches a single UTF-8 encoded codepoint. Provided for Lua
 
 Returns the number of UTF-8 codepoints in the string. If the string is not valid UTF-8, returns `nil` and an error message.
 
-```gscript
+```leia
 utf8.len("hello")  -- 5
 utf8.len("中文")    -- 2
 ```
@@ -23,7 +23,7 @@ utf8.len("中文")    -- 2
 
 Creates a string from one or more Unicode codepoint numbers.
 
-```gscript
+```leia
 utf8.char(72, 101, 108, 108, 111)  -- "Hello"
 utf8.char(20013, 25991)            -- "中文"
 ```
@@ -32,7 +32,7 @@ utf8.char(20013, 25991)            -- "中文"
 
 Returns the codepoint values for positions `i` through `j` (1-based codepoint indices). Defaults to a single codepoint at position `i`.
 
-```gscript
+```leia
 utf8.codepoint("A", 1)       -- 65
 a, b, c := utf8.codepoint("ABC", 1, 3)  -- 65, 66, 67
 ```
@@ -41,7 +41,7 @@ a, b, c := utf8.codepoint("ABC", 1, 3)  -- 65, 66, 67
 
 Returns a table (array) of `{pos, code}` entries for each codepoint in the string. `pos` is the 1-based byte offset, `code` is the Unicode codepoint value.
 
-```gscript
+```leia
 result := utf8.codes("AB")
 -- result[1] = {pos: 1, code: 65}
 -- result[2] = {pos: 2, code: 66}
@@ -51,7 +51,7 @@ result := utf8.codes("AB")
 
 Returns the 1-based byte position of the `n`-th codepoint, optionally starting the search from byte position `i` (1-based, default 1).
 
-```gscript
+```leia
 utf8.offset("中文测试", 2)  -- 4 (second codepoint starts at byte 4)
 ```
 
@@ -59,7 +59,7 @@ utf8.offset("中文测试", 2)  -- 4 (second codepoint starts at byte 4)
 
 Returns `true` if the string is valid UTF-8.
 
-```gscript
+```leia
 utf8.valid("hello")  -- true
 utf8.valid("中文")    -- true
 ```
@@ -70,7 +70,7 @@ Returns structured UTF-8 diagnostics using Go's strict `unicode/utf8` decoder.
 The returned table has `valid`, `byteCount`, `runeCount`, and, for invalid
 input, `pos` plus `error`.
 
-```gscript
+```leia
 report := utf8.validate("hello")
 report.valid      -- true
 report.runeCount  -- 5
@@ -86,7 +86,7 @@ Returns a non-strict UTF-8 string by replacing invalid byte sequences. The
 default replacement is Unicode U+FFFD; pass `replacement` to use a different
 string.
 
-```gscript
+```leia
 utf8.sanitize("a" .. string.char(0x80) .. "b")       -- "a�b"
 utf8.sanitize(string.char(0xc0, 0x80), "?")          -- "??"
 ```
@@ -95,7 +95,7 @@ utf8.sanitize(string.char(0xc0, 0x80), "?")          -- "??"
 
 Reverses the string by codepoint (not by byte).
 
-```gscript
+```leia
 utf8.reverse("abc")  -- "cba"
 utf8.reverse("中文")  -- "文中"
 ```
@@ -104,7 +104,7 @@ utf8.reverse("中文")  -- "文中"
 
 Returns a substring by codepoint indices (1-based). Negative indices count from the end. Defaults `j` to the end of the string.
 
-```gscript
+```leia
 utf8.sub("hello", 2, 4)     -- "ell"
 utf8.sub("中文测试", 2, 3)   -- "文测"
 utf8.sub("hello", 3)        -- "llo"
@@ -114,7 +114,7 @@ utf8.sub("hello", 3)        -- "llo"
 
 Returns the string with all codepoints converted to uppercase using Unicode rules.
 
-```gscript
+```leia
 utf8.upper("hello")  -- "HELLO"
 ```
 
@@ -122,7 +122,7 @@ utf8.upper("hello")  -- "HELLO"
 
 Returns the string with all codepoints converted to lowercase using Unicode rules.
 
-```gscript
+```leia
 utf8.lower("HELLO")  -- "hello"
 ```
 
@@ -136,7 +136,7 @@ Returns a single-letter classification for the given codepoint:
 - `"P"` -- Punctuation or symbol
 - `"O"` -- Other
 
-```gscript
+```leia
 utf8.charclass(65)   -- "L" (letter 'A')
 utf8.charclass(48)   -- "N" (digit '0')
 utf8.charclass(32)   -- "S" (space)

@@ -58,7 +58,7 @@ constant index -> VM.globalArray index
 Then Tier 2 could lower global reads and top-level writes to indexed array
 operations guarded by `VM.globalVer`.
 
-On paper, that is exactly what we want. GScript already uses indexed globals in
+On paper, that is exactly what we want. Leia already uses indexed globals in
 the VM. The method JIT should not hash string names in hot code either.
 
 ## The main-only trap
@@ -254,7 +254,7 @@ The final gate was:
 
 ```text
 go test ./internal/methodjit -count=1
-go test ./benchmarks ./gscript ./internal/... ./cmd/... -count=1 -timeout=300s
+go test ./benchmarks ./leia ./internal/... ./cmd/... -count=1 -timeout=300s
 bash benchmarks/diagnose_tier2.sh ackermann mutual_recursion nbody sum_primes
 bash benchmarks/regression_guard.sh --runs=3 --timeout=90 \
   --bench ackermann \
@@ -336,12 +336,12 @@ This patch does not make the suite beat LuaJIT.
 The full guard still shows:
 
 ```text
-ackermann        GScript 0.017s   LuaJIT 0.006s
-mutual_recursion GScript 0.016s   LuaJIT 0.004s
-nbody            GScript 0.080s   LuaJIT 0.034s
-fannkuch         GScript 0.046s   LuaJIT 0.020s
-matmul           GScript 0.129s   LuaJIT 0.022s
-sort             GScript 0.050s   LuaJIT 0.010s
+ackermann        Leia 0.017s   LuaJIT 0.006s
+mutual_recursion Leia 0.016s   LuaJIT 0.004s
+nbody            Leia 0.080s   LuaJIT 0.034s
+fannkuch         Leia 0.046s   LuaJIT 0.020s
+matmul           Leia 0.129s   LuaJIT 0.022s
+sort             Leia 0.050s   LuaJIT 0.010s
 ```
 
 The remaining gaps are not global lookup gaps anymore. They are:

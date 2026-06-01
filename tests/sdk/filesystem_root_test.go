@@ -1,4 +1,4 @@
-package gscript_test
+package leia_test
 
 import (
 	"os"
@@ -6,24 +6,24 @@ import (
 	"strings"
 	"testing"
 
-	gs "github.com/never-labs/gscript"
+	leia "github.com/never-labs/leia"
 )
 
 func TestWithFilesystemRootConfinesIOLibFiles(t *testing.T) {
 	for _, tc := range []struct {
 		name string
-		opts []gs.Option
+		opts []leia.Option
 	}{
 		{name: "interpreter"},
-		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			root := t.TempDir()
-			opts := append([]gs.Option{
-				gs.WithLibs(gs.LibString | gs.LibIO),
-				gs.WithFilesystemRoot(root),
+			opts := append([]leia.Option{
+				leia.WithLibs(leia.LibString | leia.LibIO),
+				leia.WithFilesystemRoot(root),
 			}, tc.opts...)
-			vm := gs.New(opts...)
+			vm := leia.New(opts...)
 			if err := vm.Exec(`
 				f := io.open("inside.txt", "w")
 				assert(f:write("ok"))
@@ -52,21 +52,21 @@ func TestWithFilesystemRootConfinesIOLibFiles(t *testing.T) {
 func TestWithFilesystemRootConfinesOSFileMutation(t *testing.T) {
 	for _, tc := range []struct {
 		name string
-		opts []gs.Option
+		opts []leia.Option
 	}{
 		{name: "interpreter"},
-		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			root := t.TempDir()
 			if err := os.WriteFile(filepath.Join(root, "old.txt"), []byte("ok"), 0644); err != nil {
 				t.Fatal(err)
 			}
-			opts := append([]gs.Option{
-				gs.WithLibs(gs.LibString | gs.LibOS),
-				gs.WithFilesystemRoot(root),
+			opts := append([]leia.Option{
+				leia.WithLibs(leia.LibString | leia.LibOS),
+				leia.WithFilesystemRoot(root),
 			}, tc.opts...)
-			vm := gs.New(opts...)
+			vm := leia.New(opts...)
 			if err := vm.Exec(`ok := os.rename("old.txt", "new.txt")`); err != nil {
 				t.Fatalf("os.rename inside root failed: %v", err)
 			}
@@ -99,7 +99,7 @@ func TestWithFilesystemRootReadOnlyAllowsFileLoadsAndConfinesReads(t *testing.T)
 	if err := os.Mkdir(root, 0755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(root, "inside.gs"), []byte(`loaded := "inside"`), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(root, "inside.leia"), []byte(`loaded := "inside"`), 0644); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(root, "inside.txt"), []byte("inside"), 0644); err != nil {
@@ -109,9 +109,9 @@ func TestWithFilesystemRootReadOnlyAllowsFileLoadsAndConfinesReads(t *testing.T)
 		t.Fatal(err)
 	}
 
-	vm := gs.New(gs.WithLibs(gs.LibString|gs.LibFS), gs.WithFilesystemRoot(root), gs.WithFilesystemWrite(false))
+	vm := leia.New(leia.WithLibs(leia.LibString|leia.LibFS), leia.WithFilesystemRoot(root), leia.WithFilesystemWrite(false))
 	if err := vm.Exec(`
-		dofile("inside.gs")
+		dofile("inside.leia")
 		inside, insideErr := fs.readfile("inside.txt")
 		outside, outsideErr := fs.readfile("../outside.txt")
 	`); err != nil {
@@ -155,7 +155,7 @@ func TestWithFilesystemRootWriteOnlyConfinesWritesAndRemovesFileLoads(t *testing
 		t.Fatal(err)
 	}
 
-	vm := gs.New(gs.WithLibs(gs.LibString|gs.LibFS), gs.WithFilesystemRoot(root), gs.WithFilesystemRead(false))
+	vm := leia.New(leia.WithLibs(leia.LibString|leia.LibFS), leia.WithFilesystemRoot(root), leia.WithFilesystemRead(false))
 	if err := vm.Exec(`
 		insideOK, insideErr := fs.writefile("inside.txt", "inside")
 		outsideOK, outsideErr := fs.writefile("../outside.txt", "outside")
@@ -220,7 +220,7 @@ func TestWithFilesystemRootConfinesFSModule(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vm := gs.New(gs.WithLibs(gs.LibString|gs.LibFS), gs.WithFilesystemRoot(root))
+	vm := leia.New(leia.WithLibs(leia.LibString|leia.LibFS), leia.WithFilesystemRoot(root))
 	if err := vm.Exec(`
 		inside, insideErr := fs.readfile("inside.txt")
 		outside, outsideErr := fs.readfile("../outside.txt")
@@ -256,10 +256,10 @@ func TestWithFilesystemRootConfinesBytecodeRequire(t *testing.T) {
 	if err := os.Mkdir(root, 0755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(base, "outside.gs"), []byte(`return { value: 99 }`), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(base, "outside.leia"), []byte(`return { value: 99 }`), 0644); err != nil {
 		t.Fatal(err)
 	}
-	vm := gs.New(gs.WithRequirePath(root), gs.WithFilesystemRoot(root), gs.WithVM())
+	vm := leia.New(leia.WithRequirePath(root), leia.WithFilesystemRoot(root), leia.WithVM())
 	err := vm.Exec(`require("../outside")`)
 	if err == nil || !strings.Contains(err.Error(), "escapes root") {
 		t.Fatalf("require outside error = %v, want escapes root", err)

@@ -1,4 +1,4 @@
-package gscript_test
+package leia_test
 
 import (
 	"context"
@@ -10,16 +10,16 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	gs "github.com/never-labs/gscript"
-	"github.com/never-labs/gscript/llm"
-	"github.com/never-labs/gscript/llm/anthropic"
-	"github.com/never-labs/gscript/llm/openai"
+	leia "github.com/never-labs/leia"
+	"github.com/never-labs/leia/llm"
+	"github.com/never-labs/leia/llm/anthropic"
+	"github.com/never-labs/leia/llm/openai"
 )
 
 func TestLLMCommandProvider(t *testing.T) {
-	vm := gs.New(
-		gs.WithLibs(gs.LibString|gs.LibLLM),
-		gs.WithLLMCommand("sh", "-c", `printf 'mock:%s' "$0"`),
+	vm := leia.New(
+		leia.WithLibs(leia.LibString|leia.LibLLM),
+		leia.WithLLMCommand("sh", "-c", `printf 'mock:%s' "$0"`),
 	)
 	if err := vm.Exec(`
 result, err := llm.turn({messages: {llm.user("hello")}})
@@ -63,7 +63,7 @@ func TestAnthropicCompatibleLLMProvider(t *testing.T) {
     "type": "tool_use",
     "id": "toolu_1",
     "name": "lookup",
-    "input": {"name": "gscript", "limit": 3}
+    "input": {"name": "leia", "limit": 3}
   }],
   "usage": {"input_tokens": 9, "output_tokens": 6}
 }`)
@@ -142,18 +142,18 @@ func TestClassifyLLMProviderError(t *testing.T) {
 func TestLLMModelsProviderConfigPreservesHostProvider(t *testing.T) {
 	for _, mode := range []struct {
 		name string
-		opts []gs.Option
+		opts []leia.Option
 	}{
 		{name: "interpreter"},
-		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
 	} {
 		t.Run(mode.name, func(t *testing.T) {
 			provider := &mockLLMProvider{res: llm.TurnResult{Status: "final_answer", Text: "host"}}
-			opts := append([]gs.Option{
-				gs.WithLibs(gs.LibString | gs.LibLLM),
-				gs.WithLLMProvider(provider),
+			opts := append([]leia.Option{
+				leia.WithLibs(leia.LibString | leia.LibLLM),
+				leia.WithLLMProvider(provider),
 			}, mode.opts...)
-			vm := gs.New(opts...)
+			vm := leia.New(opts...)
 			err := vm.Exec(`
 models {
     default: "chat"

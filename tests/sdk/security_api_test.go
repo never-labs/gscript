@@ -1,4 +1,4 @@
-package gscript_test
+package leia_test
 
 import (
 	"errors"
@@ -7,11 +7,11 @@ import (
 	"strings"
 	"testing"
 
-	gs "github.com/never-labs/gscript"
+	leia "github.com/never-labs/leia"
 )
 
 func TestWithLibsRestrictsUnsafeGlobals(t *testing.T) {
-	vm := gs.New(gs.WithLibs(gs.LibSafe))
+	vm := leia.New(leia.WithLibs(leia.LibSafe))
 	err := vm.Exec(`
 		hasMath := type(math)
 		hasJSON := type(json)
@@ -42,7 +42,7 @@ func TestWithLibsRestrictsUnsafeGlobals(t *testing.T) {
 }
 
 func TestWithLibsRestrictsBytecodeVM(t *testing.T) {
-	vm := gs.New(gs.WithLibs(gs.LibSafe), gs.WithVM())
+	vm := leia.New(leia.WithLibs(leia.LibSafe), leia.WithVM())
 	err := vm.Exec(`
 		hasString := type(string)
 		hasBytes := type(bytes)
@@ -71,7 +71,7 @@ func TestWithLibsRestrictsBytecodeVM(t *testing.T) {
 }
 
 func TestWithSandboxDisablesFilesystemCapabilities(t *testing.T) {
-	vm := gs.New(gs.WithSandbox())
+	vm := leia.New(leia.WithSandbox())
 	if err := vm.Exec(`hasJSON := type(json)`); err != nil {
 		t.Fatal(err)
 	}
@@ -94,7 +94,7 @@ func TestWithSandboxDisablesFilesystemCapabilities(t *testing.T) {
 }
 
 func TestSecuritySandboxDisablesHostCapabilitiesAndJIT(t *testing.T) {
-	vm := gs.New(gs.WithJIT(), gs.SecuritySandbox(), gs.WithMaxSteps(16))
+	vm := leia.New(leia.WithJIT(), leia.SecuritySandbox(), leia.WithMaxSteps(16))
 	if err := vm.Exec(`hasJSON := type(require("json"))`); err != nil {
 		t.Fatalf("safe stdlib should remain available: %v", err)
 	}
@@ -109,7 +109,7 @@ func TestSecuritySandboxDisablesHostCapabilitiesAndJIT(t *testing.T) {
 		}
 	}
 	err := vm.Exec(`for {}`)
-	var budgetErr *gs.BudgetError
+	var budgetErr *leia.BudgetError
 	if !errors.As(err, &budgetErr) {
 		t.Fatalf("expected step budget in sandboxed loop, got %T %v", err, err)
 	}
@@ -128,14 +128,14 @@ func TestSecuritySandboxDisablesHostCapabilitiesAndJIT(t *testing.T) {
 func TestWithDynamicEvalFalseBlocksScriptStringCompilation(t *testing.T) {
 	for _, tc := range []struct {
 		name string
-		opts []gs.Option
+		opts []leia.Option
 	}{
 		{name: "interpreter"},
-		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			opts := append([]gs.Option{gs.WithDynamicEval(false)}, tc.opts...)
-			vm := gs.New(opts...)
+			opts := append([]leia.Option{leia.WithDynamicEval(false)}, tc.opts...)
+			vm := leia.New(opts...)
 			if err := vm.Exec(`fn, loadErr := load("x := 1")`); err != nil {
 				t.Fatal(err)
 			}
@@ -162,9 +162,9 @@ func TestWithDynamicEvalFalseBlocksScriptStringCompilation(t *testing.T) {
 }
 
 func TestWithSecurityAppliesSandboxAndBudgets(t *testing.T) {
-	vm := gs.New(gs.WithJIT(), gs.WithSecurity(gs.SecurityPolicy{
-		Libs:                    gs.LibSafe,
-		Capabilities:            gs.CapSafe,
+	vm := leia.New(leia.WithJIT(), leia.WithSecurity(leia.SecurityPolicy{
+		Libs:                    leia.LibSafe,
+		Capabilities:            leia.CapSafe,
 		DisableModuleLoading:    true,
 		DisableJIT:              true,
 		MaxSteps:                32,
@@ -177,7 +177,7 @@ func TestWithSecurityAppliesSandboxAndBudgets(t *testing.T) {
 		MaxModuleDepth:          1,
 		MaxFilesystemReadBytes:  128,
 		MaxFilesystemWriteBytes: 128,
-		EnvironmentAllowlist:    []string{"GSCRIPT_PUBLIC_ENV_CAP_TEST"},
+		EnvironmentAllowlist:    []string{"LEIA_PUBLIC_ENV_CAP_TEST"},
 		DisableDynamicEval:      true,
 		DisableNetworkAccess:    true,
 		DisableDebugAccess:      true,
@@ -195,7 +195,7 @@ func TestWithSecurityAppliesSandboxAndBudgets(t *testing.T) {
 		t.Fatal("WithSecurity allowed filesystem API")
 	}
 	err := vm.Exec(`value := large()`)
-	var budgetErr *gs.BudgetError
+	var budgetErr *leia.BudgetError
 	if !errors.As(err, &budgetErr) || budgetErr.Resource != "host_result_bytes" || budgetErr.Limit != 4 {
 		t.Fatalf("expected host_result_bytes budget 4, got %T %v", err, err)
 	}
@@ -207,10 +207,10 @@ func TestWithSecurityAppliesSandboxAndBudgets(t *testing.T) {
 
 func TestWithModuleLoadingFalseAllowsStdlibRequireButBlocksFileModules(t *testing.T) {
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "helper.gs"), []byte(`return { value: 42 }`), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "helper.leia"), []byte(`return { value: 42 }`), 0644); err != nil {
 		t.Fatal(err)
 	}
-	vm := gs.New(gs.WithRequirePath(dir), gs.WithModuleLoading(false))
+	vm := leia.New(leia.WithRequirePath(dir), leia.WithModuleLoading(false))
 	if err := vm.Exec(`result := type(require("json"))`); err != nil {
 		t.Fatal(err)
 	}
@@ -229,10 +229,10 @@ func TestWithModuleLoadingFalseAllowsStdlibRequireButBlocksFileModules(t *testin
 
 func TestWithModuleLoadingFalseRestrictsBytecodeVM(t *testing.T) {
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "helper.gs"), []byte(`return { value: 42 }`), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "helper.leia"), []byte(`return { value: 42 }`), 0644); err != nil {
 		t.Fatal(err)
 	}
-	vm := gs.New(gs.WithRequirePath(dir), gs.WithModuleLoading(false), gs.WithVM())
+	vm := leia.New(leia.WithRequirePath(dir), leia.WithModuleLoading(false), leia.WithVM())
 	if err := vm.Exec(`stdlibResult := type(require("json"))`); err != nil {
 		t.Fatalf("stdlib require should still work with module loading disabled: %v", err)
 	}

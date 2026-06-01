@@ -27,7 +27,7 @@ func TestTrimAndPredicates(t *testing.T) {
 	if got := Trim("..hi..", "."); got != "hi" {
 		t.Fatalf("Trim = %q", got)
 	}
-	if !HasPrefix("gscript", "gs") || !HasSuffix("gscript", "script") || !Contains("gscript", "cri") {
+	if !HasPrefix("leia", "le") || !HasSuffix("leia", "ia") || !Contains("leia", "ei") {
 		t.Fatal("string predicates failed")
 	}
 	if got := Count("banana", "an"); got != 2 {

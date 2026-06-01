@@ -4,22 +4,22 @@ import (
 	"path/filepath"
 	"testing"
 
-	gs "github.com/never-labs/gscript"
+	leia "github.com/never-labs/leia"
 )
 
-// BenchmarkChessAI runs the chess_bench.gs Xiangqi AI benchmark script using the VM.
+// BenchmarkChessAI runs the chess_bench.leia Xiangqi AI benchmark script using the VM.
 func BenchmarkChessAI(b *testing.B) {
-	chessBenchPath, err := filepath.Abs(filepath.Join("..", "examples", "game_engine", "chess_bench.gs"))
+	chessBenchPath, err := filepath.Abs(filepath.Join("..", "examples", "game_engine", "chess_bench.leia"))
 	if err != nil {
-		b.Fatalf("failed to resolve chess_bench.gs path: %v", err)
+		b.Fatalf("failed to resolve chess_bench.leia path: %v", err)
 	}
 
 	for i := 0; i < b.N; i++ {
-		vm := gs.New(gs.WithVM(), gs.WithPrint(func(args ...interface{}) {
+		vm := leia.New(leia.WithVM(), leia.WithPrint(func(args ...interface{}) {
 			// Suppress output during benchmark
 		}))
 		if err := vm.ExecFile(chessBenchPath); err != nil {
-			b.Fatalf("chess_bench.gs execution error: %v", err)
+			b.Fatalf("chess_bench.leia execution error: %v", err)
 		}
 	}
 }

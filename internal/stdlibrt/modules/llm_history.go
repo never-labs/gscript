@@ -3,7 +3,7 @@ package modules
 import (
 	"fmt"
 
-	stdlibllm "github.com/never-labs/gscript/internal/stdlib/llm"
+	stdlibllm "github.com/never-labs/leia/internal/stdlib/llm"
 )
 
 // BuildLLMHistoryLib creates the "history" stdlib table with helpers for

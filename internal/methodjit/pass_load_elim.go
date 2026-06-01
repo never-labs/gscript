@@ -177,7 +177,7 @@ func LoadEliminationPass(fn *Function) (*Function, error) {
 
 			if !handled && opIsGlobalRead(instr.Op) {
 				// R53: globals are read-only for the body of a function in
-				// nearly all GScript code. Two reads of globals[i] in the
+				// nearly all Leia code. Two reads of globals[i] in the
 				// same block return the same runtime pointer. CSE.
 				if origID, ok := globalAvail[instr.Aux]; ok {
 					origInstr := instrByID[origID]

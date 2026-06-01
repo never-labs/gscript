@@ -4,7 +4,7 @@
 
 ## The Problem
 
-The GScript JIT grew organically over 14 blog posts. Each optimization added code to wherever it fit at the moment. The result:
+The Leia JIT grew organically over 14 blog posts. Each optimization added code to wherever it fit at the moment. The result:
 
 - **`ssa.go`** (1,479 lines): SSA IR definitions, builder, guard analysis, and pipeline orchestration — all in one file
 - **`codegen.go`** (1,367 lines): 50+ methods on one struct, mixing analysis, value access, and code emission

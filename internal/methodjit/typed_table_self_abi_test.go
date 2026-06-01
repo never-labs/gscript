@@ -4,15 +4,15 @@ package methodjit
 
 import (
 	"encoding/binary"
-	"github.com/never-labs/gscript/internal/testutil/vmtest"
+	"github.com/never-labs/leia/internal/testutil/vmtest"
 	"strconv"
 	"strings"
 	"testing"
 	"unsafe"
 
-	"github.com/never-labs/gscript/internal/jit"
-	"github.com/never-labs/gscript/internal/runtime"
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/jit"
+	"github.com/never-labs/leia/internal/runtime"
+	"github.com/never-labs/leia/internal/vm"
 )
 
 func TestTypedTableSelfABI_CheckTreeUsesNativeRecursiveCalls(t *testing.T) {

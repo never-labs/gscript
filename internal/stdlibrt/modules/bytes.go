@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"math"
 
-	stdbytes "github.com/never-labs/gscript/internal/stdlib/bytes"
+	stdbytes "github.com/never-labs/leia/internal/stdlib/bytes"
 )
 
 // BuildBytes creates the "bytes" standard library table.
@@ -24,7 +24,7 @@ func BuildBytes(maxHostResult func() int64) *Table {
 		}))
 	}
 
-	// createBufferTable wraps a bytes.Buffer in a GScript table with methods
+	// createBufferTable wraps a bytes.Buffer in a Leia table with methods
 	createBufferTable := func(buf *bytes.Buffer) *Table {
 		bt := NewTable()
 

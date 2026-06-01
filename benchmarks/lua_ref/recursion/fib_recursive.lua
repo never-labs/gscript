@@ -1,5 +1,5 @@
 -- Benchmark: Recursive Fibonacci
--- Matches benchmarks/recursion/fib_recursive.gs: fib(35) x 10 reps
+-- Matches benchmarks/recursion/fib_recursive.leia: fib(35) x 10 reps
 
 local function fib(n)
     if n < 2 then return n end

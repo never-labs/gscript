@@ -4,7 +4,7 @@ We had three JIT compilers. Now we have two — and they actually work together.
 
 ## The Problem
 
-GScript accumulated three separate compilation backends over time:
+Leia accumulated three separate compilation backends over time:
 
 1. **Method JIT** (`codegen*.go`, 5.6k lines) — compiles entire functions to ARM64. Fast function calls, self-recursion optimization, register pinning. No float support.
 
@@ -49,7 +49,7 @@ The fix has two parts:
 ## Architecture After
 
 ```
-gscript -jit foo.gs
+leia -jit foo.leia
 
   ┌─────────────────────────────────────────────┐
   │ Method JIT (codegen*.go)                    │

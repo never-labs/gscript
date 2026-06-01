@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/leia/internal/runtime"
 )
 
 func TestCallSiteRuntimeSpecializationDiagnosticsRejectBenchmarkMetadataWithoutShape(t *testing.T) {
@@ -21,10 +21,10 @@ func advance(dt) { return dt }
 	}
 
 	sources := []string{
-		"benchmarks/numeric/fannkuch.gs",
-		"benchmarks/control/sieve.gs",
-		"benchmarks/numeric/matmul.gs",
-		"benchmarks/numeric/nbody.gs",
+		"benchmarks/numeric/fannkuch.leia",
+		"benchmarks/control/sieve.leia",
+		"benchmarks/numeric/matmul.leia",
+		"benchmarks/numeric/nbody.leia",
 	}
 	for i, child := range proto.Protos {
 		child.Source = sources[i]
@@ -43,7 +43,7 @@ func advance(dt) { return dt }
 }
 
 func TestPermutationFlipChecksumRecognizesCurrentBenchmarkShape(t *testing.T) {
-	src, err := os.ReadFile(filepath.Join("..", "..", "benchmarks", "numeric", "fannkuch.gs"))
+	src, err := os.ReadFile(filepath.Join("..", "..", "benchmarks", "numeric", "fannkuch.leia"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -65,7 +65,7 @@ func TestPermutationFlipChecksumRecognizesCurrentBenchmarkShape(t *testing.T) {
 }
 
 func TestPermutationFlipChecksumIgnoresBenchmarkMetadata(t *testing.T) {
-	src, err := os.ReadFile(filepath.Join("..", "..", "benchmarks", "numeric", "fannkuch.gs"))
+	src, err := os.ReadFile(filepath.Join("..", "..", "benchmarks", "numeric", "fannkuch.leia"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,7 +76,7 @@ func TestPermutationFlipChecksumIgnoresBenchmarkMetadata(t *testing.T) {
 		t.Fatal("missing fannkuch proto")
 	}
 	child.Name = "shape_only_permutation_stats"
-	child.Source = "host/generated/not-a-benchmark.gs"
+	child.Source = "host/generated/not-a-benchmark.leia"
 	if !isPermutationFlipChecksumSpecializationProto(child) {
 		t.Fatalf("permutation flip checksum should recognize bytecode shape independent of name/source: code=%d const=%d maxstack=%d", len(child.Code), len(child.Constants), child.MaxStack)
 	}

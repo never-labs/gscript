@@ -11,8 +11,8 @@ package methodjit
 import (
 	"fmt"
 
-	"github.com/never-labs/gscript/internal/runtime"
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/runtime"
+	"github.com/never-labs/leia/internal/vm"
 )
 
 // executeCallExit handles a call-exit in the TieringManager's Tier 2 path.

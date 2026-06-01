@@ -1,4 +1,4 @@
-package gscript
+package leia
 
 import (
 	"context"
@@ -6,13 +6,13 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/never-labs/gscript/internal/ast"
-	"github.com/never-labs/gscript/internal/lexer"
-	"github.com/never-labs/gscript/internal/parser"
-	bytecodevm "github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/ast"
+	"github.com/never-labs/leia/internal/lexer"
+	"github.com/never-labs/leia/internal/parser"
+	bytecodevm "github.com/never-labs/leia/internal/vm"
 )
 
-// Program is a compiled GScript source unit.
+// Program is a compiled Leia source unit.
 //
 // Program hides parser, AST, bytecode, and JIT details from embedding callers.
 // It may cache VM/JIT state while running, so callers should not run the same
@@ -40,7 +40,7 @@ func WithSourceName(name string) CompileOption {
 	}
 }
 
-// Compile parses a GScript source string into a reusable Program.
+// Compile parses a Leia source string into a reusable Program.
 func Compile(src string, opts ...CompileOption) (*Program, error) {
 	cfg := compileOptions{sourceName: "<string>"}
 	for _, opt := range opts {
@@ -66,7 +66,7 @@ func CompileContext(ctx context.Context, src string, opts ...CompileOption) (*Pr
 	return prog, nil
 }
 
-// CompileFile reads and parses a GScript file into a reusable Program.
+// CompileFile reads and parses a Leia file into a reusable Program.
 func CompileFile(path string, opts ...CompileOption) (*Program, error) {
 	src, err := os.ReadFile(path)
 	if err != nil {

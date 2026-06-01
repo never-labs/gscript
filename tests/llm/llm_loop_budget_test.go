@@ -1,10 +1,10 @@
-package gscript_test
+package leia_test
 
 import (
 	"testing"
 
-	gs "github.com/never-labs/gscript"
-	"github.com/never-labs/gscript/llm"
+	leia "github.com/never-labs/leia"
+	"github.com/never-labs/leia/llm"
 )
 
 func TestLoopBudgets(t *testing.T) {
@@ -14,13 +14,13 @@ func TestLoopBudgets(t *testing.T) {
 			Calls: []llm.ToolCall{{
 				ID:   "call_1",
 				Tool: "lookup",
-				Args: map[string]any{"name": "gscript"},
+				Args: map[string]any{"name": "leia"},
 			}},
 			Usage: llm.TurnUsage{InputTokens: 2, OutputTokens: 3},
 		},
 		{Status: "final_answer", Text: "done"},
 	}}
-	vm := gs.New(gs.WithLibs(gs.LibString|gs.LibLLM), gs.WithLLMProvider(provider))
+	vm := leia.New(leia.WithLibs(leia.LibString|leia.LibLLM), leia.WithLLMProvider(provider))
 	if err := vm.Exec(`
 lookup := llm.tool("lookup", func(name) {
     return "docs:" .. name, nil
@@ -52,7 +52,7 @@ func TestLoopToolCallBudget(t *testing.T) {
 			{ID: "call_2", Tool: "lookup", Args: map[string]any{"name": "b"}},
 		},
 	}}
-	vm := gs.New(gs.WithLibs(gs.LibString|gs.LibLLM), gs.WithLLMProvider(provider))
+	vm := leia.New(leia.WithLibs(leia.LibString|leia.LibLLM), leia.WithLLMProvider(provider))
 	if err := vm.Exec(`
 lookup := llm.tool("lookup", func(name) {
     return "docs:" .. name, nil
@@ -77,7 +77,7 @@ err_dimension := err.dimension
 
 func TestLoopTimeBudget(t *testing.T) {
 	provider := &mockLLMProvider{res: llm.TurnResult{Status: "final_answer", Text: "done"}}
-	vm := gs.New(gs.WithLibs(gs.LibString|gs.LibLLM), gs.WithLLMProvider(provider))
+	vm := leia.New(leia.WithLibs(leia.LibString|leia.LibLLM), leia.WithLLMProvider(provider))
 	if err := vm.Exec(`
 result, err := loop.react({
     user: "find docs",
@@ -100,7 +100,7 @@ err_message := err.message
 
 func TestLoopScriptContextCancellation(t *testing.T) {
 	provider := &mockLLMProvider{res: llm.TurnResult{Status: "final_answer", Text: "done"}}
-	vm := gs.New(gs.WithLibs(gs.LibString|gs.LibLLM), gs.WithLLMProvider(provider))
+	vm := leia.New(leia.WithLibs(leia.LibString|leia.LibLLM), leia.WithLLMProvider(provider))
 	if err := vm.Exec(`
 ctx, cancel := context.withCancel()
 cancel()

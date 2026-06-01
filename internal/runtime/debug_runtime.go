@@ -3,13 +3,13 @@ package runtime
 import (
 	"fmt"
 
-	"github.com/never-labs/gscript/internal/support"
+	"github.com/never-labs/leia/internal/support"
 )
 
-// DebugFrame describes one active runtime call in GScript-shaped terms.
+// DebugFrame describes one active runtime call in Leia-shaped terms.
 type DebugFrame = support.Frame
 
-// DebugHookOptions describes the coarse-grained GScript debug hook filters.
+// DebugHookOptions describes the coarse-grained Leia debug hook filters.
 type DebugHookOptions = support.HookOptions
 
 func DefaultDebugHookOptions() DebugHookOptions {

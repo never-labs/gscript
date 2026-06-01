@@ -4,7 +4,7 @@ The `time` library provides date/time operations.
 
 ## Time Tables
 
-A "time table" is a GScript table with the following fields:
+A "time table" is a Leia table with the following fields:
 
 | Field     | Type   | Description                                    |
 |-----------|--------|------------------------------------------------|

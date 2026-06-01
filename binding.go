@@ -1,10 +1,10 @@
-package gscript
+package leia
 
 import (
 	"reflect"
 
-	"github.com/never-labs/gscript/internal/binding"
-	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/leia/internal/binding"
+	"github.com/never-labs/leia/internal/runtime"
 )
 
 var hostBinding = binding.Converter{

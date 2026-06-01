@@ -6,8 +6,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/never-labs/gscript/internal/runtime"
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/runtime"
+	"github.com/never-labs/leia/internal/vm"
 )
 
 func withExitResumeCheck(t *testing.T, fn func()) {
@@ -156,7 +156,7 @@ func f(n) {
 
 func TestExitResumeCheck_CacheableNewTableMarksResultSlot(t *testing.T) {
 	withExitResumeCheck(t, func() {
-		t.Setenv("GSCRIPT_TIER2_NO_FILTER", "1")
+		t.Setenv("LEIA_TIER2_NO_FILTER", "1")
 		src := `
 	func f(n) {
 	    row := {nil}

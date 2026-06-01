@@ -7,17 +7,17 @@ import (
 	"strings"
 	"sync"
 
-	hostio "github.com/never-labs/gscript/internal/stdlib/io"
-	"github.com/never-labs/gscript/internal/stdlibrt"
-	"github.com/never-labs/gscript/internal/support"
+	hostio "github.com/never-labs/leia/internal/stdlib/io"
+	"github.com/never-labs/leia/internal/stdlibrt"
+	"github.com/never-labs/leia/internal/support"
 )
 
 const (
-	fileMarkerKey = "__gscript_file"
-	fileClosedKey = "__gscript_file_closed"
+	fileMarkerKey = "__leia_file"
+	fileClosedKey = "__leia_file_closed"
 )
 
-type gscriptFileHandle struct {
+type leiaFileHandle struct {
 	file   *os.File
 	reader *bufio.Reader
 	table  *Table
@@ -69,7 +69,7 @@ func BuildIO(opts stdlibrt.HostOptions) *Table {
 	// io.lines([filename]) -> iterator
 	set("lines", func(args []Value) ([]Value, error) {
 		var scanner *bufio.Scanner
-		var opened *gscriptFileHandle
+		var opened *leiaFileHandle
 
 		if len(args) >= 1 && args[0].IsString() {
 			var err error
@@ -203,7 +203,7 @@ func BuildIO(opts stdlibrt.HostOptions) *Table {
 		if root() != "" {
 			dir = root()
 		}
-		file, err := os.CreateTemp(dir, "gscript-*")
+		file, err := os.CreateTemp(dir, "leia-*")
 		if err != nil {
 			return []Value{NilValue(), StringValue(err.Error())}, nil
 		}
@@ -222,7 +222,7 @@ func resolveIOPath(root string, filesystemRead, filesystemWrite bool, path strin
 	return hostio.ResolvePath(root, path, filesystemRead, filesystemWrite, read, write)
 }
 
-func inputOutputTarget(root string, filesystemRead, filesystemWrite bool, v Value, stringMode int) (*gscriptFileHandle, error) {
+func inputOutputTarget(root string, filesystemRead, filesystemWrite bool, v Value, stringMode int) (*leiaFileHandle, error) {
 	if v.IsString() {
 		read, write := support.FileModeAccess(stringMode)
 		path, err := resolveIOPath(root, filesystemRead, filesystemWrite, v.Str(), read, write)
@@ -252,15 +252,15 @@ func inputOutputTarget(root string, filesystemRead, filesystemWrite bool, v Valu
 
 var fileHandleRegistry = struct {
 	sync.RWMutex
-	handles map[*Table]*gscriptFileHandle
-}{handles: map[*Table]*gscriptFileHandle{}}
+	handles map[*Table]*leiaFileHandle
+}{handles: map[*Table]*leiaFileHandle{}}
 
 func isFileTable(t *Table) bool {
 	return t.RawGet(StringValue(fileMarkerKey)).Truthy()
 }
 
-func newFileHandle(file *os.File, std bool) *gscriptFileHandle {
-	h := &gscriptFileHandle{
+func newFileHandle(file *os.File, std bool) *leiaFileHandle {
+	h := &leiaFileHandle{
 		file:   file,
 		reader: bufio.NewReader(file),
 		std:    std,
@@ -272,14 +272,14 @@ func newFileHandle(file *os.File, std bool) *gscriptFileHandle {
 	return h
 }
 
-func (h *gscriptFileHandle) markClosed() {
+func (h *leiaFileHandle) markClosed() {
 	h.closed = true
 	if h.table != nil {
 		h.table.RawSet(StringValue(fileClosedKey), BoolValue(true))
 	}
 }
 
-func (h *gscriptFileHandle) close() error {
+func (h *leiaFileHandle) close() error {
 	if h.closed {
 		return fmt.Errorf("file is already closed")
 	}
@@ -294,7 +294,7 @@ func (h *gscriptFileHandle) close() error {
 	return err
 }
 
-func (h *gscriptFileHandle) flush() error {
+func (h *leiaFileHandle) flush() error {
 	if h.closed {
 		return fmt.Errorf("file is closed")
 	}
@@ -304,7 +304,7 @@ func (h *gscriptFileHandle) flush() error {
 	return h.file.Sync()
 }
 
-func (h *gscriptFileHandle) seek(whence string, offset int64) (int64, error) {
+func (h *leiaFileHandle) seek(whence string, offset int64) (int64, error) {
 	if h.closed {
 		return 0, fmt.Errorf("file is closed")
 	}
@@ -320,7 +320,7 @@ func (h *gscriptFileHandle) seek(whence string, offset int64) (int64, error) {
 	return pos, nil
 }
 
-func (h *gscriptFileHandle) read(args []Value, start int) ([]Value, error) {
+func (h *leiaFileHandle) read(args []Value, start int) ([]Value, error) {
 	if h.closed {
 		return []Value{NilValue(), StringValue("file is closed")}, nil
 	}
@@ -342,7 +342,7 @@ func (h *gscriptFileHandle) read(args []Value, start int) ([]Value, error) {
 	return results, nil
 }
 
-func (h *gscriptFileHandle) readOne(format Value) (Value, error) {
+func (h *leiaFileHandle) readOne(format Value) (Value, error) {
 	if format.IsNumber() {
 		n := int(toInt(format))
 		return ioReadResultValue(hostio.ReadOne(h.reader, hostio.CountFormat(n)))
@@ -372,7 +372,7 @@ func ioReadResultValue(result hostio.ReadResult, err error) (Value, error) {
 }
 
 // buildFileTable creates a table representing a file object with read/write/close/lines methods.
-func buildFileTable(h *gscriptFileHandle) *Table {
+func buildFileTable(h *leiaFileHandle) *Table {
 	ft := NewTable()
 	ft.RawSet(StringValue(fileMarkerKey), BoolValue(true))
 	ft.RawSet(StringValue(fileClosedKey), BoolValue(false))

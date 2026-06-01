@@ -69,14 +69,14 @@ class BenchmarkOutputTest(unittest.TestCase):
         self.assertIn("TIMEOUT after 0.05s", result.output)
         self.assertGreaterEqual(result.wall_seconds, 0)
 
-    def test_build_gscript_uses_standard_go_command(self):
+    def test_build_leia_uses_standard_go_command(self):
         with mock.patch("benchmark_output.subprocess.run") as run:
             run.return_value = mock.Mock(returncode=0, stdout="")
 
-            output.build_gscript(Path("/repo"), Path("/tmp/gscript"))
+            output.build_leia(Path("/repo"), Path("/tmp/leia"))
 
         run.assert_called_once_with(
-            ["go", "build", "-o", "/tmp/gscript", "./cmd/gscript"],
+            ["go", "build", "-o", "/tmp/leia", "./cmd/leia"],
             cwd=Path("/repo"),
             stdout=output.subprocess.PIPE,
             stderr=output.subprocess.STDOUT,
@@ -84,49 +84,49 @@ class BenchmarkOutputTest(unittest.TestCase):
             check=False,
         )
 
-    def test_build_gscript_keeps_custom_failure_message(self):
+    def test_build_leia_keeps_custom_failure_message(self):
         with mock.patch("benchmark_output.subprocess.run") as run, mock.patch("benchmark_output.print") as print_:
             run.return_value = mock.Mock(returncode=12, stdout="compiler output")
 
             with self.assertRaisesRegex(SystemExit, "build failed in /repo with exit 12"):
-                output.build_gscript(
+                output.build_leia(
                     Path("/repo"),
-                    Path("/tmp/gscript"),
+                    Path("/tmp/leia"),
                     failure_message="build failed in {root} with exit {exit_code}",
                 )
 
         print_.assert_called_once_with("compiler output", file=output.sys.stderr)
 
-    def test_gscript_mode_command_formats_vm_mode(self):
-        cmd, env = output.gscript_mode_command("vm", Path("/bin/gscript"), Path("/bench/main.gs"))
+    def test_leia_mode_command_formats_vm_mode(self):
+        cmd, env = output.leia_mode_command("vm", Path("/bin/leia"), Path("/bench/main.leia"))
 
-        self.assertEqual(cmd, ["/bin/gscript", "-vm", "/bench/main.gs"])
+        self.assertEqual(cmd, ["/bin/leia", "-vm", "/bench/main.leia"])
         self.assertIsInstance(env, dict)
-        self.assertNotIn("GSCRIPT_TIER2_NO_FILTER", env)
+        self.assertNotIn("LEIA_TIER2_NO_FILTER", env)
 
-    def test_gscript_mode_command_formats_jit_mode(self):
-        cmd, env = output.gscript_mode_command("default", Path("/bin/gscript"), Path("/bench/main.gs"))
+    def test_leia_mode_command_formats_jit_mode(self):
+        cmd, env = output.leia_mode_command("default", Path("/bin/leia"), Path("/bench/main.leia"))
 
-        self.assertEqual(cmd, ["/bin/gscript", "-jit", "-jit-stats", "-exit-stats", "/bench/main.gs"])
+        self.assertEqual(cmd, ["/bin/leia", "-jit", "-jit-stats", "-exit-stats", "/bench/main.leia"])
         self.assertIsInstance(env, dict)
-        self.assertNotIn("GSCRIPT_TIER2_NO_FILTER", env)
+        self.assertNotIn("LEIA_TIER2_NO_FILTER", env)
 
-    def test_gscript_mode_command_formats_no_filter_mode(self):
-        cmd, env = output.gscript_mode_command("no_filter", Path("/bin/gscript"), Path("/bench/main.gs"))
+    def test_leia_mode_command_formats_no_filter_mode(self):
+        cmd, env = output.leia_mode_command("no_filter", Path("/bin/leia"), Path("/bench/main.leia"))
 
-        self.assertEqual(cmd, ["/bin/gscript", "-jit", "-jit-stats", "-exit-stats", "/bench/main.gs"])
-        self.assertEqual(env["GSCRIPT_TIER2_NO_FILTER"], "1")
+        self.assertEqual(cmd, ["/bin/leia", "-jit", "-jit-stats", "-exit-stats", "/bench/main.leia"])
+        self.assertEqual(env["LEIA_TIER2_NO_FILTER"], "1")
 
-    def test_gscript_mode_command_rejects_unknown_mode(self):
+    def test_leia_mode_command_rejects_unknown_mode(self):
         with self.assertRaisesRegex(ValueError, "unknown mode: bad"):
-            output.gscript_mode_command("bad", Path("/bin/gscript"), Path("/bench/main.gs"))
+            output.leia_mode_command("bad", Path("/bin/leia"), Path("/bench/main.leia"))
 
     def test_benchmark_mode_command_formats_luajit_mode(self):
         with mock.patch("pathlib.Path.exists", return_value=True):
             cmd, env, unavailable = output.benchmark_mode_command(
                 "luajit",
-                Path("/bin/gscript"),
-                Path("/bench/main.gs"),
+                Path("/bin/leia"),
+                Path("/bench/main.leia"),
                 luajit_bin="/bin/luajit",
                 luajit_script=Path("/bench/main.lua"),
             )
@@ -138,8 +138,8 @@ class BenchmarkOutputTest(unittest.TestCase):
     def test_benchmark_mode_command_reports_missing_luajit_input(self):
         cmd, env, unavailable = output.benchmark_mode_command(
             "luajit",
-            Path("/bin/gscript"),
-            Path("/bench/main.gs"),
+            Path("/bin/leia"),
+            Path("/bench/main.leia"),
             luajit_bin="/bin/luajit",
             luajit_script=Path("/missing/main.lua"),
         )
@@ -151,8 +151,8 @@ class BenchmarkOutputTest(unittest.TestCase):
     def test_benchmark_mode_command_reports_skipped_luajit_mode(self):
         cmd, env, unavailable = output.benchmark_mode_command(
             "luajit",
-            Path("/bin/gscript"),
-            Path("/bench/main.gs"),
+            Path("/bin/leia"),
+            Path("/bench/main.leia"),
             luajit_bin=None,
             luajit_script=Path("/bench/main.lua"),
         )
@@ -161,23 +161,23 @@ class BenchmarkOutputTest(unittest.TestCase):
         self.assertIsNone(env)
         self.assertEqual(unavailable, "skipped")
 
-    def test_benchmark_mode_command_formats_gscript_mode(self):
+    def test_benchmark_mode_command_formats_leia_mode(self):
         with mock.patch("pathlib.Path.exists", return_value=True):
             cmd, env, unavailable = output.benchmark_mode_command(
                 "default",
-                Path("/bin/gscript"),
-                Path("/bench/main.gs"),
+                Path("/bin/leia"),
+                Path("/bench/main.leia"),
             )
 
-        self.assertEqual(cmd, ["/bin/gscript", "-jit", "-jit-stats", "-exit-stats", "/bench/main.gs"])
+        self.assertEqual(cmd, ["/bin/leia", "-jit", "-jit-stats", "-exit-stats", "/bench/main.leia"])
         self.assertIsInstance(env, dict)
         self.assertIsNone(unavailable)
 
-    def test_benchmark_mode_command_reports_missing_gscript_input(self):
+    def test_benchmark_mode_command_reports_missing_leia_input(self):
         cmd, env, unavailable = output.benchmark_mode_command(
             "default",
-            Path("/bin/gscript"),
-            Path("/missing/main.gs"),
+            Path("/bin/leia"),
+            Path("/missing/main.leia"),
         )
 
         self.assertIsNone(cmd)

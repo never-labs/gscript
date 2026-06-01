@@ -7,7 +7,7 @@
 package methodjit
 
 import (
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/vm"
 )
 
 func inferGuardedFixedShapeArgFactsForProto(target *vm.FuncProto, globals map[string]*vm.FuncProto) map[int]FixedShapeTableFact {

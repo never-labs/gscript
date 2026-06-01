@@ -1,6 +1,6 @@
 # color
 
-The `color` library provides an RGBA color type for GScript. Colors are tables with fields `r`, `g`, `b`, `a` (all in the 0.0 to 1.0 range) and metatables for operator overloading.
+The `color` library provides an RGBA color type for Leia. Colors are tables with fields `r`, `g`, `b`, `a` (all in the 0.0 to 1.0 range) and metatables for operator overloading.
 
 ## Constructors
 

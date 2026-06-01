@@ -98,7 +98,7 @@ func TestUUIDParseInvalid(t *testing.T) {
 }
 
 func TestUUIDNil(t *testing.T) {
-	// Use bracket notation since "nil" is a keyword in GScript
+	// Use bracket notation since "nil" is a keyword in Leia
 	interp := runWithLib(t, `result := uuid["nil"]()`, "uuid", BuildUUID())
 
 	v := interp.GetGlobal("result")

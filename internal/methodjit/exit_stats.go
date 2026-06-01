@@ -9,7 +9,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/vm"
 )
 
 // ExitSiteMeta ties a Tier 2 exit-resume/deopt instruction ID back to the

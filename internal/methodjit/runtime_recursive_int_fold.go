@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/never-labs/gscript/internal/runtime"
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/runtime"
+	"github.com/never-labs/leia/internal/vm"
 )
 
 const maxRuntimeRecursiveIntFoldIterations = 1_000_000

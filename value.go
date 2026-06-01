@@ -1,13 +1,13 @@
-package gscript
+package leia
 
 import (
 	"fmt"
 	"reflect"
 
-	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/leia/internal/runtime"
 )
 
-// Kind identifies the public kind of a GScript value.
+// Kind identifies the public kind of a Leia value.
 type Kind string
 
 const (
@@ -23,7 +23,7 @@ const (
 	KindUnknown   Kind = "unknown"
 )
 
-// Value is the public representation of a GScript value.
+// Value is the public representation of a Leia value.
 //
 // It intentionally hides the internal runtime value layout. Existing APIs that
 // still accept interface{} can also accept Value directly.
@@ -32,32 +32,32 @@ type Value struct {
 	valid bool
 }
 
-// Nil constructs a nil GScript value.
+// Nil constructs a nil Leia value.
 func Nil() Value {
 	return toPublic(runtime.NilValue())
 }
 
-// Bool constructs a boolean GScript value.
+// Bool constructs a boolean Leia value.
 func Bool(v bool) Value {
 	return toPublic(runtime.BoolValue(v))
 }
 
-// Int constructs an integer GScript value.
+// Int constructs an integer Leia value.
 func Int(v int64) Value {
 	return toPublic(runtime.IntValue(v))
 }
 
-// Float constructs a floating-point GScript value.
+// Float constructs a floating-point Leia value.
 func Float(v float64) Value {
 	return toPublic(runtime.FloatValue(v))
 }
 
-// String constructs a string GScript value.
+// String constructs a string Leia value.
 func String(v string) Value {
 	return toPublic(runtime.StringValue(v))
 }
 
-// Decode converts a Go value into a public GScript value using the existing
+// Decode converts a Go value into a public Leia value using the existing
 // reflection conversion rules.
 func Decode(v interface{}) (Value, error) {
 	rv, err := toValue(v)
@@ -71,12 +71,12 @@ func Decode(v interface{}) (Value, error) {
 func MustDecode(v interface{}) Value {
 	pv, err := Decode(v)
 	if err != nil {
-		panic(fmt.Sprintf("gscript.MustDecode: %v", err))
+		panic(fmt.Sprintf("leia.MustDecode: %v", err))
 	}
 	return pv
 }
 
-// Encode converts a public GScript value back into its default Go
+// Encode converts a public Leia value back into its default Go
 // representation.
 func Encode(v Value) (interface{}, error) {
 	rv, err := fromValue(fromPublic(v), nil)
@@ -175,7 +175,7 @@ func (v Value) Encode() (interface{}, error) {
 // Decode stores the Go value converted with the existing reflection rules.
 func (v *Value) Decode(src interface{}) error {
 	if v == nil {
-		return fmt.Errorf("gscript.Value.Decode: nil receiver")
+		return fmt.Errorf("leia.Value.Decode: nil receiver")
 	}
 	decoded, err := Decode(src)
 	if err != nil {

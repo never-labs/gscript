@@ -87,7 +87,7 @@ If any guard fails, the VM runs the original bytecode. That fallback matters
 because table reads can invoke `__index`, and a kernel that silently replaces
 that with raw array access would be wrong.
 
-The kernel returns a normal GScript table. Internally it is built as a
+The kernel returns a normal Leia table. Internally it is built as a
 DenseMatrix, so the result still behaves like table-of-rows while using one
 flat float backing.
 

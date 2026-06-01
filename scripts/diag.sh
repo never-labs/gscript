@@ -24,8 +24,8 @@
 #   bash scripts/diag.sh table                — dump table/ only
 #   bash scripts/diag.sh <benchmark>          — dump a single benchmark.
 #                                                Forms accepted:
-#                                                  sieve, sieve.gs
-#                                                  control/sieve, control/sieve.gs
+#                                                  sieve, sieve.leia
+#                                                  control/sieve, control/sieve.leia
 #                                                  table/json_table_walk
 #                                                  recursion/ack_nested_shifted
 #                                                Bare basenames are searched in
@@ -52,7 +52,7 @@ fi
 DIAG_ROOT="diag"
 mkdir -p "$DIAG_ROOT"
 
-# Resolve benchmark list. Each entry is "<domain>/<file>.gs", relative to
+# Resolve benchmark list. Each entry is "<domain>/<file>.leia", relative to
 # benchmarks/.
 BENCHES=()
 while IFS= read -r bench; do
@@ -71,13 +71,13 @@ try:
     if selector == "all":
         specs = discovery.discover_benchmarks(root, discovery.GROUPS)
         for spec in specs:
-            print(spec.gscript.relative_to(root / "benchmarks"))
+            print(spec.leia.relative_to(root / "benchmarks"))
         raise SystemExit(0)
 
     if selector in discovery.GROUPS:
         specs = discovery.discover_benchmarks(root, [selector])
         for spec in specs:
-            print(spec.gscript.relative_to(root / "benchmarks"))
+            print(spec.leia.relative_to(root / "benchmarks"))
         raise SystemExit(0)
 
     path = discovery.resolve_script_path(root, selector)
@@ -110,8 +110,8 @@ echo
 failed=()
 for bench in "${BENCHES[@]}"; do
     sub="${bench%%/*}"               # benchmark domain
-    file="${bench#*/}"               # foo.gs
-    name="${file%.gs}"               # foo
+    file="${bench#*/}"               # foo.leia
+    name="${file%.leia}"               # foo
     out_dir="$DIAG_ROOT/$sub/$name"
     rm -rf "$out_dir"
     mkdir -p "$out_dir"

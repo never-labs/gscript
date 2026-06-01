@@ -3,8 +3,8 @@ package methodjit
 import (
 	"os"
 
-	"github.com/never-labs/gscript/internal/runtime"
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/runtime"
+	"github.com/never-labs/leia/internal/vm"
 )
 
 func init() {
@@ -374,7 +374,7 @@ func tier2FinalCallModules(specializationGlobals map[string]*vm.FuncProto) []Tie
 		tier2PassModuleWithCtx("FieldCallPolyLenFusion", Tier2PhaseFinalCall, analysisFacts(AnalysisFactFieldPolyShapeFacts), nil, FieldCallPolyLenFusionPassCtx),
 		tier2PassModuleWithCtxUpdates("RangeAnalysis (post-final-call)", Tier2PhaseFinalCall, nil, rangeAnalysisFacts(), RangeAnalysisPassCtx),
 	}
-	if os.Getenv("GSCRIPT_FIELD_SHAPE_SPLIT") == "1" {
+	if os.Getenv("LEIA_FIELD_SHAPE_SPLIT") == "1" {
 		modules = append(modules, tier2PassModuleWithCtx("FieldShapeCallSplit (experimental)", Tier2PhaseFinalCall, analysisFacts(AnalysisFactFieldPolyShapeFacts), nil, FieldShapeCallSplitPassCtx))
 	}
 	return modules

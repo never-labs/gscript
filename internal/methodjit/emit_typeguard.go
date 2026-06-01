@@ -10,7 +10,7 @@ package methodjit
 import (
 	"unsafe"
 
-	"github.com/never-labs/gscript/internal/jit"
+	"github.com/never-labs/leia/internal/jit"
 )
 
 // emitCheckIsInt emits ARM64 code that checks if a NaN-boxed value in valReg

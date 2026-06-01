@@ -11,7 +11,7 @@ import (
 	"math"
 	"strconv"
 
-	"github.com/never-labs/gscript/internal/ast"
+	"github.com/never-labs/leia/internal/ast"
 )
 
 // ====================================================================
@@ -235,7 +235,7 @@ func (interp *Interpreter) evalExprList(exprs []ast.Expr, env *Environment) ([]V
 	return result, nil
 }
 
-// explicitSpreadExpr recognizes GScript's explicit multi-value expansion forms.
+// explicitSpreadExpr recognizes Leia's explicit multi-value expansion forms.
 // spread(expr) expands expr's values, while table.spread is an ordinary
 // multi-return call that opts in to expansion at any list position.
 func explicitSpreadExpr(expr ast.Expr) (ast.Expr, bool) {
@@ -925,7 +925,7 @@ func (interp *Interpreter) callFunction(fn Value, args []Value) ([]Value, error)
 	return nil, nil
 }
 
-// CallFunction calls a GScript function value with the given args.
+// CallFunction calls a Leia function value with the given args.
 // This is a public method for embedding use.
 func (interp *Interpreter) CallFunction(fn Value, args []Value) ([]Value, error) {
 	interp.resetExecutionBudgets()

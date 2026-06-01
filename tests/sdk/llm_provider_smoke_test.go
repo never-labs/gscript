@@ -1,4 +1,4 @@
-package gscript_test
+package leia_test
 
 import (
 	"context"
@@ -7,10 +7,10 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	gs "github.com/never-labs/gscript"
-	"github.com/never-labs/gscript/llm"
-	llmcommand "github.com/never-labs/gscript/llm/command"
-	llmopenai "github.com/never-labs/gscript/llm/openai"
+	leia "github.com/never-labs/leia"
+	"github.com/never-labs/leia/llm"
+	llmcommand "github.com/never-labs/leia/llm/command"
+	llmopenai "github.com/never-labs/leia/llm/openai"
 )
 
 type sdkSmokeLLMProvider struct {
@@ -25,18 +25,18 @@ func (p *sdkSmokeLLMProvider) Turn(_ context.Context, req llm.TurnRequest) (llm.
 func TestWithLLMProviderSDKSmoke(t *testing.T) {
 	for _, tc := range []struct {
 		name string
-		opts []gs.Option
+		opts []leia.Option
 	}{
 		{name: "interpreter"},
-		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			provider := &sdkSmokeLLMProvider{}
-			opts := append([]gs.Option{
-				gs.WithLibs(gs.LibString | gs.LibLLM),
-				gs.WithLLMProvider(provider),
+			opts := append([]leia.Option{
+				leia.WithLibs(leia.LibString | leia.LibLLM),
+				leia.WithLLMProvider(provider),
 			}, tc.opts...)
-			vm := gs.New(opts...)
+			vm := leia.New(opts...)
 			if err := vm.Exec(`
 result, err := llm.turn({
     model: "sdk-smoke",
@@ -63,10 +63,10 @@ text := result.text
 func TestLLMProviderSubpackageSDKSmoke(t *testing.T) {
 	for _, tc := range []struct {
 		name string
-		opts []gs.Option
+		opts []leia.Option
 	}{
 		{name: "interpreter"},
-		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -78,15 +78,15 @@ func TestLLMProviderSubpackageSDKSmoke(t *testing.T) {
 			}))
 			defer server.Close()
 
-			opts := append([]gs.Option{
-				gs.WithLibs(gs.LibString | gs.LibLLM),
-				gs.WithLLMProvider(llmopenai.Provider{
+			opts := append([]leia.Option{
+				leia.WithLibs(leia.LibString | leia.LibLLM),
+				leia.WithLLMProvider(llmopenai.Provider{
 					Endpoint: server.URL,
 					Model:    "sdk-openai",
 					Client:   server.Client(),
 				}),
 			}, tc.opts...)
-			vm := gs.New(opts...)
+			vm := leia.New(opts...)
 			if err := vm.Exec(`
 result, err := llm.turn({messages: {llm.user("hello")}})
 text := result.text
@@ -105,9 +105,9 @@ text := result.text
 }
 
 func TestLLMCommandSubpackageSDKSmoke(t *testing.T) {
-	vm := gs.New(
-		gs.WithLibs(gs.LibString|gs.LibLLM),
-		gs.WithLLMProvider(llmcommand.Provider{
+	vm := leia.New(
+		leia.WithLibs(leia.LibString|leia.LibLLM),
+		leia.WithLLMProvider(llmcommand.Provider{
 			Command: "sh",
 			Args:    []string{"-c", `printf 'sdk command:%s' "$0"`},
 		}),
@@ -128,7 +128,7 @@ text := result.text
 }
 
 func TestLLMWithoutProviderSDKSmoke(t *testing.T) {
-	vm := gs.New(gs.WithLibs(gs.LibString | gs.LibLLM))
+	vm := leia.New(leia.WithLibs(leia.LibString | leia.LibLLM))
 	if err := vm.Exec(`
 result, err := llm.turn({messages: {llm.user("hi")}})
 kind := err.kind

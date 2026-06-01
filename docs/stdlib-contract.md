@@ -1,6 +1,6 @@
 # Standard Library Contract Index
 
-This file is the machine-checkable index for the current GScript standard
+This file is the machine-checkable index for the current Leia standard
 library contract. The module list is intentionally mirrored from
 `internal/runtime/stdlib.go` and each row records the externally visible risk
 and optimization policy for that module.

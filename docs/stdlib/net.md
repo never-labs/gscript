@@ -13,7 +13,7 @@ All request functions return a response table with these fields:
 | `body`       | string   | Response body as a string                  |
 | `headers`    | table    | Response headers (name -> value)           |
 | `ok`         | bool     | `true` if status < 400                     |
-| `json()`     | function | Parses body as JSON, returns GScript value |
+| `json()`     | function | Parses body as JSON, returns Leia value |
 
 ## Options Table
 

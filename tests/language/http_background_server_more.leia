@@ -1,0 +1,38 @@
+print("case:http_background_server_more")
+
+server := http.listen("127.0.0.1:0", func(req, res) {
+	res.header("X-Leia", "yes")
+	res.write(req.method .. ":" .. req.path .. ":" .. req.param("name"))
+}, {background: true})
+
+assert(type(server) == "table")
+assert(type(server.addr) == "string")
+assert(type(server.url) == "string")
+assert(type(server.close) == "function")
+assert(type(server.shutdown) == "function")
+assert(type(server.wait) == "function")
+
+resp := http.get(server.url .. "/hello?name=world")
+assert(resp.status == 200)
+assert(resp.body == "GET:/hello:world")
+assert(resp.headers["X-Leia"] == "yes")
+
+ok, err := server.close()
+assert(ok == true)
+ok, err = server.wait()
+assert(ok == true)
+
+router := http.newRouter()
+router.get("/route", func(req, res) {
+	res.status(201).write("route:" .. req.path)
+})
+routerServer := router.listen("127.0.0.1:0", {background: true})
+routeResp := http.get(routerServer.url .. "/route")
+assert(routeResp.status == 201)
+assert(routeResp.body == "route:/route")
+ok, err = routerServer.shutdown()
+assert(ok == true)
+ok, err = routerServer.wait()
+assert(ok == true)
+
+print("ok")

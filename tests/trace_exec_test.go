@@ -6,15 +6,15 @@ import (
 	"testing"
 	"time"
 
-	gs "github.com/never-labs/gscript"
+	leia "github.com/never-labs/leia"
 )
 
-// runWithTimeout executes GScript source with JIT enabled and fails if it hangs.
+// runWithTimeout executes Leia source with JIT enabled and fails if it hangs.
 func runWithTimeout(t *testing.T, src string, timeoutSecs int) error {
 	t.Helper()
 	done := make(chan error, 1)
 	go func() {
-		vm := gs.New(gs.WithJIT())
+		vm := leia.New(leia.WithJIT())
 		done <- vm.Exec(src)
 	}()
 	select {
@@ -30,8 +30,8 @@ func runWithTimeout(t *testing.T, src string, timeoutSecs int) error {
 // Fails if either execution errors.
 func runAndCompare(t *testing.T, src, varName string) (interface{}, interface{}) {
 	t.Helper()
-	vmResult := runAndGet(t, src, varName, gs.WithVM())
-	jitResult := runAndGet(t, src, varName, gs.WithJIT())
+	vmResult := runAndGet(t, src, varName, leia.WithVM())
+	jitResult := runAndGet(t, src, varName, leia.WithJIT())
 	return vmResult, jitResult
 }
 

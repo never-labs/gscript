@@ -1,4 +1,4 @@
-package gscript_test
+package leia_test
 
 import (
 	"fmt"
@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	gs "github.com/never-labs/gscript"
+	leia "github.com/never-labs/leia"
 )
 
 type Vec2 struct {
@@ -19,7 +19,7 @@ func (v *Vec2) Scale(f float64)    { v.X *= f; v.Y *= f }
 func (v Vec2) String() string      { return fmt.Sprintf("Vec2(%g, %g)", v.X, v.Y) }
 
 func TestBindStruct_new(t *testing.T) {
-	vm := gs.New()
+	vm := leia.New()
 	if err := vm.BindStruct("Vec2", Vec2{}); err != nil {
 		t.Fatal(err)
 	}
@@ -39,7 +39,7 @@ func TestBindStruct_new(t *testing.T) {
 
 func TestBindStruct_fieldAccess(t *testing.T) {
 	var output []string
-	vm := gs.New(gs.WithPrint(func(args ...interface{}) {
+	vm := leia.New(leia.WithPrint(func(args ...interface{}) {
 		parts := make([]string, len(args))
 		for i, a := range args {
 			parts[i] = fmt.Sprint(a)
@@ -70,7 +70,7 @@ func TestBindStruct_fieldAccess(t *testing.T) {
 
 func TestBindStruct_fieldSet(t *testing.T) {
 	var output []string
-	vm := gs.New(gs.WithPrint(func(args ...interface{}) {
+	vm := leia.New(leia.WithPrint(func(args ...interface{}) {
 		parts := make([]string, len(args))
 		for i, a := range args {
 			parts[i] = fmt.Sprint(a)
@@ -98,7 +98,7 @@ func TestBindStruct_fieldSet(t *testing.T) {
 
 func TestBindStruct_methodCall(t *testing.T) {
 	var output []string
-	vm := gs.New(gs.WithPrint(func(args ...interface{}) {
+	vm := leia.New(leia.WithPrint(func(args ...interface{}) {
 		parts := make([]string, len(args))
 		for i, a := range args {
 			parts[i] = fmt.Sprint(a)
@@ -125,7 +125,7 @@ func TestBindStruct_methodCall(t *testing.T) {
 
 func TestBindStruct_returnStruct(t *testing.T) {
 	var output []string
-	vm := gs.New(gs.WithPrint(func(args ...interface{}) {
+	vm := leia.New(leia.WithPrint(func(args ...interface{}) {
 		parts := make([]string, len(args))
 		for i, a := range args {
 			parts[i] = fmt.Sprint(a)
@@ -157,7 +157,7 @@ func TestBindStruct_returnStruct(t *testing.T) {
 }
 
 func TestBindStructWithConstructor(t *testing.T) {
-	vm := gs.New()
+	vm := leia.New()
 
 	type Player struct {
 		Name  string
@@ -172,7 +172,7 @@ func TestBindStructWithConstructor(t *testing.T) {
 	}
 
 	var output []string
-	vm = gs.New(gs.WithPrint(func(args ...interface{}) {
+	vm = leia.New(leia.WithPrint(func(args ...interface{}) {
 		parts := make([]string, len(args))
 		for i, a := range args {
 			parts[i] = fmt.Sprint(a)

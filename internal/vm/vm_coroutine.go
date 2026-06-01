@@ -4,7 +4,7 @@ package vm
 
 import (
 	"fmt"
-	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/leia/internal/runtime"
 	"unsafe"
 )
 
@@ -51,7 +51,7 @@ func (vm *VM) tryFastCoroutineCall(gf *runtime.GoFunction, base, a, nArgs, c int
 		if !ok {
 			gf := vm.regs[base+a+1].GoFunction()
 			if gf == nil {
-				return true, fmt.Errorf("coroutine.create expects a GScript function")
+				return true, fmt.Errorf("coroutine.create expects a Leia function")
 			}
 			co := NewVMGoCoroutine(gf)
 			vm.recordCoroutineCreated(false)
@@ -99,7 +99,7 @@ func (vm *VM) tryFastCoroutineCall(gf *runtime.GoFunction, base, a, nArgs, c int
 		if !ok {
 			gf := vm.regs[base+a+1].GoFunction()
 			if gf == nil {
-				return true, fmt.Errorf("coroutine.create expects a GScript function")
+				return true, fmt.Errorf("coroutine.create expects a Leia function")
 			}
 			co := NewVMGoCoroutine(gf)
 			vm.recordCoroutineCreated(false)

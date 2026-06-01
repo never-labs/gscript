@@ -106,5 +106,5 @@ The feedback infrastructure was the right architectural investment. Round 12 fai
 
 *Previous: [The Harness](/23-the-harness)*
 
-*This is post 24 in the [GScript JIT series](https://jxwr.github.io/gscript/).
+*This is post 24 in the [Leia JIT series](https://jxwr.github.io/leia/).
 All numbers from a single-thread ARM64 Apple Silicon machine.*

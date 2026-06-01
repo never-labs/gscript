@@ -1,6 +1,6 @@
 package modules
 
-import stdlibllm "github.com/never-labs/gscript/internal/stdlib/llm"
+import stdlibllm "github.com/never-labs/leia/internal/stdlib/llm"
 
 func llmToolsFromValue(v Value) []LLMTool {
 	if !v.IsTable() {

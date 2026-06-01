@@ -1,5 +1,5 @@
 -- Benchmark: Object Creation
--- Matches benchmarks/calls/object_creation.gs.
+-- Matches benchmarks/calls/object_creation.leia.
 
 local function new_vec3(x, y, z)
     return { x = x, y = y, z = z }

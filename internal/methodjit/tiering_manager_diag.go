@@ -22,7 +22,7 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/vm"
 )
 
 // Tier2Trace records intermediate artifacts produced during a Tier 2

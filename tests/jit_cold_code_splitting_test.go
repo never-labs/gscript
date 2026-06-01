@@ -5,7 +5,7 @@ package tests_test
 import (
 	"testing"
 
-	gs "github.com/never-labs/gscript"
+	leia "github.com/never-labs/leia"
 )
 
 // TestJIT_ColdCodeSplitting_FnCalls verifies that inline call loops produce
@@ -21,8 +21,8 @@ func callMany() {
 for i := 1; i <= 15; i++ { callMany() }
 result := callMany()
 `
-	vmResult := runAndGet(t, src, "result", gs.WithVM())
-	jitResult := runAndGet(t, src, "result", gs.WithJIT())
+	vmResult := runAndGet(t, src, "result", leia.WithVM())
+	jitResult := runAndGet(t, src, "result", leia.WithJIT())
 
 	expected := int64(10000)
 	if vmResult != expected {
@@ -50,8 +50,8 @@ func sumN(n) {
 for i := 1; i <= 15; i++ { sumN(10) }
 result := sumN(10000)
 `
-	vmResult := runAndGet(t, src, "result", gs.WithVM())
-	jitResult := runAndGet(t, src, "result", gs.WithJIT())
+	vmResult := runAndGet(t, src, "result", leia.WithVM())
+	jitResult := runAndGet(t, src, "result", leia.WithJIT())
 
 	expected := int64(50005000)
 	if vmResult != expected {
@@ -72,8 +72,8 @@ func fib(n) {
 }
 result := fib(15)
 `
-	vmResult := runAndGet(t, src, "result", gs.WithVM())
-	jitResult := runAndGet(t, src, "result", gs.WithJIT())
+	vmResult := runAndGet(t, src, "result", leia.WithVM())
+	jitResult := runAndGet(t, src, "result", leia.WithJIT())
 
 	expected := int64(610)
 	if vmResult != expected {
@@ -95,8 +95,8 @@ func ackermann(m, n) {
 }
 result := ackermann(3, 4)
 `
-	vmResult := runAndGet(t, src, "result", gs.WithVM())
-	jitResult := runAndGet(t, src, "result", gs.WithJIT())
+	vmResult := runAndGet(t, src, "result", leia.WithVM())
+	jitResult := runAndGet(t, src, "result", leia.WithJIT())
 
 	expected := int64(125)
 	if vmResult != expected {
@@ -120,7 +120,7 @@ func addOne(x) {
 for i := 1; i <= 15; i++ { addOne(10) }
 result := addOne(42)
 `
-	jitResult := runAndGet(t, src, "result", gs.WithJIT())
+	jitResult := runAndGet(t, src, "result", leia.WithJIT())
 	expected := int64(43)
 	if jitResult != expected {
 		t.Errorf("JIT addOne: got %v (%T), want %d", jitResult, jitResult, expected)

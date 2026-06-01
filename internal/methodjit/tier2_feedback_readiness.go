@@ -5,7 +5,7 @@ package methodjit
 import (
 	"fmt"
 
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/vm"
 )
 
 const tier2FeedbackHardHotCallCount = 16

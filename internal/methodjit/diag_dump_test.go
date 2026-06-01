@@ -48,9 +48,9 @@ type diagProtoStats struct {
 //
 // DIAG_BENCH formats accepted:
 //
-//	"sieve.gs"                       — bare basename: searched by file name
-//	"table/json_table_walk.gs"       — explicit subdirectory under benchmarks/
-//	"recursion/ack_nested_shifted.gs" — likewise
+//	"sieve.leia"                       — bare basename: searched by file name
+//	"table/json_table_walk.leia"       — explicit subdirectory under benchmarks/
+//	"recursion/ack_nested_shifted.leia" — likewise
 func TestDiagDump(t *testing.T) {
 	benchFile := os.Getenv("DIAG_BENCH")
 	if benchFile == "" {

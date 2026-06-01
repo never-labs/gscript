@@ -33,14 +33,14 @@ import (
 )
 
 func TestSelfCall_RegsLazyFlush(t *testing.T) {
-	srcBytes, err := os.ReadFile("../../benchmarks/recursion/ackermann.gs")
+	srcBytes, err := os.ReadFile("../../benchmarks/recursion/ackermann.leia")
 	if err != nil {
-		t.Fatalf("read ackermann.gs: %v", err)
+		t.Fatalf("read ackermann.leia: %v", err)
 	}
 	top := compileTop(t, string(srcBytes))
 	target := findProtoByName(top, "ack")
 	if target == nil {
-		t.Fatalf("function 'ack' not found in ackermann.gs")
+		t.Fatalf("function 'ack' not found in ackermann.leia")
 	}
 
 	bf, err := CompileBaseline(target)

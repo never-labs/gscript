@@ -3,7 +3,7 @@ package methodjit
 import (
 	"testing"
 
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/vm"
 )
 
 func TestAnalyzeClosureRecurrence_UpvalueDelta(t *testing.T) {

@@ -1,4 +1,4 @@
-// Package modfile parses and formats GScript module manifests.
+// Package modfile parses and formats Leia module manifests.
 package modfile
 
 import (
@@ -10,11 +10,11 @@ import (
 	"unicode"
 )
 
-const FileName = "gscript.mod"
+const FileName = "leia.mod"
 
 type File struct {
 	Module      string
-	GS          string
+	Leia          string
 	Go          string
 	Capability  []string
 	Require     []Require
@@ -107,17 +107,17 @@ func Parse(name string, r io.Reader) (File, []Diagnostic) {
 				continue
 			}
 			f.Module = fields[1]
-		case "gs":
+		case "leia":
 			if len(fields) != 2 {
-				diags = append(diags, diag(lineNo, "gs expects one language version"))
+				diags = append(diags, diag(lineNo, "leia expects one language version"))
 				continue
 			}
 			if seenGS != 0 {
-				diags = append(diags, diag(lineNo, fmt.Sprintf("gs declared more than once; first declared on line %d", seenGS)))
+				diags = append(diags, diag(lineNo, fmt.Sprintf("leia declared more than once; first declared on line %d", seenGS)))
 				continue
 			}
 			seenGS = lineNo
-			f.GS = fields[1]
+			f.Leia = fields[1]
 		case "go":
 			switch {
 			case len(fields) == 2:
@@ -254,8 +254,8 @@ func Parse(name string, r io.Reader) (File, []Diagnostic) {
 	if f.Module == "" {
 		diags = append(diags, Diagnostic{Message: "module is required"})
 	}
-	if f.GS == "" {
-		f.GS = "0.1"
+	if f.Leia == "" {
+		f.Leia = "0.1"
 	}
 	return f, diags
 }
@@ -263,8 +263,8 @@ func Parse(name string, r io.Reader) (File, []Diagnostic) {
 func Format(f File) []byte {
 	var b strings.Builder
 	fmt.Fprintf(&b, "module %s\n", f.Module)
-	if f.GS != "" {
-		fmt.Fprintf(&b, "gs %s\n", f.GS)
+	if f.Leia != "" {
+		fmt.Fprintf(&b, "leia %s\n", f.Leia)
 	}
 	writeGo(&b, f.Go, f.GoRequire, f.GoReplace)
 	writeCapabilities(&b, f.Capability)

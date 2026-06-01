@@ -1,12 +1,12 @@
 package benchmarks
 
 import (
-	gs "github.com/never-labs/gscript"
+	leia "github.com/never-labs/leia"
 	"testing"
 )
 
-func BenchmarkGScriptJITHeavyLoopWarm(b *testing.B) {
-	vm := gs.New(gs.WithJIT())
+func BenchmarkLeiaJITHeavyLoopWarm(b *testing.B) {
+	vm := leia.New(leia.WithJIT())
 	// Define function and warm up JIT (threshold=10 calls)
 	vm.Exec(`
 func sumN(n) {
@@ -24,8 +24,8 @@ for i := 1; i <= 15; i++ { sumN(10) }
 	}
 }
 
-func BenchmarkGScriptVMHeavyLoopWarm(b *testing.B) {
-	vm := gs.New(gs.WithVM())
+func BenchmarkLeiaVMHeavyLoopWarm(b *testing.B) {
+	vm := leia.New(leia.WithVM())
 	vm.Exec(`
 func sumN(n) {
     s := 0
@@ -41,8 +41,8 @@ func sumN(n) {
 	}
 }
 
-func BenchmarkGScriptJITFibIterativeWarm(b *testing.B) {
-	vm := gs.New(gs.WithJIT())
+func BenchmarkLeiaJITFibIterativeWarm(b *testing.B) {
+	vm := leia.New(leia.WithJIT())
 	vm.Exec(`
 func fib(n) {
     a := 0
@@ -62,8 +62,8 @@ for i := 1; i <= 15; i++ { fib(10) }
 	}
 }
 
-func BenchmarkGScriptVMFibIterativeWarm(b *testing.B) {
-	vm := gs.New(gs.WithVM())
+func BenchmarkLeiaVMFibIterativeWarm(b *testing.B) {
+	vm := leia.New(leia.WithVM())
 	vm.Exec(`
 func fib(n) {
     a := 0
@@ -82,8 +82,8 @@ func fib(n) {
 	}
 }
 
-func BenchmarkGScriptVMFunctionCallsWarm(b *testing.B) {
-	vm := gs.New(gs.WithVM())
+func BenchmarkLeiaVMFunctionCallsWarm(b *testing.B) {
+	vm := leia.New(leia.WithVM())
 	vm.Exec(`
 func add(a, b) {
     return a + b
@@ -102,8 +102,8 @@ func callMany() {
 	}
 }
 
-func BenchmarkGScriptJITFunctionCallsWarm(b *testing.B) {
-	vm := gs.New(gs.WithJIT())
+func BenchmarkLeiaJITFunctionCallsWarm(b *testing.B) {
+	vm := leia.New(leia.WithJIT())
 	vm.Exec(`
 func add(a, b) {
     return a + b
@@ -123,8 +123,8 @@ for i := 1; i <= 15; i++ { callMany() }
 	}
 }
 
-func BenchmarkGScriptJITFibRecursiveWarm(b *testing.B) {
-	vm := gs.New(gs.WithJIT())
+func BenchmarkLeiaJITFibRecursiveWarm(b *testing.B) {
+	vm := leia.New(leia.WithJIT())
 	vm.Exec(`
 func fib(n) {
     if n < 2 {
@@ -140,8 +140,8 @@ for i := 1; i <= 15; i++ { fib(10) }
 	}
 }
 
-func BenchmarkGScriptVMFibRecursiveWarm(b *testing.B) {
-	vm := gs.New(gs.WithVM())
+func BenchmarkLeiaVMFibRecursiveWarm(b *testing.B) {
+	vm := leia.New(leia.WithVM())
 	vm.Exec(`
 func fib(n) {
     if n < 2 {
@@ -156,8 +156,8 @@ func fib(n) {
 	}
 }
 
-func BenchmarkGScriptJITAckermannWarm(b *testing.B) {
-	vm := gs.New(gs.WithJIT())
+func BenchmarkLeiaJITAckermannWarm(b *testing.B) {
+	vm := leia.New(leia.WithJIT())
 	vm.Exec(`
 func ack(m, n) {
     if m == 0 { return n + 1 }
@@ -172,8 +172,8 @@ for i := 1; i <= 15; i++ { ack(2, 2) }
 	}
 }
 
-func BenchmarkGScriptVMAckermannWarm(b *testing.B) {
-	vm := gs.New(gs.WithVM())
+func BenchmarkLeiaVMAckermannWarm(b *testing.B) {
+	vm := leia.New(leia.WithVM())
 	vm.Exec(`
 func ack(m, n) {
     if m == 0 { return n + 1 }
@@ -189,8 +189,8 @@ func ack(m, n) {
 
 // --- Math Intensive (Leibniz Pi) ---
 
-func BenchmarkGScriptJITMathLeibnizWarm(b *testing.B) {
-	vm := gs.New(gs.WithJIT())
+func BenchmarkLeiaJITMathLeibnizWarm(b *testing.B) {
+	vm := leia.New(leia.WithJIT())
 	vm.Exec(`
 func leibniz(n) {
     sum := 0.0
@@ -209,8 +209,8 @@ for i := 1; i <= 15; i++ { leibniz(100) }
 	}
 }
 
-func BenchmarkGScriptVMMathLeibnizWarm(b *testing.B) {
-	vm := gs.New(gs.WithVM())
+func BenchmarkLeiaVMMathLeibnizWarm(b *testing.B) {
+	vm := leia.New(leia.WithVM())
 	vm.Exec(`
 func leibniz(n) {
     sum := 0.0
@@ -230,8 +230,8 @@ func leibniz(n) {
 
 // --- Table Field Access (particle update) ---
 
-func BenchmarkGScriptJITTableFieldWarm(b *testing.B) {
-	vm := gs.New(gs.WithJIT())
+func BenchmarkLeiaJITTableFieldWarm(b *testing.B) {
+	vm := leia.New(leia.WithJIT())
 	vm.Exec(`
 particles := {}
 for i := 1; i <= 100; i++ {
@@ -253,8 +253,8 @@ for i := 1; i <= 15; i++ { step() }
 	}
 }
 
-func BenchmarkGScriptVMTableFieldWarm(b *testing.B) {
-	vm := gs.New(gs.WithVM())
+func BenchmarkLeiaVMTableFieldWarm(b *testing.B) {
+	vm := leia.New(leia.WithVM())
 	vm.Exec(`
 particles := {}
 for i := 1; i <= 100; i++ {
@@ -277,8 +277,8 @@ func step() {
 
 // --- Object Creation ---
 
-func BenchmarkGScriptJITObjectCreateWarm(b *testing.B) {
-	vm := gs.New(gs.WithJIT())
+func BenchmarkLeiaJITObjectCreateWarm(b *testing.B) {
+	vm := leia.New(leia.WithJIT())
 	vm.Exec(`
 func create_objects(n) {
     total := 0.0
@@ -296,8 +296,8 @@ for i := 1; i <= 15; i++ { create_objects(100) }
 	}
 }
 
-func BenchmarkGScriptVMObjectCreateWarm(b *testing.B) {
-	vm := gs.New(gs.WithVM())
+func BenchmarkLeiaVMObjectCreateWarm(b *testing.B) {
+	vm := leia.New(leia.WithVM())
 	vm.Exec(`
 func create_objects(n) {
     total := 0.0

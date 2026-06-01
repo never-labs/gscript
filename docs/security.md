@@ -1,6 +1,6 @@
 # Security and Isolation Roadmap
 
-This document defines the production security model GScript should expose to
+This document defines the production security model Leia should expose to
 embedders. It is a roadmap, not a statement that every control is implemented
 today. Current code already has an important base: `LibFlags`,
 `CapabilityFlags`, `LibSafe`, `WithSandbox`, stdlib module restriction,
@@ -55,7 +55,7 @@ Current controls are split deliberately:
   or host-heavy modules from that table set.
 - `CapabilityFlags` gate host-backed effects that can remain dangerous even
   when a library table exists. The current public flags are
-  `CapModuleLoading` for filesystem-backed `.gs` module loading and
+  `CapModuleLoading` for filesystem-backed `.leia` module loading and
   `CapFilesystemRead` / `CapFilesystemWrite` for script-side filesystem APIs.
   `CapFilesystem` is a compatibility alias for
   `CapFilesystemRead | CapFilesystemWrite`.
@@ -92,9 +92,9 @@ effects yet.
 The current public safe entry point is:
 
 ```go
-vm := gscript.New(
-    gscript.SecuritySandbox(),
-    gscript.WithMaxSteps(1_000_000),
+vm := leia.New(
+    leia.SecuritySandbox(),
+    leia.WithMaxSteps(1_000_000),
 )
 ```
 
@@ -122,7 +122,7 @@ Script-visible test diagnostics can also be disabled independently.
 - `require("json")` and other enabled built-in stdlib modules still work,
   because stdlib module identity is controlled by `LibFlags`, not
   `CapModuleLoading`.
-- `require("tenant.module")` cannot load a `.gs` file from the host
+- `require("tenant.module")` cannot load a `.leia` file from the host
   filesystem.
 
 This is an in-process sandbox boundary, not a complete isolation boundary. It
@@ -244,7 +244,7 @@ Implementation notes:
 - Put accounting in allocation constructors and growth paths, not at every
   read. Table resize, string creation, byte buffers, channel creation, and
   coroutine creation are the main enforcement points.
-- Charge host callbacks for values converted into GScript values.
+- Charge host callbacks for values converted into Leia values.
 - Keep `collectgarbage("stats")` diagnostic-only. It should not be the security
   enforcement API.
 
@@ -279,7 +279,7 @@ goroutine stack.
 
 ## Goroutine, Coroutine, and Channel Limits
 
-GScript exposes coroutines today and has tests around Go channel host
+Leia exposes coroutines today and has tests around Go channel host
 integration. Any production concurrency feature must be bounded because it can
 otherwise bypass CPU and memory assumptions.
 
@@ -420,7 +420,7 @@ Current public module-loading policy:
 
 - Built-in stdlib `require(name)` is allowed only for modules present under the
   active `LibFlags` preset.
-- `WithModuleLoading(false)` disables filesystem-backed `.gs` module loading
+- `WithModuleLoading(false)` disables filesystem-backed `.leia` module loading
   while still allowing enabled built-in stdlib modules to be required.
 - `WithSandbox()` sets `CapModuleLoading` off, so file modules cannot be loaded
   by `require`.
@@ -470,9 +470,9 @@ Core rules:
 Host callbacks should be registered through a secure wrapper:
 
 ```go
-vm.RegisterCapability("tenant.lookupUser", gscript.Capability{
-    Effects: []gscript.Effect{gscript.EffectNetwork},
-    Fn: func(ctx gscript.CallContext, userID string) (User, error) {
+vm.RegisterCapability("tenant.lookupUser", leia.Capability{
+    Effects: []leia.Effect{leia.EffectNetwork},
+    Fn: func(ctx leia.CallContext, userID string) (User, error) {
         if err := ctx.Check(); err != nil {
             return User{}, err
         }
@@ -544,7 +544,7 @@ turn denied operations into a denial-of-service path.
 The API should make the safe path concise and the unsafe path explicit.
 
 ```go
-package gscript
+package leia
 
 type SecurityPolicy struct {
     Identity IdentityPolicy
@@ -681,11 +681,11 @@ const (
 Module flags can bridge into the policy:
 
 ```go
-vm := gscript.New(
-    gscript.WithLibs(gscript.LibSafe),
-    gscript.WithSecurity(gscript.SecurityPolicy{
-        Modules: gscript.ModulePolicy{
-            AllowedStdlib: gscript.StdlibNames(gscript.LibSafe),
+vm := leia.New(
+    leia.WithLibs(leia.LibSafe),
+    leia.WithSecurity(leia.SecurityPolicy{
+        Modules: leia.ModulePolicy{
+            AllowedStdlib: leia.StdlibNames(leia.LibSafe),
         },
     }),
 )

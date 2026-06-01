@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/vm"
 )
 
 func TestTableArraySwapFusion_FusesSameBlockExchange(t *testing.T) {

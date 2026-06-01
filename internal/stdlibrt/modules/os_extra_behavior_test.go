@@ -30,7 +30,7 @@ func TestOsGetenv(t *testing.T) {
 }
 
 func TestOsGetenvMissing(t *testing.T) {
-	interp := runWithLib(t, `result := os.getenv("__GSCRIPT_NONEXISTENT_VAR__")`, "os", BuildOS())
+	interp := runWithLib(t, `result := os.getenv("__LEIA_NONEXISTENT_VAR__")`, "os", BuildOS())
 	v := interp.GetGlobal("result")
 	if !v.IsNil() {
 		t.Errorf("os.getenv for missing var should be nil, got %v", v)
@@ -39,10 +39,10 @@ func TestOsGetenvMissing(t *testing.T) {
 
 func TestOsSetenvUnsetenv(t *testing.T) {
 	interp := runWithLib(t, `
-		os.setenv("GSCRIPT_TEST_VAR", "hello")
-		a := os.getenv("GSCRIPT_TEST_VAR")
-		os.unsetenv("GSCRIPT_TEST_VAR")
-		b := os.getenv("GSCRIPT_TEST_VAR")
+		os.setenv("LEIA_TEST_VAR", "hello")
+		a := os.getenv("LEIA_TEST_VAR")
+		os.unsetenv("LEIA_TEST_VAR")
+		b := os.getenv("LEIA_TEST_VAR")
 	`, "os", BuildOS())
 	if interp.GetGlobal("a").Str() != "hello" {
 		t.Errorf("expected 'hello', got '%s'", interp.GetGlobal("a").Str())
@@ -94,11 +94,11 @@ func TestOsGetpid(t *testing.T) {
 }
 
 func TestOsExpand(t *testing.T) {
-	os.Setenv("GSCRIPT_EXPAND_TEST", "world")
-	defer os.Unsetenv("GSCRIPT_EXPAND_TEST")
+	os.Setenv("LEIA_EXPAND_TEST", "world")
+	defer os.Unsetenv("LEIA_EXPAND_TEST")
 
 	interp := runWithLib(t, `
-		result := os.expand("hello $GSCRIPT_EXPAND_TEST")
+		result := os.expand("hello $LEIA_EXPAND_TEST")
 	`, "os", BuildOS())
 	if interp.GetGlobal("result").Str() != "hello world" {
 		t.Errorf("expected 'hello world', got '%s'", interp.GetGlobal("result").Str())

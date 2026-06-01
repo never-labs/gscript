@@ -6,7 +6,7 @@
 
 package methodjit
 
-import "github.com/never-labs/gscript/internal/vm"
+import "github.com/never-labs/leia/internal/vm"
 
 // findProtoByName walks a proto tree depth-first and returns the first
 // proto whose Name matches. Returns nil if not found.

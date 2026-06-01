@@ -4,11 +4,11 @@ import (
 	"os"
 	"testing"
 
-	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/leia/internal/runtime"
 )
 
 func TestRegexpRandomDriverRuntimeSpecialization(t *testing.T) {
-	src, err := os.ReadFile("../../benchmarks/string/regexp_random.gs")
+	src, err := os.ReadFile("../../benchmarks/string/regexp_random.leia")
 	if err != nil {
 		t.Fatal(err)
 	}

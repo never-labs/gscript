@@ -3,8 +3,8 @@
 package methodjit
 
 import (
-	"github.com/never-labs/gscript/internal/jit"
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/jit"
+	"github.com/never-labs/leia/internal/vm"
 )
 
 func baselineGuardedConstCallFolds(proto *vm.FuncProto) map[int]GuardedConstCallFoldFact {

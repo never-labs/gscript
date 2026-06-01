@@ -4,9 +4,9 @@ We sat down to clean up the project structure and run the test suite. What we fo
 
 ## Bug 1: The Goroutine That Couldn't Talk Back
 
-**Symptom:** The Chinese Chess AI demo (`chess_ai.gs`) launched, you could move a piece, but the AI would think forever. The timer ticked up. The AI never moved.
+**Symptom:** The Chinese Chess AI demo (`chess_ai.leia`) launched, you could move a piece, but the AI would think forever. The timer ticked up. The AI never moved.
 
-**Root cause:** The game loop spawned a goroutine to run the AI search (so the UI wouldn't freeze). Inside that goroutine, `getAIMove()` spawned *more* goroutines (6 parallel search workers) and used channels + a polling loop to coordinate them. In GScript's VM, goroutines get their own VM instance. Shared variable mutations (`aiDone = true`) in the child goroutine were not visible to the parent — the game loop never saw the result.
+**Root cause:** The game loop spawned a goroutine to run the AI search (so the UI wouldn't freeze). Inside that goroutine, `getAIMove()` spawned *more* goroutines (6 parallel search workers) and used channels + a polling loop to coordinate them. In Leia's VM, goroutines get their own VM instance. Shared variable mutations (`aiDone = true`) in the child goroutine were not visible to the parent — the game loop never saw the result.
 
 **Fix:** Replaced the Lazy SMP parallel search with a single-threaded iterative deepening loop. The search runs synchronously inside one goroutine; time limits are checked after each depth iteration completes. No channels, no nested goroutines, no polling.
 
@@ -32,7 +32,7 @@ for depth := 1; depth <= 12; depth++ {
 
 **Symptom:** `TestChessAI_Completes` crashed with SIGSEGV inside `scanTableRoots` during GC compaction. The crash was intermittent — sometimes it passed, sometimes it segfaulted.
 
-**Root cause:** GScript uses NaN-boxing: pointers are hidden inside `uint64` values that Go's GC can't see. A custom `gcRootLog` tracks these pointers so they survive Go GC cycles. Periodically, `gcCompact()` scans all VM registers to find live pointers and discards dead entries.
+**Root cause:** Leia uses NaN-boxing: pointers are hidden inside `uint64` values that Go's GC can't see. A custom `gcRootLog` tracks these pointers so they survive Go GC cycles. Periodically, `gcCompact()` scans all VM registers to find live pointers and discards dead entries.
 
 The problem: `gcCompact()` was triggered from inside `keepAlive()`, which is called by `TableValue()`. At that moment, the new table had been added to the gcLog but had NOT yet been stored into a VM register (the calling instruction was still mid-execution). So `gcCompact` scanned registers, didn't find the new table, and removed its gcLog entry. Later, Go's GC collected the underlying `*Table`. Next time something touched that register — SIGSEGV.
 
@@ -57,7 +57,7 @@ Key insight: per-instruction CheckGC (atomic load every instruction) caused a 4x
 
 ## Bug 3: The Self-Call That Corrupted the Stack
 
-**Symptom:** `binary_trees.gs` crashed with SIGSEGV under JIT. `pc=0x1` — the CPU jumped to address 1. Even `makeTree(1)` crashed. VM mode worked fine.
+**Symptom:** `binary_trees.leia` crashed with SIGSEGV under JIT. `pc=0x1` — the CPU jumped to address 1. Even `makeTree(1)` crashed. VM mode worked fine.
 
 **Root cause:** The JIT has a self-call optimization for recursive functions. When `fib(n)` calls `fib(n-1)`, instead of exiting to Go for `OP_CALL`, the JIT emits a direct `BL self_call_entry` — a native ARM64 branch-and-link. This pushes a return address on the ARM64 stack.
 

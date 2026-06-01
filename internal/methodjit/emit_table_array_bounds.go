@@ -2,7 +2,7 @@
 
 package methodjit
 
-import "github.com/never-labs/gscript/internal/jit"
+import "github.com/never-labs/leia/internal/jit"
 
 const tier2SparseArrayMax = 1024 // must match runtime.sparseArrayMax
 

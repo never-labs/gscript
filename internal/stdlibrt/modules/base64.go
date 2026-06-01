@@ -2,9 +2,9 @@ package modules
 
 import (
 	"fmt"
-	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/leia/internal/runtime"
 
-	base64lib "github.com/never-labs/gscript/internal/stdlib/base64"
+	base64lib "github.com/never-labs/leia/internal/stdlib/base64"
 )
 
 // buildBase64Lib creates the "base64" standard library table.

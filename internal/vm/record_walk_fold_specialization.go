@@ -1,6 +1,6 @@
 package vm
 
-import "github.com/never-labs/gscript/internal/runtime"
+import "github.com/never-labs/leia/internal/runtime"
 
 type recordWalkFoldSpec struct {
 	recordFields [6]string

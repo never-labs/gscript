@@ -1,5 +1,5 @@
 -- Benchmark: Table Array Access
--- Matches benchmarks/table/table_array_access.gs.
+-- Matches benchmarks/table/table_array_access.leia.
 
 local function int_array_sum(n)
     local arr = {}

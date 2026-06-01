@@ -5,7 +5,7 @@ package methodjit
 import (
 	"unsafe"
 
-	"github.com/never-labs/gscript/internal/jit"
+	"github.com/never-labs/leia/internal/jit"
 )
 
 // emitTier2EntryMark writes 1 to proto.EnteredTier2 (one byte). It is

@@ -14,9 +14,9 @@ In [Post #8](08-what-the-academics-know), we paused the optimization grind and l
 
 The scoreboard at the end of Post #8:
 
-| Benchmark | GScript | LuaJIT | Ratio | Status |
+| Benchmark | Leia | LuaJIT | Ratio | Status |
 |-----------|---------|--------|-------|--------|
-| fib(20) | 24us | 26us | 0.92x | **GScript wins** |
+| fib(20) | 24us | 26us | 0.92x | **Leia wins** |
 | ackermann(3,11) | 17us | ~17us | ~1.0x | Tied |
 | callMany (fn calls) | 5.1us | 3us | 1.7x | LuaJIT leads |
 | mandelbrot(1000) | 0.23s | 0.056s | 4.0x | LuaJIT leads |
@@ -28,7 +28,7 @@ What actually happened was a day of seven optimizations, three correctness fixes
 
 ## Optimization 1: While-Loop Back-Edge Detection
 
-The trace JIT has always been loop-centric. It looks for back-edges --- the jump at the bottom of a loop that goes back to the top --- and starts recording when a back-edge gets hot. But the back-edge detection only worked for `for` loops. GScript's `for` loops compile to a `FORPREP`/`FORLOOP` bytecode pair, and the JIT recognized `FORLOOP` as a back-edge.
+The trace JIT has always been loop-centric. It looks for back-edges --- the jump at the bottom of a loop that goes back to the top --- and starts recording when a back-edge gets hot. But the back-edge detection only worked for `for` loops. Leia's `for` loops compile to a `FORPREP`/`FORLOOP` bytecode pair, and the JIT recognized `FORLOOP` as a back-edge.
 
 `while` loops compile differently. A `while` loop is an `LT` or `LE` comparison followed by a conditional `JMP`. There is no explicit `FORLOOP` instruction. The trace JIT did not recognize the backward `JMP` at the bottom of a while loop as a back-edge. Result: while loops never got hot-counted, never got recorded, never got compiled.
 
@@ -153,7 +153,7 @@ The result on mandelbrot was modest --- the benchmark is still dominated by the 
 
 This is the optimization that changed the scoreboard.
 
-In [Post #8](08-what-the-academics-know), we described BOLT's principle: hot code should be contiguous, cold code should be elsewhere. The specific application to GScript's method JIT: guard-failure handlers (side-exit stubs) sit in the middle of the hot path, polluting the instruction cache.
+In [Post #8](08-what-the-academics-know), we described BOLT's principle: hot code should be contiguous, cold code should be elsewhere. The specific application to Leia's method JIT: guard-failure handlers (side-exit stubs) sit in the middle of the hot path, polluting the instruction cache.
 
 Here is what the method JIT's compiled code looked like before cold code splitting, for the `callMany` benchmark:
 
@@ -382,14 +382,14 @@ Here is where things stand after all seven optimizations:
 
 | Benchmark | Before | After | LuaJIT | vs LuaJIT |
 |-----------|--------|-------|--------|-----------|
-| **fib(20)** | 24us | 24us | 25us | **GScript wins** |
+| **fib(20)** | 24us | 24us | 25us | **Leia wins** |
 | **fn_calls (10K)** | **5.1us** | **2.6us** | **2.5us** | **5% gap (was 70%)** |
 | ackermann(3,11) | 30us | 30us | 12us | 2.5x gap |
 | sieve(1M x3) | 0.17s | 0.11s | 0.013s | 8.5x gap |
 | mandelbrot(1000) | 0.23s | 0.23s | 0.06s | 4x gap |
 | matmul(300) | 1.63s | 1.19s | 0.031s | 38x gap |
 
-The headline: **fn_calls went from 70% behind LuaJIT to 5% behind.** One more small optimization and we have a second benchmark where GScript matches or beats LuaJIT.
+The headline: **fn_calls went from 70% behind LuaJIT to 5% behind.** One more small optimization and we have a second benchmark where Leia matches or beats LuaJIT.
 
 The sieve improved 35% but is still 8.5x behind LuaJIT. This is the Value size story --- sieve is table-heavy (array reads and writes in the inner loop), and 32 bytes per Value vs 8 bytes per TValue is a 4x data overhead before we even count instructions.
 
@@ -397,18 +397,18 @@ matmul improved 27% from native SETTABLE but is still 38x behind. Same root caus
 
 ## The Emerging Pattern
 
-Look at the benchmarks where GScript is competitive:
+Look at the benchmarks where Leia is competitive:
 
 - **fib**: pure recursion, no tables, no loops. Method JIT.
 - **fn_calls**: tight loop, simple function calls, no tables. Method JIT.
 
-Now look at where GScript is far behind:
+Now look at where Leia is far behind:
 
 - **sieve**: array-heavy. 8.5x gap.
 - **matmul**: array-heavy. 38x gap.
 - **mandelbrot**: compute-heavy but float-heavy. 4x gap.
 
-The pattern is consistent with everything we have learned: GScript's method JIT produces excellent code for integer computation and function calls. The trace JIT handles simple loops well. But anything that touches tables or floats heavily runs into the Value 32B wall.
+The pattern is consistent with everything we have learned: Leia's method JIT produces excellent code for integer computation and function calls. The trace JIT handles simple loops well. But anything that touches tables or floats heavily runs into the Value 32B wall.
 
 The cold code splitting optimization is instructive. It gave fn_calls a 2x improvement --- not by generating better arithmetic, but by making the instruction cache work better. The actual computation was already optimal (4 instructions per iteration, same as LuaJIT). The overhead was in the *layout* of the code. Once we fixed the layout, the computation ran at nearly LuaJIT speed.
 
@@ -420,7 +420,7 @@ For the table-heavy benchmarks (sieve, matmul, nbody, spectral_norm), no amount 
 
 The immediate opportunities:
 
-1. **Close the fn_calls gap.** We are 5% behind LuaJIT. The remaining gap is likely in the method JIT's function entry/exit sequence --- a few instructions of overhead per call. Shaving 2-3 instructions off the entry sequence should close it. This would give us a second benchmark where GScript beats LuaJIT.
+1. **Close the fn_calls gap.** We are 5% behind LuaJIT. The remaining gap is likely in the method JIT's function entry/exit sequence --- a few instructions of overhead per call. Shaving 2-3 instructions off the entry sequence should close it. This would give us a second benchmark where Leia beats LuaJIT.
 
 2. **Apply cold code splitting to the trace JIT.** Today's optimization was in the method JIT only. The trace JIT has the same problem --- guard handlers interspersed with hot code. Applying the same two-pass emission to traced loops should help mandelbrot and sieve.
 

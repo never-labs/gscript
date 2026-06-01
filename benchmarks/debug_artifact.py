@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Build one JSON artifact from existing benchmark/debug outputs.
 
-This is intentionally an offline aggregator. It does not build gscript or run
+This is intentionally an offline aggregator. It does not build leia or run
 benchmarks; callers feed it files already produced by timing_compare.py,
 strict_guard.py, profile_exits.py, runtime/perf stats flags, and
 -jit-dump-warm.

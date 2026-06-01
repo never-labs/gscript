@@ -21,7 +21,7 @@ local function quicksort(arr, lo, hi)
     quicksort(arr, i + 1, hi)
 end
 
--- Generate pseudo-random array using LCG (same seed as GScript)
+-- Generate pseudo-random array using LCG (same seed as Leia)
 local function make_random_array(n, seed)
     local arr = {}
     local x = seed

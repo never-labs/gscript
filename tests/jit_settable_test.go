@@ -5,7 +5,7 @@ package tests_test
 import (
 	"testing"
 
-	gs "github.com/never-labs/gscript"
+	leia "github.com/never-labs/leia"
 )
 
 // TestMethodJIT_SettableNative tests SETTABLE native fast path in method JIT.
@@ -22,8 +22,8 @@ func fillTable(n) {
 }
 result := fillTable(1000)
 `
-	vmResult := runAndGet(t, src, "result", gs.WithVM())
-	jitResult := runAndGet(t, src, "result", gs.WithJIT())
+	vmResult := runAndGet(t, src, "result", leia.WithVM())
+	jitResult := runAndGet(t, src, "result", leia.WithJIT())
 
 	expected := int64(200)
 	if vmResult != expected {
@@ -54,8 +54,8 @@ func buildAndSum(n) {
 }
 result := buildAndSum(100)
 `
-	vmResult := runAndGet(t, src, "result", gs.WithVM())
-	jitResult := runAndGet(t, src, "result", gs.WithJIT())
+	vmResult := runAndGet(t, src, "result", leia.WithVM())
+	jitResult := runAndGet(t, src, "result", leia.WithJIT())
 
 	// sum 1..100 = 5050
 	expected := int64(5050)
@@ -87,8 +87,8 @@ func overwrite(n) {
 }
 result := overwrite(100)
 `
-	vmResult := runAndGet(t, src, "result", gs.WithVM())
-	jitResult := runAndGet(t, src, "result", gs.WithJIT())
+	vmResult := runAndGet(t, src, "result", leia.WithVM())
+	jitResult := runAndGet(t, src, "result", leia.WithJIT())
 
 	expected := int64(150) // 50 * 3
 	if vmResult != expected {
@@ -115,8 +115,8 @@ func setConst(n) {
 }
 result := setConst(100)
 `
-	vmResult := runAndGet(t, src, "result", gs.WithVM())
-	jitResult := runAndGet(t, src, "result", gs.WithJIT())
+	vmResult := runAndGet(t, src, "result", leia.WithVM())
+	jitResult := runAndGet(t, src, "result", leia.WithJIT())
 
 	expected := int64(100) // last write wins
 	if vmResult != expected {
@@ -150,8 +150,8 @@ func appendTest(n) {
 }
 result := appendTest(1000)
 `
-	vmResult := runAndGet(t, src, "result", gs.WithVM())
-	jitResult := runAndGet(t, src, "result", gs.WithJIT())
+	vmResult := runAndGet(t, src, "result", leia.WithVM())
+	jitResult := runAndGet(t, src, "result", leia.WithJIT())
 
 	expected := int64(1000)
 	if vmResult != expected {
@@ -193,8 +193,8 @@ func sieve(n) {
 }
 result := sieve(10000)
 `
-	vmResult := runAndGet(t, src, "result", gs.WithVM())
-	jitResult := runAndGet(t, src, "result", gs.WithJIT())
+	vmResult := runAndGet(t, src, "result", leia.WithVM())
+	jitResult := runAndGet(t, src, "result", leia.WithJIT())
 
 	expected := int64(1229) // number of primes up to 10000
 	if vmResult != expected {

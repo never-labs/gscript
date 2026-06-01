@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	binfmt "github.com/never-labs/gscript/internal/support/binaryfmt"
+	binfmt "github.com/never-labs/leia/internal/support/binaryfmt"
 )
 
 func BuildBinary(maxHostResult func() int64) *Table {
@@ -40,7 +40,7 @@ func buildBinaryLib(maxHostResult func() int64) *Table {
 	set("pack", func(args []Value) ([]Value, error) { return binaryPackValues("binary.pack", args, max()) })
 
 	// binary.unpack(format, data [, offset]) -> values..., nextOffset
-	// Offset is 1-based, matching GScript string positions.
+	// Offset is 1-based, matching Leia string positions.
 	set("unpack", func(args []Value) ([]Value, error) { return binaryUnpackValues("binary.unpack", args) })
 
 	// binary.size(format) -> byte count, or nil,err for variable-size formats.

@@ -16,8 +16,8 @@ package methodjit
 import (
 	"fmt"
 
-	"github.com/never-labs/gscript/internal/jit"
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/jit"
+	"github.com/never-labs/leia/internal/vm"
 )
 
 func (ec *emitContext) emitLenNative(instr *Instr) {

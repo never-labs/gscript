@@ -1,6 +1,6 @@
 package vm
 
-import "github.com/never-labs/gscript/internal/runtime"
+import "github.com/never-labs/leia/internal/runtime"
 
 type permutationFlipChecksumSpecializationCache struct {
 	fingerprint runtimeSpecializationFingerprint

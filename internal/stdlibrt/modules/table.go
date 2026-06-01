@@ -5,8 +5,8 @@ import (
 	"sort"
 	"strings"
 
-	tablelib "github.com/never-labs/gscript/internal/stdlib/table"
-	"github.com/never-labs/gscript/internal/stdlibrt"
+	tablelib "github.com/never-labs/leia/internal/stdlib/table"
+	"github.com/never-labs/leia/internal/stdlibrt"
 )
 
 type TableSortCaller = stdlibrt.Caller

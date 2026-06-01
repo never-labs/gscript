@@ -1,20 +1,20 @@
-package gscript_test
+package leia_test
 
 import (
 	"strings"
 	"testing"
 
-	gs "github.com/never-labs/gscript"
-	"github.com/never-labs/gscript/llm"
+	leia "github.com/never-labs/leia"
+	"github.com/never-labs/leia/llm"
 )
 
 func TestLoopHelpers(t *testing.T) {
 	for _, tc := range []struct {
 		name string
-		opts []gs.Option
+		opts []leia.Option
 	}{
 		{name: "interpreter"},
-		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			provider := &mockLLMProvider{results: []llm.TurnResult{
@@ -24,16 +24,16 @@ func TestLoopHelpers(t *testing.T) {
 					Calls: []llm.ToolCall{{
 						ID:   "call_1",
 						Tool: "lookup",
-						Args: map[string]any{"name": "gscript"},
+						Args: map[string]any{"name": "leia"},
 					}},
 				},
 				{Status: "final_answer", Text: "react"},
 			}}
-			opts := append([]gs.Option{
-				gs.WithLibs(gs.LibString | gs.LibLLM),
-				gs.WithLLMProvider(provider),
+			opts := append([]leia.Option{
+				leia.WithLibs(leia.LibString | leia.LibLLM),
+				leia.WithLLMProvider(provider),
 			}, tc.opts...)
-			vm := gs.New(opts...)
+			vm := leia.New(opts...)
 			if err := vm.Exec(`
 simple, simple_err := loop.simple({system: "short", user: "hello"})
 lookup := llm.tool("lookup", func(name) {
@@ -57,7 +57,7 @@ react_text := react.text
 			if len(provider.requests) != 3 || len(provider.requests[0].Messages) != 2 || provider.requests[0].Messages[0].Role != "system" {
 				t.Fatalf("requests = %#v", provider.requests)
 			}
-			if len(provider.requests[2].Messages) != 3 || provider.requests[2].Messages[2].Value != "docs:gscript" {
+			if len(provider.requests[2].Messages) != 3 || provider.requests[2].Messages[2].Value != "docs:leia" {
 				t.Fatalf("react request = %#v", provider.requests[2])
 			}
 		})
@@ -67,20 +67,20 @@ react_text := react.text
 func TestLoopSnapshotResume(t *testing.T) {
 	for _, tc := range []struct {
 		name string
-		opts []gs.Option
+		opts []leia.Option
 	}{
 		{name: "interpreter"},
-		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			vm := gs.New(append([]gs.Option{gs.WithLibs(gs.LibString | gs.LibLLM)}, tc.opts...)...)
+			vm := leia.New(append([]leia.Option{leia.WithLibs(leia.LibString | leia.LibLLM)}, tc.opts...)...)
 			if err := vm.Exec(`
 lookup := llm.tool("lookup", func(name) {
     return "docs:" .. name, nil
 }, {params: {"name"}})
 pending := {id: "call_1", tool: "lookup", args: {name: "old"}}
 token := loop.snapshot({msg.user("find docs")}, pending)
-approved, approved_err := loop.resume(token, {ok: true, args: {name: "gscript"}}, {lookup})
+approved, approved_err := loop.resume(token, {ok: true, args: {name: "leia"}}, {lookup})
 approved_status := approved.status
 approved_history_len := #approved.history
 approved_value := approved.value
@@ -100,7 +100,7 @@ missing_kind := missing_err.kind
 			deniedStatus, _ := vm.Get("denied_status")
 			deniedHistoryLen, _ := vm.Get("denied_history_len")
 			missingKind, _ := vm.Get("missing_kind")
-			if approvedStatus != "dispatched" || approvedHistoryLen != int64(3) || approvedValue != "docs:gscript" {
+			if approvedStatus != "dispatched" || approvedHistoryLen != int64(3) || approvedValue != "docs:leia" {
 				t.Fatalf("approved status=%#v history=%#v value=%#v", approvedStatus, approvedHistoryLen, approvedValue)
 			}
 			if deniedStatus != "denied" || deniedHistoryLen != int64(3) || missingKind != "validation" {
@@ -113,13 +113,13 @@ missing_kind := missing_err.kind
 func TestLoopSnapshotStore(t *testing.T) {
 	for _, tc := range []struct {
 		name string
-		opts []gs.Option
+		opts []leia.Option
 	}{
 		{name: "interpreter"},
-		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			vm := gs.New(append([]gs.Option{gs.WithLibs(gs.LibString | gs.LibLLM)}, tc.opts...)...)
+			vm := leia.New(append([]leia.Option{leia.WithLibs(leia.LibString | leia.LibLLM)}, tc.opts...)...)
 			if err := vm.Exec(`
 saved := nil
 saved_token := ""
@@ -143,7 +143,7 @@ store := {
 lookup := llm.tool("lookup", func(name) {
     return "docs:" .. name, nil
 }, {params: {"name"}})
-token, snap_err := loop.snapshot({msg.user("find docs")}, {id: "call_1", tool: "lookup", args: {name: "gscript"}}, store)
+token, snap_err := loop.snapshot({msg.user("find docs")}, {id: "call_1", tool: "lookup", args: {name: "leia"}}, store)
 stored_name := saved.pending.args.name
 loaded, loaded_err := loop.resume("external-token", {ok: true}, {lookup}, store)
 loaded_status := loaded.status
@@ -152,9 +152,9 @@ loaded_value := loaded.value
 				t.Fatalf("Exec: %v", err)
 			}
 			for name, want := range map[string]interface{}{
-				"stored_name":   "gscript",
+				"stored_name":   "leia",
 				"loaded_status": "dispatched",
-				"loaded_value":  "docs:gscript",
+				"loaded_value":  "docs:leia",
 				"loaded_token":  "external-token",
 				"deleted_token": "external-token",
 			} {
@@ -175,20 +175,20 @@ loaded_value := loaded.value
 func TestLoopSnapshotTraceEvents(t *testing.T) {
 	for _, tc := range []struct {
 		name string
-		opts []gs.Option
+		opts []leia.Option
 	}{
 		{name: "interpreter"},
-		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var events []llm.TraceEvent
-			opts := append([]gs.Option{
-				gs.WithLibs(gs.LibString | gs.LibLLM),
-				gs.WithLLMTrace(func(event llm.TraceEvent) {
+			opts := append([]leia.Option{
+				leia.WithLibs(leia.LibString | leia.LibLLM),
+				leia.WithLLMTrace(func(event llm.TraceEvent) {
 					events = append(events, event)
 				}),
 			}, tc.opts...)
-			vm := gs.New(opts...)
+			vm := leia.New(opts...)
 			if err := vm.Exec(`
 saved := nil
 store := {
@@ -206,7 +206,7 @@ store := {
 lookup := llm.tool("lookup", func(name) {
     return "docs:" .. name, nil
 }, {params: {"name"}})
-token, snap_err := loop.snapshot({msg.user("find docs")}, {id: "call_1", tool: "lookup", args: {name: "gscript"}}, store)
+token, snap_err := loop.snapshot({msg.user("find docs")}, {id: "call_1", tool: "lookup", args: {name: "leia"}}, store)
 loaded, loaded_err := loop.resume(token, {ok: true}, {lookup}, store)
 `); err != nil {
 				t.Fatalf("Exec: %v", err)
@@ -239,10 +239,10 @@ loaded, loaded_err := loop.resume(token, {ok: true}, {lookup}, store)
 func TestLoopReactApproveWhenPauses(t *testing.T) {
 	for _, tc := range []struct {
 		name string
-		opts []gs.Option
+		opts []leia.Option
 	}{
 		{name: "interpreter"},
-		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			provider := &mockLLMProvider{res: llm.TurnResult{
@@ -253,11 +253,11 @@ func TestLoopReactApproveWhenPauses(t *testing.T) {
 					Args: map[string]any{"amount": int64(150)},
 				}},
 			}}
-			opts := append([]gs.Option{
-				gs.WithLibs(gs.LibString | gs.LibLLM),
-				gs.WithLLMProvider(provider),
+			opts := append([]leia.Option{
+				leia.WithLibs(leia.LibString | leia.LibLLM),
+				leia.WithLLMProvider(provider),
 			}, tc.opts...)
-			vm := gs.New(opts...)
+			vm := leia.New(opts...)
 			if err := vm.Exec(`
 refund := llm.tool("refund", func(amount) {
     return "refund:" .. amount, nil
@@ -296,10 +296,10 @@ resume_value := resume.value
 func TestLoopPlanExecute(t *testing.T) {
 	for _, tc := range []struct {
 		name string
-		opts []gs.Option
+		opts []leia.Option
 	}{
 		{name: "interpreter"},
-		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			provider := &mockLLMProvider{results: []llm.TurnResult{
@@ -309,16 +309,16 @@ func TestLoopPlanExecute(t *testing.T) {
 					Calls: []llm.ToolCall{{
 						ID:   "call_1",
 						Tool: "lookup",
-						Args: map[string]any{"name": "gscript"},
+						Args: map[string]any{"name": "leia"},
 					}},
 				},
 				{Status: "final_answer", Text: "done"},
 			}}
-			opts := append([]gs.Option{
-				gs.WithLibs(gs.LibString | gs.LibLLM),
-				gs.WithLLMProvider(provider),
+			opts := append([]leia.Option{
+				leia.WithLibs(leia.LibString | leia.LibLLM),
+				leia.WithLLMProvider(provider),
 			}, tc.opts...)
-			vm := gs.New(opts...)
+			vm := leia.New(opts...)
 			if err := vm.Exec(`
 lookup := llm.tool("lookup", func(name) {
     return "docs:" .. name, nil
@@ -351,7 +351,7 @@ plan := result.plan
 			if len(provider.requests[1].Messages) < 2 || !strings.Contains(provider.requests[1].Messages[0].Text, "lookup docs") {
 				t.Fatalf("execute messages = %#v", provider.requests[1].Messages)
 			}
-			if len(provider.requests[2].Messages) < 4 || provider.requests[2].Messages[3].Value != "docs:gscript" {
+			if len(provider.requests[2].Messages) < 4 || provider.requests[2].Messages[3].Value != "docs:leia" {
 				t.Fatalf("final messages = %#v", provider.requests[2].Messages)
 			}
 		})
@@ -361,21 +361,21 @@ plan := result.plan
 func TestLoopReflect(t *testing.T) {
 	for _, tc := range []struct {
 		name string
-		opts []gs.Option
+		opts []leia.Option
 	}{
 		{name: "interpreter"},
-		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			provider := &mockLLMProvider{results: []llm.TurnResult{
 				{Status: "final_answer", Text: "draft"},
 				{Status: "final_answer", Text: "refined"},
 			}}
-			opts := append([]gs.Option{
-				gs.WithLibs(gs.LibString | gs.LibLLM),
-				gs.WithLLMProvider(provider),
+			opts := append([]leia.Option{
+				leia.WithLibs(leia.LibString | leia.LibLLM),
+				leia.WithLLMProvider(provider),
 			}, tc.opts...)
-			vm := gs.New(opts...)
+			vm := leia.New(opts...)
 			if err := vm.Exec(`
 result, err := loop.reflect({
     user: "answer",

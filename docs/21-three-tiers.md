@@ -74,7 +74,7 @@ Plus the low-level infrastructure in `internal/jit/`:
   value_layout.go       (354)  NaN-boxing constants and helpers
 ```
 
-The graph builder correctly converts any GScript function to CFG-based SSA. The IR interpreter executes that IR and produces the same results as the VM -- it is the correctness oracle that catches graph builder bugs without touching ARM64. The validator checks structural invariants after every pass. The optimization passes are individually tested and composable. The register allocator assigns hardware registers to SSA values.
+The graph builder correctly converts any Leia function to CFG-based SSA. The IR interpreter executes that IR and produces the same results as the VM -- it is the correctness oracle that catches graph builder bugs without touching ARM64. The validator checks structural invariants after every pass. The optimization passes are individually tested and composable. The register allocator assigns hardware registers to SSA values.
 
 All of this stays.
 

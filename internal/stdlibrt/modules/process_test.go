@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/never-labs/gscript/internal/runtime"
-	"github.com/never-labs/gscript/internal/stdlibrt"
+	"github.com/never-labs/leia/internal/runtime"
+	"github.com/never-labs/leia/internal/stdlibrt"
 )
 
 func processInterp(t *testing.T) *runtime.Interpreter {
@@ -130,8 +130,8 @@ func TestProcessPid(t *testing.T) {
 func TestProcessEnv(t *testing.T) {
 	interp := processInterp(t)
 
-	os.Setenv("GSCRIPT_TEST_PROC_ENV", "test_value")
-	defer os.Unsetenv("GSCRIPT_TEST_PROC_ENV")
+	os.Setenv("LEIA_TEST_PROC_ENV", "test_value")
+	defer os.Unsetenv("LEIA_TEST_PROC_ENV")
 
 	execOnInterp(t, interp, `env := process.env()`)
 
@@ -139,7 +139,7 @@ func TestProcessEnv(t *testing.T) {
 	if !v.IsTable() {
 		t.Fatalf("expected table, got %s", v.TypeName())
 	}
-	val := v.Table().RawGet(runtime.StringValue("GSCRIPT_TEST_PROC_ENV"))
+	val := v.Table().RawGet(runtime.StringValue("LEIA_TEST_PROC_ENV"))
 	if val.Str() != "test_value" {
 		t.Errorf("expected 'test_value', got '%s'", val.Str())
 	}

@@ -1,6 +1,6 @@
 package fs
 
-import "github.com/never-labs/gscript/internal/support/hostpath"
+import "github.com/never-labs/leia/internal/support/hostpath"
 
 // ResolveSandboxPath resolves path under root and rejects escapes. Empty root
 // preserves the host path unchanged for unrestricted embedders.

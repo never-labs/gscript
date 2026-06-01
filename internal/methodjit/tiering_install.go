@@ -5,7 +5,7 @@ package methodjit
 import (
 	"unsafe"
 
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/vm"
 )
 
 func (tm *TieringManager) installTier2(proto *vm.FuncProto, cf *CompiledFunction) {

@@ -13,15 +13,15 @@ class TriageSelectorTest(unittest.TestCase):
 
         self.assertEqual(
             triage.bench_id_to_path(root, "data/soa_dot"),
-            ("data", "soa_dot", root / "benchmarks" / "data" / "soa_dot.gs"),
+            ("data", "soa_dot", root / "benchmarks" / "data" / "soa_dot.leia"),
         )
         self.assertEqual(
             triage.bench_id_to_path(root, "concurrency/goroutine_sleep"),
-            ("concurrency", "goroutine_sleep", root / "benchmarks" / "concurrency" / "goroutine_sleep.gs"),
+            ("concurrency", "goroutine_sleep", root / "benchmarks" / "concurrency" / "goroutine_sleep.leia"),
         )
         self.assertEqual(
             triage.bench_id_to_path(root, "table/events_metamethod"),
-            ("table", "events_metamethod", root / "benchmarks" / "table" / "events_metamethod.gs"),
+            ("table", "events_metamethod", root / "benchmarks" / "table" / "events_metamethod.leia"),
         )
 
     def test_groups_for_benches_uses_shared_domain_selector_resolution(self):

@@ -14,13 +14,13 @@ In [Post #21](21-three-tiers), we deleted 5,600 lines of broken emission code an
 
 That rebuild is done. Tier 1 compiles every function on first call. Tier 2 optimizes hot functions with type specialization, constant propagation, dead code elimination, inlining, and register allocation. The benchmarks are in, and the story they tell is more interesting than any individual number.
 
-This post is about what we learned. Not just about GScript, but about what makes *any* dynamic language JIT fast --- the techniques that matter, ranked by impact, with real data from a compiler we built from scratch.
+This post is about what we learned. Not just about Leia, but about what makes *any* dynamic language JIT fast --- the techniques that matter, ranked by impact, with real data from a compiler we built from scratch.
 
 ---
 
 ## The seven techniques, ranked
 
-We implemented every major JIT optimization technique in GScript's Tier 2. We measured each one. Here is the ranking, from most impactful to least, for dynamic languages.
+We implemented every major JIT optimization technique in Leia's Tier 2. We measured each one. Here is the ranking, from most impactful to least, for dynamic languages.
 
 ### #1. Type specialization
 
@@ -30,7 +30,7 @@ A dynamic language does not know, at compile time, what type a variable holds. T
 
 Type specialization observes the types that actually appear at runtime, inserts a guard ("if this is not an integer, bail out"), and generates code that assumes the guard holds. One ADD instruction instead of a type-check-dispatch-ADD sequence.
 
-In GScript, the TypeSpecialize pass replaces generic IR operations with type-specialized variants:
+In Leia, the TypeSpecialize pass replaces generic IR operations with type-specialized variants:
 
 ```
 Before:  v5 = OpAdd v3, v4       (generic: check types, dispatch, add)
@@ -64,7 +64,7 @@ ADD    X20, X20, X21           ; raw integer add, result stays in register
 
 One instruction instead of fourteen. No type check, no tag extraction, no re-boxing, no memory round-trip.
 
-The data from GScript: `fibonacci_iterative` went from 1.04s in the interpreter to 0.075s in Tier 2. That is a 14.6x speedup. The mandelbrot micro-benchmark, which runs a tight float loop, went from 143 microseconds (VM) to 0.24 microseconds (Tier 2) --- a 591x improvement. The bulk of those gains come from type specialization turning every arithmetic operation from a 14-instruction sequence into a 1-instruction sequence.
+The data from Leia: `fibonacci_iterative` went from 1.04s in the interpreter to 0.075s in Tier 2. That is a 14.6x speedup. The mandelbrot micro-benchmark, which runs a tight float loop, went from 143 microseconds (VM) to 0.24 microseconds (Tier 2) --- a 591x improvement. The bulk of those gains come from type specialization turning every arithmetic operation from a 14-instruction sequence into a 1-instruction sequence.
 
 ### #2. Inline caches
 
@@ -72,7 +72,7 @@ Property access in dynamic languages is hash table lookup. When you write `point
 
 An inline cache (IC) remembers the result of the last lookup at each access site. It caches the table's "shape" (its set of field names and their positions) and the field's offset. On the next access, it compares the table's shape with the cached shape. If they match --- and they almost always do --- it reads the field directly by offset. One comparison and one memory load, about 3 nanoseconds.
 
-GScript's Tier 1 implements per-PC inline field caches:
+Leia's Tier 1 implements per-PC inline field caches:
 
 ```arm64
 ; Inline cache for GETFIELD point.x
@@ -97,7 +97,7 @@ When function A calls function B, the optimizer cannot see across the call. It c
 
 Inlining removes that wall. The callee's IR is spliced into the caller's IR, and suddenly the optimizer sees everything. Type specialization works across the former call boundary. Constant propagation folds arguments. Dead code elimination removes unused computations that were invisible before inlining.
 
-GScript's `pass_inline.go` does explicit monomorphic inlining: if a call site always calls the same function, and that function is small enough, its body is spliced into the caller's SSA graph. LuaJIT achieves the same effect naturally --- its trace recorder follows execution through function calls, recording the callee's body as part of the trace. V8's TurboFan uses explicit inlining heuristics similar to ours.
+Leia's `pass_inline.go` does explicit monomorphic inlining: if a call site always calls the same function, and that function is small enough, its body is spliced into the caller's SSA graph. LuaJIT achieves the same effect naturally --- its trace recorder follows execution through function calls, recording the callee's body as part of the trace. V8's TurboFan uses explicit inlining heuristics similar to ours.
 
 The Sum(10000) micro-benchmark, where the loop body calls a trivial helper, shows the effect: VM 98 microseconds, Tier 1 23 microseconds, Tier 2 with inlining 5 microseconds. The 19x over VM comes from inlining removing the call boundary, which lets type specialization and register allocation work on the combined code.
 
@@ -107,7 +107,7 @@ Dynamic languages create many temporary objects. Every `{x: 1, y: 2}` is a heap 
 
 Escape analysis detects objects that never "escape" the function --- they are created, used, and discarded without being stored in a global, passed to another function, or returned. These objects can be replaced with scalar variables on the stack: instead of allocating a `{x, y}` table and reading `point.x`, the compiler keeps `x` and `y` in registers.
 
-GScript does not implement escape analysis yet. V8's TurboFan does. PyPy does. LuaJIT does not --- but LuaJIT has allocation sinking, which is a related technique that delays allocation until a side exit proves it is needed.
+Leia does not implement escape analysis yet. V8's TurboFan does. PyPy does. LuaJIT does not --- but LuaJIT has allocation sinking, which is a related technique that delays allocation until a side exit proves it is needed.
 
 This is the technique we expect to deliver the next large step for allocation-heavy benchmarks like `binary_trees` and `object_creation`, which currently run *slower* under JIT because the exit-resume overhead per NEWTABLE dominates.
 
@@ -119,7 +119,7 @@ Type specialization inserts a guard: "if this is not an integer, bail out." But 
 
 Without deopt, you cannot speculate. Without speculation, you cannot type-specialize. Without type specialization, your JIT is just a faster interpreter dispatch.
 
-GScript's deopt path: when a type guard fails in Tier 2, the compiled code stores its register state back to the VM register file and exits with `ExitDeopt`. The tiering manager catches this exit and re-enters the function through Tier 1 (the baseline JIT), which handles all types correctly because it never speculates. After enough deopts, the function is permanently downgraded to Tier 1.
+Leia's deopt path: when a type guard fails in Tier 2, the compiled code stores its register state back to the VM register file and exits with `ExitDeopt`. The tiering manager catches this exit and re-enters the function through Tier 1 (the baseline JIT), which handles all types correctly because it never speculates. After enough deopts, the function is permanently downgraded to Tier 1.
 
 ```
 Tier 2 guard fires → spill registers → ExitDeopt → TieringManager
@@ -133,9 +133,9 @@ Every production JIT has this machinery. LuaJIT calls them side exits with snaps
 
 The CPU has registers. Memory is slow. Keeping values in registers instead of loading and storing them from memory on every operation eliminates enormous overhead --- an L1 cache hit is 3--4 cycles, but a register access is 0 cycles.
 
-But here is the counterintuitive finding from GScript: **register allocation without type specialization can be slower than no register allocation at all.**
+But here is the counterintuitive finding from Leia: **register allocation without type specialization can be slower than no register allocation at all.**
 
-GScript's Tier 3 (register-allocated, without raw-int mode) was tested against Tier 1 (baseline, no register allocation). On Sum(10000), Tier 3 was 27,228 ns/op versus Tier 1's 19,079 ns/op. The register-allocated code was 1.4x *slower*.
+Leia's Tier 3 (register-allocated, without raw-int mode) was tested against Tier 1 (baseline, no register allocation). On Sum(10000), Tier 3 was 27,228 ns/op versus Tier 1's 19,079 ns/op. The register-allocated code was 1.4x *slower*.
 
 Why? Because without type specialization, both tiers shuffle NaN-boxed 64-bit values. The register allocator keeps NaN-boxed values in registers instead of memory --- but it still does the type check, the tag extraction, the re-boxing. The 14-instruction ADD sequence stays the same. The allocator just moves the 14 instructions from operating on memory to operating on registers, adding SSA overhead without removing the fundamental bottleneck.
 
@@ -149,13 +149,13 @@ Loop-invariant code motion (LICM), loop unrolling, strength reduction. These are
 
 Consider a loop that computes mandelbrot iterations. In C, the loop body is already tight: a few multiplies, a few adds, a comparison. LICM and unrolling squeeze out the last 10--20%. In a dynamic language, the loop body starts at 14 instructions per operation instead of one. Type specialization delivers a 10x improvement. Unrolling the now-specialized loop delivers another 10--20% on top.
 
-GScript does not currently implement LICM or loop unrolling. The 591x on mandelbrot micro comes entirely from type specialization and register allocation. Loop optimizations are on the roadmap, but they are not the bottleneck.
+Leia does not currently implement LICM or loop unrolling. The 591x on mandelbrot micro comes entirely from type specialization and register allocation. Loop optimizations are on the roadmap, but they are not the bottleneck.
 
 ---
 
 ## The architecture
 
-GScript's multi-tier JIT follows V8's design. Three tiers, each with a single responsibility.
+Leia's multi-tier JIT follows V8's design. Three tiers, each with a single responsibility.
 
 ```
 Tier 0: Interpreter (VM)
@@ -210,7 +210,7 @@ The mandelbrot 591x deserves explanation. The micro-benchmark runs 10 iterations
 
 Here is the most important thing we learned, and it is not about any individual optimization technique.
 
-GScript's Tier 2 has all the core optimizations: type specialization, register allocation, inlining, constant propagation, dead code elimination, deoptimization. The micro-benchmarks prove they work --- 14.6x, 19x, 591x over the interpreter.
+Leia's Tier 2 has all the core optimizations: type specialization, register allocation, inlining, constant propagation, dead code elimination, deoptimization. The micro-benchmarks prove they work --- 14.6x, 19x, 591x over the interpreter.
 
 But look at the full benchmark suite. Most benchmarks still run at Tier 1 speed.
 
@@ -228,15 +228,15 @@ Compare with the production JITs:
 
 **V8** compiles everything at every tier. Sparkplug compiles all JavaScript. Maglev compiles all JavaScript, just with optimization. TurboFan compiles all JavaScript, just with more aggressive optimization. There is no subset of the language that prevents promotion.
 
-**GScript** currently has a promotion barrier. Tier 1 handles all 45 opcodes. Tier 2 handles a subset: arithmetic, comparisons, branches, constants, slots, calls (via exit), and a few others. Functions that use table operations, field access, or certain globals cannot promote.
+**Leia** currently has a promotion barrier. Tier 1 handles all 45 opcodes. Tier 2 handles a subset: arithmetic, comparisons, branches, constants, slots, calls (via exit), and a few others. Functions that use table operations, field access, or certain globals cannot promote.
 
-This is the gap that explains why GScript's micro-benchmark numbers look competitive while the full-suite numbers do not. The optimizer is good. The set of functions it can optimize is too small.
+This is the gap that explains why Leia's micro-benchmark numbers look competitive while the full-suite numbers do not. The optimizer is good. The set of functions it can optimize is too small.
 
 ---
 
 ## Comparison table
 
-| Technique | LuaJIT | V8 TurboFan | PyPy | GScript |
+| Technique | LuaJIT | V8 TurboFan | PyPy | Leia |
 |-----------|--------|-------------|------|---------|
 | Type Specialization | Trace auto-specialize | FeedbackVector + guards | RPython type inference | TypeSpecialize pass |
 | Inline Caches | Built into trace | Hidden class + megamorphic IC | Map-based IC | Tier 1 per-PC FieldCache |
@@ -246,7 +246,7 @@ This is the gap that explains why GScript's micro-benchmark numbers look competi
 | Register Allocation | Custom (LuaJIT has ~16 regs) | Sea-of-nodes regalloc | RPython backend | Forward-scan (5 GPR, 8 FPR) |
 | Promotion Barrier | None (traces everything) | None (compiles everything) | None | Table/field ops block Tier 2 |
 
-The last row is the important one. Every production JIT has eliminated the promotion barrier. GScript has not --- yet.
+The last row is the important one. Every production JIT has eliminated the promotion barrier. Leia has not --- yet.
 
 ---
 
@@ -266,7 +266,7 @@ This is why Tier 3 (regalloc without type spec) was slower than Tier 1 (no regal
 
 **Lesson 3: Coverage matters more than peak performance.**
 
-GScript's Tier 2 produces code that runs mandelbrot micro at 591x over the interpreter. LuaJIT runs the full mandelbrot(1000) at about 25x over GScript's interpreter. The per-instruction quality is comparable --- but LuaJIT optimizes the entire function while GScript optimizes a subset of operations and exits to Go for the rest.
+Leia's Tier 2 produces code that runs mandelbrot micro at 591x over the interpreter. LuaJIT runs the full mandelbrot(1000) at about 25x over Leia's interpreter. The per-instruction quality is comparable --- but LuaJIT optimizes the entire function while Leia optimizes a subset of operations and exits to Go for the rest.
 
 A 10x optimizer that covers 100% of functions beats a 1000x optimizer that covers 10% of functions. Every time.
 
@@ -284,7 +284,7 @@ The roadmap is driven by the promotion barrier analysis. In order of expected im
 
 **4. Escape analysis.** Replace short-lived table allocations with scalar values. Unlocks binary_trees, object_creation, and any allocation-heavy inner loop.
 
-**5. Zero-indexed arrays and ArrayFloat JIT paths.** Lua-compatible 1-indexed arrays add overhead. GScript could optionally use 0-indexed arrays for numeric hot paths, and emit FMADD/FMSUB for float array operations.
+**5. Zero-indexed arrays and ArrayFloat JIT paths.** Lua-compatible 1-indexed arrays add overhead. Leia could optionally use 0-indexed arrays for numeric hot paths, and emit FMADD/FMSUB for float array operations.
 
 Each step expands the set of functions eligible for Tier 2. The optimizer is ready. The task is bringing more code to it.
 
@@ -298,7 +298,7 @@ It is not one technique. It is the combination: type specialization to eliminate
 
 But more than the techniques, the lesson is about coverage. A JIT that optimizes 100% of a language's operations, even modestly, will outperform one that optimizes a subset of operations extremely well. LuaJIT is fast not because its trace compiler produces better code than V8's TurboFan --- it does not, on a per-instruction basis. LuaJIT is fast because Mike Pall ensured that every Lua operation has a native implementation in the trace recorder. There is no operation that forces a trace exit.
 
-GScript is not there yet. The optimizer works. The coverage does not. That is the next chapter.
+Leia is not there yet. The optimizer works. The coverage does not. That is the next chapter.
 
 ---
 

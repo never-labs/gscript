@@ -2,12 +2,12 @@ package modules
 
 import (
 	"fmt"
-	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/leia/internal/runtime"
 
-	basebits "github.com/never-labs/gscript/internal/stdlib/bits"
+	basebits "github.com/never-labs/leia/internal/stdlib/bits"
 )
 
-// buildBitsLib creates the GScript-native "bits" standard library.
+// buildBitsLib creates the Leia-native "bits" standard library.
 //
 // The API intentionally uses Go-style names and 64-bit integer operations
 // instead of mirroring Lua bitwise operator syntax. Lua compatibility can be

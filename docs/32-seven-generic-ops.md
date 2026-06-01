@@ -23,7 +23,7 @@ v45  = Div         v0, v43 : float         // dt / (dsq * dist) — GENERIC
 
 `v43` is `:float` (both operands have type guards from field feedback). But `v0` is `:any`. TypeSpecialize sees `Div(any, float)` and gives up — it needs both operands typed.
 
-The clever thing: `Div` returns `:float` unconditionally in GScript (Lua semantics — division always produces a float). So `mag` IS typed in the type map. Downstream, `bj.mass * mag` sees `float * float` and becomes `MulFloat`. The damage doesn't cascade through the j-loop.
+The clever thing: `Div` returns `:float` unconditionally in Leia (Lua semantics — division always produces a float). So `mag` IS typed in the type map. Downstream, `bj.mass * mag` sees `float * float` and becomes `MulFloat`. The damage doesn't cascade through the j-loop.
 
 But the position update loop is less lucky:
 

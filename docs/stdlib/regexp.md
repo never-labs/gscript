@@ -8,7 +8,7 @@ The `regexp` library provides regular expression matching using Go's RE2 syntax.
 
 Compiles a regular expression pattern. Returns a regexp object on success, or `nil` and an error message on failure.
 
-```gscript
+```leia
 re, err := regexp.compile("[0-9]+")
 if err != nil {
     print("bad pattern: " .. err)
@@ -19,7 +19,7 @@ if err != nil {
 
 Compiles a regular expression pattern. Raises an error if the pattern is invalid.
 
-```gscript
+```leia
 re := regexp.mustCompile("[0-9]+")
 ```
 
@@ -27,7 +27,7 @@ re := regexp.mustCompile("[0-9]+")
 
 Returns `true` if the pattern matches anywhere in the string.
 
-```gscript
+```leia
 regexp.match("^hello", "hello world")  -- true
 ```
 
@@ -35,7 +35,7 @@ regexp.match("^hello", "hello world")  -- true
 
 Returns the first match of the pattern in the string, or `nil` if no match.
 
-```gscript
+```leia
 regexp.find("[0-9]+", "abc123def")  -- "123"
 ```
 
@@ -43,7 +43,7 @@ regexp.find("[0-9]+", "abc123def")  -- "123"
 
 Returns a table (array) of all matches. Pass `n` to limit the number of matches (`-1` for all, which is the default).
 
-```gscript
+```leia
 regexp.findAll("[0-9]+", "a1b22c333")  -- {"1", "22", "333"}
 ```
 
@@ -51,7 +51,7 @@ regexp.findAll("[0-9]+", "a1b22c333")  -- {"1", "22", "333"}
 
 Replaces the first match of the pattern with the replacement string.
 
-```gscript
+```leia
 regexp.replace("[0-9]+", "a1b22", "X")  -- "aXb22"
 ```
 
@@ -59,7 +59,7 @@ regexp.replace("[0-9]+", "a1b22", "X")  -- "aXb22"
 
 Replaces all matches of the pattern with the replacement string.
 
-```gscript
+```leia
 regexp.replaceAll("[0-9]+", "a1b22c333", "X")  -- "aXbXcX"
 ```
 
@@ -67,7 +67,7 @@ regexp.replaceAll("[0-9]+", "a1b22c333", "X")  -- "aXbXcX"
 
 Splits the string around matches of the pattern. Pass `n` to limit the number of parts (`-1` for all, which is the default).
 
-```gscript
+```leia
 regexp.split(",\\s*", "a, b, c")  -- {"a", "b", "c"}
 ```
 
@@ -91,7 +91,7 @@ Returns the first match, or `nil`.
 
 Returns a table where index 1 is the full match and indices 2, 3, ... are the captured subgroups. Returns `nil` if no match.
 
-```gscript
+```leia
 re := regexp.mustCompile("(\\w+)@(\\w+)")
 m := re.findSubmatch("user@host")
 -- m[1] = "user@host", m[2] = "user", m[3] = "host"

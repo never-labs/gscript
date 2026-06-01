@@ -76,7 +76,7 @@ Once the bytecode proves that shape exactly, the table has no language-visible
 identity. No user code can observe its address. No metatable can be attached to
 it. No iterator can see its keys. No closure captures it. No call receives it.
 
-So the whole-call kernel does not allocate a GScript table at all.
+So the whole-call kernel does not allocate a Leia table at all.
 
 It runs the same algorithm over a byte slice:
 
@@ -86,7 +86,7 @@ flags[j] = 0
 count flags[i] != 0
 ```
 
-Then it returns the count as a normal GScript value.
+Then it returns the count as a normal Leia value.
 
 The result is large:
 

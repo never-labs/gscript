@@ -10,7 +10,7 @@ import (
 	"math"
 	"math/big"
 
-	"github.com/never-labs/gscript/internal/jit"
+	"github.com/never-labs/leia/internal/jit"
 )
 
 // --- Constant emission ---

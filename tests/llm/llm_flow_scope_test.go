@@ -1,20 +1,20 @@
-package gscript_test
+package leia_test
 
 import (
-	gs "github.com/never-labs/gscript"
+	leia "github.com/never-labs/leia"
 	"testing"
 )
 
 func TestLLMAgentFlowImplicitConfigLocalsAreWhitelistedAndShadowable(t *testing.T) {
 	for _, tc := range []struct {
 		name string
-		opts []gs.Option
+		opts []leia.Option
 	}{
 		{name: "interpreter"},
-		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			vm := gs.New(append([]gs.Option{gs.WithLibs(gs.LibLLM)}, tc.opts...)...)
+			vm := leia.New(append([]leia.Option{leia.WithLibs(leia.LibLLM)}, tc.opts...)...)
 			err := vm.Exec(`
 agent probe(q) {
     model: "cfg-model"
@@ -64,13 +64,13 @@ func TestLLMAgentFlowDoesNotInjectArbitraryMetaFields(t *testing.T) {
 		t.Run(field.name, func(t *testing.T) {
 			for _, tc := range []struct {
 				name string
-				opts []gs.Option
+				opts []leia.Option
 			}{
 				{name: "interpreter"},
-				{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+				{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
 			} {
 				t.Run(tc.name, func(t *testing.T) {
-					vm := gs.New(append([]gs.Option{gs.WithLibs(gs.LibLLM)}, tc.opts...)...)
+					vm := leia.New(append([]leia.Option{leia.WithLibs(leia.LibLLM)}, tc.opts...)...)
 					err := vm.Exec(`
 ` + field.name + ` := "outer-` + field.name + `"
 

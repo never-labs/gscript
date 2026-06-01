@@ -117,7 +117,7 @@ def conformance_cases(root: Path) -> dict[str, list[Path]]:
 def benchmark_ids(root: Path) -> set[str]:
     ids: set[str] = set()
     for group in BENCHMARK_GROUPS:
-        for path in (root / "benchmarks" / group).glob("*.gs"):
+        for path in (root / "benchmarks" / group).glob("*.leia"):
             ids.add(f"{group}/{path.stem}")
     return ids
 

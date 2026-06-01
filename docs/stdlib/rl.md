@@ -1,6 +1,6 @@
 # rl
 
-The `rl` library provides bindings to [raylib](https://www.raylib.com/) via [raylib-go](https://github.com/gen2brain/raylib-go), enabling game development in GScript. It covers window management, 2D rendering, input handling, audio, collision detection, and math utilities.
+The `rl` library provides bindings to [raylib](https://www.raylib.com/) via [raylib-go](https://github.com/gen2brain/raylib-go), enabling game development in Leia. It covers window management, 2D rendering, input handling, audio, collision detection, and math utilities.
 
 ## Colors
 
@@ -566,7 +566,7 @@ rl.RAYWHITE    -- {r: 245, g: 245, b: 245, a: 255}
 
 ```
 -- Initialize
-rl.initWindow(800, 600, "GScript Game")
+rl.initWindow(800, 600, "Leia Game")
 rl.setTargetFPS(60)
 
 x := 400

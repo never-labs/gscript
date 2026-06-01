@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/leia/internal/runtime"
 )
 
 func jsonInterp(t *testing.T, src string) *Interpreter {

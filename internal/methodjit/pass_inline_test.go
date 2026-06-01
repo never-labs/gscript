@@ -1,5 +1,5 @@
 // pass_inline_test.go tests the function inlining pass.
-// Tests compile GScript source with multiple functions, build the caller's IR,
+// Tests compile Leia source with multiple functions, build the caller's IR,
 // run the inline pass, and verify that small callees are inlined (OpCall removed)
 // while large or recursive callees are left as calls.
 
@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/never-labs/gscript/internal/runtime"
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/runtime"
+	"github.com/never-labs/leia/internal/vm"
 )
 
 // buildInlineTestIR compiles source and builds caller IR + inline config.

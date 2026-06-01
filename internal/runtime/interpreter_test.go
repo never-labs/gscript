@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/never-labs/gscript/internal/lexer"
-	"github.com/never-labs/gscript/internal/parser"
+	"github.com/never-labs/leia/internal/lexer"
+	"github.com/never-labs/leia/internal/parser"
 )
 
 // helper: parse and execute source code, return the interpreter.

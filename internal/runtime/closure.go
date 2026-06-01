@@ -3,7 +3,7 @@ package runtime
 import (
 	"unsafe"
 
-	"github.com/never-labs/gscript/internal/ast"
+	"github.com/never-labs/leia/internal/ast"
 )
 
 // FuncProto holds the parsed function information (shared across all closures
@@ -55,7 +55,7 @@ type Closure struct {
 	Env      *Environment // the environment where the closure was defined
 }
 
-// GoFunction is a native Go function callable from GScript.
+// GoFunction is a native Go function callable from Leia.
 type GoFunction struct {
 	Name     string
 	Fn       func(args []Value) ([]Value, error)

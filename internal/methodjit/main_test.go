@@ -46,7 +46,7 @@ import (
 	"testing"
 )
 
-const envKey = "_GSCRIPT_JIT_TESTS_RERUN"
+const envKey = "_LEIA_JIT_TESTS_RERUN"
 
 func TestMain(m *testing.M) {
 	if os.Getenv(envKey) == "" {

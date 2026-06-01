@@ -22,7 +22,7 @@ func makeTree(depth) {
 ```
 
 That was already a real compiler win. The builder could allocate normal
-two-field GScript tables directly instead of falling through generic bytecode
+two-field Leia tables directly instead of falling through generic bytecode
 and runtime table operations at every node.
 
 But it was still building the whole tree.
@@ -249,7 +249,7 @@ race when concurrent tables are enabled.
 The lazy root is not enough.
 
 Once a lazy child has been exposed, the parent stores that child as a boxed
-GScript value inside `LazyRecursiveTable.childValues`. Those values can point
+Leia value inside `LazyRecursiveTable.childValues`. Those values can point
 to heap tables.
 
 The table root scanner therefore scans lazy child values in addition to the
@@ -371,5 +371,5 @@ to build.
 
 *Previous: [The Loop Counted By Twos](/77-the-loop-counted-by-twos)*
 
-*This is post 78 in the [GScript JIT series](https://jxwr.github.io/gscript/).
+*This is post 78 in the [Leia JIT series](https://jxwr.github.io/leia/).
 All numbers from a single-thread ARM64 Apple Silicon machine.*

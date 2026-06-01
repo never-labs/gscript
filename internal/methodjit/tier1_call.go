@@ -32,8 +32,8 @@ import (
 	"sync"
 	"unsafe"
 
-	"github.com/never-labs/gscript/internal/jit"
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/jit"
+	"github.com/never-labs/leia/internal/vm"
 )
 
 // Struct layout constants for vm.Closure and vm.FuncProto.

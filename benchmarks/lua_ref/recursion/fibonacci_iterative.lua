@@ -1,5 +1,5 @@
 -- Benchmark: Iterative Fibonacci
--- Matches benchmarks/recursion/fibonacci_iterative.gs: fib_iter(70) x 1,000,000 reps.
+-- Matches benchmarks/recursion/fibonacci_iterative.leia: fib_iter(70) x 1,000,000 reps.
 
 local function fib_iter(n)
     local a = 0

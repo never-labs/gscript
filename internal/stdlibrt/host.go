@@ -1,6 +1,6 @@
 package stdlibrt
 
-import "github.com/never-labs/gscript/internal/runtime"
+import "github.com/never-labs/leia/internal/runtime"
 
 type HostOptions struct {
 	SkipHostIO            bool

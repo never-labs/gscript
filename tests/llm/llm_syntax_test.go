@@ -1,34 +1,34 @@
-package gscript_test
+package leia_test
 
 import (
 	"testing"
 
-	gs "github.com/never-labs/gscript"
-	"github.com/never-labs/gscript/llm"
+	leia "github.com/never-labs/leia"
+	"github.com/never-labs/leia/llm"
 )
 
 func TestLLMSyntaxExecutesThroughLLMStdlib(t *testing.T) {
 	for _, tc := range []struct {
 		name string
-		opts []gs.Option
+		opts []leia.Option
 	}{
 		{name: "interpreter"},
-		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			provider := &mockLLMProvider{results: []llm.TurnResult{
 				{Status: "final_answer", Text: "agent-ok"},
 				{Status: "final_answer", Text: "turn-ok"},
 			}}
-			opts := append([]gs.Option{
-				gs.WithLibs(gs.LibString | gs.LibLLM),
-				gs.WithLLMProvider(provider),
+			opts := append([]leia.Option{
+				leia.WithLibs(leia.LibString | leia.LibLLM),
+				leia.WithLLMProvider(provider),
 			}, tc.opts...)
-			vm := gs.New(opts...)
+			vm := leia.New(opts...)
 			err := vm.Exec(`
 // Lookup docs.
-//gscript:requires docs.read, net.client
-//gscript:param query search query text
+//leia:requires docs.read, net.client
+//leia:param query search query text
 tool lookup(query) {
     return "found:" .. query, nil
 }
@@ -48,7 +48,7 @@ answer := agent(q) {
     user: q
 }
 
-result, err := answer("search gscript")
+result, err := answer("search leia")
 direct, direct_err := turn {
     model: "direct-model"
     messages: messages { user: "single turn" }
@@ -66,7 +66,7 @@ turn_text := direct.text
 			if agentReq.Model != "mock-fast" {
 				t.Fatalf("agent model = %q, want mock-fast", agentReq.Model)
 			}
-			if len(agentReq.Messages) != 2 || agentReq.Messages[0].Role != "system" || agentReq.Messages[1].Text != "search gscript" {
+			if len(agentReq.Messages) != 2 || agentReq.Messages[0].Role != "system" || agentReq.Messages[1].Text != "search leia" {
 				t.Fatalf("agent messages = %#v", agentReq.Messages)
 			}
 			if len(agentReq.Tools) != 1 || agentReq.Tools[0].Name != "lookup" {

@@ -9,7 +9,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/never-labs/gscript/internal/stdlibrt"
+	"github.com/never-labs/leia/internal/stdlibrt"
 )
 
 func TestHTTPBuildRequestTable(t *testing.T) {
@@ -103,9 +103,9 @@ func TestHTTPResponseJSON(t *testing.T) {
 	val := buildResponseTable(w, req)
 	tbl := val.Table()
 
-	// Build a GScript table to serialize
+	// Build a Leia table to serialize
 	data := NewTable()
-	data.RawSet(StringValue("name"), StringValue("GScript"))
+	data.RawSet(StringValue("name"), StringValue("Leia"))
 	data.RawSet(StringValue("version"), IntValue(1))
 
 	jsonFn := tbl.RawGet(StringValue("json")).GoFunction()
@@ -124,8 +124,8 @@ func TestHTTPResponseJSON(t *testing.T) {
 	if err := json.Unmarshal(body, &parsed); err != nil {
 		t.Fatalf("failed to parse JSON response: %v", err)
 	}
-	if parsed["name"] != "GScript" {
-		t.Errorf("expected name=GScript, got %v", parsed["name"])
+	if parsed["name"] != "Leia" {
+		t.Errorf("expected name=Leia, got %v", parsed["name"])
 	}
 }
 
@@ -192,10 +192,10 @@ func TestHTTPEndToEnd(t *testing.T) {
 }
 
 func TestHTTPEndToEndWithInterpreter(t *testing.T) {
-	// Test that the interpreter can call a GScript handler function
+	// Test that the interpreter can call a Leia handler function
 	interp := New()
 
-	// Create a GScript handler function as a GoFunction for simplicity
+	// Create a Leia handler function as a GoFunction for simplicity
 	handlerFn := FunctionValue(&GoFunction{
 		Name: "testHandler",
 		Fn: func(args []Value) ([]Value, error) {

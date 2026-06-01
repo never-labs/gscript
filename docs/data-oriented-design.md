@@ -1,8 +1,8 @@
 # Data-Oriented and Array Programming Design
 
 This document is a design slice for adding data-oriented and array-programming
-capabilities to GScript. It references Odin because Odin exposes several of the
-same ideas as language features, but GScript is a dynamic embeddable scripting
+capabilities to Leia. It references Odin because Odin exposes several of the
+same ideas as language features, but Leia is a dynamic embeddable scripting
 language. The goal is to migrate the shape of the ideas, not Odin's static
 compiler model.
 
@@ -24,7 +24,7 @@ type. Odin applies array programming to them directly: arithmetic and comparison
 operators can operate element-wise on fixed arrays. That works well because the
 compiler knows the element type, length, and storage layout before codegen.
 
-GScript should migrate the user model, not the exact type model:
+Leia should migrate the user model, not the exact type model:
 
 - typed dense arrays should have a single numeric element kind and contiguous
   backing storage;
@@ -43,8 +43,8 @@ Odin has explicit `swizzle(a, 2, 1, 0)` and implicit fields such as `xyzw` and
 small vector math because it makes lane projection, duplication, and reordering
 cheap and readable.
 
-GScript should start with explicit projection operations. Implicit field syntax
-looks attractive, but it collides with GScript table/property semantics and is
+Leia should start with explicit projection operations. Implicit field syntax
+looks attractive, but it collides with Leia table/property semantics and is
 not suitable for a dynamic language until the parser and object model have a
 clear distinction between vector lanes and table fields.
 
@@ -63,7 +63,7 @@ internal representation is column-major to support SIMD-friendly access, and it
 has an explicit row-major directive for alternate storage. Odin can make those
 layout decisions statically.
 
-GScript should separate matrix semantics from storage details:
+Leia should separate matrix semantics from storage details:
 
 - matrix values should carry element kind, rows, columns, and layout metadata;
 - math APIs should define whether operations are element-wise, matrix
@@ -80,7 +80,7 @@ Odin's `#soa` lets code access records as if they were an array of structs while
 storing fields as separate arrays. It also provides `soa_zip` and `soa_unzip` so
 existing slices can be treated as one structured sequence without copying.
 
-This is the most important Odin idea for GScript: users should get the cache and
+This is the most important Odin idea for Leia: users should get the cache and
 SIMD benefits of structure-of-arrays without writing index plumbing everywhere.
 
 Portable design:
@@ -98,7 +98,7 @@ Odin exposes SIMD vectors as `#simd [N]T`, with lane operations and support
 procedures such as gather, scatter, select, reductions, fused multiply-add, and
 runtime swizzle. That is appropriate for a compiled systems language.
 
-For GScript, SIMD should first be a backend optimization for dense arrays,
+For Leia, SIMD should first be a backend optimization for dense arrays,
 vectors, matrices, and SoA columns. The user-facing contract should be ordinary
 numeric semantics with stable fallbacks. SIMD should only become visible through
 capability/debug APIs once correctness, determinism, and platform fallback rules
@@ -107,7 +107,7 @@ are tested.
 ## What Not To Copy Directly
 
 - Do not copy Odin's compile-time fixed-array syntax as a Phase A feature.
-  GScript currently has dynamic syntax and table semantics; parser-level array
+  Leia currently has dynamic syntax and table semantics; parser-level array
   types would create a large language-spec burden.
 - Do not copy implicit `.x`, `.y`, `.rgba`, or writable swizzle fields until
   table field lookup, method lookup, and vector lane lookup have a documented
@@ -116,7 +116,7 @@ are tested.
   Host APIs may need controlled buffer access, but script-level pointer access
   conflicts with embedding safety and sandboxing.
 - Do not expose `#no_bounds_check`-style controls. Bounds checks are part of
-  GScript safety; optimized kernels can remove checks internally only when they
+  Leia safety; optimized kernels can remove checks internally only when they
   preserve observable errors.
 - Do not require users to understand alignment, padding, or CPU lane width.
   These belong to runtime specialization and diagnostics, not core semantics.
@@ -134,11 +134,11 @@ Deliverables:
 
 - constructors for `f64`, `f32`, `i64`, `i32`, and `bool` dense arrays;
 - length, capacity, indexing, slicing, copy, fill, append, resize, and
-  conversion to/from ordinary GScript tables;
+  conversion to/from ordinary Leia tables;
 - element-wise `add`, `sub`, `mul`, `div`, comparisons, min/max, clamp, and
   reductions through stdlib functions;
 - clear shape/type errors for mismatched lengths and unsupported element kinds;
-- host embedding conversion rules for Go slices and dense GScript values.
+- host embedding conversion rules for Go slices and dense Leia values.
 
 Acceptance:
 

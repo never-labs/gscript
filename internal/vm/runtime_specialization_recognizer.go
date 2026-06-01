@@ -3,7 +3,7 @@ package vm
 import (
 	"math"
 
-	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/leia/internal/runtime"
 )
 
 // RuntimeSpecializationRoute identifies how a structural runtime specialization

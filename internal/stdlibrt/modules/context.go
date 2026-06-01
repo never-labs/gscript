@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/leia/internal/runtime"
 )
 
 func BuildContext() *runtime.Table {

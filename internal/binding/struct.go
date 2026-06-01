@@ -7,7 +7,7 @@ import (
 	"sync"
 	"unicode"
 
-	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/leia/internal/runtime"
 )
 
 // capitalizeFirst returns the string with the first letter uppercased.
@@ -21,7 +21,7 @@ func capitalizeFirst(s string) string {
 	return string(r)
 }
 
-// bindStructToInterp creates a GScript "class" table for a Go struct type
+// bindStructToInterp creates a Leia "class" table for a Go struct type
 // and registers it as a global in the interpreter.
 //
 // Given struct:
@@ -29,7 +29,7 @@ func capitalizeFirst(s string) string {
 //	type Vec2 struct { X, Y float64 }
 //	func (v Vec2) Length() float64 { ... }
 //
-// In GScript:
+// In Leia:
 //
 //	v := Vec2.new(0, 1)  -- creates new instance
 //	print(v.X)           -- field access
@@ -303,7 +303,7 @@ func (c Converter) BindStructToInterp(interp *runtime.Interpreter, name string, 
 	return nil
 }
 
-// makeStructInstance creates a GScript table wrapping a Go struct value.
+// makeStructInstance creates a Leia table wrapping a Go struct value.
 // The table uses instanceMeta for field/method access via __index/__newindex.
 func makeStructInstance(rv reflect.Value, instanceMeta *runtime.Table) runtime.Value {
 	t := runtime.NewTable()
@@ -314,7 +314,7 @@ func makeStructInstance(rv reflect.Value, instanceMeta *runtime.Table) runtime.V
 	return runtime.TableValue(t)
 }
 
-// structToValue converts a Go struct reflect.Value into a GScript table instance.
+// structToValue converts a Go struct reflect.Value into a Leia table instance.
 // This is used when returning Go structs from wrapped functions.
 func (c Converter) structToValue(rv reflect.Value) (runtime.Value, error) {
 	// Create a simple instance meta with __index for field access
@@ -466,7 +466,7 @@ func extractGoValue(val runtime.Value) reflect.Value {
 	return rv.Elem()
 }
 
-// fromValueStruct attempts to convert a GScript table back to a Go struct.
+// fromValueStruct attempts to convert a Leia table back to a Go struct.
 func (c Converter) fromValueStruct(val runtime.Value, target reflect.Type) (reflect.Value, error) {
 	// Try registry first
 	if val.IsTable() {

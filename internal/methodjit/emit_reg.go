@@ -47,7 +47,7 @@
 package methodjit
 
 import (
-	"github.com/never-labs/gscript/internal/jit"
+	"github.com/never-labs/leia/internal/jit"
 )
 
 // computeCrossBlockLive returns a set of value IDs that are used in a different

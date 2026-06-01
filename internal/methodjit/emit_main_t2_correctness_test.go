@@ -19,11 +19,11 @@ import (
 func readBenchFile(name string) ([]byte, error) {
 	domain := "numeric"
 	switch name {
-	case "sort.gs":
+	case "sort.leia":
 		domain = "table"
-	case "sieve.gs":
+	case "sieve.leia":
 		domain = "control"
-	case "closure_bench.gs":
+	case "closure_bench.leia":
 		domain = "calls"
 	}
 	p := filepath.Join("..", "..", "benchmarks", domain, name)
@@ -44,7 +44,7 @@ func TestMainT2_SortFullBench(t *testing.T) {
 	t.Skip("known bug: quicksort Tier 2 miscompiles on LCG input; see R75/R78 notes")
 }
 
-// TestMainT2_SortPattern: sort.gs shape with loop-calls in <main>.
+// TestMainT2_SortPattern: sort.leia shape with loop-calls in <main>.
 // Previously SIGSEGV or wrong output when main reached Tier 2.
 func TestMainT2_SortPattern(t *testing.T) {
 	src := `

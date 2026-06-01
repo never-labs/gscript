@@ -141,7 +141,7 @@ depth > 0:
 ```
 
 That is why the allocation profile barely changed. The benchmark still creates
-roughly the same number of GScript table objects. The improvement came from
+roughly the same number of Leia table objects. The improvement came from
 removing the recursive VM execution around those allocations.
 
 The guard result after merging:
@@ -235,7 +235,7 @@ integer arguments
 ```
 
 The next time the same subproblem appears, it is a map lookup inside the Tier 2
-protocol, not another GScript call tree.
+protocol, not another Leia call tree.
 
 The focused guard after merging:
 
@@ -302,14 +302,14 @@ If the evaluator cannot stay inside that envelope, it falls back.
 
 Two small correctness details are worth calling out.
 
-First, integer arithmetic is limited to int48-compatible results. GScript's
+First, integer arithmetic is limited to int48-compatible results. Leia's
 `runtime.IntValue` promotes values outside the int48 range to floats. The SCC
 protocol is an integer protocol, so it cannot silently wrap or keep pretending
 the result is an int. If an arithmetic result leaves the representable range,
 the protocol rejects and the VM handles the program normally.
 
 Second, `%` has to match the VM's signed modulo semantics. Go's `%` keeps the
-sign of the dividend. GScript's VM adjusts the result to match Lua-style modulo
+sign of the dividend. Leia's VM adjusts the result to match Lua-style modulo
 behavior:
 
 ```

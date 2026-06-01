@@ -6,8 +6,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/never-labs/gscript/internal/runtime"
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/runtime"
+	"github.com/never-labs/leia/internal/vm"
 )
 
 // bit returns a uint64 with the specified slot bits set.
@@ -85,9 +85,9 @@ func TestKnownInt_ModKeepsIntResult(t *testing.T) {
 // TestKnownInt_Ackermann: verifies that on real ackermann bytecode, the
 // second EQ and both SUB PCs have both operands marked as known-int.
 func TestKnownInt_Ackermann(t *testing.T) {
-	srcBytes, err := os.ReadFile("../../benchmarks/recursion/ackermann.gs")
+	srcBytes, err := os.ReadFile("../../benchmarks/recursion/ackermann.leia")
 	if err != nil {
-		t.Fatalf("read ackermann.gs: %v", err)
+		t.Fatalf("read ackermann.leia: %v", err)
 	}
 	top := compileTop(t, string(srcBytes))
 	ack := findProtoByName(top, "ack")

@@ -5,7 +5,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	utf8x "github.com/never-labs/gscript/internal/stdlib/utf8x"
+	utf8x "github.com/never-labs/leia/internal/stdlib/utf8x"
 )
 
 // BuildUTF8 creates the "utf8" standard library table.

@@ -87,7 +87,7 @@
 <body>
 
 <h1>Beyond LuaJIT</h1>
-<p class="subtitle">Notes on building a JIT compiler for GScript.</p>
+<p class="subtitle">Notes on building a JIT compiler for Leia.</p>
 
 <h2>Release Readiness</h2>
 
@@ -109,7 +109,7 @@
   <span class="date">2026-05-15</span>
   <br>
   <a href="87-the-scoreboard-turned-green">The Scoreboard Turned Green</a>
-  <p>The latest full local run is the first where every measured GScript row is ahead of the LuaJIT reference. This post covers the final stretch: stable closure and protocol call feedback, table and dispatch native paths, numeric lowering cleanup, Tier 2 compile-time trimming, refreshable synthetic guard deopts, and the benchmark scaling policy that removed short-run noise from <code>mutual_recursion</code>, <code>actors_dispatch_mutation</code>, <code>groupby_nested_agg</code>, and <code>matmul_dense_unroll2</code>.</p>
+  <p>The latest full local run is the first where every measured Leia row is ahead of the LuaJIT reference. This post covers the final stretch: stable closure and protocol call feedback, table and dispatch native paths, numeric lowering cleanup, Tier 2 compile-time trimming, refreshable synthetic guard deopts, and the benchmark scaling policy that removed short-run noise from <code>mutual_recursion</code>, <code>actors_dispatch_mutation</code>, <code>groupby_nested_agg</code>, and <code>matmul_dense_unroll2</code>.</p>
 </div>
 
 <div class="post">
@@ -158,7 +158,7 @@
   <span class="date">2026-05-01</span>
   <br>
   <a href="80-the-table-that-never-existed">The Table That Never Existed</a>
-  <p><code>sieve</code> stopped allocating and mutating a GScript table once the whole function proved that the table was local, integer-keyed, boolean-only, and never escaped. A structural value-return whole-call kernel now runs the same mark/count computation over a byte slice and returns the normal count value. The guard moved <code>sieve</code> from about 0.016s to about 0.004s, well ahead of the local LuaJIT reference around 0.010s, while <code>sort</code>, <code>matmul</code>, <code>nbody</code>, and <code>fannkuch</code> stayed flat.</p>
+  <p><code>sieve</code> stopped allocating and mutating a Leia table once the whole function proved that the table was local, integer-keyed, boolean-only, and never escaped. A structural value-return whole-call kernel now runs the same mark/count computation over a byte slice and returns the normal count value. The guard moved <code>sieve</code> from about 0.016s to about 0.004s, well ahead of the local LuaJIT reference around 0.010s, while <code>sort</code>, <code>matmul</code>, <code>nbody</code>, and <code>fannkuch</code> stayed flat.</p>
 </div>
 
 <div class="post">
@@ -193,7 +193,7 @@
   <span class="date">2026-04-30</span>
   <br>
   <a href="75-the-call-tree-learned-its-shape">The Call Tree Learned Its Shape</a>
-  <p><code>binary_trees</code> and <code>mutual_recursion</code> moved for the same architectural reason: Tier 2 can now install whole-call protocols when the entire recursive call tree has a provable shape. Fixed recursive table builders allocate normal GScript tables without re-entering the VM for every node, while pure integer mutual-recursive SCCs run through a guarded, bounded memoized evaluator. The merged guards moved <code>binary_trees</code> to about 0.151s and <code>mutual_recursion</code> to about 0.001s, faster than the local LuaJIT reference for the latter.</p>
+  <p><code>binary_trees</code> and <code>mutual_recursion</code> moved for the same architectural reason: Tier 2 can now install whole-call protocols when the entire recursive call tree has a provable shape. Fixed recursive table builders allocate normal Leia tables without re-entering the VM for every node, while pure integer mutual-recursive SCCs run through a guarded, bounded memoized evaluator. The merged guards moved <code>binary_trees</code> to about 0.151s and <code>mutual_recursion</code> to about 0.001s, faster than the local LuaJIT reference for the latter.</p>
 </div>
 
 <div class="post">
@@ -382,7 +382,7 @@
   <span class="date">2026-04-27</span>
   <br>
   <a href="48-the-debugger-that-runs-production">The Debugger That Runs Production</a>
-  <p>The next optimization loop needed production-grade visibility before more performance work. Six tools now answer the questions that used to require guesswork: <code>-jit-timeline</code> for tier chronology, <code>-jit-dump-warm</code> for real warm Tier 2 artifacts, structured optimization remarks, IR/ASM/source mapping, <code>-exit-stats</code> for hot deopt and exit sites, and <code>GSCRIPT_EXIT_RESUME_CHECK=1</code> for executable exit-resume invariants. The goal is not prettier dumps. The goal is that every performance premise has to survive production evidence before code changes begin.</p>
+  <p>The next optimization loop needed production-grade visibility before more performance work. Six tools now answer the questions that used to require guesswork: <code>-jit-timeline</code> for tier chronology, <code>-jit-dump-warm</code> for real warm Tier 2 artifacts, structured optimization remarks, IR/ASM/source mapping, <code>-exit-stats</code> for hot deopt and exit sites, and <code>LEIA_EXIT_RESUME_CHECK=1</code> for executable exit-resume invariants. The goal is not prettier dumps. The goal is that every performance premise has to survive production evidence before code changes begin.</p>
 </div>
 
 <div class="post">
@@ -550,7 +550,7 @@
   <span class="date">2026-03</span>
   <br>
   <a href="22-jit-optimization-techniques">What Makes a JIT Compiler Fast</a>
-  <p>Seven optimization techniques ranked by impact, with real numbers from GScript's multi-tier JIT. Type specialization delivers 14.6x on fibonacci, inline caches deliver 6.25x on field access, mandelbrot micro hits 591x. But the key insight is about coverage: a 10x optimizer that handles 100% of functions beats a 1000x optimizer that handles 10%.</p>
+  <p>Seven optimization techniques ranked by impact, with real numbers from Leia's multi-tier JIT. Type specialization delivers 14.6x on fibonacci, inline caches deliver 6.25x on field access, mandelbrot micro hits 591x. But the key insight is about coverage: a 10x optimizer that handles 100% of functions beats a 1000x optimizer that handles 10%.</p>
 </div>
 
 <div class="post">
@@ -655,7 +655,7 @@
   <span class="date">2026-03</span>
   <br>
   <a href="07-the-day-we-beat-luajit">The Day We Beat LuaJIT</a>
-  <p>fib(20): GScript 24&micro;s, LuaJIT 26&micro;s. Function inlining, register pinning, and the moment we saw the number.</p>
+  <p>fib(20): Leia 24&micro;s, LuaJIT 26&micro;s. Function inlining, register pinning, and the moment we saw the number.</p>
 </div>
 
 <div class="post">
@@ -703,7 +703,7 @@
 <h2>vs LuaJIT (full suite) &mdash; 2026-03-28</h2>
 
 <table>
-  <tr><th>Benchmark</th><th>GScript JIT</th><th>LuaJIT</th><th>Gap</th></tr>
+  <tr><th>Benchmark</th><th>Leia JIT</th><th>LuaJIT</th><th>Gap</th></tr>
   <tr><td>fib(35)</td><td>1.555s</td><td>23ms</td><td>67.6&times;</td></tr>
   <tr><td>sieve(1M &times;3)</td><td>130ms</td><td>10ms</td><td>13.0&times;</td></tr>
   <tr><td>mandelbrot(1000)</td><td>276ms</td><td>51ms</td><td>5.4&times;</td></tr>
@@ -737,7 +737,7 @@
 </table>
 
 <footer>
-  <a href="https://github.com/jxwr/gscript">github.com/jxwr/gscript</a>
+  <a href="https://github.com/jxwr/leia">github.com/jxwr/leia</a>
 </footer>
 
 </body>

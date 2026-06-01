@@ -1009,7 +1009,7 @@ func TestTier2FinalCallModuleOrder(t *testing.T) {
 }
 
 func TestTier2FinalCallModuleOrderExperimentalFieldShapeSplit(t *testing.T) {
-	t.Setenv("GSCRIPT_FIELD_SHAPE_SPLIT", "1")
+	t.Setenv("LEIA_FIELD_SHAPE_SPLIT", "1")
 	assertTier2ModuleOrder(t, tier2FinalCallModules(nil), Tier2PhaseFinalCall, []string{
 		"CallABI (final)",
 		"CallSiteRuntimeSpecializationExit (final)",
@@ -1023,7 +1023,7 @@ func TestTier2FinalCallModuleOrderExperimentalFieldShapeSplit(t *testing.T) {
 }
 
 func TestTier2FinalCallModuleOrderIgnoresOtherFieldShapeSplitValues(t *testing.T) {
-	t.Setenv("GSCRIPT_FIELD_SHAPE_SPLIT", "0")
+	t.Setenv("LEIA_FIELD_SHAPE_SPLIT", "0")
 	assertTier2ModuleOrder(t, tier2FinalCallModules(nil), Tier2PhaseFinalCall, []string{
 		"CallABI (final)",
 		"CallSiteRuntimeSpecializationExit (final)",

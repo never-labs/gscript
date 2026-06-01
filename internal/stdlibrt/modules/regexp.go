@@ -4,14 +4,14 @@ import (
 	"fmt"
 	"regexp"
 
-	regexplib "github.com/never-labs/gscript/internal/stdlib/regexp"
+	regexplib "github.com/never-labs/leia/internal/stdlib/regexp"
 )
 
 func cachedStdlibRegexp(pattern string) (*regexp.Regexp, error) {
 	return regexplib.Compile(pattern)
 }
 
-// makeReObject wraps a compiled *regexp.Regexp into a GScript table with methods.
+// makeReObject wraps a compiled *regexp.Regexp into a Leia table with methods.
 func makeReObject(re *regexp.Regexp) *Table {
 	t := NewTable()
 

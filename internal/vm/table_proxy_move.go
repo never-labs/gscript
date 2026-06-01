@@ -1,6 +1,6 @@
 package vm
 
-import rt "github.com/never-labs/gscript/internal/runtime"
+import rt "github.com/never-labs/leia/internal/runtime"
 
 func (vm *VM) tryForwardingProxyTableMove(src, dst rt.Value, first, last, target int64) (bool, rt.Value, error) {
 	if last < first {

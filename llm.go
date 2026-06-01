@@ -1,14 +1,14 @@
-package gscript
+package leia
 
 import (
-	llm "github.com/never-labs/gscript/llm"
-	llmcommand "github.com/never-labs/gscript/llm/command"
+	llm "github.com/never-labs/leia/llm"
+	llmcommand "github.com/never-labs/leia/llm/command"
 )
 
 // ClassifyLLMProviderError returns a stable diagnostic category for provider
 // errors without inspecting prompts, messages, or tokens.
 //
-// Deprecated: use llm.ClassifyProviderError from github.com/never-labs/gscript/llm.
+// Deprecated: use llm.ClassifyProviderError from github.com/never-labs/leia/llm.
 func ClassifyLLMProviderError(err error) string {
 	return llm.ClassifyProviderError(err)
 }
@@ -52,7 +52,7 @@ func WithLLMReplay(records []llm.Record) Option {
 // passed as the final command argument.
 //
 // Deprecated: use WithLLMProvider with command.Provider from
-// github.com/never-labs/gscript/llm/command.
+// github.com/never-labs/leia/llm/command.
 func WithLLMCommand(command string, args ...string) Option {
 	return WithLLMProvider(llmcommand.Provider{Command: command, Args: args})
 }

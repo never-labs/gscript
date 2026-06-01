@@ -7,7 +7,7 @@ import (
 	"strings"
 	"sync"
 
-	stdlibllm "github.com/never-labs/gscript/internal/stdlib/llm"
+	stdlibllm "github.com/never-labs/leia/internal/stdlib/llm"
 )
 
 // BuildLLMLib creates the "llm" standard library table. It is the first-stage

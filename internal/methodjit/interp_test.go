@@ -9,27 +9,27 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/never-labs/gscript/internal/lexer"
-	"github.com/never-labs/gscript/internal/parser"
-	"github.com/never-labs/gscript/internal/runtime"
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/lexer"
+	"github.com/never-labs/leia/internal/parser"
+	"github.com/never-labs/leia/internal/runtime"
+	"github.com/never-labs/leia/internal/vm"
 )
 
-// compileFunction compiles GScript source and returns the FuncProto for the
+// compileFunction compiles Leia source and returns the FuncProto for the
 // first declared function. Same as compile() but named for clarity in interp tests.
 func compileFunction(t *testing.T, src string) *vm.FuncProto {
 	t.Helper()
 	return compile(t, src)
 }
 
-// compileProto compiles GScript source and returns the top-level proto.
+// compileProto compiles Leia source and returns the top-level proto.
 // Alias for compileTop, used by tiering_manager_test.go.
 func compileProto(t *testing.T, src string) *vm.FuncProto {
 	t.Helper()
 	return compileTop(t, src)
 }
 
-// compileTop compiles full GScript source and returns the top-level (main) proto.
+// compileTop compiles full Leia source and returns the top-level (main) proto.
 func compileTop(t *testing.T, src string) *vm.FuncProto {
 	t.Helper()
 	tokens, err := lexer.New(src).Tokenize()

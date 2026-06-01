@@ -6,14 +6,14 @@
 package methodjit
 
 import (
-	"github.com/never-labs/gscript/internal/testutil/vmtest"
+	"github.com/never-labs/leia/internal/testutil/vmtest"
 	"os"
 	"sort"
 	"strings"
 	"testing"
 
-	"github.com/never-labs/gscript/internal/runtime"
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/runtime"
+	"github.com/never-labs/leia/internal/vm"
 )
 
 func TestAnalyzeFuncProfile_PureComputeLoop(t *testing.T) {
@@ -237,7 +237,7 @@ for i := 1; i <= 10; i++ {
 }
 
 func TestLoopCallGateAllowsInlinedHighArityStringFormatConst(t *testing.T) {
-	t.Setenv("GSCRIPT_TIER2_NO_FILTER", "1")
+	t.Setenv("LEIA_TIER2_NO_FILTER", "1")
 	top := compileProto(t, `
 func make_line(i) {
     status := 200
@@ -419,7 +419,7 @@ for i := 1; i <= 10; i++ {
 		t.Fatal("native-safe helper loop should remain eligible for Tier2")
 	}
 
-	t.Setenv("GSCRIPT_TIER2_NO_FILTER", "1")
+	t.Setenv("LEIA_TIER2_NO_FILTER", "1")
 	tm = NewTieringManager()
 	if tm.shouldSuppressMainLoopCallTier2(top, profile) {
 		t.Fatal("no-filter diagnostics should bypass the main-loop prefilter")
@@ -483,7 +483,7 @@ func parse(lines, n) {
 }
 
 func TestHasGenericStringFormatIntCallDetectsMixedInventory(t *testing.T) {
-	src, err := os.ReadFile("../../benchmarks/app/mixed_inventory_sim.gs")
+	src, err := os.ReadFile("../../benchmarks/app/mixed_inventory_sim.leia")
 	if err != nil {
 		t.Fatalf("read mixed_inventory_sim: %v", err)
 	}
@@ -613,7 +613,7 @@ func map_array(a, f) {
 		t.Fatal("suppressed map_array should not be recorded as a Tier2 failure")
 	}
 
-	t.Setenv("GSCRIPT_TIER2_NO_FILTER", "1")
+	t.Setenv("LEIA_TIER2_NO_FILTER", "1")
 	tm = NewTieringManager()
 	if tm.shouldSuppressLoopCallTier2(mapArray, profile) {
 		t.Fatal("no-filter diagnostics should bypass the dynamic loop-call prefilter")

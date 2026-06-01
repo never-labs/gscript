@@ -7,13 +7,13 @@
 package methodjit
 
 import (
-	"github.com/never-labs/gscript/internal/testutil/vmtest"
+	"github.com/never-labs/leia/internal/testutil/vmtest"
 	"testing"
 
-	"github.com/never-labs/gscript/internal/lexer"
-	"github.com/never-labs/gscript/internal/parser"
-	"github.com/never-labs/gscript/internal/runtime"
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/lexer"
+	"github.com/never-labs/leia/internal/parser"
+	"github.com/never-labs/leia/internal/runtime"
+	"github.com/never-labs/leia/internal/vm"
 )
 
 // ---------------------------------------------------------------------------
@@ -1049,7 +1049,7 @@ result := fib(15)
 // Baseline feedback tests: verify Tier 1 type feedback collection
 // ---------------------------------------------------------------------------
 
-// compileAndRunForFeedback compiles and runs a GScript program with the
+// compileAndRunForFeedback compiles and runs a Leia program with the
 // baseline JIT, then finds the inner function named "f" and returns its proto
 // so the caller can inspect the Feedback vector.
 func compileAndRunForFeedback(t *testing.T, src string) (*vm.VM, *vm.FuncProto) {

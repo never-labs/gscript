@@ -43,7 +43,7 @@ I asked the diagnostic to keep counting. Here's ack's per-call overhead, from th
 
 The thing I was going to fix is almost invisible. The thing I *wasn't* going to fix is 13% of the hot path all by itself: every `m == 0`, every `m - 1`, every `n == 0`, every `n - 1` compiles to a polymorphic template that runs the full int/float tag check before it can do the thing. Two LSRs, a MOV, a CMP, a conditional branch — twice, once for each operand — and only *then* does the int-path SBFX and subtract.
 
-ack(m, n) in GScript runs sixty-seven million recursive calls. Each call pays for the same ten instructions of "is this an int? ... okay is this other thing an int?" that we could have known statically the moment the function was compiled.
+ack(m, n) in Leia runs sixty-seven million recursive calls. Each call pays for the same ten instructions of "is this an int? ... okay is this other thing an int?" that we could have known statically the moment the function was compiled.
 
 ## Why Tier 1 can't already do this
 

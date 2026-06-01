@@ -8,9 +8,9 @@
 package methodjit
 
 import (
-	"github.com/never-labs/gscript/internal/jit"
-	"github.com/never-labs/gscript/internal/runtime"
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/jit"
+	"github.com/never-labs/leia/internal/runtime"
+	"github.com/never-labs/leia/internal/vm"
 )
 
 // emitBaselineGetGlobal emits native ARM64 for OP_GETGLOBAL: R(A) = globals[K(Bx)]

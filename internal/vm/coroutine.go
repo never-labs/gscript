@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"unsafe"
 
-	rt "github.com/never-labs/gscript/internal/runtime"
+	rt "github.com/never-labs/leia/internal/runtime"
 )
 
 // VMCoroutineStatus represents the state of a VM coroutine.
@@ -174,7 +174,7 @@ func (vm *VM) newCoroutineLib() *rt.Table {
 			if !ok {
 				gf := args[0].GoFunction()
 				if gf == nil {
-					return nil, fmt.Errorf("coroutine.create expects a GScript function")
+					return nil, fmt.Errorf("coroutine.create expects a Leia function")
 				}
 				co := NewVMGoCoroutine(gf)
 				vm.recordCoroutineCreated(false)
@@ -272,7 +272,7 @@ func (vm *VM) newCoroutineLib() *rt.Table {
 					}
 					return []rt.Value{rt.FunctionValue(wrapper)}, nil
 				}
-				return nil, fmt.Errorf("coroutine.wrap expects a GScript function")
+				return nil, fmt.Errorf("coroutine.wrap expects a Leia function")
 			}
 			co := NewVMCoroutine(cl)
 			co.wrapped = true

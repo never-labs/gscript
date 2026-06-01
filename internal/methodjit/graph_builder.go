@@ -1,4 +1,4 @@
-// graph_builder.go converts GScript bytecode (FuncProto) into CFG-based SSA IR.
+// graph_builder.go converts Leia bytecode (FuncProto) into CFG-based SSA IR.
 // Uses the Braun et al. 2013 algorithm for SSA construction: single forward pass
 // over bytecode with lazy phi insertion at join points.
 // See graph_builder_ssa.go for the SSA variable resolution functions.
@@ -6,8 +6,8 @@
 package methodjit
 
 import (
-	"github.com/never-labs/gscript/internal/runtime"
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/runtime"
+	"github.com/never-labs/leia/internal/vm"
 )
 
 // BuildGraph converts a FuncProto's bytecode into CFG SSA IR using the

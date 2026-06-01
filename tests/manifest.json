@@ -4,7 +4,7 @@
   "cases": [
     {
       "id": "language/all_harness_flags_format",
-      "path": "tests/language/all_harness_flags_format.gs",
+      "path": "tests/language/all_harness_flags_format.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -19,7 +19,7 @@
     },
     {
       "id": "language/api_arith_metamethod_chain_more",
-      "path": "tests/language/api_arith_metamethod_chain_more.gs",
+      "path": "tests/language/api_arith_metamethod_chain_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -34,7 +34,7 @@
     },
     {
       "id": "language/api_metamethod_compare_len_concat_more",
-      "path": "tests/language/api_metamethod_compare_len_concat_more.gs",
+      "path": "tests/language/api_metamethod_compare_len_concat_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -49,7 +49,7 @@
     },
     {
       "id": "language/api_raw_ops_more",
-      "path": "tests/language/api_raw_ops_more.gs",
+      "path": "tests/language/api_raw_ops_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -64,7 +64,7 @@
     },
     {
       "id": "language/api_table_self_keys_more",
-      "path": "tests/language/api_table_self_keys_more.gs",
+      "path": "tests/language/api_table_self_keys_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -79,7 +79,7 @@
     },
     {
       "id": "language/api_testkit_runtime_diagnostics",
-      "path": "tests/language/api_testkit_runtime_diagnostics.gs",
+      "path": "tests/language/api_testkit_runtime_diagnostics.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -93,13 +93,13 @@
       ]
     },
     {
-      "id": "language/attrib_const_defer_gscript",
-      "path": "tests/language/attrib_const_defer_gscript.gs",
+      "id": "language/attrib_const_defer_leia",
+      "path": "tests/language/attrib_const_defer_leia.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
         "kind": "lua",
-        "path": "tests/language/attrib_const_defer_gscript.lua"
+        "path": "tests/language/attrib_const_defer_leia.lua"
       },
       "status": "passing",
       "tags": [
@@ -109,7 +109,7 @@
     },
     {
       "id": "language/attrib_require_all_stdlib_more",
-      "path": "tests/language/attrib_require_all_stdlib_more.gs",
+      "path": "tests/language/attrib_require_all_stdlib_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -124,7 +124,7 @@
     },
     {
       "id": "language/attrib_require_builtin_modules_more",
-      "path": "tests/language/attrib_require_builtin_modules_more.gs",
+      "path": "tests/language/attrib_require_builtin_modules_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -139,7 +139,7 @@
     },
     {
       "id": "language/attrib_require_go_host_modules_more",
-      "path": "tests/language/attrib_require_go_host_modules_more.gs",
+      "path": "tests/language/attrib_require_go_host_modules_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -154,7 +154,7 @@
     },
     {
       "id": "language/attrib_scope_shadow_more",
-      "path": "tests/language/attrib_scope_shadow_more.gs",
+      "path": "tests/language/attrib_scope_shadow_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -169,7 +169,7 @@
     },
     {
       "id": "language/attrib_unpack_assignment_more",
-      "path": "tests/language/attrib_unpack_assignment_more.gs",
+      "path": "tests/language/attrib_unpack_assignment_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -184,7 +184,7 @@
     },
     {
       "id": "language/base64_raw_url_edges_more",
-      "path": "tests/language/base64_raw_url_edges_more.gs",
+      "path": "tests/language/base64_raw_url_edges_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -199,7 +199,7 @@
     },
     {
       "id": "language/big_generated_eval_env_more",
-      "path": "tests/language/big_generated_eval_env_more.gs",
+      "path": "tests/language/big_generated_eval_env_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -214,7 +214,7 @@
     },
     {
       "id": "language/big_table_growth_more",
-      "path": "tests/language/big_table_growth_more.gs",
+      "path": "tests/language/big_table_growth_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -229,7 +229,7 @@
     },
     {
       "id": "language/big_table_sparse_pressure_more2",
-      "path": "tests/language/big_table_sparse_pressure_more2.gs",
+      "path": "tests/language/big_table_sparse_pressure_more2.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -244,7 +244,7 @@
     },
     {
       "id": "language/binary_namespace_more",
-      "path": "tests/language/binary_namespace_more.gs",
+      "path": "tests/language/binary_namespace_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -259,7 +259,7 @@
     },
     {
       "id": "language/binary_numeric_fields_more",
-      "path": "tests/language/binary_numeric_fields_more.gs",
+      "path": "tests/language/binary_numeric_fields_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -274,7 +274,7 @@
     },
     {
       "id": "language/bits_go_host_more",
-      "path": "tests/language/bits_go_host_more.gs",
+      "path": "tests/language/bits_go_host_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -289,7 +289,7 @@
     },
     {
       "id": "language/bitwise_bit32_arshift_more",
-      "path": "tests/language/bitwise_bit32_arshift_more.gs",
+      "path": "tests/language/bitwise_bit32_arshift_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -304,7 +304,7 @@
     },
     {
       "id": "language/bitwise_bit32_errors",
-      "path": "tests/language/bitwise_bit32_errors.gs",
+      "path": "tests/language/bitwise_bit32_errors.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -319,7 +319,7 @@
     },
     {
       "id": "language/bitwise_bit32_extract_replace",
-      "path": "tests/language/bitwise_bit32_extract_replace.gs",
+      "path": "tests/language/bitwise_bit32_extract_replace.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -334,7 +334,7 @@
     },
     {
       "id": "language/bitwise_bit32_float_conversion",
-      "path": "tests/language/bitwise_bit32_float_conversion.gs",
+      "path": "tests/language/bitwise_bit32_float_conversion.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -349,7 +349,7 @@
     },
     {
       "id": "language/bitwise_bit32_identities",
-      "path": "tests/language/bitwise_bit32_identities.gs",
+      "path": "tests/language/bitwise_bit32_identities.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -364,7 +364,7 @@
     },
     {
       "id": "language/bitwise_bit32_rotate",
-      "path": "tests/language/bitwise_bit32_rotate.gs",
+      "path": "tests/language/bitwise_bit32_rotate.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -379,7 +379,7 @@
     },
     {
       "id": "language/bitwise_bit32_shift_sweep",
-      "path": "tests/language/bitwise_bit32_shift_sweep.gs",
+      "path": "tests/language/bitwise_bit32_shift_sweep.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -394,7 +394,7 @@
     },
     {
       "id": "language/bitwise_bit32_shifts",
-      "path": "tests/language/bitwise_bit32_shifts.gs",
+      "path": "tests/language/bitwise_bit32_shifts.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -409,7 +409,7 @@
     },
     {
       "id": "language/bitwise_bit32_varargs",
-      "path": "tests/language/bitwise_bit32_varargs.gs",
+      "path": "tests/language/bitwise_bit32_varargs.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -424,7 +424,7 @@
     },
     {
       "id": "language/bitwise_bit32_wrap_more",
-      "path": "tests/language/bitwise_bit32_wrap_more.gs",
+      "path": "tests/language/bitwise_bit32_wrap_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -439,7 +439,7 @@
     },
     {
       "id": "language/bitwise_direct_ops_more",
-      "path": "tests/language/bitwise_direct_ops_more.gs",
+      "path": "tests/language/bitwise_direct_ops_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -454,7 +454,7 @@
     },
     {
       "id": "language/bwcoercion_bit32_numeric_strings",
-      "path": "tests/language/bwcoercion_bit32_numeric_strings.gs",
+      "path": "tests/language/bwcoercion_bit32_numeric_strings.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -469,7 +469,7 @@
     },
     {
       "id": "language/bwcoercion_bit32_string_edges_more2",
-      "path": "tests/language/bwcoercion_bit32_string_edges_more2.gs",
+      "path": "tests/language/bwcoercion_bit32_string_edges_more2.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -484,7 +484,7 @@
     },
     {
       "id": "language/bytes_hash_base64_go_host_more",
-      "path": "tests/language/bytes_hash_base64_go_host_more.gs",
+      "path": "tests/language/bytes_hash_base64_go_host_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -499,7 +499,7 @@
     },
     {
       "id": "language/bytes_numeric_buffer_more",
-      "path": "tests/language/bytes_numeric_buffer_more.gs",
+      "path": "tests/language/bytes_numeric_buffer_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -514,7 +514,7 @@
     },
     {
       "id": "language/calls_anonymous_invocation",
-      "path": "tests/language/calls_anonymous_invocation.gs",
+      "path": "tests/language/calls_anonymous_invocation.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -529,7 +529,7 @@
     },
     {
       "id": "language/calls_builtin_missing_args",
-      "path": "tests/language/calls_builtin_missing_args.gs",
+      "path": "tests/language/calls_builtin_missing_args.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -544,7 +544,7 @@
     },
     {
       "id": "language/calls_call_chain",
-      "path": "tests/language/calls_call_chain.gs",
+      "path": "tests/language/calls_call_chain.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -559,7 +559,7 @@
     },
     {
       "id": "language/calls_closure_parameter_capture_more",
-      "path": "tests/language/calls_closure_parameter_capture_more.gs",
+      "path": "tests/language/calls_closure_parameter_capture_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -574,7 +574,7 @@
     },
     {
       "id": "language/calls_extra_builtin_args_more",
-      "path": "tests/language/calls_extra_builtin_args_more.gs",
+      "path": "tests/language/calls_extra_builtin_args_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -589,7 +589,7 @@
     },
     {
       "id": "language/calls_fixed_arity_nested_adjust_more",
-      "path": "tests/language/calls_fixed_arity_nested_adjust_more.gs",
+      "path": "tests/language/calls_fixed_arity_nested_adjust_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -604,7 +604,7 @@
     },
     {
       "id": "language/calls_fixedpoint_returns",
-      "path": "tests/language/calls_fixedpoint_returns.gs",
+      "path": "tests/language/calls_fixedpoint_returns.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -619,7 +619,7 @@
     },
     {
       "id": "language/calls_incorrect_args_more",
-      "path": "tests/language/calls_incorrect_args_more.gs",
+      "path": "tests/language/calls_incorrect_args_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -634,7 +634,7 @@
     },
     {
       "id": "language/calls_inline_function_args",
-      "path": "tests/language/calls_inline_function_args.gs",
+      "path": "tests/language/calls_inline_function_args.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -649,7 +649,7 @@
     },
     {
       "id": "language/calls_inline_table_args",
-      "path": "tests/language/calls_inline_table_args.gs",
+      "path": "tests/language/calls_inline_table_args.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -664,7 +664,7 @@
     },
     {
       "id": "language/calls_long_method_name_more",
-      "path": "tests/language/calls_long_method_name_more.gs",
+      "path": "tests/language/calls_long_method_name_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -679,7 +679,7 @@
     },
     {
       "id": "language/calls_method_recursion",
-      "path": "tests/language/calls_method_recursion.gs",
+      "path": "tests/language/calls_method_recursion.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -694,7 +694,7 @@
     },
     {
       "id": "language/calls_multiline_adjust_more",
-      "path": "tests/language/calls_multiline_adjust_more.gs",
+      "path": "tests/language/calls_multiline_adjust_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -709,7 +709,7 @@
     },
     {
       "id": "language/calls_multireturn",
-      "path": "tests/language/calls_multireturn.gs",
+      "path": "tests/language/calls_multireturn.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -724,7 +724,7 @@
     },
     {
       "id": "language/calls_multireturn_adjust_more",
-      "path": "tests/language/calls_multireturn_adjust_more.gs",
+      "path": "tests/language/calls_multireturn_adjust_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -739,7 +739,7 @@
     },
     {
       "id": "language/calls_nested_method_more",
-      "path": "tests/language/calls_nested_method_more.gs",
+      "path": "tests/language/calls_nested_method_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -754,7 +754,7 @@
     },
     {
       "id": "language/calls_recursion_error_more",
-      "path": "tests/language/calls_recursion_error_more.gs",
+      "path": "tests/language/calls_recursion_error_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -769,7 +769,7 @@
     },
     {
       "id": "language/calls_ret2_pack_adjust_more",
-      "path": "tests/language/calls_ret2_pack_adjust_more.gs",
+      "path": "tests/language/calls_ret2_pack_adjust_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -784,7 +784,7 @@
     },
     {
       "id": "language/calls_return_values",
-      "path": "tests/language/calls_return_values.gs",
+      "path": "tests/language/calls_return_values.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -799,7 +799,7 @@
     },
     {
       "id": "language/calls_tail_call_metamethod_more",
-      "path": "tests/language/calls_tail_call_metamethod_more.gs",
+      "path": "tests/language/calls_tail_call_metamethod_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -814,7 +814,7 @@
     },
     {
       "id": "language/calls_tail_missing_matrix_more",
-      "path": "tests/language/calls_tail_missing_matrix_more.gs",
+      "path": "tests/language/calls_tail_missing_matrix_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -829,7 +829,7 @@
     },
     {
       "id": "language/calls_tail_varargs",
-      "path": "tests/language/calls_tail_varargs.gs",
+      "path": "tests/language/calls_tail_varargs.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -844,7 +844,7 @@
     },
     {
       "id": "language/calls_tail_varargs_more2",
-      "path": "tests/language/calls_tail_varargs_more2.gs",
+      "path": "tests/language/calls_tail_varargs_more2.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -859,7 +859,7 @@
     },
     {
       "id": "language/calls_type_basic",
-      "path": "tests/language/calls_type_basic.gs",
+      "path": "tests/language/calls_type_basic.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -874,7 +874,7 @@
     },
     {
       "id": "language/closure_break_upvalues",
-      "path": "tests/language/closure_break_upvalues.gs",
+      "path": "tests/language/closure_break_upvalues.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -889,7 +889,7 @@
     },
     {
       "id": "language/closure_for_control",
-      "path": "tests/language/closure_for_control.gs",
+      "path": "tests/language/closure_for_control.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -904,7 +904,7 @@
     },
     {
       "id": "language/closure_identity_more",
-      "path": "tests/language/closure_identity_more.gs",
+      "path": "tests/language/closure_identity_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -919,7 +919,7 @@
     },
     {
       "id": "language/closure_if_branch_upvalues_more",
-      "path": "tests/language/closure_if_branch_upvalues_more.gs",
+      "path": "tests/language/closure_if_branch_upvalues_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -934,7 +934,7 @@
     },
     {
       "id": "language/closure_loop_mutation_more2",
-      "path": "tests/language/closure_loop_mutation_more2.gs",
+      "path": "tests/language/closure_loop_mutation_more2.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -949,7 +949,7 @@
     },
     {
       "id": "language/closure_multilevel_state_more",
-      "path": "tests/language/closure_multilevel_state_more.gs",
+      "path": "tests/language/closure_multilevel_state_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -964,7 +964,7 @@
     },
     {
       "id": "language/closure_repeat_until_upvalues",
-      "path": "tests/language/closure_repeat_until_upvalues.gs",
+      "path": "tests/language/closure_repeat_until_upvalues.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -979,7 +979,7 @@
     },
     {
       "id": "language/closure_shared_sibling_upvalues_more",
-      "path": "tests/language/closure_shared_sibling_upvalues_more.gs",
+      "path": "tests/language/closure_shared_sibling_upvalues_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -994,7 +994,7 @@
     },
     {
       "id": "language/closure_tailcall_upvalue",
-      "path": "tests/language/closure_tailcall_upvalue.gs",
+      "path": "tests/language/closure_tailcall_upvalue.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -1009,7 +1009,7 @@
     },
     {
       "id": "language/closure_upvalues",
-      "path": "tests/language/closure_upvalues.gs",
+      "path": "tests/language/closure_upvalues.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -1024,7 +1024,7 @@
     },
     {
       "id": "language/code_arithmetic_constants_more",
-      "path": "tests/language/code_arithmetic_constants_more.gs",
+      "path": "tests/language/code_arithmetic_constants_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -1039,7 +1039,7 @@
     },
     {
       "id": "language/code_comparison_immediates_more",
-      "path": "tests/language/code_comparison_immediates_more.gs",
+      "path": "tests/language/code_comparison_immediates_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -1054,7 +1054,7 @@
     },
     {
       "id": "language/code_constant_branch_matrix_more2",
-      "path": "tests/language/code_constant_branch_matrix_more2.gs",
+      "path": "tests/language/code_constant_branch_matrix_more2.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -1069,7 +1069,7 @@
     },
     {
       "id": "language/code_explicit_spread_more",
-      "path": "tests/language/code_explicit_spread_more.gs",
+      "path": "tests/language/code_explicit_spread_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -1084,7 +1084,7 @@
     },
     {
       "id": "language/code_string_constant_closure_more",
-      "path": "tests/language/code_string_constant_closure_more.gs",
+      "path": "tests/language/code_string_constant_closure_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -1099,7 +1099,7 @@
     },
     {
       "id": "language/compress_error_levels_more",
-      "path": "tests/language/compress_error_levels_more.gs",
+      "path": "tests/language/compress_error_levels_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -1114,7 +1114,7 @@
     },
     {
       "id": "language/constructs_boolean_paths_more",
-      "path": "tests/language/constructs_boolean_paths_more.gs",
+      "path": "tests/language/constructs_boolean_paths_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -1129,7 +1129,7 @@
     },
     {
       "id": "language/constructs_function_branches_more",
-      "path": "tests/language/constructs_function_branches_more.gs",
+      "path": "tests/language/constructs_function_branches_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -1144,7 +1144,7 @@
     },
     {
       "id": "language/constructs_if_expr_tables",
-      "path": "tests/language/constructs_if_expr_tables.gs",
+      "path": "tests/language/constructs_if_expr_tables.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -1159,7 +1159,7 @@
     },
     {
       "id": "language/constructs_label_goto_control",
-      "path": "tests/language/constructs_label_goto_control.gs",
+      "path": "tests/language/constructs_label_goto_control.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -1174,7 +1174,7 @@
     },
     {
       "id": "language/constructs_loop_break_count",
-      "path": "tests/language/constructs_loop_break_count.gs",
+      "path": "tests/language/constructs_loop_break_count.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -1189,7 +1189,7 @@
     },
     {
       "id": "language/constructs_loop_break_repeat_more",
-      "path": "tests/language/constructs_loop_break_repeat_more.gs",
+      "path": "tests/language/constructs_loop_break_repeat_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -1204,7 +1204,7 @@
     },
     {
       "id": "language/constructs_loops_tables",
-      "path": "tests/language/constructs_loops_tables.gs",
+      "path": "tests/language/constructs_loops_tables.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -1219,7 +1219,7 @@
     },
     {
       "id": "language/constructs_multireturn_tables",
-      "path": "tests/language/constructs_multireturn_tables.gs",
+      "path": "tests/language/constructs_multireturn_tables.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -1234,7 +1234,7 @@
     },
     {
       "id": "language/constructs_precedence",
-      "path": "tests/language/constructs_precedence.gs",
+      "path": "tests/language/constructs_precedence.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -1249,7 +1249,7 @@
     },
     {
       "id": "language/constructs_recursive_multireturn_more",
-      "path": "tests/language/constructs_recursive_multireturn_more.gs",
+      "path": "tests/language/constructs_recursive_multireturn_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -1264,7 +1264,7 @@
     },
     {
       "id": "language/constructs_short_circuit",
-      "path": "tests/language/constructs_short_circuit.gs",
+      "path": "tests/language/constructs_short_circuit.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -1279,7 +1279,7 @@
     },
     {
       "id": "language/constructs_silly_loop_scope_more",
-      "path": "tests/language/constructs_silly_loop_scope_more.gs",
+      "path": "tests/language/constructs_silly_loop_scope_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -1294,7 +1294,7 @@
     },
     {
       "id": "language/container_sort_go_host_more",
-      "path": "tests/language/container_sort_go_host_more.gs",
+      "path": "tests/language/container_sort_go_host_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -1309,7 +1309,7 @@
     },
     {
       "id": "language/control_coroutine_defer_more",
-      "path": "tests/language/control_coroutine_defer_more.gs",
+      "path": "tests/language/control_coroutine_defer_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -1324,7 +1324,7 @@
     },
     {
       "id": "language/coroutine_create_gofunction",
-      "path": "tests/language/coroutine_create_gofunction.gs",
+      "path": "tests/language/coroutine_create_gofunction.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -1339,7 +1339,7 @@
     },
     {
       "id": "language/coroutine_defer_xpcall_edges_more",
-      "path": "tests/language/coroutine_defer_xpcall_edges_more.gs",
+      "path": "tests/language/coroutine_defer_xpcall_edges_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -1354,7 +1354,7 @@
     },
     {
       "id": "language/coroutine_multi_yield_resume_more",
-      "path": "tests/language/coroutine_multi_yield_resume_more.gs",
+      "path": "tests/language/coroutine_multi_yield_resume_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -1369,7 +1369,7 @@
     },
     {
       "id": "language/coroutine_recursive_yield_more",
-      "path": "tests/language/coroutine_recursive_yield_more.gs",
+      "path": "tests/language/coroutine_recursive_yield_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -1384,7 +1384,7 @@
     },
     {
       "id": "language/coroutine_self_resume_status_more",
-      "path": "tests/language/coroutine_self_resume_status_more.gs",
+      "path": "tests/language/coroutine_self_resume_status_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -1399,7 +1399,7 @@
     },
     {
       "id": "language/coroutine_status_yieldable_more",
-      "path": "tests/language/coroutine_status_yieldable_more.gs",
+      "path": "tests/language/coroutine_status_yieldable_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -1414,7 +1414,7 @@
     },
     {
       "id": "language/coroutine_tail_yield_more",
-      "path": "tests/language/coroutine_tail_yield_more.gs",
+      "path": "tests/language/coroutine_tail_yield_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -1429,7 +1429,7 @@
     },
     {
       "id": "language/coroutine_wrap_basic",
-      "path": "tests/language/coroutine_wrap_basic.gs",
+      "path": "tests/language/coroutine_wrap_basic.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -1444,7 +1444,7 @@
     },
     {
       "id": "language/coroutine_wrap_sieve_more",
-      "path": "tests/language/coroutine_wrap_sieve_more.gs",
+      "path": "tests/language/coroutine_wrap_sieve_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -1459,7 +1459,7 @@
     },
     {
       "id": "language/coroutine_yield_resume_values",
-      "path": "tests/language/coroutine_yield_resume_values.gs",
+      "path": "tests/language/coroutine_yield_resume_values.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -1474,7 +1474,7 @@
     },
     {
       "id": "language/crypto_go_host_more",
-      "path": "tests/language/crypto_go_host_more.gs",
+      "path": "tests/language/crypto_go_host_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -1489,7 +1489,7 @@
     },
     {
       "id": "language/cstack_pattern_complexity_more",
-      "path": "tests/language/cstack_pattern_complexity_more.gs",
+      "path": "tests/language/cstack_pattern_complexity_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -1504,7 +1504,7 @@
     },
     {
       "id": "language/cstack_pattern_recursion_small",
-      "path": "tests/language/cstack_pattern_recursion_small.gs",
+      "path": "tests/language/cstack_pattern_recursion_small.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -1519,7 +1519,7 @@
     },
     {
       "id": "language/csv_go_host_more",
-      "path": "tests/language/csv_go_host_more.gs",
+      "path": "tests/language/csv_go_host_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -1534,7 +1534,7 @@
     },
     {
       "id": "language/csv_options_quotes_more",
-      "path": "tests/language/csv_options_quotes_more.gs",
+      "path": "tests/language/csv_options_quotes_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -1548,13 +1548,13 @@
       ]
     },
     {
-      "id": "language/db_gscript_diagnostics_more",
-      "path": "tests/language/db_gscript_diagnostics_more.gs",
+      "id": "language/db_leia_diagnostics_more",
+      "path": "tests/language/db_leia_diagnostics_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
         "kind": "lua",
-        "path": "tests/language/db_gscript_diagnostics_more.lua"
+        "path": "tests/language/db_leia_diagnostics_more.lua"
       },
       "status": "passing",
       "tags": [
@@ -1564,7 +1564,7 @@
     },
     {
       "id": "language/db_nested_call_flow_more",
-      "path": "tests/language/db_nested_call_flow_more.gs",
+      "path": "tests/language/db_nested_call_flow_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -1579,7 +1579,7 @@
     },
     {
       "id": "language/db_pcall_nested_errors",
-      "path": "tests/language/db_pcall_nested_errors.gs",
+      "path": "tests/language/db_pcall_nested_errors.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -1594,7 +1594,7 @@
     },
     {
       "id": "language/db_upvalue_closure_flow",
-      "path": "tests/language/db_upvalue_closure_flow.gs",
+      "path": "tests/language/db_upvalue_closure_flow.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -1609,7 +1609,7 @@
     },
     {
       "id": "language/db_vararg_transfer_values",
-      "path": "tests/language/db_vararg_transfer_values.gs",
+      "path": "tests/language/db_vararg_transfer_values.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -1624,7 +1624,7 @@
     },
     {
       "id": "language/db_vm_debug_parity_more",
-      "path": "tests/language/db_vm_debug_parity_more.gs",
+      "path": "tests/language/db_vm_debug_parity_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -1639,7 +1639,7 @@
     },
     {
       "id": "language/debug_host_helpers_more",
-      "path": "tests/language/debug_host_helpers_more.gs",
+      "path": "tests/language/debug_host_helpers_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -1654,7 +1654,7 @@
     },
     {
       "id": "language/defer_loader_require_edges_more",
-      "path": "tests/language/defer_loader_require_edges_more.gs",
+      "path": "tests/language/defer_loader_require_edges_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -1669,7 +1669,7 @@
     },
     {
       "id": "language/encoding_ini_xml_roundtrip_more",
-      "path": "tests/language/encoding_ini_xml_roundtrip_more.gs",
+      "path": "tests/language/encoding_ini_xml_roundtrip_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -1684,7 +1684,7 @@
     },
     {
       "id": "language/errors_assert_messages_more",
-      "path": "tests/language/errors_assert_messages_more.gs",
+      "path": "tests/language/errors_assert_messages_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -1699,7 +1699,7 @@
     },
     {
       "id": "language/errors_assert_pcall",
-      "path": "tests/language/errors_assert_pcall.gs",
+      "path": "tests/language/errors_assert_pcall.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -1714,7 +1714,7 @@
     },
     {
       "id": "language/errors_call_index_failures_more",
-      "path": "tests/language/errors_call_index_failures_more.gs",
+      "path": "tests/language/errors_call_index_failures_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -1729,7 +1729,7 @@
     },
     {
       "id": "language/errors_common_runtime_failures",
-      "path": "tests/language/errors_common_runtime_failures.gs",
+      "path": "tests/language/errors_common_runtime_failures.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -1744,7 +1744,7 @@
     },
     {
       "id": "language/errors_error_edge_values",
-      "path": "tests/language/errors_error_edge_values.gs",
+      "path": "tests/language/errors_error_edge_values.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -1759,7 +1759,7 @@
     },
     {
       "id": "language/errors_non_string_messages_deeper",
-      "path": "tests/language/errors_non_string_messages_deeper.gs",
+      "path": "tests/language/errors_non_string_messages_deeper.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -1774,7 +1774,7 @@
     },
     {
       "id": "language/errors_non_string_messages_more",
-      "path": "tests/language/errors_non_string_messages_more.gs",
+      "path": "tests/language/errors_non_string_messages_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -1789,7 +1789,7 @@
     },
     {
       "id": "language/errors_pcall_basic",
-      "path": "tests/language/errors_pcall_basic.gs",
+      "path": "tests/language/errors_pcall_basic.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -1804,7 +1804,7 @@
     },
     {
       "id": "language/errors_pcall_xpcall_values",
-      "path": "tests/language/errors_pcall_xpcall_values.gs",
+      "path": "tests/language/errors_pcall_xpcall_values.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -1819,7 +1819,7 @@
     },
     {
       "id": "language/errors_runtime_failures_more",
-      "path": "tests/language/errors_runtime_failures_more.gs",
+      "path": "tests/language/errors_runtime_failures_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -1834,7 +1834,7 @@
     },
     {
       "id": "language/errors_runtime_messages_more",
-      "path": "tests/language/errors_runtime_messages_more.gs",
+      "path": "tests/language/errors_runtime_messages_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -1849,7 +1849,7 @@
     },
     {
       "id": "language/errors_xpcall_args_more",
-      "path": "tests/language/errors_xpcall_args_more.gs",
+      "path": "tests/language/errors_xpcall_args_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -1864,7 +1864,7 @@
     },
     {
       "id": "language/errors_xpcall_handler_more",
-      "path": "tests/language/errors_xpcall_handler_more.gs",
+      "path": "tests/language/errors_xpcall_handler_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -1879,7 +1879,7 @@
     },
     {
       "id": "language/errors_xpcall_nested_error_more",
-      "path": "tests/language/errors_xpcall_nested_error_more.gs",
+      "path": "tests/language/errors_xpcall_nested_error_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -1894,7 +1894,7 @@
     },
     {
       "id": "language/events_arith_compare",
-      "path": "tests/language/events_arith_compare.gs",
+      "path": "tests/language/events_arith_compare.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -1909,7 +1909,7 @@
     },
     {
       "id": "language/events_call_levels",
-      "path": "tests/language/events_call_levels.gs",
+      "path": "tests/language/events_call_levels.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -1924,7 +1924,7 @@
     },
     {
       "id": "language/events_compare_compat_more",
-      "path": "tests/language/events_compare_compat_more.gs",
+      "path": "tests/language/events_compare_compat_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -1939,7 +1939,7 @@
     },
     {
       "id": "language/events_compare_metamethods",
-      "path": "tests/language/events_compare_metamethods.gs",
+      "path": "tests/language/events_compare_metamethods.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -1954,7 +1954,7 @@
     },
     {
       "id": "language/events_compare_ordering",
-      "path": "tests/language/events_compare_ordering.gs",
+      "path": "tests/language/events_compare_ordering.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -1969,7 +1969,7 @@
     },
     {
       "id": "language/events_compare_sets",
-      "path": "tests/language/events_compare_sets.gs",
+      "path": "tests/language/events_compare_sets.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -1984,7 +1984,7 @@
     },
     {
       "id": "language/events_concat_chain_more",
-      "path": "tests/language/events_concat_chain_more.gs",
+      "path": "tests/language/events_concat_chain_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -1999,7 +1999,7 @@
     },
     {
       "id": "language/events_concat_metamethod",
-      "path": "tests/language/events_concat_metamethod.gs",
+      "path": "tests/language/events_concat_metamethod.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -2014,7 +2014,7 @@
     },
     {
       "id": "language/events_concat_numeric_operand_more",
-      "path": "tests/language/events_concat_numeric_operand_more.gs",
+      "path": "tests/language/events_concat_numeric_operand_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -2029,7 +2029,7 @@
     },
     {
       "id": "language/events_dynamic_call_metatable",
-      "path": "tests/language/events_dynamic_call_metatable.gs",
+      "path": "tests/language/events_dynamic_call_metatable.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -2044,7 +2044,7 @@
     },
     {
       "id": "language/events_eq_invalidate",
-      "path": "tests/language/events_eq_invalidate.gs",
+      "path": "tests/language/events_eq_invalidate.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -2059,7 +2059,7 @@
     },
     {
       "id": "language/events_eq_invalidate_more",
-      "path": "tests/language/events_eq_invalidate_more.gs",
+      "path": "tests/language/events_eq_invalidate_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -2074,7 +2074,7 @@
     },
     {
       "id": "language/events_index_chain",
-      "path": "tests/language/events_index_chain.gs",
+      "path": "tests/language/events_index_chain.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -2089,7 +2089,7 @@
     },
     {
       "id": "language/events_index_function_parent_more",
-      "path": "tests/language/events_index_function_parent_more.gs",
+      "path": "tests/language/events_index_function_parent_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -2104,7 +2104,7 @@
     },
     {
       "id": "language/events_index_newindex_call",
-      "path": "tests/language/events_index_newindex_call.gs",
+      "path": "tests/language/events_index_newindex_call.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -2119,7 +2119,7 @@
     },
     {
       "id": "language/events_metatable_basic_more",
-      "path": "tests/language/events_metatable_basic_more.gs",
+      "path": "tests/language/events_metatable_basic_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -2134,7 +2134,7 @@
     },
     {
       "id": "language/events_metatable_protection_more",
-      "path": "tests/language/events_metatable_protection_more.gs",
+      "path": "tests/language/events_metatable_protection_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -2149,7 +2149,7 @@
     },
     {
       "id": "language/events_newindex_chain",
-      "path": "tests/language/events_newindex_chain.gs",
+      "path": "tests/language/events_newindex_chain.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -2164,7 +2164,7 @@
     },
     {
       "id": "language/events_newindex_existing",
-      "path": "tests/language/events_newindex_existing.gs",
+      "path": "tests/language/events_newindex_existing.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -2179,7 +2179,7 @@
     },
     {
       "id": "language/events_newindex_loop_more",
-      "path": "tests/language/events_newindex_loop_more.gs",
+      "path": "tests/language/events_newindex_loop_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -2194,7 +2194,7 @@
     },
     {
       "id": "language/events_newindex_self_metatable_more",
-      "path": "tests/language/events_newindex_self_metatable_more.gs",
+      "path": "tests/language/events_newindex_self_metatable_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -2209,7 +2209,7 @@
     },
     {
       "id": "language/events_newindex_table_redirect_more",
-      "path": "tests/language/events_newindex_table_redirect_more.gs",
+      "path": "tests/language/events_newindex_table_redirect_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -2224,7 +2224,7 @@
     },
     {
       "id": "language/events_partial_order_more",
-      "path": "tests/language/events_partial_order_more.gs",
+      "path": "tests/language/events_partial_order_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -2239,7 +2239,7 @@
     },
     {
       "id": "language/events_rawget_more2",
-      "path": "tests/language/events_rawget_more2.gs",
+      "path": "tests/language/events_rawget_more2.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -2254,7 +2254,7 @@
     },
     {
       "id": "language/events_rawget_rawset",
-      "path": "tests/language/events_rawget_rawset.gs",
+      "path": "tests/language/events_rawget_rawset.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -2269,7 +2269,7 @@
     },
     {
       "id": "language/events_rawlen",
-      "path": "tests/language/events_rawlen.gs",
+      "path": "tests/language/events_rawlen.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -2284,7 +2284,7 @@
     },
     {
       "id": "language/events_rawlen_more2",
-      "path": "tests/language/events_rawlen_more2.gs",
+      "path": "tests/language/events_rawlen_more2.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -2299,7 +2299,7 @@
     },
     {
       "id": "language/files_append_read_all_more",
-      "path": "tests/language/files_append_read_all_more.gs",
+      "path": "tests/language/files_append_read_all_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -2314,7 +2314,7 @@
     },
     {
       "id": "language/files_file_lines_streams_more",
-      "path": "tests/language/files_file_lines_streams_more.gs",
+      "path": "tests/language/files_file_lines_streams_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -2329,7 +2329,7 @@
     },
     {
       "id": "language/files_io_read_formats_more",
-      "path": "tests/language/files_io_read_formats_more.gs",
+      "path": "tests/language/files_io_read_formats_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -2344,7 +2344,7 @@
     },
     {
       "id": "language/files_io_read_numbers",
-      "path": "tests/language/files_io_read_numbers.gs",
+      "path": "tests/language/files_io_read_numbers.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -2359,7 +2359,7 @@
     },
     {
       "id": "language/files_io_write_read_lines",
-      "path": "tests/language/files_io_write_read_lines.gs",
+      "path": "tests/language/files_io_write_read_lines.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -2374,7 +2374,7 @@
     },
     {
       "id": "language/files_seek_overwrite_more",
-      "path": "tests/language/files_seek_overwrite_more.gs",
+      "path": "tests/language/files_seek_overwrite_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -2389,7 +2389,7 @@
     },
     {
       "id": "language/files_tmpfile_flush_type_more",
-      "path": "tests/language/files_tmpfile_flush_type_more.gs",
+      "path": "tests/language/files_tmpfile_flush_type_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -2404,7 +2404,7 @@
     },
     {
       "id": "language/files_tmpname_remove_rename",
-      "path": "tests/language/files_tmpname_remove_rename.gs",
+      "path": "tests/language/files_tmpname_remove_rename.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -2419,7 +2419,7 @@
     },
     {
       "id": "language/fs_path_glob_cwd_more",
-      "path": "tests/language/fs_path_glob_cwd_more.gs",
+      "path": "tests/language/fs_path_glob_cwd_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -2434,7 +2434,7 @@
     },
     {
       "id": "language/fs_path_go_host_more",
-      "path": "tests/language/fs_path_go_host_more.gs",
+      "path": "tests/language/fs_path_go_host_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -2449,7 +2449,7 @@
     },
     {
       "id": "language/gc_basic_more",
-      "path": "tests/language/gc_basic_more.gs",
+      "path": "tests/language/gc_basic_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -2464,7 +2464,7 @@
     },
     {
       "id": "language/gc_collectgarbage_modes",
-      "path": "tests/language/gc_collectgarbage_modes.gs",
+      "path": "tests/language/gc_collectgarbage_modes.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -2479,7 +2479,7 @@
     },
     {
       "id": "language/gc_collectgarbage_more2",
-      "path": "tests/language/gc_collectgarbage_more2.gs",
+      "path": "tests/language/gc_collectgarbage_more2.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -2494,7 +2494,7 @@
     },
     {
       "id": "language/gc_collectgarbage_protocol",
-      "path": "tests/language/gc_collectgarbage_protocol.gs",
+      "path": "tests/language/gc_collectgarbage_protocol.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -2509,7 +2509,7 @@
     },
     {
       "id": "language/gc_collectgarbage_stop_step_more",
-      "path": "tests/language/gc_collectgarbage_stop_step_more.gs",
+      "path": "tests/language/gc_collectgarbage_stop_step_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -2524,7 +2524,7 @@
     },
     {
       "id": "language/gc_generational_table_barrier_slice",
-      "path": "tests/language/gc_generational_table_barrier_slice.gs",
+      "path": "tests/language/gc_generational_table_barrier_slice.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -2539,7 +2539,7 @@
     },
     {
       "id": "language/gc_stats_defer_cleanup",
-      "path": "tests/language/gc_stats_defer_cleanup.gs",
+      "path": "tests/language/gc_stats_defer_cleanup.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -2554,7 +2554,7 @@
     },
     {
       "id": "language/gengc_running_mode_restore_more",
-      "path": "tests/language/gengc_running_mode_restore_more.gs",
+      "path": "tests/language/gengc_running_mode_restore_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -2569,7 +2569,7 @@
     },
     {
       "id": "language/go_channel_edges_more",
-      "path": "tests/language/go_channel_edges_more.gs",
+      "path": "tests/language/go_channel_edges_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -2584,7 +2584,7 @@
     },
     {
       "id": "language/go_channel_host_more",
-      "path": "tests/language/go_channel_host_more.gs",
+      "path": "tests/language/go_channel_host_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -2599,7 +2599,7 @@
     },
     {
       "id": "language/goto_flow_equivalent_more",
-      "path": "tests/language/goto_flow_equivalent_more.gs",
+      "path": "tests/language/goto_flow_equivalent_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -2614,7 +2614,7 @@
     },
     {
       "id": "language/goto_if_branch_equivalent_more",
-      "path": "tests/language/goto_if_branch_equivalent_more.gs",
+      "path": "tests/language/goto_if_branch_equivalent_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -2629,7 +2629,7 @@
     },
     {
       "id": "language/goto_simple_paths_more",
-      "path": "tests/language/goto_simple_paths_more.gs",
+      "path": "tests/language/goto_simple_paths_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -2644,7 +2644,7 @@
     },
     {
       "id": "language/heavy_concat_pressure_more2",
-      "path": "tests/language/heavy_concat_pressure_more2.gs",
+      "path": "tests/language/heavy_concat_pressure_more2.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -2659,7 +2659,7 @@
     },
     {
       "id": "language/heavy_generated_concat_more",
-      "path": "tests/language/heavy_generated_concat_more.gs",
+      "path": "tests/language/heavy_generated_concat_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -2674,7 +2674,7 @@
     },
     {
       "id": "language/heavy_string_growth_small",
-      "path": "tests/language/heavy_string_growth_small.gs",
+      "path": "tests/language/heavy_string_growth_small.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -2689,7 +2689,7 @@
     },
     {
       "id": "language/http_background_server_more",
-      "path": "tests/language/http_background_server_more.gs",
+      "path": "tests/language/http_background_server_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -2704,7 +2704,7 @@
     },
     {
       "id": "language/http_router_json_edges_more",
-      "path": "tests/language/http_router_json_edges_more.gs",
+      "path": "tests/language/http_router_json_edges_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -2719,7 +2719,7 @@
     },
     {
       "id": "language/io_current_stream_more",
-      "path": "tests/language/io_current_stream_more.gs",
+      "path": "tests/language/io_current_stream_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -2734,7 +2734,7 @@
     },
     {
       "id": "language/json_go_host_more",
-      "path": "tests/language/json_go_host_more.gs",
+      "path": "tests/language/json_go_host_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -2749,7 +2749,7 @@
     },
     {
       "id": "language/literals_control_escapes_more",
-      "path": "tests/language/literals_control_escapes_more.gs",
+      "path": "tests/language/literals_control_escapes_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -2764,7 +2764,7 @@
     },
     {
       "id": "language/literals_line_comment_strings_more",
-      "path": "tests/language/literals_line_comment_strings_more.gs",
+      "path": "tests/language/literals_line_comment_strings_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -2779,7 +2779,7 @@
     },
     {
       "id": "language/literals_long_brackets_more",
-      "path": "tests/language/literals_long_brackets_more.gs",
+      "path": "tests/language/literals_long_brackets_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -2794,7 +2794,7 @@
     },
     {
       "id": "language/literals_long_string_more",
-      "path": "tests/language/literals_long_string_more.gs",
+      "path": "tests/language/literals_long_string_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -2809,7 +2809,7 @@
     },
     {
       "id": "language/literals_string_table_more2",
-      "path": "tests/language/literals_string_table_more2.gs",
+      "path": "tests/language/literals_string_table_more2.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -2824,7 +2824,7 @@
     },
     {
       "id": "language/literals_strings_basic",
-      "path": "tests/language/literals_strings_basic.gs",
+      "path": "tests/language/literals_strings_basic.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -2839,7 +2839,7 @@
     },
     {
       "id": "language/locals_basic_more",
-      "path": "tests/language/locals_basic_more.gs",
+      "path": "tests/language/locals_basic_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -2854,7 +2854,7 @@
     },
     {
       "id": "language/locals_block_assignment_scope_more",
-      "path": "tests/language/locals_block_assignment_scope_more.gs",
+      "path": "tests/language/locals_block_assignment_scope_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -2869,7 +2869,7 @@
     },
     {
       "id": "language/locals_many_shadow_slots_more2",
-      "path": "tests/language/locals_many_shadow_slots_more2.gs",
+      "path": "tests/language/locals_many_shadow_slots_more2.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -2884,7 +2884,7 @@
     },
     {
       "id": "language/locals_repeat_shadow_more2",
-      "path": "tests/language/locals_repeat_shadow_more2.gs",
+      "path": "tests/language/locals_repeat_shadow_more2.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -2899,7 +2899,7 @@
     },
     {
       "id": "language/locals_scope",
-      "path": "tests/language/locals_scope.gs",
+      "path": "tests/language/locals_scope.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -2914,7 +2914,7 @@
     },
     {
       "id": "language/locals_shadowing_repeat_more",
-      "path": "tests/language/locals_shadowing_repeat_more.gs",
+      "path": "tests/language/locals_shadowing_repeat_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -2929,7 +2929,7 @@
     },
     {
       "id": "language/log_go_host_more",
-      "path": "tests/language/log_go_host_more.gs",
+      "path": "tests/language/log_go_host_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -2944,7 +2944,7 @@
     },
     {
       "id": "language/main_generated_chunk_eval_more",
-      "path": "tests/language/main_generated_chunk_eval_more.gs",
+      "path": "tests/language/main_generated_chunk_eval_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -2959,7 +2959,7 @@
     },
     {
       "id": "language/main_multiline_chunk_values",
-      "path": "tests/language/main_multiline_chunk_values.gs",
+      "path": "tests/language/main_multiline_chunk_values.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -2974,7 +2974,7 @@
     },
     {
       "id": "language/main_print_write_more",
-      "path": "tests/language/main_print_write_more.gs",
+      "path": "tests/language/main_print_write_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -2989,7 +2989,7 @@
     },
     {
       "id": "language/main_script_file_vm_more",
-      "path": "tests/language/main_script_file_vm_more.gs",
+      "path": "tests/language/main_script_file_vm_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -3004,7 +3004,7 @@
     },
     {
       "id": "language/main_script_process_more",
-      "path": "tests/language/main_script_process_more.gs",
+      "path": "tests/language/main_script_process_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -3019,7 +3019,7 @@
     },
     {
       "id": "language/main_vm_loader_more",
-      "path": "tests/language/main_vm_loader_more.gs",
+      "path": "tests/language/main_vm_loader_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -3034,7 +3034,7 @@
     },
     {
       "id": "language/math_float_int_order_edges",
-      "path": "tests/language/math_float_int_order_edges.gs",
+      "path": "tests/language/math_float_int_order_edges.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -3049,7 +3049,7 @@
     },
     {
       "id": "language/math_float_notation_coercion",
-      "path": "tests/language/math_float_notation_coercion.gs",
+      "path": "tests/language/math_float_notation_coercion.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -3064,7 +3064,7 @@
     },
     {
       "id": "language/math_floor_ceil_large_more",
-      "path": "tests/language/math_floor_ceil_large_more.gs",
+      "path": "tests/language/math_floor_ceil_large_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -3079,7 +3079,7 @@
     },
     {
       "id": "language/math_floor_ceil_minmax",
-      "path": "tests/language/math_floor_ceil_minmax.gs",
+      "path": "tests/language/math_floor_ceil_minmax.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -3094,7 +3094,7 @@
     },
     {
       "id": "language/math_floor_power",
-      "path": "tests/language/math_floor_power.gs",
+      "path": "tests/language/math_floor_power.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -3109,7 +3109,7 @@
     },
     {
       "id": "language/math_fmod_integer_more",
-      "path": "tests/language/math_fmod_integer_more.gs",
+      "path": "tests/language/math_fmod_integer_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -3124,7 +3124,7 @@
     },
     {
       "id": "language/math_fmod_more2",
-      "path": "tests/language/math_fmod_more2.gs",
+      "path": "tests/language/math_fmod_more2.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -3139,7 +3139,7 @@
     },
     {
       "id": "language/math_go_helpers_more",
-      "path": "tests/language/math_go_helpers_more.gs",
+      "path": "tests/language/math_go_helpers_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -3154,7 +3154,7 @@
     },
     {
       "id": "language/math_implicit_conversion_more",
-      "path": "tests/language/math_implicit_conversion_more.gs",
+      "path": "tests/language/math_implicit_conversion_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -3169,7 +3169,7 @@
     },
     {
       "id": "language/math_lib_basic",
-      "path": "tests/language/math_lib_basic.gs",
+      "path": "tests/language/math_lib_basic.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -3184,7 +3184,7 @@
     },
     {
       "id": "language/math_log_angle_more",
-      "path": "tests/language/math_log_angle_more.gs",
+      "path": "tests/language/math_log_angle_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -3199,7 +3199,7 @@
     },
     {
       "id": "language/math_minmax_abs_round_more",
-      "path": "tests/language/math_minmax_abs_round_more.gs",
+      "path": "tests/language/math_minmax_abs_round_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -3214,7 +3214,7 @@
     },
     {
       "id": "language/math_minmax_more2",
-      "path": "tests/language/math_minmax_more2.gs",
+      "path": "tests/language/math_minmax_more2.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -3229,7 +3229,7 @@
     },
     {
       "id": "language/math_mod_consistency_more",
-      "path": "tests/language/math_mod_consistency_more.gs",
+      "path": "tests/language/math_mod_consistency_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -3244,7 +3244,7 @@
     },
     {
       "id": "language/math_mod_large_precision_more",
-      "path": "tests/language/math_mod_large_precision_more.gs",
+      "path": "tests/language/math_mod_large_precision_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -3259,7 +3259,7 @@
     },
     {
       "id": "language/math_modf_finite_edges",
-      "path": "tests/language/math_modf_finite_edges.gs",
+      "path": "tests/language/math_modf_finite_edges.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -3274,7 +3274,7 @@
     },
     {
       "id": "language/math_modf_huge",
-      "path": "tests/language/math_modf_huge.gs",
+      "path": "tests/language/math_modf_huge.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -3289,7 +3289,7 @@
     },
     {
       "id": "language/math_modf_inf_integer",
-      "path": "tests/language/math_modf_inf_integer.gs",
+      "path": "tests/language/math_modf_inf_integer.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -3304,7 +3304,7 @@
     },
     {
       "id": "language/math_modulo_lua_semantics",
-      "path": "tests/language/math_modulo_lua_semantics.gs",
+      "path": "tests/language/math_modulo_lua_semantics.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -3319,7 +3319,7 @@
     },
     {
       "id": "language/math_nan_compare_more",
-      "path": "tests/language/math_nan_compare_more.gs",
+      "path": "tests/language/math_nan_compare_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -3334,7 +3334,7 @@
     },
     {
       "id": "language/math_nan_inf_basic",
-      "path": "tests/language/math_nan_inf_basic.gs",
+      "path": "tests/language/math_nan_inf_basic.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -3349,7 +3349,7 @@
     },
     {
       "id": "language/math_nan_zero_more",
-      "path": "tests/language/math_nan_zero_more.gs",
+      "path": "tests/language/math_nan_zero_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -3364,7 +3364,7 @@
     },
     {
       "id": "language/math_negative_powers_more",
-      "path": "tests/language/math_negative_powers_more.gs",
+      "path": "tests/language/math_negative_powers_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -3379,7 +3379,7 @@
     },
     {
       "id": "language/math_numeric_strings_more",
-      "path": "tests/language/math_numeric_strings_more.gs",
+      "path": "tests/language/math_numeric_strings_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -3394,7 +3394,7 @@
     },
     {
       "id": "language/math_order_coercion",
-      "path": "tests/language/math_order_coercion.gs",
+      "path": "tests/language/math_order_coercion.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -3409,7 +3409,7 @@
     },
     {
       "id": "language/math_order_ops",
-      "path": "tests/language/math_order_ops.gs",
+      "path": "tests/language/math_order_ops.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -3424,7 +3424,7 @@
     },
     {
       "id": "language/math_random_errors_more",
-      "path": "tests/language/math_random_errors_more.gs",
+      "path": "tests/language/math_random_errors_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -3439,7 +3439,7 @@
     },
     {
       "id": "language/math_random_protocol",
-      "path": "tests/language/math_random_protocol.gs",
+      "path": "tests/language/math_random_protocol.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -3454,7 +3454,7 @@
     },
     {
       "id": "language/math_random_range_more",
-      "path": "tests/language/math_random_range_more.gs",
+      "path": "tests/language/math_random_range_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -3469,7 +3469,7 @@
     },
     {
       "id": "language/math_random_small_intervals_more",
-      "path": "tests/language/math_random_small_intervals_more.gs",
+      "path": "tests/language/math_random_small_intervals_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -3484,7 +3484,7 @@
     },
     {
       "id": "language/math_random_unit_edges_more",
-      "path": "tests/language/math_random_unit_edges_more.gs",
+      "path": "tests/language/math_random_unit_edges_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -3499,7 +3499,7 @@
     },
     {
       "id": "language/math_tointeger_basic",
-      "path": "tests/language/math_tointeger_basic.gs",
+      "path": "tests/language/math_tointeger_basic.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -3514,7 +3514,7 @@
     },
     {
       "id": "language/math_tointeger_edges_more",
-      "path": "tests/language/math_tointeger_edges_more.gs",
+      "path": "tests/language/math_tointeger_edges_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -3529,7 +3529,7 @@
     },
     {
       "id": "language/math_tonumber_base",
-      "path": "tests/language/math_tonumber_base.gs",
+      "path": "tests/language/math_tonumber_base.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -3544,7 +3544,7 @@
     },
     {
       "id": "language/math_tonumber_base_loop_more",
-      "path": "tests/language/math_tonumber_base_loop_more.gs",
+      "path": "tests/language/math_tonumber_base_loop_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -3559,7 +3559,7 @@
     },
     {
       "id": "language/math_tonumber_base_more",
-      "path": "tests/language/math_tonumber_base_more.gs",
+      "path": "tests/language/math_tonumber_base_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -3574,7 +3574,7 @@
     },
     {
       "id": "language/math_tonumber_basic",
-      "path": "tests/language/math_tonumber_basic.gs",
+      "path": "tests/language/math_tonumber_basic.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -3589,7 +3589,7 @@
     },
     {
       "id": "language/math_tonumber_decimal_edges",
-      "path": "tests/language/math_tonumber_decimal_edges.gs",
+      "path": "tests/language/math_tonumber_decimal_edges.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -3604,7 +3604,7 @@
     },
     {
       "id": "language/math_tonumber_decimal_more2",
-      "path": "tests/language/math_tonumber_decimal_more2.gs",
+      "path": "tests/language/math_tonumber_decimal_more2.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -3619,7 +3619,7 @@
     },
     {
       "id": "language/math_tonumber_hex",
-      "path": "tests/language/math_tonumber_hex.gs",
+      "path": "tests/language/math_tonumber_hex.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -3634,7 +3634,7 @@
     },
     {
       "id": "language/math_tonumber_hex_more2",
-      "path": "tests/language/math_tonumber_hex_more2.gs",
+      "path": "tests/language/math_tonumber_hex_more2.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -3649,7 +3649,7 @@
     },
     {
       "id": "language/math_tonumber_invalid_more",
-      "path": "tests/language/math_tonumber_invalid_more.gs",
+      "path": "tests/language/math_tonumber_invalid_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -3664,7 +3664,7 @@
     },
     {
       "id": "language/math_tonumber_invalid_more2",
-      "path": "tests/language/math_tonumber_invalid_more2.gs",
+      "path": "tests/language/math_tonumber_invalid_more2.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -3679,7 +3679,7 @@
     },
     {
       "id": "language/math_tonumber_long_decimal_more",
-      "path": "tests/language/math_tonumber_long_decimal_more.gs",
+      "path": "tests/language/math_tonumber_long_decimal_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -3694,7 +3694,7 @@
     },
     {
       "id": "language/math_tonumber_overflow_more",
-      "path": "tests/language/math_tonumber_overflow_more.gs",
+      "path": "tests/language/math_tonumber_overflow_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -3709,7 +3709,7 @@
     },
     {
       "id": "language/math_transcendentals",
-      "path": "tests/language/math_transcendentals.gs",
+      "path": "tests/language/math_transcendentals.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -3724,7 +3724,7 @@
     },
     {
       "id": "language/math_transcendentals_more",
-      "path": "tests/language/math_transcendentals_more.gs",
+      "path": "tests/language/math_transcendentals_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -3739,7 +3739,7 @@
     },
     {
       "id": "language/math_unsigned_compare",
-      "path": "tests/language/math_unsigned_compare.gs",
+      "path": "tests/language/math_unsigned_compare.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -3754,7 +3754,7 @@
     },
     {
       "id": "language/matrix_host_dense_more",
-      "path": "tests/language/matrix_host_dense_more.gs",
+      "path": "tests/language/matrix_host_dense_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -3769,7 +3769,7 @@
     },
     {
       "id": "language/net_http_background_roundtrip_more",
-      "path": "tests/language/net_http_background_roundtrip_more.gs",
+      "path": "tests/language/net_http_background_roundtrip_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -3784,7 +3784,7 @@
     },
     {
       "id": "language/net_http_methods_more",
-      "path": "tests/language/net_http_methods_more.gs",
+      "path": "tests/language/net_http_methods_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -3799,7 +3799,7 @@
     },
     {
       "id": "language/nextvar_checknext_more",
-      "path": "tests/language/nextvar_checknext_more.gs",
+      "path": "tests/language/nextvar_checknext_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -3814,7 +3814,7 @@
     },
     {
       "id": "language/nextvar_empty_loops_more",
-      "path": "tests/language/nextvar_empty_loops_more.gs",
+      "path": "tests/language/nextvar_empty_loops_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -3829,7 +3829,7 @@
     },
     {
       "id": "language/nextvar_empty_numeric_for",
-      "path": "tests/language/nextvar_empty_numeric_for.gs",
+      "path": "tests/language/nextvar_empty_numeric_for.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -3844,7 +3844,7 @@
     },
     {
       "id": "language/nextvar_generic_for_multivalue_more",
-      "path": "tests/language/nextvar_generic_for_multivalue_more.gs",
+      "path": "tests/language/nextvar_generic_for_multivalue_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -3859,7 +3859,7 @@
     },
     {
       "id": "language/nextvar_hash_length_growth",
-      "path": "tests/language/nextvar_hash_length_growth.gs",
+      "path": "tests/language/nextvar_hash_length_growth.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -3874,7 +3874,7 @@
     },
     {
       "id": "language/nextvar_ipairs_false_more",
-      "path": "tests/language/nextvar_ipairs_false_more.gs",
+      "path": "tests/language/nextvar_ipairs_false_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -3889,7 +3889,7 @@
     },
     {
       "id": "language/nextvar_ipairs_index_metamethod",
-      "path": "tests/language/nextvar_ipairs_index_metamethod.gs",
+      "path": "tests/language/nextvar_ipairs_index_metamethod.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -3904,7 +3904,7 @@
     },
     {
       "id": "language/nextvar_ipairs_next",
-      "path": "tests/language/nextvar_ipairs_next.gs",
+      "path": "tests/language/nextvar_ipairs_next.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -3919,7 +3919,7 @@
     },
     {
       "id": "language/nextvar_ipairs_protocol_more",
-      "path": "tests/language/nextvar_ipairs_protocol_more.gs",
+      "path": "tests/language/nextvar_ipairs_protocol_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -3934,7 +3934,7 @@
     },
     {
       "id": "language/nextvar_iterator_errors_more",
-      "path": "tests/language/nextvar_iterator_errors_more.gs",
+      "path": "tests/language/nextvar_iterator_errors_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -3949,7 +3949,7 @@
     },
     {
       "id": "language/nextvar_length_more",
-      "path": "tests/language/nextvar_length_more.gs",
+      "path": "tests/language/nextvar_length_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -3964,7 +3964,7 @@
     },
     {
       "id": "language/nextvar_length_nil",
-      "path": "tests/language/nextvar_length_nil.gs",
+      "path": "tests/language/nextvar_length_nil.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -3979,7 +3979,7 @@
     },
     {
       "id": "language/nextvar_next_function_identity_more",
-      "path": "tests/language/nextvar_next_function_identity_more.gs",
+      "path": "tests/language/nextvar_next_function_identity_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -3994,7 +3994,7 @@
     },
     {
       "id": "language/nextvar_next_pairs_copy",
-      "path": "tests/language/nextvar_next_pairs_copy.gs",
+      "path": "tests/language/nextvar_next_pairs_copy.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -4009,7 +4009,7 @@
     },
     {
       "id": "language/nextvar_next_sparse_tail",
-      "path": "tests/language/nextvar_next_sparse_tail.gs",
+      "path": "tests/language/nextvar_next_sparse_tail.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -4024,7 +4024,7 @@
     },
     {
       "id": "language/nextvar_next_tail_more",
-      "path": "tests/language/nextvar_next_tail_more.gs",
+      "path": "tests/language/nextvar_next_tail_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -4039,7 +4039,7 @@
     },
     {
       "id": "language/nextvar_numeric_for_float_counts",
-      "path": "tests/language/nextvar_numeric_for_float_counts.gs",
+      "path": "tests/language/nextvar_numeric_for_float_counts.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -4054,7 +4054,7 @@
     },
     {
       "id": "language/nextvar_numeric_for_fractional_more",
-      "path": "tests/language/nextvar_numeric_for_fractional_more.gs",
+      "path": "tests/language/nextvar_numeric_for_fractional_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -4069,7 +4069,7 @@
     },
     {
       "id": "language/nextvar_numeric_for_more2",
-      "path": "tests/language/nextvar_numeric_for_more2.gs",
+      "path": "tests/language/nextvar_numeric_for_more2.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -4084,7 +4084,7 @@
     },
     {
       "id": "language/nextvar_pairs_delete",
-      "path": "tests/language/nextvar_pairs_delete.gs",
+      "path": "tests/language/nextvar_pairs_delete.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -4099,7 +4099,7 @@
     },
     {
       "id": "language/nextvar_pairs_delete_strings_more",
-      "path": "tests/language/nextvar_pairs_delete_strings_more.gs",
+      "path": "tests/language/nextvar_pairs_delete_strings_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -4114,7 +4114,7 @@
     },
     {
       "id": "language/nextvar_pairs_key_types_more",
-      "path": "tests/language/nextvar_pairs_key_types_more.gs",
+      "path": "tests/language/nextvar_pairs_key_types_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -4129,7 +4129,7 @@
     },
     {
       "id": "language/nextvar_pairs_many_string_keys",
-      "path": "tests/language/nextvar_pairs_many_string_keys.gs",
+      "path": "tests/language/nextvar_pairs_many_string_keys.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -4144,7 +4144,7 @@
     },
     {
       "id": "language/nextvar_pairs_metamethod",
-      "path": "tests/language/nextvar_pairs_metamethod.gs",
+      "path": "tests/language/nextvar_pairs_metamethod.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -4159,7 +4159,7 @@
     },
     {
       "id": "language/nextvar_pairs_protocol_more2",
-      "path": "tests/language/nextvar_pairs_protocol_more2.gs",
+      "path": "tests/language/nextvar_pairs_protocol_more2.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -4174,7 +4174,7 @@
     },
     {
       "id": "language/nextvar_pairs_return_triple",
-      "path": "tests/language/nextvar_pairs_return_triple.gs",
+      "path": "tests/language/nextvar_pairs_return_triple.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -4189,7 +4189,7 @@
     },
     {
       "id": "language/nextvar_pairs_string_keys",
-      "path": "tests/language/nextvar_pairs_string_keys.gs",
+      "path": "tests/language/nextvar_pairs_string_keys.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -4204,7 +4204,7 @@
     },
     {
       "id": "language/nextvar_power_keys_more",
-      "path": "tests/language/nextvar_power_keys_more.gs",
+      "path": "tests/language/nextvar_power_keys_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -4219,7 +4219,7 @@
     },
     {
       "id": "language/nextvar_table_insert_general_more",
-      "path": "tests/language/nextvar_table_insert_general_more.gs",
+      "path": "tests/language/nextvar_table_insert_general_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -4234,7 +4234,7 @@
     },
     {
       "id": "language/nextvar_table_insert_remove_edges",
-      "path": "tests/language/nextvar_table_insert_remove_edges.gs",
+      "path": "tests/language/nextvar_table_insert_remove_edges.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -4249,7 +4249,7 @@
     },
     {
       "id": "language/nextvar_table_insert_remove_proxy_metamethods",
-      "path": "tests/language/nextvar_table_insert_remove_proxy_metamethods.gs",
+      "path": "tests/language/nextvar_table_insert_remove_proxy_metamethods.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -4264,7 +4264,7 @@
     },
     {
       "id": "language/nextvar_table_insert_string_more",
-      "path": "tests/language/nextvar_table_insert_string_more.gs",
+      "path": "tests/language/nextvar_table_insert_string_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -4279,7 +4279,7 @@
     },
     {
       "id": "language/nextvar_table_length_nils_more",
-      "path": "tests/language/nextvar_table_length_nils_more.gs",
+      "path": "tests/language/nextvar_table_length_nils_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -4294,7 +4294,7 @@
     },
     {
       "id": "language/nextvar_table_maxn",
-      "path": "tests/language/nextvar_table_maxn.gs",
+      "path": "tests/language/nextvar_table_maxn.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -4309,7 +4309,7 @@
     },
     {
       "id": "language/nextvar_table_remove_more",
-      "path": "tests/language/nextvar_table_remove_more.gs",
+      "path": "tests/language/nextvar_table_remove_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -4324,7 +4324,7 @@
     },
     {
       "id": "language/nextvar_table_remove_sequences",
-      "path": "tests/language/nextvar_table_remove_sequences.gs",
+      "path": "tests/language/nextvar_table_remove_sequences.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -4339,7 +4339,7 @@
     },
     {
       "id": "language/os_go_host_env_expand_more",
-      "path": "tests/language/os_go_host_env_expand_more.gs",
+      "path": "tests/language/os_go_host_env_expand_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -4354,7 +4354,7 @@
     },
     {
       "id": "language/os_time_date_host_more",
-      "path": "tests/language/os_time_date_host_more.gs",
+      "path": "tests/language/os_time_date_host_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -4369,7 +4369,7 @@
     },
     {
       "id": "language/pm_captures_basic_more",
-      "path": "tests/language/pm_captures_basic_more.gs",
+      "path": "tests/language/pm_captures_basic_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -4384,7 +4384,7 @@
     },
     {
       "id": "language/pm_class_sets_ascii_more",
-      "path": "tests/language/pm_class_sets_ascii_more.gs",
+      "path": "tests/language/pm_class_sets_ascii_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -4399,7 +4399,7 @@
     },
     {
       "id": "language/pm_escape_compat_more",
-      "path": "tests/language/pm_escape_compat_more.gs",
+      "path": "tests/language/pm_escape_compat_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -4414,7 +4414,7 @@
     },
     {
       "id": "language/pm_find_empty_anchor",
-      "path": "tests/language/pm_find_empty_anchor.gs",
+      "path": "tests/language/pm_find_empty_anchor.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -4429,7 +4429,7 @@
     },
     {
       "id": "language/pm_find_match_more_ascii",
-      "path": "tests/language/pm_find_match_more_ascii.gs",
+      "path": "tests/language/pm_find_match_more_ascii.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -4444,7 +4444,7 @@
     },
     {
       "id": "language/pm_find_nul_more2",
-      "path": "tests/language/pm_find_nul_more2.gs",
+      "path": "tests/language/pm_find_nul_more2.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -4459,7 +4459,7 @@
     },
     {
       "id": "language/pm_find_nul_strings",
-      "path": "tests/language/pm_find_nul_strings.gs",
+      "path": "tests/language/pm_find_nul_strings.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -4474,7 +4474,7 @@
     },
     {
       "id": "language/pm_frontier_compat_more",
-      "path": "tests/language/pm_frontier_compat_more.gs",
+      "path": "tests/language/pm_frontier_compat_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -4489,7 +4489,7 @@
     },
     {
       "id": "language/pm_gmatch_numeric_pairs_more",
-      "path": "tests/language/pm_gmatch_numeric_pairs_more.gs",
+      "path": "tests/language/pm_gmatch_numeric_pairs_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -4504,7 +4504,7 @@
     },
     {
       "id": "language/pm_gmatch_words_more",
-      "path": "tests/language/pm_gmatch_words_more.gs",
+      "path": "tests/language/pm_gmatch_words_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -4519,7 +4519,7 @@
     },
     {
       "id": "language/pm_gsub_capture_reorder_more",
-      "path": "tests/language/pm_gsub_capture_reorder_more.gs",
+      "path": "tests/language/pm_gsub_capture_reorder_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -4534,7 +4534,7 @@
     },
     {
       "id": "language/pm_gsub_captures",
-      "path": "tests/language/pm_gsub_captures.gs",
+      "path": "tests/language/pm_gsub_captures.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -4549,7 +4549,7 @@
     },
     {
       "id": "language/pm_gsub_empty_match_more",
-      "path": "tests/language/pm_gsub_empty_match_more.gs",
+      "path": "tests/language/pm_gsub_empty_match_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -4564,7 +4564,7 @@
     },
     {
       "id": "language/pm_gsub_error_subset_more",
-      "path": "tests/language/pm_gsub_error_subset_more.gs",
+      "path": "tests/language/pm_gsub_error_subset_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -4579,7 +4579,7 @@
     },
     {
       "id": "language/pm_gsub_function_balanced_more",
-      "path": "tests/language/pm_gsub_function_balanced_more.gs",
+      "path": "tests/language/pm_gsub_function_balanced_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -4594,7 +4594,7 @@
     },
     {
       "id": "language/pm_gsub_limit_count_more",
-      "path": "tests/language/pm_gsub_limit_count_more.gs",
+      "path": "tests/language/pm_gsub_limit_count_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -4609,7 +4609,7 @@
     },
     {
       "id": "language/pm_gsub_replacement_more",
-      "path": "tests/language/pm_gsub_replacement_more.gs",
+      "path": "tests/language/pm_gsub_replacement_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -4624,7 +4624,7 @@
     },
     {
       "id": "language/pm_gsub_table_fallback_more",
-      "path": "tests/language/pm_gsub_table_fallback_more.gs",
+      "path": "tests/language/pm_gsub_table_fallback_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -4639,7 +4639,7 @@
     },
     {
       "id": "language/pm_gsub_table_replacement_more",
-      "path": "tests/language/pm_gsub_table_replacement_more.gs",
+      "path": "tests/language/pm_gsub_table_replacement_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -4654,7 +4654,7 @@
     },
     {
       "id": "language/pm_gsub_trim",
-      "path": "tests/language/pm_gsub_trim.gs",
+      "path": "tests/language/pm_gsub_trim.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -4669,7 +4669,7 @@
     },
     {
       "id": "language/pm_malformed_pattern_errors_more",
-      "path": "tests/language/pm_malformed_pattern_errors_more.gs",
+      "path": "tests/language/pm_malformed_pattern_errors_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -4684,7 +4684,7 @@
     },
     {
       "id": "language/pm_match_capture_suffix_more",
-      "path": "tests/language/pm_match_capture_suffix_more.gs",
+      "path": "tests/language/pm_match_capture_suffix_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -4699,7 +4699,7 @@
     },
     {
       "id": "language/pm_match_captures_ascii",
-      "path": "tests/language/pm_match_captures_ascii.gs",
+      "path": "tests/language/pm_match_captures_ascii.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -4714,7 +4714,7 @@
     },
     {
       "id": "language/pm_match_classes_more2",
-      "path": "tests/language/pm_match_classes_more2.gs",
+      "path": "tests/language/pm_match_classes_more2.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -4729,7 +4729,7 @@
     },
     {
       "id": "language/pm_match_classes_repetition_more",
-      "path": "tests/language/pm_match_classes_repetition_more.gs",
+      "path": "tests/language/pm_match_classes_repetition_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -4744,7 +4744,7 @@
     },
     {
       "id": "language/pm_match_minimal_more",
-      "path": "tests/language/pm_match_minimal_more.gs",
+      "path": "tests/language/pm_match_minimal_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -4759,7 +4759,7 @@
     },
     {
       "id": "language/pm_match_repetition",
-      "path": "tests/language/pm_match_repetition.gs",
+      "path": "tests/language/pm_match_repetition.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -4774,7 +4774,7 @@
     },
     {
       "id": "language/pm_pattern_nul_magic_more",
-      "path": "tests/language/pm_pattern_nul_magic_more.gs",
+      "path": "tests/language/pm_pattern_nul_magic_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -4789,7 +4789,7 @@
     },
     {
       "id": "language/pm_pattern_runtime_more",
-      "path": "tests/language/pm_pattern_runtime_more.gs",
+      "path": "tests/language/pm_pattern_runtime_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -4804,7 +4804,7 @@
     },
     {
       "id": "language/process_exec_run_more",
-      "path": "tests/language/process_exec_run_more.gs",
+      "path": "tests/language/process_exec_run_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -4819,7 +4819,7 @@
     },
     {
       "id": "language/process_go_host_entry_exit_more",
-      "path": "tests/language/process_go_host_entry_exit_more.gs",
+      "path": "tests/language/process_go_host_entry_exit_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -4834,7 +4834,7 @@
     },
     {
       "id": "language/rand_go_host_more",
-      "path": "tests/language/rand_go_host_more.gs",
+      "path": "tests/language/rand_go_host_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -4849,7 +4849,7 @@
     },
     {
       "id": "language/regexp_go_host_more",
-      "path": "tests/language/regexp_go_host_more.gs",
+      "path": "tests/language/regexp_go_host_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -4864,7 +4864,7 @@
     },
     {
       "id": "language/regexp_submatch_limits_more",
-      "path": "tests/language/regexp_submatch_limits_more.gs",
+      "path": "tests/language/regexp_submatch_limits_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -4879,7 +4879,7 @@
     },
     {
       "id": "language/sort_binary_string_order_more",
-      "path": "tests/language/sort_binary_string_order_more.gs",
+      "path": "tests/language/sort_binary_string_order_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -4894,7 +4894,7 @@
     },
     {
       "id": "language/sort_callback_helpers_more",
-      "path": "tests/language/sort_callback_helpers_more.gs",
+      "path": "tests/language/sort_callback_helpers_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -4909,7 +4909,7 @@
     },
     {
       "id": "language/sort_custom_comparator",
-      "path": "tests/language/sort_custom_comparator.gs",
+      "path": "tests/language/sort_custom_comparator.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -4924,7 +4924,7 @@
     },
     {
       "id": "language/sort_equal_false_more",
-      "path": "tests/language/sort_equal_false_more.gs",
+      "path": "tests/language/sort_equal_false_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -4939,7 +4939,7 @@
     },
     {
       "id": "language/sort_invalid_order_function",
-      "path": "tests/language/sort_invalid_order_function.gs",
+      "path": "tests/language/sort_invalid_order_function.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -4954,7 +4954,7 @@
     },
     {
       "id": "language/sort_invalid_order_more2",
-      "path": "tests/language/sort_invalid_order_more2.gs",
+      "path": "tests/language/sort_invalid_order_more2.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -4969,7 +4969,7 @@
     },
     {
       "id": "language/sort_len_noninteger_more",
-      "path": "tests/language/sort_len_noninteger_more.gs",
+      "path": "tests/language/sort_len_noninteger_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -4984,7 +4984,7 @@
     },
     {
       "id": "language/sort_metatable_lt_more",
-      "path": "tests/language/sort_metatable_lt_more.gs",
+      "path": "tests/language/sort_metatable_lt_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -4999,7 +4999,7 @@
     },
     {
       "id": "language/sort_month_names_more",
-      "path": "tests/language/sort_month_names_more.gs",
+      "path": "tests/language/sort_month_names_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -5014,7 +5014,7 @@
     },
     {
       "id": "language/sort_order",
-      "path": "tests/language/sort_order.gs",
+      "path": "tests/language/sort_order.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -5029,7 +5029,7 @@
     },
     {
       "id": "language/sort_pack_nil_counts_more",
-      "path": "tests/language/sort_pack_nil_counts_more.gs",
+      "path": "tests/language/sort_pack_nil_counts_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -5044,7 +5044,7 @@
     },
     {
       "id": "language/sort_pack_unpack",
-      "path": "tests/language/sort_pack_unpack.gs",
+      "path": "tests/language/sort_pack_unpack.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -5059,7 +5059,7 @@
     },
     {
       "id": "language/sort_permutation_more",
-      "path": "tests/language/sort_permutation_more.gs",
+      "path": "tests/language/sort_permutation_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -5074,7 +5074,7 @@
     },
     {
       "id": "language/sort_reverse_closure_more",
-      "path": "tests/language/sort_reverse_closure_more.gs",
+      "path": "tests/language/sort_reverse_closure_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -5089,7 +5089,7 @@
     },
     {
       "id": "language/sort_table_insert_errors",
-      "path": "tests/language/sort_table_insert_errors.gs",
+      "path": "tests/language/sort_table_insert_errors.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -5104,7 +5104,7 @@
     },
     {
       "id": "language/sort_table_insert_remove_concat",
-      "path": "tests/language/sort_table_insert_remove_concat.gs",
+      "path": "tests/language/sort_table_insert_remove_concat.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -5119,7 +5119,7 @@
     },
     {
       "id": "language/sort_table_move",
-      "path": "tests/language/sort_table_move.gs",
+      "path": "tests/language/sort_table_move.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -5134,7 +5134,7 @@
     },
     {
       "id": "language/sort_table_proxy_metamethods",
-      "path": "tests/language/sort_table_proxy_metamethods.gs",
+      "path": "tests/language/sort_table_proxy_metamethods.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -5149,7 +5149,7 @@
     },
     {
       "id": "language/sort_unpack_assignment_more",
-      "path": "tests/language/sort_unpack_assignment_more.gs",
+      "path": "tests/language/sort_unpack_assignment_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -5164,7 +5164,7 @@
     },
     {
       "id": "language/sort_unpack_ranges",
-      "path": "tests/language/sort_unpack_ranges.gs",
+      "path": "tests/language/sort_unpack_ranges.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -5179,7 +5179,7 @@
     },
     {
       "id": "language/sort_unpack_sparse_boundary_more",
-      "path": "tests/language/sort_unpack_sparse_boundary_more.gs",
+      "path": "tests/language/sort_unpack_sparse_boundary_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -5194,7 +5194,7 @@
     },
     {
       "id": "language/strings_basic",
-      "path": "tests/language/strings_basic.gs",
+      "path": "tests/language/strings_basic.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -5209,7 +5209,7 @@
     },
     {
       "id": "language/strings_byte_ascii_indices",
-      "path": "tests/language/strings_byte_ascii_indices.gs",
+      "path": "tests/language/strings_byte_ascii_indices.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -5224,7 +5224,7 @@
     },
     {
       "id": "language/strings_byte_char_edges",
-      "path": "tests/language/strings_byte_char_edges.gs",
+      "path": "tests/language/strings_byte_char_edges.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -5239,7 +5239,7 @@
     },
     {
       "id": "language/strings_byte_char_more2",
-      "path": "tests/language/strings_byte_char_more2.gs",
+      "path": "tests/language/strings_byte_char_more2.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -5254,7 +5254,7 @@
     },
     {
       "id": "language/strings_byte_range_multi_more",
-      "path": "tests/language/strings_byte_range_multi_more.gs",
+      "path": "tests/language/strings_byte_range_multi_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -5269,7 +5269,7 @@
     },
     {
       "id": "language/strings_char_ascii_more",
-      "path": "tests/language/strings_char_ascii_more.gs",
+      "path": "tests/language/strings_char_ascii_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -5284,7 +5284,7 @@
     },
     {
       "id": "language/strings_char_errors_more",
-      "path": "tests/language/strings_char_errors_more.gs",
+      "path": "tests/language/strings_char_errors_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -5299,7 +5299,7 @@
     },
     {
       "id": "language/strings_compare_binary_more",
-      "path": "tests/language/strings_compare_binary_more.gs",
+      "path": "tests/language/strings_compare_binary_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -5314,7 +5314,7 @@
     },
     {
       "id": "language/strings_find_empty_more",
-      "path": "tests/language/strings_find_empty_more.gs",
+      "path": "tests/language/strings_find_empty_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -5329,7 +5329,7 @@
     },
     {
       "id": "language/strings_find_offsets_more",
-      "path": "tests/language/strings_find_offsets_more.gs",
+      "path": "tests/language/strings_find_offsets_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -5344,7 +5344,7 @@
     },
     {
       "id": "language/strings_find_plain_more",
-      "path": "tests/language/strings_find_plain_more.gs",
+      "path": "tests/language/strings_find_plain_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -5359,7 +5359,7 @@
     },
     {
       "id": "language/strings_format_error_subset_more",
-      "path": "tests/language/strings_format_error_subset_more.gs",
+      "path": "tests/language/strings_format_error_subset_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -5374,7 +5374,7 @@
     },
     {
       "id": "language/strings_format_exponent_more",
-      "path": "tests/language/strings_format_exponent_more.gs",
+      "path": "tests/language/strings_format_exponent_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -5389,7 +5389,7 @@
     },
     {
       "id": "language/strings_format_flags_extended",
-      "path": "tests/language/strings_format_flags_extended.gs",
+      "path": "tests/language/strings_format_flags_extended.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -5404,7 +5404,7 @@
     },
     {
       "id": "language/strings_format_flags_more",
-      "path": "tests/language/strings_format_flags_more.gs",
+      "path": "tests/language/strings_format_flags_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -5419,7 +5419,7 @@
     },
     {
       "id": "language/strings_format_iso_flags_more",
-      "path": "tests/language/strings_format_iso_flags_more.gs",
+      "path": "tests/language/strings_format_iso_flags_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -5434,7 +5434,7 @@
     },
     {
       "id": "language/strings_format_large32_subset_more",
-      "path": "tests/language/strings_format_large32_subset_more.gs",
+      "path": "tests/language/strings_format_large32_subset_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -5449,7 +5449,7 @@
     },
     {
       "id": "language/strings_format_long_number_more",
-      "path": "tests/language/strings_format_long_number_more.gs",
+      "path": "tests/language/strings_format_long_number_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -5464,7 +5464,7 @@
     },
     {
       "id": "language/strings_format_long_precision",
-      "path": "tests/language/strings_format_long_precision.gs",
+      "path": "tests/language/strings_format_long_precision.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -5479,7 +5479,7 @@
     },
     {
       "id": "language/strings_format_numbers_flags",
-      "path": "tests/language/strings_format_numbers_flags.gs",
+      "path": "tests/language/strings_format_numbers_flags.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -5494,7 +5494,7 @@
     },
     {
       "id": "language/strings_format_numeric_flags_more",
-      "path": "tests/language/strings_format_numeric_flags_more.gs",
+      "path": "tests/language/strings_format_numeric_flags_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -5509,7 +5509,7 @@
     },
     {
       "id": "language/strings_format_percent_char_more",
-      "path": "tests/language/strings_format_percent_char_more.gs",
+      "path": "tests/language/strings_format_percent_char_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -5524,7 +5524,7 @@
     },
     {
       "id": "language/strings_format_pointer",
-      "path": "tests/language/strings_format_pointer.gs",
+      "path": "tests/language/strings_format_pointer.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -5539,7 +5539,7 @@
     },
     {
       "id": "language/strings_format_quote_literals",
-      "path": "tests/language/strings_format_quote_literals.gs",
+      "path": "tests/language/strings_format_quote_literals.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -5554,7 +5554,7 @@
     },
     {
       "id": "language/strings_format_string_values",
-      "path": "tests/language/strings_format_string_values.gs",
+      "path": "tests/language/strings_format_string_values.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -5569,7 +5569,7 @@
     },
     {
       "id": "language/strings_format_tostring",
-      "path": "tests/language/strings_format_tostring.gs",
+      "path": "tests/language/strings_format_tostring.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -5584,7 +5584,7 @@
     },
     {
       "id": "language/strings_format_tostring_more2",
-      "path": "tests/language/strings_format_tostring_more2.gs",
+      "path": "tests/language/strings_format_tostring_more2.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -5599,7 +5599,7 @@
     },
     {
       "id": "language/strings_gmatch_coroutine",
-      "path": "tests/language/strings_gmatch_coroutine.gs",
+      "path": "tests/language/strings_gmatch_coroutine.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -5614,7 +5614,7 @@
     },
     {
       "id": "language/strings_gmatch_coroutine_more2",
-      "path": "tests/language/strings_gmatch_coroutine_more2.gs",
+      "path": "tests/language/strings_gmatch_coroutine_more2.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -5629,7 +5629,7 @@
     },
     {
       "id": "language/strings_go_helpers_more",
-      "path": "tests/language/strings_go_helpers_more.gs",
+      "path": "tests/language/strings_go_helpers_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -5644,7 +5644,7 @@
     },
     {
       "id": "language/strings_patterns_basic",
-      "path": "tests/language/strings_patterns_basic.gs",
+      "path": "tests/language/strings_patterns_basic.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -5659,7 +5659,7 @@
     },
     {
       "id": "language/strings_pointer_format_more",
-      "path": "tests/language/strings_pointer_format_more.gs",
+      "path": "tests/language/strings_pointer_format_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -5674,7 +5674,7 @@
     },
     {
       "id": "language/strings_rep_reverse_tostring",
-      "path": "tests/language/strings_rep_reverse_tostring.gs",
+      "path": "tests/language/strings_rep_reverse_tostring.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -5689,7 +5689,7 @@
     },
     {
       "id": "language/strings_rep_separator_more",
-      "path": "tests/language/strings_rep_separator_more.gs",
+      "path": "tests/language/strings_rep_separator_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -5704,7 +5704,7 @@
     },
     {
       "id": "language/strings_rep_tostring_ascii_more",
-      "path": "tests/language/strings_rep_tostring_ascii_more.gs",
+      "path": "tests/language/strings_rep_tostring_ascii_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -5719,7 +5719,7 @@
     },
     {
       "id": "language/strings_reverse_ascii_more",
-      "path": "tests/language/strings_reverse_ascii_more.gs",
+      "path": "tests/language/strings_reverse_ascii_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -5734,7 +5734,7 @@
     },
     {
       "id": "language/strings_string_pack_go_style",
-      "path": "tests/language/strings_string_pack_go_style.gs",
+      "path": "tests/language/strings_string_pack_go_style.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -5749,7 +5749,7 @@
     },
     {
       "id": "language/strings_string_pack_more",
-      "path": "tests/language/strings_string_pack_more.gs",
+      "path": "tests/language/strings_string_pack_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -5764,7 +5764,7 @@
     },
     {
       "id": "language/strings_sub_boundary_more",
-      "path": "tests/language/strings_sub_boundary_more.gs",
+      "path": "tests/language/strings_sub_boundary_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -5779,7 +5779,7 @@
     },
     {
       "id": "language/strings_sub_find_len_ascii_more",
-      "path": "tests/language/strings_sub_find_len_ascii_more.gs",
+      "path": "tests/language/strings_sub_find_len_ascii_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -5794,7 +5794,7 @@
     },
     {
       "id": "language/strings_sub_method_more",
-      "path": "tests/language/strings_sub_method_more.gs",
+      "path": "tests/language/strings_sub_method_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -5809,7 +5809,7 @@
     },
     {
       "id": "language/strings_table_concat_binary",
-      "path": "tests/language/strings_table_concat_binary.gs",
+      "path": "tests/language/strings_table_concat_binary.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -5824,7 +5824,7 @@
     },
     {
       "id": "language/strings_table_concat_empty_errors_more",
-      "path": "tests/language/strings_table_concat_empty_errors_more.gs",
+      "path": "tests/language/strings_table_concat_empty_errors_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -5839,7 +5839,7 @@
     },
     {
       "id": "language/strings_table_concat_errors",
-      "path": "tests/language/strings_table_concat_errors.gs",
+      "path": "tests/language/strings_table_concat_errors.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -5854,7 +5854,7 @@
     },
     {
       "id": "language/strings_table_concat_errors_more2",
-      "path": "tests/language/strings_table_concat_errors_more2.gs",
+      "path": "tests/language/strings_table_concat_errors_more2.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -5869,7 +5869,7 @@
     },
     {
       "id": "language/strings_table_concat_long_ranges_more",
-      "path": "tests/language/strings_table_concat_long_ranges_more.gs",
+      "path": "tests/language/strings_table_concat_long_ranges_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -5884,7 +5884,7 @@
     },
     {
       "id": "language/strings_table_concat_more2",
-      "path": "tests/language/strings_table_concat_more2.gs",
+      "path": "tests/language/strings_table_concat_more2.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -5899,7 +5899,7 @@
     },
     {
       "id": "language/strings_table_concat_ranges",
-      "path": "tests/language/strings_table_concat_ranges.gs",
+      "path": "tests/language/strings_table_concat_ranges.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -5914,7 +5914,7 @@
     },
     {
       "id": "language/strings_table_concat_ranges_more3",
-      "path": "tests/language/strings_table_concat_ranges_more3.gs",
+      "path": "tests/language/strings_table_concat_ranges_more3.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -5929,7 +5929,7 @@
     },
     {
       "id": "language/strings_tostring_metamethod",
-      "path": "tests/language/strings_tostring_metamethod.gs",
+      "path": "tests/language/strings_tostring_metamethod.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -5944,7 +5944,7 @@
     },
     {
       "id": "language/strings_transform_basic",
-      "path": "tests/language/strings_transform_basic.gs",
+      "path": "tests/language/strings_transform_basic.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -5959,7 +5959,7 @@
     },
     {
       "id": "language/table_go_helpers_more",
-      "path": "tests/language/table_go_helpers_more.gs",
+      "path": "tests/language/table_go_helpers_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -5974,7 +5974,7 @@
     },
     {
       "id": "language/table_higher_order_vm_callbacks_more",
-      "path": "tests/language/table_higher_order_vm_callbacks_more.gs",
+      "path": "tests/language/table_higher_order_vm_callbacks_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -5989,7 +5989,7 @@
     },
     {
       "id": "language/table_proxy_concat_flatten_more",
-      "path": "tests/language/table_proxy_concat_flatten_more.gs",
+      "path": "tests/language/table_proxy_concat_flatten_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -6004,7 +6004,7 @@
     },
     {
       "id": "language/table_raw_helpers_more",
-      "path": "tests/language/table_raw_helpers_more.gs",
+      "path": "tests/language/table_raw_helpers_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -6019,7 +6019,7 @@
     },
     {
       "id": "language/time_color_hash_edges_more",
-      "path": "tests/language/time_color_hash_edges_more.gs",
+      "path": "tests/language/time_color_hash_edges_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -6034,7 +6034,7 @@
     },
     {
       "id": "language/time_compress_encoding_go_host_more",
-      "path": "tests/language/time_compress_encoding_go_host_more.gs",
+      "path": "tests/language/time_compress_encoding_go_host_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -6049,7 +6049,7 @@
     },
     {
       "id": "language/time_process_debug_edges_more",
-      "path": "tests/language/time_process_debug_edges_more.gs",
+      "path": "tests/language/time_process_debug_edges_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -6064,7 +6064,7 @@
     },
     {
       "id": "language/tpack_pack_count_more",
-      "path": "tests/language/tpack_pack_count_more.gs",
+      "path": "tests/language/tpack_pack_count_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -6079,7 +6079,7 @@
     },
     {
       "id": "language/tpack_select_more",
-      "path": "tests/language/tpack_select_more.gs",
+      "path": "tests/language/tpack_select_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -6094,7 +6094,7 @@
     },
     {
       "id": "language/tpack_vararg_edges_more",
-      "path": "tests/language/tpack_vararg_edges_more.gs",
+      "path": "tests/language/tpack_vararg_edges_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -6109,7 +6109,7 @@
     },
     {
       "id": "language/tracegc_stats_progress_more",
-      "path": "tests/language/tracegc_stats_progress_more.gs",
+      "path": "tests/language/tracegc_stats_progress_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -6124,7 +6124,7 @@
     },
     {
       "id": "language/url_canonical_edges_more",
-      "path": "tests/language/url_canonical_edges_more.gs",
+      "path": "tests/language/url_canonical_edges_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -6139,7 +6139,7 @@
     },
     {
       "id": "language/url_go_host_more",
-      "path": "tests/language/url_go_host_more.gs",
+      "path": "tests/language/url_go_host_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -6154,7 +6154,7 @@
     },
     {
       "id": "language/utf8_basic",
-      "path": "tests/language/utf8_basic.gs",
+      "path": "tests/language/utf8_basic.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -6169,7 +6169,7 @@
     },
     {
       "id": "language/utf8_boundary_chars_more",
-      "path": "tests/language/utf8_boundary_chars_more.gs",
+      "path": "tests/language/utf8_boundary_chars_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -6184,7 +6184,7 @@
     },
     {
       "id": "language/utf8_char_codes",
-      "path": "tests/language/utf8_char_codes.gs",
+      "path": "tests/language/utf8_char_codes.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -6199,7 +6199,7 @@
     },
     {
       "id": "language/utf8_char_range_errors",
-      "path": "tests/language/utf8_char_range_errors.gs",
+      "path": "tests/language/utf8_char_range_errors.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -6214,7 +6214,7 @@
     },
     {
       "id": "language/utf8_codepoint_bounds",
-      "path": "tests/language/utf8_codepoint_bounds.gs",
+      "path": "tests/language/utf8_codepoint_bounds.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -6229,7 +6229,7 @@
     },
     {
       "id": "language/utf8_codes_empty_iterator",
-      "path": "tests/language/utf8_codes_empty_iterator.gs",
+      "path": "tests/language/utf8_codes_empty_iterator.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -6244,7 +6244,7 @@
     },
     {
       "id": "language/utf8_codes_iterator",
-      "path": "tests/language/utf8_codes_iterator.gs",
+      "path": "tests/language/utf8_codes_iterator.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -6259,7 +6259,7 @@
     },
     {
       "id": "language/utf8_complex_string_more",
-      "path": "tests/language/utf8_complex_string_more.gs",
+      "path": "tests/language/utf8_complex_string_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -6274,7 +6274,7 @@
     },
     {
       "id": "language/utf8_go_helpers_more",
-      "path": "tests/language/utf8_go_helpers_more.gs",
+      "path": "tests/language/utf8_go_helpers_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -6289,7 +6289,7 @@
     },
     {
       "id": "language/utf8_invalid_sequences_more",
-      "path": "tests/language/utf8_invalid_sequences_more.gs",
+      "path": "tests/language/utf8_invalid_sequences_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -6304,7 +6304,7 @@
     },
     {
       "id": "language/utf8_len_range_more",
-      "path": "tests/language/utf8_len_range_more.gs",
+      "path": "tests/language/utf8_len_range_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -6319,7 +6319,7 @@
     },
     {
       "id": "language/utf8_multibyte_offsets",
-      "path": "tests/language/utf8_multibyte_offsets.gs",
+      "path": "tests/language/utf8_multibyte_offsets.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -6334,7 +6334,7 @@
     },
     {
       "id": "language/utf8_offset_len_errors",
-      "path": "tests/language/utf8_offset_len_errors.gs",
+      "path": "tests/language/utf8_offset_len_errors.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -6349,7 +6349,7 @@
     },
     {
       "id": "language/utf8_supplementary_more",
-      "path": "tests/language/utf8_supplementary_more.gs",
+      "path": "tests/language/utf8_supplementary_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -6364,7 +6364,7 @@
     },
     {
       "id": "language/utf8_testkit_edges_more",
-      "path": "tests/language/utf8_testkit_edges_more.gs",
+      "path": "tests/language/utf8_testkit_edges_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -6379,7 +6379,7 @@
     },
     {
       "id": "language/utf8_validation_helpers_more",
-      "path": "tests/language/utf8_validation_helpers_more.gs",
+      "path": "tests/language/utf8_validation_helpers_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -6394,7 +6394,7 @@
     },
     {
       "id": "language/uuid_go_host_more",
-      "path": "tests/language/uuid_go_host_more.gs",
+      "path": "tests/language/uuid_go_host_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -6409,7 +6409,7 @@
     },
     {
       "id": "language/vararg_argument_adjust_more",
-      "path": "tests/language/vararg_argument_adjust_more.gs",
+      "path": "tests/language/vararg_argument_adjust_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -6424,7 +6424,7 @@
     },
     {
       "id": "language/vararg_call_unpack_more",
-      "path": "tests/language/vararg_call_unpack_more.gs",
+      "path": "tests/language/vararg_call_unpack_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -6439,7 +6439,7 @@
     },
     {
       "id": "language/vararg_forwarding",
-      "path": "tests/language/vararg_forwarding.gs",
+      "path": "tests/language/vararg_forwarding.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -6454,7 +6454,7 @@
     },
     {
       "id": "language/vararg_long_parameter_list_more",
-      "path": "tests/language/vararg_long_parameter_list_more.gs",
+      "path": "tests/language/vararg_long_parameter_list_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -6469,7 +6469,7 @@
     },
     {
       "id": "language/vararg_method_recursive_more",
-      "path": "tests/language/vararg_method_recursive_more.gs",
+      "path": "tests/language/vararg_method_recursive_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -6484,7 +6484,7 @@
     },
     {
       "id": "language/vararg_pack",
-      "path": "tests/language/vararg_pack.gs",
+      "path": "tests/language/vararg_pack.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -6499,7 +6499,7 @@
     },
     {
       "id": "language/vararg_select",
-      "path": "tests/language/vararg_select.gs",
+      "path": "tests/language/vararg_select.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -6514,7 +6514,7 @@
     },
     {
       "id": "language/vararg_tail_missing_args",
-      "path": "tests/language/vararg_tail_missing_args.gs",
+      "path": "tests/language/vararg_tail_missing_args.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -6529,7 +6529,7 @@
     },
     {
       "id": "language/vec_color_geometry_hsl_more",
-      "path": "tests/language/vec_color_geometry_hsl_more.gs",
+      "path": "tests/language/vec_color_geometry_hsl_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -6544,7 +6544,7 @@
     },
     {
       "id": "language/vec_color_go_host_more",
-      "path": "tests/language/vec_color_go_host_more.gs",
+      "path": "tests/language/vec_color_go_host_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -6559,7 +6559,7 @@
     },
     {
       "id": "language/verybig_many_constants_more2",
-      "path": "tests/language/verybig_many_constants_more2.gs",
+      "path": "tests/language/verybig_many_constants_more2.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -6574,7 +6574,7 @@
     },
     {
       "id": "language/verybig_method_constants_more",
-      "path": "tests/language/verybig_method_constants_more.gs",
+      "path": "tests/language/verybig_method_constants_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -6589,7 +6589,7 @@
     },
     {
       "id": "language/verybig_rk_constants_more",
-      "path": "tests/language/verybig_rk_constants_more.gs",
+      "path": "tests/language/verybig_rk_constants_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -6604,7 +6604,7 @@
     },
     {
       "id": "language/xpcall_iterator_edges_more",
-      "path": "tests/language/xpcall_iterator_edges_more.gs",
+      "path": "tests/language/xpcall_iterator_edges_more.leia",
       "domain": "language",
       "kind": "test",
       "reference": {
@@ -6619,7 +6619,7 @@
     },
     {
       "id": "smoke/01_basic",
-      "path": "tests/smoke/01_basic.gs",
+      "path": "tests/smoke/01_basic.leia",
       "domain": "smoke",
       "kind": "test",
       "reference": null,
@@ -6631,7 +6631,7 @@
     },
     {
       "id": "smoke/02_strings",
-      "path": "tests/smoke/02_strings.gs",
+      "path": "tests/smoke/02_strings.leia",
       "domain": "smoke",
       "kind": "test",
       "reference": null,
@@ -6643,7 +6643,7 @@
     },
     {
       "id": "smoke/03_control",
-      "path": "tests/smoke/03_control.gs",
+      "path": "tests/smoke/03_control.leia",
       "domain": "smoke",
       "kind": "test",
       "reference": null,
@@ -6655,7 +6655,7 @@
     },
     {
       "id": "smoke/04_functions",
-      "path": "tests/smoke/04_functions.gs",
+      "path": "tests/smoke/04_functions.leia",
       "domain": "smoke",
       "kind": "test",
       "reference": null,
@@ -6667,7 +6667,7 @@
     },
     {
       "id": "smoke/05_tables",
-      "path": "tests/smoke/05_tables.gs",
+      "path": "tests/smoke/05_tables.leia",
       "domain": "smoke",
       "kind": "test",
       "reference": null,
@@ -6679,7 +6679,7 @@
     },
     {
       "id": "smoke/06_closures",
-      "path": "tests/smoke/06_closures.gs",
+      "path": "tests/smoke/06_closures.leia",
       "domain": "smoke",
       "kind": "test",
       "reference": null,
@@ -6691,7 +6691,7 @@
     },
     {
       "id": "smoke/07_metatable",
-      "path": "tests/smoke/07_metatable.gs",
+      "path": "tests/smoke/07_metatable.leia",
       "domain": "smoke",
       "kind": "test",
       "reference": null,
@@ -6703,7 +6703,7 @@
     },
     {
       "id": "smoke/08_coroutine",
-      "path": "tests/smoke/08_coroutine.gs",
+      "path": "tests/smoke/08_coroutine.leia",
       "domain": "smoke",
       "kind": "test",
       "reference": null,
@@ -6715,7 +6715,7 @@
     },
     {
       "id": "smoke/09_error",
-      "path": "tests/smoke/09_error.gs",
+      "path": "tests/smoke/09_error.leia",
       "domain": "smoke",
       "kind": "test",
       "reference": null,
@@ -6727,7 +6727,7 @@
     },
     {
       "id": "smoke/10_string_ops",
-      "path": "tests/smoke/10_string_ops.gs",
+      "path": "tests/smoke/10_string_ops.leia",
       "domain": "smoke",
       "kind": "test",
       "reference": null,
@@ -6739,7 +6739,7 @@
     },
     {
       "id": "smoke/11_iterator",
-      "path": "tests/smoke/11_iterator.gs",
+      "path": "tests/smoke/11_iterator.leia",
       "domain": "smoke",
       "kind": "test",
       "reference": null,
@@ -6751,7 +6751,7 @@
     },
     {
       "id": "smoke/12_advanced",
-      "path": "tests/smoke/12_advanced.gs",
+      "path": "tests/smoke/12_advanced.leia",
       "domain": "smoke",
       "kind": "test",
       "reference": null,

@@ -3,7 +3,7 @@ package modules
 import (
 	"testing"
 
-	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/leia/internal/runtime"
 )
 
 func TestMatrixDenseGetSet(t *testing.T) {

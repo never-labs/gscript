@@ -14,14 +14,14 @@ import (
 // (Requires ∪ Provides ∪ Updates ∪ OptionalReads) and reports undeclared reads.
 //
 // It ENFORCES by default: every optional hint read must be declared on the
-// module contract. Set GSCRIPT_ENFORCE_READ_CONTRACT=0 to downgrade to
+// module contract. Set LEIA_ENFORCE_READ_CONTRACT=0 to downgrade to
 // report-only while intentionally introducing a new undeclared read.
 //
 // Note: a module that declares nothing has an empty allowed set, so every domain
 // it reads is undeclared. Reads performed inside a pass's internally-built
 // sub-Function (e.g. inlining) are not observed.
 func TestReadContract_ProductionPipeline(t *testing.T) {
-	enforce := os.Getenv("GSCRIPT_ENFORCE_READ_CONTRACT") != "0"
+	enforce := os.Getenv("LEIA_ENFORCE_READ_CONTRACT") != "0"
 	roots := []string{
 		"../../benchmarks/numeric",
 		"../../benchmarks/recursion",
@@ -35,7 +35,7 @@ func TestReadContract_ProductionPipeline(t *testing.T) {
 	}
 	var files []string
 	for _, root := range roots {
-		matches, _ := filepath.Glob(filepath.Join(root, "*.gs"))
+		matches, _ := filepath.Glob(filepath.Join(root, "*.leia"))
 		files = append(files, matches...)
 	}
 	if len(files) == 0 {

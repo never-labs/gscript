@@ -40,19 +40,19 @@
 // TieringManager does NOT promote a bare top-level loop on its own, so EVERY
 // scenario drives its global stores through a hot function CALL inside the
 // loop; that promotes <main> (the inlined function body) to Tier 2. We set
-// GSCRIPT_TIER2_NO_FILTER=1 so the optimizing tier is exercised without the
+// LEIA_TIER2_NO_FILTER=1 so the optimizing tier is exercised without the
 // production viability filter masking the path under test, and every test
 // asserts promotion actually happened via tm.Tier2Entered() (requireTier2).
 
 package methodjit
 
 import (
-	"github.com/never-labs/gscript/internal/testutil/vmtest"
+	"github.com/never-labs/leia/internal/testutil/vmtest"
 	"sort"
 	"testing"
 
-	"github.com/never-labs/gscript/internal/runtime"
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/runtime"
+	"github.com/never-labs/leia/internal/vm"
 )
 
 // runTier2Globals executes src with the TieringManager and returns the globals
@@ -171,7 +171,7 @@ func crossTierAllGlobals(t *testing.T, src string) {
 // ---------------------------------------------------------------------------
 
 func TestSetGlobal_CrossTier_WholeStateDifferential(t *testing.T) {
-	t.Setenv("GSCRIPT_TIER2_NO_FILTER", "1")
+	t.Setenv("LEIA_TIER2_NO_FILTER", "1")
 	// The reducer runs inside a hot function call; this is what drives
 	// promotion to the optimizing tier (a pure top-level loop with no call is
 	// intentionally NOT promoted by the TieringManager today). The function
@@ -212,7 +212,7 @@ for i := 1; i <= 50000; i++ {
 // ---------------------------------------------------------------------------
 
 func TestSetGlobal_CrossTier_HazardA_WriteThenReadback(t *testing.T) {
-	t.Setenv("GSCRIPT_TIER2_NO_FILTER", "1")
+	t.Setenv("LEIA_TIER2_NO_FILTER", "1")
 	src := `
 shared := 0
 mirror := 0
@@ -238,7 +238,7 @@ for i := 1; i <= 50000; i++ { r = step(i) }
 //
 // step() repeatedly SetGlobals the existing global `acc`, and at several
 // distinct iterations assigns to names never declared at top level
-// (`late_a`, `late_b`, `late_c`). In GScript such assignments create brand-new
+// (`late_a`, `late_b`, `late_c`). In Leia such assignments create brand-new
 // globals, which append to (and may realloc) vm.globalArray DURING the hot
 // loop. If a native store held `acc` through a base pointer captured before a
 // realloc, subsequent stores would land in the stale backing array and be
@@ -249,7 +249,7 @@ for i := 1; i <= 50000; i++ { r = step(i) }
 // ---------------------------------------------------------------------------
 
 func TestSetGlobal_CrossTier_HazardB_NewGlobalReallocation(t *testing.T) {
-	t.Setenv("GSCRIPT_TIER2_NO_FILTER", "1")
+	t.Setenv("LEIA_TIER2_NO_FILTER", "1")
 	src := `
 acc := 0
 func step(i) {
@@ -290,7 +290,7 @@ for i := 1; i <= 50000; i++ { r = step(i) }
 // ---------------------------------------------------------------------------
 
 func TestSetGlobal_CrossTier_DeoptAfterSetGlobal(t *testing.T) {
-	t.Setenv("GSCRIPT_TIER2_NO_FILTER", "1")
+	t.Setenv("LEIA_TIER2_NO_FILTER", "1")
 	src := `
 acc := 0
 flip := 0
@@ -318,7 +318,7 @@ for i := 1; i <= 50000; i++ { r = step(i) }
 // ---------------------------------------------------------------------------
 // 5. Exit-resume-check parity.
 //
-// GSCRIPT_EXIT_RESUME_CHECK=1 (see exit_resume_check.go) installs a shadow
+// LEIA_EXIT_RESUME_CHECK=1 (see exit_resume_check.go) installs a shadow
 // register verifier around Tier 2 exits at COMPILE time. We re-run the
 // deopt-after-SetGlobal scenario with it enabled and assert the global state is
 // unchanged versus the oracle. This guards that the store-near-exit machinery a
@@ -328,8 +328,8 @@ for i := 1; i <= 50000; i++ { r = step(i) }
 // ---------------------------------------------------------------------------
 
 func TestSetGlobal_CrossTier_ExitResumeCheckParity(t *testing.T) {
-	t.Setenv("GSCRIPT_TIER2_NO_FILTER", "1")
-	t.Setenv("GSCRIPT_EXIT_RESUME_CHECK", "1")
+	t.Setenv("LEIA_TIER2_NO_FILTER", "1")
+	t.Setenv("LEIA_EXIT_RESUME_CHECK", "1")
 	src := `
 acc := 0
 flip := 0

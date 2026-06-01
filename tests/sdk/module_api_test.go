@@ -1,11 +1,11 @@
-package gscript_test
+package leia_test
 
 import (
 	"fmt"
 	"strings"
 	"testing"
 
-	gs "github.com/never-labs/gscript"
+	leia "github.com/never-labs/leia"
 )
 
 type hostModuleService struct {
@@ -23,8 +23,8 @@ func (s *hostModuleService) Bump() int64 {
 }
 
 func TestRegisterModuleRequire(t *testing.T) {
-	vm := gs.New(gs.WithSandbox())
-	err := vm.RegisterModule("go/strings", gs.Module{
+	vm := leia.New(leia.WithSandbox())
+	err := vm.RegisterModule("go/strings", leia.Module{
 		"upper": strings.ToUpper,
 		"join":  strings.Join,
 	})
@@ -51,13 +51,13 @@ result := strings.upper("hello")
 func TestStdlibUUIDRequirePackageLoadedIdentity(t *testing.T) {
 	for _, tc := range []struct {
 		name string
-		opts []gs.Option
+		opts []leia.Option
 	}{
 		{name: "interpreter"},
-		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			vm := gs.New(tc.opts...)
+			vm := leia.New(tc.opts...)
 			if err := vm.Exec(`
 mod := require("uuid")
 sameGlobal := mod == uuid
@@ -82,21 +82,21 @@ result := type(mod.v4())
 func TestWithGoImportsRequireAllowlist(t *testing.T) {
 	for _, tc := range []struct {
 		name string
-		opts []gs.Option
+		opts []leia.Option
 	}{
 		{name: "interpreter"},
-		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			opts := append([]gs.Option{
-				gs.WithSandbox(),
-				gs.WithGoImports(map[string]any{
-					"strings": gs.Module{
+			opts := append([]leia.Option{
+				leia.WithSandbox(),
+				leia.WithGoImports(map[string]any{
+					"strings": leia.Module{
 						"upper": strings.ToUpper,
 					},
 				}),
 			}, tc.opts...)
-			vm := gs.New(opts...)
+			vm := leia.New(opts...)
 			if err := vm.Exec(`
 strings := require("go:strings")
 same := package.loaded["go:strings"] == strings
@@ -117,21 +117,21 @@ result := strings.upper("go-host")
 func TestWithGoImportsImportSyntax(t *testing.T) {
 	for _, tc := range []struct {
 		name string
-		opts []gs.Option
+		opts []leia.Option
 	}{
 		{name: "interpreter"},
-		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			opts := append([]gs.Option{
-				gs.WithSandbox(),
-				gs.WithGoImports(map[string]any{
-					"go:strings": gs.Module{
+			opts := append([]leia.Option{
+				leia.WithSandbox(),
+				leia.WithGoImports(map[string]any{
+					"go:strings": leia.Module{
 						"upper": strings.ToUpper,
 					},
 				}),
 			}, tc.opts...)
-			vm := gs.New(opts...)
+			vm := leia.New(opts...)
 			if err := vm.Exec(`
 import "go:strings" as strings
 same := package.loaded["go:strings"] == strings
@@ -152,18 +152,18 @@ result := strings.upper("imported")
 func TestWithGoImportsRejectsUnauthorizedGoImport(t *testing.T) {
 	for _, tc := range []struct {
 		name string
-		opts []gs.Option
+		opts []leia.Option
 	}{
 		{name: "interpreter"},
-		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			opts := append([]gs.Option{
-				gs.WithGoImports(map[string]any{
-					"go:strings": gs.Module{"upper": strings.ToUpper},
+			opts := append([]leia.Option{
+				leia.WithGoImports(map[string]any{
+					"go:strings": leia.Module{"upper": strings.ToUpper},
 				}),
 			}, tc.opts...)
-			vm := gs.New(opts...)
+			vm := leia.New(opts...)
 			err := vm.Exec(`require("go:os")`)
 			if err == nil {
 				t.Fatal("expected unauthorized go import to fail")
@@ -176,7 +176,7 @@ func TestWithGoImportsRejectsUnauthorizedGoImport(t *testing.T) {
 }
 
 func TestRegisterModuleFromService(t *testing.T) {
-	vm := gs.New(gs.WithSandbox(), gs.WithModuleLoading(false))
+	vm := leia.New(leia.WithSandbox(), leia.WithModuleLoading(false))
 	service := &hostModuleService{Prefix: "job"}
 	if err := vm.RegisterModuleFrom("go/host", service); err != nil {
 		t.Fatal(err)
@@ -204,9 +204,9 @@ second := host.bump()
 }
 
 func TestRegisterModuleFromExactNames(t *testing.T) {
-	vm := gs.New()
+	vm := leia.New()
 	service := &hostModuleService{Prefix: "task"}
-	if err := vm.RegisterModuleFrom("go/exact", service, gs.WithModuleExactNames()); err != nil {
+	if err := vm.RegisterModuleFrom("go/exact", service, leia.WithModuleExactNames()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -222,8 +222,8 @@ result := host.Label(3)
 }
 
 func TestRegisterModuleRequireBytecodeVM(t *testing.T) {
-	vm := gs.New(gs.WithVM())
-	err := vm.RegisterModule("go/strings", gs.Module{
+	vm := leia.New(leia.WithVM())
+	err := vm.RegisterModule("go/strings", leia.Module{
 		"upper": strings.ToUpper,
 	})
 	if err != nil {
@@ -247,11 +247,11 @@ result := strings.upper("vm")
 }
 
 func TestRegisterModuleRequireBytecodeVMAfterInit(t *testing.T) {
-	vm := gs.New(gs.WithVM(), gs.WithModuleLoading(false))
+	vm := leia.New(leia.WithVM(), leia.WithModuleLoading(false))
 	if err := vm.Exec(`warmup := true`); err != nil {
 		t.Fatal(err)
 	}
-	err := vm.RegisterModule("go/strings", gs.Module{
+	err := vm.RegisterModule("go/strings", leia.Module{
 		"upper": strings.ToUpper,
 	})
 	if err != nil {
@@ -283,11 +283,11 @@ result := strings.upper("late")
 }
 
 func TestRegisterModuleRequireBytecodeVMNativeRequireAfterInit(t *testing.T) {
-	vm := gs.New(gs.WithVM())
+	vm := leia.New(leia.WithVM())
 	if err := vm.Exec(`warmup := true`); err != nil {
 		t.Fatal(err)
 	}
-	err := vm.RegisterModule("go/strings", gs.Module{
+	err := vm.RegisterModule("go/strings", leia.Module{
 		"upper": strings.ToUpper,
 	})
 	if err != nil {

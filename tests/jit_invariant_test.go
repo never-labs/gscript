@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	gs "github.com/never-labs/gscript"
+	leia "github.com/never-labs/leia"
 )
 
 // assertVMEqualsJIT runs the same source in bytecode-VM mode (no JIT) and in
@@ -18,14 +18,14 @@ func assertVMEqualsJIT(t *testing.T, src string, vars ...string) {
 	t.Helper()
 
 	// --- VM (bytecode interpreter, no JIT) ---
-	vmInstance := gs.New(gs.WithVM())
+	vmInstance := leia.New(leia.WithVM())
 	if err := vmInstance.Exec(src); err != nil {
 		t.Fatalf("VM exec error: %v", err)
 	}
 
 	// --- JIT (with trace compilation) ---
 	type jitResult struct {
-		vm       *gs.VM
+		vm       *leia.VM
 		err      error
 		panicVal interface{}
 	}
@@ -36,12 +36,12 @@ func assertVMEqualsJIT(t *testing.T, src string, vars ...string) {
 				done <- jitResult{panicVal: r}
 			}
 		}()
-		jitVM := gs.New(gs.WithJIT())
+		jitVM := leia.New(leia.WithJIT())
 		err := jitVM.Exec(src)
 		done <- jitResult{vm: jitVM, err: err}
 	}()
 
-	var jitInstance *gs.VM
+	var jitInstance *leia.VM
 	select {
 	case res := <-done:
 		if res.panicVal != nil {

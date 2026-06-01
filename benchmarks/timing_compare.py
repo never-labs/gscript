@@ -82,7 +82,7 @@ LUA_ASSIGN_RE_TEMPLATE = r"(?m)^(\s*(?:local\s+)?{name}\s*=\s*)([^\n]+?)(\s*(?:-
 class BenchmarkSpec:
     group: str
     name: str
-    gscript_rel: str
+    leia_rel: str
     luajit_rel: str | None = None
 
     @property
@@ -529,7 +529,7 @@ canonical_groups = discovery.canonical_groups
 
 def discover_specs(root: Path, groups: list[str]) -> list[BenchmarkSpec]:
     return [
-        BenchmarkSpec(spec.group, spec.name, spec.gscript_rel, spec.luajit_rel)
+        BenchmarkSpec(spec.group, spec.name, spec.leia_rel, spec.luajit_rel)
         for spec in discovery.discover_benchmarks(root, groups)
     ]
 
@@ -634,8 +634,8 @@ def scaled_path(
     return out, changes
 
 
-def build_gscript(root: Path, out: Path) -> None:
-    benchmark_output.build_gscript(
+def build_leia(root: Path, out: Path) -> None:
+    benchmark_output.build_leia(
         root,
         out,
         failure_message="build failed in {root} with exit {exit_code}",
@@ -665,27 +665,27 @@ def export_head_snapshot(repo: Path, dest: Path, ref: str) -> None:
 def command_for(
     subject: str,
     mode: str,
-    gscript_path: Path | None,
-    gscript_bin: Path | None,
+    leia_path: Path | None,
+    leia_bin: Path | None,
     luajit_path: Path | None,
     luajit_bin: str | None,
 ) -> tuple[list[str] | None, dict[str, str] | None, str | None]:
     if subject == "luajit":
         return benchmark_output.benchmark_mode_command(
             "luajit",
-            gscript_bin,
-            gscript_path,
+            leia_bin,
+            leia_path,
             luajit_bin=luajit_bin,
             luajit_script=luajit_path,
         )
-    return benchmark_output.benchmark_mode_command(mode, gscript_bin, gscript_path)
+    return benchmark_output.benchmark_mode_command(mode, leia_bin, leia_path)
 
 
 def run_subject(
     subject: str,
     mode: str,
     root: Path,
-    gscript_bin: Path | None,
+    leia_bin: Path | None,
     luajit_bin: str | None,
     spec: BenchmarkSpec,
     scale_tempdir: Path,
@@ -693,9 +693,9 @@ def run_subject(
     args: argparse.Namespace,
 ) -> SubjectResult:
     overrides = scale_overrides_for(spec, scale_overrides)
-    gscript_path, _gs_changes = scaled_path(root, spec.gscript_rel, spec, subject, "gscript", scale_tempdir, overrides)
+    leia_path, _gs_changes = scaled_path(root, spec.leia_rel, spec, subject, "leia", scale_tempdir, overrides)
     lua_path, _lua_changes = scaled_path(root, spec.luajit_rel, spec, subject, "luajit", scale_tempdir, overrides)
-    cmd, env, unavailable = command_for(subject, mode, gscript_path, gscript_bin, lua_path, luajit_bin)
+    cmd, env, unavailable = command_for(subject, mode, leia_path, leia_bin, lua_path, luajit_bin)
     if unavailable:
         return SubjectResult(subject=subject, mode=mode, status=unavailable, note="input unavailable")
     assert cmd is not None
@@ -1048,7 +1048,7 @@ def main() -> int:
     parser.add_argument("--bench", action="append", help="benchmark name or group/name; repeatable")
     parser.add_argument("--group", action="append", choices=discovery.group_choices(GROUPS), help="benchmark group; repeatable")
     parser.add_argument("--all-groups", action="store_true", help="run all benchmark groups")
-    parser.add_argument("--mode", action="append", choices=MODES, help="GScript mode; repeatable")
+    parser.add_argument("--mode", action="append", choices=MODES, help="Leia mode; repeatable")
     parser.add_argument("--runs", type=positive_int, default=5, help="measured samples after calibration")
     parser.add_argument("--warmup", type=int, default=1, help="warmup samples after calibration")
     parser.add_argument("--timeout", type=positive_int, default=60, help="timeout per command invocation")
@@ -1123,24 +1123,24 @@ def main() -> int:
     args.scale_values = format_scale_overrides(scale_overrides)
     luajit_bin = None if args.no_luajit else shutil.which("luajit")
 
-    tempdir = Path(tempfile.mkdtemp(prefix="gscript_timing_compare_"))
-    current_bin = tempdir / "current-gscript"
+    tempdir = Path(tempfile.mkdtemp(prefix="leia_timing_compare_"))
+    current_bin = tempdir / "current-leia"
     head_root = tempdir / "head-src"
-    head_bin = tempdir / "head-gscript"
+    head_bin = tempdir / "head-leia"
     started = time.time()
     try:
         export_head_snapshot(root, head_root, args.head_ref)
-        build_gscript(root, current_bin)
-        build_gscript(head_root, head_bin)
+        build_leia(root, current_bin)
+        build_leia(head_root, head_bin)
 
         results: list[BenchmarkResult] = []
         for spec in specs:
             spec_scale = scale_overrides_for(spec, scale_overrides)
             row_scale: dict[str, str] = {}
             if spec_scale:
-                _, gs_changes = scaled_path(root, spec.gscript_rel, spec, "report", "gscript", tempdir, spec_scale)
+                _, gs_changes = scaled_path(root, spec.leia_rel, spec, "report", "leia", tempdir, spec_scale)
                 _, lua_changes = scaled_path(root, spec.luajit_rel, spec, "report", "luajit", tempdir, spec_scale)
-                require_scale_matches(spec, gs_changes, spec_scale, "GScript")
+                require_scale_matches(spec, gs_changes, spec_scale, "Leia")
                 if spec.luajit_rel is not None:
                     require_scale_matches(spec, lua_changes, spec_scale, "LuaJIT")
                 row_scale.update(gs_changes)

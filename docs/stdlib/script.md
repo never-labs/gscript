@@ -1,6 +1,6 @@
 # script
 
-The `script` library compiles, evaluates, and loads GScript chunks with optional
+The `script` library compiles, evaluates, and loads Leia chunks with optional
 environment and source configuration.
 
 ## Environment Options
@@ -38,7 +38,7 @@ compiled program and returns top-level return values.
 ```
 fn := script.compile("return a + b", {
     env: {a: 1, b: 2},
-    sourceName: "virtual/generated.gs",
+    sourceName: "virtual/generated.leia",
 })
 print(fn())  -- 3
 ```
@@ -48,7 +48,7 @@ print(fn())  -- 3
 Compile and immediately execute source text.
 
 ```
-name := script.eval("return name", {env: {name: "gscript"}})
+name := script.eval("return name", {env: {name: "leia"}})
 ```
 
 ### script.loadFile(path [, opts]) -> function
@@ -72,6 +72,6 @@ Set the current script directory and return the previous value.
 
 ```
 old := script.setDir("plugins")
-plugin := script.loadFile("tool.gs", {sourceName: "plugin/tool.gs"})
+plugin := script.loadFile("tool.leia", {sourceName: "plugin/tool.leia"})
 script.setDir(old)
 ```

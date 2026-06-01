@@ -3,12 +3,12 @@
 package methodjit
 
 import (
-	"github.com/never-labs/gscript/internal/testutil/vmtest"
+	"github.com/never-labs/leia/internal/testutil/vmtest"
 	"math"
 	"testing"
 
-	"github.com/never-labs/gscript/internal/runtime"
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/runtime"
+	"github.com/never-labs/leia/internal/vm"
 )
 
 func runStringFuncVM(t *testing.T, src, fnName string, args []runtime.Value) []runtime.Value {
@@ -37,7 +37,7 @@ func runStringFuncForcedTier2(t *testing.T, src, fnName string, args []runtime.V
 func runStringFuncForcedTier2WithManager(t *testing.T, src, fnName string, args []runtime.Value, noFilter bool) ([]runtime.Value, *TieringManager, *vm.FuncProto) {
 	t.Helper()
 	if noFilter {
-		t.Setenv("GSCRIPT_TIER2_NO_FILTER", "1")
+		t.Setenv("LEIA_TIER2_NO_FILTER", "1")
 	}
 
 	top := compileTop(t, src)
@@ -1192,7 +1192,7 @@ func lookup(n) {
 	}
 	want := requireOneInt(t, "VM lookup", wantValues)
 
-	t.Setenv("GSCRIPT_TIER2_NO_FILTER", "1")
+	t.Setenv("LEIA_TIER2_NO_FILTER", "1")
 	tm := NewTieringManager()
 	v.SetMethodJIT(tm)
 	if err := tm.CompileTier2(proto); err != nil {

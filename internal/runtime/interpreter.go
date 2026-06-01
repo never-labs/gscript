@@ -6,15 +6,15 @@ import (
 	"os"
 	"sync/atomic"
 
-	"github.com/never-labs/gscript/internal/support/hostpath"
-	"github.com/never-labs/gscript/internal/support/modresolve"
+	"github.com/never-labs/leia/internal/support/hostpath"
+	"github.com/never-labs/leia/internal/support/modresolve"
 )
 
 // Core tree-walking interpreter: the Interpreter type, its constructors, and
 // the global-environment / args / package-cache accessors. Builtin
 // registration, metamethod helpers, statement and expression evaluation, and
 // numeric parsing live in the sibling interpreter_*.go files.
-// Interpreter is the tree-walking evaluator for GScript programs.
+// Interpreter is the tree-walking evaluator for Leia programs.
 type Interpreter struct {
 	globals            *Environment
 	output             []string            // captured print output (for testing)
@@ -24,9 +24,9 @@ type Interpreter struct {
 	stringMeta         *Table              // metatable for string values (__index → string lib)
 	scriptDir          string              // directory of the main script (for require path resolution)
 	moduleCollections  map[string]string   // collection prefix -> filesystem root for require("name:pkg")
-	moduleReplaces     map[string]string   // module path prefix -> filesystem root for gscript.mod replace
+	moduleReplaces     map[string]string   // module path prefix -> filesystem root for leia.mod replace
 	moduleCacheModules []modresolve.CacheModule
-	moduleLoading      bool               // require() may load .gs files from the filesystem
+	moduleLoading      bool               // require() may load .leia files from the filesystem
 	filesystemEnabled  bool               // script-side file APIs may access the filesystem
 	filesystemRead     bool               // fs read operations are enabled
 	filesystemWrite    bool               // fs write operations are enabled
@@ -47,7 +47,7 @@ type Interpreter struct {
 	args               []string           // current script entrypoint args: [0]=script, [1:]=user args
 	callStack          []DebugFrame       // active runtime calls, oldest to newest
 	deferStack         [][]deferredCall   // active function-scope deferred calls
-	debugHook          Value              // optional GScript diagnostic hook
+	debugHook          Value              // optional Leia diagnostic hook
 	debugOpts          DebugHookOptions   // filters for debugHook
 	debugSink          Value              // optional explicit diagnostic sink
 	debugBusy          bool               // prevents debug hooks from recursively firing
@@ -252,7 +252,7 @@ func (interp *Interpreter) resolveModulePath(name string) string {
 	return result.File
 }
 
-// SetModuleLoading controls whether require() may load .gs files from the
+// SetModuleLoading controls whether require() may load .leia files from the
 // filesystem. Requiring already-registered stdlib modules remains controlled by
 // RestrictStdlib.
 func (interp *Interpreter) SetModuleLoading(enabled bool) {
@@ -437,7 +437,7 @@ func (interp *Interpreter) packageLoaded(name string) Value {
 }
 
 // SetArgs sets the script entrypoint arguments and updates the global arg table.
-// The resulting table follows GScript's Lua-compatible convention:
+// The resulting table follows Leia's Lua-compatible convention:
 // arg[0] is the script name, and arg[1..n] are user arguments.
 func (interp *Interpreter) SetArgs(script string, args []string) {
 	argv := make([]string, 0, len(args)+1)

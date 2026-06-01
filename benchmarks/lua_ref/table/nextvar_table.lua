@@ -1,5 +1,5 @@
 -- Conformance hot benchmark: nextvar/table/api/gc traversal family.
--- Matches benchmarks/table/nextvar_table.gs.
+-- Matches benchmarks/table/nextvar_table.leia.
 
 local MOD = 1000000007
 

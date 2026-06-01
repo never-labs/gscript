@@ -5,7 +5,7 @@ import (
 	goruntime "runtime"
 	"strings"
 
-	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/leia/internal/runtime"
 )
 
 func (vm *VM) RegisterDebugLib() {

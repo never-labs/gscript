@@ -1,4 +1,4 @@
-package gscript_test
+package leia_test
 
 import (
 	"context"
@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	gs "github.com/never-labs/gscript"
-	"github.com/never-labs/gscript/llm"
-	"github.com/never-labs/gscript/llm/openai"
+	leia "github.com/never-labs/leia"
+	"github.com/never-labs/leia/llm"
+	"github.com/never-labs/leia/llm/openai"
 )
 
 func float64Ptr(v float64) *float64 {
@@ -44,7 +44,7 @@ func TestOpenAICompatibleLLMProvider(t *testing.T) {
       "tool_calls": [{
         "id": "call_1",
         "type": "function",
-        "function": {"name": "lookup", "arguments": "{\"name\":\"gscript\",\"limit\":3}"}
+        "function": {"name": "lookup", "arguments": "{\"name\":\"leia\",\"limit\":3}"}
       }]
     }
   }],
@@ -191,9 +191,9 @@ func TestWithOpenAICompatibleLLM(t *testing.T) {
 		fmt.Fprint(w, `{"choices":[{"finish_reason":"stop","message":{"role":"assistant","content":"ok"}}]}`)
 	}))
 	defer server.Close()
-	vm := gs.New(
-		gs.WithLibs(gs.LibString|gs.LibLLM),
-		gs.WithOpenAICompatibleLLM(server.URL, "", "mock-fast"),
+	vm := leia.New(
+		leia.WithLibs(leia.LibString|leia.LibLLM),
+		leia.WithOpenAICompatibleLLM(server.URL, "", "mock-fast"),
 	)
 	if err := vm.Exec(`
 result, err := llm.turn({messages: {llm.user("hello")}})
@@ -210,10 +210,10 @@ text := result.text
 func TestLLMModelsProviderConfigOpenAICompatible(t *testing.T) {
 	for _, mode := range []struct {
 		name string
-		opts []gs.Option
+		opts []leia.Option
 	}{
 		{name: "interpreter"},
-		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
 	} {
 		t.Run(mode.name, func(t *testing.T) {
 			var got map[string]any
@@ -232,8 +232,8 @@ func TestLLMModelsProviderConfigOpenAICompatible(t *testing.T) {
 			}))
 			defer server.Close()
 
-			opts := append([]gs.Option{gs.WithLibs(gs.LibString | gs.LibLLM)}, mode.opts...)
-			vm := gs.New(opts...)
+			opts := append([]leia.Option{leia.WithLibs(leia.LibString | leia.LibLLM)}, mode.opts...)
+			vm := leia.New(opts...)
 			err := vm.Exec(fmt.Sprintf(`
 models {
     default: "chat"

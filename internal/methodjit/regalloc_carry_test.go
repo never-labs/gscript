@@ -9,7 +9,7 @@
 // The test uses two routes:
 //   1. A handwritten minimal IR (header with float phi → body with MulFloat)
 //      to pin down the core invariant deterministically.
-//   2. The real mandelbrot proto from ../../benchmarks/numeric/mandelbrot.gs,
+//   2. The real mandelbrot proto from ../../benchmarks/numeric/mandelbrot.leia,
 //      where the inner-loop body currently collides with the loop-carried
 //      float phi (v64/v65 in current numbering).
 
@@ -19,7 +19,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/vm"
 )
 
 func TestRegallocCarriesRawIntIntoSinglePredBlock(t *testing.T) {
@@ -163,9 +163,9 @@ func TestRegallocCarriesLoopHeaderPhis_Synthetic(t *testing.T) {
 // then asserts that no SSA value defined in a non-header loop-body block is
 // assigned to the same FPR as one of the innermost loop-header's float phis.
 func TestRegallocCarriesLoopHeaderPhis_Mandelbrot(t *testing.T) {
-	srcBytes, err := os.ReadFile("../../benchmarks/numeric/mandelbrot.gs")
+	srcBytes, err := os.ReadFile("../../benchmarks/numeric/mandelbrot.leia")
 	if err != nil {
-		t.Fatalf("read mandelbrot.gs: %v", err)
+		t.Fatalf("read mandelbrot.leia: %v", err)
 	}
 	top := compileTop(t, string(srcBytes))
 

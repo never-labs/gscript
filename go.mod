@@ -1,4 +1,4 @@
-module github.com/never-labs/gscript
+module github.com/never-labs/leia
 
 go 1.25.7
 

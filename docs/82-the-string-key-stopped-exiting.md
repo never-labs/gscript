@@ -257,7 +257,7 @@ seven times faster than the VM and only a few times behind LuaJIT on the local
 run:
 
 ```text
-GScript JIT:  about 0.023s
+Leia JIT:  about 0.023s
 LuaJIT:       about 0.010s
 ```
 

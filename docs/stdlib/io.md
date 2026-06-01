@@ -1,13 +1,13 @@
 # io
 
-The `io` library provides Lua-style file I/O around GScript file handles.
+The `io` library provides Lua-style file I/O around Leia file handles.
 
 ## Module Functions
 
 ### io.write(...)
 
 Write values to the current output stream without adding a newline. Values are
-converted with GScript string conversion. Returns `nil` on success or
+converted with Leia string conversion. Returns `nil` on success or
 `nil, error` if the stream cannot be written.
 
 ### io.read([format...])
@@ -51,7 +51,7 @@ creating or truncating the file.
 
 ### io.type(obj) -> string | nil
 
-Return `"file"` for an open GScript file handle, `"closed file"` for a closed
+Return `"file"` for an open Leia file handle, `"closed file"` for a closed
 handle, or `nil` for non-file values.
 
 ### io.tmpfile() -> file [, error]

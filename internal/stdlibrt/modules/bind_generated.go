@@ -5,7 +5,7 @@ package modules
 import (
 	"fmt"
 
-	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/leia/internal/runtime"
 )
 
 func installBase64GeneratedBindings(t *runtime.Table, maxHostResult func() int64) {

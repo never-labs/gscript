@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/vm"
 )
 
 func TestPrint_Empty(t *testing.T) {

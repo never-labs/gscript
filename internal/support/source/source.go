@@ -1,5 +1,5 @@
 // Package source provides shared source-file discovery and syntax checks for
-// GScript tooling.
+// Leia tooling.
 package source
 
 import (
@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"sort"
 
-	"github.com/never-labs/gscript/internal/lexer"
-	"github.com/never-labs/gscript/internal/parser"
+	"github.com/never-labs/leia/internal/lexer"
+	"github.com/never-labs/leia/internal/parser"
 )
 
 func Files(path string) ([]string, error) {
@@ -18,8 +18,8 @@ func Files(path string) ([]string, error) {
 		return nil, err
 	}
 	if !info.IsDir() {
-		if filepath.Ext(path) != ".gs" {
-			return nil, fmt.Errorf("file must have .gs extension")
+		if filepath.Ext(path) != ".leia" {
+			return nil, fmt.Errorf("file must have .leia extension")
 		}
 		return []string{path}, nil
 	}
@@ -32,7 +32,7 @@ func Files(path string) ([]string, error) {
 		if d.IsDir() {
 			return nil
 		}
-		if filepath.Ext(p) == ".gs" {
+		if filepath.Ext(p) == ".leia" {
 			files = append(files, p)
 		}
 		return nil

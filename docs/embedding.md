@@ -1,23 +1,23 @@
 # Go Embedding API Audit and Roadmap
 
 This document audits the current Go-facing embedding surface and defines the
-API shape needed before GScript can be treated as a production embeddable
-runtime. It is intentionally scoped to the public `gscript` package and the
-runtime behavior visible through `gscript/`, `internal/runtime`,
-`internal/vm`, and `cmd/gscript`.
+API shape needed before Leia can be treated as a production embeddable
+runtime. It is intentionally scoped to the public `leia` package and the
+runtime behavior visible through `leia/`, `internal/runtime`,
+`internal/vm`, and `cmd/leia`.
 
 ## Current public API
 
 The public import path is:
 
 ```go
-import gs "github.com/Never-Labs/gscript/gscript"
+import leia "github.com/Never-Labs/leia/leia"
 ```
 
 The current API is useful for tests, demos, and controlled in-process
 extensions:
 
-- VM creation: `gscript.New(opts ...Option) *VM`.
+- VM creation: `leia.New(opts ...Option) *VM`.
 - Execution: `(*VM).Exec(src string) error` and `(*VM).ExecFile(path string) error`.
 - Compiled programs: `Compile`, `CompileFile`, `(*VM).Run`, `Program`, and
   `Program.SourceName`.
@@ -55,8 +55,8 @@ requiring external users to name `internal/runtime` types.
 
 The public surface has executable Go examples in
 `examples/embedding/embedding_test.go` and package-level examples in
-`gscript/example_test.go`. They are normal Go example tests, so
-`go test ./examples/embedding ./gscript` verifies that snippets for
+`leia/example_test.go`. They are normal Go example tests, so
+`go test ./examples/embedding ./leia` verifies that snippets for
 `Compile`/`Run`, public `Value`, host function binding, `WithSandbox`,
 `WithMaxSteps`, hot loading, explicit Go-backed host modules, and structured
 errors continue to compile and match their documented output. See the
@@ -66,11 +66,11 @@ example-by-example coverage list.
 For example, a host can compile once, run on a VM, then inspect globals:
 
 ```go
-prog, err := gs.Compile(`result := 40 + 2`, gs.WithSourceName("calc.gs"))
+prog, err := leia.Compile(`result := 40 + 2`, leia.WithSourceName("calc.leia"))
 if err != nil {
     panic(err)
 }
-vm := gs.New(gs.WithVM())
+vm := leia.New(leia.WithVM())
 if err := vm.Run(prog); err != nil {
     panic(err)
 }
@@ -92,20 +92,20 @@ Go hosts install a backend:
 ```go
 type Provider struct{}
 
-func (Provider) Turn(ctx context.Context, req gscript.LLMTurnRequest) (gscript.LLMTurnResult, error) {
-    return gscript.LLMTurnResult{Status: "final_answer", Text: "ok"}, nil
+func (Provider) Turn(ctx context.Context, req leia.LLMTurnRequest) (leia.LLMTurnResult, error) {
+    return leia.LLMTurnResult{Status: "final_answer", Text: "ok"}, nil
 }
 
-vm := gscript.New(gscript.WithLibs(gscript.LibString|gscript.LibLLM), gscript.WithLLMProvider(Provider{}))
+vm := leia.New(leia.WithLibs(leia.LibString|leia.LibLLM), leia.WithLLMProvider(Provider{}))
 ```
 
 For OpenAI-compatible chat-completions gateways, hosts can use the built-in
 HTTP adapter:
 
 ```go
-vm := gscript.New(
-    gscript.WithLibs(gscript.LibString|gscript.LibLLM),
-    gscript.WithOpenAICompatibleLLM(
+vm := leia.New(
+    leia.WithLibs(leia.LibString|leia.LibLLM),
+    leia.WithOpenAICompatibleLLM(
         "https://api.openai.com/v1/chat/completions",
         os.Getenv("OPENAI_API_KEY"),
         "gpt-4.1-mini",
@@ -116,9 +116,9 @@ vm := gscript.New(
 `OpenAICompatibleLLMProvider` exposes the same adapter as a struct for custom
 HTTP clients, headers, local gateways, test servers, request timeouts, and
 bounded retries on transient network failures or `408` / `409` / `429` / `5xx`
-HTTP responses. Non-2xx HTTP responses return `*gscript.OpenAICompatibleLLMError`
+HTTP responses. Non-2xx HTTP responses return `*leia.OpenAICompatibleLLMError`
 with `StatusCode`, trimmed `Body`, and `Retryable` fields for host policy.
-`gscript.ClassifyLLMProviderError(err)` maps built-in provider status errors,
+`leia.ClassifyLLMProviderError(err)` maps built-in provider status errors,
 context cancellation/deadlines, and network errors into stable diagnostic
 categories: `network`, `auth`, `rate_limit`, `request`, or `provider`. The
 classifier never inspects prompt text, messages, or token values.
@@ -126,14 +126,14 @@ classifier never inspects prompt text, messages, or token values.
 Anthropic-compatible gateways are supported through
 `AnthropicCompatibleLLMProvider` and `WithAnthropicCompatibleLLM`. Hosts pass
 their own endpoint, API key, model, timeout, retry, and header policy explicitly;
-GScript does not encode vendor-specific local wrapper conventions.
-`*gscript.AnthropicCompatibleLLMError` exposes the same status fields and
+Leia does not encode vendor-specific local wrapper conventions.
+`*leia.AnthropicCompatibleLLMError` exposes the same status fields and
 provider error classification behavior as the OpenAI-compatible adapter.
 
 AI-native `models {}` declarations can also construct these built-in adapters
 when the VM has no host-injected provider:
 
-```gscript
+```leia
 models {
     default: "fast"
     fast: {
@@ -174,25 +174,25 @@ The real-provider integration smoke is gated and uses generic environment
 names:
 
 ```sh
-GSCRIPT_LLM_INTEGRATION=1 \
-GSCRIPT_ANTHROPIC_COMPAT_BASE_URL=https://provider.example/api/anthropic \
-GSCRIPT_ANTHROPIC_COMPAT_API_KEY=... \
-GSCRIPT_ANTHROPIC_COMPAT_MODEL=... \
-go test ./gscript -run TestAnthropicCompatibleLLMIntegration -v
+LEIA_LLM_INTEGRATION=1 \
+LEIA_ANTHROPIC_COMPAT_BASE_URL=https://provider.example/api/anthropic \
+LEIA_ANTHROPIC_COMPAT_API_KEY=... \
+LEIA_ANTHROPIC_COMPAT_MODEL=... \
+go test ./leia -run TestAnthropicCompatibleLLMIntegration -v
 ```
 
 The same gate also covers the AI-native `models {}` / `turn {}` path:
 
 ```sh
-GSCRIPT_LLM_INTEGRATION=1 \
-GSCRIPT_ANTHROPIC_COMPAT_BASE_URL=https://provider.example/api/anthropic \
-GSCRIPT_ANTHROPIC_COMPAT_API_KEY=... \
-GSCRIPT_ANTHROPIC_COMPAT_MODEL=... \
-go test ./gscript -run TestAINativeSyntaxAnthropicCompatibleLLMIntegration -v
+LEIA_LLM_INTEGRATION=1 \
+LEIA_ANTHROPIC_COMPAT_BASE_URL=https://provider.example/api/anthropic \
+LEIA_ANTHROPIC_COMPAT_API_KEY=... \
+LEIA_ANTHROPIC_COMPAT_MODEL=... \
+go test ./leia -run TestAINativeSyntaxAnthropicCompatibleLLMIntegration -v
 ```
 
 Both tests skip by default. They are not part of the default `go test` or
-`gscript ci` gates because they perform real network calls and require an
+`leia ci` gates because they perform real network calls and require an
 external provider account. Keep keys in local environment variables or CI secret
 stores; never commit provider tokens or `.env` files with token values.
 
@@ -205,31 +205,31 @@ with a direct agent value in `tools: [extract_memory]` and checks the resulting
 system/user/assistant/tool history.
 
 ```sh
-GSCRIPT_LLM_INTEGRATION=1 \
-GSCRIPT_GLM_BASE_URL=https://open.bigmodel.cn/api/anthropic \
-GSCRIPT_GLM_API_KEY=... \
-GSCRIPT_GLM_MODEL=glm-5.1 \
-go test ./gscript -run 'Test(GLMAnthropicCompatibleLLMIntegration|AINativeSyntaxGLMIntegration|AINativeSyntaxGLMDirectAgentToolsIntegration)' -count=1 -v
+LEIA_LLM_INTEGRATION=1 \
+LEIA_GLM_BASE_URL=https://open.bigmodel.cn/api/anthropic \
+LEIA_GLM_API_KEY=... \
+LEIA_GLM_MODEL=glm-5.1 \
+go test ./leia -run 'Test(GLMAnthropicCompatibleLLMIntegration|AINativeSyntaxGLMIntegration|AINativeSyntaxGLMDirectAgentToolsIntegration)' -count=1 -v
 ```
 
-`GSCRIPT_GLM_BASE_URL` defaults to `https://open.bigmodel.cn/api/anthropic`,
-and `GSCRIPT_GLM_MODEL` defaults to `glm-5.1`. If `GSCRIPT_GLM_API_KEY` is not
+`LEIA_GLM_BASE_URL` defaults to `https://open.bigmodel.cn/api/anthropic`,
+and `LEIA_GLM_MODEL` defaults to `glm-5.1`. If `LEIA_GLM_API_KEY` is not
 set, the tests also accept the local wrapper's key variables,
 `SENTINEL_GLM_API_KEY` or `GLM_API_KEY`. Missing keys skip the tests safely.
 
-The same scenarios are available as `examples/ai_native_glm_smoke.gs` and
-`examples/ai_native_glm_direct_agent_tools.gs`. Until the bytecode VM LLM path
+The same scenarios are available as `examples/ai_native_glm_smoke.leia` and
+`examples/ai_native_glm_direct_agent_tools.leia`. Until the bytecode VM LLM path
 is promoted to the default smoke target, run those examples through the
 interpreter path:
 
 ```sh
-GSCRIPT_GLM_BASE_URL=https://open.bigmodel.cn/api/anthropic \
-GSCRIPT_GLM_API_KEY=... \
-GSCRIPT_GLM_MODEL=glm-5.1 \
-gscript -jit=false examples/ai_native_glm_smoke.gs
+LEIA_GLM_BASE_URL=https://open.bigmodel.cn/api/anthropic \
+LEIA_GLM_API_KEY=... \
+LEIA_GLM_MODEL=glm-5.1 \
+leia -jit=false examples/ai_native_glm_smoke.leia
 
-GSCRIPT_GLM_API_KEY=... \
-gscript -jit=false examples/ai_native_glm_direct_agent_tools.gs
+LEIA_GLM_API_KEY=... \
+leia -jit=false examples/ai_native_glm_direct_agent_tools.leia
 ```
 
 Hosts can also attach a metadata-only trace sink. The runtime reports turn,
@@ -238,11 +238,11 @@ usage, token metadata, and tool names; prompt text and tool result values are
 intentionally omitted by default.
 
 ```go
-trace := gscript.NewLLMTraceRecorder()
-vm := gscript.New(
-    gscript.WithLibs(gscript.LibString|gscript.LibLLM),
-    gscript.WithLLMProvider(Provider{}),
-    gscript.WithLLMTrace(func(event gscript.LLMTraceEvent) {
+trace := leia.NewLLMTraceRecorder()
+vm := leia.New(
+    leia.WithLibs(leia.LibString|leia.LibLLM),
+    leia.WithLLMProvider(Provider{}),
+    leia.WithLLMTrace(func(event leia.LLMTraceEvent) {
         trace.Record(event)
         log.Printf("llm event=%s status=%s tool=%s", event.Type, event.Status, event.Tool)
     }),
@@ -256,23 +256,23 @@ For deterministic tests and CI, hosts can record provider turns and replay them
 without reaching an external model:
 
 ```go
-recorder := gscript.NewLLMRecorder()
-vm := gscript.New(
-    gscript.WithLibs(gscript.LibString|gscript.LibLLM),
-    gscript.WithLLMProvider(Provider{}),
-    gscript.WithLLMRecorder(recorder.Record),
+recorder := leia.NewLLMRecorder()
+vm := leia.New(
+    leia.WithLibs(leia.LibString|leia.LibLLM),
+    leia.WithLLMProvider(Provider{}),
+    leia.WithLLMRecorder(recorder.Record),
 )
 
-replay := gscript.New(
-    gscript.WithLibs(gscript.LibString|gscript.LibLLM),
-    gscript.WithLLMReplay(recorder.Records()),
+replay := leia.New(
+    leia.WithLibs(leia.LibString|leia.LibLLM),
+    leia.WithLLMReplay(recorder.Records()),
 )
 ```
 
 Replay is strict and sequential: each incoming request must match the next
 recorded request before the recorded result or provider error is returned.
 Go hosts can inspect replay failures with `errors.As` for
-`*gscript.LLMReplayMismatchError` and `*gscript.LLMReplayExhaustedError`.
+`*leia.LLMReplayMismatchError` and `*leia.LLMReplayExhaustedError`.
 `LLMRecorder` is a thread-safe sink with `Records`, `Reset`, and `Save` helpers.
 `NewLLMReplayProvider` exposes `Remaining`, `Consumed`, `Reset`, and `Records`
 helpers for reusable evaluation fixtures. `MarshalLLMRecords`,
@@ -281,7 +281,7 @@ helpers for reusable evaluation fixtures. `MarshalLLMRecords`,
 
 Scripts call the backend through `llm.turn` and explicitly dispatch tool calls:
 
-```gscript
+```leia
 lookup := llm.tool("lookup", func(name) {
     return "docs:" .. name, nil
 }, {
@@ -312,7 +312,7 @@ calls `llm.turn`, dispatches returned tool calls through the provided tool list,
 adds `msg.assistant_call` / `msg.tool_result` style messages to history, and
 stops on a final answer:
 
-```gscript
+```leia
 result, err := llm.react({
     messages: {msg.system("Use tools."), msg.user("find docs")},
     tools: {lookup},
@@ -376,26 +376,26 @@ For local command-backed experiments, `WithLLMCommand` can wrap an executable
 that reads the prompt from the final argument:
 
 ```go
-vm := gscript.New(gscript.WithLLMCommand("my-llm-command", "--plain"))
+vm := leia.New(leia.WithLLMCommand("my-llm-command", "--plain"))
 ```
 
 Structured errors use standard Go error APIs:
 
 ```go
-var gsErr *gs.Error
-var hostErr *gs.HostCallbackError
+var gsErr *leia.Error
+var hostErr *leia.HostCallbackError
 fmt.Println(errors.As(err, &gsErr), errors.As(err, &hostErr))
 ```
 
-`os.exit` and `process.exit` return a catchable `*gs.ExitError` through the
+`os.exit` and `process.exit` return a catchable `*leia.ExitError` through the
 public API instead of terminating the embedding process. The CLI maps that
 error back to an operating-system exit code.
 
 Go-backed modules are explicit host capabilities:
 
 ```go
-vm := gs.New(gs.WithSandbox(), gs.WithModuleLoading(false))
-vm.RegisterModule("go/strings", gs.Module{"upper": strings.ToUpper})
+vm := leia.New(leia.WithSandbox(), leia.WithModuleLoading(false))
+vm.RegisterModule("go/strings", leia.Module{"upper": strings.ToUpper})
 vm.Exec(`strings := require("go/strings"); result := strings.upper("hello")`)
 ```
 
@@ -423,10 +423,10 @@ register only the `go/...` modules it intends scripts to access.
 `New` creates a tree-walking interpreter by default. `WithVM` switches `Exec`
 and later calls to the bytecode VM path. `WithJIT` implies `WithVM` and enables
 the platform JIT where available. The CLI defaults to bytecode VM plus JIT,
-but the public `gscript.New()` default remains the interpreter path.
+but the public `leia.New()` default remains the interpreter path.
 
 `Exec` and `ExecFile` parse source every time. The bytecode path compiles to an
-internal `*vm.FuncProto` and persists the bytecode VM inside `gscript.VM` so
+internal `*vm.FuncProto` and persists the bytecode VM inside `leia.VM` so
 subsequent `Call` operations can route bytecode closures correctly. There is
 also a reusable `Program` from `Compile`/`CompileFile` for embedding code that
 wants an explicit compile step.
@@ -467,7 +467,7 @@ final `error` is non-nil, the script call fails with that error.
 `ToValue` currently supports:
 
 - `nil`, booleans, signed and unsigned integers, floats, strings.
-- slices and arrays as 1-based GScript arrays.
+- slices and arrays as 1-based Leia arrays.
 - maps as tables.
 - structs and pointers to structs as reflected table/userdata-like values.
 - functions as reflected native functions.
@@ -475,7 +475,7 @@ final `error` is non-nil, the script call fails with that error.
 
 `FromValue` supports typed conversion to booleans, integers, unsigned integers,
 floats, strings, slices, maps, structs, and empty interface. Untyped default
-conversion maps GScript ints to `int64`, floats to `float64`, strings to
+conversion maps Leia ints to `int64`, floats to `float64`, strings to
 `string`, arrays to `[]interface{}`, string-keyed tables to
 `map[string]interface{}`, and functions to the raw value.
 
@@ -488,7 +488,7 @@ clear pointer versus value semantics.
 
 ## Error and diagnostics audit
 
-The public `gscript.Error` has `Kind`, `Message`, `Line`, `Col`, `File`, and
+The public `leia.Error` has `Kind`, `Message`, `Line`, `Col`, `File`, and
 `Value` fields. In practice, most public wrappers currently set `Kind`,
 `Message`, and sometimes `File`; line/column and original script error values
 are not consistently propagated through the public API.
@@ -518,7 +518,7 @@ The current public API separates library visibility from host effects:
   compatibility alias for `CapFilesystemRead | CapFilesystemWrite`.
 - `WithSandbox()` selects `LibSafe` and `CapSafe`, so filesystem-backed module
   loading and script-side filesystem APIs are disabled by default.
-- `WithModuleLoading(false)` blocks `.gs` files loaded through `require`, but
+- `WithModuleLoading(false)` blocks `.leia` files loaded through `require`, but
   still allows enabled built-in stdlib modules such as `json`.
 - `WithFilesystem(false)` clears both filesystem read and write capabilities.
   When both are disabled, `fs`, `dofile`, and `loadfile` are removed; this does
@@ -701,7 +701,7 @@ method allowlists, field allowlists, error mapping, and panic recovery.
 
 ### Value conversion
 
-Introduce a public `Value` type or interface in the `gscript` package. The
+Introduce a public `Value` type or interface in the `leia` package. The
 current raw-value escape hatches should not expose `internal/runtime`.
 
 Required API:
@@ -858,11 +858,11 @@ Keep `VM` single-owner and make that explicit. Add:
 
 ### Phase 0: Document and stabilize the current surface
 
-- Keep `gscript.New`, `Exec`, `ExecFile`, `Call`, `Set`, `Get`,
+- Keep `leia.New`, `Exec`, `ExecFile`, `Call`, `Set`, `Get`,
   `RegisterFunc`, `RegisterTable`, `BindStruct`, and `Pool` working.
 - Document that methods exposing `internal/runtime.Value` are advanced and not
   a stable external embedding contract.
-- Fill line/column/file propagation in `gscript.Error` where internal
+- Fill line/column/file propagation in `leia.Error` where internal
   `SourceError` already exists.
 - Add examples for `WithLibs(LibSafe)`, `WithRequirePath`, `WithVM`, and
   pooling.
@@ -871,7 +871,7 @@ Keep `VM` single-owner and make that explicit. Add:
 
 - Harden the initial `Program`, `Compile`, `CompileFile`, and `Run` APIs into a
   stable production contract.
-- Introduce `gscript.Value`.
+- Introduce `leia.Value`.
 - Hide internal `runtime.Value` from new public APIs.
 - Decide whether compiled programs are immutable and safe for concurrent
   sharing, or explicitly single-owner because they may hold JIT state.

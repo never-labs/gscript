@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/leia/internal/runtime"
 )
 
-// toValue converts a Go value to an internal GScript value using reflection.
+// toValue converts a Go value to an internal Leia value using reflection.
 // Supported types:
 //
 //	nil               -> nil
@@ -118,7 +118,7 @@ func (c Converter) ReflectToValue(rv reflect.Value) (runtime.Value, error) {
 	return runtime.NilValue(), fmt.Errorf("unsupported Go type: %s", rv.Type())
 }
 
-// fromValue converts an internal GScript value to a Go value of the target type.
+// fromValue converts an internal Leia value to a Go value of the target type.
 // If target is nil, uses a default mapping (int64, float64, string, map, etc.)
 func (c Converter) FromValue(val runtime.Value, target reflect.Type) (reflect.Value, error) {
 	if target == nil {
@@ -310,7 +310,7 @@ func (c Converter) FromValueDefault(val runtime.Value) (reflect.Value, error) {
 	return reflect.ValueOf(nil), nil
 }
 
-// wrapGoFunc wraps a Go function (reflect.Value) as a GoFunction callable from GScript.
+// wrapGoFunc wraps a Go function (reflect.Value) as a GoFunction callable from Leia.
 // It uses reflection to convert arguments and return values automatically.
 func (c Converter) WrapGoFunc(fn reflect.Value) (*runtime.GoFunction, error) {
 	fnType := fn.Type()

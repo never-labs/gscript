@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/leia/internal/runtime"
 )
 
 func TestRecordWalkFoldSpecializationDerivesFieldsFromBytecode(t *testing.T) {
@@ -62,7 +62,7 @@ func fold_rows(rows, n, passes) {
 	fold := findTestProtoByName(proto, "fold_rows")
 	if fold != nil {
 		fold.Name = "shape_only_record_fold"
-		fold.Source = "host/generated/not-a-benchmark.gs"
+		fold.Source = "host/generated/not-a-benchmark.leia"
 	}
 	if fold == nil || !isRecordWalkFoldProto(fold) {
 		t.Fatal("renamed record fold proto not recognized")

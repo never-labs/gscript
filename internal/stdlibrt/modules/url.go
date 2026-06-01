@@ -3,7 +3,7 @@ package modules
 import (
 	"fmt"
 
-	urllib "github.com/never-labs/gscript/internal/stdlib/url"
+	urllib "github.com/never-labs/leia/internal/stdlib/url"
 )
 
 // BuildURL creates the "url" standard library table.

@@ -3,7 +3,7 @@
 ## Scope
 
 This report records the current main worktree benchmark comparison from
-2026-05-02. The numbers below are median-of-3 results for GScript default JIT
+2026-05-02. The numbers below are median-of-3 results for Leia default JIT
 and the local LuaJIT reference.
 
 It also records a follow-up `strict_guard.py` median-of-5 pass over the current
@@ -16,7 +16,7 @@ does not mean literal zero runtime.
 
 ## Full LuaJIT comparison
 
-| Benchmark | GScript JIT | LuaJIT | JIT/LuaJIT | Status |
+| Benchmark | Leia JIT | LuaJIT | JIT/LuaJIT | Status |
 | --- | ---: | ---: | ---: | --- |
 | fib | 0.000s | 0.025s | n/a | below display precision |
 | fib_recursive | 0.000s | 0.324s | n/a | below display precision |
@@ -51,7 +51,7 @@ Most measured core-suite rows are now ahead of the local LuaJIT reference.
 `table_field_access` is at parity. The remaining comparable gaps are
 concentrated in:
 
-| Benchmark | GScript JIT | LuaJIT | Gap |
+| Benchmark | Leia JIT | LuaJIT | Gap |
 | --- | ---: | ---: | ---: |
 | coroutine_bench | 0.019s | 0.009s | 2.11x slower |
 | table_array_access | 0.019s | 0.010s | 1.90x slower |
@@ -81,9 +81,9 @@ python3 benchmarks/strict_guard.py \
   --runs 5 --warmup 1 --timeout 120
 ```
 
-Ranked by best GScript mode against LuaJIT:
+Ranked by best Leia mode against LuaJIT:
 
-| Benchmark | Best GScript | LuaJIT | Gap |
+| Benchmark | Best Leia | LuaJIT | Gap |
 | --- | ---: | ---: | ---: |
 | app/mixed_inventory_sim | 0.152s | 0.022s | 6.91x slower |
 | app/actors_dispatch_mutation | 0.039s | 0.011s | 3.55x slower |
@@ -178,7 +178,7 @@ mixed_inventory_sim:
 Use this as the current docs summary:
 
 ```text
-On the 2026-05-02 median-of-3 local Darwin/arm64 comparison, GScript default
+On the 2026-05-02 median-of-3 local Darwin/arm64 comparison, Leia default
 JIT is ahead of the local LuaJIT reference on most measured core-suite rows,
 at parity on table_field_access, and still behind on table_array_access,
 coroutine_bench, closure_bench, and string_bench. Timings printed as 0.000s

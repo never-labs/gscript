@@ -1,5 +1,5 @@
 -- Benchmark: Table Field Access
--- Matches benchmarks/table/table_field_access.gs.
+-- Matches benchmarks/table/table_field_access.leia.
 
 local function make_particle(x, y, z, vx, vy, vz)
     return { x = x, y = y, z = z, vx = vx, vy = vy, vz = vz, mass = 1.0 }

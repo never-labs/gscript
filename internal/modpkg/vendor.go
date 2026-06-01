@@ -33,13 +33,13 @@ func Vendor(path string, opts VendorOptions) VendorReport {
 	abs, err := filepath.Abs(path)
 	report := VendorReport{SchemaVersion: 1}
 	if err != nil {
-		report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "GS9101", Message: err.Error()})
+		report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "LEIA9101", Message: err.Error()})
 		return report
 	}
 	manifest, manifestPath, err := ReadFileWithPath(abs)
 	report.Manifest = manifestPath
 	if err != nil {
-		report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "GS9103", Message: err.Error(), File: manifestPath})
+		report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "LEIA9103", Message: err.Error(), File: manifestPath})
 		return report
 	}
 	vendorDir := opts.VendorDir
@@ -51,19 +51,19 @@ func Vendor(path string, opts VendorOptions) VendorReport {
 	report.VendorDir = vendorDir
 	if opts.Clear {
 		if err := os.RemoveAll(vendorDir); err != nil {
-			report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "GS9112", Message: err.Error(), File: vendorDir})
+			report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "LEIA9112", Message: err.Error(), File: vendorDir})
 			return report
 		}
 	}
 	cacheDir, err := ModuleCacheDir(opts.CacheDir)
 	if err != nil {
-		report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "GS9110", Message: err.Error()})
+		report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "LEIA9110", Message: err.Error()})
 		return report
 	}
 	for _, req := range manifest.Require {
 		entry, err := vendorRequirement(cacheDir, vendorDir, req.Path, req.Version)
 		if err != nil {
-			report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "GS9113", Message: err.Error()})
+			report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "LEIA9113", Message: err.Error()})
 			continue
 		}
 		report.Modules = append(report.Modules, entry)
@@ -74,7 +74,7 @@ func Vendor(path string, opts VendorOptions) VendorReport {
 		if len(diags) == 0 {
 			sumPath := filepath.Join(abs, SumFileName)
 			if err := updateSumFile(sumPath, entries); err != nil {
-				report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "GS9109", Message: err.Error(), File: sumPath})
+				report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "LEIA9109", Message: err.Error(), File: sumPath})
 			}
 		}
 	}
@@ -88,7 +88,7 @@ func vendorRequirement(cacheDir, vendorDir, modulePath, version string) (VendorE
 	}
 	source := cachedRequirementRoot(cacheDir, modulePath, version)
 	if _, err := os.Stat(source); err != nil {
-		return VendorEntry{}, fmt.Errorf("%s@%s is not downloaded; run gscript mod download", modulePath, version)
+		return VendorEntry{}, fmt.Errorf("%s@%s is not downloaded; run leia mod download", modulePath, version)
 	}
 	target := filepath.Join(vendorDir, filepath.FromSlash(modulePath+"@"+version))
 	if err := os.RemoveAll(target); err != nil {

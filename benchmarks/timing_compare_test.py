@@ -71,7 +71,7 @@ class TimingCompareDiagnosticTest(unittest.TestCase):
         spec = timing.BenchmarkSpec(
             "calls",
             "calls_vararg_coroutine",
-            "benchmarks/calls/calls_vararg_coroutine.gs",
+            "benchmarks/calls/calls_vararg_coroutine.leia",
             "benchmarks/lua_ref/calls/calls_vararg_coroutine.lua",
         )
         samples = [
@@ -99,7 +99,7 @@ class TimingCompareDiagnosticTest(unittest.TestCase):
         spec = timing.BenchmarkSpec(
             "calls",
             "calls_vararg_coroutine",
-            "benchmarks/calls/calls_vararg_coroutine.gs",
+            "benchmarks/calls/calls_vararg_coroutine.leia",
             "benchmarks/lua_ref/calls/calls_vararg_coroutine.lua",
         )
         low_samples = [

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/leia/internal/runtime"
 )
 
 func matrixMultiplySource(t *testing.T, file string) string {
@@ -19,7 +19,7 @@ func matrixMultiplySource(t *testing.T, file string) string {
 }
 
 func TestMatrixMultiplyRuntimeSpecializationDiagnostics(t *testing.T) {
-	top := compileProto(t, matrixMultiplySource(t, "matmul.gs"))
+	top := compileProto(t, matrixMultiplySource(t, "matmul.leia"))
 	matmul := findTestProtoByName(top, "matmul")
 	if matmul == nil {
 		t.Fatal("missing matmul proto")
@@ -44,7 +44,7 @@ func TestMatrixMultiplyRuntimeSpecializationDiagnostics(t *testing.T) {
 }
 
 func TestMatrixMultiplyRuntimeSpecializationDenseVariant(t *testing.T) {
-	top := compileProto(t, matrixMultiplySource(t, "matmul_dense.gs"))
+	top := compileProto(t, matrixMultiplySource(t, "matmul_dense.leia"))
 	matmul := findTestProtoByName(top, "matmul")
 	if matmul == nil {
 		t.Fatal("missing dense matmul proto")
@@ -63,8 +63,8 @@ func TestMatrixMultiplyRuntimeSpecializationIgnoresBenchmarkMetadata(t *testing.
 		file string
 		kind matrixMultiplySpecializationKind
 	}{
-		{file: "matmul.gs", kind: matrixMultiplySpecializationPlain},
-		{file: "matmul_dense.gs", kind: matrixMultiplySpecializationDense},
+		{file: "matmul.leia", kind: matrixMultiplySpecializationPlain},
+		{file: "matmul_dense.leia", kind: matrixMultiplySpecializationDense},
 	} {
 		top := compileProto(t, matrixMultiplySource(t, tc.file))
 		matmul := findTestProtoByName(top, "matmul")
@@ -72,7 +72,7 @@ func TestMatrixMultiplyRuntimeSpecializationIgnoresBenchmarkMetadata(t *testing.
 			t.Fatalf("%s: missing matmul proto", tc.file)
 		}
 		matmul.Name = "shape_only_matrix_product"
-		matmul.Source = "host/generated/not-a-benchmark.gs"
+		matmul.Source = "host/generated/not-a-benchmark.leia"
 		spec, ok := matrixMultiplySpecializationSpecForProto(matmul)
 		if !ok {
 			t.Fatalf("%s: matrix multiply should recognize bytecode shape independent of name/source", tc.file)
@@ -87,7 +87,7 @@ func TestMatrixMultiplyRuntimeSpecializationRecordsHit(t *testing.T) {
 	stats := runtime.EnableRuntimePathStats()
 	defer runtime.DisableRuntimePathStats()
 
-	src := matrixMultiplySource(t, "matmul.gs")
+	src := matrixMultiplySource(t, "matmul.leia")
 	src = strings.Replace(src, "N := 60", "N := 8", 1)
 	src = strings.Replace(src, "REPS := 20", "REPS := 1", 1)
 	globals := compileAndRun(t, src)
@@ -100,7 +100,7 @@ func TestMatrixMultiplyRuntimeSpecializationRecordsHit(t *testing.T) {
 }
 
 func TestDenseMatrixMultiplyTransposedRuntimeSpecializationDiagnostics(t *testing.T) {
-	top := compileProto(t, matrixMultiplySource(t, "matmul_dense_tb.gs"))
+	top := compileProto(t, matrixMultiplySource(t, "matmul_dense_tb.leia"))
 	matmul := findTestProtoByName(top, "matmul")
 	if matmul == nil {
 		t.Fatal("missing dense transposed matmul proto")
@@ -127,13 +127,13 @@ func TestDenseMatrixMultiplyTransposedRuntimeSpecializationDiagnostics(t *testin
 }
 
 func TestDenseMatrixMultiplyTransposedRuntimeSpecializationIgnoresBenchmarkMetadata(t *testing.T) {
-	top := compileProto(t, matrixMultiplySource(t, "matmul_dense_tb.gs"))
+	top := compileProto(t, matrixMultiplySource(t, "matmul_dense_tb.leia"))
 	matmul := findTestProtoByName(top, "matmul")
 	if matmul == nil {
 		t.Fatal("missing dense transposed matmul proto")
 	}
 	matmul.Name = "shape_only_transposed_matrix_product"
-	matmul.Source = "host/generated/not-a-benchmark.gs"
+	matmul.Source = "host/generated/not-a-benchmark.leia"
 	if !isDenseMatrixMultiplyTransposedProto(matmul) {
 		t.Fatal("dense matrix multiply transposed should recognize bytecode shape independent of name/source")
 	}
@@ -143,7 +143,7 @@ func TestDenseMatrixMultiplyTransposedRuntimeSpecializationRecordsHit(t *testing
 	stats := runtime.EnableRuntimePathStats()
 	defer runtime.DisableRuntimePathStats()
 
-	src := matrixMultiplySource(t, "matmul_dense_tb.gs")
+	src := matrixMultiplySource(t, "matmul_dense_tb.leia")
 	src = strings.Replace(src, "N := 300", "N := 12", 1)
 	globals := compileAndRun(t, src)
 	if v := globals["c"]; !v.IsTable() {

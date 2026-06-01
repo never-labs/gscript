@@ -8,7 +8,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/vm"
 )
 
 type tier2CompileDelayError struct {
@@ -48,7 +48,7 @@ func (tm *TieringManager) compileTier2(proto *vm.FuncProto) (cf *CompiledFunctio
 		if r := recover(); r != nil {
 			cf = nil
 			retErr = fmt.Errorf("tier2: panic during compilation: %v", r)
-			if os.Getenv("GSCRIPT_JIT_DEBUG") == "1" {
+			if os.Getenv("LEIA_JIT_DEBUG") == "1" {
 				fmt.Fprintf(os.Stderr, "tier2: panic during compilation of %q: %v\n", proto.Name, r)
 			}
 		}
@@ -74,10 +74,10 @@ func (tm *TieringManager) compileTier2(proto *vm.FuncProto) (cf *CompiledFunctio
 			if trace != nil && !recordedWarmDump {
 				tm.recordWarmDumpCompile(proto, trace, cf, retErr)
 			}
-			if os.Getenv("GSCRIPT_JIT_DEBUG") == "1" {
+			if os.Getenv("LEIA_JIT_DEBUG") == "1" {
 				fmt.Fprintf(os.Stderr, "tier2: compilation failed for %q: %v\n", proto.Name, retErr)
 			}
-		} else if os.Getenv("GSCRIPT_JIT_DEBUG") == "1" {
+		} else if os.Getenv("LEIA_JIT_DEBUG") == "1" {
 			if cf != nil {
 				cf.CompileDurationNanos = durationNanos
 			}
@@ -393,7 +393,7 @@ func (tm *TieringManager) compileTier2Pipeline(proto *vm.FuncProto, trace *Tier2
 		// not replay partially executed table mutations. Restart-style OSR remains
 		// gated by isOSRRestartSafe before the OSR counter is armed.
 		//
-		// Bypass via GSCRIPT_TIER2_NO_FILTER=1 (diagnostic / perf-comparison).
+		// Bypass via LEIA_TIER2_NO_FILTER=1 (diagnostic / perf-comparison).
 		//
 		// Depth-aware filter (R162): old LoopDepth>=2 candidates use the classic
 		// non-native-call filter. LoopDepth<2 candidates use the stricter blocker
@@ -466,11 +466,11 @@ func (tm *TieringManager) compileTier2Pipeline(proto *vm.FuncProto, trace *Tier2
 	var cf *CompiledFunction
 	addStage("ARM64Compile", func() error {
 		var err error
-		traceNativeCalls := tm.envR154Trace || trace != nil || os.Getenv("GSCRIPT_JIT_DEBUG") == "1"
+		traceNativeCalls := tm.envR154Trace || trace != nil || os.Getenv("LEIA_JIT_DEBUG") == "1"
 		cf, err = CompileWithOptions(fn, alloc, CompileOptions{
 			EnableTier2BlockCounters: tm.perfStatsEnabled,
 			TraceNativeCalls:         traceNativeCalls,
-			PrintNativeCallTrace:     tm.envR154Trace || os.Getenv("GSCRIPT_JIT_DEBUG") == "1",
+			PrintNativeCallTrace:     tm.envR154Trace || os.Getenv("LEIA_JIT_DEBUG") == "1",
 		})
 		if err != nil {
 			remarks.Add("Tier2Gate", "blocked", 0, 0, OpNop,

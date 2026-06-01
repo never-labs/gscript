@@ -1,24 +1,24 @@
-package gscript_test
+package leia_test
 
 import (
 	"reflect"
 	"testing"
 
-	gs "github.com/never-labs/gscript"
+	leia "github.com/never-labs/leia"
 )
 
 func TestPublicValueConstructorsAndAccessors(t *testing.T) {
 	tests := []struct {
 		name string
-		val  gs.Value
-		kind gs.Kind
+		val  leia.Value
+		kind leia.Kind
 		text string
 	}{
-		{name: "nil", val: gs.Nil(), kind: gs.KindNil, text: "nil"},
-		{name: "bool", val: gs.Bool(true), kind: gs.KindBool, text: "true"},
-		{name: "int", val: gs.Int(42), kind: gs.KindInt, text: "42"},
-		{name: "float", val: gs.Float(1.5), kind: gs.KindFloat, text: "1.5"},
-		{name: "string", val: gs.String("hello"), kind: gs.KindString, text: "hello"},
+		{name: "nil", val: leia.Nil(), kind: leia.KindNil, text: "nil"},
+		{name: "bool", val: leia.Bool(true), kind: leia.KindBool, text: "true"},
+		{name: "int", val: leia.Int(42), kind: leia.KindInt, text: "42"},
+		{name: "float", val: leia.Float(1.5), kind: leia.KindFloat, text: "1.5"},
+		{name: "string", val: leia.String("hello"), kind: leia.KindString, text: "hello"},
 	}
 
 	for _, tt := range tests {
@@ -32,24 +32,24 @@ func TestPublicValueConstructorsAndAccessors(t *testing.T) {
 		})
 	}
 
-	if got := gs.Bool(true).Bool(); !got {
+	if got := leia.Bool(true).Bool(); !got {
 		t.Fatalf("Bool() = false, want true")
 	}
-	if got := gs.Int(42).Int(); got != 42 {
+	if got := leia.Int(42).Int(); got != 42 {
 		t.Fatalf("Int() = %d, want 42", got)
 	}
-	if got := gs.Float(1.5).Float(); got != 1.5 {
+	if got := leia.Float(1.5).Float(); got != 1.5 {
 		t.Fatalf("Float() = %v, want 1.5", got)
 	}
-	if got := gs.Int(42).Float(); got != 42 {
+	if got := leia.Int(42).Float(); got != 42 {
 		t.Fatalf("Int().Float() = %v, want 42", got)
 	}
 }
 
 func TestPublicValueZeroValueIsNil(t *testing.T) {
-	var v gs.Value
-	if got := v.Kind(); got != gs.KindNil {
-		t.Fatalf("zero Kind() = %q, want %q", got, gs.KindNil)
+	var v leia.Value
+	if got := v.Kind(); got != leia.KindNil {
+		t.Fatalf("zero Kind() = %q, want %q", got, leia.KindNil)
 	}
 	if !v.IsNil() {
 		t.Fatal("zero Value should be nil")
@@ -57,8 +57,8 @@ func TestPublicValueZeroValueIsNil(t *testing.T) {
 }
 
 func TestPublicValueWorksWithInterfaceConversion(t *testing.T) {
-	public := gs.String("bridge")
-	decoded, err := gs.Decode(public)
+	public := leia.String("bridge")
+	decoded, err := leia.Decode(public)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -68,11 +68,11 @@ func TestPublicValueWorksWithInterfaceConversion(t *testing.T) {
 }
 
 func TestPublicValueEncodeDecode(t *testing.T) {
-	v, err := gs.Decode(map[string]int{"answer": 42})
+	v, err := leia.Decode(map[string]int{"answer": 42})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := v.Kind(); got != gs.KindTable {
+	if got := v.Kind(); got != leia.KindTable {
 		t.Fatalf("Kind() = %q, want table", got)
 	}
 
@@ -90,7 +90,7 @@ func TestPublicValueEncodeDecode(t *testing.T) {
 }
 
 func TestPublicValueDecodeHelpers(t *testing.T) {
-	v, err := gs.Decode("hello")
+	v, err := leia.Decode("hello")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -98,18 +98,18 @@ func TestPublicValueDecodeHelpers(t *testing.T) {
 		t.Fatalf("Decode().String() = %q, want hello", got)
 	}
 
-	decoded := gs.MustDecode(true)
+	decoded := leia.MustDecode(true)
 	if !decoded.Bool() {
 		t.Fatalf("MustDecode(true).Bool() = false, want true")
 	}
 }
 
 func TestPublicValueDecodeMethodAndTypedConversion(t *testing.T) {
-	var v gs.Value
+	var v leia.Value
 	if err := v.Decode("123"); err != nil {
 		t.Fatal(err)
 	}
-	if got := v.Kind(); got != gs.KindString {
+	if got := v.Kind(); got != leia.KindString {
 		t.Fatalf("Kind() = %q, want string", got)
 	}
 

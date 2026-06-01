@@ -42,7 +42,7 @@ The interesting part is why the original method JIT left so much on the table.
 The loop body is just a swap and an add. The problem is that the add is exactly
 the kind of add that eventually escapes the raw integer representation.
 
-GScript's fast integer path is bounded by the NaN-box int range. For ordinary
+Leia's fast integer path is bounded by the NaN-box int range. For ordinary
 small loops, `a + b` can stay raw in an ARM64 register. For Fibonacci, the
 values grow exponentially. `fib(69)` still fits in the raw int range used by
 the JIT. `fib(70)` crosses it. A compiler that keeps the add raw forever is

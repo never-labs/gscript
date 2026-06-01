@@ -69,7 +69,7 @@ first in future regressions, because it has the least slack.
 
 ## The Full Ranking
 
-Lower is better. `Cur/LJ` below `1.00x` means GScript is faster than the local
+Lower is better. `Cur/LJ` below `1.00x` means Leia is faster than the local
 LuaJIT reference on this machine.
 
 ```text
@@ -164,7 +164,7 @@ program being timed is still the same program.
 
 ## What This Does Not Mean
 
-This is not a claim that GScript is faster than LuaJIT in general. It is a
+This is not a claim that Leia is faster than LuaJIT in general. It is a
 claim about this repository's checked-in benchmark corpus, on this local
 Darwin/arm64 machine, using the paired Lua reference programs and the current
 timing harness.

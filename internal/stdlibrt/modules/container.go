@@ -4,7 +4,7 @@ import (
 	"container/heap"
 	"fmt"
 
-	containerdata "github.com/never-labs/gscript/internal/stdlib/container"
+	containerdata "github.com/never-labs/leia/internal/stdlib/container"
 )
 
 // BuildContainer creates the "container" standard library table.
@@ -294,7 +294,7 @@ func BuildContainer() *Table {
 			},
 		}))
 		// Store the Go heap in a closure
-		// We use function closures to store Go data in GScript tables
+		// We use function closures to store Go data in Leia tables
 
 		// Helper functions for this heap instance
 		pushFn := &GoFunction{

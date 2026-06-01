@@ -7,8 +7,8 @@ import (
 	"testing"
 	"unsafe"
 
-	"github.com/never-labs/gscript/internal/runtime"
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/runtime"
+	"github.com/never-labs/leia/internal/vm"
 )
 
 func TestFieldShapeCallSplit_SingleBlockCaseCompilesNative(t *testing.T) {

@@ -7,7 +7,7 @@ manually keeping parallel arrays aligned.
 SoA values are built from dense arrays such as `[]f64{...}`, `[]bool{...}`, and
 `[N]i64{...}`. All columns must have the same length.
 
-```gscript
+```leia
 points := soa.zip({
     x: []f64{1, 2, 3},
     y: []f64{4, 5, 6},
@@ -20,7 +20,7 @@ print(soa.row(points, 2).id)  // 102
 
 ## Layout and Indexing
 
-- Row indexes are one-based, matching GScript table conventions.
+- Row indexes are one-based, matching Leia table conventions.
 - `soa.slice(s, first, last)` uses one-based inclusive bounds. For example,
   `soa.slice(s, 2, 4)` returns rows 2, 3, and 4.
 - Column names are strings. `soa.columns` and `soa.shape().columns` report them
@@ -103,7 +103,7 @@ the same length as `s`.
 
 Returns layout diagnostics:
 
-```gscript
+```leia
 shape := soa.shape(points)
 print(shape.length)
 print(shape.version)
@@ -143,7 +143,7 @@ Use `soa.filter` as the current compact/filter operation: build a bool dense
 mask from a predicate, compact all columns together, then continue with column
 kernels on the returned SoA.
 
-```gscript
+```leia
 active := soa.filter(points, []bool{true, false, true})
 activeX := soa.sum(active, "x")
 ```
@@ -158,7 +158,7 @@ Use gather when the selection is already represented as positions rather than
 a predicate mask: sparse lookup, permutation, join output, stable top-K, or
 replaying an externally computed order.
 
-```gscript
+```leia
 picked := soa.gather(points, [3]i64{3, 1, 3})
 ```
 
@@ -167,7 +167,7 @@ picked := soa.gather(points, [3]i64{3, 1, 3})
 Returns the one-based indexes where `mask` is true. The mask length must match
 the SoA length.
 
-```gscript
+```leia
 moving := soa.mask(points, "velocity", ">", 0)
 movingRows := soa.indicesWhere(points, moving)
 picked := soa.gather(points, movingRows)
@@ -179,7 +179,7 @@ Writes `values` into `column` at one-based `indices`. `values` can be a scalar
 or a dense array with the same length as `indices`; duplicate indexes use
 last-write-wins order.
 
-```gscript
+```leia
 rows := soa.indicesWhere(points, moving)
 soa.scatterInto(points, "visible", rows, true)
 soa.scatterInto(points, "score", rows, []f64{1.0, 2.0, 3.0})
@@ -198,7 +198,7 @@ Returns a bool dense array produced by comparing `column` with `rhs`.
 aliases (`eq`, `ne`, `lt`, `le`, `gt`, `ge`). `rhs` may be a numeric or bool
 scalar, or a string naming another column in the same SoA.
 
-```gscript
+```leia
 moving := soa.mask(points, "velocity", ">", 0)
 ahead := soa.mask(points, "x", ">=", "target_x")
 active := soa.compact(points, moving)
@@ -213,7 +213,7 @@ Returns a dense array by selecting one value per row from `if_true` when
 columns in `s`. Numeric selections return `i64` when both sides are integer,
 otherwise `f64`; bool selections require both sides to be bool.
 
-```gscript
+```leia
 moving := soa.mask(points, "velocity", ">", 0)
 signed_speed := soa.select(points, moving, "velocity", 0)
 visible := soa.select(points, moving, true, false)
@@ -230,7 +230,7 @@ can avoid allocating a new dense array every iteration.
 Fuses `soa.select` with a numeric sum reduction. Use this when the selected
 temporary is only needed for an aggregate:
 
-```gscript
+```leia
 total := soa.sumSelect(points, moving, "velocity", 0)
 ```
 
@@ -270,7 +270,7 @@ dense array with the same length as `s`.
 
 Runs multiple independent affine updates in one call:
 
-```gscript
+```leia
 soa.affineMany(points, {
     {dst: "x", src: "vx", scale: dt, bias: 0},
     {dst: "y", src: "vy", scale: dt, bias: 0},
@@ -309,7 +309,7 @@ multiple aggregate values are needed.
 Returns an inclusive prefix sum for a numeric dense column. The output dtype
 matches the source column.
 
-```gscript
+```leia
 offsets := soa.scan(points, "count")
 ```
 
@@ -324,7 +324,7 @@ Returns a dense array where each numeric value in `column` is clamped into
 `min..max`. Bounds must be numeric for `f64` columns and integer-compatible
 for `i64` columns.
 
-```gscript
+```leia
 safe_speed := soa.clamp(points, "velocity", 0, 100)
 ```
 
@@ -339,7 +339,7 @@ Returns the dot product of two numeric dense columns with the same length.
 When both columns are `i64`, the result is an integer; mixed or `f64` columns
 return a float.
 
-```gscript
+```leia
 energy := soa.dot(points, "velocity", "mass")
 ```
 
@@ -348,7 +348,7 @@ energy := soa.dot(points, "velocity", "mass")
 Reduces numeric `column` over mask-true rows without row materialization.
 `mask` must be a bool dense array with the same length as `s`.
 
-```gscript
+```leia
 mask := []bool{true, false, true}
 total := soa.sumWhere(points, "x", mask)
 ```

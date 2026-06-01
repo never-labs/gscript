@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/never-labs/gscript/llm"
-	"github.com/never-labs/gscript/llm/openai"
+	"github.com/never-labs/leia/llm"
+	"github.com/never-labs/leia/llm/openai"
 )
 
 const (

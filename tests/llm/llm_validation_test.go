@@ -1,10 +1,10 @@
-package gscript_test
+package leia_test
 
 import (
 	"strings"
 	"testing"
 
-	gs "github.com/never-labs/gscript"
+	leia "github.com/never-labs/leia"
 )
 
 func TestLLMSyntaxValidation(t *testing.T) {
@@ -87,23 +87,23 @@ tool lookup(query) {
     return query, nil
 }
 `,
-			want: "missing gscript:requires",
+			want: "missing leia:requires",
 		},
 		{
 			name: "tool invalid requires",
 			src: `
-//gscript:requires docs..read
+//leia:requires docs..read
 tool lookup(query) {
     return query, nil
 }
 `,
-			want: "invalid gscript:requires",
+			want: "invalid leia:requires",
 		},
 		{
 			name: "tool unknown param doc",
 			src: `
-//gscript:requires none
-//gscript:param missing not a parameter
+//leia:requires none
+//leia:param missing not a parameter
 tool lookup(query) {
     return query, nil
 }
@@ -113,19 +113,19 @@ tool lookup(query) {
 		{
 			name: "tool duplicate param doc",
 			src: `
-//gscript:requires none
-//gscript:param query first
-//gscript:param query second
+//leia:requires none
+//leia:param query first
+//leia:param query second
 tool lookup(query) {
     return query, nil
 }
 `,
-			want: "duplicate gscript:param",
+			want: "duplicate leia:param",
 		},
 		{
 			name: "agent duplicate tools",
 			src: `
-//gscript:requires none
+//leia:requires none
 tool lookup(query) {
     return query, nil
 }
@@ -171,7 +171,7 @@ func f() {
 		{
 			name: "agent capabilities missing tool requirement",
 			src: `
-//gscript:requires docs.read, net.client
+//leia:requires docs.read, net.client
 tool lookup(query) {
     return query, nil
 }
@@ -187,7 +187,7 @@ agent answer(q) {
 		{
 			name: "agent defaults merged capabilities missing inherited tool requirement",
 			src: `
-//gscript:requires net.client
+//leia:requires net.client
 tool lookup(query) {
     return query, nil
 }
@@ -206,7 +206,7 @@ agent answer(q) {
 		{
 			name: "turn caps missing tool requirement",
 			src: `
-//gscript:requires payments.refund
+//leia:requires payments.refund
 tool refund(id) {
     return id, nil
 }
@@ -225,14 +225,14 @@ func f() {
 		t.Run(tc.name, func(t *testing.T) {
 			for _, mode := range []struct {
 				name string
-				opts []gs.Option
+				opts []leia.Option
 			}{
 				{name: "interpreter"},
-				{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+				{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
 			} {
 				t.Run(mode.name, func(t *testing.T) {
-					opts := append([]gs.Option{gs.WithLibs(gs.LibString | gs.LibLLM)}, mode.opts...)
-					vm := gs.New(opts...)
+					opts := append([]leia.Option{leia.WithLibs(leia.LibString | leia.LibLLM)}, mode.opts...)
+					vm := leia.New(opts...)
 					err := vm.Exec(tc.src)
 					if err == nil || !strings.Contains(err.Error(), tc.want) {
 						t.Fatalf("Exec error = %v, want substring %q", err, tc.want)
@@ -246,14 +246,14 @@ func f() {
 func TestLLMSyntaxValidationAllowsAliasOnlyModels(t *testing.T) {
 	for _, mode := range []struct {
 		name string
-		opts []gs.Option
+		opts []leia.Option
 	}{
 		{name: "interpreter"},
-		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
 	} {
 		t.Run(mode.name, func(t *testing.T) {
-			opts := append([]gs.Option{gs.WithLibs(gs.LibString | gs.LibLLM)}, mode.opts...)
-			vm := gs.New(opts...)
+			opts := append([]leia.Option{leia.WithLibs(leia.LibString | leia.LibLLM)}, mode.opts...)
+			vm := leia.New(opts...)
 			err := vm.Exec(`
 models {
     default: "fast"

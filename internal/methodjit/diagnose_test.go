@@ -1,5 +1,5 @@
 // diagnose_test.go tests the unified diagnostic tool for the Method JIT.
-// Each test compiles a GScript function, runs Diagnose(), and verifies
+// Each test compiles a Leia function, runs Diagnose(), and verifies
 // the report contains expected sections and correct match/mismatch verdicts.
 
 //go:build darwin && arm64
@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/leia/internal/runtime"
 )
 
 // TestDiagnose_SimpleAdd: f(3,4)=7. Verify Match=true, report contains IR.

@@ -12,7 +12,7 @@ import (
 	"testing"
 	"unsafe"
 
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/vm"
 )
 
 // ackTotalInsnBaseline is the total ARM64 instruction count for the Tier 1
@@ -33,15 +33,15 @@ import (
 const ackTotalInsnBaseline = 936
 
 func TestDumpTier1_AckermannBody(t *testing.T) {
-	srcBytes, err := os.ReadFile("../../benchmarks/recursion/ackermann.gs")
+	srcBytes, err := os.ReadFile("../../benchmarks/recursion/ackermann.leia")
 	if err != nil {
-		t.Fatalf("read ackermann.gs: %v", err)
+		t.Fatalf("read ackermann.leia: %v", err)
 	}
 	top := compileTop(t, string(srcBytes))
 
 	target := findProtoByName(top, "ack")
 	if target == nil {
-		t.Fatalf("function 'ack' not found in ackermann.gs")
+		t.Fatalf("function 'ack' not found in ackermann.leia")
 	}
 	t.Logf("=== ack (numParams=%d, maxStack=%d, bytecode len=%d) ===",
 		target.NumParams, target.MaxStack, len(target.Code))
@@ -90,7 +90,7 @@ func TestDumpTier1_AckermannBody(t *testing.T) {
 	out := make([]byte, size)
 	copy(out, src)
 
-	outPath := "/tmp/gscript_ack_tier1.bin"
+	outPath := "/tmp/leia_ack_tier1.bin"
 	if err := os.WriteFile(outPath, out, 0o644); err != nil {
 		t.Fatalf("write %s: %v", outPath, err)
 	}

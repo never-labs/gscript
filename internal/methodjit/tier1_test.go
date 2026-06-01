@@ -1,22 +1,22 @@
 //go:build darwin && arm64
 
 // tier1_test.go tests the Tier 1 baseline compiler.
-// Each test compiles a GScript program, runs it via both the VM interpreter
+// Each test compiles a Leia program, runs it via both the VM interpreter
 // and the baseline JIT engine, and compares the results.
 
 package methodjit
 
 import (
 	"fmt"
-	"github.com/never-labs/gscript/internal/testutil/vmtest"
+	"github.com/never-labs/leia/internal/testutil/vmtest"
 	"os"
 	"path/filepath"
 	"testing"
 
-	"github.com/never-labs/gscript/internal/lexer"
-	"github.com/never-labs/gscript/internal/parser"
-	"github.com/never-labs/gscript/internal/runtime"
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/lexer"
+	"github.com/never-labs/leia/internal/parser"
+	"github.com/never-labs/leia/internal/runtime"
+	"github.com/never-labs/leia/internal/vm"
 )
 
 // runVMFull executes a full program via the VM and returns globals.
@@ -578,7 +578,7 @@ result := is_even(10)
 	}
 }
 
-// TestTier1_BenchmarkFiles runs actual .gs benchmark files.
+// TestTier1_BenchmarkFiles runs actual .leia benchmark files.
 func TestTier1_BenchmarkFiles(t *testing.T) {
 	benchDir := filepath.Join("..", "..", "benchmarks", "numeric")
 	files := []struct {
@@ -590,7 +590,7 @@ func TestTier1_BenchmarkFiles(t *testing.T) {
 
 	for _, f := range files {
 		t.Run(f.name, func(t *testing.T) {
-			path := filepath.Join(benchDir, f.name+".gs")
+			path := filepath.Join(benchDir, f.name+".leia")
 			data, err := os.ReadFile(path)
 			if err != nil {
 				t.Skipf("benchmark file not found: %s", path)

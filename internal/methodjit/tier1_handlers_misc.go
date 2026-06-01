@@ -11,8 +11,8 @@ import (
 	"math"
 	"unsafe"
 
-	"github.com/never-labs/gscript/internal/runtime"
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/runtime"
+	"github.com/never-labs/leia/internal/vm"
 )
 
 // handleConcat handles OP_CONCAT exit: R(A) = R(B)..R(B+1)..R(C)

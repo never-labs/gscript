@@ -11,12 +11,12 @@
 package methodjit
 
 import (
-	"github.com/never-labs/gscript/internal/testutil/vmtest"
+	"github.com/never-labs/leia/internal/testutil/vmtest"
 	"testing"
 	"time"
 
-	"github.com/never-labs/gscript/internal/runtime"
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/runtime"
+	"github.com/never-labs/leia/internal/vm"
 )
 
 // TestTier2RecursionHangRepro attempts to reproduce the hang observed when
@@ -139,7 +139,7 @@ result := fib(5)
 // TestTier2RecursionDeeperFib drives the same harness as
 // TestTier2RecursionHangRepro but with deeper fib(n) arguments and a
 // repeat loop, to see if the hang surfaces at load profiles closer to
-// fib_recursive.gs (fib(35), REPS=10).
+// fib_recursive.leia (fib(35), REPS=10).
 func TestTier2RecursionDeeperFib(t *testing.T) {
 	cases := []struct {
 		name    string

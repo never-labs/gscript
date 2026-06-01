@@ -1,5 +1,5 @@
 -- Benchmark: Coroutine Performance
--- Matches benchmarks/calls/coroutine_bench.gs.
+-- Matches benchmarks/calls/coroutine_bench.leia.
 
 local function test_yield_loop(n)
     local co = coroutine.create(function()

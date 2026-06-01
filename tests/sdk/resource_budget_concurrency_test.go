@@ -1,19 +1,19 @@
-package gscript_test
+package leia_test
 
 import (
 	"errors"
 	"testing"
 
-	gs "github.com/never-labs/gscript"
+	leia "github.com/never-labs/leia"
 )
 
 func TestWithMaxGoroutinesLimitsInterpreterGoStatements(t *testing.T) {
-	vm := gs.New(gs.WithMaxGoroutines(0))
+	vm := leia.New(leia.WithMaxGoroutines(0))
 	if err := vm.Exec(`func done() {}; go done()`); err != nil {
 		t.Fatal(err)
 	}
 
-	limited := gs.New(gs.WithMaxGoroutines(1))
+	limited := leia.New(leia.WithMaxGoroutines(1))
 	err := limited.Exec(`
 		block := make(chan)
 		func worker() { <-block }
@@ -23,7 +23,7 @@ func TestWithMaxGoroutinesLimitsInterpreterGoStatements(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected goroutine budget error")
 	}
-	var budgetErr *gs.BudgetError
+	var budgetErr *leia.BudgetError
 	if !errors.As(err, &budgetErr) {
 		t.Fatalf("expected BudgetError, got %T %v", err, err)
 	}
@@ -33,12 +33,12 @@ func TestWithMaxGoroutinesLimitsInterpreterGoStatements(t *testing.T) {
 }
 
 func TestWithMaxChannelCapacityLimitsInterpreterMakeChan(t *testing.T) {
-	vm := gs.New(gs.WithMaxChannelCapacity(2))
+	vm := leia.New(leia.WithMaxChannelCapacity(2))
 	err := vm.Exec(`ch := make(chan, 3)`)
 	if err == nil {
 		t.Fatal("expected channel capacity budget error")
 	}
-	var budgetErr *gs.BudgetError
+	var budgetErr *leia.BudgetError
 	if !errors.As(err, &budgetErr) {
 		t.Fatalf("expected BudgetError, got %T %v", err, err)
 	}
@@ -48,7 +48,7 @@ func TestWithMaxChannelCapacityLimitsInterpreterMakeChan(t *testing.T) {
 }
 
 func TestWithMaxGoroutinesLimitsBytecodeGoStatements(t *testing.T) {
-	vm := gs.New(gs.WithVM(), gs.WithMaxGoroutines(1))
+	vm := leia.New(leia.WithVM(), leia.WithMaxGoroutines(1))
 	err := vm.Exec(`
 		block := make(chan)
 		func worker() { <-block }
@@ -58,7 +58,7 @@ func TestWithMaxGoroutinesLimitsBytecodeGoStatements(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected goroutine budget error")
 	}
-	var budgetErr *gs.BudgetError
+	var budgetErr *leia.BudgetError
 	if !errors.As(err, &budgetErr) {
 		t.Fatalf("expected BudgetError, got %T %v", err, err)
 	}
@@ -68,12 +68,12 @@ func TestWithMaxGoroutinesLimitsBytecodeGoStatements(t *testing.T) {
 }
 
 func TestWithMaxChannelCapacityLimitsBytecodeMakeChan(t *testing.T) {
-	vm := gs.New(gs.WithVM(), gs.WithMaxChannelCapacity(2))
+	vm := leia.New(leia.WithVM(), leia.WithMaxChannelCapacity(2))
 	err := vm.Exec(`ch := make(chan, 3)`)
 	if err == nil {
 		t.Fatal("expected channel capacity budget error")
 	}
-	var budgetErr *gs.BudgetError
+	var budgetErr *leia.BudgetError
 	if !errors.As(err, &budgetErr) {
 		t.Fatalf("expected BudgetError, got %T %v", err, err)
 	}

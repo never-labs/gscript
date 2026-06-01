@@ -6,8 +6,8 @@ import (
 	"math"
 	"unsafe"
 
-	"github.com/never-labs/gscript/internal/runtime"
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/runtime"
+	"github.com/never-labs/leia/internal/vm"
 )
 
 func observeTier2CallExitFeedback(proto *vm.FuncProto, cf *CompiledFunction, ctx *ExecContext, regs []runtime.Value, base int) {

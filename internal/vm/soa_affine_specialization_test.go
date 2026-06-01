@@ -1,13 +1,13 @@
 package vm
 
 import (
-	"github.com/never-labs/gscript/internal/testutil/vmtest"
+	"github.com/never-labs/leia/internal/testutil/vmtest"
 	"math"
 	"testing"
 
-	"github.com/never-labs/gscript/internal/lexer"
-	"github.com/never-labs/gscript/internal/parser"
-	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/leia/internal/lexer"
+	"github.com/never-labs/leia/internal/parser"
+	"github.com/never-labs/leia/internal/runtime"
 )
 
 const soaAffineUpdateSource = `
@@ -102,7 +102,7 @@ func TestSoAColumnAffineUpdateIgnoresBenchmarkMetadata(t *testing.T) {
 		t.Fatal("missing affine_update proto")
 	}
 	affine.Name = "not_a_benchmark_kernel"
-	affine.Source = "generated/shape_only.gs"
+	affine.Source = "generated/shape_only.leia"
 	if !isSoAColumnAffineUpdateProto(affine) {
 		t.Fatal("soa affine update should recognize bytecode shape independent of name/source")
 	}

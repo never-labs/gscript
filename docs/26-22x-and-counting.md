@@ -96,7 +96,7 @@ Second, the pass runs after ConstProp but before DCE. When a redundant GetField 
 
 Third, the broad improvement across non-nbody benchmarks tells us that GetField overhead was a universal tax, not an nbody-specific problem. Any function that accesses the same field twice in a basic block was paying 16 extra instructions. The load elimination pass is 84 lines and benefits every benchmark that uses tables.
 
-mandelbrot at 0.062s is now 1.22x from LuaJIT's 0.051s. That's the closest any GScript benchmark has come to LuaJIT -- a gap small enough that we could close it with shape check hoisting alone.
+mandelbrot at 0.062s is now 1.22x from LuaJIT's 0.051s. That's the closest any Leia benchmark has come to LuaJIT -- a gap small enough that we could close it with shape check hoisting alone.
 
 ## What I'd do differently
 
@@ -108,5 +108,5 @@ The TypeFloat guard had been a no-op for 12+ rounds. Nobody noticed because it's
 
 *Previous: [The Function That Never Graduated](/25-the-function-that-never-graduated)*
 
-*This is post 26 in the [GScript JIT series](https://jxwr.github.io/gscript/).
+*This is post 26 in the [Leia JIT series](https://jxwr.github.io/leia/).
 All numbers from a single-thread ARM64 Apple Silicon machine.*

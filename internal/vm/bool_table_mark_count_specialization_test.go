@@ -5,12 +5,12 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/leia/internal/runtime"
 )
 
 func boolTableMarkCountSource(t *testing.T) string {
 	t.Helper()
-	src, err := os.ReadFile(filepath.Join("..", "..", "benchmarks", "control", "sieve.gs"))
+	src, err := os.ReadFile(filepath.Join("..", "..", "benchmarks", "control", "sieve.leia"))
 	if err != nil {
 		t.Fatalf("read sieve benchmark: %v", err)
 	}
@@ -54,7 +54,7 @@ func TestBoolTableMarkCountIgnoresBenchmarkMetadata(t *testing.T) {
 		t.Fatal("missing sieve proto")
 	}
 	sieve.Name = "shape_only_bool_table_count"
-	sieve.Source = "host/generated/not-a-benchmark.gs"
+	sieve.Source = "host/generated/not-a-benchmark.leia"
 	if !isBoolTableMarkCountProto(sieve) {
 		t.Fatalf("bool table mark count should recognize bytecode shape independent of name/source: code=%d const=%d maxstack=%d", len(sieve.Code), len(sieve.Constants), sieve.MaxStack)
 	}

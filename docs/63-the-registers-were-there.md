@@ -237,7 +237,7 @@ needed.
 LuaJIT is still faster. On this run:
 
 ```
-GScript method JIT: 0.064s
+Leia method JIT: 0.064s
 LuaJIT:             0.033s
 ```
 

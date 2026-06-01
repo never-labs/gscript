@@ -4,11 +4,11 @@ package methodjit
 
 import (
 	"encoding/binary"
-	"github.com/never-labs/gscript/internal/testutil/vmtest"
+	"github.com/never-labs/leia/internal/testutil/vmtest"
 	"strings"
 	"testing"
 
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/vm"
 )
 
 func TestLoopExitStorePhis_DefersBoxedPhiWriteThrough(t *testing.T) {

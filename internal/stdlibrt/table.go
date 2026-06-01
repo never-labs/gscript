@@ -1,6 +1,6 @@
 package stdlibrt
 
-import "github.com/never-labs/gscript/internal/runtime"
+import "github.com/never-labs/leia/internal/runtime"
 
 type Caller func(runtime.Value, []runtime.Value) ([]runtime.Value, error)
 type Less func(runtime.Value, runtime.Value) (bool, error)

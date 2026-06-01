@@ -1,6 +1,6 @@
 package methodjit
 
-import "github.com/never-labs/gscript/internal/vm"
+import "github.com/never-labs/leia/internal/vm"
 
 // TableArraySwapFusionPass fuses same-block typed-array exchange patterns:
 //

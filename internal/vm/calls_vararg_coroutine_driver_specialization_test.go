@@ -4,11 +4,11 @@ import (
 	"os"
 	"testing"
 
-	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/leia/internal/runtime"
 )
 
 func TestCallsVarargCoroutineDriverRuntimeSpecialization(t *testing.T) {
-	src, err := os.ReadFile("../../benchmarks/calls/calls_vararg_coroutine.gs")
+	src, err := os.ReadFile("../../benchmarks/calls/calls_vararg_coroutine.leia")
 	if err != nil {
 		t.Fatal(err)
 	}

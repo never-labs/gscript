@@ -6,7 +6,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/never-labs/gscript/llm"
+	"github.com/never-labs/leia/llm"
 )
 
 // Provider is a simple command-backed LLM provider. It is intended for local

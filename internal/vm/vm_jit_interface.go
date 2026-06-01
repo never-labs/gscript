@@ -7,7 +7,7 @@ package vm
 import (
 	"fmt"
 
-	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/leia/internal/runtime"
 )
 
 // ResumeFromPC resumes execution of the current top call frame starting at

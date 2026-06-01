@@ -25,8 +25,8 @@ Primary full timing command documented in `benchmarks/README.md` and
 python3 benchmarks/timing_compare.py --all-groups --runs=5 --warmup=1 \
   --time-source=auto --min-sample-seconds=0.100 --max-repeat=128 \
   --sort=luajit-gap \
-  --json /tmp/gscript_timing_compare.json \
-  --markdown /tmp/gscript_timing_compare.md
+  --json /tmp/leia_timing_compare.json \
+  --markdown /tmp/leia_timing_compare.md
 ```
 
 Hot-loop scaling profile for short workloads:
@@ -34,8 +34,8 @@ Hot-loop scaling profile for short workloads:
 ```bash
 python3 benchmarks/timing_compare.py --runs=5 --warmup=1 \
   --scale-profile=hot --sort=luajit-gap \
-  --json /tmp/gscript_hot_timing.json \
-  --markdown /tmp/gscript_hot_timing.md
+  --json /tmp/leia_hot_timing.json \
+  --markdown /tmp/leia_hot_timing.md
 ```
 
 Script-only timing for publishable hot-loop claims:
@@ -95,8 +95,8 @@ logical-time benchmark and prefers wall time for that case when wall timing is
 allowed.
 
 The official hot scripts mostly print `Time: %.3fs` from an in-script timer:
-GScript uses `time.now()` / `time.since()`, while Lua uses `os.clock()`.
-`control/defer_protected` is the exception: both GScript and Lua versions
+Leia uses `time.now()` / `time.since()`, while Lua uses `os.clock()`.
+`control/defer_protected` is the exception: both Leia and Lua versions
 print deterministic synthetic `logicalTime`, not elapsed wall or CPU time.
 
 The hot region is not fully uniform across official hot cases. Most scripts put
@@ -134,8 +134,8 @@ large enough, but they use a wider threshold than script-timed rows. This keeps
 startup fallback from hiding severe slowdowns without letting process startup
 jitter dominate hot-loop decisions.
 
-Timer semantic risk: GScript `time.since()` and Lua `os.clock()` may not have
-identical semantics. The GScript timer appears to be wall-style elapsed time,
+Timer semantic risk: Leia `time.since()` and Lua `os.clock()` may not have
+identical semantics. The Leia timer appears to be wall-style elapsed time,
 while `os.clock()` is CPU time in Lua. Comparing those is acceptable only when
 the workload is CPU-bound and not affected by sleep, I/O, or scheduling noise.
 Host-heavy official cases such as `stdlib_host_hot` should be treated carefully.
@@ -183,8 +183,8 @@ Every benchmark report row should expose these fields, even if some are empty:
 | `checksum` | Printed checksum or stable output hash. |
 | `cv_pct` | Coefficient of variation for the measured subject. |
 | `ci95_half_width_pct` | 95% confidence interval half-width when available. |
-| `t2_attempted` / `t2_entered` / `t2_failed` | Tier 2 counters for GScript JIT modes. |
-| `exit_total` | Total JIT exits for GScript JIT modes. |
+| `t2_attempted` / `t2_entered` / `t2_failed` | Tier 2 counters for Leia JIT modes. |
+| `exit_total` | Total JIT exits for Leia JIT modes. |
 | `command` | Exact command used for the report. |
 | `platform` | OS, arch, Go version, LuaJIT path/version when available. |
 | `commit` / `dirty` | Git identity and dirty-worktree flag. |
@@ -223,7 +223,7 @@ and applies separate script-time vs wall-time regression thresholds.
 3. Emit exact effective command and arguments into Markdown output, not only
    JSON. This makes report screenshots and copied tables auditable.
 
-4. Add a report warning when GScript and LuaJIT use different timing semantics
+4. Add a report warning when Leia and LuaJIT use different timing semantics
    for the same row, especially for host-heavy or logical-time official cases.
 
 ## P2 Fixes

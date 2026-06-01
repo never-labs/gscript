@@ -9,13 +9,13 @@
 package methodjit
 
 import (
-	"github.com/never-labs/gscript/internal/testutil/vmtest"
+	"github.com/never-labs/leia/internal/testutil/vmtest"
 	"os"
 	"strings"
 	"testing"
 
-	"github.com/never-labs/gscript/internal/runtime"
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/runtime"
+	"github.com/never-labs/leia/internal/vm"
 )
 
 // TestOSR_BasicForLoop verifies that OSR triggers for a function with a
@@ -242,15 +242,15 @@ result := sum_with_init(5000)
 }
 
 func TestOSR_RestartDisabledForTableSideEffectsNoFilter(t *testing.T) {
-	old := os.Getenv("GSCRIPT_TIER2_NO_FILTER")
+	old := os.Getenv("LEIA_TIER2_NO_FILTER")
 	t.Cleanup(func() {
 		if old == "" {
-			os.Unsetenv("GSCRIPT_TIER2_NO_FILTER")
+			os.Unsetenv("LEIA_TIER2_NO_FILTER")
 		} else {
-			os.Setenv("GSCRIPT_TIER2_NO_FILTER", old)
+			os.Setenv("LEIA_TIER2_NO_FILTER", old)
 		}
 	})
-	os.Setenv("GSCRIPT_TIER2_NO_FILTER", "1")
+	os.Setenv("LEIA_TIER2_NO_FILTER", "1")
 
 	src := `
 func make_particles(n) {

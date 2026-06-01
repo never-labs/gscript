@@ -8,15 +8,15 @@ import (
 	"strings"
 	"testing"
 
-	gs "github.com/never-labs/gscript"
+	leia "github.com/never-labs/leia"
 )
 
-// runGScript executes a GScript source string and captures its print output.
-func runGScript(t *testing.T, src string) string {
+// runLeia executes a Leia source string and captures its print output.
+func runLeia(t *testing.T, src string) string {
 	t.Helper()
 	var buf bytes.Buffer
 
-	vm := gs.New(gs.WithPrint(func(args ...interface{}) {
+	vm := leia.New(leia.WithPrint(func(args ...interface{}) {
 		parts := make([]string, len(args))
 		for i, a := range args {
 			parts[i] = fmt.Sprint(a)
@@ -29,18 +29,18 @@ func runGScript(t *testing.T, src string) string {
 	return buf.String()
 }
 
-// runGScriptFile reads a .gs file and executes it.
-func runGScriptFile(t *testing.T, filename string) string {
+// runLeiaFile reads a .leia file and executes it.
+func runLeiaFile(t *testing.T, filename string) string {
 	t.Helper()
 	src, err := os.ReadFile(filename)
 	if err != nil {
 		t.Fatalf("failed to read %s: %v", filename, err)
 	}
-	return runGScript(t, string(src))
+	return runLeia(t, string(src))
 }
 
 func TestBasicArithmetic(t *testing.T) {
-	out := runGScriptFile(t, filepath.Join("smoke", "01_basic.gs"))
+	out := runLeiaFile(t, filepath.Join("smoke", "01_basic.leia"))
 	lines := strings.Split(strings.TrimSpace(out), "\n")
 	expected := []string{"3", "7", "20", "2.5", "1", "256"}
 	if len(lines) != len(expected) {
@@ -55,7 +55,7 @@ func TestBasicArithmetic(t *testing.T) {
 }
 
 func TestStrings(t *testing.T) {
-	out := runGScriptFile(t, filepath.Join("smoke", "02_strings.gs"))
+	out := runLeiaFile(t, filepath.Join("smoke", "02_strings.leia"))
 	lines := strings.Split(strings.TrimSpace(out), "\n")
 	expected := []string{"hello world", "5", "HELLO", "ell", "ababab"}
 	if len(lines) != len(expected) {
@@ -70,7 +70,7 @@ func TestStrings(t *testing.T) {
 }
 
 func TestControlFlow(t *testing.T) {
-	out := runGScriptFile(t, filepath.Join("smoke", "03_control.gs"))
+	out := runLeiaFile(t, filepath.Join("smoke", "03_control.leia"))
 	lines := strings.Split(strings.TrimSpace(out), "\n")
 	expected := []string{"medium", "55", "128"}
 	if len(lines) != len(expected) {
@@ -85,7 +85,7 @@ func TestControlFlow(t *testing.T) {
 }
 
 func TestFunctions(t *testing.T) {
-	out := runGScriptFile(t, filepath.Join("smoke", "04_functions.gs"))
+	out := runLeiaFile(t, filepath.Join("smoke", "04_functions.leia"))
 	lines := strings.Split(strings.TrimSpace(out), "\n")
 	// add(3,4) = 7
 	// divmod(17,5): q = 3.4, r = 2
@@ -103,7 +103,7 @@ func TestFunctions(t *testing.T) {
 }
 
 func TestTables(t *testing.T) {
-	out := runGScriptFile(t, filepath.Join("smoke", "05_tables.gs"))
+	out := runLeiaFile(t, filepath.Join("smoke", "05_tables.leia"))
 	lines := strings.Split(strings.TrimSpace(out), "\n")
 	expected := []string{
 		"5",     // #arr
@@ -127,7 +127,7 @@ func TestTables(t *testing.T) {
 }
 
 func TestClosures(t *testing.T) {
-	out := runGScriptFile(t, filepath.Join("smoke", "06_closures.gs"))
+	out := runLeiaFile(t, filepath.Join("smoke", "06_closures.leia"))
 	lines := strings.Split(strings.TrimSpace(out), "\n")
 	expected := []string{"1", "2", "11", "3", "12"}
 	if len(lines) != len(expected) {
@@ -142,7 +142,7 @@ func TestClosures(t *testing.T) {
 }
 
 func TestMetatable(t *testing.T) {
-	out := runGScriptFile(t, filepath.Join("smoke", "07_metatable.gs"))
+	out := runLeiaFile(t, filepath.Join("smoke", "07_metatable.leia"))
 	lines := strings.Split(strings.TrimSpace(out), "\n")
 	expected := []string{
 		"Rex says woof",
@@ -162,7 +162,7 @@ func TestMetatable(t *testing.T) {
 }
 
 func TestCoroutine(t *testing.T) {
-	out := runGScriptFile(t, filepath.Join("smoke", "08_coroutine.gs"))
+	out := runLeiaFile(t, filepath.Join("smoke", "08_coroutine.leia"))
 	lines := strings.Split(strings.TrimSpace(out), "\n")
 	expected := []string{"1", "4", "9", "16", "25"}
 	if len(lines) != len(expected) {
@@ -177,7 +177,7 @@ func TestCoroutine(t *testing.T) {
 }
 
 func TestError(t *testing.T) {
-	out := runGScriptFile(t, filepath.Join("smoke", "09_error.gs"))
+	out := runLeiaFile(t, filepath.Join("smoke", "09_error.leia"))
 	lines := strings.Split(strings.TrimSpace(out), "\n")
 	expected := []string{
 		"false",                // ok (pcall caught error)
@@ -202,7 +202,7 @@ func TestError(t *testing.T) {
 }
 
 func TestStringOps(t *testing.T) {
-	out := runGScriptFile(t, filepath.Join("smoke", "10_string_ops.gs"))
+	out := runLeiaFile(t, filepath.Join("smoke", "10_string_ops.leia"))
 	lines := strings.Split(strings.TrimSpace(out), "\n")
 	expected := []string{
 		"13",               // string.len
@@ -225,7 +225,7 @@ func TestStringOps(t *testing.T) {
 }
 
 func TestIterator(t *testing.T) {
-	out := runGScriptFile(t, filepath.Join("smoke", "11_iterator.gs"))
+	out := runLeiaFile(t, filepath.Join("smoke", "11_iterator.leia"))
 	lines := strings.Split(strings.TrimSpace(out), "\n")
 	// ipairs output: 1 a, 2 b, 3 c, 4 d
 	// pairs sorted output: x 1, y 2, z 3
@@ -245,7 +245,7 @@ func TestIterator(t *testing.T) {
 }
 
 func TestAdvanced(t *testing.T) {
-	out := runGScriptFile(t, filepath.Join("smoke", "12_advanced.gs"))
+	out := runLeiaFile(t, filepath.Join("smoke", "12_advanced.leia"))
 	lines := strings.Split(strings.TrimSpace(out), "\n")
 	expected := []string{"832040"}
 	if len(lines) != len(expected) {
@@ -262,9 +262,9 @@ func TestAdvanced(t *testing.T) {
 // TestExamples runs example programs to make sure they don't error.
 func TestExamples(t *testing.T) {
 	examples := []string{
-		filepath.Join("..", "examples", "hello", "fib.gs"),
-		filepath.Join("..", "examples", "hello", "counter.gs"),
-		filepath.Join("..", "examples", "hello", "class.gs"),
+		filepath.Join("..", "examples", "hello", "fib.leia"),
+		filepath.Join("..", "examples", "hello", "counter.leia"),
+		filepath.Join("..", "examples", "hello", "class.leia"),
 	}
 	for _, ex := range examples {
 		t.Run(filepath.Base(ex), func(t *testing.T) {
@@ -272,7 +272,7 @@ func TestExamples(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to read %s: %v", ex, err)
 			}
-			vm := gs.New()
+			vm := leia.New()
 			if err := vm.Exec(string(src)); err != nil {
 				t.Fatalf("runtime error: %v", err)
 			}

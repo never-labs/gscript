@@ -1,5 +1,5 @@
 // Package runtime: shape.go implements the Shape (hidden-class) system for
-// GScript tables.  Each unique ordered field sequence maps to a single Shape
+// Leia tables.  Each unique ordered field sequence maps to a single Shape
 // instance shared across all tables with those fields.  Shapes form a
 // transition graph: Shape.Transition(key) returns (and caches) the shape
 // reached by appending key, enabling V8-style O(1) field lookup.
@@ -21,7 +21,7 @@ var (
 	shapeByID      sync.Map     // uint32 → *Shape
 )
 
-// Shape is an immutable hidden-class descriptor for a GScript table.
+// Shape is an immutable hidden-class descriptor for a Leia table.
 // All tables that have the same fields in the same insertion order share a
 // single Shape instance.
 type Shape struct {

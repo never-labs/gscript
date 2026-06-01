@@ -34,8 +34,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/never-labs/gscript/internal/runtime"
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/runtime"
+	"github.com/never-labs/leia/internal/vm"
 )
 
 // inlineMaxCalleeSize is the maximum bytecode count for a callee to be
@@ -128,7 +128,7 @@ func NewTieringManager() *TieringManager {
 		profileCache:       make(map[*vm.FuncProto]FuncProfile),
 		// R162: cache env vars once to keep hot paths free of syscalls.
 		envR154Trace:     os.Getenv("R154_TRACE") == "1",
-		envTier2NoFilter: os.Getenv("GSCRIPT_TIER2_NO_FILTER") == "1",
+		envTier2NoFilter: os.Getenv("LEIA_TIER2_NO_FILTER") == "1",
 		policy:           PromotionPolicy{},
 		recompile:        Tier2RecompilePolicy{},
 	}

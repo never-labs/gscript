@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/never-labs/gscript/internal/stdlib/catalog"
+	"github.com/never-labs/leia/internal/stdlib/catalog"
 )
 
 func TestStdlibContractDocumentsRuntimeModules(t *testing.T) {

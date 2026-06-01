@@ -123,5 +123,5 @@ The stale comment ("mandelbrot LoopDepth=1, called 1000x") survived because nobo
 
 *Previous: [The Missing Fast Paths](/24-the-missing-fast-paths)*
 
-*This is post 25 in the [GScript JIT series](https://jxwr.github.io/gscript/).
+*This is post 25 in the [Leia JIT series](https://jxwr.github.io/leia/).
 All numbers from a single-thread ARM64 Apple Silicon machine.*

@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/never-labs/gscript/internal/runtime"
-	"github.com/never-labs/gscript/internal/stdlibrt"
+	"github.com/never-labs/leia/internal/runtime"
+	"github.com/never-labs/leia/internal/stdlibrt"
 )
 
 func TestBuildFSWithPolicyReadGate(t *testing.T) {
@@ -32,15 +32,15 @@ func TestBuildNetWithPolicyNetworkGate(t *testing.T) {
 }
 
 func TestBuildOSWithPolicyEnvironmentAllowlist(t *testing.T) {
-	t.Setenv("GSCRIPT_STDLIBRT_HOST_IO_ALLOWED", "yes")
+	t.Setenv("LEIA_STDLIBRT_HOST_IO_ALLOWED", "yes")
 	lib := BuildOSWithPolicy(stdlibrt.HostOptions{
 		EnvironmentRead: func() bool { return true },
 		EnvironmentAllowed: func(name string) bool {
-			return name == "GSCRIPT_STDLIBRT_HOST_IO_ALLOWED"
+			return name == "LEIA_STDLIBRT_HOST_IO_ALLOWED"
 		},
 	})
 	getenv := lib.RawGetString("getenv").GoFunction()
-	got, err := getenv.Fn([]runtime.Value{runtime.StringValue("GSCRIPT_STDLIBRT_HOST_IO_ALLOWED")})
+	got, err := getenv.Fn([]runtime.Value{runtime.StringValue("LEIA_STDLIBRT_HOST_IO_ALLOWED")})
 	if err != nil || len(got) != 1 || got[0].Str() != "yes" {
 		t.Fatalf("allowed getenv = %v, %v; want yes", got, err)
 	}

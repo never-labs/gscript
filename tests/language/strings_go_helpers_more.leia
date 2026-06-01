@@ -1,0 +1,19 @@
+print("case:strings_go_helpers_more")
+
+parts := string.split("a::b::c", "::")
+assert(#parts == 3 && parts[1] == "a" && parts[3] == "c")
+
+chars := string.split("go", "")
+assert(#chars == 2 && chars[1] == "g" && chars[2] == "o")
+
+assert(string.trim("  hi\n") == "hi")
+assert(string.trimLeft("..hi..", ".") == "hi..")
+assert(string.trimRight("..hi..", ".") == "..hi")
+assert(string.replaceAll("go go", "go", "run") == "run run")
+assert(string.join({"a", "b", "c"}, "/") == "a/b/c")
+assert(string.title("hello leia") == "Hello Leia")
+assert(string.padLeft("7", 3, "0") == "007")
+assert(string.padRight("go", 4, ".") == "go..")
+assert(string.isNumeric("-42") && string.isNumeric("3.14") && !string.isNumeric("x7"))
+
+print("ok")

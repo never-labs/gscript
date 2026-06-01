@@ -2,7 +2,7 @@
 # Focused Tier 2 diagnostic runner.
 #
 # Runs domain benchmarks in VM mode, normal JIT mode, and with
-# GSCRIPT_TIER2_NO_FILTER=1, preserving enough output to catch both
+# LEIA_TIER2_NO_FILTER=1, preserving enough output to catch both
 # performance changes and "faster but wrong" checksum/output changes.
 #
 # Usage:
@@ -13,12 +13,12 @@ set -uo pipefail
 cd "$(dirname "$0")/.."
 
 TMP_BASE="${TMPDIR:-/tmp}"
-GSCRIPT_BIN="$(mktemp "${TMP_BASE%/}/gscript_diag_tier2.XXXXXX")"
-RESULTS_DIR="$(mktemp -d "${TMP_BASE%/}/gscript_diag_tier2_results.XXXXXX")"
+LEIA_BIN="$(mktemp "${TMP_BASE%/}/leia_diag_tier2.XXXXXX")"
+RESULTS_DIR="$(mktemp -d "${TMP_BASE%/}/leia_diag_tier2_results.XXXXXX")"
 TIMEOUT_SEC="${TIMEOUT_SEC:-60}"
 
 cleanup() {
-    rm -f "$GSCRIPT_BIN"
+    rm -f "$LEIA_BIN"
     rm -rf "$RESULTS_DIR"
 }
 trap cleanup EXIT
@@ -102,7 +102,7 @@ extract_failures() {
     ' "$file" | tr '\n' ';' | sed 's/;$/ /; s/|/\\|/g'
 }
 
-if ! go build -o "$GSCRIPT_BIN" ./cmd/gscript 2>&1; then
+if ! go build -o "$LEIA_BIN" ./cmd/leia 2>&1; then
     echo "ERROR: build failed" >&2
     exit 1
 fi
@@ -120,12 +120,12 @@ printf "| %-22s | %-9s | %-9s | %-10s | %-9s | %-45s | %-55s |\n" \
 
 for bench in $BENCHMARKS; do
     if [[ "$bench" == */* ]]; then
-        file="benchmarks/${bench}.gs"
+        file="benchmarks/${bench}.leia"
     else
         file=""
         for group in numeric recursion table calls string concurrency data app control; do
-            if [[ -f "benchmarks/$group/${bench}.gs" ]]; then
-                file="benchmarks/$group/${bench}.gs"
+            if [[ -f "benchmarks/$group/${bench}.leia" ]]; then
+                file="benchmarks/$group/${bench}.leia"
                 break
             fi
         done
@@ -140,13 +140,13 @@ for bench in $BENCHMARKS; do
         out="$RESULTS_DIR/${bench}_${mode}.out"
         case "$mode" in
             vm)
-                run_with_timeout "$TIMEOUT_SEC" "$GSCRIPT_BIN" -vm "$file" >"$out" 2>&1
+                run_with_timeout "$TIMEOUT_SEC" "$LEIA_BIN" -vm "$file" >"$out" 2>&1
                 ;;
             no-filter)
-                GSCRIPT_TIER2_NO_FILTER=1 run_with_timeout "$TIMEOUT_SEC" "$GSCRIPT_BIN" -jit -jit-stats "$file" >"$out" 2>&1
+                LEIA_TIER2_NO_FILTER=1 run_with_timeout "$TIMEOUT_SEC" "$LEIA_BIN" -jit -jit-stats "$file" >"$out" 2>&1
                 ;;
             default)
-                run_with_timeout "$TIMEOUT_SEC" "$GSCRIPT_BIN" -jit -jit-stats "$file" >"$out" 2>&1
+                run_with_timeout "$TIMEOUT_SEC" "$LEIA_BIN" -jit -jit-stats "$file" >"$out" 2>&1
                 ;;
         esac
         ec=$?

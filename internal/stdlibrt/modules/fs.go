@@ -6,9 +6,9 @@ import (
 	"os"
 	"path/filepath"
 
-	hostfs "github.com/never-labs/gscript/internal/stdlib/fs"
-	"github.com/never-labs/gscript/internal/stdlibrt"
-	"github.com/never-labs/gscript/internal/support/hostpath"
+	hostfs "github.com/never-labs/leia/internal/stdlib/fs"
+	"github.com/never-labs/leia/internal/stdlibrt"
+	"github.com/never-labs/leia/internal/support/hostpath"
 )
 
 func resolveSandboxPath(root, path string) (string, error) {

@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/leia/internal/runtime"
 
-	stdtime "github.com/never-labs/gscript/internal/stdlib/time"
+	stdtime "github.com/never-labs/leia/internal/stdlib/time"
 )
 
 var timeTableCtor = runtime.NewSmallTableCtorN([]string{
@@ -23,7 +23,7 @@ var timeTableCtor = runtime.NewSmallTableCtorN([]string{
 	"tz",
 })
 
-// goTimeToTable converts a Go time.Time to a GScript time table.
+// goTimeToTable converts a Go time.Time to a Leia time table.
 func goTimeToTable(t time.Time) *runtime.Table {
 	// unix timestamp as float64 with nanosecond precision
 	unix := float64(t.Unix()) + float64(t.Nanosecond())/1e9
@@ -44,7 +44,7 @@ func goTimeToTable(t time.Time) *runtime.Table {
 	return runtime.NewTableFromCtorNNonNilCache(&timeTableCtor, vals[:])
 }
 
-// tableToGoTime converts a GScript time table runtime.Value to a Go time.Time.
+// tableToGoTime converts a Leia time table runtime.Value to a Go time.Time.
 func tableToGoTime(v runtime.Value) (time.Time, error) {
 	if !v.IsTable() {
 		return time.Time{}, fmt.Errorf("expected time table, got %s", v.TypeName())

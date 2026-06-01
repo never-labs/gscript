@@ -5,7 +5,7 @@ package tests_test
 import (
 	"testing"
 
-	gs "github.com/never-labs/gscript"
+	leia "github.com/never-labs/leia"
 )
 
 // TestJIT_SideExit_TableOps tests that table operations cause JIT side-exits
@@ -22,8 +22,8 @@ for i := 1; i <= 100; i++ {
 }
 result := sum
 `
-	vmResult := runAndGet(t, src, "result", gs.WithVM())
-	jitResult := runAndGet(t, src, "result", gs.WithJIT())
+	vmResult := runAndGet(t, src, "result", leia.WithVM())
+	jitResult := runAndGet(t, src, "result", leia.WithJIT())
 
 	// sum of squares 1..100 = 100*101*201/6 = 338350
 	expected := int64(338350)
@@ -50,8 +50,8 @@ for i := 1; i <= 50; i++ {
 }
 result := sum
 `
-	vmResult := runAndGet(t, src, "result", gs.WithVM())
-	jitResult := runAndGet(t, src, "result", gs.WithJIT())
+	vmResult := runAndGet(t, src, "result", leia.WithVM())
+	jitResult := runAndGet(t, src, "result", leia.WithJIT())
 
 	// sum of 2*i for i=1..50 = 2 * (50*51/2) = 2550
 	expected := int64(2550)
@@ -72,8 +72,8 @@ for i := 0; i < 50; i++ {
 }
 result := #s
 `
-	vmResult := runAndGet(t, src, "result", gs.WithVM())
-	jitResult := runAndGet(t, src, "result", gs.WithJIT())
+	vmResult := runAndGet(t, src, "result", leia.WithVM())
+	jitResult := runAndGet(t, src, "result", leia.WithJIT())
 
 	expected := int64(50)
 	if vmResult != expected {

@@ -5,7 +5,7 @@ package methodjit
 import (
 	"fmt"
 
-	"github.com/never-labs/gscript/internal/jit"
+	"github.com/never-labs/leia/internal/jit"
 )
 
 func (ec *emitContext) emitCallSiteRuntimeSpecializationOpExitIfEligible(instr *Instr) bool {

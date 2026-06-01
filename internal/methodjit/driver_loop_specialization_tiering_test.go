@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/vm"
 )
 
 const rawIntNestedTieringSource = `
@@ -91,7 +91,7 @@ func TestDriverLoopRuntimeSpecializationTieringUsesVMCapability(t *testing.T) {
 }
 
 func TestDriverLoopRuntimeSpecializationTieringKeepsDensePairwiseLoopOnVMRoute(t *testing.T) {
-	src, err := os.ReadFile(filepath.Join("..", "..", "benchmarks", "numeric", "nbody_dense.gs"))
+	src, err := os.ReadFile(filepath.Join("..", "..", "benchmarks", "numeric", "nbody_dense.leia"))
 	if err != nil {
 		t.Fatalf("read nbody_dense benchmark: %v", err)
 	}

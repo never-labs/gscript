@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/never-labs/gscript/benchmarks/layoutbench/report"
+	"github.com/never-labs/leia/benchmarks/layoutbench/report"
 )
 
 func main() {

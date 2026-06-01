@@ -5,9 +5,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/never-labs/gscript/internal/lexer"
-	"github.com/never-labs/gscript/internal/parser"
-	"github.com/never-labs/gscript/internal/stdlibrt"
+	"github.com/never-labs/leia/internal/lexer"
+	"github.com/never-labs/leia/internal/parser"
+	"github.com/never-labs/leia/internal/stdlibrt"
 )
 
 func execOSProgram(t *testing.T, interp *Interpreter, src string) error {
@@ -49,7 +49,7 @@ func newCoreWithOSModule() *Interpreter {
 }
 
 func TestOSEnvironReturnsEnvironmentTable(t *testing.T) {
-	t.Setenv("GSCRIPT_OS_ENVIRON_TEST", "present")
+	t.Setenv("LEIA_OS_ENVIRON_TEST", "present")
 
 	results, err := callOSFunction(t, BuildOS(), "environ")
 	if err != nil {
@@ -58,14 +58,14 @@ func TestOSEnvironReturnsEnvironmentTable(t *testing.T) {
 	if len(results) != 1 || !results[0].IsTable() {
 		t.Fatalf("os.environ returned %v, want table", results)
 	}
-	got := results[0].Table().RawGetString("GSCRIPT_OS_ENVIRON_TEST")
+	got := results[0].Table().RawGetString("LEIA_OS_ENVIRON_TEST")
 	if !got.IsString() || got.Str() != "present" {
-		t.Fatalf("GSCRIPT_OS_ENVIRON_TEST = %v, want present", got)
+		t.Fatalf("LEIA_OS_ENVIRON_TEST = %v, want present", got)
 	}
 }
 
 func TestOSEnvironmentReadCapabilityRequired(t *testing.T) {
-	t.Setenv("GSCRIPT_OS_READ_DISABLED_TEST", "secret")
+	t.Setenv("LEIA_OS_READ_DISABLED_TEST", "secret")
 	interp := newCoreWithOSModule()
 	interp.SetEnvironmentCapabilities(false, true)
 
@@ -73,9 +73,9 @@ func TestOSEnvironmentReadCapabilityRequired(t *testing.T) {
 		name string
 		src  string
 	}{
-		{name: "getenv", src: `x := os.getenv("GSCRIPT_OS_READ_DISABLED_TEST")`},
+		{name: "getenv", src: `x := os.getenv("LEIA_OS_READ_DISABLED_TEST")`},
 		{name: "environ", src: `x := os.environ()`},
-		{name: "expand", src: `x := os.expand("$GSCRIPT_OS_READ_DISABLED_TEST")`},
+		{name: "expand", src: `x := os.expand("$LEIA_OS_READ_DISABLED_TEST")`},
 	} {
 		err := execOSProgram(t, interp, tc.src)
 		if err == nil || !strings.Contains(err.Error(), "environment read access disabled") {
@@ -83,21 +83,21 @@ func TestOSEnvironmentReadCapabilityRequired(t *testing.T) {
 		}
 	}
 
-	if err := execOSProgram(t, interp, `ok := os.setenv("GSCRIPT_OS_READ_DISABLED_WRITE_OK", "yes")`); err != nil {
+	if err := execOSProgram(t, interp, `ok := os.setenv("LEIA_OS_READ_DISABLED_WRITE_OK", "yes")`); err != nil {
 		t.Fatalf("setenv with write capability enabled failed: %v", err)
 	}
-	if got := os.Getenv("GSCRIPT_OS_READ_DISABLED_WRITE_OK"); got != "yes" {
-		t.Fatalf("GSCRIPT_OS_READ_DISABLED_WRITE_OK = %q, want yes", got)
+	if got := os.Getenv("LEIA_OS_READ_DISABLED_WRITE_OK"); got != "yes" {
+		t.Fatalf("LEIA_OS_READ_DISABLED_WRITE_OK = %q, want yes", got)
 	}
-	t.Cleanup(func() { _ = os.Unsetenv("GSCRIPT_OS_READ_DISABLED_WRITE_OK") })
+	t.Cleanup(func() { _ = os.Unsetenv("LEIA_OS_READ_DISABLED_WRITE_OK") })
 }
 
 func TestOSEnvironmentWriteCapabilityRequired(t *testing.T) {
-	t.Setenv("GSCRIPT_OS_WRITE_DISABLED_TEST", "visible")
+	t.Setenv("LEIA_OS_WRITE_DISABLED_TEST", "visible")
 	interp := newCoreWithOSModule()
 	interp.SetEnvironmentCapabilities(true, false)
 
-	if err := execOSProgram(t, interp, `x := os.getenv("GSCRIPT_OS_WRITE_DISABLED_TEST")`); err != nil {
+	if err := execOSProgram(t, interp, `x := os.getenv("LEIA_OS_WRITE_DISABLED_TEST")`); err != nil {
 		t.Fatalf("getenv with read capability enabled failed: %v", err)
 	}
 	if got := interp.GetGlobal("x"); !got.IsString() || got.Str() != "visible" {
@@ -108,8 +108,8 @@ func TestOSEnvironmentWriteCapabilityRequired(t *testing.T) {
 		name string
 		src  string
 	}{
-		{name: "setenv", src: `ok := os.setenv("GSCRIPT_OS_WRITE_DISABLED_SET", "no")`},
-		{name: "unsetenv", src: `ok := os.unsetenv("GSCRIPT_OS_WRITE_DISABLED_TEST")`},
+		{name: "setenv", src: `ok := os.setenv("LEIA_OS_WRITE_DISABLED_SET", "no")`},
+		{name: "unsetenv", src: `ok := os.unsetenv("LEIA_OS_WRITE_DISABLED_TEST")`},
 	} {
 		err := execOSProgram(t, interp, tc.src)
 		if err == nil || !strings.Contains(err.Error(), "environment write access disabled") {

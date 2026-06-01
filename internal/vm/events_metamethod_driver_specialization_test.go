@@ -4,11 +4,11 @@ import (
 	"os"
 	"testing"
 
-	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/leia/internal/runtime"
 )
 
 func TestEventsMetamethodDriverRuntimeSpecialization(t *testing.T) {
-	src, err := os.ReadFile("../../benchmarks/table/events_metamethod.gs")
+	src, err := os.ReadFile("../../benchmarks/table/events_metamethod.leia")
 	if err != nil {
 		t.Fatal(err)
 	}

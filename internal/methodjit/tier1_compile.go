@@ -23,8 +23,8 @@ package methodjit
 import (
 	"fmt"
 
-	"github.com/never-labs/gscript/internal/jit"
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/jit"
+	"github.com/never-labs/leia/internal/vm"
 )
 
 // BaselineFunc holds the generated native code for a baseline-compiled function.

@@ -17,9 +17,9 @@ python3 benchmarks/strict_guard.py --runs=3 --warmup=1 --timeout=90 \
 
 The strict pass discovers the full benchmark surface:
 
-- `benchmarks/suite/*.gs`
+- `benchmarks/suite/*.leia`
 - `benchmarks/extended/manifest.json`
-- `benchmarks/variants/*.gs`
+- `benchmarks/variants/*.leia`
 
 For each benchmark it runs VM, default JIT, no-filter JIT, and LuaJIT when a
 matching Lua reference exists and `luajit` is in `PATH`. The report includes
@@ -52,7 +52,7 @@ bash benchmarks/regression_guard.sh --runs=3 \
   --markdown benchmarks/data/regression_guard_latest.md
 ```
 
-The command builds `cmd/gscript` once, runs every benchmark sample in isolation,
+The command builds `cmd/leia` once, runs every benchmark sample in isolation,
 prints the full table, and exits non-zero after the table if any default-JIT
 benchmark is more than `--threshold` percent slower than
 `benchmarks/data/baseline.json`.

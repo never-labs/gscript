@@ -42,25 +42,25 @@ func Download(path string, opts DownloadOptions) DownloadReport {
 	abs, err := filepath.Abs(path)
 	report := DownloadReport{SchemaVersion: 1}
 	if err != nil {
-		report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "GS9101", Message: err.Error()})
+		report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "LEIA9101", Message: err.Error()})
 		return report
 	}
 	manifest, manifestPath, err := ReadFileWithPath(abs)
 	report.Manifest = manifestPath
 	if err != nil {
-		report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "GS9103", Message: err.Error(), File: manifestPath})
+		report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "LEIA9103", Message: err.Error(), File: manifestPath})
 		return report
 	}
 	cacheDir, err := moduleCacheDir(opts.CacheDir)
 	if err != nil {
-		report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "GS9110", Message: err.Error()})
+		report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "LEIA9110", Message: err.Error()})
 		return report
 	}
 	report.CacheDir = cacheDir
 	for _, req := range manifest.Require {
 		entry, err := downloadRequirement(req.Path, req.Version, cacheDir, opts)
 		if err != nil {
-			report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "GS9111", Message: err.Error()})
+			report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "LEIA9111", Message: err.Error()})
 			continue
 		}
 		report.Modules = append(report.Modules, entry)
@@ -71,7 +71,7 @@ func Download(path string, opts DownloadOptions) DownloadReport {
 		if len(diags) == 0 {
 			sumPath := filepath.Join(abs, SumFileName)
 			if err := updateSumFile(sumPath, entries); err != nil {
-				report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "GS9109", Message: err.Error(), File: sumPath})
+				report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "LEIA9109", Message: err.Error(), File: sumPath})
 			}
 		}
 	}
@@ -183,14 +183,14 @@ func ModuleCacheDir(override string) (string, error) {
 	if override != "" {
 		return filepath.Abs(override)
 	}
-	if env := os.Getenv("GSCRIPT_CACHE"); env != "" {
+	if env := os.Getenv("LEIA_CACHE"); env != "" {
 		return filepath.Abs(env)
 	}
 	base, err := os.UserCacheDir()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(base, "gscript", "mod"), nil
+	return filepath.Join(base, "leia", "mod"), nil
 }
 
 func fetchFile(url, path string, client *http.Client) error {

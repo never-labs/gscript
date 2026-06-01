@@ -1,4 +1,4 @@
-package gscript_test
+package leia_test
 
 import (
 	"path/filepath"

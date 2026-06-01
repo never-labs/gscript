@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/leia/internal/runtime"
 )
 
 type stdlibHostDriverSpec struct {

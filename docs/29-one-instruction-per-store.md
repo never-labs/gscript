@@ -67,7 +67,7 @@ b.le loop
 
 Four instructions.
 
-The fundamental issue: GScript's Method JIT validates the table on every access because it generates code per-block, not per-trace. The emitter doesn't know that the table hasn't changed since the last iteration. Each iteration re-checks type, pointer, metatable, and kind — all invariant.
+The fundamental issue: Leia's Method JIT validates the table on every access because it generates code per-block, not per-trace. The emitter doesn't know that the table hasn't changed since the last iteration. Each iteration re-checks type, pointer, metatable, and kind — all invariant.
 
 For GetField, we solved this with `shapeVerified` (round 17) — after verifying a table's shape once, subsequent GetField ops in the same block skip the shape check. But GetTable has no equivalent mechanism.
 

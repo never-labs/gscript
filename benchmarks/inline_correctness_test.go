@@ -3,11 +3,11 @@ package benchmarks
 import (
 	"testing"
 
-	gs "github.com/never-labs/gscript"
+	leia "github.com/never-labs/leia"
 )
 
 func TestInlineCallCorrectness(t *testing.T) {
-	v := gs.New(gs.WithJIT())
+	v := leia.New(leia.WithJIT())
 	err := v.Exec(`
 func add(a, b) {
     return a + b
@@ -41,7 +41,7 @@ for i := 1; i <= 15; i++ { callMany() }
 }
 
 func TestInlineCallSubCorrectness(t *testing.T) {
-	v := gs.New(gs.WithJIT())
+	v := leia.New(leia.WithJIT())
 	err := v.Exec(`
 func sub(a, b) {
     return a - b
@@ -75,7 +75,7 @@ for i := 1; i <= 15; i++ { callManySub() }
 }
 
 func TestInlineCallMulCorrectness(t *testing.T) {
-	v := gs.New(gs.WithJIT())
+	v := leia.New(leia.WithJIT())
 	err := v.Exec(`
 func mul(a, b) {
     return a * b

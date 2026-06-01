@@ -1,18 +1,18 @@
-package gscript_test
+package leia_test
 
 import (
 	"path/filepath"
 	"runtime"
 	"testing"
 
-	gs "github.com/never-labs/gscript"
-	"github.com/never-labs/gscript/llm"
+	leia "github.com/never-labs/leia"
+	"github.com/never-labs/leia/llm"
 )
 
-func llmScenarioOptions(provider llm.Provider, opts ...gs.Option) []gs.Option {
-	base := []gs.Option{
-		gs.WithLibs(gs.LibString | gs.LibLLM),
-		gs.WithLLMProvider(provider),
+func llmScenarioOptions(provider llm.Provider, opts ...leia.Option) []leia.Option {
+	base := []leia.Option{
+		leia.WithLibs(leia.LibString | leia.LibLLM),
+		leia.WithLLMProvider(provider),
 	}
 	return append(base, opts...)
 }

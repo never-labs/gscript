@@ -1,14 +1,14 @@
-package gscript_test
+package leia_test
 
 import (
 	"errors"
 	"testing"
 
-	gs "github.com/never-labs/gscript"
+	leia "github.com/never-labs/leia"
 )
 
 func TestWithMaxNativeCallsLimitsInterpreterHostCalls(t *testing.T) {
-	vm := gs.New(gs.WithMaxNativeCalls(3))
+	vm := leia.New(leia.WithMaxNativeCalls(3))
 	var calls int64
 	if err := vm.RegisterFunc("tick", func() int64 {
 		calls++
@@ -24,7 +24,7 @@ func TestWithMaxNativeCallsLimitsInterpreterHostCalls(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected native call budget error")
 	}
-	var budgetErr *gs.BudgetError
+	var budgetErr *leia.BudgetError
 	if !errors.As(err, &budgetErr) {
 		t.Fatalf("expected BudgetError, got %T %v", err, err)
 	}
@@ -37,7 +37,7 @@ func TestWithMaxNativeCallsLimitsInterpreterHostCalls(t *testing.T) {
 }
 
 func TestWithMaxCallDepthLimitsInterpreterRecursion(t *testing.T) {
-	vm := gs.New(gs.WithMaxCallDepth(8))
+	vm := leia.New(leia.WithMaxCallDepth(8))
 	err := vm.Exec(`
 		func recurse(n) {
 			return recurse(n + 1)
@@ -47,7 +47,7 @@ func TestWithMaxCallDepthLimitsInterpreterRecursion(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected call depth budget error")
 	}
-	var budgetErr *gs.BudgetError
+	var budgetErr *leia.BudgetError
 	if !errors.As(err, &budgetErr) {
 		t.Fatalf("expected BudgetError, got %T %v", err, err)
 	}
@@ -57,7 +57,7 @@ func TestWithMaxCallDepthLimitsInterpreterRecursion(t *testing.T) {
 }
 
 func TestWithMaxNativeCallsLimitsBytecodeHostCalls(t *testing.T) {
-	vm := gs.New(gs.WithVM(), gs.WithMaxNativeCalls(3))
+	vm := leia.New(leia.WithVM(), leia.WithMaxNativeCalls(3))
 	var calls int64
 	if err := vm.RegisterFunc("tick", func() int64 {
 		calls++
@@ -73,7 +73,7 @@ func TestWithMaxNativeCallsLimitsBytecodeHostCalls(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected native call budget error")
 	}
-	var budgetErr *gs.BudgetError
+	var budgetErr *leia.BudgetError
 	if !errors.As(err, &budgetErr) {
 		t.Fatalf("expected BudgetError, got %T %v", err, err)
 	}
@@ -86,7 +86,7 @@ func TestWithMaxNativeCallsLimitsBytecodeHostCalls(t *testing.T) {
 }
 
 func TestWithMaxNativeCallsLimitsBytecodeFastStdlibCalls(t *testing.T) {
-	vm := gs.New(gs.WithVM(), gs.WithMaxNativeCalls(2))
+	vm := leia.New(leia.WithVM(), leia.WithMaxNativeCalls(2))
 	err := vm.Exec(`
 		s := "abcdef"
 		for i := 1; i <= 4; i++ {
@@ -96,7 +96,7 @@ func TestWithMaxNativeCallsLimitsBytecodeFastStdlibCalls(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected native call budget error")
 	}
-	var budgetErr *gs.BudgetError
+	var budgetErr *leia.BudgetError
 	if !errors.As(err, &budgetErr) {
 		t.Fatalf("expected BudgetError, got %T %v", err, err)
 	}
@@ -106,7 +106,7 @@ func TestWithMaxNativeCallsLimitsBytecodeFastStdlibCalls(t *testing.T) {
 }
 
 func TestWithMaxCallDepthLimitsBytecodeRecursion(t *testing.T) {
-	vm := gs.New(gs.WithVM(), gs.WithMaxCallDepth(8))
+	vm := leia.New(leia.WithVM(), leia.WithMaxCallDepth(8))
 	err := vm.Exec(`
 		func recurse(n) {
 			return recurse(n + 1)
@@ -116,7 +116,7 @@ func TestWithMaxCallDepthLimitsBytecodeRecursion(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected call depth budget error")
 	}
-	var budgetErr *gs.BudgetError
+	var budgetErr *leia.BudgetError
 	if !errors.As(err, &budgetErr) {
 		t.Fatalf("expected BudgetError, got %T %v", err, err)
 	}

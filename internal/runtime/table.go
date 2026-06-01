@@ -23,9 +23,9 @@ const initialStringMapCap = 64
 // table representation.
 const SmallFieldCap = smallFieldCap
 
-// Table is GScript's associative array / object type.
+// Table is Leia's associative array / object type.
 // Tables have an optimized array part for sequential integer keys 1..n,
-// flat slices for small string-keyed tables (most GScript objects),
+// flat slices for small string-keyed tables (most Leia objects),
 // and maps for larger tables.
 //
 // Tables start WITHOUT a mutex (fast single-threaded path). When shared

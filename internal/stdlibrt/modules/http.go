@@ -8,9 +8,9 @@ import (
 	"net/http"
 	"sync"
 
-	hosthttp "github.com/never-labs/gscript/internal/stdlib/http"
-	hostnet "github.com/never-labs/gscript/internal/stdlib/net"
-	"github.com/never-labs/gscript/internal/stdlibrt"
+	hosthttp "github.com/never-labs/leia/internal/stdlib/http"
+	hostnet "github.com/never-labs/leia/internal/stdlib/net"
+	"github.com/never-labs/leia/internal/stdlibrt"
 )
 
 func BuildHTTP(opts stdlibrt.HostOptions) *Table {
@@ -112,7 +112,7 @@ func BuildHTTPWithCallerAndPolicy(call ScriptFunctionCaller, networkAllowed func
 	return t
 }
 
-// buildRequestTable creates a GScript table representing an HTTP request.
+// buildRequestTable creates a Leia table representing an HTTP request.
 func buildRequestTable(r *http.Request, maxHostResult int64) (Value, error) {
 	t := NewTable()
 
@@ -166,14 +166,14 @@ func buildRequestTable(r *http.Request, maxHostResult int64) (Value, error) {
 			if err := json.Unmarshal(body, &data); err != nil {
 				return []Value{NilValue(), StringValue(err.Error())}, nil
 			}
-			return []Value{goToGScript(data)}, nil
+			return []Value{goToLeia(data)}, nil
 		},
 	}))
 
 	return TableValue(t), nil
 }
 
-// buildResponseTable creates a GScript table representing an HTTP response writer.
+// buildResponseTable creates a Leia table representing an HTTP response writer.
 func buildResponseTable(w http.ResponseWriter, r *http.Request) Value {
 	t := NewTable()
 	written := false
@@ -221,7 +221,7 @@ func buildResponseTable(w http.ResponseWriter, r *http.Request) Value {
 				statusSet = true
 			}
 			if len(args) > 0 {
-				data := gscriptToGo(args[0])
+				data := leiaToGo(args[0])
 				jsonBytes, err := json.Marshal(data)
 				if err != nil {
 					return nil, err
@@ -385,7 +385,7 @@ func startHTTPServer(addr string, handler http.Handler, background bool) ([]Valu
 	}
 
 	if !background {
-		fmt.Printf("GScript HTTP server listening on %s\n", ln.Addr().String())
+		fmt.Printf("Leia HTTP server listening on %s\n", ln.Addr().String())
 		err := server.Serve(ln)
 		if err == http.ErrServerClosed {
 			return nil, nil
@@ -476,8 +476,8 @@ func (h *httpServerHandle) shutdown() error {
 	return h.server.Shutdown(context.Background())
 }
 
-// goToGScript converts Go values (from JSON unmarshal) to GScript Values.
-func goToGScript(v interface{}) Value {
+// goToLeia converts Go values (from JSON unmarshal) to Leia Values.
+func goToLeia(v interface{}) Value {
 	switch val := v.(type) {
 	case nil:
 		return NilValue()
@@ -490,13 +490,13 @@ func goToGScript(v interface{}) Value {
 	case []interface{}:
 		t := NewTable()
 		for i, item := range val {
-			t.RawSet(IntValue(int64(i+1)), goToGScript(item))
+			t.RawSet(IntValue(int64(i+1)), goToLeia(item))
 		}
 		return TableValue(t)
 	case map[string]interface{}:
 		t := NewTable()
 		for k, item := range val {
-			t.RawSet(StringValue(k), goToGScript(item))
+			t.RawSet(StringValue(k), goToLeia(item))
 		}
 		return TableValue(t)
 	default:
@@ -504,8 +504,8 @@ func goToGScript(v interface{}) Value {
 	}
 }
 
-// gscriptToGo converts GScript Values to Go values (for JSON marshal).
-func gscriptToGo(v Value) interface{} {
+// leiaToGo converts Leia Values to Go values (for JSON marshal).
+func leiaToGo(v Value) interface{} {
 	switch v.Type() {
 	case TypeNil:
 		return nil
@@ -524,7 +524,7 @@ func gscriptToGo(v Value) interface{} {
 		if length > 0 {
 			arr := make([]interface{}, length)
 			for i := 1; i <= length; i++ {
-				arr[i-1] = gscriptToGo(t.RawGet(IntValue(int64(i))))
+				arr[i-1] = leiaToGo(t.RawGet(IntValue(int64(i))))
 			}
 			return arr
 		}
@@ -536,7 +536,7 @@ func gscriptToGo(v Value) interface{} {
 			if !ok {
 				break
 			}
-			m[k.String()] = gscriptToGo(val)
+			m[k.String()] = leiaToGo(val)
 			key = k
 		}
 		return m

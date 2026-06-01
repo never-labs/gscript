@@ -54,8 +54,8 @@ class ScriptEntrypointConsistencyTest(unittest.TestCase):
             with self.subTest(script=script):
                 text = (ROOT / "scripts" / script).read_text()
                 self.assertIn(expected, text)
-                self.assertNotIn("github.com/gscript/gscript", text)
-                self.assertNotIn("github.com/Never-Labs/gscript", text)
+                self.assertNotIn("github.com/leia/leia", text)
+                self.assertNotIn("github.com/Never-Labs/leia", text)
 
     def test_production_check_full_plan_avoids_go_test_duplicates(self):
         text = (ROOT / "scripts" / "production_check.sh").read_text()

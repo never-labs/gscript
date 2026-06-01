@@ -1,6 +1,6 @@
-// Package nanbox implements NaN-boxed 8-byte Values for GScript Season 2.
+// Package nanbox implements NaN-boxed 8-byte Values for Leia Season 2.
 //
-// Every GScript value (float64, int48, bool, nil, pointer) is packed into a
+// Every Leia value (float64, int48, bool, nil, pointer) is packed into a
 // single uint64 using the quiet-NaN payload space of IEEE 754 doubles.
 //
 // Encoding layout:

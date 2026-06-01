@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/never-labs/gscript/internal/runtime"
-	"github.com/never-labs/gscript/llm"
-	"github.com/never-labs/gscript/llm/anthropic"
-	"github.com/never-labs/gscript/llm/openai"
+	"github.com/never-labs/leia/internal/runtime"
+	"github.com/never-labs/leia/llm"
+	"github.com/never-labs/leia/llm/anthropic"
+	"github.com/never-labs/leia/llm/openai"
 )
 
 type providerAdapter struct {

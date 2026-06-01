@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Benchmark comparison and regression guard for GScript.
+"""Benchmark comparison and regression guard for Leia.
 
 Runs domain benchmarks in VM, default JIT, no-filter JIT, and optional LuaJIT
 modes. Each benchmark/mode is isolated so a timeout or crash records a row but
@@ -200,17 +200,17 @@ def run_command(cmd: list[str], timeout: int, env: dict[str, str] | None = None)
 def resolve_benchmark(root: Path, bench: str) -> tuple[str, Path, Path | None]:
     identity = discovery.resolve_script_identity(root, bench, BENCHMARK_GROUPS)
     if identity is None:
-        return bench, root / "benchmarks" / "__missing__" / f"{bench}.gs", None
-    group, name, gs = identity
+        return bench, root / "benchmarks" / "__missing__" / f"{bench}.leia", None
+    group, name, leia = identity
     lua = root / "benchmarks" / "lua_ref" / group / f"{name}.lua"
-    return f"{group}/{name}", gs, lua if lua.exists() else None
+    return f"{group}/{name}", leia, lua if lua.exists() else None
 
 
 def run_mode(
     mode: str,
     bench: str,
     root: Path,
-    gscript_bin: Path,
+    leia_bin: Path,
     luajit_bin: str | None,
     runs: int,
     timeout: int,
@@ -230,12 +230,12 @@ def run_mode(
             return ModeResult(status="missing")
         env = os.environ.copy()
         if mode == "vm":
-            cmd = [str(gscript_bin), "-vm", str(script_file)]
+            cmd = [str(leia_bin), "-vm", str(script_file)]
         elif mode == "default":
-            cmd = [str(gscript_bin), "-jit", "-jit-stats", "-exit-stats", str(script_file)]
+            cmd = [str(leia_bin), "-jit", "-jit-stats", "-exit-stats", str(script_file)]
         elif mode == "no_filter":
-            env["GSCRIPT_TIER2_NO_FILTER"] = "1"
-            cmd = [str(gscript_bin), "-jit", "-jit-stats", "-exit-stats", str(script_file)]
+            env["LEIA_TIER2_NO_FILTER"] = "1"
+            cmd = [str(leia_bin), "-jit", "-jit-stats", "-exit-stats", str(script_file)]
         else:
             raise ValueError(f"unknown mode: {mode}")
 
@@ -244,8 +244,8 @@ def run_mode(
     return summarize_samples(samples)
 
 
-def build_gscript(root: Path, out: Path) -> None:
-    benchmark_output.build_gscript(root, out)
+def build_leia(root: Path, out: Path) -> None:
+    benchmark_output.build_leia(root, out)
 
 
 def load_baseline(path: Path | None) -> dict[str, float]:
@@ -442,7 +442,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--markdown", type=Path, help="write markdown summary table to this path")
     parser.add_argument("--bench", action="append", help="benchmark to run; repeatable")
     parser.add_argument("--no-luajit", action="store_true", help="skip LuaJIT even when installed")
-    parser.add_argument("--keep-bin", action="store_true", help="keep temporary gscript binary")
+    parser.add_argument("--keep-bin", action="store_true", help="keep temporary leia binary")
     args = parser.parse_args(argv)
 
     if args.runs <= 0:
@@ -454,21 +454,21 @@ def main(argv: list[str] | None = None) -> int:
     benchmarks = args.bench or DEFAULT_BENCHMARKS
     baseline = load_baseline(root / args.baseline if not args.baseline.is_absolute() else args.baseline)
 
-    tempdir = Path(tempfile.mkdtemp(prefix="gscript_bench_guard_"))
-    gscript_bin = tempdir / "gscript"
+    tempdir = Path(tempfile.mkdtemp(prefix="leia_bench_guard_"))
+    leia_bin = tempdir / "leia"
     luajit_bin = None if args.no_luajit else shutil.which("luajit")
 
     started = time.time()
     try:
-        build_gscript(root, gscript_bin)
+        build_leia(root, leia_bin)
         results: list[BenchmarkResult] = []
         for bench in benchmarks:
             bench_id, _script_file, _lua_file = resolve_benchmark(root, bench)
             row = BenchmarkResult(benchmark=bench_id)
-            row.vm = run_mode("vm", bench, root, gscript_bin, luajit_bin, args.runs, args.timeout)
-            row.default = run_mode("default", bench, root, gscript_bin, luajit_bin, args.runs, args.timeout)
-            row.no_filter = run_mode("no_filter", bench, root, gscript_bin, luajit_bin, args.runs, args.timeout)
-            row.luajit = run_mode("luajit", bench, root, gscript_bin, luajit_bin, args.runs, args.timeout)
+            row.vm = run_mode("vm", bench, root, leia_bin, luajit_bin, args.runs, args.timeout)
+            row.default = run_mode("default", bench, root, leia_bin, luajit_bin, args.runs, args.timeout)
+            row.no_filter = run_mode("no_filter", bench, root, leia_bin, luajit_bin, args.runs, args.timeout)
+            row.luajit = run_mode("luajit", bench, root, leia_bin, luajit_bin, args.runs, args.timeout)
 
             base = baseline.get(bench_id)
             row.baseline_seconds = base
@@ -512,7 +512,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1 if any(r.regression for r in results) else 0
     finally:
         if args.keep_bin:
-            print(f"Kept gscript binary: {gscript_bin}")
+            print(f"Kept leia binary: {leia_bin}")
         else:
             shutil.rmtree(tempdir, ignore_errors=True)
 

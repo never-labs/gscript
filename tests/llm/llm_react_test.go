@@ -1,10 +1,10 @@
-package gscript_test
+package leia_test
 
 import (
 	"testing"
 
-	gs "github.com/never-labs/gscript"
-	"github.com/never-labs/gscript/llm"
+	leia "github.com/never-labs/leia"
+	"github.com/never-labs/leia/llm"
 )
 
 func TestLLMReactDispatchLoop(t *testing.T) {
@@ -14,12 +14,12 @@ func TestLLMReactDispatchLoop(t *testing.T) {
 			Calls: []llm.ToolCall{{
 				ID:   "call_1",
 				Tool: "lookup",
-				Args: map[string]any{"name": "gscript"},
+				Args: map[string]any{"name": "leia"},
 			}},
 		},
 		{Status: "final_answer", Text: "done"},
 	}}
-	vm := gs.New(gs.WithLibs(gs.LibString|gs.LibLLM), gs.WithLLMProvider(provider))
+	vm := leia.New(leia.WithLibs(leia.LibString|leia.LibLLM), leia.WithLLMProvider(provider))
 	if err := vm.Exec(`
 lookup := llm.tool("lookup", func(name) {
     return "docs:" .. name, nil
@@ -38,7 +38,7 @@ history_len := #result.history
 	if len(provider.requests) != 2 {
 		t.Fatalf("requests = %d, want 2", len(provider.requests))
 	}
-	if len(provider.requests[1].Messages) != 3 || provider.requests[1].Messages[1].ToolCall == nil || provider.requests[1].Messages[2].Value != "docs:gscript" {
+	if len(provider.requests[1].Messages) != 3 || provider.requests[1].Messages[1].ToolCall == nil || provider.requests[1].Messages[2].Value != "docs:leia" {
 		t.Fatalf("second request messages = %#v", provider.requests[1].Messages)
 	}
 	status, _ := vm.Get("status")
@@ -56,12 +56,12 @@ func TestLLMReactCanWindowHistory(t *testing.T) {
 			Calls: []llm.ToolCall{{
 				ID:   "call_1",
 				Tool: "lookup",
-				Args: map[string]any{"name": "gscript"},
+				Args: map[string]any{"name": "leia"},
 			}},
 		},
 		{Status: "final_answer", Text: "done"},
 	}}
-	vm := gs.New(gs.WithLibs(gs.LibString|gs.LibLLM), gs.WithLLMProvider(provider))
+	vm := leia.New(leia.WithLibs(leia.LibString|leia.LibLLM), leia.WithLLMProvider(provider))
 	if err := vm.Exec(`
 lookup := llm.tool("lookup", func(name) {
     return "docs:" .. name, nil
@@ -80,7 +80,7 @@ status := result.status
 		t.Fatalf("requests = %d, want 2", len(provider.requests))
 	}
 	second := provider.requests[1].Messages
-	if len(second) != 2 || second[0].Role != "assistant" || second[0].ToolCall == nil || second[1].Role != "tool" || second[1].Value != "docs:gscript" {
+	if len(second) != 2 || second[0].Role != "assistant" || second[0].ToolCall == nil || second[1].Role != "tool" || second[1].Value != "docs:leia" {
 		t.Fatalf("second request messages = %#v", second)
 	}
 	status, _ := vm.Get("status")
@@ -96,12 +96,12 @@ func TestLLMReactRetriesTransientToolErrors(t *testing.T) {
 			Calls: []llm.ToolCall{{
 				ID:   "call_1",
 				Tool: "lookup",
-				Args: map[string]any{"name": "gscript"},
+				Args: map[string]any{"name": "leia"},
 			}},
 		},
 		{Status: "final_answer", Text: "done"},
 	}}
-	vm := gs.New(gs.WithLibs(gs.LibString|gs.LibLLM), gs.WithLLMProvider(provider))
+	vm := leia.New(leia.WithLibs(leia.LibString|leia.LibLLM), leia.WithLLMProvider(provider))
 	if err := vm.Exec(`
 attempts := 0
 lookup := llm.tool("lookup", func(name) {
@@ -126,7 +126,7 @@ status := result.status
 	if attempts != int64(2) || status != "done" {
 		t.Fatalf("attempts=%#v status=%#v", attempts, status)
 	}
-	if len(provider.requests) != 2 || len(provider.requests[1].Messages) != 3 || provider.requests[1].Messages[2].Value != "docs:gscript" {
+	if len(provider.requests) != 2 || len(provider.requests[1].Messages) != 3 || provider.requests[1].Messages[2].Value != "docs:leia" {
 		t.Fatalf("requests = %#v", provider.requests)
 	}
 }
@@ -137,10 +137,10 @@ func TestLLMReactFatalToolErrorPropagates(t *testing.T) {
 		Calls: []llm.ToolCall{{
 			ID:   "call_1",
 			Tool: "lookup",
-			Args: map[string]any{"name": "gscript"},
+			Args: map[string]any{"name": "leia"},
 		}},
 	}}
-	vm := gs.New(gs.WithLibs(gs.LibString|gs.LibLLM), gs.WithLLMProvider(provider))
+	vm := leia.New(leia.WithLibs(leia.LibString|leia.LibLLM), leia.WithLLMProvider(provider))
 	if err := vm.Exec(`
 lookup := llm.tool("lookup", func(name) {
     return nil, {kind: "fatal", message: "stop"}

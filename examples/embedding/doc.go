@@ -1,2 +1,2 @@
-// Package embedding contains executable examples for embedding GScript in Go.
+// Package embedding contains executable examples for embedding Leia in Go.
 package embedding

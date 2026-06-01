@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"io"
 
-	basecompress "github.com/never-labs/gscript/internal/stdlib/compress"
+	basecompress "github.com/never-labs/leia/internal/stdlib/compress"
 )
 
 // BuildCompress creates the "compress" standard library table.

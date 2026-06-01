@@ -1,25 +1,25 @@
-# GScript Tooling Roadmap
+# Leia Tooling Roadmap
 
-本文审计 GScript 的生产级工具链现状，并给出缺口、优先级和建议的
+本文审计 Leia 的生产级工具链现状，并给出缺口、优先级和建议的
 CLI/API 形状。范围覆盖 CLI、formatter、linter、package/module 管理、
 test runner、benchmark runner、文档生成、诊断输出、REPL、source map 和 CI
 入口。
 
 ## Executive Summary
 
-GScript 当前最强的工具链资产是运行时/性能诊断：`cmd/gscript` 已提供 JIT
+Leia 当前最强的工具链资产是运行时/性能诊断：`cmd/leia` 已提供 JIT
 开关、profile、Tier 2 统计、runtime path 统计、warm dump、source/PC map
 等生产路径诊断；`benchmarks/` 里也有 `timing_compare.py`、`strict_guard.py`、
 `diagnose.py`、`triage.py` 等成熟 harness。CLI 现在也有最小可用的
-`gscript fmt`、`gscript lint` 和 `gscript test` 子命令入口。
+`leia fmt`、`leia lint` 和 `leia test` 子命令入口。
 
 主要缺口在用户级开发工具：`fmt`/`lint`/`test` 已有脚手架，但 formatter
 仍不是 AST pretty printer，linter 目前只做词法/语法诊断；还没有稳定的
-`gscript bench`、`gscript doc` 子命令；REPL 仍是最小可用；
+`leia bench`、`leia doc` 子命令；REPL 仍是最小可用；
 module 管理只有 `require()` 解析和 `package.loaded` 缓存，没有 manifest、
 lockfile、版本、发布或 dependency graph；CI 没有仓库内统一入口。
 
-生产级路线应避免再增加零散脚本，优先收敛到一个稳定的 `gscript` 子命令
+生产级路线应避免再增加零散脚本，优先收敛到一个稳定的 `leia` 子命令
 界面，同时保留现有 Python/shell harness 作为底层实现，逐步迁移公共输出
 schema。
 
@@ -35,7 +35,7 @@ schema。
 
 ### Current State
 
-`cmd/gscript/main.go` 是主入口，使用 Go `flag` 包提供平铺 flags 和少量
+`cmd/leia/main.go` 是主入口，使用 Go `flag` 包提供平铺 flags 和少量
 子命令：
 
 - `-e` 执行字符串。
@@ -49,55 +49,55 @@ schema。
   `-tier2-perf-stats-json`、`-tier2-spec-state-json`、
   `-tier2-spec-worklist-json`、`-jit-op-audit`、`-jit-op-audit-json`、
   `-coroutine-stats`、`-runtime-path-stats`、`-runtime-path-stats-json`。
-- `gscript test [--format=text|json] [--list] [--seed SEED] <path-or-dir>`
-  递归运行 `.gs` 文件，可用同名 `.out` 做 stdout golden 对比；`--list`
+- `leia test [--format=text|json] [--list] [--seed SEED] <path-or-dir>`
+  递归运行 `.leia` 文件，可用同名 `.out` 做 stdout golden 对比；`--list`
   reports the resolved test files without running them, `--seed` exposes
-  `GSCRIPT_TEST_SEED` to scripts for deterministic scenarios, and JSON output
+  `LEIA_TEST_SEED` to scripts for deterministic scenarios, and JSON output
   reports per-file status for CI integrations.
-- `gscript fmt [--check] [--write] [--stdin-file-name FILE] <path-or-dir> [...]`
+- `leia fmt [--check] [--write] [--stdin-file-name FILE] <path-or-dir> [...]`
   解析并规范基础空白。
-- `gscript lint [--format=text|json|sarif] <path-or-dir> [...]` 解析文件/目录并报告
-  `GS1001` 词法或语法错误；SARIF output is available for CI/code-scanning
+- `leia lint [--format=text|json|sarif] <path-or-dir> [...]` 解析文件/目录并报告
+  `LEIA1001` 词法或语法错误；SARIF output is available for CI/code-scanning
   integrations.
-- `gscript capabilities [--json]` reports the current binary's platform,
+- `leia capabilities [--json]` reports the current binary's platform,
   execution backends, stdlib modules, supported subcommands, and stable tooling
   output formats for CI/editor integration. JSON output also includes an
   `ai_native` section so editors, CI jobs, and agent harnesses can discover
   supported AI-native syntax, metadata directives, static validation passes,
   runtime lowering targets, and formatter/linter integration without scraping
   help text.
-- `gscript env [--json] [--path PATH]` reports version, platform,
+- `leia env [--json] [--path PATH]` reports version, platform,
   capabilities, project config discovery, and user cache/config directories in
   one environment snapshot for CI/editor integration.
-- `gscript run [--vm] [--jit=true|false] <file.gs> [args...]` is the explicit
-  script execution subcommand; legacy `gscript <file.gs>` remains supported.
-- `gscript eval [--vm] [--jit=true|false] <source> [args...]` is the explicit
-  source-string execution subcommand; legacy `gscript -e <source>` remains
+- `leia run [--vm] [--jit=true|false] <file.leia> [args...]` is the explicit
+  script execution subcommand; legacy `leia <file.leia>` remains supported.
+- `leia eval [--vm] [--jit=true|false] <source> [args...]` is the explicit
+  source-string execution subcommand; legacy `leia -e <source>` remains
   supported.
-- `gscript repl` is the explicit interactive shell subcommand; legacy no-arg
+- `leia repl` is the explicit interactive shell subcommand; legacy no-arg
   invocation remains supported.
-- `gscript config [--json] [path]` walks upward from a file or directory,
-  discovers `gscript.toml`, validates the supported project/tool keys, and
+- `leia config [--json] [path]` walks upward from a file or directory,
+  discovers `leia.toml`, validates the supported project/tool keys, and
   reports the resolved project root for CI/editor integration.
-- `gscript check [--json] [--no-fmt] [--no-lint] [--no-test] [--no-docs] <path-or-dir>`
+- `leia check [--json] [--no-fmt] [--no-lint] [--no-test] [--no-docs] <path-or-dir>`
   runs the formatter check, linter, test runner, and documentation reference
   check as a single CI gate.
-- `gscript diag dump ...` and `gscript diag bundle ...` are stable facades over
+- `leia diag dump ...` and `leia diag bundle ...` are stable facades over
   the existing production Tier 2 dump and diagnostics bundle scripts.
-- `gscript inspect bytecode [--proto NAME] <file.gs>` disassembles compiled
+- `leia inspect bytecode [--proto NAME] <file.leia>` disassembles compiled
   bytecode through the supported CLI instead of requiring developer-only dump
   binaries.
-- `gscript doc generate [--output DIR]` emits generated CLI and stdlib
-  reference Markdown from the current binary; `gscript doc check` runs the
+- `leia doc generate [--output DIR]` emits generated CLI and stdlib
+  reference Markdown from the current binary; `leia doc check` runs the
   repository documentation reference checker.
-- `gscript mod init|graph|verify` provides a local package manifest and static
+- `leia mod init|graph|verify` provides a local package manifest and static
   `require("...")` graph workflow without introducing networked package
   fetching.
-- `gscript ci smoke|pr|perf|release [--list] [--no-luajit]` provides canonical
+- `leia ci smoke|pr|perf|release [--list] [--no-luajit]` provides canonical
   local CI profiles and can print the underlying commands before running them.
-- `gscript version [--json]` reports binary, platform, Go, and VCS build
+- `leia version [--json]` reports binary, platform, Go, and VCS build
   metadata for release/debugging provenance.
-- `gscript help [command]` lists supported commands and command-specific usage.
+- `leia help [command]` lists supported commands and command-specific usage.
 
 There are also developer binaries:
 
@@ -126,27 +126,27 @@ P0:
   `--config PATH`, `--no-config`, `--color=auto|always|never`.
 - Define exit codes: `0` success, `1` runtime/test failure, `2` usage/config
   error, `3` parse/lint failure, `4` internal/tool failure, `124` timeout.
-- Reuse `gscript config --json` as the common discovery layer for editor, CI,
+- Reuse `leia config --json` as the common discovery layer for editor, CI,
   formatter, linter, test, and future package commands.
 
 P1:
 
-- Fold `dump` and `dump_bytecode` into `gscript inspect bytecode`.
-- Extend `gscript capabilities --json` with benchmark dependencies, config
+- Fold `dump` and `dump_bytecode` into `leia inspect bytecode`.
+- Extend `leia capabilities --json` with benchmark dependencies, config
   discovery, and diagnostic schema metadata as those surfaces stabilize.
 
 Suggested CLI:
 
 ```bash
-gscript run script.gs -- arg1 arg2
-gscript run --vm script.gs
-gscript eval 'print("hello")'
-gscript run --jit --diag=exit,tier2,runtime-path --json script.gs
-gscript inspect bytecode script.gs --proto sum
-gscript capabilities --json
-gscript env --json
-gscript check --json ./tests
-gscript diag bundle --output /tmp/gscript-diag --skip-benchmarks
+leia run script.leia -- arg1 arg2
+leia run --vm script.leia
+leia eval 'print("hello")'
+leia run --jit --diag=exit,tier2,runtime-path --json script.leia
+leia inspect bytecode script.leia --proto sum
+leia capabilities --json
+leia env --json
+leia check --json ./tests
+leia diag bundle --output /tmp/leia-diag --skip-benchmarks
 ```
 
 Suggested Go API:
@@ -168,8 +168,8 @@ func RunString(ctx context.Context, source, name string, opts RunOptions) (*RunR
 
 ### Current State
 
-`gscript fmt` is a minimal parser-backed formatter scaffold. It accepts one or
-more `.gs` files or directories, recursively discovers `.gs` files in
+`leia fmt` is a minimal parser-backed formatter scaffold. It accepts one or
+more `.leia` files or directories, recursively discovers `.leia` files in
 directories, and parses each file before changing bytes. The current formatter
 contract is intentionally narrow:
 
@@ -185,13 +185,13 @@ is accepted as an explicit spelling of the default write mode. `--check` and
 `--write` are mutually exclusive.
 
 Editor stdin mode is available with `--stdin-file-name FILE`. In this mode
-`gscript fmt --stdin-file-name foo.gs < in.gs` reads source from stdin, uses the
+`leia fmt --stdin-file-name foo.leia < in.leia` reads source from stdin, uses the
 provided filename for diagnostics, writes the formatted result to stdout, and
-never writes files. `--check --stdin-file-name foo.gs < in.gs` exits non-zero
-and reports `foo.gs: not formatted` when stdin would change.
+never writes files. `--check --stdin-file-name foo.leia < in.leia` exits non-zero
+and reports `foo.leia: not formatted` when stdin would change.
 
 The AST/parser currently do not expose a complete comment-preserving pretty
-printer. Until that exists, `gscript fmt` remains a whitespace normalizer with
+printer. Until that exists, `leia fmt` remains a whitespace normalizer with
 a clear no-op boundary for AST layout.
 
 ### Gaps
@@ -217,10 +217,10 @@ P1:
 Suggested CLI:
 
 ```bash
-gscript fmt file.gs
-gscript fmt --check ./...
-gscript fmt --write ./examples ./tests
-gscript fmt --stdin-file-name scratch.gs < scratch.gs
+leia fmt file.leia
+leia fmt --check ./...
+leia fmt --write ./examples ./tests
+leia fmt --stdin-file-name scratch.leia < scratch.leia
 ```
 
 Suggested API:
@@ -238,13 +238,13 @@ func Format(filename string, src []byte, opts FormatOptions) ([]byte, error)
 
 ### Current State
 
-`gscript lint` is a minimal parser-backed linter scaffold. It accepts one or
-more `.gs` files or directories, recursively discovers `.gs` files in
-directories, and reports lexer/parser failures as `GS1001` errors. The default
+`leia lint` is a minimal parser-backed linter scaffold. It accepts one or
+more `.leia` files or directories, recursively discovers `.leia` files in
+directories, and reports lexer/parser failures as `LEIA1001` errors. The default
 `--format=text` mode preserves the original stderr output:
 
 ```text
-path/to/file.gs: GS1001 error: parse error: parse error at 1:6: expected ...
+path/to/file.leia: LEIA1001 error: parse error: parse error at 1:6: expected ...
 ```
 
 `--format=json` writes a JSON diagnostics array to stdout. Each diagnostic has
@@ -256,8 +256,8 @@ for compatibility.
 ```json
 [
   {
-    "file": "path/to/file.gs",
-    "code": "GS1001",
+    "file": "path/to/file.leia",
+    "code": "LEIA1001",
     "severity": "error",
     "message": "parse error: parse error at 1:6: expected ...",
     "line": 1,
@@ -286,9 +286,9 @@ model is designed.
 
 P0:
 
-- Add parser-backed `gscript lint` with diagnostics using stable codes such as
-  `GS1001` parse, `GS1101` unreachable, `GS1201` unresolved require,
-  `GS1301` suspicious global, `GS2001` JIT portability warning.
+- Add parser-backed `leia lint` with diagnostics using stable codes such as
+  `LEIA1001` parse, `LEIA1101` unreachable, `LEIA1201` unresolved require,
+  `LEIA1301` suspicious global, `LEIA2001` JIT portability warning.
 - Emit line/column, source span, severity, message, and optional fix hint.
 
 P1:
@@ -299,19 +299,19 @@ P1:
 Suggested CLI:
 
 ```bash
-gscript lint ./...
-gscript lint --format=json tests/01_basic.gs
-gscript lint --deny=warning --format=sarif --output /tmp/gscript.sarif ./...
+leia lint ./...
+leia lint --format=json tests/01_basic.leia
+leia lint --deny=warning --format=sarif --output /tmp/leia.sarif ./...
 ```
 
 Suggested diagnostic schema:
 
 ```json
 {
-  "code": "GS1201",
+  "code": "LEIA1201",
   "severity": "error",
   "message": "module not found",
-  "file": "main.gs",
+  "file": "main.leia",
   "range": {"start": {"line": 10, "column": 12}, "end": {"line": 10, "column": 25}},
   "hint": "checked script dir and configured module paths"
 }
@@ -325,15 +325,15 @@ Runtime module loading exists:
 
 - Tree-walker `require(name)` checks `package.loaded`, an interpreter module
   cache, builtin modules, then resolves `strings.ReplaceAll(name, ".", "/") +
-  ".gs"` relative to script dir.
+  ".leia"` relative to script dir.
 - Bytecode VM `require(name)` checks `package.loaded`, globally registered
-  table/function modules, then loads the resolved `.gs` file.
-- `gscript.WithRequirePath(path)` sets the base directory for embedded usage.
+  table/function modules, then loads the resolved `.leia` file.
+- `leia.WithRequirePath(path)` sets the base directory for embedded usage.
 - `ExecFile` and CLI file execution set script dir to the executed file's
   directory.
 - Standard library modules are documented under `docs/stdlib/`.
-- `gscript mod init` writes `gscript.mod.json`, `gscript mod graph` statically
-  scans string-literal `require("...")` calls, and `gscript mod verify` checks
+- `leia mod init` writes `leia.mod.json`, `leia mod graph` statically
+  scans string-literal `require("...")` calls, and `leia mod verify` checks
   the local manifest plus graph.
 
 ### Gaps
@@ -350,29 +350,29 @@ Runtime module loading exists:
 
 P0:
 
-- Extend the local `gscript.mod.json` workflow into lockfiles and verified
+- Extend the local `leia.mod.json` workflow into lockfiles and verified
   vendoring.
 - Document and centralize module resolution rules so interpreter and VM share
   one resolver.
-- Add a project manifest, e.g. `gscript.toml`, with `name`, `version`,
+- Add a project manifest, e.g. `leia.toml`, with `name`, `version`,
   `main`, `paths`, `dependencies`, and `tool` sections.
-- Add `gscript mod graph` and `gscript mod verify` before adding networked
+- Add `leia mod graph` and `leia mod verify` before adding networked
   installs.
 
 P1:
 
 - Add lockfile with content hashes.
 - Add local path dependencies and vendoring.
-- Add builtin module inventory through `gscript mod stdlib --json`.
+- Add builtin module inventory through `leia mod stdlib --json`.
 
 Suggested CLI:
 
 ```bash
-gscript mod init
-gscript mod graph
-gscript mod verify
-gscript mod vendor
-gscript mod stdlib --json
+leia mod init
+leia mod graph
+leia mod verify
+leia mod vendor
+leia mod stdlib --json
 ```
 
 Suggested resolver API:
@@ -400,21 +400,21 @@ Testing is Go-driven:
 
 - Top-level README recommends `go test ./... -count=1 -p 1 -timeout=600s`.
 - `docs/testing-matrix.md` documents core VM/JIT/runtime tests, hand-written
-  `tests/01_basic.gs` through `tests/12_advanced.gs`, official Lua translated
-  cases, and optional JIT parity through `GSCRIPT_OFFICIAL_CHECK_JIT=1`.
-- Official translated cases compare Lua output to GScript output and are not
+  `tests/01_basic.leia` through `tests/12_advanced.leia`, official Lua translated
+  cases, and optional JIT parity through `LEIA_OFFICIAL_CHECK_JIT=1`.
+- Official translated cases compare Lua output to Leia output and are not
   performance timings.
 
-### Current `gscript test` behavior
+### Current `leia test` behavior
 
-`gscript test <path-or-dir>` runs `.gs` files directly. A single file path must
-end in `.gs`; a directory path is walked recursively and all `.gs` files are run
+`leia test <path-or-dir>` runs `.leia` files directly. A single file path must
+end in `.leia`; a directory path is walked recursively and all `.leia` files are run
 in sorted order. `--list` prints the resolved order without running scripts.
-`--seed SEED` sets `GSCRIPT_TEST_SEED` for the duration of the run and restores
+`--seed SEED` sets `LEIA_TEST_SEED` for the duration of the run and restores
 the caller's environment afterward. By default the runner only checks whether
-each script succeeds. If a sibling `<name>.out` file exists next to `<name>.gs`,
+each script succeeds. If a sibling `<name>.out` file exists next to `<name>.leia`,
 the runner captures stdout and compares it exactly to the golden file.
-Mismatches report the `.gs` file, the `.out` file, and an expected/got stdout
+Mismatches report the `.leia` file, the `.out` file, and an expected/got stdout
 summary.
 
 ### Gaps
@@ -427,9 +427,9 @@ summary.
 
 P0:
 
-- Add `gscript test` as a wrapper over language-level tests and existing Go
+- Add `leia test` as a wrapper over language-level tests and existing Go
   semantic harnesses.
-- Define test file discovery: `*_test.gs`, `tests/**/*.gs`, and manifest opt-in.
+- Define test file discovery: `*_test.leia`, `tests/**/*.leia`, and manifest opt-in.
 - Keep `--list` and `--seed` as stable primitives for CI sharding and
   deterministic randomized tests.
 - Add JUnit output for CI.
@@ -442,10 +442,10 @@ P1:
 Suggested CLI:
 
 ```bash
-gscript test ./...
-gscript test tests --run TestStrings --mode=vm
-gscript test tests/language --mode=jit --json --output /tmp/test.json
-gscript test --junit /tmp/gscript-junit.xml --timeout=60s ./...
+leia test ./...
+leia test tests --run TestStrings --mode=vm
+leia test tests/language --mode=jit --json --output /tmp/test.json
+leia test --junit /tmp/leia-junit.xml --timeout=60s ./...
 ```
 
 Suggested test API:
@@ -472,8 +472,8 @@ Benchmark tooling is the most mature area:
   source tracking, confidence intervals, scaling, JSON and Markdown output.
 - `benchmarks/strict_guard.py` is the broad truth pass for suite, extended, and
   variants, with modes `vm`, `default`, `no_filter`, and `luajit`.
-- `gscript bench compare ...`, `gscript bench strict ...`, and
-  `gscript bench diagnose ...` are stable CLI facades over the Python
+- `leia bench compare ...`, `leia bench strict ...`, and
+  `leia bench diagnose ...` are stable CLI facades over the Python
   performance harnesses; arguments after the mode are passed through unchanged.
 - `benchmarks/diagnose.py` collects timing, exits, runtime-path counters,
   Tier 2 perf, speculation state/worklist, and optional pprof/warm dumps.
@@ -487,7 +487,7 @@ Benchmark tooling is the most mature area:
 
 - Benchmark entry points are powerful but fragmented across Python, shell, and
   Go test.
-- `gscript bench` exists as a thin facade over compare/strict/diagnose, but
+- `leia bench` exists as a thin facade over compare/strict/diagnose, but
   benchmark profiles are not yet centralized in project config.
 - Result schemas are close but not centralized/versioned.
 - No explicit machine-readable benchmark manifest schema beyond current JSON
@@ -497,7 +497,7 @@ Benchmark tooling is the most mature area:
 
 P0:
 
-- Extend `gscript bench` with named profiles over existing harnesses.
+- Extend `leia bench` with named profiles over existing harnesses.
 - Version benchmark result JSON schema.
 - Keep suite/extended/variants/official as separate groups; do not collapse to
   one score.
@@ -511,16 +511,16 @@ P1:
 Suggested CLI:
 
 ```bash
-gscript bench compare --group=suite --mode=default --runs=5
-gscript bench strict --group=suite --group=extended --runs=3 --warmup=1
-gscript bench diagnose --bench=numeric/spectral_norm --pprof --warm-dump
+leia bench compare --group=suite --mode=default --runs=5
+leia bench strict --group=suite --group=extended --runs=3 --warmup=1
+leia bench diagnose --bench=numeric/spectral_norm --pprof --warm-dump
 ```
 
 Suggested schema envelope:
 
 ```json
 {
-  "schema": "gscript.benchmark.v1",
+  "schema": "leia.benchmark.v1",
   "environment": {},
   "groups": ["suite", "extended"],
   "results": []
@@ -535,8 +535,8 @@ Docs are Markdown/HTML under `docs/`, including stdlib pages and performance
 writeups. `docs/_config.yml` and `docs/_layouts/default.html` indicate static
 site generation support. `scripts/docs_check.sh` is the current repository
 check for relative Markdown links and documented release-script entrypoints.
-`gscript doc generate` emits a CLI reference and stdlib inventory from the
-current binary. `gscript doc check` wraps `scripts/docs_check.sh`.
+`leia doc generate` emits a CLI reference and stdlib inventory from the
+current binary. `leia doc check` wraps `scripts/docs_check.sh`.
 
 ### Gaps
 
@@ -549,9 +549,9 @@ current binary. `gscript doc check` wraps `scripts/docs_check.sh`.
 
 P0:
 
-- Extend `gscript doc generate` beyond CLI/std-lib inventory into detailed flag
+- Extend `leia doc generate` beyond CLI/std-lib inventory into detailed flag
   docs and language references.
-- Keep `scripts/docs_check.sh` in the release gate until `gscript doc check`
+- Keep `scripts/docs_check.sh` in the release gate until `leia doc check`
   owns stale generated docs and broken internal links.
 
 P1:
@@ -564,9 +564,9 @@ Suggested CLI:
 
 ```bash
 scripts/docs_check.sh
-gscript doc generate --output docs/reference
-gscript doc check
-gscript doc check --snippets docs
+leia doc generate --output docs/reference
+leia doc check
+leia doc check --snippets docs
 ```
 
 Suggested metadata API:
@@ -617,16 +617,16 @@ P0:
 
 P1:
 
-- Add `gscript diag collect` to create a portable artifact directory.
+- Add `leia diag collect` to create a portable artifact directory.
 - Add direct JIT symbol/perf-map integration where platform support allows.
 
 Suggested CLI:
 
 ```bash
-gscript run --jit --diag=jit,exit,tier2,runtime-path script.gs \
-  --diag-output /tmp/gscript-diag.json
-gscript diag collect --bench=numeric/spectral_norm --out-dir=/tmp/gscript-diag
-gscript diag map-pc --warm-dir=/tmp/gscript-warm --profile=/tmp/cpu.pprof
+leia run --jit --diag=jit,exit,tier2,runtime-path script.leia \
+  --diag-output /tmp/leia-diag.json
+leia diag collect --bench=numeric/spectral_norm --out-dir=/tmp/leia-diag
+leia diag map-pc --warm-dir=/tmp/leia-warm --profile=/tmp/cpu.pprof
 ```
 
 ## REPL
@@ -652,7 +652,7 @@ The no-argument CLI enters a simple REPL:
 
 P0:
 
-- Move REPL to explicit `gscript repl`.
+- Move REPL to explicit `leia repl`.
 - Add parse-completeness detection before execution.
 - Add `--mode=interp|vm|jit`.
 
@@ -665,16 +665,16 @@ P1:
 Suggested CLI:
 
 ```bash
-gscript repl
-gscript repl --mode=vm
-gscript repl --mode=jit --stats
+leia repl
+leia repl --mode=vm
+leia repl --mode=jit --stats
 ```
 
 Suggested REPL commands:
 
 ```text
 .help
-.load path/to/file.gs
+.load path/to/file.leia
 .mode vm
 .inspect bytecode functionName
 .stats jit
@@ -707,7 +707,7 @@ Source metadata exists and is used:
 
 P0:
 
-- Define `gscript.sourcemap.v1` with source file, line, optional column,
+- Define `leia.sourcemap.v1` with source file, line, optional column,
   bytecode PC, IR id, native code range, and inlining/source-proto fields.
 - Use the same range model for parser/linter/runtime diagnostics.
 
@@ -719,8 +719,8 @@ P1:
 Suggested CLI:
 
 ```bash
-gscript inspect sourcemap script.gs --json
-gscript run --jit --emit-sourcemap=/tmp/script.sourcemap.json script.gs
+leia inspect sourcemap script.leia --json
+leia run --jit --emit-sourcemap=/tmp/script.sourcemap.json script.leia
 ```
 
 ## CI Entry Points
@@ -738,7 +738,7 @@ python3 benchmarks/timing_compare.py --all --runs 7 --warmup 2 --timeout 900 --t
 ```
 
 `docs/testing-matrix.md` documents more precise correctness and performance
-commands. `gscript ci smoke|pr|perf|release` wraps the common local gates and
+commands. `leia ci smoke|pr|perf|release` wraps the common local gates and
 supports `--list` for hosted CI review/debugging.
 
 `scripts/worktree_audit.sh` is a read-only guard for agent-heavy local
@@ -750,7 +750,7 @@ script never removes or prunes worktrees.
 
 ### Gaps
 
-- `gscript ci` provides canonical local profiles, but hosted workflow files are
+- `leia ci` provides canonical local profiles, but hosted workflow files are
   not yet checked in.
 - Fast/slow/release split exists as CLI profiles, but thresholds and artifact
   policy still live in shell scripts.
@@ -762,7 +762,7 @@ script never removes or prunes worktrees.
 
 P0:
 
-- Extend `gscript ci` with hosted workflow integration and artifact upload.
+- Extend `leia ci` with hosted workflow integration and artifact upload.
 - Keep profiles explicit: `smoke`, `pr`, `perf`, `release`.
 
 P1:
@@ -774,26 +774,26 @@ P1:
 Suggested CLI:
 
 ```bash
-gscript ci smoke
-gscript ci pr
-gscript ci perf --json /tmp/perf.json --markdown /tmp/perf.md
-gscript ci release
+leia ci smoke
+leia ci pr
+leia ci perf --json /tmp/perf.json --markdown /tmp/perf.md
+leia ci release
 ```
 
 Suggested profile commands:
 
 ```bash
 # smoke
-go test ./cmd/... ./gscript ./internal/... ./tests -count=1 -timeout=120s
+go test ./cmd/... ./leia ./internal/... ./tests -count=1 -timeout=120s
 scripts/worktree_audit.sh
 
 # pr
 go test ./... -count=1 -p 1 -timeout=600s
-python3 benchmarks/strict_guard.py --group suite --runs=3 --warmup=1 --timeout=90 --json /tmp/gscript-pr-bench.json
+python3 benchmarks/strict_guard.py --group suite --runs=3 --warmup=1 --timeout=90 --json /tmp/leia-pr-bench.json
 
 # release
 go test ./... -count=1 -p 1 -timeout=600s
-python3 benchmarks/strict_guard.py --group suite --group extended --group variants --group official --runs=5 --warmup=2 --timeout=240 --json /tmp/gscript-release-bench.json --markdown /tmp/gscript-release-bench.md
+python3 benchmarks/strict_guard.py --group suite --group extended --group variants --group official --runs=5 --warmup=2 --timeout=240 --json /tmp/leia-release-bench.json --markdown /tmp/leia-release-bench.md
 python3 benchmarks/conformance_perf_coverage.py --check --json /tmp/conformance_perf_coverage.json --markdown /tmp/conformance_perf_coverage.md
 ```
 
@@ -801,14 +801,14 @@ python3 benchmarks/conformance_perf_coverage.py --check --json /tmp/conformance_
 
 ### P0: Stabilize Entry Points
 
-1. Add `gscript run`, `eval`, `repl`, `inspect`, `diag`, `test`, `bench`, `doc`,
+1. Add `leia run`, `eval`, `repl`, `inspect`, `diag`, `test`, `bench`, `doc`,
    `mod`, and `ci` command skeletons while preserving legacy flags.
 2. Add shared JSON diagnostic envelope and output routing.
 3. Centralize module resolution and document `require()` semantics.
 
 ### P1: Make CI And Developer Loops Reliable
 
-1. Add hosted workflow around `gscript ci`.
+1. Add hosted workflow around `leia ci`.
 2. Add generated docs freshness checks for committed reference files.
 3. Add REPL completeness, history, and VM/JIT mode.
 4. Version benchmark, diagnostic, sourcemap, and test-report schemas.
@@ -824,27 +824,27 @@ python3 benchmarks/conformance_perf_coverage.py --check --json /tmp/conformance_
 ## Command Inventory Target
 
 ```text
-gscript run
-gscript eval
-gscript repl
-gscript fmt
-gscript lint
-gscript test
-gscript bench
-gscript bench diagnose
-gscript inspect bytecode
-gscript diag dump
-gscript diag bundle
-gscript mod init
-gscript mod graph
-gscript mod verify
-gscript doc generate
-gscript doc check
-gscript ci smoke|pr|perf|release
-gscript capabilities
-gscript env
-gscript version
-gscript help
+leia run
+leia eval
+leia repl
+leia fmt
+leia lint
+leia test
+leia bench
+leia bench diagnose
+leia inspect bytecode
+leia diag dump
+leia diag bundle
+leia mod init
+leia mod graph
+leia mod verify
+leia doc generate
+leia doc check
+leia ci smoke|pr|perf|release
+leia capabilities
+leia env
+leia version
+leia help
 ```
 
 ## Non-Goals For The First Iteration

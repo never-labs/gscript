@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate and validate lightweight GScript case manifests."""
+"""Generate and validate lightweight Leia case manifests."""
 
 from __future__ import annotations
 
@@ -69,10 +69,10 @@ def lua_ref_for(root_name: str, path: Path) -> str | None:
     return repo_rel(lua_path) if lua_path.exists() else None
 
 
-def iter_gscript_cases(root_name: str) -> list[Path]:
+def iter_leia_cases(root_name: str) -> list[Path]:
     base = ROOT / root_name
     paths: list[Path] = []
-    for path in sorted(base.rglob("*.gs")):
+    for path in sorted(base.rglob("*.leia")):
         rel_parts = path.relative_to(base).parts
         if any(part in EXCLUDED_DIRS for part in rel_parts):
             continue
@@ -84,7 +84,7 @@ def iter_gscript_cases(root_name: str) -> list[Path]:
 
 def discover_cases(root_name: str) -> list[dict[str, Any]]:
     cases: list[dict[str, Any]] = []
-    for path in iter_gscript_cases(root_name):
+    for path in iter_leia_cases(root_name):
         domain = domain_for(root_name, path)
         lua_ref = lua_ref_for(root_name, path)
         cases.append(
@@ -173,9 +173,9 @@ def validate_manifest(root_name: str) -> list[str]:
     missing_paths = sorted(set(discovered_by_path) - set(manifest_by_path))
     extra_paths = sorted(set(manifest_by_path) - set(discovered_by_path))
     if missing_paths:
-        errors.append(f"{repo_rel(manifest_path)}: missing .gs cases: {', '.join(missing_paths)}")
+        errors.append(f"{repo_rel(manifest_path)}: missing .leia cases: {', '.join(missing_paths)}")
     if extra_paths:
-        errors.append(f"{repo_rel(manifest_path)}: extra .gs cases: {', '.join(extra_paths)}")
+        errors.append(f"{repo_rel(manifest_path)}: extra .leia cases: {', '.join(extra_paths)}")
 
     if manifest.get("case_count") != len(cases):
         errors.append(f"{repo_rel(manifest_path)}: case_count does not match cases length")

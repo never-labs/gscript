@@ -5,7 +5,7 @@ package tests_test
 import (
 	"testing"
 
-	gs "github.com/never-labs/gscript"
+	leia "github.com/never-labs/leia"
 )
 
 func TestTraceExec_CallExit_AsSideExit(t *testing.T) {
@@ -114,8 +114,8 @@ func floatSum(n) {
 }
 result := floatSum(100)
 `
-	vmResult := runAndGet(t, src, "result", gs.WithVM())
-	jitResult := runAndGet(t, src, "result", gs.WithJIT())
+	vmResult := runAndGet(t, src, "result", leia.WithVM())
+	jitResult := runAndGet(t, src, "result", leia.WithJIT())
 
 	expected := 50.0
 	if vmResult != expected {
@@ -139,8 +139,8 @@ func floatProd(n) {
 }
 result := floatProd(100)
 `
-	vmResult := runAndGet(t, src, "result", gs.WithVM())
-	jitResult := runAndGet(t, src, "result", gs.WithJIT())
+	vmResult := runAndGet(t, src, "result", leia.WithVM())
+	jitResult := runAndGet(t, src, "result", leia.WithJIT())
 
 	// 1.01^100 ~= 2.704813829...
 	if vmResult != jitResult {
@@ -162,8 +162,8 @@ func mixedAccum(n) {
 }
 result := mixedAccum(100)
 `
-	vmResult := runAndGet(t, src, "result", gs.WithVM())
-	jitResult := runAndGet(t, src, "result", gs.WithJIT())
+	vmResult := runAndGet(t, src, "result", leia.WithVM())
+	jitResult := runAndGet(t, src, "result", leia.WithJIT())
 
 	// sum = 0.1 * sum(1..100) = 0.1 * 5050 = 505.0
 	if vmResult != jitResult {
@@ -185,8 +185,8 @@ func countdown(n) {
 }
 result := countdown(200)
 `
-	vmResult := runAndGet(t, src, "result", gs.WithVM())
-	jitResult := runAndGet(t, src, "result", gs.WithJIT())
+	vmResult := runAndGet(t, src, "result", leia.WithVM())
+	jitResult := runAndGet(t, src, "result", leia.WithJIT())
 
 	// 100.0 - 200*0.25 = 100.0 - 50.0 = 50.0
 	expected := 50.0

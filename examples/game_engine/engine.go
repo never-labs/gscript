@@ -5,7 +5,7 @@ import (
 	"math"
 	"os"
 
-	gs "github.com/never-labs/gscript"
+	leia "github.com/never-labs/leia"
 )
 
 // ---- Game Engine Types ----
@@ -57,7 +57,7 @@ func (inp *Input) IsDown(key string) bool { return inp.keys[key] }
 // ---- Engine ----
 
 type Engine struct {
-	vm       *gs.VM
+	vm       *leia.VM
 	input    *Input
 	entities map[string]*Entity
 }
@@ -68,7 +68,7 @@ func NewEngine(scriptPath string) (*Engine, error) {
 		entities: make(map[string]*Entity),
 	}
 
-	vm := gs.New(gs.WithLibs(gs.LibSafe | gs.LibMath))
+	vm := leia.New(leia.WithLibs(leia.LibSafe | leia.LibMath))
 
 	// Bind Vec2 type
 	vm.BindStruct("Vec2", Vec2{})
@@ -102,7 +102,7 @@ func NewEngine(scriptPath string) (*Engine, error) {
 			}
 		},
 		"entityCount": func() int { return len(e.entities) },
-		"log":         func(msg string) { fmt.Println("[GScript]", msg) },
+		"log":         func(msg string) { fmt.Println("[Leia]", msg) },
 	})
 
 	// Register input
@@ -156,7 +156,7 @@ func (e *Engine) SimulateInput(key string, down bool) {
 }
 
 func main() {
-	scriptPath := "examples/game_engine/game.gs"
+	scriptPath := "examples/game_engine/game.leia"
 	if len(os.Args) > 1 {
 		scriptPath = os.Args[1]
 	}
@@ -167,7 +167,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	fmt.Println("=== GScript Game Engine Demo ===")
+	fmt.Println("=== Leia Game Engine Demo ===")
 
 	if err := eng.Start(); err != nil {
 		fmt.Println("onStart error:", err)

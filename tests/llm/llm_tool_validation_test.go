@@ -1,29 +1,29 @@
-package gscript_test
+package leia_test
 
 import (
 	"testing"
 
-	gs "github.com/never-labs/gscript"
+	leia "github.com/never-labs/leia"
 )
 
 func TestLLMSyntaxValidationAllowsStaticToolCapsCoverage(t *testing.T) {
 	for _, mode := range []struct {
 		name string
-		opts []gs.Option
+		opts []leia.Option
 	}{
 		{name: "interpreter"},
-		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
 	} {
 		t.Run(mode.name, func(t *testing.T) {
-			opts := append([]gs.Option{gs.WithLibs(gs.LibString | gs.LibLLM)}, mode.opts...)
-			vm := gs.New(opts...)
+			opts := append([]leia.Option{leia.WithLibs(leia.LibString | leia.LibLLM)}, mode.opts...)
+			vm := leia.New(opts...)
 			err := vm.Exec(`
-//gscript:requires docs.read, net.client
+//leia:requires docs.read, net.client
 tool lookup(query) {
     return query, nil
 }
 
-//gscript:requires none
+//leia:requires none
 tool local_only(query) {
     return query, nil
 }
@@ -67,16 +67,16 @@ func f(caps) {
 func TestLLMSyntaxValidationAllowsDynamicDefaultsToolCapsRefs(t *testing.T) {
 	for _, mode := range []struct {
 		name string
-		opts []gs.Option
+		opts []leia.Option
 	}{
 		{name: "interpreter"},
-		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
 	} {
 		t.Run(mode.name, func(t *testing.T) {
-			opts := append([]gs.Option{gs.WithLibs(gs.LibString | gs.LibLLM)}, mode.opts...)
-			vm := gs.New(opts...)
+			opts := append([]leia.Option{leia.WithLibs(leia.LibString | leia.LibLLM)}, mode.opts...)
+			vm := leia.New(opts...)
 			err := vm.Exec(`
-//gscript:requires net.client
+//leia:requires net.client
 tool lookup(query) {
     return query, nil
 }
@@ -103,14 +103,14 @@ agent answer(q) {
 func TestLLMSyntaxValidationAllowsDynamicToolRefs(t *testing.T) {
 	for _, mode := range []struct {
 		name string
-		opts []gs.Option
+		opts []leia.Option
 	}{
 		{name: "interpreter"},
-		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
 	} {
 		t.Run(mode.name, func(t *testing.T) {
-			opts := append([]gs.Option{gs.WithLibs(gs.LibString | gs.LibLLM)}, mode.opts...)
-			vm := gs.New(opts...)
+			opts := append([]leia.Option{leia.WithLibs(leia.LibString | leia.LibLLM)}, mode.opts...)
+			vm := leia.New(opts...)
 			err := vm.Exec(`
 func f(tools) {
     _ = turn {
@@ -129,17 +129,17 @@ func f(tools) {
 func TestLLMSyntaxValidationAllowsScopedToolRefs(t *testing.T) {
 	for _, mode := range []struct {
 		name string
-		opts []gs.Option
+		opts []leia.Option
 	}{
 		{name: "interpreter"},
-		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
 	} {
 		t.Run(mode.name, func(t *testing.T) {
-			opts := append([]gs.Option{gs.WithLibs(gs.LibString | gs.LibLLM)}, mode.opts...)
-			vm := gs.New(opts...)
+			opts := append([]leia.Option{leia.WithLibs(leia.LibString | leia.LibLLM)}, mode.opts...)
+			vm := leia.New(opts...)
 			err := vm.Exec(`
 func make_agent(prefix) {
-    //gscript:requires none
+    //leia:requires none
     tool local_lookup(query) {
         return prefix .. query, nil
     }

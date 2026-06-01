@@ -4,11 +4,11 @@ import (
 	"os"
 	"testing"
 
-	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/leia/internal/runtime"
 )
 
 func TestStdlibHostDriverRuntimeSpecialization(t *testing.T) {
-	src, err := os.ReadFile("../../benchmarks/app/stdlib_host.gs")
+	src, err := os.ReadFile("../../benchmarks/app/stdlib_host.leia")
 	if err != nil {
 		t.Fatal(err)
 	}

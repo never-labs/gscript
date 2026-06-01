@@ -6,12 +6,12 @@ import (
 )
 
 func TestParseFormatModuleFile(t *testing.T) {
-	f, diags := Parse("gscript.mod", strings.NewReader(`
+	f, diags := Parse("leia.mod", strings.NewReader(`
 module example.com/app
-gs 0.1
+leia 0.1
 go 1.25.7
 go require github.com/gen2brain/raylib-go/raylib v0.55.1
-go replace github.com/never-labs/gscript => ../gscript
+go replace github.com/never-labs/leia => ../leia
 
 capability net.client
 cap fs.read,tool.exec
@@ -22,13 +22,13 @@ collection vendor ./vendor
 	if len(diags) != 0 {
 		t.Fatalf("Parse diagnostics = %#v", diags)
 	}
-	if f.Module != "example.com/app" || f.GS != "0.1" {
+	if f.Module != "example.com/app" || f.Leia != "0.1" {
 		t.Fatalf("file = %#v", f)
 	}
 	if f.Go != "1.25.7" || len(f.GoRequire) != 1 || f.GoRequire[0].Path != "github.com/gen2brain/raylib-go/raylib" {
 		t.Fatalf("go metadata = %#v", f)
 	}
-	if len(f.GoReplace) != 1 || f.GoReplace[0].NewPath != "../gscript" {
+	if len(f.GoReplace) != 1 || f.GoReplace[0].NewPath != "../leia" {
 		t.Fatalf("go replaces = %#v", f.GoReplace)
 	}
 	if len(f.Require) != 1 || f.Require[0].Path != "example.com/lib" || f.Require[0].Version != "v0.2.0" {
@@ -46,10 +46,10 @@ collection vendor ./vendor
 	out := string(Format(f))
 	for _, want := range []string{
 		"module example.com/app\n",
-		"gs 0.1\n",
+		"leia 0.1\n",
 		"go 1.25.7\n",
 		"go require github.com/gen2brain/raylib-go/raylib v0.55.1\n",
-		"go replace github.com/never-labs/gscript => ../gscript\n",
+		"go replace github.com/never-labs/leia => ../leia\n",
 		"capability fs.read\n",
 		"capability net.client\n",
 		"capability tool.exec\n",
@@ -64,7 +64,7 @@ collection vendor ./vendor
 }
 
 func TestParseRejectsDuplicateGoNativeDirectives(t *testing.T) {
-	_, diags := Parse("gscript.mod", strings.NewReader(`module example.com/app
+	_, diags := Parse("leia.mod", strings.NewReader(`module example.com/app
 go 1.25
 go 1.26
 go require example.com/native v1.0.0
@@ -91,7 +91,7 @@ go replace example.com/native => ./other
 }
 
 func TestParseCapabilityDirectiveRejectsInvalidNames(t *testing.T) {
-	_, diags := Parse("gscript.mod", strings.NewReader(`module example.com/app
+	_, diags := Parse("leia.mod", strings.NewReader(`module example.com/app
 capability fs.read "bad"
 cap
 `))
@@ -101,7 +101,7 @@ cap
 }
 
 func TestParseRejectsUnknownAndDuplicateDirectives(t *testing.T) {
-	_, diags := Parse("gscript.mod", strings.NewReader(`
+	_, diags := Parse("leia.mod", strings.NewReader(`
 module example.com/app
 module example.com/again
 require example.com/lib v1.0.0
@@ -115,8 +115,8 @@ unknown thing
 }
 
 func TestParseRejectsDuplicateRequirePathWithDifferentVersion(t *testing.T) {
-	_, diags := Parse("gscript.mod", strings.NewReader(`module example.com/app
-gs 0.1
+	_, diags := Parse("leia.mod", strings.NewReader(`module example.com/app
+leia 0.1
 require example.com/lib v1.0.0
 require example.com/lib v2.0.0
 `))
@@ -136,16 +136,16 @@ require example.com/lib v2.0.0
 }
 
 func TestParseRejectsDuplicateGSAndReplace(t *testing.T) {
-	_, diags := Parse("gscript.mod", strings.NewReader(`module example.com/app
-gs 0.1
-gs 0.2
+	_, diags := Parse("leia.mod", strings.NewReader(`module example.com/app
+leia 0.1
+leia 0.2
 replace example.com/lib => ./lib
 replace example.com/lib => ./other-lib
 replace example.com/lib v1.0.0 => ./lib-v1
 replace example.com/lib v1.0.0 => ./other-lib-v1
 `))
 	for _, want := range []string{
-		"gs declared more than once",
+		"leia declared more than once",
 		"duplicate replace for example.com/lib",
 	} {
 		found := false

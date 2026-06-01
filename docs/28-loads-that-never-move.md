@@ -54,7 +54,7 @@ Hoisting 4 GetField to the preheader eliminates 8 dependent loads per iteration.
 
 V8 TurboFan handles this in `load-elimination.cc`: `ComputeLoopState` scans the loop body, kills any field that has a StoreField, and propagates survivors as loop-invariant. LuaJIT handles it differently — loop unrolling re-emits loads through the CSE pipeline, and the second copy finds the first. Both eliminate the redundant loads.
 
-GScript's LICM already has everything except the field-load case: preheader creation, invariant fixpoint iteration, instruction movement. The fix is adding `OpGetField` to `canHoistOp` with an alias check: if no `SetField` on the same (object, field) exists in the loop body, and no `OpCall` exists (calls can modify any table), then the load is loop-invariant.
+Leia's LICM already has everything except the field-load case: preheader creation, invariant fixpoint iteration, instruction movement. The fix is adding `OpGetField` to `canHoistOp` with an alias check: if no `SetField` on the same (object, field) exists in the loop body, and no `OpCall` exists (calls can modify any table), then the load is loop-invariant.
 
 We're also adding store-to-load forwarding to LoadElimination — after `SetField(obj, "vx", val)`, a subsequent `GetField(obj, "vx")` in the same block should return `val` instead of reloading from memory. It's a 3-line change to the existing pass.
 
@@ -66,7 +66,7 @@ We're also adding store-to-load forwarding to LoadElimination — after `SetFiel
 
 Expected impact: nbody -8-10%. Could outperform if the FPR carry kicks in like round 9 (where LICM invariant carry gave nbody -12.2%).
 
-The remaining 15.9x gap to LuaJIT is still enormous. This round won't close it — the fundamental issue is that every field access in GScript involves pointer indirection through Go's table representation, while LuaJIT's trace compiler keeps values unboxed in registers for the entire trace. But each round chips away at the overhead, and the compound effects have been surprising (round 16 predicted 6-8%, delivered 26%).
+The remaining 15.9x gap to LuaJIT is still enormous. This round won't close it — the fundamental issue is that every field access in Leia involves pointer indirection through Go's table representation, while LuaJIT's trace compiler keeps values unboxed in registers for the entire trace. But each round chips away at the overhead, and the compound effects have been surprising (round 16 predicted 6-8%, delivered 26%).
 
 ## What we built
 
@@ -121,5 +121,5 @@ The infrastructure is correct and will help future loops that are truly load-bou
 
 *Previous: [1.4% Compute, 98.6% Overhead](/27-one-point-four-percent)*
 
-*This is post 28 in the [GScript JIT series](https://jxwr.github.io/gscript/).
+*This is post 28 in the [Leia JIT series](https://jxwr.github.io/leia/).
 All numbers from a single-thread ARM64 Apple Silicon machine.*

@@ -1,29 +1,29 @@
-package gscript_test
+package leia_test
 
 import (
-	gs "github.com/never-labs/gscript"
-	"github.com/never-labs/gscript/llm"
+	leia "github.com/never-labs/leia"
+	"github.com/never-labs/leia/llm"
 	"testing"
 )
 
 func TestLLMStandaloneBudgetLimitsDirectTurns(t *testing.T) {
 	for _, tc := range []struct {
 		name string
-		opts []gs.Option
+		opts []leia.Option
 	}{
 		{name: "interpreter"},
-		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			provider := &mockLLMProvider{results: []llm.TurnResult{
 				{Status: "final_answer", Text: "one"},
 				{Status: "final_answer", Text: "two"},
 			}}
-			opts := append([]gs.Option{
-				gs.WithLibs(gs.LibString | gs.LibLLM),
-				gs.WithLLMProvider(provider),
+			opts := append([]leia.Option{
+				leia.WithLibs(leia.LibString | leia.LibLLM),
+				leia.WithLLMProvider(provider),
 			}, tc.opts...)
-			vm := gs.New(opts...)
+			vm := leia.New(opts...)
 			if err := vm.Exec(`
 err_kind := nil
 err_dimension := nil
@@ -52,21 +52,21 @@ budget { turns: 1 } {
 func TestLLMStandaloneBudgetNestedIntersectionUsesOuterTokens(t *testing.T) {
 	for _, tc := range []struct {
 		name string
-		opts []gs.Option
+		opts []leia.Option
 	}{
 		{name: "interpreter"},
-		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			provider := &mockLLMProvider{results: []llm.TurnResult{
 				{Status: "final_answer", Text: "one", Usage: llm.TurnUsage{InputTokens: 2, OutputTokens: 3}},
 				{Status: "final_answer", Text: "two"},
 			}}
-			opts := append([]gs.Option{
-				gs.WithLibs(gs.LibString | gs.LibLLM),
-				gs.WithLLMProvider(provider),
+			opts := append([]leia.Option{
+				leia.WithLibs(leia.LibString | leia.LibLLM),
+				leia.WithLLMProvider(provider),
 			}, tc.opts...)
-			vm := gs.New(opts...)
+			vm := leia.New(opts...)
 			if err := vm.Exec(`
 err_kind := nil
 err_dimension := nil
@@ -97,10 +97,10 @@ budget { tokens: 5 } {
 func TestLLMStandaloneBudgetLimitsToolCallsAndTime(t *testing.T) {
 	for _, tc := range []struct {
 		name string
-		opts []gs.Option
+		opts []leia.Option
 	}{
 		{name: "interpreter"},
-		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			provider := &mockLLMProvider{results: []llm.TurnResult{
@@ -109,18 +109,18 @@ func TestLLMStandaloneBudgetLimitsToolCallsAndTime(t *testing.T) {
 					Calls: []llm.ToolCall{{
 						ID:   "call_1",
 						Tool: "lookup",
-						Args: map[string]any{"query": "gscript"},
+						Args: map[string]any{"query": "leia"},
 					}},
 				},
 				{Status: "final_answer", Text: "unused"},
 			}}
-			opts := append([]gs.Option{
-				gs.WithLibs(gs.LibString | gs.LibLLM),
-				gs.WithLLMProvider(provider),
+			opts := append([]leia.Option{
+				leia.WithLibs(leia.LibString | leia.LibLLM),
+				leia.WithLLMProvider(provider),
 			}, tc.opts...)
-			vm := gs.New(opts...)
+			vm := leia.New(opts...)
 			if err := vm.Exec(`
-//gscript:requires none
+//leia:requires none
 tool lookup(query) {
     return "found:" .. query, nil
 }
@@ -128,7 +128,7 @@ tool lookup(query) {
 agent researcher() {
     model: "mock"
     tools: [lookup]
-    user: "find gscript"
+    user: "find leia"
 }
 
 call_kind := nil

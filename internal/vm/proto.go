@@ -1,7 +1,7 @@
 package vm
 
 import (
-	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/leia/internal/runtime"
 	"unsafe"
 )
 

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	gs "github.com/never-labs/gscript"
+	leia "github.com/never-labs/leia"
 	lua "github.com/yuin/gopher-lua"
 	"go.starlark.net/starlark"
 )
@@ -14,9 +14,9 @@ import (
 // Note: Starlark forbids recursion by design, so it is excluded here.
 // ---------------------------------------------------------------------------
 
-func BenchmarkGScriptFibRecursive(b *testing.B) {
+func BenchmarkLeiaFibRecursive(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		vm := gs.New()
+		vm := leia.New()
 		vm.Exec(`
 func fib(n) {
     if n < 2 { return n }
@@ -27,9 +27,9 @@ fib(20)
 	}
 }
 
-func BenchmarkGScriptVMFibRecursive(b *testing.B) {
+func BenchmarkLeiaVMFibRecursive(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		vm := gs.New(gs.WithVM())
+		vm := leia.New(leia.WithVM())
 		vm.Exec(`
 func fib(n) {
     if n < 2 { return n }
@@ -40,9 +40,9 @@ fib(20)
 	}
 }
 
-func BenchmarkGScriptJITFibRecursive(b *testing.B) {
+func BenchmarkLeiaJITFibRecursive(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		vm := gs.New(gs.WithJIT())
+		vm := leia.New(leia.WithJIT())
 		vm.Exec(`
 func fib(n) {
     if n < 2 { return n }
@@ -71,9 +71,9 @@ fib(20)
 // Fibonacci (recursive, n=25) -- heavier recursion
 // ---------------------------------------------------------------------------
 
-func BenchmarkGScriptVMFibRecursive_N25(b *testing.B) {
+func BenchmarkLeiaVMFibRecursive_N25(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		vm := gs.New(gs.WithVM())
+		vm := leia.New(leia.WithVM())
 		vm.Exec(`
 func fib(n) {
     if n < 2 { return n }
@@ -84,9 +84,9 @@ fib(25)
 	}
 }
 
-func BenchmarkGScriptJITFibRecursive_N25(b *testing.B) {
+func BenchmarkLeiaJITFibRecursive_N25(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		vm := gs.New(gs.WithJIT())
+		vm := leia.New(leia.WithJIT())
 		vm.Exec(`
 func fib(n) {
     if n < 2 { return n }
@@ -115,9 +115,9 @@ fib(25)
 // Fibonacci (iterative, n=30) -- loop performance
 // ---------------------------------------------------------------------------
 
-func BenchmarkGScriptFibIterative(b *testing.B) {
+func BenchmarkLeiaFibIterative(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		vm := gs.New()
+		vm := leia.New()
 		vm.Exec(`
 func fib(n) {
     a := 0
@@ -134,9 +134,9 @@ fib(30)
 	}
 }
 
-func BenchmarkGScriptVMFibIterative(b *testing.B) {
+func BenchmarkLeiaVMFibIterative(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		vm := gs.New(gs.WithVM())
+		vm := leia.New(leia.WithVM())
 		vm.Exec(`
 func fib(n) {
     a := 0
@@ -153,9 +153,9 @@ fib(30)
 	}
 }
 
-func BenchmarkGScriptJITFibIterative(b *testing.B) {
+func BenchmarkLeiaJITFibIterative(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		vm := gs.New(gs.WithJIT())
+		vm := leia.New(leia.WithJIT())
 		vm.Exec(`
 func fib(n) {
     a := 0
@@ -208,9 +208,9 @@ fib(30)
 // Heavy loop -- sum 1..100000 (JIT shines here: compilation cost amortized)
 // ---------------------------------------------------------------------------
 
-func BenchmarkGScriptVMHeavyLoop(b *testing.B) {
+func BenchmarkLeiaVMHeavyLoop(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		vm := gs.New(gs.WithVM())
+		vm := leia.New(leia.WithVM())
 		vm.Exec(`
 func sumN(n) {
     s := 0
@@ -224,9 +224,9 @@ sumN(100000)
 	}
 }
 
-func BenchmarkGScriptJITHeavyLoop(b *testing.B) {
+func BenchmarkLeiaJITHeavyLoop(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		vm := gs.New(gs.WithJIT())
+		vm := leia.New(leia.WithJIT())
 		vm.Exec(`
 func sumN(n) {
     s := 0
@@ -276,9 +276,9 @@ sumN(100000)
 // Table / dict operations -- create table with 1000 keys, read all keys
 // ---------------------------------------------------------------------------
 
-func BenchmarkGScriptTableOps(b *testing.B) {
+func BenchmarkLeiaTableOps(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		vm := gs.New()
+		vm := leia.New()
 		vm.Exec(`
 t := {}
 for i := 0; i < 1000; i++ {
@@ -292,9 +292,9 @@ for i := 0; i < 1000; i++ {
 	}
 }
 
-func BenchmarkGScriptVMTableOps(b *testing.B) {
+func BenchmarkLeiaVMTableOps(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		vm := gs.New(gs.WithVM())
+		vm := leia.New(leia.WithVM())
 		vm.Exec(`
 t := {}
 for i := 0; i < 1000; i++ {
@@ -347,9 +347,9 @@ run()
 // String concatenation -- concatenate strings in a loop
 // ---------------------------------------------------------------------------
 
-func BenchmarkGScriptStringConcat(b *testing.B) {
+func BenchmarkLeiaStringConcat(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		vm := gs.New()
+		vm := leia.New()
 		vm.Exec(`
 s := ""
 for i := 0; i < 100; i++ {
@@ -359,9 +359,9 @@ for i := 0; i < 100; i++ {
 	}
 }
 
-func BenchmarkGScriptVMStringConcat(b *testing.B) {
+func BenchmarkLeiaVMStringConcat(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		vm := gs.New(gs.WithVM())
+		vm := leia.New(leia.WithVM())
 		vm.Exec(`
 s := ""
 for i := 0; i < 100; i++ {
@@ -403,9 +403,9 @@ run()
 // Closure creation -- create 1000 closures
 // ---------------------------------------------------------------------------
 
-func BenchmarkGScriptClosureCreation(b *testing.B) {
+func BenchmarkLeiaClosureCreation(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		vm := gs.New()
+		vm := leia.New()
 		vm.Exec(`
 func make(x) {
     return func() { return x }
@@ -418,9 +418,9 @@ for i := 1; i <= 1000; i++ {
 	}
 }
 
-func BenchmarkGScriptVMClosureCreation(b *testing.B) {
+func BenchmarkLeiaVMClosureCreation(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		vm := gs.New(gs.WithVM())
+		vm := leia.New(leia.WithVM())
 		vm.Exec(`
 func make(x) {
     return func() { return x }
@@ -473,9 +473,9 @@ run()
 // Function calls -- call a simple function 10000 times
 // ---------------------------------------------------------------------------
 
-func BenchmarkGScriptFunctionCalls(b *testing.B) {
+func BenchmarkLeiaFunctionCalls(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		vm := gs.New()
+		vm := leia.New()
 		vm.Exec(`
 func add(a, b) {
     return a + b
@@ -488,9 +488,9 @@ for i := 0; i < 10000; i++ {
 	}
 }
 
-func BenchmarkGScriptVMFunctionCalls(b *testing.B) {
+func BenchmarkLeiaVMFunctionCalls(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		vm := gs.New(gs.WithVM())
+		vm := leia.New(leia.WithVM())
 		vm.Exec(`
 func add(a, b) {
     return a + b
@@ -503,9 +503,9 @@ for i := 0; i < 10000; i++ {
 	}
 }
 
-func BenchmarkGScriptJITFunctionCalls(b *testing.B) {
+func BenchmarkLeiaJITFunctionCalls(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		vm := gs.New(gs.WithJIT())
+		vm := leia.New(leia.WithJIT())
 		vm.Exec(`
 func add(a, b) {
     return a + b
@@ -556,16 +556,16 @@ run()
 // VM startup -- measure time to create a new VM instance
 // ---------------------------------------------------------------------------
 
-func BenchmarkGScriptStartup(b *testing.B) {
+func BenchmarkLeiaStartup(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		vm := gs.New()
+		vm := leia.New()
 		vm.Exec(`x := 1`)
 	}
 }
 
-func BenchmarkGScriptVMStartup(b *testing.B) {
+func BenchmarkLeiaVMStartup(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		vm := gs.New(gs.WithVM())
+		vm := leia.New(leia.WithVM())
 		vm.Exec(`x := 1`)
 	}
 }
@@ -590,7 +590,7 @@ func BenchmarkStarlarkStartup(b *testing.B) {
 // ---------------------------------------------------------------------------
 
 func TestPrintBenchmarkInfo(t *testing.T) {
-	fmt.Println("=== GScript Performance Benchmark Suite ===")
+	fmt.Println("=== Leia Performance Benchmark Suite ===")
 	fmt.Println()
 	fmt.Println("Scenarios tested:")
 	fmt.Println("  1. Fibonacci (recursive, n=20)  - pure computation (no Starlark: recursion forbidden)")
@@ -601,7 +601,7 @@ func TestPrintBenchmarkInfo(t *testing.T) {
 	fmt.Println("  6. Function calls                 - call function 10000 times")
 	fmt.Println("  7. VM startup                     - create VM + run trivial script")
 	fmt.Println()
-	fmt.Println("Runtimes compared: GScript (tree-walker), GScript (bytecode VM), GScript (JIT), gopher-lua, starlark-go")
+	fmt.Println("Runtimes compared: Leia (tree-walker), Leia (bytecode VM), Leia (JIT), gopher-lua, starlark-go")
 	fmt.Println()
 	fmt.Println("Note: Starlark forbids recursion and top-level for-loops,")
 	fmt.Println("      so all Starlark benchmarks wrap code in functions.")

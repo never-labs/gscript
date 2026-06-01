@@ -52,7 +52,7 @@ This was pure cleanup, zero performance impact. But necessary — you can't opti
 
 While investigating the function inlining failure, we found three real bugs:
 
-**Bug 1: Division Always Returns Float.** GScript follows Lua semantics: `/` always returns float. The SSA builder was creating `SSA_DIV_INT` when both operands were integers, storing raw int64 values where IEEE 754 doubles were expected. The NaN-boxing mismatch corrupted everything downstream. The expression `(i+j)*(i+j+1)/2` in spectral_norm was the canary.
+**Bug 1: Division Always Returns Float.** Leia follows Lua semantics: `/` always returns float. The SSA builder was creating `SSA_DIV_INT` when both operands were integers, storing raw int64 values where IEEE 754 doubles were expected. The NaN-boxing mismatch corrupted everything downstream. The expression `(i+j)*(i+j+1)/2` in spectral_norm was the canary.
 
 **Bug 2: BOX_INT Slot Zero Corruption.** The `emitIntToFloat` helper created temporary `SSA_BOX_INT` instructions with `Slot=0` (Go's zero-value default). The emitter's `spillFloat` then stored the converted float to VM slot 0 — overwriting `time.now()` tables, function references, whatever happened to be in slot 0. We spent hours chasing "bad argument #1 to time.since: expected time table, got number" before realizing the spill was writing to the wrong slot.
 

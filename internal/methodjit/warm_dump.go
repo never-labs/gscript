@@ -22,7 +22,7 @@ import (
 
 	"golang.org/x/arch/arm64/arm64asm"
 
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/vm"
 )
 
 // WarmDumpSession records Tier 2 compile artifacts observed during a real run.
@@ -559,10 +559,10 @@ func warmSymbolName(fnName, protoName string, instrID int, irOp string, bytecode
 		protoName = fnName
 	}
 	if irOp == "" {
-		return "gscript_jit::" + sanitizeWarmSymbolPart(protoName)
+		return "leia_jit::" + sanitizeWarmSymbolPart(protoName)
 	}
 	parts := []string{
-		"gscript_jit::" + sanitizeWarmSymbolPart(fnName),
+		"leia_jit::" + sanitizeWarmSymbolPart(fnName),
 		"proto=" + sanitizeWarmSymbolPart(protoName),
 		fmt.Sprintf("ir=%d", instrID),
 		"op=" + sanitizeWarmSymbolPart(irOp),

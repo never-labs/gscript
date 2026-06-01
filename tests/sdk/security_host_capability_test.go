@@ -1,50 +1,50 @@
-package gscript_test
+package leia_test
 
 import (
 	"fmt"
 	"strings"
 	"testing"
 
-	gs "github.com/never-labs/gscript"
+	leia "github.com/never-labs/leia"
 )
 
 func TestEnvironmentCapabilities(t *testing.T) {
-	t.Setenv("GSCRIPT_PUBLIC_ENV_CAP_TEST", "visible")
+	t.Setenv("LEIA_PUBLIC_ENV_CAP_TEST", "visible")
 
 	tests := []struct {
 		name    string
-		opts    []gs.Option
+		opts    []leia.Option
 		src     string
 		wantErr string
 	}{
 		{
 			name:    "environment disabled blocks getenv",
-			opts:    []gs.Option{gs.WithEnvironment(false)},
-			src:     `value := os.getenv("GSCRIPT_PUBLIC_ENV_CAP_TEST")`,
+			opts:    []leia.Option{leia.WithEnvironment(false)},
+			src:     `value := os.getenv("LEIA_PUBLIC_ENV_CAP_TEST")`,
 			wantErr: "environment read access disabled",
 		},
 		{
 			name:    "read disabled blocks expand",
-			opts:    []gs.Option{gs.WithEnvironmentRead(false)},
-			src:     `value := os.expand("$GSCRIPT_PUBLIC_ENV_CAP_TEST")`,
+			opts:    []leia.Option{leia.WithEnvironmentRead(false)},
+			src:     `value := os.expand("$LEIA_PUBLIC_ENV_CAP_TEST")`,
 			wantErr: "environment read access disabled",
 		},
 		{
 			name:    "write disabled blocks setenv",
-			opts:    []gs.Option{gs.WithEnvironmentWrite(false)},
-			src:     `ok := os.setenv("GSCRIPT_PUBLIC_ENV_WRITE_TEST", "blocked")`,
+			opts:    []leia.Option{leia.WithEnvironmentWrite(false)},
+			src:     `ok := os.setenv("LEIA_PUBLIC_ENV_WRITE_TEST", "blocked")`,
 			wantErr: "environment write access disabled",
 		},
 		{
 			name: "read only still reads",
-			opts: []gs.Option{gs.WithEnvironmentWrite(false)},
-			src:  `value := os.getenv("GSCRIPT_PUBLIC_ENV_CAP_TEST")`,
+			opts: []leia.Option{leia.WithEnvironmentWrite(false)},
+			src:  `value := os.getenv("LEIA_PUBLIC_ENV_CAP_TEST")`,
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			vm := gs.New(tc.opts...)
+			vm := leia.New(tc.opts...)
 			err := vm.Exec(tc.src)
 			if tc.wantErr != "" {
 				if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
@@ -69,17 +69,17 @@ func TestEnvironmentCapabilities(t *testing.T) {
 func TestWithProcessShellFalseBlocksShell(t *testing.T) {
 	for _, tc := range []struct {
 		name string
-		opts []gs.Option
+		opts []leia.Option
 	}{
 		{name: "interpreter"},
-		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			opts := append([]gs.Option{
-				gs.WithLibs(gs.LibString | gs.LibProcess),
-				gs.WithProcessShell(false),
+			opts := append([]leia.Option{
+				leia.WithLibs(leia.LibString | leia.LibProcess),
+				leia.WithProcessShell(false),
 			}, tc.opts...)
-			vm := gs.New(opts...)
+			vm := leia.New(opts...)
 			err := vm.Exec(`result := process.shell("echo blocked")`)
 			if err == nil || !strings.Contains(err.Error(), "process shell access disabled") {
 				t.Fatalf("process.shell err = %v, want process shell access disabled", err)
@@ -91,17 +91,17 @@ func TestWithProcessShellFalseBlocksShell(t *testing.T) {
 func TestWithProcessExecutionFalseBlocksRunExecAndWhich(t *testing.T) {
 	for _, tc := range []struct {
 		name string
-		opts []gs.Option
+		opts []leia.Option
 	}{
 		{name: "interpreter"},
-		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			opts := append([]gs.Option{
-				gs.WithLibs(gs.LibString | gs.LibProcess),
-				gs.WithProcessExecution(false),
+			opts := append([]leia.Option{
+				leia.WithLibs(leia.LibString | leia.LibProcess),
+				leia.WithProcessExecution(false),
 			}, tc.opts...)
-			vm := gs.New(opts...)
+			vm := leia.New(opts...)
 			for _, src := range []string{
 				`result := process.run("echo blocked")`,
 				`result := process.exec("echo", "blocked")`,
@@ -122,17 +122,17 @@ func TestWithFilesystemRootConfinesProcessRunDir(t *testing.T) {
 
 	for _, tc := range []struct {
 		name string
-		opts []gs.Option
+		opts []leia.Option
 	}{
 		{name: "interpreter"},
-		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			opts := append([]gs.Option{
-				gs.WithLibs(gs.LibString | gs.LibProcess),
-				gs.WithFilesystemRoot(root),
+			opts := append([]leia.Option{
+				leia.WithLibs(leia.LibString | leia.LibProcess),
+				leia.WithFilesystemRoot(root),
 			}, tc.opts...)
-			vm := gs.New(opts...)
+			vm := leia.New(opts...)
 			src := fmt.Sprintf(`result := process.run({"pwd"}, {dir: %q})`, outside)
 			err := vm.Exec(src)
 			if err == nil || !strings.Contains(err.Error(), "filesystem access denied") {
@@ -145,31 +145,31 @@ func TestWithFilesystemRootConfinesProcessRunDir(t *testing.T) {
 func TestProcessRunEnvFollowsEnvironmentPolicy(t *testing.T) {
 	for _, tc := range []struct {
 		name string
-		opts []gs.Option
+		opts []leia.Option
 	}{
 		{name: "interpreter"},
-		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
 	} {
 		t.Run(tc.name+"/write-disabled", func(t *testing.T) {
-			opts := append([]gs.Option{
-				gs.WithLibs(gs.LibString | gs.LibProcess),
-				gs.WithEnvironmentWrite(false),
+			opts := append([]leia.Option{
+				leia.WithLibs(leia.LibString | leia.LibProcess),
+				leia.WithEnvironmentWrite(false),
 			}, tc.opts...)
-			vm := gs.New(opts...)
-			err := vm.Exec(`result := process.run({"pwd"}, {env: {GSCRIPT_PROCESS_ENV_POLICY_TEST: "blocked"}})`)
+			vm := leia.New(opts...)
+			err := vm.Exec(`result := process.run({"pwd"}, {env: {LEIA_PROCESS_ENV_POLICY_TEST: "blocked"}})`)
 			if err == nil || !strings.Contains(err.Error(), "environment write access disabled") {
 				t.Fatalf("process.run env err = %v, want environment write access disabled", err)
 			}
 		})
 
 		t.Run(tc.name+"/allowlist", func(t *testing.T) {
-			opts := append([]gs.Option{
-				gs.WithLibs(gs.LibString | gs.LibProcess),
-				gs.WithEnvironmentAllowlist("GSCRIPT_PROCESS_ENV_ALLOWED"),
+			opts := append([]leia.Option{
+				leia.WithLibs(leia.LibString | leia.LibProcess),
+				leia.WithEnvironmentAllowlist("LEIA_PROCESS_ENV_ALLOWED"),
 			}, tc.opts...)
-			vm := gs.New(opts...)
-			err := vm.Exec(`result := process.run({"pwd"}, {env: {GSCRIPT_PROCESS_ENV_BLOCKED: "blocked"}})`)
-			if err == nil || !strings.Contains(err.Error(), "environment variable not allowed: GSCRIPT_PROCESS_ENV_BLOCKED") {
+			vm := leia.New(opts...)
+			err := vm.Exec(`result := process.run({"pwd"}, {env: {LEIA_PROCESS_ENV_BLOCKED: "blocked"}})`)
+			if err == nil || !strings.Contains(err.Error(), "environment variable not allowed: LEIA_PROCESS_ENV_BLOCKED") {
 				t.Fatalf("process.run env allowlist err = %v, want environment variable not allowed", err)
 			}
 		})
@@ -179,17 +179,17 @@ func TestProcessRunEnvFollowsEnvironmentPolicy(t *testing.T) {
 func TestWithNetworkAccessFalseBlocksNetAndHTTP(t *testing.T) {
 	for _, tc := range []struct {
 		name string
-		opts []gs.Option
+		opts []leia.Option
 	}{
 		{name: "interpreter"},
-		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			opts := append([]gs.Option{
-				gs.WithLibs(gs.LibString | gs.LibNet | gs.LibHTTP),
-				gs.WithNetworkAccess(false),
+			opts := append([]leia.Option{
+				leia.WithLibs(leia.LibString | leia.LibNet | leia.LibHTTP),
+				leia.WithNetworkAccess(false),
 			}, tc.opts...)
-			vm := gs.New(opts...)
+			vm := leia.New(opts...)
 			for _, src := range []string{
 				`resp := net.get("http://127.0.0.1:1")`,
 				`resp := net.request({url: "http://127.0.0.1:1"})`,
@@ -208,17 +208,17 @@ func TestWithNetworkAccessFalseBlocksNetAndHTTP(t *testing.T) {
 func TestWithDebugAccessFalseBlocksDebugAPIs(t *testing.T) {
 	for _, tc := range []struct {
 		name string
-		opts []gs.Option
+		opts []leia.Option
 	}{
 		{name: "interpreter"},
-		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			opts := append([]gs.Option{
-				gs.WithLibs(gs.LibString | gs.LibDebug),
-				gs.WithDebugAccess(false),
+			opts := append([]leia.Option{
+				leia.WithLibs(leia.LibString | leia.LibDebug),
+				leia.WithDebugAccess(false),
 			}, tc.opts...)
-			vm := gs.New(opts...)
+			vm := leia.New(opts...)
 			for _, src := range []string{
 				`stack := debug.stack()`,
 				`globals := debug.globals()`,
@@ -238,17 +238,17 @@ func TestWithDebugAccessFalseBlocksDebugAPIs(t *testing.T) {
 func TestWithTestkitAccessFalseBlocksTestkitAPIs(t *testing.T) {
 	for _, tc := range []struct {
 		name string
-		opts []gs.Option
+		opts []leia.Option
 	}{
 		{name: "interpreter"},
-		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			opts := append([]gs.Option{
-				gs.WithLibs(gs.LibString | gs.LibTestkit),
-				gs.WithTestkitAccess(false),
+			opts := append([]leia.Option{
+				leia.WithLibs(leia.LibString | leia.LibTestkit),
+				leia.WithTestkitAccess(false),
 			}, tc.opts...)
-			vm := gs.New(opts...)
+			vm := leia.New(opts...)
 			for _, src := range []string{
 				`stats := testkit.memory()`,
 				`info := testkit.value(42)`,
@@ -266,23 +266,23 @@ func TestWithTestkitAccessFalseBlocksTestkitAPIs(t *testing.T) {
 }
 
 func TestEnvironmentAllowlist(t *testing.T) {
-	t.Setenv("GSCRIPT_PUBLIC_ENV_ALLOWED", "visible")
-	t.Setenv("GSCRIPT_PUBLIC_ENV_BLOCKED", "secret")
+	t.Setenv("LEIA_PUBLIC_ENV_ALLOWED", "visible")
+	t.Setenv("LEIA_PUBLIC_ENV_BLOCKED", "secret")
 
 	for _, tc := range []struct {
 		name string
-		opts []gs.Option
+		opts []leia.Option
 	}{
 		{name: "interpreter"},
-		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			opts := append([]gs.Option{gs.WithEnvironmentAllowlist("GSCRIPT_PUBLIC_ENV_ALLOWED")}, tc.opts...)
-			vm := gs.New(opts...)
+			opts := append([]leia.Option{leia.WithEnvironmentAllowlist("LEIA_PUBLIC_ENV_ALLOWED")}, tc.opts...)
+			vm := leia.New(opts...)
 			if err := vm.Exec(`
-				allowed := os.getenv("GSCRIPT_PUBLIC_ENV_ALLOWED")
-				blocked := os.getenv("GSCRIPT_PUBLIC_ENV_BLOCKED")
-				expanded := os.expand("$GSCRIPT_PUBLIC_ENV_ALLOWED:$GSCRIPT_PUBLIC_ENV_BLOCKED")
+				allowed := os.getenv("LEIA_PUBLIC_ENV_ALLOWED")
+				blocked := os.getenv("LEIA_PUBLIC_ENV_BLOCKED")
+				expanded := os.expand("$LEIA_PUBLIC_ENV_ALLOWED:$LEIA_PUBLIC_ENV_BLOCKED")
 				all := os.environ()
 				procEnv := process.env()
 			`); err != nil {
@@ -310,14 +310,14 @@ func TestEnvironmentAllowlist(t *testing.T) {
 				if !ok {
 					t.Fatalf("%s = %T, want map", tableName, got)
 				}
-				if env["GSCRIPT_PUBLIC_ENV_ALLOWED"] != "visible" {
-					t.Fatalf("%s allowed = %v, want visible", tableName, env["GSCRIPT_PUBLIC_ENV_ALLOWED"])
+				if env["LEIA_PUBLIC_ENV_ALLOWED"] != "visible" {
+					t.Fatalf("%s allowed = %v, want visible", tableName, env["LEIA_PUBLIC_ENV_ALLOWED"])
 				}
-				if _, ok := env["GSCRIPT_PUBLIC_ENV_BLOCKED"]; ok {
+				if _, ok := env["LEIA_PUBLIC_ENV_BLOCKED"]; ok {
 					t.Fatalf("%s exposed blocked environment variable", tableName)
 				}
 			}
-			err := vm.Exec(`os.setenv("GSCRIPT_PUBLIC_ENV_BLOCKED", "changed")`)
+			err := vm.Exec(`os.setenv("LEIA_PUBLIC_ENV_BLOCKED", "changed")`)
 			if err == nil || !strings.Contains(err.Error(), "environment variable not allowed") {
 				t.Fatalf("setenv blocked err = %v, want environment variable not allowed", err)
 			}

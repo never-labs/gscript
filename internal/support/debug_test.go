@@ -31,10 +31,10 @@ func TestHookWantsRespectsEventAndKindFilters(t *testing.T) {
 
 func TestFormatTraceback(t *testing.T) {
 	got := FormatTraceback("boom", []Frame{
-		{Name: "outer", Kind: "script", SourceName: "a.gs", Line: 2, Column: 3},
+		{Name: "outer", Kind: "script", SourceName: "a.leia", Line: 2, Column: 3},
 		{Name: "inner", Kind: "native"},
 	})
-	want := "boom\nstack traceback:\n  native inner\n  script outer @ a.gs:2:3"
+	want := "boom\nstack traceback:\n  native inner\n  script outer @ a.leia:2:3"
 	if got != want {
 		t.Fatalf("traceback mismatch\nwant: %q\n got: %q", want, got)
 	}

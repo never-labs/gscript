@@ -1,0 +1,21 @@
+print("case:process_go_host_entry_exit_more")
+
+process.setArgs("tool.leia", "build", "--fast")
+args := process.args()
+entry := process.entry()
+assert(args[0] == "tool.leia")
+assert(args[1] == "build")
+assert(args[2] == "--fast")
+assert(entry.file == "tool.leia")
+assert(entry.args[0] == "tool.leia")
+assert(entry.args[1] == "build")
+assert(type(entry.dir) == "string")
+
+okFalse, errFalse := pcall(process.exit, false)
+assert(!okFalse && errFalse == "process exit 1")
+okCode, errCode := pcall(process.exit, 7)
+assert(!okCode && errCode == "process exit 7")
+assert(!pcall(process.exit, "bad"))
+assert(!pcall(process.setArgs))
+
+print("ok")

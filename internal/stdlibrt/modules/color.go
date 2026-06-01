@@ -3,7 +3,7 @@ package modules
 import (
 	"fmt"
 
-	stdcolor "github.com/never-labs/gscript/internal/stdlib/color"
+	stdcolor "github.com/never-labs/leia/internal/stdlib/color"
 )
 
 // --------------------------------------------------------------------------

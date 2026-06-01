@@ -1,8 +1,8 @@
-package gscript_test
+package leia_test
 
 import (
-	gs "github.com/never-labs/gscript"
-	"github.com/never-labs/gscript/llm"
+	leia "github.com/never-labs/leia"
+	"github.com/never-labs/leia/llm"
 	"strings"
 	"testing"
 )
@@ -10,28 +10,28 @@ import (
 func TestLLMNamedAgentFlowAndDirectTurnSugar(t *testing.T) {
 	for _, tc := range []struct {
 		name string
-		opts []gs.Option
+		opts []leia.Option
 	}{
 		{name: "interpreter"},
-		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			provider := &mockLLMProvider{results: []llm.TurnResult{
 				{Status: "final_answer", Text: "flow-ok"},
 				{Status: "final_answer", Text: "turn-sugar-ok"},
 			}}
-			opts := append([]gs.Option{
-				gs.WithLibs(gs.LibString | gs.LibLLM),
-				gs.WithLLMProvider(provider),
+			opts := append([]leia.Option{
+				leia.WithLibs(leia.LibString | leia.LibLLM),
+				leia.WithLLMProvider(provider),
 			}, tc.opts...)
-			vm := gs.New(opts...)
+			vm := leia.New(opts...)
 			err := vm.Exec(`
 models {
     default: "alias"
     alias: "resolved-model"
 }
 
-//gscript:requires none
+//leia:requires none
 tool echo_tool(query) {
     return query, nil
 }
@@ -102,20 +102,20 @@ turn_text := turn_result.text
 func TestLLMMessagesBlockAllowsMixedMessageItems(t *testing.T) {
 	for _, tc := range []struct {
 		name string
-		opts []gs.Option
+		opts []leia.Option
 	}{
 		{name: "interpreter"},
-		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			provider := &mockLLMProvider{res: llm.TurnResult{Status: "final_answer", Text: "ok"}}
-			opts := append([]gs.Option{
-				gs.WithLibs(gs.LibString | gs.LibLLM),
-				gs.WithLLMProvider(provider),
+			opts := append([]leia.Option{
+				leia.WithLibs(leia.LibString | leia.LibLLM),
+				leia.WithLLMProvider(provider),
 			}, tc.opts...)
-			vm := gs.New(opts...)
+			vm := leia.New(opts...)
 			err := vm.Exec(`
-call := {id: "call_1", tool: "lookup", args: {query: "gscript"}}
+call := {id: "call_1", tool: "lookup", args: {query: "leia"}}
 history := messages {
     system: "System text."
     user: "Find docs."
@@ -159,15 +159,15 @@ history_len := #history
 func TestLLMHistoryHelpersAndValidateOutput(t *testing.T) {
 	for _, tc := range []struct {
 		name string
-		opts []gs.Option
+		opts []leia.Option
 	}{
 		{name: "interpreter"},
-		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			vm := gs.New(append([]gs.Option{gs.WithLibs(gs.LibString | gs.LibLLM)}, tc.opts...)...)
+			vm := leia.New(append([]leia.Option{leia.WithLibs(leia.LibString | leia.LibLLM)}, tc.opts...)...)
 			if err := vm.Exec(`
-call := {id: "call_1", tool: "lookup", args: {query: "gscript"}}
+call := {id: "call_1", tool: "lookup", args: {query: "leia"}}
 h := messages {
     user: "Find docs."
     msg.assistant_call(call)
@@ -221,21 +221,21 @@ user_count := #all_users
 func TestLLMFlowAgentUsesStdlibAgentAmbientConfig(t *testing.T) {
 	for _, tc := range []struct {
 		name string
-		opts []gs.Option
+		opts []leia.Option
 	}{
 		{name: "interpreter"},
-		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			provider := &mockLLMProvider{results: []llm.TurnResult{
 				{Status: "final_answer", Text: "one", Usage: llm.TurnUsage{InputTokens: 2, OutputTokens: 3}},
 				{Status: "final_answer", Text: "two"},
 			}}
-			opts := append([]gs.Option{
-				gs.WithLibs(gs.LibString | gs.LibLLM),
-				gs.WithLLMProvider(provider),
+			opts := append([]leia.Option{
+				leia.WithLibs(leia.LibString | leia.LibLLM),
+				leia.WithLLMProvider(provider),
 			}, tc.opts...)
-			vm := gs.New(opts...)
+			vm := leia.New(opts...)
 			err := vm.Exec(`
 models {
     default: "default-alias"
@@ -244,7 +244,7 @@ models {
 }
 
 // Echoes a query.
-//gscript:requires none
+//leia:requires none
 tool echo_tool(query) {
     return query, nil
 }

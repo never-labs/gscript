@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/never-labs/gscript/internal/jit"
+	"github.com/never-labs/leia/internal/jit"
 )
 
 // computeTailCalls (R107) scans the IR for the tail-call pattern:

@@ -5,11 +5,11 @@ import (
 	"regexp"
 	"strconv"
 
-	"github.com/never-labs/gscript/internal/ast"
+	"github.com/never-labs/leia/internal/ast"
 )
 
 // LuaError represents an error raised by the error() built-in or other
-// GScript runtime mechanisms. It wraps a Value so that error objects are
+// Leia runtime mechanisms. It wraps a Value so that error objects are
 // not limited to strings.
 type LuaError struct {
 	Value Value // the error value (can be any type)

@@ -3,7 +3,7 @@ package vm
 import (
 	"testing"
 
-	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/leia/internal/runtime"
 )
 
 const numericArrayRegionSortSource = `
@@ -65,7 +65,7 @@ func TestNumericArrayRegionSortIgnoresBenchmarkMetadata(t *testing.T) {
 		t.Fatal("missing quicksort proto")
 	}
 	quicksort.Name = "runtime_generated_region_sort"
-	quicksort.Source = "host/generated/not-a-benchmark.gs"
+	quicksort.Source = "host/generated/not-a-benchmark.leia"
 
 	if !isNumericArrayRegionSortProto(quicksort) {
 		t.Fatal("numeric_array_region_sort recognizer should depend on bytecode shape, not proto metadata")

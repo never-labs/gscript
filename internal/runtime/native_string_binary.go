@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	binfmt "github.com/never-labs/gscript/internal/support/binaryfmt"
+	binfmt "github.com/never-labs/leia/internal/support/binaryfmt"
 )
 
 // These adapters back the runtime-native string.pack/unpack/packsize entries.

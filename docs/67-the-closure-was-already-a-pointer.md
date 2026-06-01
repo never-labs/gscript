@@ -41,7 +41,7 @@ This round chased one of those contracts.
 
 ## The Expensive Question
 
-GScript values are tagged. A function value can be a VM closure. The hot call
+Leia values are tagged. A function value can be a VM closure. The hot call
 path asks a simple question many times:
 
 ```

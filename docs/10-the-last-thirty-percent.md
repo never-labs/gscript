@@ -14,9 +14,9 @@ In [Post #9](09-the-cold-code-revolution), we had a productive day of seven opti
 
 The scoreboard at the end of Post #9:
 
-| Benchmark | GScript | LuaJIT | Gap |
+| Benchmark | Leia | LuaJIT | Gap |
 |-----------|---------|--------|-----|
-| fib(20) | 24us | 25us | **GScript wins** |
+| fib(20) | 24us | 25us | **Leia wins** |
 | fn calls (10K) | 2.6us | 2.5us | 5% gap |
 | ackermann(3,4) | 30us | 12us | 2.5x |
 | mandelbrot(1000) | 0.23s | 0.06s | 4.0x |
@@ -52,7 +52,7 @@ Wait --- we said mandelbrot was 0.23s. The intermediate number 0.214s came from 
 
 The trace JIT emits type guards to ensure values have the expected type. For integer operations, these guards are essential --- if a value that should be an integer is actually a float, the integer arithmetic instruction will produce garbage.
 
-But for float operations, the situation is different. ARM64's `FMUL`, `FADD`, `FSUB` instructions operate on float registers. If the source value is already a float, the guard is redundant. And if the source value is an integer, GScript's semantics automatically promote it to float --- so the "guard that this is a float" should not abort, it should just convert.
+But for float operations, the situation is different. ARM64's `FMUL`, `FADD`, `FSUB` instructions operate on float registers. If the source value is already a float, the guard is redundant. And if the source value is an integer, Leia's semantics automatically promote it to float --- so the "guard that this is a float" should not abort, it should just convert.
 
 The optimization: for slots that are only used in float operations (no integer operations depend on them), skip the float type guard entirely. Instead, emit a "convert if integer" instruction that handles both cases. This eliminates a branch per float operation.
 
@@ -68,9 +68,9 @@ For mandelbrot, several temporary slots are write-before-read. Each eliminated g
 
 ## Type-Specialized Arrays
 
-GScript arrays (created by `make([]int, n)` or `make([]float, n)`) store `Value` elements --- our 24-byte tagged union. When the trace JIT compiles an array access like `a[i]`, it must load 24 bytes, check the type tag, extract the payload, and operate on it.
+Leia arrays (created by `make([]int, n)` or `make([]float, n)`) store `Value` elements --- our 24-byte tagged union. When the trace JIT compiles an array access like `a[i]`, it must load 24 bytes, check the type tag, extract the payload, and operate on it.
 
-LuaJIT has the same general problem, but its TValue is 8 bytes (NaN-boxed), so an array of 1000 elements is 8KB. GScript's array of 1000 elements is 24KB. The 3x memory footprint translates directly to 3x more cache misses.
+LuaJIT has the same general problem, but its TValue is 8 bytes (NaN-boxed), so an array of 1000 elements is 8KB. Leia's array of 1000 elements is 24KB. The 3x memory footprint translates directly to 3x more cache misses.
 
 The type-specialized array optimization: when an array is created with a type hint (`make([]int, n)` or `make([]float, n)`), allocate a compact backing store of unboxed `int64` or `float64` values. The `ArrayInt` type stores raw 8-byte integers; `ArrayFloat` stores raw 8-byte floats. No type tags, no padding.
 
@@ -159,7 +159,7 @@ With the growable call stack, binary_trees runs correctly in all three modes:
 binary_trees:  VM 1.255s | JIT 1.871s | Trace 1.871s | LuaJIT 0.17s
 ```
 
-The 7.4x gap to LuaJIT is entirely the Value size problem. binary_trees creates millions of 3-element tables (node, left, right). Each table stores 3 Values = 72 bytes in GScript vs 24 bytes in LuaJIT. The tree has ~131,000 leaf nodes and ~65,000 internal nodes --- roughly 200,000 allocations. At 72 vs 24 bytes per node, GScript allocates 14MB of node data vs LuaJIT's 5MB. The 3x memory overhead means 3x more cache pressure, plus GC pressure from 3x more pointer-sized objects to trace.
+The 7.4x gap to LuaJIT is entirely the Value size problem. binary_trees creates millions of 3-element tables (node, left, right). Each table stores 3 Values = 72 bytes in Leia vs 24 bytes in LuaJIT. The tree has ~131,000 leaf nodes and ~65,000 internal nodes --- roughly 200,000 allocations. At 72 vs 24 bytes per node, Leia allocates 14MB of node data vs LuaJIT's 5MB. The 3x memory overhead means 3x more cache pressure, plus GC pressure from 3x more pointer-sized objects to trace.
 
 Note that the JIT and trace modes are *slower* than the VM interpreter on this benchmark. The method JIT's overhead (compilation time, guard checks) exceeds its benefit for code that is dominated by memory allocation. The trace JIT's overhead is even worse --- it tries to record the recursive tree construction, fails, and adds recording overhead on top of the allocation cost.
 
@@ -177,9 +177,9 @@ After all ten optimizations:
 
 ### vs LuaJIT (warm micro-benchmarks)
 
-| Benchmark | GScript JIT | LuaJIT | Result |
+| Benchmark | Leia JIT | LuaJIT | Result |
 |-----------|-------------|--------|--------|
-| **fib(20)** | **19.4us** | 24.7us | **GScript 21% faster** |
+| **fib(20)** | **19.4us** | 24.7us | **Leia 21% faster** |
 | **fn calls (10K)** | **2.66us** | 2.6us | **parity** |
 | **ackermann(3,4)** | 18.9us | 12.0us | 1.6x gap |
 | mandelbrot(1000) | 0.155s | 0.058s | 2.7x gap |
@@ -234,7 +234,7 @@ This is the same lesson from Post #5 (the blacklist that changed everything) and
 
 The scoreboard tells a clear story. There are two categories of benchmarks:
 
-**Compute-heavy (competitive):** fib, fn_calls, ackermann, mandelbrot. These benchmarks do arithmetic in registers, with minimal table access. GScript is within 1-3x of LuaJIT on all of them.
+**Compute-heavy (competitive):** fib, fn_calls, ackermann, mandelbrot. These benchmarks do arithmetic in registers, with minimal table access. Leia is within 1-3x of LuaJIT on all of them.
 
 **Table-heavy (10-80x behind):** matmul, nbody, spectral_norm, method_dispatch, sort, sieve, binary_trees. These benchmarks create tables, read fields, write elements. Every table operation moves 24 bytes per Value instead of 8. The 3x memory overhead cascades: 3x more cache misses, 3x more memory bandwidth, 3x more GC pressure.
 

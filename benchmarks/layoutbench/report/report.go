@@ -8,7 +8,7 @@ import (
 	"runtime"
 	"time"
 
-	layoutbench "github.com/never-labs/gscript/benchmarks/layoutbench"
+	layoutbench "github.com/never-labs/leia/benchmarks/layoutbench"
 )
 
 type Report struct {
@@ -64,12 +64,12 @@ func RunCLI(args []string, stdout io.Writer, stderr io.Writer) int {
 
 func Build(particles, steps, vectors, repeats int) Report {
 	return Report{
-		Schema:         "gscript.layout_benchmark.v1",
+		Schema:         "leia.layout_benchmark.v1",
 		GeneratedAtUTC: time.Now().UTC().Format(time.RFC3339),
 		GoVersion:      runtime.Version(),
 		GOOS:           runtime.GOOS,
 		GOARCH:         runtime.GOARCH,
-		BackendStatus:  "pending_gscript_typed_array_soa_backend",
+		BackendStatus:  "pending_leia_typed_array_soa_backend",
 		Results: []Result{
 			measureParticleAoS(particles, steps, repeats),
 			measureParticleSoA(particles, steps, repeats),
@@ -159,7 +159,7 @@ func makeResult(name, layout, impl string, n, steps, repeats int, seconds, items
 		Benchmark:           name,
 		Layout:              layout,
 		Implementation:      impl,
-		BackendStatus:       "pending_gscript_typed_array_soa_backend",
+		BackendStatus:       "pending_leia_typed_array_soa_backend",
 		N:                   n,
 		Steps:               steps,
 		Repeats:             repeats,

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Repeatable performance gate for core GScript hot paths.
+# Repeatable performance gate for core Leia hot paths.
 #
 # This is a thin wrapper around benchmarks/timing_compare.py plus an optional
 # strict_guard.py truth pass. It does not tune workloads in production code; it
@@ -16,7 +16,7 @@ WARMUP=1
 TIMEOUT=120
 THRESHOLD=0.12
 WALL_THRESHOLD=0.30
-OUT_DIR="${TMPDIR:-/tmp}/gscript_performance_gate"
+OUT_DIR="${TMPDIR:-/tmp}/leia_performance_gate"
 HEAD_REF="HEAD"
 PROFILE="core"
 STRICT=1
@@ -89,7 +89,7 @@ Options:
   --timeout N             Timeout per command invocation. Default: 120.
   --threshold F           Script-timed current/HEAD regression limit. Default: 0.12.
   --wall-threshold F      Wall-timed current/HEAD regression limit. Default: 0.30.
-  --out-dir DIR           Artifact directory. Default: ${TMPDIR:-/tmp}/gscript_performance_gate.
+  --out-dir DIR           Artifact directory. Default: ${TMPDIR:-/tmp}/leia_performance_gate.
   --head-ref REF          Clean baseline ref for timing_compare.py. Default: HEAD.
   --no-luajit             Skip LuaJIT timing.
   --strict / --no-strict  Enable or skip strict_guard.py truth pass. Default: --strict.

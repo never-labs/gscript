@@ -6,11 +6,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/never-labs/gscript/llm"
+	"github.com/never-labs/leia/llm"
 )
 
 func TestProviderTurnPassesModelAndRenderedPrompt(t *testing.T) {
-	t.Setenv("GSCRIPT_LLM_COMMAND_HELPER", "1")
+	t.Setenv("LEIA_LLM_COMMAND_HELPER", "1")
 	provider := Provider{
 		Command: os.Args[0],
 		Args:    []string{"-test.run=TestHelperProcess", "--"},
@@ -36,7 +36,7 @@ func TestProviderTurnPassesModelAndRenderedPrompt(t *testing.T) {
 }
 
 func TestProviderTurnKeepsExistingModelFlag(t *testing.T) {
-	t.Setenv("GSCRIPT_LLM_COMMAND_HELPER", "1")
+	t.Setenv("LEIA_LLM_COMMAND_HELPER", "1")
 	provider := Provider{
 		Command: os.Args[0],
 		Args:    []string{"-test.run=TestHelperProcess", "--", "--model=preselected"},
@@ -66,7 +66,7 @@ func TestProviderTurnRequiresCommand(t *testing.T) {
 }
 
 func TestHelperProcess(t *testing.T) {
-	if os.Getenv("GSCRIPT_LLM_COMMAND_HELPER") != "1" {
+	if os.Getenv("LEIA_LLM_COMMAND_HELPER") != "1" {
 		return
 	}
 	for i, arg := range os.Args {

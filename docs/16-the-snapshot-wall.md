@@ -4,7 +4,7 @@ Six rounds of fixes. Five different approaches. Zero success. This is the story 
 
 ## Where We Are
 
-GScript's trace JIT compiles hot loops to ARM64 native code. It works beautifully for pure integer workloads — fib runs at LuaJIT parity. But nbody (floating-point physics simulation) runs at 1.8 seconds, 55x behind LuaJIT's 0.035s. The trace compiles, the guards fire, and the native code... never executes.
+Leia's trace JIT compiles hot loops to ARM64 native code. It works beautifully for pure integer workloads — fib runs at LuaJIT parity. But nbody (floating-point physics simulation) runs at 1.8 seconds, 55x behind LuaJIT's 0.035s. The trace compiles, the guards fire, and the native code... never executes.
 
 The immediate blocker: pre-loop type guards keep failing. The trace expects slot 13 to hold an integer at loop entry, but it holds nil (the function was just called, locals aren't initialized yet). Five consecutive guard failures → blacklist → interpreter forever.
 

@@ -8,8 +8,8 @@ package vm
 import (
 	"fmt"
 
-	"github.com/never-labs/gscript/internal/ast"
-	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/leia/internal/ast"
+	"github.com/never-labs/leia/internal/runtime"
 )
 
 // --------------------------------------------------------------------

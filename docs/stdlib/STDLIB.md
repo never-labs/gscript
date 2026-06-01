@@ -1,6 +1,6 @@
-# GScript Standard Library Reference
+# Leia Standard Library Reference
 
-GScript ships with a comprehensive standard library covering application development, game development, and system scripting.
+Leia ships with a comprehensive standard library covering application development, game development, and system scripting.
 
 ## Quick Overview
 
@@ -38,13 +38,13 @@ GScript ships with a comprehensive standard library covering application develop
 
 ## Embedding API Library Presets
 
-When embedding GScript in Go, use `LibFlags` to control which libraries are available:
+When embedding Leia in Go, use `LibFlags` to control which libraries are available:
 
 ```go
-gscript.New(gscript.WithLibs(gscript.LibApp))   // app dev preset
-gscript.New(gscript.WithLibs(gscript.LibGame))  // game dev preset
-gscript.New(gscript.WithLibs(gscript.LibSafe))  // sandboxed (no I/O)
-gscript.New(gscript.WithLibs(gscript.LibAll))   // everything (default)
+leia.New(leia.WithLibs(leia.LibApp))   // app dev preset
+leia.New(leia.WithLibs(leia.LibGame))  // game dev preset
+leia.New(leia.WithLibs(leia.LibSafe))  // sandboxed (no I/O)
+leia.New(leia.WithLibs(leia.LibAll))   // everything (default)
 ```
 
 | Preset | Included Libraries |
@@ -79,7 +79,7 @@ Supported options: `collect`, `count`, `stats`, `step`, `stop`, `restart`,
 
 ## Core Control Flow
 
-GScript supports structured loops plus Go-style labels for rare state-machine
+Leia supports structured loops plus Go-style labels for rare state-machine
 or cleanup exits. Labels are written as `name:` and jumps as `goto name`.
 Labels are function-local and unique. A `goto` may jump forward, backward, or
 out of nested blocks, but it may not jump into a deeper block or skip a local
@@ -132,7 +132,7 @@ as `%b()`. Frontier assertions like `%f[%w]` use a byte-oriented matcher path
 for word-boundary style scans while the ordinary pattern body still uses RE2.
 Use the `regexp` package directly for native Go regular expressions.
 
-See individual function reference at: [GScript README Language Features](../../README.md)
+See individual function reference at: [Leia README Language Features](../../README.md)
 
 ---
 
@@ -243,8 +243,8 @@ pretty := json.pretty({a: 1, b: {c: 2}})
 
 | Function | Description |
 |----------|-------------|
-| `json.encode(v)` | Encode GScript value to JSON string |
-| `json.decode(s)` | Parse JSON string to GScript value |
+| `json.encode(v)` | Encode Leia value to JSON string |
+| `json.decode(s)` | Parse JSON string to Leia value |
 | `json.pretty(v [, indent])` | Pretty-print JSON (default 2-space indent) |
 
 ---
@@ -330,7 +330,7 @@ files, err := fs.glob("/tmp/*.txt")
 
 // Misc
 dir := fs.tempdir()                   // "/tmp"
-path, err := fs.tempfile("/tmp", "gs")  // temp file path
+path, err := fs.tempfile("/tmp", "leia")  // temp file path
 cwd, err := fs.cwd()
 ok, err := fs.chdir("/new/dir")
 ```
@@ -683,12 +683,12 @@ See [process.md](process.md).
 ```go
 argv := process.args()       // argv[0] is script path/entry name
 entry := process.entry()     // {file, dir, args}
-process.setArgs("tool.gs", "build", "--fast")
+process.setArgs("tool.leia", "build", "--fast")
 
 result := process.run({"echo", "hello"})
 out, err := process.exec("echo", "hello")
 sh := process.shell("echo $HOME")
-path := process.which("gscript")
+path := process.which("leia")
 pid := process.pid()
 env := process.env()
 
@@ -699,15 +699,15 @@ process.exit(0)              // raises a host-visible process exit signal
 
 ## script
 
-Compile, evaluate, and load GScript source. See [script.md](script.md).
+Compile, evaluate, and load Leia source. See [script.md](script.md).
 
 ```go
-fn := script.compile("return 1 + 2", {sourceName: "generated.gs"})
+fn := script.compile("return 1 + 2", {sourceName: "generated.leia"})
 print(fn())                  // 3
 
-result := script.eval("return name", {env: {name: "gscript"}})
-chunk := script.loadFile("plugin.gs", {scriptDir: "plugins"})
-script.runFile("main.gs", {sourceName: "virtual/main.gs"})
+result := script.eval("return name", {env: {name: "leia"}})
+chunk := script.loadFile("plugin.leia", {scriptDir: "plugins"})
+script.runFile("main.leia", {sourceName: "virtual/main.leia"})
 
 dir := script.dir()
 old := script.setDir("scripts")
@@ -740,7 +740,7 @@ debug.setHook(nil)
 
 ## testkit
 
-Small runtime test helpers for translated official cases and GScript self-tests.
+Small runtime test helpers for translated official cases and Leia self-tests.
 This is a Go-host replacement for Lua's private C test library, not a
 `T.testC` instruction emulator.
 

@@ -30,7 +30,7 @@ import benchmark_discovery as discovery
 import timing_compare as timing_harness
 
 
-DEFAULT_OUT_DIR = Path(os.environ.get("TMPDIR", "/tmp")) / "gscript-triage"
+DEFAULT_OUT_DIR = Path(os.environ.get("TMPDIR", "/tmp")) / "leia-triage"
 
 PPROF_ROW_RE = re.compile(
     r"^\s*(?P<flat>[0-9.]+)(?P<flat_unit>ns|us|ms|s)?\s+"
@@ -386,10 +386,10 @@ def collect_spec_state(root: Path, out_dir: Path, bench: str, timeout: int) -> P
     script = bench_script_path(root, bench)
     if script is None:
         return None
-    tempdir = Path(tempfile.mkdtemp(prefix="gscript_triage_spec_"))
+    tempdir = Path(tempfile.mkdtemp(prefix="leia_triage_spec_"))
     try:
-        binary = tempdir / "gscript"
-        build = run(["go", "build", "-o", str(binary), "./cmd/gscript"], root, timeout)
+        binary = tempdir / "leia"
+        build = run(["go", "build", "-o", str(binary), "./cmd/leia"], root, timeout)
         if build.returncode != 0:
             return None
         spec_state_json = out_dir / "tier2-spec-state.json"
@@ -928,12 +928,12 @@ def main() -> int:
         bench_info = bench_id_to_path(root, first)
         if bench_info:
             group, bench_name, bench_path = bench_info
-            tempdir = Path(tempfile.mkdtemp(prefix="gscript_triage_pprof_"))
+            tempdir = Path(tempfile.mkdtemp(prefix="leia_triage_pprof_"))
             try:
-                binary = tempdir / "gscript"
-                build = run(["go", "build", "-o", str(binary), "./cmd/gscript"], root, int(args.timeout))
+                binary = tempdir / "leia"
+                build = run(["go", "build", "-o", str(binary), "./cmd/leia"], root, int(args.timeout))
                 if build.returncode == 0:
-                    pprof_binary = out_dir / "gscript.pprof.bin"
+                    pprof_binary = out_dir / "leia.pprof.bin"
                     shutil.copy2(binary, pprof_binary)
                     cpu = out_dir / f"{bench_name}.pprof"
                     run([str(binary), "-jit", "-cpuprofile", str(cpu), str(bench_path.relative_to(root))], root, int(args.timeout))
@@ -952,12 +952,12 @@ def main() -> int:
             memprofile_path = Path(args.memprofile)
         elif bench_info:
             _, bench_name, bench_path = bench_info
-            tempdir = Path(tempfile.mkdtemp(prefix="gscript_triage_mem_"))
+            tempdir = Path(tempfile.mkdtemp(prefix="leia_triage_mem_"))
             try:
-                binary = tempdir / "gscript"
-                build = run(["go", "build", "-o", str(binary), "./cmd/gscript"], root, int(args.timeout))
+                binary = tempdir / "leia"
+                build = run(["go", "build", "-o", str(binary), "./cmd/leia"], root, int(args.timeout))
                 if build.returncode == 0:
-                    pprof_binary = out_dir / "gscript.pprof.bin"
+                    pprof_binary = out_dir / "leia.pprof.bin"
                     shutil.copy2(binary, pprof_binary)
                     memprofile_path = out_dir / f"{bench_name}.memprofile"
                     run([str(binary), "-jit", "-memprofile", str(memprofile_path), str(bench_path.relative_to(root))], root, int(args.timeout))
@@ -971,12 +971,12 @@ def main() -> int:
         bench_info = bench_id_to_path(root, first)
         if bench_info:
             _, bench_name, bench_path = bench_info
-            tempdir = Path(tempfile.mkdtemp(prefix="gscript_triage_warm_"))
+            tempdir = Path(tempfile.mkdtemp(prefix="leia_triage_warm_"))
             try:
-                binary = tempdir / "gscript"
-                build = run(["go", "build", "-o", str(binary), "./cmd/gscript"], root, int(args.timeout))
+                binary = tempdir / "leia"
+                build = run(["go", "build", "-o", str(binary), "./cmd/leia"], root, int(args.timeout))
                 if build.returncode == 0:
-                    pprof_binary = out_dir / "gscript.pprof.bin"
+                    pprof_binary = out_dir / "leia.pprof.bin"
                     shutil.copy2(binary, pprof_binary)
                     warm_dir = out_dir / f"{bench_name}.warm"
                     if warm_dir.exists():

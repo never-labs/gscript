@@ -25,7 +25,7 @@
 //      pre-header is interposed).
 //
 // Correctness notes:
-//   - OpGuardType IS hoisted when its operand is invariant. GScript's deopt
+//   - OpGuardType IS hoisted when its operand is invariant. Leia's deopt
 //     model (ExitCode=2, jump to deopt_epilogue) has no PC-dependent state.
 //   - OpGuardTruthy/OpGuardNonNil are NOT hoisted (control-flow guards).
 //   - OpLoadSlot is only hoisted if no in-loop OpStoreSlot writes the
@@ -38,7 +38,7 @@ package methodjit
 import (
 	"fmt"
 
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/vm"
 )
 
 var licmPassAllowedDomains = allowedDomainsForModule(analysisFacts(AnalysisFactInt48Safe, AnalysisFactCallABIs, AnalysisFactFixedShapeTables, AnalysisFactSpecDependencyProtos), nil, nil)

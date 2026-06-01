@@ -68,7 +68,7 @@ The rows had to stop being independent allocations.
 
 ## DenseMatrix Already Existed, But The Benchmark Did Not Use It
 
-GScript already had a `matrix` library path that could build a DenseMatrix:
+Leia already had a `matrix` library path that could build a DenseMatrix:
 
 ```
 flat backing: []float64

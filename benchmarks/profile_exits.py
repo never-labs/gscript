@@ -54,7 +54,7 @@ def parse_time(output: str) -> float | None:
 
 def build(root: Path, out: Path) -> None:
     proc = subprocess.run(
-        ["go", "build", "-o", str(out), "./cmd/gscript"],
+        ["go", "build", "-o", str(out), "./cmd/leia"],
         cwd=root,
         text=True,
         stdout=subprocess.PIPE,
@@ -73,13 +73,13 @@ def benchmark_path(root: Path, bench: str) -> tuple[str, Path] | None:
         name = bench
         groups = list(BENCHMARK_GROUPS)
     for group in groups:
-        path = root / "benchmarks" / group / f"{name}.gs"
+        path = root / "benchmarks" / group / f"{name}.leia"
         if path.exists():
             return f"{group}/{name}", path
     return None
 
 
-def run_one(root: Path, gscript: Path, bench: str, mode: str, timeout: int) -> dict:
+def run_one(root: Path, leia: Path, bench: str, mode: str, timeout: int) -> dict:
     resolved = benchmark_path(root, bench)
     if resolved is None:
         return {"benchmark": bench, "status": "missing"}
@@ -89,8 +89,8 @@ def run_one(root: Path, gscript: Path, bench: str, mode: str, timeout: int) -> d
 
     env = os.environ.copy()
     if mode == "no_filter":
-        env["GSCRIPT_TIER2_NO_FILTER"] = "1"
-    cmd = [str(gscript), "-jit", "-jit-stats", "-exit-stats-json", str(path)]
+        env["LEIA_TIER2_NO_FILTER"] = "1"
+    cmd = [str(leia), "-jit", "-jit-stats", "-exit-stats-json", str(path)]
     try:
         proc = subprocess.run(
             cmd,
@@ -213,11 +213,11 @@ def main() -> int:
 
     root = Path(__file__).resolve().parents[1]
     benches = args.bench or DEFAULT_BENCHMARKS
-    tempdir = Path(tempfile.mkdtemp(prefix="gscript_exit_profile_"))
-    gscript = tempdir / "gscript"
+    tempdir = Path(tempfile.mkdtemp(prefix="leia_exit_profile_"))
+    leia = tempdir / "leia"
     try:
-        build(root, gscript)
-        results = [run_one(root, gscript, bench, args.mode, args.timeout) for bench in benches]
+        build(root, leia)
+        results = [run_one(root, leia, bench, args.mode, args.timeout) for bench in benches]
     finally:
         shutil.rmtree(tempdir, ignore_errors=True)
 

@@ -7,7 +7,7 @@ import (
 	"strconv"
 )
 
-// JSONValueToGo converts a GScript Value to a Go value suitable for json.Marshal.
+// JSONValueToGo converts a Leia Value to a Go value suitable for json.Marshal.
 // Mixed tables, sparse arrays, and hash tables are encoded as JSON objects.
 func JSONValueToGo(v Value) any {
 	switch v.Type() {
@@ -32,7 +32,7 @@ func JSONValueToGo(v Value) any {
 	}
 }
 
-// JSONTableToGo converts a GScript table to either a JSON array or object.
+// JSONTableToGo converts a Leia table to either a JSON array or object.
 func JSONTableToGo(tbl *Table) any {
 	length := tbl.Length()
 	hasHashKeys := false
@@ -76,7 +76,7 @@ func JSONTableToGo(tbl *Table) any {
 	return m
 }
 
-// JSONGoToValue converts a Go value decoded by json.Decoder into a GScript Value.
+// JSONGoToValue converts a Go value decoded by json.Decoder into a Leia Value.
 func JSONGoToValue(v any) Value {
 	switch val := v.(type) {
 	case nil:

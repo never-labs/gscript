@@ -1,15 +1,15 @@
-package gscript_test
+package leia_test
 
 import (
 	"errors"
 	"strings"
 	"testing"
 
-	gs "github.com/never-labs/gscript"
+	leia "github.com/never-labs/leia"
 )
 
 func TestWithMaxStepsLimitsInterpreterExecution(t *testing.T) {
-	vm := gs.New(gs.WithMaxSteps(8))
+	vm := leia.New(leia.WithMaxSteps(8))
 	err := vm.Exec(`
 		i := 0
 		for {
@@ -25,12 +25,12 @@ func TestWithMaxStepsLimitsInterpreterExecution(t *testing.T) {
 }
 
 func TestWithMaxStepsLimitsEmptyInterpreterLoop(t *testing.T) {
-	vm := gs.New(gs.WithMaxSteps(8))
+	vm := leia.New(leia.WithMaxSteps(8))
 	err := vm.Exec(`for {}`)
 	if err == nil {
 		t.Fatal("expected step limit error")
 	}
-	var budgetErr *gs.BudgetError
+	var budgetErr *leia.BudgetError
 	if !errors.As(err, &budgetErr) {
 		t.Fatalf("expected BudgetError, got %T %v", err, err)
 	}
@@ -40,7 +40,7 @@ func TestWithMaxStepsLimitsEmptyInterpreterLoop(t *testing.T) {
 }
 
 func TestWithMaxStepsAllowsInterpreterExecutionWithinBudget(t *testing.T) {
-	vm := gs.New(gs.WithMaxSteps(64))
+	vm := leia.New(leia.WithMaxSteps(64))
 	if err := vm.Exec(`
 		sum := 0
 		for i := 0; i < 5; i++ {
@@ -59,7 +59,7 @@ func TestWithMaxStepsAllowsInterpreterExecutionWithinBudget(t *testing.T) {
 }
 
 func TestWithMaxStepsLimitsBytecodeExecution(t *testing.T) {
-	vm := gs.New(gs.WithVM(), gs.WithMaxSteps(8))
+	vm := leia.New(leia.WithVM(), leia.WithMaxSteps(8))
 	err := vm.Exec(`
 		i := 0
 		for {
@@ -75,12 +75,12 @@ func TestWithMaxStepsLimitsBytecodeExecution(t *testing.T) {
 }
 
 func TestWithMaxStepsLimitsEmptyBytecodeLoop(t *testing.T) {
-	vm := gs.New(gs.WithVM(), gs.WithMaxSteps(8))
+	vm := leia.New(leia.WithVM(), leia.WithMaxSteps(8))
 	err := vm.Exec(`for {}`)
 	if err == nil {
 		t.Fatal("expected step limit error")
 	}
-	var budgetErr *gs.BudgetError
+	var budgetErr *leia.BudgetError
 	if !errors.As(err, &budgetErr) {
 		t.Fatalf("expected BudgetError, got %T %v", err, err)
 	}
@@ -90,7 +90,7 @@ func TestWithMaxStepsLimitsEmptyBytecodeLoop(t *testing.T) {
 }
 
 func TestWithMaxStepsAllowsBytecodeExecutionWithinBudget(t *testing.T) {
-	vm := gs.New(gs.WithVM(), gs.WithMaxSteps(256))
+	vm := leia.New(leia.WithVM(), leia.WithMaxSteps(256))
 	if err := vm.Exec(`
 		sum := 0
 		for i := 0; i < 5; i++ {

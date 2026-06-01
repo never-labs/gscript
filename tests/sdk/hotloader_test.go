@@ -1,4 +1,4 @@
-package gscript_test
+package leia_test
 
 import (
 	"os"
@@ -6,17 +6,17 @@ import (
 	"strings"
 	"testing"
 
-	gs "github.com/never-labs/gscript"
+	leia "github.com/never-labs/leia"
 )
 
 func TestHotLoaderReloadSwapsProgram(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "logic.gs")
+	path := filepath.Join(dir, "logic.leia")
 	if err := os.WriteFile(path, []byte(`func answer() { return 1 }`), 0644); err != nil {
 		t.Fatal(err)
 	}
 
-	loader := gs.NewHotLoader()
+	loader := leia.NewHotLoader()
 	handle, err := loader.Load(path)
 	if err != nil {
 		t.Fatal(err)
@@ -25,7 +25,7 @@ func TestHotLoaderReloadSwapsProgram(t *testing.T) {
 		t.Fatalf("generation = %d, want 1", handle.Generation())
 	}
 
-	vm := gs.New()
+	vm := leia.New()
 	got, err := handle.Call(vm, "answer")
 	if err != nil {
 		t.Fatal(err)
@@ -44,7 +44,7 @@ func TestHotLoaderReloadSwapsProgram(t *testing.T) {
 		t.Fatalf("generation = %d, want 2", handle.Generation())
 	}
 
-	vm = gs.New()
+	vm = leia.New()
 	got, err = handle.Call(vm, "answer")
 	if err != nil {
 		t.Fatal(err)
@@ -56,12 +56,12 @@ func TestHotLoaderReloadSwapsProgram(t *testing.T) {
 
 func TestHotLoaderReloadFailureKeepsPreviousProgram(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "logic.gs")
+	path := filepath.Join(dir, "logic.leia")
 	if err := os.WriteFile(path, []byte(`func answer() { return 7 }`), 0644); err != nil {
 		t.Fatal(err)
 	}
 
-	loader := gs.NewHotLoader()
+	loader := leia.NewHotLoader()
 	handle, err := loader.Load(path)
 	if err != nil {
 		t.Fatal(err)
@@ -77,7 +77,7 @@ func TestHotLoaderReloadFailureKeepsPreviousProgram(t *testing.T) {
 		t.Fatalf("generation = %d, want 1", handle.Generation())
 	}
 
-	vm := gs.New()
+	vm := leia.New()
 	got, err := handle.Call(vm, "answer")
 	if err != nil {
 		t.Fatal(err)
@@ -89,12 +89,12 @@ func TestHotLoaderReloadFailureKeepsPreviousProgram(t *testing.T) {
 
 func TestHotLoaderReloadIfChangedSkipsSameSource(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "logic.gs")
+	path := filepath.Join(dir, "logic.leia")
 	if err := os.WriteFile(path, []byte(`func answer() { return 7 }`), 0644); err != nil {
 		t.Fatal(err)
 	}
 
-	loader := gs.NewHotLoader()
+	loader := leia.NewHotLoader()
 	handle, err := loader.Load(path)
 	if err != nil {
 		t.Fatal(err)
@@ -130,7 +130,7 @@ func writeScript(t *testing.T, path, src string) {
 	}
 }
 
-func assertCallResult(t *testing.T, inst *gs.HotInstance, name string, argsAndWant ...interface{}) {
+func assertCallResult(t *testing.T, inst *leia.HotInstance, name string, argsAndWant ...interface{}) {
 	t.Helper()
 	if len(argsAndWant) == 0 {
 		t.Fatal("missing expected result")

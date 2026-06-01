@@ -1,4 +1,4 @@
-# GScript Agent Layer Specification — v1 draft
+# Leia Agent Layer Specification — v1 draft
 
 > Status: design draft.
 > Scope: `models` / `tool` / `budget` / `turn` / `agent` plus the capability + result/error conventions around them.
@@ -11,9 +11,9 @@
 1. **Dynamic, Lua-semantics, Go syntax.** No type system. No typed struct literals. No type annotations.
 2. **Five keywords**: `models`, `tool`, `budget`, `turn`, `agent`. Nothing else gets reserved.
 3. **`turn` is the only LLM-call primitive.** All LLM I/O — including the LLM calls inside any `agent` body — goes through `turn`. Runtime is free to inline, but observable behavior must match.
-4. **`agent` is metadata + body.** Two blocks: the first declares model/tools/caps/system; the second is regular GScript code where the user writes the loop and calls `turn` directly.
-5. **`budget` is ambient.** `budget { config } { body }` pushes a frame; nested calls read it via runtime helpers. No `ctx` parameter threaded through GScript code.
-6. **Declaration metadata in comments.** `tool` annotations use Go-style `//gs:` directives.
+4. **`agent` is metadata + body.** Two blocks: the first declares model/tools/caps/system; the second is regular Leia code where the user writes the loop and calls `turn` directly.
+5. **`budget` is ambient.** `budget { config } { body }` pushes a frame; nested calls read it via runtime helpers. No `ctx` parameter threaded through Leia code.
+6. **Declaration metadata in comments.** `tool` annotations use Go-style `//leia:` directives.
 7. **`err` vs `result.status`.** `err` = "something went wrong, propagate." `result.status` = "the call finished one of several ways, dispatch here." Both are plain tables with string fields.
 8. **No hidden machinery in `agent`.** Schema validation, HITL, retry, dispatch, memory — none of these are language features. They are patterns the user writes in the body, optionally helped by `loop.*` and `msg.*` standard library.
 
@@ -49,10 +49,10 @@ CapTerm  = 'cap' '.' Ident '.' Ident
 
 ### 1.4 Comment directives
 
-Lines beginning with `//gs:` immediately preceding a `tool` declaration are parsed as directives.
+Lines beginning with `//leia:` immediately preceding a `tool` declaration are parsed as directives.
 
 ```
-//gs:requires <CapExpr>
+//leia:requires <CapExpr>
 ```
 
 Only one directive in v1. All other `//` lines before the tool are doc comment; Go-style first-sentence-as-summary applies.
@@ -81,7 +81,7 @@ Stored as 64-bit bitmask. `|` union, `&` intersection. `a ⊆ b` iff `a & b == a
 
 ## 3. `models` declaration
 
-```gscript
+```leia
 models {
     "default":          anthropic({ api_key: env("ANTHROPIC_API_KEY"), model: "claude-opus-4-7" })
     "claude-haiku-4-5": anthropic({ api_key: env("ANTHROPIC_API_KEY"), model: "claude-haiku-4-5" })
@@ -101,11 +101,11 @@ models {
 
 ## 4. `tool` declaration
 
-```gscript
+```leia
 // issue_refund issues a refund to the original payment method.
 // amount is in USD.
 //
-//gs:requires cap.payments.refund
+//leia:requires cap.payments.refund
 tool issue_refund(order_id, amount, reason) {
     return payments.refund(order_id, amount, reason)
 }
@@ -117,8 +117,8 @@ ToolDecl = 'tool' Ident '(' [ParamList] ')' Block
 ```
 
 **Rules**:
-- `//gs:requires <CapExpr>` is mandatory (pure tools write `cap.none`).
-- Body returns `(value, err)` like every GScript function.
+- `//leia:requires <CapExpr>` is mandatory (pure tools write `cap.none`).
+- Body returns `(value, err)` like every Leia function.
 - Doc comment becomes the LLM-facing description; first sentence is the summary.
 - No kind hints on parameters — LLM infers from name + doc; runtime tries lightweight coercion on incoming args.
 
@@ -136,7 +136,7 @@ This categorization is library convention (`dispatch` implements it). User code 
 
 ## 5. `budget` block
 
-```gscript
+```leia
 budget {
     tokens: 30_000
     time:   60s
@@ -249,7 +249,7 @@ MetaFields = { Ident ':' Expression [ ',' ] }
 
 ### 7.2 Body
 
-The body is a normal GScript code block. In the implemented syntax this body is
+The body is a normal Leia code block. In the implemented syntax this body is
 introduced by `flow { ... }` when the user wants a custom loop. Inside, the
 following names are injected as ordinary lexical locals at the top of the body:
 
@@ -276,7 +276,7 @@ be performed explicitly by user code or helpers.
 for message constructors, and bare expressions are inserted as-is, so initial
 prompts and dynamic tool history can use one sequence:
 
-```gscript
+```leia
 history := messages {
     system: system
     user: question
@@ -296,12 +296,12 @@ already be message-shaped tables.
    - If `caps:` is given, use it.
    - Else, `union(t.requires for t in tools)`.
 2. For each `t in tools`, require `t.requires ⊆ effective_caps`.
-3. The enclosing scope's caps (`gscript.WithCapabilities`) must include `effective_caps`.
+3. The enclosing scope's caps (`leia.WithCapabilities`) must include `effective_caps`.
 4. If body declares sub-agents in scope, their `effective_caps` are also checked transitively.
 
 ### 7.5 Example
 
-```gscript
+```leia
 agent support(message) {
     model:  "default"
     tools:  [lookup_order, issue_refund, send_email]
@@ -372,7 +372,7 @@ the agent returns a structured result with `value`, the tool result is that
 For the common static case, an agent value may also appear directly in an
 agent's `tools:` list:
 
-```gscript
+```leia
 agent supervisor(q) {
     tools: [delegate_research]
     user: q
@@ -448,7 +448,7 @@ err.cause      (optional, nested error)
 
 Check by direct field access:
 
-```gscript
+```leia
 if err != nil {
     if err.kind == "budget" { /* graceful */ }
     return nil, err
@@ -495,13 +495,13 @@ The Go embedding API seeds the bottom frame:
 
 ```go
 vm.Run(ctx, prog,
-    gscript.WithBudget(gscript.Budget{Tokens: 100_000, Time: 5*time.Minute}),
-    gscript.WithCheckpointStore(store),
-    gscript.WithCapabilities(cap.DBRead | cap.SMTPSend),
+    leia.WithBudget(leia.Budget{Tokens: 100_000, Time: 5*time.Minute}),
+    leia.WithCheckpointStore(store),
+    leia.WithCapabilities(cap.DBRead | cap.SMTPSend),
 )
 ```
 
-GScript code never sees `ctx` as a parameter.
+Leia code never sees `ctx` as a parameter.
 
 ---
 
@@ -515,7 +515,7 @@ ModelsDecl   = 'models' '{' { ModelBinding } '}'
 ModelBinding = StringLit ':' Expression [ ',' ]
 
 ToolDecl     = 'tool' Ident '(' [ParamList] ')' Block
-               // metadata extracted from preceding //gs:requires + doc comment
+               // metadata extracted from preceding //leia:requires + doc comment
 
 TurnDecl     = 'turn'  Ident '(' [ParamList] ')' '{' FieldBindings '}'
 TurnLit      = 'turn'  [ '(' [ParamList] ')' ] '{' FieldBindings '}'
@@ -540,7 +540,7 @@ LitMoney     = '$' <decimal>
 
 ### 12.1 Single-turn classifier
 
-```gscript
+```leia
 models {
     "default": anthropic({ api_key: env("ANTHROPIC_API_KEY"), model: "claude-haiku-4-5" })
 }
@@ -557,18 +557,18 @@ agent classify(text) {
 
 ### 12.2 Self-correcting SQL agent
 
-```gscript
-//gs:requires cap.db.read
+```leia
+//leia:requires cap.db.read
 tool list_tables() {
     return db.query("SELECT name FROM sqlite_master WHERE type='table'")
 }
 
-//gs:requires cap.db.read
+//leia:requires cap.db.read
 tool describe(table) {
     return db.query("PRAGMA table_info(" + table + ")")
 }
 
-//gs:requires cap.db.read
+//leia:requires cap.db.read
 tool run_sql(query) {
     if not is_readonly(query) {
         return nil, { kind: "validation", message: "only SELECT allowed" }
@@ -622,7 +622,7 @@ agent ask_db(question) {
 
 ### 12.3 Customer support with HITL (using `loop.react`)
 
-```gscript
+```leia
 import "loop"
 
 agent support(message) {
@@ -661,7 +661,7 @@ func handle_approval(token, approval) {
 
 ### 12.4 Deep research (multi-agent composition)
 
-```gscript
+```leia
 agent plan(question) {
     model:  "default"
     system: "Decompose into 3-5 parallel sub-queries. Reply JSON: {subqueries: [...]}."
@@ -735,11 +735,11 @@ func deep_research(question) {
 
 ## 13. Test cases
 
-Each test is a pair `(source.gs, expect.json)` under `tests/agent/`. Mock provider used.
+Each test is a pair `(source.leia, expect.json)` under `tests/agent/`. Mock provider used.
 
 ### 13.1 Lexer
 
-```gscript
+```leia
 // T01 — duration arithmetic
 assert(60s + 30s == 90s)
 assert(500ms < 1s)
@@ -753,7 +753,7 @@ assert(1_000_000 == 1000000)
 
 ### 13.2 `models` lazy + default key
 
-```gscript
+```leia
 // T10 — module loads even with a "broken" model (lazy)
 models { "broken": anthropic({ api_key: "" }) }
 // expect: load OK; error on first use
@@ -770,27 +770,27 @@ assert(err == nil)
 
 ### 13.3 `tool` declaration & comment directives
 
-```gscript
+```leia
 // T20 — direct call is fully dynamic
-//gs:requires cap.none
+//leia:requires cap.none
 tool t1(x, y) { return x + y, nil }
 v, _ := t1(1, 2)
 assert(v == 3)
 v, _ = t1("a", "b")
 assert(v == "ab")
 
-// T21 — missing //gs:requires → load error
+// T21 — missing //leia:requires → load error
 
 // T22 — categorized errors flow correctly through dispatch
-//gs:requires cap.none
+//leia:requires cap.none
 tool flaky(x) { return nil, { kind: "network", message: "transient" } }
 // when called via dispatch inside an agent body, dispatch retries
 ```
 
 ### 13.4 Capability flow
 
-```gscript
-//gs:requires cap.db.read
+```leia
+//leia:requires cap.db.read
 tool needs_db(q) { return q, nil }
 
 // T30 — caps default to union of tools.requires
@@ -817,13 +817,13 @@ agent a3() {
 }
 
 // T33 — embedding-side caps gate
-// Go: gscript.WithCapabilities(cap.None)
+// Go: leia.WithCapabilities(cap.None)
 //   any agent with non-empty caps → compile error
 ```
 
 ### 13.5 `budget` propagation
 
-```gscript
+```leia
 // T40 — exhausted budget → err.kind == "budget"
 budget { tokens: 10 } {
     _, err := turn { messages: [msg.user("x")] }()
@@ -856,13 +856,13 @@ budget { cancel: sig } {
 
 ### 13.6 `turn` returns
 
-```gscript
+```leia
 // T50 — final_answer
 result, err := turn { messages: [msg.user("hi")] }()
 assert(result.status == "final_answer")
 
 // T51 — tool_calls (turn itself doesn't dispatch)
-//gs:requires cap.none
+//leia:requires cap.none
 tool d(x) { return x, nil }
 result, _ := turn { tools: [d], messages: [msg.user("use it")] }()
 assert(result.status == "tool_calls")
@@ -876,7 +876,7 @@ assert(result.reason == "max")
 
 ### 13.7 `agent` body execution
 
-```gscript
+```leia
 // T60 — named agent call
 agent classify(text) {
     system: "Reply 'positive' or 'negative'."
@@ -904,7 +904,7 @@ v, e := my_agent()
 
 ### 13.8 HITL
 
-```gscript
+```leia
 // T70 — snapshot returns a token; resume continues
 agent flow(x) {
     tools: [issue_refund]
@@ -934,14 +934,14 @@ budget { store: in_memory_store() } {
 // G01 — top-level budget
 ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 defer cancel()
-_, err := vm.Run(ctx, prog, gscript.WithBudget(gscript.Budget{Tokens: 50_000}))
+_, err := vm.Run(ctx, prog, leia.WithBudget(leia.Budget{Tokens: 50_000}))
 
 // G02 — capability gate
-_, err := gscript.Compile(src, gscript.WithCapabilities(gscript.CapDBRead))
+_, err := leia.Compile(src, leia.WithCapabilities(leia.CapDBRead))
 // any agent declaring caps outside CapDBRead → compile error
 
 // G03 — checkpoint store for HITL
-_, err := vm.Run(ctx, prog, gscript.WithCheckpointStore(redisStore))
+_, err := vm.Run(ctx, prog, leia.WithCheckpointStore(redisStore))
 ```
 
 ---
@@ -1022,7 +1022,7 @@ _, err := vm.Run(ctx, prog, gscript.WithCheckpointStore(redisStore))
 
 | Version | Scope |
 |---|---|
-| **v1** | This document. Behind feature flag (`gscript.WithAgentLayer(true)`). |
+| **v1** | This document. Behind feature flag (`leia.WithAgentLayer(true)`). |
 | **v2** | Streaming inside HITL, file-level caps, more providers, MCP server export from `tool` decls, expanded `loop.*` library. |
 | **v3** | `record` / `replay` / `diff`, eval suite primitives, `pool.HotSwap` integration. |
 | **v4+** | Custom providers, capability self-declaration, semantic caching, multi-modal. |
@@ -1036,7 +1036,7 @@ _, err := vm.Run(ctx, prog, gscript.WithCheckpointStore(redisStore))
 | Lexer additions | `internal/lexer/lexer.go` |
 | Parser (`models`, `tool`, `budget`, `turn`, `agent`) | `internal/parser/parser.go` |
 | AST nodes | `internal/ast/ast.go` |
-| `//gs:` directive extractor | new `internal/parser/directives.go` |
+| `//leia:` directive extractor | new `internal/parser/directives.go` |
 | Capability flow lint | new `internal/runtime/cap_lint.go` |
 | `tool` runtime descriptor | new `internal/runtime/tool.go` |
 | `turn` runtime engine | new `internal/runtime/turn.go` |
@@ -1045,7 +1045,7 @@ _, err := vm.Run(ctx, prog, gscript.WithCheckpointStore(redisStore))
 | Ambient frame stack | extension of `internal/runtime/interpreter.go` |
 | HITL `snapshot` / `resume` | new `internal/runtime/hitl.go` |
 | `msg.*` / `dispatch` / `loop.*` / `chat.*` stdlib | new `internal/runtime/agent_stdlib/` |
-| Embedding API extensions | `gscript/options.go`, `gscript/vm.go`, `gscript/program.go` |
+| Embedding API extensions | `leia/options.go`, `leia/vm.go`, `leia/program.go` |
 | Test harness | new `tests/agent/` |
 
 ---

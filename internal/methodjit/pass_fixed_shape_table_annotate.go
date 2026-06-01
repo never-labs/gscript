@@ -9,8 +9,8 @@ package methodjit
 import (
 	"fmt"
 
-	"github.com/never-labs/gscript/internal/runtime"
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/runtime"
+	"github.com/never-labs/leia/internal/vm"
 )
 
 func annotateFixedShapeGetFields(fn *Function, tableShapes *TableShapeFacts, numeric *NumericFacts, facts map[int]FixedShapeTableFact) {

@@ -5,7 +5,7 @@ coarse event hooks.
 
 VM note: file-mode VM execution has official translated coverage for
 `debug.info(function)`, `debug.value`, stack/source metadata, numeric frame
-queries, and hook/sink events. The API is intentionally GScript/Go-host shaped
+queries, and hook/sink events. The API is intentionally Leia/Go-host shaped
 instead of a byte-for-byte Lua `debug` clone.
 
 ## Source Information
@@ -42,7 +42,7 @@ in addition to source fields.
 
 ```
 fn := script.compile("func f(x) { return debug.info(0) }\nreturn f(1)", {
-    sourceName: "virtual/generated.gs",
+    sourceName: "virtual/generated.leia",
 })
 info := fn()
 print(info.sourceName, info.line, info.column)

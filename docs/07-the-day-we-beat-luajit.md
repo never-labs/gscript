@@ -126,7 +126,7 @@ This is one of the things that makes compiler optimization work unpredictable. Y
 
 ### Optimization 1: Pin R(0) to X19
 
-In GScript's calling convention, R(0) holds the first parameter of the current function. For `fib(n)`, R(0) is `n`. Every entry to the function loads `n` from the Value array in memory:
+In Leia's calling convention, R(0) holds the first parameter of the current function. For `fib(n)`, R(0) is `n`. Every entry to the function loads `n` from the Value array in memory:
 
 ```arm64
 // Before: load n from memory at function entry
@@ -207,19 +207,19 @@ print(string.format('fib(20): %.0fus', (os.clock()-t)/100*1e6))
 fib(20): 26us
 ```
 
-24us vs 26us. GScript is 9% faster than LuaJIT on fib(20).
+24us vs 26us. Leia is 9% faster than LuaJIT on fib(20).
 
-Not on a synthetic microbenchmark we designed to win. Not with a warm cache advantage. The same algorithm, the same recursion depth, the same computation. GScript's method JIT, running on a language implemented in Go, compiling to ARM64 on the fly, producing code that outperforms Mike Pall's hand-tuned trace compiler on the canonical recursive benchmark.
+Not on a synthetic microbenchmark we designed to win. Not with a warm cache advantage. The same algorithm, the same recursion depth, the same computation. Leia's method JIT, running on a language implemented in Go, compiling to ARM64 on the fly, producing code that outperforms Mike Pall's hand-tuned trace compiler on the canonical recursive benchmark.
 
 It is one benchmark. It is the benchmark that plays to our method JIT's strengths (pure recursion, no loops, no table ops). But it is real.
 
 ## The Scoreboard
 
-Here is where GScript stands against LuaJIT across the benchmark suite:
+Here is where Leia stands against LuaJIT across the benchmark suite:
 
-| Benchmark | GScript | LuaJIT | Ratio | Status |
+| Benchmark | Leia | LuaJIT | Ratio | Status |
 |-----------|---------|--------|-------|--------|
-| fib(20) | 24us | 26us | 0.92x | **GScript wins by 9%** |
+| fib(20) | 24us | 26us | 0.92x | **Leia wins by 9%** |
 | ackermann(3,11) | 17us | ~17us | ~1.0x | **Tied** |
 | callMany (fn calls) | 5.1us | 3us | 1.7x | LuaJIT leads |
 | mandelbrot(1000) | 0.23s | 0.056s | 4.0x | LuaJIT leads |
@@ -227,13 +227,13 @@ Here is where GScript stands against LuaJIT across the benchmark suite:
 
 Two benchmarks won. Three to go.
 
-The pattern in the results reveals the architecture. GScript wins on **pure computation with recursion** --- fib and ackermann are function-call-heavy, integer-only, no table access. The method JIT handles these well because it compiles functions as units, recognizes self-recursion, and (now) pins registers across calls.
+The pattern in the results reveals the architecture. Leia wins on **pure computation with recursion** --- fib and ackermann are function-call-heavy, integer-only, no table access. The method JIT handles these well because it compiles functions as units, recognizes self-recursion, and (now) pins registers across calls.
 
-GScript loses on **loop-heavy computation** (mandelbrot) and **table-heavy computation** (nbody). mandelbrot's gap is in the trace JIT's register allocator and sub-trace call overhead, as analyzed in Post #6. nbody's gap is in the 32-byte Value representation --- every table read moves 4x more data than LuaJIT's 8-byte NaN-boxed TValues.
+Leia loses on **loop-heavy computation** (mandelbrot) and **table-heavy computation** (nbody). mandelbrot's gap is in the trace JIT's register allocator and sub-trace call overhead, as analyzed in Post #6. nbody's gap is in the 32-byte Value representation --- every table read moves 4x more data than LuaJIT's 8-byte NaN-boxed TValues.
 
 ## What This Means
 
-It means the method JIT works. For compute-heavy, self-recursive functions, GScript's code quality is now at or above LuaJIT's level. The combination of accumulator pinning, R(0) register pinning, constant propagation, and dead store elimination produces tight ARM64 that wastes very few instructions.
+It means the method JIT works. For compute-heavy, self-recursive functions, Leia's code quality is now at or above LuaJIT's level. The combination of accumulator pinning, R(0) register pinning, constant propagation, and dead store elimination produces tight ARM64 that wastes very few instructions.
 
 But it also means the easy wins are behind us.
 
@@ -243,7 +243,7 @@ fib and ackermann are the benchmarks most amenable to method-JIT optimization --
 
 **mandelbrot (4.0x gap)**: The trace JIT's inner loop is 26 instructions per iteration vs a theoretical minimum of ~15. The register allocator is better than it was (SSA-ref-level linear scan replaced the frequency-based allocator from Post #6), but the 1 million sub-trace calls per mandelbrot(1000) each carry a 61-instruction prologue/epilogue. The fix is code inlining --- copying the inner trace's machine code into the outer trace, eliminating the call boundary entirely.
 
-**Table operations (7.5x gap)**: This is the representation problem. GScript's 32-byte Values vs LuaJIT's 8-byte NaN-boxed TValues. Every table read, every table write, every array access moves 4x more memory. The GC sees 4x more pointers. The caches hold 4x fewer values. NaN-boxing is the fix, and it touches every file in the runtime. It is a multi-week redesign, not an optimization pass.
+**Table operations (7.5x gap)**: This is the representation problem. Leia's 32-byte Values vs LuaJIT's 8-byte NaN-boxed TValues. Every table read, every table write, every array access moves 4x more memory. The GC sees 4x more pointers. The caches hold 4x fewer values. NaN-boxing is the fix, and it touches every file in the runtime. It is a multi-week redesign, not an optimization pass.
 
 ## What Changed Today
 

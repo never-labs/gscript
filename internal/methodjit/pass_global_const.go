@@ -3,7 +3,7 @@ package methodjit
 import (
 	"reflect"
 
-	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/leia/internal/runtime"
 )
 
 type GlobalConstSpecializationConfig struct {

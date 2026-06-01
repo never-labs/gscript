@@ -4,7 +4,7 @@ package vm
 
 import (
 	"fmt"
-	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/leia/internal/runtime"
 	"math"
 )
 

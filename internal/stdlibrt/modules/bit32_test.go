@@ -7,7 +7,7 @@ import (
 // ==================================================================
 // Bit32 library tests
 // ==================================================================
-// Note: GScript does not support hex literals, so we use decimal values.
+// Note: Leia does not support hex literals, so we use decimal values.
 
 func TestBit32Band(t *testing.T) {
 	// 0xFF=255, 0x0F=15

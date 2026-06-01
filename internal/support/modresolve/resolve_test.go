@@ -14,10 +14,10 @@ func TestResolveUsesCollectionReplaceAndModuleRoot(t *testing.T) {
 		wantKind string
 		wantFile string
 	}{
-		{module: "vendor:pkg.util", wantKind: "collection", wantFile: filepath.Join("/project/vendor", "pkg", "util.gs")},
-		{module: "example.com/lib/foo", wantKind: "replace", wantFile: filepath.Join("/project/local/lib", "foo.gs")},
-		{module: "pkg.util", wantKind: "module", wantFile: filepath.Join("/project/root", "pkg", "util.gs")},
-		{module: "../outside", wantKind: "module", wantFile: filepath.Join("/project", "outside.gs")},
+		{module: "vendor:pkg.util", wantKind: "collection", wantFile: filepath.Join("/project/vendor", "pkg", "util.leia")},
+		{module: "example.com/lib/foo", wantKind: "replace", wantFile: filepath.Join("/project/local/lib", "foo.leia")},
+		{module: "pkg.util", wantKind: "module", wantFile: filepath.Join("/project/root", "pkg", "util.leia")},
+		{module: "../outside", wantKind: "module", wantFile: filepath.Join("/project", "outside.leia")},
 	}
 	for _, tt := range tests {
 		got := Resolve(tt.module, collections, replaces, "/project/root")
@@ -47,16 +47,16 @@ func TestResolveReplaceUsesLongestPrefix(t *testing.T) {
 	if got.Root != "/project/local/sub" {
 		t.Fatalf("Resolve root = %q, want /project/local/sub", got.Root)
 	}
-	if got.Rel != filepath.Join("pkg", "util.gs") {
-		t.Fatalf("Resolve rel = %q, want %q", got.Rel, filepath.Join("pkg", "util.gs"))
+	if got.Rel != filepath.Join("pkg", "util.leia") {
+		t.Fatalf("Resolve rel = %q, want %q", got.Rel, filepath.Join("pkg", "util.leia"))
 	}
-	if got.File != filepath.Join("/project/local/sub", "pkg", "util.gs") {
-		t.Fatalf("Resolve file = %q, want %q", got.File, filepath.Join("/project/local/sub", "pkg", "util.gs"))
+	if got.File != filepath.Join("/project/local/sub", "pkg", "util.leia") {
+		t.Fatalf("Resolve file = %q, want %q", got.File, filepath.Join("/project/local/sub", "pkg", "util.leia"))
 	}
 }
 
 func TestResolveExactReplaceToGSFile(t *testing.T) {
-	replaces := []Replace{{Path: "example.com/tool", Root: "/project/tools/tool.gs"}}
+	replaces := []Replace{{Path: "example.com/tool", Root: "/project/tools/tool.leia"}}
 
 	got := Resolve("example.com/tool", nil, replaces, "/project/root")
 
@@ -69,11 +69,11 @@ func TestResolveExactReplaceToGSFile(t *testing.T) {
 	if got.Root != "/project/tools" {
 		t.Fatalf("Resolve root = %q, want /project/tools", got.Root)
 	}
-	if got.Rel != "tool.gs" {
-		t.Fatalf("Resolve rel = %q, want tool.gs", got.Rel)
+	if got.Rel != "tool.leia" {
+		t.Fatalf("Resolve rel = %q, want tool.leia", got.Rel)
 	}
-	if got.File != "/project/tools/tool.gs" {
-		t.Fatalf("Resolve file = %q, want /project/tools/tool.gs", got.File)
+	if got.File != "/project/tools/tool.leia" {
+		t.Fatalf("Resolve file = %q, want /project/tools/tool.leia", got.File)
 	}
 }
 
@@ -92,7 +92,7 @@ func TestResolveCacheUsesDownloadedModule(t *testing.T) {
 	if got.Path != "github.com/acme/toolkit" {
 		t.Fatalf("Resolve path = %q, want github.com/acme/toolkit", got.Path)
 	}
-	if got.File != filepath.Join("/cache/github.com/acme/toolkit@v1.2.3", "sub", "mod.gs") {
+	if got.File != filepath.Join("/cache/github.com/acme/toolkit@v1.2.3", "sub", "mod.leia") {
 		t.Fatalf("Resolve file = %q, want cache sub module", got.File)
 	}
 }
@@ -109,7 +109,7 @@ func TestResolveCacheUsesLongestPrefix(t *testing.T) {
 		"/project/root",
 	)
 
-	if got.Kind != "cache" || got.Path != "github.com/acme/toolkit/pkg" || got.File != filepath.Join("/cache/repo/pkg", "util.gs") {
+	if got.Kind != "cache" || got.Path != "github.com/acme/toolkit/pkg" || got.File != filepath.Join("/cache/repo/pkg", "util.leia") {
 		t.Fatalf("Resolve = %#v, want longest cache prefix", got)
 	}
 }
@@ -125,11 +125,11 @@ func TestResolveCollectionMissFallsBackToModuleRoot(t *testing.T) {
 	if got.Root != "/project/root" {
 		t.Fatalf("Resolve root = %q, want /project/root", got.Root)
 	}
-	if got.Rel != filepath.Join("missing:pkg", "util.gs") {
-		t.Fatalf("Resolve rel = %q, want %q", got.Rel, filepath.Join("missing:pkg", "util.gs"))
+	if got.Rel != filepath.Join("missing:pkg", "util.leia") {
+		t.Fatalf("Resolve rel = %q, want %q", got.Rel, filepath.Join("missing:pkg", "util.leia"))
 	}
-	if got.File != filepath.Join("/project/root", "missing:pkg", "util.gs") {
-		t.Fatalf("Resolve file = %q, want %q", got.File, filepath.Join("/project/root", "missing:pkg", "util.gs"))
+	if got.File != filepath.Join("/project/root", "missing:pkg", "util.leia") {
+		t.Fatalf("Resolve file = %q, want %q", got.File, filepath.Join("/project/root", "missing:pkg", "util.leia"))
 	}
 }
 
@@ -142,10 +142,10 @@ func TestResolveRelativeRequireOutsideKeepsPathSemantics(t *testing.T) {
 	if got.Root != "/project/root" {
 		t.Fatalf("Resolve root = %q, want /project/root", got.Root)
 	}
-	if got.Rel != "../outside.gs" {
-		t.Fatalf("Resolve rel = %q, want ../outside.gs", got.Rel)
+	if got.Rel != "../outside.leia" {
+		t.Fatalf("Resolve rel = %q, want ../outside.leia", got.Rel)
 	}
-	if filepath.Clean(got.File) != filepath.Clean("/project/outside.gs") {
-		t.Fatalf("Resolve file = %q, want %q", got.File, filepath.Join("/project", "outside.gs"))
+	if filepath.Clean(got.File) != filepath.Clean("/project/outside.leia") {
+		t.Fatalf("Resolve file = %q, want %q", got.File, filepath.Join("/project", "outside.leia"))
 	}
 }

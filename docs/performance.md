@@ -1,7 +1,7 @@
 # Performance and JIT Roadmap
 
 This document defines the production guardrails for performance work in
-GScript. Performance wins are only accepted when they preserve semantics,
+Leia. Performance wins are only accepted when they preserve semantics,
 generalize beyond the benchmark that exposed the gap, and remain visible in the
 benchmark history.
 
@@ -14,7 +14,7 @@ benchmark history.
   validate a hypothesis, and prevent regression; do not tune code to recognize
   benchmark names, fixed constants, or one checked-in loop body.
 - LuaJIT is the external throughput reference where a comparable Lua program
-  exists. It is not the semantic oracle for GScript-only language behavior.
+  exists. It is not the semantic oracle for Leia-only language behavior.
 - Runtime specialization must be guarded by recorded feedback, dependency
   checks, and deoptimization paths. A specialization is production-ready only
   when invalidation and fallback are tested.
@@ -27,8 +27,8 @@ benchmark history.
 Every optimization must run against a correctness oracle before its timing is
 trusted:
 
-1. Compare VM, default JIT, and no-filter JIT output for the same GScript
-   benchmark. The VM is the primary semantic oracle for GScript.
+1. Compare VM, default JIT, and no-filter JIT output for the same Leia
+   benchmark. The VM is the primary semantic oracle for Leia.
 2. Compare explicit `checksum:` output, when present. If a benchmark lacks a
    stable checksum, add one before using it for performance decisions.
 3. Compare the full output hash for programs whose visible result is more than
@@ -68,9 +68,9 @@ Use the benchmark tools for different jobs:
 ### Data-Oriented Array / SoA Benchmark Plan
 
 Data-oriented array work must ship with a direct AoS-vs-SoA performance witness.
-Until the GScript typed-array/SoA backend is merged, the checked-in harness uses
+Until the Leia typed-array/SoA backend is merged, the checked-in harness uses
 Go-side references for the expected storage paths and marks every JSON row with
-`backend_status=pending_gscript_typed_array_soa_backend`.
+`backend_status=pending_leia_typed_array_soa_backend`.
 
 SoA must be measured on two classes of workload:
 
@@ -108,19 +108,19 @@ Runnable entry points:
 go test ./benchmarks/data_oriented -bench=. -run '^$' -benchtime=1s
 go run ./benchmarks/data_oriented/cmd/data_oriented_bench \
   -particles=32768 -steps=64 -vectors=65536 -repeats=5 \
-  > /tmp/gscript_data_oriented_bench.json
-go run ./cmd/gscript examples/data_oriented/particle_integration.gs
-go run ./cmd/gscript examples/data_oriented/soa_kernels.gs
+  > /tmp/leia_data_oriented_bench.json
+go run ./cmd/leia examples/data_oriented/particle_integration.leia
+go run ./cmd/leia examples/data_oriented/soa_kernels.leia
 ```
 
-`examples/data_oriented/soa_kernels.gs` is the smoke coverage for the current
+`examples/data_oriented/soa_kernels.leia` is the smoke coverage for the current
 SoA stdlib surface: `zip`, `unzip`, `len`, `columns`, `column`, `shape`, `row`,
 `setRow`, `slice`, `filter`, `addScaled`, `affine`, `affineMany`, and `sum`.
 
-The JSON schema is `gscript.data_oriented_benchmark.v1`; rows include
+The JSON schema is `leia.data_oriented_benchmark.v1`; rows include
 `benchmark`, `layout`, `implementation`, `backend_status`, problem size,
 repeat count, seconds, per-item nanoseconds, throughput, and checksum. When the
-typed-array backend lands, add matching GScript SoA rows without changing those
+typed-array backend lands, add matching Leia SoA rows without changing those
 field names so `performance_gate` can ingest the same artifact.
 
 Default local timing command:
@@ -129,8 +129,8 @@ Default local timing command:
 python3 benchmarks/timing_compare.py --all-groups --runs=5 --warmup=1 \
   --time-source=auto --min-sample-seconds=0.100 --max-repeat=128 \
   --sort=luajit-gap \
-  --json /tmp/gscript_timing_compare.json \
-  --markdown /tmp/gscript_timing_compare.md
+  --json /tmp/leia_timing_compare.json \
+  --markdown /tmp/leia_timing_compare.md
 ```
 
 Default repeatable performance gate:
@@ -158,7 +158,7 @@ noise, and fails rows that remain `low_resolution`, `missing`, `timeout`, or
 
 `scripts/production_check.sh` is the release-gate entrypoint. Its default
 `--full` mode calls `bash scripts/performance_gate.sh --full`; when `luajit` is
-not on `PATH`, it appends `--no-luajit` so the GScript current-vs-HEAD gate and
+not on `PATH`, it appends `--no-luajit` so the Leia current-vs-HEAD gate and
 strict truth pass still run. `scripts/production_check.sh --quick` intentionally
 skips this gate and stays limited to short correctness checks.
 
@@ -167,8 +167,8 @@ Useful variants:
 ```bash
 bash scripts/performance_gate.sh --smoke
 bash scripts/performance_gate.sh --bench numeric/spectral_norm --bench table/nextvar_table
-bash scripts/performance_gate.sh --full --runs=5 --warmup=1 --out-dir /tmp/gscript_perf_full
-bash scripts/performance_gate.sh --validate-only /tmp/gscript_perf_full/timing_gate.json
+bash scripts/performance_gate.sh --full --runs=5 --warmup=1 --out-dir /tmp/leia_perf_full
+bash scripts/performance_gate.sh --validate-only /tmp/leia_perf_full/timing_gate.json
 ```
 
 Rules for benchmark quality:
@@ -189,11 +189,11 @@ Rules for benchmark quality:
 LuaJIT comparison has two jobs:
 
 - It ranks remaining gaps on workloads where a faithful Lua reference exists.
-- It detects suspicious wins when GScript appears much faster on a narrow kernel
+- It detects suspicious wins when Leia appears much faster on a narrow kernel
   but related variants do not show the same advantage.
 
 Interpret `Current/LuaJIT` and `JIT/LJ` as ratios, not absolute quality labels.
-Lower is faster relative to LuaJIT. A strong GScript result still needs matching
+Lower is faster relative to LuaJIT. A strong Leia result still needs matching
 checksums, stable timing, and variant coverage.
 
 LuaJIT must be optional in developer loops but present in publish-grade reports.

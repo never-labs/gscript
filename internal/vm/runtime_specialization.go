@@ -4,7 +4,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/leia/internal/runtime"
 )
 
 const (
@@ -532,7 +532,7 @@ var driverLoopRuntimeSpecializationRegistry = [driverLoopRuntimeSpecializationCo
 var disabledDriverLoopRuntimeSpecializations = disabledDriverLoopRuntimeSpecializationMask(driverLoopRuntimeSpecializationRegistry[:])
 
 func runtimeSpecializationDisabledNames() map[string]bool {
-	raw := os.Getenv("GSCRIPT_DISABLE_RUNTIME_SPECIALIZATIONS")
+	raw := os.Getenv("LEIA_DISABLE_RUNTIME_SPECIALIZATIONS")
 	if raw == "" {
 		return nil
 	}

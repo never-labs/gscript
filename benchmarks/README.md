@@ -1,4 +1,4 @@
-# GScript Benchmarks
+# Leia Benchmarks
 
 Benchmarks are grouped by capability domain:
 
@@ -23,8 +23,8 @@ LuaJIT references live under `benchmarks/lua_ref/<domain>/`.
 python3 benchmarks/timing_compare.py --all-groups --runs=5 --warmup=1 \
   --time-source=auto --min-sample-seconds=0.100 --max-repeat=128 \
   --sort=luajit-gap \
-  --json /tmp/gscript_timing_compare.json \
-  --markdown /tmp/gscript_timing_compare.md
+  --json /tmp/leia_timing_compare.json \
+  --markdown /tmp/leia_timing_compare.md
 
 # Strict truth pass across all domain groups.
 python3 benchmarks/strict_guard.py --runs=3 --warmup=1 --timeout=90 \
@@ -39,8 +39,8 @@ python3 benchmarks/strict_guard.py --runs=3 --warmup=0 --max-repeat=8 \
 # Hot-loop scaling profile for low-resolution workloads.
 python3 benchmarks/timing_compare.py --runs=5 --warmup=1 \
   --scale-profile=hot --sort=luajit-gap \
-  --json /tmp/gscript_hot_timing.json \
-  --markdown /tmp/gscript_hot_timing.md
+  --json /tmp/leia_hot_timing.json \
+  --markdown /tmp/leia_hot_timing.md
 
 # Semantic-family performance coverage audit.
 bash benchmarks/coverage_guard.sh
@@ -53,12 +53,12 @@ python3 benchmarks/profile_exits.py --bench=numeric/spectral_norm --top=30
 
 python3 benchmarks/triage.py --bench=numeric/spectral_norm \
   --scale=numeric/spectral_norm:N=2000 --time-source=script \
-  --diag --pprof --memprofile --warm-dump --out-dir=/tmp/gscript-triage
+  --diag --pprof --memprofile --warm-dump --out-dir=/tmp/leia-triage
 
 python3 benchmarks/diagnose.py \
   --bench=calls/method_dispatch \
   --bench=table/groupby_nested_agg \
-  --out-dir=/tmp/gscript-diagnose
+  --out-dir=/tmp/leia-diagnose
 
 bash scripts/diag.sh table/table_array_access
 ```

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/vm"
 )
 
 // TestPassContext_RangeAnalysisCorpusEnforced drives the real Tier 2 pipeline
@@ -30,7 +30,7 @@ func TestPassContext_RangeAnalysisCorpusEnforced(t *testing.T) {
 	}
 	var files []string
 	for _, root := range roots {
-		matches, _ := filepath.Glob(filepath.Join(root, "*.gs"))
+		matches, _ := filepath.Glob(filepath.Join(root, "*.leia"))
 		files = append(files, matches...)
 	}
 	if len(files) == 0 {

@@ -1,8 +1,8 @@
 # Go Embedding API Audit
 
 This document audits the current public Go embedding API and the internal
-concepts that are indirectly exposed through it. Scope: `gscript/`,
-`cmd/gscript`, and the `internal` runtime/VM concepts that shape the public
+concepts that are indirectly exposed through it. Scope: `leia/`,
+`cmd/leia`, and the `internal` runtime/VM concepts that shape the public
 embedding contract.
 
 ## Current Available API
@@ -10,7 +10,7 @@ embedding contract.
 Public import path:
 
 ```go
-import "github.com/Never-Labs/gscript/gscript"
+import "github.com/Never-Labs/leia/leia"
 ```
 
 Current public package surface:
@@ -42,10 +42,10 @@ Current public package surface:
 Execution currently has two public engine modes. `New()` defaults to the
 tree-walking interpreter. `WithVM()` switches execution to the bytecode VM.
 `WithJIT()` implies `WithVM()` and enables the platform JIT where available.
-`cmd/gscript` defaults differently: the CLI default is VM plus JIT unless
+`cmd/leia` defaults differently: the CLI default is VM plus JIT unless
 flags select VM-only or interpreter execution.
 
-`cmd/gscript` exposes operational capabilities through flags, not through the
+`cmd/leia` exposes operational capabilities through flags, not through the
 embedding API: `-e`, `-vm`, `-jit`, CPU/memory profiling, JIT tier stats,
 timeline dumps, warm dumps, exit stats, Tier 2 diagnostics, MethodJIT op
 audits, coroutine stats, and runtime path stats. These flags are useful design
@@ -65,7 +65,7 @@ embedders except by shelling out.
   `FromValue`, `GetValue`, `SetValue`, `CallFunction`, and `Interpreter`
   mention `internal/runtime` types. External modules cannot import those
   packages, so these APIs are not a stable third-party embedding contract.
-- Error propagation is shallow. `gscript.Error` has `Line`, `Col`, `File`, and
+- Error propagation is shallow. `leia.Error` has `Line`, `Col`, `File`, and
   `Value`, but the wrappers mostly populate kind/message/file only. Internal
   `runtime.SourceError`, `runtime.LuaError`, stack/debug frames, and bytecode
   diagnostics are not normalized into a public error shape.
@@ -100,9 +100,9 @@ embedders except by shelling out.
 
 ## Internal Concepts: Publish or Keep Internal
 
-Should become public, behind stable `gscript` package types:
+Should become public, behind stable `leia` package types:
 
-- Value model: expose a `gscript.Value` abstraction with constructors,
+- Value model: expose a `leia.Value` abstraction with constructors,
   inspection, table access, function handles, and encode/decode helpers. Do
   not expose `runtime.Value` directly.
 - Compiled programs: expose immutable `Program`/`Function` handles. Hide AST,
@@ -307,7 +307,7 @@ and debug capabilities should route through explicit policy objects.
   remove or deprecate it cleanly.
 - Mark APIs that mention `internal/runtime` as advanced/legacy in docs, then
   provide public replacements before deprecation. Do not remove them until
-  embedders have `gscript.Value`, `Function`, and `Program`.
+  embedders have `leia.Value`, `Function`, and `Program`.
 - Preserve `LibFlags` bit values and preset names. Add new library bits only
   at higher unused positions.
 - Keep current reflection behavior as default for compatibility. Add stricter
@@ -325,7 +325,7 @@ and debug capabilities should route through explicit policy objects.
 - Create public documentation that clearly labels the current embedding API,
   unstable raw-value escape hatches, and the fact that `LibSafe` is not a full
   security sandbox.
-- Fill `gscript.Error` consistently from `runtime.SourceError` and
+- Fill `leia.Error` consistently from `runtime.SourceError` and
   `runtime.LuaError` in interpreter and bytecode paths.
 - Add examples/tests for `WithLibs(LibSafe)`, `WithRequirePath`, `WithVM`,
   `WithJIT`, `RegisterFunc`, `RegisterTable`, struct binding, and `Pool`.
@@ -336,7 +336,7 @@ and debug capabilities should route through explicit policy objects.
 
 ### P1
 
-- Add `gscript.Value`, `Kind`, constructors, inspection methods,
+- Add `leia.Value`, `Kind`, constructors, inspection methods,
   `Encode`, and `Decode`.
 - Harden the existing `Program`, `Compile`, `CompileFile`, and `Run` APIs into
   a documented compiled-artifact contract with explicit concurrency and

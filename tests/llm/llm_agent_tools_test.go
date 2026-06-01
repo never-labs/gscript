@@ -1,19 +1,19 @@
-package gscript_test
+package leia_test
 
 import (
 	"testing"
 
-	gs "github.com/never-labs/gscript"
-	"github.com/never-labs/gscript/llm"
+	leia "github.com/never-labs/leia"
+	"github.com/never-labs/leia/llm"
 )
 
 func TestLLMAgentScenarioAgentAsToolStructuredHandoff(t *testing.T) {
 	for _, tc := range []struct {
 		name string
-		opts []gs.Option
+		opts []leia.Option
 	}{
 		{name: "interpreter"},
-		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			provider := &mockLLMProvider{results: []llm.TurnResult{
@@ -31,7 +31,7 @@ func TestLLMAgentScenarioAgentAsToolStructuredHandoff(t *testing.T) {
 				},
 				{Status: "final_answer", Text: "Use delegated research: Agents can be delegated as tools."},
 			}}
-			vm := gs.New(llmScenarioOptions(provider, tc.opts...)...)
+			vm := leia.New(llmScenarioOptions(provider, tc.opts...)...)
 
 			if err := vm.Exec(`
 agent extract_research(topic) {
@@ -44,7 +44,7 @@ agent extract_research(topic) {
     }
 }
 
-//gscript:requires none
+//leia:requires none
 tool delegate_research(topic) {
     result, err := extract_research(topic)
     if err != nil {
@@ -143,10 +143,10 @@ tool_confidence := result.history[4].value.confidence
 func TestLLMAgentScenarioToolofRuntimeAgentAsTool(t *testing.T) {
 	for _, tc := range []struct {
 		name string
-		opts []gs.Option
+		opts []leia.Option
 	}{
 		{name: "interpreter"},
-		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			provider := &mockLLMProvider{results: []llm.TurnResult{
@@ -164,7 +164,7 @@ func TestLLMAgentScenarioToolofRuntimeAgentAsTool(t *testing.T) {
 				},
 				{Status: "final_answer", Text: "Delegation complete."},
 			}}
-			vm := gs.New(llmScenarioOptions(provider, tc.opts...)...)
+			vm := leia.New(llmScenarioOptions(provider, tc.opts...)...)
 
 			if err := vm.Exec(`
 agent extract_research(topic) {
@@ -261,10 +261,10 @@ alias_name := alias_delegate.name
 func TestLLMAgentScenarioDirectAgentInToolsList(t *testing.T) {
 	for _, tc := range []struct {
 		name string
-		opts []gs.Option
+		opts []leia.Option
 	}{
 		{name: "interpreter"},
-		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			provider := &mockLLMProvider{results: []llm.TurnResult{
@@ -282,7 +282,7 @@ func TestLLMAgentScenarioDirectAgentInToolsList(t *testing.T) {
 				},
 				{Status: "final_answer", Text: "Direct delegation complete."},
 			}}
-			vm := gs.New(llmScenarioOptions(provider, tc.opts...)...)
+			vm := leia.New(llmScenarioOptions(provider, tc.opts...)...)
 
 			if err := vm.Exec(`
 agent extract_research(topic) {

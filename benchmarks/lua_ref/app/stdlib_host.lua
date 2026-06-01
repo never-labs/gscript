@@ -4,8 +4,8 @@ local MOD = 1000000007
 local N = 7000
 
 local env = {
-    GSCRIPT_STDLIB_HOST_A = "alpha",
-    GSCRIPT_STDLIB_HOST_B = "beta",
+    LEIA_STDLIB_HOST_A = "alpha",
+    LEIA_STDLIB_HOST_B = "beta",
 }
 
 local function mix(sum, v)
@@ -200,7 +200,7 @@ local function run_hot(n)
         local parsed = time.parse(formatted, "2006-01-02T15:04:05")
         checksum = mix(checksum, parsed.year + parsed.month * 31 + parsed.day + #formatted)
 
-        local expanded = osx.expand("$GSCRIPT_STDLIB_HOST_A/${GSCRIPT_STDLIB_HOST_B}/" .. name)
+        local expanded = osx.expand("$LEIA_STDLIB_HOST_A/${LEIA_STDLIB_HOST_B}/" .. name)
         checksum = mix(checksum, #expanded)
 
         local line = string.format("svc=api status=%d route=/v1/items/%d trace=%s", 200 + (i % 5) * 100, id, name)

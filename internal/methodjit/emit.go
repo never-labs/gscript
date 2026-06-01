@@ -23,9 +23,9 @@ package methodjit
 import (
 	"unsafe"
 
-	"github.com/never-labs/gscript/internal/jit"
-	"github.com/never-labs/gscript/internal/runtime"
-	"github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/leia/internal/jit"
+	"github.com/never-labs/leia/internal/runtime"
+	"github.com/never-labs/leia/internal/vm"
 )
 
 // Pinned register aliases (must match trace JIT convention).
@@ -178,7 +178,7 @@ type ExecContext struct {
 	ResumeNumericPass int64
 
 	// ExitResumeCheckShadow points at a debug-only []runtime.Value shadow
-	// buffer. When GSCRIPT_EXIT_RESUME_CHECK=1 at Tier 2 compile time, exit
+	// buffer. When LEIA_EXIT_RESUME_CHECK=1 at Tier 2 compile time, exit
 	// stubs mirror materialized live register values here before returning to
 	// Go so the execute loop can verify VM home-slot consistency.
 	ExitResumeCheckShadow uintptr
@@ -647,7 +647,7 @@ type CompiledFunction struct {
 	// version-local IR instruction ID.
 	Continuations map[Tier2ContinuationKey]Tier2Continuation
 
-	// ExitResumeCheck is populated only when GSCRIPT_EXIT_RESUME_CHECK=1 at
+	// ExitResumeCheck is populated only when LEIA_EXIT_RESUME_CHECK=1 at
 	// compile time. Nil keeps the normal execute path at near-zero overhead.
 	ExitResumeCheck *exitResumeCheckMetadata
 

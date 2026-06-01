@@ -2,7 +2,7 @@
 
 The `fs` library provides functions for interacting with the local file system: reading and writing files, creating directories, listing directory contents, and more.
 
-All functions that can fail follow the GScript multiple-return convention: on success they return the result value, and on error they return `nil` (or `false`) followed by an error message string.
+All functions that can fail follow the Leia multiple-return convention: on success they return the result value, and on error they return `nil` (or `false`) followed by an error message string.
 
 ## Functions
 

@@ -1,11 +1,11 @@
 package debug
 
-import "github.com/never-labs/gscript/internal/support"
+import "github.com/never-labs/leia/internal/support"
 
-// Frame describes one active runtime call in GScript-shaped terms.
+// Frame describes one active runtime call in Leia-shaped terms.
 type Frame = support.Frame
 
-// HookOptions describes the coarse-grained GScript debug hook filters.
+// HookOptions describes the coarse-grained Leia debug hook filters.
 type HookOptions = support.HookOptions
 
 func DefaultHookOptions() HookOptions {

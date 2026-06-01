@@ -11,7 +11,7 @@ import (
 )
 
 // Recorder is a thread-safe record sink for deterministic LLM replay fixtures.
-// Pass recorder.Record to gscript.WithLLMRecorder.
+// Pass recorder.Record to leia.WithLLMRecorder.
 type Recorder struct {
 	mu      sync.Mutex
 	records []Record
@@ -121,7 +121,7 @@ func MarshalRecords(records []Record) ([]byte, error) {
 
 // UnmarshalRecords parses replay fixture JSON. Integer-valued JSON numbers
 // are normalized back to int64 so strict replay matching remains compatible
-// with values produced by the GScript runtime.
+// with values produced by the Leia runtime.
 func UnmarshalRecords(data []byte) ([]Record, error) {
 	var records []Record
 	if err := json.Unmarshal(data, &records); err != nil {

@@ -1,0 +1,132 @@
+// Smoke test and usage tour for the current structure-of-arrays stdlib.
+// Run with:
+//   go run ./cmd/leia examples/data_processing/data_oriented/soa_kernels.leia
+
+func check(name, ok) {
+    assert(ok)
+    print("ok", name)
+}
+
+x := []f64{1, 2, 3, 4}
+velocity := []f64{10, 20, 30, 40}
+y := []f64{0, 0, 0, 0}
+vy := []f64{1, 2, 3, 4}
+id := [4]i64{101, 102, 103, 104}
+
+points := soa.zip({
+    x: x,
+    y: y,
+    velocity: velocity,
+    vy: vy,
+    id: id,
+})
+
+check("len", soa.len(points) == 4)
+check("columns sorted", soa.columns(points)[1] == "id")
+check("shape", soa.shape(points).columns[1].dtype == "i64")
+check("direct column access", points.x[1] == 1 && points["velocity"][2] == 20)
+directRow := points[1]
+directRow.x = 11
+points[1] = directRow
+check("direct row writeback", points.x[1] == 11)
+points.x = []f64{1, 2, 3, 4}
+check("direct column assignment", points.x[1] == 1 && points.x[4] == 4)
+extended := soa.withColumn(points, "speed", []f64{1.5, 2.5, 3.5, 4.5})
+withoutY := soa.dropColumn(extended, "y")
+check("withColumn", soa.column(extended, "speed")[4] == 4.5)
+check("dropColumn", soa.column(withoutY, "y") == nil && soa.column(withoutY, "x")[1] == 1)
+scratch := soa.zip({x: []f64{1, 2}, id: []i64{10, 20}, ok: []bool{true, false}})
+check("resize grow", soa.resize(scratch, 3) && soa.len(scratch) == 3 && soa.column(scratch, "x")[3] == 0)
+check("appendRow", soa.appendRow(scratch, {x: 4, id: 40, ok: true}) && soa.len(scratch) == 4)
+check("resize shrink", soa.resize(scratch, 2) && soa.len(scratch) == 2 && soa.column(scratch, "id")[2] == 20)
+check("fill", soa.fill(scratch, "x", 7) && soa.column(scratch, "x")[1] == 7 && soa.column(scratch, "x")[2] == 7)
+check("fillWhere", soa.fillWhere(scratch, "ok", []bool{true, false}, true) && soa.column(scratch, "ok")[1])
+
+row := soa.row(points, 2)
+check("row copy", row.id == 102 && row.x == 2)
+row.x = 99
+check("row does not mutate", soa.column(points, "x")[2] == 2)
+
+check("setRow", soa.setRow(points, 2, {
+    id: 202,
+    velocity: 20,
+    vy: 2,
+    x: 12,
+    y: 7,
+}))
+check("setRow writes columns", soa.row(points, 2).x == 12 && soa.row(points, 2).id == 202)
+
+check("addScaled", soa.addScaled(points, "x", "velocity", 0.5))
+check("addScaled result", soa.column(points, "x")[1] == 6 && soa.column(points, "x")[2] == 22)
+
+check("affine", soa.affine(points, "x", "velocity", 2, 1))
+check("affine result", soa.column(points, "x")[3] == 61)
+check("sum", soa.sum(points, "x") == 204)
+check("min/max/mean", soa.min(points, "x") == 21 && soa.max(points, "x") == 81 && soa.mean(points, "x") == 51)
+fullStats := soa.stats(points, "x")
+check("stats", fullStats.count == 4 && fullStats.mean == 51)
+
+check("affineWhere", soa.affineWhere(points, "x", "velocity", 0.1, []bool{true, false, true, false}, 1))
+check("affineWhere masked result", soa.column(points, "x")[1] == 2 && soa.column(points, "x")[2] == 41)
+
+check("affineMany", soa.affineMany(points, {
+    {dst: "x", src: "velocity", scale: 0.25, bias: 0.5},
+    {dst: "y", src: "vy", scale: 10, bias: 1},
+}))
+check("affineMany x", soa.column(points, "x")[4] == 10.5)
+check("affineMany y", soa.column(points, "y")[4] == 41)
+
+fastMask := soa.mask(points, "velocity", ">=", 20)
+aheadMask := soa.mask(points, "x", "<", "velocity")
+check("mask scalar", soa.countWhere(points, fastMask) == 3)
+check("mask column", soa.countWhere(points, aheadMask) == 4)
+selectedSpeed := soa.select(points, fastMask, "velocity", 0)
+check("select scalar", selectedSpeed[1] == 0 && selectedSpeed[2] == 20)
+selectedX := soa.select(points, aheadMask, "x", "velocity")
+check("select column", selectedX[1] == soa.column(points, "x")[1] && selectedX[4] == soa.column(points, "x")[4])
+check("selectInto", soa.selectInto(points, "y", fastMask, "velocity", 0) && soa.column(points, "y")[1] == 0 && soa.column(points, "y")[2] == 20)
+check("sumSelect", soa.sumSelect(points, fastMask, "velocity", 0) == 90)
+
+window := soa.slice(points, 2, 4)
+check("slice inclusive", soa.len(window) == 3 && soa.column(window, "id")[1] == 202)
+
+active := soa.filter(points, []bool{true, false, true, false})
+check("filter", soa.len(active) == 2 && soa.column(active, "x")[2] == 8)
+
+picked := soa.gather(points, [3]i64{4, 1, 4})
+check("gather preserves order", soa.len(picked) == 3 && soa.column(picked, "id")[1] == 104)
+check("gather preserves duplicates", soa.column(picked, "id")[3] == 104)
+pickedRows := soa.indicesWhere(points, []bool{false, true, false, true})
+check("indicesWhere", pickedRows[1] == 2 && pickedRows[2] == 4)
+check("scatterInto scalar", soa.scatterInto(points, "id", pickedRows, 900) && soa.column(points, "id")[2] == 900 && soa.column(points, "id")[4] == 900)
+check("scatterInto dense", soa.scatterInto(points, "y", pickedRows, []f64{77, 88}) && soa.column(points, "y")[2] == 77 && soa.column(points, "y")[4] == 88)
+
+// Current compact/filter spelling: compute or reuse a bool dense mask, compact
+// all columns together, then keep using column kernels on the resulting SoA.
+movingMask := []bool{true, true, false, true}
+moving := soa.compact(points, movingMask)
+check("compact/filter keeps alignment", soa.len(moving) == 3 && soa.column(moving, "id")[2] == 900)
+
+// Masked aggregate spelling: reduce the hot column directly over the mask
+// when the compacted rows are not needed downstream.
+check("masked aggregate sumWhere", soa.sumWhere(points, "velocity", movingMask) == 70)
+velocityPrefix := soa.scan(points, "velocity")
+check("scan", velocityPrefix[1] == 10 && velocityPrefix[4] == 100)
+clampedVelocity := soa.clamp(points, "velocity", 15, 35)
+check("clamp", clampedVelocity[1] == 15 && clampedVelocity[4] == 35)
+check("dot", soa.dot(points, "x", "velocity") == 800)
+check("dotWhere", soa.dotWhere(points, "x", "velocity", movingMask) == 560)
+check("scanInto", soa.scanInto(points, "x", "velocity") && soa.column(points, "x")[3] == 60)
+check("clampInto", soa.clampInto(points, "x", "x", 0, 50) && soa.column(points, "x")[3] == 50)
+check("masked aggregate minWhere", soa.minWhere(points, "velocity", movingMask) == 10)
+check("masked aggregate meanWhere", soa.meanWhere(points, "velocity", movingMask) == 70 / 3)
+check("masked aggregate maxWhere", soa.maxWhere(points, "velocity", movingMask) == 40)
+check("masked aggregate countWhere", soa.countWhere(points, movingMask) == 3)
+stats := soa.statsWhere(points, "velocity", movingMask)
+check("masked aggregate statsWhere", stats.count == 3 && stats.mean == 70 / 3)
+
+columns := soa.unzip(points)
+columns.velocity[1] = 999
+check("unzip copies", soa.column(points, "velocity")[1] == 10)
+
+print("soa_kernels smoke passed")

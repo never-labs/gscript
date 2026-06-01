@@ -126,9 +126,9 @@ Set the interpreter-backed script argument list. This is mainly useful for
 embedders and tests that need to emulate command-line execution.
 
 ```
-process.setArgs("tool.gs", "build", "--fast")
+process.setArgs("tool.leia", "build", "--fast")
 args := process.args()
--- args[0] == "tool.gs"
+-- args[0] == "tool.leia"
 -- args[1] == "build"
 -- args[2] == "--fast"
 ```

@@ -1,5 +1,5 @@
 // ir_ops.go defines the Op enum for the Method JIT's CFG SSA IR.
-// Every GScript bytecode opcode maps to at least one Op. Type-specialized
+// Every Leia bytecode opcode maps to at least one Op. Type-specialized
 // variants (AddInt, AddFloat) are introduced by optimization passes.
 
 package methodjit
