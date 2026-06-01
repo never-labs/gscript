@@ -17,8 +17,19 @@ When adding a standard-library module, update `internal/stdlib/catalog` with its
 layer, description, safe-default status, and required capabilities. The docs
 generator reads that metadata directly. When adding functions to an existing
 module, put the user-visible contract near the module implementation until the
-function-level generator is added. Generated docs should be refreshed with:
+function-level generator is added. Generated Markdown reference pages should be
+refreshed with:
 
 ```bash
-go run ./cmd/leia doc generate --output docs/reference/generated
+go run ./cmd/leia doc generate --layout site --output docs
 ```
+
+The same source metadata can be emitted as machine-readable JSON for site
+builders or release tooling:
+
+```bash
+go run ./cmd/leia doc generate --format json
+```
+
+`scripts/docs_check.sh` compares the checked-in Markdown reference pages with
+the current generated output, so stale generated docs fail the docs gate.

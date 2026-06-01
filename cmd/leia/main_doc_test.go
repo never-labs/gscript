@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -50,6 +51,52 @@ func TestDocGenerateWritesSiteLayout(t *testing.T) {
 	}
 	if !bytes.Contains(stdlibDoc, []byte("Generated from the current runtime stdlib catalog.")) {
 		t.Fatalf("stdlib site doc = %q, want generated stdlib inventory", string(stdlibDoc))
+	}
+}
+
+func TestDocGenerateWritesJSONReferenceFiles(t *testing.T) {
+	dir := t.TempDir()
+	var stdout, stderr bytes.Buffer
+	code := runDocCommand([]string{"generate", "--format", "json", "--layout", "site", "--output", dir}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runDocCommand code = %d, stderr = %q", code, stderr.String())
+	}
+	cliDoc, err := os.ReadFile(filepath.Join(dir, "reference", "cli", "index.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var cliRef docCLIReference
+	if err := json.Unmarshal(cliDoc, &cliRef); err != nil {
+		t.Fatalf("decode cli json: %v", err)
+	}
+	if cliRef.SchemaVersion != 1 || len(cliRef.Commands) == 0 || cliRef.Commands[0].Usage == "" {
+		t.Fatalf("cli json = %#v, want versioned command reference with usage", cliRef)
+	}
+	stdlibDoc, err := os.ReadFile(filepath.Join(dir, "reference", "stdlib", "index.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var stdlibRef docStdlibInventory
+	if err := json.Unmarshal(stdlibDoc, &stdlibRef); err != nil {
+		t.Fatalf("decode stdlib json: %v", err)
+	}
+	if stdlibRef.SchemaVersion != 1 || len(stdlibRef.Layers) == 0 || len(stdlibRef.Layers[0].Modules) == 0 {
+		t.Fatalf("stdlib json = %#v, want versioned stdlib inventory", stdlibRef)
+	}
+}
+
+func TestDocGenerateWritesCombinedJSONToStdout(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := runDocCommand([]string{"generate", "--format", "json"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runDocCommand code = %d, stderr = %q", code, stderr.String())
+	}
+	var bundle docReferenceBundle
+	if err := json.Unmarshal(stdout.Bytes(), &bundle); err != nil {
+		t.Fatalf("decode combined json: %v", err)
+	}
+	if bundle.SchemaVersion != 1 || len(bundle.CLI.Commands) == 0 || len(bundle.Stdlib.Layers) == 0 {
+		t.Fatalf("bundle = %#v, want CLI and stdlib references", bundle)
 	}
 }
 
