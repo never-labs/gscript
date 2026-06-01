@@ -54,7 +54,7 @@ func ParseWithStrftimeLayout(value, layout string) (gotime.Time, error) {
 }
 
 // LuaDateFormat formats t using the Lua os.date directive subset supported by
-// the runtime stdlib.
+// the stdlib runtime binding layer.
 func LuaDateFormat(format string, t gotime.Time) string {
 	result := format
 	replacements := map[string]string{

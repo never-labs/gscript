@@ -1044,7 +1044,7 @@ func RefreshStringLibWithCaller(t *Table, caller ScriptFunctionCaller, maxHostRe
 }
 
 // buildStringLib returns the runtime-native string substrate used by the
-// built-in runtime stdlib installation path.
+// built-in stdlib installation path.
 func buildStringLib() *Table {
 	return BuildStringLibWithCaller(nil)
 }

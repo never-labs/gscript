@@ -11,14 +11,14 @@ import (
 	"github.com/never-labs/leia/internal/stdlib/catalog"
 )
 
-func TestStdlibContractDocumentsRuntimeModules(t *testing.T) {
+func TestStdlibContractDocumentsCatalogModules(t *testing.T) {
 	root := findRepoRoot(t)
-	runtimeModules := readStdlibModuleNames(t)
+	catalogModules := readStdlibModuleNames(t)
 	contractRows := readStdlibContractRows(t, root)
 
-	for _, name := range runtimeModules {
+	for _, name := range catalogModules {
 		if !contractRows[name] {
-			t.Fatalf("docs/reference/stdlib/index.md missing runtime stdlib module %q", name)
+			t.Fatalf("docs/reference/stdlib/index.md missing catalog stdlib module %q", name)
 		}
 	}
 }
@@ -30,12 +30,12 @@ func readStdlibModuleNames(t *testing.T) []string {
 	names := catalog.ModuleNames()
 	for _, name := range names {
 		if seen[name] {
-			t.Fatalf("runtime stdlib registry has duplicate module %q", name)
+			t.Fatalf("stdlib catalog has duplicate module %q", name)
 		}
 		seen[name] = true
 	}
 	if len(names) == 0 {
-		t.Fatal("runtime stdlib registry contains no module names")
+		t.Fatal("stdlib catalog contains no module names")
 	}
 	sort.Strings(names)
 	return names
