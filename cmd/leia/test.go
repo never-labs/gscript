@@ -22,8 +22,8 @@ func runTestCommand(args []string, opts cliRunOptions, outw, errw io.Writer) int
 	listOnly := fs.Bool("list", false, "list matching .leia test files without running them")
 	manifestCheck := fs.Bool("manifest-check", false, "check tests/manifest.json against discovered test cases")
 	seed := fs.String("seed", "", "set LEIA_TEST_SEED while running tests")
-	if err := fs.Parse(args); err != nil {
-		return 2
+	if code, done := parseCLIFlags(fs, args); done {
+		return code
 	}
 	if *manifestCheck {
 		if fs.NArg() != 0 {

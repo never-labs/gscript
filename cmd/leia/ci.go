@@ -25,13 +25,17 @@ func runCICommand(args []string, outw, errw io.Writer) int {
 		fmt.Fprintln(errw, "usage: leia ci [smoke|pr|perf|release] [--list] [--no-luajit]")
 		return 2
 	}
+	if args[0] == "help" || args[0] == "-h" || args[0] == "--help" {
+		fmt.Fprintln(outw, "usage: leia ci [smoke|pr|perf|release] [--list] [--no-luajit]")
+		return 0
+	}
 	profile := args[0]
 	fs := flag.NewFlagSet("ci "+profile, flag.ContinueOnError)
 	fs.SetOutput(errw)
 	listOnly := fs.Bool("list", false, "print commands without running them")
 	noLuaJIT := fs.Bool("no-luajit", false, "skip LuaJIT where supported")
-	if err := fs.Parse(args[1:]); err != nil {
-		return 2
+	if code, done := parseCLIFlags(fs, args[1:]); done {
+		return code
 	}
 	if len(fs.Args()) != 0 {
 		fmt.Fprintln(errw, "usage: leia ci [smoke|pr|perf|release] [--list] [--no-luajit]")

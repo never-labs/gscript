@@ -35,8 +35,8 @@ func runEnvCommand(args []string, outw, errw io.Writer) int {
 	fs.SetOutput(errw)
 	jsonOut := fs.Bool("json", false, "print environment as JSON")
 	start := fs.String("path", ".", "path used for project config discovery")
-	if err := fs.Parse(args); err != nil {
-		return 2
+	if code, done := parseCLIFlags(fs, args); done {
+		return code
 	}
 	if len(fs.Args()) != 0 {
 		fmt.Fprintln(errw, "usage: leia env [--json] [--path PATH]")

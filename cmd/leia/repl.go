@@ -13,8 +13,8 @@ import (
 func runREPLCommand(args []string, outw, errw io.Writer) int {
 	fs := flag.NewFlagSet("repl", flag.ContinueOnError)
 	fs.SetOutput(errw)
-	if err := fs.Parse(args); err != nil {
-		return 2
+	if code, done := parseCLIFlags(fs, args); done {
+		return code
 	}
 	if len(fs.Args()) != 0 {
 		fmt.Fprintln(errw, "usage: leia repl")

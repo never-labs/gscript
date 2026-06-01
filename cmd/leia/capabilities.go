@@ -88,8 +88,8 @@ func runCapabilitiesCommand(args []string, outw, errw io.Writer) int {
 	fs := flag.NewFlagSet("capabilities", flag.ContinueOnError)
 	fs.SetOutput(errw)
 	jsonOut := fs.Bool("json", false, "print capabilities as JSON")
-	if err := fs.Parse(args); err != nil {
-		return 2
+	if code, done := parseCLIFlags(fs, args); done {
+		return code
 	}
 	if len(fs.Args()) != 0 {
 		fmt.Fprintln(errw, "usage: leia capabilities [--json]")

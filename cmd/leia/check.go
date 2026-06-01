@@ -35,8 +35,8 @@ func runCheckCommand(args []string, outw, errw io.Writer) int {
 	noTest := fs.Bool("no-test", false, "skip tests")
 	noManifest := fs.Bool("no-manifest", false, "skip test and benchmark manifest coverage check")
 	noDocs := fs.Bool("no-docs", false, "skip docs check")
-	if err := fs.Parse(args); err != nil {
-		return 2
+	if code, done := parseCLIFlags(fs, args); done {
+		return code
 	}
 	paths := fs.Args()
 	if len(paths) == 0 {

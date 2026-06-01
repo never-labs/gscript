@@ -53,8 +53,8 @@ func runLintCommand(args []string, outw, errw io.Writer) int {
 	fs := flag.NewFlagSet("lint", flag.ContinueOnError)
 	fs.SetOutput(errw)
 	format := fs.String("format", "text", "output format: text, json, or sarif")
-	if err := fs.Parse(args); err != nil {
-		return 2
+	if code, done := parseCLIFlags(fs, args); done {
+		return code
 	}
 	paths := fs.Args()
 	if len(paths) == 0 {

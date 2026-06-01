@@ -69,8 +69,8 @@ func runConfigCommand(args []string, outw, errw io.Writer) int {
 	fs := flag.NewFlagSet("config", flag.ContinueOnError)
 	fs.SetOutput(errw)
 	jsonOut := fs.Bool("json", false, "print resolved configuration as JSON")
-	if err := fs.Parse(args); err != nil {
-		return 2
+	if code, done := parseCLIFlags(fs, args); done {
+		return code
 	}
 	if len(fs.Args()) > 1 {
 		fmt.Fprintln(errw, "usage: leia config [--json] [path]")

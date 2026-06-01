@@ -39,8 +39,8 @@ func runInspectBytecodeCommand(args []string, outw, errw io.Writer) int {
 	fs := flag.NewFlagSet("inspect bytecode", flag.ContinueOnError)
 	fs.SetOutput(errw)
 	protoName := fs.String("proto", "", "dump only a named proto")
-	if err := fs.Parse(args); err != nil {
-		return 2
+	if code, done := parseCLIFlags(fs, args); done {
+		return code
 	}
 	paths := fs.Args()
 	if len(paths) != 1 {
@@ -77,8 +77,8 @@ func runInspectDirectivesCommand(args []string, outw, errw io.Writer) int {
 	fs := flag.NewFlagSet("inspect directives", flag.ContinueOnError)
 	fs.SetOutput(errw)
 	jsonOut := fs.Bool("json", false, "print directives as JSON")
-	if err := fs.Parse(args); err != nil {
-		return 2
+	if code, done := parseCLIFlags(fs, args); done {
+		return code
 	}
 	paths := fs.Args()
 	if len(paths) != 1 {

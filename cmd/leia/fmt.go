@@ -17,8 +17,8 @@ func runFmtCommand(args []string, outw, errw io.Writer) int {
 	check := fs.Bool("check", false, "check whether files are formatted without writing")
 	write := fs.Bool("write", false, "write formatted files in place")
 	stdinFileName := fs.String("stdin-file-name", "", "read source from stdin and use this filename for diagnostics")
-	if err := fs.Parse(args); err != nil {
-		return 2
+	if code, done := parseCLIFlags(fs, args); done {
+		return code
 	}
 	paths := fs.Args()
 	if len(paths) == 0 && *stdinFileName == "" {

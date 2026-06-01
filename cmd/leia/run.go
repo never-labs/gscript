@@ -14,8 +14,8 @@ func runRunCommand(args []string, outw, errw io.Writer) int {
 	useVM := fs.Bool("vm", false, "use bytecode VM without JIT")
 	useJIT := fs.Bool("jit", true, "use bytecode VM with JIT compilation")
 	modMode := fs.String("mod", string(leia.ModuleModeMod), "module mode: readonly, vendor, or mod")
-	if err := fs.Parse(args); err != nil {
-		return 2
+	if code, done := parseCLIFlags(fs, args); done {
+		return code
 	}
 	moduleMode := leia.ModuleMode(*modMode)
 	if !leia.ValidModuleMode(moduleMode) {

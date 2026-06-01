@@ -19,16 +19,6 @@ type modDownloadReport = modpkg.DownloadReport
 type modVendorReport = modpkg.VendorReport
 type modGoModReport = modpkg.GoModReport
 
-func parseModFlags(fs *flag.FlagSet, args []string) (int, bool) {
-	if err := fs.Parse(args); err != nil {
-		if err == flag.ErrHelp {
-			return 0, true
-		}
-		return 2, true
-	}
-	return 0, false
-}
-
 func runModCommand(args []string, outw, errw io.Writer) int {
 	if len(args) == 0 {
 		fmt.Fprintln(errw, "usage: leia mod [init|add|tidy|check|download|vendor|lock|list|graph|explain|capability|gomod|verify] [flags]")
@@ -75,7 +65,7 @@ func runModInitCommand(args []string, outw, errw io.Writer) int {
 	fs.SetOutput(errw)
 	module := fs.String("module", "", "module path")
 	dir := fs.String("dir", ".", "project directory")
-	if code, done := parseModFlags(fs, args); done {
+	if code, done := parseCLIFlags(fs, args); done {
 		return code
 	}
 	if len(fs.Args()) != 0 {
@@ -95,7 +85,7 @@ func runModAddCommand(args []string, outw, errw io.Writer) int {
 	fs := flag.NewFlagSet("mod add", flag.ContinueOnError)
 	fs.SetOutput(errw)
 	dir := fs.String("dir", ".", "project directory")
-	if code, done := parseModFlags(fs, args); done {
+	if code, done := parseCLIFlags(fs, args); done {
 		return code
 	}
 	targets := fs.Args()
@@ -117,7 +107,7 @@ func runModTidyCommand(args []string, outw, errw io.Writer) int {
 	fs.SetOutput(errw)
 	jsonOut := fs.Bool("json", false, "print tidy report as JSON")
 	dir := fs.String("dir", ".", "project directory")
-	if code, done := parseModFlags(fs, args); done {
+	if code, done := parseCLIFlags(fs, args); done {
 		return code
 	}
 	if len(fs.Args()) != 0 {
@@ -156,7 +146,7 @@ func runModLockCommand(args []string, outw, errw io.Writer) int {
 	fs := flag.NewFlagSet("mod lock", flag.ContinueOnError)
 	fs.SetOutput(errw)
 	jsonOut := fs.Bool("json", false, "print lock report as JSON")
-	if code, done := parseModFlags(fs, args); done {
+	if code, done := parseCLIFlags(fs, args); done {
 		return code
 	}
 	path := "."
@@ -198,7 +188,7 @@ func runModDownloadCommand(args []string, outw, errw io.Writer) int {
 	jsonOut := fs.Bool("json", false, "print download report as JSON")
 	cacheDir := fs.String("cache", "", "module cache directory")
 	githubBase := fs.String("github-base", "", "GitHub-compatible base URL")
-	if code, done := parseModFlags(fs, args); done {
+	if code, done := parseCLIFlags(fs, args); done {
 		return code
 	}
 	path := "."
@@ -252,7 +242,7 @@ func runModVendorCommand(args []string, outw, errw io.Writer) int {
 	cacheDir := fs.String("cache", "", "module cache directory")
 	vendorDir := fs.String("vendor-dir", "", "vendor directory")
 	clear := fs.Bool("clear", false, "remove vendor directory before copying modules")
-	if code, done := parseModFlags(fs, args); done {
+	if code, done := parseCLIFlags(fs, args); done {
 		return code
 	}
 	path := "."
@@ -295,7 +285,7 @@ func runModGraphCommand(args []string, outw, errw io.Writer) int {
 	fs := flag.NewFlagSet("mod graph", flag.ContinueOnError)
 	fs.SetOutput(errw)
 	jsonOut := fs.Bool("json", false, "print module graph as JSON")
-	if code, done := parseModFlags(fs, args); done {
+	if code, done := parseCLIFlags(fs, args); done {
 		return code
 	}
 	path := "."
@@ -336,7 +326,7 @@ func runModListCommand(args []string, outw, errw io.Writer) int {
 	fs := flag.NewFlagSet("mod list", flag.ContinueOnError)
 	fs.SetOutput(errw)
 	jsonOut := fs.Bool("json", false, "print module list as JSON")
-	if code, done := parseModFlags(fs, args); done {
+	if code, done := parseCLIFlags(fs, args); done {
 		return code
 	}
 	path := "."
@@ -401,7 +391,7 @@ func runModExplainCommand(args []string, outw, errw io.Writer) int {
 	fs.SetOutput(errw)
 	jsonOut := fs.Bool("json", false, "print resolution as JSON")
 	dir := fs.String("dir", ".", "project directory")
-	if code, done := parseModFlags(fs, args); done {
+	if code, done := parseCLIFlags(fs, args); done {
 		return code
 	}
 	if len(fs.Args()) != 1 {
@@ -442,7 +432,7 @@ func runModCapabilityCommand(args []string, outw, errw io.Writer) int {
 	fs := flag.NewFlagSet("mod capability", flag.ContinueOnError)
 	fs.SetOutput(errw)
 	jsonOut := fs.Bool("json", false, "print capability matrix as JSON")
-	if code, done := parseModFlags(fs, args); done {
+	if code, done := parseCLIFlags(fs, args); done {
 		return code
 	}
 	path := "."
@@ -491,7 +481,7 @@ func runModGoModCommand(args []string, outw, errw io.Writer) int {
 	fs.SetOutput(errw)
 	jsonOut := fs.Bool("json", false, "print generated go.mod report as JSON")
 	write := fs.Bool("write", false, "write generated go.mod next to leia.mod")
-	if code, done := parseModFlags(fs, args); done {
+	if code, done := parseCLIFlags(fs, args); done {
 		return code
 	}
 	path := "."
@@ -535,7 +525,7 @@ func runModVerifyCommand(args []string, outw, errw io.Writer) int {
 	fs.SetOutput(errw)
 	jsonOut := fs.Bool("json", false, "print verification as JSON")
 	cacheDir := fs.String("cache", "", "module cache directory")
-	if code, done := parseModFlags(fs, args); done {
+	if code, done := parseCLIFlags(fs, args); done {
 		return code
 	}
 	path := "."

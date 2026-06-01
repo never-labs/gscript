@@ -2,6 +2,16 @@ package main
 
 import "flag"
 
+func parseCLIFlags(fs *flag.FlagSet, args []string) (int, bool) {
+	if err := fs.Parse(args); err != nil {
+		if err == flag.ErrHelp {
+			return 0, true
+		}
+		return 2, true
+	}
+	return 0, false
+}
+
 func flagWasSet(fs *flag.FlagSet, name string) bool {
 	found := false
 	fs.Visit(func(f *flag.Flag) {

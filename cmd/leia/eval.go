@@ -13,8 +13,8 @@ func runEvalCommand(args []string, outw, errw io.Writer) int {
 	fs.SetOutput(errw)
 	useVM := fs.Bool("vm", false, "use bytecode VM without JIT")
 	useJIT := fs.Bool("jit", true, "use bytecode VM with JIT compilation")
-	if err := fs.Parse(args); err != nil {
-		return 2
+	if code, done := parseCLIFlags(fs, args); done {
+		return code
 	}
 	rest := fs.Args()
 	if len(rest) == 0 {

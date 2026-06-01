@@ -110,6 +110,32 @@ func TestReleaseMatrixDocCommandSurfaceIsUsable(t *testing.T) {
 	}
 }
 
+func TestReleaseMatrixTopLevelCommandHelpIsSuccessful(t *testing.T) {
+	root := findRepoRoot(t)
+	for _, command := range []string{
+		"eval",
+		"run",
+		"repl",
+		"fmt",
+		"lint",
+		"test",
+		"version",
+		"env",
+		"config",
+		"check",
+		"capabilities",
+		"ci",
+		"diag",
+		"diagnose",
+		"inspect",
+		"bench",
+		"doc",
+		"mod",
+	} {
+		runCommand(t, root, 30*time.Second, "go", "run", "./cmd/leia", command, "--help")
+	}
+}
+
 func TestReleaseMatrixModuleHelpSurfaceIsUsable(t *testing.T) {
 	root := findRepoRoot(t)
 	for _, mode := range []string{
