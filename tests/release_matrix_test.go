@@ -563,6 +563,31 @@ func TestReleaseMatrixDocumentedExampleCommandsStayRunnable(t *testing.T) {
 	}
 }
 
+func TestReleaseMatrixExamplesReadmeCommandsStayRunnable(t *testing.T) {
+	root := findRepoRoot(t)
+	examplesReadme := readFileString(t, filepath.Join(root, "examples", "README.md"))
+	for _, forbidden := range []string{
+		"go run ../cmd/leia run hello/metatables.leia",
+		"go run ../cmd/leia run llm/agent_as_tool.leia",
+		"go run ../cmd/leia run game_engine/game_of_life.leia",
+		"go run ../cmd/leia run game_engine/tetris.leia",
+		"go run ../cmd/leia run web/hello_server.leia",
+	} {
+		if strings.Contains(examplesReadme, forbidden) {
+			t.Fatalf("examples/README.md must not present non-smoke command %q as no-network runnable", forbidden)
+		}
+	}
+
+	commands := documentedExamplesReadmeRunCommands(t, examplesReadme)
+	if len(commands) == 0 {
+		t.Fatal("examples/README.md must contain runnable no-network example commands")
+	}
+	examplesDir := filepath.Join(root, "examples")
+	for _, args := range commands {
+		runCommand(t, examplesDir, 30*time.Second, "go", args...)
+	}
+}
+
 func TestReleaseMatrixPerformanceDocsUseCurrentBenchCommands(t *testing.T) {
 	root := findRepoRoot(t)
 	for _, path := range []string{
@@ -623,6 +648,23 @@ func documentedExampleRunCommands(t *testing.T, doc string) [][]string {
 		fields := strings.Fields(line)
 		if len(fields) != 5 {
 			t.Fatalf("unexpected documented example command shape %q", line)
+		}
+		commands = append(commands, fields[1:])
+	}
+	return commands
+}
+
+func documentedExamplesReadmeRunCommands(t *testing.T, doc string) [][]string {
+	t.Helper()
+	var commands [][]string
+	for _, line := range strings.Split(doc, "\n") {
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(line, "go run ../cmd/leia run ") {
+			continue
+		}
+		fields := strings.Fields(line)
+		if len(fields) != 5 {
+			t.Fatalf("unexpected examples README command shape %q", line)
 		}
 		commands = append(commands, fields[1:])
 	}
