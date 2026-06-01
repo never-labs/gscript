@@ -162,6 +162,23 @@ func TestStdlibrtModulesDoNotOwnAdapterContracts(t *testing.T) {
 	})
 }
 
+func TestInternalSupportPackagesStayGrouped(t *testing.T) {
+	root := repoRoot(t)
+	for _, name := range []string{"binaryfmt", "debugstate", "filemode", "outputlimit"} {
+		if _, err := os.Stat(filepath.Join(root, "internal", name)); !os.IsNotExist(err) {
+			t.Fatalf("internal/%s should not be a top-level architecture package; keep shared support code under internal/support/%s", name, name)
+		}
+		dir := filepath.Join(root, "internal", "support", name)
+		info, err := os.Stat(dir)
+		if err != nil {
+			t.Fatalf("internal/support/%s missing: %v", name, err)
+		}
+		if !info.IsDir() {
+			t.Fatalf("internal/support/%s is not a directory", name)
+		}
+	}
+}
+
 func hasGoFile(t *testing.T, dir string) bool {
 	t.Helper()
 	found := false

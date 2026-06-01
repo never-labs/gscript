@@ -7,9 +7,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/never-labs/gscript/internal/filemode"
 	hostio "github.com/never-labs/gscript/internal/stdlib/io"
 	"github.com/never-labs/gscript/internal/stdlibrt/host"
+	"github.com/never-labs/gscript/internal/support/filemode"
 )
 
 const (

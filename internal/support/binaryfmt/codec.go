@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/never-labs/gscript/internal/outputlimit"
+	"github.com/never-labs/gscript/internal/support/outputlimit"
 )
 
 const maxInt48 = (1 << 47) - 1

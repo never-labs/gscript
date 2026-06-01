@@ -1,6 +1,6 @@
 package debug
 
-import "github.com/never-labs/gscript/internal/debugstate"
+import "github.com/never-labs/gscript/internal/support/debugstate"
 
 // Frame describes one active runtime call in GScript-shaped terms.
 type Frame = debugstate.Frame
