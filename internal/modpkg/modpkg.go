@@ -515,8 +515,12 @@ func List(path string) ListReport {
 
 	collections := moduleCollections(abs, manifest)
 	replaces := moduleReplaces(abs, manifest)
+	cacheModules := listVendorModules(abs, manifest)
+	if cacheDir, err := ModuleCacheDir(""); err == nil {
+		cacheModules = append(cacheModules, listCacheModules(cacheDir, manifest)...)
+	}
 	for _, req := range manifest.Require {
-		result := modresolve.Resolve(req.Path, collections, replaces, abs)
+		result := modresolve.ResolveWithCache(req.Path, collections, replaces, cacheModules, abs)
 		item := ListRequire{
 			Path:    req.Path,
 			Version: req.Version,
@@ -550,6 +554,36 @@ func List(path string) ListReport {
 	}
 	report.OK = len(report.Diagnostics) == 0
 	return report
+}
+
+func listVendorModules(root string, manifest modfile.File) []modresolve.CacheModule {
+	modules := make([]modresolve.CacheModule, 0, len(manifest.Require))
+	for _, req := range manifest.Require {
+		if req.Version == "" {
+			continue
+		}
+		vendorRoot := filepath.Join(root, "vendor", filepath.FromSlash(req.Path+"@"+req.Version))
+		if _, err := os.Stat(vendorRoot); err != nil {
+			continue
+		}
+		modules = append(modules, modresolve.CacheModule{Path: req.Path, Version: req.Version, Root: vendorRoot, Kind: "vendor"})
+	}
+	return modules
+}
+
+func listCacheModules(cacheDir string, manifest modfile.File) []modresolve.CacheModule {
+	modules := make([]modresolve.CacheModule, 0, len(manifest.Require))
+	for _, req := range manifest.Require {
+		if req.Version == "" {
+			continue
+		}
+		cacheRoot := filepath.Join(cacheDir, "extract", filepath.FromSlash(req.Path+"@"+req.Version))
+		if _, err := os.Stat(cacheRoot); err != nil {
+			continue
+		}
+		modules = append(modules, modresolve.CacheModule{Path: req.Path, Version: req.Version, Root: cacheRoot, Kind: "cache"})
+	}
+	return modules
 }
 
 func Lock(path string) SumReport {

@@ -202,6 +202,28 @@ func TestListReportsManifestEntriesAndLocalResolution(t *testing.T) {
 	}
 }
 
+func TestListReportsVendoredRequireResolution(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "gscript.mod"), strings.Join([]string{
+		"module example.com/app",
+		"gs 0.1",
+		"require github.com/acme/toolkit v1.2.3",
+		"",
+	}, "\n"))
+	writeFile(t, filepath.Join(dir, "vendor", "github.com", "acme", "toolkit@v1.2.3", "main.gs"), "return 1\n")
+
+	report := List(dir)
+	if !report.OK {
+		t.Fatalf("List OK = false, diagnostics = %#v", report.Diagnostics)
+	}
+	if len(report.Requires) != 1 {
+		t.Fatalf("List requires = %#v, want one", report.Requires)
+	}
+	if report.Requires[0].Kind != "vendor" {
+		t.Fatalf("List require = %#v, want vendor kind", report.Requires[0])
+	}
+}
+
 func TestDownloadFetchesGitHubTagArchiveIntoCache(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, filepath.Join(dir, "gscript.mod"), strings.Join([]string{

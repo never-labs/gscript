@@ -20,6 +20,7 @@ type CacheModule struct {
 	Path    string
 	Version string
 	Root    string
+	Kind    string
 }
 
 type Result struct {
@@ -119,7 +120,11 @@ func ResolveCache(module string, cacheModules []CacheModule) (Result, bool) {
 		rel = filepath.Base(best.Path)
 	}
 	rel = strings.ReplaceAll(rel, ".", "/") + ".gs"
-	return Result{Kind: "cache", Path: best.Path, Root: best.Root, Rel: rel, File: filepath.Join(best.Root, rel)}, true
+	kind := best.Kind
+	if kind == "" {
+		kind = "cache"
+	}
+	return Result{Kind: kind, Path: best.Path, Root: best.Root, Rel: rel, File: filepath.Join(best.Root, rel)}, true
 }
 
 func moduleFile(module string) string {

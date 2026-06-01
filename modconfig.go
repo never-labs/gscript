@@ -73,7 +73,7 @@ func vendorModulesForManifest(root string, manifest modfile.File) []modresolve.C
 		if _, err := os.Stat(vendorRoot); err != nil {
 			continue
 		}
-		modules = append(modules, modresolve.CacheModule{Path: req.Path, Version: req.Version, Root: vendorRoot})
+		modules = append(modules, modresolve.CacheModule{Path: req.Path, Version: req.Version, Root: vendorRoot, Kind: "vendor"})
 	}
 	return modules
 }
@@ -90,7 +90,7 @@ func cacheModulesForManifest(cacheDir string, manifest modfile.File) []modresolv
 			// offline and will fail normally if the file is unavailable.
 			continue
 		}
-		modules = append(modules, modresolve.CacheModule{Path: req.Path, Version: req.Version, Root: root})
+		modules = append(modules, modresolve.CacheModule{Path: req.Path, Version: req.Version, Root: root, Kind: "cache"})
 	}
 	return modules
 }
