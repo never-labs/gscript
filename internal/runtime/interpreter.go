@@ -4,11 +4,10 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path/filepath"
-	"strings"
 	"sync/atomic"
 
 	"github.com/never-labs/gscript/internal/support/hostpath"
+	"github.com/never-labs/gscript/internal/support/modresolve"
 )
 
 // Core tree-walking interpreter: the Interpreter type, its constructors, and
@@ -236,42 +235,16 @@ func (interp *Interpreter) SetModuleReplace(path, root string) {
 }
 
 func (interp *Interpreter) resolveModulePath(name string) string {
-	if idx := strings.Index(name, ":"); idx > 0 && interp.moduleCollections != nil {
-		prefix := name[:idx]
-		if root := interp.moduleCollections[prefix]; root != "" {
-			rest := strings.ReplaceAll(name[idx+1:], ".", "/") + ".gs"
-			return filepath.Join(root, rest)
-		}
+	collections := make([]modresolve.Collection, 0, len(interp.moduleCollections))
+	for name, root := range interp.moduleCollections {
+		collections = append(collections, modresolve.Collection{Name: name, Root: root})
 	}
-	if replaced := resolveReplacedModulePath(name, interp.moduleReplaces); replaced != "" {
-		return replaced
+	replaces := make([]modresolve.Replace, 0, len(interp.moduleReplaces))
+	for path, root := range interp.moduleReplaces {
+		replaces = append(replaces, modresolve.Replace{Path: path, Root: root})
 	}
-	return interp.resolveScriptPath(strings.ReplaceAll(name, ".", "/") + ".gs")
-}
-
-func resolveReplacedModulePath(name string, replacements map[string]string) string {
-	var bestPath, bestRoot string
-	for path, root := range replacements {
-		if name != path && !strings.HasPrefix(name, path+"/") {
-			continue
-		}
-		if len(path) > len(bestPath) {
-			bestPath = path
-			bestRoot = root
-		}
-	}
-	if bestPath == "" {
-		return ""
-	}
-	if name == bestPath {
-		if filepath.Ext(bestRoot) == ".gs" {
-			return bestRoot
-		}
-		return bestRoot + ".gs"
-	}
-	rest := strings.TrimPrefix(name[len(bestPath):], "/")
-	rest = strings.ReplaceAll(rest, ".", "/") + ".gs"
-	return filepath.Join(bestRoot, rest)
+	result := modresolve.Resolve(name, collections, replaces, interp.scriptDir)
+	return result.File
 }
 
 // SetModuleLoading controls whether require() may load .gs files from the

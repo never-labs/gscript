@@ -4,13 +4,15 @@ package vm
 
 import (
 	"fmt"
-	"github.com/never-labs/gscript/internal/lexer"
-	"github.com/never-labs/gscript/internal/parser"
-	"github.com/never-labs/gscript/internal/runtime"
 	"os"
 	"path/filepath"
 	"strings"
 	"unsafe"
+
+	"github.com/never-labs/gscript/internal/lexer"
+	"github.com/never-labs/gscript/internal/parser"
+	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/gscript/internal/support/modresolve"
 )
 
 type vmScriptConfig struct {
@@ -270,42 +272,16 @@ func (vm *VM) resolveScriptPath(filename string) string {
 }
 
 func (vm *VM) resolveModulePath(name string) string {
-	if idx := strings.Index(name, ":"); idx > 0 && vm.moduleCollections != nil {
-		prefix := name[:idx]
-		if root := vm.moduleCollections[prefix]; root != "" {
-			rest := strings.ReplaceAll(name[idx+1:], ".", "/") + ".gs"
-			return filepath.Join(root, rest)
-		}
+	collections := make([]modresolve.Collection, 0, len(vm.moduleCollections))
+	for name, root := range vm.moduleCollections {
+		collections = append(collections, modresolve.Collection{Name: name, Root: root})
 	}
-	if replaced := resolveReplacedModulePath(name, vm.moduleReplaces); replaced != "" {
-		return replaced
+	replaces := make([]modresolve.Replace, 0, len(vm.moduleReplaces))
+	for path, root := range vm.moduleReplaces {
+		replaces = append(replaces, modresolve.Replace{Path: path, Root: root})
 	}
-	return vm.resolveScriptPath(strings.ReplaceAll(name, ".", "/") + ".gs")
-}
-
-func resolveReplacedModulePath(name string, replacements map[string]string) string {
-	var bestPath, bestRoot string
-	for path, root := range replacements {
-		if name != path && !strings.HasPrefix(name, path+"/") {
-			continue
-		}
-		if len(path) > len(bestPath) {
-			bestPath = path
-			bestRoot = root
-		}
-	}
-	if bestPath == "" {
-		return ""
-	}
-	if name == bestPath {
-		if filepath.Ext(bestRoot) == ".gs" {
-			return bestRoot
-		}
-		return bestRoot + ".gs"
-	}
-	rest := strings.TrimPrefix(name[len(bestPath):], "/")
-	rest = strings.ReplaceAll(rest, ".", "/") + ".gs"
-	return filepath.Join(bestRoot, rest)
+	result := modresolve.Resolve(name, collections, replaces, vm.scriptDir)
+	return result.File
 }
 
 func (vm *VM) resolveScriptPathWithDir(filename string, dir string) string {

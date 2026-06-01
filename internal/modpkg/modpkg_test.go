@@ -135,7 +135,7 @@ func TestExplainResolvesStdlibCollectionReplaceAndModuleRoot(t *testing.T) {
 		{name: "stdlib", module: "json", wantKind: "stdlib", wantPath: "json"},
 		{name: "collection", module: "vendor:tool", wantKind: "collection", wantPath: "vendor", wantSuffix: filepath.Join("vendor", "tool.gs")},
 		{name: "replace", module: "example.com/lib/sub", wantKind: "replace", wantPath: "example.com/lib", wantSuffix: filepath.Join("local", "lib", "sub.gs")},
-		{name: "module root", module: "example.com/app/local", wantKind: "module", wantPath: "example.com/app", wantSuffix: filepath.Join("example", "com", "app", "local.gs")},
+		{name: "module root", module: "example.com/app/local", wantKind: "module", wantPath: "example.com/app", wantSuffix: filepath.Join("example.com", "app", "local.gs")},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
