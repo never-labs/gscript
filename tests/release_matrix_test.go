@@ -73,6 +73,18 @@ func TestReleaseMatrixLanguageSpecMatchesGrammarAppendix(t *testing.T) {
 	}
 }
 
+func TestReleaseMatrixStableKeywordsMatchLexer(t *testing.T) {
+	root := findRepoRoot(t)
+	spec := readFileString(t, filepath.Join(root, "docs", "spec", "language.md"))
+	lexerSource := readFileString(t, filepath.Join(root, "internal", "lexer", "token.go"))
+
+	specKeywords := parseSpecKeywordList(t, spec)
+	lexerKeywords := parseLexerKeywordMap(t, lexerSource)
+	if !sameStringSet(specKeywords, lexerKeywords) {
+		t.Fatalf("stable keyword list must match lexer keywords\nspec:  %s\nlexer: %s", strings.Join(specKeywords, ", "), strings.Join(lexerKeywords, ", "))
+	}
+}
+
 func normalizeGrammarText(s string) string {
 	var lines []string
 	for _, line := range strings.Split(s, "\n") {
@@ -83,6 +95,57 @@ func normalizeGrammarText(s string) string {
 		lines = append(lines, strings.Join(fields, " "))
 	}
 	return strings.Join(lines, "\n")
+}
+
+func parseSpecKeywordList(t *testing.T, spec string) []string {
+	t.Helper()
+	re := regexp.MustCompile("(?s)Stable keywords:\\s*```text\\s*(.*?)\\s*```")
+	match := re.FindStringSubmatch(spec)
+	if len(match) != 2 {
+		t.Fatal("docs/spec/language.md must contain a Stable keywords text block")
+	}
+	return sortedUniqueStrings(strings.Fields(match[1]))
+}
+
+func parseLexerKeywordMap(t *testing.T, lexerSource string) []string {
+	t.Helper()
+	re := regexp.MustCompile("(?s)var keywords = map\\[string\\]TokenType\\{(.*?)\\n\\}")
+	match := re.FindStringSubmatch(lexerSource)
+	if len(match) != 2 {
+		t.Fatal("internal/lexer/token.go must contain lexer keyword map")
+	}
+	keyRE := regexp.MustCompile(`"([^"]+)"\s*:`)
+	var keywords []string
+	for _, key := range keyRE.FindAllStringSubmatch(match[1], -1) {
+		keywords = append(keywords, key[1])
+	}
+	return sortedUniqueStrings(keywords)
+}
+
+func sameStringSet(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func sortedUniqueStrings(values []string) []string {
+	seen := map[string]bool{}
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		if seen[value] {
+			continue
+		}
+		seen[value] = true
+		out = append(out, value)
+	}
+	sort.Strings(out)
+	return out
 }
 
 func TestReleaseMatrixConformanceCasesHaveStatusAndClassification(t *testing.T) {
