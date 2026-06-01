@@ -1,0 +1,24 @@
+{
+  "name": "tree-sitter-leia",
+  "version": "0.0.1",
+  "description": "Leia grammar for tree-sitter",
+  "private": true,
+  "main": "grammar.js",
+  "scripts": {
+    "generate": "tree-sitter generate",
+    "test": "tree-sitter test"
+  },
+  "devDependencies": {
+    "tree-sitter-cli": "0.25.10"
+  },
+  "tree-sitter": [
+    {
+      "scope": "source.leia",
+      "file-types": [
+        "leia"
+      ],
+      "grammar": "tree-sitter-leia"
+    }
+  ],
+  "license": "MIT"
+}

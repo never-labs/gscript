@@ -1,0 +1,25 @@
+==================
+Tables and lists
+==================
+
+user := {
+  name: "Leia",
+  scores: [1, 2, 3],
+  ["active"]: true,
+  []f64{1.5, 2.5},
+}
+
+---
+
+(source_file
+  (statement
+    (simple_statement
+      (assignment_statement
+        left: (expression_list)
+        right: (expression_list
+          (expression
+            (table_literal
+              (table_field)
+              (table_field)
+              (table_field)
+              (table_field))))))))

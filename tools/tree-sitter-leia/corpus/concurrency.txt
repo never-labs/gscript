@@ -1,0 +1,45 @@
+==================
+Goroutines channels and select
+==================
+
+func worker(out) {
+  out <- 42
+}
+
+out := make(chan, 1)
+go worker(out)
+
+select {
+case value := <-out:
+  print(value)
+case out <- 7:
+  print("sent")
+default:
+  print("empty")
+}
+
+---
+
+(source_file
+  (statement
+    (function_declaration
+      name: (identifier)
+      parameters: (parameter_list)
+      body: (block
+        (statement
+          (simple_statement
+            (send_statement))))))
+  (statement
+    (simple_statement
+      (assignment_statement)))
+  (statement
+    (go_statement
+      call: (expression
+        (call_expression))))
+  (statement
+    (select_statement
+      (select_case
+        (select_receive_clause))
+      (select_case
+        (select_send_clause))
+      (select_case))))

@@ -81,18 +81,67 @@ func TestPlaygroundExamplesAPI(t *testing.T) {
 	if len(examples) < 3 {
 		t.Fatalf("examples = %d, want at least 3", len(examples))
 	}
+	for _, example := range examples {
+		if example.ID == "" || example.Title == "" || example.Section == "" || example.Summary == "" {
+			t.Fatalf("incomplete tour example: %#v", example)
+		}
+	}
+}
+
+func TestPlaygroundTourAndAIAPI(t *testing.T) {
+	handler := newPlaygroundHandler(playgroundOptions{
+		Runner: func(context.Context, playgroundRunRequest, playgroundOptions) playgroundRunResponse {
+			return playgroundRunResponse{}
+		},
+	})
+	for _, path := range []string{"/api/tour", "/api/ai"} {
+		t.Run(path, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, path, nil)
+			rec := httptest.NewRecorder()
+			handler.ServeHTTP(rec, req)
+			if rec.Code != http.StatusOK {
+				t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
+			}
+			var examples []playgroundExample
+			if err := json.Unmarshal(rec.Body.Bytes(), &examples); err != nil {
+				t.Fatalf("decode examples: %v", err)
+			}
+			if len(examples) < 3 {
+				t.Fatalf("examples = %d, want at least 3", len(examples))
+			}
+			for _, example := range examples {
+				if example.ID == "" || example.Title == "" || example.Section == "" || example.Summary == "" {
+					t.Fatalf("incomplete example: %#v", example)
+				}
+			}
+		})
+	}
 }
 
 func TestPlaygroundExamplesExecute(t *testing.T) {
-	for _, example := range playgroundExamples() {
-		t.Run(example.Name, func(t *testing.T) {
+	var examples []playgroundExample
+	examples = append(examples, playgroundTourLessons()...)
+	examples = append(examples, playgroundAIExamples()...)
+	for _, example := range examples {
+		if !example.Runnable {
+			continue
+		}
+		if strings.Contains(strings.ToLower(example.Requires), "llm") ||
+			strings.Contains(strings.ToLower(example.Requires), "credential") {
+			continue
+		}
+		t.Run(example.ID, func(t *testing.T) {
 			dir := t.TempDir()
 			path := dir + "/main.leia"
 			if err := os.WriteFile(path, []byte(example.Source), 0600); err != nil {
 				t.Fatal(err)
 			}
 			var stdout, stderr bytes.Buffer
-			code := runPlaygroundExecCommand([]string{"--max-steps=2000000", path}, &stdout, &stderr)
+			args := []string{"--max-steps=2000000", path}
+			if strings.HasPrefix(example.ID, "ai-") {
+				args = []string{"--profile=ai", "--max-steps=2000000", path}
+			}
+			code := runPlaygroundExecCommand(args, &stdout, &stderr)
 			if code != 0 {
 				t.Fatalf("example failed with code %d\nstdout:\n%s\nstderr:\n%s\nsource:\n%s", code, stdout.String(), stderr.String(), example.Source)
 			}
@@ -100,6 +149,37 @@ func TestPlaygroundExamplesExecute(t *testing.T) {
 				t.Fatalf("example produced no stdout\nsource:\n%s", example.Source)
 			}
 		})
+	}
+}
+
+func TestPlaygroundExecAIProfileUsesGLMEnv(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			t.Fatalf("method = %s, want POST", r.Method)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"content":[{"type":"text","text":"LEIA_GLM_OK"}],"stop_reason":"end_turn","usage":{"input_tokens":1,"output_tokens":1}}`))
+	}))
+	defer server.Close()
+	t.Setenv("LEIA_GLM_BASE_URL", server.URL)
+	t.Setenv("LEIA_GLM_API_KEY", "test-key")
+	t.Setenv("LEIA_GLM_MODEL", "mock-glm")
+
+	dir := t.TempDir()
+	path := dir + "/main.leia"
+	src := `result, err := turn { user: "Reply exactly: LEIA_GLM_OK", max_tokens: 16, temperature: 0 }
+if err != nil { print(err.message); return }
+print(result.text)`
+	if err := os.WriteFile(path, []byte(src), 0600); err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	code := runPlaygroundExecCommand([]string{"--profile=ai", "--max-steps=100000", path}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("code = %d\nstdout:\n%s\nstderr:\n%s", code, stdout.String(), stderr.String())
+	}
+	if strings.TrimSpace(stdout.String()) != "LEIA_GLM_OK" {
+		t.Fatalf("stdout = %q", stdout.String())
 	}
 }
 

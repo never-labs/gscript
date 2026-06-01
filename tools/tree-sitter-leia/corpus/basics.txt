@@ -1,0 +1,27 @@
+==================
+Function and loop
+==================
+
+func fib(n) {
+  if n < 2 { return n }
+  return fib(n - 1) + fib(n - 2)
+}
+
+for i := 0; i <= 10; i++ {
+  print(i, fib(i))
+}
+
+---
+
+(source_file
+  (statement
+    (function_declaration
+      name: (identifier)
+      parameters: (parameter_list)
+      body: (block)))
+  (statement
+    (for_statement
+      initializer: (simple_statement)
+      condition: (expression)
+      update: (simple_statement)
+      body: (block))))

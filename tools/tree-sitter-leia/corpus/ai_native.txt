@@ -1,0 +1,63 @@
+==================
+AI-native declarations and expressions
+==================
+
+models {
+  default: "demo"
+  demo: { provider_model: "mock" }
+}
+
+tool lookup(query) {
+  return "doc:" .. query, nil
+}
+
+agent defaults {
+  model: "demo"
+  tools: [lookup]
+  budget: { turns: 4, calls: 4, time: 30s }
+}
+
+agent answer(question) {
+  system: "Use local docs."
+  user: question
+  tools: [lookup]
+} flow {
+  history := messages {
+    system: system
+    user: question
+  }
+  result, err := turn {
+    model: model
+    messages: history
+  }
+  return result, err
+}
+
+budget { turns: 1 } {
+  result, err := answer("What is Leia?")
+}
+
+---
+
+(source_file
+  (statement
+    (models_declaration
+      config: (config_block)))
+  (statement
+    (tool_declaration
+      name: (identifier)
+      parameters: (parameter_list)
+      body: (block)))
+  (statement
+    (agent_defaults_declaration
+      config: (config_block)))
+  (statement
+    (agent_declaration
+      name: (identifier)
+      parameters: (parameter_list)
+      config: (config_block)
+      flow: (flow_block)))
+  (statement
+    (budget_statement
+      config: (config_block)
+      body: (block))))

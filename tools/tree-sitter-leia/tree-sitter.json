@@ -1,0 +1,24 @@
+{
+  "grammars": [
+    {
+      "name": "leia",
+      "camelcase": "Leia",
+      "scope": "source.leia",
+      "file-types": [
+        "leia"
+      ],
+      "injection-regex": "^leia$",
+      "class-name": "TreeSitterLeia"
+    }
+  ],
+  "metadata": {
+    "version": "0.0.1",
+    "license": "MIT",
+    "description": "Leia grammar for tree-sitter",
+    "authors": [
+      {
+        "name": "Leia contributors"
+      }
+    ]
+  }
+}

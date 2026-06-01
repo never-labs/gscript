@@ -1,0 +1,58 @@
+version: 2
+
+project_name: leia
+
+before:
+  hooks:
+    - go mod download
+
+builds:
+  - id: leia
+    main: ./cmd/leia
+    binary: leia
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+      - linux
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+
+archives:
+  - id: leia
+    ids:
+      - leia
+    name_template: "{{ .ProjectName }}_{{ .Tag }}_{{ .Os }}_{{ .Arch }}"
+    formats:
+      - tar.gz
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+    files:
+      - README.md
+      - SECURITY.md
+
+checksum:
+  name_template: SHA256SUMS
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+release:
+  github:
+    owner: never-labs
+    name: leia
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
