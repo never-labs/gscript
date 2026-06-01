@@ -68,6 +68,8 @@ func (e *BaselineJITEngine) handleBaselineOpExit(ctx *ExecContext, regs []runtim
 		return e.handleTForLoop(ctx, regs, base, proto)
 	case vm.OP_POW:
 		return e.handlePow(ctx, regs, base, proto)
+	case vm.OP_ADD, vm.OP_SUB, vm.OP_MUL, vm.OP_DIV, vm.OP_MOD:
+		return e.handleArithmetic(ctx, regs, base, proto)
 	case vm.OP_LT:
 		return e.handleLT(ctx, regs, base, proto)
 	case vm.OP_LE:

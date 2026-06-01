@@ -138,27 +138,32 @@ func CompileBaseline(proto *vm.FuncProto) (*BaselineFunc, error) {
 			if intSpecEligible(intSpecEnabled, intInfo, pc, inst, proto) {
 				emitBaselineArithIntSpec(asm, inst, "add", pc)
 			} else {
-				emitBaselineArith(asm, inst, "add")
+				emitBaselineArith(asm, inst, "add", vm.OP_ADD, pc)
+				resumePCs = append(resumePCs, pc+1)
 			}
 		case vm.OP_SUB:
 			if intSpecEligible(intSpecEnabled, intInfo, pc, inst, proto) {
 				emitBaselineArithIntSpec(asm, inst, "sub", pc)
 			} else {
-				emitBaselineArith(asm, inst, "sub")
+				emitBaselineArith(asm, inst, "sub", vm.OP_SUB, pc)
+				resumePCs = append(resumePCs, pc+1)
 			}
 		case vm.OP_MUL:
 			if intSpecEligible(intSpecEnabled, intInfo, pc, inst, proto) {
 				emitBaselineArithIntSpec(asm, inst, "mul", pc)
 			} else {
-				emitBaselineArith(asm, inst, "mul")
+				emitBaselineArith(asm, inst, "mul", vm.OP_MUL, pc)
+				resumePCs = append(resumePCs, pc+1)
 			}
 		case vm.OP_DIV:
-			emitBaselineDiv(asm, inst)
+			emitBaselineDiv(asm, inst, pc)
+			resumePCs = append(resumePCs, pc+1)
 		case vm.OP_MOD:
 			if intSpecEligible(intSpecEnabled, intInfo, pc, inst, proto) {
 				emitBaselineModIntSpec(asm, inst, pc)
 			} else {
-				emitBaselineMod(asm, inst)
+				emitBaselineMod(asm, inst, pc)
+				resumePCs = append(resumePCs, pc+1)
 			}
 		case vm.OP_UNM:
 			emitBaselineUnm(asm, inst)

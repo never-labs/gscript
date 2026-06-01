@@ -154,8 +154,10 @@ func emitBaselineMove(asm *jit.Assembler, inst uint32) {
 // Arithmetic: ADD, SUB, MUL
 // ---------------------------------------------------------------------------
 
-// emitBaselineArith emits code for ADD/SUB/MUL with int fast-path and float fallback.
-func emitBaselineArith(asm *jit.Assembler, inst uint32, op string) {
+// emitBaselineArith emits code for ADD/SUB/MUL with int fast-path and
+// int/float native fallback. Other dynamic values exit to the VM so string
+// coercion, metamethods, and error paths stay centralized.
+func emitBaselineArith(asm *jit.Assembler, inst uint32, op string, opcode vm.Opcode, pc int) {
 	a := vm.DecodeA(inst)
 	bidx := vm.DecodeB(inst)
 	cidx := vm.DecodeC(inst)
@@ -166,6 +168,7 @@ func emitBaselineArith(asm *jit.Assembler, inst uint32, op string) {
 
 	doneLabel := nextLabel("arith_done")
 	floatLabel := nextLabel("arith_float")
+	slowLabel := nextLabel("arith_slow")
 
 	// Check X0 is int
 	asm.LSRimm(jit.X2, jit.X0, 48)
@@ -215,10 +218,27 @@ func emitBaselineArith(asm *jit.Assembler, inst uint32, op string) {
 
 	// Float fallback.
 	asm.Label(floatLabel)
+	emitBranchIfNonNumeric(asm, jit.X0, slowLabel)
+	emitBranchIfNonNumeric(asm, jit.X1, slowLabel)
 	emitFloatArith(asm, jit.X0, jit.X1, op)
 	storeSlot(asm, a, jit.X0)
+	asm.B(doneLabel)
+
+	asm.Label(slowLabel)
+	emitBaselineOpExitCommon(asm, opcode, pc, a, bidx, cidx)
 
 	asm.Label(doneLabel)
+}
+
+// emitBranchIfNonNumeric branches when gpReg is a tagged non-int value. Floats
+// are untagged in the NaN-box layout; ints are tagged but accepted here.
+func emitBranchIfNonNumeric(asm *jit.Assembler, gpReg jit.Reg, slowLabel string) {
+	numericLabel := nextLabel("numeric_value")
+	jit.EmitIsTaggedPinned(asm, gpReg, jit.X4, mRegTagInt)
+	asm.BCond(jit.CondNE, numericLabel) // untagged float
+	checkIntTag(asm, gpReg, jit.X4)
+	asm.BCond(jit.CondNE, slowLabel)
+	asm.Label(numericLabel)
 }
 
 // emitFloatArith converts two NaN-boxed values to float64, performs the operation,
@@ -281,7 +301,7 @@ func emitToFloat(asm *jit.Assembler, fpReg jit.FReg, gpReg jit.Reg, scratch1, sc
 }
 
 // emitBaselineDiv: R(A) = RK(B) / RK(C) — always returns float.
-func emitBaselineDiv(asm *jit.Assembler, inst uint32) {
+func emitBaselineDiv(asm *jit.Assembler, inst uint32, pc int) {
 	a := vm.DecodeA(inst)
 	bidx := vm.DecodeB(inst)
 	cidx := vm.DecodeC(inst)
@@ -289,13 +309,24 @@ func emitBaselineDiv(asm *jit.Assembler, inst uint32) {
 	loadRK(asm, jit.X0, bidx)
 	loadRK(asm, jit.X1, cidx)
 
+	doneLabel := nextLabel("div_done")
+	slowLabel := nextLabel("div_slow")
+
 	// DIV always returns float in Leia (5/2 = 2.5).
+	emitBranchIfNonNumeric(asm, jit.X0, slowLabel)
+	emitBranchIfNonNumeric(asm, jit.X1, slowLabel)
 	emitFloatArith(asm, jit.X0, jit.X1, "div")
 	storeSlot(asm, a, jit.X0)
+	asm.B(doneLabel)
+
+	asm.Label(slowLabel)
+	emitBaselineOpExitCommon(asm, vm.OP_DIV, pc, a, bidx, cidx)
+
+	asm.Label(doneLabel)
 }
 
 // emitBaselineMod: R(A) = RK(B) % RK(C)
-func emitBaselineMod(asm *jit.Assembler, inst uint32) {
+func emitBaselineMod(asm *jit.Assembler, inst uint32, pc int) {
 	a := vm.DecodeA(inst)
 	bidx := vm.DecodeB(inst)
 	cidx := vm.DecodeC(inst)
@@ -305,6 +336,7 @@ func emitBaselineMod(asm *jit.Assembler, inst uint32) {
 
 	doneLabel := nextLabel("mod_done")
 	floatLabel := nextLabel("mod_float")
+	slowLabel := nextLabel("mod_slow")
 
 	// Check both are int
 	asm.LSRimm(jit.X2, jit.X0, 48)
@@ -331,6 +363,8 @@ func emitBaselineMod(asm *jit.Assembler, inst uint32) {
 	// Actually for mod, just do: a - floor(a/b)*b
 	// Simpler: exit to Go for float mod. For now, use integer-only fast path.
 	asm.Label(floatLabel)
+	emitBranchIfNonNumeric(asm, jit.X0, slowLabel)
+	emitBranchIfNonNumeric(asm, jit.X1, slowLabel)
 	// For float mod, we do: a - floor(a/b)*b
 	emitToFloat(asm, jit.D0, jit.X0, jit.X4, jit.X5)
 	emitToFloat(asm, jit.D1, jit.X1, jit.X4, jit.X5)
@@ -340,6 +374,10 @@ func emitBaselineMod(asm *jit.Assembler, inst uint32) {
 	asm.FSUBd(jit.D0, jit.D0, jit.D2) // D0 = a - floor(a/b)*b
 	asm.FMOVtoGP(jit.X0, jit.D0)
 	storeSlot(asm, a, jit.X0)
+	asm.B(doneLabel)
+
+	asm.Label(slowLabel)
+	emitBaselineOpExitCommon(asm, vm.OP_MOD, pc, a, bidx, cidx)
 
 	asm.Label(doneLabel)
 }

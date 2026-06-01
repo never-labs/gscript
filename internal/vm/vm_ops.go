@@ -585,6 +585,29 @@ func (vm *VM) arithMod(a, b runtime.Value) (runtime.Value, error) {
 	return vm.arith(a, b, "__mod", func(x, y float64) float64 { return math.Mod(x, y) })
 }
 
+// ArithmeticForJIT evaluates a bytecode arithmetic opcode using the VM's full
+// dynamic semantics. Baseline/native JIT code calls this when operands are not
+// both plain numeric values, preserving string coercion, metamethods, and
+// runtime errors in one place.
+func (vm *VM) ArithmeticForJIT(op Opcode, a, b runtime.Value) (runtime.Value, error) {
+	switch op {
+	case OP_ADD:
+		return vm.arith(a, b, "__add", func(x, y float64) float64 { return x + y })
+	case OP_SUB:
+		return vm.arith(a, b, "__sub", func(x, y float64) float64 { return x - y })
+	case OP_MUL:
+		return vm.arith(a, b, "__mul", func(x, y float64) float64 { return x * y })
+	case OP_DIV:
+		return vm.arith(a, b, "__div", func(x, y float64) float64 { return x / y })
+	case OP_MOD:
+		return vm.arithMod(a, b)
+	case OP_POW:
+		return vm.arith(a, b, "__pow", func(x, y float64) float64 { return math.Pow(x, y) })
+	default:
+		return runtime.NilValue(), fmt.Errorf("unsupported arithmetic opcode for JIT: %s", OpName(op))
+	}
+}
+
 func bitwiseInt(v runtime.Value) (int64, error) {
 	n, ok := v.ToNumber()
 	if !ok {
