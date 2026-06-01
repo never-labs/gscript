@@ -30,9 +30,9 @@ func processExitCode(err error) (int, bool) {
 	if exit, ok := processExit(err); ok {
 		return exit.Code, true
 	}
-	var gsExit *leia.ExitError
-	if errors.As(err, &gsExit) {
-		return gsExit.Code, true
+	var leiaExit *leia.ExitError
+	if errors.As(err, &leiaExit) {
+		return leiaExit.Code, true
 	}
 	return 0, false
 }

@@ -168,12 +168,12 @@ func TestExecError(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected parse error")
 	}
-	gsErr, ok := err.(*leia.Error)
+	leiaErr, ok := err.(*leia.Error)
 	if !ok {
 		t.Fatalf("expected *leia.Error, got %T", err)
 	}
-	if gsErr.Kind != leia.ErrParse {
-		t.Fatalf("expected ErrParse, got %s", gsErr.Kind)
+	if leiaErr.Kind != leia.ErrParse {
+		t.Fatalf("expected ErrParse, got %s", leiaErr.Kind)
 	}
 }
 

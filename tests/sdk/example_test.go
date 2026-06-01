@@ -112,9 +112,9 @@ func ExampleError() {
 
 	err := vm.Exec(`fail()`)
 
-	var gsErr *leia.Error
+	var leiaErr *leia.Error
 	var hostErr *leia.HostCallbackError
-	fmt.Println(errors.As(err, &gsErr), gsErr.Kind)
+	fmt.Println(errors.As(err, &leiaErr), leiaErr.Kind)
 	fmt.Println(errors.As(err, &hostErr), hostErr.Name, errors.Is(err, sentinel))
 
 	// Output:

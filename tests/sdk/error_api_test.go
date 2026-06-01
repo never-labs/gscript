@@ -28,12 +28,12 @@ func TestErrorAPI_scriptErrorValue(t *testing.T) {
 	if !errors.Is(err, &leia.Error{Kind: leia.ErrScript}) {
 		t.Fatalf("script error is not identifiable as ErrScript: %T %v", err, err)
 	}
-	var gsErr *leia.Error
-	if !errors.As(err, &gsErr) {
+	var leiaErr *leia.Error
+	if !errors.As(err, &leiaErr) {
 		t.Fatalf("expected *leia.Error, got %T", err)
 	}
-	if gsErr.Value != "boom" {
-		t.Fatalf("script error value = %#v, want %q", gsErr.Value, "boom")
+	if leiaErr.Value != "boom" {
+		t.Fatalf("script error value = %#v, want %q", leiaErr.Value, "boom")
 	}
 }
 

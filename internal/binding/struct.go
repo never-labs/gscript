@@ -486,14 +486,14 @@ func (c Converter) fromValueStruct(val runtime.Value, target reflect.Type) (refl
 				continue
 			}
 			// Try lowercase name first, then exact
-			gsVal := t.RawGet(runtime.StringValue(strings.ToLower(f.Name)))
-			if gsVal.IsNil() {
-				gsVal = t.RawGet(runtime.StringValue(f.Name))
+			scriptVal := t.RawGet(runtime.StringValue(strings.ToLower(f.Name)))
+			if scriptVal.IsNil() {
+				scriptVal = t.RawGet(runtime.StringValue(f.Name))
 			}
-			if gsVal.IsNil() {
+			if scriptVal.IsNil() {
 				continue
 			}
-			fv, err := c.FromValue(gsVal, f.Type)
+			fv, err := c.FromValue(scriptVal, f.Type)
 			if err != nil {
 				continue
 			}

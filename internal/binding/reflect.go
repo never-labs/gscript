@@ -346,13 +346,13 @@ func (c Converter) WrapGoFunc(fn reflect.Value) (*runtime.GoFunction, error) {
 				}
 				slice := reflect.MakeSlice(sliceType, remaining, remaining)
 				for j := 0; j < remaining; j++ {
-					var gsVal runtime.Value
+					var scriptVal runtime.Value
 					if i+j < len(args) {
-						gsVal = args[i+j]
+						scriptVal = args[i+j]
 					} else {
-						gsVal = runtime.NilValue()
+						scriptVal = runtime.NilValue()
 					}
-					rv, err := c.FromValue(gsVal, elemType)
+					rv, err := c.FromValue(scriptVal, elemType)
 					if err != nil {
 						return nil, fmt.Errorf("arg %d: %v", i+j, err)
 					}
@@ -362,13 +362,13 @@ func (c Converter) WrapGoFunc(fn reflect.Value) (*runtime.GoFunction, error) {
 				break
 			}
 			argType := fnType.In(i)
-			var gsVal runtime.Value
+			var scriptVal runtime.Value
 			if i < len(args) {
-				gsVal = args[i]
+				scriptVal = args[i]
 			} else {
-				gsVal = runtime.NilValue()
+				scriptVal = runtime.NilValue()
 			}
-			rv, err := c.FromValue(gsVal, argType)
+			rv, err := c.FromValue(scriptVal, argType)
 			if err != nil {
 				return nil, fmt.Errorf("arg %d: %v", i, err)
 			}
@@ -399,11 +399,11 @@ func (c Converter) WrapGoFunc(fn reflect.Value) (*runtime.GoFunction, error) {
 
 		result := make([]runtime.Value, 0, len(out))
 		for _, rv := range out {
-			gsVal, err := c.ReflectToValue(rv)
+			scriptVal, err := c.ReflectToValue(rv)
 			if err != nil {
 				return nil, err
 			}
-			result = append(result, gsVal)
+			result = append(result, scriptVal)
 		}
 		return result, nil
 	}

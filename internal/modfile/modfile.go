@@ -82,7 +82,7 @@ func Parse(name string, r io.Reader) (File, []Diagnostic) {
 	seenGoReplace := map[string]int{}
 	seenCollection := map[string]bool{}
 	seenCapability := map[string]bool{}
-	seenGS := 0
+	seenLeia := 0
 	seenGo := 0
 
 	scanner := bufio.NewScanner(r)
@@ -112,11 +112,11 @@ func Parse(name string, r io.Reader) (File, []Diagnostic) {
 				diags = append(diags, diag(lineNo, "leia expects one language version"))
 				continue
 			}
-			if seenGS != 0 {
-				diags = append(diags, diag(lineNo, fmt.Sprintf("leia declared more than once; first declared on line %d", seenGS)))
+			if seenLeia != 0 {
+				diags = append(diags, diag(lineNo, fmt.Sprintf("leia declared more than once; first declared on line %d", seenLeia)))
 				continue
 			}
-			seenGS = lineNo
+			seenLeia = lineNo
 			f.Leia = fields[1]
 		case "go":
 			switch {

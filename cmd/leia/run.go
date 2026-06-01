@@ -63,12 +63,12 @@ func canUsePublicRunPath(opts cliRunOptions) bool {
 }
 
 func publicRunOptions(opts cliRunOptions, script string, args []string) []leia.Option {
-	gsOpts := append([]leia.Option{}, leia.ModuleOptionsForScriptMode(script, opts.ModuleMode)...)
-	gsOpts = append(gsOpts, leia.WithArgs(script, args...))
+	leiaOpts := append([]leia.Option{}, leia.ModuleOptionsForScriptMode(script, opts.ModuleMode)...)
+	leiaOpts = append(leiaOpts, leia.WithArgs(script, args...))
 	if opts.UseJIT {
-		gsOpts = append(gsOpts, leia.WithJIT())
+		leiaOpts = append(leiaOpts, leia.WithJIT())
 	} else if opts.UseVM {
-		gsOpts = append(gsOpts, leia.WithVM())
+		leiaOpts = append(leiaOpts, leia.WithVM())
 	}
-	return gsOpts
+	return leiaOpts
 }

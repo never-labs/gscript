@@ -67,6 +67,27 @@ jsonMod := require("json")
 	}
 }
 
+func TestModCommandHelpMentionsAllImplementedModes(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := runModCommand([]string{"help"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("mod help code = %d, stderr = %q", code, stderr.String())
+	}
+	help := stdout.String()
+	topic, ok := lookupCLICommand("mod")
+	if !ok {
+		t.Fatal("mod command missing from CLI registry")
+	}
+	for _, mode := range []string{"init", "add", "tidy", "check", "download", "vendor", "lock", "list", "graph", "explain", "capability", "gomod", "verify"} {
+		if !strings.Contains(help, mode) {
+			t.Fatalf("mod help = %q, missing mode %q", help, mode)
+		}
+		if !strings.Contains(topic.Usage, mode) {
+			t.Fatalf("registered mod usage = %q, missing mode %q", topic.Usage, mode)
+		}
+	}
+}
+
 func TestModVerifyReportsMissingManifest(t *testing.T) {
 	dir := t.TempDir()
 	var stdout, stderr bytes.Buffer

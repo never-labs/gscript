@@ -53,12 +53,12 @@ func TestError_parseError(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error")
 	}
-	gsErr, ok := err.(*leia.Error)
+	leiaErr, ok := err.(*leia.Error)
 	if !ok {
 		t.Fatalf("expected *leia.Error, got %T", err)
 	}
-	if gsErr.Kind != leia.ErrParse {
-		t.Fatalf("expected ErrParse, got %s", gsErr.Kind)
+	if leiaErr.Kind != leia.ErrParse {
+		t.Fatalf("expected ErrParse, got %s", leiaErr.Kind)
 	}
 }
 
@@ -68,12 +68,12 @@ func TestError_runtimeError(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected runtime error")
 	}
-	gsErr, ok := err.(*leia.Error)
+	leiaErr, ok := err.(*leia.Error)
 	if !ok {
 		t.Fatalf("expected *leia.Error, got %T", err)
 	}
-	if gsErr.Kind != leia.ErrRuntime {
-		t.Fatalf("expected ErrRuntime, got %s", gsErr.Kind)
+	if leiaErr.Kind != leia.ErrRuntime {
+		t.Fatalf("expected ErrRuntime, got %s", leiaErr.Kind)
 	}
 }
 

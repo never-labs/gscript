@@ -90,9 +90,9 @@ func readManifestConformanceCases(t *testing.T, root string) []manifestConforman
 			t.Fatalf("tests manifest has duplicate language conformance case %q", name)
 		}
 		seen[name] = true
-		gsPath := filepath.Join(root, filepath.FromSlash(entry.Path))
+		leiaPath := filepath.Join(root, filepath.FromSlash(entry.Path))
 		luaPath := filepath.Join(root, filepath.FromSlash(entry.Reference.Path))
-		if _, err := os.Stat(gsPath); err != nil {
+		if _, err := os.Stat(leiaPath); err != nil {
 			t.Fatalf("manifest case %s missing Leia file %s: %v", entry.ID, entry.Path, err)
 		}
 		if _, err := os.Stat(luaPath); err != nil {
@@ -100,7 +100,7 @@ func readManifestConformanceCases(t *testing.T, root string) []manifestConforman
 		}
 		cases = append(cases, manifestConformanceCase{
 			Name:     name,
-			LeiaPath: gsPath,
+			LeiaPath: leiaPath,
 			LuaPath:  luaPath,
 		})
 	}
