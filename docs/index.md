@@ -23,6 +23,8 @@ only.
   Go-native binding metadata.
 - [Go embedding API](reference/embedding/index.md): public Go package surface,
   host bindings, sandbox options, and VM lifetime rules.
+- [Security and sandboxing](reference/security/index.md): library selection,
+  host capabilities, resource budgets, and Go binding rules.
 - [Hot reload](reference/hot-reload/index.md): loader handles, persistent
   instances, automatic state preservation, and rollback behavior.
 - [Errors and diagnostics](reference/diagnostics/index.md): Go error types,

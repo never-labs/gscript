@@ -64,3 +64,6 @@ Leia module management is intentionally smaller than npm-style package systems:
 - native Go dependencies stay explicit in `leia.mod`;
 - capability summaries remain visible at module boundaries;
 - readonly and vendor modes are preferred for reproducible execution.
+
+See [Security and sandboxing](../security/index.md) for the host capability
+model that consumes these summaries.

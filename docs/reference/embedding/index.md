@@ -116,6 +116,9 @@ vm := leia.New(
 Setting resource budgets disables JIT execution for that VM so native code
 cannot bypass budget checkpoints.
 
+See [Security and sandboxing](../security/index.md) for the full capability,
+filesystem, process, dynamic-eval, and resource-budget model.
+
 ## Modules
 
 Module-aware embeddings can use:
