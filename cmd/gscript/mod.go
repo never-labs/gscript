@@ -12,10 +12,11 @@ import (
 type modGraphReport = modpkg.GraphReport
 type modVerifyReport = modpkg.VerifyReport
 type modTidyReport = modpkg.TidyReport
+type modExplainReport = modpkg.ExplainReport
 
 func runModCommand(args []string, outw, errw io.Writer) int {
 	if len(args) == 0 {
-		fmt.Fprintln(errw, "usage: gscript mod [init|add|tidy|lock|graph|verify] [flags]")
+		fmt.Fprintln(errw, "usage: gscript mod [init|add|tidy|lock|graph|explain|verify] [flags]")
 		return 2
 	}
 	switch args[0] {
@@ -29,13 +30,15 @@ func runModCommand(args []string, outw, errw io.Writer) int {
 		return runModLockCommand(args[1:], outw, errw)
 	case "graph":
 		return runModGraphCommand(args[1:], outw, errw)
+	case "explain":
+		return runModExplainCommand(args[1:], outw, errw)
 	case "verify":
 		return runModVerifyCommand(args[1:], outw, errw)
 	case "help", "-h", "--help":
-		fmt.Fprintln(outw, "usage: gscript mod [init|add|tidy|lock|graph|verify] [flags]")
+		fmt.Fprintln(outw, "usage: gscript mod [init|add|tidy|lock|graph|explain|verify] [flags]")
 		return 0
 	default:
-		fmt.Fprintf(errw, "gscript mod: unknown mode %q (want init, add, tidy, lock, graph, or verify)\n", args[0])
+		fmt.Fprintf(errw, "gscript mod: unknown mode %q (want init, add, tidy, lock, graph, explain, or verify)\n", args[0])
 		return 2
 	}
 }
@@ -198,6 +201,48 @@ func runModGraphCommand(args []string, outw, errw io.Writer) int {
 		fmt.Fprintf(errw, "%s %s: %s\n", diag.Severity, diag.Code, diag.Message)
 	}
 	if err != nil {
+		return 1
+	}
+	return 0
+}
+
+func runModExplainCommand(args []string, outw, errw io.Writer) int {
+	fs := flag.NewFlagSet("mod explain", flag.ContinueOnError)
+	fs.SetOutput(errw)
+	jsonOut := fs.Bool("json", false, "print resolution as JSON")
+	dir := fs.String("dir", ".", "project directory")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	if len(fs.Args()) != 1 {
+		fmt.Fprintln(errw, "usage: gscript mod explain [--json] [--dir DIR] MODULE")
+		return 2
+	}
+	report := modpkg.Explain(*dir, fs.Args()[0])
+	if *jsonOut {
+		enc := json.NewEncoder(outw)
+		enc.SetIndent("", "  ")
+		if err := enc.Encode(report); err != nil {
+			fmt.Fprintf(errw, "gscript mod explain: %v\n", err)
+			return 1
+		}
+	} else {
+		if report.OK {
+			fmt.Fprintf(outw, "%s -> %s", report.Module, report.Kind)
+			if report.File != "" {
+				fmt.Fprintf(outw, " %s", report.File)
+			}
+			fmt.Fprintln(outw)
+		}
+		for _, diag := range report.Diagnostics {
+			if diag.File != "" {
+				fmt.Fprintf(errw, "%s: %s %s: %s\n", diag.File, diag.Severity, diag.Code, diag.Message)
+			} else {
+				fmt.Fprintf(errw, "%s %s: %s\n", diag.Severity, diag.Code, diag.Message)
+			}
+		}
+	}
+	if !report.OK {
 		return 1
 	}
 	return 0

@@ -122,6 +122,37 @@ func TestVerifySumDetectsCollectionAndLocalReplaceChanges(t *testing.T) {
 	assertDiagnostic(t, diags, "GS9109", "checksum mismatch for example.com/lib")
 }
 
+func TestExplainResolvesStdlibCollectionReplaceAndModuleRoot(t *testing.T) {
+	dir := newLockedModule(t)
+
+	tests := []struct {
+		name       string
+		module     string
+		wantKind   string
+		wantPath   string
+		wantSuffix string
+	}{
+		{name: "stdlib", module: "json", wantKind: "stdlib", wantPath: "json"},
+		{name: "collection", module: "vendor:tool", wantKind: "collection", wantPath: "vendor", wantSuffix: filepath.Join("vendor", "tool.gs")},
+		{name: "replace", module: "example.com/lib/sub", wantKind: "replace", wantPath: "example.com/lib", wantSuffix: filepath.Join("local", "lib", "sub.gs")},
+		{name: "module root", module: "example.com/app/local", wantKind: "module", wantPath: "example.com/app", wantSuffix: filepath.Join("example", "com", "app", "local.gs")},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			report := Explain(dir, tt.module)
+			if !report.OK || len(report.Diagnostics) != 0 {
+				t.Fatalf("Explain(%q) = %#v, want ok", tt.module, report)
+			}
+			if report.Kind != tt.wantKind || report.Path != tt.wantPath {
+				t.Fatalf("Explain(%q) kind/path = %q/%q, want %q/%q", tt.module, report.Kind, report.Path, tt.wantKind, tt.wantPath)
+			}
+			if tt.wantSuffix != "" && !strings.HasSuffix(report.File, tt.wantSuffix) {
+				t.Fatalf("Explain(%q) file = %q, want suffix %q", tt.module, report.File, tt.wantSuffix)
+			}
+		})
+	}
+}
+
 func newLockedModule(t *testing.T) string {
 	t.Helper()
 

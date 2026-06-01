@@ -47,6 +47,17 @@ type TidyReport struct {
 	Diagnostics   []Diagnostic `json:"diagnostics,omitempty"`
 }
 
+type ExplainReport struct {
+	SchemaVersion int          `json:"schema_version"`
+	OK            bool         `json:"ok"`
+	Module        string       `json:"module"`
+	Kind          string       `json:"kind,omitempty"`
+	Path          string       `json:"path,omitempty"`
+	Root          string       `json:"root,omitempty"`
+	File          string       `json:"file,omitempty"`
+	Diagnostics   []Diagnostic `json:"diagnostics,omitempty"`
+}
+
 type Diagnostic struct {
 	Severity string `json:"severity"`
 	Code     string `json:"code"`
@@ -244,6 +255,48 @@ func Tidy(path string) TidyReport {
 	return report
 }
 
+func Explain(path, module string) ExplainReport {
+	abs, err := filepath.Abs(path)
+	report := ExplainReport{SchemaVersion: 1, Module: module}
+	if err != nil {
+		report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "GS9101", Message: err.Error()})
+		return report
+	}
+	manifest, manifestPath, err := ReadFileWithPath(abs)
+	if err != nil {
+		report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "GS9103", Message: err.Error(), File: manifestPath})
+		return report
+	}
+	if isStdlibModule(module) {
+		report.OK = true
+		report.Kind = "stdlib"
+		report.Path = module
+		return report
+	}
+	if colName, colRoot, rel, ok := explainCollection(abs, manifest, module); ok {
+		report.OK = true
+		report.Kind = "collection"
+		report.Path = colName
+		report.Root = colRoot
+		report.File = filepath.Join(colRoot, rel)
+		return report
+	}
+	if rep, root, rel, ok := explainReplace(abs, manifest, module); ok {
+		report.OK = true
+		report.Kind = "replace"
+		report.Path = rep.Path
+		report.Root = root
+		report.File = filepath.Join(root, rel)
+		return report
+	}
+	report.OK = true
+	report.Kind = "module"
+	report.Path = manifest.Module
+	report.Root = abs
+	report.File = filepath.Join(abs, strings.ReplaceAll(module, ".", "/")+".gs")
+	return report
+}
+
 func Lock(path string) SumReport {
 	abs, err := filepath.Abs(path)
 	report := SumReport{SchemaVersion: 1}
@@ -438,6 +491,67 @@ func verifyDependencies(root string, manifest modfile.File, graph GraphReport) [
 		}
 	}
 	return diags
+}
+
+func isStdlibModule(name string) bool {
+	for _, module := range catalog.ModuleNames() {
+		if module == name {
+			return true
+		}
+	}
+	return false
+}
+
+func explainCollection(root string, manifest modfile.File, module string) (string, string, string, bool) {
+	idx := strings.Index(module, ":")
+	if idx <= 0 {
+		return "", "", "", false
+	}
+	prefix := module[:idx]
+	for _, col := range manifest.Collections {
+		if col.Name != prefix {
+			continue
+		}
+		colRoot := cleanLocalRoot(root, col.Path)
+		rel := strings.ReplaceAll(module[idx+1:], ".", "/") + ".gs"
+		return col.Name, colRoot, rel, true
+	}
+	return "", "", "", false
+}
+
+func explainReplace(root string, manifest modfile.File, module string) (modfile.Replace, string, string, bool) {
+	var best modfile.Replace
+	for _, rep := range manifest.Replace {
+		if !isLocalPath(rep.NewPath) {
+			continue
+		}
+		if module != rep.Path && !strings.HasPrefix(module, rep.Path+"/") {
+			continue
+		}
+		if len(rep.Path) > len(best.Path) {
+			best = rep
+		}
+	}
+	if best.Path == "" {
+		return modfile.Replace{}, "", "", false
+	}
+	repRoot := cleanLocalRoot(root, best.NewPath)
+	if module == best.Path {
+		if filepath.Ext(repRoot) == ".gs" {
+			return best, filepath.Dir(repRoot), filepath.Base(repRoot), true
+		}
+		return best, filepath.Dir(repRoot), filepath.Base(repRoot) + ".gs", true
+	}
+	rel := strings.TrimPrefix(module[len(best.Path):], "/")
+	rel = strings.ReplaceAll(rel, ".", "/") + ".gs"
+	return best, repRoot, rel, true
+}
+
+func cleanLocalRoot(root, path string) string {
+	if filepath.IsAbs(path) {
+		return filepath.Clean(path)
+	}
+	return filepath.Clean(filepath.Join(root, path))
 }
 
 func sumEntries(root string, manifest modfile.File) ([]SumEntry, []Diagnostic) {

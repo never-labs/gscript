@@ -280,3 +280,33 @@ collection vendor ./vendor
 		t.Fatalf("verify diagnostics = %+v, want checksum mismatch", verify.Diagnostics)
 	}
 }
+
+func TestModExplainReportsResolvedModuleKind(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, "local", "lib"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "gscript.mod"), []byte(`module example.com/demo
+gs 0.1
+require example.com/lib v0.1.0
+replace example.com/lib => ./local/lib
+`), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runModCommand([]string{"explain", "--json", "--dir", dir, "example.com/lib/foo"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("mod explain code = %d, stderr = %q stdout = %q", code, stderr.String(), stdout.String())
+	}
+	var explain modExplainReport
+	if err := json.Unmarshal(stdout.Bytes(), &explain); err != nil {
+		t.Fatalf("stdout is not JSON explain report: %v; stdout = %q", err, stdout.String())
+	}
+	if !explain.OK || explain.Kind != "replace" || explain.Path != "example.com/lib" {
+		t.Fatalf("explain = %+v, want replace resolution", explain)
+	}
+	if !strings.HasSuffix(explain.File, filepath.Join("local", "lib", "foo.gs")) {
+		t.Fatalf("explain file = %q, want local replace target", explain.File)
+	}
+}
