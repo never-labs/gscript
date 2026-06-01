@@ -634,12 +634,12 @@ func assertPairTable(t *testing.T, result []runtime.Value, foo, bar runtime.Valu
 	}
 }
 
-// TestTier2_FixedTablePrewarmTwoShapesNoExits exercises the regression that
-// `extended/json_table_walk` exposed: a single proto allocates fixed records of
-// two distinct shapes inside a hot loop, and each shape lives at its own IR
-// instruction (its own NewTable cache slot). With compile-time prewarm of the
-// fixed-record cache, the JIT fast path must service every allocation in the
-// loop — Tier 2 must take zero ExitTableExit deopts at the NewFixedTable sites.
+// TestTier2_FixedTablePrewarmTwoShapesNoExits exercises a fixed-record cache
+// regression: a single proto allocates two distinct shapes inside a hot loop,
+// and each shape lives at its own IR instruction (its own NewTable cache slot).
+// With compile-time prewarm of the fixed-record cache, the JIT fast path must
+// service every allocation in the loop — Tier 2 must take zero ExitTableExit
+// deopts at the NewFixedTable sites.
 func TestTier2_FixedTablePrewarmTwoShapesNoExits(t *testing.T) {
 	src := `
 func build(n) {

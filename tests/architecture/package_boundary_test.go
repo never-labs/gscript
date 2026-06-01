@@ -1,4 +1,4 @@
-package tests_test
+package architecture_test
 
 import (
 	"bytes"

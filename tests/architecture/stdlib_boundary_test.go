@@ -1,4 +1,4 @@
-package leia_test
+package architecture_test
 
 import (
 	"go/parser"

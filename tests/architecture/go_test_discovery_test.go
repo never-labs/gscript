@@ -1,4 +1,4 @@
-package tests_test
+package architecture_test
 
 import (
 	"os/exec"
@@ -25,6 +25,7 @@ func TestGoTestAllPackagesIncludesRestructuredTestDirs(t *testing.T) {
 	}
 
 	for _, suffix := range []string{
+		"tests/architecture",
 		"tests/llm",
 		"tests/integration/llm",
 		"tests/sdk",
