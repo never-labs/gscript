@@ -11,6 +11,7 @@ import (
 	"github.com/never-labs/gscript/internal/runtime"
 	"github.com/never-labs/gscript/internal/stdlib/catalog"
 	tablelib "github.com/never-labs/gscript/internal/stdlib/table"
+	syncrt "github.com/never-labs/gscript/internal/stdlibrt/concurrency"
 	"github.com/never-labs/gscript/internal/stdlibrt/host"
 	stdlibinstall "github.com/never-labs/gscript/internal/stdlibrt/install"
 	llmrt "github.com/never-labs/gscript/internal/stdlibrt/llm"
@@ -739,7 +740,7 @@ func (vm *VM) RegisterHTTPLib() {
 
 func (vm *VM) RegisterSyncLib() {
 	std := vm.newStdlibInstallContext()
-	syncLib := runtime.TableValue(modules.BuildSync(modules.SyncOptions{
+	syncLib := runtime.TableValue(modules.BuildSync(syncrt.Options{
 		Call:   vm.callValue,
 		Launch: vm.launchSyncTask,
 	}))

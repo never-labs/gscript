@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/never-labs/gscript/internal/runtime"
+	syncrt "github.com/never-labs/gscript/internal/stdlibrt/concurrency"
 	"github.com/never-labs/gscript/internal/stdlibrt/host"
 	llmrt "github.com/never-labs/gscript/internal/stdlibrt/llm"
 	"github.com/never-labs/gscript/internal/stdlibrt/modules"
@@ -110,7 +111,7 @@ func InstallModules(installer runtime.StdlibInstaller, maxHostResult func() int6
 	installer.RegisterTable("rl", modules.BuildRL())
 	installer.RegisterTable("sort", modules.BuildSortLibWithCallerAndLess(opts.ScriptCaller, opts.Less))
 	installer.RegisterTable("soa", modules.BuildSOA())
-	installer.RegisterTable("sync", modules.BuildSync(modules.SyncOptions{
+	installer.RegisterTable("sync", modules.BuildSync(syncrt.Options{
 		Call: opts.ScriptCaller,
 	}))
 	installer.RegisterTable("string", modules.BuildString(opts.ScriptCaller, maxHostResult))

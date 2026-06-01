@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/never-labs/gscript/internal/runtime"
+	syncrt "github.com/never-labs/gscript/internal/stdlibrt/concurrency"
 
 	stdlibsync "github.com/never-labs/gscript/internal/stdlib/sync"
 )
@@ -26,14 +27,9 @@ type scriptOnce struct {
 	err  error
 }
 
-type SyncTaskLauncher func(Value, []Value, func(error))
+type SyncTaskLauncher = syncrt.TaskLauncher
 
-type SyncOptions struct {
-	Call   ScriptFunctionCaller
-	Launch SyncTaskLauncher
-}
-
-func BuildSync(options SyncOptions) *Table {
+func BuildSync(options syncrt.Options) *Table {
 	call := options.Call
 	launch := options.Launch
 	if launch == nil {

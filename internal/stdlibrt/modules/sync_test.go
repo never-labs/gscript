@@ -4,13 +4,14 @@ import (
 	"testing"
 
 	"github.com/never-labs/gscript/internal/runtime"
+	syncrt "github.com/never-labs/gscript/internal/stdlibrt/concurrency"
 )
 
 func syncInterp(t *testing.T, src string) *runtime.Interpreter {
 	t.Helper()
 	interp := runtime.NewCore()
 	interp.InstallRuntimeStdlib()
-	installTestModule(interp, "sync", runtime.TableValue(BuildSync(SyncOptions{Call: interp.CallFunction})))
+	installTestModule(interp, "sync", runtime.TableValue(BuildSync(syncrt.Options{Call: interp.CallFunction})))
 	installTestModule(interp, "time", runtime.TableValue(BuildTime()))
 	execOnInterp(t, interp, src)
 	return interp
