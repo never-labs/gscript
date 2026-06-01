@@ -88,9 +88,13 @@ func TestReleaseMatrixStableKeywordsMatchLexer(t *testing.T) {
 func TestReleaseMatrixSpecIndexDocumentsChapteredReference(t *testing.T) {
 	root := findRepoRoot(t)
 	index := readFileString(t, filepath.Join(root, "docs", "spec", "index.md"))
+	overview := readFileString(t, filepath.Join(root, "docs", "spec", "language.md"))
 	docsHome := readFileString(t, filepath.Join(root, "docs", "index.md"))
 	readme := readFileString(t, filepath.Join(root, "README.md"))
 
+	if !strings.Contains(overview, "[index.md](index.md)") || !strings.Contains(overview, "compatibility overview") {
+		t.Fatal("docs/spec/language.md must point old links to the chaptered spec entrypoint")
+	}
 	if !strings.Contains(docsHome, "(spec/index.md)") {
 		t.Fatal("docs/index.md must link the chaptered language spec entrypoint")
 	}

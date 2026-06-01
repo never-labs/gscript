@@ -1,9 +1,13 @@
-# Leia Language Specification
+# Leia Language Specification Overview
 
-This document is the normative language contract for Leia. It is intentionally
-separate from implementation notes: parser, interpreter, bytecode VM, JIT,
-formatter, linter, sandboxing, and embedding APIs must either implement this
-behavior or mark a feature as experimental before exposing it to users.
+This page is the compatibility overview for older links. The chaptered
+normative specification starts at [index.md](index.md); new language-visible
+changes should update the relevant chapter there first.
+
+Leia's specification is intentionally separate from implementation notes:
+parser, interpreter, bytecode VM, JIT, formatter, linter, sandboxing, and
+embedding APIs must either implement the stable behavior or mark a feature as
+experimental before exposing it to users.
 
 Leia uses Go-flavored syntax with dynamic values and Lua-compatible table and
 multi-return behavior where that compatibility is useful. It is not a Lua clone:
