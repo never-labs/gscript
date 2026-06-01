@@ -215,6 +215,23 @@ func TestRunTestCommandGoldenIgnoreSkipsComparison(t *testing.T) {
 	}
 }
 
+func TestRunTestCommandSuppressesPassingScriptStdout(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "noisy.leia")
+	if err := os.WriteFile(path, []byte("print(\"script-noise\")\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runTestCommand([]string{dir}, cliRunOptions{UseVM: false}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runTestCommand code = %d, stderr = %q", code, stderr.String())
+	}
+	if strings.Contains(stdout.String(), "script-noise") || strings.Contains(stderr.String(), "script-noise") {
+		t.Fatalf("script stdout leaked: stdout = %q stderr = %q", stdout.String(), stderr.String())
+	}
+}
+
 func TestRunTestCommandGoldenUpdateWritesGolden(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "ok.leia")

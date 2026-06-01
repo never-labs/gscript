@@ -190,18 +190,11 @@ func runTestsDetailed(path string, opts cliRunOptions, errw io.Writer, text bool
 			continue
 		}
 
-		var runErr error
 		var stdout []byte
+		var runErr error
 		compareGolden := goldenMode == "auto" && hasGolden || goldenMode == "require"
 		updateGolden := goldenMode == "update"
-		if compareGolden || updateGolden {
-			stdout, runErr = runScriptFileCapturingStdout(filename, opts)
-		} else if canUsePublicRunPath(opts) {
-			runErr = runPublicScriptFile(filename, nil, opts)
-		} else {
-			interp := newCLIInterpreter()
-			runErr = runScriptFile(interp, filename, nil, opts)
-		}
+		stdout, runErr = runScriptFileCapturingStdout(filename, opts)
 		if runErr != nil {
 			if code, isExit := processExitCode(runErr); isExit && code == 0 {
 				fileResult.ExitCodeOK = true
