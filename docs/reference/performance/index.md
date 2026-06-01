@@ -91,13 +91,13 @@ leia bench --full \
   --markdown /tmp/leia_timing.md
 
 leia bench strict \
-  --json benchmarks/data/strict_guard_latest.json \
-  --markdown benchmarks/data/strict_guard_latest.md
+  --json /tmp/leia_strict_guard.json \
+  --markdown /tmp/leia_strict_guard.md
 ```
 
 Release and diagnostic scripts collect these artifacts into evidence bundles.
-Do not commit temporary timing output unless it is an intentional baseline or
-history file under `benchmarks/data/`.
+Do not commit temporary timing output. Only maintainers should update
+intentional baseline or history files under `benchmarks/data/`.
 
 ## Adding Benchmarks
 
