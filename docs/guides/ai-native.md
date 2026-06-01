@@ -36,7 +36,7 @@ summarize := agent {
 result, err := summarize("Summarize this file.")
 ```
 
-The exact syntax remains governed by [the language spec](../spec/language.md)
-and should reuse the existing stdlib implementation rather than forking an
-independent AI runtime.
-
+The stable user contract is documented in the
+[AI-native reference](../reference/ai/index.md) and the syntax remains governed
+by [the language spec](../spec/language.md). New AI features should reuse the
+existing stdlib implementation rather than forking an independent AI runtime.

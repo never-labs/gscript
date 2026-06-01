@@ -25,6 +25,8 @@ only.
   host bindings, sandbox options, and VM lifetime rules.
 - [Errors and diagnostics](reference/diagnostics/index.md): Go error types,
   CLI JSON/SARIF outputs, and diagnostic bundle entrypoints.
+- [AI-native reference](reference/ai/index.md): models, tools, messages, turns,
+  agents, budgets, providers, and replay.
 - [Embedding guide](guides/embedding.md): host integration, sandboxing, and
   reload-oriented runtime usage.
 - [AI-native guide](guides/ai-native.md): agents, tools, models, message
