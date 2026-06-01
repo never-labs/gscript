@@ -16,7 +16,7 @@ type modExplainReport = modpkg.ExplainReport
 
 func runModCommand(args []string, outw, errw io.Writer) int {
 	if len(args) == 0 {
-		fmt.Fprintln(errw, "usage: gscript mod [init|add|tidy|lock|graph|explain|verify] [flags]")
+		fmt.Fprintln(errw, "usage: gscript mod [init|add|tidy|check|lock|graph|explain|verify] [flags]")
 		return 2
 	}
 	switch args[0] {
@@ -26,6 +26,8 @@ func runModCommand(args []string, outw, errw io.Writer) int {
 		return runModAddCommand(args[1:], outw, errw)
 	case "tidy":
 		return runModTidyCommand(args[1:], outw, errw)
+	case "check":
+		return runModVerifyCommand(args[1:], outw, errw)
 	case "lock":
 		return runModLockCommand(args[1:], outw, errw)
 	case "graph":
@@ -35,10 +37,10 @@ func runModCommand(args []string, outw, errw io.Writer) int {
 	case "verify":
 		return runModVerifyCommand(args[1:], outw, errw)
 	case "help", "-h", "--help":
-		fmt.Fprintln(outw, "usage: gscript mod [init|add|tidy|lock|graph|explain|verify] [flags]")
+		fmt.Fprintln(outw, "usage: gscript mod [init|add|tidy|check|lock|graph|explain|verify] [flags]")
 		return 0
 	default:
-		fmt.Fprintf(errw, "gscript mod: unknown mode %q (want init, add, tidy, lock, graph, explain, or verify)\n", args[0])
+		fmt.Fprintf(errw, "gscript mod: unknown mode %q (want init, add, tidy, check, lock, graph, explain, or verify)\n", args[0])
 		return 2
 	}
 }

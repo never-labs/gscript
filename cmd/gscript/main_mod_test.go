@@ -79,6 +79,26 @@ func TestModVerifyReportsMissingManifest(t *testing.T) {
 	}
 }
 
+func TestModCheckRunsVerification(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "gscript.mod"), []byte("module example.com/demo\ngs 0.1\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runModCommand([]string{"check", "--json", dir}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("mod check code = %d, stderr = %q stdout = %q", code, stderr.String(), stdout.String())
+	}
+	var verify modVerifyReport
+	if err := json.Unmarshal(stdout.Bytes(), &verify); err != nil {
+		t.Fatalf("stdout is not JSON verify report: %v; stdout = %q", err, stdout.String())
+	}
+	if !verify.OK || verify.Manifest != filepath.Join(dir, "gscript.mod") {
+		t.Fatalf("verify = %+v, want ok manifest", verify)
+	}
+}
+
 func TestModAddAndTidy(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "main.gs"), []byte(`net := require("example.com/lib/net")

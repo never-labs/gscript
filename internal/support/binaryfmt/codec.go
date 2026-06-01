@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/never-labs/gscript/internal/support/outputlimit"
+	"github.com/never-labs/gscript/internal/support"
 )
 
 const maxInt48 = (1 << 47) - 1
@@ -47,7 +47,7 @@ func Pack(apiName, formatText string, values []PackValue, maxHostResult int64) (
 	if len(values) != len(format.Fields) {
 		return "", fmt.Errorf("%s: got %d values for %d fields", apiName, len(values), len(format.Fields))
 	}
-	buf, _ := outputlimit.NewBuffers(maxHostResult)
+	buf, _ := support.NewOutputBuffers(maxHostResult)
 	for i, field := range format.Fields {
 		if err := packField(apiName, buf, format, field, values[i]); err != nil {
 			return "", err

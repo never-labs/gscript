@@ -1,11 +1,11 @@
-package filemode
+package support
 
 import (
 	"os"
 	"testing"
 )
 
-func TestParse(t *testing.T) {
+func TestParseFileMode(t *testing.T) {
 	tests := []struct {
 		mode string
 		flag int
@@ -21,14 +21,14 @@ func TestParse(t *testing.T) {
 		{mode: "x", ok: false},
 	}
 	for _, tt := range tests {
-		flag, ok := Parse(tt.mode)
+		flag, ok := ParseFileMode(tt.mode)
 		if ok != tt.ok || flag != tt.flag {
-			t.Fatalf("Parse(%q) = (%d, %v), want (%d, %v)", tt.mode, flag, ok, tt.flag, tt.ok)
+			t.Fatalf("ParseFileMode(%q) = (%d, %v), want (%d, %v)", tt.mode, flag, ok, tt.flag, tt.ok)
 		}
 	}
 }
 
-func TestAccess(t *testing.T) {
+func TestFileModeAccess(t *testing.T) {
 	tests := []struct {
 		name      string
 		flag      int
@@ -40,9 +40,9 @@ func TestAccess(t *testing.T) {
 		{name: "read write", flag: os.O_RDWR, wantRead: true, wantWrite: true},
 	}
 	for _, tt := range tests {
-		read, write := Access(tt.flag)
+		read, write := FileModeAccess(tt.flag)
 		if read != tt.wantRead || write != tt.wantWrite {
-			t.Fatalf("%s: Access(%d) = (%v, %v), want (%v, %v)", tt.name, tt.flag, read, write, tt.wantRead, tt.wantWrite)
+			t.Fatalf("%s: FileModeAccess(%d) = (%v, %v), want (%v, %v)", tt.name, tt.flag, read, write, tt.wantRead, tt.wantWrite)
 		}
 	}
 }

@@ -1,4 +1,4 @@
-package debugstate
+package support
 
 import "testing"
 

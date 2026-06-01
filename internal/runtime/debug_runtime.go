@@ -3,17 +3,17 @@ package runtime
 import (
 	"fmt"
 
-	"github.com/never-labs/gscript/internal/support/debugstate"
+	"github.com/never-labs/gscript/internal/support"
 )
 
 // DebugFrame describes one active runtime call in GScript-shaped terms.
-type DebugFrame = debugstate.Frame
+type DebugFrame = support.Frame
 
 // DebugHookOptions describes the coarse-grained GScript debug hook filters.
-type DebugHookOptions = debugstate.HookOptions
+type DebugHookOptions = support.HookOptions
 
 func DefaultDebugHookOptions() DebugHookOptions {
-	return debugstate.DefaultHookOptions()
+	return support.DefaultHookOptions()
 }
 
 func ParseDebugHookOptions(v Value) (DebugHookOptions, error) {
@@ -104,7 +104,7 @@ func DebugEventTable(eventType, kind, name string, data Value) *Table {
 }
 
 func DebugHookWants(opts DebugHookOptions, eventType, kind string) bool {
-	return debugstate.HookWants(opts, eventType, kind)
+	return support.HookWants(opts, eventType, kind)
 }
 
 func (interp *Interpreter) pushDebugFrame(name, kind string) {
@@ -301,7 +301,7 @@ func DebugFunctionInfo(fn Value) *Table {
 }
 
 func FormatDebugTraceback(message string, frames []DebugFrame) string {
-	return debugstate.FormatTraceback(message, frames)
+	return support.FormatTraceback(message, frames)
 }
 
 func debugFramesTable(frames []DebugFrame) *Table { return DebugFramesTable(frames) }

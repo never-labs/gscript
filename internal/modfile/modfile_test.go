@@ -78,6 +78,32 @@ require example.com/lib v2.0.0
 	}
 }
 
+func TestParseRejectsDuplicateGSAndReplace(t *testing.T) {
+	_, diags := Parse("gscript.mod", strings.NewReader(`module example.com/app
+gs 0.1
+gs 0.2
+replace example.com/lib => ./lib
+replace example.com/lib => ./other-lib
+replace example.com/lib v1.0.0 => ./lib-v1
+replace example.com/lib v1.0.0 => ./other-lib-v1
+`))
+	for _, want := range []string{
+		"gs declared more than once",
+		"duplicate replace for example.com/lib",
+	} {
+		found := false
+		for _, diag := range diags {
+			if strings.Contains(diag.Message, want) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Fatalf("Parse diagnostics = %#v, want %q", diags, want)
+		}
+	}
+}
+
 func TestAddRequireUpdatesExistingPath(t *testing.T) {
 	f := File{Module: "example.com/app"}
 	var err error

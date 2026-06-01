@@ -73,7 +73,9 @@ func Parse(name string, r io.Reader) (File, []Diagnostic) {
 	var f File
 	var diags []Diagnostic
 	seenRequire := map[string]int{}
+	seenReplace := map[string]int{}
 	seenCollection := map[string]bool{}
+	seenGS := 0
 
 	scanner := bufio.NewScanner(r)
 	for lineNo := 1; scanner.Scan(); lineNo++ {
@@ -102,6 +104,11 @@ func Parse(name string, r io.Reader) (File, []Diagnostic) {
 				diags = append(diags, diag(lineNo, "gs expects one language version"))
 				continue
 			}
+			if seenGS != 0 {
+				diags = append(diags, diag(lineNo, fmt.Sprintf("gs declared more than once; first declared on line %d", seenGS)))
+				continue
+			}
+			seenGS = lineNo
 			f.GS = fields[1]
 		case "require":
 			if len(fields) != 3 {
@@ -141,6 +148,12 @@ func Parse(name string, r io.Reader) (File, []Diagnostic) {
 			if len(old) == 2 {
 				rep.Version = old[1]
 			}
+			key := rep.Path + "\x00" + rep.Version
+			if prevLine, ok := seenReplace[key]; ok {
+				diags = append(diags, diag(lineNo, fmt.Sprintf("duplicate replace for %s; first declared on line %d", rep.Path, prevLine)))
+				continue
+			}
+			seenReplace[key] = lineNo
 			f.Replace = append(f.Replace, rep)
 		case "collection":
 			if len(fields) != 3 {

@@ -1,12 +1,12 @@
-package outputlimit
+package support
 
 import (
 	"strings"
 	"testing"
 )
 
-func TestBuffersShareBudget(t *testing.T) {
-	stdout, stderr := NewBuffers(5)
+func TestOutputBuffersShareBudget(t *testing.T) {
+	stdout, stderr := NewOutputBuffers(5)
 	if n, err := stdout.Write([]byte("abc")); err != nil || n != 3 {
 		t.Fatalf("stdout.Write = (%d, %v), want (3, nil)", n, err)
 	}
@@ -21,8 +21,8 @@ func TestBuffersShareBudget(t *testing.T) {
 	}
 }
 
-func TestBufferKeepsPartialWriteBeforeLimit(t *testing.T) {
-	stdout, _ := NewBuffers(4)
+func TestOutputBufferKeepsPartialWriteBeforeLimit(t *testing.T) {
+	stdout, _ := NewOutputBuffers(4)
 	n, err := stdout.Write([]byte("abcdef"))
 	if err == nil {
 		t.Fatalf("Write returned nil error after exceeding limit")
@@ -38,8 +38,8 @@ func TestBufferKeepsPartialWriteBeforeLimit(t *testing.T) {
 	}
 }
 
-func TestBufferUnlimitedWhenMaxIsZero(t *testing.T) {
-	stdout, stderr := NewBuffers(0)
+func TestOutputBufferUnlimitedWhenMaxIsZero(t *testing.T) {
+	stdout, stderr := NewOutputBuffers(0)
 	if _, err := stdout.Write([]byte("abc")); err != nil {
 		t.Fatalf("stdout.Write returned error: %v", err)
 	}

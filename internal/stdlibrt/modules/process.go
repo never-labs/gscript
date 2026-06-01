@@ -10,7 +10,7 @@ import (
 
 	"github.com/never-labs/gscript/internal/runtime"
 	"github.com/never-labs/gscript/internal/stdlibrt"
-	"github.com/never-labs/gscript/internal/support/outputlimit"
+	"github.com/never-labs/gscript/internal/support"
 )
 
 // BuildProcessWithPolicy creates the "process" standard library table.
@@ -124,7 +124,7 @@ func BuildProcessWithPolicy(opts stdlibrt.HostOptions) *Table {
 		}
 
 		cmd := exec.CommandContext(ctx, cmdArgs[0], cmdArgs[1:]...)
-		stdout, stderr := outputlimit.NewBuffers(hostResultLimit(opts.MaxHostResult))
+		stdout, stderr := support.NewOutputBuffers(hostResultLimit(opts.MaxHostResult))
 		cmd.Stdout = stdout
 		cmd.Stderr = stderr
 		if stdinStr != "" {
@@ -188,7 +188,7 @@ func BuildProcessWithPolicy(opts stdlibrt.HostOptions) *Table {
 			cmdArgs[i] = a.String()
 		}
 		cmd := exec.Command(cmdArgs[0], cmdArgs[1:]...)
-		stdout, stderr := outputlimit.NewBuffers(hostResultLimit(opts.MaxHostResult))
+		stdout, stderr := support.NewOutputBuffers(hostResultLimit(opts.MaxHostResult))
 		cmd.Stdout = stdout
 		cmd.Stderr = stderr
 		err := cmd.Run()
@@ -209,7 +209,7 @@ func BuildProcessWithPolicy(opts stdlibrt.HostOptions) *Table {
 			return nil, fmt.Errorf("process shell access disabled")
 		}
 		cmd := exec.Command("/bin/sh", "-c", args[0].Str())
-		stdout, stderr := outputlimit.NewBuffers(hostResultLimit(opts.MaxHostResult))
+		stdout, stderr := support.NewOutputBuffers(hostResultLimit(opts.MaxHostResult))
 		cmd.Stdout = stdout
 		cmd.Stderr = stderr
 

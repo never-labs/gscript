@@ -1,12 +1,12 @@
-package filemode
+package support
 
 import (
 	"os"
 	"strings"
 )
 
-// Parse converts the script-facing io.open mode string into os.OpenFile flags.
-func Parse(mode string) (int, bool) {
+// ParseFileMode converts the script-facing io.open mode string into os.OpenFile flags.
+func ParseFileMode(mode string) (int, bool) {
 	mode = strings.ReplaceAll(mode, "b", "")
 	switch mode {
 	case "r":
@@ -26,8 +26,8 @@ func Parse(mode string) (int, bool) {
 	}
 }
 
-// Access reports which filesystem capabilities are required by flags.
-func Access(flag int) (read, write bool) {
+// FileModeAccess reports which filesystem capabilities are required by flags.
+func FileModeAccess(flag int) (read, write bool) {
 	read = flag&os.O_WRONLY == 0 || flag&os.O_RDWR != 0
 	write = flag&(os.O_WRONLY|os.O_RDWR|os.O_CREATE|os.O_TRUNC|os.O_APPEND) != 0
 	return read, write

@@ -9,7 +9,7 @@ import (
 
 	hostio "github.com/never-labs/gscript/internal/stdlib/io"
 	"github.com/never-labs/gscript/internal/stdlibrt"
-	"github.com/never-labs/gscript/internal/support/filemode"
+	"github.com/never-labs/gscript/internal/support"
 )
 
 const (
@@ -119,12 +119,12 @@ func BuildIO(opts stdlibrt.HostOptions) *Table {
 			mode = args[1].Str()
 		}
 
-		flag, ok := filemode.Parse(mode)
+		flag, ok := support.ParseFileMode(mode)
 		if !ok {
 			return []Value{NilValue(), StringValue(fmt.Sprintf("invalid mode: %s", mode))}, nil
 		}
 
-		read, write := filemode.Access(flag)
+		read, write := support.FileModeAccess(flag)
 		resolved, err := resolveIOPath(root(), fsRead(), fsWrite(), filename, read, write)
 		if err != nil {
 			return nil, err
@@ -224,7 +224,7 @@ func resolveIOPath(root string, filesystemRead, filesystemWrite bool, path strin
 
 func inputOutputTarget(root string, filesystemRead, filesystemWrite bool, v Value, stringMode int) (*gscriptFileHandle, error) {
 	if v.IsString() {
-		read, write := filemode.Access(stringMode)
+		read, write := support.FileModeAccess(stringMode)
 		path, err := resolveIOPath(root, filesystemRead, filesystemWrite, v.Str(), read, write)
 		if err != nil {
 			return nil, err
