@@ -55,3 +55,12 @@ type("x")     // "string"
 type({})      // "table"
 type(func() {}) // "function"
 ```
+
+```leia run
+assert(type(nil) == "nil")
+assert(type(true) == "boolean")
+assert(type(1) == "number")
+assert(type("x") == "string")
+assert(type({}) == "table")
+assert(type(func() {}) == "function")
+```

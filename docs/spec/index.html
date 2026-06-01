@@ -328,7 +328,13 @@ type(true)    // &quot;boolean&quot;
 type(1)       // &quot;number&quot;
 type(&quot;x&quot;)     // &quot;string&quot;
 type({})      // &quot;table&quot;
-type(func() {}) // &quot;function&quot;</code></pre></section><section><h2 id="expressions">Expressions</h2>
+type(func() {}) // &quot;function&quot;</code></pre>
+<pre><code>assert(type(nil) == &quot;nil&quot;)
+assert(type(true) == &quot;boolean&quot;)
+assert(type(1) == &quot;number&quot;)
+assert(type(&quot;x&quot;) == &quot;string&quot;)
+assert(type({}) == &quot;table&quot;)
+assert(type(func() {}) == &quot;function&quot;)</code></pre></section><section><h2 id="expressions">Expressions</h2>
 <p>Expressions compute values. Evaluation proceeds according to the expression form and may raise runtime errors unless protected by a recovery construct.</p>
 <h3 id="expressions-precedence">Precedence</h3>
 <p>Operators follow this precedence, from highest to lowest:</p>
@@ -350,19 +356,36 @@ y := (1 + 2) * 3    // 9
 z := false || &quot;ok&quot;  // &quot;ok&quot;
 w := nil &amp;&amp; fail()  // nil; fail is not called</code></pre>
 <h3 id="expressions-calls">Calls</h3>
-<p>A call expression invokes a callable value. As an expression, a call contributes its first result unless a surrounding syntax form explicitly preserves multiple results.</p>
+<p>A call expression invokes a callable value. Calls may produce zero or more results. A call used where exactly one expression value is required contributes its first result, or <code>nil</code> when it produces no results. Expression-list positions are adjusted by the multi-return rules in <a href="#">Functions</a>.</p>
 <pre><code>func pair() {
     return &quot;a&quot;, &quot;b&quot;
 }
 
 x, y := pair()          // x == &quot;a&quot;, y == &quot;b&quot;
 first := pair()         // first == &quot;a&quot;</code></pre>
+<p>The built-in <code>spread(x)</code> form preserves multiple results from a call in argument and table-constructor positions where explicit expansion is required.</p>
+<pre><code>values := {1, spread(pair()), 4}
+// values is {1, &quot;a&quot;, &quot;b&quot;, 4}</code></pre>
 <h3 id="expressions-indexing-and-member-selection">Indexing And Member Selection</h3>
 <p><code>x[y]</code> indexes a table-like or host-backed value. <code>x.name</code> is member selection and is equivalent to a string-key field lookup where supported.</p>
 <pre><code>user := { name: &quot;Ada&quot; }
 same := user.name == user[&quot;name&quot;]
 user[&quot;score&quot;] = 10</code></pre>
 <p>Metamethods may affect indexing, assignment, calls, arithmetic, comparison, and length behavior as specified in <a href="#">Tables And Metatables</a>.</p>
+<h3 id="expressions-operators">Operators</h3>
+<p>Numeric operators accept numbers and strings that <code>tonumber</code> can parse as numbers. Invalid numeric strings and unsupported operand types raise runtime errors unless a matching metamethod applies. Library functions such as <code>tonumber</code>, <code>tostring</code>, <code>math.tointeger</code>, and formatting helpers expose the same conversions explicitly.</p>
+<p>| Operator family | Stable behavior | |---|---| | <code>+ - * / % **</code> | Numeric arithmetic. Numeric strings are converted before the operation. Integer operands may keep integer representation when the operation is exact; otherwise results may be floating-point. Unsupported operands raise a runtime error unless a matching arithmetic metamethod applies. | | unary <code>-</code> | Numeric negation or <code>__unm</code> on values with a metatable handler. | | <code>..</code> | String concatenation. Non-string primitive operands may be converted using <code>tostring</code> according to the runtime string contract; table-like operands may use <code>__concat</code>. | | <code>#</code> | Length operation. Strings return byte length. Tables use ordinary sequence/metatable length behavior; <code>rawlen</code> bypasses <code>__len</code>. | | <code>== !=</code> | Equality and inequality. Primitive values compare by value; tables, functions, channels, coroutines, and host values compare by identity unless a stable equality metamethod applies. | | <code>&lt; &lt;= &gt; &gt;=</code> | Ordered comparison over compatible primitive values or comparison metamethods. Incompatible values raise a runtime error. | | <code>&amp;&amp; || !</code> | Logical operations using Leia truthiness. <code>&amp;&amp;</code> and <code>||</code> short-circuit and return operand values. | | <code>&amp; | ^ &amp;^ &lt;&lt; &gt;&gt;</code> | Integer bitwise operations. Operands must be numbers or numeric strings that can be converted to integers according to the runtime integer conversion rules; invalid operands raise a runtime error. | | <code>&lt;-</code> | Channel receive in expression position. It blocks until a value is received, the channel is closed, or the host cancels execution. |</p>
+<pre><code>1 + 2        // 3
+&quot;5&quot; + 3      // 8
+&quot;x&quot; + 3      // runtime error
+&quot;a&quot; .. 3     // &quot;a3&quot;
+(1 &lt;&lt; 8)     // 256</code></pre>
+<pre><code>assert(1 + 2 == 3)
+assert(&quot;5&quot; + 3 == 8)
+ok, _ := pcall(func() { return &quot;x&quot; + 3 })
+assert(!ok)
+assert(&quot;a&quot; .. 3 == &quot;a3&quot;)
+assert((1 &lt;&lt; 8) == 256)</code></pre>
 <h3 id="expressions-literals">Literals</h3>
 <p>Table literals, list literals, dense array literals, function literals, anonymous agent expressions, <code>turn</code> expressions, and <code>messages</code> blocks are expressions. Their specific syntax is listed in <a href="#">grammar.ebnf</a>.</p>
 <h3 id="expressions-evaluation-order">Evaluation Order</h3>
@@ -431,6 +454,34 @@ first()        // nil; missing arguments become nil</code></pre>
 }
 
 count(1, 2, 3) // 3</code></pre>
+<pre><code>func count(...) {
+    args := {...}
+    return #args
+}
+
+assert(count(1, 2, 3) == 3)</code></pre>
+<h3 id="functions-multiple-results">Multiple Results</h3>
+<p>Function calls and some built-ins may produce multiple results. Leia adjusts those results according to the syntactic position where the call appears.</p>
+<p>In assignment and return positions, a final call expands to as many values as needed. Missing values become <code>nil</code>; extra values are discarded.</p>
+<pre><code>func triple() {
+    return 10, 20, 30
+}
+
+a, b, c := triple() // 10, 20, 30
+x, y := triple()    // 10, 20
+return triple()     // returns 10, 20, 30</code></pre>
+<p>A parenthesized call contributes exactly one value.</p>
+<pre><code>a, b := (triple()) // a == 10, b == nil</code></pre>
+<p>When a call appears before the final expression in an expression list, it contributes exactly one value. A final call may expand.</p>
+<pre><code>a, b, c, d := triple(), triple()
+// a == 10; b == 10; c == 20; d == 30</code></pre>
+<p>Function-call arguments and table constructors use the same adjustment rule: non-final calls contribute one value; final calls expand. Use <code>spread(call())</code> to expand a call in a non-final position.</p>
+<pre><code>func pack(...) { return table.pack(...) }
+
+pack(triple(), &quot;x&quot;)          // receives 10, &quot;x&quot;
+pack(spread(triple()), &quot;x&quot;)  // receives 10, 20, 30, &quot;x&quot;
+{triple()}                   // {10, 20, 30}
+{(triple())}                 // {10}</code></pre>
 <p>Closures capture lexical variables by reference. Mutating a captured variable is visible to all closures that share the binding.</p>
 <pre><code>func counter() {
     n := 0
@@ -443,6 +494,17 @@ count(1, 2, 3) // 3</code></pre>
 next := counter()
 next() // 1
 next() // 2</code></pre>
+<pre><code>func counter() {
+    n := 0
+    return func() {
+        n = n + 1
+        return n
+    }
+}
+
+next := counter()
+assert(next() == 1)
+assert(next() == 2)</code></pre>
 <p>Script functions and host functions share the same script-visible call result model. Host functions may return structured recoverable errors where their module contract specifies <code>nil, err</code> behavior.</p>
 <p>Tail-call optimization is an implementation detail unless a section explicitly promises stack behavior for a feature.</p></section><section><h2 id="tables-and-metatables">Tables And Metatables</h2>
 <p>Tables are mutable identity-bearing maps. Keys and values are runtime values. Implementations may use optimized array, record, or typed layouts when this does not change observable behavior.</p>
@@ -476,6 +538,9 @@ rawget(t, &quot;created&quot;) // 13</code></pre>
 <pre><code>t := setmetatable({}, { __len: func(_) { return 99 } })
 #t        // 99
 rawlen(t) // 0</code></pre>
+<pre><code>t := setmetatable({}, { __len: func(_) { return 99 } })
+assert(#t == 99)
+assert(rawlen(t) == 0)</code></pre>
 <p>Sequence length on sparse tables follows Leia runtime behavior. Programs that depend on sparse length edge cases should pin that behavior with tests.</p></section><section><h2 id="concurrency">Concurrency</h2>
 <p>Leia supports Go-style concurrency constructs adapted to a scripting runtime.</p>
 <p><code>go call()</code> starts a goroutine-like task. Implementations may schedule tasks on host threads where safe. The host runtime remains responsible for resource budgets, cancellation, and integration with embedding policies.</p>
