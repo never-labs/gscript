@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/never-labs/gscript/internal/runtime"
-	llmrt "github.com/never-labs/gscript/internal/stdlibrt/llm"
+	"github.com/never-labs/gscript/internal/stdlibrt"
 )
 
 type llmInstallRecorder struct {
@@ -34,7 +34,7 @@ func (r *llmInstallRecorder) RegisterAlias(name string, value runtime.Value) {
 func TestInstallLLMRegistersPublicBindingsAndToolofAlias(t *testing.T) {
 	rec := newLLMInstallRecorder()
 
-	InstallLLM(rec, llmrt.Options{})
+	InstallLLM(rec, stdlibrt.LLMOptions{})
 
 	for _, name := range []string{"llm", "msg", "history", "chat", "loop"} {
 		val := rec.modules[name]

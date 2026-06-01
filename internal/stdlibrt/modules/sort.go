@@ -5,7 +5,7 @@ import (
 	"sort"
 
 	stdsort "github.com/never-labs/gscript/internal/stdlib/sort"
-	tablehooks "github.com/never-labs/gscript/internal/stdlibrt/tablehooks"
+	"github.com/never-labs/gscript/internal/stdlibrt"
 )
 
 func defaultValueLess(a, b Value) (bool, error) {
@@ -22,7 +22,7 @@ func BuildSortLibWithCaller(call ScriptFunctionCaller) *Table {
 // BuildSortLibWithCallerAndLess is like BuildSortLibWithCaller, but lets an
 // execution engine provide its own less-than semantics for callback-produced
 // keys.
-func BuildSortLibWithCallerAndLess(call ScriptFunctionCaller, less tablehooks.Less) *Table {
+func BuildSortLibWithCallerAndLess(call ScriptFunctionCaller, less stdlibrt.Less) *Table {
 	if less == nil {
 		less = defaultValueLess
 	}

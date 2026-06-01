@@ -1,4 +1,4 @@
-package llm
+package stdlibrt
 
 import (
 	"context"
@@ -6,7 +6,7 @@ import (
 	"github.com/never-labs/gscript/internal/runtime"
 )
 
-type Options struct {
+type LLMOptions struct {
 	Call            runtime.ScriptFunctionCaller
 	Provider        func() runtime.LLMProvider
 	ProviderFactory func() runtime.LLMProviderFactory

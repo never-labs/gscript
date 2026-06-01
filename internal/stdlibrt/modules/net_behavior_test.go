@@ -9,13 +9,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/never-labs/gscript/internal/stdlibrt/host"
+	"github.com/never-labs/gscript/internal/stdlibrt"
 )
 
 // netInterp creates an interpreter with the net library manually registered.
 func netInterp(t *testing.T, src string) *Interpreter {
 	t.Helper()
-	return runWithLib(t, src, "net", BuildNet(host.Options{}))
+	return runWithLib(t, src, "net", BuildNet(stdlibrt.HostOptions{}))
 }
 
 // ==================================================================

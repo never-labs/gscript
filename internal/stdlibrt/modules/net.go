@@ -8,13 +8,13 @@ import (
 	"time"
 
 	hosthttp "github.com/never-labs/gscript/internal/stdlib/http"
-	"github.com/never-labs/gscript/internal/stdlibrt/host"
+	"github.com/never-labs/gscript/internal/stdlibrt"
 )
 
 // BuildNet creates the "net" standard library table for HTTP client operations.
-func BuildNet(opts host.Options) *Table {
+func BuildNet(opts stdlibrt.HostOptions) *Table {
 	t := markStdlibrtModule(NewTable())
-	networkAllowed := func() bool { return host.Bool(opts.NetworkAllowed, true) }
+	networkAllowed := func() bool { return stdlibrt.HostBool(opts.NetworkAllowed, true) }
 	maxHostResult := func() int64 { return hostResultLimit(opts.MaxHostResult) }
 
 	set := func(name string, fn func([]Value) ([]Value, error)) {

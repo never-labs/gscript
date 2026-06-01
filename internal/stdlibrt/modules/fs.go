@@ -6,9 +6,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/never-labs/gscript/internal/support/hostpath"
 	hostfs "github.com/never-labs/gscript/internal/stdlib/fs"
-	"github.com/never-labs/gscript/internal/stdlibrt/host"
+	"github.com/never-labs/gscript/internal/stdlibrt"
+	"github.com/never-labs/gscript/internal/support/hostpath"
 )
 
 func resolveSandboxPath(root, path string) (string, error) {
@@ -21,18 +21,18 @@ func BuildFS(roots ...string) *Table {
 	if len(roots) > 0 {
 		root = roots[0]
 	}
-	return BuildFSWithPolicy(host.Options{
+	return BuildFSWithPolicy(stdlibrt.HostOptions{
 		FilesystemRoot:  func() string { return root },
 		FilesystemRead:  func() bool { return true },
 		FilesystemWrite: func() bool { return true },
 	})
 }
 
-func BuildFSWithPolicy(opts host.Options) *Table {
+func BuildFSWithPolicy(opts stdlibrt.HostOptions) *Table {
 	t := markStdlibrtModule(NewTable())
-	root := func() string { return host.String(opts.FilesystemRoot) }
-	read := func() bool { return host.Bool(opts.FilesystemRead, true) }
-	write := func() bool { return host.Bool(opts.FilesystemWrite, true) }
+	root := func() string { return stdlibrt.HostString(opts.FilesystemRoot) }
+	read := func() bool { return stdlibrt.HostBool(opts.FilesystemRead, true) }
+	write := func() bool { return stdlibrt.HostBool(opts.FilesystemWrite, true) }
 	maxReadBytes := func() int64 {
 		if opts.MaxFSReadBytes == nil {
 			return 0

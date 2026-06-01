@@ -140,6 +140,27 @@ func TestStdlibrtModulesDoNotOwnAdapterContracts(t *testing.T) {
 	})
 }
 
+func TestStdlibrtKeepsThinContractsInRootPackage(t *testing.T) {
+	root := filepath.Join(repoRoot(t), "internal", "stdlibrt")
+	allowedSubdirs := map[string]bool{
+		"install": true,
+		"modules": true,
+	}
+
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		t.Fatalf("read internal/stdlibrt: %v", err)
+	}
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		if !allowedSubdirs[entry.Name()] {
+			t.Fatalf("internal/stdlibrt/%s is a thin adapter subpackage; keep adapter contracts in internal/stdlibrt or put real module bindings under modules", entry.Name())
+		}
+	}
+}
+
 func TestInternalSupportPackagesStayGrouped(t *testing.T) {
 	root := repoRoot(t)
 	for _, name := range []string{"binaryfmt", "debugstate", "filemode", "hostpath", "outputlimit", "stringlib"} {
@@ -153,6 +174,39 @@ func TestInternalSupportPackagesStayGrouped(t *testing.T) {
 		}
 		if !info.IsDir() {
 			t.Fatalf("internal/support/%s is not a directory", name)
+		}
+	}
+}
+
+func TestInternalTopLevelPackagesStayArchitectural(t *testing.T) {
+	root := filepath.Join(repoRoot(t), "internal")
+	allowed := map[string]bool{
+		"ast":       true,
+		"binding":   true,
+		"jit":       true,
+		"lexer":     true,
+		"llmbridge": true,
+		"methodjit": true,
+		"nanbox":    true,
+		"parser":    true,
+		"runtime":   true,
+		"stdlib":    true,
+		"stdlibrt":  true,
+		"support":   true,
+		"testutil":  true,
+		"vm":        true,
+	}
+
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		t.Fatalf("read internal: %v", err)
+	}
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		if !allowed[entry.Name()] {
+			t.Fatalf("internal/%s is not an approved top-level architecture package; move small helpers under internal/support or tests under internal/testutil", entry.Name())
 		}
 	}
 }

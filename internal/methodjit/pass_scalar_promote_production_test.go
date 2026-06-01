@@ -10,7 +10,7 @@ package methodjit
 
 import (
 	"fmt"
-	"github.com/never-labs/gscript/internal/vmtest"
+	"github.com/never-labs/gscript/internal/testutil/vmtest"
 	"testing"
 
 	"github.com/never-labs/gscript/internal/vm"

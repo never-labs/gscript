@@ -5,7 +5,7 @@ package methodjit
 import (
 	"encoding/json"
 	"errors"
-	"github.com/never-labs/gscript/internal/vmtest"
+	"github.com/never-labs/gscript/internal/testutil/vmtest"
 	"os"
 	"path/filepath"
 	"strings"

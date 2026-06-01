@@ -8,7 +8,7 @@ import (
 	"sync"
 
 	hostio "github.com/never-labs/gscript/internal/stdlib/io"
-	"github.com/never-labs/gscript/internal/stdlibrt/host"
+	"github.com/never-labs/gscript/internal/stdlibrt"
 	"github.com/never-labs/gscript/internal/support/filemode"
 )
 
@@ -26,11 +26,11 @@ type gscriptFileHandle struct {
 }
 
 // BuildIO creates the "io" standard library table.
-func BuildIO(opts host.Options) *Table {
+func BuildIO(opts stdlibrt.HostOptions) *Table {
 	t := markStdlibrtModule(NewTable())
-	root := func() string { return host.String(opts.FilesystemRoot) }
-	fsRead := func() bool { return host.Bool(opts.FilesystemRead, true) }
-	fsWrite := func() bool { return host.Bool(opts.FilesystemWrite, true) }
+	root := func() string { return stdlibrt.HostString(opts.FilesystemRoot) }
+	fsRead := func() bool { return stdlibrt.HostBool(opts.FilesystemRead, true) }
+	fsWrite := func() bool { return stdlibrt.HostBool(opts.FilesystemWrite, true) }
 	currentInput := newFileHandle(os.Stdin, true)
 	currentOutput := newFileHandle(os.Stdout, true)
 	stdErr := newFileHandle(os.Stderr, true)

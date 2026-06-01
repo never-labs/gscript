@@ -4,7 +4,7 @@ package methodjit
 
 import (
 	"encoding/binary"
-	"github.com/never-labs/gscript/internal/vmtest"
+	"github.com/never-labs/gscript/internal/testutil/vmtest"
 	"math"
 	"os"
 	"strings"

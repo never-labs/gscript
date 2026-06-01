@@ -9,7 +9,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/never-labs/gscript/internal/stdlibrt/host"
+	"github.com/never-labs/gscript/internal/stdlibrt"
 )
 
 func TestHTTPBuildRequestTable(t *testing.T) {
@@ -236,7 +236,7 @@ func TestHTTPEndToEndWithInterpreter(t *testing.T) {
 
 func TestHTTPListenBackgroundHandleRoundTrip(t *testing.T) {
 	interp := New()
-	httpModule := TableValue(BuildHTTP(host.Options{Call: interp.CallFunction, NetworkAllowed: interp.NetworkAccessEnabled, MaxHostResult: interp.MaxHostResultBytes}))
+	httpModule := TableValue(BuildHTTP(stdlibrt.HostOptions{Call: interp.CallFunction, NetworkAllowed: interp.NetworkAccessEnabled, MaxHostResult: interp.MaxHostResultBytes}))
 	interp.SetGlobal("http", httpModule)
 	interp.SetModule("http", httpModule)
 	src := `
@@ -286,7 +286,7 @@ func TestHTTPListenBackgroundHandleRoundTrip(t *testing.T) {
 
 func TestHTTPRouterBackgroundShutdown(t *testing.T) {
 	interp := New()
-	httpModule := TableValue(BuildHTTP(host.Options{Call: interp.CallFunction, NetworkAllowed: interp.NetworkAccessEnabled, MaxHostResult: interp.MaxHostResultBytes}))
+	httpModule := TableValue(BuildHTTP(stdlibrt.HostOptions{Call: interp.CallFunction, NetworkAllowed: interp.NetworkAccessEnabled, MaxHostResult: interp.MaxHostResultBytes}))
 	interp.SetGlobal("http", httpModule)
 	interp.SetModule("http", httpModule)
 	src := `
@@ -332,7 +332,7 @@ func TestHTTPListenBackgroundPortConflictFailsSynchronously(t *testing.T) {
 	defer ln.Close()
 
 	interp := New()
-	httpModule := TableValue(BuildHTTP(host.Options{Call: interp.CallFunction, NetworkAllowed: interp.NetworkAccessEnabled, MaxHostResult: interp.MaxHostResultBytes}))
+	httpModule := TableValue(BuildHTTP(stdlibrt.HostOptions{Call: interp.CallFunction, NetworkAllowed: interp.NetworkAccessEnabled, MaxHostResult: interp.MaxHostResultBytes}))
 	interp.SetGlobal("http", httpModule)
 	interp.SetModule("http", httpModule)
 	src := fmt.Sprintf(`

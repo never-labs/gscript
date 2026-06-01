@@ -5,10 +5,10 @@ import (
 	goruntime "runtime"
 
 	"github.com/never-labs/gscript/internal/runtime"
-	testkitrt "github.com/never-labs/gscript/internal/stdlibrt/testkit"
+	"github.com/never-labs/gscript/internal/stdlibrt"
 )
 
-func BuildTestkit(opts testkitrt.Options) *runtime.Table {
+func BuildTestkit(opts stdlibrt.TestkitOptions) *runtime.Table {
 	t := runtime.NewTable()
 	tk := opts.Runtime
 

@@ -11,10 +11,8 @@ import (
 	"github.com/never-labs/gscript/internal/runtime"
 	"github.com/never-labs/gscript/internal/stdlib/catalog"
 	tablelib "github.com/never-labs/gscript/internal/stdlib/table"
-	syncrt "github.com/never-labs/gscript/internal/stdlibrt/concurrency"
-	"github.com/never-labs/gscript/internal/stdlibrt/host"
+	"github.com/never-labs/gscript/internal/stdlibrt"
 	stdlibinstall "github.com/never-labs/gscript/internal/stdlibrt/install"
-	llmrt "github.com/never-labs/gscript/internal/stdlibrt/llm"
 	"github.com/never-labs/gscript/internal/stdlibrt/modules"
 )
 
@@ -73,7 +71,7 @@ func (vm *VM) RegisterStdlibRuntimeModules() {
 		ScriptCaller: vm.callValue,
 		Less:         vm.valueLessThan,
 		SkipTable:    true,
-		Host: host.Options{
+		Host: stdlibrt.HostOptions{
 			SkipHostIO:     true,
 			NetworkAllowed: func() bool { return vm.networkAccess },
 			MaxHostResult:  func() int64 { return vm.maxHostResult },
@@ -703,7 +701,7 @@ func (vm *VM) RegisterStringLib() {
 }
 
 func (vm *VM) RegisterLLMLib() {
-	modules.InstallLLM(vm.newStdlibInstallContext(), llmrt.Options{
+	modules.InstallLLM(vm.newStdlibInstallContext(), stdlibrt.LLMOptions{
 		Call: vm.callValue,
 		Provider: func() runtime.LLMProvider {
 			return vm.llmProvider
@@ -740,7 +738,7 @@ func (vm *VM) RegisterHTTPLib() {
 
 func (vm *VM) RegisterSyncLib() {
 	std := vm.newStdlibInstallContext()
-	syncLib := runtime.TableValue(modules.BuildSync(syncrt.Options{
+	syncLib := runtime.TableValue(modules.BuildSync(stdlibrt.ConcurrencyOptions{
 		Call:   vm.callValue,
 		Launch: vm.launchSyncTask,
 	}))

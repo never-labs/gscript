@@ -1,13 +1,13 @@
-package testkit
+package stdlibrt
 
 import "github.com/never-labs/gscript/internal/runtime"
 
-type Runtime interface {
+type TestkitRuntime interface {
 	TestkitAccessEnabled() bool
 	TestkitMemorySnapshot() *runtime.Table
 }
 
-type Options struct {
-	Runtime Runtime
+type TestkitOptions struct {
+	Runtime TestkitRuntime
 	Call    runtime.ScriptFunctionCaller
 }

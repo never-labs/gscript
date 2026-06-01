@@ -10,7 +10,7 @@ import (
 
 	"github.com/never-labs/gscript/internal/lexer"
 	"github.com/never-labs/gscript/internal/parser"
-	"github.com/never-labs/gscript/internal/stdlibrt/host"
+	"github.com/never-labs/gscript/internal/stdlibrt"
 )
 
 // runWithFSPath creates a temp dir and runs GScript source with the fs lib registered.
@@ -43,7 +43,7 @@ func runWithFSPathCaps(t *testing.T, src string, read, write bool) (*Interpreter
 		t.Fatalf("parse error: %v", err)
 	}
 	interp := New()
-	fsModule := TableValue(BuildFSWithPolicy(host.Options{FilesystemRoot: func() string { return "" }, FilesystemRead: func() bool { return read }, FilesystemWrite: func() bool { return write }}))
+	fsModule := TableValue(BuildFSWithPolicy(stdlibrt.HostOptions{FilesystemRoot: func() string { return "" }, FilesystemRead: func() bool { return read }, FilesystemWrite: func() bool { return write }}))
 	interp.SetGlobal("fs", fsModule)
 	interp.SetModule("fs", fsModule)
 	// Provide the temp dir as a global for tests to use

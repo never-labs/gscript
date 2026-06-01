@@ -10,10 +10,10 @@ import (
 
 	hosthttp "github.com/never-labs/gscript/internal/stdlib/http"
 	hostnet "github.com/never-labs/gscript/internal/stdlib/net"
-	"github.com/never-labs/gscript/internal/stdlibrt/host"
+	"github.com/never-labs/gscript/internal/stdlibrt"
 )
 
-func BuildHTTP(opts host.Options) *Table {
+func BuildHTTP(opts stdlibrt.HostOptions) *Table {
 	return BuildHTTPWithCallerAndPolicy(opts.Call, opts.NetworkAllowed, opts.MaxHostResult)
 }
 
@@ -46,7 +46,7 @@ func BuildHTTPWithCallerAndPolicy(call ScriptFunctionCaller, networkAllowed func
 		if len(args) < 2 {
 			return nil, fmt.Errorf("http.listen requires address and handler")
 		}
-		if !host.Bool(networkAllowed, true) {
+		if !stdlibrt.HostBool(networkAllowed, true) {
 			return nil, fmt.Errorf("network access disabled")
 		}
 		addr := args[0].Str()
@@ -77,7 +77,7 @@ func BuildHTTPWithCallerAndPolicy(call ScriptFunctionCaller, networkAllowed func
 		if len(args) < 1 {
 			return nil, fmt.Errorf("http.get requires a URL")
 		}
-		if !host.Bool(networkAllowed, true) {
+		if !stdlibrt.HostBool(networkAllowed, true) {
 			return nil, fmt.Errorf("network access disabled")
 		}
 		url := args[0].Str()

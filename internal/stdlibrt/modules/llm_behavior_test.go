@@ -10,7 +10,7 @@ import (
 	"github.com/never-labs/gscript/internal/lexer"
 	"github.com/never-labs/gscript/internal/parser"
 	"github.com/never-labs/gscript/internal/runtime"
-	llmrt "github.com/never-labs/gscript/internal/stdlibrt/llm"
+	"github.com/never-labs/gscript/internal/stdlibrt"
 )
 
 type testLLMProvider struct {
@@ -59,7 +59,7 @@ func parseLLMTestProgram(t *testing.T, src string) *ast.Program {
 func runLLMTestProgram(t *testing.T, src string, provider runtime.LLMProvider) *runtime.Interpreter {
 	t.Helper()
 	interp := runtime.NewCore()
-	InstallLLM(interpInstaller{interp: interp}, llmrt.Options{
+	InstallLLM(interpInstaller{interp: interp}, stdlibrt.LLMOptions{
 		Call:     interp.CallFunction,
 		Provider: func() runtime.LLMProvider { return provider },
 		MaxHostResult: func() int64 {

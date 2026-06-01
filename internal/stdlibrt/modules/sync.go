@@ -5,7 +5,7 @@ import (
 	"sync"
 
 	"github.com/never-labs/gscript/internal/runtime"
-	syncrt "github.com/never-labs/gscript/internal/stdlibrt/concurrency"
+	"github.com/never-labs/gscript/internal/stdlibrt"
 
 	stdlibsync "github.com/never-labs/gscript/internal/stdlib/sync"
 )
@@ -27,7 +27,7 @@ type scriptOnce struct {
 	err  error
 }
 
-func BuildSync(options syncrt.Options) *Table {
+func BuildSync(options stdlibrt.ConcurrencyOptions) *Table {
 	call := options.Call
 	launch := options.Launch
 	if launch == nil {
@@ -67,7 +67,7 @@ func BuildSync(options syncrt.Options) *Table {
 	return markStdlibrtModule(t)
 }
 
-func syncGroupFromArgs(call ScriptFunctionCaller, launch syncrt.TaskLauncher, args []Value) ([]Value, error) {
+func syncGroupFromArgs(call ScriptFunctionCaller, launch stdlibrt.TaskLauncher, args []Value) ([]Value, error) {
 	if len(args) == 0 || args[0].IsNil() {
 		state := runtime.NewScriptContextState()
 		ctx := TableValue(runtime.NewScriptContextTable(state))
@@ -85,7 +85,7 @@ func syncGroupFromArgs(call ScriptFunctionCaller, launch syncrt.TaskLauncher, ar
 	return []Value{TableValue(newScriptTaskGroupTable(call, launch, ctx, cancel))}, nil
 }
 
-func defaultSyncTaskLauncher(call ScriptFunctionCaller) syncrt.TaskLauncher {
+func defaultSyncTaskLauncher(call ScriptFunctionCaller) stdlibrt.TaskLauncher {
 	return func(fn Value, args []Value, done func(error)) {
 		go func() {
 			var err error
@@ -150,7 +150,7 @@ func waitGroupAdd(state *scriptWaitGroup, delta int) (err error) {
 	return stdlibsync.AddWaitGroup(&state.wg, delta)
 }
 
-func newScriptTaskGroupTable(call ScriptFunctionCaller, launch syncrt.TaskLauncher, ctx, cancel Value) *Table {
+func newScriptTaskGroupTable(call ScriptFunctionCaller, launch stdlibrt.TaskLauncher, ctx, cancel Value) *Table {
 	state := &scriptTaskGroup{ctx: ctx, cancel: cancel, call: call}
 	if launch == nil {
 		launch = defaultSyncTaskLauncher(func(Value, []Value) ([]Value, error) {

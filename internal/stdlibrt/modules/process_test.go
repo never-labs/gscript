@@ -7,13 +7,13 @@ import (
 	"time"
 
 	"github.com/never-labs/gscript/internal/runtime"
-	"github.com/never-labs/gscript/internal/stdlibrt/host"
+	"github.com/never-labs/gscript/internal/stdlibrt"
 )
 
 func processInterp(t *testing.T) *runtime.Interpreter {
 	t.Helper()
 	interp := runtime.NewCore()
-	processModule := runtime.TableValue(BuildProcessWithPolicy(host.Options{
+	processModule := runtime.TableValue(BuildProcessWithPolicy(stdlibrt.HostOptions{
 		ProcessExecution:      interp.ProcessExecutionEnabled,
 		ProcessShell:          interp.ProcessShellEnabled,
 		EnvironmentRead:       interp.EnvironmentReadEnabled,

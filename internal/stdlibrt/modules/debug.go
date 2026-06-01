@@ -5,10 +5,10 @@ import (
 	goruntime "runtime"
 
 	"github.com/never-labs/gscript/internal/runtime"
-	debugrt "github.com/never-labs/gscript/internal/stdlibrt/debug"
+	"github.com/never-labs/gscript/internal/stdlibrt"
 )
 
-func BuildDebug(dbg debugrt.Runtime) *runtime.Table {
+func BuildDebug(dbg stdlibrt.DebugRuntime) *runtime.Table {
 	t := runtime.NewTable()
 
 	set := func(name string, fn func([]runtime.Value) ([]runtime.Value, error)) {
@@ -158,7 +158,7 @@ func BuildDebug(dbg debugrt.Runtime) *runtime.Table {
 	return t
 }
 
-func debugStack(dbg debugrt.Runtime, skip int) []runtime.DebugFrame {
+func debugStack(dbg stdlibrt.DebugRuntime, skip int) []runtime.DebugFrame {
 	if dbg == nil {
 		return nil
 	}

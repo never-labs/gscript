@@ -6,7 +6,7 @@ import (
 
 	"github.com/never-labs/gscript/internal/lexer"
 	"github.com/never-labs/gscript/internal/parser"
-	"github.com/never-labs/gscript/internal/stdlibrt/host"
+	"github.com/never-labs/gscript/internal/stdlibrt"
 )
 
 func execBinaryIOTest(t *testing.T, interp *Interpreter, src string) {
@@ -26,7 +26,7 @@ func execBinaryIOTest(t *testing.T, interp *Interpreter, src string) {
 
 func TestIOFileHandleSeekFlushTypeAndClose(t *testing.T) {
 	interp := New()
-	ioModule := TableValue(BuildIO(host.Options{}))
+	ioModule := TableValue(BuildIO(stdlibrt.HostOptions{}))
 	interp.SetGlobal("io", ioModule)
 	interp.SetModule("io", ioModule)
 	path := filepath.Join(t.TempDir(), "seek.txt")
@@ -70,7 +70,7 @@ func TestIOFileHandleSeekFlushTypeAndClose(t *testing.T) {
 
 func TestIOInputOutputAndTmpfile(t *testing.T) {
 	interp := New()
-	ioModule := TableValue(BuildIO(host.Options{}))
+	ioModule := TableValue(BuildIO(stdlibrt.HostOptions{}))
 	interp.SetGlobal("io", ioModule)
 	interp.SetModule("io", ioModule)
 	path := filepath.Join(t.TempDir(), "redirect.txt")
@@ -112,7 +112,7 @@ func TestIOInputOutputAndTmpfile(t *testing.T) {
 
 func TestIOReadFormatsLineWithNewlineBytesAndMultipleResults(t *testing.T) {
 	interp := New()
-	ioModule := TableValue(BuildIO(host.Options{}))
+	ioModule := TableValue(BuildIO(stdlibrt.HostOptions{}))
 	interp.SetGlobal("io", ioModule)
 	interp.SetModule("io", ioModule)
 	path := filepath.Join(t.TempDir(), "read-formats.txt")

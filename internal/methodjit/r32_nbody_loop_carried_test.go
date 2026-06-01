@@ -12,7 +12,7 @@ package methodjit
 
 import (
 	"fmt"
-	"github.com/never-labs/gscript/internal/vmtest"
+	"github.com/never-labs/gscript/internal/testutil/vmtest"
 	"os"
 	"strings"
 	"testing"

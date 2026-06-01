@@ -1,8 +1,8 @@
-package host
+package stdlibrt
 
 import "github.com/never-labs/gscript/internal/runtime"
 
-type Options struct {
+type HostOptions struct {
 	SkipHostIO            bool
 	NetworkAllowed        func() bool
 	FilesystemRoot        func() string
@@ -23,14 +23,14 @@ type Options struct {
 	Call                  runtime.ScriptFunctionCaller
 }
 
-func Bool(fn func() bool, fallback bool) bool {
+func HostBool(fn func() bool, fallback bool) bool {
 	if fn == nil {
 		return fallback
 	}
 	return fn()
 }
 
-func String(fn func() string) string {
+func HostString(fn func() string) string {
 	if fn == nil {
 		return ""
 	}

@@ -1,8 +1,8 @@
-package debug
+package stdlibrt
 
 import "github.com/never-labs/gscript/internal/runtime"
 
-type Runtime interface {
+type DebugRuntime interface {
 	DebugAccessEnabled() bool
 	DebugStackSnapshot(skip int) []runtime.DebugFrame
 	DebugGlobalsSnapshot() *runtime.Table

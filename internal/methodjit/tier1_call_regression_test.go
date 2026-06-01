@@ -7,7 +7,7 @@
 package methodjit
 
 import (
-	"github.com/never-labs/gscript/internal/vmtest"
+	"github.com/never-labs/gscript/internal/testutil/vmtest"
 	"os"
 	"testing"
 	"unsafe"

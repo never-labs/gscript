@@ -6,34 +6,34 @@ import (
 	"strings"
 
 	tablelib "github.com/never-labs/gscript/internal/stdlib/table"
-	tablehooks "github.com/never-labs/gscript/internal/stdlibrt/tablehooks"
+	"github.com/never-labs/gscript/internal/stdlibrt"
 )
 
-type TableSortCaller = tablehooks.Caller
-type TableSortLess = tablehooks.Less
-type TableSortLen = tablehooks.Len
-type TableSortGet = tablehooks.Get
-type TableSortSet = tablehooks.Set
-type TableSortTryPlainArraySort = tablehooks.TryPlainArraySort
-type TableMoveGet = tablehooks.MoveGet
-type TableMoveSet = tablehooks.MoveSet
-type TableMoveTryPlainArrayMove = tablehooks.TryPlainArrayMove
-type TableInsertLen = tablehooks.InsertLen
-type TableInsertGet = tablehooks.InsertGet
-type TableInsertSet = tablehooks.InsertSet
-type TableInsertTryPlainArrayInsert = tablehooks.TryPlainArrayInsert
-type TableRemoveLen = tablehooks.RemoveLen
-type TableRemoveGet = tablehooks.RemoveGet
-type TableRemoveSet = tablehooks.RemoveSet
-type TableRemoveTryPlainArrayRemove = tablehooks.TryPlainArrayRemove
-type TableUnpackLen = tablehooks.UnpackLen
-type TableUnpackGet = tablehooks.UnpackGet
+type TableSortCaller = stdlibrt.Caller
+type TableSortLess = stdlibrt.Less
+type TableSortLen = stdlibrt.Len
+type TableSortGet = stdlibrt.Get
+type TableSortSet = stdlibrt.Set
+type TableSortTryPlainArraySort = stdlibrt.TryPlainArraySort
+type TableMoveGet = stdlibrt.MoveGet
+type TableMoveSet = stdlibrt.MoveSet
+type TableMoveTryPlainArrayMove = stdlibrt.TryPlainArrayMove
+type TableInsertLen = stdlibrt.InsertLen
+type TableInsertGet = stdlibrt.InsertGet
+type TableInsertSet = stdlibrt.InsertSet
+type TableInsertTryPlainArrayInsert = stdlibrt.TryPlainArrayInsert
+type TableRemoveLen = stdlibrt.RemoveLen
+type TableRemoveGet = stdlibrt.RemoveGet
+type TableRemoveSet = stdlibrt.RemoveSet
+type TableRemoveTryPlainArrayRemove = stdlibrt.TryPlainArrayRemove
+type TableUnpackLen = stdlibrt.UnpackLen
+type TableUnpackGet = stdlibrt.UnpackGet
 
 // BuildTable creates the "table" standard-library module. By default it uses
-// raw table access. Supplying tablehooks.Options upgrades the helpers that need
+// raw table access. Supplying stdlibrt.TableOptions upgrades the helpers that need
 // execution-engine semantics, such as table.sort callbacks and proxy-aware
 // table access.
-func BuildTable(options ...tablehooks.Options) *Table {
+func BuildTable(options ...stdlibrt.TableOptions) *Table {
 	opts := defaultTableOptions()
 	if len(options) > 0 {
 		opts = mergeTableOptions(opts, options[0])
@@ -54,8 +54,8 @@ func BuildTable(options ...tablehooks.Options) *Table {
 	return lib
 }
 
-func defaultTableOptions() tablehooks.Options {
-	return tablehooks.Options{
+func defaultTableOptions() stdlibrt.TableOptions {
+	return stdlibrt.TableOptions{
 		Less: func(a, b Value) (bool, error) {
 			less, ok := a.LessThan(b)
 			return ok && less, nil
@@ -85,7 +85,7 @@ func defaultTableOptions() tablehooks.Options {
 	}
 }
 
-func mergeTableOptions(base tablehooks.Options, override tablehooks.Options) tablehooks.Options {
+func mergeTableOptions(base stdlibrt.TableOptions, override stdlibrt.TableOptions) stdlibrt.TableOptions {
 	if override.Call != nil {
 		base.Call = override.Call
 	}

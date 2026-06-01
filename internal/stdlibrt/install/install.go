@@ -4,12 +4,8 @@ import (
 	"context"
 
 	"github.com/never-labs/gscript/internal/runtime"
-	syncrt "github.com/never-labs/gscript/internal/stdlibrt/concurrency"
-	"github.com/never-labs/gscript/internal/stdlibrt/host"
-	llmrt "github.com/never-labs/gscript/internal/stdlibrt/llm"
+	"github.com/never-labs/gscript/internal/stdlibrt"
 	"github.com/never-labs/gscript/internal/stdlibrt/modules"
-	tablehooks "github.com/never-labs/gscript/internal/stdlibrt/tablehooks"
-	testkitrt "github.com/never-labs/gscript/internal/stdlibrt/testkit"
 )
 
 // Install registers the standard library on interp.
@@ -20,7 +16,7 @@ func Install(interp *runtime.Interpreter) {
 	interp.InstallRuntimeStdlib()
 	InstallModules(interpreterInstaller{interp: interp}, interp.MaxHostResultBytes, ModuleOptions{
 		ScriptCaller: interp.CallFunction,
-		Host: host.Options{
+		Host: stdlibrt.HostOptions{
 			NetworkAllowed:        interp.NetworkAccessEnabled,
 			FilesystemRoot:        interp.FilesystemRoot,
 			FilesystemRead:        interp.FilesystemReadEnabled,
@@ -39,7 +35,7 @@ func Install(interp *runtime.Interpreter) {
 			MaxHostResult:         interp.MaxHostResultBytes,
 			Call:                  interp.CallFunction,
 		},
-		Table: tablehooks.Options{
+		Table: stdlibrt.TableOptions{
 			Call: interp.CallFunction,
 			Less: interp.ValueLessThan,
 			Len:  interp.TableLen,
@@ -53,9 +49,9 @@ func Install(interp *runtime.Interpreter) {
 
 type ModuleOptions struct {
 	ScriptCaller runtime.ScriptFunctionCaller
-	Less         tablehooks.Less
-	Host         host.Options
-	Table        tablehooks.Options
+	Less         stdlibrt.Less
+	Host         stdlibrt.HostOptions
+	Table        stdlibrt.TableOptions
 	SkipTable    bool
 }
 
@@ -112,7 +108,7 @@ func InstallModules(installer runtime.StdlibInstaller, maxHostResult func() int6
 	installer.RegisterTable("rl", modules.BuildRL())
 	installer.RegisterTable("sort", modules.BuildSortLibWithCallerAndLess(opts.ScriptCaller, opts.Less))
 	installer.RegisterTable("soa", modules.BuildSOA())
-	installer.RegisterTable("sync", modules.BuildSync(syncrt.Options{
+	installer.RegisterTable("sync", modules.BuildSync(stdlibrt.ConcurrencyOptions{
 		Call: opts.ScriptCaller,
 	}))
 	installer.RegisterTable("string", modules.BuildString(opts.ScriptCaller, maxHostResult))
@@ -130,7 +126,7 @@ func InstallLLM(interp *runtime.Interpreter) {
 	if interp == nil {
 		return
 	}
-	modules.InstallLLM(interpreterInstaller{interp: interp}, llmrt.Options{
+	modules.InstallLLM(interpreterInstaller{interp: interp}, stdlibrt.LLMOptions{
 		Call: interp.CallFunction,
 		Provider: func() runtime.LLMProvider {
 			return interp.LLMProvider()
@@ -159,7 +155,7 @@ func InstallDebugAndTestkit(interp *runtime.Interpreter) {
 	}
 	installer := interpreterInstaller{interp: interp}
 	installer.RegisterTable("debug", modules.BuildDebug(interp))
-	installer.RegisterTable("testkit", modules.BuildTestkit(testkitrt.Options{
+	installer.RegisterTable("testkit", modules.BuildTestkit(stdlibrt.TestkitOptions{
 		Runtime: interp,
 		Call:    interp.CallFunction,
 	}))

@@ -1,4 +1,4 @@
-package tablehooks
+package stdlibrt
 
 import "github.com/never-labs/gscript/internal/runtime"
 
@@ -24,7 +24,7 @@ type UnpackGet func(runtime.Value, runtime.Value) (runtime.Value, error)
 
 // Options provides execution-engine hooks needed by table helpers that must
 // respect script-visible metamethods and callbacks.
-type Options struct {
+type TableOptions struct {
 	Call Caller
 	Less Less
 	Len  Len

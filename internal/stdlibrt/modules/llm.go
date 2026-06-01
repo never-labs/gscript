@@ -2,11 +2,11 @@ package modules
 
 import (
 	"github.com/never-labs/gscript/internal/runtime"
-	llmrt "github.com/never-labs/gscript/internal/stdlibrt/llm"
+	"github.com/never-labs/gscript/internal/stdlibrt"
 )
 
 // InstallLLM registers the public LLM-facing standard-library bindings.
-func InstallLLM(installer runtime.StdlibInstaller, opts llmrt.Options) {
+func InstallLLM(installer runtime.StdlibInstaller, opts stdlibrt.LLMOptions) {
 	if installer == nil {
 		return
 	}
