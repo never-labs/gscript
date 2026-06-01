@@ -17,6 +17,14 @@ Embedders install providers through Go options:
 | `leia.WithLLMReplay(records)` | Replays recorded turns deterministically. |
 
 Provider implementations use `github.com/never-labs/leia/llm.Provider`.
+The same package exposes the host/provider contract types used by embedders:
+`ProviderConfig`, `ProviderFactory`, `TurnRequest`, `TurnResult`, `Tool`,
+`ToolCall`, `Message`, and provider error classifications such as
+`ProviderErrorNetwork`.
+
+Deterministic tests can use `llm.NewRecorder`, `llm.SaveRecords`,
+`llm.LoadRecords`, `llm.NewReplayProvider`, and `llm.NewTraceRecorder` without
+calling a live model.
 
 ## Model Declarations
 

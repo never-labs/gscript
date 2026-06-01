@@ -221,7 +221,11 @@ secrets, or live-provider outputs that expose private data.
 
 ## Useful Examples
 
+Offline examples:
+
 - `examples/llm/agent.leia`: model defaults, tools, agent, and turn syntax.
-- `examples/llm/agent_as_tool.leia`: direct agent-as-tool delegation.
 - `examples/llm/incident_response.leia`: custom flow with manual dispatch.
+
+Live-provider examples:
+
 - `examples/llm/glm_smoke.leia`: live provider smoke path.

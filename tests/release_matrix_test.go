@@ -327,6 +327,77 @@ func TestReleaseMatrixHotReloadDocsUsePublicSDKSurface(t *testing.T) {
 	}
 }
 
+func TestReleaseMatrixAINativeDocsUsePublicLLMSurface(t *testing.T) {
+	root := findRepoRoot(t)
+	docs := strings.Join([]string{
+		readFileString(t, filepath.Join(root, "docs", "reference", "ai", "index.md")),
+		readFileString(t, filepath.Join(root, "docs", "guides", "ai-native.md")),
+	}, "\n")
+	rootGoDoc := runCommand(t, root, 30*time.Second, "go", "doc", "-all", ".")
+	llmGoDoc := runCommand(t, root, 30*time.Second, "go", "doc", "-all", "./llm")
+
+	for _, api := range []string{
+		"WithLLMProvider",
+		"WithLLMProviderFactory",
+		"WithLLMRecorder",
+		"WithLLMReplay",
+		"WithLLMTrace",
+	} {
+		if !strings.Contains(docs, api) {
+			t.Fatalf("AI-native docs must mention host API %s", api)
+		}
+		if !strings.Contains(rootGoDoc, api) {
+			t.Fatalf("AI-native docs mention %s but root go doc does not expose it", api)
+		}
+	}
+
+	for _, api := range []string{
+		"Provider",
+		"ProviderConfig",
+		"ProviderFactory",
+		"TurnRequest",
+		"TurnResult",
+		"Tool",
+		"ToolCall",
+		"Message",
+		"NewRecorder",
+		"LoadRecords",
+		"SaveRecords",
+		"NewReplayProvider",
+		"NewTraceRecorder",
+		"ProviderErrorNetwork",
+	} {
+		if !strings.Contains(docs, api) {
+			t.Fatalf("AI-native docs must mention llm API/semantic term %s", api)
+		}
+		if !strings.Contains(llmGoDoc, api) {
+			t.Fatalf("AI-native docs mention %s but llm go doc does not expose it", api)
+		}
+	}
+}
+
+func TestReleaseMatrixAINativeExamplesStayRunnable(t *testing.T) {
+	root := findRepoRoot(t)
+	guide := readFileString(t, filepath.Join(root, "docs", "guides", "ai-native.md"))
+	for _, forbidden := range []string{
+		"examples/llm/agent_as_tool.leia",
+	} {
+		if strings.Contains(guide, forbidden) {
+			t.Fatalf("docs/guides/ai-native.md must not recommend currently failing AI example %s", forbidden)
+		}
+	}
+	if !strings.Contains(guide, "Live-provider examples") || !strings.Contains(guide, "examples/llm/glm_smoke.leia") {
+		t.Fatal("AI-native guide must keep live provider examples separated from offline examples")
+	}
+
+	for _, example := range []string{
+		"examples/llm/agent.leia",
+		"examples/llm/incident_response.leia",
+	} {
+		runCommand(t, root, 30*time.Second, "go", "run", "./cmd/leia", "run", example)
+	}
+}
+
 func TestReleaseMatrixDocumentedSmokeCommandsStayRunnable(t *testing.T) {
 	root := findRepoRoot(t)
 	for _, path := range []string{
