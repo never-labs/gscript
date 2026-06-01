@@ -43,6 +43,8 @@ only.
   history, and provider setup.
 - [Examples](examples/index.md): runnable scripts and embedding examples by
   product area.
+- [Example tree README](../examples/README.md): local example dependency and
+  release expectations.
 - [Testing and release gates](testing.md): correctness, docs, and release
   evidence.
 - [Security policy](../SECURITY.md): supported versions, reporting route, and

@@ -234,6 +234,7 @@ def check_release_gate_docs() -> None:
             "docs/reference/security/index.md",
             "docs/reference/performance/index.md",
             "choose a license and add a root `LICENSE` file",
+            "docs/release/notes-template.md",
         ],
     )
     require_snippets(
@@ -249,6 +250,7 @@ def check_release_gate_docs() -> None:
             "docs/reference/hot-reload/index.md",
             "docs/reference/ai/index.md",
             "docs/reference/data-oriented/index.md",
+            "examples/README.md",
         ],
     )
 

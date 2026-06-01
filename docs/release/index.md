@@ -31,9 +31,14 @@ The release evidence should cite:
 - `docs/reference/data-oriented/index.md`
 - `docs/reference/performance/index.md`
 - `docs/reference/diagnostics/index.md`
+- `examples/README.md`
 
 Before a public tag, update install instructions, examples, compatibility
 notes, known issues, benchmark caveats, and security notes.
+
+Use [`notes-template.md`](notes-template.md) for release candidates and public
+tags so compatibility, security, performance, validation, and artifact evidence
+are recorded consistently.
 
 ## Public Release Blockers
 
@@ -43,5 +48,6 @@ Do not cut a public release until these repository-level decisions are complete:
 - confirm the vulnerability reporting route in `SECURITY.md`;
 - verify install commands against the published module path;
 - run release evidence on the target platforms;
+- fill out `docs/release/notes-template.md` for the candidate;
 - document any experimental language, stdlib, AI, package, or JIT behavior that
   is intentionally outside the compatibility promise.
