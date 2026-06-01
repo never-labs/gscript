@@ -231,6 +231,9 @@ Long-running concurrent tasks must remain cancellable through host controls or
 runtime resource budgets. JIT participation is allowed only where semantic
 checks and deoptimization remain correct.
 
+See [`../reference/concurrency/index.md`](../reference/concurrency/index.md)
+for channel syntax, `select`, `sync`, `context`, and embedding budgets.
+
 ## Intentional Differences From Lua
 
 Leia differs from Lua when Go-native embedding, safety, or product clarity wins:

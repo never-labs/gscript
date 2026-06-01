@@ -21,6 +21,8 @@ only.
   by tooling.
 - [Modules](reference/modules/index.md): `leia.mod`, `leia.sum`, vendoring, and
   Go-native binding metadata.
+- [Concurrency](reference/concurrency/index.md): goroutines, channels, select,
+  sync primitives, contexts, and concurrency budgets.
 - [Go embedding API](reference/embedding/index.md): public Go package surface,
   host bindings, sandbox options, and VM lifetime rules.
 - [Security and sandboxing](reference/security/index.md): library selection,
