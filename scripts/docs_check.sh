@@ -15,6 +15,7 @@ Checks README/docs Markdown for:
   - fenced code blocks that mention release scripts whose files exist and are executable.
   - non-archive docs do not reintroduce retired project names.
   - release-readiness docs keep machine-checkable language and AI-native gates.
+  - generated reference docs and the checked-in language spec HTML are fresh.
 
 The release-script check covers:
   scripts/production_check.sh
@@ -55,6 +56,10 @@ done
 python3 scripts/spec_preview.py --output "$TMP_DOCS/spec-preview.html" >/dev/null
 if [ ! -s "$TMP_DOCS/spec-preview.html" ]; then
     echo "error: spec preview generator produced no output" >&2
+    exit 1
+fi
+if ! cmp -s "$TMP_DOCS/spec-preview.html" "docs/spec/index.html"; then
+    echo "error: docs/spec/index.html is stale; run: python3 scripts/spec_preview.py --output docs/spec/index.html" >&2
     exit 1
 fi
 
@@ -284,6 +289,7 @@ print(
     f"{checked_release_gate_docs} release-gate docs, "
     f"{checked_retired_paths} retired-path mentions, "
     f"{checked_retired_names} retired-name mentions, "
-    "2 generated reference docs."
+    "2 generated reference docs, "
+    "1 generated spec HTML."
 )
 PY
