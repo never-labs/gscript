@@ -28,3 +28,5 @@ bash scripts/docs_check.sh
 bash scripts/performance_gate.sh --feature-smoke
 ```
 
+See [Performance and benchmarks](reference/performance/index.md) for benchmark
+selectors, timing quality rules, strict guard modes, and artifact conventions.

@@ -27,6 +27,8 @@ only.
   instances, automatic state preservation, and rollback behavior.
 - [Errors and diagnostics](reference/diagnostics/index.md): Go error types,
   CLI JSON/SARIF outputs, and diagnostic bundle entrypoints.
+- [Performance and benchmarks](reference/performance/index.md): benchmark
+  selectors, timing modes, strict guards, and release artifacts.
 - [AI-native reference](reference/ai/index.md): models, tools, messages, turns,
   agents, budgets, providers, and replay.
 - [Embedding guide](guides/embedding.md): host integration, sandboxing, and
