@@ -16,6 +16,11 @@ repository version. A release may label a subset as stable, experimental, or
 implementation-defined in release notes. Stable behavior is behavior covered by
 this specification and by the release feature matrix.
 
+The same content is also available as a checked-in
+[single-page HTML edition](index.html) generated from these Markdown chapters.
+The Markdown chapters and [grammar appendix](grammar.ebnf) remain the source of
+truth.
+
 ## Normative Documents
 
 - [Notation](notation.md): EBNF notation, terminology, and normative wording.

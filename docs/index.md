@@ -11,7 +11,8 @@ only.
 ## Start Here
 
 - [Language specification](spec/index.md): the normative syntax and behavior
-  contract for users, tooling, VM, JIT, and embedding APIs.
+  contract for users, tooling, VM, JIT, and embedding APIs. A checked-in
+  [single-page HTML edition](spec/index.html) is available for browser reading.
 - [Getting started](tutorial/getting-started.md): install, run, test, and embed
   Leia in a small Go program.
 - [Standard library](reference/stdlib/index.md): generated-style module index

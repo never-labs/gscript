@@ -77,6 +77,7 @@ Start with:
 
 - [Documentation home](docs/index.md)
 - [Language specification](docs/spec/index.md)
+- [Language specification HTML](docs/spec/index.html)
 - [Getting started](docs/tutorial/getting-started.md)
 - [Standard library](docs/reference/stdlib/index.md)
 - [CLI reference](docs/reference/cli/index.md)
