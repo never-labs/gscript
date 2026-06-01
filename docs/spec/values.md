@@ -18,6 +18,15 @@ Stable value categories are:
 Only `nil` and `false` are falsy. Numbers, including `0`, empty strings, empty
 tables, functions, coroutines, and channels are truthy.
 
+```leia
+if 0 {
+    print("numbers are truthy")
+}
+if "" {
+    print("empty strings are truthy")
+}
+```
+
 Numbers are represented as integers or floating-point values where possible.
 Arithmetic may preserve integer representation when exact and fall back to
 floating-point or boxed runtime operations. JIT raw integer representations are
@@ -34,3 +43,15 @@ categories.
 Functions are callable values. Host functions and script functions share call
 semantics but may differ in performance, resource accounting, and recoverable
 host error behavior.
+
+The `type` function reports the stable script-visible category for ordinary
+values.
+
+```leia
+type(nil)     // "nil"
+type(true)    // "boolean"
+type(1)       // "number"
+type("x")     // "string"
+type({})      // "table"
+type(func() {}) // "function"
+```
