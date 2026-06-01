@@ -51,6 +51,14 @@ func TestStdlibCatalogHasUniqueModuleNames(t *testing.T) {
 	}
 }
 
+func TestStdlibCatalogModulesHaveDescriptions(t *testing.T) {
+	for _, module := range catalog.Modules() {
+		if module.Description == "" {
+			t.Fatalf("stdlib module %q is missing a generated-doc description", module.Name)
+		}
+	}
+}
+
 func publicModuleType(t *testing.T, vm *leia.VM, name string) string {
 	t.Helper()
 	if err := vm.Exec(`result := type(package.loaded["` + name + `"])`); err != nil {

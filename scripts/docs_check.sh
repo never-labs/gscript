@@ -70,6 +70,19 @@ errors = []
 checked_links = 0
 checked_script_mentions = 0
 checked_release_gate_docs = 0
+checked_retired_paths = 0
+
+retired_paths = {
+    "docs/language-spec.md": "docs/spec/language.md",
+    "docs/stdlib-contract.md": "docs/reference/stdlib/index.md",
+    "docs/test-matrix.md": "docs/testing.md",
+    "docs/testing-matrix.md": "docs/testing.md",
+    "docs/embedding.md": "docs/guides/embedding.md",
+    "docs/tooling.md": "docs/guides/tooling.md",
+    "docs/release.md": "docs/release/index.md",
+    "docs/production-readiness-checklist.md": "docs/release/index.md",
+    "docs/stdlib.md": "docs/reference/stdlib/index.md",
+}
 
 
 def strip_link_destination(raw: str) -> str:
@@ -116,6 +129,17 @@ def check_markdown_links(path: Path) -> None:
                 errors.append(
                     f"{path.relative_to(root)}:{line_no}: missing markdown link target: {target}"
                 )
+
+
+def check_retired_paths(path: Path) -> None:
+    global checked_retired_paths
+    text = path.read_text(encoding="utf-8")
+    rel = path.relative_to(root)
+    for old, new in retired_paths.items():
+        if old not in text:
+            continue
+        checked_retired_paths += 1
+        errors.append(f"{rel}: references retired docs path {old}; use {new}")
 
 
 def check_script_mentions(path: Path) -> None:
@@ -202,6 +226,7 @@ for doc_file in doc_files:
     if doc_file.is_file():
         check_markdown_links(doc_file)
         check_script_mentions(doc_file)
+        check_retired_paths(doc_file)
 
 check_release_gate_docs()
 
@@ -215,6 +240,7 @@ print(
     f"docs_check.sh: checked {len(doc_files)} Markdown files, "
     f"{checked_links} relative .md links, "
     f"{checked_script_mentions} release-script code-block mentions, "
-    f"{checked_release_gate_docs} release-gate docs."
+    f"{checked_release_gate_docs} release-gate docs, "
+    f"{checked_retired_paths} retired-path mentions."
 )
 PY

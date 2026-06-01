@@ -13,11 +13,12 @@ The documentation source of truth is split by ownership:
 Prefer generated reference for long API inventories. Hand-written docs should
 explain concepts, examples, safety boundaries, and tradeoffs.
 
-When adding a standard-library function, put its user-visible contract near the
-module implementation and update catalog metadata if the module's safety layer
-or capabilities change. Generated docs should be refreshed with:
+When adding a standard-library module, update `internal/stdlib/catalog` with its
+layer, description, safe-default status, and required capabilities. The docs
+generator reads that metadata directly. When adding functions to an existing
+module, put the user-visible contract near the module implementation until the
+function-level generator is added. Generated docs should be refreshed with:
 
 ```bash
 go run ./cmd/leia doc generate --output docs/reference/generated
 ```
-

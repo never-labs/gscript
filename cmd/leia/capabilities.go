@@ -42,6 +42,7 @@ type cliStdlibLayer struct {
 
 type cliStdlibModule struct {
 	Name         string   `json:"name"`
+	Description  string   `json:"description"`
 	Capabilities []string `json:"capabilities,omitempty"`
 	SafeDefault  bool     `json:"safe_default,omitempty"`
 }
@@ -224,6 +225,7 @@ func buildStdlibLayerCapabilities() []cliStdlibLayer {
 		for _, module := range catalog.ModulesForLayer(name) {
 			modules = append(modules, cliStdlibModule{
 				Name:         module.Name,
+				Description:  module.Description,
 				Capabilities: append([]string(nil), module.Capabilities...),
 				SafeDefault:  module.SafeDefault,
 			})
