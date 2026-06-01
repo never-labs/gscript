@@ -187,6 +187,9 @@ Typed arrays, matrices, vectors, and SOA data are standard-library data
 structures, not separate primitive value kinds unless a future spec revision
 promotes them.
 
+See [`../reference/data-oriented/index.md`](../reference/data-oriented/index.md)
+for dense-array literals, SoA layout, masks, and column kernels.
+
 ## Modules, Loading, And Scope
 
 `require(name)` first resolves enabled built-in standard-library modules, then

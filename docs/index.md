@@ -23,6 +23,8 @@ only.
   Go-native binding metadata.
 - [Concurrency](reference/concurrency/index.md): goroutines, channels, select,
   sync primitives, contexts, and concurrency budgets.
+- [Data-oriented programming](reference/data-oriented/index.md): dense arrays,
+  SoA layouts, masks, column kernels, and numeric performance model.
 - [Go embedding API](reference/embedding/index.md): public Go package surface,
   host bindings, sandbox options, and VM lifetime rules.
 - [Security and sandboxing](reference/security/index.md): library selection,
