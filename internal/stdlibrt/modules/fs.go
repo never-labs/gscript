@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/never-labs/gscript/internal/hostpath"
+	"github.com/never-labs/gscript/internal/support/hostpath"
 	hostfs "github.com/never-labs/gscript/internal/stdlib/fs"
 	"github.com/never-labs/gscript/internal/stdlibrt/host"
 )

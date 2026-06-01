@@ -6,7 +6,7 @@ import (
 	"os"
 	"sync/atomic"
 
-	"github.com/never-labs/gscript/internal/hostpath"
+	"github.com/never-labs/gscript/internal/support/hostpath"
 )
 
 // Core tree-walking interpreter: the Interpreter type, its constructors, and
