@@ -215,3 +215,68 @@ collection vendor ./missing-vendor
 		t.Fatalf("verify diagnostics = %+v, want two local path diagnostics", verify.Diagnostics)
 	}
 }
+
+func TestModLockWritesSumAndVerifyDetectsLocalMutation(t *testing.T) {
+	dir := t.TempDir()
+	vendorDir := filepath.Join(dir, "vendor", "pkg")
+	if err := os.MkdirAll(vendorDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	vendorFile := filepath.Join(vendorDir, "util.gs")
+	if err := os.WriteFile(vendorFile, []byte(`func value() { return 1 }`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "main.gs"), []byte(`util := require("vendor:pkg.util")`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "gscript.mod"), []byte(`module example.com/demo
+gs 0.1
+collection vendor ./vendor
+`), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runModCommand([]string{"lock", "--json", dir}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("mod lock code = %d, stderr = %q stdout = %q", code, stderr.String(), stdout.String())
+	}
+	sumPath := filepath.Join(dir, "gscript.sum")
+	if _, err := os.Stat(sumPath); err != nil {
+		t.Fatalf("expected gscript.sum: %v", err)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = runModCommand([]string{"verify", "--json", dir}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("mod verify after lock code = %d, stderr=%q stdout=%q", code, stderr.String(), stdout.String())
+	}
+
+	if err := os.WriteFile(vendorFile, []byte(`func value() { return 2 }`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	stdout.Reset()
+	stderr.Reset()
+	code = runModCommand([]string{"verify", "--json", dir}, &stdout, &stderr)
+	if code != 1 {
+		t.Fatalf("mod verify after mutation code = %d, want 1; stderr=%q stdout=%q", code, stderr.String(), stdout.String())
+	}
+	var verify modVerifyReport
+	if err := json.Unmarshal(stdout.Bytes(), &verify); err != nil {
+		t.Fatalf("stdout is not JSON verify report: %v; stdout = %q", err, stdout.String())
+	}
+	if verify.OK {
+		t.Fatalf("verify = %+v, want checksum failure", verify)
+	}
+	found := false
+	for _, diag := range verify.Diagnostics {
+		if diag.Code == "GS9109" && strings.Contains(diag.Message, "checksum mismatch") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("verify diagnostics = %+v, want checksum mismatch", verify.Diagnostics)
+	}
+}

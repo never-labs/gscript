@@ -188,6 +188,7 @@ func TestInternalTopLevelPackagesStayArchitectural(t *testing.T) {
 		"llmbridge": true,
 		"methodjit": true,
 		"modfile":   true,
+		"modpkg":    true,
 		"nanbox":    true,
 		"parser":    true,
 		"runtime":   true,
