@@ -101,7 +101,7 @@ go run ./cmd/leia mod verify --json
 
 Next steps:
 
-- Read the [language specification](../spec/language.md).
+- Read the [language specification](../spec/index.md).
 - Browse the [standard-library index](../reference/stdlib/index.md).
 - Use the [embedding reference](../reference/embedding/index.md) and
   [security reference](../reference/security/index.md) for host integration.

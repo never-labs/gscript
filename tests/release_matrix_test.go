@@ -65,7 +65,7 @@ func TestReleaseMatrixLanguageSpecMatchesGrammarAppendix(t *testing.T) {
 		`const_decl = "const" identifier ( "=" | ":=" ) expr ;`,
 	} {
 		if !strings.Contains(spec, production) {
-			t.Fatalf("docs/spec/language.md must include grammar production %q", production)
+			t.Fatalf("docs/spec/language.md overview must include grammar production %q", production)
 		}
 		if !strings.Contains(grammar, production) {
 			t.Fatalf("docs/spec/grammar.ebnf must include grammar production %q", production)
@@ -82,6 +82,45 @@ func TestReleaseMatrixStableKeywordsMatchLexer(t *testing.T) {
 	lexerKeywords := parseLexerKeywordMap(t, lexerSource)
 	if !sameStringSet(specKeywords, lexerKeywords) {
 		t.Fatalf("stable keyword list must match lexer keywords\nspec:  %s\nlexer: %s", strings.Join(specKeywords, ", "), strings.Join(lexerKeywords, ", "))
+	}
+}
+
+func TestReleaseMatrixSpecIndexDocumentsChapteredReference(t *testing.T) {
+	root := findRepoRoot(t)
+	index := readFileString(t, filepath.Join(root, "docs", "spec", "index.md"))
+	docsHome := readFileString(t, filepath.Join(root, "docs", "index.md"))
+	readme := readFileString(t, filepath.Join(root, "README.md"))
+
+	if !strings.Contains(docsHome, "(spec/index.md)") {
+		t.Fatal("docs/index.md must link the chaptered language spec entrypoint")
+	}
+	if !strings.Contains(readme, "(docs/spec/index.md)") {
+		t.Fatal("README.md must link the chaptered language spec entrypoint")
+	}
+
+	for _, chapter := range []string{
+		"notation.md",
+		"source.md",
+		"lexical.md",
+		"declarations.md",
+		"values.md",
+		"expressions.md",
+		"statements.md",
+		"functions.md",
+		"tables.md",
+		"concurrency.md",
+		"ai-native.md",
+		"modules.md",
+		"errors.md",
+		"implementation.md",
+		"grammar.ebnf",
+	} {
+		if !strings.Contains(index, "("+chapter+")") {
+			t.Fatalf("docs/spec/index.md must link %s", chapter)
+		}
+		if _, err := os.Stat(filepath.Join(root, "docs", "spec", chapter)); err != nil {
+			t.Fatalf("spec chapter %s is missing: %v", chapter, err)
+		}
 	}
 }
 
@@ -102,7 +141,7 @@ func parseSpecKeywordList(t *testing.T, spec string) []string {
 	re := regexp.MustCompile("(?s)Stable keywords:\\s*```text\\s*(.*?)\\s*```")
 	match := re.FindStringSubmatch(spec)
 	if len(match) != 2 {
-		t.Fatal("docs/spec/language.md must contain a Stable keywords text block")
+		t.Fatal("docs/spec/language.md overview must contain a Stable keywords text block")
 	}
 	return sortedUniqueStrings(strings.Fields(match[1]))
 }

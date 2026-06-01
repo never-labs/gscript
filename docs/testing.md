@@ -16,7 +16,7 @@ Important inputs:
 - `tests/language/MANIFEST.md`
 - `docs/reference/stdlib/index.md`
 - `tests/feature_matrix.json`
-- `docs/spec/language.md`
+- `docs/spec/index.md`
 
 Release-gate commands:
 

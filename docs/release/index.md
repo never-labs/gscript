@@ -15,7 +15,7 @@ bash scripts/performance_gate.sh --feature-smoke
 
 The release evidence should cite:
 
-- `docs/spec/language.md`
+- `docs/spec/index.md`
 - `tests/feature_matrix.json`
 - `tests/language/MANIFEST.md`
 - `tests/language/KNOWN_FAILURES.md`

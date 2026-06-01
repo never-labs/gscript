@@ -1,6 +1,6 @@
 (* Leia user-facing grammar.
 
-   This file is the syntax appendix for docs/spec/language.md. It describes
+   This file is the syntax appendix for docs/spec/index.md. It describes
    stable source syntax, not parser helper productions or internal AST shapes.
    Keywords such as agent, models, turn, messages, budget, flow, and tool are
    contextual identifiers unless the production below uses them in that

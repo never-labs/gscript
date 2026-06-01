@@ -10,7 +10,7 @@ only.
 
 ## Start Here
 
-- [Language specification](spec/language.md): the normative syntax and behavior
+- [Language specification](spec/index.md): the normative syntax and behavior
   contract for users, tooling, VM, JIT, and embedding APIs.
 - [Getting started](tutorial/getting-started.md): install, run, test, and embed
   Leia in a small Go program.

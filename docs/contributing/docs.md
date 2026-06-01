@@ -2,7 +2,7 @@
 
 The documentation source of truth is split by ownership:
 
-- Language syntax and semantics: `docs/spec/language.md`.
+- Language syntax and semantics: `docs/spec/index.md`.
 - Standard-library module inventory: `internal/stdlib/catalog` plus generated
   reference under `docs/reference/stdlib/`.
 - CLI command inventory: `cmd/leia` command registry plus generated reference

@@ -85,7 +85,7 @@ checked_retired_paths = 0
 checked_retired_names = 0
 
 retired_paths = {
-    "docs/language-spec.md": "docs/spec/language.md",
+    "docs/language-spec.md": "docs/spec/index.md",
     "docs/stdlib-contract.md": "docs/reference/stdlib/index.md",
     "docs/test-matrix.md": "docs/testing.md",
     "docs/testing-matrix.md": "docs/testing.md",
@@ -228,7 +228,7 @@ def check_release_gate_docs() -> None:
             release_matrix_cmd,
             "bash scripts/performance_gate.sh --feature-smoke",
             "tests/feature_matrix.json",
-            "docs/spec/language.md",
+            "docs/spec/index.md",
             "tests/language/MISSING_CAPABILITIES.md",
             "docs/reference/stdlib/index.md",
             "docs/reference/security/index.md",

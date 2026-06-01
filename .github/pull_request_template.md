@@ -9,7 +9,7 @@ go test ./...
 
 ## Compatibility
 
-- [ ] Language-visible behavior is unchanged, or `docs/spec/language.md` is updated.
+- [ ] Language-visible behavior is unchanged, or `docs/spec/index.md` is updated.
 - [ ] Stable syntax is unchanged, or `docs/spec/grammar.ebnf` and parser tests are updated.
 - [ ] Stable feature coverage is unchanged, or `tests/feature_matrix.json` is updated.
 - [ ] Standard-library catalog metadata is unchanged, or `internal/stdlib/catalog` is updated.

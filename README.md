@@ -76,7 +76,7 @@ surface.
 Start with:
 
 - [Documentation home](docs/index.md)
-- [Language specification](docs/spec/language.md)
+- [Language specification](docs/spec/index.md)
 - [Getting started](docs/tutorial/getting-started.md)
 - [Standard library](docs/reference/stdlib/index.md)
 - [CLI reference](docs/reference/cli/index.md)
