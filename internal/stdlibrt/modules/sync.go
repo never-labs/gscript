@@ -27,8 +27,6 @@ type scriptOnce struct {
 	err  error
 }
 
-type SyncTaskLauncher = syncrt.TaskLauncher
-
 func BuildSync(options syncrt.Options) *Table {
 	call := options.Call
 	launch := options.Launch
@@ -69,7 +67,7 @@ func BuildSync(options syncrt.Options) *Table {
 	return markStdlibrtModule(t)
 }
 
-func syncGroupFromArgs(call ScriptFunctionCaller, launch SyncTaskLauncher, args []Value) ([]Value, error) {
+func syncGroupFromArgs(call ScriptFunctionCaller, launch syncrt.TaskLauncher, args []Value) ([]Value, error) {
 	if len(args) == 0 || args[0].IsNil() {
 		state := runtime.NewScriptContextState()
 		ctx := TableValue(runtime.NewScriptContextTable(state))
@@ -87,7 +85,7 @@ func syncGroupFromArgs(call ScriptFunctionCaller, launch SyncTaskLauncher, args 
 	return []Value{TableValue(newScriptTaskGroupTable(call, launch, ctx, cancel))}, nil
 }
 
-func defaultSyncTaskLauncher(call ScriptFunctionCaller) SyncTaskLauncher {
+func defaultSyncTaskLauncher(call ScriptFunctionCaller) syncrt.TaskLauncher {
 	return func(fn Value, args []Value, done func(error)) {
 		go func() {
 			var err error
@@ -152,7 +150,7 @@ func waitGroupAdd(state *scriptWaitGroup, delta int) (err error) {
 	return stdlibsync.AddWaitGroup(&state.wg, delta)
 }
 
-func newScriptTaskGroupTable(call ScriptFunctionCaller, launch SyncTaskLauncher, ctx, cancel Value) *Table {
+func newScriptTaskGroupTable(call ScriptFunctionCaller, launch syncrt.TaskLauncher, ctx, cancel Value) *Table {
 	state := &scriptTaskGroup{ctx: ctx, cancel: cancel, call: call}
 	if launch == nil {
 		launch = defaultSyncTaskLauncher(func(Value, []Value) ([]Value, error) {
