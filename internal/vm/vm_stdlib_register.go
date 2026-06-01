@@ -13,6 +13,7 @@ import (
 	tablelib "github.com/never-labs/gscript/internal/stdlib/table"
 	"github.com/never-labs/gscript/internal/stdlibrt/host"
 	stdlibinstall "github.com/never-labs/gscript/internal/stdlibrt/install"
+	llmrt "github.com/never-labs/gscript/internal/stdlibrt/llm"
 	"github.com/never-labs/gscript/internal/stdlibrt/modules"
 )
 
@@ -701,7 +702,7 @@ func (vm *VM) RegisterStringLib() {
 }
 
 func (vm *VM) RegisterLLMLib() {
-	modules.InstallLLM(vm.newStdlibInstallContext(), modules.LLMOptions{
+	modules.InstallLLM(vm.newStdlibInstallContext(), llmrt.Options{
 		Call: vm.callValue,
 		Provider: func() runtime.LLMProvider {
 			return vm.llmProvider

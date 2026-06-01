@@ -5,19 +5,10 @@ import (
 	goruntime "runtime"
 
 	"github.com/never-labs/gscript/internal/runtime"
+	testkitrt "github.com/never-labs/gscript/internal/stdlibrt/testkit"
 )
 
-type TestkitRuntime interface {
-	TestkitAccessEnabled() bool
-	TestkitMemorySnapshot() *runtime.Table
-}
-
-type TestkitOptions struct {
-	Runtime TestkitRuntime
-	Call    runtime.ScriptFunctionCaller
-}
-
-func BuildTestkit(opts TestkitOptions) *runtime.Table {
+func BuildTestkit(opts testkitrt.Options) *runtime.Table {
 	t := runtime.NewTable()
 	tk := opts.Runtime
 

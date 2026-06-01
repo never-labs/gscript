@@ -4,13 +4,14 @@ import (
 	"testing"
 
 	"github.com/never-labs/gscript/internal/runtime"
+	testkitrt "github.com/never-labs/gscript/internal/stdlibrt/testkit"
 )
 
 func testkitInterp(t *testing.T, src string) *runtime.Interpreter {
 	t.Helper()
 	interp := runtime.NewCore()
 	interp.InstallRuntimeStdlib()
-	installTestModule(interp, "testkit", runtime.TableValue(BuildTestkit(TestkitOptions{
+	installTestModule(interp, "testkit", runtime.TableValue(BuildTestkit(testkitrt.Options{
 		Runtime: interp,
 		Call:    interp.CallFunction,
 	})))

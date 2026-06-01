@@ -5,7 +5,9 @@ import (
 
 	"github.com/never-labs/gscript/internal/runtime"
 	"github.com/never-labs/gscript/internal/stdlibrt/host"
+	llmrt "github.com/never-labs/gscript/internal/stdlibrt/llm"
 	"github.com/never-labs/gscript/internal/stdlibrt/modules"
+	testkitrt "github.com/never-labs/gscript/internal/stdlibrt/testkit"
 )
 
 // Install registers the standard library on interp.
@@ -126,7 +128,7 @@ func InstallLLM(interp *runtime.Interpreter) {
 	if interp == nil {
 		return
 	}
-	modules.InstallLLM(interpreterInstaller{interp: interp}, modules.LLMOptions{
+	modules.InstallLLM(interpreterInstaller{interp: interp}, llmrt.Options{
 		Call: interp.CallFunction,
 		Provider: func() runtime.LLMProvider {
 			return interp.LLMProvider()
@@ -155,7 +157,7 @@ func InstallDebugAndTestkit(interp *runtime.Interpreter) {
 	}
 	installer := interpreterInstaller{interp: interp}
 	installer.RegisterTable("debug", modules.BuildDebug(interp))
-	installer.RegisterTable("testkit", modules.BuildTestkit(modules.TestkitOptions{
+	installer.RegisterTable("testkit", modules.BuildTestkit(testkitrt.Options{
 		Runtime: interp,
 		Call:    interp.CallFunction,
 	}))
