@@ -7,6 +7,8 @@ import (
 
 // ClassifyLLMProviderError returns a stable diagnostic category for provider
 // errors without inspecting prompts, messages, or tokens.
+//
+// Deprecated: use llm.ClassifyProviderError from github.com/never-labs/gscript/llm.
 func ClassifyLLMProviderError(err error) string {
 	return llm.ClassifyProviderError(err)
 }
@@ -48,6 +50,9 @@ func WithLLMReplay(records []llm.Record) Option {
 // WithLLMCommand installs a simple command-backed provider. It is intended for
 // local tooling and tests. The prompt is rendered from the request messages and
 // passed as the final command argument.
+//
+// Deprecated: use WithLLMProvider with command.Provider from
+// github.com/never-labs/gscript/llm/command.
 func WithLLMCommand(command string, args ...string) Option {
 	return WithLLMProvider(llmcommand.Provider{Command: command, Args: args})
 }
