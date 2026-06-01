@@ -85,9 +85,14 @@ Start with:
 - [Security reference](docs/reference/security/index.md)
 - [Performance reference](docs/reference/performance/index.md)
 - [Examples](docs/examples/index.md)
+- [Security policy](SECURITY.md)
+- [Contributing](CONTRIBUTING.md)
 
 ## Project Status
 
 Leia is under active development. The stable contract is the language spec plus
 feature matrix and release gates. Experimental behavior should be documented as
 such before users depend on it.
+
+No license has been selected in this repository yet. Do not assume redistribution
+or production adoption rights until a root `LICENSE` file is added.

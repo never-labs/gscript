@@ -45,6 +45,10 @@ only.
   product area.
 - [Testing and release gates](testing.md): correctness, docs, and release
   evidence.
+- [Security policy](../SECURITY.md): supported versions, reporting route, and
+  untrusted-script baseline.
+- [Contributing](../CONTRIBUTING.md): local checks, change expectations, and PR
+  checklist.
 
 ## Documentation Policy
 
