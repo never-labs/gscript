@@ -110,6 +110,7 @@ type vmOptions struct {
 	capabilities       CapabilityFlags
 	requirePath        string
 	moduleCollections  map[string]string
+	moduleReplaces     map[string]string
 	filesystemRoot     string
 	dynamicEval        bool
 	environmentVars    []string
@@ -452,6 +453,21 @@ func WithModuleCollection(name, root string) Option {
 			o.moduleCollections = make(map[string]string)
 		}
 		o.moduleCollections[name] = root
+	}
+}
+
+// WithModuleReplace maps a module path prefix to a local filesystem root.
+// require("example.com/lib/foo") resolves as ROOT/foo.gs when the prefix is
+// example.com/lib. This is the runtime side of gscript.mod replace directives.
+func WithModuleReplace(path, root string) Option {
+	return func(o *vmOptions) {
+		if path == "" || root == "" {
+			return
+		}
+		if o.moduleReplaces == nil {
+			o.moduleReplaces = make(map[string]string)
+		}
+		o.moduleReplaces[path] = root
 	}
 }
 

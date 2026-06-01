@@ -57,6 +57,27 @@ unknown thing
 	}
 }
 
+func TestParseRejectsDuplicateRequirePathWithDifferentVersion(t *testing.T) {
+	_, diags := Parse("gscript.mod", strings.NewReader(`module example.com/app
+gs 0.1
+require example.com/lib v1.0.0
+require example.com/lib v2.0.0
+`))
+	if len(diags) == 0 {
+		t.Fatal("Parse diagnostics = nil, want duplicate require diagnostic")
+	}
+	found := false
+	for _, diag := range diags {
+		if strings.Contains(diag.Message, "duplicate require for example.com/lib") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("Parse diagnostics = %#v, want duplicate require path diagnostic", diags)
+	}
+}
+
 func TestAddRequireUpdatesExistingPath(t *testing.T) {
 	f := File{Module: "example.com/app"}
 	var err error

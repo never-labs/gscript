@@ -25,6 +25,7 @@ type Interpreter struct {
 	stringMeta         *Table              // metatable for string values (__index → string lib)
 	scriptDir          string              // directory of the main script (for require path resolution)
 	moduleCollections  map[string]string   // collection prefix -> filesystem root for require("name:pkg")
+	moduleReplaces     map[string]string   // module path prefix -> filesystem root for gscript.mod replace
 	moduleLoading      bool                // require() may load .gs files from the filesystem
 	filesystemEnabled  bool                // script-side file APIs may access the filesystem
 	filesystemRead     bool                // fs read operations are enabled
@@ -224,6 +225,16 @@ func (interp *Interpreter) SetModuleCollection(name, root string) {
 	interp.moduleCollections[name] = root
 }
 
+func (interp *Interpreter) SetModuleReplace(path, root string) {
+	if path == "" || root == "" {
+		return
+	}
+	if interp.moduleReplaces == nil {
+		interp.moduleReplaces = make(map[string]string)
+	}
+	interp.moduleReplaces[path] = root
+}
+
 func (interp *Interpreter) resolveModulePath(name string) string {
 	if idx := strings.Index(name, ":"); idx > 0 && interp.moduleCollections != nil {
 		prefix := name[:idx]
@@ -232,7 +243,35 @@ func (interp *Interpreter) resolveModulePath(name string) string {
 			return filepath.Join(root, rest)
 		}
 	}
+	if replaced := resolveReplacedModulePath(name, interp.moduleReplaces); replaced != "" {
+		return replaced
+	}
 	return interp.resolveScriptPath(strings.ReplaceAll(name, ".", "/") + ".gs")
+}
+
+func resolveReplacedModulePath(name string, replacements map[string]string) string {
+	var bestPath, bestRoot string
+	for path, root := range replacements {
+		if name != path && !strings.HasPrefix(name, path+"/") {
+			continue
+		}
+		if len(path) > len(bestPath) {
+			bestPath = path
+			bestRoot = root
+		}
+	}
+	if bestPath == "" {
+		return ""
+	}
+	if name == bestPath {
+		if filepath.Ext(bestRoot) == ".gs" {
+			return bestRoot
+		}
+		return bestRoot + ".gs"
+	}
+	rest := strings.TrimPrefix(name[len(bestPath):], "/")
+	rest = strings.ReplaceAll(rest, ".", "/") + ".gs"
+	return filepath.Join(bestRoot, rest)
 }
 
 // SetModuleLoading controls whether require() may load .gs files from the

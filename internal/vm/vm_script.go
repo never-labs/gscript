@@ -277,7 +277,35 @@ func (vm *VM) resolveModulePath(name string) string {
 			return filepath.Join(root, rest)
 		}
 	}
+	if replaced := resolveReplacedModulePath(name, vm.moduleReplaces); replaced != "" {
+		return replaced
+	}
 	return vm.resolveScriptPath(strings.ReplaceAll(name, ".", "/") + ".gs")
+}
+
+func resolveReplacedModulePath(name string, replacements map[string]string) string {
+	var bestPath, bestRoot string
+	for path, root := range replacements {
+		if name != path && !strings.HasPrefix(name, path+"/") {
+			continue
+		}
+		if len(path) > len(bestPath) {
+			bestPath = path
+			bestRoot = root
+		}
+	}
+	if bestPath == "" {
+		return ""
+	}
+	if name == bestPath {
+		if filepath.Ext(bestRoot) == ".gs" {
+			return bestRoot
+		}
+		return bestRoot + ".gs"
+	}
+	rest := strings.TrimPrefix(name[len(bestPath):], "/")
+	rest = strings.ReplaceAll(rest, ".", "/") + ".gs"
+	return filepath.Join(bestRoot, rest)
 }
 
 func (vm *VM) resolveScriptPathWithDir(filename string, dir string) string {
@@ -307,6 +335,16 @@ func (vm *VM) SetModuleCollection(name, root string) {
 		vm.moduleCollections = make(map[string]string)
 	}
 	vm.moduleCollections[name] = root
+}
+
+func (vm *VM) SetModuleReplace(path, root string) {
+	if path == "" || root == "" {
+		return
+	}
+	if vm.moduleReplaces == nil {
+		vm.moduleReplaces = make(map[string]string)
+	}
+	vm.moduleReplaces[path] = root
 }
 
 // Execute runs a top-level function prototype.

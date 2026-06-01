@@ -155,6 +155,9 @@ func newVM(o vmOptions) *VM {
 	for name, root := range o.moduleCollections {
 		interp.SetModuleCollection(name, root)
 	}
+	for path, root := range o.moduleReplaces {
+		interp.SetModuleReplace(path, root)
+	}
 	if o.argsSet {
 		interp.SetArgs(o.argScript, o.args)
 	}
@@ -252,6 +255,9 @@ func (vm *VM) RunContext(ctx context.Context, prog *Program) error {
 			bvm.SetScriptDir(vm.interp.ScriptDir())
 			for name, root := range vm.opts.moduleCollections {
 				bvm.SetModuleCollection(name, root)
+			}
+			for path, root := range vm.opts.moduleReplaces {
+				bvm.SetModuleReplace(path, root)
 			}
 			bvm.RestrictStdlib(stdlibAllowedNames(vm.opts.libs))
 			vm.applyBytecodeCapabilities(bvm)

@@ -40,6 +40,16 @@ func ModuleOptionsForScript(script string) []Option {
 		}
 		opts = append(opts, WithModuleCollection(col.Name, root))
 	}
+	for _, rep := range manifest.Replace {
+		if !isLocalModulePath(rep.NewPath) {
+			continue
+		}
+		root := rep.NewPath
+		if !filepath.IsAbs(root) {
+			root = filepath.Join(dir, root)
+		}
+		opts = append(opts, WithModuleReplace(rep.Path, root))
+	}
 	return opts
 }
 
@@ -59,4 +69,8 @@ func findModuleFile(start string) (string, string, bool) {
 		}
 		dir = parent
 	}
+}
+
+func isLocalModulePath(path string) bool {
+	return strings.HasPrefix(path, ".") || filepath.IsAbs(path)
 }

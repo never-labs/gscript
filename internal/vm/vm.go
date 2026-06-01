@@ -102,6 +102,7 @@ type VM struct {
 	debugBusy            bool
 	scriptDir            string
 	moduleCollections    map[string]string
+	moduleReplaces       map[string]string
 	maxSteps             int64 // <=0 means unlimited
 	steps                int64
 	maxNativeCalls       int64 // <=0 means unlimited
@@ -1040,6 +1041,7 @@ func newIsolatedChildVM(parent *VM) *VM {
 	child.RegisterLoaderLib()
 	child.scriptDir = parent.scriptDir
 	child.moduleCollections = cloneStringMap(parent.moduleCollections)
+	child.moduleReplaces = cloneStringMap(parent.moduleReplaces)
 	runtime.RegisterVM(child)
 	child.attachIsolatedChildJIT(parent)
 	return child

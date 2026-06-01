@@ -573,11 +573,11 @@ def suspicious_kernel_wins(
                     f"- `{row.benchmark}`: baseline win lacks a comparable `{related.benchmark}` "
                     "LuaJIT related workload result."
                 )
-            elif v_ratio >= args.variant_confirm_ratio:
+            elif related_ratio >= args.related_confirm_ratio:
                 lines.append(
                     f"- `{row.benchmark}`: baseline beats LuaJIT by {fmt_ratio(1.0 / lj_ratio)}, "
-                    f"but `{variant.benchmark}` is {fmt_ratio(v_ratio)} of LuaJIT "
-                    "(variant does not confirm the win)."
+                    f"but `{related.benchmark}` is {fmt_ratio(related_ratio)} of LuaJIT "
+                    "(related workload does not confirm the win)."
                 )
     return lines
 
@@ -758,7 +758,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--dry-run", action="store_true", help="build no binary and run no benchmarks")
     parser.add_argument("--suspicious-vm-speedup", type=float, default=2.0)
     parser.add_argument("--suspicious-luajit-ratio", type=float, default=0.75)
-    parser.add_argument("--variant-confirm-ratio", type=float, default=0.95)
+    parser.add_argument("--related-confirm-ratio", type=float, default=0.95)
     parser.add_argument("--json", type=Path, default=Path("benchmarks/data/strict_guard_latest.json"))
     parser.add_argument("--markdown", type=Path, default=Path("benchmarks/data/strict_guard_latest.md"))
     parser.add_argument("--keep-bin", action="store_true", help="keep temporary gscript binary")

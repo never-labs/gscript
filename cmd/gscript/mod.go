@@ -2,14 +2,10 @@ package main
 
 import (
 	"encoding/json"
-	"errors"
 	"flag"
 	"fmt"
 	"io"
-	"os"
-	"path/filepath"
 
-	"github.com/never-labs/gscript/internal/modfile"
 	"github.com/never-labs/gscript/internal/modpkg"
 )
 
@@ -56,28 +52,8 @@ func runModInitCommand(args []string, outw, errw io.Writer) int {
 		fmt.Fprintln(errw, "usage: gscript mod init [--module PATH] [--dir DIR]")
 		return 2
 	}
-	absDir, err := filepath.Abs(*dir)
+	path, err := modpkg.Init(modpkg.InitOptions{Module: *module, Dir: *dir})
 	if err != nil {
-		fmt.Fprintf(errw, "gscript mod init: %v\n", err)
-		return 1
-	}
-	if *module == "" {
-		*module = filepath.Base(absDir)
-	}
-	if err := os.MkdirAll(absDir, 0755); err != nil {
-		fmt.Fprintf(errw, "gscript mod init: %v\n", err)
-		return 1
-	}
-	path := filepath.Join(absDir, modfile.FileName)
-	if _, err := os.Stat(path); err == nil {
-		fmt.Fprintf(errw, "gscript mod init: %s already exists\n", path)
-		return 1
-	} else if err != nil && !errors.Is(err, os.ErrNotExist) {
-		fmt.Fprintf(errw, "gscript mod init: %v\n", err)
-		return 1
-	}
-	data := modfile.Format(modfile.File{Module: *module, GS: "0.1"})
-	if err := os.WriteFile(path, data, 0644); err != nil {
 		fmt.Fprintf(errw, "gscript mod init: %v\n", err)
 		return 1
 	}

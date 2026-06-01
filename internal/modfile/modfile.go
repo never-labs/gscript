@@ -72,7 +72,7 @@ func DropRequire(f File, path string) File {
 func Parse(name string, r io.Reader) (File, []Diagnostic) {
 	var f File
 	var diags []Diagnostic
-	seenRequire := map[string]bool{}
+	seenRequire := map[string]int{}
 	seenCollection := map[string]bool{}
 
 	scanner := bufio.NewScanner(r)
@@ -112,12 +112,11 @@ func Parse(name string, r io.Reader) (File, []Diagnostic) {
 				diags = append(diags, diag(lineNo, "invalid require path"))
 				continue
 			}
-			key := fields[1] + "@" + fields[2]
-			if seenRequire[key] {
-				diags = append(diags, diag(lineNo, "duplicate require"))
+			if prevLine, ok := seenRequire[fields[1]]; ok {
+				diags = append(diags, diag(lineNo, fmt.Sprintf("duplicate require for %s; first declared on line %d", fields[1], prevLine)))
 				continue
 			}
-			seenRequire[key] = true
+			seenRequire[fields[1]] = lineNo
 			f.Require = append(f.Require, Require{Path: fields[1], Version: fields[2]})
 		case "replace":
 			idx := indexField(fields, "=>")

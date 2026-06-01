@@ -54,6 +54,11 @@ type Diagnostic struct {
 	File     string `json:"file,omitempty"`
 }
 
+type InitOptions struct {
+	Module string
+	Dir    string
+}
+
 type SumReport struct {
 	SchemaVersion int          `json:"schema_version"`
 	OK            bool         `json:"ok"`
@@ -71,6 +76,35 @@ type SumEntry struct {
 }
 
 var requireStringRE = regexp.MustCompile(`require\s*\(\s*"([^"]+)"\s*\)`)
+
+func Init(opts InitOptions) (string, error) {
+	dir := opts.Dir
+	if dir == "" {
+		dir = "."
+	}
+	absDir, err := filepath.Abs(dir)
+	if err != nil {
+		return "", err
+	}
+	module := opts.Module
+	if module == "" {
+		module = filepath.Base(absDir)
+	}
+	if err := os.MkdirAll(absDir, 0755); err != nil {
+		return "", err
+	}
+	path := filepath.Join(absDir, modfile.FileName)
+	if _, err := os.Stat(path); err == nil {
+		return path, fmt.Errorf("%s already exists", path)
+	} else if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return path, err
+	}
+	data := modfile.Format(modfile.File{Module: module, GS: "0.1"})
+	if err := os.WriteFile(path, data, 0644); err != nil {
+		return path, err
+	}
+	return path, nil
+}
 
 func AddRequirements(dir string, targets []string) (string, error) {
 	manifest, path, err := ReadFileWithPath(dir)
