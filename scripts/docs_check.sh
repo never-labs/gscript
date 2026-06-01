@@ -13,7 +13,7 @@ Usage: scripts/docs_check.sh [--help]
 Checks README/docs Markdown for:
   - relative .md links whose target file exists;
   - fenced code blocks that mention release scripts whose files exist and are executable.
-  - non-archive docs do not reintroduce retired GScript-era names.
+  - non-archive docs do not reintroduce retired project names.
   - release-readiness docs keep machine-checkable language and AI-native gates.
 
 The release-script check covers:
@@ -164,9 +164,7 @@ def check_retired_names(path: Path) -> None:
         if not retired_name_re.search(line):
             continue
         checked_retired_names += 1
-        errors.append(
-            f"{rel}:{line_no}: references retired GScript-era naming; use Leia naming"
-        )
+        errors.append(f"{rel}:{line_no}: references retired project naming; use Leia naming")
 
 
 def check_script_mentions(path: Path) -> None:
