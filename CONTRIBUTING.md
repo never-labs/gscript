@@ -20,7 +20,7 @@ Focused loops:
 ```bash
 go run ./cmd/leia fmt --check tests/smoke/01_basic.leia
 go run ./cmd/leia lint tests/smoke/01_basic.leia
-go run ./cmd/leia test tests/smoke
+go run ./cmd/leia test tests/smoke/01_basic.leia
 bash scripts/docs_check.sh
 ```
 

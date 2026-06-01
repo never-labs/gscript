@@ -415,6 +415,7 @@ func TestReleaseMatrixDocumentedSmokeCommandsStayRunnable(t *testing.T) {
 	root := findRepoRoot(t)
 	for _, path := range []string{
 		"README.md",
+		"CONTRIBUTING.md",
 		"docs/tutorial/getting-started.md",
 		"docs/guides/tooling.md",
 	} {
