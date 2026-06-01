@@ -233,6 +233,7 @@ def check_release_gate_docs() -> None:
             "docs/reference/stdlib/index.md",
             "docs/reference/security/index.md",
             "docs/reference/performance/index.md",
+            "choose a license and add a root `LICENSE` file",
         ],
     )
     require_snippets(

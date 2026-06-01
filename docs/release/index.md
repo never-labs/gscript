@@ -34,3 +34,14 @@ The release evidence should cite:
 
 Before a public tag, update install instructions, examples, compatibility
 notes, known issues, benchmark caveats, and security notes.
+
+## Public Release Blockers
+
+Do not cut a public release until these repository-level decisions are complete:
+
+- choose a license and add a root `LICENSE` file;
+- confirm the vulnerability reporting route in `SECURITY.md`;
+- verify install commands against the published module path;
+- run release evidence on the target platforms;
+- document any experimental language, stdlib, AI, package, or JIT behavior that
+  is intentionally outside the compatibility promise.
