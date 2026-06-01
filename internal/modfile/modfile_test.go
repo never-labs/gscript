@@ -56,3 +56,19 @@ unknown thing
 		t.Fatalf("diagnostics = %#v, want 4", diags)
 	}
 }
+
+func TestAddRequireUpdatesExistingPath(t *testing.T) {
+	f := File{Module: "example.com/app"}
+	var err error
+	f, err = AddRequire(f, Require{Path: "example.com/lib", Version: "v0.1.0"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	f, err = AddRequire(f, Require{Path: "example.com/lib", Version: "v0.2.0"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(f.Require) != 1 || f.Require[0].Version != "v0.2.0" {
+		t.Fatalf("requires = %#v", f.Require)
+	}
+}

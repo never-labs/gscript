@@ -78,3 +78,140 @@ func TestModVerifyReportsMissingManifest(t *testing.T) {
 		t.Fatalf("verify = %+v, want missing manifest diagnostic", verify)
 	}
 }
+
+func TestModAddAndTidy(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "main.gs"), []byte(`net := require("example.com/lib/net")
+json := require("json")
+localMod := require("pkg.helper")
+vendored := require("vendor:foo")
+`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "gscript.mod"), []byte(`module example.com/demo
+gs 0.1
+require example.com/lib v0.1.0
+require example.com/unused v9.9.9
+collection vendor ./vendor
+`), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runModCommand([]string{"add", "--dir", dir, "example.com/lib@v0.2.0"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("mod add code = %d, stderr = %q", code, stderr.String())
+	}
+	manifestBytes, err := os.ReadFile(filepath.Join(dir, "gscript.mod"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := string(manifestBytes); !strings.Contains(got, "require example.com/lib v0.2.0") {
+		t.Fatalf("manifest after add = %q", got)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = runModCommand([]string{"tidy", "--json", "--dir", dir}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("mod tidy code = %d, stderr = %q stdout = %q", code, stderr.String(), stdout.String())
+	}
+	var tidy modTidyReport
+	if err := json.Unmarshal(stdout.Bytes(), &tidy); err != nil {
+		t.Fatalf("stdout is not JSON tidy report: %v; stdout = %q", err, stdout.String())
+	}
+	if !tidy.OK || !containsString(tidy.Removed, "example.com/unused") || len(tidy.Missing) != 0 {
+		t.Fatalf("tidy = %+v, want removed unused and no missing", tidy)
+	}
+	manifestBytes, err = os.ReadFile(filepath.Join(dir, "gscript.mod"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := string(manifestBytes)
+	if strings.Contains(got, "example.com/unused") {
+		t.Fatalf("manifest after tidy still contains unused require: %q", got)
+	}
+	if strings.Contains(got, "json") || strings.Contains(got, "vendor:foo") || strings.Contains(got, "pkg.helper") {
+		t.Fatalf("manifest after tidy added non-third-party require: %q", got)
+	}
+}
+
+func TestModTidyReportsMissingExternalRequire(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "main.gs"), []byte(`lib := require("example.com/lib/net")`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "gscript.mod"), []byte("module example.com/demo\ngs 0.1\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runModCommand([]string{"tidy", "--json", "--dir", dir}, &stdout, &stderr)
+	if code != 1 {
+		t.Fatalf("mod tidy code = %d, want 1; stderr=%q stdout=%q", code, stderr.String(), stdout.String())
+	}
+	var tidy modTidyReport
+	if err := json.Unmarshal(stdout.Bytes(), &tidy); err != nil {
+		t.Fatalf("stdout is not JSON tidy report: %v; stdout = %q", err, stdout.String())
+	}
+	if tidy.OK || !containsString(tidy.Missing, "example.com/lib/net") {
+		t.Fatalf("tidy = %+v, want missing external require", tidy)
+	}
+}
+
+func TestModVerifyReportsMissingExternalRequire(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "main.gs"), []byte(`lib := require("example.com/lib/net")`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "gscript.mod"), []byte("module example.com/demo\ngs 0.1\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runModCommand([]string{"verify", "--json", dir}, &stdout, &stderr)
+	if code != 1 {
+		t.Fatalf("mod verify code = %d, want 1; stderr=%q stdout=%q", code, stderr.String(), stdout.String())
+	}
+	var verify modVerifyReport
+	if err := json.Unmarshal(stdout.Bytes(), &verify); err != nil {
+		t.Fatalf("stdout is not JSON verify report: %v; stdout = %q", err, stdout.String())
+	}
+	if verify.OK || len(verify.Diagnostics) == 0 || verify.Diagnostics[0].Code != "GS9106" {
+		t.Fatalf("verify = %+v, want missing require diagnostic", verify)
+	}
+}
+
+func TestModVerifyChecksLocalCollectionsAndReplaces(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "main.gs"), []byte(`vendored := require("vendor:foo")`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "gscript.mod"), []byte(`module example.com/demo
+gs 0.1
+require example.com/lib v0.1.0
+replace example.com/lib => ./missing-lib
+collection vendor ./missing-vendor
+`), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runModCommand([]string{"verify", "--json", dir}, &stdout, &stderr)
+	if code != 1 {
+		t.Fatalf("mod verify code = %d, want 1; stderr=%q stdout=%q", code, stderr.String(), stdout.String())
+	}
+	var verify modVerifyReport
+	if err := json.Unmarshal(stdout.Bytes(), &verify); err != nil {
+		t.Fatalf("stdout is not JSON verify report: %v; stdout = %q", err, stdout.String())
+	}
+	count := 0
+	for _, diag := range verify.Diagnostics {
+		if diag.Code == "GS9107" {
+			count++
+		}
+	}
+	if count != 2 {
+		t.Fatalf("verify diagnostics = %+v, want two local path diagnostics", verify.Diagnostics)
+	}
+}

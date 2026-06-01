@@ -41,6 +41,34 @@ type Diagnostic struct {
 	Message string
 }
 
+func AddRequire(f File, req Require) (File, error) {
+	if !validModulePath(req.Path) {
+		return f, fmt.Errorf("invalid require path")
+	}
+	if strings.TrimSpace(req.Version) == "" {
+		return f, fmt.Errorf("require version is required")
+	}
+	for i := range f.Require {
+		if f.Require[i].Path == req.Path {
+			f.Require[i].Version = req.Version
+			return f, nil
+		}
+	}
+	f.Require = append(f.Require, req)
+	return f, nil
+}
+
+func DropRequire(f File, path string) File {
+	out := f.Require[:0]
+	for _, req := range f.Require {
+		if req.Path != path {
+			out = append(out, req)
+		}
+	}
+	f.Require = out
+	return f
+}
+
 func Parse(name string, r io.Reader) (File, []Diagnostic) {
 	var f File
 	var diags []Diagnostic
