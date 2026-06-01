@@ -253,6 +253,8 @@ raw := `line\n`</code></pre>
  &lt;- ... . , ; : ( ) [ ] { }</code></pre>
 <p>The parser may reject a token sequence even when each token is lexically valid. For example, <code>a + * b</code> is lexically valid as tokens but invalid as an expression.</p></section><section><h2 id="declarations-and-scope">Declarations And Scope</h2>
 <p>Leia uses lexical scope. A declaration binds an identifier in the innermost enclosing block or module scope according to the declaration form.</p>
+<p>A binding is visible from its declaration point through the end of the block that owns it, including nested blocks and function literals created in that region. A use before the declaration point does not see the later binding. Module-scope declarations are visible to later module-scope code and to nested blocks in the same module.</p>
+<p>An inner declaration may shadow an outer binding with the same name. While the inner binding is in scope, unqualified uses resolve to the inner binding. The outer binding remains alive if it is captured or otherwise still reachable, but it is not directly addressable by that name until the inner scope ends.</p>
 <h3 id="declarations-and-scope-variables">Variables</h3>
 <p>Assignment with <code>:=</code> introduces local bindings. Assignment with <code>=</code> updates existing targets. Multiple assignment adjusts values according to the multi-return rules in <a href="#">Expressions</a>.</p>
 <pre><code>x := 1
@@ -265,6 +267,16 @@ if true {
 
 print(x) // 2</code></pre>
 <p>The inner <code>x</code> shadows the outer <code>x</code> only inside the block.</p>
+<p><code>:=</code> creates bindings in the current lexical block. Reusing a name that is already declared in an outer block creates a new shadowing binding; it does not update the outer binding. Use <code>=</code> to update an existing visible binding.</p>
+<pre><code>value := 1
+
+{
+    value := 2 // new binding in this block
+    value = 3  // updates the inner binding
+}
+
+// value is still 1 here</code></pre>
+<p>Same-block redeclaration is reserved by the v1.0 contract: portable programs must not declare the same identifier twice in one lexical block unless a later spec section explicitly permits a narrower form. A declaration may not shadow a label because labels use a separate function-level namespace.</p>
 <h3 id="declarations-and-scope-constants">Constants</h3>
 <pre><code>const_decl = &quot;const&quot; identifier ( &quot;=&quot; | &quot;:=&quot; ) expr ;</code></pre>
 <p>A const binding may not be rebound. Const does not freeze the internals of a mutable value such as a table.</p>
@@ -273,6 +285,7 @@ print(x) // 2</code></pre>
 
 const settings := { retries: 3 }
 settings.retries = 4 // valid: table contents remain mutable</code></pre>
+<p>Const visibility and shadowing follow the ordinary lexical binding rules. An inner declaration may shadow an outer const, but code that resolves to the const binding may not assign to that binding with <code>=</code>, compound assignment, or increment/decrement forms.</p>
 <h3 id="declarations-and-scope-functions">Functions</h3>
 <pre><code>func_decl = &quot;func&quot; identifier param_list block ;</code></pre>
 <p>A function declaration binds the function value to the declared name in the enclosing scope. Function bodies capture lexical bindings by reference.</p>
@@ -285,9 +298,12 @@ func bump() {
     total = total + 1
     return total
 }</code></pre>
+<p>The function name is bound in the enclosing scope before the function body is evaluated, so the body may refer to the function for recursion. Parameters are local bindings in the function body. They shadow outer bindings with the same names for the entire body.</p>
+<p>Function declarations follow the same same-block redeclaration portability rule as other declarations. A nested function declaration may shadow an outer function or variable name in its own block.</p>
 <h3 id="declarations-and-scope-imports">Imports</h3>
 <pre><code>import_decl = &quot;import&quot; string_lit &quot;as&quot; identifier ;</code></pre>
 <p><code>import &quot;go:...&quot; as name</code> declares an explicit host-provided Go binding. The source path does not reflect arbitrary Go packages by itself; the embedder must provide an allowlisted binding through the Go API.</p>
+<p>The import alias is a lexical binding in the declaration&#x27;s scope. It may be shadowed by an inner declaration. Portable programs must avoid same-block alias conflicts.</p>
 <h3 id="declarations-and-scope-labels">Labels</h3>
 <p>Labels are declared with <code>::name::</code>. Label names live in a function-level label namespace. A <code>goto</code> must not jump into a deeper lexical scope or over a local declaration.</p>
 <pre><code>i := 0
@@ -318,10 +334,41 @@ if i &lt; 3 {
 if &quot;&quot; {
     print(&quot;empty strings are truthy&quot;)
 }</code></pre>
-<p>Numbers are represented as integers or floating-point values where possible. Arithmetic may preserve integer representation when exact and fall back to floating-point or boxed runtime operations. JIT raw integer representations are not observable.</p>
-<p>Strings are immutable byte strings. Library functions may interpret strings as UTF-8, paths, JSON, or protocol data when their module contract says so.</p>
+<p>Numbers have one script-visible category, <code>number</code>, with integer and floating-point subtypes observable through <code>math.type</code>.</p>
+<p>Integer literals may be decimal or use the <code>0x</code>, <code>0b</code>, and <code>0o</code> prefixes specified in <a href="#">Lexical Elements</a>. The portable exact integer range for ordinary values is at least signed 48-bit two&#x27;s-complement: <code>-140737488355328</code> through <code>140737488355327</code>. Implementations may preserve larger integer values in host APIs, libraries, or optimized paths, but portable programs must not depend on exact integer subtype preservation outside that range unless a module contract says so.</p>
+<p>Floating-point literals use IEEE-754 binary64 semantics. Decimal and exponent forms such as <code>1.25</code>, <code>.5</code>, <code>1.</code>, and <code>1e3</code> are accepted where the lexer recognizes them. Finite binary64 values have 53 bits of integer precision; <code>math.huge</code>, infinities, and NaN follow the runtime math library contract.</p>
+<p>Arithmetic may preserve integer representation when exact and fall back to floating-point or boxed runtime operations. JIT raw integer representations are not observable.</p>
+<pre><code>assert(type(1) == &quot;number&quot;)
+assert(math.type(1) == &quot;integer&quot;)
+assert(math.type(1.5) == &quot;float&quot;)
+assert(0xff == 255)
+assert(0b1010 == 10)
+assert(0o755 == 493)
+assert(0.2e2 == 20)</code></pre>
+<p>Strings are immutable byte strings. String operations produce new strings or views specified by their library contract; they do not mutate existing string values. Library functions may interpret strings as UTF-8, paths, JSON, or protocol data when their module contract says so.</p>
+<pre><code>s := &quot;abc&quot;
+t := s .. &quot;d&quot;
+assert(s == &quot;abc&quot;)
+assert(t == &quot;abcd&quot;)
+assert(#&quot;A&quot; == 1)</code></pre>
 <p>Tables are mutable identity-bearing key/value objects. Arrays, records, dense vectors, matrices, and SOA layouts are optimized representations or standard library structures unless a future spec promotes them to primitive value categories.</p>
-<p>Functions are callable values. Host functions and script functions share call semantics but may differ in performance, resource accounting, and recoverable host error behavior.</p>
+<p>Functions are callable identity-bearing values. Script functions close over their lexical environment. Host functions and script functions share script-visible call, argument adjustment, multi-return, and protected-call semantics, but may differ in performance, resource accounting, and recoverable host error behavior. Functions compare by identity unless a host-backed value documents a narrower comparison rule.</p>
+<p>Channels are identity-bearing synchronization values created by the runtime or host libraries. Channel sends and receives transfer ordinary Leia values without copying table/function/channel identity. Equality compares channel identity. A receive from a closed channel yields the channel contract&#x27;s closed result; sends to a closed channel raise a runtime error unless protected.</p>
+<pre><code>func makeCounter() {
+    n := 0
+    return func() {
+        n = n + 1
+        return n
+    }
+}
+
+counter := makeCounter()
+same := counter
+other := makeCounter()
+assert(counter == same)
+assert(counter != other)
+assert(counter() == 1)
+assert(counter() == 2)</code></pre>
 <p>The <code>type</code> function reports the stable script-visible category for ordinary values.</p>
 <pre><code>type(nil)     // &quot;nil&quot;
 type(true)    // &quot;boolean&quot;
@@ -373,8 +420,16 @@ same := user.name == user[&quot;name&quot;]
 user[&quot;score&quot;] = 10</code></pre>
 <p>Metamethods may affect indexing, assignment, calls, arithmetic, comparison, and length behavior as specified in <a href="#">Tables And Metatables</a>.</p>
 <h3 id="expressions-operators">Operators</h3>
-<p>Numeric operators accept numbers and strings that <code>tonumber</code> can parse as numbers. Invalid numeric strings and unsupported operand types raise runtime errors unless a matching metamethod applies. Library functions such as <code>tonumber</code>, <code>tostring</code>, <code>math.tointeger</code>, and formatting helpers expose the same conversions explicitly.</p>
-<p>| Operator family | Stable behavior | |---|---| | <code>+ - * / % **</code> | Numeric arithmetic. Numeric strings are converted before the operation. Integer operands may keep integer representation when the operation is exact; otherwise results may be floating-point. Unsupported operands raise a runtime error unless a matching arithmetic metamethod applies. | | unary <code>-</code> | Numeric negation or <code>__unm</code> on values with a metatable handler. | | <code>..</code> | String concatenation. Non-string primitive operands may be converted using <code>tostring</code> according to the runtime string contract; table-like operands may use <code>__concat</code>. | | <code>#</code> | Length operation. Strings return byte length. Tables use ordinary sequence/metatable length behavior; <code>rawlen</code> bypasses <code>__len</code>. | | <code>== !=</code> | Equality and inequality. Primitive values compare by value; tables, functions, channels, coroutines, and host values compare by identity unless a stable equality metamethod applies. | | <code>&lt; &lt;= &gt; &gt;=</code> | Ordered comparison over compatible primitive values or comparison metamethods. Incompatible values raise a runtime error. | | <code>&amp;&amp; || !</code> | Logical operations using Leia truthiness. <code>&amp;&amp;</code> and <code>||</code> short-circuit and return operand values. | | <code>&amp; | ^ &amp;^ &lt;&lt; &gt;&gt;</code> | Integer bitwise operations. Operands must be numbers or numeric strings that can be converted to integers according to the runtime integer conversion rules; invalid operands raise a runtime error. | | <code>&lt;-</code> | Channel receive in expression position. It blocks until a value is received, the channel is closed, or the host cancels execution. |</p>
+<p>Operator dispatch has three layers:</p>
+<ol>
+<li>apply the primitive operation when the operands are already valid for it;</li>
+<li>apply the operator&#x27;s stable primitive coercions, if any;</li>
+<li>otherwise consult the matching metamethod where metatables support that</li>
+</ol>
+<p>operator, then raise a runtime error if no applicable metamethod exists.</p>
+<p>Numeric arithmetic operators accept numbers and strings that <code>tonumber</code> can parse as numbers. Numeric string coercion is attempted before metamethod lookup for primitive strings. Invalid numeric strings and unsupported operand types raise runtime errors unless a matching metamethod applies to a non-primitive operand. Library functions such as <code>tonumber</code>, <code>tostring</code>, <code>math.tointeger</code>, and formatting helpers expose the same conversions explicitly.</p>
+<p>| Operator | Operands and coercions | Result and errors | Metamethod | |---|---|---|---| | <code>+</code> | Numbers or numeric strings. | Addition. Exact integer operands may produce an integer; mixed or inexact results may be float. Invalid operands error. | <code>__add</code> | | binary <code>-</code> | Numbers or numeric strings. | Subtraction with the same numeric representation rule as <code>+</code>. Invalid operands error. | <code>__sub</code> | | <code>*</code> | Numbers or numeric strings. | Multiplication with the same numeric representation rule as <code>+</code>. Invalid operands error. | <code>__mul</code> | | <code>/</code> | Numbers or numeric strings. | Division produces numeric runtime division semantics; integer inputs may produce a float. Invalid operands error. | <code>__div</code> | | <code>%</code> | Numbers or numeric strings. | Modulo follows Leia numeric modulo semantics. Invalid operands error. | <code>__mod</code> | | <code>**</code> | Numbers or numeric strings. | Exponentiation follows the math library&#x27;s power semantics. Invalid operands error. | <code>__pow</code> | | unary <code>-</code> | Number or numeric string. | Numeric negation. Invalid operands error. | <code>__unm</code> | | <code>..</code> | Strings, numbers, and operands accepted by the runtime concatenation contract. | Concatenation returns a string for primitive operands. Invalid operands error. | <code>__concat</code> | | <code>#</code> | String, table-like value, or host-backed value with length support. | Strings return byte length. Tables use ordinary sequence/metatable length behavior. Invalid operands error. | <code>__len</code>; <code>rawlen</code> bypasses it | | <code>==</code> | Any values. | Primitive values compare by value. Tables, functions, channels, coroutines, and host values compare by identity unless stable equality metamethod dispatch applies. | <code>__eq</code> | | <code>!=</code> | Any values. | Logical negation of <code>==</code>, including any stable <code>__eq</code> dispatch. | <code>__eq</code> | | <code>&lt;</code> | Compatible numbers or compatible strings. Numeric strings are not coerced for primitive string ordering; use <code>tonumber</code> explicitly. | Ordered comparison. Incompatible operands error. | <code>__lt</code> | | <code>&lt;=</code> | Compatible numbers or compatible strings. Numeric strings are not coerced for primitive string ordering. | Ordered comparison. Incompatible operands error. | <code>__le</code>, or stable fallback through <code>__lt</code> where supported | | <code>&gt;</code> | Compatible numbers or compatible strings. Numeric strings are not coerced for primitive string ordering. | Equivalent to reversed <code>&lt;</code> after dispatch. Incompatible operands error. | <code>__lt</code> with reversed operands | | <code>&gt;=</code> | Compatible numbers or compatible strings. Numeric strings are not coerced for primitive string ordering. | Equivalent to reversed <code>&lt;=</code> after dispatch. Incompatible operands error. | <code>__le</code> with reversed operands, or stable fallback through <code>__lt</code> where supported | | <code>&amp;&amp;</code> | Any values. | Returns the left operand when it is falsy; otherwise evaluates and returns the right operand. | none | | <code>||</code> | Any values. | Returns the left operand when it is truthy; otherwise evaluates and returns the right operand. | none | | <code>!</code> | Any value. | Returns <code>true</code> for <code>nil</code> and <code>false</code>; returns <code>false</code> for every other value. | none | | <code>&amp;</code> | Numbers or numeric strings convertible to integers by runtime integer conversion. | Bitwise and. Invalid or non-integral operands error. | none | | <code>|</code> | Numbers or numeric strings convertible to integers by runtime integer conversion. | Bitwise or. Invalid or non-integral operands error. | none | | <code>^</code> | Numbers or numeric strings convertible to integers by runtime integer conversion. | Bitwise xor. Invalid or non-integral operands error. | none | | <code>&amp;^</code> | Numbers or numeric strings convertible to integers by runtime integer conversion. | Bit clear. Invalid or non-integral operands error. | none | | <code>&lt;&lt;</code> | Integer-convertible left and shift count operands; numeric strings are accepted through the same conversion. | Left shift. Invalid operands error. | none | | <code>&gt;&gt;</code> | Integer-convertible left and shift count operands; numeric strings are accepted through the same conversion. | Right shift. Invalid operands error. | none | | <code>&lt;-</code> | Channel value. | Receive blocks until a value is received, the channel is closed, or the host cancels execution. Invalid operands error. | none |</p>
+<p>Raw helpers bypass their corresponding metamethods: for example, <code>rawget</code>, <code>rawset</code>, <code>rawequal</code>, and <code>rawlen</code> use raw table/string behavior where they are defined.</p>
 <pre><code>1 + 2        // 3
 &quot;5&quot; + 3      // 8
 &quot;x&quot; + 3      // runtime error
@@ -386,6 +441,18 @@ ok, _ := pcall(func() { return &quot;x&quot; + 3 })
 assert(!ok)
 assert(&quot;a&quot; .. 3 == &quot;a3&quot;)
 assert((1 &lt;&lt; 8) == 256)</code></pre>
+<pre><code>boxed := setmetatable({value: 4}, {
+    __add: func(left, right) {
+        return left.value + right
+    },
+    __len: func(_) {
+        return 9
+    },
+})
+
+assert(boxed + 3 == 7)
+assert(#boxed == 9)
+assert(rawlen(boxed) == 0)</code></pre>
 <h3 id="expressions-literals">Literals</h3>
 <p>Table literals, list literals, dense array literals, function literals, anonymous agent expressions, <code>turn</code> expressions, and <code>messages</code> blocks are expressions. Their specific syntax is listed in <a href="#">grammar.ebnf</a>.</p>
 <h3 id="expressions-evaluation-order">Evaluation Order</h3>
@@ -399,8 +466,8 @@ func mark(name) {
 result := mark(&quot;left&quot;) .. mark(&quot;right&quot;)
 // events is {&quot;left&quot;, &quot;right&quot;}</code></pre></section><section><h2 id="statements">Statements</h2>
 <p>Statements control execution.</p>
-<p>Blocks introduce lexical scope. A block is a sequence of statements enclosed in braces.</p>
-<p><code>if</code> evaluates its condition and executes the first matching branch. Conditions use Leia truthiness: only <code>nil</code> and <code>false</code> are false.</p>
+<p>Blocks introduce lexical scope. A block is a sequence of statements enclosed in braces. Locals declared inside the block are not visible after the closing brace. A block evaluates its statements in source order until control transfers, an error unwinds, or the block ends normally.</p>
+<p><code>if</code> evaluates its condition and executes the first matching branch. Conditions use Leia truthiness: only <code>nil</code> and <code>false</code> are false. <code>elseif</code> branches are tested left-to-right after earlier conditions are false. At most one branch runs, and branch blocks have their own lexical scopes.</p>
 <pre><code>if 0 {
     print(&quot;zero is truthy&quot;)
 }
@@ -416,9 +483,25 @@ for i := 1; i &lt;= 3; i++ {
     sum += i
 }
 
-for key, value := range { a: 1, b: 2 } {
+for key, value := range pairs({ a: 1, b: 2 }) {
     print(key, value)
 }</code></pre>
+<p><code>for { ... }</code> repeats until <code>break</code>, <code>return</code>, <code>goto</code>, an error, or host cancellation exits the loop. <code>for condition { ... }</code> evaluates the condition before every iteration using ordinary truthiness.</p>
+<p>In <code>for init; condition; post { ... }</code>, the init statement runs once before the first condition check. The condition is checked before each iteration. The post statement runs after each normal iteration and after <code>continue</code>; it does not run after <code>break</code>, <code>return</code>, <code>goto</code>, or an unwind out of the loop body.</p>
+<p><code>for key := range iterator { ... }</code> and <code>for key, value := range iterator { ... }</code> iterate over a runtime iterator. For ordinary tables, use <code>pairs(table)</code> to obtain the table iterator. Sequence-style table entries use 1-based integer keys. Non-sequence table iteration order is unspecified and must not be used for stable program behavior.</p>
+<p>The range variables are fresh lexical bindings for each iteration. Closures created inside the loop capture that iteration&#x27;s bindings, not one shared loop slot.</p>
+<pre><code>items := {10, 20, 30}
+sum := 0
+keySum := 0
+
+for k, v := range pairs(items) {
+    keySum += k
+    sum += v
+}
+
+assert(keySum == 6)
+assert(sum == 60)</code></pre>
+<p><code>break</code> exits the innermost enclosing loop. <code>continue</code> starts the next iteration of the innermost enclosing loop. Outside a loop they are invalid.</p>
 <p><code>select</code> waits on channel send or receive cases. A <code>default</code> case is selected when no communication can proceed immediately.</p>
 <pre><code>select {
 case value := &lt;-ch:
@@ -434,6 +517,7 @@ default:
 
 go work(ch)</code></pre>
 <p><code>return</code> exits the current function and returns zero or more values. Return values use multi-return adjustment.</p>
+<p><code>defer</code> evaluates the callee and arguments when the <code>defer</code> statement executes, then invokes the deferred call later. Deferred calls run in last-in, first-out order when the current function exits normally or unwinds through a protected boundary.</p>
 <p><code>goto</code> transfers control to a label in the same function subject to lexical scope restrictions. It must not jump into a block or over a local declaration.</p>
 <p><code>budget { ... } { ... }</code> applies an AI budget to the enclosed block. Public budget dimensions are specified in <a href="#">AI-Native Syntax</a>.</p>
 <pre><code>budget { turns: 1, tokens: 256, time: 30 } {
@@ -462,7 +546,20 @@ count(1, 2, 3) // 3</code></pre>
 assert(count(1, 2, 3) == 3)</code></pre>
 <h3 id="functions-multiple-results">Multiple Results</h3>
 <p>Function calls and some built-ins may produce multiple results. Leia adjusts those results according to the syntactic position where the call appears.</p>
-<p>In assignment and return positions, a final call expands to as many values as needed. Missing values become <code>nil</code>; extra values are discarded.</p>
+<p>The stable adjustment rule is:</p>
+<ol>
+<li>In an expression list, every non-final expression contributes exactly one</li>
+</ol>
+<p>value. If that expression is a call, only its first result is used, or <code>nil</code> if it returns no values.</p>
+<ol>
+<li>If the final expression is a call, its full result list is available to the</li>
+</ol>
+<p>enclosing assignment, return, call argument list, or table constructor.</p>
+<ol>
+<li>The enclosing form then consumes the available values. Missing assignment</li>
+</ol>
+<p>targets or parameters receive <code>nil</code>; surplus values are discarded unless the enclosing form preserves them, such as <code>return</code> or vararg forwarding.</p>
+<p>In assignment and return positions, a final call expands. Missing assignment values become <code>nil</code>; extra assignment values are discarded.</p>
 <pre><code>func triple() {
     return 10, 20, 30
 }
@@ -470,18 +567,27 @@ assert(count(1, 2, 3) == 3)</code></pre>
 a, b, c := triple() // 10, 20, 30
 x, y := triple()    // 10, 20
 return triple()     // returns 10, 20, 30</code></pre>
-<p>A parenthesized call contributes exactly one value.</p>
+<p>A parenthesized call is no longer in an expanding position and contributes exactly one value.</p>
 <pre><code>a, b := (triple()) // a == 10, b == nil</code></pre>
 <p>When a call appears before the final expression in an expression list, it contributes exactly one value. A final call may expand.</p>
 <pre><code>a, b, c, d := triple(), triple()
 // a == 10; b == 10; c == 20; d == 30</code></pre>
-<p>Function-call arguments and table constructors use the same adjustment rule: non-final calls contribute one value; final calls expand. Use <code>spread(call())</code> to expand a call in a non-final position.</p>
+<p>Function-call arguments and table constructors use the same expression-list rule: non-final calls contribute one value; final calls expand. Use <code>spread(call())</code> to expand a call in a non-final position.</p>
 <pre><code>func pack(...) { return table.pack(...) }
 
 pack(triple(), &quot;x&quot;)          // receives 10, &quot;x&quot;
 pack(spread(triple()), &quot;x&quot;)  // receives 10, 20, 30, &quot;x&quot;
 {triple()}                   // {10, 20, 30}
 {(triple())}                 // {10}</code></pre>
+<p>If a function has fixed parameters followed by <code>...</code>, fixed parameters are filled first and only the remaining adjusted argument values are captured by the vararg binding. When the final argument expression expands, all of its remaining results may enter <code>...</code>.</p>
+<pre><code>func rest(a, ...) {
+    return a, {...}
+}
+
+first, tail := rest(triple()) // first == 10; tail == {20, 30}</code></pre>
+<p>Multi-return adjustment is not transitive through variables or table fields. A variable holding the first result of a call is an ordinary single value.</p>
+<pre><code>v := triple() // v == 10
+a, b := v     // a == 10; b == nil</code></pre>
 <p>Closures capture lexical variables by reference. Mutating a captured variable is visible to all closures that share the binding.</p>
 <pre><code>func counter() {
     n := 0
@@ -533,7 +639,21 @@ t.created = 12
 rawget(t, &quot;created&quot;) // nil; __newindex handled the write
 rawset(t, &quot;created&quot;, 13)
 rawget(t, &quot;created&quot;) // 13</code></pre>
-<p>Stable metatable behavior includes indexing, new indexing, call, arithmetic, comparison, concatenation, and length behavior where covered by conformance tests and the feature matrix. Exact Lua debug-slot protocols, binary chunks, and finalizer behavior are not stable Leia promises unless specified separately.</p>
+<p>Stable metatable behavior is defined by the events below. A metamethod is looked up by raw string key in the value&#x27;s metatable. Binary operators first try the left operand&#x27;s metamethod and then the right operand&#x27;s metamethod when needed. Each metamethod receives the listed arguments; unless otherwise stated, only its first return value is used.</p>
+<p>| Metamethod | Trigger | Arguments | Result contract | | --- | --- | --- | --- | | <code>__index</code> | <code>t[k]</code> or <code>t.k</code> when <code>t</code> has no raw key <code>k</code>. Strings use a standard-library <code>__index</code> table for methods. | If function: <code>(t, k)</code>. If table: lookup continues in that table with key <code>k</code>. | Function result or redirected table lookup result. Missing chains produce <code>nil</code>; excessive cycles raise a runtime error. | | <code>__newindex</code> | <code>t[k] = v</code> when <code>t</code> has no raw key <code>k</code>. | If function: <code>(t, k, v)</code>. If table: assignment continues in that table. | Return values are ignored. Existing raw keys are updated directly. | | <code>__call</code> | Calling a non-function table value, <code>t(...)</code>. | <code>(t, ...)</code> | All return values become the call result. | | <code>__add</code>, <code>__sub</code>, <code>__mul</code>, <code>__div</code>, <code>__mod</code>, <code>__pow</code> | <code>+</code>, <code>-</code>, <code>*</code>, <code>/</code>, <code>%</code>, <code>**</code> when the primitive numeric operation is not applicable. | <code>(left, right)</code> | First return value is the operator result. | | <code>__unm</code> | Unary <code>-x</code> when primitive numeric negation is not applicable. | <code>(x)</code> | First return value is the operator result. | | <code>__concat</code> | <code>left .. right</code> when primitive string/number concatenation is not applicable. | <code>(left, right)</code> | First return value is the concatenation result. | | <code>__len</code> | <code>#x</code> for tables or other values with length behavior. | <code>(x)</code> | First return value is the length result. Library APIs that require an integer length may reject non-integer or negative results. | | <code>__eq</code> | <code>left == right</code> or <code>left != right</code> for identity-bearing values that are not raw-equal. | <code>(left, right)</code> | Truthiness of the first return value determines equality; <code>!=</code> negates it. | | <code>__lt</code> | <code>left &lt; right</code>, and reversed <code>&gt;</code> forms. | <code>(left, right)</code> for <code>&lt;</code>; operands are reversed for <code>&gt;</code>. | Truthiness of the first return value determines the comparison. | | <code>__le</code> | <code>left &lt;= right</code>, and reversed <code>&gt;=</code> forms. | <code>(left, right)</code> for <code>&lt;=</code>; operands are reversed for <code>&gt;=</code>. | Truthiness of the first return value determines the comparison. | | <code>__pairs</code> | <code>pairs(x)</code> when <code>x</code> has this metamethod. | <code>(x)</code> | Must return iterator function, state, and initial control value. | | <code>__tostring</code> | <code>tostring(x)</code> for a table with this metamethod. | <code>(x)</code> | Must return a string; other results raise a runtime error. | | <code>__name</code> | <code>tostring(x)</code> fallback for a table with no <code>__tostring</code>. | Not called; read as a string field. | Used as a type-name prefix in the fallback string form. | | <code>__metatable</code> | <code>getmetatable(x)</code> and <code>setmetatable(x, mt)</code> for protected tables. | Not called; read as a field. | <code>getmetatable</code> returns this value; attempts to change the protected metatable raise a runtime error. |</p>
+<p>Metamethods for integer floor division, bitwise operators, finalizers, weak tables, binary chunks, and Lua debug-slot protocols are not v1.0 stable contract unless a later spec revision names them explicitly.</p>
+<pre><code>vec := {x: 3}
+mt := {
+    __add: func(a, b) { return {x: a.x + b.x} },
+    __eq: func(a, b) { return a.x == b.x },
+    __tostring: func(a) { return &quot;vec(&quot; .. a.x .. &quot;)&quot; },
+}
+setmetatable(vec, mt)
+other := setmetatable({x: 4}, mt)
+sum := vec + other
+assert(sum.x == 7)
+assert(vec == setmetatable({x: 3}, mt))
+assert(tostring(vec) == &quot;vec(3)&quot;)</code></pre>
 <p>The length operator <code>#x</code> uses the value&#x27;s ordinary length behavior and may consult <code>__len</code>. <code>rawlen(x)</code> bypasses <code>__len</code> for tables and strings.</p>
 <pre><code>t := setmetatable({}, { __len: func(_) { return 99 } })
 #t        // 99
@@ -560,6 +680,8 @@ ch &lt;- &quot;ready&quot;
 value := &lt;-ch
 close(ch)
 value, ok := &lt;-ch // ok is false after the buffered values are consumed</code></pre>
+<p>For a single channel, successful sends are received in send order. With one sender this is program order. With multiple senders, the order is the order in which sends successfully commit to that channel; scheduling determines which sender commits first. Buffered channels preserve FIFO order among values already queued in that buffer.</p>
+<p>Closing a channel prevents future sends. Receives continue to drain buffered values before reporting closure. Once the channel is closed and empty, a receive returns <code>nil, false</code> in comma-ok forms, and a receive expression yields <code>nil</code>. Sending on a closed channel or closing an already closed channel is a runtime error.</p>
 <p><code>select</code> chooses a ready communication case. If multiple cases are ready, the implementation may choose among them. If no case is ready and a <code>default</code> case exists, <code>default</code> runs immediately.</p>
 <pre><code>select {
 case value := &lt;-left:
@@ -569,6 +691,22 @@ case right &lt;- 20:
 default:
     print(&quot;idle&quot;)
 }</code></pre>
+<p>Channel communication is the synchronization primitive exposed by the stable language contract:</p>
+<ul>
+<li>A successful send synchronizes with the receive that obtains that value.</li>
+<li>Closing a channel synchronizes with receives that observe the closed state</li>
+</ul>
+<p>after queued values have been consumed.</p>
+<ul>
+<li>For unbuffered channels, send and receive complete as a rendezvous; neither</li>
+</ul>
+<p>side completes before the other side is ready.</p>
+<ul>
+<li>For buffered channels, a send may complete before a receiver accepts the</li>
+</ul>
+<p>value, but the value and writes sequenced before the send become visible to the receiver that later obtains that value.</p>
+<p>Outside those synchronization edges, concurrent tasks have no specified memory ordering. Programs must not depend on the relative timing of ordinary reads and writes performed by different tasks unless they are ordered by channels or by a host-provided synchronization object whose module contract says so. Data races on mutable script values have unspecified results, though implementations must not turn them into host memory corruption.</p>
+<p>The language does not promise fairness among runnable tasks, blocked sends, blocked receives, or simultaneously ready <code>select</code> cases. An implementation may make progress decisions according to its scheduler and host integration. Code that requires fairness must encode it explicitly with protocol state, timeouts, or host-provided primitives.</p>
 <p>Long-running concurrent tasks must cooperate with cancellation and resource limits provided by the host. The language does not promise that every script operation is preemptible at instruction-level granularity.</p>
 <p>JIT and bytecode execution must preserve concurrency-visible behavior: communication order, channel close behavior, synchronization results, and protected error boundaries must not change when optimizations are enabled.</p></section><section><h2 id="ai-native-syntax">AI-Native Syntax</h2>
 <p>AI-native syntax is a language layer over the <code>llm</code>, <code>msg</code>, <code>history</code>, and <code>loop</code> standard-library modules. It must use the same provider, tracing, record/replay, cancellation, and capability paths as direct library calls.</p>
@@ -641,11 +779,59 @@ history[#history + 1] = msg.tool_result(&quot;call_1&quot;, { summary: &quot;fou
 }</code></pre>
 <h3 id="ai-native-syntax-errors">Errors</h3>
 <p>Recoverable provider, budget, validation, and tool failures return structured <code>nil, err</code> results unless an API explicitly documents a runtime error. Trace events must avoid prompt and tool-result leakage unless explicitly configured by the host.</p></section><section><h2 id="modules-and-loading">Modules And Loading</h2>
-<p><code>require(name)</code> loads built-in standard-library modules and project modules according to runtime module options. Loaded module results are cached in <code>package.loaded</code>.</p>
+<p><code>require(name)</code> loads built-in standard-library modules, host-registered modules, and project modules according to runtime module options. <code>name</code> must be a string. Loaded module results are cached in <code>package.loaded</code>.</p>
 <pre><code>json := require(&quot;json&quot;)
 text := json.encode({ok: true})
 same := require(&quot;json&quot;)</code></pre>
 <p>If a module returns a value, that value is the result of <code>require</code>. Requiring the same module path again returns the cached module value unless the host explicitly installs a different loader policy.</p>
+<p>The v1.0 stable resolution order is:</p>
+<ol>
+<li>If <code>package.loaded[name]</code> is non-<code>nil</code>, return it.</li>
+<li>If the runtime has an internal loaded-module cache entry for <code>name</code>, return</li>
+</ol>
+<p>that entry.</p>
+<ol>
+<li>If <code>name</code> is an enabled standard-library module, return that module and</li>
+</ol>
+<p>store it in <code>package.loaded[name]</code>.</p>
+<ol>
+<li>If <code>name</code> names a host-registered module or an allowlisted <code>go:</code> import,</li>
+</ol>
+<p>return that module and store it in <code>package.loaded[name]</code>. Host modules are subject to the active capability policy.</p>
+<ol>
+<li>If filesystem module loading is disabled, raise a runtime error. This does</li>
+</ol>
+<p>not disable already loaded modules, standard-library modules, or registered host modules.</p>
+<ol>
+<li>Resolve a filesystem-backed <code>.leia</code> module path using the project resolver</li>
+</ol>
+<p>below, then execute that file.</p>
+<ol>
+<li>If the file returns at least one value, cache and return the first value. If</li>
+</ol>
+<p>it returns no values, cache and return <code>true</code>.</p>
+<p>Filesystem-backed project module resolution is deterministic:</p>
+<ol>
+<li>A collection require of the form <code>prefix:path.to.module</code> matches a configured</li>
+</ol>
+<p>collection with the same <code>prefix</code>; it resolves under the collection root as <code>path/to/module.leia</code>.</p>
+<ol>
+<li>Otherwise, the longest configured <code>replace</code> path that equals <code>name</code> or is a</li>
+</ol>
+<p>slash-prefix of <code>name</code> wins. Exact replaces may point at a <code>.leia</code> file or at a module root. Subpaths below a replace root convert dots to path separators and append <code>.leia</code>.</p>
+<ol>
+<li>Otherwise, the longest downloaded-cache or vendor entry that equals <code>name</code> or</li>
+</ol>
+<p>is a slash-prefix of <code>name</code> wins. Subpaths convert dots to path separators and append <code>.leia</code>; an exact module path loads the module&#x27;s base file.</p>
+<ol>
+<li>Otherwise, <code>name</code> resolves relative to the active require root or script</li>
+</ol>
+<p>directory. Names containing <code>/</code> or starting with <code>.</code> keep path syntax and add <code>.leia</code>; other names convert dots to path separators and add <code>.leia</code>.</p>
+<p>The resolved file is still checked by filesystem root, module byte, module depth, readonly, vendor, and capability controls before execution.</p>
+<pre><code>json1 := require(&quot;json&quot;)
+json2 := require(&quot;json&quot;)
+assert(json1 == json2)
+assert(package.loaded[&quot;json&quot;] == json1)</code></pre>
 <p><code>leia.mod</code> describes a module path, Leia language/module format version, dependencies, replacements, capability summaries, source collections, and optional Go-native binding metadata. <code>leia.sum</code> records remote or vendored module hashes when the module toolchain is used.</p>
 <p>Module paths may be GitHub-style repository paths. Leia does not require a central registry for basic module use.</p>
 <p><code>import &quot;go:...&quot; as name</code> is explicit host binding syntax. It does not automatically reflect arbitrary Go packages; embedders must provide bindings through the public Go API and the active capability policy may still reject use.</p>
@@ -653,19 +839,31 @@ same := require(&quot;json&quot;)</code></pre>
 <p>The declaration above is only valid when the embedder has allowlisted and registered the <code>go:net/http</code> binding. Source syntax alone never grants host access.</p>
 <p>Readonly and vendor module modes are intended for reproducible execution. Host applications should choose the module mode explicitly when running untrusted scripts.</p></section><section><h2 id="errors-and-diagnostics">Errors And Diagnostics</h2>
 <p>Leia distinguishes runtime errors from recoverable structured failures.</p>
-<p>Programmer errors such as wrong argument types, invalid operations, missing fields where an API requires them, and invalid control flow generally raise runtime errors.</p>
-<pre><code>error(&quot;boom&quot;)</code></pre>
-<p>Recoverable host and provider failures should return <code>nil, err</code> or a structured result when the API is designed for recovery. LLM provider failures, filesystem failures, network failures, and sandbox denials must not leak data forbidden by the active capability policy.</p>
-<p><code>pcall</code> and <code>xpcall</code>-style protected execution convert runtime errors into values according to their standard-library contract.</p>
-<pre><code>ok, value := pcall(func() {
-    error({kind: &quot;demo&quot;})
+<p>Programmer errors such as wrong argument types, invalid operations, missing fields where an API requires them, invalid control flow, exhausted resource budgets, and denied capabilities generally raise runtime errors.</p>
+<p>An error object is any Leia value carried by an error path. <code>error(value)</code> raises that exact value, without converting it to a string. <code>error()</code> raises a string error object. Extra arguments to <code>error</code> are ignored by the v1.0 contract.</p>
+<pre><code>payload := {kind: &quot;demo&quot;, message: &quot;boom&quot;}
+ok, err := pcall(func() {
+    error(payload)
 })
-// ok == false; value.kind == &quot;demo&quot;
+assert(!ok)
+assert(err == payload)
+assert(err.kind == &quot;demo&quot;)</code></pre>
+<p><code>pcall(fn, ...)</code> calls <code>fn(...)</code> in protected mode. On success it returns <code>true</code> followed by all results from the call. On failure it returns <code>false</code> and one error object. If the failure came from <code>error(value)</code>, the object is <code>value</code>; if it came from a runtime, host, parser, budget, or capability failure, the protected error object is a diagnostic string.</p>
+<p><code>xpcall(fn, handler, ...)</code> calls <code>fn(...)</code> in protected mode. On success it returns <code>true</code> followed by all results from <code>fn</code>. On failure it calls <code>handler(err)</code> and returns <code>false</code> plus the handler&#x27;s first result. If the handler itself fails, <code>xpcall</code> returns <code>false</code> plus the handler failure&#x27;s error object.</p>
+<pre><code>ok, value := pcall(func(a, b) {
+    return a + b, &quot;kept&quot;
+}, 2, 5)
+assert(ok &amp;&amp; value == 7)
 
 ok, handled := xpcall(error, func(err) {
     return &quot;handled:&quot; .. tostring(err)
 }, &quot;boom&quot;)
-// ok == false; handled == &quot;handled:boom&quot;</code></pre>
+assert(!ok &amp;&amp; handled == &quot;handled:boom&quot;)</code></pre>
+<p>Recoverable host and provider failures should return <code>nil, err</code> or a structured result when the API is designed for recovery. Error result tables use stable, lowercase string fields when structured recovery is intended:</p>
+<p>| Field | Meaning | | --- | --- | | <code>kind</code> | Machine-readable category such as <code>validation</code>, <code>provider</code>, <code>network</code>, <code>rate_limit</code>, <code>budget</code>, <code>capability</code>, or an API-specific kind. | | <code>message</code> | Human-readable diagnostic string safe to expose under the active capability policy. | | <code>code</code> | Optional machine-readable API/provider code. | | <code>source</code> | Optional subsystem or provider name. | | <code>retryable</code> | Optional boolean hint for transient failures. |</p>
+<p>LLM provider failures, filesystem failures, network failures, and sandbox denials must not leak data forbidden by the active capability policy.</p>
+<p>Common runtime errors include:</p>
+<p>| Error class | Examples | | --- | --- | | Arity/type errors | Calling a builtin without a required argument; passing a non-string to <code>require</code>; using a table where a number is required. | | Invalid operators | Arithmetic, concatenation, length, or comparison over unsupported values when no matching metamethod applies. | | Invalid calls | Calling a non-function value with no <code>__call</code> metamethod. | | Table/metatable protocol errors | Excessive <code>__index</code> or <code>__newindex</code> chains; invalid <code>__tostring</code> return type; attempts to change a protected metatable. | | Module loading errors | Module not found, module loading disabled, module path escaping the configured filesystem root, module byte/depth budget exceeded. | | Coroutine errors | Yielding outside a yieldable coroutine boundary or resuming an invalid coroutine state. | | Resource and capability errors | Step budget exceeded, host-result byte budget exceeded, filesystem/network/process/debug access denied. |</p>
 <p>Diagnostics should include source location when available. CLI diagnostics may be emitted as text, JSON, or SARIF according to the command contract.</p></section><section><h2 id="implementation-requirements">Implementation Requirements</h2>
 <p>The interpreter is the semantic baseline. Bytecode VM execution and JIT execution must preserve interpreter-visible behavior for stable language features.</p>
 <p>An optimization may specialize at runtime after guards, but it must not depend on benchmark names, source file names, or fixed benchmark input sizes. Guard failure must deoptimize or recover without changing user-visible results.</p>

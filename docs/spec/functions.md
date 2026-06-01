@@ -42,8 +42,19 @@ assert(count(1, 2, 3) == 3)
 Function calls and some built-ins may produce multiple results. Leia adjusts
 those results according to the syntactic position where the call appears.
 
-In assignment and return positions, a final call expands to as many values as
-needed. Missing values become `nil`; extra values are discarded.
+The stable adjustment rule is:
+
+1. In an expression list, every non-final expression contributes exactly one
+   value. If that expression is a call, only its first result is used, or `nil`
+   if it returns no values.
+2. If the final expression is a call, its full result list is available to the
+   enclosing assignment, return, call argument list, or table constructor.
+3. The enclosing form then consumes the available values. Missing assignment
+   targets or parameters receive `nil`; surplus values are discarded unless the
+   enclosing form preserves them, such as `return` or vararg forwarding.
+
+In assignment and return positions, a final call expands. Missing assignment
+values become `nil`; extra assignment values are discarded.
 
 ```leia
 func triple() {
@@ -55,7 +66,8 @@ x, y := triple()    // 10, 20
 return triple()     // returns 10, 20, 30
 ```
 
-A parenthesized call contributes exactly one value.
+A parenthesized call is no longer in an expanding position and contributes
+exactly one value.
 
 ```leia
 a, b := (triple()) // a == 10, b == nil
@@ -69,9 +81,9 @@ a, b, c, d := triple(), triple()
 // a == 10; b == 10; c == 20; d == 30
 ```
 
-Function-call arguments and table constructors use the same adjustment rule:
-non-final calls contribute one value; final calls expand. Use `spread(call())`
-to expand a call in a non-final position.
+Function-call arguments and table constructors use the same expression-list
+rule: non-final calls contribute one value; final calls expand. Use
+`spread(call())` to expand a call in a non-final position.
 
 ```leia
 func pack(...) { return table.pack(...) }
@@ -80,6 +92,27 @@ pack(triple(), "x")          // receives 10, "x"
 pack(spread(triple()), "x")  // receives 10, 20, 30, "x"
 {triple()}                   // {10, 20, 30}
 {(triple())}                 // {10}
+```
+
+If a function has fixed parameters followed by `...`, fixed parameters are
+filled first and only the remaining adjusted argument values are captured by the
+vararg binding. When the final argument expression expands, all of its remaining
+results may enter `...`.
+
+```leia
+func rest(a, ...) {
+    return a, {...}
+}
+
+first, tail := rest(triple()) // first == 10; tail == {20, 30}
+```
+
+Multi-return adjustment is not transitive through variables or table fields. A
+variable holding the first result of a call is an ordinary single value.
+
+```leia
+v := triple() // v == 10
+a, b := v     // a == 10; b == nil
 ```
 
 Closures capture lexical variables by reference. Mutating a captured variable is

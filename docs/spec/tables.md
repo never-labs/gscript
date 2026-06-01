@@ -41,11 +41,47 @@ rawset(t, "created", 13)
 rawget(t, "created") // 13
 ```
 
-Stable metatable behavior includes indexing, new indexing, call, arithmetic,
-comparison, concatenation, and length behavior where covered by conformance
-tests and the feature matrix. Exact Lua debug-slot protocols, binary chunks,
-and finalizer behavior are not stable Leia promises unless specified
-separately.
+Stable metatable behavior is defined by the events below. A metamethod is looked
+up by raw string key in the value's metatable. Binary operators first try the
+left operand's metamethod and then the right operand's metamethod when needed.
+Each metamethod receives the listed arguments; unless otherwise stated, only its
+first return value is used.
+
+| Metamethod | Trigger | Arguments | Result contract |
+| --- | --- | --- | --- |
+| `__index` | `t[k]` or `t.k` when `t` has no raw key `k`. Strings use a standard-library `__index` table for methods. | If function: `(t, k)`. If table: lookup continues in that table with key `k`. | Function result or redirected table lookup result. Missing chains produce `nil`; excessive cycles raise a runtime error. |
+| `__newindex` | `t[k] = v` when `t` has no raw key `k`. | If function: `(t, k, v)`. If table: assignment continues in that table. | Return values are ignored. Existing raw keys are updated directly. |
+| `__call` | Calling a non-function table value, `t(...)`. | `(t, ...)` | All return values become the call result. |
+| `__add`, `__sub`, `__mul`, `__div`, `__mod`, `__pow` | `+`, `-`, `*`, `/`, `%`, `**` when the primitive numeric operation is not applicable. | `(left, right)` | First return value is the operator result. |
+| `__unm` | Unary `-x` when primitive numeric negation is not applicable. | `(x)` | First return value is the operator result. |
+| `__concat` | `left .. right` when primitive string/number concatenation is not applicable. | `(left, right)` | First return value is the concatenation result. |
+| `__len` | `#x` for tables or other values with length behavior. | `(x)` | First return value is the length result. Library APIs that require an integer length may reject non-integer or negative results. |
+| `__eq` | `left == right` or `left != right` for identity-bearing values that are not raw-equal. | `(left, right)` | Truthiness of the first return value determines equality; `!=` negates it. |
+| `__lt` | `left < right`, and reversed `>` forms. | `(left, right)` for `<`; operands are reversed for `>`. | Truthiness of the first return value determines the comparison. |
+| `__le` | `left <= right`, and reversed `>=` forms. | `(left, right)` for `<=`; operands are reversed for `>=`. | Truthiness of the first return value determines the comparison. |
+| `__pairs` | `pairs(x)` when `x` has this metamethod. | `(x)` | Must return iterator function, state, and initial control value. |
+| `__tostring` | `tostring(x)` for a table with this metamethod. | `(x)` | Must return a string; other results raise a runtime error. |
+| `__name` | `tostring(x)` fallback for a table with no `__tostring`. | Not called; read as a string field. | Used as a type-name prefix in the fallback string form. |
+| `__metatable` | `getmetatable(x)` and `setmetatable(x, mt)` for protected tables. | Not called; read as a field. | `getmetatable` returns this value; attempts to change the protected metatable raise a runtime error. |
+
+Metamethods for integer floor division, bitwise operators, finalizers, weak
+tables, binary chunks, and Lua debug-slot protocols are not v1.0 stable
+contract unless a later spec revision names them explicitly.
+
+```leia run all
+vec := {x: 3}
+mt := {
+    __add: func(a, b) { return {x: a.x + b.x} },
+    __eq: func(a, b) { return a.x == b.x },
+    __tostring: func(a) { return "vec(" .. a.x .. ")" },
+}
+setmetatable(vec, mt)
+other := setmetatable({x: 4}, mt)
+sum := vec + other
+assert(sum.x == 7)
+assert(vec == setmetatable({x: 3}, mt))
+assert(tostring(vec) == "vec(3)")
+```
 
 The length operator `#x` uses the value's ordinary length behavior and may
 consult `__len`. `rawlen(x)` bypasses `__len` for tables and strings.

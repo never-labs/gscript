@@ -68,23 +68,51 @@ length behavior as specified in [Tables And Metatables](tables.md).
 
 ## Operators
 
-Numeric operators accept numbers and strings that `tonumber` can parse as
-numbers. Invalid numeric strings and unsupported operand types raise runtime
-errors unless a matching metamethod applies. Library functions such as
-`tonumber`, `tostring`, `math.tointeger`, and formatting helpers expose the
-same conversions explicitly.
+Operator dispatch has three layers:
 
-| Operator family | Stable behavior |
-|---|---|
-| `+ - * / % **` | Numeric arithmetic. Numeric strings are converted before the operation. Integer operands may keep integer representation when the operation is exact; otherwise results may be floating-point. Unsupported operands raise a runtime error unless a matching arithmetic metamethod applies. |
-| unary `-` | Numeric negation or `__unm` on values with a metatable handler. |
-| `..` | String concatenation. Non-string primitive operands may be converted using `tostring` according to the runtime string contract; table-like operands may use `__concat`. |
-| `#` | Length operation. Strings return byte length. Tables use ordinary sequence/metatable length behavior; `rawlen` bypasses `__len`. |
-| `== !=` | Equality and inequality. Primitive values compare by value; tables, functions, channels, coroutines, and host values compare by identity unless a stable equality metamethod applies. |
-| `< <= > >=` | Ordered comparison over compatible primitive values or comparison metamethods. Incompatible values raise a runtime error. |
-| `&& || !` | Logical operations using Leia truthiness. `&&` and `||` short-circuit and return operand values. |
-| `& | ^ &^ << >>` | Integer bitwise operations. Operands must be numbers or numeric strings that can be converted to integers according to the runtime integer conversion rules; invalid operands raise a runtime error. |
-| `<-` | Channel receive in expression position. It blocks until a value is received, the channel is closed, or the host cancels execution. |
+1. apply the primitive operation when the operands are already valid for it;
+2. apply the operator's stable primitive coercions, if any;
+3. otherwise consult the matching metamethod where metatables support that
+   operator, then raise a runtime error if no applicable metamethod exists.
+
+Numeric arithmetic operators accept numbers and strings that `tonumber` can
+parse as numbers. Numeric string coercion is attempted before metamethod lookup
+for primitive strings. Invalid numeric strings and unsupported operand types
+raise runtime errors unless a matching metamethod applies to a non-primitive
+operand. Library functions such as `tonumber`, `tostring`, `math.tointeger`,
+and formatting helpers expose the same conversions explicitly.
+
+| Operator | Operands and coercions | Result and errors | Metamethod |
+|---|---|---|---|
+| `+` | Numbers or numeric strings. | Addition. Exact integer operands may produce an integer; mixed or inexact results may be float. Invalid operands error. | `__add` |
+| binary `-` | Numbers or numeric strings. | Subtraction with the same numeric representation rule as `+`. Invalid operands error. | `__sub` |
+| `*` | Numbers or numeric strings. | Multiplication with the same numeric representation rule as `+`. Invalid operands error. | `__mul` |
+| `/` | Numbers or numeric strings. | Division produces numeric runtime division semantics; integer inputs may produce a float. Invalid operands error. | `__div` |
+| `%` | Numbers or numeric strings. | Modulo follows Leia numeric modulo semantics. Invalid operands error. | `__mod` |
+| `**` | Numbers or numeric strings. | Exponentiation follows the math library's power semantics. Invalid operands error. | `__pow` |
+| unary `-` | Number or numeric string. | Numeric negation. Invalid operands error. | `__unm` |
+| `..` | Strings, numbers, and operands accepted by the runtime concatenation contract. | Concatenation returns a string for primitive operands. Invalid operands error. | `__concat` |
+| `#` | String, table-like value, or host-backed value with length support. | Strings return byte length. Tables use ordinary sequence/metatable length behavior. Invalid operands error. | `__len`; `rawlen` bypasses it |
+| `==` | Any values. | Primitive values compare by value. Tables, functions, channels, coroutines, and host values compare by identity unless stable equality metamethod dispatch applies. | `__eq` |
+| `!=` | Any values. | Logical negation of `==`, including any stable `__eq` dispatch. | `__eq` |
+| `<` | Compatible numbers or compatible strings. Numeric strings are not coerced for primitive string ordering; use `tonumber` explicitly. | Ordered comparison. Incompatible operands error. | `__lt` |
+| `<=` | Compatible numbers or compatible strings. Numeric strings are not coerced for primitive string ordering. | Ordered comparison. Incompatible operands error. | `__le`, or stable fallback through `__lt` where supported |
+| `>` | Compatible numbers or compatible strings. Numeric strings are not coerced for primitive string ordering. | Equivalent to reversed `<` after dispatch. Incompatible operands error. | `__lt` with reversed operands |
+| `>=` | Compatible numbers or compatible strings. Numeric strings are not coerced for primitive string ordering. | Equivalent to reversed `<=` after dispatch. Incompatible operands error. | `__le` with reversed operands, or stable fallback through `__lt` where supported |
+| `&&` | Any values. | Returns the left operand when it is falsy; otherwise evaluates and returns the right operand. | none |
+| `||` | Any values. | Returns the left operand when it is truthy; otherwise evaluates and returns the right operand. | none |
+| `!` | Any value. | Returns `true` for `nil` and `false`; returns `false` for every other value. | none |
+| `&` | Numbers or numeric strings convertible to integers by runtime integer conversion. | Bitwise and. Invalid or non-integral operands error. | none |
+| `|` | Numbers or numeric strings convertible to integers by runtime integer conversion. | Bitwise or. Invalid or non-integral operands error. | none |
+| `^` | Numbers or numeric strings convertible to integers by runtime integer conversion. | Bitwise xor. Invalid or non-integral operands error. | none |
+| `&^` | Numbers or numeric strings convertible to integers by runtime integer conversion. | Bit clear. Invalid or non-integral operands error. | none |
+| `<<` | Integer-convertible left and shift count operands; numeric strings are accepted through the same conversion. | Left shift. Invalid operands error. | none |
+| `>>` | Integer-convertible left and shift count operands; numeric strings are accepted through the same conversion. | Right shift. Invalid operands error. | none |
+| `<-` | Channel value. | Receive blocks until a value is received, the channel is closed, or the host cancels execution. Invalid operands error. | none |
+
+Raw helpers bypass their corresponding metamethods: for example, `rawget`,
+`rawset`, `rawequal`, and `rawlen` use raw table/string behavior where they are
+defined.
 
 ```leia
 1 + 2        // 3
@@ -101,6 +129,21 @@ ok, _ := pcall(func() { return "x" + 3 })
 assert(!ok)
 assert("a" .. 3 == "a3")
 assert((1 << 8) == 256)
+```
+
+```leia run all
+boxed := setmetatable({value: 4}, {
+    __add: func(left, right) {
+        return left.value + right
+    },
+    __len: func(_) {
+        return 9
+    },
+})
+
+assert(boxed + 3 == 7)
+assert(#boxed == 9)
+assert(rawlen(boxed) == 0)
 ```
 
 ## Literals
