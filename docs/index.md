@@ -17,6 +17,10 @@ only.
 - [Standard library](reference/stdlib/index.md): generated-style module index
   organized from the runtime catalog.
 - [CLI reference](reference/cli/index.md): stable command surface.
+- [File directives](reference/directives/index.md): `//leia:` metadata consumed
+  by tooling.
+- [Modules](reference/modules/index.md): `leia.mod`, `leia.sum`, vendoring, and
+  Go-native binding metadata.
 - [Embedding guide](guides/embedding.md): host integration, sandboxing, and
   reload-oriented runtime usage.
 - [AI-native guide](guides/ai-native.md): agents, tools, models, message
@@ -30,4 +34,3 @@ The docs are split into user-facing reference, tutorials, guides, release
 process, and internals. Generated reference should come from code-owned metadata
 where practical. Hand-written prose should explain concepts and tradeoffs, not
 duplicate long API tables that the runtime can emit.
-
