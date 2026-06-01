@@ -52,6 +52,11 @@ for generated in reference/cli/index.md reference/stdlib/index.md; do
         exit 1
     fi
 done
+python3 scripts/spec_preview.py --output "$TMP_DOCS/spec-preview.html" >/dev/null
+if [ ! -s "$TMP_DOCS/spec-preview.html" ]; then
+    echo "error: spec preview generator produced no output" >&2
+    exit 1
+fi
 
 python3 - <<'PY'
 import os
