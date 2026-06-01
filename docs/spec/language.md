@@ -196,12 +196,13 @@ Operators follow the current parser precedence contract:
 3. multiplicative arithmetic;
 4. additive arithmetic and concatenation where supported;
 5. comparisons;
-6. logical `and`;
-7. logical `or`;
+6. logical `&&`;
+7. logical `||`;
 8. assignment forms.
 
-Parentheses override precedence. Short-circuit operators return operand values,
-not coerced booleans.
+Parentheses override precedence. Short-circuit operators are `&&` and `||`;
+they return operand values, not coerced booleans. Unary logical negation is
+`!`.
 
 ## Numbers, Strings, And Stdlib
 
