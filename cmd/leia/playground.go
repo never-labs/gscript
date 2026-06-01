@@ -792,6 +792,66 @@ if err != nil { print(err.message); return }
 print(result.text)`,
 		},
 		{
+			ID:       "ai-support-triage",
+			Title:    "Support Triage",
+			Section:  "Agent Workflows",
+			Summary:  "A support agent combines policy text, a safe lookup tool, and a concise customer-facing answer.",
+			Runnable: true,
+			Requires: "LLM provider",
+			Concepts: []string{
+				"Business tools are explicit and capability-scoped.",
+				"The agent decides whether the tool is useful for the current turn.",
+				"The result is ordinary text that a host can log, review, or replay.",
+			},
+			Source: `//leia:requires orders.read
+//leia:param id order id
+tool lookup_order(id) {
+    return { id: id, status: "delivered", total: 42, refundable: true }, nil
+}
+
+agent support_triage(message) {
+    system: "You are a concise support assistant. Use lookup_order for order status. Mention whether refund is possible."
+    user: message
+    tools: [lookup_order]
+}
+
+result, err := support_triage("Customer asks: order A100 arrived damaged. Can I get a refund?")
+if err != nil { print(err.message); return }
+print(result.text)`,
+		},
+		{
+			ID:       "ai-draft-review",
+			Title:    "Draft And Review",
+			Section:  "Agent Workflows",
+			Summary:  "Use one agent to draft an answer and a second turn to review it against a checklist.",
+			Runnable: true,
+			Requires: "LLM provider",
+			Concepts: []string{
+				"Agent outputs can feed a later review turn.",
+				"History separates system instructions, draft content, and review request.",
+				"This pattern is useful for lightweight agent quality gates.",
+			},
+			Source: `agent draft_release_note(change) {
+    system: "Write a release note in two short bullets."
+    user: change
+}
+
+draft, err := draft_release_note("Playground now has runnable Tour, Examples, and AI demos.")
+if err != nil { print(err.message); return }
+
+review := messages {
+    system: "Review the draft. Reply PASS if it is concise and user-facing; otherwise explain one fix."
+    user: draft.text
+}
+
+checked, err := turn { messages: review, max_tokens: 64 }
+if err != nil { print(err.message); return }
+print("draft:")
+print(draft.text)
+print("review:")
+print(checked.text)`,
+		},
+		{
 			ID:       "ai-coding-agent",
 			Title:    "Coding Agent Shape",
 			Section:  "Agent Workflows",

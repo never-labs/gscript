@@ -14,7 +14,7 @@ Generated from the current `leia` binary capabilities.
 | `doc` | Generate reference docs or validate repository docs. |
 | `env` | Report toolchain, project, cache, and platform environment. |
 | `eval` | Execute source passed on the command line. |
-| `evaluate` | Emit a syntax-level agent evaluation report skeleton. |
+| `evaluate` | Run evaluate blocks and emit an agent evaluation report. |
 | `fmt` | Normalize source formatting. |
 | `help` | Show command help. |
 | `inspect` | Inspect compiled artifacts and file directives. |

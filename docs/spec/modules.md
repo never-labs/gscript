@@ -70,6 +70,26 @@ assert(mod.answer == 42)
 assert(require("example.preloaded") == mod)
 ```
 
+If a `package.loaded[name]` entry is replaced with another non-`nil` value,
+the next `require(name)` returns that replacement. Assigning `nil` removes the
+table entry but does not specify a full unload operation: an implementation may
+still have an internal loaded-module cache entry for `name`, and the normal
+resolution order applies again.
+
+```leia run
+package.loaded["example.override"] = {value: 1}
+first := require("example.override")
+assert(first.value == 1)
+
+package.loaded["example.override"] = {value: 2}
+second := require("example.override")
+assert(second.value == 2)
+
+package.loaded["example.override"] = nil
+third := require("example.override")
+assert(third == second)
+```
+
 The module name must be a string.
 
 ```leia run all

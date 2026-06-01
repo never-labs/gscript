@@ -16,8 +16,19 @@ first(1, 2, 3) // 1; the extra argument is discarded
 first()        // nil; missing arguments become nil
 ```
 
+```leia run all
+func first(a, b) {
+    return a
+}
+
+assert(first(1, 2, 3) == 1)
+assert(first() == nil)
+```
+
 The parameter `...` accepts any remaining arguments. Inside the function,
-`{...}` constructs a table containing those arguments.
+`{...}` constructs a table containing those arguments. A function may have at
+most one vararg parameter, and it must be the final parameter. Fixed parameters
+are filled before the vararg list is formed.
 
 ```leia
 func count(...) {
@@ -35,6 +46,18 @@ func count(...) {
 }
 
 assert(count(1, 2, 3) == 3)
+```
+
+```leia run all
+func rest(head, ...) {
+    tail := {...}
+    return {head, tail[1], tail[2]}
+}
+
+values := rest("a", "b", "c")
+assert(values[1] == "a")
+assert(values[2] == "b")
+assert(values[3] == "c")
 ```
 
 ## Multiple Results
@@ -113,6 +136,36 @@ variable holding the first result of a call is an ordinary single value.
 ```leia
 v := triple() // v == 10
 a, b := v     // a == 10; b == nil
+```
+
+```leia run
+func triple() {
+    return 10, 20, 30
+}
+
+a, b, c := triple()
+assert(a == 10)
+assert(b == 20)
+assert(c == 30)
+
+func sum3(x, y, z) {
+    return x + y + z
+}
+
+assert(sum3(triple()) == 60)
+assert(sum3(triple(), 1, 2) == 13)
+
+expanded := {1, spread(triple()), 40}
+assert(expanded[1] == 1)
+assert(expanded[2] == 10)
+assert(expanded[3] == 20)
+assert(expanded[4] == 30)
+assert(expanded[5] == 40)
+
+v := triple()
+x, y := v
+assert(x == 10)
+assert(y == nil)
 ```
 
 Closures capture lexical variables by reference. Mutating a captured variable is

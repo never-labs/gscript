@@ -7,6 +7,13 @@ braces. Locals declared inside the block are not visible after the closing
 brace. A block evaluates its statements in source order until control transfers,
 an error unwinds, or the block ends normally.
 
+```leia fail
+if true {
+    hidden := 1
+}
+assert(hidden == 1)
+```
+
 `if` evaluates its condition and executes the first matching branch. Conditions
 use Leia truthiness: only `nil` and `false` are false. `elseif` branches are
 tested left-to-right after earlier conditions are false. At most one branch
@@ -56,6 +63,26 @@ first condition check. The condition is checked before each iteration. The post
 statement runs after each normal iteration and after `continue`; it does not run
 after `break`, `return`, `goto`, or an unwind out of the loop body.
 
+```leia run all
+postCount := 0
+bodyCount := 0
+
+for i := 0; i < 4; postCount++ {
+    if i == 1 {
+        i++
+        continue
+    }
+    if i == 3 {
+        break
+    }
+    bodyCount += 1
+    i++
+}
+
+assert(postCount == 3)
+assert(bodyCount == 2)
+```
+
 `for key := range iterator { ... }` and
 `for key, value := range iterator { ... }` iterate over a runtime iterator. For
 ordinary tables, use `pairs(table)` to obtain the table iterator. Sequence-style
@@ -78,6 +105,20 @@ for k, v := range pairs(items) {
 
 assert(keySum == 6)
 assert(sum == 60)
+```
+
+```leia run
+calls := {}
+
+for _, value := range pairs({10, 20, 30}) {
+    calls[#calls + 1] = func() {
+        return value
+    }
+}
+
+assert(calls[1]() == 10)
+assert(calls[2]() == 20)
+assert(calls[3]() == 30)
 ```
 
 `break` exits the innermost enclosing loop. `continue` starts the next

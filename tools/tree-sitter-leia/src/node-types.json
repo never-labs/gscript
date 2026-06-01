@@ -554,6 +554,32 @@
     }
   },
   {
+    "type": "evaluate_block",
+    "named": true,
+    "fields": {
+      "body": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "block",
+            "named": true
+          }
+        ]
+      },
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "string",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
     "type": "expression",
     "named": true,
     "fields": {},
@@ -1461,6 +1487,10 @@
           "named": true
         },
         {
+          "type": "evaluate_block",
+          "named": true
+        },
+        {
           "type": "for_statement",
           "named": true
         },
@@ -1893,6 +1923,10 @@
   },
   {
     "type": "elseif",
+    "named": false
+  },
+  {
+    "type": "evaluate",
     "named": false
   },
   {

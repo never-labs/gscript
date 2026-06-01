@@ -1,0 +1,8 @@
+func normalize(name) {
+    return string.lower(string.gsub(name, "%s+", "-"))
+}
+
+evaluate "normalizes display names" {
+    slug := normalize("Leia Evaluate")
+    assert(slug == "leia-evaluate")
+}

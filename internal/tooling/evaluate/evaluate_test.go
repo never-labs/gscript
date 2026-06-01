@@ -41,7 +41,7 @@ evaluate "answer echoes through tool" {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if report.SchemaVersion != SchemaVersion || report.Phase != "syntax-static" || report.Status != "ok" {
+	if report.SchemaVersion != SchemaVersion || report.Phase != "runtime-minimal" || report.Status != "ok" {
 		t.Fatalf("report header = %#v", report)
 	}
 	if report.Summary.Files != 1 || report.Summary.ParsedFiles != 1 {
@@ -53,7 +53,7 @@ evaluate "answer echoes through tool" {
 	if report.Summary.EvaluateBlocks != 1 {
 		t.Fatalf("summary evaluate blocks = %#v", report.Summary)
 	}
-	if len(report.Cases) != 1 || report.Cases[0].Name != "answer echoes through tool" || report.Cases[0].Status != "discovered" {
+	if len(report.Cases) != 1 || report.Cases[0].Name != "answer echoes through tool" || report.Cases[0].Status != "passed" {
 		t.Fatalf("cases = %#v", report.Cases)
 	}
 	if report.Cases[0].SourcePath != path || report.Cases[0].Range.StartLine == 0 || report.Cases[0].CaseID == "" {
@@ -64,6 +64,35 @@ evaluate "answer echoes through tool" {
 	}
 	if len(report.Findings) != 1 || report.Findings[0].Kind != "todo" {
 		t.Fatalf("findings = %#v, want one TODO finding", report.Findings)
+	}
+}
+
+func TestRunExecutesEvaluateBodyAndReportsFailure(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "checks.leia")
+	if err := os.WriteFile(path, []byte(`evaluate "math still works" {
+    value := 2 + 2
+    assert(value == 5, "expected five")
+}
+`), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	report, err := Run(Options{Paths: []string{path}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Status != "failed" {
+		t.Fatalf("status = %q, want failed", report.Status)
+	}
+	if len(report.Cases) != 1 || report.Cases[0].Status != "failed" {
+		t.Fatalf("cases = %#v", report.Cases)
+	}
+	if len(report.Findings) != 1 || report.Findings[0].Kind != "case_runtime_error" {
+		t.Fatalf("findings = %#v, want case_runtime_error", report.Findings)
+	}
+	if report.Findings[0].Line != 1 || report.Findings[0].Column != 1 {
+		t.Fatalf("finding source = %#v", report.Findings[0])
 	}
 }
 

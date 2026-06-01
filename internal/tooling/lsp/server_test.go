@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"strings"
 	"testing"
 )
 
@@ -38,6 +39,12 @@ func TestServerInitializeShutdown(t *testing.T) {
 	}
 	if caps["completionProvider"] == nil {
 		t.Fatalf("initialize result missing completion capability: %#v", caps)
+	}
+	if caps["hoverProvider"] != true {
+		t.Fatalf("initialize result missing hover capability: %#v", caps)
+	}
+	if caps["documentSymbolProvider"] != true {
+		t.Fatalf("initialize result missing document symbol capability: %#v", caps)
 	}
 	if got := msgs[1]["id"]; got != float64(2) {
 		t.Fatalf("shutdown id = %#v, want 2", got)
@@ -198,6 +205,153 @@ func TestCompletionReturnsLeiaKeywords(t *testing.T) {
 		if !labels[want] {
 			t.Fatalf("completion labels missing %q: %#v", want, labels)
 		}
+	}
+}
+
+func TestDocumentSymbolReturnsDeclarations(t *testing.T) {
+	input := mustEncodeMessages(t,
+		map[string]any{
+			"jsonrpc": "2.0",
+			"method":  "textDocument/didOpen",
+			"params": map[string]any{
+				"textDocument": map[string]any{
+					"uri":        "file:///tmp/symbols.leia",
+					"languageId": "leia",
+					"version":    1,
+					"text": strings.Join([]string{
+						"func add(a, b) {",
+						"    return a + b",
+						"}",
+						"// Calculator tool.",
+						"// leia:requires: cap.none",
+						"tool calculate(input) {",
+						"    return input",
+						"}",
+						"agent helper {",
+						"    model: \"test\"",
+						"}",
+						"",
+					}, "\n"),
+				},
+			},
+		},
+		map[string]any{
+			"jsonrpc": "2.0",
+			"id":      9,
+			"method":  "textDocument/documentSymbol",
+			"params": map[string]any{
+				"textDocument": map[string]any{"uri": "file:///tmp/symbols.leia"},
+			},
+		},
+	)
+	var out bytes.Buffer
+	err := NewServer().Run(context.Background(), bytes.NewReader(input), &out)
+	if err != nil {
+		t.Fatalf("Run returned error: %v", err)
+	}
+
+	msgs := readOutputMessages(t, out.Bytes())
+	if len(msgs) != 2 {
+		t.Fatalf("expected diagnostics notification and documentSymbol response, got %d: %#v", len(msgs), msgs)
+	}
+	symbols := msgs[1]["result"].([]any)
+	if len(symbols) != 3 {
+		t.Fatalf("expected 3 symbols, got %#v", symbols)
+	}
+	got := map[string]map[string]any{}
+	for _, raw := range symbols {
+		sym := raw.(map[string]any)
+		got[sym["name"].(string)] = sym
+	}
+	for _, name := range []string{"add", "calculate", "helper"} {
+		if got[name] == nil {
+			t.Fatalf("missing symbol %q: %#v", name, got)
+		}
+	}
+	if got["add"]["kind"] != float64(12) {
+		t.Fatalf("add kind = %#v, want function", got["add"]["kind"])
+	}
+	if got["helper"]["kind"] != float64(5) {
+		t.Fatalf("helper kind = %#v, want class", got["helper"]["kind"])
+	}
+	selection := got["calculate"]["selectionRange"].(map[string]any)
+	start := selection["start"].(map[string]any)
+	if start["line"] != float64(5) || start["character"] != float64(5) {
+		t.Fatalf("calculate selection start = %#v, want 5:5", start)
+	}
+}
+
+func TestHoverReturnsKeywordStdlibAndDeclaration(t *testing.T) {
+	src := strings.Join([]string{
+		"func add(a, b) {",
+		"    return a + b",
+		"}",
+		"math.floor(1.2)",
+		"",
+	}, "\n")
+	input := mustEncodeMessages(t,
+		map[string]any{
+			"jsonrpc": "2.0",
+			"method":  "textDocument/didOpen",
+			"params": map[string]any{
+				"textDocument": map[string]any{
+					"uri":        "file:///tmp/hover.leia",
+					"languageId": "leia",
+					"version":    1,
+					"text":       src,
+				},
+			},
+		},
+		map[string]any{
+			"jsonrpc": "2.0",
+			"id":      10,
+			"method":  "textDocument/hover",
+			"params": map[string]any{
+				"textDocument": map[string]any{"uri": "file:///tmp/hover.leia"},
+				"position":     map[string]any{"line": 1, "character": 5},
+			},
+		},
+		map[string]any{
+			"jsonrpc": "2.0",
+			"id":      11,
+			"method":  "textDocument/hover",
+			"params": map[string]any{
+				"textDocument": map[string]any{"uri": "file:///tmp/hover.leia"},
+				"position":     map[string]any{"line": 3, "character": 1},
+			},
+		},
+		map[string]any{
+			"jsonrpc": "2.0",
+			"id":      12,
+			"method":  "textDocument/hover",
+			"params": map[string]any{
+				"textDocument": map[string]any{"uri": "file:///tmp/hover.leia"},
+				"position":     map[string]any{"line": 0, "character": 6},
+			},
+		},
+	)
+	var out bytes.Buffer
+	err := NewServer().Run(context.Background(), bytes.NewReader(input), &out)
+	if err != nil {
+		t.Fatalf("Run returned error: %v", err)
+	}
+
+	msgs := readOutputMessages(t, out.Bytes())
+	if len(msgs) != 4 {
+		t.Fatalf("expected diagnostics notification and 3 hover responses, got %d: %#v", len(msgs), msgs)
+	}
+	assertHoverContains(t, msgs[1], "**return**")
+	assertHoverContains(t, msgs[2], "stdlib module `math`")
+	assertHoverContains(t, msgs[3], "func `add(a, b)`")
+}
+
+func assertHoverContains(t *testing.T, msg map[string]any, want string) {
+	t.Helper()
+	result := msg["result"].(map[string]any)
+	contents := result["contents"].(map[string]any)
+	value := contents["value"].(string)
+	if !strings.Contains(value, want) {
+		t.Fatalf("hover = %q, want substring %q", value, want)
 	}
 }
 

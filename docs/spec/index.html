@@ -539,6 +539,10 @@ result <span class="tok-operator">:=</span> mark(<span class="tok-string">&quot;
 <span class="tok-comment">// events is {&quot;left&quot;, &quot;right&quot;}</span></code></pre></section><section><h2 id="statements">Statements</h2>
 <p>Statements control execution.</p>
 <p>Blocks introduce lexical scope. A block is a sequence of statements enclosed in braces. Locals declared inside the block are not visible after the closing brace. A block evaluates its statements in source order until control transfers, an error unwinds, or the block ends normally.</p>
+<pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-keyword">if</span> <span class="tok-constant">true</span> {
+    hidden <span class="tok-operator">:=</span> <span class="tok-number">1</span>
+}
+<span class="tok-builtin">assert</span>(hidden <span class="tok-operator">==</span> <span class="tok-number">1</span>)</code></pre>
 <p><code>if</code> evaluates its condition and executes the first matching branch. Conditions use Leia truthiness: only <code>nil</code> and <code>false</code> are false. <code>elseif</code> branches are tested left-to-right after earlier conditions are false. At most one branch runs, and branch blocks have their own lexical scopes.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code">seen <span class="tok-operator">:=</span> {}
 <span class="tok-keyword">if</span> <span class="tok-number">0</span> {
@@ -569,6 +573,23 @@ valueSum <span class="tok-operator">:=</span> <span class="tok-number">0</span>
 <span class="tok-builtin">assert</span>(valueSum <span class="tok-operator">==</span> <span class="tok-number">3</span>)</code></pre>
 <p><code>for { ... }</code> repeats until <code>break</code>, <code>return</code>, <code>goto</code>, an error, or host cancellation exits the loop. <code>for condition { ... }</code> evaluates the condition before every iteration using ordinary truthiness.</p>
 <p>In <code>for init; condition; post { ... }</code>, the init statement runs once before the first condition check. The condition is checked before each iteration. The post statement runs after each normal iteration and after <code>continue</code>; it does not run after <code>break</code>, <code>return</code>, <code>goto</code>, or an unwind out of the loop body.</p>
+<pre class="language-leia leia-code"><code class="language-leia leia-code">postCount <span class="tok-operator">:=</span> <span class="tok-number">0</span>
+bodyCount <span class="tok-operator">:=</span> <span class="tok-number">0</span>
+
+<span class="tok-keyword">for</span> i <span class="tok-operator">:=</span> <span class="tok-number">0</span>; i <span class="tok-operator">&lt;</span> <span class="tok-number">4</span>; postCount<span class="tok-operator">++</span> {
+    <span class="tok-keyword">if</span> i <span class="tok-operator">==</span> <span class="tok-number">1</span> {
+        i<span class="tok-operator">++</span>
+        <span class="tok-keyword">continue</span>
+    }
+    <span class="tok-keyword">if</span> i <span class="tok-operator">==</span> <span class="tok-number">3</span> {
+        <span class="tok-keyword">break</span>
+    }
+    bodyCount <span class="tok-operator">+=</span> <span class="tok-number">1</span>
+    i<span class="tok-operator">++</span>
+}
+
+<span class="tok-builtin">assert</span>(postCount <span class="tok-operator">==</span> <span class="tok-number">3</span>)
+<span class="tok-builtin">assert</span>(bodyCount <span class="tok-operator">==</span> <span class="tok-number">2</span>)</code></pre>
 <p><code>for key := range iterator { ... }</code> and <code>for key, value := range iterator { ... }</code> iterate over a runtime iterator. For ordinary tables, use <code>pairs(table)</code> to obtain the table iterator. Sequence-style table entries use 1-based integer keys. Non-sequence table iteration order is unspecified and must not be used for stable program behavior.</p>
 <p>The range variables are fresh lexical bindings for each iteration. Closures created inside the loop capture that iteration&#x27;s bindings, not one shared loop slot.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code">items <span class="tok-operator">:=</span> {<span class="tok-number">10</span>, <span class="tok-number">20</span>, <span class="tok-number">30</span>}
@@ -582,6 +603,17 @@ keySum <span class="tok-operator">:=</span> <span class="tok-number">0</span>
 
 <span class="tok-builtin">assert</span>(keySum <span class="tok-operator">==</span> <span class="tok-number">6</span>)
 <span class="tok-builtin">assert</span>(sum <span class="tok-operator">==</span> <span class="tok-number">60</span>)</code></pre>
+<pre class="language-leia leia-code"><code class="language-leia leia-code">calls <span class="tok-operator">:=</span> {}
+
+<span class="tok-keyword">for</span> _, value <span class="tok-operator">:=</span> <span class="tok-keyword">range</span> <span class="tok-builtin">pairs</span>({<span class="tok-number">10</span>, <span class="tok-number">20</span>, <span class="tok-number">30</span>}) {
+    calls[<span class="tok-operator">#</span>calls <span class="tok-operator">+</span> <span class="tok-number">1</span>] <span class="tok-operator">=</span> <span class="tok-keyword">func</span>() {
+        <span class="tok-keyword">return</span> value
+    }
+}
+
+<span class="tok-builtin">assert</span>(calls[<span class="tok-number">1</span>]() <span class="tok-operator">==</span> <span class="tok-number">10</span>)
+<span class="tok-builtin">assert</span>(calls[<span class="tok-number">2</span>]() <span class="tok-operator">==</span> <span class="tok-number">20</span>)
+<span class="tok-builtin">assert</span>(calls[<span class="tok-number">3</span>]() <span class="tok-operator">==</span> <span class="tok-number">30</span>)</code></pre>
 <p><code>break</code> exits the innermost enclosing loop. <code>continue</code> starts the next iteration of the innermost enclosing loop. Outside a loop they are invalid.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code">values <span class="tok-operator">:=</span> {}
 <span class="tok-keyword">for</span> i <span class="tok-operator">:=</span> <span class="tok-number">1</span>; i <span class="tok-operator">&lt;=</span> <span class="tok-number">6</span>; i<span class="tok-operator">++</span> {
@@ -638,7 +670,13 @@ scoped()
 
 first(<span class="tok-number">1</span>, <span class="tok-number">2</span>, <span class="tok-number">3</span>) <span class="tok-comment">// 1; the extra argument is discarded</span>
 first()        <span class="tok-comment">// nil; missing arguments become nil</span></code></pre>
-<p>The parameter <code>...</code> accepts any remaining arguments. Inside the function, <code>{...}</code> constructs a table containing those arguments.</p>
+<pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-keyword">func</span> first(a, b) {
+    <span class="tok-keyword">return</span> a
+}
+
+<span class="tok-builtin">assert</span>(first(<span class="tok-number">1</span>, <span class="tok-number">2</span>, <span class="tok-number">3</span>) <span class="tok-operator">==</span> <span class="tok-number">1</span>)
+<span class="tok-builtin">assert</span>(first() <span class="tok-operator">==</span> <span class="tok-constant">nil</span>)</code></pre>
+<p>The parameter <code>...</code> accepts any remaining arguments. Inside the function, <code>{...}</code> constructs a table containing those arguments. A function may have at most one vararg parameter, and it must be the final parameter. Fixed parameters are filled before the vararg list is formed.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-keyword">func</span> count(<span class="tok-operator">...</span>) {
     args <span class="tok-operator">:=</span> {<span class="tok-operator">...</span>}
     <span class="tok-keyword">return</span> <span class="tok-operator">#</span>args
@@ -651,6 +689,15 @@ count(<span class="tok-number">1</span>, <span class="tok-number">2</span>, <spa
 }
 
 <span class="tok-builtin">assert</span>(count(<span class="tok-number">1</span>, <span class="tok-number">2</span>, <span class="tok-number">3</span>) <span class="tok-operator">==</span> <span class="tok-number">3</span>)</code></pre>
+<pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-keyword">func</span> rest(head, <span class="tok-operator">...</span>) {
+    tail <span class="tok-operator">:=</span> {<span class="tok-operator">...</span>}
+    <span class="tok-keyword">return</span> {head, tail[<span class="tok-number">1</span>], tail[<span class="tok-number">2</span>]}
+}
+
+values <span class="tok-operator">:=</span> rest(<span class="tok-string">&quot;a&quot;</span>, <span class="tok-string">&quot;b&quot;</span>, <span class="tok-string">&quot;c&quot;</span>)
+<span class="tok-builtin">assert</span>(values[<span class="tok-number">1</span>] <span class="tok-operator">==</span> <span class="tok-string">&quot;a&quot;</span>)
+<span class="tok-builtin">assert</span>(values[<span class="tok-number">2</span>] <span class="tok-operator">==</span> <span class="tok-string">&quot;b&quot;</span>)
+<span class="tok-builtin">assert</span>(values[<span class="tok-number">3</span>] <span class="tok-operator">==</span> <span class="tok-string">&quot;c&quot;</span>)</code></pre>
 <h3 id="functions-multiple-results">Multiple Results</h3>
 <p>Function calls and some built-ins may produce multiple results. Leia adjusts those results according to the syntactic position where the call appears.</p>
 <p>The stable adjustment rule is:</p>
@@ -688,6 +735,33 @@ first, tail <span class="tok-operator">:=</span> rest(triple()) <span class="tok
 <p>Multi-return adjustment is not transitive through variables or table fields. A variable holding the first result of a call is an ordinary single value.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code">v <span class="tok-operator">:=</span> triple() <span class="tok-comment">// v == 10</span>
 a, b <span class="tok-operator">:=</span> v     <span class="tok-comment">// a == 10; b == nil</span></code></pre>
+<pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-keyword">func</span> triple() {
+    <span class="tok-keyword">return</span> <span class="tok-number">10</span>, <span class="tok-number">20</span>, <span class="tok-number">30</span>
+}
+
+a, b, c <span class="tok-operator">:=</span> triple()
+<span class="tok-builtin">assert</span>(a <span class="tok-operator">==</span> <span class="tok-number">10</span>)
+<span class="tok-builtin">assert</span>(b <span class="tok-operator">==</span> <span class="tok-number">20</span>)
+<span class="tok-builtin">assert</span>(c <span class="tok-operator">==</span> <span class="tok-number">30</span>)
+
+<span class="tok-keyword">func</span> sum3(x, y, z) {
+    <span class="tok-keyword">return</span> x <span class="tok-operator">+</span> y <span class="tok-operator">+</span> z
+}
+
+<span class="tok-builtin">assert</span>(sum3(triple()) <span class="tok-operator">==</span> <span class="tok-number">60</span>)
+<span class="tok-builtin">assert</span>(sum3(triple(), <span class="tok-number">1</span>, <span class="tok-number">2</span>) <span class="tok-operator">==</span> <span class="tok-number">13</span>)
+
+expanded <span class="tok-operator">:=</span> {<span class="tok-number">1</span>, <span class="tok-builtin">spread</span>(triple()), <span class="tok-number">40</span>}
+<span class="tok-builtin">assert</span>(expanded[<span class="tok-number">1</span>] <span class="tok-operator">==</span> <span class="tok-number">1</span>)
+<span class="tok-builtin">assert</span>(expanded[<span class="tok-number">2</span>] <span class="tok-operator">==</span> <span class="tok-number">10</span>)
+<span class="tok-builtin">assert</span>(expanded[<span class="tok-number">3</span>] <span class="tok-operator">==</span> <span class="tok-number">20</span>)
+<span class="tok-builtin">assert</span>(expanded[<span class="tok-number">4</span>] <span class="tok-operator">==</span> <span class="tok-number">30</span>)
+<span class="tok-builtin">assert</span>(expanded[<span class="tok-number">5</span>] <span class="tok-operator">==</span> <span class="tok-number">40</span>)
+
+v <span class="tok-operator">:=</span> triple()
+x, y <span class="tok-operator">:=</span> v
+<span class="tok-builtin">assert</span>(x <span class="tok-operator">==</span> <span class="tok-number">10</span>)
+<span class="tok-builtin">assert</span>(y <span class="tok-operator">==</span> <span class="tok-constant">nil</span>)</code></pre>
 <p>Closures capture lexical variables by reference. Mutating a captured variable is visible to all closures that share the binding.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-keyword">func</span> counter() {
     n <span class="tok-operator">:=</span> <span class="tok-number">0</span>
@@ -1024,7 +1098,7 @@ last <span class="tok-operator">:=</span> <span class="tok-number">0</span>
 <p>An AI operation is deterministic until it reaches a provider, host callback, or tool body with side effects. Tests and replay fixtures should therefore record provider turns at the host boundary.</p>
 <h3 id="ai-native-syntax-evaluate-blocks">Evaluate Blocks</h3>
 <p><code>evaluate &quot;case name&quot; { ... }</code> declares a source-level agent regression case. The case name is a required string literal. The block body uses ordinary Leia statements, so tools can parse declarations, setup code, agent calls, and later assertion syntax without relying on an external fixture format.</p>
-<p>In ordinary script execution an evaluate block has no runtime effect. The <code>leia evaluate</code> command owns discovery and evaluation semantics. The P0 runner discovers cases, reports their source position, and validates the body with the same parser and AI-native syntax checks used for normal code; provider execution, scoring, record/replay, golden updates, and tool/file assertions are reserved for later evaluate phases.</p>
+<p>In ordinary script execution an evaluate block has no runtime effect. The <code>leia evaluate</code> command owns discovery and evaluation semantics. The minimal runner discovers cases, reports their source position, validates the body with the same parser and AI-native syntax checks used for normal code, then executes the body as ordinary Leia code. Built-in <code>assert</code> failures or other runtime errors mark that case failed; provider scoring, record/replay, golden updates, and richer tool/file assertions are reserved for later evaluate phases.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-directive">//leia:requires none</span>
 <span class="tok-keyword">tool</span> lookup(topic) {
     <span class="tok-keyword">return</span> <span class="tok-string">&quot;docs:&quot;</span> <span class="tok-operator">..</span> topic, <span class="tok-constant">nil</span>
@@ -1037,7 +1111,9 @@ last <span class="tok-operator">:=</span> <span class="tok-number">0</span>
 }
 
 evaluate <span class="tok-string">&quot;answer can use lookup&quot;</span> {
-    result, err <span class="tok-operator">:=</span> answer(<span class="tok-string">&quot;what changed?&quot;</span>)
+    result, err <span class="tok-operator">:=</span> lookup(<span class="tok-string">&quot;evaluate&quot;</span>)
+    <span class="tok-builtin">assert</span>(err <span class="tok-operator">==</span> <span class="tok-constant">nil</span>)
+    <span class="tok-builtin">assert</span>(result <span class="tok-operator">==</span> <span class="tok-string">&quot;docs:evaluate&quot;</span>)
 }</code></pre>
 <h3 id="ai-native-syntax-models">Models</h3>
 <p><code>models { ... }</code> declares module-scoped model aliases and provider configuration. A field key is the public alias used by script code. A field value is either another alias string or a provider configuration table.</p>
@@ -1412,6 +1488,18 @@ json2 <span class="tok-operator">:=</span> <span class="tok-builtin">require</sp
 mod <span class="tok-operator">:=</span> <span class="tok-builtin">require</span>(<span class="tok-string">&quot;example.preloaded&quot;</span>)
 <span class="tok-builtin">assert</span>(mod.answer <span class="tok-operator">==</span> <span class="tok-number">42</span>)
 <span class="tok-builtin">assert</span>(<span class="tok-builtin">require</span>(<span class="tok-string">&quot;example.preloaded&quot;</span>) <span class="tok-operator">==</span> mod)</code></pre>
+<p>If a <code>package.loaded[name]</code> entry is replaced with another non-<code>nil</code> value, the next <code>require(name)</code> returns that replacement. Assigning <code>nil</code> removes the table entry but does not specify a full unload operation: an implementation may still have an internal loaded-module cache entry for <code>name</code>, and the normal resolution order applies again.</p>
+<pre class="language-leia leia-code"><code class="language-leia leia-code">package.loaded[<span class="tok-string">&quot;example.override&quot;</span>] <span class="tok-operator">=</span> {value: <span class="tok-number">1</span>}
+first <span class="tok-operator">:=</span> <span class="tok-builtin">require</span>(<span class="tok-string">&quot;example.override&quot;</span>)
+<span class="tok-builtin">assert</span>(first.value <span class="tok-operator">==</span> <span class="tok-number">1</span>)
+
+package.loaded[<span class="tok-string">&quot;example.override&quot;</span>] <span class="tok-operator">=</span> {value: <span class="tok-number">2</span>}
+second <span class="tok-operator">:=</span> <span class="tok-builtin">require</span>(<span class="tok-string">&quot;example.override&quot;</span>)
+<span class="tok-builtin">assert</span>(second.value <span class="tok-operator">==</span> <span class="tok-number">2</span>)
+
+package.loaded[<span class="tok-string">&quot;example.override&quot;</span>] <span class="tok-operator">=</span> <span class="tok-constant">nil</span>
+third <span class="tok-operator">:=</span> <span class="tok-builtin">require</span>(<span class="tok-string">&quot;example.override&quot;</span>)
+<span class="tok-builtin">assert</span>(third <span class="tok-operator">==</span> second)</code></pre>
 <p>The module name must be a string.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code">ok, err <span class="tok-operator">:=</span> <span class="tok-builtin">pcall</span>(<span class="tok-builtin">require</span>, <span class="tok-number">123</span>)
 <span class="tok-builtin">assert</span>(<span class="tok-operator">!</span>ok)
@@ -1468,6 +1556,13 @@ ok, err <span class="tok-operator">:=</span> <span class="tok-builtin">pcall</sp
 <span class="tok-builtin">assert</span>(err <span class="tok-operator">==</span> payload)
 <span class="tok-builtin">assert</span>(err.kind <span class="tok-operator">==</span> <span class="tok-string">&quot;demo&quot;</span>)</code></pre>
 <p><code>pcall(fn, ...)</code> calls <code>fn(...)</code> in protected mode. On success it returns <code>true</code> followed by all results from the call. On failure it returns <code>false</code> and one error object. If the failure came from <code>error(value)</code> or <code>assert(false, value)</code>, the object is <code>value</code>; if it came from a runtime, host, parser, budget, or capability failure, the protected error object is the current diagnostic string.</p>
+<pre class="language-leia leia-code"><code class="language-leia leia-code">ok, a, b <span class="tok-operator">:=</span> <span class="tok-builtin">pcall</span>(<span class="tok-keyword">func</span>() {
+    <span class="tok-keyword">return</span> <span class="tok-string">&quot;a&quot;</span>, <span class="tok-string">&quot;b&quot;</span>
+})
+
+<span class="tok-builtin">assert</span>(ok)
+<span class="tok-builtin">assert</span>(a <span class="tok-operator">==</span> <span class="tok-string">&quot;a&quot;</span>)
+<span class="tok-builtin">assert</span>(b <span class="tok-operator">==</span> <span class="tok-string">&quot;b&quot;</span>)</code></pre>
 <p><code>xpcall(fn, handler, ...)</code> calls <code>fn(...)</code> in protected mode. On success it returns <code>true</code> followed by all results from <code>fn</code>. On failure it calls <code>handler(err)</code> and returns <code>false</code> plus the handler&#x27;s first result. If the handler itself fails, <code>xpcall</code> returns <code>false</code> plus the handler failure&#x27;s error object.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code">ok, value <span class="tok-operator">:=</span> <span class="tok-builtin">pcall</span>(<span class="tok-keyword">func</span>(a, b) {
     <span class="tok-keyword">return</span> a <span class="tok-operator">+</span> b, <span class="tok-string">&quot;kept&quot;</span>
@@ -1478,6 +1573,13 @@ ok, handled <span class="tok-operator">:=</span> <span class="tok-builtin">xpcal
     <span class="tok-keyword">return</span> <span class="tok-string">&quot;handled:&quot;</span> <span class="tok-operator">..</span> <span class="tok-builtin">tostring</span>(err)
 }, <span class="tok-string">&quot;boom&quot;</span>)
 <span class="tok-builtin">assert</span>(<span class="tok-operator">!</span>ok <span class="tok-operator">&amp;&amp;</span> handled <span class="tok-operator">==</span> <span class="tok-string">&quot;handled:boom&quot;</span>)</code></pre>
+<pre class="language-leia leia-code"><code class="language-leia leia-code">payload <span class="tok-operator">:=</span> {kind: <span class="tok-string">&quot;assertion&quot;</span>}
+ok, err <span class="tok-operator">:=</span> <span class="tok-builtin">pcall</span>(<span class="tok-keyword">func</span>() {
+    <span class="tok-builtin">assert</span>(<span class="tok-constant">false</span>, payload)
+})
+
+<span class="tok-builtin">assert</span>(<span class="tok-operator">!</span>ok)
+<span class="tok-builtin">assert</span>(err <span class="tok-operator">==</span> payload)</code></pre>
 <p>Runtime errors raised by invalid operations become diagnostic strings inside <code>pcall</code> and <code>xpcall</code>.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code">ok, err <span class="tok-operator">:=</span> <span class="tok-builtin">pcall</span>(<span class="tok-keyword">func</span>() {
     <span class="tok-keyword">return</span> <span class="tok-string">&quot;x&quot;</span> <span class="tok-operator">+</span> <span class="tok-number">3</span>

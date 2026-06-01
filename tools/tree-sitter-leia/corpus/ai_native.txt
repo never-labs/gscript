@@ -37,6 +37,10 @@ budget { turns: 1 } {
   result, err := answer("What is Leia?")
 }
 
+evaluate "answer can use lookup" {
+  result, err := answer("what changed?")
+}
+
 ---
 
 (source_file
@@ -60,4 +64,40 @@ budget { turns: 1 } {
   (statement
     (budget_statement
       config: (config_block)
+      body: (block)))
+  (statement
+    (evaluate_block
+      name: (string)
       body: (block))))
+
+==================
+AI-native expressions
+==================
+
+run := agent {
+  model: "demo"
+  output: { summary: "" }
+} flow {
+  prompt := messages {
+    system: "Be concise."
+    "user": "Summarize this."
+    [role]: content
+  }
+  return turn {
+    messages: prompt
+    tools: [lookup]
+  }
+}
+
+---
+
+(source_file
+  (statement
+    (simple_statement
+      (assignment_statement
+        left: (expression_list)
+        right: (expression_list
+          (expression
+            (agent_literal
+              config: (config_block)
+              flow: (flow_block))))))))

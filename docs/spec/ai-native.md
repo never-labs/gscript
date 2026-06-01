@@ -19,11 +19,12 @@ statements, so tools can parse declarations, setup code, agent calls, and later
 assertion syntax without relying on an external fixture format.
 
 In ordinary script execution an evaluate block has no runtime effect. The
-`leia evaluate` command owns discovery and evaluation semantics. The P0 runner
-discovers cases, reports their source position, and validates the body with the
-same parser and AI-native syntax checks used for normal code; provider
-execution, scoring, record/replay, golden updates, and tool/file assertions are
-reserved for later evaluate phases.
+`leia evaluate` command owns discovery and evaluation semantics. The minimal
+runner discovers cases, reports their source position, validates the body with
+the same parser and AI-native syntax checks used for normal code, then executes
+the body as ordinary Leia code. Built-in `assert` failures or other runtime
+errors mark that case failed; provider scoring, record/replay, golden updates,
+and richer tool/file assertions are reserved for later evaluate phases.
 
 ```leia
 //leia:requires none
@@ -38,7 +39,9 @@ agent answer(question) {
 }
 
 evaluate "answer can use lookup" {
-    result, err := answer("what changed?")
+    result, err := lookup("evaluate")
+    assert(err == nil)
+    assert(result == "docs:evaluate")
 }
 ```
 

@@ -78,8 +78,11 @@ def check_textmate() -> None:
 
     assert_match(leia, "keyword.control.directive.leia", source)
     assert_match(leia, "storage.type.function.leia", source)
+    assert_match(leia, "storage.type.function.leia", 'import "go:net/http" as http')
     assert_match(leia, "keyword.control.ai.leia", source)
+    assert_match(leia, "keyword.control.ai.leia", 'evaluate "answer can use lookup" {}')
     assert_match(leia, "support.type.primitive.leia", source)
+    assert_match(leia, "support.type.primitive.leia", "ids := [3]i64{1, 2, 3}")
     assert_match(leia, "constant.numeric.duration.leia", source)
     assert_match(leia, "keyword.operator.leia", source)
     assert_match(leia, "entity.name.function.leia", source)
@@ -128,6 +131,8 @@ def check_tree_sitter_assets() -> None:
         "agent_declaration",
         "models_declaration",
         "tool_declaration",
+        "import_declaration",
+        "evaluate_block",
         "turn_expression",
         "messages_expression",
         "dense_literal",

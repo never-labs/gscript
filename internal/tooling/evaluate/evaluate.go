@@ -13,6 +13,8 @@ import (
 	"github.com/never-labs/leia/internal/ast"
 	"github.com/never-labs/leia/internal/lexer"
 	"github.com/never-labs/leia/internal/parser"
+	"github.com/never-labs/leia/internal/runtime"
+	stdlibinstall "github.com/never-labs/leia/internal/stdlib/install"
 )
 
 const SchemaVersion = 1
@@ -70,6 +72,11 @@ type Finding struct {
 	Column   int    `json:"column,omitempty"`
 }
 
+type parsedCase struct {
+	Case
+	Body *ast.BlockStmt
+}
+
 func Run(opts Options) (Report, error) {
 	paths := opts.Paths
 	if len(paths) == 0 {
@@ -81,13 +88,13 @@ func Run(opts Options) (Report, error) {
 	}
 	report := Report{
 		SchemaVersion: SchemaVersion,
-		Phase:         "syntax-static",
+		Phase:         "runtime-minimal",
 		Status:        "ok",
 		Inputs:        []Input{},
 		Cases:         []Case{},
 		Findings:      []Finding{},
 		Notes: []string{
-			"evaluate P0 performs syntax-level discovery only; it does not run providers, tools, or agent workflows.",
+			"evaluate runs each evaluate block body as ordinary Leia code; provider scoring, golden updates, and workflow orchestration are reserved for later phases.",
 		},
 	}
 	for _, file := range files {
@@ -103,18 +110,37 @@ func Run(opts Options) (Report, error) {
 		}
 		report.Findings = append(report.Findings, todoFindings(file, src)...)
 		if strings.HasSuffix(file, ".leia") {
-			counts, cases, findings := parseLeia(file, src)
+			counts, prog, cases, findings := parseLeia(file, src)
 			report.Summary.ParsedFiles += counts.ParsedFiles
 			report.Summary.EvaluateBlocks += counts.EvaluateBlocks
 			report.Summary.Agents += counts.Agents
 			report.Summary.Tools += counts.Tools
 			report.Summary.Models += counts.Models
 			report.Summary.Budgets += counts.Budgets
-			report.Cases = append(report.Cases, cases...)
 			if len(findings) > 0 {
 				input.Status = "error"
 				report.Status = "failed"
 				report.Findings = append(report.Findings, findings...)
+			} else {
+				for _, parsed := range cases {
+					c := parsed.Case
+					if err := executeCase(file, prog, parsed); err != nil {
+						c.Status = "failed"
+						input.Status = "error"
+						report.Status = "failed"
+						report.Findings = append(report.Findings, Finding{
+							Kind:     "case_runtime_error",
+							Severity: "error",
+							Message:  err.Error(),
+							Path:     file,
+							Line:     c.Range.StartLine,
+							Column:   c.Range.StartColumn,
+						})
+					} else {
+						c.Status = "passed"
+					}
+					report.Cases = append(report.Cases, c)
+				}
 			}
 		}
 		report.Inputs = append(report.Inputs, input)
@@ -229,25 +255,25 @@ func todoMarkerIndex(text string) int {
 	return -1
 }
 
-func parseLeia(path string, src []byte) (Summary, []Case, []Finding) {
+func parseLeia(path string, src []byte) (Summary, *ast.Program, []parsedCase, []Finding) {
 	tokens, err := lexer.New(string(src)).Tokenize()
 	if err != nil {
-		return Summary{}, nil, []Finding{{Kind: "lex_error", Severity: "error", Message: err.Error(), Path: path}}
+		return Summary{}, nil, nil, []Finding{{Kind: "lex_error", Severity: "error", Message: err.Error(), Path: path}}
 	}
 	prog, err := parser.New(tokens).Parse()
 	if err != nil {
-		return Summary{}, nil, []Finding{{Kind: "parse_error", Severity: "error", Message: err.Error(), Path: path}}
+		return Summary{}, nil, nil, []Finding{{Kind: "parse_error", Severity: "error", Message: err.Error(), Path: path}}
 	}
 	counts := Summary{ParsedFiles: 1}
-	var cases []Case
+	var cases []parsedCase
 	countLLMStmts(path, prog.Stmts, &counts, &cases)
 	if err := ast.ValidateLLM(prog); err != nil {
-		return counts, cases, []Finding{{Kind: "ai_syntax_error", Severity: "error", Message: err.Error(), Path: path}}
+		return counts, prog, cases, []Finding{{Kind: "ai_syntax_error", Severity: "error", Message: err.Error(), Path: path}}
 	}
-	return counts, cases, nil
+	return counts, prog, cases, nil
 }
 
-func countLLMStmts(path string, stmts []ast.Stmt, counts *Summary, cases *[]Case) {
+func countLLMStmts(path string, stmts []ast.Stmt, counts *Summary, cases *[]parsedCase) {
 	for _, stmt := range stmts {
 		switch s := stmt.(type) {
 		case *ast.AgentDeclStmt:
@@ -269,15 +295,18 @@ func countLLMStmts(path string, stmts []ast.Stmt, counts *Summary, cases *[]Case
 			}
 		case *ast.EvaluateBlockStmt:
 			counts.EvaluateBlocks++
-			*cases = append(*cases, Case{
-				CaseID:     fmt.Sprintf("%s:%d:%d", path, s.P.Line, s.P.Column),
-				Name:       s.Name,
-				SourcePath: path,
-				Range: SourceRange{
-					StartLine:   s.P.Line,
-					StartColumn: s.P.Column,
+			*cases = append(*cases, parsedCase{
+				Case: Case{
+					CaseID:     fmt.Sprintf("%s:%d:%d", path, s.P.Line, s.P.Column),
+					Name:       s.Name,
+					SourcePath: path,
+					Range: SourceRange{
+						StartLine:   s.P.Line,
+						StartColumn: s.P.Column,
+					},
+					Status: "pending",
 				},
-				Status: "discovered",
+				Body: s.Body,
 			})
 			if s.Body != nil {
 				countLLMStmts(path, s.Body.Stmts, counts, cases)
@@ -323,6 +352,34 @@ func countLLMStmts(path string, stmts []ast.Stmt, counts *Summary, cases *[]Case
 			}
 		}
 	}
+}
+
+func executeCase(path string, prog *ast.Program, c parsedCase) error {
+	if prog == nil || c.Body == nil {
+		return nil
+	}
+	interp := runtime.NewCore()
+	stdlibinstall.Install(interp)
+	if abs, err := filepath.Abs(path); err == nil {
+		interp.SetScriptDir(filepath.Dir(abs))
+	}
+	interp.SetArgs(path, nil)
+	return interp.Exec(&ast.Program{
+		Stmts:          caseProgramStmts(prog.Stmts, c.Body.Stmts),
+		FileDirectives: append([]ast.FileDirective(nil), prog.FileDirectives...),
+	})
+}
+
+func caseProgramStmts(topLevel []ast.Stmt, body []ast.Stmt) []ast.Stmt {
+	stmts := make([]ast.Stmt, 0, len(topLevel)+len(body))
+	for _, stmt := range topLevel {
+		if _, ok := stmt.(*ast.EvaluateBlockStmt); ok {
+			continue
+		}
+		stmts = append(stmts, stmt)
+	}
+	stmts = append(stmts, body...)
+	return stmts
 }
 
 func FormatText(report Report) string {

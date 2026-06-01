@@ -193,6 +193,7 @@ func TestInternalTopLevelPackagesStayArchitectural(t *testing.T) {
 		"stdlib":    true,
 		"support":   true,
 		"testutil":  true,
+		"tooling":   true,
 		"vm":        true,
 	}
 

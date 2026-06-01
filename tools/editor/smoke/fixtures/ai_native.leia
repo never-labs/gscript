@@ -30,6 +30,10 @@ agent answer(question) {
     return result, err
 }
 
+evaluate "answer can use lookup" {
+    result, err := answer("What is Leia?")
+}
+
 go func() {
     ch := chan()
     ch <- answer("What is Leia?")

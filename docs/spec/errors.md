@@ -27,6 +27,16 @@ value)`, the object is `value`; if it came from a runtime, host, parser,
 budget, or capability failure, the protected error object is the current
 diagnostic string.
 
+```leia run
+ok, a, b := pcall(func() {
+    return "a", "b"
+})
+
+assert(ok)
+assert(a == "a")
+assert(b == "b")
+```
+
 `xpcall(fn, handler, ...)` calls `fn(...)` in protected mode. On success it
 returns `true` followed by all results from `fn`. On failure it calls
 `handler(err)` and returns `false` plus the handler's first result. If the
@@ -43,6 +53,16 @@ ok, handled := xpcall(error, func(err) {
     return "handled:" .. tostring(err)
 }, "boom")
 assert(!ok && handled == "handled:boom")
+```
+
+```leia run all
+payload := {kind: "assertion"}
+ok, err := pcall(func() {
+    assert(false, payload)
+})
+
+assert(!ok)
+assert(err == payload)
 ```
 
 Runtime errors raised by invalid operations become diagnostic strings inside

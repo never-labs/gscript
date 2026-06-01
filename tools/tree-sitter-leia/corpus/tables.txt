@@ -7,6 +7,7 @@ user := {
   scores: [1, 2, 3],
   ["active"]: true,
   []f64{1.5, 2.5},
+  flags: [3]bool{true; false; true},
 }
 
 ---
@@ -22,4 +23,40 @@ user := {
               (table_field)
               (table_field)
               (table_field)
+              (table_field)
               (table_field))))))))
+
+==================
+Dense arrays
+==================
+
+ids := [3]i64{1, 2, 3}
+weights := []f32{1.5; 2.5; 3.5}
+mask := [2]bool{true, false}
+
+---
+
+(source_file
+  (statement
+    (simple_statement
+      (assignment_statement
+        right: (expression_list
+          (expression
+            (dense_literal
+              length: (number)
+              type: (dense_type)))))))
+  (statement
+    (simple_statement
+      (assignment_statement
+        right: (expression_list
+          (expression
+            (dense_literal
+              type: (dense_type)))))))
+  (statement
+    (simple_statement
+      (assignment_statement
+        right: (expression_list
+          (expression
+            (dense_literal
+              length: (number)
+              type: (dense_type))))))))

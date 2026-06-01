@@ -48,6 +48,7 @@ module.exports = grammar({
       $.agent_declaration,
       $.models_declaration,
       $.budget_statement,
+      $.evaluate_block,
       $.if_statement,
       $.for_statement,
       $.select_statement,
@@ -104,6 +105,12 @@ module.exports = grammar({
     budget_statement: $ => seq(
       "budget",
       field("config", $.config_block),
+      field("body", $.block),
+    ),
+
+    evaluate_block: $ => seq(
+      "evaluate",
+      field("name", $.string),
       field("body", $.block),
     ),
 

@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/never-labs/leia/internal/evaluate"
+	"github.com/never-labs/leia/internal/tooling/evaluate"
 )
 
 func runEvaluateCommand(args []string, outw, errw io.Writer) int {

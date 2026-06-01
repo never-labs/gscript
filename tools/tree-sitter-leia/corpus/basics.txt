@@ -25,3 +25,26 @@ for i := 0; i <= 10; i++ {
       condition: (expression)
       update: (simple_statement)
       body: (block))))
+
+==================
+Imports and require
+==================
+
+import "go:net/http" as http
+
+json := require("json")
+assets := require("assets:icons.logo")
+
+---
+
+(source_file
+  (statement
+    (import_declaration
+      path: (string)
+      alias: (identifier)))
+  (statement
+    (simple_statement
+      (assignment_statement)))
+  (statement
+    (simple_statement
+      (assignment_statement))))

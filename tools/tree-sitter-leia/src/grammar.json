@@ -94,6 +94,10 @@
         },
         {
           "type": "SYMBOL",
+          "name": "evaluate_block"
+        },
+        {
+          "type": "SYMBOL",
           "name": "if_statement"
         },
         {
@@ -378,6 +382,31 @@
           "content": {
             "type": "SYMBOL",
             "name": "config_block"
+          }
+        },
+        {
+          "type": "FIELD",
+          "name": "body",
+          "content": {
+            "type": "SYMBOL",
+            "name": "block"
+          }
+        }
+      ]
+    },
+    "evaluate_block": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "evaluate"
+        },
+        {
+          "type": "FIELD",
+          "name": "name",
+          "content": {
+            "type": "SYMBOL",
+            "name": "string"
           }
         },
         {
