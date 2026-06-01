@@ -5,21 +5,10 @@ import (
 	goruntime "runtime"
 
 	"github.com/never-labs/gscript/internal/runtime"
+	debugrt "github.com/never-labs/gscript/internal/stdlibrt/debug"
 )
 
-type DebugRuntime interface {
-	DebugAccessEnabled() bool
-	DebugStackSnapshot(skip int) []runtime.DebugFrame
-	DebugGlobalsSnapshot() *runtime.Table
-	SetDebugHookValue(hook runtime.Value, opts runtime.DebugHookOptions)
-	ClearDebugHookValue()
-	DebugHookValue() (runtime.Value, runtime.DebugHookOptions)
-	SetDebugSinkValue(sink runtime.Value) runtime.Value
-	EmitDebugHook(eventType, kind, name string, data runtime.Value) error
-	EmitDebugSink(event *runtime.Table) error
-}
-
-func BuildDebug(dbg DebugRuntime) *runtime.Table {
+func BuildDebug(dbg debugrt.Runtime) *runtime.Table {
 	t := runtime.NewTable()
 
 	set := func(name string, fn func([]runtime.Value) ([]runtime.Value, error)) {
@@ -169,7 +158,7 @@ func BuildDebug(dbg DebugRuntime) *runtime.Table {
 	return t
 }
 
-func debugStack(dbg DebugRuntime, skip int) []runtime.DebugFrame {
+func debugStack(dbg debugrt.Runtime, skip int) []runtime.DebugFrame {
 	if dbg == nil {
 		return nil
 	}

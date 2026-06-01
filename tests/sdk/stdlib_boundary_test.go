@@ -1,6 +1,7 @@
 package gscript_test
 
 import (
+	"go/ast"
 	"go/parser"
 	"go/token"
 	"os"
@@ -124,6 +125,41 @@ func TestInternalStdlibDirsRepresentCatalogModules(t *testing.T) {
 			t.Fatalf("internal/stdlib/%s is not a catalog stdlib module; shared substrates belong in neutral internal packages", dir)
 		}
 	}
+}
+
+func TestStdlibrtModulesDoNotOwnAdapterContracts(t *testing.T) {
+	modulesRoot := filepath.Join(repoRoot(t), "internal", "stdlibrt", "modules")
+
+	forEachGoFile(t, modulesRoot, func(path string) {
+		if strings.HasSuffix(path, "_test.go") {
+			return
+		}
+		file, err := parser.ParseFile(token.NewFileSet(), path, nil, 0)
+		if err != nil {
+			t.Fatalf("parse %s: %v", path, err)
+		}
+		for _, decl := range file.Decls {
+			gen, ok := decl.(*ast.GenDecl)
+			if !ok || gen.Tok != token.TYPE {
+				continue
+			}
+			for _, spec := range gen.Specs {
+				typeSpec, ok := spec.(*ast.TypeSpec)
+				if !ok {
+					continue
+				}
+				name := typeSpec.Name.Name
+				if strings.HasSuffix(name, "Options") {
+					t.Fatalf("%s defines adapter option type %s; stdlibrt adapter contracts belong in dedicated internal/stdlibrt/* packages", relativeToRoot(t, path), name)
+				}
+				if strings.HasSuffix(name, "Runtime") {
+					if _, ok := typeSpec.Type.(*ast.InterfaceType); ok {
+						t.Fatalf("%s defines runtime adapter interface %s; stdlibrt adapter contracts belong in dedicated internal/stdlibrt/* packages", relativeToRoot(t, path), name)
+					}
+				}
+			}
+		}
+	})
 }
 
 func hasGoFile(t *testing.T, dir string) bool {
