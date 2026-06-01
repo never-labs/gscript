@@ -33,3 +33,9 @@ go run ./cmd/leia doc generate --format json
 
 `scripts/docs_check.sh` compares the checked-in Markdown reference pages with
 the current generated output, so stale generated docs fail the docs gate.
+
+Run the same gate through the CLI when checking documentation locally:
+
+```bash
+go run ./cmd/leia doc check
+```
