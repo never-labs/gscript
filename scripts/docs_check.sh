@@ -51,7 +51,11 @@ from urllib.parse import unquote
 
 root = Path.cwd()
 doc_files = [root / "README.md"]
-doc_files.extend(sorted((root / "docs").rglob("*.md")))
+doc_files.extend(
+    path
+    for path in sorted((root / "docs").rglob("*.md"))
+    if "archive" not in path.relative_to(root / "docs").parts
+)
 
 link_re = re.compile(r"(?<!!)\[[^\]\n]*\]\(([^)\n]+)\)")
 fence_re = re.compile(r"^\s*(```+|~~~+)")
@@ -169,19 +173,19 @@ def require_snippets(path: Path, snippets: list[str]) -> None:
 def check_release_gate_docs() -> None:
     release_matrix_cmd = "go test ./tests -run 'TestFeatureMatrixSchema|TestReleaseMatrix' -count=1"
     require_snippets(
-        root / "docs" / "production-readiness-checklist.md",
+        root / "docs" / "release" / "index.md",
         [
-            "### AI-Native Language Gates",
+            "## Machine-Checkable Release Evidence",
             release_matrix_cmd,
             "bash scripts/performance_gate.sh --feature-smoke",
             "tests/feature_matrix.json",
-            "docs/language-spec.md",
+            "docs/spec/language.md",
             "tests/language/MISSING_CAPABILITIES.md",
-            "docs/stdlib-contract.md",
+            "docs/reference/stdlib/index.md",
         ],
     )
     require_snippets(
-        root / "docs" / "release.md",
+        root / "docs" / "release" / "index.md",
         [
             "## Machine-Checkable Release Evidence",
             "bash scripts/production_check.sh --quick",

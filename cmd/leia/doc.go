@@ -122,10 +122,18 @@ func generateStdlibInventoryMarkdown() []byte {
 	var b bytes.Buffer
 	fmt.Fprintln(&b, "# Leia Standard Library Inventory")
 	fmt.Fprintln(&b)
-	fmt.Fprintln(&b, "Generated from the current runtime stdlib registry.")
+	fmt.Fprintln(&b, "Generated from the current runtime stdlib catalog.")
 	fmt.Fprintln(&b)
-	for _, module := range caps.StdlibModules {
-		fmt.Fprintf(&b, "- `%s`\n", strings.TrimSpace(module))
+	fmt.Fprintln(&b, "| Layer | Module | Safe default | Capabilities |")
+	fmt.Fprintln(&b, "|---|---|---|---|")
+	for _, layer := range caps.StdlibLayers {
+		for _, module := range layer.Modules {
+			capabilities := "none"
+			if len(module.Capabilities) > 0 {
+				capabilities = strings.Join(module.Capabilities, ", ")
+			}
+			fmt.Fprintf(&b, "| `%s` | `%s` | %t | %s |\n", layer.Name, strings.TrimSpace(module.Name), module.SafeDefault, capabilities)
+		}
 	}
 	return b.Bytes()
 }

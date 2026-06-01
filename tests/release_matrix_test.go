@@ -83,15 +83,15 @@ func TestReleaseMatrixConformanceCasesHaveStatusAndClassification(t *testing.T) 
 
 func TestReleaseMatrixKnownGapDocsAreReleaseGateInputs(t *testing.T) {
 	root := findRepoRoot(t)
-	testMatrix := readFileString(t, filepath.Join(root, "docs", "test-matrix.md"))
+	testMatrix := readFileString(t, filepath.Join(root, "docs", "testing.md"))
 	for _, ref := range []string{
 		"tests/language/MISSING_CAPABILITIES.md",
 		"tests/language/KNOWN_FAILURES.md",
 		"tests/language/MANIFEST.md",
-		"docs/stdlib-contract.md",
+		"docs/reference/stdlib/index.md",
 	} {
 		if !strings.Contains(testMatrix, ref) {
-			t.Fatalf("docs/test-matrix.md must name %s as a release-gate input", ref)
+			t.Fatalf("docs/testing.md must name %s as a release-gate input", ref)
 		}
 	}
 }

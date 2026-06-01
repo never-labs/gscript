@@ -18,7 +18,7 @@ func TestStdlibContractDocumentsRuntimeModules(t *testing.T) {
 
 	for _, name := range runtimeModules {
 		if !contractRows[name] {
-			t.Fatalf("docs/stdlib-contract.md missing runtime stdlib module %q", name)
+			t.Fatalf("docs/reference/stdlib/index.md missing runtime stdlib module %q", name)
 		}
 	}
 }
@@ -44,7 +44,7 @@ func readStdlibModuleNames(t *testing.T) []string {
 func readStdlibContractRows(t *testing.T, root string) map[string]bool {
 	t.Helper()
 
-	data, err := os.ReadFile(filepath.Join(root, "docs", "stdlib-contract.md"))
+	data, err := os.ReadFile(filepath.Join(root, "docs", "reference", "stdlib", "index.md"))
 	if err != nil {
 		t.Fatalf("read stdlib contract: %v", err)
 	}
@@ -58,21 +58,21 @@ func readStdlibContractRows(t *testing.T, root string) map[string]bool {
 		}
 		columns := strings.Split(line, "|")
 		if len(columns) != 7 {
-			t.Fatalf("docs/stdlib-contract.md:%d row for %q has %d table columns, want 5", lineNo+1, match[1], len(columns)-2)
+			t.Fatalf("docs/reference/stdlib/index.md:%d row for %q has %d table columns, want 5", lineNo+1, match[1], len(columns)-2)
 		}
 		for i := 2; i <= 5; i++ {
 			if strings.TrimSpace(columns[i]) == "" {
-				t.Fatalf("docs/stdlib-contract.md:%d row for %q has empty contract field", lineNo+1, match[1])
+				t.Fatalf("docs/reference/stdlib/index.md:%d row for %q has empty contract field", lineNo+1, match[1])
 			}
 		}
 		name := match[1]
 		if rows[name] {
-			t.Fatalf("docs/stdlib-contract.md:%d duplicate module row %q", lineNo+1, name)
+			t.Fatalf("docs/reference/stdlib/index.md:%d duplicate module row %q", lineNo+1, name)
 		}
 		rows[name] = true
 	}
 	if len(rows) == 0 {
-		t.Fatal("docs/stdlib-contract.md contains no machine-checkable module rows")
+		t.Fatal("docs/reference/stdlib/index.md contains no machine-checkable module rows")
 	}
 	return rows
 }

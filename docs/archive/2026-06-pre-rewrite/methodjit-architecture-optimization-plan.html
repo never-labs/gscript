@@ -1,0 +1,599 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MethodJIT 架构优化计划</title>
+  <style>
+    :root {
+      --bg: #f6f7f9;
+      --ink: #17202a;
+      --muted: #5e6b78;
+      --panel: #fff;
+      --line: #d9e0e8;
+      --blue: #2457a6;
+      --green: #217a5b;
+      --orange: #b35c00;
+      --red: #a7333f;
+      --violet: #6250a4;
+      --shadow: 0 10px 26px rgba(25, 36, 50, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    }
+
+    header {
+      background: #111827;
+      color: #fff;
+      padding: 28px 32px;
+    }
+
+    header h1 {
+      margin: 0 0 8px;
+      font-size: 28px;
+      letter-spacing: 0;
+    }
+
+    header p {
+      margin: 0;
+      color: #d3dae5;
+      max-width: 1120px;
+    }
+
+    main {
+      max-width: 1320px;
+      margin: 0 auto;
+      padding: 28px 24px 52px;
+    }
+
+    h2 {
+      margin: 0 0 14px;
+      font-size: 20px;
+      letter-spacing: 0;
+    }
+
+    h3 {
+      margin: 0 0 8px;
+      font-size: 16px;
+      letter-spacing: 0;
+    }
+
+    section { margin-bottom: 24px; }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      padding: 18px;
+    }
+
+    .note {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    .code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+      background: #eef2f7;
+      border: 1px solid #d9e1ec;
+      border-radius: 6px;
+      padding: 2px 5px;
+      white-space: nowrap;
+    }
+
+    .grid {
+      display: grid;
+      gap: 16px;
+    }
+
+    .cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+    .badge {
+      display: inline-block;
+      padding: 3px 7px;
+      border-radius: 999px;
+      color: #fff;
+      font-size: 12px;
+      margin: 0 5px 6px 0;
+      background: #64748b;
+    }
+
+    .blue { background: var(--blue); }
+    .green { background: var(--green); }
+    .orange { background: var(--orange); }
+    .red { background: var(--red); }
+    .violet { background: var(--violet); }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: var(--shadow);
+    }
+
+    th, td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: #eef2f7;
+      font-weight: 700;
+    }
+
+    tr:last-child td { border-bottom: 0; }
+
+    .score {
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .p0 { color: var(--red); }
+    .p1 { color: var(--orange); }
+    .p2 { color: var(--blue); }
+
+    .flow {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr 1fr;
+      gap: 14px;
+    }
+
+    .flow-card {
+      position: relative;
+      min-height: 150px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      box-shadow: var(--shadow);
+      padding: 16px;
+    }
+
+    .flow-card:not(:last-child)::after {
+      content: "→";
+      position: absolute;
+      right: -18px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #7a8694;
+      font-size: 24px;
+      font-weight: 700;
+    }
+
+    .lane {
+      display: grid;
+      grid-template-columns: 210px 1fr 300px;
+      gap: 12px;
+      padding: 12px 0;
+      border-top: 1px solid var(--line);
+    }
+
+    .lane:first-child {
+      padding-top: 0;
+      border-top: 0;
+    }
+
+    .stage {
+      border-radius: 8px;
+      padding: 12px;
+      color: #fff;
+      background: var(--blue);
+      min-height: 82px;
+    }
+
+    .stage small {
+      display: block;
+      margin-top: 4px;
+      color: rgba(255, 255, 255, 0.78);
+    }
+
+    .items {
+      display: flex;
+      flex-wrap: wrap;
+      align-content: flex-start;
+      gap: 8px;
+    }
+
+    .item {
+      border: 1px solid #ced7e2;
+      background: #fbfcfe;
+      border-radius: 7px;
+      padding: 8px 10px;
+      min-width: 190px;
+      max-width: 320px;
+    }
+
+    .item strong {
+      display: block;
+      font-size: 13px;
+    }
+
+    .item span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 3px;
+    }
+
+    .guard {
+      border: 1px dashed #b8c3d1;
+      border-radius: 8px;
+      padding: 10px;
+      background: #f9fbfd;
+    }
+
+    .ok {
+      border-left: 4px solid var(--green);
+      background: #f0fdf7;
+    }
+
+    .warn {
+      border-left: 4px solid var(--orange);
+      background: #fff7ed;
+    }
+
+    .risk {
+      border-left: 4px solid var(--red);
+      background: #fff5f5;
+    }
+
+    ol, ul { margin: 8px 0 0 20px; padding: 0; }
+    li { margin: 5px 0; }
+
+    @media (max-width: 1060px) {
+      .cols-2,
+      .cols-3,
+      .flow,
+      .lane {
+        grid-template-columns: 1fr;
+      }
+
+      .flow-card:not(:last-child)::after {
+        content: "↓";
+        right: 18px;
+        top: auto;
+        bottom: -24px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>MethodJIT 架构优化计划</h1>
+    <p>目标是把当前“已经模块化”的 Tier2 优化器继续收敛成可验证、可诊断、可扩展的编译器架构，而不是继续靠人工记忆维护 pass 顺序。</p>
+  </header>
+
+  <main>
+    <section class="panel ok">
+      <h2>目标状态</h2>
+      <p class="note">
+        MethodJIT 的优化管线应该满足四个条件：
+        pass 顺序可声明、分析事实可校验、诊断输出可解释、Tier1/Tier2 策略边界清楚。
+        后续新增优化时，开发者应该只需要声明“我属于哪个阶段、读什么事实、写什么事实、失败怎么回退”，而不是手工猜测应该插在哪里。
+      </p>
+    </section>
+
+    <section class="panel">
+      <h2>V8 调研后的设计基准</h2>
+      <p class="note">
+        V8 的现代架构不是一个单体 JIT，而是多层 tiering 加多个明确边界的 compiler pipeline：
+        Ignition 解释器、Sparkplug baseline、Maglev 中层优化器、TurboFan/Turboshaft 高层优化器。
+        对 gscript 来说，不能照搬复杂度，但应该吸收它的几个结构原则。
+      </p>
+      <table style="margin-top: 14px">
+        <thead>
+          <tr>
+            <th>V8 设计点</th>
+            <th>观察</th>
+            <th>gscript 应该怎么吸收</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>TieringManager</td>
+            <td>优化决策和编译 pipeline 分离，decision 里带目标 tier、并发模式和原因。</td>
+            <td>把 Tier1/Tier2 晋升条件、拒绝原因、blacklist/deopt 原因集中到 tiering policy，不散在 pass 里。</td>
+          </tr>
+          <tr>
+            <td>PipelineData</td>
+            <td>编译过程状态集中在 data 对象里，phase 只通过 data 访问 graph、stats、broker、trace。</td>
+            <td>让 <span class="code">Tier2OptimizerContext</span> 演进成真正的 pipeline data，承载 IR、analysis、diagnostics、dependencies。</td>
+          </tr>
+          <tr>
+            <td>PhaseScope / BeginPhaseKind</td>
+            <td>每个 phase 都有统一 scope，自动处理统计、临时内存、node origin、trace。</td>
+            <td>给 MethodJIT module run 包一层标准 phase scope，统一 timing、snapshot、error、fact diff。</td>
+          </tr>
+          <tr>
+            <td>Graph verification</td>
+            <td>Maglev 和 TurboFan 在关键阶段后打印/验证 graph，debug 下更严格。</td>
+            <td>在高风险 lowering、DCE、register allocation 前后加 IR verifier，不靠性能测试发现坏 IR。</td>
+          </tr>
+          <tr>
+            <td>CompilationDependencies</td>
+            <td>优化假设被记录为 dependency，最终安装；假设失效时 deopt/invalidates compiled code。</td>
+            <td>把 table shape、metatable version、global const、call ABI 等假设从散落 guard 收敛成 dependency registry。</td>
+          </tr>
+          <tr>
+            <td>BailoutReason</td>
+            <td>phase 可以显式返回 bailout，pipeline 记录原因并放弃优化。</td>
+            <td>MethodJIT pass 不应该只返回普通 error；需要区分 compiler bug、unsupported shape、guarded bailout。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>现状到目标的架构变化</h2>
+      <div class="flow">
+        <div class="flow-card">
+          <h3>当前状态</h3>
+          <span class="badge blue">module builder</span>
+          <span class="badge">phase order</span>
+          <p class="note">已经从大函数顺序调用，升级成多个 builder 注册 module。</p>
+        </div>
+        <div class="flow-card">
+          <h3>主要缺口</h3>
+          <span class="badge orange">contract 不完整</span>
+          <span class="badge orange">全局注册</span>
+          <p class="note">Requires/Provides 还不完整，phase 可能重复，init 注册隐式。</p>
+        </div>
+        <div class="flow-card">
+          <h3>架构收敛</h3>
+          <span class="badge green">typed facts</span>
+          <span class="badge green">plan validator</span>
+          <p class="note">把 pass contract 类型化，并让 plan 构建时完成校验。</p>
+        </div>
+        <div class="flow-card">
+          <h3>长期形态</h3>
+          <span class="badge violet">可解释 JIT</span>
+          <span class="badge violet">可插拔 pass</span>
+          <p class="note">每次优化都能解释来源、依赖、输出和 fallback。</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>优先级清单</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>优先级</th>
+            <th>架构问题</th>
+            <th>当前风险</th>
+            <th>改造方案</th>
+            <th>验收标准</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="score p0">P0</td>
+            <td>phase 重复执行风险</td>
+            <td><span class="code">BuildModulePlan</span> 原来直接 append phase；同 phase 多 builder 时会重复跑同一 phase 模块。</td>
+            <td>已改成 <span class="code">Tier2OptimizerPhaseGroup</span>，plan canonical execution shape 按 group 执行。</td>
+            <td>已补 <span class="code">TestTier2OptimizerPlanDeduplicatesFallbackPhases</span>。</td>
+          </tr>
+          <tr>
+            <td class="score p0">P0</td>
+            <td>pass contract 不可信</td>
+            <td>很多 module 写 <span class="code">Provides: nil // Updates existing facts</span>，依赖图无法表达真实读写。</td>
+            <td>引入 <span class="code">Reads/Writes/Updates</span> 或完善 Requires/Provides 语义。</td>
+            <td>所有核心 pass 都声明事实读写；dependency checker 能覆盖主要分析事实。</td>
+          </tr>
+          <tr>
+            <td class="score p0">P0</td>
+            <td>Tier1/Tier2 可调用策略混淆</td>
+            <td><span class="code">MethodJITCallable()</span> 允许部分 vararg 进 Tier1，但 Tier2 仍禁止 vararg；命名容易误用。</td>
+            <td>拆成 <span class="code">Tier1Callable</span> / <span class="code">Tier2Callable</span>，并补 ABI 说明。</td>
+            <td>vararg/no-OP_VARARG 测试覆盖 Tier1；Tier2 放开前有独立设计。</td>
+          </tr>
+          <tr>
+            <td class="score p1">P1</td>
+            <td>依赖校验位置不合理</td>
+            <td>每次 run plan 都做 dependency validation，和“初始化/测试期检查”的注释冲突。</td>
+            <td>构建默认 plan 时校验一次，缓存 validated plan；测试开启严格校验。</td>
+            <td>热路径不再重复校验；测试仍能捕获缺失依赖。</td>
+          </tr>
+          <tr>
+            <td class="score p1">P1</td>
+            <td>全局 init 注册难测试</td>
+            <td>module 注册顺序隐式，测试无法简单构造隔离 registry。</td>
+            <td>提供显式 <span class="code">DefaultModuleRegistry()</span>，init 只做兼容层或逐步移除。</td>
+            <td>单测可以创建临时 registry，不污染全局状态。</td>
+          </tr>
+          <tr>
+            <td class="score p1">P1</td>
+            <td>fact 使用字符串</td>
+            <td>拼写错误运行时才发现；重构不安全。</td>
+            <td>定义 <span class="code">type AnalysisFact string</span> 和常量集合。</td>
+            <td>module metadata 不再直接写裸字符串。</td>
+          </tr>
+          <tr>
+            <td class="score p1">P1</td>
+            <td>诊断只覆盖成功路径</td>
+            <td>module 出错时缺少失败前后 IR、耗时、依赖状态。</td>
+            <td>snapshot callback 支持 failure snapshot 和 module error record。</td>
+            <td>故意失败的 pass 测试能看到失败 module 和失败时 IR。</td>
+          </tr>
+          <tr>
+            <td class="score p2">P2</td>
+            <td><span class="code">Order</span> 字段未生效</td>
+            <td>字段存在但没有参与排序，会误导后续开发者。</td>
+            <td>要么实现 phase 内 module order，要么删除字段。</td>
+            <td>代码和注释一致，没有“未来保留但看似生效”的接口。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="panel">
+      <h2>分阶段实施计划</h2>
+
+      <div class="lane">
+        <div class="stage">阶段 A<small>Plan 结构正确性</small></div>
+        <div class="items">
+          <div class="item"><strong>Phase 分组</strong><span>已完成：plan canonical shape 改成 phase group。</span></div>
+          <div class="item"><strong>Phase 去重</strong><span>已完成：fallback phases 也去重执行。</span></div>
+          <div class="item"><strong>Plan golden test</strong><span>锁住默认 phase/module 顺序。</span></div>
+          <div class="item"><strong>Duplicate order 检查</strong><span>注册冲突时测试能失败。</span></div>
+        </div>
+        <div class="guard">
+          <strong>边界</strong>
+          <p class="note">这一阶段不改任何优化逻辑，只改 plan 组装和测试。</p>
+        </div>
+      </div>
+
+      <div class="lane">
+        <div class="stage">阶段 B<small>Pass Contract 类型化</small></div>
+        <div class="items">
+          <div class="item"><strong>AnalysisFact 常量</strong><span>替换裸字符串。</span></div>
+          <div class="item"><strong>Reads/Writes/Updates</strong><span>表达读、写、更新已有事实。</span></div>
+          <div class="item"><strong>Fact owner 文档</strong><span>每个 fact 说明 owner pass 和消费者。</span></div>
+          <div class="item"><strong>Checker 强化</strong><span>报告多个 provider、未使用 fact、循环依赖。</span></div>
+        </div>
+        <div class="guard">
+          <strong>验收</strong>
+          <p class="note">依赖检查不再只是局部有效，而是能描述核心分析数据流。</p>
+        </div>
+      </div>
+
+      <div class="lane">
+        <div class="stage">阶段 C<small>PipelineData 与 Registry</small></div>
+        <div class="items">
+          <div class="item"><strong>PipelineData</strong><span>把 context 扩展为显式编译状态容器。</span></div>
+          <div class="item"><strong>显式 registry</strong><span>从全局 init 迁移到可构造 registry。</span></div>
+          <div class="item"><strong>测试隔离</strong><span>测试可注册临时 module，不污染默认 registry。</span></div>
+          <div class="item"><strong>ValidatedPlan 缓存</strong><span>构建时校验，运行时直接执行。</span></div>
+          <div class="item"><strong>Feature flag</strong><span>后续可按模块开关优化。</span></div>
+        </div>
+        <div class="guard">
+          <strong>收益</strong>
+          <p class="note">新优化可以插拔、A/B、灰度，而不是改全局函数顺序。</p>
+        </div>
+      </div>
+
+      <div class="lane">
+        <div class="stage">阶段 D<small>PhaseScope 与诊断闭环</small></div>
+        <div class="items">
+          <div class="item"><strong>PhaseScope</strong><span>统一 phase timing、trace、snapshot、error。</span></div>
+          <div class="item"><strong>成功 snapshot</strong><span>保留现有 module 后快照。</span></div>
+          <div class="item"><strong>失败 snapshot</strong><span>pass error 时记录失败现场。</span></div>
+          <div class="item"><strong>Fact diff</strong><span>记录 module 读写了哪些分析事实。</span></div>
+          <div class="item"><strong>Reason 记录</strong><span>优化命中/跳过都有原因。</span></div>
+        </div>
+        <div class="guard">
+          <strong>输出</strong>
+          <p class="note">诊断工具能回答：为什么这个 pass 跑了、依赖什么、改了什么、为什么失败。</p>
+        </div>
+      </div>
+
+      <div class="lane">
+        <div class="stage">阶段 E<small>Tier 策略与 Dependency</small></div>
+        <div class="items">
+          <div class="item"><strong>Tier1Callable</strong><span>解释 Tier1 native handler 能力边界。</span></div>
+          <div class="item"><strong>Tier2Callable</strong><span>解释 native trampoline/ABI 能力边界。</span></div>
+          <div class="item"><strong>Vararg policy</strong><span>vararg/no-OP_VARARG 单独测试。</span></div>
+          <div class="item"><strong>Promotion reason</strong><span>不晋升也记录原因，类似 V8 optimization reason。</span></div>
+          <div class="item"><strong>Dependency registry</strong><span>shape/metatable/global 假设集中记录和失效。</span></div>
+        </div>
+        <div class="guard">
+          <strong>风险控制</strong>
+          <p class="note">避免把 Tier1 安全的函数错误晋升到 Tier2 native 路径。</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="grid cols-2">
+      <div class="panel">
+        <h2>SOLID 对应关系</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>原则</th>
+              <th>架构动作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>SRP</td>
+              <td>module 只负责一个 pass；registry 只负责注册；plan builder 只负责排序校验；diagnose 只负责观察。</td>
+            </tr>
+            <tr>
+              <td>OCP</td>
+              <td>新增优化通过 module/phase/fact contract 扩展，而不是修改大函数调用链。</td>
+            </tr>
+            <tr>
+              <td>LSP</td>
+              <td>所有 module 必须遵守相同 contract：声明依赖、返回新 Function、错误可诊断。</td>
+            </tr>
+            <tr>
+              <td>ISP</td>
+              <td>拆分 Run、RunWithContext、diagnostic hook，避免每个 pass 都依赖一个大上下文。</td>
+            </tr>
+            <tr>
+              <td>DIP</td>
+              <td>optimizer 依赖 module interface/contract，不依赖具体 pass 文件和 init 顺序。</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="panel">
+        <h2>编译器/JIT 角度</h2>
+        <ul>
+          <li>phase 是编译器 pipeline 的粗粒度 barrier。</li>
+          <li>fact 是 analysis pass 和 transform pass 之间的 contract。</li>
+          <li>validator 是 pass manager 的安全网。</li>
+          <li>diagnose 是可解释 JIT 的观测层。</li>
+          <li>Tier policy 是运行时调度和 native ABI 的边界，不应混在优化 pass 里。</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="panel warn">
+      <h2>提交策略</h2>
+      <ol>
+        <li>每个阶段单独提交，不和性能优化混在一起。</li>
+        <li>阶段 A/B/C 属于架构重构，提交信息明确“不改变优化语义”。</li>
+        <li>如果某个提交改变 JIT 晋升策略，必须单独提交，不能写成纯重构。</li>
+        <li>每个提交至少跑 <span class="code">go test ./internal/methodjit ./internal/vm ./internal/runtime -count=1</span>。</li>
+        <li>涉及 plan 执行顺序时，补 golden test；涉及性能热路径时，再跑 strict guard。</li>
+      </ol>
+    </section>
+
+    <section class="panel risk">
+      <h2>不要做的事</h2>
+      <ul>
+        <li>不要继续扩大隐式全局 registry，而没有测试隔离能力。</li>
+        <li>不要把裸字符串 fact 继续扩散到新 pass。</li>
+        <li>不要让诊断逻辑反向污染优化 pass 的核心逻辑。</li>
+        <li>不要在“重构”提交里悄悄改变 Tier1/Tier2 晋升策略。</li>
+        <li>不要为了快速插 pass 绕过 dependency checker。</li>
+      </ul>
+    </section>
+
+    <section class="panel">
+      <h2>调研来源</h2>
+      <ul>
+        <li>V8 <span class="code">src/execution/tiering-manager.cc</span>：tiering decision、optimization reason、target code kind。</li>
+        <li>V8 <span class="code">src/maglev/maglev-compiler.cc</span>：graph build、verify、trace、post-hoc optimization、register allocation、code assembly。</li>
+        <li>V8 <span class="code">src/compiler/turboshaft/pipelines.h</span>：PipelineData、PhaseScope、phase kind、trace/print graph、bailout。</li>
+        <li>V8 <span class="code">src/compiler/compilation-dependencies.h</span>：优化假设 dependency 的集中记录与安装。</li>
+        <li>V8 官方博客：Maglev、Sparkplug、Turboshaft 相关设计说明。</li>
+      </ul>
+    </section>
+  </main>
+</body>
+</html>

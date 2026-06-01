@@ -34,5 +34,6 @@ func main() {
 }
 ```
 
-See [docs/embedding.md](docs/embedding.md), [docs/tooling.md](docs/tooling.md),
-and [docs/language-spec.md](docs/language-spec.md).
+See [docs/index.md](docs/index.md), [docs/spec/language.md](docs/spec/language.md),
+[docs/tutorial/getting-started.md](docs/tutorial/getting-started.md), and
+[docs/guides/embedding.md](docs/guides/embedding.md).

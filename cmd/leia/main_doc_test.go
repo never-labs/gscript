@@ -27,7 +27,7 @@ func TestDocGenerateWritesReferenceFiles(t *testing.T) {
 	if !bytes.Contains(cliDoc, []byte("`run`")) || !bytes.Contains(cliDoc, []byte("`doc`")) {
 		t.Fatalf("cli.md = %q, want command reference", string(cliDoc))
 	}
-	if !bytes.Contains(stdlibDoc, []byte("`json`")) {
+	if !bytes.Contains(stdlibDoc, []byte("`json`")) || !bytes.Contains(stdlibDoc, []byte("Safe default")) {
 		t.Fatalf("stdlib.md = %q, want stdlib inventory", string(stdlibDoc))
 	}
 }

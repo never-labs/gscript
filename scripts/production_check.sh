@@ -18,7 +18,7 @@ usage() {
     cat <<'EOF'
 Usage: scripts/production_check.sh [--quick] [--full] [--list] [--out-dir DIR] [--help]
 
-Runs the release-gate commands from docs/production-readiness-checklist.md.
+Runs the release-gate commands from docs/release/index.md.
 
 Options:
   --quick   Run short correctness gates only: core packages, feature matrix,

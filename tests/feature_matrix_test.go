@@ -147,7 +147,7 @@ func decodeRequiredStringList(t *testing.T, feature map[string]json.RawMessage, 
 
 func loadLanguageSpecSections(t *testing.T, root string) map[string]bool {
 	t.Helper()
-	data, err := os.ReadFile(filepath.Join(root, "docs", "language-spec.md"))
+	data, err := os.ReadFile(filepath.Join(root, "docs", "spec", "language.md"))
 	if err != nil {
 		t.Fatalf("read language spec: %v", err)
 	}
