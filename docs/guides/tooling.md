@@ -22,7 +22,8 @@ bash scripts/worktree_audit.sh
 Documentation:
 
 ```bash
-go run ./cmd/leia doc generate --output docs/reference/generated
+go run ./cmd/leia doc generate --layout site --output docs
+go run ./cmd/leia doc generate --format json
 go run ./cmd/leia doc check
 ```
 
@@ -32,4 +33,3 @@ Performance and diagnostics:
 go run ./cmd/leia bench compare --bench numeric/mandelbrot --runs 3 --warmup 1
 go run ./cmd/leia diag bundle --output /tmp/leia-diag --skip-benchmarks
 ```
-

@@ -23,6 +23,8 @@ only.
   Go-native binding metadata.
 - [Go embedding API](reference/embedding/index.md): public Go package surface,
   host bindings, sandbox options, and VM lifetime rules.
+- [Errors and diagnostics](reference/diagnostics/index.md): Go error types,
+  CLI JSON/SARIF outputs, and diagnostic bundle entrypoints.
 - [Embedding guide](guides/embedding.md): host integration, sandboxing, and
   reload-oriented runtime usage.
 - [AI-native guide](guides/ai-native.md): agents, tools, models, message
