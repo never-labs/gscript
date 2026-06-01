@@ -41,6 +41,10 @@ Capability flags decide which installed APIs may touch host resources.
 Capability bits are separate from library selection so embedders can expose a
 module table while denying its host effects.
 
+Network, debug, testkit, process execution, shell execution, and dynamic eval
+are controlled by separate switches. They default to enabled for trusted local
+scripts and are disabled by `WithSandbox()` and `SecuritySandbox()`.
+
 | Capability | Gates |
 |---|---|
 | `CapModuleLoading` | Script-side `require()` loading `.leia` files from the host filesystem. |
@@ -149,6 +153,7 @@ capability llm.turn
 These declarations make module boundaries auditable. Use:
 
 ```bash
+cd path/to/module
 leia mod capability --json
 ```
 

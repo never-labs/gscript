@@ -202,6 +202,23 @@ func TestReleaseMatrixModuleDocsKeepFirstRunCommandsLocal(t *testing.T) {
 	}
 }
 
+func TestReleaseMatrixSecurityDocsUseModuleScopedCapabilityCommand(t *testing.T) {
+	root := findRepoRoot(t)
+	security := readFileString(t, filepath.Join(root, "docs", "reference", "security", "index.md"))
+	if !strings.Contains(security, "cd path/to/module\nleia mod capability --json") {
+		t.Fatal("security reference must show module capability command from a module directory")
+	}
+	if !strings.Contains(security, "controlled by separate switches") {
+		t.Fatal("security reference must distinguish capability bits from network/debug/process switches")
+	}
+
+	tmp := t.TempDir()
+	if err := os.WriteFile(filepath.Join(tmp, "leia.mod"), []byte("module github.com/example/secure\nleia 0.1\ncapability fs.read\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	runCommand(t, root, 30*time.Second, "go", "run", "./cmd/leia", "mod", "capability", "--json", tmp)
+}
+
 func TestReleaseMatrixDocumentedSmokeCommandsStayRunnable(t *testing.T) {
 	root := findRepoRoot(t)
 	for _, path := range []string{
