@@ -43,6 +43,12 @@ line_comment  = "//" { any_char_except_newline } ;
 block_comment = "/*" { any_char } "*/" ;
 ```
 
+Line comments that begin with `//leia:` before the first parsed token are file
+directives. They are metadata for tools, sandbox policy, build selection, and
+test classification; they do not execute and do not grant capabilities by
+themselves. The directive contract is documented in
+[`../reference/directives/index.md`](../reference/directives/index.md).
+
 Stable keywords:
 
 ```text
@@ -230,6 +236,11 @@ for dense-array literals, SoA layout, masks, and column kernels.
 `require(name)` first resolves enabled built-in standard-library modules, then
 project/module paths according to runtime module options and the active
 capability policy. Module results are cached in `package.loaded`.
+
+`import "go:..." as name` is source syntax for explicit host-provided Go
+bindings. The import path does not reflect arbitrary Go packages by itself:
+embedders must allow the binding through the Go API, and the active capability
+policy may still reject use at load time or call time.
 
 `leia.mod` describes a Leia module. `leia.sum` records remote or vendored module
 hashes when the module toolchain is used. Go imports are explicit host bindings;

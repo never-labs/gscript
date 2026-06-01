@@ -112,6 +112,8 @@ func TestLanguageGrammarAppendixDocumentsStableSyntax(t *testing.T) {
 		"[`grammar.ebnf`](grammar.ebnf)",
 		"AI-native syntax is part of the language surface",
 		"desugaring layer over the standard library",
+		"[`../reference/directives/index.md`](../reference/directives/index.md)",
+		"`import \"go:...\" as name` is source syntax for explicit host-provided Go",
 	} {
 		if !strings.Contains(spec, snippet) {
 			t.Fatalf("language spec must document grammar appendix and AI-native lowering; missing %q", snippet)
