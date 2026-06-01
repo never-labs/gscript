@@ -34,7 +34,9 @@ The CLI forwards to the Python harnesses:
 leia bench --quick
 leia bench numeric/matmul --runs 5 --warmup 1
 leia bench --full --runs 5 --warmup 1 --sort luajit-gap
-leia bench strict --runs 3 --warmup 1
+leia bench strict --runs 3 --warmup 1 \
+  --json /tmp/leia_strict_guard.json \
+  --markdown /tmp/leia_strict_guard.md
 leia diagnose table/table_array_access --out-dir /tmp/leia-diag
 ```
 

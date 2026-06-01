@@ -30,9 +30,10 @@ platform, CPU, Go version, and whether LuaJIT was available.
 
 ```bash
 go run ./cmd/leia bench --quick
-go run ./cmd/leia bench list
 go run ./cmd/leia bench compare --bench numeric/matmul_dense --runs 5 --warmup 1
-go run ./cmd/leia bench strict --bench table/table_array_access --runs 5 --warmup 1
+go run ./cmd/leia bench strict --bench table/table_array_access --runs 5 --warmup 1 \
+  --json /tmp/leia-strict.json \
+  --markdown /tmp/leia-strict.md
 bash scripts/performance_gate.sh --feature-smoke
 bash scripts/performance_gate.sh --full --no-luajit
 ```

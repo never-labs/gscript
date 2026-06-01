@@ -220,6 +220,33 @@ func TestReleaseMatrixDocumentedExampleCommandsStayRunnable(t *testing.T) {
 	}
 }
 
+func TestReleaseMatrixPerformanceDocsUseCurrentBenchCommands(t *testing.T) {
+	root := findRepoRoot(t)
+	for _, path := range []string{
+		"docs/reference/performance/index.md",
+		"docs/guides/tooling.md",
+		"docs/contributing/performance.md",
+	} {
+		data := readFileString(t, filepath.Join(root, filepath.FromSlash(path)))
+		if strings.Contains(data, "bench list") {
+			t.Fatalf("%s must not document removed bench list command", path)
+		}
+		for _, line := range strings.Split(data, "\n") {
+			trimmed := strings.TrimSpace(line)
+			if !strings.Contains(trimmed, "bench strict") {
+				continue
+			}
+			if strings.Contains(trimmed, "--json") || strings.HasSuffix(trimmed, "\\") {
+				continue
+			}
+			t.Fatalf("%s documents bench strict without explicit artifact paths: %q", path, trimmed)
+		}
+	}
+
+	runCommand(t, root, 30*time.Second, "go", "run", "./cmd/leia", "bench", "compare", "--bench", "control/sieve", "--runs", "1", "--warmup", "0", "--no-luajit", "--json", "/tmp/leia-release-matrix-timing.json", "--markdown", "/tmp/leia-release-matrix-timing.md")
+	runCommand(t, root, 30*time.Second, "go", "run", "./cmd/leia", "bench", "strict", "--bench", "control/sieve", "--runs", "1", "--warmup", "0", "--no-luajit", "--json", "/tmp/leia-release-matrix-strict.json", "--markdown", "/tmp/leia-release-matrix-strict.md")
+}
+
 func TestReleaseMatrixStdlibContractHasConformanceCoverageEntry(t *testing.T) {
 	root := findRepoRoot(t)
 	modules := readStdlibContractRows(t, root)
