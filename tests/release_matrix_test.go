@@ -431,6 +431,31 @@ func TestReleaseMatrixDocumentedSmokeCommandsStayRunnable(t *testing.T) {
 	runCommand(t, root, 30*time.Second, "go", "run", "./cmd/leia", "test", "tests/smoke/01_basic.leia")
 }
 
+func TestReleaseMatrixGettingStartedExamplesStayRunnable(t *testing.T) {
+	root := findRepoRoot(t)
+	gettingStarted := readFileString(t, filepath.Join(root, "docs", "tutorial", "getting-started.md"))
+	for _, forbidden := range []string{
+		"go run ./cmd/leia run examples/hello/metatables.leia",
+		"go run ./cmd/leia run examples/llm/agent_as_tool.leia",
+		"go run ./cmd/leia run examples/game_engine/game_of_life.leia",
+		"go run ./cmd/leia run examples/game_engine/tetris.leia",
+		"go run ./cmd/leia run examples/web/hello_server.leia",
+	} {
+		if strings.Contains(gettingStarted, forbidden) {
+			t.Fatalf("docs/tutorial/getting-started.md must not present non-smoke command %q as first-run runnable", forbidden)
+		}
+	}
+
+	for _, example := range []string{
+		"examples/hello/fib.leia",
+		"examples/hello/types_demo.leia",
+		"examples/concurrency/goroutines_channels.leia",
+		"examples/data_processing/data_oriented/soa_kernels.leia",
+	} {
+		runCommand(t, root, 30*time.Second, "go", "run", "./cmd/leia", "run", example)
+	}
+}
+
 func TestReleaseMatrixDocumentedExampleCommandsStayRunnable(t *testing.T) {
 	root := findRepoRoot(t)
 	examplesDoc := readFileString(t, filepath.Join(root, "docs", "examples", "index.md"))
