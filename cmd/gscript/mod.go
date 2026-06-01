@@ -11,14 +11,9 @@ import (
 	"regexp"
 	"sort"
 	"strings"
-)
 
-type modManifest struct {
-	SchemaVersion int      `json:"schema_version"`
-	Name          string   `json:"name"`
-	Version       string   `json:"version"`
-	RequirePaths  []string `json:"require_paths,omitempty"`
-}
+	"github.com/never-labs/gscript/internal/modfile"
+)
 
 type modGraphReport struct {
 	SchemaVersion int             `json:"schema_version"`
@@ -73,14 +68,13 @@ func runModCommand(args []string, outw, errw io.Writer) int {
 func runModInitCommand(args []string, outw, errw io.Writer) int {
 	fs := flag.NewFlagSet("mod init", flag.ContinueOnError)
 	fs.SetOutput(errw)
-	name := fs.String("name", "", "module name")
-	version := fs.String("version", "0.1.0", "module version")
+	module := fs.String("module", "", "module path")
 	dir := fs.String("dir", ".", "project directory")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
 	if len(fs.Args()) != 0 {
-		fmt.Fprintln(errw, "usage: gscript mod init [--name NAME] [--version VERSION] [--dir DIR]")
+		fmt.Fprintln(errw, "usage: gscript mod init [--module PATH] [--dir DIR]")
 		return 2
 	}
 	absDir, err := filepath.Abs(*dir)
@@ -88,20 +82,14 @@ func runModInitCommand(args []string, outw, errw io.Writer) int {
 		fmt.Fprintf(errw, "gscript mod init: %v\n", err)
 		return 1
 	}
-	if *name == "" {
-		*name = filepath.Base(absDir)
-	}
-	manifest := modManifest{
-		SchemaVersion: 1,
-		Name:          *name,
-		Version:       *version,
-		RequirePaths:  []string{"."},
+	if *module == "" {
+		*module = filepath.Base(absDir)
 	}
 	if err := os.MkdirAll(absDir, 0755); err != nil {
 		fmt.Fprintf(errw, "gscript mod init: %v\n", err)
 		return 1
 	}
-	path := filepath.Join(absDir, "gscript.mod.json")
+	path := filepath.Join(absDir, modfile.FileName)
 	if _, err := os.Stat(path); err == nil {
 		fmt.Fprintf(errw, "gscript mod init: %s already exists\n", path)
 		return 1
@@ -109,12 +97,7 @@ func runModInitCommand(args []string, outw, errw io.Writer) int {
 		fmt.Fprintf(errw, "gscript mod init: %v\n", err)
 		return 1
 	}
-	data, err := json.MarshalIndent(manifest, "", "  ")
-	if err != nil {
-		fmt.Fprintf(errw, "gscript mod init: %v\n", err)
-		return 1
-	}
-	data = append(data, '\n')
+	data := modfile.Format(modfile.File{Module: *module, GS: "0.1"})
 	if err := os.WriteFile(path, data, 0644); err != nil {
 		fmt.Fprintf(errw, "gscript mod init: %v\n", err)
 		return 1
@@ -260,23 +243,17 @@ func verifyModule(path string) modVerifyReport {
 		report.Diagnostics = append(report.Diagnostics, modDiagnostic{Severity: "error", Code: "GS9101", Message: err.Error()})
 		return report
 	}
-	manifestPath := filepath.Join(abs, "gscript.mod.json")
+	manifestPath := filepath.Join(abs, modfile.FileName)
 	report.Manifest = manifestPath
-	manifest, err := readModManifest(manifestPath)
+	manifest, err := readModFile(abs)
 	if err != nil {
 		report.Diagnostics = append(report.Diagnostics, modDiagnostic{Severity: "error", Code: "GS9103", Message: err.Error(), File: manifestPath})
 		report.Graph, _ = buildModGraph(abs)
 		return report
 	}
 	report.Graph, _ = buildModGraph(abs)
-	if manifest.SchemaVersion != 1 {
-		report.Diagnostics = append(report.Diagnostics, modDiagnostic{Severity: "error", Code: "GS9104", Message: "schema_version must be 1", File: manifestPath})
-	}
-	if strings.TrimSpace(manifest.Name) == "" {
-		report.Diagnostics = append(report.Diagnostics, modDiagnostic{Severity: "error", Code: "GS9104", Message: "name is required", File: manifestPath})
-	}
-	if strings.TrimSpace(manifest.Version) == "" {
-		report.Diagnostics = append(report.Diagnostics, modDiagnostic{Severity: "error", Code: "GS9104", Message: "version is required", File: manifestPath})
+	if strings.TrimSpace(manifest.Module) == "" {
+		report.Diagnostics = append(report.Diagnostics, modDiagnostic{Severity: "error", Code: "GS9104", Message: "module is required", File: manifestPath})
 	}
 	for _, diag := range report.Graph.Diagnostics {
 		report.Diagnostics = append(report.Diagnostics, diag)
@@ -285,14 +262,23 @@ func verifyModule(path string) modVerifyReport {
 	return report
 }
 
-func readModManifest(path string) (modManifest, error) {
-	var manifest modManifest
+func readModFile(dir string) (modfile.File, error) {
+	path := filepath.Join(dir, modfile.FileName)
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return manifest, err
+		return modfile.File{}, err
 	}
-	if err := json.Unmarshal(data, &manifest); err != nil {
-		return manifest, err
+	file, diags := modfile.Parse(path, strings.NewReader(string(data)))
+	if len(diags) > 0 {
+		parts := make([]string, 0, len(diags))
+		for _, diag := range diags {
+			if diag.Line > 0 {
+				parts = append(parts, fmt.Sprintf("line %d: %s", diag.Line, diag.Message))
+			} else {
+				parts = append(parts, diag.Message)
+			}
+		}
+		return file, errors.New(strings.Join(parts, "; "))
 	}
-	return manifest, nil
+	return file, nil
 }

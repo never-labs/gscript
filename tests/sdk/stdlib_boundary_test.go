@@ -187,6 +187,7 @@ func TestInternalTopLevelPackagesStayArchitectural(t *testing.T) {
 		"lexer":     true,
 		"llmbridge": true,
 		"methodjit": true,
+		"modfile":   true,
 		"nanbox":    true,
 		"parser":    true,
 		"runtime":   true,

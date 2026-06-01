@@ -18,13 +18,20 @@ jsonMod := require("json")
 	}
 
 	var stdout, stderr bytes.Buffer
-	code := runModCommand([]string{"init", "--name", "demo", "--dir", dir}, &stdout, &stderr)
+	code := runModCommand([]string{"init", "--module", "example.com/demo", "--dir", dir}, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("mod init code = %d, stderr = %q", code, stderr.String())
 	}
-	manifestPath := filepath.Join(dir, "gscript.mod.json")
+	manifestPath := filepath.Join(dir, "gscript.mod")
 	if !strings.Contains(stdout.String(), manifestPath) {
 		t.Fatalf("stdout = %q, want manifest path", stdout.String())
+	}
+	manifestBytes, err := os.ReadFile(manifestPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := string(manifestBytes); !strings.Contains(got, "module example.com/demo\n") || !strings.Contains(got, "gs 0.1\n") {
+		t.Fatalf("manifest = %q, want compact gscript.mod format", got)
 	}
 
 	stdout.Reset()
