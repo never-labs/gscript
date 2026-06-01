@@ -56,8 +56,9 @@ and raw backtick strings.
 
 ## Syntactic Grammar
 
-The grammar below is the user-facing contract. Internal parser helper rules are
-not public syntax.
+The grammar below is the short user-facing contract. The fuller syntax appendix
+is maintained in [`grammar.ebnf`](grammar.ebnf). Internal parser helper rules
+are not public syntax.
 
 ```ebnf
 program       = { separator | statement } EOF ;
@@ -255,4 +256,3 @@ Before changing language behavior:
 3. add or update semantic tests;
 4. verify interpreter, VM, and JIT behavior;
 5. update generated or reference docs if user-visible APIs changed.
-

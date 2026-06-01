@@ -1,0 +1,158 @@
+(* Leia user-facing grammar.
+
+   This file is the syntax appendix for docs/spec/language.md. It describes
+   stable source syntax, not parser helper productions or internal AST shapes.
+   Keywords such as agent, models, turn, messages, budget, flow, and tool are
+   contextual identifiers unless the production below uses them in that
+   position.
+*)
+
+program        = { separator | statement } EOF ;
+separator      = ";" ;
+block          = "{" { separator | statement } "}" ;
+
+statement      = func_decl
+               | import_decl
+               | tool_decl
+               | agent_defaults_decl
+               | agent_decl
+               | models_decl
+               | budget_stmt
+               | if_stmt
+               | for_stmt
+               | select_stmt
+               | return_stmt
+               | break_stmt
+               | continue_stmt
+               | goto_stmt
+               | label_stmt
+               | go_stmt
+               | defer_stmt
+               | const_decl
+               | simple_stmt ;
+
+func_decl      = "func" identifier param_list block ;
+import_decl    = "import" string_lit "as" identifier ;
+tool_decl      = "tool" identifier param_list block ;
+models_decl    = "models" config_block ;
+budget_stmt    = "budget" config_block block ;
+
+agent_defaults_decl
+               = "agent" "defaults" config_block ;
+agent_decl     = "agent" identifier [ param_list ] config_block [ flow_block ] ;
+flow_block     = "flow" block ;
+
+param_list     = "(" [ param { "," param } [ "," vararg_param ]
+                     | vararg_param ] ")" ;
+param          = identifier ;
+vararg_param   = "..." | identifier "..." ;
+
+if_stmt        = "if" expr block { "elseif" expr block } [ "else" block ] ;
+for_stmt       = "for" block
+               | "for" expr block
+               | "for" simple_stmt ";" expr ";" simple_stmt block
+               | "for" identifier [ "," identifier ] ":=" "range" expr block ;
+
+select_stmt    = "select" "{" { select_case } "}" ;
+select_case    = ( "case" ( recv_clause | send_clause ) | "default" )
+                 ":" { separator | statement } ;
+recv_clause    = [ identifier [ "," identifier ] ":=" ] "<-" expr ;
+send_clause    = expr "<-" [ expr ] ;
+
+return_stmt    = "return" [ expr_list ] ;
+break_stmt     = "break" ;
+continue_stmt  = "continue" ;
+goto_stmt      = "goto" identifier ;
+label_stmt     = "::" identifier "::" ;
+go_stmt        = "go" call_expr ;
+defer_stmt     = "defer" call_expr ;
+const_decl     = "const" identifier ( "=" | ":=" ) expr ;
+
+simple_stmt    = assignment
+               | compound_assignment
+               | inc_dec_stmt
+               | send_clause
+               | call_expr
+               | expr ;
+assignment     = expr_list ( "=" | ":=" ) expr_list ;
+compound_assignment
+               = expr ( "+=" | "-=" | "*=" | "/=" | "%=" ) expr ;
+inc_dec_stmt   = expr ( "++" | "--" ) ;
+expr_list      = expr { "," expr } ;
+
+expr           = logical_or ;
+logical_or     = logical_and { "||" logical_and } ;
+logical_and    = comparison { "&&" comparison } ;
+comparison     = bit_or { ( "==" | "!=" | "<" | "<=" | ">" | ">=" ) bit_or } ;
+bit_or         = bit_xor { "|" bit_xor } ;
+bit_xor        = bit_and { "^" bit_and } ;
+bit_and        = shift { ( "&" | "&^" ) shift } ;
+shift          = concat { ( "<<" | ">>" ) concat } ;
+concat         = additive { ".." additive } ;
+additive       = multiplicative { ( "+" | "-" ) multiplicative } ;
+multiplicative = unary { ( "*" | "/" | "%" ) unary } ;
+unary          = ( "!" | "-" | "#" | "<-" ) unary | power ;
+power          = postfix { "**" unary } ;
+
+postfix        = primary { call_suffix | index_suffix | member_suffix } ;
+call_expr      = postfix call_suffix ;
+call_suffix    = "(" [ expr_list ] ")" ;
+index_suffix   = "[" expr "]" ;
+member_suffix  = "." identifier ;
+
+primary        = identifier
+               | number_lit
+               | string_lit
+               | "true"
+               | "false"
+               | "nil"
+               | "..."
+               | "(" expr ")"
+               | func_lit
+               | agent_lit
+               | turn_expr
+               | messages_expr
+               | table_lit
+               | list_lit
+               | dense_lit ;
+
+func_lit       = "func" param_list block ;
+agent_lit      = "agent" [ param_list ] config_block [ flow_block ] ;
+turn_expr      = "turn" config_block ;
+messages_expr  = "messages" "{" [ message_field { field_sep message_field } [ field_sep ] ] "}" ;
+
+config_block   = "{" [ config_field { field_sep config_field } [ field_sep ] ] "}" ;
+config_field   = identifier ":" expr
+               | string_lit ":" expr
+               | "[" expr "]" ":" expr ;
+
+message_field  = identifier ":" expr
+               | string_lit ":" expr
+               | table_field ;
+
+table_lit      = "{" [ table_field { field_sep table_field } [ field_sep ] ] "}" ;
+table_field    = identifier ":" expr
+               | "[" expr "]" ":" expr
+               | expr ;
+list_lit       = "[" [ expr { field_sep expr } [ field_sep ] ] "]" ;
+dense_lit      = "[" [ integer_lit ] "]" dense_type "{" [ expr { field_sep expr } [ field_sep ] ] "}" ;
+dense_type     = "i8" | "i16" | "i32" | "i64" | "u8" | "u16" | "u32" | "u64"
+               | "f32" | "f64" | "bool" ;
+field_sep      = "," | ";" ;
+
+identifier     = ( "A".."Z" | "a".."z" | "_" )
+                 { "A".."Z" | "a".."z" | "0".."9" | "_" } ;
+number_lit     = integer_lit | float_lit ;
+integer_lit    = decimal_lit | hex_lit | binary_lit | octal_lit ;
+decimal_lit    = digit { digit | "_" } ;
+hex_lit        = "0" ( "x" | "X" ) hex_digit { hex_digit | "_" } ;
+binary_lit     = "0" ( "b" | "B" ) ( "0" | "1" ) { "0" | "1" | "_" } ;
+octal_lit      = "0" ( "o" | "O" ) ( "0".."7" ) { "0".."7" | "_" } ;
+float_lit      = decimal_lit "." decimal_lit [ exponent ]
+               | decimal_lit exponent ;
+exponent       = ( "e" | "E" ) [ "+" | "-" ] decimal_lit ;
+digit          = "0".."9" ;
+hex_digit      = digit | "A".."F" | "a".."f" ;
+string_lit     = quoted_string | raw_string ;
+quoted_string  = '"' { escaped_char | any_char_except_quote_or_newline } '"' ;
+raw_string     = "`" { any_char_except_backtick } "`" ;
