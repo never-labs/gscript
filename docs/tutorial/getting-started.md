@@ -15,7 +15,7 @@ Start with small scripts:
 
 ```bash
 go run ./cmd/leia run examples/hello/fib.leia
-go run ./cmd/leia run examples/hello/metatables.leia
+go run ./cmd/leia run examples/hello/types_demo.leia
 ```
 
 Then try the product-direction examples:
