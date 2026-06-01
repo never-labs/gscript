@@ -53,7 +53,7 @@ func Install(interp *runtime.Interpreter) {
 
 type ModuleOptions struct {
 	ScriptCaller runtime.ScriptFunctionCaller
-	Less         modules.ValueLessFunc
+	Less         tablehooks.Less
 	Host         host.Options
 	Table        tablehooks.Options
 	SkipTable    bool
