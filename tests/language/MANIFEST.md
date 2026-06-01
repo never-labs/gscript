@@ -41,7 +41,7 @@ Current translated passing cases: 441.
 | `attrib_const_defer_gscript` | `locals.lua`, `constructs.lua` | GScript Go-style `const` readonly binding checks and `defer` LIFO cleanup on error; intentionally not Lua `<const>/<close>` syntax. |
 | `attrib_require_builtin_modules_more` | `attrib.lua` | `require` returns cached builtin standard-library modules and exposes them through `package.loaded`. |
 | `attrib_require_go_host_modules_more` | `attrib.lua` | Go-host standard-library modules return their global table from `require` and share identity through `package.loaded`. |
-| `attrib_require_all_stdlib_more` | `attrib.lua` | Full Go-host stdlib require/package.loaded identity sweep across remaining module tables, including stub-safe `rl`. |
+| `attrib_require_all_stdlib_more` | `attrib.lua` | Full Go-host stdlib require/package.loaded identity sweep across remaining module tables. |
 | `calls_anonymous_invocation` | `calls.lua` | Immediately invoked anonymous functions and simple multi-return anonymous closures. |
 | `calls_builtin_missing_args` | `calls.lua` | Missing-argument errors for core builtins through protected calls. |
 | `calls_fixedpoint_returns` | `calls.lua` | Fixed-point function calls, closure-returning calls, recursive multi-return unpack. |

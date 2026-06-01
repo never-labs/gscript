@@ -54,7 +54,6 @@ var modules = []ModuleInfo{
 	{Name: "process", Layer: LayerHost, Capabilities: []string{"process.exec", "process.shell"}},
 	{Name: "rand", Layer: LayerBase, SafeDefault: true},
 	{Name: "regexp", Layer: LayerBase, SafeDefault: true},
-	{Name: "rl", Layer: LayerVendor},
 	{Name: "script", Layer: LayerHost, Capabilities: []string{"script.eval", "module.load"}},
 	{Name: "soa", Layer: LayerData, SafeDefault: true},
 	{Name: "sort", Layer: LayerBase, SafeDefault: true},

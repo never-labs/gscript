@@ -51,11 +51,14 @@ func TestRegistryLayerQueries(t *testing.T) {
 		LayerCompat: {"bit32"},
 		LayerData:   {"array", "binary", "csv", "matrix", "soa", "vec"},
 		LayerHost:   {"debug", "fs", "http", "io", "log", "net", "os", "process", "script", "testkit"},
-		LayerVendor: {"rl"},
+		LayerVendor: nil,
 	}
 	for layer, want := range cases {
 		got := moduleNames(ModulesForLayer(layer))
 		sort.Strings(got)
+		if want == nil {
+			want = []string{}
+		}
 		if !reflect.DeepEqual(got, want) {
 			t.Fatalf("ModulesForLayer(%q) = %#v, want %#v", layer, got, want)
 		}

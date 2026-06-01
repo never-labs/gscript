@@ -120,7 +120,6 @@ func TestEachPublicLibFlagExposesNamedGlobal(t *testing.T) {
 		{"matrix", gs.LibMatrix, "matrix"},
 		{"compress", gs.LibCompress, "compress"},
 		{"container", gs.LibContainer, "container"},
-		{"rl", gs.LibRL, "rl"},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

@@ -16,7 +16,6 @@ const (
 	LibOS                             // os.*
 	LibCoroutine                      // coroutine (built-in, always available)
 	LibHTTP                           // http.* (server)
-	LibRL                             // rl.* (raylib)
 	LibJSON                           // json.*
 	LibBase64                         // base64.*
 	LibHash                           // hash.*
@@ -53,7 +52,7 @@ const (
 
 	// LibAll includes every library (default).
 	LibAll = LibString | LibTable | LibMath | LibIO | LibOS | LibCoroutine |
-		LibHTTP | LibRL | LibJSON | LibBase64 | LibHash |
+		LibHTTP | LibJSON | LibBase64 | LibHash |
 		LibFS | LibPath | LibTime | LibNet |
 		LibVec | LibColor | LibRegexp | LibUTF8 | LibBit32 |
 		LibBinary | LibBits | LibBytes | LibCSV | LibURL | LibUUID |
@@ -78,9 +77,9 @@ const (
 		LibCompress | LibCrypto | LibContainer | LibLog | LibArray | LibSoA |
 		LibLLM
 
-	// LibGame is a preset for game development (no I/O, includes rl/vec/color).
+	// LibGame is a preset for game development (no I/O, includes vec/color).
 	LibGame = LibString | LibTable | LibMath | LibCoroutine |
-		LibRL | LibVec | LibColor | LibJSON | LibBit32 | LibBits |
+		LibVec | LibColor | LibJSON | LibBit32 | LibBits |
 		LibTime | LibRand | LibArray | LibSoA
 )
 

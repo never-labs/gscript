@@ -44,7 +44,7 @@ case 时如果再次发现问题才需要新增的能力候选。
 - `go_channel_host_more`: Go-style channel/goroutine 在 VM 文件模式下覆盖 buffered producer、range over closed channel、closed receive 和容量/关闭错误路径。
 - `matrix_host_dense_more`: `matrix.dense` / `matrix.getf` / `matrix.setf` 在脚本层覆盖 flat backing 读写、普通索引一致性和稳定参数错误。
 - `attrib_require_go_host_modules_more`: Go-host 标准库模块通过 `require` 和 `package.loaded` 保持全局表身份一致。
-- `attrib_require_all_stdlib_more`: 剩余 Go-host stdlib 模块通过 `require` 和 `package.loaded` 保持全局表身份一致，包括 stub-safe `rl`。
+- `attrib_require_all_stdlib_more`: 剩余 Go-host stdlib 模块通过 `require` 和 `package.loaded` 保持全局表身份一致。
 - `http_background_server_more`: `http.listen` / `router.listen` 支持 `{background: true}`，返回可 `close` / `shutdown` / `wait` 的 server handle，脚本层可稳定做本地请求回环测试。
 - `json_go_host_more`: `json.encode` / `decode` / `pretty` 在脚本层覆盖嵌套结构、round-trip、非法 JSON 和 trailing data 拒绝。
 - `regexp_go_host_more`: Go RE2 风格 `regexp` helper 和 compiled object 覆盖 match/find/submatch/split/replace 与 invalid pattern 错误。
