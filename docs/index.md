@@ -51,6 +51,7 @@ only.
   untrusted-script baseline.
 - [Contributing](../CONTRIBUTING.md): local checks, change expectations, and PR
   checklist.
+- [Code of conduct](../CODE_OF_CONDUCT.md): baseline collaboration policy.
 - [Performance contribution guide](contributing/performance.md): benchmark
   evidence format for optimization work.
 

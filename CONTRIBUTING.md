@@ -3,6 +3,8 @@
 Leia is still moving quickly. Changes should keep the language contract,
 runtime behavior, tooling, docs, and performance gates aligned.
 
+Participation is covered by [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md).
+
 ## Local Setup
 
 Use a recent Go toolchain and run commands from the repository root.
