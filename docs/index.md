@@ -21,6 +21,8 @@ only.
   by tooling.
 - [Modules](reference/modules/index.md): `leia.mod`, `leia.sum`, vendoring, and
   Go-native binding metadata.
+- [Go embedding API](reference/embedding/index.md): public Go package surface,
+  host bindings, sandbox options, and VM lifetime rules.
 - [Embedding guide](guides/embedding.md): host integration, sandboxing, and
   reload-oriented runtime usage.
 - [AI-native guide](guides/ai-native.md): agents, tools, models, message
