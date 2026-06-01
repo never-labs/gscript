@@ -52,12 +52,30 @@ func ModuleOptionsForScript(script string) []Option {
 		}
 		opts = append(opts, WithModuleReplace(rep.Path, root))
 	}
+	if modules := vendorModulesForManifest(dir, manifest); len(modules) > 0 {
+		opts = append(opts, withModuleCacheModules(modules))
+	}
 	if cacheDir, err := modpkg.ModuleCacheDir(""); err == nil {
 		if modules := cacheModulesForManifest(cacheDir, manifest); len(modules) > 0 {
 			opts = append(opts, WithModuleCache(cacheDir), withModuleCacheModules(modules))
 		}
 	}
 	return opts
+}
+
+func vendorModulesForManifest(root string, manifest modfile.File) []modresolve.CacheModule {
+	modules := make([]modresolve.CacheModule, 0, len(manifest.Require))
+	for _, req := range manifest.Require {
+		if req.Version == "" {
+			continue
+		}
+		vendorRoot := filepath.Join(root, "vendor", filepath.FromSlash(req.Path+"@"+req.Version))
+		if _, err := os.Stat(vendorRoot); err != nil {
+			continue
+		}
+		modules = append(modules, modresolve.CacheModule{Path: req.Path, Version: req.Version, Root: vendorRoot})
+	}
+	return modules
 }
 
 func cacheModulesForManifest(cacheDir string, manifest modfile.File) []modresolve.CacheModule {

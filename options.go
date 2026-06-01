@@ -486,7 +486,7 @@ func WithModuleCache(root string) Option {
 
 func withModuleCacheModules(modules []modresolve.CacheModule) Option {
 	return func(o *vmOptions) {
-		o.moduleCacheModules = append([]modresolve.CacheModule(nil), modules...)
+		o.moduleCacheModules = append(o.moduleCacheModules, modules...)
 	}
 }
 
