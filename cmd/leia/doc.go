@@ -190,7 +190,7 @@ func generateStdlibInventoryMarkdown() []byte {
 	var b bytes.Buffer
 	fmt.Fprintln(&b, "# Leia Standard Library Inventory")
 	fmt.Fprintln(&b)
-	fmt.Fprintln(&b, "Generated from the current runtime stdlib catalog.")
+	fmt.Fprintln(&b, "Generated from `internal/stdlib/catalog`, the code-owned standard-library metadata.")
 	fmt.Fprintln(&b)
 	fmt.Fprintln(&b, "| Layer | Module | Description | Safe default | Capabilities |")
 	fmt.Fprintln(&b, "|---|---|---|---|---|")

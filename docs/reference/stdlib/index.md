@@ -1,6 +1,6 @@
 # Leia Standard Library Inventory
 
-Generated from the current runtime stdlib catalog.
+Generated from `internal/stdlib/catalog`, the code-owned standard-library metadata.
 
 | Layer | Module | Description | Safe default | Capabilities |
 |---|---|---|---|---|

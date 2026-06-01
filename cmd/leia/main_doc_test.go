@@ -49,7 +49,7 @@ func TestDocGenerateWritesSiteLayout(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.Contains(stdlibDoc, []byte("Generated from the current runtime stdlib catalog.")) {
+	if !bytes.Contains(stdlibDoc, []byte("Generated from `internal/stdlib/catalog`")) {
 		t.Fatalf("stdlib site doc = %q, want generated stdlib inventory", string(stdlibDoc))
 	}
 }
