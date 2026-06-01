@@ -1,5 +1,5 @@
 // Minimal web server
-// Run: ./leia examples/web/hello_server.leia
+// Run: leia run examples/web/hello_server.leia
 
 http.listen(":8080", func(req, res) {
     res.write("Hello from Leia!\n")

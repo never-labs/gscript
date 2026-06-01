@@ -1,6 +1,6 @@
 // Smoke test and usage tour for the current structure-of-arrays stdlib.
 // Run with:
-//   go run ./cmd/leia examples/data_processing/data_oriented/soa_kernels.leia
+//   go run ./cmd/leia run examples/data_processing/data_oriented/soa_kernels.leia
 
 func check(name, ok) {
     assert(ok)

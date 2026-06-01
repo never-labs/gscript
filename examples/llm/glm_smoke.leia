@@ -9,7 +9,7 @@
 //   LEIA_GLM_BASE_URL=https://open.bigmodel.cn/api/anthropic \
 //   LEIA_GLM_API_KEY=... \
 //   LEIA_GLM_MODEL=glm-5.1 \
-//   leia examples/llm/glm_smoke.leia
+//   leia run examples/llm/glm_smoke.leia
 
 models {
     default: "glm-smoke"

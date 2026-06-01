@@ -1,5 +1,5 @@
 // Leia Web Server Demo
-// Run: ./leia examples/web/webserver.leia
+// Run: leia run examples/web/webserver.leia
 
 router := http.newRouter()
 

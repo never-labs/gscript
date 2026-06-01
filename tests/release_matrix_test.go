@@ -457,6 +457,41 @@ func TestReleaseMatrixGettingStartedExamplesStayRunnable(t *testing.T) {
 	}
 }
 
+func TestReleaseMatrixExampleRunCommentsUseCurrentCLI(t *testing.T) {
+	root := findRepoRoot(t)
+	var offenders []string
+	err := filepath.WalkDir(filepath.Join(root, "examples"), func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() || filepath.Ext(path) != ".leia" {
+			return nil
+		}
+		rel, err := filepath.Rel(root, path)
+		if err != nil {
+			return err
+		}
+		rel = filepath.ToSlash(rel)
+		data := readFileString(t, path)
+		for lineNo, line := range strings.Split(data, "\n") {
+			if !strings.Contains(line, "Run:") && !strings.Contains(line, "go run") && !strings.Contains(line, "leia ") {
+				continue
+			}
+			if strings.Contains(line, "./leia") || strings.Contains(line, "leia examples/") || strings.Contains(line, "./cmd/leia examples/") {
+				offenders = append(offenders, rel+":"+strconv.Itoa(lineNo+1)+": "+strings.TrimSpace(line))
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("walk examples: %v", err)
+	}
+	if len(offenders) > 0 {
+		sort.Strings(offenders)
+		t.Fatalf("example run comments must use current `leia run` CLI shape:\n%s", strings.Join(offenders, "\n"))
+	}
+}
+
 func TestReleaseMatrixDocumentedExampleCommandsStayRunnable(t *testing.T) {
 	root := findRepoRoot(t)
 	examplesDoc := readFileString(t, filepath.Join(root, "docs", "examples", "index.md"))
