@@ -389,6 +389,13 @@ func (vm *VM) globalIsStdType(name string) bool {
 // tableSet performs table assignment with __newindex metamethod support.
 
 func (vm *VM) tableSet(t runtime.Value, key runtime.Value, val runtime.Value) error {
+	return vm.tableSetDepth(t, key, val, 0)
+}
+
+func (vm *VM) tableSetDepth(t runtime.Value, key runtime.Value, val runtime.Value, depth int) error {
+	if depth > maxMetaDepth {
+		return fmt.Errorf("__newindex chain too deep")
+	}
 	if t.IsSoA() {
 		if handled, err := t.SoA().SetIndex(key, val); handled || err != nil {
 			return err
@@ -415,7 +422,7 @@ func (vm *VM) tableSet(t runtime.Value, key runtime.Value, val runtime.Value) er
 					return err
 				}
 				if ni.IsTable() {
-					return vm.tableSet(runtime.TableValue(ni.Table()), key, val)
+					return vm.tableSetDepth(runtime.TableValue(ni.Table()), key, val, depth+1)
 				}
 			}
 		}

@@ -27,7 +27,22 @@ func TestSpecRunnableExamples(t *testing.T) {
 				t.Run(mode.name, func(t *testing.T) {
 					args := append([]string{"run", "./cmd/leia", "run"}, mode.flags...)
 					args = append(args, path)
-					runCommand(t, root, 30*time.Second, "go", args...)
+					result := runCommandResult(root, 30*time.Second, "go", args...)
+					if mode.wantFailure {
+						if result.timedOut {
+							t.Fatalf("%s timed out after %s", commandLine("go", args), 30*time.Second)
+						}
+						if result.err == nil {
+							t.Fatalf("%s succeeded; expected failure\nstdout:\n%s\nstderr:\n%s", commandLine("go", args), result.stdout, result.stderr)
+						}
+						return
+					}
+					if result.err != nil {
+						if result.timedOut {
+							t.Fatalf("%s timed out after %s", commandLine("go", args), 30*time.Second)
+						}
+						t.Fatalf("%s failed: %v\nstdout:\n%s\nstderr:\n%s", commandLine("go", args), result.err, result.stdout, result.stderr)
+					}
 				})
 			}
 		})
@@ -41,8 +56,9 @@ type runnableSpecExample struct {
 }
 
 type specExampleMode struct {
-	name  string
-	flags []string
+	name        string
+	flags       []string
+	wantFailure bool
 }
 
 func collectRunnableSpecExamples(t *testing.T, root string) []runnableSpecExample {
@@ -107,6 +123,14 @@ func specExampleModes(info string) ([]specExampleMode, bool) {
 			{name: "interpreter", flags: []string{"-jit=false"}},
 			{name: "vm", flags: []string{"-vm"}},
 			{name: "default", flags: nil},
+		}, true
+	case "leia fail":
+		return []specExampleMode{{name: "interpreter", flags: []string{"-jit=false"}, wantFailure: true}}, true
+	case "leia fail all":
+		return []specExampleMode{
+			{name: "interpreter", flags: []string{"-jit=false"}, wantFailure: true},
+			{name: "vm", flags: []string{"-vm"}, wantFailure: true},
+			{name: "default", flags: nil, wantFailure: true},
 		}, true
 	default:
 		return nil, false

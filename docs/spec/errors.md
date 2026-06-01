@@ -22,9 +22,10 @@ assert(err.kind == "demo")
 
 `pcall(fn, ...)` calls `fn(...)` in protected mode. On success it returns
 `true` followed by all results from the call. On failure it returns `false` and
-one error object. If the failure came from `error(value)`, the object is
-`value`; if it came from a runtime, host, parser, budget, or capability failure,
-the protected error object is a diagnostic string.
+one error object. If the failure came from `error(value)` or `assert(false,
+value)`, the object is `value`; if it came from a runtime, host, parser,
+budget, or capability failure, the protected error object is the current
+diagnostic string.
 
 `xpcall(fn, handler, ...)` calls `fn(...)` in protected mode. On success it
 returns `true` followed by all results from `fn`. On failure it calls
@@ -44,6 +45,13 @@ ok, handled := xpcall(error, func(err) {
 assert(!ok && handled == "handled:boom")
 ```
 
+Protected calls are recovery boundaries for ordinary script failures. They do
+not make process termination, cancellation, host shutdown, or bugs in the host
+process safe to continue unless the embedding API explicitly reports those
+conditions as ordinary errors. A protected call whose own first argument is
+invalid raises an unprotected argument error; wrap the call site itself if that
+failure must be recovered.
+
 Recoverable host and provider failures should return `nil, err` or a
 structured result when the API is designed for recovery. Error result tables use
 stable, lowercase string fields when structured recovery is intended:
@@ -55,6 +63,16 @@ stable, lowercase string fields when structured recovery is intended:
 | `code` | Optional machine-readable API/provider code. |
 | `source` | Optional subsystem or provider name. |
 | `retryable` | Optional boolean hint for transient failures. |
+
+Host and provider APIs should use stable `kind` and `code` values when callers
+need branching behavior:
+
+| Kind | Typical codes |
+| --- | --- |
+| `host` | API-specific codes for callback, provider, process, filesystem, network, or environment failures. Public Go callback failures surface as `*leia.HostCallbackError`; callback panics surface as `*leia.HostCallbackPanicError`. |
+| `capability` | A denied capability name or API-specific denial code, such as disabled filesystem read/write, network, process execution, debug, testkit, dynamic eval, or module loading. Capability denials are currently runtime diagnostics unless a library intentionally returns a structured error table. |
+| `budget` | One of the current public budget resources: `steps`, `native_calls`, `call_depth`, `goroutines`, `channel_capacity`, `host_result_bytes`, `module_bytes`, or `module_depth`. Public execution APIs expose these through `*leia.BudgetError.Resource` and `Limit`. |
+| `provider` | Provider-specific API codes, model errors, rate limits, authentication failures, or validation failures. |
 
 LLM provider failures, filesystem failures, network failures, and sandbox
 denials must not leak data forbidden by the active capability policy.
@@ -71,5 +89,32 @@ Common runtime errors include:
 | Coroutine errors | Yielding outside a yieldable coroutine boundary or resuming an invalid coroutine state. |
 | Resource and capability errors | Step budget exceeded, host-result byte budget exceeded, filesystem/network/process/debug access denied. |
 
-Diagnostics should include source location when available. CLI diagnostics may
-be emitted as text, JSON, or SARIF according to the command contract.
+Public Go execution APIs expose typed errors before text formatting. `*leia.Error`
+has stable fields `Kind`, `Message`, `Line`, `Col`, `File`, `Err`, and `Value`.
+`Kind` is `lex`, `parse`, `runtime`, or `script`; `script` is used for
+`error(value)` and carries the converted original value in `Value` when
+conversion succeeds. Runtime, parser, and lexer errors use `Message` as a human
+diagnostic. `Err` unwraps to the underlying cause, including `*leia.BudgetError`,
+`*leia.ExitError`, host callback errors, and host callback panic errors when
+available.
+
+Inside Leia code, typed diagnostics are not automatically reified as tables.
+The current boundary is:
+
+| Boundary | Error representation |
+| --- | --- |
+| Public Go APIs | Typed Go errors such as `*leia.Error`, `*leia.BudgetError`, `*leia.HostCallbackError`, `*leia.HostCallbackPanicError`, and `*leia.ExitError`. |
+| `pcall` / `xpcall` for `error(value)` | The original Leia value. |
+| `pcall` / `xpcall` for runtime, parser, host, budget, or capability failures | A diagnostic string. |
+| Recoverable library/provider APIs | API-specific results, commonly `nil, err` or a table with fields such as `kind`, `message`, `code`, `source`, and `retryable`. |
+| CLI diagnostics | Command-specific text, JSON, or SARIF. JSON field names documented for a command are the stable interface; prose messages may change. |
+
+Diagnostics should include source location when available. Stable source fields
+are source name or file path, line, and column. Public Go APIs map those to
+`File`, `Line`, and `Col`. String diagnostics may include the same coordinates
+in text, but callers that need stability should use typed Go errors or CLI JSON.
+
+Stack and traceback text is diagnostic output, not a stable machine interface.
+Debug APIs may expose source names and frames for humans, but frame formatting,
+function names, native/script labels, and stack depth are not stable unless a
+specific command or API documents them as structured fields.

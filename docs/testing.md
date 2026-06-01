@@ -9,7 +9,7 @@ Leia uses several test layers:
 - Benchmark manifests and performance gates under `benchmarks/`.
 - Documentation and release evidence checks.
 - Runnable examples embedded in `docs/spec/*.md` code fences marked
-  `leia run` or `leia run all`.
+  `leia run`, `leia run all`, `leia fail`, or `leia fail all`.
 
 Important inputs:
 

@@ -18,7 +18,7 @@ Assigning `nil` to a table field removes that field for ordinary table lookup.
 Tables compare by identity unless a metatable supplies comparison behavior.
 
 Raw helpers bypass metamethods by contract. Non-raw operations may consult
-metatables when the runtime supports the corresponding metamethod.
+metatables when the corresponding operation names an event below.
 
 ```leia
 log := {}
@@ -42,23 +42,35 @@ rawget(t, "created") // 13
 ```
 
 Stable metatable behavior is defined by the events below. A metamethod is looked
-up by raw string key in the value's metatable. Binary operators first try the
-left operand's metamethod and then the right operand's metamethod when needed.
-Each metamethod receives the listed arguments; unless otherwise stated, only its
-first return value is used.
+up by raw string key in the value's metatable. The lookup never invokes
+`__index` on the metatable itself. Each metamethod receives the listed
+arguments; unless otherwise stated, only its first return value is used.
+
+For a binary event named `event`, Leia uses this lookup algorithm after any
+primitive operation has failed:
+
+1. If the left operand is a table and its metatable has a non-`nil` raw field named `event`, use that value.
+2. Otherwise, if the right operand is a table and its metatable has a non-`nil` raw field named `event`, use that value.
+3. Otherwise, the operation raises the normal type error for that operator.
+
+The chosen metamethod is called as `(left, right)` even when it came from the
+right operand. Operators `>` and `>=` are normalized before lookup: `left > right`
+dispatches as `right < left`, and `left >= right` dispatches as `right <= left`.
+Leia does not require the two operands to share the same metatable or the same
+metamethod function.
 
 | Metamethod | Trigger | Arguments | Result contract |
 | --- | --- | --- | --- |
-| `__index` | `t[k]` or `t.k` when `t` has no raw key `k`. Strings use a standard-library `__index` table for methods. | If function: `(t, k)`. If table: lookup continues in that table with key `k`. | Function result or redirected table lookup result. Missing chains produce `nil`; excessive cycles raise a runtime error. |
-| `__newindex` | `t[k] = v` when `t` has no raw key `k`. | If function: `(t, k, v)`. If table: assignment continues in that table. | Return values are ignored. Existing raw keys are updated directly. |
+| `__index` | `t[k]` or `t.k` when `t` has no raw key `k`. Strings use a standard-library `__index` table for methods. | If function: `(t, k)`. If table: lookup continues in that table with key `k`. | Function result or redirected table lookup result. Missing chains produce `nil`; chains deeper than 50 redirects raise a runtime error. |
+| `__newindex` | `t[k] = v` when `t` has no raw key `k`. | If function: `(t, k, v)`. If table: assignment continues in that table. | Return values are ignored. Existing raw keys are updated directly. Chains deeper than 50 redirects raise a runtime error. |
 | `__call` | Calling a non-function table value, `t(...)`. | `(t, ...)` | All return values become the call result. |
 | `__add`, `__sub`, `__mul`, `__div`, `__mod`, `__pow` | `+`, `-`, `*`, `/`, `%`, `**` when the primitive numeric operation is not applicable. | `(left, right)` | First return value is the operator result. |
 | `__unm` | Unary `-x` when primitive numeric negation is not applicable. | `(x)` | First return value is the operator result. |
 | `__concat` | `left .. right` when primitive string/number concatenation is not applicable. | `(left, right)` | First return value is the concatenation result. |
 | `__len` | `#x` for tables or other values with length behavior. | `(x)` | First return value is the length result. Library APIs that require an integer length may reject non-integer or negative results. |
-| `__eq` | `left == right` or `left != right` for identity-bearing values that are not raw-equal. | `(left, right)` | Truthiness of the first return value determines equality; `!=` negates it. |
+| `__eq` | `left == right` or `left != right` when both operands are tables and are not the same table identity. | `(left, right)` | Truthiness of the first return value determines equality; `!=` negates it. Primitive values and same-identity tables use raw equality and do not call `__eq`. |
 | `__lt` | `left < right`, and reversed `>` forms. | `(left, right)` for `<`; operands are reversed for `>`. | Truthiness of the first return value determines the comparison. |
-| `__le` | `left <= right`, and reversed `>=` forms. | `(left, right)` for `<=`; operands are reversed for `>=`. | Truthiness of the first return value determines the comparison. |
+| `__le` | `left <= right`, and reversed `>=` forms. | `(left, right)` for `<=`; operands are reversed for `>=`. | Truthiness of the first return value determines the comparison. There is no fallback to `__lt`; if neither operand supplies `__le`, the operation raises a comparison error. |
 | `__pairs` | `pairs(x)` when `x` has this metamethod. | `(x)` | Must return iterator function, state, and initial control value. |
 | `__tostring` | `tostring(x)` for a table with this metamethod. | `(x)` | Must return a string; other results raise a runtime error. |
 | `__name` | `tostring(x)` fallback for a table with no `__tostring`. | Not called; read as a string field. | Used as a type-name prefix in the fallback string form. |
@@ -81,6 +93,72 @@ sum := vec + other
 assert(sum.x == 7)
 assert(vec == setmetatable({x: 3}, mt))
 assert(tostring(vec) == "vec(3)")
+```
+
+```leia run all
+left := setmetatable({name: "left"}, {
+    __add: func(a, b) { return a.name .. "+" .. b.name },
+})
+right := setmetatable({name: "right"}, {
+    __add: func(a, b) { return a.name .. "->" .. b.name },
+})
+plain := {name: "plain"}
+
+assert(left + right == "left+right")
+assert(plain + right == "plain->right")
+```
+
+```leia run all
+mt := {}
+mt.__eq = func(a, b) { return a.key == b.key }
+mt.__lt = func(a, b) { return a.key < b.key }
+
+a := setmetatable({key: 1}, mt)
+b := setmetatable({key: 1}, mt)
+c := a
+
+assert(a == b)
+assert(rawequal(a, c))
+assert(!rawequal(a, b))
+assert(pcall(func() { return a <= b }) == false)
+
+mt.__le = func(a, b) { return a.key <= b.key }
+assert(a <= b)
+```
+
+`__index` and `__newindex` table redirects are ordinary table operations on the
+redirect target. They can chain through more metatables, and the same raw-key
+rule is applied at each hop. A function-valued `__index` or `__newindex` stops
+the chain by handling the operation directly.
+
+```leia run all
+base := {answer: 42}
+middle := setmetatable({}, {__index: base})
+obj := setmetatable({}, {__index: middle})
+assert(obj.answer == 42)
+
+log := {}
+sink := setmetatable({}, {
+    __newindex: func(_, key, value) {
+        log[#log + 1] = key .. ":" .. value
+    },
+})
+proxy := setmetatable({}, {__newindex: sink})
+proxy.event = "saved"
+assert(log[1] == "event:saved")
+assert(rawget(proxy, "event") == nil)
+```
+
+```leia fail all
+t := {}
+setmetatable(t, {__index: t})
+return t.missing
+```
+
+```leia fail all
+t := {}
+setmetatable(t, {__newindex: t})
+t.missing = 1
 ```
 
 The length operator `#x` uses the value's ordinary length behavior and may

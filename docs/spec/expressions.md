@@ -96,9 +96,9 @@ and formatting helpers expose the same conversions explicitly.
 | `==` | Any values. | Primitive values compare by value. Tables, functions, channels, coroutines, and host values compare by identity unless stable equality metamethod dispatch applies. | `__eq` |
 | `!=` | Any values. | Logical negation of `==`, including any stable `__eq` dispatch. | `__eq` |
 | `<` | Compatible numbers or compatible strings. Numeric strings are not coerced for primitive string ordering; use `tonumber` explicitly. | Ordered comparison. Incompatible operands error. | `__lt` |
-| `<=` | Compatible numbers or compatible strings. Numeric strings are not coerced for primitive string ordering. | Ordered comparison. Incompatible operands error. | `__le`, or stable fallback through `__lt` where supported |
+| `<=` | Compatible numbers or compatible strings. Numeric strings are not coerced for primitive string ordering. | Ordered comparison. Incompatible operands error. | `__le`; no fallback to `__lt` |
 | `>` | Compatible numbers or compatible strings. Numeric strings are not coerced for primitive string ordering. | Equivalent to reversed `<` after dispatch. Incompatible operands error. | `__lt` with reversed operands |
-| `>=` | Compatible numbers or compatible strings. Numeric strings are not coerced for primitive string ordering. | Equivalent to reversed `<=` after dispatch. Incompatible operands error. | `__le` with reversed operands, or stable fallback through `__lt` where supported |
+| `>=` | Compatible numbers or compatible strings. Numeric strings are not coerced for primitive string ordering. | Equivalent to reversed `<=` after dispatch. Incompatible operands error. | `__le` with reversed operands; no fallback to `__lt` |
 | `&&` | Any values. | Returns the left operand when it is falsy; otherwise evaluates and returns the right operand. | none |
 | `||` | Any values. | Returns the left operand when it is truthy; otherwise evaluates and returns the right operand. | none |
 | `!` | Any value. | Returns `true` for `nil` and `false`; returns `false` for every other value. | none |
@@ -125,10 +125,12 @@ defined.
 ```leia run
 assert(1 + 2 == 3)
 assert("5" + 3 == 8)
-ok, _ := pcall(func() { return "x" + 3 })
-assert(!ok)
 assert("a" .. 3 == "a3")
 assert((1 << 8) == 256)
+```
+
+```leia fail all
+return "x" + 3
 ```
 
 ```leia run all

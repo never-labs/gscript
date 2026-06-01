@@ -44,6 +44,43 @@ def inline_markdown(text: str) -> str:
     return text
 
 
+def is_table_separator(line: str) -> bool:
+    cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+    return bool(cells) and all(re.fullmatch(r":?-{3,}:?", cell or "") for cell in cells)
+
+
+def split_table_row(line: str) -> list[str]:
+    text = line.strip()
+    if text.startswith("|"):
+        text = text[1:]
+    if text.endswith("|"):
+        text = text[:-1]
+    cells: list[str] = []
+    current: list[str] = []
+    in_code = False
+    escaped = False
+    for char in text:
+        if escaped:
+            current.append(char)
+            escaped = False
+            continue
+        if char == "\\":
+            current.append(char)
+            escaped = True
+            continue
+        if char == "`":
+            current.append(char)
+            in_code = not in_code
+            continue
+        if char == "|" and not in_code:
+            cells.append("".join(current).strip())
+            current = []
+            continue
+        current.append(char)
+    cells.append("".join(current).strip())
+    return cells
+
+
 def markdown_to_html(text: str, prefix: str) -> str:
     lines = text.splitlines()
     out: list[str] = []
@@ -68,7 +105,9 @@ def markdown_to_html(text: str, prefix: str) -> str:
             out.append("</ol>")
             in_ol = False
 
-    for line in lines:
+    i = 0
+    while i < len(lines):
+        line = lines[i]
         if line.startswith("```"):
             close_paragraph()
             close_lists()
@@ -78,13 +117,37 @@ def markdown_to_html(text: str, prefix: str) -> str:
                 in_code = False
             else:
                 in_code = True
+            i += 1
             continue
         if in_code:
             code.append(line)
+            i += 1
+            continue
+        if (
+            line.strip().startswith("|")
+            and i + 1 < len(lines)
+            and is_table_separator(lines[i + 1])
+        ):
+            close_paragraph()
+            close_lists()
+            header = split_table_row(line)
+            i += 2
+            rows: list[list[str]] = []
+            while i < len(lines) and lines[i].strip().startswith("|"):
+                rows.append(split_table_row(lines[i]))
+                i += 1
+            out.append('<div class="table-wrap"><table>')
+            out.append("<thead><tr>" + "".join(f"<th>{inline_markdown(cell)}</th>" for cell in header) + "</tr></thead>")
+            out.append("<tbody>")
+            for row in rows:
+                padded = row + [""] * max(0, len(header) - len(row))
+                out.append("<tr>" + "".join(f"<td>{inline_markdown(cell)}</td>" for cell in padded[: len(header)]) + "</tr>")
+            out.append("</tbody></table></div>")
             continue
         if not line.strip():
             close_paragraph()
             close_lists()
+            i += 1
             continue
         if line.startswith("# "):
             close_paragraph()
@@ -115,9 +178,13 @@ def markdown_to_html(text: str, prefix: str) -> str:
                 in_ol = True
             item = re.sub(r"^\d+\. ", "", line).strip()
             out.append("<li>" + inline_markdown(item) + "</li>")
+        elif (in_ul or in_ol) and line.startswith(("  ", "\t")) and out and out[-1].endswith("</li>"):
+            continuation = inline_markdown(line.strip())
+            out[-1] = out[-1][:-5] + " " + continuation + "</li>"
         else:
             close_lists()
             paragraph.append(line.strip())
+        i += 1
 
     close_paragraph()
     close_lists()
@@ -240,6 +307,13 @@ code {{ font-family:Menlo, Consolas, 'Liberation Mono', monospace; font-size:.92
 p code, li code {{ background:var(--code-bg); border:1px solid #e5e7eb; border-radius:3px; padding:1px 4px; }}
 pre {{ background:var(--code-bg); border:1px solid var(--line); border-radius:4px; overflow:auto; padding:14px 16px; max-width:920px; }}
 pre code {{ background:transparent; border:0; padding:0; color:#111827; }}
+.table-wrap {{ max-width:920px; overflow-x:auto; margin:14px 0 18px; }}
+table {{ width:100%; border-collapse:collapse; border-top:1px solid var(--line); border-bottom:1px solid var(--line); font-size:14px; }}
+th, td {{ text-align:left; vertical-align:top; padding:8px 10px; border-bottom:1px solid #e5e7eb; }}
+th {{ font-weight:600; background:#f8fafc; color:#1f2937; white-space:nowrap; }}
+td {{ min-width:120px; }}
+td:first-child, th:first-child {{ white-space:nowrap; }}
+tr:last-child td {{ border-bottom:0; }}
 footer {{ color:var(--muted); border-top:1px solid var(--line); margin-top:42px; padding-top:18px; font-size:14px; }}
 @media (max-width:900px) {{
   .shell {{ display:block; padding:20px; }}

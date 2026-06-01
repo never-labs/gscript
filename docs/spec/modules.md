@@ -60,8 +60,66 @@ assert(package.loaded["json"] == json1)
 
 `leia.mod` describes a module path, Leia language/module format version,
 dependencies, replacements, capability summaries, source collections, and
-optional Go-native binding metadata. `leia.sum` records remote or vendored
-module hashes when the module toolchain is used.
+optional Go-native binding metadata. The current manifest grammar is line
+oriented. Comments start with `//`; paths may contain letters, digits, `.`,
+`-`, `_`, `/`, and `:`, but not `..` or `\`.
+
+```text
+module example.com/app
+leia 0.1
+
+capability fs.read net.client
+capability tool.exec
+
+require github.com/example/lib v1.2.3
+replace github.com/example/lib v1.2.3 => ./third_party/lib
+collection assets ./assets
+
+go 1.25
+go require example.com/native v1.0.0
+go replace example.com/native => ./native
+```
+
+The `module` directive is required. `leia` records the Leia language/module
+format version; if it is absent, the current parser defaults it to `0.1`.
+`require` stores a module path and a version string. The implementation treats
+versions as opaque strings, but the downloader currently supports GitHub tag
+downloads for `github.com/owner/repo[/subdir]` requirements. `replace` maps a
+module path, optionally for one version, to another path; runtime module
+options only use local replacement targets (`./...` or absolute paths). `go`,
+`go require`, and `go replace` are metadata for `leia mod gomod`; they do not
+enable source-level `go:` imports by themselves.
+
+`capability` (or `cap`) is a declarative summary of host capabilities the
+module expects. Capabilities may be written as separate fields or comma
+separated values. The module loader does not grant permissions from this field;
+hosts still enforce the active capability policy. `leia mod capability` reads
+the main manifest and locally available dependency manifests, then reports a
+capability universe and per-module matrix. Missing dependency manifests are
+warnings, not proof that a module needs no capabilities.
+
+`collection name path` configures collection requires such as
+`require("assets:icons.logo")`. The name may contain letters, digits, `_`, and
+`-`. Relative collection paths are resolved from the directory containing the
+nearest `leia.mod`.
+
+`leia.sum` records hashes produced by module tooling. `leia mod lock` writes
+entries for local collections, local replaces, and locally available downloaded
+or vendored requirements. `leia mod download` and `leia mod vendor` update
+remote module entries after the dependency is present locally. The current file
+format is:
+
+```text
+collection NAME TARGET h1:BASE64_SHA256
+replace PATH VERSION_OR_- TARGET h1:BASE64_SHA256
+module PATH VERSION TARGET h1:BASE64_SHA256
+```
+
+Hashes are computed over stable path/data pairs. Directory hashes include only
+`.leia` files and `leia.mod`, skip VCS directories, sort paths, and use the
+`h1:` prefix with base64-encoded SHA-256 bytes. `leia mod verify` and
+`leia mod check` compare current local content with `leia.sum`; if no
+`leia.sum` exists, sum verification is skipped.
 
 Module paths may be GitHub-style repository paths. Leia does not require a
 central registry for basic module use.
@@ -78,6 +136,18 @@ The declaration above is only valid when the embedder has allowlisted and
 registered the `go:net/http` binding. Source syntax alone never grants host
 access.
 
-Readonly and vendor module modes are intended for reproducible execution. Host
-applications should choose the module mode explicitly when running untrusted
-scripts.
+Module mode controls how a discovered manifest is applied at runtime:
+
+| Mode | Runtime behavior |
+| --- | --- |
+| `mod` | Use local replaces, existing vendor entries, and existing module-cache entries. It does not download or mutate files. |
+| `readonly` | Same offline behavior as `mod` for current resolution. It is the mode hosts should choose when manifest/cache mutation is disallowed. |
+| `vendor` | Ignore the module cache and resolve required remote modules from `vendor/PATH@VERSION`. Missing remote vendor entries stay visible to resolution and fail normally when the module file is unavailable. |
+
+When `ModuleOptionsForScriptMode` is used, the nearest ancestor `leia.mod`
+sets the require root, collections, local replaces, module mode, and any local
+vendor/cache entries already present. Invalid manifests are ignored by that
+runtime helper rather than repaired. The CLI module commands are the mutating
+surface: `leia mod add`, `tidy`, `download`, `vendor`, and `lock` may update
+`leia.mod`, `vendor/`, the module cache, or `leia.sum`; ordinary script
+execution does not.
