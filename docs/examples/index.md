@@ -12,7 +12,8 @@ The repository-local example policy and dependency notes live in
 ```bash
 go run ./cmd/leia run examples/hello/fib.leia
 go run ./cmd/leia run examples/hello/types_demo.leia
-go run ./cmd/leia run examples/hello/metatables.leia
+go run ./cmd/leia run examples/hello/counter.leia
+go run ./cmd/leia run examples/hello/functional.leia
 ```
 
 | Directory | Focus |
@@ -49,7 +50,6 @@ Use these with the [concurrency reference](../reference/concurrency/index.md).
 
 ```bash
 go run ./cmd/leia run examples/llm/agent.leia
-go run ./cmd/leia run examples/llm/agent_as_tool.leia
 go run ./cmd/leia run examples/llm/incident_response.leia
 ```
 
@@ -74,12 +74,15 @@ See [Embedding Leia](../guides/embedding.md).
 
 ## Game And Web Examples
 
-```bash
-go run ./cmd/leia run examples/game_engine/game_of_life.leia
-go run ./cmd/leia run examples/game_engine/tetris.leia
-go run ./cmd/leia run examples/web/hello_server.leia
-```
+Game and web examples are source references for larger host integrations,
+long-running servers, graphical bindings, and interactive workloads. They are
+not first-run smoke commands.
 
-Some game or web examples are meant as source references rather than automated
-release gates. Prefer the smoke, SDK, and integration tests for deterministic
-correctness checks.
+Review these files directly when working on those areas:
+
+- `examples/game_engine/game_of_life.leia`
+- `examples/game_engine/tetris.leia`
+- `examples/web/hello_server.leia`
+
+Prefer the smoke, SDK, and integration tests for deterministic correctness
+checks.

@@ -196,6 +196,30 @@ func TestReleaseMatrixDocumentedSmokeCommandsStayRunnable(t *testing.T) {
 	runCommand(t, root, 30*time.Second, "go", "run", "./cmd/leia", "test", "tests/smoke/01_basic.leia")
 }
 
+func TestReleaseMatrixDocumentedExampleCommandsStayRunnable(t *testing.T) {
+	root := findRepoRoot(t)
+	examplesDoc := readFileString(t, filepath.Join(root, "docs", "examples", "index.md"))
+	for _, forbidden := range []string{
+		"go run ./cmd/leia run examples/hello/metatables.leia",
+		"go run ./cmd/leia run examples/llm/agent_as_tool.leia",
+		"go run ./cmd/leia run examples/game_engine/game_of_life.leia",
+		"go run ./cmd/leia run examples/game_engine/tetris.leia",
+		"go run ./cmd/leia run examples/web/hello_server.leia",
+	} {
+		if strings.Contains(examplesDoc, forbidden) {
+			t.Fatalf("docs/examples/index.md must not present non-smoke command %q as first-run runnable", forbidden)
+		}
+	}
+
+	commands := documentedExampleRunCommands(t, examplesDoc)
+	if len(commands) == 0 {
+		t.Fatal("docs/examples/index.md must contain runnable example commands")
+	}
+	for _, args := range commands {
+		runCommand(t, root, 30*time.Second, "go", args...)
+	}
+}
+
 func TestReleaseMatrixStdlibContractHasConformanceCoverageEntry(t *testing.T) {
 	root := findRepoRoot(t)
 	modules := readStdlibContractRows(t, root)
@@ -216,6 +240,23 @@ func TestReleaseMatrixStdlibContractHasConformanceCoverageEntry(t *testing.T) {
 		sort.Strings(missing)
 		t.Fatalf("stdlib contract modules need a conformance case or documented capability entry: %s", strings.Join(missing, ", "))
 	}
+}
+
+func documentedExampleRunCommands(t *testing.T, doc string) [][]string {
+	t.Helper()
+	var commands [][]string
+	for _, line := range strings.Split(doc, "\n") {
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(line, "go run ./cmd/leia run examples/") {
+			continue
+		}
+		fields := strings.Fields(line)
+		if len(fields) != 5 {
+			t.Fatalf("unexpected documented example command shape %q", line)
+		}
+		commands = append(commands, fields[1:])
+	}
+	return commands
 }
 
 func loadReleaseFeatureMatrix(t *testing.T, root string) releaseFeatureMatrix {
