@@ -15,7 +15,7 @@ only.
 - [Getting started](tutorial/getting-started.md): install, run, test, and embed
   Leia in a small Go program.
 - [Standard library](reference/stdlib/index.md): generated-style module index
-  organized from the runtime catalog.
+  organized from `internal/stdlib/catalog`.
 - [CLI reference](reference/cli/index.md): stable command surface.
 - [File directives](reference/directives/index.md): `//leia:` metadata consumed
   by tooling.
@@ -35,6 +35,8 @@ only.
   CLI JSON/SARIF outputs, and diagnostic bundle entrypoints.
 - [Performance and benchmarks](reference/performance/index.md): benchmark
   selectors, timing modes, strict guards, and release artifacts.
+- [Platforms and execution modes](reference/platforms/index.md): interpreter,
+  bytecode VM, JIT, and hosted runner expectations.
 - [AI-native reference](reference/ai/index.md): models, tools, messages, turns,
   agents, budgets, providers, and replay.
 - [Embedding guide](guides/embedding.md): host integration, sandboxing, and

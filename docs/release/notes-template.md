@@ -9,6 +9,7 @@ Use this template for release candidates and public tags.
 - Date:
 - Platforms:
 - Go version:
+- Execution modes tested:
 - License:
 
 ## Compatibility

@@ -110,6 +110,7 @@ func TestReleaseMatrixCommunityEntrypointsAreLinked(t *testing.T) {
 		"examples/README.md",
 		"docs/release/notes-template.md",
 		"docs/contributing/performance.md",
+		"docs/reference/platforms/index.md",
 	} {
 		if _, err := os.Stat(filepath.Join(root, path)); err != nil {
 			t.Fatalf("release community entrypoint %s is missing: %v", path, err)
@@ -130,6 +131,7 @@ func TestReleaseMatrixCommunityEntrypointsAreLinked(t *testing.T) {
 		"../CODE_OF_CONDUCT.md",
 		"../examples/README.md",
 		"contributing/performance.md",
+		"reference/platforms/index.md",
 	} {
 		if !strings.Contains(docsIndex, ref) {
 			t.Fatalf("docs/index.md must link %s", ref)
@@ -141,6 +143,7 @@ func TestReleaseMatrixCommunityEntrypointsAreLinked(t *testing.T) {
 		"choose a license and add a root `LICENSE` file",
 		"docs/release/notes-template.md",
 		"examples/README.md",
+		"docs/reference/platforms/index.md",
 	} {
 		if !strings.Contains(release, snippet) {
 			t.Fatalf("docs/release/index.md must mention %q", snippet)

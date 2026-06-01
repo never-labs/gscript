@@ -84,6 +84,7 @@ Start with:
 - [AI-native guide](docs/guides/ai-native.md)
 - [Security reference](docs/reference/security/index.md)
 - [Performance reference](docs/reference/performance/index.md)
+- [Platforms and execution modes](docs/reference/platforms/index.md)
 - [Examples](docs/examples/index.md)
 - [Security policy](SECURITY.md)
 - [Contributing](CONTRIBUTING.md)

@@ -233,6 +233,7 @@ def check_release_gate_docs() -> None:
             "docs/reference/stdlib/index.md",
             "docs/reference/security/index.md",
             "docs/reference/performance/index.md",
+            "docs/reference/platforms/index.md",
             "choose a license and add a root `LICENSE` file",
             "docs/release/notes-template.md",
         ],
@@ -251,6 +252,7 @@ def check_release_gate_docs() -> None:
             "docs/reference/ai/index.md",
             "docs/reference/data-oriented/index.md",
             "examples/README.md",
+            "state tested platforms and execution modes",
         ],
     )
 

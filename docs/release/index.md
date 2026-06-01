@@ -30,6 +30,7 @@ The release evidence should cite:
 - `docs/reference/concurrency/index.md`
 - `docs/reference/data-oriented/index.md`
 - `docs/reference/performance/index.md`
+- `docs/reference/platforms/index.md`
 - `docs/reference/diagnostics/index.md`
 - `examples/README.md`
 
@@ -47,6 +48,7 @@ Do not cut a public release until these repository-level decisions are complete:
 - choose a license and add a root `LICENSE` file;
 - confirm the vulnerability reporting route in `SECURITY.md`;
 - verify install commands against the published module path;
+- state tested platforms and execution modes;
 - run release evidence on the target platforms;
 - fill out `docs/release/notes-template.md` for the candidate;
 - document any experimental language, stdlib, AI, package, or JIT behavior that
