@@ -58,6 +58,26 @@ assert(json1 == json2)
 assert(package.loaded["json"] == json1)
 ```
 
+The `package.loaded` table is part of the lookup contract. A non-`nil` entry
+short-circuits resolution and is returned directly. This is mainly useful for
+embedders, tests, and compatibility shims; ordinary modules should prefer
+returning a value from the module file.
+
+```leia run all
+package.loaded["example.preloaded"] = {answer: 42}
+mod := require("example.preloaded")
+assert(mod.answer == 42)
+assert(require("example.preloaded") == mod)
+```
+
+The module name must be a string.
+
+```leia run all
+ok, err := pcall(require, 123)
+assert(!ok)
+assert(type(err) == "string")
+```
+
 `leia.mod` describes a module path, Leia language/module format version,
 dependencies, replacements, capability summaries, source collections, and
 optional Go-native binding metadata. The current manifest grammar is line
@@ -97,6 +117,21 @@ hosts still enforce the active capability policy. `leia mod capability` reads
 the main manifest and locally available dependency manifests, then reports a
 capability universe and per-module matrix. Missing dependency manifests are
 warnings, not proof that a module needs no capabilities.
+
+For example, this manifest says the module expects filesystem reads and network
+client access:
+
+```text
+module example.com/report
+leia 0.1
+
+capability fs.read,net.client
+```
+
+Running `leia mod capability --json` from that module produces a machine-readable
+summary of declared capabilities. The exact output order is not part of the
+language contract, but the data model is a universe of capability names plus a
+per-module matrix.
 
 `collection name path` configures collection requires such as
 `require("assets:icons.logo")`. The name may contain letters, digits, `_`, and

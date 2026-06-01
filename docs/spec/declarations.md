@@ -20,16 +20,16 @@ Assignment with `:=` introduces local bindings. Assignment with `=` updates
 existing targets. Multiple assignment adjusts values according to the
 multi-return rules in [Expressions](expressions.md).
 
-```leia
+```leia run all
 x := 1
 x = x + 1
 
 if true {
     x := "inner"
-    print(x) // inner
+    assert(x == "inner")
 }
 
-print(x) // 2
+assert(x == 2)
 ```
 
 The inner `x` shadows the outer `x` only inside the block.
@@ -38,15 +38,16 @@ The inner `x` shadows the outer `x` only inside the block.
 already declared in an outer block creates a new shadowing binding; it does not
 update the outer binding. Use `=` to update an existing visible binding.
 
-```leia
+```leia run all
 value := 1
 
-{
+if true {
     value := 2 // new binding in this block
     value = 3  // updates the inner binding
+    assert(value == 3)
 }
 
-// value is still 1 here
+assert(value == 1)
 ```
 
 Same-block redeclaration is reserved by the v1.0 contract: portable programs
@@ -63,12 +64,14 @@ const_decl = "const" identifier ( "=" | ":=" ) expr ;
 A const binding may not be rebound. Const does not freeze the internals of a
 mutable value such as a table.
 
-```leia
+```leia run all
 const limit := 10
 // limit = 11       // invalid: const binding
 
 const settings := { retries: 3 }
 settings.retries = 4 // valid: table contents remain mutable
+assert(limit == 10)
+assert(settings.retries == 4)
 ```
 
 Const visibility and shadowing follow the ordinary lexical binding rules. An
@@ -85,7 +88,7 @@ func_decl = "func" identifier param_list block ;
 A function declaration binds the function value to the declared name in the
 enclosing scope. Function bodies capture lexical bindings by reference.
 
-```leia
+```leia run all
 func add(a, b) {
     return a + b
 }
@@ -95,6 +98,10 @@ func bump() {
     total = total + 1
     return total
 }
+
+assert(add(2, 3) == 5)
+assert(bump() == 1)
+assert(bump() == 2)
 ```
 
 The function name is bound in the enclosing scope before the function body is
@@ -122,17 +129,18 @@ conflicts.
 
 ## Labels
 
-Labels are declared with `::name::`. Label names live in a function-level label
+Labels are declared with `name:`. Label names live in a function-level label
 namespace. A `goto` must not jump into a deeper lexical scope or over a local
 declaration.
 
-```leia
+```leia run all
 i := 0
-::again::
+again:
 i = i + 1
 if i < 3 {
     goto again
 }
+assert(i == 3)
 ```
 
 ## AI Declarations

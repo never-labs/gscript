@@ -12,30 +12,39 @@ use Leia truthiness: only `nil` and `false` are false. `elseif` branches are
 tested left-to-right after earlier conditions are false. At most one branch
 runs, and branch blocks have their own lexical scopes.
 
-```leia
+```leia run all
+seen := {}
 if 0 {
-    print("zero is truthy")
+    seen.zero = true
 }
 
 if nil {
-    print("not reached")
+    seen.nilBranch = true
 } else {
-    print("nil is false")
+    seen.elseBranch = true
 }
+
+assert(seen.zero)
+assert(seen.elseBranch)
+assert(seen.nilBranch == nil)
 ```
 
 `for` supports indefinite loops, condition loops, C-style loops, and range
 loops. Loop bodies may use `break` and `continue`.
 
-```leia
+```leia run all
 sum := 0
 for i := 1; i <= 3; i++ {
     sum += i
 }
+assert(sum == 6)
 
+valueSum := 0
 for key, value := range pairs({ a: 1, b: 2 }) {
-    print(key, value)
+    assert(#key == 1)
+    valueSum += value
 }
+assert(valueSum == 3)
 ```
 
 `for { ... }` repeats until `break`, `return`, `goto`, an error, or host
@@ -74,6 +83,24 @@ assert(sum == 60)
 `break` exits the innermost enclosing loop. `continue` starts the next
 iteration of the innermost enclosing loop. Outside a loop they are invalid.
 
+```leia run all
+values := {}
+for i := 1; i <= 6; i++ {
+    if i % 2 == 0 {
+        continue
+    }
+    if i > 5 {
+        break
+    }
+    values[#values + 1] = i
+}
+
+assert(#values == 3)
+assert(values[1] == 1)
+assert(values[2] == 3)
+assert(values[3] == 5)
+```
+
 `select` waits on channel send or receive cases. A `default` case is selected
 when no communication can proceed immediately.
 
@@ -105,6 +132,20 @@ values use multi-return adjustment.
 then invokes the deferred call later. Deferred calls run in last-in, first-out
 order when the current function exits normally or unwinds through a protected
 boundary.
+
+```leia run all
+events := {}
+func scoped() {
+    defer func() { events[#events + 1] = "last" }()
+    defer func() { events[#events + 1] = "first" }()
+    events[#events + 1] = "body"
+}
+
+scoped()
+assert(events[1] == "body")
+assert(events[2] == "first")
+assert(events[3] == "last")
+```
 
 `goto` transfers control to a label in the same function subject to lexical
 scope restrictions. It must not jump into a block or over a local declaration.

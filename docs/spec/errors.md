@@ -45,12 +45,34 @@ ok, handled := xpcall(error, func(err) {
 assert(!ok && handled == "handled:boom")
 ```
 
+Runtime errors raised by invalid operations become diagnostic strings inside
+`pcall` and `xpcall`.
+
+```leia run all
+ok, err := pcall(func() {
+    return "x" + 3
+})
+assert(!ok)
+assert(type(err) == "string")
+
+ok, handled := xpcall(func() {
+    return {}()
+}, func(err) {
+    return "kind=" .. type(err)
+})
+assert(!ok && handled == "kind=string")
+```
+
 Protected calls are recovery boundaries for ordinary script failures. They do
 not make process termination, cancellation, host shutdown, or bugs in the host
 process safe to continue unless the embedding API explicitly reports those
 conditions as ordinary errors. A protected call whose own first argument is
 invalid raises an unprotected argument error; wrap the call site itself if that
 failure must be recovered.
+
+```leia fail all
+pcall()
+```
 
 Recoverable host and provider failures should return `nil, err` or a
 structured result when the API is designed for recovery. Error result tables use
