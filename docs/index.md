@@ -41,6 +41,8 @@ only.
   reload-oriented runtime usage.
 - [AI-native guide](guides/ai-native.md): agents, tools, models, message
   history, and provider setup.
+- [Examples](examples/index.md): runnable scripts and embedding examples by
+  product area.
 - [Testing and release gates](testing.md): correctness, docs, and release
   evidence.
 
