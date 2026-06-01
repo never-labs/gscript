@@ -97,6 +97,19 @@ func TestReleaseMatrixKnownGapDocsAreReleaseGateInputs(t *testing.T) {
 	}
 }
 
+func TestReleaseMatrixDocCommandSurfaceIsUsable(t *testing.T) {
+	root := findRepoRoot(t)
+	for _, args := range [][]string{
+		{"run", "./cmd/leia", "doc", "help"},
+		{"run", "./cmd/leia", "doc", "generate", "--help"},
+		{"run", "./cmd/leia", "doc", "check", "--help"},
+		{"run", "./cmd/leia", "doc", "generate", "--format", "json"},
+		{"run", "./cmd/leia", "doc", "check"},
+	} {
+		runCommand(t, root, 30*time.Second, "go", args...)
+	}
+}
+
 func TestReleaseMatrixCommunityEntrypointsAreLinked(t *testing.T) {
 	root := findRepoRoot(t)
 	for _, path := range []string{
