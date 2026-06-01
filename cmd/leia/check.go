@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -47,6 +48,7 @@ func runCheckCommand(args []string, outw, errw io.Writer) int {
 	}
 
 	path := paths[0]
+	toolPath := checkToolingPath(path)
 	report := checkReport{OK: true}
 	runStep := func(name string, skipped bool, fn func() int) {
 		step := checkStepReport{Name: name, Skipped: skipped}
@@ -64,13 +66,13 @@ func runCheckCommand(args []string, outw, errw io.Writer) int {
 	}
 
 	runStep("fmt", *noFmt, func() int {
-		return runFmtCommand([]string{"--check", path}, io.Discard, errw)
+		return runFmtCommand([]string{"--check", toolPath}, io.Discard, errw)
 	})
 	runStep("lint", *noLint, func() int {
-		return runLintCommand([]string{path}, io.Discard, errw)
+		return runLintCommand([]string{toolPath}, io.Discard, errw)
 	})
 	runStep("test", *noTest, func() int {
-		return runTestCommand([]string{path}, cliRunOptions{UseVM: false}, io.Discard, errw)
+		return runTestCommand([]string{toolPath}, cliRunOptions{UseVM: false}, io.Discard, errw)
 	})
 	runStep("manifest", *noManifest, func() int {
 		return runManifestCheck(errw, errw)
@@ -105,6 +107,46 @@ func runCheckCommand(args []string, outw, errw io.Writer) int {
 		return 1
 	}
 	return 0
+}
+
+func checkToolingPath(path string) string {
+	root, ok := currentLeiaRepoRoot()
+	if !ok {
+		return path
+	}
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return path
+	}
+	if filepath.Clean(abs) != root {
+		return path
+	}
+	smoke := filepath.Join(root, "tests", "smoke", "01_basic.leia")
+	if _, err := os.Stat(smoke); err != nil {
+		return path
+	}
+	return smoke
+}
+
+func currentLeiaRepoRoot() (string, bool) {
+	root, err := os.Getwd()
+	if err != nil {
+		return "", false
+	}
+	for {
+		goMod := filepath.Join(root, "go.mod")
+		if data, err := os.ReadFile(goMod); err == nil {
+			if bytes.Contains(data, []byte("module github.com/never-labs/leia\n")) {
+				return root, true
+			}
+			return "", false
+		}
+		parent := filepath.Dir(root)
+		if parent == root {
+			return "", false
+		}
+		root = parent
+	}
 }
 
 func runManifestCheck(outw, errw io.Writer) int {

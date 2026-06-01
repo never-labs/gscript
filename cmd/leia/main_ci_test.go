@@ -126,3 +126,17 @@ func TestCheckCommandReportsFailureAndSkips(t *testing.T) {
 		t.Fatalf("docs step = %+v, want skipped ok", report.Steps[4])
 	}
 }
+
+func TestCheckCommandUsesSmokeSourceForRepositoryRootTooling(t *testing.T) {
+	root := repoRootForBoundaryTest(t)
+	got := checkToolingPath(root)
+	want := filepath.Join(root, "tests", "smoke", "01_basic.leia")
+	if got != want {
+		t.Fatalf("checkToolingPath(repo root) = %q, want %q", got, want)
+	}
+
+	dir := t.TempDir()
+	if got := checkToolingPath(dir); got != dir {
+		t.Fatalf("checkToolingPath(user dir) = %q, want %q", got, dir)
+	}
+}
