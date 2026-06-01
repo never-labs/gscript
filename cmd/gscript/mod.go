@@ -17,10 +17,11 @@ type modListReport = modpkg.ListReport
 type modCapabilityReport = modpkg.CapabilityReport
 type modDownloadReport = modpkg.DownloadReport
 type modVendorReport = modpkg.VendorReport
+type modGoModReport = modpkg.GoModReport
 
 func runModCommand(args []string, outw, errw io.Writer) int {
 	if len(args) == 0 {
-		fmt.Fprintln(errw, "usage: gscript mod [init|add|tidy|check|download|vendor|lock|list|graph|explain|capability|verify] [flags]")
+		fmt.Fprintln(errw, "usage: gscript mod [init|add|tidy|check|download|vendor|lock|list|graph|explain|capability|gomod|verify] [flags]")
 		return 2
 	}
 	switch args[0] {
@@ -46,13 +47,15 @@ func runModCommand(args []string, outw, errw io.Writer) int {
 		return runModExplainCommand(args[1:], outw, errw)
 	case "capability", "capabilities", "cap":
 		return runModCapabilityCommand(args[1:], outw, errw)
+	case "gomod", "go-mod":
+		return runModGoModCommand(args[1:], outw, errw)
 	case "verify":
 		return runModVerifyCommand(args[1:], outw, errw)
 	case "help", "-h", "--help":
-		fmt.Fprintln(outw, "usage: gscript mod [init|add|tidy|check|download|vendor|lock|list|graph|explain|capability|verify] [flags]")
+		fmt.Fprintln(outw, "usage: gscript mod [init|add|tidy|check|download|vendor|lock|list|graph|explain|capability|gomod|verify] [flags]")
 		return 0
 	default:
-		fmt.Fprintf(errw, "gscript mod: unknown mode %q (want init, add, tidy, check, download, vendor, lock, list, graph, explain, capability, or verify)\n", args[0])
+		fmt.Fprintf(errw, "gscript mod: unknown mode %q (want init, add, tidy, check, download, vendor, lock, list, graph, explain, capability, gomod, or verify)\n", args[0])
 		return 2
 	}
 }
@@ -458,6 +461,50 @@ func runModCapabilityCommand(args []string, outw, errw io.Writer) int {
 				fmt.Fprintf(outw, " %s", cap)
 			}
 			fmt.Fprintln(outw)
+		}
+		for _, diag := range report.Diagnostics {
+			if diag.File != "" {
+				fmt.Fprintf(errw, "%s: %s %s: %s\n", diag.File, diag.Severity, diag.Code, diag.Message)
+			} else {
+				fmt.Fprintf(errw, "%s %s: %s\n", diag.Severity, diag.Code, diag.Message)
+			}
+		}
+	}
+	if !report.OK {
+		return 1
+	}
+	return 0
+}
+
+func runModGoModCommand(args []string, outw, errw io.Writer) int {
+	fs := flag.NewFlagSet("mod gomod", flag.ContinueOnError)
+	fs.SetOutput(errw)
+	jsonOut := fs.Bool("json", false, "print generated go.mod report as JSON")
+	write := fs.Bool("write", false, "write generated go.mod next to gscript.mod")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	path := "."
+	if len(fs.Args()) == 1 {
+		path = fs.Args()[0]
+	} else if len(fs.Args()) > 1 {
+		fmt.Fprintln(errw, "usage: gscript mod gomod [--json] [--write] [path]")
+		return 2
+	}
+	report := modpkg.GenerateGoMod(path, *write)
+	if *jsonOut {
+		enc := json.NewEncoder(outw)
+		enc.SetIndent("", "  ")
+		if err := enc.Encode(report); err != nil {
+			fmt.Fprintf(errw, "gscript mod gomod: %v\n", err)
+			return 1
+		}
+	} else {
+		if report.OK && !*write {
+			fmt.Fprint(outw, report.Content)
+		}
+		if report.OK && *write {
+			fmt.Fprintf(outw, "wrote %s\n", report.GoMod)
 		}
 		for _, diag := range report.Diagnostics {
 			if diag.File != "" {

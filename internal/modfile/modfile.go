@@ -15,9 +15,12 @@ const FileName = "gscript.mod"
 type File struct {
 	Module      string
 	GS          string
+	Go          string
 	Capability  []string
 	Require     []Require
+	GoRequire   []Require
 	Replace     []Replace
+	GoReplace   []Replace
 	Collections []Collection
 }
 
@@ -75,9 +78,12 @@ func Parse(name string, r io.Reader) (File, []Diagnostic) {
 	var diags []Diagnostic
 	seenRequire := map[string]int{}
 	seenReplace := map[string]int{}
+	seenGoRequire := map[string]int{}
+	seenGoReplace := map[string]int{}
 	seenCollection := map[string]bool{}
 	seenCapability := map[string]bool{}
 	seenGS := 0
+	seenGo := 0
 
 	scanner := bufio.NewScanner(r)
 	for lineNo := 1; scanner.Scan(); lineNo++ {
@@ -112,6 +118,59 @@ func Parse(name string, r io.Reader) (File, []Diagnostic) {
 			}
 			seenGS = lineNo
 			f.GS = fields[1]
+		case "go":
+			switch {
+			case len(fields) == 2:
+				if seenGo != 0 {
+					diags = append(diags, diag(lineNo, fmt.Sprintf("go declared more than once; first declared on line %d", seenGo)))
+					continue
+				}
+				seenGo = lineNo
+				f.Go = fields[1]
+			case len(fields) == 4 && fields[1] == "require":
+				if !validModulePath(fields[2]) {
+					diags = append(diags, diag(lineNo, "invalid go require path"))
+					continue
+				}
+				if prevLine, ok := seenGoRequire[fields[2]]; ok {
+					diags = append(diags, diag(lineNo, fmt.Sprintf("duplicate go require for %s; first declared on line %d", fields[2], prevLine)))
+					continue
+				}
+				seenGoRequire[fields[2]] = lineNo
+				f.GoRequire = append(f.GoRequire, Require{Path: fields[2], Version: fields[3]})
+			case len(fields) >= 5 && fields[1] == "replace":
+				idx := indexField(fields, "=>")
+				if idx == -1 || idx < 3 || idx >= len(fields)-1 {
+					diags = append(diags, diag(lineNo, "go replace expects: go replace path [version] => path"))
+					continue
+				}
+				old := fields[2:idx]
+				if len(old) > 2 {
+					diags = append(diags, diag(lineNo, "go replace old side expects path and optional version"))
+					continue
+				}
+				if !validModulePath(old[0]) {
+					diags = append(diags, diag(lineNo, "invalid go replace path"))
+					continue
+				}
+				if len(fields[idx+1:]) != 1 {
+					diags = append(diags, diag(lineNo, "go replace new side expects one path"))
+					continue
+				}
+				rep := Replace{Path: old[0], NewPath: fields[idx+1]}
+				if len(old) == 2 {
+					rep.Version = old[1]
+				}
+				key := rep.Path + "\x00" + rep.Version
+				if prevLine, ok := seenGoReplace[key]; ok {
+					diags = append(diags, diag(lineNo, fmt.Sprintf("duplicate go replace for %s; first declared on line %d", rep.Path, prevLine)))
+					continue
+				}
+				seenGoReplace[key] = lineNo
+				f.GoReplace = append(f.GoReplace, rep)
+			default:
+				diags = append(diags, diag(lineNo, "go expects version, require, or replace"))
+			}
 		case "require":
 			if len(fields) != 3 {
 				diags = append(diags, diag(lineNo, "require expects path and version"))
@@ -207,11 +266,34 @@ func Format(f File) []byte {
 	if f.GS != "" {
 		fmt.Fprintf(&b, "gs %s\n", f.GS)
 	}
+	writeGo(&b, f.Go, f.GoRequire, f.GoReplace)
 	writeCapabilities(&b, f.Capability)
 	writeRequires(&b, f.Require)
 	writeReplaces(&b, f.Replace)
 	writeCollections(&b, f.Collections)
 	return []byte(b.String())
+}
+
+func writeGo(b *strings.Builder, version string, reqs []Require, reps []Replace) {
+	if version == "" && len(reqs) == 0 && len(reps) == 0 {
+		return
+	}
+	b.WriteByte('\n')
+	if version != "" {
+		fmt.Fprintf(b, "go %s\n", version)
+	}
+	sort.Slice(reqs, func(i, j int) bool { return reqs[i].Path < reqs[j].Path })
+	for _, req := range reqs {
+		fmt.Fprintf(b, "go require %s %s\n", req.Path, req.Version)
+	}
+	sort.Slice(reps, func(i, j int) bool { return reps[i].Path < reps[j].Path })
+	for _, rep := range reps {
+		if rep.Version != "" {
+			fmt.Fprintf(b, "go replace %s %s => %s\n", rep.Path, rep.Version, rep.NewPath)
+		} else {
+			fmt.Fprintf(b, "go replace %s => %s\n", rep.Path, rep.NewPath)
+		}
+	}
 }
 
 func stripComment(line string) string {

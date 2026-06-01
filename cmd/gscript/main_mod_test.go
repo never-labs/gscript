@@ -128,6 +128,51 @@ collection vendor ./vendor
 	}
 }
 
+func TestModGoModGeneratesNativeManifest(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "gscript.mod"), []byte(`module example.com/native
+gs 0.1
+go 1.25.7
+go require github.com/never-labs/gscript v0.0.0-20260601065425-1c9cadbd856f
+go require github.com/gen2brain/raylib-go/raylib v0.55.1
+go replace example.com/local => ../local
+`), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runModCommand([]string{"gomod", dir}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("mod gomod code = %d, stderr = %q", code, stderr.String())
+	}
+	got := stdout.String()
+	for _, want := range []string{
+		"module example.com/native\n",
+		"go 1.25.7\n",
+		"github.com/gen2brain/raylib-go/raylib v0.55.1\n",
+		"github.com/never-labs/gscript v0.0.0-20260601065425-1c9cadbd856f\n",
+		"replace example.com/local => ../local\n",
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("generated go.mod missing %q in:\n%s", want, got)
+		}
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = runModCommand([]string{"gomod", "--write", dir}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("mod gomod --write code = %d, stderr = %q", code, stderr.String())
+	}
+	written, err := os.ReadFile(filepath.Join(dir, "go.mod"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(written) != got {
+		t.Fatalf("written go.mod differs:\n%s\nwant:\n%s", string(written), got)
+	}
+}
+
 func TestModCapabilityReportsMatrix(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "gscript.mod"), []byte(`module example.com/demo

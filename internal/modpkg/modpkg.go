@@ -106,6 +106,16 @@ type CapabilityReport struct {
 	Diagnostics   []Diagnostic               `json:"diagnostics,omitempty"`
 }
 
+type GoModReport struct {
+	SchemaVersion int          `json:"schema_version"`
+	OK            bool         `json:"ok"`
+	Manifest      string       `json:"manifest,omitempty"`
+	GoMod         string       `json:"go_mod,omitempty"`
+	Content       string       `json:"content,omitempty"`
+	Written       bool         `json:"written,omitempty"`
+	Diagnostics   []Diagnostic `json:"diagnostics,omitempty"`
+}
+
 type CapabilityModule struct {
 	Path         string   `json:"path"`
 	Version      string   `json:"version,omitempty"`
@@ -901,6 +911,72 @@ func ReadFileWithPath(dir string) (modfile.File, string, error) {
 
 func WriteFile(path string, file modfile.File) error {
 	return os.WriteFile(path, modfile.Format(file), 0644)
+}
+
+func GenerateGoMod(path string, write bool) GoModReport {
+	abs, err := filepath.Abs(path)
+	report := GoModReport{SchemaVersion: 1}
+	if err != nil {
+		report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "GS9101", Message: err.Error()})
+		return report
+	}
+	manifest, manifestPath, err := ReadFileWithPath(abs)
+	report.Manifest = manifestPath
+	report.GoMod = filepath.Join(abs, "go.mod")
+	if err != nil {
+		report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "GS9103", Message: err.Error(), File: manifestPath})
+		return report
+	}
+	content, err := GoModContent(manifest)
+	if err != nil {
+		report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "GS9120", Message: err.Error(), File: manifestPath})
+		return report
+	}
+	report.Content = string(content)
+	if write {
+		if err := os.WriteFile(report.GoMod, content, 0644); err != nil {
+			report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "GS9121", Message: err.Error(), File: report.GoMod})
+			return report
+		}
+		report.Written = true
+	}
+	report.OK = len(report.Diagnostics) == 0
+	return report
+}
+
+func GoModContent(manifest modfile.File) ([]byte, error) {
+	if strings.TrimSpace(manifest.Module) == "" {
+		return nil, fmt.Errorf("module is required")
+	}
+	version := strings.TrimSpace(manifest.Go)
+	if version == "" {
+		version = "1.25"
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "module %s\n\n", manifest.Module)
+	fmt.Fprintf(&b, "go %s\n", version)
+	if len(manifest.GoRequire) > 0 {
+		reqs := append([]modfile.Require(nil), manifest.GoRequire...)
+		sort.Slice(reqs, func(i, j int) bool { return reqs[i].Path < reqs[j].Path })
+		b.WriteString("\nrequire (\n")
+		for _, req := range reqs {
+			fmt.Fprintf(&b, "\t%s %s\n", req.Path, req.Version)
+		}
+		b.WriteString(")\n")
+	}
+	if len(manifest.GoReplace) > 0 {
+		reps := append([]modfile.Replace(nil), manifest.GoReplace...)
+		sort.Slice(reps, func(i, j int) bool { return reps[i].Path < reps[j].Path })
+		b.WriteByte('\n')
+		for _, rep := range reps {
+			if rep.Version != "" {
+				fmt.Fprintf(&b, "replace %s %s => %s\n", rep.Path, rep.Version, rep.NewPath)
+			} else {
+				fmt.Fprintf(&b, "replace %s => %s\n", rep.Path, rep.NewPath)
+			}
+		}
+	}
+	return []byte(b.String()), nil
 }
 
 func ParseRequireTarget(target string) (modfile.Require, error) {

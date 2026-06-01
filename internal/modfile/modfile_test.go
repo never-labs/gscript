@@ -9,6 +9,9 @@ func TestParseFormatModuleFile(t *testing.T) {
 	f, diags := Parse("gscript.mod", strings.NewReader(`
 module example.com/app
 gs 0.1
+go 1.25.7
+go require github.com/gen2brain/raylib-go/raylib v0.55.1
+go replace github.com/never-labs/gscript => ../gscript
 
 capability net.client
 cap fs.read,tool.exec
@@ -21,6 +24,12 @@ collection vendor ./vendor
 	}
 	if f.Module != "example.com/app" || f.GS != "0.1" {
 		t.Fatalf("file = %#v", f)
+	}
+	if f.Go != "1.25.7" || len(f.GoRequire) != 1 || f.GoRequire[0].Path != "github.com/gen2brain/raylib-go/raylib" {
+		t.Fatalf("go metadata = %#v", f)
+	}
+	if len(f.GoReplace) != 1 || f.GoReplace[0].NewPath != "../gscript" {
+		t.Fatalf("go replaces = %#v", f.GoReplace)
 	}
 	if len(f.Require) != 1 || f.Require[0].Path != "example.com/lib" || f.Require[0].Version != "v0.2.0" {
 		t.Fatalf("requires = %#v", f.Require)
@@ -38,6 +47,9 @@ collection vendor ./vendor
 	for _, want := range []string{
 		"module example.com/app\n",
 		"gs 0.1\n",
+		"go 1.25.7\n",
+		"go require github.com/gen2brain/raylib-go/raylib v0.55.1\n",
+		"go replace github.com/never-labs/gscript => ../gscript\n",
 		"capability fs.read\n",
 		"capability net.client\n",
 		"capability tool.exec\n",
@@ -47,6 +59,33 @@ collection vendor ./vendor
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("Format missing %q in:\n%s", want, out)
+		}
+	}
+}
+
+func TestParseRejectsDuplicateGoNativeDirectives(t *testing.T) {
+	_, diags := Parse("gscript.mod", strings.NewReader(`module example.com/app
+go 1.25
+go 1.26
+go require example.com/native v1.0.0
+go require example.com/native v1.1.0
+go replace example.com/native => ./native
+go replace example.com/native => ./other
+`))
+	for _, want := range []string{
+		"go declared more than once",
+		"duplicate go require for example.com/native",
+		"duplicate go replace for example.com/native",
+	} {
+		found := false
+		for _, diag := range diags {
+			if strings.Contains(diag.Message, want) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Fatalf("Parse diagnostics = %#v, want %q", diags, want)
 		}
 	}
 }
