@@ -110,6 +110,27 @@ func TestReleaseMatrixDocCommandSurfaceIsUsable(t *testing.T) {
 	}
 }
 
+func TestReleaseMatrixModuleHelpSurfaceIsUsable(t *testing.T) {
+	root := findRepoRoot(t)
+	for _, mode := range []string{
+		"init",
+		"add",
+		"tidy",
+		"check",
+		"download",
+		"vendor",
+		"lock",
+		"list",
+		"graph",
+		"explain",
+		"capability",
+		"gomod",
+		"verify",
+	} {
+		runCommand(t, root, 30*time.Second, "go", "run", "./cmd/leia", "mod", mode, "--help")
+	}
+}
+
 func TestReleaseMatrixCommunityEntrypointsAreLinked(t *testing.T) {
 	root := findRepoRoot(t)
 	for _, path := range []string{

@@ -88,6 +88,33 @@ func TestModCommandHelpMentionsAllImplementedModes(t *testing.T) {
 	}
 }
 
+func TestModSubcommandHelpFlagsExitSuccessfully(t *testing.T) {
+	for _, mode := range []string{
+		"init",
+		"add",
+		"tidy",
+		"check",
+		"download",
+		"vendor",
+		"lock",
+		"list",
+		"graph",
+		"explain",
+		"capability",
+		"gomod",
+		"verify",
+	} {
+		var stdout, stderr bytes.Buffer
+		code := runModCommand([]string{mode, "--help"}, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("mod %s --help code = %d, stdout = %q stderr = %q", mode, code, stdout.String(), stderr.String())
+		}
+		if stdout.Len() == 0 && stderr.Len() == 0 {
+			t.Fatalf("mod %s --help produced no output", mode)
+		}
+	}
+}
+
 func TestModVerifyReportsMissingManifest(t *testing.T) {
 	dir := t.TempDir()
 	var stdout, stderr bytes.Buffer
