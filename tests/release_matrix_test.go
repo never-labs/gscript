@@ -96,6 +96,58 @@ func TestReleaseMatrixKnownGapDocsAreReleaseGateInputs(t *testing.T) {
 	}
 }
 
+func TestReleaseMatrixCommunityEntrypointsAreLinked(t *testing.T) {
+	root := findRepoRoot(t)
+	for _, path := range []string{
+		"README.md",
+		"SECURITY.md",
+		"CONTRIBUTING.md",
+		"CODE_OF_CONDUCT.md",
+		".github/ISSUE_TEMPLATE/bug_report.md",
+		".github/ISSUE_TEMPLATE/performance_regression.md",
+		".github/ISSUE_TEMPLATE/language_proposal.md",
+		".github/pull_request_template.md",
+		"examples/README.md",
+		"docs/release/notes-template.md",
+		"docs/contributing/performance.md",
+	} {
+		if _, err := os.Stat(filepath.Join(root, path)); err != nil {
+			t.Fatalf("release community entrypoint %s is missing: %v", path, err)
+		}
+	}
+
+	readme := readFileString(t, filepath.Join(root, "README.md"))
+	for _, ref := range []string{"SECURITY.md", "CONTRIBUTING.md", "CODE_OF_CONDUCT.md"} {
+		if !strings.Contains(readme, ref) {
+			t.Fatalf("README.md must link %s", ref)
+		}
+	}
+
+	docsIndex := readFileString(t, filepath.Join(root, "docs", "index.md"))
+	for _, ref := range []string{
+		"../SECURITY.md",
+		"../CONTRIBUTING.md",
+		"../CODE_OF_CONDUCT.md",
+		"../examples/README.md",
+		"contributing/performance.md",
+	} {
+		if !strings.Contains(docsIndex, ref) {
+			t.Fatalf("docs/index.md must link %s", ref)
+		}
+	}
+
+	release := readFileString(t, filepath.Join(root, "docs", "release", "index.md"))
+	for _, snippet := range []string{
+		"choose a license and add a root `LICENSE` file",
+		"docs/release/notes-template.md",
+		"examples/README.md",
+	} {
+		if !strings.Contains(release, snippet) {
+			t.Fatalf("docs/release/index.md must mention %q", snippet)
+		}
+	}
+}
+
 func TestReleaseMatrixStdlibContractHasConformanceCoverageEntry(t *testing.T) {
 	root := findRepoRoot(t)
 	modules := readStdlibContractRows(t, root)
