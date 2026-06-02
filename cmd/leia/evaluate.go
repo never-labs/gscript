@@ -304,7 +304,11 @@ func htmlLLMCaseSummary(run *evaluate.LLMCaseRun) string {
 	if run == nil {
 		return ""
 	}
-	return fmt.Sprintf("turns %d, tokens %d/%d, cost %.4g", run.Turns, run.InputTokens, run.OutputTokens, run.Cost)
+	out := fmt.Sprintf("turns %d, tokens %d/%d, cost %.4g", run.Turns, run.InputTokens, run.OutputTokens, run.Cost)
+	if run.RecordPath != "" {
+		out += ", record " + run.RecordPath
+	}
+	return out
 }
 
 func formatEvaluateMetricValues(values map[string]int) string {

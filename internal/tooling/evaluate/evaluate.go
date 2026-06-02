@@ -122,6 +122,7 @@ type Case struct {
 
 type LLMCaseRun struct {
 	TraceRef     string  `json:"trace_ref,omitempty"`
+	RecordPath   string  `json:"record_path,omitempty"`
 	Turns        int     `json:"turns,omitempty"`
 	StreamEvents int     `json:"stream_events,omitempty"`
 	ToolCalls    int     `json:"tool_calls,omitempty"`
@@ -396,6 +397,9 @@ func Run(opts Options) (Report, error) {
 			run.report.RecordedTurns = len(records)
 		}
 		if err := llm.SaveRecords(run.recordPath, records); err != nil {
+			return report, err
+		}
+		if err := writeCaseRecords(&report, run); err != nil {
 			return report, err
 		}
 	}
@@ -837,6 +841,9 @@ func caseMatchesFilter(c Case, filter string) bool {
 type runContext struct {
 	recorder        *llm.Recorder
 	recordPath      string
+	activeMu        sync.Mutex
+	active          replayCaseRef
+	caseRecords     map[string][]llm.Record
 	replayProvider  *llm.ReplayProvider
 	replayMonitor   *replayMonitor
 	factoryMu       sync.Mutex
@@ -879,34 +886,47 @@ func newRunContext(opts Options) (*runContext, error) {
 	if opts.LLMRecordPath != "" {
 		run.recorder = llm.NewRecorder()
 		run.recordPath = opts.LLMRecordPath
+		run.caseRecords = map[string][]llm.Record{}
 		run.report = &LLMRun{Mode: "record", RecordPath: opts.LLMRecordPath}
 	}
 	if opts.LLMUpdateGoldenPath != "" {
 		run.recorder = llm.NewRecorder()
 		run.recordPath = opts.LLMUpdateGoldenPath
+		run.caseRecords = map[string][]llm.Record{}
 		run.report = &LLMRun{Mode: "update_golden", RecordPath: opts.LLMUpdateGoldenPath, GoldenUpdated: true}
 	}
 	return run, nil
 }
 
 func (run *runContext) setActiveCase(c Case) {
-	if run == nil || run.replayMonitor == nil {
+	if run == nil {
 		return
 	}
-	run.replayMonitor.SetActiveCase(replayCaseRef{
+	item := replayCaseRef{
 		CaseID: c.CaseID,
 		Name:   c.Name,
 		Path:   c.SourcePath,
 		Line:   c.Range.StartLine,
 		Column: c.Range.StartColumn,
-	})
+	}
+	run.activeMu.Lock()
+	run.active = item
+	run.activeMu.Unlock()
+	if run.replayMonitor != nil {
+		run.replayMonitor.SetActiveCase(item)
+	}
 }
 
 func (run *runContext) clearActiveCase() {
-	if run == nil || run.replayMonitor == nil {
+	if run == nil {
 		return
 	}
-	run.replayMonitor.ClearActiveCase()
+	run.activeMu.Lock()
+	run.active = replayCaseRef{}
+	run.activeMu.Unlock()
+	if run.replayMonitor != nil {
+		run.replayMonitor.ClearActiveCase()
+	}
 }
 
 func collectFiles(paths []string) ([]string, error) {
@@ -1131,7 +1151,7 @@ func executeCase(path string, prog *ast.Program, c parsedCase, run *runContext) 
 			interp.SetLLMProvider(llmbridge.ProviderAdapter(run.replayMonitor))
 		}
 		if run.recorder != nil {
-			interp.SetLLMProviderFactory(recordingProviderFactory(run.guardedProviderFactory(), run.recorder.Record))
+			interp.SetLLMProviderFactory(recordingProviderFactory(run.guardedProviderFactory(), run.recordLLMTurn))
 		} else if run.providerFactory != nil {
 			interp.SetLLMProviderFactory(run.guardedProviderFactory())
 		}
@@ -1158,6 +1178,72 @@ func (run *runContext) guardedProviderFactory() runtime.LLMProviderFactory {
 		defer run.factoryMu.Unlock()
 		return run.providerFactory(cfg)
 	}
+}
+
+func (run *runContext) recordLLMTurn(record llm.Record) {
+	if run == nil || run.recorder == nil {
+		return
+	}
+	run.recorder.Record(record)
+	run.activeMu.Lock()
+	item := run.active
+	if item.CaseID != "" && run.caseRecords != nil {
+		run.caseRecords[item.CaseID] = append(run.caseRecords[item.CaseID], record)
+	}
+	run.activeMu.Unlock()
+}
+
+func writeCaseRecords(report *Report, run *runContext) error {
+	if report == nil || run == nil || run.recordPath == "" || len(run.caseRecords) == 0 {
+		return nil
+	}
+	for i := range report.Cases {
+		c := &report.Cases[i]
+		records := run.caseRecords[c.CaseID]
+		if len(records) == 0 {
+			continue
+		}
+		path := caseRecordPath(run.recordPath, *c, i)
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			return err
+		}
+		if err := llm.SaveRecords(path, records); err != nil {
+			return err
+		}
+		if c.LLM == nil {
+			c.LLM = &LLMCaseRun{TraceRef: "case:" + c.CaseID}
+		}
+		c.LLM.RecordPath = path
+	}
+	return nil
+}
+
+func caseRecordPath(recordPath string, c Case, index int) string {
+	dir := strings.TrimSuffix(recordPath, filepath.Ext(recordPath)) + ".cases"
+	name := fmt.Sprintf("%03d-%s.records.json", index+1, sanitizeCaseRecordName(c.Name))
+	return filepath.Join(dir, name)
+}
+
+func sanitizeCaseRecordName(name string) string {
+	var b strings.Builder
+	lastDash := false
+	for _, r := range strings.ToLower(name) {
+		ok := (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9')
+		if ok {
+			b.WriteRune(r)
+			lastDash = false
+			continue
+		}
+		if !lastDash && b.Len() > 0 {
+			b.WriteByte('-')
+			lastDash = true
+		}
+	}
+	out := strings.Trim(b.String(), "-")
+	if out == "" {
+		return "case"
+	}
+	return out
 }
 
 type llmCaseTrace struct {
@@ -1743,6 +1829,9 @@ func FormatText(report Report) string {
 				c.LLM.Cost,
 				c.LLM.TraceRef,
 			)
+			if c.LLM.RecordPath != "" {
+				fmt.Fprintf(&b, "    llm record=%s\n", c.LLM.RecordPath)
+			}
 		}
 		for _, subcase := range c.Subcases {
 			fmt.Fprintf(&b, "    %s case %s (%dms, %d metrics)\n", caseStatusMark(subcase.Status), subcase.CaseID, subcase.DurationMS, len(subcase.Metrics))

@@ -556,6 +556,16 @@ evaluate "records llm turn" {
 	if report.Cases[0].LLM == nil || report.Cases[0].LLM.TraceRef == "" || report.Cases[0].LLM.Turns != 1 || report.Cases[0].LLM.InputTokens != 11 {
 		t.Fatalf("case llm = %#v", report.Cases[0].LLM)
 	}
+	if report.Cases[0].LLM.RecordPath == "" || !strings.Contains(report.Cases[0].LLM.RecordPath, "records.cases") {
+		t.Fatalf("case record path = %#v", report.Cases[0].LLM)
+	}
+	caseRecords, err := llm.LoadRecords(report.Cases[0].LLM.RecordPath)
+	if err != nil {
+		t.Fatalf("load case records: %v", err)
+	}
+	if len(caseRecords) != 1 || caseRecords[0].Result.Text != "recorded" {
+		t.Fatalf("case records = %#v", caseRecords)
+	}
 }
 
 func TestRunReplaysLLMTurns(t *testing.T) {
@@ -791,6 +801,16 @@ evaluate "updates golden" {
 	}
 	if len(records) != 1 || records[0].Request.Messages[0].Text != "refresh" || records[0].Result.Text != "fresh" {
 		t.Fatalf("records = %#v", records)
+	}
+	if report.Cases[0].LLM == nil || report.Cases[0].LLM.RecordPath == "" {
+		t.Fatalf("case llm = %#v", report.Cases[0].LLM)
+	}
+	caseRecords, err := llm.LoadRecords(report.Cases[0].LLM.RecordPath)
+	if err != nil {
+		t.Fatalf("load case records: %v", err)
+	}
+	if len(caseRecords) != 1 || caseRecords[0].Request.Messages[0].Text != "refresh" {
+		t.Fatalf("case records = %#v", caseRecords)
 	}
 }
 

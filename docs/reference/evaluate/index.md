@@ -56,6 +56,13 @@ The three LLM fixture modes are mutually exclusive. The explicit
 `--llm-replay` and `--llm-record` spellings are also accepted when a script or
 dashboard wants the fixture type in the flag name.
 
+When `--record` or `--update-golden` is used, the command still writes the
+global fixture requested by the flag. It also writes per-case fixtures under a
+stable sibling directory such as `agent.records.cases/001-refund-flow.records.json`
+and reports each path as `cases[].llm.record_path`. These per-case fixtures are
+for debugging and future replay workflows; the global fixture remains the
+canonical replay input.
+
 The JSON report is versioned with `schema_version: 1` and includes:
 
 | Field | Meaning |
@@ -67,7 +74,7 @@ The JSON report is versioned with `schema_version: 1` and includes:
 | `summary` | File, parse, AI declaration, TODO, selected/skipped case, pass/fail/list, assertion, duration, and pass-rate counts. |
 | `llm` | Optional LLM metadata: mode, fixture paths, loaded/replayed/remaining/recorded turn counts, aggregate turn count, provider errors, input/output tokens, latency, and cost. |
 | `inputs` | Per-input file status. |
-| `cases` | Evaluate blocks with `case_id`, `name`, source path, range, status, per-case `started_at`, duration, optional per-case `llm` stats, raw metrics, subcases, assertions, and diagnostics. |
+| `cases` | Evaluate blocks with `case_id`, `name`, source path, range, status, per-case `started_at`, duration, optional per-case `llm` stats and `llm.record_path`, raw metrics, subcases, assertions, and diagnostics. |
 | `metrics` | Top-level summaries aggregated from `eval.metric` values. Bool metrics report pass rate, true, and false counts. Number metrics report mean, min, and max. String metrics report category counts. |
 | `comparison` | Optional baseline comparison with summary pass-rate deltas and metric deltas. |
 | `findings` | TODO, IO, lex, parse, AI syntax, case runtime, and replay-drift findings. Replay mismatch findings include stable JSON `details.expected` and `details.actual` request summaries plus `case_id`/`case_name` attribution when the drift happened inside an evaluate case; exhausted and unconsumed replay findings include turn/count details. |
