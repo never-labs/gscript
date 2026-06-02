@@ -44,6 +44,7 @@ Evaluate examples live under `evaluate/`. Run replay-backed agent checks with:
 
 ```bash
 go run ../cmd/leia evaluate --llm-replay evaluate/agent_replay.records.json evaluate/agent_replay.leia
+go run ../cmd/leia evaluate --llm-replay evaluate/multiturn_replay.records.json evaluate/multiturn_replay.leia
 ```
 
 Examples that open network listeners or touch host resources, such as `web/`,

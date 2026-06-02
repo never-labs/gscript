@@ -1,0 +1,23 @@
+evaluate "multiturn history replay" {
+    history := messages {
+        system: "Plan and then summarize Leia work."
+        user: "Create a short implementation plan for evaluate blocks."
+    }
+
+    plan, err := llm.turn({
+        model: "mock-fast",
+        messages: history,
+    })
+    assert(err == nil)
+    assert(plan.text == "1. Parse evaluate blocks. 2. Execute assertions.")
+
+    history[#history + 1] = msg.assistant(plan.text)
+    history[#history + 1] = msg.user("Condense the plan into a release note.")
+
+    note, err := llm.turn({
+        model: "mock-fast",
+        messages: history,
+    })
+    assert(err == nil)
+    assert(note.text == "Evaluate blocks now support deterministic regression replay.")
+}

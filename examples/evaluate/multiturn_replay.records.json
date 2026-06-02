@@ -1,0 +1,48 @@
+[
+  {
+    "Request": {
+      "Model": "mock-fast",
+      "Messages": [
+        {
+          "Role": "system",
+          "Text": "Plan and then summarize Leia work."
+        },
+        {
+          "Role": "user",
+          "Text": "Create a short implementation plan for evaluate blocks."
+        }
+      ]
+    },
+    "Result": {
+      "Status": "final_answer",
+      "Text": "1. Parse evaluate blocks. 2. Execute assertions."
+    }
+  },
+  {
+    "Request": {
+      "Model": "mock-fast",
+      "Messages": [
+        {
+          "Role": "system",
+          "Text": "Plan and then summarize Leia work."
+        },
+        {
+          "Role": "user",
+          "Text": "Create a short implementation plan for evaluate blocks."
+        },
+        {
+          "Role": "assistant",
+          "Text": "1. Parse evaluate blocks. 2. Execute assertions."
+        },
+        {
+          "Role": "user",
+          "Text": "Condense the plan into a release note."
+        }
+      ]
+    },
+    "Result": {
+      "Status": "final_answer",
+      "Text": "Evaluate blocks now support deterministic regression replay."
+    }
+  }
+]
