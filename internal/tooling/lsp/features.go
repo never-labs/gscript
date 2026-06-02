@@ -3,6 +3,8 @@ package lsp
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
+	"path/filepath"
 	"sort"
 	"strings"
 	"unicode"
@@ -82,6 +84,16 @@ type inlayHint struct {
 	Label    string   `json:"label"`
 	Kind     int      `json:"kind,omitempty"`
 	Tooltip  string   `json:"tooltip,omitempty"`
+}
+
+type documentLinkParams struct {
+	TextDocument textDocumentIdentifier `json:"textDocument"`
+}
+
+type documentLink struct {
+	Range   lspRange `json:"range"`
+	Target  string   `json:"target,omitempty"`
+	Tooltip string   `json:"tooltip,omitempty"`
 }
 
 type sourceSymbol struct {
@@ -319,6 +331,18 @@ func (s *Server) inlayHint(id *json.RawMessage, params json.RawMessage) error {
 	return s.respondMaybe(id, collectInlayHints(src, p.Range), nil)
 }
 
+func (s *Server) documentLink(id *json.RawMessage, params json.RawMessage) error {
+	var p documentLinkParams
+	if err := json.Unmarshal(params, &p); err != nil {
+		return s.respondMaybe(id, nil, &responseError{Code: errCodeInvalidParams, Message: err.Error()})
+	}
+	src, ok := s.documentText(p.TextDocument.URI)
+	if !ok {
+		return s.respondMaybe(id, []documentLink{}, nil)
+	}
+	return s.respondMaybe(id, collectDocumentLinks(p.TextDocument.URI, src), nil)
+}
+
 func (s *Server) documentText(uri string) (string, bool) {
 	if uri == "" {
 		return "", false
@@ -327,6 +351,85 @@ func (s *Server) documentText(uri string) (string, bool) {
 	defer s.mu.Unlock()
 	src, ok := s.docs[uri]
 	return src, ok
+}
+
+func collectDocumentLinks(uri, src string) []documentLink {
+	tokens, err := lexer.New(src).Tokenize()
+	if err != nil {
+		return nil
+	}
+	var out []documentLink
+	for i, tok := range tokens {
+		if tok.Type != lexer.TOKEN_STRING || !looksLikeLocalModulePath(tok.Value) {
+			continue
+		}
+		switch {
+		case tokenLooksLikeImportPath(tokens, i):
+			if target := resolveLocalModuleURI(uri, tok.Value); target != "" {
+				out = append(out, documentLink{Range: stringLiteralContentRange(tok), Target: target, Tooltip: "Open imported Leia module"})
+			}
+		case tokenLooksLikeRequireArg(tokens, i):
+			if target := resolveLocalModuleURI(uri, tok.Value); target != "" {
+				out = append(out, documentLink{Range: stringLiteralContentRange(tok), Target: target, Tooltip: "Open required Leia module"})
+			}
+		}
+	}
+	return out
+}
+
+func tokenLooksLikeImportPath(tokens []lexer.Token, index int) bool {
+	return index > 0 && tokenText(tokens[index-1]) == "import"
+}
+
+func tokenLooksLikeRequireArg(tokens []lexer.Token, index int) bool {
+	for i := index - 1; i >= 0 && tokens[i].Line == tokens[index].Line; i-- {
+		if tokenText(tokens[i]) == "require" {
+			return true
+		}
+	}
+	return false
+}
+
+func looksLikeLocalModulePath(path string) bool {
+	if path == "" || strings.HasPrefix(path, "go:") || strings.Contains(path, "://") {
+		return false
+	}
+	return strings.HasPrefix(path, ".") || strings.HasPrefix(path, "/") || strings.Contains(path, "/") || strings.HasSuffix(path, ".leia")
+}
+
+func resolveLocalModuleURI(baseURI, modulePath string) string {
+	target := modulePath
+	if !filepath.IsAbs(target) {
+		basePath := fileURIPath(baseURI)
+		if basePath == "" {
+			return ""
+		}
+		target = filepath.Join(filepath.Dir(basePath), modulePath)
+	}
+	if filepath.Ext(target) == "" {
+		target += ".leia"
+	}
+	return pathToFileURI(filepath.Clean(target))
+}
+
+func fileURIPath(uri string) string {
+	parsed, err := url.Parse(uri)
+	if err != nil || parsed.Scheme != "file" || parsed.Path == "" {
+		return ""
+	}
+	path, err := url.PathUnescape(parsed.Path)
+	if err != nil {
+		return ""
+	}
+	return filepath.FromSlash(path)
+}
+
+func pathToFileURI(path string) string {
+	if path == "" {
+		return ""
+	}
+	u := url.URL{Scheme: "file", Path: filepath.ToSlash(path)}
+	return u.String()
 }
 
 func collectCodeLens(uri, src string) []codeLens {
@@ -740,6 +843,14 @@ func lineRange(src string, line int) lspRange {
 
 func tokenRange(tok lexer.Token) lspRange {
 	start := positionFromOneBased(tok.Line, tok.Column)
+	return lspRange{
+		Start: start,
+		End:   position{Line: start.Line, Character: start.Character + len(tok.Value)},
+	}
+}
+
+func stringLiteralContentRange(tok lexer.Token) lspRange {
+	start := positionFromOneBased(tok.Line, tok.Column+1)
 	return lspRange{
 		Start: start,
 		End:   position{Line: start.Line, Character: start.Character + len(tok.Value)},

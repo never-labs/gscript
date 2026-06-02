@@ -153,6 +153,7 @@ def check_vscode() -> None:
         "workspace/symbol",
         "textDocument/codeLens",
         "textDocument/inlayHint",
+        "textDocument/documentLink",
         "textDocument/publishDiagnostics",
         "restartLanguageServer",
         "failPending",

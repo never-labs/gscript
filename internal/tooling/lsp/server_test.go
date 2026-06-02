@@ -46,6 +46,9 @@ func TestServerInitializeShutdown(t *testing.T) {
 	if caps["documentSymbolProvider"] != true {
 		t.Fatalf("initialize result missing document symbol capability: %#v", caps)
 	}
+	if caps["documentLinkProvider"] == nil {
+		t.Fatalf("initialize result missing document link capability: %#v", caps)
+	}
 	if caps["workspaceSymbolProvider"] != true {
 		t.Fatalf("initialize result missing workspace symbol capability: %#v", caps)
 	}
@@ -336,6 +339,67 @@ func TestDocumentSymbolReturnsDeclarations(t *testing.T) {
 	start := selection["start"].(map[string]any)
 	if start["line"] != float64(5) || start["character"] != float64(5) {
 		t.Fatalf("calculate selection start = %#v, want 5:5", start)
+	}
+}
+
+func TestDocumentLinkReturnsLocalModuleLinks(t *testing.T) {
+	src := strings.Join([]string{
+		`helper := require("./helper")`,
+		`json := require("json")`,
+		`import "./tools/other" as other`,
+		`import "go:strings" as strings`,
+		"",
+	}, "\n")
+	input := mustEncodeMessages(t,
+		map[string]any{
+			"jsonrpc": "2.0",
+			"method":  "textDocument/didOpen",
+			"params": map[string]any{
+				"textDocument": map[string]any{
+					"uri":        "file:///tmp/project/main.leia",
+					"languageId": "leia",
+					"version":    1,
+					"text":       src,
+				},
+			},
+		},
+		map[string]any{
+			"jsonrpc": "2.0",
+			"id":      31,
+			"method":  "textDocument/documentLink",
+			"params": map[string]any{
+				"textDocument": map[string]any{"uri": "file:///tmp/project/main.leia"},
+			},
+		},
+	)
+	var out bytes.Buffer
+	err := NewServer().Run(context.Background(), bytes.NewReader(input), &out)
+	if err != nil {
+		t.Fatalf("Run returned error: %v", err)
+	}
+	msgs := readOutputMessages(t, out.Bytes())
+	if len(msgs) != 2 {
+		t.Fatalf("expected diagnostics notification and documentLink response, got %d: %#v", len(msgs), msgs)
+	}
+	links := msgs[1]["result"].([]any)
+	if len(links) != 2 {
+		t.Fatalf("document links = %#v, want helper and other only", links)
+	}
+	targets := map[string]bool{}
+	for _, raw := range links {
+		link := raw.(map[string]any)
+		targets[link["target"].(string)] = true
+		if link["tooltip"] == "" {
+			t.Fatalf("document link missing tooltip: %#v", link)
+		}
+	}
+	for _, want := range []string{
+		"file:///tmp/project/helper.leia",
+		"file:///tmp/project/tools/other.leia",
+	} {
+		if !targets[want] {
+			t.Fatalf("document link targets missing %q: %#v", want, targets)
+		}
 	}
 }
 

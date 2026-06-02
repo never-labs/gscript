@@ -328,6 +328,9 @@ class MinimalLanguageClient {
       vscode.languages.registerInlayHintsProvider("leia", {
         provideInlayHints: (doc, range) => this.provideInlayHints(doc, range)
       }),
+      vscode.languages.registerDocumentLinkProvider("leia", {
+        provideDocumentLinks: (doc) => this.provideDocumentLinks(doc)
+      }),
       vscode.languages.registerCompletionItemProvider("leia", {
         provideCompletionItems: (doc, pos) => this.provideCompletionItems(doc, pos)
       }),
@@ -478,6 +481,18 @@ class MinimalLanguageClient {
           vscode.InlayHintKind.Type
         );
         out.tooltip = hint.tooltip;
+        return out;
+      })
+    );
+  }
+
+  provideDocumentLinks(doc) {
+    return this.request("textDocument/documentLink", {
+      textDocument: { uri: doc.uri.toString() }
+    }).then((result) =>
+      (result || []).map((link) => {
+        const out = new vscode.DocumentLink(lspRange(link.range), link.target ? vscode.Uri.parse(link.target) : undefined);
+        out.tooltip = link.tooltip;
         return out;
       })
     );

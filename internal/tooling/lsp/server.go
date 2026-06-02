@@ -129,6 +129,8 @@ func (s *Server) handle(payload []byte) error {
 		return s.codeLens(req.ID, req.Params)
 	case "textDocument/inlayHint":
 		return s.inlayHint(req.ID, req.Params)
+	case "textDocument/documentLink":
+		return s.documentLink(req.ID, req.Params)
 	case "textDocument/definition":
 		return s.definition(req.ID, req.Params)
 	case "textDocument/references":
@@ -157,7 +159,10 @@ func initializeResult() map[string]any {
 			"codeLensProvider": map[string]any{
 				"resolveProvider": false,
 			},
-			"inlayHintProvider":  true,
+			"inlayHintProvider": true,
+			"documentLinkProvider": map[string]any{
+				"resolveProvider": false,
+			},
 			"definitionProvider": true,
 			"referencesProvider": true,
 			"renameProvider": map[string]any{
