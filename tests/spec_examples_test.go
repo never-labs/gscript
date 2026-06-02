@@ -15,6 +15,8 @@ func TestSpecRunnableExamples(t *testing.T) {
 	if len(examples) == 0 {
 		t.Fatal("docs/spec must contain at least one ```leia run example")
 	}
+	leiaBin := filepath.Join(t.TempDir(), "leia")
+	runCommand(t, root, 60*time.Second, "go", "build", "-o", leiaBin, "./cmd/leia")
 	for _, example := range examples {
 		example := example
 		t.Run(example.name, func(t *testing.T) {
@@ -25,23 +27,23 @@ func TestSpecRunnableExamples(t *testing.T) {
 			for _, mode := range example.modes {
 				mode := mode
 				t.Run(mode.name, func(t *testing.T) {
-					args := append([]string{"run", "./cmd/leia", "run"}, mode.flags...)
+					args := append([]string{"run"}, mode.flags...)
 					args = append(args, path)
-					result := runCommandResult(root, 30*time.Second, "go", args...)
+					result := runCommandResult(root, 30*time.Second, leiaBin, args...)
 					if mode.wantFailure {
 						if result.timedOut {
-							t.Fatalf("%s timed out after %s", commandLine("go", args), 30*time.Second)
+							t.Fatalf("%s timed out after %s", commandLine(leiaBin, args), 30*time.Second)
 						}
 						if result.err == nil {
-							t.Fatalf("%s succeeded; expected failure\nstdout:\n%s\nstderr:\n%s", commandLine("go", args), result.stdout, result.stderr)
+							t.Fatalf("%s succeeded; expected failure\nstdout:\n%s\nstderr:\n%s", commandLine(leiaBin, args), result.stdout, result.stderr)
 						}
 						return
 					}
 					if result.err != nil {
 						if result.timedOut {
-							t.Fatalf("%s timed out after %s", commandLine("go", args), 30*time.Second)
+							t.Fatalf("%s timed out after %s", commandLine(leiaBin, args), 30*time.Second)
 						}
-						t.Fatalf("%s failed: %v\nstdout:\n%s\nstderr:\n%s", commandLine("go", args), result.err, result.stdout, result.stderr)
+						t.Fatalf("%s failed: %v\nstdout:\n%s\nstderr:\n%s", commandLine(leiaBin, args), result.err, result.stdout, result.stderr)
 					}
 				})
 			}
