@@ -435,6 +435,66 @@ func (e *BaselineJITEngine) handleTForCall(ctx *ExecContext, regs []runtime.Valu
 		return nil
 	}
 	fnVal := regs[absA]
+	if fnVal.IsTable() {
+		pairsFn := e.callVM.GetGlobal("pairs")
+		if pairsFn.IsNil() {
+			return fmt.Errorf("no pairs function for table TFORCALL")
+		}
+		results, err := e.callVM.CallValue(pairsFn, []runtime.Value{fnVal})
+		if err != nil {
+			return err
+		}
+		for i := 0; i < 3; i++ {
+			idx := absA + i
+			if idx >= len(regs) {
+				continue
+			}
+			if i < len(results) {
+				regs[idx] = results[i]
+			} else {
+				regs[idx] = runtime.NilValue()
+			}
+		}
+		fnVal = regs[absA]
+	}
+	if fnVal.IsChannel() {
+		ch := fnVal.Channel()
+		val, ok := ch.Recv()
+		for i := 0; i < c; i++ {
+			idx := absA + 3 + i
+			if idx >= len(regs) {
+				continue
+			}
+			if i == 0 && ok {
+				regs[idx] = val
+			} else {
+				regs[idx] = runtime.NilValue()
+			}
+		}
+		return nil
+	}
+	if gf := fnVal.GoFunction(); gf != nil && gf.FastArg1Ret2 != nil {
+		runtime.RecordRuntimePathNativeCallFastFor(gf)
+		r0, r1, n, err := gf.FastArg1Ret2(regs[absA+1])
+		if err != nil {
+			return err
+		}
+		for i := 0; i < c; i++ {
+			idx := absA + 3 + i
+			if idx >= len(regs) {
+				continue
+			}
+			switch {
+			case i == 0 && n > 0:
+				regs[idx] = r0
+			case i == 1 && n > 1:
+				regs[idx] = r1
+			default:
+				regs[idx] = runtime.NilValue()
+			}
+		}
+		return nil
+	}
 	if gf := fnVal.GoFunction(); gf != nil && gf.FastArg2Ret2 != nil {
 		runtime.RecordRuntimePathNativeCallFastFor(gf)
 		r0, r1, n, err := gf.FastArg2Ret2(regs[absA+1], regs[absA+2])

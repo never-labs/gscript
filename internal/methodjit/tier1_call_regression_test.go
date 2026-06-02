@@ -7,11 +7,12 @@
 package methodjit
 
 import (
-	"github.com/never-labs/leia/internal/testutil/vmtest"
 	"os"
 	"testing"
 	"unsafe"
 
+	"github.com/never-labs/leia/internal/runtime"
+	"github.com/never-labs/leia/internal/testutil/vmtest"
 	"github.com/never-labs/leia/internal/vm"
 )
 
@@ -154,6 +155,116 @@ checksum := run(20000, 1)
 	got := jitVM.GetGlobal("checksum")
 	if got != want {
 		t.Fatalf("checksum mismatch: JIT=%v VM=%v", got, want)
+	}
+}
+
+func TestTier1TForCallBareTableRangeMatchesVM(t *testing.T) {
+	src := `
+state := {minute: 360, shichen: "卯时", day: 1}
+npcs := {{id: "a", name: "A"}, {id: "b", name: "B"}}
+events := {}
+
+func shichen_for_minute(minute) {
+  idx := math.floor((minute % 1440) / 120)
+  if idx == 0 { return "子时" }
+  if idx == 1 { return "丑时" }
+  if idx == 2 { return "寅时" }
+  if idx == 3 { return "卯时" }
+  if idx == 4 { return "辰时" }
+  if idx == 5 { return "巳时" }
+  if idx == 6 { return "午时" }
+  if idx == 7 { return "未时" }
+  if idx == 8 { return "申时" }
+  if idx == 9 { return "酉时" }
+  if idx == 10 { return "戌时" }
+  return "亥时"
+}
+
+func find_npc(id) {
+  for _, npc := range npcs {
+    if npc.id == id {
+      return npc
+    }
+  }
+  return nil
+}
+
+func append_event(kind, actor_id) {
+  actor_name := "world"
+  actor := find_npc(actor_id)
+  if actor != nil {
+    actor_name = actor.name
+  }
+  events[#events + 1] = {
+    day: state.day,
+    minute: state.minute,
+    shichen: state.shichen,
+    kind: kind,
+    actor: actor_name,
+  }
+}
+
+func run(ticks) {
+  state = {minute: 360, shichen: "卯时", day: 1}
+  events = {}
+  append_event("day_start", "world")
+  for i := 1; i <= ticks; i++ {
+    state.minute = state.minute + 24
+    if state.minute >= 1440 {
+      append_event("day_end", "world")
+      state.day = state.day + 1
+      state.minute = state.minute - 1080
+      state.shichen = shichen_for_minute(state.minute)
+      append_event("day_start", "world")
+    }
+    next_shichen := shichen_for_minute(state.minute)
+    if next_shichen != state.shichen {
+      state.shichen = next_shichen
+      append_event("shichen", "world")
+    }
+    if state.minute % 360 == 0 {
+      append_event("routine", "a")
+    }
+    if state.minute % 180 == 0 {
+      append_event("director", "a")
+    }
+  }
+  return #events
+}
+`
+	top := compileTop(t, src)
+
+	vmOnly := vm.New(vmtest.NewInterpreterGlobals())
+	defer vmOnly.Close()
+	if _, err := vmOnly.Execute(top); err != nil {
+		t.Fatalf("VM execute: %v", err)
+	}
+	wantValues, err := vmOnly.CallValue(vmOnly.GetGlobal("run"), []runtime.Value{runtime.IntValue(60)})
+	if err != nil {
+		t.Fatalf("VM run: %v", err)
+	}
+	if len(wantValues) == 0 {
+		t.Fatal("VM run returned no values")
+	}
+
+	jitVM := vm.New(vmtest.NewInterpreterGlobals())
+	defer jitVM.Close()
+	jitVM.SetMethodJIT(NewTieringManager())
+	if _, err := jitVM.Execute(top); err != nil {
+		t.Fatalf("JIT execute: %v", err)
+	}
+	var gotValues []runtime.Value
+	for i := 0; i < 20; i++ {
+		gotValues, err = jitVM.CallValue(jitVM.GetGlobal("run"), []runtime.Value{runtime.IntValue(60)})
+		if err != nil {
+			t.Fatalf("JIT run #%d: %v", i+1, err)
+		}
+	}
+	if len(gotValues) == 0 {
+		t.Fatal("JIT run returned no values")
+	}
+	if gotValues[0] != wantValues[0] {
+		t.Fatalf("event count mismatch: JIT=%v VM=%v", gotValues[0], wantValues[0])
 	}
 }
 
