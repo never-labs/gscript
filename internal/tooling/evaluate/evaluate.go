@@ -3,6 +3,7 @@ package evaluate
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"fmt"
 	"io/fs"
 	"os"
@@ -13,15 +14,20 @@ import (
 
 	"github.com/never-labs/leia/internal/ast"
 	"github.com/never-labs/leia/internal/lexer"
+	"github.com/never-labs/leia/internal/llmbridge"
 	"github.com/never-labs/leia/internal/parser"
 	"github.com/never-labs/leia/internal/runtime"
 	stdlibinstall "github.com/never-labs/leia/internal/stdlib/install"
+	"github.com/never-labs/leia/llm"
 )
 
 const SchemaVersion = 1
 
 type Options struct {
-	Paths []string
+	Paths              []string
+	LLMRecordPath      string
+	LLMReplayPath      string
+	LLMProviderFactory runtime.LLMProviderFactory
 }
 
 type Report struct {
@@ -96,6 +102,10 @@ type parsedCase struct {
 }
 
 func Run(opts Options) (Report, error) {
+	run, err := newRunContext(opts)
+	if err != nil {
+		return Report{}, err
+	}
 	paths := opts.Paths
 	if len(paths) == 0 {
 		paths = []string{"."}
@@ -112,8 +122,14 @@ func Run(opts Options) (Report, error) {
 		Cases:         []Case{},
 		Findings:      []Finding{},
 		Notes: []string{
-			"evaluate runs each evaluate block body as ordinary Leia code; provider scoring, golden updates, and workflow orchestration are reserved for later phases.",
+			"evaluate runs each evaluate block body as ordinary Leia code; provider scoring and workflow orchestration are reserved for later phases.",
 		},
+	}
+	if opts.LLMReplayPath != "" {
+		report.Notes = append(report.Notes, fmt.Sprintf("llm replay loaded from %s", opts.LLMReplayPath))
+	}
+	if opts.LLMRecordPath != "" {
+		report.Notes = append(report.Notes, fmt.Sprintf("llm turns will be recorded to %s", opts.LLMRecordPath))
 	}
 	for _, file := range files {
 		input := Input{Path: file, Status: "ok"}
@@ -144,7 +160,7 @@ func Run(opts Options) (Report, error) {
 					c := parsed.Case
 					c.Assertions = collectAssertions(parsed.Body)
 					start := time.Now()
-					if err := executeCase(file, prog, parsed); err != nil {
+					if err := executeCase(file, prog, parsed, run); err != nil {
 						c.Status = "failed"
 						c.DurationMS = elapsedMillis(start)
 						markAssertions(c.Assertions, "unknown")
@@ -183,7 +199,36 @@ func Run(opts Options) (Report, error) {
 			report.Summary.TODOs++
 		}
 	}
+	if run != nil && run.recorder != nil {
+		if err := run.recorder.Save(opts.LLMRecordPath); err != nil {
+			return report, err
+		}
+	}
 	return report, nil
+}
+
+type runContext struct {
+	recorder        *llm.Recorder
+	replayProvider  runtime.LLMProvider
+	providerFactory runtime.LLMProviderFactory
+}
+
+func newRunContext(opts Options) (*runContext, error) {
+	if opts.LLMRecordPath != "" && opts.LLMReplayPath != "" {
+		return nil, fmt.Errorf("llm record and replay modes are mutually exclusive")
+	}
+	run := &runContext{providerFactory: opts.LLMProviderFactory}
+	if opts.LLMReplayPath != "" {
+		records, err := llm.LoadRecords(opts.LLMReplayPath)
+		if err != nil {
+			return nil, err
+		}
+		run.replayProvider = llmbridge.ProviderAdapter(llm.NewReplayProvider(records))
+	}
+	if opts.LLMRecordPath != "" {
+		run.recorder = llm.NewRecorder()
+	}
+	return run, nil
 }
 
 func collectFiles(paths []string) ([]string, error) {
@@ -387,12 +432,22 @@ func countLLMStmts(path string, stmts []ast.Stmt, counts *Summary, cases *[]pars
 	}
 }
 
-func executeCase(path string, prog *ast.Program, c parsedCase) error {
+func executeCase(path string, prog *ast.Program, c parsedCase, run *runContext) error {
 	if prog == nil || c.Body == nil {
 		return nil
 	}
 	interp := runtime.NewCore()
 	stdlibinstall.Install(interp)
+	if run != nil {
+		if run.replayProvider != nil {
+			interp.SetLLMProvider(run.replayProvider)
+		}
+		if run.recorder != nil {
+			interp.SetLLMProviderFactory(recordingProviderFactory(run.providerFactory, run.recorder.Record))
+		} else if run.providerFactory != nil {
+			interp.SetLLMProviderFactory(run.providerFactory)
+		}
+	}
 	if abs, err := filepath.Abs(path); err == nil {
 		interp.SetScriptDir(filepath.Dir(abs))
 	}
@@ -401,6 +456,39 @@ func executeCase(path string, prog *ast.Program, c parsedCase) error {
 		Stmts:          caseProgramStmts(prog.Stmts, c.Body.Stmts),
 		FileDirectives: append([]ast.FileDirective(nil), prog.FileDirectives...),
 	})
+}
+
+type recordingProvider struct {
+	provider runtime.LLMProvider
+	sink     llm.RecordSink
+}
+
+func recordingProviderFactory(factory runtime.LLMProviderFactory, sink llm.RecordSink) runtime.LLMProviderFactory {
+	if factory == nil {
+		return nil
+	}
+	return func(cfg runtime.LLMProviderConfig) (runtime.LLMProvider, error) {
+		provider, err := factory(cfg)
+		if err != nil || provider == nil || sink == nil {
+			return provider, err
+		}
+		return recordingProvider{provider: provider, sink: sink}, nil
+	}
+}
+
+func (p recordingProvider) Turn(ctx context.Context, req runtime.LLMTurnRequest) (runtime.LLMTurnResult, error) {
+	res, err := p.provider.Turn(ctx, req)
+	if p.sink != nil {
+		record := llm.Record{
+			Request: llmbridge.PublicTurnRequest(req),
+			Result:  llmbridge.PublicTurnResult(res),
+		}
+		if err != nil {
+			record.Error = err.Error()
+		}
+		p.sink(record)
+	}
+	return res, err
 }
 
 func elapsedMillis(start time.Time) int64 {

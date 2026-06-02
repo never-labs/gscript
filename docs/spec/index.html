@@ -313,6 +313,29 @@ i <span class="tok-operator">=</span> i <span class="tok-operator">+</span> <spa
 <li>channels;</li>
 <li>host-backed values represented through tables or native functions.</li>
 </ul>
+<p>The v1.0 value model has three observable attributes:</p>
+<ol>
+<li>category, reported by <code>type</code>;</li>
+<li>representation details explicitly exposed by a stable API, such as <code>math.type</code> for numbers;</li>
+<li>identity, only for tables, functions, coroutines, channels, and documented host-backed values.</li>
+</ol>
+<p>Variables, parameters, table fields, return slots, channel messages, and protected-call result slots hold values. Assignment copies the value reference, not the contents of an identity-bearing value. Reassigning a variable does not mutate the old value; mutating an aliased table does.</p>
+<pre class="language-leia leia-code"><code class="language-leia leia-code">a <span class="tok-operator">:=</span> {count: <span class="tok-number">1</span>}
+b <span class="tok-operator">:=</span> a
+b.count <span class="tok-operator">=</span> <span class="tok-number">2</span>
+<span class="tok-builtin">assert</span>(a.count <span class="tok-operator">==</span> <span class="tok-number">2</span>)
+<span class="tok-builtin">assert</span>(a <span class="tok-operator">==</span> b)
+
+b <span class="tok-operator">=</span> {count: <span class="tok-number">3</span>}
+<span class="tok-builtin">assert</span>(a.count <span class="tok-operator">==</span> <span class="tok-number">2</span>)
+<span class="tok-builtin">assert</span>(b.count <span class="tok-operator">==</span> <span class="tok-number">3</span>)
+<span class="tok-builtin">assert</span>(a <span class="tok-operator">!=</span> b)
+
+x <span class="tok-operator">:=</span> <span class="tok-number">1</span>
+y <span class="tok-operator">:=</span> x
+y <span class="tok-operator">=</span> <span class="tok-number">2</span>
+<span class="tok-builtin">assert</span>(x <span class="tok-operator">==</span> <span class="tok-number">1</span>)
+<span class="tok-builtin">assert</span>(y <span class="tok-operator">==</span> <span class="tok-number">2</span>)</code></pre>
 <p>Only <code>nil</code> and <code>false</code> are falsy. Numbers, including <code>0</code>, empty strings, empty tables, functions, coroutines, and channels are truthy.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-keyword">if</span> <span class="tok-number">0</span> {
     <span class="tok-builtin">print</span>(<span class="tok-string">&quot;numbers are truthy&quot;</span>)
@@ -326,6 +349,16 @@ i <span class="tok-operator">=</span> i <span class="tok-operator">+</span> <spa
 <p>Arithmetic may preserve integer representation when both operands are integers and the result fits the integer subtype range. Integer overflow promotes the result to float. Mixed integer/float arithmetic produces float. Division produces float. Exact float-to-integer conversion is exposed by <code>math.tointeger</code>; conversion succeeds only for finite integral values in the host integer range, and the resulting value still obeys the ordinary runtime subtype range. JIT raw integer representations are not observable.</p>
 <p>Numeric equality compares numeric values, so <code>1 == 1.0</code> is true even though <code>math.type(1)</code> and <code>math.type(1.0)</code> differ. Ordered numeric comparison converts both operands to their numeric value. NaN is unordered: it is not equal to itself, and all primitive ordered comparisons involving NaN are false. Positive and negative infinity compare according to IEEE-754 ordering.</p>
 <p>Other primitive equality compares booleans and strings by value; <code>nil</code> is equal only to <code>nil</code>. Strings order lexicographically by byte sequence. Values of other categories do not have primitive ordering. Identity-bearing values compare by identity unless metatable or host contracts say otherwise.</p>
+<p>The primitive equality relation is total and never raises an error. Primitive ordering is partial: it is defined only for numeric operands and for string operands, plus any metatable or host comparison contract documented elsewhere. Ordering values from unsupported categories raises a runtime error.</p>
+<pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-builtin">assert</span>(<span class="tok-constant">nil</span> <span class="tok-operator">==</span> <span class="tok-constant">nil</span>)
+<span class="tok-builtin">assert</span>(<span class="tok-constant">true</span> <span class="tok-operator">!=</span> <span class="tok-constant">false</span>)
+<span class="tok-builtin">assert</span>(<span class="tok-string">&quot;a&quot;</span> <span class="tok-operator">&lt;</span> <span class="tok-string">&quot;b&quot;</span>)
+<span class="tok-builtin">assert</span>(<span class="tok-number">2</span> <span class="tok-operator">&lt;</span> <span class="tok-number">3.5</span>)
+
+ok <span class="tok-operator">:=</span> <span class="tok-builtin">pcall</span>(<span class="tok-keyword">func</span>() {
+    <span class="tok-keyword">return</span> {} <span class="tok-operator">&lt;</span> {}
+})
+<span class="tok-builtin">assert</span>(<span class="tok-operator">!</span>ok)</code></pre>
 <p>Primitive string conversion for numbers is stable: integer values format as decimal without a suffix; floats use binary64 shortest-round-trip formatting, with a <code>.0</code> suffix for finite whole-number floats so their subtype remains visible. NaN stringifies as <code>NaN</code>, positive infinity as <code>+Inf</code>, and negative infinity as <code>-Inf</code>.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-builtin">assert</span>(<span class="tok-builtin">type</span>(<span class="tok-number">1</span>) <span class="tok-operator">==</span> <span class="tok-string">&quot;number&quot;</span>)
 <span class="tok-builtin">assert</span>(math.<span class="tok-builtin">type</span>(<span class="tok-number">1</span>) <span class="tok-operator">==</span> <span class="tok-string">&quot;integer&quot;</span>)
@@ -366,6 +399,7 @@ t <span class="tok-operator">:=</span> s <span class="tok-operator">..</span> <s
 <span class="tok-builtin">assert</span>(t <span class="tok-operator">==</span> <span class="tok-string">&quot;abcd&quot;</span>)
 <span class="tok-builtin">assert</span>(<span class="tok-operator">#</span><span class="tok-string">&quot;A&quot;</span> <span class="tok-operator">==</span> <span class="tok-number">1</span>)</code></pre>
 <p>Tables are mutable identity-bearing key/value objects. Raw table equality is identity equality. Table keys may be any non-<code>nil</code> runtime value. Assigning <code>nil</code> removes a key. Arrays, records, dense vectors, matrices, and SOA layouts are optimized representations or standard library structures unless a future spec promotes them to primitive value categories.</p>
+<p>Value transport does not deep-copy tables, functions, channels, or coroutines. A module, host API, or standard-library function may explicitly document that it clones or serializes a value; absent that contract, ordinary argument passing, returns, table storage, and channel transfer preserve identity.</p>
 <p>The v1.0 numeric table-key contract follows the current runtime exactly. An integer key is stored as an integer key. A float key whose value is finite and integral is normalized to the corresponding integer key when written. Ordinary float-key lookup is not normalized before lookup. Therefore <code>1 == 1.0</code> is true, but the table hash slot used for a stored integer key is not found by an ordinary <code>1.0</code> lookup; <code>t[1]</code> and <code>t[1.0]</code> do not behave as interchangeable lookup expressions. Non-integral float keys are stored and looked up as float keys. NaN may be used as a raw key by the current runtime, but it still does not compare equal with <code>==</code>; portable programs should avoid NaN table keys unless a module explicitly documents that convention.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code">t <span class="tok-operator">:=</span> {}
 t[<span class="tok-number">1</span>] <span class="tok-operator">=</span> <span class="tok-string">&quot;int&quot;</span>
@@ -788,13 +822,40 @@ x, y <span class="tok-operator">:=</span> v
 <p>Script functions and host functions share the same script-visible call result model. Host functions may return structured recoverable errors where their module contract specifies <code>nil, err</code> behavior.</p>
 <p>Tail-call optimization is an implementation detail unless a section explicitly promises stack behavior for a feature.</p></section><section><h2 id="tables-and-metatables">Tables And Metatables</h2>
 <p>Tables are mutable identity-bearing maps. Keys and values are runtime values. Implementations may use optimized array, record, or typed layouts when this does not change observable behavior.</p>
-<p>Table constructors create fresh table identities. List-style fields are assigned using 1-based integer sequence keys. Keyed fields assign the specified key.</p>
+<p>Table constructors create fresh table identities. List-style fields are assigned using 1-based integer sequence keys. Keyed fields assign the specified key. The v1.0 stable constructor subset is simple list fields, named fields, and explicit keyed fields that do not depend on an interleaving order between those forms. Portable programs must not depend on duplicate constructor fields that write the same normalized key, or on list-index assignment after interleaved keyed fields; use explicit assignments when that order matters. A constructor expression itself never reuses an existing table identity.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code">t <span class="tok-operator">:=</span> { <span class="tok-string">&quot;first&quot;</span>, <span class="tok-string">&quot;second&quot;</span>, name: <span class="tok-string">&quot;Ada&quot;</span> }
 t[<span class="tok-number">1</span>]        <span class="tok-comment">// &quot;first&quot;</span>
 t.name      <span class="tok-comment">// &quot;Ada&quot;</span>
 t[<span class="tok-string">&quot;name&quot;</span>]   <span class="tok-comment">// &quot;Ada&quot;</span></code></pre>
+<pre class="language-leia leia-code"><code class="language-leia leia-code">a <span class="tok-operator">:=</span> {<span class="tok-string">&quot;x&quot;</span>, <span class="tok-string">&quot;y&quot;</span>, name: <span class="tok-string">&quot;Ada&quot;</span>}
+b <span class="tok-operator">:=</span> {<span class="tok-string">&quot;x&quot;</span>, <span class="tok-string">&quot;y&quot;</span>, name: <span class="tok-string">&quot;Ada&quot;</span>}
+<span class="tok-builtin">assert</span>(a <span class="tok-operator">!=</span> b)
+<span class="tok-builtin">assert</span>(a[<span class="tok-number">1</span>] <span class="tok-operator">==</span> <span class="tok-string">&quot;x&quot;</span>)
+<span class="tok-builtin">assert</span>(a[<span class="tok-number">2</span>] <span class="tok-operator">==</span> <span class="tok-string">&quot;y&quot;</span>)
+<span class="tok-builtin">assert</span>(a.name <span class="tok-operator">==</span> <span class="tok-string">&quot;Ada&quot;</span>)
+
+a[<span class="tok-number">3</span>] <span class="tok-operator">=</span> <span class="tok-string">&quot;third&quot;</span>
+<span class="tok-builtin">assert</span>(a[<span class="tok-number">3</span>] <span class="tok-operator">==</span> <span class="tok-string">&quot;third&quot;</span>)</code></pre>
 <p>Assigning <code>nil</code> to a table field removes that field for ordinary table lookup. Tables compare by identity unless a metatable supplies comparison behavior.</p>
+<p>Raw table operations are the primitive map operations:</p>
+<ul>
+<li><code>rawget(t, k)</code> returns the stored value for key <code>k</code>, or <code>nil</code> if absent;</li>
+<li><code>rawset(t, k, v)</code> stores <code>v</code> at key <code>k</code> and returns <code>t</code>;</li>
+<li><code>rawset(t, k, nil)</code> removes key <code>k</code>;</li>
+<li><code>rawequal(a, b)</code> compares primitive equality without invoking <code>__eq</code>;</li>
+<li><code>rawlen(x)</code> returns the primitive length for strings and tables.</li>
+</ul>
 <p>Raw helpers bypass metamethods by contract. Non-raw operations may consult metatables when the corresponding operation names an event below.</p>
+<pre class="language-leia leia-code"><code class="language-leia leia-code">t <span class="tok-operator">:=</span> {}
+<span class="tok-builtin">assert</span>(<span class="tok-builtin">rawset</span>(t, <span class="tok-string">&quot;x&quot;</span>, <span class="tok-number">1</span>) <span class="tok-operator">==</span> t)
+<span class="tok-builtin">assert</span>(<span class="tok-builtin">rawget</span>(t, <span class="tok-string">&quot;x&quot;</span>) <span class="tok-operator">==</span> <span class="tok-number">1</span>)
+t.x <span class="tok-operator">=</span> <span class="tok-constant">nil</span>
+<span class="tok-builtin">assert</span>(<span class="tok-builtin">rawget</span>(t, <span class="tok-string">&quot;x&quot;</span>) <span class="tok-operator">==</span> <span class="tok-constant">nil</span>)
+
+a <span class="tok-operator">:=</span> {}
+b <span class="tok-operator">:=</span> {}
+<span class="tok-builtin">assert</span>(<span class="tok-builtin">rawequal</span>(a, a))
+<span class="tok-builtin">assert</span>(<span class="tok-operator">!</span><span class="tok-builtin">rawequal</span>(a, b))</code></pre>
 <pre class="language-leia leia-code"><code class="language-leia leia-code">log <span class="tok-operator">:=</span> {}
 t <span class="tok-operator">:=</span> <span class="tok-builtin">setmetatable</span>({present: <span class="tok-number">11</span>}, {
     __index: <span class="tok-keyword">func</span>(_, key) {
@@ -906,7 +967,22 @@ t.missing <span class="tok-operator">=</span> <span class="tok-number">1</span><
 <pre class="language-leia leia-code"><code class="language-leia leia-code">t <span class="tok-operator">:=</span> <span class="tok-builtin">setmetatable</span>({}, { __len: <span class="tok-keyword">func</span>(_) { <span class="tok-keyword">return</span> <span class="tok-number">99</span> } })
 <span class="tok-builtin">assert</span>(<span class="tok-operator">#</span>t <span class="tok-operator">==</span> <span class="tok-number">99</span>)
 <span class="tok-builtin">assert</span>(<span class="tok-builtin">rawlen</span>(t) <span class="tok-operator">==</span> <span class="tok-number">0</span>)</code></pre>
-<p>Sequence length on sparse tables follows Leia runtime behavior. Programs that depend on sparse length edge cases should pin that behavior with tests.</p></section><section><h2 id="concurrency">Concurrency</h2>
+<p>Sequence length on sparse tables follows Leia runtime behavior. Programs that depend on sparse length edge cases should pin that behavior with tests.</p>
+<p>Iteration order for hash-like table keys is not a v1.0 stable contract. Programs may depend on <code>pairs</code> visiting each key that remains present during an ordinary traversal, but not on the order of those visits. <code>ipairs</code> is the portable sequence traversal form for consecutive positive integer keys starting at <code>1</code>; it stops at the first missing or <code>nil</code> element.</p>
+<pre class="language-leia leia-code"><code class="language-leia leia-code">t <span class="tok-operator">:=</span> {<span class="tok-number">10</span>, <span class="tok-number">20</span>, [<span class="tok-number">4</span>]: <span class="tok-number">40</span>, name: <span class="tok-string">&quot;Ada&quot;</span>}
+seen <span class="tok-operator">:=</span> {}
+<span class="tok-keyword">for</span> _, value <span class="tok-operator">:=</span> <span class="tok-keyword">range</span> <span class="tok-builtin">ipairs</span>(t) {
+    seen[<span class="tok-operator">#</span>seen <span class="tok-operator">+</span> <span class="tok-number">1</span>] <span class="tok-operator">=</span> value
+}
+<span class="tok-builtin">assert</span>(<span class="tok-operator">#</span>seen <span class="tok-operator">==</span> <span class="tok-number">2</span>)
+<span class="tok-builtin">assert</span>(seen[<span class="tok-number">1</span>] <span class="tok-operator">==</span> <span class="tok-number">10</span>)
+<span class="tok-builtin">assert</span>(seen[<span class="tok-number">2</span>] <span class="tok-operator">==</span> <span class="tok-number">20</span>)
+
+count <span class="tok-operator">:=</span> <span class="tok-number">0</span>
+<span class="tok-keyword">for</span> _ <span class="tok-operator">:=</span> <span class="tok-keyword">range</span> <span class="tok-builtin">pairs</span>(t) {
+    count <span class="tok-operator">=</span> count <span class="tok-operator">+</span> <span class="tok-number">1</span>
+}
+<span class="tok-builtin">assert</span>(count <span class="tok-operator">==</span> <span class="tok-number">4</span>)</code></pre></section><section><h2 id="concurrency">Concurrency</h2>
 <p>Leia supports Go-style concurrent tasks and channels. The stable contract is intentionally small: tasks run independently, channels are the synchronization primitive, and host policies control cancellation and resource limits.</p>
 <h3 id="concurrency-tasks">Tasks</h3>
 <p>A <code>go</code> statement starts a concurrent task:</p>
@@ -1460,7 +1536,16 @@ value, err <span class="tok-operator">:=</span> wrapped.fn(<span class="tok-stri
 <pre class="language-leia leia-code"><code class="language-leia leia-code">json <span class="tok-operator">:=</span> <span class="tok-builtin">require</span>(<span class="tok-string">&quot;json&quot;</span>)
 text <span class="tok-operator">:=</span> json.encode({ok: <span class="tok-constant">true</span>})
 same <span class="tok-operator">:=</span> <span class="tok-builtin">require</span>(<span class="tok-string">&quot;json&quot;</span>)</code></pre>
-<p>If a module returns a value, that value is the result of <code>require</code>. Requiring the same module path again returns the cached module value unless the host explicitly installs a different loader policy.</p>
+<p>The result of <code>require(name)</code> is a single value. If a filesystem-backed module returns at least one value, the first value is the module value; additional return values are discarded. If it returns no values, the module value is <code>true</code>. Standard-library and host modules define their own module value, usually a table or callable function. Requiring the same module name again returns the cached module value unless the host explicitly installs a different loader policy.</p>
+<p>Module loading is observable as:</p>
+<ol>
+<li>resolve <code>name</code> to one enabled loader;</li>
+<li>execute that loader at most once for a cache miss;</li>
+<li>normalize the loader result to one module value;</li>
+<li>store that value in the module cache and <code>package.loaded[name]</code>;</li>
+<li>return the module value.</li>
+</ol>
+<p>A failed load does not produce a stable cached module value. Implementations may keep internal negative-cache or in-progress state for diagnostics and cycle detection, but a later successful <code>require</code> must still return the successful module value.</p>
 <p>The v1.0 stable resolution order is:</p>
 <ol>
 <li>If <code>package.loaded[name]</code> is non-<code>nil</code>, return it.</li>
@@ -1471,6 +1556,7 @@ same <span class="tok-operator">:=</span> <span class="tok-builtin">require</spa
 <li>Resolve a filesystem-backed <code>.leia</code> module path using the project resolver below, then execute that file.</li>
 <li>If the file returns at least one value, cache and return the first value. If it returns no values, cache and return <code>true</code>.</li>
 </ol>
+<p>Resolution uses the original string <code>name</code> as the <code>package.loaded</code> key. Path normalization during filesystem resolution does not make different spelling forms interchangeable cache keys unless an embedding policy documents that aliasing explicitly.</p>
 <p>Filesystem-backed project module resolution is deterministic:</p>
 <ol>
 <li>A collection require of the form <code>prefix:path.to.module</code> matches a configured collection with the same <code>prefix</code>; it resolves under the collection root as <code>path/to/module.leia</code>.</li>
@@ -1488,6 +1574,13 @@ json2 <span class="tok-operator">:=</span> <span class="tok-builtin">require</sp
 mod <span class="tok-operator">:=</span> <span class="tok-builtin">require</span>(<span class="tok-string">&quot;example.preloaded&quot;</span>)
 <span class="tok-builtin">assert</span>(mod.answer <span class="tok-operator">==</span> <span class="tok-number">42</span>)
 <span class="tok-builtin">assert</span>(<span class="tok-builtin">require</span>(<span class="tok-string">&quot;example.preloaded&quot;</span>) <span class="tok-operator">==</span> mod)</code></pre>
+<p>Because <code>package.loaded</code> is an ordinary table, any non-<code>nil</code> Leia value can be used as a preloaded module value. A false module value is still loaded: only <code>nil</code> means absent.</p>
+<pre class="language-leia leia-code"><code class="language-leia leia-code">package.loaded[<span class="tok-string">&quot;example.false&quot;</span>] <span class="tok-operator">=</span> <span class="tok-constant">false</span>
+<span class="tok-builtin">assert</span>(<span class="tok-builtin">require</span>(<span class="tok-string">&quot;example.false&quot;</span>) <span class="tok-operator">==</span> <span class="tok-constant">false</span>)
+
+fn <span class="tok-operator">:=</span> <span class="tok-keyword">func</span>(x) { <span class="tok-keyword">return</span> x <span class="tok-operator">+</span> <span class="tok-number">1</span> }
+package.loaded[<span class="tok-string">&quot;example.callable&quot;</span>] <span class="tok-operator">=</span> fn
+<span class="tok-builtin">assert</span>(<span class="tok-builtin">require</span>(<span class="tok-string">&quot;example.callable&quot;</span>)(<span class="tok-number">4</span>) <span class="tok-operator">==</span> <span class="tok-number">5</span>)</code></pre>
 <p>If a <code>package.loaded[name]</code> entry is replaced with another non-<code>nil</code> value, the next <code>require(name)</code> returns that replacement. Assigning <code>nil</code> removes the table entry but does not specify a full unload operation: an implementation may still have an internal loaded-module cache entry for <code>name</code>, and the normal resolution order applies again.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code">package.loaded[<span class="tok-string">&quot;example.override&quot;</span>] <span class="tok-operator">=</span> {value: <span class="tok-number">1</span>}
 first <span class="tok-operator">:=</span> <span class="tok-builtin">require</span>(<span class="tok-string">&quot;example.override&quot;</span>)
@@ -1544,10 +1637,13 @@ module PATH VERSION TARGET h1:BASE64_SHA256</code></pre>
 <tr><td><code>readonly</code></td><td>Same offline behavior as <code>mod</code> for current resolution. It is the mode hosts should choose when manifest/cache mutation is disallowed.</td></tr>
 <tr><td><code>vendor</code></td><td>Ignore the module cache and resolve required remote modules from <code>vendor/PATH@VERSION</code>. Missing remote vendor entries stay visible to resolution and fail normally when the module file is unavailable.</td></tr>
 </tbody></table></div>
-<p>When <code>ModuleOptionsForScriptMode</code> is used, the nearest ancestor <code>leia.mod</code> sets the require root, collections, local replaces, module mode, and any local vendor/cache entries already present. Invalid manifests are ignored by that runtime helper rather than repaired. The CLI module commands are the mutating surface: <code>leia mod add</code>, <code>tidy</code>, <code>download</code>, <code>vendor</code>, and <code>lock</code> may update <code>leia.mod</code>, <code>vendor/</code>, the module cache, or <code>leia.sum</code>; ordinary script execution does not.</p></section><section><h2 id="errors-and-diagnostics">Errors And Diagnostics</h2>
+<p>When <code>ModuleOptionsForScriptMode</code> is used, the nearest ancestor <code>leia.mod</code> sets the require root, collections, local replaces, module mode, and any local vendor/cache entries already present. Invalid manifests are ignored by that runtime helper rather than repaired. The CLI module commands are the mutating surface: <code>leia mod add</code>, <code>tidy</code>, <code>download</code>, <code>vendor</code>, and <code>lock</code> may update <code>leia.mod</code>, <code>vendor/</code>, the module cache, or <code>leia.sum</code>; ordinary script execution does not.</p>
+<p>Top-level module code executes in the same language as ordinary scripts. Lexical declarations inside the module are private to that module execution unless the module returns or stores a value that exposes them. Mutating globals or host resources during module loading is a side effect of <code>require</code>; portable modules should make those side effects explicit in their documented contract and keep the returned module value stable across repeated requires.</p></section><section><h2 id="errors-and-diagnostics">Errors And Diagnostics</h2>
 <p>Leia distinguishes runtime errors from recoverable structured failures.</p>
 <p>Programmer errors such as wrong argument types, invalid operations, missing fields where an API requires them, invalid control flow, exhausted resource budgets, and denied capabilities generally raise runtime errors.</p>
 <p>An error object is any Leia value carried by an error path. <code>error(value)</code> raises that exact value, without converting it to a string. <code>error()</code> raises a string error object. Extra arguments to <code>error</code> are ignored by the v1.0 contract.</p>
+<p>Raising an error abandons the current expression or statement and unwinds the active call stack until it reaches a protected-call boundary or the top-level execution boundary. Deferred calls run according to the statement semantics for <code>defer</code>; errors raised while unwinding replace or report through the same runtime error path as other deferred-call failures.</p>
+<p>The v1.0 contract for script-raised error objects is identity-preserving for identity-bearing values. A table raised with <code>error(t)</code> is the same table received by <code>pcall</code> or by an <code>xpcall</code> handler.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code">payload <span class="tok-operator">:=</span> {kind: <span class="tok-string">&quot;demo&quot;</span>, message: <span class="tok-string">&quot;boom&quot;</span>}
 ok, err <span class="tok-operator">:=</span> <span class="tok-builtin">pcall</span>(<span class="tok-keyword">func</span>() {
     <span class="tok-builtin">error</span>(payload)
@@ -1555,6 +1651,15 @@ ok, err <span class="tok-operator">:=</span> <span class="tok-builtin">pcall</sp
 <span class="tok-builtin">assert</span>(<span class="tok-operator">!</span>ok)
 <span class="tok-builtin">assert</span>(err <span class="tok-operator">==</span> payload)
 <span class="tok-builtin">assert</span>(err.kind <span class="tok-operator">==</span> <span class="tok-string">&quot;demo&quot;</span>)</code></pre>
+<pre class="language-leia leia-code"><code class="language-leia leia-code">ok, err <span class="tok-operator">:=</span> <span class="tok-builtin">pcall</span>(<span class="tok-keyword">func</span>() {
+    <span class="tok-builtin">error</span>()
+})
+<span class="tok-builtin">assert</span>(<span class="tok-operator">!</span>ok)
+<span class="tok-builtin">assert</span>(<span class="tok-builtin">type</span>(err) <span class="tok-operator">==</span> <span class="tok-string">&quot;string&quot;</span>)
+
+ok, err <span class="tok-operator">=</span> <span class="tok-builtin">pcall</span>(<span class="tok-builtin">error</span>, <span class="tok-constant">false</span>)
+<span class="tok-builtin">assert</span>(<span class="tok-operator">!</span>ok)
+<span class="tok-builtin">assert</span>(err <span class="tok-operator">==</span> <span class="tok-constant">false</span>)</code></pre>
 <p><code>pcall(fn, ...)</code> calls <code>fn(...)</code> in protected mode. On success it returns <code>true</code> followed by all results from the call. On failure it returns <code>false</code> and one error object. If the failure came from <code>error(value)</code> or <code>assert(false, value)</code>, the object is <code>value</code>; if it came from a runtime, host, parser, budget, or capability failure, the protected error object is the current diagnostic string.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code">ok, a, b <span class="tok-operator">:=</span> <span class="tok-builtin">pcall</span>(<span class="tok-keyword">func</span>() {
     <span class="tok-keyword">return</span> <span class="tok-string">&quot;a&quot;</span>, <span class="tok-string">&quot;b&quot;</span>
@@ -1563,6 +1668,7 @@ ok, err <span class="tok-operator">:=</span> <span class="tok-builtin">pcall</sp
 <span class="tok-builtin">assert</span>(ok)
 <span class="tok-builtin">assert</span>(a <span class="tok-operator">==</span> <span class="tok-string">&quot;a&quot;</span>)
 <span class="tok-builtin">assert</span>(b <span class="tok-operator">==</span> <span class="tok-string">&quot;b&quot;</span>)</code></pre>
+<p>The first argument to <code>pcall</code> is evaluated before the protected call begins and must be callable. Arguments after the function are evaluated before entering the callee, then passed normally. Once the callable is entered, both script-raised errors and runtime errors are converted to the protected result form.</p>
 <p><code>xpcall(fn, handler, ...)</code> calls <code>fn(...)</code> in protected mode. On success it returns <code>true</code> followed by all results from <code>fn</code>. On failure it calls <code>handler(err)</code> and returns <code>false</code> plus the handler&#x27;s first result. If the handler itself fails, <code>xpcall</code> returns <code>false</code> plus the handler failure&#x27;s error object.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code">ok, value <span class="tok-operator">:=</span> <span class="tok-builtin">pcall</span>(<span class="tok-keyword">func</span>(a, b) {
     <span class="tok-keyword">return</span> a <span class="tok-operator">+</span> b, <span class="tok-string">&quot;kept&quot;</span>
@@ -1573,6 +1679,14 @@ ok, handled <span class="tok-operator">:=</span> <span class="tok-builtin">xpcal
     <span class="tok-keyword">return</span> <span class="tok-string">&quot;handled:&quot;</span> <span class="tok-operator">..</span> <span class="tok-builtin">tostring</span>(err)
 }, <span class="tok-string">&quot;boom&quot;</span>)
 <span class="tok-builtin">assert</span>(<span class="tok-operator">!</span>ok <span class="tok-operator">&amp;&amp;</span> handled <span class="tok-operator">==</span> <span class="tok-string">&quot;handled:boom&quot;</span>)</code></pre>
+<pre class="language-leia leia-code"><code class="language-leia leia-code">ok, a, b <span class="tok-operator">:=</span> <span class="tok-builtin">xpcall</span>(<span class="tok-keyword">func</span>() {
+    <span class="tok-builtin">error</span>(<span class="tok-string">&quot;bad&quot;</span>)
+}, <span class="tok-keyword">func</span>(err) {
+    <span class="tok-keyword">return</span> <span class="tok-string">&quot;handled:&quot;</span> <span class="tok-operator">..</span> err, <span class="tok-string">&quot;discarded&quot;</span>
+})
+<span class="tok-builtin">assert</span>(<span class="tok-operator">!</span>ok)
+<span class="tok-builtin">assert</span>(a <span class="tok-operator">==</span> <span class="tok-string">&quot;handled:bad&quot;</span>)
+<span class="tok-builtin">assert</span>(b <span class="tok-operator">==</span> <span class="tok-constant">nil</span>)</code></pre>
 <pre class="language-leia leia-code"><code class="language-leia leia-code">payload <span class="tok-operator">:=</span> {kind: <span class="tok-string">&quot;assertion&quot;</span>}
 ok, err <span class="tok-operator">:=</span> <span class="tok-builtin">pcall</span>(<span class="tok-keyword">func</span>() {
     <span class="tok-builtin">assert</span>(<span class="tok-constant">false</span>, payload)
@@ -1593,6 +1707,7 @@ ok, handled <span class="tok-operator">:=</span> <span class="tok-builtin">xpcal
     <span class="tok-keyword">return</span> <span class="tok-string">&quot;kind=&quot;</span> <span class="tok-operator">..</span> <span class="tok-builtin">type</span>(err)
 })
 <span class="tok-builtin">assert</span>(<span class="tok-operator">!</span>ok <span class="tok-operator">&amp;&amp;</span> handled <span class="tok-operator">==</span> <span class="tok-string">&quot;kind=string&quot;</span>)</code></pre>
+<p>Diagnostic strings are for humans. The stable script-level contract is their type, recovery boundary, and association with the failing operation, not exact wording. Tests and portable programs must not parse runtime diagnostic prose unless a specific CLI JSON field or library result table documents that text as machine-readable.</p>
 <p>Protected calls are recovery boundaries for ordinary script failures. They do not make process termination, cancellation, host shutdown, or bugs in the host process safe to continue unless the embedding API explicitly reports those conditions as ordinary errors. A protected call whose own first argument is invalid raises an unprotected argument error; wrap the call site itself if that failure must be recovered.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-builtin">pcall</span>()</code></pre>
 <p>Recoverable host and provider failures should return <code>nil, err</code> or a structured result when the API is designed for recovery. Error result tables use stable, lowercase string fields when structured recovery is intended:</p>

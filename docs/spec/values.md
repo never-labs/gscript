@@ -15,6 +15,38 @@ Stable value categories are:
 - channels;
 - host-backed values represented through tables or native functions.
 
+The v1.0 value model has three observable attributes:
+
+1. category, reported by `type`;
+2. representation details explicitly exposed by a stable API, such as
+   `math.type` for numbers;
+3. identity, only for tables, functions, coroutines, channels, and documented
+   host-backed values.
+
+Variables, parameters, table fields, return slots, channel messages, and
+protected-call result slots hold values. Assignment copies the value reference,
+not the contents of an identity-bearing value. Reassigning a variable does not
+mutate the old value; mutating an aliased table does.
+
+```leia run all
+a := {count: 1}
+b := a
+b.count = 2
+assert(a.count == 2)
+assert(a == b)
+
+b = {count: 3}
+assert(a.count == 2)
+assert(b.count == 3)
+assert(a != b)
+
+x := 1
+y := x
+y = 2
+assert(x == 1)
+assert(y == 2)
+```
+
 Only `nil` and `false` are falsy. Numbers, including `0`, empty strings, empty
 tables, functions, coroutines, and channels are truthy.
 
@@ -66,6 +98,23 @@ Other primitive equality compares booleans and strings by value; `nil` is equal
 only to `nil`. Strings order lexicographically by byte sequence. Values of other
 categories do not have primitive ordering. Identity-bearing values compare by
 identity unless metatable or host contracts say otherwise.
+
+The primitive equality relation is total and never raises an error. Primitive
+ordering is partial: it is defined only for numeric operands and for string
+operands, plus any metatable or host comparison contract documented elsewhere.
+Ordering values from unsupported categories raises a runtime error.
+
+```leia run all
+assert(nil == nil)
+assert(true != false)
+assert("a" < "b")
+assert(2 < 3.5)
+
+ok := pcall(func() {
+    return {} < {}
+})
+assert(!ok)
+```
 
 Primitive string conversion for numbers is stable: integer values format as
 decimal without a suffix; floats use binary64 shortest-round-trip formatting,
@@ -129,6 +178,11 @@ identity equality. Table keys may be any non-`nil` runtime value. Assigning
 `nil` removes a key. Arrays, records, dense vectors, matrices, and SOA layouts
 are optimized representations or standard library structures unless a future
 spec promotes them to primitive value categories.
+
+Value transport does not deep-copy tables, functions, channels, or coroutines.
+A module, host API, or standard-library function may explicitly document that it
+clones or serializes a value; absent that contract, ordinary argument passing,
+returns, table storage, and channel transfer preserve identity.
 
 The v1.0 numeric table-key contract follows the current runtime exactly. An
 integer key is stored as an integer key. A float key whose value is finite and

@@ -1,0 +1,8 @@
+evaluate "summarizes with replayed llm turn" {
+    result, err := llm.turn({
+        model: "mock-fast",
+        messages: {llm.user("Summarize Leia evaluate in five words.")},
+    })
+    assert(err == nil)
+    assert(result.text == "Deterministic evaluate blocks for agents.")
+}

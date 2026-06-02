@@ -385,10 +385,134 @@ func playgroundAIProfileOptions() []leia.Option {
 		leia.WithNetworkAccess(true),
 		leia.WithLLMProviderFactory(playgroundLLMProviderFactory),
 	}
+	if os.Getenv("LEIA_PLAYGROUND_MOCK_LLM") != "" {
+		opts = append(opts, leia.WithLLMProvider(playgroundMockLLMProvider{}))
+		return opts
+	}
 	if provider, ok := playgroundGLMProviderFromEnv(); ok {
 		opts = append(opts, leia.WithLLMProvider(provider))
 	}
 	return opts
+}
+
+type playgroundMockLLMProvider struct{}
+
+func (playgroundMockLLMProvider) Turn(_ context.Context, req llm.TurnRequest) (llm.TurnResult, error) {
+	if wantsJSONObject(req.ResponseFormat) {
+		if requestContains(req, "slugify") {
+			return llm.TurnResult{Status: "final_answer", Text: playgroundMockSlugifyPatch()}, nil
+		}
+		if requestContains(req, "structured research handoff") || requestContains(req, "Research ") {
+			return llm.TurnResult{Status: "final_answer", Text: `{"summary":"delegated research ok","confidence":1}`}, nil
+		}
+		if requestContains(req, "codename") || requestContains(req, "direct-agent-tool") {
+			return llm.TurnResult{Status: "final_answer", Text: `{"project":"ORCHID","owner":"ADA","remembered":true,"source":"direct-agent-tool"}`}, nil
+		}
+		if requestContains(req, "project") || requestContains(req, "ORCHID") || requestContains(req, "memory") {
+			return llm.TurnResult{Status: "final_answer", Text: `{"project":"ORCHID","owner":"ADA","risk":"LOW","remembered":true,"meta":{"source":"mock"}}`}, nil
+		}
+		return llm.TurnResult{Status: "final_answer", Text: `{"product":"playground","severity":"low","action":"improve_demos"}`}, nil
+	}
+	if len(req.Messages) > 0 {
+		last := req.Messages[len(req.Messages)-1]
+		if last.Role == "tool" {
+			return llm.TurnResult{Status: "final_answer", Text: "MOCK_TOOL_RESULT " + fmt.Sprint(last.Value)}, nil
+		}
+	}
+	if len(req.Tools) > 0 {
+		tool := req.Tools[0].Name
+		switch tool {
+		case "extract_memory":
+			return llm.TurnResult{Status: "tool_calls", Calls: []llm.ToolCall{{
+				ID: "call_extract_1", Tool: tool, Args: map[string]any{"note": lastUserText(req)},
+			}}}, nil
+		case "search_runbook":
+			return llm.TurnResult{Status: "tool_calls", Calls: []llm.ToolCall{{
+				ID: "call_runbook_1", Tool: tool, Args: map[string]any{"service": "checkout", "symptom": "p95 latency spike"},
+			}}}, nil
+		case "get_metrics":
+			return llm.TurnResult{Status: "tool_calls", Calls: []llm.ToolCall{{
+				ID: "call_metrics_1", Tool: tool, Args: map[string]any{"service": "checkout"},
+			}}}, nil
+		case "lookup_order":
+			return llm.TurnResult{Status: "tool_calls", Calls: []llm.ToolCall{{
+				ID: "call_order_1", Tool: tool, Args: map[string]any{"id": "A100"},
+			}}}, nil
+		default:
+			args := map[string]any{"query": "memory"}
+			if len(req.Tools[0].Params) > 0 && req.Tools[0].Params[0] != "query" {
+				args = map[string]any{req.Tools[0].Params[0]: lastUserText(req)}
+			}
+			return llm.TurnResult{Status: "tool_calls", Calls: []llm.ToolCall{{
+				ID: "call_tool_1", Tool: tool, Args: args,
+			}}}, nil
+		}
+	}
+	if requestContains(req, "PASS") {
+		return llm.TurnResult{Status: "final_answer", Text: "PASS"}, nil
+	}
+	if requestContains(req, "project=ORCHID") {
+		return llm.TurnResult{Status: "final_answer", Text: "project=ORCHID;owner=ADA;risk=LOW"}, nil
+	}
+	if requestContains(req, "MEMORY_STORED") {
+		return llm.TurnResult{Status: "final_answer", Text: "MEMORY_STORED"}, nil
+	}
+	if requestContains(req, "LEIA_GLM_OK") {
+		return llm.TurnResult{Status: "final_answer", Text: "LEIA_GLM_OK"}, nil
+	}
+	return llm.TurnResult{Status: "final_answer", Text: "MOCK_AI_OK"}, nil
+}
+
+func wantsJSONObject(format any) bool {
+	if format == nil {
+		return false
+	}
+	if m, ok := format.(map[string]any); ok {
+		return fmt.Sprint(m["type"]) == "json_object"
+	}
+	return strings.Contains(fmt.Sprint(format), "json_object")
+}
+
+func requestContains(req llm.TurnRequest, needle string) bool {
+	haystack := strings.ToLower(needle)
+	for _, msg := range req.Messages {
+		if strings.Contains(strings.ToLower(msg.Text), haystack) || strings.Contains(strings.ToLower(fmt.Sprint(msg.Value)), haystack) {
+			return true
+		}
+	}
+	return strings.Contains(strings.ToLower(req.Model), haystack)
+}
+
+func lastUserText(req llm.TurnRequest) string {
+	for i := len(req.Messages) - 1; i >= 0; i-- {
+		if req.Messages[i].Role == "user" {
+			return req.Messages[i].Text
+		}
+	}
+	return ""
+}
+
+func playgroundMockSlugifyPatch() string {
+	code := `func slugify(title) {
+    value := string.lower(string.trim(title))
+    value, _ = string.gsub(value, "%s+", "-")
+    return value
+}
+
+evaluate "slugify cases" {
+    assert(slugify("Hello Leia") == "hello-leia")
+    assert(slugify("AI Native Script") == "ai-native-script")
+}`
+	return jsonEncodeObject(map[string]string{
+		"code": code,
+		"risk": "mock proposal only",
+	})
+}
+
+func jsonEncodeObject(value map[string]string) string {
+	var buf bytes.Buffer
+	_ = json.NewEncoder(&buf).Encode(value)
+	return strings.TrimSpace(buf.String())
 }
 
 func playgroundGLMProviderFromEnv() (llm.Provider, bool) {
@@ -1223,7 +1347,8 @@ func playgroundExamplesRoot() string {
 }
 
 func repositoryExampleRunnable(path string) bool {
-	return !strings.Contains(path, "/llm/") &&
+	return !strings.Contains(path, "/evaluate/") &&
+		!strings.Contains(path, "/llm/") &&
 		!strings.Contains(path, "/web/") &&
 		!strings.Contains(path, "/game_engine/") &&
 		!strings.Contains(path, "/concurrency/context_process.leia") &&
@@ -1233,6 +1358,8 @@ func repositoryExampleRunnable(path string) bool {
 
 func repositoryExampleRequires(path string) string {
 	switch {
+	case strings.Contains(path, "/evaluate/"):
+		return "leia evaluate CLI"
 	case strings.Contains(path, "/llm/"):
 		return "LLM provider"
 	case strings.Contains(path, "/web/"):

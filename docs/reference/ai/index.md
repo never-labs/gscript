@@ -114,6 +114,19 @@ The AI surface has four distinct responsibilities:
   tool execution happens in the built-in agent loop or in explicit flow code
   through `llm.dispatch`.
 
+Composition rules:
+
+- `model`, `tools`, budget, output, `response_format`, and metadata fields are
+  agent configuration. `agent defaults` supplies module-level values;
+  agent-local fields override them.
+- `system` and `user` are prompts used to create the first message history for
+  the built-in agent loop. A manual `flow` may use `system`, but it should build
+  user messages from parameters or pass prompt fields through `turn` inheritance.
+- `messages`/`history` is the actual ordered context sent to a provider. Once a
+  script passes `messages` to `turn`, that array is the context for that request.
+- `turn` may receive `tools`, but it only exposes possible tool calls in
+  `result.calls`. It does not execute the calls or append tool results.
+
 For an agent without a custom `flow`, Leia runs the built-in loop: synthesize
 messages from `system` and `user`, call one `turn`, dispatch any returned tool
 calls, append assistant tool-call and tool-result messages, and repeat until
@@ -152,6 +165,12 @@ Important fields:
 | `stream` | Provider streaming hint. |
 | `stop` | Stop sequences. |
 | `metadata` | String metadata passed to the provider. |
+
+When `model` is omitted, the turn uses the ambient agent model if it is running
+inside an agent. Otherwise it uses the module's `models { default: ... }` alias
+or the host provider's default behavior. Host-injected providers may ignore
+script-declared provider config, but the script-level alias still names the
+requested model.
 
 Result shape:
 
@@ -201,7 +220,13 @@ agent defaults {
 ```
 
 Agent config fields are merged with defaults. Agent-local fields override
-defaults.
+defaults. For the built-in loop, the merged config becomes:
+
+- Model request settings: `model`, sampling fields, response format, metadata.
+- Initial history: `system` followed by `user` when present.
+- Tool availability: merged `tools`, including plain tools and agent-as-tool
+  values.
+- Limits and validation: `budget` and `output`.
 
 ## Custom Flow
 
@@ -211,6 +236,11 @@ body can access the merged agent config fields `model`, `system`, `tools`, and
 shadowed inside the flow body. Other config fields, including `user`, `budget`,
 `response_format`, and `metadata`, are not injected as variables; `turn {}` can
 still inherit them through the ambient agent configuration.
+
+A flow owns history. To continue a conversation, append assistant messages,
+assistant tool calls, and tool results to the same `messages` array before the
+next `turn`. Passing `tools` to the next `turn` makes those tools available to
+the model again; it still does not dispatch them automatically.
 
 ```leia
 agent incident_brief(service) {

@@ -32,6 +32,10 @@ agent supervisor(question) {
 }
 
 result, err := supervisor("Should this workflow delegate research?")
+if err != nil {
+    print(err.message)
+    return
+}
 
 final_text := result.text
 outer_history_len := #result.history
@@ -39,3 +43,7 @@ outer_history_len := #result.history
 // Use history.find to locate the tool result without depending on index order.
 tool_msg, _ := history.find(result.history, {role: "tool"})
 delegated_summary := tool_msg.value.summary
+
+print("final", final_text)
+print("history", outer_history_len)
+print("delegated", delegated_summary)

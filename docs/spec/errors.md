@@ -10,6 +10,16 @@ An error object is any Leia value carried by an error path. `error(value)` raise
 that exact value, without converting it to a string. `error()` raises a string
 error object. Extra arguments to `error` are ignored by the v1.0 contract.
 
+Raising an error abandons the current expression or statement and unwinds the
+active call stack until it reaches a protected-call boundary or the top-level
+execution boundary. Deferred calls run according to the statement semantics for
+`defer`; errors raised while unwinding replace or report through the same
+runtime error path as other deferred-call failures.
+
+The v1.0 contract for script-raised error objects is identity-preserving for
+identity-bearing values. A table raised with `error(t)` is the same table
+received by `pcall` or by an `xpcall` handler.
+
 ```leia run all
 payload := {kind: "demo", message: "boom"}
 ok, err := pcall(func() {
@@ -18,6 +28,18 @@ ok, err := pcall(func() {
 assert(!ok)
 assert(err == payload)
 assert(err.kind == "demo")
+```
+
+```leia run all
+ok, err := pcall(func() {
+    error()
+})
+assert(!ok)
+assert(type(err) == "string")
+
+ok, err = pcall(error, false)
+assert(!ok)
+assert(err == false)
 ```
 
 `pcall(fn, ...)` calls `fn(...)` in protected mode. On success it returns
@@ -37,6 +59,11 @@ assert(a == "a")
 assert(b == "b")
 ```
 
+The first argument to `pcall` is evaluated before the protected call begins and
+must be callable. Arguments after the function are evaluated before entering the
+callee, then passed normally. Once the callable is entered, both script-raised
+errors and runtime errors are converted to the protected result form.
+
 `xpcall(fn, handler, ...)` calls `fn(...)` in protected mode. On success it
 returns `true` followed by all results from `fn`. On failure it calls
 `handler(err)` and returns `false` plus the handler's first result. If the
@@ -53,6 +80,17 @@ ok, handled := xpcall(error, func(err) {
     return "handled:" .. tostring(err)
 }, "boom")
 assert(!ok && handled == "handled:boom")
+```
+
+```leia run all
+ok, a, b := xpcall(func() {
+    error("bad")
+}, func(err) {
+    return "handled:" .. err, "discarded"
+})
+assert(!ok)
+assert(a == "handled:bad")
+assert(b == nil)
 ```
 
 ```leia run all
@@ -82,6 +120,12 @@ ok, handled := xpcall(func() {
 })
 assert(!ok && handled == "kind=string")
 ```
+
+Diagnostic strings are for humans. The stable script-level contract is their
+type, recovery boundary, and association with the failing operation, not exact
+wording. Tests and portable programs must not parse runtime diagnostic prose
+unless a specific CLI JSON field or library result table documents that text as
+machine-readable.
 
 Protected calls are recovery boundaries for ordinary script failures. They do
 not make process termination, cancellation, host shutdown, or bugs in the host

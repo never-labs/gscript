@@ -63,3 +63,7 @@ manual, manual_err := manual_research("agent history")
 manual_text := manual.text
 manual_evidence := manual.evidence
 manual_history_len := manual.history_len
+
+print("manual", manual_text)
+print("evidence", manual_evidence)
+print("history", manual_history_len)

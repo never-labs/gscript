@@ -97,3 +97,9 @@ research_text := research.text
 brief_text := brief.text
 brief_evidence := brief.evidence
 brief_history_len := brief.history_len
+
+print("faq", faq_text)
+print("research", research_text)
+print("brief", brief_text)
+print("evidence", brief_evidence)
+print("history", brief_history_len)

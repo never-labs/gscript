@@ -23,7 +23,7 @@ tool lookup(query) {
 agent defaults {
     model: "demo"
     tools: [lookup]
-    budget: {turns: 4, calls: 4, tokens: 2000, time: 30s}
+    budget: {turns: 4, calls: 4, tokens: 2000, time: 30}
 }
 
 agent answer(question) {
@@ -48,8 +48,11 @@ agent review(question) {
     return result, err
 }
 
-budget { turns: 1 } {
+budget { turns: 2 } {
     result, err := answer("What is Leia?")
-    _ = result
-    _ = err
+    if err != nil {
+        print(err.message)
+        return
+    }
+    print(result.text)
 }

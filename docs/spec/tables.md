@@ -6,6 +6,12 @@ does not change observable behavior.
 
 Table constructors create fresh table identities. List-style fields are assigned
 using 1-based integer sequence keys. Keyed fields assign the specified key.
+The v1.0 stable constructor subset is simple list fields, named fields, and
+explicit keyed fields that do not depend on an interleaving order between those
+forms. Portable programs must not depend on duplicate constructor fields that
+write the same normalized key, or on list-index assignment after interleaved
+keyed fields; use explicit assignments when that order matters. A constructor
+expression itself never reuses an existing table identity.
 
 ```leia
 t := { "first", "second", name: "Ada" }
@@ -14,11 +20,44 @@ t.name      // "Ada"
 t["name"]   // "Ada"
 ```
 
+```leia run all
+a := {"x", "y", name: "Ada"}
+b := {"x", "y", name: "Ada"}
+assert(a != b)
+assert(a[1] == "x")
+assert(a[2] == "y")
+assert(a.name == "Ada")
+
+a[3] = "third"
+assert(a[3] == "third")
+```
+
 Assigning `nil` to a table field removes that field for ordinary table lookup.
 Tables compare by identity unless a metatable supplies comparison behavior.
 
+Raw table operations are the primitive map operations:
+
+- `rawget(t, k)` returns the stored value for key `k`, or `nil` if absent;
+- `rawset(t, k, v)` stores `v` at key `k` and returns `t`;
+- `rawset(t, k, nil)` removes key `k`;
+- `rawequal(a, b)` compares primitive equality without invoking `__eq`;
+- `rawlen(x)` returns the primitive length for strings and tables.
+
 Raw helpers bypass metamethods by contract. Non-raw operations may consult
 metatables when the corresponding operation names an event below.
+
+```leia run all
+t := {}
+assert(rawset(t, "x", 1) == t)
+assert(rawget(t, "x") == 1)
+t.x = nil
+assert(rawget(t, "x") == nil)
+
+a := {}
+b := {}
+assert(rawequal(a, a))
+assert(!rawequal(a, b))
+```
 
 ```leia
 log := {}
@@ -178,3 +217,26 @@ assert(rawlen(t) == 0)
 
 Sequence length on sparse tables follows Leia runtime behavior. Programs that
 depend on sparse length edge cases should pin that behavior with tests.
+
+Iteration order for hash-like table keys is not a v1.0 stable contract.
+Programs may depend on `pairs` visiting each key that remains present during an
+ordinary traversal, but not on the order of those visits. `ipairs` is the
+portable sequence traversal form for consecutive positive integer keys starting
+at `1`; it stops at the first missing or `nil` element.
+
+```leia run all
+t := {10, 20, [4]: 40, name: "Ada"}
+seen := {}
+for _, value := range ipairs(t) {
+    seen[#seen + 1] = value
+}
+assert(#seen == 2)
+assert(seen[1] == 10)
+assert(seen[2] == 20)
+
+count := 0
+for _ := range pairs(t) {
+    count = count + 1
+}
+assert(count == 4)
+```

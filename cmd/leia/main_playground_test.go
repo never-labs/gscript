@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -119,6 +120,7 @@ func TestPlaygroundTourAndAIAPI(t *testing.T) {
 }
 
 func TestPlaygroundExamplesExecute(t *testing.T) {
+	t.Setenv("LEIA_PLAYGROUND_MOCK_LLM", "1")
 	var examples []playgroundExample
 	examples = append(examples, playgroundTourLessons()...)
 	examples = append(examples, playgroundAIExamples()...)
@@ -126,8 +128,7 @@ func TestPlaygroundExamplesExecute(t *testing.T) {
 		if !example.Runnable {
 			continue
 		}
-		if strings.Contains(strings.ToLower(example.Requires), "llm") ||
-			strings.Contains(strings.ToLower(example.Requires), "credential") {
+		if strings.Contains(strings.ToLower(example.Requires), "credential") {
 			continue
 		}
 		t.Run(example.ID, func(t *testing.T) {
@@ -147,6 +148,84 @@ func TestPlaygroundExamplesExecute(t *testing.T) {
 			}
 			if strings.TrimSpace(stdout.String()) == "" {
 				t.Fatalf("example produced no stdout\nsource:\n%s", example.Source)
+			}
+		})
+	}
+}
+
+func TestPlaygroundRepositoryExamplesExecuteOrExplain(t *testing.T) {
+	examples, err := playgroundRepositoryExamples(playgroundExamplesRoot())
+	if err != nil {
+		t.Fatalf("load repository examples: %v", err)
+	}
+	if len(examples) == 0 {
+		t.Fatal("repository examples are empty")
+	}
+	for _, example := range examples {
+		t.Run(example.ID, func(t *testing.T) {
+			if strings.TrimSpace(example.Source) == "" {
+				t.Fatalf("source is empty")
+			}
+			if !example.Runnable {
+				if strings.TrimSpace(example.Requires) == "" {
+					t.Fatalf("non-runnable example must explain requires: %#v", example)
+				}
+				return
+			}
+			dir := t.TempDir()
+			path := filepath.Join(dir, "main.leia")
+			if err := os.WriteFile(path, []byte(example.Source), 0600); err != nil {
+				t.Fatal(err)
+			}
+			var stdout, stderr bytes.Buffer
+			code := runPlaygroundExecCommand([]string{"--max-steps=2000000", path}, &stdout, &stderr)
+			if code != 0 {
+				t.Fatalf("repository example failed with code %d\nstdout:\n%s\nstderr:\n%s\nsource:\n%s", code, stdout.String(), stderr.String(), example.Source)
+			}
+			if strings.TrimSpace(stdout.String()) == "" {
+				t.Fatalf("repository example produced no stdout\nsource:\n%s", example.Source)
+			}
+		})
+	}
+}
+
+func TestPlaygroundAIExamplesCoverRunnableWorkflowShapes(t *testing.T) {
+	t.Setenv("LEIA_PLAYGROUND_MOCK_LLM", "1")
+	want := map[string][]string{
+		"ai-one-line":          {"LEIA_GLM_OK"},
+		"ai-agent-shape":       {"MOCK_AI_OK"},
+		"ai-structured-output": {"\"product\":\"playground\""},
+		"ai-tool":              {"MOCK_TOOL_RESULT"},
+		"ai-memory":            {"project=ORCHID"},
+		"ai-agent-tool":        {"MOCK_TOOL_RESULT"},
+		"ai-support-triage":    {"MOCK_TOOL_RESULT"},
+		"ai-draft-review":      {"draft:", "review:", "PASS"},
+		"ai-coding-agent":      {"attempts", "2 slugify cases passed", "func slugify"},
+		"ai-evaluate-loop":     {"run leia evaluate"},
+	}
+	for _, example := range playgroundAIExamples() {
+		t.Run(example.ID, func(t *testing.T) {
+			if !example.Runnable {
+				t.Fatalf("%s should be runnable under the local mock AI profile", example.ID)
+			}
+			dir := t.TempDir()
+			path := dir + "/main.leia"
+			if err := os.WriteFile(path, []byte(example.Source), 0600); err != nil {
+				t.Fatal(err)
+			}
+			var stdout, stderr bytes.Buffer
+			code := runPlaygroundExecCommand([]string{"--profile=ai", "--max-steps=2000000", path}, &stdout, &stderr)
+			if code != 0 {
+				t.Fatalf("example failed with code %d\nstdout:\n%s\nstderr:\n%s\nsource:\n%s", code, stdout.String(), stderr.String(), example.Source)
+			}
+			checks, ok := want[example.ID]
+			if !ok {
+				t.Fatalf("missing workflow-shape assertion for %s", example.ID)
+			}
+			for _, needle := range checks {
+				if !strings.Contains(stdout.String(), needle) {
+					t.Fatalf("stdout for %s missing %q\nstdout:\n%s", example.ID, needle, stdout.String())
+				}
 			}
 		})
 	}

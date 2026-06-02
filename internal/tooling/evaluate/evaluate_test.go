@@ -1,10 +1,14 @@
 package evaluate
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/never-labs/leia/internal/runtime"
+	"github.com/never-labs/leia/llm"
 )
 
 func TestRunReportsSyntaxSkeletonAndTODOs(t *testing.T) {
@@ -138,4 +142,101 @@ func TestRunReportsAISyntaxValidation(t *testing.T) {
 	if len(report.Findings) != 1 || report.Findings[0].Kind != "ai_syntax_error" {
 		t.Fatalf("findings = %#v, want ai_syntax_error", report.Findings)
 	}
+}
+
+func TestRunRecordsLLMTurns(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "llm_eval.leia")
+	if err := os.WriteFile(path, []byte(`models {
+    default: {
+        protocol: "openai_compatible"
+        provider_model: "mock-fast"
+    }
+}
+
+evaluate "records llm turn" {
+    result, err := llm.turn({
+        messages: {llm.user("hello")},
+    })
+    assert(err == nil)
+    assert(result.text == "recorded")
+}
+`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	recordPath := filepath.Join(dir, "records.json")
+
+	report, err := Run(Options{
+		Paths:         []string{path},
+		LLMRecordPath: recordPath,
+		LLMProviderFactory: func(cfg runtime.LLMProviderConfig) (runtime.LLMProvider, error) {
+			if cfg.Protocol != "openai_compatible" || cfg.ProviderModel != "mock-fast" {
+				t.Fatalf("cfg = %#v, want mock provider config", cfg)
+			}
+			return testRuntimeLLMProvider{res: runtime.LLMTurnResult{Status: "final_answer", Text: "recorded"}}, nil
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Status != "ok" || len(report.Cases) != 1 || report.Cases[0].Status != "passed" {
+		t.Fatalf("report = %#v", report)
+	}
+	records, err := llm.LoadRecords(recordPath)
+	if err != nil {
+		t.Fatalf("load records: %v", err)
+	}
+	if len(records) != 1 || records[0].Request.Messages[0].Text != "hello" || records[0].Result.Text != "recorded" {
+		t.Fatalf("records = %#v", records)
+	}
+}
+
+func TestRunReplaysLLMTurns(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "llm_eval.leia")
+	if err := os.WriteFile(path, []byte(`evaluate "replays llm turn" {
+    result, err := llm.turn({
+        model: "mock-fast",
+        messages: {llm.user("hello")},
+    })
+    assert(err == nil)
+    assert(result.text == "from replay")
+}
+`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	recordPath := filepath.Join(dir, "records.json")
+	if err := llm.SaveRecords(recordPath, []llm.Record{{
+		Request: llm.TurnRequest{
+			Model:    "mock-fast",
+			Messages: []llm.Message{{Role: "user", Text: "hello"}},
+		},
+		Result: llm.TurnResult{Status: "final_answer", Text: "from replay"},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+
+	report, err := Run(Options{Paths: []string{path}, LLMReplayPath: recordPath})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Status != "ok" || len(report.Cases) != 1 || report.Cases[0].Status != "passed" {
+		t.Fatalf("report = %#v", report)
+	}
+}
+
+func TestRunRejectsRecordAndReplayTogether(t *testing.T) {
+	_, err := Run(Options{LLMRecordPath: "records.json", LLMReplayPath: "records.json"})
+	if err == nil || !strings.Contains(err.Error(), "mutually exclusive") {
+		t.Fatalf("err = %v, want mutually exclusive", err)
+	}
+}
+
+type testRuntimeLLMProvider struct {
+	res runtime.LLMTurnResult
+	err error
+}
+
+func (p testRuntimeLLMProvider) Turn(context.Context, runtime.LLMTurnRequest) (runtime.LLMTurnResult, error) {
+	return p.res, p.err
 }

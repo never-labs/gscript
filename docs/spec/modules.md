@@ -10,9 +10,26 @@ text := json.encode({ok: true})
 same := require("json")
 ```
 
-If a module returns a value, that value is the result of `require`. Requiring
-the same module path again returns the cached module value unless the host
-explicitly installs a different loader policy.
+The result of `require(name)` is a single value. If a filesystem-backed module
+returns at least one value, the first value is the module value; additional
+return values are discarded. If it returns no values, the module value is
+`true`. Standard-library and host modules define their own module value, usually
+a table or callable function. Requiring the same module name again returns the
+cached module value unless the host explicitly installs a different loader
+policy.
+
+Module loading is observable as:
+
+1. resolve `name` to one enabled loader;
+2. execute that loader at most once for a cache miss;
+3. normalize the loader result to one module value;
+4. store that value in the module cache and `package.loaded[name]`;
+5. return the module value.
+
+A failed load does not produce a stable cached module value. Implementations may
+keep internal negative-cache or in-progress state for diagnostics and cycle
+detection, but a later successful `require` must still return the successful
+module value.
 
 The v1.0 stable resolution order is:
 
@@ -31,6 +48,11 @@ The v1.0 stable resolution order is:
    below, then execute that file.
 7. If the file returns at least one value, cache and return the first value. If
    it returns no values, cache and return `true`.
+
+Resolution uses the original string `name` as the `package.loaded` key. Path
+normalization during filesystem resolution does not make different spelling
+forms interchangeable cache keys unless an embedding policy documents that
+aliasing explicitly.
 
 Filesystem-backed project module resolution is deterministic:
 
@@ -68,6 +90,19 @@ package.loaded["example.preloaded"] = {answer: 42}
 mod := require("example.preloaded")
 assert(mod.answer == 42)
 assert(require("example.preloaded") == mod)
+```
+
+Because `package.loaded` is an ordinary table, any non-`nil` Leia value can be
+used as a preloaded module value. A false module value is still loaded: only
+`nil` means absent.
+
+```leia run all
+package.loaded["example.false"] = false
+assert(require("example.false") == false)
+
+fn := func(x) { return x + 1 }
+package.loaded["example.callable"] = fn
+assert(require("example.callable")(4) == 5)
 ```
 
 If a `package.loaded[name]` entry is replaced with another non-`nil` value,
@@ -206,3 +241,10 @@ runtime helper rather than repaired. The CLI module commands are the mutating
 surface: `leia mod add`, `tidy`, `download`, `vendor`, and `lock` may update
 `leia.mod`, `vendor/`, the module cache, or `leia.sum`; ordinary script
 execution does not.
+
+Top-level module code executes in the same language as ordinary scripts.
+Lexical declarations inside the module are private to that module execution
+unless the module returns or stores a value that exposes them. Mutating globals
+or host resources during module loading is a side effect of `require`; portable
+modules should make those side effects explicit in their documented contract
+and keep the returned module value stable across repeated requires.

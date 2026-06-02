@@ -19,6 +19,61 @@ Use the simplest layer that fits the workflow:
 
 The stable contract is in the [AI-native reference](../reference/ai/index.md).
 
+## How The Pieces Fit
+
+`turn` is the primitive: it sends one request with one message history. `agent`
+is a reusable wrapper around turns. An agent can build history from `system` and
+`user`, inherit a default model and tools, and run the built-in tool loop. Add
+`flow` only when the script must own that loop.
+
+Smallest shape:
+
+```leia
+result, err := turn {
+    messages: messages {
+        user: "Return one sentence about Leia."
+    }
+}
+```
+
+Reusable shape with defaults, assuming `lookup_runbook` is a declared tool:
+
+```leia
+agent defaults {
+    model: "fast"
+    tools: [lookup_runbook]
+}
+
+agent answer(question) {
+    system: "Use tool evidence when it helps."
+    user: question
+}
+```
+
+Here `answer` inherits `model` and `tools`. The runtime creates history from the
+agent's `system` and `user`, calls a turn, dispatches requested tools, appends
+tool messages, and repeats until the model returns a final answer.
+
+Custom shape:
+
+```leia
+agent answer_with_review(question) {
+    system: "Use tool evidence and then write a final answer."
+    tools: [lookup_runbook]
+} flow {
+    h := messages {
+        system: system
+        user: question
+    }
+    first, err := turn { model: model, messages: h, tools: tools }
+    if err != nil { return nil, err }
+    return first, nil
+}
+```
+
+Inside `flow`, the script decides which history and tools each `turn` receives.
+No tool call is dispatched unless the flow calls `llm.dispatch`.
+
 ## Start Offline
 
 Most tests should use a mock or replay provider from Go. That keeps tests
@@ -81,7 +136,9 @@ print(result.text)
 ```
 
 Use `turn` when the script owns the message history and the provider should do
-exactly one request.
+exactly one request. If a `turn` is inside an agent, it can inherit ambient
+agent settings such as the default model; pass `messages` explicitly when the
+flow owns the history.
 
 ## Agent
 
@@ -97,7 +154,9 @@ result, err := summarize("Leia embeds into Go and supports hot reload.")
 ```
 
 Use `agent` when you want a function-shaped abstraction that carries model,
-system prompt, input, tools, output expectations, and budget defaults.
+system prompt, input, tools, output expectations, and budget defaults. Without a
+custom `flow`, the agent converts `system` and `user` into the first history and
+runs the built-in turn/tool loop.
 
 ## Tools
 
@@ -155,8 +214,10 @@ agent incident(service) {
 }
 ```
 
-Inside `flow`, agent config fields such as `model`, `system`, `user`, and
-`tools` are available as lexical bindings.
+Inside `flow`, merged agent config fields such as `model`, `system`, and
+`tools` are available as lexical bindings. Build the user message from function
+parameters or pass `user` through `turn {}` inheritance instead of relying on a
+`user` local.
 
 ## Agent As Tool
 

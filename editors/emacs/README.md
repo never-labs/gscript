@@ -43,3 +43,17 @@ Enable LSP support when Eglot is available:
 (leia-eglot-setup)
 (add-hook 'leia-mode-hook #'eglot-ensure)
 ```
+
+## Tree-sitter
+
+This package does not currently bundle an Emacs `treesit` major mode. Emacs 29+
+users who want to experiment with tree-sitter should install the local grammar
+from `tools/tree-sitter-leia` and define or consume a downstream `leia-ts-mode`.
+
+```elisp
+(add-to-list 'treesit-language-source-alist
+             '(leia "/path/to/leia/tools/tree-sitter-leia"))
+(treesit-install-language-grammar 'leia)
+```
+
+Use `leia` as the grammar symbol and `source.leia` as the language scope.

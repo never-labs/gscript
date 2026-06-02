@@ -140,8 +140,25 @@ def check_vscode() -> None:
 
 
 def check_tree_sitter_assets() -> None:
+    package = load_json(ROOT / "tools/tree-sitter-leia/package.json")
+    config = load_json(ROOT / "tools/tree-sitter-leia/tree-sitter.json")
     load_json(ROOT / "tools/tree-sitter-leia/src/grammar.json")
     node_types = load_json(ROOT / "tools/tree-sitter-leia/src/node-types.json")
+
+    package_entry = package.get("tree-sitter", [{}])[0]
+    if package_entry.get("scope") != "source.leia":
+        fail("tree-sitter package metadata has the wrong scope")
+    if package_entry.get("file-types") != ["leia"]:
+        fail("tree-sitter package metadata has the wrong file types")
+
+    grammar_entry = config.get("grammars", [{}])[0]
+    if grammar_entry.get("name") != "leia":
+        fail("tree-sitter.json has the wrong grammar name")
+    if grammar_entry.get("scope") != "source.leia":
+        fail("tree-sitter.json has the wrong scope")
+    if grammar_entry.get("file-types") != ["leia"]:
+        fail("tree-sitter.json has the wrong file types")
+
     named_types = {item["type"] for item in node_types if item.get("named")}
     for node_type in (
         "agent_declaration",
@@ -157,10 +174,41 @@ def check_tree_sitter_assets() -> None:
             fail(f"tree-sitter node-types missing {node_type}")
 
 
+def check_downstream_docs() -> None:
+    tree_sitter_readme = (ROOT / "tools/tree-sitter-leia/README.md").read_text(encoding="utf-8")
+    emacs_readme = (ROOT / "editors/emacs/README.md").read_text(encoding="utf-8")
+
+    for marker in (
+        "## Downstream Editor Integration",
+        "grammar name: `leia`",
+        "scope: `source.leia`",
+        "### Neovim",
+        "parser_config.leia",
+        "### Helix",
+        "[[grammar]]",
+        "### Zed",
+        "[grammars.leia]",
+        "### Emacs `treesit`",
+        "treesit-language-source-alist",
+    ):
+        if marker not in tree_sitter_readme:
+            fail(f"tree-sitter README missing downstream marker {marker}")
+
+    for marker in (
+        "## Tree-sitter",
+        "tools/tree-sitter-leia",
+        "treesit-language-source-alist",
+        "source.leia",
+    ):
+        if marker not in emacs_readme:
+            fail(f"Emacs README missing tree-sitter marker {marker}")
+
+
 def main() -> int:
     check_textmate()
     check_vscode()
     check_tree_sitter_assets()
+    check_downstream_docs()
     print("editor_smoke.py: ok")
     return 0
 

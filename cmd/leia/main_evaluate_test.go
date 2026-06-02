@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/never-labs/leia/internal/tooling/evaluate"
+	"github.com/never-labs/leia/llm"
 )
 
 func TestEvaluateCommandWritesJSONSkeleton(t *testing.T) {
@@ -118,5 +119,44 @@ func TestEvaluateCommandTextFormatListsCases(t *testing.T) {
 		if !strings.Contains(stdout.String(), want) {
 			t.Fatalf("stdout = %q, want %q", stdout.String(), want)
 		}
+	}
+}
+
+func TestEvaluateCommandLLMReplay(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "llm_eval.leia")
+	src := `evaluate "cli replay" {
+    result, err := llm.turn({
+        model: "mock-fast",
+        messages: {llm.user("hello")},
+    })
+    assert(err == nil)
+    assert(result.text == "from cli replay")
+}
+`
+	if err := os.WriteFile(path, []byte(src), 0644); err != nil {
+		t.Fatal(err)
+	}
+	recordPath := filepath.Join(dir, "records.json")
+	if err := llm.SaveRecords(recordPath, []llm.Record{{
+		Request: llm.TurnRequest{
+			Model:    "mock-fast",
+			Messages: []llm.Message{{Role: "user", Text: "hello"}},
+		},
+		Result: llm.TurnResult{Status: "final_answer", Text: "from cli replay"},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	code := runEvaluateCommand([]string{"--format=json", "--llm-replay", recordPath, path}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runEvaluateCommand code = %d, stderr = %q", code, stderr.String())
+	}
+	var report evaluate.Report
+	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
+		t.Fatalf("decode report: %v\n%s", err, stdout.String())
+	}
+	if report.Status != "ok" || len(report.Cases) != 1 || report.Cases[0].Status != "passed" {
+		t.Fatalf("report = %#v", report)
 	}
 }

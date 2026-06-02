@@ -1,0 +1,17 @@
+[
+  {
+    "Request": {
+      "Model": "mock-fast",
+      "Messages": [
+        {
+          "Role": "user",
+          "Text": "Summarize Leia evaluate in five words."
+        }
+      ]
+    },
+    "Result": {
+      "Status": "final_answer",
+      "Text": "Deterministic evaluate blocks for agents."
+    }
+  }
+]
