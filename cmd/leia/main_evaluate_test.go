@@ -74,6 +74,7 @@ func TestEvaluateCommandHelpExplainsReplayModes(t *testing.T) {
 		"Examples:",
 		"--report eval-report.json",
 		"--format=html --report eval-report.html",
+		"--parallel",
 		"--replay examples/evaluate/agent_replay.records.json",
 		"LLM fixture modes are mutually exclusive:",
 		"--record",
@@ -84,6 +85,66 @@ func TestEvaluateCommandHelpExplainsReplayModes(t *testing.T) {
 			t.Fatalf("stderr = %q, want %q", stderr.String(), want)
 		}
 	}
+}
+
+func TestEvaluateCommandAcceptsParallelFlag(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "parallel.leia")
+	src := `evaluate "first" {
+    eval.metric("correct", true)
+    assert(true)
+}
+
+evaluate "second" {
+    eval.metric("correct", true)
+    assert(true)
+}
+`
+	if err := os.WriteFile(path, []byte(src), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runEvaluateCommand([]string{"--format=json", "--parallel=2", path}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runEvaluateCommand code = %d, stderr = %q", code, stderr.String())
+	}
+	var report evaluate.Report
+	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
+		t.Fatalf("decode report: %v\n%s", err, stdout.String())
+	}
+	if report.Status != "ok" || report.Summary.CasesSelected != 2 || report.Summary.CasesPassed != 2 {
+		t.Fatalf("report = %#v", report)
+	}
+	if len(report.Cases) != 2 || report.Cases[0].Name != "first" || report.Cases[1].Name != "second" {
+		t.Fatalf("cases = %#v", report.Cases)
+	}
+	if !hasEvaluateNote(report.Notes, "parallel evaluate execution: 2 workers") {
+		t.Fatalf("notes = %#v", report.Notes)
+	}
+}
+
+func TestEvaluateCommandRejectsInvalidParallel(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := runEvaluateCommand([]string{"--parallel=0"}, &stdout, &stderr)
+	if code != 2 {
+		t.Fatalf("runEvaluateCommand code = %d, stderr = %q", code, stderr.String())
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("stdout = %q, want empty", stdout.String())
+	}
+	if !strings.Contains(stderr.String(), "--parallel must be >= 1") {
+		t.Fatalf("stderr = %q", stderr.String())
+	}
+}
+
+func hasEvaluateNote(notes []string, want string) bool {
+	for _, note := range notes {
+		if strings.Contains(note, want) {
+			return true
+		}
+	}
+	return false
 }
 
 func TestEvaluateCommandWritesReportToOutputFile(t *testing.T) {

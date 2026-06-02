@@ -240,6 +240,134 @@ func TestRunEvalLoadJSONLAndSkipIf(t *testing.T) {
 	}
 }
 
+func TestRunParallelPreservesReportSemantics(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "parallel.leia")
+	if err := os.WriteFile(path, []byte(`evaluate "case one" {
+    eval.metric("correct", true)
+    assert(true)
+}
+
+evaluate "case two" {
+    eval.metric("correct", true)
+    assert(true)
+}
+
+evaluate "case three" {
+    eval.metric("label", "stable")
+    assert(true)
+}
+`), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	report, err := Run(Options{Paths: []string{path}, Parallel: 3})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Status != "ok" || report.Summary.EvaluateBlocks != 3 || report.Summary.CasesSelected != 3 || report.Summary.CasesPassed != 3 {
+		t.Fatalf("summary/report = status %q summary %#v", report.Status, report.Summary)
+	}
+	if len(report.Cases) != 3 {
+		t.Fatalf("cases = %#v", report.Cases)
+	}
+	for i, want := range []string{"case one", "case two", "case three"} {
+		if report.Cases[i].Name != want || report.Cases[i].Status != "passed" {
+			t.Fatalf("case %d = %#v, want %q passed", i, report.Cases[i], want)
+		}
+	}
+	summaries := metricSummariesByName(report.Metrics)
+	if summaries["correct"].Type != "bool" || summaries["correct"].Count != 2 || summaries["correct"].PassRate != 1 {
+		t.Fatalf("correct summary = %#v", summaries["correct"])
+	}
+	if summaries["label"].Type != "string" || summaries["label"].Values["stable"] != 1 {
+		t.Fatalf("label summary = %#v", summaries["label"])
+	}
+	if !hasNoteContaining(report.Notes, "parallel evaluate execution: 3 workers") {
+		t.Fatalf("notes = %#v", report.Notes)
+	}
+}
+
+func TestRunParallelPreservesFailureAccounting(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "parallel_fail.leia")
+	if err := os.WriteFile(path, []byte(`evaluate "passes" {
+    assert(true)
+}
+
+evaluate "assert fails" {
+    assert(false, "intentional")
+}
+
+evaluate "subcase fails" {
+    eval.case("row", func() {
+        assert(false, "row failed")
+    })
+}
+`), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	report, err := Run(Options{Paths: []string{path}, Parallel: 2})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Status != "failed" || report.Summary.CasesPassed != 1 || report.Summary.CasesFailed != 2 {
+		t.Fatalf("report = status %q summary %#v", report.Status, report.Summary)
+	}
+	if len(report.Cases) != 3 || report.Cases[0].Status != "passed" || report.Cases[1].Status != "failed" || report.Cases[2].Status != "failed" {
+		t.Fatalf("cases = %#v", report.Cases)
+	}
+	kinds := map[string]int{}
+	for _, finding := range report.Findings {
+		kinds[finding.Kind]++
+	}
+	if kinds["case_runtime_error"] != 1 || kinds["eval_subcase_failure"] != 1 {
+		t.Fatalf("findings = %#v", report.Findings)
+	}
+	if len(report.Inputs) != 1 || report.Inputs[0].Status != "error" {
+		t.Fatalf("inputs = %#v", report.Inputs)
+	}
+}
+
+func TestRunParallelListOnlyDoesNotExecute(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "parallel_list.leia")
+	if err := os.WriteFile(path, []byte(`evaluate "listed only" {
+    assert(false, "must not execute")
+}
+`), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	report, err := Run(Options{Paths: []string{path}, ListOnly: true, Parallel: 4})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Status != "ok" || len(report.Cases) != 1 || report.Cases[0].Status != "listed" {
+		t.Fatalf("report = %#v", report)
+	}
+	if report.Summary.CasesListed != 1 || report.Summary.CasesFailed != 0 {
+		t.Fatalf("summary = %#v", report.Summary)
+	}
+}
+
+func TestRunParallelRejectsNegativeWorkers(t *testing.T) {
+	_, err := Run(Options{Paths: []string{"."}, Parallel: -1})
+	if err == nil || !strings.Contains(err.Error(), "parallel must be non-negative") {
+		t.Fatalf("err = %v", err)
+	}
+}
+
+func hasNoteContaining(notes []string, want string) bool {
+	for _, note := range notes {
+		if strings.Contains(note, want) {
+			return true
+		}
+	}
+	return false
+}
+
 func metricSummariesByName(metrics []MetricSummary) map[string]MetricSummary {
 	out := map[string]MetricSummary{}
 	for _, metric := range metrics {

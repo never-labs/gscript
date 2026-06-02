@@ -27,6 +27,7 @@ func runEvaluateCommand(args []string, outw, errw io.Writer) int {
 	gate := fs.Bool("gate", false, "CI gate mode: exit non-zero when any selected case, replay check, or report finding fails")
 	baselinePath := fs.String("baseline", "", "compare this run against a previous JSON evaluate report")
 	compareMode := fs.Bool("compare", false, "compare two existing JSON evaluate reports: leia evaluate --compare BASELINE CURRENT")
+	parallel := fs.Int("parallel", 1, "execute selected evaluate blocks with this many workers; deterministic LLM fixture modes remain serial")
 	regressionThreshold := fs.Float64("regression-threshold", 0, "allowed pass-rate regression when --baseline is set")
 	record := fs.String("record", "", "alias for --llm-record")
 	replay := fs.String("replay", "", "alias for --llm-replay")
@@ -43,6 +44,10 @@ func runEvaluateCommand(args []string, outw, errw io.Writer) int {
 	}
 	if *format != "json" && *format != "text" && *format != "html" {
 		fmt.Fprintf(errw, "leia evaluate: unknown format %q (want json, text, or html)\n", *format)
+		return 2
+	}
+	if *parallel < 1 {
+		fmt.Fprintln(errw, "leia evaluate: --parallel must be >= 1")
 		return 2
 	}
 	reportPath, err := coalesceEvaluatePathFlag("output", *output, "report", *reportPathFlag)
@@ -87,6 +92,7 @@ func runEvaluateCommand(args []string, outw, errw io.Writer) int {
 		Paths:               fs.Args(),
 		Filter:              *filter,
 		ListOnly:            *listOnly,
+		Parallel:            *parallel,
 		LLMRecordPath:       recordPath,
 		LLMReplayPath:       replayPath,
 		LLMUpdateGoldenPath: *updateGolden,
@@ -317,6 +323,7 @@ func evaluateUsage(fs *flag.FlagSet) string {
 	b.WriteString("  leia evaluate --format=text examples/evaluate/basic_assert.leia\n")
 	b.WriteString("  leia evaluate --json --report eval-report.json tests/agents\n")
 	b.WriteString("  leia evaluate --format=html --report eval-report.html tests/agents\n")
+	b.WriteString("  leia evaluate --parallel=8 tests/agents\n")
 	b.WriteString("  leia evaluate --baseline baseline.json --regression-threshold 0.05 tests/agents\n")
 	b.WriteString("  leia evaluate --replay examples/evaluate/agent_replay.records.json examples/evaluate/agent_replay.leia\n")
 	b.WriteString("  leia evaluate --list --filter refund tests/agents\n\n")

@@ -31,6 +31,7 @@ type Options struct {
 	Paths               []string
 	Filter              string
 	ListOnly            bool
+	Parallel            int
 	LLMRecordPath       string
 	LLMReplayPath       string
 	LLMUpdateGoldenPath string
@@ -199,6 +200,21 @@ type parsedCase struct {
 	Body *ast.BlockStmt
 }
 
+type pendingCase struct {
+	Path  string
+	Prog  *ast.Program
+	Case  Case
+	Body  *ast.BlockStmt
+	Index int
+}
+
+type executedCase struct {
+	Index      int
+	Case       Case
+	Finding    *Finding
+	InputError bool
+}
+
 type caseEvalData struct {
 	Metrics  []Metric
 	Subcases []Subcase
@@ -215,6 +231,10 @@ func (d caseEvalData) Failed() bool {
 
 func Run(opts Options) (Report, error) {
 	run, err := newRunContext(opts)
+	if err != nil {
+		return Report{}, err
+	}
+	parallel, parallelRequested, err := effectiveParallel(opts, run)
 	if err != nil {
 		return Report{}, err
 	}
@@ -253,8 +273,18 @@ func Run(opts Options) (Report, error) {
 	if opts.ListOnly {
 		report.Notes = append(report.Notes, "list mode: evaluate cases are discovered but not executed")
 	}
+	if parallelRequested {
+		if parallel > 1 {
+			report.Notes = append(report.Notes, fmt.Sprintf("parallel evaluate execution: %d workers", parallel))
+		} else if run != nil && run.report != nil {
+			report.Notes = append(report.Notes, "parallel evaluate execution disabled for deterministic LLM fixture mode")
+		}
+	}
+	var pending []pendingCase
+	inputIndexByPath := map[string]int{}
 	for _, file := range files {
 		input := Input{Path: file, Status: "ok"}
+		inputIndexByPath[file] = len(report.Inputs)
 		report.Summary.Files++
 		src, err := os.ReadFile(file)
 		if err != nil {
@@ -291,56 +321,29 @@ func Run(opts Options) (Report, error) {
 						report.Cases = append(report.Cases, c)
 						continue
 					}
-					start := time.Now()
-					c.StartedAt = start.UTC().Format(time.RFC3339)
-					caseData, err := executeCase(file, prog, parsed, run)
-					c.Metrics = caseData.Metrics
-					c.Subcases = caseData.Subcases
-					if err != nil {
-						c.Status = "failed"
-						c.DurationMS = elapsedMillis(start)
-						markAssertions(c.Assertions, "unknown")
-						markFailedAssertion(c.Assertions, err.Error())
-						c.Diagnostics = append(c.Diagnostics, Diagnostic{
-							Kind:     "runtime_error",
-							Severity: "error",
-							Message:  err.Error(),
-							Range:    c.Range,
-						})
-						input.Status = "error"
-						report.Status = "failed"
-						report.Findings = append(report.Findings, Finding{
-							Kind:     "case_runtime_error",
-							Severity: "error",
-							Message:  err.Error(),
-							Path:     file,
-							Line:     c.Range.StartLine,
-							Column:   c.Range.StartColumn,
-						})
-					} else if caseData.Failed() {
-						c.Status = "failed"
-						c.DurationMS = elapsedMillis(start)
-						markAssertions(c.Assertions, "passed")
-						input.Status = "error"
-						report.Status = "failed"
-						report.Findings = append(report.Findings, Finding{
-							Kind:     "eval_subcase_failure",
-							Severity: "error",
-							Message:  "one or more eval.case subcases failed",
-							Path:     file,
-							Line:     c.Range.StartLine,
-							Column:   c.Range.StartColumn,
-						})
-					} else {
-						c.Status = "passed"
-						c.DurationMS = elapsedMillis(start)
-						markAssertions(c.Assertions, "passed")
-					}
-					report.Cases = append(report.Cases, c)
+					pending = append(pending, pendingCase{
+						Path:  file,
+						Prog:  prog,
+						Case:  c,
+						Body:  parsed.Body,
+						Index: len(pending),
+					})
 				}
 			}
 		}
 		report.Inputs = append(report.Inputs, input)
+	}
+	for _, result := range executePendingCases(pending, run, parallel) {
+		report.Cases = append(report.Cases, result.Case)
+		if result.InputError {
+			if inputIdx, ok := inputIndexByPath[result.Case.SourcePath]; ok && inputIdx >= 0 && inputIdx < len(report.Inputs) {
+				report.Inputs[inputIdx].Status = "error"
+			}
+			report.Status = "failed"
+		}
+		if result.Finding != nil {
+			report.Findings = append(report.Findings, *result.Finding)
+		}
 	}
 	for _, finding := range report.Findings {
 		if finding.Kind == "todo" {
@@ -378,6 +381,115 @@ func Run(opts Options) (Report, error) {
 	}
 	finalizeSummary(&report)
 	return report, nil
+}
+
+func effectiveParallel(opts Options, run *runContext) (int, bool, error) {
+	if opts.Parallel < 0 {
+		return 0, false, fmt.Errorf("parallel must be non-negative")
+	}
+	requested := opts.Parallel > 1
+	if !requested {
+		return 1, false, nil
+	}
+	if run != nil && run.report != nil {
+		return 1, true, nil
+	}
+	return opts.Parallel, true, nil
+}
+
+func executePendingCases(pending []pendingCase, run *runContext, parallel int) []executedCase {
+	if len(pending) == 0 {
+		return nil
+	}
+	if parallel <= 1 || len(pending) == 1 {
+		out := make([]executedCase, len(pending))
+		for i, item := range pending {
+			out[i] = executePendingCase(item, run)
+		}
+		return out
+	}
+	if parallel > len(pending) {
+		parallel = len(pending)
+	}
+	jobs := make(chan pendingCase)
+	results := make(chan executedCase, len(pending))
+	var wg sync.WaitGroup
+	for i := 0; i < parallel; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for item := range jobs {
+				results <- executePendingCase(item, run)
+			}
+		}()
+	}
+	for _, item := range pending {
+		jobs <- item
+	}
+	close(jobs)
+	wg.Wait()
+	close(results)
+	out := make([]executedCase, len(pending))
+	for result := range results {
+		if result.Index >= 0 && result.Index < len(out) {
+			out[result.Index] = result
+		}
+	}
+	return out
+}
+
+func executePendingCase(item pendingCase, run *runContext) executedCase {
+	c := item.Case
+	start := time.Now()
+	c.StartedAt = start.UTC().Format(time.RFC3339)
+	caseData, err := executeCase(item.Path, item.Prog, parsedCase{Case: item.Case, Body: item.Body}, run)
+	c.Metrics = caseData.Metrics
+	c.Subcases = caseData.Subcases
+	result := executedCase{Index: item.Index, Case: c}
+	if err != nil {
+		c.Status = "failed"
+		c.DurationMS = elapsedMillis(start)
+		markAssertions(c.Assertions, "unknown")
+		markFailedAssertion(c.Assertions, err.Error())
+		c.Diagnostics = append(c.Diagnostics, Diagnostic{
+			Kind:     "runtime_error",
+			Severity: "error",
+			Message:  err.Error(),
+			Range:    c.Range,
+		})
+		result.Case = c
+		result.InputError = true
+		result.Finding = &Finding{
+			Kind:     "case_runtime_error",
+			Severity: "error",
+			Message:  err.Error(),
+			Path:     item.Path,
+			Line:     c.Range.StartLine,
+			Column:   c.Range.StartColumn,
+		}
+		return result
+	}
+	if caseData.Failed() {
+		c.Status = "failed"
+		c.DurationMS = elapsedMillis(start)
+		markAssertions(c.Assertions, "passed")
+		result.Case = c
+		result.InputError = true
+		result.Finding = &Finding{
+			Kind:     "eval_subcase_failure",
+			Severity: "error",
+			Message:  "one or more eval.case subcases failed",
+			Path:     item.Path,
+			Line:     c.Range.StartLine,
+			Column:   c.Range.StartColumn,
+		}
+		return result
+	}
+	c.Status = "passed"
+	c.DurationMS = elapsedMillis(start)
+	markAssertions(c.Assertions, "passed")
+	result.Case = c
+	return result
 }
 
 func finalizeSummary(report *Report) {
@@ -674,6 +786,7 @@ type runContext struct {
 	recordPath      string
 	replayProvider  *llm.ReplayProvider
 	replayMonitor   *replayMonitor
+	factoryMu       sync.Mutex
 	providerFactory runtime.LLMProviderFactory
 	report          *LLMRun
 }
@@ -935,9 +1048,9 @@ func executeCase(path string, prog *ast.Program, c parsedCase, run *runContext) 
 			interp.SetLLMProvider(llmbridge.ProviderAdapter(run.replayMonitor))
 		}
 		if run.recorder != nil {
-			interp.SetLLMProviderFactory(recordingProviderFactory(run.providerFactory, run.recorder.Record))
+			interp.SetLLMProviderFactory(recordingProviderFactory(run.guardedProviderFactory(), run.recorder.Record))
 		} else if run.providerFactory != nil {
-			interp.SetLLMProviderFactory(run.providerFactory)
+			interp.SetLLMProviderFactory(run.guardedProviderFactory())
 		}
 	}
 	if baseDir != "" {
@@ -949,6 +1062,17 @@ func executeCase(path string, prog *ast.Program, c parsedCase, run *runContext) 
 		FileDirectives: append([]ast.FileDirective(nil), prog.FileDirectives...),
 	})
 	return evalState.Data(), err
+}
+
+func (run *runContext) guardedProviderFactory() runtime.LLMProviderFactory {
+	if run == nil || run.providerFactory == nil {
+		return nil
+	}
+	return func(cfg runtime.LLMProviderConfig) (runtime.LLMProvider, error) {
+		run.factoryMu.Lock()
+		defer run.factoryMu.Unlock()
+		return run.providerFactory(cfg)
+	}
 }
 
 type replayMonitor struct {
