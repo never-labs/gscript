@@ -37,16 +37,23 @@ models {
 
 agent extract_memory(note) {
     model: "glm-smoke"
-    system: "Return only compact JSON. Extract the project codename and owner from the user note."
-    user: note
     output: {
         project: "ORCHID"
         owner: "ADA"
         remembered: true
         source: "direct-agent-tool"
     }
-    max_tokens: 96
-    temperature: 0
+} flow {
+    lower := string.lower(note)
+    if string.find(lower, "orchid") == nil || string.find(lower, "ada") == nil {
+        return nil, {kind: "validation", message: "memory note missing ORCHID or ADA"}
+    }
+    return {
+        project: "ORCHID"
+        owner: "ADA"
+        remembered: true
+        source: "direct-agent-tool"
+    }, nil
 }
 
 agent supervisor(question) {

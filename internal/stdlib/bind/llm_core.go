@@ -238,8 +238,8 @@ func BuildLLMLib(call ScriptFunctionCaller, provider func() LLMProvider, provide
 			if !tt.RawGetString("params").IsTable() && len(meta.Params) > 0 {
 				tt.RawSetString("params", llmStringArrayValue(meta.Params))
 			}
-			if tt.RawGetString("schema").IsNil() && !meta.Output.IsNil() {
-				tt.RawSetString("schema", meta.Output)
+			if tt.RawGetString("output").IsNil() && !meta.Output.IsNil() {
+				tt.RawSetString("output", meta.Output)
 			}
 		}
 		return []Value{tool}, nil

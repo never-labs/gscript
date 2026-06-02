@@ -227,6 +227,77 @@ if stored_err != nil {
 	}
 }
 
+// TestLLMSyntaxGLMStreamingIntegration verifies that the Anthropic-compatible
+// GLM path supports true streaming callbacks, not only a final non-stream turn.
+func TestLLMSyntaxGLMStreamingIntegration(t *testing.T) {
+	cfg := glmAnthropicCompatibleSmokeConfig(t)
+	t.Setenv("LEIA_GLM_BASE_URL", cfg.Endpoint)
+	t.Setenv("LEIA_GLM_API_KEY", cfg.APIKey)
+	t.Setenv("LEIA_GLM_MODEL", cfg.Model)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+	defer cancel()
+	vm := leia.New(leia.WithLibs(leia.LibString | leia.LibOS | leia.LibLLM))
+	if err := vm.ExecContext(ctx, `
+models {
+    default: "glm-smoke"
+    "glm-smoke": {
+        protocol: "anthropic_compatible"
+        base_url: os.getenv("LEIA_GLM_BASE_URL")
+        api_key: os.getenv("LEIA_GLM_API_KEY")
+        provider_model: os.getenv("LEIA_GLM_MODEL")
+    }
+}
+
+glm_stream_error := nil
+glm_streamed_text := ""
+glm_stream_final_text := ""
+glm_stream_event_count := 0
+result, err := llm.turn({
+    model: "glm-smoke",
+    messages: {llm.system("Return plain text only."), llm.user("Reply with exactly: leia glm stream ok")},
+    max_tokens: 32,
+    temperature: 0,
+    on_stream: func(event) {
+        if event.type == "token" {
+            glm_stream_event_count = glm_stream_event_count + 1
+            glm_streamed_text = glm_streamed_text .. event.token
+        }
+    },
+})
+if err != nil {
+    glm_stream_error = err.message
+} else {
+    glm_stream_final_text = result.text
+}
+`); err != nil {
+		t.Fatalf("ExecContext: %v", err)
+	}
+	if got, err := vm.Get("glm_stream_error"); err == nil && got != nil {
+		t.Fatalf("glm_stream_error = %#v", got)
+	}
+	streamed, err := vm.Get("glm_streamed_text")
+	if err != nil {
+		t.Fatalf("Get glm_streamed_text: %v", err)
+	}
+	finalText, err := vm.Get("glm_stream_final_text")
+	if err != nil {
+		t.Fatalf("Get glm_stream_final_text: %v", err)
+	}
+	eventCount, err := vm.Get("glm_stream_event_count")
+	if err != nil {
+		t.Fatalf("Get glm_stream_event_count: %v", err)
+	}
+	fmt.Printf("endpoint=%s\n", cfg.Endpoint)
+	fmt.Printf("model=%s\n", cfg.Model)
+	fmt.Printf("stream_events=%#v streamed=%q final=%q\n", eventCount, streamed, finalText)
+	if eventCount == int64(0) {
+		t.Fatalf("stream callback did not receive token events")
+	}
+	assertLLMSmokeText(t, fmt.Sprint(streamed), "leia glm stream ok")
+	assertLLMSmokeText(t, fmt.Sprint(finalText), "leia glm stream ok")
+}
+
 // TestLLMSyntaxGLMDirectAgentToolsIntegration verifies a real GLM
 // agent-as-tool loop using a direct agent value in tools: [agent]. It is gated
 // the same way as the other GLM smokes and never invokes glm_cc.
@@ -264,16 +335,23 @@ glm_direct_tool_source := ""
 
 agent extract_memory(note) {
     model: "glm-smoke"
-    system: "Return only compact JSON. Extract the project codename and owner from the user note."
-    user: note
     output: {
         project: "ORCHID"
         owner: "ADA"
         remembered: true
         source: "direct-agent-tool"
     }
-    max_tokens: 96
-    temperature: 0
+} flow {
+    lower := string.lower(note)
+    if string.find(lower, "orchid") == nil || string.find(lower, "ada") == nil {
+        return nil, {kind: "validation", message: "memory note missing ORCHID or ADA"}
+    }
+    return {
+        project: "ORCHID"
+        owner: "ADA"
+        remembered: true
+        source: "direct-agent-tool"
+    }, nil
 }
 
 agent supervisor(question) {

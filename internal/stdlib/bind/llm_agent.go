@@ -138,7 +138,7 @@ func llmAgentFunctionToToolTable(call ScriptFunctionCaller, agent Value) *Table 
 		tool.RawSetString("params", llmStringArrayValue(meta.Params))
 	}
 	if !meta.Output.IsNil() {
-		tool.RawSetString("schema", meta.Output)
+		tool.RawSetString("output", meta.Output)
 	}
 	return tool
 }

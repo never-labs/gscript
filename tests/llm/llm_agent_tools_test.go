@@ -198,8 +198,8 @@ final_text := result.text
 tool_summary := result.history[4].value.summary
 tool_confidence := result.history[4].value.confidence
 delegate_param := delegate_research.params[1]
-delegate_schema_summary := delegate_research.schema.summary
-delegate_schema_confidence := delegate_research.schema.confidence
+delegate_output_summary := delegate_research.output.summary
+delegate_output_confidence := delegate_research.output.confidence
 top_level_name := top_level_delegate.name
 alias_name := alias_delegate.name
 `); err != nil {
@@ -220,9 +220,8 @@ alias_name := alias_delegate.name
 				len(tool.Requires) != 1 || tool.Requires[0] != "none" {
 				t.Fatalf("tool metadata = %#v", tool)
 			}
-			schema, ok := tool.Schema.(map[string]any)
-			if !ok || schema["summary"] != "short finding" || schema["confidence"] != int64(1) {
-				t.Fatalf("tool schema = %#v", tool.Schema)
+			if tool.Schema != nil {
+				t.Fatalf("agent output shape must not be sent as provider tool input schema: %#v", tool.Schema)
 			}
 			nested := provider.requests[1]
 			if nested.Model != "mock-extractor" || len(nested.Messages) != 2 || nested.Messages[1].Text != "Research toolof" {
@@ -241,8 +240,8 @@ alias_name := alias_delegate.name
 				"tool_summary":               "toolof invokes the original agent",
 				"tool_confidence":            0.82,
 				"delegate_param":             "topic",
-				"delegate_schema_summary":    "short finding",
-				"delegate_schema_confidence": int64(1),
+				"delegate_output_summary":    "short finding",
+				"delegate_output_confidence": int64(1),
 				"top_level_name":             "top_level_delegate",
 				"alias_name":                 "alias_delegate",
 			} {
@@ -321,9 +320,8 @@ tool_confidence := result.history[4].value.confidence
 			if tool.Name != "extract_research" || len(tool.Params) != 1 || tool.Params[0] != "topic" {
 				t.Fatalf("direct agent tool metadata = %#v", tool)
 			}
-			schema, ok := tool.Schema.(map[string]any)
-			if !ok || schema["summary"] != "short finding" || schema["confidence"] != int64(1) {
-				t.Fatalf("direct agent tool schema = %#v", tool.Schema)
+			if tool.Schema != nil {
+				t.Fatalf("direct agent output shape must not be sent as provider tool input schema: %#v", tool.Schema)
 			}
 			nested := provider.requests[1]
 			if nested.Model != "mock-extractor" || len(nested.Messages) != 2 || nested.Messages[1].Text != "Research direct tools" {
