@@ -65,14 +65,20 @@ type RuntimeInfo struct {
 }
 
 type LLMRun struct {
-	Mode           string `json:"mode"`
-	RecordPath     string `json:"record_path,omitempty"`
-	ReplayPath     string `json:"replay_path,omitempty"`
-	GoldenUpdated  bool   `json:"golden_updated,omitempty"`
-	LoadedTurns    int    `json:"loaded_turns,omitempty"`
-	RecordedTurns  int    `json:"recorded_turns,omitempty"`
-	ReplayedTurns  int    `json:"replayed_turns,omitempty"`
-	RemainingTurns int    `json:"remaining_turns,omitempty"`
+	Mode           string  `json:"mode"`
+	RecordPath     string  `json:"record_path,omitempty"`
+	ReplayPath     string  `json:"replay_path,omitempty"`
+	GoldenUpdated  bool    `json:"golden_updated,omitempty"`
+	LoadedTurns    int     `json:"loaded_turns,omitempty"`
+	RecordedTurns  int     `json:"recorded_turns,omitempty"`
+	ReplayedTurns  int     `json:"replayed_turns,omitempty"`
+	RemainingTurns int     `json:"remaining_turns,omitempty"`
+	Turns          int     `json:"turns,omitempty"`
+	Errors         int     `json:"errors,omitempty"`
+	InputTokens    int64   `json:"input_tokens,omitempty"`
+	OutputTokens   int64   `json:"output_tokens,omitempty"`
+	LatencyMS      int64   `json:"latency_ms,omitempty"`
+	Cost           float64 `json:"cost,omitempty"`
 }
 
 type Summary struct {
@@ -107,10 +113,23 @@ type Case struct {
 	Status      string       `json:"status"`
 	StartedAt   string       `json:"started_at,omitempty"`
 	DurationMS  int64        `json:"duration_ms,omitempty"`
+	LLM         *LLMCaseRun  `json:"llm,omitempty"`
 	Metrics     []Metric     `json:"metrics,omitempty"`
 	Subcases    []Subcase    `json:"subcases,omitempty"`
 	Assertions  []Assertion  `json:"assertions,omitempty"`
 	Diagnostics []Diagnostic `json:"diagnostics,omitempty"`
+}
+
+type LLMCaseRun struct {
+	TraceRef     string  `json:"trace_ref,omitempty"`
+	Turns        int     `json:"turns,omitempty"`
+	StreamEvents int     `json:"stream_events,omitempty"`
+	ToolCalls    int     `json:"tool_calls,omitempty"`
+	Errors       int     `json:"errors,omitempty"`
+	InputTokens  int64   `json:"input_tokens,omitempty"`
+	OutputTokens int64   `json:"output_tokens,omitempty"`
+	LatencyMS    int64   `json:"latency_ms,omitempty"`
+	Cost         float64 `json:"cost,omitempty"`
 }
 
 type SourceRange struct {
@@ -218,6 +237,7 @@ type executedCase struct {
 type caseEvalData struct {
 	Metrics  []Metric
 	Subcases []Subcase
+	LLM      *LLMCaseRun
 }
 
 func (d caseEvalData) Failed() bool {
@@ -380,6 +400,7 @@ func Run(opts Options) (Report, error) {
 		}
 	}
 	finalizeSummary(&report)
+	finalizeLLMSummary(&report)
 	return report, nil
 }
 
@@ -442,9 +463,14 @@ func executePendingCase(item pendingCase, run *runContext) executedCase {
 	c := item.Case
 	start := time.Now()
 	c.StartedAt = start.UTC().Format(time.RFC3339)
+	if run != nil {
+		run.setActiveCase(c)
+		defer run.clearActiveCase()
+	}
 	caseData, err := executeCase(item.Path, item.Prog, parsedCase{Case: item.Case, Body: item.Body}, run)
 	c.Metrics = caseData.Metrics
 	c.Subcases = caseData.Subcases
+	c.LLM = caseData.LLM
 	result := executedCase{Index: item.Index, Case: c}
 	if err != nil {
 		c.Status = "failed"
@@ -512,6 +538,33 @@ func finalizeSummary(report *Report) {
 		report.Summary.PassRate = float64(report.Summary.CasesPassed) / float64(executable)
 	}
 	report.Metrics = aggregateMetricSummaries(report.Cases)
+}
+
+func finalizeLLMSummary(report *Report) {
+	var summary LLMRun
+	for _, c := range report.Cases {
+		if c.LLM == nil {
+			continue
+		}
+		summary.Turns += c.LLM.Turns
+		summary.Errors += c.LLM.Errors
+		summary.InputTokens += c.LLM.InputTokens
+		summary.OutputTokens += c.LLM.OutputTokens
+		summary.LatencyMS += c.LLM.LatencyMS
+		summary.Cost += c.LLM.Cost
+	}
+	if report.LLM == nil {
+		if summary.Turns == 0 && summary.Errors == 0 {
+			return
+		}
+		report.LLM = &LLMRun{Mode: "live"}
+	}
+	report.LLM.Turns = summary.Turns
+	report.LLM.Errors = summary.Errors
+	report.LLM.InputTokens = summary.InputTokens
+	report.LLM.OutputTokens = summary.OutputTokens
+	report.LLM.LatencyMS = summary.LatencyMS
+	report.LLM.Cost = summary.Cost
 }
 
 func AttachBaselineComparison(current *Report, baseline Report, baselinePath string, threshold float64) {
@@ -791,6 +844,14 @@ type runContext struct {
 	report          *LLMRun
 }
 
+type replayCaseRef struct {
+	CaseID string
+	Name   string
+	Path   string
+	Line   int
+	Column int
+}
+
 func newRunContext(opts Options) (*runContext, error) {
 	modes := 0
 	if opts.LLMRecordPath != "" {
@@ -826,6 +887,26 @@ func newRunContext(opts Options) (*runContext, error) {
 		run.report = &LLMRun{Mode: "update_golden", RecordPath: opts.LLMUpdateGoldenPath, GoldenUpdated: true}
 	}
 	return run, nil
+}
+
+func (run *runContext) setActiveCase(c Case) {
+	if run == nil || run.replayMonitor == nil {
+		return
+	}
+	run.replayMonitor.SetActiveCase(replayCaseRef{
+		CaseID: c.CaseID,
+		Name:   c.Name,
+		Path:   c.SourcePath,
+		Line:   c.Range.StartLine,
+		Column: c.Range.StartColumn,
+	})
+}
+
+func (run *runContext) clearActiveCase() {
+	if run == nil || run.replayMonitor == nil {
+		return
+	}
+	run.replayMonitor.ClearActiveCase()
 }
 
 func collectFiles(paths []string) ([]string, error) {
@@ -1034,6 +1115,8 @@ func executeCase(path string, prog *ast.Program, c parsedCase, run *runContext) 
 		return caseEvalData{}, nil
 	}
 	interp := runtime.NewCore()
+	trace := newLLMCaseTrace(c.CaseID)
+	interp.SetLLMTraceSink(trace.Record)
 	stdlibinstall.Install(interp)
 	baseDir := ""
 	if abs, err := filepath.Abs(path); err == nil {
@@ -1061,7 +1144,9 @@ func executeCase(path string, prog *ast.Program, c parsedCase, run *runContext) 
 		Stmts:          caseProgramStmts(prog.Stmts, c.Body.Stmts),
 		FileDirectives: append([]ast.FileDirective(nil), prog.FileDirectives...),
 	})
-	return evalState.Data(), err
+	data := evalState.Data()
+	data.LLM = trace.Snapshot()
+	return data, err
 }
 
 func (run *runContext) guardedProviderFactory() runtime.LLMProviderFactory {
@@ -1075,10 +1160,64 @@ func (run *runContext) guardedProviderFactory() runtime.LLMProviderFactory {
 	}
 }
 
+type llmCaseTrace struct {
+	caseID string
+	mu     sync.Mutex
+	stats  LLMCaseRun
+}
+
+func newLLMCaseTrace(caseID string) *llmCaseTrace {
+	return &llmCaseTrace{caseID: caseID}
+}
+
+func (t *llmCaseTrace) Record(event runtime.LLMTraceEvent) {
+	if t == nil {
+		return
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.stats.TraceRef == "" {
+		t.stats.TraceRef = "case:" + t.caseID
+	}
+	switch event.Type {
+	case "turn_end":
+		t.stats.Turns++
+		t.stats.InputTokens += event.Usage.InputTokens
+		t.stats.OutputTokens += event.Usage.OutputTokens
+		t.stats.LatencyMS += event.Usage.LatencyMS
+		t.stats.Cost += event.Usage.Cost
+	case "turn_error", "react_error", "tool_error", "tool_fatal":
+		t.stats.Errors++
+	case "turn_stream":
+		t.stats.StreamEvents++
+	case "tool_call":
+		t.stats.ToolCalls++
+	}
+}
+
+func (t *llmCaseTrace) Snapshot() *LLMCaseRun {
+	if t == nil {
+		return nil
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.stats.TraceRef == "" {
+		return nil
+	}
+	out := t.stats
+	return &out
+}
+
 type replayMonitor struct {
 	provider *llm.ReplayProvider
 	mu       sync.Mutex
-	errors   []error
+	active   replayCaseRef
+	errors   []replayError
+}
+
+type replayError struct {
+	err  error
+	item replayCaseRef
 }
 
 func (m *replayMonitor) Turn(ctx context.Context, req llm.TurnRequest) (llm.TurnResult, error) {
@@ -1088,11 +1227,29 @@ func (m *replayMonitor) Turn(ctx context.Context, req llm.TurnRequest) (llm.Turn
 		var exhausted *llm.ReplayExhaustedError
 		if errors.As(err, &mismatch) || errors.As(err, &exhausted) {
 			m.mu.Lock()
-			m.errors = append(m.errors, err)
+			m.errors = append(m.errors, replayError{err: err, item: m.active})
 			m.mu.Unlock()
 		}
 	}
 	return res, err
+}
+
+func (m *replayMonitor) SetActiveCase(item replayCaseRef) {
+	if m == nil {
+		return
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.active = item
+}
+
+func (m *replayMonitor) ClearActiveCase() {
+	if m == nil {
+		return
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.active = replayCaseRef{}
 }
 
 func (m *replayMonitor) Findings() []Finding {
@@ -1102,7 +1259,8 @@ func (m *replayMonitor) Findings() []Finding {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	var out []Finding
-	for _, err := range m.errors {
+	for _, replayErr := range m.errors {
+		err := replayErr.err
 		kind := "llm_replay_error"
 		details := map[string]any{}
 		var mismatch *llm.ReplayMismatchError
@@ -1116,10 +1274,17 @@ func (m *replayMonitor) Findings() []Finding {
 			kind = "llm_replay_exhausted"
 			details["turn"] = exhausted.Turn
 		}
+		if replayErr.item.CaseID != "" {
+			details["case_id"] = replayErr.item.CaseID
+			details["case_name"] = replayErr.item.Name
+		}
 		out = append(out, Finding{
 			Kind:     kind,
 			Severity: "error",
 			Message:  err.Error(),
+			Path:     replayErr.item.Path,
+			Line:     replayErr.item.Line,
+			Column:   replayErr.item.Column,
 			Details:  details,
 		})
 	}
@@ -1510,6 +1675,17 @@ func FormatText(report Report) string {
 			}
 		}
 	}
+	if report.LLM != nil && (report.LLM.Turns > 0 || report.LLM.Errors > 0) {
+		fmt.Fprintf(&b, "llm: mode=%s turns=%d errors=%d input_tokens=%d output_tokens=%d latency_ms=%d cost=%.4g\n",
+			report.LLM.Mode,
+			report.LLM.Turns,
+			report.LLM.Errors,
+			report.LLM.InputTokens,
+			report.LLM.OutputTokens,
+			report.LLM.LatencyMS,
+			report.LLM.Cost,
+		)
+	}
 	if report.Comparison != nil {
 		fmt.Fprintf(&b, "comparison: baseline=%s threshold=%.4g\n", report.Comparison.BaselinePath, report.Comparison.RegressionThreshold)
 		if report.Comparison.Summary != nil {
@@ -1556,6 +1732,17 @@ func FormatText(report Report) string {
 		)
 		for _, metric := range c.Metrics {
 			fmt.Fprintf(&b, "    metric %s=%v (%s)\n", metric.Name, metric.Value, metric.Type)
+		}
+		if c.LLM != nil {
+			fmt.Fprintf(&b, "    llm turns=%d errors=%d input_tokens=%d output_tokens=%d latency_ms=%d cost=%.4g trace=%s\n",
+				c.LLM.Turns,
+				c.LLM.Errors,
+				c.LLM.InputTokens,
+				c.LLM.OutputTokens,
+				c.LLM.LatencyMS,
+				c.LLM.Cost,
+				c.LLM.TraceRef,
+			)
 		}
 		for _, subcase := range c.Subcases {
 			fmt.Fprintf(&b, "    %s case %s (%dms, %d metrics)\n", caseStatusMark(subcase.Status), subcase.CaseID, subcase.DurationMS, len(subcase.Metrics))

@@ -65,12 +65,12 @@ The JSON report is versioned with `schema_version: 1` and includes:
 | `started_at` | UTC RFC3339 timestamp for the evaluation run. |
 | `runtime` | Leia and Go runtime metadata: version, OS/arch, and build VCS fields when available. |
 | `summary` | File, parse, AI declaration, TODO, selected/skipped case, pass/fail/list, assertion, duration, and pass-rate counts. |
-| `llm` | Optional LLM fixture metadata: mode, paths, loaded turns, replayed turns, remaining turns, and recorded turns. |
+| `llm` | Optional LLM metadata: mode, fixture paths, loaded/replayed/remaining/recorded turn counts, aggregate turn count, provider errors, input/output tokens, latency, and cost. |
 | `inputs` | Per-input file status. |
-| `cases` | Evaluate blocks with `case_id`, `name`, source path, range, status, per-case `started_at`, duration, raw metrics, subcases, assertions, and diagnostics. |
+| `cases` | Evaluate blocks with `case_id`, `name`, source path, range, status, per-case `started_at`, duration, optional per-case `llm` stats, raw metrics, subcases, assertions, and diagnostics. |
 | `metrics` | Top-level summaries aggregated from `eval.metric` values. Bool metrics report pass rate, true, and false counts. Number metrics report mean, min, and max. String metrics report category counts. |
 | `comparison` | Optional baseline comparison with summary pass-rate deltas and metric deltas. |
-| `findings` | TODO, IO, lex, parse, AI syntax, case runtime, and replay-drift findings. Replay mismatch findings include stable JSON `details.expected` and `details.actual` request summaries; exhausted and unconsumed replay findings include turn/count details. |
+| `findings` | TODO, IO, lex, parse, AI syntax, case runtime, and replay-drift findings. Replay mismatch findings include stable JSON `details.expected` and `details.actual` request summaries plus `case_id`/`case_name` attribution when the drift happened inside an evaluate case; exhausted and unconsumed replay findings include turn/count details. |
 | `notes` | Explicit scope notes so callers do not confuse this with full eval scoring. |
 
 Ordinary script execution still treats evaluate blocks as runtime no-ops. The

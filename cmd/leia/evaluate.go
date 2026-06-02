@@ -193,6 +193,11 @@ func renderEvaluateHTML(report evaluate.Report) string {
 	writeHTMLStat(&b, "Pass rate", fmt.Sprintf("%.2f", report.Summary.PassRate))
 	writeHTMLStat(&b, "Duration", fmt.Sprintf("%dms", report.Summary.DurationMS))
 	writeHTMLStat(&b, "Assertions", fmt.Sprintf("%d", report.Summary.Assertions))
+	if report.LLM != nil && (report.LLM.Turns > 0 || report.LLM.Errors > 0) {
+		writeHTMLStat(&b, "LLM turns", fmt.Sprintf("%d", report.LLM.Turns))
+		writeHTMLStat(&b, "LLM tokens", fmt.Sprintf("%d/%d", report.LLM.InputTokens, report.LLM.OutputTokens))
+		writeHTMLStat(&b, "LLM cost", fmt.Sprintf("%.4g", report.LLM.Cost))
+	}
 	b.WriteString("</section>")
 	if len(report.Metrics) > 0 {
 		b.WriteString("<h2>Metrics</h2><table><thead><tr><th>Name</th><th>Type</th><th>Summary</th><th>Count</th></tr></thead><tbody>")
@@ -219,9 +224,9 @@ func renderEvaluateHTML(report evaluate.Report) string {
 		}
 		b.WriteString("</tbody></table>")
 	}
-	b.WriteString("<h2>Cases</h2><table><thead><tr><th>Status</th><th>Name</th><th>Location</th><th>Duration</th><th>Assertions</th><th>Metrics</th><th>Subcases</th></tr></thead><tbody>")
+	b.WriteString("<h2>Cases</h2><table><thead><tr><th>Status</th><th>Name</th><th>Location</th><th>Duration</th><th>Assertions</th><th>Metrics</th><th>Subcases</th><th>LLM</th></tr></thead><tbody>")
 	for _, c := range report.Cases {
-		fmt.Fprintf(&b, "<tr><td>%s</td><td>%s</td><td><code>%s:%d:%d</code></td><td>%dms</td><td>%d</td><td>%d</td><td>%d</td></tr>",
+		fmt.Fprintf(&b, "<tr><td>%s</td><td>%s</td><td><code>%s:%d:%d</code></td><td>%dms</td><td>%d</td><td>%d</td><td>%d</td><td>%s</td></tr>",
 			html.EscapeString(c.Status),
 			html.EscapeString(c.Name),
 			html.EscapeString(c.SourcePath),
@@ -231,9 +236,10 @@ func renderEvaluateHTML(report evaluate.Report) string {
 			len(c.Assertions),
 			len(c.Metrics),
 			len(c.Subcases),
+			html.EscapeString(htmlLLMCaseSummary(c.LLM)),
 		)
 		for _, subcase := range c.Subcases {
-			fmt.Fprintf(&b, "<tr><td>↳ %s</td><td><code>%s</code></td><td></td><td>%dms</td><td></td><td>%d</td><td></td></tr>",
+			fmt.Fprintf(&b, "<tr><td>↳ %s</td><td><code>%s</code></td><td></td><td>%dms</td><td></td><td>%d</td><td></td><td></td></tr>",
 				html.EscapeString(subcase.Status),
 				html.EscapeString(subcase.CaseID),
 				subcase.DurationMS,
@@ -292,6 +298,13 @@ func htmlMetricSummary(metric evaluate.MetricSummary) string {
 	default:
 		return ""
 	}
+}
+
+func htmlLLMCaseSummary(run *evaluate.LLMCaseRun) string {
+	if run == nil {
+		return ""
+	}
+	return fmt.Sprintf("turns %d, tokens %d/%d, cost %.4g", run.Turns, run.InputTokens, run.OutputTokens, run.Cost)
 }
 
 func formatEvaluateMetricValues(values map[string]int) string {

@@ -530,7 +530,11 @@ evaluate "records llm turn" {
 			if cfg.Protocol != "openai_compatible" || cfg.ProviderModel != "mock-fast" {
 				t.Fatalf("cfg = %#v, want mock provider config", cfg)
 			}
-			return testRuntimeLLMProvider{res: runtime.LLMTurnResult{Status: "final_answer", Text: "recorded"}}, nil
+			return testRuntimeLLMProvider{res: runtime.LLMTurnResult{
+				Status: "final_answer",
+				Text:   "recorded",
+				Usage:  runtime.LLMTurnUsage{InputTokens: 11, OutputTokens: 7, Cost: 0.012, LatencyMS: 123},
+			}}, nil
 		},
 	})
 	if err != nil {
@@ -545,6 +549,12 @@ evaluate "records llm turn" {
 	}
 	if len(records) != 1 || records[0].Request.Messages[0].Text != "hello" || records[0].Result.Text != "recorded" {
 		t.Fatalf("records = %#v", records)
+	}
+	if report.LLM == nil || report.LLM.Turns != 1 || report.LLM.InputTokens != 11 || report.LLM.OutputTokens != 7 || report.LLM.LatencyMS != 123 || report.LLM.Cost != 0.012 {
+		t.Fatalf("llm summary = %#v", report.LLM)
+	}
+	if report.Cases[0].LLM == nil || report.Cases[0].LLM.TraceRef == "" || report.Cases[0].LLM.Turns != 1 || report.Cases[0].LLM.InputTokens != 11 {
+		t.Fatalf("case llm = %#v", report.Cases[0].LLM)
 	}
 }
 
@@ -568,7 +578,11 @@ func TestRunReplaysLLMTurns(t *testing.T) {
 			Model:    "mock-fast",
 			Messages: []llm.Message{{Role: "user", Text: "hello"}},
 		},
-		Result: llm.TurnResult{Status: "final_answer", Text: "from replay"},
+		Result: llm.TurnResult{
+			Status: "final_answer",
+			Text:   "from replay",
+			Usage:  llm.TurnUsage{InputTokens: 3, OutputTokens: 4, Cost: 0.005, LatencyMS: 44},
+		},
 	}}); err != nil {
 		t.Fatal(err)
 	}
@@ -582,6 +596,12 @@ func TestRunReplaysLLMTurns(t *testing.T) {
 	}
 	if report.LLM == nil || report.LLM.Mode != "replay" || report.LLM.LoadedTurns != 1 || report.LLM.ReplayedTurns != 1 || report.LLM.RemainingTurns != 0 {
 		t.Fatalf("llm report = %#v", report.LLM)
+	}
+	if report.LLM.Turns != 1 || report.LLM.InputTokens != 3 || report.LLM.OutputTokens != 4 || report.LLM.LatencyMS != 44 || report.LLM.Cost != 0.005 {
+		t.Fatalf("llm usage = %#v", report.LLM)
+	}
+	if report.Cases[0].LLM == nil || report.Cases[0].LLM.TraceRef == "" || report.Cases[0].LLM.Turns != 1 {
+		t.Fatalf("case llm = %#v", report.Cases[0].LLM)
 	}
 }
 
@@ -662,6 +682,12 @@ func TestRunFailsWhenReplayRequestMismatches(t *testing.T) {
 	if got := report.Findings[0].Details["turn"]; got != 0 {
 		t.Fatalf("finding details turn = %#v", got)
 	}
+	if report.Findings[0].Path != path || report.Findings[0].Line == 0 {
+		t.Fatalf("finding source = %#v", report.Findings[0])
+	}
+	if report.Findings[0].Details["case_id"] != report.Cases[0].CaseID || report.Findings[0].Details["case_name"] != "request mismatch" {
+		t.Fatalf("finding case details = %#v", report.Findings[0].Details)
+	}
 	expected, ok := report.Findings[0].Details["expected"].(map[string]any)
 	if !ok || expected["model"] != "mock-fast" {
 		t.Fatalf("finding details expected = %#v", report.Findings[0].Details["expected"])
@@ -718,6 +744,9 @@ func TestRunFailsWhenReplayIsExhausted(t *testing.T) {
 	}
 	if got := report.Findings[0].Details["turn"]; got != 0 {
 		t.Fatalf("finding details turn = %#v", got)
+	}
+	if report.Findings[0].Path != path || report.Findings[0].Details["case_id"] != report.Cases[0].CaseID {
+		t.Fatalf("finding attribution = %#v", report.Findings[0])
 	}
 }
 
