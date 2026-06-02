@@ -2,6 +2,7 @@ package leia_test
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -151,6 +152,69 @@ text := result.text
 				t.Fatalf("tokens = %#v", tokens)
 			}
 		})
+	}
+}
+
+func TestLLMTurnStreamsToScriptCallback(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []leia.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			provider := &streamingTraceProvider{}
+			opts := append([]leia.Option{
+				leia.WithLibs(leia.LibString | leia.LibLLM),
+				leia.WithLLMProvider(provider),
+			}, tc.opts...)
+			vm := leia.New(opts...)
+			if err := vm.Exec(`
+streamed := ""
+last_event := ""
+result, err := llm.turn({
+    model: "mock-fast",
+    messages: {llm.user("hello")},
+    on_stream: func(event) {
+        streamed = streamed .. event.token
+        last_event = event.type
+    },
+})
+text := result.text
+`); err != nil {
+				t.Fatalf("Exec: %v", err)
+			}
+			text, _ := vm.Get("text")
+			streamed, _ := vm.Get("streamed")
+			lastEvent, _ := vm.Get("last_event")
+			if text != "hello stream" || streamed != "hello stream" || lastEvent != "token" || !provider.usedStream {
+				t.Fatalf("text=%#v streamed=%#v last_event=%#v usedStream=%v", text, streamed, lastEvent, provider.usedStream)
+			}
+		})
+	}
+}
+
+func TestLLMTurnRejectsNonFunctionStreamCallback(t *testing.T) {
+	provider := &streamingTraceProvider{}
+	vm := leia.New(
+		leia.WithLibs(leia.LibString|leia.LibLLM),
+		leia.WithLLMProvider(provider),
+	)
+	if err := vm.Exec(`
+result, err := llm.turn({
+    messages: {llm.user("hello")},
+    on_stream: "not a function",
+})
+kind := err.kind
+message := err.message
+`); err != nil {
+		t.Fatalf("Exec: %v", err)
+	}
+	kind, _ := vm.Get("kind")
+	message, _ := vm.Get("message")
+	if kind != "validation" || !strings.Contains(fmt.Sprint(message), "on_stream") {
+		t.Fatalf("kind=%#v message=%#v", kind, message)
 	}
 }
 

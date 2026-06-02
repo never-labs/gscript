@@ -612,6 +612,7 @@ Stable request fields include:
 | `temperature` / `top_p` | Sampling hints. |
 | `response_format` | Provider response-format hint. |
 | `stream` | Request incremental provider output when supported. |
+| `on_stream` / `onStream` | Optional script callback for streaming events. The callback receives one event table per provider event and automatically enables `stream`. |
 | `stop` | Stop sequences. |
 | `metadata` | Host/provider metadata. |
 
@@ -621,6 +622,11 @@ does not change script-level return values: `turn { ... }` still returns one
 complete result table and one error value after the provider finishes. If the
 provider does not support streaming, the field is a provider hint and the turn
 falls back to the ordinary complete-result path.
+
+When `on_stream` is a function, the implementation calls it with an event table
+containing `type`, `token`, `text`, `status`, `reason`, and `usage`. The
+callback is best used for UI updates, logs, or incremental buffers; the final
+turn result remains authoritative.
 
 If a `turn` runs inside an agent, absent `model`, `tools`, `budget`,
 `response_format`, `metadata`, `max_tokens`, and sampling fields inherit from

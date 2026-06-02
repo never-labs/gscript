@@ -163,6 +163,7 @@ Important fields:
 | `temperature` / `top_p` | Sampling controls. |
 | `response_format` | Provider response-format hint. |
 | `stream` | Request incremental provider output when supported. |
+| `on_stream` / `onStream` | Optional script callback for streaming events. The callback receives `{type, token, text, status, reason, usage}` tables and automatically enables `stream`. |
 | `stop` | Stop sequences. |
 | `metadata` | String metadata passed to the provider. |
 
@@ -170,6 +171,19 @@ With `stream: true`, providers that implement streaming emit incremental
 `turn_stream` trace events through `leia.WithLLMTrace`. The returned `result`
 remains the complete final turn result. Providers without streaming support
 ignore the hint and return normally.
+
+With `on_stream`, scripts can consume provider tokens as they arrive while still
+receiving the final complete result:
+
+```leia
+text := ""
+result, err := llm.turn({
+    messages: {llm.user("Reply slowly.")}
+    on_stream: func(event) {
+        text = text .. event.token
+    }
+})
+```
 
 When `model` is omitted, the turn uses the ambient agent model if it is running
 inside an agent. Otherwise it uses the module's `models { default: ... }` alias
