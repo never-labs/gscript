@@ -72,6 +72,7 @@ func TestEvaluateCommandHelpExplainsReplayModes(t *testing.T) {
 		"usage: leia evaluate [options] [path-or-dir...]",
 		"Run source-level evaluate blocks",
 		"Examples:",
+		"--output eval-report.json",
 		"--llm-replay examples/evaluate/agent_replay.records.json",
 		"LLM fixture modes are mutually exclusive:",
 		"--update-golden",
@@ -79,6 +80,70 @@ func TestEvaluateCommandHelpExplainsReplayModes(t *testing.T) {
 		if !strings.Contains(stderr.String(), want) {
 			t.Fatalf("stderr = %q, want %q", stderr.String(), want)
 		}
+	}
+}
+
+func TestEvaluateCommandWritesReportToOutputFile(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "checks.leia")
+	src := `evaluate "file report" {
+    assert(true)
+}
+`
+	if err := os.WriteFile(path, []byte(src), 0644); err != nil {
+		t.Fatal(err)
+	}
+	reportPath := filepath.Join(dir, "eval-report.json")
+	var stdout, stderr bytes.Buffer
+	code := runEvaluateCommand([]string{"--format=json", "--output", reportPath, path}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runEvaluateCommand code = %d, stderr = %q", code, stderr.String())
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("stdout = %q, want empty", stdout.String())
+	}
+	data, err := os.ReadFile(reportPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var report evaluate.Report
+	if err := json.Unmarshal(data, &report); err != nil {
+		t.Fatalf("decode report: %v\n%s", err, string(data))
+	}
+	if report.Status != "ok" || len(report.Cases) != 1 || report.Cases[0].Status != "passed" {
+		t.Fatalf("report = %#v", report)
+	}
+}
+
+func TestEvaluateCommandWritesFailedReportToOutputFile(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "checks.leia")
+	src := `evaluate "file failure report" {
+    assert(false, "expected failure")
+}
+`
+	if err := os.WriteFile(path, []byte(src), 0644); err != nil {
+		t.Fatal(err)
+	}
+	reportPath := filepath.Join(dir, "eval-report.json")
+	var stdout, stderr bytes.Buffer
+	code := runEvaluateCommand([]string{"--json", "--output", reportPath, path}, &stdout, &stderr)
+	if code != 1 {
+		t.Fatalf("runEvaluateCommand code = %d, stderr = %q", code, stderr.String())
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("stdout = %q, want empty", stdout.String())
+	}
+	data, err := os.ReadFile(reportPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var report evaluate.Report
+	if err := json.Unmarshal(data, &report); err != nil {
+		t.Fatalf("decode report: %v\n%s", err, string(data))
+	}
+	if report.Status != "failed" || len(report.Cases) != 1 || report.Cases[0].Status != "failed" {
+		t.Fatalf("report = %#v", report)
 	}
 }
 

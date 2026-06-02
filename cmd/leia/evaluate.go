@@ -1,10 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 
 	"github.com/never-labs/leia/internal/tooling/evaluate"
@@ -23,6 +25,7 @@ func runEvaluateCommand(args []string, outw, errw io.Writer) int {
 	llmRecord := fs.String("llm-record", "", "record LLM turns to a replay JSON file")
 	llmReplay := fs.String("llm-replay", "", "replay LLM turns from a replay JSON file")
 	updateGolden := fs.String("update-golden", "", "rewrite an LLM replay JSON file from a live evaluation run")
+	output := fs.String("output", "", "write the evaluate report to this file instead of stdout")
 	if code, done := parseCLIFlags(fs, args); done {
 		return code
 	}
@@ -47,20 +50,37 @@ func runEvaluateCommand(args []string, outw, errw io.Writer) int {
 		fmt.Fprintf(errw, "leia evaluate: %v\n", err)
 		return 1
 	}
-	if *format == "text" {
-		_, _ = io.WriteString(outw, evaluate.FormatText(report))
-	} else {
-		enc := json.NewEncoder(outw)
-		enc.SetIndent("", "  ")
-		if err := enc.Encode(report); err != nil {
-			fmt.Fprintf(errw, "leia evaluate: %v\n", err)
+	rendered, err := renderEvaluateReport(report, *format)
+	if err != nil {
+		fmt.Fprintf(errw, "leia evaluate: %v\n", err)
+		return 1
+	}
+	if *output != "" {
+		if err := os.WriteFile(*output, rendered, 0o600); err != nil {
+			fmt.Fprintf(errw, "leia evaluate: write %s: %v\n", *output, err)
 			return 1
 		}
+	} else if _, err := outw.Write(rendered); err != nil {
+		fmt.Fprintf(errw, "leia evaluate: %v\n", err)
+		return 1
 	}
 	if report.Status == "failed" {
 		return 1
 	}
 	return 0
+}
+
+func renderEvaluateReport(report evaluate.Report, format string) ([]byte, error) {
+	if format == "text" {
+		return []byte(evaluate.FormatText(report)), nil
+	}
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetIndent("", "  ")
+	if err := enc.Encode(report); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
 }
 
 func evaluateUsage(fs *flag.FlagSet) string {
@@ -69,6 +89,7 @@ func evaluateUsage(fs *flag.FlagSet) string {
 	b.WriteString("Run source-level evaluate blocks and emit a versioned agent evaluation report.\n\n")
 	b.WriteString("Examples:\n")
 	b.WriteString("  leia evaluate --format=text examples/evaluate/basic_assert.leia\n")
+	b.WriteString("  leia evaluate --json --output eval-report.json tests/agents\n")
 	b.WriteString("  leia evaluate --llm-replay examples/evaluate/agent_replay.records.json examples/evaluate/agent_replay.leia\n")
 	b.WriteString("  leia evaluate --list --filter refund tests/agents\n\n")
 	b.WriteString("LLM fixture modes are mutually exclusive:\n")
