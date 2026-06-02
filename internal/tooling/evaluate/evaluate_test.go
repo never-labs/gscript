@@ -69,6 +69,9 @@ evaluate "answer echoes through tool" {
 	if len(report.Cases) != 1 || report.Cases[0].Name != "answer echoes through tool" || report.Cases[0].Status != "passed" {
 		t.Fatalf("cases = %#v", report.Cases)
 	}
+	if report.Summary.CasesSelected != 1 || report.Summary.CasesPassed != 1 || report.Summary.CasesFailed != 0 || report.Summary.CasesListed != 0 || report.Summary.Assertions != 0 || report.Summary.PassRate != 1 {
+		t.Fatalf("summary execution = %#v", report.Summary)
+	}
 	if report.Cases[0].SourcePath != path || report.Cases[0].Range.StartLine == 0 || report.Cases[0].CaseID == "" {
 		t.Fatalf("case source metadata = %#v", report.Cases[0])
 	}
@@ -101,6 +104,9 @@ func TestRunExecutesEvaluateBodyAndReportsFailure(t *testing.T) {
 	if len(report.Cases) != 1 || report.Cases[0].Status != "failed" {
 		t.Fatalf("cases = %#v", report.Cases)
 	}
+	if report.Summary.CasesSelected != 1 || report.Summary.CasesPassed != 0 || report.Summary.CasesFailed != 1 || report.Summary.Assertions != 1 || report.Summary.PassRate != 0 {
+		t.Fatalf("summary execution = %#v", report.Summary)
+	}
 	if len(report.Findings) != 1 || report.Findings[0].Kind != "case_runtime_error" {
 		t.Fatalf("findings = %#v, want case_runtime_error", report.Findings)
 	}
@@ -130,6 +136,9 @@ evaluate "beta case" {
 	if report.Status != "ok" || report.Summary.EvaluateBlocks != 2 || len(report.Cases) != 1 || report.Cases[0].Name != "beta case" {
 		t.Fatalf("report = %#v", report)
 	}
+	if report.Summary.CasesSelected != 1 || report.Summary.CasesSkipped != 1 || report.Summary.CasesPassed != 1 {
+		t.Fatalf("summary filter counts = %#v", report.Summary)
+	}
 }
 
 func TestRunListsEvaluateCasesWithoutExecuting(t *testing.T) {
@@ -148,6 +157,9 @@ func TestRunListsEvaluateCasesWithoutExecuting(t *testing.T) {
 	}
 	if report.Status != "ok" || len(report.Cases) != 1 || report.Cases[0].Status != "listed" {
 		t.Fatalf("report = %#v", report)
+	}
+	if report.Summary.CasesSelected != 1 || report.Summary.CasesListed != 1 || report.Summary.CasesPassed != 0 || report.Summary.CasesFailed != 0 || report.Summary.Assertions != 1 {
+		t.Fatalf("summary list counts = %#v", report.Summary)
 	}
 	if len(report.Findings) != 0 {
 		t.Fatalf("findings = %#v", report.Findings)

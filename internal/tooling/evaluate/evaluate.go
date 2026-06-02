@@ -71,14 +71,22 @@ type LLMRun struct {
 }
 
 type Summary struct {
-	Files          int `json:"files"`
-	ParsedFiles    int `json:"parsed_files"`
-	EvaluateBlocks int `json:"evaluate_blocks"`
-	Agents         int `json:"agents"`
-	Tools          int `json:"tools"`
-	Models         int `json:"models"`
-	Budgets        int `json:"budgets"`
-	TODOs          int `json:"todos"`
+	Files          int     `json:"files"`
+	ParsedFiles    int     `json:"parsed_files"`
+	EvaluateBlocks int     `json:"evaluate_blocks"`
+	CasesSelected  int     `json:"cases_selected"`
+	CasesPassed    int     `json:"cases_passed"`
+	CasesFailed    int     `json:"cases_failed"`
+	CasesListed    int     `json:"cases_listed"`
+	CasesSkipped   int     `json:"cases_skipped"`
+	Assertions     int     `json:"assertions"`
+	DurationMS     int64   `json:"duration_ms"`
+	PassRate       float64 `json:"pass_rate"`
+	Agents         int     `json:"agents"`
+	Tools          int     `json:"tools"`
+	Models         int     `json:"models"`
+	Budgets        int     `json:"budgets"`
+	TODOs          int     `json:"todos"`
 }
 
 type Input struct {
@@ -197,10 +205,12 @@ func Run(opts Options) (Report, error) {
 			} else {
 				for _, parsed := range cases {
 					if filter != "" && !caseMatchesFilter(parsed.Case, filter) {
+						report.Summary.CasesSkipped++
 						continue
 					}
 					c := parsed.Case
 					c.Assertions = collectAssertions(parsed.Body)
+					report.Summary.CasesSelected++
 					if opts.ListOnly {
 						c.Status = "listed"
 						report.Cases = append(report.Cases, c)
@@ -270,7 +280,29 @@ func Run(opts Options) (Report, error) {
 			return report, err
 		}
 	}
+	finalizeSummary(&report)
 	return report, nil
+}
+
+func finalizeSummary(report *Report) {
+	var executable int
+	for _, c := range report.Cases {
+		report.Summary.Assertions += len(c.Assertions)
+		report.Summary.DurationMS += c.DurationMS
+		switch c.Status {
+		case "passed":
+			report.Summary.CasesPassed++
+			executable++
+		case "failed":
+			report.Summary.CasesFailed++
+			executable++
+		case "listed":
+			report.Summary.CasesListed++
+		}
+	}
+	if executable > 0 {
+		report.Summary.PassRate = float64(report.Summary.CasesPassed) / float64(executable)
+	}
 }
 
 func runtimeInfo() RuntimeInfo {
@@ -794,11 +826,18 @@ func markAssertions(assertions []Assertion, status string) {
 
 func FormatText(report Report) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "evaluate: %s (%d files, %d parsed, %d cases, %d agents, %d tools, %d todos)\n",
+	fmt.Fprintf(&b, "evaluate: %s (%d files, %d parsed, %d selected/%d discovered cases, %d passed, %d failed, %d listed, %.2f pass rate, %dms, %d assertions, %d agents, %d tools, %d todos)\n",
 		report.Status,
 		report.Summary.Files,
 		report.Summary.ParsedFiles,
+		report.Summary.CasesSelected,
 		report.Summary.EvaluateBlocks,
+		report.Summary.CasesPassed,
+		report.Summary.CasesFailed,
+		report.Summary.CasesListed,
+		report.Summary.PassRate,
+		report.Summary.DurationMS,
+		report.Summary.Assertions,
 		report.Summary.Agents,
 		report.Summary.Tools,
 		report.Summary.TODOs,

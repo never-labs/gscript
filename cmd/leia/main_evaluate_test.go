@@ -44,6 +44,9 @@ evaluate "answer baseline" {
 	if report.Summary.Agents != 0 || report.Summary.EvaluateBlocks != 1 || report.Summary.TODOs != 1 {
 		t.Fatalf("summary = %#v", report.Summary)
 	}
+	if report.Summary.CasesSelected != 1 || report.Summary.CasesPassed != 1 || report.Summary.Assertions != 1 || report.Summary.PassRate != 1 {
+		t.Fatalf("summary execution = %#v", report.Summary)
+	}
 	if len(report.Cases) != 1 || report.Cases[0].Name != "answer baseline" || report.Cases[0].Status != "passed" {
 		t.Fatalf("cases = %#v", report.Cases)
 	}
@@ -94,7 +97,7 @@ func TestEvaluateCommandTextFormat(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("runEvaluateCommand code = %d, stderr = %q", code, stderr.String())
 	}
-	if !strings.Contains(stdout.String(), "evaluate: ok") || !strings.Contains(stdout.String(), "0 cases") || !strings.Contains(stdout.String(), "1 todos") || !strings.Contains(stdout.String(), "findings:") {
+	if !strings.Contains(stdout.String(), "evaluate: ok") || !strings.Contains(stdout.String(), "0 selected/0 discovered cases") || !strings.Contains(stdout.String(), "1 todos") || !strings.Contains(stdout.String(), "findings:") {
 		t.Fatalf("stdout = %q", stdout.String())
 	}
 }
@@ -115,7 +118,7 @@ func TestEvaluateCommandTextFormatListsCases(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("runEvaluateCommand code = %d, stderr = %q", code, stderr.String())
 	}
-	for _, want := range []string{"evaluate: ok", "PASS text report case", "1 assertions"} {
+	for _, want := range []string{"evaluate: ok", "1 selected/1 discovered cases", "1.00 pass rate", "PASS text report case", "1 assertions"} {
 		if !strings.Contains(stdout.String(), want) {
 			t.Fatalf("stdout = %q, want %q", stdout.String(), want)
 		}

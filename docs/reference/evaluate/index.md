@@ -48,7 +48,7 @@ The JSON report is versioned with `schema_version: 1` and includes:
 | `status` | `ok` or `failed`. Syntax, validation, and case runtime errors make the report fail. |
 | `started_at` | UTC RFC3339 timestamp for the evaluation run. |
 | `runtime` | Leia and Go runtime metadata: version, OS/arch, and build VCS fields when available. |
-| `summary` | File, parse, AI declaration, and TODO counts. |
+| `summary` | File, parse, AI declaration, TODO, selected/skipped case, pass/fail/list, assertion, duration, and pass-rate counts. |
 | `llm` | Optional LLM fixture metadata: mode, paths, loaded turns, replayed turns, remaining turns, and recorded turns. |
 | `inputs` | Per-input file status. |
 | `cases` | Evaluate blocks with `case_id`, `name`, source path, range, and `passed` or `failed` status. |
@@ -57,3 +57,10 @@ The JSON report is versioned with `schema_version: 1` and includes:
 
 Ordinary script execution still treats evaluate blocks as runtime no-ops. The
 minimal runner only changes `leia evaluate`.
+
+Summary fields are intentionally dashboard-friendly. `evaluate_blocks` is the
+number of discovered blocks before filtering. `cases_selected` is the number
+that matched `--filter` and were listed or executed. `cases_skipped` is the
+number filtered out. `cases_passed` and `cases_failed` count executed cases;
+`cases_listed` counts `--list` results. `pass_rate` is
+`cases_passed / (cases_passed + cases_failed)` and is `0` when no case ran.
