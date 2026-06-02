@@ -52,3 +52,6 @@ __pycache__/
 # Local architecture review artifacts
 /docs/methodjit-architecture-optimization-plan.html
 /docs/methodjit-optimizer-pipeline.html
+
+# Local game project notes (not part of language release)
+/games/
