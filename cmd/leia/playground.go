@@ -1682,9 +1682,10 @@ let activeTab = "playground";
 let currentItems = [];
 
 const leiaKeywords = new Set([
-  "agent", "and", "break", "continue", "defer", "do", "else", "elseif", "end",
-  "evaluate", "false", "flow", "for", "func", "go", "if", "in", "local", "nil",
-  "not", "or", "return", "then", "tool", "true", "turn", "while"
+  "agent", "and", "break", "budget", "case", "const", "continue", "default",
+  "defer", "do", "else", "elseif", "end", "evaluate", "false", "flow", "for",
+  "func", "go", "if", "import", "in", "local", "messages", "models", "nil",
+  "not", "or", "return", "select", "then", "tool", "true", "turn"
 ]);
 const leiaBuiltins = new Set([
   "print", "pairs", "ipairs", "range", "len", "type", "tostring", "tonumber",
@@ -1709,7 +1710,7 @@ function highlightLeia(text) {
   while (i < text.length) {
     const ch = text[i];
     const next = text[i + 1] || "";
-    if (ch === "-" && next === "-") {
+    if ((ch === "-" && next === "-") || (ch === "/" && next === "/")) {
       let j = i + 2;
       while (j < text.length && text[j] !== "\n") j++;
       out += span("tok-comment", text.slice(i, j));

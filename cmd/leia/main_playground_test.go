@@ -89,6 +89,35 @@ func TestPlaygroundExamplesAPI(t *testing.T) {
 	}
 }
 
+func TestPlaygroundPageSyntaxSurfaceMatchesLeia(t *testing.T) {
+	handler := newPlaygroundHandler(playgroundOptions{
+		Runner: func(context.Context, playgroundRunRequest, playgroundOptions) playgroundRunResponse {
+			return playgroundRunResponse{}
+		},
+	})
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+	body := rec.Body.String()
+	for _, want := range []string{
+		`"models"`,
+		`"messages"`,
+		`"budget"`,
+		`"select"`,
+		`ch === "/" && next === "/"`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("playground page missing %q", want)
+		}
+	}
+	if strings.Contains(body, `"while"`) {
+		t.Fatalf("playground page still advertises unsupported while keyword")
+	}
+}
+
 func TestPlaygroundTourAndAIAPI(t *testing.T) {
 	handler := newPlaygroundHandler(playgroundOptions{
 		Runner: func(context.Context, playgroundRunRequest, playgroundOptions) playgroundRunResponse {
