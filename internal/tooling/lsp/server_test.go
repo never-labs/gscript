@@ -55,8 +55,12 @@ func TestServerInitializeShutdown(t *testing.T) {
 	}
 	legend := semanticProvider["legend"].(map[string]any)
 	tokenTypes := legend["tokenTypes"].([]any)
-	if len(tokenTypes) == 0 || tokenTypes[0] != "keyword" {
+	if len(tokenTypes) != len(semanticTokenTypes) || tokenTypes[0] != "keyword" || tokenTypes[len(tokenTypes)-1] != "namespace" {
 		t.Fatalf("semantic token legend = %#v", legend)
+	}
+	tokenModifiers := legend["tokenModifiers"].([]any)
+	if len(tokenModifiers) != len(semanticTokenModifiers) || tokenModifiers[0] != "declaration" || tokenModifiers[len(tokenModifiers)-1] != "defaultLibrary" {
+		t.Fatalf("semantic token modifiers = %#v", legend)
 	}
 	if caps["workspaceSymbolProvider"] != true {
 		t.Fatalf("initialize result missing workspace symbol capability: %#v", caps)
@@ -558,6 +562,30 @@ func TestSemanticTokensLexerErrorReturnsEmptyData(t *testing.T) {
 	}
 }
 
+func TestSemanticTokensClassifyLeiaSemanticRoles(t *testing.T) {
+	src := strings.Join([]string{
+		`import "go:strings" as strings`,
+		`agent reviewer(question) {`,
+		`    model: "mock"`,
+		`}`,
+		`func add(a, b) {`,
+		`    return math.floor(a + b)`,
+		`}`,
+		`object:run()`,
+		"",
+	}, "\n")
+	tokens := decodedSemanticTokens(src)
+	assertSemanticToken(t, tokens, "strings", semanticNamespace, semanticDeclarationModifier)
+	assertSemanticToken(t, tokens, "reviewer", semanticType, semanticDeclarationModifier)
+	assertSemanticToken(t, tokens, "question", semanticParameter, semanticDeclarationModifier)
+	assertSemanticToken(t, tokens, "model", semanticProperty, 0)
+	assertSemanticToken(t, tokens, "add", semanticFunction, semanticDeclarationModifier)
+	assertSemanticToken(t, tokens, "a", semanticParameter, semanticDeclarationModifier)
+	assertSemanticToken(t, tokens, "math", semanticNamespace, semanticDefaultLibraryModifier)
+	assertSemanticToken(t, tokens, "floor", semanticProperty, 0)
+	assertSemanticToken(t, tokens, "run", semanticMethod, 0)
+}
+
 func TestWorkspaceSymbolReturnsOpenDocumentDeclarations(t *testing.T) {
 	input := mustEncodeMessages(t,
 		map[string]any{
@@ -1008,6 +1036,50 @@ func assertHoverContains(t *testing.T, msg map[string]any, want string) {
 	if !strings.Contains(value, want) {
 		t.Fatalf("hover = %q, want substring %q", value, want)
 	}
+}
+
+type semanticTokenForTest struct {
+	Text      string
+	TokenType int
+	Modifier  int
+}
+
+func decodedSemanticTokens(src string) []semanticTokenForTest {
+	data := collectSemanticTokens(src)
+	lines := strings.Split(src, "\n")
+	var out []semanticTokenForTest
+	line, char := 0, 0
+	for i := 0; i+4 < len(data); i += 5 {
+		deltaLine := data[i]
+		deltaStart := data[i+1]
+		length := data[i+2]
+		line += deltaLine
+		if deltaLine == 0 {
+			char += deltaStart
+		} else {
+			char = deltaStart
+		}
+		text := ""
+		if line >= 0 && line < len(lines) && char >= 0 && char+length <= len(lines[line]) {
+			text = lines[line][char : char+length]
+		}
+		out = append(out, semanticTokenForTest{
+			Text:      text,
+			TokenType: data[i+3],
+			Modifier:  data[i+4],
+		})
+	}
+	return out
+}
+
+func assertSemanticToken(t *testing.T, tokens []semanticTokenForTest, text string, tokenType int, modifier int) {
+	t.Helper()
+	for _, tok := range tokens {
+		if tok.Text == text && tok.TokenType == tokenType && tok.Modifier == modifier {
+			return
+		}
+	}
+	t.Fatalf("missing semantic token %q type=%d modifier=%d in %#v", text, tokenType, modifier, tokens)
 }
 
 func mustEncodeMessages(t *testing.T, msgs ...any) []byte {

@@ -3,8 +3,8 @@
 const vscode = require("vscode");
 const path = require("path");
 
-const semanticTokenTypes = ["keyword", "variable", "function", "string", "number", "operator", "type"];
-const semanticTokenModifiers = ["declaration"];
+const semanticTokenTypes = ["keyword", "variable", "function", "method", "string", "number", "operator", "type", "parameter", "property", "namespace"];
+const semanticTokenModifiers = ["declaration", "readonly", "defaultLibrary"];
 const semanticTokenLegend = new vscode.SemanticTokensLegend(semanticTokenTypes, semanticTokenModifiers);
 
 let lspClient;

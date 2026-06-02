@@ -25,27 +25,41 @@ var semanticTokenTypes = []string{
 	"keyword",
 	"variable",
 	"function",
+	"method",
 	"string",
 	"number",
 	"operator",
 	"type",
+	"parameter",
+	"property",
+	"namespace",
 }
 
 var semanticTokenModifiers = []string{
 	"declaration",
+	"readonly",
+	"defaultLibrary",
 }
 
 const (
 	semanticKeyword = iota
 	semanticVariable
 	semanticFunction
+	semanticMethod
 	semanticString
 	semanticNumber
 	semanticOperator
 	semanticType
+	semanticParameter
+	semanticProperty
+	semanticNamespace
 )
 
-const semanticDeclarationModifier = 1
+const (
+	semanticDeclarationModifier = 1 << iota
+	semanticReadonlyModifier
+	semanticDefaultLibraryModifier
+)
 
 type hoverParams struct {
 	TextDocument textDocumentIdentifier `json:"textDocument"`
@@ -436,12 +450,27 @@ func semanticTokenKind(tokens []lexer.Token, index int) (int, int, bool) {
 	switch tok.Type {
 	case lexer.TOKEN_IDENT:
 		switch {
+		case tokenLooksLikeImportAlias(tokens, index):
+			return semanticNamespace, semanticDeclarationModifier, true
 		case tokenIsDeclarationName(tokens, index):
+			if tokenText(tokens[index-1]) == "agent" {
+				return semanticType, semanticDeclarationModifier, true
+			}
 			return semanticFunction, semanticDeclarationModifier, true
+		case tokenIsParameterDeclaration(tokens, index):
+			return semanticParameter, semanticDeclarationModifier, true
+		case tokenLooksLikeMethodCall(tokens, index):
+			return semanticMethod, 0, true
+		case tokenLooksLikeProperty(tokens, index):
+			return semanticProperty, 0, true
+		case tokenLooksLikeStdlibNamespace(tokens, index):
+			return semanticNamespace, semanticDefaultLibraryModifier, true
 		case tokenLooksLikeFunctionCall(tokens, index):
 			return semanticFunction, 0, true
-		case tok.Value == "agent" || tok.Value == "tool" || tok.Value == "evaluate" || tok.Value == "models" || tok.Value == "turn" || tok.Value == "messages" || tok.Value == "budget":
+		case tok.Value == "agent" || tok.Value == "tool" || tok.Value == "evaluate" || tok.Value == "models" || tok.Value == "turn" || tok.Value == "messages" || tok.Value == "budget" || tok.Value == "flow" || tok.Value == "react" || tok.Value == "import" || tok.Value == "as":
 			return semanticKeyword, 0, true
+		case tok.Value == "i32" || tok.Value == "i64" || tok.Value == "f32" || tok.Value == "f64" || tok.Value == "bool":
+			return semanticType, semanticDefaultLibraryModifier, true
 		default:
 			return semanticVariable, 0, true
 		}
@@ -473,6 +502,56 @@ func tokenIsDeclarationName(tokens []lexer.Token, index int) bool {
 	}
 	prev := tokens[index-1]
 	return prev.Type == lexer.TOKEN_FUNC || tokenText(prev) == "agent" || tokenText(prev) == "tool"
+}
+
+func tokenLooksLikeImportAlias(tokens []lexer.Token, index int) bool {
+	return index > 0 && tokenText(tokens[index-1]) == "as"
+}
+
+func tokenIsParameterDeclaration(tokens []lexer.Token, index int) bool {
+	open := -1
+	depth := 0
+	for i := index - 1; i >= 0; i-- {
+		switch tokens[i].Type {
+		case lexer.TOKEN_RPAREN:
+			depth++
+		case lexer.TOKEN_LPAREN:
+			if depth == 0 {
+				open = i
+				i = -1
+			} else {
+				depth--
+			}
+		}
+	}
+	if open <= 1 {
+		return false
+	}
+	if tokenText(tokens[open-2]) != "func" && tokenText(tokens[open-2]) != "tool" && tokenText(tokens[open-2]) != "agent" {
+		return false
+	}
+	for i := open + 1; i < len(tokens) && i < index; i++ {
+		if tokens[i].Type == lexer.TOKEN_RPAREN {
+			return false
+		}
+	}
+	return true
+}
+
+func tokenLooksLikeMethodCall(tokens []lexer.Token, index int) bool {
+	return index > 0 && index+1 < len(tokens) && tokens[index-1].Type == lexer.TOKEN_COLON && tokens[index+1].Type == lexer.TOKEN_LPAREN
+}
+
+func tokenLooksLikeProperty(tokens []lexer.Token, index int) bool {
+	return (index > 0 && tokens[index-1].Type == lexer.TOKEN_DOT) || (index+1 < len(tokens) && tokens[index+1].Type == lexer.TOKEN_COLON)
+}
+
+func tokenLooksLikeStdlibNamespace(tokens []lexer.Token, index int) bool {
+	if index+1 >= len(tokens) || tokens[index+1].Type != lexer.TOKEN_DOT {
+		return false
+	}
+	_, ok := catalog.Module(tokens[index].Value)
+	return ok
 }
 
 func tokenLooksLikeFunctionCall(tokens []lexer.Token, index int) bool {
