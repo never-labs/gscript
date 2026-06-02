@@ -19,6 +19,7 @@ leia evaluate --json --report eval-report.json path/to/project
 leia evaluate --format=text path/to/project
 leia evaluate --format=html --report eval-report.html path/to/project
 leia evaluate --gate tests/agents
+leia evaluate --baseline baseline.json --regression-threshold 0.05 tests/agents
 leia evaluate --list --filter "refund flow" tests/agents
 leia evaluate --filter "refund flow" tests/agents
 leia evaluate --replay tests/agent.records.json tests/agent.leia
@@ -41,6 +42,8 @@ package:
 | `--format json\|text\|html` | Select the report renderer. |
 | `--report FILE` | Write the rendered report to `FILE` instead of stdout. `--output FILE` is accepted as an alias. The command still exits non-zero when the report status is `failed`. |
 | `--gate` | Explicit CI gate mode. The current command already exits non-zero for failed reports; the flag documents that intent in scripts. |
+| `--baseline FILE` | Load a previous JSON evaluate report and attach a comparison section to the current report. |
+| `--regression-threshold N` | Allow bool pass-rate regressions up to `N` when `--baseline` is used. Summary pass-rate and bool metric pass-rate regressions beyond the threshold fail the report. Number and string metrics are compared but not treated as regressions because directionality is metric-specific. |
 | `--replay FILE` | Use `FILE` as a deterministic provider transcript. Request mismatches, exhausted replay, or unconsumed turns fail the report. |
 | `--record FILE` | Run against the configured provider and write observed turns to `FILE`. |
 | `--update-golden FILE` | Run against the configured provider and rewrite `FILE` as the new golden transcript. This is intentionally explicit so CI can forbid it. |
@@ -62,6 +65,7 @@ The JSON report is versioned with `schema_version: 1` and includes:
 | `inputs` | Per-input file status. |
 | `cases` | Evaluate blocks with `case_id`, `name`, source path, range, status, per-case `started_at`, duration, raw metrics, subcases, assertions, and diagnostics. |
 | `metrics` | Top-level summaries aggregated from `eval.metric` values. Bool metrics report pass rate, true, and false counts. Number metrics report mean, min, and max. String metrics report category counts. |
+| `comparison` | Optional baseline comparison with summary pass-rate deltas and metric deltas. |
 | `findings` | TODO, IO, lex, parse, AI syntax, case runtime, and replay-drift findings. Replay mismatch findings include stable JSON `details.expected` and `details.actual` request summaries; exhausted and unconsumed replay findings include turn/count details. |
 | `notes` | Explicit scope notes so callers do not confuse this with full eval scoring. |
 

@@ -25,6 +25,8 @@ func runEvaluateCommand(args []string, outw, errw io.Writer) int {
 	listOnly := fs.Bool("list", false, "list discovered evaluate cases without executing them")
 	filter := fs.String("filter", "", "run only evaluate cases whose name, source path, or case id contains this text")
 	gate := fs.Bool("gate", false, "CI gate mode: exit non-zero when any selected case, replay check, or report finding fails")
+	baselinePath := fs.String("baseline", "", "compare this run against a previous JSON evaluate report")
+	regressionThreshold := fs.Float64("regression-threshold", 0, "allowed pass-rate regression when --baseline is set")
 	record := fs.String("record", "", "alias for --llm-record")
 	replay := fs.String("replay", "", "alias for --llm-replay")
 	llmRecord := fs.String("llm-record", "", "record LLM turns to a replay JSON file")
@@ -71,6 +73,14 @@ func runEvaluateCommand(args []string, outw, errw io.Writer) int {
 		fmt.Fprintf(errw, "leia evaluate: %v\n", err)
 		return 1
 	}
+	if *baselinePath != "" {
+		baseline, err := loadEvaluateReport(*baselinePath)
+		if err != nil {
+			fmt.Fprintf(errw, "leia evaluate: %v\n", err)
+			return 1
+		}
+		evaluate.AttachBaselineComparison(&report, baseline, *baselinePath, *regressionThreshold)
+	}
 	rendered, err := renderEvaluateReport(report, *format)
 	if err != nil {
 		fmt.Fprintf(errw, "leia evaluate: %v\n", err)
@@ -99,6 +109,18 @@ func coalesceEvaluatePathFlag(shortName, shortValue, longName, longValue string)
 		return shortValue, nil
 	}
 	return "", fmt.Errorf("--%s and --%s specify different files", shortName, longName)
+}
+
+func loadEvaluateReport(path string) (evaluate.Report, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return evaluate.Report{}, fmt.Errorf("read baseline report %s: %v", path, err)
+	}
+	var report evaluate.Report
+	if err := json.Unmarshal(data, &report); err != nil {
+		return evaluate.Report{}, fmt.Errorf("decode baseline report %s: %v", path, err)
+	}
+	return report, nil
 }
 
 func renderEvaluateReport(report evaluate.Report, format string) ([]byte, error) {
@@ -151,6 +173,19 @@ func renderEvaluateHTML(report evaluate.Report) string {
 		}
 		b.WriteString("</tbody></table>")
 	}
+	if report.Comparison != nil {
+		b.WriteString("<h2>Comparison</h2><table><thead><tr><th>Metric</th><th>Type</th><th>Baseline</th><th>Current</th><th>Delta</th><th>Status</th></tr></thead><tbody>")
+		if report.Comparison.Summary != nil {
+			writeHTMLComparisonRow(&b, "summary.pass_rate", "bool", report.Comparison.Summary.BaselinePassRate, report.Comparison.Summary.CurrentPassRate, report.Comparison.Summary.DeltaPassRate, report.Comparison.Summary.Regressed)
+		}
+		for _, metric := range report.Comparison.Metrics {
+			if metric.Type != "bool" && metric.Type != "number" {
+				continue
+			}
+			writeHTMLComparisonRow(&b, metric.Name, metric.Type, metric.Baseline, metric.Current, metric.Delta, metric.Regressed)
+		}
+		b.WriteString("</tbody></table>")
+	}
 	b.WriteString("<h2>Cases</h2><table><thead><tr><th>Status</th><th>Name</th><th>Location</th><th>Duration</th><th>Assertions</th><th>Metrics</th><th>Subcases</th></tr></thead><tbody>")
 	for _, c := range report.Cases {
 		fmt.Fprintf(&b, "<tr><td>%s</td><td>%s</td><td><code>%s:%d:%d</code></td><td>%dms</td><td>%d</td><td>%d</td><td>%d</td></tr>",
@@ -198,6 +233,21 @@ func writeHTMLStat(b *strings.Builder, label, value string) {
 	fmt.Fprintf(b, "<div class=\"card\"><div class=\"label\">%s</div><div class=\"value\">%s</div></div>", html.EscapeString(label), html.EscapeString(value))
 }
 
+func writeHTMLComparisonRow(b *strings.Builder, name, typ string, baseline, current, delta float64, regressed bool) {
+	status := "ok"
+	if regressed {
+		status = "regressed"
+	}
+	fmt.Fprintf(b, "<tr><td><code>%s</code></td><td>%s</td><td>%.4g</td><td>%.4g</td><td>%.4g</td><td>%s</td></tr>",
+		html.EscapeString(name),
+		html.EscapeString(typ),
+		baseline,
+		current,
+		delta,
+		status,
+	)
+}
+
 func htmlMetricSummary(metric evaluate.MetricSummary) string {
 	switch metric.Type {
 	case "bool":
@@ -240,6 +290,7 @@ func evaluateUsage(fs *flag.FlagSet) string {
 	b.WriteString("  leia evaluate --format=text examples/evaluate/basic_assert.leia\n")
 	b.WriteString("  leia evaluate --json --report eval-report.json tests/agents\n")
 	b.WriteString("  leia evaluate --format=html --report eval-report.html tests/agents\n")
+	b.WriteString("  leia evaluate --baseline baseline.json --regression-threshold 0.05 tests/agents\n")
 	b.WriteString("  leia evaluate --replay examples/evaluate/agent_replay.records.json examples/evaluate/agent_replay.leia\n")
 	b.WriteString("  leia evaluate --list --filter refund tests/agents\n\n")
 	b.WriteString("LLM fixture modes are mutually exclusive:\n")

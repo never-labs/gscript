@@ -48,6 +48,7 @@ type Report struct {
 	Inputs        []Input         `json:"inputs"`
 	Cases         []Case          `json:"cases"`
 	Metrics       []MetricSummary `json:"metrics,omitempty"`
+	Comparison    *Comparison     `json:"comparison,omitempty"`
 	Findings      []Finding       `json:"findings"`
 	Notes         []string        `json:"notes"`
 }
@@ -147,6 +148,31 @@ type MetricSummary struct {
 	Min      float64        `json:"min,omitempty"`
 	Max      float64        `json:"max,omitempty"`
 	Values   map[string]int `json:"values,omitempty"`
+}
+
+type Comparison struct {
+	BaselinePath        string             `json:"baseline_path,omitempty"`
+	RegressionThreshold float64            `json:"regression_threshold"`
+	Summary             *SummaryComparison `json:"summary,omitempty"`
+	Metrics             []MetricComparison `json:"metrics,omitempty"`
+}
+
+type SummaryComparison struct {
+	BaselinePassRate float64 `json:"baseline_pass_rate"`
+	CurrentPassRate  float64 `json:"current_pass_rate"`
+	DeltaPassRate    float64 `json:"delta_pass_rate"`
+	Regressed        bool    `json:"regressed,omitempty"`
+}
+
+type MetricComparison struct {
+	Name          string  `json:"name"`
+	Type          string  `json:"type"`
+	Baseline      float64 `json:"baseline,omitempty"`
+	Current       float64 `json:"current,omitempty"`
+	Delta         float64 `json:"delta,omitempty"`
+	BaselineCount int     `json:"baseline_count,omitempty"`
+	CurrentCount  int     `json:"current_count,omitempty"`
+	Regressed     bool    `json:"regressed,omitempty"`
 }
 
 type Subcase struct {
@@ -374,6 +400,120 @@ func finalizeSummary(report *Report) {
 		report.Summary.PassRate = float64(report.Summary.CasesPassed) / float64(executable)
 	}
 	report.Metrics = aggregateMetricSummaries(report.Cases)
+}
+
+func AttachBaselineComparison(current *Report, baseline Report, baselinePath string, threshold float64) {
+	if current == nil {
+		return
+	}
+	comparison := CompareReports(*current, baseline, baselinePath, threshold)
+	current.Comparison = &comparison
+	if comparison.Summary != nil && comparison.Summary.Regressed {
+		current.Status = "failed"
+		current.Findings = append(current.Findings, Finding{
+			Kind:     "evaluate_regression",
+			Severity: "error",
+			Message:  fmt.Sprintf("summary pass_rate regressed by %.4g below threshold %.4g", -comparison.Summary.DeltaPassRate, threshold),
+			Path:     baselinePath,
+			Details: map[string]any{
+				"baseline_pass_rate": comparison.Summary.BaselinePassRate,
+				"current_pass_rate":  comparison.Summary.CurrentPassRate,
+				"delta_pass_rate":    comparison.Summary.DeltaPassRate,
+				"threshold":          threshold,
+			},
+		})
+	}
+	for _, metric := range comparison.Metrics {
+		if !metric.Regressed {
+			continue
+		}
+		current.Status = "failed"
+		current.Findings = append(current.Findings, Finding{
+			Kind:     "evaluate_metric_regression",
+			Severity: "error",
+			Message:  fmt.Sprintf("metric %q pass_rate regressed by %.4g below threshold %.4g", metric.Name, -metric.Delta, threshold),
+			Path:     baselinePath,
+			Details: map[string]any{
+				"name":      metric.Name,
+				"type":      metric.Type,
+				"baseline":  metric.Baseline,
+				"current":   metric.Current,
+				"delta":     metric.Delta,
+				"threshold": threshold,
+			},
+		})
+	}
+}
+
+func CompareReports(current, baseline Report, baselinePath string, threshold float64) Comparison {
+	comparison := Comparison{
+		BaselinePath:        baselinePath,
+		RegressionThreshold: threshold,
+		Summary: &SummaryComparison{
+			BaselinePassRate: baseline.Summary.PassRate,
+			CurrentPassRate:  current.Summary.PassRate,
+			DeltaPassRate:    current.Summary.PassRate - baseline.Summary.PassRate,
+		},
+	}
+	if comparison.Summary.DeltaPassRate < -threshold {
+		comparison.Summary.Regressed = true
+	}
+	comparison.Metrics = compareMetricSummaries(current.Metrics, baseline.Metrics, threshold)
+	return comparison
+}
+
+func compareMetricSummaries(current, baseline []MetricSummary, threshold float64) []MetricComparison {
+	currentByKey := map[string]MetricSummary{}
+	baselineByKey := map[string]MetricSummary{}
+	keys := map[string]bool{}
+	for _, metric := range current {
+		key := metric.Name + "\x00" + metric.Type
+		currentByKey[key] = metric
+		keys[key] = true
+	}
+	for _, metric := range baseline {
+		key := metric.Name + "\x00" + metric.Type
+		baselineByKey[key] = metric
+		keys[key] = true
+	}
+	ordered := make([]string, 0, len(keys))
+	for key := range keys {
+		ordered = append(ordered, key)
+	}
+	sort.Strings(ordered)
+	out := make([]MetricComparison, 0, len(ordered))
+	for _, key := range ordered {
+		cur := currentByKey[key]
+		base := baselineByKey[key]
+		name, typ := splitMetricKey(key)
+		item := MetricComparison{
+			Name:          name,
+			Type:          typ,
+			BaselineCount: base.Count,
+			CurrentCount:  cur.Count,
+		}
+		switch typ {
+		case "bool":
+			item.Baseline = base.PassRate
+			item.Current = cur.PassRate
+			item.Delta = item.Current - item.Baseline
+			item.Regressed = item.Delta < -threshold
+		case "number":
+			item.Baseline = base.Mean
+			item.Current = cur.Mean
+			item.Delta = item.Current - item.Baseline
+		}
+		out = append(out, item)
+	}
+	return out
+}
+
+func splitMetricKey(key string) (string, string) {
+	parts := strings.SplitN(key, "\x00", 2)
+	if len(parts) != 2 {
+		return key, ""
+	}
+	return parts[0], parts[1]
 }
 
 type metricAccumulator struct {
@@ -1244,6 +1384,38 @@ func FormatText(report Report) string {
 			default:
 				fmt.Fprintf(&b, "  %s %s count=%d\n", metric.Name, metric.Type, metric.Count)
 			}
+		}
+	}
+	if report.Comparison != nil {
+		fmt.Fprintf(&b, "comparison: baseline=%s threshold=%.4g\n", report.Comparison.BaselinePath, report.Comparison.RegressionThreshold)
+		if report.Comparison.Summary != nil {
+			mark := "ok"
+			if report.Comparison.Summary.Regressed {
+				mark = "regressed"
+			}
+			fmt.Fprintf(&b, "  summary pass_rate %.4g -> %.4g (delta %.4g, %s)\n",
+				report.Comparison.Summary.BaselinePassRate,
+				report.Comparison.Summary.CurrentPassRate,
+				report.Comparison.Summary.DeltaPassRate,
+				mark,
+			)
+		}
+		for _, metric := range report.Comparison.Metrics {
+			if metric.Type != "bool" && metric.Type != "number" {
+				continue
+			}
+			mark := "ok"
+			if metric.Regressed {
+				mark = "regressed"
+			}
+			fmt.Fprintf(&b, "  metric %s %s %.4g -> %.4g (delta %.4g, %s)\n",
+				metric.Name,
+				metric.Type,
+				metric.Baseline,
+				metric.Current,
+				metric.Delta,
+				mark,
+			)
 		}
 	}
 	for _, c := range report.Cases {

@@ -220,6 +220,90 @@ func TestEvaluateCommandGateFlagKeepsFailureExit(t *testing.T) {
 	}
 }
 
+func TestEvaluateCommandBaselineComparisonPassesWithinThreshold(t *testing.T) {
+	dir := t.TempDir()
+	baselinePath := filepath.Join(dir, "baseline.json")
+	baseline := evaluate.Report{
+		SchemaVersion: 1,
+		Status:        "ok",
+		Summary:       evaluate.Summary{PassRate: 0.9},
+		Metrics: []evaluate.MetricSummary{{
+			Name: "correct", Type: "bool", Count: 10, True: 9, False: 1, PassRate: 0.9,
+		}},
+	}
+	writeEvaluateJSONReport(t, baselinePath, baseline)
+	path := filepath.Join(dir, "checks.leia")
+	src := `evaluate "baseline ok" {
+    eval.case("row_1", func() { eval.metric("correct", true) })
+    eval.case("row_2", func() { eval.metric("correct", true) })
+}
+`
+	if err := os.WriteFile(path, []byte(src), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runEvaluateCommand([]string{"--format=json", "--baseline", baselinePath, "--regression-threshold", "0.05", path}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runEvaluateCommand code = %d, stderr = %q", code, stderr.String())
+	}
+	var report evaluate.Report
+	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
+		t.Fatalf("decode report: %v\n%s", err, stdout.String())
+	}
+	if report.Comparison == nil || report.Comparison.Summary == nil || report.Comparison.Summary.Regressed {
+		t.Fatalf("comparison = %#v", report.Comparison)
+	}
+	if report.Comparison.Metrics[0].Name != "correct" || report.Comparison.Metrics[0].Regressed {
+		t.Fatalf("metric comparison = %#v", report.Comparison.Metrics)
+	}
+}
+
+func TestEvaluateCommandBaselineComparisonFailsGate(t *testing.T) {
+	dir := t.TempDir()
+	baselinePath := filepath.Join(dir, "baseline.json")
+	baseline := evaluate.Report{
+		SchemaVersion: 1,
+		Status:        "ok",
+		Summary:       evaluate.Summary{PassRate: 1},
+		Metrics: []evaluate.MetricSummary{{
+			Name: "correct", Type: "bool", Count: 2, True: 2, PassRate: 1,
+		}},
+	}
+	writeEvaluateJSONReport(t, baselinePath, baseline)
+	path := filepath.Join(dir, "checks.leia")
+	src := `evaluate "baseline regression" {
+    eval.case("row_1", func() { eval.metric("correct", true) })
+    eval.case("row_2", func() { eval.metric("correct", false) })
+}
+`
+	if err := os.WriteFile(path, []byte(src), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runEvaluateCommand([]string{"--format=text", "--baseline", baselinePath, "--regression-threshold", "0.1", path}, &stdout, &stderr)
+	if code != 1 {
+		t.Fatalf("runEvaluateCommand code = %d, stderr = %q stdout=%q", code, stderr.String(), stdout.String())
+	}
+	for _, want := range []string{"evaluate: failed", "comparison:", "summary pass_rate 1 -> 1", "metric correct bool 1 -> 0.5", "regressed"} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Fatalf("stdout missing %q:\n%s", want, stdout.String())
+		}
+	}
+}
+
+func writeEvaluateJSONReport(t *testing.T, path string, report evaluate.Report) {
+	t.Helper()
+	data, err := json.Marshal(report)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, data, 0644); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestEvaluateCommandJSONFailureStatus(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "fail.leia")
