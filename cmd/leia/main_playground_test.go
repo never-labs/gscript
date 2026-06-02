@@ -183,6 +183,34 @@ print(result.text)`
 	}
 }
 
+func TestPlaygroundExecGLMProfileAliasUsesAIProfile(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"content":[{"type":"text","text":"LEIA_GLM_OK"}],"stop_reason":"end_turn","usage":{"input_tokens":1,"output_tokens":1}}`))
+	}))
+	defer server.Close()
+	t.Setenv("LEIA_GLM_BASE_URL", server.URL)
+	t.Setenv("LEIA_GLM_API_KEY", "test-key")
+	t.Setenv("LEIA_GLM_MODEL", "mock-glm")
+
+	dir := t.TempDir()
+	path := dir + "/main.leia"
+	src := `result, err := turn { user: "Reply exactly: LEIA_GLM_OK", max_tokens: 16, temperature: 0 }
+if err != nil { print(err.message); return }
+print(result.text)`
+	if err := os.WriteFile(path, []byte(src), 0600); err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	code := runPlaygroundExecCommand([]string{"--profile=glm", "--max-steps=100000", path}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("code = %d\nstdout:\n%s\nstderr:\n%s", code, stdout.String(), stderr.String())
+	}
+	if strings.TrimSpace(stdout.String()) != "LEIA_GLM_OK" {
+		t.Fatalf("stdout = %q", stdout.String())
+	}
+}
+
 func TestPlaygroundCommandRejectsBadFlags(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	code := runPlaygroundCommand([]string{"--timeout=0s"}, &stdout, &stderr)

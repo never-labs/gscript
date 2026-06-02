@@ -240,7 +240,7 @@ func normalizePlaygroundProfile(profile string) string {
 	switch strings.ToLower(strings.TrimSpace(profile)) {
 	case "", "sandbox":
 		return "sandbox"
-	case "ai", "llm":
+	case "ai", "llm", "glm":
 		return "ai"
 	default:
 		return ""
@@ -482,171 +482,263 @@ func playgroundTourLessons() []playgroundExample {
 	return []playgroundExample{
 		{
 			ID:      "welcome",
-			Title:   "Welcome",
+			Title:   "A Useful First Script",
 			Section: "Basics",
-			Summary: "Start with print, local bindings, strings, and arithmetic.",
+			Summary: "Start with a tiny data-cleanup script instead of isolated print statements.",
 			Concepts: []string{
 				"`:=` creates a local binding.",
-				"`print` writes tab-separated values to stdout.",
-				"Numbers and strings are ordinary first-class values.",
+				"Tables can hold records with named fields.",
+				"Standard library calls compose with ordinary script code.",
 			},
-			Source: `print("hello from Leia")
+			Source: `raw := {
+    { name: "Ada", email: " ADA@EXAMPLE.COM ", active: true },
+    { name: "Lin", email: " lin@example.com ", active: false },
+    { name: "Grace", email: " Grace@Example.com ", active: true },
+}
 
-name := "playground"
-year := 2026
-print("running", name, year)
-print("score", 40 + 2)`,
+clean := {}
+for _, user := range raw {
+    if !user.active {
+        continue
+    }
+    clean[#clean + 1] = {
+        name: user.name,
+        email: string.lower(string.trim(user.email)),
+    }
+}
+
+print(json.encode(clean))`,
 			Runnable: true,
 		},
 		{
 			ID:      "control-flow",
-			Title:   "Control Flow",
+			Title:   "Control Flow And Scope",
 			Section: "Basics",
-			Summary: "Use if statements and loops for predictable imperative code.",
+			Summary: "Use ordinary imperative control flow with lexical block scope.",
 			Concepts: []string{
 				"`if` conditions use blocks with braces.",
-				"`for` can be a counted loop.",
-				"`continue` and `break` work inside loops.",
+				"Only `nil` and `false` are false.",
+				"Loop bodies can build up tables incrementally.",
 			},
-			Source: `total := 0
-
-for i := 1; i <= 10; i = i + 1 {
-    if i % 2 == 1 {
-        continue
-    }
-    total = total + i
+			Source: `events := {
+    { type: "click", value: 1 },
+    { type: "view", value: 5 },
+    { type: "click", value: 2 },
+    { type: "error", value: 99 },
 }
 
-if total > 20 {
-    print("large", total)
-} else {
-    print("small", total)
+counts := {}
+for _, event := range events {
+    if event.type == "error" {
+        continue
+    }
+    if counts[event.type] == nil {
+        counts[event.type] = 0
+    }
+    counts[event.type] = counts[event.type] + event.value
+}
+
+for kind, count := range counts {
+    print(kind, count)
 }`,
 			Runnable: true,
 		},
 		{
 			ID:      "functions",
-			Title:   "Functions",
+			Title:   "Functions And Multiple Returns",
 			Section: "Functions",
-			Summary: "Functions are values, can call other functions, and may return multiple values.",
+			Summary: "Functions are values and can return status plus data without special syntax.",
 			Concepts: []string{
 				"`func name(args) { ... }` declares a function.",
-				"Multiple return values are adjusted at assignment sites.",
-				"Recursion works in the interpreter and bytecode VM.",
+				"Multiple returns make result/error-style APIs natural.",
+				"Closures can capture local state.",
 			},
-			Source: `func divmod(a, b) {
-    return a / b, a % b
+			Source: `func parse_score(row) {
+    parts := string.split(row, ":")
+    if #parts != 2 {
+        return nil, "bad row: " .. row
+    }
+    return { name: string.trim(parts[1]), score: tonumber(parts[2]) }, nil
 }
 
-func fib(n) {
-    if n < 2 {
+func counter() {
+    n := 0
+    return func() {
+        n = n + 1
         return n
     }
-    return fib(n - 1) + fib(n - 2)
 }
 
-q, r := divmod(17, 5)
-print("divmod", q, r)
-print("fib", fib(10))`,
+next_id := counter()
+for _, row := range { "Ada:98", "bad", "Grace:95" } {
+    item, err := parse_score(row)
+    if err != nil {
+        print("skip", err)
+        continue
+    }
+    print(next_id(), item.name, item.score)
+}`,
 			Runnable: true,
 		},
 		{
 			ID:      "tables",
-			Title:   "Tables",
+			Title:   "Tables As Records And Maps",
 			Section: "Data",
-			Summary: "Tables provide array-like and map-like data in one dynamic structure.",
+			Summary: "Tables cover records, arrays, dictionaries, and nested data structures.",
 			Concepts: []string{
 				"Array indexes are one-based.",
 				"Named fields and computed fields share the same table value.",
-				"`range` iterates key/value pairs.",
+				"`pairs` and `range` work well for grouping and aggregation.",
 			},
-			Source: `scores := { ada: 98, lin: 91, ken: 87 }
-scores["grace"] = 95
-
-total := 0
-count := 0
-for name, score := range scores {
-    print(name, score)
-    total = total + score
-    count = count + 1
+			Source: `orders := {
+    { region: "apac", amount: 12 },
+    { region: "emea", amount: 20 },
+    { region: "apac", amount: 30 },
 }
-print("avg", total / count)`,
+
+by_region := {}
+for _, order := range orders {
+    bucket := by_region[order.region]
+    if bucket == nil {
+        bucket = { total: 0, count: 0 }
+        by_region[order.region] = bucket
+    }
+    bucket.total = bucket.total + order.amount
+    bucket.count = bucket.count + 1
+}
+
+print(json.encode(by_region))`,
 			Runnable: true,
 		},
 		{
 			ID:      "strings-stdlib",
-			Title:   "Strings And Stdlib",
+			Title:   "Standard Library Pipeline",
 			Section: "Standard Library",
-			Summary: "The sandboxed playground exposes safe standard-library modules such as string, math, json, and sort.",
+			Summary: "Safe standard-library modules are available without filesystem or network access.",
 			Concepts: []string{
 				"Standard libraries are available as global module tables.",
-				"Safe modules work without host filesystem or network access.",
-				"JSON and string helpers are useful for scripts and agent data.",
+				"JSON, string, table, and math helpers are enough for many host scripts.",
+				"Structured output stays easy to pass back to Go.",
 			},
-			Source: `text := "Leia Playground"
-print(string.lower(text))
-print(string.sub(text, 1, 4))
+			Source: `items := { "alpha", "beta", "alpha", "gamma" }
+seen := {}
+unique := {}
+for _, item := range items {
+    key := string.upper(item)
+    if seen[key] == nil {
+        seen[key] = true
+        unique[#unique + 1] = key
+    }
+}
 
-payload := json.encode({ language: "Leia", ok: true, count: 3 })
-print(payload)
-
-print("sqrt", math.sqrt(81))`,
+table.sort(unique)
+print(table.concat(unique, ","))
+print("distance", math.sqrt(3 * 3 + 4 * 4))`,
 			Runnable: true,
 		},
 		{
 			ID:      "errors",
-			Title:   "Errors",
+			Title:   "Errors And Recovery",
 			Section: "Robustness",
-			Summary: "Use protected calls when a script should recover from a runtime error.",
+			Summary: "Protected calls let host-facing scripts recover and return useful fallback data.",
 			Concepts: []string{
 				"`error` raises a runtime error.",
 				"`pcall` returns a status plus values instead of aborting.",
-				"Recovered errors can be printed, inspected, or converted into fallback values.",
+				"`assert` is useful in tests and evaluate blocks.",
 			},
-			Source: `func risky(n) {
-    if n == 0 {
-        error("division by zero")
+			Source: `func require_field(row, name) {
+    value := row[name]
+    if value == nil {
+        error("missing field: " .. name)
     }
-    return 10 / n
+    return value
 }
 
-ok, value := pcall(risky, 2)
-print(ok, value)
-
-ok, value = pcall(risky, 0)
-print(ok, value)`,
+rows := { { name: "Ada" }, { email: "lin@example.com" } }
+for _, row := range rows {
+    ok, value := pcall(require_field, row, "name")
+    if ok {
+        print("name", value)
+    } else {
+        print("recover", value)
+    }
+}`,
 			Runnable: true,
 		},
 		{
-			ID:      "channels",
-			Title:   "Channels",
+			ID:      "concurrency",
+			Title:   "Go-Style Concurrency",
 			Section: "Concurrency",
-			Summary: "Leia borrows Go-style channels for simple message passing.",
+			Summary: "Use goroutines, channels, and wait groups for simple parallel coordination.",
 			Concepts: []string{
-				"`make(chan, n)` creates a buffered channel.",
-				"`ch <- value` sends; `<-ch` receives.",
-				"Receives currently return value and ok, matching Go-style checked receive.",
+				"`go func() { ... }()` starts concurrent work.",
+				"Channels pass results back to the coordinator.",
+				"`sync.waitgroup()` waits for a fixed set of tasks.",
 			},
-			Source: `ch := make(chan, 2)
-ch <- "alpha"
-ch <- "beta"
+			Source: `jobs := { 3, 5, 8, 13 }
+out := make(chan, #jobs)
+wg := sync.waitgroup()
 
-print(<-ch)
-print(<-ch)`,
+for _, n := range jobs {
+    wg.add(1)
+    go func(value) {
+        out <- value * value
+        wg.done()
+    }(n)
+}
+
+wg.wait()
+sum := 0
+for i := 1; i <= #jobs; i++ {
+    sum = sum + (<-out)
+}
+print("sum of squares", sum)`,
 			Runnable: true,
 		},
 		{
 			ID:      "data-oriented",
 			Title:   "Data-Oriented Arrays",
 			Section: "Data",
-			Summary: "Dense arrays are the foundation for data-oriented workloads and later JIT optimizations.",
+			Summary: "Dense arrays and SoA tables give numeric scripts a clear, optimizable shape.",
 			Concepts: []string{
-				"`array.i64({...})` converts a table into a dense integer array.",
-				"Loops over dense arrays keep hot numeric code straightforward.",
-				"This is the user-facing shape that SoA and matrix work build on.",
+				"`[]f64{...}` and `[]i64{...}` create dense arrays.",
+				"`soa.zip` groups columns without losing column access.",
+				"Column kernels are the public shape for future JIT wins.",
 			},
-			Source: `xs := array.i64({ 1, 4, 9, 16, 25 })
-print("sum", array.sum(xs))`,
+			Source: `particles := soa.zip({
+    x: []f64{0, 1, 2, 3},
+    vx: []f64{0.5, 0.25, -0.5, 1.0},
+    id: []i64{101, 102, 103, 104},
+})
+
+soa.addScaled(particles, "x", "vx", 2.0)
+fast := soa.mask(particles, "vx", ">=", 0.5)
+
+print("positions", json.encode(soa.unzip(particles).x))
+print("fast count", soa.countWhere(particles, fast))
+print("fast ids", json.encode(soa.select(particles, fast, "id", 0)))`,
+			Runnable: true,
+		},
+		{
+			ID:      "evaluate",
+			Title:   "Executable Evaluation Blocks",
+			Section: "AI And Testing",
+			Summary: "Evaluate blocks make script-level regression checks live beside the code they verify.",
+			Concepts: []string{
+				"`evaluate \"name\" { ... }` is parsed by Leia tooling.",
+				"`leia evaluate` executes evaluate bodies and reports pass/fail JSON.",
+				"Normal script execution treats evaluate blocks as declarations, so examples can still run.",
+			},
+			Source: `func normalize_name(s) {
+    return string.lower(string.trim(s))
+}
+
+evaluate "normalizes display names" {
+    assert(normalize_name(" ADA ") == "ada")
+    assert(normalize_name("Grace") == "grace")
+}
+
+print("run leia evaluate to execute the evaluate block")`,
 			Runnable: true,
 		},
 	}
@@ -672,50 +764,55 @@ print(result.text)`,
 		},
 		{
 			ID:       "ai-agent-shape",
-			Title:    "Agent Shape",
+			Title:    "Reusable Agent",
 			Section:  "AI Basics",
-			Summary:  "Agents package prompt, input, and model choice as a callable value.",
+			Summary:  "An agent is a callable prompt capsule with defaults, input, and ordinary return values.",
 			Runnable: true,
+			Requires: "LLM provider",
 			Concepts: []string{
 				"`agent` declarations create callable AI values.",
 				"The host-provided GLM profile supplies the default model.",
 				"Use plain text for the simplest live agent path.",
 			},
 			Source: `agent summarize(topic) {
-    system: "Summarize in one sentence. Return plain text only."
+    system: "Summarize in one sentence for an engineer evaluating Leia. Return plain text only."
     user: topic
 }
 
-result, err := summarize("Leia is a Go-native scripting language with hot reload and AI agents.")
+result, err := summarize("Leia is a Go-native, hot-reloadable scripting language with AI-native agents.")
 if err != nil { print(err.message); return }
 print(result.text)`,
 		},
 		{
-			ID:       "ai-models",
-			Title:    "Named Models",
-			Section:  "Configuration",
-			Summary:  "Model blocks let scripts name provider configurations without a separate config file.",
+			ID:       "ai-structured-output",
+			Title:    "Structured Output",
+			Section:  "AI Basics",
+			Summary:  "Agents can ask for a concrete output shape and receive validated JSON-like data.",
 			Runnable: true,
-			Requires: "environment-backed model credentials",
+			Requires: "LLM provider",
 			Concepts: []string{
-				"`models` defines project-local model aliases.",
-				"Environment variables keep API keys out of source files.",
-				"Agents can select a model by its alias.",
+				"`output` declares the expected result shape.",
+				"The runtime validates model text before returning it as `result.value`.",
+				"Hosts can consume the value without reparsing ad-hoc prose.",
 			},
 			Source: `result, err := turn {
-    user: "Reply exactly: MODEL_ALIAS_OK"
-    max_tokens: 16
+    system: "Return raw JSON only. Do not use markdown, prose, or code fences."
+    user: "Return exactly this object with no extra keys: {\"product\":\"playground\",\"severity\":\"low\",\"action\":\"improve_demos\"}"
+    response_format: {type: "json_object"}
+    max_tokens: 64
     temperature: 0
 }
 if err != nil { print(err.message); return }
-print(result.text)`,
+ticket := json.decode(result.text)
+print(json.encode(ticket))`,
 		},
 		{
 			ID:       "ai-tool",
-			Title:    "Tool Use",
+			Title:    "Tool Use With Local Data",
 			Section:  "Tools",
-			Summary:  "Tools are ordinary Leia functions with descriptions and capability annotations.",
+			Summary:  "Expose a narrow local function to the model instead of giving it broad host access.",
 			Runnable: true,
+			Requires: "LLM provider",
 			Concepts: []string{
 				"`tool` declares a callable function that an agent can expose to a model.",
 				"`//leia:requires` documents required host capabilities.",
@@ -724,16 +821,21 @@ print(result.text)`,
 			Source: `//leia:requires docs.read
 //leia:param query search query
 tool lookup(query) {
-    return "doc:" .. query, nil
+    docs := {
+        memory: "Use messages{} for history, then append msg.assistant and msg.user.",
+        tools: "Declare tool functions and pass them in an agent tools list.",
+        eval: "Use evaluate blocks for regression checks."
+    }
+    return docs[query] || "No local doc for " .. query, nil
 }
 
 agent answer_with_lookup(question) {
-    system: "Use lookup when useful. Reply in one short sentence."
+    system: "Use lookup with one of: memory, tools, eval. Reply in two short bullets."
     user: question
     tools: [lookup]
 }
 
-result, err := answer_with_lookup("What does lookup return for agent memory?")
+result, err := answer_with_lookup("How should I keep multi-turn memory in Leia?")
 if err != nil { print(err.message); return }
 print(result.text)`,
 		},
@@ -741,7 +843,7 @@ print(result.text)`,
 			ID:       "ai-memory",
 			Title:    "Multi-Turn Memory",
 			Section:  "Conversation",
-			Summary:  "Separate history construction from each new user input for multi-turn agents.",
+			Summary:  "Build history explicitly, then add assistant and user turns as the conversation evolves.",
 			Runnable: true,
 			Requires: "LLM provider",
 			Concepts: []string{
@@ -751,14 +853,14 @@ print(result.text)`,
 			},
 			Source: `history := messages {
     system: "Remember facts exactly."
-    user: "Store: project=ORCHID, owner=ADA. Reply MEMORY_STORED."
+    user: "Store these facts: project=ORCHID, owner=ADA, risk=LOW. Reply MEMORY_STORED."
 }
 
 stored, err := turn { messages: history, max_tokens: 32 }
 if err != nil { return nil, err }
 
 history[#history + 1] = msg.assistant(stored.text)
-history[#history + 1] = msg.user("Recall the project and owner.")
+history[#history + 1] = msg.user("Recall project, owner, and risk as key=value pairs.")
 
 recalled, err := turn { messages: history, max_tokens: 64 }
 print(recalled.text)`,
@@ -767,7 +869,7 @@ print(recalled.text)`,
 			ID:       "ai-agent-tool",
 			Title:    "Agent As Tool",
 			Section:  "Tools",
-			Summary:  "An agent can be exposed as a tool to a supervisor agent for delegation.",
+			Summary:  "Delegate focused extraction work to a specialist agent from a supervisor.",
 			Runnable: true,
 			Requires: "LLM provider",
 			Concepts: []string{
@@ -776,18 +878,18 @@ print(recalled.text)`,
 				"Output shapes make tool results predictable.",
 			},
 			Source: `agent extract_memory(note) {
-    system: "Extract project and owner. Return compact JSON."
+    system: "Extract project, owner, and risk. Return compact JSON."
     user: note
-    output: { project: "ORCHID", owner: "ADA" }
+    output: { project: "ORCHID", owner: "ADA", risk: "LOW" }
 }
 
 agent supervisor(question) {
-    system: "Call extract_memory before answering."
+    system: "Call extract_memory before answering. Summarize the extracted fields."
     user: question
     tools: [extract_memory]
 }
 
-result, err := supervisor("project is ORCHID and owner is ADA")
+result, err := supervisor("project is ORCHID, owner is ADA, launch risk is LOW")
 if err != nil { print(err.message); return }
 print(result.text)`,
 		},
@@ -853,30 +955,208 @@ print(checked.text)`,
 		},
 		{
 			ID:       "ai-coding-agent",
-			Title:    "Coding Agent Shape",
+			Title:    "Coding Agent With Safe Tools",
 			Section:  "Agent Workflows",
-			Summary:  "A coding agent combines read-only tools, patch proposal, trace recording, and a strict output contract.",
+			Summary:  "A coding agent gathers context, checks tests, iterates on feedback, and returns a bounded program patch.",
 			Runnable: true,
+			Requires: "LLM provider",
 			Concepts: []string{
-				"Keep dangerous host actions behind explicit tools and capabilities.",
-				"Return a structured patch plan instead of mutating files implicitly.",
-				"Use evaluate blocks later to regression-test prompts and tool choices.",
+				"Multiple tools expose narrow read/search/test capabilities.",
+				"A custom `flow` controls the loop instead of letting the model mutate files.",
+				"The agent can revise after test feedback and still return a reviewable result.",
 			},
-			Source: `//leia:requires fs.read
+			Source: `func read_file_impl(path) {
+    if path == "README.md" {
+        return "Build a small Leia program. Prefer pure functions and evaluate blocks.", nil
+    }
+    if path == "src/main.leia" {
+        return "func slugify(title) { return title }", nil
+    }
+    if path == "tests/slugify_cases.txt" {
+        return "Hello Leia => hello-leia; AI Native Script => ai-native-script", nil
+    }
+    return "missing file: " .. path, nil
+}
+
+func search_repo_impl(query) {
+    if string.find(query, "slug") != nil {
+        return {"src/main.leia", "tests/slugify_cases.txt"}, nil
+    }
+    return {"README.md"}, nil
+}
+
+func read_docs_impl(topic) {
+    docs := {
+        strings: "Use string.lower, string.trim, string.gsub, and string.split for text cleanup.",
+        eval_doc: "Use evaluate \"name\" { assert(...) } for regression checks.",
+        style: "Keep host-changing operations behind explicit tools."
+    }
+    return docs[topic] || "No docs for " .. topic, nil
+}
+
+func run_tests_impl(patch) {
+    lower := string.lower(patch)
+    has_function := string.find(lower, "func slugify") != nil
+    has_evaluate := string.find(lower, "evaluate") != nil
+    has_cases := string.find(lower, "hello%-leia") != nil && string.find(lower, "ai%-native%-script") != nil
+    uses_supported_string_api := string.find(lower, "string.lower") != nil && string.find(lower, "string.trim") != nil && string.find(lower, "string.gsub") != nil
+    has_leia_binding := string.find(lower, ":=") != nil
+    uses_invalid_syntax := string.find(lower, "var ") != nil ||
+        string.find(lower, "let ") != nil ||
+        string.find(lower, "while ") != nil ||
+        string.find(lower, "import ") != nil ||
+        string.find(lower, "\n#") != nil ||
+        string.find(lower, " null") != nil ||
+        string.find(lower, "string.at") != nil ||
+        string.find(lower, "string.length") != nil ||
+        string.find(lower, "string.substring") != nil
+    if has_function && has_evaluate && has_cases && uses_supported_string_api && has_leia_binding && !uses_invalid_syntax {
+        return { ok: true, output: "2 slugify cases passed" }, nil
+    }
+    return { ok: false, output: "patch must be raw Leia code only. Use := locals, // comments, nil, func slugify, string.lower/trim/gsub, evaluate cases for hello-leia and ai-native-script. Do not use markdown, import, var, let, while, # comments, null, string.at, string.length, or string.substring" }, nil
+}
+
+func propose_file_impl(path, body) {
+    return { path: path, body: body, mode: "proposal_only" }, nil
+}
+
+//leia:requires fs.read
 //leia:param path source file path
 tool read_file(path) {
-    return "file:" .. path .. ": contents omitted in demo", nil
+    return read_file_impl(path)
+}
+
+//leia:requires repo.search
+//leia:param query search query
+tool search_repo(query) {
+    return search_repo_impl(query)
+}
+
+//leia:requires docs.read
+//leia:param topic language topic
+tool read_docs(topic) {
+    return read_docs_impl(topic)
+}
+
+//leia:requires tests.run
+//leia:param patch proposed patch text
+tool run_tests(patch) {
+    return run_tests_impl(patch)
+}
+
+//leia:requires patch.write
+//leia:param path target path
+//leia:param body proposed file content
+tool propose_file(path, body) {
+    return propose_file_impl(path, body)
 }
 
 agent coding_agent(task) {
-    system: "Inspect files, then propose a small patch plan. Do not mutate files. Return plain text only."
+    system: "You are a careful coding agent for Leia. Produce a complete Leia patch proposal. Include code, tests, and risk notes. Do not claim to have written files."
     user: task
-    tools: [read_file]
+    tools: [search_repo, read_file, read_docs, run_tests, propose_file]
+    budget: {turns: 4, calls: 8, tokens: 3200}
+} flow {
+    hits, _ := search_repo_impl("slugify implementation and tests")
+    readme, _ := read_file_impl("README.md")
+    current, _ := read_file_impl("src/main.leia")
+    cases, _ := read_file_impl("tests/slugify_cases.txt")
+    string_docs, _ := read_docs_impl("strings")
+    eval_docs, _ := read_docs_impl("eval_doc")
+
+    prompt := task ..
+        "\n\nsearch: " .. json.encode(hits) ..
+        "\nreadme: " .. readme ..
+        "\ncurrent: " .. current ..
+        "\ncases: " .. cases ..
+        "\nstring_docs: " .. string_docs ..
+        "\nevaluate_docs: " .. eval_docs ..
+        "\n\nReturn raw JSON only with exactly two string fields: code and risk. code must be raw Leia source, not markdown. Include func slugify(title), use string.lower/string.trim/string.gsub, and include an evaluate block with the two required cases. Use := locals, nil, and // comments. Do not use import, var, let, while, null, # comments, markdown, string.at, string.length, or string.substring."
+
+    last := nil
+    for attempt := 1; attempt <= 3; attempt++ {
+        draft, err := turn {
+            system: system
+            user: prompt
+            tools: {}
+            response_format: {type: "json_object"}
+            max_tokens: 700
+        }
+        if err != nil {
+            return nil, err
+        }
+        decoded, patch := pcall(json.decode, draft.text)
+        if !decoded || patch == nil || patch.code == nil {
+            fence := string.char(96, 96, 96)
+            cleaned, _ := string.gsub(draft.text, fence .. "json", "")
+            cleaned, _ = string.gsub(cleaned, fence, "")
+            decoded, patch = pcall(json.decode, cleaned)
+        }
+        if !decoded || patch == nil || patch.code == nil {
+            patch = {
+                code: draft.text,
+                risk: "model did not return the requested JSON shape",
+            }
+        }
+        last = patch
+
+        report, test_err := run_tests_impl(patch.code)
+        if test_err != nil {
+            return nil, test_err
+        }
+        if report.ok {
+            proposal, _ := propose_file_impl("src/main.leia", patch.code)
+            return {
+                text: patch.code,
+                attempts: attempt,
+                tests: report.output,
+                risk: patch.risk,
+                proposal: proposal,
+            }, nil
+        }
+
+        prompt = prompt .. "\n\nPrevious code:\n" .. patch.code .. "\n\nTest feedback: " .. report.output .. ". Return raw JSON only with fixed code and risk."
+    }
+
+    return {
+        text: last.code,
+        attempts: 3,
+        tests: "needs human review after three attempts",
+        risk: last.risk,
+    }, nil
 }
 
-result, err := coding_agent("Inspect cmd/leia/playground.go and suggest a tiny UI improvement.")
+result, err := coding_agent("Implement slugify(title) for blog URLs and include evaluate regression cases.")
 if err != nil { print(err.message); return }
+print("attempts", result.attempts)
+print("tests", result.tests)
+print("risk", result.risk)
 print(result.text)`,
+		},
+		{
+			ID:       "ai-evaluate-loop",
+			Title:    "Agent Regression Test",
+			Section:  "Evaluation",
+			Summary:  "Keep agent behavior checks near the prompt using evaluate blocks.",
+			Runnable: true,
+			Concepts: []string{
+				"`evaluate` blocks are normal source-level declarations.",
+				"`leia evaluate` executes the block and reports pass/fail JSON.",
+				"This is the local skeleton for richer record/replay agent evaluation.",
+			},
+			Source: `func classify_local(text) {
+    if string.find(string.lower(text), "refund") != nil {
+        return "refund"
+    }
+    return "other"
+}
+
+evaluate "refund classifier baseline" {
+    assert(classify_local("customer asks for a refund") == "refund")
+    assert(classify_local("customer says hello") == "other")
+}
+
+print("run leia evaluate to execute this regression block")`,
 		},
 	}
 }
