@@ -59,9 +59,9 @@ See [AI-native Leia](../guides/ai-native.md).
 ## Evaluate Examples
 
 ```bash
-go run ./cmd/leia evaluate --llm-replay examples/evaluate/agent_replay.records.json examples/evaluate/agent_replay.leia
-go run ./cmd/leia evaluate --llm-replay examples/evaluate/llm_replay.records.json examples/evaluate/llm_replay.leia
-go run ./cmd/leia evaluate --llm-replay examples/evaluate/multiturn_replay.records.json examples/evaluate/multiturn_replay.leia
+go run ./cmd/leia evaluate --replay examples/evaluate/agent_replay.records.json examples/evaluate/agent_replay.leia
+go run ./cmd/leia evaluate --replay examples/evaluate/llm_replay.records.json examples/evaluate/llm_replay.leia
+go run ./cmd/leia evaluate --replay examples/evaluate/multiturn_replay.records.json examples/evaluate/multiturn_replay.leia
 ```
 
 Evaluate examples are source-level regression checks. Some are ordinary local

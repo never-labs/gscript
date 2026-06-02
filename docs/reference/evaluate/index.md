@@ -18,7 +18,7 @@ leia evaluate --json --output eval-report.json path/to/project
 leia evaluate --format=text path/to/project
 leia evaluate --list --filter "refund flow" tests/agents
 leia evaluate --filter "refund flow" tests/agents
-leia evaluate --llm-replay tests/agent.records.json tests/agent.leia
+leia evaluate --replay tests/agent.records.json tests/agent.leia
 leia evaluate --update-golden tests/agent.records.json tests/agent.leia
 ```
 
@@ -36,11 +36,13 @@ package:
 | Flag | Meaning |
 |---|---|
 | `--output FILE` | Write the rendered JSON or text report to `FILE` instead of stdout. The command still exits non-zero when the report status is `failed`. |
-| `--llm-replay FILE` | Use `FILE` as a deterministic provider transcript. Request mismatches, exhausted replay, or unconsumed turns fail the report. |
-| `--llm-record FILE` | Run against the configured provider and write observed turns to `FILE`. |
+| `--replay FILE` | Use `FILE` as a deterministic provider transcript. Request mismatches, exhausted replay, or unconsumed turns fail the report. |
+| `--record FILE` | Run against the configured provider and write observed turns to `FILE`. |
 | `--update-golden FILE` | Run against the configured provider and rewrite `FILE` as the new golden transcript. This is intentionally explicit so CI can forbid it. |
 
-The three LLM fixture modes are mutually exclusive.
+The three LLM fixture modes are mutually exclusive. The explicit
+`--llm-replay` and `--llm-record` spellings are also accepted when a script or
+dashboard wants the fixture type in the flag name.
 
 The JSON report is versioned with `schema_version: 1` and includes:
 

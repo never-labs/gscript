@@ -73,8 +73,10 @@ func TestEvaluateCommandHelpExplainsReplayModes(t *testing.T) {
 		"Run source-level evaluate blocks",
 		"Examples:",
 		"--output eval-report.json",
-		"--llm-replay examples/evaluate/agent_replay.records.json",
+		"--replay examples/evaluate/agent_replay.records.json",
 		"LLM fixture modes are mutually exclusive:",
+		"--record",
+		"--llm-record",
 		"--update-golden",
 	} {
 		if !strings.Contains(stderr.String(), want) {
@@ -297,7 +299,7 @@ func TestEvaluateCommandLLMReplay(t *testing.T) {
 		t.Fatal(err)
 	}
 	var stdout, stderr bytes.Buffer
-	code := runEvaluateCommand([]string{"--format=json", "--llm-replay", recordPath, path}, &stdout, &stderr)
+	code := runEvaluateCommand([]string{"--format=json", "--replay", recordPath, path}, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("runEvaluateCommand code = %d, stderr = %q", code, stderr.String())
 	}
@@ -310,6 +312,20 @@ func TestEvaluateCommandLLMReplay(t *testing.T) {
 	}
 	if report.LLM == nil || report.LLM.Mode != "replay" || report.LLM.ReplayedTurns != 1 {
 		t.Fatalf("llm report = %#v", report.LLM)
+	}
+}
+
+func TestEvaluateCommandRejectsConflictingReplayAliases(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := runEvaluateCommand([]string{"--replay", "short.json", "--llm-replay", "long.json"}, &stdout, &stderr)
+	if code != 2 {
+		t.Fatalf("runEvaluateCommand code = %d, stderr = %q", code, stderr.String())
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("stdout = %q, want empty", stdout.String())
+	}
+	if !strings.Contains(stderr.String(), "--replay and --llm-replay specify different files") {
+		t.Fatalf("stderr = %q", stderr.String())
 	}
 }
 
