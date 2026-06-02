@@ -44,6 +44,8 @@ only.
   reload-oriented runtime usage.
 - [AI-native guide](guides/ai-native.md): agents, tools, models, message
   history, and provider setup.
+- [Editors and LSP](guides/editors.md): `leia-lsp`, syntax highlighting,
+  tree-sitter, VS Code, Emacs, Neovim, Helix, and Zed integration.
 - [Style guide](guides/style.md): naming, errors, capabilities, AI-native
   patterns, concurrency, and test conventions.
 - [Cookbook](cookbook/index.md): short recipes for testing, evaluate replay,
