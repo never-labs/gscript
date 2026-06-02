@@ -83,15 +83,34 @@ assert(postCount == 3)
 assert(bodyCount == 2)
 ```
 
-`for key := range iterator { ... }` and
-`for key, value := range iterator { ... }` iterate over a runtime iterator. For
-ordinary tables, use `pairs(table)` to obtain the table iterator. Sequence-style
-table entries use 1-based integer keys. Non-sequence table iteration order is
-unspecified and must not be used for stable program behavior.
+`for key := range expr { ... }` and
+`for key, value := range expr { ... }` evaluate `expr` once, then iterate
+according to the resulting value category. The range variables are fresh lexical
+bindings for each iteration. Closures created inside the loop capture that
+iteration's bindings, not one shared loop slot.
 
-The range variables are fresh lexical bindings for each iteration. Closures
-created inside the loop capture that iteration's bindings, not one shared loop
-slot.
+The v1.0 range algorithm is:
+
+1. Evaluate `expr` once before the loop begins.
+2. If the value is a table, repeatedly call the table's next-entry operation.
+   With one range variable, bind the key. With two range variables, bind the key
+   and value. Sequence-style table entries use 1-based integer keys.
+   Non-sequence table iteration order is unspecified and must not be used for
+   stable program behavior.
+3. If the value is a function, call it with no arguments before each iteration.
+   If the call returns no values or first returns `nil`, stop. Bind the first
+   result to the first range variable. Portable programs should not depend on a
+   second range variable for function iterators in v1.0; return a table or tuple
+   value when an iterator needs to carry multiple fields.
+4. If the value is a channel, receive until the channel is closed and drained.
+   With one range variable, bind each received value. With two range variables,
+   the second variable is currently not assigned by the stable channel range
+   contract and portable programs should use one variable.
+5. Any other value raises a runtime error.
+
+`break` exits the loop. `continue` skips to the next iteration and causes the
+range source to be advanced again according to the same algorithm. A `return`
+from the body exits the enclosing function.
 
 ```leia run
 items := {10, 20, 30}
@@ -119,6 +138,42 @@ for _, value := range pairs({10, 20, 30}) {
 assert(calls[1]() == 10)
 assert(calls[2]() == 20)
 assert(calls[3]() == 30)
+```
+
+```leia run all
+func counter(limit) {
+    n := 0
+    return func() {
+        n = n + 1
+        if n > limit {
+            return nil
+        }
+        return {value: n, square: n * n}
+    }
+}
+
+sum := 0
+for pair := range counter(3) {
+    sum += pair.value + pair.square
+}
+assert(sum == 20)
+
+ch := make(chan, 2)
+ch <- "a"
+ch <- "b"
+close(ch)
+
+text := ""
+for value := range ch {
+    text = text .. value
+}
+assert(text == "ab")
+
+ok := pcall(func() {
+    for _ := range 123 {
+    }
+})
+assert(!ok)
 ```
 
 `break` exits the innermost enclosing loop. `continue` starts the next
