@@ -695,6 +695,18 @@ first <span class="tok-operator">:=</span> pair()         <span class="tok-comme
 <pre class="language-leia leia-code"><code class="language-leia leia-code">user <span class="tok-operator">:=</span> { name: <span class="tok-string">&quot;Ada&quot;</span> }
 same <span class="tok-operator">:=</span> user.name <span class="tok-operator">==</span> user[<span class="tok-string">&quot;name&quot;</span>]
 user[<span class="tok-string">&quot;score&quot;</span>] <span class="tok-operator">=</span> <span class="tok-number">10</span></code></pre>
+<p><code>x:name(args)</code> is a method call. It evaluates <code>x</code> once, looks up field <code>name</code> on that receiver, then calls the result with the receiver inserted as the first argument. Therefore <code>x:name(a, b)</code> has the same stable call semantics as <code>x.name(x, a, b)</code>, except the receiver expression is evaluated only once.</p>
+<pre class="language-leia leia-code"><code class="language-leia leia-code">counter <span class="tok-operator">:=</span> {
+    value: <span class="tok-number">0</span>,
+    add: <span class="tok-keyword">func</span>(self, delta) {
+        self.value <span class="tok-operator">+=</span> delta
+        <span class="tok-keyword">return</span> self.value
+    },
+}
+
+<span class="tok-builtin">assert</span>(counter:add(<span class="tok-number">2</span>) <span class="tok-operator">==</span> <span class="tok-number">2</span>)
+<span class="tok-builtin">assert</span>(counter.add(counter, <span class="tok-number">3</span>) <span class="tok-operator">==</span> <span class="tok-number">5</span>)
+<span class="tok-builtin">assert</span>(counter.value <span class="tok-operator">==</span> <span class="tok-number">5</span>)</code></pre>
 <p>Metamethods may affect indexing, assignment, calls, arithmetic, comparison, and length behavior as specified in <a href="#">Tables And Metatables</a>.</p>
 <h3 id="expressions-operators">Operators</h3>
 <p>Operator dispatch has three layers:</p>
@@ -1632,10 +1644,25 @@ last <span class="tok-operator">:=</span> <span class="tok-number">0</span>
 <p>Optimizations may change timing, scheduling, batching, or whether a task reaches a cancellation checkpoint before another task, except where the program has established ordering through channels or a specified synchronization library. JIT side exits and deoptimization must resume with the same observable channel, defer, cancellation, and protected-error state as interpreter execution.</p></section><section><h2 id="ai-native-syntax">AI-Native Syntax</h2>
 <p>Leia&#x27;s AI-native syntax is a language layer over the <code>llm</code>, <code>msg</code>, <code>history</code>, and <code>loop</code> standard-library modules. The syntax is stable only when it uses the same provider, tracing, record/replay, cancellation, budget, and capability paths as direct library calls. Implementations must desugar the syntax to those runtime paths rather than maintaining a separate AI execution engine.</p>
 <p>An AI operation is deterministic until it reaches a provider, host callback, or tool body with side effects. Tests and replay fixtures should therefore record provider turns at the host boundary.</p>
+<h3 id="ai-native-syntax-stable-contract">Stable Contract</h3>
+<p>The stable AI-native contract is the following lowering boundary:</p>
+<div class="table-wrap"><table>
+<thead><tr><th>Source construct</th><th>Stable runtime meaning</th></tr></thead>
+<tbody>
+<tr><td><code>agent</code> without <code>flow</code></td><td>A callable frame that runs the built-in loop.</td></tr>
+<tr><td><code>agent</code> with <code>flow</code></td><td>A callable frame whose body is exactly the user flow.</td></tr>
+<tr><td><code>turn { ... }</code></td><td>One provider request. It does not dispatch tools.</td></tr>
+<tr><td><code>messages { ... }</code> / history</td><td>The ordered transcript carried between turns.</td></tr>
+<tr><td><code>tool</code></td><td>A callable tool table checked against declared capabilities.</td></tr>
+<tr><td><code>evaluate</code></td><td>A source-level regression case discovered by <code>leia evaluate</code>.</td></tr>
+</tbody></table></div>
+<p>An agent frame owns ambient configuration: <code>model</code>, <code>system</code>, <code>user</code>, <code>tools</code>, budget, capabilities, output shape, tracing, cancellation, replay, and provider selection. A <code>turn</code> may inherit from that frame, but the turn remains a single provider boundary operation. Tool dispatch is a separate operation performed either by the built-in agent loop or by explicit user code.</p>
+<p><code>history</code> and <code>messages</code> name the same stable data shape: an ordered list of normalized message tables. <code>messages { ... }</code> constructs such a list; a history variable is just a program variable holding that list. Histories, not tool lists or ambient config, are the durable evidence passed from one provider turn to the next.</p>
 <h3 id="ai-native-syntax-evaluate-blocks">Evaluate Blocks</h3>
 <p><code>evaluate &quot;case name&quot; { ... }</code> declares a source-level agent regression case. The case name is a required string literal. The block body uses ordinary Leia statements, so tools can parse declarations, setup code, agent calls, and later assertion syntax without relying on an external fixture format.</p>
-<p>In ordinary script execution an evaluate block has no runtime effect. The <code>leia evaluate</code> command owns discovery and evaluation semantics. The minimal runner discovers cases, reports their source position, validates the body with the same parser and AI-native syntax checks used for normal code, then executes the body as ordinary Leia code. Built-in <code>assert</code> failures or other runtime errors mark that case failed; provider scoring and richer tool/file assertions are reserved for later evaluate phases.</p>
+<p>In ordinary script execution an evaluate block has no runtime effect. The <code>leia evaluate</code> command owns discovery and evaluation semantics. The minimal runner discovers cases, reports their source position, validates the body with the same parser and AI-native syntax checks used for normal code, then executes the body as ordinary Leia code under the evaluation harness. Built-in <code>assert</code> failures or other runtime errors mark that case failed; provider scoring and richer tool/file assertions are reserved for later evaluate phases.</p>
 <p>The <code>leia evaluate</code> command may install a deterministic LLM replay provider or record provider turns into a golden fixture. Replay fixtures are strict: a request mismatch, an exhausted fixture, or leftover unconsumed turns is an evaluation failure. Updating a golden fixture is an explicit command-line mode, not an ordinary script side effect.</p>
+<p>Evaluate cases should be written so their non-provider behavior is deterministic. Runnable examples in this spec use local tools, custom flows, replay, or validation helpers rather than live network LLMs.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-directive">//leia:requires none</span>
 <span class="tok-keyword">tool</span> lookup(topic) {
     <span class="tok-keyword">return</span> <span class="tok-string">&quot;docs:&quot;</span> <span class="tok-operator">..</span> topic, <span class="tok-constant">nil</span>
@@ -1651,7 +1678,9 @@ evaluate <span class="tok-string">&quot;answer can use lookup&quot;</span> {
     result, err <span class="tok-operator">:=</span> lookup(<span class="tok-string">&quot;evaluate&quot;</span>)
     <span class="tok-builtin">assert</span>(err <span class="tok-operator">==</span> <span class="tok-constant">nil</span>)
     <span class="tok-builtin">assert</span>(result <span class="tok-operator">==</span> <span class="tok-string">&quot;docs:evaluate&quot;</span>)
-}</code></pre>
+}
+
+<span class="tok-keyword">return</span> lookup.name</code></pre>
 <h3 id="ai-native-syntax-models">Models</h3>
 <p><code>models { ... }</code> declares module-scoped model aliases and provider configuration. A field key is the public alias used by script code. A field value is either another alias string or a provider configuration table.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-contextual">models</span> {
@@ -1686,6 +1715,8 @@ value, err <span class="tok-operator">:=</span> search_notes.fn(<span class="tok
 <p>Tool values are ordinary values. They can be placed in <code>tools</code> lists, passed to <code>llm.dispatch</code>, inspected with <code>llm.tool_caps</code>, or constructed dynamically with <code>llm.tool</code> and <code>llm.toolof</code> when syntax is not convenient.</p>
 <h3 id="ai-native-syntax-agents">Agents</h3>
 <p>An <code>agent</code> is a callable workflow value. Calling an agent returns <code>(result, err)</code>. Without a custom <code>flow</code>, the runtime executes the built-in ReAct-style loop: synthesize an initial message history from configuration, perform turns, dispatch requested tools, append tool results, and stop on a final answer, provider stop, budget error, approval pause, cancellation, or unrecoverable tool/provider error.</p>
+<p>The built-in loop is the default because an agent declaration is normally a complete workflow specification. Adding <code>flow { ... }</code> replaces that loop with the supplied code. It does not customize one step of the default loop; it owns the whole workflow body.</p>
+<p>Every agent call creates a fresh agent frame. The frame is visible to nested <code>turn {}</code> calls as ambient configuration and to nested agent-as-tool calls as shared provider, trace, replay, budget, cancellation, and approval context.</p>
 <p>Named agents bind their name in the current scope:</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-contextual">agent</span> summarize(text) {
     system: <span class="tok-string">&quot;Return one concise paragraph.&quot;</span>
@@ -1707,9 +1738,17 @@ out, err <span class="tok-operator">:=</span> echo(<span class="tok-string">&quo
 <ul>
 <li>an **agent** is a callable workflow frame with configuration, defaults, budget, tools, output handling, tracing, replay, and optional custom <code>flow</code>;</li>
 <li>a **turn** is one provider request made from inside or outside such a frame;</li>
-<li>a built-in agent without <code>flow</code> repeatedly performs turns and dispatches tools for the caller;</li>
-<li>a custom <code>flow</code> performs no hidden turns. It runs ordinary Leia code, and the author must call <code>turn { ... }</code>, <code>llm.dispatch</code>, or other helpers explicitly.</li>
+<li>a built-in agent, meaning an agent without <code>flow</code>, repeatedly performs turns and dispatches tools for the caller;</li>
+<li>a custom-flow agent, meaning an agent with <code>flow</code>, performs no hidden turns and no hidden tool dispatch. It runs ordinary Leia code, and the author must call <code>turn { ... }</code>, <code>llm.dispatch</code>, or other helpers explicitly.</li>
 </ul>
+<p>The stable invariants are:</p>
+<ol>
+<li>A <code>turn</code> consumes a request table and produces one provider result or error.</li>
+<li>Passing <code>tools</code> to a turn only serializes available tool schemas into that provider request.</li>
+<li>A provider tool-call result is data. It has no effect until dispatched.</li>
+<li>Dispatch results become model-visible only after the surrounding code appends paired assistant-call and tool-result or tool-error messages to history.</li>
+<li>A later turn sees prior work only through its <code>messages</code> field.</li>
+</ol>
 <p>The default agent loop can be understood as this conceptual shape:</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-contextual">agent</span> answer(question) {
     model: <span class="tok-string">&quot;fast&quot;</span>
@@ -1724,7 +1763,8 @@ out, err <span class="tok-operator">:=</span> echo(<span class="tok-string">&quo
 <span class="tok-comment">// 3. if result.status == &quot;tool_calls&quot;, dispatch requested tools;</span>
 <span class="tok-comment">// 4. append tool results to history;</span>
 <span class="tok-comment">// 5. call another turn with the updated history;</span>
-<span class="tok-comment">// 6. stop on final answer, provider stop, budget, cancellation, or error.</span>
+<span class="tok-comment">// 6. validate structured output when configured;</span>
+<span class="tok-comment">// 7. stop on final answer, provider stop, budget, approval, cancellation, or error.</span>
 result, err <span class="tok-operator">:=</span> answer(<span class="tok-string">&quot;What changed?&quot;</span>)</code></pre>
 <p>The same structure can be written manually with a custom <code>flow</code> when the program needs precise multi-turn control:</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-contextual">agent</span> answer(question) {
@@ -1779,6 +1819,17 @@ result, err <span class="tok-operator">:=</span> answer(<span class="tok-string"
 out, err <span class="tok-operator">:=</span> scripted(<span class="tok-string">&quot;hello&quot;</span>)
 <span class="tok-keyword">return</span> out.inherited_model, out.inherited_tools, out.message_count, err</code></pre>
 <p>An important consequence is that <code>turn {}</code> never calls tools by itself. Passing <code>tools</code> to a turn only tells the provider which tool schemas are available. If the provider responds with tool calls, either the built-in agent loop or custom flow code must dispatch them and then make a later turn with the updated history.</p>
+<p>Agent results from the built-in loop include the final provider data and the history accumulated by the loop. The stable fields are:</p>
+<div class="table-wrap"><table>
+<thead><tr><th>Field</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td><code>status</code></td><td><code>done</code>, <code>tool_calls</code>, <code>stop</code>, <code>approval_pending</code>, or error-specific status.</td></tr>
+<tr><td><code>text</code></td><td>Final answer text when available.</td></tr>
+<tr><td><code>value</code></td><td>Structured value when <code>output</code> validation succeeds.</td></tr>
+<tr><td><code>history</code></td><td>Final message history accumulated by the loop.</td></tr>
+<tr><td><code>usage</code></td><td>Aggregated provider usage when available.</td></tr>
+</tbody></table></div>
+<p>Custom-flow agents return whatever the flow returns. They do not receive the built-in agent result wrapper unless the flow constructs it explicitly.</p>
 <h3 id="ai-native-syntax-agent-configuration">Agent Configuration</h3>
 <p>Agent configuration is a table-like field block. The stable fields are:</p>
 <div class="table-wrap"><table>
@@ -1808,6 +1859,18 @@ out, err <span class="tok-operator">:=</span> scripted(<span class="tok-string">
 <li>explicit fields on an inner <code>turn</code>.</li>
 </ol>
 <p>For scalar fields, later values replace earlier values. <code>tools</code> is inherited as one ordered list; an agent that sets <code>tools</code> replaces the default list rather than appending to it. <code>budget</code> dimensions compose by taking every specified limit from the closest frame and leaving unspecified dimensions inherited. The merged configuration is ambient for <code>turn {}</code> inheritance. Flow-local identifier injection, described below, is generated from fields written directly in the agent declaration or literal.</p>
+<p>Ambient configuration is not a lexical scope. It is a request-construction input read by AI runtime operations. In particular:</p>
+<div class="table-wrap"><table>
+<thead><tr><th>Item</th><th>Ambient inheritance</th><th>Flow-local identifier</th></tr></thead>
+<tbody>
+<tr><td><code>model</code></td><td>yes</td><td>only when explicit</td></tr>
+<tr><td><code>system</code></td><td>yes</td><td>only when explicit</td></tr>
+<tr><td><code>user</code></td><td>yes, for synthesized messages</td><td>no</td></tr>
+<tr><td><code>tools</code></td><td>yes</td><td>only when explicit</td></tr>
+<tr><td><code>budget</code></td><td>yes</td><td>no</td></tr>
+<tr><td><code>output</code></td><td>yes</td><td>only when explicit</td></tr>
+<tr><td>provider hints</td><td>yes</td><td>no</td></tr>
+</tbody></table></div>
 <pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-contextual">agent</span> defaults {
     model: <span class="tok-string">&quot;fast&quot;</span>
     system: <span class="tok-string">&quot;default system&quot;</span>
@@ -1837,6 +1900,7 @@ out, err <span class="tok-operator">:=</span> probe(<span class="tok-string">&qu
 <tr><td><code>output</code></td><td>explicit <code>output</code> field</td></tr>
 </tbody></table></div>
 <p>Only fields present in that explicit block create locals; omitted fields do not create <code>nil</code> locals. Defaults can still affect ambient <code>turn {}</code> behavior, but they do not create flow-local identifiers. No other config field is injected. In particular, <code>user</code>, <code>budget</code>, <code>response_format</code>, <code>metadata</code>, <code>max_tokens</code>, and sampling fields remain ambient configuration for <code>turn {}</code> but are not local variables. User declarations may shadow injected locals under the normal lexical scoping rules.</p>
+<p>The flow receives ordinary call parameters through its lexical scope. For prompt inputs, prefer using parameters directly (<code>q</code> in the examples) over relying on the <code>user</code> config field, because <code>user</code> is ambient prompt configuration and is not injected as a local.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code">user <span class="tok-operator">:=</span> <span class="tok-string">&quot;outer&quot;</span>
 
 <span class="tok-contextual">agent</span> scope(q) {
@@ -1853,12 +1917,22 @@ out, err <span class="tok-operator">:=</span> probe(<span class="tok-string">&qu
 out, err <span class="tok-operator">:=</span> scope(<span class="tok-string">&quot;inner&quot;</span>)
 <span class="tok-keyword">return</span> out.observed, out.shadowed, err</code></pre>
 <h3 id="ai-native-syntax-messages">Messages</h3>
-<p><code>messages { ... }</code> constructs an ordered message list. Role fields are converted to normalized message tables:</p>
+<p><code>messages { ... }</code> constructs an ordered message list. A history is any value with that same ordered list shape. Role fields are converted to normalized message tables:</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code">history <span class="tok-operator">:=</span> <span class="tok-contextual">messages</span> {
     system: <span class="tok-string">&quot;Use evidence.&quot;</span>
     user: <span class="tok-string">&quot;Find release notes.&quot;</span>
 }</code></pre>
 <p>The stable shorthand roles are <code>system</code>, <code>user</code>, and <code>assistant</code>. A field whose key is not one of those roles becomes <code>{role: key, text: value}</code>. A field without a key is inserted as-is, which allows incremental histories to mix message helper results in the same block.</p>
+<p>The stable normalized fields are:</p>
+<div class="table-wrap"><table>
+<thead><tr><th>Message kind</th><th>Required stable fields</th></tr></thead>
+<tbody>
+<tr><td>text message</td><td><code>role</code>, <code>text</code></td></tr>
+<tr><td>assistant tool call</td><td><code>role: &quot;assistant&quot;</code>, <code>tool_call</code></td></tr>
+<tr><td>tool result</td><td><code>role: &quot;tool&quot;</code>, <code>tool_use_id</code>, <code>value</code></td></tr>
+<tr><td>tool error</td><td><code>role: &quot;tool&quot;</code>, <code>tool_use_id</code>, <code>error</code> or error text</td></tr>
+</tbody></table></div>
+<p>Implementations may carry provider-specific metadata, but code that wants to be portable must preserve at least these fields.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code">call <span class="tok-operator">:=</span> {id: <span class="tok-string">&quot;call_1&quot;</span>, <span class="tok-keyword">tool</span>: <span class="tok-string">&quot;lookup&quot;</span>, args: {query: <span class="tok-string">&quot;leia&quot;</span>}}
 history <span class="tok-operator">:=</span> <span class="tok-contextual">messages</span> {
     system: <span class="tok-string">&quot;Use tool evidence.&quot;</span>
@@ -1872,6 +1946,15 @@ history <span class="tok-operator">:=</span> <span class="tok-contextual">messag
 <p>For histories built across multiple turns, append helper results explicitly: <code>msg.system</code>, <code>msg.user</code>, <code>msg.assistant</code>, <code>msg.assistant_call</code>, <code>msg.tool_result</code>, and <code>msg.tool_error</code>.</p>
 <p>Histories are the only stable handoff between provider turns. A tool list in a request is schema/context for the provider; it is not evidence by itself. When a provider requests a tool call, the call and its result become visible to a later turn only if the surrounding agent loop or custom flow appends both an assistant tool-call message and a matching tool-result or tool-error message to the next history.</p>
 <p>Tool-call messages and tool-result messages are paired by call id. The assistant message records the provider&#x27;s requested tool name and arguments. The tool message records the local dispatch result, recoverable dispatch error, and the same call id. Implementations must preserve this pairing when lowering the built-in agent loop, and user-written flows should preserve it when constructing manual histories.</p>
+<pre class="language-leia leia-code"><code class="language-leia leia-code">history <span class="tok-operator">:=</span> <span class="tok-contextual">messages</span> {
+    system: <span class="tok-string">&quot;s&quot;</span>
+    user: <span class="tok-string">&quot;u&quot;</span>
+}
+
+history[<span class="tok-operator">#</span>history <span class="tok-operator">+</span> <span class="tok-number">1</span>] <span class="tok-operator">=</span> msg.assistant(<span class="tok-string">&quot;draft&quot;</span>)
+history[<span class="tok-operator">#</span>history <span class="tok-operator">+</span> <span class="tok-number">1</span>] <span class="tok-operator">=</span> msg.user(<span class="tok-string">&quot;revise&quot;</span>)
+
+<span class="tok-keyword">return</span> <span class="tok-operator">#</span>history, history[<span class="tok-number">3</span>].role, history[<span class="tok-number">4</span>].text</code></pre>
 <pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-directive">//leia:requires none</span>
 <span class="tok-directive">//leia:param topic topic to look up</span>
 <span class="tok-keyword">tool</span> lookup(topic) {
@@ -1904,6 +1987,16 @@ value, err <span class="tok-operator">:=</span> llm.dispatch(call, [lookup])
 <span class="tok-keyword">return</span> <span class="tok-operator">#</span>history, history[<span class="tok-number">3</span>].tool_call.<span class="tok-keyword">tool</span>, history[<span class="tok-number">4</span>].tool_use_id, history[<span class="tok-number">4</span>].value, err</code></pre>
 <h3 id="ai-native-syntax-turns">Turns</h3>
 <p><code>turn { ... }</code> performs exactly one provider request and returns <code>(result, err)</code>. It never dispatches tools by itself. If the provider returns tool calls, the result has <code>status: &quot;tool_calls&quot;</code> and the caller or surrounding agent loop decides whether to dispatch them.</p>
+<p>The operation is equivalent to:</p>
+<ol>
+<li>merge explicit request fields over ambient agent configuration, if any;</li>
+<li>synthesize <code>messages</code> from <code>system</code> and <code>user</code> only when <code>messages</code> is absent;</li>
+<li>normalize tools, including agent-as-tool wrappers;</li>
+<li>check budget and cancellation;</li>
+<li>call the provider once;</li>
+<li>return the provider result or a structured error.</li>
+</ol>
+<p>No step above calls <code>llm.dispatch</code>.</p>
 <p>Stable request fields include:</p>
 <div class="table-wrap"><table>
 <thead><tr><th>Field</th><th>Meaning</th></tr></thead>
@@ -1962,11 +2055,22 @@ value, err <span class="tok-operator">:=</span> llm.dispatch(call, [lookup])
 <p>Recoverable failures return <code>nil, err</code>; see <a href="#">Errors</a> for error object conventions.</p>
 <h3 id="ai-native-syntax-structured-output">Structured Output</h3>
 <p><code>output</code> is an example shape, not a static type declaration. When a built-in agent loop receives a final text response and <code>output</code> is present, it parses the text as JSON, validates that the decoded table has the same required fields and primitive shapes as the example, and returns the parsed value in the agent result. Missing fields, type mismatches, non-object JSON, trailing JSON, and invalid JSON are validation errors.</p>
+<p>The stable validation rule is structural:</p>
+<div class="table-wrap"><table>
+<thead><tr><th>Example value</th><th>Accepted decoded value</th></tr></thead>
+<tbody>
+<tr><td>string</td><td>string</td></tr>
+<tr><td>number</td><td>number</td></tr>
+<tr><td>boolean</td><td>boolean</td></tr>
+<tr><td>table object</td><td>table with the same required keys recursively validated</td></tr>
+</tbody></table></div>
+<p>Extra fields may be preserved. Missing required fields fail. Arrays and richer schemas are provider or library extensions until specified separately.</p>
 <p>If <code>output_retries</code> or <code>output_repair</code> is configured, the built-in loop may perform additional repair turns before returning a validation error. Repair turns consume normal turn and token budgets.</p>
 <p>A custom <code>flow</code> that returns arbitrary values is not automatically validated. Inside a flow, use <code>llm.validate_output(value, output)</code> when the flow wants to enforce the same shape explicitly. A <code>turn {}</code> inside a flow still inherits an ambient <code>output</code> as a provider <code>response_format</code> hint when no explicit <code>response_format</code> is supplied.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code">ok, ok_msg <span class="tok-operator">:=</span> llm.validate_output({summary: <span class="tok-string">&quot;done&quot;</span>, score: <span class="tok-number">1</span>}, {summary: <span class="tok-string">&quot;x&quot;</span>, score: <span class="tok-number">0</span>})
 bad, bad_msg <span class="tok-operator">:=</span> llm.validate_output({summary: <span class="tok-number">1</span>}, {summary: <span class="tok-string">&quot;x&quot;</span>})
-<span class="tok-keyword">return</span> ok, ok_msg, bad, bad_msg <span class="tok-operator">!=</span> <span class="tok-string">&quot;&quot;</span></code></pre>
+json_ok, _ <span class="tok-operator">:=</span> llm.validate_output(<span class="tok-string">&quot;{\&quot;summary\&quot;:\&quot;done\&quot;}&quot;</span>, {summary: <span class="tok-string">&quot;x&quot;</span>})
+<span class="tok-keyword">return</span> ok, ok_msg, bad, bad_msg <span class="tok-operator">!=</span> <span class="tok-string">&quot;&quot;</span>, json_ok</code></pre>
 <h3 id="ai-native-syntax-agent-as-tool">Agent As Tool</h3>
 <p>An agent value may appear directly in another agent&#x27;s <code>tools</code> list or in a <code>turn</code> tools list. The runtime wraps it as a tool at the boundary. The wrapper derives the tool name from the named agent when available, derives parameter names from the agent signature, uses <code>description</code> or <code>system</code> as the tool description, and uses <code>output</code> as the tool-result shape.</p>
 <p>When the wrapper calls the delegated agent:</p>
@@ -1976,6 +2080,7 @@ bad, bad_msg <span class="tok-operator">:=</span> llm.validate_output({summary: 
 <li>successful agent results are unwrapped so structured <code>result.value</code> becomes the tool result;</li>
 <li>pending approval, cancellation, provider, validation, and tool failures are returned as structured tool errors.</li>
 </ol>
+<p>Wrapping an agent does not make it a provider request. It is still a local tool dispatch path until that tool is advertised to a provider by a later <code>turn</code> or built-in agent loop.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-contextual">agent</span> extract(topic) {
     description: <span class="tok-string">&quot;Extract one finding.&quot;</span>
     output: {summary: <span class="tok-string">&quot;short finding&quot;</span>}
@@ -1992,7 +2097,27 @@ value, err <span class="tok-operator">:=</span> wrapped.fn(<span class="tok-stri
     result, err <span class="tok-operator">:=</span> <span class="tok-contextual">turn</span> { user: <span class="tok-string">&quot;short answer&quot;</span> }
 }</code></pre>
 <p>Budgets are checked before turns, before tool calls, and after provider usage is charged. Cancellation is checked before each provider turn and before each tool dispatch. Recoverable provider, budget, validation, cancellation, approval, and tool failures return structured <code>nil, err</code> results unless a specific API documents a runtime error.</p>
-<p>Trace events must avoid prompt text and tool-result values unless explicitly configured by the host. The stable trace surface is metadata such as event type, model, step, status, message count, tool count, tool name, and usage.</p></section><section><h2 id="modules-and-loading">Modules And Loading</h2>
+<p>Trace events must avoid prompt text and tool-result values unless explicitly configured by the host. The stable trace surface is metadata such as event type, model, step, status, message count, tool count, tool name, and usage.</p>
+<h3 id="ai-native-syntax-record-replay-and-evaluate">Record, Replay, And Evaluate</h3>
+<p>Record/replay observes provider turns, not agents, tools, or arbitrary runtime values. A recorded turn contains the normalized request sent to the provider and the provider result or provider error returned from that exact boundary. Local tool execution is represented indirectly: the next recorded request contains any assistant-call and tool-result messages that the loop or flow appended to history.</p>
+<p>Replay is strict and ordered:</p>
+<ol>
+<li>each provider request must match the next fixture request after model alias resolution and request normalization;</li>
+<li>replay returns the fixture result instead of calling a live provider;</li>
+<li>an unexpected request, exhausted fixture, or unconsumed fixture record is an evaluation failure;</li>
+<li>replay does not hide local tool, validation, budget, or cancellation errors.</li>
+</ol>
+<p><code>leia evaluate</code> composes this with source-level cases. Each <code>evaluate</code> block is a named regression case. The harness may run the case with a live provider in explicit record mode, then persist the provider turns as a golden fixture. In normal replay mode, the same case must consume that fixture exactly. Fixture updates are command-driven and must never occur as a side effect of <code>leia run</code>.</p>
+<pre class="language-leia leia-code"><code class="language-leia leia-code">record <span class="tok-operator">:=</span> {
+    request: {
+        model: <span class="tok-string">&quot;mock-chat&quot;</span>
+        <span class="tok-contextual">messages</span>: <span class="tok-contextual">messages</span> { user: <span class="tok-string">&quot;draft&quot;</span> }
+        tools: {}
+    }
+    result: {status: <span class="tok-string">&quot;final_answer&quot;</span>, text: <span class="tok-string">&quot;ok&quot;</span>}
+}
+
+<span class="tok-keyword">return</span> record.request.model, record.request.<span class="tok-contextual">messages</span>[<span class="tok-number">1</span>].text, record.result.text</code></pre></section><section><h2 id="modules-and-loading">Modules And Loading</h2>
 <p><code>require(name)</code> loads enabled standard-library modules, host-registered modules, and filesystem-backed project modules according to runtime module options. <code>name</code> must be a string. Loaded module results are cached in <code>package.loaded</code>.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code">json <span class="tok-operator">:=</span> <span class="tok-builtin">require</span>(<span class="tok-string">&quot;json&quot;</span>)
 text <span class="tok-operator">:=</span> json.encode({ok: <span class="tok-constant">true</span>})
@@ -2013,9 +2138,9 @@ same <span class="tok-operator">:=</span> <span class="tok-builtin">require</spa
 <p>Resolution uses the original string <code>name</code> as the <code>package.loaded</code> key. Path normalization during filesystem resolution does not make different spelling forms interchangeable cache keys unless an embedding policy documents that aliasing explicitly.</p>
 <p>Filesystem-backed project module resolution is deterministic:</p>
 <ol>
-<li>A collection require of the form <code>prefix:path.to.module</code> matches a configured collection with the same <code>prefix</code>; it resolves under the collection root as <code>path/to/module.leia</code>.</li>
-<li>Otherwise, the longest configured <code>replace</code> path that equals <code>name</code> or is a slash-prefix of <code>name</code> wins. An exact replace whose target ends in <code>.leia</code> loads that file; an exact replace whose target is not a <code>.leia</code> file appends <code>.leia</code> to the target path. Subpaths below a replace root convert dots to path separators and append <code>.leia</code>.</li>
-<li>Otherwise, the longest local vendor or downloaded-cache entry that equals <code>name</code> or is a slash-prefix of <code>name</code> wins. Subpaths convert dots to path separators and append <code>.leia</code>; an exact cache or vendor module path loads <code>basename(name).leia</code> inside that entry root.</li>
+<li>A collection require of the form <code>prefix:path.to.module</code> matches a configured collection with the same <code>prefix</code>; it resolves under the collection root as <code>path/to/module.leia</code>. Collection matching is explicit; an unmatched <code>prefix:</code> name continues through the remaining resolver rules as an ordinary module name.</li>
+<li>Otherwise, the longest configured <code>replace</code> path that equals <code>name</code> or is a slash-prefix of <code>name</code> wins. An exact replace whose target ends in <code>.leia</code> loads that file; an exact replace whose target is not a <code>.leia</code> file appends <code>.leia</code> to the target path. Subpaths below a replace root convert dots to path separators and append <code>.leia</code>. Only local replace targets are used by runtime module setup.</li>
+<li>Otherwise, the longest local vendor or downloaded-cache entry that equals <code>name</code> or is a slash-prefix of <code>name</code> wins. Subpaths convert dots to path separators and append <code>.leia</code>; an exact cache or vendor module path loads <code>basename(name).leia</code> inside that entry root. Vendor entries are considered before downloaded-cache entries when both are present.</li>
 <li>Otherwise, <code>name</code> resolves relative to the active require root or script directory. Names containing <code>/</code> or starting with <code>.</code> keep path syntax and add <code>.leia</code>; other names convert dots to path separators and add <code>.leia</code>. This is local module path lookup; the <code>module</code> directive in <code>leia.mod</code> does not by itself create a filesystem file.</li>
 </ol>
 <p>The resolved file is still checked by filesystem root, module byte, module depth, readonly, vendor, and capability controls before execution.</p>
@@ -2034,6 +2159,24 @@ helper <span class="tok-operator">:=</span> <span class="tok-builtin">require</s
 <span class="tok-builtin">assert</span>(helper.value <span class="tok-operator">==</span> <span class="tok-number">7</span>)
 <span class="tok-builtin">assert</span>(<span class="tok-builtin">require</span>(<span class="tok-string">&quot;local_helper&quot;</span>) <span class="tok-operator">==</span> helper)
 <span class="tok-builtin">assert</span>(package.loaded[<span class="tok-string">&quot;local_helper&quot;</span>] <span class="tok-operator">==</span> helper)</code></pre>
+<pre class="language-leia leia-code"><code class="language-leia leia-code">fs <span class="tok-operator">:=</span> <span class="tok-builtin">require</span>(<span class="tok-string">&quot;fs&quot;</span>)
+path <span class="tok-operator">:=</span> <span class="tok-builtin">require</span>(<span class="tok-string">&quot;path&quot;</span>)
+script <span class="tok-operator">:=</span> <span class="tok-builtin">require</span>(<span class="tok-string">&quot;script&quot;</span>)
+
+root <span class="tok-operator">:=</span> script.dir()
+pkgDir <span class="tok-operator">:=</span> path.join(root, <span class="tok-string">&quot;pkg&quot;</span>)
+<span class="tok-keyword">if</span> <span class="tok-operator">!</span>fs.exists(pkgDir) {
+    <span class="tok-builtin">assert</span>(fs.mkdir(pkgDir))
+}
+<span class="tok-builtin">assert</span>(fs.writefile(path.join(pkgDir, <span class="tok-string">&quot;tool.leia&quot;</span>), <span class="tok-string">`return {name: &quot;dot&quot;}`</span>))
+<span class="tok-builtin">assert</span>(fs.writefile(path.join(root, <span class="tok-string">&quot;path_tool.leia&quot;</span>), <span class="tok-string">`return {name: &quot;path&quot;}`</span>))
+
+dot <span class="tok-operator">:=</span> <span class="tok-builtin">require</span>(<span class="tok-string">&quot;pkg.tool&quot;</span>)
+byPath <span class="tok-operator">:=</span> <span class="tok-builtin">require</span>(<span class="tok-string">&quot;./path_tool&quot;</span>)
+<span class="tok-builtin">assert</span>(dot.name <span class="tok-operator">==</span> <span class="tok-string">&quot;dot&quot;</span>)
+<span class="tok-builtin">assert</span>(byPath.name <span class="tok-operator">==</span> <span class="tok-string">&quot;path&quot;</span>)
+<span class="tok-builtin">assert</span>(package.loaded[<span class="tok-string">&quot;pkg.tool&quot;</span>] <span class="tok-operator">==</span> dot)
+<span class="tok-builtin">assert</span>(package.loaded[<span class="tok-string">&quot;./path_tool&quot;</span>] <span class="tok-operator">==</span> byPath)</code></pre>
 <p>The <code>package.loaded</code> table is part of the lookup contract. A non-<code>nil</code> entry short-circuits resolution and is returned directly. This is mainly useful for embedders, tests, and compatibility shims; ordinary modules should prefer returning a value from the module file.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code">package.loaded[<span class="tok-string">&quot;example.preloaded&quot;</span>] <span class="tok-operator">=</span> {answer: <span class="tok-number">42</span>}
 mod <span class="tok-operator">:=</span> <span class="tok-builtin">require</span>(<span class="tok-string">&quot;example.preloaded&quot;</span>)
@@ -2076,33 +2219,40 @@ collection assets ./assets
 go 1.25
 go require example.com/native v1.0.0
 go replace example.com/native =&gt; ./native</code></pre>
-<p>The <code>module</code> directive is required. <code>leia</code> records the Leia language/module format version; if it is absent, the current parser defaults it to <code>0.1</code>. <code>require</code> stores a module path and a version string. The implementation treats versions as opaque strings, but the downloader currently supports GitHub tag downloads for <code>github.com/owner/repo[/subdir]</code> requirements. <code>replace</code> maps a module path, optionally for one version, to another path; runtime module options only use local replacement targets (<code>./...</code> or absolute paths). <code>go</code>, <code>go require</code>, and <code>go replace</code> are metadata for <code>leia mod gomod</code>; they do not enable source-level <code>go:</code> imports by themselves.</p>
+<p>The <code>module</code> directive is required. <code>leia</code> records the Leia language/module format version; if it is absent, the current parser defaults it to <code>0.1</code>. <code>require</code> stores a module path and a version string. Versions are opaque to the language contract. Current module tooling can download GitHub tag archives for <code>github.com/owner/repo[/subdir]</code> requirements, but ordinary script execution does not perform network access. <code>replace</code> maps a module path, optionally for one version, to another path; runtime module options only use local replacement targets (<code>./...</code> or absolute paths). Non-local replacements are metadata for module tooling, not runtime fetch instructions. <code>go</code>, <code>go require</code>, and <code>go replace</code> are metadata for <code>leia mod gomod</code>; they do not enable source-level <code>go:</code> imports by themselves.</p>
 <p><code>capability</code> (or <code>cap</code>) is a declarative summary of host capabilities the module expects. Capabilities may be written as separate fields or comma separated values. The module loader does not grant permissions from this field; hosts still enforce the active capability policy. <code>leia mod capability</code> reads the main manifest and locally available dependency manifests, then reports a capability universe and per-module matrix. Missing dependency manifests are warnings, not proof that a module needs no capabilities.</p>
+<p>Capability names in <code>leia.mod</code> are documentation and tooling input. They are not ambient authority, and they do not weaken <code>Cap*</code> runtime options, sandbox roots, library flags, or host-specific policy. A host may reject code whose declared capability summary is incomplete, excessive, or inconsistent with the host policy, but that decision is outside <code>require</code> resolution.</p>
 <p>For example, this manifest says the module expects filesystem reads and network client access:</p>
 <pre class="language-text"><code class="language-text">module example.com/report
 leia 0.1
 
 capability fs.read,net.client</code></pre>
 <p>Running <code>leia mod capability --json</code> from that module produces a machine-readable summary of declared capabilities. The exact output order is not part of the language contract, but the data model is a universe of capability names plus a per-module matrix.</p>
-<p><code>collection name path</code> configures collection requires such as <code>require(&quot;assets:icons.logo&quot;)</code>. The name may contain letters, digits, <code>_</code>, and <code>-</code>. Relative collection paths are resolved from the directory containing the nearest <code>leia.mod</code>.</p>
+<p><code>collection name path</code> configures collection requires such as <code>require(&quot;assets:icons.logo&quot;)</code>. The name may contain letters, digits, <code>_</code>, and <code>-</code>. Relative collection paths are resolved from the directory containing the nearest <code>leia.mod</code>. Collections are local source roots; they do not imply dependency versions, downloads, or registry lookup.</p>
 <p><code>leia.sum</code> records hashes produced by module tooling. <code>leia mod lock</code> writes entries for local collections, local replaces, and locally available downloaded or vendored requirements. <code>leia mod download</code> and <code>leia mod vendor</code> update remote module entries after the dependency is present locally. The current file format is:</p>
 <pre class="language-text"><code class="language-text">collection NAME TARGET h1:BASE64_SHA256
 replace PATH VERSION_OR_- TARGET h1:BASE64_SHA256
 module PATH VERSION TARGET h1:BASE64_SHA256</code></pre>
 <p>Hashes are computed over stable path/data pairs. Directory hashes include only <code>.leia</code> files and <code>leia.mod</code>, skip VCS directories, sort paths, and use the <code>h1:</code> prefix with base64-encoded SHA-256 bytes. <code>leia mod verify</code> and <code>leia mod check</code> compare current local content with <code>leia.sum</code>; if no <code>leia.sum</code> exists, sum verification is skipped.</p>
-<p>Module paths may be GitHub-style repository paths. Leia does not require a central registry for basic module use.</p>
+<p><code>leia.sum</code> is not a package index, registry, or permission grant. It records content that module tooling has already made available locally. Runtime <code>require</code> does not consult a central registry, discover new versions, download missing requirements, or repair mismatched sums.</p>
+<p>The stable package-management boundary is local-first. Module paths may be GitHub-style repository paths because current tooling can cache GitHub archives, but a GitHub-looking path is still only a string in <code>leia.mod</code> until tooling or the user has placed content in a local replace, vendor directory, or module cache. Leia does not require or define a central registry for basic module use.</p>
 <p><code>import &quot;go:...&quot; as name</code> is explicit host binding syntax. It does not automatically reflect arbitrary Go packages; embedders must provide bindings through the public Go API and the active capability policy may still reject use.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-keyword">import</span> <span class="tok-string">&quot;go:net/http&quot;</span> as http</code></pre>
 <p>The declaration above is only valid when the embedder has allowlisted and registered the <code>go:net/http</code> binding. Source syntax alone never grants host access.</p>
+<pre class="language-leia leia-code"><code class="language-leia leia-code">ok, err <span class="tok-operator">:=</span> <span class="tok-builtin">pcall</span>(<span class="tok-builtin">require</span>, <span class="tok-string">&quot;go:net/http&quot;</span>)
+<span class="tok-builtin">assert</span>(<span class="tok-operator">!</span>ok)
+<span class="tok-builtin">assert</span>(<span class="tok-builtin">type</span>(err) <span class="tok-operator">==</span> <span class="tok-string">&quot;string&quot;</span>)</code></pre>
+<p>Go import allowlisting is an embedder contract. <code>WithGoImports</code> and <code>RegisterModule(&quot;go:...&quot;, ...)</code> expose only named host-provided modules. A <code>go require</code> directive in <code>leia.mod</code>, a Go module path in <code>go.mod</code>, or source syntax such as <code>import &quot;go:net/http&quot; as http</code> never loads arbitrary Go code by package path.</p>
 <p>Module mode controls how a discovered manifest is applied at runtime. Runtime module setup is offline: it uses local replaces, already present vendor directories, and already present cache directories; it does not run <code>git</code>, download modules, or rewrite <code>leia.mod</code>.</p>
 <div class="table-wrap"><table>
 <thead><tr><th>Mode</th><th>Runtime behavior</th></tr></thead>
 <tbody>
-<tr><td><code>mod</code></td><td>Use local replaces, existing vendor entries, and existing module-cache entries. It does not download or mutate files.</td></tr>
-<tr><td><code>readonly</code></td><td>Same offline behavior as <code>mod</code> for current resolution. It is the mode hosts should choose when manifest/cache mutation is disallowed.</td></tr>
-<tr><td><code>vendor</code></td><td>Ignore the module cache and resolve required remote modules from <code>vendor/PATH@VERSION</code>. Missing remote vendor entries stay visible to resolution and fail normally when the module file is unavailable.</td></tr>
+<tr><td><code>mod</code></td><td>Use local replaces, existing vendor entries, and existing module-cache entries. It does not download or mutate files. Vendor entries win over cache entries for the same required module.</td></tr>
+<tr><td><code>readonly</code></td><td>Same offline resolution behavior as <code>mod</code>. It is the mode hosts should choose when manifest, cache, vendor, or sum-file mutation is disallowed.</td></tr>
+<tr><td><code>vendor</code></td><td>Ignore the module cache and resolve required remote modules from <code>vendor/PATH@VERSION</code>. Missing remote vendor entries stay visible to resolution and fail normally when the module file is unavailable. Local replaces and collections still apply.</td></tr>
 </tbody></table></div>
-<p>When <code>ModuleOptionsForScriptMode</code> is used, the nearest ancestor <code>leia.mod</code> sets the require root, collections, local replaces, module mode, and any local vendor/cache entries already present. Invalid manifests are ignored by that runtime helper rather than repaired. The CLI module commands are the mutating surface: <code>leia mod add</code>, <code>tidy</code>, <code>download</code>, <code>vendor</code>, and <code>lock</code> may update <code>leia.mod</code>, <code>vendor/</code>, the module cache, or <code>leia.sum</code>; ordinary script execution does not.</p>
+<p>When <code>ModuleOptionsForScriptMode</code> is used, the nearest ancestor <code>leia.mod</code> sets the require root, collections, local replaces, module mode, and local vendor/cache entries already present. Invalid manifests are ignored by that runtime helper rather than repaired. Manifest discovery does not make the declared <code>module</code> path a new filesystem root; it sets metadata and dependency rules for the project rooted at the manifest directory.</p>
+<p>The CLI module commands are the mutating surface: <code>leia mod add</code>, <code>tidy</code>, <code>download</code>, <code>vendor</code>, and <code>lock</code> may update <code>leia.mod</code>, <code>vendor/</code>, the module cache, or <code>leia.sum</code>; ordinary script execution does not. <code>leia mod list</code>, <code>graph</code>, <code>explain</code>, <code>capability</code>, <code>gomod</code>, <code>verify</code>, and <code>check</code> report or validate local module state under their documented command options.</p>
 <p>Top-level module code executes in the same language as ordinary scripts. Lexical declarations inside the module are private to that module execution unless the module returns or stores a value that exposes them. Mutating globals or host resources during module loading is a side effect of <code>require</code>; portable modules should make those side effects explicit in their documented contract and keep the returned module value stable across repeated requires.</p></section><section><h2 id="errors-and-diagnostics">Errors And Diagnostics</h2>
 <p>Leia distinguishes runtime errors from recoverable structured failures. A runtime error aborts the current expression or statement and unwinds the active call stack until it reaches a protected-call boundary or the top-level execution boundary. Deferred calls run according to the statement semantics for <code>defer</code>; errors raised while unwinding replace or report through the same runtime error path as other deferred-call failures.</p>
 <h3 id="errors-and-diagnostics-error-values">Error Values</h3>
@@ -2368,7 +2518,9 @@ for_stmt       = &quot;for&quot; block
 select_stmt    = &quot;select&quot; &quot;{&quot; { select_case } &quot;}&quot; ;
 select_case    = ( &quot;case&quot; ( recv_clause | send_clause ) | &quot;default&quot; )
                  &quot;:&quot; { separator | statement } ;
-recv_clause    = [ identifier [ &quot;,&quot; identifier ] &quot;:=&quot; ] &quot;&lt;-&quot; expr ;
+recv_clause    = &quot;&lt;-&quot; expr
+               | identifier &quot;:=&quot; &quot;&lt;-&quot; expr
+               | identifier &quot;,&quot; identifier &quot;:=&quot; &quot;&lt;-&quot; expr ;
 send_clause    = expr &quot;&lt;-&quot; expr ;
 
 return_stmt    = &quot;return&quot; [ expr_list ] ;
@@ -2388,27 +2540,24 @@ simple_stmt    = assignment
                | expr ;
 assignment     = expr_list ( &quot;=&quot; | &quot;:=&quot; ) expr_list ;
 compound_assignment
-               = expr ( &quot;+=&quot; | &quot;-=&quot; | &quot;*=&quot; | &quot;/=&quot; | &quot;%=&quot; ) expr ;
+               = expr ( &quot;+=&quot; | &quot;-=&quot; | &quot;*=&quot; | &quot;/=&quot; ) expr ;
 inc_dec_stmt   = expr ( &quot;++&quot; | &quot;--&quot; ) ;
 expr_list      = expr { &quot;,&quot; expr } ;
 
 expr           = logical_or ;
 logical_or     = logical_and { &quot;||&quot; logical_and } ;
 logical_and    = comparison { &quot;&amp;&amp;&quot; comparison } ;
-comparison     = bit_or { ( &quot;==&quot; | &quot;!=&quot; | &quot;&lt;&quot; | &quot;&lt;=&quot; | &quot;&gt;&quot; | &quot;&gt;=&quot; ) bit_or } ;
-bit_or         = bit_xor { &quot;|&quot; bit_xor } ;
-bit_xor        = bit_and { &quot;^&quot; bit_and } ;
-bit_and        = shift { ( &quot;&amp;&quot; | &quot;&amp;^&quot; ) shift } ;
-shift          = concat { ( &quot;&lt;&lt;&quot; | &quot;&gt;&gt;&quot; ) concat } ;
-concat         = additive { &quot;..&quot; additive } ;
-additive       = multiplicative { ( &quot;+&quot; | &quot;-&quot; ) multiplicative } ;
-multiplicative = unary { ( &quot;*&quot; | &quot;/&quot; | &quot;%&quot; ) unary } ;
-unary          = ( &quot;!&quot; | &quot;-&quot; | &quot;#&quot; | &quot;&lt;-&quot; ) unary | power ;
+comparison     = concat { ( &quot;==&quot; | &quot;!=&quot; | &quot;&lt;&quot; | &quot;&lt;=&quot; | &quot;&gt;&quot; | &quot;&gt;=&quot; ) concat } ;
+concat         = additive [ &quot;..&quot; concat ] ;
+additive       = multiplicative { ( &quot;+&quot; | &quot;-&quot; | &quot;|&quot; | &quot;^&quot; ) multiplicative } ;
+multiplicative = unary { ( &quot;*&quot; | &quot;/&quot; | &quot;%&quot; | &quot;&lt;&lt;&quot; | &quot;&gt;&gt;&quot; | &quot;&amp;&quot; | &quot;&amp;^&quot; ) unary } ;
+unary          = ( &quot;!&quot; | &quot;-&quot; | &quot;#&quot; | &quot;&lt;-&quot; | &quot;^&quot; ) unary | power ;
 power          = postfix { &quot;**&quot; unary } ;
 
-postfix        = primary { call_suffix | index_suffix | member_suffix } ;
-call_expr      = postfix call_suffix ;
+postfix        = primary { call_suffix | method_suffix | index_suffix | member_suffix } ;
+call_expr      = postfix ( call_suffix | method_suffix ) ;
 call_suffix    = &quot;(&quot; [ expr_list ] &quot;)&quot; ;
+method_suffix  = &quot;:&quot; identifier &quot;(&quot; [ expr_list ] &quot;)&quot; ;
 index_suffix   = &quot;[&quot; expr &quot;]&quot; ;
 member_suffix  = &quot;.&quot; identifier ;
 
@@ -2448,8 +2597,7 @@ table_field    = identifier &quot;:&quot; expr
                | expr ;
 list_lit       = &quot;[&quot; [ expr { field_sep expr } [ field_sep ] ] &quot;]&quot; ;
 dense_lit      = &quot;[&quot; [ integer_lit ] &quot;]&quot; dense_type &quot;{&quot; [ expr { field_sep expr } [ field_sep ] ] &quot;}&quot; ;
-dense_type     = &quot;i8&quot; | &quot;i16&quot; | &quot;i32&quot; | &quot;i64&quot; | &quot;u8&quot; | &quot;u16&quot; | &quot;u32&quot; | &quot;u64&quot;
-               | &quot;f32&quot; | &quot;f64&quot; | &quot;bool&quot; ;
+dense_type     = &quot;i32&quot; | &quot;i64&quot; | &quot;f32&quot; | &quot;f64&quot; | &quot;bool&quot; ;
 field_sep      = &quot;,&quot; | &quot;;&quot; ;
 
 identifier     = ( &quot;A&quot;..&quot;Z&quot; | &quot;a&quot;..&quot;z&quot; | &quot;_&quot; )

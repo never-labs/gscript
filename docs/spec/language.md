@@ -66,9 +66,9 @@ and raw backtick strings.
 
 ## Syntactic Grammar
 
-The grammar below is the short user-facing contract. The fuller syntax appendix
-is maintained in [`grammar.ebnf`](grammar.ebnf). Internal parser helper rules
-are not public syntax.
+The grammar below is a short orientation summary, not a second grammar source.
+The normative syntax appendix is [`grammar.ebnf`](grammar.ebnf). Internal
+parser helper rules are not public syntax.
 
 ```ebnf
 program       = { separator | statement } EOF ;
@@ -100,8 +100,11 @@ go_stmt       = "go" call_expr ;
 defer_stmt    = "defer" call_expr ;
 const_decl    = "const" identifier ( "=" | ":=" ) expr ;
 
-simple_stmt   = assignment | expr ;
-assignment    = expr_list ( "=" | ":=" | "+=" | "-=" | "*=" | "/=" | "%=" ) expr_list ;
+simple_stmt   = assignment | compound_assignment | inc_dec_stmt
+              | send_clause | call_expr | expr ;
+assignment    = expr_list ( "=" | ":=" ) expr_list ;
+compound_assignment = expr ( "+=" | "-=" | "*=" | "/=" ) expr ;
+inc_dec_stmt  = expr ( "++" | "--" ) ;
 expr_list     = expr { "," expr } ;
 ```
 

@@ -83,6 +83,25 @@ same := user.name == user["name"]
 user["score"] = 10
 ```
 
+`x:name(args)` is a method call. It evaluates `x` once, looks up field `name`
+on that receiver, then calls the result with the receiver inserted as the first
+argument. Therefore `x:name(a, b)` has the same stable call semantics as
+`x.name(x, a, b)`, except the receiver expression is evaluated only once.
+
+```leia run all
+counter := {
+    value: 0,
+    add: func(self, delta) {
+        self.value += delta
+        return self.value
+    },
+}
+
+assert(counter:add(2) == 2)
+assert(counter.add(counter, 3) == 5)
+assert(counter.value == 5)
+```
+
 Metamethods may affect indexing, assignment, calls, arithmetic, comparison, and
 length behavior as specified in [Tables And Metatables](tables.md).
 

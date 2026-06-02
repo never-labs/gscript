@@ -11,6 +11,31 @@ An AI operation is deterministic until it reaches a provider, host callback, or
 tool body with side effects. Tests and replay fixtures should therefore record
 provider turns at the host boundary.
 
+## Stable Contract
+
+The stable AI-native contract is the following lowering boundary:
+
+| Source construct | Stable runtime meaning |
+|---|---|
+| `agent` without `flow` | A callable frame that runs the built-in loop. |
+| `agent` with `flow` | A callable frame whose body is exactly the user flow. |
+| `turn { ... }` | One provider request. It does not dispatch tools. |
+| `messages { ... }` / history | The ordered transcript carried between turns. |
+| `tool` | A callable tool table checked against declared capabilities. |
+| `evaluate` | A source-level regression case discovered by `leia evaluate`. |
+
+An agent frame owns ambient configuration: `model`, `system`, `user`, `tools`,
+budget, capabilities, output shape, tracing, cancellation, replay, and
+provider selection. A `turn` may inherit from that frame, but the turn remains
+a single provider boundary operation. Tool dispatch is a separate operation
+performed either by the built-in agent loop or by explicit user code.
+
+`history` and `messages` name the same stable data shape: an ordered list of
+normalized message tables. `messages { ... }` constructs such a list; a
+history variable is just a program variable holding that list. Histories, not
+tool lists or ambient config, are the durable evidence passed from one provider
+turn to the next.
+
 ## Evaluate Blocks
 
 `evaluate "case name" { ... }` declares a source-level agent regression case.
@@ -22,9 +47,9 @@ In ordinary script execution an evaluate block has no runtime effect. The
 `leia evaluate` command owns discovery and evaluation semantics. The minimal
 runner discovers cases, reports their source position, validates the body with
 the same parser and AI-native syntax checks used for normal code, then executes
-the body as ordinary Leia code. Built-in `assert` failures or other runtime
-errors mark that case failed; provider scoring and richer tool/file assertions
-are reserved for later evaluate phases.
+the body as ordinary Leia code under the evaluation harness. Built-in `assert`
+failures or other runtime errors mark that case failed; provider scoring and
+richer tool/file assertions are reserved for later evaluate phases.
 
 The `leia evaluate` command may install a deterministic LLM replay provider or
 record provider turns into a golden fixture. Replay fixtures are strict: a
@@ -32,7 +57,11 @@ request mismatch, an exhausted fixture, or leftover unconsumed turns is an
 evaluation failure. Updating a golden fixture is an explicit command-line mode,
 not an ordinary script side effect.
 
-```leia
+Evaluate cases should be written so their non-provider behavior is deterministic.
+Runnable examples in this spec use local tools, custom flows, replay, or
+validation helpers rather than live network LLMs.
+
+```leia run all
 //leia:requires none
 tool lookup(topic) {
     return "docs:" .. topic, nil
@@ -49,6 +78,8 @@ evaluate "answer can use lookup" {
     assert(err == nil)
     assert(result == "docs:evaluate")
 }
+
+return lookup.name
 ```
 
 ## Models
@@ -125,6 +156,15 @@ dispatch requested tools, append tool results, and stop on a final answer,
 provider stop, budget error, approval pause, cancellation, or unrecoverable
 tool/provider error.
 
+The built-in loop is the default because an agent declaration is normally a
+complete workflow specification. Adding `flow { ... }` replaces that loop with
+the supplied code. It does not customize one step of the default loop; it owns
+the whole workflow body.
+
+Every agent call creates a fresh agent frame. The frame is visible to nested
+`turn {}` calls as ambient configuration and to nested agent-as-tool calls as
+shared provider, trace, replay, budget, cancellation, and approval context.
+
 Named agents bind their name in the current scope:
 
 ```leia
@@ -159,10 +199,21 @@ an empty parameter list.
 - an **agent** is a callable workflow frame with configuration, defaults,
   budget, tools, output handling, tracing, replay, and optional custom `flow`;
 - a **turn** is one provider request made from inside or outside such a frame;
-- a built-in agent without `flow` repeatedly performs turns and dispatches
-  tools for the caller;
-- a custom `flow` performs no hidden turns. It runs ordinary Leia code, and the
-  author must call `turn { ... }`, `llm.dispatch`, or other helpers explicitly.
+- a built-in agent, meaning an agent without `flow`, repeatedly performs turns
+  and dispatches tools for the caller;
+- a custom-flow agent, meaning an agent with `flow`, performs no hidden turns
+  and no hidden tool dispatch. It runs ordinary Leia code, and the author must
+  call `turn { ... }`, `llm.dispatch`, or other helpers explicitly.
+
+The stable invariants are:
+
+1. A `turn` consumes a request table and produces one provider result or error.
+2. Passing `tools` to a turn only serializes available tool schemas into that
+   provider request.
+3. A provider tool-call result is data. It has no effect until dispatched.
+4. Dispatch results become model-visible only after the surrounding code appends
+   paired assistant-call and tool-result or tool-error messages to history.
+5. A later turn sees prior work only through its `messages` field.
 
 The default agent loop can be understood as this conceptual shape:
 
@@ -180,7 +231,8 @@ agent answer(question) {
 // 3. if result.status == "tool_calls", dispatch requested tools;
 // 4. append tool results to history;
 // 5. call another turn with the updated history;
-// 6. stop on final answer, provider stop, budget, cancellation, or error.
+// 6. validate structured output when configured;
+// 7. stop on final answer, provider stop, budget, approval, cancellation, or error.
 result, err := answer("What changed?")
 ```
 
@@ -253,6 +305,20 @@ the provider responds with tool calls, either the built-in agent loop or custom
 flow code must dispatch them and then make a later turn with the updated
 history.
 
+Agent results from the built-in loop include the final provider data and the
+history accumulated by the loop. The stable fields are:
+
+| Field | Meaning |
+|---|---|
+| `status` | `done`, `tool_calls`, `stop`, `approval_pending`, or error-specific status. |
+| `text` | Final answer text when available. |
+| `value` | Structured value when `output` validation succeeds. |
+| `history` | Final message history accumulated by the loop. |
+| `usage` | Aggregated provider usage when available. |
+
+Custom-flow agents return whatever the flow returns. They do not receive the
+built-in agent result wrapper unless the flow constructs it explicitly.
+
 ## Agent Configuration
 
 Agent configuration is a table-like field block. The stable fields are:
@@ -291,6 +357,19 @@ limit from the closest frame and leaving unspecified dimensions inherited.
 The merged configuration is ambient for `turn {}` inheritance. Flow-local
 identifier injection, described below, is generated from fields written
 directly in the agent declaration or literal.
+
+Ambient configuration is not a lexical scope. It is a request-construction
+input read by AI runtime operations. In particular:
+
+| Item | Ambient inheritance | Flow-local identifier |
+|---|---:|---:|
+| `model` | yes | only when explicit |
+| `system` | yes | only when explicit |
+| `user` | yes, for synthesized messages | no |
+| `tools` | yes | only when explicit |
+| `budget` | yes | no |
+| `output` | yes | only when explicit |
+| provider hints | yes | no |
 
 ```leia run all
 agent defaults {
@@ -334,6 +413,11 @@ and sampling fields remain ambient configuration for `turn {}` but are not
 local variables. User declarations may shadow injected locals under the normal
 lexical scoping rules.
 
+The flow receives ordinary call parameters through its lexical scope. For prompt
+inputs, prefer using parameters directly (`q` in the examples) over relying on
+the `user` config field, because `user` is ambient prompt configuration and is
+not injected as a local.
+
 ```leia run all
 user := "outer"
 
@@ -354,8 +438,9 @@ return out.observed, out.shadowed, err
 
 ## Messages
 
-`messages { ... }` constructs an ordered message list. Role fields are
-converted to normalized message tables:
+`messages { ... }` constructs an ordered message list. A history is any value
+with that same ordered list shape. Role fields are converted to normalized
+message tables:
 
 ```leia
 history := messages {
@@ -368,6 +453,18 @@ The stable shorthand roles are `system`, `user`, and `assistant`. A field whose
 key is not one of those roles becomes `{role: key, text: value}`. A field
 without a key is inserted as-is, which allows incremental histories to mix
 message helper results in the same block.
+
+The stable normalized fields are:
+
+| Message kind | Required stable fields |
+|---|---|
+| text message | `role`, `text` |
+| assistant tool call | `role: "assistant"`, `tool_call` |
+| tool result | `role: "tool"`, `tool_use_id`, `value` |
+| tool error | `role: "tool"`, `tool_use_id`, `error` or error text |
+
+Implementations may carry provider-specific metadata, but code that wants to be
+portable must preserve at least these fields.
 
 ```leia run all
 call := {id: "call_1", tool: "lookup", args: {query: "leia"}}
@@ -399,6 +496,18 @@ tool message records the local dispatch result, recoverable dispatch error, and
 the same call id. Implementations must preserve this pairing when lowering the
 built-in agent loop, and user-written flows should preserve it when constructing
 manual histories.
+
+```leia run all
+history := messages {
+    system: "s"
+    user: "u"
+}
+
+history[#history + 1] = msg.assistant("draft")
+history[#history + 1] = msg.user("revise")
+
+return #history, history[3].role, history[4].text
+```
 
 ```leia run all
 //leia:requires none
@@ -439,6 +548,17 @@ return #history, history[3].tool_call.tool, history[4].tool_use_id, history[4].v
 err)`. It never dispatches tools by itself. If the provider returns tool calls,
 the result has `status: "tool_calls"` and the caller or surrounding agent loop
 decides whether to dispatch them.
+
+The operation is equivalent to:
+
+1. merge explicit request fields over ambient agent configuration, if any;
+2. synthesize `messages` from `system` and `user` only when `messages` is absent;
+3. normalize tools, including agent-as-tool wrappers;
+4. check budget and cancellation;
+5. call the provider once;
+6. return the provider result or a structured error.
+
+No step above calls `llm.dispatch`.
 
 Stable request fields include:
 
@@ -525,6 +645,18 @@ fields and primitive shapes as the example, and returns the parsed value in the
 agent result. Missing fields, type mismatches, non-object JSON, trailing JSON,
 and invalid JSON are validation errors.
 
+The stable validation rule is structural:
+
+| Example value | Accepted decoded value |
+|---|---|
+| string | string |
+| number | number |
+| boolean | boolean |
+| table object | table with the same required keys recursively validated |
+
+Extra fields may be preserved. Missing required fields fail. Arrays and richer
+schemas are provider or library extensions until specified separately.
+
 If `output_retries` or `output_repair` is configured, the built-in loop may
 perform additional repair turns before returning a validation error. Repair
 turns consume normal turn and token budgets.
@@ -538,7 +670,8 @@ ambient `output` as a provider `response_format` hint when no explicit
 ```leia run all
 ok, ok_msg := llm.validate_output({summary: "done", score: 1}, {summary: "x", score: 0})
 bad, bad_msg := llm.validate_output({summary: 1}, {summary: "x"})
-return ok, ok_msg, bad, bad_msg != ""
+json_ok, _ := llm.validate_output("{\"summary\":\"done\"}", {summary: "x"})
+return ok, ok_msg, bad, bad_msg != "", json_ok
 ```
 
 ## Agent As Tool
@@ -558,6 +691,10 @@ When the wrapper calls the delegated agent:
    the tool result;
 4. pending approval, cancellation, provider, validation, and tool failures are
    returned as structured tool errors.
+
+Wrapping an agent does not make it a provider request. It is still a local tool
+dispatch path until that tool is advertised to a provider by a later `turn` or
+built-in agent loop.
 
 ```leia run all
 agent extract(topic) {
@@ -593,3 +730,40 @@ documents a runtime error.
 Trace events must avoid prompt text and tool-result values unless explicitly
 configured by the host. The stable trace surface is metadata such as event
 type, model, step, status, message count, tool count, tool name, and usage.
+
+## Record, Replay, And Evaluate
+
+Record/replay observes provider turns, not agents, tools, or arbitrary runtime
+values. A recorded turn contains the normalized request sent to the provider
+and the provider result or provider error returned from that exact boundary.
+Local tool execution is represented indirectly: the next recorded request
+contains any assistant-call and tool-result messages that the loop or flow
+appended to history.
+
+Replay is strict and ordered:
+
+1. each provider request must match the next fixture request after model alias
+   resolution and request normalization;
+2. replay returns the fixture result instead of calling a live provider;
+3. an unexpected request, exhausted fixture, or unconsumed fixture record is an
+   evaluation failure;
+4. replay does not hide local tool, validation, budget, or cancellation errors.
+
+`leia evaluate` composes this with source-level cases. Each `evaluate` block is
+a named regression case. The harness may run the case with a live provider in
+explicit record mode, then persist the provider turns as a golden fixture. In
+normal replay mode, the same case must consume that fixture exactly. Fixture
+updates are command-driven and must never occur as a side effect of `leia run`.
+
+```leia run all
+record := {
+    request: {
+        model: "mock-chat"
+        messages: messages { user: "draft" }
+        tools: {}
+    }
+    result: {status: "final_answer", text: "ok"}
+}
+
+return record.request.model, record.request.messages[1].text, record.result.text
+```

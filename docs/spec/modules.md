@@ -61,16 +61,20 @@ Filesystem-backed project module resolution is deterministic:
 
 1. A collection require of the form `prefix:path.to.module` matches a configured
    collection with the same `prefix`; it resolves under the collection root as
-   `path/to/module.leia`.
+   `path/to/module.leia`. Collection matching is explicit; an unmatched
+   `prefix:` name continues through the remaining resolver rules as an ordinary
+   module name.
 2. Otherwise, the longest configured `replace` path that equals `name` or is a
    slash-prefix of `name` wins. An exact replace whose target ends in `.leia`
    loads that file; an exact replace whose target is not a `.leia` file appends
    `.leia` to the target path. Subpaths below a replace root convert dots to
-   path separators and append `.leia`.
+   path separators and append `.leia`. Only local replace targets are used by
+   runtime module setup.
 3. Otherwise, the longest local vendor or downloaded-cache entry that equals
    `name` or is a slash-prefix of `name` wins. Subpaths convert dots to path
    separators and append `.leia`; an exact cache or vendor module path loads
-   `basename(name).leia` inside that entry root.
+   `basename(name).leia` inside that entry root. Vendor entries are considered
+   before downloaded-cache entries when both are present.
 4. Otherwise, `name` resolves relative to the active require root or script
    directory. Names containing `/` or starting with `.` keep path syntax and add
    `.leia`; other names convert dots to path separators and add `.leia`. This
@@ -99,6 +103,27 @@ helper := require("local_helper")
 assert(helper.value == 7)
 assert(require("local_helper") == helper)
 assert(package.loaded["local_helper"] == helper)
+```
+
+```leia run all
+fs := require("fs")
+path := require("path")
+script := require("script")
+
+root := script.dir()
+pkgDir := path.join(root, "pkg")
+if !fs.exists(pkgDir) {
+    assert(fs.mkdir(pkgDir))
+}
+assert(fs.writefile(path.join(pkgDir, "tool.leia"), `return {name: "dot"}`))
+assert(fs.writefile(path.join(root, "path_tool.leia"), `return {name: "path"}`))
+
+dot := require("pkg.tool")
+byPath := require("./path_tool")
+assert(dot.name == "dot")
+assert(byPath.name == "path")
+assert(package.loaded["pkg.tool"] == dot)
+assert(package.loaded["./path_tool"] == byPath)
 ```
 
 The `package.loaded` table is part of the lookup contract. A non-`nil` entry
@@ -178,13 +203,15 @@ go replace example.com/native => ./native
 
 The `module` directive is required. `leia` records the Leia language/module
 format version; if it is absent, the current parser defaults it to `0.1`.
-`require` stores a module path and a version string. The implementation treats
-versions as opaque strings, but the downloader currently supports GitHub tag
-downloads for `github.com/owner/repo[/subdir]` requirements. `replace` maps a
-module path, optionally for one version, to another path; runtime module
-options only use local replacement targets (`./...` or absolute paths). `go`,
-`go require`, and `go replace` are metadata for `leia mod gomod`; they do not
-enable source-level `go:` imports by themselves.
+`require` stores a module path and a version string. Versions are opaque to the
+language contract. Current module tooling can download GitHub tag archives for
+`github.com/owner/repo[/subdir]` requirements, but ordinary script execution
+does not perform network access. `replace` maps a module path, optionally for
+one version, to another path; runtime module options only use local replacement
+targets (`./...` or absolute paths). Non-local replacements are metadata for
+module tooling, not runtime fetch instructions. `go`, `go require`, and
+`go replace` are metadata for `leia mod gomod`; they do not enable source-level
+`go:` imports by themselves.
 
 `capability` (or `cap`) is a declarative summary of host capabilities the
 module expects. Capabilities may be written as separate fields or comma
@@ -193,6 +220,12 @@ hosts still enforce the active capability policy. `leia mod capability` reads
 the main manifest and locally available dependency manifests, then reports a
 capability universe and per-module matrix. Missing dependency manifests are
 warnings, not proof that a module needs no capabilities.
+
+Capability names in `leia.mod` are documentation and tooling input. They are
+not ambient authority, and they do not weaken `Cap*` runtime options, sandbox
+roots, library flags, or host-specific policy. A host may reject code whose
+declared capability summary is incomplete, excessive, or inconsistent with the
+host policy, but that decision is outside `require` resolution.
 
 For example, this manifest says the module expects filesystem reads and network
 client access:
@@ -212,7 +245,8 @@ per-module matrix.
 `collection name path` configures collection requires such as
 `require("assets:icons.logo")`. The name may contain letters, digits, `_`, and
 `-`. Relative collection paths are resolved from the directory containing the
-nearest `leia.mod`.
+nearest `leia.mod`. Collections are local source roots; they do not imply
+dependency versions, downloads, or registry lookup.
 
 `leia.sum` records hashes produced by module tooling. `leia mod lock` writes
 entries for local collections, local replaces, and locally available downloaded
@@ -232,8 +266,16 @@ Hashes are computed over stable path/data pairs. Directory hashes include only
 `leia mod check` compare current local content with `leia.sum`; if no
 `leia.sum` exists, sum verification is skipped.
 
-Module paths may be GitHub-style repository paths. Leia does not require a
-central registry for basic module use.
+`leia.sum` is not a package index, registry, or permission grant. It records
+content that module tooling has already made available locally. Runtime
+`require` does not consult a central registry, discover new versions, download
+missing requirements, or repair mismatched sums.
+
+The stable package-management boundary is local-first. Module paths may be
+GitHub-style repository paths because current tooling can cache GitHub archives,
+but a GitHub-looking path is still only a string in `leia.mod` until tooling or
+the user has placed content in a local replace, vendor directory, or module
+cache. Leia does not require or define a central registry for basic module use.
 
 `import "go:..." as name` is explicit host binding syntax. It does not
 automatically reflect arbitrary Go packages; embedders must provide bindings
@@ -247,6 +289,18 @@ The declaration above is only valid when the embedder has allowlisted and
 registered the `go:net/http` binding. Source syntax alone never grants host
 access.
 
+```leia run all
+ok, err := pcall(require, "go:net/http")
+assert(!ok)
+assert(type(err) == "string")
+```
+
+Go import allowlisting is an embedder contract. `WithGoImports` and
+`RegisterModule("go:...", ...)` expose only named host-provided modules. A
+`go require` directive in `leia.mod`, a Go module path in `go.mod`, or source
+syntax such as `import "go:net/http" as http` never loads arbitrary Go code by
+package path.
+
 Module mode controls how a discovered manifest is applied at runtime. Runtime
 module setup is offline: it uses local replaces, already present vendor
 directories, and already present cache directories; it does not run `git`,
@@ -254,17 +308,22 @@ download modules, or rewrite `leia.mod`.
 
 | Mode | Runtime behavior |
 | --- | --- |
-| `mod` | Use local replaces, existing vendor entries, and existing module-cache entries. It does not download or mutate files. |
-| `readonly` | Same offline behavior as `mod` for current resolution. It is the mode hosts should choose when manifest/cache mutation is disallowed. |
-| `vendor` | Ignore the module cache and resolve required remote modules from `vendor/PATH@VERSION`. Missing remote vendor entries stay visible to resolution and fail normally when the module file is unavailable. |
+| `mod` | Use local replaces, existing vendor entries, and existing module-cache entries. It does not download or mutate files. Vendor entries win over cache entries for the same required module. |
+| `readonly` | Same offline resolution behavior as `mod`. It is the mode hosts should choose when manifest, cache, vendor, or sum-file mutation is disallowed. |
+| `vendor` | Ignore the module cache and resolve required remote modules from `vendor/PATH@VERSION`. Missing remote vendor entries stay visible to resolution and fail normally when the module file is unavailable. Local replaces and collections still apply. |
 
 When `ModuleOptionsForScriptMode` is used, the nearest ancestor `leia.mod`
-sets the require root, collections, local replaces, module mode, and any local
+sets the require root, collections, local replaces, module mode, and local
 vendor/cache entries already present. Invalid manifests are ignored by that
-runtime helper rather than repaired. The CLI module commands are the mutating
-surface: `leia mod add`, `tidy`, `download`, `vendor`, and `lock` may update
-`leia.mod`, `vendor/`, the module cache, or `leia.sum`; ordinary script
-execution does not.
+runtime helper rather than repaired. Manifest discovery does not make the
+declared `module` path a new filesystem root; it sets metadata and dependency
+rules for the project rooted at the manifest directory.
+
+The CLI module commands are the mutating surface: `leia mod add`, `tidy`,
+`download`, `vendor`, and `lock` may update `leia.mod`, `vendor/`, the module
+cache, or `leia.sum`; ordinary script execution does not. `leia mod list`,
+`graph`, `explain`, `capability`, `gomod`, `verify`, and `check` report or
+validate local module state under their documented command options.
 
 Top-level module code executes in the same language as ordinary scripts.
 Lexical declarations inside the module are private to that module execution

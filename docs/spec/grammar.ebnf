@@ -58,7 +58,9 @@ for_stmt       = "for" block
 select_stmt    = "select" "{" { select_case } "}" ;
 select_case    = ( "case" ( recv_clause | send_clause ) | "default" )
                  ":" { separator | statement } ;
-recv_clause    = [ identifier [ "," identifier ] ":=" ] "<-" expr ;
+recv_clause    = "<-" expr
+               | identifier ":=" "<-" expr
+               | identifier "," identifier ":=" "<-" expr ;
 send_clause    = expr "<-" expr ;
 
 return_stmt    = "return" [ expr_list ] ;
@@ -78,27 +80,24 @@ simple_stmt    = assignment
                | expr ;
 assignment     = expr_list ( "=" | ":=" ) expr_list ;
 compound_assignment
-               = expr ( "+=" | "-=" | "*=" | "/=" | "%=" ) expr ;
+               = expr ( "+=" | "-=" | "*=" | "/=" ) expr ;
 inc_dec_stmt   = expr ( "++" | "--" ) ;
 expr_list      = expr { "," expr } ;
 
 expr           = logical_or ;
 logical_or     = logical_and { "||" logical_and } ;
 logical_and    = comparison { "&&" comparison } ;
-comparison     = bit_or { ( "==" | "!=" | "<" | "<=" | ">" | ">=" ) bit_or } ;
-bit_or         = bit_xor { "|" bit_xor } ;
-bit_xor        = bit_and { "^" bit_and } ;
-bit_and        = shift { ( "&" | "&^" ) shift } ;
-shift          = concat { ( "<<" | ">>" ) concat } ;
-concat         = additive { ".." additive } ;
-additive       = multiplicative { ( "+" | "-" ) multiplicative } ;
-multiplicative = unary { ( "*" | "/" | "%" ) unary } ;
-unary          = ( "!" | "-" | "#" | "<-" ) unary | power ;
+comparison     = concat { ( "==" | "!=" | "<" | "<=" | ">" | ">=" ) concat } ;
+concat         = additive [ ".." concat ] ;
+additive       = multiplicative { ( "+" | "-" | "|" | "^" ) multiplicative } ;
+multiplicative = unary { ( "*" | "/" | "%" | "<<" | ">>" | "&" | "&^" ) unary } ;
+unary          = ( "!" | "-" | "#" | "<-" | "^" ) unary | power ;
 power          = postfix { "**" unary } ;
 
-postfix        = primary { call_suffix | index_suffix | member_suffix } ;
-call_expr      = postfix call_suffix ;
+postfix        = primary { call_suffix | method_suffix | index_suffix | member_suffix } ;
+call_expr      = postfix ( call_suffix | method_suffix ) ;
 call_suffix    = "(" [ expr_list ] ")" ;
+method_suffix  = ":" identifier "(" [ expr_list ] ")" ;
 index_suffix   = "[" expr "]" ;
 member_suffix  = "." identifier ;
 
@@ -138,8 +137,7 @@ table_field    = identifier ":" expr
                | expr ;
 list_lit       = "[" [ expr { field_sep expr } [ field_sep ] ] "]" ;
 dense_lit      = "[" [ integer_lit ] "]" dense_type "{" [ expr { field_sep expr } [ field_sep ] ] "}" ;
-dense_type     = "i8" | "i16" | "i32" | "i64" | "u8" | "u16" | "u32" | "u64"
-               | "f32" | "f64" | "bool" ;
+dense_type     = "i32" | "i64" | "f32" | "f64" | "bool" ;
 field_sep      = "," | ";" ;
 
 identifier     = ( "A".."Z" | "a".."z" | "_" )
