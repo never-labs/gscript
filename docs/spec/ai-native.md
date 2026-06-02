@@ -60,6 +60,9 @@ regression tests. This module is not part of ordinary script execution.
 | `eval.load_jsonl(path)` | Load a JSON Lines corpus relative to the evaluate source file and return an array table of decoded rows. |
 | `eval.skip_if(cond, reason)` | If `cond` is truthy, mark the active subcase skipped and return true. The caller should usually `return` after it. |
 | `eval.fail_if(cond, message)` | If `cond` is truthy, raise a runtime error with `message`. |
+| `eval.usage()` | Return current case LLM usage, including `turns`, token counts, latency, cost, tool calls, stream events, and provider errors. |
+| `eval.budget(table)` | Raise a runtime error when current LLM usage exceeds a positive limit in `table`. Supported limits are `turns`, `tokens`, `input_tokens`, `output_tokens`, `latency_ms`, `cost`, and `money`. |
+| `eval.judge(options)` | Run a bounded judge turn by calling `llm.turn(options)`. Missing `max_tokens` defaults to `200`; missing `budget` defaults to `{tokens: 512, turns: 1}`. Provider usage is recorded as `judge_*` metrics. |
 
 The evaluation report preserves raw metrics on each case and subcase and also
 includes top-level metric summaries. Boolean metrics are summarized as true,

@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	goruntime "runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -568,6 +569,152 @@ evaluate "records llm turn" {
 	}
 }
 
+func TestRunEvalUsageAndBudget(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "llm_budget.leia")
+	if err := os.WriteFile(path, []byte(`models {
+    default: {
+        protocol: "openai_compatible"
+        provider_model: "mock-fast"
+    }
+}
+
+evaluate "llm usage budget" {
+    result, err := llm.turn({
+        messages: {llm.user("hello")},
+    })
+    assert(err == nil)
+    assert(result.text == "ok")
+    usage := eval.usage()
+    assert(usage.turns == 1)
+    assert(usage.input_tokens == 11)
+    assert(usage.output_tokens == 7)
+    assert(usage.tokens == 18)
+    assert(usage.cost == 0.012)
+    eval.budget({tokens: 20, cost: 0.02, latency_ms: 200})
+}
+`), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	report, err := Run(Options{
+		Paths: []string{path},
+		LLMProviderFactory: func(runtime.LLMProviderConfig) (runtime.LLMProvider, error) {
+			return testRuntimeLLMProvider{res: runtime.LLMTurnResult{
+				Status: "final_answer",
+				Text:   "ok",
+				Usage:  runtime.LLMTurnUsage{InputTokens: 11, OutputTokens: 7, Cost: 0.012, LatencyMS: 123},
+			}}, nil
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Status != "ok" || len(report.Cases) != 1 || report.Cases[0].Status != "passed" {
+		t.Fatalf("report = %#v", report)
+	}
+	if report.Cases[0].LLM == nil || report.Cases[0].LLM.Turns != 1 || report.Cases[0].LLM.InputTokens != 11 || report.Cases[0].LLM.OutputTokens != 7 {
+		t.Fatalf("case llm = %#v", report.Cases[0].LLM)
+	}
+}
+
+func TestRunEvalBudgetFailure(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "llm_budget_fail.leia")
+	if err := os.WriteFile(path, []byte(`models {
+    default: {
+        protocol: "openai_compatible"
+        provider_model: "mock-fast"
+    }
+}
+
+evaluate "llm budget fails" {
+    result, err := llm.turn({
+        messages: {llm.user("hello")},
+    })
+    assert(err == nil)
+    assert(result.text == "ok")
+    eval.budget({tokens: 10})
+}
+`), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	report, err := Run(Options{
+		Paths: []string{path},
+		LLMProviderFactory: func(runtime.LLMProviderConfig) (runtime.LLMProvider, error) {
+			return testRuntimeLLMProvider{res: runtime.LLMTurnResult{
+				Status: "final_answer",
+				Text:   "ok",
+				Usage:  runtime.LLMTurnUsage{InputTokens: 11, OutputTokens: 7},
+			}}, nil
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Status != "failed" || len(report.Cases) != 1 || report.Cases[0].Status != "failed" {
+		t.Fatalf("report = %#v", report)
+	}
+	if len(report.Findings) != 1 || report.Findings[0].Kind != "case_runtime_error" || !strings.Contains(report.Findings[0].Message, "eval.budget exceeded: tokens") {
+		t.Fatalf("findings = %#v", report.Findings)
+	}
+}
+
+func TestRunEvalJudgeDefaultsAndMetrics(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "llm_judge.leia")
+	if err := os.WriteFile(path, []byte(`models {
+    default: {
+        protocol: "openai_compatible"
+        provider_model: "judge-fast"
+    }
+}
+
+evaluate "judge helper" {
+    result, err := eval.judge({
+        messages: {llm.user("score this result")}
+    })
+    assert(err == nil)
+    assert(result.text == "ok")
+}
+`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	provider := &capturingRuntimeLLMProvider{res: runtime.LLMTurnResult{
+		Status: "final_answer",
+		Text:   "ok",
+		Usage:  runtime.LLMTurnUsage{InputTokens: 5, OutputTokens: 2, Cost: 0.001, LatencyMS: 50},
+	}}
+
+	report, err := Run(Options{
+		Paths: []string{path},
+		LLMProviderFactory: func(runtime.LLMProviderConfig) (runtime.LLMProvider, error) {
+			return provider, nil
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Status != "ok" || len(report.Cases) != 1 || report.Cases[0].Status != "passed" {
+		t.Fatalf("report = %#v", report)
+	}
+	requests := provider.Requests()
+	if len(requests) != 1 || requests[0].MaxTokens != 200 {
+		t.Fatalf("requests = %#v, want one request with max_tokens default 200", requests)
+	}
+	summaries := metricSummariesByName(report.Metrics)
+	if summaries["judge_cost"].Type != "number" || summaries["judge_cost"].Mean != 0.001 {
+		t.Fatalf("judge_cost summary = %#v", summaries["judge_cost"])
+	}
+	if summaries["judge_input_tokens"].Mean != 5 || summaries["judge_output_tokens"].Mean != 2 || summaries["judge_tokens"].Mean != 7 {
+		t.Fatalf("judge token summaries = %#v", summaries)
+	}
+	if report.Cases[0].LLM == nil || report.Cases[0].LLM.Turns != 1 || report.Cases[0].LLM.InputTokens != 5 || report.Cases[0].LLM.OutputTokens != 2 {
+		t.Fatalf("case llm = %#v", report.Cases[0].LLM)
+	}
+}
+
 func TestRunReplaysLLMTurns(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "llm_eval.leia")
@@ -828,4 +975,24 @@ type testRuntimeLLMProvider struct {
 
 func (p testRuntimeLLMProvider) Turn(context.Context, runtime.LLMTurnRequest) (runtime.LLMTurnResult, error) {
 	return p.res, p.err
+}
+
+type capturingRuntimeLLMProvider struct {
+	mu       sync.Mutex
+	res      runtime.LLMTurnResult
+	err      error
+	requests []runtime.LLMTurnRequest
+}
+
+func (p *capturingRuntimeLLMProvider) Turn(_ context.Context, req runtime.LLMTurnRequest) (runtime.LLMTurnResult, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.requests = append(p.requests, req)
+	return p.res, p.err
+}
+
+func (p *capturingRuntimeLLMProvider) Requests() []runtime.LLMTurnRequest {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return append([]runtime.LLMTurnRequest(nil), p.requests...)
 }

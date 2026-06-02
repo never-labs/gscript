@@ -17,6 +17,8 @@ import (
 type evalCollector struct {
 	call    runtime.ScriptFunctionCaller
 	baseDir string
+	llm     func() *LLMCaseRun
+	llmTurn runtime.Value
 
 	mu          sync.Mutex
 	metrics     []Metric
@@ -24,8 +26,8 @@ type evalCollector struct {
 	activeStack []int
 }
 
-func newEvalCollector(call runtime.ScriptFunctionCaller, baseDir string) *evalCollector {
-	return &evalCollector{call: call, baseDir: baseDir}
+func newEvalCollector(call runtime.ScriptFunctionCaller, baseDir string, llm func() *LLMCaseRun, llmTurn runtime.Value) *evalCollector {
+	return &evalCollector{call: call, baseDir: baseDir, llm: llm, llmTurn: llmTurn}
 }
 
 func (c *evalCollector) BuildModule() *runtime.Table {
@@ -49,6 +51,18 @@ func (c *evalCollector) BuildModule() *runtime.Table {
 	t.RawSetString("fail_if", runtime.FunctionValue(&runtime.GoFunction{
 		Name: "eval.fail_if",
 		Fn:   c.failIf,
+	}))
+	t.RawSetString("usage", runtime.FunctionValue(&runtime.GoFunction{
+		Name: "eval.usage",
+		Fn:   c.usage,
+	}))
+	t.RawSetString("budget", runtime.FunctionValue(&runtime.GoFunction{
+		Name: "eval.budget",
+		Fn:   c.budget,
+	}))
+	t.RawSetString("judge", runtime.FunctionValue(&runtime.GoFunction{
+		Name: "eval.judge",
+		Fn:   c.judge,
 	}))
 	return t
 }
@@ -147,6 +161,166 @@ func (c *evalCollector) failIf(args []runtime.Value) ([]runtime.Value, error) {
 		message = args[1].Str()
 	}
 	return nil, errors.New(message)
+}
+
+func (c *evalCollector) usage(args []runtime.Value) ([]runtime.Value, error) {
+	return []runtime.Value{runtime.TableValue(llmCaseUsageTable(c.currentLLM()))}, nil
+}
+
+func (c *evalCollector) budget(args []runtime.Value) ([]runtime.Value, error) {
+	if len(args) < 1 || !args[0].IsTable() {
+		return nil, fmt.Errorf("bad argument to 'eval.budget' (budget table expected)")
+	}
+	usage := c.currentLLM()
+	if err := checkEvalBudget(args[0].Table(), usage); err != nil {
+		return nil, err
+	}
+	return []runtime.Value{runtime.BoolValue(true)}, nil
+}
+
+func (c *evalCollector) judge(args []runtime.Value) ([]runtime.Value, error) {
+	if len(args) < 1 || !args[0].IsTable() {
+		return nil, fmt.Errorf("bad argument to 'eval.judge' (llm turn options table expected)")
+	}
+	if c.llmTurn.IsNil() || !c.llmTurn.IsFunction() {
+		return nil, fmt.Errorf("eval.judge requires llm.turn")
+	}
+	opts := args[0].Table()
+	if opts.RawGetString("max_tokens").IsNil() {
+		opts.RawSetString("max_tokens", runtime.IntValue(200))
+	}
+	if opts.RawGetString("budget").IsNil() {
+		budget := runtime.NewTable()
+		budget.RawSetString("tokens", runtime.IntValue(512))
+		budget.RawSetString("turns", runtime.IntValue(1))
+		opts.RawSetString("budget", runtime.TableValue(budget))
+	}
+	values, err := c.call(c.llmTurn, []runtime.Value{runtime.TableValue(opts)})
+	if err != nil {
+		return nil, err
+	}
+	if len(values) > 0 && values[0].IsTable() {
+		result := values[0].Table()
+		if usage := result.RawGetString("usage"); usage.IsTable() {
+			usageTable := usage.Table()
+			input := usageTable.RawGetString("input_tokens")
+			output := usageTable.RawGetString("output_tokens")
+			c.recordMetric(metricFromValue("judge_cost", usageTable.RawGetString("cost")))
+			c.recordMetric(metricFromValue("judge_input_tokens", input))
+			c.recordMetric(metricFromValue("judge_output_tokens", output))
+			if input.IsNumber() || output.IsNumber() {
+				c.recordMetric(metricFromValue("judge_tokens", runtime.IntValue(evalValueInt(input)+evalValueInt(output))))
+			}
+		}
+	}
+	return values, nil
+}
+
+func (c *evalCollector) currentLLM() *LLMCaseRun {
+	if c == nil || c.llm == nil {
+		return nil
+	}
+	return c.llm()
+}
+
+func llmCaseUsageTable(usage *LLMCaseRun) *runtime.Table {
+	t := runtime.NewTable()
+	if usage == nil {
+		t.RawSetString("turns", runtime.IntValue(0))
+		t.RawSetString("stream_events", runtime.IntValue(0))
+		t.RawSetString("tool_calls", runtime.IntValue(0))
+		t.RawSetString("errors", runtime.IntValue(0))
+		t.RawSetString("input_tokens", runtime.IntValue(0))
+		t.RawSetString("output_tokens", runtime.IntValue(0))
+		t.RawSetString("tokens", runtime.IntValue(0))
+		t.RawSetString("latency_ms", runtime.IntValue(0))
+		t.RawSetString("cost", runtime.FloatValue(0))
+		return t
+	}
+	t.RawSetString("trace_ref", runtime.StringValue(usage.TraceRef))
+	if usage.RecordPath != "" {
+		t.RawSetString("record_path", runtime.StringValue(usage.RecordPath))
+	}
+	t.RawSetString("turns", runtime.IntValue(int64(usage.Turns)))
+	t.RawSetString("stream_events", runtime.IntValue(int64(usage.StreamEvents)))
+	t.RawSetString("tool_calls", runtime.IntValue(int64(usage.ToolCalls)))
+	t.RawSetString("errors", runtime.IntValue(int64(usage.Errors)))
+	t.RawSetString("input_tokens", runtime.IntValue(usage.InputTokens))
+	t.RawSetString("output_tokens", runtime.IntValue(usage.OutputTokens))
+	t.RawSetString("tokens", runtime.IntValue(usage.InputTokens+usage.OutputTokens))
+	t.RawSetString("latency_ms", runtime.IntValue(usage.LatencyMS))
+	t.RawSetString("cost", runtime.FloatValue(usage.Cost))
+	t.RawSetString("money", runtime.FloatValue(usage.Cost))
+	return t
+}
+
+func checkEvalBudget(config *runtime.Table, usage *LLMCaseRun) error {
+	table := llmCaseUsageTable(usage)
+	for _, key := range []string{"turns", "tokens", "input_tokens", "output_tokens", "latency_ms"} {
+		limit, ok := evalBudgetInt(config, key)
+		if !ok || limit <= 0 {
+			continue
+		}
+		used := evalValueInt(table.RawGetString(key))
+		if used > limit {
+			return fmt.Errorf("eval.budget exceeded: %s (used %d > limit %d)", key, used, limit)
+		}
+	}
+	for _, key := range []string{"cost", "money"} {
+		limit, ok := evalBudgetFloat(config, key)
+		if !ok || limit <= 0 {
+			continue
+		}
+		used := evalValueFloat(table.RawGetString(key))
+		if used > limit {
+			return fmt.Errorf("eval.budget exceeded: %s (used %.6g > limit %.6g)", key, used, limit)
+		}
+	}
+	return nil
+}
+
+func evalBudgetInt(t *runtime.Table, key string) (int64, bool) {
+	if t == nil {
+		return 0, false
+	}
+	v := t.RawGetString(key)
+	if !v.IsNumber() {
+		return 0, false
+	}
+	return evalValueInt(v), true
+}
+
+func evalBudgetFloat(t *runtime.Table, key string) (float64, bool) {
+	if t == nil {
+		return 0, false
+	}
+	v := t.RawGetString(key)
+	if !v.IsNumber() {
+		return 0, false
+	}
+	return evalValueFloat(v), true
+}
+
+func evalValueInt(v runtime.Value) int64 {
+	switch {
+	case v.IsInt():
+		return v.Int()
+	case v.IsFloat():
+		return int64(v.Float())
+	default:
+		return 0
+	}
+}
+
+func evalValueFloat(v runtime.Value) float64 {
+	switch {
+	case v.IsInt():
+		return float64(v.Int())
+	case v.IsFloat():
+		return v.Float()
+	default:
+		return 0
+	}
 }
 
 func (c *evalCollector) resolvePath(path string) string {

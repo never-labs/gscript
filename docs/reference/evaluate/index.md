@@ -11,7 +11,8 @@ assertions such as `assert(result == "ok")` determine whether the case passes.
 It also counts static declarations such as `agent`, `tool`, `models`, and
 `budget`, and reports local `TODO` lines as informational findings. During the
 run, the harness-only `eval` module can load JSONL corpora, run named subcases,
-record metrics, skip fixtures, and fail gates without adding more syntax.
+record metrics, inspect LLM usage, enforce local budgets, run bounded judge
+turns, skip fixtures, and fail gates without adding more syntax.
 
 ```sh
 leia evaluate --json path/to/script.leia
@@ -62,6 +63,38 @@ stable sibling directory such as `agent.records.cases/001-refund-flow.records.js
 and reports each path as `cases[].llm.record_path`. These per-case fixtures are
 for debugging and future replay workflows; the global fixture remains the
 canonical replay input.
+
+## Harness module
+
+`leia evaluate` installs an `eval` module only while it executes evaluate
+blocks. Ordinary script execution does not install this module.
+
+| Function | Meaning |
+|---|---|
+| `eval.case(id, fn)` | Run one named subcase. Runtime errors inside `fn` fail that subcase and return `(false, err)` without stopping later subcases. |
+| `eval.metric(name, value)` | Record a bool, number, string, nil, or JSON-like metric on the active subcase, or on the outer evaluate block when no subcase is active. |
+| `eval.load_jsonl(path)` | Load a JSON Lines corpus relative to the evaluate source file. |
+| `eval.skip_if(cond, reason)` | Mark the active subcase skipped when `cond` is truthy. Returns whether it skipped. |
+| `eval.fail_if(cond, message)` | Stop the current evaluate block when `cond` is truthy. |
+| `eval.usage()` | Return current case LLM usage: `turns`, `input_tokens`, `output_tokens`, `tokens`, `latency_ms`, `cost`, `tool_calls`, `stream_events`, and `errors`. |
+| `eval.budget(table)` | Fail the current case when current LLM usage exceeds a positive limit in `table`. Supported keys are `turns`, `tokens`, `input_tokens`, `output_tokens`, `latency_ms`, `cost`, and `money`. |
+| `eval.judge(options)` | Call `llm.turn(options)` for judge-style scoring. If absent, it defaults `max_tokens` to `200` and `budget` to `{tokens: 512, turns: 1}`. It records `judge_cost`, `judge_input_tokens`, `judge_output_tokens`, and `judge_tokens` metrics when provider usage is available. |
+
+Example:
+
+```leia
+evaluate "refund classifier corpus" {
+    cases := eval.load_jsonl("refund_cases.jsonl")
+    for _, row := range cases {
+        eval.case(row.id, func() {
+            result, err := classify_refund(row.input)
+            assert(err == nil)
+            eval.metric("correct", result.action == row.expected)
+            eval.budget({tokens: 5000, cost: 0.02})
+        })
+    }
+}
+```
 
 The JSON report is versioned with `schema_version: 1` and includes:
 

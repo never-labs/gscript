@@ -1142,7 +1142,11 @@ func executeCase(path string, prog *ast.Program, c parsedCase, run *runContext) 
 	if abs, err := filepath.Abs(path); err == nil {
 		baseDir = filepath.Dir(abs)
 	}
-	evalState := newEvalCollector(interp.CallFunction, baseDir)
+	llmTurn := runtime.NilValue()
+	if llmValue := interp.GetGlobal("llm"); llmValue.IsTable() {
+		llmTurn = llmValue.Table().RawGetString("turn")
+	}
+	evalState := newEvalCollector(interp.CallFunction, baseDir, trace.Snapshot, llmTurn)
 	evalModule := runtime.TableValue(evalState.BuildModule())
 	interp.SetGlobal("eval", evalModule)
 	interp.SetModule("eval", evalModule)
