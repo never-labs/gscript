@@ -230,7 +230,7 @@ func TestPlaygroundAIExamplesCoverRunnableWorkflowShapes(t *testing.T) {
 		"ai-agent-tool":        {"MOCK_TOOL_RESULT"},
 		"ai-support-triage":    {"MOCK_TOOL_RESULT"},
 		"ai-draft-review":      {"draft:", "review:", "PASS"},
-		"ai-coding-agent":      {"attempts", "2 slugify cases passed", "func slugify"},
+		"ai-coding-agent":      {"attempts", "2 slugify cases passed", "tools\tsearch_repo,read_file,read_docs,run_tests,propose_file", "func slugify"},
 		"ai-evaluate-loop":     {"run leia evaluate"},
 	}
 	for _, example := range playgroundAIExamples() {

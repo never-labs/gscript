@@ -1084,6 +1084,7 @@ a, b <span class="tok-operator">:=</span> forward()
 <span class="tok-builtin">assert</span>(a <span class="tok-operator">==</span> <span class="tok-string">&quot;left&quot;</span>)
 <span class="tok-builtin">assert</span>(b <span class="tok-operator">==</span> <span class="tok-string">&quot;right&quot;</span>)</code></pre>
 <p><code>defer</code> evaluates the callee and arguments when the <code>defer</code> statement executes, then invokes the deferred call later. Deferred calls run in last-in, first-out order when the current function exits normally, returns explicitly, or unwinds through a protected boundary. A deferred call cannot change the already computed return values unless it mutates an identity-bearing value reachable from those return values.</p>
+<p>The evaluated deferred call is a call plus its already adjusted argument values. Later assignment to a variable that was used as an argument does not change that deferred argument value. A deferred closure with no argument, however, still closes over lexical bindings in the ordinary way; when it runs, it observes the current value of those captured bindings.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code">events <span class="tok-operator">:=</span> {}
 <span class="tok-keyword">func</span> scoped() {
     <span class="tok-keyword">defer</span> <span class="tok-keyword">func</span>() { events[<span class="tok-operator">#</span>events <span class="tok-operator">+</span> <span class="tok-number">1</span>] <span class="tok-operator">=</span> <span class="tok-string">&quot;last&quot;</span> }()
@@ -1095,6 +1096,23 @@ scoped()
 <span class="tok-builtin">assert</span>(events[<span class="tok-number">1</span>] <span class="tok-operator">==</span> <span class="tok-string">&quot;body&quot;</span>)
 <span class="tok-builtin">assert</span>(events[<span class="tok-number">2</span>] <span class="tok-operator">==</span> <span class="tok-string">&quot;first&quot;</span>)
 <span class="tok-builtin">assert</span>(events[<span class="tok-number">3</span>] <span class="tok-operator">==</span> <span class="tok-string">&quot;last&quot;</span>)</code></pre>
+<pre class="language-leia leia-code"><code class="language-leia leia-code">events <span class="tok-operator">:=</span> {}
+<span class="tok-keyword">func</span> record(value) {
+    events[<span class="tok-operator">#</span>events <span class="tok-operator">+</span> <span class="tok-number">1</span>] <span class="tok-operator">=</span> value
+}
+
+<span class="tok-keyword">func</span> scoped() {
+    value <span class="tok-operator">:=</span> <span class="tok-string">&quot;initial&quot;</span>
+    <span class="tok-keyword">defer</span> record(value) <span class="tok-comment">// argument value captured now</span>
+    <span class="tok-keyword">defer</span> <span class="tok-keyword">func</span>() {
+        record(<span class="tok-string">&quot;closure:&quot;</span> <span class="tok-operator">..</span> value) <span class="tok-comment">// lexical binding read when defer runs</span>
+    }()
+    value <span class="tok-operator">=</span> <span class="tok-string">&quot;changed&quot;</span>
+}
+
+scoped()
+<span class="tok-builtin">assert</span>(events[<span class="tok-number">1</span>] <span class="tok-operator">==</span> <span class="tok-string">&quot;closure:changed&quot;</span>)
+<span class="tok-builtin">assert</span>(events[<span class="tok-number">2</span>] <span class="tok-operator">==</span> <span class="tok-string">&quot;initial&quot;</span>)</code></pre>
 <p>Labels are declared as <code>name:</code> statements. Label names live in a function-level namespace separate from ordinary lexical variables. <code>goto name</code> transfers control to a label in the same function. It must not jump into a deeper lexical scope, into a loop body from outside that loop, or over a local declaration that would be in scope at the target. It may jump forward or backward within the same scope when doing so does not bypass such declarations.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code">i <span class="tok-operator">:=</span> <span class="tok-number">0</span>
 again:

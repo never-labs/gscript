@@ -354,6 +354,12 @@ through a protected boundary. A deferred call cannot change the already
 computed return values unless it mutates an identity-bearing value reachable
 from those return values.
 
+The evaluated deferred call is a call plus its already adjusted argument
+values. Later assignment to a variable that was used as an argument does not
+change that deferred argument value. A deferred closure with no argument,
+however, still closes over lexical bindings in the ordinary way; when it runs,
+it observes the current value of those captured bindings.
+
 ```leia run all
 events := {}
 func scoped() {
@@ -366,6 +372,26 @@ scoped()
 assert(events[1] == "body")
 assert(events[2] == "first")
 assert(events[3] == "last")
+```
+
+```leia run all
+events := {}
+func record(value) {
+    events[#events + 1] = value
+}
+
+func scoped() {
+    value := "initial"
+    defer record(value) // argument value captured now
+    defer func() {
+        record("closure:" .. value) // lexical binding read when defer runs
+    }()
+    value = "changed"
+}
+
+scoped()
+assert(events[1] == "closure:changed")
+assert(events[2] == "initial")
 ```
 
 Labels are declared as `name:` statements. Label names live in a function-level

@@ -1028,6 +1028,7 @@ history[#history + 1] = msg.assistant(stored.text)
 history[#history + 1] = msg.user("Recall project, owner, and risk as key=value pairs.")
 
 recalled, err := turn { messages: history, max_tokens: 64 }
+if err != nil { print(err.message); return }
 print(recalled.text)`,
 		},
 		{
@@ -1043,9 +1044,17 @@ print(recalled.text)`,
 				"Output shapes make tool results predictable.",
 			},
 			Source: `agent extract_memory(note) {
-    system: "Extract project, owner, and risk. Return compact JSON."
-    user: note
     output: { project: "ORCHID", owner: "ADA", risk: "LOW" }
+} flow {
+    lower := string.lower(note)
+    if string.find(lower, "orchid") == nil || string.find(lower, "ada") == nil {
+        return nil, {kind: "validation", message: "memory note must mention ORCHID and ADA"}
+    }
+    risk := "LOW"
+    if string.find(lower, "high") != nil {
+        risk = "HIGH"
+    }
+    return { project: "ORCHID", owner: "ADA", risk: risk }, nil
 }
 
 agent supervisor(question) {
@@ -1127,7 +1136,7 @@ print(checked.text)`,
 			Requires: "LLM provider",
 			Concepts: []string{
 				"Multiple tools expose narrow read/search/test capabilities.",
-				"A custom `flow` controls the loop instead of letting the model mutate files.",
+				"A custom `flow` can call the same safe implementation functions that back those tools.",
 				"The agent can revise after test feedback and still return a reviewable result.",
 			},
 			Source: `func read_file_impl(path) {
@@ -1276,6 +1285,7 @@ agent coding_agent(task) {
                 attempts: attempt,
                 tests: report.output,
                 risk: patch.risk,
+                tools: {"search_repo", "read_file", "read_docs", "run_tests", "propose_file"},
                 proposal: proposal,
             }, nil
         }
@@ -1296,6 +1306,7 @@ if err != nil { print(err.message); return }
 print("attempts", result.attempts)
 print("tests", result.tests)
 print("risk", result.risk)
+print("tools", table.concat(result.tools, ","))
 print(result.text)`,
 		},
 		{
