@@ -71,10 +71,10 @@ func ciProfileCommands(profile string, noLuaJIT bool) ([]ciCommand, error) {
 	switch profile {
 	case "smoke":
 		return []ciCommand{
-			{Name: "Go smoke tests", Args: []string{"go", "test", "./cmd/leia", ".", "./internal/runtime", "./internal/vm", "-count=1"}},
+			{Name: "Go smoke tests", Args: []string{"go", "test", "./cmd/leia", "./cmd/leia-lsp", ".", "./internal/runtime", "./internal/vm", "./internal/tooling/lsp", "-count=1"}},
 			{Name: "Manifest coverage", Args: manifestCoverageCommand()},
 			{Name: "Module path gate", Args: modulePathGateCommand()},
-			{Name: "Tooling check", Args: []string{"go", "run", "./cmd/leia", "check", "--no-test", "--no-docs", ciSmokeScriptPath}},
+			{Name: "Tooling check", Args: []string{"go", "run", "./cmd/leia", "check", "--no-test", "--no-docs", "--no-editor", ciSmokeScriptPath}},
 			{Name: "Worktree audit", Args: []string{"bash", "scripts/worktree_audit.sh"}},
 		}, nil
 	case "pr":

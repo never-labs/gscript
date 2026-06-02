@@ -17,7 +17,7 @@ func TestCICommandListsProfiles(t *testing.T) {
 		t.Fatalf("runCICommand code = %d, stderr = %q", code, stderr.String())
 	}
 	out := stdout.String()
-	for _, want := range []string{"go test", "tests/manifest.py", "github.com/never-labs/leia", "leia check", "tests/smoke/01_basic.leia", "worktree_audit.sh"} {
+	for _, want := range []string{"go test", "./cmd/leia-lsp", "./internal/tooling/lsp", "tests/manifest.py", "github.com/never-labs/leia", "leia check", "--no-editor", "tests/smoke/01_basic.leia", "worktree_audit.sh"} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("stdout = %q, want %q", out, want)
 		}
@@ -87,8 +87,8 @@ func TestCheckCommandJSONRunsEnabledSteps(t *testing.T) {
 	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
 		t.Fatalf("stdout is not JSON check report: %v; stdout = %q", err, stdout.String())
 	}
-	if !report.OK || len(report.Steps) != 5 {
-		t.Fatalf("report = %+v, want five passing steps", report)
+	if !report.OK || len(report.Steps) != 6 {
+		t.Fatalf("report = %+v, want six passing steps", report)
 	}
 	for _, step := range report.Steps {
 		if !step.OK || step.Skipped || step.ExitCode != 0 {
@@ -105,7 +105,7 @@ func TestCheckCommandReportsFailureAndSkips(t *testing.T) {
 	}
 
 	var stdout, stderr bytes.Buffer
-	code := runCheckCommand([]string{"--json", "--no-test", "--no-manifest", "--no-docs", dir}, &stdout, &stderr)
+	code := runCheckCommand([]string{"--json", "--no-test", "--no-manifest", "--no-docs", "--no-editor", dir}, &stdout, &stderr)
 	if code != 1 {
 		t.Fatalf("runCheckCommand code = %d, want 1", code)
 	}
@@ -113,8 +113,8 @@ func TestCheckCommandReportsFailureAndSkips(t *testing.T) {
 	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
 		t.Fatalf("stdout is not JSON check report: %v; stdout = %q", err, stdout.String())
 	}
-	if report.OK || len(report.Steps) != 5 {
-		t.Fatalf("report = %+v, want failed report with five steps", report)
+	if report.OK || len(report.Steps) != 6 {
+		t.Fatalf("report = %+v, want failed report with six steps", report)
 	}
 	if !report.Steps[2].Skipped || !report.Steps[2].OK {
 		t.Fatalf("test step = %+v, want skipped ok", report.Steps[2])
@@ -124,6 +124,9 @@ func TestCheckCommandReportsFailureAndSkips(t *testing.T) {
 	}
 	if !report.Steps[4].Skipped || !report.Steps[4].OK {
 		t.Fatalf("docs step = %+v, want skipped ok", report.Steps[4])
+	}
+	if !report.Steps[5].Skipped || !report.Steps[5].OK {
+		t.Fatalf("editor step = %+v, want skipped ok", report.Steps[5])
 	}
 }
 

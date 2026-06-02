@@ -35,6 +35,7 @@ func runCheckCommand(args []string, outw, errw io.Writer) int {
 	noTest := fs.Bool("no-test", false, "skip tests")
 	noManifest := fs.Bool("no-manifest", false, "skip test and benchmark manifest coverage check")
 	noDocs := fs.Bool("no-docs", false, "skip docs check")
+	noEditor := fs.Bool("no-editor", false, "skip editor asset check")
 	if code, done := parseCLIFlags(fs, args); done {
 		return code
 	}
@@ -43,7 +44,7 @@ func runCheckCommand(args []string, outw, errw io.Writer) int {
 		paths = []string{"."}
 	}
 	if len(paths) != 1 {
-		fmt.Fprintln(errw, "usage: leia check [--json] [--no-fmt] [--no-lint] [--no-test] [--no-manifest] [--no-docs] [path-or-dir]")
+		fmt.Fprintln(errw, "usage: leia check [--json] [--no-fmt] [--no-lint] [--no-test] [--no-manifest] [--no-docs] [--no-editor] [path-or-dir]")
 		return 2
 	}
 
@@ -83,6 +84,13 @@ func runCheckCommand(args []string, outw, errw io.Writer) int {
 			docsOut = errw
 		}
 		return runDocsCheck(docsOut, errw)
+	})
+	runStep("editor", *noEditor, func() int {
+		editorOut := outw
+		if *jsonOut {
+			editorOut = errw
+		}
+		return runEditorCheck(editorOut, errw)
 	})
 
 	if *jsonOut {
@@ -173,6 +181,19 @@ func runManifestCheckRoots(roots []string, outw, errw io.Writer) int {
 
 func runDocsCheck(outw, errw io.Writer) int {
 	script, err := findScriptFromCWD(filepath.Join("scripts", "docs_check.sh"))
+	if err != nil {
+		fmt.Fprintf(errw, "leia check: %v\n", err)
+		return 1
+	}
+	cmd := checkExecCommand("bash", script)
+	cmd.Stdout = outw
+	cmd.Stderr = errw
+	cmd.Dir = filepath.Dir(filepath.Dir(script))
+	return runExternalCommand(cmd, "leia check", errw)
+}
+
+func runEditorCheck(outw, errw io.Writer) int {
+	script, err := findScriptFromCWD(filepath.Join("scripts", "editor_check.sh"))
 	if err != nil {
 		fmt.Fprintf(errw, "leia check: %v\n", err)
 		return 1
