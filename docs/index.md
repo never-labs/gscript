@@ -44,6 +44,10 @@ only.
   reload-oriented runtime usage.
 - [AI-native guide](guides/ai-native.md): agents, tools, models, message
   history, and provider setup.
+- [Style guide](guides/style.md): naming, errors, capabilities, AI-native
+  patterns, concurrency, and test conventions.
+- [Cookbook](cookbook/index.md): short recipes for testing, evaluate replay,
+  Go embedding, concurrency, SoA, and tooling.
 - [Examples](examples/index.md): runnable scripts and embedding examples by
   product area.
 - [Example tree README](../examples/README.md): local example dependency and
