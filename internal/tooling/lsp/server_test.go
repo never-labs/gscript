@@ -46,6 +46,9 @@ func TestServerInitializeShutdown(t *testing.T) {
 	if caps["documentSymbolProvider"] != true {
 		t.Fatalf("initialize result missing document symbol capability: %#v", caps)
 	}
+	if caps["definitionProvider"] != true || caps["referencesProvider"] != true || caps["renameProvider"] != true {
+		t.Fatalf("initialize result missing navigation capabilities: %#v", caps)
+	}
 	if got := msgs[1]["id"]; got != float64(2) {
 		t.Fatalf("shutdown id = %#v, want 2", got)
 	}
@@ -388,6 +391,133 @@ func TestHoverReturnsKeywordStdlibAndDeclaration(t *testing.T) {
 	assertHoverContains(t, msgs[1], "**return**")
 	assertHoverContains(t, msgs[2], "stdlib module `math`")
 	assertHoverContains(t, msgs[3], "func `add(a, b)`")
+}
+
+func TestDefinitionReferencesAndRename(t *testing.T) {
+	src := strings.Join([]string{
+		"func add(a, b) {",
+		"    return a + b",
+		"}",
+		"result := add(1, 2)",
+		"again := add(result, 3)",
+		"",
+	}, "\n")
+	input := mustEncodeMessages(t,
+		map[string]any{
+			"jsonrpc": "2.0",
+			"method":  "textDocument/didOpen",
+			"params": map[string]any{
+				"textDocument": map[string]any{
+					"uri":        "file:///tmp/nav.leia",
+					"languageId": "leia",
+					"version":    1,
+					"text":       src,
+				},
+			},
+		},
+		map[string]any{
+			"jsonrpc": "2.0",
+			"id":      20,
+			"method":  "textDocument/definition",
+			"params": map[string]any{
+				"textDocument": map[string]any{"uri": "file:///tmp/nav.leia"},
+				"position":     map[string]any{"line": 3, "character": 11},
+			},
+		},
+		map[string]any{
+			"jsonrpc": "2.0",
+			"id":      21,
+			"method":  "textDocument/references",
+			"params": map[string]any{
+				"textDocument": map[string]any{"uri": "file:///tmp/nav.leia"},
+				"position":     map[string]any{"line": 3, "character": 11},
+				"context":      map[string]any{"includeDeclaration": true},
+			},
+		},
+		map[string]any{
+			"jsonrpc": "2.0",
+			"id":      22,
+			"method":  "textDocument/rename",
+			"params": map[string]any{
+				"textDocument": map[string]any{"uri": "file:///tmp/nav.leia"},
+				"position":     map[string]any{"line": 0, "character": 6},
+				"newName":      "sum",
+			},
+		},
+	)
+	var out bytes.Buffer
+	err := NewServer().Run(context.Background(), bytes.NewReader(input), &out)
+	if err != nil {
+		t.Fatalf("Run returned error: %v", err)
+	}
+
+	msgs := readOutputMessages(t, out.Bytes())
+	if len(msgs) != 4 {
+		t.Fatalf("expected diagnostics notification and 3 navigation responses, got %d: %#v", len(msgs), msgs)
+	}
+	def := msgs[1]["result"].(map[string]any)
+	defRange := def["range"].(map[string]any)
+	defStart := defRange["start"].(map[string]any)
+	if def["uri"] != "file:///tmp/nav.leia" || defStart["line"] != float64(0) || defStart["character"] != float64(5) {
+		t.Fatalf("definition = %#v, want add declaration at 0:5", def)
+	}
+
+	refs := msgs[2]["result"].([]any)
+	if len(refs) != 3 {
+		t.Fatalf("references = %#v, want declaration plus two calls", refs)
+	}
+
+	edit := msgs[3]["result"].(map[string]any)
+	changes := edit["changes"].(map[string]any)
+	edits := changes["file:///tmp/nav.leia"].([]any)
+	if len(edits) != 3 {
+		t.Fatalf("rename edits = %#v, want three add replacements", edits)
+	}
+	for _, raw := range edits {
+		e := raw.(map[string]any)
+		if e["newText"] != "sum" {
+			t.Fatalf("rename edit = %#v, want newText sum", e)
+		}
+	}
+}
+
+func TestRenameRejectsInvalidIdentifier(t *testing.T) {
+	input := mustEncodeMessages(t,
+		map[string]any{
+			"jsonrpc": "2.0",
+			"method":  "textDocument/didOpen",
+			"params": map[string]any{
+				"textDocument": map[string]any{
+					"uri":        "file:///tmp/rename-bad.leia",
+					"languageId": "leia",
+					"version":    1,
+					"text":       "func add() { return 1 }\n",
+				},
+			},
+		},
+		map[string]any{
+			"jsonrpc": "2.0",
+			"id":      23,
+			"method":  "textDocument/rename",
+			"params": map[string]any{
+				"textDocument": map[string]any{"uri": "file:///tmp/rename-bad.leia"},
+				"position":     map[string]any{"line": 0, "character": 6},
+				"newName":      "1bad",
+			},
+		},
+	)
+	var out bytes.Buffer
+	err := NewServer().Run(context.Background(), bytes.NewReader(input), &out)
+	if err != nil {
+		t.Fatalf("Run returned error: %v", err)
+	}
+	msgs := readOutputMessages(t, out.Bytes())
+	if len(msgs) != 2 {
+		t.Fatalf("expected diagnostics notification and rename response, got %d: %#v", len(msgs), msgs)
+	}
+	if msgs[1]["error"] == nil {
+		t.Fatalf("rename response = %#v, want error for invalid identifier", msgs[1])
+	}
 }
 
 func assertHoverContains(t *testing.T, msg map[string]any, want string) {

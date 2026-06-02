@@ -125,6 +125,12 @@ func (s *Server) handle(payload []byte) error {
 		return s.hover(req.ID, req.Params)
 	case "textDocument/documentSymbol":
 		return s.documentSymbol(req.ID, req.Params)
+	case "textDocument/definition":
+		return s.definition(req.ID, req.Params)
+	case "textDocument/references":
+		return s.references(req.ID, req.Params)
+	case "textDocument/rename":
+		return s.rename(req.ID, req.Params)
 	default:
 		return s.respondMaybe(req.ID, nil, &responseError{Code: errCodeMethodNotFound, Message: "method not found: " + req.Method})
 	}
@@ -140,6 +146,9 @@ func initializeResult() map[string]any {
 			"documentFormattingProvider": true,
 			"hoverProvider":              true,
 			"documentSymbolProvider":     true,
+			"definitionProvider":         true,
+			"referencesProvider":         true,
+			"renameProvider":             true,
 			"completionProvider": map[string]any{
 				"triggerCharacters": []string{".", ":"},
 			},

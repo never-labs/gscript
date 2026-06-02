@@ -53,6 +53,36 @@ type sourceSymbol struct {
 	NameRange lspRange
 }
 
+type textDocumentPositionParams struct {
+	TextDocument textDocumentIdentifier `json:"textDocument"`
+	Position     position               `json:"position"`
+}
+
+type referenceParams struct {
+	TextDocument textDocumentIdentifier `json:"textDocument"`
+	Position     position               `json:"position"`
+	Context      referenceContext       `json:"context,omitempty"`
+}
+
+type referenceContext struct {
+	IncludeDeclaration bool `json:"includeDeclaration,omitempty"`
+}
+
+type renameParams struct {
+	TextDocument textDocumentIdentifier `json:"textDocument"`
+	Position     position               `json:"position"`
+	NewName      string                 `json:"newName"`
+}
+
+type location struct {
+	URI   string   `json:"uri"`
+	Range lspRange `json:"range"`
+}
+
+type workspaceEdit struct {
+	Changes map[string][]textEdit `json:"changes"`
+}
+
 func (s *Server) hover(id *json.RawMessage, params json.RawMessage) error {
 	var p hoverParams
 	if err := json.Unmarshal(params, &p); err != nil {
@@ -74,6 +104,76 @@ func (s *Server) hover(id *json.RawMessage, params json.RawMessage) error {
 		}, nil)
 	}
 	return s.respondMaybe(id, nil, nil)
+}
+
+func (s *Server) definition(id *json.RawMessage, params json.RawMessage) error {
+	var p textDocumentPositionParams
+	if err := json.Unmarshal(params, &p); err != nil {
+		return s.respondMaybe(id, nil, &responseError{Code: errCodeInvalidParams, Message: err.Error()})
+	}
+	src, ok := s.documentText(p.TextDocument.URI)
+	if !ok {
+		return s.respondMaybe(id, nil, nil)
+	}
+	word, _ := wordAtPosition(src, p.Position)
+	if word == "" {
+		return s.respondMaybe(id, nil, nil)
+	}
+	sym, ok := findSourceSymbol(src, word)
+	if !ok {
+		return s.respondMaybe(id, nil, nil)
+	}
+	return s.respondMaybe(id, location{URI: p.TextDocument.URI, Range: sym.NameRange}, nil)
+}
+
+func (s *Server) references(id *json.RawMessage, params json.RawMessage) error {
+	var p referenceParams
+	if err := json.Unmarshal(params, &p); err != nil {
+		return s.respondMaybe(id, nil, &responseError{Code: errCodeInvalidParams, Message: err.Error()})
+	}
+	src, ok := s.documentText(p.TextDocument.URI)
+	if !ok {
+		return s.respondMaybe(id, []location{}, nil)
+	}
+	word, _ := wordAtPosition(src, p.Position)
+	if word == "" {
+		return s.respondMaybe(id, []location{}, nil)
+	}
+	refs := wordReferences(src, word)
+	if !p.Context.IncludeDeclaration {
+		if sym, ok := findSourceSymbol(src, word); ok {
+			refs = filterReferenceRanges(refs, sym.NameRange)
+		}
+	}
+	out := make([]location, 0, len(refs))
+	for _, r := range refs {
+		out = append(out, location{URI: p.TextDocument.URI, Range: r})
+	}
+	return s.respondMaybe(id, out, nil)
+}
+
+func (s *Server) rename(id *json.RawMessage, params json.RawMessage) error {
+	var p renameParams
+	if err := json.Unmarshal(params, &p); err != nil {
+		return s.respondMaybe(id, nil, &responseError{Code: errCodeInvalidParams, Message: err.Error()})
+	}
+	if !validIdentifierName(p.NewName) {
+		return s.respondMaybe(id, nil, &responseError{Code: errCodeInvalidParams, Message: "newName must be a valid Leia identifier"})
+	}
+	src, ok := s.documentText(p.TextDocument.URI)
+	if !ok {
+		return s.respondMaybe(id, workspaceEdit{Changes: map[string][]textEdit{}}, nil)
+	}
+	word, _ := wordAtPosition(src, p.Position)
+	if word == "" {
+		return s.respondMaybe(id, workspaceEdit{Changes: map[string][]textEdit{}}, nil)
+	}
+	refs := wordReferences(src, word)
+	edits := make([]textEdit, 0, len(refs))
+	for _, r := range refs {
+		edits = append(edits, textEdit{Range: r, NewText: p.NewName})
+	}
+	return s.respondMaybe(id, workspaceEdit{Changes: map[string][]textEdit{p.TextDocument.URI: edits}}, nil)
 }
 
 func (s *Server) documentSymbol(id *json.RawMessage, params json.RawMessage) error {
@@ -122,6 +222,84 @@ func hoverText(src, word string) string {
 		}
 	}
 	return ""
+}
+
+func findSourceSymbol(src, name string) (sourceSymbol, bool) {
+	for _, sym := range collectSourceSymbols(src) {
+		if sym.Name == name {
+			return sym, true
+		}
+	}
+	return sourceSymbol{}, false
+}
+
+func wordReferences(src, word string) []lspRange {
+	if word == "" {
+		return nil
+	}
+	tokens, err := lexer.New(src).Tokenize()
+	if err != nil {
+		return nil
+	}
+	var out []lspRange
+	for _, tok := range tokens {
+		if tok.Type == lexer.TOKEN_IDENT && tok.Value == word {
+			out = append(out, tokenRange(tok))
+			continue
+		}
+		if tok.Type == lexer.TOKEN_STRING && tok.Value == word && tokenLooksLikeEvaluateName(tokens, tok) {
+			out = append(out, tokenRange(tok))
+		}
+	}
+	return out
+}
+
+func tokenLooksLikeEvaluateName(tokens []lexer.Token, target lexer.Token) bool {
+	for i, tok := range tokens {
+		if tok.Line != target.Line || tok.Column != target.Column {
+			continue
+		}
+		for j := i - 1; j >= 0 && tokens[j].Line == target.Line; j-- {
+			if tokenText(tokens[j]) == "evaluate" {
+				return true
+			}
+		}
+		return false
+	}
+	return false
+}
+
+func filterReferenceRanges(refs []lspRange, exclude lspRange) []lspRange {
+	out := refs[:0]
+	for _, r := range refs {
+		if sameRange(r, exclude) {
+			continue
+		}
+		out = append(out, r)
+	}
+	return out
+}
+
+func sameRange(a, b lspRange) bool {
+	return a.Start == b.Start && a.End == b.End
+}
+
+func validIdentifierName(name string) bool {
+	if name == "" {
+		return false
+	}
+	for i, r := range name {
+		if i == 0 {
+			if r != '_' && !unicode.IsLetter(r) {
+				return false
+			}
+			continue
+		}
+		if r != '_' && !unicode.IsLetter(r) && !unicode.IsDigit(r) {
+			return false
+		}
+	}
+	return true
 }
 
 var keywordHover = map[string]string{
