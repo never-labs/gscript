@@ -293,6 +293,63 @@ func TestEvaluateCommandBaselineComparisonFailsGate(t *testing.T) {
 	}
 }
 
+func TestEvaluateCommandComparesExistingReports(t *testing.T) {
+	dir := t.TempDir()
+	baselinePath := filepath.Join(dir, "baseline.json")
+	currentPath := filepath.Join(dir, "current.json")
+	baseline := evaluate.Report{
+		SchemaVersion: 1,
+		Status:        "ok",
+		Summary:       evaluate.Summary{PassRate: 1},
+		Metrics: []evaluate.MetricSummary{{
+			Name: "correct", Type: "bool", Count: 4, True: 4, PassRate: 1,
+		}},
+	}
+	current := evaluate.Report{
+		SchemaVersion: 1,
+		Status:        "ok",
+		Summary:       evaluate.Summary{PassRate: 1},
+		Metrics: []evaluate.MetricSummary{{
+			Name: "correct", Type: "bool", Count: 4, True: 2, False: 2, PassRate: 0.5,
+		}},
+	}
+	writeEvaluateJSONReport(t, baselinePath, baseline)
+	writeEvaluateJSONReport(t, currentPath, current)
+
+	var stdout, stderr bytes.Buffer
+	code := runEvaluateCommand([]string{"--compare", "--format=json", "--regression-threshold", "0.1", baselinePath, currentPath}, &stdout, &stderr)
+	if code != 1 {
+		t.Fatalf("runEvaluateCommand code = %d, stderr = %q stdout=%q", code, stderr.String(), stdout.String())
+	}
+	var report evaluate.Report
+	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
+		t.Fatalf("decode report: %v\n%s", err, stdout.String())
+	}
+	if report.Status != "failed" || report.Comparison == nil || report.Comparison.BaselinePath != baselinePath {
+		t.Fatalf("report comparison = status %q comparison %#v", report.Status, report.Comparison)
+	}
+	if len(report.Comparison.Metrics) != 1 || report.Comparison.Metrics[0].Name != "correct" || !report.Comparison.Metrics[0].Regressed {
+		t.Fatalf("metric comparison = %#v", report.Comparison.Metrics)
+	}
+	if len(report.Findings) != 1 || report.Findings[0].Kind != "evaluate_metric_regression" {
+		t.Fatalf("findings = %#v", report.Findings)
+	}
+}
+
+func TestEvaluateCommandCompareRejectsWrongArity(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := runEvaluateCommand([]string{"--compare", "one.json"}, &stdout, &stderr)
+	if code != 2 {
+		t.Fatalf("runEvaluateCommand code = %d, stderr = %q", code, stderr.String())
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("stdout = %q, want empty", stdout.String())
+	}
+	if !strings.Contains(stderr.String(), "--compare requires BASELINE and CURRENT report paths") {
+		t.Fatalf("stderr = %q", stderr.String())
+	}
+}
+
 func writeEvaluateJSONReport(t *testing.T, path string, report evaluate.Report) {
 	t.Helper()
 	data, err := json.Marshal(report)

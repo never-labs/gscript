@@ -26,6 +26,7 @@ func runEvaluateCommand(args []string, outw, errw io.Writer) int {
 	filter := fs.String("filter", "", "run only evaluate cases whose name, source path, or case id contains this text")
 	gate := fs.Bool("gate", false, "CI gate mode: exit non-zero when any selected case, replay check, or report finding fails")
 	baselinePath := fs.String("baseline", "", "compare this run against a previous JSON evaluate report")
+	compareMode := fs.Bool("compare", false, "compare two existing JSON evaluate reports: leia evaluate --compare BASELINE CURRENT")
 	regressionThreshold := fs.Float64("regression-threshold", 0, "allowed pass-rate regression when --baseline is set")
 	record := fs.String("record", "", "alias for --llm-record")
 	replay := fs.String("replay", "", "alias for --llm-replay")
@@ -48,6 +49,28 @@ func runEvaluateCommand(args []string, outw, errw io.Writer) int {
 	if err != nil {
 		fmt.Fprintf(errw, "leia evaluate: %v\n", err)
 		return 2
+	}
+	if *compareMode {
+		if *listOnly || *filter != "" || *baselinePath != "" || *record != "" || *replay != "" || *llmRecord != "" || *llmReplay != "" || *updateGolden != "" {
+			fmt.Fprintln(errw, "leia evaluate: --compare cannot be combined with source execution, filter, baseline, or LLM fixture flags")
+			return 2
+		}
+		if len(fs.Args()) != 2 {
+			fmt.Fprintln(errw, "leia evaluate: --compare requires BASELINE and CURRENT report paths")
+			return 2
+		}
+		baseline, err := loadEvaluateReport(fs.Args()[0])
+		if err != nil {
+			fmt.Fprintf(errw, "leia evaluate: %v\n", err)
+			return 1
+		}
+		report, err := loadEvaluateReport(fs.Args()[1])
+		if err != nil {
+			fmt.Fprintf(errw, "leia evaluate: %v\n", err)
+			return 1
+		}
+		evaluate.AttachBaselineComparison(&report, baseline, fs.Args()[0], *regressionThreshold)
+		return writeEvaluateReport(report, *format, reportPath, outw, errw, *gate)
 	}
 	recordPath, err := coalesceEvaluatePathFlag("record", *record, "llm-record", *llmRecord)
 	if err != nil {
@@ -81,24 +104,7 @@ func runEvaluateCommand(args []string, outw, errw io.Writer) int {
 		}
 		evaluate.AttachBaselineComparison(&report, baseline, *baselinePath, *regressionThreshold)
 	}
-	rendered, err := renderEvaluateReport(report, *format)
-	if err != nil {
-		fmt.Fprintf(errw, "leia evaluate: %v\n", err)
-		return 1
-	}
-	if reportPath != "" {
-		if err := os.WriteFile(reportPath, rendered, 0o600); err != nil {
-			fmt.Fprintf(errw, "leia evaluate: write %s: %v\n", reportPath, err)
-			return 1
-		}
-	} else if _, err := outw.Write(rendered); err != nil {
-		fmt.Fprintf(errw, "leia evaluate: %v\n", err)
-		return 1
-	}
-	if report.Status == "failed" || (*gate && report.Status != "ok") {
-		return 1
-	}
-	return 0
+	return writeEvaluateReport(report, *format, reportPath, outw, errw, *gate)
 }
 
 func coalesceEvaluatePathFlag(shortName, shortValue, longName, longValue string) (string, error) {
@@ -114,13 +120,34 @@ func coalesceEvaluatePathFlag(shortName, shortValue, longName, longValue string)
 func loadEvaluateReport(path string) (evaluate.Report, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return evaluate.Report{}, fmt.Errorf("read baseline report %s: %v", path, err)
+		return evaluate.Report{}, fmt.Errorf("read evaluate report %s: %v", path, err)
 	}
 	var report evaluate.Report
 	if err := json.Unmarshal(data, &report); err != nil {
-		return evaluate.Report{}, fmt.Errorf("decode baseline report %s: %v", path, err)
+		return evaluate.Report{}, fmt.Errorf("decode evaluate report %s: %v", path, err)
 	}
 	return report, nil
+}
+
+func writeEvaluateReport(report evaluate.Report, format, reportPath string, outw, errw io.Writer, gate bool) int {
+	rendered, err := renderEvaluateReport(report, format)
+	if err != nil {
+		fmt.Fprintf(errw, "leia evaluate: %v\n", err)
+		return 1
+	}
+	if reportPath != "" {
+		if err := os.WriteFile(reportPath, rendered, 0o600); err != nil {
+			fmt.Fprintf(errw, "leia evaluate: write %s: %v\n", reportPath, err)
+			return 1
+		}
+	} else if _, err := outw.Write(rendered); err != nil {
+		fmt.Fprintf(errw, "leia evaluate: %v\n", err)
+		return 1
+	}
+	if report.Status == "failed" || (gate && report.Status != "ok") {
+		return 1
+	}
+	return 0
 }
 
 func renderEvaluateReport(report evaluate.Report, format string) ([]byte, error) {
