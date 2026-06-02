@@ -19,6 +19,7 @@ import re
 import shutil
 import statistics
 import subprocess
+import sys
 import tempfile
 import time
 from dataclasses import asdict, dataclass, field
@@ -771,6 +772,11 @@ def main(argv: list[str] | None = None) -> int:
         default=1,
         help="number of benchmarks to run concurrently; modes within a benchmark remain sequential",
     )
+    parser.add_argument(
+        "--progress",
+        action="store_true",
+        help="print per-benchmark progress to stderr for long strict runs",
+    )
     args = parser.parse_args(argv)
 
     if args.warmup < 0:
@@ -800,7 +806,15 @@ def main(argv: list[str] | None = None) -> int:
         else:
             build_leia(root, leia_bin)
 
+            total_specs = len(specs)
+
             def run_spec(index: int, spec: BenchmarkSpec) -> tuple[int, BenchmarkResult]:
+                if args.progress:
+                    print(
+                        f"[strict_guard] {index}/{total_specs} start {spec.benchmark_id}",
+                        file=sys.stderr,
+                        flush=True,
+                    )
                 row = BenchmarkResult(spec.name, spec.group, spec.base)
                 for mode in modes:
                     row.modes[mode] = run_mode(
@@ -816,6 +830,12 @@ def main(argv: list[str] | None = None) -> int:
                         args.max_repeat,
                         args.allow_wall_time,
                         repeat_for(repeat_overrides, mode, spec.name, spec.benchmark_id),
+                    )
+                if args.progress:
+                    print(
+                        f"[strict_guard] {index}/{total_specs} done  {spec.benchmark_id}",
+                        file=sys.stderr,
+                        flush=True,
                     )
                 return index, row
 

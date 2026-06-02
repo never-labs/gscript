@@ -67,7 +67,7 @@ FEATURE_SMOKE_BENCHES=(
 STRICT_CORE_BENCHES=(
     "control/sieve"
     "string/string_bench"
-    "table/table_array_access"
+    "table/table_field_access"
     "table/json_table_walk"
 )
 
@@ -516,6 +516,7 @@ if [ "$STRICT" -eq 1 ]; then
         --min-sample-seconds=0.100
         --max-repeat=128
         --jobs="$JOBS"
+        --progress
         --json "$STRICT_JSON"
         --markdown "$STRICT_MD"
     )

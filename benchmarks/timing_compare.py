@@ -34,6 +34,7 @@ GROUPS = discovery.GROUPS
 MODES = ["default", "vm", "no_filter"]
 TIME_SOURCES = ["auto", "script", "wall"]
 SERIAL_GROUPS = {"concurrency"}
+WALL_TIME_GROUPS = {"concurrency"}
 
 HOT_SCALE_PROFILE = [
     "recursion/mutual_recursion:REPS=1000000",
@@ -471,6 +472,7 @@ def subject_diagnostic(
     samples: list[Sample],
     applied_overrides: list[ScaleOverride],
     args: argparse.Namespace,
+    time_source: str,
 ) -> dict[str, object]:
     low_samples = low_resolution_samples(samples)
     wall_timed = source_is_wall_timed(subject)
@@ -481,7 +483,7 @@ def subject_diagnostic(
         "timer_resolution": args.timer_resolution,
         "min_wall_repeat": args.min_wall_repeat,
         "wall_fallback": not args.no_wall_fallback,
-        "time_source": args.time_source,
+        "time_source": time_source,
         "scale_profile": args.scale_profile,
         "scale": scale_arg_values(applied_overrides),
     }
@@ -522,6 +524,12 @@ def subject_diagnostic(
             "min_wall_repeat": args.min_wall_repeat,
         }
     return diagnostic
+
+
+def effective_time_source(spec: BenchmarkSpec, requested: str) -> str:
+    if requested == "auto" and spec.group in WALL_TIME_GROUPS:
+        return "wall"
+    return requested
 
 
 canonical_group = discovery.canonical_group
@@ -701,6 +709,7 @@ def run_subject(
     if unavailable:
         return SubjectResult(subject=subject, mode=mode, status=unavailable, note="input unavailable")
     assert cmd is not None
+    time_source = effective_time_source(spec, args.time_source)
     repeat, calibration = calibrate_repeat(
         cmd,
         env,
@@ -710,7 +719,7 @@ def run_subject(
         args.max_repeat,
         not args.no_wall_fallback,
         args.min_wall_repeat,
-        args.time_source,
+        time_source,
     )
     samples = [calibration]
     for _ in range(args.warmup):
@@ -722,7 +731,7 @@ def run_subject(
             args.timer_resolution,
             args.min_sample_seconds,
             not args.no_wall_fallback,
-            args.time_source,
+            time_source,
         )
     for _ in range(args.runs):
         samples.append(
@@ -734,12 +743,12 @@ def run_subject(
                 args.timer_resolution,
                 args.min_sample_seconds,
                 not args.no_wall_fallback,
-                args.time_source,
+                time_source,
             )
         )
     measured = samples[1:] if len(samples) > 1 else samples
     result = summarize_subject(subject, mode, measured, repeat)
-    result.diagnostic = subject_diagnostic(spec, result, measured, overrides, args)
+    result.diagnostic = subject_diagnostic(spec, result, measured, overrides, args, time_source)
     return result
 
 

@@ -43,6 +43,7 @@ class ScriptEntrypointConsistencyTest(unittest.TestCase):
         self.assertIn("python3 benchmarks/strict_guard.py", gate)
         self.assertIn("--progress", gate)
         self.assertIn('--jobs="$JOBS"', gate)
+        self.assertIn("table/table_field_access", gate)
         self.assertIn("--quick-phase-smoke", gate)
         self.assertIn('PROFILE="quick_phase_smoke"', gate)
         self.assertIn("STRICT_SMOKE_BENCHES=(", gate)
