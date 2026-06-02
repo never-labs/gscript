@@ -4,8 +4,10 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	goruntime "runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/never-labs/leia/internal/runtime"
 	"github.com/never-labs/leia/llm"
@@ -48,6 +50,12 @@ evaluate "answer echoes through tool" {
 	}
 	if report.SchemaVersion != SchemaVersion || report.Phase != "runtime-minimal" || report.Status != "ok" {
 		t.Fatalf("report header = %#v", report)
+	}
+	if _, err := time.Parse(time.RFC3339, report.StartedAt); err != nil {
+		t.Fatalf("started_at = %q: %v", report.StartedAt, err)
+	}
+	if report.Runtime.LeiaVersion == "" || report.Runtime.GoVersion == "" || report.Runtime.GOOS != goruntime.GOOS || report.Runtime.GOARCH != goruntime.GOARCH {
+		t.Fatalf("runtime = %#v", report.Runtime)
 	}
 	if report.Summary.Files != 1 || report.Summary.ParsedFiles != 1 {
 		t.Fatalf("summary files = %#v", report.Summary)

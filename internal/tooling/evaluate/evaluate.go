@@ -8,6 +8,8 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	goruntime "runtime"
+	"runtime/debug"
 	"sort"
 	"strings"
 	"time"
@@ -33,15 +35,27 @@ type Options struct {
 }
 
 type Report struct {
-	SchemaVersion int       `json:"schema_version"`
-	Phase         string    `json:"phase"`
-	Status        string    `json:"status"`
-	Summary       Summary   `json:"summary"`
-	LLM           *LLMRun   `json:"llm,omitempty"`
-	Inputs        []Input   `json:"inputs"`
-	Cases         []Case    `json:"cases"`
-	Findings      []Finding `json:"findings"`
-	Notes         []string  `json:"notes"`
+	SchemaVersion int         `json:"schema_version"`
+	Phase         string      `json:"phase"`
+	Status        string      `json:"status"`
+	StartedAt     string      `json:"started_at"`
+	Runtime       RuntimeInfo `json:"runtime"`
+	Summary       Summary     `json:"summary"`
+	LLM           *LLMRun     `json:"llm,omitempty"`
+	Inputs        []Input     `json:"inputs"`
+	Cases         []Case      `json:"cases"`
+	Findings      []Finding   `json:"findings"`
+	Notes         []string    `json:"notes"`
+}
+
+type RuntimeInfo struct {
+	LeiaVersion string `json:"leia_version"`
+	GoVersion   string `json:"go_version"`
+	GOOS        string `json:"goos"`
+	GOARCH      string `json:"goarch"`
+	Revision    string `json:"revision,omitempty"`
+	Modified    string `json:"modified,omitempty"`
+	Time        string `json:"time,omitempty"`
 }
 
 type LLMRun struct {
@@ -132,6 +146,8 @@ func Run(opts Options) (Report, error) {
 		SchemaVersion: SchemaVersion,
 		Phase:         "runtime-minimal",
 		Status:        "ok",
+		StartedAt:     time.Now().UTC().Format(time.RFC3339),
+		Runtime:       runtimeInfo(),
 		Inputs:        []Input{},
 		Cases:         []Case{},
 		Findings:      []Finding{},
@@ -246,6 +262,28 @@ func Run(opts Options) (Report, error) {
 		}
 	}
 	return report, nil
+}
+
+func runtimeInfo() RuntimeInfo {
+	info := RuntimeInfo{
+		LeiaVersion: "dev",
+		GoVersion:   goruntime.Version(),
+		GOOS:        goruntime.GOOS,
+		GOARCH:      goruntime.GOARCH,
+	}
+	if build, ok := debug.ReadBuildInfo(); ok {
+		for _, setting := range build.Settings {
+			switch setting.Key {
+			case "vcs.revision":
+				info.Revision = setting.Value
+			case "vcs.modified":
+				info.Modified = setting.Value
+			case "vcs.time":
+				info.Time = setting.Value
+			}
+		}
+	}
+	return info
 }
 
 func caseMatchesFilter(c Case, filter string) bool {

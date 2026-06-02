@@ -41,6 +41,8 @@ The JSON report is versioned with `schema_version: 1` and includes:
 |---|---|
 | `phase` | Currently `runtime-minimal`. |
 | `status` | `ok` or `failed`. Syntax, validation, and case runtime errors make the report fail. |
+| `started_at` | UTC RFC3339 timestamp for the evaluation run. |
+| `runtime` | Leia and Go runtime metadata: version, OS/arch, and build VCS fields when available. |
 | `summary` | File, parse, AI declaration, and TODO counts. |
 | `llm` | Optional LLM fixture metadata: mode, paths, loaded turns, replayed turns, remaining turns, and recorded turns. |
 | `inputs` | Per-input file status. |
