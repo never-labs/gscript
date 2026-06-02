@@ -694,9 +694,13 @@ func (p *Parser) parseIfStmt() (ast.Stmt, error) {
 		Body: body,
 	}
 
-	// Parse elseif chains
-	for p.check(lexer.TOKEN_ELSEIF) {
+	// Parse elseif chains. Leia accepts both the compact `elseif` form and
+	// the Go-style two-token `else if` form; both lower to the same AST.
+	for p.check(lexer.TOKEN_ELSEIF) || (p.check(lexer.TOKEN_ELSE) && p.peekAt(1).Type == lexer.TOKEN_IF) {
 		eiTok := p.advance()
+		if eiTok.Type == lexer.TOKEN_ELSE {
+			eiTok = p.advance()
+		}
 		eiPos := p.tokenPos(eiTok)
 
 		eiCond, err := p.parseExpr()

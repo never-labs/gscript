@@ -337,6 +337,23 @@ func TestIfElseIf(t *testing.T) {
 	}
 }
 
+func TestIfElseIfTwoToken(t *testing.T) {
+	v := getCoreGlobal(t, `
+		x := 15
+		result := 0
+		if x < 10 {
+			result = 1
+		} else if x < 20 {
+			result = 2
+		} else {
+			result = 3
+		}
+	`, "result")
+	if !v.IsInt() || v.Int() != 2 {
+		t.Errorf("expected int 2, got %v", v)
+	}
+}
+
 // ==================================================================
 // 5. For loops
 // ==================================================================

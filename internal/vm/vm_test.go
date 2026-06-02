@@ -658,6 +658,20 @@ func TestIfElseIf(t *testing.T) {
 	expectGlobalInt(t, g, "x", 2)
 }
 
+func TestIfElseIfTwoToken(t *testing.T) {
+	g := compileAndRun(t, `
+		x := 0
+		if false {
+			x = 1
+		} else if true {
+			x = 2
+		} else {
+			x = 3
+		}
+	`)
+	expectGlobalInt(t, g, "x", 2)
+}
+
 func TestForNumLoop(t *testing.T) {
 	g := compileAndRun(t, `
 		sum := 0

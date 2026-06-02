@@ -877,6 +877,26 @@ func TestIfElseIfElseStmt(t *testing.T) {
 	}
 }
 
+func TestIfElseIfTwoTokenStmt(t *testing.T) {
+	src := `if x > 0 {
+		y := 1
+	} else if x == 0 {
+		y := 0
+	} else if x > -10 {
+		y := -1
+	} else {
+		y := -2
+	}`
+	prog := mustParse(t, src)
+	ifStmt := prog.Stmts[0].(*ast.IfStmt)
+	if len(ifStmt.ElseIfs) != 2 {
+		t.Fatalf("expected 2 else-if clauses, got %d", len(ifStmt.ElseIfs))
+	}
+	if ifStmt.ElseBody == nil {
+		t.Error("expected else body")
+	}
+}
+
 // ============================================================
 // For loop variants
 // ============================================================
