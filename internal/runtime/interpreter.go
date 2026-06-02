@@ -104,6 +104,122 @@ func New() *Interpreter {
 	return NewCore()
 }
 
+func (interp *Interpreter) newConcurrentChild() *Interpreter {
+	if interp == nil {
+		return nil
+	}
+	return &Interpreter{
+		globals:            interp.globals,
+		modules:            interp.modules,
+		stdlibModules:      interp.stdlibModules,
+		stringMeta:         interp.stringMeta,
+		scriptDir:          interp.scriptDir,
+		moduleCollections:  interp.moduleCollections,
+		moduleReplaces:     interp.moduleReplaces,
+		moduleCacheModules: interp.moduleCacheModules,
+		moduleLoading:      interp.moduleLoading,
+		filesystemEnabled:  interp.filesystemEnabled,
+		filesystemRead:     interp.filesystemRead,
+		filesystemWrite:    interp.filesystemWrite,
+		filesystemRoot:     interp.filesystemRoot,
+		dynamicEval:        interp.dynamicEval,
+		environmentRead:    interp.environmentRead,
+		environmentWrite:   interp.environmentWrite,
+		allowedEnv:         interp.allowedEnv,
+		networkAccess:      interp.networkAccess,
+		processExecution:   interp.processExecution,
+		processShell:       interp.processShell,
+		debugAccess:        interp.debugAccess,
+		testkitAccess:      interp.testkitAccess,
+		llmProvider:        interp.llmProvider,
+		llmProviderFactory: interp.llmProviderFactory,
+		llmTraceSink:       interp.llmTraceSink,
+		currentSourceName:  interp.currentSourceName,
+		args:               interp.args,
+		gcMode:             interp.gcMode,
+		gcRunning:          interp.gcRunning,
+		maxSteps:           interp.maxSteps,
+		maxNativeCalls:     interp.maxNativeCalls,
+		maxCallDepth:       interp.maxCallDepth,
+		maxGoroutines:      interp.maxGoroutines,
+		activeGoroutines:   interp.activeGoroutines,
+		maxChannelCap:      interp.maxChannelCap,
+		maxHostResult:      interp.maxHostResult,
+		maxModuleBytes:     interp.maxModuleBytes,
+		maxModuleDepth:     interp.maxModuleDepth,
+		maxFSReadBytes:     interp.maxFSReadBytes,
+		maxFSWriteBytes:    interp.maxFSWriteBytes,
+		moduleDepth:        interp.moduleDepth,
+		ctx:                interp.ctx,
+	}
+}
+
+// LaunchFunction starts a script function on an isolated interpreter state. The
+// child shares user-visible globals and heap values, but owns call/defer/debug
+// stacks so background tasks cannot corrupt the parent interpreter execution.
+func (interp *Interpreter) LaunchFunction(fn Value, args []Value, done func(error)) {
+	if err := interp.StartFunction(fn, args, done); err != nil && done != nil {
+		done(err)
+	}
+}
+
+func (interp *Interpreter) StartFunction(fn Value, args []Value, done func(error)) error {
+	if interp == nil {
+		return fmt.Errorf("nil interpreter")
+	}
+	taskArgs := append([]Value(nil), args...)
+	if err := interp.reserveGoroutineBudget(); err != nil {
+		return err
+	}
+	interp.markConcurrentTables()
+	child := interp.newConcurrentChild()
+	go func() {
+		var err error
+		defer func() {
+			if r := recover(); r != nil {
+				err = fmt.Errorf("panic: %v", r)
+			}
+			interp.releaseGoroutineBudget()
+			if done != nil {
+				done(err)
+			}
+		}()
+		_, err = child.callFunction(fn, taskArgs)
+	}()
+	return nil
+}
+
+func (interp *Interpreter) markConcurrentTables() {
+	if interp == nil || interp.globals == nil {
+		return
+	}
+	seen := make(map[*Table]struct{})
+	var mark func(Value, int)
+	mark = func(v Value, depth int) {
+		if !v.IsTable() || depth > 4 {
+			return
+		}
+		t := v.Table()
+		if t == nil {
+			return
+		}
+		if _, ok := seen[t]; ok {
+			return
+		}
+		seen[t] = struct{}{}
+		t.SetConcurrent(true)
+		for _, key := range t.PairsKeysSnapshot() {
+			mark(t.RawGet(key), depth+1)
+		}
+	}
+	for _, v := range interp.globals.ValuesSnapshot() {
+		mark(v, 0)
+	}
+	if interp.stringMeta != nil {
+		mark(TableValue(interp.stringMeta), 0)
+	}
+}
+
 // Globals returns the global environment.
 func (interp *Interpreter) Globals() *Environment {
 	return interp.globals

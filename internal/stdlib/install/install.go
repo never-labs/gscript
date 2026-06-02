@@ -15,6 +15,7 @@ func Install(interp *runtime.Interpreter) {
 	interp.InstallRuntimeStdlib()
 	InstallModules(interpreterInstaller{interp: interp}, interp.MaxHostResultBytes, ModuleOptions{
 		ScriptCaller: interp.CallFunction,
+		TaskLauncher: interp.LaunchFunction,
 		Host: stdbind.HostOptions{
 			NetworkAllowed:        interp.NetworkAccessEnabled,
 			FilesystemRoot:        interp.FilesystemRoot,
@@ -48,6 +49,7 @@ func Install(interp *runtime.Interpreter) {
 
 type ModuleOptions struct {
 	ScriptCaller runtime.ScriptFunctionCaller
+	TaskLauncher stdbind.TaskLauncher
 	Less         stdbind.Less
 	Host         stdbind.HostOptions
 	Table        stdbind.TableOptions
@@ -107,7 +109,8 @@ func InstallModules(installer runtime.StdlibInstaller, maxHostResult func() int6
 	installer.RegisterTable("sort", stdbind.BuildSortLibWithCallerAndLess(opts.ScriptCaller, opts.Less))
 	installer.RegisterTable("soa", stdbind.BuildSOA())
 	installer.RegisterTable("sync", stdbind.BuildSync(stdbind.ConcurrencyOptions{
-		Call: opts.ScriptCaller,
+		Call:   opts.ScriptCaller,
+		Launch: opts.TaskLauncher,
 	}))
 	installer.RegisterTable("string", stdbind.BuildString(opts.ScriptCaller, maxHostResult))
 	if !opts.SkipTable {

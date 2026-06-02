@@ -10,7 +10,7 @@ func syncInterp(t *testing.T, src string) *runtime.Interpreter {
 	t.Helper()
 	interp := runtime.NewCore()
 	interp.InstallRuntimeStdlib()
-	installTestModule(interp, "sync", runtime.TableValue(BuildSync(ConcurrencyOptions{Call: interp.CallFunction})))
+	installTestModule(interp, "sync", runtime.TableValue(BuildSync(ConcurrencyOptions{Call: interp.CallFunction, Launch: interp.LaunchFunction})))
 	installTestModule(interp, "time", runtime.TableValue(BuildTime()))
 	execOnInterp(t, interp, src)
 	return interp

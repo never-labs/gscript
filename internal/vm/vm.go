@@ -1091,6 +1091,7 @@ func (vm *VM) launchSyncTask(fn runtime.Value, args []runtime.Value, done func(e
 			}
 		}()
 		if cl, ok := closureFromValue(fn); ok {
+			cl = cloneClosureForConcurrentCall(cl)
 			_, err = goVM.call(cl, taskArgs, 0, 0)
 			return
 		}
@@ -1110,16 +1111,16 @@ func clonePackageTableForChild(parent *runtime.Table) *runtime.Table {
 	pkg := runtime.NewTable()
 	loaded := runtime.NewTable()
 	if parent != nil {
-		parentLoaded := parent.RawGetString("loaded")
+		parentLoaded := parent.RawGetStringNoCache("loaded")
 		if parentLoaded.IsTable() {
 			src := parentLoaded.Table()
 			for _, name := range catalog.ModuleNames() {
-				if v := src.RawGetString(name); !v.IsNil() {
+				if v := src.RawGetStringNoCache(name); !v.IsNil() {
 					loaded.RawSetString(name, v)
 				}
 			}
 		}
-		if path := parent.RawGetString("path"); !path.IsNil() {
+		if path := parent.RawGetStringNoCache("path"); !path.IsNil() {
 			pkg.RawSetString("path", path)
 		}
 	}
@@ -1130,6 +1131,12 @@ func clonePackageTableForChild(parent *runtime.Table) *runtime.Table {
 func cloneTableForChild(parent *runtime.Table) *runtime.Table {
 	out := runtime.NewTable()
 	if parent == nil {
+		return out
+	}
+	if parent.ForEachPlainRaw(func(key, val runtime.Value) bool {
+		out.RawSet(key, val)
+		return true
+	}) {
 		return out
 	}
 	for _, key := range parent.PairsKeysSnapshot() {
@@ -3395,6 +3402,7 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 					}
 				}()
 				if cl, ok := closureFromValue(fn); ok {
+					cl = cloneClosureForConcurrentCall(cl)
 					if _, err := goVM.call(cl, goArgs, 0, 0); err != nil {
 						_ = goVM.emitGoroutineError(err, fn)
 					}

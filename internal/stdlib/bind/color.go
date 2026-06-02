@@ -2,6 +2,7 @@ package bind
 
 import (
 	"fmt"
+	"sync"
 
 	stdcolor "github.com/never-labs/leia/internal/stdlib/lib/color"
 )
@@ -10,7 +11,17 @@ import (
 // Color metatable (shared across all color instances)
 // --------------------------------------------------------------------------
 
-var colorMeta *Table
+var (
+	colorMetaOnce sync.Once
+	colorMeta     *Table
+)
+
+func sharedColorMeta() *Table {
+	colorMetaOnce.Do(func() {
+		colorMeta = newColorMeta()
+	})
+	return colorMeta
+}
 
 func newColorMeta() *Table {
 	mt := NewTable()
@@ -79,7 +90,7 @@ func makeColorRGBA(c stdcolor.RGBA) Value {
 	t.RawSet(StringValue("b"), FloatValue(c.B))
 	t.RawSet(StringValue("a"), FloatValue(c.A))
 	t.RawSet(StringValue("_type"), StringValue("color"))
-	t.SetMetatable(colorMeta)
+	t.SetMetatable(sharedColorMeta())
 	return TableValue(t)
 }
 
@@ -106,8 +117,6 @@ func colorRGBA(v Value) stdcolor.RGBA {
 // --------------------------------------------------------------------------
 
 func BuildColor() *Table {
-	colorMeta = newColorMeta()
-
 	t := NewTable()
 
 	set := func(name string, fn func([]Value) ([]Value, error)) {

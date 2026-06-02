@@ -351,6 +351,60 @@ func NewClosure(proto *FuncProto) *Closure {
 	return cl
 }
 
+func cloneClosureForConcurrentCall(src *Closure) *Closure {
+	if src == nil {
+		return nil
+	}
+	dst := NewClosure(cloneProtoForConcurrentCall(src.Proto))
+	for i, uv := range src.Upvalues {
+		if i >= len(dst.Upvalues) {
+			break
+		}
+		dst.Upvalues[i] = uv
+	}
+	return dst
+}
+
+func cloneProtoForConcurrentCall(src *FuncProto) *FuncProto {
+	if src == nil {
+		return nil
+	}
+	dst := *src
+	dst.GlobalCache = nil
+	dst.FieldCache = nil
+	dst.FieldPolyCache = nil
+	dst.ResumePayloadCache = nil
+	dst.RuntimeSpecs = FuncProtoRuntimeSpecializations{}
+	dst.FuncProtoFeedbackState = FuncProtoFeedbackState{}
+	dst.FeedbackMu = sync.Mutex{}
+	dst.CallCount = 0
+	dst.CompiledCodePtr = 0
+	dst.DirectEntryPtr = 0
+	dst.Tier2DirectEntryPtr = 0
+	dst.Tier2LeafEntryPtr = 0
+	dst.DirectEntryVersion = 0
+	dst.Tier2NumericEntryPtr = 0
+	dst.Tier2TypedEntryPtr = 0
+	dst.Tier2TypedClobberEntryPtr = 0
+	dst.Tier2TypedEntryABI = 0
+	dst.GlobalValCachePtr = 0
+	dst.GlobalValCacheGen = 0
+	dst.Tier2GlobalCachePtr = 0
+	dst.Tier2GlobalCacheGenPtr = 0
+	dst.Tier2GlobalIndexPtr = 0
+	dst.Tier2Promoted = false
+	dst.NeedsTier2 = false
+	dst.EnteredTier2 = 0
+	dst.TableStringKeyCache = nil
+	if len(src.Protos) > 0 {
+		dst.Protos = make([]*FuncProto, len(src.Protos))
+		for i, child := range src.Protos {
+			dst.Protos[i] = cloneProtoForConcurrentCall(child)
+		}
+	}
+	return &dst
+}
+
 // Upvalue is a mutable reference to a value.
 // When "open", it points into a register in the call stack.
 // When "closed", it holds its own copy (the register has gone out of scope).

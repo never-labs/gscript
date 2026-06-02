@@ -184,7 +184,7 @@ func stringBoxSlabRootForPointer(p unsafe.Pointer) unsafe.Pointer {
 	for j := i - 1; j >= 0; j-- {
 		r := stringBoxSlabRanges.ranges[j]
 		if addr >= r.start && addr < r.end {
-			return unsafe.Pointer(r.start)
+			return pointerFromUintptr(r.start)
 		}
 		if addr >= r.end || r.start < addr {
 			break

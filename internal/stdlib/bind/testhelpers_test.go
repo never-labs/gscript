@@ -83,7 +83,7 @@ func installTestModules(interp *runtime.Interpreter) {
 	installTestModule(interp, "rand", runtime.TableValue(BuildRand()))
 	installTestModule(interp, "regexp", runtime.TableValue(BuildRegexp()))
 	installTestModule(interp, "sort", runtime.TableValue(BuildSortLibWithCaller(interp.CallFunction)))
-	installTestModule(interp, "sync", runtime.TableValue(BuildSync(ConcurrencyOptions{Call: interp.CallFunction})))
+	installTestModule(interp, "sync", runtime.TableValue(BuildSync(ConcurrencyOptions{Call: interp.CallFunction, Launch: interp.LaunchFunction})))
 	stringLib := BuildString(interp.CallFunction, interp.MaxHostResultBytes)
 	interp.SetStringLibrary(stringLib)
 	installTestModule(interp, "string", runtime.TableValue(stringLib))

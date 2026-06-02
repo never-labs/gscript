@@ -119,7 +119,7 @@ func tableSlabRootForPointer(p unsafe.Pointer) unsafe.Pointer {
 	for j := i - 1; j >= 0; j-- {
 		r := tableSlabRanges.ranges[j]
 		if addr >= r.start && addr < r.end {
-			return unsafe.Pointer(r.start)
+			return pointerFromUintptr(r.start)
 		}
 		if addr >= r.end || r.start < addr {
 			break
@@ -134,15 +134,15 @@ func visitCurrentTableSlabRoot(visitor func(unsafe.Pointer)) {
 	}
 	start := atomic.LoadUintptr(&DefaultHeap.tableSlabStart)
 	if start != 0 {
-		visitor(unsafe.Pointer(start))
+		visitor(pointerFromUintptr(start))
 	}
 	start = atomic.LoadUintptr(&DefaultHeap.tableSvalsSlabStart)
 	if start != 0 {
-		visitor(unsafe.Pointer(start))
+		visitor(pointerFromUintptr(start))
 	}
 	start = atomic.LoadUintptr(&DefaultHeap.tableSvalsNSlabStart)
 	if start != 0 {
-		visitor(unsafe.Pointer(start))
+		visitor(pointerFromUintptr(start))
 	}
 }
 
@@ -158,21 +158,21 @@ func (h *Heap) tableRootInCurrentSlab(addr uintptr) unsafe.Pointer {
 	if start != 0 && addr >= start {
 		end := atomic.LoadUintptr(&h.tableSlabEnd)
 		if addr < end {
-			return unsafe.Pointer(start)
+			return pointerFromUintptr(start)
 		}
 	}
 	start = atomic.LoadUintptr(&h.tableSvalsSlabStart)
 	if start != 0 && addr >= start {
 		end := atomic.LoadUintptr(&h.tableSvalsSlabEnd)
 		if addr < end {
-			return unsafe.Pointer(start)
+			return pointerFromUintptr(start)
 		}
 	}
 	start = atomic.LoadUintptr(&h.tableSvalsNSlabStart)
 	if start != 0 && addr >= start {
 		end := atomic.LoadUintptr(&h.tableSvalsNSlabEnd)
 		if addr < end {
-			return unsafe.Pointer(start)
+			return pointerFromUintptr(start)
 		}
 	}
 	return nil

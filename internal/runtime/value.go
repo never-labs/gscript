@@ -497,9 +497,24 @@ func ChannelValue(ch *Channel) Value {
 // Internal helpers for NaN-box decoding
 // ---------------------------------------------------------------------------
 
+// pointerFromUintptr recovers a Go pointer from an address managed by the Leia
+// runtime. It is used only at low-level NaN-box/slab decode boundaries.
+//
+// Leia intentionally stores non-moving Go heap pointers in integer payloads for
+// Value tags and slab metadata. The heap/iface root tables keep referents alive;
+// this function is the corresponding pointer recovery primitive. Go's checkptr
+// instrumentation cannot prove that invariant from the integer bits alone, so
+// keep the exemption local instead of disabling checkptr for the package or
+// tests.
+//
+//go:nocheckptr
+func pointerFromUintptr(addr uintptr) unsafe.Pointer {
+	return unsafe.Pointer(addr)
+}
+
 // ptrPayload extracts the raw pointer from a pointer-tagged Value.
 func (v Value) ptrPayload() unsafe.Pointer {
-	return unsafe.Pointer(uintptr(uint64(v) & ptrAddrMask))
+	return pointerFromUintptr(uintptr(uint64(v) & ptrAddrMask))
 }
 
 // ptrSubType extracts the pointer sub-type bits (44-47) from a pointer-tagged Value.

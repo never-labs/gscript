@@ -190,6 +190,12 @@ func (v Value) ToBool() bool {
 
 // ToPointer extracts the unsafe.Pointer from a pointer Value.
 // The caller must ensure IsPointer() is true.
+//
+// NaN-boxed values intentionally carry pointer bits through an integer payload.
+// The runtime owns the lifetime invariant; checkptr cannot infer it from the
+// packed representation, so keep the exemption local to this decode primitive.
+//
+//go:nocheckptr
 func (v Value) ToPointer() unsafe.Pointer {
 	return unsafe.Pointer(uintptr(uint64(v) & payloadMask))
 }

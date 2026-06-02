@@ -1,10 +1,13 @@
 package runtime
 
+import "sync"
+
 // Environment represents a lexical scope. Each scope holds its own variables
 // and a pointer to the enclosing (parent) scope. Variables are stored as
 // Upvalue pointers so that closures can share mutable state with their
 // defining scope.
 type Environment struct {
+	mu     sync.RWMutex
 	vars   map[string]*Upvalue
 	parent *Environment
 }
@@ -19,12 +22,16 @@ func NewEnvironment(parent *Environment) *Environment {
 
 // Get looks up a variable by walking the scope chain.
 func (e *Environment) Get(name string) (Value, bool) {
+	e.mu.RLock()
 	uv, ok := e.vars[name]
 	if ok {
+		e.mu.RUnlock()
 		return uv.Get(), true
 	}
-	if e.parent != nil {
-		return e.parent.Get(name)
+	parent := e.parent
+	e.mu.RUnlock()
+	if parent != nil {
+		return parent.Get(name)
 	}
 	return NilValue(), false
 }
@@ -32,16 +39,20 @@ func (e *Environment) Get(name string) (Value, bool) {
 // Set assigns to an existing variable somewhere in the scope chain.
 // Returns false if the variable was not found in any scope.
 func (e *Environment) Set(name string, val Value) bool {
+	e.mu.RLock()
 	uv, ok := e.vars[name]
 	if ok {
+		e.mu.RUnlock()
 		if uv.ReadOnly() {
 			return false
 		}
 		uv.Set(val)
 		return true
 	}
-	if e.parent != nil {
-		return e.parent.Set(name, val)
+	parent := e.parent
+	e.mu.RUnlock()
+	if parent != nil {
+		return parent.Set(name, val)
 	}
 	return false
 }
@@ -49,46 +60,62 @@ func (e *Environment) Set(name string, val Value) bool {
 // Define creates a new variable in the current scope (shadows any outer binding).
 func (e *Environment) Define(name string, val Value) {
 	v := val // make a local copy so the Upvalue points at stable storage
+	e.mu.Lock()
+	defer e.mu.Unlock()
 	e.vars[name] = NewUpvalue(&v)
 }
 
 // Delete removes a binding from this exact scope.
 func (e *Environment) Delete(name string) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
 	delete(e.vars, name)
 }
 
 // DefineReadOnly creates a new read-only variable in the current scope.
 func (e *Environment) DefineReadOnly(name string, val Value) {
 	v := val // make a local copy so the Upvalue points at stable storage
+	e.mu.Lock()
+	defer e.mu.Unlock()
 	e.vars[name] = NewReadOnlyUpvalue(&v)
 }
 
 // IsReadOnly reports whether name resolves to a read-only binding.
 func (e *Environment) IsReadOnly(name string) bool {
+	e.mu.RLock()
 	uv, ok := e.vars[name]
 	if ok {
+		e.mu.RUnlock()
 		return uv.ReadOnly()
 	}
-	if e.parent != nil {
-		return e.parent.IsReadOnly(name)
+	parent := e.parent
+	e.mu.RUnlock()
+	if parent != nil {
+		return parent.IsReadOnly(name)
 	}
 	return false
 }
 
 // IsLocalReadOnly reports whether name is read-only in this exact scope.
 func (e *Environment) IsLocalReadOnly(name string) bool {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
 	uv, ok := e.vars[name]
 	return ok && uv.ReadOnly()
 }
 
 // GetUpvalue returns the *Upvalue for a name in the scope chain, for closure capture.
 func (e *Environment) GetUpvalue(name string) (*Upvalue, bool) {
+	e.mu.RLock()
 	uv, ok := e.vars[name]
 	if ok {
+		e.mu.RUnlock()
 		return uv, true
 	}
-	if e.parent != nil {
-		return e.parent.GetUpvalue(name)
+	parent := e.parent
+	e.mu.RUnlock()
+	if parent != nil {
+		return parent.GetUpvalue(name)
 	}
 	return nil, false
 }
@@ -96,5 +123,24 @@ func (e *Environment) GetUpvalue(name string) (*Upvalue, bool) {
 // DefineUpvalue adds an existing *Upvalue to this scope (sharing the same pointer).
 // This allows closures to share mutable references to captured variables.
 func (e *Environment) DefineUpvalue(name string, uv *Upvalue) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
 	e.vars[name] = uv
+}
+
+func (e *Environment) ValuesSnapshot() []Value {
+	if e == nil {
+		return nil
+	}
+	e.mu.RLock()
+	values := make([]Value, 0, len(e.vars))
+	for _, uv := range e.vars {
+		values = append(values, uv.Get())
+	}
+	parent := e.parent
+	e.mu.RUnlock()
+	if parent != nil {
+		values = append(values, parent.ValuesSnapshot()...)
+	}
+	return values
 }

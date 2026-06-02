@@ -27,7 +27,7 @@ type scriptOnce struct {
 }
 
 func BuildSync(options ConcurrencyOptions) *Table {
-	call := options.Call
+	call := serializedScriptCaller(options.Call)
 	launch := options.Launch
 	if launch == nil {
 		launch = defaultSyncTaskLauncher(call)
@@ -64,6 +64,18 @@ func BuildSync(options ConcurrencyOptions) *Table {
 		},
 	}))
 	return markStdlibBoundModule(t)
+}
+
+func serializedScriptCaller(call ScriptFunctionCaller) ScriptFunctionCaller {
+	if call == nil {
+		return nil
+	}
+	var mu sync.Mutex
+	return func(fn Value, args []Value) ([]Value, error) {
+		mu.Lock()
+		defer mu.Unlock()
+		return call(fn, args)
+	}
 }
 
 func syncGroupFromArgs(call ScriptFunctionCaller, launch TaskLauncher, args []Value) ([]Value, error) {
@@ -220,7 +232,14 @@ func (g *scriptTaskGroup) errorCount() int {
 }
 
 func (g *scriptTaskGroup) cancelGroup() {
-	if g == nil || g.cancel.IsNil() || g.call == nil {
+	if g == nil || g.cancel.IsNil() {
+		return
+	}
+	if gf := g.cancel.GoFunction(); gf != nil {
+		_, _ = gf.Fn(nil)
+		return
+	}
+	if g.call == nil {
 		return
 	}
 	_, _ = g.call(g.cancel, nil)

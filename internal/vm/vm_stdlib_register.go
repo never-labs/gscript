@@ -68,6 +68,7 @@ func (vm *VM) RegisterStdlibRuntimeModules() {
 		return vm.maxHostResult
 	}, stdlibinstall.ModuleOptions{
 		ScriptCaller: vm.callValue,
+		TaskLauncher: vm.launchSyncTask,
 		Less:         vm.valueLessThan,
 		SkipTable:    true,
 		Host: stdbind.HostOptions{

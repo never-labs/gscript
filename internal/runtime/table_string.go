@@ -34,6 +34,33 @@ func (t *Table) RawGetString(key string) Value {
 	return NilValue()
 }
 
+// RawGetStringNoCache retrieves a string field without populating lookup caches
+// or otherwise mutating table iteration state. It is intended for snapshotting
+// shared read-mostly tables while creating isolated concurrent runtimes.
+func (t *Table) RawGetStringNoCache(key string) Value {
+	if t == nil {
+		return NilValue()
+	}
+	if t.mu != nil {
+		t.mu.RLock()
+		defer t.mu.RUnlock()
+	}
+	if t.lazyTree != nil {
+		return t.lazyTree.get(t, key)
+	}
+	for i, k := range t.skeys {
+		if k == key {
+			return t.svals[i]
+		}
+	}
+	if t.smap != nil {
+		if v, ok := t.smap[key]; ok {
+			return v
+		}
+	}
+	return NilValue()
+}
+
 // RawGetStringCached retrieves a value by string key using an inline cache hint.
 // The cache stores the field index and the table's shapeID from a previous lookup.
 // On cache hit (shapeID match), avoids both string comparison and O(n) scan.

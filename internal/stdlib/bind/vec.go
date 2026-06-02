@@ -2,6 +2,7 @@ package bind
 
 import (
 	"fmt"
+	"sync"
 
 	stdvec "github.com/never-labs/leia/internal/stdlib/lib/vec"
 )
@@ -215,16 +216,33 @@ func newVec3Meta() *Table {
 
 // Shared metatables (created once per BuildVec call)
 var (
-	vec2Meta *Table
-	vec3Meta *Table
+	vecMetaOnce sync.Once
+	vec2Meta    *Table
+	vec3Meta    *Table
 )
+
+func sharedVec2Meta() *Table {
+	vecMetaOnce.Do(func() {
+		vec2Meta = newVec2Meta()
+		vec3Meta = newVec3Meta()
+	})
+	return vec2Meta
+}
+
+func sharedVec3Meta() *Table {
+	vecMetaOnce.Do(func() {
+		vec2Meta = newVec2Meta()
+		vec3Meta = newVec3Meta()
+	})
+	return vec3Meta
+}
 
 func makeVec2Value(x, y float64) Value {
 	t := NewTable()
 	t.RawSet(StringValue("x"), FloatValue(x))
 	t.RawSet(StringValue("y"), FloatValue(y))
 	t.RawSet(StringValue("_type"), StringValue("vec2"))
-	t.SetMetatable(vec2Meta)
+	t.SetMetatable(sharedVec2Meta())
 	return TableValue(t)
 }
 
@@ -238,7 +256,7 @@ func makeVec3Value(x, y, z float64) Value {
 	t.RawSet(StringValue("y"), FloatValue(y))
 	t.RawSet(StringValue("z"), FloatValue(z))
 	t.RawSet(StringValue("_type"), StringValue("vec3"))
-	t.SetMetatable(vec3Meta)
+	t.SetMetatable(sharedVec3Meta())
 	return TableValue(t)
 }
 
@@ -269,10 +287,6 @@ func isVec3(v Value) bool {
 // --------------------------------------------------------------------------
 
 func BuildVec() *Table {
-	// Create shared metatables
-	vec2Meta = newVec2Meta()
-	vec3Meta = newVec3Meta()
-
 	t := NewTable()
 
 	set := func(name string, fn func([]Value) ([]Value, error)) {

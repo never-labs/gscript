@@ -277,37 +277,9 @@ func (interp *Interpreter) execGo(s *ast.GoStmt, env *Environment) ([]Value, boo
 		if err != nil {
 			return nil, false, false, false, err
 		}
-		if err := interp.reserveGoroutineBudget(); err != nil {
+		if err := interp.StartFunction(fn, args, nil); err != nil {
 			return nil, false, false, false, err
 		}
-		go func() {
-			defer interp.releaseGoroutineBudget()
-			childInterp := &Interpreter{
-				globals:          interp.globals,
-				stringMeta:       interp.stringMeta,
-				maxSteps:         interp.maxSteps,
-				maxNativeCalls:   interp.maxNativeCalls,
-				maxCallDepth:     interp.maxCallDepth,
-				maxGoroutines:    interp.maxGoroutines,
-				activeGoroutines: interp.activeGoroutines,
-				maxChannelCap:    interp.maxChannelCap,
-				maxHostResult:    interp.maxHostResult,
-				maxModuleBytes:   interp.maxModuleBytes,
-				maxModuleDepth:   interp.maxModuleDepth,
-				maxFSReadBytes:   interp.maxFSReadBytes,
-				maxFSWriteBytes:  interp.maxFSWriteBytes,
-				dynamicEval:      interp.dynamicEval,
-				environmentRead:  interp.environmentRead,
-				environmentWrite: interp.environmentWrite,
-				allowedEnv:       interp.allowedEnv,
-				networkAccess:    interp.networkAccess,
-				processExecution: interp.processExecution,
-				processShell:     interp.processShell,
-				debugAccess:      interp.debugAccess,
-				testkitAccess:    interp.testkitAccess,
-			}
-			childInterp.callFunction(fn, args)
-		}()
 	case *ast.MethodCallExpr:
 		obj, err := interp.evalExprSingle(call.Object, env)
 		if err != nil {
@@ -321,37 +293,9 @@ func (interp *Interpreter) execGo(s *ast.GoStmt, env *Environment) ([]Value, boo
 		if err != nil {
 			return nil, false, false, false, err
 		}
-		if err := interp.reserveGoroutineBudget(); err != nil {
+		if err := interp.StartFunction(method, args, nil); err != nil {
 			return nil, false, false, false, err
 		}
-		go func() {
-			defer interp.releaseGoroutineBudget()
-			childInterp := &Interpreter{
-				globals:          interp.globals,
-				stringMeta:       interp.stringMeta,
-				maxSteps:         interp.maxSteps,
-				maxNativeCalls:   interp.maxNativeCalls,
-				maxCallDepth:     interp.maxCallDepth,
-				maxGoroutines:    interp.maxGoroutines,
-				activeGoroutines: interp.activeGoroutines,
-				maxChannelCap:    interp.maxChannelCap,
-				maxHostResult:    interp.maxHostResult,
-				maxModuleBytes:   interp.maxModuleBytes,
-				maxModuleDepth:   interp.maxModuleDepth,
-				maxFSReadBytes:   interp.maxFSReadBytes,
-				maxFSWriteBytes:  interp.maxFSWriteBytes,
-				dynamicEval:      interp.dynamicEval,
-				environmentRead:  interp.environmentRead,
-				environmentWrite: interp.environmentWrite,
-				allowedEnv:       interp.allowedEnv,
-				networkAccess:    interp.networkAccess,
-				processExecution: interp.processExecution,
-				processShell:     interp.processShell,
-				debugAccess:      interp.debugAccess,
-				testkitAccess:    interp.testkitAccess,
-			}
-			childInterp.callFunction(method, args)
-		}()
 	default:
 		return nil, false, false, false, fmt.Errorf("go statement requires a function call")
 	}

@@ -1,6 +1,7 @@
 package runtime
 
 import (
+	"sync"
 	"unsafe"
 
 	"github.com/never-labs/leia/internal/ast"
@@ -23,6 +24,7 @@ type FuncProto struct {
 // closure hold a pointer to the same Upvalue, allowing mutations to be visible
 // from both sides.
 type Upvalue struct {
+	mu       sync.RWMutex
 	val      *Value
 	readOnly bool
 }
@@ -39,10 +41,18 @@ func NewReadOnlyUpvalue(v *Value) *Upvalue {
 }
 
 // Get returns the current value.
-func (u *Upvalue) Get() Value { return *u.val }
+func (u *Upvalue) Get() Value {
+	u.mu.RLock()
+	defer u.mu.RUnlock()
+	return *u.val
+}
 
 // Set assigns a new value.
-func (u *Upvalue) Set(v Value) { *u.val = v }
+func (u *Upvalue) Set(v Value) {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	*u.val = v
+}
 
 // ReadOnly reports whether this binding rejects variable reassignment.
 func (u *Upvalue) ReadOnly() bool { return u.readOnly }
