@@ -46,6 +46,8 @@ only.
   history, and provider setup.
 - [Editors and LSP](guides/editors.md): `leia-lsp`, syntax highlighting,
   tree-sitter, VS Code, Emacs, Neovim, Helix, and Zed integration.
+- [Packages and modules](guides/packages.md): decentralized GitHub-path modules,
+  `leia.mod`, `leia.sum`, vendoring, verification, and capability summaries.
 - [Style guide](guides/style.md): naming, errors, capabilities, AI-native
   patterns, concurrency, and test conventions.
 - [Cookbook](cookbook/index.md): short recipes for testing, evaluate replay,
