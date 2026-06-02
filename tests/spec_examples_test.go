@@ -74,7 +74,7 @@ func TestSpecLeiaCodeFencesAreExecutableOrExplicitlyNonExecutable(t *testing.T) 
 				continue
 			}
 			if info == "leia run" || info == "leia fail" {
-				bad = append(bad, entry.Name()+":"+strconv.Itoa(i+1)+": stable spec examples must use all execution modes: ```"+info)
+				bad = append(bad, entry.Name()+":"+strconv.Itoa(i+1)+": stable spec examples must use all execution modes: use ```leia run all or ```leia fail all")
 				continue
 			}
 			if _, ok := specExampleModes(info); ok {
@@ -84,7 +84,7 @@ func TestSpecLeiaCodeFencesAreExecutableOrExplicitlyNonExecutable(t *testing.T) 
 		}
 	}
 	if len(bad) > 0 {
-		t.Fatalf("docs/spec Leia code fences must use a runnable gate (leia run, leia run all, leia fail, leia fail all) or a non-Leia info string:\n%s", strings.Join(bad, "\n"))
+		t.Fatalf("docs/spec Leia code fences must use a stable spec gate (leia run all or leia fail all) or a non-Leia info string:\n%s", strings.Join(bad, "\n"))
 	}
 }
 

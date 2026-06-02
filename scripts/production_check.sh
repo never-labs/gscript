@@ -262,9 +262,31 @@ add_methodjit_regression_gate() {
         "go test ./internal/vm -run TestCompilerReturn -count=1 && go test ./internal/methodjit -run 'TestRawIntSelfABI_NonEligibleStaysBoxed|TestRawIntSelfABI_EligibleExecutionMatrix|TestRawIntSelfABI_ExitResumeFallbackKeepsCallerLiveValues|TestExitResumeCheck_RawIntSelfCallFallbackFrame|TestTier2_StringFormatLookupPreservesPositiveDivisorModuloSemantics|TestTier2_StringFormatIntLoweringCoversGenericSingleIntPatterns|TestTier2_StringFormatIntMinInt64FallsBackPrecisely|TestTier2_StringFormatIntReboundCalleeFallsBackPrecisely|TestTier2_StringFormatIntFeedbackDynamicPatternGuardsPattern|TestTier2_StringFormatConstMultiArgUsesPreciseOpExit' -count=1"
 }
 
+add_race_smoke_gate() {
+    if ! have_cmd go; then
+        add_skip "Concurrency Race Smoke" "missing go"
+        return
+    fi
+    local goos
+    local goarch
+    goos="$(go env GOOS 2>/dev/null || true)"
+    goarch="$(go env GOARCH 2>/dev/null || true)"
+    case "$goos/$goarch" in
+        darwin/arm64|darwin/amd64|linux/amd64|linux/arm64)
+            ;;
+        *)
+            add_skip "Concurrency Race Smoke" "race detector not enabled for ${goos}/${goarch}"
+            return
+            ;;
+    esac
+    add_run "Concurrency Race Smoke" \
+        "go test -race ./internal/runtime ./internal/nanbox ./internal/vm ./llm ./tests/sdk ./tests/llm ./cmd/leia -count=1"
+}
+
 build_quick_plan() {
     add_go_test "Core Go packages" \
         "go test . ./cmd/leia ./internal/lexer ./internal/parser ./internal/runtime ./internal/vm -count=1"
+    add_race_smoke_gate
     add_methodjit_regression_gate
     add_go_test "Feature Matrix and Integration" \
         "go test ./tests -run 'TestFeatureMatrix|TestIntegration' -count=1"
@@ -283,6 +305,7 @@ build_quick_plan() {
 build_full_plan() {
     add_go_test "Correctness" \
         "go test ./... -count=1"
+    add_race_smoke_gate
     if have_cmd go; then
         add_skip "Feature Matrix" "covered by Correctness (go test ./... -count=1)"
         add_skip "Language Conformance Surface" "covered by Correctness (go test ./... -count=1)"
