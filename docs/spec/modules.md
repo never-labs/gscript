@@ -5,10 +5,12 @@ modules, and filesystem-backed project modules according to runtime module
 options. `name` must be a string. Loaded module results are cached in
 `package.loaded`.
 
-```leia
+```leia run all
 json := require("json")
 text := json.encode({ok: true})
 same := require("json")
+assert(type(text) == "string")
+assert(same == json)
 ```
 
 The result of `require(name)` is a single value. Standard-library and host
@@ -157,7 +159,11 @@ table entry but does not specify a full unload operation: an implementation may
 still have an internal loaded-module cache entry for `name`, and the normal
 resolution order applies again.
 
-```leia run
+For example, after removal, a later `require` may return an internal cached
+value or may attempt normal resolution again; the exact behavior is not a
+runnable stable spec example:
+
+```text
 package.loaded["example.override"] = {value: 1}
 first := require("example.override")
 assert(first.value == 1)
@@ -167,8 +173,8 @@ second := require("example.override")
 assert(second.value == 2)
 
 package.loaded["example.override"] = nil
+// A later require may return an internal cached value or resolve again.
 third := require("example.override")
-assert(third == second)
 ```
 
 The module name must be a string.
@@ -281,7 +287,10 @@ cache. Leia does not require or define a central registry for basic module use.
 automatically reflect arbitrary Go packages; embedders must provide bindings
 through the public Go API and the active capability policy may still reject use.
 
-```leia
+The following declaration is host-only syntax, not a runnable local spec
+example:
+
+```text
 import "go:net/http" as http
 ```
 

@@ -684,17 +684,32 @@ y <span class="tok-operator">:=</span> (x <span class="tok-operator">=</span> <s
     <span class="tok-keyword">return</span> <span class="tok-string">&quot;a&quot;</span>, <span class="tok-string">&quot;b&quot;</span>
 }
 
-x, y <span class="tok-operator">:=</span> pair()          <span class="tok-comment">// x == &quot;a&quot;, y == &quot;b&quot;</span>
-first <span class="tok-operator">:=</span> pair()         <span class="tok-comment">// first == &quot;a&quot;</span></code></pre>
+x, y <span class="tok-operator">:=</span> pair()
+first <span class="tok-operator">:=</span> pair()
+
+<span class="tok-builtin">assert</span>(x <span class="tok-operator">==</span> <span class="tok-string">&quot;a&quot;</span>)
+<span class="tok-builtin">assert</span>(y <span class="tok-operator">==</span> <span class="tok-string">&quot;b&quot;</span>)
+<span class="tok-builtin">assert</span>(first <span class="tok-operator">==</span> <span class="tok-string">&quot;a&quot;</span>)</code></pre>
 <p>The built-in <code>spread(x)</code> form preserves multiple results from a call in argument and table-constructor positions where explicit expansion is required.</p>
-<pre class="language-leia leia-code"><code class="language-leia leia-code">values <span class="tok-operator">:=</span> {<span class="tok-number">1</span>, <span class="tok-builtin">spread</span>(pair()), <span class="tok-number">4</span>}
-<span class="tok-comment">// values is {1, &quot;a&quot;, &quot;b&quot;, 4}</span></code></pre>
+<pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-keyword">func</span> pair() {
+    <span class="tok-keyword">return</span> <span class="tok-string">&quot;a&quot;</span>, <span class="tok-string">&quot;b&quot;</span>
+}
+
+values <span class="tok-operator">:=</span> {<span class="tok-number">1</span>, <span class="tok-builtin">spread</span>(pair()), <span class="tok-number">4</span>}
+
+<span class="tok-builtin">assert</span>(values[<span class="tok-number">1</span>] <span class="tok-operator">==</span> <span class="tok-number">1</span>)
+<span class="tok-builtin">assert</span>(values[<span class="tok-number">2</span>] <span class="tok-operator">==</span> <span class="tok-string">&quot;a&quot;</span>)
+<span class="tok-builtin">assert</span>(values[<span class="tok-number">3</span>] <span class="tok-operator">==</span> <span class="tok-string">&quot;b&quot;</span>)
+<span class="tok-builtin">assert</span>(values[<span class="tok-number">4</span>] <span class="tok-operator">==</span> <span class="tok-number">4</span>)</code></pre>
 <p>Calls evaluate the callee expression before arguments, then evaluate arguments left-to-right. Index and member selection evaluate the receiver before the key or field lookup. These forms return the value produced or stored by the target; they do not create a fresh identity by themselves.</p>
 <h3 id="expressions-indexing-and-member-selection">Indexing And Member Selection</h3>
 <p><code>x[y]</code> indexes a table-like or host-backed value. <code>x.name</code> is member selection and is equivalent to a string-key field lookup where supported.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code">user <span class="tok-operator">:=</span> { name: <span class="tok-string">&quot;Ada&quot;</span> }
 same <span class="tok-operator">:=</span> user.name <span class="tok-operator">==</span> user[<span class="tok-string">&quot;name&quot;</span>]
-user[<span class="tok-string">&quot;score&quot;</span>] <span class="tok-operator">=</span> <span class="tok-number">10</span></code></pre>
+user[<span class="tok-string">&quot;score&quot;</span>] <span class="tok-operator">=</span> <span class="tok-number">10</span>
+
+<span class="tok-builtin">assert</span>(same)
+<span class="tok-builtin">assert</span>(user.score <span class="tok-operator">==</span> <span class="tok-number">10</span>)</code></pre>
 <p><code>x:name(args)</code> is a method call. It evaluates <code>x</code> once, looks up field <code>name</code> on that receiver, then calls the result with the receiver inserted as the first argument. Therefore <code>x:name(a, b)</code> has the same stable call semantics as <code>x.name(x, a, b)</code>, except the receiver expression is evaluated only once.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code">counter <span class="tok-operator">:=</span> {
     value: <span class="tok-number">0</span>,
@@ -748,11 +763,12 @@ user[<span class="tok-string">&quot;score&quot;</span>] <span class="tok-operato
 <tr><td><code>&lt;-</code></td><td>Channel value.</td><td>Receive blocks until a value is received, the channel is closed, or the host cancels execution. Invalid operands error.</td><td>none</td></tr>
 </tbody></table></div>
 <p>Raw helpers bypass their corresponding metamethods: for example, <code>rawget</code>, <code>rawset</code>, <code>rawequal</code>, and <code>rawlen</code> use raw table/string behavior where they are defined.</p>
-<pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-number">1</span> <span class="tok-operator">+</span> <span class="tok-number">2</span>        <span class="tok-comment">// 3</span>
-<span class="tok-string">&quot;5&quot;</span> <span class="tok-operator">+</span> <span class="tok-number">3</span>      <span class="tok-comment">// 8</span>
-<span class="tok-string">&quot;x&quot;</span> <span class="tok-operator">+</span> <span class="tok-number">3</span>      <span class="tok-comment">// runtime error</span>
-<span class="tok-string">&quot;a&quot;</span> <span class="tok-operator">..</span> <span class="tok-number">3</span>     <span class="tok-comment">// &quot;a3&quot;</span>
-(<span class="tok-number">1</span> <span class="tok-operator">&lt;&lt;</span> <span class="tok-number">8</span>)     <span class="tok-comment">// 256</span></code></pre>
+<p>Non-executable operator result summary:</p>
+<pre class="language-text"><code class="language-text">1 + 2        // 3
+&quot;5&quot; + 3      // 8
+&quot;x&quot; + 3      // runtime error
+&quot;a&quot; .. 3     // &quot;a3&quot;
+(1 &lt;&lt; 8)     // 256</code></pre>
 <pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-builtin">assert</span>(<span class="tok-number">1</span> <span class="tok-operator">+</span> <span class="tok-number">2</span> <span class="tok-operator">==</span> <span class="tok-number">3</span>)
 <span class="tok-builtin">assert</span>(<span class="tok-string">&quot;5&quot;</span> <span class="tok-operator">+</span> <span class="tok-number">3</span> <span class="tok-operator">==</span> <span class="tok-number">8</span>)
 <span class="tok-builtin">assert</span>(<span class="tok-string">&quot;a&quot;</span> <span class="tok-operator">..</span> <span class="tok-number">3</span> <span class="tok-operator">==</span> <span class="tok-string">&quot;a3&quot;</span>)
@@ -993,14 +1009,16 @@ ch <span class="tok-operator">&lt;-</span> <span class="tok-string">&quot;ready&
 }
 <span class="tok-builtin">assert</span>(observed <span class="tok-operator">==</span> <span class="tok-string">&quot;recv:ready&quot;</span>)</code></pre>
 <p><code>go call()</code> starts a goroutine-like task. <code>defer call()</code> schedules cleanup to run when the current function returns or unwinds through a protected boundary.</p>
-<pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-keyword">func</span> work(ch) {
-    <span class="tok-keyword">defer</span> <span class="tok-builtin">print</span>(<span class="tok-string">&quot;done&quot;</span>)
-    ch <span class="tok-operator">&lt;-</span> <span class="tok-string">&quot;ready&quot;</span>
+<pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-keyword">func</span> work(ready, done) {
+    <span class="tok-keyword">defer</span> <span class="tok-keyword">func</span>() { done <span class="tok-operator">&lt;-</span> <span class="tok-string">&quot;done&quot;</span> }()
+    ready <span class="tok-operator">&lt;-</span> <span class="tok-string">&quot;ready&quot;</span>
 }
 
 ready <span class="tok-operator">:=</span> <span class="tok-builtin">make</span>(<span class="tok-keyword">chan</span>, <span class="tok-number">1</span>)
-<span class="tok-keyword">go</span> work(ready)
-<span class="tok-builtin">assert</span>(<span class="tok-operator">&lt;-</span>ready <span class="tok-operator">==</span> <span class="tok-string">&quot;ready&quot;</span>)</code></pre>
+done <span class="tok-operator">:=</span> <span class="tok-builtin">make</span>(<span class="tok-keyword">chan</span>, <span class="tok-number">1</span>)
+<span class="tok-keyword">go</span> work(ready, done)
+<span class="tok-builtin">assert</span>(<span class="tok-operator">&lt;-</span>ready <span class="tok-operator">==</span> <span class="tok-string">&quot;ready&quot;</span>)
+<span class="tok-builtin">assert</span>(<span class="tok-operator">&lt;-</span>done <span class="tok-operator">==</span> <span class="tok-string">&quot;done&quot;</span>)</code></pre>
 <p><code>return</code> exits the current function and returns zero or more values. Return values use the multi-return adjustment rules in <a href="#">Functions</a>. At module top level, <code>return</code> stops execution of the current chunk or module and produces the module result used by loaders such as <code>require</code>.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-keyword">func</span> pair() {
     <span class="tok-keyword">return</span> <span class="tok-string">&quot;left&quot;</span>, <span class="tok-string">&quot;right&quot;</span>
@@ -1039,8 +1057,9 @@ i <span class="tok-operator">=</span> i <span class="tok-operator">+</span> <spa
     <span class="tok-builtin">print</span>(<span class="tok-string">&quot;unreachable&quot;</span>)
 }</code></pre>
 <p><code>budget { ... } { ... }</code> applies an AI budget to the enclosed block. Public budget dimensions are specified in <a href="#">AI-Native Syntax</a>.</p>
-<pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-contextual">budget</span> { turns: <span class="tok-number">1</span>, tokens: <span class="tok-number">256</span>, time: <span class="tok-number">30</span> } {
-    result, err <span class="tok-operator">:=</span> answer(<span class="tok-string">&quot;short task&quot;</span>)
+<p>Non-executable AI budget sketch:</p>
+<pre class="language-text"><code class="language-text">budget { turns: 1, tokens: 256, time: 30 } {
+    result, err := answer(&quot;short task&quot;)
 }</code></pre></section><section><h2 id="functions">Functions</h2>
 <p>Functions are first-class callable values. They may be named declarations or anonymous literals.</p>
 <p>Parameters are lexical bindings initialized from call arguments. Missing arguments become <code>nil</code>; extra arguments are discarded unless the function has a vararg parameter. The call does not expose an argument count to fixed parameters; a fixed parameter that receives an explicit <code>nil</code> is indistinguishable from one filled because the argument is missing.</p>
@@ -1211,9 +1230,9 @@ same_next <span class="tok-operator">:=</span> <span class="tok-builtin">next</s
 <p>Tables are mutable identity-bearing maps. Keys and values are runtime values. Implementations may use optimized array, record, or typed layouts when this does not change observable behavior.</p>
 <p>Table constructors create fresh table identities. List-style fields are assigned using 1-based integer sequence keys. Keyed fields assign the specified key. The v1.0 stable constructor subset is simple list fields, named fields, and explicit keyed fields that do not depend on an interleaving order between those forms. Portable programs must not depend on duplicate constructor fields that write the same normalized key, or on list-index assignment after interleaved keyed fields; use explicit assignments when that order matters. A constructor expression itself never reuses an existing table identity.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code">t <span class="tok-operator">:=</span> { <span class="tok-string">&quot;first&quot;</span>, <span class="tok-string">&quot;second&quot;</span>, name: <span class="tok-string">&quot;Ada&quot;</span> }
-t[<span class="tok-number">1</span>]        <span class="tok-comment">// &quot;first&quot;</span>
-t.name      <span class="tok-comment">// &quot;Ada&quot;</span>
-t[<span class="tok-string">&quot;name&quot;</span>]   <span class="tok-comment">// &quot;Ada&quot;</span></code></pre>
+<span class="tok-builtin">assert</span>(t[<span class="tok-number">1</span>] <span class="tok-operator">==</span> <span class="tok-string">&quot;first&quot;</span>)
+<span class="tok-builtin">assert</span>(t.name <span class="tok-operator">==</span> <span class="tok-string">&quot;Ada&quot;</span>)
+<span class="tok-builtin">assert</span>(t[<span class="tok-string">&quot;name&quot;</span>] <span class="tok-operator">==</span> <span class="tok-string">&quot;Ada&quot;</span>)</code></pre>
 <pre class="language-leia leia-code"><code class="language-leia leia-code">a <span class="tok-operator">:=</span> {<span class="tok-string">&quot;x&quot;</span>, <span class="tok-string">&quot;y&quot;</span>, name: <span class="tok-string">&quot;Ada&quot;</span>}
 b <span class="tok-operator">:=</span> {<span class="tok-string">&quot;x&quot;</span>, <span class="tok-string">&quot;y&quot;</span>, name: <span class="tok-string">&quot;Ada&quot;</span>}
 <span class="tok-builtin">assert</span>(a <span class="tok-operator">!=</span> b)
@@ -1254,13 +1273,16 @@ t <span class="tok-operator">:=</span> <span class="tok-builtin">setmetatable</s
     },
 })
 
-t.missing        <span class="tok-comment">// &quot;fallback&quot;</span>
-<span class="tok-builtin">rawget</span>(t, <span class="tok-string">&quot;missing&quot;</span>) <span class="tok-comment">// nil</span>
+<span class="tok-builtin">assert</span>(t.present <span class="tok-operator">==</span> <span class="tok-number">11</span>)
+<span class="tok-builtin">assert</span>(t.missing <span class="tok-operator">==</span> <span class="tok-string">&quot;fallback&quot;</span>)
+<span class="tok-builtin">assert</span>(log[<span class="tok-number">1</span>] <span class="tok-operator">==</span> <span class="tok-string">&quot;index:missing&quot;</span>)
+<span class="tok-builtin">assert</span>(<span class="tok-builtin">rawget</span>(t, <span class="tok-string">&quot;missing&quot;</span>) <span class="tok-operator">==</span> <span class="tok-constant">nil</span>)
 
 t.created <span class="tok-operator">=</span> <span class="tok-number">12</span>
-<span class="tok-builtin">rawget</span>(t, <span class="tok-string">&quot;created&quot;</span>) <span class="tok-comment">// nil; __newindex handled the write</span>
+<span class="tok-builtin">assert</span>(log[<span class="tok-number">2</span>] <span class="tok-operator">==</span> <span class="tok-string">&quot;new:created&quot;</span>)
+<span class="tok-builtin">assert</span>(<span class="tok-builtin">rawget</span>(t, <span class="tok-string">&quot;created&quot;</span>) <span class="tok-operator">==</span> <span class="tok-constant">nil</span>)
 <span class="tok-builtin">rawset</span>(t, <span class="tok-string">&quot;created&quot;</span>, <span class="tok-number">13</span>)
-<span class="tok-builtin">rawget</span>(t, <span class="tok-string">&quot;created&quot;</span>) <span class="tok-comment">// 13</span></code></pre>
+<span class="tok-builtin">assert</span>(<span class="tok-builtin">rawget</span>(t, <span class="tok-string">&quot;created&quot;</span>) <span class="tok-operator">==</span> <span class="tok-number">13</span>)</code></pre>
 <p>Stable table/metamethod behavior is defined by the events below. A metamethod is looked up by raw string key in the value&#x27;s metatable. The lookup never invokes <code>__index</code> on the metatable itself. Each metamethod receives the listed arguments; unless otherwise stated, only its first return value is used.</p>
 <p>Only table values have user-controlled metatables in the v1.0 stable contract. Strings have implementation-provided method lookup through <code>__index</code>, but portable programs must not assume that <code>setmetatable</code> can change string behavior.</p>
 <p>For a binary event named <code>event</code>, Leia uses this lookup algorithm after any primitive operation has failed:</p>
@@ -1407,8 +1429,8 @@ proxy.event <span class="tok-operator">=</span> <span class="tok-string">&quot;s
 t.missing <span class="tok-operator">=</span> <span class="tok-number">1</span></code></pre>
 <p>The length operator <code>#x</code> uses the value&#x27;s ordinary length behavior and may consult <code>__len</code>. <code>rawlen(x)</code> bypasses <code>__len</code> for tables and strings.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code">t <span class="tok-operator">:=</span> <span class="tok-builtin">setmetatable</span>({}, { __len: <span class="tok-keyword">func</span>(_) { <span class="tok-keyword">return</span> <span class="tok-number">99</span> } })
-<span class="tok-operator">#</span>t        <span class="tok-comment">// 99</span>
-<span class="tok-builtin">rawlen</span>(t) <span class="tok-comment">// 0</span></code></pre>
+<span class="tok-builtin">assert</span>(<span class="tok-operator">#</span>t <span class="tok-operator">==</span> <span class="tok-number">99</span>)
+<span class="tok-builtin">assert</span>(<span class="tok-builtin">rawlen</span>(t) <span class="tok-operator">==</span> <span class="tok-number">0</span>)</code></pre>
 <pre class="language-leia leia-code"><code class="language-leia leia-code">t <span class="tok-operator">:=</span> <span class="tok-builtin">setmetatable</span>({}, { __len: <span class="tok-keyword">func</span>(_) { <span class="tok-keyword">return</span> <span class="tok-number">99</span> } })
 <span class="tok-builtin">assert</span>(<span class="tok-operator">#</span>t <span class="tok-operator">==</span> <span class="tok-number">99</span>)
 <span class="tok-builtin">assert</span>(<span class="tok-builtin">rawlen</span>(t) <span class="tok-operator">==</span> <span class="tok-number">0</span>)</code></pre>
@@ -2121,7 +2143,9 @@ value, err <span class="tok-operator">:=</span> wrapped.fn(<span class="tok-stri
 <p><code>require(name)</code> loads enabled standard-library modules, host-registered modules, and filesystem-backed project modules according to runtime module options. <code>name</code> must be a string. Loaded module results are cached in <code>package.loaded</code>.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code">json <span class="tok-operator">:=</span> <span class="tok-builtin">require</span>(<span class="tok-string">&quot;json&quot;</span>)
 text <span class="tok-operator">:=</span> json.encode({ok: <span class="tok-constant">true</span>})
-same <span class="tok-operator">:=</span> <span class="tok-builtin">require</span>(<span class="tok-string">&quot;json&quot;</span>)</code></pre>
+same <span class="tok-operator">:=</span> <span class="tok-builtin">require</span>(<span class="tok-string">&quot;json&quot;</span>)
+<span class="tok-builtin">assert</span>(<span class="tok-builtin">type</span>(text) <span class="tok-operator">==</span> <span class="tok-string">&quot;string&quot;</span>)
+<span class="tok-builtin">assert</span>(same <span class="tok-operator">==</span> json)</code></pre>
 <p>The result of <code>require(name)</code> is a single value. Standard-library and host modules define their own module value, usually a table or callable function. If a filesystem-backed module returns at least one value, the first value is the module value and additional return values are discarded. If it returns no values, the module value is <code>true</code>.</p>
 <p>The observable <code>require(name)</code> algorithm is:</p>
 <ol>
@@ -2190,17 +2214,18 @@ fn <span class="tok-operator">:=</span> <span class="tok-keyword">func</span>(x)
 package.loaded[<span class="tok-string">&quot;example.callable&quot;</span>] <span class="tok-operator">=</span> fn
 <span class="tok-builtin">assert</span>(<span class="tok-builtin">require</span>(<span class="tok-string">&quot;example.callable&quot;</span>)(<span class="tok-number">4</span>) <span class="tok-operator">==</span> <span class="tok-number">5</span>)</code></pre>
 <p>If a <code>package.loaded[name]</code> entry is replaced with another non-<code>nil</code> value, the next <code>require(name)</code> returns that replacement. Assigning <code>nil</code> removes the table entry but does not specify a full unload operation: an implementation may still have an internal loaded-module cache entry for <code>name</code>, and the normal resolution order applies again.</p>
-<pre class="language-leia leia-code"><code class="language-leia leia-code">package.loaded[<span class="tok-string">&quot;example.override&quot;</span>] <span class="tok-operator">=</span> {value: <span class="tok-number">1</span>}
-first <span class="tok-operator">:=</span> <span class="tok-builtin">require</span>(<span class="tok-string">&quot;example.override&quot;</span>)
-<span class="tok-builtin">assert</span>(first.value <span class="tok-operator">==</span> <span class="tok-number">1</span>)
+<p>For example, after removal, a later <code>require</code> may return an internal cached value or may attempt normal resolution again; the exact behavior is not a runnable stable spec example:</p>
+<pre class="language-text"><code class="language-text">package.loaded[&quot;example.override&quot;] = {value: 1}
+first := require(&quot;example.override&quot;)
+assert(first.value == 1)
 
-package.loaded[<span class="tok-string">&quot;example.override&quot;</span>] <span class="tok-operator">=</span> {value: <span class="tok-number">2</span>}
-second <span class="tok-operator">:=</span> <span class="tok-builtin">require</span>(<span class="tok-string">&quot;example.override&quot;</span>)
-<span class="tok-builtin">assert</span>(second.value <span class="tok-operator">==</span> <span class="tok-number">2</span>)
+package.loaded[&quot;example.override&quot;] = {value: 2}
+second := require(&quot;example.override&quot;)
+assert(second.value == 2)
 
-package.loaded[<span class="tok-string">&quot;example.override&quot;</span>] <span class="tok-operator">=</span> <span class="tok-constant">nil</span>
-third <span class="tok-operator">:=</span> <span class="tok-builtin">require</span>(<span class="tok-string">&quot;example.override&quot;</span>)
-<span class="tok-builtin">assert</span>(third <span class="tok-operator">==</span> second)</code></pre>
+package.loaded[&quot;example.override&quot;] = nil
+// A later require may return an internal cached value or resolve again.
+third := require(&quot;example.override&quot;)</code></pre>
 <p>The module name must be a string.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code">ok, err <span class="tok-operator">:=</span> <span class="tok-builtin">pcall</span>(<span class="tok-builtin">require</span>, <span class="tok-number">123</span>)
 <span class="tok-builtin">assert</span>(<span class="tok-operator">!</span>ok)
@@ -2237,7 +2262,8 @@ module PATH VERSION TARGET h1:BASE64_SHA256</code></pre>
 <p><code>leia.sum</code> is not a package index, registry, or permission grant. It records content that module tooling has already made available locally. Runtime <code>require</code> does not consult a central registry, discover new versions, download missing requirements, or repair mismatched sums.</p>
 <p>The stable package-management boundary is local-first. Module paths may be GitHub-style repository paths because current tooling can cache GitHub archives, but a GitHub-looking path is still only a string in <code>leia.mod</code> until tooling or the user has placed content in a local replace, vendor directory, or module cache. Leia does not require or define a central registry for basic module use.</p>
 <p><code>import &quot;go:...&quot; as name</code> is explicit host binding syntax. It does not automatically reflect arbitrary Go packages; embedders must provide bindings through the public Go API and the active capability policy may still reject use.</p>
-<pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-keyword">import</span> <span class="tok-string">&quot;go:net/http&quot;</span> as http</code></pre>
+<p>The following declaration is host-only syntax, not a runnable local spec example:</p>
+<pre class="language-text"><code class="language-text">import &quot;go:net/http&quot; as http</code></pre>
 <p>The declaration above is only valid when the embedder has allowlisted and registered the <code>go:net/http</code> binding. Source syntax alone never grants host access.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code">ok, err <span class="tok-operator">:=</span> <span class="tok-builtin">pcall</span>(<span class="tok-builtin">require</span>, <span class="tok-string">&quot;go:net/http&quot;</span>)
 <span class="tok-builtin">assert</span>(<span class="tok-operator">!</span>ok)

@@ -7,7 +7,7 @@ braces. Locals declared inside the block are not visible after the closing
 brace. A block evaluates its statements in source order until control transfers,
 an error unwinds, or the block ends normally.
 
-```leia fail
+```leia fail all
 if true {
     hidden := 1
 }
@@ -112,7 +112,7 @@ The v1.0 range algorithm is:
 range source to be advanced again according to the same algorithm. A `return`
 from the body exits the enclosing function.
 
-```leia run
+```leia run all
 items := {10, 20, 30}
 sum := 0
 keySum := 0
@@ -231,15 +231,17 @@ assert(observed == "recv:ready")
 `go call()` starts a goroutine-like task. `defer call()` schedules cleanup to
 run when the current function returns or unwinds through a protected boundary.
 
-```leia
-func work(ch) {
-    defer print("done")
-    ch <- "ready"
+```leia run all
+func work(ready, done) {
+    defer func() { done <- "done" }()
+    ready <- "ready"
 }
 
 ready := make(chan, 1)
-go work(ready)
+done := make(chan, 1)
+go work(ready, done)
 assert(<-ready == "ready")
+assert(<-done == "done")
 ```
 
 `return` exits the current function and returns zero or more values. Return
@@ -310,7 +312,9 @@ if true {
 `budget { ... } { ... }` applies an AI budget to the enclosed block. Public
 budget dimensions are specified in [AI-Native Syntax](ai-native.md).
 
-```leia
+Non-executable AI budget sketch:
+
+```text
 budget { turns: 1, tokens: 256, time: 30 } {
     result, err := answer("short task")
 }

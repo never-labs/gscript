@@ -50,21 +50,33 @@ results. A call used where exactly one expression value is required contributes
 its first result, or `nil` when it produces no results. Expression-list
 positions are adjusted by the multi-return rules in [Functions](functions.md).
 
-```leia
+```leia run all
 func pair() {
     return "a", "b"
 }
 
-x, y := pair()          // x == "a", y == "b"
-first := pair()         // first == "a"
+x, y := pair()
+first := pair()
+
+assert(x == "a")
+assert(y == "b")
+assert(first == "a")
 ```
 
 The built-in `spread(x)` form preserves multiple results from a call in
 argument and table-constructor positions where explicit expansion is required.
 
-```leia
+```leia run all
+func pair() {
+    return "a", "b"
+}
+
 values := {1, spread(pair()), 4}
-// values is {1, "a", "b", 4}
+
+assert(values[1] == 1)
+assert(values[2] == "a")
+assert(values[3] == "b")
+assert(values[4] == 4)
 ```
 
 Calls evaluate the callee expression before arguments, then evaluate arguments
@@ -77,10 +89,13 @@ they do not create a fresh identity by themselves.
 `x[y]` indexes a table-like or host-backed value. `x.name` is member selection
 and is equivalent to a string-key field lookup where supported.
 
-```leia
+```leia run all
 user := { name: "Ada" }
 same := user.name == user["name"]
 user["score"] = 10
+
+assert(same)
+assert(user.score == 10)
 ```
 
 `x:name(args)` is a method call. It evaluates `x` once, looks up field `name`
@@ -160,7 +175,9 @@ Raw helpers bypass their corresponding metamethods: for example, `rawget`,
 `rawset`, `rawequal`, and `rawlen` use raw table/string behavior where they are
 defined.
 
-```leia
+Non-executable operator result summary:
+
+```text
 1 + 2        // 3
 "5" + 3      // 8
 "x" + 3      // runtime error
@@ -168,7 +185,7 @@ defined.
 (1 << 8)     // 256
 ```
 
-```leia run
+```leia run all
 assert(1 + 2 == 3)
 assert("5" + 3 == 8)
 assert("a" .. 3 == "a3")

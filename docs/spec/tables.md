@@ -13,11 +13,11 @@ write the same normalized key, or on list-index assignment after interleaved
 keyed fields; use explicit assignments when that order matters. A constructor
 expression itself never reuses an existing table identity.
 
-```leia
+```leia run all
 t := { "first", "second", name: "Ada" }
-t[1]        // "first"
-t.name      // "Ada"
-t["name"]   // "Ada"
+assert(t[1] == "first")
+assert(t.name == "Ada")
+assert(t["name"] == "Ada")
 ```
 
 ```leia run all
@@ -59,7 +59,7 @@ assert(rawequal(a, a))
 assert(!rawequal(a, b))
 ```
 
-```leia
+```leia run all
 log := {}
 t := setmetatable({present: 11}, {
     __index: func(_, key) {
@@ -71,13 +71,16 @@ t := setmetatable({present: 11}, {
     },
 })
 
-t.missing        // "fallback"
-rawget(t, "missing") // nil
+assert(t.present == 11)
+assert(t.missing == "fallback")
+assert(log[1] == "index:missing")
+assert(rawget(t, "missing") == nil)
 
 t.created = 12
-rawget(t, "created") // nil; __newindex handled the write
+assert(log[2] == "new:created")
+assert(rawget(t, "created") == nil)
 rawset(t, "created", 13)
-rawget(t, "created") // 13
+assert(rawget(t, "created") == 13)
 ```
 
 Stable table/metamethod behavior is defined by the events below. A metamethod
@@ -277,10 +280,10 @@ t.missing = 1
 The length operator `#x` uses the value's ordinary length behavior and may
 consult `__len`. `rawlen(x)` bypasses `__len` for tables and strings.
 
-```leia
+```leia run all
 t := setmetatable({}, { __len: func(_) { return 99 } })
-#t        // 99
-rawlen(t) // 0
+assert(#t == 99)
+assert(rawlen(t) == 0)
 ```
 
 ```leia run all
