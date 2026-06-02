@@ -80,10 +80,15 @@ rawset(t, "created", 13)
 rawget(t, "created") // 13
 ```
 
-Stable metatable behavior is defined by the events below. A metamethod is looked
-up by raw string key in the value's metatable. The lookup never invokes
-`__index` on the metatable itself. Each metamethod receives the listed
+Stable table/metamethod behavior is defined by the events below. A metamethod
+is looked up by raw string key in the value's metatable. The lookup never
+invokes `__index` on the metatable itself. Each metamethod receives the listed
 arguments; unless otherwise stated, only its first return value is used.
+
+Only table values have user-controlled metatables in the v1.0 stable contract.
+Strings have implementation-provided method lookup through `__index`, but
+portable programs must not assume that `setmetatable` can change string
+behavior.
 
 For a binary event named `event`, Leia uses this lookup algorithm after any
 primitive operation has failed:
@@ -92,32 +97,49 @@ primitive operation has failed:
 2. Otherwise, if the right operand is a table and its metatable has a non-`nil` raw field named `event`, use that value.
 3. Otherwise, the operation raises the normal type error for that operator.
 
-The chosen metamethod is called as `(left, right)` even when it came from the
-right operand. Operators `>` and `>=` are normalized before lookup: `left > right`
-dispatches as `right < left`, and `left >= right` dispatches as `right <= left`.
-Leia does not require the two operands to share the same metatable or the same
-metamethod function.
+The chosen binary metamethod is called as `(left, right)` even when it came from
+the right operand. Operators `>` and `>=` are normalized before lookup:
+`left > right` dispatches as `right < left`, and `left >= right` dispatches as
+`right <= left`. Leia does not require the two operands to share the same
+metatable or metamethod function.
 
-| Metamethod | Trigger | Arguments | Result contract |
+| Metamethod | Trigger | Arity | Return contract |
 | --- | --- | --- | --- |
-| `__index` | `t[k]` or `t.k` when `t` has no raw key `k`. Strings use a standard-library `__index` table for methods. | If function: `(t, k)`. If table: lookup continues in that table with key `k`. | Function result or redirected table lookup result. Missing chains produce `nil`; chains deeper than 50 redirects raise a runtime error. |
-| `__newindex` | `t[k] = v` when `t` has no raw key `k`. | If function: `(t, k, v)`. If table: assignment continues in that table. | Return values are ignored. Existing raw keys are updated directly. Chains deeper than 50 redirects raise a runtime error. |
-| `__call` | Calling a non-function table value, `t(...)`. | `(t, ...)` | All return values become the call result. |
-| `__add`, `__sub`, `__mul`, `__div`, `__mod`, `__pow` | `+`, `-`, `*`, `/`, `%`, `**` when the primitive numeric operation is not applicable. | `(left, right)` | First return value is the operator result. |
+| `__index` | `t[k]` or `t.k` when table `t` has no raw key `k`. Strings use an implementation-provided `__index` table for methods. | If function: `(t, k)`. If table: no call; lookup continues in that table with key `k`. | Function result or redirected table lookup result. Missing chains produce `nil`; chains deeper than 50 redirects raise a runtime error. |
+| `__newindex` | `t[k] = v` when table `t` has no raw key `k`. | If function: `(t, k, v)`. If table: no call; assignment continues in that table. | Return values are ignored. Existing raw keys are updated directly. Chains deeper than 50 redirects raise a runtime error. |
+| `__add` | `left + right` when primitive numeric addition is not applicable. | `(left, right)` | First return value is the operator result. |
+| `__sub` | `left - right` when primitive numeric subtraction is not applicable. | `(left, right)` | First return value is the operator result. |
+| `__mul` | `left * right` when primitive numeric multiplication is not applicable. | `(left, right)` | First return value is the operator result. |
+| `__div` | `left / right` when primitive numeric division is not applicable. | `(left, right)` | First return value is the operator result. |
+| `__mod` | `left % right` when primitive numeric modulo is not applicable. | `(left, right)` | First return value is the operator result. |
+| `__pow` | `left ** right` when primitive numeric exponentiation is not applicable. | `(left, right)` | First return value is the operator result. |
 | `__unm` | Unary `-x` when primitive numeric negation is not applicable. | `(x)` | First return value is the operator result. |
-| `__concat` | `left .. right` when primitive string/number concatenation is not applicable. | `(left, right)` | First return value is the concatenation result. |
-| `__len` | `#x` for tables or other values with length behavior. | `(x)` | First return value is the length result. Library APIs that require an integer length may reject non-integer or negative results. |
 | `__eq` | `left == right` or `left != right` when both operands are tables and are not the same table identity. | `(left, right)` | Truthiness of the first return value determines equality; `!=` negates it. Primitive values and same-identity tables use raw equality and do not call `__eq`. |
-| `__lt` | `left < right`, and reversed `>` forms. | `(left, right)` for `<`; operands are reversed for `>`. | Truthiness of the first return value determines the comparison. |
-| `__le` | `left <= right`, and reversed `>=` forms. | `(left, right)` for `<=`; operands are reversed for `>=`. | Truthiness of the first return value determines the comparison. There is no fallback to `__lt`; if neither operand supplies `__le`, the operation raises a comparison error. |
-| `__pairs` | `pairs(x)` when `x` has this metamethod. | `(x)` | Must return iterator function, state, and initial control value. |
+| `__lt` | `left < right`, or `left > right` after operand reversal. | `(left, right)` for `<`; `(right, left)` for `>`. | Truthiness of the first return value determines the comparison. |
+| `__le` | `left <= right`, or `left >= right` after operand reversal. | `(left, right)` for `<=`; `(right, left)` for `>=`. | Truthiness of the first return value determines the comparison. There is no fallback to `__lt`; if neither operand supplies `__le`, the operation raises a comparison error. |
+| `__concat` | `left .. right` when primitive string/number concatenation is not applicable. | `(left, right)` | First return value is the concatenation result. |
+| `__len` | `#x` for a table `x`. | `(x)` | First return value is the length result. Library APIs that require an integer length may reject non-integer or negative results. |
+| `__call` | Calling a non-function table value, `t(...)`. | `(t, ...)` | All return values become the call result. |
 | `__tostring` | `tostring(x)` for a table with this metamethod. | `(x)` | Must return a string; other results raise a runtime error. |
-| `__name` | `tostring(x)` fallback for a table with no `__tostring`. | Not called; read as a string field. | Used as a type-name prefix in the fallback string form. |
-| `__metatable` | `getmetatable(x)` and `setmetatable(x, mt)` for protected tables. | Not called; read as a field. | `getmetatable` returns this value; attempts to change the protected metatable raise a runtime error. |
+| `__metatable` | `getmetatable(x)` and `setmetatable(x, mt)` for a table whose current metatable has a non-`nil` raw `__metatable` field. | Not called; read as a field. | `getmetatable` returns this value instead of the real metatable. Attempts to change the protected metatable raise a runtime error. |
 
-Metamethods for integer floor division, bitwise operators, finalizers, weak
-tables, binary chunks, and Lua debug-slot protocols are not v1.0 stable
-contract unless a later spec revision names them explicitly.
+Raw operations bypass metamethod dispatch by contract:
+
+- `rawget` never invokes `__index`;
+- `rawset` never invokes `__newindex` and can create, replace, or remove raw keys directly;
+- `rawequal` never invokes `__eq`;
+- `rawlen` never invokes `__len`.
+
+`__metatable` protects the metatable slot, not arbitrary table contents. If a
+program already holds a reference to the metatable table, ordinary writes to
+that table remain ordinary table writes.
+
+The current implementation also supports `__pairs` for `pairs(x)` and `__name`
+as a `tostring` fallback prefix. These are implementation extensions, not part
+of the v1.0 stable table/metamethod contract above. Metamethods for integer
+floor division, bitwise operators, finalizers, weak tables, binary chunks, and
+Lua debug-slot protocols are not v1.0 stable contract unless a later spec
+revision names them explicitly.
 
 ```leia run all
 vec := {x: 3}
@@ -132,6 +154,58 @@ sum := vec + other
 assert(sum.x == 7)
 assert(vec == setmetatable({x: 3}, mt))
 assert(tostring(vec) == "vec(3)")
+```
+
+```leia run all
+num_mt := {}
+num := func(value) {
+    return setmetatable({value: value}, num_mt)
+}
+
+num_mt.__add = func(a, b) { return num(a.value + b.value) }
+num_mt.__sub = func(a, b) { return num(a.value - b.value) }
+num_mt.__mul = func(a, b) { return num(a.value * b.value) }
+num_mt.__div = func(a, b) { return num(a.value / b.value) }
+num_mt.__mod = func(a, b) { return num(a.value % b.value) }
+num_mt.__pow = func(a, b) { return num(a.value ** b.value) }
+num_mt.__unm = func(a) { return num(-a.value) }
+num_mt.__concat = func(a, b) { return "num:" .. a.value .. ":" .. b.value }
+
+a := num(5)
+b := num(2)
+assert((a + b).value == 7)
+assert((a - b).value == 3)
+assert((a * b).value == 10)
+assert((a / b).value == 2.5)
+assert((a % b).value == 1)
+assert((a ** b).value == 25)
+assert((-a).value == -5)
+assert(a .. b == "num:5:2")
+```
+
+```leia run all
+callable := setmetatable({base: 10}, {
+    __call: func(self, value) {
+        return self.base + value, self.base - value
+    },
+})
+
+sum, diff := callable(3)
+assert(sum == 13)
+assert(diff == 7)
+
+mt := {__metatable: "locked"}
+protected := setmetatable({}, mt)
+assert(getmetatable(protected) == "locked")
+
+ok, err := pcall(func() {
+    setmetatable(protected, nil)
+})
+assert(!ok)
+assert(type(err) == "string")
+
+mt.__metatable = nil
+assert(setmetatable(protected, nil) == protected)
 ```
 
 ```leia run all

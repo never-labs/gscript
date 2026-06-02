@@ -1,8 +1,9 @@
 # Modules And Loading
 
-`require(name)` loads built-in standard-library modules, host-registered
-modules, and project modules according to runtime module options. `name` must
-be a string. Loaded module results are cached in `package.loaded`.
+`require(name)` loads enabled standard-library modules, host-registered
+modules, and filesystem-backed project modules according to runtime module
+options. `name` must be a string. Loaded module results are cached in
+`package.loaded`.
 
 ```leia
 json := require("json")
@@ -10,44 +11,46 @@ text := json.encode({ok: true})
 same := require("json")
 ```
 
-The result of `require(name)` is a single value. If a filesystem-backed module
-returns at least one value, the first value is the module value; additional
-return values are discarded. If it returns no values, the module value is
-`true`. Standard-library and host modules define their own module value, usually
-a table or callable function. Requiring the same module name again returns the
-cached module value unless the host explicitly installs a different loader
-policy.
+The result of `require(name)` is a single value. Standard-library and host
+modules define their own module value, usually a table or callable function. If
+a filesystem-backed module returns at least one value, the first value is the
+module value and additional return values are discarded. If it returns no
+values, the module value is `true`.
 
-Module loading is observable as:
-
-1. resolve `name` to one enabled loader;
-2. execute that loader at most once for a cache miss;
-3. normalize the loader result to one module value;
-4. store that value in the module cache and `package.loaded[name]`;
-5. return the module value.
-
-A failed load does not produce a stable cached module value. Implementations may
-keep internal negative-cache or in-progress state for diagnostics and cycle
-detection, but a later successful `require` must still return the successful
-module value.
-
-The v1.0 stable resolution order is:
+The observable `require(name)` algorithm is:
 
 1. If `package.loaded[name]` is non-`nil`, return it.
 2. If the runtime has an internal loaded-module cache entry for `name`, return
-   that entry.
-3. If `name` is an enabled standard-library module, return that module and
-   store it in `package.loaded[name]`.
-4. If `name` names a host-registered module or an allowlisted `go:` import,
-   return that module and store it in `package.loaded[name]`. Host modules are
-   subject to the active capability policy.
-5. If filesystem module loading is disabled, raise a runtime error. This does
-   not disable already loaded modules, standard-library modules, or registered
-   host modules.
-6. Resolve a filesystem-backed `.leia` module path using the project resolver
-   below, then execute that file.
-7. If the file returns at least one value, cache and return the first value. If
-   it returns no values, cache and return `true`.
+   that entry. This cache is an implementation detail; `package.loaded` is the
+   portable observable table.
+3. If `name` is an installed standard-library module that remains enabled by
+   the active `LibFlags` policy, return its module value and store it in
+   `package.loaded[name]`. Disabled standard-library modules are removed from
+   the module cache and from `package.loaded`.
+4. If `name` names a host-registered module, including an explicitly
+   allowlisted `go:` module installed by the embedder, return that module and
+   store it in `package.loaded[name]`. Source syntax never loads arbitrary Go
+   packages by path.
+5. If filesystem module loading is disabled, raise `module loading disabled`.
+   This does not disable already loaded modules, enabled standard-library
+   modules, or registered host modules.
+6. Resolve a filesystem-backed `.leia` file with the resolver below. If the
+   resolved path is outside the configured filesystem root, violates module byte
+   or module depth limits, cannot be opened, or does not exist, raise a runtime
+   error.
+7. Execute the resolved file. If execution succeeds, normalize the return value
+   to one module value, store that value in the internal cache where present and
+   in `package.loaded[name]`, and return it.
+
+A failed load does not produce a stable cached module value. A later successful
+`require(name)` must still return the successful module value.
+
+Filesystem-backed modules are cached only after successful execution. The
+current implementation does not prefill `package.loaded[name]` with an
+in-progress placeholder before running the file. A direct or indirect cycle such
+as `a` requiring `b` requiring `a` therefore recurses until a configured module
+depth limit or another runtime resource limit fails; it does not return a
+partially initialized module.
 
 Resolution uses the original string `name` as the `package.loaded` key. Path
 normalization during filesystem resolution does not make different spelling
@@ -60,15 +63,19 @@ Filesystem-backed project module resolution is deterministic:
    collection with the same `prefix`; it resolves under the collection root as
    `path/to/module.leia`.
 2. Otherwise, the longest configured `replace` path that equals `name` or is a
-   slash-prefix of `name` wins. Exact replaces may point at a `.leia` file or at
-   a module root. Subpaths below a replace root convert dots to path separators
-   and append `.leia`.
-3. Otherwise, the longest downloaded-cache or vendor entry that equals `name` or
-   is a slash-prefix of `name` wins. Subpaths convert dots to path separators and
-   append `.leia`; an exact module path loads the module's base file.
+   slash-prefix of `name` wins. An exact replace whose target ends in `.leia`
+   loads that file; an exact replace whose target is not a `.leia` file appends
+   `.leia` to the target path. Subpaths below a replace root convert dots to
+   path separators and append `.leia`.
+3. Otherwise, the longest local vendor or downloaded-cache entry that equals
+   `name` or is a slash-prefix of `name` wins. Subpaths convert dots to path
+   separators and append `.leia`; an exact cache or vendor module path loads
+   `basename(name).leia` inside that entry root.
 4. Otherwise, `name` resolves relative to the active require root or script
    directory. Names containing `/` or starting with `.` keep path syntax and add
-   `.leia`; other names convert dots to path separators and add `.leia`.
+   `.leia`; other names convert dots to path separators and add `.leia`. This
+   is local module path lookup; the `module` directive in `leia.mod` does not by
+   itself create a filesystem file.
 
 The resolved file is still checked by filesystem root, module byte, module
 depth, readonly, vendor, and capability controls before execution.
@@ -78,6 +85,20 @@ json1 := require("json")
 json2 := require("json")
 assert(json1 == json2)
 assert(package.loaded["json"] == json1)
+```
+
+```leia run all
+fs := require("fs")
+path := require("path")
+script := require("script")
+
+modulePath := path.join(script.dir(), "local_helper.leia")
+assert(fs.writefile(modulePath, `return {value: 7}`))
+
+helper := require("local_helper")
+assert(helper.value == 7)
+assert(require("local_helper") == helper)
+assert(package.loaded["local_helper"] == helper)
 ```
 
 The `package.loaded` table is part of the lookup contract. A non-`nil` entry
@@ -226,7 +247,10 @@ The declaration above is only valid when the embedder has allowlisted and
 registered the `go:net/http` binding. Source syntax alone never grants host
 access.
 
-Module mode controls how a discovered manifest is applied at runtime:
+Module mode controls how a discovered manifest is applied at runtime. Runtime
+module setup is offline: it uses local replaces, already present vendor
+directories, and already present cache directories; it does not run `git`,
+download modules, or rewrite `leia.mod`.
 
 | Mode | Runtime behavior |
 | --- | --- |

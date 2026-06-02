@@ -62,28 +62,39 @@ if "" {
 Numbers have one script-visible category, `number`, with integer and
 floating-point subtypes observable through `math.type`. The subtype is part of
 the v1.0 observable contract for `math.type`, `tostring`, table-key behavior,
-and host APIs that expose value kinds.
+and host APIs that expose value kinds. The subtype is a property of the runtime
+value, not of a variable or table slot.
 
-Integer literals may be decimal or use the `0x`, `0b`, and `0o` prefixes
-specified in [Lexical Elements](lexical.md). The portable integer subtype range
-for ordinary values is signed 48-bit two's-complement:
-`-140737488355328` through `140737488355327`. Values outside that range are
-represented as floats by the current runtime value model. Portable programs
-must not depend on integer subtype preservation outside that range unless a
-module contract says so. The unary `-` operator is not part of a decimal
-literal; a negative boundary value can be produced by arithmetic even when the
-corresponding positive magnitude would already be a float.
+Numeric literal syntax determines the initial runtime subtype. An integer
+literal token is a decimal numeral without a decimal point or exponent, or a
+prefixed numeral using `0x`, `0b`, or `0o` as specified in
+[Lexical Elements](lexical.md). An integer literal denotes an integer value
+when its mathematical value is in the portable integer subtype range; otherwise
+it denotes the nearest representable float selected by the current runtime
+conversion. A floating-point literal token has a decimal point or exponent and
+always denotes a float value, even when its mathematical value is integral.
+The unary `-` operator is not part of any literal token.
 
-Floating-point literals use IEEE-754 binary64 semantics. Decimal and exponent
-forms such as `1.25` and `1e3` are accepted where the lexer recognizes them.
-Finite binary64 values have 53 bits of integer precision.
-`math.huge` is positive infinity; negative infinity is `-math.huge`; NaN is
-produced by math operations such as `math.sqrt(-1)`.
+The portable integer subtype range for ordinary values is signed 48-bit
+two's-complement: `-140737488355328` through `140737488355327`. Portable
+programs may rely on integer subtype preservation inside that closed range.
+Portable programs must not rely on integer subtype preservation outside that
+range unless a module or host contract explicitly promises a wider range.
+A negative boundary value can be produced by arithmetic even when the
+corresponding positive source literal would be outside the range.
 
-Arithmetic may preserve integer representation when both operands are integers
-and the result fits the integer subtype range. Integer overflow promotes the
-result to float. Mixed integer/float arithmetic produces float. Division
-produces float. Exact float-to-integer conversion is exposed by
+Float values use IEEE-754 binary64 semantics. Finite binary64 values have
+53 bits of integer precision, so every integer whose magnitude is at most
+`9007199254740992` is exactly representable as a float; not every larger
+integer is. Decimal conversion for float literals is implementation-defined
+only within the ordinary binary64 nearest-representable result. `math.huge` is
+positive infinity; negative infinity is `-math.huge`; NaN is produced by math
+operations such as `math.sqrt(-1)`.
+
+Arithmetic may preserve integer representation when all operands that determine
+the result are integers and the result fits the integer subtype range. Integer
+overflow promotes the result to float. Mixed integer/float arithmetic produces
+float. Division produces float. Exact float-to-integer conversion is exposed by
 `math.tointeger`; conversion succeeds only for finite integral values in the
 host integer range, and the resulting value still obeys the ordinary runtime
 subtype range. JIT raw integer representations are not observable.
@@ -126,6 +137,7 @@ infinity as `-Inf`.
 assert(type(1) == "number")
 assert(math.type(1) == "integer")
 assert(math.type(1.5) == "float")
+assert(math.type(1e3) == "float")
 assert(0xff == 255)
 assert(0b1010 == 10)
 assert(0o755 == 493)
@@ -145,6 +157,16 @@ assert(math.tointeger(1.5) == nil)
 ```
 
 ```leia run all
+assert(9007199254740992.0 == 9007199254740992.0 + 1.0)
+assert(9007199254740992.0 + 2.0 == 9007199254740994.0)
+
+fromFloat := math.tointeger(140737488355327.0)
+assert(fromFloat == 140737488355327)
+assert(math.type(fromFloat) == "integer")
+assert(math.tointeger(math.huge) == nil)
+```
+
+```leia run all
 nan := math.sqrt(-1)
 assert(math.isnan(nan))
 assert(math.isinf(math.huge))
@@ -160,17 +182,25 @@ assert(tostring(math.huge) == "+Inf")
 assert(tostring(-math.huge) == "-Inf")
 ```
 
-Strings are immutable byte strings. String operations produce new strings or
-views specified by their library contract; they do not mutate existing string
-values. Library functions may interpret strings as UTF-8, paths, JSON, or
-protocol data when their module contract says so.
+Strings are immutable byte strings. A string value is its byte sequence; strings
+do not have script-visible identity separate from that sequence. Equality and
+ordering compare byte sequences, and `#s` reports the byte length. Assignment,
+argument passing, return, table storage, and channel transfer of a string value
+cannot create aliases through which the original bytes can be mutated. String
+operations produce new strings or views specified by their library contract;
+they do not mutate existing string values. Library functions may interpret
+strings as UTF-8, paths, JSON, or protocol data when their module contract says
+so.
 
 ```leia run all
 s := "abc"
+alias := s
 t := s .. "d"
 assert(s == "abc")
+assert(alias == "abc")
 assert(t == "abcd")
 assert(#"A" == 1)
+assert(string.sub(t, 1, 3) == s)
 ```
 
 Tables are mutable identity-bearing key/value objects. Raw table equality is
@@ -214,13 +244,17 @@ assert(t[1] != t[1.5])
 Functions are callable identity-bearing values. Script functions close over
 their lexical environment; each evaluation of a function expression creates a
 distinct function identity even if it closes over equal values or the same
-source body. Aliasing preserves identity. Host functions are also functions:
-their identity is the host-provided callable object, not the display name
-returned by `tostring` and not structural equivalence of native code. Host
-functions and script functions share script-visible call, argument adjustment,
-multi-return, and protected-call semantics, but may differ in performance,
-resource accounting, and recoverable host error behavior. Functions compare by
-identity unless a host-backed value documents a narrower comparison rule.
+source body. A function declaration initializes its binding with one function
+value when the declaration executes. Aliasing preserves identity; copying a
+function value into a variable, table field, return slot, or channel message
+does not clone the function or its captured environment. Host functions are
+also functions: their identity is the host-provided callable object, not the
+display name returned by `tostring` and not structural equivalence of native
+code. Host functions and script functions share script-visible call, argument
+adjustment, multi-return, and protected-call semantics, but may differ in
+performance, resource accounting, and recoverable host error behavior.
+Functions compare by identity unless a host-backed value documents a narrower
+comparison rule.
 
 ```leia run all
 func makeCounter() {
@@ -234,8 +268,13 @@ func makeCounter() {
 counter := makeCounter()
 same := counter
 other := makeCounter()
+expr1 := func() { return 1 }
+expr2 := func() { return 1 }
+tableAlias := {fn: expr1}
 assert(counter == same)
 assert(counter != other)
+assert(expr1 != expr2)
+assert(tableAlias.fn == expr1)
 assert(counter() == 1)
 assert(counter() == 2)
 
@@ -247,9 +286,11 @@ assert(host != print)
 Channels are identity-bearing synchronization values created by the runtime or
 host libraries. Leia v1.0 has one script-visible channel category,
 `type(ch) == "channel"`; it does not have distinct send-only, receive-only, or
-direction-parameterized channel types. Host APIs may document directional
-capabilities, but those capabilities are not separate language-level value
-types.
+direction-parameterized channel types. Channel direction is not a value subtype,
+not part of equality, and not reported by `type`. A host API may document that
+a parameter will only be sent to or only received from, but that direction is an
+API precondition or capability contract, not a separate language-level value
+type and not a castable value form.
 
 Channel sends and receives transfer ordinary Leia values without copying
 table/function/channel identity. Equality compares channel identity. A receive
@@ -265,11 +306,18 @@ assert(ch == same)
 assert(ch != other)
 
 box := {value: 7}
+func id(x) { return x }
+fn := id
 ch <- box
 received := <-ch
 assert(received == box)
 received.value = 8
 assert(box.value == 8)
+
+ch <- fn
+receivedFn := <-ch
+assert(receivedFn == fn)
+assert(receivedFn(9) == 9)
 ```
 
 The `type` function reports the stable script-visible category for ordinary
