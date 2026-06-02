@@ -17,10 +17,12 @@ import (
 func runTestCommand(args []string, opts cliRunOptions, outw, errw io.Writer) int {
 	fs := flag.NewFlagSet("test", flag.ContinueOnError)
 	fs.SetOutput(errw)
+	jsonOut := fs.Bool("json", false, "write the test report as JSON")
 	format := fs.String("format", "text", "output format: text or json")
 	goldenMode := fs.String("golden", "auto", "golden stdout mode: auto, require, ignore, or update")
 	listOnly := fs.Bool("list", false, "list matching .leia test files without running them")
 	manifestCheck := fs.Bool("manifest-check", false, "check tests/manifest.json against discovered test cases")
+	output := fs.String("output", "", "write command output to this file instead of stdout")
 	seed := fs.String("seed", "", "set LEIA_TEST_SEED while running tests")
 	if code, done := parseCLIFlags(fs, args); done {
 		return code
@@ -32,12 +34,15 @@ func runTestCommand(args []string, opts cliRunOptions, outw, errw io.Writer) int
 		}
 		return runManifestCheckRoots([]string{"tests"}, outw, errw)
 	}
+	if *jsonOut {
+		*format = "json"
+	}
 	paths := fs.Args()
 	if len(paths) == 0 {
 		paths = []string{defaultTestPath()}
 	}
 	if len(paths) != 1 {
-		fmt.Fprintln(errw, "usage: leia test [--format=text|json] [--golden=auto|require|ignore|update] [--list] [--seed SEED] [path-or-dir]")
+		fmt.Fprintln(errw, "usage: leia test [--json|--format=text|json] [--output FILE] [--golden=auto|require|ignore|update] [--list] [--seed SEED] [path-or-dir]")
 		return 2
 	}
 	if !flagWasSet(fs, "format") {
@@ -65,24 +70,39 @@ func runTestCommand(args []string, opts cliRunOptions, outw, errw io.Writer) int
 			return 1
 		}
 		if *format == "json" {
-			if err := json.NewEncoder(outw).Encode(struct {
+			var buf bytes.Buffer
+			if err := json.NewEncoder(&buf).Encode(struct {
 				GoldenMode string   `json:"golden_mode"`
 				Files      []string `json:"files"`
 			}{GoldenMode: *goldenMode, Files: files}); err != nil {
 				fmt.Fprintf(errw, "leia test: write json: %v\n", err)
 				return 1
 			}
+			if err := writeCLIOutput(outw, *output, buf.Bytes()); err != nil {
+				fmt.Fprintf(errw, "leia test: %v\n", err)
+				return 1
+			}
 			return 0
 		}
+		var buf bytes.Buffer
 		for _, file := range files {
-			fmt.Fprintln(outw, file)
+			fmt.Fprintln(&buf, file)
+		}
+		if err := writeCLIOutput(outw, *output, buf.Bytes()); err != nil {
+			fmt.Fprintf(errw, "leia test: %v\n", err)
+			return 1
 		}
 		return 0
 	}
 	result := runTestsDetailed(paths[0], opts, errw, *format == "text", *seed, *goldenMode)
 	if *format == "json" {
-		if err := json.NewEncoder(outw).Encode(result); err != nil {
+		var buf bytes.Buffer
+		if err := json.NewEncoder(&buf).Encode(result); err != nil {
 			fmt.Fprintf(errw, "leia test: write json: %v\n", err)
+			return 1
+		}
+		if err := writeCLIOutput(outw, *output, buf.Bytes()); err != nil {
+			fmt.Fprintf(errw, "leia test: %v\n", err)
 			return 1
 		}
 	}
@@ -106,6 +126,17 @@ func validTestGoldenMode(mode string) bool {
 	default:
 		return false
 	}
+}
+
+func writeCLIOutput(outw io.Writer, outputPath string, data []byte) error {
+	if outputPath != "" {
+		if err := os.WriteFile(outputPath, data, 0600); err != nil {
+			return fmt.Errorf("write %s: %w", outputPath, err)
+		}
+		return nil
+	}
+	_, err := outw.Write(data)
+	return err
 }
 
 type testRunResult struct {

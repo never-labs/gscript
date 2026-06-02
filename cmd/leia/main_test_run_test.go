@@ -166,6 +166,38 @@ func TestRunTestCommandJSONReportsResults(t *testing.T) {
 	}
 }
 
+func TestRunTestCommandWritesJSONReportToOutputFile(t *testing.T) {
+	dir := t.TempDir()
+	okPath := filepath.Join(dir, "ok.leia")
+	if err := os.WriteFile(okPath, []byte("print(\"ok\")\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(strings.TrimSuffix(okPath, ".leia")+".out", []byte("ok\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	reportPath := filepath.Join(dir, "test-report.json")
+
+	var stdout, stderr bytes.Buffer
+	code := runTestCommand([]string{"--json", "--output", reportPath, dir}, cliRunOptions{UseVM: false}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runTestCommand code = %d, stderr = %q", code, stderr.String())
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("stdout = %q, want empty", stdout.String())
+	}
+	data, err := os.ReadFile(reportPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var result testRunResult
+	if err := json.Unmarshal(data, &result); err != nil {
+		t.Fatalf("report is not JSON: %v; data = %q", err, string(data))
+	}
+	if !result.OK || result.Total != 1 || result.Passed != 1 || result.GoldenMode != "auto" {
+		t.Fatalf("result = %+v, want one passing test", result)
+	}
+}
+
 func TestRunTestCommandGoldenRequireReportsMissingGolden(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "missing.leia")
@@ -188,6 +220,38 @@ func TestRunTestCommandGoldenRequireReportsMissingGolden(t *testing.T) {
 	}
 	if result.OK || result.GoldenMode != "require" || len(result.Files) != 1 || result.Files[0].Golden != golden || !strings.Contains(result.Files[0].Error, "missing golden") {
 		t.Fatalf("result = %+v, want missing golden failure for %s", result, golden)
+	}
+}
+
+func TestRunTestCommandWritesFailingJSONReportToOutputFile(t *testing.T) {
+	dir := t.TempDir()
+	badPath := filepath.Join(dir, "bad.leia")
+	if err := os.WriteFile(badPath, []byte("print(\"actual\")\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(strings.TrimSuffix(badPath, ".leia")+".out", []byte("expected\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	reportPath := filepath.Join(dir, "test-report.json")
+
+	var stdout, stderr bytes.Buffer
+	code := runTestCommand([]string{"--format=json", "--output", reportPath, dir}, cliRunOptions{UseVM: false}, &stdout, &stderr)
+	if code != 1 {
+		t.Fatalf("runTestCommand code = %d, want 1; stderr = %q", code, stderr.String())
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("stdout = %q, want empty", stdout.String())
+	}
+	data, err := os.ReadFile(reportPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var result testRunResult
+	if err := json.Unmarshal(data, &result); err != nil {
+		t.Fatalf("report is not JSON: %v; data = %q", err, string(data))
+	}
+	if result.OK || result.Total != 1 || result.Failed != 1 || len(result.Files) != 1 {
+		t.Fatalf("result = %+v, want one failing test", result)
 	}
 }
 
