@@ -1,0 +1,21 @@
+[
+  {
+    "Request": {
+      "Model": "mock-fast",
+      "Messages": [
+        {
+          "Role": "system",
+          "Text": "Classify support message. Return refund, shipping, or other."
+        },
+        {
+          "Role": "user",
+          "Text": "Customer asks for a refund after a damaged delivery."
+        }
+      ]
+    },
+    "Result": {
+      "Status": "final_answer",
+      "Text": "refund"
+    }
+  }
+]

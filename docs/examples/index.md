@@ -48,16 +48,24 @@ Use these with the [concurrency reference](../reference/concurrency/index.md).
 
 ## AI Examples
 
-```bash
-go run ./cmd/leia run examples/llm/agent.leia
-go run ./cmd/leia run examples/llm/incident_response.leia
-```
-
-Most AI examples are useful with a mock/replay provider in tests. Live-provider
-examples such as `glm_smoke.leia` require opt-in environment variables and must
-not be run with committed secrets.
+AI examples under `examples/llm/` demonstrate agent declarations, direct
+agent-as-tool, manual tool history, incident-response flow, and live GLM smoke
+scripts. They require a host-injected mock/replay provider or explicit
+live-provider environment variables, so they are not first-run smoke commands.
+Never run live-provider examples with committed secrets.
 
 See [AI-native Leia](../guides/ai-native.md).
+
+## Evaluate Examples
+
+```bash
+go run ./cmd/leia evaluate --llm-replay examples/evaluate/agent_replay.records.json examples/evaluate/agent_replay.leia
+go run ./cmd/leia evaluate --llm-replay examples/evaluate/llm_replay.records.json examples/evaluate/llm_replay.leia
+```
+
+Evaluate examples are source-level regression checks. Some are ordinary local
+assertions; LLM examples pair the `.leia` source with a replay fixture so they
+run deterministically without provider credentials.
 
 ## Embedding Examples
 

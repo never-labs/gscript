@@ -221,6 +221,28 @@ func TestEvaluateCommandLLMReplay(t *testing.T) {
 	}
 }
 
+func TestEvaluateCommandAgentReplayExample(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := runEvaluateCommand([]string{
+		"--format=json",
+		"--llm-replay", "../../examples/evaluate/agent_replay.records.json",
+		"../../examples/evaluate/agent_replay.leia",
+	}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runEvaluateCommand code = %d, stderr = %q", code, stderr.String())
+	}
+	var report evaluate.Report
+	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
+		t.Fatalf("decode report: %v\n%s", err, stdout.String())
+	}
+	if report.Status != "ok" || len(report.Cases) != 1 || report.Cases[0].Status != "passed" {
+		t.Fatalf("report = %#v", report)
+	}
+	if report.LLM == nil || report.LLM.Mode != "replay" || report.LLM.ReplayedTurns != 1 {
+		t.Fatalf("llm report = %#v", report.LLM)
+	}
+}
+
 func TestEvaluateCommandUpdateGoldenWritesFixture(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "basic.leia")

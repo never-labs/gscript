@@ -58,6 +58,7 @@ Custom shape:
 
 ```leia
 agent answer_with_review(question) {
+    model: "fast"
     system: "Use tool evidence and then write a final answer."
     tools: [lookup_runbook]
 } flow {
@@ -72,7 +73,11 @@ agent answer_with_review(question) {
 ```
 
 Inside `flow`, the script decides which history and tools each `turn` receives.
-No tool call is dispatched unless the flow calls `llm.dispatch`.
+The merged agent config exposes `model`, `system`, `tools`, and
+`capabilities` as ordinary lexical bindings. Other fields such as `user`,
+`budget`, `response_format`, and `metadata` stay in the ambient agent config
+and are inherited by `turn` when omitted, but they are not injected as local
+variables. No tool call is dispatched unless the flow calls `llm.dispatch`.
 
 ## Start Offline
 
@@ -214,10 +219,10 @@ agent incident(service) {
 }
 ```
 
-Inside `flow`, merged agent config fields such as `model`, `system`, and
-`tools` are available as lexical bindings. Build the user message from function
-parameters or pass `user` through `turn {}` inheritance instead of relying on a
-`user` local.
+Inside `flow`, the lexical bindings are the same stable subset described
+above: `model`, `system`, `tools`, and `capabilities`. Build the user message
+from function parameters or pass prompt fields through `turn {}` inheritance
+instead of relying on a `user` local.
 
 ## Agent As Tool
 

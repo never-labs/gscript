@@ -40,6 +40,12 @@ AI examples live under `llm/`. Most are intended to work with a mock or replay
 provider in tests. Live-provider examples require opt-in environment variables
 and must never commit API keys.
 
+Evaluate examples live under `evaluate/`. Run replay-backed agent checks with:
+
+```bash
+go run ../cmd/leia evaluate --llm-replay evaluate/agent_replay.records.json evaluate/agent_replay.leia
+```
+
 Examples that open network listeners or touch host resources, such as `web/`,
 should be run intentionally and reviewed with the security reference.
 
