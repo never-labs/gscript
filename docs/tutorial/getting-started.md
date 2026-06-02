@@ -9,6 +9,20 @@ go run ./cmd/leia eval 'print("hello from leia")'
 go run ./cmd/leia run tests/smoke/01_basic.leia
 ```
 
+Install from the module path when you want a local `leia` binary:
+
+```bash
+go install github.com/never-labs/leia/cmd/leia@latest
+leia version
+```
+
+After public binary releases exist, `scripts/install.sh` can install a
+checksummed release artifact:
+
+```bash
+bash scripts/install.sh --version v0.1.0 --bin-dir "$HOME/bin" --dry-run
+```
+
 ## Run Examples
 
 Start with small scripts:

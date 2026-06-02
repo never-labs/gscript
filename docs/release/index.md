@@ -37,6 +37,15 @@ The release evidence should cite:
 Before a public tag, update install instructions, examples, compatibility
 notes, known issues, benchmark caveats, and security notes.
 
+Distribution checks are split between local artifacts and hosted workflow
+presence. The local check validates GoReleaser metadata and the install script
+dry-run matrix even when GitHub workflow files are intentionally absent:
+
+```bash
+bash scripts/release_distribution_check.sh
+bash scripts/install.sh --version v0.1.0 --os darwin --arch arm64 --dry-run
+```
+
 Use [`notes-template.md`](notes-template.md) for release candidates and public
 tags so compatibility, security, performance, validation, and artifact evidence
 are recorded consistently.

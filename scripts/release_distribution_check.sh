@@ -23,9 +23,19 @@ require_contains() {
 }
 
 require_file .goreleaser.yaml
-require_file .github/workflows/release.yml
-require_file .github/workflows/distribution-check.yml
 require_file scripts/install.sh
+
+optional_workflow() {
+  local file="$1"
+  if [[ -f "$file" ]]; then
+    echo "release_distribution_check.sh: found $file"
+  else
+    echo "release_distribution_check.sh: $file not present; skipping hosted workflow check"
+  fi
+}
+
+optional_workflow .github/workflows/release.yml
+optional_workflow .github/workflows/distribution-check.yml
 
 require_contains .goreleaser.yaml "version: 2"
 require_contains .goreleaser.yaml "main: ./cmd/leia"
