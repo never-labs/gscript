@@ -41,8 +41,11 @@ class ScriptEntrypointConsistencyTest(unittest.TestCase):
         gate = (ROOT / "scripts" / "performance_gate.sh").read_text()
         self.assertIn("python3 benchmarks/timing_compare.py", gate)
         self.assertIn("python3 benchmarks/strict_guard.py", gate)
+        self.assertIn("--progress", gate)
         self.assertIn("--quick-phase-smoke", gate)
         self.assertIn('PROFILE="quick_phase_smoke"', gate)
+        self.assertIn("STRICT_SMOKE_BENCHES=(", gate)
+        self.assertIn('for bench in "${STRICT_SMOKE_BENCHES[@]}"; do', gate)
         self.assertIn('if [ "$PROFILE" = "full" ]; then', gate)
         self.assertIn('for bench in "${STRICT_CORE_BENCHES[@]}"; do', gate)
 

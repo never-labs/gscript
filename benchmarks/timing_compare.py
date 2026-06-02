@@ -1099,6 +1099,11 @@ def main() -> int:
     )
     parser.add_argument("--json", type=Path, help="write machine-readable result JSON")
     parser.add_argument("--markdown", type=Path, help="write markdown report")
+    parser.add_argument(
+        "--progress",
+        action="store_true",
+        help="print per-benchmark progress to stderr for long full-suite runs",
+    )
     args = parser.parse_args()
 
     if args.warmup < 0:
@@ -1134,7 +1139,14 @@ def main() -> int:
         build_leia(head_root, head_bin)
 
         results: list[BenchmarkResult] = []
-        for spec in specs:
+        total_specs = len(specs)
+        for index, spec in enumerate(specs, start=1):
+            if args.progress:
+                print(
+                    f"[timing_compare] {index}/{total_specs} start {spec.benchmark_id}",
+                    file=sys.stderr,
+                    flush=True,
+                )
             spec_scale = scale_overrides_for(spec, scale_overrides)
             row_scale: dict[str, str] = {}
             if spec_scale:
@@ -1155,6 +1167,12 @@ def main() -> int:
                     "luajit": run_subject("luajit", mode, root, None, luajit_bin, spec, tempdir, scale_overrides, args),
                 }
             results.append(row)
+            if args.progress:
+                print(
+                    f"[timing_compare] {index}/{total_specs} done  {spec.benchmark_id}",
+                    file=sys.stderr,
+                    flush=True,
+                )
 
         print_table(sorted_results_for_print(results, modes, args.sort), modes)
 

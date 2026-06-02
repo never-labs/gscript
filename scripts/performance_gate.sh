@@ -40,6 +40,11 @@ SMOKE_BENCHES=(
     "table/table_array_access"
 )
 
+STRICT_SMOKE_BENCHES=(
+    "control/sieve"
+    "string/string_bench"
+)
+
 PHASE_SMOKE_BENCHES=(
     "control/sieve"
     "table/table_array_access"
@@ -438,6 +443,7 @@ TIMING_CMD=(
     --min-wall-repeat=8
     --scale-profile=hot
     --sort=luajit-gap
+    --progress
     --head-ref="$HEAD_REF"
     --json "$TIMING_JSON"
     --markdown "$TIMING_MD"
@@ -506,7 +512,7 @@ if [ "$STRICT" -eq 1 ]; then
         done
     else
         if [ "$PROFILE" = "smoke" ]; then
-            for bench in "${SMOKE_BENCHES[@]}"; do
+            for bench in "${STRICT_SMOKE_BENCHES[@]}"; do
                 STRICT_CMD+=(--bench "$bench")
             done
         elif [ "$PROFILE" = "phase_smoke" ] || [ "$PROFILE" = "quick_phase_smoke" ]; then
