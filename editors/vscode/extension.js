@@ -319,6 +319,9 @@ class MinimalLanguageClient {
       vscode.languages.registerDocumentSymbolProvider("leia", {
         provideDocumentSymbols: (doc) => this.provideDocumentSymbols(doc)
       }),
+      vscode.languages.registerWorkspaceSymbolProvider({
+        provideWorkspaceSymbols: (query) => this.provideWorkspaceSymbols(query)
+      }),
       vscode.languages.registerCodeLensProvider("leia", {
         provideCodeLenses: (doc) => this.provideCodeLenses(doc)
       }),
@@ -419,6 +422,19 @@ class MinimalLanguageClient {
         lspRange(sym.selectionRange)
       )
     ));
+  }
+
+  provideWorkspaceSymbols(query) {
+    return this.request("workspace/symbol", { query }).then((result) =>
+      (result || []).map((sym) =>
+        new vscode.SymbolInformation(
+          sym.name,
+          sym.kind || vscode.SymbolKind.Function,
+          sym.containerName || "",
+          new vscode.Location(vscode.Uri.parse(sym.location.uri), lspRange(sym.location.range))
+        )
+      )
+    );
   }
 
   provideCompletionItems(doc, pos) {

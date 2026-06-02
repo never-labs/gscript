@@ -3,6 +3,7 @@ package lsp
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 	"unicode"
 
@@ -43,6 +44,17 @@ type documentSymbol struct {
 	Kind           int      `json:"kind"`
 	Range          lspRange `json:"range"`
 	SelectionRange lspRange `json:"selectionRange"`
+}
+
+type workspaceSymbolParams struct {
+	Query string `json:"query,omitempty"`
+}
+
+type workspaceSymbolInformation struct {
+	Name      string   `json:"name"`
+	Kind      int      `json:"kind"`
+	Location  location `json:"location"`
+	Container string   `json:"containerName,omitempty"`
 }
 
 type codeLensParams struct {
@@ -222,6 +234,39 @@ func (s *Server) documentSymbol(id *json.RawMessage, params json.RawMessage) err
 			Range:          sym.Range,
 			SelectionRange: sym.NameRange,
 		})
+	}
+	return s.respondMaybe(id, out, nil)
+}
+
+func (s *Server) workspaceSymbol(id *json.RawMessage, params json.RawMessage) error {
+	var p workspaceSymbolParams
+	if len(params) > 0 {
+		if err := json.Unmarshal(params, &p); err != nil {
+			return s.respondMaybe(id, nil, &responseError{Code: errCodeInvalidParams, Message: err.Error()})
+		}
+	}
+	query := strings.ToLower(strings.TrimSpace(p.Query))
+	docs := s.documentSnapshot()
+	uris := make([]string, 0, len(docs))
+	for uri := range docs {
+		uris = append(uris, uri)
+	}
+	sort.Strings(uris)
+	var out []workspaceSymbolInformation
+	for _, uri := range uris {
+		for _, sym := range collectSourceSymbols(docs[uri]) {
+			if query != "" && !strings.Contains(strings.ToLower(sym.Name), query) {
+				continue
+			}
+			out = append(out, workspaceSymbolInformation{
+				Name: sym.Name,
+				Kind: sym.Kind,
+				Location: location{
+					URI:   uri,
+					Range: sym.NameRange,
+				},
+			})
+		}
 	}
 	return s.respondMaybe(id, out, nil)
 }

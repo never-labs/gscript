@@ -46,6 +46,9 @@ func TestServerInitializeShutdown(t *testing.T) {
 	if caps["documentSymbolProvider"] != true {
 		t.Fatalf("initialize result missing document symbol capability: %#v", caps)
 	}
+	if caps["workspaceSymbolProvider"] != true {
+		t.Fatalf("initialize result missing workspace symbol capability: %#v", caps)
+	}
 	if caps["codeLensProvider"] == nil {
 		t.Fatalf("initialize result missing code lens capability: %#v", caps)
 	}
@@ -332,6 +335,80 @@ func TestDocumentSymbolReturnsDeclarations(t *testing.T) {
 	start := selection["start"].(map[string]any)
 	if start["line"] != float64(5) || start["character"] != float64(5) {
 		t.Fatalf("calculate selection start = %#v, want 5:5", start)
+	}
+}
+
+func TestWorkspaceSymbolReturnsOpenDocumentDeclarations(t *testing.T) {
+	input := mustEncodeMessages(t,
+		map[string]any{
+			"jsonrpc": "2.0",
+			"method":  "textDocument/didOpen",
+			"params": map[string]any{
+				"textDocument": map[string]any{
+					"uri":        "file:///tmp/alpha.leia",
+					"languageId": "leia",
+					"version":    1,
+					"text":       "func alpha_tool() { return 1 }\n",
+				},
+			},
+		},
+		map[string]any{
+			"jsonrpc": "2.0",
+			"method":  "textDocument/didOpen",
+			"params": map[string]any{
+				"textDocument": map[string]any{
+					"uri":        "file:///tmp/beta.leia",
+					"languageId": "leia",
+					"version":    1,
+					"text": strings.Join([]string{
+						"agent beta_agent {",
+						"    model: \"mock\"",
+						"}",
+						"evaluate \"beta baseline\" {",
+						"    assert(true)",
+						"}",
+						"",
+					}, "\n"),
+				},
+			},
+		},
+		map[string]any{
+			"jsonrpc": "2.0",
+			"id":      40,
+			"method":  "workspace/symbol",
+			"params":  map[string]any{"query": "beta"},
+		},
+	)
+	var out bytes.Buffer
+	err := NewServer().Run(context.Background(), bytes.NewReader(input), &out)
+	if err != nil {
+		t.Fatalf("Run returned error: %v", err)
+	}
+
+	msgs := readOutputMessages(t, out.Bytes())
+	if len(msgs) != 3 {
+		t.Fatalf("expected two diagnostics notifications and workspace/symbol response, got %d: %#v", len(msgs), msgs)
+	}
+	symbols := msgs[2]["result"].([]any)
+	if len(symbols) != 2 {
+		t.Fatalf("workspace symbols = %#v, want beta_agent and beta baseline", symbols)
+	}
+	got := map[string]map[string]any{}
+	for _, raw := range symbols {
+		sym := raw.(map[string]any)
+		got[sym["name"].(string)] = sym
+	}
+	for _, name := range []string{"beta_agent", "beta baseline"} {
+		if got[name] == nil {
+			t.Fatalf("missing workspace symbol %q: %#v", name, got)
+		}
+		loc := got[name]["location"].(map[string]any)
+		if loc["uri"] != "file:///tmp/beta.leia" {
+			t.Fatalf("symbol %s location = %#v", name, loc)
+		}
+	}
+	if got["alpha_tool"] != nil {
+		t.Fatalf("query unexpectedly returned alpha_tool: %#v", got)
 	}
 }
 

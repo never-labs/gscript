@@ -149,6 +149,7 @@ def check_vscode() -> None:
         "textDocument/definition",
         "textDocument/references",
         "textDocument/rename",
+        "workspace/symbol",
         "textDocument/codeLens",
         "textDocument/inlayHint",
         "textDocument/publishDiagnostics",

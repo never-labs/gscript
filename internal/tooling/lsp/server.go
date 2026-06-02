@@ -135,6 +135,8 @@ func (s *Server) handle(payload []byte) error {
 		return s.references(req.ID, req.Params)
 	case "textDocument/rename":
 		return s.rename(req.ID, req.Params)
+	case "workspace/symbol":
+		return s.workspaceSymbol(req.ID, req.Params)
 	default:
 		return s.respondMaybe(req.ID, nil, &responseError{Code: errCodeMethodNotFound, Message: "method not found: " + req.Method})
 	}
@@ -153,10 +155,11 @@ func initializeResult() map[string]any {
 			"codeLensProvider": map[string]any{
 				"resolveProvider": false,
 			},
-			"inlayHintProvider":  true,
-			"definitionProvider": true,
-			"referencesProvider": true,
-			"renameProvider":     true,
+			"inlayHintProvider":       true,
+			"definitionProvider":      true,
+			"referencesProvider":      true,
+			"renameProvider":          true,
+			"workspaceSymbolProvider": true,
 			"completionProvider": map[string]any{
 				"triggerCharacters": []string{".", ":"},
 			},
@@ -244,6 +247,16 @@ func (s *Server) didClose(params json.RawMessage) error {
 	delete(s.docs, p.TextDocument.URI)
 	s.mu.Unlock()
 	return s.publishDiagnostics(p.TextDocument.URI, nil)
+}
+
+func (s *Server) documentSnapshot() map[string]string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make(map[string]string, len(s.docs))
+	for uri, src := range s.docs {
+		out[uri] = src
+	}
+	return out
 }
 
 type formattingParams struct {
