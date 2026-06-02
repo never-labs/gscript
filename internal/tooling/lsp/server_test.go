@@ -46,6 +46,12 @@ func TestServerInitializeShutdown(t *testing.T) {
 	if caps["documentSymbolProvider"] != true {
 		t.Fatalf("initialize result missing document symbol capability: %#v", caps)
 	}
+	if caps["codeLensProvider"] == nil {
+		t.Fatalf("initialize result missing code lens capability: %#v", caps)
+	}
+	if caps["inlayHintProvider"] != true {
+		t.Fatalf("initialize result missing inlay hint capability: %#v", caps)
+	}
 	if caps["definitionProvider"] != true || caps["referencesProvider"] != true || caps["renameProvider"] != true {
 		t.Fatalf("initialize result missing navigation capabilities: %#v", caps)
 	}
@@ -326,6 +332,126 @@ func TestDocumentSymbolReturnsDeclarations(t *testing.T) {
 	start := selection["start"].(map[string]any)
 	if start["line"] != float64(5) || start["character"] != float64(5) {
 		t.Fatalf("calculate selection start = %#v, want 5:5", start)
+	}
+}
+
+func TestCodeLensReturnsAgentAndEvaluateActions(t *testing.T) {
+	src := strings.Join([]string{
+		"agent helper {",
+		"    model: \"mock\"",
+		"}",
+		"evaluate \"helper baseline\" {",
+		"    assert(true)",
+		"}",
+		"",
+	}, "\n")
+	input := mustEncodeMessages(t,
+		map[string]any{
+			"jsonrpc": "2.0",
+			"method":  "textDocument/didOpen",
+			"params": map[string]any{
+				"textDocument": map[string]any{
+					"uri":        "file:///tmp/lens.leia",
+					"languageId": "leia",
+					"version":    1,
+					"text":       src,
+				},
+			},
+		},
+		map[string]any{
+			"jsonrpc": "2.0",
+			"id":      30,
+			"method":  "textDocument/codeLens",
+			"params": map[string]any{
+				"textDocument": map[string]any{"uri": "file:///tmp/lens.leia"},
+			},
+		},
+	)
+	var out bytes.Buffer
+	err := NewServer().Run(context.Background(), bytes.NewReader(input), &out)
+	if err != nil {
+		t.Fatalf("Run returned error: %v", err)
+	}
+
+	msgs := readOutputMessages(t, out.Bytes())
+	if len(msgs) != 2 {
+		t.Fatalf("expected diagnostics notification and codeLens response, got %d: %#v", len(msgs), msgs)
+	}
+	lenses := msgs[1]["result"].([]any)
+	if len(lenses) != 2 {
+		t.Fatalf("expected two code lenses, got %#v", lenses)
+	}
+	commands := map[string]string{}
+	for _, raw := range lenses {
+		lens := raw.(map[string]any)
+		cmd := lens["command"].(map[string]any)
+		commands[cmd["command"].(string)] = cmd["title"].(string)
+	}
+	if commands["leia.agent.run"] != "Run agent" {
+		t.Fatalf("missing agent code lens: %#v", commands)
+	}
+	if commands["leia.evaluate.case"] != "Run evaluate case" {
+		t.Fatalf("missing evaluate code lens: %#v", commands)
+	}
+}
+
+func TestInlayHintReturnsAgentAndEvaluateHints(t *testing.T) {
+	src := strings.Join([]string{
+		"agent helper {",
+		"    model: \"mock\"",
+		"}",
+		"evaluate \"helper baseline\" {",
+		"    assert(true)",
+		"}",
+		"",
+	}, "\n")
+	input := mustEncodeMessages(t,
+		map[string]any{
+			"jsonrpc": "2.0",
+			"method":  "textDocument/didOpen",
+			"params": map[string]any{
+				"textDocument": map[string]any{
+					"uri":        "file:///tmp/hints.leia",
+					"languageId": "leia",
+					"version":    1,
+					"text":       src,
+				},
+			},
+		},
+		map[string]any{
+			"jsonrpc": "2.0",
+			"id":      31,
+			"method":  "textDocument/inlayHint",
+			"params": map[string]any{
+				"textDocument": map[string]any{"uri": "file:///tmp/hints.leia"},
+				"range": map[string]any{
+					"start": map[string]any{"line": 0, "character": 0},
+					"end":   map[string]any{"line": 6, "character": 0},
+				},
+			},
+		},
+	)
+	var out bytes.Buffer
+	err := NewServer().Run(context.Background(), bytes.NewReader(input), &out)
+	if err != nil {
+		t.Fatalf("Run returned error: %v", err)
+	}
+
+	msgs := readOutputMessages(t, out.Bytes())
+	if len(msgs) != 2 {
+		t.Fatalf("expected diagnostics notification and inlayHint response, got %d: %#v", len(msgs), msgs)
+	}
+	hints := msgs[1]["result"].([]any)
+	if len(hints) != 2 {
+		t.Fatalf("expected two inlay hints, got %#v", hints)
+	}
+	labels := map[string]bool{}
+	for _, raw := range hints {
+		hint := raw.(map[string]any)
+		labels[hint["label"].(string)] = true
+	}
+	if !labels[" agent"] || !labels[" eval"] {
+		t.Fatalf("missing expected hint labels: %#v", labels)
 	}
 }
 

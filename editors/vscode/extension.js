@@ -13,6 +13,8 @@ function activate(context) {
     vscode.commands.registerCommand("leia.lintWorkspace", () => runWorkspaceCommand("lint")),
     vscode.commands.registerCommand("leia.checkWorkspace", () => runWorkspaceCommand("check")),
     vscode.commands.registerCommand("leia.previewSpec", previewSpec),
+    vscode.commands.registerCommand("leia.evaluate.case", (uri, name) => runEvaluateCase(uri, name)),
+    vscode.commands.registerCommand("leia.agent.run", (uri) => runFileURI(uri)),
     vscode.tasks.registerTaskProvider("leia", new LeiaTaskProvider())
   );
   startLanguageServer(context);
@@ -88,6 +90,31 @@ async function runCurrentFile(subcommand) {
   }
   await vscode.window.activeTextEditor.document.save();
   runInTerminal(`${shellQuote(executable())} ${subcommand} ${shellQuote(file)}`, workspaceFolder());
+}
+
+async function runFileURI(uri) {
+  const parsed = typeof uri === "string" ? vscode.Uri.parse(uri) : uri;
+  if (!parsed) {
+    return;
+  }
+  const doc = await vscode.workspace.openTextDocument(parsed);
+  await doc.save();
+  runInTerminal(`${shellQuote(executable())} run ${shellQuote(parsed.fsPath)}`, workspaceFolder());
+}
+
+async function runEvaluateCase(uri, name) {
+  const parsed = typeof uri === "string" ? vscode.Uri.parse(uri) : uri;
+  if (!parsed) {
+    return;
+  }
+  const doc = await vscode.workspace.openTextDocument(parsed);
+  await doc.save();
+  const args = ["evaluate"];
+  if (name) {
+    args.push("--filter", name);
+  }
+  args.push(parsed.fsPath);
+  runInTerminal(shellJoin([executable(), ...args]), workspaceFolder());
 }
 
 async function formatCurrentFile() {
@@ -248,6 +275,12 @@ class MinimalLanguageClient {
       vscode.languages.registerDocumentSymbolProvider("leia", {
         provideDocumentSymbols: (doc) => this.provideDocumentSymbols(doc)
       }),
+      vscode.languages.registerCodeLensProvider("leia", {
+        provideCodeLenses: (doc) => this.provideCodeLenses(doc)
+      }),
+      vscode.languages.registerInlayHintsProvider("leia", {
+        provideInlayHints: (doc, range) => this.provideInlayHints(doc, range)
+      }),
       vscode.languages.registerCompletionItemProvider("leia", {
         provideCompletionItems: (doc, pos) => this.provideCompletionItems(doc, pos)
       }),
@@ -349,6 +382,40 @@ class MinimalLanguageClient {
         completion.detail = item.detail;
         completion.insertText = item.insertText || item.label;
         return completion;
+      })
+    );
+  }
+
+  provideCodeLenses(doc) {
+    return this.request("textDocument/codeLens", {
+      textDocument: { uri: doc.uri.toString() }
+    }).then((result) =>
+      (result || []).map((lens) =>
+        new vscode.CodeLens(lspRange(lens.range), lens.command ? {
+          title: lens.command.title,
+          command: lens.command.command,
+          arguments: lens.command.arguments || []
+        } : undefined)
+      )
+    );
+  }
+
+  provideInlayHints(doc, range) {
+    return this.request("textDocument/inlayHint", {
+      textDocument: { uri: doc.uri.toString() },
+      range: {
+        start: { line: range.start.line, character: range.start.character },
+        end: { line: range.end.line, character: range.end.character }
+      }
+    }).then((result) =>
+      (result || []).map((hint) => {
+        const out = new vscode.InlayHint(
+          new vscode.Position(hint.position.line, hint.position.character),
+          hint.label,
+          vscode.InlayHintKind.Type
+        );
+        out.tooltip = hint.tooltip;
+        return out;
       })
     );
   }

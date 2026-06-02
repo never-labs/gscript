@@ -23,6 +23,8 @@
     "onCommand:leia.lintWorkspace",
     "onCommand:leia.checkWorkspace",
     "onCommand:leia.previewSpec",
+    "onCommand:leia.evaluate.case",
+    "onCommand:leia.agent.run",
     "onTaskType:leia"
   ],
   "contributes": {
@@ -98,6 +100,16 @@
       {
         "command": "leia.previewSpec",
         "title": "Leia: Preview Language Spec",
+        "category": "Leia"
+      },
+      {
+        "command": "leia.evaluate.case",
+        "title": "Leia: Run Evaluate Case",
+        "category": "Leia"
+      },
+      {
+        "command": "leia.agent.run",
+        "title": "Leia: Run Agent File",
         "category": "Leia"
       }
     ],

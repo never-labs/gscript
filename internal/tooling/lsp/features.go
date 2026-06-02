@@ -45,6 +45,33 @@ type documentSymbol struct {
 	SelectionRange lspRange `json:"selectionRange"`
 }
 
+type codeLensParams struct {
+	TextDocument textDocumentIdentifier `json:"textDocument"`
+}
+
+type command struct {
+	Title     string `json:"title"`
+	Command   string `json:"command"`
+	Arguments []any  `json:"arguments,omitempty"`
+}
+
+type codeLens struct {
+	Range   lspRange `json:"range"`
+	Command command  `json:"command,omitempty"`
+}
+
+type inlayHintParams struct {
+	TextDocument textDocumentIdentifier `json:"textDocument"`
+	Range        lspRange               `json:"range,omitempty"`
+}
+
+type inlayHint struct {
+	Position position `json:"position"`
+	Label    string   `json:"label"`
+	Kind     int      `json:"kind,omitempty"`
+	Tooltip  string   `json:"tooltip,omitempty"`
+}
+
 type sourceSymbol struct {
 	Name      string
 	Detail    string
@@ -199,6 +226,30 @@ func (s *Server) documentSymbol(id *json.RawMessage, params json.RawMessage) err
 	return s.respondMaybe(id, out, nil)
 }
 
+func (s *Server) codeLens(id *json.RawMessage, params json.RawMessage) error {
+	var p codeLensParams
+	if err := json.Unmarshal(params, &p); err != nil {
+		return s.respondMaybe(id, nil, &responseError{Code: errCodeInvalidParams, Message: err.Error()})
+	}
+	src, ok := s.documentText(p.TextDocument.URI)
+	if !ok {
+		return s.respondMaybe(id, []codeLens{}, nil)
+	}
+	return s.respondMaybe(id, collectCodeLens(p.TextDocument.URI, src), nil)
+}
+
+func (s *Server) inlayHint(id *json.RawMessage, params json.RawMessage) error {
+	var p inlayHintParams
+	if err := json.Unmarshal(params, &p); err != nil {
+		return s.respondMaybe(id, nil, &responseError{Code: errCodeInvalidParams, Message: err.Error()})
+	}
+	src, ok := s.documentText(p.TextDocument.URI)
+	if !ok {
+		return s.respondMaybe(id, []inlayHint{}, nil)
+	}
+	return s.respondMaybe(id, collectInlayHints(src, p.Range), nil)
+}
+
 func (s *Server) documentText(uri string) (string, bool) {
 	if uri == "" {
 		return "", false
@@ -207,6 +258,68 @@ func (s *Server) documentText(uri string) (string, bool) {
 	defer s.mu.Unlock()
 	src, ok := s.docs[uri]
 	return src, ok
+}
+
+func collectCodeLens(uri, src string) []codeLens {
+	syms := collectSourceSymbols(src)
+	out := make([]codeLens, 0, len(syms))
+	for _, sym := range syms {
+		switch sym.Kind {
+		case symbolKindEvent:
+			out = append(out, codeLens{
+				Range: sym.Range,
+				Command: command{
+					Title:     "Run evaluate case",
+					Command:   "leia.evaluate.case",
+					Arguments: []any{uri, sym.Name},
+				},
+			})
+		case symbolKindClass:
+			out = append(out, codeLens{
+				Range: sym.Range,
+				Command: command{
+					Title:     "Run agent",
+					Command:   "leia.agent.run",
+					Arguments: []any{uri, sym.Name},
+				},
+			})
+		}
+	}
+	return out
+}
+
+func collectInlayHints(src string, requested lspRange) []inlayHint {
+	syms := collectSourceSymbols(src)
+	out := make([]inlayHint, 0, len(syms))
+	for _, sym := range syms {
+		if !rangeIntersectsLine(requested, sym.Range.Start.Line) {
+			continue
+		}
+		switch sym.Kind {
+		case symbolKindEvent:
+			out = append(out, inlayHint{
+				Position: sym.Range.End,
+				Label:    " eval",
+				Kind:     3,
+				Tooltip:  "Leia evaluate block discovered by `leia evaluate`.",
+			})
+		case symbolKindClass:
+			out = append(out, inlayHint{
+				Position: sym.Range.End,
+				Label:    " agent",
+				Kind:     3,
+				Tooltip:  "Leia AI agent declaration.",
+			})
+		}
+	}
+	return out
+}
+
+func rangeIntersectsLine(r lspRange, line int) bool {
+	if r.Start == (position{}) && r.End == (position{}) {
+		return true
+	}
+	return line >= r.Start.Line && line <= r.End.Line
 }
 
 func hoverText(src, word string) string {
