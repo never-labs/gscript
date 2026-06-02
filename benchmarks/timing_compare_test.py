@@ -84,7 +84,7 @@ class TimingCompareDiagnosticTest(unittest.TestCase):
             )
         ]
         subject = timing.summarize_subject("current", "default", samples, repeat=128)
-        subject.diagnostic = timing.subject_diagnostic(spec, subject, samples, [], args())
+        subject.diagnostic = timing.subject_diagnostic(spec, subject, samples, [], args(), "auto")
 
         payload = asdict(subject)
         advice = payload["diagnostic"]["low_resolution"]
@@ -106,13 +106,13 @@ class TimingCompareDiagnosticTest(unittest.TestCase):
             timing.Sample(status="low_resolution", repeat=128, script_total_seconds=0.0, wall_total_seconds=0.010)
         ]
         current = timing.summarize_subject("current", "default", low_samples, repeat=128)
-        current.diagnostic = timing.subject_diagnostic(spec, current, low_samples, [], args())
+        current.diagnostic = timing.subject_diagnostic(spec, current, low_samples, [], args(), "auto")
 
         wall_samples = [
             timing.Sample(status="ok", seconds=0.006, repeat=8, source="wall_repeat", wall_total_seconds=0.048)
         ]
         luajit = timing.summarize_subject("luajit", "default", wall_samples, repeat=8)
-        luajit.diagnostic = timing.subject_diagnostic(spec, luajit, wall_samples, [], args())
+        luajit.diagnostic = timing.subject_diagnostic(spec, luajit, wall_samples, [], args(), "auto")
 
         bench.modes["default"] = {
             "current": current,
@@ -126,6 +126,27 @@ class TimingCompareDiagnosticTest(unittest.TestCase):
         self.assertIn("--min-sample-seconds 0.050", report)
         self.assertIn("## Wall-Repeat Diagnostics", report)
         self.assertIn("scale workload enough for script_repeat", report)
+
+    def test_auto_time_source_uses_wall_for_concurrency(self):
+        spec = timing.BenchmarkSpec(
+            "concurrency",
+            "waitgroup",
+            "benchmarks/concurrency/waitgroup.leia",
+            "benchmarks/lua_ref/concurrency/waitgroup.lua",
+        )
+
+        self.assertEqual(timing.effective_time_source(spec, "auto"), "wall")
+        self.assertEqual(timing.effective_time_source(spec, "script"), "script")
+
+    def test_auto_time_source_keeps_script_auto_for_non_concurrency(self):
+        spec = timing.BenchmarkSpec(
+            "table",
+            "table_array_access",
+            "benchmarks/table/table_array_access.leia",
+            "benchmarks/lua_ref/table/table_array_access.lua",
+        )
+
+        self.assertEqual(timing.effective_time_source(spec, "auto"), "auto")
 
 
 if __name__ == "__main__":

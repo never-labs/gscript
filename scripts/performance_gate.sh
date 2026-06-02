@@ -23,6 +23,7 @@ STRICT=1
 NO_LUAJIT=0
 VALIDATE_ONLY=""
 JOBS="${LEIA_PERF_JOBS:-}"
+MAX_JOBS="${LEIA_PERF_MAX_JOBS:-8}"
 
 BENCHES=()
 
@@ -98,7 +99,7 @@ Options:
   --out-dir DIR           Artifact directory. Default: ${TMPDIR:-/tmp}/leia_performance_gate.
   --head-ref REF          Clean baseline ref for timing_compare.py. Default: HEAD.
   --no-luajit             Skip LuaJIT timing.
-  --jobs N                Run up to N benchmarks concurrently. Default: auto, capped at 6.
+  --jobs N                Run up to N benchmarks concurrently. Default: auto, capped by LEIA_PERF_MAX_JOBS or 8.
   --strict / --no-strict  Enable or skip strict_guard.py truth pass. Default: --strict.
   --validate-only JSON    Only validate an existing timing_compare JSON artifact.
   -h, --help              Show this help.
@@ -433,9 +434,16 @@ fi
 mkdir -p "$OUT_DIR"
 
 if [ -z "$JOBS" ]; then
-    JOBS="$(python3 - <<'PY'
+    JOBS="$(python3 - "$MAX_JOBS" <<'PY'
 import os
-print(max(1, min(6, os.cpu_count() or 1)))
+import sys
+
+try:
+    max_jobs = int(sys.argv[1])
+except (IndexError, ValueError):
+    max_jobs = 8
+max_jobs = max(1, max_jobs)
+print(max(1, min(max_jobs, os.cpu_count() or 1)))
 PY
 )"
 fi
