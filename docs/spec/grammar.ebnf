@@ -156,9 +156,12 @@ hex_digit      = digit | "A".."F" | "a".."f" ;
 string_lit     = quoted_string | raw_string ;
 quoted_string  = '"' { escaped_char | any_char_except_quote_or_newline } '"' ;
 raw_string     = "`" { any_char_except_backtick } "`" ;
-escaped_char   = "\\" ( "\\" | '"' | "n" | "r" | "t" | "0" | "x" hex_digit hex_digit
+escaped_char   = "\\" ( "\\" | '"' | "a" | "b" | "f" | "n" | "r" | "t" | "v"
+                    | "x" hex_digit hex_digit
                     | "u" hex_digit hex_digit hex_digit hex_digit
-                    | "U" hex_digit hex_digit hex_digit hex_digit hex_digit hex_digit hex_digit hex_digit ) ;
+                    | "U" hex_digit hex_digit hex_digit hex_digit hex_digit hex_digit hex_digit hex_digit
+                    | decimal_escape ) ;
+decimal_escape = digit [ digit [ digit ] ] ;
 any_char_except_quote_or_newline
                = ? any Unicode scalar value except '"' and newline ? ;
 any_char_except_backtick

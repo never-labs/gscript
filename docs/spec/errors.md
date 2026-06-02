@@ -98,7 +98,7 @@ value)`, the object is `value`; if it came from a runtime, host, parser,
 budget, or capability failure, the protected error object is the current
 diagnostic string.
 
-```leia run
+```leia run all
 ok, a, b := pcall(func() {
     return "a", "b"
 })

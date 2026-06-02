@@ -9,6 +9,7 @@ import (
 	"fmt"
 
 	"github.com/never-labs/leia/internal/ast"
+	"github.com/never-labs/leia/internal/runtime"
 )
 
 func (c *compiler) compileIfStmt(s *ast.IfStmt) error {
@@ -328,13 +329,15 @@ func (c *compiler) compileForRangeStmt(s *ast.ForRangeStmt) error {
 	if s.Value != "" {
 		nVars = 2
 	}
-
-	c.locals = append(c.locals, localVar{name: s.Key, reg: iterBase + 3, depth: c.depth})
+	capturesRangeVar := forRangeBodyCapturesVars(s)
 	for c.nextReg < iterBase+3+nVars {
 		c.allocReg()
 	}
-	if s.Value != "" {
-		c.locals = append(c.locals, localVar{name: s.Value, reg: iterBase + 4, depth: c.depth})
+	if !capturesRangeVar {
+		c.locals = append(c.locals, localVar{name: s.Key, reg: iterBase + 3, depth: c.depth})
+		if s.Value != "" {
+			c.locals = append(c.locals, localVar{name: s.Value, reg: iterBase + 4, depth: c.depth})
+		}
 	}
 
 	c.pushLoop()
@@ -346,6 +349,14 @@ func (c *compiler) compileForRangeStmt(s *ast.ForRangeStmt) error {
 	bodyStart := c.currentPC()
 
 	c.enterScope()
+	if capturesRangeVar {
+		keyReg := c.addLocal(s.Key)
+		c.emitABC(OP_MOVE, keyReg, iterBase+3, 0, line)
+		if s.Value != "" {
+			valueReg := c.addLocal(s.Value)
+			c.emitABC(OP_MOVE, valueReg, iterBase+4, 0, line)
+		}
+	}
 	for _, st := range s.Body.Stmts {
 		if err := c.compileStmt(st); err != nil {
 			return err
@@ -367,7 +378,209 @@ func (c *compiler) compileForRangeStmt(s *ast.ForRangeStmt) error {
 	c.patchContinues(info, continueTarget)
 
 	c.leaveScope()
+	if capturesRangeVar {
+		c.nextReg = iterBase
+	}
 	return nil
+}
+
+func forRangeBodyCapturesVars(s *ast.ForRangeStmt) bool {
+	if s == nil || s.Body == nil {
+		return false
+	}
+	names := map[string]bool{s.Key: true}
+	if s.Value != "" {
+		names[s.Value] = true
+	}
+	return blockNestedFunctionCapturesAny(s.Body, names)
+}
+
+func blockNestedFunctionCapturesAny(block *ast.BlockStmt, names map[string]bool) bool {
+	if block == nil {
+		return false
+	}
+	for _, stmt := range block.Stmts {
+		if stmtNestedFunctionCapturesAny(stmt, names) {
+			return true
+		}
+	}
+	return false
+}
+
+func stmtNestedFunctionCapturesAny(stmt ast.Stmt, names map[string]bool) bool {
+	switch s := stmt.(type) {
+	case *ast.DeclareStmt:
+		for _, value := range s.Values {
+			if exprNestedFunctionCapturesAny(value, names) {
+				return true
+			}
+		}
+	case *ast.AssignStmt:
+		for _, target := range s.Targets {
+			if exprNestedFunctionCapturesAny(target, names) {
+				return true
+			}
+		}
+		for _, value := range s.Values {
+			if exprNestedFunctionCapturesAny(value, names) {
+				return true
+			}
+		}
+	case *ast.CompoundAssignStmt:
+		return exprNestedFunctionCapturesAny(s.Target, names) || exprNestedFunctionCapturesAny(s.Value, names)
+	case *ast.IncDecStmt:
+		return exprNestedFunctionCapturesAny(s.Target, names)
+	case *ast.CallStmt:
+		return exprNestedFunctionCapturesAny(s.Call, names)
+	case *ast.GoStmt:
+		return exprNestedFunctionCapturesAny(s.Call, names)
+	case *ast.DeferStmt:
+		return exprNestedFunctionCapturesAny(s.Call, names)
+	case *ast.SendStmt:
+		return exprNestedFunctionCapturesAny(s.Channel, names) || exprNestedFunctionCapturesAny(s.Value, names)
+	case *ast.SelectStmt:
+		for _, selCase := range s.Cases {
+			if exprNestedFunctionCapturesAny(selCase.Channel, names) ||
+				exprNestedFunctionCapturesAny(selCase.SendValue, names) ||
+				blockNestedFunctionCapturesAny(selCase.Body, names) {
+				return true
+			}
+		}
+		return blockNestedFunctionCapturesAny(s.Default, names)
+	case *ast.IfStmt:
+		if exprNestedFunctionCapturesAny(s.Cond, names) || blockNestedFunctionCapturesAny(s.Body, names) {
+			return true
+		}
+		for _, elseIf := range s.ElseIfs {
+			if exprNestedFunctionCapturesAny(elseIf.Cond, names) || blockNestedFunctionCapturesAny(elseIf.Body, names) {
+				return true
+			}
+		}
+		return blockNestedFunctionCapturesAny(s.ElseBody, names)
+	case *ast.ForNumStmt:
+		return stmtNestedFunctionCapturesAny(s.Init, names) ||
+			exprNestedFunctionCapturesAny(s.Cond, names) ||
+			stmtNestedFunctionCapturesAny(s.Post, names) ||
+			blockNestedFunctionCapturesAny(s.Body, names)
+	case *ast.ForRangeStmt:
+		return exprNestedFunctionCapturesAny(s.Iter, names) || blockNestedFunctionCapturesAny(s.Body, names)
+	case *ast.ForStmt:
+		return exprNestedFunctionCapturesAny(s.Cond, names) || blockNestedFunctionCapturesAny(s.Body, names)
+	case *ast.ReturnStmt:
+		for _, value := range s.Values {
+			if exprNestedFunctionCapturesAny(value, names) {
+				return true
+			}
+		}
+	case *ast.FuncDeclStmt:
+		return functionBodyCapturesAny(s.Body, s.Params, names)
+	case *ast.ToolDeclStmt:
+		return functionBodyCapturesAny(s.Body, s.Params, names)
+	case *ast.AgentDeclStmt:
+		return blockNestedFunctionCapturesAny(s.Flow, names)
+	case *ast.AgentDefaultsDeclStmt:
+		return configNestedFunctionCapturesAny(s.Config, names)
+	case *ast.ModelsDeclStmt:
+		return configNestedFunctionCapturesAny(s.Config, names)
+	case *ast.BudgetStmt:
+		return configNestedFunctionCapturesAny(s.Config, names) || blockNestedFunctionCapturesAny(s.Body, names)
+	case *ast.EvaluateBlockStmt:
+		return blockNestedFunctionCapturesAny(s.Body, names)
+	case *ast.BlockStmt:
+		return blockNestedFunctionCapturesAny(s, names)
+	}
+	return false
+}
+
+func functionBodyCapturesAny(body *ast.BlockStmt, params []ast.FuncParam, names map[string]bool) bool {
+	paramNames := make([]string, 0, len(params))
+	for _, param := range params {
+		paramNames = append(paramNames, param.Name)
+	}
+	freeVars := runtime.FreeVars(body, paramNames)
+	for _, name := range freeVars {
+		if names[name] {
+			return true
+		}
+	}
+	return false
+}
+
+func exprNestedFunctionCapturesAny(expr ast.Expr, names map[string]bool) bool {
+	switch e := expr.(type) {
+	case *ast.BinaryExpr:
+		return exprNestedFunctionCapturesAny(e.Left, names) || exprNestedFunctionCapturesAny(e.Right, names)
+	case *ast.UnaryExpr:
+		return exprNestedFunctionCapturesAny(e.Operand, names)
+	case *ast.ParenExpr:
+		return exprNestedFunctionCapturesAny(e.Inner, names)
+	case *ast.IndexExpr:
+		return exprNestedFunctionCapturesAny(e.Table, names) || exprNestedFunctionCapturesAny(e.Index, names)
+	case *ast.FieldExpr:
+		return exprNestedFunctionCapturesAny(e.Table, names)
+	case *ast.CallExpr:
+		if exprNestedFunctionCapturesAny(e.Func, names) {
+			return true
+		}
+		for _, arg := range e.Args {
+			if exprNestedFunctionCapturesAny(arg, names) {
+				return true
+			}
+		}
+	case *ast.MethodCallExpr:
+		if exprNestedFunctionCapturesAny(e.Object, names) {
+			return true
+		}
+		for _, arg := range e.Args {
+			if exprNestedFunctionCapturesAny(arg, names) {
+				return true
+			}
+		}
+	case *ast.FuncLitExpr:
+		return functionBodyCapturesAny(e.Body, e.Params, names)
+	case *ast.AgentLitExpr:
+		return configNestedFunctionCapturesAny(e.Config, names) || blockNestedFunctionCapturesAny(e.Flow, names)
+	case *ast.TurnExpr:
+		return configNestedFunctionCapturesAny(e.Config, names)
+	case *ast.MessagesExpr:
+		for _, field := range e.Fields {
+			if exprNestedFunctionCapturesAny(field.Value, names) || exprNestedFunctionCapturesAny(field.Key, names) {
+				return true
+			}
+		}
+	case *ast.ListLitExpr:
+		for _, value := range e.Values {
+			if exprNestedFunctionCapturesAny(value, names) {
+				return true
+			}
+		}
+	case *ast.TableLitExpr:
+		for _, field := range e.Fields {
+			if exprNestedFunctionCapturesAny(field.Key, names) || exprNestedFunctionCapturesAny(field.Value, names) {
+				return true
+			}
+		}
+	case *ast.DenseLitExpr:
+		for _, value := range e.Values {
+			if exprNestedFunctionCapturesAny(value, names) {
+				return true
+			}
+		}
+	case *ast.RecvExpr:
+		return exprNestedFunctionCapturesAny(e.Channel, names)
+	case *ast.MakeChanExpr:
+		return exprNestedFunctionCapturesAny(e.Size, names)
+	}
+	return false
+}
+
+func configNestedFunctionCapturesAny(config []ast.ConfigField, names map[string]bool) bool {
+	for _, field := range config {
+		if exprNestedFunctionCapturesAny(field.Key, names) || exprNestedFunctionCapturesAny(field.Value, names) {
+			return true
+		}
+	}
+	return false
 }
 
 // ---- ReturnStmt ----

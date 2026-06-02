@@ -73,6 +73,10 @@ func TestSpecLeiaCodeFencesAreExecutableOrExplicitlyNonExecutable(t *testing.T) 
 			if !strings.HasPrefix(info, "leia") {
 				continue
 			}
+			if info == "leia run" || info == "leia fail" {
+				bad = append(bad, entry.Name()+":"+strconv.Itoa(i+1)+": stable spec examples must use all execution modes: ```"+info)
+				continue
+			}
 			if _, ok := specExampleModes(info); ok {
 				continue
 			}

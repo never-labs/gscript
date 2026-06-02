@@ -14,13 +14,13 @@ Stable identifiers are ASCII. Non-ASCII code points may appear in comments and
 strings. Future revisions may extend identifier characters, but portable source
 should use ASCII identifiers.
 
-```leia run
+```leia run all
 // Non-ASCII text is stable in comments and strings.
 text := "cafe"
 assert(text == "cafe")
 ```
 
-```leia fail
+```leia fail all
 cafeé := 1
 ```
 
@@ -55,7 +55,7 @@ them being accepted, ignored, preserved, rejected, or reported in inspection
 output. Regardless of those diagnostics, an unknown file directive must not gain
 execution behavior or silently grant capabilities.
 
-```leia run
+```leia run all
 //leia:build linux,darwin
 //leia:test smoke
 //leia:cap fs.read

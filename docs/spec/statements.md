@@ -126,7 +126,7 @@ assert(keySum == 6)
 assert(sum == 60)
 ```
 
-```leia run
+```leia run all
 calls := {}
 
 for _, value := range pairs({10, 20, 30}) {

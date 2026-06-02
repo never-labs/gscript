@@ -83,6 +83,9 @@ func TestReleaseMatrixGrammarAppendixMatchesParserSurface(t *testing.T) {
 		`additive = multiplicative { ( "+" | "-" | "|" | "^" ) multiplicative } ;`,
 		`multiplicative = unary { ( "*" | "/" | "%" | "<<" | ">>" | "&" | "&^" ) unary } ;`,
 		`dense_type = "i32" | "i64" | "f32" | "f64" | "bool" ;`,
+		`escaped_char = "\\" ( "\\" | '"' | "a" | "b" | "f" | "n" | "r" | "t" | "v"`,
+		`| decimal_escape ) ;`,
+		`decimal_escape = digit [ digit [ digit ] ] ;`,
 	} {
 		if !strings.Contains(grammar, production) {
 			t.Fatalf("docs/spec/grammar.ebnf must include parser-aligned production %q", production)

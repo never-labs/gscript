@@ -38,6 +38,28 @@ func compileAndRun(t *testing.T, src string) map[string]runtime.Value {
 	return globals
 }
 
+func TestForRangeCapturedVariablesAreFreshPerIteration(t *testing.T) {
+	globals := compileAndRun(t, `
+calls := {}
+
+for _, value := range pairs({10, 20, 30}) {
+    calls[#calls + 1] = func() {
+        return value
+    }
+}
+
+r1 := calls[1]()
+r2 := calls[2]()
+r3 := calls[3]()
+`)
+	for name, want := range map[string]int64{"r1": 10, "r2": 20, "r3": 30} {
+		got := globals[name]
+		if !got.IsInt() || got.Int() != want {
+			t.Fatalf("%s = %s, want %d", name, got.String(), want)
+		}
+	}
+}
+
 func TestDenseArrayNumericLiteralIndex(t *testing.T) {
 	globals := compileAndRun(t, `
 func make_selected() {

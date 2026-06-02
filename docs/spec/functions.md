@@ -174,7 +174,7 @@ assert(a == 10)
 assert(b == nil)
 ```
 
-```leia run
+```leia run all
 func triple() {
     return 10, 20, 30
 }

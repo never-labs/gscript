@@ -2646,9 +2646,12 @@ hex_digit      = digit | &quot;A&quot;..&quot;F&quot; | &quot;a&quot;..&quot;f&q
 string_lit     = quoted_string | raw_string ;
 quoted_string  = &#x27;&quot;&#x27; { escaped_char | any_char_except_quote_or_newline } &#x27;&quot;&#x27; ;
 raw_string     = &quot;`&quot; { any_char_except_backtick } &quot;`&quot; ;
-escaped_char   = &quot;\\&quot; ( &quot;\\&quot; | &#x27;&quot;&#x27; | &quot;n&quot; | &quot;r&quot; | &quot;t&quot; | &quot;0&quot; | &quot;x&quot; hex_digit hex_digit
+escaped_char   = &quot;\\&quot; ( &quot;\\&quot; | &#x27;&quot;&#x27; | &quot;a&quot; | &quot;b&quot; | &quot;f&quot; | &quot;n&quot; | &quot;r&quot; | &quot;t&quot; | &quot;v&quot;
+                    | &quot;x&quot; hex_digit hex_digit
                     | &quot;u&quot; hex_digit hex_digit hex_digit hex_digit
-                    | &quot;U&quot; hex_digit hex_digit hex_digit hex_digit hex_digit hex_digit hex_digit hex_digit ) ;
+                    | &quot;U&quot; hex_digit hex_digit hex_digit hex_digit hex_digit hex_digit hex_digit hex_digit
+                    | decimal_escape ) ;
+decimal_escape = digit [ digit [ digit ] ] ;
 any_char_except_quote_or_newline
                = ? any Unicode scalar value except &#x27;&quot;&#x27; and newline ? ;
 any_char_except_backtick
