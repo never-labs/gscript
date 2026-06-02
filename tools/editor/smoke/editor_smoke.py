@@ -148,6 +148,7 @@ def check_vscode() -> None:
         "startLanguageServer(context)",
         "textDocument/definition",
         "textDocument/references",
+        "textDocument/prepareRename",
         "textDocument/rename",
         "workspace/symbol",
         "textDocument/codeLens",

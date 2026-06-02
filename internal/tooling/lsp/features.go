@@ -113,6 +113,11 @@ type renameParams struct {
 	NewName      string                 `json:"newName"`
 }
 
+type prepareRenameResult struct {
+	Range       lspRange `json:"range"`
+	Placeholder string   `json:"placeholder"`
+}
+
 type location struct {
 	URI   string   `json:"uri"`
 	Range lspRange `json:"range"`
@@ -189,6 +194,25 @@ func (s *Server) references(id *json.RawMessage, params json.RawMessage) error {
 		out = append(out, location{URI: p.TextDocument.URI, Range: r})
 	}
 	return s.respondMaybe(id, out, nil)
+}
+
+func (s *Server) prepareRename(id *json.RawMessage, params json.RawMessage) error {
+	var p textDocumentPositionParams
+	if err := json.Unmarshal(params, &p); err != nil {
+		return s.respondMaybe(id, nil, &responseError{Code: errCodeInvalidParams, Message: err.Error()})
+	}
+	src, ok := s.documentText(p.TextDocument.URI)
+	if !ok {
+		return s.respondMaybe(id, nil, nil)
+	}
+	word, wordRange := wordAtPosition(src, p.Position)
+	if word == "" || !validIdentifierName(word) {
+		return s.respondMaybe(id, nil, nil)
+	}
+	if len(wordReferences(src, word)) == 0 {
+		return s.respondMaybe(id, nil, nil)
+	}
+	return s.respondMaybe(id, prepareRenameResult{Range: wordRange, Placeholder: word}, nil)
 }
 
 func (s *Server) rename(id *json.RawMessage, params json.RawMessage) error {

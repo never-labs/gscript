@@ -338,6 +338,7 @@ class MinimalLanguageClient {
         provideReferences: (doc, pos, context) => this.provideReferences(doc, pos, context)
       }),
       vscode.languages.registerRenameProvider("leia", {
+        prepareRename: (doc, pos) => this.prepareRename(doc, pos),
         provideRenameEdits: (doc, pos, newName) => this.provideRenameEdits(doc, pos, newName)
       }),
       vscode.languages.registerDocumentFormattingEditProvider("leia", {
@@ -498,6 +499,18 @@ class MinimalLanguageClient {
     }).then((result) =>
       (result || []).map((loc) => new vscode.Location(vscode.Uri.parse(loc.uri), lspRange(loc.range)))
     );
+  }
+
+  prepareRename(doc, pos) {
+    return this.request("textDocument/prepareRename", lspPositionParams(doc, pos)).then((result) => {
+      if (!result) {
+        return undefined;
+      }
+      return {
+        range: lspRange(result.range),
+        placeholder: result.placeholder || doc.getText(lspRange(result.range))
+      };
+    });
   }
 
   provideRenameEdits(doc, pos, newName) {

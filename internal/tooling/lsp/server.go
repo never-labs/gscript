@@ -133,6 +133,8 @@ func (s *Server) handle(payload []byte) error {
 		return s.definition(req.ID, req.Params)
 	case "textDocument/references":
 		return s.references(req.ID, req.Params)
+	case "textDocument/prepareRename":
+		return s.prepareRename(req.ID, req.Params)
 	case "textDocument/rename":
 		return s.rename(req.ID, req.Params)
 	case "workspace/symbol":
@@ -155,10 +157,12 @@ func initializeResult() map[string]any {
 			"codeLensProvider": map[string]any{
 				"resolveProvider": false,
 			},
-			"inlayHintProvider":       true,
-			"definitionProvider":      true,
-			"referencesProvider":      true,
-			"renameProvider":          true,
+			"inlayHintProvider":  true,
+			"definitionProvider": true,
+			"referencesProvider": true,
+			"renameProvider": map[string]any{
+				"prepareProvider": true,
+			},
 			"workspaceSymbolProvider": true,
 			"completionProvider": map[string]any{
 				"triggerCharacters": []string{".", ":"},

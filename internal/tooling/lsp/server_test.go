@@ -55,7 +55,8 @@ func TestServerInitializeShutdown(t *testing.T) {
 	if caps["inlayHintProvider"] != true {
 		t.Fatalf("initialize result missing inlay hint capability: %#v", caps)
 	}
-	if caps["definitionProvider"] != true || caps["referencesProvider"] != true || caps["renameProvider"] != true {
+	renameProvider, ok := caps["renameProvider"].(map[string]any)
+	if caps["definitionProvider"] != true || caps["referencesProvider"] != true || !ok || renameProvider["prepareProvider"] != true {
 		t.Fatalf("initialize result missing navigation capabilities: %#v", caps)
 	}
 	if got := msgs[1]["id"]; got != float64(2) {
@@ -640,6 +641,15 @@ func TestDefinitionReferencesAndRename(t *testing.T) {
 		map[string]any{
 			"jsonrpc": "2.0",
 			"id":      22,
+			"method":  "textDocument/prepareRename",
+			"params": map[string]any{
+				"textDocument": map[string]any{"uri": "file:///tmp/nav.leia"},
+				"position":     map[string]any{"line": 0, "character": 6},
+			},
+		},
+		map[string]any{
+			"jsonrpc": "2.0",
+			"id":      23,
 			"method":  "textDocument/rename",
 			"params": map[string]any{
 				"textDocument": map[string]any{"uri": "file:///tmp/nav.leia"},
@@ -655,8 +665,8 @@ func TestDefinitionReferencesAndRename(t *testing.T) {
 	}
 
 	msgs := readOutputMessages(t, out.Bytes())
-	if len(msgs) != 4 {
-		t.Fatalf("expected diagnostics notification and 3 navigation responses, got %d: %#v", len(msgs), msgs)
+	if len(msgs) != 5 {
+		t.Fatalf("expected diagnostics notification and 4 navigation responses, got %d: %#v", len(msgs), msgs)
 	}
 	def := msgs[1]["result"].(map[string]any)
 	defRange := def["range"].(map[string]any)
@@ -670,7 +680,17 @@ func TestDefinitionReferencesAndRename(t *testing.T) {
 		t.Fatalf("references = %#v, want declaration plus two calls", refs)
 	}
 
-	edit := msgs[3]["result"].(map[string]any)
+	prep := msgs[3]["result"].(map[string]any)
+	if prep["placeholder"] != "add" {
+		t.Fatalf("prepareRename = %#v, want placeholder add", prep)
+	}
+	prepRange := prep["range"].(map[string]any)
+	prepStart := prepRange["start"].(map[string]any)
+	if prepStart["line"] != float64(0) || prepStart["character"] != float64(5) {
+		t.Fatalf("prepareRename range = %#v, want add declaration at 0:5", prepRange)
+	}
+
+	edit := msgs[4]["result"].(map[string]any)
 	changes := edit["changes"].(map[string]any)
 	edits := changes["file:///tmp/nav.leia"].([]any)
 	if len(edits) != 3 {
@@ -720,6 +740,44 @@ func TestRenameRejectsInvalidIdentifier(t *testing.T) {
 	}
 	if msgs[1]["error"] == nil {
 		t.Fatalf("rename response = %#v, want error for invalid identifier", msgs[1])
+	}
+}
+
+func TestPrepareRenameReturnsNilOutsideIdentifier(t *testing.T) {
+	input := mustEncodeMessages(t,
+		map[string]any{
+			"jsonrpc": "2.0",
+			"method":  "textDocument/didOpen",
+			"params": map[string]any{
+				"textDocument": map[string]any{
+					"uri":        "file:///tmp/prepare-empty.leia",
+					"languageId": "leia",
+					"version":    1,
+					"text":       "func add() { return 1 }\n",
+				},
+			},
+		},
+		map[string]any{
+			"jsonrpc": "2.0",
+			"id":      24,
+			"method":  "textDocument/prepareRename",
+			"params": map[string]any{
+				"textDocument": map[string]any{"uri": "file:///tmp/prepare-empty.leia"},
+				"position":     map[string]any{"line": 0, "character": 4},
+			},
+		},
+	)
+	var out bytes.Buffer
+	err := NewServer().Run(context.Background(), bytes.NewReader(input), &out)
+	if err != nil {
+		t.Fatalf("Run returned error: %v", err)
+	}
+	msgs := readOutputMessages(t, out.Bytes())
+	if len(msgs) != 2 {
+		t.Fatalf("expected diagnostics notification and prepareRename response, got %d: %#v", len(msgs), msgs)
+	}
+	if got, ok := msgs[1]["result"]; !ok || got != nil {
+		t.Fatalf("prepareRename response = %#v, want nil result", msgs[1])
 	}
 }
 
