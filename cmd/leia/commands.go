@@ -26,7 +26,7 @@ func cliCommands() []cliCommandSpec {
 		{Name: "diagnose", Usage: "usage: leia diagnose <benchmark> [diagnose-flags...]", Summary: "Collect benchmark timing, exit, and Tier 2 diagnostics.", Run: runDiagnoseCommand},
 		{Name: "doc", Usage: "usage: leia doc [generate|check] [flags]", Summary: "Generate reference docs or validate repository docs.", Run: runDocCommand},
 		{Name: "eval", Usage: "usage: leia eval [--vm] [--jit=true|false] <source> [args...]", Summary: "Execute source passed on the command line.", Run: runEvalCommand},
-		{Name: "evaluate", Usage: "usage: leia evaluate [--json|--format=text] [--output FILE] [--list] [--filter TEXT] [--replay FILE|--record FILE|--update-golden FILE] [path-or-dir...]", Summary: "Run evaluate blocks and emit an agent evaluation report.", Run: runEvaluateCommand},
+		{Name: "evaluate", Usage: "usage: leia evaluate [--json|--format=text|json|html] [--report FILE] [--gate] [--list] [--filter TEXT] [--replay FILE|--record FILE|--update-golden FILE] [path-or-dir...]", Summary: "Run evaluate blocks and emit an agent evaluation report.", Run: runEvaluateCommand},
 		{Name: "env", Usage: "usage: leia env [--json] [--path PATH]", Summary: "Report toolchain, project, cache, and platform environment.", Run: runEnvCommand},
 		{Name: "fmt", Usage: "usage: leia fmt [--check] [--write] [--stdin-file-name FILE] <path-or-dir> [...]", Summary: "Normalize source formatting.", Run: runFmtCommand},
 		{Name: "help", Usage: "usage: leia help [command]", Summary: "Show command help.", Run: runHelpCommand},

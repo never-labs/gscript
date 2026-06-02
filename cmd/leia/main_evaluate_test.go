@@ -72,7 +72,8 @@ func TestEvaluateCommandHelpExplainsReplayModes(t *testing.T) {
 		"usage: leia evaluate [options] [path-or-dir...]",
 		"Run source-level evaluate blocks",
 		"Examples:",
-		"--output eval-report.json",
+		"--report eval-report.json",
+		"--format=html --report eval-report.html",
 		"--replay examples/evaluate/agent_replay.records.json",
 		"LLM fixture modes are mutually exclusive:",
 		"--record",
@@ -117,6 +118,55 @@ func TestEvaluateCommandWritesReportToOutputFile(t *testing.T) {
 	}
 }
 
+func TestEvaluateCommandWritesHTMLReportAlias(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "checks.leia")
+	src := `evaluate "html report" {
+    eval.metric("correct", true)
+    eval.case("row_1", func() {
+        eval.metric("score", 0.75)
+        assert(true)
+    })
+}
+`
+	if err := os.WriteFile(path, []byte(src), 0644); err != nil {
+		t.Fatal(err)
+	}
+	reportPath := filepath.Join(dir, "eval-report.html")
+	var stdout, stderr bytes.Buffer
+	code := runEvaluateCommand([]string{"--format=html", "--report", reportPath, path}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runEvaluateCommand code = %d, stderr = %q", code, stderr.String())
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("stdout = %q, want empty", stdout.String())
+	}
+	data, err := os.ReadFile(reportPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	html := string(data)
+	for _, want := range []string{"<!doctype html>", "Leia Evaluate Report", "html report", "row_1", "correct", "score", "mean 0.75"} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("html report missing %q:\n%s", want, html)
+		}
+	}
+}
+
+func TestEvaluateCommandRejectsConflictingOutputAliases(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := runEvaluateCommand([]string{"--output", "a.json", "--report", "b.json"}, &stdout, &stderr)
+	if code != 2 {
+		t.Fatalf("runEvaluateCommand code = %d, stderr = %q", code, stderr.String())
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("stdout = %q, want empty", stdout.String())
+	}
+	if !strings.Contains(stderr.String(), "--output and --report specify different files") {
+		t.Fatalf("stderr = %q", stderr.String())
+	}
+}
+
 func TestEvaluateCommandWritesFailedReportToOutputFile(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "checks.leia")
@@ -146,6 +196,27 @@ func TestEvaluateCommandWritesFailedReportToOutputFile(t *testing.T) {
 	}
 	if report.Status != "failed" || len(report.Cases) != 1 || report.Cases[0].Status != "failed" {
 		t.Fatalf("report = %#v", report)
+	}
+}
+
+func TestEvaluateCommandGateFlagKeepsFailureExit(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "fail.leia")
+	src := `evaluate "gate failure" {
+    assert(false, "boom")
+}
+`
+	if err := os.WriteFile(path, []byte(src), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runEvaluateCommand([]string{"--gate", "--format=text", path}, &stdout, &stderr)
+	if code != 1 {
+		t.Fatalf("runEvaluateCommand code = %d, stderr = %q", code, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "evaluate: failed") {
+		t.Fatalf("stdout = %q", stdout.String())
 	}
 }
 

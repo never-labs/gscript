@@ -25,7 +25,7 @@ results:
 
 ```bash
 go run ./cmd/leia test --json --output test-report.json tests/smoke/01_basic.leia
-go run ./cmd/leia evaluate --json --output eval-report.json examples/evaluate/basic_assert.leia
+go run ./cmd/leia evaluate --json --report eval-report.json examples/evaluate/basic_assert.leia
 ```
 
 ## CI Profiles
