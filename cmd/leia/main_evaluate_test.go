@@ -225,6 +225,49 @@ func TestEvaluateCommandLLMReplay(t *testing.T) {
 	}
 }
 
+func TestEvaluateCommandLLMReplayMismatchFailsReport(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "llm_eval.leia")
+	src := `evaluate "cli replay mismatch" {
+    result, err := llm.turn({
+        model: "mock-fast",
+        messages: {llm.user("actual")},
+    })
+    assert(result == nil)
+    assert(err.message == "llm replay request mismatch at turn 0")
+}
+`
+	if err := os.WriteFile(path, []byte(src), 0644); err != nil {
+		t.Fatal(err)
+	}
+	recordPath := filepath.Join(dir, "records.json")
+	if err := llm.SaveRecords(recordPath, []llm.Record{{
+		Request: llm.TurnRequest{
+			Model:    "mock-fast",
+			Messages: []llm.Message{{Role: "user", Text: "expected"}},
+		},
+		Result: llm.TurnResult{Status: "final_answer", Text: "unused"},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runEvaluateCommand([]string{"--format=json", "--llm-replay", recordPath, path}, &stdout, &stderr)
+	if code != 1 {
+		t.Fatalf("runEvaluateCommand code = %d, stderr = %q", code, stderr.String())
+	}
+	var report evaluate.Report
+	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
+		t.Fatalf("decode report: %v\n%s", err, stdout.String())
+	}
+	if report.Status != "failed" || len(report.Cases) != 1 || report.Cases[0].Status != "passed" {
+		t.Fatalf("report = %#v", report)
+	}
+	if len(report.Findings) != 1 || report.Findings[0].Kind != "llm_replay_mismatch" {
+		t.Fatalf("findings = %#v", report.Findings)
+	}
+}
+
 func TestEvaluateCommandAgentReplayExample(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	code := runEvaluateCommand([]string{

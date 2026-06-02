@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -12,6 +13,7 @@ import (
 	"runtime/debug"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/never-labs/leia/internal/ast"
@@ -261,6 +263,10 @@ func Run(opts Options) (Report, error) {
 			run.report.ReplayedTurns = run.replayProvider.Consumed()
 			run.report.RemainingTurns = run.replayProvider.Remaining()
 		}
+		for _, finding := range run.replayMonitor.Findings() {
+			report.Status = "failed"
+			report.Findings = append(report.Findings, finding)
+		}
 		if remaining := run.replayProvider.Remaining(); remaining > 0 {
 			report.Status = "failed"
 			report.Findings = append(report.Findings, Finding{
@@ -340,6 +346,7 @@ type runContext struct {
 	recorder        *llm.Recorder
 	recordPath      string
 	replayProvider  *llm.ReplayProvider
+	replayMonitor   *replayMonitor
 	providerFactory runtime.LLMProviderFactory
 	report          *LLMRun
 }
@@ -365,6 +372,7 @@ func newRunContext(opts Options) (*runContext, error) {
 			return nil, err
 		}
 		run.replayProvider = llm.NewReplayProvider(records)
+		run.replayMonitor = &replayMonitor{provider: run.replayProvider}
 		run.report = &LLMRun{Mode: "replay", ReplayPath: opts.LLMReplayPath, LoadedTurns: len(records)}
 	}
 	if opts.LLMRecordPath != "" {
@@ -589,7 +597,7 @@ func executeCase(path string, prog *ast.Program, c parsedCase, run *runContext) 
 	stdlibinstall.Install(interp)
 	if run != nil {
 		if run.replayProvider != nil {
-			interp.SetLLMProvider(llmbridge.ProviderAdapter(run.replayProvider))
+			interp.SetLLMProvider(llmbridge.ProviderAdapter(run.replayMonitor))
 		}
 		if run.recorder != nil {
 			interp.SetLLMProviderFactory(recordingProviderFactory(run.providerFactory, run.recorder.Record))
@@ -605,6 +613,51 @@ func executeCase(path string, prog *ast.Program, c parsedCase, run *runContext) 
 		Stmts:          caseProgramStmts(prog.Stmts, c.Body.Stmts),
 		FileDirectives: append([]ast.FileDirective(nil), prog.FileDirectives...),
 	})
+}
+
+type replayMonitor struct {
+	provider *llm.ReplayProvider
+	mu       sync.Mutex
+	errors   []error
+}
+
+func (m *replayMonitor) Turn(ctx context.Context, req llm.TurnRequest) (llm.TurnResult, error) {
+	res, err := m.provider.Turn(ctx, req)
+	if err != nil {
+		var mismatch *llm.ReplayMismatchError
+		var exhausted *llm.ReplayExhaustedError
+		if errors.As(err, &mismatch) || errors.As(err, &exhausted) {
+			m.mu.Lock()
+			m.errors = append(m.errors, err)
+			m.mu.Unlock()
+		}
+	}
+	return res, err
+}
+
+func (m *replayMonitor) Findings() []Finding {
+	if m == nil {
+		return nil
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	var out []Finding
+	for _, err := range m.errors {
+		kind := "llm_replay_error"
+		var mismatch *llm.ReplayMismatchError
+		var exhausted *llm.ReplayExhaustedError
+		if errors.As(err, &mismatch) {
+			kind = "llm_replay_mismatch"
+		} else if errors.As(err, &exhausted) {
+			kind = "llm_replay_exhausted"
+		}
+		out = append(out, Finding{
+			Kind:     kind,
+			Severity: "error",
+			Message:  err.Error(),
+		})
+	}
+	return out
 }
 
 type recordingProvider struct {

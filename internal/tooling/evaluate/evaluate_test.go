@@ -359,6 +359,88 @@ func TestRunFailsWhenReplayHasUnconsumedTurns(t *testing.T) {
 	}
 }
 
+func TestRunFailsWhenReplayRequestMismatches(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "llm_eval.leia")
+	if err := os.WriteFile(path, []byte(`evaluate "request mismatch" {
+    result, err := llm.turn({
+        model: "mock-fast",
+        messages: {llm.user("actual")},
+    })
+    assert(result == nil)
+    assert(err != nil)
+    assert(err.message == "llm replay request mismatch at turn 0")
+}
+`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	recordPath := filepath.Join(dir, "records.json")
+	if err := llm.SaveRecords(recordPath, []llm.Record{{
+		Request: llm.TurnRequest{
+			Model:    "mock-fast",
+			Messages: []llm.Message{{Role: "user", Text: "expected"}},
+		},
+		Result: llm.TurnResult{Status: "final_answer", Text: "unused"},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+
+	report, err := Run(Options{Paths: []string{path}, LLMReplayPath: recordPath})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Status != "failed" || len(report.Cases) != 1 || report.Cases[0].Status != "passed" {
+		t.Fatalf("report = %#v", report)
+	}
+	if report.LLM == nil || report.LLM.ReplayedTurns != 1 || report.LLM.RemainingTurns != 0 {
+		t.Fatalf("llm report = %#v", report.LLM)
+	}
+	if len(report.Cases[0].Diagnostics) != 0 {
+		t.Fatalf("diagnostics = %#v", report.Cases[0].Diagnostics)
+	}
+	if len(report.Findings) != 1 || report.Findings[0].Kind != "llm_replay_mismatch" || !strings.Contains(report.Findings[0].Message, "llm replay request mismatch") {
+		t.Fatalf("findings = %#v", report.Findings)
+	}
+}
+
+func TestRunFailsWhenReplayIsExhausted(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "llm_eval.leia")
+	if err := os.WriteFile(path, []byte(`evaluate "replay exhausted" {
+    result, err := llm.turn({
+        model: "mock-fast",
+        messages: {llm.user("hello")},
+    })
+    assert(result == nil)
+    assert(err != nil)
+    assert(err.message == "llm replay exhausted at turn 0")
+}
+`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	recordPath := filepath.Join(dir, "records.json")
+	if err := llm.SaveRecords(recordPath, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	report, err := Run(Options{Paths: []string{path}, LLMReplayPath: recordPath})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Status != "failed" || len(report.Cases) != 1 || report.Cases[0].Status != "passed" {
+		t.Fatalf("report = %#v", report)
+	}
+	if report.LLM == nil || report.LLM.LoadedTurns != 0 || report.LLM.ReplayedTurns != 0 || report.LLM.RemainingTurns != 0 {
+		t.Fatalf("llm report = %#v", report.LLM)
+	}
+	if len(report.Cases[0].Diagnostics) != 0 {
+		t.Fatalf("diagnostics = %#v", report.Cases[0].Diagnostics)
+	}
+	if len(report.Findings) != 1 || report.Findings[0].Kind != "llm_replay_exhausted" || !strings.Contains(report.Findings[0].Message, "llm replay exhausted") {
+		t.Fatalf("findings = %#v", report.Findings)
+	}
+}
+
 func TestRunUpdateGoldenWritesLLMFixture(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "llm_eval.leia")
