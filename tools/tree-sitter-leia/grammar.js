@@ -224,7 +224,7 @@ module.exports = grammar({
 
     compound_assignment_statement: $ => seq(
       field("left", $.expression),
-      choice("+=", "-=", "*=", "/=", "%="),
+      choice("+=", "-=", "*=", "/="),
       field("right", $.expression),
     ),
 
@@ -325,7 +325,7 @@ module.exports = grammar({
       "}",
     )),
 
-    dense_type: _ => choice("i8", "i16", "i32", "i64", "u8", "u16", "u32", "u64", "f32", "f64", "bool"),
+    dense_type: _ => choice("i32", "i64", "f32", "f64", "bool"),
     field_separator: _ => choice(",", ";"),
 
     unary_expression: $ => prec(PREC.unary, seq(

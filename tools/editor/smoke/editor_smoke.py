@@ -60,6 +60,19 @@ def assert_match(grammar: dict, name: str, sample: str) -> None:
         fail(f"pattern {name} did not match {sample!r}")
 
 
+def assert_no_match(grammar: dict, name: str, sample: str) -> None:
+    pattern = pattern_by_name(grammar, name)
+    regex = pattern.get("match") or pattern.get("begin")
+    if not isinstance(regex, str):
+        fail(f"pattern {name} has no regex")
+    try:
+        compiled = re.compile(regex, re.MULTILINE)
+    except re.error as exc:
+        fail(f"pattern {name} does not compile: {exc}")
+    if compiled.search(sample):
+        fail(f"pattern {name} unexpectedly matched {sample!r}")
+
+
 def assert_path(path: str) -> None:
     if not (ROOT / path).is_file():
         fail(f"missing path {path}")
@@ -83,8 +96,13 @@ def check_textmate() -> None:
     assert_match(leia, "keyword.control.ai.leia", 'evaluate "answer can use lookup" {}')
     assert_match(leia, "support.type.primitive.leia", source)
     assert_match(leia, "support.type.primitive.leia", "ids := [3]i64{1, 2, 3}")
+    for unsupported in ("i8", "i16", "u8", "u16", "u32", "u64"):
+        assert_no_match(leia, "support.type.primitive.leia", f"ids := [3]{unsupported}{{1, 2, 3}}")
     assert_match(leia, "constant.numeric.duration.leia", source)
     assert_match(leia, "keyword.operator.leia", source)
+    operator_pattern = pattern_by_name(leia, "keyword.operator.leia")
+    if "%=" in str(operator_pattern.get("match", "")):
+        fail("Leia TextMate grammar still exposes unsupported %= compound assignment")
     assert_match(leia, "entity.name.function.leia", source)
 
     assert_match(leia_mod, "keyword.control.leia-mod", manifest)
@@ -148,6 +166,7 @@ def check_tree_sitter_assets() -> None:
     config = load_json(ROOT / "tools/tree-sitter-leia/tree-sitter.json")
     load_json(ROOT / "tools/tree-sitter-leia/src/grammar.json")
     node_types = load_json(ROOT / "tools/tree-sitter-leia/src/node-types.json")
+    grammar_js = (ROOT / "tools/tree-sitter-leia/grammar.js").read_text(encoding="utf-8")
 
     package_entry = package.get("tree-sitter", [{}])[0]
     if package_entry.get("scope") != "source.leia":
@@ -187,6 +206,10 @@ def check_tree_sitter_assets() -> None:
     ):
         if marker not in query:
             fail(f"tree-sitter highlight query missing {marker}")
+
+    for unsupported in ('"%="', '"i8"', '"i16"', '"u8"', '"u16"', '"u32"', '"u64"'):
+        if unsupported in grammar_js or unsupported in query:
+            fail(f"tree-sitter editor assets still expose unsupported token {unsupported}")
 
 
 def check_packaged_editor_integrations() -> None:

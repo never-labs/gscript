@@ -2,9 +2,7 @@
 ; Keep in sync with tools/tree-sitter-leia/queries/highlights.scm.
 
 [
-  "break"
   "case"
-  "continue"
   "default"
   "defer"
   "else"
@@ -13,7 +11,6 @@
   "go"
   "goto"
   "if"
-  "in"
   "range"
   "return"
   "select"
@@ -38,7 +35,6 @@
 
 [
   "as"
-  "var"
 ] @keyword
 
 [
@@ -46,8 +42,6 @@
   "false"
 ] @constant.builtin.boolean
 
-"nil" @constant.builtin
-"..." @punctuation.special
 
 (comment) @comment
 (string) @string
@@ -99,7 +93,6 @@
   "-="
   "*="
   "/="
-  "%="
 ] @operator
 
 [

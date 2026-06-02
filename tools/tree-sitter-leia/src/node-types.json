@@ -1717,10 +1717,6 @@
     "named": false
   },
   {
-    "type": "%=",
-    "named": false
-  },
-  {
     "type": "&",
     "named": false
   },
@@ -1962,19 +1958,11 @@
     "named": false
   },
   {
-    "type": "i16",
-    "named": false
-  },
-  {
     "type": "i32",
     "named": false
   },
   {
     "type": "i64",
-    "named": false
-  },
-  {
-    "type": "i8",
     "named": false
   },
   {
@@ -2031,22 +2019,6 @@
   },
   {
     "type": "turn",
-    "named": false
-  },
-  {
-    "type": "u16",
-    "named": false
-  },
-  {
-    "type": "u32",
-    "named": false
-  },
-  {
-    "type": "u64",
-    "named": false
-  },
-  {
-    "type": "u8",
     "named": false
   },
   {

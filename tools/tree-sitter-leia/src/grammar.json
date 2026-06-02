@@ -1250,10 +1250,6 @@
             {
               "type": "STRING",
               "value": "/="
-            },
-            {
-              "type": "STRING",
-              "value": "%="
             }
           ]
         },
@@ -2139,35 +2135,11 @@
       "members": [
         {
           "type": "STRING",
-          "value": "i8"
-        },
-        {
-          "type": "STRING",
-          "value": "i16"
-        },
-        {
-          "type": "STRING",
           "value": "i32"
         },
         {
           "type": "STRING",
           "value": "i64"
-        },
-        {
-          "type": "STRING",
-          "value": "u8"
-        },
-        {
-          "type": "STRING",
-          "value": "u16"
-        },
-        {
-          "type": "STRING",
-          "value": "u32"
-        },
-        {
-          "type": "STRING",
-          "value": "u64"
         },
         {
           "type": "STRING",

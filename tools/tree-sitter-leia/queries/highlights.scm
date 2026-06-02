@@ -1,9 +1,7 @@
 ; Leia tree-sitter highlights.
 
 [
-  "break"
   "case"
-  "continue"
   "default"
   "defer"
   "else"
@@ -12,7 +10,6 @@
   "go"
   "goto"
   "if"
-  "in"
   "range"
   "return"
   "select"
@@ -37,7 +34,6 @@
 
 [
   "as"
-  "var"
 ] @keyword
 
 [
@@ -45,8 +41,6 @@
   "false"
 ] @boolean
 
-"nil" @constant.builtin
-"..." @punctuation.special
 
 (comment) @comment
 (string) @string
@@ -73,7 +67,7 @@
 (vararg_parameter) @variable.parameter
 
 (call_expression
-  function: (identifier) @function.call)
+  function: (expression (identifier) @function.call))
 
 (method_call_expression
   method: (identifier) @function.method.call)
@@ -120,7 +114,6 @@
   "-="
   "*="
   "/="
-  "%="
 ] @operator
 
 [
