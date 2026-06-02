@@ -278,6 +278,10 @@ func BuildLLMLib(call ScriptFunctionCaller, provider func() LLMProvider, provide
 		if tv := opts.RawGetString("tools"); llmToolsListHasAgents(tv) {
 			opts.RawSetString("tools", llmNormalizeToolsValue(call, tv))
 		}
+		onStream := opts.RawGetString("on_stream")
+		if onStream.IsNil() {
+			onStream = opts.RawGetString("onStream")
+		}
 		p, providerErr := llmResolveProviderForModel(opts, modelAliases, currentProvider(), currentProviderFactory())
 		if !providerErr.IsNil() {
 			agentConfigMu.RUnlock()
@@ -304,10 +308,6 @@ func BuildLLMLib(call ScriptFunctionCaller, provider func() LLMProvider, provide
 			// model knows the requested shape. Auto-validation is left to the
 			// flow body via llm.validate_output.
 			opts.RawSetString("response_format", TableValue(llmJSONResponseFormatTable()))
-		}
-		onStream := opts.RawGetString("on_stream")
-		if onStream.IsNil() {
-			onStream = opts.RawGetString("onStream")
 		}
 		if !onStream.IsNil() {
 			if !onStream.IsFunction() {

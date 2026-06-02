@@ -224,6 +224,7 @@ func TestPlaygroundAIExamplesCoverRunnableWorkflowShapes(t *testing.T) {
 		"ai-one-line":          {"LEIA_GLM_OK"},
 		"ai-agent-shape":       {"MOCK_AI_OK"},
 		"ai-structured-output": {"\"product\":\"playground\""},
+		"ai-streaming":         {"streamed\tLEIA_GLM_OK", "final\tLEIA_GLM_OK"},
 		"ai-tool":              {"MOCK_TOOL_RESULT"},
 		"ai-memory":            {"project=ORCHID"},
 		"ai-agent-tool":        {"MOCK_TOOL_RESULT"},

@@ -463,6 +463,24 @@ func (playgroundMockLLMProvider) Turn(_ context.Context, req llm.TurnRequest) (l
 	return llm.TurnResult{Status: "final_answer", Text: "MOCK_AI_OK"}, nil
 }
 
+func (p playgroundMockLLMProvider) StreamTurn(ctx context.Context, req llm.TurnRequest, sink llm.StreamSink) (llm.TurnResult, error) {
+	res, err := p.Turn(ctx, req)
+	if err != nil || sink == nil || res.Text == "" {
+		return res, err
+	}
+	for i, token := range strings.Fields(res.Text) {
+		if i > 0 {
+			if err := sink(llm.StreamEvent{Type: "token", Token: " ", Text: " "}); err != nil {
+				return llm.TurnResult{}, err
+			}
+		}
+		if err := sink(llm.StreamEvent{Type: "token", Token: token, Text: token}); err != nil {
+			return llm.TurnResult{}, err
+		}
+	}
+	return res, nil
+}
+
 func wantsJSONObject(format any) bool {
 	if format == nil {
 		return false
@@ -929,6 +947,29 @@ print(result.text)`,
 if err != nil { print(err.message); return }
 ticket := json.decode(result.text)
 print(json.encode(ticket))`,
+		},
+		{
+			ID:       "ai-streaming",
+			Title:    "Streaming Tokens",
+			Section:  "AI Basics",
+			Summary:  "Use a turn callback to update UI state while still receiving the final provider result.",
+			Runnable: true,
+			Requires: "LLM provider",
+			Concepts: []string{
+				"`on_stream` receives provider token events as ordinary tables.",
+				"Providing `on_stream` automatically requests streaming.",
+				"The final `result.text` remains the authoritative complete answer.",
+			},
+			Source: `streamed := ""
+result, err := llm.turn({
+    user: "Reply exactly: LEIA_GLM_OK"
+    on_stream: func(event) {
+        streamed = streamed .. event.token
+    }
+})
+if err != nil { print(err.message); return }
+print("streamed", streamed)
+print("final", result.text)`,
 		},
 		{
 			ID:       "ai-tool",
