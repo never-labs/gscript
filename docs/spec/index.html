@@ -181,71 +181,178 @@ Repetition  = &quot;{&quot; Expression &quot;}&quot; ;</code></pre>
 <li>experimental behavior may change without compatibility guarantees.</li>
 </ul>
 <p>Examples are explanatory unless a surrounding section says they are normative.</p></section><section><h2 id="source-code-representation">Source Code Representation</h2>
-<p>Leia source files are UTF-8 text. Implementations may reject invalid UTF-8 or the NUL character. Source text is not normalized: distinct Unicode code point sequences remain distinct strings and comments.</p>
+<p>Leia source files are UTF-8 text. The stable source contract excludes invalid UTF-8 byte sequences and the NUL character. Implementations may reject either before lexing and tools may report them as source encoding errors rather than language syntax errors.</p>
+<p>Source text is not normalized. Distinct Unicode code point sequences remain distinct in comments and string literal contents, and implementations must not apply Unicode normalization before tokenization or before comparing string values.</p>
 <p>Stable identifiers are ASCII. Non-ASCII code points may appear in comments and strings. Future revisions may extend identifier characters, but portable source should use ASCII identifiers.</p>
+<pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-comment">// Non-ASCII text is stable in comments and strings.</span>
+text <span class="tok-operator">:=</span> <span class="tok-string">&quot;cafe&quot;</span>
+<span class="tok-builtin">assert</span>(text <span class="tok-operator">==</span> <span class="tok-string">&quot;cafe&quot;</span>)</code></pre>
+<pre class="language-leia leia-code"><code class="language-leia leia-code">cafeé <span class="tok-operator">:=</span> <span class="tok-number">1</span></code></pre>
 <p>Whitespace separates tokens but does not by itself terminate statements. Semicolons are optional separators in the public grammar.</p>
 <p>Comments have two forms:</p>
 <pre class="language-ebnf"><code class="language-ebnf">line_comment  = &quot;//&quot; { any_char_except_newline } ;
 block_comment = &quot;/*&quot; { any_char } &quot;*/&quot; ;</code></pre>
-<p>Line comments that begin with <code>//leia:</code> before the first parsed token in a file are file directives. Directives are metadata for tooling, sandbox policy, build selection, tests, and AI tool declarations. Directives do not execute and do not grant capabilities by themselves.</p>
-<p>Directive syntax and recognized keys are specified in <a href="#">File Directives</a>.</p></section><section><h2 id="lexical-elements">Lexical Elements</h2>
-<p>Tokens are identifiers, keywords, literals, operators, and punctuation. Implementations must choose the longest valid token when scanning source.</p>
+<p>Line comments that begin with the exact prefix <code>//leia:</code> and are attached to the first parsed token in a file are file directives. A file directive must appear before imports, declarations, statements, and any non-directive leading comment that separates it from the first token. <code>//@leia:</code>, <code>/* //leia:... */</code>, and <code>// leia:</code> are ordinary comments, not file directives.</p>
+<p>File directives are metadata for tooling, sandbox policy, build selection, and tests. They do not execute, import modules, skip tests, grant host capabilities, enable providers, or change expression and statement semantics by themselves. Tools and host applications decide how to interpret the metadata they recognize.</p>
+<p>The stable file directive kinds are the ones specified in <a href="#">File Directives</a>: <code>build</code>, <code>test</code>, <code>cap</code>, and <code>feature</code>. Implementations may report malformed arguments, unsupported argument values, duplicates, or unrecognized <code>//leia:</code> names as diagnostics when a tool or host policy validates directives. Unknown file directive names are not reserved extension points for user programs: portable source must not depend on them being accepted, ignored, preserved, rejected, or reported in inspection output. Regardless of those diagnostics, an unknown file directive must not gain execution behavior or silently grant capabilities.</p>
+<pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-directive">//leia:build linux,darwin</span>
+<span class="tok-directive">//leia:test smoke</span>
+<span class="tok-directive">//leia:cap fs.read</span>
+<span class="tok-directive">//leia:feature source-directives</span>
+<span class="tok-comment">//@leia:build ignored</span>
+ran <span class="tok-operator">:=</span> <span class="tok-constant">true</span>
+<span class="tok-builtin">assert</span>(ran)</code></pre>
+<p><code>//leia:</code> comments outside the file-directive position remain comments for this chapter. Other chapters may define declaration-local directive comments, such as AI tool metadata, but those comments are not file directives.</p></section><section><h2 id="lexical-elements">Lexical Elements</h2>
+<p>Tokens are identifiers, keywords, literals, operators, and punctuation. Whitespace and comments separate tokens but are not tokens themselves.</p>
+<p>Implementations must scan the longest valid token from the current byte position. For example, <code>...</code> is one ellipsis token, not <code>..</code> plus <code>.</code>, and <code>&lt;=</code> is one comparison token, not <code>&lt;</code> plus <code>=</code>.</p>
+<pre class="language-leia leia-code"><code class="language-leia leia-code">concat <span class="tok-operator">:=</span> <span class="tok-string">&quot;a&quot;</span> <span class="tok-operator">..</span> <span class="tok-string">&quot;b&quot;</span>
+ellipsis_seen <span class="tok-operator">:=</span> <span class="tok-constant">false</span>
+
+<span class="tok-keyword">func</span> collect(<span class="tok-operator">...</span>) {
+    ellipsis_seen <span class="tok-operator">=</span> <span class="tok-constant">true</span>
+}
+
+collect(<span class="tok-number">1</span>, <span class="tok-number">2</span>, <span class="tok-number">3</span>)
+
+<span class="tok-builtin">assert</span>(concat <span class="tok-operator">==</span> <span class="tok-string">&quot;ab&quot;</span>)
+<span class="tok-builtin">assert</span>(ellipsis_seen)</code></pre>
+<p>The parser may reject a token sequence even when every token is lexically valid.</p>
 <h3 id="lexical-elements-identifiers">Identifiers</h3>
-<pre class="language-ebnf"><code class="language-ebnf">identifier = ( &quot;A&quot;..&quot;Z&quot; | &quot;a&quot;..&quot;z&quot; | &quot;_&quot; )
-             { &quot;A&quot;..&quot;Z&quot; | &quot;a&quot;..&quot;z&quot; | &quot;0&quot;..&quot;9&quot; | &quot;_&quot; } ;
-digit      = &quot;0&quot;..&quot;9&quot; ;</code></pre>
-<p>Identifiers name variables, functions, labels, tools, agents, module aliases, and fields. Identifiers are case-sensitive.</p>
+<p>Identifiers are ASCII-only. They begin with an ASCII letter or underscore and continue with ASCII letters, ASCII digits, or underscores.</p>
+<pre class="language-ebnf"><code class="language-ebnf">identifier = ident_start { ident_continue } ;
+ident_start = &quot;A&quot;..&quot;Z&quot; | &quot;a&quot;..&quot;z&quot; | &quot;_&quot; ;
+ident_continue = ident_start | &quot;0&quot;..&quot;9&quot; ;</code></pre>
+<p>Identifiers name variables, functions, labels, tools, agents, module aliases, and fields. Identifiers are case-sensitive. Non-ASCII letters are not identifier characters in v1.0 source.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code">name <span class="tok-operator">:=</span> <span class="tok-string">&quot;leia&quot;</span>
 Name <span class="tok-operator">:=</span> <span class="tok-string">&quot;different binding&quot;</span>
 _scratch <span class="tok-operator">:=</span> <span class="tok-number">42</span>
+agent_name <span class="tok-operator">:=</span> <span class="tok-string">&quot;summarizer&quot;</span>
 
 <span class="tok-builtin">assert</span>(name <span class="tok-operator">==</span> <span class="tok-string">&quot;leia&quot;</span>)
 <span class="tok-builtin">assert</span>(Name <span class="tok-operator">==</span> <span class="tok-string">&quot;different binding&quot;</span>)
-<span class="tok-builtin">assert</span>(_scratch <span class="tok-operator">==</span> <span class="tok-number">42</span>)</code></pre>
+<span class="tok-builtin">assert</span>(_scratch <span class="tok-operator">==</span> <span class="tok-number">42</span>)
+<span class="tok-builtin">assert</span>(agent_name <span class="tok-operator">==</span> <span class="tok-string">&quot;summarizer&quot;</span>)</code></pre>
 <p>The identifiers <code>name</code> and <code>Name</code> are distinct. A digit may not be the first character of an identifier.</p>
+<pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-number">1</span>name <span class="tok-operator">:=</span> <span class="tok-string">&quot;not an identifier&quot;</span></code></pre>
 <h3 id="lexical-elements-keywords">Keywords</h3>
-<p>The following keywords are reserved and may not be used as identifiers.</p>
+<p>Reserved keywords are recognized only when the complete identifier spelling matches a keyword. Longer names that contain a keyword remain identifiers, so <code>func_name</code>, <code>returning</code>, and <code>iffoo</code> are ordinary identifiers.</p>
+<p>The following keywords are reserved and may not be used as identifiers:</p>
 <pre class="language-text"><code class="language-text">func return if else elseif for range break continue in var go chan defer const goto
 true false nil</code></pre>
-<p>AI-native words such as <code>agent</code>, <code>models</code>, <code>tool</code>, <code>turn</code>, <code>messages</code>, <code>flow</code>, and <code>budget</code> are contextual syntax words. They remain ordinary identifiers outside the grammar positions that use them.</p>
-<pre class="language-leia leia-code"><code class="language-leia leia-code">agent_name <span class="tok-operator">:=</span> <span class="tok-string">&quot;summarizer&quot;</span>
-turn_count <span class="tok-operator">:=</span> <span class="tok-number">1</span>
+<pre class="language-leia leia-code"><code class="language-leia leia-code">func_name <span class="tok-operator">:=</span> <span class="tok-string">&quot;ordinary identifier&quot;</span>
+returning <span class="tok-operator">:=</span> <span class="tok-constant">true</span>
+iffoo <span class="tok-operator">:=</span> <span class="tok-number">7</span>
 
-<span class="tok-builtin">assert</span>(agent_name <span class="tok-operator">==</span> <span class="tok-string">&quot;summarizer&quot;</span>)
-<span class="tok-builtin">assert</span>(turn_count <span class="tok-operator">==</span> <span class="tok-number">1</span>)</code></pre>
-<p>In a declaration position, contextual words introduce AI-native syntax:</p>
-<pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-contextual">agent</span> summarize(text) {
-    user: text
-}</code></pre>
-<h3 id="lexical-elements-literals">Literals</h3>
-<p>Numeric literals support decimal integers and floats plus <code>0x</code>, <code>0b</code>, and <code>0o</code> integer prefixes. Underscores may separate digits where accepted by the lexer. Decimal float forms include <code>1.25</code> and exponent forms such as <code>1e3</code>.</p>
-<pre class="language-leia leia-code"><code class="language-leia leia-code">decimal <span class="tok-operator">:=</span> <span class="tok-number">1000000</span>
+<span class="tok-builtin">assert</span>(func_name <span class="tok-operator">==</span> <span class="tok-string">&quot;ordinary identifier&quot;</span>)
+<span class="tok-builtin">assert</span>(returning <span class="tok-operator">==</span> <span class="tok-constant">true</span>)
+<span class="tok-builtin">assert</span>(iffoo <span class="tok-operator">==</span> <span class="tok-number">7</span>)</code></pre>
+<pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-keyword">func</span> <span class="tok-operator">:=</span> <span class="tok-string">&quot;reserved&quot;</span></code></pre>
+<p>AI-native words such as <code>agent</code>, <code>models</code>, <code>tool</code>, <code>turn</code>, <code>messages</code>, <code>evaluate</code>, <code>case</code>, <code>expect</code>, <code>flow</code>, and <code>budget</code> are contextual syntax words, not lexical keywords. They scan as identifiers outside grammar positions that assign them AI-native meaning.</p>
+<pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-contextual">agent</span> <span class="tok-operator">:=</span> <span class="tok-string">&quot;identifier&quot;</span>
+<span class="tok-keyword">tool</span> <span class="tok-operator">:=</span> <span class="tok-string">&quot;identifier&quot;</span>
+<span class="tok-contextual">turn</span> <span class="tok-operator">:=</span> <span class="tok-number">1</span>
+<span class="tok-contextual">budget</span> <span class="tok-operator">:=</span> <span class="tok-number">2</span>
+
+<span class="tok-builtin">assert</span>(<span class="tok-contextual">agent</span> <span class="tok-operator">==</span> <span class="tok-string">&quot;identifier&quot;</span>)
+<span class="tok-builtin">assert</span>(<span class="tok-keyword">tool</span> <span class="tok-operator">==</span> <span class="tok-string">&quot;identifier&quot;</span>)
+<span class="tok-builtin">assert</span>(<span class="tok-contextual">turn</span> <span class="tok-operator">+</span> <span class="tok-contextual">budget</span> <span class="tok-operator">==</span> <span class="tok-number">3</span>)</code></pre>
+<p>In grammar positions that define AI-native forms, contextual words are consumed by that syntax rather than bound as ordinary identifiers. See <a href="#">AI-Native Constructs</a> for the stable forms.</p>
+<h3 id="lexical-elements-numeric-literals">Numeric Literals</h3>
+<p>Numeric literals are unsigned tokens. Unary <code>+</code> and <code>-</code> are separate operators. The stable v1.0 numeric forms are decimal integers, decimal floats, and base-prefixed integers.</p>
+<pre class="language-ebnf"><code class="language-ebnf">number_lit  = decimal_int [ fraction ] [ exponent ]
+            | decimal_int exponent
+            | based_int ;
+decimal_int = digit { [ &quot;_&quot; ] digit } ;
+fraction    = &quot;.&quot; digit { [ &quot;_&quot; ] digit } ;
+exponent    = ( &quot;e&quot; | &quot;E&quot; ) [ &quot;+&quot; | &quot;-&quot; ] digit { [ &quot;_&quot; ] digit } ;
+based_int   = &quot;0&quot; ( &quot;x&quot; | &quot;X&quot; ) hex_digits
+            | &quot;0&quot; ( &quot;b&quot; | &quot;B&quot; ) bin_digits
+            | &quot;0&quot; ( &quot;o&quot; | &quot;O&quot; ) oct_digits ;
+hex_digits  = hex_digit { [ &quot;_&quot; ] hex_digit } ;
+bin_digits  = bin_digit { [ &quot;_&quot; ] bin_digit } ;
+oct_digits  = oct_digit { [ &quot;_&quot; ] oct_digit } ;
+hex_digit   = digit | &quot;A&quot;..&quot;F&quot; | &quot;a&quot;..&quot;f&quot; ;
+bin_digit   = &quot;0&quot; | &quot;1&quot; ;
+oct_digit   = &quot;0&quot;..&quot;7&quot; ;
+digit       = &quot;0&quot;..&quot;9&quot; ;</code></pre>
+<p>For valid programs, an underscore may appear only between digits within the same digit sequence. It may not start or end a number, appear next to <code>.</code>, appear immediately after an exponent marker or exponent sign, or appear twice in a row. Current implementations may scan some wider base-prefixed spellings before numeric conversion rejects or accepts them; portable v1.0 source should use digits valid for the base and the underscore placement above.</p>
+<p>Decimal float forms include <code>1.25</code>, <code>1e3</code>, <code>1.25e2</code>, and <code>1_2.3_4e5_6</code>. A dot belongs to a number only when it is not the start of <code>..</code>; therefore <code>1..2</code> scans as <code>1</code>, <code>..</code>, <code>2</code>.</p>
+<pre class="language-leia leia-code"><code class="language-leia leia-code">decimal <span class="tok-operator">:=</span> <span class="tok-number">1_000_000</span>
 hex <span class="tok-operator">:=</span> <span class="tok-number">0xff</span>
 binary <span class="tok-operator">:=</span> <span class="tok-number">0b1010</span>
 octal <span class="tok-operator">:=</span> <span class="tok-number">0o755</span>
 float <span class="tok-operator">:=</span> <span class="tok-number">1.25e2</span>
+<span class="tok-builtin">spread</span> <span class="tok-operator">:=</span> <span class="tok-string">&quot;1&quot;</span> <span class="tok-operator">..</span> <span class="tok-string">&quot;2&quot;</span>
 
 <span class="tok-builtin">assert</span>(decimal <span class="tok-operator">==</span> <span class="tok-number">1000000</span>)
 <span class="tok-builtin">assert</span>(hex <span class="tok-operator">==</span> <span class="tok-number">255</span>)
 <span class="tok-builtin">assert</span>(binary <span class="tok-operator">==</span> <span class="tok-number">10</span>)
 <span class="tok-builtin">assert</span>(octal <span class="tok-operator">==</span> <span class="tok-number">493</span>)
-<span class="tok-builtin">assert</span>(float <span class="tok-operator">==</span> <span class="tok-number">125</span>)</code></pre>
-<p>String literals are quoted strings with escapes or raw backtick strings. Strings are byte strings; UTF-8 interpretation is provided by library helpers. Stable quoted-string escapes are <code>\\</code>, <code>\&quot;</code>, <code>\n</code>, <code>\r</code>, <code>\t</code>, <code>\0</code>, <code>\xNN</code>, <code>\uNNNN</code>, and <code>\UNNNNNNNN</code>. Raw strings do not process escapes and may not contain a backtick byte.</p>
+<span class="tok-builtin">assert</span>(float <span class="tok-operator">==</span> <span class="tok-number">125</span>)
+<span class="tok-builtin">assert</span>(<span class="tok-builtin">spread</span> <span class="tok-operator">==</span> <span class="tok-string">&quot;12&quot;</span>)</code></pre>
+<pre class="language-leia leia-code"><code class="language-leia leia-code">bad <span class="tok-operator">:=</span> <span class="tok-number">1</span>__2</code></pre>
+<pre class="language-leia leia-code"><code class="language-leia leia-code">bad <span class="tok-operator">:=</span> <span class="tok-number">1</span>e_2</code></pre>
+<h3 id="lexical-elements-string-literals">String Literals</h3>
+<p>Quoted string literals use double quotes and process escapes. Raw string literals use backticks and do not process escapes.</p>
+<pre class="language-ebnf"><code class="language-ebnf">quoted_string = &#x27;&quot;&#x27; { quoted_char | escape } &#x27;&quot;&#x27; ;
+raw_string    = &#x27;`&#x27; { any_byte_except_backtick } &#x27;`&#x27; ;
+escape        = &quot;\\&quot; | &quot;\&quot;&quot; | &quot;\a&quot; | &quot;\b&quot; | &quot;\f&quot; | &quot;\n&quot; | &quot;\r&quot; | &quot;\t&quot; | &quot;\v&quot;
+              | &quot;\x&quot; hex hex
+              | &quot;\u&quot; hex hex hex hex
+              | &quot;\U&quot; hex hex hex hex hex hex hex hex
+              | &quot;\&quot; decimal_escape ;
+decimal_escape = digit [ digit [ digit ] ] ;
+hex           = &quot;0&quot;..&quot;9&quot; | &quot;A&quot;..&quot;F&quot; | &quot;a&quot;..&quot;f&quot; ;</code></pre>
+<p>Stable quoted-string escapes are <code>\\</code>, <code>\&quot;</code>, <code>\a</code>, <code>\b</code>, <code>\f</code>, <code>\n</code>, <code>\r</code>, <code>\t</code>, <code>\v</code>, <code>\xNN</code>, <code>\uNNNN</code>, <code>\UNNNNNNNN</code>, and decimal byte escapes from <code>\0</code> through <code>\255</code>. Hex and Unicode escapes require exactly the specified number of hex digits. Unicode escapes must encode a valid Unicode scalar value.</p>
+<p>Strings are byte strings; UTF-8 interpretation is provided by library helpers. <code>&quot;\uNNNN&quot;</code> and <code>&quot;\UNNNNNNNN&quot;</code> append the UTF-8 bytes for the escaped rune.</p>
+<p>Raw strings may span lines, preserve every byte between the delimiters, and may not contain a backtick byte. Quoted strings may not contain an unescaped newline.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code">quoted <span class="tok-operator">:=</span> <span class="tok-string">&quot;line\n&quot;</span>
 raw <span class="tok-operator">:=</span> <span class="tok-string">`line\n`</span>
+unicode <span class="tok-operator">:=</span> <span class="tok-string">&quot;\u0041\U00000042&quot;</span>
+byte_escape <span class="tok-operator">:=</span> <span class="tok-string">&quot;\065&quot;</span>
 
 <span class="tok-builtin">assert</span>(<span class="tok-operator">#</span>quoted <span class="tok-operator">==</span> <span class="tok-number">5</span>)
-<span class="tok-builtin">assert</span>(<span class="tok-operator">#</span>raw <span class="tok-operator">==</span> <span class="tok-number">6</span>)</code></pre>
+<span class="tok-builtin">assert</span>(<span class="tok-operator">#</span>raw <span class="tok-operator">==</span> <span class="tok-number">6</span>)
+<span class="tok-builtin">assert</span>(unicode <span class="tok-operator">==</span> <span class="tok-string">&quot;AB&quot;</span>)
+<span class="tok-builtin">assert</span>(byte_escape <span class="tok-operator">==</span> <span class="tok-string">&quot;A&quot;</span>)</code></pre>
 <p>The first string contains a newline byte. The second contains the two bytes backslash and <code>n</code>.</p>
+<pre class="language-leia leia-code"><code class="language-leia leia-code">bad <span class="tok-operator">:=</span> <span class="tok-string">&quot;line
+break&quot;</span></code></pre>
 <p>Boolean and nil literals are <code>true</code>, <code>false</code>, and <code>nil</code>.</p>
+<h3 id="lexical-elements-comments-and-directives">Comments And Directives</h3>
+<p>Line comments begin with <code>//</code> and continue to the end of the line. Block comments begin with <code>/*</code> and end at the next <code>*/</code>; block comments do not nest. Comments are otherwise ignored for parsing.</p>
+<pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-comment">// A full-line comment.</span>
+x <span class="tok-operator">:=</span> <span class="tok-number">1</span> <span class="tok-comment">/* inline block comment */</span> <span class="tok-operator">+</span> <span class="tok-number">2</span>
+
+<span class="tok-builtin">assert</span>(x <span class="tok-operator">==</span> <span class="tok-number">3</span>)</code></pre>
+<p>File directives are line comments whose text begins with <code>leia:</code> after <code>//</code>. Directives attach to the following token when they are in the leading comment group for that token; blank-line separation starts a new group. Stable directive names and their semantic effects are specified by the directive and AI-native chapters. Lexically, a directive is still a line comment.</p>
+<pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-comment">// leia:requires docs.read</span>
+<span class="tok-comment">// leia:cap net.client</span>
+<span class="tok-contextual">agent</span> summarize(text) {
+    user: text
+}</code></pre>
+<pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-comment">/* block comments do not nest
+   /* inner */</span>
+<span class="tok-operator">*</span><span class="tok-operator">/</span>
+x <span class="tok-operator">:=</span> <span class="tok-number">1</span></code></pre>
 <h3 id="lexical-elements-operators-and-punctuation">Operators And Punctuation</h3>
 <p>The stable operator and punctuation tokens are:</p>
 <pre class="language-text"><code class="language-text">++ -- + - * / % ** .. # !
- += -= *= /= %= =
- := == != &lt; &lt;= &gt; &gt;=
+ += -= *= /=
+ = := == != &lt; &lt;= &gt; &gt;=
  &amp;&amp; || &amp; | ^ &amp;^ &lt;&lt; &gt;&gt;
  &lt;- ... . , ; : ( ) [ ] { }</code></pre>
-<p>The parser may reject a token sequence even when each token is lexically valid. For example, <code>a + * b</code> is lexically valid as tokens but invalid as an expression.</p></section><section><h2 id="declarations-and-scope">Declarations And Scope</h2>
+<p>Longest-token scanning applies to this table. For example, <code>+=</code> is one token, <code>++</code> is one token, <code>**</code> is one token, <code>...</code> is one token, and <code>&lt;-</code> is one token.</p>
+<pre class="language-leia leia-code"><code class="language-leia leia-code">x <span class="tok-operator">:=</span> <span class="tok-number">1</span>
+x <span class="tok-operator">+=</span> <span class="tok-number">2</span>
+y <span class="tok-operator">:=</span> <span class="tok-number">2</span> <span class="tok-operator">**</span> <span class="tok-number">3</span>
+bits <span class="tok-operator">:=</span> (<span class="tok-number">1</span> <span class="tok-operator">&lt;&lt;</span> <span class="tok-number">4</span>) <span class="tok-operator">|</span> <span class="tok-number">3</span>
+
+<span class="tok-builtin">assert</span>(x <span class="tok-operator">==</span> <span class="tok-number">3</span>)
+<span class="tok-builtin">assert</span>(y <span class="tok-operator">==</span> <span class="tok-number">8</span>)
+<span class="tok-builtin">assert</span>(bits <span class="tok-operator">==</span> <span class="tok-number">19</span>)</code></pre>
+<p>The parser may reject a token sequence even when each token is lexically valid. For example, <code>a + * b</code> is lexically valid as tokens but invalid as an expression.</p>
+<pre class="language-leia leia-code"><code class="language-leia leia-code">a <span class="tok-operator">:=</span> <span class="tok-number">1</span> <span class="tok-operator">+</span> <span class="tok-operator">*</span> <span class="tok-number">2</span></code></pre></section><section><h2 id="declarations-and-scope">Declarations And Scope</h2>
 <p>Leia uses lexical scope. A declaration creates a binding for an identifier in the innermost enclosing lexical block, or in module scope when the declaration appears at top level.</p>
 <p>For <code>:=</code>, <code>const</code>, <code>func</code>, and <code>import</code>, the declaration point is the end of the declaration statement. The new binding is visible after that point through the end of the block that owns it, including nested blocks and function literals created in that region. The initializer or right-hand side of a declaration is evaluated before the new binding is visible, so names in that expression resolve exactly as they would immediately before the declaration. Module-scope declarations are visible to later module-scope code and to nested blocks in the same module.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code">x <span class="tok-operator">:=</span> <span class="tok-number">10</span>
@@ -549,15 +656,14 @@ receivedFn <span class="tok-operator">:=</span> <span class="tok-operator">&lt;-
 <li>postfix call, index, and member selection;</li>
 <li>unary operators;</li>
 <li>exponentiation;</li>
-<li>multiplicative arithmetic;</li>
-<li>additive arithmetic and concatenation;</li>
-<li>shifts and bitwise operators;</li>
+<li>multiplicative arithmetic, shifts, bitwise and, and bit clear;</li>
+<li>additive arithmetic, bitwise or, and bitwise xor;</li>
+<li>concatenation;</li>
 <li>comparisons;</li>
 <li>logical <code>&amp;&amp;</code>;</li>
-<li>logical <code>||</code>;</li>
-<li>assignment forms.</li>
+<li>logical <code>||</code>.</li>
 </ol>
-<p>Parentheses override precedence. <code>&amp;&amp;</code> and <code>||</code> short-circuit and return operand values rather than coerced booleans. Unary logical negation is <code>!</code>.</p>
+<p>Parentheses override precedence. <code>..</code> and <code>**</code> are right-associative; other binary operators in the table above are left-associative. <code>&amp;&amp;</code> and <code>||</code> short-circuit and return operand values rather than coerced booleans. Unary logical negation is <code>!</code>. Unary <code>^</code> is bitwise not; binary <code>^</code> is bitwise xor. Assignment forms are statements, not expressions.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code">x <span class="tok-operator">:=</span> <span class="tok-number">1</span> <span class="tok-operator">+</span> <span class="tok-number">2</span> <span class="tok-operator">*</span> <span class="tok-number">3</span>      <span class="tok-comment">// 7</span>
 y <span class="tok-operator">:=</span> (<span class="tok-number">1</span> <span class="tok-operator">+</span> <span class="tok-number">2</span>) <span class="tok-operator">*</span> <span class="tok-number">3</span>    <span class="tok-comment">// 9</span>
 z <span class="tok-operator">:=</span> <span class="tok-constant">false</span> <span class="tok-operator">||</span> <span class="tok-string">&quot;ok&quot;</span>  <span class="tok-comment">// &quot;ok&quot;</span>
@@ -566,7 +672,12 @@ w <span class="tok-operator">:=</span> <span class="tok-constant">nil</span> <sp
 <span class="tok-builtin">assert</span>(x <span class="tok-operator">==</span> <span class="tok-number">7</span>)
 <span class="tok-builtin">assert</span>(y <span class="tok-operator">==</span> <span class="tok-number">9</span>)
 <span class="tok-builtin">assert</span>(z <span class="tok-operator">==</span> <span class="tok-string">&quot;ok&quot;</span>)
-<span class="tok-builtin">assert</span>(w <span class="tok-operator">==</span> <span class="tok-constant">nil</span>)</code></pre>
+<span class="tok-builtin">assert</span>(w <span class="tok-operator">==</span> <span class="tok-constant">nil</span>)
+<span class="tok-builtin">assert</span>(<span class="tok-number">1</span> <span class="tok-operator">|</span> <span class="tok-number">2</span> <span class="tok-operator">+</span> <span class="tok-number">4</span> <span class="tok-operator">==</span> <span class="tok-number">7</span>)
+<span class="tok-builtin">assert</span>(<span class="tok-number">1</span> <span class="tok-operator">&lt;&lt;</span> <span class="tok-number">2</span> <span class="tok-operator">*</span> <span class="tok-number">3</span> <span class="tok-operator">==</span> <span class="tok-number">12</span>)
+<span class="tok-builtin">assert</span>(<span class="tok-string">&quot;a&quot;</span> <span class="tok-operator">..</span> <span class="tok-string">&quot;b&quot;</span> <span class="tok-operator">..</span> <span class="tok-string">&quot;c&quot;</span> <span class="tok-operator">==</span> <span class="tok-string">&quot;abc&quot;</span>)</code></pre>
+<pre class="language-leia leia-code"><code class="language-leia leia-code">x <span class="tok-operator">:=</span> <span class="tok-number">1</span>
+y <span class="tok-operator">:=</span> (x <span class="tok-operator">=</span> <span class="tok-number">2</span>)</code></pre>
 <h3 id="expressions-calls">Calls</h3>
 <p>A call expression invokes a callable value. Calls may produce zero or more results. A call used where exactly one expression value is required contributes its first result, or <code>nil</code> when it produces no results. Expression-list positions are adjusted by the multi-return rules in <a href="#">Functions</a>.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-keyword">func</span> pair() {
@@ -578,6 +689,7 @@ first <span class="tok-operator">:=</span> pair()         <span class="tok-comme
 <p>The built-in <code>spread(x)</code> form preserves multiple results from a call in argument and table-constructor positions where explicit expansion is required.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code">values <span class="tok-operator">:=</span> {<span class="tok-number">1</span>, <span class="tok-builtin">spread</span>(pair()), <span class="tok-number">4</span>}
 <span class="tok-comment">// values is {1, &quot;a&quot;, &quot;b&quot;, 4}</span></code></pre>
+<p>Calls evaluate the callee expression before arguments, then evaluate arguments left-to-right. Index and member selection evaluate the receiver before the key or field lookup. These forms return the value produced or stored by the target; they do not create a fresh identity by themselves.</p>
 <h3 id="expressions-indexing-and-member-selection">Indexing And Member Selection</h3>
 <p><code>x[y]</code> indexes a table-like or host-backed value. <code>x.name</code> is member selection and is equivalent to a string-key field lookup where supported.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code">user <span class="tok-operator">:=</span> { name: <span class="tok-string">&quot;Ada&quot;</span> }
@@ -591,7 +703,8 @@ user[<span class="tok-string">&quot;score&quot;</span>] <span class="tok-operato
 <li>apply the operator&#x27;s stable primitive coercions, if any;</li>
 <li>otherwise consult the matching metamethod where metatables support that operator, then raise a runtime error if no applicable metamethod exists.</li>
 </ol>
-<p>Numeric arithmetic operators accept numbers and strings that <code>tonumber</code> can parse as numbers. Numeric string coercion is attempted before metamethod lookup for primitive strings. Invalid numeric strings and unsupported operand types raise runtime errors unless a matching metamethod applies to a non-primitive operand. Library functions such as <code>tonumber</code>, <code>tostring</code>, <code>math.tointeger</code>, and formatting helpers expose the same conversions explicitly.</p>
+<p>Numeric arithmetic operators accept numbers and strings that <code>tonumber</code> can parse as numbers. Numeric string coercion is attempted before metamethod lookup for primitive strings. Invalid numeric strings and unsupported operand types raise runtime errors unless a matching metamethod applies to a non-primitive operand. Library functions such as <code>tonumber</code>, <code>tostring</code>, <code>math.tointeger</code>, and formatting helpers expose related conversions explicitly.</p>
+<p>Bitwise operators first apply the numeric conversion used by <code>tonumber</code>, then convert the numeric result to an integer operand. Float values, including numeric strings that parse as floats, are truncated toward zero by the current runtime conversion. Negative shift counts raise runtime errors. Bitwise operators do not dispatch metamethods.</p>
 <div class="table-wrap"><table>
 <thead><tr><th>Operator</th><th>Operands and coercions</th><th>Result and errors</th><th>Metamethod</th></tr></thead>
 <tbody>
@@ -602,7 +715,7 @@ user[<span class="tok-string">&quot;score&quot;</span>] <span class="tok-operato
 <tr><td><code>%</code></td><td>Numbers or numeric strings.</td><td>Modulo follows Leia numeric modulo semantics. Invalid operands error.</td><td><code>__mod</code></td></tr>
 <tr><td><code>**</code></td><td>Numbers or numeric strings.</td><td>Exponentiation follows the math library&#x27;s power semantics. Invalid operands error.</td><td><code>__pow</code></td></tr>
 <tr><td>unary <code>-</code></td><td>Number or numeric string.</td><td>Numeric negation. Invalid operands error.</td><td><code>__unm</code></td></tr>
-<tr><td><code>..</code></td><td>Strings, numbers, and operands accepted by the runtime concatenation contract.</td><td>Concatenation returns a string for primitive operands. Invalid operands error.</td><td><code>__concat</code></td></tr>
+<tr><td><code>..</code></td><td>Strings and numbers.</td><td>Concatenation returns a string for primitive operands. Invalid operands error unless a metamethod applies.</td><td><code>__concat</code></td></tr>
 <tr><td><code>#</code></td><td>String, table-like value, or host-backed value with length support.</td><td>Strings return byte length. Tables use ordinary sequence/metatable length behavior. Invalid operands error.</td><td><code>__len</code>; <code>rawlen</code> bypasses it</td></tr>
 <tr><td><code>==</code></td><td>Any values.</td><td>Primitive values compare by value. Tables, functions, channels, coroutines, and host values compare by identity unless stable equality metamethod dispatch applies.</td><td><code>__eq</code></td></tr>
 <tr><td><code>!=</code></td><td>Any values.</td><td>Logical negation of <code>==</code>, including any stable <code>__eq</code> dispatch.</td><td><code>__eq</code></td></tr>
@@ -613,12 +726,13 @@ user[<span class="tok-string">&quot;score&quot;</span>] <span class="tok-operato
 <tr><td><code>&amp;&amp;</code></td><td>Any values.</td><td>Returns the left operand when it is falsy; otherwise evaluates and returns the right operand.</td><td>none</td></tr>
 <tr><td><code>||</code></td><td>Any values.</td><td>Returns the left operand when it is truthy; otherwise evaluates and returns the right operand.</td><td>none</td></tr>
 <tr><td><code>!</code></td><td>Any value.</td><td>Returns <code>true</code> for <code>nil</code> and <code>false</code>; returns <code>false</code> for every other value.</td><td>none</td></tr>
-<tr><td><code>&amp;</code></td><td>Numbers or numeric strings convertible to integers by runtime integer conversion.</td><td>Bitwise and. Invalid or non-integral operands error.</td><td>none</td></tr>
-<tr><td><code>|</code></td><td>Numbers or numeric strings convertible to integers by runtime integer conversion.</td><td>Bitwise or. Invalid or non-integral operands error.</td><td>none</td></tr>
-<tr><td><code>^</code></td><td>Numbers or numeric strings convertible to integers by runtime integer conversion.</td><td>Bitwise xor. Invalid or non-integral operands error.</td><td>none</td></tr>
-<tr><td><code>&amp;^</code></td><td>Numbers or numeric strings convertible to integers by runtime integer conversion.</td><td>Bit clear. Invalid or non-integral operands error.</td><td>none</td></tr>
-<tr><td><code>&lt;&lt;</code></td><td>Integer-convertible left and shift count operands; numeric strings are accepted through the same conversion.</td><td>Left shift. Invalid operands error.</td><td>none</td></tr>
-<tr><td><code>&gt;&gt;</code></td><td>Integer-convertible left and shift count operands; numeric strings are accepted through the same conversion.</td><td>Right shift. Invalid operands error.</td><td>none</td></tr>
+<tr><td><code>&amp;</code></td><td>Numbers or numeric strings accepted by bitwise conversion.</td><td>Bitwise and. Invalid operands error.</td><td>none</td></tr>
+<tr><td><code>|</code></td><td>Numbers or numeric strings accepted by bitwise conversion.</td><td>Bitwise or. Invalid operands error.</td><td>none</td></tr>
+<tr><td>binary <code>^</code></td><td>Numbers or numeric strings accepted by bitwise conversion.</td><td>Bitwise xor. Invalid operands error.</td><td>none</td></tr>
+<tr><td>unary <code>^</code></td><td>Number or numeric string accepted by bitwise conversion.</td><td>Bitwise not. Invalid operands error.</td><td>none</td></tr>
+<tr><td><code>&amp;^</code></td><td>Numbers or numeric strings accepted by bitwise conversion.</td><td>Bit clear. Invalid operands error.</td><td>none</td></tr>
+<tr><td><code>&lt;&lt;</code></td><td>Number or numeric-string left operand and shift count accepted by bitwise conversion.</td><td>Left shift. Negative shift count errors; shift counts of 64 or more produce <code>0</code>. Invalid operands error.</td><td>none</td></tr>
+<tr><td><code>&gt;&gt;</code></td><td>Number or numeric-string left operand and shift count accepted by bitwise conversion.</td><td>Logical right shift of the 64-bit operand representation. Negative shift count errors; shift counts of 64 or more produce <code>0</code>. Invalid operands error.</td><td>none</td></tr>
 <tr><td><code>&lt;-</code></td><td>Channel value.</td><td>Receive blocks until a value is received, the channel is closed, or the host cancels execution. Invalid operands error.</td><td>none</td></tr>
 </tbody></table></div>
 <p>Raw helpers bypass their corresponding metamethods: for example, <code>rawget</code>, <code>rawset</code>, <code>rawequal</code>, and <code>rawlen</code> use raw table/string behavior where they are defined.</p>
@@ -630,8 +744,11 @@ user[<span class="tok-string">&quot;score&quot;</span>] <span class="tok-operato
 <pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-builtin">assert</span>(<span class="tok-number">1</span> <span class="tok-operator">+</span> <span class="tok-number">2</span> <span class="tok-operator">==</span> <span class="tok-number">3</span>)
 <span class="tok-builtin">assert</span>(<span class="tok-string">&quot;5&quot;</span> <span class="tok-operator">+</span> <span class="tok-number">3</span> <span class="tok-operator">==</span> <span class="tok-number">8</span>)
 <span class="tok-builtin">assert</span>(<span class="tok-string">&quot;a&quot;</span> <span class="tok-operator">..</span> <span class="tok-number">3</span> <span class="tok-operator">==</span> <span class="tok-string">&quot;a3&quot;</span>)
-<span class="tok-builtin">assert</span>((<span class="tok-number">1</span> <span class="tok-operator">&lt;&lt;</span> <span class="tok-number">8</span>) <span class="tok-operator">==</span> <span class="tok-number">256</span>)</code></pre>
+<span class="tok-builtin">assert</span>((<span class="tok-number">1</span> <span class="tok-operator">&lt;&lt;</span> <span class="tok-number">8</span>) <span class="tok-operator">==</span> <span class="tok-number">256</span>)
+<span class="tok-builtin">assert</span>((<span class="tok-string">&quot;3.9&quot;</span> <span class="tok-operator">&amp;</span> <span class="tok-number">1</span>) <span class="tok-operator">==</span> <span class="tok-number">1</span>)
+<span class="tok-builtin">assert</span>((<span class="tok-operator">^</span><span class="tok-string">&quot;0&quot;</span>) <span class="tok-operator">==</span> <span class="tok-operator">-</span><span class="tok-number">1</span>)</code></pre>
 <pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-keyword">return</span> <span class="tok-string">&quot;x&quot;</span> <span class="tok-operator">+</span> <span class="tok-number">3</span></code></pre>
+<pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-keyword">return</span> <span class="tok-number">1</span> <span class="tok-operator">&lt;&lt;</span> <span class="tok-operator">-</span><span class="tok-number">1</span></code></pre>
 <pre class="language-leia leia-code"><code class="language-leia leia-code">boxed <span class="tok-operator">:=</span> <span class="tok-builtin">setmetatable</span>({value: <span class="tok-number">4</span>}, {
     __add: <span class="tok-keyword">func</span>(left, right) {
         <span class="tok-keyword">return</span> left.value <span class="tok-operator">+</span> right
@@ -646,7 +763,7 @@ user[<span class="tok-string">&quot;score&quot;</span>] <span class="tok-operato
 <span class="tok-builtin">assert</span>(<span class="tok-builtin">rawlen</span>(boxed) <span class="tok-operator">==</span> <span class="tok-number">0</span>)</code></pre>
 <h3 id="expressions-literals">Literals</h3>
 <p>Table literals, list literals, dense array literals, function literals, anonymous agent expressions, <code>turn</code> expressions, and <code>messages</code> blocks are expressions. Their specific syntax is listed in <a href="#">grammar.ebnf</a>.</p>
-<p>Literal operands are evaluated left-to-right. A literal that constructs an identity-bearing value creates a fresh identity each time the literal is evaluated. This applies to table literals, function literals, anonymous agent expressions, <code>turn</code> request objects, <code>messages</code> arrays, and dense arrays.</p>
+<p>Literal operands are evaluated left-to-right. A literal that constructs an identity-bearing value creates a fresh identity each time the literal is evaluated. This applies to table literals, function literals, anonymous agent expressions, <code>turn</code> request objects, <code>messages</code> arrays, and dense arrays. Calls, index expressions, and member selections do not imply freshness: a call returns the callee&#x27;s result, and selection returns the stored member or indexed value.</p>
 <p>Table fields are evaluated in source order. For stable v1.0 programs, avoid depending on duplicate keys or on subtle interleaving between list-style and keyed fields; <a href="#">Tables And Metatables</a> defines the portable constructor subset. List literals evaluate each element in order and store the results as a new 1-based array table. Dense array literals evaluate each element in order, convert each element according to the dense element type, and raise a runtime error if a value cannot be represented by that element type. Function and agent literals capture their lexical environment by reference. <code>messages</code> blocks evaluate role fields in order and create a new ordered message array.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code">events <span class="tok-operator">:=</span> {}
 <span class="tok-keyword">func</span> mark(name, value) {
@@ -671,7 +788,12 @@ dense <span class="tok-operator">:=</span> []i64{mark(<span class="tok-string">&
 <span class="tok-builtin">assert</span>(t[<span class="tok-number">1</span>] <span class="tok-operator">==</span> <span class="tok-number">2</span>)
 <span class="tok-builtin">assert</span>(list[<span class="tok-number">1</span>] <span class="tok-operator">==</span> <span class="tok-number">10</span> <span class="tok-operator">&amp;&amp;</span> list[<span class="tok-number">2</span>] <span class="tok-operator">==</span> <span class="tok-number">20</span>)
 <span class="tok-builtin">assert</span>(dense[<span class="tok-number">1</span>] <span class="tok-operator">==</span> <span class="tok-number">3</span> <span class="tok-operator">&amp;&amp;</span> dense[<span class="tok-number">2</span>] <span class="tok-operator">==</span> <span class="tok-number">4</span>)
-<span class="tok-builtin">assert</span>({} <span class="tok-operator">!=</span> {})</code></pre>
+<span class="tok-builtin">assert</span>({} <span class="tok-operator">!=</span> {})
+
+child <span class="tok-operator">:=</span> {}
+holder <span class="tok-operator">:=</span> { child: child }
+<span class="tok-builtin">assert</span>(holder.child <span class="tok-operator">==</span> child)
+<span class="tok-builtin">assert</span>(holder[<span class="tok-string">&quot;child&quot;</span>] <span class="tok-operator">==</span> child)</code></pre>
 <h3 id="expressions-evaluation-order">Evaluation Order</h3>
 <p>Within an expression list, subexpressions are evaluated left-to-right unless a specific expression form short-circuits. Implementations may optimize execution but must preserve observable side effects and error behavior.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code">events <span class="tok-operator">:=</span> {}
@@ -684,6 +806,12 @@ result <span class="tok-operator">:=</span> mark(<span class="tok-string">&quot;
 <span class="tok-builtin">assert</span>(result <span class="tok-operator">==</span> <span class="tok-string">&quot;leftright&quot;</span>)
 <span class="tok-builtin">assert</span>(events[<span class="tok-number">1</span>] <span class="tok-operator">==</span> <span class="tok-string">&quot;left&quot;</span>)
 <span class="tok-builtin">assert</span>(events[<span class="tok-number">2</span>] <span class="tok-operator">==</span> <span class="tok-string">&quot;right&quot;</span>)
+
+events <span class="tok-operator">=</span> {}
+holder <span class="tok-operator">:=</span> { [mark(<span class="tok-string">&quot;key&quot;</span>)]: mark(<span class="tok-string">&quot;value&quot;</span>) }
+<span class="tok-builtin">assert</span>(events[<span class="tok-number">1</span>] <span class="tok-operator">==</span> <span class="tok-string">&quot;key&quot;</span>)
+<span class="tok-builtin">assert</span>(events[<span class="tok-number">2</span>] <span class="tok-operator">==</span> <span class="tok-string">&quot;value&quot;</span>)
+<span class="tok-builtin">assert</span>(holder.key <span class="tok-operator">==</span> <span class="tok-string">&quot;value&quot;</span>)
 
 <span class="tok-keyword">func</span> fail_if_called() {
     <span class="tok-builtin">error</span>(<span class="tok-string">&quot;should not be called&quot;</span>)
@@ -2124,9 +2252,17 @@ fails(<span class="tok-keyword">func</span>() { coroutine.yield() })</code></pre
 <p>Public Go execution APIs expose typed errors before text formatting. <code>*leia.Error</code> has stable fields <code>Kind</code>, <code>Message</code>, <code>Line</code>, <code>Col</code>, <code>File</code>, <code>Err</code>, and <code>Value</code>. <code>Kind</code> is <code>lex</code>, <code>parse</code>, <code>runtime</code>, or <code>script</code>; <code>script</code> is used for <code>error(value)</code> and carries the converted original value in <code>Value</code> when conversion succeeds. Runtime, parser, and lexer errors use <code>Message</code> as a human diagnostic. <code>Err</code> unwraps to the underlying cause, including <code>*leia.BudgetError</code>, <code>*leia.ExitError</code>, host callback errors, and host callback panic errors when available.</p>
 <p>Diagnostics should include source location when available. Stable source fields are source name or file path, line, and column. Public Go APIs map those to <code>File</code>, <code>Line</code>, and <code>Col</code>. Script-side debug APIs may expose <code>sourceName</code>, <code>line</code>, and <code>column</code> fields for frames and functions when debug access is enabled. String diagnostics may include the same coordinates in text, but callers that need stability should use typed Go errors, documented debug table fields, or CLI JSON.</p>
 <p>Stack and traceback text is diagnostic output, not a stable machine interface. Frame ordering, formatting, function names, native/script labels, and stack depth are not stable unless a specific command or API documents them as structured fields.</p></section><section><h2 id="implementation-requirements">Implementation Requirements</h2>
-<p>The interpreter is the semantic baseline. Bytecode VM execution and JIT execution must preserve interpreter-visible behavior for stable language features.</p>
-<p>An optimization may specialize at runtime after guards, but it must not depend on benchmark names, source file names, or fixed benchmark input sizes. Guard failure must deoptimize or recover without changing user-visible results.</p>
-<p>Implementation details are not observable language behavior:</p>
+<p>This chapter defines implementation constraints for stable language behavior. It is normative for interpreter, VM, JIT, standard-library, documentation, and release-gate work.</p>
+<h3 id="implementation-requirements-interpreter-baseline">Interpreter Baseline</h3>
+<p>The interpreter is the semantic baseline for all stable language features. A stable feature is not implemented until the interpreter behavior is defined, tested, and listed in <code>tests/feature_matrix.json</code> with the relevant coverage references.</p>
+<p>Bytecode VM and JIT execution must preserve interpreter-visible behavior. The following observable results must be equivalent across execution modes unless a feature entry explicitly records an unsupported mode:</p>
+<ul>
+<li>returned values and side effects;</li>
+<li>control-flow behavior, including errors, protected-call results, defers, coroutine state, channel operations, and synchronization behavior;</li>
+<li>source locations and diagnostics that are specified by the language or CLI contract;</li>
+<li>standard-library module identity and visible module state.</li>
+</ul>
+<p>Implementation details are not observable language behavior and must not be used by user code as compatibility guarantees:</p>
 <ul>
 <li>table layout;</li>
 <li>dense numeric representation;</li>
@@ -2136,7 +2272,43 @@ fails(<span class="tok-keyword">func</span>() { coroutine.yield() })</code></pre
 <li>garbage collection timing;</li>
 <li>scheduling details except for specified channel and synchronization behavior.</li>
 </ul>
-<p>Release gates must connect stable features to tests through <code>tests/feature_matrix.json</code>. Changes to stable syntax require parser tests, grammar updates, and conformance or semantic tests. Changes to stable runtime behavior require VM/interpreter coverage and, when performance-sensitive, benchmark coverage.</p></section><section><h2 id="grammar-appendix">Grammar appendix</h2><pre class="language-ebnf"><code class="language-ebnf">(* Leia user-facing grammar.
+<h3 id="implementation-requirements-vm-and-jit-equivalence">VM And JIT Equivalence</h3>
+<p>VM and JIT support for a stable feature must be justified by equivalence tests, not by benchmark success alone. A change that alters parsing, bytecode generation, interpreter execution, VM execution, or JIT execution for a stable feature must update the corresponding <code>tests/feature_matrix.json</code> row and must include conformance, semantic-gate, or mode-equivalence coverage appropriate to the changed behavior.</p>
+<p>Runnable examples in the spec are part of this contract. Fenced examples marked with <code>leia run</code>, <code>leia run all</code>, <code>leia fail</code>, or <code>leia fail all</code> are executable spec examples and are validated by <code>tests/spec_examples_test.go</code>. Any normative example added to <code>docs/spec/*.md</code> that is intended to demonstrate accepted or rejected behavior must use one of those runnable fence tags unless the example is explicitly non-executable syntax notation.</p>
+<h3 id="implementation-requirements-runtime-specialization">Runtime Specialization</h3>
+<p>Runtime specialization is permitted only behind guards that check the facts required by the specialized path. A specialized path must either:</p>
+<ul>
+<li>prove that the specialized facts still hold before executing behavior that depends on them; or</li>
+<li>deoptimize, side-exit, or recover to an unspecialized path before user-visible behavior can diverge.</li>
+</ul>
+<p>Guard failure, side exit, deoptimization, fallback, or recovery must preserve the same visible result as interpreter execution for the same program state. Recovery must not replay visible side effects, skip required side effects, alter error values, or change coroutine/channel/synchronization state.</p>
+<p>Specialization must be derived from runtime-observed program facts, static language facts, or explicit implementation configuration. It must not depend on benchmark names, source file names, directory names, fixed benchmark input sizes, or other source-name based selectors. Benchmark fixtures may exercise specialized behavior, but they must not be the condition that enables that behavior.</p>
+<h3 id="implementation-requirements-release-gates">Release Gates</h3>
+<p>Stable syntax and runtime behavior must be represented in <code>tests/feature_matrix.json</code>. The matrix is a release gate: a stable feature row must carry <code>parser</code>, <code>bytecode</code>, <code>interpreter</code>, <code>tier1</code>, <code>tier2</code>, <code>semantic_gate</code>, <code>conformance_case</code>, and <code>perf_hot_case</code> status according to the matrix schema. The schema and referenced files are checked by <code>go test ./tests -run &#x27;TestFeatureMatrixSchema|TestReleaseMatrix&#x27; -count=1</code>.</p>
+<p>Changes to stable syntax require:</p>
+<ul>
+<li>grammar and spec updates in <code>docs/spec/grammar.ebnf</code> and the relevant <code>docs/spec/*.md</code> chapter;</li>
+<li>parser or lexer tests covering the syntax;</li>
+<li>conformance or semantic tests proving accepted and rejected behavior;</li>
+<li>a matching <code>tests/feature_matrix.json</code> update.</li>
+</ul>
+<p>Changes to stable runtime behavior require:</p>
+<ul>
+<li>interpreter coverage for the baseline behavior;</li>
+<li>VM coverage when bytecode execution is affected;</li>
+<li>JIT semantic-gate or equivalence coverage when tier1 or tier2 execution is affected;</li>
+<li>release-matrix coverage for any changed stable spec section.</li>
+</ul>
+<p>Documentation release checks are enforced by <code>scripts/docs_check.sh</code>. That gate checks Markdown links, documented release-script references, release-readiness snippets, generated reference documentation, and generated spec HTML freshness.</p>
+<h3 id="implementation-requirements-standard-library-and-catalog-synchronization">Standard Library And Catalog Synchronization</h3>
+<p>The public standard-library surface must stay synchronized across implementation registration, catalog metadata, generated reference documentation, and tests. Adding, removing, renaming, or changing the public behavior of a standard library module requires updating <code>internal/stdlib/catalog/catalog.go</code>, <code>docs/reference/stdlib/index.md</code>, and the corresponding stdlib tests. Generated stdlib documentation must remain reproducible by the docs generation command checked by <code>scripts/docs_check.sh</code>.</p>
+<p>Catalog metadata is part of the release surface. Module names, layers, capabilities, and safe-default classification must match the implementation and the documented embedding/security behavior. Host-capability modules must not be documented or cataloged as safe defaults unless their implementation is safe without host authority.</p>
+<h3 id="implementation-requirements-performance-sensitive-changes">Performance-Sensitive Changes</h3>
+<p>A performance-sensitive change is any implementation change that affects hot loops, numeric operations, table access, calls, strings, concurrency, data oriented operations, standard-library dispatch, tiering, guards, deopt, or JIT code generation. Such a change requires correctness evidence and performance evidence. Benchmark output is not a substitute for semantic coverage.</p>
+<p>Performance-sensitive changes must use the repository performance gate relevant to the touched path. The repository provides <code>scripts/performance_gate.sh</code>, which wraps <code>benchmarks/timing_compare.py</code> and <code>benchmarks/strict_guard.py</code>. Release documentation also references <code>bash scripts/performance_gate.sh --feature-smoke</code> for feature-smoke performance evidence.</p>
+<h3 id="implementation-requirements-architecture-and-package-boundaries">Architecture And Package Boundaries</h3>
+<p>Implementation changes must preserve package ownership boundaries. Runtime, VM, JIT, method-JIT, stdlib catalog, stdlib binding, stdlib installation, and stdlib module packages must not gain imports that collapse their separation of responsibilities. Internal package boundaries are checked by <code>tests/architecture/package_boundary_test.go</code>.</p>
+<p>The standard-library catalog must remain metadata-only and must not depend on runtime values, module constructors, VM, JIT, method-JIT, stdlib binding, or stdlib installation packages. Standard-library module implementations must not import VM, JIT, method-JIT, binding, installation, or runtime internals unless a specific architecture test and spec update authorize the dependency.</p></section><section><h2 id="grammar-appendix">Grammar appendix</h2><pre class="language-ebnf"><code class="language-ebnf">(* Leia user-facing grammar.
 
    This file is the syntax appendix for docs/spec/index.md. It describes
    stable source syntax, not parser helper productions or internal AST shapes.

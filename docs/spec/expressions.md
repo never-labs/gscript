@@ -10,16 +10,18 @@ Operators follow this precedence, from highest to lowest:
 1. postfix call, index, and member selection;
 2. unary operators;
 3. exponentiation;
-4. multiplicative arithmetic;
-5. additive arithmetic and concatenation;
-6. shifts and bitwise operators;
+4. multiplicative arithmetic, shifts, bitwise and, and bit clear;
+5. additive arithmetic, bitwise or, and bitwise xor;
+6. concatenation;
 7. comparisons;
 8. logical `&&`;
-9. logical `||`;
-10. assignment forms.
+9. logical `||`.
 
-Parentheses override precedence. `&&` and `||` short-circuit and return operand
-values rather than coerced booleans. Unary logical negation is `!`.
+Parentheses override precedence. `..` and `**` are right-associative; other
+binary operators in the table above are left-associative. `&&` and `||`
+short-circuit and return operand values rather than coerced booleans. Unary
+logical negation is `!`. Unary `^` is bitwise not; binary `^` is bitwise xor.
+Assignment forms are statements, not expressions.
 
 ```leia run all
 x := 1 + 2 * 3      // 7
@@ -31,6 +33,14 @@ assert(x == 7)
 assert(y == 9)
 assert(z == "ok")
 assert(w == nil)
+assert(1 | 2 + 4 == 7)
+assert(1 << 2 * 3 == 12)
+assert("a" .. "b" .. "c" == "abc")
+```
+
+```leia fail all
+x := 1
+y := (x = 2)
 ```
 
 ## Calls
@@ -56,6 +66,11 @@ argument and table-constructor positions where explicit expansion is required.
 values := {1, spread(pair()), 4}
 // values is {1, "a", "b", 4}
 ```
+
+Calls evaluate the callee expression before arguments, then evaluate arguments
+left-to-right. Index and member selection evaluate the receiver before the key
+or field lookup. These forms return the value produced or stored by the target;
+they do not create a fresh identity by themselves.
 
 ## Indexing And Member Selection
 
@@ -85,7 +100,13 @@ parse as numbers. Numeric string coercion is attempted before metamethod lookup
 for primitive strings. Invalid numeric strings and unsupported operand types
 raise runtime errors unless a matching metamethod applies to a non-primitive
 operand. Library functions such as `tonumber`, `tostring`, `math.tointeger`,
-and formatting helpers expose the same conversions explicitly.
+and formatting helpers expose related conversions explicitly.
+
+Bitwise operators first apply the numeric conversion used by `tonumber`, then
+convert the numeric result to an integer operand. Float values, including
+numeric strings that parse as floats, are truncated toward zero by the current
+runtime conversion. Negative shift counts raise runtime errors. Bitwise
+operators do not dispatch metamethods.
 
 | Operator | Operands and coercions | Result and errors | Metamethod |
 |---|---|---|---|
@@ -96,7 +117,7 @@ and formatting helpers expose the same conversions explicitly.
 | `%` | Numbers or numeric strings. | Modulo follows Leia numeric modulo semantics. Invalid operands error. | `__mod` |
 | `**` | Numbers or numeric strings. | Exponentiation follows the math library's power semantics. Invalid operands error. | `__pow` |
 | unary `-` | Number or numeric string. | Numeric negation. Invalid operands error. | `__unm` |
-| `..` | Strings, numbers, and operands accepted by the runtime concatenation contract. | Concatenation returns a string for primitive operands. Invalid operands error. | `__concat` |
+| `..` | Strings and numbers. | Concatenation returns a string for primitive operands. Invalid operands error unless a metamethod applies. | `__concat` |
 | `#` | String, table-like value, or host-backed value with length support. | Strings return byte length. Tables use ordinary sequence/metatable length behavior. Invalid operands error. | `__len`; `rawlen` bypasses it |
 | `==` | Any values. | Primitive values compare by value. Tables, functions, channels, coroutines, and host values compare by identity unless stable equality metamethod dispatch applies. | `__eq` |
 | `!=` | Any values. | Logical negation of `==`, including any stable `__eq` dispatch. | `__eq` |
@@ -107,12 +128,13 @@ and formatting helpers expose the same conversions explicitly.
 | `&&` | Any values. | Returns the left operand when it is falsy; otherwise evaluates and returns the right operand. | none |
 | `||` | Any values. | Returns the left operand when it is truthy; otherwise evaluates and returns the right operand. | none |
 | `!` | Any value. | Returns `true` for `nil` and `false`; returns `false` for every other value. | none |
-| `&` | Numbers or numeric strings convertible to integers by runtime integer conversion. | Bitwise and. Invalid or non-integral operands error. | none |
-| `|` | Numbers or numeric strings convertible to integers by runtime integer conversion. | Bitwise or. Invalid or non-integral operands error. | none |
-| `^` | Numbers or numeric strings convertible to integers by runtime integer conversion. | Bitwise xor. Invalid or non-integral operands error. | none |
-| `&^` | Numbers or numeric strings convertible to integers by runtime integer conversion. | Bit clear. Invalid or non-integral operands error. | none |
-| `<<` | Integer-convertible left and shift count operands; numeric strings are accepted through the same conversion. | Left shift. Invalid operands error. | none |
-| `>>` | Integer-convertible left and shift count operands; numeric strings are accepted through the same conversion. | Right shift. Invalid operands error. | none |
+| `&` | Numbers or numeric strings accepted by bitwise conversion. | Bitwise and. Invalid operands error. | none |
+| `|` | Numbers or numeric strings accepted by bitwise conversion. | Bitwise or. Invalid operands error. | none |
+| binary `^` | Numbers or numeric strings accepted by bitwise conversion. | Bitwise xor. Invalid operands error. | none |
+| unary `^` | Number or numeric string accepted by bitwise conversion. | Bitwise not. Invalid operands error. | none |
+| `&^` | Numbers or numeric strings accepted by bitwise conversion. | Bit clear. Invalid operands error. | none |
+| `<<` | Number or numeric-string left operand and shift count accepted by bitwise conversion. | Left shift. Negative shift count errors; shift counts of 64 or more produce `0`. Invalid operands error. | none |
+| `>>` | Number or numeric-string left operand and shift count accepted by bitwise conversion. | Logical right shift of the 64-bit operand representation. Negative shift count errors; shift counts of 64 or more produce `0`. Invalid operands error. | none |
 | `<-` | Channel value. | Receive blocks until a value is received, the channel is closed, or the host cancels execution. Invalid operands error. | none |
 
 Raw helpers bypass their corresponding metamethods: for example, `rawget`,
@@ -132,10 +154,16 @@ assert(1 + 2 == 3)
 assert("5" + 3 == 8)
 assert("a" .. 3 == "a3")
 assert((1 << 8) == 256)
+assert(("3.9" & 1) == 1)
+assert((^"0") == -1)
 ```
 
 ```leia fail all
 return "x" + 3
+```
+
+```leia fail all
+return 1 << -1
 ```
 
 ```leia run all
@@ -162,7 +190,9 @@ expressions. Their specific syntax is listed in [grammar.ebnf](grammar.ebnf).
 Literal operands are evaluated left-to-right. A literal that constructs an
 identity-bearing value creates a fresh identity each time the literal is
 evaluated. This applies to table literals, function literals, anonymous agent
-expressions, `turn` request objects, `messages` arrays, and dense arrays.
+expressions, `turn` request objects, `messages` arrays, and dense arrays. Calls,
+index expressions, and member selections do not imply freshness: a call returns
+the callee's result, and selection returns the stored member or indexed value.
 
 Table fields are evaluated in source order. For stable v1.0 programs, avoid
 depending on duplicate keys or on subtle interleaving between list-style and
@@ -200,6 +230,11 @@ assert(t[1] == 2)
 assert(list[1] == 10 && list[2] == 20)
 assert(dense[1] == 3 && dense[2] == 4)
 assert({} != {})
+
+child := {}
+holder := { child: child }
+assert(holder.child == child)
+assert(holder["child"] == child)
 ```
 
 ## Evaluation Order
@@ -219,6 +254,12 @@ result := mark("left") .. mark("right")
 assert(result == "leftright")
 assert(events[1] == "left")
 assert(events[2] == "right")
+
+events = {}
+holder := { [mark("key")]: mark("value") }
+assert(events[1] == "key")
+assert(events[2] == "value")
+assert(holder.key == "value")
 
 func fail_if_called() {
     error("should not be called")
