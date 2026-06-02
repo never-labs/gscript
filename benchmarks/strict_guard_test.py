@@ -184,6 +184,11 @@ class StrictGuardReportTest(unittest.TestCase):
         specs = sg.discover_specs(root, sg.ALL_GROUPS)
         self.assertEqual({spec.benchmark_id for spec in specs}, expected)
 
+    def test_default_strict_groups_exclude_concurrency_truth_pass(self):
+        self.assertIn("concurrency", sg.ALL_GROUPS)
+        self.assertNotIn("concurrency", sg.DEFAULT_GROUPS)
+        self.assertIn("table", sg.DEFAULT_GROUPS)
+
     def test_select_specs_accepts_domain_group_selectors(self):
         root = Path(__file__).resolve().parents[1]
         specs = sg.discover_specs(root, sg.ALL_GROUPS)

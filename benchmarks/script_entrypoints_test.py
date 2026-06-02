@@ -43,6 +43,8 @@ class ScriptEntrypointConsistencyTest(unittest.TestCase):
         self.assertIn("python3 benchmarks/strict_guard.py", gate)
         self.assertIn("--quick-phase-smoke", gate)
         self.assertIn('PROFILE="quick_phase_smoke"', gate)
+        self.assertIn('if [ "$PROFILE" = "full" ]; then', gate)
+        self.assertIn('for bench in "${STRICT_CORE_BENCHES[@]}"; do', gate)
 
     def test_python_benchmark_entrypoints_share_discovery_groups(self):
         expected = tuple(discovery.GROUPS)

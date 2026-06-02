@@ -29,8 +29,9 @@ import benchmark_output
 
 DEFAULT_MODES = ["vm", "default", "no_filter", "luajit"]
 DEFAULT_ORDER = discovery.DEFAULT_ORDER
-DEFAULT_GROUPS = discovery.GROUPS
-ALL_GROUPS = DEFAULT_GROUPS
+ALL_GROUPS = discovery.GROUPS
+STRICT_DEFAULT_GROUPS = tuple(group for group in discovery.GROUPS if group != "concurrency")
+DEFAULT_GROUPS = STRICT_DEFAULT_GROUPS
 
 LOGICAL_TIME_BENCHMARKS = {
     "control/defer_protected",

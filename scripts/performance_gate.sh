@@ -500,7 +500,11 @@ if [ "$STRICT" -eq 1 ]; then
     if [ "$NO_LUAJIT" -eq 1 ]; then
         STRICT_CMD+=(--no-luajit)
     fi
-    if [ "$PROFILE" != "full" ]; then
+    if [ "$PROFILE" = "full" ]; then
+        for bench in "${STRICT_CORE_BENCHES[@]}"; do
+            STRICT_CMD+=(--bench "$bench")
+        done
+    else
         if [ "$PROFILE" = "smoke" ]; then
             for bench in "${SMOKE_BENCHES[@]}"; do
                 STRICT_CMD+=(--bench "$bench")

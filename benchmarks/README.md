@@ -26,7 +26,7 @@ python3 benchmarks/timing_compare.py --all-groups --runs=5 --warmup=1 \
   --json /tmp/leia_timing_compare.json \
   --markdown /tmp/leia_timing_compare.md
 
-# Strict truth pass across all domain groups.
+# Strict truth pass across hot, script-timed groups.
 python3 benchmarks/strict_guard.py --runs=3 --warmup=1 --timeout=90 \
   --json benchmarks/data/strict_guard_latest.json \
   --markdown benchmarks/data/strict_guard_latest.md
@@ -67,9 +67,12 @@ bash scripts/diag.sh table/table_array_access
 source, repeat count, CI, parameter scaling, current-vs-HEAD deltas, and LuaJIT
 gaps.
 
-`strict_guard.py` is the release/regression truth pass. It runs VM, default JIT,
-no-filter JIT, and LuaJIT where a reference exists, then checks output stability
-and timing quality.
+`strict_guard.py` is the release/regression truth pass for hot, script-timed
+workloads. It runs VM, default JIT, no-filter JIT, and LuaJIT where a reference
+exists, then checks output stability and timing quality. Concurrency benchmarks
+remain available via explicit `--group=concurrency` or `--bench=...`, but they
+are not part of the default strict pass because many are semantic or blocking
+wall-time workloads rather than comparable hot loops.
 
 Benchmark selectors are domain IDs such as `numeric/matmul` or
 `table/json_table_walk`. Historical selector families are intentionally not
