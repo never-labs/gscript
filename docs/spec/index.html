@@ -197,7 +197,11 @@ digit      = &quot;0&quot;..&quot;9&quot; ;</code></pre>
 <p>Identifiers name variables, functions, labels, tools, agents, module aliases, and fields. Identifiers are case-sensitive.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code">name <span class="tok-operator">:=</span> <span class="tok-string">&quot;leia&quot;</span>
 Name <span class="tok-operator">:=</span> <span class="tok-string">&quot;different binding&quot;</span>
-_scratch <span class="tok-operator">:=</span> <span class="tok-number">42</span></code></pre>
+_scratch <span class="tok-operator">:=</span> <span class="tok-number">42</span>
+
+<span class="tok-builtin">assert</span>(name <span class="tok-operator">==</span> <span class="tok-string">&quot;leia&quot;</span>)
+<span class="tok-builtin">assert</span>(Name <span class="tok-operator">==</span> <span class="tok-string">&quot;different binding&quot;</span>)
+<span class="tok-builtin">assert</span>(_scratch <span class="tok-operator">==</span> <span class="tok-number">42</span>)</code></pre>
 <p>The identifiers <code>name</code> and <code>Name</code> are distinct. A digit may not be the first character of an identifier.</p>
 <h3 id="lexical-elements-keywords">Keywords</h3>
 <p>The following keywords are reserved and may not be used as identifiers.</p>
@@ -205,7 +209,10 @@ _scratch <span class="tok-operator">:=</span> <span class="tok-number">42</span>
 true false nil</code></pre>
 <p>AI-native words such as <code>agent</code>, <code>models</code>, <code>tool</code>, <code>turn</code>, <code>messages</code>, <code>flow</code>, and <code>budget</code> are contextual syntax words. They remain ordinary identifiers outside the grammar positions that use them.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code">agent_name <span class="tok-operator">:=</span> <span class="tok-string">&quot;summarizer&quot;</span>
-turn_count <span class="tok-operator">:=</span> <span class="tok-number">1</span></code></pre>
+turn_count <span class="tok-operator">:=</span> <span class="tok-number">1</span>
+
+<span class="tok-builtin">assert</span>(agent_name <span class="tok-operator">==</span> <span class="tok-string">&quot;summarizer&quot;</span>)
+<span class="tok-builtin">assert</span>(turn_count <span class="tok-operator">==</span> <span class="tok-number">1</span>)</code></pre>
 <p>In a declaration position, contextual words introduce AI-native syntax:</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-contextual">agent</span> summarize(text) {
     user: text
@@ -216,10 +223,19 @@ turn_count <span class="tok-operator">:=</span> <span class="tok-number">1</span
 hex <span class="tok-operator">:=</span> <span class="tok-number">0xff</span>
 binary <span class="tok-operator">:=</span> <span class="tok-number">0b1010</span>
 octal <span class="tok-operator">:=</span> <span class="tok-number">0o755</span>
-float <span class="tok-operator">:=</span> <span class="tok-number">1.25e2</span></code></pre>
+float <span class="tok-operator">:=</span> <span class="tok-number">1.25e2</span>
+
+<span class="tok-builtin">assert</span>(decimal <span class="tok-operator">==</span> <span class="tok-number">1000000</span>)
+<span class="tok-builtin">assert</span>(hex <span class="tok-operator">==</span> <span class="tok-number">255</span>)
+<span class="tok-builtin">assert</span>(binary <span class="tok-operator">==</span> <span class="tok-number">10</span>)
+<span class="tok-builtin">assert</span>(octal <span class="tok-operator">==</span> <span class="tok-number">493</span>)
+<span class="tok-builtin">assert</span>(float <span class="tok-operator">==</span> <span class="tok-number">125</span>)</code></pre>
 <p>String literals are quoted strings with escapes or raw backtick strings. Strings are byte strings; UTF-8 interpretation is provided by library helpers.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code">quoted <span class="tok-operator">:=</span> <span class="tok-string">&quot;line\n&quot;</span>
-raw <span class="tok-operator">:=</span> <span class="tok-string">`line\n`</span></code></pre>
+raw <span class="tok-operator">:=</span> <span class="tok-string">`line\n`</span>
+
+<span class="tok-builtin">assert</span>(<span class="tok-operator">#</span>quoted <span class="tok-operator">==</span> <span class="tok-number">5</span>)
+<span class="tok-builtin">assert</span>(<span class="tok-operator">#</span>raw <span class="tok-operator">==</span> <span class="tok-number">6</span>)</code></pre>
 <p>The first string contains a newline byte. The second contains the two bytes backslash and <code>n</code>.</p>
 <p>Boolean and nil literals are <code>true</code>, <code>false</code>, and <code>nil</code>.</p>
 <h3 id="lexical-elements-operators-and-punctuation">Operators And Punctuation</h3>
