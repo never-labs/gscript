@@ -317,7 +317,7 @@ func BuildLLMLib(call ScriptFunctionCaller, provider func() LLMProvider, provide
 			return []Value{NilValue(), err}, nil
 		}
 		trace(LLMTraceEvent{Type: "turn_start", Model: req.Model, MessageCount: len(req.Messages), ToolCount: len(req.Tools)})
-		res, err := p.Turn(currentContext(), req)
+		res, err := llmTurnWithOptionalStream(currentContext(), p, req, trace, LLMTraceEvent{})
 		if err != nil {
 			trace(LLMTraceEvent{Type: "turn_error", Model: req.Model, ErrorKind: ClassifyLLMProviderError(err), Message: err.Error()})
 			return []Value{NilValue(), llmProviderErrorValue(err)}, nil
@@ -693,7 +693,7 @@ func llmPlanTurn(src, opts *Table, provider LLMProvider, ctx context.Context, ma
 		Metadata:       llmStringMapFromValue(src.RawGetString("metadata")),
 	}
 	trace(LLMTraceEvent{Type: "turn_start", Model: req.Model, MessageCount: len(req.Messages)})
-	res, err := provider.Turn(ctx, req)
+	res, err := llmTurnWithOptionalStream(ctx, provider, req, trace, LLMTraceEvent{})
 	if err != nil {
 		trace(LLMTraceEvent{Type: "turn_error", Model: req.Model, ErrorKind: ClassifyLLMProviderError(err), Message: err.Error()})
 		return LLMTurnResult{}, llmProviderErrorValue(err)
@@ -757,7 +757,7 @@ func llmReflectResult(src, result *Table, provider LLMProvider, ctx context.Cont
 			Metadata:       llmStringMapFromValue(src.RawGetString("metadata")),
 		}
 		trace(LLMTraceEvent{Type: "turn_start", Model: req.Model, MessageCount: len(req.Messages)})
-		res, err := provider.Turn(ctx, req)
+		res, err := llmTurnWithOptionalStream(ctx, provider, req, trace, LLMTraceEvent{})
 		if err != nil {
 			trace(LLMTraceEvent{Type: "turn_error", Model: req.Model, ErrorKind: ClassifyLLMProviderError(err), Message: err.Error()})
 			return llmProviderErrorValue(err)

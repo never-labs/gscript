@@ -791,6 +791,25 @@ func (p recordingProvider) Turn(ctx context.Context, req runtime.LLMTurnRequest)
 	return res, err
 }
 
+func (p recordingProvider) StreamTurn(ctx context.Context, req runtime.LLMTurnRequest, sink runtime.LLMStreamSink) (runtime.LLMTurnResult, error) {
+	streaming, ok := p.provider.(runtime.LLMStreamingProvider)
+	if !ok {
+		return p.Turn(ctx, req)
+	}
+	res, err := streaming.StreamTurn(ctx, req, sink)
+	if p.sink != nil {
+		record := llm.Record{
+			Request: llmbridge.PublicTurnRequest(req),
+			Result:  llmbridge.PublicTurnResult(res),
+		}
+		if err != nil {
+			record.Error = err.Error()
+		}
+		p.sink(record)
+	}
+	return res, err
+}
+
 func elapsedMillis(start time.Time) int64 {
 	return time.Since(start).Milliseconds()
 }

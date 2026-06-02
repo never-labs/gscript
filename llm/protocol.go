@@ -12,6 +12,25 @@ type Provider interface {
 	Turn(context.Context, TurnRequest) (TurnResult, error)
 }
 
+// StreamingProvider is an optional extension for providers that can surface
+// incremental model output. Implementations must still return the complete
+// TurnResult after the stream finishes so callers that only understand Turn can
+// keep the same semantics.
+type StreamingProvider interface {
+	StreamTurn(context.Context, TurnRequest, StreamSink) (TurnResult, error)
+}
+
+type StreamEvent struct {
+	Type   string
+	Token  string
+	Text   string
+	Status string
+	Reason string
+	Usage  TurnUsage
+}
+
+type StreamSink func(StreamEvent) error
+
 type Message struct {
 	Role      string
 	Text      string

@@ -27,6 +27,20 @@ func (a providerAdapter) Turn(ctx context.Context, req runtime.LLMTurnRequest) (
 	return RuntimeTurnResult(res), err
 }
 
+func (a providerAdapter) StreamTurn(ctx context.Context, req runtime.LLMTurnRequest, sink runtime.LLMStreamSink) (runtime.LLMTurnResult, error) {
+	streaming, ok := a.provider.(llm.StreamingProvider)
+	if !ok {
+		return a.Turn(ctx, req)
+	}
+	res, err := streaming.StreamTurn(ctx, PublicTurnRequest(req), func(event llm.StreamEvent) error {
+		if sink == nil {
+			return nil
+		}
+		return sink(RuntimeStreamEvent(event))
+	})
+	return RuntimeTurnResult(res), err
+}
+
 func TraceAdapter(sink llm.TraceSink) runtime.LLMTraceSink {
 	if sink == nil {
 		return nil
@@ -219,6 +233,28 @@ func PublicTurnUsage(usage runtime.LLMTurnUsage) llm.TurnUsage {
 	}
 }
 
+func PublicStreamEvent(event runtime.LLMStreamEvent) llm.StreamEvent {
+	return llm.StreamEvent{
+		Type:   event.Type,
+		Token:  event.Token,
+		Text:   event.Text,
+		Status: event.Status,
+		Reason: event.Reason,
+		Usage:  PublicTurnUsage(event.Usage),
+	}
+}
+
+func RuntimeStreamEvent(event llm.StreamEvent) runtime.LLMStreamEvent {
+	return runtime.LLMStreamEvent{
+		Type:   event.Type,
+		Token:  event.Token,
+		Text:   event.Text,
+		Status: event.Status,
+		Reason: event.Reason,
+		Usage:  RuntimeTurnUsage(event.Usage),
+	}
+}
+
 func RuntimeTurnUsage(usage llm.TurnUsage) runtime.LLMTurnUsage {
 	return runtime.LLMTurnUsage{
 		InputTokens:  usage.InputTokens,
@@ -303,6 +339,22 @@ func DefaultProviderFactory(cfg llm.ProviderConfig) (llm.Provider, error) {
 
 func (p recordingProvider) Turn(ctx context.Context, req llm.TurnRequest) (llm.TurnResult, error) {
 	res, err := p.provider.Turn(ctx, req)
+	if p.sink != nil {
+		record := llm.Record{Request: cloneLLMRequest(req), Result: cloneLLMResult(res)}
+		if err != nil {
+			record.Error = err.Error()
+		}
+		p.sink(record)
+	}
+	return res, err
+}
+
+func (p recordingProvider) StreamTurn(ctx context.Context, req llm.TurnRequest, sink llm.StreamSink) (llm.TurnResult, error) {
+	streaming, ok := p.provider.(llm.StreamingProvider)
+	if !ok {
+		return p.Turn(ctx, req)
+	}
+	res, err := streaming.StreamTurn(ctx, req, sink)
 	if p.sink != nil {
 		record := llm.Record{Request: cloneLLMRequest(req), Result: cloneLLMResult(res)}
 		if err != nil {

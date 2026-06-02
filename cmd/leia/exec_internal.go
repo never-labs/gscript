@@ -87,6 +87,27 @@ func (a cliLLMProviderAdapter) Turn(ctx context.Context, req runtime.LLMTurnRequ
 	return cliRuntimeLLMTurnResult(res), err
 }
 
+func (a cliLLMProviderAdapter) StreamTurn(ctx context.Context, req runtime.LLMTurnRequest, sink runtime.LLMStreamSink) (runtime.LLMTurnResult, error) {
+	streaming, ok := a.provider.(llm.StreamingProvider)
+	if !ok {
+		return a.Turn(ctx, req)
+	}
+	res, err := streaming.StreamTurn(ctx, cliPublicLLMTurnRequest(req), func(event llm.StreamEvent) error {
+		if sink == nil {
+			return nil
+		}
+		return sink(runtime.LLMStreamEvent{
+			Type:   event.Type,
+			Token:  event.Token,
+			Text:   event.Text,
+			Status: event.Status,
+			Reason: event.Reason,
+			Usage:  cliRuntimeLLMTurnUsage(event.Usage),
+		})
+	})
+	return cliRuntimeLLMTurnResult(res), err
+}
+
 func cliPublicLLMTurnRequest(req runtime.LLMTurnRequest) llm.TurnRequest {
 	out := llm.TurnRequest{
 		Model:          req.Model,
@@ -152,12 +173,7 @@ func cliRuntimeLLMTurnResult(res llm.TurnResult) runtime.LLMTurnResult {
 		Status: res.Status,
 		Text:   res.Text,
 		Reason: res.Reason,
-		Usage: runtime.LLMTurnUsage{
-			InputTokens:  res.Usage.InputTokens,
-			OutputTokens: res.Usage.OutputTokens,
-			Cost:         res.Usage.Cost,
-			LatencyMS:    res.Usage.LatencyMS,
-		},
+		Usage:  cliRuntimeLLMTurnUsage(res.Usage),
 	}
 	if len(res.Calls) > 0 {
 		out.Calls = make([]runtime.LLMToolCall, len(res.Calls))
@@ -170,6 +186,15 @@ func cliRuntimeLLMTurnResult(res llm.TurnResult) runtime.LLMTurnResult {
 		}
 	}
 	return out
+}
+
+func cliRuntimeLLMTurnUsage(usage llm.TurnUsage) runtime.LLMTurnUsage {
+	return runtime.LLMTurnUsage{
+		InputTokens:  usage.InputTokens,
+		OutputTokens: usage.OutputTokens,
+		Cost:         usage.Cost,
+		LatencyMS:    usage.LatencyMS,
+	}
 }
 
 func cloneStringMap(src map[string]string) map[string]string {

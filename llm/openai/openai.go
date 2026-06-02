@@ -1,6 +1,7 @@
 package openai
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -55,6 +56,15 @@ func (e *Error) LLMProviderErrorKind() string {
 }
 
 func (p Provider) Turn(ctx context.Context, req llm.TurnRequest) (llm.TurnResult, error) {
+	return p.turn(ctx, req, nil)
+}
+
+func (p Provider) StreamTurn(ctx context.Context, req llm.TurnRequest, sink llm.StreamSink) (llm.TurnResult, error) {
+	req.Stream = true
+	return p.turn(ctx, req, sink)
+}
+
+func (p Provider) turn(ctx context.Context, req llm.TurnRequest, sink llm.StreamSink) (llm.TurnResult, error) {
 	if p.Timeout > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, p.Timeout)
@@ -78,7 +88,7 @@ func (p Provider) Turn(ctx context.Context, req llm.TurnRequest) (llm.TurnResult
 	}
 	var lastErr error
 	for attempt := 0; attempt < attempts; attempt++ {
-		res, retry, err := p.turnOnce(ctx, endpoint, body)
+		res, retry, err := p.turnOnce(ctx, endpoint, body, req.Stream, sink)
 		if err == nil {
 			return res, nil
 		}
@@ -93,7 +103,7 @@ func (p Provider) Turn(ctx context.Context, req llm.TurnRequest) (llm.TurnResult
 	return llm.TurnResult{}, lastErr
 }
 
-func (p Provider) turnOnce(ctx context.Context, endpoint string, body []byte) (llm.TurnResult, bool, error) {
+func (p Provider) turnOnce(ctx context.Context, endpoint string, body []byte, stream bool, sink llm.StreamSink) (llm.TurnResult, bool, error) {
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
 	if err != nil {
 		return llm.TurnResult{}, false, err
@@ -123,11 +133,48 @@ func (p Provider) turnOnce(ctx context.Context, endpoint string, body []byte) (l
 			Retryable:  retryable,
 		}
 	}
+	if stream {
+		res, err := decodeOpenAIStream(resp.Body, sink)
+		return res, false, err
+	}
 	var out openAIChatResponse
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
 		return llm.TurnResult{}, false, err
 	}
 	return openAITurnResult(out), false, nil
+}
+
+func decodeOpenAIStream(body io.Reader, sink llm.StreamSink) (llm.TurnResult, error) {
+	scanner := bufio.NewScanner(body)
+	scanner.Buffer(make([]byte, 0, 4096), 1024*1024)
+	state := openAIStreamState{}
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || strings.HasPrefix(line, "event:") {
+			continue
+		}
+		if !strings.HasPrefix(line, "data:") {
+			continue
+		}
+		data := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
+		if data == "" {
+			continue
+		}
+		if data == "[DONE]" {
+			break
+		}
+		var chunk openAIChatStreamResponse
+		if err := json.Unmarshal([]byte(data), &chunk); err != nil {
+			return llm.TurnResult{}, err
+		}
+		if err := state.apply(chunk, sink); err != nil {
+			return llm.TurnResult{}, err
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return llm.TurnResult{}, err
+	}
+	return state.result(), nil
 }
 
 func openAIRetryableStatus(status int) bool {
@@ -233,6 +280,104 @@ type openAIChatResponse struct {
 		PromptTokens     int64 `json:"prompt_tokens"`
 		CompletionTokens int64 `json:"completion_tokens"`
 	} `json:"usage"`
+}
+
+type openAIChatStreamResponse struct {
+	Choices []struct {
+		FinishReason string             `json:"finish_reason"`
+		Delta        openAIMessageDelta `json:"delta"`
+	} `json:"choices"`
+	Usage struct {
+		PromptTokens     int64 `json:"prompt_tokens"`
+		CompletionTokens int64 `json:"completion_tokens"`
+	} `json:"usage"`
+}
+
+type openAIMessageDelta struct {
+	Role      string                `json:"role,omitempty"`
+	Content   string                `json:"content,omitempty"`
+	ToolCalls []openAIToolCallDelta `json:"tool_calls,omitempty"`
+}
+
+type openAIToolCallDelta struct {
+	Index    int                `json:"index"`
+	ID       string             `json:"id,omitempty"`
+	Type     string             `json:"type,omitempty"`
+	Function openAIToolFunction `json:"function,omitempty"`
+}
+
+type openAIStreamState struct {
+	text         strings.Builder
+	finishReason string
+	usage        llm.TurnUsage
+	toolCalls    []openAIToolCall
+}
+
+func (s *openAIStreamState) apply(chunk openAIChatStreamResponse, sink llm.StreamSink) error {
+	if chunk.Usage.PromptTokens != 0 || chunk.Usage.CompletionTokens != 0 {
+		s.usage.InputTokens = chunk.Usage.PromptTokens
+		s.usage.OutputTokens = chunk.Usage.CompletionTokens
+	}
+	if len(chunk.Choices) == 0 {
+		return nil
+	}
+	choice := chunk.Choices[0]
+	if choice.FinishReason != "" {
+		s.finishReason = choice.FinishReason
+	}
+	if choice.Delta.Content != "" {
+		s.text.WriteString(choice.Delta.Content)
+		if sink != nil {
+			if err := sink(llm.StreamEvent{Type: "token", Token: choice.Delta.Content, Text: choice.Delta.Content}); err != nil {
+				return err
+			}
+		}
+	}
+	for _, delta := range choice.Delta.ToolCalls {
+		s.applyToolCallDelta(delta)
+	}
+	return nil
+}
+
+func (s *openAIStreamState) applyToolCallDelta(delta openAIToolCallDelta) {
+	for len(s.toolCalls) <= delta.Index {
+		s.toolCalls = append(s.toolCalls, openAIToolCall{Type: "function"})
+	}
+	call := &s.toolCalls[delta.Index]
+	if delta.ID != "" {
+		call.ID = delta.ID
+	}
+	if delta.Type != "" {
+		call.Type = delta.Type
+	}
+	if delta.Function.Name != "" {
+		call.Function.Name += delta.Function.Name
+	}
+	if delta.Function.Arguments != "" {
+		call.Function.Arguments += delta.Function.Arguments
+	}
+}
+
+func (s openAIStreamState) result() llm.TurnResult {
+	res := llm.TurnResult{
+		Text:   s.text.String(),
+		Reason: s.finishReason,
+		Usage:  s.usage,
+	}
+	for _, call := range s.toolCalls {
+		if call.ID == "" && call.Function.Name == "" && call.Function.Arguments == "" {
+			continue
+		}
+		res.Calls = append(res.Calls, llmToolCallFromOpenAI(call))
+	}
+	if len(res.Calls) > 0 {
+		res.Status = "tool_calls"
+	} else if s.finishReason == "length" || s.finishReason == "content_filter" {
+		res.Status = "stop"
+	} else {
+		res.Status = "final_answer"
+	}
+	return res
 }
 
 func openAIChatRequestFromTurn(req llm.TurnRequest, model string) openAIChatRequest {

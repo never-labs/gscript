@@ -572,9 +572,16 @@ Stable request fields include:
 | `max_tokens` | Output token hint. |
 | `temperature` / `top_p` | Sampling hints. |
 | `response_format` | Provider response-format hint. |
-| `stream` | Provider streaming hint. |
+| `stream` | Request incremental provider output when supported. |
 | `stop` | Stop sequences. |
 | `metadata` | Host/provider metadata. |
+
+When `stream` is true and the installed provider implements streaming, the host
+trace sink receives `turn_stream` events for incremental text tokens. Streaming
+does not change script-level return values: `turn { ... }` still returns one
+complete result table and one error value after the provider finishes. If the
+provider does not support streaming, the field is a provider hint and the turn
+falls back to the ordinary complete-result path.
 
 If a `turn` runs inside an agent, absent `model`, `tools`, `budget`,
 `response_format`, `metadata`, `max_tokens`, and sampling fields inherit from

@@ -13,6 +13,24 @@ type LLMProvider interface {
 	Turn(context.Context, LLMTurnRequest) (LLMTurnResult, error)
 }
 
+// LLMStreamingProvider is an optional extension used when a script requests
+// stream:true. It emits incremental output while preserving the final TurnResult
+// contract of LLMProvider.
+type LLMStreamingProvider interface {
+	StreamTurn(context.Context, LLMTurnRequest, LLMStreamSink) (LLMTurnResult, error)
+}
+
+type LLMStreamEvent struct {
+	Type   string
+	Token  string
+	Text   string
+	Status string
+	Reason string
+	Usage  LLMTurnUsage
+}
+
+type LLMStreamSink func(LLMStreamEvent) error
+
 // LLMProviderConfig is the runtime shape of one models {} provider entry.
 // The runtime records this data, but construction is delegated to the host
 // package to avoid coupling the interpreter to concrete HTTP providers.

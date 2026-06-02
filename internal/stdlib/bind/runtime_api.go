@@ -12,6 +12,9 @@ type (
 	LLMProvider          = runtime.LLMProvider
 	LLMProviderConfig    = runtime.LLMProviderConfig
 	LLMProviderFactory   = runtime.LLMProviderFactory
+	LLMStreamEvent       = runtime.LLMStreamEvent
+	LLMStreamSink        = runtime.LLMStreamSink
+	LLMStreamingProvider = runtime.LLMStreamingProvider
 	LLMTool              = runtime.LLMTool
 	LLMToolCall          = runtime.LLMToolCall
 	LLMTraceEvent        = runtime.LLMTraceEvent

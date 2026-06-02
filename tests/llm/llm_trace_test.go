@@ -1,6 +1,7 @@
 package leia_test
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -72,6 +73,82 @@ react_result, react_err := llm.react({
 			}
 			if events[4].Tool != "lookup" || events[4].CallID != "call_1" || events[6].Step != 1 || events[7].Usage.OutputTokens != 4 {
 				t.Fatalf("react metadata = %#v", events)
+			}
+		})
+	}
+}
+
+type streamingTraceProvider struct {
+	usedStream bool
+}
+
+func (p *streamingTraceProvider) Turn(context.Context, llm.TurnRequest) (llm.TurnResult, error) {
+	return llm.TurnResult{Status: "final_answer", Text: "fallback"}, nil
+}
+
+func (p *streamingTraceProvider) StreamTurn(_ context.Context, req llm.TurnRequest, sink llm.StreamSink) (llm.TurnResult, error) {
+	p.usedStream = req.Stream
+	for _, token := range []string{"hello", " ", "stream"} {
+		if sink != nil {
+			if err := sink(llm.StreamEvent{Type: "token", Token: token, Text: token}); err != nil {
+				return llm.TurnResult{}, err
+			}
+		}
+	}
+	return llm.TurnResult{
+		Status: "final_answer",
+		Text:   "hello stream",
+		Usage:  llm.TurnUsage{InputTokens: 1, OutputTokens: 3},
+	}, nil
+}
+
+func TestLLMTraceSinkReceivesStreamingTokens(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []leia.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			provider := &streamingTraceProvider{}
+			var events []llm.TraceEvent
+			opts := append([]leia.Option{
+				leia.WithLibs(leia.LibString | leia.LibLLM),
+				leia.WithLLMProvider(provider),
+				leia.WithLLMTrace(func(event llm.TraceEvent) {
+					events = append(events, event)
+				}),
+			}, tc.opts...)
+			vm := leia.New(opts...)
+			if err := vm.Exec(`
+result, err := llm.turn({
+    model: "mock-fast",
+    messages: {llm.user("hello")},
+    stream: true,
+})
+text := result.text
+`); err != nil {
+				t.Fatalf("Exec: %v", err)
+			}
+			text, _ := vm.Get("text")
+			if text != "hello stream" || !provider.usedStream {
+				t.Fatalf("text=%#v usedStream=%v", text, provider.usedStream)
+			}
+			got := make([]string, 0, len(events))
+			tokens := make([]string, 0, 3)
+			for _, event := range events {
+				got = append(got, event.Type)
+				if event.Type == "turn_stream" {
+					tokens = append(tokens, event.Token)
+				}
+			}
+			want := []string{"turn_start", "turn_stream", "turn_stream", "turn_stream", "turn_end"}
+			if strings.Join(got, ",") != strings.Join(want, ",") {
+				t.Fatalf("events = %#v, want %#v", got, want)
+			}
+			if strings.Join(tokens, "") != "hello stream" {
+				t.Fatalf("tokens = %#v", tokens)
 			}
 		})
 	}

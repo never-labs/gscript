@@ -348,7 +348,7 @@ func llmReact(opts *Table, provider LLMProvider, call ScriptFunctionCaller, ctx 
 			Metadata:       llmStringMapFromValue(opts.RawGetString("metadata")),
 		}
 		llmTrace(trace, LLMTraceEvent{Type: "turn_start", Model: req.Model, Step: int64(step), MessageCount: len(req.Messages), ToolCount: len(req.Tools)})
-		res, err := provider.Turn(ctx, req)
+		res, err := llmTurnWithOptionalStream(ctx, provider, req, trace, LLMTraceEvent{Step: int64(step)})
 		if err != nil {
 			llmTrace(trace, LLMTraceEvent{Type: "turn_error", Model: req.Model, Step: int64(step), ErrorKind: ClassifyLLMProviderError(err), Message: err.Error()})
 			return []Value{NilValue(), llmProviderErrorValue(err)}, nil
@@ -534,7 +534,7 @@ func llmRepairStructuredOutput(opts *Table, provider LLMProvider, ctx context.Co
 			Metadata:       llmStringMapFromValue(opts.RawGetString("metadata")),
 		}
 		llmTrace(trace, LLMTraceEvent{Type: "turn_start", Model: req.Model, Step: step, Attempt: int64(attempt), MessageCount: len(req.Messages), ToolCount: len(req.Tools)})
-		res, err := provider.Turn(ctx, req)
+		res, err := llmTurnWithOptionalStream(ctx, provider, req, trace, LLMTraceEvent{Step: step, Attempt: int64(attempt)})
 		if err != nil {
 			llmTrace(trace, LLMTraceEvent{Type: "turn_error", Model: req.Model, Step: step, Attempt: int64(attempt), ErrorKind: ClassifyLLMProviderError(err), Message: err.Error()})
 			return NilValue(), NilValue(), "", llmProviderErrorValue(err), true

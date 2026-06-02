@@ -162,9 +162,14 @@ Important fields:
 | `max_tokens` | Output token limit. |
 | `temperature` / `top_p` | Sampling controls. |
 | `response_format` | Provider response-format hint. |
-| `stream` | Provider streaming hint. |
+| `stream` | Request incremental provider output when supported. |
 | `stop` | Stop sequences. |
 | `metadata` | String metadata passed to the provider. |
+
+With `stream: true`, providers that implement streaming emit incremental
+`turn_stream` trace events through `leia.WithLLMTrace`. The returned `result`
+remains the complete final turn result. Providers without streaming support
+ignore the hint and return normally.
 
 When `model` is omitted, the turn uses the ambient agent model if it is running
 inside an agent. Otherwise it uses the module's `models { default: ... }` alias

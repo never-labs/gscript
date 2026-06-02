@@ -143,6 +143,47 @@ func TestOpenAICompatibleLLMProviderRetriesTransientStatus(t *testing.T) {
 	}
 }
 
+func TestOpenAICompatibleLLMProviderStreamsContent(t *testing.T) {
+	var got map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := json.NewDecoder(r.Body).Decode(&got); err != nil {
+			t.Fatalf("Decode request: %v", err)
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		fmt.Fprintln(w, `data: {"choices":[{"delta":{"role":"assistant"}}]}`)
+		fmt.Fprintln(w, `data: {"choices":[{"delta":{"content":"hello"}}]}`)
+		fmt.Fprintln(w, `data: {"choices":[{"delta":{"content":" world"},"finish_reason":"stop"}],"usage":{"prompt_tokens":3,"completion_tokens":2}}`)
+		fmt.Fprintln(w, `data: [DONE]`)
+	}))
+	defer server.Close()
+	provider := openai.Provider{
+		Endpoint: server.URL,
+		Model:    "mock-fast",
+		Client:   server.Client(),
+	}
+	var tokens []string
+	res, err := provider.StreamTurn(context.Background(), llm.TurnRequest{
+		Messages: []llm.Message{{Role: "user", Text: "hello"}},
+	}, func(event llm.StreamEvent) error {
+		if event.Type == "token" {
+			tokens = append(tokens, event.Token)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("StreamTurn: %v", err)
+	}
+	if got["stream"] != true {
+		t.Fatalf("request stream = %#v", got["stream"])
+	}
+	if res.Status != "final_answer" || res.Text != "hello world" || res.Usage.InputTokens != 3 || res.Usage.OutputTokens != 2 {
+		t.Fatalf("result = %#v", res)
+	}
+	if strings.Join(tokens, "|") != "hello| world" {
+		t.Fatalf("tokens = %#v", tokens)
+	}
+}
+
 func TestOpenAICompatibleLLMProviderTypedStatusError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bad request", http.StatusBadRequest)

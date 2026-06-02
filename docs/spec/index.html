@@ -2035,10 +2035,11 @@ value, err <span class="tok-operator">:=</span> llm.dispatch(call, [lookup])
 <tr><td><code>max_tokens</code></td><td>Output token hint.</td></tr>
 <tr><td><code>temperature</code> / <code>top_p</code></td><td>Sampling hints.</td></tr>
 <tr><td><code>response_format</code></td><td>Provider response-format hint.</td></tr>
-<tr><td><code>stream</code></td><td>Provider streaming hint.</td></tr>
+<tr><td><code>stream</code></td><td>Request incremental provider output when supported.</td></tr>
 <tr><td><code>stop</code></td><td>Stop sequences.</td></tr>
 <tr><td><code>metadata</code></td><td>Host/provider metadata.</td></tr>
 </tbody></table></div>
+<p>When <code>stream</code> is true and the installed provider implements streaming, the host trace sink receives <code>turn_stream</code> events for incremental text tokens. Streaming does not change script-level return values: <code>turn { ... }</code> still returns one complete result table and one error value after the provider finishes. If the provider does not support streaming, the field is a provider hint and the turn falls back to the ordinary complete-result path.</p>
 <p>If a <code>turn</code> runs inside an agent, absent <code>model</code>, <code>tools</code>, <code>budget</code>, <code>response_format</code>, <code>metadata</code>, <code>max_tokens</code>, and sampling fields inherit from the ambient agent configuration. If both <code>messages</code> and <code>user</code> are absent, an ambient agent <code>system</code> and <code>user</code> are used to synthesize messages. Outside an agent, a <code>turn</code> must have explicit <code>messages</code> or <code>user</code>, unless the host installs a provider layer with different documented behavior.</p>
 <p>Inside a custom <code>flow</code>, inheritance and local variables are related but not the same thing. Ambient inheritance affects <code>turn {}</code> request construction. Flow-local injection only creates identifiers such as <code>model</code>, <code>system</code>, and <code>tools</code> for fields explicitly written in the agent configuration. For example:</p>
 <pre class="language-text"><code class="language-text">agent inherit(q) {
