@@ -51,7 +51,8 @@ func jitShouldStayInInterpreter(proto *vm.FuncProto) bool {
 
 func jitRequiresInterpreter(proto *vm.FuncProto) bool {
 	return jitUnsupportedVMOnlyControl(proto) ||
-		jitUnsupportedConcurrencyControl(proto)
+		jitUnsupportedConcurrencyControl(proto) ||
+		jitUnsupportedMultiReturn(proto)
 }
 
 func jitTier2CallableGate(proto *vm.FuncProto) GateResult {

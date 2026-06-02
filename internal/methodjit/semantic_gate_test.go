@@ -5,6 +5,7 @@ package methodjit
 import (
 	"testing"
 
+	"github.com/never-labs/leia/internal/testutil/vmtest"
 	"github.com/never-labs/leia/internal/vm"
 )
 
@@ -18,8 +19,34 @@ func TestJITSemanticGateKeepsTopLevelInInterpreter(t *testing.T) {
 func TestJITSemanticGateRejectsMultiReturnABI(t *testing.T) {
 	top := compileTop(t, `func f() { return 1, 2 }`)
 	fn := findFirstProtoWithName(t, top, "f")
+	if !jitRequiresInterpreter(fn) {
+		t.Fatal("multi-return function should require interpreter under the current one-result JIT ABI")
+	}
 	if !jitShouldStayInInterpreter(fn) {
 		t.Fatal("multi-return function should stay interpreted")
+	}
+}
+
+func TestJITPreservesMultiReturnAssignmentBySkippingMultiReturnCallee(t *testing.T) {
+	top := compileTop(t, `
+func triple() { return 10, 20, 30 }
+a, b, c := triple()
+assert(a == 10 && b == 20 && c == 30)
+`)
+	fn := findFirstProtoWithName(t, top, "triple")
+	if fn == nil {
+		t.Fatal("triple proto not found")
+	}
+
+	engine := NewTieringManager()
+	v := vm.New(vmtest.NewInterpreterGlobals())
+	defer v.Close()
+	v.SetMethodJIT(engine)
+	if _, err := v.Execute(top); err != nil {
+		t.Fatalf("JIT VM execute: %v", err)
+	}
+	if engine.tier1.compiled[fn] != nil {
+		t.Fatal("multi-return callee was baseline-compiled despite unsupported result ABI")
 	}
 }
 

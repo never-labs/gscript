@@ -775,8 +775,8 @@ scoped()
     <span class="tok-keyword">return</span> a
 }
 
-first(<span class="tok-number">1</span>, <span class="tok-number">2</span>, <span class="tok-number">3</span>) <span class="tok-comment">// 1; the extra argument is discarded</span>
-first()        <span class="tok-comment">// nil; missing arguments become nil</span></code></pre>
+<span class="tok-builtin">assert</span>(first(<span class="tok-number">1</span>, <span class="tok-number">2</span>, <span class="tok-number">3</span>) <span class="tok-operator">==</span> <span class="tok-number">1</span>) <span class="tok-comment">// the extra argument is discarded</span>
+<span class="tok-builtin">assert</span>(first() <span class="tok-operator">==</span> <span class="tok-constant">nil</span>)      <span class="tok-comment">// missing arguments become nil</span></code></pre>
 <pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-keyword">func</span> first(a, b) {
     <span class="tok-keyword">return</span> a
 }
@@ -789,7 +789,7 @@ first()        <span class="tok-comment">// nil; missing arguments become nil</s
     <span class="tok-keyword">return</span> <span class="tok-operator">#</span>args
 }
 
-count(<span class="tok-number">1</span>, <span class="tok-number">2</span>, <span class="tok-number">3</span>) <span class="tok-comment">// 3</span></code></pre>
+<span class="tok-builtin">assert</span>(count(<span class="tok-number">1</span>, <span class="tok-number">2</span>, <span class="tok-number">3</span>) <span class="tok-operator">==</span> <span class="tok-number">3</span>)</code></pre>
 <pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-keyword">func</span> count(<span class="tok-operator">...</span>) {
     args <span class="tok-operator">:=</span> {<span class="tok-operator">...</span>}
     <span class="tok-keyword">return</span> <span class="tok-operator">#</span>args
@@ -820,28 +820,72 @@ values <span class="tok-operator">:=</span> rest(<span class="tok-string">&quot;
 
 a, b, c <span class="tok-operator">:=</span> triple() <span class="tok-comment">// 10, 20, 30</span>
 x, y <span class="tok-operator">:=</span> triple()    <span class="tok-comment">// 10, 20</span>
-<span class="tok-keyword">return</span> triple()     <span class="tok-comment">// returns 10, 20, 30</span></code></pre>
-<p>A parenthesized call is no longer in an expanding position and contributes exactly one value.</p>
-<pre class="language-leia leia-code"><code class="language-leia leia-code">a, b <span class="tok-operator">:=</span> (triple()) <span class="tok-comment">// a == 10, b == nil</span></code></pre>
-<p>When a call appears before the final expression in an expression list, it contributes exactly one value. A final call may expand.</p>
-<pre class="language-leia leia-code"><code class="language-leia leia-code">a, b, c, d <span class="tok-operator">:=</span> triple(), triple()
-<span class="tok-comment">// a == 10; b == 10; c == 20; d == 30</span></code></pre>
-<p>Function-call arguments and table constructors use the same expression-list rule: non-final calls contribute one value; final calls expand. Use <code>spread(call())</code> to expand a call in a non-final position.</p>
-<pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-keyword">func</span> pack(<span class="tok-operator">...</span>) { <span class="tok-keyword">return</span> table.pack(<span class="tok-operator">...</span>) }
+<span class="tok-keyword">func</span> forward() {
+    <span class="tok-keyword">return</span> triple()
+}
+p, q, r <span class="tok-operator">:=</span> forward()
 
-pack(triple(), <span class="tok-string">&quot;x&quot;</span>)          <span class="tok-comment">// receives 10, &quot;x&quot;</span>
-pack(<span class="tok-builtin">spread</span>(triple()), <span class="tok-string">&quot;x&quot;</span>)  <span class="tok-comment">// receives 10, 20, 30, &quot;x&quot;</span>
-{triple()}                   <span class="tok-comment">// {10, 20, 30}</span>
-{(triple())}                 <span class="tok-comment">// {10}</span></code></pre>
+<span class="tok-builtin">assert</span>(a <span class="tok-operator">==</span> <span class="tok-number">10</span> <span class="tok-operator">&amp;&amp;</span> b <span class="tok-operator">==</span> <span class="tok-number">20</span> <span class="tok-operator">&amp;&amp;</span> c <span class="tok-operator">==</span> <span class="tok-number">30</span>)
+<span class="tok-builtin">assert</span>(x <span class="tok-operator">==</span> <span class="tok-number">10</span> <span class="tok-operator">&amp;&amp;</span> y <span class="tok-operator">==</span> <span class="tok-number">20</span>)
+<span class="tok-builtin">assert</span>(p <span class="tok-operator">==</span> <span class="tok-number">10</span> <span class="tok-operator">&amp;&amp;</span> q <span class="tok-operator">==</span> <span class="tok-number">20</span> <span class="tok-operator">&amp;&amp;</span> r <span class="tok-operator">==</span> <span class="tok-number">30</span>)</code></pre>
+<p>A parenthesized call is no longer in an expanding position and contributes exactly one value.</p>
+<pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-keyword">func</span> triple() {
+    <span class="tok-keyword">return</span> <span class="tok-number">10</span>, <span class="tok-number">20</span>, <span class="tok-number">30</span>
+}
+
+a, b <span class="tok-operator">:=</span> (triple()) <span class="tok-comment">// a == 10, b == nil</span>
+<span class="tok-builtin">assert</span>(a <span class="tok-operator">==</span> <span class="tok-number">10</span>)
+<span class="tok-builtin">assert</span>(b <span class="tok-operator">==</span> <span class="tok-constant">nil</span>)</code></pre>
+<p>When a call appears before the final expression in an expression list, it contributes exactly one value. A final call may expand.</p>
+<pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-keyword">func</span> triple() {
+    <span class="tok-keyword">return</span> <span class="tok-number">10</span>, <span class="tok-number">20</span>, <span class="tok-number">30</span>
+}
+
+a, b, c, d <span class="tok-operator">:=</span> triple(), triple()
+<span class="tok-comment">// a == 10; b == 10; c == 20; d == 30</span>
+<span class="tok-builtin">assert</span>(a <span class="tok-operator">==</span> <span class="tok-number">10</span>)
+<span class="tok-builtin">assert</span>(b <span class="tok-operator">==</span> <span class="tok-number">10</span>)
+<span class="tok-builtin">assert</span>(c <span class="tok-operator">==</span> <span class="tok-number">20</span>)
+<span class="tok-builtin">assert</span>(d <span class="tok-operator">==</span> <span class="tok-number">30</span>)</code></pre>
+<p>Function-call arguments and table constructors use the same expression-list rule: non-final calls contribute one value; final calls expand. Use <code>spread(call())</code> to expand a call in a non-final position.</p>
+<pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-keyword">func</span> triple() {
+    <span class="tok-keyword">return</span> <span class="tok-number">10</span>, <span class="tok-number">20</span>, <span class="tok-number">30</span>
+}
+
+<span class="tok-keyword">func</span> pack(<span class="tok-operator">...</span>) { <span class="tok-keyword">return</span> table.pack(<span class="tok-operator">...</span>) }
+
+plain <span class="tok-operator">:=</span> pack(triple(), <span class="tok-string">&quot;x&quot;</span>)          <span class="tok-comment">// receives 10, &quot;x&quot;</span>
+expanded <span class="tok-operator">:=</span> pack(<span class="tok-builtin">spread</span>(triple()), <span class="tok-string">&quot;x&quot;</span>)  <span class="tok-comment">// receives 10, 20, 30, &quot;x&quot;</span>
+list <span class="tok-operator">:=</span> {triple()}                   <span class="tok-comment">// {10, 20, 30}</span>
+single <span class="tok-operator">:=</span> {(triple())}               <span class="tok-comment">// {10}</span>
+
+<span class="tok-builtin">assert</span>(plain[<span class="tok-number">1</span>] <span class="tok-operator">==</span> <span class="tok-number">10</span> <span class="tok-operator">&amp;&amp;</span> plain[<span class="tok-number">2</span>] <span class="tok-operator">==</span> <span class="tok-string">&quot;x&quot;</span>)
+<span class="tok-builtin">assert</span>(expanded[<span class="tok-number">1</span>] <span class="tok-operator">==</span> <span class="tok-number">10</span> <span class="tok-operator">&amp;&amp;</span> expanded[<span class="tok-number">2</span>] <span class="tok-operator">==</span> <span class="tok-number">20</span> <span class="tok-operator">&amp;&amp;</span> expanded[<span class="tok-number">3</span>] <span class="tok-operator">==</span> <span class="tok-number">30</span> <span class="tok-operator">&amp;&amp;</span> expanded[<span class="tok-number">4</span>] <span class="tok-operator">==</span> <span class="tok-string">&quot;x&quot;</span>)
+<span class="tok-builtin">assert</span>(list[<span class="tok-number">1</span>] <span class="tok-operator">==</span> <span class="tok-number">10</span> <span class="tok-operator">&amp;&amp;</span> list[<span class="tok-number">2</span>] <span class="tok-operator">==</span> <span class="tok-number">20</span> <span class="tok-operator">&amp;&amp;</span> list[<span class="tok-number">3</span>] <span class="tok-operator">==</span> <span class="tok-number">30</span>)
+<span class="tok-builtin">assert</span>(single[<span class="tok-number">1</span>] <span class="tok-operator">==</span> <span class="tok-number">10</span> <span class="tok-operator">&amp;&amp;</span> single[<span class="tok-number">2</span>] <span class="tok-operator">==</span> <span class="tok-constant">nil</span>)</code></pre>
 <p>If a function has fixed parameters followed by <code>...</code>, fixed parameters are filled first and only the remaining adjusted argument values are captured by the vararg binding. When the final argument expression expands, all of its remaining results may enter <code>...</code>.</p>
-<pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-keyword">func</span> rest(a, <span class="tok-operator">...</span>) {
+<pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-keyword">func</span> triple() {
+    <span class="tok-keyword">return</span> <span class="tok-number">10</span>, <span class="tok-number">20</span>, <span class="tok-number">30</span>
+}
+
+<span class="tok-keyword">func</span> rest(a, <span class="tok-operator">...</span>) {
     <span class="tok-keyword">return</span> a, {<span class="tok-operator">...</span>}
 }
 
-first, tail <span class="tok-operator">:=</span> rest(triple()) <span class="tok-comment">// first == 10; tail == {20, 30}</span></code></pre>
+first, tail <span class="tok-operator">:=</span> rest(triple()) <span class="tok-comment">// first == 10; tail == {20, 30}</span>
+<span class="tok-builtin">assert</span>(first <span class="tok-operator">==</span> <span class="tok-number">10</span>)
+<span class="tok-builtin">assert</span>(tail[<span class="tok-number">1</span>] <span class="tok-operator">==</span> <span class="tok-number">20</span>)
+<span class="tok-builtin">assert</span>(tail[<span class="tok-number">2</span>] <span class="tok-operator">==</span> <span class="tok-number">30</span>)</code></pre>
 <p>Multi-return adjustment is not transitive through variables or table fields. A variable holding the first result of a call is an ordinary single value.</p>
-<pre class="language-leia leia-code"><code class="language-leia leia-code">v <span class="tok-operator">:=</span> triple() <span class="tok-comment">// v == 10</span>
-a, b <span class="tok-operator">:=</span> v     <span class="tok-comment">// a == 10; b == nil</span></code></pre>
+<pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-keyword">func</span> triple() {
+    <span class="tok-keyword">return</span> <span class="tok-number">10</span>, <span class="tok-number">20</span>, <span class="tok-number">30</span>
+}
+
+v <span class="tok-operator">:=</span> triple() <span class="tok-comment">// v == 10</span>
+a, b <span class="tok-operator">:=</span> v     <span class="tok-comment">// a == 10; b == nil</span>
+<span class="tok-builtin">assert</span>(v <span class="tok-operator">==</span> <span class="tok-number">10</span>)
+<span class="tok-builtin">assert</span>(a <span class="tok-operator">==</span> <span class="tok-number">10</span>)
+<span class="tok-builtin">assert</span>(b <span class="tok-operator">==</span> <span class="tok-constant">nil</span>)</code></pre>
 <pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-keyword">func</span> triple() {
     <span class="tok-keyword">return</span> <span class="tok-number">10</span>, <span class="tok-number">20</span>, <span class="tok-number">30</span>
 }
@@ -879,8 +923,8 @@ x, y <span class="tok-operator">:=</span> v
 }
 
 <span class="tok-builtin">next</span> <span class="tok-operator">:=</span> counter()
-<span class="tok-builtin">next</span>() <span class="tok-comment">// 1</span>
-<span class="tok-builtin">next</span>() <span class="tok-comment">// 2</span></code></pre>
+<span class="tok-builtin">assert</span>(<span class="tok-builtin">next</span>() <span class="tok-operator">==</span> <span class="tok-number">1</span>)
+<span class="tok-builtin">assert</span>(<span class="tok-builtin">next</span>() <span class="tok-operator">==</span> <span class="tok-number">2</span>)</code></pre>
 <pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-keyword">func</span> counter() {
     n <span class="tok-operator">:=</span> <span class="tok-number">0</span>
     <span class="tok-keyword">return</span> <span class="tok-keyword">func</span>() {
