@@ -1,0 +1,4 @@
+name = "Leia"
+grammar = "leia"
+path_suffixes = ["leia"]
+line_comments = ["// "]

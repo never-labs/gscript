@@ -1,0 +1,15 @@
+[[language]]
+name = "leia"
+scope = "source.leia"
+file-types = ["leia"]
+comment-token = "//"
+auto-format = true
+formatter = { command = "leia", args = ["fmt"] }
+language-servers = ["leia-lsp"]
+
+[[grammar]]
+name = "leia"
+source = { path = "../../tools/tree-sitter-leia" }
+
+[language-server.leia-lsp]
+command = "leia-lsp"

@@ -114,6 +114,8 @@ def check_vscode() -> None:
         "leia.lintWorkspace",
         "leia.checkWorkspace",
         "leia.previewSpec",
+        "leia.evaluate.case",
+        "leia.agent.run",
     ):
         if command not in commands:
             fail(f"VS Code package is missing command {command}")
@@ -128,6 +130,8 @@ def check_vscode() -> None:
         "textDocument/definition",
         "textDocument/references",
         "textDocument/rename",
+        "textDocument/codeLens",
+        "textDocument/inlayHint",
         "textDocument/publishDiagnostics",
     ):
         if marker not in extension:
@@ -173,6 +177,45 @@ def check_tree_sitter_assets() -> None:
         if node_type not in named_types:
             fail(f"tree-sitter node-types missing {node_type}")
 
+    query = (ROOT / "tools/tree-sitter-leia/queries/highlights.scm").read_text(encoding="utf-8")
+    for marker in (
+        "@keyword.control",
+        "@function.call",
+        "@variable.parameter",
+        "(evaluate_block",
+        "(agent_declaration",
+    ):
+        if marker not in query:
+            fail(f"tree-sitter highlight query missing {marker}")
+
+
+def check_packaged_editor_integrations() -> None:
+    for path in (
+        "editors/neovim/README.md",
+        "editors/neovim/queries/leia/highlights.scm",
+        "editors/helix/languages.toml",
+        "editors/helix/queries/leia/highlights.scm",
+        "editors/zed/extension.toml",
+        "editors/zed/languages/leia/config.toml",
+        "editors/zed/languages/leia/highlights.scm",
+    ):
+        assert_path(path)
+
+    neovim_readme = (ROOT / "editors/neovim/README.md").read_text(encoding="utf-8")
+    for marker in ("parser_config.leia", "tools/tree-sitter-leia", "queries/leia"):
+        if marker not in neovim_readme:
+            fail(f"Neovim README missing {marker}")
+
+    helix_config = (ROOT / "editors/helix/languages.toml").read_text(encoding="utf-8")
+    for marker in ('name = "leia"', 'language-servers = ["leia-lsp"]', 'source = { path = "../../tools/tree-sitter-leia" }'):
+        if marker not in helix_config:
+            fail(f"Helix config missing {marker}")
+
+    zed_manifest = (ROOT / "editors/zed/extension.toml").read_text(encoding="utf-8")
+    for marker in ('id = "leia"', "[grammars.leia]", "tools/tree-sitter-leia"):
+        if marker not in zed_manifest:
+            fail(f"Zed extension manifest missing {marker}")
+
 
 def check_downstream_docs() -> None:
     tree_sitter_readme = (ROOT / "tools/tree-sitter-leia/README.md").read_text(encoding="utf-8")
@@ -208,6 +251,7 @@ def main() -> int:
     check_textmate()
     check_vscode()
     check_tree_sitter_assets()
+    check_packaged_editor_integrations()
     check_downstream_docs()
     print("editor_smoke.py: ok")
     return 0

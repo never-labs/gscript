@@ -1,0 +1,11 @@
+id = "leia"
+name = "Leia"
+version = "0.1.0"
+schema_version = 1
+authors = ["Leia contributors"]
+description = "Leia language support for Zed."
+repository = "https://github.com/never-labs/leia"
+
+[grammars.leia]
+repository = "file:../../tools/tree-sitter-leia"
+rev = "local"
