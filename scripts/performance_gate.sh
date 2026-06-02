@@ -452,6 +452,18 @@ TIMING_JSON="$OUT_DIR/timing_gate.json"
 TIMING_MD="$OUT_DIR/timing_gate.md"
 STRICT_JSON="$OUT_DIR/strict_gate.json"
 STRICT_MD="$OUT_DIR/strict_gate.md"
+ALL_BENCHMARK_GROUPS=(
+    numeric
+    recursion
+    table
+    calls
+    string
+    concurrency
+    data
+    app
+    control
+    precision
+)
 
 TIMING_CMD=(
     python3 benchmarks/timing_compare.py
@@ -528,6 +540,9 @@ if [ "$STRICT" -eq 1 ]; then
         --json "$STRICT_JSON"
         --markdown "$STRICT_MD"
     )
+    for group in "${ALL_BENCHMARK_GROUPS[@]}"; do
+        STRICT_CMD+=(--group "$group")
+    done
     if [ "$NO_LUAJIT" -eq 1 ]; then
         STRICT_CMD+=(--no-luajit)
     fi
