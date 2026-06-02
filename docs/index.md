@@ -54,6 +54,8 @@ only.
   release expectations.
 - [Testing and release gates](testing.md): correctness, docs, and release
   evidence.
+- [Governance](governance.md): maintainer responsibilities, RFC scope,
+  compatibility, and release readiness.
 - [Security policy](../SECURITY.md): supported versions, reporting route, and
   untrusted-script baseline.
 - [Contributing](../CONTRIBUTING.md): local checks, change expectations, and PR

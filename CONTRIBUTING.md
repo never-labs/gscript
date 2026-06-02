@@ -70,3 +70,13 @@ and whether untrusted scripts can reach the changed behavior.
 Issue and pull request templates live under `.github/`. Use the language
 proposal template for syntax or semantic changes so spec, grammar, feature
 matrix, and tests stay connected.
+
+## Governance And RFCs
+
+Public-contract changes should follow the lightweight governance docs:
+
+- [`docs/governance.md`](docs/governance.md)
+- [`docs/contributing/rfcs.md`](docs/contributing/rfcs.md)
+- [`docs/contributing/deprecations.md`](docs/contributing/deprecations.md)
+
+Start larger proposals from [`rfcs/0000-template.md`](rfcs/0000-template.md).
