@@ -36,6 +36,90 @@ assert(seen.elseBranch)
 assert(seen.nilBranch == nil)
 ```
 
+Simple statements are assignments, compound assignments, increment and
+decrement statements, send statements, calls, and expression statements.
+Expression statements evaluate their expression for side effects and discard
+all results.
+
+An assignment evaluates the right-hand side expression list left-to-right, then
+evaluates any address subexpressions needed by non-variable targets, then stores
+adjusted values into the targets from left to right. A target may be a visible
+variable binding, a table or host-backed index expression, or a member
+selection. Assignment to an invalid target raises a runtime error. `:=` creates
+fresh lexical bindings in the current block for identifier targets; `=` updates
+existing targets. Multi-value adjustment for the right-hand side follows the
+rules in [Functions](functions.md).
+
+```leia run all
+events := {}
+func mark(name, value) {
+    events[#events + 1] = name
+    return value
+}
+
+box := {slot: 0}
+box[mark("key", "slot")] = mark("value", 7)
+assert(box.slot == 7)
+assert(events[1] == "value")
+assert(events[2] == "key")
+
+func pair() {
+    return "left", "right"
+}
+a, b, c := pair()
+assert(a == "left")
+assert(b == "right")
+assert(c == nil)
+```
+
+Compound assignment `x += y`, `x -= y`, `x *= y`, and `x /= y` is equivalent
+to evaluating the target once, reading its current value, applying the
+corresponding binary operator to that value and the right-hand expression, then
+storing the result back into the same target. The operator may use ordinary
+primitive coercions or metamethod dispatch. `x++` and `x--` are statements
+equivalent to adding or subtracting integer `1` from the target once.
+
+```leia run all
+count := 1
+count += 2
+count *= 3
+count--
+assert(count == 8)
+
+log := {}
+t := setmetatable({}, {
+    __index: func(_, key) {
+        log[#log + 1] = "read:" .. key
+        return 10
+    },
+    __newindex: func(_, key, value) {
+        log[#log + 1] = "write:" .. key .. "=" .. value
+    },
+})
+t.score += 5
+assert(log[1] == "read:score")
+assert(log[2] == "write:score=15")
+```
+
+```leia fail all
+1 = 2
+```
+
+```leia fail all
+name := "x"
+name++
+```
+
+`ch <- value` as a statement sends `value` to channel `ch`. Send blocking,
+close, ordering, and cancellation semantics are specified in
+[Concurrency](concurrency.md).
+
+```leia run all
+ch := make(chan, 1)
+ch <- "sent"
+assert(<-ch == "sent")
+```
+
 `for` supports indefinite loops, condition loops, C-style loops, and range
 loops. Loop bodies may use `break` and `continue`.
 

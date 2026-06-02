@@ -286,12 +286,6 @@ assert(#t == 99)
 assert(rawlen(t) == 0)
 ```
 
-```leia run all
-t := setmetatable({}, { __len: func(_) { return 99 } })
-assert(#t == 99)
-assert(rawlen(t) == 0)
-```
-
 Sequence length on sparse tables follows Leia runtime behavior. Programs that
 depend on sparse length edge cases should pin that behavior with tests.
 

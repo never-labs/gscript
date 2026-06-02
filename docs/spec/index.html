@@ -874,6 +874,54 @@ short_or <span class="tok-operator">:=</span> <span class="tok-constant">true</s
 <span class="tok-builtin">assert</span>(seen.zero)
 <span class="tok-builtin">assert</span>(seen.elseBranch)
 <span class="tok-builtin">assert</span>(seen.nilBranch <span class="tok-operator">==</span> <span class="tok-constant">nil</span>)</code></pre>
+<p>Simple statements are assignments, compound assignments, increment and decrement statements, send statements, calls, and expression statements. Expression statements evaluate their expression for side effects and discard all results.</p>
+<p>An assignment evaluates the right-hand side expression list left-to-right, then evaluates any address subexpressions needed by non-variable targets, then stores adjusted values into the targets from left to right. A target may be a visible variable binding, a table or host-backed index expression, or a member selection. Assignment to an invalid target raises a runtime error. <code>:=</code> creates fresh lexical bindings in the current block for identifier targets; <code>=</code> updates existing targets. Multi-value adjustment for the right-hand side follows the rules in <a href="#">Functions</a>.</p>
+<pre class="language-leia leia-code"><code class="language-leia leia-code">events <span class="tok-operator">:=</span> {}
+<span class="tok-keyword">func</span> mark(name, value) {
+    events[<span class="tok-operator">#</span>events <span class="tok-operator">+</span> <span class="tok-number">1</span>] <span class="tok-operator">=</span> name
+    <span class="tok-keyword">return</span> value
+}
+
+box <span class="tok-operator">:=</span> {slot: <span class="tok-number">0</span>}
+box[mark(<span class="tok-string">&quot;key&quot;</span>, <span class="tok-string">&quot;slot&quot;</span>)] <span class="tok-operator">=</span> mark(<span class="tok-string">&quot;value&quot;</span>, <span class="tok-number">7</span>)
+<span class="tok-builtin">assert</span>(box.slot <span class="tok-operator">==</span> <span class="tok-number">7</span>)
+<span class="tok-builtin">assert</span>(events[<span class="tok-number">1</span>] <span class="tok-operator">==</span> <span class="tok-string">&quot;value&quot;</span>)
+<span class="tok-builtin">assert</span>(events[<span class="tok-number">2</span>] <span class="tok-operator">==</span> <span class="tok-string">&quot;key&quot;</span>)
+
+<span class="tok-keyword">func</span> pair() {
+    <span class="tok-keyword">return</span> <span class="tok-string">&quot;left&quot;</span>, <span class="tok-string">&quot;right&quot;</span>
+}
+a, b, c <span class="tok-operator">:=</span> pair()
+<span class="tok-builtin">assert</span>(a <span class="tok-operator">==</span> <span class="tok-string">&quot;left&quot;</span>)
+<span class="tok-builtin">assert</span>(b <span class="tok-operator">==</span> <span class="tok-string">&quot;right&quot;</span>)
+<span class="tok-builtin">assert</span>(c <span class="tok-operator">==</span> <span class="tok-constant">nil</span>)</code></pre>
+<p>Compound assignment <code>x += y</code>, <code>x -= y</code>, <code>x *= y</code>, and <code>x /= y</code> is equivalent to evaluating the target once, reading its current value, applying the corresponding binary operator to that value and the right-hand expression, then storing the result back into the same target. The operator may use ordinary primitive coercions or metamethod dispatch. <code>x++</code> and <code>x--</code> are statements equivalent to adding or subtracting integer <code>1</code> from the target once.</p>
+<pre class="language-leia leia-code"><code class="language-leia leia-code">count <span class="tok-operator">:=</span> <span class="tok-number">1</span>
+count <span class="tok-operator">+=</span> <span class="tok-number">2</span>
+count <span class="tok-operator">*=</span> <span class="tok-number">3</span>
+count<span class="tok-operator">--</span>
+<span class="tok-builtin">assert</span>(count <span class="tok-operator">==</span> <span class="tok-number">8</span>)
+
+log <span class="tok-operator">:=</span> {}
+t <span class="tok-operator">:=</span> <span class="tok-builtin">setmetatable</span>({}, {
+    __index: <span class="tok-keyword">func</span>(_, key) {
+        log[<span class="tok-operator">#</span>log <span class="tok-operator">+</span> <span class="tok-number">1</span>] <span class="tok-operator">=</span> <span class="tok-string">&quot;read:&quot;</span> <span class="tok-operator">..</span> key
+        <span class="tok-keyword">return</span> <span class="tok-number">10</span>
+    },
+    __newindex: <span class="tok-keyword">func</span>(_, key, value) {
+        log[<span class="tok-operator">#</span>log <span class="tok-operator">+</span> <span class="tok-number">1</span>] <span class="tok-operator">=</span> <span class="tok-string">&quot;write:&quot;</span> <span class="tok-operator">..</span> key <span class="tok-operator">..</span> <span class="tok-string">&quot;=&quot;</span> <span class="tok-operator">..</span> value
+    },
+})
+t.score <span class="tok-operator">+=</span> <span class="tok-number">5</span>
+<span class="tok-builtin">assert</span>(log[<span class="tok-number">1</span>] <span class="tok-operator">==</span> <span class="tok-string">&quot;read:score&quot;</span>)
+<span class="tok-builtin">assert</span>(log[<span class="tok-number">2</span>] <span class="tok-operator">==</span> <span class="tok-string">&quot;write:score=15&quot;</span>)</code></pre>
+<pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-number">1</span> <span class="tok-operator">=</span> <span class="tok-number">2</span></code></pre>
+<pre class="language-leia leia-code"><code class="language-leia leia-code">name <span class="tok-operator">:=</span> <span class="tok-string">&quot;x&quot;</span>
+name<span class="tok-operator">++</span></code></pre>
+<p><code>ch &lt;- value</code> as a statement sends <code>value</code> to channel <code>ch</code>. Send blocking, close, ordering, and cancellation semantics are specified in <a href="#">Concurrency</a>.</p>
+<pre class="language-leia leia-code"><code class="language-leia leia-code">ch <span class="tok-operator">:=</span> <span class="tok-builtin">make</span>(<span class="tok-keyword">chan</span>, <span class="tok-number">1</span>)
+ch <span class="tok-operator">&lt;-</span> <span class="tok-string">&quot;sent&quot;</span>
+<span class="tok-builtin">assert</span>(<span class="tok-operator">&lt;-</span>ch <span class="tok-operator">==</span> <span class="tok-string">&quot;sent&quot;</span>)</code></pre>
 <p><code>for</code> supports indefinite loops, condition loops, C-style loops, and range loops. Loop bodies may use <code>break</code> and <code>continue</code>.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code">sum <span class="tok-operator">:=</span> <span class="tok-number">0</span>
 <span class="tok-keyword">for</span> i <span class="tok-operator">:=</span> <span class="tok-number">1</span>; i <span class="tok-operator">&lt;=</span> <span class="tok-number">3</span>; i<span class="tok-operator">++</span> {
@@ -1432,9 +1480,6 @@ proxy.event <span class="tok-operator">=</span> <span class="tok-string">&quot;s
 <span class="tok-builtin">setmetatable</span>(t, {__newindex: t})
 t.missing <span class="tok-operator">=</span> <span class="tok-number">1</span></code></pre>
 <p>The length operator <code>#x</code> uses the value&#x27;s ordinary length behavior and may consult <code>__len</code>. <code>rawlen(x)</code> bypasses <code>__len</code> for tables and strings.</p>
-<pre class="language-leia leia-code"><code class="language-leia leia-code">t <span class="tok-operator">:=</span> <span class="tok-builtin">setmetatable</span>({}, { __len: <span class="tok-keyword">func</span>(_) { <span class="tok-keyword">return</span> <span class="tok-number">99</span> } })
-<span class="tok-builtin">assert</span>(<span class="tok-operator">#</span>t <span class="tok-operator">==</span> <span class="tok-number">99</span>)
-<span class="tok-builtin">assert</span>(<span class="tok-builtin">rawlen</span>(t) <span class="tok-operator">==</span> <span class="tok-number">0</span>)</code></pre>
 <pre class="language-leia leia-code"><code class="language-leia leia-code">t <span class="tok-operator">:=</span> <span class="tok-builtin">setmetatable</span>({}, { __len: <span class="tok-keyword">func</span>(_) { <span class="tok-keyword">return</span> <span class="tok-number">99</span> } })
 <span class="tok-builtin">assert</span>(<span class="tok-operator">#</span>t <span class="tok-operator">==</span> <span class="tok-number">99</span>)
 <span class="tok-builtin">assert</span>(<span class="tok-builtin">rawlen</span>(t) <span class="tok-operator">==</span> <span class="tok-number">0</span>)</code></pre>
