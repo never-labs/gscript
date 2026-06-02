@@ -50,13 +50,17 @@ assert(y == 2)
 Only `nil` and `false` are falsy. Numbers, including `0`, empty strings, empty
 tables, functions, coroutines, and channels are truthy.
 
-```leia
+```leia run all
+seenZero := false
+seenEmpty := false
 if 0 {
-    print("numbers are truthy")
+    seenZero = true
 }
 if "" {
-    print("empty strings are truthy")
+    seenEmpty = true
 }
+assert(seenZero)
+assert(seenEmpty)
 ```
 
 Numbers have one script-visible category, `number`, with integer and
@@ -323,7 +327,7 @@ assert(receivedFn(9) == 9)
 The `type` function reports the stable script-visible category for ordinary
 values.
 
-```leia
+```text
 type(nil)     // "nil"
 type(true)    // "boolean"
 type(1)       // "number"

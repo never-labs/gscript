@@ -88,7 +88,7 @@ return lookup.name
 configuration. A field key is the public alias used by script code. A field
 value is either another alias string or a provider configuration table.
 
-```leia
+```text
 models {
     default: "fast"
     fast: {
@@ -167,7 +167,7 @@ shared provider, trace, replay, budget, cancellation, and approval context.
 
 Named agents bind their name in the current scope:
 
-```leia
+```text
 agent summarize(text) {
     system: "Return one concise paragraph."
     user: text
@@ -217,7 +217,7 @@ The stable invariants are:
 
 The default agent loop can be understood as this conceptual shape:
 
-```leia
+```text
 agent answer(question) {
     model: "fast"
     system: "Use tools when useful."
@@ -239,7 +239,7 @@ result, err := answer("What changed?")
 The same structure can be written manually with a custom `flow` when the
 program needs precise multi-turn control:
 
-```leia
+```text
 agent answer(question) {
     model: "fast"
     system: "Use tools when useful."
@@ -442,7 +442,7 @@ return out.observed, out.shadowed, err
 with that same ordered list shape. Role fields are converted to normalized
 message tables:
 
-```leia
+```text
 history := messages {
     system: "Use evidence."
     user: "Find release notes."
@@ -588,7 +588,7 @@ same thing. Ambient inheritance affects `turn {}` request construction.
 Flow-local injection only creates identifiers such as `model`, `system`, and
 `tools` for fields explicitly written in the agent configuration. For example:
 
-```leia
+```text
 agent inherit(q) {
     model: "fast"
     system: "Brief."
@@ -613,7 +613,7 @@ agent inherit(q) {
 Outside an agent there is no ambient frame, so request construction must be
 explicit:
 
-```leia
+```text
 result, err := turn {
     model: "fast"
     messages: messages {
@@ -715,7 +715,7 @@ Public budget dimensions are `turns`, `calls`, `tokens`, and `time`. Provider
 usage may include cost metadata, but money accounting is not a stable
 script-level budget dimension.
 
-```leia
+```text
 budget { turns: 2, calls: 4, tokens: 1000, time: 30 } {
     result, err := turn { user: "short answer" }
 }

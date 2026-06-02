@@ -233,7 +233,7 @@ group for that token; blank-line separation starts a new group. Stable directive
 names and their semantic effects are specified by the directive and AI-native
 chapters. Lexically, a directive is still a line comment.
 
-```leia
+```text
 // leia:requires docs.read
 // leia:cap net.client
 agent summarize(text) {

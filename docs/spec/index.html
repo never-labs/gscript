@@ -326,9 +326,9 @@ x <span class="tok-operator">:=</span> <span class="tok-number">1</span> <span c
 
 <span class="tok-builtin">assert</span>(x <span class="tok-operator">==</span> <span class="tok-number">3</span>)</code></pre>
 <p>File directives are line comments whose text begins with <code>leia:</code> after <code>//</code>. Directives attach to the following token when they are in the leading comment group for that token; blank-line separation starts a new group. Stable directive names and their semantic effects are specified by the directive and AI-native chapters. Lexically, a directive is still a line comment.</p>
-<pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-comment">// leia:requires docs.read</span>
-<span class="tok-comment">// leia:cap net.client</span>
-<span class="tok-contextual">agent</span> summarize(text) {
+<pre class="language-text"><code class="language-text">// leia:requires docs.read
+// leia:cap net.client
+agent summarize(text) {
     user: text
 }</code></pre>
 <pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-comment">/* block comments do not nest
@@ -500,12 +500,16 @@ y <span class="tok-operator">=</span> <span class="tok-number">2</span>
 <span class="tok-builtin">assert</span>(x <span class="tok-operator">==</span> <span class="tok-number">1</span>)
 <span class="tok-builtin">assert</span>(y <span class="tok-operator">==</span> <span class="tok-number">2</span>)</code></pre>
 <p>Only <code>nil</code> and <code>false</code> are falsy. Numbers, including <code>0</code>, empty strings, empty tables, functions, coroutines, and channels are truthy.</p>
-<pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-keyword">if</span> <span class="tok-number">0</span> {
-    <span class="tok-builtin">print</span>(<span class="tok-string">&quot;numbers are truthy&quot;</span>)
+<pre class="language-leia leia-code"><code class="language-leia leia-code">seenZero <span class="tok-operator">:=</span> <span class="tok-constant">false</span>
+seenEmpty <span class="tok-operator">:=</span> <span class="tok-constant">false</span>
+<span class="tok-keyword">if</span> <span class="tok-number">0</span> {
+    seenZero <span class="tok-operator">=</span> <span class="tok-constant">true</span>
 }
 <span class="tok-keyword">if</span> <span class="tok-string">&quot;&quot;</span> {
-    <span class="tok-builtin">print</span>(<span class="tok-string">&quot;empty strings are truthy&quot;</span>)
-}</code></pre>
+    seenEmpty <span class="tok-operator">=</span> <span class="tok-constant">true</span>
+}
+<span class="tok-builtin">assert</span>(seenZero)
+<span class="tok-builtin">assert</span>(seenEmpty)</code></pre>
 <p>Numbers have one script-visible category, <code>number</code>, with integer and floating-point subtypes observable through <code>math.type</code>. The subtype is part of the v1.0 observable contract for <code>math.type</code>, <code>tostring</code>, table-key behavior, and host APIs that expose value kinds. The subtype is a property of the runtime value, not of a variable or table slot.</p>
 <p>Numeric literal syntax determines the initial runtime subtype. An integer literal token is a decimal numeral without a decimal point or exponent, or a prefixed numeral using <code>0x</code>, <code>0b</code>, or <code>0o</code> as specified in <a href="#">Lexical Elements</a>. An integer literal denotes an integer value when its mathematical value is in the portable integer subtype range; otherwise it denotes the nearest representable float selected by the current runtime conversion. A floating-point literal token has a decimal point or exponent and always denotes a float value, even when its mathematical value is integral. The unary <code>-</code> operator is not part of any literal token.</p>
 <p>The portable integer subtype range for ordinary values is signed 48-bit two&#x27;s-complement: <code>-140737488355328</code> through <code>140737488355327</code>. Portable programs may rely on integer subtype preservation inside that closed range. Portable programs must not rely on integer subtype preservation outside that range unless a module or host contract explicitly promises a wider range. A negative boundary value can be produced by arithmetic even when the corresponding positive source literal would be outside the range.</p>
@@ -637,12 +641,12 @@ receivedFn <span class="tok-operator">:=</span> <span class="tok-operator">&lt;-
 <span class="tok-builtin">assert</span>(receivedFn <span class="tok-operator">==</span> fn)
 <span class="tok-builtin">assert</span>(receivedFn(<span class="tok-number">9</span>) <span class="tok-operator">==</span> <span class="tok-number">9</span>)</code></pre>
 <p>The <code>type</code> function reports the stable script-visible category for ordinary values.</p>
-<pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-builtin">type</span>(<span class="tok-constant">nil</span>)     <span class="tok-comment">// &quot;nil&quot;</span>
-<span class="tok-builtin">type</span>(<span class="tok-constant">true</span>)    <span class="tok-comment">// &quot;boolean&quot;</span>
-<span class="tok-builtin">type</span>(<span class="tok-number">1</span>)       <span class="tok-comment">// &quot;number&quot;</span>
-<span class="tok-builtin">type</span>(<span class="tok-string">&quot;x&quot;</span>)     <span class="tok-comment">// &quot;string&quot;</span>
-<span class="tok-builtin">type</span>({})      <span class="tok-comment">// &quot;table&quot;</span>
-<span class="tok-builtin">type</span>(<span class="tok-keyword">func</span>() {}) <span class="tok-comment">// &quot;function&quot;</span></code></pre>
+<pre class="language-text"><code class="language-text">type(nil)     // &quot;nil&quot;
+type(true)    // &quot;boolean&quot;
+type(1)       // &quot;number&quot;
+type(&quot;x&quot;)     // &quot;string&quot;
+type({})      // &quot;table&quot;
+type(func() {}) // &quot;function&quot;</code></pre>
 <pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-builtin">assert</span>(<span class="tok-builtin">type</span>(<span class="tok-constant">nil</span>) <span class="tok-operator">==</span> <span class="tok-string">&quot;nil&quot;</span>)
 <span class="tok-builtin">assert</span>(<span class="tok-builtin">type</span>(<span class="tok-constant">true</span>) <span class="tok-operator">==</span> <span class="tok-string">&quot;boolean&quot;</span>)
 <span class="tok-builtin">assert</span>(<span class="tok-builtin">type</span>(<span class="tok-number">1</span>) <span class="tok-operator">==</span> <span class="tok-string">&quot;number&quot;</span>)
@@ -1705,11 +1709,11 @@ evaluate <span class="tok-string">&quot;answer can use lookup&quot;</span> {
 <span class="tok-keyword">return</span> lookup.name</code></pre>
 <h3 id="ai-native-syntax-models">Models</h3>
 <p><code>models { ... }</code> declares module-scoped model aliases and provider configuration. A field key is the public alias used by script code. A field value is either another alias string or a provider configuration table.</p>
-<pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-contextual">models</span> {
-    <span class="tok-keyword">default</span>: <span class="tok-string">&quot;fast&quot;</span>
+<pre class="language-text"><code class="language-text">models {
+    default: &quot;fast&quot;
     fast: {
-        protocol: <span class="tok-string">&quot;anthropic_compatible&quot;</span>
-        provider_model: <span class="tok-string">&quot;glm-4.5&quot;</span>
+        protocol: &quot;anthropic_compatible&quot;
+        provider_model: &quot;glm-4.5&quot;
     }
 }</code></pre>
 <p><code>default</code> is the model used when neither a <code>turn</code> nor an ambient agent configuration supplies <code>model</code>. <code>default</code> may point to another alias. Alias cycles are validation errors. If an alias maps to a provider configuration, the host&#x27;s provider factory may resolve it to an actual provider model name; if no factory is installed, the configuration is still visible to tooling but cannot perform live requests.</p>
@@ -1740,8 +1744,8 @@ value, err <span class="tok-operator">:=</span> search_notes.fn(<span class="tok
 <p>The built-in loop is the default because an agent declaration is normally a complete workflow specification. Adding <code>flow { ... }</code> replaces that loop with the supplied code. It does not customize one step of the default loop; it owns the whole workflow body.</p>
 <p>Every agent call creates a fresh agent frame. The frame is visible to nested <code>turn {}</code> calls as ambient configuration and to nested agent-as-tool calls as shared provider, trace, replay, budget, cancellation, and approval context.</p>
 <p>Named agents bind their name in the current scope:</p>
-<pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-contextual">agent</span> summarize(text) {
-    system: <span class="tok-string">&quot;Return one concise paragraph.&quot;</span>
+<pre class="language-text"><code class="language-text">agent summarize(text) {
+    system: &quot;Return one concise paragraph.&quot;
     user: text
 }</code></pre>
 <p>Anonymous agents are expressions and may be assigned, passed, or immediately called:</p>
@@ -1772,54 +1776,54 @@ out, err <span class="tok-operator">:=</span> echo(<span class="tok-string">&quo
 <li>A later turn sees prior work only through its <code>messages</code> field.</li>
 </ol>
 <p>The default agent loop can be understood as this conceptual shape:</p>
-<pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-contextual">agent</span> answer(question) {
-    model: <span class="tok-string">&quot;fast&quot;</span>
-    system: <span class="tok-string">&quot;Use tools when useful.&quot;</span>
+<pre class="language-text"><code class="language-text">agent answer(question) {
+    model: &quot;fast&quot;
+    system: &quot;Use tools when useful.&quot;
     user: question
     tools: [lookup]
 }
 
-<span class="tok-comment">// Calling the agent runs the built-in loop:</span>
-<span class="tok-comment">// 1. build messages from system + user;</span>
-<span class="tok-comment">// 2. call turn { model, messages, tools };</span>
-<span class="tok-comment">// 3. if result.status == &quot;tool_calls&quot;, dispatch requested tools;</span>
-<span class="tok-comment">// 4. append tool results to history;</span>
-<span class="tok-comment">// 5. call another turn with the updated history;</span>
-<span class="tok-comment">// 6. validate structured output when configured;</span>
-<span class="tok-comment">// 7. stop on final answer, provider stop, budget, approval, cancellation, or error.</span>
-result, err <span class="tok-operator">:=</span> answer(<span class="tok-string">&quot;What changed?&quot;</span>)</code></pre>
+// Calling the agent runs the built-in loop:
+// 1. build messages from system + user;
+// 2. call turn { model, messages, tools };
+// 3. if result.status == &quot;tool_calls&quot;, dispatch requested tools;
+// 4. append tool results to history;
+// 5. call another turn with the updated history;
+// 6. validate structured output when configured;
+// 7. stop on final answer, provider stop, budget, approval, cancellation, or error.
+result, err := answer(&quot;What changed?&quot;)</code></pre>
 <p>The same structure can be written manually with a custom <code>flow</code> when the program needs precise multi-turn control:</p>
-<pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-contextual">agent</span> answer(question) {
-    model: <span class="tok-string">&quot;fast&quot;</span>
-    system: <span class="tok-string">&quot;Use tools when useful.&quot;</span>
+<pre class="language-text"><code class="language-text">agent answer(question) {
+    model: &quot;fast&quot;
+    system: &quot;Use tools when useful.&quot;
     tools: [lookup]
-} <span class="tok-contextual">flow</span> {
-    history <span class="tok-operator">:=</span> <span class="tok-contextual">messages</span> {
+} flow {
+    history := messages {
         system: system
         user: question
     }
 
-    first, err <span class="tok-operator">:=</span> <span class="tok-contextual">turn</span> {
-        <span class="tok-contextual">messages</span>: history
+    first, err := turn {
+        messages: history
         tools: tools
     }
-    <span class="tok-keyword">if</span> err <span class="tok-operator">!=</span> <span class="tok-constant">nil</span> {
-        <span class="tok-keyword">return</span> <span class="tok-constant">nil</span>, err
+    if err != nil {
+        return nil, err
     }
 
-    <span class="tok-keyword">if</span> first.status <span class="tok-operator">==</span> <span class="tok-string">&quot;tool_calls&quot;</span> {
-        call <span class="tok-operator">:=</span> first.calls[<span class="tok-number">1</span>]
-        value, tool_err <span class="tok-operator">:=</span> llm.dispatch(call, tools)
-        <span class="tok-keyword">if</span> tool_err <span class="tok-operator">!=</span> <span class="tok-constant">nil</span> {
-            history[<span class="tok-operator">#</span>history <span class="tok-operator">+</span> <span class="tok-number">1</span>] <span class="tok-operator">=</span> msg.tool_error(call.id, tool_err.message)
-        } <span class="tok-keyword">else</span> {
-            history[<span class="tok-operator">#</span>history <span class="tok-operator">+</span> <span class="tok-number">1</span>] <span class="tok-operator">=</span> msg.assistant_call(call)
-            history[<span class="tok-operator">#</span>history <span class="tok-operator">+</span> <span class="tok-number">1</span>] <span class="tok-operator">=</span> msg.tool_result(call.id, value)
+    if first.status == &quot;tool_calls&quot; {
+        call := first.calls[1]
+        value, tool_err := llm.dispatch(call, tools)
+        if tool_err != nil {
+            history[#history + 1] = msg.tool_error(call.id, tool_err.message)
+        } else {
+            history[#history + 1] = msg.assistant_call(call)
+            history[#history + 1] = msg.tool_result(call.id, value)
         }
-        <span class="tok-keyword">return</span> <span class="tok-contextual">turn</span> { <span class="tok-contextual">messages</span>: history }
+        return turn { messages: history }
     }
 
-    <span class="tok-keyword">return</span> first, <span class="tok-constant">nil</span>
+    return first, nil
 }</code></pre>
 <p>Both examples use the same <code>turn</code> operation at the provider boundary. The difference is where the loop policy lives: in the built-in agent loop, or in user-written <code>flow</code> code.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-contextual">agent</span> scripted(question) {
@@ -1940,9 +1944,9 @@ out, err <span class="tok-operator">:=</span> scope(<span class="tok-string">&qu
 <span class="tok-keyword">return</span> out.observed, out.shadowed, err</code></pre>
 <h3 id="ai-native-syntax-messages">Messages</h3>
 <p><code>messages { ... }</code> constructs an ordered message list. A history is any value with that same ordered list shape. Role fields are converted to normalized message tables:</p>
-<pre class="language-leia leia-code"><code class="language-leia leia-code">history <span class="tok-operator">:=</span> <span class="tok-contextual">messages</span> {
-    system: <span class="tok-string">&quot;Use evidence.&quot;</span>
-    user: <span class="tok-string">&quot;Find release notes.&quot;</span>
+<pre class="language-text"><code class="language-text">history := messages {
+    system: &quot;Use evidence.&quot;
+    user: &quot;Find release notes.&quot;
 }</code></pre>
 <p>The stable shorthand roles are <code>system</code>, <code>user</code>, and <code>assistant</code>. A field whose key is not one of those roles becomes <code>{role: key, text: value}</code>. A field without a key is inserted as-is, which allows incremental histories to mix message helper results in the same block.</p>
 <p>The stable normalized fields are:</p>
@@ -2037,31 +2041,31 @@ value, err <span class="tok-operator">:=</span> llm.dispatch(call, [lookup])
 </tbody></table></div>
 <p>If a <code>turn</code> runs inside an agent, absent <code>model</code>, <code>tools</code>, <code>budget</code>, <code>response_format</code>, <code>metadata</code>, <code>max_tokens</code>, and sampling fields inherit from the ambient agent configuration. If both <code>messages</code> and <code>user</code> are absent, an ambient agent <code>system</code> and <code>user</code> are used to synthesize messages. Outside an agent, a <code>turn</code> must have explicit <code>messages</code> or <code>user</code>, unless the host installs a provider layer with different documented behavior.</p>
 <p>Inside a custom <code>flow</code>, inheritance and local variables are related but not the same thing. Ambient inheritance affects <code>turn {}</code> request construction. Flow-local injection only creates identifiers such as <code>model</code>, <code>system</code>, and <code>tools</code> for fields explicitly written in the agent configuration. For example:</p>
-<pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-contextual">agent</span> inherit(q) {
-    model: <span class="tok-string">&quot;fast&quot;</span>
-    system: <span class="tok-string">&quot;Brief.&quot;</span>
+<pre class="language-text"><code class="language-text">agent inherit(q) {
+    model: &quot;fast&quot;
+    system: &quot;Brief.&quot;
     user: q
-} <span class="tok-contextual">flow</span> {
-    <span class="tok-comment">// Uses inherited model, system, and user to build the request.</span>
-    first, err <span class="tok-operator">:=</span> <span class="tok-contextual">turn</span> {}
+} flow {
+    // Uses inherited model, system, and user to build the request.
+    first, err := turn {}
 
-    <span class="tok-comment">// Equivalent explicit form for the message list, while still inheriting</span>
-    <span class="tok-comment">// model and other omitted request fields.</span>
-    second, err <span class="tok-operator">:=</span> <span class="tok-contextual">turn</span> {
-        <span class="tok-contextual">messages</span>: <span class="tok-contextual">messages</span> {
+    // Equivalent explicit form for the message list, while still inheriting
+    // model and other omitted request fields.
+    second, err := turn {
+        messages: messages {
             system: system
             user: q
         }
     }
 
-    <span class="tok-keyword">return</span> second, err
+    return second, err
 }</code></pre>
 <p>Outside an agent there is no ambient frame, so request construction must be explicit:</p>
-<pre class="language-leia leia-code"><code class="language-leia leia-code">result, err <span class="tok-operator">:=</span> <span class="tok-contextual">turn</span> {
-    model: <span class="tok-string">&quot;fast&quot;</span>
-    <span class="tok-contextual">messages</span>: <span class="tok-contextual">messages</span> {
-        system: <span class="tok-string">&quot;Brief.&quot;</span>
-        user: <span class="tok-string">&quot;Explain Leia.&quot;</span>
+<pre class="language-text"><code class="language-text">result, err := turn {
+    model: &quot;fast&quot;
+    messages: messages {
+        system: &quot;Brief.&quot;
+        user: &quot;Explain Leia.&quot;
     }
 }</code></pre>
 <p>Result fields are stable:</p>
@@ -2115,8 +2119,8 @@ value, err <span class="tok-operator">:=</span> wrapped.fn(<span class="tok-stri
 <span class="tok-keyword">return</span> wrapped.name, value.summary, err</code></pre>
 <h3 id="ai-native-syntax-budgets-cancellation-and-errors">Budgets, Cancellation, And Errors</h3>
 <p>Public budget dimensions are <code>turns</code>, <code>calls</code>, <code>tokens</code>, and <code>time</code>. Provider usage may include cost metadata, but money accounting is not a stable script-level budget dimension.</p>
-<pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-contextual">budget</span> { turns: <span class="tok-number">2</span>, calls: <span class="tok-number">4</span>, tokens: <span class="tok-number">1000</span>, time: <span class="tok-number">30</span> } {
-    result, err <span class="tok-operator">:=</span> <span class="tok-contextual">turn</span> { user: <span class="tok-string">&quot;short answer&quot;</span> }
+<pre class="language-text"><code class="language-text">budget { turns: 2, calls: 4, tokens: 1000, time: 30 } {
+    result, err := turn { user: &quot;short answer&quot; }
 }</code></pre>
 <p>Budgets are checked before turns, before tool calls, and after provider usage is charged. Cancellation is checked before each provider turn and before each tool dispatch. Recoverable provider, budget, validation, cancellation, approval, and tool failures return structured <code>nil, err</code> results unless a specific API documents a runtime error.</p>
 <p>Trace events must avoid prompt text and tool-result values unless explicitly configured by the host. The stable trace surface is metadata such as event type, model, step, status, message count, tool count, tool name, and usage.</p>
