@@ -261,6 +261,72 @@ func TestPlaygroundAIExamplesCoverRunnableWorkflowShapes(t *testing.T) {
 	}
 }
 
+func TestPlaygroundTourExamplesProduceTeachingOutputs(t *testing.T) {
+	want := map[string][]string{
+		"welcome": {
+			`"name":"Ada"`,
+			`"email":"ada@example.com"`,
+			`"name":"Grace"`,
+		},
+		"control-flow": {
+			"click\t3",
+			"view\t5",
+		},
+		"functions": {
+			"1\tAda\t98",
+			"skip\tbad row: bad",
+			"2\tGrace\t95",
+		},
+		"tables": {
+			`"apac"`,
+			`"total":42`,
+			`"count":2`,
+		},
+		"strings-stdlib": {
+			"ALPHA,BETA,GAMMA",
+			"distance\t5",
+		},
+		"errors": {
+			"name\tAda",
+			"recover\tmissing field: name",
+		},
+		"concurrency": {
+			"sum of squares\t267",
+		},
+		"data-oriented": {
+			"positions",
+			"fast count\t2",
+			"fast ids",
+		},
+		"evaluate": {
+			"run leia evaluate to execute the evaluate block",
+		},
+	}
+	for _, example := range playgroundTourLessons() {
+		t.Run(example.ID, func(t *testing.T) {
+			checks, ok := want[example.ID]
+			if !ok {
+				t.Fatalf("missing teaching-output assertion for %s", example.ID)
+			}
+			dir := t.TempDir()
+			path := filepath.Join(dir, "main.leia")
+			if err := os.WriteFile(path, []byte(example.Source), 0600); err != nil {
+				t.Fatal(err)
+			}
+			var stdout, stderr bytes.Buffer
+			code := runPlaygroundExecCommand([]string{"--max-steps=2000000", path}, &stdout, &stderr)
+			if code != 0 {
+				t.Fatalf("example failed with code %d\nstdout:\n%s\nstderr:\n%s\nsource:\n%s", code, stdout.String(), stderr.String(), example.Source)
+			}
+			for _, needle := range checks {
+				if !strings.Contains(stdout.String(), needle) {
+					t.Fatalf("stdout for %s missing %q\nstdout:\n%s", example.ID, needle, stdout.String())
+				}
+			}
+		})
+	}
+}
+
 func TestPlaygroundExecAIProfileUsesGLMEnv(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
