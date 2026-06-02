@@ -154,6 +154,7 @@ def check_vscode() -> None:
         "textDocument/codeLens",
         "textDocument/inlayHint",
         "textDocument/documentLink",
+        "textDocument/semanticTokens/full",
         "textDocument/publishDiagnostics",
         "restartLanguageServer",
         "failPending",

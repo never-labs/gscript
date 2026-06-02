@@ -131,6 +131,8 @@ func (s *Server) handle(payload []byte) error {
 		return s.inlayHint(req.ID, req.Params)
 	case "textDocument/documentLink":
 		return s.documentLink(req.ID, req.Params)
+	case "textDocument/semanticTokens/full":
+		return s.semanticTokensFull(req.ID, req.Params)
 	case "textDocument/definition":
 		return s.definition(req.ID, req.Params)
 	case "textDocument/references":
@@ -162,6 +164,13 @@ func initializeResult() map[string]any {
 			"inlayHintProvider": true,
 			"documentLinkProvider": map[string]any{
 				"resolveProvider": false,
+			},
+			"semanticTokensProvider": map[string]any{
+				"legend": map[string]any{
+					"tokenTypes":     semanticTokenTypes,
+					"tokenModifiers": semanticTokenModifiers,
+				},
+				"full": true,
 			},
 			"definitionProvider": true,
 			"referencesProvider": true,

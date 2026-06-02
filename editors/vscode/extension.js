@@ -3,6 +3,10 @@
 const vscode = require("vscode");
 const path = require("path");
 
+const semanticTokenTypes = ["keyword", "variable", "function", "string", "number", "operator", "type"];
+const semanticTokenModifiers = ["declaration"];
+const semanticTokenLegend = new vscode.SemanticTokensLegend(semanticTokenTypes, semanticTokenModifiers);
+
 let lspClient;
 let lspContext;
 let lspOutput;
@@ -331,6 +335,9 @@ class MinimalLanguageClient {
       vscode.languages.registerDocumentLinkProvider("leia", {
         provideDocumentLinks: (doc) => this.provideDocumentLinks(doc)
       }),
+      vscode.languages.registerDocumentSemanticTokensProvider("leia", {
+        provideDocumentSemanticTokens: (doc) => this.provideSemanticTokens(doc)
+      }, semanticTokenLegend),
       vscode.languages.registerCompletionItemProvider("leia", {
         provideCompletionItems: (doc, pos) => this.provideCompletionItems(doc, pos)
       }),
@@ -496,6 +503,23 @@ class MinimalLanguageClient {
         return out;
       })
     );
+  }
+
+  provideSemanticTokens(doc) {
+    return this.request("textDocument/semanticTokens/full", {
+      textDocument: { uri: doc.uri.toString() }
+    }).then((result) => {
+      const builder = new vscode.SemanticTokensBuilder(semanticTokenLegend);
+      const data = result && Array.isArray(result.data) ? result.data : [];
+      let line = 0;
+      let character = 0;
+      for (let i = 0; i + 4 < data.length; i += 5) {
+        line += data[i];
+        character = data[i] === 0 ? character + data[i + 1] : data[i + 1];
+        builder.push(line, character, data[i + 2], data[i + 3], data[i + 4]);
+      }
+      return builder.build();
+    });
   }
 
   provideDefinition(doc, pos) {

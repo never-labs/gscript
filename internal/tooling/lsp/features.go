@@ -21,6 +21,32 @@ const (
 	symbolKindFunction = 12
 )
 
+var semanticTokenTypes = []string{
+	"keyword",
+	"variable",
+	"function",
+	"string",
+	"number",
+	"operator",
+	"type",
+}
+
+var semanticTokenModifiers = []string{
+	"declaration",
+}
+
+const (
+	semanticKeyword = iota
+	semanticVariable
+	semanticFunction
+	semanticString
+	semanticNumber
+	semanticOperator
+	semanticType
+)
+
+const semanticDeclarationModifier = 1
+
 type hoverParams struct {
 	TextDocument textDocumentIdentifier `json:"textDocument"`
 	Position     position               `json:"position"`
@@ -94,6 +120,14 @@ type documentLink struct {
 	Range   lspRange `json:"range"`
 	Target  string   `json:"target,omitempty"`
 	Tooltip string   `json:"tooltip,omitempty"`
+}
+
+type semanticTokensParams struct {
+	TextDocument textDocumentIdentifier `json:"textDocument"`
+}
+
+type semanticTokensResult struct {
+	Data []int `json:"data"`
 }
 
 type sourceSymbol struct {
@@ -343,6 +377,18 @@ func (s *Server) documentLink(id *json.RawMessage, params json.RawMessage) error
 	return s.respondMaybe(id, collectDocumentLinks(p.TextDocument.URI, src), nil)
 }
 
+func (s *Server) semanticTokensFull(id *json.RawMessage, params json.RawMessage) error {
+	var p semanticTokensParams
+	if err := json.Unmarshal(params, &p); err != nil {
+		return s.respondMaybe(id, nil, &responseError{Code: errCodeInvalidParams, Message: err.Error()})
+	}
+	src, ok := s.documentText(p.TextDocument.URI)
+	if !ok {
+		return s.respondMaybe(id, semanticTokensResult{Data: []int{}}, nil)
+	}
+	return s.respondMaybe(id, semanticTokensResult{Data: collectSemanticTokens(src)}, nil)
+}
+
 func (s *Server) documentText(uri string) (string, bool) {
 	if uri == "" {
 		return "", false
@@ -351,6 +397,93 @@ func (s *Server) documentText(uri string) (string, bool) {
 	defer s.mu.Unlock()
 	src, ok := s.docs[uri]
 	return src, ok
+}
+
+func collectSemanticTokens(src string) []int {
+	tokens, err := lexer.New(src).Tokenize()
+	if err != nil {
+		return []int{}
+	}
+	var data []int
+	prevLine, prevChar := 0, 0
+	for i, tok := range tokens {
+		tokenType, modifiers, ok := semanticTokenKind(tokens, i)
+		if !ok {
+			continue
+		}
+		r, ok := semanticTokenRange(src, tok)
+		if !ok {
+			continue
+		}
+		if r.End.Character <= r.Start.Character {
+			continue
+		}
+		deltaLine := r.Start.Line - prevLine
+		deltaStart := r.Start.Character
+		if deltaLine == 0 {
+			deltaStart -= prevChar
+		}
+		length := r.End.Character - r.Start.Character
+		data = append(data, deltaLine, deltaStart, length, tokenType, modifiers)
+		prevLine = r.Start.Line
+		prevChar = r.Start.Character
+	}
+	return data
+}
+
+func semanticTokenKind(tokens []lexer.Token, index int) (int, int, bool) {
+	tok := tokens[index]
+	switch tok.Type {
+	case lexer.TOKEN_IDENT:
+		switch {
+		case tokenIsDeclarationName(tokens, index):
+			return semanticFunction, semanticDeclarationModifier, true
+		case tokenLooksLikeFunctionCall(tokens, index):
+			return semanticFunction, 0, true
+		case tok.Value == "agent" || tok.Value == "tool" || tok.Value == "evaluate" || tok.Value == "models" || tok.Value == "turn" || tok.Value == "messages" || tok.Value == "budget":
+			return semanticKeyword, 0, true
+		default:
+			return semanticVariable, 0, true
+		}
+	case lexer.TOKEN_STRING:
+		return semanticString, 0, true
+	case lexer.TOKEN_NUMBER:
+		return semanticNumber, 0, true
+	case lexer.TOKEN_TRUE, lexer.TOKEN_FALSE, lexer.TOKEN_NIL:
+		return semanticKeyword, 0, true
+	case lexer.TOKEN_FUNC, lexer.TOKEN_RETURN, lexer.TOKEN_IF, lexer.TOKEN_ELSE, lexer.TOKEN_ELSEIF,
+		lexer.TOKEN_FOR, lexer.TOKEN_RANGE, lexer.TOKEN_BREAK, lexer.TOKEN_CONTINUE, lexer.TOKEN_IN,
+		lexer.TOKEN_VAR, lexer.TOKEN_GO, lexer.TOKEN_CHAN, lexer.TOKEN_DEFER, lexer.TOKEN_CONST, lexer.TOKEN_GOTO:
+		return semanticKeyword, 0, true
+	case lexer.TOKEN_ARROW, lexer.TOKEN_ASSIGN, lexer.TOKEN_DECLARE, lexer.TOKEN_PLUS_ASSIGN, lexer.TOKEN_MINUS_ASSIGN,
+		lexer.TOKEN_STAR_ASSIGN, lexer.TOKEN_SLASH_ASSIGN, lexer.TOKEN_EQ, lexer.TOKEN_NEQ, lexer.TOKEN_LT, lexer.TOKEN_LE,
+		lexer.TOKEN_GT, lexer.TOKEN_GE, lexer.TOKEN_PLUS, lexer.TOKEN_MINUS, lexer.TOKEN_STAR, lexer.TOKEN_SLASH,
+		lexer.TOKEN_PERCENT, lexer.TOKEN_POW, lexer.TOKEN_AND, lexer.TOKEN_OR, lexer.TOKEN_NOT, lexer.TOKEN_BIT_AND,
+		lexer.TOKEN_BIT_OR, lexer.TOKEN_BIT_XOR, lexer.TOKEN_BIT_AND_NOT, lexer.TOKEN_SHL, lexer.TOKEN_SHR,
+		lexer.TOKEN_CONCAT, lexer.TOKEN_LEN, lexer.TOKEN_ELLIPSIS, lexer.TOKEN_INC, lexer.TOKEN_DEC:
+		return semanticOperator, 0, true
+	default:
+		return 0, 0, false
+	}
+}
+
+func tokenIsDeclarationName(tokens []lexer.Token, index int) bool {
+	if index == 0 || tokens[index].Type != lexer.TOKEN_IDENT {
+		return false
+	}
+	prev := tokens[index-1]
+	return prev.Type == lexer.TOKEN_FUNC || tokenText(prev) == "agent" || tokenText(prev) == "tool"
+}
+
+func tokenLooksLikeFunctionCall(tokens []lexer.Token, index int) bool {
+	return index+1 < len(tokens) && tokens[index+1].Type == lexer.TOKEN_LPAREN
+}
+
+func semanticTokenRange(src string, tok lexer.Token) (lspRange, bool) {
+	if tok.Type == lexer.TOKEN_STRING {
+		return sourceStringLiteralContentRange(src, tok)
+	}
+	return tokenRange(tok), true
 }
 
 func collectDocumentLinks(uri, src string) []documentLink {
@@ -855,6 +988,36 @@ func stringLiteralContentRange(tok lexer.Token) lspRange {
 		Start: start,
 		End:   position{Line: start.Line, Character: start.Character + len(tok.Value)},
 	}
+}
+
+func sourceStringLiteralContentRange(src string, tok lexer.Token) (lspRange, bool) {
+	lines := strings.Split(src, "\n")
+	lineIdx := tok.Line - 1
+	colIdx := tok.Column - 1
+	if lineIdx < 0 || lineIdx >= len(lines) || colIdx < 0 || colIdx >= len(lines[lineIdx]) {
+		return lspRange{}, false
+	}
+	line := lines[lineIdx]
+	quote := line[colIdx]
+	if quote != '"' && quote != '`' {
+		return stringLiteralContentRange(tok), true
+	}
+	for i := colIdx + 1; i < len(line); i++ {
+		ch := line[i]
+		if quote == '"' && ch == '\\' {
+			i++
+			continue
+		}
+		if ch == quote {
+			return lspRange{
+				Start: position{Line: lineIdx, Character: colIdx + 1},
+				End:   position{Line: lineIdx, Character: i},
+			}, true
+		}
+	}
+	// Multiline raw strings are valid Leia, but LSP semantic token entries are
+	// single-line. Skip them until the server supports multiline token splitting.
+	return lspRange{}, false
 }
 
 func tokenPos(tok lexer.Token) ast.Pos {

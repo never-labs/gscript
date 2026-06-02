@@ -49,6 +49,15 @@ func TestServerInitializeShutdown(t *testing.T) {
 	if caps["documentLinkProvider"] == nil {
 		t.Fatalf("initialize result missing document link capability: %#v", caps)
 	}
+	semanticProvider, ok := caps["semanticTokensProvider"].(map[string]any)
+	if !ok || semanticProvider["full"] != true {
+		t.Fatalf("initialize result missing semantic tokens capability: %#v", caps)
+	}
+	legend := semanticProvider["legend"].(map[string]any)
+	tokenTypes := legend["tokenTypes"].([]any)
+	if len(tokenTypes) == 0 || tokenTypes[0] != "keyword" {
+		t.Fatalf("semantic token legend = %#v", legend)
+	}
 	if caps["workspaceSymbolProvider"] != true {
 		t.Fatalf("initialize result missing workspace symbol capability: %#v", caps)
 	}
@@ -400,6 +409,152 @@ func TestDocumentLinkReturnsLocalModuleLinks(t *testing.T) {
 		if !targets[want] {
 			t.Fatalf("document link targets missing %q: %#v", want, targets)
 		}
+	}
+}
+
+func TestSemanticTokensFullReturnsEncodedTokens(t *testing.T) {
+	src := strings.Join([]string{
+		"func add(a, b) {",
+		"    return a + b",
+		"}",
+		`answer := add(40, 2)`,
+		"",
+	}, "\n")
+	input := mustEncodeMessages(t,
+		map[string]any{
+			"jsonrpc": "2.0",
+			"method":  "textDocument/didOpen",
+			"params": map[string]any{
+				"textDocument": map[string]any{
+					"uri":        "file:///tmp/semantic.leia",
+					"languageId": "leia",
+					"version":    1,
+					"text":       src,
+				},
+			},
+		},
+		map[string]any{
+			"jsonrpc": "2.0",
+			"id":      32,
+			"method":  "textDocument/semanticTokens/full",
+			"params": map[string]any{
+				"textDocument": map[string]any{"uri": "file:///tmp/semantic.leia"},
+			},
+		},
+	)
+	var out bytes.Buffer
+	err := NewServer().Run(context.Background(), bytes.NewReader(input), &out)
+	if err != nil {
+		t.Fatalf("Run returned error: %v", err)
+	}
+	msgs := readOutputMessages(t, out.Bytes())
+	if len(msgs) != 2 {
+		t.Fatalf("expected diagnostics notification and semantic tokens response, got %d: %#v", len(msgs), msgs)
+	}
+	result := msgs[1]["result"].(map[string]any)
+	data := result["data"].([]any)
+	if len(data) == 0 || len(data)%5 != 0 {
+		t.Fatalf("semantic token data = %#v, want non-empty 5-tuples", data)
+	}
+	foundDeclaration := false
+	for i := 0; i+4 < len(data); i += 5 {
+		if data[i+3] == float64(semanticFunction) && data[i+4] == float64(semanticDeclarationModifier) {
+			foundDeclaration = true
+			break
+		}
+	}
+	if !foundDeclaration {
+		t.Fatalf("semantic token data = %#v, want function declaration token", data)
+	}
+}
+
+func TestSemanticTokensStringEscapesStayWithinSourceLine(t *testing.T) {
+	src := "value := \"a\\nb\"\nraw := `multi\nline`\n"
+	input := mustEncodeMessages(t,
+		map[string]any{
+			"jsonrpc": "2.0",
+			"method":  "textDocument/didOpen",
+			"params": map[string]any{
+				"textDocument": map[string]any{
+					"uri":        "file:///tmp/semantic-strings.leia",
+					"languageId": "leia",
+					"version":    1,
+					"text":       src,
+				},
+			},
+		},
+		map[string]any{
+			"jsonrpc": "2.0",
+			"id":      33,
+			"method":  "textDocument/semanticTokens/full",
+			"params": map[string]any{
+				"textDocument": map[string]any{"uri": "file:///tmp/semantic-strings.leia"},
+			},
+		},
+	)
+	var out bytes.Buffer
+	err := NewServer().Run(context.Background(), bytes.NewReader(input), &out)
+	if err != nil {
+		t.Fatalf("Run returned error: %v", err)
+	}
+	msgs := readOutputMessages(t, out.Bytes())
+	if len(msgs) != 2 {
+		t.Fatalf("expected diagnostics notification and semantic tokens response, got %d: %#v", len(msgs), msgs)
+	}
+	data := msgs[1]["result"].(map[string]any)["data"].([]any)
+	lines := strings.Split(src, "\n")
+	line, char := 0, 0
+	for i := 0; i+4 < len(data); i += 5 {
+		deltaLine := int(data[i].(float64))
+		deltaStart := int(data[i+1].(float64))
+		length := int(data[i+2].(float64))
+		line += deltaLine
+		if deltaLine == 0 {
+			char += deltaStart
+		} else {
+			char = deltaStart
+		}
+		if line < 0 || line >= len(lines) || char+length > len(lines[line]) {
+			t.Fatalf("semantic token tuple %v extends past source line %d %q", data[i:i+5], line, lines[line])
+		}
+	}
+}
+
+func TestSemanticTokensLexerErrorReturnsEmptyData(t *testing.T) {
+	input := mustEncodeMessages(t,
+		map[string]any{
+			"jsonrpc": "2.0",
+			"method":  "textDocument/didOpen",
+			"params": map[string]any{
+				"textDocument": map[string]any{
+					"uri":        "file:///tmp/semantic-bad.leia",
+					"languageId": "leia",
+					"version":    1,
+					"text":       "value := \"unterminated\n",
+				},
+			},
+		},
+		map[string]any{
+			"jsonrpc": "2.0",
+			"id":      34,
+			"method":  "textDocument/semanticTokens/full",
+			"params": map[string]any{
+				"textDocument": map[string]any{"uri": "file:///tmp/semantic-bad.leia"},
+			},
+		},
+	)
+	var out bytes.Buffer
+	err := NewServer().Run(context.Background(), bytes.NewReader(input), &out)
+	if err != nil {
+		t.Fatalf("Run returned error: %v", err)
+	}
+	msgs := readOutputMessages(t, out.Bytes())
+	if len(msgs) != 2 {
+		t.Fatalf("expected diagnostics notification and semantic tokens response, got %d: %#v", len(msgs), msgs)
+	}
+	data := msgs[1]["result"].(map[string]any)["data"].([]any)
+	if len(data) != 0 {
+		t.Fatalf("semantic token data = %#v, want empty data for lexer error", data)
 	}
 }
 
