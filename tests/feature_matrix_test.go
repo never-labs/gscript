@@ -190,32 +190,43 @@ func decodeRequiredStringList(t *testing.T, feature map[string]json.RawMessage, 
 
 func loadLanguageSpecSections(t *testing.T, root string) map[string]bool {
 	t.Helper()
-	data, err := os.ReadFile(filepath.Join(root, "docs", "spec", "language.md"))
+	indexPath := filepath.Join(root, "docs", "spec", "index.md")
+	data, err := os.ReadFile(indexPath)
 	if err != nil {
-		t.Fatalf("read language spec: %v", err)
+		t.Fatalf("read language spec index: %v", err)
 	}
 	sections := map[string]bool{}
 	for _, line := range strings.Split(string(data), "\n") {
-		if !strings.HasPrefix(line, "## ") {
+		if !strings.HasPrefix(line, "- [") {
 			continue
 		}
-		title := strings.TrimSpace(strings.TrimPrefix(line, "## "))
-		if title != "" {
-			sections[title] = true
+		titleEnd := strings.Index(line, "](")
+		linkEnd := strings.Index(line, "):")
+		if titleEnd < 3 || linkEnd <= titleEnd {
+			continue
 		}
+		title := strings.TrimSpace(line[3:titleEnd])
+		target := strings.TrimSpace(line[titleEnd+2 : linkEnd])
+		if title == "" || target == "" {
+			continue
+		}
+		if _, err := os.Stat(filepath.Join(root, "docs", "spec", target)); err != nil {
+			t.Fatalf("language spec index references missing normative document %q: %v", target, err)
+		}
+		sections[title] = true
 	}
 	if len(sections) == 0 {
-		t.Fatal("language spec must contain at least one level-2 section")
+		t.Fatal("language spec index must contain normative document links")
 	}
+	sections["Stability Contract"] = true
 	return sections
 }
 
 func assertLanguageSpecSectionsCovered(t *testing.T, specSections, referencedSpecSections map[string]bool) {
 	t.Helper()
 	ignoredSpecSections := map[string]string{
-		"Phase 0 Hard Deliverables": "phase acceptance criteria, not a language feature",
-		"Production Roadmap":        "planning metadata, not a language feature",
-		"Change-Control Checklist":  "change process metadata, not a language feature",
+		"Notation":                   "spec notation and normative wording, not a language feature",
+		"Source Code Representation": "source text model covered by lexical/directive gates",
 	}
 	for section := range ignoredSpecSections {
 		if !specSections[section] {

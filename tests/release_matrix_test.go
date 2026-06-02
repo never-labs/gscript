@@ -918,9 +918,8 @@ func releaseGateStatus(status string) bool {
 
 func releaseIgnoredSpecSections() map[string]string {
 	return map[string]string{
-		"Phase 0 Hard Deliverables": "phase acceptance criteria, not a language feature",
-		"Production Roadmap":        "planning metadata, not a language feature",
-		"Change-Control Checklist":  "change process metadata, not a language feature",
+		"Notation":                   "spec notation and normative wording, not a language feature",
+		"Source Code Representation": "source text model covered by lexical/directive gates",
 	}
 }
 
