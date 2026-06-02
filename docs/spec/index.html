@@ -1686,7 +1686,17 @@ last <span class="tok-operator">:=</span> <span class="tok-number">0</span>
 <p><code>history</code> and <code>messages</code> name the same stable data shape: an ordered list of normalized message tables. <code>messages { ... }</code> constructs such a list; a history variable is just a program variable holding that list. Histories, not tool lists or ambient config, are the durable evidence passed from one provider turn to the next.</p>
 <h3 id="ai-native-syntax-evaluate-blocks">Evaluate Blocks</h3>
 <p><code>evaluate &quot;case name&quot; { ... }</code> declares a source-level agent regression case. The case name is a required string literal. The block body uses ordinary Leia statements, so tools can parse declarations, setup code, agent calls, and later assertion syntax without relying on an external fixture format.</p>
-<p>In ordinary script execution an evaluate block has no runtime effect. The <code>leia evaluate</code> command owns discovery and evaluation semantics. The minimal runner discovers cases, reports their source position, validates the body with the same parser and AI-native syntax checks used for normal code, then executes the body as ordinary Leia code under the evaluation harness. Built-in <code>assert</code> failures or other runtime errors mark that case failed; provider scoring and richer tool/file assertions are reserved for later evaluate phases.</p>
+<p>In ordinary script execution an evaluate block has no runtime effect. The <code>leia evaluate</code> command owns discovery and evaluation semantics. The runner discovers cases, reports their source position, validates the body with the same parser and AI-native syntax checks used for normal code, then executes the body as ordinary Leia code under the evaluation harness. Built-in <code>assert</code> failures or other runtime errors mark that case failed.</p>
+<p>During <code>leia evaluate</code>, the harness installs an <code>eval</code> module for dataset-style regression tests. This module is not part of ordinary script execution.</p>
+<div class="table-wrap"><table>
+<thead><tr><th>Function</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td><code>eval.case(id, fn)</code></td><td>Run one named subcase. Runtime errors inside <code>fn</code> fail that subcase but do not stop later subcases. Returns <code>(ok, err)</code>.</td></tr>
+<tr><td><code>eval.metric(name, value)</code></td><td>Record a bool, number, string, nil, or JSON-like value on the active subcase, or on the outer evaluate block when no subcase is active.</td></tr>
+<tr><td><code>eval.load_jsonl(path)</code></td><td>Load a JSON Lines corpus relative to the evaluate source file and return an array table of decoded rows.</td></tr>
+<tr><td><code>eval.skip_if(cond, reason)</code></td><td>If <code>cond</code> is truthy, mark the active subcase skipped and return true. The caller should usually <code>return</code> after it.</td></tr>
+<tr><td><code>eval.fail_if(cond, message)</code></td><td>If <code>cond</code> is truthy, raise a runtime error with <code>message</code>.</td></tr>
+</tbody></table></div>
 <p>The <code>leia evaluate</code> command may install a deterministic LLM replay provider or record provider turns into a golden fixture. Replay fixtures are strict: a request mismatch, an exhausted fixture, or leftover unconsumed turns is an evaluation failure. Updating a golden fixture is an explicit command-line mode, not an ordinary script side effect.</p>
 <p>Evaluate cases should be written so their non-provider behavior is deterministic. Runnable examples in this spec use local tools, custom flows, replay, or validation helpers rather than live network LLMs.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-directive">//leia:requires none</span>
@@ -1707,6 +1717,21 @@ evaluate <span class="tok-string">&quot;answer can use lookup&quot;</span> {
 }
 
 <span class="tok-keyword">return</span> lookup.name</code></pre>
+<p>Inside an evaluation run, subcases and metrics can be recorded with the harness module:</p>
+<pre class="language-text"><code class="language-text">evaluate &quot;answer corpus&quot; {
+    rows := eval.load_jsonl(&quot;answer_cases.jsonl&quot;)
+    for _, row := range rows {
+        ok, err := eval.case(row.id, func() {
+            if eval.skip_if(row.skip, &quot;fixture disabled&quot;) {
+                return
+            }
+            result, err := lookup(row.topic)
+            assert(err == nil)
+            eval.metric(&quot;correct&quot;, result == row.expected)
+        })
+        assert(ok || err != nil)
+    }
+}</code></pre>
 <h3 id="ai-native-syntax-models">Models</h3>
 <p><code>models { ... }</code> declares module-scoped model aliases and provider configuration. A field key is the public alias used by script code. A field value is either another alias string or a provider configuration table.</p>
 <pre class="language-text"><code class="language-text">models {

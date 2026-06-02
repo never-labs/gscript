@@ -118,6 +118,109 @@ func TestRunExecutesEvaluateBodyAndReportsFailure(t *testing.T) {
 	}
 }
 
+func TestRunCollectsEvalMetricsAndSubcases(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "eval_cases.leia")
+	if err := os.WriteFile(path, []byte(`evaluate "dataset metrics" {
+    eval.metric("outer_count", 2)
+    ok, err := eval.case("case_001", func() {
+        eval.metric("correct", true)
+        eval.metric("label", "refund")
+        assert(true)
+    })
+    assert(ok)
+    ok2, err2 := eval.case("case_002", func() {
+        eval.metric("correct", false)
+        assert(false, "intentional failure")
+    })
+    assert(!ok2)
+    assert(err2 != nil)
+}
+`), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	report, err := Run(Options{Paths: []string{path}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Status != "failed" || report.Summary.CasesFailed != 1 {
+		t.Fatalf("report = %#v", report)
+	}
+	if len(report.Cases) != 1 {
+		t.Fatalf("cases = %#v", report.Cases)
+	}
+	c := report.Cases[0]
+	if c.Status != "failed" || len(c.Metrics) != 1 || c.Metrics[0].Name != "outer_count" || c.Metrics[0].Value != int64(2) {
+		t.Fatalf("case metrics/status = %#v", c)
+	}
+	if len(c.Subcases) != 2 {
+		t.Fatalf("subcases = %#v", c.Subcases)
+	}
+	if c.Subcases[0].CaseID != "case_001" || c.Subcases[0].Status != "passed" || len(c.Subcases[0].Metrics) != 2 {
+		t.Fatalf("subcase 1 = %#v", c.Subcases[0])
+	}
+	if c.Subcases[1].CaseID != "case_002" || c.Subcases[1].Status != "failed" || len(c.Subcases[1].Diagnostics) != 1 {
+		t.Fatalf("subcase 2 = %#v", c.Subcases[1])
+	}
+	text := FormatText(report)
+	for _, want := range []string{
+		"1 metrics, 2 subcases",
+		"metric outer_count=2 (number)",
+		"PASS case case_001",
+		"FAIL case case_002",
+		"metric correct=false (bool)",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("text report missing %q:\n%s", want, text)
+		}
+	}
+}
+
+func TestRunEvalLoadJSONLAndSkipIf(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "cases.jsonl"), []byte(
+		"{\"id\":\"keep\",\"expected\":\"refund\"}\n"+
+			"{\"id\":\"skip\",\"expected\":\"exchange\",\"skip\":true}\n",
+	), 0644); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, "eval_jsonl.leia")
+	if err := os.WriteFile(path, []byte(`evaluate "jsonl corpus" {
+    cases := eval.load_jsonl("cases.jsonl")
+    for _, case := range cases {
+        eval.case(case.id, func() {
+            if eval.skip_if(case.skip, "fixture disabled") {
+                return
+            }
+            eval.metric("expected", case.expected)
+            eval.fail_if(case.expected != "refund", "unexpected label")
+        })
+    }
+}
+`), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	report, err := Run(Options{Paths: []string{path}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Status != "ok" || len(report.Cases) != 1 {
+		t.Fatalf("report = %#v", report)
+	}
+	subcases := report.Cases[0].Subcases
+	if len(subcases) != 2 {
+		t.Fatalf("subcases = %#v", subcases)
+	}
+	if subcases[0].CaseID != "keep" || subcases[0].Status != "passed" || len(subcases[0].Metrics) != 1 || subcases[0].Metrics[0].Value != "refund" {
+		t.Fatalf("first subcase = %#v", subcases[0])
+	}
+	if subcases[1].CaseID != "skip" || subcases[1].Status != "skipped" || len(subcases[1].Diagnostics) != 1 {
+		t.Fatalf("second subcase = %#v", subcases[1])
+	}
+}
+
 func TestRunMarksFailingAssertionBySourcePosition(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "checks.leia")

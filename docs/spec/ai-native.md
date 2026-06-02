@@ -44,12 +44,22 @@ statements, so tools can parse declarations, setup code, agent calls, and later
 assertion syntax without relying on an external fixture format.
 
 In ordinary script execution an evaluate block has no runtime effect. The
-`leia evaluate` command owns discovery and evaluation semantics. The minimal
-runner discovers cases, reports their source position, validates the body with
-the same parser and AI-native syntax checks used for normal code, then executes
-the body as ordinary Leia code under the evaluation harness. Built-in `assert`
-failures or other runtime errors mark that case failed; provider scoring and
-richer tool/file assertions are reserved for later evaluate phases.
+`leia evaluate` command owns discovery and evaluation semantics. The runner
+discovers cases, reports their source position, validates the body with the
+same parser and AI-native syntax checks used for normal code, then executes the
+body as ordinary Leia code under the evaluation harness. Built-in `assert`
+failures or other runtime errors mark that case failed.
+
+During `leia evaluate`, the harness installs an `eval` module for dataset-style
+regression tests. This module is not part of ordinary script execution.
+
+| Function | Meaning |
+|---|---|
+| `eval.case(id, fn)` | Run one named subcase. Runtime errors inside `fn` fail that subcase but do not stop later subcases. Returns `(ok, err)`. |
+| `eval.metric(name, value)` | Record a bool, number, string, nil, or JSON-like value on the active subcase, or on the outer evaluate block when no subcase is active. |
+| `eval.load_jsonl(path)` | Load a JSON Lines corpus relative to the evaluate source file and return an array table of decoded rows. |
+| `eval.skip_if(cond, reason)` | If `cond` is truthy, mark the active subcase skipped and return true. The caller should usually `return` after it. |
+| `eval.fail_if(cond, message)` | If `cond` is truthy, raise a runtime error with `message`. |
 
 The `leia evaluate` command may install a deterministic LLM replay provider or
 record provider turns into a golden fixture. Replay fixtures are strict: a
@@ -80,6 +90,26 @@ evaluate "answer can use lookup" {
 }
 
 return lookup.name
+```
+
+Inside an evaluation run, subcases and metrics can be recorded with the harness
+module:
+
+```text
+evaluate "answer corpus" {
+    rows := eval.load_jsonl("answer_cases.jsonl")
+    for _, row := range rows {
+        ok, err := eval.case(row.id, func() {
+            if eval.skip_if(row.skip, "fixture disabled") {
+                return
+            }
+            result, err := lookup(row.topic)
+            assert(err == nil)
+            eval.metric("correct", result == row.expected)
+        })
+        assert(ok || err != nil)
+    }
+}
 ```
 
 ## Models

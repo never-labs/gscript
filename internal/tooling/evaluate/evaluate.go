@@ -104,6 +104,8 @@ type Case struct {
 	Status      string       `json:"status"`
 	StartedAt   string       `json:"started_at,omitempty"`
 	DurationMS  int64        `json:"duration_ms,omitempty"`
+	Metrics     []Metric     `json:"metrics,omitempty"`
+	Subcases    []Subcase    `json:"subcases,omitempty"`
 	Assertions  []Assertion  `json:"assertions,omitempty"`
 	Diagnostics []Diagnostic `json:"diagnostics,omitempty"`
 }
@@ -127,6 +129,21 @@ type Diagnostic struct {
 	Range    SourceRange `json:"range"`
 }
 
+type Metric struct {
+	Name  string `json:"name"`
+	Type  string `json:"type"`
+	Value any    `json:"value"`
+}
+
+type Subcase struct {
+	CaseID      string       `json:"case_id"`
+	Status      string       `json:"status"`
+	StartedAt   string       `json:"started_at,omitempty"`
+	DurationMS  int64        `json:"duration_ms,omitempty"`
+	Metrics     []Metric     `json:"metrics,omitempty"`
+	Diagnostics []Diagnostic `json:"diagnostics,omitempty"`
+}
+
 type Finding struct {
 	Kind     string         `json:"kind"`
 	Severity string         `json:"severity"`
@@ -140,6 +157,20 @@ type Finding struct {
 type parsedCase struct {
 	Case
 	Body *ast.BlockStmt
+}
+
+type caseEvalData struct {
+	Metrics  []Metric
+	Subcases []Subcase
+}
+
+func (d caseEvalData) Failed() bool {
+	for _, subcase := range d.Subcases {
+		if subcase.Status == "failed" {
+			return true
+		}
+	}
+	return false
 }
 
 func Run(opts Options) (Report, error) {
@@ -222,7 +253,10 @@ func Run(opts Options) (Report, error) {
 					}
 					start := time.Now()
 					c.StartedAt = start.UTC().Format(time.RFC3339)
-					if err := executeCase(file, prog, parsed, run); err != nil {
+					caseData, err := executeCase(file, prog, parsed, run)
+					c.Metrics = caseData.Metrics
+					c.Subcases = caseData.Subcases
+					if err != nil {
 						c.Status = "failed"
 						c.DurationMS = elapsedMillis(start)
 						markAssertions(c.Assertions, "unknown")
@@ -239,6 +273,20 @@ func Run(opts Options) (Report, error) {
 							Kind:     "case_runtime_error",
 							Severity: "error",
 							Message:  err.Error(),
+							Path:     file,
+							Line:     c.Range.StartLine,
+							Column:   c.Range.StartColumn,
+						})
+					} else if caseData.Failed() {
+						c.Status = "failed"
+						c.DurationMS = elapsedMillis(start)
+						markAssertions(c.Assertions, "passed")
+						input.Status = "error"
+						report.Status = "failed"
+						report.Findings = append(report.Findings, Finding{
+							Kind:     "eval_subcase_failure",
+							Severity: "error",
+							Message:  "one or more eval.case subcases failed",
 							Path:     file,
 							Line:     c.Range.StartLine,
 							Column:   c.Range.StartColumn,
@@ -591,12 +639,20 @@ func countLLMStmts(path string, stmts []ast.Stmt, counts *Summary, cases *[]pars
 	}
 }
 
-func executeCase(path string, prog *ast.Program, c parsedCase, run *runContext) error {
+func executeCase(path string, prog *ast.Program, c parsedCase, run *runContext) (caseEvalData, error) {
 	if prog == nil || c.Body == nil {
-		return nil
+		return caseEvalData{}, nil
 	}
 	interp := runtime.NewCore()
 	stdlibinstall.Install(interp)
+	baseDir := ""
+	if abs, err := filepath.Abs(path); err == nil {
+		baseDir = filepath.Dir(abs)
+	}
+	evalState := newEvalCollector(interp.CallFunction, baseDir)
+	evalModule := runtime.TableValue(evalState.BuildModule())
+	interp.SetGlobal("eval", evalModule)
+	interp.SetModule("eval", evalModule)
 	if run != nil {
 		if run.replayProvider != nil {
 			interp.SetLLMProvider(llmbridge.ProviderAdapter(run.replayMonitor))
@@ -607,14 +663,15 @@ func executeCase(path string, prog *ast.Program, c parsedCase, run *runContext) 
 			interp.SetLLMProviderFactory(run.providerFactory)
 		}
 	}
-	if abs, err := filepath.Abs(path); err == nil {
-		interp.SetScriptDir(filepath.Dir(abs))
+	if baseDir != "" {
+		interp.SetScriptDir(baseDir)
 	}
 	interp.SetArgs(path, nil)
-	return interp.Exec(&ast.Program{
+	err := interp.Exec(&ast.Program{
 		Stmts:          caseProgramStmts(prog.Stmts, c.Body.Stmts),
 		FileDirectives: append([]ast.FileDirective(nil), prog.FileDirectives...),
 	})
+	return evalState.Data(), err
 }
 
 type replayMonitor struct {
@@ -1038,7 +1095,7 @@ func FormatText(report Report) string {
 		report.Summary.TODOs,
 	)
 	for _, c := range report.Cases {
-		fmt.Fprintf(&b, "  %s %s (%s:%d:%d, %dms, %d assertions)\n",
+		fmt.Fprintf(&b, "  %s %s (%s:%d:%d, %dms, %d assertions, %d metrics, %d subcases)\n",
 			caseStatusMark(c.Status),
 			c.Name,
 			c.SourcePath,
@@ -1046,7 +1103,21 @@ func FormatText(report Report) string {
 			c.Range.StartColumn,
 			c.DurationMS,
 			len(c.Assertions),
+			len(c.Metrics),
+			len(c.Subcases),
 		)
+		for _, metric := range c.Metrics {
+			fmt.Fprintf(&b, "    metric %s=%v (%s)\n", metric.Name, metric.Value, metric.Type)
+		}
+		for _, subcase := range c.Subcases {
+			fmt.Fprintf(&b, "    %s case %s (%dms, %d metrics)\n", caseStatusMark(subcase.Status), subcase.CaseID, subcase.DurationMS, len(subcase.Metrics))
+			for _, metric := range subcase.Metrics {
+				fmt.Fprintf(&b, "      metric %s=%v (%s)\n", metric.Name, metric.Value, metric.Type)
+			}
+			for _, d := range subcase.Diagnostics {
+				fmt.Fprintf(&b, "      %s: %s\n", d.Kind, d.Message)
+			}
+		}
 		for _, d := range c.Diagnostics {
 			fmt.Fprintf(&b, "    %s: %s\n", d.Kind, d.Message)
 		}
