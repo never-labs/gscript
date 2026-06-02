@@ -1,6 +1,9 @@
 import subprocess
+import sys
 import unittest
 from pathlib import Path
+
+sys.dont_write_bytecode = True
 
 import benchmark_discovery as discovery
 import conformance_perf_coverage as coverage
@@ -77,7 +80,16 @@ class ScriptEntrypointConsistencyTest(unittest.TestCase):
                 if script.suffix == ".sh":
                     cmd = ["bash", "-n", str(script)]
                 elif script.suffix == ".py":
-                    cmd = ["python3", "-m", "py_compile", str(script)]
+                    cmd = [
+                        "python3",
+                        "-c",
+                        (
+                            "import ast, pathlib, sys; "
+                            "path = pathlib.Path(sys.argv[1]); "
+                            "ast.parse(path.read_text(encoding='utf-8'), filename=str(path))"
+                        ),
+                        str(script),
+                    ]
                 else:
                     self.fail(f"unsupported script entrypoint type: {script.name}")
                 subprocess.run(

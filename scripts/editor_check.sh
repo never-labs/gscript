@@ -19,7 +19,14 @@ cmp -s tools/syntax/textmate/leia-mod.tmLanguage.json editors/vscode/syntaxes/le
 
 node -c editors/vscode/extension.js >/dev/null
 node -c tools/tree-sitter-leia/grammar.js >/dev/null
-python3 -m py_compile scripts/spec_preview.py
+python3 - scripts/spec_preview.py <<'PY'
+import ast
+import pathlib
+import sys
+
+path = pathlib.Path(sys.argv[1])
+ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+PY
 python3 tools/editor/smoke/editor_smoke.py >/dev/null
 
 tree_sitter=""
