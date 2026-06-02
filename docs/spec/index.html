@@ -481,7 +481,12 @@ received.value <span class="tok-operator">=</span> <span class="tok-number">8</s
 <pre class="language-leia leia-code"><code class="language-leia leia-code">x <span class="tok-operator">:=</span> <span class="tok-number">1</span> <span class="tok-operator">+</span> <span class="tok-number">2</span> <span class="tok-operator">*</span> <span class="tok-number">3</span>      <span class="tok-comment">// 7</span>
 y <span class="tok-operator">:=</span> (<span class="tok-number">1</span> <span class="tok-operator">+</span> <span class="tok-number">2</span>) <span class="tok-operator">*</span> <span class="tok-number">3</span>    <span class="tok-comment">// 9</span>
 z <span class="tok-operator">:=</span> <span class="tok-constant">false</span> <span class="tok-operator">||</span> <span class="tok-string">&quot;ok&quot;</span>  <span class="tok-comment">// &quot;ok&quot;</span>
-w <span class="tok-operator">:=</span> <span class="tok-constant">nil</span> <span class="tok-operator">&amp;&amp;</span> fail()  <span class="tok-comment">// nil; fail is not called</span></code></pre>
+w <span class="tok-operator">:=</span> <span class="tok-constant">nil</span> <span class="tok-operator">&amp;&amp;</span> fail()  <span class="tok-comment">// nil; fail is not called</span>
+
+<span class="tok-builtin">assert</span>(x <span class="tok-operator">==</span> <span class="tok-number">7</span>)
+<span class="tok-builtin">assert</span>(y <span class="tok-operator">==</span> <span class="tok-number">9</span>)
+<span class="tok-builtin">assert</span>(z <span class="tok-operator">==</span> <span class="tok-string">&quot;ok&quot;</span>)
+<span class="tok-builtin">assert</span>(w <span class="tok-operator">==</span> <span class="tok-constant">nil</span>)</code></pre>
 <h3 id="expressions-calls">Calls</h3>
 <p>A call expression invokes a callable value. Calls may produce zero or more results. A call used where exactly one expression value is required contributes its first result, or <code>nil</code> when it produces no results. Expression-list positions are adjusted by the multi-return rules in <a href="#">Functions</a>.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-keyword">func</span> pair() {
@@ -570,7 +575,18 @@ user[<span class="tok-string">&quot;score&quot;</span>] <span class="tok-operato
 }
 
 result <span class="tok-operator">:=</span> mark(<span class="tok-string">&quot;left&quot;</span>) <span class="tok-operator">..</span> mark(<span class="tok-string">&quot;right&quot;</span>)
-<span class="tok-comment">// events is {&quot;left&quot;, &quot;right&quot;}</span></code></pre></section><section><h2 id="statements">Statements</h2>
+<span class="tok-builtin">assert</span>(result <span class="tok-operator">==</span> <span class="tok-string">&quot;leftright&quot;</span>)
+<span class="tok-builtin">assert</span>(events[<span class="tok-number">1</span>] <span class="tok-operator">==</span> <span class="tok-string">&quot;left&quot;</span>)
+<span class="tok-builtin">assert</span>(events[<span class="tok-number">2</span>] <span class="tok-operator">==</span> <span class="tok-string">&quot;right&quot;</span>)
+
+<span class="tok-keyword">func</span> fail_if_called() {
+    <span class="tok-builtin">error</span>(<span class="tok-string">&quot;should not be called&quot;</span>)
+}
+
+short_and <span class="tok-operator">:=</span> <span class="tok-constant">false</span> <span class="tok-operator">&amp;&amp;</span> fail_if_called()
+short_or <span class="tok-operator">:=</span> <span class="tok-constant">true</span> <span class="tok-operator">||</span> fail_if_called()
+<span class="tok-builtin">assert</span>(short_and <span class="tok-operator">==</span> <span class="tok-constant">false</span>)
+<span class="tok-builtin">assert</span>(short_or <span class="tok-operator">==</span> <span class="tok-constant">true</span>)</code></pre></section><section><h2 id="statements">Statements</h2>
 <p>Statements control execution.</p>
 <p>Blocks introduce lexical scope. A block is a sequence of statements enclosed in braces. Locals declared inside the block are not visible after the closing brace. A block evaluates its statements in source order until control transfers, an error unwinds, or the block ends normally.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-keyword">if</span> <span class="tok-constant">true</span> {

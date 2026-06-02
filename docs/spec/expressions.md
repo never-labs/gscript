@@ -21,11 +21,16 @@ Operators follow this precedence, from highest to lowest:
 Parentheses override precedence. `&&` and `||` short-circuit and return operand
 values rather than coerced booleans. Unary logical negation is `!`.
 
-```leia
+```leia run all
 x := 1 + 2 * 3      // 7
 y := (1 + 2) * 3    // 9
 z := false || "ok"  // "ok"
 w := nil && fail()  // nil; fail is not called
+
+assert(x == 7)
+assert(y == 9)
+assert(z == "ok")
+assert(w == nil)
 ```
 
 ## Calls
@@ -160,7 +165,7 @@ Within an expression list, subexpressions are evaluated left-to-right unless a
 specific expression form short-circuits. Implementations may optimize execution
 but must preserve observable side effects and error behavior.
 
-```leia
+```leia run all
 events := {}
 func mark(name) {
     events[#events + 1] = name
@@ -168,5 +173,16 @@ func mark(name) {
 }
 
 result := mark("left") .. mark("right")
-// events is {"left", "right"}
+assert(result == "leftright")
+assert(events[1] == "left")
+assert(events[2] == "right")
+
+func fail_if_called() {
+    error("should not be called")
+}
+
+short_and := false && fail_if_called()
+short_or := true || fail_if_called()
+assert(short_and == false)
+assert(short_or == true)
 ```
