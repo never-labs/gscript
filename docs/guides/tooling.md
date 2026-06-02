@@ -8,6 +8,7 @@ Leia treats tools as part of the language product.
 go run ./cmd/leia fmt --check tests/smoke/01_basic.leia
 go run ./cmd/leia lint tests/smoke/01_basic.leia
 go run ./cmd/leia test tests/smoke/01_basic.leia
+go run ./cmd/leia test --json --output test-report.json tests/smoke/01_basic.leia
 go run ./cmd/leia check --no-docs .
 ```
 
@@ -17,6 +18,14 @@ checks. Use skip flags only while iterating:
 ```bash
 go run ./cmd/leia check --no-test --no-docs tests/smoke/01_basic.leia
 go run ./cmd/leia check --json .
+```
+
+Use JSON reports when another tool or CI step needs stable machine-readable
+results:
+
+```bash
+go run ./cmd/leia test --json --output test-report.json tests/smoke/01_basic.leia
+go run ./cmd/leia evaluate --json --output eval-report.json examples/evaluate/basic_assert.leia
 ```
 
 ## CI Profiles
