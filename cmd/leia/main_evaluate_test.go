@@ -59,6 +59,29 @@ evaluate "answer baseline" {
 	}
 }
 
+func TestEvaluateCommandHelpExplainsReplayModes(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := runEvaluateCommand([]string{"--help"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runEvaluateCommand code = %d", code)
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("stdout = %q, want empty", stdout.String())
+	}
+	for _, want := range []string{
+		"usage: leia evaluate [options] [path-or-dir...]",
+		"Run source-level evaluate blocks",
+		"Examples:",
+		"--llm-replay examples/evaluate/agent_replay.records.json",
+		"LLM fixture modes are mutually exclusive:",
+		"--update-golden",
+	} {
+		if !strings.Contains(stderr.String(), want) {
+			t.Fatalf("stderr = %q, want %q", stderr.String(), want)
+		}
+	}
+}
+
 func TestEvaluateCommandJSONFailureStatus(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "fail.leia")
