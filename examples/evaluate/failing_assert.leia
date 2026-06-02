@@ -1,0 +1,11 @@
+func classify_risk(score) {
+    if score >= 80 {
+        return "high"
+    }
+    return "low"
+}
+
+evaluate "risk threshold catches stale expectation" {
+    label := classify_risk(95)
+    assert(label == "low", "expected the report to show this failed assertion")
+}

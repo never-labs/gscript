@@ -300,6 +300,7 @@ func completionItems() []completionItem {
 		{Label: "defer", Kind: keywordKind, Detail: "Leia keyword"},
 		{Label: "else", Kind: keywordKind, Detail: "Leia keyword"},
 		{Label: "elseif", Kind: keywordKind, Detail: "Leia keyword"},
+		{Label: "evaluate", Kind: keywordKind, Detail: "Leia evaluation block"},
 		{Label: "false", Kind: keywordKind, Detail: "Leia literal"},
 		{Label: "for", Kind: keywordKind, Detail: "Leia keyword"},
 		{Label: "func", Kind: keywordKind, Detail: "Leia keyword"},

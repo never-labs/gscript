@@ -14,6 +14,7 @@ import (
 
 const (
 	symbolKindClass    = 5
+	symbolKindEvent    = 24
 	symbolKindFunction = 12
 )
 
@@ -132,6 +133,7 @@ var keywordHover = map[string]string{
 	"defer":    "Defers a call until the current function returns.",
 	"else":     "Starts the fallback branch of an if statement.",
 	"elseif":   "Starts an additional conditional branch of an if statement.",
+	"evaluate": "Declares an agent regression case for `leia evaluate`.",
 	"false":    "Boolean false literal.",
 	"for":      "Starts a loop.",
 	"func":     "Declares a named function or creates a function literal.",
@@ -208,6 +210,7 @@ func collectStmtSymbols(src string, tokens []lexer.Token, stmts []ast.Stmt, out 
 				collectStmtSymbols(src, tokens, st.Body.Stmts, out)
 			}
 		case *ast.EvaluateBlockStmt:
+			*out = append(*out, evaluateBlockSymbol(src, tokens, st))
 			if st.Body != nil {
 				collectStmtSymbols(src, tokens, st.Body.Stmts, out)
 			}
@@ -235,6 +238,17 @@ func collectSourceSymbolsFromTokens(src string, tokens []lexer.Token) []sourceSy
 	return out
 }
 
+func evaluateBlockSymbol(src string, tokens []lexer.Token, st *ast.EvaluateBlockStmt) sourceSymbol {
+	nameRange := findEvaluateNameRange(tokens, st.P, st.Name)
+	return sourceSymbol{
+		Name:      st.Name,
+		Detail:    fmt.Sprintf("evaluate `%s`", st.Name),
+		Kind:      symbolKindEvent,
+		Range:     lineRange(src, nameRange.Start.Line),
+		NameRange: nameRange,
+	}
+}
+
 func declarationSymbol(src string, tokens []lexer.Token, pos ast.Pos, prefix, name, detail string, kind int) sourceSymbol {
 	nameRange := findNameRange(tokens, pos, prefix, name)
 	return sourceSymbol{
@@ -257,6 +271,24 @@ func findNameRange(tokens []lexer.Token, pos ast.Pos, prefix, name string) lspRa
 				break
 			}
 			if next.Type == lexer.TOKEN_IDENT && next.Value == name {
+				return tokenRange(next)
+			}
+		}
+	}
+	return lspRange{Start: positionFromOneBased(pos.Line, pos.Column), End: positionFromOneBased(pos.Line, pos.Column+len(name))}
+}
+
+func findEvaluateNameRange(tokens []lexer.Token, pos ast.Pos, name string) lspRange {
+	for i, tok := range tokens {
+		if tok.Line != pos.Line || tok.Column != pos.Column || tokenText(tok) != "evaluate" {
+			continue
+		}
+		for j := i + 1; j < len(tokens); j++ {
+			next := tokens[j]
+			if next.Line != tok.Line {
+				break
+			}
+			if next.Type == lexer.TOKEN_STRING && next.Value == name {
 				return tokenRange(next)
 			}
 		}

@@ -46,6 +46,9 @@ evaluate "answer baseline" {
 	if len(report.Cases) != 1 || report.Cases[0].Name != "answer baseline" || report.Cases[0].Status != "passed" {
 		t.Fatalf("cases = %#v", report.Cases)
 	}
+	if report.Cases[0].DurationMS < 0 || len(report.Cases[0].Assertions) != 1 || report.Cases[0].Assertions[0].Status != "passed" {
+		t.Fatalf("case metadata = %#v", report.Cases[0])
+	}
 }
 
 func TestEvaluateCommandJSONFailureStatus(t *testing.T) {
@@ -71,6 +74,9 @@ func TestEvaluateCommandJSONFailureStatus(t *testing.T) {
 	if report.Status != "failed" || len(report.Cases) != 1 || report.Cases[0].Status != "failed" {
 		t.Fatalf("report = %#v", report)
 	}
+	if len(report.Cases[0].Assertions) != 1 || report.Cases[0].Assertions[0].Status != "failed" || len(report.Cases[0].Diagnostics) != 1 {
+		t.Fatalf("case failure metadata = %#v", report.Cases[0])
+	}
 	if len(report.Findings) != 1 || report.Findings[0].Kind != "case_runtime_error" {
 		t.Fatalf("findings = %#v", report.Findings)
 	}
@@ -87,7 +93,30 @@ func TestEvaluateCommandTextFormat(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("runEvaluateCommand code = %d, stderr = %q", code, stderr.String())
 	}
-	if !strings.Contains(stdout.String(), "evaluate: ok") || !strings.Contains(stdout.String(), "0 cases") || !strings.Contains(stdout.String(), "1 todos") {
+	if !strings.Contains(stdout.String(), "evaluate: ok") || !strings.Contains(stdout.String(), "0 cases") || !strings.Contains(stdout.String(), "1 todos") || !strings.Contains(stdout.String(), "findings:") {
 		t.Fatalf("stdout = %q", stdout.String())
+	}
+}
+
+func TestEvaluateCommandTextFormatListsCases(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "checks.leia")
+	src := `evaluate "text report case" {
+    assert(true)
+}
+`
+	if err := os.WriteFile(path, []byte(src), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runEvaluateCommand([]string{"--format=text", path}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runEvaluateCommand code = %d, stderr = %q", code, stderr.String())
+	}
+	for _, want := range []string{"evaluate: ok", "PASS text report case", "1 assertions"} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Fatalf("stdout = %q, want %q", stdout.String(), want)
+		}
 	}
 }

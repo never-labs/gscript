@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/never-labs/leia/internal/ast"
 	"github.com/never-labs/leia/internal/lexer"
@@ -51,16 +52,33 @@ type Input struct {
 }
 
 type Case struct {
-	CaseID     string      `json:"case_id"`
-	Name       string      `json:"name"`
-	SourcePath string      `json:"source_path"`
-	Range      SourceRange `json:"range"`
-	Status     string      `json:"status"`
+	CaseID      string       `json:"case_id"`
+	Name        string       `json:"name"`
+	SourcePath  string       `json:"source_path"`
+	Range       SourceRange  `json:"range"`
+	Status      string       `json:"status"`
+	DurationMS  int64        `json:"duration_ms,omitempty"`
+	Assertions  []Assertion  `json:"assertions,omitempty"`
+	Diagnostics []Diagnostic `json:"diagnostics,omitempty"`
 }
 
 type SourceRange struct {
 	StartLine   int `json:"start_line"`
 	StartColumn int `json:"start_column"`
+}
+
+type Assertion struct {
+	ID      string      `json:"id"`
+	Status  string      `json:"status"`
+	Range   SourceRange `json:"range"`
+	Message string      `json:"message,omitempty"`
+}
+
+type Diagnostic struct {
+	Kind     string      `json:"kind"`
+	Severity string      `json:"severity"`
+	Message  string      `json:"message"`
+	Range    SourceRange `json:"range"`
 }
 
 type Finding struct {
@@ -124,8 +142,21 @@ func Run(opts Options) (Report, error) {
 			} else {
 				for _, parsed := range cases {
 					c := parsed.Case
+					c.Assertions = collectAssertions(parsed.Body)
+					start := time.Now()
 					if err := executeCase(file, prog, parsed); err != nil {
 						c.Status = "failed"
+						c.DurationMS = elapsedMillis(start)
+						markAssertions(c.Assertions, "unknown")
+						if len(c.Assertions) == 1 || len(c.Assertions) > 0 && strings.Contains(err.Error(), "assert") {
+							c.Assertions[0].Status = "failed"
+						}
+						c.Diagnostics = append(c.Diagnostics, Diagnostic{
+							Kind:     "runtime_error",
+							Severity: "error",
+							Message:  err.Error(),
+							Range:    c.Range,
+						})
 						input.Status = "error"
 						report.Status = "failed"
 						report.Findings = append(report.Findings, Finding{
@@ -138,6 +169,8 @@ func Run(opts Options) (Report, error) {
 						})
 					} else {
 						c.Status = "passed"
+						c.DurationMS = elapsedMillis(start)
+						markAssertions(c.Assertions, "passed")
 					}
 					report.Cases = append(report.Cases, c)
 				}
@@ -370,6 +403,10 @@ func executeCase(path string, prog *ast.Program, c parsedCase) error {
 	})
 }
 
+func elapsedMillis(start time.Time) int64 {
+	return time.Since(start).Milliseconds()
+}
+
 func caseProgramStmts(topLevel []ast.Stmt, body []ast.Stmt) []ast.Stmt {
 	stmts := make([]ast.Stmt, 0, len(topLevel)+len(body))
 	for _, stmt := range topLevel {
@@ -382,8 +419,177 @@ func caseProgramStmts(topLevel []ast.Stmt, body []ast.Stmt) []ast.Stmt {
 	return stmts
 }
 
+func collectAssertions(body *ast.BlockStmt) []Assertion {
+	var out []Assertion
+	collectAssertionsInBlock(body, &out)
+	return out
+}
+
+func collectAssertionsInBlock(body *ast.BlockStmt, out *[]Assertion) {
+	if body == nil {
+		return
+	}
+	for _, stmt := range body.Stmts {
+		collectAssertionsInStmt(stmt, out)
+	}
+}
+
+func collectAssertionsInStmt(stmt ast.Stmt, out *[]Assertion) {
+	switch s := stmt.(type) {
+	case *ast.AssignStmt:
+		collectAssertionsInExprs(s.Targets, out)
+		collectAssertionsInExprs(s.Values, out)
+	case *ast.DeclareStmt:
+		collectAssertionsInExprs(s.Values, out)
+	case *ast.CompoundAssignStmt:
+		collectAssertionsInExpr(s.Target, out)
+		collectAssertionsInExpr(s.Value, out)
+	case *ast.IncDecStmt:
+		collectAssertionsInExpr(s.Target, out)
+	case *ast.CallStmt:
+		collectAssertionsInExpr(s.Call, out)
+	case *ast.GoStmt:
+		collectAssertionsInExpr(s.Call, out)
+	case *ast.DeferStmt:
+		collectAssertionsInExpr(s.Call, out)
+	case *ast.SendStmt:
+		collectAssertionsInExpr(s.Channel, out)
+		collectAssertionsInExpr(s.Value, out)
+	case *ast.SelectStmt:
+		for _, c := range s.Cases {
+			collectAssertionsInExpr(c.Channel, out)
+			collectAssertionsInExpr(c.SendValue, out)
+			collectAssertionsInBlock(c.Body, out)
+		}
+		collectAssertionsInBlock(s.Default, out)
+	case *ast.IfStmt:
+		collectAssertionsInExpr(s.Cond, out)
+		collectAssertionsInBlock(s.Body, out)
+		for _, elseif := range s.ElseIfs {
+			collectAssertionsInExpr(elseif.Cond, out)
+			collectAssertionsInBlock(elseif.Body, out)
+		}
+		collectAssertionsInBlock(s.ElseBody, out)
+	case *ast.ForNumStmt:
+		collectAssertionsInStmt(s.Init, out)
+		collectAssertionsInExpr(s.Cond, out)
+		collectAssertionsInStmt(s.Post, out)
+		collectAssertionsInBlock(s.Body, out)
+	case *ast.ForRangeStmt:
+		collectAssertionsInExpr(s.Iter, out)
+		collectAssertionsInBlock(s.Body, out)
+	case *ast.ForStmt:
+		collectAssertionsInExpr(s.Cond, out)
+		collectAssertionsInBlock(s.Body, out)
+	case *ast.ReturnStmt:
+		collectAssertionsInExprs(s.Values, out)
+	case *ast.FuncDeclStmt:
+		collectAssertionsInBlock(s.Body, out)
+	case *ast.ToolDeclStmt:
+		collectAssertionsInBlock(s.Body, out)
+	case *ast.AgentDeclStmt:
+		collectAssertionsInConfig(s.Config, out)
+		collectAssertionsInBlock(s.Flow, out)
+	case *ast.AgentDefaultsDeclStmt:
+		collectAssertionsInConfig(s.Config, out)
+	case *ast.ModelsDeclStmt:
+		collectAssertionsInConfig(s.Config, out)
+	case *ast.BudgetStmt:
+		collectAssertionsInConfig(s.Config, out)
+		collectAssertionsInBlock(s.Body, out)
+	case *ast.EvaluateBlockStmt:
+		collectAssertionsInBlock(s.Body, out)
+	}
+}
+
+func collectAssertionsInConfig(fields []ast.ConfigField, out *[]Assertion) {
+	for _, field := range fields {
+		collectAssertionsInExpr(field.Key, out)
+		collectAssertionsInExpr(field.Value, out)
+	}
+}
+
+func collectAssertionsInExprs(exprs []ast.Expr, out *[]Assertion) {
+	for _, expr := range exprs {
+		collectAssertionsInExpr(expr, out)
+	}
+}
+
+func collectAssertionsInExpr(expr ast.Expr, out *[]Assertion) {
+	switch e := expr.(type) {
+	case nil:
+		return
+	case *ast.BinaryExpr:
+		collectAssertionsInExpr(e.Left, out)
+		collectAssertionsInExpr(e.Right, out)
+	case *ast.UnaryExpr:
+		collectAssertionsInExpr(e.Operand, out)
+	case *ast.ParenExpr:
+		collectAssertionsInExpr(e.Inner, out)
+	case *ast.IndexExpr:
+		collectAssertionsInExpr(e.Table, out)
+		collectAssertionsInExpr(e.Index, out)
+	case *ast.FieldExpr:
+		collectAssertionsInExpr(e.Table, out)
+	case *ast.CallExpr:
+		if isAssertCall(e) {
+			*out = append(*out, Assertion{
+				ID: fmt.Sprintf("assert:%d:%d", e.P.Line, e.P.Column),
+				Range: SourceRange{
+					StartLine:   e.P.Line,
+					StartColumn: e.P.Column,
+				},
+				Status: "pending",
+			})
+		}
+		collectAssertionsInExpr(e.Func, out)
+		collectAssertionsInExprs(e.Args, out)
+	case *ast.MethodCallExpr:
+		collectAssertionsInExpr(e.Object, out)
+		collectAssertionsInExprs(e.Args, out)
+	case *ast.FuncLitExpr:
+		collectAssertionsInBlock(e.Body, out)
+	case *ast.AgentLitExpr:
+		collectAssertionsInConfig(e.Config, out)
+		collectAssertionsInBlock(e.Flow, out)
+	case *ast.TurnExpr:
+		collectAssertionsInConfig(e.Config, out)
+	case *ast.MessagesExpr:
+		collectAssertionsInTableFields(e.Fields, out)
+	case *ast.ListLitExpr:
+		collectAssertionsInExprs(e.Values, out)
+	case *ast.TableLitExpr:
+		collectAssertionsInTableFields(e.Fields, out)
+	case *ast.DenseLitExpr:
+		collectAssertionsInExprs(e.Values, out)
+	case *ast.RecvExpr:
+		collectAssertionsInExpr(e.Channel, out)
+	case *ast.MakeChanExpr:
+		collectAssertionsInExpr(e.Size, out)
+	}
+}
+
+func collectAssertionsInTableFields(fields []ast.TableField, out *[]Assertion) {
+	for _, field := range fields {
+		collectAssertionsInExpr(field.Key, out)
+		collectAssertionsInExpr(field.Value, out)
+	}
+}
+
+func isAssertCall(call *ast.CallExpr) bool {
+	ident, ok := call.Func.(*ast.IdentExpr)
+	return ok && ident.Name == "assert"
+}
+
+func markAssertions(assertions []Assertion, status string) {
+	for i := range assertions {
+		assertions[i].Status = status
+	}
+}
+
 func FormatText(report Report) string {
-	return fmt.Sprintf("evaluate: %s (%d files, %d parsed, %d cases, %d agents, %d tools, %d todos)\n",
+	var b strings.Builder
+	fmt.Fprintf(&b, "evaluate: %s (%d files, %d parsed, %d cases, %d agents, %d tools, %d todos)\n",
 		report.Status,
 		report.Summary.Files,
 		report.Summary.ParsedFiles,
@@ -392,4 +598,40 @@ func FormatText(report Report) string {
 		report.Summary.Tools,
 		report.Summary.TODOs,
 	)
+	for _, c := range report.Cases {
+		fmt.Fprintf(&b, "  %s %s (%s:%d:%d, %dms, %d assertions)\n",
+			caseStatusMark(c.Status),
+			c.Name,
+			c.SourcePath,
+			c.Range.StartLine,
+			c.Range.StartColumn,
+			c.DurationMS,
+			len(c.Assertions),
+		)
+		for _, d := range c.Diagnostics {
+			fmt.Fprintf(&b, "    %s: %s\n", d.Kind, d.Message)
+		}
+	}
+	if len(report.Findings) > 0 {
+		fmt.Fprintf(&b, "findings:\n")
+		for _, f := range report.Findings {
+			location := f.Path
+			if f.Line > 0 {
+				location = fmt.Sprintf("%s:%d:%d", f.Path, f.Line, f.Column)
+			}
+			fmt.Fprintf(&b, "  %s %s %s: %s\n", f.Severity, f.Kind, location, f.Message)
+		}
+	}
+	return b.String()
+}
+
+func caseStatusMark(status string) string {
+	switch status {
+	case "passed":
+		return "PASS"
+	case "failed":
+		return "FAIL"
+	default:
+		return strings.ToUpper(status)
+	}
 }

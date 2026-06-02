@@ -201,7 +201,7 @@ func TestCompletionReturnsLeiaKeywords(t *testing.T) {
 	for _, item := range items {
 		labels[item.(map[string]any)["label"].(string)] = true
 	}
-	for _, want := range []string{"func", "return", "agent", "tool"} {
+	for _, want := range []string{"func", "return", "agent", "tool", "evaluate"} {
 		if !labels[want] {
 			t.Fatalf("completion labels missing %q: %#v", want, labels)
 		}
@@ -230,6 +230,12 @@ func TestDocumentSymbolReturnsDeclarations(t *testing.T) {
 						"agent helper {",
 						"    model: \"test\"",
 						"}",
+						"evaluate \"slug baseline\" {",
+						"    func normalize(name) {",
+						"        return name",
+						"    }",
+						"    assert(normalize(\"Leia\") == \"Leia\")",
+						"}",
 						"",
 					}, "\n"),
 				},
@@ -255,15 +261,15 @@ func TestDocumentSymbolReturnsDeclarations(t *testing.T) {
 		t.Fatalf("expected diagnostics notification and documentSymbol response, got %d: %#v", len(msgs), msgs)
 	}
 	symbols := msgs[1]["result"].([]any)
-	if len(symbols) != 3 {
-		t.Fatalf("expected 3 symbols, got %#v", symbols)
+	if len(symbols) != 5 {
+		t.Fatalf("expected 5 symbols, got %#v", symbols)
 	}
 	got := map[string]map[string]any{}
 	for _, raw := range symbols {
 		sym := raw.(map[string]any)
 		got[sym["name"].(string)] = sym
 	}
-	for _, name := range []string{"add", "calculate", "helper"} {
+	for _, name := range []string{"add", "calculate", "helper", "slug baseline", "normalize"} {
 		if got[name] == nil {
 			t.Fatalf("missing symbol %q: %#v", name, got)
 		}
@@ -273,6 +279,9 @@ func TestDocumentSymbolReturnsDeclarations(t *testing.T) {
 	}
 	if got["helper"]["kind"] != float64(5) {
 		t.Fatalf("helper kind = %#v, want class", got["helper"]["kind"])
+	}
+	if got["slug baseline"]["kind"] != float64(24) {
+		t.Fatalf("slug baseline kind = %#v, want event", got["slug baseline"]["kind"])
 	}
 	selection := got["calculate"]["selectionRange"].(map[string]any)
 	start := selection["start"].(map[string]any)

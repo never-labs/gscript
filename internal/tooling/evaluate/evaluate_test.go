@@ -3,6 +3,7 @@ package evaluate
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -93,6 +94,30 @@ func TestRunExecutesEvaluateBodyAndReportsFailure(t *testing.T) {
 	}
 	if report.Findings[0].Line != 1 || report.Findings[0].Column != 1 {
 		t.Fatalf("finding source = %#v", report.Findings[0])
+	}
+}
+
+func TestRunEvaluateFailureExampleReportsFailedCase(t *testing.T) {
+	examplePath := filepath.Join("..", "..", "..", "examples", "evaluate", "failing_assert.leia")
+
+	report, err := Run(Options{Paths: []string{examplePath}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Status != "failed" {
+		t.Fatalf("status = %q, want failed", report.Status)
+	}
+	if report.Summary.Files != 1 || report.Summary.ParsedFiles != 1 || report.Summary.EvaluateBlocks != 1 {
+		t.Fatalf("summary = %#v", report.Summary)
+	}
+	if len(report.Cases) != 1 || report.Cases[0].Name != "risk threshold catches stale expectation" || report.Cases[0].Status != "failed" {
+		t.Fatalf("cases = %#v", report.Cases)
+	}
+	if len(report.Findings) != 1 || report.Findings[0].Kind != "case_runtime_error" {
+		t.Fatalf("findings = %#v, want case_runtime_error", report.Findings)
+	}
+	if !strings.Contains(report.Findings[0].Message, "expected the report to show this failed assertion") {
+		t.Fatalf("finding message = %q", report.Findings[0].Message)
 	}
 }
 
