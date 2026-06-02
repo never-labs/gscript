@@ -3289,6 +3289,21 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 			}
 			fnVal := vm.regs[base+a]
 
+			if fnVal.IsTable() {
+				results, err := vm.newPairsFunction().Fn([]runtime.Value{fnVal})
+				if err != nil {
+					return nil, err
+				}
+				for i := 0; i < 3; i++ {
+					if i < len(results) {
+						vm.regs[base+a+i] = results[i]
+					} else {
+						vm.regs[base+a+i] = runtime.NilValue()
+					}
+				}
+				fnVal = vm.regs[base+a]
+			}
+
 			if fnVal.IsChannel() {
 				ch := fnVal.Channel()
 				val, ok := ch.Recv()

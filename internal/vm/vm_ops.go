@@ -126,6 +126,24 @@ func (vm *VM) tableGetDepth(t runtime.Value, key runtime.Value, depth int) (runt
 			if !v.IsNil() {
 				return v, nil
 			}
+			idx := vm.stringMeta.RawGetString("__index")
+			if idx.IsTable() {
+				return vm.tableGetDepth(runtime.TableValue(idx.Table()), key, depth+1)
+			}
+			if idx.IsFunction() {
+				if result, ok, err := vm.fastIndexStringDispatch(idx, t, key); ok || err != nil {
+					return result, err
+				}
+				args := [2]runtime.Value{t, key}
+				results, err := vm.callValue(idx, args[:])
+				if err != nil {
+					return runtime.NilValue(), err
+				}
+				if len(results) > 0 {
+					return results[0], nil
+				}
+				return runtime.NilValue(), nil
+			}
 		}
 		return runtime.NilValue(), nil
 	}

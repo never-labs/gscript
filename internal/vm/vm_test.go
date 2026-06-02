@@ -60,6 +60,35 @@ r3 := calls[3]()
 	}
 }
 
+func TestForRangeBareTableUsesPairs(t *testing.T) {
+	globals := compileAndRun(t, `
+seen := {}
+for _, npc := range {{id: "a"}, {id: "b"}} {
+    seen[#seen + 1] = npc.id
+}
+first := seen[1]
+second := seen[2]
+`)
+	if got := globals["first"]; !got.IsString() || got.Str() != "a" {
+		t.Fatalf("first = %s, want a", got.String())
+	}
+	if got := globals["second"]; !got.IsString() || got.Str() != "b" {
+		t.Fatalf("second = %s, want b", got.String())
+	}
+}
+
+func TestStringMethodCallUsesStringIndexMetatable(t *testing.T) {
+	globals := compileAndRun(t, `
+start_pos, end_pos := "hello":find("ll")
+`)
+	if got := globals["start_pos"]; !got.IsInt() || got.Int() != 3 {
+		t.Fatalf("start_pos = %s, want 3", got.String())
+	}
+	if got := globals["end_pos"]; !got.IsInt() || got.Int() != 4 {
+		t.Fatalf("end_pos = %s, want 4", got.String())
+	}
+}
+
 func TestDenseArrayNumericLiteralIndex(t *testing.T) {
 	globals := compileAndRun(t, `
 func make_selected() {
