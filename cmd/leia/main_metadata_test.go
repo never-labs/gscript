@@ -56,7 +56,7 @@ func TestCapabilitiesJSON(t *testing.T) {
 			t.Fatalf("llm runtime primitives = %#v, want %q", caps.LLM.RuntimePrimitives, want)
 		}
 	}
-	if !containsString(caps.Commands, "bench") || !containsString(caps.Commands, "capabilities") || !containsString(caps.Commands, "check") || !containsString(caps.Commands, "ci") || !containsString(caps.Commands, "config") || !containsString(caps.Commands, "diag") || !containsString(caps.Commands, "doc") || !containsString(caps.Commands, "env") || !containsString(caps.Commands, "eval") || !containsString(caps.Commands, "fmt") || !containsString(caps.Commands, "help") || !containsString(caps.Commands, "inspect") || !containsString(caps.Commands, "lint") || !containsString(caps.Commands, "mod") || !containsString(caps.Commands, "repl") || !containsString(caps.Commands, "run") || !containsString(caps.Commands, "test") || !containsString(caps.Commands, "version") {
+	if !containsString(caps.Commands, "bench") || !containsString(caps.Commands, "capabilities") || !containsString(caps.Commands, "check") || !containsString(caps.Commands, "ci") || !containsString(caps.Commands, "config") || !containsString(caps.Commands, "diag") || !containsString(caps.Commands, "doc") || !containsString(caps.Commands, "env") || !containsString(caps.Commands, "eval") || !containsString(caps.Commands, "fmt") || !containsString(caps.Commands, "help") || !containsString(caps.Commands, "inspect") || !containsString(caps.Commands, "lint") || !containsString(caps.Commands, "lsp") || !containsString(caps.Commands, "mod") || !containsString(caps.Commands, "repl") || !containsString(caps.Commands, "run") || !containsString(caps.Commands, "test") || !containsString(caps.Commands, "version") {
 		t.Fatalf("commands = %#v, want core command set", caps.Commands)
 	}
 	if !containsString(caps.Tooling.Linter.Formats, "json") || !containsString(caps.Tooling.Linter.Formats, "sarif") || !containsString(caps.Tooling.Linter.Codes, "LEIA1001") {
@@ -232,6 +232,17 @@ func TestHelpCommandShowsCommandUsage(t *testing.T) {
 	out := stdout.String()
 	if !strings.Contains(out, "usage: leia run") || !strings.Contains(out, "Run a script file") {
 		t.Fatalf("stdout = %q, want run usage", out)
+	}
+}
+
+func TestLSPCommandHelpDoesNotStartServer(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := runLSPCommand([]string{"--help"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runLSPCommand help code = %d, stderr = %q", code, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "usage: leia lsp") {
+		t.Fatalf("stdout = %q, want lsp usage", stdout.String())
 	}
 }
 

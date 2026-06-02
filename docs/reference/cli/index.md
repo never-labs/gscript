@@ -19,6 +19,7 @@ Generated from the current `leia` binary capabilities.
 | `help` | Show command help. |
 | `inspect` | Inspect compiled artifacts and file directives. |
 | `lint` | Report source diagnostics. |
+| `lsp` | Run the Leia Language Server Protocol endpoint over stdio. |
 | `mod` | Manage local module metadata and require graphs. |
 | `playground` | Serve the local backend-powered Leia playground. |
 | `repl` | Start the interactive shell. |
