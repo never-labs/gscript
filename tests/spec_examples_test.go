@@ -13,7 +13,7 @@ func TestSpecRunnableExamples(t *testing.T) {
 	root := findRepoRoot(t)
 	examples := collectRunnableSpecExamples(t, root)
 	if len(examples) == 0 {
-		t.Fatal("docs/spec must contain at least one ```leia run example")
+		t.Fatal("docs/spec must contain at least one stable runnable example fence: ```leia run all")
 	}
 	leiaBin := filepath.Join(t.TempDir(), "leia")
 	runCommand(t, root, 60*time.Second, "go", "build", "-o", leiaBin, "./cmd/leia")
