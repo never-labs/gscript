@@ -10,6 +10,7 @@ reported as low_resolution instead of being treated as wins.
 from __future__ import annotations
 
 import argparse
+import concurrent.futures
 import hashlib
 import json
 import math
@@ -32,6 +33,7 @@ DEFAULT_ORDER = discovery.DEFAULT_ORDER
 ALL_GROUPS = discovery.GROUPS
 STRICT_DEFAULT_GROUPS = tuple(group for group in discovery.GROUPS if group != "concurrency")
 DEFAULT_GROUPS = STRICT_DEFAULT_GROUPS
+SERIAL_GROUPS = {"concurrency"}
 
 LOGICAL_TIME_BENCHMARKS = {
     "control/defer_protected",
@@ -763,6 +765,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--json", type=Path, default=Path("benchmarks/data/strict_guard_latest.json"))
     parser.add_argument("--markdown", type=Path, default=Path("benchmarks/data/strict_guard_latest.md"))
     parser.add_argument("--keep-bin", action="store_true", help="keep temporary leia binary")
+    parser.add_argument(
+        "--jobs",
+        type=positive_int,
+        default=1,
+        help="number of benchmarks to run concurrently; modes within a benchmark remain sequential",
+    )
     args = parser.parse_args(argv)
 
     if args.warmup < 0:
@@ -791,8 +799,8 @@ def main(argv: list[str] | None = None) -> int:
             results = dry_run_results(specs, modes, luajit_bin)
         else:
             build_leia(root, leia_bin)
-            results = []
-            for spec in specs:
+
+            def run_spec(index: int, spec: BenchmarkSpec) -> tuple[int, BenchmarkResult]:
                 row = BenchmarkResult(spec.name, spec.group, spec.base)
                 for mode in modes:
                     row.modes[mode] = run_mode(
@@ -809,7 +817,36 @@ def main(argv: list[str] | None = None) -> int:
                         args.allow_wall_time,
                         repeat_for(repeat_overrides, mode, spec.name, spec.benchmark_id),
                     )
-                results.append(row)
+                return index, row
+
+            results_by_index: list[BenchmarkResult | None] = [None] * len(specs)
+            if args.jobs == 1 or len(specs) <= 1:
+                for index, spec in enumerate(specs, start=1):
+                    completed_index, row = run_spec(index, spec)
+                    results_by_index[completed_index - 1] = row
+            else:
+                parallel_specs = [
+                    (index, spec)
+                    for index, spec in enumerate(specs, start=1)
+                    if spec.group not in SERIAL_GROUPS
+                ]
+                serial_specs = [
+                    (index, spec)
+                    for index, spec in enumerate(specs, start=1)
+                    if spec.group in SERIAL_GROUPS
+                ]
+                with concurrent.futures.ThreadPoolExecutor(max_workers=args.jobs) as executor:
+                    future_map = {
+                        executor.submit(run_spec, index, spec): index
+                        for index, spec in parallel_specs
+                    }
+                    for future in concurrent.futures.as_completed(future_map):
+                        completed_index, row = future.result()
+                        results_by_index[completed_index - 1] = row
+                for index, spec in serial_specs:
+                    completed_index, row = run_spec(index, spec)
+                    results_by_index[completed_index - 1] = row
+            results = [row for row in results_by_index if row is not None]
 
         print_brief(results, modes)
 

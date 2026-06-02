@@ -22,6 +22,7 @@ PROFILE="core"
 STRICT=1
 NO_LUAJIT=0
 VALIDATE_ONLY=""
+JOBS="${LEIA_PERF_JOBS:-}"
 
 BENCHES=()
 
@@ -97,6 +98,7 @@ Options:
   --out-dir DIR           Artifact directory. Default: ${TMPDIR:-/tmp}/leia_performance_gate.
   --head-ref REF          Clean baseline ref for timing_compare.py. Default: HEAD.
   --no-luajit             Skip LuaJIT timing.
+  --jobs N                Run up to N benchmarks concurrently. Default: auto, capped at 6.
   --strict / --no-strict  Enable or skip strict_guard.py truth pass. Default: --strict.
   --validate-only JSON    Only validate an existing timing_compare JSON artifact.
   -h, --help              Show this help.
@@ -174,6 +176,10 @@ while [ "$#" -gt 0 ]; do
             ;;
         --no-luajit)
             NO_LUAJIT=1
+            ;;
+        --jobs)
+            shift
+            JOBS="$1"
             ;;
         --strict)
             STRICT=1
@@ -426,6 +432,14 @@ fi
 
 mkdir -p "$OUT_DIR"
 
+if [ -z "$JOBS" ]; then
+    JOBS="$(python3 - <<'PY'
+import os
+print(max(1, min(6, os.cpu_count() or 1)))
+PY
+)"
+fi
+
 TIMING_JSON="$OUT_DIR/timing_gate.json"
 TIMING_MD="$OUT_DIR/timing_gate.md"
 STRICT_JSON="$OUT_DIR/strict_gate.json"
@@ -444,6 +458,7 @@ TIMING_CMD=(
     --scale-profile=hot
     --sort=luajit-gap
     --progress
+    --jobs="$JOBS"
     --head-ref="$HEAD_REF"
     --json "$TIMING_JSON"
     --markdown "$TIMING_MD"
@@ -500,6 +515,7 @@ if [ "$STRICT" -eq 1 ]; then
         --timeout="$TIMEOUT"
         --min-sample-seconds=0.100
         --max-repeat=128
+        --jobs="$JOBS"
         --json "$STRICT_JSON"
         --markdown "$STRICT_MD"
     )

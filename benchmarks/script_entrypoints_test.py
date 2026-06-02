@@ -42,6 +42,7 @@ class ScriptEntrypointConsistencyTest(unittest.TestCase):
         self.assertIn("python3 benchmarks/timing_compare.py", gate)
         self.assertIn("python3 benchmarks/strict_guard.py", gate)
         self.assertIn("--progress", gate)
+        self.assertIn('--jobs="$JOBS"', gate)
         self.assertIn("--quick-phase-smoke", gate)
         self.assertIn('PROFILE="quick_phase_smoke"', gate)
         self.assertIn("STRICT_SMOKE_BENCHES=(", gate)

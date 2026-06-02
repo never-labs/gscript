@@ -11,6 +11,7 @@ exit counts without trusting low-resolution 0.000/0.001s script timings.
 from __future__ import annotations
 
 import argparse
+import concurrent.futures
 import json
 import math
 import platform
@@ -32,6 +33,7 @@ DEFAULT_ORDER = discovery.DEFAULT_ORDER
 GROUPS = discovery.GROUPS
 MODES = ["default", "vm", "no_filter"]
 TIME_SOURCES = ["auto", "script", "wall"]
+SERIAL_GROUPS = {"concurrency"}
 
 HOT_SCALE_PROFILE = [
     "recursion/mutual_recursion:REPS=1000000",
@@ -1104,6 +1106,12 @@ def main() -> int:
         action="store_true",
         help="print per-benchmark progress to stderr for long full-suite runs",
     )
+    parser.add_argument(
+        "--jobs",
+        type=positive_int,
+        default=1,
+        help="number of benchmarks to run concurrently; each benchmark still runs current, HEAD, and LuaJIT sequentially",
+    )
     args = parser.parse_args()
 
     if args.warmup < 0:
@@ -1138,9 +1146,9 @@ def main() -> int:
         build_leia(root, current_bin)
         build_leia(head_root, head_bin)
 
-        results: list[BenchmarkResult] = []
         total_specs = len(specs)
-        for index, spec in enumerate(specs, start=1):
+
+        def run_spec(index: int, spec: BenchmarkSpec) -> tuple[int, BenchmarkResult]:
             if args.progress:
                 print(
                     f"[timing_compare] {index}/{total_specs} start {spec.benchmark_id}",
@@ -1166,13 +1174,43 @@ def main() -> int:
                     "head": run_subject("head", mode, head_input_root, head_bin, luajit_bin, spec, tempdir, scale_overrides, args),
                     "luajit": run_subject("luajit", mode, root, None, luajit_bin, spec, tempdir, scale_overrides, args),
                 }
-            results.append(row)
             if args.progress:
                 print(
                     f"[timing_compare] {index}/{total_specs} done  {spec.benchmark_id}",
                     file=sys.stderr,
                     flush=True,
                 )
+            return index, row
+
+        results_by_index: list[BenchmarkResult | None] = [None] * total_specs
+        if args.jobs == 1 or total_specs <= 1:
+            for index, spec in enumerate(specs, start=1):
+                completed_index, row = run_spec(index, spec)
+                results_by_index[completed_index - 1] = row
+        else:
+            parallel_specs = [
+                (index, spec)
+                for index, spec in enumerate(specs, start=1)
+                if spec.group not in SERIAL_GROUPS
+            ]
+            serial_specs = [
+                (index, spec)
+                for index, spec in enumerate(specs, start=1)
+                if spec.group in SERIAL_GROUPS
+            ]
+            with concurrent.futures.ThreadPoolExecutor(max_workers=args.jobs) as executor:
+                future_map = {
+                    executor.submit(run_spec, index, spec): index
+                    for index, spec in parallel_specs
+                }
+                for future in concurrent.futures.as_completed(future_map):
+                    completed_index, row = future.result()
+                    results_by_index[completed_index - 1] = row
+            for index, spec in serial_specs:
+                completed_index, row = run_spec(index, spec)
+                results_by_index[completed_index - 1] = row
+
+        results = [row for row in results_by_index if row is not None]
 
         print_table(sorted_results_for_print(results, modes, args.sort), modes)
 

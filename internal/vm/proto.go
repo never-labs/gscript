@@ -2,6 +2,7 @@ package vm
 
 import (
 	"github.com/never-labs/leia/internal/runtime"
+	"sync"
 	"unsafe"
 )
 
@@ -35,6 +36,7 @@ type FuncProto struct {
 	ResumePayloadCache        []int8                          // per-PC cache for ResumePayloadIsFieldOnly: 0 unknown, 1 false, 2 true
 	RuntimeSpecs              FuncProtoRuntimeSpecializations // runtime-generated specialization caches outside native ABI layout
 	FuncProtoFeedbackState                                    // profiling feedback consumed by Tier 1/Tier 2
+	FeedbackMu                sync.Mutex                      // protects lazy profiling feedback writes from concurrent child VMs
 	HasSelfCalls              bool                            // true if function has recursive calls to itself (set during JIT compilation)
 	LeafNoCall                bool                            // true if bytecode has no call/yield/resume/go operations
 	Tier2LeafNoCall           bool                            // true if optimized Tier 2 IR has no nested call/yield/resume operations
@@ -255,6 +257,8 @@ func (p *FuncProto) ObserveArgShapes(args []runtime.Value) {
 	if p == nil || p.NumParams == 0 || len(args) == 0 {
 		return
 	}
+	p.FeedbackMu.Lock()
+	defer p.FeedbackMu.Unlock()
 	if p.ArgShapeFeedback == nil {
 		p.ArgShapeFeedback = make(ArgArrayElementShapeFeedbackVector, p.NumParams)
 	}
@@ -288,6 +292,8 @@ func (p *FuncProto) ObserveArgArrayElementShapes(args []runtime.Value) {
 	if p == nil || p.NumParams == 0 || len(args) == 0 {
 		return
 	}
+	p.FeedbackMu.Lock()
+	defer p.FeedbackMu.Unlock()
 	if p.ArgArrayElementShapeFeedback == nil {
 		p.ArgArrayElementShapeFeedback = make(ArgArrayElementShapeFeedbackVector, p.NumParams)
 	}
