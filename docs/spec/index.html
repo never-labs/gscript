@@ -218,7 +218,7 @@ turn_count <span class="tok-operator">:=</span> <span class="tok-number">1</span
     user: text
 }</code></pre>
 <h3 id="lexical-elements-literals">Literals</h3>
-<p>Numeric literals support decimal integers and floats plus <code>0x</code>, <code>0b</code>, and <code>0o</code> integer prefixes. Underscores may separate digits where accepted by the lexer.</p>
+<p>Numeric literals support decimal integers and floats plus <code>0x</code>, <code>0b</code>, and <code>0o</code> integer prefixes. Underscores may separate digits where accepted by the lexer. Decimal float forms include <code>1.25</code> and exponent forms such as <code>1e3</code>.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code">decimal <span class="tok-operator">:=</span> <span class="tok-number">1000000</span>
 hex <span class="tok-operator">:=</span> <span class="tok-number">0xff</span>
 binary <span class="tok-operator">:=</span> <span class="tok-number">0b1010</span>
@@ -230,7 +230,7 @@ float <span class="tok-operator">:=</span> <span class="tok-number">1.25e2</span
 <span class="tok-builtin">assert</span>(binary <span class="tok-operator">==</span> <span class="tok-number">10</span>)
 <span class="tok-builtin">assert</span>(octal <span class="tok-operator">==</span> <span class="tok-number">493</span>)
 <span class="tok-builtin">assert</span>(float <span class="tok-operator">==</span> <span class="tok-number">125</span>)</code></pre>
-<p>String literals are quoted strings with escapes or raw backtick strings. Strings are byte strings; UTF-8 interpretation is provided by library helpers.</p>
+<p>String literals are quoted strings with escapes or raw backtick strings. Strings are byte strings; UTF-8 interpretation is provided by library helpers. Stable quoted-string escapes are <code>\\</code>, <code>\&quot;</code>, <code>\n</code>, <code>\r</code>, <code>\t</code>, <code>\0</code>, <code>\xNN</code>, <code>\uNNNN</code>, and <code>\UNNNNNNNN</code>. Raw strings do not process escapes and may not contain a backtick byte.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code">quoted <span class="tok-operator">:=</span> <span class="tok-string">&quot;line\n&quot;</span>
 raw <span class="tok-operator">:=</span> <span class="tok-string">`line\n`</span>
 
@@ -361,7 +361,7 @@ y <span class="tok-operator">=</span> <span class="tok-number">2</span>
 }</code></pre>
 <p>Numbers have one script-visible category, <code>number</code>, with integer and floating-point subtypes observable through <code>math.type</code>. The subtype is part of the v1.0 observable contract for <code>math.type</code>, <code>tostring</code>, table-key behavior, and host APIs that expose value kinds.</p>
 <p>Integer literals may be decimal or use the <code>0x</code>, <code>0b</code>, and <code>0o</code> prefixes specified in <a href="#">Lexical Elements</a>. The portable integer subtype range for ordinary values is signed 48-bit two&#x27;s-complement: <code>-140737488355328</code> through <code>140737488355327</code>. Values outside that range are represented as floats by the current runtime value model. Portable programs must not depend on integer subtype preservation outside that range unless a module contract says so. The unary <code>-</code> operator is not part of a decimal literal; a negative boundary value can be produced by arithmetic even when the corresponding positive magnitude would already be a float.</p>
-<p>Floating-point literals use IEEE-754 binary64 semantics. Decimal and exponent forms such as <code>1.25</code>, <code>.5</code>, <code>1.</code>, and <code>1e3</code> are accepted where the lexer recognizes them. Finite binary64 values have 53 bits of integer precision. <code>math.huge</code> is positive infinity; negative infinity is <code>-math.huge</code>; NaN is produced by math operations such as <code>math.sqrt(-1)</code>.</p>
+<p>Floating-point literals use IEEE-754 binary64 semantics. Decimal and exponent forms such as <code>1.25</code> and <code>1e3</code> are accepted where the lexer recognizes them. Finite binary64 values have 53 bits of integer precision. <code>math.huge</code> is positive infinity; negative infinity is <code>-math.huge</code>; NaN is produced by math operations such as <code>math.sqrt(-1)</code>.</p>
 <p>Arithmetic may preserve integer representation when both operands are integers and the result fits the integer subtype range. Integer overflow promotes the result to float. Mixed integer/float arithmetic produces float. Division produces float. Exact float-to-integer conversion is exposed by <code>math.tointeger</code>; conversion succeeds only for finite integral values in the host integer range, and the resulting value still obeys the ordinary runtime subtype range. JIT raw integer representations are not observable.</p>
 <p>Numeric equality compares numeric values, so <code>1 == 1.0</code> is true even though <code>math.type(1)</code> and <code>math.type(1.0)</code> differ. Ordered numeric comparison converts both operands to their numeric value. NaN is unordered: it is not equal to itself, and all primitive ordered comparisons involving NaN are false. Positive and negative infinity compare according to IEEE-754 ordering.</p>
 <p>Other primitive equality compares booleans and strings by value; <code>nil</code> is equal only to <code>nil</code>. Strings order lexicographically by byte sequence. Values of other categories do not have primitive ordering. Identity-bearing values compare by identity unless metatable or host contracts say otherwise.</p>
@@ -582,6 +582,32 @@ user[<span class="tok-string">&quot;score&quot;</span>] <span class="tok-operato
 <span class="tok-builtin">assert</span>(<span class="tok-builtin">rawlen</span>(boxed) <span class="tok-operator">==</span> <span class="tok-number">0</span>)</code></pre>
 <h3 id="expressions-literals">Literals</h3>
 <p>Table literals, list literals, dense array literals, function literals, anonymous agent expressions, <code>turn</code> expressions, and <code>messages</code> blocks are expressions. Their specific syntax is listed in <a href="#">grammar.ebnf</a>.</p>
+<p>Literal operands are evaluated left-to-right. A literal that constructs an identity-bearing value creates a fresh identity each time the literal is evaluated. This applies to table literals, function literals, anonymous agent expressions, <code>turn</code> request objects, <code>messages</code> arrays, and dense arrays.</p>
+<p>Table fields are evaluated in source order. For stable v1.0 programs, avoid depending on duplicate keys or on subtle interleaving between list-style and keyed fields; <a href="#">Tables And Metatables</a> defines the portable constructor subset. List literals evaluate each element in order and store the results as a new 1-based array table. Dense array literals evaluate each element in order, convert each element according to the dense element type, and raise a runtime error if a value cannot be represented by that element type. Function and agent literals capture their lexical environment by reference. <code>messages</code> blocks evaluate role fields in order and create a new ordered message array.</p>
+<pre class="language-leia leia-code"><code class="language-leia leia-code">events <span class="tok-operator">:=</span> {}
+<span class="tok-keyword">func</span> mark(name, value) {
+    events[<span class="tok-operator">#</span>events <span class="tok-operator">+</span> <span class="tok-number">1</span>] <span class="tok-operator">=</span> name
+    <span class="tok-keyword">return</span> value
+}
+
+t <span class="tok-operator">:=</span> {
+    first: mark(<span class="tok-string">&quot;field&quot;</span>, <span class="tok-number">1</span>),
+    mark(<span class="tok-string">&quot;list&quot;</span>, <span class="tok-number">2</span>),
+}
+list <span class="tok-operator">:=</span> [mark(<span class="tok-string">&quot;a&quot;</span>, <span class="tok-number">10</span>), mark(<span class="tok-string">&quot;b&quot;</span>, <span class="tok-number">20</span>)]
+dense <span class="tok-operator">:=</span> []i64{mark(<span class="tok-string">&quot;d1&quot;</span>, <span class="tok-number">3</span>), mark(<span class="tok-string">&quot;d2&quot;</span>, <span class="tok-number">4</span>)}
+
+<span class="tok-builtin">assert</span>(events[<span class="tok-number">1</span>] <span class="tok-operator">==</span> <span class="tok-string">&quot;field&quot;</span>)
+<span class="tok-builtin">assert</span>(events[<span class="tok-number">2</span>] <span class="tok-operator">==</span> <span class="tok-string">&quot;list&quot;</span>)
+<span class="tok-builtin">assert</span>(events[<span class="tok-number">3</span>] <span class="tok-operator">==</span> <span class="tok-string">&quot;a&quot;</span>)
+<span class="tok-builtin">assert</span>(events[<span class="tok-number">4</span>] <span class="tok-operator">==</span> <span class="tok-string">&quot;b&quot;</span>)
+<span class="tok-builtin">assert</span>(events[<span class="tok-number">5</span>] <span class="tok-operator">==</span> <span class="tok-string">&quot;d1&quot;</span>)
+<span class="tok-builtin">assert</span>(events[<span class="tok-number">6</span>] <span class="tok-operator">==</span> <span class="tok-string">&quot;d2&quot;</span>)
+<span class="tok-builtin">assert</span>(t.first <span class="tok-operator">==</span> <span class="tok-number">1</span>)
+<span class="tok-builtin">assert</span>(t[<span class="tok-number">1</span>] <span class="tok-operator">==</span> <span class="tok-number">2</span>)
+<span class="tok-builtin">assert</span>(list[<span class="tok-number">1</span>] <span class="tok-operator">==</span> <span class="tok-number">10</span> <span class="tok-operator">&amp;&amp;</span> list[<span class="tok-number">2</span>] <span class="tok-operator">==</span> <span class="tok-number">20</span>)
+<span class="tok-builtin">assert</span>(dense[<span class="tok-number">1</span>] <span class="tok-operator">==</span> <span class="tok-number">3</span> <span class="tok-operator">&amp;&amp;</span> dense[<span class="tok-number">2</span>] <span class="tok-operator">==</span> <span class="tok-number">4</span>)
+<span class="tok-builtin">assert</span>({} <span class="tok-operator">!=</span> {})</code></pre>
 <h3 id="expressions-evaluation-order">Evaluation Order</h3>
 <p>Within an expression list, subexpressions are evaluated left-to-right unless a specific expression form short-circuits. Implementations may optimize execution but must preserve observable side effects and error behavior.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code">events <span class="tok-operator">:=</span> {}
@@ -764,7 +790,19 @@ scoped()
 <span class="tok-builtin">assert</span>(events[<span class="tok-number">1</span>] <span class="tok-operator">==</span> <span class="tok-string">&quot;body&quot;</span>)
 <span class="tok-builtin">assert</span>(events[<span class="tok-number">2</span>] <span class="tok-operator">==</span> <span class="tok-string">&quot;first&quot;</span>)
 <span class="tok-builtin">assert</span>(events[<span class="tok-number">3</span>] <span class="tok-operator">==</span> <span class="tok-string">&quot;last&quot;</span>)</code></pre>
-<p><code>goto</code> transfers control to a label in the same function subject to lexical scope restrictions. It must not jump into a block or over a local declaration.</p>
+<p>Labels are declared as <code>name:</code> statements. Label names live in a function-level namespace separate from ordinary lexical variables. <code>goto name</code> transfers control to a label in the same function. It must not jump into a deeper lexical scope, into a loop body from outside that loop, or over a local declaration that would be in scope at the target. It may jump forward or backward within the same scope when doing so does not bypass such declarations.</p>
+<pre class="language-leia leia-code"><code class="language-leia leia-code">i <span class="tok-operator">:=</span> <span class="tok-number">0</span>
+again:
+i <span class="tok-operator">=</span> i <span class="tok-operator">+</span> <span class="tok-number">1</span>
+<span class="tok-keyword">if</span> i <span class="tok-operator">&lt;</span> <span class="tok-number">3</span> {
+    <span class="tok-keyword">goto</span> again
+}
+<span class="tok-builtin">assert</span>(i <span class="tok-operator">==</span> <span class="tok-number">3</span>)</code></pre>
+<pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-keyword">goto</span> inside
+<span class="tok-keyword">if</span> <span class="tok-constant">true</span> {
+    inside:
+    <span class="tok-builtin">print</span>(<span class="tok-string">&quot;unreachable&quot;</span>)
+}</code></pre>
 <p><code>budget { ... } { ... }</code> applies an AI budget to the enclosed block. Public budget dimensions are specified in <a href="#">AI-Native Syntax</a>.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-contextual">budget</span> { turns: <span class="tok-number">1</span>, tokens: <span class="tok-number">256</span>, time: <span class="tok-number">30</span> } {
     result, err <span class="tok-operator">:=</span> answer(<span class="tok-string">&quot;short task&quot;</span>)
@@ -1946,13 +1984,13 @@ select_stmt    = &quot;select&quot; &quot;{&quot; { select_case } &quot;}&quot; 
 select_case    = ( &quot;case&quot; ( recv_clause | send_clause ) | &quot;default&quot; )
                  &quot;:&quot; { separator | statement } ;
 recv_clause    = [ identifier [ &quot;,&quot; identifier ] &quot;:=&quot; ] &quot;&lt;-&quot; expr ;
-send_clause    = expr &quot;&lt;-&quot; [ expr ] ;
+send_clause    = expr &quot;&lt;-&quot; expr ;
 
 return_stmt    = &quot;return&quot; [ expr_list ] ;
 break_stmt     = &quot;break&quot; ;
 continue_stmt  = &quot;continue&quot; ;
 goto_stmt      = &quot;goto&quot; identifier ;
-label_stmt     = &quot;::&quot; identifier &quot;::&quot; ;
+label_stmt     = identifier &quot;:&quot; ;
 go_stmt        = &quot;go&quot; call_expr ;
 defer_stmt     = &quot;defer&quot; call_expr ;
 const_decl     = &quot;const&quot; identifier ( &quot;=&quot; | &quot;:=&quot; ) expr ;
@@ -2045,6 +2083,13 @@ hex_digit      = digit | &quot;A&quot;..&quot;F&quot; | &quot;a&quot;..&quot;f&q
 string_lit     = quoted_string | raw_string ;
 quoted_string  = &#x27;&quot;&#x27; { escaped_char | any_char_except_quote_or_newline } &#x27;&quot;&#x27; ;
 raw_string     = &quot;`&quot; { any_char_except_backtick } &quot;`&quot; ;
+escaped_char   = &quot;\\&quot; ( &quot;\\&quot; | &#x27;&quot;&#x27; | &quot;n&quot; | &quot;r&quot; | &quot;t&quot; | &quot;0&quot; | &quot;x&quot; hex_digit hex_digit
+                    | &quot;u&quot; hex_digit hex_digit hex_digit hex_digit
+                    | &quot;U&quot; hex_digit hex_digit hex_digit hex_digit hex_digit hex_digit hex_digit hex_digit ) ;
+any_char_except_quote_or_newline
+               = ? any Unicode scalar value except &#x27;&quot;&#x27; and newline ? ;
+any_char_except_backtick
+               = ? any Unicode scalar value except &quot;`&quot; ? ;
 </code></pre></section>
 <footer>Generated locally from the current worktree: <code>/Users/jxwr/ai/ai_agent_experiment_gscript/gscript/docs/spec</code>.</footer>
 </main>

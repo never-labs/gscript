@@ -60,6 +60,7 @@ agent summarize(text) {
 
 Numeric literals support decimal integers and floats plus `0x`, `0b`, and `0o`
 integer prefixes. Underscores may separate digits where accepted by the lexer.
+Decimal float forms include `1.25` and exponent forms such as `1e3`.
 
 ```leia run all
 decimal := 1000000
@@ -77,6 +78,9 @@ assert(float == 125)
 
 String literals are quoted strings with escapes or raw backtick strings.
 Strings are byte strings; UTF-8 interpretation is provided by library helpers.
+Stable quoted-string escapes are `\\`, `\"`, `\n`, `\r`, `\t`, `\0`,
+`\xNN`, `\uNNNN`, and `\UNNNNNNNN`. Raw strings do not process escapes and
+may not contain a backtick byte.
 
 ```leia run all
 quoted := "line\n"

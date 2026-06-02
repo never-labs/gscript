@@ -243,8 +243,30 @@ assert(events[2] == "first")
 assert(events[3] == "last")
 ```
 
-`goto` transfers control to a label in the same function subject to lexical
-scope restrictions. It must not jump into a block or over a local declaration.
+Labels are declared as `name:` statements. Label names live in a function-level
+namespace separate from ordinary lexical variables. `goto name` transfers
+control to a label in the same function. It must not jump into a deeper lexical
+scope, into a loop body from outside that loop, or over a local declaration that
+would be in scope at the target. It may jump forward or backward within the same
+scope when doing so does not bypass such declarations.
+
+```leia run all
+i := 0
+again:
+i = i + 1
+if i < 3 {
+    goto again
+}
+assert(i == 3)
+```
+
+```leia fail all
+goto inside
+if true {
+    inside:
+    print("unreachable")
+}
+```
 
 `budget { ... } { ... }` applies an AI budget to the enclosed block. Public
 budget dimensions are specified in [AI-Native Syntax](ai-native.md).

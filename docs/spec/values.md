@@ -75,8 +75,8 @@ literal; a negative boundary value can be produced by arithmetic even when the
 corresponding positive magnitude would already be a float.
 
 Floating-point literals use IEEE-754 binary64 semantics. Decimal and exponent
-forms such as `1.25`, `.5`, `1.`, and `1e3` are accepted where the lexer
-recognizes them. Finite binary64 values have 53 bits of integer precision.
+forms such as `1.25` and `1e3` are accepted where the lexer recognizes them.
+Finite binary64 values have 53 bits of integer precision.
 `math.huge` is positive infinity; negative infinity is `-math.huge`; NaN is
 produced by math operations such as `math.sqrt(-1)`.
 

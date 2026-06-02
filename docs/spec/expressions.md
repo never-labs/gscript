@@ -159,6 +159,49 @@ Table literals, list literals, dense array literals, function literals,
 anonymous agent expressions, `turn` expressions, and `messages` blocks are
 expressions. Their specific syntax is listed in [grammar.ebnf](grammar.ebnf).
 
+Literal operands are evaluated left-to-right. A literal that constructs an
+identity-bearing value creates a fresh identity each time the literal is
+evaluated. This applies to table literals, function literals, anonymous agent
+expressions, `turn` request objects, `messages` arrays, and dense arrays.
+
+Table fields are evaluated in source order. For stable v1.0 programs, avoid
+depending on duplicate keys or on subtle interleaving between list-style and
+keyed fields; [Tables And Metatables](tables.md) defines the portable
+constructor subset. List literals evaluate each element in order and store the
+results as a new 1-based array table. Dense array literals evaluate each
+element in order, convert each element according to the dense element type, and
+raise a runtime error if a value cannot be represented by that element type.
+Function and agent literals capture their lexical environment by reference.
+`messages` blocks evaluate role fields in order and create a new ordered
+message array.
+
+```leia run all
+events := {}
+func mark(name, value) {
+    events[#events + 1] = name
+    return value
+}
+
+t := {
+    first: mark("field", 1),
+    mark("list", 2),
+}
+list := [mark("a", 10), mark("b", 20)]
+dense := []i64{mark("d1", 3), mark("d2", 4)}
+
+assert(events[1] == "field")
+assert(events[2] == "list")
+assert(events[3] == "a")
+assert(events[4] == "b")
+assert(events[5] == "d1")
+assert(events[6] == "d2")
+assert(t.first == 1)
+assert(t[1] == 2)
+assert(list[1] == 10 && list[2] == 20)
+assert(dense[1] == 3 && dense[2] == 4)
+assert({} != {})
+```
+
 ## Evaluation Order
 
 Within an expression list, subexpressions are evaluated left-to-right unless a

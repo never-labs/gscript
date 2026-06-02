@@ -59,13 +59,13 @@ select_stmt    = "select" "{" { select_case } "}" ;
 select_case    = ( "case" ( recv_clause | send_clause ) | "default" )
                  ":" { separator | statement } ;
 recv_clause    = [ identifier [ "," identifier ] ":=" ] "<-" expr ;
-send_clause    = expr "<-" [ expr ] ;
+send_clause    = expr "<-" expr ;
 
 return_stmt    = "return" [ expr_list ] ;
 break_stmt     = "break" ;
 continue_stmt  = "continue" ;
 goto_stmt      = "goto" identifier ;
-label_stmt     = "::" identifier "::" ;
+label_stmt     = identifier ":" ;
 go_stmt        = "go" call_expr ;
 defer_stmt     = "defer" call_expr ;
 const_decl     = "const" identifier ( "=" | ":=" ) expr ;
@@ -158,3 +158,10 @@ hex_digit      = digit | "A".."F" | "a".."f" ;
 string_lit     = quoted_string | raw_string ;
 quoted_string  = '"' { escaped_char | any_char_except_quote_or_newline } '"' ;
 raw_string     = "`" { any_char_except_backtick } "`" ;
+escaped_char   = "\\" ( "\\" | '"' | "n" | "r" | "t" | "0" | "x" hex_digit hex_digit
+                    | "u" hex_digit hex_digit hex_digit hex_digit
+                    | "U" hex_digit hex_digit hex_digit hex_digit hex_digit hex_digit hex_digit hex_digit ) ;
+any_char_except_quote_or_newline
+               = ? any Unicode scalar value except '"' and newline ? ;
+any_char_except_backtick
+               = ? any Unicode scalar value except "`" ? ;
