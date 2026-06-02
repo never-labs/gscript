@@ -122,6 +122,35 @@ func TestEvaluateCommandTextFormatListsCases(t *testing.T) {
 	}
 }
 
+func TestEvaluateCommandFiltersCases(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "checks.leia")
+	src := `evaluate "skip me" {
+    assert(false, "should not run")
+}
+
+evaluate "run me" {
+    assert(true)
+}
+`
+	if err := os.WriteFile(path, []byte(src), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runEvaluateCommand([]string{"--format=json", "--filter", "run me", path}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runEvaluateCommand code = %d, stderr = %q", code, stderr.String())
+	}
+	var report evaluate.Report
+	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
+		t.Fatalf("decode report: %v\n%s", err, stdout.String())
+	}
+	if report.Summary.EvaluateBlocks != 2 || len(report.Cases) != 1 || report.Cases[0].Name != "run me" {
+		t.Fatalf("report = %#v", report)
+	}
+}
+
 func TestEvaluateCommandLLMReplay(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "llm_eval.leia")

@@ -15,9 +15,14 @@ scoring and workflow orchestration are reserved for later phases.
 ```sh
 leia evaluate --json path/to/script.leia
 leia evaluate --format=text path/to/project
+leia evaluate --filter "refund flow" tests/agents
 leia evaluate --llm-replay tests/agent.records.json tests/agent.leia
 leia evaluate --update-golden tests/agent.records.json tests/agent.leia
 ```
+
+`--filter TEXT` runs only cases whose name, source path, or case id contains
+`TEXT`. Discovery counts still include all evaluate blocks so dashboards can
+distinguish "not discovered" from "discovered but filtered out".
 
 LLM record/replay uses the same JSON fixture format as the public `llm`
 package:

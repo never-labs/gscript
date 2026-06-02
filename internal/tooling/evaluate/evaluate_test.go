@@ -101,6 +101,29 @@ func TestRunExecutesEvaluateBodyAndReportsFailure(t *testing.T) {
 	}
 }
 
+func TestRunFiltersEvaluateCases(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "cases.leia")
+	if err := os.WriteFile(path, []byte(`evaluate "alpha case" {
+    assert(false, "alpha should be filtered out")
+}
+
+evaluate "beta case" {
+    assert(true)
+}
+`), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	report, err := Run(Options{Paths: []string{path}, Filter: "beta"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Status != "ok" || report.Summary.EvaluateBlocks != 2 || len(report.Cases) != 1 || report.Cases[0].Name != "beta case" {
+		t.Fatalf("report = %#v", report)
+	}
+}
+
 func TestRunEvaluateFailureExampleReportsFailedCase(t *testing.T) {
 	examplePath := filepath.Join("..", "..", "..", "examples", "evaluate", "failing_assert.leia")
 

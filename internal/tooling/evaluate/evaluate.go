@@ -25,6 +25,7 @@ const SchemaVersion = 1
 
 type Options struct {
 	Paths               []string
+	Filter              string
 	LLMRecordPath       string
 	LLMReplayPath       string
 	LLMUpdateGoldenPath string
@@ -145,6 +146,10 @@ func Run(opts Options) (Report, error) {
 	if run != nil && run.recordPath != "" {
 		report.Notes = append(report.Notes, fmt.Sprintf("llm turns will be recorded to %s", run.recordPath))
 	}
+	filter := strings.TrimSpace(opts.Filter)
+	if filter != "" {
+		report.Notes = append(report.Notes, fmt.Sprintf("filter: %s", filter))
+	}
 	for _, file := range files {
 		input := Input{Path: file, Status: "ok"}
 		report.Summary.Files++
@@ -171,6 +176,9 @@ func Run(opts Options) (Report, error) {
 				report.Findings = append(report.Findings, findings...)
 			} else {
 				for _, parsed := range cases {
+					if filter != "" && !caseMatchesFilter(parsed.Case, filter) {
+						continue
+					}
 					c := parsed.Case
 					c.Assertions = collectAssertions(parsed.Body)
 					start := time.Now()
@@ -238,6 +246,15 @@ func Run(opts Options) (Report, error) {
 		}
 	}
 	return report, nil
+}
+
+func caseMatchesFilter(c Case, filter string) bool {
+	if filter == "" {
+		return true
+	}
+	return strings.Contains(c.Name, filter) ||
+		strings.Contains(c.CaseID, filter) ||
+		strings.Contains(c.SourcePath, filter)
 }
 
 type runContext struct {
