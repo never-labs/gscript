@@ -42,12 +42,13 @@ feature must update the corresponding `tests/feature_matrix.json` row and must
 include conformance, semantic-gate, or mode-equivalence coverage appropriate to
 the changed behavior.
 
-Runnable examples in the spec are part of this contract. Fenced examples marked
-with `leia run`, `leia run all`, `leia fail`, or `leia fail all` are executable
-spec examples and are validated by `tests/spec_examples_test.go`. Any normative
-example added to `docs/spec/*.md` that is intended to demonstrate accepted or
-rejected behavior must use one of those runnable fence tags unless the example
-is explicitly non-executable syntax notation.
+Runnable examples in the spec are part of this contract. Stable spec examples
+must use `leia run all` for accepted programs or `leia fail all` for rejected
+programs, and are validated by `tests/spec_examples_test.go` across the
+interpreter, VM, and default execution modes. Any normative example added to
+`docs/spec/*.md` that is intended to demonstrate accepted or rejected behavior
+must use one of those all-mode runnable fence tags unless the example is
+explicitly non-executable syntax notation.
 
 ## Runtime Specialization
 
