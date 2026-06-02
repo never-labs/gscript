@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	leia "github.com/never-labs/leia"
@@ -112,6 +113,97 @@ func TestAnthropicCompatibleLLMProvider(t *testing.T) {
 		t.Fatalf("result = %#v", res)
 	}
 	if len(res.Calls) != 1 || res.Calls[0].Tool != "lookup" || res.Calls[0].Args["limit"] != int64(3) {
+		t.Fatalf("calls = %#v", res.Calls)
+	}
+}
+
+func TestAnthropicCompatibleLLMProviderStreamsContent(t *testing.T) {
+	var got map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := json.NewDecoder(r.Body).Decode(&got); err != nil {
+			t.Fatalf("Decode request: %v", err)
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		fmt.Fprintln(w, `event: message_start`)
+		fmt.Fprintln(w, `data: {"type":"message_start","message":{"usage":{"input_tokens":3,"output_tokens":0}}}`)
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, `event: content_block_start`)
+		fmt.Fprintln(w, `data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}`)
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, `event: content_block_delta`)
+		fmt.Fprintln(w, `data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"hello"}}`)
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, `event: content_block_delta`)
+		fmt.Fprintln(w, `data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":" stream"}}`)
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, `event: message_delta`)
+		fmt.Fprintln(w, `data: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":2}}`)
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, `event: message_stop`)
+		fmt.Fprintln(w, `data: {"type":"message_stop"}`)
+	}))
+	defer server.Close()
+	provider := anthropic.Provider{
+		Endpoint: server.URL,
+		Model:    "mock-fast",
+		Client:   server.Client(),
+	}
+	var tokens []string
+	res, err := provider.StreamTurn(context.Background(), llm.TurnRequest{
+		Messages: []llm.Message{{Role: "user", Text: "hello"}},
+	}, func(event llm.StreamEvent) error {
+		if event.Type == "token" {
+			tokens = append(tokens, event.Token)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("StreamTurn: %v", err)
+	}
+	if got["stream"] != true {
+		t.Fatalf("request stream = %#v", got["stream"])
+	}
+	if res.Status != "final_answer" || res.Text != "hello stream" || res.Reason != "end_turn" || res.Usage.InputTokens != 3 || res.Usage.OutputTokens != 2 {
+		t.Fatalf("result = %#v", res)
+	}
+	if strings.Join(tokens, "|") != "hello| stream" {
+		t.Fatalf("tokens = %#v", tokens)
+	}
+}
+
+func TestAnthropicCompatibleLLMProviderStreamsToolUse(t *testing.T) {
+	var got map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := json.NewDecoder(r.Body).Decode(&got); err != nil {
+			t.Fatalf("Decode request: %v", err)
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		fmt.Fprintln(w, `data: {"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"toolu_1","name":"lookup","input":{}}}`)
+		fmt.Fprintln(w, `data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"{\"query\":"}}`)
+		fmt.Fprintln(w, `data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"\"leia\"}"}}`)
+		fmt.Fprintln(w, `data: {"type":"message_delta","delta":{"stop_reason":"tool_use"},"usage":{"output_tokens":4}}`)
+		fmt.Fprintln(w, `data: {"type":"message_stop"}`)
+	}))
+	defer server.Close()
+	provider := anthropic.Provider{
+		Endpoint: server.URL,
+		Model:    "mock-fast",
+		Client:   server.Client(),
+	}
+	res, err := provider.StreamTurn(context.Background(), llm.TurnRequest{
+		Messages: []llm.Message{{Role: "user", Text: "lookup"}},
+		Tools:    []llm.Tool{{Name: "lookup", Params: []string{"query"}}},
+	}, nil)
+	if err != nil {
+		t.Fatalf("StreamTurn: %v", err)
+	}
+	if got["stream"] != true {
+		t.Fatalf("request stream = %#v", got["stream"])
+	}
+	if res.Status != "tool_calls" || len(res.Calls) != 1 {
+		t.Fatalf("result = %#v", res)
+	}
+	if res.Calls[0].ID != "toolu_1" || res.Calls[0].Tool != "lookup" || res.Calls[0].Args["query"] != "leia" {
 		t.Fatalf("calls = %#v", res.Calls)
 	}
 }

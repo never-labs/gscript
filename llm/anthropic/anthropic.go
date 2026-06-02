@@ -1,12 +1,14 @@
 package anthropic
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 
@@ -34,6 +36,15 @@ type Provider struct {
 }
 
 func (p Provider) Turn(ctx context.Context, req llm.TurnRequest) (llm.TurnResult, error) {
+	return p.turn(ctx, req, nil)
+}
+
+func (p Provider) StreamTurn(ctx context.Context, req llm.TurnRequest, sink llm.StreamSink) (llm.TurnResult, error) {
+	req.Stream = true
+	return p.turn(ctx, req, sink)
+}
+
+func (p Provider) turn(ctx context.Context, req llm.TurnRequest, sink llm.StreamSink) (llm.TurnResult, error) {
 	if p.Timeout > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, p.Timeout)
@@ -57,7 +68,7 @@ func (p Provider) Turn(ctx context.Context, req llm.TurnRequest) (llm.TurnResult
 	}
 	var lastErr error
 	for attempt := 0; attempt < attempts; attempt++ {
-		res, retry, err := p.turnOnce(ctx, endpoint, body)
+		res, retry, err := p.turnOnce(ctx, endpoint, body, req.Stream, sink)
 		if err == nil {
 			return res, nil
 		}
@@ -72,7 +83,7 @@ func (p Provider) Turn(ctx context.Context, req llm.TurnRequest) (llm.TurnResult
 	return llm.TurnResult{}, lastErr
 }
 
-func (p Provider) turnOnce(ctx context.Context, endpoint string, body []byte) (llm.TurnResult, bool, error) {
+func (p Provider) turnOnce(ctx context.Context, endpoint string, body []byte, stream bool, sink llm.StreamSink) (llm.TurnResult, bool, error) {
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
 	if err != nil {
 		return llm.TurnResult{}, false, err
@@ -108,11 +119,48 @@ func (p Provider) turnOnce(ctx context.Context, endpoint string, body []byte) (l
 			Retryable:  retryable,
 		}
 	}
+	if stream {
+		res, err := decodeAnthropicStream(resp.Body, sink)
+		return res, false, err
+	}
 	var out anthropicResponse
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
 		return llm.TurnResult{}, false, err
 	}
 	return anthropicTurnResult(out), false, nil
+}
+
+func decodeAnthropicStream(body io.Reader, sink llm.StreamSink) (llm.TurnResult, error) {
+	scanner := bufio.NewScanner(body)
+	scanner.Buffer(make([]byte, 0, 4096), 1024*1024)
+	state := anthropicStreamState{}
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || strings.HasPrefix(line, "event:") {
+			continue
+		}
+		if !strings.HasPrefix(line, "data:") {
+			continue
+		}
+		data := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
+		if data == "" {
+			continue
+		}
+		if data == "[DONE]" {
+			break
+		}
+		var event anthropicStreamEvent
+		if err := json.Unmarshal([]byte(data), &event); err != nil {
+			return llm.TurnResult{}, err
+		}
+		if err := state.apply(event, sink); err != nil {
+			return llm.TurnResult{}, err
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return llm.TurnResult{}, err
+	}
+	return state.result(), nil
 }
 
 // Error reports a non-2xx response from an
@@ -152,6 +200,7 @@ type anthropicRequest struct {
 	TopP          *float64           `json:"top_p,omitempty"`
 	StopSequences []string           `json:"stop_sequences,omitempty"`
 	Metadata      map[string]string  `json:"metadata,omitempty"`
+	Stream        bool               `json:"stream,omitempty"`
 }
 
 type anthropicMessage struct {
@@ -194,6 +243,48 @@ type anthropicResponse struct {
 	} `json:"usage"`
 }
 
+type anthropicStreamEvent struct {
+	Type         string `json:"type"`
+	Index        int    `json:"index"`
+	ContentBlock struct {
+		Type  string         `json:"type"`
+		Text  string         `json:"text"`
+		ID    string         `json:"id"`
+		Name  string         `json:"name"`
+		Input map[string]any `json:"input"`
+	} `json:"content_block"`
+	Delta struct {
+		Type        string `json:"type"`
+		Text        string `json:"text"`
+		PartialJSON string `json:"partial_json"`
+		StopReason  string `json:"stop_reason"`
+	} `json:"delta"`
+	Message struct {
+		Usage struct {
+			InputTokens  int64 `json:"input_tokens"`
+			OutputTokens int64 `json:"output_tokens"`
+		} `json:"usage"`
+	} `json:"message"`
+	Usage struct {
+		InputTokens  int64 `json:"input_tokens"`
+		OutputTokens int64 `json:"output_tokens"`
+	} `json:"usage"`
+}
+
+type anthropicStreamState struct {
+	text       strings.Builder
+	reason     string
+	usage      llm.TurnUsage
+	toolBlocks map[int]*anthropicStreamToolBlock
+}
+
+type anthropicStreamToolBlock struct {
+	id        string
+	name      string
+	inputJSON strings.Builder
+	input     map[string]any
+}
+
 func anthropicMessagesEndpoint(endpoint string) string {
 	if endpoint == "" {
 		return defaultAnthropicCompatibleEndpoint
@@ -213,6 +304,7 @@ func anthropicRequestFromTurn(req llm.TurnRequest, model string) anthropicReques
 		TopP:          cloneFloat64Ptr(req.TopP),
 		StopSequences: append([]string(nil), req.Stop...),
 		Metadata:      cloneStringMap(req.Metadata),
+		Stream:        req.Stream,
 	}
 	if out.MaxTokens <= 0 {
 		out.MaxTokens = 1024
@@ -322,6 +414,111 @@ func anthropicTurnResult(resp anthropicResponse) llm.TurnResult {
 	if len(res.Calls) > 0 {
 		res.Status = "tool_calls"
 	} else if resp.StopReason == "max_tokens" || resp.StopReason == "stop_sequence" {
+		res.Status = "stop"
+	} else {
+		res.Status = "final_answer"
+	}
+	return res
+}
+
+func (s *anthropicStreamState) apply(event anthropicStreamEvent, sink llm.StreamSink) error {
+	switch event.Type {
+	case "message_start":
+		s.applyUsage(event.Message.Usage.InputTokens, event.Message.Usage.OutputTokens)
+	case "content_block_start":
+		if event.ContentBlock.Type == "text" && event.ContentBlock.Text != "" {
+			return s.appendText(event.ContentBlock.Text, sink)
+		}
+		if event.ContentBlock.Type == "tool_use" {
+			block := s.toolBlock(event.Index)
+			block.id = event.ContentBlock.ID
+			block.name = event.ContentBlock.Name
+			if len(event.ContentBlock.Input) > 0 {
+				block.input = openai.NormalizeMap(event.ContentBlock.Input)
+			}
+		}
+	case "content_block_delta":
+		switch event.Delta.Type {
+		case "text_delta":
+			return s.appendText(event.Delta.Text, sink)
+		case "input_json_delta":
+			s.toolBlock(event.Index).inputJSON.WriteString(event.Delta.PartialJSON)
+		}
+	case "message_delta":
+		if event.Delta.StopReason != "" {
+			s.reason = event.Delta.StopReason
+		}
+		s.applyUsage(event.Usage.InputTokens, event.Usage.OutputTokens)
+	case "message_stop":
+		return nil
+	}
+	return nil
+}
+
+func (s *anthropicStreamState) appendText(text string, sink llm.StreamSink) error {
+	if text == "" {
+		return nil
+	}
+	s.text.WriteString(text)
+	if sink == nil {
+		return nil
+	}
+	return sink(llm.StreamEvent{Type: "token", Token: text, Text: text})
+}
+
+func (s *anthropicStreamState) applyUsage(input, output int64) {
+	if input != 0 {
+		s.usage.InputTokens = input
+	}
+	if output != 0 {
+		s.usage.OutputTokens = output
+	}
+}
+
+func (s *anthropicStreamState) toolBlock(index int) *anthropicStreamToolBlock {
+	if s.toolBlocks == nil {
+		s.toolBlocks = make(map[int]*anthropicStreamToolBlock)
+	}
+	block := s.toolBlocks[index]
+	if block == nil {
+		block = &anthropicStreamToolBlock{}
+		s.toolBlocks[index] = block
+	}
+	return block
+}
+
+func (s *anthropicStreamState) result() llm.TurnResult {
+	res := llm.TurnResult{
+		Text:   s.text.String(),
+		Reason: s.reason,
+		Usage:  s.usage,
+	}
+	indices := make([]int, 0, len(s.toolBlocks))
+	for index := range s.toolBlocks {
+		indices = append(indices, index)
+	}
+	sort.Ints(indices)
+	for _, index := range indices {
+		block := s.toolBlocks[index]
+		if block == nil || (block.id == "" && block.name == "" && block.inputJSON.Len() == 0 && len(block.input) == 0) {
+			continue
+		}
+		args := block.input
+		if args == nil && block.inputJSON.Len() > 0 {
+			var decoded map[string]any
+			if err := json.Unmarshal([]byte(block.inputJSON.String()), &decoded); err == nil {
+				args = openai.NormalizeMap(decoded)
+			}
+		}
+		res.Calls = append(res.Calls, llm.ToolCall{
+			ID:   block.id,
+			Tool: block.name,
+			Args: args,
+		})
+	}
+	if len(res.Calls) > 0 {
+		res.Status = "tool_calls"
+	} else if s.reason == "max_tokens" || s.reason == "stop_sequence" {
 		res.Status = "stop"
 	} else {
 		res.Status = "final_answer"
