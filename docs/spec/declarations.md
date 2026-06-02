@@ -1,13 +1,28 @@
 # Declarations And Scope
 
-Leia uses lexical scope. A declaration binds an identifier in the innermost
-enclosing block or module scope according to the declaration form.
+Leia uses lexical scope. A declaration creates a binding for an identifier in
+the innermost enclosing lexical block, or in module scope when the declaration
+appears at top level.
 
-A binding is visible from its declaration point through the end of the block
-that owns it, including nested blocks and function literals created in that
-region. A use before the declaration point does not see the later binding.
+For `:=`, `const`, `func`, and `import`, the declaration point is the end of
+the declaration statement. The new binding is visible after that point through
+the end of the block that owns it, including nested blocks and function
+literals created in that region. The initializer or right-hand side of a
+declaration is evaluated before the new binding is visible, so names in that
+expression resolve exactly as they would immediately before the declaration.
 Module-scope declarations are visible to later module-scope code and to nested
 blocks in the same module.
+
+```leia run all
+x := 10
+
+if true {
+    x := x + 1 // RHS uses the outer x; the inner x starts after this statement
+    assert(x == 11)
+}
+
+assert(x == 10)
+```
 
 An inner declaration may shadow an outer binding with the same name. While the
 inner binding is in scope, unqualified uses resolve to the inner binding. The
@@ -52,8 +67,11 @@ assert(value == 1)
 
 Same-block redeclaration is reserved by the v1.0 contract: portable programs
 must not declare the same identifier twice in one lexical block unless a later
-spec section explicitly permits a narrower form. A declaration may not shadow a
-label because labels use a separate function-level namespace.
+spec section explicitly permits a narrower form. The current implementation
+accepts some same-block redeclarations, including repeated `:=` and repeated
+`func` declarations, but interpreter and VM capture behavior is not part of the
+stable contract for those programs. Implementations may reject same-block
+redeclarations in stable mode.
 
 ## Constants
 
@@ -78,6 +96,25 @@ Const visibility and shadowing follow the ordinary lexical binding rules. An
 inner declaration may shadow an outer const, but code that resolves to the const
 binding may not assign to that binding with `=`, compound assignment, or
 increment/decrement forms.
+
+```leia fail all
+const limit := 10
+limit = 11
+```
+
+The read-only property belongs to the binding, not to the identifier spelling.
+A shadowing declaration creates a separate binding.
+
+```leia run all
+const n := 1
+
+if true {
+    n := 2
+    assert(n == 2)
+}
+
+assert(n == 1)
+```
 
 ## Functions
 
@@ -104,10 +141,22 @@ assert(bump() == 1)
 assert(bump() == 2)
 ```
 
-The function name is bound in the enclosing scope before the function body is
-evaluated, so the body may refer to the function for recursion. Parameters are
-local bindings in the function body. They shadow outer bindings with the same
-names for the entire body.
+The function declaration's binding is visible to code after the declaration
+statement. The function body is evaluated later, in an environment where the
+function name resolves to that binding, so the body may refer to the function
+for recursion. Parameters are local bindings in the function body. They shadow
+outer bindings with the same names for the entire body.
+
+```leia run all
+func factorial(n) {
+    if n <= 1 {
+        return 1
+    }
+    return n * factorial(n - 1)
+}
+
+assert(factorial(5) == 120)
+```
 
 Function declarations follow the same same-block redeclaration portability rule
 as other declarations. A nested function declaration may shadow an outer
@@ -123,15 +172,27 @@ import_decl = "import" string_lit "as" identifier ;
 source path does not reflect arbitrary Go packages by itself; the embedder must
 provide an allowlisted binding through the Go API.
 
-The import alias is a lexical binding in the declaration's scope. It may be
+The import alias is a lexical binding in the declaration's scope. It is visible
+only after the import declaration statement completes, and it may be
 shadowed by an inner declaration. Portable programs must avoid same-block alias
-conflicts.
+conflicts with any other declaration.
+
+An import path names a capability provided by the module loader or embedder.
+The command-line runner rejects unallowlisted Go imports.
+
+```leia fail all
+import "go:math" as math
+```
 
 ## Labels
 
 Labels are declared with `name:`. Label names live in a function-level label
-namespace. A `goto` must not jump into a deeper lexical scope or over a local
-declaration.
+namespace that is separate from lexical value bindings. A label may have the
+same spelling as a variable, constant, function, parameter, or import alias.
+Labels do not shadow lexical bindings, and lexical bindings do not shadow
+labels. Within a function, each label name may be declared at most once.
+
+A `goto` must not jump into a deeper lexical scope or over a local declaration.
 
 ```leia run all
 i := 0
@@ -141,6 +202,25 @@ if i < 3 {
     goto again
 }
 assert(i == 3)
+```
+
+```leia run all
+done:
+done := true
+assert(done)
+```
+
+```leia fail all
+again:
+again:
+```
+
+```leia fail all
+goto inner
+if true {
+    x := 1
+    inner:
+}
 ```
 
 ## AI Declarations

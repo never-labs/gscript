@@ -246,8 +246,16 @@ raw <span class="tok-operator">:=</span> <span class="tok-string">`line\n`</span
  &amp;&amp; || &amp; | ^ &amp;^ &lt;&lt; &gt;&gt;
  &lt;- ... . , ; : ( ) [ ] { }</code></pre>
 <p>The parser may reject a token sequence even when each token is lexically valid. For example, <code>a + * b</code> is lexically valid as tokens but invalid as an expression.</p></section><section><h2 id="declarations-and-scope">Declarations And Scope</h2>
-<p>Leia uses lexical scope. A declaration binds an identifier in the innermost enclosing block or module scope according to the declaration form.</p>
-<p>A binding is visible from its declaration point through the end of the block that owns it, including nested blocks and function literals created in that region. A use before the declaration point does not see the later binding. Module-scope declarations are visible to later module-scope code and to nested blocks in the same module.</p>
+<p>Leia uses lexical scope. A declaration creates a binding for an identifier in the innermost enclosing lexical block, or in module scope when the declaration appears at top level.</p>
+<p>For <code>:=</code>, <code>const</code>, <code>func</code>, and <code>import</code>, the declaration point is the end of the declaration statement. The new binding is visible after that point through the end of the block that owns it, including nested blocks and function literals created in that region. The initializer or right-hand side of a declaration is evaluated before the new binding is visible, so names in that expression resolve exactly as they would immediately before the declaration. Module-scope declarations are visible to later module-scope code and to nested blocks in the same module.</p>
+<pre class="language-leia leia-code"><code class="language-leia leia-code">x <span class="tok-operator">:=</span> <span class="tok-number">10</span>
+
+<span class="tok-keyword">if</span> <span class="tok-constant">true</span> {
+    x <span class="tok-operator">:=</span> x <span class="tok-operator">+</span> <span class="tok-number">1</span> <span class="tok-comment">// RHS uses the outer x; the inner x starts after this statement</span>
+    <span class="tok-builtin">assert</span>(x <span class="tok-operator">==</span> <span class="tok-number">11</span>)
+}
+
+<span class="tok-builtin">assert</span>(x <span class="tok-operator">==</span> <span class="tok-number">10</span>)</code></pre>
 <p>An inner declaration may shadow an outer binding with the same name. While the inner binding is in scope, unqualified uses resolve to the inner binding. The outer binding remains alive if it is captured or otherwise still reachable, but it is not directly addressable by that name until the inner scope ends.</p>
 <h3 id="declarations-and-scope-variables">Variables</h3>
 <p>Assignment with <code>:=</code> introduces local bindings. Assignment with <code>=</code> updates existing targets. Multiple assignment adjusts values according to the multi-return rules in <a href="#">Expressions</a>.</p>
@@ -271,7 +279,7 @@ x <span class="tok-operator">=</span> x <span class="tok-operator">+</span> <spa
 }
 
 <span class="tok-builtin">assert</span>(value <span class="tok-operator">==</span> <span class="tok-number">1</span>)</code></pre>
-<p>Same-block redeclaration is reserved by the v1.0 contract: portable programs must not declare the same identifier twice in one lexical block unless a later spec section explicitly permits a narrower form. A declaration may not shadow a label because labels use a separate function-level namespace.</p>
+<p>Same-block redeclaration is reserved by the v1.0 contract: portable programs must not declare the same identifier twice in one lexical block unless a later spec section explicitly permits a narrower form. The current implementation accepts some same-block redeclarations, including repeated <code>:=</code> and repeated <code>func</code> declarations, but interpreter and VM capture behavior is not part of the stable contract for those programs. Implementations may reject same-block redeclarations in stable mode.</p>
 <h3 id="declarations-and-scope-constants">Constants</h3>
 <pre class="language-ebnf"><code class="language-ebnf">const_decl = &quot;const&quot; identifier ( &quot;=&quot; | &quot;:=&quot; ) expr ;</code></pre>
 <p>A const binding may not be rebound. Const does not freeze the internals of a mutable value such as a table.</p>
@@ -283,6 +291,17 @@ settings.retries <span class="tok-operator">=</span> <span class="tok-number">4<
 <span class="tok-builtin">assert</span>(limit <span class="tok-operator">==</span> <span class="tok-number">10</span>)
 <span class="tok-builtin">assert</span>(settings.retries <span class="tok-operator">==</span> <span class="tok-number">4</span>)</code></pre>
 <p>Const visibility and shadowing follow the ordinary lexical binding rules. An inner declaration may shadow an outer const, but code that resolves to the const binding may not assign to that binding with <code>=</code>, compound assignment, or increment/decrement forms.</p>
+<pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-keyword">const</span> limit <span class="tok-operator">:=</span> <span class="tok-number">10</span>
+limit <span class="tok-operator">=</span> <span class="tok-number">11</span></code></pre>
+<p>The read-only property belongs to the binding, not to the identifier spelling. A shadowing declaration creates a separate binding.</p>
+<pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-keyword">const</span> n <span class="tok-operator">:=</span> <span class="tok-number">1</span>
+
+<span class="tok-keyword">if</span> <span class="tok-constant">true</span> {
+    n <span class="tok-operator">:=</span> <span class="tok-number">2</span>
+    <span class="tok-builtin">assert</span>(n <span class="tok-operator">==</span> <span class="tok-number">2</span>)
+}
+
+<span class="tok-builtin">assert</span>(n <span class="tok-operator">==</span> <span class="tok-number">1</span>)</code></pre>
 <h3 id="declarations-and-scope-functions">Functions</h3>
 <pre class="language-ebnf"><code class="language-ebnf">func_decl = &quot;func&quot; identifier param_list block ;</code></pre>
 <p>A function declaration binds the function value to the declared name in the enclosing scope. Function bodies capture lexical bindings by reference.</p>
@@ -299,14 +318,25 @@ total <span class="tok-operator">:=</span> <span class="tok-number">0</span>
 <span class="tok-builtin">assert</span>(add(<span class="tok-number">2</span>, <span class="tok-number">3</span>) <span class="tok-operator">==</span> <span class="tok-number">5</span>)
 <span class="tok-builtin">assert</span>(bump() <span class="tok-operator">==</span> <span class="tok-number">1</span>)
 <span class="tok-builtin">assert</span>(bump() <span class="tok-operator">==</span> <span class="tok-number">2</span>)</code></pre>
-<p>The function name is bound in the enclosing scope before the function body is evaluated, so the body may refer to the function for recursion. Parameters are local bindings in the function body. They shadow outer bindings with the same names for the entire body.</p>
+<p>The function declaration&#x27;s binding is visible to code after the declaration statement. The function body is evaluated later, in an environment where the function name resolves to that binding, so the body may refer to the function for recursion. Parameters are local bindings in the function body. They shadow outer bindings with the same names for the entire body.</p>
+<pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-keyword">func</span> factorial(n) {
+    <span class="tok-keyword">if</span> n <span class="tok-operator">&lt;=</span> <span class="tok-number">1</span> {
+        <span class="tok-keyword">return</span> <span class="tok-number">1</span>
+    }
+    <span class="tok-keyword">return</span> n <span class="tok-operator">*</span> factorial(n <span class="tok-operator">-</span> <span class="tok-number">1</span>)
+}
+
+<span class="tok-builtin">assert</span>(factorial(<span class="tok-number">5</span>) <span class="tok-operator">==</span> <span class="tok-number">120</span>)</code></pre>
 <p>Function declarations follow the same same-block redeclaration portability rule as other declarations. A nested function declaration may shadow an outer function or variable name in its own block.</p>
 <h3 id="declarations-and-scope-imports">Imports</h3>
 <pre class="language-ebnf"><code class="language-ebnf">import_decl = &quot;import&quot; string_lit &quot;as&quot; identifier ;</code></pre>
 <p><code>import &quot;go:...&quot; as name</code> declares an explicit host-provided Go binding. The source path does not reflect arbitrary Go packages by itself; the embedder must provide an allowlisted binding through the Go API.</p>
-<p>The import alias is a lexical binding in the declaration&#x27;s scope. It may be shadowed by an inner declaration. Portable programs must avoid same-block alias conflicts.</p>
+<p>The import alias is a lexical binding in the declaration&#x27;s scope. It is visible only after the import declaration statement completes, and it may be shadowed by an inner declaration. Portable programs must avoid same-block alias conflicts with any other declaration.</p>
+<p>An import path names a capability provided by the module loader or embedder. The command-line runner rejects unallowlisted Go imports.</p>
+<pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-keyword">import</span> <span class="tok-string">&quot;go:math&quot;</span> as math</code></pre>
 <h3 id="declarations-and-scope-labels">Labels</h3>
-<p>Labels are declared with <code>name:</code>. Label names live in a function-level label namespace. A <code>goto</code> must not jump into a deeper lexical scope or over a local declaration.</p>
+<p>Labels are declared with <code>name:</code>. Label names live in a function-level label namespace that is separate from lexical value bindings. A label may have the same spelling as a variable, constant, function, parameter, or import alias. Labels do not shadow lexical bindings, and lexical bindings do not shadow labels. Within a function, each label name may be declared at most once.</p>
+<p>A <code>goto</code> must not jump into a deeper lexical scope or over a local declaration.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code">i <span class="tok-operator">:=</span> <span class="tok-number">0</span>
 again:
 i <span class="tok-operator">=</span> i <span class="tok-operator">+</span> <span class="tok-number">1</span>
@@ -314,6 +344,16 @@ i <span class="tok-operator">=</span> i <span class="tok-operator">+</span> <spa
     <span class="tok-keyword">goto</span> again
 }
 <span class="tok-builtin">assert</span>(i <span class="tok-operator">==</span> <span class="tok-number">3</span>)</code></pre>
+<pre class="language-leia leia-code"><code class="language-leia leia-code">done:
+done <span class="tok-operator">:=</span> <span class="tok-constant">true</span>
+<span class="tok-builtin">assert</span>(done)</code></pre>
+<pre class="language-leia leia-code"><code class="language-leia leia-code">again:
+again:</code></pre>
+<pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-keyword">goto</span> inner
+<span class="tok-keyword">if</span> <span class="tok-constant">true</span> {
+    x <span class="tok-operator">:=</span> <span class="tok-number">1</span>
+    inner:
+}</code></pre>
 <h3 id="declarations-and-scope-ai-declarations">AI Declarations</h3>
 <p><code>models</code>, <code>tool</code>, <code>agent defaults</code>, and named <code>agent</code> declarations are module-level or block-level declarations according to their source position. Their detailed semantics are specified in <a href="#">AI-Native Syntax</a>.</p></section><section><h2 id="values-and-types">Values And Types</h2>
 <p>Leia is dynamically typed. Types are properties of runtime values, not declared static variable slots.</p>
@@ -787,22 +827,53 @@ ok <span class="tok-operator">:=</span> <span class="tok-builtin">pcall</span>(<
 <span class="tok-builtin">assert</span>(values[<span class="tok-number">1</span>] <span class="tok-operator">==</span> <span class="tok-number">1</span>)
 <span class="tok-builtin">assert</span>(values[<span class="tok-number">2</span>] <span class="tok-operator">==</span> <span class="tok-number">3</span>)
 <span class="tok-builtin">assert</span>(values[<span class="tok-number">3</span>] <span class="tok-operator">==</span> <span class="tok-number">5</span>)</code></pre>
-<p><code>select</code> waits on channel send or receive cases. A <code>default</code> case is selected when no communication can proceed immediately.</p>
-<pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-keyword">select</span> {
+<p><code>select</code> waits on channel send or receive cases. Its full communication semantics are specified in <a href="#">Concurrency</a>. Statement-level rules are:</p>
+<ol>
+<li>receive-case bindings are scoped to the selected case body;</li>
+<li>a send case evaluates its channel and value expressions before attempting the selected send;</li>
+<li>a <code>default</code> case is selected immediately when no communication can proceed;</li>
+<li>a <code>select</code> with no cases raises a runtime error.</li>
+</ol>
+<pre class="language-leia leia-code"><code class="language-leia leia-code">ch <span class="tok-operator">:=</span> <span class="tok-builtin">make</span>(<span class="tok-keyword">chan</span>, <span class="tok-number">1</span>)
+observed <span class="tok-operator">:=</span> <span class="tok-string">&quot;&quot;</span>
+<span class="tok-keyword">select</span> {
 <span class="tok-keyword">case</span> value <span class="tok-operator">:=</span> <span class="tok-operator">&lt;-</span>ch:
-    <span class="tok-builtin">print</span>(value)
+    observed <span class="tok-operator">=</span> <span class="tok-string">&quot;recv:&quot;</span> <span class="tok-operator">..</span> value
 <span class="tok-keyword">default</span>:
-    <span class="tok-builtin">print</span>(<span class="tok-string">&quot;nothing ready&quot;</span>)
-}</code></pre>
+    observed <span class="tok-operator">=</span> <span class="tok-string">&quot;default&quot;</span>
+}
+<span class="tok-builtin">assert</span>(observed <span class="tok-operator">==</span> <span class="tok-string">&quot;default&quot;</span>)
+
+ch <span class="tok-operator">&lt;-</span> <span class="tok-string">&quot;ready&quot;</span>
+<span class="tok-keyword">select</span> {
+<span class="tok-keyword">case</span> value <span class="tok-operator">:=</span> <span class="tok-operator">&lt;-</span>ch:
+    observed <span class="tok-operator">=</span> <span class="tok-string">&quot;recv:&quot;</span> <span class="tok-operator">..</span> value
+<span class="tok-keyword">default</span>:
+    observed <span class="tok-operator">=</span> <span class="tok-string">&quot;default&quot;</span>
+}
+<span class="tok-builtin">assert</span>(observed <span class="tok-operator">==</span> <span class="tok-string">&quot;recv:ready&quot;</span>)</code></pre>
 <p><code>go call()</code> starts a goroutine-like task. <code>defer call()</code> schedules cleanup to run when the current function returns or unwinds through a protected boundary.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-keyword">func</span> work(ch) {
     <span class="tok-keyword">defer</span> <span class="tok-builtin">print</span>(<span class="tok-string">&quot;done&quot;</span>)
     ch <span class="tok-operator">&lt;-</span> <span class="tok-string">&quot;ready&quot;</span>
 }
 
-<span class="tok-keyword">go</span> work(ch)</code></pre>
-<p><code>return</code> exits the current function and returns zero or more values. Return values use multi-return adjustment.</p>
-<p><code>defer</code> evaluates the callee and arguments when the <code>defer</code> statement executes, then invokes the deferred call later. Deferred calls run in last-in, first-out order when the current function exits normally or unwinds through a protected boundary.</p>
+ready <span class="tok-operator">:=</span> <span class="tok-builtin">make</span>(<span class="tok-keyword">chan</span>, <span class="tok-number">1</span>)
+<span class="tok-keyword">go</span> work(ready)
+<span class="tok-builtin">assert</span>(<span class="tok-operator">&lt;-</span>ready <span class="tok-operator">==</span> <span class="tok-string">&quot;ready&quot;</span>)</code></pre>
+<p><code>return</code> exits the current function and returns zero or more values. Return values use the multi-return adjustment rules in <a href="#">Functions</a>. At module top level, <code>return</code> stops execution of the current chunk or module and produces the module result used by loaders such as <code>require</code>.</p>
+<pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-keyword">func</span> pair() {
+    <span class="tok-keyword">return</span> <span class="tok-string">&quot;left&quot;</span>, <span class="tok-string">&quot;right&quot;</span>
+}
+
+<span class="tok-keyword">func</span> forward() {
+    <span class="tok-keyword">return</span> pair()
+}
+
+a, b <span class="tok-operator">:=</span> forward()
+<span class="tok-builtin">assert</span>(a <span class="tok-operator">==</span> <span class="tok-string">&quot;left&quot;</span>)
+<span class="tok-builtin">assert</span>(b <span class="tok-operator">==</span> <span class="tok-string">&quot;right&quot;</span>)</code></pre>
+<p><code>defer</code> evaluates the callee and arguments when the <code>defer</code> statement executes, then invokes the deferred call later. Deferred calls run in last-in, first-out order when the current function exits normally, returns explicitly, or unwinds through a protected boundary. A deferred call cannot change the already computed return values unless it mutates an identity-bearing value reachable from those return values.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code">events <span class="tok-operator">:=</span> {}
 <span class="tok-keyword">func</span> scoped() {
     <span class="tok-keyword">defer</span> <span class="tok-keyword">func</span>() { events[<span class="tok-operator">#</span>events <span class="tok-operator">+</span> <span class="tok-number">1</span>] <span class="tok-operator">=</span> <span class="tok-string">&quot;last&quot;</span> }()
@@ -832,26 +903,19 @@ i <span class="tok-operator">=</span> i <span class="tok-operator">+</span> <spa
     result, err <span class="tok-operator">:=</span> answer(<span class="tok-string">&quot;short task&quot;</span>)
 }</code></pre></section><section><h2 id="functions">Functions</h2>
 <p>Functions are first-class callable values. They may be named declarations or anonymous literals.</p>
-<p>Parameters are lexical bindings initialized from call arguments. Missing arguments become <code>nil</code>; extra arguments are discarded unless the function has a vararg parameter.</p>
+<p>Parameters are lexical bindings initialized from call arguments. Missing arguments become <code>nil</code>; extra arguments are discarded unless the function has a vararg parameter. The call does not expose an argument count to fixed parameters; a fixed parameter that receives an explicit <code>nil</code> is indistinguishable from one filled because the argument is missing.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-keyword">func</span> first(a, b) {
-    <span class="tok-keyword">return</span> a
+    <span class="tok-keyword">return</span> a, b
 }
 
-<span class="tok-builtin">assert</span>(first(<span class="tok-number">1</span>, <span class="tok-number">2</span>, <span class="tok-number">3</span>) <span class="tok-operator">==</span> <span class="tok-number">1</span>) <span class="tok-comment">// the extra argument is discarded</span>
-<span class="tok-builtin">assert</span>(first() <span class="tok-operator">==</span> <span class="tok-constant">nil</span>)      <span class="tok-comment">// missing arguments become nil</span></code></pre>
-<pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-keyword">func</span> first(a, b) {
-    <span class="tok-keyword">return</span> a
-}
+one, two <span class="tok-operator">:=</span> first(<span class="tok-number">1</span>, <span class="tok-number">2</span>, <span class="tok-number">3</span>)
+missing_a, missing_b <span class="tok-operator">:=</span> first()
+explicit_nil, after_nil <span class="tok-operator">:=</span> first(<span class="tok-constant">nil</span>, <span class="tok-string">&quot;x&quot;</span>)
 
-<span class="tok-builtin">assert</span>(first(<span class="tok-number">1</span>, <span class="tok-number">2</span>, <span class="tok-number">3</span>) <span class="tok-operator">==</span> <span class="tok-number">1</span>)
-<span class="tok-builtin">assert</span>(first() <span class="tok-operator">==</span> <span class="tok-constant">nil</span>)</code></pre>
+<span class="tok-builtin">assert</span>(one <span class="tok-operator">==</span> <span class="tok-number">1</span> <span class="tok-operator">&amp;&amp;</span> two <span class="tok-operator">==</span> <span class="tok-number">2</span>)                  <span class="tok-comment">// extra argument discarded</span>
+<span class="tok-builtin">assert</span>(missing_a <span class="tok-operator">==</span> <span class="tok-constant">nil</span> <span class="tok-operator">&amp;&amp;</span> missing_b <span class="tok-operator">==</span> <span class="tok-constant">nil</span>)  <span class="tok-comment">// missing arguments become nil</span>
+<span class="tok-builtin">assert</span>(explicit_nil <span class="tok-operator">==</span> <span class="tok-constant">nil</span> <span class="tok-operator">&amp;&amp;</span> after_nil <span class="tok-operator">==</span> <span class="tok-string">&quot;x&quot;</span>)</code></pre>
 <p>The parameter <code>...</code> accepts any remaining arguments. Inside the function, <code>{...}</code> constructs a table containing those arguments. A function may have at most one vararg parameter, and it must be the final parameter. Fixed parameters are filled before the vararg list is formed.</p>
-<pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-keyword">func</span> count(<span class="tok-operator">...</span>) {
-    args <span class="tok-operator">:=</span> {<span class="tok-operator">...</span>}
-    <span class="tok-keyword">return</span> <span class="tok-operator">#</span>args
-}
-
-<span class="tok-builtin">assert</span>(count(<span class="tok-number">1</span>, <span class="tok-number">2</span>, <span class="tok-number">3</span>) <span class="tok-operator">==</span> <span class="tok-number">3</span>)</code></pre>
 <pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-keyword">func</span> count(<span class="tok-operator">...</span>) {
     args <span class="tok-operator">:=</span> {<span class="tok-operator">...</span>}
     <span class="tok-keyword">return</span> <span class="tok-operator">#</span>args
@@ -909,20 +973,22 @@ a, b, c, d <span class="tok-operator">:=</span> triple(), triple()
 <span class="tok-builtin">assert</span>(b <span class="tok-operator">==</span> <span class="tok-number">10</span>)
 <span class="tok-builtin">assert</span>(c <span class="tok-operator">==</span> <span class="tok-number">20</span>)
 <span class="tok-builtin">assert</span>(d <span class="tok-operator">==</span> <span class="tok-number">30</span>)</code></pre>
-<p>Function-call arguments and table constructors use the same expression-list rule: non-final calls contribute one value; final calls expand. Use <code>spread(call())</code> to expand a call in a non-final position.</p>
+<p>Function-call arguments, including calls to host functions, and table constructors use the same expression-list rule: non-final calls contribute one value; final calls expand. Use <code>spread(call())</code> to expand a call in a non-final position.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-keyword">func</span> triple() {
     <span class="tok-keyword">return</span> <span class="tok-number">10</span>, <span class="tok-number">20</span>, <span class="tok-number">30</span>
 }
 
 <span class="tok-keyword">func</span> pack(<span class="tok-operator">...</span>) { <span class="tok-keyword">return</span> table.pack(<span class="tok-operator">...</span>) }
 
-plain <span class="tok-operator">:=</span> pack(triple(), <span class="tok-string">&quot;x&quot;</span>)          <span class="tok-comment">// receives 10, &quot;x&quot;</span>
-expanded <span class="tok-operator">:=</span> pack(<span class="tok-builtin">spread</span>(triple()), <span class="tok-string">&quot;x&quot;</span>)  <span class="tok-comment">// receives 10, 20, 30, &quot;x&quot;</span>
-list <span class="tok-operator">:=</span> {triple()}                   <span class="tok-comment">// {10, 20, 30}</span>
-single <span class="tok-operator">:=</span> {(triple())}               <span class="tok-comment">// {10}</span>
+plain <span class="tok-operator">:=</span> pack(triple(), <span class="tok-string">&quot;x&quot;</span>)              <span class="tok-comment">// receives 10, &quot;x&quot;</span>
+expanded <span class="tok-operator">:=</span> pack(<span class="tok-builtin">spread</span>(triple()), <span class="tok-string">&quot;x&quot;</span>)   <span class="tok-comment">// receives 10, 20, 30, &quot;x&quot;</span>
+host_expanded <span class="tok-operator">:=</span> table.pack(triple())     <span class="tok-comment">// host calls use the same rule</span>
+list <span class="tok-operator">:=</span> {triple()}                        <span class="tok-comment">// {10, 20, 30}</span>
+single <span class="tok-operator">:=</span> {(triple())}                    <span class="tok-comment">// {10}</span>
 
 <span class="tok-builtin">assert</span>(plain[<span class="tok-number">1</span>] <span class="tok-operator">==</span> <span class="tok-number">10</span> <span class="tok-operator">&amp;&amp;</span> plain[<span class="tok-number">2</span>] <span class="tok-operator">==</span> <span class="tok-string">&quot;x&quot;</span>)
 <span class="tok-builtin">assert</span>(expanded[<span class="tok-number">1</span>] <span class="tok-operator">==</span> <span class="tok-number">10</span> <span class="tok-operator">&amp;&amp;</span> expanded[<span class="tok-number">2</span>] <span class="tok-operator">==</span> <span class="tok-number">20</span> <span class="tok-operator">&amp;&amp;</span> expanded[<span class="tok-number">3</span>] <span class="tok-operator">==</span> <span class="tok-number">30</span> <span class="tok-operator">&amp;&amp;</span> expanded[<span class="tok-number">4</span>] <span class="tok-operator">==</span> <span class="tok-string">&quot;x&quot;</span>)
+<span class="tok-builtin">assert</span>(host_expanded[<span class="tok-number">1</span>] <span class="tok-operator">==</span> <span class="tok-number">10</span> <span class="tok-operator">&amp;&amp;</span> host_expanded[<span class="tok-number">2</span>] <span class="tok-operator">==</span> <span class="tok-number">20</span> <span class="tok-operator">&amp;&amp;</span> host_expanded[<span class="tok-number">3</span>] <span class="tok-operator">==</span> <span class="tok-number">30</span>)
 <span class="tok-builtin">assert</span>(list[<span class="tok-number">1</span>] <span class="tok-operator">==</span> <span class="tok-number">10</span> <span class="tok-operator">&amp;&amp;</span> list[<span class="tok-number">2</span>] <span class="tok-operator">==</span> <span class="tok-number">20</span> <span class="tok-operator">&amp;&amp;</span> list[<span class="tok-number">3</span>] <span class="tok-operator">==</span> <span class="tok-number">30</span>)
 <span class="tok-builtin">assert</span>(single[<span class="tok-number">1</span>] <span class="tok-operator">==</span> <span class="tok-number">10</span> <span class="tok-operator">&amp;&amp;</span> single[<span class="tok-number">2</span>] <span class="tok-operator">==</span> <span class="tok-constant">nil</span>)</code></pre>
 <p>If a function has fixed parameters followed by <code>...</code>, fixed parameters are filled first and only the remaining adjusted argument values are captured by the vararg binding. When the final argument expression expands, all of its remaining results may enter <code>...</code>.</p>
@@ -975,31 +1041,33 @@ v <span class="tok-operator">:=</span> triple()
 x, y <span class="tok-operator">:=</span> v
 <span class="tok-builtin">assert</span>(x <span class="tok-operator">==</span> <span class="tok-number">10</span>)
 <span class="tok-builtin">assert</span>(y <span class="tok-operator">==</span> <span class="tok-constant">nil</span>)</code></pre>
-<p>Closures capture lexical variables by reference. Mutating a captured variable is visible to all closures that share the binding.</p>
+<p>Closures capture lexical variables by reference. Mutating a captured variable is visible to all closures that share the binding. Each evaluation of a function literal creates a distinct function value. Returning or assigning an existing function value preserves that value&#x27;s identity and captured environment.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-keyword">func</span> counter() {
     n <span class="tok-operator">:=</span> <span class="tok-number">0</span>
-    <span class="tok-keyword">return</span> <span class="tok-keyword">func</span>() {
+    inc <span class="tok-operator">:=</span> <span class="tok-keyword">func</span>() {
         n <span class="tok-operator">=</span> n <span class="tok-operator">+</span> <span class="tok-number">1</span>
         <span class="tok-keyword">return</span> n
     }
-}
-
-<span class="tok-builtin">next</span> <span class="tok-operator">:=</span> counter()
-<span class="tok-builtin">assert</span>(<span class="tok-builtin">next</span>() <span class="tok-operator">==</span> <span class="tok-number">1</span>)
-<span class="tok-builtin">assert</span>(<span class="tok-builtin">next</span>() <span class="tok-operator">==</span> <span class="tok-number">2</span>)</code></pre>
-<pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-keyword">func</span> counter() {
-    n <span class="tok-operator">:=</span> <span class="tok-number">0</span>
-    <span class="tok-keyword">return</span> <span class="tok-keyword">func</span>() {
-        n <span class="tok-operator">=</span> n <span class="tok-operator">+</span> <span class="tok-number">1</span>
+    get <span class="tok-operator">:=</span> <span class="tok-keyword">func</span>() {
         <span class="tok-keyword">return</span> n
     }
+    <span class="tok-keyword">return</span> inc, get
 }
 
-<span class="tok-builtin">next</span> <span class="tok-operator">:=</span> counter()
+<span class="tok-builtin">next</span>, current <span class="tok-operator">:=</span> counter()
+other, other_current <span class="tok-operator">:=</span> counter()
+same_next <span class="tok-operator">:=</span> <span class="tok-builtin">next</span>
+
 <span class="tok-builtin">assert</span>(<span class="tok-builtin">next</span>() <span class="tok-operator">==</span> <span class="tok-number">1</span>)
-<span class="tok-builtin">assert</span>(<span class="tok-builtin">next</span>() <span class="tok-operator">==</span> <span class="tok-number">2</span>)</code></pre>
-<p>Script functions and host functions share the same script-visible call result model. Host functions may return structured recoverable errors where their module contract specifies <code>nil, err</code> behavior.</p>
-<p>Tail-call optimization is an implementation detail unless a section explicitly promises stack behavior for a feature.</p></section><section><h2 id="tables-and-metatables">Tables And Metatables</h2>
+<span class="tok-builtin">assert</span>(current() <span class="tok-operator">==</span> <span class="tok-number">1</span>)        <span class="tok-comment">// sibling closure sees the same binding</span>
+<span class="tok-builtin">assert</span>(<span class="tok-builtin">next</span>() <span class="tok-operator">==</span> <span class="tok-number">2</span>)
+<span class="tok-builtin">assert</span>(current() <span class="tok-operator">==</span> <span class="tok-number">2</span>)
+<span class="tok-builtin">assert</span>(other() <span class="tok-operator">==</span> <span class="tok-number">1</span>)          <span class="tok-comment">// a separate call has separate captures</span>
+<span class="tok-builtin">assert</span>(other_current() <span class="tok-operator">==</span> <span class="tok-number">1</span>)
+<span class="tok-builtin">assert</span>(<span class="tok-builtin">next</span> <span class="tok-operator">==</span> same_next)
+<span class="tok-builtin">assert</span>(<span class="tok-builtin">next</span> <span class="tok-operator">!=</span> other)</code></pre>
+<p>Script functions and host functions share the same script-visible call result model: argument adjustment, result adjustment, protected-call behavior, and vararg collection are defined at the script boundary rather than by the implementation language of the callee. Host functions may return structured recoverable errors where their module contract specifies <code>nil, err</code> behavior. Uncaught host failures surface as ordinary runtime errors to script code.</p>
+<p>Tail-call optimization is not part of the stable function contract. A call in tail position has the same observable result adjustment as any other returned call, but the specification does not promise stack reuse, frame elision, debug-frame shape, or unbounded recursion unless a section explicitly promises stack behavior for a feature.</p></section><section><h2 id="tables-and-metatables">Tables And Metatables</h2>
 <p>Tables are mutable identity-bearing maps. Keys and values are runtime values. Implementations may use optimized array, record, or typed layouts when this does not change observable behavior.</p>
 <p>Table constructors create fresh table identities. List-style fields are assigned using 1-based integer sequence keys. Keyed fields assign the specified key. The v1.0 stable constructor subset is simple list fields, named fields, and explicit keyed fields that do not depend on an interleaving order between those forms. Portable programs must not depend on duplicate constructor fields that write the same normalized key, or on list-index assignment after interleaved keyed fields; use explicit assignments when that order matters. A constructor expression itself never reuses an existing table identity.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code">t <span class="tok-operator">:=</span> { <span class="tok-string">&quot;first&quot;</span>, <span class="tok-string">&quot;second&quot;</span>, name: <span class="tok-string">&quot;Ada&quot;</span> }
@@ -1224,7 +1292,7 @@ count <span class="tok-operator">:=</span> <span class="tok-number">0</span>
 <h3 id="concurrency-tasks">Tasks</h3>
 <p>A <code>go</code> statement starts a concurrent task:</p>
 <pre class="language-ebnf"><code class="language-ebnf">go_stmt = &quot;go&quot; call_expr ;</code></pre>
-<p>The callee and all arguments are evaluated in the current task before the new task is started. The new task then calls the evaluated function or method with those evaluated arguments. Later changes to variables used to compute the callee or arguments do not change that call, though captured tables and other reference values remain shared values.</p>
+<p>The callee and all arguments are evaluated exactly once in the current task before the new task is started. Argument evaluation is sequenced before the task start: side effects needed to compute the call happen in the spawning task, and an error while evaluating the callee or an argument prevents the task from being created. The new task then calls the evaluated function or method with those evaluated arguments. Later changes to variables used to compute the callee or arguments do not change that call, though captured tables and other reference values remain shared values.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-keyword">func</span> worker(input, output) {
     value <span class="tok-operator">:=</span> <span class="tok-operator">&lt;-</span>input
     output <span class="tok-operator">&lt;-</span> value <span class="tok-operator">*</span> <span class="tok-number">2</span>
@@ -1236,7 +1304,14 @@ output <span class="tok-operator">:=</span> <span class="tok-builtin">make</span
 input <span class="tok-operator">&lt;-</span> <span class="tok-number">21</span>
 answer <span class="tok-operator">:=</span> <span class="tok-operator">&lt;-</span>output
 <span class="tok-builtin">assert</span>(answer <span class="tok-operator">==</span> <span class="tok-number">42</span>)</code></pre>
-<p>A <code>go</code> statement accepts only function-call and method-call forms. Starting a task may raise a runtime error if a host goroutine budget is exhausted. Return values from the task are discarded. An uncaught error in the task does not become a return value of the spawning task; implementations report it through their runtime diagnostic path.</p>
+<pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-keyword">func</span> fail_arg() {
+    <span class="tok-builtin">error</span>(<span class="tok-string">&quot;argument failed&quot;</span>)
+}
+
+<span class="tok-keyword">go</span> <span class="tok-keyword">func</span>(value) {
+}(fail_arg())</code></pre>
+<p>A <code>go</code> statement accepts only function-call and method-call forms. Starting a task may raise a runtime error if a host goroutine budget is exhausted. Return values from the task are discarded.</p>
+<p>Each task has its own error boundary. An uncaught error in a spawned task does not become a return value of the spawning task and is not caught by a <code>pcall</code> or <code>xpcall</code> that only protected the <code>go</code> statement. Implementations report uncaught task errors through their runtime diagnostic path. The stable contract does not require such an error to synchronously stop the spawning task at a particular source location.</p>
 <p>Tasks are scheduled by the implementation and host runtime. Implementations may run tasks on host threads where safe, but Leia does not promise a particular thread, interleaving, fairness policy, or instruction-level preemption point. Programs that need completion should communicate explicitly, usually by sending a result on a channel.</p>
 <h3 id="concurrency-channels">Channels</h3>
 <p>A channel is created with <code>make(chan)</code> or <code>make(chan, capacity)</code>. The capacity must be a non-negative integer. <code>make(chan)</code> is equivalent to <code>make(chan, 0)</code> and creates an unbuffered channel. <code>type(ch)</code> returns <code>&quot;channel&quot;</code>; v1.0 has no script-visible send-only, receive-only, or direction-parameterized channel types.</p>
@@ -1280,6 +1355,10 @@ sent, err <span class="tok-operator">:=</span> <span class="tok-builtin">pcall</
 closed, err <span class="tok-operator">:=</span> <span class="tok-builtin">pcall</span>(<span class="tok-builtin">close</span>, ch)
 <span class="tok-builtin">assert</span>(closed <span class="tok-operator">==</span> <span class="tok-constant">false</span>)
 <span class="tok-builtin">assert</span>(string.find(err, <span class="tok-string">&quot;closed channel&quot;</span>, <span class="tok-number">1</span>, <span class="tok-constant">true</span>) <span class="tok-operator">!=</span> <span class="tok-constant">nil</span>)</code></pre>
+<pre class="language-leia leia-code"><code class="language-leia leia-code">ch <span class="tok-operator">:=</span> <span class="tok-builtin">make</span>(<span class="tok-keyword">chan</span>)
+<span class="tok-builtin">close</span>(ch)
+ch <span class="tok-operator">&lt;-</span> <span class="tok-string">&quot;late&quot;</span></code></pre>
+<p>Closing a channel is not a broadcast of a value. It only makes future receives ready after the channel has no queued values left. If multiple tasks receive from the same closed and empty channel, each receive observes <code>nil</code> or <code>nil, false</code>; no task owns the closed state exclusively.</p>
 <p>Receiving from or sending to a non-channel value is a runtime error. Creating a channel with a negative or non-integer capacity is a runtime error. Host options may impose a maximum channel capacity.</p>
 <h3 id="concurrency-select">Select</h3>
 <p><code>select</code> waits on channel send or receive cases:</p>
@@ -1287,8 +1366,8 @@ closed, err <span class="tok-operator">:=</span> <span class="tok-builtin">pcall
 select_case = ( &quot;case&quot; recv_clause | &quot;case&quot; send_clause | &quot;default&quot; ) &quot;:&quot; block ;
 recv_clause = [ identifier [ &quot;,&quot; identifier ] &quot;:=&quot; ] &quot;&lt;-&quot; expression ;
 send_clause = expression &quot;&lt;-&quot; expression ;</code></pre>
-<p>A receive case may bind the received value, or the received value and the receive-ok boolean. Those bindings are scoped to the selected case body. A send case evaluates and sends the case value when that case is selected.</p>
-<p>If one or more communication cases can proceed, one ready case is chosen. If no communication case can proceed and a <code>default</code> case exists, <code>default</code> is chosen immediately. If no case can proceed and no <code>default</code> exists, <code>select</code> blocks until a case can proceed. If multiple cases are ready, the implementation may choose any ready case.</p>
+<p>A receive case may bind the received value, or the received value and the receive-ok boolean. Those bindings are scoped to the selected case body. A send case evaluates and sends the case value when that case is selected. The stable contract does not require expressions belonging to unselected send or receive cases to be evaluated before the selection decision, except for work needed by the implementation to determine whether a communication can proceed. Programs must not depend on side effects in unselected cases.</p>
+<p>If one or more communication cases can proceed, one ready case is chosen. If no communication case can proceed and a <code>default</code> case exists, <code>default</code> is chosen immediately. If no case can proceed and no <code>default</code> exists, <code>select</code> blocks until a case can proceed. If multiple cases are ready, the implementation may choose any ready case; portable programs must not assume fairness or round-robin ordering.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code">ch <span class="tok-operator">:=</span> <span class="tok-builtin">make</span>(<span class="tok-keyword">chan</span>, <span class="tok-number">1</span>)
 selected <span class="tok-operator">:=</span> <span class="tok-string">&quot;&quot;</span>
 
@@ -1324,9 +1403,11 @@ state <span class="tok-operator">:=</span> <span class="tok-string">&quot;unset&
     state <span class="tok-operator">=</span> <span class="tok-string">&quot;default&quot;</span>
 }
 <span class="tok-builtin">assert</span>(state <span class="tok-operator">==</span> <span class="tok-string">&quot;closed&quot;</span>)</code></pre>
+<pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-keyword">select</span> {
+}</code></pre>
 <p>Timeouts and cancellation are library protocols built on channels. For example, <code>time.after(duration)</code> returns a channel that becomes ready after the duration. The language-level <code>select</code> semantics do not require a special timeout case.</p>
 <h3 id="concurrency-defer-errors-and-task-boundaries">Defer, Errors, And Task Boundaries</h3>
-<p><code>defer call()</code> is function-scoped. It evaluates the callee and arguments when the <code>defer</code> statement executes, and runs deferred calls in last-in, first-out order when the current function returns or unwinds through a protected boundary. Concurrent tasks have their own defer stack; a task started by <code>go</code> does not inherit the spawning task&#x27;s pending defers.</p>
+<p><code>defer call()</code> is function-scoped. It evaluates the callee and arguments when the <code>defer</code> statement executes, and runs deferred calls in last-in, first-out order when the current function returns or unwinds through a protected boundary. Concurrent tasks have their own defer stack; a task started by <code>go</code> does not inherit the spawning task&#x27;s pending defers, and deferred calls registered inside that task do not run in the spawning task.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code">events <span class="tok-operator">:=</span> {}
 <span class="tok-keyword">func</span> record(x) {
     events[<span class="tok-operator">#</span>events <span class="tok-operator">+</span> <span class="tok-number">1</span>] <span class="tok-operator">=</span> x
@@ -1340,6 +1421,16 @@ state <span class="tok-operator">:=</span> <span class="tok-string">&quot;unset&
 work()
 <span class="tok-builtin">assert</span>(events[<span class="tok-number">1</span>] <span class="tok-operator">==</span> <span class="tok-string">&quot;inner&quot;</span>)
 <span class="tok-builtin">assert</span>(events[<span class="tok-number">2</span>] <span class="tok-operator">==</span> <span class="tok-string">&quot;outer&quot;</span>)</code></pre>
+<pre class="language-leia leia-code"><code class="language-leia leia-code">done <span class="tok-operator">:=</span> <span class="tok-builtin">make</span>(<span class="tok-keyword">chan</span>, <span class="tok-number">1</span>)
+
+<span class="tok-keyword">func</span> work() {
+    <span class="tok-keyword">defer</span> <span class="tok-keyword">func</span>() {
+        done <span class="tok-operator">&lt;-</span> <span class="tok-string">&quot;deferred in task&quot;</span>
+    }()
+}
+
+<span class="tok-keyword">go</span> work()
+<span class="tok-builtin">assert</span>(<span class="tok-operator">&lt;-</span>done <span class="tok-operator">==</span> <span class="tok-string">&quot;deferred in task&quot;</span>)</code></pre>
 <p>Protected calls (<code>pcall</code> and <code>xpcall</code>) catch runtime errors that occur while the protected function is executing in the same task, including deferred-call errors from that protected function. They do not catch uncaught errors from other tasks started with <code>go</code>; use channels or runtime diagnostics to report those errors.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code">ok, err <span class="tok-operator">:=</span> <span class="tok-builtin">pcall</span>(<span class="tok-keyword">func</span>() {
     <span class="tok-keyword">defer</span> <span class="tok-builtin">error</span>(<span class="tok-string">&quot;cleanup failed&quot;</span>)
@@ -1377,10 +1468,12 @@ result <span class="tok-operator">:=</span> <span class="tok-operator">&lt;-</sp
 <h3 id="concurrency-memory-ordering">Memory Ordering</h3>
 <p>Channel communication is the synchronization primitive in the stable language contract:</p>
 <ul>
+<li>The side effects used to evaluate a <code>go</code> statement&#x27;s callee and arguments are sequenced before the started task begins executing that call.</li>
 <li>A successful send synchronizes with the receive that obtains that value.</li>
 <li>Closing a channel synchronizes with receives that observe the closed state after queued values have been consumed.</li>
 <li>For unbuffered channels, send and receive complete as a rendezvous; neither side completes before the other side is ready.</li>
 <li>For buffered channels, a send may complete before a receiver accepts the value, but the value and writes sequenced before the send become visible to the receiver that later obtains that value.</li>
+<li>A receive that observes channel closure is ordered after the successful <code>close(ch)</code> call and after any queued values that receive is required to drain.</li>
 </ul>
 <p>Outside those synchronization edges, concurrent tasks have no specified memory ordering. Programs must not depend on the relative timing of ordinary reads and writes performed by different tasks unless they are ordered by channels or by a host-provided synchronization object whose module contract says so.</p>
 <p>Mutable tables are shared by identity. Concurrent unsynchronized mutation of the same table has unspecified script-level results: reads may observe any interleaving allowed by the implementation, and compound operations such as <code>x = x + 1</code> are not atomic. Implementations must protect host memory safety, but programs that require deterministic results should transfer ownership through channels or guard shared tables with a synchronization library.</p>
@@ -1405,8 +1498,10 @@ last <span class="tok-operator">:=</span> <span class="tok-number">0</span>
     last <span class="tok-operator">=</span> <span class="tok-operator">&lt;-</span>replies
 }
 <span class="tok-builtin">assert</span>(last <span class="tok-operator">==</span> <span class="tok-number">4</span>)</code></pre>
+<p>The contract intentionally does not define atomics, volatile variables, data-race diagnostics, or visibility guarantees for unsynchronized table or global variable accesses. Host modules may expose additional synchronization APIs, but those APIs must document their own ordering rules.</p>
 <h3 id="concurrency-optimization-contract">Optimization Contract</h3>
-<p>JIT, bytecode, and interpreter execution must preserve concurrency-visible behavior: communication order, channel close behavior, synchronization results, select readiness, protected error boundaries, and host cancellation boundaries must not change when optimizations are enabled. Optimizations may change timing, scheduling, or whether a task reaches a cancellation checkpoint before another task, except where the program has established ordering through channels or a specified synchronization library.</p></section><section><h2 id="ai-native-syntax">AI-Native Syntax</h2>
+<p>JIT, bytecode, and interpreter execution must preserve concurrency-visible behavior: communication order, channel close behavior, synchronization results, select readiness, protected error boundaries, and host cancellation boundaries must not change when optimizations are enabled. Optimizers must not move ordinary reads, writes, calls, defers, channel operations, <code>select</code>, <code>close</code>, task start, or protected-call boundaries across a synchronization or error boundary in a way that changes the behavior described in this chapter.</p>
+<p>Optimizations may change timing, scheduling, batching, or whether a task reaches a cancellation checkpoint before another task, except where the program has established ordering through channels or a specified synchronization library. JIT side exits and deoptimization must resume with the same observable channel, defer, cancellation, and protected-error state as interpreter execution.</p></section><section><h2 id="ai-native-syntax">AI-Native Syntax</h2>
 <p>Leia&#x27;s AI-native syntax is a language layer over the <code>llm</code>, <code>msg</code>, <code>history</code>, and <code>loop</code> standard-library modules. The syntax is stable only when it uses the same provider, tracing, record/replay, cancellation, budget, and capability paths as direct library calls. Implementations must desugar the syntax to those runtime paths rather than maintaining a separate AI execution engine.</p>
 <p>An AI operation is deterministic until it reaches a provider, host callback, or tool body with side effects. Tests and replay fixtures should therefore record provider turns at the host boundary.</p>
 <h3 id="ai-native-syntax-evaluate-blocks">Evaluate Blocks</h3>

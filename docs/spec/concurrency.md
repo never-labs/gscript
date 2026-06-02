@@ -12,10 +12,13 @@ A `go` statement starts a concurrent task:
 go_stmt = "go" call_expr ;
 ```
 
-The callee and all arguments are evaluated in the current task before the new
-task is started. The new task then calls the evaluated function or method with
-those evaluated arguments. Later changes to variables used to compute the callee
-or arguments do not change that call, though captured tables and other reference
+The callee and all arguments are evaluated exactly once in the current task
+before the new task is started. Argument evaluation is sequenced before the task
+start: side effects needed to compute the call happen in the spawning task, and
+an error while evaluating the callee or an argument prevents the task from being
+created. The new task then calls the evaluated function or method with those
+evaluated arguments. Later changes to variables used to compute the callee or
+arguments do not change that call, though captured tables and other reference
 values remain shared values.
 
 ```leia run all
@@ -32,11 +35,25 @@ answer := <-output
 assert(answer == 42)
 ```
 
+```leia fail all
+func fail_arg() {
+    error("argument failed")
+}
+
+go func(value) {
+}(fail_arg())
+```
+
 A `go` statement accepts only function-call and method-call forms. Starting a
 task may raise a runtime error if a host goroutine budget is exhausted. Return
-values from the task are discarded. An uncaught error in the task does not become
-a return value of the spawning task; implementations report it through their
-runtime diagnostic path.
+values from the task are discarded.
+
+Each task has its own error boundary. An uncaught error in a spawned task does
+not become a return value of the spawning task and is not caught by a `pcall` or
+`xpcall` that only protected the `go` statement. Implementations report uncaught
+task errors through their runtime diagnostic path. The stable contract does not
+require such an error to synchronously stop the spawning task at a particular
+source location.
 
 Tasks are scheduled by the implementation and host runtime. Implementations may
 run tasks on host threads where safe, but Leia does not promise a particular
@@ -116,6 +133,17 @@ assert(closed == false)
 assert(string.find(err, "closed channel", 1, true) != nil)
 ```
 
+```leia fail all
+ch := make(chan)
+close(ch)
+ch <- "late"
+```
+
+Closing a channel is not a broadcast of a value. It only makes future receives
+ready after the channel has no queued values left. If multiple tasks receive from
+the same closed and empty channel, each receive observes `nil` or `nil, false`;
+no task owns the closed state exclusively.
+
 Receiving from or sending to a non-channel value is a runtime error. Creating a
 channel with a negative or non-integer capacity is a runtime error. Host options
 may impose a maximum channel capacity.
@@ -133,13 +161,18 @@ send_clause = expression "<-" expression ;
 
 A receive case may bind the received value, or the received value and the
 receive-ok boolean. Those bindings are scoped to the selected case body. A send
-case evaluates and sends the case value when that case is selected.
+case evaluates and sends the case value when that case is selected. The stable
+contract does not require expressions belonging to unselected send or receive
+cases to be evaluated before the selection decision, except for work needed by
+the implementation to determine whether a communication can proceed. Programs
+must not depend on side effects in unselected cases.
 
 If one or more communication cases can proceed, one ready case is chosen. If no
 communication case can proceed and a `default` case exists, `default` is chosen
 immediately. If no case can proceed and no `default` exists, `select` blocks
 until a case can proceed. If multiple cases are ready, the implementation may
-choose any ready case.
+choose any ready case; portable programs must not assume fairness or round-robin
+ordering.
 
 ```leia run all
 ch := make(chan, 1)
@@ -186,6 +219,11 @@ default:
 assert(state == "closed")
 ```
 
+```leia fail all
+select {
+}
+```
+
 Timeouts and cancellation are library protocols built on channels. For example,
 `time.after(duration)` returns a channel that becomes ready after the duration.
 The language-level `select` semantics do not require a special timeout case.
@@ -196,7 +234,8 @@ The language-level `select` semantics do not require a special timeout case.
 `defer` statement executes, and runs deferred calls in last-in, first-out order
 when the current function returns or unwinds through a protected boundary.
 Concurrent tasks have their own defer stack; a task started by `go` does not
-inherit the spawning task's pending defers.
+inherit the spawning task's pending defers, and deferred calls registered inside
+that task do not run in the spawning task.
 
 ```leia run all
 events := {}
@@ -212,6 +251,19 @@ func work() {
 work()
 assert(events[1] == "inner")
 assert(events[2] == "outer")
+```
+
+```leia run all
+done := make(chan, 1)
+
+func work() {
+    defer func() {
+        done <- "deferred in task"
+    }()
+}
+
+go work()
+assert(<-done == "deferred in task")
 ```
 
 Protected calls (`pcall` and `xpcall`) catch runtime errors that occur while the
@@ -279,6 +331,8 @@ termination outside such a boundary is controlled by the embedding contract.
 Channel communication is the synchronization primitive in the stable language
 contract:
 
+- The side effects used to evaluate a `go` statement's callee and arguments are
+  sequenced before the started task begins executing that call.
 - A successful send synchronizes with the receive that obtains that value.
 - Closing a channel synchronizes with receives that observe the closed state
   after queued values have been consumed.
@@ -287,6 +341,8 @@ contract:
 - For buffered channels, a send may complete before a receiver accepts the
   value, but the value and writes sequenced before the send become visible to
   the receiver that later obtains that value.
+- A receive that observes channel closure is ordered after the successful
+  `close(ch)` call and after any queued values that receive is required to drain.
 
 Outside those synchronization edges, concurrent tasks have no specified memory
 ordering. Programs must not depend on the relative timing of ordinary reads and
@@ -324,12 +380,23 @@ for i := 1; i <= 4; i++ {
 assert(last == 4)
 ```
 
+The contract intentionally does not define atomics, volatile variables, data-race
+diagnostics, or visibility guarantees for unsynchronized table or global
+variable accesses. Host modules may expose additional synchronization APIs, but
+those APIs must document their own ordering rules.
+
 ## Optimization Contract
 
 JIT, bytecode, and interpreter execution must preserve concurrency-visible
 behavior: communication order, channel close behavior, synchronization results,
 select readiness, protected error boundaries, and host cancellation boundaries
-must not change when optimizations are enabled. Optimizations may change timing,
-scheduling, or whether a task reaches a cancellation checkpoint before another
-task, except where the program has established ordering through channels or a
-specified synchronization library.
+must not change when optimizations are enabled. Optimizers must not move ordinary
+reads, writes, calls, defers, channel operations, `select`, `close`, task start,
+or protected-call boundaries across a synchronization or error boundary in a way
+that changes the behavior described in this chapter.
+
+Optimizations may change timing, scheduling, batching, or whether a task reaches
+a cancellation checkpoint before another task, except where the program has
+established ordering through channels or a specified synchronization library.
+JIT side exits and deoptimization must resume with the same observable channel,
+defer, cancellation, and protected-error state as interpreter execution.

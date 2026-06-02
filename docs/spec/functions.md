@@ -5,39 +5,28 @@ anonymous literals.
 
 Parameters are lexical bindings initialized from call arguments. Missing
 arguments become `nil`; extra arguments are discarded unless the function has a
-vararg parameter.
+vararg parameter. The call does not expose an argument count to fixed
+parameters; a fixed parameter that receives an explicit `nil` is
+indistinguishable from one filled because the argument is missing.
 
 ```leia run all
 func first(a, b) {
-    return a
+    return a, b
 }
 
-assert(first(1, 2, 3) == 1) // the extra argument is discarded
-assert(first() == nil)      // missing arguments become nil
-```
+one, two := first(1, 2, 3)
+missing_a, missing_b := first()
+explicit_nil, after_nil := first(nil, "x")
 
-```leia run all
-func first(a, b) {
-    return a
-}
-
-assert(first(1, 2, 3) == 1)
-assert(first() == nil)
+assert(one == 1 && two == 2)                  // extra argument discarded
+assert(missing_a == nil && missing_b == nil)  // missing arguments become nil
+assert(explicit_nil == nil && after_nil == "x")
 ```
 
 The parameter `...` accepts any remaining arguments. Inside the function,
 `{...}` constructs a table containing those arguments. A function may have at
 most one vararg parameter, and it must be the final parameter. Fixed parameters
 are filled before the vararg list is formed.
-
-```leia run all
-func count(...) {
-    args := {...}
-    return #args
-}
-
-assert(count(1, 2, 3) == 3)
-```
 
 ```leia run all
 func count(...) {
@@ -125,9 +114,10 @@ assert(c == 20)
 assert(d == 30)
 ```
 
-Function-call arguments and table constructors use the same expression-list
-rule: non-final calls contribute one value; final calls expand. Use
-`spread(call())` to expand a call in a non-final position.
+Function-call arguments, including calls to host functions, and table
+constructors use the same expression-list rule: non-final calls contribute one
+value; final calls expand. Use `spread(call())` to expand a call in a non-final
+position.
 
 ```leia run all
 func triple() {
@@ -136,13 +126,15 @@ func triple() {
 
 func pack(...) { return table.pack(...) }
 
-plain := pack(triple(), "x")          // receives 10, "x"
-expanded := pack(spread(triple()), "x")  // receives 10, 20, 30, "x"
-list := {triple()}                   // {10, 20, 30}
-single := {(triple())}               // {10}
+plain := pack(triple(), "x")              // receives 10, "x"
+expanded := pack(spread(triple()), "x")   // receives 10, 20, 30, "x"
+host_expanded := table.pack(triple())     // host calls use the same rule
+list := {triple()}                        // {10, 20, 30}
+single := {(triple())}                    // {10}
 
 assert(plain[1] == 10 && plain[2] == "x")
 assert(expanded[1] == 10 && expanded[2] == 20 && expanded[3] == 30 && expanded[4] == "x")
+assert(host_expanded[1] == 10 && host_expanded[2] == 20 && host_expanded[3] == 30)
 assert(list[1] == 10 && list[2] == 20 && list[3] == 30)
 assert(single[1] == 10 && single[2] == nil)
 ```
@@ -213,39 +205,46 @@ assert(y == nil)
 ```
 
 Closures capture lexical variables by reference. Mutating a captured variable is
-visible to all closures that share the binding.
+visible to all closures that share the binding. Each evaluation of a function
+literal creates a distinct function value. Returning or assigning an existing
+function value preserves that value's identity and captured environment.
 
 ```leia run all
 func counter() {
     n := 0
-    return func() {
+    inc := func() {
         n = n + 1
         return n
     }
-}
-
-next := counter()
-assert(next() == 1)
-assert(next() == 2)
-```
-
-```leia run all
-func counter() {
-    n := 0
-    return func() {
-        n = n + 1
+    get := func() {
         return n
     }
+    return inc, get
 }
 
-next := counter()
+next, current := counter()
+other, other_current := counter()
+same_next := next
+
 assert(next() == 1)
+assert(current() == 1)        // sibling closure sees the same binding
 assert(next() == 2)
+assert(current() == 2)
+assert(other() == 1)          // a separate call has separate captures
+assert(other_current() == 1)
+assert(next == same_next)
+assert(next != other)
 ```
 
 Script functions and host functions share the same script-visible call result
-model. Host functions may return structured recoverable errors where their
-module contract specifies `nil, err` behavior.
+model: argument adjustment, result adjustment, protected-call behavior, and
+vararg collection are defined at the script boundary rather than by the
+implementation language of the callee. Host functions may return structured
+recoverable errors where their module contract specifies `nil, err` behavior.
+Uncaught host failures surface as ordinary runtime errors to script code.
 
-Tail-call optimization is an implementation detail unless a section explicitly
-promises stack behavior for a feature.
+Tail-call optimization is not part of the stable function contract. A call in
+tail position has the same observable result adjustment as any other returned
+call, but the specification does not promise stack reuse, frame elision,
+debug-frame shape, or unbounded recursion unless a section explicitly promises
+stack behavior for a feature.

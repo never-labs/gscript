@@ -197,16 +197,35 @@ assert(values[2] == 3)
 assert(values[3] == 5)
 ```
 
-`select` waits on channel send or receive cases. A `default` case is selected
-when no communication can proceed immediately.
+`select` waits on channel send or receive cases. Its full communication
+semantics are specified in [Concurrency](concurrency.md). Statement-level
+rules are:
 
-```leia
+1. receive-case bindings are scoped to the selected case body;
+2. a send case evaluates its channel and value expressions before attempting the
+   selected send;
+3. a `default` case is selected immediately when no communication can proceed;
+4. a `select` with no cases raises a runtime error.
+
+```leia run all
+ch := make(chan, 1)
+observed := ""
 select {
 case value := <-ch:
-    print(value)
+    observed = "recv:" .. value
 default:
-    print("nothing ready")
+    observed = "default"
 }
+assert(observed == "default")
+
+ch <- "ready"
+select {
+case value := <-ch:
+    observed = "recv:" .. value
+default:
+    observed = "default"
+}
+assert(observed == "recv:ready")
 ```
 
 `go call()` starts a goroutine-like task. `defer call()` schedules cleanup to
@@ -218,16 +237,36 @@ func work(ch) {
     ch <- "ready"
 }
 
-go work(ch)
+ready := make(chan, 1)
+go work(ready)
+assert(<-ready == "ready")
 ```
 
 `return` exits the current function and returns zero or more values. Return
-values use multi-return adjustment.
+values use the multi-return adjustment rules in [Functions](functions.md).
+At module top level, `return` stops execution of the current chunk or module and
+produces the module result used by loaders such as `require`.
+
+```leia run all
+func pair() {
+    return "left", "right"
+}
+
+func forward() {
+    return pair()
+}
+
+a, b := forward()
+assert(a == "left")
+assert(b == "right")
+```
 
 `defer` evaluates the callee and arguments when the `defer` statement executes,
 then invokes the deferred call later. Deferred calls run in last-in, first-out
-order when the current function exits normally or unwinds through a protected
-boundary.
+order when the current function exits normally, returns explicitly, or unwinds
+through a protected boundary. A deferred call cannot change the already
+computed return values unless it mutates an identity-bearing value reachable
+from those return values.
 
 ```leia run all
 events := {}
