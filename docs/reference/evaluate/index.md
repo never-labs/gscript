@@ -10,13 +10,25 @@ file's top-level setup code and then the evaluate body, so normal Leia
 assertions such as `assert(result == "ok")` determine whether the case passes.
 It also counts static declarations such as `agent`, `tool`, `models`, and
 `budget`, and reports local `TODO` lines as informational findings. Provider
-scoring, golden updates, and workflow orchestration are reserved for later
-phases.
+scoring and workflow orchestration are reserved for later phases.
 
 ```sh
 leia evaluate --json path/to/script.leia
 leia evaluate --format=text path/to/project
+leia evaluate --llm-replay tests/agent.records.json tests/agent.leia
+leia evaluate --update-golden tests/agent.records.json tests/agent.leia
 ```
+
+LLM record/replay uses the same JSON fixture format as the public `llm`
+package:
+
+| Flag | Meaning |
+|---|---|
+| `--llm-replay FILE` | Use `FILE` as a deterministic provider transcript. Request mismatches, exhausted replay, or unconsumed turns fail the report. |
+| `--llm-record FILE` | Run against the configured provider and write observed turns to `FILE`. |
+| `--update-golden FILE` | Run against the configured provider and rewrite `FILE` as the new golden transcript. This is intentionally explicit so CI can forbid it. |
+
+The three LLM fixture modes are mutually exclusive.
 
 The JSON report is versioned with `schema_version: 1` and includes:
 
@@ -25,6 +37,7 @@ The JSON report is versioned with `schema_version: 1` and includes:
 | `phase` | Currently `runtime-minimal`. |
 | `status` | `ok` or `failed`. Syntax, validation, and case runtime errors make the report fail. |
 | `summary` | File, parse, AI declaration, and TODO counts. |
+| `llm` | Optional LLM fixture metadata: mode, paths, loaded turns, replayed turns, remaining turns, and recorded turns. |
 | `inputs` | Per-input file status. |
 | `cases` | Evaluate blocks with `case_id`, `name`, source path, range, and `passed` or `failed` status. |
 | `findings` | TODO, IO, lex, parse, AI syntax, and case runtime findings. |

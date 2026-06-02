@@ -24,10 +24,11 @@ import (
 const SchemaVersion = 1
 
 type Options struct {
-	Paths              []string
-	LLMRecordPath      string
-	LLMReplayPath      string
-	LLMProviderFactory runtime.LLMProviderFactory
+	Paths               []string
+	LLMRecordPath       string
+	LLMReplayPath       string
+	LLMUpdateGoldenPath string
+	LLMProviderFactory  runtime.LLMProviderFactory
 }
 
 type Report struct {
@@ -35,10 +36,22 @@ type Report struct {
 	Phase         string    `json:"phase"`
 	Status        string    `json:"status"`
 	Summary       Summary   `json:"summary"`
+	LLM           *LLMRun   `json:"llm,omitempty"`
 	Inputs        []Input   `json:"inputs"`
 	Cases         []Case    `json:"cases"`
 	Findings      []Finding `json:"findings"`
 	Notes         []string  `json:"notes"`
+}
+
+type LLMRun struct {
+	Mode           string `json:"mode"`
+	RecordPath     string `json:"record_path,omitempty"`
+	ReplayPath     string `json:"replay_path,omitempty"`
+	GoldenUpdated  bool   `json:"golden_updated,omitempty"`
+	LoadedTurns    int    `json:"loaded_turns,omitempty"`
+	RecordedTurns  int    `json:"recorded_turns,omitempty"`
+	ReplayedTurns  int    `json:"replayed_turns,omitempty"`
+	RemainingTurns int    `json:"remaining_turns,omitempty"`
 }
 
 type Summary struct {
@@ -125,11 +138,12 @@ func Run(opts Options) (Report, error) {
 			"evaluate runs each evaluate block body as ordinary Leia code; provider scoring and workflow orchestration are reserved for later phases.",
 		},
 	}
+	report.LLM = run.report
 	if opts.LLMReplayPath != "" {
 		report.Notes = append(report.Notes, fmt.Sprintf("llm replay loaded from %s", opts.LLMReplayPath))
 	}
-	if opts.LLMRecordPath != "" {
-		report.Notes = append(report.Notes, fmt.Sprintf("llm turns will be recorded to %s", opts.LLMRecordPath))
+	if run != nil && run.recordPath != "" {
+		report.Notes = append(report.Notes, fmt.Sprintf("llm turns will be recorded to %s", run.recordPath))
 	}
 	for _, file := range files {
 		input := Input{Path: file, Status: "ok"}
@@ -199,8 +213,27 @@ func Run(opts Options) (Report, error) {
 			report.Summary.TODOs++
 		}
 	}
+	if run != nil && run.replayProvider != nil {
+		if run.report != nil {
+			run.report.ReplayedTurns = run.replayProvider.Consumed()
+			run.report.RemainingTurns = run.replayProvider.Remaining()
+		}
+		if remaining := run.replayProvider.Remaining(); remaining > 0 {
+			report.Status = "failed"
+			report.Findings = append(report.Findings, Finding{
+				Kind:     "llm_replay_unconsumed",
+				Severity: "error",
+				Message:  fmt.Sprintf("llm replay left %d unconsumed turn(s)", remaining),
+				Path:     opts.LLMReplayPath,
+			})
+		}
+	}
 	if run != nil && run.recorder != nil {
-		if err := run.recorder.Save(opts.LLMRecordPath); err != nil {
+		records := run.recorder.Records()
+		if run.report != nil {
+			run.report.RecordedTurns = len(records)
+		}
+		if err := llm.SaveRecords(run.recordPath, records); err != nil {
 			return report, err
 		}
 	}
@@ -209,13 +242,25 @@ func Run(opts Options) (Report, error) {
 
 type runContext struct {
 	recorder        *llm.Recorder
-	replayProvider  runtime.LLMProvider
+	recordPath      string
+	replayProvider  *llm.ReplayProvider
 	providerFactory runtime.LLMProviderFactory
+	report          *LLMRun
 }
 
 func newRunContext(opts Options) (*runContext, error) {
-	if opts.LLMRecordPath != "" && opts.LLMReplayPath != "" {
-		return nil, fmt.Errorf("llm record and replay modes are mutually exclusive")
+	modes := 0
+	if opts.LLMRecordPath != "" {
+		modes++
+	}
+	if opts.LLMReplayPath != "" {
+		modes++
+	}
+	if opts.LLMUpdateGoldenPath != "" {
+		modes++
+	}
+	if modes > 1 {
+		return nil, fmt.Errorf("llm record, replay, and update-golden modes are mutually exclusive")
 	}
 	run := &runContext{providerFactory: opts.LLMProviderFactory}
 	if opts.LLMReplayPath != "" {
@@ -223,10 +268,18 @@ func newRunContext(opts Options) (*runContext, error) {
 		if err != nil {
 			return nil, err
 		}
-		run.replayProvider = llmbridge.ProviderAdapter(llm.NewReplayProvider(records))
+		run.replayProvider = llm.NewReplayProvider(records)
+		run.report = &LLMRun{Mode: "replay", ReplayPath: opts.LLMReplayPath, LoadedTurns: len(records)}
 	}
 	if opts.LLMRecordPath != "" {
 		run.recorder = llm.NewRecorder()
+		run.recordPath = opts.LLMRecordPath
+		run.report = &LLMRun{Mode: "record", RecordPath: opts.LLMRecordPath}
+	}
+	if opts.LLMUpdateGoldenPath != "" {
+		run.recorder = llm.NewRecorder()
+		run.recordPath = opts.LLMUpdateGoldenPath
+		run.report = &LLMRun{Mode: "update_golden", RecordPath: opts.LLMUpdateGoldenPath, GoldenUpdated: true}
 	}
 	return run, nil
 }
@@ -440,7 +493,7 @@ func executeCase(path string, prog *ast.Program, c parsedCase, run *runContext) 
 	stdlibinstall.Install(interp)
 	if run != nil {
 		if run.replayProvider != nil {
-			interp.SetLLMProvider(run.replayProvider)
+			interp.SetLLMProvider(llmbridge.ProviderAdapter(run.replayProvider))
 		}
 		if run.recorder != nil {
 			interp.SetLLMProviderFactory(recordingProviderFactory(run.providerFactory, run.recorder.Record))

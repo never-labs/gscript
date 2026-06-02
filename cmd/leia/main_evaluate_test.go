@@ -159,4 +159,39 @@ func TestEvaluateCommandLLMReplay(t *testing.T) {
 	if report.Status != "ok" || len(report.Cases) != 1 || report.Cases[0].Status != "passed" {
 		t.Fatalf("report = %#v", report)
 	}
+	if report.LLM == nil || report.LLM.Mode != "replay" || report.LLM.ReplayedTurns != 1 {
+		t.Fatalf("llm report = %#v", report.LLM)
+	}
+}
+
+func TestEvaluateCommandUpdateGoldenWritesFixture(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "basic.leia")
+	src := `evaluate "cli update golden" {
+    assert(true)
+}
+`
+	if err := os.WriteFile(path, []byte(src), 0644); err != nil {
+		t.Fatal(err)
+	}
+	recordPath := filepath.Join(dir, "golden.json")
+	var stdout, stderr bytes.Buffer
+	code := runEvaluateCommand([]string{"--format=json", "--update-golden", recordPath, path}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runEvaluateCommand code = %d, stderr = %q", code, stderr.String())
+	}
+	var report evaluate.Report
+	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
+		t.Fatalf("decode report: %v\n%s", err, stdout.String())
+	}
+	if report.LLM == nil || report.LLM.Mode != "update_golden" || !report.LLM.GoldenUpdated || report.LLM.RecordedTurns != 0 {
+		t.Fatalf("llm report = %#v", report.LLM)
+	}
+	records, err := llm.LoadRecords(recordPath)
+	if err != nil {
+		t.Fatalf("load golden: %v", err)
+	}
+	if len(records) != 0 {
+		t.Fatalf("records = %#v, want empty fixture", records)
+	}
 }

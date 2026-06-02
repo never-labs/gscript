@@ -16,6 +16,7 @@ func runEvaluateCommand(args []string, outw, errw io.Writer) int {
 	format := fs.String("format", "json", "output format: json or text")
 	llmRecord := fs.String("llm-record", "", "record LLM turns to a replay JSON file")
 	llmReplay := fs.String("llm-replay", "", "replay LLM turns from a replay JSON file")
+	updateGolden := fs.String("update-golden", "", "rewrite an LLM replay JSON file from a live evaluation run")
 	if err := fs.Parse(args); err != nil {
 		if err == flag.ErrHelp {
 			return 0
@@ -31,10 +32,11 @@ func runEvaluateCommand(args []string, outw, errw io.Writer) int {
 	}
 
 	report, err := evaluate.Run(evaluate.Options{
-		Paths:              fs.Args(),
-		LLMRecordPath:      *llmRecord,
-		LLMReplayPath:      *llmReplay,
-		LLMProviderFactory: cliDefaultLLMProviderFactory,
+		Paths:               fs.Args(),
+		LLMRecordPath:       *llmRecord,
+		LLMReplayPath:       *llmReplay,
+		LLMUpdateGoldenPath: *updateGolden,
+		LLMProviderFactory:  cliDefaultLLMProviderFactory,
 	})
 	if err != nil {
 		fmt.Fprintf(errw, "leia evaluate: %v\n", err)

@@ -223,6 +223,85 @@ func TestRunReplaysLLMTurns(t *testing.T) {
 	if report.Status != "ok" || len(report.Cases) != 1 || report.Cases[0].Status != "passed" {
 		t.Fatalf("report = %#v", report)
 	}
+	if report.LLM == nil || report.LLM.Mode != "replay" || report.LLM.LoadedTurns != 1 || report.LLM.ReplayedTurns != 1 || report.LLM.RemainingTurns != 0 {
+		t.Fatalf("llm report = %#v", report.LLM)
+	}
+}
+
+func TestRunFailsWhenReplayHasUnconsumedTurns(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "llm_eval.leia")
+	if err := os.WriteFile(path, []byte(`evaluate "does not call llm" {
+    assert(true)
+}
+`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	recordPath := filepath.Join(dir, "records.json")
+	if err := llm.SaveRecords(recordPath, []llm.Record{{
+		Request: llm.TurnRequest{
+			Model:    "mock-fast",
+			Messages: []llm.Message{{Role: "user", Text: "unused"}},
+		},
+		Result: llm.TurnResult{Status: "final_answer", Text: "unused"},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+
+	report, err := Run(Options{Paths: []string{path}, LLMReplayPath: recordPath})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Status != "failed" || report.LLM == nil || report.LLM.RemainingTurns != 1 {
+		t.Fatalf("report = %#v", report)
+	}
+	if len(report.Findings) != 1 || report.Findings[0].Kind != "llm_replay_unconsumed" {
+		t.Fatalf("findings = %#v", report.Findings)
+	}
+}
+
+func TestRunUpdateGoldenWritesLLMFixture(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "llm_eval.leia")
+	if err := os.WriteFile(path, []byte(`models {
+    default: {
+        protocol: "openai_compatible"
+        provider_model: "mock-fast"
+    }
+}
+
+evaluate "updates golden" {
+    result, err := llm.turn({
+        messages: {llm.user("refresh")},
+    })
+    assert(err == nil)
+    assert(result.text == "fresh")
+}
+`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	recordPath := filepath.Join(dir, "golden.json")
+
+	report, err := Run(Options{
+		Paths:               []string{path},
+		LLMUpdateGoldenPath: recordPath,
+		LLMProviderFactory: func(runtime.LLMProviderConfig) (runtime.LLMProvider, error) {
+			return testRuntimeLLMProvider{res: runtime.LLMTurnResult{Status: "final_answer", Text: "fresh"}}, nil
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Status != "ok" || report.LLM == nil || report.LLM.Mode != "update_golden" || !report.LLM.GoldenUpdated || report.LLM.RecordedTurns != 1 {
+		t.Fatalf("report = %#v", report)
+	}
+	records, err := llm.LoadRecords(recordPath)
+	if err != nil {
+		t.Fatalf("load records: %v", err)
+	}
+	if len(records) != 1 || records[0].Request.Messages[0].Text != "refresh" || records[0].Result.Text != "fresh" {
+		t.Fatalf("records = %#v", records)
+	}
 }
 
 func TestRunRejectsRecordAndReplayTogether(t *testing.T) {

@@ -23,8 +23,14 @@ In ordinary script execution an evaluate block has no runtime effect. The
 runner discovers cases, reports their source position, validates the body with
 the same parser and AI-native syntax checks used for normal code, then executes
 the body as ordinary Leia code. Built-in `assert` failures or other runtime
-errors mark that case failed; provider scoring, record/replay, golden updates,
-and richer tool/file assertions are reserved for later evaluate phases.
+errors mark that case failed; provider scoring and richer tool/file assertions
+are reserved for later evaluate phases.
+
+The `leia evaluate` command may install a deterministic LLM replay provider or
+record provider turns into a golden fixture. Replay fixtures are strict: a
+request mismatch, an exhausted fixture, or leftover unconsumed turns is an
+evaluation failure. Updating a golden fixture is an explicit command-line mode,
+not an ordinary script side effect.
 
 ```leia
 //leia:requires none
