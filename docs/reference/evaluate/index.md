@@ -51,7 +51,7 @@ The JSON report is versioned with `schema_version: 1` and includes:
 | `summary` | File, parse, AI declaration, TODO, selected/skipped case, pass/fail/list, assertion, duration, and pass-rate counts. |
 | `llm` | Optional LLM fixture metadata: mode, paths, loaded turns, replayed turns, remaining turns, and recorded turns. |
 | `inputs` | Per-input file status. |
-| `cases` | Evaluate blocks with `case_id`, `name`, source path, range, and `passed` or `failed` status. |
+| `cases` | Evaluate blocks with `case_id`, `name`, source path, range, status, per-case `started_at`, duration, assertions, and diagnostics. |
 | `findings` | TODO, IO, lex, parse, AI syntax, and case runtime findings. |
 | `notes` | Explicit scope notes so callers do not confuse this with full eval scoring. |
 

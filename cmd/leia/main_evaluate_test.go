@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/never-labs/leia/internal/tooling/evaluate"
 	"github.com/never-labs/leia/llm"
@@ -52,6 +53,9 @@ evaluate "answer baseline" {
 	}
 	if report.Cases[0].DurationMS < 0 || len(report.Cases[0].Assertions) != 1 || report.Cases[0].Assertions[0].Status != "passed" {
 		t.Fatalf("case metadata = %#v", report.Cases[0])
+	}
+	if _, err := time.Parse(time.RFC3339, report.Cases[0].StartedAt); err != nil {
+		t.Fatalf("case started_at = %q: %v", report.Cases[0].StartedAt, err)
 	}
 }
 

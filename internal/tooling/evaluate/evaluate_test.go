@@ -69,6 +69,9 @@ evaluate "answer echoes through tool" {
 	if len(report.Cases) != 1 || report.Cases[0].Name != "answer echoes through tool" || report.Cases[0].Status != "passed" {
 		t.Fatalf("cases = %#v", report.Cases)
 	}
+	if _, err := time.Parse(time.RFC3339, report.Cases[0].StartedAt); err != nil {
+		t.Fatalf("case started_at = %q: %v", report.Cases[0].StartedAt, err)
+	}
 	if report.Summary.CasesSelected != 1 || report.Summary.CasesPassed != 1 || report.Summary.CasesFailed != 0 || report.Summary.CasesListed != 0 || report.Summary.Assertions != 0 || report.Summary.PassRate != 1 {
 		t.Fatalf("summary execution = %#v", report.Summary)
 	}
@@ -115,6 +118,34 @@ func TestRunExecutesEvaluateBodyAndReportsFailure(t *testing.T) {
 	}
 }
 
+func TestRunMarksFailingAssertionBySourcePosition(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "checks.leia")
+	if err := os.WriteFile(path, []byte(`evaluate "second assertion fails" {
+    assert(true, "first assertion should pass")
+    value := 2 + 2
+    assert(value == 5, "second assertion should fail")
+}
+`), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	report, err := Run(Options{Paths: []string{path}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Status != "failed" || len(report.Cases) != 1 || report.Cases[0].Status != "failed" {
+		t.Fatalf("report = %#v", report)
+	}
+	assertions := report.Cases[0].Assertions
+	if len(assertions) != 2 {
+		t.Fatalf("assertions = %#v", assertions)
+	}
+	if assertions[0].Status != "unknown" || assertions[1].Status != "failed" {
+		t.Fatalf("assertions = %#v, want only second assertion failed", assertions)
+	}
+}
+
 func TestRunFiltersEvaluateCases(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "cases.leia")
@@ -157,6 +188,9 @@ func TestRunListsEvaluateCasesWithoutExecuting(t *testing.T) {
 	}
 	if report.Status != "ok" || len(report.Cases) != 1 || report.Cases[0].Status != "listed" {
 		t.Fatalf("report = %#v", report)
+	}
+	if report.Cases[0].StartedAt != "" || report.Cases[0].DurationMS != 0 {
+		t.Fatalf("listed case execution metadata = %#v", report.Cases[0])
 	}
 	if report.Summary.CasesSelected != 1 || report.Summary.CasesListed != 1 || report.Summary.CasesPassed != 0 || report.Summary.CasesFailed != 0 || report.Summary.Assertions != 1 {
 		t.Fatalf("summary list counts = %#v", report.Summary)

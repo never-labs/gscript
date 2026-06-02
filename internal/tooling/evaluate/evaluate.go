@@ -100,6 +100,7 @@ type Case struct {
 	SourcePath  string       `json:"source_path"`
 	Range       SourceRange  `json:"range"`
 	Status      string       `json:"status"`
+	StartedAt   string       `json:"started_at,omitempty"`
 	DurationMS  int64        `json:"duration_ms,omitempty"`
 	Assertions  []Assertion  `json:"assertions,omitempty"`
 	Diagnostics []Diagnostic `json:"diagnostics,omitempty"`
@@ -217,13 +218,12 @@ func Run(opts Options) (Report, error) {
 						continue
 					}
 					start := time.Now()
+					c.StartedAt = start.UTC().Format(time.RFC3339)
 					if err := executeCase(file, prog, parsed, run); err != nil {
 						c.Status = "failed"
 						c.DurationMS = elapsedMillis(start)
 						markAssertions(c.Assertions, "unknown")
-						if len(c.Assertions) == 1 || len(c.Assertions) > 0 && strings.Contains(err.Error(), "assert") {
-							c.Assertions[0].Status = "failed"
-						}
+						markFailedAssertion(c.Assertions, err.Error())
 						c.Diagnostics = append(c.Diagnostics, Diagnostic{
 							Kind:     "runtime_error",
 							Severity: "error",
@@ -822,6 +822,31 @@ func markAssertions(assertions []Assertion, status string) {
 	for i := range assertions {
 		assertions[i].Status = status
 	}
+}
+
+func markFailedAssertion(assertions []Assertion, message string) {
+	if len(assertions) == 0 {
+		return
+	}
+	line, column, ok := leadingSourcePosition(message)
+	if ok {
+		for i := range assertions {
+			if assertions[i].Range.StartLine == line && assertions[i].Range.StartColumn == column {
+				assertions[i].Status = "failed"
+				return
+			}
+		}
+	}
+	if len(assertions) == 1 || strings.Contains(message, "assert") {
+		assertions[0].Status = "failed"
+	}
+}
+
+func leadingSourcePosition(message string) (line, column int, ok bool) {
+	if _, err := fmt.Sscanf(message, "%d:%d:", &line, &column); err == nil {
+		return line, column, true
+	}
+	return 0, 0, false
 }
 
 func FormatText(report Report) string {
