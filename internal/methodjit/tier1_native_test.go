@@ -809,7 +809,49 @@ func f(n) {
 }
 result := 0
 for i := 1; i <= 80; i++ { result = f(40) }
-`, "result")
+	`, "result")
+}
+
+func TestTier1_DirectEntrySafetyKeepsOnlyNativeHandledCallees(t *testing.T) {
+	top := compileProto(t, `
+global_value := 41
+
+func pure_inc(n) {
+    return n + 1
+}
+
+func reads_global() {
+    return global_value
+}
+
+func allocates_table() {
+    t := {x: 1}
+    return t.x
+}
+
+func nested_call(n) {
+    return pure_inc(n)
+}
+`)
+
+	cases := []struct {
+		name string
+		want bool
+	}{
+		{"pure_inc", true},
+		{"reads_global", false},
+		{"allocates_table", false},
+		{"nested_call", false},
+	}
+	for _, tc := range cases {
+		proto := findProtoByName(top, tc.name)
+		if proto == nil {
+			t.Fatalf("missing proto %s", tc.name)
+		}
+		if got := nativeBLRReplaySafe(proto); got != tc.want {
+			t.Fatalf("nativeBLRReplaySafe(%s)=%v, want %v", tc.name, got, tc.want)
+		}
+	}
 }
 
 // ---------------------------------------------------------------------------

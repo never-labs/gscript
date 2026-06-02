@@ -267,13 +267,14 @@ func (e *BaselineJITEngine) TryCompile(proto *vm.FuncProto) interface{} {
 }
 
 // nativeBLRReplaySafe reports whether a Tier 1 direct-entry caller may safely
-// jump into proto. A direct BLR callee that exits after native partial execution
-// is currently recovered by re-executing the callee from pc=0. That is only safe
-// if no visible native side effect can have happened before the exit.
+// jump into proto. Baseline direct-entry calls share one ExecContext with the
+// caller; when the callee hits an op-exit, Go has to reconstruct both caller and
+// callee state. That recovery path is fragile for nested/direct calls, so only
+// publish DirectEntryPtr for callees whose bytecode is entirely native-handled.
 //
 // This is intentionally conservative and local: it keeps pure callees on BLR,
-// while withholding DirectEntryPtr for callees that perform native-visible
-// mutations before any later operation that can exit to Go.
+// while routing globals, table ops, nested calls, allocation, varargs, channels,
+// and other exit-resume bytecodes through the normal CALL slow path.
 func nativeBLRReplaySafe(proto *vm.FuncProto) bool {
 	if proto == nil {
 		return true
@@ -284,14 +285,9 @@ func nativeBLRReplaySafe(proto *vm.FuncProto) bool {
 	if baselineHasStaticSelfAndNonSelfCall(proto) {
 		return false
 	}
-	seenSideEffect := false
 	for _, inst := range proto.Code {
-		op := vm.DecodeOp(inst)
-		if seenSideEffect && tier1OpMayExitAfterNativeSideEffect(proto, inst) {
+		if tier1OpUnsafeForDirectEntry(proto, inst) {
 			return false
-		}
-		if tier1OpHasNativeVisibleSideEffect(op) {
-			seenSideEffect = true
 		}
 	}
 	return true
@@ -319,15 +315,6 @@ func baselineHasStaticSelfAndNonSelfCall(proto *vm.FuncProto) bool {
 	return false
 }
 
-func tier1OpHasNativeVisibleSideEffect(op vm.Opcode) bool {
-	switch op {
-	case vm.OP_SETTABLE, vm.OP_SETFIELD, vm.OP_SETUPVAL:
-		return true
-	default:
-		return false
-	}
-}
-
 func tier1OpMayExitAfterNativeSideEffect(proto *vm.FuncProto, inst uint32) bool {
 	op := vm.DecodeOp(inst)
 	switch op {
@@ -338,6 +325,30 @@ func tier1OpMayExitAfterNativeSideEffect(proto *vm.FuncProto, inst uint32) bool 
 		return !tier1UpvalueAccessStaticallyValid(proto, inst)
 	default:
 		return tier1OpMayExit(op)
+	}
+}
+
+func tier1OpUnsafeForDirectEntry(proto *vm.FuncProto, inst uint32) bool {
+	op := vm.DecodeOp(inst)
+	switch op {
+	case vm.OP_GETUPVAL, vm.OP_SETUPVAL:
+		return !tier1UpvalueAccessStaticallyValid(proto, inst)
+	case vm.OP_GETGLOBAL, vm.OP_SETGLOBAL,
+		vm.OP_NEWTABLE, vm.OP_NEWOBJECT2, vm.OP_NEWOBJECTN,
+		vm.OP_GETTABLE, vm.OP_SETTABLE,
+		vm.OP_GETFIELD, vm.OP_SETFIELD,
+		vm.OP_SETLIST, vm.OP_APPEND,
+		vm.OP_CONCAT, vm.OP_LEN, vm.OP_POW,
+		vm.OP_CLOSURE, vm.OP_CLOSE,
+		vm.OP_SELF, vm.OP_VARARG,
+		vm.OP_TFORCALL,
+		vm.OP_GO, vm.OP_MAKECHAN, vm.OP_SEND, vm.OP_RECV, vm.OP_RECVOK, vm.OP_TRYSEND, vm.OP_TRYRECV, vm.OP_TRYRECVOK, vm.OP_SELECT,
+		vm.OP_CALL:
+		return true
+	case vm.OP_LT, vm.OP_LE:
+		return true
+	default:
+		return false
 	}
 }
 
