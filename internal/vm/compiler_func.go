@@ -41,6 +41,7 @@ func (c *compiler) compileFunction(name string, params []ast.FuncParam, body *as
 	}
 	child.proto.NumParams = numFixedParams
 	child.collectFunctionArities(body.Stmts)
+	child.collectFunctionResults(body.Stmts)
 	child.collectLabelDepths(body.Stmts, child.depth)
 
 	for _, stmt := range body.Stmts {

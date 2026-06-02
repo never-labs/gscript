@@ -245,9 +245,27 @@ add_release_smoke() {
         "go run ./cmd/leia $SMOKE_SCRIPT && go run ./cmd/leia -jit benchmarks/table/table_field_access.leia && go run ./cmd/leia inspect bytecode $SMOKE_SCRIPT"
 }
 
+add_methodjit_regression_gate() {
+    if ! have_cmd go; then
+        add_skip "MethodJIT Regression" "missing go"
+        return
+    fi
+    local goos
+    local goarch
+    goos="$(go env GOOS 2>/dev/null || true)"
+    goarch="$(go env GOARCH 2>/dev/null || true)"
+    if [ "$goos" != "darwin" ] || [ "$goarch" != "arm64" ]; then
+        add_skip "MethodJIT Regression" "methodjit native tests require darwin/arm64, got ${goos}/${goarch}"
+        return
+    fi
+    add_run "MethodJIT Regression" \
+        "go test ./internal/vm -run TestCompilerReturn -count=1 && go test ./internal/methodjit -run 'TestRawIntSelfABI_NonEligibleStaysBoxed|TestRawIntSelfABI_EligibleExecutionMatrix|TestRawIntSelfABI_ExitResumeFallbackKeepsCallerLiveValues|TestExitResumeCheck_RawIntSelfCallFallbackFrame|TestTier2_StringFormatLookupPreservesPositiveDivisorModuloSemantics|TestTier2_StringFormatIntLoweringCoversGenericSingleIntPatterns|TestTier2_StringFormatIntMinInt64FallsBackPrecisely|TestTier2_StringFormatIntReboundCalleeFallsBackPrecisely|TestTier2_StringFormatIntFeedbackDynamicPatternGuardsPattern|TestTier2_StringFormatConstMultiArgUsesPreciseOpExit' -count=1"
+}
+
 build_quick_plan() {
     add_go_test "Core Go packages" \
         "go test . ./cmd/leia ./internal/lexer ./internal/parser ./internal/runtime ./internal/vm -count=1"
+    add_methodjit_regression_gate
     add_go_test "Feature Matrix and Integration" \
         "go test ./tests -run 'TestFeatureMatrix|TestIntegration' -count=1"
     add_go_test "Release Matrix Metadata" \

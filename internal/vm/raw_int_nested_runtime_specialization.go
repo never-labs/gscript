@@ -267,13 +267,15 @@ func rawIntNestedSubParamConst(inst uint32, dstSlot, paramSlot, constSlot int) b
 }
 
 func rawIntNestedTailSelfCallReturn(callInst, returnInst uint32, fnSlot int) bool {
-	return DecodeOp(callInst) == OP_CALL &&
-		DecodeA(callInst) == fnSlot &&
-		DecodeB(callInst) == 3 &&
-		DecodeC(callInst) == 0 &&
-		DecodeOp(returnInst) == OP_RETURN &&
-		DecodeA(returnInst) == fnSlot &&
-		DecodeB(returnInst) == 0
+	if DecodeOp(callInst) != OP_CALL ||
+		DecodeA(callInst) != fnSlot ||
+		DecodeB(callInst) != 3 ||
+		DecodeOp(returnInst) != OP_RETURN ||
+		DecodeA(returnInst) != fnSlot {
+		return false
+	}
+	return (DecodeC(callInst) == 0 && DecodeB(returnInst) == 0) ||
+		(DecodeC(callInst) == 2 && DecodeB(returnInst) == 2)
 }
 
 func rawIntNestedSelfGlobal(proto *FuncProto, pc int) (slot int, name string, ok bool) {

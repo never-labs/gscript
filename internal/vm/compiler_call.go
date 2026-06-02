@@ -173,6 +173,16 @@ func (c *compiler) callExprKnownSingleResult(call *ast.CallExpr) bool {
 		return false
 	}
 	if fn, ok := call.Func.(*ast.IdentExpr); ok {
+		if c != nil {
+			if c.proto != nil && c.proto.Name != "" && fn.Name == c.proto.Name {
+				if res, ok := c.funcResults[fn.Name]; ok && res.single {
+					return true
+				}
+			}
+			if res, ok := c.funcResults[fn.Name]; ok && res.single {
+				return true
+			}
+		}
 		switch fn.Name {
 		case "tonumber", "type", "len", "tostring", "error", "assert":
 			return true

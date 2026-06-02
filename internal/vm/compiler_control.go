@@ -595,8 +595,10 @@ func (c *compiler) compileReturnStmt(s *ast.ReturnStmt) error {
 	}
 
 	lastIsMulti := false
-	switch s.Values[nValues-1].(type) {
-	case *ast.CallExpr, *ast.MethodCallExpr, *ast.VarArgExpr:
+	switch v := s.Values[nValues-1].(type) {
+	case *ast.CallExpr:
+		lastIsMulti = !c.callExprKnownSingleResult(v)
+	case *ast.MethodCallExpr, *ast.VarArgExpr:
 		lastIsMulti = true
 	}
 

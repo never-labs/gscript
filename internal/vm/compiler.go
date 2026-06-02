@@ -23,6 +23,7 @@ func Compile(prog *ast.Program) (*FuncProto, error) {
 	}
 	c := newCompiler(nil, "<main>", 0, false)
 	c.collectFunctionArities(prog.Stmts)
+	c.collectFunctionResults(prog.Stmts)
 	c.collectLabelDepths(prog.Stmts, c.depth)
 	for _, stmt := range prog.Stmts {
 		if err := c.compileStmt(stmt); err != nil {
@@ -76,7 +77,9 @@ type compiler struct {
 	labelDepths    map[string]int
 	gotos          []compiledGoto
 	funcArities    map[string]functionArity
+	funcResults    map[string]functionResult
 	arityScopes    []map[string]*functionArity
+	resultScopes   []map[string]*functionResult
 }
 
 type compiledLabel struct {
@@ -97,13 +100,22 @@ type functionArity struct {
 	vararg    bool
 }
 
+type functionResult struct {
+	single bool
+}
+
 func newCompiler(parent *compiler, name string, line int, isVarArg bool) *compiler {
 	var arities map[string]functionArity
+	var results map[string]functionResult
 	if parent != nil {
 		arities = parent.funcArities
+		results = parent.funcResults
 	}
 	if arities == nil {
 		arities = make(map[string]functionArity)
+	}
+	if results == nil {
+		results = make(map[string]functionResult)
 	}
 	return &compiler{
 		parent: parent,
@@ -115,6 +127,7 @@ func newCompiler(parent *compiler, name string, line int, isVarArg bool) *compil
 		labels:      make(map[string]compiledLabel),
 		labelDepths: make(map[string]int),
 		funcArities: arities,
+		funcResults: results,
 	}
 }
 
@@ -138,6 +151,32 @@ func (c *compiler) collectFunctionArities(stmts []ast.Stmt) {
 	}
 }
 
+func (c *compiler) collectFunctionResults(stmts []ast.Stmt) {
+	if c == nil || c.funcResults == nil {
+		return
+	}
+	funcs := make([]*ast.FuncDeclStmt, 0)
+	for _, stmt := range stmts {
+		if fn, ok := stmt.(*ast.FuncDeclStmt); ok {
+			funcs = append(funcs, fn)
+			c.setFunctionResult(fn.Name, functionResult{})
+		}
+	}
+	for iter := 0; iter < len(funcs)+1; iter++ {
+		changed := false
+		for _, fn := range funcs {
+			next := functionResult{single: functionBodyKnownSingleResult(fn.Name, fn.Body, c.funcResults)}
+			if c.funcResults[fn.Name] != next {
+				c.setFunctionResult(fn.Name, next)
+				changed = true
+			}
+		}
+		if !changed {
+			return
+		}
+	}
+}
+
 func (c *compiler) setFunctionArity(name string, arity functionArity) {
 	if c == nil || c.funcArities == nil || name == "" {
 		return
@@ -156,6 +195,24 @@ func (c *compiler) setFunctionArity(name string, arity functionArity) {
 	c.funcArities[name] = arity
 }
 
+func (c *compiler) setFunctionResult(name string, result functionResult) {
+	if c == nil || c.funcResults == nil || name == "" {
+		return
+	}
+	if len(c.resultScopes) > 0 {
+		scope := c.resultScopes[len(c.resultScopes)-1]
+		if _, recorded := scope[name]; !recorded {
+			if prev, ok := c.funcResults[name]; ok {
+				prevCopy := prev
+				scope[name] = &prevCopy
+			} else {
+				scope[name] = nil
+			}
+		}
+	}
+	c.funcResults[name] = result
+}
+
 func countFixedFunctionParams(params []ast.FuncParam) (int, bool) {
 	numFixedParams := 0
 	for _, p := range params {
@@ -165,6 +222,198 @@ func countFixedFunctionParams(params []ast.FuncParam) (int, bool) {
 		numFixedParams++
 	}
 	return numFixedParams, false
+}
+
+func functionBodyKnownSingleResult(name string, body *ast.BlockStmt, known map[string]functionResult) bool {
+	if !blockAlwaysReturns(body) {
+		return false
+	}
+	returnStmts := make([]*ast.ReturnStmt, 0)
+	collectReturnStmts(body, &returnStmts)
+	if len(returnStmts) == 0 {
+		return false
+	}
+	for _, ret := range returnStmts {
+		if !returnStmtKnownSingleResult(name, ret, known) {
+			return false
+		}
+	}
+	return true
+}
+
+func collectReturnStmts(stmt ast.Stmt, out *[]*ast.ReturnStmt) {
+	switch s := stmt.(type) {
+	case nil:
+		return
+	case *ast.ReturnStmt:
+		*out = append(*out, s)
+	case *ast.BlockStmt:
+		if s == nil {
+			return
+		}
+		for _, child := range s.Stmts {
+			collectReturnStmts(child, out)
+		}
+	case *ast.IfStmt:
+		if s == nil {
+			return
+		}
+		collectReturnStmts(s.Body, out)
+		for _, elseIf := range s.ElseIfs {
+			collectReturnStmts(elseIf.Body, out)
+		}
+		collectReturnStmts(s.ElseBody, out)
+	case *ast.ForNumStmt:
+		if s == nil {
+			return
+		}
+		collectReturnStmts(s.Init, out)
+		collectReturnStmts(s.Post, out)
+		collectReturnStmts(s.Body, out)
+	case *ast.ForRangeStmt:
+		if s == nil {
+			return
+		}
+		collectReturnStmts(s.Body, out)
+	case *ast.ForStmt:
+		if s == nil {
+			return
+		}
+		collectReturnStmts(s.Body, out)
+	case *ast.SelectStmt:
+		if s == nil {
+			return
+		}
+		for _, c := range s.Cases {
+			collectReturnStmts(c.Body, out)
+		}
+		collectReturnStmts(s.Default, out)
+	case *ast.BudgetStmt:
+		if s == nil {
+			return
+		}
+		collectReturnStmts(s.Body, out)
+	case *ast.EvaluateBlockStmt:
+		if s == nil {
+			return
+		}
+		collectReturnStmts(s.Body, out)
+	case *ast.AgentDeclStmt:
+		if s == nil {
+			return
+		}
+	}
+}
+
+func returnStmtKnownSingleResult(currentName string, ret *ast.ReturnStmt, known map[string]functionResult) bool {
+	if ret == nil {
+		return false
+	}
+	if len(ret.Values) == 0 {
+		return false
+	}
+	if len(ret.Values) != 1 {
+		return false
+	}
+	return exprKnownSingleResult(currentName, ret.Values[0], known)
+}
+
+func exprKnownSingleResult(currentName string, expr ast.Expr, known map[string]functionResult) bool {
+	switch e := expr.(type) {
+	case nil:
+		return true
+	case *ast.CallExpr:
+		return callKnownSingleResult(currentName, e, known)
+	case *ast.MethodCallExpr, *ast.VarArgExpr:
+		return false
+	default:
+		return true
+	}
+}
+
+func callKnownSingleResult(currentName string, call *ast.CallExpr, known map[string]functionResult) bool {
+	if call == nil {
+		return false
+	}
+	if fn, ok := call.Func.(*ast.IdentExpr); ok {
+		if fn.Name == currentName && currentName != "" {
+			return true
+		}
+		if res, ok := known[fn.Name]; ok && res.single {
+			return true
+		}
+		switch fn.Name {
+		case "tonumber", "type", "len", "tostring", "error", "assert":
+			return true
+		}
+		return false
+	}
+	if field, ok := call.Func.(*ast.FieldExpr); ok {
+		recv, ok := field.Table.(*ast.IdentExpr)
+		if !ok {
+			return false
+		}
+		switch recv.Name {
+		case "bit32", "math":
+			return true
+		case "string":
+			switch field.Field {
+			case "format", "sub", "len", "upper", "lower", "reverse", "rep", "split", "trim", "trimLeft", "trimRight", "hasPrefix", "hasSuffix", "contains", "count", "replaceAll":
+				return true
+			}
+		case "time":
+			switch field.Field {
+			case "now", "since":
+				return true
+			}
+		case "utf8":
+			switch field.Field {
+			case "char", "codes", "offset", "valid", "validate", "sanitize", "reverse", "sub", "upper", "lower", "charclass":
+				return true
+			case "codepoint":
+				return len(call.Args) <= 2
+			}
+		}
+	}
+	return false
+}
+
+func blockAlwaysReturns(block *ast.BlockStmt) bool {
+	if block == nil {
+		return false
+	}
+	for _, stmt := range block.Stmts {
+		if stmtAlwaysReturns(stmt) {
+			return true
+		}
+	}
+	return false
+}
+
+func stmtAlwaysReturns(stmt ast.Stmt) bool {
+	switch s := stmt.(type) {
+	case *ast.ReturnStmt:
+		return s != nil
+	case *ast.BlockStmt:
+		return blockAlwaysReturns(s)
+	case *ast.IfStmt:
+		if s == nil || s.Body == nil || s.ElseBody == nil {
+			return false
+		}
+		if !blockAlwaysReturns(s.Body) || !blockAlwaysReturns(s.ElseBody) {
+			return false
+		}
+		for _, elseIf := range s.ElseIfs {
+			if elseIf.Body == nil || !blockAlwaysReturns(elseIf.Body) {
+				return false
+			}
+		}
+		return true
+	case *ast.BudgetStmt:
+		return s != nil && blockAlwaysReturns(s.Body)
+	default:
+		return false
+	}
 }
 
 // --------------------------------------------------------------------
@@ -199,6 +448,7 @@ func (c *compiler) freeRegs(n int) { c.nextReg -= n }
 func (c *compiler) enterScope() {
 	c.depth++
 	c.arityScopes = append(c.arityScopes, make(map[string]*functionArity))
+	c.resultScopes = append(c.resultScopes, make(map[string]*functionResult))
 }
 
 func (c *compiler) leaveScope() {
@@ -234,6 +484,17 @@ func (c *compiler) leaveScope() {
 			}
 		}
 		c.arityScopes = c.arityScopes[:len(c.arityScopes)-1]
+	}
+	if len(c.resultScopes) > 0 {
+		scope := c.resultScopes[len(c.resultScopes)-1]
+		for name, prev := range scope {
+			if prev == nil {
+				delete(c.funcResults, name)
+			} else {
+				c.funcResults[name] = *prev
+			}
+		}
+		c.resultScopes = c.resultScopes[:len(c.resultScopes)-1]
 	}
 	c.depth--
 }
