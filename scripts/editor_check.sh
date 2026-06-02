@@ -4,6 +4,42 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
+REQUIRE_TREE_SITTER=0
+
+usage() {
+  cat <<'EOF'
+Usage: scripts/editor_check.sh [--require-tree-sitter] [--help]
+
+Checks editor-facing assets for Leia. By default, tree-sitter corpus tests run
+when a tree-sitter CLI is available and print an explicit skip when it is not.
+
+Options:
+  --require-tree-sitter
+      Fail if neither tools/tree-sitter-leia/node_modules/.bin/tree-sitter nor
+      a global tree-sitter command is available.
+  --help
+      Show this help.
+EOF
+}
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --require-tree-sitter)
+      REQUIRE_TREE_SITTER=1
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "unknown argument: $1" >&2
+      usage >&2
+      exit 2
+      ;;
+  esac
+  shift
+done
+
 python3 -m json.tool tools/syntax/textmate/leia.tmLanguage.json >/dev/null
 python3 -m json.tool tools/syntax/textmate/leia-mod.tmLanguage.json >/dev/null
 python3 -m json.tool editors/vscode/package.json >/dev/null
@@ -38,6 +74,11 @@ fi
 
 if [ -n "$tree_sitter" ]; then
   (cd tools/tree-sitter-leia && "$tree_sitter" test >/dev/null)
+elif [ "$REQUIRE_TREE_SITTER" = "1" ]; then
+  echo "editor_check.sh: tree-sitter CLI is required; run: npm --prefix tools/tree-sitter-leia ci" >&2
+  exit 1
+else
+  echo "editor_check.sh: skipped tree-sitter corpus; run npm --prefix tools/tree-sitter-leia ci or pass --require-tree-sitter" >&2
 fi
 
 if command -v emacs >/dev/null 2>&1; then
