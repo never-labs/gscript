@@ -163,8 +163,23 @@ func TestRunCollectsEvalMetricsAndSubcases(t *testing.T) {
 	if c.Subcases[1].CaseID != "case_002" || c.Subcases[1].Status != "failed" || len(c.Subcases[1].Diagnostics) != 1 {
 		t.Fatalf("subcase 2 = %#v", c.Subcases[1])
 	}
+	if len(report.Metrics) != 3 {
+		t.Fatalf("metric summaries = %#v", report.Metrics)
+	}
+	summaries := metricSummariesByName(report.Metrics)
+	if summaries["correct"].Type != "bool" || summaries["correct"].Count != 2 || summaries["correct"].True != 1 || summaries["correct"].False != 1 || summaries["correct"].PassRate != 0.5 {
+		t.Fatalf("correct summary = %#v", summaries["correct"])
+	}
+	if summaries["label"].Type != "string" || summaries["label"].Values["refund"] != 1 {
+		t.Fatalf("label summary = %#v", summaries["label"])
+	}
+	if summaries["outer_count"].Type != "number" || summaries["outer_count"].Mean != 2 {
+		t.Fatalf("outer_count summary = %#v", summaries["outer_count"])
+	}
 	text := FormatText(report)
 	for _, want := range []string{
+		"metrics:",
+		"correct bool pass_rate=0.50 true=1 false=1 count=2",
 		"1 metrics, 2 subcases",
 		"metric outer_count=2 (number)",
 		"PASS case case_001",
@@ -219,6 +234,18 @@ func TestRunEvalLoadJSONLAndSkipIf(t *testing.T) {
 	if subcases[1].CaseID != "skip" || subcases[1].Status != "skipped" || len(subcases[1].Diagnostics) != 1 {
 		t.Fatalf("second subcase = %#v", subcases[1])
 	}
+	summaries := metricSummariesByName(report.Metrics)
+	if summaries["expected"].Count != 1 || summaries["expected"].Values["refund"] != 1 || summaries["expected"].Values["exchange"] != 0 {
+		t.Fatalf("expected summary includes skipped row or is missing value: %#v", summaries["expected"])
+	}
+}
+
+func metricSummariesByName(metrics []MetricSummary) map[string]MetricSummary {
+	out := map[string]MetricSummary{}
+	for _, metric := range metrics {
+		out[metric.Name] = metric
+	}
+	return out
 }
 
 func TestRunMarksFailingAssertionBySourcePosition(t *testing.T) {

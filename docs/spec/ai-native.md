@@ -61,6 +61,12 @@ regression tests. This module is not part of ordinary script execution.
 | `eval.skip_if(cond, reason)` | If `cond` is truthy, mark the active subcase skipped and return true. The caller should usually `return` after it. |
 | `eval.fail_if(cond, message)` | If `cond` is truthy, raise a runtime error with `message`. |
 
+The evaluation report preserves raw metrics on each case and subcase and also
+includes top-level metric summaries. Boolean metrics are summarized as true,
+false, and pass-rate counts. Numeric metrics are summarized as count, mean, min,
+and max. String metrics are summarized as category counts. Skipped subcases do
+not contribute to metric summaries.
+
 The `leia evaluate` command may install a deterministic LLM replay provider or
 record provider turns into a golden fixture. Replay fixtures are strict: a
 request mismatch, an exhausted fixture, or leftover unconsumed turns is an

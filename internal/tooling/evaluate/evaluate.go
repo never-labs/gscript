@@ -38,17 +38,18 @@ type Options struct {
 }
 
 type Report struct {
-	SchemaVersion int         `json:"schema_version"`
-	Phase         string      `json:"phase"`
-	Status        string      `json:"status"`
-	StartedAt     string      `json:"started_at"`
-	Runtime       RuntimeInfo `json:"runtime"`
-	Summary       Summary     `json:"summary"`
-	LLM           *LLMRun     `json:"llm,omitempty"`
-	Inputs        []Input     `json:"inputs"`
-	Cases         []Case      `json:"cases"`
-	Findings      []Finding   `json:"findings"`
-	Notes         []string    `json:"notes"`
+	SchemaVersion int             `json:"schema_version"`
+	Phase         string          `json:"phase"`
+	Status        string          `json:"status"`
+	StartedAt     string          `json:"started_at"`
+	Runtime       RuntimeInfo     `json:"runtime"`
+	Summary       Summary         `json:"summary"`
+	LLM           *LLMRun         `json:"llm,omitempty"`
+	Inputs        []Input         `json:"inputs"`
+	Cases         []Case          `json:"cases"`
+	Metrics       []MetricSummary `json:"metrics,omitempty"`
+	Findings      []Finding       `json:"findings"`
+	Notes         []string        `json:"notes"`
 }
 
 type RuntimeInfo struct {
@@ -133,6 +134,19 @@ type Metric struct {
 	Name  string `json:"name"`
 	Type  string `json:"type"`
 	Value any    `json:"value"`
+}
+
+type MetricSummary struct {
+	Name     string         `json:"name"`
+	Type     string         `json:"type"`
+	Count    int            `json:"count"`
+	True     int            `json:"true,omitempty"`
+	False    int            `json:"false,omitempty"`
+	PassRate float64        `json:"pass_rate,omitempty"`
+	Mean     float64        `json:"mean,omitempty"`
+	Min      float64        `json:"min,omitempty"`
+	Max      float64        `json:"max,omitempty"`
+	Values   map[string]int `json:"values,omitempty"`
 }
 
 type Subcase struct {
@@ -358,6 +372,129 @@ func finalizeSummary(report *Report) {
 	}
 	if executable > 0 {
 		report.Summary.PassRate = float64(report.Summary.CasesPassed) / float64(executable)
+	}
+	report.Metrics = aggregateMetricSummaries(report.Cases)
+}
+
+type metricAccumulator struct {
+	name       string
+	typ        string
+	count      int
+	trueCount  int
+	falseCount int
+	sum        float64
+	min        float64
+	max        float64
+	values     map[string]int
+}
+
+func aggregateMetricSummaries(cases []Case) []MetricSummary {
+	accs := map[string]*metricAccumulator{}
+	for _, c := range cases {
+		for _, metric := range c.Metrics {
+			addMetric(accs, metric)
+		}
+		for _, subcase := range c.Subcases {
+			if subcase.Status == "skipped" {
+				continue
+			}
+			for _, metric := range subcase.Metrics {
+				addMetric(accs, metric)
+			}
+		}
+	}
+	names := make([]string, 0, len(accs))
+	for name := range accs {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	out := make([]MetricSummary, 0, len(names))
+	for _, name := range names {
+		acc := accs[name]
+		summary := MetricSummary{
+			Name:  acc.name,
+			Type:  acc.typ,
+			Count: acc.count,
+		}
+		switch acc.typ {
+		case "bool":
+			summary.True = acc.trueCount
+			summary.False = acc.falseCount
+			if acc.count > 0 {
+				summary.PassRate = float64(acc.trueCount) / float64(acc.count)
+			}
+		case "number":
+			if acc.count > 0 {
+				summary.Mean = acc.sum / float64(acc.count)
+				summary.Min = acc.min
+				summary.Max = acc.max
+			}
+		case "string":
+			summary.Values = acc.values
+		}
+		out = append(out, summary)
+	}
+	return out
+}
+
+func addMetric(accs map[string]*metricAccumulator, metric Metric) {
+	if metric.Name == "" || metric.Type == "nil" {
+		return
+	}
+	key := metric.Name + "\x00" + metric.Type
+	acc := accs[key]
+	if acc == nil {
+		acc = &metricAccumulator{name: metric.Name, typ: metric.Type}
+		if metric.Type == "string" {
+			acc.values = map[string]int{}
+		}
+		accs[key] = acc
+	}
+	switch metric.Type {
+	case "bool":
+		v, ok := metric.Value.(bool)
+		if !ok {
+			return
+		}
+		acc.count++
+		if v {
+			acc.trueCount++
+		} else {
+			acc.falseCount++
+		}
+	case "number":
+		v, ok := metricNumber(metric.Value)
+		if !ok {
+			return
+		}
+		if acc.count == 0 || v < acc.min {
+			acc.min = v
+		}
+		if acc.count == 0 || v > acc.max {
+			acc.max = v
+		}
+		acc.count++
+		acc.sum += v
+	case "string":
+		v, ok := metric.Value.(string)
+		if !ok {
+			return
+		}
+		acc.count++
+		acc.values[v]++
+	}
+}
+
+func metricNumber(v any) (float64, bool) {
+	switch n := v.(type) {
+	case int:
+		return float64(n), true
+	case int64:
+		return float64(n), true
+	case float64:
+		return n, true
+	default:
+		return 0, false
 	}
 }
 
@@ -1094,6 +1231,21 @@ func FormatText(report Report) string {
 		report.Summary.Tools,
 		report.Summary.TODOs,
 	)
+	if len(report.Metrics) > 0 {
+		fmt.Fprintf(&b, "metrics:\n")
+		for _, metric := range report.Metrics {
+			switch metric.Type {
+			case "bool":
+				fmt.Fprintf(&b, "  %s bool pass_rate=%.2f true=%d false=%d count=%d\n", metric.Name, metric.PassRate, metric.True, metric.False, metric.Count)
+			case "number":
+				fmt.Fprintf(&b, "  %s number mean=%.4g min=%.4g max=%.4g count=%d\n", metric.Name, metric.Mean, metric.Min, metric.Max, metric.Count)
+			case "string":
+				fmt.Fprintf(&b, "  %s string count=%d values=%s\n", metric.Name, metric.Count, formatMetricValues(metric.Values))
+			default:
+				fmt.Fprintf(&b, "  %s %s count=%d\n", metric.Name, metric.Type, metric.Count)
+			}
+		}
+	}
 	for _, c := range report.Cases {
 		fmt.Fprintf(&b, "  %s %s (%s:%d:%d, %dms, %d assertions, %d metrics, %d subcases)\n",
 			caseStatusMark(c.Status),
@@ -1132,6 +1284,27 @@ func FormatText(report Report) string {
 			fmt.Fprintf(&b, "  %s %s %s: %s\n", f.Severity, f.Kind, location, f.Message)
 		}
 	}
+	return b.String()
+}
+
+func formatMetricValues(values map[string]int) string {
+	if len(values) == 0 {
+		return "{}"
+	}
+	keys := make([]string, 0, len(values))
+	for key := range values {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	var b strings.Builder
+	b.WriteString("{")
+	for i, key := range keys {
+		if i > 0 {
+			b.WriteString(", ")
+		}
+		fmt.Fprintf(&b, "%s:%d", key, values[key])
+	}
+	b.WriteString("}")
 	return b.String()
 }
 
