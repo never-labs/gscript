@@ -70,6 +70,9 @@ npm run package
 The extension should use `leia-lsp` for language features and the bundled
 TextMate grammars for `.leia` and `leia.mod` highlighting.
 
+Use `Leia: Restart Language Server` from the command palette after changing the
+`leia.languageServer.executable` setting or replacing the `leia-lsp` binary.
+
 ## Emacs
 
 The dependency-free major mode lives at `editors/emacs/leia-mode.el`.
@@ -107,4 +110,3 @@ Before a public release:
   scope `source.leia`.
 - Any published editor package should call the shared `leia-lsp` server rather
   than reimplementing diagnostics or formatting.
-

@@ -132,6 +132,7 @@ def check_vscode() -> None:
         "leia.lintWorkspace",
         "leia.checkWorkspace",
         "leia.previewSpec",
+        "leia.restartLanguageServer",
         "leia.evaluate.case",
         "leia.agent.run",
     ):
@@ -151,6 +152,8 @@ def check_vscode() -> None:
         "textDocument/codeLens",
         "textDocument/inlayHint",
         "textDocument/publishDiagnostics",
+        "restartLanguageServer",
+        "failPending",
     ):
         if marker not in extension:
             fail(f"VS Code extension missing LSP marker {marker}")

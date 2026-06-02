@@ -23,6 +23,7 @@
     "onCommand:leia.lintWorkspace",
     "onCommand:leia.checkWorkspace",
     "onCommand:leia.previewSpec",
+    "onCommand:leia.restartLanguageServer",
     "onCommand:leia.evaluate.case",
     "onCommand:leia.agent.run",
     "onTaskType:leia"
@@ -103,6 +104,11 @@
         "category": "Leia"
       },
       {
+        "command": "leia.restartLanguageServer",
+        "title": "Leia: Restart Language Server",
+        "category": "Leia"
+      },
+      {
         "command": "leia.evaluate.case",
         "title": "Leia: Run Evaluate Case",
         "category": "Leia"
@@ -156,6 +162,9 @@
         },
         {
           "command": "leia.previewSpec"
+        },
+        {
+          "command": "leia.restartLanguageServer"
         }
       ]
     },

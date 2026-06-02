@@ -4,8 +4,11 @@ const vscode = require("vscode");
 const path = require("path");
 
 let lspClient;
+let lspContext;
+let lspOutput;
 
 function activate(context) {
+  lspContext = context;
   context.subscriptions.push(
     vscode.commands.registerCommand("leia.runFile", () => runCurrentFile("run")),
     vscode.commands.registerCommand("leia.formatFile", formatCurrentFile),
@@ -13,6 +16,7 @@ function activate(context) {
     vscode.commands.registerCommand("leia.lintWorkspace", () => runWorkspaceCommand("lint")),
     vscode.commands.registerCommand("leia.checkWorkspace", () => runWorkspaceCommand("check")),
     vscode.commands.registerCommand("leia.previewSpec", previewSpec),
+    vscode.commands.registerCommand("leia.restartLanguageServer", restartLanguageServer),
     vscode.commands.registerCommand("leia.evaluate.case", (uri, name) => runEvaluateCase(uri, name)),
     vscode.commands.registerCommand("leia.agent.run", (uri) => runFileURI(uri)),
     vscode.tasks.registerTaskProvider("leia", new LeiaTaskProvider())
@@ -25,6 +29,11 @@ function deactivate() {
     lspClient.dispose();
     lspClient = undefined;
   }
+  if (lspOutput) {
+    lspOutput.dispose();
+    lspOutput = undefined;
+  }
+  lspContext = undefined;
 }
 
 function executable() {
@@ -237,11 +246,33 @@ function startLanguageServer(context) {
 	const command = lspExecutable();
 
 	const output = vscode.window.createOutputChannel("Leia Language Server");
+  lspOutput = output;
   const child = require("child_process").spawn(command, [], {
     stdio: ["pipe", "pipe", "pipe"]
   });
   lspClient = new MinimalLanguageClient(child, output);
-  context.subscriptions.push(lspClient, output);
+  context.subscriptions.push(lspClient);
+}
+
+function restartLanguageServer() {
+  if (!lspEnabled()) {
+    vscode.window.showInformationMessage("Leia language server is disabled.");
+    return;
+  }
+  if (!lspContext) {
+    vscode.window.showErrorMessage("Leia: extension context is not available.");
+    return;
+  }
+  if (lspClient) {
+    lspClient.dispose();
+    lspClient = undefined;
+  }
+  if (lspOutput) {
+    lspOutput.dispose();
+    lspOutput = undefined;
+  }
+  startLanguageServer(lspContext);
+  vscode.window.showInformationMessage("Leia language server restarted.");
 }
 
 class MinimalLanguageClient {
@@ -250,12 +281,25 @@ class MinimalLanguageClient {
     this.output = output;
     this.buffer = Buffer.alloc(0);
     this.nextID = 1;
+    this.disposed = false;
     this.documents = new Map();
     this.disposables = [];
     this.child.stdout.on("data", (chunk) => this.handleData(chunk));
     this.child.stderr.on("data", (chunk) => output.append(chunk.toString()));
     this.child.on("error", (err) => {
+      if (this.disposed) {
+        return;
+      }
       output.appendLine(`failed to start leia-lsp: ${err.message}`);
+      this.failPending(err.message);
+    });
+    this.child.on("close", (code, signal) => {
+      if (this.disposed) {
+        return;
+      }
+      const suffix = signal ? `signal ${signal}` : `exit ${code}`;
+      output.appendLine(`leia-lsp stopped (${suffix})`);
+      this.failPending(`leia-lsp stopped (${suffix})`);
     });
     this.sendRequest("initialize", {
       processId: process.pid,
@@ -303,6 +347,8 @@ class MinimalLanguageClient {
   }
 
 	dispose() {
+    this.disposed = true;
+    this.failPending("leia-lsp client disposed");
 		for (const disposable of this.disposables) {
 			disposable.dispose();
 		}
@@ -483,6 +529,9 @@ class MinimalLanguageClient {
 
   send(payload) {
     const body = Buffer.from(JSON.stringify(payload), "utf8");
+    if (!this.child || this.child.killed || !this.child.stdin.writable) {
+      throw new Error("leia-lsp is not running");
+    }
     this.child.stdin.write(`Content-Length: ${body.length}\r\n\r\n`);
     this.child.stdin.write(body);
   }
@@ -540,6 +589,16 @@ class MinimalLanguageClient {
 			return item;
     });
     this.collection.set(uri, diagnostics);
+  }
+
+  failPending(message) {
+    if (!this.pending) {
+      return;
+    }
+    for (const pending of this.pending.values()) {
+      pending.reject(new Error(message));
+    }
+    this.pending.clear();
   }
 }
 
