@@ -123,6 +123,42 @@ func TestDidChangeClearsSyntaxDiagnostics(t *testing.T) {
 	}
 }
 
+func TestDidOpenPublishesAINativeDiagnostics(t *testing.T) {
+	input := mustEncodeMessages(t,
+		map[string]any{
+			"jsonrpc": "2.0",
+			"method":  "textDocument/didOpen",
+			"params": map[string]any{
+				"textDocument": map[string]any{
+					"uri":        "file:///tmp/ai-diagnostic.leia",
+					"languageId": "leia",
+					"version":    1,
+					"text":       "tool missing_caps() { return nil, nil }\n",
+				},
+			},
+		},
+	)
+	var out bytes.Buffer
+	err := NewServer().Run(context.Background(), bytes.NewReader(input), &out)
+	if err != nil {
+		t.Fatalf("Run returned error: %v", err)
+	}
+
+	msgs := readOutputMessages(t, out.Bytes())
+	if len(msgs) != 1 {
+		t.Fatalf("expected one diagnostic notification, got %d: %#v", len(msgs), msgs)
+	}
+	params := msgs[0]["params"].(map[string]any)
+	diagnostics := params["diagnostics"].([]any)
+	if len(diagnostics) != 1 {
+		t.Fatalf("expected one diagnostic, got %#v", diagnostics)
+	}
+	diag := diagnostics[0].(map[string]any)
+	if diag["code"] != "LEIA2001" || !strings.Contains(diag["message"].(string), "tool missing_caps") {
+		t.Fatalf("unexpected AI-native diagnostic: %#v", diag)
+	}
+}
+
 func TestFormattingReturnsWholeDocumentEdit(t *testing.T) {
 	input := mustEncodeMessages(t,
 		map[string]any{
