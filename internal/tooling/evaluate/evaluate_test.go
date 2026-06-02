@@ -401,6 +401,17 @@ func TestRunFailsWhenReplayRequestMismatches(t *testing.T) {
 	if len(report.Findings) != 1 || report.Findings[0].Kind != "llm_replay_mismatch" || !strings.Contains(report.Findings[0].Message, "llm replay request mismatch") {
 		t.Fatalf("findings = %#v", report.Findings)
 	}
+	if got := report.Findings[0].Details["turn"]; got != 0 {
+		t.Fatalf("finding details turn = %#v", got)
+	}
+	expected, ok := report.Findings[0].Details["expected"].(llm.TurnRequest)
+	if !ok || expected.Messages[0].Text != "expected" {
+		t.Fatalf("finding details expected = %#v", report.Findings[0].Details["expected"])
+	}
+	actual, ok := report.Findings[0].Details["actual"].(llm.TurnRequest)
+	if !ok || actual.Messages[0].Text != "actual" {
+		t.Fatalf("finding details actual = %#v", report.Findings[0].Details["actual"])
+	}
 }
 
 func TestRunFailsWhenReplayIsExhausted(t *testing.T) {
@@ -438,6 +449,9 @@ func TestRunFailsWhenReplayIsExhausted(t *testing.T) {
 	}
 	if len(report.Findings) != 1 || report.Findings[0].Kind != "llm_replay_exhausted" || !strings.Contains(report.Findings[0].Message, "llm replay exhausted") {
 		t.Fatalf("findings = %#v", report.Findings)
+	}
+	if got := report.Findings[0].Details["turn"]; got != 0 {
+		t.Fatalf("finding details turn = %#v", got)
 	}
 }
 

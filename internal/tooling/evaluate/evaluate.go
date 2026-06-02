@@ -128,12 +128,13 @@ type Diagnostic struct {
 }
 
 type Finding struct {
-	Kind     string `json:"kind"`
-	Severity string `json:"severity"`
-	Message  string `json:"message"`
-	Path     string `json:"path,omitempty"`
-	Line     int    `json:"line,omitempty"`
-	Column   int    `json:"column,omitempty"`
+	Kind     string         `json:"kind"`
+	Severity string         `json:"severity"`
+	Message  string         `json:"message"`
+	Path     string         `json:"path,omitempty"`
+	Line     int            `json:"line,omitempty"`
+	Column   int            `json:"column,omitempty"`
+	Details  map[string]any `json:"details,omitempty"`
 }
 
 type parsedCase struct {
@@ -274,6 +275,7 @@ func Run(opts Options) (Report, error) {
 				Severity: "error",
 				Message:  fmt.Sprintf("llm replay left %d unconsumed turn(s)", remaining),
 				Path:     opts.LLMReplayPath,
+				Details:  map[string]any{"remaining_turns": remaining},
 			})
 		}
 	}
@@ -644,17 +646,23 @@ func (m *replayMonitor) Findings() []Finding {
 	var out []Finding
 	for _, err := range m.errors {
 		kind := "llm_replay_error"
+		details := map[string]any{}
 		var mismatch *llm.ReplayMismatchError
 		var exhausted *llm.ReplayExhaustedError
 		if errors.As(err, &mismatch) {
 			kind = "llm_replay_mismatch"
+			details["turn"] = mismatch.Turn
+			details["expected"] = mismatch.Expected
+			details["actual"] = mismatch.Actual
 		} else if errors.As(err, &exhausted) {
 			kind = "llm_replay_exhausted"
+			details["turn"] = exhausted.Turn
 		}
 		out = append(out, Finding{
 			Kind:     kind,
 			Severity: "error",
 			Message:  err.Error(),
+			Details:  details,
 		})
 	}
 	return out

@@ -266,6 +266,9 @@ func TestEvaluateCommandLLMReplayMismatchFailsReport(t *testing.T) {
 	if len(report.Findings) != 1 || report.Findings[0].Kind != "llm_replay_mismatch" {
 		t.Fatalf("findings = %#v", report.Findings)
 	}
+	if report.Findings[0].Details["expected"] == nil || report.Findings[0].Details["actual"] == nil {
+		t.Fatalf("finding details = %#v", report.Findings[0].Details)
+	}
 }
 
 func TestEvaluateCommandAgentReplayExample(t *testing.T) {
