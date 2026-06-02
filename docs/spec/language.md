@@ -237,8 +237,8 @@ contract. Sequence length follows Leia's stable runtime behavior; sparse-table
 edge cases should be tested before being relied on as data model.
 
 Typed arrays, matrices, vectors, and SOA data are standard-library data
-structures, not separate primitive value kinds unless a future spec revision
-promotes them.
+structures, not separate primitive value kinds unless a separate stable spec
+section explicitly promotes them.
 
 See [`../reference/data-oriented/index.md`](../reference/data-oriented/index.md)
 for dense-array literals, SoA layout, masks, and column kernels.

@@ -3,6 +3,8 @@
 Functions are first-class callable values. They may be named declarations or
 anonymous literals.
 
+## Parameters
+
 Parameters are lexical bindings initialized from call arguments. Missing
 arguments become `nil`; extra arguments are discarded unless the function has a
 vararg parameter. The call does not expose an argument count to fixed
@@ -22,6 +24,8 @@ assert(one == 1 && two == 2)                  // extra argument discarded
 assert(missing_a == nil && missing_b == nil)  // missing arguments become nil
 assert(explicit_nil == nil && after_nil == "x")
 ```
+
+## Varargs
 
 The parameter `...` accepts any remaining arguments. Inside the function,
 `{...}` constructs a table containing those arguments. A function may have at
@@ -204,6 +208,8 @@ assert(x == 10)
 assert(y == nil)
 ```
 
+## Closures
+
 Closures capture lexical variables by reference. Mutating a captured variable is
 visible to all closures that share the binding. Each evaluation of a function
 literal creates a distinct function value. Returning or assigning an existing
@@ -236,12 +242,16 @@ assert(next == same_next)
 assert(next != other)
 ```
 
+## Host Functions
+
 Script functions and host functions share the same script-visible call result
 model: argument adjustment, result adjustment, protected-call behavior, and
 vararg collection are defined at the script boundary rather than by the
 implementation language of the callee. Host functions may return structured
 recoverable errors where their module contract specifies `nil, err` behavior.
 Uncaught host failures surface as ordinary runtime errors to script code.
+
+## Tail Calls
 
 Tail-call optimization is not part of the stable function contract. A call in
 tail position has the same observable result adjustment as any other returned

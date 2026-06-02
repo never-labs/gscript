@@ -1,5 +1,7 @@
 # Modules And Loading
 
+## Require
+
 `require(name)` loads enabled standard-library modules, host-registered
 modules, and filesystem-backed project modules according to runtime module
 options. `name` must be a string. Loaded module results are cached in
@@ -46,6 +48,8 @@ The observable `require(name)` algorithm is:
 
 A failed load does not produce a stable cached module value. A later successful
 `require(name)` must still return the successful module value.
+
+## Filesystem Resolution
 
 Filesystem-backed modules are cached only after successful execution. The
 current implementation does not prefill `package.loaded[name]` with an
@@ -128,6 +132,8 @@ assert(package.loaded["pkg.tool"] == dot)
 assert(package.loaded["./path_tool"] == byPath)
 ```
 
+## The `package.loaded` Table
+
 The `package.loaded` table is part of the lookup contract. A non-`nil` entry
 short-circuits resolution and is returned directly. This is mainly useful for
 embedders, tests, and compatibility shims; ordinary modules should prefer
@@ -185,6 +191,8 @@ assert(!ok)
 assert(type(err) == "string")
 ```
 
+## Module Manifests
+
 `leia.mod` describes a module path, Leia language/module format version,
 dependencies, replacements, capability summaries, source collections, and
 optional Go-native binding metadata. The current manifest grammar is line
@@ -233,6 +241,8 @@ roots, library flags, or host-specific policy. A host may reject code whose
 declared capability summary is incomplete, excessive, or inconsistent with the
 host policy, but that decision is outside `require` resolution.
 
+## Capability Summaries
+
 For example, this manifest says the module expects filesystem reads and network
 client access:
 
@@ -253,6 +263,8 @@ per-module matrix.
 `-`. Relative collection paths are resolved from the directory containing the
 nearest `leia.mod`. Collections are local source roots; they do not imply
 dependency versions, downloads, or registry lookup.
+
+## Sum Files
 
 `leia.sum` records hashes produced by module tooling. `leia mod lock` writes
 entries for local collections, local replaces, and locally available downloaded
@@ -283,6 +295,8 @@ but a GitHub-looking path is still only a string in `leia.mod` until tooling or
 the user has placed content in a local replace, vendor directory, or module
 cache. Leia does not require or define a central registry for basic module use.
 
+## Go Host Imports
+
 `import "go:..." as name` is explicit host binding syntax. It does not
 automatically reflect arbitrary Go packages; embedders must provide bindings
 through the public Go API and the active capability policy may still reject use.
@@ -310,6 +324,8 @@ Go import allowlisting is an embedder contract. `WithGoImports` and
 syntax such as `import "go:net/http" as http` never loads arbitrary Go code by
 package path.
 
+## Module Modes
+
 Module mode controls how a discovered manifest is applied at runtime. Runtime
 module setup is offline: it uses local replaces, already present vendor
 directories, and already present cache directories; it does not run `git`,
@@ -333,6 +349,8 @@ The CLI module commands are the mutating surface: `leia mod add`, `tidy`,
 cache, or `leia.sum`; ordinary script execution does not. `leia mod list`,
 `graph`, `explain`, `capability`, `gomod`, `verify`, and `check` report or
 validate local module state under their documented command options.
+
+## Module Execution
 
 Top-level module code executes in the same language as ordinary scripts.
 Lexical declarations inside the module are private to that module execution

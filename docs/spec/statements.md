@@ -2,6 +2,8 @@
 
 Statements control execution.
 
+## Blocks
+
 Blocks introduce lexical scope. A block is a sequence of statements enclosed in
 braces. Locals declared inside the block are not visible after the closing
 brace. A block evaluates its statements in source order until control transfers,
@@ -13,6 +15,8 @@ if true {
 }
 assert(hidden == 1)
 ```
+
+## If Statements
 
 `if` evaluates its condition and executes the first matching branch. Conditions
 use Leia truthiness: only `nil` and `false` are false. `elseif` branches are
@@ -36,10 +40,14 @@ assert(seen.elseBranch)
 assert(seen.nilBranch == nil)
 ```
 
+## Simple Statements
+
 Simple statements are assignments, compound assignments, increment and
 decrement statements, send statements, calls, and expression statements.
 Expression statements evaluate their expression for side effects and discard
 all results.
+
+## Assignment
 
 An assignment evaluates the right-hand side expression list left-to-right, then
 evaluates any address subexpressions needed by non-variable targets, then stores
@@ -71,6 +79,8 @@ assert(a == "left")
 assert(b == "right")
 assert(c == nil)
 ```
+
+## Compound Assignment And Inc/Dec
 
 Compound assignment `x += y`, `x -= y`, `x *= y`, and `x /= y` is equivalent
 to evaluating the target once, reading its current value, applying the
@@ -110,6 +120,8 @@ name := "x"
 name++
 ```
 
+## Send Statements
+
 `ch <- value` as a statement sends `value` to channel `ch`. Send blocking,
 close, ordering, and cancellation semantics are specified in
 [Concurrency](concurrency.md).
@@ -119,6 +131,8 @@ ch := make(chan, 1)
 ch <- "sent"
 assert(<-ch == "sent")
 ```
+
+## For Statements
 
 `for` supports indefinite loops, condition loops, C-style loops, and range
 loops. Loop bodies may use `break` and `continue`.
@@ -166,6 +180,8 @@ for i := 0; i < 4; postCount++ {
 assert(postCount == 3)
 assert(bodyCount == 2)
 ```
+
+## Range Loops
 
 `for key := range expr { ... }` and
 `for key, value := range expr { ... }` evaluate `expr` once, then iterate
@@ -260,6 +276,8 @@ ok := pcall(func() {
 assert(!ok)
 ```
 
+## Break And Continue
+
 `break` exits the innermost enclosing loop. `continue` starts the next
 iteration of the innermost enclosing loop. Outside a loop they are invalid.
 
@@ -280,6 +298,8 @@ assert(values[1] == 1)
 assert(values[2] == 3)
 assert(values[3] == 5)
 ```
+
+## Select Statements
 
 `select` waits on channel send or receive cases. Its full communication
 semantics are specified in [Concurrency](concurrency.md). Statement-level
@@ -312,6 +332,8 @@ default:
 assert(observed == "recv:ready")
 ```
 
+## Go And Defer Statements
+
 `go call()` starts a goroutine-like task. `defer call()` schedules cleanup to
 run when the current function returns or unwinds through a protected boundary.
 
@@ -327,6 +349,8 @@ go work(ready, done)
 assert(<-ready == "ready")
 assert(<-done == "done")
 ```
+
+## Return Statements
 
 `return` exits the current function and returns zero or more values. Return
 values use the multi-return adjustment rules in [Functions](functions.md).
@@ -346,6 +370,8 @@ a, b := forward()
 assert(a == "left")
 assert(b == "right")
 ```
+
+## Deferred Calls
 
 `defer` evaluates the callee and arguments when the `defer` statement executes,
 then invokes the deferred call later. Deferred calls run in last-in, first-out
@@ -394,6 +420,8 @@ assert(events[1] == "closure:changed")
 assert(events[2] == "initial")
 ```
 
+## Labels And Goto
+
 Labels are declared as `name:` statements. Label names live in a function-level
 namespace separate from ordinary lexical variables. `goto name` transfers
 control to a label in the same function. It must not jump into a deeper lexical
@@ -418,6 +446,8 @@ if true {
     print("unreachable")
 }
 ```
+
+## Budget Statements
 
 `budget { ... } { ... }` applies an AI budget to the enclosed block. Public
 budget dimensions are specified in [AI-Native Syntax](ai-native.md).

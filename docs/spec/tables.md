@@ -4,6 +4,8 @@ Tables are mutable identity-bearing maps. Keys and values are runtime values.
 Implementations may use optimized array, record, or typed layouts when this
 does not change observable behavior.
 
+## Constructors
+
 Table constructors create fresh table identities. List-style fields are assigned
 using 1-based integer sequence keys. Keyed fields assign the specified key.
 The v1.0 stable constructor subset is simple list fields, named fields, and
@@ -34,6 +36,8 @@ assert(a[3] == "third")
 
 Assigning `nil` to a table field removes that field for ordinary table lookup.
 Tables compare by identity unless a metatable supplies comparison behavior.
+
+## Raw Operations
 
 Raw table operations are the primitive map operations:
 
@@ -83,6 +87,8 @@ rawset(t, "created", 13)
 assert(rawget(t, "created") == 13)
 ```
 
+## Metamethod Dispatch
+
 Stable table/metamethod behavior is defined by the events below. A metamethod
 is looked up by raw string key in the value's metatable. The lookup never
 invokes `__index` on the metatable itself. Each metamethod receives the listed
@@ -105,6 +111,8 @@ the right operand. Operators `>` and `>=` are normalized before lookup:
 `left > right` dispatches as `right < left`, and `left >= right` dispatches as
 `right <= left`. Leia does not require the two operands to share the same
 metatable or metamethod function.
+
+## Stable Metamethods
 
 | Metamethod | Trigger | Arity | Return contract |
 | --- | --- | --- | --- |
@@ -136,6 +144,8 @@ Raw operations bypass metamethod dispatch by contract:
 `__metatable` protects the metatable slot, not arbitrary table contents. If a
 program already holds a reference to the metatable table, ordinary writes to
 that table remain ordinary table writes.
+
+## Implementation Extensions
 
 The current implementation also supports `__pairs` for `pairs(x)` and `__name`
 as a `tostring` fallback prefix. These are implementation extensions, not part
@@ -276,6 +286,8 @@ t := {}
 setmetatable(t, {__newindex: t})
 t.missing = 1
 ```
+
+## Length And Sequence Traversal
 
 The length operator `#x` uses the value's ordinary length behavior and may
 consult `__len`. `rawlen(x)` bypasses `__len` for tables and strings.

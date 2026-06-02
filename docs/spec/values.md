@@ -23,6 +23,8 @@ The v1.0 value model has three observable attributes:
 3. identity, only for tables, functions, coroutines, channels, and documented
    host-backed values.
 
+## Assignment, Identity, And Aliasing
+
 Variables, parameters, table fields, return slots, channel messages, and
 protected-call result slots hold values. Assignment copies the value reference,
 not the contents of an identity-bearing value. Reassigning a variable does not
@@ -47,6 +49,8 @@ assert(x == 1)
 assert(y == 2)
 ```
 
+## Truthiness
+
 Only `nil` and `false` are falsy. Numbers, including `0`, empty strings, empty
 tables, functions, coroutines, and channels are truthy.
 
@@ -62,6 +66,8 @@ if "" {
 assert(seenZero)
 assert(seenEmpty)
 ```
+
+## Numbers
 
 Numbers have one script-visible category, `number`, with integer and
 floating-point subtypes observable through `math.type`. The subtype is part of
@@ -186,6 +192,8 @@ assert(tostring(math.huge) == "+Inf")
 assert(tostring(-math.huge) == "-Inf")
 ```
 
+## Strings
+
 Strings are immutable byte strings. A string value is its byte sequence; strings
 do not have script-visible identity separate from that sequence. Equality and
 ordering compare byte sequences, and `#s` reports the byte length. Assignment,
@@ -207,11 +215,13 @@ assert(#"A" == 1)
 assert(string.sub(t, 1, 3) == s)
 ```
 
+## Tables
+
 Tables are mutable identity-bearing key/value objects. Raw table equality is
 identity equality. Table keys may be any non-`nil` runtime value. Assigning
 `nil` removes a key. Arrays, records, dense vectors, matrices, and SOA layouts
-are optimized representations or standard library structures unless a future
-spec promotes them to primitive value categories.
+are optimized representations or standard library structures unless a separate
+stable spec section explicitly promotes them to primitive value categories.
 
 Value transport does not deep-copy tables, functions, channels, or coroutines.
 A module, host API, or standard-library function may explicitly document that it
@@ -244,6 +254,8 @@ t[1.5] = "float"
 assert(t[1.5] == "float")
 assert(t[1] != t[1.5])
 ```
+
+## Functions
 
 Functions are callable identity-bearing values. Script functions close over
 their lexical environment; each evaluation of a function expression creates a
@@ -287,6 +299,8 @@ assert(host == tostring)
 assert(host != print)
 ```
 
+## Channels
+
 Channels are identity-bearing synchronization values created by the runtime or
 host libraries. Leia v1.0 has one script-visible channel category,
 `type(ch) == "channel"`; it does not have distinct send-only, receive-only, or
@@ -323,6 +337,8 @@ receivedFn := <-ch
 assert(receivedFn == fn)
 assert(receivedFn(9) == 9)
 ```
+
+## Type Queries
 
 The `type` function reports the stable script-visible category for ordinary
 values.
