@@ -14,6 +14,7 @@ func runEvaluateCommand(args []string, outw, errw io.Writer) int {
 	fs.SetOutput(errw)
 	jsonOut := fs.Bool("json", false, "write the evaluate report as JSON")
 	format := fs.String("format", "json", "output format: json or text")
+	listOnly := fs.Bool("list", false, "list discovered evaluate cases without executing them")
 	filter := fs.String("filter", "", "run only evaluate cases whose name, source path, or case id contains this text")
 	llmRecord := fs.String("llm-record", "", "record LLM turns to a replay JSON file")
 	llmReplay := fs.String("llm-replay", "", "replay LLM turns from a replay JSON file")
@@ -35,6 +36,7 @@ func runEvaluateCommand(args []string, outw, errw io.Writer) int {
 	report, err := evaluate.Run(evaluate.Options{
 		Paths:               fs.Args(),
 		Filter:              *filter,
+		ListOnly:            *listOnly,
 		LLMRecordPath:       *llmRecord,
 		LLMReplayPath:       *llmReplay,
 		LLMUpdateGoldenPath: *updateGolden,

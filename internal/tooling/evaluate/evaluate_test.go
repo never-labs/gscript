@@ -132,6 +132,28 @@ evaluate "beta case" {
 	}
 }
 
+func TestRunListsEvaluateCasesWithoutExecuting(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "cases.leia")
+	if err := os.WriteFile(path, []byte(`evaluate "listed failure" {
+    assert(false, "list mode must not execute")
+}
+`), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	report, err := Run(Options{Paths: []string{path}, ListOnly: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Status != "ok" || len(report.Cases) != 1 || report.Cases[0].Status != "listed" {
+		t.Fatalf("report = %#v", report)
+	}
+	if len(report.Findings) != 0 {
+		t.Fatalf("findings = %#v", report.Findings)
+	}
+}
+
 func TestRunEvaluateFailureExampleReportsFailedCase(t *testing.T) {
 	examplePath := filepath.Join("..", "..", "..", "examples", "evaluate", "failing_assert.leia")
 

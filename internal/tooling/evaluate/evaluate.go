@@ -28,6 +28,7 @@ const SchemaVersion = 1
 type Options struct {
 	Paths               []string
 	Filter              string
+	ListOnly            bool
 	LLMRecordPath       string
 	LLMReplayPath       string
 	LLMUpdateGoldenPath string
@@ -166,6 +167,9 @@ func Run(opts Options) (Report, error) {
 	if filter != "" {
 		report.Notes = append(report.Notes, fmt.Sprintf("filter: %s", filter))
 	}
+	if opts.ListOnly {
+		report.Notes = append(report.Notes, "list mode: evaluate cases are discovered but not executed")
+	}
 	for _, file := range files {
 		input := Input{Path: file, Status: "ok"}
 		report.Summary.Files++
@@ -197,6 +201,11 @@ func Run(opts Options) (Report, error) {
 					}
 					c := parsed.Case
 					c.Assertions = collectAssertions(parsed.Body)
+					if opts.ListOnly {
+						c.Status = "listed"
+						report.Cases = append(report.Cases, c)
+						continue
+					}
 					start := time.Now()
 					if err := executeCase(file, prog, parsed, run); err != nil {
 						c.Status = "failed"

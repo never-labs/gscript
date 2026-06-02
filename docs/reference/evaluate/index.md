@@ -15,10 +15,15 @@ scoring and workflow orchestration are reserved for later phases.
 ```sh
 leia evaluate --json path/to/script.leia
 leia evaluate --format=text path/to/project
+leia evaluate --list --filter "refund flow" tests/agents
 leia evaluate --filter "refund flow" tests/agents
 leia evaluate --llm-replay tests/agent.records.json tests/agent.leia
 leia evaluate --update-golden tests/agent.records.json tests/agent.leia
 ```
+
+`--list` discovers evaluate cases without executing their bodies. Listed cases
+use status `listed`, keep source metadata and assertion metadata, and do not
+consume LLM replay fixtures.
 
 `--filter TEXT` runs only cases whose name, source path, or case id contains
 `TEXT`. Discovery counts still include all evaluate blocks so dashboards can

@@ -151,6 +151,31 @@ evaluate "run me" {
 	}
 }
 
+func TestEvaluateCommandListsCasesWithoutExecuting(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "checks.leia")
+	src := `evaluate "list only" {
+    assert(false, "should not execute")
+}
+`
+	if err := os.WriteFile(path, []byte(src), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runEvaluateCommand([]string{"--format=json", "--list", path}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runEvaluateCommand code = %d, stderr = %q", code, stderr.String())
+	}
+	var report evaluate.Report
+	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
+		t.Fatalf("decode report: %v\n%s", err, stdout.String())
+	}
+	if report.Status != "ok" || len(report.Cases) != 1 || report.Cases[0].Status != "listed" {
+		t.Fatalf("report = %#v", report)
+	}
+}
+
 func TestEvaluateCommandLLMReplay(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "llm_eval.leia")
