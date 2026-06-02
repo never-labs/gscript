@@ -73,6 +73,34 @@ func TestReleaseMatrixLanguageSpecMatchesGrammarAppendix(t *testing.T) {
 	}
 }
 
+func TestReleaseMatrixGrammarAppendixMatchesParserSurface(t *testing.T) {
+	root := findRepoRoot(t)
+	grammar := normalizeGrammarText(readFileString(t, filepath.Join(root, "docs", "spec", "grammar.ebnf")))
+
+	for _, production := range []string{
+		`method_suffix = ":" identifier "(" [ expr_list ] ")" ;`,
+		`call_expr = postfix ( call_suffix | method_suffix ) ;`,
+		`additive = multiplicative { ( "+" | "-" | "|" | "^" ) multiplicative } ;`,
+		`multiplicative = unary { ( "*" | "/" | "%" | "<<" | ">>" | "&" | "&^" ) unary } ;`,
+		`dense_type = "i32" | "i64" | "f32" | "f64" | "bool" ;`,
+	} {
+		if !strings.Contains(grammar, production) {
+			t.Fatalf("docs/spec/grammar.ebnf must include parser-aligned production %q", production)
+		}
+	}
+	for _, unsupported := range []string{
+		`"%="`,
+		`"u8"`,
+		`"u16"`,
+		`"u32"`,
+		`"u64"`,
+	} {
+		if strings.Contains(grammar, unsupported) {
+			t.Fatalf("docs/spec/grammar.ebnf advertises unsupported parser surface %s", unsupported)
+		}
+	}
+}
+
 func TestReleaseMatrixStableKeywordsMatchLexer(t *testing.T) {
 	root := findRepoRoot(t)
 	spec := readFileString(t, filepath.Join(root, "docs", "spec", "language.md"))

@@ -49,6 +49,39 @@ func TestSpecRunnableExamples(t *testing.T) {
 	}
 }
 
+func TestSpecLeiaCodeFencesAreExecutableOrExplicitlyNonExecutable(t *testing.T) {
+	root := findRepoRoot(t)
+	specDir := filepath.Join(root, "docs", "spec")
+	entries, err := os.ReadDir(specDir)
+	if err != nil {
+		t.Fatalf("read docs/spec: %v", err)
+	}
+	var bad []string
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".md") {
+			continue
+		}
+		path := filepath.Join(specDir, entry.Name())
+		lines := strings.Split(readFileString(t, path), "\n")
+		for i, line := range lines {
+			if !strings.HasPrefix(line, "```") {
+				continue
+			}
+			info := strings.TrimSpace(strings.TrimPrefix(line, "```"))
+			if !strings.HasPrefix(info, "leia") {
+				continue
+			}
+			if _, ok := specExampleModes(info); ok {
+				continue
+			}
+			bad = append(bad, entry.Name()+":"+strconv.Itoa(i+1)+": ```"+info)
+		}
+	}
+	if len(bad) > 0 {
+		t.Fatalf("docs/spec Leia code fences must use a runnable gate (leia run, leia run all, leia fail, leia fail all) or a non-Leia info string:\n%s", strings.Join(bad, "\n"))
+	}
+}
+
 type runnableSpecExample struct {
 	name   string
 	source string
