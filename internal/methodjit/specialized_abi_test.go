@@ -490,16 +490,15 @@ func TestAnalyzeSpecializedABI_RejectsUnsupportedABIShape(t *testing.T) {
 	}
 }
 
-func TestAnalyzeSpecializedABI_RawIntNumericSelfRecursiveShapes(t *testing.T) {
+func TestAnalyzeSpecializedABI_RawIntNumericSelfRecursiveSingleReturnShapes(t *testing.T) {
 	tests := []struct {
-		name           string
-		src            string
-		protoName      string
-		wantParams     int
-		minSelfCalls   int
-		minArithOps    int
-		minCompareOps  int
-		wantDynamicRet bool
+		name          string
+		src           string
+		protoName     string
+		wantParams    int
+		minSelfCalls  int
+		minArithOps   int
+		minCompareOps int
 	}{
 		{
 			name:       "nested one-param recursion",
@@ -521,13 +520,12 @@ func TestAnalyzeSpecializedABI_RawIntNumericSelfRecursiveShapes(t *testing.T) {
 	if n <= 1 { return acc }
 	return fold(n - 1, acc * n)
 }`,
-			minSelfCalls:   1,
-			minArithOps:    2,
-			minCompareOps:  1,
-			wantDynamicRet: true,
+			minSelfCalls:  1,
+			minArithOps:   2,
+			minCompareOps: 1,
 		},
 		{
-			name:       "two-param nested dynamic return",
+			name:       "two-param nested recursive return",
 			protoName:  "nest",
 			wantParams: 2,
 			src: `func nest(a, b) {
@@ -535,10 +533,9 @@ func TestAnalyzeSpecializedABI_RawIntNumericSelfRecursiveShapes(t *testing.T) {
 	if b == 0 { return nest(a - 1, 1) }
 	return nest(a - 1, nest(a, b - 1))
 }`,
-			minSelfCalls:   3,
-			minArithOps:    4,
-			minCompareOps:  2,
-			wantDynamicRet: true,
+			minSelfCalls:  3,
+			minArithOps:   4,
+			minCompareOps: 2,
 		},
 	}
 
@@ -562,8 +559,12 @@ func TestAnalyzeSpecializedABI_RawIntNumericSelfRecursiveShapes(t *testing.T) {
 			if compareOps < tt.minCompareOps {
 				t.Fatalf("compare op count=%d want >=%d", compareOps, tt.minCompareOps)
 			}
-			if got := dynamicReturns > 0; got != tt.wantDynamicRet {
-				t.Fatalf("dynamic return present=%v want %v", got, tt.wantDynamicRet)
+			// The compiler now lowers statically single-result recursive returns
+			// to OP_RETURN B=2 instead of the return-all ABI. Raw-int ABI
+			// analysis must keep these shapes eligible under that stable
+			// single-return contract.
+			if dynamicReturns != 0 {
+				t.Fatalf("dynamic return-all op count=%d want 0 for fixed single-result recursive returns", dynamicReturns)
 			}
 		})
 	}

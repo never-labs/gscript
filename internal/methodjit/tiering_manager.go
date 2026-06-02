@@ -395,22 +395,6 @@ func (tm *TieringManager) getProfile(proto *vm.FuncProto) FuncProfile {
 // density, call patterns) to decide promotion thresholds instead of a simple
 // call count.
 func (tm *TieringManager) TryCompile(proto *vm.FuncProto) interface{} {
-	if jitRequiresInterpreter(proto) {
-		tm.tracePromotionDecision(proto, PromotionDecision{
-			Action: TieringActionStayInterpreted,
-			Reason: PromotionReasonInterpreterRequired,
-			Gate:   blockGate("JITSemanticGate", "VM-only control requires interpreter"),
-		})
-		return nil
-	}
-	if jitSemanticGateEnabled() && jitShouldStayInInterpreter(proto) {
-		tm.tracePromotionDecision(proto, PromotionDecision{
-			Action: TieringActionStayInterpreted,
-			Reason: PromotionReasonSemanticGate,
-			Gate:   blockGate("JITSemanticGate", "semantic gate kept function interpreted"),
-		})
-		return nil
-	}
 	if tm.envR154Trace {
 		_, compiled := tm.tier2CompiledFor(proto)
 		fmt.Fprintf(os.Stderr, "[R154] TryCompile proto=%q CallCount=%d tier2Compiled_has=%v tier2Failed=%v\n",
@@ -437,6 +421,22 @@ func (tm *TieringManager) TryCompile(proto *vm.FuncProto) interface{} {
 			Compiled: compiled,
 		})
 		return compiled
+	}
+	if jitRequiresInterpreter(proto) {
+		tm.tracePromotionDecision(proto, PromotionDecision{
+			Action: TieringActionStayInterpreted,
+			Reason: PromotionReasonInterpreterRequired,
+			Gate:   blockGate("JITSemanticGate", "VM-only control requires interpreter"),
+		})
+		return nil
+	}
+	if jitSemanticGateEnabled() && jitShouldStayInInterpreter(proto) {
+		tm.tracePromotionDecision(proto, PromotionDecision{
+			Action: TieringActionStayInterpreted,
+			Reason: PromotionReasonSemanticGate,
+			Gate:   blockGate("JITSemanticGate", "semantic gate kept function interpreted"),
+		})
+		return nil
 	}
 	if !recompileRequested && tm.tier1Only[proto] {
 		tm.tracePromotionDecision(proto, PromotionDecision{

@@ -137,6 +137,7 @@ func caller(f, n) {
 
 func TestTier1CallICNoFilterClosureBenchDoesNotCrash(t *testing.T) {
 	t.Setenv("LEIA_TIER2_NO_FILTER", "1")
+	t.Setenv("LEIA_JIT_SEMANTIC_GATE", "1")
 
 	src, err := os.ReadFile("../../benchmarks/calls/closure_bench.leia")
 	if err != nil {

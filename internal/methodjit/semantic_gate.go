@@ -43,6 +43,7 @@ func jitShouldStayInInterpreter(proto *vm.FuncProto) bool {
 		jitUnsupportedConcurrencyControl(proto) ||
 		jitUnsupportedVMOnlyControl(proto) ||
 		jitUnsupportedMultiReturn(proto) ||
+		jitUnsupportedClosureFactory(proto) ||
 		jitUnsupportedClosureArithmetic(proto) ||
 		jitUnsupportedDynamicOperators(proto) ||
 		jitUnsupportedComparisonBranch(proto) ||
@@ -53,6 +54,25 @@ func jitRequiresInterpreter(proto *vm.FuncProto) bool {
 	return jitUnsupportedVMOnlyControl(proto) ||
 		jitUnsupportedConcurrencyControl(proto) ||
 		jitUnsupportedMultiReturn(proto)
+}
+
+func jitUnsupportedClosureFactory(proto *vm.FuncProto) bool {
+	if proto == nil {
+		return false
+	}
+	_, ok := immediateClosureFactoryPattern(proto)
+	if ok {
+		return true
+	}
+	for _, child := range proto.Protos {
+		if child == nil || child.NumParams != 1 || len(child.Upvalues) == 0 {
+			continue
+		}
+		if _, ok := simpleClosureExprPattern(child); ok {
+			return true
+		}
+	}
+	return false
 }
 
 func jitTier2CallableGate(proto *vm.FuncProto) GateResult {

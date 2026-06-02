@@ -62,6 +62,18 @@ func make(a) {
 	}
 }
 
+func TestJITSemanticGateRejectsCapturedClosureFactory(t *testing.T) {
+	top := compileTop(t, `
+func make_adder(x) {
+	return func(y) { return x + y }
+}
+`)
+	makeAdder := findFirstProtoWithName(t, top, "make_adder")
+	if !jitShouldStayInInterpreter(makeAdder) {
+		t.Fatal("captured closure factory should stay interpreted until closure upvalue construction is JIT-safe")
+	}
+}
+
 func TestJITSemanticGateRejectsComparisonBranches(t *testing.T) {
 	top := compileTop(t, `func f(a) { if a < 10 { return 1 } }`)
 	fn := findFirstProtoWithName(t, top, "f")

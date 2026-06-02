@@ -17,9 +17,10 @@ import (
 // R29 baseline: fib is currently regressed; this fixture sentinels the self-call
 // path insn count so R30+ can assert the guard removal actually trims instructions.
 //
-// Tier 1 CALL IC direct-entry versioning adds a Tier2Promoted guard to the
-// non-self fallback path, taking fib from 635 to 639 instructions.
-const fibTotalInsnBaseline = 639
+// Return-result lowering now keeps recursive fib's call returns on the fixed
+// single-result path. The Tier 1 body currently carries the corresponding
+// fixed-return call plumbing, taking fib to 679 instructions.
+const fibTotalInsnBaseline = 679
 
 func TestDumpTier1_FibBody(t *testing.T) {
 	srcBytes, err := os.ReadFile("../../benchmarks/recursion/fib.leia")

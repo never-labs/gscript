@@ -287,6 +287,8 @@ for i := 1; i <= 200; i++ {
 // calls increment the callee's CallCount. This is critical for Tier 2
 // promotion of functions called primarily via BLR (not through the VM).
 func TestTieringManager_BLRCallCountIncrement(t *testing.T) {
+	t.Setenv("LEIA_JIT_SEMANTIC_GATE", "1")
+
 	// inner() is called from outer() via native BLR.
 	// outer() is called 5 times via VM OP_CALL, each calling inner() once.
 	// Without BLR call count increment, inner's CallCount would only be 5
