@@ -3,6 +3,8 @@
 const vscode = require("vscode");
 const path = require("path");
 
+let lspClient;
+
 function activate(context) {
   context.subscriptions.push(
     vscode.commands.registerCommand("leia.runFile", () => runCurrentFile("run")),
@@ -13,12 +15,27 @@ function activate(context) {
     vscode.commands.registerCommand("leia.previewSpec", previewSpec),
     vscode.tasks.registerTaskProvider("leia", new LeiaTaskProvider())
   );
+  startLanguageServer(context);
 }
 
-function deactivate() {}
+function deactivate() {
+  if (lspClient) {
+    lspClient.dispose();
+    lspClient = undefined;
+  }
+}
 
 function executable() {
   return vscode.workspace.getConfiguration("leia").get("executable", "leia");
+}
+
+function lspExecutable() {
+  const config = vscode.workspace.getConfiguration("leia");
+  return config.get("languageServer.executable", "leia-lsp");
+}
+
+function lspEnabled() {
+  return vscode.workspace.getConfiguration("leia").get("languageServer.enabled", true);
 }
 
 function workspaceFolder() {
@@ -184,6 +201,308 @@ function specPreviewCommand(cwd, extraArgs) {
 
 function shellJoin(parts) {
   return parts.map(shellQuote).join(" ");
+}
+
+function startLanguageServer(context) {
+	if (!lspEnabled()) {
+		return;
+	}
+	const command = lspExecutable();
+
+	const output = vscode.window.createOutputChannel("Leia Language Server");
+  const child = require("child_process").spawn(command, [], {
+    stdio: ["pipe", "pipe", "pipe"]
+  });
+  lspClient = new MinimalLanguageClient(child, output);
+  context.subscriptions.push(lspClient, output);
+}
+
+class MinimalLanguageClient {
+  constructor(child, output) {
+    this.child = child;
+    this.output = output;
+    this.buffer = Buffer.alloc(0);
+    this.nextID = 1;
+    this.documents = new Map();
+    this.disposables = [];
+    this.child.stdout.on("data", (chunk) => this.handleData(chunk));
+    this.child.stderr.on("data", (chunk) => output.append(chunk.toString()));
+    this.child.on("error", (err) => {
+      output.appendLine(`failed to start leia-lsp: ${err.message}`);
+    });
+    this.sendRequest("initialize", {
+      processId: process.pid,
+      rootUri: vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders[0]
+        ? vscode.workspace.workspaceFolders[0].uri.toString()
+        : null,
+      capabilities: {}
+    });
+    this.sendNotification("initialized", {});
+    this.disposables.push(
+      vscode.workspace.onDidOpenTextDocument((doc) => this.didOpen(doc)),
+      vscode.workspace.onDidChangeTextDocument((event) => this.didChange(event.document)),
+      vscode.workspace.onDidCloseTextDocument((doc) => this.didClose(doc)),
+      vscode.languages.registerHoverProvider("leia", {
+        provideHover: (doc, pos) => this.provideHover(doc, pos)
+      }),
+      vscode.languages.registerDocumentSymbolProvider("leia", {
+        provideDocumentSymbols: (doc) => this.provideDocumentSymbols(doc)
+      }),
+      vscode.languages.registerCompletionItemProvider("leia", {
+        provideCompletionItems: (doc, pos) => this.provideCompletionItems(doc, pos)
+      }),
+      vscode.languages.registerDefinitionProvider("leia", {
+        provideDefinition: (doc, pos) => this.provideDefinition(doc, pos)
+      }),
+      vscode.languages.registerReferenceProvider("leia", {
+        provideReferences: (doc, pos, context) => this.provideReferences(doc, pos, context)
+      }),
+      vscode.languages.registerRenameProvider("leia", {
+        provideRenameEdits: (doc, pos, newName) => this.provideRenameEdits(doc, pos, newName)
+      }),
+      vscode.languages.registerDocumentFormattingEditProvider("leia", {
+        provideDocumentFormattingEdits: (doc) => this.provideFormatting(doc)
+      })
+    );
+    for (const doc of vscode.workspace.textDocuments) {
+      this.didOpen(doc);
+    }
+  }
+
+	dispose() {
+		for (const disposable of this.disposables) {
+			disposable.dispose();
+		}
+		this.disposables = [];
+		if (this.collection) {
+			this.collection.dispose();
+			this.collection = undefined;
+		}
+		if (this.child && !this.child.killed) {
+			this.child.kill();
+		}
+  }
+
+  didOpen(doc) {
+    if (doc.languageId !== "leia") {
+      return;
+    }
+    this.documents.set(doc.uri.toString(), doc);
+    this.sendNotification("textDocument/didOpen", {
+      textDocument: {
+        uri: doc.uri.toString(),
+        languageId: "leia",
+        version: doc.version,
+        text: doc.getText()
+      }
+    });
+  }
+
+  didChange(doc) {
+    if (doc.languageId !== "leia") {
+      return;
+    }
+    this.documents.set(doc.uri.toString(), doc);
+    this.sendNotification("textDocument/didChange", {
+      textDocument: { uri: doc.uri.toString(), version: doc.version },
+      contentChanges: [{ text: doc.getText() }]
+    });
+  }
+
+  didClose(doc) {
+    if (doc.languageId !== "leia") {
+      return;
+    }
+    this.documents.delete(doc.uri.toString());
+    this.sendNotification("textDocument/didClose", {
+      textDocument: { uri: doc.uri.toString() }
+    });
+  }
+
+  provideHover(doc, pos) {
+    return this.request("textDocument/hover", lspPositionParams(doc, pos)).then((result) => {
+      if (!result) {
+        return undefined;
+      }
+      return new vscode.Hover(new vscode.MarkdownString(result.contents.value), lspRange(result.range));
+    });
+  }
+
+  provideDocumentSymbols(doc) {
+    return this.request("textDocument/documentSymbol", {
+      textDocument: { uri: doc.uri.toString() }
+    }).then((result) => (result || []).map((sym) =>
+      new vscode.DocumentSymbol(
+        sym.name,
+        sym.detail || "",
+        sym.kind || vscode.SymbolKind.Function,
+        lspRange(sym.range),
+        lspRange(sym.selectionRange)
+      )
+    ));
+  }
+
+  provideCompletionItems(doc, pos) {
+    return this.request("textDocument/completion", lspPositionParams(doc, pos)).then((result) =>
+      (result || []).map((item) => {
+        const completion = new vscode.CompletionItem(item.label, item.kind || vscode.CompletionItemKind.Keyword);
+        completion.detail = item.detail;
+        completion.insertText = item.insertText || item.label;
+        return completion;
+      })
+    );
+  }
+
+  provideDefinition(doc, pos) {
+    return this.request("textDocument/definition", lspPositionParams(doc, pos)).then((result) => {
+      if (!result) {
+        return undefined;
+      }
+      return new vscode.Location(vscode.Uri.parse(result.uri), lspRange(result.range));
+    });
+  }
+
+  provideReferences(doc, pos, context) {
+    return this.request("textDocument/references", {
+      ...lspPositionParams(doc, pos),
+      context: { includeDeclaration: context.includeDeclaration }
+    }).then((result) =>
+      (result || []).map((loc) => new vscode.Location(vscode.Uri.parse(loc.uri), lspRange(loc.range)))
+    );
+  }
+
+  provideRenameEdits(doc, pos, newName) {
+    return this.request("textDocument/rename", {
+      ...lspPositionParams(doc, pos),
+      newName
+    }).then((result) => {
+      const edit = new vscode.WorkspaceEdit();
+      const changes = result && result.changes ? result.changes : {};
+      for (const [uri, edits] of Object.entries(changes)) {
+        for (const item of edits) {
+          edit.replace(vscode.Uri.parse(uri), lspRange(item.range), item.newText);
+        }
+      }
+      return edit;
+    });
+  }
+
+  provideFormatting(doc) {
+    return this.request("textDocument/formatting", {
+      textDocument: { uri: doc.uri.toString() }
+    }).then((result) =>
+      (result || []).map((edit) => new vscode.TextEdit(lspRange(edit.range), edit.newText))
+    );
+  }
+
+  request(method, params) {
+    const id = this.nextID++;
+    return new Promise((resolve, reject) => {
+      this.pending = this.pending || new Map();
+      this.pending.set(id, { resolve, reject });
+      this.send({ jsonrpc: "2.0", id, method, params });
+    });
+  }
+
+  sendRequest(method, params) {
+    return this.request(method, params).catch((err) => {
+      this.output.appendLine(err.message);
+    });
+  }
+
+  sendNotification(method, params) {
+    this.send({ jsonrpc: "2.0", method, params });
+  }
+
+  send(payload) {
+    const body = Buffer.from(JSON.stringify(payload), "utf8");
+    this.child.stdin.write(`Content-Length: ${body.length}\r\n\r\n`);
+    this.child.stdin.write(body);
+  }
+
+  handleData(chunk) {
+    this.buffer = Buffer.concat([this.buffer, chunk]);
+    while (true) {
+      const marker = this.buffer.indexOf("\r\n\r\n");
+      if (marker < 0) {
+        return;
+      }
+      const header = this.buffer.slice(0, marker).toString();
+      const match = /Content-Length:\s*(\d+)/i.exec(header);
+      if (!match) {
+        this.buffer = this.buffer.slice(marker + 4);
+        continue;
+      }
+      const length = Number(match[1]);
+      const start = marker + 4;
+      const end = start + length;
+      if (this.buffer.length < end) {
+        return;
+      }
+      const payload = JSON.parse(this.buffer.slice(start, end).toString());
+      this.buffer = this.buffer.slice(end);
+      this.handleMessage(payload);
+    }
+  }
+
+  handleMessage(message) {
+    if (message.method === "textDocument/publishDiagnostics") {
+      this.publishDiagnostics(message.params);
+      return;
+    }
+    if (message.id !== undefined && this.pending && this.pending.has(message.id)) {
+      const pending = this.pending.get(message.id);
+      this.pending.delete(message.id);
+      if (message.error) {
+        pending.reject(new Error(message.error.message));
+      } else {
+        pending.resolve(message.result);
+      }
+    }
+  }
+
+	publishDiagnostics(params) {
+		if (!this.collection) {
+			this.collection = vscode.languages.createDiagnosticCollection("leia");
+		}
+		const uri = vscode.Uri.parse(params.uri);
+		const diagnostics = (params.diagnostics || []).map((diag) => {
+			const item = new vscode.Diagnostic(lspRange(diag.range), diag.message, diagnosticSeverity(diag.severity));
+			item.code = diag.code;
+			item.source = diag.source || "leia";
+			return item;
+    });
+    this.collection.set(uri, diagnostics);
+  }
+}
+
+function lspPositionParams(doc, pos) {
+  return {
+    textDocument: { uri: doc.uri.toString() },
+    position: { line: pos.line, character: pos.character }
+  };
+}
+
+function lspRange(range) {
+	return new vscode.Range(
+		new vscode.Position(range.start.line, range.start.character),
+		new vscode.Position(range.end.line, range.end.character)
+	);
+}
+
+function diagnosticSeverity(value) {
+	switch (value) {
+		case 1:
+			return vscode.DiagnosticSeverity.Error;
+		case 2:
+			return vscode.DiagnosticSeverity.Warning;
+		case 3:
+			return vscode.DiagnosticSeverity.Information;
+		case 4:
+			return vscode.DiagnosticSeverity.Hint;
+		default:
+			return vscode.DiagnosticSeverity.Error;
+	}
 }
 
 module.exports = {

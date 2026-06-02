@@ -187,14 +187,24 @@
     "configuration": {
       "title": "Leia",
       "properties": {
-        "leia.executable": {
-          "type": "string",
-          "default": "leia",
-          "description": "Path to the Leia CLI executable."
-        },
-        "leia.specPreviewScript": {
-          "type": "string",
-          "default": "scripts/spec_preview.py",
+		"leia.executable": {
+		  "type": "string",
+		  "default": "leia",
+		  "description": "Path to the Leia CLI executable."
+		},
+		"leia.languageServer.enabled": {
+		  "type": "boolean",
+		  "default": true,
+		  "description": "Enable the Leia language server for diagnostics, hover, symbols, navigation, rename, completion, and formatting."
+		},
+		"leia.languageServer.executable": {
+		  "type": "string",
+		  "default": "leia-lsp",
+		  "description": "Path to the leia-lsp executable."
+		},
+		"leia.specPreviewScript": {
+		  "type": "string",
+		  "default": "scripts/spec_preview.py",
           "description": "Workspace-relative path to the spec HTML generator."
         },
         "leia.specPreviewOutput": {

@@ -19,6 +19,8 @@
 (require 'compile)
 (require 'rx)
 
+(defvar eglot-server-programs)
+
 (defgroup leia nil
   "Editing support for the Leia language."
   :group 'languages
@@ -26,6 +28,11 @@
 
 (defcustom leia-command "leia"
   "Command used to invoke the Leia CLI."
+  :type 'string
+  :group 'leia)
+
+(defcustom leia-lsp-command "leia-lsp"
+  "Command used to invoke the Leia language server."
   :type 'string
   :group 'leia)
 
@@ -161,6 +168,16 @@
 (defun leia--compile (command)
   "Run COMMAND through `compile'."
   (compile command))
+
+;;;###autoload
+(defun leia-eglot-setup ()
+  "Register `leia-lsp' with Eglot for `leia-mode'.
+This function does not require Eglot at load time; call it from init after
+Eglot is available."
+  (interactive)
+  (require 'eglot)
+  (add-to-list 'eglot-server-programs
+               `(leia-mode . (,leia-lsp-command))))
 
 ;;;###autoload
 (defun leia-run-current-file (&optional vm)

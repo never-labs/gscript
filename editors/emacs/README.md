@@ -28,9 +28,18 @@ The mode registers:
   - `C-c C-f` / `M-x leia-format-current-file`
   - `C-c C-c` / `M-x leia-check-format-current-file`
   - `C-c C-t` / `M-x leia-test`
+- Optional Eglot integration through `leia-lsp`.
 
 Set `leia-command` if the CLI is not available as `leia`:
 
 ```elisp
 (setq leia-command "/path/to/leia")
+```
+
+Enable LSP support when Eglot is available:
+
+```elisp
+(setq leia-lsp-command "/path/to/leia-lsp")
+(leia-eglot-setup)
+(add-hook 'leia-mode-hook #'eglot-ensure)
 ```

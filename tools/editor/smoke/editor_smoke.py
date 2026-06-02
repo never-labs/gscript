@@ -98,6 +98,7 @@ def check_vscode() -> None:
     languages = {item["id"]: item for item in package["contributes"]["languages"]}
     grammars = {item["language"]: item for item in package["contributes"]["grammars"]}
     commands = {item["command"] for item in package["contributes"]["commands"]}
+    config = package["contributes"].get("configuration", {}).get("properties", {})
 
     for language in ("leia", "leia-mod"):
         if language not in languages:
@@ -116,6 +117,21 @@ def check_vscode() -> None:
     ):
         if command not in commands:
             fail(f"VS Code package is missing command {command}")
+
+    for setting in ("leia.languageServer.enabled", "leia.languageServer.executable"):
+        if setting not in config:
+            fail(f"VS Code package is missing setting {setting}")
+
+    extension = (ROOT / "editors/vscode/extension.js").read_text(encoding="utf-8")
+    for marker in (
+        "startLanguageServer(context)",
+        "textDocument/definition",
+        "textDocument/references",
+        "textDocument/rename",
+        "textDocument/publishDiagnostics",
+    ):
+        if marker not in extension:
+            fail(f"VS Code extension missing LSP marker {marker}")
 
     snippets = load_json(ROOT / "editors/vscode/snippets/leia.json")
     for key in ("function", "agent", "tool", "turn", "test", "go routine"):
