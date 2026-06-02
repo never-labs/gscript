@@ -269,6 +269,14 @@ func TestEvaluateCommandLLMReplayMismatchFailsReport(t *testing.T) {
 	if report.Findings[0].Details["expected"] == nil || report.Findings[0].Details["actual"] == nil {
 		t.Fatalf("finding details = %#v", report.Findings[0].Details)
 	}
+	expected, ok := report.Findings[0].Details["expected"].(map[string]any)
+	if !ok || expected["Model"] != nil || expected["model"] != "mock-fast" {
+		t.Fatalf("expected details = %#v", report.Findings[0].Details["expected"])
+	}
+	actual, ok := report.Findings[0].Details["actual"].(map[string]any)
+	if !ok || actual["Model"] != nil || actual["model"] != "mock-fast" {
+		t.Fatalf("actual details = %#v", report.Findings[0].Details["actual"])
+	}
 }
 
 func TestEvaluateCommandAgentReplayExample(t *testing.T) {

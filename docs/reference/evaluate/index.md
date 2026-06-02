@@ -52,7 +52,7 @@ The JSON report is versioned with `schema_version: 1` and includes:
 | `llm` | Optional LLM fixture metadata: mode, paths, loaded turns, replayed turns, remaining turns, and recorded turns. |
 | `inputs` | Per-input file status. |
 | `cases` | Evaluate blocks with `case_id`, `name`, source path, range, status, per-case `started_at`, duration, assertions, and diagnostics. |
-| `findings` | TODO, IO, lex, parse, AI syntax, case runtime, and replay-drift findings. Replay mismatch findings include `details.expected` and `details.actual`; exhausted and unconsumed replay findings include turn/count details. |
+| `findings` | TODO, IO, lex, parse, AI syntax, case runtime, and replay-drift findings. Replay mismatch findings include stable JSON `details.expected` and `details.actual` request summaries; exhausted and unconsumed replay findings include turn/count details. |
 | `notes` | Explicit scope notes so callers do not confuse this with full eval scoring. |
 
 Ordinary script execution still treats evaluate blocks as runtime no-ops. The

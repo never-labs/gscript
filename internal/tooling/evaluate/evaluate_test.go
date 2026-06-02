@@ -404,13 +404,21 @@ func TestRunFailsWhenReplayRequestMismatches(t *testing.T) {
 	if got := report.Findings[0].Details["turn"]; got != 0 {
 		t.Fatalf("finding details turn = %#v", got)
 	}
-	expected, ok := report.Findings[0].Details["expected"].(llm.TurnRequest)
-	if !ok || expected.Messages[0].Text != "expected" {
+	expected, ok := report.Findings[0].Details["expected"].(map[string]any)
+	if !ok || expected["model"] != "mock-fast" {
 		t.Fatalf("finding details expected = %#v", report.Findings[0].Details["expected"])
 	}
-	actual, ok := report.Findings[0].Details["actual"].(llm.TurnRequest)
-	if !ok || actual.Messages[0].Text != "actual" {
+	expectedMessages, ok := expected["messages"].([]map[string]any)
+	if !ok || len(expectedMessages) != 1 || expectedMessages[0]["text"] != "expected" {
+		t.Fatalf("finding details expected messages = %#v", expected["messages"])
+	}
+	actual, ok := report.Findings[0].Details["actual"].(map[string]any)
+	if !ok || actual["model"] != "mock-fast" {
 		t.Fatalf("finding details actual = %#v", report.Findings[0].Details["actual"])
+	}
+	actualMessages, ok := actual["messages"].([]map[string]any)
+	if !ok || len(actualMessages) != 1 || actualMessages[0]["text"] != "actual" {
+		t.Fatalf("finding details actual messages = %#v", actual["messages"])
 	}
 }
 

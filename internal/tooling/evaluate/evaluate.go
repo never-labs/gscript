@@ -652,8 +652,8 @@ func (m *replayMonitor) Findings() []Finding {
 		if errors.As(err, &mismatch) {
 			kind = "llm_replay_mismatch"
 			details["turn"] = mismatch.Turn
-			details["expected"] = mismatch.Expected
-			details["actual"] = mismatch.Actual
+			details["expected"] = replayRequestDetails(mismatch.Expected)
+			details["actual"] = replayRequestDetails(mismatch.Actual)
 		} else if errors.As(err, &exhausted) {
 			kind = "llm_replay_exhausted"
 			details["turn"] = exhausted.Turn
@@ -664,6 +664,96 @@ func (m *replayMonitor) Findings() []Finding {
 			Message:  err.Error(),
 			Details:  details,
 		})
+	}
+	return out
+}
+
+func replayRequestDetails(req llm.TurnRequest) map[string]any {
+	out := map[string]any{}
+	if req.Model != "" {
+		out["model"] = req.Model
+	}
+	if len(req.Messages) > 0 {
+		messages := make([]map[string]any, 0, len(req.Messages))
+		for _, msg := range req.Messages {
+			messages = append(messages, replayMessageDetails(msg))
+		}
+		out["messages"] = messages
+	}
+	if len(req.Tools) > 0 {
+		tools := make([]map[string]any, 0, len(req.Tools))
+		for _, tool := range req.Tools {
+			item := map[string]any{"name": tool.Name}
+			if tool.Description != "" {
+				item["description"] = tool.Description
+			}
+			if len(tool.Params) > 0 {
+				item["params"] = append([]string(nil), tool.Params...)
+			}
+			if len(tool.Requires) > 0 {
+				item["requires"] = append([]string(nil), tool.Requires...)
+			}
+			if tool.Schema != nil {
+				item["schema"] = tool.Schema
+			}
+			tools = append(tools, item)
+		}
+		out["tools"] = tools
+	}
+	if req.ForceTool != "" {
+		out["force_tool"] = req.ForceTool
+	}
+	if req.MaxTokens != 0 {
+		out["max_tokens"] = req.MaxTokens
+	}
+	if req.Temperature != nil {
+		out["temperature"] = *req.Temperature
+	}
+	if req.TopP != nil {
+		out["top_p"] = *req.TopP
+	}
+	if req.ResponseFormat != nil {
+		out["response_format"] = req.ResponseFormat
+	}
+	if req.Stream {
+		out["stream"] = true
+	}
+	if len(req.Stop) > 0 {
+		out["stop"] = append([]string(nil), req.Stop...)
+	}
+	if len(req.Metadata) > 0 {
+		metadata := map[string]string{}
+		for key, value := range req.Metadata {
+			metadata[key] = value
+		}
+		out["metadata"] = metadata
+	}
+	return out
+}
+
+func replayMessageDetails(msg llm.Message) map[string]any {
+	out := map[string]any{"role": msg.Role}
+	if msg.Text != "" {
+		out["text"] = msg.Text
+	}
+	if msg.ToolUseID != "" {
+		out["tool_use_id"] = msg.ToolUseID
+	}
+	if msg.Value != nil {
+		out["value"] = msg.Value
+	}
+	if msg.Error != "" {
+		out["error"] = msg.Error
+	}
+	if msg.ToolCall != nil {
+		toolCall := map[string]any{
+			"id":   msg.ToolCall.ID,
+			"tool": msg.ToolCall.Tool,
+		}
+		if len(msg.ToolCall.Args) > 0 {
+			toolCall["args"] = msg.ToolCall.Args
+		}
+		out["tool_call"] = toolCall
 	}
 	return out
 }
