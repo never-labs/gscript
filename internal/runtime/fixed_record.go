@@ -328,3 +328,10 @@ func scanFixedRecordRoots(fr *FixedRecord, visitor func(unsafe.Pointer), seen ma
 		ScanValueRoots(fr.values[i], visitor, seen)
 	}
 }
+
+// ScanFixedRecordRootsExported lets VM-owned coroutine state expose pooled
+// fixed records to root compaction without moving FixedRecord internals out of
+// runtime.
+func ScanFixedRecordRootsExported(fr *FixedRecord, visitor func(unsafe.Pointer), seen map[uintptr]struct{}) {
+	scanFixedRecordRoots(fr, visitor, seen)
+}

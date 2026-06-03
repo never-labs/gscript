@@ -65,6 +65,7 @@ func (vm *VM) writeNoResults(dst, c int) {
 		vm.top = dst
 		return
 	}
+	vm.top = dst + c - 1
 	for i := 0; i < c-1; i++ {
 		vm.regs[dst+i] = runtime.NilValue()
 	}

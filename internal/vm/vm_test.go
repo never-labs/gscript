@@ -60,6 +60,46 @@ r3 := calls[3]()
 	}
 }
 
+func TestFixedResultCallsDoNotLeakVMTop(t *testing.T) {
+	src := `
+func many(x) {
+    return x, x + 1, x + 2
+}
+
+func fixed(x) {
+    values := {many(x)}
+    return values[1]
+}
+
+total := 0
+for i := 1; i <= 20000; i++ {
+    total = total + fixed(i)
+}
+`
+	tokens, err := lexer.New(src).Tokenize()
+	if err != nil {
+		t.Fatalf("lexer error: %v", err)
+	}
+	prog, err := parser.New(tokens).Parse()
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+	proto, err := Compile(prog)
+	if err != nil {
+		t.Fatalf("compile error: %v", err)
+	}
+	vm := New(vmtest.NewInterpreterGlobals())
+	if _, err := vm.Execute(proto); err != nil {
+		t.Fatalf("runtime error: %v", err)
+	}
+	if got := len(vm.regs); got > 1024 {
+		t.Fatalf("register window grew to %d slots; fixed-result calls leaked top", got)
+	}
+	if got := vm.Top(); got > 128 {
+		t.Fatalf("vm top = %d; fixed-result calls leaked top", got)
+	}
+}
+
 func TestForRangeBareTableUsesPairs(t *testing.T) {
 	globals := compileAndRun(t, `
 seen := {}

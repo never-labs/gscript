@@ -37,6 +37,7 @@ func (vm *VM) writeCallResults(dst, c int, results []runtime.Value) {
 		vm.top = dst + len(results)
 		return
 	}
+	vm.top = dst + c - 1
 	if c == 1 {
 		return
 	}

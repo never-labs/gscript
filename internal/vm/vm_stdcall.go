@@ -150,6 +150,7 @@ func (vm *VM) storeStdSelectRange(absSlot, rawC, valueStart, valueEnd int) {
 		return
 	}
 	nr := rawC - 1
+	vm.top = absSlot + nr
 	for i := 0; i < nr; i++ {
 		dst := absSlot + i
 		if dst >= len(vm.regs) {
@@ -175,6 +176,7 @@ func (vm *VM) storeStdSelectResults(absSlot, rawC int, results []runtime.Value) 
 		return
 	}
 	nr := rawC - 1
+	vm.top = absSlot + nr
 	for i := 0; i < nr; i++ {
 		idx := absSlot + i
 		if idx >= len(vm.regs) {
@@ -204,6 +206,7 @@ func (vm *VM) storeFixedFastCallResult(absSlot, rawC int, r0, r1 runtime.Value, 
 		return
 	}
 	nr := rawC - 1
+	vm.top = absSlot + nr
 	if nr <= 0 {
 		return
 	}

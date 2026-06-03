@@ -151,6 +151,7 @@ func (vm *VM) writeSingleCallResult(dst, c int, result runtime.Value) {
 		vm.top = dst + 1
 		return
 	}
+	vm.top = dst + c - 1
 	if c == 1 {
 		return
 	}
@@ -172,13 +173,16 @@ func (vm *VM) writeCoroutineResumeResults(dst, c int, ok bool, values []runtime.
 	if c == 3 && len(values) == 1 {
 		vm.regs[dst] = runtime.BoolValue(ok)
 		vm.regs[dst+1] = values[0]
+		vm.top = dst + 2
 		return
 	}
 	if c == 2 && len(values) == 0 {
 		vm.regs[dst] = runtime.BoolValue(ok)
+		vm.top = dst + 1
 		return
 	}
 	nr := c - 1
+	vm.top = dst + nr
 	for i := 0; i < nr; i++ {
 		switch {
 		case i == 0:

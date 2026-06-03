@@ -18,12 +18,12 @@ import (
 	"unsafe"
 )
 
-// tableSlabSize: Tables per backing block. A block of 8192 Tables at
-// ~240 B/each is roughly 2 MB of Go heap per refill. Allocation-heavy
-// workloads such as tree construction create millions of short-lived tables;
-// using page-scale slabs amortizes Go heap object setup, root-log entries, and
-// slab-range metadata without changing individual table identity.
-const tableSlabSize = 8192
+// tableSlabSize: Tables per backing block. Table contains pointer-bearing
+// fields, and Go keeps the whole backing object alive when any interior table
+// pointer is rooted. Keep slabs moderately small so long-running scripts do
+// not retain thousands of dead tables and their transitive contents because
+// one table from the same slab remains live.
+const tableSlabSize = 256
 
 // tableSlab is a bump allocator for *Table. Holds the current backing []Table;
 // the next free slot is published in Heap.tableSlabNext so readers can reserve

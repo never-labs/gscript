@@ -61,6 +61,14 @@ func (s *Shape) Transition(key string) *Shape {
 	return actual.(*Shape)
 }
 
+func cloneShapeKeys(keys []string) []string {
+	out := make([]string, len(keys))
+	for i, key := range keys {
+		out[i] = strings.Clone(key)
+	}
+	return out
+}
+
 // getOrCreateShape is the internal factory.  It is thread-safe.
 func getOrCreateShape(keys []string) *Shape {
 	if len(keys) == 0 {
@@ -69,24 +77,25 @@ func getOrCreateShape(keys []string) *Shape {
 	if len(keys) == 1 {
 		return getOrCreateSingleFieldShape(keys[0])
 	}
-	k := strings.Join(keys, "\x00")
+	ownedKeys := cloneShapeKeys(keys)
+	k := strings.Join(ownedKeys, "\x00")
 	if v, ok := shapeByKey.Load(k); ok {
 		return v.(*Shape)
 	}
 	id := atomic.AddUint32(&shapeIDCounter, 1)
-	fm := make(map[string]int, len(keys))
-	for i, key := range keys {
+	fm := make(map[string]int, len(ownedKeys))
+	for i, key := range ownedKeys {
 		fm[key] = i
 	}
 	s := &Shape{
 		ID:                id,
-		FieldKeys:         keys,
+		FieldKeys:         ownedKeys,
 		FieldMap:          fm,
-		fieldMutations:    make([]uint64, len(keys)),
-		fieldTypes:        make([]uint32, len(keys)),
-		fieldTypeEpoch:    make([]uint64, len(keys)),
-		fieldClosures:     make([]uintptr, len(keys)),
-		fieldClosureEpoch: make([]uint64, len(keys)),
+		fieldMutations:    make([]uint64, len(ownedKeys)),
+		fieldTypes:        make([]uint32, len(ownedKeys)),
+		fieldTypeEpoch:    make([]uint64, len(ownedKeys)),
+		fieldClosures:     make([]uintptr, len(ownedKeys)),
+		fieldClosureEpoch: make([]uint64, len(ownedKeys)),
 	}
 	actual, loaded := shapeByKey.LoadOrStore(k, s)
 	if loaded {
@@ -102,18 +111,19 @@ func getOrCreateSingleFieldShape(key string) *Shape {
 		return v.(*Shape)
 	}
 	id := atomic.AddUint32(&shapeIDCounter, 1)
-	keys := []string{key}
+	ownedKey := strings.Clone(key)
+	keys := []string{ownedKey}
 	s := &Shape{
 		ID:                id,
 		FieldKeys:         keys,
-		FieldMap:          map[string]int{key: 0},
+		FieldMap:          map[string]int{ownedKey: 0},
 		fieldMutations:    make([]uint64, len(keys)),
 		fieldTypes:        make([]uint32, len(keys)),
 		fieldTypeEpoch:    make([]uint64, len(keys)),
 		fieldClosures:     make([]uintptr, len(keys)),
 		fieldClosureEpoch: make([]uint64, len(keys)),
 	}
-	actual, loaded := shapeByKey.LoadOrStore(key, s)
+	actual, loaded := shapeByKey.LoadOrStore(ownedKey, s)
 	if loaded {
 		return actual.(*Shape)
 	}

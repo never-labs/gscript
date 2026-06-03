@@ -30,7 +30,7 @@ type stringSlab struct {
 	// Retained older backings stay alive via their outstanding sub-slices;
 	// this field just documents intent and keeps a slab-level reference
 	// while the Heap exists.
-	retained []*[]string
+	retained [][]string
 }
 
 // allocStringKeys returns a zero-length []string with the requested capacity,
@@ -56,7 +56,7 @@ func (s *stringSlab) allocStringKeys(capacity int) []string {
 func (s *stringSlab) refill() {
 	next := make([]string, stringSlabSize)
 	if s.backing != nil {
-		s.retained = append(s.retained, &s.backing)
+		s.retained = append(s.retained, s.backing)
 	}
 	s.backing = next
 	s.idx = 0

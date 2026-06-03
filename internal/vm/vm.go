@@ -1360,6 +1360,7 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 				for i := 0; i < nr; i++ {
 					vm.regs[rb+i] = runtime.NilValue()
 				}
+				vm.top = rb + nr
 			} else {
 				vm.top = rb
 			}
@@ -2491,7 +2492,11 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 						if vm.top > newBase {
 							newBase = vm.top
 						}
-						needed := newBase + proto.MaxStack + 1
+						frameSlots := proto.MaxStack
+						if proto.NumParams > frameSlots {
+							frameSlots = proto.NumParams
+						}
+						needed := newBase + frameSlots + 1
 						if needed > len(vm.regs) {
 							newRegs := runtime.MakeNilSlice(needed * 2)
 							copy(newRegs, vm.regs)
@@ -2542,16 +2547,6 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 
 			// ---- Fast path: VM Closure (inline call) ----
 			if cl, ok := closureFromValue(fnVal); ok {
-				if b != 0 && nArgs == 1 {
-					handled, err := vm.tryRecursiveTableBuildFoldRegion(frame, base, cl, a, nArgs, c)
-					if handled {
-						if err != nil {
-							return nil, wrapLineErr(frame, err)
-						}
-						observeCallResultFixed(callerProto, callPC, vm.regs, base+a, c)
-						break
-					}
-				}
 				if b != 0 && callSiteRuntimeSpecializationArity(nArgs) {
 					args := vm.regs[base+a+1 : base+a+1+nArgs]
 					handled, err := vm.tryValueRuntimeSpecialization(cl, args, c, base+a)
@@ -2599,7 +2594,15 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 				}
 
 				// Ensure register space
-				needed := newBase + proto.MaxStack + 1
+				frameSlots := proto.MaxStack
+				if proto.NumParams > frameSlots {
+					frameSlots = proto.NumParams
+				}
+				needed := newBase + frameSlots + 1
+				if newBase < 0 || frameSlots < 0 || needed < 0 || needed > 1<<24 {
+					return nil, fmt.Errorf("invalid VM call frame sizing: proto=%p max_stack=%d num_params=%d base=%d top=%d new_base=%d needed=%d pc=%d call_pc=%d",
+						proto, proto.MaxStack, proto.NumParams, base, vm.top, newBase, needed, frame.pc, callPC)
+				}
 				if needed > len(vm.regs) {
 					newRegs := runtime.MakeNilSlice(needed * 2)
 					copy(newRegs, vm.regs)
@@ -2675,6 +2678,7 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 										vm.regs[base+a+i] = runtime.NilValue()
 									}
 								}
+								vm.top = base + a + nr
 							}
 							observeCallResultSlice(callerProto, callPC, results, c)
 							break
@@ -2727,7 +2731,11 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 								newBase = vm.top
 							}
 
-							needed := newBase + proto.MaxStack + 1
+							frameSlots := proto.MaxStack
+							if proto.NumParams > frameSlots {
+								frameSlots = proto.NumParams
+							}
+							needed := newBase + frameSlots + 1
 							if needed > len(vm.regs) {
 								newRegs := runtime.MakeNilSlice(needed * 2)
 								copy(newRegs, vm.regs)
@@ -2799,6 +2807,7 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 													vm.regs[base+a+i] = runtime.NilValue()
 												}
 											}
+											vm.top = base + a + nr
 										}
 										observeCallResultSlice(callerProto, callPC, results, c)
 										break
@@ -2973,6 +2982,7 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 							vm.top = base + a + 1
 						} else {
 							nr := c - 1
+							vm.top = base + a + nr
 							if nr > 0 {
 								vm.regs[base+a] = result
 								for i := 1; i < nr; i++ {
@@ -2997,6 +3007,7 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 								vm.regs[base+a+i] = runtime.NilValue()
 							}
 						}
+						vm.top = base + a + nr
 					}
 					observeCallResultSlice(callerProto, callPC, results, c)
 					break
@@ -3031,6 +3042,7 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 						vm.regs[base+a+i] = runtime.NilValue()
 					}
 				}
+				vm.top = base + a + nr
 			}
 			observeCallResultSlice(callerProto, callPC, results, c)
 
@@ -3054,6 +3066,24 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 			a := DecodeA(inst)
 			b := DecodeB(inst)
 
+			var nret int
+			switch {
+			case b == 0:
+				nret = vm.top - (base + a)
+			case b == 1:
+				nret = 0
+			default:
+				nret = b - 1
+			}
+			if nret < 0 {
+				nret = 0
+			}
+			var deferredReturn []runtime.Value
+			if len(frame.defers) > 0 && nret > 0 {
+				deferredReturn = make([]runtime.Value, nret)
+				copy(deferredReturn, vm.regs[base+a:base+a+nret])
+			}
+
 			if err := vm.drainFrameDefers(frame); err != nil {
 				return nil, wrapLineErr(frame, err)
 			}
@@ -3061,31 +3091,22 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 
 			// Initial frame return → back to Go caller (call() will pop)
 			if vm.frameCount <= initialFC {
-				if b == 0 {
-					nret := vm.top - (base + a)
-					var ret []runtime.Value
-					if nret <= len(vm.retBuf) {
-						ret = vm.retBuf[:nret]
-					} else {
-						ret = make([]runtime.Value, nret)
-					}
+				if nret == 0 {
+					return nil, nil
+				}
+				var ret []runtime.Value
+				if deferredReturn != nil {
+					ret = deferredReturn
+				} else if nret <= len(vm.retBuf) {
+					ret = vm.retBuf[:nret]
 					for i := 0; i < nret; i++ {
 						ret[i] = vm.regs[base+a+i]
 					}
-					return ret, nil
-				}
-				if b == 1 {
-					return nil, nil
-				}
-				nret := b - 1
-				var ret []runtime.Value
-				if nret <= len(vm.retBuf) {
-					ret = vm.retBuf[:nret]
 				} else {
 					ret = make([]runtime.Value, nret)
-				}
-				for i := 0; i < nret; i++ {
-					ret[i] = vm.regs[base+a+i]
+					for i := 0; i < nret; i++ {
+						ret[i] = vm.regs[base+a+i]
+					}
 				}
 				return ret, nil
 			}
@@ -3097,30 +3118,30 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 			resultBase := frame.resultBase
 			resultCount := frame.resultCount
 
-			var nret int
-			if b == 0 {
-				nret = vm.top - (base + a)
-			} else if b == 1 {
-				nret = 0
-			} else {
-				nret = b - 1
-			}
-
 			if resultCount == 0 {
 				// Return all results
 				for i := 0; i < nret; i++ {
-					vm.regs[resultBase+i] = vm.regs[base+a+i]
+					if deferredReturn != nil {
+						vm.regs[resultBase+i] = deferredReturn[i]
+					} else {
+						vm.regs[resultBase+i] = vm.regs[base+a+i]
+					}
 				}
 				vm.top = resultBase + nret
 			} else {
 				nr := resultCount - 1
 				for i := 0; i < nr; i++ {
 					if i < nret {
-						vm.regs[resultBase+i] = vm.regs[base+a+i]
+						if deferredReturn != nil {
+							vm.regs[resultBase+i] = deferredReturn[i]
+						} else {
+							vm.regs[resultBase+i] = vm.regs[base+a+i]
+						}
 					} else {
 						vm.regs[resultBase+i] = runtime.NilValue()
 					}
 				}
+				vm.top = resultBase + nr
 			}
 			if vm.frameCount > 0 {
 				observeCallResultFixed(vm.frames[vm.frameCount-1].closure.Proto, childCallSitePC, vm.regs, resultBase, resultCount)

@@ -64,6 +64,8 @@ var (
 	gcScratch      gcCompactScratchState
 
 	vmCoroutinePtrResolver func(unsafe.Pointer) any
+	vmClosureRootScanner   func(unsafe.Pointer, func(unsafe.Pointer), map[uintptr]struct{})
+	vmCoroutineRootScanner func(unsafe.Pointer, func(unsafe.Pointer), map[uintptr]struct{})
 )
 
 // RegisterVM adds a VM to the active set for GC root scanning.
@@ -136,6 +138,16 @@ func CheckGC() {
 	}
 }
 
+// ForceGCCompaction rebuilds the NaN-box root log immediately. It is intended
+// for explicit collectgarbage("collect") calls at known script safe points.
+func ForceGCCompaction() {
+	if atomic.LoadInt32(&activeVMCount) == 0 {
+		return
+	}
+	gcCompact()
+	atomic.StoreInt32(&gcNeedsCompact, 0)
+}
+
 // gcCompact rebuilds the gcRootLog with only pointers reachable from active VMs.
 // Conservative: retains any pointer that appears in a VM's register file, globals,
 // open upvalues, or recursively inside any reachable table.
@@ -177,6 +189,7 @@ func gcCompact() {
 	}
 	visitCurrentTableSlabRoot(visitor)
 	scanSimpleFormatCacheRoots(visitor, liveSet)
+	scanCachedIntStringRoots(visitor, liveSet)
 
 	// Compact in-place. This avoids allocating and GC-scanning a fresh
 	// multi-megabyte root log on every compaction.
@@ -250,6 +263,32 @@ func ScanValueRoots(v Value, visitor func(unsafe.Pointer), seen map[uintptr]stru
 		scanLazyStringRoots(ls, visitor, seen)
 		return
 	}
+	if sub == ptrSubClosure {
+		visitor(p)
+		closure := (*Closure)(p)
+		scanClosureRoots(closure, visitor, seen)
+		return
+	}
+	if sub == ptrSubCoroutine {
+		visitor(p)
+		co := (*Coroutine)(p)
+		scanCoroutineRoots(co, visitor, seen)
+		return
+	}
+	if sub == ptrSubVMClosure {
+		visitor(p)
+		if vmClosureRootScanner != nil {
+			vmClosureRootScanner(p, visitor, seen)
+		}
+		return
+	}
+	if sub == ptrSubVMCoroutine {
+		visitor(p)
+		if vmCoroutineRootScanner != nil {
+			vmCoroutineRootScanner(p, visitor, seen)
+		}
+		return
+	}
 	if sub == ptrSubString {
 		visitStringRoot(p, visitor)
 		return
@@ -293,6 +332,10 @@ func scanTableRoots(t *Table, visitor func(unsafe.Pointer), seen map[uintptr]str
 			ScanValueRoots(v, visitor, seen)
 		}
 	}
+	for _, k := range t.keys {
+		ScanValueRoots(k, visitor, seen)
+	}
+	ScanValueRoots(t.nextKey, visitor, seen)
 	// String map values
 	for _, v := range t.smap {
 		ScanValueRoots(v, visitor, seen)
@@ -318,10 +361,63 @@ func scanTableRoots(t *Table, visitor func(unsafe.Pointer), seen map[uintptr]str
 	}
 }
 
+func scanClosureRoots(cl *Closure, visitor func(unsafe.Pointer), seen map[uintptr]struct{}) {
+	if cl == nil {
+		return
+	}
+	for _, uv := range cl.Upvalues {
+		if uv != nil {
+			ScanValueRoots(uv.Get(), visitor, seen)
+		}
+	}
+	if cl.Env != nil {
+		scanEnvironmentRoots(cl.Env, visitor, seen)
+	}
+}
+
+func scanEnvironmentRoots(env *Environment, visitor func(unsafe.Pointer), seen map[uintptr]struct{}) {
+	if env == nil {
+		return
+	}
+	addr := uintptr(unsafe.Pointer(env))
+	if _, already := seen[addr]; already {
+		return
+	}
+	seen[addr] = struct{}{}
+
+	env.mu.RLock()
+	upvalues := make([]*Upvalue, 0, len(env.vars))
+	for _, uv := range env.vars {
+		upvalues = append(upvalues, uv)
+	}
+	parent := env.parent
+	env.mu.RUnlock()
+
+	for _, uv := range upvalues {
+		if uv != nil {
+			ScanValueRoots(uv.Get(), visitor, seen)
+		}
+	}
+	scanEnvironmentRoots(parent, visitor, seen)
+}
+
+func scanCoroutineRoots(co *Coroutine, visitor func(unsafe.Pointer), seen map[uintptr]struct{}) {
+	if co == nil {
+		return
+	}
+	ScanValueRoots(co.fn, visitor, seen)
+}
+
 // ScanTableRootsExported is the exported version of scanTableRoots.
 // Used by the vm package to scan string metatables and other table roots.
 func ScanTableRootsExported(t *Table, visitor func(unsafe.Pointer), seen map[uintptr]struct{}) {
 	scanTableRoots(t, visitor, seen)
+}
+
+func scanCachedIntStringRoots(visitor func(unsafe.Pointer), seen map[uintptr]struct{}) {
+	for _, v := range cachedIntStringValues {
+		ScanValueRoots(v, visitor, seen)
+	}
 }
 
 // GCRootLogSize returns the current number of entries in the root log (for diagnostics).
@@ -358,4 +454,17 @@ func lookupIface(p unsafe.Pointer) any {
 // interface-root map.
 func RegisterVMCoroutinePtrResolver(fn func(unsafe.Pointer) any) {
 	vmCoroutinePtrResolver = fn
+}
+
+// RegisterVMClosureRootScanner lets the VM package recursively scan bytecode
+// closure roots held inside runtime.Value tables without making runtime import
+// vm. The scanner must visit closure upvalues and proto constants.
+func RegisterVMClosureRootScanner(fn func(unsafe.Pointer, func(unsafe.Pointer), map[uintptr]struct{})) {
+	vmClosureRootScanner = fn
+}
+
+// RegisterVMCoroutineRootScanner lets the VM package recursively scan
+// coroutine roots held inside runtime.Value without importing vm.
+func RegisterVMCoroutineRootScanner(fn func(unsafe.Pointer, func(unsafe.Pointer), map[uintptr]struct{})) {
+	vmCoroutineRootScanner = fn
 }
