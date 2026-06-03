@@ -130,16 +130,28 @@ func gcLogGrowAt(idx int64, p unsafe.Pointer) {
 	ifaceMu.Unlock()
 }
 
-// CheckGC runs deferred GC compaction if needed. Must be called at a VM safe
-// point where all recent allocations have been stored into registers/globals.
+// CheckGC runs deferred GC maintenance if needed. The current NaN-box runtime
+// keeps a conservative append-only root log because Go and JIT/native frames can
+// temporarily hold pointer-tagged Values outside VM register scanning.
 func CheckGC() {
 	if atomic.LoadInt32(&gcNeedsCompact) != 0 && atomic.CompareAndSwapInt32(&gcNeedsCompact, 1, 0) {
 		gcCompact()
 	}
 }
 
-// ForceGCCompaction rebuilds the NaN-box root log immediately. It is intended
-// for explicit collectgarbage("collect") calls at known script safe points.
+// RequestGCCompaction records a script request for GC maintenance. It does not
+// make the root log precise: some live NaN-boxed values can sit in Go/native/JIT
+// frames that are not visible to VM root scanners.
+func RequestGCCompaction() {
+	if atomic.LoadInt32(&activeVMCount) == 0 {
+		return
+	}
+	atomic.StoreInt32(&gcNeedsCompact, 1)
+}
+
+// ForceGCCompaction preserves compatibility with tests and diagnostics. It is
+// intentionally conservative: runtime correctness depends on the root log
+// keeping all previously published NaN-boxed pointers alive.
 func ForceGCCompaction() {
 	if atomic.LoadInt32(&activeVMCount) == 0 {
 		return
@@ -148,78 +160,13 @@ func ForceGCCompaction() {
 	atomic.StoreInt32(&gcNeedsCompact, 0)
 }
 
-// gcCompact rebuilds the gcRootLog with only pointers reachable from active VMs.
-// Conservative: retains any pointer that appears in a VM's register file, globals,
-// open upvalues, or recursively inside any reachable table.
+// gcCompact used to rebuild gcRootLog with only pointers reachable from active
+// VMs. That is unsafe for a NaN-boxed runtime with JIT/native frames: a Value
+// can be live in a Go argument slice, native frame, or CPU register while not
+// present in VM registers. Keep the log append-only until the runtime has a
+// proven stop-the-world safe point that materializes every live Value.
 func gcCompact() {
-	// Prevent re-entrant compaction.
-	if !atomic.CompareAndSwapInt32(&gcCompacting, 0, 1) {
-		return
-	}
-	defer atomic.StoreInt32(&gcCompacting, 0)
-
-	// Snapshot current cursor.
-	oldCursor := atomic.LoadInt64(&gcLog.cursor)
-	if oldCursor <= gcCompactInterval/2 {
-		return // not worth compacting
-	}
-
-	// Grab a snapshot of registered VMs.
-	activeVMsMu.Lock()
-	gcScratch.vms = append(gcScratch.vms[:0], activeVMs...)
-	vms := gcScratch.vms
-	activeVMsMu.Unlock()
-
-	if len(vms) == 0 {
-		return // no VMs to scan; keep everything (conservative)
-	}
-
-	// Build the live set: all pointers reachable from any VM.
-	if gcScratch.liveSet == nil {
-		gcScratch.liveSet = make(map[uintptr]struct{}, oldCursor/4)
-	} else {
-		clear(gcScratch.liveSet)
-	}
-	liveSet := gcScratch.liveSet
-	visitor := func(p unsafe.Pointer) {
-		liveSet[uintptr(p)] = struct{}{}
-	}
-	for _, vm := range vms {
-		vm.ScanGCRoots(visitor)
-	}
-	visitCurrentTableSlabRoot(visitor)
-	scanSimpleFormatCacheRoots(visitor, liveSet)
-	scanCachedIntStringRoots(visitor, liveSet)
-
-	// Compact in-place. This avoids allocating and GC-scanning a fresh
-	// multi-megabyte root log on every compaction.
-	var newCursor int64
-	for i := int64(0); i < oldCursor && i < int64(len(gcLog.entries)); i++ {
-		p := gcLog.entries[i]
-		if p == nil {
-			continue
-		}
-		if _, live := liveSet[uintptr(p)]; live {
-			gcLog.entries[newCursor] = p
-			newCursor++
-		}
-	}
-
-	// During compaction, concurrent keepAlive calls may have added entries
-	// beyond oldCursor. Copy those too (conservative).
-	currentCursor := atomic.LoadInt64(&gcLog.cursor)
-	for i := oldCursor; i < currentCursor && i < int64(len(gcLog.entries)); i++ {
-		p := gcLog.entries[i]
-		if p != nil {
-			gcLog.entries[newCursor] = p
-			newCursor++
-		}
-	}
-	for i := newCursor; i < currentCursor && i < int64(len(gcLog.entries)); i++ {
-		gcLog.entries[i] = nil
-	}
-
-	atomic.StoreInt64(&gcLog.cursor, newCursor)
+	atomic.StoreInt32(&gcNeedsCompact, 0)
 }
 
 // ScanValueRoots scans a single Value for GC root pointers.

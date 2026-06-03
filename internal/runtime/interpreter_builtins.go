@@ -193,7 +193,7 @@ func (interp *Interpreter) registerBuiltins() {
 
 			switch option {
 			case "collect":
-				ForceGCCompaction()
+				RequestGCCompaction()
 				goruntime.GC()
 				return []Value{IntValue(0)}, nil
 			case "stop":
