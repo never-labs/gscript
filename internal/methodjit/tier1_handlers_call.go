@@ -543,7 +543,7 @@ genericNativePath:
 		}
 	}
 
-	results, err := e.callVM.CallValue(fnVal, callArgs)
+	results, err := e.callVM.CallValueNoMethodJIT(fnVal, callArgs)
 	if err != nil {
 		return err
 	}

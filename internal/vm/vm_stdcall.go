@@ -229,6 +229,9 @@ func (vm *VM) storeFixedFastCallResult(absSlot, rawC int, r0, r1 runtime.Value, 
 }
 
 func (vm *VM) executeDirectGoFunctionFastCall(gf *runtime.GoFunction, absSlot, nArgs, rawC int) (bool, error) {
+	if vm.suppressMethodJIT > 0 {
+		return false, nil
+	}
 	if gf == nil || nArgs < 1 || nArgs > 8 || absSlot+nArgs >= len(vm.regs) {
 		return false, nil
 	}

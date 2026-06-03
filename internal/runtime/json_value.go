@@ -105,9 +105,12 @@ func JSONGoToValue(v any) Value {
 		}
 		return TableValue(tbl)
 	case map[string]any:
-		tbl := NewTableSized(0, len(val))
+		// JSON object field order is external and dynamic. Build map-backed
+		// tables directly instead of interning every decoded object into the
+		// hidden-class transition cache.
+		tbl := NewPlainIntArrayMapTable(0, 0, len(val))
 		for k, item := range val {
-			tbl.RawSetString(k, JSONGoToValue(item))
+			tbl.InitStringMapSlot(k, JSONGoToValue(item))
 		}
 		return TableValue(tbl)
 	default:
