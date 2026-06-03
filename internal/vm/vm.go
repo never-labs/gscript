@@ -81,6 +81,7 @@ type VM struct {
 	top                  int            // top of used registers (for variable returns)
 	stringMeta           *runtime.Table // string metatable
 	methodJIT            MethodJITEngine
+	suppressMethodJIT    int
 	argBuf               [16]runtime.Value // pre-allocated arg buffer for OP_CALL
 	retBuf               [8]runtime.Value  // pre-allocated return buffer for OP_RETURN
 	coroutineResultBuf   [8]runtime.Value  // pre-allocated coroutine.resume result buffer
@@ -1160,6 +1161,22 @@ func (vm *VM) CallValue(fn runtime.Value, args []runtime.Value) ([]runtime.Value
 	return vm.callValue(fn, args)
 }
 
+// CallValueNoMethodJIT calls a function value while suppressing method-JIT entry.
+// Host callbacks such as HTTP handlers run on Go-managed goroutines and may be
+// invoked long after the top-level script entered server.wait(); keeping them on
+// the bytecode interpreter path avoids native trampoline frames in host stacks
+// while preserving JIT for ordinary program execution.
+func (vm *VM) CallValueNoMethodJIT(fn runtime.Value, args []runtime.Value) ([]runtime.Value, error) {
+	vm.resetExecutionBudgets()
+	return vm.callValueNoMethodJIT(fn, args)
+}
+
+func (vm *VM) callValueNoMethodJIT(fn runtime.Value, args []runtime.Value) ([]runtime.Value, error) {
+	vm.suppressMethodJIT++
+	defer func() { vm.suppressMethodJIT-- }()
+	return vm.callValue(fn, args)
+}
+
 func (vm *VM) executeMethodJIT(compiled interface{}, regs []runtime.Value, base int, proto *FuncProto) ([]runtime.Value, error) {
 	if exec, ok := vm.methodJIT.(methodJITEngineWithResultBuffer); ok {
 		return exec.ExecuteWithResultBuffer(compiled, regs, base, proto, vm.retBuf[:0])
@@ -1250,7 +1267,7 @@ func (vm *VM) call(cl *Closure, args []runtime.Value, base int, numResults int) 
 	}
 
 	// Method JIT: check for compiled function.
-	if vm.methodJIT != nil && proto.MethodJITTier1Callable() && !proto.JITDisabled {
+	if vm.methodJIT != nil && vm.suppressMethodJIT == 0 && proto.MethodJITTier1Callable() && !proto.JITDisabled {
 		proto.CallCount++
 		if proto.CallCount <= 64 {
 			proto.ObserveArgShapes(args)

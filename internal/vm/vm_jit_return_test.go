@@ -83,3 +83,30 @@ func TestMethodJITBufferedReturnFallbackPreservesInterpreterMultiReturn(t *testi
 		t.Fatalf("results=%v, want [1 2]", results)
 	}
 }
+
+func TestCallValueNoMethodJITSuppressesMethodJIT(t *testing.T) {
+	proto := compileProto(t, `func f() { return 1, 2 }`)
+	v := New(vmtest.NewInterpreterGlobals())
+	if _, err := v.Execute(proto); err != nil {
+		t.Fatalf("Execute top: %v", err)
+	}
+	fn := v.GetGlobal("f")
+	if fn.IsNil() {
+		t.Fatal("missing function f")
+	}
+
+	jit := &resultBufferJIT{value: runtime.IntValue(99)}
+	v.SetMethodJIT(jit)
+	results, err := v.CallValueNoMethodJIT(fn, nil)
+	if err != nil {
+		t.Fatalf("CallValueNoMethodJIT: %v", err)
+	}
+	if jit.sawBuffer || jit.usedFallbackExecute {
+		t.Fatal("CallValueNoMethodJIT invoked MethodJIT")
+	}
+	if len(results) != 2 ||
+		!results[0].IsInt() || results[0].Int() != 1 ||
+		!results[1].IsInt() || results[1].Int() != 2 {
+		t.Fatalf("results=%v, want [1 2]", results)
+	}
+}
