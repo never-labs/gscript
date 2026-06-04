@@ -71,6 +71,7 @@ func (vm *VM) RegisterStdlibRuntimeModules() {
 		TaskLauncher: vm.launchSyncTask,
 		Less:         vm.valueLessThan,
 		SkipTable:    true,
+		Dialects:     vm.dialects,
 		Host: stdbind.HostOptions{
 			SkipHostIO:            true,
 			NetworkAllowed:        func() bool { return vm.networkAccess },

@@ -12,7 +12,7 @@ import (
 // quote { ... }, and small safe data transforms such as path`...`, url`...`, words`...`, nums`...`,
 // mdtable`...`, kv`...`, env`...`, jsonl`...`, semver`...`, html_escape`...`, urlquery`...`, mime`...`,
 // urlpath`...`, duration`...`, tap`...`, junit`...`, base64`...`, and hash`...`.
-func BuildDialect(opts HostOptions, maxHostResult func() int64) *Table {
+func BuildDialect(opts HostOptions, maxHostResult func() int64, specs ...DialectSpec) *Table {
 	t := markStdlibBoundModule(NewTable())
 
 	set := func(name string, fn func([]Value) ([]Value, error)) {
@@ -27,6 +27,13 @@ func BuildDialect(opts HostOptions, maxHostResult func() int64) *Table {
 	registerDialectWeb(register)
 	registerDialectData(register, maxHostResult)
 	registerDialectAI(register)
+	for _, spec := range specs {
+		names, handler, err := dialectSpecHandler(spec)
+		if err != nil {
+			panic(err)
+		}
+		register(names, handler)
+	}
 
 	eval := func(tag string, body Value, options *Table) ([]Value, error) {
 		handler, ok := registry.handler(tag)
@@ -119,6 +126,16 @@ type dialectMetadata struct {
 	Category     string
 	Capabilities []string
 	Builtin      bool
+}
+
+// DialectSpec describes a host-provided dialect registration.
+type DialectSpec struct {
+	Name         string
+	Aliases      []string
+	Category     string
+	Capabilities []string
+	Eval         func(Value, *Table) ([]Value, error)
+	Block        func(Value, *Table) ([]Value, error)
 }
 
 type dialectRegisterFunc func([]string, dialectHandler)
@@ -296,6 +313,29 @@ func dialectUserHandler(args []Value, call ScriptFunctionCaller) ([]string, dial
 	}
 	handler := dialectScriptHandler(call, evalFn, blockFn)
 	handler.meta = dialectUserMetadata(optionalTableArg(args, 2))
+	return names, handler, nil
+}
+
+func dialectSpecHandler(spec DialectSpec) ([]string, dialectHandler, error) {
+	names := make([]string, 0, 1+len(spec.Aliases))
+	names = append(names, spec.Name)
+	names = append(names, spec.Aliases...)
+	for _, name := range names {
+		if !validDialectName(name) {
+			return nil, dialectHandler{}, fmt.Errorf("dialect registry: invalid dialect name %q", name)
+		}
+	}
+	handler := dialectHandler{
+		eval:  spec.Eval,
+		block: spec.Block,
+		meta: dialectMetadata{
+			Category:     spec.Category,
+			Capabilities: append([]string(nil), spec.Capabilities...),
+		},
+	}
+	if handler.block == nil {
+		handler.block = handler.eval
+	}
 	return names, handler, nil
 }
 

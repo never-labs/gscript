@@ -75,7 +75,9 @@ func effectiveModuleCacheModules(o vmOptions) []modresolve.CacheModule {
 
 func newVM(o vmOptions) *VM {
 	interp := runtime.NewCore()
-	stdlibinstall.Install(interp)
+	stdlibinstall.InstallWithOptions(interp, stdlibinstall.ModuleOptions{
+		Dialects: bindDialectSpecs(o.dialects),
+	})
 	allowedStdlib := stdlibAllowedNames(o.libs)
 	interp.RestrictStdlib(allowedStdlib)
 	interp.SetModuleLoading(o.capabilities&CapModuleLoading != 0)
@@ -269,7 +271,9 @@ func (vm *VM) RunContext(ctx context.Context, prog *Program) error {
 		// Reuse existing bytecode VM if available (preserves JIT state)
 		bvm := vm.bvm
 		if bvm == nil {
-			bvm = bytecodevm.New(globals)
+			bvm = bytecodevm.NewWithOptions(globals, bytecodevm.Options{
+				Dialects: bindDialectSpecs(vm.opts.dialects),
+			})
 			bvm.SetStringMeta(vm.interp.StringMeta())
 			bvm.SetScriptDir(vm.interp.ScriptDir())
 			for name, root := range vm.opts.moduleCollections {

@@ -141,6 +141,7 @@ type vmOptions struct {
 	llmTraceSink       llm.TraceSink
 	llmRecordSink      llm.RecordSink
 	goImports          map[string]any
+	dialects           []hostDialectSpec
 	argScript          string
 	args               []string
 	argsSet            bool

@@ -57,9 +57,11 @@ func TestPublicSDKRecommendedAPISignaturesHideInternalRuntime(t *testing.T) {
 		"Int":         leia.Int,
 		"Float":       leia.Float,
 		"String":      leia.String,
+		"WithDialect": leia.WithDialect,
 	} {
 		assertNoInternalRuntimeType(t, name, reflect.TypeOf(fn))
 	}
+	assertNoInternalRuntimeType(t, "DialectHandler", reflect.TypeOf((*leia.DialectHandler)(nil)).Elem())
 }
 
 func TestPublicSDKRawRuntimeMethodsAreNotExported(t *testing.T) {

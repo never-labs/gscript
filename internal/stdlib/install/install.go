@@ -9,11 +9,17 @@ import (
 
 // Install registers the standard library on interp.
 func Install(interp *runtime.Interpreter) {
+	InstallWithOptions(interp, ModuleOptions{})
+}
+
+// InstallWithOptions registers the standard library on interp with additional
+// module options used by embedders.
+func InstallWithOptions(interp *runtime.Interpreter, extra ModuleOptions) {
 	if interp == nil {
 		return
 	}
 	interp.InstallRuntimeStdlib()
-	InstallModules(interpreterInstaller{interp: interp}, interp.MaxHostResultBytes, ModuleOptions{
+	opts := ModuleOptions{
 		ScriptCaller: interp.CallFunction,
 		TaskLauncher: interp.LaunchFunction,
 		Host: stdbind.HostOptions{
@@ -42,7 +48,9 @@ func Install(interp *runtime.Interpreter) {
 			Get:  interp.TableGet,
 			Set:  interp.TableSet,
 		},
-	})
+	}
+	opts.Dialects = append(opts.Dialects, extra.Dialects...)
+	InstallModules(interpreterInstaller{interp: interp}, interp.MaxHostResultBytes, opts)
 	InstallDebugAndTestkit(interp)
 	InstallLLM(interp)
 }
@@ -53,6 +61,7 @@ type ModuleOptions struct {
 	Less         stdbind.Less
 	Host         stdbind.HostOptions
 	Table        stdbind.TableOptions
+	Dialects     []stdbind.DialectSpec
 	SkipTable    bool
 }
 
@@ -89,7 +98,7 @@ func InstallModules(installer runtime.StdlibInstaller, maxHostResult func() int6
 	installer.RegisterTable("context", stdbind.BuildContext())
 	installer.RegisterTable("crypto", stdbind.BuildCrypto(maxHostResult))
 	installer.RegisterTable("csv", stdbind.BuildCSV(maxHostResult))
-	installer.RegisterTable("dialect", stdbind.BuildDialect(hostOpts, maxHostResult))
+	installer.RegisterTable("dialect", stdbind.BuildDialect(hostOpts, maxHostResult, opts.Dialects...))
 	installer.RegisterTable("encoding", stdbind.BuildEncoding(maxHostResult))
 	if !hostOpts.SkipHostIO {
 		installer.RegisterTable("fs", stdbind.BuildFSWithPolicy(hostOpts))

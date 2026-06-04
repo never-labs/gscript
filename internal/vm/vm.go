@@ -9,6 +9,7 @@ import (
 	"unsafe"
 
 	"github.com/never-labs/leia/internal/runtime"
+	stdbind "github.com/never-labs/leia/internal/stdlib/bind"
 	"github.com/never-labs/leia/internal/stdlib/catalog"
 	"github.com/never-labs/leia/internal/support/hostpath"
 	"github.com/never-labs/leia/internal/support/modresolve"
@@ -136,6 +137,7 @@ type VM struct {
 	llmProvider          runtime.LLMProvider
 	llmProviderFactory   runtime.LLMProviderFactory
 	llmTraceSink         runtime.LLMTraceSink
+	dialects             []stdbind.DialectSpec
 	ctx                  context.Context
 }
 
@@ -920,8 +922,18 @@ func (vm *VM) resolveGlobalIndex(name string) int {
 	return idx
 }
 
+// Options configures a bytecode VM instance.
+type Options struct {
+	Dialects []stdbind.DialectSpec
+}
+
 // New creates a new VM with the given globals.
 func New(globals map[string]runtime.Value) *VM {
+	return NewWithOptions(globals, Options{})
+}
+
+// NewWithOptions creates a new VM with the given globals and options.
+func NewWithOptions(globals map[string]runtime.Value, opts Options) *VM {
 	// Build indexed global array from the initial map
 	ga := make([]runtime.Value, 0, len(globals))
 	gi := make(map[string]int, len(globals))
@@ -952,6 +964,7 @@ func New(globals map[string]runtime.Value) *VM {
 		processShell:       true,
 		debugAccess:        true,
 		testkitAccess:      true,
+		dialects:           append([]stdbind.DialectSpec(nil), opts.Dialects...),
 	}
 	v.initTypeNameValues()
 	v.RegisterCoroutineLib()
