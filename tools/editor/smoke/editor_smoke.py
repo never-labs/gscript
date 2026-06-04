@@ -184,6 +184,9 @@ def check_vscode() -> None:
             fail(f"VS Code package is missing setting {setting}")
 
     extension = (ROOT / "editors/vscode/extension.js").read_text(encoding="utf-8")
+    for marker in ('"import"', '"dialect"'):
+        if marker not in extension:
+            fail(f"VS Code semantic token legend missing {marker}")
     for marker in (
         "startLanguageServer(context)",
         "textDocument/definition",

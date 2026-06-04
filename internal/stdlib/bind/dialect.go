@@ -94,10 +94,15 @@ func (r *dialectRegistry) register(names []string, handler dialectHandler) {
 	if handler.eval == nil && handler.block == nil {
 		panic("dialect registry: handler requires eval or block")
 	}
+	seen := make(map[string]struct{}, len(names))
 	for _, name := range names {
 		if name == "" {
 			panic("dialect registry: empty dialect name")
 		}
+		if _, exists := seen[name]; exists {
+			panic(fmt.Sprintf("dialect registry: duplicate dialect %q", name))
+		}
+		seen[name] = struct{}{}
 		if _, exists := r.handlers[name]; exists {
 			panic(fmt.Sprintf("dialect registry: duplicate dialect %q", name))
 		}

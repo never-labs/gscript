@@ -72,7 +72,9 @@ require github.com/acme/toolkit v1.2.3
 		t.Fatal(err)
 	}
 	path := filepath.Join(dir, "main.leia")
-	if err := os.WriteFile(path, []byte(`u := require("github.com/acme/toolkit/pkg/util"); assert(u.value == 91)`), 0644); err != nil {
+	if err := os.WriteFile(path, []byte(`import "github.com/acme/toolkit/pkg/util" as u
+assert(u.value == 91)
+`), 0644); err != nil {
 		t.Fatal(err)
 	}
 

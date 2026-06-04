@@ -1,0 +1,79 @@
+// sql_result_analytics.leia - Model a database result set locally.
+// Demonstrates: SQL-shaped text, CSV rows, regexp validation, SoA analytics, JSON output.
+
+print("=== Dialects: SQL result analytics ===")
+
+query := lines`SELECT region, status, amount
+FROM invoices
+WHERE status IN ('paid', 'late')
+ORDER BY region, status;
+`
+sql_text := table.concat(query, " ")
+
+identifier := regexp!`^[A-Za-z_][A-Za-z0-9_]*$`
+assert(identifier.match("invoices") == true)
+assert(identifier.match("1bad") == false)
+
+rows := dialect.eval("csv", "id,region,status,amount\n1,north,paid,120\n2,north,late,35\n3,south,paid,80\n4,south,late,55\n5,south,paid,40\n", {headers: true})
+
+ids := {}
+amounts := {}
+paid_flags := {}
+late_flags := {}
+for i := 1; i <= #rows; i++ {
+    ids[i] = tonumber(rows[i].id)
+    amounts[i] = tonumber(rows[i].amount)
+    if rows[i].status == "paid" {
+        paid_flags[i] = 1
+        late_flags[i] = 0
+    } else {
+        paid_flags[i] = 0
+        late_flags[i] = 1
+    }
+}
+
+result_set := soa.zip({
+    id: array.i64(ids),
+    amount: array.f64(amounts),
+    paid: array.f64(paid_flags),
+    late: array.f64(late_flags),
+})
+
+regions := {"north", "south"}
+summary := {}
+for r := 1; r <= #regions; r++ {
+    region := regions[r]
+    total := 0
+    paid_count := 0
+    late_count := 0
+    for i := 1; i <= #rows; i++ {
+        if rows[i].region == region {
+            total = total + tonumber(rows[i].amount)
+            paid_count = paid_count + paid_flags[i]
+            late_count = late_count + late_flags[i]
+        }
+    }
+    summary[r] = {region: region, total: total, paid: paid_count, late: late_count}
+}
+
+encoded_summary := dialect.eval("json", summary, {mode: "encode"})
+
+print("sql:", sql_text)
+print("rows:", soa.len(result_set))
+print(string.format("total amount: %.0f", soa.sum(result_set, "amount")))
+print(string.format("paid rows: %.0f late rows: %.0f", soa.sum(result_set, "paid"), soa.sum(result_set, "late")))
+print(encoded_summary)
+
+assert(sql_text == "SELECT region, status, amount FROM invoices WHERE status IN ('paid', 'late') ORDER BY region, status;")
+assert(#rows == 5)
+assert(soa.len(result_set) == 5)
+assert(soa.sum(result_set, "amount") == 330)
+assert(soa.mean(result_set, "amount") == 66)
+assert(soa.sum(result_set, "paid") == 3)
+assert(soa.sum(result_set, "late") == 2)
+assert(summary[1].region == "north")
+assert(summary[1].total == 155)
+assert(summary[2].total == 175)
+assert(encoded_summary == "[{\"late\":1,\"paid\":1,\"region\":\"north\",\"total\":155},{\"late\":1,\"paid\":2,\"region\":\"south\",\"total\":175}]")
+
+print("sql result analytics ok")

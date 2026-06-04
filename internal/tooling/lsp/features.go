@@ -37,6 +37,8 @@ var semanticTokenModifiers = []string{
 	"declaration",
 	"readonly",
 	"defaultLibrary",
+	"import",
+	"dialect",
 }
 
 const (
@@ -57,6 +59,8 @@ const (
 	semanticDeclarationModifier = 1 << iota
 	semanticReadonlyModifier
 	semanticDefaultLibraryModifier
+	semanticImportModifier
+	semanticDialectModifier
 )
 
 type hoverParams struct {
@@ -449,13 +453,19 @@ func semanticTokenKind(tokens []lexer.Token, index int) (int, int, bool) {
 	case lexer.TOKEN_IDENT:
 		switch {
 		case tokenLooksLikeImportAlias(tokens, index):
-			return semanticNamespace, semanticDeclarationModifier, true
+			return semanticNamespace, semanticDeclarationModifier | semanticImportModifier, true
+		case tokenLooksLikeImportKeyword(tokens, index):
+			return semanticKeyword, semanticImportModifier, true
+		case tokenLooksLikeImportAs(tokens, index):
+			return semanticKeyword, semanticImportModifier, true
+		case tokenLooksLikeContextualKeyword(tokens, index):
+			return semanticKeyword, 0, true
+		case tokenLooksLikeDialectTag(tokens, index):
+			return semanticNamespace, semanticDialectModifier, true
 		case tokenIsDeclarationName(tokens, index):
 			return semanticFunction, semanticDeclarationModifier, true
 		case tokenIsParameterDeclaration(tokens, index):
 			return semanticParameter, semanticDeclarationModifier, true
-		case tokenLooksLikeContextualKeyword(tokens, index):
-			return semanticKeyword, 0, true
 		case tokenLooksLikeMethodCall(tokens, index):
 			return semanticMethod, 0, true
 		case tokenLooksLikeProperty(tokens, index):
@@ -470,6 +480,12 @@ func semanticTokenKind(tokens []lexer.Token, index int) (int, int, bool) {
 			return semanticVariable, 0, true
 		}
 	case lexer.TOKEN_STRING:
+		if tokenLooksLikeImportPath(tokens, index) {
+			return semanticString, semanticImportModifier, true
+		}
+		if tokenLooksLikeDialectBody(tokens, index) {
+			return semanticString, semanticDialectModifier, true
+		}
 		return semanticString, 0, true
 	case lexer.TOKEN_NUMBER:
 		return semanticNumber, 0, true
@@ -485,7 +501,15 @@ func semanticTokenKind(tokens []lexer.Token, index int) (int, int, bool) {
 		lexer.TOKEN_PERCENT, lexer.TOKEN_POW, lexer.TOKEN_AND, lexer.TOKEN_OR, lexer.TOKEN_NOT, lexer.TOKEN_BIT_AND,
 		lexer.TOKEN_BIT_OR, lexer.TOKEN_BIT_XOR, lexer.TOKEN_BIT_AND_NOT, lexer.TOKEN_SHL, lexer.TOKEN_SHR,
 		lexer.TOKEN_CONCAT, lexer.TOKEN_LEN, lexer.TOKEN_ELLIPSIS, lexer.TOKEN_INC, lexer.TOKEN_DEC:
+		if tok.Type == lexer.TOKEN_NOT && tokenLooksLikeDialectBang(tokens, index) {
+			return semanticOperator, semanticDialectModifier, true
+		}
 		return semanticOperator, 0, true
+	case lexer.TOKEN_DOLLAR:
+		if tokenLooksLikeShellDialectTag(tokens, index) {
+			return semanticNamespace, semanticDialectModifier, true
+		}
+		return 0, 0, false
 	default:
 		return 0, 0, false
 	}
@@ -501,6 +525,63 @@ func tokenIsDeclarationName(tokens []lexer.Token, index int) bool {
 
 func tokenLooksLikeImportAlias(tokens []lexer.Token, index int) bool {
 	return index > 0 && tokenText(tokens[index-1]) == "as"
+}
+
+func tokenLooksLikeImportKeyword(tokens []lexer.Token, index int) bool {
+	return tokens[index].Type == lexer.TOKEN_IDENT && tokens[index].Value == "import" && tokenAtStartOfStmt(tokens, index)
+}
+
+func tokenLooksLikeImportAs(tokens []lexer.Token, index int) bool {
+	return tokens[index].Type == lexer.TOKEN_IDENT && tokens[index].Value == "as" && index > 0 &&
+		tokens[index-1].Type == lexer.TOKEN_STRING && index+1 < len(tokens) && tokens[index+1].Type == lexer.TOKEN_IDENT
+}
+
+func tokenLooksLikeDialectTag(tokens []lexer.Token, index int) bool {
+	if tokens[index].Type != lexer.TOKEN_IDENT || !tokenCanStartDialectExpression(tokens, index) {
+		return false
+	}
+	return index+1 < len(tokens) && (tokens[index+1].Type == lexer.TOKEN_STRING || tokens[index+1].Type == lexer.TOKEN_LBRACE ||
+		(tokens[index+1].Type == lexer.TOKEN_NOT && index+2 < len(tokens) &&
+			(tokens[index+2].Type == lexer.TOKEN_STRING || tokens[index+2].Type == lexer.TOKEN_LBRACE)))
+}
+
+func tokenCanStartDialectExpression(tokens []lexer.Token, index int) bool {
+	if index == 0 {
+		return true
+	}
+	prev := tokens[index-1]
+	if prev.Line < tokens[index].Line {
+		return true
+	}
+	switch prev.Type {
+	case lexer.TOKEN_ASSIGN, lexer.TOKEN_DECLARE, lexer.TOKEN_COMMA, lexer.TOKEN_LPAREN, lexer.TOKEN_LBRACKET,
+		lexer.TOKEN_LBRACE, lexer.TOKEN_COLON, lexer.TOKEN_RETURN, lexer.TOKEN_ARROW, lexer.TOKEN_PLUS,
+		lexer.TOKEN_MINUS, lexer.TOKEN_STAR, lexer.TOKEN_SLASH, lexer.TOKEN_PERCENT, lexer.TOKEN_AND,
+		lexer.TOKEN_OR, lexer.TOKEN_NOT:
+		return true
+	default:
+		return false
+	}
+}
+
+func tokenLooksLikeDialectBang(tokens []lexer.Token, index int) bool {
+	return index > 0 && tokens[index-1].Type == lexer.TOKEN_IDENT && index+1 < len(tokens) &&
+		(tokens[index+1].Type == lexer.TOKEN_STRING || tokens[index+1].Type == lexer.TOKEN_LBRACE) &&
+		tokenLooksLikeDialectTag(tokens, index-1)
+}
+
+func tokenLooksLikeDialectBody(tokens []lexer.Token, index int) bool {
+	if index > 0 && tokens[index-1].Type == lexer.TOKEN_IDENT && tokenLooksLikeDialectTag(tokens, index-1) {
+		return true
+	}
+	if index > 1 && tokens[index-1].Type == lexer.TOKEN_NOT && tokenLooksLikeDialectBang(tokens, index-1) {
+		return true
+	}
+	return index > 0 && tokenLooksLikeShellDialectTag(tokens, index-1)
+}
+
+func tokenLooksLikeShellDialectTag(tokens []lexer.Token, index int) bool {
+	return tokens[index].Type == lexer.TOKEN_DOLLAR && index+1 < len(tokens) && tokens[index+1].Type == lexer.TOKEN_STRING
 }
 
 func tokenLooksLikeContextualKeyword(tokens []lexer.Token, index int) bool {

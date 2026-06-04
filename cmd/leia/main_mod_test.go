@@ -15,8 +15,12 @@ import (
 
 func TestModInitGraphAndVerify(t *testing.T) {
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "main.leia"), []byte(`helper := require("pkg.helper")
-jsonMod := require("json")
+	if err := os.WriteFile(filepath.Join(dir, "main.leia"), []byte(`import (
+  "pkg.helper" as helper
+  "json" as jsonMod
+)
+_ = helper
+_ = jsonMod
 `), 0644); err != nil {
 		t.Fatal(err)
 	}
@@ -351,10 +355,16 @@ require github.com/acme/toolkit v1.2.3
 
 func TestModAddAndTidy(t *testing.T) {
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "main.leia"), []byte(`net := require("example.com/lib/net")
-json := require("json")
-localMod := require("pkg.helper")
-vendored := require("vendor:foo")
+	if err := os.WriteFile(filepath.Join(dir, "main.leia"), []byte(`import (
+  "example.com/lib/net" as net
+  "json" as json
+  "pkg.helper" as localMod
+  "vendor:foo" as vendored
+)
+_ = net
+_ = json
+_ = localMod
+_ = vendored
 `), 0644); err != nil {
 		t.Fatal(err)
 	}
@@ -548,7 +558,9 @@ func testCommandGitHubZip(t *testing.T, name, data string) []byte {
 
 func TestModTidyReportsMissingExternalRequire(t *testing.T) {
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "main.leia"), []byte(`lib := require("example.com/lib/net")`), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "main.leia"), []byte(`import "example.com/lib/net" as lib
+_ = lib
+`), 0644); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(dir, "leia.mod"), []byte("module example.com/demo\nleia 0.1\n"), 0644); err != nil {
@@ -571,7 +583,9 @@ func TestModTidyReportsMissingExternalRequire(t *testing.T) {
 
 func TestModVerifyReportsMissingExternalRequire(t *testing.T) {
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "main.leia"), []byte(`lib := require("example.com/lib/net")`), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "main.leia"), []byte(`import "example.com/lib/net" as lib
+_ = lib
+`), 0644); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(dir, "leia.mod"), []byte("module example.com/demo\nleia 0.1\n"), 0644); err != nil {
@@ -594,7 +608,9 @@ func TestModVerifyReportsMissingExternalRequire(t *testing.T) {
 
 func TestModVerifyChecksLocalCollectionsAndReplaces(t *testing.T) {
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "main.leia"), []byte(`vendored := require("vendor:foo")`), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "main.leia"), []byte(`import "vendor:foo" as vendored
+_ = vendored
+`), 0644); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(dir, "leia.mod"), []byte(`module example.com/demo
@@ -636,7 +652,9 @@ func TestModLockWritesSumAndVerifyDetectsLocalMutation(t *testing.T) {
 	if err := os.WriteFile(vendorFile, []byte(`func value() { return 1 }`), 0644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "main.leia"), []byte(`util := require("vendor:pkg.util")`), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "main.leia"), []byte(`import "vendor:pkg.util" as util
+_ = util
+`), 0644); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(dir, "leia.mod"), []byte(`module example.com/demo

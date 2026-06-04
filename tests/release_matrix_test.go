@@ -359,6 +359,29 @@ func TestReleaseMatrixDocumentedCIProfilesAreInspectable(t *testing.T) {
 	}
 }
 
+func TestReleaseMatrixCIProfilesKeepExampleImportGuards(t *testing.T) {
+	root := findRepoRoot(t)
+
+	smokeOut := runCommand(t, root, 30*time.Second, "go", "run", "./cmd/leia", "ci", "smoke", "--list")
+	for _, want := range []string{"go test", "./cmd/leia", "python3 tests/manifest.py check tests benchmarks"} {
+		if !strings.Contains(smokeOut, want) {
+			t.Fatalf("ci smoke --list must include %q so example/import guards stay in the smoke test matrix; got:\n%s", want, smokeOut)
+		}
+	}
+
+	releaseOut := runCommand(t, root, 30*time.Second, "go", "run", "./cmd/leia", "ci", "release", "--list")
+	if !strings.Contains(releaseOut, "bash scripts/production_check.sh --full") {
+		t.Fatalf("ci release --list must run the full production check; got:\n%s", releaseOut)
+	}
+
+	productionOut := runCommand(t, root, 30*time.Second, "bash", "scripts/production_check.sh", "--full", "--list")
+	for _, want := range []string{"go test ./... -count=1", "python3 tests/manifest.py check tests benchmarks"} {
+		if !strings.Contains(productionOut, want) {
+			t.Fatalf("production_check.sh --full --list must include %q so dialect/package-managed example tests stay release-gated; got:\n%s", want, productionOut)
+		}
+	}
+}
+
 func TestReleaseMatrixCommunityEntrypointsAreLinked(t *testing.T) {
 	root := findRepoRoot(t)
 	for _, path := range []string{

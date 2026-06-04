@@ -59,7 +59,7 @@ func TestServerInitializeShutdown(t *testing.T) {
 		t.Fatalf("semantic token legend = %#v", legend)
 	}
 	tokenModifiers := legend["tokenModifiers"].([]any)
-	if len(tokenModifiers) != len(semanticTokenModifiers) || tokenModifiers[0] != "declaration" || tokenModifiers[len(tokenModifiers)-1] != "defaultLibrary" {
+	if len(tokenModifiers) != len(semanticTokenModifiers) || tokenModifiers[0] != "declaration" || tokenModifiers[len(tokenModifiers)-1] != "dialect" {
 		t.Fatalf("semantic token modifiers = %#v", legend)
 	}
 	if caps["workspaceSymbolProvider"] != true {
@@ -520,6 +520,9 @@ func TestSemanticTokensLexerErrorReturnsEmptyData(t *testing.T) {
 func TestSemanticTokensClassifyLeiaSemanticRoles(t *testing.T) {
 	src := strings.Join([]string{
 		`import "go:strings" as strings`,
+		`rows := csv!` + "`a,b\\n1,2\\n`",
+		`out := $` + "`printf ok`",
+		`prompt! { role: "system" }`,
 		`select {`,
 		`case value := <-ch:`,
 		`    return value`,
@@ -533,8 +536,16 @@ func TestSemanticTokensClassifyLeiaSemanticRoles(t *testing.T) {
 		"",
 	}, "\n")
 	tokens := decodedSemanticTokens(src)
-	assertSemanticToken(t, tokens, "import", semanticKeyword, 0)
-	assertSemanticToken(t, tokens, "strings", semanticNamespace, semanticDeclarationModifier)
+	assertSemanticToken(t, tokens, "import", semanticKeyword, semanticImportModifier)
+	assertSemanticToken(t, tokens, "go:strings", semanticString, semanticImportModifier)
+	assertSemanticToken(t, tokens, "as", semanticKeyword, semanticImportModifier)
+	assertSemanticToken(t, tokens, "strings", semanticNamespace, semanticDeclarationModifier|semanticImportModifier)
+	assertSemanticToken(t, tokens, "csv", semanticNamespace, semanticDialectModifier)
+	assertSemanticToken(t, tokens, "!", semanticOperator, semanticDialectModifier)
+	assertSemanticToken(t, tokens, `a,b\n1,2\n`, semanticString, semanticDialectModifier)
+	assertSemanticToken(t, tokens, "$", semanticNamespace, semanticDialectModifier)
+	assertSemanticToken(t, tokens, "printf ok", semanticString, semanticDialectModifier)
+	assertSemanticToken(t, tokens, "prompt", semanticNamespace, semanticDialectModifier)
 	assertSemanticToken(t, tokens, "select", semanticKeyword, 0)
 	assertSemanticToken(t, tokens, "case", semanticKeyword, 0)
 	assertSemanticToken(t, tokens, "default", semanticKeyword, 0)
