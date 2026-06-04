@@ -8,10 +8,14 @@ func TestDialectNetworkParsesIPCIDRAndHostPort(t *testing.T) {
 		ip_in_net := dialect.eval("ipaddr", "10.2.3.4", {cidr: "10.2.0.0/16"})
 		ip_out_net := dialect.eval("ipaddr", "10.3.3.4", {cidr: "10.2.0.0/16"})
 		bad_ip, bad_ip_err := dialect.eval("ipaddr", "not-an-ip")
+		bad_ip_cidr, bad_ip_cidr_err := dialect.eval("ipaddr", "10.2.3.4", {cidr: "not-a-cidr"})
 		net := cidr`+"`"+`10.2.0.7/16`+"`"+`
 		net_contains := dialect.eval("cidr", "10.2.0.0/16", {ip: "10.2.3.4"})
 		net_misses := dialect.eval("cidr", "10.2.0.0/16", {ip: "10.3.3.4"})
+		v6_contains := dialect.eval("cidr", "2001:db8::/32", {ip: "2001:db8::42"})
+		v6_misses := dialect.eval("cidr", "2001:db8::/32", {ip: "2001:db9::1"})
 		bad_cidr, bad_cidr_err := dialect.eval("cidr", "10.2.0.0")
+		bad_cidr_ip, bad_cidr_ip_err := dialect.eval("cidr", "2001:db8::/32", {ip: "not-an-ip"})
 		hp := hostport`+"`"+`[2001:db8::1]:443`+"`"+`
 		hp_joined := dialect.eval("hostport", {host: "2001:db8::1", port: "443"}, {mode: "encode"})
 		bad_hp, bad_hp_err := dialect.eval("hostport", "2001:db8::1:443")
@@ -36,6 +40,9 @@ func TestDialectNetworkParsesIPCIDRAndHostPort(t *testing.T) {
 	if !interp.GetGlobal("bad_ip").IsNil() || !interp.GetGlobal("bad_ip_err").IsString() {
 		t.Fatalf("bad ip = %v err %v, want nil error string", interp.GetGlobal("bad_ip"), interp.GetGlobal("bad_ip_err"))
 	}
+	if !interp.GetGlobal("bad_ip_cidr").IsNil() || !interp.GetGlobal("bad_ip_cidr_err").IsString() {
+		t.Fatalf("bad ip cidr = %v err %v, want nil error string", interp.GetGlobal("bad_ip_cidr"), interp.GetGlobal("bad_ip_cidr_err"))
+	}
 
 	network := interp.GetGlobal("net").Table()
 	if got := network.RawGetString("masked").Str(); got != "10.2.0.0/16" {
@@ -50,8 +57,17 @@ func TestDialectNetworkParsesIPCIDRAndHostPort(t *testing.T) {
 	if interp.GetGlobal("net_misses").Table().RawGetString("contains").Bool() {
 		t.Fatalf("net_misses contains = true, want false")
 	}
+	if !interp.GetGlobal("v6_contains").Table().RawGetString("contains").Bool() {
+		t.Fatalf("v6_contains contains = false, want true")
+	}
+	if interp.GetGlobal("v6_misses").Table().RawGetString("contains").Bool() {
+		t.Fatalf("v6_misses contains = true, want false")
+	}
 	if !interp.GetGlobal("bad_cidr").IsNil() || !interp.GetGlobal("bad_cidr_err").IsString() {
 		t.Fatalf("bad cidr = %v err %v, want nil error string", interp.GetGlobal("bad_cidr"), interp.GetGlobal("bad_cidr_err"))
+	}
+	if !interp.GetGlobal("bad_cidr_ip").IsNil() || !interp.GetGlobal("bad_cidr_ip_err").IsString() {
+		t.Fatalf("bad cidr ip = %v err %v, want nil error string", interp.GetGlobal("bad_cidr_ip"), interp.GetGlobal("bad_cidr_ip_err"))
 	}
 
 	hostport := interp.GetGlobal("hp").Table()
@@ -75,6 +91,8 @@ func TestDialectHostPortModeAliasesAndUnknownMode(t *testing.T) {
 		decoded := dialect.eval("hostport", "example.com:443", {mode: "decode"})
 		joined := dialect.eval("hostport", {host: "example.com", port: "443"}, {mode: "join"})
 		formatted := dialect.eval("hostport", {host: "example.com", port: "443"}, {mode: "format"})
+		missing_host, missing_host_err := dialect.eval("hostport", {port: "443"}, {mode: "encode"})
+		missing_port, missing_port_err := dialect.eval("hostport", {host: "example.com"}, {mode: "encode"})
 		bad, bad_err := dialect.eval("hostport", "example.com:443", {mode: "bogus"})
 	`, "dialect", BuildDialect(HostOptions{}, nil))
 
@@ -90,5 +108,7 @@ func TestDialectHostPortModeAliasesAndUnknownMode(t *testing.T) {
 	if got := interp.GetGlobal("formatted").Str(); got != "example.com:443" {
 		t.Fatalf("formatted = %q, want example.com:443", got)
 	}
+	assertDialectModeError(t, interp.GetGlobal("missing_host"), interp.GetGlobal("missing_host_err"), "hostport dialect: host and port required for encode")
+	assertDialectModeError(t, interp.GetGlobal("missing_port"), interp.GetGlobal("missing_port_err"), "hostport dialect: host and port required for encode")
 	assertDialectModeError(t, interp.GetGlobal("bad"), interp.GetGlobal("bad_err"), "hostport dialect: unknown mode")
 }

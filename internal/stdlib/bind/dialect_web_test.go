@@ -9,6 +9,8 @@ func TestDialectURLParseBoundaries(t *testing.T) {
 	interp := runWithLib(t, `
 		parsed := dialect.eval("url", "http://user:p%40ss@[2001:db8::1]:8080/a%20b?tag=a&tag=b&empty=#frag")
 		invalid, invalid_err := dialect.eval("url", "http://[::1")
+		bad_path_percent, bad_path_percent_err := dialect.eval("url", "https://example.test/a%zz")
+		bad_user_percent, bad_user_percent_err := dialect.eval("url", "https://u%zz@example.test/")
 	`, "dialect", BuildDialect(HostOptions{}, nil))
 
 	parsed := interp.GetGlobal("parsed").Table()
@@ -45,6 +47,16 @@ func TestDialectURLParseBoundaries(t *testing.T) {
 	}
 	if got := interp.GetGlobal("invalid_err"); !got.IsString() || got.Str() == "" {
 		t.Fatalf("invalid URL error = %v, want non-empty string", got)
+	}
+	for _, name := range []string{"bad_path_percent", "bad_user_percent"} {
+		if !interp.GetGlobal(name).IsNil() {
+			t.Fatalf("%s returned non-nil result", name)
+		}
+	}
+	for _, name := range []string{"bad_path_percent_err", "bad_user_percent_err"} {
+		if got := interp.GetGlobal(name); !got.IsString() || got.Str() == "" {
+			t.Fatalf("%s = %v, want non-empty string", name, got)
+		}
 	}
 }
 
@@ -464,6 +476,7 @@ func TestDialectHeadersBoundaryParsing(t *testing.T) {
 func TestDialectHeadersInvalidInputReturnsError(t *testing.T) {
 	interp := runWithLib(t, `
 		parsed, parse_err := dialect.eval("http_headers", "ok: yes\r\nnot a header\r\n")
+		encoded_scalar, encode_scalar_err := dialect.eval("headers", "x-ok: yes", {mode: "encode"})
 		bad := {}
 		bad["bad name"] = "x"
 		encoded, encode_err := dialect.eval("headers", bad, {mode: "encode"})
@@ -477,6 +490,12 @@ func TestDialectHeadersInvalidInputReturnsError(t *testing.T) {
 	}
 	if got := interp.GetGlobal("parse_err"); !got.IsString() || got.Str() == "" {
 		t.Fatalf("invalid parse error = %v, want non-empty string", got)
+	}
+	if !interp.GetGlobal("encoded_scalar").IsNil() {
+		t.Fatalf("invalid scalar encode returned non-nil result")
+	}
+	if got := interp.GetGlobal("encode_scalar_err"); !got.IsString() || got.Str() == "" {
+		t.Fatalf("invalid scalar encode error = %v, want non-empty string", got)
 	}
 	if !interp.GetGlobal("encoded").IsNil() {
 		t.Fatalf("invalid encode returned non-nil result")
@@ -604,18 +623,21 @@ set-cookie: b=2
 
 func TestDialectHTTPMessageInvalidInputReturnsError(t *testing.T) {
 	interp := runWithLib(t, `
+		bad_empty, bad_empty_err := dialect.eval("httpmsg", "")
 		bad_start, bad_start_err := dialect.eval("httpmsg", "not http\r\nx: y\r\n\r\n")
 		bad_header, bad_header_err := dialect.eval("httpmsg", "GET / HTTP/1.1\r\nbad header\r\n\r\n")
+		bad_status, bad_status_err := dialect.eval("httpmsg", {type: "response", status: 99}, {mode: "encode"})
 		bad_encode, bad_encode_err := dialect.eval("httpmsg", {method: "BAD METHOD", target: "/"}, {mode: "encode"})
 		bad_header_encode, bad_header_encode_err := dialect.eval("httpmsg", {method: "GET", headers: {["bad name"]: "x"}}, {mode: "encode"})
+		bad_header_value, bad_header_value_err := dialect.eval("httpmsg", {method: "GET", headers: {["x-ok"]: "first\r\nsecond: no"}}, {mode: "format"})
 	`, "dialect", BuildDialect(HostOptions{}, nil))
 
-	for _, name := range []string{"bad_start", "bad_header", "bad_encode", "bad_header_encode"} {
+	for _, name := range []string{"bad_empty", "bad_start", "bad_header", "bad_status", "bad_encode", "bad_header_encode", "bad_header_value"} {
 		if !interp.GetGlobal(name).IsNil() {
 			t.Fatalf("%s returned non-nil result", name)
 		}
 	}
-	for _, name := range []string{"bad_start_err", "bad_header_err", "bad_encode_err", "bad_header_encode_err"} {
+	for _, name := range []string{"bad_empty_err", "bad_start_err", "bad_header_err", "bad_status_err", "bad_encode_err", "bad_header_encode_err", "bad_header_value_err"} {
 		if got := interp.GetGlobal(name); !got.IsString() || got.Str() == "" {
 			t.Fatalf("%s = %v, want non-empty string", name, got)
 		}
@@ -653,6 +675,7 @@ func TestDialectCookieBoundaryValues(t *testing.T) {
 func TestDialectCookieInvalidInputReturnsError(t *testing.T) {
 	interp := runWithLib(t, `
 		parsed, parse_err := dialect.eval("cookie", "ok=1; missing")
+		encoded_scalar, encode_scalar_err := dialect.eval("cookie", "ok=1", {mode: "encode"})
 		bad := {}
 		bad["bad name"] = "x"
 		encoded, encode_err := dialect.eval("cookie", bad, {mode: "encode"})
@@ -667,6 +690,12 @@ func TestDialectCookieInvalidInputReturnsError(t *testing.T) {
 	if got := interp.GetGlobal("parse_err"); !got.IsString() || got.Str() == "" {
 		t.Fatalf("invalid parse error = %v, want non-empty string", got)
 	}
+	if !interp.GetGlobal("encoded_scalar").IsNil() {
+		t.Fatalf("invalid scalar encode returned non-nil result")
+	}
+	if got := interp.GetGlobal("encode_scalar_err"); !got.IsString() || got.Str() == "" {
+		t.Fatalf("invalid scalar encode error = %v, want non-empty string", got)
+	}
 	if !interp.GetGlobal("encoded").IsNil() {
 		t.Fatalf("invalid encode returned non-nil result")
 	}
@@ -678,5 +707,78 @@ func TestDialectCookieInvalidInputReturnsError(t *testing.T) {
 	}
 	if got := interp.GetGlobal("encode_value_err"); !got.IsString() || got.Str() == "" {
 		t.Fatalf("invalid encode value error = %v, want non-empty string", got)
+	}
+}
+
+func TestDialectSSEInvalidInputReturnsError(t *testing.T) {
+	interp := runWithLib(t, `
+		bad_retry, bad_retry_err := dialect.eval("sse", "retry: soon\n\n")
+		ok_scalar_encode, scalar_encode_err := pcall(dialect.eval, "sse", "data: hi\n\n", {mode: "encode"})
+		ok_bad_retry_encode, bad_retry_encode_err := pcall(dialect.eval, "sse", {{data: "hi", retry: "soon"}}, {mode: "format"})
+	`, "dialect", BuildDialect(HostOptions{}, nil))
+
+	if !interp.GetGlobal("bad_retry").IsNil() {
+		t.Fatalf("invalid retry parse returned non-nil result")
+	}
+	if got := interp.GetGlobal("bad_retry_err"); !got.IsString() || got.Str() == "" {
+		t.Fatalf("invalid retry parse error = %v, want non-empty string", got)
+	}
+	if got := interp.GetGlobal("ok_scalar_encode").Bool(); got {
+		t.Fatalf("scalar encode pcall succeeded, want failure")
+	}
+	if got := interp.GetGlobal("scalar_encode_err"); got.IsNil() || got.String() == "" {
+		t.Fatalf("scalar encode error = %v, want non-empty error", got)
+	}
+	if got := interp.GetGlobal("ok_bad_retry_encode").Bool(); got {
+		t.Fatalf("bad retry encode pcall succeeded, want failure")
+	}
+	if got := interp.GetGlobal("bad_retry_encode_err"); got.IsNil() || got.String() == "" {
+		t.Fatalf("bad retry encode error = %v, want non-empty error", got)
+	}
+}
+
+func TestDialectMultipartInvalidInputReturnsError(t *testing.T) {
+	interp := runWithLib(t, `
+		bad_content_type, bad_content_type_err := dialect.eval("multipart", "--x--\r\n", {content_type: "multipart/form-data; boundary"})
+		bad_boundary, bad_boundary_err := dialect.eval("multipart", "--bad--\r\n", {boundary: "bad\r\nboundary"})
+		bad_parse, bad_parse_err := dialect.eval("multipart", "not multipart", {boundary: "fixture"})
+		bad_scalar_encode, bad_scalar_encode_err := dialect.eval("multipart", "not parts", {mode: "encode", boundary: "fixture"})
+		bad_item_encode, bad_item_encode_err := dialect.eval("multipart", {"not table"}, {mode: "format", boundary: "fixture"})
+		bad_header := {{name: "field", body: "value", headers: {["bad name"]: "x"}}}
+		bad_header_encode, bad_header_encode_err := dialect.eval("multipart", bad_header, {mode: "encode", boundary: "fixture"})
+		bad_header_value := {{name: "field", body: "value", headers: {["x-ok"]: "first\r\nsecond: no"}}}
+		bad_header_value_encode, bad_header_value_encode_err := dialect.eval("multipart", bad_header_value, {mode: "encode", boundary: "fixture"})
+	`, "dialect", BuildDialect(HostOptions{}, nil))
+
+	for _, name := range []string{"bad_content_type", "bad_boundary", "bad_parse", "bad_scalar_encode", "bad_item_encode", "bad_header_encode", "bad_header_value_encode"} {
+		if !interp.GetGlobal(name).IsNil() {
+			t.Fatalf("%s returned non-nil result", name)
+		}
+	}
+	for _, name := range []string{"bad_content_type_err", "bad_boundary_err", "bad_parse_err", "bad_scalar_encode_err", "bad_item_encode_err", "bad_header_encode_err", "bad_header_value_encode_err"} {
+		if got := interp.GetGlobal(name); !got.IsString() || got.Str() == "" {
+			t.Fatalf("%s = %v, want non-empty string", name, got)
+		}
+	}
+}
+
+func TestDialectJWTInvalidInputReturnsError(t *testing.T) {
+	interp := runWithLib(t, `
+		bad_segments, bad_segments_err := dialect.eval("jwt", "not-a-token")
+		bad_header_b64, bad_header_b64_err := dialect.eval("jwt", "%.e30.sig")
+		bad_payload_b64, bad_payload_b64_err := dialect.eval("jwt", "e30.%.sig")
+		bad_header_json, bad_header_json_err := dialect.eval("jwt", "bm90LWpzb24.e30.sig")
+		bad_payload_json, bad_payload_json_err := dialect.eval("jwt", "e30.bm90LWpzb24.sig", {mode: "decode"})
+	`, "dialect", BuildDialect(HostOptions{}, nil))
+
+	for _, name := range []string{"bad_segments", "bad_header_b64", "bad_payload_b64", "bad_header_json", "bad_payload_json"} {
+		if !interp.GetGlobal(name).IsNil() {
+			t.Fatalf("%s returned non-nil result", name)
+		}
+	}
+	for _, name := range []string{"bad_segments_err", "bad_header_b64_err", "bad_payload_b64_err", "bad_header_json_err", "bad_payload_json_err"} {
+		if got := interp.GetGlobal(name); !got.IsString() || got.Str() == "" {
+			t.Fatalf("%s = %v, want non-empty string", name, got)
+		}
 	}
 }

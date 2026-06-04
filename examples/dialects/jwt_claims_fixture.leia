@@ -2,7 +2,7 @@ print("=== Dialects: JWT claims fixture ===")
 
 token := "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOiJ1c2VyLTQyIiwic2NvcGUiOiJyZWFkIHdyaXRlIiwiZXhwIjoxODkzNDU2MDAwfQ.signature"
 decoded := jwt`eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOiJ1c2VyLTQyIiwic2NvcGUiOiJyZWFkIHdyaXRlIiwiZXhwIjoxODkzNDU2MDAwfQ.signature`
-again := dialect.eval("jwt", token, {mode: "unverified"})
+again := dialect.eval("jwt", token, {mode: "decode"})
 
 print("subject:", decoded.payload.sub)
 print("scope:", decoded.payload.scope)

@@ -11,6 +11,7 @@ cookie: session=s-123; cohort=beta
 x-trace-id: req-42
 
 `
+request_again := dialect.eval("httpmsg", "GET /v1/search?q=leia+dialects&debug=true HTTP/1.1\r\nhost: api.example.test:9443\r\naccept: application/json\r\ncache-control: max-age=60\r\ncookie: session=s-123; cohort=beta\r\nx-trace-id: req-42\r\n\r\n", {mode: "parse"})
 request_url := url`https://api.example.test:9443/v1/search?q=leia+dialects&debug=true`
 request_headers := request.headers
 request_cookies := dialect.eval("cookie", request_headers.Cookie)
@@ -29,13 +30,13 @@ response_headers["content-type"] = response_type.type
 response_headers["cache-control"] = "max-age=" .. cache_control["max-age"]
 response_headers.etag = "\"" .. string.sub(etag, 1, 12) .. "\""
 response_headers["x-trace-id"] = request_headers["X-Trace-Id"]
-wire_response := httpmsg {
+wire_response := dialect.eval("httpmsg", {
     type: "response",
     status: 200,
     reason: "OK",
     headers: response_headers,
     body: response_body,
-}
+}, {mode: "format"})
 
 events := {
     {phase: "request", method: "GET", host: request_url.host, path: request_url.path, trace: request_headers["X-Trace-Id"]},
@@ -54,6 +55,7 @@ print(trace)
 
 assert(request.type == "request")
 assert(request.method == "GET")
+assert(request_again.method == request.method)
 assert(request.target == "/v1/search?q=leia+dialects&debug=true")
 assert(request_url.scheme == "https")
 assert(request_url.port == "9443")

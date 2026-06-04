@@ -29,8 +29,8 @@ encoded := dialect.eval("sse", {
     {event: "token", id: "1", data: "Hel"},
     {event: "token", id: "2", data: "lo"},
     {event: "done", id: "3", data: "{}"},
-}, {mode: "encode"})
-roundtrip := dialect.eval("sse", encoded)
+}, {mode: "format"})
+roundtrip := dialect.eval("sse", encoded, {mode: "parse"})
 
 print("stream text:", text, "events", #stream)
 assert(text == "Hello")

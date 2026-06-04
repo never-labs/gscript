@@ -6,8 +6,8 @@ parts := {
     {name: "file", filename: "hello.txt", content_type: "text/plain", body: "hello leia"},
 }
 
-body := dialect.eval("multipart", parts, {mode: "encode", boundary: boundary})
-parsed := dialect.eval("multipart", body, {content_type: "multipart/form-data; boundary=" .. boundary})
+body := dialect.eval("multipart", parts, {mode: "format", boundary: boundary})
+parsed := dialect.eval("multipart", body, {mode: "decode", contentType: "multipart/form-data; boundary=" .. boundary})
 meta := json`{"ok":true,"kind":"upload"}`
 
 print("parts:", #parsed, parsed[1].name, parsed[2].filename)

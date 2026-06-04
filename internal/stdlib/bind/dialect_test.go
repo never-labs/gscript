@@ -275,8 +275,10 @@ func TestDialectShellwordsParseAndEncode(t *testing.T) {
 		to_encode[4] = "it's"
 		to_encode[5] = ""
 		encoded := dialect.eval("shellwords", to_encode, {mode: "encode"})
+		formatted := dialect.eval("shellwords", to_encode, {mode: "format"})
 		roundtrip := dialect.eval("shellwords", encoded)
 		bad, bad_err := dialect.eval("shellwords", "'unterminated")
+		bad_mode, bad_mode_err := dialect.eval("shellwords", "printf ok", {mode: "bogus"})
 	`, "dialect", BuildDialect(HostOptions{}, nil))
 
 	parsed := stringSliceFromArray(interp.GetGlobal("parsed").Table())
@@ -288,6 +290,9 @@ func TestDialectShellwordsParseAndEncode(t *testing.T) {
 	if got := interp.GetGlobal("encoded").Str(); got != wantEncoded {
 		t.Fatalf("encoded = %q, want %q", got, wantEncoded)
 	}
+	if got := interp.GetGlobal("formatted").Str(); got != wantEncoded {
+		t.Fatalf("formatted = %q, want %q", got, wantEncoded)
+	}
 	roundtrip := stringSliceFromArray(interp.GetGlobal("roundtrip").Table())
 	wantRoundtrip := []string{"printf", "%s\n", "hello world", "it's", ""}
 	if !reflect.DeepEqual(roundtrip, wantRoundtrip) {
@@ -298,6 +303,60 @@ func TestDialectShellwordsParseAndEncode(t *testing.T) {
 	}
 	if got := interp.GetGlobal("bad_err"); !got.IsString() || !strings.Contains(got.Str(), "unterminated single quote") {
 		t.Fatalf("bad_err = %v, want unterminated single quote", got)
+	}
+	assertDialectModeError(t, interp.GetGlobal("bad_mode"), interp.GetGlobal("bad_mode_err"), "shellwords dialect: unknown mode")
+}
+
+func TestDialectCommandStructuredOptions(t *testing.T) {
+	interp := runWithLib(t, `
+		stdin_env := dialect.eval("cmd", {
+			cmd: "sh",
+			args: {"-c", "cat; printf :$LEIA_DIALECT_TEST"},
+			stdin: "payload",
+			env: {LEIA_DIALECT_TEST: "env-ok"},
+		})
+		argv := dialect.eval("cmd", {"printf", "argv-%s", "ok"})
+		string_opts := dialect.eval("cmd", "sh -c 'cat; printf :$LEIA_DIALECT_TEST'", {
+			stdin: "body",
+			env: {LEIA_DIALECT_TEST: "from-options"},
+		})
+		missing := dialect.eval("cmd", "definitely-not-a-leia-command")
+		bad_words, bad_words_err := dialect.eval("cmd", "'unterminated")
+	`, "dialect", BuildDialect(HostOptions{}, nil))
+
+	stdinEnv := interp.GetGlobal("stdin_env").Table()
+	if !stdinEnv.RawGetString("ok").Bool() {
+		t.Fatalf("stdin_env ok = false, stderr=%q", stdinEnv.RawGetString("stderr").Str())
+	}
+	if got := stdinEnv.RawGetString("text").Str(); got != "payload:env-ok" {
+		t.Fatalf("stdin_env text = %q, want payload:env-ok", got)
+	}
+	argv := interp.GetGlobal("argv").Table()
+	if !argv.RawGetString("ok").Bool() {
+		t.Fatalf("argv ok = false, stderr=%q", argv.RawGetString("stderr").Str())
+	}
+	if got := argv.RawGetString("text").Str(); got != "argv-ok" {
+		t.Fatalf("argv text = %q, want argv-ok", got)
+	}
+	stringOpts := interp.GetGlobal("string_opts").Table()
+	if !stringOpts.RawGetString("ok").Bool() {
+		t.Fatalf("string_opts ok = false, stderr=%q", stringOpts.RawGetString("stderr").Str())
+	}
+	if got := stringOpts.RawGetString("text").Str(); got != "body:from-options" {
+		t.Fatalf("string_opts text = %q, want body:from-options", got)
+	}
+	missing := interp.GetGlobal("missing").Table()
+	if missing.RawGetString("ok").Bool() {
+		t.Fatalf("missing command ok = true, want false")
+	}
+	if got := missing.RawGetString("code").Int(); got != -1 {
+		t.Fatalf("missing command code = %d, want -1", got)
+	}
+	if !interp.GetGlobal("bad_words").IsNil() {
+		t.Fatalf("bad command words returned non-nil result")
+	}
+	if got := interp.GetGlobal("bad_words_err"); !got.IsString() || !strings.Contains(got.Str(), "unterminated single quote") {
+		t.Fatalf("bad command words err = %v, want shellwords error", got)
 	}
 }
 

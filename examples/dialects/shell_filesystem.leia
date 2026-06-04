@@ -44,6 +44,17 @@ assert(cmd_result.text == "command-ok")
 print("cmd stdout:", cmd_result.text)
 print("cmd ok:", cmd_result.ok, "code:", cmd_result.code)
 
+// cmd also accepts structured argv/options when shell quoting would be noisy.
+structured_cmd := dialect.eval("cmd", {
+    cmd: "sh",
+    args: {"-c", "cat; printf :$LEIA_DIALECT_EXAMPLE"},
+    stdin: "body",
+    env: {LEIA_DIALECT_EXAMPLE: "env"},
+})
+assert(structured_cmd.ok == true)
+assert(structured_cmd.text == "body:env")
+print("cmd structured:", structured_cmd.text)
+
 // shellwords parses command-line text into argv and encodes argv tables back to
 // shell-safe command lines.
 argv := shellwords`printf 'quoted value' a\ b ""`
@@ -53,10 +64,12 @@ assert(argv[2] == "quoted value")
 assert(argv[3] == "a b")
 assert(argv[4] == "")
 encoded_cmd := dialect.eval("shellwords", {"printf", "%s\n", "quoted value", "it's", ""}, {mode: "encode"})
+formatted_cmd := dialect.eval("shellwords", {"printf", "%s\n", "quoted value", "it's", ""}, {mode: "format"})
 roundtrip_argv := dialect.eval("shellwords", encoded_cmd)
 assert(roundtrip_argv[3] == "quoted value")
 assert(roundtrip_argv[4] == "it's")
 assert(roundtrip_argv[5] == "")
+assert(formatted_cmd == encoded_cmd)
 print("shellwords encoded:", encoded_cmd)
 
 // glob expands a pattern under the configured filesystem root.
