@@ -82,20 +82,26 @@ env_vars := env`APP_NAME=leia
 APP_MODE=example
 EMPTY=
 `
+env_text := dialect.eval("env", {APP_NAME: "leia", APP_MODE: "example", EMPTY: ""}, {mode: "encode"})
 print("env app:", env_vars.APP_NAME, env_vars.APP_MODE)
 print("env empty value:", env_vars.EMPTY == "")
+print("env encoded:", string.gsub(env_text, "\n", "|"))
 assert(env_vars.APP_NAME == "leia")
 assert(env_vars.EMPTY == "")
+assert(env_text == "APP_MODE=example\nAPP_NAME=leia\nEMPTY=\n")
 
 kv_pairs := kv`host=localhost
 port=8080
 enabled=true
 `
+kv_text := dialect.eval("kv", {port: 8080, host: "localhost"}, {mode: "encode"})
 print("kv host:", kv_pairs.host)
 print("kv port:", kv_pairs.port)
 print("kv enabled:", kv_pairs.enabled)
+print("kv encoded:", string.gsub(kv_text, "\n", "|"))
 assert(kv_pairs.host == "localhost")
 assert(kv_pairs.port == "8080")
+assert(kv_text == "host=localhost\nport=8080\n")
 
 rendered := template { text: "Hello {{.name}}, score={{.score}}", data: {name: csv_rows[1].name, score: csv_rows[1].score} }
 print("template:", rendered)

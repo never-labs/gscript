@@ -81,7 +81,10 @@ func registerDialectText(register dialectRegisterFunc, maxHostResult func() int6
 	})
 	register([]string{"kv"}, dialectHandler{
 		eval: func(body Value, options *Table) ([]Value, error) {
-			return dialectKV(body.Str(), options, false)
+			return dialectKV(body, options, false, maxHostResult)
+		},
+		block: func(body Value, options *Table) ([]Value, error) {
+			return dialectKV(body, options, false, maxHostResult)
 		},
 	})
 	register([]string{"logfmt"}, dialectHandler{
@@ -94,7 +97,10 @@ func registerDialectText(register dialectRegisterFunc, maxHostResult func() int6
 	})
 	register([]string{"env"}, dialectHandler{
 		eval: func(body Value, options *Table) ([]Value, error) {
-			return dialectKV(body.Str(), options, true)
+			return dialectKV(body, options, true, maxHostResult)
+		},
+		block: func(body Value, options *Table) ([]Value, error) {
+			return dialectKV(body, options, true, maxHostResult)
 		},
 	})
 	register([]string{"ini"}, dialectHandler{
@@ -827,7 +833,7 @@ func numberMatrixToValue(rows [][]Value) Value {
 	return TableValue(out)
 }
 
-func dialectKV(src string, opts *Table, envMode bool) ([]Value, error) {
+func dialectKV(body Value, opts *Table, envMode bool, maxHostResult func() int64) ([]Value, error) {
 	kvOpts := dialectlib.KVOptions{Sep: "=", Trim: true, EnvMode: envMode}
 	if opts != nil && opts.RawGetString("sep").IsString() && opts.RawGetString("sep").Str() != "" {
 		kvOpts.Sep = opts.RawGetString("sep").Str()
@@ -835,6 +841,30 @@ func dialectKV(src string, opts *Table, envMode bool) ([]Value, error) {
 	if opts != nil && opts.RawGetString("trim").IsBool() {
 		kvOpts.Trim = opts.RawGetString("trim").Bool()
 	}
+	mode := ""
+	if opts != nil && opts.RawGetString("mode").IsString() {
+		mode = opts.RawGetString("mode").Str()
+	}
+	if body.IsTable() || mode == "encode" || mode == "format" {
+		values := map[string]string{}
+		if body.IsTable() {
+			body.Table().ForEachPlainRaw(func(k, v Value) bool {
+				if k.IsString() {
+					values[k.Str()] = v.String()
+				}
+				return true
+			})
+		}
+		encoded, err := dialectlib.EncodeKV(values, kvOpts)
+		if err != nil {
+			return []Value{NilValue(), StringValue(err.Error())}, nil
+		}
+		if err := CheckProjectedHostStringBytes(hostResultLimit(maxHostResult), len(encoded)); err != nil {
+			return nil, err
+		}
+		return []Value{StringValue(encoded)}, nil
+	}
+	src := body.Str()
 	parsed, err := dialectlib.KV(src, kvOpts)
 	if err != nil {
 		return []Value{NilValue(), StringValue(err.Error())}, nil

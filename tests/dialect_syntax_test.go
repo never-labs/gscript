@@ -591,6 +591,42 @@ func TestStdlibDataDialectsExecuteThroughStdlib(t *testing.T) {
 	}
 }
 
+func TestKVEnvDialectsEncodeThroughStdlib(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []leia.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			vm := leia.New(append([]leia.Option{
+				leia.WithLibs(leia.LibAll),
+			}, tc.opts...)...)
+			err := vm.Exec(`
+				kv_text := dialect.eval("kv", {score: 42, name: "Ada"}, {mode: "encode"})
+				kv_roundtrip := dialect.eval("kv", kv_text)
+				env_text := dialect.eval("env", {TOKEN: "abc 123", EMPTY: ""}, {mode: "encode"})
+				env_roundtrip := dialect.eval("env", env_text)
+
+				kv_name := kv_roundtrip.name
+				kv_score := kv_roundtrip.score
+				env_token := env_roundtrip.TOKEN
+				env_empty := env_roundtrip.EMPTY
+			`)
+			if err != nil {
+				t.Fatalf("Exec: %v", err)
+			}
+			assertGet(t, vm, "kv_text", "name=Ada\nscore=42\n")
+			assertGet(t, vm, "kv_name", "Ada")
+			assertGet(t, vm, "kv_score", "42")
+			assertGet(t, vm, "env_text", "EMPTY=\nTOKEN=abc 123\n")
+			assertGet(t, vm, "env_token", "abc 123")
+			assertGet(t, vm, "env_empty", "")
+		})
+	}
+}
+
 func TestReportAndRouteDialectsExecuteThroughStdlib(t *testing.T) {
 	for _, tc := range []struct {
 		name string

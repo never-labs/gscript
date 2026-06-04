@@ -1,8 +1,10 @@
 package dialect
 
 import (
+	"fmt"
 	"html"
 	"net/url"
+	"sort"
 	"strings"
 )
 
@@ -77,6 +79,37 @@ func KV(src string, opts KVOptions) (map[string]string, error) {
 		out[key] = val
 	}
 	return out, nil
+}
+
+func EncodeKV(values map[string]string, opts KVOptions) (string, error) {
+	sep := opts.Sep
+	if sep == "" {
+		sep = "="
+	}
+	keys := make([]string, 0, len(values))
+	for key := range values {
+		if key == "" {
+			return "", fmt.Errorf("kv: empty key")
+		}
+		if strings.ContainsAny(key, "\r\n") || strings.Contains(key, sep) {
+			return "", fmt.Errorf("kv: invalid key %q", key)
+		}
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	var b strings.Builder
+	for _, key := range keys {
+		value := values[key]
+		if strings.ContainsAny(value, "\r\n") {
+			return "", fmt.Errorf("kv: invalid value for %q", key)
+		}
+		b.WriteString(key)
+		b.WriteString(sep)
+		b.WriteString(value)
+		b.WriteByte('\n')
+	}
+	return b.String(), nil
 }
 
 func HTMLEscape(src string) string {

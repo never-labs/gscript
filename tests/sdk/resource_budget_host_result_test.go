@@ -161,6 +161,34 @@ func TestWithMaxHostResultBytesLimitsCSVEncoding(t *testing.T) {
 	}
 }
 
+func TestWithMaxHostResultBytesLimitsKVEncoding(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []leia.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, src := range []string{
+				`value := dialect.eval("kv", {name: "12345"}, {mode: "encode"})`,
+				`value := dialect.eval("env", {TOKEN: "12345"}, {mode: "encode"})`,
+			} {
+				opts := append([]leia.Option{
+					leia.WithLibs(leia.LibString | leia.LibDialect),
+					leia.WithMaxHostResultBytes(4),
+				}, tc.opts...)
+				vm := leia.New(opts...)
+				err := vm.Exec(src)
+				var budgetErr *leia.BudgetError
+				if !errors.As(err, &budgetErr) || budgetErr.Resource != "host_result_bytes" || budgetErr.Limit != 4 {
+					t.Fatalf("%s expected host_result_bytes budget 4, got %T %v", src, err, err)
+				}
+			}
+		})
+	}
+}
+
 func TestWithMaxHostResultBytesLimitsBytesAndBinaryOutput(t *testing.T) {
 	for _, tc := range []struct {
 		name string
