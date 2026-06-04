@@ -283,6 +283,8 @@ func collectStaticRequires(prog *ast.Program) []string {
 
 func collectStmtRequires(out []string, stmt ast.Stmt) []string {
 	switch s := stmt.(type) {
+	case *ast.BlockStmt:
+		return collectBlockRequires(out, s)
 	case *ast.AssignStmt:
 		return collectExprListRequires(out, s.Values)
 	case *ast.DeclareStmt:

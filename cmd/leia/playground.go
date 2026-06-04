@@ -1371,7 +1371,7 @@ print(result.text)`,
 			Concepts: []string{
 				"Plain Leia code can still test prompt-adjacent helper logic.",
 				"`assert` makes examples fail fast in CI and in the playground.",
-				"Richer agent evaluation will build on this executable style instead of old keyword blocks.",
+				"Richer agent evaluation can build on this executable style.",
 			},
 			Source: `func classify_local(text) {
     if string.find(string.lower(text), "refund") != nil {

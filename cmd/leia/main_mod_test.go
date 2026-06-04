@@ -406,6 +406,90 @@ collection vendor ./vendor
 	}
 }
 
+func TestModGraphTidyAndVerifyUseGoStyleImports(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, "vendor"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "main.leia"), []byte(`import (
+  "example.com/lib/net" as net
+  "json" as json
+  "pkg.helper" as helper
+  "vendor:foo" as vendored
+)
+_ = net
+_ = json
+_ = helper
+_ = vendored
+`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "leia.mod"), []byte(`module example.com/demo
+leia 0.1
+require example.com/lib v1.2.3
+require example.com/unused v9.9.9
+collection vendor ./vendor
+`), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runModCommand([]string{"graph", "--json", dir}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("mod graph code = %d, stderr = %q stdout = %q", code, stderr.String(), stdout.String())
+	}
+	var graph modGraphReport
+	if err := json.Unmarshal(stdout.Bytes(), &graph); err != nil {
+		t.Fatalf("stdout is not JSON graph: %v; stdout = %q", err, stdout.String())
+	}
+	if len(graph.Files) != 1 ||
+		!containsString(graph.Files[0].Requires, "example.com/lib/net") ||
+		!containsString(graph.Files[0].Requires, "json") ||
+		!containsString(graph.Files[0].Requires, "pkg.helper") ||
+		!containsString(graph.Files[0].Requires, "vendor:foo") {
+		t.Fatalf("graph = %+v, want Go-style import edges", graph)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = runModCommand([]string{"tidy", "--json", "--dir", dir}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("mod tidy code = %d, stderr = %q stdout = %q", code, stderr.String(), stdout.String())
+	}
+	var tidy modTidyReport
+	if err := json.Unmarshal(stdout.Bytes(), &tidy); err != nil {
+		t.Fatalf("stdout is not JSON tidy report: %v; stdout = %q", err, stdout.String())
+	}
+	if !tidy.OK || !containsString(tidy.Removed, "example.com/unused") || len(tidy.Missing) != 0 {
+		t.Fatalf("tidy = %+v, want Go-style imports to drive tidy", tidy)
+	}
+	manifestBytes, err := os.ReadFile(filepath.Join(dir, "leia.mod"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := string(manifestBytes)
+	if strings.Contains(got, "example.com/unused") {
+		t.Fatalf("manifest after tidy still contains unused require: %q", got)
+	}
+	if strings.Contains(got, "json") || strings.Contains(got, "vendor:foo") || strings.Contains(got, "pkg.helper") {
+		t.Fatalf("manifest after tidy added non-third-party import: %q", got)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = runModCommand([]string{"verify", "--json", dir}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("mod verify code = %d, stderr = %q stdout = %q", code, stderr.String(), stdout.String())
+	}
+	var verify modVerifyReport
+	if err := json.Unmarshal(stdout.Bytes(), &verify); err != nil {
+		t.Fatalf("stdout is not JSON verify report: %v; stdout = %q", err, stdout.String())
+	}
+	if !verify.OK {
+		t.Fatalf("verify = %+v, want Go-style imports covered by manifest", verify)
+	}
+}
+
 func testCommandGitHubZip(t *testing.T, name, data string) []byte {
 	t.Helper()
 

@@ -5,7 +5,7 @@
 // UI surfaces should be supplied by a package/native adapter declared in
 // leia.mod instead of becoming a built-in dialect or core stdlib module.
 
-ui := require("github.com/never-labs/leia-ui/raylib")
+import "github.com/never-labs/leia-ui/raylib" as ui
 
 app := {
   title: "Package-managed UI",

@@ -1875,22 +1875,8 @@ func parseInterpolatedStringParts(pos ast.Pos, value string) ([]ast.Interpolated
 			parts = append(parts, ast.InterpolatedStringPart{Text: value[:start]})
 		}
 		exprStart := start + 2
-		depth := 1
-		end := exprStart
-	scanInterpolation:
-		for end < len(value) && depth > 0 {
-			switch value[end] {
-			case '{':
-				depth++
-			case '}':
-				depth--
-				if depth == 0 {
-					break scanInterpolation
-				}
-			}
-			end++
-		}
-		if depth != 0 {
+		end, ok := scanInterpolationEnd(value, exprStart)
+		if !ok {
 			return nil, fmt.Errorf("parse error at %d:%d: unterminated interpolation", pos.Line, pos.Column)
 		}
 		exprSrc := strings.TrimSpace(value[exprStart:end])
@@ -1913,6 +1899,64 @@ func parseInterpolatedStringParts(pos ast.Pos, value string) ([]ast.Interpolated
 		value = value[end+1:]
 	}
 	return parts, nil
+}
+
+func scanInterpolationEnd(value string, start int) (int, bool) {
+	depth := 1
+	for i := start; i < len(value); i++ {
+		switch value[i] {
+		case '"':
+			next, ok := skipQuotedString(value, i)
+			if !ok {
+				return 0, false
+			}
+			i = next
+		case '`':
+			next := strings.IndexByte(value[i+1:], '`')
+			if next < 0 {
+				return 0, false
+			}
+			i += next + 1
+		case '/':
+			if i+1 >= len(value) {
+				continue
+			}
+			switch value[i+1] {
+			case '/':
+				next := strings.IndexByte(value[i+2:], '\n')
+				if next < 0 {
+					return len(value), false
+				}
+				i += next + 1
+			case '*':
+				next := strings.Index(value[i+2:], "*/")
+				if next < 0 {
+					return 0, false
+				}
+				i += next + 3
+			}
+		case '{':
+			depth++
+		case '}':
+			depth--
+			if depth == 0 {
+				return i, true
+			}
+		}
+	}
+	return 0, false
+}
+
+func skipQuotedString(value string, start int) (int, bool) {
+	for i := start + 1; i < len(value); i++ {
+		switch value[i] {
+		case '\\':
+			i++
+		case '"':
+			return i, true
+		}
+	}
+	return 0, false
 }
 
 func (p *Parser) onlySemicolonsOrEOFRemain() bool {

@@ -26,6 +26,33 @@ func TestTaggedDialectInterpolationParses(t *testing.T) {
 	}
 }
 
+func TestTaggedDialectInterpolationParsesNestedExpressionStrings(t *testing.T) {
+	prog := mustParse(t, "msg := prompt`value=${choose({right: \"}\", left: \"{\"})}`")
+	decl := prog.Stmts[0].(*ast.DeclareStmt)
+	tagged := decl.Values[0].(*ast.TaggedStringExpr)
+	interp := tagged.Body.(*ast.InterpolatedStringExpr)
+	if len(interp.Parts) != 2 {
+		t.Fatalf("parts = %#v, want text + expr", interp.Parts)
+	}
+	if interp.Parts[0].Text != "value=" {
+		t.Fatalf("text part = %q, want value=", interp.Parts[0].Text)
+	}
+	call, ok := interp.Parts[1].Expr.(*ast.CallExpr)
+	if !ok {
+		t.Fatalf("expr part = %T, want call", interp.Parts[1].Expr)
+	}
+	if ident, ok := call.Func.(*ast.IdentExpr); !ok || ident.Name != "choose" {
+		t.Fatalf("call func = %#v, want choose ident", call.Func)
+	}
+	if len(call.Args) != 1 {
+		t.Fatalf("call args = %d, want 1", len(call.Args))
+	}
+	table, ok := call.Args[0].(*ast.TableLitExpr)
+	if !ok || len(table.Fields) != 2 {
+		t.Fatalf("call arg = %#v, want table with two fields", call.Args[0])
+	}
+}
+
 func TestTaggedDialectStringFormsParse(t *testing.T) {
 	prog := mustParse(t, "pattern := re!`^[a-z]+-${suffix}$`\nencoded := base64`${name}`")
 	if len(prog.Stmts) != 2 {
@@ -84,6 +111,50 @@ quoted := quote {
 	quoteBlock := prog.Stmts[1].(*ast.DeclareStmt).Values[0].(*ast.TaggedBlockExpr)
 	if quoteBlock.Tag != "quote" || quoteBlock.Body == nil || len(quoteBlock.Body.Stmts) != 2 || len(quoteBlock.Config) != 0 {
 		t.Fatalf("quote block = %#v, want raw block with 2 statements", quoteBlock)
+	}
+}
+
+func TestTaggedDialectExpressionStatementsLowerToDialectCalls(t *testing.T) {
+	prog := mustParse(t, "prompt`hello ${name}`\nprompt {\n    role: \"system\"\n}\nquote! {\n    x := 1\n}\n")
+	if len(prog.Stmts) != 3 {
+		t.Fatalf("stmt count = %d, want 3", len(prog.Stmts))
+	}
+	want := []struct {
+		method   string
+		tag      string
+		failFast bool
+	}{
+		{method: "eval", tag: "prompt"},
+		{method: "eval_block", tag: "prompt"},
+		{method: "eval_raw", tag: "quote", failFast: true},
+	}
+	for i, tt := range want {
+		callStmt, ok := prog.Stmts[i].(*ast.CallStmt)
+		if !ok {
+			t.Fatalf("stmt[%d] = %T, want CallStmt", i, prog.Stmts[i])
+		}
+		field, ok := callStmt.Call.Func.(*ast.FieldExpr)
+		if !ok {
+			t.Fatalf("stmt[%d] func = %T, want FieldExpr", i, callStmt.Call.Func)
+		}
+		if recv, ok := field.Table.(*ast.IdentExpr); !ok || recv.Name != "dialect" || field.Field != tt.method {
+			t.Fatalf("stmt[%d] call func = %#v, want dialect.%s", i, callStmt.Call.Func, tt.method)
+		}
+		tag, ok := callStmt.Call.Args[0].(*ast.StringLit)
+		if !ok || tag.Value != tt.tag {
+			t.Fatalf("stmt[%d] tag arg = %#v, want %q", i, callStmt.Call.Args[0], tt.tag)
+		}
+		opts, ok := callStmt.Call.Args[2].(*ast.TableLitExpr)
+		if !ok || len(opts.Fields) != 1 {
+			t.Fatalf("stmt[%d] opts = %#v, want fail_fast option", i, callStmt.Call.Args[2])
+		}
+		failFast, ok := opts.Fields[0].Value.(*ast.BoolLit)
+		if !ok || failFast.Value != tt.failFast {
+			t.Fatalf("stmt[%d] fail_fast = %#v, want %v", i, opts.Fields[0].Value, tt.failFast)
+		}
+	}
+	if _, ok := prog.Stmts[2].(*ast.CallStmt).Call.Args[1].(*ast.FuncLitExpr); !ok {
+		t.Fatalf("raw block body = %T, want FuncLitExpr", prog.Stmts[2].(*ast.CallStmt).Call.Args[1])
 	}
 }
 

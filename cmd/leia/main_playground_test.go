@@ -218,6 +218,66 @@ func TestPlaygroundRepositoryExamplesExecuteOrExplain(t *testing.T) {
 	}
 }
 
+func TestPlaygroundRepositoryCoreExampleCoverage(t *testing.T) {
+	root := playgroundExamplesRoot()
+	examples, err := playgroundRepositoryExamples(root)
+	if err != nil {
+		t.Fatalf("load repository examples: %v", err)
+	}
+	byID := make(map[string]playgroundExample, len(examples))
+	for _, example := range examples {
+		byID[example.ID] = example
+	}
+
+	manualRequires := map[string]string{
+		"repo-concurrency-context_process":                        "process host access",
+		"repo-concurrency-goroutine_errors":                       "debug event sink host access",
+		"repo-data_processing-data_oriented-particle_integration": "higher playground step budget",
+	}
+	for _, dir := range []string{"hello", "concurrency", "data_processing"} {
+		dir := dir
+		t.Run(dir, func(t *testing.T) {
+			err := filepath.WalkDir(filepath.Join(root, dir), func(path string, d os.DirEntry, err error) error {
+				if err != nil {
+					return err
+				}
+				if d.IsDir() || filepath.Ext(path) != ".leia" {
+					return nil
+				}
+				rel, err := filepath.Rel(root, path)
+				if err != nil {
+					return err
+				}
+				id := "repo-" + strings.TrimSuffix(filepath.ToSlash(rel), ".leia")
+				id = strings.ReplaceAll(id, "/", "-")
+				example, ok := byID[id]
+				if !ok {
+					t.Fatalf("%s is not exposed through playground repository examples", filepath.ToSlash(rel))
+				}
+				if requires, manual := manualRequires[id]; manual {
+					if example.Runnable {
+						t.Fatalf("%s should be manual-run only", id)
+					}
+					if example.Requires != requires {
+						t.Fatalf("%s requires = %q, want %q", id, example.Requires, requires)
+					}
+					return nil
+				}
+				if !example.Runnable {
+					t.Fatalf("%s should be runnable, requires = %q", id, example.Requires)
+				}
+				if strings.TrimSpace(example.Requires) != "" {
+					t.Fatalf("%s runnable example should not require manual setup: %q", id, example.Requires)
+				}
+				return nil
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
 func TestPlaygroundRepositoryHostCapabilityExampleIsManualRunOnly(t *testing.T) {
 	examples, err := playgroundRepositoryExamples(playgroundExamplesRoot())
 	if err != nil {
@@ -258,7 +318,7 @@ func TestPlaygroundRepositoryPackageManagedUIExampleIsManualRunOnly(t *testing.T
 		if example.Requires != "package-managed UI runtime and native window host access" {
 			t.Fatalf("requires = %q", example.Requires)
 		}
-		if !strings.Contains(example.Source, `require("github.com/never-labs/leia-ui/raylib")`) {
+		if !strings.Contains(example.Source, `import "github.com/never-labs/leia-ui/raylib" as ui`) {
 			t.Fatalf("source missing package-managed UI runtime import\nsource:\n%s", example.Source)
 		}
 		return
@@ -281,7 +341,7 @@ func TestPlaygroundRepositoryPackageManagedDatabaseExampleIsManualRunOnly(t *tes
 		if example.Requires != "package-managed database runtime and native SQL driver" {
 			t.Fatalf("requires = %q", example.Requires)
 		}
-		if !strings.Contains(example.Source, `require("github.com/never-labs/leia-db/sqlite")`) {
+		if !strings.Contains(example.Source, `import "github.com/never-labs/leia-db/sqlite" as sqlite`) {
 			t.Fatalf("source missing package-managed database runtime import\nsource:\n%s", example.Source)
 		}
 		return

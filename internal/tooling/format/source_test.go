@@ -36,3 +36,15 @@ func TestSourceFormatsTaggedBlockIndentation(t *testing.T) {
 		t.Fatalf("Source second pass = %q, want %q", string(again), want)
 	}
 }
+
+func TestSourcePreservesRawStringIndentationInsideTaggedRawBlock(t *testing.T) {
+	src := []byte("quote {\nbody := `{\n  \"ok\": true\n}`\nif true {\nreturn body\n}\n}\n")
+	got, err := Source("eval.leia", src)
+	if err != nil {
+		t.Fatalf("Source returned error: %v", err)
+	}
+	want := "quote {\n    body := `{\n  \"ok\": true\n}`\n    if true {\n        return body\n    }\n}\n"
+	if string(got) != want {
+		t.Fatalf("Source() = %q, want %q", string(got), want)
+	}
+}

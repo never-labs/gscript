@@ -10,6 +10,17 @@ ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "performance_gate.sh"
 
 
+def shell_array_values(text, name):
+    start = text.index(f"{name}=(")
+    end = text.index("\n)", start)
+    values = []
+    for line in text[start:end].splitlines()[1:]:
+        stripped = line.strip()
+        if stripped.startswith('"') and stripped.endswith('"'):
+            values.append(stripped.strip('"'))
+    return values
+
+
 def subject(median, status="ok", source="script_repeat", cv=2.0):
     return {
         "status": status,
@@ -73,6 +84,23 @@ class PerformanceGateValidationTest(unittest.TestCase):
     def test_syntax_smoke_includes_dialect_guard(self):
         gate = SCRIPT.read_text()
         self.assertIn('"app/dialect_syntax_smoke"', gate)
+
+    def test_syntax_smoke_keeps_dialect_out_of_timing_comparisons(self):
+        gate = SCRIPT.read_text()
+        self.assertNotIn("app/dialect_syntax_smoke", shell_array_values(gate, "SYNTAX_SMOKE_BENCHES"))
+        self.assertEqual(
+            shell_array_values(gate, "SYNTAX_DIALECT_SMOKE_BENCHES"),
+            ["app/dialect_syntax_smoke"],
+        )
+
+    def test_syntax_smoke_strict_pass_uses_leia_only_modes_for_dialect_guard(self):
+        gate = SCRIPT.read_text()
+        self.assertIn(
+            'if [ "$PROFILE" = "syntax_smoke" ]; then\n'
+            "        STRICT_CMD+=(--mode vm --mode default --mode no_filter)\n"
+            "    fi",
+            gate,
+        )
 
     def test_help_documents_syntax_smoke_profile(self):
         proc = subprocess.run(

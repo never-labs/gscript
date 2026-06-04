@@ -6,7 +6,7 @@
 // declared in leia.mod instead of becoming a built-in dialect or core stdlib
 // module.
 
-sqlite := require("github.com/never-labs/leia-db/sqlite")
+import "github.com/never-labs/leia-db/sqlite" as sqlite
 
 query := {
   driver: "sqlite",

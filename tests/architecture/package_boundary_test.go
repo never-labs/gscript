@@ -101,9 +101,91 @@ func TestInternalPackageBoundaries(t *testing.T) {
 	assertNoInternalImports(t, pkgs, internal("stdlib"))
 }
 
+func TestInternalPackageBoundaryTestImports(t *testing.T) {
+	root := findRepoRoot(t)
+	cmd := exec.Command("go", "list", "-json", "./internal/...")
+	cmd.Dir = root
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("go list internal packages: %v\n%s", err, out)
+	}
+
+	pkgs := map[string]goListPackage{}
+	dec := json.NewDecoder(bytes.NewReader(out))
+	for {
+		var pkg goListPackage
+		if err := dec.Decode(&pkg); err != nil {
+			if err == io.EOF {
+				break
+			}
+			t.Fatalf("decode go list package: %v", err)
+		}
+		pkgs[pkg.ImportPath] = pkg
+	}
+
+	modulePath := readModulePath(t, root)
+	internal := func(suffix string) string {
+		return modulePath + "/internal/" + suffix
+	}
+
+	for _, pkg := range pkgs {
+		testPkg := pkg.withTestImports()
+		switch {
+		case strings.HasPrefix(pkg.ImportPath, internal("stdlib/lib/")):
+			assertNoImportPrefixes(t, testPkg,
+				internal("runtime"),
+				internal("vm"),
+				internal("jit"),
+				internal("methodjit"),
+				internal("stdlib/bind"),
+				internal("stdlib/install"),
+			)
+		case pkg.ImportPath == internal("stdlib/catalog"):
+			assertNoImportPrefixes(t, testPkg,
+				internal("runtime"),
+				internal("vm"),
+				internal("jit"),
+				internal("methodjit"),
+				internal("stdlib/bind"),
+				internal("stdlib/install"),
+			)
+		case pkg.ImportPath == internal("stdlib/bind"):
+			assertNoImportPrefixes(t, testPkg,
+				internal("vm"),
+				internal("jit"),
+				internal("methodjit"),
+				internal("stdlib/install"),
+			)
+		case pkg.ImportPath == internal("stdlib/install"):
+			assertNoImportPrefixes(t, testPkg,
+				internal("vm"),
+				internal("jit"),
+				internal("methodjit"),
+			)
+		case strings.HasPrefix(pkg.ImportPath, internal("support")):
+			assertNoImportPrefixes(t, testPkg,
+				internal("binding"),
+				internal("llmbridge"),
+				internal("modpkg"),
+				internal("runtime"),
+				internal("stdlib"),
+				internal("vm"),
+				internal("jit"),
+				internal("methodjit"),
+			)
+		case pkg.ImportPath == internal("jit"):
+			assertNoImportPrefixes(t, testPkg, internal("vm"), internal("methodjit"))
+		case pkg.ImportPath == internal("vm"):
+			assertNoImportPrefixes(t, testPkg, internal("methodjit"))
+		}
+	}
+}
+
 type goListPackage struct {
-	ImportPath string
-	Imports    []string
+	ImportPath   string
+	Imports      []string
+	TestImports  []string
+	XTestImports []string
 }
 
 func assertNoImports(t *testing.T, pkg goListPackage, forbidden ...string) {
@@ -134,6 +216,11 @@ func assertNoImportPrefixes(t *testing.T, pkg goListPackage, forbiddenPrefixes .
 			}
 		}
 	}
+}
+
+func (pkg goListPackage) withTestImports() goListPackage {
+	pkg.Imports = append(append([]string{}, pkg.TestImports...), pkg.XTestImports...)
+	return pkg
 }
 
 func assertNoInternalImports(t *testing.T, pkgs map[string]goListPackage, root string) {

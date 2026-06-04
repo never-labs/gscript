@@ -577,6 +577,9 @@ if [ "$STRICT" -eq 1 ]; then
     if [ "$NO_LUAJIT" -eq 1 ]; then
         STRICT_CMD+=(--no-luajit)
     fi
+    if [ "$PROFILE" = "syntax_smoke" ]; then
+        STRICT_CMD+=(--mode vm --mode default --mode no_filter)
+    fi
     if [ "$PROFILE" = "full" ]; then
         for bench in "${STRICT_CORE_BENCHES[@]}"; do
             STRICT_CMD+=(--bench "$bench")
