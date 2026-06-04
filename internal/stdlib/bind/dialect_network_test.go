@@ -14,9 +14,17 @@ func TestDialectNetworkParsesIPCIDRAndHostPort(t *testing.T) {
 		net_misses := dialect.eval("cidr", "10.2.0.0/16", {ip: "10.3.3.4"})
 		v6_contains := dialect.eval("cidr", "2001:db8::/32", {ip: "2001:db8::42"})
 		v6_misses := dialect.eval("cidr", "2001:db8::/32", {ip: "2001:db9::1"})
+		any_v4_contains := dialect.eval("cidr", "0.0.0.0/0", {ip: "203.0.113.9"})
+		exact_v4_contains := dialect.eval("cidr", "192.168.1.7/32", {ip: "192.168.1.7"})
+		exact_v4_misses := dialect.eval("cidr", "192.168.1.7/32", {ip: "192.168.1.8"})
+		any_v6_contains := dialect.eval("cidr", "::/0", {ip: "2001:db8::1"})
+		exact_v6_contains := dialect.eval("cidr", "2001:db8::1/128", {ip: "2001:db8::1"})
+		exact_v6_misses := dialect.eval("cidr", "2001:db8::1/128", {ip: "2001:db8::2"})
 		bad_cidr, bad_cidr_err := dialect.eval("cidr", "10.2.0.0")
 		bad_cidr_ip, bad_cidr_ip_err := dialect.eval("cidr", "2001:db8::/32", {ip: "not-an-ip"})
+		zone_ip := ipaddr`+"`"+`fe80::1%eth0`+"`"+`
 		hp := hostport`+"`"+`[2001:db8::1]:443`+"`"+`
+		zone_hp := hostport`+"`"+`[fe80::1%lo0]:8080`+"`"+`
 		hp_joined := dialect.eval("hostport", {host: "2001:db8::1", port: "443"}, {mode: "encode"})
 		bad_hp, bad_hp_err := dialect.eval("hostport", "2001:db8::1:443")
 	`, "dialect", BuildDialect(HostOptions{}, nil))
@@ -63,11 +71,28 @@ func TestDialectNetworkParsesIPCIDRAndHostPort(t *testing.T) {
 	if interp.GetGlobal("v6_misses").Table().RawGetString("contains").Bool() {
 		t.Fatalf("v6_misses contains = true, want false")
 	}
+	for _, name := range []string{"any_v4_contains", "exact_v4_contains", "any_v6_contains", "exact_v6_contains"} {
+		if !interp.GetGlobal(name).Table().RawGetString("contains").Bool() {
+			t.Fatalf("%s contains = false, want true", name)
+		}
+	}
+	for _, name := range []string{"exact_v4_misses", "exact_v6_misses"} {
+		if interp.GetGlobal(name).Table().RawGetString("contains").Bool() {
+			t.Fatalf("%s contains = true, want false", name)
+		}
+	}
 	if !interp.GetGlobal("bad_cidr").IsNil() || !interp.GetGlobal("bad_cidr_err").IsString() {
 		t.Fatalf("bad cidr = %v err %v, want nil error string", interp.GetGlobal("bad_cidr"), interp.GetGlobal("bad_cidr_err"))
 	}
 	if !interp.GetGlobal("bad_cidr_ip").IsNil() || !interp.GetGlobal("bad_cidr_ip_err").IsString() {
 		t.Fatalf("bad cidr ip = %v err %v, want nil error string", interp.GetGlobal("bad_cidr_ip"), interp.GetGlobal("bad_cidr_ip_err"))
+	}
+	zoneIP := interp.GetGlobal("zone_ip").Table()
+	if got := zoneIP.RawGetString("zone").Str(); got != "eth0" {
+		t.Fatalf("zone ip zone = %q, want eth0", got)
+	}
+	if !zoneIP.RawGetString("is6").Bool() || !zoneIP.RawGetString("link_local_unicast").Bool() {
+		t.Fatalf("zone ip flags is6=%v link_local=%v, want true true", zoneIP.RawGetString("is6"), zoneIP.RawGetString("link_local_unicast"))
 	}
 
 	hostport := interp.GetGlobal("hp").Table()
@@ -76,6 +101,13 @@ func TestDialectNetworkParsesIPCIDRAndHostPort(t *testing.T) {
 	}
 	if got := hostport.RawGetString("port").Str(); got != "443" {
 		t.Fatalf("hostport port = %q, want 443", got)
+	}
+	zoneHostport := interp.GetGlobal("zone_hp").Table()
+	if got := zoneHostport.RawGetString("host").Str(); got != "fe80::1%lo0" {
+		t.Fatalf("zone hostport host = %q, want fe80::1%%lo0", got)
+	}
+	if got := zoneHostport.RawGetString("addr").Table().RawGetString("zone").Str(); got != "lo0" {
+		t.Fatalf("zone hostport addr zone = %q, want lo0", got)
 	}
 	if got := interp.GetGlobal("hp_joined").Str(); got != "[2001:db8::1]:443" {
 		t.Fatalf("joined hostport = %q, want [2001:db8::1]:443", got)

@@ -176,6 +176,8 @@ retry: 2500
 `+"`"+`
 		encoded := dialect.eval("sse", {{event: "done", id: "2", data: "ok"}}, {mode: "encode"})
 		roundtrip := dialect.eval("sse", encoded)
+		boundary_events := dialect.eval("sse", ": heartbeat\nevent: zero\nretry: 0\ndata:\ndata\n\n")
+		boundary_encoded := dialect.eval("sse", {{event: "zero", retry: 0, data: ""}}, {mode: "encode"})
 		bad, bad_err := dialect.eval("sse", "retry: soon\n\n")
 	`, "dialect", BuildDialect(HostOptions{}, nil))
 
@@ -197,6 +199,19 @@ retry: 2500
 	if got := roundtrip.RawGetString("event").Str(); got != "done" {
 		t.Fatalf("roundtrip event = %q, want done", got)
 	}
+	boundary := interp.GetGlobal("boundary_events").Table().RawGetInt(1).Table()
+	if got := boundary.RawGetString("event").Str(); got != "zero" {
+		t.Fatalf("boundary event = %q, want zero", got)
+	}
+	if got := boundary.RawGetString("data").Str(); got != "\n" {
+		t.Fatalf("boundary data = %q, want two empty data lines joined", got)
+	}
+	if !boundary.RawGetString("retry").IsNil() {
+		t.Fatalf("retry:0 materialized as %v, want nil field", boundary.RawGetString("retry"))
+	}
+	if got := interp.GetGlobal("boundary_encoded").Str(); got != "event: zero\ndata: \n\n" {
+		t.Fatalf("boundary encoded = %q, want zero event with empty data", got)
+	}
 	if !interp.GetGlobal("bad").IsNil() || !interp.GetGlobal("bad_err").IsString() {
 		t.Fatalf("bad SSE = %v err %v, want nil error string", interp.GetGlobal("bad"), interp.GetGlobal("bad_err"))
 	}
@@ -212,6 +227,10 @@ func TestDialectMultipartParseAndEncode(t *testing.T) {
 			{name: "file", filename: "a.txt", content_type: "text/plain", body: "hello"},
 		}, {mode: "encode", boundary: "fixture"})
 		roundtrip := dialect.eval("multipart", encoded, {boundary: "fixture"})
+		single_headers := {}
+		single_headers["X-Tag"] = {"a", "b"}
+		single_encoded, single_encode_err := dialect.eval("multipart", {name: "note", value: "hello", contentType: "text/plain", headers: single_headers}, {mode: "encode", boundary: "fixture"})
+		single_roundtrip := dialect.eval("multipart", single_encoded, {boundary: "fixture"})
 		missing_boundary, missing_boundary_err := dialect.eval("multipart", body)
 	`, "dialect", BuildDialect(HostOptions{}, nil))
 
@@ -243,6 +262,23 @@ func TestDialectMultipartParseAndEncode(t *testing.T) {
 	if got := roundtrip.RawGetInt(2).Table().RawGetString("body").Str(); got != "hello" {
 		t.Fatalf("roundtrip body = %q, want hello", got)
 	}
+	if !interp.GetGlobal("single_encode_err").IsNil() {
+		t.Fatalf("single multipart encode err = %v, want nil", interp.GetGlobal("single_encode_err"))
+	}
+	single := interp.GetGlobal("single_roundtrip").Table().RawGetInt(1).Table()
+	if got := single.RawGetString("name").Str(); got != "note" {
+		t.Fatalf("single name = %q, want note", got)
+	}
+	if got := single.RawGetString("content_type").Str(); got != "text/plain" {
+		t.Fatalf("single content_type = %q, want text/plain", got)
+	}
+	if got := single.RawGetString("contentType").Str(); got != "text/plain" {
+		t.Fatalf("single contentType = %q, want text/plain", got)
+	}
+	headers := single.RawGetString("headers").Table()
+	if got := headers.RawGetString("X-Tag").Table().RawGetInt(2).Str(); got != "b" {
+		t.Fatalf("single X-Tag second = %q, want b", got)
+	}
 	if !interp.GetGlobal("missing_boundary").IsNil() || !interp.GetGlobal("missing_boundary_err").IsString() {
 		t.Fatalf("missing boundary = %v err %v, want nil error string", interp.GetGlobal("missing_boundary"), interp.GetGlobal("missing_boundary_err"))
 	}
@@ -251,7 +287,9 @@ func TestDialectMultipartParseAndEncode(t *testing.T) {
 func TestDialectJWTUnverifiedDecode(t *testing.T) {
 	interp := runWithLib(t, `
 		token := "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOiJ1c2VyLTQyIiwic2NvcGUiOiJyZWFkIHdyaXRlIiwiZXhwIjoxODkzNDU2MDAwfQ.signature"
+		structured_token := "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOiJ1c2VyLTQyIiwiYWRtaW4iOnRydWUsInJvbGVzIjpbInJlYWQiLCJ3cml0ZSJdLCJwcm9maWxlIjp7InRlYW0iOiJpbmZyYSIsImxldmVsIjozfSwic2NvcmUiOjEyLjV9.signature"
 		decoded := dialect.eval("jwt", token)
+		structured := dialect.eval("jwt", structured_token)
 		decoded_explicit := dialect.eval("jwt", token, {mode: "unverified"})
 		bad, bad_err := dialect.eval("jwt", "not-a-token")
 		bad_mode, bad_mode_err := dialect.eval("jwt", token, {mode: "verify"})
@@ -274,6 +312,26 @@ func TestDialectJWTUnverifiedDecode(t *testing.T) {
 	}
 	if got := decoded.RawGetString("segments").Table().RawGetString("signature").Str(); got != "signature" {
 		t.Fatalf("signature segment = %q, want signature", got)
+	}
+	structured := interp.GetGlobal("structured").Table()
+	if got := structured.RawGetString("header_json").Str(); got != `{"alg":"none","typ":"JWT"}` {
+		t.Fatalf("structured header_json = %q", got)
+	}
+	if got := structured.RawGetString("payload_json").Str(); got != `{"sub":"user-42","admin":true,"roles":["read","write"],"profile":{"team":"infra","level":3},"score":12.5}` {
+		t.Fatalf("structured payload_json = %q", got)
+	}
+	structuredPayload := structured.RawGetString("payload").Table()
+	if !structuredPayload.RawGetString("admin").Bool() {
+		t.Fatalf("structured admin = false, want true")
+	}
+	if got := structuredPayload.RawGetString("roles").Table().RawGetInt(2).Str(); got != "write" {
+		t.Fatalf("structured role[2] = %q, want write", got)
+	}
+	if got := structuredPayload.RawGetString("profile").Table().RawGetString("team").Str(); got != "infra" {
+		t.Fatalf("structured profile.team = %q, want infra", got)
+	}
+	if got := structured.RawGetString("segments").Table().RawGetString("header").Str(); got == "" {
+		t.Fatalf("structured header segment is empty")
 	}
 	if got := interp.GetGlobal("decoded_explicit").Table().RawGetString("payload").Table().RawGetString("scope").Str(); got != "read write" {
 		t.Fatalf("explicit payload scope = %q, want read write", got)

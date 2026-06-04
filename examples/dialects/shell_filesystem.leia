@@ -55,6 +55,23 @@ assert(structured_cmd.ok == true)
 assert(structured_cmd.text == "body:env")
 print("cmd structured:", structured_cmd.text)
 
+entry := process.entry()
+cwd_cmd := dialect.eval("cmd", {
+    cmd: "sh",
+    args: {"-c", "basename \"$PWD\""},
+    cwd: entry.dir,
+})
+override_cwd_cmd := dialect.eval("cmd", {
+    cmd: "sh",
+    args: {"-c", "basename \"$PWD\""},
+    cwd: "/",
+}, {cwd: entry.dir})
+assert(cwd_cmd.ok == true)
+assert(cwd_cmd.text == "dialects\n")
+assert(override_cwd_cmd.ok == true)
+assert(override_cwd_cmd.text == "dialects\n")
+print("cmd cwd:", string.trim(cwd_cmd.text))
+
 // shellwords parses command-line text into argv and encodes argv tables back to
 // shell-safe command lines.
 argv := shellwords`printf 'quoted value' a\ b ""`
@@ -73,7 +90,6 @@ assert(formatted_cmd == encoded_cmd)
 print("shellwords encoded:", encoded_cmd)
 
 // glob expands a pattern under the configured filesystem root.
-entry := process.entry()
 matches := dialect.eval("glob", path.join(entry.dir, "*.leia"))
 found_shell_filesystem := false
 print("glob matches:", #matches)

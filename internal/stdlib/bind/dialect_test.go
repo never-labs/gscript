@@ -320,6 +320,25 @@ func TestDialectCommandStructuredOptions(t *testing.T) {
 			stdin: "body",
 			env: {LEIA_DIALECT_TEST: "from-options"},
 		})
+		option_override := dialect.eval("cmd", {
+			cmd: "sh",
+			args: {"-c", "cat; printf :$LEIA_DIALECT_TEST"},
+			stdin: "body-a",
+			env: {LEIA_DIALECT_TEST: "env-a"},
+		}, {
+			stdin: "body-b",
+			env: {LEIA_DIALECT_TEST: "env-b"},
+		})
+		cwd_alias := dialect.eval("cmd", {
+			cmd: "sh",
+			args: {"-c", "basename \"$PWD\""},
+			cwd: ".",
+		})
+		option_cwd := dialect.eval("cmd", {
+			cmd: "sh",
+			args: {"-c", "basename \"$PWD\""},
+			cwd: "/",
+		}, {cwd: "."})
 		missing := dialect.eval("cmd", "definitely-not-a-leia-command")
 		bad_words, bad_words_err := dialect.eval("cmd", "'unterminated")
 	`, "dialect", BuildDialect(HostOptions{}, nil))
@@ -345,6 +364,27 @@ func TestDialectCommandStructuredOptions(t *testing.T) {
 	if got := stringOpts.RawGetString("text").Str(); got != "body:from-options" {
 		t.Fatalf("string_opts text = %q, want body:from-options", got)
 	}
+	optionOverride := interp.GetGlobal("option_override").Table()
+	if !optionOverride.RawGetString("ok").Bool() {
+		t.Fatalf("option_override ok = false, stderr=%q", optionOverride.RawGetString("stderr").Str())
+	}
+	if got := optionOverride.RawGetString("text").Str(); got != "body-b:env-b" {
+		t.Fatalf("option_override text = %q, want body-b:env-b", got)
+	}
+	cwdAlias := interp.GetGlobal("cwd_alias").Table()
+	if !cwdAlias.RawGetString("ok").Bool() {
+		t.Fatalf("cwd_alias ok = false, stderr=%q", cwdAlias.RawGetString("stderr").Str())
+	}
+	if got := strings.TrimSpace(cwdAlias.RawGetString("text").Str()); got != "bind" {
+		t.Fatalf("cwd_alias basename = %q, want bind", got)
+	}
+	optionCWD := interp.GetGlobal("option_cwd").Table()
+	if !optionCWD.RawGetString("ok").Bool() {
+		t.Fatalf("option_cwd ok = false, stderr=%q", optionCWD.RawGetString("stderr").Str())
+	}
+	if got := strings.TrimSpace(optionCWD.RawGetString("text").Str()); got != "bind" {
+		t.Fatalf("option_cwd basename = %q, want bind", got)
+	}
 	missing := interp.GetGlobal("missing").Table()
 	if missing.RawGetString("ok").Bool() {
 		t.Fatalf("missing command ok = true, want false")
@@ -358,6 +398,87 @@ func TestDialectCommandStructuredOptions(t *testing.T) {
 	if got := interp.GetGlobal("bad_words_err"); !got.IsString() || !strings.Contains(got.Str(), "unterminated single quote") {
 		t.Fatalf("bad command words err = %v, want shellwords error", got)
 	}
+}
+
+func TestDialectCommandHostPoliciesAndFailFast(t *testing.T) {
+	eval := BuildDialect(HostOptions{
+		EnvironmentWrite: func() bool { return false },
+	}, nil).RawGetString("eval").GoFunction()
+	if eval == nil {
+		t.Fatalf("dialect.eval is not a Go function")
+	}
+	envBlocked, err := eval.Fn([]Value{
+		StringValue("cmd"),
+		TableValue(testTableFromMap(map[string]Value{
+			"cmd":  StringValue("sh"),
+			"args": TableValue(testArrayTableFromValues([]Value{StringValue("-c"), StringValue("printf $LEIA_BLOCKED")})),
+			"env":  TableValue(testTableFromMap(map[string]Value{"LEIA_BLOCKED": StringValue("blocked")})),
+		})),
+	})
+	if err != nil {
+		t.Fatalf("env blocked returned Go error: %v", err)
+	}
+	if len(envBlocked) != 2 || !envBlocked[0].IsNil() || !strings.Contains(envBlocked[1].Str(), "environment write access disabled") {
+		t.Fatalf("env blocked result = %#v, want nil + environment error", envBlocked)
+	}
+
+	_, err = BuildDialect(HostOptions{}, nil).RawGetString("eval").GoFunction().Fn([]Value{
+		StringValue("cmd"),
+		StringValue("sh -c 'printf cmderr 1>&2; exit 4'"),
+		TableValue(testTableFromMap(map[string]Value{"fail_fast": BoolValue(true)})),
+	})
+	if err == nil || !strings.Contains(err.Error(), "cmd dialect failed with exit code 4: cmderr") {
+		t.Fatalf("fail_fast err = %v, want cmd exit error", err)
+	}
+}
+
+func TestDialectShellwordsArgumentErrors(t *testing.T) {
+	eval := BuildDialect(HostOptions{}, nil).RawGetString("eval").GoFunction()
+	for _, tc := range []struct {
+		name string
+		body Value
+		want string
+	}{
+		{name: "non table", body: IntValue(7), want: "table or string expected"},
+		{name: "nested table", body: TableValue(testArrayTableFromValues([]Value{TableValue(NewTable())})), want: "argument 1 must be scalar"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := eval.Fn([]Value{StringValue("shellwords"), tc.body, TableValue(testTableFromMap(map[string]Value{"mode": StringValue("encode")}))})
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("shellwords err = %v, want %q", err, tc.want)
+			}
+		})
+	}
+}
+
+func TestDialectGlobEmptyAndInvalidPattern(t *testing.T) {
+	interp := runWithLib(t, `
+		empty := dialect.eval("glob", "definitely-no-leia-file-*")
+		bad, bad_err := dialect.eval("glob", "[")
+	`, "dialect", BuildDialect(HostOptions{}, nil))
+
+	if got := interp.GetGlobal("empty").Table().Length(); got != 0 {
+		t.Fatalf("empty glob length = %d, want 0", got)
+	}
+	if !interp.GetGlobal("bad").IsNil() || !strings.Contains(interp.GetGlobal("bad_err").Str(), "syntax error in pattern") {
+		t.Fatalf("bad glob = %v err %v, want nil syntax error", interp.GetGlobal("bad"), interp.GetGlobal("bad_err"))
+	}
+}
+
+func testTableFromMap(values map[string]Value) *Table {
+	t := NewTable()
+	for key, value := range values {
+		t.RawSetString(key, value)
+	}
+	return t
+}
+
+func testArrayTableFromValues(values []Value) *Table {
+	t := NewTable()
+	for i, value := range values {
+		t.RawSetInt(int64(i+1), value)
+	}
+	return t
 }
 
 func TestDialectBlockAndRawEvalHelpers(t *testing.T) {

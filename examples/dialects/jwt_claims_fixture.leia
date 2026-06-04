@@ -1,12 +1,15 @@
 print("=== Dialects: JWT claims fixture ===")
 
 token := "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOiJ1c2VyLTQyIiwic2NvcGUiOiJyZWFkIHdyaXRlIiwiZXhwIjoxODkzNDU2MDAwfQ.signature"
+structured_token := "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOiJ1c2VyLTQyIiwiYWRtaW4iOnRydWUsInJvbGVzIjpbInJlYWQiLCJ3cml0ZSJdLCJwcm9maWxlIjp7InRlYW0iOiJpbmZyYSIsImxldmVsIjozfSwic2NvcmUiOjEyLjV9.signature"
 decoded := jwt`eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOiJ1c2VyLTQyIiwic2NvcGUiOiJyZWFkIHdyaXRlIiwiZXhwIjoxODkzNDU2MDAwfQ.signature`
 again := dialect.eval("jwt", token, {mode: "decode"})
+structured := dialect.eval("jwt", structured_token)
 
 print("subject:", decoded.payload.sub)
 print("scope:", decoded.payload.scope)
 print("alg:", decoded.header.alg, "verified:", decoded.verified)
+print("roles:", structured.payload.roles[1], structured.payload.roles[2])
 
 assert(decoded.header.typ == "JWT")
 assert(decoded.header.alg == "none")
@@ -16,5 +19,11 @@ assert(decoded.payload.exp == 1893456000)
 assert(decoded.signature == "signature")
 assert(decoded.verified == false)
 assert(again.payload.sub == decoded.payload.sub)
+assert(structured.header_json == "{\"alg\":\"none\",\"typ\":\"JWT\"}")
+assert(structured.payload.admin == true)
+assert(structured.payload.roles[2] == "write")
+assert(structured.payload.profile.team == "infra")
+assert(structured.payload.score == 12.5)
+assert(structured.segments.header != "")
 
 print("jwt claims fixture ok")

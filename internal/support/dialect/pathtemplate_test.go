@@ -29,6 +29,30 @@ func TestPathTemplateMatchAndExpand(t *testing.T) {
 	}
 }
 
+func TestPathTemplateCatchAllBoundaries(t *testing.T) {
+	match, err := MatchPathTemplate("/v1/users/{id}/files/{*rest}", "/v1/users/ada/files")
+	if err != nil {
+		t.Fatalf("MatchPathTemplate empty catch-all: %v", err)
+	}
+	if !match.Matched {
+		t.Fatal("empty catch-all matched = false, want true")
+	}
+	if got := match.Params["id"]; got != "ada" {
+		t.Fatalf("id = %q, want ada", got)
+	}
+	if got := match.Params["rest"]; got != "" {
+		t.Fatalf("rest = %q, want empty", got)
+	}
+
+	noMatch, err := MatchPathTemplate("/v1/users/{id}/files/{*rest}", "/v1/users/ada")
+	if err != nil {
+		t.Fatalf("MatchPathTemplate shorter path: %v", err)
+	}
+	if noMatch.Matched {
+		t.Fatal("shorter path matched = true, want false")
+	}
+}
+
 func TestPathTemplateNoMatchAndValidation(t *testing.T) {
 	match, err := MatchPathTemplate("/v1/users/{id}", "/v1/orgs/123")
 	if err != nil {

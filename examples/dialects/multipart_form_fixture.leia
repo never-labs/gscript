@@ -8,10 +8,15 @@ parts := {
 
 body := dialect.eval("multipart", parts, {mode: "format", boundary: boundary})
 parsed := dialect.eval("multipart", body, {mode: "decode", contentType: "multipart/form-data; boundary=" .. boundary})
+single_headers := {}
+single_headers["X-Tag"] = {"a", "b"}
+single_body := dialect.eval("multipart", {name: "note", value: "hello", contentType: "text/plain", headers: single_headers}, {mode: "format", boundary: boundary})
+single := dialect.eval("multipart", single_body, {mode: "decode", boundary: boundary})
 meta := json`{"ok":true,"kind":"upload"}`
 
 print("parts:", #parsed, parsed[1].name, parsed[2].filename)
 print("file:", parsed[2].body)
+print("single:", single[1].name, single[1].contentType)
 
 assert(#parsed == 2)
 assert(parsed[1].name == "meta")
@@ -20,6 +25,11 @@ assert(parsed[1].body == "{\"ok\":true,\"kind\":\"upload\"}")
 assert(parsed[2].name == "file")
 assert(parsed[2].filename == "hello.txt")
 assert(parsed[2].body == "hello leia")
+assert(single[1].name == "note")
+assert(single[1].body == "hello")
+assert(single[1].content_type == "text/plain")
+assert(single[1].contentType == "text/plain")
+assert(single[1].headers["X-Tag"][2] == "b")
 assert(meta.kind == "upload")
 
 print("multipart form fixture ok")

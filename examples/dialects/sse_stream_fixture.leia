@@ -31,6 +31,7 @@ encoded := dialect.eval("sse", {
     {event: "done", id: "3", data: "{}"},
 }, {mode: "format"})
 roundtrip := dialect.eval("sse", encoded, {mode: "parse"})
+heartbeat := dialect.eval("sse", ": heartbeat\nevent: tick\nretry: 0\ndata:\ndata\n\n")
 
 print("stream text:", text, "events", #stream)
 assert(text == "Hello")
@@ -38,5 +39,9 @@ assert(done)
 assert(#stream == 3)
 assert(roundtrip[1].data == "Hel")
 assert(roundtrip[3].event == "done")
+assert(#heartbeat == 1)
+assert(heartbeat[1].event == "tick")
+assert(heartbeat[1].data == "\n")
+assert(heartbeat[1].retry == nil)
 
 print("sse stream fixture ok")
