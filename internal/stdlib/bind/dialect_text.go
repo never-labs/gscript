@@ -28,6 +28,10 @@ func registerDialectText(register dialectRegisterFunc, maxHostResult func() int6
 		eval:  dialectJSON,
 		block: dialectJSON,
 	})
+	register([]string{"jsonptr"}, dialectHandler{
+		eval:  dialectJSONPointer,
+		block: dialectJSONPointer,
+	})
 	register([]string{"jsonl"}, dialectHandler{
 		eval: func(body Value, options *Table) ([]Value, error) {
 			return dialectJSONL(body, options, maxHostResult)
@@ -263,6 +267,73 @@ func dialectJSON(body Value, opts *Table) ([]Value, error) {
 		return nil, fmt.Errorf("json dialect: %v", err)
 	}
 	return []Value{StringValue(string(data))}, nil
+}
+
+func dialectJSONPointer(body Value, opts *Table) ([]Value, error) {
+	mode := ""
+	if opts != nil && opts.RawGetString("mode").IsString() {
+		mode = opts.RawGetString("mode").Str()
+	}
+	if mode == "encode" || mode == "format" {
+		if !body.IsTable() {
+			return nil, fmt.Errorf("jsonptr dialect: encode expects token array")
+		}
+		tokens := make([]string, 0, body.Table().Length())
+		for i := 1; i <= body.Table().Length(); i++ {
+			tokens = append(tokens, body.Table().RawGetInt(int64(i)).String())
+		}
+		return []Value{StringValue(dialectlib.EncodeJSONPointer(tokens))}, nil
+	}
+	path := ""
+	if opts != nil {
+		if v := opts.RawGetString("path"); v.IsString() {
+			path = v.Str()
+		} else if v := opts.RawGetString("pointer"); v.IsString() {
+			path = v.Str()
+		}
+	}
+	target := body
+	if body.IsTable() && path == "" {
+		tbl := body.Table()
+		if v := tbl.RawGetString("path"); v.IsString() {
+			path = v.Str()
+		} else if v := tbl.RawGetString("pointer"); v.IsString() {
+			path = v.Str()
+		}
+		if data := tbl.RawGetString("data"); !data.IsNil() {
+			target = data
+		} else if value := tbl.RawGetString("value"); !value.IsNil() {
+			target = value
+		}
+	}
+	tokens, err := dialectlib.ParseJSONPointer(path)
+	if err != nil {
+		return []Value{NilValue(), StringValue(err.Error())}, nil
+	}
+	value, err := jsonPointerLookup(target, tokens)
+	if err != nil {
+		return []Value{NilValue(), StringValue(err.Error())}, nil
+	}
+	return []Value{value}, nil
+}
+
+func jsonPointerLookup(value Value, tokens []string) (Value, error) {
+	current := value
+	for _, token := range tokens {
+		if !current.IsTable() {
+			return NilValue(), fmt.Errorf("jsonptr: cannot descend into %s", current.TypeName())
+		}
+		tbl := current.Table()
+		if idx, ok := dialectlib.JSONPointerIndex(token); ok && idx < tbl.Length() {
+			current = tbl.RawGetInt(int64(idx + 1))
+			continue
+		}
+		current = tbl.RawGetString(token)
+		if current.IsNil() {
+			return NilValue(), fmt.Errorf("jsonptr: missing token %q", token)
+		}
+	}
+	return current, nil
 }
 
 func dialectJSONL(body Value, opts *Table, maxHostResult func() int64) ([]Value, error) {

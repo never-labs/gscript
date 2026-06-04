@@ -1,0 +1,27 @@
+print("=== Dialects: JSON pointer extract ===")
+
+doc := json`{
+  "trace": {
+    "id": "agent-42",
+    "events": [
+      {"type": "token", "data": "Hel"},
+      {"type": "token", "data": "lo"},
+      {"type": "done", "data": {}}
+    ]
+  },
+  "meta": {"model/name": "fixture"}
+}`
+
+first := dialect.eval("jsonptr", doc, {path: "/trace/events/0/data"})
+second := dialect.eval("jsonptr", doc, {path: "/trace/events/1/data"})
+model := dialect.eval("jsonptr", doc, {path: "/meta/model~1name"})
+path := dialect.eval("jsonptr", {"trace", "events", "2", "type"}, {mode: "encode"})
+done := dialect.eval("jsonptr", doc, {path: path})
+
+print("message:", first .. second, "model:", model, "done:", done)
+assert(first .. second == "Hello")
+assert(model == "fixture")
+assert(path == "/trace/events/2/type")
+assert(done == "done")
+
+print("json pointer extract ok")

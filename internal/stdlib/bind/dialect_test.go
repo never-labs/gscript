@@ -15,7 +15,7 @@ func TestDialectTagsExposeInstalledHandlers(t *testing.T) {
 	got := stringSetFromArray(interp.GetGlobal("tags").Table())
 	want := []string{
 		"base32", "base64", "binary", "cidr", "cmd", "cookie", "cookies", "csv", "deflate", "duration", "env", "glob",
-		"gzip", "hash", "headers", "hex", "hostport", "html_escape", "http_headers", "httpmsg", "ini", "ipaddr", "json", "jsonl",
+		"gzip", "hash", "headers", "hex", "hostport", "html_escape", "http_headers", "httpmsg", "ini", "ipaddr", "json", "jsonl", "jsonptr",
 		"junit", "kv", "lines", "logfmt", "mdtable", "mime", "numbers", "nums", "path", "prompt",
 		"quote", "re", "regexp", "semver", "sh", "shellwords", "split", "sse", "tap", "template", "tsv", "url",
 		"urlpath", "urlquery", "uuid", "words", "xml", "zlib",
@@ -393,6 +393,33 @@ func TestDialectLogfmtParseAndEncode(t *testing.T) {
 	}
 	if !interp.GetGlobal("bad").IsNil() || !interp.GetGlobal("bad_err").IsString() {
 		t.Fatalf("bad logfmt = %v err %v, want nil error string", interp.GetGlobal("bad"), interp.GetGlobal("bad_err"))
+	}
+}
+
+func TestDialectJSONPointerLookupAndEncode(t *testing.T) {
+	interp := runWithLib(t, `
+		doc := json`+"`"+`{"events":[{"type":"token","data":"hello"},{"type":"done","data":{}}],"meta":{"trace/id":"agent-42"}}`+"`"+`
+		first := dialect.eval("jsonptr", doc, {path: "/events/0/data"})
+		trace := dialect.eval("jsonptr", doc, {path: "/meta/trace~1id"})
+		encoded := dialect.eval("jsonptr", {"meta", "trace/id"}, {mode: "encode"})
+		missing, missing_err := dialect.eval("jsonptr", doc, {path: "/events/2"})
+		bad, bad_err := dialect.eval("jsonptr", doc, {path: "events/0"})
+	`, "dialect", BuildDialect(HostOptions{}, nil))
+
+	if got := interp.GetGlobal("first").Str(); got != "hello" {
+		t.Fatalf("first = %q, want hello", got)
+	}
+	if got := interp.GetGlobal("trace").Str(); got != "agent-42" {
+		t.Fatalf("trace = %q, want agent-42", got)
+	}
+	if got := interp.GetGlobal("encoded").Str(); got != "/meta/trace~1id" {
+		t.Fatalf("encoded = %q, want /meta/trace~1id", got)
+	}
+	if !interp.GetGlobal("missing").IsNil() || !interp.GetGlobal("missing_err").IsString() {
+		t.Fatalf("missing = %v err %v, want nil error string", interp.GetGlobal("missing"), interp.GetGlobal("missing_err"))
+	}
+	if !interp.GetGlobal("bad").IsNil() || !interp.GetGlobal("bad_err").IsString() {
+		t.Fatalf("bad = %v err %v, want nil error string", interp.GetGlobal("bad"), interp.GetGlobal("bad_err"))
 	}
 }
 
