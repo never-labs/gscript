@@ -110,8 +110,8 @@ expr_list     = expr { "," expr } ;
 
 Tables, calls, member selection, indexing, anonymous functions, dense arrays,
 imports, and tagged dialect forms are layered on this core grammar. AI workflows
-use the `llm`, `msg`, `history`, and `loop` standard-library modules, with small
-tagged-block conveniences for the most common model-turn forms.
+use the `llm`, `msg`, `history`, and `loop` standard-library modules. Dialect
+tags and blocks are generic syntax and are not special-cased for AI forms.
 
 ## Dialects And AI-Native Syntax
 

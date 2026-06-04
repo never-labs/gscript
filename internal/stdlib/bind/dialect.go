@@ -2,26 +2,23 @@ package bind
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
 
-	"github.com/never-labs/leia/internal/runtime"
 	base64lib "github.com/never-labs/leia/internal/stdlib/lib/base64"
 	hashlib "github.com/never-labs/leia/internal/stdlib/lib/hash"
 	pathlib "github.com/never-labs/leia/internal/stdlib/lib/path"
-	urllib "github.com/never-labs/leia/internal/stdlib/lib/url"
 	"github.com/never-labs/leia/internal/support"
 )
 
 // BuildDialect creates the "dialect" standard library table. Dialects are a
 // small native dispatch layer used by tagged literals and tagged blocks:
 // sh`...`, cmd`...`, glob`...`, json`...`, prompt`...`, quote { ... }, and
-// small safe data transforms such as path`...`, url`...`, base64`...`, and
-// hash`...`.
+// small safe data transforms such as path`...`, url`...`, words`...`, kv`...`,
+// env`...`, html_escape`...`, urlquery`...`, base64`...`, and hash`...`.
 func BuildDialect(opts HostOptions, maxHostResult func() int64) *Table {
 	t := markStdlibBoundModule(NewTable())
 	root := func() string { return HostString(opts.FilesystemRoot) }
@@ -43,10 +40,26 @@ func BuildDialect(opts HostOptions, maxHostResult func() int64) *Table {
 			return dialectRegexp(body.Str(), failFast)
 		case "json":
 			return dialectJSON(body, options)
+		case "csv":
+			return dialectCSV(body.Str(), options)
+		case "lines", "split":
+			return dialectLines(body.Str(), options)
+		case "words":
+			return dialectWords(body.Str()), nil
+		case "kv":
+			return dialectKV(body.Str(), options, false)
+		case "env":
+			return dialectKV(body.Str(), options, true)
+		case "template":
+			return dialectTemplate(body, options, maxHostResult)
 		case "path":
 			return []Value{StringValue(pathlib.Clean(body.Str()))}, nil
 		case "url":
 			return dialectURL(body.Str())
+		case "html_escape":
+			return dialectHTMLEscape(body.Str(), options)
+		case "urlquery":
+			return dialectURLQuery(body, options)
 		case "base64":
 			return dialectBase64(body.Str(), options, maxHostResult)
 		case "hash":
@@ -78,6 +91,8 @@ func BuildDialect(opts HostOptions, maxHostResult func() int64) *Table {
 			return []Value{dialectPrompt(args[1], optsTbl)}, nil
 		case "json":
 			return dialectJSON(args[1], optsTbl)
+		case "template":
+			return dialectTemplate(args[1], optsTbl, maxHostResult)
 		case "quote":
 			return []Value{dialectQuote(tag, args[1], optsTbl)}, nil
 		default:
@@ -198,52 +213,6 @@ func dialectRegexp(pattern string, failFast bool) ([]Value, error) {
 		return []Value{NilValue(), StringValue(err.Error())}, nil
 	}
 	return []Value{TableValue(makeReObject(re))}, nil
-}
-
-func dialectJSON(body Value, opts *Table) ([]Value, error) {
-	mode := ""
-	if opts != nil && opts.RawGetString("mode").IsString() {
-		mode = opts.RawGetString("mode").Str()
-	}
-	if body.IsString() && mode != "encode" {
-		decoder := json.NewDecoder(strings.NewReader(body.Str()))
-		decoder.UseNumber()
-		var goVal any
-		if err := decoder.Decode(&goVal); err != nil {
-			return []Value{NilValue(), StringValue(err.Error())}, nil
-		}
-		return []Value{runtime.JSONGoToValue(goVal)}, nil
-	}
-	data, err := json.Marshal(runtime.JSONValueToGo(body))
-	if err != nil {
-		return nil, fmt.Errorf("json dialect: %v", err)
-	}
-	return []Value{StringValue(string(data))}, nil
-}
-
-func dialectURL(src string) ([]Value, error) {
-	u, err := urllib.Parse(src)
-	if err != nil {
-		return []Value{NilValue(), StringValue(err.Error())}, nil
-	}
-	result := NewTable()
-	result.RawSetString("scheme", StringValue(u.Scheme))
-	result.RawSetString("host", StringValue(u.Host))
-	result.RawSetString("port", StringValue(u.Port))
-	result.RawSetString("path", StringValue(u.Path))
-	result.RawSetString("fragment", StringValue(u.Fragment))
-	result.RawSetString("raw", StringValue(u.Raw))
-	result.RawSetString("user", StringValue(u.User))
-	result.RawSetString("hasUser", BoolValue(u.HasUser))
-	if u.Password != nil {
-		result.RawSetString("password", StringValue(*u.Password))
-	}
-	query := NewTable()
-	for k, v := range u.Query {
-		query.RawSetString(k, StringValue(v))
-	}
-	result.RawSetString("query", TableValue(query))
-	return []Value{TableValue(result)}, nil
 }
 
 func dialectBase64(src string, opts *Table, maxHostResult func() int64) ([]Value, error) {

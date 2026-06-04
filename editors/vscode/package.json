@@ -25,7 +25,6 @@
     "onCommand:leia.previewSpec",
     "onCommand:leia.restartLanguageServer",
     "onCommand:leia.evaluate.case",
-    "onCommand:leia.agent.run",
     "onTaskType:leia"
   ],
   "contributes": {
@@ -111,11 +110,6 @@
       {
         "command": "leia.evaluate.case",
         "title": "Leia: Run Evaluate Case",
-        "category": "Leia"
-      },
-      {
-        "command": "leia.agent.run",
-        "title": "Leia: Run Agent File",
         "category": "Leia"
       }
     ],

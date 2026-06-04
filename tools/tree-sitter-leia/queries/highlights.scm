@@ -16,17 +16,6 @@
 ] @keyword.control
 
 [
-  "agent"
-  "budget"
-  "evaluate"
-  "flow"
-  "messages"
-  "models"
-  "tool"
-  "turn"
-] @keyword
-
-[
   "const"
   "func"
   "import"
@@ -51,14 +40,16 @@
 (function_declaration
   name: (identifier) @function)
 
-(tool_declaration
-  name: (identifier) @function)
+(tagged_string_expression
+  tag: (identifier) @tag)
 
-(agent_declaration
-  name: (identifier) @type)
+(tagged_string_expression
+  tag: (shell_tag) @tag)
 
-(evaluate_block
-  name: (string) @string.special)
+(tagged_block_expression
+  tag: (identifier) @tag)
+
+(dialect_bang) @operator
 
 (import_declaration
   alias: (identifier) @namespace)
@@ -79,9 +70,6 @@
   key: (identifier) @property)
 
 (table_field
-  key: (identifier) @property)
-
-(message_field
   key: (identifier) @property)
 
 [

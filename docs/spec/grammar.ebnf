@@ -2,8 +2,9 @@
 
    This file is the syntax appendix for docs/spec/index.md. It describes
    stable source syntax, not parser helper productions or internal AST shapes.
-   Dialect tags such as turn, model, sh, json, and re are ordinary identifiers
-   until they appear directly before a tagged string or tagged block.
+   Dialect tags such as sh, json, re, prompt, and user-defined names are
+   ordinary identifiers until they appear directly before a tagged string or
+   tagged block.
 *)
 
 program        = { separator | statement } EOF ;

@@ -1,0 +1,28 @@
+// shell_filesystem.leia - Built-in dialects for local process and filesystem work.
+// Demonstrates: $, cmd, glob, path
+//leia:cap process.exec,process.shell,fs.read
+
+print("=== Dialects: shell, command, filesystem ===")
+
+name := "Leia"
+
+// $ runs a small shell snippet and returns a process result table.
+shell_result := $`printf 'hello-%s' '${name}'`
+print("$ stdout:", shell_result.text)
+print("$ ok:", shell_result.ok, "code:", shell_result.code)
+
+// cmd runs a command without shell interpolation.
+cmd_result := cmd`printf command-ok`
+print("cmd stdout:", cmd_result.text)
+print("cmd ok:", cmd_result.ok, "code:", cmd_result.code)
+
+// glob expands a pattern under the configured filesystem root.
+matches := glob`examples/dialects/*.leia`
+print("glob matches:", #matches)
+for i := 1; i <= #matches; i++ {
+    print("  match[" .. i .. "]:", matches[i])
+}
+
+// path cleans a path string without touching the filesystem.
+cleaned := path`examples/dialects/../dialects/./shell_filesystem.leia`
+print("path cleaned:", cleaned)

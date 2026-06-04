@@ -1,5 +1,4 @@
-; Leia tree-sitter highlights for Helix.
-; Keep in sync with tools/tree-sitter-leia/queries/highlights.scm.
+; Leia tree-sitter highlights.
 
 [
   "case"
@@ -17,17 +16,6 @@
 ] @keyword.control
 
 [
-  "agent"
-  "budget"
-  "evaluate"
-  "flow"
-  "messages"
-  "models"
-  "tool"
-  "turn"
-] @keyword
-
-[
   "const"
   "func"
   "import"
@@ -40,28 +28,49 @@
 [
   "true"
   "false"
-] @constant.builtin.boolean
+] @boolean
 
 
 (comment) @comment
 (string) @string
-(number) @constant.numeric.integer
-(duration) @constant.numeric.integer
+(number) @number
+(duration) @number
 (dense_type) @type.builtin
 
-(function_declaration name: (identifier) @function)
-(tool_declaration name: (identifier) @function)
-(agent_declaration name: (identifier) @type)
-(evaluate_block name: (string) @string.special)
-(import_declaration alias: (identifier) @namespace)
+(function_declaration
+  name: (identifier) @function)
+
+(tagged_string_expression
+  tag: (identifier) @tag)
+
+(tagged_string_expression
+  tag: (shell_tag) @tag)
+
+(tagged_block_expression
+  tag: (identifier) @tag)
+
+(dialect_bang) @operator
+
+(import_declaration
+  alias: (identifier) @namespace)
+
 (parameter) @variable.parameter
 (vararg_parameter) @variable.parameter
-(call_expression function: (identifier) @function)
-(method_call_expression method: (identifier) @function.method)
-(field_expression field: (identifier) @variable.other.member)
-(config_field key: (identifier) @variable.other.member)
-(table_field key: (identifier) @variable.other.member)
-(message_field key: (identifier) @variable.other.member)
+
+(call_expression
+  function: (expression (identifier) @function.call))
+
+(method_call_expression
+  method: (identifier) @function.method.call)
+
+(field_expression
+  field: (identifier) @property)
+
+(config_field
+  key: (identifier) @property)
+
+(table_field
+  key: (identifier) @property)
 
 [
   "+"

@@ -1452,6 +1452,7 @@ func repositoryExampleRunnable(path string) bool {
 	return !strings.Contains(path, "/evaluate/") &&
 		!strings.Contains(path, "/llm/") &&
 		!strings.Contains(path, "/web/") &&
+		!strings.Contains(path, "/dialects/shell_filesystem.leia") &&
 		!strings.Contains(path, "/game_engine/") &&
 		!strings.Contains(path, "/concurrency/context_process.leia") &&
 		!strings.Contains(path, "/concurrency/goroutine_errors.leia") &&
@@ -1466,6 +1467,8 @@ func repositoryExampleRequires(path string) string {
 		return "LLM provider"
 	case strings.Contains(path, "/web/"):
 		return "network/server host access"
+	case strings.Contains(path, "/dialects/shell_filesystem.leia"):
+		return "process shell and filesystem host access"
 	case strings.Contains(path, "/game_engine/"):
 		return "game/window host access"
 	case strings.Contains(path, "/concurrency/context_process.leia"):

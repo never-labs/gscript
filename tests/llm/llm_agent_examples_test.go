@@ -177,3 +177,52 @@ func TestLLMAgentScenarioManualToolHistoryExampleSmoke(t *testing.T) {
 		})
 	}
 }
+
+func TestLLMDirectTurnExampleSmoke(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []leia.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			provider := &mockLLMProvider{res: llm.TurnResult{
+				Status: "final_answer",
+				Text:   "Direct llm.turn keeps examples simple.",
+			}}
+			vm := leia.New(llmScenarioOptions(provider, tc.opts...)...)
+
+			if err := vm.ExecFile(filepath.Join(repoRoot(t), "examples", "llm", "direct_turn.leia")); err != nil {
+				t.Fatalf("ExecFile: %v", err)
+			}
+
+			if len(provider.requests) != 1 {
+				t.Fatalf("requests = %d, want 1", len(provider.requests))
+			}
+			req := provider.requests[0]
+			if req.Model != "mock-fast" || req.MaxTokens != 64 || req.Temperature == nil || *req.Temperature != 0 {
+				t.Fatalf("request = %#v", req)
+			}
+			if len(req.Messages) != 2 ||
+				req.Messages[0].Role != "system" ||
+				req.Messages[1].Role != "user" ||
+				req.Messages[1].Text != "Summarize direct LLM calls." {
+				t.Fatalf("messages = %#v", req.Messages)
+			}
+
+			for name, want := range map[string]any{
+				"direct_text":   "Direct llm.turn keeps examples simple.",
+				"direct_status": "final_answer",
+			} {
+				got, err := vm.Get(name)
+				if err != nil {
+					t.Fatalf("Get %s: %v", name, err)
+				}
+				if got != want {
+					t.Fatalf("%s = %#v, want %#v", name, got, want)
+				}
+			}
+		})
+	}
+}

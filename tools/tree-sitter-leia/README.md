@@ -8,9 +8,8 @@ covers:
 
 - basic declarations and statements
 - functions and function literals
-- table, list, dense, message, turn, and agent literals
+- table, list, and dense literals
 - goroutine/channel/select syntax
-- AI-native `models`, `agent`, `tool`, and `budget` forms
 
 ## Verify
 

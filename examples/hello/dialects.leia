@@ -1,0 +1,58 @@
+// dialects.leia - runnable examples for generic dialect syntax.
+
+print("=== Leia Dialect Syntax Demo ===")
+
+import p "path"
+
+name := "Leia"
+
+decoded := json`{"project":"Leia","score":7}`
+encoded := json {project: name, ok: true}
+clean_path := path`examples//hello/../hello/dialects.leia`
+joined_path := p.join("examples", "hello", "dialects.leia")
+parsed_url := url`https://example.com:8443/search?q=leia&tag=dialect#demo`
+encoded_name := base64`Hello ${name}`
+decoded_name := dialect.eval("base64", encoded_name, {mode: "decode"})
+sha1 := dialect.eval("hash", "leia", {algo: "sha1"})
+rows := csv`name,score
+Ada,42
+Bob,7
+`
+nonempty_lines := lines`alpha
+
+beta
+`
+templated := template {text: "Hello {{.name}}", data: {name: name}}
+word := re!`^[A-Z][a-z]+$`
+user_prompt := prompt`Summarize ${name} dialect syntax.`
+system_prompt := prompt {role: "system", text: "Use examples."}
+quoted := quote {
+    total := 1
+    total += 2
+}
+
+assert(decoded.project == "Leia")
+assert(decoded.score == 7)
+assert(encoded == `{"ok":true,"project":"Leia"}`)
+assert(clean_path == joined_path)
+assert(parsed_url.host == "example.com")
+assert(parsed_url.port == "8443")
+assert(parsed_url.query.q == "leia")
+assert(parsed_url.query.tag == "dialect")
+assert(decoded_name == "Hello Leia")
+assert(sha1 == "3ea1ebad1aa28de8fc67188a456b9747bbcca81a")
+assert(rows[2][1] == "Ada")
+assert(rows[3][2] == "7")
+assert(#nonempty_lines == 2)
+assert(nonempty_lines[2] == "beta")
+assert(templated == "Hello Leia")
+assert(word.match("Leia") == true)
+assert(user_prompt.text == "Summarize Leia dialect syntax.")
+assert(system_prompt.body.role == "system")
+assert(system_prompt.body.text == "Use examples.")
+assert(quoted.kind == "function")
+
+print("decoded project:", decoded.project)
+print("csv first row:", rows[2][1] .. "=" .. rows[2][2])
+print("prompt:", user_prompt.text)
+print("dialects ok")

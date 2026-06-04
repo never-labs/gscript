@@ -48,10 +48,10 @@
     "fallthrough"))
 
 (defconst leia--declarations
-  '("chan" "const" "func" "import" "tool" "var"))
+  '("chan" "const" "func" "import" "var"))
 
 (defconst leia--contextual-keywords
-  '("agent" "budget" "capabilities" "flow" "messages" "models" "react" "turn"))
+  '())
 
 (defconst leia--constants
   '("false" "nil" "true"))
@@ -73,6 +73,9 @@
 
 (defconst leia-font-lock-keywords
   `((,(rx "//leia:" (+ (or word "_" "." "-"))) . font-lock-preprocessor-face)
+    (,(rx "$" (* space) "`") . font-lock-preprocessor-face)
+    (,(rx symbol-start (group (+ (or word "_"))) (? "!") (* space) (or "`" "{"))
+     1 font-lock-preprocessor-face)
     (,(regexp-opt leia--keywords 'symbols) . font-lock-keyword-face)
     (,(regexp-opt leia--declarations 'symbols) . font-lock-type-face)
     (,(regexp-opt leia--contextual-keywords 'symbols) . font-lock-keyword-face)

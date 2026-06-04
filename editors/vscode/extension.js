@@ -22,7 +22,6 @@ function activate(context) {
     vscode.commands.registerCommand("leia.previewSpec", previewSpec),
     vscode.commands.registerCommand("leia.restartLanguageServer", restartLanguageServer),
     vscode.commands.registerCommand("leia.evaluate.case", (uri, name) => runEvaluateCase(uri, name)),
-    vscode.commands.registerCommand("leia.agent.run", (uri) => runFileURI(uri)),
     vscode.tasks.registerTaskProvider("leia", new LeiaTaskProvider())
   );
   startLanguageServer(context);

@@ -10,6 +10,7 @@ These should run from a clean checkout without secrets:
 ```bash
 go run ../cmd/leia run hello/fib.leia
 go run ../cmd/leia run hello/types_demo.leia
+go run ../cmd/leia run hello/dialects.leia
 go run ../cmd/leia run data_processing/data_oriented/soa_kernels.leia
 go run ../cmd/leia run concurrency/select_timeout.leia
 ```
@@ -37,8 +38,9 @@ injection, hot reload, and persistent instances.
 ## AI And Host-Backed Examples
 
 AI examples live under `llm/`. Most are intended to work with a mock or replay
-provider in tests. Live-provider examples require opt-in environment variables
-and must never commit API keys.
+provider in tests. `llm/direct_turn.leia` shows the ordinary `llm.turn` request
+shape without an agent wrapper. Live-provider examples require opt-in
+environment variables and must never commit API keys.
 
 Evaluate examples live under `evaluate/`. Run replay-backed agent checks with:
 

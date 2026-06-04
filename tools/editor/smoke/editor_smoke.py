@@ -47,6 +47,10 @@ def pattern_by_name(grammar: dict, name: str) -> dict:
     fail(f"missing TextMate pattern {name}")
 
 
+def has_pattern(grammar: dict, name: str) -> bool:
+    return any(pattern.get("name") == name for pattern in repository_patterns(grammar))
+
+
 def assert_match(grammar: dict, name: str, sample: str) -> None:
     pattern = pattern_by_name(grammar, name)
     regex = pattern.get("match") or pattern.get("begin")
@@ -58,6 +62,28 @@ def assert_match(grammar: dict, name: str, sample: str) -> None:
         fail(f"pattern {name} does not compile: {exc}")
     if not compiled.search(sample):
         fail(f"pattern {name} did not match {sample!r}")
+
+
+def assert_any_match(grammar: dict, name: str, sample: str) -> None:
+    for pattern in repository_patterns(grammar):
+        pattern_name = pattern.get("name")
+        capture_names = {
+            capture.get("name")
+            for capture in pattern.get("captures", {}).values()
+            if isinstance(capture, dict)
+        }
+        if pattern_name != name and name not in capture_names:
+            continue
+        regex = pattern.get("match") or pattern.get("begin")
+        if not isinstance(regex, str):
+            continue
+        try:
+            compiled = re.compile(regex, re.MULTILINE)
+        except re.error as exc:
+            fail(f"pattern {name} does not compile: {exc}")
+        if compiled.search(sample):
+            return
+    fail(f"no pattern {name} matched {sample!r}")
 
 
 def assert_no_match(grammar: dict, name: str, sample: str) -> None:
@@ -92,8 +118,11 @@ def check_textmate() -> None:
     assert_match(leia, "keyword.control.directive.leia", source)
     assert_match(leia, "storage.type.function.leia", source)
     assert_match(leia, "storage.type.function.leia", 'import "go:net/http" as http')
-    assert_match(leia, "keyword.control.ai.leia", source)
-    assert_match(leia, "keyword.control.ai.leia", 'evaluate "answer can use lookup" {}')
+    if has_pattern(leia, "keyword.control.ai.leia"):
+        fail("Leia TextMate grammar still exposes old AI-native keyword scope")
+    assert_any_match(leia, "entity.name.tag.dialect.leia", "rows := csv`a,b\\n1,2\\n`")
+    assert_any_match(leia, "entity.name.tag.dialect.leia", "out := $`printf ok`")
+    assert_any_match(leia, "meta.dialect.tagged-block.leia", 'prompt { role: "system" }')
     assert_match(leia, "support.type.primitive.leia", source)
     assert_match(leia, "support.type.primitive.leia", "ids := [3]i64{1, 2, 3}")
     for unsupported in ("i8", "i16", "u8", "u16", "u32", "u64"):
@@ -134,10 +163,11 @@ def check_vscode() -> None:
         "leia.previewSpec",
         "leia.restartLanguageServer",
         "leia.evaluate.case",
-        "leia.agent.run",
     ):
         if command not in commands:
             fail(f"VS Code package is missing command {command}")
+    if "leia.agent.run" in commands:
+        fail("VS Code package still exposes old agent run command")
 
     for setting in ("leia.languageServer.enabled", "leia.languageServer.executable"):
         if setting not in config:
@@ -163,9 +193,12 @@ def check_vscode() -> None:
             fail(f"VS Code extension missing LSP marker {marker}")
 
     snippets = load_json(ROOT / "editors/vscode/snippets/leia.json")
-    for key in ("function", "agent", "tool", "turn", "test", "go routine"):
+    for key in ("function", "llm agent", "llm tool", "llm turn", "test", "go routine"):
         if key not in snippets:
             fail(f"VS Code snippets missing {key}")
+    for key in ("agent", "tool", "turn"):
+        if key in snippets:
+            fail(f"VS Code snippets still expose old {key} block snippet")
 
 
 def check_tree_sitter_assets() -> None:
@@ -190,29 +223,31 @@ def check_tree_sitter_assets() -> None:
         fail("tree-sitter.json has the wrong file types")
 
     named_types = {item["type"] for item in node_types if item.get("named")}
-    for node_type in (
-        "agent_declaration",
-        "models_declaration",
-        "tool_declaration",
-        "import_declaration",
-        "evaluate_block",
-        "turn_expression",
-        "messages_expression",
-        "dense_literal",
-    ):
+    for node_type in ("import_declaration", "dense_literal", "tagged_string_expression", "tagged_block_expression"):
         if node_type not in named_types:
             fail(f"tree-sitter node-types missing {node_type}")
+    for old_node_type in (
+        "agent_declaration",
+        "agent_defaults_declaration",
+        "agent_literal",
+        "budget_statement",
+        "evaluate_block",
+        "message_field",
+        "messages_expression",
+        "models_declaration",
+        "tool_declaration",
+        "turn_expression",
+    ):
+        if old_node_type in named_types:
+            fail(f"tree-sitter node-types still expose old AI-native node {old_node_type}")
 
     query = (ROOT / "tools/tree-sitter-leia/queries/highlights.scm").read_text(encoding="utf-8")
-    for marker in (
-        "@keyword.control",
-        "@function.call",
-        "@variable.parameter",
-        "(evaluate_block",
-        "(agent_declaration",
-    ):
+    for marker in ("@keyword.control", "@function.call", "@variable.parameter", "@tag"):
         if marker not in query:
             fail(f"tree-sitter highlight query missing {marker}")
+    for old_marker in ("(evaluate_block", "(agent_declaration", "(tool_declaration", "(message_field"):
+        if old_marker in query:
+            fail(f"tree-sitter highlight query still references old AI-native marker {old_marker}")
 
     for unsupported in ('"%="', '"i8"', '"i16"', '"u8"', '"u16"', '"u32"', '"u64"'):
         if unsupported in grammar_js or unsupported in query:

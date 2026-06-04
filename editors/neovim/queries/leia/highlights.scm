@@ -1,5 +1,4 @@
-; Leia tree-sitter highlights for Neovim.
-; Keep in sync with tools/tree-sitter-leia/queries/highlights.scm.
+; Leia tree-sitter highlights.
 
 [
   "case"
@@ -15,17 +14,6 @@
   "return"
   "select"
 ] @keyword.control
-
-[
-  "agent"
-  "budget"
-  "evaluate"
-  "flow"
-  "messages"
-  "models"
-  "tool"
-  "turn"
-] @keyword
 
 [
   "const"
@@ -49,19 +37,40 @@
 (duration) @number
 (dense_type) @type.builtin
 
-(function_declaration name: (identifier) @function)
-(tool_declaration name: (identifier) @function)
-(agent_declaration name: (identifier) @type)
-(evaluate_block name: (string) @string.special)
-(import_declaration alias: (identifier) @namespace)
+(function_declaration
+  name: (identifier) @function)
+
+(tagged_string_expression
+  tag: (identifier) @tag)
+
+(tagged_string_expression
+  tag: (shell_tag) @tag)
+
+(tagged_block_expression
+  tag: (identifier) @tag)
+
+(dialect_bang) @operator
+
+(import_declaration
+  alias: (identifier) @namespace)
+
 (parameter) @variable.parameter
 (vararg_parameter) @variable.parameter
-(call_expression function: (identifier) @function.call)
-(method_call_expression method: (identifier) @function.method.call)
-(field_expression field: (identifier) @property)
-(config_field key: (identifier) @property)
-(table_field key: (identifier) @property)
-(message_field key: (identifier) @property)
+
+(call_expression
+  function: (expression (identifier) @function.call))
+
+(method_call_expression
+  method: (identifier) @function.method.call)
+
+(field_expression
+  field: (identifier) @property)
+
+(config_field
+  key: (identifier) @property)
+
+(table_field
+  key: (identifier) @property)
 
 [
   "+"

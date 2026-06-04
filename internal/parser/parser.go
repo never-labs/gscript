@@ -1163,14 +1163,6 @@ func (p *Parser) taggedExprStmtCall(expr ast.Expr) *ast.CallExpr {
 }
 
 func parserDialectCall(pos ast.Pos, method, tag string, body ast.Expr, failFast bool) *ast.CallExpr {
-	if method == "eval_block" {
-		switch tag {
-		case "turn":
-			return parserRuntimeCall(pos, "llm", "turn", body)
-		case "model", "models":
-			return parserRuntimeCall(pos, "llm", "register_models", body)
-		}
-	}
 	opts := &ast.TableLitExpr{P: pos, Fields: []ast.TableField{
 		{Key: &ast.StringLit{P: pos, Value: "fail_fast"}, Value: &ast.BoolLit{P: pos, Value: failFast}},
 	}}
@@ -1186,18 +1178,6 @@ func parserDialectCall(pos ast.Pos, method, tag string, body ast.Expr, failFast 
 			body,
 			opts,
 		},
-	}
-}
-
-func parserRuntimeCall(pos ast.Pos, table, field string, args ...ast.Expr) *ast.CallExpr {
-	return &ast.CallExpr{
-		P: pos,
-		Func: &ast.FieldExpr{
-			P:     pos,
-			Table: &ast.IdentExpr{P: pos, Name: table},
-			Field: field,
-		},
-		Args: args,
 	}
 }
 

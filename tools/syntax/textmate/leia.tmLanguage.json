@@ -16,6 +16,9 @@
       "include": "#numbers"
     },
     {
+      "include": "#dialects"
+    },
+    {
       "include": "#keywords"
     },
     {
@@ -110,10 +113,37 @@
       ]
     },
     "contextual": {
+      "patterns": []
+    },
+    "dialects": {
       "patterns": [
         {
-          "name": "keyword.control.ai.leia",
-          "match": "\\b(?:agent|models|tool|turn|messages|flow|budget|evaluate|react)\\b"
+          "name": "entity.name.tag.dialect.leia",
+          "match": "\\$(?=\\s*`)"
+        },
+        {
+          "name": "meta.dialect.tagged-string.leia",
+          "match": "\\b([A-Za-z_][A-Za-z0-9_]*)(!)?(?=\\s*`)",
+          "captures": {
+            "1": {
+              "name": "entity.name.tag.dialect.leia"
+            },
+            "2": {
+              "name": "keyword.operator.dialect.leia"
+            }
+          }
+        },
+        {
+          "name": "meta.dialect.tagged-block.leia",
+          "match": "\\b([A-Za-z_][A-Za-z0-9_]*)(!)?(?=\\s*\\{)",
+          "captures": {
+            "1": {
+              "name": "entity.name.tag.dialect.leia"
+            },
+            "2": {
+              "name": "keyword.operator.dialect.leia"
+            }
+          }
         }
       ]
     },

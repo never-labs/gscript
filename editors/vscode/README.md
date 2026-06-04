@@ -8,7 +8,7 @@ This directory contains the Leia editor integration for VS Code.
 - Leia language server integration for diagnostics, hover, document symbols,
   completion, formatting, go-to definition, references, and rename.
 - Bracket, comment, and string pairing rules.
-- Snippets for functions, tests, AI-native agents, tools, turns, and channel-based concurrency.
+- Snippets for functions, tests, `llm` helpers, and channel-based concurrency.
 - Commands that call the repository CLI:
   - `Leia: Run Current File`
   - `Leia: Test Workspace`

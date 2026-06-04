@@ -1,0 +1,28 @@
+// Direct llm.turn demo.
+//
+// This example is intended for host tests with a mock or replay provider. It
+// shows the ordinary stdlib LLM call style without wrapping the request in an
+// agent.
+
+func answer_with_plain_turn(question) {
+    return llm.turn({
+        model: "mock-fast"
+        messages: {
+            llm.system("Answer using the provider response exactly."),
+            llm.user(question),
+        }
+        max_tokens: 64
+        temperature: 0
+    })
+}
+
+direct_result, direct_err := answer_with_plain_turn("Summarize direct LLM calls.")
+assert(direct_err == nil)
+assert(direct_result.status == "final_answer")
+assert(direct_result.text == "Direct llm.turn keeps examples simple.")
+
+direct_text := direct_result.text
+direct_status := direct_result.status
+
+print("direct status:", direct_status)
+print("direct answer:", direct_text)

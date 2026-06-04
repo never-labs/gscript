@@ -43,12 +43,6 @@ module.exports = grammar({
     statement: $ => choice(
       $.function_declaration,
       $.import_declaration,
-      $.tool_declaration,
-      $.agent_defaults_declaration,
-      $.agent_declaration,
-      $.models_declaration,
-      $.budget_statement,
-      $.evaluate_block,
       $.if_statement,
       $.for_statement,
       $.select_statement,
@@ -78,43 +72,6 @@ module.exports = grammar({
       "as",
       field("alias", $.identifier),
     ),
-
-    tool_declaration: $ => seq(
-      "tool",
-      field("name", $.identifier),
-      field("parameters", $.parameter_list),
-      field("body", $.block),
-    ),
-
-    agent_defaults_declaration: $ => seq(
-      "agent",
-      "defaults",
-      field("config", $.config_block),
-    ),
-
-    agent_declaration: $ => seq(
-      "agent",
-      field("name", $.identifier),
-      optional(field("parameters", $.parameter_list)),
-      field("config", $.config_block),
-      optional(field("flow", $.flow_block)),
-    ),
-
-    models_declaration: $ => seq("models", field("config", $.config_block)),
-
-    budget_statement: $ => seq(
-      "budget",
-      field("config", $.config_block),
-      field("body", $.block),
-    ),
-
-    evaluate_block: $ => seq(
-      "evaluate",
-      field("name", $.string),
-      field("body", $.block),
-    ),
-
-    flow_block: $ => seq("flow", $.block),
 
     parameter_list: $ => seq(
       "(",
@@ -236,6 +193,8 @@ module.exports = grammar({
     expression_list: $ => seq($.expression, repeat(seq(",", $.expression))),
 
     expression: $ => choice(
+      $.tagged_string_expression,
+      $.tagged_block_expression,
       $.identifier,
       $.number,
       $.duration,
@@ -245,9 +204,6 @@ module.exports = grammar({
       $.vararg_expression,
       $.parenthesized_expression,
       $.function_literal,
-      $.agent_literal,
-      $.turn_expression,
-      $.messages_expression,
       $.table_literal,
       $.list_literal,
       $.dense_literal,
@@ -264,27 +220,26 @@ module.exports = grammar({
 
     function_literal: $ => seq("func", $.parameter_list, $.block),
 
-    agent_literal: $ => seq(
-      "agent",
-      optional($.parameter_list),
-      field("config", $.config_block),
-      optional(field("flow", $.flow_block)),
-    ),
+    tagged_string_expression: $ => prec(PREC.call, choice(
+      seq(
+        field("tag", $.identifier),
+        optional(field("bang", $.dialect_bang)),
+        field("body", $.string),
+      ),
+      seq(
+        field("tag", $.shell_tag),
+        field("body", $.string),
+      ),
+    )),
 
-    turn_expression: $ => seq("turn", field("config", $.config_block)),
-    messages_expression: $ => seq("messages", $.messages_block),
-
-    messages_block: $ => seq(
-      "{",
-      optional(seq($.message_field, repeat(seq($.field_separator, $.message_field)), optional($.field_separator))),
-      "}",
-    ),
-
-    message_field: $ => choice(
-      prec(1, seq(field("key", choice($.identifier, $.string)), ":", field("value", $.expression))),
-      prec(1, seq("[", field("key", $.expression), "]", ":", field("value", $.expression))),
-      field("value", $.expression),
-    ),
+    tagged_block_expression: $ => prec(PREC.call, seq(
+      field("tag", $.identifier),
+      optional(field("bang", $.dialect_bang)),
+      choice(
+        field("config", $.config_block),
+        field("body", $.block),
+      ),
+    )),
 
     config_block: $ => seq(
       "{",
@@ -417,5 +372,7 @@ module.exports = grammar({
       seq("`", repeat(/[^`]/), "`"),
     )),
     identifier: _ => /[A-Za-z_][A-Za-z0-9_]*/,
+    shell_tag: _ => "$",
+    dialect_bang: _ => "!",
   },
 });

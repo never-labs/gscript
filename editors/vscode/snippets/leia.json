@@ -8,41 +8,45 @@
     ],
     "description": "Define a Leia function"
   },
-  "agent": {
-    "prefix": "agent",
+  "llm agent": {
+    "prefix": "llm.agent",
     "body": [
-      "agent ${1:name}(${2:input}) {",
-      "    model: \"${3:default}\"",
-      "    system: \"${4:Be concise.}\"",
-      "    user: ${2:input}",
-      "}",
+      "${1:agent_name} := llm.agent(\"${1:agent_name}\", func(${2:input}) {",
+      "    return {",
+      "        model: \"${3:default}\"",
+      "        messages: {",
+      "            llm.system(\"${4:Be concise.}\"),",
+      "            llm.user(${2:input})",
+      "        }",
+      "    }, nil",
+      "})",
       "",
-      "${5:result}, err := ${1:name}(${6:value})"
+      "${5:result}, err := ${1:agent_name}(${6:value})"
     ],
-    "description": "Define and call an AI-native agent"
+    "description": "Define and call an llm.agent"
   },
-  "tool": {
-    "prefix": "tool",
+  "llm tool": {
+    "prefix": "llm.tool",
     "body": [
       "// ${1:Describe what this tool does.}",
       "//leia:requires ${2:none}",
-      "tool ${3:name}(${4:arg}) {",
+      "${3:tool_name} := llm.tool(\"${3:tool_name}\", func(${4:arg}) {",
       "    ${0:return nil, nil}",
-      "}"
+      "})"
     ],
-    "description": "Define an AI-native tool with capability metadata"
+    "description": "Define an llm.tool with capability metadata"
   },
-  "turn": {
-    "prefix": "turn",
+  "llm turn": {
+    "prefix": "llm.turn",
     "body": [
-      "result, err := turn {",
+      "result, err := llm.turn({",
       "    model: \"${1:default}\"",
-      "    messages: messages {",
-      "        system: \"${2:Be precise.}\"",
-      "        user: ${3:question}",
+      "    messages: {",
+      "        llm.system(\"${2:Be precise.}\"),",
+      "        llm.user(${3:question})",
       "    }",
       "    max_tokens: ${4:256}",
-      "}"
+      "})"
     ],
     "description": "Run one LLM provider turn"
   },
