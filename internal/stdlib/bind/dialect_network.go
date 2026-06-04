@@ -78,9 +78,9 @@ func dialectCIDR(body Value, opts *Table) ([]Value, error) {
 }
 
 func dialectHostPort(body Value, opts *Table) ([]Value, error) {
-	mode := ""
-	if opts != nil && opts.RawGetString("mode").IsString() {
-		mode = opts.RawGetString("mode").Str()
+	mode := dialectMode(opts)
+	if !dialectModeAllowed(mode, "", "parse", "decode", "encode", "join", "format") {
+		return dialectUnknownMode("hostport", mode)
 	}
 	if body.IsTable() || mode == "encode" || mode == "join" || mode == "format" {
 		host := ""

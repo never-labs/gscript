@@ -1,6 +1,9 @@
 package bind
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestDialectURLParseBoundaries(t *testing.T) {
 	interp := runWithLib(t, `
@@ -268,6 +271,101 @@ func TestDialectJWTUnverifiedDecode(t *testing.T) {
 	}
 	if !interp.GetGlobal("bad_mode").IsNil() || !interp.GetGlobal("bad_mode_err").IsString() {
 		t.Fatalf("bad mode = %v err %v, want nil error string", interp.GetGlobal("bad_mode"), interp.GetGlobal("bad_mode_err"))
+	}
+}
+
+func TestDialectWebUnknownModesAreReported(t *testing.T) {
+	interp := runWithLib(t, `
+		html_bad, html_bad_err := dialect.eval("html_escape", "<x>", {mode: "bogus"})
+		urlquery_bad, urlquery_bad_err := dialect.eval("urlquery", "a=1", {mode: "bogus"})
+		mime_bad, mime_bad_err := dialect.eval("mime", "text/plain", {mode: "bogus"})
+		headers_bad, headers_bad_err := dialect.eval("headers", "X-Test: ok\r\n", {mode: "bogus"})
+		cookie_bad, cookie_bad_err := dialect.eval("cookie", "a=1", {mode: "bogus"})
+		httpmsg_bad, httpmsg_bad_err := dialect.eval("httpmsg", "GET / HTTP/1.1\r\nHost: example.com\r\n\r\n", {mode: "bogus"})
+		sse_bad, sse_bad_err := dialect.eval("sse", "data: hello\n\n", {mode: "bogus"})
+		multipart_bad, multipart_bad_err := dialect.eval("multipart", "--fixture--\r\n", {mode: "bogus", boundary: "fixture"})
+		jwt_bad, jwt_bad_err := dialect.eval("jwt", "a.b.c", {mode: "verify"})
+	`, "dialect", BuildDialect(HostOptions{}, nil))
+
+	assertDialectModeError(t, interp.GetGlobal("html_bad"), interp.GetGlobal("html_bad_err"), "html_escape dialect: unknown mode")
+	assertDialectModeError(t, interp.GetGlobal("urlquery_bad"), interp.GetGlobal("urlquery_bad_err"), "urlquery dialect: unknown mode")
+	assertDialectModeError(t, interp.GetGlobal("mime_bad"), interp.GetGlobal("mime_bad_err"), "mime dialect: unknown mode")
+	assertDialectModeError(t, interp.GetGlobal("headers_bad"), interp.GetGlobal("headers_bad_err"), "headers dialect: unknown mode")
+	assertDialectModeError(t, interp.GetGlobal("cookie_bad"), interp.GetGlobal("cookie_bad_err"), "cookie dialect: unknown mode")
+	assertDialectModeError(t, interp.GetGlobal("httpmsg_bad"), interp.GetGlobal("httpmsg_bad_err"), "httpmsg dialect: unknown mode")
+	assertDialectModeError(t, interp.GetGlobal("sse_bad"), interp.GetGlobal("sse_bad_err"), "sse dialect: unknown mode")
+	assertDialectModeError(t, interp.GetGlobal("multipart_bad"), interp.GetGlobal("multipart_bad_err"), "multipart dialect: unknown mode")
+	assertDialectModeError(t, interp.GetGlobal("jwt_bad"), interp.GetGlobal("jwt_bad_err"), "jwt dialect: unknown mode")
+}
+
+func TestDialectWebModeAliasesKeepDirectionInference(t *testing.T) {
+	interp := runWithLib(t, `
+		html_escaped := dialect.eval("html_escape", "<x>", {mode: "encode"})
+		html_unescaped := dialect.eval("html_escape", "&lt;x&gt;", {mode: "decode"})
+		query_encoded := dialect.eval("urlquery", {q: "a b"}, {mode: "format"})
+		query_decoded := dialect.eval("urlquery", "q=a+b", {mode: "decode"})
+		query_component := dialect.eval("urlquery", "a b", {mode: "escape"})
+		mime_encoded := dialect.eval("mime", {type: "text/plain", params: {charset: "utf-8"}}, {mode: "format"})
+		mime_parsed := dialect.eval("mime", "text/plain; charset=utf-8", {mode: "parse"})
+		headers_encoded := dialect.eval("headers", {x_test: "ok"}, {mode: "format"})
+		headers_parsed := dialect.eval("headers", "X-Test: ok\r\n", {mode: "decode"})
+		cookie_encoded := dialect.eval("cookie", {sid: "abc"}, {mode: "format"})
+		cookie_parsed := dialect.eval("cookie", "sid=abc", {mode: "parse"})
+		http_encoded := dialect.eval("httpmsg", {method: "GET", target: "/", version: "HTTP/1.1", headers: {Host: "example.com"}}, {mode: "format"})
+		http_parsed := dialect.eval("httpmsg", "GET / HTTP/1.1\r\nHost: example.com\r\n\r\n", {mode: "decode"})
+		sse_encoded := dialect.eval("sse", {{event: "token", data: "hi"}}, {mode: "format"})
+		sse_parsed := dialect.eval("sse", "event: token\ndata: hi\n\n", {mode: "parse"})
+		mp_encoded := dialect.eval("multipart", {{name: "field", body: "value"}}, {mode: "format", boundary: "fixture"})
+		mp_parsed := dialect.eval("multipart", mp_encoded, {mode: "decode", boundary: "fixture"})
+	`, "dialect", BuildDialect(HostOptions{}, nil))
+
+	if got := interp.GetGlobal("html_escaped").Str(); got != "&lt;x&gt;" {
+		t.Fatalf("html escaped = %q, want &lt;x&gt;", got)
+	}
+	if got := interp.GetGlobal("html_unescaped").Str(); got != "<x>" {
+		t.Fatalf("html unescaped = %q, want <x>", got)
+	}
+	if got := interp.GetGlobal("query_encoded").Str(); got != "q=a+b" {
+		t.Fatalf("query encoded = %q, want q=a+b", got)
+	}
+	if got := interp.GetGlobal("query_decoded").Table().RawGetString("q").Str(); got != "a b" {
+		t.Fatalf("query decoded q = %q, want a b", got)
+	}
+	if got := interp.GetGlobal("query_component").Str(); got != "a+b" {
+		t.Fatalf("query component = %q, want a+b", got)
+	}
+	if got := interp.GetGlobal("mime_encoded").Str(); got != "text/plain; charset=utf-8" {
+		t.Fatalf("mime encoded = %q, want formatted media type", got)
+	}
+	if got := interp.GetGlobal("mime_parsed").Table().RawGetString("params").Table().RawGetString("charset").Str(); got != "utf-8" {
+		t.Fatalf("mime charset = %q, want utf-8", got)
+	}
+	if got := interp.GetGlobal("headers_encoded").Str(); got != "X_test: ok\r\n" {
+		t.Fatalf("headers encoded = %q, want header line", got)
+	}
+	if got := interp.GetGlobal("headers_parsed").Table().RawGetString("X-Test").Str(); got != "ok" {
+		t.Fatalf("headers parsed = %q, want ok", got)
+	}
+	if got := interp.GetGlobal("cookie_encoded").Str(); got != "sid=abc" {
+		t.Fatalf("cookie encoded = %q, want sid=abc", got)
+	}
+	if got := interp.GetGlobal("cookie_parsed").Table().RawGetString("sid").Str(); got != "abc" {
+		t.Fatalf("cookie parsed = %q, want abc", got)
+	}
+	if got := interp.GetGlobal("http_encoded").Str(); !strings.Contains(got, "GET / HTTP/1.1") {
+		t.Fatalf("http encoded = %q, want request line", got)
+	}
+	if got := interp.GetGlobal("http_parsed").Table().RawGetString("method").Str(); got != "GET" {
+		t.Fatalf("http parsed method = %q, want GET", got)
+	}
+	if got := interp.GetGlobal("sse_encoded").Str(); !strings.Contains(got, "event: token") {
+		t.Fatalf("sse encoded = %q, want event", got)
+	}
+	if got := interp.GetGlobal("sse_parsed").Table().RawGetInt(1).Table().RawGetString("data").Str(); got != "hi" {
+		t.Fatalf("sse parsed data = %q, want hi", got)
+	}
+	if got := interp.GetGlobal("mp_parsed").Table().RawGetInt(1).Table().RawGetString("body").Str(); got != "value" {
+		t.Fatalf("multipart parsed body = %q, want value", got)
 	}
 }
 

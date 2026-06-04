@@ -1,6 +1,9 @@
 package bind
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestDialectDelimitedParseAndEncode(t *testing.T) {
 	interp := runWithLib(t, `
@@ -75,5 +78,135 @@ func TestDialectKVEnvParseAndEncode(t *testing.T) {
 	}
 	if !interp.GetGlobal("bad").IsNil() || !interp.GetGlobal("bad_err").IsString() {
 		t.Fatalf("bad kv encode = %v err %v, want nil error string", interp.GetGlobal("bad"), interp.GetGlobal("bad_err"))
+	}
+}
+
+func TestDialectTextUnknownModesAreReported(t *testing.T) {
+	interp := runWithLib(t, `
+		json_bad, json_bad_err := dialect.eval("json", "{}", {mode: "bogus"})
+		jsonptr_bad, jsonptr_bad_err := dialect.eval("jsonptr", {data: {name: "Ada"}, path: "/name"}, {mode: "bogus"})
+		jsonl_bad, jsonl_bad_err := dialect.eval("jsonl", "{}", {mode: "bogus"})
+		csv_bad, csv_bad_err := dialect.eval("csv", "a,b\n", {mode: "bogus"})
+		tsv_bad, tsv_bad_err := dialect.eval("tsv", "a\tb\n", {mode: "bogus"})
+		md_bad, md_bad_err := dialect.eval("mdtable", "| a |\n| - |\n| b |\n", {mode: "bogus"})
+		kv_bad, kv_bad_err := dialect.eval("kv", "a=1", {mode: "bogus"})
+		env_bad, env_bad_err := dialect.eval("env", "A=1", {mode: "bogus"})
+		logfmt_bad, logfmt_bad_err := dialect.eval("logfmt", "a=1", {mode: "bogus"})
+		ini_bad, ini_bad_err := dialect.eval("ini", "a=1", {mode: "bogus"})
+		semver_bad, semver_bad_err := dialect.eval("semver", "1.2.3", {mode: "bogus"})
+		duration_bad, duration_bad_err := dialect.eval("duration", "1s", {mode: "bogus"})
+		tap_bad, tap_bad_err := dialect.eval("tap", "1..1\nok 1\n", {mode: "bogus"})
+		xml_bad, xml_bad_err := dialect.eval("xml", "<x>", {mode: "bogus"})
+	`, "dialect", BuildDialect(HostOptions{}, nil))
+
+	assertDialectModeError(t, interp.GetGlobal("json_bad"), interp.GetGlobal("json_bad_err"), "json dialect: unknown mode")
+	assertDialectModeError(t, interp.GetGlobal("jsonptr_bad"), interp.GetGlobal("jsonptr_bad_err"), "jsonptr dialect: unknown mode")
+	assertDialectModeError(t, interp.GetGlobal("jsonl_bad"), interp.GetGlobal("jsonl_bad_err"), "jsonl dialect: unknown mode")
+	assertDialectModeError(t, interp.GetGlobal("csv_bad"), interp.GetGlobal("csv_bad_err"), "csv dialect: unknown mode")
+	assertDialectModeError(t, interp.GetGlobal("tsv_bad"), interp.GetGlobal("tsv_bad_err"), "tsv dialect: unknown mode")
+	assertDialectModeError(t, interp.GetGlobal("md_bad"), interp.GetGlobal("md_bad_err"), "mdtable dialect: unknown mode")
+	assertDialectModeError(t, interp.GetGlobal("kv_bad"), interp.GetGlobal("kv_bad_err"), "kv dialect: unknown mode")
+	assertDialectModeError(t, interp.GetGlobal("env_bad"), interp.GetGlobal("env_bad_err"), "env dialect: unknown mode")
+	assertDialectModeError(t, interp.GetGlobal("logfmt_bad"), interp.GetGlobal("logfmt_bad_err"), "logfmt dialect: unknown mode")
+	assertDialectModeError(t, interp.GetGlobal("ini_bad"), interp.GetGlobal("ini_bad_err"), "ini dialect: unknown mode")
+	assertDialectModeError(t, interp.GetGlobal("semver_bad"), interp.GetGlobal("semver_bad_err"), "semver dialect: unknown mode")
+	assertDialectModeError(t, interp.GetGlobal("duration_bad"), interp.GetGlobal("duration_bad_err"), "duration dialect: unknown mode")
+	assertDialectModeError(t, interp.GetGlobal("tap_bad"), interp.GetGlobal("tap_bad_err"), "tap dialect: unknown mode")
+	assertDialectModeError(t, interp.GetGlobal("xml_bad"), interp.GetGlobal("xml_bad_err"), "xml dialect: unknown mode")
+}
+
+func TestDialectTextModeAliasesKeepDirectionInference(t *testing.T) {
+	interp := runWithLib(t, `
+		json_decoded := dialect.eval("json", "{\"name\":\"Ada\"}", {mode: "decode"})
+		json_encoded := dialect.eval("json", {name: "Ada"}, {mode: "format"})
+		jsonptr_lookup := dialect.eval("jsonptr", {data: {name: "Ada"}, path: "/name"}, {mode: "lookup"})
+		jsonptr_encoded := dialect.eval("jsonptr", {"a/b", "c~d"}, {mode: "format"})
+		jsonl_rows := dialect.eval("jsonl", "{\"x\":1}\n", {mode: "parse"})
+		jsonl_text := dialect.eval("jsonl", {{x: 1}}, {mode: "format"})
+		csv_rows := dialect.eval("csv", "a,b\n", {mode: "decode"})
+		csv_text := dialect.eval("csv", {{"a", "b"}}, {mode: "format"})
+		kv_table := dialect.eval("kv", "a=1", {mode: "parse"})
+		kv_text := dialect.eval("kv", {a: 1}, {mode: "format"})
+		logfmt_table := dialect.eval("logfmt", "a=1", {mode: "decode"})
+		logfmt_text := dialect.eval("logfmt", {a: 1}, {mode: "format"})
+		ini_table := dialect.eval("ini", "a=1", {mode: "decode"})
+		ini_text := dialect.eval("ini", {a: 1}, {mode: "format"})
+		semver_table := dialect.eval("semver", "1.2.3", {mode: "validate"})
+		semver_text := dialect.eval("semver", {major: 1, minor: 2, patch: 3}, {mode: "format"})
+		duration_table := dialect.eval("duration", "1s", {mode: "decode"})
+		duration_text := dialect.eval("duration", {seconds: 1}, {mode: "format"})
+		tap_rows := dialect.eval("tap", "1..1\nok 1\n", {mode: "parse"})
+		tap_text := dialect.eval("tap", {{kind: "plan", first: 1, last: 1}, {kind: "test", ok: true, number: 1}}, {mode: "format"})
+	`, "dialect", BuildDialect(HostOptions{}, nil))
+
+	if got := interp.GetGlobal("json_decoded").Table().RawGetString("name").Str(); got != "Ada" {
+		t.Fatalf("json decoded name = %q, want Ada", got)
+	}
+	if got := interp.GetGlobal("json_encoded").Str(); !strings.Contains(got, `"name":"Ada"`) {
+		t.Fatalf("json encoded = %q, want name field", got)
+	}
+	if got := interp.GetGlobal("jsonptr_lookup").Str(); got != "Ada" {
+		t.Fatalf("jsonptr lookup = %q, want Ada", got)
+	}
+	if got := interp.GetGlobal("jsonptr_encoded").Str(); got != "/a~1b/c~0d" {
+		t.Fatalf("jsonptr encoded = %q, want escaped pointer", got)
+	}
+	if got := interp.GetGlobal("jsonl_rows").Table().RawGetInt(1).Table().RawGetString("x").Int(); got != 1 {
+		t.Fatalf("jsonl row x = %d, want 1", got)
+	}
+	if got := interp.GetGlobal("jsonl_text").Str(); !strings.Contains(got, `"x":1`) {
+		t.Fatalf("jsonl text = %q, want x record", got)
+	}
+	if got := interp.GetGlobal("csv_rows").Table().RawGetInt(1).Table().RawGetInt(2).Str(); got != "b" {
+		t.Fatalf("csv parsed cell = %q, want b", got)
+	}
+	if got := interp.GetGlobal("csv_text").Str(); got != "a,b\n" {
+		t.Fatalf("csv text = %q, want a,b newline", got)
+	}
+	if got := interp.GetGlobal("kv_table").Table().RawGetString("a").Str(); got != "1" {
+		t.Fatalf("kv table a = %q, want 1", got)
+	}
+	if got := interp.GetGlobal("kv_text").Str(); got != "a=1\n" {
+		t.Fatalf("kv text = %q, want a=1 newline", got)
+	}
+	if got := interp.GetGlobal("logfmt_table").Table().RawGetString("a").Str(); got != "1" {
+		t.Fatalf("logfmt table a = %q, want 1", got)
+	}
+	if got := interp.GetGlobal("logfmt_text").Str(); got != "a=1" {
+		t.Fatalf("logfmt text = %q, want a=1", got)
+	}
+	if got := interp.GetGlobal("ini_table").Table().RawGetString("a").Str(); got != "1" {
+		t.Fatalf("ini table a = %q, want 1", got)
+	}
+	if got := interp.GetGlobal("ini_text").Str(); got != "a=1\n" {
+		t.Fatalf("ini text = %q, want a=1 newline", got)
+	}
+	if got := interp.GetGlobal("semver_table").Table().RawGetString("version").Str(); got != "1.2.3" {
+		t.Fatalf("semver version = %q, want 1.2.3", got)
+	}
+	if got := interp.GetGlobal("semver_text").Str(); got != "1.2.3" {
+		t.Fatalf("semver text = %q, want 1.2.3", got)
+	}
+	if got := interp.GetGlobal("duration_table").Table().RawGetString("seconds").Float(); got != 1 {
+		t.Fatalf("duration seconds = %f, want 1", got)
+	}
+	if got := interp.GetGlobal("duration_text").Str(); got != "1s" {
+		t.Fatalf("duration text = %q, want 1s", got)
+	}
+	if got := interp.GetGlobal("tap_rows").Table().Length(); got != 2 {
+		t.Fatalf("tap rows = %d, want 2", got)
+	}
+	if got := interp.GetGlobal("tap_text").Str(); !strings.Contains(got, "ok 1") {
+		t.Fatalf("tap text = %q, want ok 1", got)
+	}
+}
+
+func assertDialectModeError(t *testing.T, value Value, err Value, want string) {
+	t.Helper()
+	if !value.IsNil() {
+		t.Fatalf("value = %v, want nil", value)
+	}
+	if !err.IsString() || !strings.Contains(err.Str(), want) {
+		t.Fatalf("err = %v, want string containing %q", err, want)
 	}
 }

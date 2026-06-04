@@ -68,3 +68,27 @@ func TestDialectNetworkParsesIPCIDRAndHostPort(t *testing.T) {
 		t.Fatalf("bad hostport = %v err %v, want nil error string", interp.GetGlobal("bad_hp"), interp.GetGlobal("bad_hp_err"))
 	}
 }
+
+func TestDialectHostPortModeAliasesAndUnknownMode(t *testing.T) {
+	interp := runWithLib(t, `
+		parsed := dialect.eval("hostport", "example.com:443", {mode: "parse"})
+		decoded := dialect.eval("hostport", "example.com:443", {mode: "decode"})
+		joined := dialect.eval("hostport", {host: "example.com", port: "443"}, {mode: "join"})
+		formatted := dialect.eval("hostport", {host: "example.com", port: "443"}, {mode: "format"})
+		bad, bad_err := dialect.eval("hostport", "example.com:443", {mode: "bogus"})
+	`, "dialect", BuildDialect(HostOptions{}, nil))
+
+	if got := interp.GetGlobal("parsed").Table().RawGetString("host").Str(); got != "example.com" {
+		t.Fatalf("parsed host = %q, want example.com", got)
+	}
+	if got := interp.GetGlobal("decoded").Table().RawGetString("port").Str(); got != "443" {
+		t.Fatalf("decoded port = %q, want 443", got)
+	}
+	if got := interp.GetGlobal("joined").Str(); got != "example.com:443" {
+		t.Fatalf("joined = %q, want example.com:443", got)
+	}
+	if got := interp.GetGlobal("formatted").Str(); got != "example.com:443" {
+		t.Fatalf("formatted = %q, want example.com:443", got)
+	}
+	assertDialectModeError(t, interp.GetGlobal("bad"), interp.GetGlobal("bad_err"), "hostport dialect: unknown mode")
+}

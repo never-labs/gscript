@@ -137,9 +137,9 @@ func registerDialectText(register dialectRegisterFunc, maxHostResult func() int6
 }
 
 func dialectXML(body Value, opts *Table) ([]Value, error) {
-	mode := "escape"
-	if opts != nil && opts.RawGetString("mode").IsString() {
-		mode = opts.RawGetString("mode").Str()
+	mode := dialectMode(opts)
+	if mode == "" {
+		mode = "escape"
 	}
 	switch mode {
 	case "", "escape", "encode":
@@ -151,16 +151,16 @@ func dialectXML(body Value, opts *Table) ([]Value, error) {
 		}
 		return []Value{StringValue(decoded)}, nil
 	default:
-		return nil, fmt.Errorf("xml dialect: unknown mode %q", mode)
+		return dialectUnknownMode("xml", mode)
 	}
 }
 
 func dialectDuration(body Value, opts *Table) ([]Value, error) {
-	mode := ""
-	if opts != nil && opts.RawGetString("mode").IsString() {
-		mode = opts.RawGetString("mode").Str()
+	mode := dialectMode(opts)
+	if !dialectModeAllowed(mode, "", "parse", "decode", "encode", "format") {
+		return dialectUnknownMode("duration", mode)
 	}
-	if mode == "encode" || !body.IsString() {
+	if mode == "encode" || mode == "format" || !body.IsString() {
 		encoded, err := encodeDialectDuration(body)
 		if err != nil {
 			return nil, err
@@ -254,11 +254,11 @@ func dialectRegexp(pattern string, failFast bool) ([]Value, error) {
 }
 
 func dialectJSON(body Value, opts *Table) ([]Value, error) {
-	mode := ""
-	if opts != nil && opts.RawGetString("mode").IsString() {
-		mode = opts.RawGetString("mode").Str()
+	mode := dialectMode(opts)
+	if !dialectModeAllowed(mode, "", "parse", "decode", "encode", "format") {
+		return dialectUnknownMode("json", mode)
 	}
-	if body.IsString() && mode != "encode" {
+	if body.IsString() && mode != "encode" && mode != "format" {
 		decoder := json.NewDecoder(strings.NewReader(body.Str()))
 		decoder.UseNumber()
 		var goVal any
@@ -282,9 +282,9 @@ func dialectJSON(body Value, opts *Table) ([]Value, error) {
 }
 
 func dialectJSONPointer(body Value, opts *Table) ([]Value, error) {
-	mode := ""
-	if opts != nil && opts.RawGetString("mode").IsString() {
-		mode = opts.RawGetString("mode").Str()
+	mode := dialectMode(opts)
+	if !dialectModeAllowed(mode, "", "lookup", "get", "parse", "decode", "encode", "format") {
+		return dialectUnknownMode("jsonptr", mode)
 	}
 	if mode == "encode" || mode == "format" {
 		if !body.IsTable() {
@@ -349,11 +349,11 @@ func jsonPointerLookup(value Value, tokens []string) (Value, error) {
 }
 
 func dialectJSONL(body Value, opts *Table, maxHostResult func() int64) ([]Value, error) {
-	mode := ""
-	if opts != nil && opts.RawGetString("mode").IsString() {
-		mode = opts.RawGetString("mode").Str()
+	mode := dialectMode(opts)
+	if !dialectModeAllowed(mode, "", "parse", "decode", "encode", "format") {
+		return dialectUnknownMode("jsonl", mode)
 	}
-	if mode == "encode" || !body.IsString() {
+	if mode == "encode" || mode == "format" || !body.IsString() {
 		data, err := encodeJSONL(body, hostResultLimit(maxHostResult))
 		if err != nil {
 			return nil, fmt.Errorf("jsonl dialect: %v", err)
@@ -450,21 +450,21 @@ func tableHasAnyKey(tbl *Table) bool {
 }
 
 func dialectCSV(body Value, opts *Table, maxHostResult func() int64) ([]Value, error) {
-	return dialectDelimited(body, opts, 0, maxHostResult)
+	return dialectDelimited("csv", body, opts, 0, maxHostResult)
 }
 
 func dialectTSV(body Value, opts *Table, maxHostResult func() int64) ([]Value, error) {
-	return dialectDelimited(body, opts, '\t', maxHostResult)
+	return dialectDelimited("tsv", body, opts, '\t', maxHostResult)
 }
 
-func dialectDelimited(body Value, opts *Table, defaultSep rune, maxHostResult func() int64) ([]Value, error) {
+func dialectDelimited(name string, body Value, opts *Table, defaultSep rune, maxHostResult func() int64) ([]Value, error) {
 	csvOpts := csvDialectOptions(opts)
 	if csvOpts.Sep == 0 {
 		csvOpts.Sep = defaultSep
 	}
-	mode := ""
-	if opts != nil && opts.RawGetString("mode").IsString() {
-		mode = opts.RawGetString("mode").Str()
+	mode := dialectMode(opts)
+	if !dialectModeAllowed(mode, "", "parse", "decode", "encode", "format") {
+		return dialectUnknownMode(name, mode)
 	}
 	if body.IsTable() || mode == "encode" || mode == "format" {
 		text, err := encodeDelimitedValue(body, opts, csvOpts, maxHostResult)
@@ -615,11 +615,11 @@ func csvHeaderRowsFromValue(rows *Table, headers []string) ([]map[string]string,
 }
 
 func dialectMarkdownTable(body Value, opts *Table, maxHostResult func() int64) ([]Value, error) {
-	mode := ""
-	if opts != nil && opts.RawGetString("mode").IsString() {
-		mode = opts.RawGetString("mode").Str()
+	mode := dialectMode(opts)
+	if !dialectModeAllowed(mode, "", "parse", "decode", "encode", "format") {
+		return dialectUnknownMode("mdtable", mode)
 	}
-	if body.IsString() && mode != "encode" {
+	if body.IsString() && mode != "encode" && mode != "format" {
 		table, err := dialectlib.ParseMarkdownTable(body.Str())
 		if err != nil {
 			return []Value{NilValue(), StringValue(err.Error())}, nil
@@ -841,9 +841,13 @@ func dialectKV(body Value, opts *Table, envMode bool, maxHostResult func() int64
 	if opts != nil && opts.RawGetString("trim").IsBool() {
 		kvOpts.Trim = opts.RawGetString("trim").Bool()
 	}
-	mode := ""
-	if opts != nil && opts.RawGetString("mode").IsString() {
-		mode = opts.RawGetString("mode").Str()
+	mode := dialectMode(opts)
+	name := "kv"
+	if envMode {
+		name = "env"
+	}
+	if !dialectModeAllowed(mode, "", "parse", "decode", "encode", "format") {
+		return dialectUnknownMode(name, mode)
 	}
 	if body.IsTable() || mode == "encode" || mode == "format" {
 		values := map[string]string{}
@@ -877,9 +881,9 @@ func dialectKV(body Value, opts *Table, envMode bool, maxHostResult func() int64
 }
 
 func dialectLogfmt(body Value, opts *Table, maxHostResult func() int64) ([]Value, error) {
-	mode := ""
-	if opts != nil && opts.RawGetString("mode").IsString() {
-		mode = opts.RawGetString("mode").Str()
+	mode := dialectMode(opts)
+	if !dialectModeAllowed(mode, "", "parse", "decode", "encode", "format") {
+		return dialectUnknownMode("logfmt", mode)
 	}
 	if body.IsTable() || mode == "encode" || mode == "format" {
 		values := map[string]string{}
@@ -915,11 +919,11 @@ func dialectLogfmt(body Value, opts *Table, maxHostResult func() int64) ([]Value
 }
 
 func dialectINI(body Value, opts *Table) ([]Value, error) {
-	mode := ""
-	if opts != nil && opts.RawGetString("mode").IsString() {
-		mode = opts.RawGetString("mode").Str()
+	mode := dialectMode(opts)
+	if !dialectModeAllowed(mode, "", "parse", "decode", "encode", "format") {
+		return dialectUnknownMode("ini", mode)
 	}
-	if body.IsString() && mode != "encode" {
+	if body.IsString() && mode != "encode" && mode != "format" {
 		doc, err := dialectlib.ParseINI(body.Str())
 		if err != nil {
 			return []Value{NilValue(), StringValue(err.Error())}, nil
@@ -999,9 +1003,9 @@ func iniScalarString(v Value) string {
 }
 
 func dialectSemVer(body Value, opts *Table) ([]Value, error) {
-	mode := ""
-	if opts != nil && opts.RawGetString("mode").IsString() {
-		mode = opts.RawGetString("mode").Str()
+	mode := dialectMode(opts)
+	if !dialectModeAllowed(mode, "", "parse", "decode", "validate", "encode", "format") {
+		return dialectUnknownMode("semver", mode)
 	}
 	if body.IsString() && mode != "encode" && mode != "format" {
 		parsed, err := dialectlib.ParseSemVer(body.Str())
@@ -1122,11 +1126,11 @@ func stringArrayToValue(values []string) Value {
 }
 
 func dialectTAP(body Value, opts *Table) ([]Value, error) {
-	mode := ""
-	if opts != nil && opts.RawGetString("mode").IsString() {
-		mode = opts.RawGetString("mode").Str()
+	mode := dialectMode(opts)
+	if !dialectModeAllowed(mode, "", "parse", "decode", "encode", "format") {
+		return dialectUnknownMode("tap", mode)
 	}
-	if body.IsString() && mode != "encode" {
+	if body.IsString() && mode != "encode" && mode != "format" {
 		doc, err := dialectlib.ParseTAP(body.Str())
 		if err != nil {
 			return []Value{NilValue(), StringValue(err.Error())}, nil

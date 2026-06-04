@@ -69,9 +69,9 @@ func registerDialectWeb(register dialectRegisterFunc, maxHostResult func() int64
 }
 
 func dialectHTMLEscape(src string, opts *Table) ([]Value, error) {
-	mode := ""
-	if opts != nil && opts.RawGetString("mode").IsString() {
-		mode = opts.RawGetString("mode").Str()
+	mode := dialectMode(opts)
+	if !dialectModeAllowed(mode, "", "escape", "encode", "unescape", "decode") {
+		return dialectUnknownMode("html_escape", mode)
 	}
 	if mode == "unescape" || mode == "decode" {
 		return []Value{StringValue(dialectlib.HTMLUnescape(src))}, nil
@@ -80,9 +80,9 @@ func dialectHTMLEscape(src string, opts *Table) ([]Value, error) {
 }
 
 func dialectURLQuery(body Value, opts *Table) ([]Value, error) {
-	mode := ""
-	if opts != nil && opts.RawGetString("mode").IsString() {
-		mode = opts.RawGetString("mode").Str()
+	mode := dialectMode(opts)
+	if !dialectModeAllowed(mode, "", "parse", "decode", "encode", "format", "escape", "encode_component", "unescape", "decode_component") {
+		return dialectUnknownMode("urlquery", mode)
 	}
 	if body.IsTable() && mode != "decode" && mode != "parse" {
 		values := url.Values{}
@@ -214,9 +214,9 @@ func stringMapFromTable(body Value, dialectName string) (map[string]string, erro
 }
 
 func dialectMIME(body Value, opts *Table) ([]Value, error) {
-	mode := ""
-	if opts != nil && opts.RawGetString("mode").IsString() {
-		mode = opts.RawGetString("mode").Str()
+	mode := dialectMode(opts)
+	if !dialectModeAllowed(mode, "", "parse", "decode", "encode", "format") {
+		return dialectUnknownMode("mime", mode)
 	}
 	if body.IsTable() || mode == "encode" || mode == "format" {
 		return dialectMIMEEncode(body, opts)
@@ -278,9 +278,9 @@ func dialectMIMEEncode(body Value, opts *Table) ([]Value, error) {
 }
 
 func dialectHeaders(body Value, opts *Table) ([]Value, error) {
-	mode := ""
-	if opts != nil && opts.RawGetString("mode").IsString() {
-		mode = opts.RawGetString("mode").Str()
+	mode := dialectMode(opts)
+	if !dialectModeAllowed(mode, "", "parse", "decode", "encode", "format") {
+		return dialectUnknownMode("headers", mode)
 	}
 	if body.IsTable() || mode == "encode" || mode == "format" {
 		text, err := encodeHeaderFields(body)
@@ -297,9 +297,9 @@ func dialectHeaders(body Value, opts *Table) ([]Value, error) {
 }
 
 func dialectCookie(body Value, opts *Table) ([]Value, error) {
-	mode := ""
-	if opts != nil && opts.RawGetString("mode").IsString() {
-		mode = opts.RawGetString("mode").Str()
+	mode := dialectMode(opts)
+	if !dialectModeAllowed(mode, "", "parse", "decode", "encode", "format") {
+		return dialectUnknownMode("cookie", mode)
 	}
 	if body.IsTable() || mode == "encode" || mode == "format" {
 		text, err := encodeCookiePairs(body)
@@ -534,9 +534,9 @@ func dialectURL(src string) ([]Value, error) {
 }
 
 func dialectHTTPMessage(body Value, opts *Table) ([]Value, error) {
-	mode := ""
-	if opts != nil && opts.RawGetString("mode").IsString() {
-		mode = opts.RawGetString("mode").Str()
+	mode := dialectMode(opts)
+	if !dialectModeAllowed(mode, "", "parse", "decode", "encode", "format") {
+		return dialectUnknownMode("httpmsg", mode)
 	}
 	if body.IsTable() || mode == "encode" || mode == "format" {
 		msg, err := httpMessageFromTable(body)
@@ -557,9 +557,9 @@ func dialectHTTPMessage(body Value, opts *Table) ([]Value, error) {
 }
 
 func dialectSSE(body Value, opts *Table) ([]Value, error) {
-	mode := ""
-	if opts != nil && opts.RawGetString("mode").IsString() {
-		mode = opts.RawGetString("mode").Str()
+	mode := dialectMode(opts)
+	if !dialectModeAllowed(mode, "", "parse", "decode", "encode", "format") {
+		return dialectUnknownMode("sse", mode)
 	}
 	if body.IsTable() || mode == "encode" || mode == "format" {
 		events, err := sseEventsFromValue(body)
@@ -576,9 +576,9 @@ func dialectSSE(body Value, opts *Table) ([]Value, error) {
 }
 
 func dialectMultipart(body Value, opts *Table, maxHostResult func() int64) ([]Value, error) {
-	mode := ""
-	if opts != nil && opts.RawGetString("mode").IsString() {
-		mode = opts.RawGetString("mode").Str()
+	mode := dialectMode(opts)
+	if !dialectModeAllowed(mode, "", "parse", "decode", "encode", "format") {
+		return dialectUnknownMode("multipart", mode)
 	}
 	boundary, err := multipartBoundaryFromOptions(opts)
 	if err != nil {
@@ -606,14 +606,11 @@ func dialectMultipart(body Value, opts *Table, maxHostResult func() int64) ([]Va
 }
 
 func dialectJWT(body Value, opts *Table) ([]Value, error) {
-	mode := ""
-	if opts != nil && opts.RawGetString("mode").IsString() {
-		mode = opts.RawGetString("mode").Str()
-	}
+	mode := dialectMode(opts)
 	switch mode {
 	case "", "decode", "parse", "unverified":
 	default:
-		return []Value{NilValue(), StringValue(fmt.Sprintf("jwt dialect: unknown mode %q", mode))}, nil
+		return dialectUnknownMode("jwt", mode)
 	}
 	parts, err := dialectlib.ParseJWTUnverified(body.String())
 	if err != nil {

@@ -116,6 +116,26 @@ func BuildDialect(opts HostOptions, maxHostResult func() int64, specs ...Dialect
 	return t
 }
 
+func dialectMode(opts *Table) string {
+	if opts != nil && opts.RawGetString("mode").IsString() {
+		return opts.RawGetString("mode").Str()
+	}
+	return ""
+}
+
+func dialectModeAllowed(mode string, allowed ...string) bool {
+	for _, item := range allowed {
+		if mode == item {
+			return true
+		}
+	}
+	return false
+}
+
+func dialectUnknownMode(name, mode string) ([]Value, error) {
+	return []Value{NilValue(), StringValue(fmt.Sprintf("%s dialect: unknown mode %q", name, mode))}, nil
+}
+
 type dialectHandler struct {
 	eval func(Value, *Table) ([]Value, error)
 
