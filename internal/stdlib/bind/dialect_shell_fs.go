@@ -9,6 +9,7 @@ import (
 
 	pathlib "github.com/never-labs/leia/internal/stdlib/lib/path"
 	"github.com/never-labs/leia/internal/support"
+	dialectlib "github.com/never-labs/leia/internal/support/dialect"
 )
 
 func registerDialectShellFS(register dialectRegisterFunc, opts HostOptions, maxHostResult func() int64) {
@@ -21,6 +22,10 @@ func registerDialectShellFS(register dialectRegisterFunc, opts HostOptions, maxH
 		eval: func(body Value, options *Table) ([]Value, error) {
 			return dialectCommand(body.Str(), opts, dialectFailFast(options), maxHostResult)
 		},
+	})
+	register([]string{"shellwords"}, dialectHandler{
+		eval:  dialectShellwords,
+		block: dialectShellwords,
 	})
 	register([]string{"glob"}, dialectHandler{
 		eval: func(body Value, _ *Table) ([]Value, error) {
@@ -66,7 +71,10 @@ func dialectCommand(src string, opts HostOptions, failFast bool, maxHostResult f
 	if !HostBool(opts.ProcessExecution, true) {
 		return nil, fmt.Errorf("process execution access disabled")
 	}
-	args := strings.Fields(src)
+	args, parseErr := dialectlib.Shellwords(src)
+	if parseErr != nil {
+		return []Value{NilValue(), StringValue(parseErr.Error())}, nil
+	}
 	if len(args) == 0 {
 		return nil, fmt.Errorf("cmd dialect: empty command")
 	}
@@ -92,6 +100,62 @@ func dialectCommand(src string, opts HostOptions, failFast bool, maxHostResult f
 		return nil, fmt.Errorf("cmd dialect failed with exit code %d: %s", exitCode, strings.TrimSpace(stderr.String()))
 	}
 	return []Value{processResultTable(ok, stdout.String(), stderr.String(), exitCode)}, nil
+}
+
+func dialectShellwords(body Value, opts *Table) ([]Value, error) {
+	mode := ""
+	if opts != nil && opts.RawGetString("mode").IsString() {
+		mode = opts.RawGetString("mode").Str()
+	}
+	if mode == "encode" || !body.IsString() {
+		args, err := shellwordsArgs(body)
+		if err != nil {
+			return nil, err
+		}
+		encoded, err := dialectlib.ShellwordsEncode(args)
+		if err != nil {
+			return []Value{NilValue(), StringValue(err.Error())}, nil
+		}
+		return []Value{StringValue(encoded)}, nil
+	}
+	if mode != "" && mode != "decode" {
+		return nil, fmt.Errorf("shellwords dialect: unknown mode %q", mode)
+	}
+	args, err := dialectlib.Shellwords(body.Str())
+	if err != nil {
+		return []Value{NilValue(), StringValue(err.Error())}, nil
+	}
+	return []Value{shellwordsTable(args)}, nil
+}
+
+func shellwordsTable(args []string) Value {
+	out := NewAppendArrayTable(len(args))
+	for i, arg := range args {
+		out.RawSetInt(int64(i+1), StringValue(arg))
+	}
+	return TableValue(out)
+}
+
+func shellwordsArgs(body Value) ([]string, error) {
+	if body.IsString() {
+		return []string{body.Str()}, nil
+	}
+	if !body.IsTable() {
+		return nil, fmt.Errorf("shellwords dialect: table or string expected")
+	}
+	tbl := body.Table()
+	args := make([]string, 0, tbl.Length())
+	for i := 1; i <= tbl.Length(); i++ {
+		v := tbl.RawGetInt(int64(i))
+		if v.IsNil() {
+			return nil, fmt.Errorf("shellwords dialect: missing argument at index %d", i)
+		}
+		if v.IsTable() {
+			return nil, fmt.Errorf("shellwords dialect: argument %d must be scalar", i)
+		}
+		args = append(args, v.String())
+	}
+	return args, nil
 }
 
 func processResultTable(ok bool, stdout, stderr string, code int) Value {

@@ -45,6 +45,10 @@ func registerDialectWeb(register dialectRegisterFunc) {
 		eval:  dialectCookie,
 		block: dialectCookie,
 	})
+	register([]string{"httpmsg"}, dialectHandler{
+		eval:  dialectHTTPMessage,
+		block: dialectHTTPMessage,
+	})
 }
 
 func dialectHTMLEscape(src string, opts *Table) ([]Value, error) {
@@ -421,22 +425,7 @@ func encodeHeaderFields(body Value) (string, error) {
 }
 
 func isHeaderFieldName(name string) bool {
-	if name == "" {
-		return false
-	}
-	for i := 0; i < len(name); i++ {
-		c := name[i]
-		if c >= 'A' && c <= 'Z' || c >= 'a' && c <= 'z' || c >= '0' && c <= '9' {
-			continue
-		}
-		switch c {
-		case '!', '#', '$', '%', '&', '\'', '*', '+', '-', '.', '^', '_', '`', '|', '~':
-			continue
-		default:
-			return false
-		}
-	}
-	return true
+	return dialectlib.IsHTTPHeaderFieldName(name)
 }
 
 func dialectURL(src string) ([]Value, error) {
@@ -462,4 +451,157 @@ func dialectURL(src string) ([]Value, error) {
 	}
 	result.RawSetString("query", TableValue(query))
 	return []Value{TableValue(result)}, nil
+}
+
+func dialectHTTPMessage(body Value, opts *Table) ([]Value, error) {
+	mode := ""
+	if opts != nil && opts.RawGetString("mode").IsString() {
+		mode = opts.RawGetString("mode").Str()
+	}
+	if body.IsTable() || mode == "encode" || mode == "format" {
+		msg, err := httpMessageFromTable(body)
+		if err != nil {
+			return []Value{NilValue(), StringValue(err.Error())}, nil
+		}
+		text, err := dialectlib.EncodeHTTPMessage(msg)
+		if err != nil {
+			return []Value{NilValue(), StringValue(err.Error())}, nil
+		}
+		return []Value{StringValue(text)}, nil
+	}
+	msg, err := dialectlib.ParseHTTPMessage(body.Str())
+	if err != nil {
+		return []Value{NilValue(), StringValue(err.Error())}, nil
+	}
+	return []Value{httpMessageToTable(msg)}, nil
+}
+
+func httpMessageToTable(msg dialectlib.HTTPMessage) Value {
+	out := NewTable()
+	out.RawSetString("type", StringValue(msg.Type))
+	out.RawSetString("startLine", StringValue(msg.StartLine))
+	out.RawSetString("version", StringValue(msg.Version))
+	if msg.Method != "" {
+		out.RawSetString("method", StringValue(msg.Method))
+		out.RawSetString("target", StringValue(msg.Target))
+	}
+	if msg.StatusCode != 0 {
+		out.RawSetString("status", IntValue(int64(msg.StatusCode)))
+		out.RawSetString("statusCode", IntValue(int64(msg.StatusCode)))
+		out.RawSetString("reason", StringValue(msg.Reason))
+	}
+	out.RawSetString("headers", httpHeadersToTable(msg.Headers))
+	out.RawSetString("body", StringValue(msg.Body))
+	return TableValue(out)
+}
+
+func httpHeadersToTable(headers map[string][]string) Value {
+	out := NewTable()
+	for key, vals := range headers {
+		if len(vals) == 1 {
+			out.RawSetString(key, StringValue(vals[0]))
+			continue
+		}
+		arr := NewAppendArrayTable(len(vals))
+		for i, val := range vals {
+			arr.RawSetInt(int64(i+1), StringValue(val))
+		}
+		out.RawSetString(key, TableValue(arr))
+	}
+	return TableValue(out)
+}
+
+func httpMessageFromTable(body Value) (dialectlib.HTTPMessage, error) {
+	if !body.IsTable() {
+		return dialectlib.HTTPMessage{}, fmt.Errorf("httpmsg dialect: table required for encode")
+	}
+	tbl := body.Table()
+	msg := dialectlib.HTTPMessage{Headers: make(map[string][]string)}
+	if v := tbl.RawGetString("type"); v.IsString() {
+		msg.Type = v.Str()
+	}
+	if v := tbl.RawGetString("startLine"); v.IsString() {
+		msg.StartLine = v.Str()
+	}
+	if v := tbl.RawGetString("method"); v.IsString() {
+		msg.Method = v.Str()
+		if msg.Type == "" {
+			msg.Type = "request"
+		}
+	}
+	if v := tbl.RawGetString("target"); v.IsString() {
+		msg.Target = v.Str()
+	} else if v := tbl.RawGetString("path"); v.IsString() {
+		msg.Target = v.Str()
+	}
+	if v := tbl.RawGetString("version"); v.IsString() {
+		msg.Version = v.Str()
+	}
+	if v := tbl.RawGetString("status"); v.IsInt() || v.IsFloat() {
+		msg.StatusCode = int(toInt(v))
+		if msg.Type == "" {
+			msg.Type = "response"
+		}
+	} else if v := tbl.RawGetString("statusCode"); v.IsInt() || v.IsFloat() {
+		msg.StatusCode = int(toInt(v))
+		if msg.Type == "" {
+			msg.Type = "response"
+		}
+	}
+	if v := tbl.RawGetString("reason"); v.IsString() {
+		msg.Reason = v.Str()
+	}
+	if v := tbl.RawGetString("body"); !v.IsNil() {
+		msg.Body = v.String()
+	}
+	if v := tbl.RawGetString("headers"); v.IsTable() {
+		headers, err := httpHeadersFromTable(v.Table())
+		if err != nil {
+			return dialectlib.HTTPMessage{}, err
+		}
+		msg.Headers = headers
+	}
+	return msg, nil
+}
+
+func httpHeadersFromTable(tbl *Table) (map[string][]string, error) {
+	headers := make(map[string][]string)
+	var invalidKey string
+	var invalidValueKey string
+	tbl.ForEachPlainRaw(func(k, v Value) bool {
+		if !k.IsString() {
+			return true
+		}
+		key := k.Str()
+		if !dialectlib.IsHTTPHeaderFieldName(key) {
+			invalidKey = key
+			return false
+		}
+		if v.IsTable() {
+			arr := v.Table()
+			for i := 1; i <= arr.Length(); i++ {
+				val := arr.RawGetInt(int64(i)).String()
+				if strings.ContainsAny(val, "\r\n") {
+					invalidValueKey = key
+					return false
+				}
+				headers[key] = append(headers[key], val)
+			}
+			return true
+		}
+		val := v.String()
+		if strings.ContainsAny(val, "\r\n") {
+			invalidValueKey = key
+			return false
+		}
+		headers[key] = append(headers[key], val)
+		return true
+	})
+	if invalidKey != "" {
+		return nil, fmt.Errorf("httpmsg dialect: invalid header name %q", invalidKey)
+	}
+	if invalidValueKey != "" {
+		return nil, fmt.Errorf("httpmsg dialect: invalid header value for %q", invalidValueKey)
+	}
+	return headers, nil
 }

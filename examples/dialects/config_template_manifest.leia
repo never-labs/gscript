@@ -1,5 +1,5 @@
 // config_template_manifest.leia - Build a deployment manifest from config dialects.
-// Demonstrates: env, kv, csv, template, headers, urlquery, and JSON encoding.
+// Demonstrates: env, ini, csv, template, headers, urlquery, and JSON encoding.
 
 print("=== Dialects: config template manifest ===")
 
@@ -8,8 +8,10 @@ APP_ENV=staging
 APP_PORT=8080
 `
 
-feature_cfg := kv`region=us-east-1
+feature_cfg := ini`region=us-east-1
 release=2026.06
+
+[feature]
 canary=true
 `
 
@@ -43,7 +45,7 @@ manifest := {
     port: tonumber(env_cfg.APP_PORT),
     region: feature_cfg.region,
     release: feature_cfg.release,
-    canary: feature_cfg.canary == "true",
+    canary: feature_cfg.feature.canary == "true",
     owner: owners[1].email,
     audit_query: query,
 }
@@ -58,6 +60,7 @@ print(encoded)
 
 assert(env_cfg.APP_NAME == "ledger-api")
 assert(feature_cfg.region == "us-east-1")
+assert(feature_cfg.feature.canary == "true")
 assert(owners[2].team == "security")
 assert(query == "env=staging&release=2026.06&service=ledger-api")
 assert(request_headers == "Content-Type: application/json\r\nX-Release: 2026.06\r\nX-Service: ledger-api\r\n")

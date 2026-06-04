@@ -6,6 +6,7 @@ import (
 	"io"
 	"math"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"text/template"
@@ -68,6 +69,10 @@ func registerDialectText(register dialectRegisterFunc, maxHostResult func() int6
 		eval: func(body Value, options *Table) ([]Value, error) {
 			return dialectKV(body.Str(), options, true)
 		},
+	})
+	register([]string{"ini"}, dialectHandler{
+		eval:  dialectINI,
+		block: dialectINI,
 	})
 	register([]string{"template"}, dialectHandler{
 		eval: func(body Value, options *Table) ([]Value, error) {
@@ -409,6 +414,99 @@ func dialectKV(src string, opts *Table, envMode bool) ([]Value, error) {
 		out.RawSetString(key, StringValue(val))
 	}
 	return []Value{TableValue(out)}, nil
+}
+
+func dialectINI(body Value, opts *Table) ([]Value, error) {
+	mode := ""
+	if opts != nil && opts.RawGetString("mode").IsString() {
+		mode = opts.RawGetString("mode").Str()
+	}
+	if body.IsString() && mode != "encode" {
+		doc, err := dialectlib.ParseINI(body.Str())
+		if err != nil {
+			return []Value{NilValue(), StringValue(err.Error())}, nil
+		}
+		return []Value{iniDocumentToValue(doc)}, nil
+	}
+	doc, err := iniDocumentFromValue(body)
+	if err != nil {
+		return nil, fmt.Errorf("ini dialect: %v", err)
+	}
+	text, err := dialectlib.EncodeINI(doc)
+	if err != nil {
+		return nil, err
+	}
+	return []Value{StringValue(text)}, nil
+}
+
+func iniDocumentToValue(doc dialectlib.INIDocument) Value {
+	out := NewTable()
+	for _, key := range sortedStringKeys(doc.Root) {
+		out.RawSetString(key, StringValue(doc.Root[key]))
+	}
+	for _, sectionName := range sortedStringKeys(doc.Sections) {
+		section := NewTable()
+		for _, key := range sortedStringKeys(doc.Sections[sectionName]) {
+			section.RawSetString(key, StringValue(doc.Sections[sectionName][key]))
+		}
+		out.RawSetString(sectionName, TableValue(section))
+	}
+	return TableValue(out)
+}
+
+func iniDocumentFromValue(v Value) (dialectlib.INIDocument, error) {
+	if !v.IsTable() {
+		return dialectlib.INIDocument{}, fmt.Errorf("table expected")
+	}
+	doc := dialectlib.INIDocument{
+		Root:     make(map[string]string),
+		Sections: make(map[string]map[string]string),
+	}
+	if err := collectINIFields(v.Table(), doc.Root, doc.Sections); err != nil {
+		return dialectlib.INIDocument{}, err
+	}
+	return doc, nil
+}
+
+func collectINIFields(tbl *Table, root map[string]string, sections map[string]map[string]string) error {
+	for key, val, ok := tbl.Next(NilValue()); ok; key, val, ok = tbl.Next(key) {
+		if !key.IsString() {
+			return fmt.Errorf("string keys expected, got %v", key.Type())
+		}
+		name := key.Str()
+		if val.IsTable() {
+			fields := make(map[string]string)
+			for subKey, subVal, subOK := val.Table().Next(NilValue()); subOK; subKey, subVal, subOK = val.Table().Next(subKey) {
+				if !subKey.IsString() {
+					return fmt.Errorf("section %q contains non-string key %v", name, subKey.Type())
+				}
+				if subVal.IsTable() {
+					return fmt.Errorf("section %q key %q has nested table value", name, subKey.Str())
+				}
+				fields[subKey.Str()] = iniScalarString(subVal)
+			}
+			sections[name] = fields
+			continue
+		}
+		root[name] = iniScalarString(val)
+	}
+	return nil
+}
+
+func iniScalarString(v Value) string {
+	if v.IsNil() {
+		return ""
+	}
+	return v.String()
+}
+
+func sortedStringKeys[V any](m map[string]V) []string {
+	keys := make([]string, 0, len(m))
+	for key := range m {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 func dialectTemplate(body Value, opts *Table, maxHostResult func() int64) ([]Value, error) {

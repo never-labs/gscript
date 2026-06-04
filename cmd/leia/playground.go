@@ -968,7 +968,7 @@ print(json.encode(ticket))`,
 			},
 			Source: `streamed := ""
 result, err := llm.turn({
-    user: "Reply exactly: LEIA_GLM_OK"
+    messages: {llm.user("Reply exactly: LEIA_GLM_OK")}
     on_stream: func(event) {
         streamed = streamed .. event.token
     }

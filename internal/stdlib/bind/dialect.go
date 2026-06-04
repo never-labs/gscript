@@ -8,8 +8,8 @@ import (
 
 // BuildDialect creates the "dialect" standard library table. Dialects are a
 // small native dispatch layer used by tagged literals and tagged blocks:
-// sh`...`, cmd`...`, glob`...`, json`...`, prompt`...`, quote { ... }, and
-// small safe data transforms such as path`...`, url`...`, words`...`, nums`...`,
+// sh`...`, cmd`...`, shellwords`...`, glob`...`, json`...`, prompt`...`,
+// quote { ... }, and small safe data transforms such as path`...`, url`...`, words`...`, nums`...`,
 // kv`...`, env`...`, jsonl`...`, html_escape`...`, urlquery`...`, mime`...`,
 // urlpath`...`, base64`...`, and hash`...`.
 func BuildDialect(opts HostOptions, maxHostResult func() int64) *Table {

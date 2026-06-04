@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"regexp"
+	"sort"
 	"strings"
 	"testing"
 
@@ -58,6 +60,31 @@ func TestRunCommandDialectExamples(t *testing.T) {
 				t.Fatalf("runRunCommand code = %d, stderr = %q", code, stderr.String())
 			}
 		})
+	}
+}
+
+func TestRunCommandDialectExamplesCoverApprovedBuiltinTags(t *testing.T) {
+	root, err := filepath.Abs(filepath.Join("..", ".."))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	matrixTags := loadFeatureMatrixBuiltinDialectTags(t, root)
+	exampleTags := collectDialectExampleTags(t, root)
+	var missing []string
+	for _, tag := range approvedBuiltinDialectTags() {
+		if !matrixTags[tag] && !exampleTags[tag] {
+			missing = append(missing, tag)
+		}
+	}
+	if len(missing) > 0 {
+		t.Fatalf("approved builtin dialect tags must be listed in tests/feature_matrix.json or covered by runnable dialect examples; missing %s", strings.Join(missing, ", "))
+	}
+
+	for _, tag := range []string{"sh", "cmd", "glob", "path", "json", "csv", "url", "base64", "prompt", "quote"} {
+		if !exampleTags[tag] {
+			t.Fatalf("runnable dialect examples must keep representative builtin tag %q covered", tag)
+		}
 	}
 }
 
@@ -286,6 +313,92 @@ func TestWorkflowEvaluateListExample(t *testing.T) {
 	if !evaluateReportHasOKInput(report.Inputs, "support_triage_replay.leia") {
 		t.Fatalf("inputs = %+v, want support_triage_replay.leia ok", report.Inputs)
 	}
+}
+
+func approvedBuiltinDialectTags() []string {
+	return []string{
+		"sh", "cmd", "shellwords", "glob", "path",
+		"re", "regexp", "json", "jsonl", "csv", "tsv", "lines", "split", "words", "nums", "numbers", "kv", "env", "ini", "template",
+		"url", "html_escape", "urlquery", "urlpath", "mime", "headers", "http_headers", "cookie", "cookies", "httpmsg",
+		"base64", "hash",
+		"prompt", "quote",
+	}
+}
+
+func loadFeatureMatrixBuiltinDialectTags(t *testing.T, root string) map[string]bool {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join(root, "tests", "feature_matrix.json"))
+	if err != nil {
+		t.Fatalf("read feature matrix: %v", err)
+	}
+	var matrix struct {
+		Features []struct {
+			ID                 string   `json:"id"`
+			BuiltinDialectTags []string `json:"builtin_dialect_tags"`
+		} `json:"features"`
+	}
+	if err := json.Unmarshal(data, &matrix); err != nil {
+		t.Fatalf("decode feature matrix: %v", err)
+	}
+	for _, feature := range matrix.Features {
+		if feature.ID != "tagged_dialect_syntax" {
+			continue
+		}
+		tags := make(map[string]bool, len(feature.BuiltinDialectTags))
+		for _, tag := range feature.BuiltinDialectTags {
+			tags[tag] = true
+		}
+		return tags
+	}
+	t.Fatal("feature_matrix.json missing tagged_dialect_syntax builtin_dialect_tags")
+	return nil
+}
+
+func collectDialectExampleTags(t *testing.T, root string) map[string]bool {
+	t.Helper()
+	approved := map[string]bool{}
+	for _, tag := range approvedBuiltinDialectTags() {
+		approved[tag] = true
+	}
+	paths := []string{filepath.Join(root, "examples", "hello", "dialects.leia")}
+	dialectDir := filepath.Join(root, "examples", "dialects")
+	entries, err := os.ReadDir(dialectDir)
+	if err != nil {
+		t.Fatalf("read examples/dialects: %v", err)
+	}
+	for _, entry := range entries {
+		if entry.IsDir() || filepath.Ext(entry.Name()) != ".leia" {
+			continue
+		}
+		paths = append(paths, filepath.Join(dialectDir, entry.Name()))
+	}
+	sort.Strings(paths)
+
+	evalRe := regexp.MustCompile(`dialect\.eval\("([A-Za-z_][A-Za-z0-9_]*)"`)
+	taggedRe := regexp.MustCompile(`\b([A-Za-z_][A-Za-z0-9_]*)!?\s*(?:` + "`" + `|\{)`)
+	shellShortcutRe := regexp.MustCompile(`\$!?\s*` + "`")
+	tags := map[string]bool{}
+	for _, path := range paths {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("read %s: %v", path, err)
+		}
+		source := string(data)
+		if shellShortcutRe.MatchString(source) {
+			tags["sh"] = true
+		}
+		for _, match := range evalRe.FindAllStringSubmatch(source, -1) {
+			if approved[match[1]] {
+				tags[match[1]] = true
+			}
+		}
+		for _, match := range taggedRe.FindAllStringSubmatch(source, -1) {
+			if approved[match[1]] {
+				tags[match[1]] = true
+			}
+		}
+	}
+	return tags
 }
 
 func containsResolvedRequire(reqs []modpkg.ListRequire, path, version string) bool {

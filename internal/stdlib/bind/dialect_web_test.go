@@ -269,6 +269,99 @@ func TestDialectCookieParseAndEncode(t *testing.T) {
 	}
 }
 
+func TestDialectHTTPMessageParseRequestResponseAndEncode(t *testing.T) {
+	interp := runWithLib(t, `
+		request := httpmsg`+"`"+`POST /v1/events?debug=true HTTP/1.1
+host: api.example.test
+content-type: application/json
+x-trace-id: req-42
+set-cookie: a=1
+set-cookie: b=2
+
+{"ok":true}`+"`"+`
+		response := dialect.eval("httpmsg", "HTTP/1.1 202 Accepted\r\ncontent-type: application/json\r\nx-trace-id: req-42\r\n\r\n{\"queued\":true}")
+
+		encoded_request := dialect.eval("httpmsg", {
+			method: "PUT",
+			target: "/v1/events/42",
+			headers: {
+				host: "api.example.test",
+				["content-type"]: "application/json",
+				["x-trace-id"]: "req-43",
+			},
+			body: "{\"done\":true}",
+		}, {mode: "encode"})
+		encoded_response := dialect.eval("httpmsg", {
+			type: "response",
+			status: 404,
+			reason: "Not Found",
+			headers: {["content-length"]: 0},
+		}, {mode: "encode"})
+	`, "dialect", BuildDialect(HostOptions{}, nil))
+
+	request := interp.GetGlobal("request").Table()
+	if got := request.RawGetString("type").Str(); got != "request" {
+		t.Fatalf("request type = %q, want request", got)
+	}
+	if got := request.RawGetString("method").Str(); got != "POST" {
+		t.Fatalf("request method = %q, want POST", got)
+	}
+	if got := request.RawGetString("target").Str(); got != "/v1/events?debug=true" {
+		t.Fatalf("request target = %q, want /v1/events?debug=true", got)
+	}
+	headers := request.RawGetString("headers").Table()
+	if got := headers.RawGetString("Host").Str(); got != "api.example.test" {
+		t.Fatalf("host = %q, want api.example.test", got)
+	}
+	cookies := headers.RawGetString("Set-Cookie").Table()
+	if got := cookies.RawGetInt(2).Str(); got != "b=2" {
+		t.Fatalf("second set-cookie = %q, want b=2", got)
+	}
+	if got := request.RawGetString("body").Str(); got != `{"ok":true}` {
+		t.Fatalf("request body = %q, want JSON body", got)
+	}
+
+	response := interp.GetGlobal("response").Table()
+	if got := response.RawGetString("type").Str(); got != "response" {
+		t.Fatalf("response type = %q, want response", got)
+	}
+	if got := response.RawGetString("status").Int(); got != 202 {
+		t.Fatalf("response status = %d, want 202", got)
+	}
+	if got := response.RawGetString("reason").Str(); got != "Accepted" {
+		t.Fatalf("response reason = %q, want Accepted", got)
+	}
+
+	wantRequest := "PUT /v1/events/42 HTTP/1.1\r\nContent-Type: application/json\r\nHost: api.example.test\r\nX-Trace-Id: req-43\r\n\r\n{\"done\":true}"
+	if got := interp.GetGlobal("encoded_request").Str(); got != wantRequest {
+		t.Fatalf("encoded request = %q, want %q", got, wantRequest)
+	}
+	wantResponse := "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\n\r\n"
+	if got := interp.GetGlobal("encoded_response").Str(); got != wantResponse {
+		t.Fatalf("encoded response = %q, want %q", got, wantResponse)
+	}
+}
+
+func TestDialectHTTPMessageInvalidInputReturnsError(t *testing.T) {
+	interp := runWithLib(t, `
+		bad_start, bad_start_err := dialect.eval("httpmsg", "not http\r\nx: y\r\n\r\n")
+		bad_header, bad_header_err := dialect.eval("httpmsg", "GET / HTTP/1.1\r\nbad header\r\n\r\n")
+		bad_encode, bad_encode_err := dialect.eval("httpmsg", {method: "BAD METHOD", target: "/"}, {mode: "encode"})
+		bad_header_encode, bad_header_encode_err := dialect.eval("httpmsg", {method: "GET", headers: {["bad name"]: "x"}}, {mode: "encode"})
+	`, "dialect", BuildDialect(HostOptions{}, nil))
+
+	for _, name := range []string{"bad_start", "bad_header", "bad_encode", "bad_header_encode"} {
+		if !interp.GetGlobal(name).IsNil() {
+			t.Fatalf("%s returned non-nil result", name)
+		}
+	}
+	for _, name := range []string{"bad_start_err", "bad_header_err", "bad_encode_err", "bad_header_encode_err"} {
+		if got := interp.GetGlobal(name); !got.IsString() || got.Str() == "" {
+			t.Fatalf("%s = %v, want non-empty string", name, got)
+		}
+	}
+}
+
 func TestDialectCookieBoundaryValues(t *testing.T) {
 	interp := runWithLib(t, `
 		parsed := dialect.eval("cookie", "empty=; token=a=b; spaced = value")

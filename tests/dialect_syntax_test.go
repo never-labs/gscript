@@ -42,6 +42,7 @@ func TestShellCommandFilesystemDialectSyntaxExecutesThroughStdlib(t *testing.T) 
 				"shell_fail := $`printf shellerr 1>&2; exit 7`\n" +
 				"shell_fail_explicit := dialect.eval(\"sh\", \"printf expliciterr 1>&2; exit 6\", {fail_fast: false})\n" +
 				"cmd_out := cmd`printf command-${name}`\n" +
+				"cmd_quoted := cmd`printf 'quoted command'`\n" +
 				"cmd_fail := cmd`/bin/sh -c false`\n" +
 				"matches := glob`" + globPattern + "`\n" +
 				"cleaned := path`./nested/../alpha.txt`\n" +
@@ -58,6 +59,7 @@ func TestShellCommandFilesystemDialectSyntaxExecutesThroughStdlib(t *testing.T) 
 				"shell_fail_explicit_code := shell_fail_explicit.code\n" +
 				"shell_fail_explicit_stderr := shell_fail_explicit.stderr\n" +
 				"cmd_text := cmd_out.text\n" +
+				"cmd_quoted_text := cmd_quoted.text\n" +
 				"cmd_ok := cmd_out.ok\n" +
 				"cmd_fail_ok := cmd_fail.ok\n" +
 				"cmd_fail_code := cmd_fail.code\n" +
@@ -82,6 +84,7 @@ func TestShellCommandFilesystemDialectSyntaxExecutesThroughStdlib(t *testing.T) 
 			assertGet(t, vm, "shell_fail_explicit_code", int64(6))
 			assertGet(t, vm, "shell_fail_explicit_stderr", "expliciterr")
 			assertGet(t, vm, "cmd_text", "command-leia")
+			assertGet(t, vm, "cmd_quoted_text", "quoted command")
 			assertGet(t, vm, "cmd_ok", true)
 			assertGet(t, vm, "cmd_fail_ok", false)
 			assertGet(t, vm, "cmd_fail_code", int64(1))
@@ -264,6 +267,15 @@ func TestStdlibDataDialectsExecuteThroughStdlib(t *testing.T) {
 				"split_rows := split`left\nright\n`\n" +
 				"line_rows_keep_empty := dialect.eval(\"lines\", \"alpha\\n\\nbeta\\n\", {keep_empty: true})\n" +
 				"words_rows := words`alpha beta gamma`\n" +
+				"shellwords_rows := shellwords`printf 'hello world' a\\ b \"\"`\n" +
+				"shellwords_to_encode := {}\n" +
+				"shellwords_to_encode[1] = \"printf\"\n" +
+				"shellwords_to_encode[2] = \"%s\\n\"\n" +
+				"shellwords_to_encode[3] = \"hello world\"\n" +
+				"shellwords_to_encode[4] = \"it's\"\n" +
+				"shellwords_to_encode[5] = \"\"\n" +
+				"shellwords_text := dialect.eval(\"shellwords\", shellwords_to_encode, {mode: \"encode\"})\n" +
+				"shellwords_roundtrip := dialect.eval(\"shellwords\", shellwords_text)\n" +
 				"num_rows := nums`1, 2; 3.5\n4e1`\n" +
 				"number_rows := dialect.eval(\"numbers\", \"-2 0 2.25\")\n" +
 				"num_matrix := dialect.eval(\"nums\", \"1,2,3\\n4,5,6\\n\", {matrix: true})\n" +
@@ -271,6 +283,10 @@ func TestStdlibDataDialectsExecuteThroughStdlib(t *testing.T) {
 				"bad_num_matrix, bad_num_matrix_err := dialect.eval(\"nums\", \"1,2\\n3,4,5\\n\", {matrix: true})\n" +
 				"kv_rows := dialect.eval(\"kv\", \"name = Ada\\nscore = 42\\n\")\n" +
 				"env_rows := dialect.eval(\"env\", \"TOKEN=\\\"abc 123\\\"\\nEMPTY=\\n\")\n" +
+				"ini_cfg := ini`app = ledger\n[database]\nhost = db.internal\nport = 5432\n`\n" +
+				"ini_database := {host: \"db.internal\", port: 5432}\n" +
+				"ini_text := dialect.eval(\"ini\", {app: \"ledger\", enabled: true, database: ini_database}, {mode: \"encode\"})\n" +
+				"ini_roundtrip := dialect.eval(\"ini\", ini_text)\n" +
 				"escaped_html := html_escape`<b>Ada & Bob</b>`\n" +
 				"unescaped_html := dialect.eval(\"html_escape\", escaped_html, {mode: \"unescape\"})\n" +
 				"urlquery_component := dialect.eval(\"urlquery\", \"hello world&x\", {mode: \"escape\"})\n" +
@@ -285,6 +301,11 @@ func TestStdlibDataDialectsExecuteThroughStdlib(t *testing.T) {
 				"header_to_encode := {}\n" +
 				"header_to_encode[\"x-trace\"] = \"abc\"\n" +
 				"header_encoded := dialect.eval(\"http_headers\", header_to_encode, {mode: \"encode\"})\n" +
+				"http_request := httpmsg`POST /submit HTTP/1.1\nHost: example.test\nContent-Type: text/plain\n\nhello`\n" +
+				"http_response := dialect.eval(\"httpmsg\", \"HTTP/1.1 201 Created\\r\\ncontent-length: 2\\r\\n\\r\\nok\")\n" +
+				"http_headers := {}\n" +
+				"http_headers.host = \"example.test\"\n" +
+				"http_encoded := dialect.eval(\"httpmsg\", {method: \"GET\", target: \"/health\", headers: http_headers}, {mode: \"encode\"})\n" +
 				"cookie_rows := cookie`session=abc123; tag=a; tag=b`\n" +
 				"cookie_encoded := dialect.eval(\"cookies\", {session: \"abc123\", tag: {\"a\", \"b\"}}, {mode: \"encode\"})\n" +
 				"template_text := template`Hello static`\n" +
@@ -307,6 +328,12 @@ func TestStdlibDataDialectsExecuteThroughStdlib(t *testing.T) {
 				"line_keep_empty_count := #line_rows_keep_empty\n" +
 				"line_keep_empty_second := line_rows_keep_empty[2]\n" +
 				"words_second := words_rows[2]\n" +
+				"shellwords_count := #shellwords_rows\n" +
+				"shellwords_second := shellwords_rows[2]\n" +
+				"shellwords_third := shellwords_rows[3]\n" +
+				"shellwords_empty := shellwords_rows[4]\n" +
+				"shellwords_roundtrip_fourth := shellwords_roundtrip[4]\n" +
+				"shellwords_roundtrip_fifth := shellwords_roundtrip[5]\n" +
 				"num_count := #num_rows\n" +
 				"num_first := num_rows[1]\n" +
 				"num_third := num_rows[3]\n" +
@@ -322,6 +349,10 @@ func TestStdlibDataDialectsExecuteThroughStdlib(t *testing.T) {
 				"kv_score := kv_rows.score\n" +
 				"env_token := env_rows.TOKEN\n" +
 				"env_empty := env_rows.EMPTY\n" +
+				"ini_app := ini_cfg.app\n" +
+				"ini_host := ini_cfg.database.host\n" +
+				"ini_port := ini_cfg.database.port\n" +
+				"ini_roundtrip_port := ini_roundtrip.database.port\n" +
 				"urlquery_q := urlquery_rows.q\n" +
 				"urlquery_page := urlquery_rows.page\n" +
 				"urlquery_tag_2 := urlquery_rows.tag[2]\n"
@@ -330,6 +361,10 @@ func TestStdlibDataDialectsExecuteThroughStdlib(t *testing.T) {
 				"mime_boundary := mime_type.params.boundary\n" +
 				"header_content_type := header_rows[\"Content-Type\"]\n" +
 				"header_second_cookie := header_rows[\"Set-Cookie\"][2]\n" +
+				"http_request_method := http_request.method\n" +
+				"http_request_body := http_request.body\n" +
+				"http_response_status := http_response.status\n" +
+				"http_response_body := http_response.body\n" +
 				"cookie_session := cookie_rows.session\n" +
 				"cookie_second_tag := cookie_rows.tag[2]\n" +
 				"bad_json_is_nil := bad_json == nil\n" +
@@ -353,6 +388,12 @@ func TestStdlibDataDialectsExecuteThroughStdlib(t *testing.T) {
 			assertGet(t, vm, "line_keep_empty_count", int64(3))
 			assertGet(t, vm, "line_keep_empty_second", "")
 			assertGet(t, vm, "words_second", "beta")
+			assertGet(t, vm, "shellwords_count", int64(4))
+			assertGet(t, vm, "shellwords_second", "hello world")
+			assertGet(t, vm, "shellwords_third", "a b")
+			assertGet(t, vm, "shellwords_empty", "")
+			assertGet(t, vm, "shellwords_roundtrip_fourth", "it's")
+			assertGet(t, vm, "shellwords_roundtrip_fifth", "")
 			assertGet(t, vm, "num_count", int64(4))
 			assertGet(t, vm, "num_first", int64(1))
 			assertGet(t, vm, "num_third", 3.5)
@@ -370,6 +411,11 @@ func TestStdlibDataDialectsExecuteThroughStdlib(t *testing.T) {
 			assertGet(t, vm, "kv_score", "42")
 			assertGet(t, vm, "env_token", "abc 123")
 			assertGet(t, vm, "env_empty", "")
+			assertGet(t, vm, "ini_app", "ledger")
+			assertGet(t, vm, "ini_host", "db.internal")
+			assertGet(t, vm, "ini_port", "5432")
+			assertGet(t, vm, "ini_text", "app=ledger\nenabled=true\n\n[database]\nhost=db.internal\nport=5432\n")
+			assertGet(t, vm, "ini_roundtrip_port", "5432")
 			assertGet(t, vm, "escaped_html", "&lt;b&gt;Ada &amp; Bob&lt;/b&gt;")
 			assertGet(t, vm, "unescaped_html", "<b>Ada & Bob</b>")
 			assertGet(t, vm, "urlquery_component", "hello+world%26x")
@@ -387,6 +433,11 @@ func TestStdlibDataDialectsExecuteThroughStdlib(t *testing.T) {
 			assertGet(t, vm, "header_content_type", "text/plain")
 			assertGet(t, vm, "header_second_cookie", "b=2")
 			assertGet(t, vm, "header_encoded", "X-Trace: abc\r\n")
+			assertGet(t, vm, "http_request_method", "POST")
+			assertGet(t, vm, "http_request_body", "hello")
+			assertGet(t, vm, "http_response_status", int64(201))
+			assertGet(t, vm, "http_response_body", "ok")
+			assertGet(t, vm, "http_encoded", "GET /health HTTP/1.1\r\nHost: example.test\r\n\r\n")
 			assertGet(t, vm, "cookie_session", "abc123")
 			assertGet(t, vm, "cookie_second_tag", "b")
 			assertGet(t, vm, "cookie_encoded", "session=abc123; tag=a; tag=b")

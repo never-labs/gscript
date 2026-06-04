@@ -499,7 +499,7 @@ func TestPlaygroundExecAIProfileUsesGLMEnv(t *testing.T) {
 
 	dir := t.TempDir()
 	path := dir + "/main.leia"
-	src := `result, err := llm.turn({ user: "Reply exactly: LEIA_GLM_OK", max_tokens: 16, temperature: 0 })
+	src := `result, err := llm.turn({ messages: {llm.user("Reply exactly: LEIA_GLM_OK")}, max_tokens: 16, temperature: 0 })
 if err != nil { print(err.message); return }
 print(result.text)`
 	if err := os.WriteFile(path, []byte(src), 0600); err != nil {
@@ -527,7 +527,7 @@ func TestPlaygroundExecGLMProfileAliasUsesAIProfile(t *testing.T) {
 
 	dir := t.TempDir()
 	path := dir + "/main.leia"
-	src := `result, err := llm.turn({ user: "Reply exactly: LEIA_GLM_OK", max_tokens: 16, temperature: 0 })
+	src := `result, err := llm.turn({ messages: {llm.user("Reply exactly: LEIA_GLM_OK")}, max_tokens: 16, temperature: 0 })
 if err != nil { print(err.message); return }
 print(result.text)`
 	if err := os.WriteFile(path, []byte(src), 0600); err != nil {

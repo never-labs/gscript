@@ -15,9 +15,9 @@ func TestDialectTagsExposeInstalledHandlers(t *testing.T) {
 	got := stringSetFromArray(interp.GetGlobal("tags").Table())
 	want := []string{
 		"base64", "cmd", "cookie", "cookies", "csv", "env", "glob",
-		"hash", "headers", "html_escape", "http_headers", "json", "jsonl",
+		"hash", "headers", "html_escape", "http_headers", "httpmsg", "ini", "json", "jsonl",
 		"kv", "lines", "mime", "numbers", "nums", "path", "prompt",
-		"quote", "re", "regexp", "sh", "split", "template", "tsv", "url",
+		"quote", "re", "regexp", "sh", "shellwords", "split", "template", "tsv", "url",
 		"urlpath", "urlquery", "words",
 	}
 	for _, name := range want {
@@ -87,6 +87,42 @@ func TestDialectRegistryRejectsDuplicateNamesInSingleRegistration(t *testing.T) 
 	registry.register([]string{"json", "json"}, handler)
 }
 
+func TestDialectShellwordsParseAndEncode(t *testing.T) {
+	interp := runWithLib(t, `
+		parsed := dialect.eval("shellwords", "printf 'hello world' a\\ b \"\"")
+		to_encode := {}
+		to_encode[1] = "printf"
+		to_encode[2] = "%s\n"
+		to_encode[3] = "hello world"
+		to_encode[4] = "it's"
+		to_encode[5] = ""
+		encoded := dialect.eval("shellwords", to_encode, {mode: "encode"})
+		roundtrip := dialect.eval("shellwords", encoded)
+		bad, bad_err := dialect.eval("shellwords", "'unterminated")
+	`, "dialect", BuildDialect(HostOptions{}, nil))
+
+	parsed := stringSliceFromArray(interp.GetGlobal("parsed").Table())
+	wantParsed := []string{"printf", "hello world", "a b", ""}
+	if !reflect.DeepEqual(parsed, wantParsed) {
+		t.Fatalf("parsed = %#v, want %#v", parsed, wantParsed)
+	}
+	wantEncoded := "printf '%s\n' 'hello world' 'it'\\''s' ''"
+	if got := interp.GetGlobal("encoded").Str(); got != wantEncoded {
+		t.Fatalf("encoded = %q, want %q", got, wantEncoded)
+	}
+	roundtrip := stringSliceFromArray(interp.GetGlobal("roundtrip").Table())
+	wantRoundtrip := []string{"printf", "%s\n", "hello world", "it's", ""}
+	if !reflect.DeepEqual(roundtrip, wantRoundtrip) {
+		t.Fatalf("roundtrip = %#v, want %#v", roundtrip, wantRoundtrip)
+	}
+	if !interp.GetGlobal("bad").IsNil() {
+		t.Fatalf("bad shellwords returned non-nil result")
+	}
+	if got := interp.GetGlobal("bad_err"); !got.IsString() || !strings.Contains(got.Str(), "unterminated single quote") {
+		t.Fatalf("bad_err = %v, want unterminated single quote", got)
+	}
+}
+
 func TestDialectBlockAndRawEvalHelpers(t *testing.T) {
 	interp := runWithLib(t, `
 		encoded := dialect.eval_block("json", {x: 1, label: "ok"})
@@ -114,6 +150,51 @@ func TestDialectBlockAndRawEvalHelpers(t *testing.T) {
 	}
 	if got := raw.RawGetString("body").Table().RawGetString("step").Str(); got != "collect" {
 		t.Fatalf("raw body step = %q, want collect", got)
+	}
+}
+
+func TestDialectINIDecodeAndEncode(t *testing.T) {
+	interp := runWithLib(t, `
+		cfg := ini`+"`"+`
+app = ledger
+enabled: true
+
+[database]
+host = db.internal
+port = 5432
+`+"`"+`
+		encoded := dialect.eval("ini", {app: "ledger", enabled: true, database: {host: "db.internal", port: 5432}}, {mode: "encode"})
+		roundtrip := dialect.eval("ini", encoded)
+		bad, bad_err := dialect.eval("ini", "[broken")
+	`, "dialect", BuildDialect(HostOptions{}, nil))
+
+	cfg := interp.GetGlobal("cfg").Table()
+	if got := cfg.RawGetString("app").Str(); got != "ledger" {
+		t.Fatalf("ini app = %q, want ledger", got)
+	}
+	if got := cfg.RawGetString("enabled").Str(); got != "true" {
+		t.Fatalf("ini enabled = %q, want true", got)
+	}
+	db := cfg.RawGetString("database").Table()
+	if got := db.RawGetString("host").Str(); got != "db.internal" {
+		t.Fatalf("ini database.host = %q, want db.internal", got)
+	}
+	if got := db.RawGetString("port").Str(); got != "5432" {
+		t.Fatalf("ini database.port = %q, want 5432", got)
+	}
+	wantEncoded := "app=ledger\nenabled=true\n\n[database]\nhost=db.internal\nport=5432\n"
+	if got := interp.GetGlobal("encoded").Str(); got != wantEncoded {
+		t.Fatalf("encoded ini = %q, want %q", got, wantEncoded)
+	}
+	roundtripDB := interp.GetGlobal("roundtrip").Table().RawGetString("database").Table()
+	if got := roundtripDB.RawGetString("port").Str(); got != "5432" {
+		t.Fatalf("roundtrip database.port = %q, want 5432", got)
+	}
+	if !interp.GetGlobal("bad").IsNil() {
+		t.Fatalf("bad ini result is not nil")
+	}
+	if got := interp.GetGlobal("bad_err").Str(); !strings.Contains(got, "ini dialect: line 1: malformed section header") {
+		t.Fatalf("bad ini error = %q", got)
 	}
 }
 

@@ -1,15 +1,18 @@
 // http_protocol_trace.leia - Inspect an HTTP exchange without network access.
-// Demonstrates: url, headers, cookie, mime, urlquery, html_escape, hash, and JSONL logs.
+// Demonstrates: httpmsg, url, cookie, mime, urlquery, html_escape, hash, and JSONL logs.
 
 print("=== Dialects: HTTP protocol trace ===")
 
-request_url := url`https://api.example.test:9443/v1/search?q=leia+dialects&debug=true`
-request_headers := headers`host: api.example.test
+request := httpmsg`GET /v1/search?q=leia+dialects&debug=true HTTP/1.1
+host: api.example.test:9443
 accept: application/json
 cache-control: max-age=60
 cookie: session=s-123; cohort=beta
 x-trace-id: req-42
+
 `
+request_url := url`https://api.example.test:9443/v1/search?q=leia+dialects&debug=true`
+request_headers := request.headers
 request_cookies := dialect.eval("cookie", request_headers.Cookie)
 
 response_type := mime`application/json; charset=utf-8`
@@ -20,11 +23,18 @@ etag_payload := request_url.path .. "?" .. urlquery {q: request_url.query.q, deb
 etag := dialect.eval("hash", etag_payload, {algo: "sha1"})
 
 safe_query := dialect.eval("html_escape", request_url.query.q)
-wire_headers := headers {
-    "content-type": response_type.type,
-    "cache-control": "max-age=" .. cache_control["max-age"],
-    "etag": "\"" .. string.sub(etag, 1, 12) .. "\"",
-    "x-trace-id": request_headers["X-Trace-Id"],
+response_body := "{\"ok\":true,\"query\":\"" .. safe_query .. "\"}"
+response_headers := {}
+response_headers["content-type"] = response_type.type
+response_headers["cache-control"] = "max-age=" .. cache_control["max-age"]
+response_headers.etag = "\"" .. string.sub(etag, 1, 12) .. "\""
+response_headers["x-trace-id"] = request_headers["X-Trace-Id"]
+wire_response := httpmsg {
+    type: "response",
+    status: 200,
+    reason: "OK",
+    headers: response_headers,
+    body: response_body,
 }
 
 events := {
@@ -38,10 +48,13 @@ print("request:", request_url.scheme, request_url.host, request_url.path)
 print("query:", request_url.query.q, request_url.query.debug)
 print("cookie cohort:", request_cookies.cohort)
 print("safe query:", safe_query)
-print("response headers:")
-print(wire_headers)
+print("response:")
+print(wire_response)
 print(trace)
 
+assert(request.type == "request")
+assert(request.method == "GET")
+assert(request.target == "/v1/search?q=leia+dialects&debug=true")
 assert(request_url.scheme == "https")
 assert(request_url.port == "9443")
 assert(request_url.path == "/v1/search")
@@ -53,7 +66,7 @@ assert(response_type.params.charset == "utf-8")
 assert(cache_control["max-age"] == "60")
 assert(etag_payload == "/v1/search?debug=true&q=leia+dialects")
 assert(etag == "edf49fbec074c8d64b496ebd3ec2de45909bcd5a")
-assert(wire_headers == "Cache-Control: max-age=60\r\nContent-Type: application/json\r\nEtag: \"edf49fbec074\"\r\nX-Trace-Id: req-42\r\n")
+assert(wire_response == "HTTP/1.1 200 OK\r\nCache-Control: max-age=60\r\nContent-Type: application/json\r\nEtag: \"edf49fbec074\"\r\nX-Trace-Id: req-42\r\n\r\n{\"ok\":true,\"query\":\"leia dialects\"}")
 assert(trace == "{\"host\":\"api.example.test\",\"method\":\"GET\",\"path\":\"/v1/search\",\"phase\":\"request\",\"trace\":\"req-42\"}\n{\"key\":\"/v1/search?debug=true\\u0026q=leia+dialects\",\"phase\":\"cache\",\"ttl\":60}\n{\"etag\":\"edf49fbec074\",\"media\":\"application/json\",\"phase\":\"response\",\"status\":200}\n")
 
 print("http protocol trace ok")

@@ -148,7 +148,14 @@ func TestFeatureMatrixCoversTaggedDialectAndModpkgReleaseGuards(t *testing.T) {
 	}
 	requireFeatureCellRefs(t, tagged, "tagged_dialect_syntax", "parser", "internal/parser/dialect_syntax_test.go")
 	requireFeatureCellRefs(t, tagged, "tagged_dialect_syntax", "interpreter", "tests/dialect_syntax_test.go", "internal/stdlib/bind/dialect_web_test.go")
-	requireFeatureCellRefs(t, tagged, "tagged_dialect_syntax", "semantic_gate", "tests/architecture/stdlib_boundary_test.go")
+	requireFeatureCellRefs(t, tagged, "tagged_dialect_syntax", "semantic_gate", "tests/architecture/stdlib_boundary_test.go", "cmd/leia/main_examples_test.go")
+	requireFeatureStringList(t, tagged, "tagged_dialect_syntax", "builtin_dialect_tags",
+		"sh", "cmd", "shellwords", "glob", "path",
+		"re", "regexp", "json", "jsonl", "csv", "tsv", "lines", "split", "words", "nums", "numbers", "kv", "env", "ini", "template",
+		"url", "html_escape", "urlquery", "urlpath", "mime", "headers", "http_headers", "cookie", "cookies", "httpmsg",
+		"base64", "hash",
+		"prompt", "quote",
+	)
 
 	parserGuard := readFileString(t, filepath.Join(root, "internal", "parser", "dialect_syntax_test.go"))
 	for _, snippet := range []string{
@@ -167,6 +174,16 @@ func TestFeatureMatrixCoversTaggedDialectAndModpkgReleaseGuards(t *testing.T) {
 	stdlibBoundary := readFileString(t, filepath.Join(root, "tests", "architecture", "stdlib_boundary_test.go"))
 	if !strings.Contains(stdlibBoundary, `"urlpath"`) {
 		t.Fatal("stdlib architecture boundary must keep urlpath in the approved web dialect registry")
+	}
+	exampleGate := readFileString(t, filepath.Join(root, "cmd", "leia", "main_examples_test.go"))
+	for _, snippet := range []string{
+		"TestRunCommandDialectExamplesCoverApprovedBuiltinTags",
+		"approvedBuiltinDialectTags",
+		"collectDialectExampleTags",
+	} {
+		if !strings.Contains(exampleGate, snippet) {
+			t.Fatalf("cmd/leia/main_examples_test.go must keep builtin dialect example gate snippet %q", snippet)
+		}
 	}
 
 	modpkg := features["module_package_management"]
@@ -283,6 +300,21 @@ func requireFeatureCellRefs(t *testing.T, feature map[string]json.RawMessage, fe
 		if !have[ref] {
 			t.Fatalf("%s.%s refs = %#v, missing %q", featureID, field, cell.Refs, ref)
 		}
+	}
+}
+
+func requireFeatureStringList(t *testing.T, feature map[string]json.RawMessage, featureID, field string, values ...string) {
+	t.Helper()
+	raw, ok := feature[field]
+	if !ok {
+		t.Fatalf("%s missing %s", featureID, field)
+	}
+	var got []string
+	if err := json.Unmarshal(raw, &got); err != nil {
+		t.Fatalf("%s.%s: %v", featureID, field, err)
+	}
+	if strings.Join(got, ",") != strings.Join(values, ",") {
+		t.Fatalf("%s.%s = %#v, want %#v", featureID, field, got, values)
 	}
 }
 

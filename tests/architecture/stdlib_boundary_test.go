@@ -1,11 +1,13 @@
 package architecture_test
 
 import (
+	"encoding/json"
 	"go/ast"
 	"go/parser"
 	"go/token"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 
@@ -170,9 +172,9 @@ func TestBuiltinDialectRegistryStaysModular(t *testing.T) {
 		"registerDialectAI",
 	}
 	expectedTagsByFile := map[string][]string{
-		"dialect_shell_fs.go": {"sh", "cmd", "glob", "path"},
-		"dialect_text.go":     {"re", "regexp", "json", "jsonl", "csv", "tsv", "lines", "split", "words", "nums", "numbers", "kv", "env", "template"},
-		"dialect_web.go":      {"url", "html_escape", "urlquery", "urlpath", "mime", "headers", "http_headers", "cookie", "cookies"},
+		"dialect_shell_fs.go": {"sh", "cmd", "shellwords", "glob", "path"},
+		"dialect_text.go":     {"re", "regexp", "json", "jsonl", "csv", "tsv", "lines", "split", "words", "nums", "numbers", "kv", "env", "ini", "template"},
+		"dialect_web.go":      {"url", "html_escape", "urlquery", "urlpath", "mime", "headers", "http_headers", "cookie", "cookies", "httpmsg"},
 		"dialect_data.go":     {"base64", "hash"},
 		"dialect_ai.go":       {"prompt", "quote"},
 	}
@@ -180,6 +182,7 @@ func TestBuiltinDialectRegistryStaysModular(t *testing.T) {
 		"dialect_shell_fs.go": {
 			"github.com/never-labs/leia/internal/stdlib/lib/path",
 			"github.com/never-labs/leia/internal/support",
+			"github.com/never-labs/leia/internal/support/dialect",
 		},
 		"dialect_text.go": {
 			"github.com/never-labs/leia/internal/runtime",
@@ -233,6 +236,33 @@ func TestBuiltinDialectRegistryStaysModular(t *testing.T) {
 				t.Fatalf("dialect tag %q registered by both %s and %s", tag, previous, fileName)
 			}
 			seen[tag] = fileName
+		}
+	}
+	featureMatrixTags := loadFeatureMatrixBuiltinDialectTags(t)
+	var missingFromMatrix, extraInMatrix []string
+	for tag := range seen {
+		if !featureMatrixTags[tag] {
+			missingFromMatrix = append(missingFromMatrix, tag)
+		}
+	}
+	for tag := range featureMatrixTags {
+		if seen[tag] == "" {
+			extraInMatrix = append(extraInMatrix, tag)
+		}
+	}
+	if len(missingFromMatrix) > 0 || len(extraInMatrix) > 0 {
+		sort.Strings(missingFromMatrix)
+		sort.Strings(extraInMatrix)
+		t.Fatalf("builtin dialect tags must stay aligned with tests/feature_matrix.json tagged_dialect_syntax.builtin_dialect_tags; missing from matrix=%v extra in matrix=%v", missingFromMatrix, extraInMatrix)
+	}
+	exampleGate := readArchitectureFile(t, filepath.Join(repoRoot(t), "cmd", "leia", "main_examples_test.go"))
+	for _, snippet := range []string{
+		"TestRunCommandDialectExamplesCoverApprovedBuiltinTags",
+		"approvedBuiltinDialectTags",
+		"collectDialectExampleTags",
+	} {
+		if !strings.Contains(exampleGate, snippet) {
+			t.Fatalf("cmd/leia/main_examples_test.go must keep builtin dialect release/example gate snippet %q", snippet)
 		}
 	}
 
@@ -471,6 +501,53 @@ func projectImports(imports []string) []string {
 		}
 	}
 	return project
+}
+
+func loadFeatureMatrixBuiltinDialectTags(t *testing.T) map[string]bool {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join(repoRoot(t), "tests", "feature_matrix.json"))
+	if err != nil {
+		t.Fatalf("read feature matrix: %v", err)
+	}
+	var matrix struct {
+		Features []struct {
+			ID                 string   `json:"id"`
+			BuiltinDialectTags []string `json:"builtin_dialect_tags"`
+		} `json:"features"`
+	}
+	if err := json.Unmarshal(data, &matrix); err != nil {
+		t.Fatalf("decode feature matrix: %v", err)
+	}
+	for _, feature := range matrix.Features {
+		if feature.ID != "tagged_dialect_syntax" {
+			continue
+		}
+		tags := make(map[string]bool, len(feature.BuiltinDialectTags))
+		for _, tag := range feature.BuiltinDialectTags {
+			if tag == "" {
+				t.Fatal("tagged_dialect_syntax.builtin_dialect_tags must not contain empty tags")
+			}
+			if tags[tag] {
+				t.Fatalf("tagged_dialect_syntax.builtin_dialect_tags contains duplicate tag %q", tag)
+			}
+			tags[tag] = true
+		}
+		if len(tags) == 0 {
+			t.Fatal("tagged_dialect_syntax.builtin_dialect_tags must list approved builtin dialect tags")
+		}
+		return tags
+	}
+	t.Fatal("feature_matrix.json missing tagged_dialect_syntax feature")
+	return nil
+}
+
+func readArchitectureFile(t *testing.T, path string) string {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read %s: %v", path, err)
+	}
+	return string(data)
 }
 
 func stringInSlice(values []string, target string) bool {

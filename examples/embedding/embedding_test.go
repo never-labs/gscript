@@ -113,7 +113,7 @@ func Example_hostFunctionBinding() {
 	// job-007
 }
 
-func Example_hostModuleRequire() {
+func Example_hostModuleImport() {
 	vm := leia.New(leia.WithSandbox(), leia.WithModuleLoading(false))
 	if err := vm.RegisterModule("go/strings", leia.Module{
 		"upper": strings.ToUpper,
@@ -122,7 +122,7 @@ func Example_hostModuleRequire() {
 	}
 
 	if err := vm.Exec(`
-strings := require("go/strings")
+import "go/strings" as strings
 result := strings.upper("hello")
 `); err != nil {
 		panic(err)
@@ -141,15 +141,8 @@ result := strings.upper("hello")
 func Example_llmProvider() {
 	vm := leia.New(leia.WithLibs(leia.LibString|leia.LibLLM), leia.WithLLMProvider(exampleLLMProvider{}))
 	if err := vm.Exec(`
-lookup := llm.tool("lookup", func(name) {
-    return "docs:" .. name, nil
-}, {description: "lookup documentation", params: {"name"}})
-
-tools := {lookup}
-	result, err := llm.react({
-    messages: {llm.system("Use tools."), llm.user("find docs")},
-    tools: tools,
-    max_steps: 2,
+result, err := llm.turn({
+    messages: {llm.user("hello from Leia")},
 })
 answer := result.text
 `); err != nil {
@@ -162,7 +155,7 @@ answer := result.text
 	fmt.Println(answer)
 
 	// Output:
-	// docs:leia
+	// hello
 }
 
 func Example_hotLoader() {

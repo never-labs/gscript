@@ -1,5 +1,5 @@
 // shell_filesystem.leia - Built-in dialects for local process and filesystem work.
-// Demonstrates: $, $!, sh, cmd, glob, path
+// Demonstrates: $, $!, sh, cmd, shellwords, glob, path
 //leia:cap process.exec,process.shell,fs.read
 
 print("=== Dialects: shell, command, filesystem ===")
@@ -43,6 +43,21 @@ assert(cmd_result.code == 0)
 assert(cmd_result.text == "command-ok")
 print("cmd stdout:", cmd_result.text)
 print("cmd ok:", cmd_result.ok, "code:", cmd_result.code)
+
+// shellwords parses command-line text into argv and encodes argv tables back to
+// shell-safe command lines.
+argv := shellwords`printf 'quoted value' a\ b ""`
+assert(#argv == 4)
+assert(argv[1] == "printf")
+assert(argv[2] == "quoted value")
+assert(argv[3] == "a b")
+assert(argv[4] == "")
+encoded_cmd := dialect.eval("shellwords", {"printf", "%s\n", "quoted value", "it's", ""}, {mode: "encode"})
+roundtrip_argv := dialect.eval("shellwords", encoded_cmd)
+assert(roundtrip_argv[3] == "quoted value")
+assert(roundtrip_argv[4] == "it's")
+assert(roundtrip_argv[5] == "")
+print("shellwords encoded:", encoded_cmd)
 
 // glob expands a pattern under the configured filesystem root.
 entry := process.entry()
