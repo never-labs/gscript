@@ -180,6 +180,10 @@ func (tm *TieringManager) compileTier2Pipeline(proto *vm.FuncProto, trace *Tier2
 	}
 
 	addStage("Tier2Gate", func() error {
+		if gate := tm.shouldSuppressStaticLoopBoundaryTier2(proto, tm.getProfile(proto)); !gate.Allowed {
+			remarks.Add("Tier2Gate", "blocked", 0, 0, OpNop, gate.Reason)
+			return fmt.Errorf("tier2: %s, staying at Tier 1", gate.Reason)
+		}
 		if gate := firstUnsupportedTier2BytecodeGate(proto); !gate.Allowed {
 			if gate.Reason != "" {
 				remarks.Add("Tier2Gate", "blocked", 0, 0, OpNop,

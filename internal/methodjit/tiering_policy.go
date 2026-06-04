@@ -192,6 +192,13 @@ func (p PromotionPolicy) Decide(proto *vm.FuncProto, profile FuncProfile, state 
 		reason = PromotionReasonLoopCallSuppressed
 		gate = blockGate("LoopCallTier2", "loop call path remains better at Tier 1")
 	}
+	if promoteTier2 {
+		if staticGate := tm.shouldSuppressStaticLoopBoundaryTier2(proto, profile); !staticGate.Allowed {
+			promoteTier2 = false
+			reason = PromotionReasonLoopCallSuppressed
+			gate = staticGate
+		}
+	}
 	if promoteTier2 && suppressedRecursivePartition {
 		promoteTier2 = false
 		reason = PromotionReasonRecursivePartition

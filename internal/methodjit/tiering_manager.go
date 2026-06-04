@@ -697,7 +697,12 @@ func (tm *TieringManager) applyPromotionDecision(proto *vm.FuncProto, profile Fu
 		if jitSemanticGateEnabled() && proto.Name == "<main>" {
 			osrGate = blockGate("OSREligibility", "top-level restart would replay observable effects")
 		} else if profile.HasLoop && profile.LoopDepth >= 1 && !decision.SuppressedRecursivePartition && !tm.tier2HasFailed(proto) {
-			if profile.LoopDepth < 2 || hasFieldDispatchCallInLoop(proto) {
+			if osrGate.Allowed {
+				if staticGate := tm.shouldSuppressStaticLoopBoundaryTier2(proto, profile); !staticGate.Allowed {
+					osrGate = staticGate
+				}
+			}
+			if osrGate.Allowed && (profile.LoopDepth < 2 || hasFieldDispatchCallInLoop(proto)) {
 				osrGate = tm.osrRestartSafetyGate(proto, profile)
 			}
 			if osrGate.Allowed && profile.LoopDepth < 2 && hasStaticCallInLoop(proto) && hasStaticOpInLoop(proto, vm.OP_RESUME) {

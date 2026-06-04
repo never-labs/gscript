@@ -452,6 +452,22 @@ func (tm *TieringManager) shouldSuppressLoopCallTier2(proto *vm.FuncProto, profi
 	return !canPromoteWithInlining(proto, globals) && !canPromoteWithNativeLoopCalls(proto, globals)
 }
 
+func (tm *TieringManager) shouldSuppressStaticLoopBoundaryTier2(proto *vm.FuncProto, profile FuncProfile) GateResult {
+	if tm == nil || tm.envTier2NoFilter || proto == nil {
+		return allowGate("StaticLoopBoundary", "not considered")
+	}
+	if !profile.HasLoop || profile.LoopDepth >= 2 {
+		return allowGate("StaticLoopBoundary", "not a shallow loop promotion candidate")
+	}
+	if hasStaticOpInLoop(proto, vm.OP_TFORCALL) {
+		return blockGate("StaticLoopBoundary", "shallow loop contains OP_TFORCALL")
+	}
+	if hasStaticOpInLoop(proto, vm.OP_TFORLOOP) {
+		return blockGate("StaticLoopBoundary", "shallow loop contains OP_TFORLOOP")
+	}
+	return allowGate("StaticLoopBoundary", "no static loop boundary blocker")
+}
+
 func stableNumericGlobals(proto *vm.FuncProto) map[string]int64 {
 	nums := make(map[string]int64)
 	regNums := make(map[int]int64)
