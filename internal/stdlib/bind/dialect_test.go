@@ -16,7 +16,7 @@ func TestDialectTagsExposeInstalledHandlers(t *testing.T) {
 	want := []string{
 		"base32", "base64", "cidr", "cmd", "cookie", "cookies", "csv", "duration", "env", "glob",
 		"hash", "headers", "hex", "hostport", "html_escape", "http_headers", "httpmsg", "ini", "ipaddr", "json", "jsonl",
-		"junit", "kv", "lines", "mdtable", "mime", "numbers", "nums", "path", "prompt",
+		"junit", "kv", "lines", "logfmt", "mdtable", "mime", "numbers", "nums", "path", "prompt",
 		"quote", "re", "regexp", "semver", "sh", "shellwords", "split", "tap", "template", "tsv", "url",
 		"urlpath", "urlquery", "words", "xml",
 	}
@@ -364,6 +364,35 @@ func TestDialectXMLEscapeAndUnescape(t *testing.T) {
 	}
 	if got := interp.GetGlobal("bad_err").Str(); !strings.Contains(got, "invalid XML numeric character reference") {
 		t.Fatalf("bad_err = %q", got)
+	}
+}
+
+func TestDialectLogfmtParseAndEncode(t *testing.T) {
+	interp := runWithLib(t, `
+		parsed := logfmt`+"`"+`level=info msg="hello world" ok trace_id=abc`+"`"+`
+		encoded := dialect.eval("logfmt", {msg: "hello world", level: "info", empty: ""}, {mode: "encode"})
+		bad, bad_err := dialect.eval("logfmt", "level=info msg=\"oops")
+	`, "dialect", BuildDialect(HostOptions{}, nil))
+
+	parsed := interp.GetGlobal("parsed").Table()
+	if got := parsed.RawGetString("level").Str(); got != "info" {
+		t.Fatalf("level = %q, want info", got)
+	}
+	if got := parsed.RawGetString("msg").Str(); got != "hello world" {
+		t.Fatalf("msg = %q, want hello world", got)
+	}
+	if got := parsed.RawGetString("ok").Str(); got != "true" {
+		t.Fatalf("ok flag = %q, want true", got)
+	}
+	pairs := parsed.RawGetString("pairs").Table()
+	if got := pairs.RawGetInt(1).Table().RawGetString("key").Str(); got != "level" {
+		t.Fatalf("first pair key = %q, want level", got)
+	}
+	if got := interp.GetGlobal("encoded").Str(); got != `empty="" level=info msg="hello world"` {
+		t.Fatalf("encoded = %q", got)
+	}
+	if !interp.GetGlobal("bad").IsNil() || !interp.GetGlobal("bad_err").IsString() {
+		t.Fatalf("bad logfmt = %v err %v, want nil error string", interp.GetGlobal("bad"), interp.GetGlobal("bad_err"))
 	}
 }
 

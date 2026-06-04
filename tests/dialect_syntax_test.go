@@ -255,6 +255,7 @@ func TestPureDialectSyntaxExecutesThroughStdlib(t *testing.T) {
 				"parsed_ip := ipaddr`10.2.3.4`\n" +
 				"parsed_net := cidr`10.2.0.0/16`\n" +
 				"parsed_hostport := hostport`127.0.0.1:8080`\n" +
+				"parsed_log := logfmt`level=info msg=\"hello leia\" ok`\n" +
 				"base64_text := base64`Hello ${name}`\n" +
 				"base64_decoded := dialect.eval(\"base64\", base64_text, {mode: \"decode\"})\n" +
 				"raw_line_rows := lines`one\\nnot split`\n" +
@@ -279,6 +280,8 @@ func TestPureDialectSyntaxExecutesThroughStdlib(t *testing.T) {
 				"ip_private := parsed_ip.private\n" +
 				"net_bits := parsed_net.bits\n" +
 				"hp_port := parsed_hostport.port\n" +
+				"log_msg := parsed_log.msg\n" +
+				"log_ok := parsed_log.ok\n" +
 				"prompt_text := msg.text\n" +
 				"raw_line_count := #raw_line_rows\n" +
 				"raw_line_first := raw_line_rows[1]\n" +
@@ -301,6 +304,8 @@ func TestPureDialectSyntaxExecutesThroughStdlib(t *testing.T) {
 			assertGet(t, vm, "ip_private", true)
 			assertGet(t, vm, "net_bits", int64(16))
 			assertGet(t, vm, "hp_port", "8080")
+			assertGet(t, vm, "log_msg", "hello leia")
+			assertGet(t, vm, "log_ok", "true")
 			assertGet(t, vm, "base64_text", "SGVsbG8gbGVpYQ==")
 			assertGet(t, vm, "base64_decoded", "Hello leia")
 			assertGet(t, vm, "raw_line_count", int64(1))

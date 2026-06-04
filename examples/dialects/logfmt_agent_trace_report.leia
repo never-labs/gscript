@@ -1,0 +1,56 @@
+print("=== Dialects: logfmt agent trace report ===")
+
+raw_events := {
+    logfmt`run=wf-17 trace=agent-42 agent=support step=classify status=ok ms=31 msg="refund requested"`,
+    logfmt`run=wf-17 trace=agent-42 agent=support step=lookup_order status=ok tool=orders ms=44 msg="order found"`,
+    logfmt`run=wf-17 trace=agent-42 agent=support step=issue_refund status=fail tool=payments ms=83 msg="limit exceeded"`,
+}
+
+total_ms := 0
+failed := 0
+tool_calls := 0
+for _, event := range raw_events {
+    total_ms += tonumber(event.ms)
+    if event.status == "fail" {
+        failed += 1
+    }
+    if event.tool != nil {
+        tool_calls += 1
+    }
+}
+
+summary := {
+    run: raw_events[1].run,
+    trace: raw_events[1].trace,
+    steps: #raw_events,
+    failed: failed,
+    tool_calls: tool_calls,
+    total_ms: total_ms,
+}
+
+summary_line := dialect.eval("logfmt", summary, {mode: "encode"})
+roundtrip := dialect.eval("logfmt", summary_line)
+tap_rows := {
+    {kind: "version", version: 13},
+    {kind: "plan", first: 1, last: 3},
+    {kind: "test", number: 1, name: "agent trace has all steps", ok: summary.steps == 3},
+    {kind: "test", number: 2, name: "agent trace reports failure", ok: summary.failed == 1},
+    {kind: "test", number: 3, name: "agent trace tracks tools", ok: summary.tool_calls == 2},
+}
+tap_report := dialect.eval("tap", tap_rows, {mode: "encode"})
+
+print("summary:", summary_line)
+print(tap_report)
+
+assert(raw_events[1].msg == "refund requested")
+assert(raw_events[3].status == "fail")
+assert(summary.steps == 3)
+assert(summary.failed == 1)
+assert(summary.tool_calls == 2)
+assert(summary.total_ms == 158)
+assert(roundtrip.run == "wf-17")
+assert(roundtrip.trace == "agent-42")
+assert(roundtrip.total_ms == "158")
+assert(string.find(tap_report, "ok 1 - agent trace has all steps", 1, true) != nil)
+
+print("logfmt agent trace report ok")

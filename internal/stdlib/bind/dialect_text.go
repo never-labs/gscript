@@ -74,6 +74,14 @@ func registerDialectText(register dialectRegisterFunc, maxHostResult func() int6
 			return dialectKV(body.Str(), options, false)
 		},
 	})
+	register([]string{"logfmt"}, dialectHandler{
+		eval: func(body Value, options *Table) ([]Value, error) {
+			return dialectLogfmt(body, options, maxHostResult)
+		},
+		block: func(body Value, options *Table) ([]Value, error) {
+			return dialectLogfmt(body, options, maxHostResult)
+		},
+	})
 	register([]string{"env"}, dialectHandler{
 		eval: func(body Value, options *Table) ([]Value, error) {
 			return dialectKV(body.Str(), options, true)
@@ -664,6 +672,44 @@ func dialectKV(src string, opts *Table, envMode bool) ([]Value, error) {
 	for key, val := range parsed {
 		out.RawSetString(key, StringValue(val))
 	}
+	return []Value{TableValue(out)}, nil
+}
+
+func dialectLogfmt(body Value, opts *Table, maxHostResult func() int64) ([]Value, error) {
+	mode := ""
+	if opts != nil && opts.RawGetString("mode").IsString() {
+		mode = opts.RawGetString("mode").Str()
+	}
+	if body.IsTable() || mode == "encode" || mode == "format" {
+		values := map[string]string{}
+		if body.IsTable() {
+			body.Table().ForEachPlainRaw(func(k, v Value) bool {
+				if k.IsString() {
+					values[k.Str()] = v.String()
+				}
+				return true
+			})
+		}
+		encoded := dialectlib.EncodeLogfmt(values)
+		if err := CheckProjectedHostStringBytes(hostResultLimit(maxHostResult), len(encoded)); err != nil {
+			return nil, err
+		}
+		return []Value{StringValue(encoded)}, nil
+	}
+	pairs, err := dialectlib.ParseLogfmt(body.Str())
+	if err != nil {
+		return []Value{NilValue(), StringValue(err.Error())}, nil
+	}
+	out := NewTable()
+	ordered := NewAppendArrayTable(len(pairs))
+	for i, pair := range pairs {
+		out.RawSetString(pair.Key, StringValue(pair.Value))
+		item := NewTable()
+		item.RawSetString("key", StringValue(pair.Key))
+		item.RawSetString("value", StringValue(pair.Value))
+		ordered.RawSetInt(int64(i+1), TableValue(item))
+	}
+	out.RawSetString("pairs", TableValue(ordered))
 	return []Value{TableValue(out)}, nil
 }
 
