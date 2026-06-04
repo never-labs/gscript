@@ -1,5 +1,5 @@
 // text_parsing.leia - Built-in dialects for small text and data transforms.
-// Demonstrates: csv, mdtable, lines/split, words, nums, env, kv, template, json/jsonl, regexp
+// Demonstrates: csv, mdtable, lines/split, words, nums, env, kv, template, json/jsonl, regexp, xml
 
 print("=== Dialects: text parsing ===")
 
@@ -116,3 +116,10 @@ print("regexp valid name:", identifier.match("csv_rows"))
 print("regexp invalid name:", identifier.match("7rows"))
 assert(identifier.match("csv_rows") == true)
 assert(identifier.match("7rows") == false)
+
+xml_escaped := xml`<node attr="a&b">Tom & 'Jerry'</node>`
+xml_unescaped, xml_err := dialect.eval("xml", xml_escaped, {mode: "unescape"})
+print("xml escaped:", xml_escaped)
+print("xml unescaped:", xml_unescaped)
+assert(xml_err == nil)
+assert(xml_unescaped == `<node attr="a&b">Tom & 'Jerry'</node>`)

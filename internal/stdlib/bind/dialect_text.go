@@ -14,6 +14,7 @@ import (
 
 	"github.com/never-labs/leia/internal/runtime"
 	csvlib "github.com/never-labs/leia/internal/stdlib/lib/csv"
+	encodinglib "github.com/never-labs/leia/internal/stdlib/lib/encoding"
 	dialectlib "github.com/never-labs/leia/internal/support/dialect"
 )
 
@@ -97,6 +98,10 @@ func registerDialectText(register dialectRegisterFunc, maxHostResult func() int6
 	register([]string{"junit"}, dialectHandler{
 		eval: dialectJUnit,
 	})
+	register([]string{"xml"}, dialectHandler{
+		eval:  dialectXML,
+		block: dialectXML,
+	})
 	register([]string{"template"}, dialectHandler{
 		eval: func(body Value, options *Table) ([]Value, error) {
 			return dialectTemplate(body, options, maxHostResult)
@@ -105,6 +110,25 @@ func registerDialectText(register dialectRegisterFunc, maxHostResult func() int6
 			return dialectTemplate(body, options, maxHostResult)
 		},
 	})
+}
+
+func dialectXML(body Value, opts *Table) ([]Value, error) {
+	mode := "escape"
+	if opts != nil && opts.RawGetString("mode").IsString() {
+		mode = opts.RawGetString("mode").Str()
+	}
+	switch mode {
+	case "", "escape", "encode":
+		return []Value{StringValue(encodinglib.XMLEscape(body.Str()))}, nil
+	case "unescape", "decode":
+		decoded, err := encodinglib.XMLUnescape(body.Str())
+		if err != nil {
+			return []Value{NilValue(), StringValue(err.Error())}, nil
+		}
+		return []Value{StringValue(decoded)}, nil
+	default:
+		return nil, fmt.Errorf("xml dialect: unknown mode %q", mode)
+	}
 }
 
 func dialectDuration(body Value, opts *Table) ([]Value, error) {

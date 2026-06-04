@@ -381,6 +381,8 @@ func TestStdlibDataDialectsExecuteThroughStdlib(t *testing.T) {
 				"template_text := template`Hello static`\n" +
 				"template_cfg := template { text: \"Score {{.score}}\", data: {score: \"42\"} }\n" +
 				"template_eval := dialect.eval(\"template\", \"Hi {{.name}}\", {data: {name: name}})\n" +
+				"xml_escaped := xml`<node attr=\"a&b\">Tom & 'Jerry'</node>`\n" +
+				"xml_unescaped, xml_unescape_err := dialect.eval(\"xml\", xml_escaped, {mode: \"unescape\"})\n" +
 				"bad_json, bad_json_err := dialect.eval(\"json\", \"{} []\")\n" +
 				"jsonl_rows := jsonl`{\"name\":\"Ada\",\"score\":42}\n{\"name\":\"Bob\",\"score\":7}\n`\n" +
 				"bad_jsonl, bad_jsonl_err := dialect.eval(\"jsonl\", \"{\\\"ok\\\":true}\\n\\n{\\\"ok\\\":false}\\n\")\n" +
@@ -448,6 +450,7 @@ func TestStdlibDataDialectsExecuteThroughStdlib(t *testing.T) {
 				"http_response_body := http_response.body\n" +
 				"cookie_session := cookie_rows.session\n" +
 				"cookie_second_tag := cookie_rows.tag[2]\n" +
+				"xml_unescape_ok := xml_unescape_err == nil\n" +
 				"bad_json_is_nil := bad_json == nil\n" +
 				"bad_jsonl_is_nil := bad_jsonl == nil\n" +
 				"jsonl_first_name := jsonl_rows[1].name\n" +
@@ -538,6 +541,9 @@ func TestStdlibDataDialectsExecuteThroughStdlib(t *testing.T) {
 			assertGet(t, vm, "cookie_session", "abc123")
 			assertGet(t, vm, "cookie_second_tag", "b")
 			assertGet(t, vm, "cookie_encoded", "session=abc123; tag=a; tag=b")
+			assertGet(t, vm, "xml_escaped", "&lt;node attr=&#34;a&amp;b&#34;&gt;Tom &amp; &#39;Jerry&#39;&lt;/node&gt;")
+			assertGet(t, vm, "xml_unescape_ok", true)
+			assertGet(t, vm, "xml_unescaped", `<node attr="a&b">Tom & 'Jerry'</node>`)
 			assertGet(t, vm, "template_text", "Hello static")
 			assertGet(t, vm, "template_cfg", "Score 42")
 			assertGet(t, vm, "template_eval", "Hi Leia")

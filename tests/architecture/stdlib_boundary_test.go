@@ -173,7 +173,7 @@ func TestBuiltinDialectRegistryStaysModular(t *testing.T) {
 	}
 	expectedTagsByFile := map[string][]string{
 		"dialect_shell_fs.go": {"sh", "cmd", "shellwords", "glob", "path"},
-		"dialect_text.go":     {"re", "regexp", "json", "jsonl", "csv", "tsv", "mdtable", "lines", "split", "words", "nums", "numbers", "kv", "env", "ini", "semver", "duration", "tap", "junit", "template"},
+		"dialect_text.go":     {"re", "regexp", "json", "jsonl", "csv", "tsv", "mdtable", "lines", "split", "words", "nums", "numbers", "kv", "env", "ini", "semver", "duration", "tap", "junit", "xml", "template"},
 		"dialect_web.go":      {"url", "html_escape", "urlquery", "urlpath", "mime", "headers", "http_headers", "cookie", "cookies", "httpmsg"},
 		"dialect_data.go":     {"base64", "hash"},
 		"dialect_ai.go":       {"prompt", "quote"},
@@ -187,6 +187,7 @@ func TestBuiltinDialectRegistryStaysModular(t *testing.T) {
 		"dialect_text.go": {
 			"github.com/never-labs/leia/internal/runtime",
 			"github.com/never-labs/leia/internal/stdlib/lib/csv",
+			"github.com/never-labs/leia/internal/stdlib/lib/encoding",
 			"github.com/never-labs/leia/internal/support/dialect",
 		},
 		"dialect_web.go": {

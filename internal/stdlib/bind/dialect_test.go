@@ -18,7 +18,7 @@ func TestDialectTagsExposeInstalledHandlers(t *testing.T) {
 		"hash", "headers", "html_escape", "http_headers", "httpmsg", "ini", "json", "jsonl",
 		"junit", "kv", "lines", "mdtable", "mime", "numbers", "nums", "path", "prompt",
 		"quote", "re", "regexp", "semver", "sh", "shellwords", "split", "tap", "template", "tsv", "url",
-		"urlpath", "urlquery", "words",
+		"urlpath", "urlquery", "words", "xml",
 	}
 	for _, name := range want {
 		if !got[name] {
@@ -328,6 +328,41 @@ func TestDialectJUnitSummary(t *testing.T) {
 		t.Fatalf("bad junit returned non-nil result")
 	}
 	if got := interp.GetGlobal("bad_err").Str(); !strings.Contains(got, `junit dialect: testsuite 1: invalid tests attribute "nope"`) {
+		t.Fatalf("bad_err = %q", got)
+	}
+}
+
+func TestDialectXMLEscapeAndUnescape(t *testing.T) {
+	interp := runWithLib(t, `
+		escaped := xml`+"`"+`<node attr="a&b">Tom & 'Jerry'</node>`+"`"+`
+		unescaped, unescape_err := dialect.eval("xml", escaped, {mode: "unescape"})
+		decoded, decoded_err := dialect.eval("xml", "&lt;x&gt;&quot;q&quot; &apos;s&apos;&lt;/x&gt;", {mode: "decode"})
+		encoded := dialect.eval("xml", "<x>&</x>", {mode: "encode"})
+		bad, bad_err := dialect.eval("xml", "&#x;", {mode: "unescape"})
+	`, "dialect", BuildDialect(HostOptions{}, nil))
+
+	if got, want := interp.GetGlobal("escaped").Str(), `&lt;node attr=&#34;a&amp;b&#34;&gt;Tom &amp; &#39;Jerry&#39;&lt;/node&gt;`; got != want {
+		t.Fatalf("escaped = %q, want %q", got, want)
+	}
+	if !interp.GetGlobal("unescape_err").IsNil() {
+		t.Fatalf("unescape_err = %v, want nil", interp.GetGlobal("unescape_err"))
+	}
+	if got := interp.GetGlobal("unescaped").Str(); got != `<node attr="a&b">Tom & 'Jerry'</node>` {
+		t.Fatalf("unescaped = %q", got)
+	}
+	if !interp.GetGlobal("decoded_err").IsNil() {
+		t.Fatalf("decoded_err = %v, want nil", interp.GetGlobal("decoded_err"))
+	}
+	if got := interp.GetGlobal("decoded").Str(); got != `<x>"q" 's'</x>` {
+		t.Fatalf("decoded = %q", got)
+	}
+	if got := interp.GetGlobal("encoded").Str(); got != "&lt;x&gt;&amp;&lt;/x&gt;" {
+		t.Fatalf("encoded = %q, want escaped string form", got)
+	}
+	if !interp.GetGlobal("bad").IsNil() {
+		t.Fatalf("bad xml returned non-nil result")
+	}
+	if got := interp.GetGlobal("bad_err").Str(); !strings.Contains(got, "invalid XML numeric character reference") {
 		t.Fatalf("bad_err = %q", got)
 	}
 }

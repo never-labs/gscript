@@ -318,7 +318,7 @@ func TestWorkflowEvaluateListExample(t *testing.T) {
 func approvedBuiltinDialectTags() []string {
 	return []string{
 		"sh", "cmd", "shellwords", "glob", "path",
-		"re", "regexp", "json", "jsonl", "csv", "tsv", "mdtable", "lines", "split", "words", "nums", "numbers", "kv", "env", "ini", "semver", "duration", "tap", "template",
+		"re", "regexp", "json", "jsonl", "csv", "tsv", "mdtable", "lines", "split", "words", "nums", "numbers", "kv", "env", "ini", "semver", "duration", "tap", "junit", "xml", "template",
 		"url", "html_escape", "urlquery", "urlpath", "mime", "headers", "http_headers", "cookie", "cookies", "httpmsg",
 		"base64", "hash",
 		"prompt", "quote",
