@@ -42,12 +42,18 @@ func registerDialectText(register dialectRegisterFunc, maxHostResult func() int6
 	})
 	register([]string{"csv"}, dialectHandler{
 		eval: func(body Value, options *Table) ([]Value, error) {
-			return dialectCSV(body.Str(), options)
+			return dialectCSV(body, options, maxHostResult)
+		},
+		block: func(body Value, options *Table) ([]Value, error) {
+			return dialectCSV(body, options, maxHostResult)
 		},
 	})
 	register([]string{"tsv"}, dialectHandler{
 		eval: func(body Value, options *Table) ([]Value, error) {
-			return dialectTSV(body.Str(), options)
+			return dialectTSV(body, options, maxHostResult)
+		},
+		block: func(body Value, options *Table) ([]Value, error) {
+			return dialectTSV(body, options, maxHostResult)
 		},
 	})
 	register([]string{"mdtable"}, dialectHandler{
@@ -437,19 +443,37 @@ func tableHasAnyKey(tbl *Table) bool {
 	return ok
 }
 
-func dialectCSV(src string, opts *Table) ([]Value, error) {
-	return dialectDelimited(src, opts, 0)
+func dialectCSV(body Value, opts *Table, maxHostResult func() int64) ([]Value, error) {
+	return dialectDelimited(body, opts, 0, maxHostResult)
 }
 
-func dialectTSV(src string, opts *Table) ([]Value, error) {
-	return dialectDelimited(src, opts, '\t')
+func dialectTSV(body Value, opts *Table, maxHostResult func() int64) ([]Value, error) {
+	return dialectDelimited(body, opts, '\t', maxHostResult)
 }
 
-func dialectDelimited(src string, opts *Table, defaultSep rune) ([]Value, error) {
+func dialectDelimited(body Value, opts *Table, defaultSep rune, maxHostResult func() int64) ([]Value, error) {
 	csvOpts := csvDialectOptions(opts)
 	if csvOpts.Sep == 0 {
 		csvOpts.Sep = defaultSep
 	}
+	mode := ""
+	if opts != nil && opts.RawGetString("mode").IsString() {
+		mode = opts.RawGetString("mode").Str()
+	}
+	if body.IsTable() || mode == "encode" || mode == "format" {
+		text, err := encodeDelimitedValue(body, opts, csvOpts, maxHostResult)
+		if err != nil {
+			if strings.Contains(err.Error(), "host result byte limit exceeded") {
+				return nil, err
+			}
+			return []Value{NilValue(), StringValue(err.Error())}, nil
+		}
+		if err := CheckProjectedHostStringBytes(hostResultLimit(maxHostResult), len(text)); err != nil {
+			return nil, err
+		}
+		return []Value{StringValue(text)}, nil
+	}
+	src := body.Str()
 	if opts != nil && opts.RawGetString("headers").Truthy() {
 		rows, err := csvlib.ParseWithHeaders(src, csvOpts)
 		if err != nil {
@@ -462,6 +486,32 @@ func dialectDelimited(src string, opts *Table, defaultSep rune) ([]Value, error)
 		return []Value{NilValue(), StringValue(err.Error())}, nil
 	}
 	return []Value{csvRowsToValue(rows)}, nil
+}
+
+func encodeDelimitedValue(body Value, opts *Table, csvOpts csvlib.Options, maxHostResult func() int64) (string, error) {
+	if !body.IsTable() {
+		return "", fmt.Errorf("csv dialect: table expected for encode")
+	}
+	buf := newHostResultBuffer(hostResultLimit(maxHostResult))
+	headers := csvHeadersFromOptions(opts)
+	if len(headers) > 0 {
+		rows, err := csvHeaderRowsFromValue(body.Table(), headers)
+		if err != nil {
+			return "", err
+		}
+		if err := csvlib.WriteWithHeaders(rows, headers, csvOpts, buf); err != nil {
+			return "", err
+		}
+		return buf.String(), nil
+	}
+	rows, err := csvRowsFromValue(body.Table())
+	if err != nil {
+		return "", err
+	}
+	if err := csvlib.Write(rows, csvOpts, buf); err != nil {
+		return "", err
+	}
+	return buf.String(), nil
 }
 
 func csvDialectOptions(opts *Table) csvlib.Options {
@@ -506,6 +556,56 @@ func csvHeaderRowsToValue(rows []map[string]string) Value {
 		result.RawSetInt(int64(i+1), TableValue(row))
 	}
 	return TableValue(result)
+}
+
+func csvRowsFromValue(rows *Table) ([][]string, error) {
+	out := make([][]string, 0, rows.Length())
+	for i := 1; i <= rows.Length(); i++ {
+		rowVal := rows.RawGetInt(int64(i))
+		if !rowVal.IsTable() {
+			return nil, fmt.Errorf("csv dialect: row %d must be table", i)
+		}
+		rowTbl := rowVal.Table()
+		record := make([]string, 0, rowTbl.Length())
+		for j := 1; j <= rowTbl.Length(); j++ {
+			record = append(record, rowTbl.RawGetInt(int64(j)).String())
+		}
+		out = append(out, record)
+	}
+	return out, nil
+}
+
+func csvHeadersFromOptions(opts *Table) []string {
+	if opts == nil {
+		return nil
+	}
+	headersVal := opts.RawGetString("headers")
+	if !headersVal.IsTable() {
+		return nil
+	}
+	headersTbl := headersVal.Table()
+	headers := make([]string, 0, headersTbl.Length())
+	for i := 1; i <= headersTbl.Length(); i++ {
+		headers = append(headers, headersTbl.RawGetInt(int64(i)).String())
+	}
+	return headers
+}
+
+func csvHeaderRowsFromValue(rows *Table, headers []string) ([]map[string]string, error) {
+	out := make([]map[string]string, 0, rows.Length())
+	for i := 1; i <= rows.Length(); i++ {
+		rowVal := rows.RawGetInt(int64(i))
+		if !rowVal.IsTable() {
+			return nil, fmt.Errorf("csv dialect: row %d must be table", i)
+		}
+		rowTbl := rowVal.Table()
+		record := make(map[string]string, len(headers))
+		for _, header := range headers {
+			record[header] = rowTbl.RawGetString(header).String()
+		}
+		out = append(out, record)
+	}
+	return out, nil
 }
 
 func dialectMarkdownTable(body Value, opts *Table, maxHostResult func() int64) ([]Value, error) {

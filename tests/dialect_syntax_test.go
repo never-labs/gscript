@@ -350,8 +350,11 @@ func TestStdlibDataDialectsExecuteThroughStdlib(t *testing.T) {
 			src := "name := \"Leia\"\n" +
 				"csv_rows := csv`name,score\nAda,42\nBob,7\n`\n" +
 				"csv_header_rows := dialect.eval(\"csv\", \"name;score\\nAda;42\\n\", {headers: true, sep: \";\"})\n" +
+				"csv_text := dialect.eval(\"csv\", {{\"name\", \"score\"}, {\"Ada\", 42}, {\"Bob\", 7}}, {mode: \"encode\"})\n" +
+				"csv_header_text := dialect.eval(\"csv\", {{name: \"Ada\", score: 42}, {name: \"Bob\", score: 7}}, {mode: \"encode\", headers: {\"name\", \"score\"}})\n" +
 				"tsv_rows := tsv`name\tscore\nAda\t42\nBob\t7\n`\n" +
 				"tsv_header_rows := dialect.eval(\"tsv\", \"name\\tscore\\nAda\\t42\\n\", {headers: true})\n" +
+				"tsv_text := dialect.eval(\"tsv\", {{\"name\", \"score\"}, {\"Ada\", 42}}, {mode: \"encode\"})\n" +
 				"mdtable_rows := mdtable`| Name | Score | Note |\n| --- | ---: | --- |\n| Ada | 42 | uses \\| safely |\n| Bob | 7 |\n`\n" +
 				"mdtable_text := dialect.eval(\"mdtable\", mdtable_rows, {mode: \"encode\"})\n" +
 				"line_rows := lines`alpha\n\nbeta\n`\n" +
@@ -489,9 +492,12 @@ func TestStdlibDataDialectsExecuteThroughStdlib(t *testing.T) {
 			assertGet(t, vm, "csv_row_2_name", "Ada")
 			assertGet(t, vm, "csv_header_name", "Ada")
 			assertGet(t, vm, "csv_header_score", "42")
+			assertGet(t, vm, "csv_text", "name,score\nAda,42\nBob,7\n")
+			assertGet(t, vm, "csv_header_text", "name,score\nAda,42\nBob,7\n")
 			assertGet(t, vm, "tsv_row_2_name", "Ada")
 			assertGet(t, vm, "tsv_header_name", "Ada")
 			assertGet(t, vm, "tsv_header_score", "42")
+			assertGet(t, vm, "tsv_text", "name\tscore\nAda\t42\n")
 			assertGet(t, vm, "mdtable_first_name", "Ada")
 			assertGet(t, vm, "mdtable_first_note", "uses | safely")
 			assertGet(t, vm, "mdtable_second_note", "")

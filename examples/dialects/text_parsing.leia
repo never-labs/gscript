@@ -4,19 +4,25 @@
 print("=== Dialects: text parsing ===")
 
 csv_rows := dialect.eval("csv", "name,score\nAda,42\nBob,7\n", {headers: true})
+csv_text := dialect.eval("csv", {{"name", "score"}, {"Ada", 42}, {"Bob", 7}}, {mode: "encode"})
 print("csv rows:", #csv_rows)
 print("csv first:", csv_rows[1].name, csv_rows[1].score)
 print("csv second:", csv_rows[2].name, csv_rows[2].score)
+print("csv encoded:", string.gsub(csv_text, "\n", "|"))
 assert(csv_rows[1].name == "Ada")
 assert(csv_rows[2].score == "7")
+assert(csv_text == "name,score\nAda,42\nBob,7\n")
 
 tsv_rows := tsv`name	score
 Ada	42
 Bob	7
 `
+tsv_text := dialect.eval("tsv", {{"name", "score"}, {"Ada", 42}}, {mode: "encode"})
 print("tsv first:", tsv_rows[2][1], tsv_rows[2][2])
+print("tsv encoded:", string.gsub(tsv_text, "\n", "|"))
 assert(tsv_rows[2][1] == "Ada")
 assert(tsv_rows[3][2] == "7")
+assert(tsv_text == "name\tscore\nAda\t42\n")
 
 markdown_rows := mdtable`| Name | Score | Note |
 | --- | ---: | --- |

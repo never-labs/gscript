@@ -143,9 +143,11 @@ func TestWithMaxHostResultBytesLimitsCSVEncoding(t *testing.T) {
 			for _, src := range []string{
 				`value := csv.encode({{"12345"}})`,
 				`value := csv.encodeWithHeaders({{name: "12345"}}, {"name"})`,
+				`value := dialect.eval("csv", {{"12345"}}, {mode: "encode"})`,
+				`value := dialect.eval("tsv", {{"12345"}}, {mode: "encode"})`,
 			} {
 				opts := append([]leia.Option{
-					leia.WithLibs(leia.LibString | leia.LibCSV),
+					leia.WithLibs(leia.LibString | leia.LibCSV | leia.LibDialect),
 					leia.WithMaxHostResultBytes(4),
 				}, tc.opts...)
 				vm := leia.New(opts...)
