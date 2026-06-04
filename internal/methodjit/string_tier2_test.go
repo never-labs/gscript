@@ -972,7 +972,7 @@ func lookup(tbl, keys, n) {
 	proto.EnsureFeedback()
 
 	tbl := runtime.NewTable()
-	for i := int64(0); i < 16; i++ {
+	for i := int64(0); i < 80; i++ {
 		tbl.RawSetString("k"+runtime.IntValue(i).String(), runtime.IntValue(i))
 	}
 	keys := runtime.NewTable()

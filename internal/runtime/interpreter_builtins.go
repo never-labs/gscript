@@ -11,6 +11,7 @@ import (
 	"math"
 	"os"
 	goruntime "runtime"
+	"runtime/debug"
 	"strings"
 )
 
@@ -195,6 +196,11 @@ func (interp *Interpreter) registerBuiltins() {
 			case "collect":
 				RequestGCCompaction()
 				goruntime.GC()
+				return []Value{IntValue(0)}, nil
+			case "release":
+				RequestGCCompaction()
+				goruntime.GC()
+				debug.FreeOSMemory()
 				return []Value{IntValue(0)}, nil
 			case "stop":
 				interp.gcRunning = false

@@ -79,7 +79,7 @@ func TestFieldPolyCacheRecordsMultipleShapes(t *testing.T) {
 
 func TestStringMapLookupCacheDynamicRead(t *testing.T) {
 	tbl := NewTable()
-	for i := 0; i < SmallFieldCap+4; i++ {
+	for i := 0; i < stringLookupCacheMinMapSize+4; i++ {
 		key := "k" + string(rune('a'+i))
 		tbl.RawSetString(key, IntValue(int64(i)))
 	}
@@ -104,7 +104,7 @@ func TestStringMapLookupCacheDynamicRead(t *testing.T) {
 
 func TestStringMapLookupCacheRefreshesOnMutation(t *testing.T) {
 	tbl := NewTable()
-	for i := 0; i < SmallFieldCap+4; i++ {
+	for i := 0; i < stringLookupCacheMinMapSize+4; i++ {
 		key := "k" + string(rune('a'+i))
 		tbl.RawSetString(key, IntValue(int64(i)))
 	}
@@ -357,7 +357,7 @@ func TestDynamicStringKeyCacheShapeGuardAfterDelete(t *testing.T) {
 	}
 }
 
-func TestStringMapLookupCacheIsReadLazyAndWriteRefreshed(t *testing.T) {
+func TestSmallStringMapLookupDoesNotAllocateTableLocalCache(t *testing.T) {
 	tbl := NewTable()
 	for i := 0; i < smallFieldCap+4; i++ {
 		tbl.RawSetString(string(rune('a'+i)), IntValue(int64(i)))
@@ -373,8 +373,29 @@ func TestStringMapLookupCacheIsReadLazyAndWriteRefreshed(t *testing.T) {
 	if got := tbl.RawGetString(key); !got.IsInt() || got.Int() != int64(smallFieldCap+3) {
 		t.Fatalf("RawGetString(%q)=%v, want %d", key, got, smallFieldCap+3)
 	}
+	if tbl.stringLookupCache != nil {
+		t.Fatal("small string maps should avoid the table-local lookup cache")
+	}
+}
+
+func TestLargeStringMapLookupCacheIsReadLazyAndWriteRefreshed(t *testing.T) {
+	tbl := NewTable()
+	for i := 0; i < stringLookupCacheMinMapSize+4; i++ {
+		tbl.RawSetString("key_"+string(rune('a'+i)), IntValue(int64(i)))
+	}
+	if tbl.smap == nil {
+		t.Fatal("test table did not promote to string map")
+	}
+
+	key := "key_" + string(rune('a'+stringLookupCacheMinMapSize+3))
+	if tbl.stringLookupCache != nil {
+		t.Fatal("string map writes should not eagerly create lookup cache")
+	}
+	if got := tbl.RawGetString(key); !got.IsInt() || got.Int() != int64(stringLookupCacheMinMapSize+3) {
+		t.Fatalf("RawGetString(%q)=%v, want %d", key, got, stringLookupCacheMinMapSize+3)
+	}
 	if tbl.stringLookupCache == nil {
-		t.Fatal("string map read should create lookup cache")
+		t.Fatal("large string map read should create lookup cache")
 	}
 
 	tbl.RawSetString(key, IntValue(99))

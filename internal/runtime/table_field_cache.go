@@ -119,6 +119,7 @@ const (
 	stringLookupCacheMinEntries = 256
 	stringLookupCacheMaxEntries = 16384
 	stringLookupCacheProbeLimit = 8
+	stringLookupCacheMinMapSize = 64
 	// StringLookupCacheProbeLimit is exported for native cache probes that must
 	// mirror the runtime insertion bound.
 	StringLookupCacheProbeLimit = stringLookupCacheProbeLimit
@@ -257,6 +258,9 @@ func (t *Table) promoteStringFieldsToMapLocked(key string, val Value) {
 
 func (t *Table) ensureStringLookupCacheLocked() *StringLookupCache {
 	if t.smap == nil {
+		return nil
+	}
+	if len(t.smap) < stringLookupCacheMinMapSize {
 		return nil
 	}
 	wantSize := stringLookupCacheSize(len(t.smap))

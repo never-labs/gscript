@@ -8,6 +8,7 @@ func TestCollectGarbageStats(t *testing.T) {
 	execBinaryIOTest(t, interp, `
 		before := collectgarbage("stats")
 		collectgarbage("collect")
+		collectgarbage("release")
 		after := collectgarbage("stats")
 		allocKB := after.allocKB
 		mode := after.mode
