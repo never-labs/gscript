@@ -254,7 +254,7 @@ func builtinDialectCategory(name string) string {
 		return "web"
 	case "ipaddr", "cidr", "hostport":
 		return "network"
-	case "base64", "hash", "hex", "base32":
+	case "base64", "hash", "hex", "base32", "uuid":
 		return "data"
 	case "prompt", "quote":
 		return "llm"

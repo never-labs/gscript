@@ -7,6 +7,7 @@ import (
 	base64lib "github.com/never-labs/leia/internal/stdlib/lib/base64"
 	encodinglib "github.com/never-labs/leia/internal/stdlib/lib/encoding"
 	hashlib "github.com/never-labs/leia/internal/stdlib/lib/hash"
+	uuidlib "github.com/never-labs/leia/internal/stdlib/lib/uuid"
 )
 
 func registerDialectData(register dialectRegisterFunc, maxHostResult func() int64) {
@@ -28,6 +29,11 @@ func registerDialectData(register dialectRegisterFunc, maxHostResult func() int6
 	register([]string{"base32"}, dialectHandler{
 		eval: func(body Value, options *Table) ([]Value, error) {
 			return dialectBase32(body.Str(), options, maxHostResult)
+		},
+	})
+	register([]string{"uuid"}, dialectHandler{
+		eval: func(body Value, options *Table) ([]Value, error) {
+			return dialectUUID(body, options)
 		},
 	})
 }
@@ -153,5 +159,33 @@ func dialectBase32(src string, opts *Table, maxHostResult func() int64) ([]Value
 		return []Value{StringValue(decoded)}, nil
 	default:
 		return nil, fmt.Errorf("base32 dialect: unknown mode %q", mode)
+	}
+}
+
+func dialectUUID(body Value, opts *Table) ([]Value, error) {
+	mode := "parse"
+	if opts != nil && opts.RawGetString("mode").IsString() {
+		mode = opts.RawGetString("mode").Str()
+	}
+	switch mode {
+	case "", "parse", "validate":
+		parsed, ok := uuidlib.Parse(body.String())
+		if !ok {
+			return []Value{NilValue(), StringValue("invalid UUID format")}, nil
+		}
+		out := NewTable()
+		out.RawSetString("text", StringValue(body.String()))
+		out.RawSetString("valid", BoolValue(true))
+		out.RawSetString("version", IntValue(parsed.Version))
+		out.RawSetString("variant", StringValue(parsed.Variant))
+		out.RawSetString("bytes", StringValue(parsed.Bytes))
+		out.RawSetString("nil", BoolValue(body.String() == uuidlib.Nil()))
+		return []Value{TableValue(out)}, nil
+	case "is_valid", "valid":
+		return []Value{BoolValue(uuidlib.IsValid(body.String()))}, nil
+	case "nil":
+		return []Value{StringValue(uuidlib.Nil())}, nil
+	default:
+		return nil, fmt.Errorf("uuid dialect: unknown mode %q", mode)
 	}
 }

@@ -18,7 +18,7 @@ func TestDialectTagsExposeInstalledHandlers(t *testing.T) {
 		"hash", "headers", "hex", "hostport", "html_escape", "http_headers", "httpmsg", "ini", "ipaddr", "json", "jsonl",
 		"junit", "kv", "lines", "logfmt", "mdtable", "mime", "numbers", "nums", "path", "prompt",
 		"quote", "re", "regexp", "semver", "sh", "shellwords", "split", "tap", "template", "tsv", "url",
-		"urlpath", "urlquery", "words", "xml",
+		"urlpath", "urlquery", "uuid", "words", "xml",
 	}
 	for _, name := range want {
 		if !got[name] {
@@ -427,6 +427,36 @@ func TestDialectHexAndBase32RoundTrip(t *testing.T) {
 	}
 	if !interp.GetGlobal("base32hex_err").IsNil() || interp.GetGlobal("base32hex_decoded").Str() != "go" {
 		t.Fatalf("base32hex decode = %v err %v, want go nil", interp.GetGlobal("base32hex_decoded"), interp.GetGlobal("base32hex_err"))
+	}
+}
+
+func TestDialectUUIDParseAndValidate(t *testing.T) {
+	interp := runWithLib(t, `
+		parsed := uuid`+"`"+`550e8400-e29b-41d4-a716-446655440000`+"`"+`
+		valid := dialect.eval("uuid", "550e8400-e29b-41d4-a716-446655440000", {mode: "is_valid"})
+		invalid := dialect.eval("uuid", "not-a-uuid", {mode: "is_valid"})
+		bad, bad_err := dialect.eval("uuid", "not-a-uuid")
+		nil_uuid := dialect.eval("uuid", "", {mode: "nil"})
+	`, "dialect", BuildDialect(HostOptions{}, nil))
+
+	parsed := interp.GetGlobal("parsed").Table()
+	if got := parsed.RawGetString("version").Int(); got != 4 {
+		t.Fatalf("uuid version = %d, want 4", got)
+	}
+	if got := parsed.RawGetString("variant").Str(); got != "RFC4122" {
+		t.Fatalf("uuid variant = %q, want RFC4122", got)
+	}
+	if got := parsed.RawGetString("bytes").Str(); got != "550e8400e29b41d4a716446655440000" {
+		t.Fatalf("uuid bytes = %q", got)
+	}
+	if !interp.GetGlobal("valid").Bool() || interp.GetGlobal("invalid").Bool() {
+		t.Fatalf("uuid valid flags = %v/%v, want true/false", interp.GetGlobal("valid"), interp.GetGlobal("invalid"))
+	}
+	if !interp.GetGlobal("bad").IsNil() || interp.GetGlobal("bad_err").Str() != "invalid UUID format" {
+		t.Fatalf("bad uuid = %v err %v, want nil invalid UUID format", interp.GetGlobal("bad"), interp.GetGlobal("bad_err"))
+	}
+	if got := interp.GetGlobal("nil_uuid").Str(); got != "00000000-0000-0000-0000-000000000000" {
+		t.Fatalf("nil uuid = %q", got)
 	}
 }
 
