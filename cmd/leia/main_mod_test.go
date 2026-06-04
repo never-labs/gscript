@@ -490,6 +490,44 @@ collection vendor ./vendor
 	}
 }
 
+func TestModTidyIgnoresLocalReplaceSourceImports(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "main.leia"), []byte(`import "example.com/lib/pkg" as lib
+_ = lib
+`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "leia.mod"), []byte(`module example.com/demo
+leia 0.1
+require example.com/lib v1.2.3
+require example.com/unused v9.9.9
+replace example.com/lib v1.2.3 => ./local/lib
+`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(dir, "local", "lib"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "local", "lib", "pkg.leia"), []byte(`import "example.com/transitive/pkg" as dep
+_ = dep
+`), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runModCommand([]string{"tidy", "--json", "--dir", dir}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("mod tidy code = %d, stderr = %q stdout = %q", code, stderr.String(), stdout.String())
+	}
+	var tidy modTidyReport
+	if err := json.Unmarshal(stdout.Bytes(), &tidy); err != nil {
+		t.Fatalf("stdout is not JSON tidy report: %v; stdout = %q", err, stdout.String())
+	}
+	if !tidy.OK || !containsString(tidy.Removed, "example.com/unused") || len(tidy.Missing) != 0 {
+		t.Fatalf("tidy = %+v, want local replace source excluded from root tidy", tidy)
+	}
+}
+
 func testCommandGitHubZip(t *testing.T, name, data string) []byte {
 	t.Helper()
 

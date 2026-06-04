@@ -145,6 +145,64 @@ func TestVerifySumDetectsCollectionAndLocalReplaceChanges(t *testing.T) {
 	assertDiagnostic(t, diags, "LEIA9109", "checksum mismatch for example.com/lib")
 }
 
+func TestVerifyChecksTransitiveDependencyManifests(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "main.leia"), `import "example.com/lib/pkg" as lib
+_ = lib
+`)
+	writeFile(t, filepath.Join(dir, "leia.mod"), strings.Join([]string{
+		"module example.com/app",
+		"leia 0.1",
+		"require example.com/lib v1.2.3",
+		"replace example.com/lib v1.2.3 => ./local/lib",
+		"",
+	}, "\n"))
+	writeFile(t, filepath.Join(dir, "local", "lib", "pkg.leia"), `import "example.com/transitive/pkg" as dep
+_ = dep
+`)
+	writeFile(t, filepath.Join(dir, "local", "lib", "leia.mod"), strings.Join([]string{
+		"module example.com/lib",
+		"leia 0.1",
+		"",
+	}, "\n"))
+
+	report := Verify(dir)
+
+	if report.OK {
+		t.Fatalf("Verify OK = true, want transitive dependency manifest error")
+	}
+	assertDiagnostic(t, report.Diagnostics, "LEIA9106", "missing require for example.com/transitive/pkg; run leia mod add example.com/transitive/pkg@VERSION")
+}
+
+func TestVerifyDoesNotRequireRootToDeclareTransitiveDependency(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "main.leia"), `import "example.com/lib/pkg" as lib
+_ = lib
+`)
+	writeFile(t, filepath.Join(dir, "leia.mod"), strings.Join([]string{
+		"module example.com/app",
+		"leia 0.1",
+		"require example.com/lib v1.2.3",
+		"replace example.com/lib v1.2.3 => ./local/lib",
+		"",
+	}, "\n"))
+	writeFile(t, filepath.Join(dir, "local", "lib", "pkg.leia"), `import "example.com/transitive/pkg" as dep
+_ = dep
+`)
+	writeFile(t, filepath.Join(dir, "local", "lib", "leia.mod"), strings.Join([]string{
+		"module example.com/lib",
+		"leia 0.1",
+		"require example.com/transitive v0.2.0",
+		"",
+	}, "\n"))
+
+	report := Verify(dir)
+
+	if !report.OK {
+		t.Fatalf("Verify OK = false, diagnostics = %#v; want transitive dependency covered by dependency manifest", report.Diagnostics)
+	}
+}
+
 func TestExplainResolvesStdlibCollectionReplaceAndModuleRoot(t *testing.T) {
 	dir := newLockedModule(t)
 
@@ -482,6 +540,9 @@ func TestScanStaticRequiresUsesAST(t *testing.T) {
 		`func nested() { return require("example.com/nested") }`,
 		`dynamic := require(name)`,
 		`again := require("example.com/direct")`,
+		`template := sh` + "`echo ${require(\"example.com/interpolated\")}`" + ``,
+		`prompt { adapter: require("example.com/config") }`,
+		`quote { import "example.com/body" as body; _ = body }`,
 		"",
 	}, "\n"))
 
@@ -489,7 +550,7 @@ func TestScanStaticRequiresUsesAST(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []string{"example.com/direct", "example.com/nested"}
+	want := []string{"example.com/body", "example.com/config", "example.com/direct", "example.com/interpolated", "example.com/nested"}
 	if strings.Join(got, ",") != strings.Join(want, ",") {
 		t.Fatalf("ScanStaticRequires = %#v, want %#v", got, want)
 	}

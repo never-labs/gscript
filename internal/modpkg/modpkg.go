@@ -226,7 +226,11 @@ func Graph(path string) (GraphReport, error) {
 		report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "LEIA9101", Message: err.Error()})
 		return report, err
 	}
+	excludes := graphExcludeRoots(abs)
 	for _, file := range files {
+		if isUnderAnyPath(file, excludes) {
+			continue
+		}
 		requires, err := ScanStaticRequires(file)
 		if err != nil {
 			report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "LEIA9102", Message: err.Error(), File: file})
@@ -242,6 +246,41 @@ func Graph(path string) (GraphReport, error) {
 		return report, errors.New("module graph has diagnostics")
 	}
 	return report, nil
+}
+
+func graphExcludeRoots(root string) []string {
+	manifest, _, err := ReadFileWithPath(root)
+	if err != nil {
+		return nil
+	}
+	excludes := []string{filepath.Join(root, "vendor")}
+	for _, col := range manifest.Collections {
+		excludes = append(excludes, cleanLocalRoot(root, col.Path))
+	}
+	for _, rep := range manifest.Replace {
+		if isLocalPath(rep.NewPath) {
+			excludes = append(excludes, cleanLocalRoot(root, rep.NewPath))
+		}
+	}
+	return excludes
+}
+
+func isUnderAnyPath(path string, roots []string) bool {
+	path = filepath.Clean(path)
+	for _, root := range roots {
+		root = filepath.Clean(root)
+		if root == "." || root == string(os.PathSeparator) {
+			continue
+		}
+		if path == root {
+			return true
+		}
+		rel, err := filepath.Rel(root, path)
+		if err == nil && rel != "." && !strings.HasPrefix(rel, ".."+string(os.PathSeparator)) && rel != ".." {
+			return true
+		}
+	}
+	return false
 }
 
 func ScanStaticRequires(file string) ([]string, error) {
@@ -380,6 +419,16 @@ func collectExprRequires(out []string, expr ast.Expr) []string {
 		return collectExprListRequires(out, e.Args)
 	case *ast.FuncLitExpr:
 		return collectBlockRequires(out, e.Body)
+	case *ast.InterpolatedStringExpr:
+		for _, part := range e.Parts {
+			out = collectExprRequires(out, part.Expr)
+		}
+		return out
+	case *ast.TaggedStringExpr:
+		return collectExprRequires(out, e.Body)
+	case *ast.TaggedBlockExpr:
+		out = collectConfigRequires(out, e.Config)
+		return collectBlockRequires(out, e.Body)
 	case *ast.ListLitExpr:
 		return collectExprListRequires(out, e.Values)
 	case *ast.TableLitExpr:
@@ -447,6 +496,7 @@ func VerifyWithOptions(path string, opts VerifyOptions) VerifyReport {
 	}
 	report.Diagnostics = append(report.Diagnostics, report.Graph.Diagnostics...)
 	report.Diagnostics = append(report.Diagnostics, verifyDependencies(abs, manifest, report.Graph)...)
+	report.Diagnostics = append(report.Diagnostics, verifyTransitiveDependencies(abs, manifest, opts)...)
 	report.Diagnostics = append(report.Diagnostics, VerifySumWithOptions(abs, opts)...)
 	report.OK = len(report.Diagnostics) == 0
 	return report
@@ -644,6 +694,10 @@ func Capability(path string) CapabilityReport {
 }
 
 func dependencyRoot(root string, manifest modfile.File, req modfile.Require) (string, string, bool) {
+	return dependencyRootWithCache(root, manifest, req, "")
+}
+
+func dependencyRootWithCache(root string, manifest modfile.File, req modfile.Require, cacheDir string) (string, string, bool) {
 	if repRoot, ok := replacementRoot(root, manifest, req); ok {
 		return repRoot, "replace", true
 	}
@@ -651,8 +705,15 @@ func dependencyRoot(root string, manifest modfile.File, req modfile.Require) (st
 	if _, err := os.Stat(vendorRoot); err == nil {
 		return vendorRoot, "vendor", true
 	}
-	if cacheDir, err := ModuleCacheDir(""); err == nil {
+	if cacheDir != "" {
 		cacheRoot := cachedRequirementRoot(cacheDir, req.Path, req.Version)
+		if _, statErr := os.Stat(cacheRoot); statErr == nil {
+			return cacheRoot, "cache", true
+		}
+		return "", "", false
+	}
+	if defaultCacheDir, err := ModuleCacheDir(""); err == nil {
+		cacheRoot := cachedRequirementRoot(defaultCacheDir, req.Path, req.Version)
 		if _, statErr := os.Stat(cacheRoot); statErr == nil {
 			return cacheRoot, "cache", true
 		}
@@ -1067,6 +1128,42 @@ func verifyDependencies(root string, manifest modfile.File, graph GraphReport) [
 				})
 			}
 		}
+	}
+	return diags
+}
+
+func verifyTransitiveDependencies(root string, manifest modfile.File, opts VerifyOptions) []Diagnostic {
+	seen := map[string]bool{}
+	return verifyDependencyModules(root, manifest, opts, seen)
+}
+
+func verifyDependencyModules(root string, manifest modfile.File, opts VerifyOptions, seen map[string]bool) []Diagnostic {
+	var diags []Diagnostic
+	for _, req := range manifest.Require {
+		depRoot, _, ok := dependencyRootWithCache(root, manifest, req, opts.CacheDir)
+		if !ok {
+			continue
+		}
+		depRoot = filepath.Clean(depRoot)
+		if seen[depRoot] {
+			continue
+		}
+		seen[depRoot] = true
+		depManifest, depManifestPath, err := ReadFileWithPath(depRoot)
+		if errors.Is(err, os.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			diags = append(diags, Diagnostic{Severity: "error", Code: "LEIA9103", Message: err.Error(), File: depManifestPath})
+			continue
+		}
+		depGraph, graphErr := Graph(depRoot)
+		diags = append(diags, depGraph.Diagnostics...)
+		diags = append(diags, verifyDependencies(depRoot, depManifest, depGraph)...)
+		if graphErr != nil {
+			continue
+		}
+		diags = append(diags, verifyDependencyModules(depRoot, depManifest, opts, seen)...)
 	}
 	return diags
 }

@@ -69,7 +69,8 @@ def assert_any_match(grammar: dict, name: str, sample: str) -> None:
         pattern_name = pattern.get("name")
         capture_names = {
             capture.get("name")
-            for capture in pattern.get("captures", {}).values()
+            for captures_key in ("captures", "beginCaptures", "endCaptures")
+            for capture in pattern.get(captures_key, {}).values()
             if isinstance(capture, dict)
         }
         if pattern_name != name and name not in capture_names:
@@ -117,12 +118,21 @@ def check_textmate() -> None:
 
     assert_match(leia, "keyword.control.directive.leia", source)
     assert_match(leia, "storage.type.function.leia", source)
-    assert_match(leia, "storage.type.function.leia", 'import "go:net/http" as http')
+    assert_match(leia, "meta.import.leia", 'import "go:net/http" as http')
+    assert_any_match(leia, "keyword.control.import.leia", 'import "go:net/http" as http')
+    assert_any_match(leia, "string.quoted.double.import.path.leia", 'import "go:net/http" as http')
+    assert_any_match(leia, "keyword.control.import.as.leia", 'import "go:net/http" as http')
+    assert_any_match(leia, "entity.name.namespace.import.leia", 'import "go:net/http" as http')
     if has_pattern(leia, "keyword.control.ai.leia"):
         fail("Leia TextMate grammar still exposes old AI-native keyword scope")
     assert_any_match(leia, "entity.name.tag.dialect.leia", "rows := csv`a,b\\n1,2\\n`")
-    assert_any_match(leia, "entity.name.tag.dialect.leia", "out := $`printf ok`")
+    assert_match(leia, "meta.dialect.tagged-string.leia", "rows := csv`a,b\\n1,2\\n`")
+    assert_match(leia, "meta.dialect.tagged-string.leia", "rows := csv!`a,b\\n1,2\\n`")
+    assert_any_match(leia, "keyword.operator.raw.dialect.leia", "rows := csv!`a,b\\n1,2\\n`")
+    assert_match(leia, "meta.dialect.shell.tagged-string.leia", "out := $`printf ok`")
+    assert_any_match(leia, "entity.name.tag.shell.leia", "out := $`printf ok`")
     assert_any_match(leia, "meta.dialect.tagged-block.leia", 'prompt { role: "system" }')
+    assert_match(leia, "meta.dialect.tagged-block.leia", 'prompt! { role: "system" }')
     assert_match(leia, "support.type.primitive.leia", source)
     assert_match(leia, "support.type.primitive.leia", "ids := [3]i64{1, 2, 3}")
     for unsupported in ("i8", "i16", "u8", "u16", "u32", "u64"):
@@ -242,9 +252,25 @@ def check_tree_sitter_assets() -> None:
             fail(f"tree-sitter node-types still expose old AI-native node {old_node_type}")
 
     query = (ROOT / "tools/tree-sitter-leia/queries/highlights.scm").read_text(encoding="utf-8")
-    for marker in ("@keyword.control", "@function.call", "@variable.parameter", "@tag"):
+    for marker in (
+        "@keyword.control",
+        "@function.call",
+        "@variable.parameter",
+        "@tag.dialect",
+        "@tag.shell",
+        "@operator.raw.dialect",
+        "@string.special.dialect",
+        "@string.special.shell",
+        "@keyword.control.import",
+        "@keyword.control.import.as",
+        "@string.special.import",
+        "@namespace.import",
+    ):
         if marker not in query:
             fail(f"tree-sitter highlight query missing {marker}")
+    for stale_marker in ("@tag)", "@namespace)", '"import"\n] @keyword.function', '"as"\n] @keyword'):
+        if stale_marker in query:
+            fail(f"tree-sitter highlight query still uses stale generic marker {stale_marker}")
     for old_marker in ("(evaluate_block", "(agent_declaration", "(tool_declaration", "(message_field"):
         if old_marker in query:
             fail(f"tree-sitter highlight query still references old AI-native marker {old_marker}")

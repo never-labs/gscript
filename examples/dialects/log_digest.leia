@@ -1,0 +1,61 @@
+// log_digest.leia - Parse JSONL events and publish a compact signed digest.
+// Demonstrates: jsonl, words, lines, base64, hash, cookie, and mime.
+
+print("=== Dialects: log digest ===")
+
+events := jsonl`{"level":"info","component":"api","message":"request accepted"}
+{"level":"warn","component":"worker","message":"retry scheduled"}
+{"level":"error","component":"api","message":"timeout waiting for upstream"}
+`
+
+counts := {info: 0, warn: 0, error: 0}
+components := {}
+message_words := 0
+
+for i := 1; i <= #events; i++ {
+    event := events[i]
+    counts[event.level] = counts[event.level] + 1
+    components[event.component] = true
+    message_words = message_words + #dialect.eval("words", event.message)
+}
+
+component_names := {}
+for name, _ := range pairs(components) {
+    component_names[#component_names + 1] = name
+}
+table.sort(component_names)
+
+summary_lines := {
+    "events=" .. #events,
+    "errors=" .. counts.error,
+    "warnings=" .. counts.warn,
+    "components=" .. table.concat(component_names, ","),
+    "message_words=" .. message_words,
+}
+summary := table.concat(summary_lines, "\n")
+digest := dialect.eval("hash", summary)
+encoded_summary := dialect.eval("base64", summary)
+decoded_summary := dialect.eval("base64", encoded_summary, {mode: "decode"})
+parsed_lines := dialect.eval("lines", summary)
+media := mime {type: "text/plain", params: {charset: "utf-8", digest: string.sub(digest, 1, 12)}}
+cookies := cookie {events: tostring(#events), errors: tostring(counts.error)}
+
+print(summary)
+print("digest:", digest)
+print("summary base64:", encoded_summary)
+print("media:", media)
+print("cookies:", cookies)
+
+assert(#events == 3)
+assert(counts.info == 1)
+assert(counts.warn == 1)
+assert(counts.error == 1)
+assert(table.concat(component_names, ",") == "api,worker")
+assert(message_words == 8)
+assert(decoded_summary == summary)
+assert(parsed_lines[3] == "warnings=1")
+assert(media == "text/plain; charset=utf-8; digest=" .. string.sub(digest, 1, 12))
+assert(cookies == "errors=1; events=3")
+assert(digest == "e3784ff5760d37ebdd9735b7429b56f472f62923763b490236df8d2516fa365e")
+
+print("log digest dialects ok")

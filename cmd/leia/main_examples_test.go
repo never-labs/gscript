@@ -33,17 +33,22 @@ func TestRunCommandDialectExamples(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	examples := []string{
-		"data_aggregation_report.leia",
-		"data_science_pipeline.leia",
-		"shell_filesystem.leia",
-		"text_parsing.leia",
-		"web_text.leia",
-	}
 	dialectDir := filepath.Join(root, "examples", "dialects")
-	covered := make(map[string]bool, len(examples))
+	entries, err := os.ReadDir(dialectDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var examples []string
+	for _, entry := range entries {
+		if entry.IsDir() || filepath.Ext(entry.Name()) != ".leia" {
+			continue
+		}
+		examples = append(examples, entry.Name())
+	}
+	if len(examples) == 0 {
+		t.Fatal("examples/dialects contains no runnable .leia examples")
+	}
 	for _, name := range examples {
-		covered[name] = true
 		t.Run(name, func(t *testing.T) {
 			path := filepath.Join(dialectDir, name)
 
@@ -53,18 +58,6 @@ func TestRunCommandDialectExamples(t *testing.T) {
 				t.Fatalf("runRunCommand code = %d, stderr = %q", code, stderr.String())
 			}
 		})
-	}
-	entries, err := os.ReadDir(dialectDir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, entry := range entries {
-		if entry.IsDir() || filepath.Ext(entry.Name()) != ".leia" {
-			continue
-		}
-		if !covered[entry.Name()] {
-			t.Fatalf("examples/dialects/%s is not covered by TestRunCommandDialectExamples", entry.Name())
-		}
 	}
 }
 

@@ -1,0 +1,80 @@
+// ai_prompt_quote.leia - Prompt-shaped and quoted dialect values without an LLM provider.
+// Demonstrates: prompt interpolation, prompt config blocks, quote values,
+// dialect.eval_raw, and JSONL message assembly.
+
+print("=== Dialects: AI prompt and quote values ===")
+
+customer := "Ada"
+ticket_id := "T-1042"
+severity := "high"
+
+system_prompt := prompt {
+    role: "system",
+    text: "Classify support tickets into route and priority."
+}
+user_prompt := prompt`Ticket ${ticket_id} from ${customer}: database backups are failing at ${severity} severity.`
+
+policy := quote {
+    body: {
+        route: "database",
+        priority: "urgent",
+        notify: {"oncall", "support-lead"},
+    }
+}
+
+quoted_flow := quote {
+    step := "collect recent backup logs"
+    owner := "database-oncall"
+    return {step: step, owner: owner}
+}
+
+raw_plan := dialect.eval_raw("triage-plan", {
+    step: "collect recent backup logs",
+    owner: "database-oncall",
+})
+
+func prompt_message(p, fallback_role, tag) {
+    role := fallback_role
+    if p.role != nil {
+        role = p.role
+    }
+    if type(p.body) == "table" && p.body.role != nil {
+        role = p.body.role
+    }
+    text := p.text
+    if type(p.body) == "table" && p.body.text != nil {
+        text = p.body.text
+    }
+    return {role: role, tag: tag, text: text}
+}
+
+messages := {
+    prompt_message(system_prompt, "system", "policy"),
+    prompt_message(user_prompt, "user", "ticket"),
+    {role: "tool", tag: raw_plan.dialect, text: raw_plan.body.step},
+}
+
+transcript := dialect.eval("jsonl", messages, {mode: "encode"})
+
+print("messages:", #messages)
+print("system:", messages[1].text)
+print("user:", messages[2].text)
+print("quote kind:", policy.kind)
+print("quoted flow kind:", quoted_flow.kind)
+print("plan:", raw_plan.dialect, raw_plan.body.owner)
+print(transcript)
+
+assert(system_prompt.body.role == "system")
+assert(system_prompt.body.text == "Classify support tickets into route and priority.")
+assert(user_prompt.text == "Ticket T-1042 from Ada: database backups are failing at high severity.")
+assert(policy.kind == "table")
+assert(policy.body.body.route == "database")
+assert(policy.body.body.notify[2] == "support-lead")
+assert(quoted_flow.kind == "function")
+assert(raw_plan.dialect == "triage-plan")
+assert(raw_plan.kind == "table")
+assert(raw_plan.body.owner == "database-oncall")
+assert(#messages == 3)
+assert(transcript == "{\"role\":\"system\",\"tag\":\"policy\",\"text\":\"Classify support tickets into route and priority.\"}\n{\"role\":\"user\",\"tag\":\"ticket\",\"text\":\"Ticket T-1042 from Ada: database backups are failing at high severity.\"}\n{\"role\":\"tool\",\"tag\":\"triage-plan\",\"text\":\"collect recent backup logs\"}\n")
+
+print("ai prompt and quote dialects ok")

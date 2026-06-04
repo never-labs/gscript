@@ -80,7 +80,7 @@ SpecT = TypeVar("SpecT", bound=SelectableSpec)
 def benchmark_id_from_selector(selector: str, allowed_groups: list[str] | tuple[str, ...] = GROUPS) -> str | None:
     text = selector.removeprefix("benchmarks/")
     if text.endswith(".leia"):
-        text = text[:-3]
+        text = text[: -len(".leia")]
     parts = text.split("/")
     if len(parts) != 2:
         return None

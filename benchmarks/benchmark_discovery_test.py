@@ -71,6 +71,13 @@ class BenchmarkDiscoveryTest(unittest.TestCase):
         with self.assertRaisesRegex(SystemExit, "unknown benchmark selector"):
             discovery.select_specs(specs, ["missing_domain/events_metamethod"])
 
+    def test_benchmark_id_from_selector_accepts_benchmark_file_paths(self):
+        self.assertEqual(
+            discovery.benchmark_id_from_selector("benchmarks/numeric/matmul.leia"),
+            "numeric/matmul",
+        )
+        self.assertEqual(discovery.benchmark_id_from_selector("numeric/matmul.leia"), "numeric/matmul")
+
     def test_spec_selectors_includes_only_canonical_domain_names(self):
         self.assertEqual(
             discovery.spec_selectors([FakeSpec("numeric", "matmul"), FakeSpec("calls", "closure_accumulator")]),

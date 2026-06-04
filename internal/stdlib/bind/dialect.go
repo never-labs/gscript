@@ -2,6 +2,8 @@ package bind
 
 import (
 	"fmt"
+	"sort"
+	"strings"
 )
 
 // BuildDialect creates the "dialect" standard library table. Dialects are a
@@ -17,12 +19,8 @@ func BuildDialect(opts HostOptions, maxHostResult func() int64) *Table {
 		t.RawSetString(name, FunctionValue(&GoFunction{Name: "dialect." + name, Fn: fn}))
 	}
 
-	handlers := make(map[string]dialectHandler)
-	register := func(names []string, handler dialectHandler) {
-		for _, name := range names {
-			handlers[name] = handler
-		}
-	}
+	registry := newDialectRegistry()
+	register := registry.register
 
 	registerDialectShellFS(register, opts, maxHostResult)
 	registerDialectText(register, maxHostResult)
@@ -31,9 +29,9 @@ func BuildDialect(opts HostOptions, maxHostResult func() int64) *Table {
 	registerDialectAI(register)
 
 	eval := func(tag string, body Value, options *Table) ([]Value, error) {
-		handler, ok := handlers[tag]
+		handler, ok := registry.handler(tag)
 		if !ok || handler.eval == nil {
-			return nil, fmt.Errorf("unknown dialect %q", tag)
+			return nil, fmt.Errorf("unknown dialect %q (available: %s)", tag, registry.availableText())
 		}
 		return handler.eval(body, options)
 	}
@@ -45,13 +43,21 @@ func BuildDialect(opts HostOptions, maxHostResult func() int64) *Table {
 		return eval(args[0].Str(), args[1], optionalTableArg(args, 2))
 	})
 
+	set("tags", func(args []Value) ([]Value, error) {
+		out := NewAppendArrayTable(len(registry.names))
+		for i, name := range registry.names {
+			out.RawSetInt(int64(i+1), StringValue(name))
+		}
+		return []Value{TableValue(out)}, nil
+	})
+
 	set("eval_block", func(args []Value) ([]Value, error) {
 		if len(args) < 2 || !args[0].IsString() {
 			return nil, fmt.Errorf("bad arguments to 'dialect.eval_block' (tag and config expected)")
 		}
 		tag := args[0].Str()
 		optsTbl := optionalTableArg(args, 2)
-		if handler, ok := handlers[tag]; ok && handler.block != nil {
+		if handler, ok := registry.handler(tag); ok && handler.block != nil {
 			return handler.block(args[1], optsTbl)
 		}
 		return eval(tag, args[1], optsTbl)
@@ -74,6 +80,43 @@ type dialectHandler struct {
 }
 
 type dialectRegisterFunc func([]string, dialectHandler)
+
+type dialectRegistry struct {
+	handlers map[string]dialectHandler
+	names    []string
+}
+
+func newDialectRegistry() *dialectRegistry {
+	return &dialectRegistry{handlers: make(map[string]dialectHandler)}
+}
+
+func (r *dialectRegistry) register(names []string, handler dialectHandler) {
+	if handler.eval == nil && handler.block == nil {
+		panic("dialect registry: handler requires eval or block")
+	}
+	for _, name := range names {
+		if name == "" {
+			panic("dialect registry: empty dialect name")
+		}
+		if _, exists := r.handlers[name]; exists {
+			panic(fmt.Sprintf("dialect registry: duplicate dialect %q", name))
+		}
+	}
+	for _, name := range names {
+		r.handlers[name] = handler
+		r.names = append(r.names, name)
+	}
+	sort.Strings(r.names)
+}
+
+func (r *dialectRegistry) handler(name string) (dialectHandler, bool) {
+	handler, ok := r.handlers[name]
+	return handler, ok
+}
+
+func (r *dialectRegistry) availableText() string {
+	return strings.Join(r.names, ", ")
+}
 
 func dialectFailFast(opts *Table) bool {
 	return opts != nil && opts.RawGetString("fail_fast").Truthy()

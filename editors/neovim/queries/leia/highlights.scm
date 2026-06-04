@@ -18,12 +18,7 @@
 [
   "const"
   "func"
-  "import"
 ] @keyword.function
-
-[
-  "as"
-] @keyword
 
 [
   "true"
@@ -41,18 +36,30 @@
   name: (identifier) @function)
 
 (tagged_string_expression
-  tag: (identifier) @tag)
+  tag: (identifier) @tag.dialect
+  body: (string) @string.special.dialect)
 
 (tagged_string_expression
-  tag: (shell_tag) @tag)
+  tag: (shell_tag) @tag.shell
+  body: (string) @string.special.shell)
 
 (tagged_block_expression
-  tag: (identifier) @tag)
+  tag: (identifier) @tag.dialect)
 
-(dialect_bang) @operator
+(tagged_string_expression
+  bang: (dialect_bang) @operator.raw.dialect)
+
+(tagged_block_expression
+  bang: (dialect_bang) @operator.raw.dialect)
 
 (import_declaration
-  alias: (identifier) @namespace)
+  "import" @keyword.control.import
+  path: (string) @string.special.import
+  "as" @keyword.control.import.as
+  alias: (identifier) @namespace.import)
+
+(unary_expression
+  operator: "!" @operator)
 
 (parameter) @variable.parameter
 (vararg_parameter) @variable.parameter
@@ -87,7 +94,6 @@
   ">="
   "&&"
   "||"
-  "!"
   "&"
   "|"
   "^"

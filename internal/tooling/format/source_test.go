@@ -48,3 +48,27 @@ func TestSourcePreservesRawStringIndentationInsideTaggedRawBlock(t *testing.T) {
 		t.Fatalf("Source() = %q, want %q", string(got), want)
 	}
 }
+
+func TestSourcePreservesCommentLikeLinesInsideRawString(t *testing.T) {
+	src := []byte("quote {\nbody := `first\n// keep at column zero\n  // keep two spaces\nlast`\n}\n")
+	got, err := Source("eval.leia", src)
+	if err != nil {
+		t.Fatalf("Source returned error: %v", err)
+	}
+	want := "quote {\n    body := `first\n// keep at column zero\n  // keep two spaces\nlast`\n}\n"
+	if string(got) != want {
+		t.Fatalf("Source() = %q, want %q", string(got), want)
+	}
+}
+
+func TestSourcePreservesTrailingSpacesInsideRawString(t *testing.T) {
+	src := []byte("quote {\nbody := `first  \nmid\t \nlast`\n}\n")
+	got, err := Source("eval.leia", src)
+	if err != nil {
+		t.Fatalf("Source returned error: %v", err)
+	}
+	want := "quote {\n    body := `first  \nmid\t \nlast`\n}\n"
+	if string(got) != want {
+		t.Fatalf("Source() = %q, want %q", string(got), want)
+	}
+}

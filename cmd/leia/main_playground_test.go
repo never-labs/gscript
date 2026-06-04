@@ -233,8 +233,9 @@ func TestPlaygroundRepositoryCoreExampleCoverage(t *testing.T) {
 		"repo-concurrency-context_process":                        "process host access",
 		"repo-concurrency-goroutine_errors":                       "debug event sink host access",
 		"repo-data_processing-data_oriented-particle_integration": "higher playground step budget",
+		"repo-dialects-shell_filesystem":                          "process shell and filesystem host access",
 	}
-	for _, dir := range []string{"hello", "concurrency", "data_processing"} {
+	for _, dir := range []string{"hello", "concurrency", "data_processing", "dialects"} {
 		dir := dir
 		t.Run(dir, func(t *testing.T) {
 			err := filepath.WalkDir(filepath.Join(root, dir), func(path string, d os.DirEntry, err error) error {
