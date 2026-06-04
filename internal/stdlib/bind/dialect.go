@@ -250,7 +250,7 @@ func builtinDialectCategory(name string) string {
 		return "shell"
 	case "json", "jsonptr", "jsonl", "csv", "tsv", "mdtable", "lines", "split", "words", "nums", "numbers", "kv", "logfmt", "env", "ini", "semver", "duration", "tap", "junit", "xml", "template", "re", "regexp":
 		return "text"
-	case "url", "html_escape", "urlquery", "urlpath", "mime", "headers", "http_headers", "httpmsg", "cookie", "cookies", "sse", "multipart":
+	case "url", "html_escape", "urlquery", "urlpath", "mime", "headers", "http_headers", "httpmsg", "cookie", "cookies", "sse", "multipart", "jwt":
 		return "web"
 	case "ipaddr", "cidr", "hostport":
 		return "network"

@@ -3,7 +3,9 @@ package bind
 import (
 	"bufio"
 	"bytes"
+	"encoding/json"
 	"fmt"
+	"io"
 	"mime"
 	"net/textproto"
 	"net/url"
@@ -59,6 +61,10 @@ func registerDialectWeb(register dialectRegisterFunc, maxHostResult func() int64
 		block: func(body Value, opts *Table) ([]Value, error) {
 			return dialectMultipart(body, opts, maxHostResult)
 		},
+	})
+	register([]string{"jwt"}, dialectHandler{
+		eval:  dialectJWT,
+		block: dialectJWT,
 	})
 }
 
@@ -597,6 +603,60 @@ func dialectMultipart(body Value, opts *Table, maxHostResult func() int64) ([]Va
 		return []Value{NilValue(), StringValue(err.Error())}, nil
 	}
 	return []Value{TableValue(multipartPartsToValue(parts))}, nil
+}
+
+func dialectJWT(body Value, opts *Table) ([]Value, error) {
+	mode := ""
+	if opts != nil && opts.RawGetString("mode").IsString() {
+		mode = opts.RawGetString("mode").Str()
+	}
+	switch mode {
+	case "", "decode", "parse", "unverified":
+	default:
+		return []Value{NilValue(), StringValue(fmt.Sprintf("jwt dialect: unknown mode %q", mode))}, nil
+	}
+	parts, err := dialectlib.ParseJWTUnverified(body.String())
+	if err != nil {
+		return []Value{NilValue(), StringValue(err.Error())}, nil
+	}
+	header, err := decodeJSONValue(parts.Header)
+	if err != nil {
+		return []Value{NilValue(), StringValue("jwt dialect: invalid decoded header JSON: " + err.Error())}, nil
+	}
+	payload, err := decodeJSONValue(parts.Payload)
+	if err != nil {
+		return []Value{NilValue(), StringValue("jwt dialect: invalid decoded payload JSON: " + err.Error())}, nil
+	}
+	out := NewTable()
+	out.RawSetString("header", header)
+	out.RawSetString("payload", payload)
+	out.RawSetString("signature", StringValue(parts.Signature))
+	out.RawSetString("header_json", StringValue(parts.Header))
+	out.RawSetString("payload_json", StringValue(parts.Payload))
+	out.RawSetString("verified", BoolValue(false))
+	segments := NewTable()
+	segments.RawSetString("header", StringValue(parts.HeaderSegment))
+	segments.RawSetString("payload", StringValue(parts.PayloadSegment))
+	segments.RawSetString("signature", StringValue(parts.SignatureSegment))
+	out.RawSetString("segments", TableValue(segments))
+	return []Value{TableValue(out)}, nil
+}
+
+func decodeJSONValue(src string) (Value, error) {
+	decoder := json.NewDecoder(strings.NewReader(src))
+	decoder.UseNumber()
+	var goVal any
+	if err := decoder.Decode(&goVal); err != nil {
+		return NilValue(), err
+	}
+	var extra any
+	if err := decoder.Decode(&extra); err != io.EOF {
+		if err == nil {
+			return NilValue(), fmt.Errorf("invalid JSON: trailing data")
+		}
+		return NilValue(), err
+	}
+	return JSONGoToValue(goVal), nil
 }
 
 func multipartBoundaryFromOptions(opts *Table) (string, error) {

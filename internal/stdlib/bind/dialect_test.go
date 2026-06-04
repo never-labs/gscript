@@ -16,7 +16,7 @@ func TestDialectTagsExposeInstalledHandlers(t *testing.T) {
 	want := []string{
 		"base32", "base64", "binary", "cidr", "cmd", "cookie", "cookies", "csv", "deflate", "duration", "env", "glob",
 		"gzip", "hash", "headers", "hex", "hostport", "html_escape", "http_headers", "httpmsg", "ini", "ipaddr", "json", "jsonl", "jsonptr",
-		"junit", "kv", "lines", "logfmt", "mdtable", "mime", "multipart", "numbers", "nums", "path", "prompt",
+		"junit", "jwt", "kv", "lines", "logfmt", "mdtable", "mime", "multipart", "numbers", "nums", "path", "prompt",
 		"quote", "re", "regexp", "semver", "sh", "shellwords", "split", "sse", "tap", "template", "tsv", "url",
 		"urlpath", "urlquery", "uuid", "words", "xml", "zlib",
 	}
@@ -104,6 +104,32 @@ func TestDialectInfoAndListExposeMetadata(t *testing.T) {
 	}
 	if first := interp.GetGlobal("all_info").Table().RawGetInt(1).Table(); !first.RawGetString("name").IsString() || !first.RawGetString("category").IsString() {
 		t.Fatalf("dialect.list first entry missing name/category: %v", first)
+	}
+}
+
+func TestBuiltinDialectInfoCategoriesAreExplicit(t *testing.T) {
+	interp := runWithLib(t, `
+		tags := dialect.tags()
+		all_info := dialect.list()
+	`, "dialect", BuildDialect(HostOptions{}, nil))
+
+	tags := stringSliceFromArray(interp.GetGlobal("tags").Table())
+	allInfo := interp.GetGlobal("all_info").Table()
+	if got, want := allInfo.Length(), len(tags); got != want {
+		t.Fatalf("dialect.list length = %d, want %d", got, want)
+	}
+	for i, tag := range tags {
+		info := allInfo.RawGetInt(int64(i + 1)).Table()
+		if got := info.RawGetString("name").Str(); got != tag {
+			t.Fatalf("dialect.list[%d].name = %q, want %q", i+1, got, tag)
+		}
+		if !info.RawGetString("builtin").Bool() {
+			t.Fatalf("builtin dialect %q reports builtin=false", tag)
+		}
+		category := info.RawGetString("category").Str()
+		if category == "" || category == "user" {
+			t.Fatalf("builtin dialect %q category = %q; update builtinDialectCategory", tag, category)
+		}
 	}
 }
 

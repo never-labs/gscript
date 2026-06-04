@@ -233,6 +233,44 @@ func TestDialectMultipartParseAndEncode(t *testing.T) {
 	}
 }
 
+func TestDialectJWTUnverifiedDecode(t *testing.T) {
+	interp := runWithLib(t, `
+		token := "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOiJ1c2VyLTQyIiwic2NvcGUiOiJyZWFkIHdyaXRlIiwiZXhwIjoxODkzNDU2MDAwfQ.signature"
+		decoded := dialect.eval("jwt", token)
+		decoded_explicit := dialect.eval("jwt", token, {mode: "unverified"})
+		bad, bad_err := dialect.eval("jwt", "not-a-token")
+		bad_mode, bad_mode_err := dialect.eval("jwt", token, {mode: "verify"})
+	`, "dialect", BuildDialect(HostOptions{}, nil))
+
+	decoded := interp.GetGlobal("decoded").Table()
+	header := decoded.RawGetString("header").Table()
+	payload := decoded.RawGetString("payload").Table()
+	if got := header.RawGetString("alg").Str(); got != "none" {
+		t.Fatalf("header alg = %q, want none", got)
+	}
+	if got := payload.RawGetString("sub").Str(); got != "user-42" {
+		t.Fatalf("payload sub = %q, want user-42", got)
+	}
+	if got := payload.RawGetString("exp").Int(); got != 1893456000 {
+		t.Fatalf("payload exp = %d, want 1893456000", got)
+	}
+	if got := decoded.RawGetString("verified").Bool(); got {
+		t.Fatalf("verified = true, want false for unverified decode")
+	}
+	if got := decoded.RawGetString("segments").Table().RawGetString("signature").Str(); got != "signature" {
+		t.Fatalf("signature segment = %q, want signature", got)
+	}
+	if got := interp.GetGlobal("decoded_explicit").Table().RawGetString("payload").Table().RawGetString("scope").Str(); got != "read write" {
+		t.Fatalf("explicit payload scope = %q, want read write", got)
+	}
+	if !interp.GetGlobal("bad").IsNil() || !interp.GetGlobal("bad_err").IsString() {
+		t.Fatalf("bad jwt = %v err %v, want nil error string", interp.GetGlobal("bad"), interp.GetGlobal("bad_err"))
+	}
+	if !interp.GetGlobal("bad_mode").IsNil() || !interp.GetGlobal("bad_mode_err").IsString() {
+		t.Fatalf("bad mode = %v err %v, want nil error string", interp.GetGlobal("bad_mode"), interp.GetGlobal("bad_mode_err"))
+	}
+}
+
 func TestDialectMIMEBoundaryParseAndEncode(t *testing.T) {
 	interp := runWithLib(t, `
 		parsed := dialect.eval("mime", "Text/HTML; Charset=UTF-8; boundary=\"abc def\"")

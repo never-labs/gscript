@@ -1,0 +1,20 @@
+print("=== Dialects: JWT claims fixture ===")
+
+token := "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOiJ1c2VyLTQyIiwic2NvcGUiOiJyZWFkIHdyaXRlIiwiZXhwIjoxODkzNDU2MDAwfQ.signature"
+decoded := jwt`eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOiJ1c2VyLTQyIiwic2NvcGUiOiJyZWFkIHdyaXRlIiwiZXhwIjoxODkzNDU2MDAwfQ.signature`
+again := dialect.eval("jwt", token, {mode: "unverified"})
+
+print("subject:", decoded.payload.sub)
+print("scope:", decoded.payload.scope)
+print("alg:", decoded.header.alg, "verified:", decoded.verified)
+
+assert(decoded.header.typ == "JWT")
+assert(decoded.header.alg == "none")
+assert(decoded.payload.sub == "user-42")
+assert(decoded.payload.scope == "read write")
+assert(decoded.payload.exp == 1893456000)
+assert(decoded.signature == "signature")
+assert(decoded.verified == false)
+assert(again.payload.sub == decoded.payload.sub)
+
+print("jwt claims fixture ok")
