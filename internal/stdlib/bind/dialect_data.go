@@ -62,9 +62,9 @@ func registerDialectData(register dialectRegisterFunc, maxHostResult func() int6
 }
 
 func dialectBase64(src string, opts *Table, maxHostResult func() int64) ([]Value, error) {
-	mode := "encode"
-	if opts != nil && opts.RawGetString("mode").IsString() {
-		mode = opts.RawGetString("mode").Str()
+	mode := dialectMode(opts)
+	if mode == "" {
+		mode = "encode"
 	}
 	switch mode {
 	case "encode", "":
@@ -96,7 +96,7 @@ func dialectBase64(src string, opts *Table, maxHostResult func() int64) ([]Value
 		}
 		return []Value{StringValue(decoded)}, nil
 	default:
-		return nil, fmt.Errorf("base64 dialect: unknown mode %q", mode)
+		return dialectUnknownMode("base64", mode)
 	}
 }
 
@@ -117,14 +117,14 @@ func dialectHash(src string, opts *Table) ([]Value, error) {
 	case "crc32":
 		return []Value{IntValue(int64(hashlib.CRC32(src)))}, nil
 	default:
-		return nil, fmt.Errorf("hash dialect: unknown algorithm %q", algo)
+		return []Value{NilValue(), StringValue(fmt.Sprintf("hash dialect: unknown algorithm %q", algo))}, nil
 	}
 }
 
 func dialectHex(src string, opts *Table, maxHostResult func() int64) ([]Value, error) {
-	mode := "encode"
-	if opts != nil && opts.RawGetString("mode").IsString() {
-		mode = opts.RawGetString("mode").Str()
+	mode := dialectMode(opts)
+	if mode == "" {
+		mode = "encode"
 	}
 	switch mode {
 	case "encode", "":
@@ -142,14 +142,14 @@ func dialectHex(src string, opts *Table, maxHostResult func() int64) ([]Value, e
 		}
 		return []Value{StringValue(decoded)}, nil
 	default:
-		return nil, fmt.Errorf("hex dialect: unknown mode %q", mode)
+		return dialectUnknownMode("hex", mode)
 	}
 }
 
 func dialectBase32(src string, opts *Table, maxHostResult func() int64) ([]Value, error) {
-	mode := "encode"
-	if opts != nil && opts.RawGetString("mode").IsString() {
-		mode = opts.RawGetString("mode").Str()
+	mode := dialectMode(opts)
+	if mode == "" {
+		mode = "encode"
 	}
 	switch mode {
 	case "encode", "":
@@ -181,14 +181,14 @@ func dialectBase32(src string, opts *Table, maxHostResult func() int64) ([]Value
 		}
 		return []Value{StringValue(decoded)}, nil
 	default:
-		return nil, fmt.Errorf("base32 dialect: unknown mode %q", mode)
+		return dialectUnknownMode("base32", mode)
 	}
 }
 
 func dialectUUID(body Value, opts *Table) ([]Value, error) {
-	mode := "parse"
-	if opts != nil && opts.RawGetString("mode").IsString() {
-		mode = opts.RawGetString("mode").Str()
+	mode := dialectMode(opts)
+	if mode == "" {
+		mode = "parse"
 	}
 	switch mode {
 	case "", "parse", "validate":
@@ -209,14 +209,14 @@ func dialectUUID(body Value, opts *Table) ([]Value, error) {
 	case "nil":
 		return []Value{StringValue(uuidlib.Nil())}, nil
 	default:
-		return nil, fmt.Errorf("uuid dialect: unknown mode %q", mode)
+		return dialectUnknownMode("uuid", mode)
 	}
 }
 
 func dialectCompress(kind, src string, opts *Table, maxHostResult func() int64) ([]Value, error) {
-	mode := "encode"
-	if opts != nil && opts.RawGetString("mode").IsString() {
-		mode = opts.RawGetString("mode").Str()
+	mode := dialectMode(opts)
+	if mode == "" {
+		mode = "encode"
 	}
 	level := compressDefaultLevel(kind)
 	if opts != nil && opts.RawGetString("level").IsNumber() {
@@ -240,7 +240,7 @@ func dialectCompress(kind, src string, opts *Table, maxHostResult func() int64) 
 		}
 		return []Value{StringValue(out)}, nil
 	default:
-		return nil, fmt.Errorf("%s dialect: unknown mode %q", kind, mode)
+		return dialectUnknownMode(kind, mode)
 	}
 }
 

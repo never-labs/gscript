@@ -531,10 +531,12 @@ func TestDialectHexAndBase32RoundTrip(t *testing.T) {
 		hexed := hex`+"`"+`go`+"`"+`
 		hex_decoded, hex_err := dialect.eval("hex", hexed, {mode: "decode"})
 		bad_hex, bad_hex_err := dialect.eval("hex", "xx", {mode: "decode"})
+		bad_hex_mode, bad_hex_mode_err := dialect.eval("hex", "go", {mode: "bogus"})
 		base32ed := base32`+"`"+`go`+"`"+`
 		base32_decoded, base32_err := dialect.eval("base32", base32ed, {mode: "decode"})
 		base32hexed := dialect.eval("base32", "go", {mode: "hex_encode"})
 		base32hex_decoded, base32hex_err := dialect.eval("base32", base32hexed, {mode: "hex_decode"})
+		bad_base32_mode, bad_base32_mode_err := dialect.eval("base32", "go", {mode: "bogus"})
 	`, "dialect", BuildDialect(HostOptions{}, nil))
 
 	if got := interp.GetGlobal("hexed").Str(); got != "676f" {
@@ -546,6 +548,7 @@ func TestDialectHexAndBase32RoundTrip(t *testing.T) {
 	if !interp.GetGlobal("bad_hex").IsNil() || !strings.Contains(interp.GetGlobal("bad_hex_err").Str(), "invalid byte") {
 		t.Fatalf("bad hex = %v err %v, want nil invalid byte", interp.GetGlobal("bad_hex"), interp.GetGlobal("bad_hex_err"))
 	}
+	assertDialectModeError(t, interp.GetGlobal("bad_hex_mode"), interp.GetGlobal("bad_hex_mode_err"), "hex dialect: unknown mode")
 	if got := interp.GetGlobal("base32ed").Str(); got != "M5XQ====" {
 		t.Fatalf("base32ed = %q, want M5XQ====", got)
 	}
@@ -558,6 +561,7 @@ func TestDialectHexAndBase32RoundTrip(t *testing.T) {
 	if !interp.GetGlobal("base32hex_err").IsNil() || interp.GetGlobal("base32hex_decoded").Str() != "go" {
 		t.Fatalf("base32hex decode = %v err %v, want go nil", interp.GetGlobal("base32hex_decoded"), interp.GetGlobal("base32hex_err"))
 	}
+	assertDialectModeError(t, interp.GetGlobal("bad_base32_mode"), interp.GetGlobal("bad_base32_mode_err"), "base32 dialect: unknown mode")
 }
 
 func TestDialectUUIDParseAndValidate(t *testing.T) {
@@ -567,6 +571,7 @@ func TestDialectUUIDParseAndValidate(t *testing.T) {
 		invalid := dialect.eval("uuid", "not-a-uuid", {mode: "is_valid"})
 		bad, bad_err := dialect.eval("uuid", "not-a-uuid")
 		nil_uuid := dialect.eval("uuid", "", {mode: "nil"})
+		bad_mode, bad_mode_err := dialect.eval("uuid", "", {mode: "bogus"})
 	`, "dialect", BuildDialect(HostOptions{}, nil))
 
 	parsed := interp.GetGlobal("parsed").Table()
@@ -588,6 +593,7 @@ func TestDialectUUIDParseAndValidate(t *testing.T) {
 	if got := interp.GetGlobal("nil_uuid").Str(); got != "00000000-0000-0000-0000-000000000000" {
 		t.Fatalf("nil uuid = %q", got)
 	}
+	assertDialectModeError(t, interp.GetGlobal("bad_mode"), interp.GetGlobal("bad_mode_err"), "uuid dialect: unknown mode")
 }
 
 func TestDialectCompressRoundTrip(t *testing.T) {
@@ -600,6 +606,7 @@ func TestDialectCompressRoundTrip(t *testing.T) {
 		deflated := dialect.eval("deflate", data)
 		deflate_decoded, deflate_err := dialect.eval("deflate", deflated, {mode: "decode"})
 		bad, bad_err := dialect.eval("gzip", "not gzip", {mode: "decode"})
+		bad_mode, bad_mode_err := dialect.eval("gzip", data, {mode: "bogus"})
 	`, "dialect", BuildDialect(HostOptions{}, nil))
 
 	if !interp.GetGlobal("gzip_err").IsNil() || interp.GetGlobal("gzip_decoded").Str() != "agent trace payload agent trace payload agent trace payload" {
@@ -613,6 +620,22 @@ func TestDialectCompressRoundTrip(t *testing.T) {
 	}
 	if !interp.GetGlobal("bad").IsNil() || !interp.GetGlobal("bad_err").IsString() {
 		t.Fatalf("bad gzip = %v err %v, want nil error string", interp.GetGlobal("bad"), interp.GetGlobal("bad_err"))
+	}
+	assertDialectModeError(t, interp.GetGlobal("bad_mode"), interp.GetGlobal("bad_mode_err"), "gzip dialect: unknown mode")
+}
+
+func TestDialectBase64HashUnknownOptionsReturnErrors(t *testing.T) {
+	interp := runWithLib(t, `
+		bad_base64, bad_base64_err := dialect.eval("base64", "go", {mode: "bogus"})
+		bad_hash, bad_hash_err := dialect.eval("hash", "go", {algo: "bogus"})
+	`, "dialect", BuildDialect(HostOptions{}, nil))
+
+	assertDialectModeError(t, interp.GetGlobal("bad_base64"), interp.GetGlobal("bad_base64_err"), "base64 dialect: unknown mode")
+	if !interp.GetGlobal("bad_hash").IsNil() {
+		t.Fatalf("bad hash value = %v, want nil", interp.GetGlobal("bad_hash"))
+	}
+	if got := interp.GetGlobal("bad_hash_err"); !got.IsString() || !strings.Contains(got.Str(), `hash dialect: unknown algorithm "bogus"`) {
+		t.Fatalf("bad hash err = %v, want unknown algorithm", got)
 	}
 }
 
