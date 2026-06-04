@@ -456,6 +456,8 @@ func TestPlaygroundTourExamplesProduceTeachingOutputs(t *testing.T) {
 		"dialects": {
 			"leia\tdialect",
 			"true",
+			"leia serves application/json",
+			"GET /health HTTP/1.1",
 			"Explain dialect",
 		},
 	}
@@ -482,6 +484,31 @@ func TestPlaygroundTourExamplesProduceTeachingOutputs(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestPlaygroundRepositoryAPIContractDialectExample(t *testing.T) {
+	examples, err := playgroundRepositoryExamples(playgroundExamplesRoot())
+	if err != nil {
+		t.Fatalf("load repository examples: %v", err)
+	}
+	for _, example := range examples {
+		if example.ID != "repo-dialects-api_contract_fixture" {
+			continue
+		}
+		if !example.Runnable {
+			t.Fatalf("%s should be runnable, requires = %q", example.ID, example.Requires)
+		}
+		if strings.TrimSpace(example.Requires) != "" {
+			t.Fatalf("%s runnable example should not require manual setup: %q", example.ID, example.Requires)
+		}
+		for _, want := range []string{`httpmsg {`, `dialect.eval("cookies"`, `template {`, `assert(fingerprint ==`} {
+			if !strings.Contains(example.Source, want) {
+				t.Fatalf("source missing %q\nsource:\n%s", want, example.Source)
+			}
+		}
+		return
+	}
+	t.Fatal("repo-dialects-api_contract_fixture example not found")
 }
 
 func TestPlaygroundExecAIProfileUsesGLMEnv(t *testing.T) {

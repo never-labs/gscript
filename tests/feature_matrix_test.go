@@ -151,7 +151,7 @@ func TestFeatureMatrixCoversTaggedDialectAndModpkgReleaseGuards(t *testing.T) {
 	requireFeatureCellRefs(t, tagged, "tagged_dialect_syntax", "semantic_gate", "tests/architecture/stdlib_boundary_test.go", "cmd/leia/main_examples_test.go")
 	requireFeatureStringList(t, tagged, "tagged_dialect_syntax", "builtin_dialect_tags",
 		"sh", "cmd", "shellwords", "glob", "path",
-		"re", "regexp", "json", "jsonl", "csv", "tsv", "lines", "split", "words", "nums", "numbers", "kv", "env", "ini", "template",
+		"re", "regexp", "json", "jsonl", "csv", "tsv", "mdtable", "lines", "split", "words", "nums", "numbers", "kv", "env", "ini", "semver", "duration", "tap", "template",
 		"url", "html_escape", "urlquery", "urlpath", "mime", "headers", "http_headers", "cookie", "cookies", "httpmsg",
 		"base64", "hash",
 		"prompt", "quote",

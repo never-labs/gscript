@@ -263,6 +263,8 @@ func TestStdlibDataDialectsExecuteThroughStdlib(t *testing.T) {
 				"csv_header_rows := dialect.eval(\"csv\", \"name;score\\nAda;42\\n\", {headers: true, sep: \";\"})\n" +
 				"tsv_rows := tsv`name\tscore\nAda\t42\nBob\t7\n`\n" +
 				"tsv_header_rows := dialect.eval(\"tsv\", \"name\\tscore\\nAda\\t42\\n\", {headers: true})\n" +
+				"mdtable_rows := mdtable`| Name | Score | Note |\n| --- | ---: | --- |\n| Ada | 42 | uses \\| safely |\n| Bob | 7 |\n`\n" +
+				"mdtable_text := dialect.eval(\"mdtable\", mdtable_rows, {mode: \"encode\"})\n" +
 				"line_rows := lines`alpha\n\nbeta\n`\n" +
 				"split_rows := split`left\nright\n`\n" +
 				"line_rows_keep_empty := dialect.eval(\"lines\", \"alpha\\n\\nbeta\\n\", {keep_empty: true})\n" +
@@ -287,6 +289,12 @@ func TestStdlibDataDialectsExecuteThroughStdlib(t *testing.T) {
 				"ini_database := {host: \"db.internal\", port: 5432}\n" +
 				"ini_text := dialect.eval(\"ini\", {app: \"ledger\", enabled: true, database: ini_database}, {mode: \"encode\"})\n" +
 				"ini_roundtrip := dialect.eval(\"ini\", ini_text)\n" +
+				"duration_parsed := duration`1h30m250ms`\n" +
+				"duration_seconds_encoded := dialect.eval(\"duration\", 90.25, {mode: \"encode\"})\n" +
+				"duration_millis_encoded := dialect.eval(\"duration\", {milliseconds: 250}, {mode: \"encode\"})\n" +
+				"duration_roundtrip := dialect.eval(\"duration\", duration_parsed, {mode: \"encode\"})\n" +
+				"tap_rows := tap`TAP version 13\n1..2\nok 1 - boot\nnot ok 2 - deploy # TODO flaky\n# expected ready\n`\n" +
+				"tap_text := dialect.eval(\"tap\", tap_rows, {mode: \"encode\"})\n" +
 				"escaped_html := html_escape`<b>Ada & Bob</b>`\n" +
 				"unescaped_html := dialect.eval(\"html_escape\", escaped_html, {mode: \"unescape\"})\n" +
 				"urlquery_component := dialect.eval(\"urlquery\", \"hello world&x\", {mode: \"escape\"})\n" +
@@ -321,6 +329,9 @@ func TestStdlibDataDialectsExecuteThroughStdlib(t *testing.T) {
 				"tsv_row_2_name := tsv_rows[2][1]\n" +
 				"tsv_header_name := tsv_header_rows[1].name\n" +
 				"tsv_header_score := tsv_header_rows[1].score\n" +
+				"mdtable_first_name := mdtable_rows[1].Name\n" +
+				"mdtable_first_note := mdtable_rows[1].Note\n" +
+				"mdtable_second_note := mdtable_rows[2].Note\n" +
 				"line_count := #line_rows\n" +
 				"line_second := line_rows[2]\n" +
 				"split_first := split_rows[1]\n" +
@@ -353,6 +364,14 @@ func TestStdlibDataDialectsExecuteThroughStdlib(t *testing.T) {
 				"ini_host := ini_cfg.database.host\n" +
 				"ini_port := ini_cfg.database.port\n" +
 				"ini_roundtrip_port := ini_roundtrip.database.port\n" +
+				"duration_text := duration_parsed.text\n" +
+				"duration_seconds := duration_parsed.seconds\n" +
+				"duration_milliseconds := duration_parsed.milliseconds\n" +
+				"duration_nanoseconds := duration_parsed.nanoseconds\n" +
+				"tap_plan_last := tap_rows[2].last\n" +
+				"tap_second_ok := tap_rows[4].ok\n" +
+				"tap_second_directive := tap_rows[4].directive\n" +
+				"tap_second_diagnostic := tap_rows[4].diagnostics[1]\n" +
 				"urlquery_q := urlquery_rows.q\n" +
 				"urlquery_page := urlquery_rows.page\n" +
 				"urlquery_tag_2 := urlquery_rows.tag[2]\n"
@@ -381,6 +400,10 @@ func TestStdlibDataDialectsExecuteThroughStdlib(t *testing.T) {
 			assertGet(t, vm, "tsv_row_2_name", "Ada")
 			assertGet(t, vm, "tsv_header_name", "Ada")
 			assertGet(t, vm, "tsv_header_score", "42")
+			assertGet(t, vm, "mdtable_first_name", "Ada")
+			assertGet(t, vm, "mdtable_first_note", "uses | safely")
+			assertGet(t, vm, "mdtable_second_note", "")
+			assertGet(t, vm, "mdtable_text", "| Name | Score | Note |\n| --- | --- | --- |\n| Ada | 42 | uses \\| safely |\n| Bob | 7 |  |\n")
 			assertGet(t, vm, "line_count", int64(2))
 			assertGet(t, vm, "line_second", "beta")
 			assertGet(t, vm, "split_first", "left")
@@ -416,6 +439,18 @@ func TestStdlibDataDialectsExecuteThroughStdlib(t *testing.T) {
 			assertGet(t, vm, "ini_port", "5432")
 			assertGet(t, vm, "ini_text", "app=ledger\nenabled=true\n\n[database]\nhost=db.internal\nport=5432\n")
 			assertGet(t, vm, "ini_roundtrip_port", "5432")
+			assertGet(t, vm, "duration_text", "1h30m0.25s")
+			assertGet(t, vm, "duration_seconds", 5400.25)
+			assertGet(t, vm, "duration_milliseconds", 5400250.0)
+			assertGet(t, vm, "duration_nanoseconds", int64(5_400_250_000_000))
+			assertGet(t, vm, "duration_seconds_encoded", "1m30.25s")
+			assertGet(t, vm, "duration_millis_encoded", "250ms")
+			assertGet(t, vm, "duration_roundtrip", "1h30m0.25s")
+			assertGet(t, vm, "tap_plan_last", int64(2))
+			assertGet(t, vm, "tap_second_ok", false)
+			assertGet(t, vm, "tap_second_directive", "TODO")
+			assertGet(t, vm, "tap_second_diagnostic", "expected ready")
+			assertGet(t, vm, "tap_text", "TAP version 13\n1..2\nok 1 - boot\nnot ok 2 - deploy # TODO flaky\n# expected ready\n")
 			assertGet(t, vm, "escaped_html", "&lt;b&gt;Ada &amp; Bob&lt;/b&gt;")
 			assertGet(t, vm, "unescaped_html", "<b>Ada & Bob</b>")
 			assertGet(t, vm, "urlquery_component", "hello+world%26x")
@@ -451,6 +486,44 @@ func TestStdlibDataDialectsExecuteThroughStdlib(t *testing.T) {
 			assertGet(t, vm, "jsonl_first_name", "Ada")
 			assertGet(t, vm, "jsonl_second_score", int64(7))
 			assertGet(t, vm, "jsonl_text", "{\"name\":\"Ada\",\"score\":42}\n{\"name\":\"Bob\",\"score\":7}\n")
+		})
+	}
+}
+
+func TestStdlibSemVerDialectExecutesThroughStdlib(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []leia.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			vm := leia.New(append([]leia.Option{
+				leia.WithLibs(leia.LibAll),
+			}, tc.opts...)...)
+			err := vm.Exec(
+				"release := semver`1.2.3-rc.1+build.7`\n" +
+					"encoded := dialect.eval(\"semver\", {major: 2, minor: 0, patch: 1, prerelease: {\"beta\", \"2\"}, build: {\"ci\", \"0042\"}}, {mode: \"encode\"})\n" +
+					"formatted := dialect.eval(\"semver\", {major: 3, minor: 4, patch: 5, pre: \"alpha.1\", build_metadata: \"sha.abcdef\"}, {mode: \"format\"})\n" +
+					"roundtrip := dialect.eval(\"semver\", encoded)\n" +
+					"bad, bad_err := dialect.eval(\"semver\", \"1.02.3\")\n" +
+					"major := release.major\n" +
+					"pre_2 := release.prerelease[2]\n" +
+					"build_2 := release.build[2]\n" +
+					"roundtrip_pre := roundtrip.pre\n" +
+					"bad_is_nil := bad == nil\n")
+			if err != nil {
+				t.Fatalf("Exec: %v", err)
+			}
+			assertGet(t, vm, "major", int64(1))
+			assertGet(t, vm, "pre_2", "1")
+			assertGet(t, vm, "build_2", "7")
+			assertGet(t, vm, "encoded", "2.0.1-beta.2+ci.0042")
+			assertGet(t, vm, "formatted", "3.4.5-alpha.1+sha.abcdef")
+			assertGet(t, vm, "roundtrip_pre", "beta.2")
+			assertGet(t, vm, "bad_is_nil", true)
+			assertStringContains(t, vm, "bad_err", "semver dialect: minor number has leading zero")
 		})
 	}
 }

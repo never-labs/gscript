@@ -10,8 +10,8 @@ import (
 // small native dispatch layer used by tagged literals and tagged blocks:
 // sh`...`, cmd`...`, shellwords`...`, glob`...`, json`...`, prompt`...`,
 // quote { ... }, and small safe data transforms such as path`...`, url`...`, words`...`, nums`...`,
-// kv`...`, env`...`, jsonl`...`, html_escape`...`, urlquery`...`, mime`...`,
-// urlpath`...`, base64`...`, and hash`...`.
+// mdtable`...`, kv`...`, env`...`, jsonl`...`, semver`...`, html_escape`...`, urlquery`...`, mime`...`,
+// urlpath`...`, duration`...`, tap`...`, base64`...`, and hash`...`.
 func BuildDialect(opts HostOptions, maxHostResult func() int64) *Table {
 	t := markStdlibBoundModule(NewTable())
 

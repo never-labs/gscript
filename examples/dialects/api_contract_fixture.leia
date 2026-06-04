@@ -1,0 +1,76 @@
+// api_contract_fixture.leia - Build a deterministic API contract fixture.
+// Demonstrates: ini, template, mime, headers, cookies, httpmsg, jsonl, and hash.
+
+print("=== Dialects: API contract fixture ===")
+
+contract := ini`service=billing-api
+version=2026.06
+
+[endpoint]
+method=POST
+path=/v1/invoices
+status=202
+`
+
+media := mime`application/json; charset=utf-8`
+request_id := "req-contract-17"
+cookie_header := dialect.eval("cookies", {session: "s-17", cohort: "beta"}, {mode: "encode"})
+
+request_header_table := {}
+request_header_table["content-type"] = media.type
+request_header_table["x-request-id"] = request_id
+request_header_table.cookie = cookie_header
+request_headers := headers {
+    "content-type": media.type,
+    "x-request-id": request_id,
+    "cookie": cookie_header,
+}
+
+body := dialect.eval("json", {invoice: "inv-1001", amount: 1250, currency: "USD"}, {mode: "encode"})
+wire_request := httpmsg {
+    method: contract.endpoint.method,
+    target: contract.endpoint.path,
+    headers: request_header_table,
+    body: body,
+}
+
+parsed_request := dialect.eval("httpmsg", wire_request)
+parsed_cookies := dialect.eval("cookie", parsed_request.headers.Cookie)
+
+fixture_lines := dialect.eval("jsonl", {
+    {phase: "request", service: contract.service, method: parsed_request.method, path: parsed_request.target},
+    {phase: "headers", request_id: parsed_request.headers["X-Request-Id"], content_type: parsed_request.headers["Content-Type"]},
+    {phase: "expect", status: tonumber(contract.endpoint.status), version: contract.version},
+}, {mode: "encode"})
+
+fingerprint := string.sub(dialect.eval("hash", wire_request .. fixture_lines), 1, 12)
+summary := template {
+    text: "{{.service}} {{.method}} {{.path}} expects {{.status}} fixture={{.fingerprint}}",
+    data: {
+        service: contract.service,
+        method: contract.endpoint.method,
+        path: contract.endpoint.path,
+        status: contract.endpoint.status,
+        fingerprint: fingerprint,
+    },
+}
+
+print(summary)
+print(wire_request)
+print(fixture_lines)
+
+assert(contract.service == "billing-api")
+assert(contract.endpoint.path == "/v1/invoices")
+assert(media.params.charset == "utf-8")
+assert(parsed_request.method == "POST")
+assert(parsed_request.target == "/v1/invoices")
+assert(parsed_request.headers["Content-Type"] == "application/json")
+assert(parsed_request.headers["X-Request-Id"] == request_id)
+assert(parsed_cookies.session == "s-17")
+assert(parsed_cookies.cohort == "beta")
+assert(body == "{\"amount\":1250,\"currency\":\"USD\",\"invoice\":\"inv-1001\"}")
+assert(request_headers == "Content-Type: application/json\r\nCookie: cohort=beta; session=s-17\r\nX-Request-Id: req-contract-17\r\n")
+assert(fingerprint == "81e8297aceae")
+assert(summary == "billing-api POST /v1/invoices expects 202 fixture=81e8297aceae")
+
+print("api contract fixture ok")

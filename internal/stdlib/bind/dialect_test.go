@@ -14,10 +14,10 @@ func TestDialectTagsExposeInstalledHandlers(t *testing.T) {
 
 	got := stringSetFromArray(interp.GetGlobal("tags").Table())
 	want := []string{
-		"base64", "cmd", "cookie", "cookies", "csv", "env", "glob",
+		"base64", "cmd", "cookie", "cookies", "csv", "duration", "env", "glob",
 		"hash", "headers", "html_escape", "http_headers", "httpmsg", "ini", "json", "jsonl",
-		"kv", "lines", "mime", "numbers", "nums", "path", "prompt",
-		"quote", "re", "regexp", "sh", "shellwords", "split", "template", "tsv", "url",
+		"kv", "lines", "mdtable", "mime", "numbers", "nums", "path", "prompt",
+		"quote", "re", "regexp", "semver", "sh", "shellwords", "split", "tap", "template", "tsv", "url",
 		"urlpath", "urlquery", "words",
 	}
 	for _, name := range want {
@@ -195,6 +195,182 @@ port = 5432
 	}
 	if got := interp.GetGlobal("bad_err").Str(); !strings.Contains(got, "ini dialect: line 1: malformed section header") {
 		t.Fatalf("bad ini error = %q", got)
+	}
+}
+
+func TestDialectSemVerDecodeAndEncode(t *testing.T) {
+	interp := runWithLib(t, `
+		parsed := semver`+"`"+`1.2.3-rc.1+build.7`+"`"+`
+		encoded := dialect.eval("semver", {major: 2, minor: 0, patch: 1, prerelease: {"beta", "2"}, build: {"ci", "0042"}}, {mode: "encode"})
+		formatted := dialect.eval("semver", {major: 3, minor: 4, patch: 5, pre: "alpha.1", build_metadata: "sha.abcdef"}, {mode: "format"})
+		roundtrip := dialect.eval("semver", encoded)
+		bad, bad_err := dialect.eval("semver", "1.02.3")
+		bad_table, bad_table_err := dialect.eval("semver", {major: 1, minor: 2, patch: 3, prerelease: {"01"}}, {mode: "encode"})
+	`, "dialect", BuildDialect(HostOptions{}, nil))
+
+	parsed := interp.GetGlobal("parsed").Table()
+	if got := parsed.RawGetString("major").Int(); got != 1 {
+		t.Fatalf("semver major = %d, want 1", got)
+	}
+	if got := parsed.RawGetString("minor").Int(); got != 2 {
+		t.Fatalf("semver minor = %d, want 2", got)
+	}
+	if got := parsed.RawGetString("patch").Int(); got != 3 {
+		t.Fatalf("semver patch = %d, want 3", got)
+	}
+	if got := parsed.RawGetString("prerelease").Table().RawGetInt(1).Str(); got != "rc" {
+		t.Fatalf("semver prerelease[1] = %q, want rc", got)
+	}
+	if got := parsed.RawGetString("prerelease").Table().RawGetInt(2).Str(); got != "1" {
+		t.Fatalf("semver prerelease[2] = %q, want 1", got)
+	}
+	if got := parsed.RawGetString("build").Table().RawGetInt(2).Str(); got != "7" {
+		t.Fatalf("semver build[2] = %q, want 7", got)
+	}
+	if got := parsed.RawGetString("version").Str(); got != "1.2.3-rc.1+build.7" {
+		t.Fatalf("semver version = %q", got)
+	}
+	if got := interp.GetGlobal("encoded").Str(); got != "2.0.1-beta.2+ci.0042" {
+		t.Fatalf("encoded semver = %q", got)
+	}
+	if got := interp.GetGlobal("formatted").Str(); got != "3.4.5-alpha.1+sha.abcdef" {
+		t.Fatalf("formatted semver = %q", got)
+	}
+	if got := interp.GetGlobal("roundtrip").Table().RawGetString("pre").Str(); got != "beta.2" {
+		t.Fatalf("roundtrip pre = %q", got)
+	}
+	if !interp.GetGlobal("bad").IsNil() {
+		t.Fatalf("bad semver returned non-nil result")
+	}
+	if got := interp.GetGlobal("bad_err").Str(); !strings.Contains(got, "semver dialect: minor number has leading zero") {
+		t.Fatalf("bad_err = %q", got)
+	}
+	if !interp.GetGlobal("bad_table").IsNil() {
+		t.Fatalf("bad semver table returned non-nil result")
+	}
+	if got := interp.GetGlobal("bad_table_err").Str(); !strings.Contains(got, "semver dialect: prerelease numeric identifier has leading zero") {
+		t.Fatalf("bad_table_err = %q", got)
+	}
+}
+
+func TestDialectMarkdownTableDecodeAndEncode(t *testing.T) {
+	interp := runWithLib(t, `
+		rows := mdtable`+"`"+`
+| Name | Score | Note |
+| --- | ---: | --- |
+| Ada | 42 | uses \| safely |
+| Bob | 7 |
+`+"`"+`
+		encoded := dialect.eval("mdtable", rows, {mode: "encode"})
+		custom := dialect.eval("mdtable", {{name: "Ada", score: 42}}, {mode: "encode", headers: {"name", "score"}})
+		bad, bad_err := dialect.eval("mdtable", "| a | b |\n| -- | --- |\n")
+	`, "dialect", BuildDialect(HostOptions{}, nil))
+
+	rows := interp.GetGlobal("rows").Table()
+	if got := rows.Length(); got != 2 {
+		t.Fatalf("rows length = %d, want 2", got)
+	}
+	if got := rows.RawGetInt(1).Table().RawGetString("Name").Str(); got != "Ada" {
+		t.Fatalf("row 1 name = %q, want Ada", got)
+	}
+	if got := rows.RawGetInt(1).Table().RawGetString("Note").Str(); got != "uses | safely" {
+		t.Fatalf("row 1 note = %q, want escaped pipe decoded", got)
+	}
+	if got := rows.RawGetInt(2).Table().RawGetString("Note").Str(); got != "" {
+		t.Fatalf("row 2 note = %q, want empty missing cell", got)
+	}
+	wantEncoded := "| Name | Score | Note |\n| --- | --- | --- |\n| Ada | 42 | uses \\| safely |\n| Bob | 7 |  |\n"
+	if got := interp.GetGlobal("encoded").Str(); got != wantEncoded {
+		t.Fatalf("encoded = %q, want %q", got, wantEncoded)
+	}
+	if got := interp.GetGlobal("custom").Str(); got != "| name | score |\n| --- | --- |\n| Ada | 42 |\n" {
+		t.Fatalf("custom encoded = %q", got)
+	}
+	if !interp.GetGlobal("bad").IsNil() {
+		t.Fatalf("bad mdtable returned non-nil result")
+	}
+	if got := interp.GetGlobal("bad_err").Str(); !strings.Contains(got, "mdtable dialect: delimiter cells must contain at least three hyphens") {
+		t.Fatalf("bad_err = %q", got)
+	}
+}
+
+func TestDialectDurationParseAndEncode(t *testing.T) {
+	interp := runWithLib(t, `
+		parsed := duration`+"`"+`1h30m250ms`+"`"+`
+		encoded_seconds := dialect.eval("duration", 90.25, {mode: "encode"})
+		encoded_millis := dialect.eval("duration", {milliseconds: 250}, {mode: "encode"})
+		encoded_roundtrip := dialect.eval("duration", parsed, {mode: "encode"})
+		bad, bad_err := dialect.eval("duration", "not-duration")
+	`, "dialect", BuildDialect(HostOptions{}, nil))
+
+	parsed := interp.GetGlobal("parsed").Table()
+	if got := parsed.RawGetString("text").Str(); got != "1h30m0.25s" {
+		t.Fatalf("duration text = %q", got)
+	}
+	if got := parsed.RawGetString("nanoseconds").Int(); got != 5_400_250_000_000 {
+		t.Fatalf("duration nanoseconds = %d", got)
+	}
+	if got := parsed.RawGetString("seconds").Number(); got != 5400.25 {
+		t.Fatalf("duration seconds = %v", got)
+	}
+	if got := parsed.RawGetString("milliseconds").Number(); got != 5_400_250 {
+		t.Fatalf("duration milliseconds = %v", got)
+	}
+	if got := interp.GetGlobal("encoded_seconds").Str(); got != "1m30.25s" {
+		t.Fatalf("encoded seconds = %q", got)
+	}
+	if got := interp.GetGlobal("encoded_millis").Str(); got != "250ms" {
+		t.Fatalf("encoded milliseconds = %q", got)
+	}
+	if got := interp.GetGlobal("encoded_roundtrip").Str(); got != "1h30m0.25s" {
+		t.Fatalf("encoded roundtrip = %q", got)
+	}
+	if !interp.GetGlobal("bad").IsNil() {
+		t.Fatalf("bad duration returned non-nil result")
+	}
+	if got := interp.GetGlobal("bad_err").Str(); !strings.Contains(got, "duration dialect:") {
+		t.Fatalf("bad duration error = %q", got)
+	}
+}
+
+func TestDialectTAPParseAndEncode(t *testing.T) {
+	interp := runWithLib(t, `
+		parsed := tap`+"`"+`TAP version 13
+1..2
+ok 1 - boot
+not ok 2 - deploy # TODO flaky
+# expected ready
+`+"`"+`
+		encoded := dialect.eval("tap", parsed, {mode: "encode"})
+		bad, bad_err := dialect.eval("tap", "not tap")
+	`, "dialect", BuildDialect(HostOptions{}, nil))
+
+	rows := interp.GetGlobal("parsed").Table()
+	if got := rows.RawGetInt(1).Table().RawGetString("version").Int(); got != 13 {
+		t.Fatalf("tap version = %d", got)
+	}
+	if got := rows.RawGetInt(2).Table().RawGetString("last").Int(); got != 2 {
+		t.Fatalf("tap plan last = %d", got)
+	}
+	second := rows.RawGetInt(4).Table()
+	if got := second.RawGetString("ok").Bool(); got {
+		t.Fatalf("tap second ok = true, want false")
+	}
+	if got := second.RawGetString("directive").Str(); got != "TODO" {
+		t.Fatalf("tap directive = %q", got)
+	}
+	if got := second.RawGetString("diagnostics").Table().RawGetInt(1).Str(); got != "expected ready" {
+		t.Fatalf("tap diagnostic = %q", got)
+	}
+	wantEncoded := "TAP version 13\n1..2\nok 1 - boot\nnot ok 2 - deploy # TODO flaky\n# expected ready\n"
+	if got := interp.GetGlobal("encoded").Str(); got != wantEncoded {
+		t.Fatalf("encoded tap = %q, want %q", got, wantEncoded)
+	}
+	if !interp.GetGlobal("bad").IsNil() {
+		t.Fatalf("bad tap returned non-nil result")
+	}
+	if got := interp.GetGlobal("bad_err").Str(); !strings.Contains(got, "tap dialect: line 1: unrecognized TAP line") {
+		t.Fatalf("bad tap error = %q", got)
 	}
 }
 

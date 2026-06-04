@@ -45,6 +45,14 @@ func registerDialectText(register dialectRegisterFunc, maxHostResult func() int6
 			return dialectTSV(body.Str(), options)
 		},
 	})
+	register([]string{"mdtable"}, dialectHandler{
+		eval: func(body Value, options *Table) ([]Value, error) {
+			return dialectMarkdownTable(body, options, maxHostResult)
+		},
+		block: func(body Value, options *Table) ([]Value, error) {
+			return dialectMarkdownTable(body, options, maxHostResult)
+		},
+	})
 	register([]string{"lines", "split"}, dialectHandler{
 		eval: func(body Value, options *Table) ([]Value, error) {
 			return dialectLines(body.Str(), options)
@@ -74,6 +82,18 @@ func registerDialectText(register dialectRegisterFunc, maxHostResult func() int6
 		eval:  dialectINI,
 		block: dialectINI,
 	})
+	register([]string{"semver"}, dialectHandler{
+		eval:  dialectSemVer,
+		block: dialectSemVer,
+	})
+	register([]string{"duration"}, dialectHandler{
+		eval:  dialectDuration,
+		block: dialectDuration,
+	})
+	register([]string{"tap"}, dialectHandler{
+		eval:  dialectTAP,
+		block: dialectTAP,
+	})
 	register([]string{"template"}, dialectHandler{
 		eval: func(body Value, options *Table) ([]Value, error) {
 			return dialectTemplate(body, options, maxHostResult)
@@ -82,6 +102,93 @@ func registerDialectText(register dialectRegisterFunc, maxHostResult func() int6
 			return dialectTemplate(body, options, maxHostResult)
 		},
 	})
+}
+
+func dialectDuration(body Value, opts *Table) ([]Value, error) {
+	mode := ""
+	if opts != nil && opts.RawGetString("mode").IsString() {
+		mode = opts.RawGetString("mode").Str()
+	}
+	if mode == "encode" || !body.IsString() {
+		encoded, err := encodeDialectDuration(body)
+		if err != nil {
+			return nil, err
+		}
+		return []Value{StringValue(encoded)}, nil
+	}
+	parts, err := dialectlib.ParseDuration(body.Str())
+	if err != nil {
+		return []Value{NilValue(), StringValue(err.Error())}, nil
+	}
+	return []Value{TableValue(durationPartsTable(parts))}, nil
+}
+
+func durationPartsTable(parts dialectlib.DurationParts) *Table {
+	out := NewTable()
+	out.RawSetString("text", StringValue(parts.Text))
+	out.RawSetString("seconds", FloatValue(parts.Seconds))
+	out.RawSetString("milliseconds", FloatValue(parts.Milliseconds))
+	out.RawSetString("nanoseconds", IntValue(parts.Nanoseconds))
+	return out
+}
+
+func encodeDialectDuration(body Value) (string, error) {
+	switch {
+	case body.IsInt():
+		return dialectlib.EncodeDurationSeconds(float64(body.Int()))
+	case body.IsFloat():
+		return dialectlib.EncodeDurationSeconds(body.Float())
+	case body.IsTable():
+		return encodeDialectDurationTable(body.Table())
+	default:
+		return "", fmt.Errorf("duration dialect: encode expects number seconds or table")
+	}
+}
+
+func encodeDialectDurationTable(tbl *Table) (string, error) {
+	if text := tbl.RawGetString("text"); text.IsString() {
+		parts, err := dialectlib.ParseDuration(text.Str())
+		if err != nil {
+			return "", err
+		}
+		return parts.Text, nil
+	}
+	if duration := tbl.RawGetString("duration"); duration.IsString() {
+		parts, err := dialectlib.ParseDuration(duration.Str())
+		if err != nil {
+			return "", err
+		}
+		return parts.Text, nil
+	}
+	if ns := firstDurationField(tbl, "nanoseconds", "ns"); !ns.IsNil() {
+		if !ns.IsNumber() {
+			return "", fmt.Errorf("duration dialect: nanoseconds must be numeric")
+		}
+		return dialectlib.EncodeDurationNanoseconds(int64(math.Round(ns.Number()))), nil
+	}
+	if ms := firstDurationField(tbl, "milliseconds", "ms"); !ms.IsNil() {
+		if !ms.IsNumber() {
+			return "", fmt.Errorf("duration dialect: milliseconds must be numeric")
+		}
+		return dialectlib.EncodeDurationMilliseconds(ms.Number())
+	}
+	if seconds := firstDurationField(tbl, "seconds", "s"); !seconds.IsNil() {
+		if !seconds.IsNumber() {
+			return "", fmt.Errorf("duration dialect: seconds must be numeric")
+		}
+		return dialectlib.EncodeDurationSeconds(seconds.Number())
+	}
+	return "", fmt.Errorf("duration dialect: table encode expects text, nanoseconds, milliseconds, or seconds")
+}
+
+func firstDurationField(tbl *Table, names ...string) Value {
+	for _, name := range names {
+		value := tbl.RawGetString(name)
+		if !value.IsNil() {
+			return value
+		}
+	}
+	return NilValue()
 }
 
 func dialectRegexp(pattern string, failFast bool) ([]Value, error) {
@@ -295,6 +402,123 @@ func csvHeaderRowsToValue(rows []map[string]string) Value {
 	return TableValue(result)
 }
 
+func dialectMarkdownTable(body Value, opts *Table, maxHostResult func() int64) ([]Value, error) {
+	mode := ""
+	if opts != nil && opts.RawGetString("mode").IsString() {
+		mode = opts.RawGetString("mode").Str()
+	}
+	if body.IsString() && mode != "encode" {
+		table, err := dialectlib.ParseMarkdownTable(body.Str())
+		if err != nil {
+			return []Value{NilValue(), StringValue(err.Error())}, nil
+		}
+		return []Value{markdownTableRowsToValue(table)}, nil
+	}
+	table, err := markdownTableFromValue(body, opts)
+	if err != nil {
+		return nil, fmt.Errorf("mdtable dialect: %v", err)
+	}
+	text, err := dialectlib.EncodeMarkdownTable(table)
+	if err != nil {
+		return nil, err
+	}
+	if err := CheckProjectedHostStringBytes(hostResultLimit(maxHostResult), len(text)); err != nil {
+		return nil, err
+	}
+	return []Value{StringValue(text)}, nil
+}
+
+func markdownTableRowsToValue(table dialectlib.MarkdownTable) Value {
+	result := NewAppendArrayTable(len(table.Rows))
+	headers := NewAppendArrayTable(len(table.Headers))
+	for i, header := range table.Headers {
+		headers.RawSetInt(int64(i+1), StringValue(header))
+	}
+	result.RawSetString("_headers", TableValue(headers))
+	for i, record := range table.Rows {
+		row := NewTableSized(0, len(record))
+		for _, header := range table.Headers {
+			row.RawSetString(header, StringValue(record[header]))
+		}
+		result.RawSetInt(int64(i+1), TableValue(row))
+	}
+	return TableValue(result)
+}
+
+func markdownTableFromValue(v Value, opts *Table) (dialectlib.MarkdownTable, error) {
+	if !v.IsTable() {
+		return dialectlib.MarkdownTable{}, fmt.Errorf("table expected")
+	}
+	rows := v.Table()
+	headers := markdownTableHeadersFromOptions(opts)
+	if len(headers) == 0 {
+		headers = markdownTableHeadersFromValue(rows.RawGetString("_headers"))
+	}
+	if len(headers) == 0 && rows.Length() > 0 {
+		first := rows.RawGetInt(1)
+		if first.IsTable() {
+			headers = markdownTableSortedRowHeaders(first.Table())
+		}
+	}
+	if len(headers) == 0 {
+		return dialectlib.MarkdownTable{}, fmt.Errorf("headers are required")
+	}
+	out := dialectlib.MarkdownTable{
+		Headers: headers,
+		Rows:    make([]map[string]string, 0, rows.Length()),
+	}
+	for i := 1; i <= rows.Length(); i++ {
+		rowVal := rows.RawGetInt(int64(i))
+		if !rowVal.IsTable() {
+			return dialectlib.MarkdownTable{}, fmt.Errorf("row %d is not a table", i)
+		}
+		rowTbl := rowVal.Table()
+		row := make(map[string]string, len(headers))
+		for _, header := range headers {
+			cell := rowTbl.RawGetString(header)
+			if cell.IsNil() {
+				row[header] = ""
+			} else {
+				row[header] = cell.String()
+			}
+		}
+		out.Rows = append(out.Rows, row)
+	}
+	return out, nil
+}
+
+func markdownTableHeadersFromOptions(opts *Table) []string {
+	if opts == nil {
+		return nil
+	}
+	return markdownTableHeadersFromValue(opts.RawGetString("headers"))
+}
+
+func markdownTableHeadersFromValue(v Value) []string {
+	if !v.IsTable() {
+		return nil
+	}
+	tbl := v.Table()
+	headers := make([]string, 0, tbl.Length())
+	for i := 1; i <= tbl.Length(); i++ {
+		header := tbl.RawGetInt(int64(i))
+		if header.IsString() && header.Str() != "" {
+			headers = append(headers, header.Str())
+		}
+	}
+	return headers
+}
+
+func markdownTableSortedRowHeaders(row *Table) []string {
+	keys := make(map[string]struct{})
+	for key, _, ok := row.Next(NilValue()); ok; key, _, ok = row.Next(key) {
+		if key.IsString() && key.Str() != "_headers" {
+			keys[key.Str()] = struct{}{}
+		}
+	}
+	return sortedStringKeys(keys)
+}
+
 func dialectLines(src string, opts *Table) ([]Value, error) {
 	keepEmpty := opts != nil && opts.RawGetString("keep_empty").Truthy()
 	keepTrailing := opts != nil && opts.RawGetString("keep_trailing").Truthy()
@@ -498,6 +722,261 @@ func iniScalarString(v Value) string {
 		return ""
 	}
 	return v.String()
+}
+
+func dialectSemVer(body Value, opts *Table) ([]Value, error) {
+	mode := ""
+	if opts != nil && opts.RawGetString("mode").IsString() {
+		mode = opts.RawGetString("mode").Str()
+	}
+	if body.IsString() && mode != "encode" && mode != "format" {
+		parsed, err := dialectlib.ParseSemVer(body.Str())
+		if err != nil {
+			return []Value{NilValue(), StringValue(err.Error())}, nil
+		}
+		return []Value{semVerToValue(parsed)}, nil
+	}
+	parsed, err := semVerFromValue(body)
+	if err != nil {
+		return []Value{NilValue(), StringValue(err.Error())}, nil
+	}
+	text, err := dialectlib.FormatSemVer(parsed)
+	if err != nil {
+		return []Value{NilValue(), StringValue(err.Error())}, nil
+	}
+	return []Value{StringValue(text)}, nil
+}
+
+func semVerToValue(v dialectlib.SemVer) Value {
+	out := NewTableSized(0, 8)
+	out.RawSetString("major", IntValue(v.Major))
+	out.RawSetString("minor", IntValue(v.Minor))
+	out.RawSetString("patch", IntValue(v.Patch))
+	out.RawSetString("prerelease", stringArrayToValue(v.Prerelease))
+	out.RawSetString("build", stringArrayToValue(v.Build))
+	out.RawSetString("pre", StringValue(strings.Join(v.Prerelease, ".")))
+	out.RawSetString("build_metadata", StringValue(strings.Join(v.Build, ".")))
+	text, _ := dialectlib.FormatSemVer(v)
+	out.RawSetString("version", StringValue(text))
+	return TableValue(out)
+}
+
+func semVerFromValue(v Value) (dialectlib.SemVer, error) {
+	if v.IsString() {
+		return dialectlib.ParseSemVer(v.Str())
+	}
+	if !v.IsTable() {
+		return dialectlib.SemVer{}, fmt.Errorf("semver dialect: table expected")
+	}
+	tbl := v.Table()
+	major, err := semVerCoreField(tbl, "major")
+	if err != nil {
+		return dialectlib.SemVer{}, err
+	}
+	minor, err := semVerCoreField(tbl, "minor")
+	if err != nil {
+		return dialectlib.SemVer{}, err
+	}
+	patch, err := semVerCoreField(tbl, "patch")
+	if err != nil {
+		return dialectlib.SemVer{}, err
+	}
+	prerelease, err := semVerIdentifierField(tbl, "prerelease", "pre")
+	if err != nil {
+		return dialectlib.SemVer{}, err
+	}
+	build, err := semVerIdentifierField(tbl, "build", "build_metadata")
+	if err != nil {
+		return dialectlib.SemVer{}, err
+	}
+	return dialectlib.SemVer{Major: major, Minor: minor, Patch: patch, Prerelease: prerelease, Build: build}, nil
+}
+
+func semVerCoreField(tbl *Table, key string) (int64, error) {
+	v := tbl.RawGetString(key)
+	switch {
+	case v.IsInt():
+		if v.Int() < 0 {
+			return 0, fmt.Errorf("semver dialect: %s must be non-negative", key)
+		}
+		return v.Int(), nil
+	case v.IsFloat():
+		f := v.Float()
+		if math.Trunc(f) != f || f < 0 || math.IsInf(f, 0) || math.IsNaN(f) {
+			return 0, fmt.Errorf("semver dialect: %s must be a non-negative integer", key)
+		}
+		return int64(f), nil
+	default:
+		return 0, fmt.Errorf("semver dialect: %s integer field required", key)
+	}
+}
+
+func semVerIdentifierField(tbl *Table, primary, alias string) ([]string, error) {
+	v := tbl.RawGetString(primary)
+	if v.IsNil() && alias != "" {
+		v = tbl.RawGetString(alias)
+	}
+	if v.IsNil() {
+		return nil, nil
+	}
+	if v.IsString() {
+		if v.Str() == "" {
+			return nil, nil
+		}
+		return strings.Split(v.Str(), "."), nil
+	}
+	if !v.IsTable() {
+		return nil, fmt.Errorf("semver dialect: %s must be a string or string array", primary)
+	}
+	ids := make([]string, 0, v.Table().Length())
+	for i := 1; i <= v.Table().Length(); i++ {
+		item := v.Table().RawGetInt(int64(i))
+		if !item.IsString() {
+			return nil, fmt.Errorf("semver dialect: %s[%d] must be a string", primary, i)
+		}
+		ids = append(ids, item.Str())
+	}
+	return ids, nil
+}
+
+func stringArrayToValue(values []string) Value {
+	out := NewAppendArrayTable(len(values))
+	for i, value := range values {
+		out.RawSetInt(int64(i+1), StringValue(value))
+	}
+	return TableValue(out)
+}
+
+func dialectTAP(body Value, opts *Table) ([]Value, error) {
+	mode := ""
+	if opts != nil && opts.RawGetString("mode").IsString() {
+		mode = opts.RawGetString("mode").Str()
+	}
+	if body.IsString() && mode != "encode" {
+		doc, err := dialectlib.ParseTAP(body.Str())
+		if err != nil {
+			return []Value{NilValue(), StringValue(err.Error())}, nil
+		}
+		return []Value{tapDocumentToValue(doc)}, nil
+	}
+	doc, err := tapDocumentFromValue(body)
+	if err != nil {
+		return nil, fmt.Errorf("tap dialect: %v", err)
+	}
+	text, err := dialectlib.EncodeTAP(doc)
+	if err != nil {
+		return nil, err
+	}
+	return []Value{StringValue(text)}, nil
+}
+
+func tapDocumentToValue(doc dialectlib.TAPDocument) Value {
+	out := NewAppendArrayTable(len(doc.Rows))
+	for i, row := range doc.Rows {
+		item := NewTable()
+		item.RawSetString("kind", StringValue(row.Kind))
+		if row.Line > 0 {
+			item.RawSetString("line", IntValue(int64(row.Line)))
+		}
+		switch row.Kind {
+		case "version":
+			item.RawSetString("version", IntValue(int64(row.Version)))
+		case "plan":
+			item.RawSetString("first", IntValue(int64(row.First)))
+			item.RawSetString("last", IntValue(int64(row.Last)))
+			setOptionalTAPDirective(item, row.Directive, row.Reason)
+		case "test":
+			item.RawSetString("ok", BoolValue(row.OK))
+			if row.Number > 0 {
+				item.RawSetString("number", IntValue(int64(row.Number)))
+			}
+			item.RawSetString("name", StringValue(row.Name))
+			setOptionalTAPDirective(item, row.Directive, row.Reason)
+			diagnostics := NewAppendArrayTable(len(row.Diagnostics))
+			for j, diagnostic := range row.Diagnostics {
+				diagnostics.RawSetInt(int64(j+1), StringValue(diagnostic))
+			}
+			item.RawSetString("diagnostics", TableValue(diagnostics))
+		case "diagnostic":
+			item.RawSetString("text", StringValue(row.Text))
+		}
+		out.RawSetInt(int64(i+1), TableValue(item))
+	}
+	return TableValue(out)
+}
+
+func setOptionalTAPDirective(item *Table, directive, reason string) {
+	if directive != "" {
+		item.RawSetString("directive", StringValue(directive))
+	}
+	if reason != "" {
+		item.RawSetString("reason", StringValue(reason))
+	}
+}
+
+func tapDocumentFromValue(v Value) (dialectlib.TAPDocument, error) {
+	if !v.IsTable() {
+		return dialectlib.TAPDocument{}, fmt.Errorf("table expected")
+	}
+	tbl := v.Table()
+	doc := dialectlib.TAPDocument{Rows: make([]dialectlib.TAPRow, 0, tbl.Length())}
+	for i := 1; i <= tbl.Length(); i++ {
+		item := tbl.RawGetInt(int64(i))
+		if !item.IsTable() {
+			return dialectlib.TAPDocument{}, fmt.Errorf("row %d: table expected", i)
+		}
+		row, err := tapRowFromTable(i, item.Table())
+		if err != nil {
+			return dialectlib.TAPDocument{}, err
+		}
+		doc.Rows = append(doc.Rows, row)
+	}
+	return doc, nil
+}
+
+func tapRowFromTable(index int, tbl *Table) (dialectlib.TAPRow, error) {
+	kind := tbl.RawGetString("kind")
+	if !kind.IsString() || kind.Str() == "" {
+		return dialectlib.TAPRow{}, fmt.Errorf("row %d: string kind expected", index)
+	}
+	row := dialectlib.TAPRow{
+		Kind:      kind.Str(),
+		Line:      tapOptionalInt(tbl.RawGetString("line")),
+		Version:   tapOptionalInt(tbl.RawGetString("version")),
+		OK:        tbl.RawGetString("ok").Truthy(),
+		Number:    tapOptionalInt(tbl.RawGetString("number")),
+		Name:      tapOptionalString(tbl.RawGetString("name")),
+		Directive: tapOptionalString(tbl.RawGetString("directive")),
+		Reason:    tapOptionalString(tbl.RawGetString("reason")),
+		First:     tapOptionalInt(tbl.RawGetString("first")),
+		Last:      tapOptionalInt(tbl.RawGetString("last")),
+		Text:      tapOptionalString(tbl.RawGetString("text")),
+	}
+	if diagnostics := tbl.RawGetString("diagnostics"); diagnostics.IsTable() {
+		row.Diagnostics = make([]string, 0, diagnostics.Table().Length())
+		for i := 1; i <= diagnostics.Table().Length(); i++ {
+			row.Diagnostics = append(row.Diagnostics, diagnostics.Table().RawGetInt(int64(i)).String())
+		}
+	}
+	return row, nil
+}
+
+func tapOptionalString(v Value) string {
+	if v.IsNil() {
+		return ""
+	}
+	return v.String()
+}
+
+func tapOptionalInt(v Value) int {
+	switch {
+	case v.IsInt():
+		return int(v.Int())
+	case v.IsFloat():
+		return int(v.Float())
+	default:
+		return 0
+	}
 }
 
 func sortedStringKeys[V any](m map[string]V) []string {

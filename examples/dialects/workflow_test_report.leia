@@ -1,5 +1,5 @@
 // workflow_test_report.leia - Replay workflow events into a test-style report.
-// Demonstrates: JSONL fixtures, table assertions, template rendering, hash, and JSON output.
+// Demonstrates: JSONL fixtures, TAP report parsing/encoding, table assertions, template rendering, hash, and JSON output.
 
 print("=== Dialects: workflow test report ===")
 
@@ -30,6 +30,10 @@ func final_status(run_id) {
     return {status: status, elapsed: elapsed, steps: steps}
 }
 
+func elapsed_duration(ms) {
+    return dialect.eval("duration", {milliseconds: ms}, {mode: "encode"})
+}
+
 results := {}
 passed := 0
 for i := 1; i <= #tests; i++ {
@@ -45,6 +49,7 @@ for i := 1; i <= #tests; i++ {
         got: actual.status,
         steps: actual.steps,
         elapsed_ms: actual.elapsed,
+        elapsed_duration: elapsed_duration(actual.elapsed),
         ok: ok,
     }
 }
@@ -55,6 +60,23 @@ report := {
     failed: #tests - passed,
     results: results,
 }
+tap_report := {
+    {kind: "version", version: 13},
+    {kind: "plan", first: 1, last: #results},
+}
+for i := 1; i <= #results; i++ {
+    tap_report[#tap_report + 1] = {
+        kind: "test",
+        ok: results[i].ok,
+        number: i,
+        name: results[i].name,
+        diagnostics: {
+            string.format("%s got=%s want=%s elapsed=%s", results[i].run, results[i].got, results[i].want, results[i].elapsed_duration),
+        },
+    }
+}
+tap_text := dialect.eval("tap", tap_report, {mode: "encode"})
+tap_rows := dialect.eval("tap", tap_text)
 report_json := dialect.eval("json", report, {mode: "encode"})
 fingerprint := dialect.eval("hash", report_json)
 summary := template {
@@ -63,10 +85,13 @@ summary := template {
 }
 
 print(summary)
+print(tap_text)
 for i := 1; i <= #results; i++ {
-    print(string.format("%s\t%s\t%s\t%dms", results[i].run, results[i].got, tostring(results[i].ok), results[i].elapsed_ms))
+    print(string.format("%s\t%s\t%s\t%s", results[i].run, results[i].got, tostring(results[i].ok), results[i].elapsed_duration))
 }
 print(report_json)
+
+slow_threshold := duration`35ms`
 
 assert(#events == 5)
 assert(#tests == 2)
@@ -74,14 +99,21 @@ assert(results[1].ok == true)
 assert(results[1].got == "ok")
 assert(results[1].steps == 3)
 assert(results[1].elapsed_ms == 43)
+assert(results[1].elapsed_duration == "43ms")
 assert(results[2].ok == true)
 assert(results[2].got == "fail")
 assert(results[2].steps == 2)
 assert(results[2].elapsed_ms == 38)
+assert(results[2].elapsed_duration == "38ms")
+assert(slow_threshold.milliseconds == 35)
 assert(report.total == 2)
 assert(report.passed == 2)
 assert(report.failed == 0)
-assert(fingerprint == "84033a89462951dcea3b82fba44af568f4d561724e1ddaac9bc0e7992ca0953a")
-assert(summary == "workflow tests: 2/2 passed, fingerprint=84033a894629")
+assert(tap_rows[2].last == 2)
+assert(tap_rows[3].ok == true)
+assert(tap_rows[4].diagnostics[1] == "wf-2 got=fail want=fail elapsed=38ms")
+assert(tap_text == "TAP version 13\n1..2\nok 1 - happy path\n# wf-1 got=ok want=ok elapsed=43ms\nok 2 - failure path\n# wf-2 got=fail want=fail elapsed=38ms\n")
+assert(string.sub(fingerprint, 1, 12) == "92929e62ccf6")
+assert(summary == "workflow tests: 2/2 passed, fingerprint=92929e62ccf6")
 
 print("workflow test report ok")

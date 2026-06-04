@@ -22,6 +22,7 @@ set-cookie: a=1
 set-cookie: b=2
 `
     cookieRows := cookie`session=abc123; tag=a; tag=b`
+    timeout := duration`250ms`
     for i := 1; i <= n; i++ {
         trace := string.format("trace-%04d", i % 997)
         headerToEncode := {}
@@ -29,6 +30,7 @@ set-cookie: b=2
         headerEncoded := dialect.eval("http_headers", headerToEncode, {mode: "encode"})
 
         cookieEncoded := dialect.eval("cookies", {session: trace, tag: {"a", "b"}}, {mode: "encode"})
+        durationEncoded := dialect.eval("duration", {milliseconds: timeout.milliseconds + i % 17}, {mode: "encode"})
 
         checksum = checksum_text(checksum, headerRows["Content-Type"])
         checksum = checksum_text(checksum, headerRows["Set-Cookie"][2])
@@ -36,6 +38,7 @@ set-cookie: b=2
         checksum = checksum_text(checksum, cookieRows.session)
         checksum = checksum_text(checksum, cookieRows.tag[2])
         checksum = checksum_text(checksum, cookieEncoded)
+        checksum = checksum_text(checksum, durationEncoded)
         checksum = mix(checksum, #trace + i % 13)
     }
     return checksum

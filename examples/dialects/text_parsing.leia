@@ -1,5 +1,5 @@
 // text_parsing.leia - Built-in dialects for small text and data transforms.
-// Demonstrates: csv, lines/split, words, nums, env, kv, template, json/jsonl, regexp
+// Demonstrates: csv, mdtable, lines/split, words, nums, env, kv, template, json/jsonl, regexp
 
 print("=== Dialects: text parsing ===")
 
@@ -17,6 +17,19 @@ Bob	7
 print("tsv first:", tsv_rows[2][1], tsv_rows[2][2])
 assert(tsv_rows[2][1] == "Ada")
 assert(tsv_rows[3][2] == "7")
+
+markdown_rows := mdtable`| Name | Score | Note |
+| --- | ---: | --- |
+| Ada | 42 | uses \| safely |
+| Bob | 7 |
+`
+markdown_text := dialect.eval("mdtable", markdown_rows, {mode: "encode"})
+print("mdtable first:", markdown_rows[1].Name, markdown_rows[1].Score)
+print("mdtable encoded bytes:", #markdown_text)
+assert(#markdown_rows == 2)
+assert(markdown_rows[1].Note == "uses | safely")
+assert(markdown_rows[2].Note == "")
+assert(markdown_text == "| Name | Score | Note |\n| --- | --- | --- |\n| Ada | 42 | uses \\| safely |\n| Bob | 7 |  |\n")
 
 line_rows := lines`alpha
 

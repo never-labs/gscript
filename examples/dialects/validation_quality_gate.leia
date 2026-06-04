@@ -1,6 +1,6 @@
 // validation_quality_gate.leia - Collect parser failures into a stable quality report.
 // Demonstrates: non-throwing dialect.eval errors, url, mime, headers,
-// cookie, urlquery, json/jsonl encoding, regexp checks, template, and hash.
+// cookie, urlquery, semver, json/jsonl encoding, regexp checks, template, and hash.
 
 print("=== Dialects: validation quality gate ===")
 
@@ -16,6 +16,8 @@ cases := jsonl`{"name":"callback-url","parser":"url","input":"https://app.exampl
 {"name":"bad-query-component","parser":"urlquery","input":"%zz"}
 {"name":"payload-json","parser":"json","input":"{\"id\":\"evt-1\",\"ok\":true}"}
 {"name":"bad-json","parser":"json","input":"{\"id\":"}
+{"name":"release-version","parser":"semver","input":"2.4.0-rc.1+ci.42"}
+{"name":"bad-version","parser":"semver","input":"2.04.0"}
 `
 
 slug := regexp!`^[a-z][a-z0-9-]*$`
@@ -85,6 +87,13 @@ for i := 1; i <= #cases; i++ {
         assert(value.id == "evt-1")
         assert(value.ok == true)
     }
+    if row.name == "release-version" {
+        assert(value.major == 2)
+        assert(value.minor == 4)
+        assert(value.patch == 0)
+        assert(value.pre == "rc.1")
+        assert(value.build_metadata == "ci.42")
+    }
 }
 
 report := {
@@ -104,20 +113,22 @@ report_lines := dialect.eval("jsonl", results, {mode: "encode"})
 print(summary)
 print(report_lines)
 
-assert(#cases == 12)
-assert(passed == 6)
-assert(failed == 6)
+assert(#cases == 14)
+assert(passed == 7)
+assert(failed == 7)
 assert(results[2].ok == false)
 assert(results[4].ok == false)
 assert(results[6].ok == false)
 assert(results[8].ok == false)
 assert(results[10].ok == false)
 assert(results[12].ok == false)
+assert(results[14].ok == false)
 assert(results[2].error != "")
 assert(results[12].error != "")
-assert(report.total == 12)
-assert(report.failed == 6)
-assert(summary == "quality gate: 6/12 valid, 6 rejected, fingerprint=" .. fingerprint)
-assert(report_lines == "{\"error\":\"\",\"name\":\"callback-url\",\"ok\":true,\"parser\":\"url\"}\n{\"error\":\"parse \\\"http://[::1\\\": missing ']'\",\"name\":\"broken-url\",\"ok\":false,\"parser\":\"url\"}\n{\"error\":\"\",\"name\":\"content-type\",\"ok\":true,\"parser\":\"mime\"}\n{\"error\":\"mime: invalid media parameter\",\"name\":\"bad-mime\",\"ok\":false,\"parser\":\"mime\"}\n{\"error\":\"\",\"name\":\"request-headers\",\"ok\":true,\"parser\":\"headers\"}\n{\"error\":\"malformed MIME header: missing\",\"name\":\"bad-headers\",\"ok\":false,\"parser\":\"headers\"}\n{\"error\":\"\",\"name\":\"session-cookie\",\"ok\":true,\"parser\":\"cookie\"}\n{\"error\":\"cookie dialect: invalid cookie\",\"name\":\"bad-cookie\",\"ok\":false,\"parser\":\"cookie\"}\n{\"error\":\"\",\"name\":\"query-component\",\"ok\":true,\"parser\":\"urlquery\"}\n{\"error\":\"invalid URL escape \\\"%zz\\\"\",\"name\":\"bad-query-component\",\"ok\":false,\"parser\":\"urlquery\"}\n{\"error\":\"\",\"name\":\"payload-json\",\"ok\":true,\"parser\":\"json\"}\n{\"error\":\"unexpected EOF\",\"name\":\"bad-json\",\"ok\":false,\"parser\":\"json\"}\n")
+assert(results[14].error != "")
+assert(report.total == 14)
+assert(report.failed == 7)
+assert(summary == "quality gate: 7/14 valid, 7 rejected, fingerprint=" .. fingerprint)
+assert(report_lines == "{\"error\":\"\",\"name\":\"callback-url\",\"ok\":true,\"parser\":\"url\"}\n{\"error\":\"parse \\\"http://[::1\\\": missing ']'\",\"name\":\"broken-url\",\"ok\":false,\"parser\":\"url\"}\n{\"error\":\"\",\"name\":\"content-type\",\"ok\":true,\"parser\":\"mime\"}\n{\"error\":\"mime: invalid media parameter\",\"name\":\"bad-mime\",\"ok\":false,\"parser\":\"mime\"}\n{\"error\":\"\",\"name\":\"request-headers\",\"ok\":true,\"parser\":\"headers\"}\n{\"error\":\"malformed MIME header: missing\",\"name\":\"bad-headers\",\"ok\":false,\"parser\":\"headers\"}\n{\"error\":\"\",\"name\":\"session-cookie\",\"ok\":true,\"parser\":\"cookie\"}\n{\"error\":\"cookie dialect: invalid cookie\",\"name\":\"bad-cookie\",\"ok\":false,\"parser\":\"cookie\"}\n{\"error\":\"\",\"name\":\"query-component\",\"ok\":true,\"parser\":\"urlquery\"}\n{\"error\":\"invalid URL escape \\\"%zz\\\"\",\"name\":\"bad-query-component\",\"ok\":false,\"parser\":\"urlquery\"}\n{\"error\":\"\",\"name\":\"payload-json\",\"ok\":true,\"parser\":\"json\"}\n{\"error\":\"unexpected EOF\",\"name\":\"bad-json\",\"ok\":false,\"parser\":\"json\"}\n{\"error\":\"\",\"name\":\"release-version\",\"ok\":true,\"parser\":\"semver\"}\n{\"error\":\"semver dialect: minor number\",\"name\":\"bad-version\",\"ok\":false,\"parser\":\"semver\"}\n")
 
 print("validation quality gate ok")

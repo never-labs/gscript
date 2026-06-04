@@ -863,16 +863,30 @@ print("fast ids", json.encode(soa.select(particles, fast, "id", 0)))`,
 			ID:      "dialects",
 			Title:   "Built-In Dialects",
 			Section: "Shell And Data",
-			Summary: "Tagged strings and blocks let scripts use shell, JSON, regexp, and prompt-shaped data without leaving Leia.",
+			Summary: "Tagged strings and blocks let scripts use JSON, regexp, HTTP, template, and prompt-shaped data without leaving Leia.",
 			Concepts: []string{
 				"`json`...`` decodes JSON text into ordinary Leia values.",
 				"`re`...`` builds a regular expression object.",
+				"`httpmsg { ... }` and `mime` help build protocol fixtures without network access.",
+				"`template { ... }` renders small deterministic text artifacts.",
 				"`prompt { ... }` creates structured prompt data.",
 				"Dialect tags are explicit, so they stay inspectable by tooling.",
 			},
 			Source: `name := "Leia"
 doc := json` + "`{\"project\":\"leia\",\"kind\":\"dialect\"}`" + `
 rx := re` + "`^Lei`" + `
+media := dialect.eval("mime", "application/json; charset=utf-8")
+headers := {}
+headers["content-type"] = media.type
+request := httpmsg {
+    method: "GET",
+    target: "/health",
+    headers: headers,
+}
+summary := template {
+    text: "{{.project}} serves {{.media}}",
+    data: {project: doc.project, media: media.type},
+}
 task := prompt {
     system: "Be brief."
     user: "Explain " .. doc.kind
@@ -880,6 +894,8 @@ task := prompt {
 
 print(doc.project, doc.kind)
 print(rx.match(name))
+print(summary)
+print(request)
 print(task.body.user)`,
 			Runnable: true,
 		},
