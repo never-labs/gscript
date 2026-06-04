@@ -175,7 +175,7 @@ func TestBuiltinDialectRegistryStaysModular(t *testing.T) {
 	expectedTagsByFile := map[string][]string{
 		"dialect_shell_fs.go": {"sh", "cmd", "shellwords", "glob", "path"},
 		"dialect_text.go":     {"re", "regexp", "json", "jsonptr", "jsonl", "csv", "tsv", "mdtable", "lines", "split", "words", "nums", "numbers", "kv", "logfmt", "env", "ini", "semver", "duration", "tap", "junit", "xml", "template"},
-		"dialect_web.go":      {"url", "html_escape", "urlquery", "urlpath", "mime", "headers", "http_headers", "cookie", "cookies", "httpmsg", "sse"},
+		"dialect_web.go":      {"url", "html_escape", "urlquery", "urlpath", "mime", "headers", "http_headers", "cookie", "cookies", "httpmsg", "sse", "multipart"},
 		"dialect_network.go":  {"ipaddr", "cidr", "hostport"},
 		"dialect_data.go":     {"base64", "hash", "hex", "base32", "uuid", "gzip", "zlib", "deflate", "binary"},
 		"dialect_ai.go":       {"prompt", "quote"},

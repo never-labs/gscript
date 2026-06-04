@@ -187,6 +187,52 @@ retry: 2500
 	}
 }
 
+func TestDialectMultipartParseAndEncode(t *testing.T) {
+	interp := runWithLib(t, `
+		body := "--fixture\r\nContent-Disposition: form-data; name=\"meta\"\r\nContent-Type: application/json\r\n\r\n{\"ok\":true}\r\n--fixture\r\nContent-Disposition: form-data; name=\"file\"; filename=\"a.txt\"\r\nContent-Type: text/plain\r\n\r\nhello\r\n--fixture--\r\n"
+		parts := dialect.eval("multipart", body, {boundary: "fixture"})
+		parts_by_content_type := dialect.eval("multipart", body, {content_type: "multipart/form-data; boundary=fixture"})
+		encoded := dialect.eval("multipart", {
+			{name: "meta", content_type: "application/json", body: "{\"ok\":true}"},
+			{name: "file", filename: "a.txt", content_type: "text/plain", body: "hello"},
+		}, {mode: "encode", boundary: "fixture"})
+		roundtrip := dialect.eval("multipart", encoded, {boundary: "fixture"})
+		missing_boundary, missing_boundary_err := dialect.eval("multipart", body)
+	`, "dialect", BuildDialect(HostOptions{}, nil))
+
+	parts := interp.GetGlobal("parts").Table()
+	if got := parts.Length(); got != 2 {
+		t.Fatalf("parts length = %d, want 2", got)
+	}
+	first := parts.RawGetInt(1).Table()
+	if got := first.RawGetString("name").Str(); got != "meta" {
+		t.Fatalf("first name = %q, want meta", got)
+	}
+	if got := first.RawGetString("content_type").Str(); got != "application/json" {
+		t.Fatalf("first content_type = %q, want application/json", got)
+	}
+	if got := first.RawGetString("body").Str(); got != `{"ok":true}` {
+		t.Fatalf("first body = %q, want json", got)
+	}
+	second := parts.RawGetInt(2).Table()
+	if got := second.RawGetString("filename").Str(); got != "a.txt" {
+		t.Fatalf("second filename = %q, want a.txt", got)
+	}
+	if got := second.RawGetString("headers").Table().RawGetString("Content-Type").Str(); got != "text/plain" {
+		t.Fatalf("second Content-Type header = %q, want text/plain", got)
+	}
+	if got := interp.GetGlobal("parts_by_content_type").Table().RawGetInt(1).Table().RawGetString("name").Str(); got != "meta" {
+		t.Fatalf("content_type boundary parse first name = %q, want meta", got)
+	}
+	roundtrip := interp.GetGlobal("roundtrip").Table()
+	if got := roundtrip.RawGetInt(2).Table().RawGetString("body").Str(); got != "hello" {
+		t.Fatalf("roundtrip body = %q, want hello", got)
+	}
+	if !interp.GetGlobal("missing_boundary").IsNil() || !interp.GetGlobal("missing_boundary_err").IsString() {
+		t.Fatalf("missing boundary = %v err %v, want nil error string", interp.GetGlobal("missing_boundary"), interp.GetGlobal("missing_boundary_err"))
+	}
+}
+
 func TestDialectMIMEBoundaryParseAndEncode(t *testing.T) {
 	interp := runWithLib(t, `
 		parsed := dialect.eval("mime", "Text/HTML; Charset=UTF-8; boundary=\"abc def\"")

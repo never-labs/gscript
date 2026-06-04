@@ -1,0 +1,25 @@
+print("=== Dialects: multipart form fixture ===")
+
+boundary := "fixture-boundary"
+parts := {
+    {name: "meta", content_type: "application/json", body: "{\"ok\":true,\"kind\":\"upload\"}"},
+    {name: "file", filename: "hello.txt", content_type: "text/plain", body: "hello leia"},
+}
+
+body := dialect.eval("multipart", parts, {mode: "encode", boundary: boundary})
+parsed := dialect.eval("multipart", body, {content_type: "multipart/form-data; boundary=" .. boundary})
+meta := json`{"ok":true,"kind":"upload"}`
+
+print("parts:", #parsed, parsed[1].name, parsed[2].filename)
+print("file:", parsed[2].body)
+
+assert(#parsed == 2)
+assert(parsed[1].name == "meta")
+assert(parsed[1].content_type == "application/json")
+assert(parsed[1].body == "{\"ok\":true,\"kind\":\"upload\"}")
+assert(parsed[2].name == "file")
+assert(parsed[2].filename == "hello.txt")
+assert(parsed[2].body == "hello leia")
+assert(meta.kind == "upload")
+
+print("multipart form fixture ok")

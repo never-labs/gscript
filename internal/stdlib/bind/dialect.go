@@ -24,7 +24,7 @@ func BuildDialect(opts HostOptions, maxHostResult func() int64, specs ...Dialect
 
 	registerDialectShellFS(register, opts, maxHostResult)
 	registerDialectText(register, maxHostResult)
-	registerDialectWeb(register)
+	registerDialectWeb(register, maxHostResult)
 	registerDialectNetwork(register)
 	registerDialectData(register, maxHostResult)
 	registerDialectAI(register)
@@ -248,9 +248,9 @@ func builtinDialectCategory(name string) string {
 	switch name {
 	case "sh", "cmd", "shellwords", "glob", "path":
 		return "shell"
-	case "json", "jsonl", "csv", "tsv", "mdtable", "lines", "split", "words", "nums", "numbers", "kv", "env", "ini", "semver", "duration", "tap", "junit", "xml", "template", "re", "regexp":
+	case "json", "jsonptr", "jsonl", "csv", "tsv", "mdtable", "lines", "split", "words", "nums", "numbers", "kv", "logfmt", "env", "ini", "semver", "duration", "tap", "junit", "xml", "template", "re", "regexp":
 		return "text"
-	case "url", "html_escape", "urlquery", "urlpath", "mime", "headers", "http_headers", "httpmsg", "cookie", "cookies":
+	case "url", "html_escape", "urlquery", "urlpath", "mime", "headers", "http_headers", "httpmsg", "cookie", "cookies", "sse", "multipart":
 		return "web"
 	case "ipaddr", "cidr", "hostport":
 		return "network"

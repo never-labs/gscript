@@ -13,7 +13,7 @@ import (
 	dialectlib "github.com/never-labs/leia/internal/support/dialect"
 )
 
-func registerDialectWeb(register dialectRegisterFunc) {
+func registerDialectWeb(register dialectRegisterFunc, maxHostResult func() int64) {
 	register([]string{"url"}, dialectHandler{
 		eval: func(body Value, _ *Table) ([]Value, error) {
 			return dialectURL(body.Str())
@@ -51,6 +51,14 @@ func registerDialectWeb(register dialectRegisterFunc) {
 	register([]string{"sse"}, dialectHandler{
 		eval:  dialectSSE,
 		block: dialectSSE,
+	})
+	register([]string{"multipart"}, dialectHandler{
+		eval: func(body Value, opts *Table) ([]Value, error) {
+			return dialectMultipart(body, opts, maxHostResult)
+		},
+		block: func(body Value, opts *Table) ([]Value, error) {
+			return dialectMultipart(body, opts, maxHostResult)
+		},
 	})
 }
 
@@ -559,6 +567,177 @@ func dialectSSE(body Value, opts *Table) ([]Value, error) {
 		return []Value{NilValue(), StringValue(err.Error())}, nil
 	}
 	return []Value{TableValue(sseEventsToValue(events))}, nil
+}
+
+func dialectMultipart(body Value, opts *Table, maxHostResult func() int64) ([]Value, error) {
+	mode := ""
+	if opts != nil && opts.RawGetString("mode").IsString() {
+		mode = opts.RawGetString("mode").Str()
+	}
+	boundary, err := multipartBoundaryFromOptions(opts)
+	if err != nil {
+		return []Value{NilValue(), StringValue(err.Error())}, nil
+	}
+	if body.IsTable() || mode == "encode" || mode == "format" {
+		parts, err := multipartPartsFromValue(body)
+		if err != nil {
+			return []Value{NilValue(), StringValue(err.Error())}, nil
+		}
+		text, err := dialectlib.EncodeMultipart(parts, boundary)
+		if err != nil {
+			return []Value{NilValue(), StringValue(err.Error())}, nil
+		}
+		if err := CheckProjectedHostStringBytes(hostResultLimit(maxHostResult), len(text)); err != nil {
+			return nil, err
+		}
+		return []Value{StringValue(text)}, nil
+	}
+	parts, err := dialectlib.ParseMultipart(body.String(), boundary)
+	if err != nil {
+		return []Value{NilValue(), StringValue(err.Error())}, nil
+	}
+	return []Value{TableValue(multipartPartsToValue(parts))}, nil
+}
+
+func multipartBoundaryFromOptions(opts *Table) (string, error) {
+	if opts == nil {
+		return "", fmt.Errorf("multipart dialect: boundary option required")
+	}
+	if v := opts.RawGetString("boundary"); v.IsString() && v.Str() != "" {
+		return v.Str(), nil
+	}
+	if v := opts.RawGetString("content_type"); v.IsString() && v.Str() != "" {
+		_, params, err := mime.ParseMediaType(v.Str())
+		if err != nil {
+			return "", fmt.Errorf("multipart dialect: invalid content_type: %w", err)
+		}
+		if boundary := params["boundary"]; boundary != "" {
+			return boundary, nil
+		}
+	}
+	if v := opts.RawGetString("contentType"); v.IsString() && v.Str() != "" {
+		_, params, err := mime.ParseMediaType(v.Str())
+		if err != nil {
+			return "", fmt.Errorf("multipart dialect: invalid contentType: %w", err)
+		}
+		if boundary := params["boundary"]; boundary != "" {
+			return boundary, nil
+		}
+	}
+	return "", fmt.Errorf("multipart dialect: boundary option required")
+}
+
+func multipartPartsToValue(parts []dialectlib.MultipartPart) *Table {
+	out := NewAppendArrayTable(len(parts))
+	for i, part := range parts {
+		row := NewTable()
+		row.RawSetString("name", StringValue(part.Name))
+		row.RawSetString("filename", StringValue(part.Filename))
+		row.RawSetString("content_type", StringValue(part.ContentType))
+		row.RawSetString("contentType", StringValue(part.ContentType))
+		row.RawSetString("body", StringValue(part.Body))
+		row.RawSetString("value", StringValue(part.Body))
+		row.RawSetString("headers", httpHeadersToTable(part.Headers))
+		out.RawSetInt(int64(i+1), TableValue(row))
+	}
+	return out
+}
+
+func multipartPartsFromValue(value Value) ([]dialectlib.MultipartPart, error) {
+	if !value.IsTable() {
+		return nil, fmt.Errorf("multipart dialect: table expected for encode")
+	}
+	tbl := value.Table()
+	if tbl.Length() == 0 && tableHasAnyKey(tbl) {
+		part, err := multipartPartFromTable(tbl)
+		if err != nil {
+			return nil, err
+		}
+		return []dialectlib.MultipartPart{part}, nil
+	}
+	parts := make([]dialectlib.MultipartPart, 0, tbl.Length())
+	for i := 1; i <= tbl.Length(); i++ {
+		item := tbl.RawGetInt(int64(i))
+		if !item.IsTable() {
+			return nil, fmt.Errorf("multipart dialect: part %d must be table", i)
+		}
+		part, err := multipartPartFromTable(item.Table())
+		if err != nil {
+			return nil, fmt.Errorf("multipart dialect: part %d: %v", i, err)
+		}
+		parts = append(parts, part)
+	}
+	return parts, nil
+}
+
+func multipartPartFromTable(tbl *Table) (dialectlib.MultipartPart, error) {
+	var part dialectlib.MultipartPart
+	if v := tbl.RawGetString("name"); v.IsString() {
+		part.Name = v.Str()
+	}
+	if v := tbl.RawGetString("filename"); v.IsString() {
+		part.Filename = v.Str()
+	}
+	if v := tbl.RawGetString("content_type"); v.IsString() {
+		part.ContentType = v.Str()
+	} else if v := tbl.RawGetString("contentType"); v.IsString() {
+		part.ContentType = v.Str()
+	}
+	if v := tbl.RawGetString("body"); !v.IsNil() {
+		part.Body = v.String()
+	} else if v := tbl.RawGetString("value"); !v.IsNil() {
+		part.Body = v.String()
+	}
+	if v := tbl.RawGetString("headers"); v.IsTable() {
+		headers, err := multipartHeadersFromTable(v.Table())
+		if err != nil {
+			return dialectlib.MultipartPart{}, err
+		}
+		part.Headers = headers
+	}
+	return part, nil
+}
+
+func multipartHeadersFromTable(tbl *Table) (map[string][]string, error) {
+	headers := make(map[string][]string)
+	var invalidKey string
+	var invalidValueKey string
+	tbl.ForEachPlainRaw(func(k, v Value) bool {
+		if !k.IsString() {
+			return true
+		}
+		key := k.Str()
+		if !dialectlib.IsHTTPHeaderFieldName(key) {
+			invalidKey = key
+			return false
+		}
+		if v.IsTable() {
+			arr := v.Table()
+			for i := 1; i <= arr.Length(); i++ {
+				val := arr.RawGetInt(int64(i)).String()
+				if strings.ContainsAny(val, "\r\n") {
+					invalidValueKey = key
+					return false
+				}
+				headers[key] = append(headers[key], val)
+			}
+			return true
+		}
+		val := v.String()
+		if strings.ContainsAny(val, "\r\n") {
+			invalidValueKey = key
+			return false
+		}
+		headers[key] = append(headers[key], val)
+		return true
+	})
+	if invalidKey != "" {
+		return nil, fmt.Errorf("multipart dialect: invalid header name %q", invalidKey)
+	}
+	if invalidValueKey != "" {
+		return nil, fmt.Errorf("multipart dialect: invalid header value for %q", invalidValueKey)
+	}
+	return headers, nil
 }
 
 func sseEventsToValue(events []dialectlib.SSEEvent) *Table {

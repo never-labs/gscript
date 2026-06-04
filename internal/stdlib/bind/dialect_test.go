@@ -16,7 +16,7 @@ func TestDialectTagsExposeInstalledHandlers(t *testing.T) {
 	want := []string{
 		"base32", "base64", "binary", "cidr", "cmd", "cookie", "cookies", "csv", "deflate", "duration", "env", "glob",
 		"gzip", "hash", "headers", "hex", "hostport", "html_escape", "http_headers", "httpmsg", "ini", "ipaddr", "json", "jsonl", "jsonptr",
-		"junit", "kv", "lines", "logfmt", "mdtable", "mime", "numbers", "nums", "path", "prompt",
+		"junit", "kv", "lines", "logfmt", "mdtable", "mime", "multipart", "numbers", "nums", "path", "prompt",
 		"quote", "re", "regexp", "semver", "sh", "shellwords", "split", "sse", "tap", "template", "tsv", "url",
 		"urlpath", "urlquery", "uuid", "words", "xml", "zlib",
 	}
@@ -58,6 +58,10 @@ func TestDialectInfoAndListExposeMetadata(t *testing.T) {
 		sh_info := dialect.info("sh")
 		glob_info := dialect.info("glob")
 		json_info := dialect.info("json")
+		jsonptr_info := dialect.info("jsonptr")
+		logfmt_info := dialect.info("logfmt")
+		sse_info := dialect.info("sse")
+		multipart_info := dialect.info("multipart")
 		missing_info := dialect.info("missing")
 		all_info := dialect.list()
 	`, "dialect", BuildDialect(HostOptions{}, nil))
@@ -77,6 +81,20 @@ func TestDialectInfoAndListExposeMetadata(t *testing.T) {
 	}
 	if got := interp.GetGlobal("json_info").Table().RawGetString("category").Str(); got != "text" {
 		t.Fatalf("json category = %q, want text", got)
+	}
+	for name, global := range map[string]string{
+		"jsonptr":   "jsonptr_info",
+		"logfmt":    "logfmt_info",
+		"sse":       "sse_info",
+		"multipart": "multipart_info",
+	} {
+		category := "text"
+		if name == "sse" || name == "multipart" {
+			category = "web"
+		}
+		if got := interp.GetGlobal(global).Table().RawGetString("category").Str(); got != category {
+			t.Fatalf("%s category = %q, want %s", name, got, category)
+		}
 	}
 	if !interp.GetGlobal("missing_info").IsNil() {
 		t.Fatalf("missing dialect info = %v, want nil", interp.GetGlobal("missing_info"))
