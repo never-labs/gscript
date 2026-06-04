@@ -1,0 +1,26 @@
+[
+  {
+    "Request": {
+      "Model": "mock-fast",
+      "Messages": [
+        {
+          "Role": "system",
+          "Text": "Classify support ticket. Return refund/escalate, shipping, or other."
+        },
+        {
+          "Role": "user",
+          "Text": "Refund request after damaged delivery, customer asks for agent follow-up."
+        }
+      ],
+      "MaxTokens": 16
+    },
+    "Result": {
+      "Status": "final_answer",
+      "Text": "refund/escalate",
+      "Usage": {
+        "InputTokens": 18,
+        "OutputTokens": 2
+      }
+    }
+  }
+]

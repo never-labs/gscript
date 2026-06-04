@@ -1,8 +1,13 @@
 package bind
 
 import (
+	"bufio"
+	"bytes"
 	"fmt"
 	"mime"
+	"net/textproto"
+	"sort"
+	"strings"
 
 	dialectlib "github.com/never-labs/leia/internal/support/dialect"
 )
@@ -25,6 +30,10 @@ func registerDialectWeb(register dialectRegisterFunc) {
 	register([]string{"mime"}, dialectHandler{
 		eval:  dialectMIME,
 		block: dialectMIME,
+	})
+	register([]string{"headers", "http_headers"}, dialectHandler{
+		eval:  dialectHeaders,
+		block: dialectHeaders,
 	})
 }
 
@@ -145,6 +154,123 @@ func dialectMIMEEncode(body Value, opts *Table) ([]Value, error) {
 		return []Value{NilValue(), StringValue("invalid media type or parameter")}, nil
 	}
 	return []Value{StringValue(formatted)}, nil
+}
+
+func dialectHeaders(body Value, opts *Table) ([]Value, error) {
+	mode := ""
+	if opts != nil && opts.RawGetString("mode").IsString() {
+		mode = opts.RawGetString("mode").Str()
+	}
+	if body.IsTable() || mode == "encode" || mode == "format" {
+		text, err := encodeHeaderFields(body)
+		if err != nil {
+			return []Value{NilValue(), StringValue(err.Error())}, nil
+		}
+		return []Value{StringValue(text)}, nil
+	}
+	fields, err := parseHeaderFields(body.Str())
+	if err != nil {
+		return []Value{NilValue(), StringValue(err.Error())}, nil
+	}
+	return []Value{fields}, nil
+}
+
+func parseHeaderFields(src string) (Value, error) {
+	reader := textproto.NewReader(bufio.NewReader(strings.NewReader(src + "\r\n\r\n")))
+	mimeHeader, err := reader.ReadMIMEHeader()
+	if err != nil {
+		return NilValue(), err
+	}
+	out := NewTable()
+	for key, vals := range mimeHeader {
+		if len(vals) == 1 {
+			out.RawSetString(key, StringValue(vals[0]))
+			continue
+		}
+		arr := NewAppendArrayTable(len(vals))
+		for i, val := range vals {
+			arr.RawSetInt(int64(i+1), StringValue(val))
+		}
+		out.RawSetString(key, TableValue(arr))
+	}
+	return TableValue(out), nil
+}
+
+func encodeHeaderFields(body Value) (string, error) {
+	if !body.IsTable() {
+		return "", fmt.Errorf("headers dialect: table required for encode")
+	}
+	header := textproto.MIMEHeader{}
+	var invalidKey string
+	var invalidValueKey string
+	body.Table().ForEachPlainRaw(func(k, v Value) bool {
+		if !k.IsString() {
+			return true
+		}
+		if !isHeaderFieldName(k.Str()) {
+			invalidKey = k.Str()
+			return false
+		}
+		name := textproto.CanonicalMIMEHeaderKey(k.Str())
+		if v.IsTable() {
+			tbl := v.Table()
+			for i := 1; i <= tbl.Length(); i++ {
+				val := tbl.RawGetInt(int64(i)).String()
+				if strings.ContainsAny(val, "\r\n") {
+					invalidValueKey = name
+					return false
+				}
+				header.Add(name, val)
+			}
+			return true
+		}
+		val := v.String()
+		if strings.ContainsAny(val, "\r\n") {
+			invalidValueKey = name
+			return false
+		}
+		header.Set(name, val)
+		return true
+	})
+	if invalidKey != "" {
+		return "", fmt.Errorf("headers dialect: invalid header name %q", invalidKey)
+	}
+	if invalidValueKey != "" {
+		return "", fmt.Errorf("headers dialect: invalid header value for %q", invalidValueKey)
+	}
+
+	keys := make([]string, 0, len(header))
+	for key := range header {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	var buf bytes.Buffer
+	for _, key := range keys {
+		for _, val := range header[key] {
+			fmt.Fprintf(&buf, "%s: %s\r\n", key, val)
+		}
+	}
+	return buf.String(), nil
+}
+
+func isHeaderFieldName(name string) bool {
+	if name == "" {
+		return false
+	}
+	for i := 0; i < len(name); i++ {
+		c := name[i]
+		if c >= 'A' && c <= 'Z' || c >= 'a' && c <= 'z' || c >= '0' && c <= '9' {
+			continue
+		}
+		switch c {
+		case '!', '#', '$', '%', '&', '\'', '*', '+', '-', '.', '^', '_', '`', '|', '~':
+			continue
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 func dialectURL(src string) ([]Value, error) {

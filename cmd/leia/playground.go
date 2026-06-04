@@ -1451,7 +1451,9 @@ func playgroundExamplesRoot() string {
 func repositoryExampleRunnable(path string) bool {
 	return !strings.Contains(path, "/evaluate/") &&
 		!strings.Contains(path, "/llm/") &&
+		!strings.Contains(path, "/workflow/support_triage_replay.leia") &&
 		!strings.Contains(path, "/web/") &&
+		!strings.Contains(path, "/database/package_managed/") &&
 		!strings.Contains(path, "/dialects/shell_filesystem.leia") &&
 		!strings.Contains(path, "/ui/package_managed/") &&
 		!strings.Contains(path, "/game_engine/") &&
@@ -1466,8 +1468,12 @@ func repositoryExampleRequires(path string) string {
 		return "leia evaluate CLI"
 	case strings.Contains(path, "/llm/"):
 		return "LLM provider"
+	case strings.Contains(path, "/workflow/support_triage_replay.leia"):
+		return "LLM replay fixture or provider"
 	case strings.Contains(path, "/web/"):
 		return "network/server host access"
+	case strings.Contains(path, "/database/package_managed/"):
+		return "package-managed database runtime and native SQL driver"
 	case strings.Contains(path, "/dialects/shell_filesystem.leia"):
 		return "process shell and filesystem host access"
 	case strings.Contains(path, "/ui/package_managed/"):

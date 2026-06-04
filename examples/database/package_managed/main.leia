@@ -1,0 +1,19 @@
+// Package-managed database example.
+//leia:cap db.open,db.query
+//
+// This file is intentionally a manifest companion, not a runnable database
+// runtime. Database access should be supplied by a package/native adapter
+// declared in leia.mod instead of becoming a built-in dialect or core stdlib
+// module.
+
+sqlite := require("github.com/never-labs/leia-db/sqlite")
+
+query := {
+  driver: "sqlite",
+  dsn: "file:example.db?mode=memory&cache=shared",
+  sql: "select id, name from users where active = ?",
+  args: {true},
+  runtime: sqlite,
+}
+
+return query

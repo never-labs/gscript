@@ -1,0 +1,33 @@
+cases := jsonl`{"id":"refund-fast-path","text":"Customer requests a refund after a damaged delivery.","expected":"refund","priority":"high"}
+{"id":"shipping-update","text":"Where is my package? Tracking has not moved.","expected":"shipping","priority":"normal"}
+{"id":"fallback-human","text":"The account email is wrong and the invoice is missing.","expected":"other","priority":"normal"}
+`
+
+func classify_ticket(text) {
+    lower := string.lower(text)
+    if string.find(lower, "refund", 1, true) != nil {
+        return "refund"
+    }
+    if string.find(lower, "package", 1, true) != nil || string.find(lower, "tracking", 1, true) != nil {
+        return "shipping"
+    }
+    return "other"
+}
+
+print("case:jsonl_workflow_test")
+
+passed := 0
+high_priority := 0
+for _, row := range cases {
+    actual := classify_ticket(row.text)
+    assert(actual == row.expected)
+    if row.priority == "high" {
+        high_priority = high_priority + 1
+    }
+    passed = passed + 1
+}
+
+assert(passed == #cases)
+print("cases", passed)
+print("high_priority", high_priority)
+print("ok")

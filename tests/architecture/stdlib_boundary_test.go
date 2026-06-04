@@ -1,6 +1,7 @@
 package architecture_test
 
 import (
+	"go/ast"
 	"go/parser"
 	"go/token"
 	"os"
@@ -159,6 +160,59 @@ func TestStdlibBindOwnsRuntimeAdapterContracts(t *testing.T) {
 	})
 }
 
+func TestBuiltinDialectRegistryStaysModular(t *testing.T) {
+	bindRoot := filepath.Join(repoRoot(t), "internal", "stdlib", "bind")
+	expectedCalls := []string{
+		"registerDialectShellFS",
+		"registerDialectText",
+		"registerDialectWeb",
+		"registerDialectData",
+		"registerDialectAI",
+	}
+	expectedTagsByFile := map[string][]string{
+		"dialect_shell_fs.go": {"sh", "cmd", "glob", "path"},
+		"dialect_text.go":     {"re", "regexp", "json", "jsonl", "csv", "lines", "split", "words", "nums", "numbers", "kv", "env", "template"},
+		"dialect_web.go":      {"url", "html_escape", "urlquery", "mime", "headers", "http_headers"},
+		"dialect_data.go":     {"base64", "hash"},
+		"dialect_ai.go":       {"prompt", "quote"},
+	}
+
+	dialectFile := parseGoFile(t, filepath.Join(bindRoot, "dialect.go"))
+	actualCalls := directCallsInFunc(dialectFile, "BuildDialect", "registerDialect")
+	if strings.Join(actualCalls, ",") != strings.Join(expectedCalls, ",") {
+		t.Fatalf("BuildDialect registers dialect modules %v, want %v", actualCalls, expectedCalls)
+	}
+
+	entries, err := os.ReadDir(bindRoot)
+	if err != nil {
+		t.Fatalf("read internal/stdlib/bind: %v", err)
+	}
+	for _, entry := range entries {
+		name := entry.Name()
+		if entry.IsDir() || !strings.HasPrefix(name, "dialect_") || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
+			continue
+		}
+		if _, ok := expectedTagsByFile[name]; !ok {
+			t.Fatalf("internal/stdlib/bind/%s is not an approved builtin dialect module; keep larger domains outside the builtin registry", name)
+		}
+	}
+
+	seen := map[string]string{}
+	for fileName, expectedTags := range expectedTagsByFile {
+		path := filepath.Join(bindRoot, fileName)
+		actualTags := dialectTagsRegisteredByFile(t, path)
+		if strings.Join(actualTags, ",") != strings.Join(expectedTags, ",") {
+			t.Fatalf("%s registers dialect tags %v, want %v", relativeToRoot(t, path), actualTags, expectedTags)
+		}
+		for _, tag := range actualTags {
+			if previous := seen[tag]; previous != "" {
+				t.Fatalf("dialect tag %q registered by both %s and %s", tag, previous, fileName)
+			}
+			seen[tag] = fileName
+		}
+	}
+}
+
 func TestInternalSupportPackagesStayGrouped(t *testing.T) {
 	root := repoRoot(t)
 	for _, name := range []string{"binaryfmt", "hostpath", "modresolve", "source", "stringlib"} {
@@ -254,15 +308,88 @@ func forEachGoFile(t *testing.T, root string, fn func(path string)) {
 
 func parseImports(t *testing.T, path string) []string {
 	t.Helper()
-	file, err := parser.ParseFile(token.NewFileSet(), path, nil, parser.ImportsOnly)
-	if err != nil {
-		t.Fatalf("parse imports for %s: %v", path, err)
-	}
+	file := parseGoFileMode(t, path, parser.ImportsOnly)
 	imports := make([]string, 0, len(file.Imports))
 	for _, spec := range file.Imports {
 		imports = append(imports, strings.Trim(spec.Path.Value, `"`))
 	}
 	return imports
+}
+
+func parseGoFile(t *testing.T, path string) *ast.File {
+	t.Helper()
+	return parseGoFileMode(t, path, 0)
+}
+
+func parseGoFileMode(t *testing.T, path string, mode parser.Mode) *ast.File {
+	t.Helper()
+	file, err := parser.ParseFile(token.NewFileSet(), path, nil, mode)
+	if err != nil {
+		t.Fatalf("parse %s: %v", path, err)
+	}
+	return file
+}
+
+func directCallsInFunc(file *ast.File, funcName, calleePrefix string) []string {
+	var calls []string
+	for _, decl := range file.Decls {
+		fn, ok := decl.(*ast.FuncDecl)
+		if !ok || fn.Name.Name != funcName || fn.Body == nil {
+			continue
+		}
+		for _, stmt := range fn.Body.List {
+			exprStmt, ok := stmt.(*ast.ExprStmt)
+			if !ok {
+				continue
+			}
+			call, ok := exprStmt.X.(*ast.CallExpr)
+			if !ok {
+				continue
+			}
+			callee, ok := call.Fun.(*ast.Ident)
+			if ok && strings.HasPrefix(callee.Name, calleePrefix) {
+				calls = append(calls, callee.Name)
+			}
+		}
+	}
+	return calls
+}
+
+func dialectTagsRegisteredByFile(t *testing.T, path string) []string {
+	t.Helper()
+	file := parseGoFile(t, path)
+	var tags []string
+	ast.Inspect(file, func(n ast.Node) bool {
+		call, ok := n.(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+		callee, ok := call.Fun.(*ast.Ident)
+		if !ok || callee.Name != "register" || len(call.Args) == 0 {
+			return true
+		}
+		lit, ok := call.Args[0].(*ast.CompositeLit)
+		if !ok {
+			t.Fatalf("%s has dialect register call without literal tag list", relativeToRoot(t, path))
+		}
+		for _, elt := range lit.Elts {
+			tag, ok := stringLiteralValue(elt)
+			if !ok {
+				t.Fatalf("%s has dialect register call with non-literal tag", relativeToRoot(t, path))
+			}
+			tags = append(tags, tag)
+		}
+		return true
+	})
+	return tags
+}
+
+func stringLiteralValue(expr ast.Expr) (string, bool) {
+	lit, ok := expr.(*ast.BasicLit)
+	if !ok || lit.Kind != token.STRING {
+		return "", false
+	}
+	return strings.Trim(lit.Value, `"`), true
 }
 
 func relativeToRoot(t *testing.T, path string) string {

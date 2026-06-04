@@ -1,0 +1,17 @@
+func classify_ticket(text) {
+    return llm.turn({
+        model: "mock-fast",
+        messages: {
+            llm.system("Classify support ticket. Return refund/escalate, shipping, or other."),
+            llm.user(text),
+        },
+        max_tokens: 16,
+    })
+}
+
+result, err := classify_ticket("Refund request after damaged delivery, customer asks for agent follow-up.")
+assert(err == nil)
+assert(result.text == "refund/escalate")
+
+classification := result.text
+print("workflow", classification)

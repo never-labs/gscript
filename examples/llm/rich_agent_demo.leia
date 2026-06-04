@@ -1,0 +1,132 @@
+// Rich agent demo with prompt dialect, message history, and tools.
+//
+// This file is designed for mock/replay execution. The LLM provider is expected
+// to return deterministic tool calls and final text, while all tool evidence is
+// produced locally by Leia functions.
+
+llm.register_models({
+    default: "triage"
+    triage: "mock-rich-agent"
+})
+
+func prompt_message(p, fallback_role, tag) {
+    body := p
+    if type(p) == "table" && p.body != nil {
+        body = p.body
+    }
+
+    role := fallback_role
+    if type(body) == "table" && body.role != nil {
+        role = body.role
+    }
+
+    text := nil
+    if type(body) == "table" {
+        text = body.text
+    } else {
+        text = body
+    }
+    if text == nil && type(p) == "table" {
+        text = p.text
+    }
+
+    m := nil
+    if role == "system" {
+        m = msg.system(text)
+    } else if role == "assistant" {
+        m = msg.assistant(text)
+    } else {
+        m = msg.user(text)
+    }
+    m.tag = tag
+    return m
+}
+
+lookup_signal := llm.tool("lookup_signal", func(service, severity) {
+    return "signal:" .. service .. ":severity=" .. severity .. ":queue=payments", nil
+}, {
+    description: "Lookup deterministic incident signal evidence."
+    params: {"service", "severity"}
+    requires: {"signals.read"}
+    param_docs: {
+        service: "service name"
+        severity: "incident severity"
+    }
+})
+
+func triage_config(service, severity) {
+    system_prompt := prompt {
+        role: "system"
+        text: "Triage incidents using only supplied history and local tool evidence."
+    }
+    task_prompt := prompt`Assess ${service} at ${severity} severity.`
+
+    return {
+        model: "triage"
+        messages: {
+            prompt_message(system_prompt, "system", "policy"),
+            msg.assistant("Previous handoff: checkout has pending payment alerts."),
+            prompt_message(task_prompt, "user", "task"),
+        }
+        tools: {lookup_signal}
+        budget: {turns: 2, calls: 1, tokens: 768}
+    }
+}
+
+triage_agent := llm.agent("triage_agent", triage_config, func(service, severity) {
+    cfg := triage_config(service, severity)
+    conversation := cfg.messages
+    task_msg, task_idx := history.find(conversation, {tag: "task"})
+
+    first, first_err := llm.turn({
+        model: cfg.model
+        messages: conversation
+        tools: cfg.tools
+    })
+    if first_err != nil {
+        return nil, first_err
+    }
+
+    call := first.calls[1]
+    evidence, dispatch_err := llm.dispatch(call, cfg.tools)
+    conversation[#conversation + 1] = msg.assistant_call(call)
+    if dispatch_err != nil {
+        conversation[#conversation + 1] = msg.tool_error(call.id, dispatch_err.message)
+    } else {
+        conversation[#conversation + 1] = msg.tool_result(call.id, evidence)
+    }
+
+    final, final_err := llm.turn({
+        model: cfg.model
+        messages: conversation
+        tools: cfg.tools
+        max_tokens: 160
+    })
+
+    tool_msg, _ := history.find(conversation, {role: "tool"})
+    return {
+        status: final.status,
+        text: final.text,
+        task: task_msg.text,
+        task_idx: task_idx,
+        evidence: tool_msg.value,
+        history_len: #conversation
+    }, final_err
+}, {params: {"service", "severity"}})
+
+rich_result, rich_err := triage_agent("checkout", "sev2")
+if rich_err != nil {
+    print(rich_err.message)
+    return
+}
+
+rich_text := rich_result.text
+rich_task := rich_result.task
+rich_task_idx := rich_result.task_idx
+rich_evidence := rich_result.evidence
+rich_history_len := rich_result.history_len
+
+print("rich", rich_text)
+print("task", rich_task)
+print("evidence", rich_evidence)
+print("history", rich_history_len)

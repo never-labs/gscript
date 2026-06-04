@@ -1,0 +1,96 @@
+// data_science_pipeline.leia - Small numeric data pipeline with existing stdlib.
+// Demonstrates: nums dialect input, dense matrix feature view, SoA columns,
+// simple scoring, aggregate metrics, and formatted output.
+
+print("=== Dialects: data science pipeline ===")
+
+feature_rows := dialect.eval("nums", `
+1.0, 0.8, 3.0
+2.0, 1.6, 2.0
+3.0, 2.4, 1.0
+4.0, 3.2, 0.0
+`, {matrix: true})
+
+targets := nums`3.04 3.98 4.92 5.86`
+
+func dense_matrix_from_rows(rows) {
+    m := matrix.dense(#rows, #rows[1])
+    for i := 1; i <= #rows; i++ {
+        row := rows[i]
+        for j := 1; j <= #row; j++ {
+            matrix.setf(m, i - 1, j - 1, row[j])
+        }
+    }
+    return m
+}
+
+func numeric_column(rows, column) {
+    out := {}
+    for i := 1; i <= #rows; i++ {
+        out[i] = rows[i][column]
+    }
+    return array.f64(out)
+}
+
+func ids(n) {
+    out := {}
+    for i := 1; i <= n; i++ {
+        out[i] = i
+    }
+    return array.i64(out)
+}
+
+func zeroes(n) {
+    out := {}
+    for i := 1; i <= n; i++ {
+        out[i] = 0.0
+    }
+    return array.f64(out)
+}
+
+features := dense_matrix_from_rows(feature_rows)
+
+samples := soa.zip({
+    id: ids(#feature_rows),
+    x1: numeric_column(feature_rows, 1),
+    x2: numeric_column(feature_rows, 2),
+    x3: numeric_column(feature_rows, 3),
+    target: array.f64(targets),
+    prediction: zeroes(#feature_rows),
+    error: zeroes(#feature_rows),
+})
+
+weights := {1.1, 0.3, 0.4}
+bias := 0.5
+for i := 1; i <= soa.len(samples); i++ {
+    score := bias
+    for j := 1; j <= #weights; j++ {
+        score = score + matrix.getf(features, i - 1, j - 1) * weights[j]
+    }
+    row := samples[i]
+    row.prediction = score
+    row.error = score - row.target
+    samples[i] = row
+}
+
+positive_error := soa.mask(samples, "error", ">", 0.0000001)
+error_stats := soa.stats(samples, "error")
+mean_prediction := soa.mean(samples, "prediction")
+positive_count := soa.countWhere(samples, positive_error)
+score_energy := soa.dot(samples, "prediction", "prediction")
+
+print(string.format("rows: %d columns: %d", soa.len(samples), #feature_rows[1]))
+print(string.format("prediction mean: %.3f", mean_prediction))
+print(string.format("error mean/min/max: %.3f %.3f %.3f", error_stats.mean, error_stats.min, error_stats.max))
+print(string.format("positive errors: %d", positive_count))
+print(string.format("prediction energy: %.3f", score_energy))
+
+assert(soa.len(samples) == 4)
+assert(matrix.getf(features, 3, 2) == 0)
+assert(soa.column(samples, "prediction")[1] == 3.04)
+assert(error_stats.mean < 0.000001 && error_stats.mean > -0.000001)
+assert(error_stats.min < 0.000001 && error_stats.min > -0.000001)
+assert(error_stats.max < 0.000001 && error_stats.max > -0.000001)
+assert(positive_count == 0)
+
+print("data science pipeline ok")

@@ -266,6 +266,52 @@ func TestPlaygroundRepositoryPackageManagedUIExampleIsManualRunOnly(t *testing.T
 	t.Fatal("repo-ui-package_managed-main example not found")
 }
 
+func TestPlaygroundRepositoryPackageManagedDatabaseExampleIsManualRunOnly(t *testing.T) {
+	examples, err := playgroundRepositoryExamples(playgroundExamplesRoot())
+	if err != nil {
+		t.Fatalf("load repository examples: %v", err)
+	}
+	for _, example := range examples {
+		if example.ID != "repo-database-package_managed-main" {
+			continue
+		}
+		if example.Runnable {
+			t.Fatalf("%s should be manual-run only in the playground", example.ID)
+		}
+		if example.Requires != "package-managed database runtime and native SQL driver" {
+			t.Fatalf("requires = %q", example.Requires)
+		}
+		if !strings.Contains(example.Source, `require("github.com/never-labs/leia-db/sqlite")`) {
+			t.Fatalf("source missing package-managed database runtime import\nsource:\n%s", example.Source)
+		}
+		return
+	}
+	t.Fatal("repo-database-package_managed-main example not found")
+}
+
+func TestPlaygroundRepositoryWorkflowReplayExampleIsManualRunOnly(t *testing.T) {
+	examples, err := playgroundRepositoryExamples(playgroundExamplesRoot())
+	if err != nil {
+		t.Fatalf("load repository examples: %v", err)
+	}
+	for _, example := range examples {
+		if example.ID != "repo-workflow-support_triage_replay" {
+			continue
+		}
+		if example.Runnable {
+			t.Fatalf("%s should be manual-run only in the playground", example.ID)
+		}
+		if example.Requires != "LLM replay fixture or provider" {
+			t.Fatalf("requires = %q", example.Requires)
+		}
+		if !strings.Contains(example.Source, `model: "mock-fast"`) {
+			t.Fatalf("source missing replay-backed mock model\nsource:\n%s", example.Source)
+		}
+		return
+	}
+	t.Fatal("repo-workflow-support_triage_replay example not found")
+}
+
 func TestPlaygroundAIExamplesCoverRunnableWorkflowShapes(t *testing.T) {
 	t.Setenv("LEIA_PLAYGROUND_MOCK_LLM", "1")
 	want := map[string][]string{
