@@ -317,6 +317,105 @@ func TestWorkflowEvaluateListExample(t *testing.T) {
 	}
 }
 
+func TestEvaluateBasicExampleExecutes(t *testing.T) {
+	root, err := filepath.Abs(filepath.Join("..", ".."))
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(root, "examples", "evaluate", "basic_assert.leia")
+
+	var stdout, stderr bytes.Buffer
+	code := runEvaluateCommand([]string{"--json", path}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("evaluate command code = %d, stderr = %q stdout = %q", code, stderr.String(), stdout.String())
+	}
+	var report struct {
+		Status  string `json:"status"`
+		Summary struct {
+			EvaluateBlocks int `json:"evaluate_blocks"`
+			CasesSelected  int `json:"cases_selected"`
+			CasesPassed    int `json:"cases_passed"`
+			Assertions     int `json:"assertions"`
+		} `json:"summary"`
+		Findings []struct {
+			Kind string `json:"kind"`
+		} `json:"findings"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
+		t.Fatalf("stdout is not JSON evaluate report: %v; stdout = %q", err, stdout.String())
+	}
+	if report.Status != "ok" || report.Summary.EvaluateBlocks != 1 || report.Summary.CasesSelected != 1 || report.Summary.CasesPassed != 1 || report.Summary.Assertions != 1 {
+		t.Fatalf("report = %+v, want one passing evaluate block with one assertion", report)
+	}
+	if len(report.Findings) != 0 {
+		t.Fatalf("findings = %+v, want none", report.Findings)
+	}
+}
+
+func TestEvaluateReplayExamplesExecute(t *testing.T) {
+	root, err := filepath.Abs(filepath.Join("..", ".."))
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := filepath.Join(root, "examples", "evaluate")
+	for _, tc := range []struct {
+		name          string
+		source        string
+		records       string
+		replayedTurns int
+	}{
+		{name: "llm", source: "llm_replay.leia", records: "llm_replay.records.json", replayedTurns: 1},
+		{name: "agent", source: "agent_replay.leia", records: "agent_replay.records.json", replayedTurns: 1},
+		{name: "multiturn", source: "multiturn_replay.leia", records: "multiturn_replay.records.json", replayedTurns: 2},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var stdout, stderr bytes.Buffer
+			code := runEvaluateCommand([]string{
+				"--json",
+				"--replay", filepath.Join(dir, tc.records),
+				filepath.Join(dir, tc.source),
+			}, &stdout, &stderr)
+			if code != 0 {
+				t.Fatalf("evaluate command code = %d, stderr = %q stdout = %q", code, stderr.String(), stdout.String())
+			}
+			var report struct {
+				Status  string `json:"status"`
+				Summary struct {
+					EvaluateBlocks int `json:"evaluate_blocks"`
+					CasesSelected  int `json:"cases_selected"`
+					CasesPassed    int `json:"cases_passed"`
+					CasesFailed    int `json:"cases_failed"`
+				} `json:"summary"`
+				LLM *struct {
+					ReplayedTurns  int `json:"replayed_turns"`
+					RemainingTurns int `json:"remaining_turns"`
+				} `json:"llm"`
+				Cases []struct {
+					Status string `json:"status"`
+				} `json:"cases"`
+				Findings []struct {
+					Kind string `json:"kind"`
+				} `json:"findings"`
+			}
+			if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
+				t.Fatalf("stdout is not JSON evaluate report: %v; stdout = %q", err, stdout.String())
+			}
+			if report.Status != "ok" || report.Summary.EvaluateBlocks != 1 || report.Summary.CasesSelected != 1 || report.Summary.CasesPassed != 1 || report.Summary.CasesFailed != 0 {
+				t.Fatalf("report = %+v, want one passing evaluate case", report)
+			}
+			if len(report.Cases) != 1 || report.Cases[0].Status != "passed" {
+				t.Fatalf("cases = %+v, want one passed case", report.Cases)
+			}
+			if report.LLM == nil || report.LLM.ReplayedTurns != tc.replayedTurns || report.LLM.RemainingTurns != 0 {
+				t.Fatalf("llm = %+v, want replayed=%d remaining=0", report.LLM, tc.replayedTurns)
+			}
+			if len(report.Findings) != 0 {
+				t.Fatalf("findings = %+v, want none", report.Findings)
+			}
+		})
+	}
+}
+
 func approvedBuiltinDialectTags() []string {
 	return []string{
 		"sh", "cmd", "shellwords", "glob", "path",

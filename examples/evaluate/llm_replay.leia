@@ -5,6 +5,8 @@ func summarize_with_replay() {
     })
 }
 
-result, err := summarize_with_replay()
-assert(err == nil)
-assert(result.text == "Deterministic agent checks with replay.")
+evaluate "llm turn consumes replay" {
+    result, err := summarize_with_replay()
+    assert(err == nil)
+    assert(result.text == "Deterministic agent checks with replay.")
+}

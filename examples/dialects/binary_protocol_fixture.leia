@@ -9,6 +9,7 @@ little_frame := dialect.eval("binary", {-1234, 16909060, 1.5, "OK"}, {mode: "pac
 little_hex := dialect.eval("hex", little_frame)
 little_decoded := dialect.eval("binary", little_frame, {mode: "unpack", format: "le:i16 u32 f32 bytes:2"})
 little_size := dialect.eval("binary", "", {mode: "size", format: "le:i16 u32 f32 bytes:2"})
+bad_mode, bad_mode_err := dialect.eval("binary", "", {mode: "bogus", format: "u8"})
 
 print("frame hex:", frame_hex)
 print("decoded:", decoded.values[1], decoded.values[2], "next", decoded.next)
@@ -27,5 +28,7 @@ assert(little_decoded.values[3] == 1.5)
 assert(little_decoded.values[4] == "OK")
 assert(little_decoded.next == 13)
 assert(little_size == 12)
+assert(bad_mode == nil)
+assert(string.find(bad_mode_err, "unknown mode") != nil)
 
 print("binary protocol fixture ok")

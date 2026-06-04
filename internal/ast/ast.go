@@ -267,6 +267,18 @@ func (s *GotoStmt) nodeType() string { return "GotoStmt" }
 func (s *GotoStmt) GetPos() Pos      { return s.P }
 func (s *GotoStmt) stmtNode()        {}
 
+// EvaluateStmt represents a source-level evaluation case:
+// evaluate "case name" { body }
+type EvaluateStmt struct {
+	P    Pos
+	Name string
+	Body *BlockStmt
+}
+
+func (s *EvaluateStmt) nodeType() string { return "EvaluateStmt" }
+func (s *EvaluateStmt) GetPos() Pos      { return s.P }
+func (s *EvaluateStmt) stmtNode()        {}
+
 // FuncDeclStmt represents a top-level named function declaration: func name(params) { body }
 type FuncDeclStmt struct {
 	P      Pos

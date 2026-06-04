@@ -8,6 +8,8 @@ classify_support := llm.agent("classify_support", func(message) {
     }
 }, nil, {params: {"message"}})
 
-result, err := classify_support("Customer asks for a refund after a damaged delivery.")
-assert(err == nil)
-assert(result.text == "refund")
+evaluate "agent consumes replay" {
+    result, err := classify_support("Customer asks for a refund after a damaged delivery.")
+    assert(err == nil)
+    assert(result.text == "refund")
+}

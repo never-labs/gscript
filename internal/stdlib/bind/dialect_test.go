@@ -772,6 +772,7 @@ func TestDialectBinaryPackUnpackAndSize(t *testing.T) {
 		mixed_size := dialect.eval("binary", "", {mode: "size", format: "le:i16 u32 f32 bytes:2"})
 		var_size, var_err := dialect.eval("binary", "", {mode: "size", format: "string"})
 		short, short_err := dialect.eval("binary", "x", {mode: "unpack", format: "u32"})
+		bad_mode, bad_mode_err := dialect.eval("binary", "", {mode: "bogus", format: "u8"})
 	`, "dialect", BuildDialect(HostOptions{}, nil))
 
 	if got := interp.GetGlobal("hexed").Str(); got != "0102676f" {
@@ -820,6 +821,7 @@ func TestDialectBinaryPackUnpackAndSize(t *testing.T) {
 	if !interp.GetGlobal("short").IsNil() || !strings.Contains(interp.GetGlobal("short_err").Str(), "binary dialect: data too short") {
 		t.Fatalf("short unpack = %v err %v, want nil data too short", interp.GetGlobal("short"), interp.GetGlobal("short_err"))
 	}
+	assertDialectModeError(t, interp.GetGlobal("bad_mode"), interp.GetGlobal("bad_mode_err"), "binary dialect: unknown mode")
 
 	for name, tc := range map[string]struct {
 		source string
@@ -828,10 +830,6 @@ func TestDialectBinaryPackUnpackAndSize(t *testing.T) {
 		"format parse error": {
 			source: `dialect.eval("binary", "", {mode: "size", format: "bytes:nope"})`,
 			want:   `binary: invalid field size "nope"`,
-		},
-		"unknown mode": {
-			source: `dialect.eval("binary", "", {mode: "bogus", format: "u8"})`,
-			want:   "binary dialect: unknown mode",
 		},
 		"bad size": {
 			source: `dialect.eval("binary", {"abc"}, {mode: "pack", format: "bytes:2"})`,

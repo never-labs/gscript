@@ -139,6 +139,9 @@ func (p *Parser) parseStmt() (ast.Stmt, error) {
 		if p.peek().Value == "import" && (p.peekAt(1).Type == lexer.TOKEN_STRING || p.peekAt(1).Type == lexer.TOKEN_IDENT || p.peekAt(1).Type == lexer.TOKEN_LPAREN) {
 			return p.parseImportDeclStmt()
 		}
+		if p.isEvaluateStmt() {
+			return p.parseEvaluateStmt()
+		}
 		if p.isLabelStmt() {
 			return p.parseLabelStmt()
 		}
@@ -173,6 +176,13 @@ func (p *Parser) isSelectStmt() bool {
 	return p.peek().Type == lexer.TOKEN_IDENT &&
 		p.peek().Value == "select" &&
 		p.peekAt(1).Type == lexer.TOKEN_LBRACE
+}
+
+func (p *Parser) isEvaluateStmt() bool {
+	return p.peek().Type == lexer.TOKEN_IDENT &&
+		p.peek().Value == "evaluate" &&
+		p.peekAt(1).Type == lexer.TOKEN_STRING &&
+		p.peekAt(2).Type == lexer.TOKEN_LBRACE
 }
 
 func (p *Parser) isLabelStmt() bool {
@@ -218,6 +228,20 @@ func (p *Parser) parseFuncDeclStmt() (ast.Stmt, error) {
 		Params: params,
 		Body:   body,
 	}, nil
+}
+
+func (p *Parser) parseEvaluateStmt() (ast.Stmt, error) {
+	tok := p.advance()
+	pos := p.tokenPos(tok)
+	nameTok, err := p.expect(lexer.TOKEN_STRING)
+	if err != nil {
+		return nil, err
+	}
+	body, err := p.parseBlock()
+	if err != nil {
+		return nil, err
+	}
+	return &ast.EvaluateStmt{P: pos, Name: nameTok.Value, Body: body}, nil
 }
 
 func (p *Parser) parseImportDeclStmt() (ast.Stmt, error) {

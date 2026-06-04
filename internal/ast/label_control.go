@@ -104,6 +104,12 @@ func (s *labelScope) walkBlock(block *BlockStmt, depth int) error {
 			if err := validateLabelStmtList(st.Body.Stmts); err != nil {
 				return err
 			}
+		case *EvaluateStmt:
+			if st.Body != nil {
+				if err := s.walkBlock(st.Body, depth+1); err != nil {
+					return err
+				}
+			}
 		default:
 			if err := s.walkStmtExprs(stmt); err != nil {
 				return err

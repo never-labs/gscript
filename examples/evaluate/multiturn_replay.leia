@@ -22,4 +22,6 @@ func run_multiturn_replay() {
     assert(note.text == "Leia checks now support deterministic replay.")
 }
 
-run_multiturn_replay()
+evaluate "multiturn replay consumes every turn" {
+    run_multiturn_replay()
+}

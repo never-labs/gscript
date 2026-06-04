@@ -180,6 +180,20 @@ func TestTaggedDialectExpressionStatementsLowerToDialectCalls(t *testing.T) {
 	}
 }
 
+func TestEvaluateStatementParses(t *testing.T) {
+	prog := mustParse(t, "evaluate \"replay fixture\" {\n    assert(true)\n}\n")
+	if len(prog.Stmts) != 1 {
+		t.Fatalf("stmt count = %d, want 1", len(prog.Stmts))
+	}
+	eval, ok := prog.Stmts[0].(*ast.EvaluateStmt)
+	if !ok {
+		t.Fatalf("stmt = %T, want EvaluateStmt", prog.Stmts[0])
+	}
+	if eval.Name != "replay fixture" || eval.Body == nil || len(eval.Body.Stmts) != 1 {
+		t.Fatalf("evaluate stmt = %#v, want named body with one assertion", eval)
+	}
+}
+
 func TestGoStyleImportParses(t *testing.T) {
 	src := `
 import "json"

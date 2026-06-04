@@ -1055,6 +1055,28 @@ func countLLMStmts(path string, stmts []ast.Stmt, counts *Summary, cases *[]pars
 			if s.Body != nil {
 				countLLMStmts(path, s.Body.Stmts, counts, cases)
 			}
+		case *ast.EvaluateStmt:
+			counts.EvaluateBlocks++
+			if s.Body != nil {
+				pos := s.GetPos()
+				name := strings.TrimSpace(s.Name)
+				if name == "" {
+					name = fmt.Sprintf("evaluate@%d:%d", pos.Line, pos.Column)
+				}
+				*cases = append(*cases, parsedCase{
+					Case: Case{
+						CaseID:     caseID(path, name, len(*cases)),
+						Name:       name,
+						SourcePath: path,
+						Range: SourceRange{
+							StartLine:   pos.Line,
+							StartColumn: pos.Column,
+						},
+						Status: "pending",
+					},
+					Body: s.Body,
+				})
+			}
 		case *ast.IfStmt:
 			if s.Body != nil {
 				countLLMStmts(path, s.Body.Stmts, counts, cases)
@@ -1492,10 +1514,25 @@ func elapsedMillis(start time.Time) int64 {
 func caseProgramStmts(topLevel []ast.Stmt, body []ast.Stmt) []ast.Stmt {
 	stmts := make([]ast.Stmt, 0, len(topLevel)+len(body))
 	for _, stmt := range topLevel {
+		if _, ok := stmt.(*ast.EvaluateStmt); ok {
+			continue
+		}
 		stmts = append(stmts, stmt)
 	}
 	stmts = append(stmts, body...)
 	return stmts
+}
+
+func caseID(path, name string, index int) string {
+	base := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
+	name = sanitizeCaseRecordName(name)
+	if base == "" {
+		base = "case"
+	}
+	if name == "" {
+		name = "case"
+	}
+	return fmt.Sprintf("%s/%03d-%s", base, index+1, name)
 }
 
 func collectAssertions(body *ast.BlockStmt) []Assertion {

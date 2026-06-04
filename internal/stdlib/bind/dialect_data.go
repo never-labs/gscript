@@ -335,7 +335,7 @@ func dialectBinary(body Value, opts *Table, maxHostResult func() int64) ([]Value
 		}
 		return []Value{IntValue(int64(size))}, nil
 	default:
-		return nil, fmt.Errorf("binary dialect: unknown mode %q", mode)
+		return []Value{NilValue(), StringValue(fmt.Sprintf("binary dialect: unknown mode %q", mode))}, nil
 	}
 }
 

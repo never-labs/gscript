@@ -2,5 +2,7 @@ func normalize(name) {
     return string.lower(string.gsub(name, "%s+", "-"))
 }
 
-slug := normalize("Leia Checks")
-assert(slug == "leia-checks")
+evaluate "basic assert" {
+    slug := normalize("Leia Checks")
+    assert(slug == "leia-checks")
+}
