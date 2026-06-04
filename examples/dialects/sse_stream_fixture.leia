@@ -1,0 +1,42 @@
+print("=== Dialects: SSE stream fixture ===")
+
+stream := sse`id: 1
+event: token
+data: Hel
+
+id: 2
+event: token
+data: lo
+
+id: 3
+event: done
+data: {}
+
+`
+
+text := ""
+done := false
+for _, event := range stream {
+    if event.event == "token" {
+        text = text .. event.data
+    }
+    if event.event == "done" {
+        done = true
+    }
+}
+
+encoded := dialect.eval("sse", {
+    {event: "token", id: "1", data: "Hel"},
+    {event: "token", id: "2", data: "lo"},
+    {event: "done", id: "3", data: "{}"},
+}, {mode: "encode"})
+roundtrip := dialect.eval("sse", encoded)
+
+print("stream text:", text, "events", #stream)
+assert(text == "Hello")
+assert(done)
+assert(#stream == 3)
+assert(roundtrip[1].data == "Hel")
+assert(roundtrip[3].event == "done")
+
+print("sse stream fixture ok")

@@ -17,7 +17,7 @@ func TestDialectTagsExposeInstalledHandlers(t *testing.T) {
 		"base32", "base64", "binary", "cidr", "cmd", "cookie", "cookies", "csv", "deflate", "duration", "env", "glob",
 		"gzip", "hash", "headers", "hex", "hostport", "html_escape", "http_headers", "httpmsg", "ini", "ipaddr", "json", "jsonl",
 		"junit", "kv", "lines", "logfmt", "mdtable", "mime", "numbers", "nums", "path", "prompt",
-		"quote", "re", "regexp", "semver", "sh", "shellwords", "split", "tap", "template", "tsv", "url",
+		"quote", "re", "regexp", "semver", "sh", "shellwords", "split", "sse", "tap", "template", "tsv", "url",
 		"urlpath", "urlquery", "uuid", "words", "xml", "zlib",
 	}
 	for _, name := range want {

@@ -149,6 +149,44 @@ func TestDialectURLPathTemplateMatchAndEncode(t *testing.T) {
 	}
 }
 
+func TestDialectSSEParseAndEncode(t *testing.T) {
+	interp := runWithLib(t, `
+		events := sse`+"`"+`: keepalive
+id: 1
+event: token
+data: hello
+data: world
+retry: 2500
+
+`+"`"+`
+		encoded := dialect.eval("sse", {{event: "done", id: "2", data: "ok"}}, {mode: "encode"})
+		roundtrip := dialect.eval("sse", encoded)
+		bad, bad_err := dialect.eval("sse", "retry: soon\n\n")
+	`, "dialect", BuildDialect(HostOptions{}, nil))
+
+	events := interp.GetGlobal("events").Table()
+	first := events.RawGetInt(1).Table()
+	if got := first.RawGetString("id").Str(); got != "1" {
+		t.Fatalf("event id = %q, want 1", got)
+	}
+	if got := first.RawGetString("event").Str(); got != "token" {
+		t.Fatalf("event type = %q, want token", got)
+	}
+	if got := first.RawGetString("data").Str(); got != "hello\nworld" {
+		t.Fatalf("event data = %q, want multiline data", got)
+	}
+	if got := first.RawGetString("retry").Int(); got != 2500 {
+		t.Fatalf("event retry = %d, want 2500", got)
+	}
+	roundtrip := interp.GetGlobal("roundtrip").Table().RawGetInt(1).Table()
+	if got := roundtrip.RawGetString("event").Str(); got != "done" {
+		t.Fatalf("roundtrip event = %q, want done", got)
+	}
+	if !interp.GetGlobal("bad").IsNil() || !interp.GetGlobal("bad_err").IsString() {
+		t.Fatalf("bad SSE = %v err %v, want nil error string", interp.GetGlobal("bad"), interp.GetGlobal("bad_err"))
+	}
+}
+
 func TestDialectMIMEBoundaryParseAndEncode(t *testing.T) {
 	interp := runWithLib(t, `
 		parsed := dialect.eval("mime", "Text/HTML; Charset=UTF-8; boundary=\"abc def\"")

@@ -48,6 +48,10 @@ func registerDialectWeb(register dialectRegisterFunc) {
 		eval:  dialectHTTPMessage,
 		block: dialectHTTPMessage,
 	})
+	register([]string{"sse"}, dialectHandler{
+		eval:  dialectSSE,
+		block: dialectSSE,
+	})
 }
 
 func dialectHTMLEscape(src string, opts *Table) ([]Value, error) {
@@ -536,6 +540,87 @@ func dialectHTTPMessage(body Value, opts *Table) ([]Value, error) {
 		return []Value{NilValue(), StringValue(err.Error())}, nil
 	}
 	return []Value{httpMessageToTable(msg)}, nil
+}
+
+func dialectSSE(body Value, opts *Table) ([]Value, error) {
+	mode := ""
+	if opts != nil && opts.RawGetString("mode").IsString() {
+		mode = opts.RawGetString("mode").Str()
+	}
+	if body.IsTable() || mode == "encode" || mode == "format" {
+		events, err := sseEventsFromValue(body)
+		if err != nil {
+			return nil, err
+		}
+		return []Value{StringValue(dialectlib.EncodeSSE(events))}, nil
+	}
+	events, err := dialectlib.ParseSSE(body.String())
+	if err != nil {
+		return []Value{NilValue(), StringValue(err.Error())}, nil
+	}
+	return []Value{TableValue(sseEventsToValue(events))}, nil
+}
+
+func sseEventsToValue(events []dialectlib.SSEEvent) *Table {
+	out := NewAppendArrayTable(len(events))
+	for i, event := range events {
+		row := NewTable()
+		row.RawSetString("event", StringValue(event.Event))
+		row.RawSetString("data", StringValue(event.Data))
+		row.RawSetString("id", StringValue(event.ID))
+		if event.Retry > 0 {
+			row.RawSetString("retry", IntValue(event.Retry))
+		}
+		out.RawSetInt(int64(i+1), TableValue(row))
+	}
+	return out
+}
+
+func sseEventsFromValue(value Value) ([]dialectlib.SSEEvent, error) {
+	if !value.IsTable() {
+		return nil, fmt.Errorf("sse dialect: table expected for encode")
+	}
+	tbl := value.Table()
+	if tbl.Length() == 0 && tableHasAnyKey(tbl) {
+		event, err := sseEventFromTable(tbl)
+		if err != nil {
+			return nil, err
+		}
+		return []dialectlib.SSEEvent{event}, nil
+	}
+	events := make([]dialectlib.SSEEvent, 0, tbl.Length())
+	for i := 1; i <= tbl.Length(); i++ {
+		item := tbl.RawGetInt(int64(i))
+		if !item.IsTable() {
+			return nil, fmt.Errorf("sse dialect: event %d must be table", i)
+		}
+		event, err := sseEventFromTable(item.Table())
+		if err != nil {
+			return nil, fmt.Errorf("sse dialect: event %d: %v", i, err)
+		}
+		events = append(events, event)
+	}
+	return events, nil
+}
+
+func sseEventFromTable(tbl *Table) (dialectlib.SSEEvent, error) {
+	var event dialectlib.SSEEvent
+	if v := tbl.RawGetString("event"); v.IsString() {
+		event.Event = v.Str()
+	}
+	if v := tbl.RawGetString("data"); !v.IsNil() {
+		event.Data = v.String()
+	}
+	if v := tbl.RawGetString("id"); !v.IsNil() {
+		event.ID = v.String()
+	}
+	if v := tbl.RawGetString("retry"); !v.IsNil() {
+		if !v.IsNumber() {
+			return event, fmt.Errorf("retry must be numeric")
+		}
+		event.Retry = toInt(v)
+	}
+	return event, nil
 }
 
 func httpMessageToTable(msg dialectlib.HTTPMessage) Value {
