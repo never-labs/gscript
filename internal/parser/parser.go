@@ -1752,10 +1752,10 @@ func (p *Parser) isTaggedStringStart() bool {
 	if p.peek().Type != lexer.TOKEN_IDENT {
 		return false
 	}
-	if p.peekAt(1).Type == lexer.TOKEN_STRING {
+	if isRawStringToken(p.peekAt(1)) {
 		return true
 	}
-	return p.peekAt(1).Type == lexer.TOKEN_NOT && p.peekAt(2).Type == lexer.TOKEN_STRING
+	return p.peekAt(1).Type == lexer.TOKEN_NOT && isRawStringToken(p.peekAt(2))
 }
 
 func (p *Parser) isTaggedBlockStart() bool {
@@ -1779,7 +1779,7 @@ func (p *Parser) parseTaggedDialectExpr() (ast.Expr, error) {
 		p.advance()
 		failFast = true
 	}
-	if p.check(lexer.TOKEN_STRING) {
+	if isRawStringToken(p.peek()) {
 		bodyTok := p.advance()
 		body, err := p.interpolatedStringExpr(p.tokenPos(bodyTok), bodyTok.Value)
 		if err != nil {
@@ -1807,15 +1807,24 @@ func (p *Parser) parseTaggedDialectExpr() (ast.Expr, error) {
 func (p *Parser) parseShellShortcutExpr() (ast.Expr, error) {
 	tok := p.advance()
 	pos := p.tokenPos(tok)
-	bodyTok, err := p.expect(lexer.TOKEN_STRING)
-	if err != nil {
-		return nil, err
+	failFast := false
+	if p.check(lexer.TOKEN_NOT) {
+		p.advance()
+		failFast = true
 	}
+	if !isRawStringToken(p.peek()) {
+		return nil, p.errorf("expected raw string after shell shortcut")
+	}
+	bodyTok := p.advance()
 	body, err := p.interpolatedStringExpr(p.tokenPos(bodyTok), bodyTok.Value)
 	if err != nil {
 		return nil, err
 	}
-	return &ast.TaggedStringExpr{P: pos, Tag: "sh", Body: body}, nil
+	return &ast.TaggedStringExpr{P: pos, Tag: "sh", Body: body, FailFast: failFast}, nil
+}
+
+func isRawStringToken(tok lexer.Token) bool {
+	return tok.Type == lexer.TOKEN_STRING && tok.IsRawString
 }
 
 func (p *Parser) isDialectFieldBlockStart() bool {

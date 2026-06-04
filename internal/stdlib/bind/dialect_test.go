@@ -18,7 +18,7 @@ func TestDialectTagsExposeInstalledHandlers(t *testing.T) {
 		"hash", "headers", "html_escape", "http_headers", "json", "jsonl",
 		"kv", "lines", "mime", "numbers", "nums", "path", "prompt",
 		"quote", "re", "regexp", "sh", "split", "template", "tsv", "url",
-		"urlquery", "words",
+		"urlpath", "urlquery", "words",
 	}
 	for _, name := range want {
 		if !got[name] {

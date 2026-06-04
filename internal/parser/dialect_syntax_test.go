@@ -26,6 +26,15 @@ func TestTaggedDialectInterpolationParses(t *testing.T) {
 	}
 }
 
+func TestShellShortcutFailFastParses(t *testing.T) {
+	prog := mustParse(t, "shell := $!`printf hello`")
+	decl := prog.Stmts[0].(*ast.DeclareStmt)
+	tagged := decl.Values[0].(*ast.TaggedStringExpr)
+	if tagged.Tag != "sh" || !tagged.FailFast {
+		t.Fatalf("tag/failFast = %q/%v, want sh/true", tagged.Tag, tagged.FailFast)
+	}
+}
+
 func TestTaggedDialectInterpolationParsesNestedExpressionStrings(t *testing.T) {
 	prog := mustParse(t, "msg := prompt`value=${choose({right: \"}\", left: \"{\"})}`")
 	decl := prog.Stmts[0].(*ast.DeclareStmt)
@@ -50,6 +59,19 @@ func TestTaggedDialectInterpolationParsesNestedExpressionStrings(t *testing.T) {
 	table, ok := call.Args[0].(*ast.TableLitExpr)
 	if !ok || len(table.Fields) != 2 {
 		t.Fatalf("call arg = %#v, want table with two fields", call.Args[0])
+	}
+}
+
+func TestTaggedDialectStringsRequireRawStringLiteral(t *testing.T) {
+	for _, src := range []string{
+		`msg := prompt"hello"`,
+		`msg := prompt!"hello"`,
+		`shell := $"printf hello"`,
+		`shell := $!"printf hello"`,
+	} {
+		t.Run(src, func(t *testing.T) {
+			mustFail(t, src)
+		})
 	}
 }
 

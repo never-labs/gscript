@@ -107,6 +107,14 @@ func URLQueryUnescape(src string) (string, error) {
 	return url.QueryUnescape(src)
 }
 
+func URLPathEscape(src string) string {
+	return url.PathEscape(src)
+}
+
+func URLPathUnescape(src string) (string, error) {
+	return url.PathUnescape(src)
+}
+
 func ParseURL(src string) (URLParts, error) {
 	u, err := url.Parse(src)
 	if err != nil {

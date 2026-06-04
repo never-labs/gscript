@@ -88,6 +88,27 @@ func TestDialectURLQueryBoundaryModes(t *testing.T) {
 	}
 }
 
+func TestDialectURLPathBoundaryModes(t *testing.T) {
+	interp := runWithLib(t, `
+		escaped := dialect.eval("urlpath", "a b/米")
+		unescaped := dialect.eval("urlpath", "a%20b%2F%E7%B1%B3", {mode: "unescape"})
+		bad, bad_err := dialect.eval("urlpath", "%zz", {mode: "decode"})
+	`, "dialect", BuildDialect(HostOptions{}, nil))
+
+	if got, want := interp.GetGlobal("escaped").Str(), "a%20b%2F%E7%B1%B3"; got != want {
+		t.Fatalf("escaped path = %q, want %q", got, want)
+	}
+	if got, want := interp.GetGlobal("unescaped").Str(), "a b/米"; got != want {
+		t.Fatalf("unescaped path = %q, want %q", got, want)
+	}
+	if !interp.GetGlobal("bad").IsNil() {
+		t.Fatalf("invalid path escape returned non-nil result")
+	}
+	if got := interp.GetGlobal("bad_err"); !got.IsString() || got.Str() == "" {
+		t.Fatalf("invalid path escape error = %v, want non-empty string", got)
+	}
+}
+
 func TestDialectMIMEBoundaryParseAndEncode(t *testing.T) {
 	interp := runWithLib(t, `
 		parsed := dialect.eval("mime", "Text/HTML; Charset=UTF-8; boundary=\"abc def\"")

@@ -9,6 +9,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/never-labs/leia/internal/modfile"
 )
 
 type DownloadOptions struct {
@@ -57,14 +59,7 @@ func Download(path string, opts DownloadOptions) DownloadReport {
 		return report
 	}
 	report.CacheDir = cacheDir
-	for _, req := range manifest.Require {
-		entry, err := downloadRequirement(req.Path, req.Version, cacheDir, opts)
-		if err != nil {
-			report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "LEIA9111", Message: err.Error()})
-			continue
-		}
-		report.Modules = append(report.Modules, entry)
-	}
+	report.Modules = append(report.Modules, downloadRequirements(abs, manifest, cacheDir, opts, &report.Diagnostics, map[string]bool{})...)
 	if len(report.Diagnostics) == 0 {
 		entries, diags := remoteSumEntries(abs, manifest, cacheDir)
 		report.Diagnostics = append(report.Diagnostics, diags...)
@@ -77,6 +72,30 @@ func Download(path string, opts DownloadOptions) DownloadReport {
 	}
 	report.OK = len(report.Diagnostics) == 0
 	return report
+}
+
+func downloadRequirements(root string, manifest modfile.File, cacheDir string, opts DownloadOptions, diags *[]Diagnostic, seen map[string]bool) []DownloadEntry {
+	var modules []DownloadEntry
+	for _, req := range manifest.Require {
+		key := req.Path + "\x00" + req.Version
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		entry, err := downloadRequirement(req.Path, req.Version, cacheDir, opts)
+		if err != nil {
+			*diags = append(*diags, Diagnostic{Severity: "error", Code: "LEIA9111", Message: err.Error()})
+			continue
+		}
+		modules = append(modules, entry)
+		depRoot := cachedRequirementRoot(cacheDir, req.Path, req.Version)
+		depManifest, _, err := ReadFileWithPath(depRoot)
+		if err != nil {
+			continue
+		}
+		modules = append(modules, downloadRequirements(depRoot, depManifest, cacheDir, opts, diags, seen)...)
+	}
+	return modules
 }
 
 func downloadRequirement(modulePath, version, cacheDir string, opts DownloadOptions) (DownloadEntry, error) {

@@ -12,7 +12,7 @@ const (
 
 	// Literals
 	TOKEN_NUMBER // 123, 1.5, 1e10
-	TOKEN_STRING // "hello"
+	TOKEN_STRING // "hello" or `hello`
 	TOKEN_TRUE   // true
 	TOKEN_FALSE  // false
 	TOKEN_NIL    // nil
@@ -195,6 +195,7 @@ func (t TokenType) String() string {
 type Token struct {
 	Type            TokenType
 	Value           string
+	IsRawString     bool
 	Line            int
 	Column          int
 	LeadingComments []Comment

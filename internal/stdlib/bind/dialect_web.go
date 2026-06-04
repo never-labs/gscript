@@ -28,6 +28,11 @@ func registerDialectWeb(register dialectRegisterFunc) {
 		eval:  dialectURLQuery,
 		block: dialectURLQuery,
 	})
+	register([]string{"urlpath"}, dialectHandler{
+		eval: func(body Value, options *Table) ([]Value, error) {
+			return dialectURLPath(body.Str(), options)
+		},
+	})
 	register([]string{"mime"}, dialectHandler{
 		eval:  dialectMIME,
 		block: dialectMIME,
@@ -103,6 +108,25 @@ func dialectURLQuery(body Value, opts *Table) ([]Value, error) {
 		out.RawSetString(key, TableValue(arr))
 	}
 	return []Value{TableValue(out)}, nil
+}
+
+func dialectURLPath(src string, opts *Table) ([]Value, error) {
+	mode := "escape"
+	if opts != nil && opts.RawGetString("mode").IsString() {
+		mode = opts.RawGetString("mode").Str()
+	}
+	switch mode {
+	case "escape", "encode", "encode_component", "":
+		return []Value{StringValue(dialectlib.URLPathEscape(src))}, nil
+	case "unescape", "decode", "decode_component":
+		decoded, err := dialectlib.URLPathUnescape(src)
+		if err != nil {
+			return []Value{NilValue(), StringValue(err.Error())}, nil
+		}
+		return []Value{StringValue(decoded)}, nil
+	default:
+		return nil, fmt.Errorf("urlpath dialect: unknown mode %q", mode)
+	}
 }
 
 func dialectMIME(body Value, opts *Table) ([]Value, error) {

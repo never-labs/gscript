@@ -7,8 +7,9 @@ func fib(n) {
   return fib(n - 1) + fib(n - 2)
 }
 
-for i := 0; i <= 10; i++ {
+for i <= 10 {
   print(i, fib(i))
+  i++
 }
 
 ---
@@ -17,14 +18,81 @@ for i := 0; i <= 10; i++ {
   (statement
     (function_declaration
       name: (identifier)
-      parameters: (parameter_list)
-      body: (block)))
+      parameters: (parameter_list
+        (parameter
+          (identifier)))
+      body: (block
+        (statement
+          (if_statement
+            condition: (expression
+              (binary_expression
+                left: (expression
+                  (identifier))
+                right: (expression
+                  (number))))
+            consequence: (block
+              (statement
+                (return_statement
+                  (expression_list
+                    (expression
+                      (identifier))))))))
+        (statement
+          (return_statement
+            (expression_list
+              (expression
+                (binary_expression
+                  left: (expression
+                    (call_expression
+                      function: (expression
+                        (identifier))
+                      arguments: (argument_list
+                        (expression
+                          (binary_expression
+                            left: (expression
+                              (identifier))
+                            right: (expression
+                              (number)))))))
+                  right: (expression
+                    (call_expression
+                      function: (expression
+                        (identifier))
+                      arguments: (argument_list
+                        (expression
+                          (binary_expression
+                            left: (expression
+                              (identifier))
+                            right: (expression
+                              (number)))))))))))))))
   (statement
     (for_statement
-      initializer: (simple_statement)
-      condition: (expression)
-      update: (simple_statement)
-      body: (block))))
+      condition: (expression
+        (binary_expression
+          left: (expression
+            (identifier))
+          right: (expression
+            (number))))
+      body: (block
+        (statement
+          (simple_statement
+            (call_statement
+              (call_expression
+                function: (expression
+                  (identifier))
+                arguments: (argument_list
+                  (expression
+                    (identifier))
+                  (expression
+                    (call_expression
+                      function: (expression
+                        (identifier))
+                      arguments: (argument_list
+                        (expression
+                          (identifier))))))))))
+        (statement
+          (simple_statement
+            (increment_statement
+              argument: (expression
+                (identifier)))))))))
 
 ==================
 Imports and require
@@ -44,7 +112,93 @@ assets := require("assets:icons.logo")
       alias: (identifier)))
   (statement
     (simple_statement
-      (assignment_statement)))
+      (assignment_statement
+        left: (expression_list
+          (expression
+            (identifier)))
+        right: (expression_list
+          (expression
+            (call_expression
+              function: (expression
+                (identifier))
+              arguments: (argument_list
+                (expression
+                  (string)))))))))
   (statement
     (simple_statement
-      (assignment_statement))))
+      (assignment_statement
+        left: (expression_list
+          (expression
+            (identifier)))
+        right: (expression_list
+          (expression
+            (call_expression
+              function: (expression
+                (identifier))
+              arguments: (argument_list
+                (expression
+                  (string))))))))))
+
+==================
+Dialect expressions
+==================
+
+rows := csv!`a,b\n1,2\n`
+out := $`printf ok`
+prompt! { role: "system" }
+script { print("ok") }
+
+---
+
+(source_file
+  (statement
+    (simple_statement
+      (assignment_statement
+        left: (expression_list
+          (expression
+            (identifier)))
+        right: (expression_list
+          (expression
+            (tagged_string_expression
+              tag: (identifier)
+              bang: (dialect_bang)
+              body: (string)))))))
+  (statement
+    (simple_statement
+      (assignment_statement
+        left: (expression_list
+          (expression
+            (identifier)))
+        right: (expression_list
+          (expression
+            (tagged_string_expression
+              tag: (shell_tag)
+              body: (string)))))))
+  (statement
+    (simple_statement
+      (expression_statement
+        (expression
+          (tagged_block_expression
+            tag: (identifier)
+            bang: (dialect_bang)
+            config: (config_block
+              (config_field
+                key: (identifier)
+                value: (expression
+                  (string)))))))))
+  (statement
+    (simple_statement
+      (expression_statement
+        (expression
+          (tagged_block_expression
+            tag: (identifier)
+            body: (block
+              (statement
+                (simple_statement
+                  (call_statement
+                    (call_expression
+                      function: (expression
+                        (identifier))
+                      arguments: (argument_list
+                        (expression
+                          (string))))))))))))))

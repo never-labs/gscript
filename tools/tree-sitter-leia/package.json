@@ -6,7 +6,7 @@
   "main": "grammar.js",
   "scripts": {
     "generate": "tree-sitter generate",
-    "test": "tree-sitter test"
+    "test": "if [ -e test ]; then echo 'tree-sitter-leia test scratch path already exists: test' >&2; exit 1; fi; trap 'rm -rf test' EXIT; mkdir -p test && ln -s ../corpus test/corpus && tree-sitter test"
   },
   "devDependencies": {
     "tree-sitter-cli": "0.25.10"

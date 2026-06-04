@@ -16,15 +16,61 @@ user := {
   (statement
     (simple_statement
       (assignment_statement
-        left: (expression_list)
+        left: (expression_list
+          (expression
+            (identifier)))
         right: (expression_list
           (expression
             (table_literal
-              (table_field)
-              (table_field)
-              (table_field)
-              (table_field)
-              (table_field))))))))
+              (table_field
+                key: (identifier)
+                value: (expression
+                  (string)))
+              (field_separator)
+              (table_field
+                key: (identifier)
+                value: (expression
+                  (list_literal
+                    (expression
+                      (number))
+                    (field_separator)
+                    (expression
+                      (number))
+                    (field_separator)
+                    (expression
+                      (number)))))
+              (field_separator)
+              (table_field
+                key: (expression
+                  (string))
+                value: (expression
+                  (boolean)))
+              (field_separator)
+              (table_field
+                value: (expression
+                  (dense_literal
+                    type: (dense_type)
+                    (expression
+                      (number))
+                    (field_separator)
+                    (expression
+                      (number)))))
+              (field_separator)
+              (table_field
+                key: (identifier)
+                value: (expression
+                  (dense_literal
+                    length: (number)
+                    type: (dense_type)
+                    (expression
+                      (boolean))
+                    (field_separator)
+                    (expression
+                      (boolean))
+                    (field_separator)
+                    (expression
+                      (boolean)))))
+              (field_separator))))))))
 
 ==================
 Dense arrays
@@ -40,23 +86,53 @@ mask := [2]bool{true, false}
   (statement
     (simple_statement
       (assignment_statement
+        left: (expression_list
+          (expression
+            (identifier)))
         right: (expression_list
           (expression
             (dense_literal
               length: (number)
-              type: (dense_type)))))))
+              type: (dense_type)
+              (expression
+                (number))
+              (field_separator)
+              (expression
+                (number))
+              (field_separator)
+              (expression
+                (number))))))))
   (statement
     (simple_statement
       (assignment_statement
+        left: (expression_list
+          (expression
+            (identifier)))
         right: (expression_list
           (expression
             (dense_literal
-              type: (dense_type)))))))
+              type: (dense_type)
+              (expression
+                (number))
+              (field_separator)
+              (expression
+                (number))
+              (field_separator)
+              (expression
+                (number))))))))
   (statement
     (simple_statement
       (assignment_statement
+        left: (expression_list
+          (expression
+            (identifier)))
         right: (expression_list
           (expression
             (dense_literal
               length: (number)
-              type: (dense_type))))))))
+              type: (dense_type)
+              (expression
+                (boolean))
+              (field_separator)
+              (expression
+                (boolean)))))))))

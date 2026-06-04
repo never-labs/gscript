@@ -105,9 +105,23 @@ def assert_path(path: str) -> None:
         fail(f"missing path {path}")
 
 
+def assert_js_array_literal(source: str, const_name: str, expected: list[str]) -> None:
+    match = re.search(rf"const\s+{re.escape(const_name)}\s*=\s*(\[[^\]]*\])", source)
+    if not match:
+        fail(f"VS Code extension missing {const_name} array")
+    try:
+        value = json.loads(match.group(1))
+    except json.JSONDecodeError as exc:
+        fail(f"VS Code extension {const_name} array is not JSON-compatible: {exc}")
+    if value != expected:
+        fail(f"VS Code extension {const_name} = {value!r}, want {expected!r}")
+
+
 def check_textmate() -> None:
     leia = load_json(ROOT / "tools/syntax/textmate/leia.tmLanguage.json")
     leia_mod = load_json(ROOT / "tools/syntax/textmate/leia-mod.tmLanguage.json")
+    vscode_leia = load_json(ROOT / "editors/vscode/syntaxes/leia.tmLanguage.json")
+    vscode_leia_mod = load_json(ROOT / "editors/vscode/syntaxes/leia-mod.tmLanguage.json")
     source = (ROOT / "tools/editor/smoke/fixtures/ai_native.leia").read_text(encoding="utf-8")
     manifest = (ROOT / "tools/editor/smoke/fixtures/leia.mod").read_text(encoding="utf-8")
 
@@ -115,6 +129,10 @@ def check_textmate() -> None:
         fail("Leia TextMate grammar has the wrong scope")
     if leia_mod.get("scopeName") != "source.leia.mod":
         fail("leia.mod TextMate grammar has the wrong scope")
+    if vscode_leia != leia:
+        fail("VS Code Leia TextMate grammar drifted from tools/syntax/textmate/leia.tmLanguage.json")
+    if vscode_leia_mod != leia_mod:
+        fail("VS Code leia.mod TextMate grammar drifted from tools/syntax/textmate/leia-mod.tmLanguage.json")
 
     assert_match(leia, "keyword.control.directive.leia", source)
     assert_match(leia, "storage.type.function.leia", source)
@@ -184,9 +202,16 @@ def check_vscode() -> None:
             fail(f"VS Code package is missing setting {setting}")
 
     extension = (ROOT / "editors/vscode/extension.js").read_text(encoding="utf-8")
-    for marker in ('"import"', '"dialect"'):
-        if marker not in extension:
-            fail(f"VS Code semantic token legend missing {marker}")
+    assert_js_array_literal(
+        extension,
+        "semanticTokenTypes",
+        ["keyword", "variable", "function", "method", "string", "number", "operator", "type", "parameter", "property", "namespace"],
+    )
+    assert_js_array_literal(
+        extension,
+        "semanticTokenModifiers",
+        ["declaration", "readonly", "defaultLibrary", "import", "dialect"],
+    )
     for marker in (
         "startLanguageServer(context)",
         "textDocument/definition",
@@ -255,6 +280,13 @@ def check_tree_sitter_assets() -> None:
             fail(f"tree-sitter node-types still expose old AI-native node {old_node_type}")
 
     query = (ROOT / "tools/tree-sitter-leia/queries/highlights.scm").read_text(encoding="utf-8")
+    for editor_query in (
+        "editors/neovim/queries/leia/highlights.scm",
+        "editors/helix/queries/leia/highlights.scm",
+        "editors/zed/languages/leia/highlights.scm",
+    ):
+        if (ROOT / editor_query).read_text(encoding="utf-8") != query:
+            fail(f"{editor_query} drifted from tools/tree-sitter-leia/queries/highlights.scm")
     for marker in (
         "@keyword.control",
         "@function.call",
@@ -281,6 +313,23 @@ def check_tree_sitter_assets() -> None:
     for unsupported in ('"%="', '"i8"', '"i16"', '"u8"', '"u16"', '"u32"', '"u64"'):
         if unsupported in grammar_js or unsupported in query:
             fail(f"tree-sitter editor assets still expose unsupported token {unsupported}")
+
+    corpus = "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in sorted((ROOT / "tools/tree-sitter-leia/corpus").glob("*.txt"))
+    )
+    for marker in (
+        "import \"go:net/http\" as http",
+        "csv!`a,b\\n1,2\\n`",
+        "$`printf ok`",
+        "prompt! { role:",
+        "(tagged_string_expression",
+        "(tagged_block_expression",
+        "(shell_tag)",
+        "(dialect_bang)",
+    ):
+        if marker not in corpus:
+            fail(f"tree-sitter corpus missing import/dialect smoke marker {marker}")
 
 
 def check_packaged_editor_integrations() -> None:

@@ -228,6 +228,19 @@ func TestRawStringLiterals(t *testing.T) {
 	})
 }
 
+func TestRawStringTokenMarksSourceForm(t *testing.T) {
+	tokens, err := New("`raw` \"quoted\"").Tokenize()
+	if err != nil {
+		t.Fatalf("Tokenize returned error: %v", err)
+	}
+	if !tokens[0].IsRawString {
+		t.Fatalf("raw string token IsRawString = false, want true")
+	}
+	if tokens[1].IsRawString {
+		t.Fatalf("quoted string token IsRawString = true, want false")
+	}
+}
+
 func TestEmptyString(t *testing.T) {
 	expectTokens(t, `""`, []Token{
 		{Type: TOKEN_STRING, Value: ""},

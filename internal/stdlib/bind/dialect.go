@@ -11,7 +11,7 @@ import (
 // sh`...`, cmd`...`, glob`...`, json`...`, prompt`...`, quote { ... }, and
 // small safe data transforms such as path`...`, url`...`, words`...`, nums`...`,
 // kv`...`, env`...`, jsonl`...`, html_escape`...`, urlquery`...`, mime`...`,
-// base64`...`, and hash`...`.
+// urlpath`...`, base64`...`, and hash`...`.
 func BuildDialect(opts HostOptions, maxHostResult func() int64) *Table {
 	t := markStdlibBoundModule(NewTable())
 

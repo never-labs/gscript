@@ -1,0 +1,123 @@
+// validation_quality_gate.leia - Collect parser failures into a stable quality report.
+// Demonstrates: non-throwing dialect.eval errors, url, mime, headers,
+// cookie, urlquery, json/jsonl encoding, regexp checks, template, and hash.
+
+print("=== Dialects: validation quality gate ===")
+
+cases := jsonl`{"name":"callback-url","parser":"url","input":"https://app.example.test/callback?code=ok"}
+{"name":"broken-url","parser":"url","input":"http://[::1"}
+{"name":"content-type","parser":"mime","input":"application/json; charset=utf-8"}
+{"name":"bad-mime","parser":"mime","input":"text/plain; bad"}
+{"name":"request-headers","parser":"headers","input":"x-trace: abc\r\naccept: application/json\r\n"}
+{"name":"bad-headers","parser":"headers","input":"ok: yes\r\nnot a header\r\n"}
+{"name":"session-cookie","parser":"cookie","input":"session=s-42; cohort=beta"}
+{"name":"bad-cookie","parser":"cookie","input":"ok=1; missing"}
+{"name":"query-component","parser":"urlquery","input":"hello+world%26x"}
+{"name":"bad-query-component","parser":"urlquery","input":"%zz"}
+{"name":"payload-json","parser":"json","input":"{\"id\":\"evt-1\",\"ok\":true}"}
+{"name":"bad-json","parser":"json","input":"{\"id\":"}
+`
+
+slug := regexp!`^[a-z][a-z0-9-]*$`
+results := {}
+passed := 0
+failed := 0
+
+func parse_case(row) {
+    if row.parser == "urlquery" {
+        value, err := dialect.eval(row.parser, row.input, {mode: "unescape"})
+        return value, err
+    }
+    value, err := dialect.eval(row.parser, row.input)
+    return value, err
+}
+
+func short_error(err) {
+    if err == nil || err == "" {
+        return ""
+    }
+    words := dialect.eval("words", err)
+    if #words <= 4 {
+        return table.concat(words, " ")
+    }
+    return words[1] .. " " .. words[2] .. " " .. words[3] .. " " .. words[4]
+}
+
+for i := 1; i <= #cases; i++ {
+    row := cases[i]
+    assert(slug.match(row.name) == true)
+
+    value, err := parse_case(row)
+    ok := err == nil
+    if ok {
+        passed = passed + 1
+    } else {
+        failed = failed + 1
+    }
+
+    results[i] = {
+        name: row.name,
+        parser: row.parser,
+        ok: ok,
+        error: short_error(err),
+    }
+
+    if row.name == "callback-url" {
+        assert(value.host == "app.example.test")
+        assert(value.query.code == "ok")
+    }
+    if row.name == "content-type" {
+        assert(value.type == "application/json")
+        assert(value.params.charset == "utf-8")
+    }
+    if row.name == "request-headers" {
+        assert(value["X-Trace"] == "abc")
+        assert(value.Accept == "application/json")
+    }
+    if row.name == "session-cookie" {
+        assert(value.session == "s-42")
+        assert(value.cohort == "beta")
+    }
+    if row.name == "query-component" {
+        assert(value == "hello world&x")
+    }
+    if row.name == "payload-json" {
+        assert(value.id == "evt-1")
+        assert(value.ok == true)
+    }
+}
+
+report := {
+    total: #cases,
+    passed: passed,
+    failed: failed,
+    results: results,
+}
+report_json := dialect.eval("json", report, {mode: "encode"})
+fingerprint := string.sub(dialect.eval("hash", report_json), 1, 12)
+summary := template {
+    text: "quality gate: {{.passed}}/{{.total}} valid, {{.failed}} rejected, fingerprint={{.fingerprint}}",
+    data: {passed: passed, total: #cases, failed: failed, fingerprint: fingerprint},
+}
+report_lines := dialect.eval("jsonl", results, {mode: "encode"})
+
+print(summary)
+print(report_lines)
+
+assert(#cases == 12)
+assert(passed == 6)
+assert(failed == 6)
+assert(results[2].ok == false)
+assert(results[4].ok == false)
+assert(results[6].ok == false)
+assert(results[8].ok == false)
+assert(results[10].ok == false)
+assert(results[12].ok == false)
+assert(results[2].error != "")
+assert(results[12].error != "")
+assert(report.total == 12)
+assert(report.failed == 6)
+assert(summary == "quality gate: 6/12 valid, 6 rejected, fingerprint=" .. fingerprint)
+assert(report_lines == "{\"error\":\"\",\"name\":\"callback-url\",\"ok\":true,\"parser\":\"url\"}\n{\"error\":\"parse \\\"http://[::1\\\": missing ']'\",\"name\":\"broken-url\",\"ok\":false,\"parser\":\"url\"}\n{\"error\":\"\",\"name\":\"content-type\",\"ok\":true,\"parser\":\"mime\"}\n{\"error\":\"mime: invalid media parameter\",\"name\":\"bad-mime\",\"ok\":false,\"parser\":\"mime\"}\n{\"error\":\"\",\"name\":\"request-headers\",\"ok\":true,\"parser\":\"headers\"}\n{\"error\":\"malformed MIME header: missing\",\"name\":\"bad-headers\",\"ok\":false,\"parser\":\"headers\"}\n{\"error\":\"\",\"name\":\"session-cookie\",\"ok\":true,\"parser\":\"cookie\"}\n{\"error\":\"cookie dialect: invalid cookie\",\"name\":\"bad-cookie\",\"ok\":false,\"parser\":\"cookie\"}\n{\"error\":\"\",\"name\":\"query-component\",\"ok\":true,\"parser\":\"urlquery\"}\n{\"error\":\"invalid URL escape \\\"%zz\\\"\",\"name\":\"bad-query-component\",\"ok\":false,\"parser\":\"urlquery\"}\n{\"error\":\"\",\"name\":\"payload-json\",\"ok\":true,\"parser\":\"json\"}\n{\"error\":\"unexpected EOF\",\"name\":\"bad-json\",\"ok\":false,\"parser\":\"json\"}\n")
+
+print("validation quality gate ok")

@@ -329,7 +329,7 @@ func (l *Lexer) readRawString() (Token, error) {
 		if l.peek() == '`' {
 			value := l.source[startPos:l.pos]
 			l.advance() // consume closing `
-			return Token{Type: TOKEN_STRING, Value: value, Line: startLine, Column: startCol}, nil
+			return Token{Type: TOKEN_STRING, Value: value, IsRawString: true, Line: startLine, Column: startCol}, nil
 		}
 		l.advance()
 	}

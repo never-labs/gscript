@@ -1257,8 +1257,9 @@ func sumEntriesWithCache(root string, manifest modfile.File, cacheDir string) ([
 }
 
 func remoteSumEntries(root string, manifest modfile.File, cacheDir string) ([]SumEntry, []Diagnostic) {
+	requirements := transitiveRequirements(root, manifest, cacheDir)
 	hasRemoteRequire := false
-	for _, req := range manifest.Require {
+	for _, req := range requirements {
 		if req.Version != "" {
 			hasRemoteRequire = true
 			break
@@ -1276,7 +1277,7 @@ func remoteSumEntries(root string, manifest modfile.File, cacheDir string) ([]Su
 	}
 	var entries []SumEntry
 	var diags []Diagnostic
-	for _, req := range manifest.Require {
+	for _, req := range requirements {
 		if req.Version == "" {
 			continue
 		}
@@ -1308,6 +1309,32 @@ func remoteSumEntries(root string, manifest modfile.File, cacheDir string) ([]Su
 		return sumKey(entries[i]) < sumKey(entries[j])
 	})
 	return entries, diags
+}
+
+func transitiveRequirements(root string, manifest modfile.File, cacheDir string) []modfile.Require {
+	seen := map[string]bool{}
+	return appendTransitiveRequirements(nil, root, manifest, cacheDir, seen)
+}
+
+func appendTransitiveRequirements(out []modfile.Require, root string, manifest modfile.File, cacheDir string, seen map[string]bool) []modfile.Require {
+	for _, req := range manifest.Require {
+		key := req.Path + "\x00" + req.Version
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		out = append(out, req)
+		depRoot, _, ok := dependencyRootWithCache(root, manifest, req, cacheDir)
+		if !ok {
+			continue
+		}
+		depManifest, _, err := ReadFileWithPath(depRoot)
+		if err != nil {
+			continue
+		}
+		out = appendTransitiveRequirements(out, depRoot, depManifest, cacheDir, seen)
+	}
+	return out
 }
 
 func remoteModuleRoots(root, cacheDir, modulePath, version string) []string {

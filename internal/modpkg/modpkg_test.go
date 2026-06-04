@@ -445,6 +445,63 @@ func TestDownloadWritesRemoteModuleSumAndVerifyChecksCache(t *testing.T) {
 	assertDiagnostic(t, diags, "LEIA9109", "checksum mismatch for github.com/acme/toolkit")
 }
 
+func TestDownloadFetchesTransitiveGitHubRequires(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "leia.mod"), strings.Join([]string{
+		"module example.com/app",
+		"leia 0.1",
+		"require github.com/acme/toolkit v1.2.3",
+		"",
+	}, "\n"))
+	archives := map[string][]byte{
+		"/acme/toolkit/archive/refs/tags/v1.2.3.zip": testGitHubZipFiles(t, map[string]string{
+			"toolkit-1.2.3/leia.mod": strings.Join([]string{
+				"module github.com/acme/toolkit",
+				"leia 0.1",
+				"require github.com/acme/transitive v0.2.0",
+				"",
+			}, "\n"),
+			"toolkit-1.2.3/pkg/util.leia": `import "github.com/acme/transitive/pkg" as dep
+_ = dep
+`,
+		}),
+		"/acme/transitive/archive/refs/tags/v0.2.0.zip": testGitHubZipFiles(t, map[string]string{
+			"transitive-0.2.0/leia.mod":       "module github.com/acme/transitive\nleia 0.1\n",
+			"transitive-0.2.0/pkg/value.leia": "return 2\n",
+		}),
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		archive, ok := archives[r.URL.Path]
+		if !ok {
+			t.Fatalf("unexpected download path = %q", r.URL.Path)
+		}
+		_, _ = w.Write(archive)
+	}))
+	defer server.Close()
+
+	cache := filepath.Join(dir, "cache")
+	report := Download(dir, DownloadOptions{CacheDir: cache, GitHubBaseURL: server.URL})
+	if !report.OK {
+		t.Fatalf("Download OK = false, diagnostics = %#v", report.Diagnostics)
+	}
+	if len(report.Modules) != 2 {
+		t.Fatalf("Download modules = %#v, want direct and transitive modules", report.Modules)
+	}
+	if _, err := os.Stat(filepath.Join(cache, "extract", "github.com", "acme", "transitive@v0.2.0", "pkg", "value.leia")); err != nil {
+		t.Fatalf("transitive cache file missing: %v", err)
+	}
+	sumEntries, err := readSumFile(filepath.Join(dir, SumFileName))
+	if err != nil {
+		t.Fatalf("readSumFile error = %v", err)
+	}
+	assertSumEntry(t, sumEntries, SumEntry{
+		Kind:    "module",
+		Path:    "github.com/acme/transitive",
+		Version: "v0.2.0",
+		Target:  "github.com/acme/transitive@v0.2.0",
+	})
+}
+
 func TestDownloadRejectsNonGitHubModules(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, filepath.Join(dir, "leia.mod"), strings.Join([]string{
@@ -489,6 +546,47 @@ func TestVendorCopiesDownloadedModules(t *testing.T) {
 	writeFile(t, target, "return 2\n")
 	diags := VerifySumWithOptions(dir, VerifyOptions{CacheDir: cache})
 	assertDiagnostic(t, diags, "LEIA9109", "checksum mismatch for github.com/acme/toolkit")
+}
+
+func TestVendorCopiesTransitiveDownloadedModules(t *testing.T) {
+	dir := t.TempDir()
+	cache := filepath.Join(dir, "cache")
+	writeFile(t, filepath.Join(dir, "leia.mod"), strings.Join([]string{
+		"module example.com/app",
+		"leia 0.1",
+		"require github.com/acme/toolkit v1.2.3",
+		"",
+	}, "\n"))
+	writeFile(t, filepath.Join(cache, "extract", "github.com", "acme", "toolkit@v1.2.3", "leia.mod"), strings.Join([]string{
+		"module github.com/acme/toolkit",
+		"leia 0.1",
+		"require github.com/acme/transitive v0.2.0",
+		"",
+	}, "\n"))
+	writeFile(t, filepath.Join(cache, "extract", "github.com", "acme", "toolkit@v1.2.3", "pkg", "util.leia"), `import "github.com/acme/transitive/pkg/value" as value
+_ = value
+`)
+	writeFile(t, filepath.Join(cache, "extract", "github.com", "acme", "transitive@v0.2.0", "leia.mod"), "module github.com/acme/transitive\nleia 0.1\n")
+	writeFile(t, filepath.Join(cache, "extract", "github.com", "acme", "transitive@v0.2.0", "pkg", "value.leia"), "return 7\n")
+
+	report := Vendor(dir, VendorOptions{CacheDir: cache})
+	if !report.OK {
+		t.Fatalf("Vendor OK = false, diagnostics = %#v", report.Diagnostics)
+	}
+	if len(report.Modules) != 2 {
+		t.Fatalf("Vendor modules = %#v, want direct and transitive modules", report.Modules)
+	}
+	target := filepath.Join(dir, "vendor", "github.com", "acme", "transitive@v0.2.0", "pkg", "value.leia")
+	if data, err := os.ReadFile(target); err != nil || string(data) != "return 7\n" {
+		t.Fatalf("vendored transitive file = %q, %v; want copied source", string(data), err)
+	}
+	if diags := VerifySumWithOptions(dir, VerifyOptions{CacheDir: cache}); len(diags) != 0 {
+		t.Fatalf("VerifySumWithOptions diagnostics = %#v, want none", diags)
+	}
+
+	writeFile(t, target, "return 8\n")
+	diags := VerifySumWithOptions(dir, VerifyOptions{CacheDir: cache})
+	assertDiagnostic(t, diags, "LEIA9109", "checksum mismatch for github.com/acme/transitive")
 }
 
 func TestVendorCopiesDownloadedGitHubSubdirModule(t *testing.T) {
@@ -559,14 +657,22 @@ func TestScanStaticRequiresUsesAST(t *testing.T) {
 func testGitHubZip(t *testing.T, name, data string) []byte {
 	t.Helper()
 
+	return testGitHubZipFiles(t, map[string]string{name: data})
+}
+
+func testGitHubZipFiles(t *testing.T, files map[string]string) []byte {
+	t.Helper()
+
 	var buf bytes.Buffer
 	zw := zip.NewWriter(&buf)
-	w, err := zw.Create(name)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := fmt.Fprint(w, data); err != nil {
-		t.Fatal(err)
+	for name, data := range files {
+		w, err := zw.Create(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := fmt.Fprint(w, data); err != nil {
+			t.Fatal(err)
+		}
 	}
 	if err := zw.Close(); err != nil {
 		t.Fatal(err)
