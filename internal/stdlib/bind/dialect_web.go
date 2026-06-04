@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"mime"
 	"net/textproto"
+	"net/url"
 	"sort"
 	"strings"
 
@@ -58,14 +59,22 @@ func dialectURLQuery(body Value, opts *Table) ([]Value, error) {
 		mode = opts.RawGetString("mode").Str()
 	}
 	if body.IsTable() && mode != "decode" && mode != "parse" {
-		values := make(map[string]string)
+		values := url.Values{}
 		body.Table().ForEachPlainRaw(func(k, v Value) bool {
 			if k.IsString() {
-				values[k.Str()] = v.String()
+				key := k.Str()
+				if v.IsTable() {
+					tbl := v.Table()
+					for i := 1; i <= tbl.Length(); i++ {
+						values.Add(key, tbl.RawGetInt(int64(i)).String())
+					}
+					return true
+				}
+				values.Set(key, v.String())
 			}
 			return true
 		})
-		return []Value{StringValue(dialectlib.URLQueryEncode(values))}, nil
+		return []Value{StringValue(values.Encode())}, nil
 	}
 	if mode == "escape" || mode == "encode_component" {
 		return []Value{StringValue(dialectlib.URLQueryEscape(body.Str()))}, nil

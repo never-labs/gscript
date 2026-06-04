@@ -176,6 +176,25 @@ func TestBuiltinDialectRegistryStaysModular(t *testing.T) {
 		"dialect_data.go":     {"base64", "hash"},
 		"dialect_ai.go":       {"prompt", "quote"},
 	}
+	expectedProjectImportsByFile := map[string][]string{
+		"dialect_shell_fs.go": {
+			"github.com/never-labs/leia/internal/stdlib/lib/path",
+			"github.com/never-labs/leia/internal/support",
+		},
+		"dialect_text.go": {
+			"github.com/never-labs/leia/internal/runtime",
+			"github.com/never-labs/leia/internal/stdlib/lib/csv",
+			"github.com/never-labs/leia/internal/support/dialect",
+		},
+		"dialect_web.go": {
+			"github.com/never-labs/leia/internal/support/dialect",
+		},
+		"dialect_data.go": {
+			"github.com/never-labs/leia/internal/stdlib/lib/base64",
+			"github.com/never-labs/leia/internal/stdlib/lib/hash",
+		},
+		"dialect_ai.go": nil,
+	}
 
 	dialectFile := parseGoFile(t, filepath.Join(bindRoot, "dialect.go"))
 	actualCalls := directCallsInFunc(dialectFile, "BuildDialect", "registerDialect")
@@ -200,6 +219,11 @@ func TestBuiltinDialectRegistryStaysModular(t *testing.T) {
 	seen := map[string]string{}
 	for fileName, expectedTags := range expectedTagsByFile {
 		path := filepath.Join(bindRoot, fileName)
+		actualProjectImports := projectImports(parseImports(t, path))
+		expectedProjectImports := expectedProjectImportsByFile[fileName]
+		if strings.Join(actualProjectImports, ",") != strings.Join(expectedProjectImports, ",") {
+			t.Fatalf("%s imports project packages %v, want %v; keep builtin dialects on small substrate packages only", relativeToRoot(t, path), actualProjectImports, expectedProjectImports)
+		}
 		actualTags := dialectTagsRegisteredByFile(t, path)
 		if strings.Join(actualTags, ",") != strings.Join(expectedTags, ",") {
 			t.Fatalf("%s registers dialect tags %v, want %v", relativeToRoot(t, path), actualTags, expectedTags)
@@ -211,6 +235,24 @@ func TestBuiltinDialectRegistryStaysModular(t *testing.T) {
 			seen[tag] = fileName
 		}
 	}
+
+	forEachGoFile(t, bindRoot, func(path string) {
+		if strings.HasSuffix(path, "_test.go") {
+			return
+		}
+		fileName := filepath.Base(path)
+		tags := dialectTagsRegisteredByFile(t, path)
+		if len(tags) > 0 {
+			if _, ok := expectedTagsByFile[fileName]; !ok {
+				t.Fatalf("%s registers builtin dialect tags %v outside an approved dialect module", relativeToRoot(t, path), tags)
+			}
+		}
+		for _, fn := range funcsAcceptingDialectRegisterFunc(t, path) {
+			if !stringInSlice(expectedCalls, fn) || expectedDialectFileForFunc(fn) != fileName {
+				t.Fatalf("%s defines %s with dialectRegisterFunc; builtin dialect registration must stay in approved modules", relativeToRoot(t, path), fn)
+			}
+		}
+	})
 }
 
 func TestInternalSupportPackagesStayGrouped(t *testing.T) {
@@ -382,6 +424,62 @@ func dialectTagsRegisteredByFile(t *testing.T, path string) []string {
 		return true
 	})
 	return tags
+}
+
+func funcsAcceptingDialectRegisterFunc(t *testing.T, path string) []string {
+	t.Helper()
+	file := parseGoFile(t, path)
+	var funcs []string
+	for _, decl := range file.Decls {
+		fn, ok := decl.(*ast.FuncDecl)
+		if !ok || fn.Type.Params == nil {
+			continue
+		}
+		for _, field := range fn.Type.Params.List {
+			ident, ok := field.Type.(*ast.Ident)
+			if ok && ident.Name == "dialectRegisterFunc" {
+				funcs = append(funcs, fn.Name.Name)
+				break
+			}
+		}
+	}
+	return funcs
+}
+
+func expectedDialectFileForFunc(funcName string) string {
+	switch funcName {
+	case "registerDialectShellFS":
+		return "dialect_shell_fs.go"
+	case "registerDialectText":
+		return "dialect_text.go"
+	case "registerDialectWeb":
+		return "dialect_web.go"
+	case "registerDialectData":
+		return "dialect_data.go"
+	case "registerDialectAI":
+		return "dialect_ai.go"
+	default:
+		return ""
+	}
+}
+
+func projectImports(imports []string) []string {
+	var project []string
+	for _, importPath := range imports {
+		if strings.HasPrefix(importPath, "github.com/never-labs/leia/") {
+			project = append(project, importPath)
+		}
+	}
+	return project
+}
+
+func stringInSlice(values []string, target string) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
 }
 
 func stringLiteralValue(expr ast.Expr) (string, bool) {

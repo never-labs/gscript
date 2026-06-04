@@ -102,6 +102,13 @@ func dialectJSON(body Value, opts *Table) ([]Value, error) {
 		if err := decoder.Decode(&goVal); err != nil {
 			return []Value{NilValue(), StringValue(err.Error())}, nil
 		}
+		var extra any
+		if err := decoder.Decode(&extra); err != io.EOF {
+			if err == nil {
+				return []Value{NilValue(), StringValue("invalid JSON: trailing data")}, nil
+			}
+			return []Value{NilValue(), StringValue(err.Error())}, nil
+		}
 		return []Value{runtime.JSONGoToValue(goVal)}, nil
 	}
 	data, err := json.Marshal(runtime.JSONValueToGo(body))

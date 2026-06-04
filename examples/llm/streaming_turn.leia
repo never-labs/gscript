@@ -1,0 +1,36 @@
+// Streaming llm.turn demo.
+//
+// This example is intended for host tests with a mock or replay provider. It
+// demonstrates token streaming through a script callback without requiring a
+// network-backed model.
+
+streamed_text := ""
+stream_event_count := 0
+last_stream_event := ""
+
+stream_result, stream_err := llm.turn({
+    model: "mock-stream"
+    messages: {
+        llm.system("Return the provider stream exactly."),
+        llm.user("Stream a short greeting."),
+    }
+    stream: true
+    on_stream: func(event) {
+        streamed_text = streamed_text .. event.token
+        stream_event_count = stream_event_count + 1
+        last_stream_event = event.type
+    }
+})
+
+assert(stream_err == nil)
+assert(stream_result.status == "final_answer")
+assert(stream_result.text == "hello stream")
+assert(streamed_text == "hello stream")
+assert(stream_event_count == 3)
+assert(last_stream_event == "token")
+
+stream_text := stream_result.text
+stream_status := stream_result.status
+
+print("stream status:", stream_status)
+print("stream text:", stream_text)

@@ -99,6 +99,26 @@ func TestPackageManagedUIExample(t *testing.T) {
 	if got := stdout.String(); !strings.Contains(got, "github.com/gen2brain/raylib-go/raylib v0.55.1") {
 		t.Fatalf("generated go.mod = %q, want native UI adapter dependency", got)
 	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = runModCommand([]string{"capability", "--json", dir}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("mod capability code = %d, stderr = %q stdout = %q", code, stderr.String(), stdout.String())
+	}
+	var caps modCapabilityReport
+	if err := json.Unmarshal(stdout.Bytes(), &caps); err != nil {
+		t.Fatalf("stdout is not JSON capability report: %v; stdout = %q", err, stdout.String())
+	}
+	if !caps.OK {
+		t.Fatalf("capability report = %+v, want package-managed UI capabilities to report", caps)
+	}
+	if !moduleHasCapabilities(caps.Modules, "example.com/leia/examples/ui/package-managed", "ui.input", "ui.window") {
+		t.Fatalf("capability modules = %+v, want UI domain capabilities on the example manifest", caps.Modules)
+	}
+	if !moduleHasPath(caps.Modules, "github.com/never-labs/leia-ui/raylib") {
+		t.Fatalf("capability modules = %+v, want external package-managed UI runtime module", caps.Modules)
+	}
 }
 
 func TestPackageManagedDatabaseExample(t *testing.T) {
@@ -149,6 +169,26 @@ func TestPackageManagedDatabaseExample(t *testing.T) {
 	}
 	if got := stdout.String(); !strings.Contains(got, "modernc.org/sqlite v1.38.2") {
 		t.Fatalf("generated go.mod = %q, want native SQLite adapter dependency", got)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = runModCommand([]string{"capability", "--json", dir}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("mod capability code = %d, stderr = %q stdout = %q", code, stderr.String(), stdout.String())
+	}
+	var caps modCapabilityReport
+	if err := json.Unmarshal(stdout.Bytes(), &caps); err != nil {
+		t.Fatalf("stdout is not JSON capability report: %v; stdout = %q", err, stdout.String())
+	}
+	if !caps.OK {
+		t.Fatalf("capability report = %+v, want package-managed database capabilities to report", caps)
+	}
+	if !moduleHasCapabilities(caps.Modules, "example.com/leia/examples/database/package-managed", "db.open", "db.query") {
+		t.Fatalf("capability modules = %+v, want database domain capabilities on the example manifest", caps.Modules)
+	}
+	if !moduleHasPath(caps.Modules, "github.com/never-labs/leia-db/sqlite") {
+		t.Fatalf("capability modules = %+v, want external package-managed database runtime module", caps.Modules)
 	}
 }
 
@@ -206,6 +246,30 @@ func TestWorkflowReplayExample(t *testing.T) {
 func containsResolvedRequire(reqs []modpkg.ListRequire, path, version string) bool {
 	for _, req := range reqs {
 		if req.Path == path && req.Version == version {
+			return true
+		}
+	}
+	return false
+}
+
+func moduleHasCapabilities(modules []modpkg.CapabilityModule, path string, capabilities ...string) bool {
+	for _, module := range modules {
+		if module.Path != path {
+			continue
+		}
+		for _, capability := range capabilities {
+			if !containsString(module.Capabilities, capability) {
+				return false
+			}
+		}
+		return true
+	}
+	return false
+}
+
+func moduleHasPath(modules []modpkg.CapabilityModule, path string) bool {
+	for _, module := range modules {
+		if module.Path == path {
 			return true
 		}
 	}

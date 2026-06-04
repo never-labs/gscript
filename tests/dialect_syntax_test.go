@@ -232,6 +232,7 @@ func TestStdlibDataDialectsExecuteThroughStdlib(t *testing.T) {
 				"number_rows := dialect.eval(\"numbers\", \"-2 0 2.25\")\n" +
 				"num_matrix := dialect.eval(\"nums\", \"1,2,3\\n4,5,6\\n\", {matrix: true})\n" +
 				"bad_nums, bad_nums_err := dialect.eval(\"nums\", \"1 nope 3\")\n" +
+				"bad_num_matrix, bad_num_matrix_err := dialect.eval(\"nums\", \"1,2\\n3,4,5\\n\", {matrix: true})\n" +
 				"kv_rows := dialect.eval(\"kv\", \"name = Ada\\nscore = 42\\n\")\n" +
 				"env_rows := dialect.eval(\"env\", \"TOKEN=\\\"abc 123\\\"\\nEMPTY=\\n\")\n" +
 				"escaped_html := html_escape`<b>Ada & Bob</b>`\n" +
@@ -245,7 +246,9 @@ func TestStdlibDataDialectsExecuteThroughStdlib(t *testing.T) {
 				"template_text := template`Hello static`\n" +
 				"template_cfg := template { text: \"Score {{.score}}\", data: {score: \"42\"} }\n" +
 				"template_eval := dialect.eval(\"template\", \"Hi {{.name}}\", {data: {name: name}})\n" +
+				"bad_json, bad_json_err := dialect.eval(\"json\", \"{} []\")\n" +
 				"jsonl_rows := jsonl`{\"name\":\"Ada\",\"score\":42}\n{\"name\":\"Bob\",\"score\":7}\n`\n" +
+				"bad_jsonl, bad_jsonl_err := dialect.eval(\"jsonl\", \"{\\\"ok\\\":true}\\n\\n{\\\"ok\\\":false}\\n\")\n" +
 				"jsonl_text := dialect.eval(\"jsonl\", jsonl_rows, {mode: \"encode\"})\n\n" +
 				"csv_row_2_name := csv_rows[2][1]\n" +
 				"csv_header_name := csv_header_rows[1].name\n" +
@@ -270,6 +273,7 @@ func TestStdlibDataDialectsExecuteThroughStdlib(t *testing.T) {
 				"num_matrix_cols := #num_matrix[1]\n" +
 				"num_matrix_last := num_matrix[2][3]\n" +
 				"bad_nums_is_nil := bad_nums == nil\n" +
+				"bad_num_matrix_is_nil := bad_num_matrix == nil\n" +
 				"kv_name := kv_rows.name\n" +
 				"kv_score := kv_rows.score\n" +
 				"env_token := env_rows.TOKEN\n" +
@@ -280,6 +284,8 @@ func TestStdlibDataDialectsExecuteThroughStdlib(t *testing.T) {
 			src += "mime_type_value := mime_type.type\n" +
 				"mime_charset := mime_type.params.charset\n" +
 				"mime_boundary := mime_type.params.boundary\n" +
+				"bad_json_is_nil := bad_json == nil\n" +
+				"bad_jsonl_is_nil := bad_jsonl == nil\n" +
 				"jsonl_first_name := jsonl_rows[1].name\n" +
 				"jsonl_second_score := jsonl_rows[2].score\n"
 			err := vm.Exec(src)
@@ -310,6 +316,8 @@ func TestStdlibDataDialectsExecuteThroughStdlib(t *testing.T) {
 			assertGet(t, vm, "num_matrix_last", int64(6))
 			assertGet(t, vm, "bad_nums_is_nil", true)
 			assertStringContains(t, vm, "bad_nums_err", `invalid number "nope"`)
+			assertGet(t, vm, "bad_num_matrix_is_nil", true)
+			assertStringContains(t, vm, "bad_num_matrix_err", "matrix row 2 has 3 values, want 2")
 			assertGet(t, vm, "kv_name", "Ada")
 			assertGet(t, vm, "kv_score", "42")
 			assertGet(t, vm, "env_token", "abc 123")
@@ -329,6 +337,10 @@ func TestStdlibDataDialectsExecuteThroughStdlib(t *testing.T) {
 			assertGet(t, vm, "template_text", "Hello static")
 			assertGet(t, vm, "template_cfg", "Score 42")
 			assertGet(t, vm, "template_eval", "Hi Leia")
+			assertGet(t, vm, "bad_json_is_nil", true)
+			assertStringContains(t, vm, "bad_json_err", "invalid JSON: trailing data")
+			assertGet(t, vm, "bad_jsonl_is_nil", true)
+			assertStringContains(t, vm, "bad_jsonl_err", "line 2: empty JSONL record")
 			assertGet(t, vm, "jsonl_first_name", "Ada")
 			assertGet(t, vm, "jsonl_second_score", int64(7))
 			assertGet(t, vm, "jsonl_text", "{\"name\":\"Ada\",\"score\":42}\n{\"name\":\"Bob\",\"score\":7}\n")

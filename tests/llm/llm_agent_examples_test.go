@@ -2,6 +2,7 @@ package leia_test
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
 
 	leia "github.com/never-labs/leia"
@@ -384,6 +385,68 @@ func TestLLMDirectTurnExampleSmoke(t *testing.T) {
 				if got != want {
 					t.Fatalf("%s = %#v, want %#v", name, got, want)
 				}
+			}
+		})
+	}
+}
+
+func TestLLMStreamingTurnExampleSmoke(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []leia.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			provider := &streamingTraceProvider{}
+			var events []llm.TraceEvent
+			opts := append([]leia.Option{
+				leia.WithLibs(leia.LibString | leia.LibLLM),
+				leia.WithLLMProvider(provider),
+				leia.WithLLMTrace(func(event llm.TraceEvent) {
+					events = append(events, event)
+				}),
+			}, tc.opts...)
+			vm := leia.New(opts...)
+
+			if err := vm.ExecFile(filepath.Join(repoRoot(t), "examples", "llm", "streaming_turn.leia")); err != nil {
+				t.Fatalf("ExecFile: %v", err)
+			}
+
+			for name, want := range map[string]any{
+				"stream_text":        "hello stream",
+				"stream_status":      "final_answer",
+				"streamed_text":      "hello stream",
+				"stream_event_count": int64(3),
+				"last_stream_event":  "token",
+			} {
+				got, err := vm.Get(name)
+				if err != nil {
+					t.Fatalf("Get %s: %v", name, err)
+				}
+				if got != want {
+					t.Fatalf("%s = %#v, want %#v", name, got, want)
+				}
+			}
+			if !provider.usedStream {
+				t.Fatalf("provider did not receive streaming request")
+			}
+
+			gotTypes := make([]string, 0, len(events))
+			tokens := make([]string, 0, 3)
+			for _, event := range events {
+				gotTypes = append(gotTypes, event.Type)
+				if event.Type == "turn_stream" {
+					tokens = append(tokens, event.Token)
+				}
+			}
+			wantTypes := []string{"turn_start", "turn_stream", "turn_stream", "turn_stream", "turn_end"}
+			if strings.Join(gotTypes, ",") != strings.Join(wantTypes, ",") {
+				t.Fatalf("trace event types = %#v, want %#v", gotTypes, wantTypes)
+			}
+			if strings.Join(tokens, "") != "hello stream" {
+				t.Fatalf("trace tokens = %#v", tokens)
 			}
 		})
 	}
