@@ -137,10 +137,14 @@ def check_textmate() -> None:
     assert_match(leia, "keyword.control.directive.leia", source)
     assert_match(leia, "storage.type.function.leia", source)
     assert_match(leia, "meta.import.leia", 'import "go:net/http" as http')
+    assert_match(leia, "meta.import.leia", 'import "json"')
+    assert_match(leia, "meta.import.leia", 'import p "path"')
+    assert_match(leia, "meta.import.group.leia", 'import (\n  "regexp"\n  fs "fs"\n)')
     assert_any_match(leia, "keyword.control.import.leia", 'import "go:net/http" as http')
     assert_any_match(leia, "string.quoted.double.import.path.leia", 'import "go:net/http" as http')
     assert_any_match(leia, "keyword.control.import.as.leia", 'import "go:net/http" as http')
     assert_any_match(leia, "entity.name.namespace.import.leia", 'import "go:net/http" as http')
+    assert_any_match(leia, "entity.name.namespace.import.leia", 'import p "path"')
     if has_pattern(leia, "keyword.control.ai.leia"):
         fail("Leia TextMate grammar still exposes old AI-native keyword scope")
     assert_any_match(leia, "entity.name.tag.dialect.leia", "rows := csv`a,b\\n1,2\\n`")
@@ -322,6 +326,9 @@ def check_tree_sitter_assets() -> None:
     )
     for marker in (
         "import \"go:net/http\" as http",
+        "import \"json\"",
+        "import p \"path\"",
+        "fs \"fs\"",
         "csv!`a,b\\n1,2\\n`",
         "$!`printf ok`",
         "prompt! { role:",

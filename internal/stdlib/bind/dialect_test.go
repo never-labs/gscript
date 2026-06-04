@@ -52,6 +52,43 @@ func TestDialectUnknownTagListsInstalledHandlers(t *testing.T) {
 	}
 }
 
+func TestDialectInfoAndListExposeMetadata(t *testing.T) {
+	interp := runWithLib(t, `
+		tags := dialect.tags()
+		sh_info := dialect.info("sh")
+		glob_info := dialect.info("glob")
+		json_info := dialect.info("json")
+		missing_info := dialect.info("missing")
+		all_info := dialect.list()
+	`, "dialect", BuildDialect(HostOptions{}, nil))
+
+	shInfo := interp.GetGlobal("sh_info").Table()
+	if got := shInfo.RawGetString("category").Str(); got != "shell" {
+		t.Fatalf("sh category = %q, want shell", got)
+	}
+	if !shInfo.RawGetString("builtin").Bool() || !shInfo.RawGetString("eval").Bool() || shInfo.RawGetString("block").Bool() {
+		t.Fatalf("sh info flags = builtin:%v eval:%v block:%v, want builtin eval-only", shInfo.RawGetString("builtin"), shInfo.RawGetString("eval"), shInfo.RawGetString("block"))
+	}
+	if got := stringSliceFromArray(shInfo.RawGetString("capabilities").Table()); !reflect.DeepEqual(got, []string{"process.shell"}) {
+		t.Fatalf("sh capabilities = %#v, want process.shell", got)
+	}
+	if got := stringSliceFromArray(interp.GetGlobal("glob_info").Table().RawGetString("capabilities").Table()); !reflect.DeepEqual(got, []string{"fs.read"}) {
+		t.Fatalf("glob capabilities = %#v, want fs.read", got)
+	}
+	if got := interp.GetGlobal("json_info").Table().RawGetString("category").Str(); got != "text" {
+		t.Fatalf("json category = %q, want text", got)
+	}
+	if !interp.GetGlobal("missing_info").IsNil() {
+		t.Fatalf("missing dialect info = %v, want nil", interp.GetGlobal("missing_info"))
+	}
+	if got, want := interp.GetGlobal("all_info").Table().Length(), interp.GetGlobal("tags").Table().Length(); got != want {
+		t.Fatalf("dialect.list length = %d, want tags length %d", got, want)
+	}
+	if first := interp.GetGlobal("all_info").Table().RawGetInt(1).Table(); !first.RawGetString("name").IsString() || !first.RawGetString("category").IsString() {
+		t.Fatalf("dialect.list first entry missing name/category: %v", first)
+	}
+}
+
 func TestDialectRegistryRejectsDuplicateNames(t *testing.T) {
 	registry := newDialectRegistry()
 	handler := dialectHandler{eval: func(Value, *Table) ([]Value, error) {
@@ -97,12 +134,14 @@ func TestDialectRegisterScriptHandler(t *testing.T) {
 			if opts != nil && opts.prefix != nil { prefix = opts.prefix }
 			if opts != nil && opts.suffix != nil { suffix = opts.suffix }
 			return prefix .. body .. suffix
-		}, {aliases: {"bracket"}})
+		}, {aliases: {"bracket"}, category: "text", capabilities: {"text.wrap"}})
 
 		literal := wrap`+"`"+`ok`+"`"+`
 		via_alias := bracket`+"`"+`ok`+"`"+`
 		explicit := dialect.eval("wrap", "ok", {prefix: "[", suffix: "]"})
 		tags := dialect.tags()
+		info := dialect.info("wrap")
+		alias_info := dialect.info("bracket")
 	`)
 
 	if got := interp.GetGlobal("literal").Str(); got != "<ok>" {
@@ -117,6 +156,22 @@ func TestDialectRegisterScriptHandler(t *testing.T) {
 	tags := stringSetFromArray(interp.GetGlobal("tags").Table())
 	if !tags["wrap"] || !tags["bracket"] {
 		t.Fatalf("registered tags missing from dialect.tags: %#v", tags)
+	}
+	info := interp.GetGlobal("info").Table()
+	if got := info.RawGetString("category").Str(); got != "text" {
+		t.Fatalf("registered category = %q, want text", got)
+	}
+	if info.RawGetString("builtin").Bool() {
+		t.Fatalf("registered builtin flag = true, want false")
+	}
+	if got := stringSliceFromArray(info.RawGetString("aliases").Table()); !reflect.DeepEqual(got, []string{"bracket"}) {
+		t.Fatalf("registered aliases = %#v, want bracket", got)
+	}
+	if got := stringSliceFromArray(info.RawGetString("capabilities").Table()); !reflect.DeepEqual(got, []string{"text.wrap"}) {
+		t.Fatalf("registered capabilities = %#v, want text.wrap", got)
+	}
+	if got := stringSliceFromArray(interp.GetGlobal("alias_info").Table().RawGetString("aliases").Table()); !reflect.DeepEqual(got, []string{"wrap"}) {
+		t.Fatalf("alias info aliases = %#v, want wrap", got)
 	}
 }
 

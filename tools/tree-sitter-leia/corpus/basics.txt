@@ -99,6 +99,12 @@ Imports and require
 ==================
 
 import "go:net/http" as http
+import "json"
+import p "path"
+import (
+  "regexp"
+  fs "fs"
+)
 
 json := require("json")
 assets := require("assets:icons.logo")
@@ -108,8 +114,26 @@ assets := require("assets:icons.logo")
 (source_file
   (statement
     (import_declaration
-      path: (string)
-      alias: (identifier)))
+      (import_spec
+        path: (string)
+        alias: (identifier))))
+  (statement
+    (import_declaration
+      (import_spec
+        path: (string))))
+  (statement
+    (import_declaration
+      (import_spec
+        alias: (identifier)
+        path: (string))))
+  (statement
+    (import_declaration
+      group: (import_group
+        (import_spec
+          path: (string))
+        (import_spec
+          alias: (identifier)
+          path: (string)))))
   (statement
     (simple_statement
       (assignment_statement

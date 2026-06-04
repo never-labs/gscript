@@ -68,9 +68,21 @@ module.exports = grammar({
 
     import_declaration: $ => seq(
       "import",
-      field("path", $.string),
-      "as",
-      field("alias", $.identifier),
+      choice(
+        field("group", $.import_group),
+        $.import_spec,
+      ),
+    ),
+
+    import_group: $ => seq(
+      "(",
+      repeat(choice($.separator, $.import_spec)),
+      ")",
+    ),
+
+    import_spec: $ => choice(
+      seq(field("path", $.string), optional(seq("as", field("alias", $.identifier)))),
+      seq(field("alias", $.identifier), field("path", $.string)),
     ),
 
     parameter_list: $ => seq(

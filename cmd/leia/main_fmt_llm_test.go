@@ -158,7 +158,14 @@ total:=1+  2
 }
 
 func llmToolchainCoverageSource() []byte {
-	return []byte(`lookup := llm.tool("lookup", func(query) {
+	return []byte(`import "json"
+import p "path"
+import (
+    "regexp"
+    fs "fs"
+)
+
+lookup := llm.tool("lookup", func(query) {
     return "found:" .. query, nil
 }, {
     description: "Lookup docs."
@@ -218,11 +225,15 @@ direct, direct_err := llm.turn({
     model: "fast"
 })
 shell := $` + "`printf leia`" + `
+raw_csv := csv!` + "`a,b\\n1,2\\n`" + `
+raw_prompt := prompt! { role: "system" }
 _ = answer
 _ = answer_err
 _ = direct
 _ = direct_err
 _ = shell
+_ = raw_csv
+_ = raw_prompt
 `)
 }
 
@@ -238,7 +249,10 @@ func TestFmtLLMSyntaxCoverage(t *testing.T) {
 		"history.find(msgs, {role: \"tool\"})",
 		"history.find_all(msgs, {role: \"user\"})",
 		"llm.validate_output({summary: \"docs\"}, {summary: \"example\"})",
+		"import p \"path\"",
 		"shell := $`printf leia`",
+		"raw_csv := csv!`a,b\\n1,2\\n`",
+		"raw_prompt := prompt! { role: \"system\" }",
 	} {
 		if !strings.Contains(string(formatted), want) {
 			t.Fatalf("formatted LLM source missing %q:\n%s", want, formatted)

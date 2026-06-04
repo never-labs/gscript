@@ -53,10 +53,19 @@
   bang: (dialect_bang) @operator.raw.dialect)
 
 (import_declaration
-  "import" @keyword.control.import
+  "import" @keyword.control.import)
+
+(import_spec
   path: (string) @string.special.import
   "as" @keyword.control.import.as
   alias: (identifier) @namespace.import)
+
+(import_spec
+  alias: (identifier) @namespace.import
+  path: (string) @string.special.import)
+
+(import_spec
+  path: (string) @string.special.import)
 
 (unary_expression
   operator: "!" @operator)

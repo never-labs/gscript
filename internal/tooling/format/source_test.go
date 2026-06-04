@@ -1,6 +1,9 @@
 package format
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestSourceNormalizesWhitespaceAndIndentation(t *testing.T) {
 	got, err := Source("scratch.leia", []byte("if true {\r\nreturn 1  \r\n}\r\n\r\n"))
@@ -34,6 +37,26 @@ func TestSourceFormatsTaggedBlockIndentation(t *testing.T) {
 	}
 	if string(again) != want {
 		t.Fatalf("Source second pass = %q, want %q", string(again), want)
+	}
+}
+
+func TestSourceAcceptsGoStyleImportsAndRawDialects(t *testing.T) {
+	src := []byte("import \"json\"\nimport p \"path\"\nimport (\n\"regexp\"\nfs \"fs\"\n)\nrows := csv!`a,b\\n1,2\\n`\nprompt! {\nrole: \"system\"\n}\n")
+	got, err := Source("dialects.leia", src)
+	if err != nil {
+		t.Fatalf("Source returned error: %v", err)
+	}
+	wantContains := []string{
+		"import \"json\"",
+		"import p \"path\"",
+		"import (",
+		"rows := csv!`a,b\\n1,2\\n`",
+		"prompt! {",
+	}
+	for _, want := range wantContains {
+		if !strings.Contains(string(got), want) {
+			t.Fatalf("Source() missing %q:\n%s", want, got)
+		}
 	}
 }
 

@@ -51,6 +51,26 @@ func BuildDialect(opts HostOptions, maxHostResult func() int64) *Table {
 		return []Value{TableValue(out)}, nil
 	})
 
+	set("info", func(args []Value) ([]Value, error) {
+		if len(args) < 1 || !args[0].IsString() {
+			return nil, fmt.Errorf("bad arguments to 'dialect.info' (tag expected)")
+		}
+		info, ok := registry.info(args[0].Str())
+		if !ok {
+			return []Value{NilValue()}, nil
+		}
+		return []Value{TableValue(info)}, nil
+	})
+
+	set("list", func(args []Value) ([]Value, error) {
+		out := NewAppendArrayTable(len(registry.names))
+		for i, name := range registry.names {
+			info, _ := registry.info(name)
+			out.RawSetInt(int64(i+1), TableValue(info))
+		}
+		return []Value{TableValue(out)}, nil
+	})
+
 	set("register", func(args []Value) ([]Value, error) {
 		names, handler, err := dialectUserHandler(args, opts.Call)
 		if err != nil {
@@ -89,19 +109,31 @@ func BuildDialect(opts HostOptions, maxHostResult func() int64) *Table {
 }
 
 type dialectHandler struct {
-	eval  func(Value, *Table) ([]Value, error)
+	eval func(Value, *Table) ([]Value, error)
+
 	block func(Value, *Table) ([]Value, error)
+	meta  dialectMetadata
+}
+
+type dialectMetadata struct {
+	Category     string
+	Capabilities []string
+	Builtin      bool
 }
 
 type dialectRegisterFunc func([]string, dialectHandler)
 
 type dialectRegistry struct {
 	handlers map[string]dialectHandler
+	aliases  map[string][]string
 	names    []string
 }
 
 func newDialectRegistry() *dialectRegistry {
-	return &dialectRegistry{handlers: make(map[string]dialectHandler)}
+	return &dialectRegistry{
+		handlers: make(map[string]dialectHandler),
+		aliases:  make(map[string][]string),
+	}
 }
 
 func (r *dialectRegistry) register(names []string, handler dialectHandler) {
@@ -128,7 +160,9 @@ func (r *dialectRegistry) tryRegister(names []string, handler dialectHandler) er
 		}
 	}
 	for _, name := range names {
+		handler.meta = normalizeDialectMetadata(name, handler.meta)
 		r.handlers[name] = handler
+		r.aliases[name] = dialectAliasesForName(name, names)
 		r.names = append(r.names, name)
 	}
 	sort.Strings(r.names)
@@ -142,6 +176,84 @@ func (r *dialectRegistry) handler(name string) (dialectHandler, bool) {
 
 func (r *dialectRegistry) availableText() string {
 	return strings.Join(r.names, ", ")
+}
+
+func (r *dialectRegistry) info(name string) (*Table, bool) {
+	handler, ok := r.handlers[name]
+	if !ok {
+		return nil, false
+	}
+	info := NewTable()
+	info.RawSetString("name", StringValue(name))
+	info.RawSetString("category", StringValue(handler.meta.Category))
+	info.RawSetString("builtin", BoolValue(handler.meta.Builtin))
+	info.RawSetString("eval", BoolValue(handler.eval != nil))
+	info.RawSetString("block", BoolValue(handler.block != nil))
+	info.RawSetString("aliases", stringArrayValue(r.aliases[name]))
+	info.RawSetString("capabilities", stringArrayValue(handler.meta.Capabilities))
+	return info, true
+}
+
+func normalizeDialectMetadata(name string, meta dialectMetadata) dialectMetadata {
+	if meta.Category == "" {
+		meta.Builtin = true
+	}
+	if meta.Category == "" {
+		meta.Category = builtinDialectCategory(name)
+	}
+	if meta.Capabilities == nil {
+		meta.Capabilities = builtinDialectCapabilities(name)
+	}
+	return meta
+}
+
+func dialectAliasesForName(name string, names []string) []string {
+	aliases := make([]string, 0, len(names)-1)
+	for _, candidate := range names {
+		if candidate != name {
+			aliases = append(aliases, candidate)
+		}
+	}
+	sort.Strings(aliases)
+	return aliases
+}
+
+func stringArrayValue(values []string) Value {
+	out := NewAppendArrayTable(len(values))
+	for i, value := range values {
+		out.RawSetInt(int64(i+1), StringValue(value))
+	}
+	return TableValue(out)
+}
+
+func builtinDialectCategory(name string) string {
+	switch name {
+	case "sh", "cmd", "shellwords", "glob", "path":
+		return "shell"
+	case "json", "jsonl", "csv", "tsv", "mdtable", "lines", "split", "words", "nums", "numbers", "kv", "env", "ini", "semver", "duration", "tap", "junit", "template", "re", "regexp":
+		return "text"
+	case "url", "html_escape", "urlquery", "urlpath", "mime", "headers", "http_headers", "httpmsg", "cookie", "cookies":
+		return "web"
+	case "base64", "hash":
+		return "data"
+	case "prompt", "quote":
+		return "llm"
+	default:
+		return "user"
+	}
+}
+
+func builtinDialectCapabilities(name string) []string {
+	switch name {
+	case "sh":
+		return []string{"process.shell"}
+	case "cmd":
+		return []string{"process.exec"}
+	case "glob":
+		return []string{"fs.read"}
+	default:
+		return []string{}
+	}
 }
 
 func dialectFailFast(opts *Table) bool {
@@ -182,7 +294,9 @@ func dialectUserHandler(args []Value, call ScriptFunctionCaller) ([]string, dial
 			blockFn = block
 		}
 	}
-	return names, dialectScriptHandler(call, evalFn, blockFn), nil
+	handler := dialectScriptHandler(call, evalFn, blockFn)
+	handler.meta = dialectUserMetadata(optionalTableArg(args, 2))
+	return names, handler, nil
 }
 
 func dialectUserHandlerFromSpec(spec *Table, call ScriptFunctionCaller) ([]string, dialectHandler, error) {
@@ -208,7 +322,34 @@ func dialectUserHandlerFromSpec(spec *Table, call ScriptFunctionCaller) ([]strin
 	if err != nil {
 		return nil, dialectHandler{}, err
 	}
-	return names, dialectScriptHandler(call, evalFn, blockFn), nil
+	handler := dialectScriptHandler(call, evalFn, blockFn)
+	handler.meta = dialectUserMetadata(spec)
+	return names, handler, nil
+}
+
+func dialectUserMetadata(opts *Table) dialectMetadata {
+	meta := dialectMetadata{Category: "user"}
+	if opts == nil {
+		return meta
+	}
+	if category := opts.RawGetString("category"); category.IsString() && category.Str() != "" {
+		meta.Category = category.Str()
+	}
+	if capabilities := opts.RawGetString("capabilities"); capabilities.IsTable() {
+		meta.Capabilities = stringSliceFromArrayValue(capabilities.Table())
+	}
+	return meta
+}
+
+func stringSliceFromArrayValue(tbl *Table) []string {
+	values := make([]string, 0, tbl.Length())
+	for i := 1; i <= tbl.Length(); i++ {
+		value := tbl.RawGetInt(int64(i))
+		if value.IsString() {
+			values = append(values, value.Str())
+		}
+	}
+	return values
 }
 
 func dialectRegisterNames(name Value, opts *Table) ([]string, error) {

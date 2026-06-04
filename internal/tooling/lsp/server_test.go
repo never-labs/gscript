@@ -315,6 +315,11 @@ func TestDocumentLinkReturnsLocalModuleLinks(t *testing.T) {
 		`helper := require("./helper")`,
 		`json := require("json")`,
 		`import "./tools/other" as other`,
+		`import local "./pkg/local"`,
+		`import (`,
+		`    "./grouped"`,
+		`    named "./named"`,
+		`)`,
 		`import "go:strings" as strings`,
 		"",
 	}, "\n")
@@ -350,8 +355,8 @@ func TestDocumentLinkReturnsLocalModuleLinks(t *testing.T) {
 		t.Fatalf("expected diagnostics notification and documentLink response, got %d: %#v", len(msgs), msgs)
 	}
 	links := msgs[1]["result"].([]any)
-	if len(links) != 2 {
-		t.Fatalf("document links = %#v, want helper and other only", links)
+	if len(links) != 5 {
+		t.Fatalf("document links = %#v, want helper, other, local, grouped, and named only", links)
 	}
 	targets := map[string]bool{}
 	for _, raw := range links {
@@ -364,6 +369,9 @@ func TestDocumentLinkReturnsLocalModuleLinks(t *testing.T) {
 	for _, want := range []string{
 		"file:///tmp/project/helper.leia",
 		"file:///tmp/project/tools/other.leia",
+		"file:///tmp/project/pkg/local.leia",
+		"file:///tmp/project/grouped.leia",
+		"file:///tmp/project/named.leia",
 	} {
 		if !targets[want] {
 			t.Fatalf("document link targets missing %q: %#v", want, targets)
@@ -520,6 +528,11 @@ func TestSemanticTokensLexerErrorReturnsEmptyData(t *testing.T) {
 func TestSemanticTokensClassifyLeiaSemanticRoles(t *testing.T) {
 	src := strings.Join([]string{
 		`import "go:strings" as strings`,
+		`import local "./pkg/local"`,
+		`import (`,
+		`    "./grouped"`,
+		`    named "./named"`,
+		`)`,
 		`rows := csv!` + "`a,b\\n1,2\\n`",
 		`out := $!` + "`printf ok`",
 		`prompt! { role: "system" }`,
@@ -540,6 +553,11 @@ func TestSemanticTokensClassifyLeiaSemanticRoles(t *testing.T) {
 	assertSemanticToken(t, tokens, "go:strings", semanticString, semanticImportModifier)
 	assertSemanticToken(t, tokens, "as", semanticKeyword, semanticImportModifier)
 	assertSemanticToken(t, tokens, "strings", semanticNamespace, semanticDeclarationModifier|semanticImportModifier)
+	assertSemanticToken(t, tokens, "local", semanticNamespace, semanticDeclarationModifier|semanticImportModifier)
+	assertSemanticToken(t, tokens, "./pkg/local", semanticString, semanticImportModifier)
+	assertSemanticToken(t, tokens, "./grouped", semanticString, semanticImportModifier)
+	assertSemanticToken(t, tokens, "named", semanticNamespace, semanticDeclarationModifier|semanticImportModifier)
+	assertSemanticToken(t, tokens, "./named", semanticString, semanticImportModifier)
 	assertSemanticToken(t, tokens, "csv", semanticNamespace, semanticDialectModifier)
 	assertSemanticToken(t, tokens, "!", semanticOperator, semanticDialectModifier)
 	assertSemanticToken(t, tokens, `a,b\n1,2\n`, semanticString, semanticDialectModifier)

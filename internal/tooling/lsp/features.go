@@ -524,7 +524,12 @@ func tokenIsDeclarationName(tokens []lexer.Token, index int) bool {
 }
 
 func tokenLooksLikeImportAlias(tokens []lexer.Token, index int) bool {
-	return index > 0 && tokenText(tokens[index-1]) == "as"
+	if index > 0 && tokenText(tokens[index-1]) == "as" {
+		return true
+	}
+	return tokens[index].Type == lexer.TOKEN_IDENT &&
+		index+1 < len(tokens) && tokens[index+1].Type == lexer.TOKEN_STRING &&
+		(index > 0 && tokenText(tokens[index-1]) == "import" || tokenIsInImportGroup(tokens, index))
 }
 
 func tokenLooksLikeImportKeyword(tokens []lexer.Token, index int) bool {
@@ -717,7 +722,35 @@ func collectDocumentLinks(uri, src string) []documentLink {
 }
 
 func tokenLooksLikeImportPath(tokens []lexer.Token, index int) bool {
-	return index > 0 && tokenText(tokens[index-1]) == "import"
+	if index > 0 && tokenText(tokens[index-1]) == "import" {
+		return true
+	}
+	if index > 1 && tokens[index-1].Type == lexer.TOKEN_IDENT && tokenText(tokens[index-2]) == "import" {
+		return true
+	}
+	if tokenIsInImportGroup(tokens, index) {
+		return true
+	}
+	if index > 0 && tokenText(tokens[index-1]) == "as" {
+		return true
+	}
+	return false
+}
+
+func tokenIsInImportGroup(tokens []lexer.Token, index int) bool {
+	depth := 0
+	for i := index - 1; i >= 0; i-- {
+		switch tokens[i].Type {
+		case lexer.TOKEN_RPAREN:
+			depth++
+		case lexer.TOKEN_LPAREN:
+			if depth == 0 {
+				return i > 0 && tokenText(tokens[i-1]) == "import"
+			}
+			depth--
+		}
+	}
+	return false
 }
 
 func tokenLooksLikeRequireArg(tokens []lexer.Token, index int) bool {
