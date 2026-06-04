@@ -47,17 +47,21 @@ func runWithLib(t *testing.T, src string, libName string, lib *runtime.Table) *r
 
 func execOnInterp(t *testing.T, interp *runtime.Interpreter, src string) {
 	t.Helper()
+	if err := execSourceOnInterp(interp, src); err != nil {
+		t.Fatalf("exec error: %v", err)
+	}
+}
+
+func execSourceOnInterp(interp *runtime.Interpreter, src string) error {
 	tokens, err := lexer.New(src).Tokenize()
 	if err != nil {
-		t.Fatalf("lexer error: %v", err)
+		return err
 	}
 	prog, err := parser.New(tokens).Parse()
 	if err != nil {
-		t.Fatalf("parse error: %v", err)
+		return err
 	}
-	if err := interp.Exec(prog); err != nil {
-		t.Fatalf("exec error: %v", err)
-	}
+	return interp.Exec(prog)
 }
 
 func installTestModules(interp *runtime.Interpreter) {

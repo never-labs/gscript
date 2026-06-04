@@ -94,6 +94,9 @@ func registerDialectText(register dialectRegisterFunc, maxHostResult func() int6
 		eval:  dialectTAP,
 		block: dialectTAP,
 	})
+	register([]string{"junit"}, dialectHandler{
+		eval: dialectJUnit,
+	})
 	register([]string{"template"}, dialectHandler{
 		eval: func(body Value, options *Table) ([]Value, error) {
 			return dialectTemplate(body, options, maxHostResult)
@@ -986,6 +989,68 @@ func sortedStringKeys[V any](m map[string]V) []string {
 	}
 	sort.Strings(keys)
 	return keys
+}
+
+func dialectJUnit(body Value, _ *Table) ([]Value, error) {
+	report, err := dialectlib.ParseJUnit(body.Str())
+	if err != nil {
+		return []Value{NilValue(), StringValue(err.Error())}, nil
+	}
+	return []Value{TableValue(junitReportToTable(report))}, nil
+}
+
+func junitReportToTable(report dialectlib.JUnitReport) *Table {
+	out := NewTable()
+	out.RawSetString("name", StringValue(report.Name))
+	out.RawSetString("tests", IntValue(int64(report.Tests)))
+	out.RawSetString("failures", IntValue(int64(report.Failures)))
+	out.RawSetString("errors", IntValue(int64(report.Errors)))
+	out.RawSetString("skipped", IntValue(int64(report.Skipped)))
+	out.RawSetString("passed", IntValue(int64(report.Passed)))
+	out.RawSetString("time", FloatValue(report.Time))
+	out.RawSetString("suites", TableValue(junitSuitesToTable(report.Suites)))
+	out.RawSetString("cases", TableValue(junitCasesToTable(report.Cases)))
+	return out
+}
+
+func junitSuitesToTable(suites []dialectlib.JUnitSuite) *Table {
+	out := NewAppendArrayTable(len(suites))
+	for i, suite := range suites {
+		item := NewTable()
+		item.RawSetString("name", StringValue(suite.Name))
+		item.RawSetString("tests", IntValue(int64(suite.Tests)))
+		item.RawSetString("failures", IntValue(int64(suite.Failures)))
+		item.RawSetString("errors", IntValue(int64(suite.Errors)))
+		item.RawSetString("skipped", IntValue(int64(suite.Skipped)))
+		item.RawSetString("passed", IntValue(int64(suite.Passed)))
+		item.RawSetString("time", FloatValue(suite.Time))
+		item.RawSetString("cases", TableValue(junitCasesToTable(suite.Cases)))
+		out.RawSetInt(int64(i+1), TableValue(item))
+	}
+	return out
+}
+
+func junitCasesToTable(cases []dialectlib.JUnitCase) *Table {
+	out := NewAppendArrayTable(len(cases))
+	for i, tc := range cases {
+		item := NewTable()
+		item.RawSetString("name", StringValue(tc.Name))
+		item.RawSetString("classname", StringValue(tc.ClassName))
+		item.RawSetString("className", StringValue(tc.ClassName))
+		item.RawSetString("time", FloatValue(tc.Time))
+		item.RawSetString("status", StringValue(tc.Status))
+		if tc.Message != "" {
+			item.RawSetString("message", StringValue(tc.Message))
+		}
+		if tc.Type != "" {
+			item.RawSetString("type", StringValue(tc.Type))
+		}
+		if tc.Text != "" {
+			item.RawSetString("text", StringValue(tc.Text))
+		}
+		out.RawSetInt(int64(i+1), TableValue(item))
+	}
+	return out
 }
 
 func dialectTemplate(body Value, opts *Table, maxHostResult func() int64) ([]Value, error) {

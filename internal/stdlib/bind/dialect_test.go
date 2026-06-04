@@ -16,7 +16,7 @@ func TestDialectTagsExposeInstalledHandlers(t *testing.T) {
 	want := []string{
 		"base64", "cmd", "cookie", "cookies", "csv", "duration", "env", "glob",
 		"hash", "headers", "html_escape", "http_headers", "httpmsg", "ini", "json", "jsonl",
-		"kv", "lines", "mdtable", "mime", "numbers", "nums", "path", "prompt",
+		"junit", "kv", "lines", "mdtable", "mime", "numbers", "nums", "path", "prompt",
 		"quote", "re", "regexp", "semver", "sh", "shellwords", "split", "tap", "template", "tsv", "url",
 		"urlpath", "urlquery", "words",
 	}
@@ -87,6 +87,85 @@ func TestDialectRegistryRejectsDuplicateNamesInSingleRegistration(t *testing.T) 
 	registry.register([]string{"json", "json"}, handler)
 }
 
+func TestDialectRegisterScriptHandler(t *testing.T) {
+	interp := New()
+	installTestModule(interp, "dialect", TableValue(BuildDialect(HostOptions{Call: interp.CallFunction}, nil)))
+	execOnInterp(t, interp, `
+		dialect.register("wrap", func(body, opts) {
+			prefix := "<"
+			suffix := ">"
+			if opts != nil && opts.prefix != nil { prefix = opts.prefix }
+			if opts != nil && opts.suffix != nil { suffix = opts.suffix }
+			return prefix .. body .. suffix
+		}, {aliases: {"bracket"}})
+
+		literal := wrap`+"`"+`ok`+"`"+`
+		via_alias := bracket`+"`"+`ok`+"`"+`
+		explicit := dialect.eval("wrap", "ok", {prefix: "[", suffix: "]"})
+		tags := dialect.tags()
+	`)
+
+	if got := interp.GetGlobal("literal").Str(); got != "<ok>" {
+		t.Fatalf("literal = %q, want <ok>", got)
+	}
+	if got := interp.GetGlobal("via_alias").Str(); got != "<ok>" {
+		t.Fatalf("via_alias = %q, want <ok>", got)
+	}
+	if got := interp.GetGlobal("explicit").Str(); got != "[ok]" {
+		t.Fatalf("explicit = %q, want [ok]", got)
+	}
+	tags := stringSetFromArray(interp.GetGlobal("tags").Table())
+	if !tags["wrap"] || !tags["bracket"] {
+		t.Fatalf("registered tags missing from dialect.tags: %#v", tags)
+	}
+}
+
+func TestDialectRegisterScriptBlockHandler(t *testing.T) {
+	interp := New()
+	installTestModule(interp, "dialect", TableValue(BuildDialect(HostOptions{Call: interp.CallFunction}, nil)))
+	execOnInterp(t, interp, `
+		dialect.register({
+			name: "box",
+			aliases: {"boxcfg"},
+			eval: func(body, opts) {
+				return {kind: "eval", body: body}
+			},
+			block: func(body, opts) {
+				return {kind: "block", title: body.title, body: body}
+			},
+		})
+
+		result := box {
+			title: "Plan"
+			steps: 3
+		}
+		raw := dialect.eval("box", "plain")
+	`)
+
+	result := interp.GetGlobal("result").Table()
+	if got := result.RawGetString("kind").Str(); got != "block" {
+		t.Fatalf("result.kind = %q, want block", got)
+	}
+	if got := result.RawGetString("title").Str(); got != "Plan" {
+		t.Fatalf("result.title = %q, want Plan", got)
+	}
+	raw := interp.GetGlobal("raw").Table()
+	if got := raw.RawGetString("kind").Str(); got != "eval" {
+		t.Fatalf("raw.kind = %q, want eval", got)
+	}
+}
+
+func TestDialectRegisterRejectsDuplicateBuiltin(t *testing.T) {
+	interp := New()
+	installTestModule(interp, "dialect", TableValue(BuildDialect(HostOptions{Call: interp.CallFunction}, nil)))
+	err := execSourceOnInterp(interp, `
+		dialect.register("json", func(body, opts) { return body })
+	`)
+	if err == nil || !strings.Contains(err.Error(), `duplicate dialect "json"`) {
+		t.Fatalf("duplicate register err = %v, want duplicate json", err)
+	}
+}
+
 func TestDialectShellwordsParseAndEncode(t *testing.T) {
 	interp := runWithLib(t, `
 		parsed := dialect.eval("shellwords", "printf 'hello world' a\\ b \"\"")
@@ -150,6 +229,51 @@ func TestDialectBlockAndRawEvalHelpers(t *testing.T) {
 	}
 	if got := raw.RawGetString("body").Table().RawGetString("step").Str(); got != "collect" {
 		t.Fatalf("raw body step = %q, want collect", got)
+	}
+}
+
+func TestDialectJUnitSummary(t *testing.T) {
+	interp := runWithLib(t, `
+		report := junit`+"`"+`<testsuites name="ci" tests="3" failures="1" errors="0" skipped="1" time="1.25">
+  <testsuite name="unit" tests="2" failures="1" errors="0" skipped="0" time="0.75">
+    <testcase classname="pkg.A" name="passes" time="0.10"/>
+    <testcase classname="pkg.A" name="fails" time="0.20"><failure type="assert" message="want true">stack line</failure></testcase>
+  </testsuite>
+  <testsuite name="integration" tests="1" failures="0" errors="0" skipped="1" time="0.50">
+    <testcase classname="pkg.B" name="skips"><skipped message="not configured"/></testcase>
+  </testsuite>
+</testsuites>`+"`"+`
+		bad, bad_err := dialect.eval("junit", "<testsuite tests=\"nope\"/>")
+	`, "dialect", BuildDialect(HostOptions{}, nil))
+
+	report := interp.GetGlobal("report").Table()
+	if got := report.RawGetString("name").Str(); got != "ci" {
+		t.Fatalf("report.name = %q, want ci", got)
+	}
+	if got := report.RawGetString("tests").Int(); got != 3 {
+		t.Fatalf("report.tests = %d, want 3", got)
+	}
+	if got := report.RawGetString("passed").Int(); got != 1 {
+		t.Fatalf("report.passed = %d, want 1", got)
+	}
+	if got := report.RawGetString("suites").Table().RawGetInt(1).Table().RawGetString("name").Str(); got != "unit" {
+		t.Fatalf("first suite name = %q, want unit", got)
+	}
+	failed := report.RawGetString("cases").Table().RawGetInt(2).Table()
+	if got := failed.RawGetString("status").Str(); got != "failed" {
+		t.Fatalf("failed.status = %q, want failed", got)
+	}
+	if got := failed.RawGetString("message").Str(); got != "want true" {
+		t.Fatalf("failed.message = %q, want want true", got)
+	}
+	if got := failed.RawGetString("text").Str(); got != "stack line" {
+		t.Fatalf("failed.text = %q, want stack line", got)
+	}
+	if !interp.GetGlobal("bad").IsNil() {
+		t.Fatalf("bad junit returned non-nil result")
+	}
+	if got := interp.GetGlobal("bad_err").Str(); !strings.Contains(got, `junit dialect: testsuite 1: invalid tests attribute "nope"`) {
+		t.Fatalf("bad_err = %q", got)
 	}
 }
 

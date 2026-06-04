@@ -51,6 +51,7 @@ SYNTAX_SMOKE_BENCHES=(
     "table/table_array_access"
     "string/string_bench"
     "data/soa_affine_many"
+    "app/dialect_syntax_smoke"
 )
 
 SYNTAX_DIALECT_SMOKE_BENCHES=(

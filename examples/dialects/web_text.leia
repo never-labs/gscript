@@ -26,9 +26,12 @@ component := dialect.eval("urlquery", "hello world&x", {mode: "escape"})
 component_decoded := dialect.eval("urlquery", component, {mode: "unescape"})
 escaped_path := urlpath`a b/米`
 decoded_path := dialect.eval("urlpath", escaped_path, {mode: "unescape"})
+route_match := dialect.eval("urlpath", "/v1/users/ada/files/docs/readme.md", {template: "/v1/users/{id}/files/{*rest}", mode: "match_template"})
+route_path := dialect.eval("urlpath", {id: route_match.params.id, rest: "docs/read me.md"}, {template: "/v1/users/{id}/files/{*rest}", mode: "encode_template"})
 print("urlquery encoded:", encoded_query)
 print("urlquery tag 2:", parsed_query.tag[2])
 print("urlpath escaped:", escaped_path)
+print("route id:", route_match.params.id)
 assert(encoded_query == "page=2&q=hello+world")
 assert(parsed_query.q == "hello world")
 assert(parsed_query.page == "2")
@@ -37,6 +40,10 @@ assert(component == "hello+world%26x")
 assert(component_decoded == "hello world&x")
 assert(escaped_path == "a%20b%2F%E7%B1%B3")
 assert(decoded_path == "a b/米")
+assert(route_match.matched == true)
+assert(route_match.params.id == "ada")
+assert(route_match.params.rest == "docs/readme.md")
+assert(route_path == "/v1/users/ada/files/docs/read%20me.md")
 
 content_type := mime`text/html; charset=utf-8; boundary="abc def"`
 encoded_content_type := mime {type: "application/json", params: {charset: "utf-8", version: 2}}

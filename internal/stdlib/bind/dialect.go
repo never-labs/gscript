@@ -11,7 +11,7 @@ import (
 // sh`...`, cmd`...`, shellwords`...`, glob`...`, json`...`, prompt`...`,
 // quote { ... }, and small safe data transforms such as path`...`, url`...`, words`...`, nums`...`,
 // mdtable`...`, kv`...`, env`...`, jsonl`...`, semver`...`, html_escape`...`, urlquery`...`, mime`...`,
-// urlpath`...`, duration`...`, tap`...`, base64`...`, and hash`...`.
+// urlpath`...`, duration`...`, tap`...`, junit`...`, base64`...`, and hash`...`.
 func BuildDialect(opts HostOptions, maxHostResult func() int64) *Table {
 	t := markStdlibBoundModule(NewTable())
 
@@ -49,6 +49,20 @@ func BuildDialect(opts HostOptions, maxHostResult func() int64) *Table {
 			out.RawSetInt(int64(i+1), StringValue(name))
 		}
 		return []Value{TableValue(out)}, nil
+	})
+
+	set("register", func(args []Value) ([]Value, error) {
+		names, handler, err := dialectUserHandler(args, opts.Call)
+		if err != nil {
+			return nil, err
+		}
+		if len(names) == 0 {
+			return nil, fmt.Errorf("bad arguments to 'dialect.register' (name expected)")
+		}
+		if err := registry.tryRegister(names, handler); err != nil {
+			return nil, err
+		}
+		return []Value{BoolValue(true)}, nil
 	})
 
 	set("eval_block", func(args []Value) ([]Value, error) {
@@ -91,20 +105,26 @@ func newDialectRegistry() *dialectRegistry {
 }
 
 func (r *dialectRegistry) register(names []string, handler dialectHandler) {
+	if err := r.tryRegister(names, handler); err != nil {
+		panic(err)
+	}
+}
+
+func (r *dialectRegistry) tryRegister(names []string, handler dialectHandler) error {
 	if handler.eval == nil && handler.block == nil {
-		panic("dialect registry: handler requires eval or block")
+		return fmt.Errorf("dialect registry: handler requires eval or block")
 	}
 	seen := make(map[string]struct{}, len(names))
 	for _, name := range names {
 		if name == "" {
-			panic("dialect registry: empty dialect name")
+			return fmt.Errorf("dialect registry: empty dialect name")
 		}
 		if _, exists := seen[name]; exists {
-			panic(fmt.Sprintf("dialect registry: duplicate dialect %q", name))
+			return fmt.Errorf("dialect registry: duplicate dialect %q", name)
 		}
 		seen[name] = struct{}{}
 		if _, exists := r.handlers[name]; exists {
-			panic(fmt.Sprintf("dialect registry: duplicate dialect %q", name))
+			return fmt.Errorf("dialect registry: duplicate dialect %q", name)
 		}
 	}
 	for _, name := range names {
@@ -112,6 +132,7 @@ func (r *dialectRegistry) register(names []string, handler dialectHandler) {
 		r.names = append(r.names, name)
 	}
 	sort.Strings(r.names)
+	return nil
 }
 
 func (r *dialectRegistry) handler(name string) (dialectHandler, bool) {
@@ -132,4 +153,116 @@ func optionalTableArg(args []Value, idx int) *Table {
 		return args[idx].Table()
 	}
 	return nil
+}
+
+func dialectUserHandler(args []Value, call ScriptFunctionCaller) ([]string, dialectHandler, error) {
+	if len(args) == 0 {
+		return nil, dialectHandler{}, fmt.Errorf("bad arguments to 'dialect.register' (name and function expected)")
+	}
+	if call == nil {
+		return nil, dialectHandler{}, fmt.Errorf("dialect.register requires script callback support")
+	}
+	if args[0].IsTable() {
+		return dialectUserHandlerFromSpec(args[0].Table(), call)
+	}
+	if !args[0].IsString() || len(args) < 2 || !args[1].IsFunction() {
+		return nil, dialectHandler{}, fmt.Errorf("bad arguments to 'dialect.register' (name and function expected)")
+	}
+	names, err := dialectRegisterNames(args[0], optionalTableArg(args, 2))
+	if err != nil {
+		return nil, dialectHandler{}, err
+	}
+	evalFn := args[1]
+	blockFn := evalFn
+	if opts := optionalTableArg(args, 2); opts != nil {
+		if block := opts.RawGetString("block"); block.IsFunction() {
+			blockFn = block
+		}
+		if block := opts.RawGetString("block_fn"); block.IsFunction() {
+			blockFn = block
+		}
+	}
+	return names, dialectScriptHandler(call, evalFn, blockFn), nil
+}
+
+func dialectUserHandlerFromSpec(spec *Table, call ScriptFunctionCaller) ([]string, dialectHandler, error) {
+	name := spec.RawGetString("name")
+	if name.IsNil() {
+		name = spec.RawGetString("tag")
+	}
+	evalFn := spec.RawGetString("eval")
+	if evalFn.IsNil() {
+		evalFn = spec.RawGetString("fn")
+	}
+	if !evalFn.IsFunction() {
+		return nil, dialectHandler{}, fmt.Errorf("dialect.register spec requires eval or fn function")
+	}
+	blockFn := spec.RawGetString("block")
+	if blockFn.IsNil() {
+		blockFn = evalFn
+	}
+	if !blockFn.IsFunction() {
+		return nil, dialectHandler{}, fmt.Errorf("dialect.register spec block must be a function")
+	}
+	names, err := dialectRegisterNames(name, spec)
+	if err != nil {
+		return nil, dialectHandler{}, err
+	}
+	return names, dialectScriptHandler(call, evalFn, blockFn), nil
+}
+
+func dialectRegisterNames(name Value, opts *Table) ([]string, error) {
+	names := make([]string, 0, 4)
+	if name.IsString() {
+		names = append(names, name.Str())
+	}
+	if opts != nil {
+		if aliases := opts.RawGetString("aliases"); aliases.IsTable() {
+			tbl := aliases.Table()
+			for i := 1; i <= tbl.Length(); i++ {
+				alias := tbl.RawGetInt(int64(i))
+				if !alias.IsString() {
+					return nil, fmt.Errorf("dialect.register alias %d must be a string", i)
+				}
+				names = append(names, alias.Str())
+			}
+		}
+	}
+	for _, name := range names {
+		if !validDialectName(name) {
+			return nil, fmt.Errorf("dialect.register invalid dialect name %q", name)
+		}
+	}
+	return names, nil
+}
+
+func dialectScriptHandler(call ScriptFunctionCaller, evalFn, blockFn Value) dialectHandler {
+	callScript := func(fn Value, body Value, opts *Table) ([]Value, error) {
+		optValue := NilValue()
+		if opts != nil {
+			optValue = TableValue(opts)
+		}
+		return call(fn, []Value{body, optValue})
+	}
+	return dialectHandler{
+		eval: func(body Value, opts *Table) ([]Value, error) {
+			return callScript(evalFn, body, opts)
+		},
+		block: func(body Value, opts *Table) ([]Value, error) {
+			return callScript(blockFn, body, opts)
+		},
+	}
+}
+
+func validDialectName(name string) bool {
+	if name == "" {
+		return false
+	}
+	for i, r := range name {
+		if r == '_' || ('a' <= r && r <= 'z') || ('A' <= r && r <= 'Z') || (i > 0 && '0' <= r && r <= '9') {
+			continue
+		}
+		return false
+	}
+	return true
 }

@@ -109,6 +109,46 @@ func TestDialectURLPathBoundaryModes(t *testing.T) {
 	}
 }
 
+func TestDialectURLPathTemplateMatchAndEncode(t *testing.T) {
+	interp := runWithLib(t, `
+		matched := dialect.eval("urlpath", "/v1/users/alice%40example/files/docs/report%201.pdf", {template: "/v1/users/{id}/files/{*rest}", mode: "match_template"})
+		no_match := dialect.eval("urlpath", "/v1/orgs/123", {template: "/v1/users/{id}", mode: "match_template"})
+		encoded := dialect.eval("urlpath", {id: "alice@example", rest: "docs/report 1.pdf"}, {template: "/v1/users/{id}/files/{*rest}", mode: "encode_template"})
+		bad, bad_err := dialect.eval("urlpath", "/v1/users/123", {template: "/v1/{bad-name}", mode: "match_template"})
+		bad_encoded, bad_encode_err := dialect.eval("urlpath", {id: "a/b"}, {template: "/v1/users/{id}", mode: "encode_template"})
+	`, "dialect", BuildDialect(HostOptions{}, nil))
+
+	matched := interp.GetGlobal("matched").Table()
+	if got := matched.RawGetString("matched").Bool(); !got {
+		t.Fatalf("matched = false, want true")
+	}
+	params := matched.RawGetString("params").Table()
+	if got := params.RawGetString("id").Str(); got != "alice@example" {
+		t.Fatalf("id = %q, want alice@example", got)
+	}
+	if got := params.RawGetString("rest").Str(); got != "docs/report 1.pdf" {
+		t.Fatalf("rest = %q, want docs/report 1.pdf", got)
+	}
+	if got := interp.GetGlobal("no_match").Table().RawGetString("matched").Bool(); got {
+		t.Fatalf("no_match matched = true, want false")
+	}
+	if got, want := interp.GetGlobal("encoded").Str(), "/v1/users/alice@example/files/docs/report%201.pdf"; got != want {
+		t.Fatalf("encoded path = %q, want %q", got, want)
+	}
+	if !interp.GetGlobal("bad").IsNil() {
+		t.Fatalf("invalid template returned non-nil result")
+	}
+	if got := interp.GetGlobal("bad_err"); !got.IsString() || got.Str() == "" {
+		t.Fatalf("invalid template error = %v, want non-empty string", got)
+	}
+	if !interp.GetGlobal("bad_encoded").IsNil() {
+		t.Fatalf("invalid encode returned non-nil result")
+	}
+	if got := interp.GetGlobal("bad_encode_err"); !got.IsString() || got.Str() == "" {
+		t.Fatalf("invalid encode error = %v, want non-empty string", got)
+	}
+}
+
 func TestDialectMIMEBoundaryParseAndEncode(t *testing.T) {
 	interp := runWithLib(t, `
 		parsed := dialect.eval("mime", "Text/HTML; Charset=UTF-8; boundary=\"abc def\"")

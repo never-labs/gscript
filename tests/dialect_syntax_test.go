@@ -171,6 +171,68 @@ func TestTaggedDialectStringsRejectQuotedStringLiterals(t *testing.T) {
 	}
 }
 
+func TestUserRegisteredDialectSyntaxExecutesThroughStdlib(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []leia.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			vm := leia.New(append([]leia.Option{
+				leia.WithLibs(leia.LibAll),
+				leia.WithProcessExecution(false),
+				leia.WithProcessShell(false),
+			}, tc.opts...)...)
+			src := `
+				dialect.register("wrap", func(body, opts) {
+					prefix := "<"
+					suffix := ">"
+					if opts != nil && opts.prefix != nil { prefix = opts.prefix }
+					if opts != nil && opts.suffix != nil { suffix = opts.suffix }
+					return prefix .. body .. suffix
+				}, {aliases: {"bracket"}})
+				dialect.register({
+					name: "record",
+					eval: func(body, opts) {
+						return {kind: "eval", body: body}
+					},
+					block: func(body, opts) {
+						return {kind: "block", name: body.name, count: body.count}
+					},
+				})
+
+				name := "leia"
+				literal := wrap` + "`" + `hello-${name}` + "`" + `
+				alias_literal := bracket` + "`" + `ok` + "`" + `
+				explicit := dialect.eval("wrap", "plain", {prefix: "[", suffix: "]"})
+				block := record {
+					name: "jobs"
+					count: 3
+				}
+				eval_record := dialect.eval("record", "plain")
+				block_kind := block.kind
+				block_name := block.name
+				block_count := block.count
+				eval_kind := eval_record.kind
+				eval_body := eval_record.body
+			`
+			if err := vm.Exec(src); err != nil {
+				t.Fatalf("Exec: %v", err)
+			}
+			assertGet(t, vm, "literal", "<hello-leia>")
+			assertGet(t, vm, "alias_literal", "<ok>")
+			assertGet(t, vm, "explicit", "[plain]")
+			assertGet(t, vm, "block_kind", "block")
+			assertGet(t, vm, "block_name", "jobs")
+			assertGet(t, vm, "block_count", int64(3))
+			assertGet(t, vm, "eval_kind", "eval")
+			assertGet(t, vm, "eval_body", "plain")
+		})
+	}
+}
+
 func TestPureDialectSyntaxExecutesThroughStdlib(t *testing.T) {
 	for _, tc := range []struct {
 		name string
@@ -486,6 +548,68 @@ func TestStdlibDataDialectsExecuteThroughStdlib(t *testing.T) {
 			assertGet(t, vm, "jsonl_first_name", "Ada")
 			assertGet(t, vm, "jsonl_second_score", int64(7))
 			assertGet(t, vm, "jsonl_text", "{\"name\":\"Ada\",\"score\":42}\n{\"name\":\"Bob\",\"score\":7}\n")
+		})
+	}
+}
+
+func TestReportAndRouteDialectsExecuteThroughStdlib(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []leia.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			vm := leia.New(append([]leia.Option{
+				leia.WithLibs(leia.LibAll),
+				leia.WithProcessExecution(false),
+				leia.WithProcessShell(false),
+			}, tc.opts...)...)
+			src := `
+				report := junit` + "`" + `<testsuites name="ci" tests="3" failures="1" errors="0" skipped="1" time="1.25">
+  <testsuite name="unit" tests="2" failures="1" errors="0" skipped="0" time="0.75">
+    <testcase classname="pkg.A" name="passes" time="0.10"/>
+    <testcase classname="pkg.A" name="fails" time="0.20"><failure type="assert" message="want true">stack line</failure></testcase>
+  </testsuite>
+  <testsuite name="integration" tests="1" failures="0" errors="0" skipped="1" time="0.50">
+    <testcase classname="pkg.B" name="skips"><skipped message="not configured"/></testcase>
+  </testsuite>
+</testsuites>` + "`" + `
+				bad_report, bad_report_err := dialect.eval("junit", "<testsuite tests=\"nope\"/>")
+				route := dialect.eval("urlpath", "/v1/users/ada/files/docs/readme.md", {template: "/v1/users/{id}/files/{*rest}", mode: "match_template"})
+				built := dialect.eval("urlpath", {id: "ada", rest: "docs/read me.md"}, {template: "/v1/users/{id}/files/{*rest}", mode: "encode_template"})
+
+				report_name := report.name
+				report_tests := report.tests
+				report_passed := report.passed
+				first_suite := report.suites[1].name
+				failed_status := report.cases[2].status
+				failed_message := report.cases[2].message
+				failed_text := report.cases[2].text
+				skipped_status := report.cases[3].status
+				bad_report_is_nil := bad_report == nil
+				route_ok := route.matched
+				route_id := route.params.id
+				route_rest := route.params.rest
+			`
+			if err := vm.Exec(src); err != nil {
+				t.Fatalf("Exec: %v", err)
+			}
+			assertGet(t, vm, "report_name", "ci")
+			assertGet(t, vm, "report_tests", int64(3))
+			assertGet(t, vm, "report_passed", int64(1))
+			assertGet(t, vm, "first_suite", "unit")
+			assertGet(t, vm, "failed_status", "failed")
+			assertGet(t, vm, "failed_message", "want true")
+			assertGet(t, vm, "failed_text", "stack line")
+			assertGet(t, vm, "skipped_status", "skipped")
+			assertGet(t, vm, "bad_report_is_nil", true)
+			assertStringContains(t, vm, "bad_report_err", `junit dialect: testsuite 1: invalid tests attribute "nope"`)
+			assertGet(t, vm, "route_ok", true)
+			assertGet(t, vm, "route_id", "ada")
+			assertGet(t, vm, "route_rest", "docs/readme.md")
+			assertGet(t, vm, "built", "/v1/users/ada/files/docs/read%20me.md")
 		})
 	}
 }

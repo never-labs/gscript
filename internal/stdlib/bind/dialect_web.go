@@ -29,9 +29,8 @@ func registerDialectWeb(register dialectRegisterFunc) {
 		block: dialectURLQuery,
 	})
 	register([]string{"urlpath"}, dialectHandler{
-		eval: func(body Value, options *Table) ([]Value, error) {
-			return dialectURLPath(body.Str(), options)
-		},
+		eval:  dialectURLPath,
+		block: dialectURLPath,
 	})
 	register([]string{"mime"}, dialectHandler{
 		eval:  dialectMIME,
@@ -114,23 +113,86 @@ func dialectURLQuery(body Value, opts *Table) ([]Value, error) {
 	return []Value{TableValue(out)}, nil
 }
 
-func dialectURLPath(src string, opts *Table) ([]Value, error) {
+func dialectURLPath(body Value, opts *Table) ([]Value, error) {
 	mode := "escape"
 	if opts != nil && opts.RawGetString("mode").IsString() {
 		mode = opts.RawGetString("mode").Str()
 	}
+	if body.IsTable() || mode == "encode_template" || mode == "expand_template" || mode == "format_template" {
+		return dialectPathTemplate(body, opts, true)
+	}
 	switch mode {
 	case "escape", "encode", "encode_component", "":
-		return []Value{StringValue(dialectlib.URLPathEscape(src))}, nil
+		return []Value{StringValue(dialectlib.URLPathEscape(body.Str()))}, nil
 	case "unescape", "decode", "decode_component":
-		decoded, err := dialectlib.URLPathUnescape(src)
+		decoded, err := dialectlib.URLPathUnescape(body.Str())
 		if err != nil {
 			return []Value{NilValue(), StringValue(err.Error())}, nil
 		}
 		return []Value{StringValue(decoded)}, nil
+	case "match_template", "template_match":
+		return dialectPathTemplate(body, opts, false)
 	default:
 		return nil, fmt.Errorf("urlpath dialect: unknown mode %q", mode)
 	}
+}
+
+func dialectPathTemplate(body Value, opts *Table, encode bool) ([]Value, error) {
+	template := ""
+	if opts != nil {
+		if v := opts.RawGetString("template"); v.IsString() {
+			template = v.Str()
+		}
+	}
+	if template == "" {
+		template = body.Str()
+	}
+	if encode {
+		params, err := stringMapFromTable(body, "urlpath")
+		if err != nil {
+			return []Value{NilValue(), StringValue(err.Error())}, nil
+		}
+		path, err := dialectlib.ExpandPathTemplate(template, params)
+		if err != nil {
+			return []Value{NilValue(), StringValue(err.Error())}, nil
+		}
+		return []Value{StringValue(path)}, nil
+	}
+	path := ""
+	if opts != nil && opts.RawGetString("path").IsString() {
+		path = opts.RawGetString("path").Str()
+	} else {
+		path = body.Str()
+	}
+	match, err := dialectlib.MatchPathTemplate(template, path)
+	if err != nil {
+		return []Value{NilValue(), StringValue(err.Error())}, nil
+	}
+	out := NewTable()
+	out.RawSetString("matched", BoolValue(match.Matched))
+	out.RawSetString("ok", BoolValue(match.Matched))
+	out.RawSetString("template", StringValue(match.Template))
+	out.RawSetString("path", StringValue(match.Path))
+	params := NewTable()
+	for key, val := range match.Params {
+		params.RawSetString(key, StringValue(val))
+	}
+	out.RawSetString("params", TableValue(params))
+	return []Value{TableValue(out)}, nil
+}
+
+func stringMapFromTable(body Value, dialectName string) (map[string]string, error) {
+	if !body.IsTable() {
+		return nil, fmt.Errorf("%s dialect: table required for encode", dialectName)
+	}
+	out := make(map[string]string)
+	body.Table().ForEachPlainRaw(func(k, v Value) bool {
+		if k.IsString() {
+			out[k.Str()] = v.String()
+		}
+		return true
+	})
+	return out, nil
 }
 
 func dialectMIME(body Value, opts *Table) ([]Value, error) {
