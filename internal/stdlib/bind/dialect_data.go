@@ -2,9 +2,11 @@ package bind
 
 import (
 	"fmt"
+	"io"
 	"strings"
 
 	base64lib "github.com/never-labs/leia/internal/stdlib/lib/base64"
+	compresslib "github.com/never-labs/leia/internal/stdlib/lib/compress"
 	encodinglib "github.com/never-labs/leia/internal/stdlib/lib/encoding"
 	hashlib "github.com/never-labs/leia/internal/stdlib/lib/hash"
 	uuidlib "github.com/never-labs/leia/internal/stdlib/lib/uuid"
@@ -34,6 +36,21 @@ func registerDialectData(register dialectRegisterFunc, maxHostResult func() int6
 	register([]string{"uuid"}, dialectHandler{
 		eval: func(body Value, options *Table) ([]Value, error) {
 			return dialectUUID(body, options)
+		},
+	})
+	register([]string{"gzip"}, dialectHandler{
+		eval: func(body Value, options *Table) ([]Value, error) {
+			return dialectCompress("gzip", body.Str(), options, maxHostResult)
+		},
+	})
+	register([]string{"zlib"}, dialectHandler{
+		eval: func(body Value, options *Table) ([]Value, error) {
+			return dialectCompress("zlib", body.Str(), options, maxHostResult)
+		},
+	})
+	register([]string{"deflate"}, dialectHandler{
+		eval: func(body Value, options *Table) ([]Value, error) {
+			return dialectCompress("deflate", body.Str(), options, maxHostResult)
 		},
 	})
 }
@@ -187,5 +204,72 @@ func dialectUUID(body Value, opts *Table) ([]Value, error) {
 		return []Value{StringValue(uuidlib.Nil())}, nil
 	default:
 		return nil, fmt.Errorf("uuid dialect: unknown mode %q", mode)
+	}
+}
+
+func dialectCompress(kind, src string, opts *Table, maxHostResult func() int64) ([]Value, error) {
+	mode := "encode"
+	if opts != nil && opts.RawGetString("mode").IsString() {
+		mode = opts.RawGetString("mode").Str()
+	}
+	level := compressDefaultLevel(kind)
+	if opts != nil && opts.RawGetString("level").IsNumber() {
+		level = compresslib.NormalizeLevel(int(toInt(opts.RawGetString("level"))), level)
+	}
+	limit := hostResultLimit(maxHostResult)
+	switch mode {
+	case "", "encode", "compress":
+		out, err := compressEncode(kind, src, level)
+		if err != nil {
+			return nil, fmt.Errorf("%s dialect: %v", kind, err)
+		}
+		if err := CheckProjectedHostStringBytes(limit, len(out)); err != nil {
+			return nil, err
+		}
+		return []Value{StringValue(out)}, nil
+	case "decode", "decompress":
+		out, err := compressDecode(kind, src, limit)
+		if err != nil {
+			return []Value{NilValue(), StringValue(err.Error())}, nil
+		}
+		return []Value{StringValue(out)}, nil
+	default:
+		return nil, fmt.Errorf("%s dialect: unknown mode %q", kind, mode)
+	}
+}
+
+func compressDefaultLevel(kind string) int {
+	switch kind {
+	case "gzip":
+		return compresslib.GzipDefaultLevel()
+	case "zlib":
+		return compresslib.ZlibDefaultLevel()
+	default:
+		return compresslib.DeflateDefaultLevel()
+	}
+}
+
+func compressEncode(kind, src string, level int) (string, error) {
+	switch kind {
+	case "gzip":
+		return compresslib.GzipEncode(src, level)
+	case "zlib":
+		return compresslib.ZlibEncode(src, level)
+	default:
+		return compresslib.DeflateEncode(src, level)
+	}
+}
+
+func compressDecode(kind, src string, limit int64) (string, error) {
+	readAll := func(r io.Reader) ([]byte, error) {
+		return ReadAllWithHostResultLimit(r, limit)
+	}
+	switch kind {
+	case "gzip":
+		return compresslib.GzipDecode(src, readAll)
+	case "zlib":
+		return compresslib.ZlibDecode(src, readAll)
+	default:
+		return compresslib.DeflateDecode(src, readAll)
 	}
 }

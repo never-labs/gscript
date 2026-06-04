@@ -271,7 +271,7 @@
       "name": "Tagged dialect strings, raw blocks, shell shortcut, and web path dialects",
       "category": "front-end-stdlib",
       "spec_sections": ["Grammar Appendix", "Lexical Elements", "Expressions", "Statements", "AI-Native Syntax", "Modules And Loading", "Values And Types"],
-      "builtin_dialect_tags": ["sh", "cmd", "shellwords", "glob", "path", "re", "regexp", "json", "jsonl", "csv", "tsv", "mdtable", "lines", "split", "words", "nums", "numbers", "kv", "logfmt", "env", "ini", "semver", "duration", "tap", "junit", "xml", "template", "url", "html_escape", "urlquery", "urlpath", "mime", "headers", "http_headers", "cookie", "cookies", "httpmsg", "ipaddr", "cidr", "hostport", "base64", "hash", "hex", "base32", "uuid", "prompt", "quote"],
+      "builtin_dialect_tags": ["sh", "cmd", "shellwords", "glob", "path", "re", "regexp", "json", "jsonl", "csv", "tsv", "mdtable", "lines", "split", "words", "nums", "numbers", "kv", "logfmt", "env", "ini", "semver", "duration", "tap", "junit", "xml", "template", "url", "html_escape", "urlquery", "urlpath", "mime", "headers", "http_headers", "cookie", "cookies", "httpmsg", "ipaddr", "cidr", "hostport", "base64", "hash", "hex", "base32", "uuid", "gzip", "zlib", "deflate", "prompt", "quote"],
       "parser": {"status": "covered", "refs": ["internal/parser/dialect_syntax_test.go", "internal/lexer/lexer_test.go"]},
       "bytecode": {"status": "semantic_only", "refs": []},
       "interpreter": {"status": "covered", "refs": ["tests/dialect_syntax_test.go", "internal/stdlib/bind/dialect_test.go", "internal/stdlib/bind/dialect_web_test.go"]},

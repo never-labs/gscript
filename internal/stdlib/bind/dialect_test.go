@@ -14,11 +14,11 @@ func TestDialectTagsExposeInstalledHandlers(t *testing.T) {
 
 	got := stringSetFromArray(interp.GetGlobal("tags").Table())
 	want := []string{
-		"base32", "base64", "cidr", "cmd", "cookie", "cookies", "csv", "duration", "env", "glob",
-		"hash", "headers", "hex", "hostport", "html_escape", "http_headers", "httpmsg", "ini", "ipaddr", "json", "jsonl",
+		"base32", "base64", "cidr", "cmd", "cookie", "cookies", "csv", "deflate", "duration", "env", "glob",
+		"gzip", "hash", "headers", "hex", "hostport", "html_escape", "http_headers", "httpmsg", "ini", "ipaddr", "json", "jsonl",
 		"junit", "kv", "lines", "logfmt", "mdtable", "mime", "numbers", "nums", "path", "prompt",
 		"quote", "re", "regexp", "semver", "sh", "shellwords", "split", "tap", "template", "tsv", "url",
-		"urlpath", "urlquery", "uuid", "words", "xml",
+		"urlpath", "urlquery", "uuid", "words", "xml", "zlib",
 	}
 	for _, name := range want {
 		if !got[name] {
@@ -457,6 +457,32 @@ func TestDialectUUIDParseAndValidate(t *testing.T) {
 	}
 	if got := interp.GetGlobal("nil_uuid").Str(); got != "00000000-0000-0000-0000-000000000000" {
 		t.Fatalf("nil uuid = %q", got)
+	}
+}
+
+func TestDialectCompressRoundTrip(t *testing.T) {
+	interp := runWithLib(t, `
+		data := "agent trace payload agent trace payload agent trace payload agent trace payload"
+		gziped := gzip`+"`"+`agent trace payload agent trace payload agent trace payload`+"`"+`
+		gzip_decoded, gzip_err := dialect.eval("gzip", gziped, {mode: "decode"})
+		zlibed := dialect.eval("zlib", data, {level: 1})
+		zlib_decoded, zlib_err := dialect.eval("zlib", zlibed, {mode: "decode"})
+		deflated := dialect.eval("deflate", data)
+		deflate_decoded, deflate_err := dialect.eval("deflate", deflated, {mode: "decode"})
+		bad, bad_err := dialect.eval("gzip", "not gzip", {mode: "decode"})
+	`, "dialect", BuildDialect(HostOptions{}, nil))
+
+	if !interp.GetGlobal("gzip_err").IsNil() || interp.GetGlobal("gzip_decoded").Str() != "agent trace payload agent trace payload agent trace payload" {
+		t.Fatalf("gzip decoded = %v err %v", interp.GetGlobal("gzip_decoded"), interp.GetGlobal("gzip_err"))
+	}
+	if !interp.GetGlobal("zlib_err").IsNil() || interp.GetGlobal("zlib_decoded").Str() != interp.GetGlobal("data").Str() {
+		t.Fatalf("zlib decoded = %v err %v", interp.GetGlobal("zlib_decoded"), interp.GetGlobal("zlib_err"))
+	}
+	if !interp.GetGlobal("deflate_err").IsNil() || interp.GetGlobal("deflate_decoded").Str() != interp.GetGlobal("data").Str() {
+		t.Fatalf("deflate decoded = %v err %v", interp.GetGlobal("deflate_decoded"), interp.GetGlobal("deflate_err"))
+	}
+	if !interp.GetGlobal("bad").IsNil() || !interp.GetGlobal("bad_err").IsString() {
+		t.Fatalf("bad gzip = %v err %v, want nil error string", interp.GetGlobal("bad"), interp.GetGlobal("bad_err"))
 	}
 }
 
