@@ -7,90 +7,121 @@
 // 2. an auto-dispatch research agent with tools,
 // 3. a custom flow that manually dispatches tool calls while enforcing defaults.
 
-models {
+llm.register_models({
     default: "ops"
     ops: {
         provider_model: "mock-ops"
     }
     planner: "mock-planner"
-}
+})
 
-//leia:requires runbooks.read
-//leia:param service production service name
-//leia:param symptom current symptom or alert summary
-tool search_runbook(service, symptom) {
+search_runbook := llm.tool("search_runbook", func(service, symptom) {
     return "runbook:" .. service .. ":" .. symptom, nil
-}
+}, {
+    params: {"service", "symptom"}
+    requires: {"runbooks.read"}
+    param_docs: {
+        service: "production service name"
+        symptom: "current symptom or alert summary"
+    }
+})
 
-//leia:requires metrics.read
-//leia:param service production service name
-tool get_metrics(service) {
+get_metrics := llm.tool("get_metrics", func(service) {
     return "metrics:" .. service .. ":latency=high,error_rate=2%", nil
-}
+}, {
+    params: {"service"}
+    requires: {"metrics.read"}
+    param_docs: {service: "production service name"}
+})
 
-agent defaults {
+llm.agent_defaults({
     model: "ops"
-    tools: [search_runbook, get_metrics]
+    tools: {search_runbook, get_metrics}
     budget: {turns: 5, calls: 4, tokens: 3000, time: 45}
-}
+})
 
-agent answer_faq(question) {
-    system: "Answer internal operations questions in one concise paragraph."
-    user: question
-    tools: []
-    budget: {turns: 1, calls: 0, tokens: 256}
-}
-
-agent investigate_alert(service, symptom) {
-    system: "Use runbook and metrics evidence before giving incident guidance."
-    user: "Investigate " .. service .. " alert: " .. symptom
-}
-
-agent incident_brief(service, symptom) {
-    model: "planner"
-    system: "Create a brief incident update from verified tool evidence."
-    tools: [search_runbook, get_metrics]
-    budget: {turns: 2, calls: 2, tokens: 800}
-} flow {
-    history := messages {
-        system: system
-        user: "Prepare incident brief for " .. service .. ": " .. symptom
+answer_faq := llm.agent("answer_faq", func(question) {
+    return {
+        messages: {
+            llm.system("Answer internal operations questions in one concise paragraph."),
+            llm.user(question),
+        }
+        tools: {}
+        budget: {turns: 1, calls: 0, tokens: 256}
     }
+}, nil, {params: {"question"}})
 
-    first, first_err := turn {
-        model: model
+investigate_alert := llm.agent("investigate_alert", func(service, symptom) {
+    return {
+        messages: {
+            llm.system("Use runbook and metrics evidence before giving incident guidance."),
+            llm.user("Investigate " .. service .. " alert: " .. symptom),
+        }
+    }
+}, nil, {params: {"service", "symptom"}})
+
+func incident_brief_config(service, symptom) {
+    return {
+        model: "planner"
+        messages: {
+            llm.system("Create a brief incident update from verified tool evidence."),
+            llm.user("Prepare incident brief for " .. service .. ": " .. symptom),
+        }
+        tools: {search_runbook, get_metrics}
+        budget: {turns: 2, calls: 2, tokens: 800}
+    }
+}
+
+incident_brief := llm.agent("incident_brief", incident_brief_config, func(service, symptom) {
+    cfg := incident_brief_config(service, symptom)
+    history := cfg.messages
+
+    first, first_err := llm.turn({
+        model: cfg.model
         messages: history
-        tools: tools
-    }
+        tools: cfg.tools
+    })
     if first_err != nil {
         return nil, first_err
     }
 
     call := first.calls[1]
-    evidence, dispatch_err := llm.dispatch(call, tools)
+    evidence, dispatch_err := llm.dispatch(call, cfg.tools)
     if dispatch_err != nil {
         return nil, dispatch_err
     }
     history[#history + 1] = msg.assistant_call(call)
     history[#history + 1] = msg.tool_result(call.id, evidence)
 
-    final, final_err := turn {
-        model: model
+    final, final_err := llm.turn({
+        model: cfg.model
         messages: history
-        tools: tools
+        tools: cfg.tools
         max_tokens: 320
-    }
+    })
     return {
         status: final.status,
         text: final.text,
         evidence: evidence,
         history_len: #history
     }, final_err
-}
+}, {params: {"service", "symptom"}})
 
 faq, faq_err := answer_faq("Who owns checkout incidents?")
+if faq_err != nil {
+    print(faq_err.message)
+    return
+}
 research, research_err := investigate_alert("checkout", "p95 latency spike")
+if research_err != nil {
+    print(research_err.message)
+    return
+}
 brief, brief_err := incident_brief("checkout", "p95 latency spike")
+if brief_err != nil {
+    print(brief_err.message)
+    return
+}
 
 faq_text := faq.text
 research_text := research.text

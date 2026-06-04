@@ -279,128 +279,7 @@ func (s *FuncDeclStmt) nodeType() string { return "FuncDeclStmt" }
 func (s *FuncDeclStmt) GetPos() Pos      { return s.P }
 func (s *FuncDeclStmt) stmtNode()        {}
 
-// ToolDeclStmt represents an AI tool declaration:
-// tool name(params) { body }
-type ToolDeclStmt struct {
-	P               Pos
-	Name            string
-	Params          []FuncParam
-	Body            *BlockStmt
-	DocComment      string
-	Requires        []string
-	ParamDocs       map[string]string
-	ParamDocEntries []ToolParamDoc
-}
-
-func (s *ToolDeclStmt) nodeType() string { return "ToolDeclStmt" }
-func (s *ToolDeclStmt) GetPos() Pos      { return s.P }
-func (s *ToolDeclStmt) stmtNode()        {}
-
-type ToolParamDoc struct {
-	Name string
-	Doc  string
-}
-
-// AIToolRegistry indexes module-level AI tools by declaration name for
-// source-level validation and future lint passes.
-type AIToolRegistry map[string]AIToolRegistryEntry
-
-// AIToolRegistryEntry captures the source metadata attached to an AI tool
-// declaration.
-type AIToolRegistryEntry struct {
-	Name      string
-	Requires  []string
-	Doc       string
-	Params    []FuncParam
-	ParamDocs map[string]string
-	Source    Pos
-}
-
-// Lookup returns a registered AI tool entry by declaration name.
-func (r AIToolRegistry) Lookup(name string) (AIToolRegistryEntry, bool) {
-	entry, ok := r[name]
-	return entry, ok
-}
-
-// RequiredCapabilitiesForTools returns the unique non-none capabilities
-// required by statically named tools, preserving first-seen order.
-func (r AIToolRegistry) RequiredCapabilitiesForTools(names []string) []string {
-	seen := map[string]bool{}
-	var out []string
-	for _, name := range names {
-		entry, ok := r.Lookup(name)
-		if !ok {
-			continue
-		}
-		for _, req := range entry.Requires {
-			if req == "" || req == "none" || req == "cap.none" || seen[req] {
-				continue
-			}
-			seen[req] = true
-			out = append(out, req)
-		}
-	}
-	return out
-}
-
-// AgentDeclStmt represents a named AI agent declaration.
-type AgentDeclStmt struct {
-	P      Pos
-	Name   string
-	Params []FuncParam
-	Config []ConfigField
-	Flow   *BlockStmt
-}
-
-func (s *AgentDeclStmt) nodeType() string { return "AgentDeclStmt" }
-func (s *AgentDeclStmt) GetPos() Pos      { return s.P }
-func (s *AgentDeclStmt) stmtNode()        {}
-
-// AgentDefaultsDeclStmt represents module-level default agent configuration:
-// agent defaults { ... }
-type AgentDefaultsDeclStmt struct {
-	P      Pos
-	Config []ConfigField
-}
-
-func (s *AgentDefaultsDeclStmt) nodeType() string { return "AgentDefaultsDeclStmt" }
-func (s *AgentDefaultsDeclStmt) GetPos() Pos      { return s.P }
-func (s *AgentDefaultsDeclStmt) stmtNode()        {}
-
-// ModelsDeclStmt represents a models { ... } declaration.
-type ModelsDeclStmt struct {
-	P      Pos
-	Config []ConfigField
-}
-
-func (s *ModelsDeclStmt) nodeType() string { return "ModelsDeclStmt" }
-func (s *ModelsDeclStmt) GetPos() Pos      { return s.P }
-func (s *ModelsDeclStmt) stmtNode()        {}
-
-// BudgetStmt represents a budget { ... } { body } statement.
-type BudgetStmt struct {
-	P      Pos
-	Config []ConfigField
-	Body   *BlockStmt
-}
-
-func (s *BudgetStmt) nodeType() string { return "BudgetStmt" }
-func (s *BudgetStmt) GetPos() Pos      { return s.P }
-func (s *BudgetStmt) stmtNode()        {}
-
-// EvaluateBlockStmt represents an agent regression case:
-// evaluate "case name" { body }
-type EvaluateBlockStmt struct {
-	P    Pos
-	Name string
-	Body *BlockStmt
-}
-
-func (s *EvaluateBlockStmt) nodeType() string { return "EvaluateBlockStmt" }
-func (s *EvaluateBlockStmt) GetPos() Pos      { return s.P }
-func (s *EvaluateBlockStmt) stmtNode()        {}
-
-// ConfigField represents a field inside agent, turn, budget, or models blocks.
+// ConfigField represents a field inside tagged configuration blocks.
 type ConfigField struct {
 	P     Pos
 	Key   Expr
@@ -447,6 +326,21 @@ func (e *StringLit) nodeType() string { return "StringLit" }
 func (e *StringLit) GetPos() Pos      { return e.P }
 func (e *StringLit) exprNode()        {}
 
+// InterpolatedStringExpr represents a string with ${expr} holes.
+type InterpolatedStringExpr struct {
+	P     Pos
+	Parts []InterpolatedStringPart
+}
+
+type InterpolatedStringPart struct {
+	Text string
+	Expr Expr
+}
+
+func (e *InterpolatedStringExpr) nodeType() string { return "InterpolatedStringExpr" }
+func (e *InterpolatedStringExpr) GetPos() Pos      { return e.P }
+func (e *InterpolatedStringExpr) exprNode()        {}
+
 // BoolLit represents a boolean literal: true, false
 type BoolLit struct {
 	P     Pos
@@ -484,6 +378,34 @@ type IdentExpr struct {
 func (e *IdentExpr) nodeType() string { return "IdentExpr" }
 func (e *IdentExpr) GetPos() Pos      { return e.P }
 func (e *IdentExpr) exprNode()        {}
+
+// TaggedStringExpr represents tag`body`, tag!`body`, and $`body` dialect
+// literals. They lower to dialect.eval(tag, body, opts).
+type TaggedStringExpr struct {
+	P        Pos
+	Tag      string
+	Body     Expr
+	FailFast bool
+}
+
+func (e *TaggedStringExpr) nodeType() string { return "TaggedStringExpr" }
+func (e *TaggedStringExpr) GetPos() Pos      { return e.P }
+func (e *TaggedStringExpr) exprNode()        {}
+
+// TaggedBlockExpr represents tag { ... } dialect blocks. Field blocks lower to
+// dialect.eval_block(tag, table, opts); raw statement blocks lower to
+// dialect.eval_raw(tag, func(){...}, opts).
+type TaggedBlockExpr struct {
+	P        Pos
+	Tag      string
+	Config   []ConfigField
+	Body     *BlockStmt
+	FailFast bool
+}
+
+func (e *TaggedBlockExpr) nodeType() string { return "TaggedBlockExpr" }
+func (e *TaggedBlockExpr) GetPos() Pos      { return e.P }
+func (e *TaggedBlockExpr) exprNode()        {}
 
 // BinaryExpr represents a binary expression: a OP b
 type BinaryExpr struct {
@@ -575,39 +497,6 @@ type FuncLitExpr struct {
 func (e *FuncLitExpr) nodeType() string { return "FuncLitExpr" }
 func (e *FuncLitExpr) GetPos() Pos      { return e.P }
 func (e *FuncLitExpr) exprNode()        {}
-
-// AgentLitExpr represents an anonymous AI agent value.
-type AgentLitExpr struct {
-	P      Pos
-	Params []FuncParam
-	Config []ConfigField
-	Flow   *BlockStmt
-}
-
-func (e *AgentLitExpr) nodeType() string { return "AgentLitExpr" }
-func (e *AgentLitExpr) GetPos() Pos      { return e.P }
-func (e *AgentLitExpr) exprNode()        {}
-
-// TurnExpr represents a turn { ... } expression.
-type TurnExpr struct {
-	P      Pos
-	Config []ConfigField
-}
-
-func (e *TurnExpr) nodeType() string { return "TurnExpr" }
-func (e *TurnExpr) GetPos() Pos      { return e.P }
-func (e *TurnExpr) exprNode()        {}
-
-// MessagesExpr represents a messages { ... } constructor. It is kept as a
-// distinct node so later lowering can preserve message role order.
-type MessagesExpr struct {
-	P      Pos
-	Fields []TableField
-}
-
-func (e *MessagesExpr) nodeType() string { return "MessagesExpr" }
-func (e *MessagesExpr) GetPos() Pos      { return e.P }
-func (e *MessagesExpr) exprNode()        {}
 
 // ListLitExpr represents a list literal: [a, b, c].
 type ListLitExpr struct {

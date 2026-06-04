@@ -11,8 +11,9 @@ import (
 
 // Parser implements a recursive descent parser for Leia.
 type Parser struct {
-	tokens []lexer.Token
-	pos    int
+	tokens              []lexer.Token
+	pos                 int
+	suppressTaggedBlock bool
 }
 
 // New creates a new Parser for the given token slice.
@@ -135,26 +136,8 @@ func (p *Parser) parseStmt() (ast.Stmt, error) {
 	case lexer.TOKEN_FUNC:
 		return p.parseFuncDeclOrExprStmt()
 	case lexer.TOKEN_IDENT:
-		if p.peek().Value == "import" && p.peekAt(1).Type == lexer.TOKEN_STRING {
+		if p.peek().Value == "import" && (p.peekAt(1).Type == lexer.TOKEN_STRING || p.peekAt(1).Type == lexer.TOKEN_IDENT || p.peekAt(1).Type == lexer.TOKEN_LPAREN) {
 			return p.parseImportDeclStmt()
-		}
-		if p.peek().Value == "tool" && p.peekAt(1).Type == lexer.TOKEN_IDENT && p.peekAt(2).Type == lexer.TOKEN_LPAREN {
-			return p.parseToolDeclStmt()
-		}
-		if p.peek().Value == "agent" &&
-			((p.peekAt(1).Type == lexer.TOKEN_IDENT && p.peekAt(2).Type == lexer.TOKEN_LBRACE) ||
-				(p.peekAt(1).Type == lexer.TOKEN_IDENT && p.peekAt(2).Type == lexer.TOKEN_LPAREN) ||
-				(p.peekAt(1).Type == lexer.TOKEN_IDENT && p.peekAt(1).Value == "defaults" && p.peekAt(2).Type == lexer.TOKEN_LBRACE)) {
-			return p.parseAgentDeclOrExprStmt()
-		}
-		if p.peek().Value == "models" && p.peekAt(1).Type == lexer.TOKEN_LBRACE {
-			return p.parseModelsDeclStmt()
-		}
-		if p.peek().Value == "budget" && p.peekAt(1).Type == lexer.TOKEN_LBRACE {
-			return p.parseBudgetStmt()
-		}
-		if p.peek().Value == "evaluate" && p.peekAt(1).Type == lexer.TOKEN_STRING && p.peekAt(2).Type == lexer.TOKEN_LBRACE {
-			return p.parseEvaluateBlockStmt()
 		}
 		if p.isLabelStmt() {
 			return p.parseLabelStmt()
@@ -240,21 +223,62 @@ func (p *Parser) parseFuncDeclStmt() (ast.Stmt, error) {
 func (p *Parser) parseImportDeclStmt() (ast.Stmt, error) {
 	importTok := p.advance()
 	pos := p.tokenPos(importTok)
-	pathTok, err := p.expect(lexer.TOKEN_STRING)
-	if err != nil {
-		return nil, err
+	if p.check(lexer.TOKEN_LPAREN) {
+		p.advance()
+		block := &ast.BlockStmt{P: pos}
+		for !p.check(lexer.TOKEN_RPAREN) && !p.isAtEnd() {
+			p.skipSemicolons()
+			if p.check(lexer.TOKEN_RPAREN) {
+				break
+			}
+			stmt, err := p.parseImportSpec(pos)
+			if err != nil {
+				return nil, err
+			}
+			block.Stmts = append(block.Stmts, stmt)
+			if p.check(lexer.TOKEN_COMMA) || p.check(lexer.TOKEN_SEMICOLON) {
+				p.advance()
+			}
+		}
+		if _, err := p.expect(lexer.TOKEN_RPAREN); err != nil {
+			return nil, err
+		}
+		return block, nil
 	}
-	if !p.checkIdent("as") {
-		return nil, p.errorf(`expected "as" in import declaration`)
+	return p.parseImportSpec(pos)
+}
+
+func (p *Parser) parseImportSpec(pos ast.Pos) (ast.Stmt, error) {
+	alias := ""
+	var pathTok lexer.Token
+	if p.check(lexer.TOKEN_STRING) {
+		pathTok = p.advance()
+		alias = defaultImportAlias(pathTok.Value)
+		if p.checkIdent("as") {
+			p.advance()
+			aliasTok, err := p.expect(lexer.TOKEN_IDENT)
+			if err != nil {
+				return nil, err
+			}
+			alias = aliasTok.Value
+		}
+	} else {
+		aliasTok, err := p.expect(lexer.TOKEN_IDENT)
+		if err != nil {
+			return nil, err
+		}
+		alias = aliasTok.Value
+		pathTok, err = p.expect(lexer.TOKEN_STRING)
+		if err != nil {
+			return nil, err
+		}
 	}
-	p.advance()
-	aliasTok, err := p.expect(lexer.TOKEN_IDENT)
-	if err != nil {
-		return nil, err
+	if alias == "" {
+		return nil, p.errorf("could not infer import alias for %q", pathTok.Value)
 	}
 	return &ast.DeclareStmt{
 		P:     pos,
-		Names: []string{aliasTok.Value},
+		Names: []string{alias},
 		Values: []ast.Expr{&ast.CallExpr{
 			P:    pos,
 			Func: &ast.IdentExpr{P: pos, Name: "require"},
@@ -263,58 +287,42 @@ func (p *Parser) parseImportDeclStmt() (ast.Stmt, error) {
 	}, nil
 }
 
-func (p *Parser) parseToolDeclStmt() (ast.Stmt, error) {
-	tok := p.advance() // consume 'tool'
-	pos := p.tokenPos(tok)
-	doc, requires, paramDocs, paramDocEntries := parseToolLeadingComments(tok)
-
-	nameTok, err := p.expect(lexer.TOKEN_IDENT)
-	if err != nil {
-		return nil, err
+func defaultImportAlias(path string) string {
+	path = strings.TrimSpace(path)
+	path = strings.TrimPrefix(path, "go:")
+	path = strings.TrimSuffix(path, "/")
+	if path == "" {
+		return ""
 	}
-	params, err := p.parseFuncParams()
-	if err != nil {
-		return nil, err
+	if idx := strings.LastIndex(path, "/"); idx >= 0 {
+		path = path[idx+1:]
 	}
-	body, err := p.parseBlock()
-	if err != nil {
-		return nil, err
+	if idx := strings.LastIndex(path, "."); idx >= 0 && idx < len(path)-1 {
+		path = path[idx+1:]
 	}
-	return &ast.ToolDeclStmt{P: pos, Name: nameTok.Value, Params: params, Body: body, DocComment: doc, Requires: requires, ParamDocs: paramDocs, ParamDocEntries: paramDocEntries}, nil
+	path = strings.ReplaceAll(path, "-", "_")
+	if !isIdentLike(path) {
+		return ""
+	}
+	return path
 }
 
-func parseToolLeadingComments(tok lexer.Token) (string, []string, map[string]string, []ast.ToolParamDoc) {
-	comments := contiguousLeadingComments(tok)
-	if len(comments) == 0 {
-		return "", nil, nil, nil
+func isIdentLike(s string) bool {
+	if s == "" {
+		return false
 	}
-	var docLines []string
-	var requires []string
-	paramDocs := map[string]string{}
-	var paramDocEntries []ast.ToolParamDoc
-	for _, comment := range comments {
-		text := strings.TrimSpace(comment.Text)
-		name, rest, isDirective := parseLeiaDirective(text)
-		if isDirective && isFileDirectiveKind(name) {
-			continue
-		}
-		if isDirective && name == "requires" {
-			requires = append(requires, parseRequiresDirective(rest)...)
-			continue
-		}
-		if isDirective && name == "param" {
-			if name, doc, ok := parseParamDirective(rest); ok {
-				paramDocs[name] = doc
-				paramDocEntries = append(paramDocEntries, ast.ToolParamDoc{Name: name, Doc: doc})
+	for i, r := range s {
+		if i == 0 {
+			if r != '_' && (r < 'A' || r > 'Z') && (r < 'a' || r > 'z') {
+				return false
 			}
 			continue
 		}
-		docLines = append(docLines, text)
+		if r != '_' && (r < 'A' || r > 'Z') && (r < 'a' || r > 'z') && (r < '0' || r > '9') {
+			return false
+		}
 	}
-	if len(paramDocs) == 0 {
-		paramDocs = nil
-	}
-	return strings.TrimSpace(strings.Join(docLines, "\n")), requires, paramDocs, paramDocEntries
+	return true
 }
 
 func directiveRest(text, directive string) (string, bool) {
@@ -397,128 +405,6 @@ func parseDirectiveArgs(rest string) []string {
 		}
 	}
 	return out
-}
-
-func contiguousLeadingComments(tok lexer.Token) []lexer.Comment {
-	comments := tok.LeadingComments
-	wantLine := tok.Line - 1
-	start := len(comments)
-	for start > 0 && comments[start-1].Line == wantLine {
-		start--
-		wantLine--
-	}
-	return comments[start:]
-}
-
-func parseRequiresDirective(rest string) []string {
-	return parseDirectiveArgs(strings.TrimLeft(rest, ": \t"))
-}
-
-func parseParamDirective(rest string) (string, string, bool) {
-	rest = strings.TrimLeft(rest, ": \t")
-	if rest == "" {
-		return "", "", false
-	}
-	nameEnd := strings.IndexFunc(rest, func(r rune) bool {
-		return r == ':' || r == '-' || r == ' ' || r == '\t'
-	})
-	if nameEnd < 0 {
-		return rest, "", true
-	}
-	name := strings.TrimSpace(rest[:nameEnd])
-	doc := strings.TrimSpace(rest[nameEnd:])
-	doc = strings.TrimLeft(doc, ":- \t")
-	if name == "" {
-		return "", "", false
-	}
-	return name, doc, true
-}
-
-func (p *Parser) parseAgentDeclOrExprStmt() (ast.Stmt, error) {
-	if p.peekAt(1).Type == lexer.TOKEN_IDENT && p.peekAt(1).Value == "defaults" && p.peekAt(2).Type == lexer.TOKEN_LBRACE {
-		return p.parseAgentDefaultsDeclStmt()
-	}
-	if p.peekAt(1).Type == lexer.TOKEN_IDENT && (p.peekAt(2).Type == lexer.TOKEN_LPAREN || p.peekAt(2).Type == lexer.TOKEN_LBRACE) {
-		return p.parseAgentDeclStmt()
-	}
-	return p.parseExpressionStmt()
-}
-
-func (p *Parser) parseAgentDefaultsDeclStmt() (ast.Stmt, error) {
-	tok := p.advance() // consume 'agent'
-	pos := p.tokenPos(tok)
-	p.advance() // consume 'defaults'
-	config, err := p.parseConfigBlock()
-	if err != nil {
-		return nil, err
-	}
-	return &ast.AgentDefaultsDeclStmt{P: pos, Config: config}, nil
-}
-
-func (p *Parser) parseAgentDeclStmt() (ast.Stmt, error) {
-	tok := p.advance() // consume 'agent'
-	pos := p.tokenPos(tok)
-
-	nameTok, err := p.expect(lexer.TOKEN_IDENT)
-	if err != nil {
-		return nil, err
-	}
-
-	var params []ast.FuncParam
-	if p.check(lexer.TOKEN_LPAREN) {
-		params, err = p.parseFuncParams()
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	config, err := p.parseConfigBlock()
-	if err != nil {
-		return nil, err
-	}
-	flow, err := p.parseOptionalFlowBlock()
-	if err != nil {
-		return nil, err
-	}
-	return &ast.AgentDeclStmt{P: pos, Name: nameTok.Value, Params: params, Config: config, Flow: flow}, nil
-}
-
-func (p *Parser) parseModelsDeclStmt() (ast.Stmt, error) {
-	tok := p.advance() // consume 'models'
-	pos := p.tokenPos(tok)
-	config, err := p.parseConfigBlock()
-	if err != nil {
-		return nil, err
-	}
-	return &ast.ModelsDeclStmt{P: pos, Config: config}, nil
-}
-
-func (p *Parser) parseBudgetStmt() (ast.Stmt, error) {
-	tok := p.advance() // consume 'budget'
-	pos := p.tokenPos(tok)
-	config, err := p.parseConfigBlock()
-	if err != nil {
-		return nil, err
-	}
-	body, err := p.parseBlock()
-	if err != nil {
-		return nil, err
-	}
-	return &ast.BudgetStmt{P: pos, Config: config, Body: body}, nil
-}
-
-func (p *Parser) parseEvaluateBlockStmt() (ast.Stmt, error) {
-	tok := p.advance() // consume 'evaluate'
-	pos := p.tokenPos(tok)
-	nameTok, err := p.expect(lexer.TOKEN_STRING)
-	if err != nil {
-		return nil, err
-	}
-	body, err := p.parseBlock()
-	if err != nil {
-		return nil, err
-	}
-	return &ast.EvaluateBlockStmt{P: pos, Name: nameTok.Value, Body: body}, nil
 }
 
 func (p *Parser) parseFuncParams() ([]ast.FuncParam, error) {
@@ -678,7 +564,7 @@ func (p *Parser) parseIfStmt() (ast.Stmt, error) {
 	tok := p.advance() // consume 'if'
 	pos := p.tokenPos(tok)
 
-	cond, err := p.parseExpr()
+	cond, err := p.parseExprBeforeBlock()
 	if err != nil {
 		return nil, err
 	}
@@ -703,7 +589,7 @@ func (p *Parser) parseIfStmt() (ast.Stmt, error) {
 		}
 		eiPos := p.tokenPos(eiTok)
 
-		eiCond, err := p.parseExpr()
+		eiCond, err := p.parseExprBeforeBlock()
 		if err != nil {
 			return nil, err
 		}
@@ -762,7 +648,7 @@ func (p *Parser) parseForStmt() (ast.Stmt, error) {
 	}
 
 	// Simple for (while) loop: for cond { }
-	cond, err := p.parseExpr()
+	cond, err := p.parseExprBeforeBlock()
 	if err != nil {
 		return nil, err
 	}
@@ -853,7 +739,7 @@ func (p *Parser) parseForRangeBody(pos ast.Pos) (ast.Stmt, error) {
 		return nil, err
 	}
 
-	iter, err := p.parseExpr()
+	iter, err := p.parseExprBeforeBlock()
 	if err != nil {
 		return nil, err
 	}
@@ -891,7 +777,7 @@ func (p *Parser) parseForNumBody(pos ast.Pos) (ast.Stmt, error) {
 		return nil, err
 	}
 
-	post, err := p.parseSimpleStmt()
+	post, err := p.parseSimpleStmtBeforeBlock()
 	if err != nil {
 		return nil, err
 	}
@@ -913,6 +799,13 @@ func (p *Parser) parseForNumBody(pos ast.Pos) (ast.Stmt, error) {
 // parseSimpleStmt parses a simple statement (no control flow).
 // Used for for-loop init and post clauses, and as the basis for parseExpressionStmt.
 func (p *Parser) parseSimpleStmt() (ast.Stmt, error) {
+	return p.parseExpressionStmt()
+}
+
+func (p *Parser) parseSimpleStmtBeforeBlock() (ast.Stmt, error) {
+	old := p.suppressTaggedBlock
+	p.suppressTaggedBlock = true
+	defer func() { p.suppressTaggedBlock = old }()
 	return p.parseExpressionStmt()
 }
 
@@ -1232,6 +1125,9 @@ func (p *Parser) parseExpressionStmt() (ast.Stmt, error) {
 		if callExpr, ok := expr.(*ast.CallExpr); ok {
 			return &ast.CallStmt{P: pos, Call: callExpr}, nil
 		}
+		if taggedCall := p.taggedExprStmtCall(expr); taggedCall != nil {
+			return &ast.CallStmt{P: pos, Call: taggedCall}, nil
+		}
 		// Method call expression: obj:method(args) used as statement.
 		// We wrap it by converting to an equivalent CallExpr.
 		if mc, ok := expr.(*ast.MethodCallExpr); ok {
@@ -1250,6 +1146,67 @@ func (p *Parser) parseExpressionStmt() (ast.Stmt, error) {
 		return nil, fmt.Errorf("parse error at %d:%d: expression is not a statement",
 			pos.Line, pos.Column)
 	}
+}
+
+func (p *Parser) taggedExprStmtCall(expr ast.Expr) *ast.CallExpr {
+	switch e := expr.(type) {
+	case *ast.TaggedStringExpr:
+		return parserDialectCall(e.P, "eval", e.Tag, e.Body, e.FailFast)
+	case *ast.TaggedBlockExpr:
+		if e.Body != nil {
+			return parserDialectCall(e.P, "eval_raw", e.Tag, &ast.FuncLitExpr{P: e.P, Body: e.Body}, e.FailFast)
+		}
+		return parserDialectCall(e.P, "eval_block", e.Tag, &ast.TableLitExpr{P: e.P, Fields: configFieldsToTableFields(e.Config)}, e.FailFast)
+	default:
+		return nil
+	}
+}
+
+func parserDialectCall(pos ast.Pos, method, tag string, body ast.Expr, failFast bool) *ast.CallExpr {
+	if method == "eval_block" {
+		switch tag {
+		case "turn":
+			return parserRuntimeCall(pos, "llm", "turn", body)
+		case "model", "models":
+			return parserRuntimeCall(pos, "llm", "register_models", body)
+		}
+	}
+	opts := &ast.TableLitExpr{P: pos, Fields: []ast.TableField{
+		{Key: &ast.StringLit{P: pos, Value: "fail_fast"}, Value: &ast.BoolLit{P: pos, Value: failFast}},
+	}}
+	return &ast.CallExpr{
+		P: pos,
+		Func: &ast.FieldExpr{
+			P:     pos,
+			Table: &ast.IdentExpr{P: pos, Name: "dialect"},
+			Field: method,
+		},
+		Args: []ast.Expr{
+			&ast.StringLit{P: pos, Value: tag},
+			body,
+			opts,
+		},
+	}
+}
+
+func parserRuntimeCall(pos ast.Pos, table, field string, args ...ast.Expr) *ast.CallExpr {
+	return &ast.CallExpr{
+		P: pos,
+		Func: &ast.FieldExpr{
+			P:     pos,
+			Table: &ast.IdentExpr{P: pos, Name: table},
+			Field: field,
+		},
+		Args: args,
+	}
+}
+
+func configFieldsToTableFields(fields []ast.ConfigField) []ast.TableField {
+	out := make([]ast.TableField, len(fields))
+	for i, field := range fields {
+		out[i] = ast.TableField{Key: field.Key, Value: field.Value}
+	}
+	return out
 }
 
 func (p *Parser) parseDeclareStmt(pos ast.Pos, firstExpr ast.Expr) (ast.Stmt, error) {
@@ -1376,7 +1333,7 @@ func (p *Parser) canStartExpr() bool {
 		lexer.TOKEN_TRUE, lexer.TOKEN_FALSE, lexer.TOKEN_NIL,
 		lexer.TOKEN_LPAREN, lexer.TOKEN_LBRACE, lexer.TOKEN_LBRACKET, lexer.TOKEN_FUNC,
 		lexer.TOKEN_MINUS, lexer.TOKEN_NOT, lexer.TOKEN_LEN,
-		lexer.TOKEN_ELLIPSIS:
+		lexer.TOKEN_ELLIPSIS, lexer.TOKEN_DOLLAR:
 		return true
 	}
 	return false
@@ -1399,6 +1356,13 @@ func (p *Parser) canStartExpr() bool {
 
 func (p *Parser) parseExpr() (ast.Expr, error) {
 	return p.parseOr()
+}
+
+func (p *Parser) parseExprBeforeBlock() (ast.Expr, error) {
+	old := p.suppressTaggedBlock
+	p.suppressTaggedBlock = true
+	defer func() { p.suppressTaggedBlock = old }()
+	return p.parseExpr()
 }
 
 func (p *Parser) parseOr() (ast.Expr, error) {
@@ -1768,17 +1732,13 @@ func (p *Parser) parsePrimary() (ast.Expr, error) {
 		return &ast.VarArgExpr{P: p.tokenPos(tok)}, nil
 
 	case lexer.TOKEN_IDENT:
-		if tok.Value == "messages" && p.peekAt(1).Type == lexer.TOKEN_LBRACE {
-			return p.parseMessagesExpr()
-		}
-		if tok.Value == "agent" && (p.peekAt(1).Type == lexer.TOKEN_LPAREN || p.peekAt(1).Type == lexer.TOKEN_LBRACE) {
-			return p.parseAgentLitExpr()
-		}
-		if tok.Value == "turn" && p.peekAt(1).Type == lexer.TOKEN_LBRACE {
-			return p.parseTurnExpr()
+		if p.isTaggedStringStart() || p.isTaggedBlockStart() {
+			return p.parseTaggedDialectExpr()
 		}
 		p.advance()
 		return &ast.IdentExpr{P: p.tokenPos(tok), Name: tok.Value}, nil
+	case lexer.TOKEN_DOLLAR:
+		return p.parseShellShortcutExpr()
 
 	case lexer.TOKEN_LPAREN:
 		tok := p.advance() // consume '('
@@ -1808,6 +1768,187 @@ func (p *Parser) parsePrimary() (ast.Expr, error) {
 	}
 }
 
+func (p *Parser) isTaggedStringStart() bool {
+	if p.peek().Type != lexer.TOKEN_IDENT {
+		return false
+	}
+	if p.peekAt(1).Type == lexer.TOKEN_STRING {
+		return true
+	}
+	return p.peekAt(1).Type == lexer.TOKEN_NOT && p.peekAt(2).Type == lexer.TOKEN_STRING
+}
+
+func (p *Parser) isTaggedBlockStart() bool {
+	if p.suppressTaggedBlock {
+		return false
+	}
+	if p.peek().Type != lexer.TOKEN_IDENT {
+		return false
+	}
+	if p.peekAt(1).Type == lexer.TOKEN_LBRACE {
+		return true
+	}
+	return p.peekAt(1).Type == lexer.TOKEN_NOT && p.peekAt(2).Type == lexer.TOKEN_LBRACE
+}
+
+func (p *Parser) parseTaggedDialectExpr() (ast.Expr, error) {
+	tagTok := p.advance()
+	pos := p.tokenPos(tagTok)
+	failFast := false
+	if p.check(lexer.TOKEN_NOT) {
+		p.advance()
+		failFast = true
+	}
+	if p.check(lexer.TOKEN_STRING) {
+		bodyTok := p.advance()
+		body, err := p.interpolatedStringExpr(p.tokenPos(bodyTok), bodyTok.Value)
+		if err != nil {
+			return nil, err
+		}
+		return &ast.TaggedStringExpr{P: pos, Tag: tagTok.Value, Body: body, FailFast: failFast}, nil
+	}
+	if p.check(lexer.TOKEN_LBRACE) {
+		if p.isDialectFieldBlockStart() {
+			config, err := p.parseConfigBlock()
+			if err != nil {
+				return nil, err
+			}
+			return &ast.TaggedBlockExpr{P: pos, Tag: tagTok.Value, Config: config, FailFast: failFast}, nil
+		}
+		body, err := p.parseBlock()
+		if err != nil {
+			return nil, err
+		}
+		return &ast.TaggedBlockExpr{P: pos, Tag: tagTok.Value, Body: body, FailFast: failFast}, nil
+	}
+	return nil, p.errorf("expected tagged dialect literal or block")
+}
+
+func (p *Parser) parseShellShortcutExpr() (ast.Expr, error) {
+	tok := p.advance()
+	pos := p.tokenPos(tok)
+	bodyTok, err := p.expect(lexer.TOKEN_STRING)
+	if err != nil {
+		return nil, err
+	}
+	body, err := p.interpolatedStringExpr(p.tokenPos(bodyTok), bodyTok.Value)
+	if err != nil {
+		return nil, err
+	}
+	return &ast.TaggedStringExpr{P: pos, Tag: "sh", Body: body}, nil
+}
+
+func (p *Parser) isDialectFieldBlockStart() bool {
+	if p.peek().Type != lexer.TOKEN_LBRACE {
+		return false
+	}
+	next := p.peekAt(1)
+	if next.Type == lexer.TOKEN_RBRACE {
+		return true
+	}
+	if (next.Type == lexer.TOKEN_IDENT || next.Type == lexer.TOKEN_STRING) && p.peekAt(2).Type == lexer.TOKEN_COLON {
+		return true
+	}
+	if next.Type == lexer.TOKEN_LBRACKET {
+		depth := 1
+		for off := 2; ; off++ {
+			tok := p.peekAt(off)
+			if tok.Type == lexer.TOKEN_EOF {
+				return false
+			}
+			switch tok.Type {
+			case lexer.TOKEN_LBRACKET:
+				depth++
+			case lexer.TOKEN_RBRACKET:
+				depth--
+				if depth == 0 {
+					return p.peekAt(off+1).Type == lexer.TOKEN_COLON
+				}
+			}
+		}
+	}
+	return false
+}
+
+func (p *Parser) interpolatedStringExpr(pos ast.Pos, value string) (ast.Expr, error) {
+	if !strings.Contains(value, "${") {
+		return &ast.StringLit{P: pos, Value: value}, nil
+	}
+	parts, err := parseInterpolatedStringParts(pos, value)
+	if err != nil {
+		return nil, err
+	}
+	return &ast.InterpolatedStringExpr{P: pos, Parts: parts}, nil
+}
+
+func parseInterpolatedStringParts(pos ast.Pos, value string) ([]ast.InterpolatedStringPart, error) {
+	var parts []ast.InterpolatedStringPart
+	for len(value) > 0 {
+		start := strings.Index(value, "${")
+		if start < 0 {
+			if value != "" {
+				parts = append(parts, ast.InterpolatedStringPart{Text: value})
+			}
+			break
+		}
+		if start > 0 {
+			parts = append(parts, ast.InterpolatedStringPart{Text: value[:start]})
+		}
+		exprStart := start + 2
+		depth := 1
+		end := exprStart
+	scanInterpolation:
+		for end < len(value) && depth > 0 {
+			switch value[end] {
+			case '{':
+				depth++
+			case '}':
+				depth--
+				if depth == 0 {
+					break scanInterpolation
+				}
+			}
+			end++
+		}
+		if depth != 0 {
+			return nil, fmt.Errorf("parse error at %d:%d: unterminated interpolation", pos.Line, pos.Column)
+		}
+		exprSrc := strings.TrimSpace(value[exprStart:end])
+		if exprSrc == "" {
+			return nil, fmt.Errorf("parse error at %d:%d: empty interpolation", pos.Line, pos.Column)
+		}
+		tokens, err := lexer.New(exprSrc).Tokenize()
+		if err != nil {
+			return nil, fmt.Errorf("parse error at %d:%d: interpolation lexer error: %w", pos.Line, pos.Column, err)
+		}
+		nested := New(tokens)
+		expr, err := nested.parseExpr()
+		if err != nil {
+			return nil, fmt.Errorf("parse error at %d:%d: interpolation parse error: %w", pos.Line, pos.Column, err)
+		}
+		if !nested.onlySemicolonsOrEOFRemain() {
+			return nil, fmt.Errorf("parse error at %d:%d: trailing interpolation tokens", pos.Line, pos.Column)
+		}
+		parts = append(parts, ast.InterpolatedStringPart{Expr: expr})
+		value = value[end+1:]
+	}
+	return parts, nil
+}
+
+func (p *Parser) onlySemicolonsOrEOFRemain() bool {
+	for p.pos < len(p.tokens) {
+		switch p.tokens[p.pos].Type {
+		case lexer.TOKEN_SEMICOLON:
+			p.pos++
+		case lexer.TOKEN_EOF:
+			return true
+		default:
+			return false
+		}
+	}
+	return true
+}
+
 func (p *Parser) parseFuncLitExpr() (ast.Expr, error) {
 	tok := p.advance() // consume 'func'
 	pos := p.tokenPos(tok)
@@ -1827,102 +1968,6 @@ func (p *Parser) parseFuncLitExpr() (ast.Expr, error) {
 		Params: params,
 		Body:   body,
 	}, nil
-}
-
-func (p *Parser) parseAgentLitExpr() (ast.Expr, error) {
-	tok := p.advance() // consume 'agent'
-	pos := p.tokenPos(tok)
-
-	var params []ast.FuncParam
-	var err error
-	if p.check(lexer.TOKEN_LPAREN) {
-		params, err = p.parseFuncParams()
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	config, err := p.parseConfigBlock()
-	if err != nil {
-		return nil, err
-	}
-	flow, err := p.parseOptionalFlowBlock()
-	if err != nil {
-		return nil, err
-	}
-	return &ast.AgentLitExpr{P: pos, Params: params, Config: config, Flow: flow}, nil
-}
-
-func (p *Parser) parseTurnExpr() (ast.Expr, error) {
-	tok := p.advance() // consume 'turn'
-	config, err := p.parseConfigBlock()
-	if err != nil {
-		return nil, err
-	}
-	return &ast.TurnExpr{P: p.tokenPos(tok), Config: config}, nil
-}
-
-func (p *Parser) parseMessagesExpr() (ast.Expr, error) {
-	tok := p.advance() // consume 'messages'
-	fields, err := p.parseMessagesBlock()
-	if err != nil {
-		return nil, err
-	}
-	return &ast.MessagesExpr{P: p.tokenPos(tok), Fields: fields}, nil
-}
-
-func (p *Parser) parseMessagesBlock() ([]ast.TableField, error) {
-	if _, err := p.expect(lexer.TOKEN_LBRACE); err != nil {
-		return nil, err
-	}
-
-	var fields []ast.TableField
-	for !p.check(lexer.TOKEN_RBRACE) && !p.isAtEnd() {
-		p.skipSemicolons()
-		if p.check(lexer.TOKEN_RBRACE) {
-			break
-		}
-		field, err := p.parseMessageField()
-		if err != nil {
-			return nil, err
-		}
-		fields = append(fields, field)
-		if p.check(lexer.TOKEN_COMMA) || p.check(lexer.TOKEN_SEMICOLON) {
-			p.advance()
-		}
-	}
-	if _, err := p.expect(lexer.TOKEN_RBRACE); err != nil {
-		return nil, err
-	}
-	return fields, nil
-}
-
-func (p *Parser) parseMessageField() (ast.TableField, error) {
-	if p.check(lexer.TOKEN_IDENT) && p.peekAt(1).Type == lexer.TOKEN_COLON {
-		keyTok := p.advance()
-		p.advance()
-		value, err := p.parseExpr()
-		if err != nil {
-			return ast.TableField{}, err
-		}
-		return ast.TableField{
-			Key:   &ast.StringLit{P: p.tokenPos(keyTok), Value: keyTok.Value},
-			Value: value,
-		}, nil
-	}
-	if p.check(lexer.TOKEN_STRING) && p.peekAt(1).Type == lexer.TOKEN_COLON {
-		keyTok := p.advance()
-		p.advance()
-		value, err := p.parseExpr()
-		if err != nil {
-			return ast.TableField{}, err
-		}
-		return ast.TableField{
-			Key:   &ast.StringLit{P: p.tokenPos(keyTok), Value: keyTok.Value},
-			Value: value,
-		}, nil
-	}
-	return p.parseTableField()
 }
 
 func (p *Parser) parseListLitExpr() (ast.Expr, error) {

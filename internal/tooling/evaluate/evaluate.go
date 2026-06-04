@@ -1043,50 +1043,12 @@ func parseLeia(path string, src []byte) (Summary, *ast.Program, []parsedCase, []
 	counts := Summary{ParsedFiles: 1}
 	var cases []parsedCase
 	countLLMStmts(path, prog.Stmts, &counts, &cases)
-	if err := ast.ValidateLLM(prog); err != nil {
-		return counts, prog, cases, []Finding{{Kind: "ai_syntax_error", Severity: "error", Message: err.Error(), Path: path}}
-	}
 	return counts, prog, cases, nil
 }
 
 func countLLMStmts(path string, stmts []ast.Stmt, counts *Summary, cases *[]parsedCase) {
 	for _, stmt := range stmts {
 		switch s := stmt.(type) {
-		case *ast.AgentDeclStmt:
-			counts.Agents++
-			if s.Flow != nil {
-				countLLMStmts(path, s.Flow.Stmts, counts, cases)
-			}
-		case *ast.ToolDeclStmt:
-			counts.Tools++
-			if s.Body != nil {
-				countLLMStmts(path, s.Body.Stmts, counts, cases)
-			}
-		case *ast.ModelsDeclStmt:
-			counts.Models++
-		case *ast.BudgetStmt:
-			counts.Budgets++
-			if s.Body != nil {
-				countLLMStmts(path, s.Body.Stmts, counts, cases)
-			}
-		case *ast.EvaluateBlockStmt:
-			counts.EvaluateBlocks++
-			*cases = append(*cases, parsedCase{
-				Case: Case{
-					CaseID:     fmt.Sprintf("%s:%d:%d", path, s.P.Line, s.P.Column),
-					Name:       s.Name,
-					SourcePath: path,
-					Range: SourceRange{
-						StartLine:   s.P.Line,
-						StartColumn: s.P.Column,
-					},
-					Status: "pending",
-				},
-				Body: s.Body,
-			})
-			if s.Body != nil {
-				countLLMStmts(path, s.Body.Stmts, counts, cases)
-			}
 		case *ast.BlockStmt:
 			countLLMStmts(path, s.Stmts, counts, cases)
 		case *ast.FuncDeclStmt:
@@ -1530,9 +1492,6 @@ func elapsedMillis(start time.Time) int64 {
 func caseProgramStmts(topLevel []ast.Stmt, body []ast.Stmt) []ast.Stmt {
 	stmts := make([]ast.Stmt, 0, len(topLevel)+len(body))
 	for _, stmt := range topLevel {
-		if _, ok := stmt.(*ast.EvaluateBlockStmt); ok {
-			continue
-		}
 		stmts = append(stmts, stmt)
 	}
 	stmts = append(stmts, body...)
@@ -1605,20 +1564,6 @@ func collectAssertionsInStmt(stmt ast.Stmt, out *[]Assertion) {
 		collectAssertionsInExprs(s.Values, out)
 	case *ast.FuncDeclStmt:
 		collectAssertionsInBlock(s.Body, out)
-	case *ast.ToolDeclStmt:
-		collectAssertionsInBlock(s.Body, out)
-	case *ast.AgentDeclStmt:
-		collectAssertionsInConfig(s.Config, out)
-		collectAssertionsInBlock(s.Flow, out)
-	case *ast.AgentDefaultsDeclStmt:
-		collectAssertionsInConfig(s.Config, out)
-	case *ast.ModelsDeclStmt:
-		collectAssertionsInConfig(s.Config, out)
-	case *ast.BudgetStmt:
-		collectAssertionsInConfig(s.Config, out)
-		collectAssertionsInBlock(s.Body, out)
-	case *ast.EvaluateBlockStmt:
-		collectAssertionsInBlock(s.Body, out)
 	}
 }
 
@@ -1669,13 +1614,6 @@ func collectAssertionsInExpr(expr ast.Expr, out *[]Assertion) {
 		collectAssertionsInExprs(e.Args, out)
 	case *ast.FuncLitExpr:
 		collectAssertionsInBlock(e.Body, out)
-	case *ast.AgentLitExpr:
-		collectAssertionsInConfig(e.Config, out)
-		collectAssertionsInBlock(e.Flow, out)
-	case *ast.TurnExpr:
-		collectAssertionsInConfig(e.Config, out)
-	case *ast.MessagesExpr:
-		collectAssertionsInTableFields(e.Fields, out)
 	case *ast.ListLitExpr:
 		collectAssertionsInExprs(e.Values, out)
 	case *ast.TableLitExpr:

@@ -43,6 +43,18 @@ func llmStringArrayValue(items []string) Value {
 	return TableValue(t)
 }
 
+func llmAgentCallArgs(meta llmAgentMetadata, args []Value) []Value {
+	if len(args) != 1 || !args[0].IsTable() || len(meta.Params) == 0 {
+		return args
+	}
+	t := args[0].Table()
+	out := make([]Value, 0, len(meta.Params))
+	for _, name := range meta.Params {
+		out = append(out, t.RawGetString(name))
+	}
+	return out
+}
+
 func llmAgentToolResultValue(v Value) Value {
 	if !v.IsTable() {
 		return v
@@ -101,7 +113,7 @@ func llmAgentFunctionToToolTable(call ScriptFunctionCaller, agent Value) *Table 
 		if call == nil {
 			return []Value{NilValue(), llmErrorValue("internal", "agent-as-tool requires a function caller")}, nil
 		}
-		results, err := call(agent, callArgs)
+		results, err := call(agent, llmAgentCallArgs(meta, callArgs))
 		if err != nil {
 			return nil, err
 		}

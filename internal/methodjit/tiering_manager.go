@@ -530,7 +530,16 @@ func (tm *TieringManager) retireStaleTier2AfterFeedback(proto *vm.FuncProto, cf 
 		return
 	}
 	traceRefresh()
-	tm.clearTier2Install(proto)
+	if cf.Code == nil {
+		tm.clearTier2Install(proto)
+		return
+	}
+	nextCF, err := tm.compileTier2(proto)
+	if err != nil || nextCF == nil {
+		tm.clearTier2Install(proto)
+		return
+	}
+	tm.markTier2Compiled(proto, nextCF)
 }
 
 func (tm *TieringManager) tryMidRunTier2Refresh(proto *vm.FuncProto, cf *CompiledFunction, ctx *ExecContext) (*CompiledFunction, int, bool) {

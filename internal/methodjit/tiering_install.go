@@ -9,7 +9,12 @@ import (
 )
 
 func (tm *TieringManager) installTier2(proto *vm.FuncProto, cf *CompiledFunction) {
-	proto.Tier2Promoted = true
+	if !proto.Tier2Promoted {
+		proto.Tier2Promoted = true
+		proto.DirectEntryVersion++
+	} else {
+		proto.Tier2Promoted = true
+	}
 
 	// Publish the generic DirectEntryPtr only when compatibility native callers can
 	// recover by replaying the call. Tier 2 callers have an ExitNativeCallExit

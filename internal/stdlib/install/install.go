@@ -89,6 +89,7 @@ func InstallModules(installer runtime.StdlibInstaller, maxHostResult func() int6
 	installer.RegisterTable("context", stdbind.BuildContext())
 	installer.RegisterTable("crypto", stdbind.BuildCrypto(maxHostResult))
 	installer.RegisterTable("csv", stdbind.BuildCSV(maxHostResult))
+	installer.RegisterTable("dialect", stdbind.BuildDialect(hostOpts, maxHostResult))
 	installer.RegisterTable("encoding", stdbind.BuildEncoding(maxHostResult))
 	if !hostOpts.SkipHostIO {
 		installer.RegisterTable("fs", stdbind.BuildFSWithPolicy(hostOpts))

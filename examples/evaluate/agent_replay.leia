@@ -1,11 +1,13 @@
-agent classify_support(message) {
-    model: "mock-fast"
-    system: "Classify support message. Return refund, shipping, or other."
-    user: message
-}
+classify_support := llm.agent("classify_support", func(message) {
+    return {
+        model: "mock-fast"
+        messages: {
+            llm.system("Classify support message. Return refund, shipping, or other."),
+            llm.user(message),
+        },
+    }
+}, nil, {params: {"message"}})
 
-evaluate "agent classifies refund request with replay" {
-    result, err := classify_support("Customer asks for a refund after a damaged delivery.")
-    assert(err == nil)
-    assert(result.text == "refund")
-}
+result, err := classify_support("Customer asks for a refund after a damaged delivery.")
+assert(err == nil)
+assert(result.text == "refund")

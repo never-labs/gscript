@@ -5,7 +5,6 @@ import (
 	"regexp"
 	"strconv"
 
-	"github.com/never-labs/leia/internal/ast"
 	"github.com/never-labs/leia/internal/lexer"
 	"github.com/never-labs/leia/internal/parser"
 )
@@ -35,12 +34,8 @@ func syntaxDiagnostics(src string) []diagnostic {
 	if err != nil {
 		return []diagnostic{newSyntaxDiagnostic("LEIA1001", fmt.Errorf("lexer error: %w", err))}
 	}
-	prog, err := parser.New(tokens).Parse()
-	if err != nil {
+	if _, err := parser.New(tokens).Parse(); err != nil {
 		return []diagnostic{newSyntaxDiagnostic("LEIA1001", fmt.Errorf("parse error: %w", err))}
-	}
-	if err := ast.ValidateLLM(prog); err != nil {
-		return []diagnostic{newSyntaxDiagnostic("LEIA2001", err)}
 	}
 	return nil
 }

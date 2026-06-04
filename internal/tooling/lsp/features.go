@@ -16,8 +16,6 @@ import (
 )
 
 const (
-	symbolKindClass    = 5
-	symbolKindEvent    = 24
 	symbolKindFunction = 12
 )
 
@@ -453,12 +451,11 @@ func semanticTokenKind(tokens []lexer.Token, index int) (int, int, bool) {
 		case tokenLooksLikeImportAlias(tokens, index):
 			return semanticNamespace, semanticDeclarationModifier, true
 		case tokenIsDeclarationName(tokens, index):
-			if tokenText(tokens[index-1]) == "agent" {
-				return semanticType, semanticDeclarationModifier, true
-			}
 			return semanticFunction, semanticDeclarationModifier, true
 		case tokenIsParameterDeclaration(tokens, index):
 			return semanticParameter, semanticDeclarationModifier, true
+		case tokenLooksLikeContextualKeyword(tokens, index):
+			return semanticKeyword, 0, true
 		case tokenLooksLikeMethodCall(tokens, index):
 			return semanticMethod, 0, true
 		case tokenLooksLikeProperty(tokens, index):
@@ -467,8 +464,6 @@ func semanticTokenKind(tokens []lexer.Token, index int) (int, int, bool) {
 			return semanticNamespace, semanticDefaultLibraryModifier, true
 		case tokenLooksLikeFunctionCall(tokens, index):
 			return semanticFunction, 0, true
-		case tok.Value == "agent" || tok.Value == "tool" || tok.Value == "evaluate" || tok.Value == "models" || tok.Value == "turn" || tok.Value == "messages" || tok.Value == "budget" || tok.Value == "flow" || tok.Value == "react" || tok.Value == "import" || tok.Value == "as":
-			return semanticKeyword, 0, true
 		case tok.Value == "i32" || tok.Value == "i64" || tok.Value == "f32" || tok.Value == "f64" || tok.Value == "bool":
 			return semanticType, semanticDefaultLibraryModifier, true
 		default:
@@ -501,11 +496,50 @@ func tokenIsDeclarationName(tokens []lexer.Token, index int) bool {
 		return false
 	}
 	prev := tokens[index-1]
-	return prev.Type == lexer.TOKEN_FUNC || tokenText(prev) == "agent" || tokenText(prev) == "tool"
+	return prev.Type == lexer.TOKEN_FUNC
 }
 
 func tokenLooksLikeImportAlias(tokens []lexer.Token, index int) bool {
 	return index > 0 && tokenText(tokens[index-1]) == "as"
+}
+
+func tokenLooksLikeContextualKeyword(tokens []lexer.Token, index int) bool {
+	tok := tokens[index]
+	if tok.Type != lexer.TOKEN_IDENT {
+		return false
+	}
+	switch tok.Value {
+	case "import":
+		return tokenAtStartOfStmt(tokens, index)
+	case "select":
+		return tokenAtStartOfStmt(tokens, index) && index+1 < len(tokens) && tokens[index+1].Type == lexer.TOKEN_LBRACE
+	case "case", "default":
+		return tokenInsideSelect(tokens, index)
+	case "as":
+		return index > 0 && tokens[index-1].Type == lexer.TOKEN_STRING && index+1 < len(tokens) && tokens[index+1].Type == lexer.TOKEN_IDENT
+	default:
+		return false
+	}
+}
+
+func tokenAtStartOfStmt(tokens []lexer.Token, index int) bool {
+	if index == 0 {
+		return true
+	}
+	prev := tokens[index-1]
+	return prev.Type == lexer.TOKEN_SEMICOLON || prev.Type == lexer.TOKEN_LBRACE || prev.Type == lexer.TOKEN_RBRACE || prev.Line < tokens[index].Line
+}
+
+func tokenInsideSelect(tokens []lexer.Token, index int) bool {
+	for i := index - 1; i >= 0; i-- {
+		if tokenText(tokens[i]) == "select" && i+1 < len(tokens) && tokens[i+1].Type == lexer.TOKEN_LBRACE {
+			return true
+		}
+		if tokens[i].Type == lexer.TOKEN_RBRACE {
+			return false
+		}
+	}
+	return false
 }
 
 func tokenIsParameterDeclaration(tokens []lexer.Token, index int) bool {
@@ -527,7 +561,7 @@ func tokenIsParameterDeclaration(tokens []lexer.Token, index int) bool {
 	if open <= 1 {
 		return false
 	}
-	if tokenText(tokens[open-2]) != "func" && tokenText(tokens[open-2]) != "tool" && tokenText(tokens[open-2]) != "agent" {
+	if tokenText(tokens[open-2]) != "func" {
 		return false
 	}
 	for i := open + 1; i < len(tokens) && i < index; i++ {
@@ -645,65 +679,13 @@ func pathToFileURI(path string) string {
 }
 
 func collectCodeLens(uri, src string) []codeLens {
-	syms := collectSourceSymbols(src)
-	out := make([]codeLens, 0, len(syms))
-	for _, sym := range syms {
-		switch sym.Kind {
-		case symbolKindEvent:
-			out = append(out, codeLens{
-				Range: sym.Range,
-				Command: command{
-					Title:     "Run evaluate case",
-					Command:   "leia.evaluate.case",
-					Arguments: []any{uri, sym.Name},
-				},
-			})
-		case symbolKindClass:
-			out = append(out, codeLens{
-				Range: sym.Range,
-				Command: command{
-					Title:     "Run agent",
-					Command:   "leia.agent.run",
-					Arguments: []any{uri, sym.Name},
-				},
-			})
-		}
-	}
-	return out
+	_, _ = uri, src
+	return []codeLens{}
 }
 
 func collectInlayHints(src string, requested lspRange) []inlayHint {
-	syms := collectSourceSymbols(src)
-	out := make([]inlayHint, 0, len(syms))
-	for _, sym := range syms {
-		if !rangeIntersectsLine(requested, sym.Range.Start.Line) {
-			continue
-		}
-		switch sym.Kind {
-		case symbolKindEvent:
-			out = append(out, inlayHint{
-				Position: sym.Range.End,
-				Label:    " eval",
-				Kind:     3,
-				Tooltip:  "Leia evaluate block discovered by `leia evaluate`.",
-			})
-		case symbolKindClass:
-			out = append(out, inlayHint{
-				Position: sym.Range.End,
-				Label:    " agent",
-				Kind:     3,
-				Tooltip:  "Leia AI agent declaration.",
-			})
-		}
-	}
-	return out
-}
-
-func rangeIntersectsLine(r lspRange, line int) bool {
-	if r.Start == (position{}) && r.End == (position{}) {
-		return true
-	}
-	return line >= r.Start.Line && line <= r.End.Line
+	_, _ = src, requested
+	return []inlayHint{}
 }
 
 func hoverText(src, word string) string {
@@ -744,26 +726,8 @@ func wordReferences(src, word string) []lspRange {
 			out = append(out, tokenRange(tok))
 			continue
 		}
-		if tok.Type == lexer.TOKEN_STRING && tok.Value == word && tokenLooksLikeEvaluateName(tokens, tok) {
-			out = append(out, tokenRange(tok))
-		}
 	}
 	return out
-}
-
-func tokenLooksLikeEvaluateName(tokens []lexer.Token, target lexer.Token) bool {
-	for i, tok := range tokens {
-		if tok.Line != target.Line || tok.Column != target.Column {
-			continue
-		}
-		for j := i - 1; j >= 0 && tokens[j].Line == target.Line; j-- {
-			if tokenText(tokens[j]) == "evaluate" {
-				return true
-			}
-		}
-		return false
-	}
-	return false
 }
 
 func filterReferenceRanges(refs []lspRange, exclude lspRange) []lspRange {
@@ -800,26 +764,28 @@ func validIdentifierName(name string) bool {
 }
 
 var keywordHover = map[string]string{
-	"agent":    "Declares or constructs an AI agent.",
+	"as":       "Names an imported module alias.",
 	"break":    "Exits the nearest enclosing loop.",
+	"case":     "Starts a select case.",
 	"chan":     "Creates or names a channel type in channel expressions.",
 	"const":    "Declares read-only local bindings.",
 	"continue": "Skips to the next iteration of the nearest enclosing loop.",
+	"default":  "Starts the default select branch.",
 	"defer":    "Defers a call until the current function returns.",
 	"else":     "Starts the fallback branch of an if statement.",
 	"elseif":   "Starts an additional conditional branch of an if statement.",
-	"evaluate": "Declares an agent regression case for `leia evaluate`.",
 	"false":    "Boolean false literal.",
 	"for":      "Starts a loop.",
 	"func":     "Declares a named function or creates a function literal.",
 	"go":       "Starts a concurrent call.",
 	"goto":     "Jumps to a label in the current function.",
 	"if":       "Starts a conditional statement.",
+	"import":   "Imports a Leia module through `require`.",
 	"in":       "Separates range loop bindings from the iterator expression.",
 	"nil":      "Nil literal.",
 	"range":    "Iterates over values in a for loop.",
 	"return":   "Returns values from the current function.",
-	"tool":     "Declares an AI tool callable by agent workflows.",
+	"select":   "Waits on channel send or receive cases.",
 	"true":     "Boolean true literal.",
 	"var":      "Declares mutable local bindings.",
 }
@@ -846,16 +812,6 @@ func collectStmtSymbols(src string, tokens []lexer.Token, stmts []ast.Stmt, out 
 			if st.Body != nil {
 				collectStmtSymbols(src, tokens, st.Body.Stmts, out)
 			}
-		case *ast.ToolDeclStmt:
-			*out = append(*out, declarationSymbol(src, tokens, st.P, "tool", st.Name, toolDetail(st), symbolKindFunction))
-			if st.Body != nil {
-				collectStmtSymbols(src, tokens, st.Body.Stmts, out)
-			}
-		case *ast.AgentDeclStmt:
-			*out = append(*out, declarationSymbol(src, tokens, st.P, "agent", st.Name, agentDetail(st), symbolKindClass))
-			if st.Flow != nil {
-				collectStmtSymbols(src, tokens, st.Flow.Stmts, out)
-			}
 		case *ast.IfStmt:
 			if st.Body != nil {
 				collectStmtSymbols(src, tokens, st.Body.Stmts, out)
@@ -880,15 +836,6 @@ func collectStmtSymbols(src string, tokens []lexer.Token, stmts []ast.Stmt, out 
 			if st.Body != nil {
 				collectStmtSymbols(src, tokens, st.Body.Stmts, out)
 			}
-		case *ast.BudgetStmt:
-			if st.Body != nil {
-				collectStmtSymbols(src, tokens, st.Body.Stmts, out)
-			}
-		case *ast.EvaluateBlockStmt:
-			*out = append(*out, evaluateBlockSymbol(src, tokens, st))
-			if st.Body != nil {
-				collectStmtSymbols(src, tokens, st.Body.Stmts, out)
-			}
 		}
 	}
 }
@@ -904,24 +851,9 @@ func collectSourceSymbolsFromTokens(src string, tokens []lexer.Token) []sourceSy
 		switch {
 		case tok.Type == lexer.TOKEN_FUNC:
 			out = append(out, declarationSymbol(src, tokens, tokenPos(tok), "func", nameTok.Value, fmt.Sprintf("func `%s`", nameTok.Value), symbolKindFunction))
-		case tok.Type == lexer.TOKEN_IDENT && tok.Value == "tool":
-			out = append(out, declarationSymbol(src, tokens, tokenPos(tok), "tool", nameTok.Value, fmt.Sprintf("tool `%s`", nameTok.Value), symbolKindFunction))
-		case tok.Type == lexer.TOKEN_IDENT && tok.Value == "agent" && nameTok.Value != "defaults":
-			out = append(out, declarationSymbol(src, tokens, tokenPos(tok), "agent", nameTok.Value, fmt.Sprintf("agent `%s`", nameTok.Value), symbolKindClass))
 		}
 	}
 	return out
-}
-
-func evaluateBlockSymbol(src string, tokens []lexer.Token, st *ast.EvaluateBlockStmt) sourceSymbol {
-	nameRange := findEvaluateNameRange(tokens, st.P, st.Name)
-	return sourceSymbol{
-		Name:      st.Name,
-		Detail:    fmt.Sprintf("evaluate `%s`", st.Name),
-		Kind:      symbolKindEvent,
-		Range:     lineRange(src, nameRange.Start.Line),
-		NameRange: nameRange,
-	}
 }
 
 func declarationSymbol(src string, tokens []lexer.Token, pos ast.Pos, prefix, name, detail string, kind int) sourceSymbol {
@@ -953,42 +885,8 @@ func findNameRange(tokens []lexer.Token, pos ast.Pos, prefix, name string) lspRa
 	return lspRange{Start: positionFromOneBased(pos.Line, pos.Column), End: positionFromOneBased(pos.Line, pos.Column+len(name))}
 }
 
-func findEvaluateNameRange(tokens []lexer.Token, pos ast.Pos, name string) lspRange {
-	for i, tok := range tokens {
-		if tok.Line != pos.Line || tok.Column != pos.Column || tokenText(tok) != "evaluate" {
-			continue
-		}
-		for j := i + 1; j < len(tokens); j++ {
-			next := tokens[j]
-			if next.Line != tok.Line {
-				break
-			}
-			if next.Type == lexer.TOKEN_STRING && next.Value == name {
-				return tokenRange(next)
-			}
-		}
-	}
-	return lspRange{Start: positionFromOneBased(pos.Line, pos.Column), End: positionFromOneBased(pos.Line, pos.Column+len(name))}
-}
-
 func functionDetail(name string, params []ast.FuncParam) string {
 	return fmt.Sprintf("func `%s(%s)`", name, formatParams(params))
-}
-
-func toolDetail(st *ast.ToolDeclStmt) string {
-	var parts []string
-	parts = append(parts, fmt.Sprintf("tool `%s(%s)`", st.Name, formatParams(st.Params)))
-	if st.DocComment != "" {
-		parts = append(parts, st.DocComment)
-	}
-	if len(st.Requires) > 0 {
-		parts = append(parts, "requires: "+strings.Join(st.Requires, ", "))
-	}
-	return strings.Join(parts, "\n\n")
-}
-
-func agentDetail(st *ast.AgentDeclStmt) string {
-	return fmt.Sprintf("agent `%s(%s)`", st.Name, formatParams(st.Params))
 }
 
 func formatParams(params []ast.FuncParam) string {

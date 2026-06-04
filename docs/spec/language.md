@@ -108,45 +108,36 @@ inc_dec_stmt  = expr ( "++" | "--" ) ;
 expr_list     = expr { "," expr } ;
 ```
 
-Tables, calls, member selection, indexing, anonymous functions, agent
-expressions, tool declarations, and message blocks are expressions or
-declarations layered on this core grammar. AI-native syntax desugars to the
-`llm`, `msg`, `history`, and `loop` standard-library modules.
+Tables, calls, member selection, indexing, anonymous functions, dense arrays,
+imports, and tagged dialect forms are layered on this core grammar. AI workflows
+use the `llm`, `msg`, `history`, and `loop` standard-library modules, with small
+tagged-block conveniences for the most common model-turn forms.
 
-## AI-Native Syntax
+## Dialects And AI-Native Syntax
 
-AI-native syntax is part of the language surface, but it is deliberately a
-desugaring layer over the standard library rather than a separate execution
-engine. The parser accepts `models`, `tool`, `agent defaults`, named `agent`
-declarations, anonymous `agent` expressions, `turn` expressions, `messages`
-blocks, `flow` blocks, and `budget` blocks as described in
-[`grammar.ebnf`](grammar.ebnf).
+Leia supports tagged dialect forms. A tagged string has the shape
+`tag`...`` or `tag!`...``; `$`...`` is shorthand for the shell dialect. A
+tagged block has the shape `tag { ... }` or `tag! { ... }`. The non-bang form
+returns the dialect result and any structured error according to the dialect
+contract. The bang form is fail-fast and raises a runtime error when the dialect
+cannot parse or execute the form.
 
-The stable lowering target is the `llm`, `msg`, `history`, and `loop` module
-family. That keeps scripted and embedded agents on the same runtime path:
-provider selection, tool dispatch, output validation, record/replay, tracing,
-and cancellation must behave the same whether the user writes AI-native syntax
-or calls the library directly.
+The AI surface is a standard-library layer rather than a separate execution
+engine. Use `llm.turn({...})` for model calls and
+`llm.register_models({...})` for model configuration. Tools, agents, messages,
+history manipulation, output validation, record/replay, tracing, and
+cancellation are ordinary calls on the `llm`, `msg`, `history`, and `loop`
+modules. This keeps scripted and embedded agents on the same runtime path.
 
-An `agent` is a callable value. Its configuration fields are defaults for the
-turns executed by that agent: explicit fields on a `turn` expression override
-agent configuration, and agent configuration overrides process or host defaults.
-A `flow` block provides the agent body when the default one-turn behavior is not
-enough. The flow body is lexical code. Only `model`, `system`, `tools`, and
-`capabilities` are injected as flow-local bindings from merged agent
-configuration. They are ordinary lexical bindings: user declarations in the
-flow body may shadow them. Other agent config fields, including `user`,
-`budget`, `response_format`, and `metadata`, are not injected as variables; they
-remain ambient agent configuration consumed by `turn {}` and lower-level
-standard-library helpers.
+An agent is a callable value produced by `llm.agent`. Its configuration fields
+are defaults for the turns executed by that agent. Explicit fields in the table
+returned by the agent body override agent defaults, and agent defaults override
+process or host defaults. There is no implicit flow scope: agent bodies are
+ordinary lexical functions, and all configuration values that the body needs
+must be passed or closed over explicitly.
 
-`messages { ... }` constructs ordered message tables. It is intended for common
-system/user/assistant/tool histories; advanced or computed histories may still
-use the message helper modules directly. `tool` declarations produce tool values
-with a callable body and optional comment-derived metadata. Agents may be used
-as tools when the runtime can derive a stable tool schema from the agent's
-configuration and output contract.
-
+Messages are ordinary ordered tables, usually built with `llm.system`,
+`llm.user`, `msg.assistant`, `msg.assistant_call`, and tool-result helpers.
 Recoverable provider, budget, validation, and tool failures return structured
 `nil, err` results unless the API explicitly documents a panic-style runtime
 error. Host-provided model credentials and endpoints are embedding policy, not

@@ -21,11 +21,13 @@ func TestLLMAgentOutputValidationError(t *testing.T) {
 			vm := leia.New(llmScenarioOptions(provider, tc.opts...)...)
 
 			if err := vm.Exec(`
-agent extract_contact(text) {
-    model: "mock-json"
-    user: text
-    output: {name: "Ada"}
-}
+extract_contact := llm.agent("extract_contact", func(text) {
+    return {
+        model: "mock-json"
+        user: text
+        output: {name: "Ada"}
+    }, nil
+})
 
 result, err := extract_contact("Ada")
 err_kind := err.kind
@@ -64,14 +66,16 @@ func TestLLMAgentOutputValidationMissingField(t *testing.T) {
 			vm := leia.New(llmScenarioOptions(provider, tc.opts...)...)
 
 			if err := vm.Exec(`
-agent extract_contact(text) {
-    model: "mock-json"
-    user: text
-    output: {
-        name: "Ada"
-        email: "ada@example.com"
-    }
-}
+extract_contact := llm.agent("extract_contact", func(text) {
+    return {
+        model: "mock-json"
+        user: text
+        output: {
+            name: "Ada"
+            email: "ada@example.com"
+        }
+    }, nil
+})
 
 result, err := extract_contact("Ada")
 err_kind := err.kind
@@ -111,16 +115,18 @@ func TestLLMAgentOutputValidationTypeMismatch(t *testing.T) {
 			vm := leia.New(llmScenarioOptions(provider, tc.opts...)...)
 
 			if err := vm.Exec(`
-agent classify(text) {
-    model: "mock-json"
-    user: text
-    output: {
-        name: "Ada"
-        score: 1
-        ok: true
-        meta: {source: "email"}
-    }
-}
+classify := llm.agent("classify", func(text) {
+    return {
+        model: "mock-json"
+        user: text
+        output: {
+            name: "Ada"
+            score: 1
+            ok: true
+            meta: {source: "email"}
+        }
+    }, nil
+})
 
 result, err := classify("Ada")
 err_kind := err.kind

@@ -19,6 +19,9 @@ LuaJIT references live under `benchmarks/lua_ref/<domain>/`.
 ## Main Commands
 
 ```bash
+# Fast grammar-change hot-path gate; writes reports under /tmp by default.
+bash scripts/performance_gate.sh --syntax-smoke --no-luajit
+
 # Current worktree vs clean HEAD vs LuaJIT.
 python3 benchmarks/timing_compare.py --all-groups --runs=5 --warmup=1 \
   --time-source=auto --min-sample-seconds=0.100 --max-repeat=128 \
@@ -45,6 +48,11 @@ python3 benchmarks/timing_compare.py --runs=5 --warmup=1 \
 # Semantic-family performance coverage audit.
 bash benchmarks/coverage_guard.sh
 ```
+
+Use `--syntax-smoke` after lexer/parser/grammar-only work when you need a
+quick current-vs-HEAD check over control, calls, table, string, and data hot
+paths without starting the longer strict truth pass. Add `--strict` if the
+change also needs VM/default/no-filter output stability evidence.
 
 ## Diagnostics
 

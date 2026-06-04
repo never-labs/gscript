@@ -543,7 +543,19 @@ genericNativePath:
 		}
 	}
 
-	results, err := e.callVM.CallValueNoMethodJIT(fnVal, callArgs)
+	callWithMethodJIT := false
+	if cl, ok := vmClosureFromValue(fnVal); ok && cl.Proto.MethodJITCallable() {
+		calleeProto := cl.Proto
+		callWithMethodJIT = calleeProto.Tier2Promoted || calleeProto.NeedsTier2 ||
+			(e.tierUpThreshold > 0 && calleeProto.CallCount >= e.tierUpThreshold)
+	}
+	var results []runtime.Value
+	var err error
+	if callWithMethodJIT {
+		results, err = e.callVM.CallValue(fnVal, callArgs)
+	} else {
+		results, err = e.callVM.CallValueNoMethodJIT(fnVal, callArgs)
+	}
 	if err != nil {
 		return err
 	}

@@ -43,6 +43,7 @@ leia diagnose table/table_array_access --out-dir /tmp/leia-diag
 The shell gate wraps the same harnesses with repository defaults:
 
 ```bash
+bash scripts/performance_gate.sh --syntax-smoke --no-luajit
 bash scripts/performance_gate.sh --smoke
 bash scripts/performance_gate.sh --feature-smoke
 bash scripts/performance_gate.sh --full
@@ -50,6 +51,11 @@ bash scripts/performance_gate.sh --full
 
 Use `--no-luajit` when LuaJIT is not installed or the workload has no useful
 Lua reference.
+
+`--syntax-smoke` is the fastest guard for lexer, parser, or grammar-only
+changes. It runs a small current-vs-HEAD hot-path subset across control, calls,
+table, string, and data workloads, uses shorter calibration, and skips the
+strict truth pass unless `--strict` is added.
 
 ## Timing Modes
 

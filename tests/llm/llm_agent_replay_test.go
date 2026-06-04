@@ -17,33 +17,43 @@ func TestLLMAgentTurnScenarioRecordReplay(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			source := `
-models {
+llm.register_models({
     default: "chat"
     chat: {provider_model: "mock-chat"}
+})
+
+func reviewer_config(topic) {
+    return {
+        model: "chat"
+        system: "Review with two passes."
+    }
 }
 
-agent reviewer(topic) {
-    model: "chat"
-    system: "Review with two passes."
-} flow {
-    draft, draft_err := turn {
-        messages: messages {
-            system: system
-            user: "Draft " .. topic
+reviewer := llm.agent("reviewer", reviewer_config, func(topic) {
+    cfg := reviewer_config(topic)
+    draft, draft_err := llm.turn({
+        model: cfg.model
+        messages: {
+            llm.system(cfg.system),
+            llm.user("Draft " .. topic),
         }
         max_tokens: 32
-    }
+    })
     if draft_err != nil {
         return nil, draft_err
     }
 
-    final, final_err := turn {
-        messages: messages {
-            user: draft.text .. " / final"
+    final, final_err := llm.turn({
+        model: cfg.model
+        messages: {
+            llm.user(draft.text .. " / final"),
         }
-    }
+    })
     return {draft: draft.text, final: final.text}, final_err
-}
+}, {
+    params: {"topic"}
+    description: "Review with two passes."
+})
 
 out, err := reviewer("recording")
 draft_text := out.draft

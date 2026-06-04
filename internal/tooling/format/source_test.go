@@ -18,13 +18,13 @@ func TestSourceRejectsInvalidSyntax(t *testing.T) {
 	}
 }
 
-func TestSourceFormatsEvaluateBlockIndentation(t *testing.T) {
-	src := []byte("evaluate \"slug baseline\" {\nassert(true)\nif true {\nassert(true)\n}\n}\n")
+func TestSourceFormatsTaggedBlockIndentation(t *testing.T) {
+	src := []byte("prompt {\nsystem: \"Be brief.\"\nuser: \"hello\"\noptions: {\nmax_tokens: 16\n}\n}\n")
 	got, err := Source("eval.leia", src)
 	if err != nil {
 		t.Fatalf("Source returned error: %v", err)
 	}
-	want := "evaluate \"slug baseline\" {\n    assert(true)\n    if true {\n        assert(true)\n    }\n}\n"
+	want := "prompt {\n    system: \"Be brief.\"\n    user: \"hello\"\n    options: {\n        max_tokens: 16\n    }\n}\n"
 	if string(got) != want {
 		t.Fatalf("Source() = %q, want %q", string(got), want)
 	}

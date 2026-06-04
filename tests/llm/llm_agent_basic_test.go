@@ -30,14 +30,14 @@ func TestLLMDirectTurnMessagesReachProviderInVMJIT(t *testing.T) {
 			vm := leia.New(llmScenarioOptions(provider, tc.opts...)...)
 
 			if err := vm.Exec(`
-history := messages {
-    system: "Keep this system prompt."
-    user: "Keep this user prompt."
+history := {
+    llm.system("Keep this system prompt."),
+    llm.user("Keep this user prompt."),
 }
-result, err := turn {
+result, err := llm.turn({
     model: "mock-chat"
     messages: history
-}
+})
 `); err != nil {
 				t.Fatalf("Exec: %v", err)
 			}
@@ -72,19 +72,19 @@ func TestLLMAgentScenarioSimpleDefaultsQuestionAnswer(t *testing.T) {
 			vm := leia.New(llmScenarioOptions(provider, tc.opts...)...)
 
 			if err := vm.Exec(`
-models {
+llm.register_models({
     default: "chat"
     chat: {provider_model: "mock-chat"}
-}
+})
 
-agent defaults {
+llm.agent_defaults({
     model: "chat"
     system: "Answer with only the requested fact."
-}
+})
 
-answer := agent(question) {
-    user: question
-}
+answer := llm.agent("answer", func(question) {
+    return {user: question}, nil
+}, nil, {params: {"question"}})
 
 result, err := answer("What is the capital of France?")
 answer_text := result.text
@@ -141,17 +141,23 @@ func TestLLMAgentScenarioReactToolAutoDispatch(t *testing.T) {
 			vm := leia.New(llmScenarioOptions(provider, tc.opts...)...)
 
 			if err := vm.Exec(`
-//leia:requires none
-tool lookup(topic) {
+lookup := llm.tool("lookup", func(topic) {
     return "doc:" .. topic, nil
+}, {
+    params: {"topic"}
+    requires: {"none"}
+})
+
+func researcher_config(topic) {
+    return {
+        model: "mock-react"
+        system: "Use tools before answering."
+        tools: {lookup}
+        user: "Find docs for " .. topic
+    }
 }
 
-agent researcher(topic) {
-    model: "mock-react"
-    system: "Use tools before answering."
-    tools: [lookup]
-    user: "Find docs for " .. topic
-}
+researcher := llm.agent("researcher", researcher_config, nil, {params: {"topic"}})
 
 result, err := researcher("leia")
 status := result.status
@@ -215,51 +221,61 @@ func TestLLMAgentScenarioComplexFlowCustomTurns(t *testing.T) {
 			vm := leia.New(llmScenarioOptions(provider, tc.opts...)...)
 
 			if err := vm.Exec(`
-//leia:requires none
-tool lookup(topic) {
+lookup := llm.tool("lookup", func(topic) {
     return "note:" .. topic, nil
+}, {
+    params: {"topic"}
+    requires: {"none"}
+})
+
+func analyst_config(topic) {
+    return {
+        model: "mock-flow"
+        system: "Build the answer from tool evidence."
+        tools: {lookup}
+    }
 }
 
-agent analyst(topic) {
-    model: "mock-flow"
-    system: "Build the answer from tool evidence."
-    tools: [lookup]
-} flow {
-    history := messages {
-        system: system
-        user: "Investigate " .. topic
+analyst := llm.agent("analyst", analyst_config, func(topic) {
+    cfg := analyst_config(topic)
+    history := {
+        llm.system(cfg.system),
+        llm.user("Investigate " .. topic),
     }
 
-    first, first_err := turn {
-        model: model
+    first, first_err := llm.turn({
+        model: cfg.model
         messages: history
-        tools: tools
-    }
+        tools: cfg.tools
+    })
     if first_err != nil {
         return nil, first_err
     }
 
     call := first.calls[1]
-    value, dispatch_err := llm.dispatch(call, tools)
+    value, dispatch_err := llm.dispatch(call, cfg.tools)
     if dispatch_err != nil {
         return nil, dispatch_err
     }
     history[#history + 1] = msg.assistant_call(call)
     history[#history + 1] = msg.tool_result(call.id, value)
 
-    final, final_err := turn {
-        model: model
+    final, final_err := llm.turn({
+        model: cfg.model
         messages: history
-        tools: tools
+        tools: cfg.tools
         max_tokens: 48
-    }
+    })
     return {
         first_status: first.status
         final_text: final.text
         tool_value: value
         history_len: #history
     }, final_err
-}
+}, {
+    params: {"topic"}
+    description: "Build the answer from tool evidence."
+})
 
 out, err := analyst("agents")
 first_status := out.first_status

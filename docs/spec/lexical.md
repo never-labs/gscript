@@ -236,8 +236,10 @@ chapters. Lexically, a directive is still a line comment.
 ```text
 // leia:requires docs.read
 // leia:cap net.client
-agent summarize(text) {
-    user: text
+func summarize(text) {
+    return llm.turn({
+        messages: {llm.user(text)}
+    })
 }
 ```
 

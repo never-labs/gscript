@@ -28,12 +28,12 @@ func TestLLMStandaloneBudgetLimitsDirectTurns(t *testing.T) {
 err_kind := nil
 err_dimension := nil
 
-budget { turns: 1 } {
-    first, first_err := turn { user: "first" }
-    second, second_err := turn { user: "second" }
+llm.with_budget({turns: 1}, func() {
+    first, first_err := llm.turn({messages: {llm.user("first")}})
+    second, second_err := llm.turn({messages: {llm.user("second")}})
     err_kind = second_err.kind
     err_dimension = second_err.dimension
-}
+})
 `); err != nil {
 				t.Fatalf("Exec: %v", err)
 			}
@@ -71,14 +71,14 @@ func TestLLMStandaloneBudgetNestedIntersectionUsesOuterTokens(t *testing.T) {
 err_kind := nil
 err_dimension := nil
 
-budget { tokens: 5 } {
-    budget { tokens: 100 } {
-        first, first_err := turn { user: "first" }
-        second, second_err := turn { user: "second" }
+llm.with_budget({tokens: 5}, func() {
+    llm.with_budget({tokens: 100}, func() {
+        first, first_err := llm.turn({messages: {llm.user("first")}})
+        second, second_err := llm.turn({messages: {llm.user("second")}})
         err_kind = second_err.kind
         err_dimension = second_err.dimension
-    }
-}
+    })
+})
 `); err != nil {
 				t.Fatalf("Exec: %v", err)
 			}
@@ -120,33 +120,30 @@ func TestLLMStandaloneBudgetLimitsToolCallsAndTime(t *testing.T) {
 			}, tc.opts...)
 			vm := leia.New(opts...)
 			if err := vm.Exec(`
-//leia:requires none
-tool lookup(query) {
+lookup := llm.tool("lookup", func(query) {
     return "found:" .. query, nil
-}
-
-agent researcher() {
-    model: "mock"
-    tools: [lookup]
-    user: "find leia"
-}
+}, {params: {"query"}, requires: {"none"}})
 
 call_kind := nil
 call_dimension := nil
 time_kind := nil
 time_message := nil
 
-budget { calls: 0 } {
-    result, err := researcher()
+llm.with_budget({calls: 0}, func() {
+    result, err := llm.run_agent({
+        model: "mock"
+        tools: {lookup}
+        user: "find leia"
+    })
     call_kind = err.kind
     call_dimension = err.dimension
-}
+})
 
-budget { time: 0 } {
-    result, err := turn { user: "deadline" }
+llm.with_budget({time: 0}, func() {
+    result, err := llm.turn({messages: {llm.user("deadline")}})
     time_kind = err.kind
     time_message = err.message
-}
+})
 `); err != nil {
 				t.Fatalf("Exec: %v", err)
 			}

@@ -330,18 +330,6 @@ func collectStmtRequires(out []string, stmt ast.Stmt) []string {
 		return collectExprListRequires(out, s.Values)
 	case *ast.FuncDeclStmt:
 		return collectBlockRequires(out, s.Body)
-	case *ast.ToolDeclStmt:
-		return collectBlockRequires(out, s.Body)
-	case *ast.AgentDeclStmt:
-		out = collectConfigRequires(out, s.Config)
-		return collectBlockRequires(out, s.Flow)
-	case *ast.AgentDefaultsDeclStmt:
-		return collectConfigRequires(out, s.Config)
-	case *ast.ModelsDeclStmt:
-		return collectConfigRequires(out, s.Config)
-	case *ast.BudgetStmt:
-		out = collectConfigRequires(out, s.Config)
-		return collectBlockRequires(out, s.Body)
 	}
 	return out
 }
@@ -390,13 +378,6 @@ func collectExprRequires(out []string, expr ast.Expr) []string {
 		return collectExprListRequires(out, e.Args)
 	case *ast.FuncLitExpr:
 		return collectBlockRequires(out, e.Body)
-	case *ast.AgentLitExpr:
-		out = collectConfigRequires(out, e.Config)
-		return collectBlockRequires(out, e.Flow)
-	case *ast.TurnExpr:
-		return collectConfigRequires(out, e.Config)
-	case *ast.MessagesExpr:
-		return collectTableFieldsRequires(out, e.Fields)
 	case *ast.ListLitExpr:
 		return collectExprListRequires(out, e.Values)
 	case *ast.TableLitExpr:

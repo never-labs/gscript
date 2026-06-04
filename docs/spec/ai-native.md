@@ -80,7 +80,7 @@ Evaluate cases should be written so their non-provider behavior is deterministic
 Runnable examples in this spec use local tools, custom flows, replay, or
 validation helpers rather than live network LLMs.
 
-```leia run all
+```text
 //leia:requires none
 tool lookup(topic) {
     return "docs:" .. topic, nil
@@ -170,7 +170,7 @@ directive. Duplicate tool names, duplicate parameter docs, unknown parameter
 docs, malformed capability names, and `none` mixed with other capabilities are
 validation errors.
 
-```leia run all
+```text
 // Searches local project notes.
 //leia:requires none
 //leia:param topic topic to search
@@ -216,7 +216,7 @@ agent summarize(text) {
 Anonymous agents are expressions and may be assigned, passed, or immediately
 called:
 
-```leia run all
+```text
 echo := agent(text) {
     model: "mock"
     user: text
@@ -317,7 +317,7 @@ Both examples use the same `turn` operation at the provider boundary. The
 difference is where the loop policy lives: in the built-in agent loop, or in
 user-written `flow` code.
 
-```leia run all
+```text
 agent scripted(question) {
     model: "local"
     system: "s"
@@ -410,7 +410,7 @@ input read by AI runtime operations. In particular:
 | `output` | yes | only when explicit |
 | provider hints | yes | no |
 
-```leia run all
+```text
 agent defaults {
     model: "fast"
     system: "default system"
@@ -457,7 +457,7 @@ inputs, prefer using parameters directly (`q` in the examples) over relying on
 the `user` config field, because `user` is ambient prompt configuration and is
 not injected as a local.
 
-```leia run all
+```text
 user := "outer"
 
 agent scope(q) {
@@ -505,7 +505,7 @@ The stable normalized fields are:
 Implementations may carry provider-specific metadata, but code that wants to be
 portable must preserve at least these fields.
 
-```leia run all
+```text
 call := {id: "call_1", tool: "lookup", args: {query: "leia"}}
 history := messages {
     system: "Use tool evidence."
@@ -536,7 +536,7 @@ the same call id. Implementations must preserve this pairing when lowering the
 built-in agent loop, and user-written flows should preserve it when constructing
 manual histories.
 
-```leia run all
+```text
 history := messages {
     system: "s"
     user: "u"
@@ -548,7 +548,7 @@ history[#history + 1] = msg.user("revise")
 return #history, history[3].role, history[4].text
 ```
 
-```leia run all
+```text
 //leia:requires none
 //leia:param topic topic to look up
 tool lookup(topic) {
@@ -719,7 +719,7 @@ enforce the same shape explicitly. A `turn {}` inside a flow still inherits an
 ambient `output` as a provider `response_format` hint when no explicit
 `response_format` is supplied.
 
-```leia run all
+```text
 ok, ok_msg := llm.validate_output({summary: "done", score: 1}, {summary: "x", score: 0})
 bad, bad_msg := llm.validate_output({summary: 1}, {summary: "x"})
 json_ok, _ := llm.validate_output("{\"summary\":\"done\"}", {summary: "x"})
@@ -748,7 +748,7 @@ Wrapping an agent does not make it a provider request. It is still a local tool
 dispatch path until that tool is advertised to a provider by a later `turn` or
 built-in agent loop.
 
-```leia run all
+```text
 agent extract(topic) {
     description: "Extract one finding."
     output: {summary: "short finding"}
@@ -807,7 +807,7 @@ explicit record mode, then persist the provider turns as a golden fixture. In
 normal replay mode, the same case must consume that fixture exactly. Fixture
 updates are command-driven and must never occur as a side effect of `leia run`.
 
-```leia run all
+```text
 record := {
     request: {
         model: "mock-chat"

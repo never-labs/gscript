@@ -26,37 +26,47 @@ func TestLLMNamedAgentFlowAndDirectTurnSugar(t *testing.T) {
 			}, tc.opts...)
 			vm := leia.New(opts...)
 			err := vm.Exec(`
-models {
+llm.register_models({
     default: "alias"
     alias: "resolved-model"
-}
+})
 
-//leia:requires none
-tool echo_tool(query) {
+echo_tool := llm.tool("echo_tool", func(query) {
     return query, nil
+}, {
+    params: {"query"}
+    requires: {"none"}
+})
+
+func support_config(q) {
+    return {
+        model: "alias"
+        tools: {echo_tool}
+        system: "Use tools when useful."
+        user: q
+    }
 }
 
-agent support(q) {
-    model: "alias"
-    tools: [echo_tool]
-    system: "Use tools when useful."
-    user: q
-} flow {
-    r, err := turn {
-        model: model
-        messages: messages {
-            system: system
-            user: q
+support := llm.agent("support", support_config, func(q) {
+    cfg := support_config(q)
+    r, err := llm.turn({
+        model: cfg.model
+        messages: {
+            llm.system(cfg.system),
+            llm.user(q),
         }
-        tools: tools
-    }
+        tools: cfg.tools
+    })
     return r, err
-}
+}, {
+    params: {"q"}
+    description: "Use tools when useful."
+})
 
 flow_result, flow_err := support("hello")
-turn_result, turn_err := turn {
-    user: "direct user shorthand"
-}
+turn_result, turn_err := llm.turn({
+    messages: {llm.user("direct user shorthand")}
+})
 flow_text := flow_result.text
 turn_text := turn_result.text
 `)
@@ -116,17 +126,17 @@ func TestLLMMessagesBlockAllowsMixedMessageItems(t *testing.T) {
 			vm := leia.New(opts...)
 			err := vm.Exec(`
 call := {id: "call_1", tool: "lookup", args: {query: "leia"}}
-history := messages {
-    system: "System text."
-    user: "Find docs."
-    msg.assistant_call(call)
-    msg.tool_result("call_1", "docs")
-    user: "Summarize."
+history := {
+    llm.system("System text."),
+    llm.user("Find docs."),
+    msg.assistant_call(call),
+    msg.tool_result("call_1", "docs"),
+    llm.user("Summarize."),
 }
-result, err := turn {
+result, err := llm.turn({
     model: "mock-chat"
     messages: history
-}
+})
 history_len := #history
 `)
 			if err != nil {
@@ -168,10 +178,10 @@ func TestLLMHistoryHelpersAndValidateOutput(t *testing.T) {
 			vm := leia.New(append([]leia.Option{leia.WithLibs(leia.LibString | leia.LibLLM)}, tc.opts...)...)
 			if err := vm.Exec(`
 call := {id: "call_1", tool: "lookup", args: {query: "leia"}}
-h := messages {
-    user: "Find docs."
-    msg.assistant_call(call)
-    msg.tool_result("call_1", {summary: "docs"})
+h := {
+    llm.user("Find docs."),
+    msg.assistant_call(call),
+    msg.tool_result("call_1", {summary: "docs"}),
 }
 tool_msg, tool_idx := history.find(h, {role: "tool"})
 assistant_msg, assistant_idx := history.last(h, {role: "assistant"})
@@ -237,37 +247,47 @@ func TestLLMFlowAgentUsesStdlibAgentAmbientConfig(t *testing.T) {
 			}, tc.opts...)
 			vm := leia.New(opts...)
 			err := vm.Exec(`
-models {
-    default: "default-alias"
-    "default-alias": "resolved-default"
+llm.register_models({
+    default: "default_alias"
+    default_alias: "resolved-default"
     flow_alias: "resolved-flow"
-}
+})
 
-// Echoes a query.
-//leia:requires none
-tool echo_tool(query) {
+echo_tool := llm.tool("echo_tool", func(query) {
     return query, nil
-}
+}, {
+    description: "Echoes a query."
+    params: {"query"}
+    requires: {"none"}
+})
 
-agent defaults {
-    model: "default-alias"
+llm.agent_defaults({
+    model: "default_alias"
     system: "Default system."
+})
+
+func flow_support_config(q) {
+    return {
+        model: "flow_alias"
+        tools: {echo_tool}
+        user: q
+        budget: {tokens: 5}
+    }
 }
 
-agent flow_support(q) {
-    model: "flow_alias"
-    tools: [echo_tool]
-    user: q
-    budget: { tokens: 5 }
-} flow {
-    first, first_err := turn {}
-    second, second_err := turn { user: "second " .. q }
+func flow_support_flow(q) {
+    first, first_err := llm.turn({})
+    second, second_err := llm.turn({
+        messages: {llm.user("second " .. q)}
+    })
     return {
         first_text: first.text
         err_kind: second_err.kind
         err_dimension: second_err.dimension
     }, nil
 }
+
+flow_support := llm.agent("flow_support", flow_support_config, flow_support_flow, {params: {"q"}})
 
 out, err := flow_support("hello")
 first_text := out.first_text

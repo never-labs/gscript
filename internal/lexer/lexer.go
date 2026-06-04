@@ -434,6 +434,9 @@ func (l *Lexer) readOperator(startLine, startCol int) (Token, error) {
 	case '%':
 		l.advance()
 		return makeToken(TOKEN_PERCENT, "%"), nil
+	case '$':
+		l.advance()
+		return makeToken(TOKEN_DOLLAR, "$"), nil
 
 	case ':':
 		l.advance()

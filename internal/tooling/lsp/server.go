@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/never-labs/leia/internal/stdlib/catalog"
 	toolformat "github.com/never-labs/leia/internal/tooling/format"
 )
 
@@ -339,30 +340,48 @@ func (s *Server) completion(id *json.RawMessage, params json.RawMessage) error {
 
 func completionItems() []completionItem {
 	const keywordKind = 14
-	return []completionItem{
-		{Label: "agent", Kind: keywordKind, Detail: "Leia declaration"},
+	const moduleKind = 9
+	const functionKind = 3
+	items := []completionItem{
+		{Label: "as", Kind: keywordKind, Detail: "Leia contextual keyword"},
 		{Label: "break", Kind: keywordKind, Detail: "Leia keyword"},
+		{Label: "case", Kind: keywordKind, Detail: "Leia contextual keyword"},
 		{Label: "chan", Kind: keywordKind, Detail: "Leia keyword"},
 		{Label: "const", Kind: keywordKind, Detail: "Leia keyword"},
 		{Label: "continue", Kind: keywordKind, Detail: "Leia keyword"},
+		{Label: "default", Kind: keywordKind, Detail: "Leia contextual keyword"},
 		{Label: "defer", Kind: keywordKind, Detail: "Leia keyword"},
 		{Label: "else", Kind: keywordKind, Detail: "Leia keyword"},
 		{Label: "elseif", Kind: keywordKind, Detail: "Leia keyword"},
-		{Label: "evaluate", Kind: keywordKind, Detail: "Leia evaluation block"},
 		{Label: "false", Kind: keywordKind, Detail: "Leia literal"},
 		{Label: "for", Kind: keywordKind, Detail: "Leia keyword"},
 		{Label: "func", Kind: keywordKind, Detail: "Leia keyword"},
 		{Label: "go", Kind: keywordKind, Detail: "Leia keyword"},
 		{Label: "goto", Kind: keywordKind, Detail: "Leia keyword"},
 		{Label: "if", Kind: keywordKind, Detail: "Leia keyword"},
+		{Label: "import", Kind: keywordKind, Detail: "Leia contextual keyword"},
 		{Label: "in", Kind: keywordKind, Detail: "Leia keyword"},
 		{Label: "nil", Kind: keywordKind, Detail: "Leia literal"},
 		{Label: "range", Kind: keywordKind, Detail: "Leia keyword"},
 		{Label: "return", Kind: keywordKind, Detail: "Leia keyword"},
-		{Label: "tool", Kind: keywordKind, Detail: "Leia declaration"},
+		{Label: "select", Kind: keywordKind, Detail: "Leia contextual keyword"},
 		{Label: "true", Kind: keywordKind, Detail: "Leia literal"},
 		{Label: "var", Kind: keywordKind, Detail: "Leia keyword"},
 	}
+	for _, name := range catalog.ModuleNames() {
+		items = append(items, completionItem{Label: name, Kind: moduleKind, Detail: "Leia stdlib module"})
+	}
+	for _, label := range []string{
+		"llm.turn",
+		"llm.tool",
+		"llm.react",
+		"llm.with_budget",
+		"llm.register_models",
+		"llm.run_agent",
+	} {
+		items = append(items, completionItem{Label: label, Kind: functionKind, Detail: "Leia llm stdlib"})
+	}
+	return items
 }
 
 func fullDocumentRange(src string) lspRange {

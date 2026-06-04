@@ -200,223 +200,35 @@ func TestConstDeclareStmt(t *testing.T) {
 	}
 }
 
-func TestLLMSyntaxParses(t *testing.T) {
+func TestLLMStdlibSyntaxParsesWithoutKeywordNodes(t *testing.T) {
 	prog := mustParse(t, `
-models {
-    default: "glm-fast"
-    "glm-fast": {
-        provider: "glm"
-        protocol: "anthropic"
-        provider_model: "glm-5.1"
-        base_url: "https://open.bigmodel.cn/api/anthropic"
-        api_key: env("GLM_API_KEY")
-    }
-}
+llm.register_models({
+    default: "mock-fast"
+    fast: { provider: "mock" }
+})
 
-agent defaults {
-    model: "glm-fast"
-    tools: [search_docs]
-}
-
-tool search_docs(query) {
-    return docs.search(query), nil
-}
-
-agent answer(q) {
-    system: "Answer briefly."
-    user: q
-}
-
-one := agent { user: "What is Leia?" }()
-manual := agent(q) {
-    tools: [search_docs]
-    user: q
-} flow {
-    r, err := turn {
-        messages: messages { user: q }
-        tools: tools
-    }
-    return r, err
-}
-`)
-	if len(prog.Stmts) != 6 {
-		t.Fatalf("statements = %d, want 6", len(prog.Stmts))
+result, err := llm.turn({
+    messages: { llm.system("Be concise."), llm.user(question) }
+})
+	`)
+	if len(prog.Stmts) != 2 {
+		t.Fatalf("statements = %d, want 2", len(prog.Stmts))
 	}
-	models, ok := prog.Stmts[0].(*ast.ModelsDeclStmt)
-	if !ok || len(models.Config) != 2 {
-		t.Fatalf("models stmt = %#v", prog.Stmts[0])
+	if callStmt, ok := prog.Stmts[0].(*ast.CallStmt); !ok {
+		t.Fatalf("model stmt = %T, want CallStmt", prog.Stmts[0])
+	} else if field, ok := callStmt.Call.Func.(*ast.FieldExpr); !ok || field.Field != "register_models" {
+		t.Fatalf("model stmt call = %#v, want llm.register_models", callStmt.Call.Func)
 	}
-	defaults, ok := prog.Stmts[1].(*ast.AgentDefaultsDeclStmt)
-	if !ok || len(defaults.Config) != 2 {
-		t.Fatalf("agent defaults stmt = %#v", prog.Stmts[1])
+	decl, ok := prog.Stmts[1].(*ast.DeclareStmt)
+	if !ok || len(decl.Values) != 1 {
+		t.Fatalf("turn decl = %#v", prog.Stmts[1])
 	}
-	tool, ok := prog.Stmts[2].(*ast.ToolDeclStmt)
-	if !ok || tool.Name != "search_docs" || len(tool.Params) != 1 {
-		t.Fatalf("tool stmt = %#v", prog.Stmts[2])
-	}
-	agentDecl, ok := prog.Stmts[3].(*ast.AgentDeclStmt)
-	if !ok || agentDecl.Name != "answer" || len(agentDecl.Params) != 1 || len(agentDecl.Config) != 2 || agentDecl.Flow != nil {
-		t.Fatalf("agent stmt = %#v", prog.Stmts[3])
-	}
-	oneDecl, ok := prog.Stmts[4].(*ast.DeclareStmt)
-	if !ok || len(oneDecl.Values) != 1 {
-		t.Fatalf("one decl = %#v", prog.Stmts[4])
-	}
-	oneCall, ok := oneDecl.Values[0].(*ast.CallExpr)
+	call, ok := decl.Values[0].(*ast.CallExpr)
 	if !ok {
-		t.Fatalf("one value = %T, want CallExpr", oneDecl.Values[0])
+		t.Fatalf("turn value = %#v, want CallExpr", decl.Values[0])
 	}
-	if _, ok := oneCall.Func.(*ast.AgentLitExpr); !ok {
-		t.Fatalf("one call func = %T, want AgentLitExpr", oneCall.Func)
-	}
-	manualDecl, ok := prog.Stmts[5].(*ast.DeclareStmt)
-	if !ok || len(manualDecl.Values) != 1 {
-		t.Fatalf("manual decl = %#v", prog.Stmts[5])
-	}
-	manualAgent, ok := manualDecl.Values[0].(*ast.AgentLitExpr)
-	if !ok || len(manualAgent.Params) != 1 || len(manualAgent.Config) != 2 || manualAgent.Flow == nil {
-		t.Fatalf("manual agent = %#v", manualDecl.Values[0])
-	}
-}
-
-func TestLLMSyntaxPositions(t *testing.T) {
-	prog := mustParse(t, `
-models {
-    default: "fast"
-}
-
-// Lookup docs.
-//leia:requires none
-tool lookup(query) {
-    return query, nil
-}
-
-agent answer(q) {
-    tools: [lookup]
-    user: q
-} flow {
-    r, err := turn {
-        messages: messages { user: q }
-        tools: tools
-    }
-    return r, err
-}
-`)
-	models := prog.Stmts[0].(*ast.ModelsDeclStmt)
-	if models.GetPos() != (ast.Pos{Line: 2, Column: 1}) || models.Config[0].P != (ast.Pos{Line: 3, Column: 5}) {
-		t.Fatalf("models positions = stmt %#v field %#v", models.GetPos(), models.Config[0].P)
-	}
-	tool := prog.Stmts[1].(*ast.ToolDeclStmt)
-	if tool.GetPos() != (ast.Pos{Line: 8, Column: 1}) {
-		t.Fatalf("tool pos = %#v", tool.GetPos())
-	}
-	agentDecl := prog.Stmts[2].(*ast.AgentDeclStmt)
-	if agentDecl.GetPos() != (ast.Pos{Line: 12, Column: 1}) || agentDecl.Config[0].P != (ast.Pos{Line: 13, Column: 5}) {
-		t.Fatalf("agent positions = stmt %#v field %#v", agentDecl.GetPos(), agentDecl.Config[0].P)
-	}
-	decl := agentDecl.Flow.Stmts[0].(*ast.DeclareStmt)
-	turnExpr := decl.Values[0].(*ast.TurnExpr)
-	if turnExpr.GetPos() != (ast.Pos{Line: 16, Column: 15}) || turnExpr.Config[0].P != (ast.Pos{Line: 17, Column: 9}) {
-		t.Fatalf("turn positions = expr %#v field %#v", turnExpr.GetPos(), turnExpr.Config[0].P)
-	}
-	messages := turnExpr.Config[0].Value.(*ast.MessagesExpr)
-	firstMessagePos := messages.Fields[0].Key.GetPos()
-	if messages.GetPos() != (ast.Pos{Line: 17, Column: 19}) || firstMessagePos != (ast.Pos{Line: 17, Column: 30}) {
-		t.Fatalf("messages positions = expr %#v field %#v", messages.GetPos(), firstMessagePos)
-	}
-}
-
-func TestEvaluateBlockSyntax(t *testing.T) {
-	prog := mustParse(t, `
-evaluate "answer uses lookup" {
-    //leia:requires none
-    tool lookup(q) {
-        return q, nil
-    }
-
-    agent answer(q) {
-        model: "mock"
-        user: q
-        tools: [lookup]
-    }
-}
-`)
-	if len(prog.Stmts) != 1 {
-		t.Fatalf("statements = %d, want 1", len(prog.Stmts))
-	}
-	eval, ok := prog.Stmts[0].(*ast.EvaluateBlockStmt)
-	if !ok {
-		t.Fatalf("stmt = %T, want EvaluateBlockStmt", prog.Stmts[0])
-	}
-	if eval.Name != "answer uses lookup" || eval.GetPos() != (ast.Pos{Line: 2, Column: 1}) {
-		t.Fatalf("evaluate block = %#v", eval)
-	}
-	if eval.Body == nil || len(eval.Body.Stmts) != 2 {
-		t.Fatalf("evaluate body = %#v", eval.Body)
-	}
-	if _, ok := eval.Body.Stmts[0].(*ast.ToolDeclStmt); !ok {
-		t.Fatalf("body[0] = %T, want ToolDeclStmt", eval.Body.Stmts[0])
-	}
-	if _, ok := eval.Body.Stmts[1].(*ast.AgentDeclStmt); !ok {
-		t.Fatalf("body[1] = %T, want AgentDeclStmt", eval.Body.Stmts[1])
-	}
-	if err := ast.ValidateLLM(prog); err != nil {
-		t.Fatalf("ValidateLLM error = %v", err)
-	}
-}
-
-func TestLLMValidationReportsStaticToolListElementLine(t *testing.T) {
-	for _, tc := range []struct {
-		name string
-		src  string
-		want string
-	}{
-		{
-			name: "unknown",
-			src: `
-//leia:requires none
-tool lookup(query) {
-    return query, nil
-}
-
-func f() {
-    _ = turn {
-        tools: [
-            lookup,
-            missing,
-        ]
-        user: "hello"
-    }
-}
-`,
-			want: `line 11: turn tools list references undeclared tool or agent "missing"`,
-		},
-		{
-			name: "duplicate",
-			src: `
-//leia:requires none
-tool lookup(query) {
-    return query, nil
-}
-
-agent answer(q) {
-    tools: [
-        lookup,
-        lookup,
-    ]
-    user: q
-}
-`,
-			want: `line 10: agent answer tools list includes duplicate tool "lookup"`,
-		},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			prog := mustParse(t, tc.src)
-			err := ast.ValidateLLM(prog)
-			if err == nil || !strings.Contains(err.Error(), tc.want) {
-				t.Fatalf("ValidateLLM error = %v, want substring %q", err, tc.want)
-			}
-		})
+	if field, ok := call.Func.(*ast.FieldExpr); !ok || field.Field != "turn" {
+		t.Fatalf("turn call = %#v, want llm.turn", call.Func)
 	}
 }
 
@@ -428,65 +240,6 @@ func TestLLMExampleParses(t *testing.T) {
 	prog := mustParse(t, string(src))
 	if len(prog.Stmts) == 0 {
 		t.Fatal("example parsed with no statements")
-	}
-}
-
-func TestLLMToolCommentDirectivesParseAndDesugar(t *testing.T) {
-	prog := mustParse(t, `
-// Lookup docs.
-//leia:requires docs.read, net.client
-//leia:param query search query text
-//leia:param limit: maximum result count
-tool search_docs(query, limit) {
-    return query, nil
-}
-`)
-	if len(prog.Stmts) != 1 {
-		t.Fatalf("statements = %d, want 1", len(prog.Stmts))
-	}
-	tool, ok := prog.Stmts[0].(*ast.ToolDeclStmt)
-	if !ok {
-		t.Fatalf("stmt = %T, want ToolDeclStmt", prog.Stmts[0])
-	}
-	if tool.DocComment != "Lookup docs." {
-		t.Fatalf("doc = %q", tool.DocComment)
-	}
-	if len(tool.Requires) != 2 || tool.Requires[0] != "docs.read" || tool.Requires[1] != "net.client" {
-		t.Fatalf("requires = %#v", tool.Requires)
-	}
-	if tool.ParamDocs["query"] != "search query text" || tool.ParamDocs["limit"] != "maximum result count" {
-		t.Fatalf("param docs = %#v", tool.ParamDocs)
-	}
-
-	desugared := ast.DesugarLLM(prog)
-	decl, ok := desugared.Stmts[0].(*ast.DeclareStmt)
-	if !ok || len(decl.Values) != 1 {
-		t.Fatalf("desugared stmt = %#v", desugared.Stmts[0])
-	}
-	call, ok := decl.Values[0].(*ast.CallExpr)
-	if !ok || len(call.Args) != 3 {
-		t.Fatalf("desugared value = %#v", decl.Values[0])
-	}
-	opts, ok := call.Args[2].(*ast.TableLitExpr)
-	if !ok {
-		t.Fatalf("tool options = %T", call.Args[2])
-	}
-	if got := stringFieldValue(opts, "description"); got != "Lookup docs." {
-		t.Fatalf("description option = %q", got)
-	}
-	requires := tableFieldValue(t, opts, "requires")
-	if got := arrayStringValue(t, requires, 1); got != "docs.read" {
-		t.Fatalf("requires[1] = %q", got)
-	}
-	if got := arrayStringValue(t, requires, 2); got != "net.client" {
-		t.Fatalf("requires[2] = %q", got)
-	}
-	paramDocs := tableFieldValue(t, opts, "param_docs")
-	if got := stringFieldValue(paramDocs, "query"); got != "search query text" {
-		t.Fatalf("param_docs.query = %q", got)
-	}
-	if got := stringFieldValue(paramDocs, "limit"); got != "maximum result count" {
-		t.Fatalf("param_docs.limit = %q", got)
 	}
 }
 
@@ -517,29 +270,6 @@ func main() {}
 	}
 	if got := prog.FileDirectives[3].Text; got != "llm" {
 		t.Fatalf("feature text = %q", got)
-	}
-}
-
-func TestFileDirectiveBeforeToolDoesNotBecomeToolDoc(t *testing.T) {
-	prog := mustParse(t, `//leia:build ai
-// Tool docs.
-//leia:requires none
-tool lookup() {
-    return nil
-}
-`)
-	if len(prog.FileDirectives) != 1 || prog.FileDirectives[0].Kind != "build" {
-		t.Fatalf("file directives = %#v", prog.FileDirectives)
-	}
-	tool, ok := prog.Stmts[0].(*ast.ToolDeclStmt)
-	if !ok {
-		t.Fatalf("stmt = %T, want ToolDeclStmt", prog.Stmts[0])
-	}
-	if tool.DocComment != "Tool docs." {
-		t.Fatalf("tool doc = %q", tool.DocComment)
-	}
-	if len(tool.Requires) != 1 || tool.Requires[0] != "none" {
-		t.Fatalf("tool requires = %#v", tool.Requires)
 	}
 }
 
@@ -583,86 +313,17 @@ func TestGoImportDesugarsToRequireDeclaration(t *testing.T) {
 	}
 }
 
-func TestLLMToolCommentBlankLineDoesNotAttach(t *testing.T) {
-	prog := mustParse(t, `
-// Stale docs.
-
-tool stale() {
-    return nil
-}
-`)
-	tool, ok := prog.Stmts[0].(*ast.ToolDeclStmt)
-	if !ok {
-		t.Fatalf("stmt = %T, want ToolDeclStmt", prog.Stmts[0])
-	}
-	if tool.DocComment != "" || len(tool.Requires) != 0 || len(tool.ParamDocs) != 0 {
-		t.Fatalf("unexpected metadata: doc=%q requires=%#v paramDocs=%#v", tool.DocComment, tool.Requires, tool.ParamDocs)
-	}
-}
-
-func tableFieldValue(t *testing.T, table *ast.TableLitExpr, key string) *ast.TableLitExpr {
-	t.Helper()
-	for _, field := range table.Fields {
-		if lit, ok := field.Key.(*ast.StringLit); ok && lit.Value == key {
-			value, ok := field.Value.(*ast.TableLitExpr)
-			if !ok {
-				t.Fatalf("%s = %T, want TableLitExpr", key, field.Value)
-			}
-			return value
-		}
-	}
-	t.Fatalf("missing table field %q in %#v", key, table.Fields)
-	return nil
-}
-
-func stringFieldValue(table *ast.TableLitExpr, key string) string {
-	for _, field := range table.Fields {
-		if lit, ok := field.Key.(*ast.StringLit); ok && lit.Value == key {
-			if value, ok := field.Value.(*ast.StringLit); ok {
-				return value.Value
-			}
-		}
-	}
-	return ""
-}
-
-func arrayStringValue(t *testing.T, table *ast.TableLitExpr, index int) string {
-	t.Helper()
-	if index < 1 || index > len(table.Fields) {
-		t.Fatalf("array index %d out of range for %#v", index, table.Fields)
-	}
-	value, ok := table.Fields[index-1].Value.(*ast.StringLit)
-	if !ok {
-		t.Fatalf("array[%d] = %T, want StringLit", index, table.Fields[index-1].Value)
-	}
-	return value.Value
-}
-
-func TestListAndMessagesExpressionsParse(t *testing.T) {
+func TestListExpressionParses(t *testing.T) {
 	prog := mustParse(t, `
 tools := [search_docs, read_url]
-history := messages {
-    system: "You are concise."
-    user: question
-    msg.assistant_call(call)
-    assistant: "ok"
-}
 `)
-	if len(prog.Stmts) != 2 {
-		t.Fatalf("statements = %d, want 2", len(prog.Stmts))
+	if len(prog.Stmts) != 1 {
+		t.Fatalf("statements = %d, want 1", len(prog.Stmts))
 	}
 	toolsDecl := prog.Stmts[0].(*ast.DeclareStmt)
 	list, ok := toolsDecl.Values[0].(*ast.ListLitExpr)
 	if !ok || len(list.Values) != 2 {
 		t.Fatalf("tools value = %#v", toolsDecl.Values[0])
-	}
-	historyDecl := prog.Stmts[1].(*ast.DeclareStmt)
-	messages, ok := historyDecl.Values[0].(*ast.MessagesExpr)
-	if !ok || len(messages.Fields) != 4 {
-		t.Fatalf("history value = %#v", historyDecl.Values[0])
-	}
-	if messages.Fields[2].Key != nil {
-		t.Fatalf("mixed message field key = %#v, want nil", messages.Fields[2].Key)
 	}
 }
 

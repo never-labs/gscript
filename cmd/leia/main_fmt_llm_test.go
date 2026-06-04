@@ -8,84 +8,64 @@ import (
 	"testing"
 )
 
-func TestFmtStdinLLMIndentation(t *testing.T) {
-	src := `tool lookup(query) {
+func TestFmtStdinLLMStdlibIndentation(t *testing.T) {
+	src := `lookup := llm.tool("lookup", func(query) {
 return "found:" .. query, nil
-}
-models {
+}, {
+description: "Lookup docs."
+params: {"query"}
+})
+
+llm.register_models({
 default: "fast"
 fast: {provider_model: "mock-fast"}
-}
-agent defaults {
+})
+
+answer := llm.agent("answer", func(q) {
+return {user: q}, nil
+}, {
 model: "fast"
-tools: [lookup]
-budget: {turns: 2, calls: 4, tokens: 1000, time: 30s}
-}
-agent researcher(topic) {
 system: "Use the tool."
-user: topic
-tools: [lookup]
-} flow {
-history := messages {
-system: system
-user: topic
-}
-result, err := turn {
-messages: history
-tools: tools
-model: model
-}
-return result, err
-}
-answer := agent(q) {
-user: q
-}
-budget { turns: 1 } {
-direct, direct_err := turn {
-messages: messages { user: "one-shot" }
-}
-_ = direct
-_ = direct_err
-}
+tools: {lookup}
+})
+
+result, err := llm.turn({
+messages: {llm.user("one-shot")}
+tools: {lookup}
+model: "fast"
+})
+_ = answer
+_ = result
+_ = err
 `
-	want := `tool lookup(query) {
+	want := `lookup := llm.tool("lookup", func(query) {
     return "found:" .. query, nil
-}
-models {
+}, {
+    description: "Lookup docs."
+    params: {"query"}
+})
+
+llm.register_models({
     default: "fast"
     fast: {provider_model: "mock-fast"}
-}
-agent defaults {
+})
+
+answer := llm.agent("answer", func(q) {
+    return {user: q}, nil
+}, {
     model: "fast"
-    tools: [lookup]
-    budget: {turns: 2, calls: 4, tokens: 1000, time: 30s}
-}
-agent researcher(topic) {
     system: "Use the tool."
-    user: topic
-    tools: [lookup]
-} flow {
-    history := messages {
-        system: system
-        user: topic
-    }
-    result, err := turn {
-        messages: history
-        tools: tools
-        model: model
-    }
-    return result, err
-}
-answer := agent(q) {
-    user: q
-}
-budget { turns: 1 } {
-    direct, direct_err := turn {
-        messages: messages { user: "one-shot" }
-    }
-    _ = direct
-    _ = direct_err
-}
+    tools: {lookup}
+})
+
+result, err := llm.turn({
+    messages: {llm.user("one-shot")}
+    tools: {lookup}
+    model: "fast"
+})
+_ = answer
+_ = result
+_ = err
 `
 
 	oldStdin := cliStdin
@@ -106,27 +86,25 @@ budget { turns: 1 } {
 }
 
 func TestFmtStdinPreservesCommentOnlyLines(t *testing.T) {
-	src := `agent sample() {
+	src := `answer := llm.agent("sample", func(q) {
 // keep this note
 
-user: "hello"
-} flow {
 if true {
 // nested
-print("ok")
+print(q)
 }
-}
+return {user: q}, nil
+})
 `
-	want := `agent sample() {
+	want := `answer := llm.agent("sample", func(q) {
     // keep this note
 
-    user: "hello"
-} flow {
     if true {
         // nested
-        print("ok")
+        print(q)
     }
-}
+    return {user: q}, nil
+})
 `
 
 	oldStdin := cliStdin
@@ -148,26 +126,24 @@ print("ok")
 
 func TestFmtPreservesIntraLineFormattingBoundary(t *testing.T) {
 	src := `// lookup searches project docs.
-//leia:requires docs.read
-tool lookup(query) {
+lookup := llm.tool("lookup", func(query) {
 return "found:"..query,nil
-}
-models {
+}, {params:{"query"}})
+llm.register_models({
 short: "x"
 longer_key : {provider_model:"mock-fast"}
-}
+})
 cfg := {short:1, longer_key : 2}
 total:=1+  2
 `
 	want := `// lookup searches project docs.
-//leia:requires docs.read
-tool lookup(query) {
+lookup := llm.tool("lookup", func(query) {
     return "found:"..query,nil
-}
-models {
+}, {params:{"query"}})
+llm.register_models({
     short: "x"
     longer_key : {provider_model:"mock-fast"}
-}
+})
 cfg := {short:1, longer_key : 2}
 total:=1+  2
 `
@@ -182,41 +158,40 @@ total:=1+  2
 }
 
 func llmToolchainCoverageSource() []byte {
-	return []byte(`// lookup searches project docs.
-//leia:requires docs.read
-//leia:param query search query
-tool lookup(query) {
+	return []byte(`lookup := llm.tool("lookup", func(query) {
     return "found:" .. query, nil
-}
+}, {
+    description: "Lookup docs."
+    requires: {"docs.read"}
+    params: {"query"}
+})
 
-models {
+llm.register_models({
     default: "fast"
     fast: {provider_model: "mock-fast"}
-}
+})
 
-agent extractor(topic) {
-    model: "fast"
-    system: "Return JSON."
-    user: topic
-    output: {summary: "example"}
-}
+extractor := llm.agent("extractor", func(topic) {
+    return {
+        model: "fast"
+        system: "Return JSON."
+        user: topic
+        output: {summary: "example"}
+    }, nil
+})
 
-delegate := toolof(extractor, {
+delegate := llm.toolof(extractor, {
     name: "delegate"
     description: "Delegate extraction."
 })
 
-agent supervisor(topic) {
-    model: "fast"
-    tools: [extractor, delegate, lookup]
-    user: topic
-} flow {
+supervisor := llm.agent("supervisor", func(topic) {
     call := {id: "call_1", tool: "lookup", args: {query: topic}}
-    msgs := messages {
-        system: system
-        user: topic
-        msg.assistant_call(call)
-        msg.tool_result("call_1", {summary: "docs"})
+    msgs := {
+        llm.system("Return concise JSON."),
+        llm.user(topic),
+        msg.assistant_call(call),
+        msg.tool_result("call_1", {summary: "docs"}),
     }
     tool_msg, tool_idx := history.find(msgs, {role: "tool"})
     assistant_msg, assistant_idx := history.last(msgs, {role: "assistant"})
@@ -230,16 +205,24 @@ agent supervisor(topic) {
     _ = all_users
     _ = ok
     _ = ok_msg
-    return turn {
+    return {
         messages: msgs
-        tools: tools
-        model: model
-    }
-}
+        tools: {lookup, delegate}
+        model: "fast"
+    }, nil
+})
 
 answer, answer_err := supervisor("leia")
+direct, direct_err := llm.turn({
+    messages: {llm.user("one-shot")}
+    model: "fast"
+})
+shell := $` + "`printf leia`" + `
 _ = answer
 _ = answer_err
+_ = direct
+_ = direct_err
+_ = shell
 `)
 }
 
@@ -249,12 +232,13 @@ func TestFmtLLMSyntaxCoverage(t *testing.T) {
 		t.Fatalf("formatSource: %v", err)
 	}
 	for _, want := range []string{
-		"tools: [extractor, delegate, lookup]",
+		"tools: {lookup, delegate}",
 		"msg.assistant_call(call)",
 		"msg.tool_result(\"call_1\", {summary: \"docs\"})",
 		"history.find(msgs, {role: \"tool\"})",
 		"history.find_all(msgs, {role: \"user\"})",
 		"llm.validate_output({summary: \"docs\"}, {summary: \"example\"})",
+		"shell := $`printf leia`",
 	} {
 		if !strings.Contains(string(formatted), want) {
 			t.Fatalf("formatted LLM source missing %q:\n%s", want, formatted)

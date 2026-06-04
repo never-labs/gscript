@@ -18,44 +18,49 @@ func TestLLMSyntaxValidationAllowsStaticToolCapsCoverage(t *testing.T) {
 			opts := append([]leia.Option{leia.WithLibs(leia.LibString | leia.LibLLM)}, mode.opts...)
 			vm := leia.New(opts...)
 			err := vm.Exec(`
-//leia:requires docs.read, net.client
-tool lookup(query) {
+lookup := llm.tool("lookup", func(query) {
     return query, nil
-}
+}, {params: {"query"}, requires: {"docs.read", "net.client"}})
 
-//leia:requires none
-tool local_only(query) {
+local_only := llm.tool("local_only", func(query) {
     return query, nil
-}
+}, {params: {"query"}, requires: {"none"}})
 
-agent defaults {
-    tools: [lookup]
-}
+llm.agent_defaults({tools: {lookup}})
 
-agent inherited(q) {
-    capabilities: ["docs.read", "net.client"]
-    user: q
-}
+inherited := llm.agent("inherited", func(q) {
+    return {
+        capabilities: {"docs.read", "net.client"}
+        user: q
+    }, nil
+})
 
-agent override(q) {
-    tools: [local_only]
-    capabilities: []
-    user: q
-}
+override := llm.agent("override", func(q) {
+    return {
+        tools: {local_only}
+        capabilities: {}
+        user: q
+    }, nil
+})
 
-agent answer(q) {
-    tools: [lookup]
-    capabilities: ["docs.read", "net.client"]
-    user: q
-}
+answer := llm.agent("answer", func(q) {
+    return {
+        tools: {lookup}
+        capabilities: {"docs.read", "net.client"}
+        user: q
+    }, nil
+})
 
 func f(caps) {
-    _ = turn {
-        tools: [lookup]
+    _ := {
+        tools: {lookup}
         caps: caps
-        user: "hello"
+        messages: {llm.user("hello")}
     }
 }
+
+ok, err := llm.check_tools({lookup}, {"docs.read", "net.client"})
+override_ok, override_err := llm.check_tools({local_only}, {})
 `)
 			if err != nil {
 				t.Fatalf("Exec: %v", err)
@@ -76,22 +81,21 @@ func TestLLMSyntaxValidationAllowsDynamicDefaultsToolCapsRefs(t *testing.T) {
 			opts := append([]leia.Option{leia.WithLibs(leia.LibString | leia.LibLLM)}, mode.opts...)
 			vm := leia.New(opts...)
 			err := vm.Exec(`
-//leia:requires net.client
-tool lookup(query) {
+lookup := llm.tool("lookup", func(query) {
     return query, nil
-}
+}, {params: {"query"}, requires: {"net.client"}})
 
-default_tools := [lookup]
-default_caps := []
+default_tools := {lookup}
+default_caps := {}
 
-agent defaults {
+llm.agent_defaults({
     tools: default_tools
     capabilities: default_caps
-}
+})
 
-agent answer(q) {
-    user: q
-}
+answer := llm.agent("answer", func(q) {
+    return {user: q}, nil
+})
 `)
 			if err != nil {
 				t.Fatalf("Exec: %v", err)
@@ -113,9 +117,9 @@ func TestLLMSyntaxValidationAllowsDynamicToolRefs(t *testing.T) {
 			vm := leia.New(opts...)
 			err := vm.Exec(`
 func f(tools) {
-    _ = turn {
-        tools: [tools[0]]
-        user: "hello"
+    _ := {
+        tools: {tools[1]}
+        messages: {llm.user("hello")}
     }
 }
 `)
@@ -139,14 +143,15 @@ func TestLLMSyntaxValidationAllowsScopedToolRefs(t *testing.T) {
 			vm := leia.New(opts...)
 			err := vm.Exec(`
 func make_agent(prefix) {
-    //leia:requires none
-    tool local_lookup(query) {
+    local_lookup := llm.tool("local_lookup", func(query) {
         return prefix .. query, nil
-    }
-    return agent(q) {
-        tools: [local_lookup]
-        user: q
-    }
+    }, {params: {"query"}, requires: {"none"}})
+    return llm.agent("local_agent", func(q) {
+        return {
+            tools: {local_lookup}
+            user: q
+        }, nil
+    })
 }
 `)
 			if err != nil {

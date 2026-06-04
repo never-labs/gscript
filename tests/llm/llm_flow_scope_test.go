@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestLLMAgentFlowImplicitConfigLocalsAreWhitelistedAndShadowable(t *testing.T) {
+func TestLLMAgentFlowExplicitConfigLocalsAreShadowable(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		opts []leia.Option
@@ -16,22 +16,31 @@ func TestLLMAgentFlowImplicitConfigLocalsAreWhitelistedAndShadowable(t *testing.
 		t.Run(tc.name, func(t *testing.T) {
 			vm := leia.New(append([]leia.Option{leia.WithLibs(leia.LibLLM)}, tc.opts...)...)
 			err := vm.Exec(`
-agent probe(q) {
+probe_config := {
     model: "cfg-model"
     system: "cfg-system"
-    capabilities: ["cfg.cap"]
-    user: q
+    capabilities: {"cfg.cap"}
     response_format: {type: "json_object"}
-} flow {
-    observed := model .. "|" .. system .. "|" .. capabilities[1]
+}
+
+probe := llm.agent("probe", func(q) {
+    return {
+        model: probe_config.model
+        system: probe_config.system
+        capabilities: probe_config.capabilities
+        user: q
+        response_format: probe_config.response_format
+    }, nil
+}, func(q) {
+    observed := probe_config.model .. "|" .. probe_config.system .. "|" .. probe_config.capabilities[1]
     model := "local-model"
     system := "local-system"
-    capabilities := ["local.cap"]
+    capabilities := {"local.cap"}
     return {
         observed: observed,
         shadowed: model .. "|" .. system .. "|" .. capabilities[1]
     }, nil
-}
+})
 
 out, err := probe("hello")
 observed := out.observed
@@ -74,12 +83,14 @@ func TestLLMAgentFlowDoesNotInjectArbitraryMetaFields(t *testing.T) {
 					err := vm.Exec(`
 ` + field.name + ` := "outer-` + field.name + `"
 
-agent probe(q) {
-    model: "cfg-model"
-    ` + field.config + `
-} flow {
+probe := llm.agent("probe", func(q) {
+    return {
+        model: "cfg-model"
+        ` + field.config + `
+    }, nil
+}, func(q) {
     return ` + field.name + `, nil
-}
+})
 
 out, err := probe("hello")
 got := out

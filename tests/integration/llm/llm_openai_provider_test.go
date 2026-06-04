@@ -276,7 +276,7 @@ func TestLLMModelsProviderConfigOpenAICompatible(t *testing.T) {
 			opts := append([]leia.Option{leia.WithLibs(leia.LibString | leia.LibLLM)}, mode.opts...)
 			vm := leia.New(opts...)
 			err := vm.Exec(fmt.Sprintf(`
-models {
+llm.register_models({
     default: "chat"
     chat: {
         protocol: "openai_compatible"
@@ -284,7 +284,7 @@ models {
         api_key: ("test" .. "-key")
         provider_model: "provider-fast"
     }
-}
+})
 
 result, err := llm.turn({model: "chat", messages: {llm.user("hello")}})
 text := result.text

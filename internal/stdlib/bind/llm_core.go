@@ -221,7 +221,7 @@ func BuildLLMLib(call ScriptFunctionCaller, provider func() LLMProvider, provide
 			name = "agent"
 		}
 		wrapper := FunctionValue(&GoFunction{Name: "llm.agent_as_tool." + name, Fn: func(callArgs []Value) ([]Value, error) {
-			results, err := call(agent, callArgs)
+			results, err := call(agent, llmAgentCallArgs(meta, callArgs))
 			if err != nil {
 				return nil, err
 			}

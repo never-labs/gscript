@@ -14,10 +14,7 @@ import (
 
 // Compile compiles a top-level program into a FuncProto.
 func Compile(prog *ast.Program) (*FuncProto, error) {
-	if err := ast.ValidateLLM(prog); err != nil {
-		return nil, err
-	}
-	prog = ast.DesugarLLM(prog)
+	prog = ast.DesugarSyntax(prog)
 	if err := ast.ValidateLabelControl(prog); err != nil {
 		return nil, err
 	}
@@ -288,20 +285,6 @@ func collectReturnStmts(stmt ast.Stmt, out *[]*ast.ReturnStmt) {
 			collectReturnStmts(c.Body, out)
 		}
 		collectReturnStmts(s.Default, out)
-	case *ast.BudgetStmt:
-		if s == nil {
-			return
-		}
-		collectReturnStmts(s.Body, out)
-	case *ast.EvaluateBlockStmt:
-		if s == nil {
-			return
-		}
-		collectReturnStmts(s.Body, out)
-	case *ast.AgentDeclStmt:
-		if s == nil {
-			return
-		}
 	}
 }
 
@@ -409,8 +392,6 @@ func stmtAlwaysReturns(stmt ast.Stmt) bool {
 			}
 		}
 		return true
-	case *ast.BudgetStmt:
-		return s != nil && blockAlwaysReturns(s.Body)
 	default:
 		return false
 	}

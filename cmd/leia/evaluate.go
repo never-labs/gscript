@@ -335,7 +335,7 @@ func formatEvaluateMetricValues(values map[string]int) string {
 func evaluateUsage(fs *flag.FlagSet) string {
 	var b strings.Builder
 	b.WriteString("usage: leia evaluate [options] [path-or-dir...]\n\n")
-	b.WriteString("Run source-level evaluate blocks and emit a versioned agent evaluation report.\n\n")
+	b.WriteString("Run source-level evaluation checks and emit a versioned agent evaluation report.\n\n")
 	b.WriteString("Examples:\n")
 	b.WriteString("  leia evaluate --format=text examples/evaluate/basic_assert.leia\n")
 	b.WriteString("  leia evaluate --json --report eval-report.json tests/agents\n")

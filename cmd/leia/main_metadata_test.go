@@ -43,7 +43,7 @@ func TestCapabilitiesJSON(t *testing.T) {
 	if !capabilitiesHaveStdlibModule(caps.StdlibLayers, "llm", "llm") || !capabilitiesHaveStdlibModule(caps.StdlibLayers, "host", "fs") || !capabilitiesHaveStdlibModule(caps.StdlibLayers, "data", "soa") {
 		t.Fatalf("stdlib_layers = %#v, want llm/llm, host/fs, and data/soa", caps.StdlibLayers)
 	}
-	for _, want := range []string{"agent", "tool", "turn", "messages_bare_expr", "direct_agent_tools", "toolof"} {
+	for _, want := range []string{"tagged_strings", "tagged_blocks", "shell_strings", "llm_stdlib_calls", "dialect_eval"} {
 		if !caps.LLM.Enabled || !containsString(caps.LLM.Syntax, want) {
 			t.Fatalf("llm syntax = %#v, want %q", caps.LLM.Syntax, want)
 		}
@@ -51,7 +51,7 @@ func TestCapabilitiesJSON(t *testing.T) {
 	if !containsString(caps.LLM.ToolMetadata, "leia:requires") || !containsString(caps.LLM.StaticValidation, "static_tool_capabilities") || !containsString(caps.LLM.Tooling, "lint-sarif") {
 		t.Fatalf("llm capabilities = %+v, want metadata, static validation, and tooling entries", caps.LLM)
 	}
-	for _, want := range []string{"llm.toolof", "llm.agent_as_tool", "llm.validate_output", "msg.assistant_call", "msg.tool_result", "history.find", "history.find_all", "history.last", "history.append"} {
+	for _, want := range []string{"llm.register_models", "llm.tool", "llm.agent", "llm.turn", "llm.toolof", "llm.agent_as_tool", "llm.validate_output", "dialect.eval", "msg.assistant_call", "msg.tool_result", "history.find", "history.find_all", "history.last", "history.append"} {
 		if !containsString(caps.LLM.RuntimePrimitives, want) {
 			t.Fatalf("llm runtime primitives = %#v, want %q", caps.LLM.RuntimePrimitives, want)
 		}

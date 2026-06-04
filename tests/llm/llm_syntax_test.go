@@ -26,33 +26,34 @@ func TestLLMSyntaxExecutesThroughLLMStdlib(t *testing.T) {
 			}, tc.opts...)
 			vm := leia.New(opts...)
 			err := vm.Exec(`
-// Lookup docs.
-//leia:requires docs.read, net.client
-//leia:param query search query text
-tool lookup(query) {
+lookup := llm.tool("lookup", func(query) {
     return "found:" .. query, nil
-}
+}, {
+    description: "Lookup docs."
+    requires: {"docs.read", "net.client"}
+    params: {"query"}
+})
 
-models {
-    default: "mock-alias"
-    "mock-alias": {provider_model: "mock-fast"}
-}
+llm.register_models({
+    default: "mock-alias",
+    ["mock-alias"]: {provider_model: "mock-fast"}
+})
 
-agent defaults {
+llm.agent_defaults({
     model: "mock-alias"
     system: "Be concise."
-    tools: [lookup]
-}
+    tools: {lookup}
+})
 
-answer := agent(q) {
-    user: q
-}
+answer := llm.agent("answer", func(q) {
+    return {user: q}, nil
+})
 
 result, err := answer("search leia")
-direct, direct_err := turn {
+direct, direct_err := llm.turn({
     model: "direct-model"
-    messages: messages { user: "single turn" }
-}
+    messages: {llm.user("single turn")}
+})
 agent_text := result.text
 turn_text := direct.text
 `)

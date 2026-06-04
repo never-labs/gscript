@@ -8,8 +8,8 @@ import (
 
 // BuildLLMHistoryLib creates the "history" stdlib table with helpers for
 // searching and mutating conversation history values produced by agents and
-// llm.react. The block-form `messages { }` constructor remains the preferred
-// way to assemble *initial* history; these helpers cover the dynamic case where
+// llm.react. Initial histories are ordinary ordered tables built with
+// llm.system/llm.user/msg.* helpers; these helpers cover the dynamic case where
 // the user reads/appends to a history list at runtime.
 func BuildLLMHistoryLib() *Table {
 	t := NewTable()

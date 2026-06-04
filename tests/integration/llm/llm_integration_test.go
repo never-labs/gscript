@@ -86,9 +86,9 @@ func TestAnthropicCompatibleLLMIntegration(t *testing.T) {
 	}
 }
 
-// TestLLMSyntaxAnthropicCompatibleLLMIntegration verifies that LLM
-// models/turn syntax can construct the same gated real-provider adapter. It is
-// intentionally skipped unless all real-provider environment variables are set.
+// TestLLMSyntaxAnthropicCompatibleLLMIntegration verifies that the LLM stdlib
+// path can construct the same gated real-provider adapter. It is intentionally
+// skipped unless all real-provider environment variables are set.
 func TestLLMSyntaxAnthropicCompatibleLLMIntegration(t *testing.T) {
 	if os.Getenv("LEIA_LLM_INTEGRATION") == "" {
 		t.Skip("set LEIA_LLM_INTEGRATION=1 to run real provider smoke")
@@ -104,7 +104,7 @@ func TestLLMSyntaxAnthropicCompatibleLLMIntegration(t *testing.T) {
 	defer cancel()
 	vm := leia.New(leia.WithLibs(leia.LibString | leia.LibOS | leia.LibLLM))
 	if err := vm.ExecContext(ctx, `
-models {
+llm.register_models({
     default: "smoke"
     smoke: {
         protocol: "anthropic_compatible"
@@ -112,16 +112,16 @@ models {
         api_key: os.getenv("LEIA_ANTHROPIC_COMPAT_API_KEY")
         provider_model: os.getenv("LEIA_ANTHROPIC_COMPAT_MODEL")
     }
-}
+})
 
-result, err := turn {
-    messages: messages {
-        system: "You are a concise test assistant. Return plain text only."
-        user: "Reply with exactly: leia llm provider ok"
+result, err := llm.turn({
+    messages: {
+        llm.system("You are a concise test assistant. Return plain text only."),
+        llm.user("Reply with exactly: leia llm provider ok"),
     }
     max_tokens: 32
     temperature: 0
-}
+})
 smoke_text := result.text
 `); err != nil {
 		t.Fatalf("ExecContext: %v", err)

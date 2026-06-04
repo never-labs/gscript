@@ -248,7 +248,7 @@ func TestLLMModelsProviderConfigPreservesHostProvider(t *testing.T) {
 			}, mode.opts...)
 			vm := leia.New(opts...)
 			err := vm.Exec(`
-models {
+llm.register_models({
     default: "chat"
     chat: {
         protocol: "openai_compatible"
@@ -256,7 +256,7 @@ models {
         api_key: ("test" .. "-key")
         provider_model: "host-model"
     }
-}
+})
 
 result, err := llm.turn({model: "chat", messages: {llm.user("hello")}})
 text := result.text

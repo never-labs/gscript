@@ -110,32 +110,24 @@ func TestLanguageGrammarAppendixDocumentsStableSyntax(t *testing.T) {
 
 	for _, snippet := range []string{
 		"[`grammar.ebnf`](grammar.ebnf)",
-		"AI-native syntax is part of the language surface",
-		"desugaring layer over the standard library",
+		"Leia supports tagged dialect forms.",
+		"The AI surface is a standard-library layer",
 		"[`../reference/directives/index.md`](../reference/directives/index.md)",
-		"`import \"go:...\" as name` is source syntax for explicit host-provided Go",
-		"Only `model`, `system`, `tools`, and\n`capabilities` are injected as flow-local bindings",
-		"including `user`,\n`budget`, `response_format`, and `metadata`, are not injected as variables",
+		"all configuration values that the body needs\nmust be passed or closed over explicitly",
 		"logical `&&`",
 		"logical `||`",
 		"Unary logical negation is\n`!`",
 	} {
 		if !strings.Contains(spec, snippet) {
-			t.Fatalf("language spec must document grammar appendix and AI-native lowering; missing %q", snippet)
+			t.Fatalf("language spec must document grammar appendix, dialects, and stdlib AI surface; missing %q", snippet)
 		}
 	}
 
 	requiredProductions := []string{
-		`import_decl    = "import" string_lit "as" identifier ;`,
+		`import_decl    = "import" ( import_spec | "(" { import_spec } ")" ) ;`,
 		`const_decl     = "const" identifier ( "=" | ":=" ) expr ;`,
-		`tool_decl      = "tool" identifier param_list block ;`,
-		`models_decl    = "models" config_block ;`,
-		`budget_stmt    = "budget" config_block block ;`,
-		`agent_defaults_decl`,
-		`agent_decl     = "agent" identifier [ param_list ] config_block [ flow_block ] ;`,
-		`agent_lit      = "agent" [ param_list ] config_block [ flow_block ] ;`,
-		`turn_expr      = "turn" config_block ;`,
-		`messages_expr  = "messages" "{"`,
+		`tagged_string  = [ identifier | "$" ] [ "!" ] raw_string_lit ;`,
+		`tagged_block   = identifier [ "!" ] config_block ;`,
 		`select_stmt    = "select" "{" { select_case } "}" ;`,
 		`dense_lit      = "[" [ integer_lit ] "]" dense_type "{"`,
 	}

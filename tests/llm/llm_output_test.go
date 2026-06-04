@@ -19,11 +19,11 @@ func TestLLMDirectTurnResponseFormatProviderRequest(t *testing.T) {
 			vm := leia.New(llmScenarioOptions(provider, tc.opts...)...)
 
 			if err := vm.Exec(`
-result, err := turn {
+result, err := llm.turn({
     model: "mock-json"
-    messages: messages {
-        system: "Return only valid JSON."
-        user: "Extract the contact."
+    messages: {
+        llm.system("Return only valid JSON."),
+        llm.user("Extract the contact."),
     }
     response_format: {
         type: "json_schema"
@@ -40,7 +40,7 @@ result, err := turn {
             }
         }
     }
-}
+})
 text := result.text
 `); err != nil {
 				t.Fatalf("Exec: %v", err)
@@ -106,15 +106,24 @@ func TestLLMAgentOutputStructuredValue(t *testing.T) {
 			vm := leia.New(llmScenarioOptions(provider, tc.opts...)...)
 
 			if err := vm.Exec(`
-agent extract_contact(text) {
-    model: "mock-json"
-    system: "Extract contact information."
-    user: text
+extract_contact := llm.agent("extract_contact", func(text) {
+    return {
+        model: "mock-json"
+        system: "Extract contact information."
+        user: text
+        output: {
+            name: "Ada Lovelace"
+            email: "ada@example.com"
+        }
+    }, nil
+}, nil, {
+    params: {"text"}
+    description: "Extract contact information."
     output: {
         name: "Ada Lovelace"
         email: "ada@example.com"
     }
-}
+})
 
 result, err := extract_contact("Ada <ada@example.com>")
 name := result.value.name
@@ -161,12 +170,17 @@ func TestLLMAgentOutputKeepsExplicitResponseFormat(t *testing.T) {
 			vm := leia.New(llmScenarioOptions(provider, tc.opts...)...)
 
 			if err := vm.Exec(`
-agent extract(text) {
-    model: "mock-json"
-    user: text
+extract := llm.agent("extract", func(text) {
+    return {
+        model: "mock-json"
+        user: text
+        output: {ok: true}
+        response_format: {type: "json_schema", name: "explicit"}
+    }, nil
+}, nil, {
+    params: {"text"}
     output: {ok: true}
-    response_format: {type: "json_schema", name: "explicit"}
-}
+})
 
 result, err := extract("ok")
 ok := result.value.ok
@@ -205,14 +219,21 @@ func TestLLMCustomFlowDoesNotAutoValidateOutput(t *testing.T) {
 			vm := leia.New(llmScenarioOptions(provider, tc.opts...)...)
 
 			if err := vm.Exec(`
-agent extract(text) {
-    model: "mock-json"
-    user: text
-    output: {name: "Ada"}
-} flow {
-    result, err := turn {}
-    return result, err
+func extract_config(text) {
+    return {
+        model: "mock-json"
+        user: text
+        output: {name: "Ada"}
+    }
 }
+
+extract := llm.agent("extract", extract_config, func(text) {
+    result, err := llm.turn({})
+    return result, err
+}, {
+    params: {"text"}
+    output: {name: "Ada"}
+})
 
 result, err := extract("Ada")
 text := result.text

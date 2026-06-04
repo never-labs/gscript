@@ -14,6 +14,9 @@ cd "$ROOT"
 RUNS=5
 WARMUP=1
 TIMEOUT=120
+MIN_SAMPLE_SECONDS=0.100
+MAX_REPEAT=128
+MIN_WALL_REPEAT=8
 THRESHOLD=0.12
 WALL_THRESHOLD=0.30
 OUT_DIR="${TMPDIR:-/tmp}/leia_performance_gate"
@@ -40,6 +43,14 @@ CORE_BENCHES=(
 SMOKE_BENCHES=(
     "control/sieve"
     "table/table_array_access"
+)
+
+SYNTAX_SMOKE_BENCHES=(
+    "control/sieve"
+    "calls/calls_vararg_coroutine"
+    "table/table_array_access"
+    "string/string_bench"
+    "data/soa_affine_many"
 )
 
 STRICT_SMOKE_BENCHES=(
@@ -86,6 +97,7 @@ Usage: bash scripts/performance_gate.sh [options]
 
 Options:
   --smoke                 Run a short two-benchmark gate.
+  --syntax-smoke          Run a fast grammar-change hot-path gate without strict pass by default.
   --phase-smoke           Run stage-end correctness + performance smoke.
   --quick-phase-smoke     Run an explicit fast phase smoke for local iteration.
   --feature-smoke         Run hot-path smoke coverage for newer language features.
@@ -116,6 +128,16 @@ while [ "$#" -gt 0 ]; do
             RUNS=1
             WARMUP=0
             TIMEOUT=60
+            ;;
+        --syntax-smoke)
+            PROFILE="syntax_smoke"
+            RUNS=1
+            WARMUP=0
+            TIMEOUT=45
+            MIN_SAMPLE_SECONDS=0.020
+            MAX_REPEAT=16
+            MIN_WALL_REPEAT=4
+            STRICT=0
             ;;
         --phase-smoke)
             PROFILE="phase_smoke"
@@ -471,10 +493,10 @@ TIMING_CMD=(
     --warmup="$WARMUP"
     --timeout="$TIMEOUT"
     --time-source=auto
-    --min-sample-seconds=0.100
+    --min-sample-seconds="$MIN_SAMPLE_SECONDS"
     --timer-resolution=0.001
-    --max-repeat=128
-    --min-wall-repeat=8
+    --max-repeat="$MAX_REPEAT"
+    --min-wall-repeat="$MIN_WALL_REPEAT"
     --scale-profile=hot
     --sort=luajit-gap
     --progress
@@ -493,6 +515,11 @@ if [ "$PROFILE" = "full" ]; then
 elif [ "$PROFILE" = "smoke" ]; then
     TIMING_CMD+=(--all-groups)
     for bench in "${SMOKE_BENCHES[@]}"; do
+        TIMING_CMD+=(--bench "$bench")
+    done
+elif [ "$PROFILE" = "syntax_smoke" ]; then
+    TIMING_CMD+=(--all-groups)
+    for bench in "${SYNTAX_SMOKE_BENCHES[@]}"; do
         TIMING_CMD+=(--bench "$bench")
     done
 elif [ "$PROFILE" = "phase_smoke" ] || [ "$PROFILE" = "quick_phase_smoke" ]; then
@@ -533,8 +560,8 @@ if [ "$STRICT" -eq 1 ]; then
         --runs="$RUNS"
         --warmup="$WARMUP"
         --timeout="$TIMEOUT"
-        --min-sample-seconds=0.100
-        --max-repeat=128
+        --min-sample-seconds="$MIN_SAMPLE_SECONDS"
+        --max-repeat="$MAX_REPEAT"
         --jobs="$JOBS"
         --progress
         --json "$STRICT_JSON"
@@ -553,6 +580,10 @@ if [ "$STRICT" -eq 1 ]; then
     else
         if [ "$PROFILE" = "smoke" ]; then
             for bench in "${STRICT_SMOKE_BENCHES[@]}"; do
+                STRICT_CMD+=(--bench "$bench")
+            done
+        elif [ "$PROFILE" = "syntax_smoke" ]; then
+            for bench in "${SYNTAX_SMOKE_BENCHES[@]}"; do
                 STRICT_CMD+=(--bench "$bench")
             done
         elif [ "$PROFILE" = "phase_smoke" ] || [ "$PROFILE" = "quick_phase_smoke" ]; then

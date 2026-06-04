@@ -2,9 +2,8 @@
 
    This file is the syntax appendix for docs/spec/index.md. It describes
    stable source syntax, not parser helper productions or internal AST shapes.
-   Keywords such as agent, models, turn, messages, budget, flow, and tool are
-   contextual identifiers unless the production below uses them in that
-   position.
+   Dialect tags such as turn, model, sh, json, and re are ordinary identifiers
+   until they appear directly before a tagged string or tagged block.
 *)
 
 program        = { separator | statement } EOF ;
@@ -13,12 +12,6 @@ block          = "{" { separator | statement } "}" ;
 
 statement      = func_decl
                | import_decl
-               | tool_decl
-               | agent_defaults_decl
-               | agent_decl
-               | models_decl
-               | budget_stmt
-               | evaluate_block
                | if_stmt
                | for_stmt
                | select_stmt
@@ -33,16 +26,8 @@ statement      = func_decl
                | simple_stmt ;
 
 func_decl      = "func" identifier param_list block ;
-import_decl    = "import" string_lit "as" identifier ;
-tool_decl      = "tool" identifier param_list block ;
-models_decl    = "models" config_block ;
-budget_stmt    = "budget" config_block block ;
-evaluate_block = "evaluate" string_lit block ;
-
-agent_defaults_decl
-               = "agent" "defaults" config_block ;
-agent_decl     = "agent" identifier [ param_list ] config_block [ flow_block ] ;
-flow_block     = "flow" block ;
+import_decl    = "import" ( import_spec | "(" { import_spec } ")" ) ;
+import_spec    = [ identifier ] string_lit ;
 
 param_list     = "(" [ param { "," param } [ "," vararg_param ]
                      | vararg_param ] ")" ;
@@ -110,26 +95,20 @@ primary        = identifier
                | "..."
                | "(" expr ")"
                | func_lit
-               | agent_lit
-               | turn_expr
-               | messages_expr
+               | tagged_string
+               | tagged_block
                | table_lit
                | list_lit
                | dense_lit ;
 
 func_lit       = "func" param_list block ;
-agent_lit      = "agent" [ param_list ] config_block [ flow_block ] ;
-turn_expr      = "turn" config_block ;
-messages_expr  = "messages" "{" [ message_field { field_sep message_field } [ field_sep ] ] "}" ;
+tagged_string  = [ identifier | "$" ] [ "!" ] raw_string_lit ;
+tagged_block   = identifier [ "!" ] config_block ;
 
 config_block   = "{" [ config_field { field_sep config_field } [ field_sep ] ] "}" ;
 config_field   = identifier ":" expr
                | string_lit ":" expr
                | "[" expr "]" ":" expr ;
-
-message_field  = identifier ":" expr
-               | string_lit ":" expr
-               | table_field ;
 
 table_lit      = "{" [ table_field { field_sep table_field } [ field_sep ] ] "}" ;
 table_field    = identifier ":" expr

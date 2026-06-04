@@ -95,8 +95,8 @@ func TestGLMAnthropicCompatibleLLMIntegration(t *testing.T) {
 }
 
 // TestLLMSyntaxGLMIntegration verifies a real multi-turn GLM flow through
-// LLM models/turn/agent syntax. It mirrors glm_cc's endpoint/key/model
-// env convention but never shells out to it.
+// the LLM stdlib API. It mirrors glm_cc's endpoint/key/model env convention
+// but never shells out to it.
 func TestLLMSyntaxGLMIntegration(t *testing.T) {
 	cfg := glmAnthropicCompatibleSmokeConfig(t)
 	t.Setenv("LEIA_GLM_BASE_URL", cfg.Endpoint)
@@ -107,7 +107,7 @@ func TestLLMSyntaxGLMIntegration(t *testing.T) {
 	defer cancel()
 	vm := leia.New(leia.WithLibs(leia.LibString | leia.LibOS | leia.LibLLM))
 	if err := vm.ExecContext(ctx, `
-models {
+llm.register_models({
     default: "glm-smoke"
     "glm-smoke": {
         protocol: "anthropic_compatible"
@@ -115,7 +115,7 @@ models {
         api_key: os.getenv("LEIA_GLM_API_KEY")
         provider_model: os.getenv("LEIA_GLM_MODEL")
     }
-}
+})
 
 glm_memory_error := nil
 glm_stored_text := ""
@@ -125,47 +125,49 @@ glm_project := ""
 glm_owner := ""
 glm_remembered := false
 glm_source := ""
-history := messages {
-    system: "You are a deterministic memory smoke-test assistant. Follow exact reply instructions. Keep answers short."
-    user: "Store this memory: project codename is ORCHID and owner is ADA. Reply exactly: MEMORY_STORED"
+history := {
+    llm.system("You are a deterministic memory smoke-test assistant. Follow exact reply instructions. Keep answers short."),
+    llm.user("Store this memory: project codename is ORCHID and owner is ADA. Reply exactly: MEMORY_STORED"),
 }
 
-stored, stored_err := turn {
+stored, stored_err := llm.turn({
     messages: history
     max_tokens: 32
     temperature: 0
-}
+})
 if stored_err != nil {
     glm_memory_error = stored_err.message
 } else {
     history[#history + 1] = msg.assistant(stored.text)
     history[#history + 1] = msg.user("Using only the stored memory, reply exactly: project=ORCHID;owner=ADA")
 
-    recalled, recalled_err := turn {
+    recalled, recalled_err := llm.turn({
         messages: history
         max_tokens: 48
         temperature: 0
-    }
+    })
     if recalled_err != nil {
         glm_memory_error = recalled_err.message
     } else {
         history[#history + 1] = msg.assistant(recalled.text)
 
-        extractor := agent(summary) {
-            model: "glm-smoke"
-            system: "Return only compact JSON with exactly these keys: project, owner, remembered, meta. meta must be an object with source. Do not include Markdown."
-            user: "Convert this memory recall into JSON. Use project=\"ORCHID\", owner=\"ADA\", remembered=true, meta.source=\"history\" when the recall says project=ORCHID;owner=ADA. Recall: " .. summary
-            output: {
-                project: "ORCHID"
-                owner: "ADA"
-                remembered: true
-                meta: {
-                    source: "history"
+        extractor := llm.agent("extractor", func(summary) {
+            return {
+                model: "glm-smoke"
+                system: "Return only compact JSON with exactly these keys: project, owner, remembered, meta. meta must be an object with source. Do not include Markdown."
+                user: "Convert this memory recall into JSON. Use project=\"ORCHID\", owner=\"ADA\", remembered=true, meta.source=\"history\" when the recall says project=ORCHID;owner=ADA. Recall: " .. summary
+                output: {
+                    project: "ORCHID"
+                    owner: "ADA"
+                    remembered: true
+                    meta: {
+                        source: "history"
+                    }
                 }
-            }
-            max_tokens: 96
-            temperature: 0
-        }
+                max_tokens: 96
+                temperature: 0
+            }, nil
+        }, nil, {params: {"summary"}})
 
         extracted, extract_err := extractor(recalled.text)
         if extract_err != nil {
@@ -239,7 +241,7 @@ func TestLLMSyntaxGLMStreamingIntegration(t *testing.T) {
 	defer cancel()
 	vm := leia.New(leia.WithLibs(leia.LibString | leia.LibOS | leia.LibLLM))
 	if err := vm.ExecContext(ctx, `
-models {
+llm.register_models({
     default: "glm-smoke"
     "glm-smoke": {
         protocol: "anthropic_compatible"
@@ -247,7 +249,7 @@ models {
         api_key: os.getenv("LEIA_GLM_API_KEY")
         provider_model: os.getenv("LEIA_GLM_MODEL")
     }
-}
+})
 
 glm_stream_error := nil
 glm_streamed_text := ""
@@ -311,7 +313,7 @@ func TestLLMSyntaxGLMDirectAgentToolsIntegration(t *testing.T) {
 	defer cancel()
 	vm := leia.New(leia.WithLibs(leia.LibString | leia.LibOS | leia.LibLLM))
 	if err := vm.ExecContext(ctx, `
-models {
+llm.register_models({
     default: "glm-smoke"
     "glm-smoke": {
         protocol: "anthropic_compatible"
@@ -319,7 +321,7 @@ models {
         api_key: os.getenv("LEIA_GLM_API_KEY")
         provider_model: os.getenv("LEIA_GLM_MODEL")
     }
-}
+})
 
 glm_direct_error := nil
 glm_direct_text := ""
@@ -333,15 +335,19 @@ glm_direct_tool_project := ""
 glm_direct_tool_owner := ""
 glm_direct_tool_source := ""
 
-agent extract_memory(note) {
-    model: "glm-smoke"
-    output: {
-        project: "ORCHID"
-        owner: "ADA"
-        remembered: true
-        source: "direct-agent-tool"
+func extract_memory_config(note) {
+    return {
+        model: "glm-smoke"
+        output: {
+            project: "ORCHID"
+            owner: "ADA"
+            remembered: true
+            source: "direct-agent-tool"
+        }
     }
-} flow {
+}
+
+func extract_memory_flow(note) {
     lower := string.lower(note)
     if string.find(lower, "orchid") == nil || string.find(lower, "ada") == nil {
         return nil, {kind: "validation", message: "memory note missing ORCHID or ADA"}
@@ -354,15 +360,19 @@ agent extract_memory(note) {
     }, nil
 }
 
-agent supervisor(question) {
-    model: "glm-smoke"
-    system: "You are testing tool use. You must call extract_memory exactly once before answering. After the tool result, answer in one short sentence that includes DIRECT_AGENT_TOOL_OK."
-    user: question
-    tools: [extract_memory]
-    max_steps: 4
-    max_tokens: 128
-    temperature: 0
-}
+extract_memory := llm.agent("extract_memory", extract_memory_config, extract_memory_flow, {params: {"note"}})
+
+supervisor := llm.agent("supervisor", func(question) {
+    return {
+        model: "glm-smoke"
+        system: "You are testing tool use. You must call extract_memory exactly once before answering. After the tool result, answer in one short sentence that includes DIRECT_AGENT_TOOL_OK."
+        user: question
+        tools: {extract_memory}
+        max_steps: 4
+        max_tokens: 128
+        temperature: 0
+    }, nil
+}, nil, {params: {"question"}})
 
 result, err := supervisor("Use the extract_memory tool with this note: project codename is ORCHID and owner is ADA. Do not answer from memory; call the tool first.")
 if err != nil {

@@ -152,42 +152,6 @@ func TestDidChangeClearsSyntaxDiagnostics(t *testing.T) {
 	}
 }
 
-func TestDidOpenPublishesAINativeDiagnostics(t *testing.T) {
-	input := mustEncodeMessages(t,
-		map[string]any{
-			"jsonrpc": "2.0",
-			"method":  "textDocument/didOpen",
-			"params": map[string]any{
-				"textDocument": map[string]any{
-					"uri":        "file:///tmp/ai-diagnostic.leia",
-					"languageId": "leia",
-					"version":    1,
-					"text":       "tool missing_caps() { return nil, nil }\n",
-				},
-			},
-		},
-	)
-	var out bytes.Buffer
-	err := NewServer().Run(context.Background(), bytes.NewReader(input), &out)
-	if err != nil {
-		t.Fatalf("Run returned error: %v", err)
-	}
-
-	msgs := readOutputMessages(t, out.Bytes())
-	if len(msgs) != 1 {
-		t.Fatalf("expected one diagnostic notification, got %d: %#v", len(msgs), msgs)
-	}
-	params := msgs[0]["params"].(map[string]any)
-	diagnostics := params["diagnostics"].([]any)
-	if len(diagnostics) != 1 {
-		t.Fatalf("expected one diagnostic, got %#v", diagnostics)
-	}
-	diag := diagnostics[0].(map[string]any)
-	if diag["code"] != "LEIA2001" || !strings.Contains(diag["message"].(string), "tool missing_caps") {
-		t.Fatalf("unexpected AI-native diagnostic: %#v", diag)
-	}
-}
-
 func TestFormattingReturnsWholeDocumentEdit(t *testing.T) {
 	input := mustEncodeMessages(t,
 		map[string]any{
@@ -236,7 +200,7 @@ func TestFormattingReturnsWholeDocumentEdit(t *testing.T) {
 	}
 }
 
-func TestCompletionReturnsLeiaKeywords(t *testing.T) {
+func TestCompletionReturnsCurrentLeiaSyntaxAndStdlib(t *testing.T) {
 	input := mustEncodeMessages(t,
 		map[string]any{
 			"jsonrpc": "2.0",
@@ -266,9 +230,14 @@ func TestCompletionReturnsLeiaKeywords(t *testing.T) {
 	for _, item := range items {
 		labels[item.(map[string]any)["label"].(string)] = true
 	}
-	for _, want := range []string{"func", "return", "agent", "tool", "evaluate"} {
+	for _, want := range []string{"func", "return", "import", "select", "llm", "llm.turn", "llm.tool", "llm.register_models"} {
 		if !labels[want] {
 			t.Fatalf("completion labels missing %q: %#v", want, labels)
+		}
+	}
+	for _, old := range []string{"agent", "tool", "evaluate"} {
+		if labels[old] {
+			t.Fatalf("completion labels unexpectedly include old AI keyword %q: %#v", old, labels)
 		}
 	}
 }
@@ -287,19 +256,11 @@ func TestDocumentSymbolReturnsDeclarations(t *testing.T) {
 						"func add(a, b) {",
 						"    return a + b",
 						"}",
-						"// Calculator tool.",
-						"// leia:requires: cap.none",
-						"tool calculate(input) {",
+						"func calculate(input) {",
 						"    return input",
 						"}",
-						"agent helper {",
-						"    model: \"test\"",
-						"}",
-						"evaluate \"slug baseline\" {",
-						"    func normalize(name) {",
-						"        return name",
-						"    }",
-						"    assert(normalize(\"Leia\") == \"Leia\")",
+						"func normalize(name) {",
+						"    return name",
 						"}",
 						"",
 					}, "\n"),
@@ -326,15 +287,15 @@ func TestDocumentSymbolReturnsDeclarations(t *testing.T) {
 		t.Fatalf("expected diagnostics notification and documentSymbol response, got %d: %#v", len(msgs), msgs)
 	}
 	symbols := msgs[1]["result"].([]any)
-	if len(symbols) != 5 {
-		t.Fatalf("expected 5 symbols, got %#v", symbols)
+	if len(symbols) != 3 {
+		t.Fatalf("expected 3 symbols, got %#v", symbols)
 	}
 	got := map[string]map[string]any{}
 	for _, raw := range symbols {
 		sym := raw.(map[string]any)
 		got[sym["name"].(string)] = sym
 	}
-	for _, name := range []string{"add", "calculate", "helper", "slug baseline", "normalize"} {
+	for _, name := range []string{"add", "calculate", "normalize"} {
 		if got[name] == nil {
 			t.Fatalf("missing symbol %q: %#v", name, got)
 		}
@@ -342,16 +303,10 @@ func TestDocumentSymbolReturnsDeclarations(t *testing.T) {
 	if got["add"]["kind"] != float64(12) {
 		t.Fatalf("add kind = %#v, want function", got["add"]["kind"])
 	}
-	if got["helper"]["kind"] != float64(5) {
-		t.Fatalf("helper kind = %#v, want class", got["helper"]["kind"])
-	}
-	if got["slug baseline"]["kind"] != float64(24) {
-		t.Fatalf("slug baseline kind = %#v, want event", got["slug baseline"]["kind"])
-	}
 	selection := got["calculate"]["selectionRange"].(map[string]any)
 	start := selection["start"].(map[string]any)
-	if start["line"] != float64(5) || start["character"] != float64(5) {
-		t.Fatalf("calculate selection start = %#v, want 5:5", start)
+	if start["line"] != float64(3) || start["character"] != float64(5) {
+		t.Fatalf("calculate selection start = %#v, want 3:5", start)
 	}
 }
 
@@ -565,8 +520,11 @@ func TestSemanticTokensLexerErrorReturnsEmptyData(t *testing.T) {
 func TestSemanticTokensClassifyLeiaSemanticRoles(t *testing.T) {
 	src := strings.Join([]string{
 		`import "go:strings" as strings`,
-		`agent reviewer(question) {`,
-		`    model: "mock"`,
+		`select {`,
+		`case value := <-ch:`,
+		`    return value`,
+		`default:`,
+		`    return nil`,
 		`}`,
 		`func add(a, b) {`,
 		`    return math.floor(a + b)`,
@@ -575,15 +533,28 @@ func TestSemanticTokensClassifyLeiaSemanticRoles(t *testing.T) {
 		"",
 	}, "\n")
 	tokens := decodedSemanticTokens(src)
+	assertSemanticToken(t, tokens, "import", semanticKeyword, 0)
 	assertSemanticToken(t, tokens, "strings", semanticNamespace, semanticDeclarationModifier)
-	assertSemanticToken(t, tokens, "reviewer", semanticType, semanticDeclarationModifier)
-	assertSemanticToken(t, tokens, "question", semanticParameter, semanticDeclarationModifier)
-	assertSemanticToken(t, tokens, "model", semanticProperty, 0)
+	assertSemanticToken(t, tokens, "select", semanticKeyword, 0)
+	assertSemanticToken(t, tokens, "case", semanticKeyword, 0)
+	assertSemanticToken(t, tokens, "default", semanticKeyword, 0)
 	assertSemanticToken(t, tokens, "add", semanticFunction, semanticDeclarationModifier)
 	assertSemanticToken(t, tokens, "a", semanticParameter, semanticDeclarationModifier)
 	assertSemanticToken(t, tokens, "math", semanticNamespace, semanticDefaultLibraryModifier)
 	assertSemanticToken(t, tokens, "floor", semanticProperty, 0)
 	assertSemanticToken(t, tokens, "run", semanticMethod, 0)
+}
+
+func TestSemanticTokensTreatLegacyAIWordsAsVariables(t *testing.T) {
+	src := strings.Join([]string{
+		`agent := tool + evaluate`,
+		`models := messages + budget`,
+		"",
+	}, "\n")
+	tokens := decodedSemanticTokens(src)
+	for _, name := range []string{"agent", "tool", "evaluate", "models", "messages", "budget"} {
+		assertSemanticToken(t, tokens, name, semanticVariable, 0)
+	}
 }
 
 func TestWorkspaceSymbolReturnsOpenDocumentDeclarations(t *testing.T) {
@@ -609,10 +580,10 @@ func TestWorkspaceSymbolReturnsOpenDocumentDeclarations(t *testing.T) {
 					"languageId": "leia",
 					"version":    1,
 					"text": strings.Join([]string{
-						"agent beta_agent {",
-						"    model: \"mock\"",
+						"func beta_agent() {",
+						"    return true",
 						"}",
-						"evaluate \"beta baseline\" {",
+						"func beta_baseline() {",
 						"    assert(true)",
 						"}",
 						"",
@@ -639,14 +610,14 @@ func TestWorkspaceSymbolReturnsOpenDocumentDeclarations(t *testing.T) {
 	}
 	symbols := msgs[2]["result"].([]any)
 	if len(symbols) != 2 {
-		t.Fatalf("workspace symbols = %#v, want beta_agent and beta baseline", symbols)
+		t.Fatalf("workspace symbols = %#v, want beta_agent and beta_baseline", symbols)
 	}
 	got := map[string]map[string]any{}
 	for _, raw := range symbols {
 		sym := raw.(map[string]any)
 		got[sym["name"].(string)] = sym
 	}
-	for _, name := range []string{"beta_agent", "beta baseline"} {
+	for _, name := range []string{"beta_agent", "beta_baseline"} {
 		if got[name] == nil {
 			t.Fatalf("missing workspace symbol %q: %#v", name, got)
 		}
@@ -657,126 +628,6 @@ func TestWorkspaceSymbolReturnsOpenDocumentDeclarations(t *testing.T) {
 	}
 	if got["alpha_tool"] != nil {
 		t.Fatalf("query unexpectedly returned alpha_tool: %#v", got)
-	}
-}
-
-func TestCodeLensReturnsAgentAndEvaluateActions(t *testing.T) {
-	src := strings.Join([]string{
-		"agent helper {",
-		"    model: \"mock\"",
-		"}",
-		"evaluate \"helper baseline\" {",
-		"    assert(true)",
-		"}",
-		"",
-	}, "\n")
-	input := mustEncodeMessages(t,
-		map[string]any{
-			"jsonrpc": "2.0",
-			"method":  "textDocument/didOpen",
-			"params": map[string]any{
-				"textDocument": map[string]any{
-					"uri":        "file:///tmp/lens.leia",
-					"languageId": "leia",
-					"version":    1,
-					"text":       src,
-				},
-			},
-		},
-		map[string]any{
-			"jsonrpc": "2.0",
-			"id":      30,
-			"method":  "textDocument/codeLens",
-			"params": map[string]any{
-				"textDocument": map[string]any{"uri": "file:///tmp/lens.leia"},
-			},
-		},
-	)
-	var out bytes.Buffer
-	err := NewServer().Run(context.Background(), bytes.NewReader(input), &out)
-	if err != nil {
-		t.Fatalf("Run returned error: %v", err)
-	}
-
-	msgs := readOutputMessages(t, out.Bytes())
-	if len(msgs) != 2 {
-		t.Fatalf("expected diagnostics notification and codeLens response, got %d: %#v", len(msgs), msgs)
-	}
-	lenses := msgs[1]["result"].([]any)
-	if len(lenses) != 2 {
-		t.Fatalf("expected two code lenses, got %#v", lenses)
-	}
-	commands := map[string]string{}
-	for _, raw := range lenses {
-		lens := raw.(map[string]any)
-		cmd := lens["command"].(map[string]any)
-		commands[cmd["command"].(string)] = cmd["title"].(string)
-	}
-	if commands["leia.agent.run"] != "Run agent" {
-		t.Fatalf("missing agent code lens: %#v", commands)
-	}
-	if commands["leia.evaluate.case"] != "Run evaluate case" {
-		t.Fatalf("missing evaluate code lens: %#v", commands)
-	}
-}
-
-func TestInlayHintReturnsAgentAndEvaluateHints(t *testing.T) {
-	src := strings.Join([]string{
-		"agent helper {",
-		"    model: \"mock\"",
-		"}",
-		"evaluate \"helper baseline\" {",
-		"    assert(true)",
-		"}",
-		"",
-	}, "\n")
-	input := mustEncodeMessages(t,
-		map[string]any{
-			"jsonrpc": "2.0",
-			"method":  "textDocument/didOpen",
-			"params": map[string]any{
-				"textDocument": map[string]any{
-					"uri":        "file:///tmp/hints.leia",
-					"languageId": "leia",
-					"version":    1,
-					"text":       src,
-				},
-			},
-		},
-		map[string]any{
-			"jsonrpc": "2.0",
-			"id":      31,
-			"method":  "textDocument/inlayHint",
-			"params": map[string]any{
-				"textDocument": map[string]any{"uri": "file:///tmp/hints.leia"},
-				"range": map[string]any{
-					"start": map[string]any{"line": 0, "character": 0},
-					"end":   map[string]any{"line": 6, "character": 0},
-				},
-			},
-		},
-	)
-	var out bytes.Buffer
-	err := NewServer().Run(context.Background(), bytes.NewReader(input), &out)
-	if err != nil {
-		t.Fatalf("Run returned error: %v", err)
-	}
-
-	msgs := readOutputMessages(t, out.Bytes())
-	if len(msgs) != 2 {
-		t.Fatalf("expected diagnostics notification and inlayHint response, got %d: %#v", len(msgs), msgs)
-	}
-	hints := msgs[1]["result"].([]any)
-	if len(hints) != 2 {
-		t.Fatalf("expected two inlay hints, got %#v", hints)
-	}
-	labels := map[string]bool{}
-	for _, raw := range hints {
-		hint := raw.(map[string]any)
-		labels[hint["label"].(string)] = true
-	}
-	if !labels[" agent"] || !labels[" eval"] {
-		t.Fatalf("missing expected hint labels: %#v", labels)
 	}
 }
 
@@ -842,6 +693,30 @@ func TestHoverReturnsKeywordStdlibAndDeclaration(t *testing.T) {
 	assertHoverContains(t, msgs[1], "**return**")
 	assertHoverContains(t, msgs[2], "stdlib module `math`")
 	assertHoverContains(t, msgs[3], "func `add(a, b)`")
+}
+
+func TestHoverDoesNotTreatLegacyAIWordsAsKeywords(t *testing.T) {
+	if got := hoverText("agent := 1\n", "agent"); got != "" {
+		t.Fatalf("legacy AI hover = %q, want empty", got)
+	}
+}
+
+func TestCodeLensAndInlayHintDoNotReturnLegacyAIActions(t *testing.T) {
+	src := strings.Join([]string{
+		"agent := 1",
+		"tool := 2",
+		"evaluate := agent + tool",
+		"func current() {",
+		"    return llm.turn({})",
+		"}",
+		"",
+	}, "\n")
+	if lenses := collectCodeLens("file:///tmp/lens.leia", src); len(lenses) != 0 {
+		t.Fatalf("legacy AI code lenses = %#v, want none", lenses)
+	}
+	if hints := collectInlayHints(src, lspRange{}); len(hints) != 0 {
+		t.Fatalf("legacy AI inlay hints = %#v, want none", hints)
+	}
 }
 
 func TestDefinitionReferencesAndRename(t *testing.T) {

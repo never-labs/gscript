@@ -31,7 +31,7 @@ type LLMStreamEvent struct {
 
 type LLMStreamSink func(LLMStreamEvent) error
 
-// LLMProviderConfig is the runtime shape of one models {} provider entry.
+// LLMProviderConfig is the runtime shape of one registered model provider entry.
 // The runtime records this data, but construction is delegated to the host
 // package to avoid coupling the interpreter to concrete HTTP providers.
 type LLMProviderConfig struct {

@@ -23,6 +23,7 @@ Important inputs:
 Release-gate commands:
 
 ```bash
+time bash scripts/performance_gate.sh --syntax-smoke --no-luajit
 go test ./tests -run 'TestFeatureMatrixSchema|TestReleaseMatrix' -count=1
 go test ./tests -run TestSpecRunnableExamples -count=1
 go test ./tests -run 'TestFeatureMatrix|TestLanguageConformanceTranslatedCases' -count=1
@@ -30,6 +31,9 @@ go test ./...
 bash scripts/docs_check.sh
 bash scripts/performance_gate.sh --feature-smoke
 ```
+
+Use the `--syntax-smoke` command first after syntax-only language changes when
+you need quick hot-path performance evidence without the longer strict pass.
 
 See [Performance and benchmarks](reference/performance/index.md) for benchmark
 selectors, timing quality rules, strict guard modes, and artifact conventions.

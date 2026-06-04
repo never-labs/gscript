@@ -49,6 +49,7 @@ const (
 	LibArray                          // array.* dense arrays
 	LibSoA                            // soa.* structure-of-arrays
 	LibLLM                            // llm.* native model/tool integration
+	LibDialect                        // dialect.* built-in language dialects
 
 	// LibAll includes every library (default).
 	LibAll = LibString | LibTable | LibMath | LibIO | LibOS | LibCoroutine |
@@ -58,7 +59,7 @@ const (
 		LibBinary | LibBits | LibBytes | LibCSV | LibURL | LibUUID |
 		LibProcess | LibScript | LibDebug | LibTestkit | LibMatrix |
 		LibRand | LibSort | LibEncoding | LibCompress | LibCrypto |
-		LibContainer | LibLog | LibArray | LibSoA | LibLLM
+		LibContainer | LibLog | LibArray | LibSoA | LibLLM | LibDialect
 
 	// LibSafe is a sandboxed subset with no I/O, network, or system access.
 	LibSafe = LibString | LibTable | LibMath | LibCoroutine |
@@ -66,7 +67,7 @@ const (
 		LibRegexp | LibUTF8 | LibBit32 | LibBinary | LibBits |
 		LibBytes | LibCSV | LibURL | LibUUID | LibMatrix |
 		LibPath | LibTime | LibRand | LibSort | LibEncoding | LibCompress | LibCrypto |
-		LibContainer | LibArray | LibSoA
+		LibContainer | LibArray | LibSoA | LibDialect
 
 	// LibApp is a convenient preset for application development (no GL).
 	LibApp = LibString | LibTable | LibMath | LibIO | LibOS | LibCoroutine |
@@ -75,7 +76,7 @@ const (
 		LibBytes | LibCSV | LibURL | LibUUID | LibProcess | LibScript |
 		LibDebug | LibMatrix | LibRand | LibSort | LibEncoding |
 		LibCompress | LibCrypto | LibContainer | LibLog | LibArray | LibSoA |
-		LibLLM
+		LibLLM | LibDialect
 
 	// LibGame is a preset for game development (no I/O, includes vec/color).
 	LibGame = LibString | LibTable | LibMath | LibCoroutine |

@@ -5,13 +5,13 @@
       "Messages": [
         {
           "Role": "user",
-          "Text": "Summarize Leia evaluate in five words."
+          "Text": "Summarize Leia replay checks in five words."
         }
       ]
     },
     "Result": {
       "Status": "final_answer",
-      "Text": "Deterministic evaluate blocks for agents."
+      "Text": "Deterministic agent checks with replay."
     }
   }
 ]

@@ -474,18 +474,6 @@ func stmtNestedFunctionCapturesAny(stmt ast.Stmt, names map[string]bool) bool {
 		}
 	case *ast.FuncDeclStmt:
 		return functionBodyCapturesAny(s.Body, s.Params, names)
-	case *ast.ToolDeclStmt:
-		return functionBodyCapturesAny(s.Body, s.Params, names)
-	case *ast.AgentDeclStmt:
-		return blockNestedFunctionCapturesAny(s.Flow, names)
-	case *ast.AgentDefaultsDeclStmt:
-		return configNestedFunctionCapturesAny(s.Config, names)
-	case *ast.ModelsDeclStmt:
-		return configNestedFunctionCapturesAny(s.Config, names)
-	case *ast.BudgetStmt:
-		return configNestedFunctionCapturesAny(s.Config, names) || blockNestedFunctionCapturesAny(s.Body, names)
-	case *ast.EvaluateBlockStmt:
-		return blockNestedFunctionCapturesAny(s.Body, names)
 	case *ast.BlockStmt:
 		return blockNestedFunctionCapturesAny(s, names)
 	}
@@ -538,16 +526,6 @@ func exprNestedFunctionCapturesAny(expr ast.Expr, names map[string]bool) bool {
 		}
 	case *ast.FuncLitExpr:
 		return functionBodyCapturesAny(e.Body, e.Params, names)
-	case *ast.AgentLitExpr:
-		return configNestedFunctionCapturesAny(e.Config, names) || blockNestedFunctionCapturesAny(e.Flow, names)
-	case *ast.TurnExpr:
-		return configNestedFunctionCapturesAny(e.Config, names)
-	case *ast.MessagesExpr:
-		for _, field := range e.Fields {
-			if exprNestedFunctionCapturesAny(field.Value, names) || exprNestedFunctionCapturesAny(field.Key, names) {
-				return true
-			}
-		}
 	case *ast.ListLitExpr:
 		for _, value := range e.Values {
 			if exprNestedFunctionCapturesAny(value, names) {

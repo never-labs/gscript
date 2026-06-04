@@ -517,10 +517,8 @@ func playgroundMockSlugifyPatch() string {
     return value
 }
 
-evaluate "slugify cases" {
-    assert(slugify("Hello Leia") == "hello-leia")
-    assert(slugify("AI Native Script") == "ai-native-script")
-}`
+	assert(slugify("Hello Leia") == "hello-leia")
+	assert(slugify("AI Native Script") == "ai-native-script")`
 	return jsonEncodeObject(map[string]string{
 		"code": code,
 		"risk": "mock proposal only",
@@ -862,25 +860,27 @@ print("fast ids", json.encode(soa.select(particles, fast, "id", 0)))`,
 			Runnable: true,
 		},
 		{
-			ID:      "evaluate",
-			Title:   "Executable Evaluation Blocks",
-			Section: "AI And Testing",
-			Summary: "Evaluate blocks make script-level regression checks live beside the code they verify.",
+			ID:      "dialects",
+			Title:   "Built-In Dialects",
+			Section: "Shell And Data",
+			Summary: "Tagged strings and blocks let scripts use shell, JSON, regexp, and prompt-shaped data without leaving Leia.",
 			Concepts: []string{
-				"`evaluate \"name\" { ... }` is parsed by Leia tooling.",
-				"`leia evaluate` executes evaluate bodies and reports pass/fail JSON.",
-				"Normal script execution treats evaluate blocks as declarations, so examples can still run.",
+				"`json`...`` decodes JSON text into ordinary Leia values.",
+				"`re`...`` builds a regular expression object.",
+				"`prompt { ... }` creates structured prompt data.",
+				"Dialect tags are explicit, so they stay inspectable by tooling.",
 			},
-			Source: `func normalize_name(s) {
-    return string.lower(string.trim(s))
+			Source: `name := "Leia"
+doc := json` + "`{\"project\":\"leia\",\"kind\":\"dialect\"}`" + `
+rx := re` + "`^Lei`" + `
+task := prompt {
+    system: "Be brief."
+    user: "Explain " .. doc.kind
 }
 
-evaluate "normalizes display names" {
-    assert(normalize_name(" ADA ") == "ada")
-    assert(normalize_name("Grace") == "grace")
-}
-
-print("run leia evaluate to execute the evaluate block")`,
+print(doc.project, doc.kind)
+print(rx.match(name))
+print(task.body.user)`,
 			Runnable: true,
 		},
 	}
@@ -896,11 +896,11 @@ func playgroundAIExamples() []playgroundExample {
 			Runnable: true,
 			Requires: "LLM provider",
 			Concepts: []string{
-				"`turn` sends one request to the selected default model.",
+				"`llm.turn` sends one request to the selected default model.",
 				"The result carries text, usage, history, and tool-call metadata.",
 				"This example is intentionally one line; configure a model provider before running.",
 			},
-			Source: `result, err := turn { user: "Reply exactly: LEIA_GLM_OK" }
+			Source: `result, err := llm.turn({ messages: {llm.user("Reply exactly: LEIA_GLM_OK")} })
 if err != nil { print(err.message); return }
 print(result.text)`,
 		},
@@ -912,14 +912,18 @@ print(result.text)`,
 			Runnable: true,
 			Requires: "LLM provider",
 			Concepts: []string{
-				"`agent` declarations create callable AI values.",
+				"`llm.agent` creates callable AI values.",
 				"The host-provided GLM profile supplies the default model.",
 				"Use plain text for the simplest live agent path.",
 			},
-			Source: `agent summarize(topic) {
-    system: "Summarize in one sentence for an engineer evaluating Leia. Return plain text only."
-    user: topic
-}
+			Source: `summarize := llm.agent("summarize", func(topic) {
+    return {
+        messages: {
+            llm.system("Summarize in one sentence for an engineer evaluating Leia. Return plain text only."),
+            llm.user(topic),
+        }
+    }
+}, nil, {params: {"topic"}})
 
 result, err := summarize("Leia is a Go-native, hot-reloadable scripting language with AI-native agents.")
 if err != nil { print(err.message); return }
@@ -937,13 +941,15 @@ print(result.text)`,
 				"The runtime validates model text before returning it as `result.value`.",
 				"Hosts can consume the value without reparsing ad-hoc prose.",
 			},
-			Source: `result, err := turn {
-    system: "Return raw JSON only. Do not use markdown, prose, or code fences."
-    user: "Return exactly this object with no extra keys: {\"product\":\"playground\",\"severity\":\"low\",\"action\":\"improve_demos\"}"
+			Source: `result, err := llm.turn({
+    messages: {
+        llm.system("Return raw JSON only. Do not use markdown, prose, or code fences."),
+        llm.user("Return exactly this object with no extra keys: {\"product\":\"playground\",\"severity\":\"low\",\"action\":\"improve_demos\"}"),
+    }
     response_format: {type: "json_object"}
     max_tokens: 64
     temperature: 0
-}
+})
 if err != nil { print(err.message); return }
 ticket := json.decode(result.text)
 print(json.encode(ticket))`,
@@ -979,26 +985,32 @@ print("final", result.text)`,
 			Runnable: true,
 			Requires: "LLM provider",
 			Concepts: []string{
-				"`tool` declares a callable function that an agent can expose to a model.",
+				"`llm.tool` wraps a callable function that an agent can expose to a model.",
 				"`//leia:requires` documents required host capabilities.",
 				"Agents receive tools as an ordinary list.",
 			},
-			Source: `//leia:requires docs.read
-//leia:param query search query
-tool lookup(query) {
+			Source: `lookup := llm.tool("lookup", func(query) {
     docs := {
-        memory: "Use messages{} for history, then append msg.assistant and msg.user.",
+        memory: "Use an ordered list of llm.system/user messages, then append msg.assistant and msg.user.",
         tools: "Declare tool functions and pass them in an agent tools list.",
-        eval: "Use evaluate blocks for regression checks."
+        dialect: "Use tagged strings such as json and shell dialects for compact host workflows."
     }
     return docs[query] || "No local doc for " .. query, nil
-}
+}, {
+    params: {"query"}
+    requires: {"docs.read"}
+    param_docs: {query: "search query"}
+})
 
-agent answer_with_lookup(question) {
-    system: "Use lookup with one of: memory, tools, eval. Reply in two short bullets."
-    user: question
-    tools: [lookup]
-}
+answer_with_lookup := llm.agent("answer_with_lookup", func(question) {
+    return {
+        messages: {
+            llm.system("Use lookup with one of: memory, tools, dialect. Reply in two short bullets."),
+            llm.user(question),
+        }
+        tools: {lookup}
+    }
+}, nil, {params: {"question"}})
 
 result, err := answer_with_lookup("How should I keep multi-turn memory in Leia?")
 if err != nil { print(err.message); return }
@@ -1016,18 +1028,18 @@ print(result.text)`,
 				"Append assistant and user messages between turns.",
 				"Record/replay can later turn this into deterministic regression data.",
 			},
-			Source: `history := messages {
-    system: "Remember facts exactly."
-    user: "Store these facts: project=ORCHID, owner=ADA, risk=LOW. Reply MEMORY_STORED."
+			Source: `history := {
+    llm.system("Remember facts exactly."),
+    llm.user("Store these facts: project=ORCHID, owner=ADA, risk=LOW. Reply MEMORY_STORED."),
 }
 
-stored, err := turn { messages: history, max_tokens: 32 }
+stored, err := llm.turn({messages: history, max_tokens: 32})
 if err != nil { return nil, err }
 
 history[#history + 1] = msg.assistant(stored.text)
 history[#history + 1] = msg.user("Recall project, owner, and risk as key=value pairs.")
 
-recalled, err := turn { messages: history, max_tokens: 64 }
+recalled, err := llm.turn({messages: history, max_tokens: 64})
 if err != nil { print(err.message); return }
 print(recalled.text)`,
 		},
@@ -1043,9 +1055,11 @@ print(recalled.text)`,
 				"The supervisor controls when to delegate.",
 				"Output shapes make tool results predictable.",
 			},
-			Source: `agent extract_memory(note) {
-    output: { project: "ORCHID", owner: "ADA", risk: "LOW" }
-} flow {
+			Source: `extract_memory := llm.agent("extract_memory", func(note) {
+    return {
+        output: { project: "ORCHID", owner: "ADA", risk: "LOW" }
+    }
+}, func(note) {
     lower := string.lower(note)
     if string.find(lower, "orchid") == nil || string.find(lower, "ada") == nil {
         return nil, {kind: "validation", message: "memory note must mention ORCHID and ADA"}
@@ -1055,13 +1069,20 @@ print(recalled.text)`,
         risk = "HIGH"
     }
     return { project: "ORCHID", owner: "ADA", risk: risk }, nil
-}
+}, {
+    params: {"note"}
+    output: {project: "ORCHID", owner: "ADA", risk: "LOW"}
+})
 
-agent supervisor(question) {
-    system: "Call extract_memory before answering. Summarize the extracted fields."
-    user: question
-    tools: [extract_memory]
-}
+supervisor := llm.agent("supervisor", func(question) {
+    return {
+        messages: {
+            llm.system("Call extract_memory before answering. Summarize the extracted fields."),
+            llm.user(question),
+        }
+        tools: {extract_memory}
+    }
+}, nil, {params: {"question"}})
 
 result, err := supervisor("project is ORCHID, owner is ADA, launch risk is LOW")
 if err != nil { print(err.message); return }
@@ -1079,17 +1100,23 @@ print(result.text)`,
 				"The agent decides whether the tool is useful for the current turn.",
 				"The result is ordinary text that a host can log, review, or replay.",
 			},
-			Source: `//leia:requires orders.read
-//leia:param id order id
-tool lookup_order(id) {
+			Source: `lookup_order := llm.tool("lookup_order", func(id) {
     return { id: id, status: "delivered", total: 42, refundable: true }, nil
-}
+}, {
+    params: {"id"}
+    requires: {"orders.read"}
+    param_docs: {id: "order id"}
+})
 
-agent support_triage(message) {
-    system: "You are a concise support assistant. Use lookup_order for order status. Mention whether refund is possible."
-    user: message
-    tools: [lookup_order]
-}
+support_triage := llm.agent("support_triage", func(message) {
+    return {
+        messages: {
+            llm.system("You are a concise support assistant. Use lookup_order for order status. Mention whether refund is possible."),
+            llm.user(message),
+        }
+        tools: {lookup_order}
+    }
+}, nil, {params: {"message"}})
 
 result, err := support_triage("Customer asks: order A100 arrived damaged. Can I get a refund?")
 if err != nil { print(err.message); return }
@@ -1107,20 +1134,24 @@ print(result.text)`,
 				"History separates system instructions, draft content, and review request.",
 				"This pattern is useful for lightweight agent quality gates.",
 			},
-			Source: `agent draft_release_note(change) {
-    system: "Write a release note in two short bullets."
-    user: change
-}
+			Source: `draft_release_note := llm.agent("draft_release_note", func(change) {
+    return {
+        messages: {
+            llm.system("Write a release note in two short bullets."),
+            llm.user(change),
+        }
+    }
+}, nil, {params: {"change"}})
 
 draft, err := draft_release_note("Playground now has runnable Tour, Examples, and AI demos.")
 if err != nil { print(err.message); return }
 
-review := messages {
-    system: "Review the draft. Reply PASS if it is concise and user-facing; otherwise explain one fix."
-    user: draft.text
+review := {
+    llm.system("Review the draft. Reply PASS if it is concise and user-facing; otherwise explain one fix."),
+    llm.user(draft.text),
 }
 
-checked, err := turn { messages: review, max_tokens: 64 }
+checked, err := llm.turn({messages: review, max_tokens: 64})
 if err != nil { print(err.message); return }
 print("draft:")
 print(draft.text)
@@ -1141,7 +1172,7 @@ print(checked.text)`,
 			},
 			Source: `func read_file_impl(path) {
     if path == "README.md" {
-        return "Build a small Leia program. Prefer pure functions and evaluate blocks.", nil
+        return "Build a small Leia program. Prefer pure functions and self-checking assertions.", nil
     }
     if path == "src/main.leia" {
         return "func slugify(title) { return title }", nil
@@ -1162,7 +1193,7 @@ func search_repo_impl(query) {
 func read_docs_impl(topic) {
     docs := {
         strings: "Use string.lower, string.trim, string.gsub, and string.split for text cleanup.",
-        eval_doc: "Use evaluate \"name\" { assert(...) } for regression checks.",
+        test_doc: "Use assert(...) in executable examples for lightweight regression checks.",
         style: "Keep host-changing operations behind explicit tools."
     }
     return docs[topic] || "No docs for " .. topic, nil
@@ -1171,7 +1202,7 @@ func read_docs_impl(topic) {
 func run_tests_impl(patch) {
     lower := string.lower(patch)
     has_function := string.find(lower, "func slugify") != nil
-    has_evaluate := string.find(lower, "evaluate") != nil
+    has_asserts := string.find(lower, "assert") != nil
     has_cases := string.find(lower, "hello%-leia") != nil && string.find(lower, "ai%-native%-script") != nil
     uses_supported_string_api := string.find(lower, "string.lower") != nil && string.find(lower, "string.trim") != nil && string.find(lower, "string.gsub") != nil
     has_leia_binding := string.find(lower, ":=") != nil
@@ -1184,78 +1215,100 @@ func run_tests_impl(patch) {
         string.find(lower, "string.at") != nil ||
         string.find(lower, "string.length") != nil ||
         string.find(lower, "string.substring") != nil
-    if has_function && has_evaluate && has_cases && uses_supported_string_api && has_leia_binding && !uses_invalid_syntax {
+    if has_function && has_asserts && has_cases && uses_supported_string_api && has_leia_binding && !uses_invalid_syntax {
         return { ok: true, output: "2 slugify cases passed" }, nil
     }
-    return { ok: false, output: "patch must be raw Leia code only. Use := locals, // comments, nil, func slugify, string.lower/trim/gsub, evaluate cases for hello-leia and ai-native-script. Do not use markdown, import, var, let, while, # comments, null, string.at, string.length, or string.substring" }, nil
+    return { ok: false, output: "patch must be raw Leia code only. Use := locals, // comments, nil, func slugify, string.lower/trim/gsub, and assert checks for hello-leia and ai-native-script. Do not use markdown, import, var, let, while, # comments, null, string.at, string.length, or string.substring" }, nil
 }
 
 func propose_file_impl(path, body) {
     return { path: path, body: body, mode: "proposal_only" }, nil
 }
 
-//leia:requires fs.read
-//leia:param path source file path
-tool read_file(path) {
+read_file := llm.tool("read_file", func(path) {
     return read_file_impl(path)
-}
+}, {
+    params: {"path"}
+    requires: {"fs.read"}
+    param_docs: {path: "source file path"}
+})
 
-//leia:requires repo.search
-//leia:param query search query
-tool search_repo(query) {
+search_repo := llm.tool("search_repo", func(query) {
     return search_repo_impl(query)
-}
+}, {
+    params: {"query"}
+    requires: {"repo.search"}
+    param_docs: {query: "search query"}
+})
 
-//leia:requires docs.read
-//leia:param topic language topic
-tool read_docs(topic) {
+read_docs := llm.tool("read_docs", func(topic) {
     return read_docs_impl(topic)
-}
+}, {
+    params: {"topic"}
+    requires: {"docs.read"}
+    param_docs: {topic: "language topic"}
+})
 
-//leia:requires tests.run
-//leia:param patch proposed patch text
-tool run_tests(patch) {
+run_tests := llm.tool("run_tests", func(patch) {
     return run_tests_impl(patch)
-}
+}, {
+    params: {"patch"}
+    requires: {"tests.run"}
+    param_docs: {patch: "proposed patch text"}
+})
 
-//leia:requires patch.write
-//leia:param path target path
-//leia:param body proposed file content
-tool propose_file(path, body) {
+propose_file := llm.tool("propose_file", func(path, body) {
     return propose_file_impl(path, body)
+}, {
+    params: {"path", "body"}
+    requires: {"patch.write"}
+    param_docs: {
+        path: "target path"
+        body: "proposed file content"
+    }
+})
+
+func coding_agent_config(task) {
+    return {
+        messages: {
+            llm.system("You are a careful coding agent for Leia. Produce a complete Leia patch proposal. Include code, tests, and risk notes. Do not claim to have written files."),
+            llm.user(task),
+        }
+        tools: {search_repo, read_file, read_docs, run_tests, propose_file}
+        budget: {turns: 4, calls: 8, tokens: 3200}
+    }
 }
 
-agent coding_agent(task) {
-    system: "You are a careful coding agent for Leia. Produce a complete Leia patch proposal. Include code, tests, and risk notes. Do not claim to have written files."
-    user: task
-    tools: [search_repo, read_file, read_docs, run_tests, propose_file]
-    budget: {turns: 4, calls: 8, tokens: 3200}
-} flow {
+coding_agent := llm.agent("coding_agent", coding_agent_config, func(task) {
+    cfg := coding_agent_config(task)
+    system_message := cfg.messages[1].text
     hits, _ := search_repo_impl("slugify implementation and tests")
     readme, _ := read_file_impl("README.md")
     current, _ := read_file_impl("src/main.leia")
     cases, _ := read_file_impl("tests/slugify_cases.txt")
     string_docs, _ := read_docs_impl("strings")
-    eval_docs, _ := read_docs_impl("eval_doc")
+	    test_docs, _ := read_docs_impl("test_doc")
 
     prompt := task ..
         "\n\nsearch: " .. json.encode(hits) ..
         "\nreadme: " .. readme ..
         "\ncurrent: " .. current ..
         "\ncases: " .. cases ..
-        "\nstring_docs: " .. string_docs ..
-        "\nevaluate_docs: " .. eval_docs ..
-        "\n\nReturn raw JSON only with exactly two string fields: code and risk. code must be raw Leia source, not markdown. Include func slugify(title), use string.lower/string.trim/string.gsub, and include an evaluate block with the two required cases. Use := locals, nil, and // comments. Do not use import, var, let, while, null, # comments, markdown, string.at, string.length, or string.substring."
+	        "\nstring_docs: " .. string_docs ..
+	        "\ntest_docs: " .. test_docs ..
+	        "\n\nReturn raw JSON only with exactly two string fields: code and risk. code must be raw Leia source, not markdown. Include func slugify(title), use string.lower/string.trim/string.gsub, and include assert checks for the two required cases. Use := locals, nil, and // comments. Do not use import, var, let, while, null, # comments, markdown, string.at, string.length, or string.substring."
 
     last := nil
     for attempt := 1; attempt <= 3; attempt++ {
-        draft, err := turn {
-            system: system
-            user: prompt
+        draft, err := llm.turn({
+            messages: {
+                llm.system(system_message),
+                llm.user(prompt),
+            }
             tools: {}
             response_format: {type: "json_object"}
             max_tokens: 700
-        }
+        })
         if err != nil {
             return nil, err
         }
@@ -1299,7 +1352,7 @@ agent coding_agent(task) {
         tests: "needs human review after three attempts",
         risk: last.risk,
     }, nil
-}
+}, {params: {"task"}})
 
 result, err := coding_agent("Implement slugify(title) for blog URLs and include evaluate regression cases.")
 if err != nil { print(err.message); return }
@@ -1310,15 +1363,15 @@ print("tools", table.concat(result.tools, ","))
 print(result.text)`,
 		},
 		{
-			ID:       "ai-evaluate-loop",
-			Title:    "Agent Regression Test",
+			ID:       "ai-self-check-loop",
+			Title:    "Agent Self-Check",
 			Section:  "Evaluation",
-			Summary:  "Keep agent behavior checks near the prompt using evaluate blocks.",
+			Summary:  "Keep local behavior checks near agent helpers with executable assertions.",
 			Runnable: true,
 			Concepts: []string{
-				"`evaluate` blocks are normal source-level declarations.",
-				"`leia evaluate` executes the block and reports pass/fail JSON.",
-				"This is the local skeleton for richer record/replay agent evaluation.",
+				"Plain Leia code can still test prompt-adjacent helper logic.",
+				"`assert` makes examples fail fast in CI and in the playground.",
+				"Richer agent evaluation will build on this executable style instead of old keyword blocks.",
 			},
 			Source: `func classify_local(text) {
     if string.find(string.lower(text), "refund") != nil {
@@ -1327,12 +1380,9 @@ print(result.text)`,
     return "other"
 }
 
-evaluate "refund classifier baseline" {
-    assert(classify_local("customer asks for a refund") == "refund")
-    assert(classify_local("customer says hello") == "other")
-}
-
-print("run leia evaluate to execute this regression block")`,
+assert(classify_local("customer asks for a refund") == "refund")
+assert(classify_local("customer says hello") == "other")
+print("local classifier checks passed")`,
 		},
 	}
 }
@@ -1734,10 +1784,10 @@ let activeTab = "playground";
 let currentItems = [];
 
 const leiaKeywords = new Set([
-  "agent", "and", "break", "budget", "case", "const", "continue", "default",
-  "defer", "do", "else", "elseif", "end", "evaluate", "false", "flow", "for",
-  "func", "go", "if", "import", "in", "local", "messages", "models", "nil",
-  "not", "or", "return", "select", "then", "tool", "true", "turn"
+  "and", "break", "case", "const", "continue", "default",
+  "defer", "do", "else", "elseif", "end", "false", "for",
+  "func", "go", "if", "import", "in", "local", "nil",
+  "not", "or", "return", "select", "then", "true"
 ]);
 const leiaBuiltins = new Set([
   "print", "pairs", "ipairs", "range", "len", "type", "tostring", "tonumber",
@@ -1745,7 +1795,7 @@ const leiaBuiltins = new Set([
 ]);
 const leiaAgentFields = new Set([
   "model", "tools", "system", "user", "output", "example", "history", "messages",
-  "budget", "parallel", "metric", "fail_if", "record_to", "filter", "seed"
+  "temperature", "max_tokens", "stream", "on_stream", "response_format"
 ]);
 
 function escapeHTML(text) {

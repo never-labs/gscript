@@ -103,9 +103,9 @@ func TestPlaygroundPageSyntaxSurfaceMatchesLeia(t *testing.T) {
 	}
 	body := rec.Body.String()
 	for _, want := range []string{
-		`"models"`,
-		`"messages"`,
-		`"budget"`,
+		`"import"`,
+		`"select"`,
+		`"model"`,
 		`"select"`,
 		`ch === "/" && next === "/"`,
 	} {
@@ -231,7 +231,7 @@ func TestPlaygroundAIExamplesCoverRunnableWorkflowShapes(t *testing.T) {
 		"ai-support-triage":    {"MOCK_TOOL_RESULT"},
 		"ai-draft-review":      {"draft:", "review:", "PASS"},
 		"ai-coding-agent":      {"attempts", "2 slugify cases passed", "tools\tsearch_repo,read_file,read_docs,run_tests,propose_file", "func slugify"},
-		"ai-evaluate-loop":     {"run leia evaluate"},
+		"ai-self-check-loop":   {"local classifier checks passed"},
 	}
 	for _, example := range playgroundAIExamples() {
 		t.Run(example.ID, func(t *testing.T) {
@@ -298,8 +298,10 @@ func TestPlaygroundTourExamplesProduceTeachingOutputs(t *testing.T) {
 			"fast count\t2",
 			"fast ids",
 		},
-		"evaluate": {
-			"run leia evaluate to execute the evaluate block",
+		"dialects": {
+			"leia\tdialect",
+			"true",
+			"Explain dialect",
 		},
 	}
 	for _, example := range playgroundTourLessons() {
@@ -342,7 +344,7 @@ func TestPlaygroundExecAIProfileUsesGLMEnv(t *testing.T) {
 
 	dir := t.TempDir()
 	path := dir + "/main.leia"
-	src := `result, err := turn { user: "Reply exactly: LEIA_GLM_OK", max_tokens: 16, temperature: 0 }
+	src := `result, err := llm.turn({ user: "Reply exactly: LEIA_GLM_OK", max_tokens: 16, temperature: 0 })
 if err != nil { print(err.message); return }
 print(result.text)`
 	if err := os.WriteFile(path, []byte(src), 0600); err != nil {
@@ -370,7 +372,7 @@ func TestPlaygroundExecGLMProfileAliasUsesAIProfile(t *testing.T) {
 
 	dir := t.TempDir()
 	path := dir + "/main.leia"
-	src := `result, err := turn { user: "Reply exactly: LEIA_GLM_OK", max_tokens: 16, temperature: 0 }
+	src := `result, err := llm.turn({ user: "Reply exactly: LEIA_GLM_OK", max_tokens: 16, temperature: 0 })
 if err != nil { print(err.message); return }
 print(result.text)`
 	if err := os.WriteFile(path, []byte(src), 0600); err != nil {

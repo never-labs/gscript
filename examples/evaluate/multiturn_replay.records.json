@@ -5,17 +5,17 @@
       "Messages": [
         {
           "Role": "system",
-          "Text": "Plan and then summarize Leia work."
+          "Text": "Plan and then summarize Leia replay work."
         },
         {
           "Role": "user",
-          "Text": "Create a short implementation plan for evaluate blocks."
+          "Text": "Create a short implementation plan for replay checks."
         }
       ]
     },
     "Result": {
       "Status": "final_answer",
-      "Text": "1. Parse evaluate blocks. 2. Execute assertions."
+      "Text": "1. Write ordinary checks. 2. Replay LLM turns."
     }
   },
   {
@@ -24,15 +24,15 @@
       "Messages": [
         {
           "Role": "system",
-          "Text": "Plan and then summarize Leia work."
+          "Text": "Plan and then summarize Leia replay work."
         },
         {
           "Role": "user",
-          "Text": "Create a short implementation plan for evaluate blocks."
+          "Text": "Create a short implementation plan for replay checks."
         },
         {
           "Role": "assistant",
-          "Text": "1. Parse evaluate blocks. 2. Execute assertions."
+          "Text": "1. Write ordinary checks. 2. Replay LLM turns."
         },
         {
           "Role": "user",
@@ -42,7 +42,7 @@
     },
     "Result": {
       "Status": "final_answer",
-      "Text": "Evaluate blocks now support deterministic regression replay."
+      "Text": "Leia checks now support deterministic replay."
     }
   }
 ]

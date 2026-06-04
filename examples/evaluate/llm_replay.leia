@@ -1,8 +1,10 @@
-evaluate "summarizes with replayed llm turn" {
-    result, err := llm.turn({
+func summarize_with_replay() {
+    return llm.turn({
         model: "mock-fast",
-        messages: {llm.user("Summarize Leia evaluate in five words.")},
+        messages: {llm.user("Summarize Leia replay checks in five words.")},
     })
-    assert(err == nil)
-    assert(result.text == "Deterministic evaluate blocks for agents.")
 }
+
+result, err := summarize_with_replay()
+assert(err == nil)
+assert(result.text == "Deterministic agent checks with replay.")

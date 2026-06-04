@@ -1,35 +1,47 @@
 // Agent-as-tool demo.
 //
 // This shows a supervisor agent delegating to a specialist agent that is
-// listed *directly* in the supervisor's tools: [...] list. The runtime
+// listed directly in the supervisor's tools list. The runtime
 // auto-wraps the agent value as a tool whose params/schema are derived from
 // the agent's declared parameters and output: shape; the agent's structured
 // result.value is fed back to the supervisor as the tool result.
 //
 // For the explicit `tool wrapper` form, see TestLLMAgentScenarioAgentAsToolStructuredHandoff.
 
-models {
+llm.register_models({
     default: "supervisor"
     supervisor: "mock-supervisor"
     extractor: "mock-extractor"
-}
+})
 
-agent extract_research(topic) {
-    model: "extractor"
-    system: "Extract a structured research handoff."
-    user: "Research " .. topic
-    output: {
-        summary: "short finding"
-        confidence: 1
+extract_research := llm.agent("extract_research", func(topic) {
+    return {
+        model: "extractor"
+        messages: {
+            llm.system("Extract a structured research handoff."),
+            llm.user("Research " .. topic),
+        }
+        output: {
+            summary: "short finding"
+            confidence: 1
+        }
     }
-}
+}, nil, {
+    params: {"topic"}
+    output: {summary: "short finding", confidence: 1}
+    description: "Extract a structured research handoff."
+})
 
-agent supervisor(question) {
-    model: "supervisor"
-    system: "Use delegated specialist agents as tools before answering."
-    user: question
-    tools: [extract_research]
-}
+supervisor := llm.agent("supervisor", func(question) {
+    return {
+        model: "supervisor"
+        messages: {
+            llm.system("Use delegated specialist agents as tools before answering."),
+            llm.user(question),
+        }
+        tools: {extract_research}
+    }
+}, nil, {params: {"question"}})
 
 result, err := supervisor("Should this workflow delegate research?")
 if err != nil {

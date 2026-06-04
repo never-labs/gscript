@@ -52,26 +52,26 @@ func TestCLILLMAnthropicCompatibleRequestsKeepPrompts(t *testing.T) {
 	defer server.Close()
 
 	source := `
-models {
-    default: "glm-smoke"
-    "glm-smoke": {
+llm.register_models({
+    default: "glm_smoke"
+    glm_smoke: {
         protocol: "anthropic_compatible"
         base_url: os.getenv("LEIA_GLM_BASE_URL")
         api_key: os.getenv("LEIA_GLM_API_KEY")
         provider_model: os.getenv("LEIA_GLM_MODEL")
     }
+})
+
+history := {
+    llm.system("You are a deterministic memory smoke-test assistant."),
+    llm.user("Store this memory: project codename is ORCHID and owner is ADA. Reply exactly: MEMORY_STORED"),
 }
 
-history := messages {
-    system: "You are a deterministic memory smoke-test assistant."
-    user: "Store this memory: project codename is ORCHID and owner is ADA. Reply exactly: MEMORY_STORED"
-}
-
-stored, err := turn {
+stored, err := llm.turn({
     messages: history
     max_tokens: 32
     temperature: 0
-}
+})
 if err != nil {
     return
 }
@@ -79,28 +79,30 @@ if err != nil {
 history[#history + 1] = msg.assistant(stored.text)
 history[#history + 1] = msg.user("Using only the stored memory, reply exactly: project=ORCHID;owner=ADA")
 
-recalled, err := turn {
+recalled, err := llm.turn({
     messages: history
     max_tokens: 48
     temperature: 0
-}
+})
 if err != nil {
     return
 }
 
-extractor := agent(summary) {
-    model: "glm-smoke"
-    system: "Return only compact JSON."
-    user: "Convert this memory recall into JSON. Recall: " .. summary
-    output: {
-        project: "ORCHID"
-        owner: "ADA"
-        remembered: true
-        meta: {source: "history"}
-    }
-    max_tokens: 96
-    temperature: 0
-}
+extractor := llm.agent("extractor", func(summary) {
+    return {
+        model: "glm_smoke"
+        system: "Return only compact JSON."
+        user: "Convert this memory recall into JSON. Recall: " .. summary
+        output: {
+            project: "ORCHID"
+            owner: "ADA"
+            remembered: true
+            meta: {source: "history"}
+        }
+        max_tokens: 96
+        temperature: 0
+    }, nil
+})
 
 extracted, err := extractor(recalled.text)
 project := extracted.value.project

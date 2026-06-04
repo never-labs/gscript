@@ -35,12 +35,12 @@ CHAPTERS = [
 LEIA_KEYWORDS = frozenset(
     """
     break case continue defer default else elseif fallthrough for go goto if
-    import in range return select switch chan const func tool var
+    import in range return select switch chan const func var
     """.split()
 )
 
 LEIA_CONTEXTUAL = frozenset(
-    "agent budget capabilities cap flow messages models turn".split()
+    "".split()
 )
 
 LEIA_CONSTANTS = frozenset("false nil true".split())

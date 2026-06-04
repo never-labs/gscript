@@ -5,28 +5,35 @@
 // return tool calls, but the flow must dispatch them and append tool evidence to
 // the history before making the next turn.
 
-//leia:requires docs.read
-//leia:param topic documentation topic
-tool lookup_doc(topic) {
+lookup_doc := llm.tool("lookup_doc", func(topic) {
     return "doc:" .. topic, nil
+}, {
+    params: {"topic"}
+    requires: {"docs.read"}
+    param_docs: {topic: "documentation topic"}
+})
+
+func manual_research_config(topic) {
+    return {
+        model: "mock-manual"
+        messages: {
+            llm.system("Use tool evidence before answering."),
+            llm.user("Find docs for " .. topic),
+        }
+        tools: {lookup_doc}
+        budget: {turns: 2, calls: 1, tokens: 512}
+    }
 }
 
-agent manual_research(topic) {
-    model: "mock-manual"
-    system: "Use tool evidence before answering."
-    tools: [lookup_doc]
-    budget: {turns: 2, calls: 1, tokens: 512}
-} flow {
-    history := messages {
-        system: system
-        user: "Find docs for " .. topic
-    }
+manual_research := llm.agent("manual_research", manual_research_config, func(topic) {
+    cfg := manual_research_config(topic)
+    history := cfg.messages
 
-    first, first_err := turn {
-        model: model
+    first, first_err := llm.turn({
+        model: cfg.model
         messages: history
-        tools: tools
-    }
+        tools: cfg.tools
+    })
     if first_err != nil {
         return nil, first_err
     }
@@ -36,7 +43,7 @@ agent manual_research(topic) {
     }
 
     call := first.calls[1]
-    evidence, dispatch_err := llm.dispatch(call, tools)
+    evidence, dispatch_err := llm.dispatch(call, cfg.tools)
     if dispatch_err != nil {
         history[#history + 1] = msg.assistant_call(call)
         history[#history + 1] = msg.tool_error(call.id, dispatch_err.message)
@@ -45,21 +52,25 @@ agent manual_research(topic) {
         history[#history + 1] = msg.tool_result(call.id, evidence)
     }
 
-    final, final_err := turn {
-        model: model
+    final, final_err := llm.turn({
+        model: cfg.model
         messages: history
-        tools: tools
+        tools: cfg.tools
         max_tokens: 128
-    }
+    })
     return {
         first_status: first.status,
         text: final.text,
         evidence: evidence,
         history_len: #history
     }, final_err
-}
+}, {params: {"topic"}})
 
 manual, manual_err := manual_research("agent history")
+if manual_err != nil {
+    print(manual_err.message)
+    return
+}
 manual_text := manual.text
 manual_evidence := manual.evidence
 manual_history_len := manual.history_len

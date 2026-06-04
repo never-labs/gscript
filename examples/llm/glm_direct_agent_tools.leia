@@ -10,40 +10,50 @@
 
 func env_first(a, b, c, fallback) {
     v := os.getenv(a)
-    if v != "" {
+    if v != nil && v != "" {
         return v
     }
     v = os.getenv(b)
-    if v != "" {
+    if v != nil && v != "" {
         return v
     }
     v = os.getenv(c)
-    if v != "" {
+    if v != nil && v != "" {
         return v
     }
     return fallback
 }
 
-models {
-    default: "glm-smoke"
-    "glm-smoke": {
+llm.register_models({
+    default: "glm-smoke",
+    ["glm-smoke"]: {
         provider: "glm"
         protocol: "anthropic_compatible"
         base_url: env_first("LEIA_GLM_BASE_URL", "ANTHROPIC_BASE_URL", "", "https://open.bigmodel.cn/api/anthropic")
         api_key: env_first("LEIA_GLM_API_KEY", "SENTINEL_GLM_API_KEY", "GLM_API_KEY", "")
         provider_model: env_first("LEIA_GLM_MODEL", "GLM_MODEL", "ANTHROPIC_MODEL", "glm-5.1")
     }
+})
+
+glm_api_key := env_first("LEIA_GLM_API_KEY", "SENTINEL_GLM_API_KEY", "GLM_API_KEY", "")
+if glm_api_key == nil || glm_api_key == "" {
+    print("set LEIA_GLM_API_KEY, SENTINEL_GLM_API_KEY, or GLM_API_KEY to run this GLM example")
+    return
 }
 
-agent extract_memory(note) {
-    model: "glm-smoke"
-    output: {
-        project: "ORCHID"
-        owner: "ADA"
-        remembered: true
-        source: "direct-agent-tool"
+func extract_memory_config(note) {
+    return {
+        model: "glm-smoke"
+        output: {
+            project: "ORCHID"
+            owner: "ADA"
+            remembered: true
+            source: "direct-agent-tool"
+        }
     }
-} flow {
+}
+
+extract_memory := llm.agent("extract_memory", extract_memory_config, func(note) {
     lower := string.lower(note)
     if string.find(lower, "orchid") == nil || string.find(lower, "ada") == nil {
         return nil, {kind: "validation", message: "memory note missing ORCHID or ADA"}
@@ -54,17 +64,24 @@ agent extract_memory(note) {
         remembered: true
         source: "direct-agent-tool"
     }, nil
-}
+}, {
+    params: {"note"}
+    output: {project: "ORCHID", owner: "ADA", remembered: true, source: "direct-agent-tool"}
+})
 
-agent supervisor(question) {
-    model: "glm-smoke"
-    system: "You are testing tool use. You must call extract_memory exactly once before answering. After the tool result, answer in one short sentence that includes DIRECT_AGENT_TOOL_OK."
-    user: question
-    tools: [extract_memory]
-    max_steps: 4
-    max_tokens: 128
-    temperature: 0
-}
+supervisor := llm.agent("supervisor", func(question) {
+    return {
+        model: "glm-smoke"
+        messages: {
+            llm.system("You are testing tool use. You must call extract_memory exactly once before answering. After the tool result, answer in one short sentence that includes DIRECT_AGENT_TOOL_OK."),
+            llm.user(question),
+        }
+        tools: {extract_memory}
+        max_steps: 4
+        max_tokens: 128
+        temperature: 0
+    }
+}, nil, {params: {"question"}})
 
 result, err := supervisor("Use the extract_memory tool with this note: project codename is ORCHID and owner is ADA. Do not answer from memory; call the tool first.")
 if err != nil {

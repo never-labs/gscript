@@ -98,6 +98,7 @@ const (
 	TOKEN_SEMICOLON // ;
 	TOKEN_DOT       // .
 	TOKEN_COLON     // :
+	TOKEN_DOLLAR    // $
 )
 
 var tokenNames = map[TokenType]string{
@@ -179,6 +180,7 @@ var tokenNames = map[TokenType]string{
 	TOKEN_SEMICOLON: "SEMICOLON",
 	TOKEN_DOT:       "DOT",
 	TOKEN_COLON:     "COLON",
+	TOKEN_DOLLAR:    "DOLLAR",
 }
 
 // String returns a human-readable name for the token type.

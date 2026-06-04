@@ -1,58 +1,62 @@
-// Minimal LLM and agent syntax sample.
+// Minimal LLM stdlib agent sample.
 //
-// This file demonstrates parser/tooling support for the LLM surface:
-// models, agent defaults, tool declarations, agents, messages, turns, and
-// budget blocks. Running it requires the LLM stdlib with a host/provider
-// configuration; `leia fmt` and `leia lint` can validate it without
-// contacting a provider.
+// This file demonstrates the table/function-shaped LLM surface:
+// model registration, llm.agent_defaults, tool descriptors, reusable agents,
+// message tables, turns, and budget wrappers. Running it requires the LLM
+// stdlib with a host/provider configuration.
 
-models {
+llm.register_models({
     default: "demo"
     demo: {
         provider_model: "mock-demo"
     }
-}
+})
 
 // lookup searches local documentation.
-//leia:requires docs.read
-//leia:param query natural-language search query
-tool lookup(query) {
+lookup := llm.tool("lookup", func(query) {
     return "doc:" .. query, nil
-}
+}, {
+    params: {"query"}
+    requires: {"docs.read"}
+    param_docs: {query: "natural-language search query"}
+})
 
-agent defaults {
+llm.agent_defaults({
     model: "demo"
-    tools: [lookup]
+    tools: {lookup}
     budget: {turns: 4, calls: 4, tokens: 2000, time: 30}
+})
+
+answer := llm.agent("answer", func(question) {
+    return {
+        messages: {
+            llm.system("Use local documentation when useful."),
+            llm.user(question),
+        }
+        tools: {lookup}
+    }
+}, nil, {params: {"question"}})
+
+func review_config(question) {
+    return {
+        messages: {
+            llm.system("Return a short answer."),
+            llm.user(question),
+        }
+    }
 }
 
-agent answer(question) {
-    system: "Use local documentation when useful."
-    user: question
-    tools: [lookup]
-}
-
-agent review(question) {
-    system: "Return a short answer."
-    user: question
-} flow {
-    history := messages {
-        system: system
-        user: question
-    }
-    result, err := turn {
-        model: model
-        messages: history
-        tools: tools
-    }
+review := llm.agent("review", review_config, func(question) {
+    cfg := review_config(question)
+    result, err := llm.turn(cfg)
     return result, err
-}
+}, {params: {"question"}})
 
-budget { turns: 2 } {
+llm.with_budget({turns: 2}, func() {
     result, err := answer("What is Leia?")
     if err != nil {
         print(err.message)
         return
     }
     print(result.text)
-}
+})

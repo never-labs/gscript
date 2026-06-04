@@ -34,18 +34,27 @@ func TestLLMAgentScenarioAgentAsToolStructuredHandoff(t *testing.T) {
 			vm := leia.New(llmScenarioOptions(provider, tc.opts...)...)
 
 			if err := vm.Exec(`
-agent extract_research(topic) {
-    model: "mock-extractor"
-    system: "Extract a structured research handoff."
-    user: "Research " .. topic
+func extract_research_config(topic) {
+    return {
+        model: "mock-extractor"
+        system: "Extract a structured research handoff."
+        user: "Research " .. topic
+        output: {
+            summary: "short finding"
+            confidence: 1
+        }
+    }, nil
+}
+
+extract_research := llm.agent("extract_research", extract_research_config, nil, {
+    params: {"topic"}
     output: {
         summary: "short finding"
         confidence: 1
     }
-}
+})
 
-//leia:requires none
-tool delegate_research(topic) {
+func delegate_research_fn(topic) {
     result, err := extract_research(topic)
     if err != nil {
         return nil, err
@@ -57,25 +66,44 @@ tool delegate_research(topic) {
     }, nil
 }
 
-agent supervisor(question) {
+delegate_research := llm.tool("delegate_research", delegate_research_fn, {params: {"topic"}, requires: {"none"}})
+
+result, err := llm.run_agent({
     model: "mock-supervisor"
     system: "Use delegated specialist agents as tools before answering."
-    user: question
-    tools: [delegate_research]
+    user: "Should this workflow delegate research?"
+    tools: {delegate_research}
+})
+err_kind := nil
+err_message := nil
+final_text := nil
+outer_history_len := nil
+tool_summary := nil
+tool_topic := nil
+tool_confidence := nil
+if err != nil {
+    err_kind = err.kind
+    err_message = err.message
+} else {
+    final_text = result.text
+    outer_history_len = #result.history
+    tool_summary = result.history[4].value.summary
+    tool_topic = result.history[4].value.topic
+    tool_confidence = result.history[4].value.confidence
 }
-
-result, err := supervisor("Should this workflow delegate research?")
-final_text := result.text
-outer_history_len := #result.history
-tool_summary := result.history[4].value.summary
-tool_topic := result.history[4].value.topic
-tool_confidence := result.history[4].value.confidence
 `); err != nil {
 				t.Fatalf("Exec: %v", err)
 			}
+			if errKind, _ := vm.Get("err_kind"); errKind != nil {
+				errMessage, _ := vm.Get("err_message")
+				t.Fatalf("agent error kind=%#v message=%#v", errKind, errMessage)
+			}
 
 			if len(provider.requests) != 3 {
-				t.Fatalf("requests = %d, want 3", len(provider.requests))
+				finalText, finalErr := vm.Get("final_text")
+				errKind, errKindErr := vm.Get("err_kind")
+				errMessage, _ := vm.Get("err_message")
+				t.Fatalf("requests = %d, want 3; final_text=%#v final_err=%v err_kind=%#v err_kind_err=%v err_message=%#v", len(provider.requests), finalText, finalErr, errKind, errKindErr, errMessage)
 			}
 			first := provider.requests[0]
 			if first.Model != "mock-supervisor" || len(first.Tools) != 1 || first.Tools[0].Name != "delegate_research" {
@@ -167,36 +195,58 @@ func TestLLMAgentScenarioToolofRuntimeAgentAsTool(t *testing.T) {
 			vm := leia.New(llmScenarioOptions(provider, tc.opts...)...)
 
 			if err := vm.Exec(`
-agent extract_research(topic) {
-    model: "mock-extractor"
-    system: "Return structured research."
-    user: "Research " .. topic
+func extract_research_config(topic) {
+    return {
+        model: "mock-extractor"
+        system: "Return structured research."
+        user: "Research " .. topic
+        output: {
+            summary: "short finding"
+            confidence: 1
+        }
+    }, nil
+}
+
+extract_research := llm.agent("extract_research", extract_research_config, nil, {
+    params: {"topic"}
     output: {
         summary: "short finding"
         confidence: 1
     }
-}
+})
 
 delegate_research := llm.toolof(extract_research, {
     name: "delegate_research"
     description: "Delegate research to a specialist agent."
-    requires: ["none"]
+    requires: {"none"}
 })
-top_level_delegate := toolof(extract_research, {name: "top_level_delegate"})
+delegate_research.output = {
+    summary: "short finding"
+    confidence: 1
+}
+top_level_delegate := llm.toolof(extract_research, {name: "top_level_delegate"})
 alias_delegate := llm.agent_as_tool(extract_research, {name: "alias_delegate"})
-runtime_tools := [delegate_research]
+runtime_tools := {delegate_research}
 
-agent supervisor(question) {
+result, err := llm.run_agent({
     model: "mock-supervisor"
     system: "Use the specialist."
-    user: question
+    user: "Check delegation."
     tools: runtime_tools
+})
+err_kind := nil
+err_message := nil
+final_text := nil
+tool_summary := nil
+tool_confidence := nil
+if err != nil {
+    err_kind = err.kind
+    err_message = err.message
+} else {
+    final_text = result.text
+    tool_summary = result.history[4].value.summary
+    tool_confidence = result.history[4].value.confidence
 }
-
-result, err := supervisor("Check delegation.")
-final_text := result.text
-tool_summary := result.history[4].value.summary
-tool_confidence := result.history[4].value.confidence
 delegate_param := delegate_research.params[1]
 delegate_output_summary := delegate_research.output.summary
 delegate_output_confidence := delegate_research.output.confidence
@@ -205,9 +255,16 @@ alias_name := alias_delegate.name
 `); err != nil {
 				t.Fatalf("Exec: %v", err)
 			}
+			if errKind, _ := vm.Get("err_kind"); errKind != nil {
+				errMessage, _ := vm.Get("err_message")
+				t.Fatalf("agent error kind=%#v message=%#v", errKind, errMessage)
+			}
 
 			if len(provider.requests) != 3 {
-				t.Fatalf("requests = %d, want 3", len(provider.requests))
+				finalText, finalErr := vm.Get("final_text")
+				errKind, errKindErr := vm.Get("err_kind")
+				errMessage, _ := vm.Get("err_message")
+				t.Fatalf("requests = %d, want 3; final_text=%#v final_err=%v err_kind=%#v err_kind_err=%v err_message=%#v", len(provider.requests), finalText, finalErr, errKind, errKindErr, errMessage)
 			}
 			first := provider.requests[0]
 			if first.Model != "mock-supervisor" || len(first.Tools) != 1 {
@@ -284,33 +341,58 @@ func TestLLMAgentScenarioDirectAgentInToolsList(t *testing.T) {
 			vm := leia.New(llmScenarioOptions(provider, tc.opts...)...)
 
 			if err := vm.Exec(`
-agent extract_research(topic) {
-    model: "mock-extractor"
-    system: "Return structured research."
-    user: "Research " .. topic
+func extract_research_config(topic) {
+    return {
+        model: "mock-extractor"
+        system: "Return structured research."
+        user: "Research " .. topic
+        output: {
+            summary: "short finding"
+            confidence: 1
+        }
+    }, nil
+}
+
+extract_research := llm.agent("extract_research", extract_research_config, nil, {
+    params: {"topic"}
     output: {
         summary: "short finding"
         confidence: 1
     }
-}
+})
 
-agent supervisor(question) {
+result, err := llm.run_agent({
     model: "mock-supervisor"
     system: "Use the specialist."
-    user: question
-    tools: [extract_research]
+    user: "Check direct delegation."
+    tools: {extract_research}
+})
+err_kind := nil
+err_message := nil
+final_text := nil
+tool_summary := nil
+tool_confidence := nil
+if err != nil {
+    err_kind = err.kind
+    err_message = err.message
+} else {
+    final_text = result.text
+    tool_summary = result.history[4].value.summary
+    tool_confidence = result.history[4].value.confidence
 }
-
-result, err := supervisor("Check direct delegation.")
-final_text := result.text
-tool_summary := result.history[4].value.summary
-tool_confidence := result.history[4].value.confidence
 `); err != nil {
 				t.Fatalf("Exec: %v", err)
 			}
+			if errKind, _ := vm.Get("err_kind"); errKind != nil {
+				errMessage, _ := vm.Get("err_message")
+				t.Fatalf("agent error kind=%#v message=%#v", errKind, errMessage)
+			}
 
 			if len(provider.requests) != 3 {
-				t.Fatalf("requests = %d, want 3", len(provider.requests))
+				finalText, finalErr := vm.Get("final_text")
+				errKind, errKindErr := vm.Get("err_kind")
+				errMessage, _ := vm.Get("err_message")
+				t.Fatalf("requests = %d, want 3; final_text=%#v final_err=%v err_kind=%#v err_kind_err=%v err_message=%#v", len(provider.requests), finalText, finalErr, errKind, errKindErr, errMessage)
 			}
 			first := provider.requests[0]
 			if first.Model != "mock-supervisor" || len(first.Tools) != 1 {
