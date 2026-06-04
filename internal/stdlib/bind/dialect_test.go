@@ -14,8 +14,8 @@ func TestDialectTagsExposeInstalledHandlers(t *testing.T) {
 
 	got := stringSetFromArray(interp.GetGlobal("tags").Table())
 	want := []string{
-		"base32", "base64", "cmd", "cookie", "cookies", "csv", "duration", "env", "glob",
-		"hash", "headers", "hex", "html_escape", "http_headers", "httpmsg", "ini", "json", "jsonl",
+		"base32", "base64", "cidr", "cmd", "cookie", "cookies", "csv", "duration", "env", "glob",
+		"hash", "headers", "hex", "hostport", "html_escape", "http_headers", "httpmsg", "ini", "ipaddr", "json", "jsonl",
 		"junit", "kv", "lines", "mdtable", "mime", "numbers", "nums", "path", "prompt",
 		"quote", "re", "regexp", "semver", "sh", "shellwords", "split", "tap", "template", "tsv", "url",
 		"urlpath", "urlquery", "words", "xml",

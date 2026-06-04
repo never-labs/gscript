@@ -168,6 +168,7 @@ func TestBuiltinDialectRegistryStaysModular(t *testing.T) {
 		"registerDialectShellFS",
 		"registerDialectText",
 		"registerDialectWeb",
+		"registerDialectNetwork",
 		"registerDialectData",
 		"registerDialectAI",
 	}
@@ -175,6 +176,7 @@ func TestBuiltinDialectRegistryStaysModular(t *testing.T) {
 		"dialect_shell_fs.go": {"sh", "cmd", "shellwords", "glob", "path"},
 		"dialect_text.go":     {"re", "regexp", "json", "jsonl", "csv", "tsv", "mdtable", "lines", "split", "words", "nums", "numbers", "kv", "env", "ini", "semver", "duration", "tap", "junit", "xml", "template"},
 		"dialect_web.go":      {"url", "html_escape", "urlquery", "urlpath", "mime", "headers", "http_headers", "cookie", "cookies", "httpmsg"},
+		"dialect_network.go":  {"ipaddr", "cidr", "hostport"},
 		"dialect_data.go":     {"base64", "hash", "hex", "base32"},
 		"dialect_ai.go":       {"prompt", "quote"},
 	}
@@ -193,6 +195,7 @@ func TestBuiltinDialectRegistryStaysModular(t *testing.T) {
 		"dialect_web.go": {
 			"github.com/never-labs/leia/internal/support/dialect",
 		},
+		"dialect_network.go": nil,
 		"dialect_data.go": {
 			"github.com/never-labs/leia/internal/stdlib/lib/base64",
 			"github.com/never-labs/leia/internal/stdlib/lib/encoding",
@@ -489,6 +492,8 @@ func expectedDialectFileForFunc(funcName string) string {
 		return "dialect_text.go"
 	case "registerDialectWeb":
 		return "dialect_web.go"
+	case "registerDialectNetwork":
+		return "dialect_network.go"
 	case "registerDialectData":
 		return "dialect_data.go"
 	case "registerDialectAI":

@@ -252,6 +252,9 @@ func TestPureDialectSyntaxExecutesThroughStdlib(t *testing.T) {
 				"encoded := json {x: 8, label: \"ok\"}\n" +
 				"cleaned_path := path`a//b/../c`\n" +
 				"parsed_url := url`https://example.com:8443/a/b?q=one&tag=two#frag`\n" +
+				"parsed_ip := ipaddr`10.2.3.4`\n" +
+				"parsed_net := cidr`10.2.0.0/16`\n" +
+				"parsed_hostport := hostport`127.0.0.1:8080`\n" +
 				"base64_text := base64`Hello ${name}`\n" +
 				"base64_decoded := dialect.eval(\"base64\", base64_text, {mode: \"decode\"})\n" +
 				"raw_line_rows := lines`one\\nnot split`\n" +
@@ -273,6 +276,9 @@ func TestPureDialectSyntaxExecutesThroughStdlib(t *testing.T) {
 				"url_port := parsed_url.port\n" +
 				"url_query_q := parsed_url.query.q\n" +
 				"url_query_tag := parsed_url.query.tag\n" +
+				"ip_private := parsed_ip.private\n" +
+				"net_bits := parsed_net.bits\n" +
+				"hp_port := parsed_hostport.port\n" +
 				"prompt_text := msg.text\n" +
 				"raw_line_count := #raw_line_rows\n" +
 				"raw_line_first := raw_line_rows[1]\n" +
@@ -292,6 +298,9 @@ func TestPureDialectSyntaxExecutesThroughStdlib(t *testing.T) {
 			assertGet(t, vm, "url_port", "8443")
 			assertGet(t, vm, "url_query_q", "one")
 			assertGet(t, vm, "url_query_tag", "two")
+			assertGet(t, vm, "ip_private", true)
+			assertGet(t, vm, "net_bits", int64(16))
+			assertGet(t, vm, "hp_port", "8080")
 			assertGet(t, vm, "base64_text", "SGVsbG8gbGVpYQ==")
 			assertGet(t, vm, "base64_decoded", "Hello leia")
 			assertGet(t, vm, "raw_line_count", int64(1))

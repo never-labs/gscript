@@ -1,0 +1,24 @@
+print("=== Dialects: network protocols ===")
+
+client := ipaddr`10.2.3.4`
+office := cidr`10.2.0.7/16`
+inside := dialect.eval("cidr", office.cidr, {ip: client.ip})
+outside := dialect.eval("ipaddr", "10.3.3.4", {cidr: office.cidr})
+listener := hostport`[2001:db8::1]:443`
+joined := dialect.eval("hostport", {host: listener.host, port: listener.port}, {mode: "encode"})
+
+print("client:", client.ip, "v", client.version, "private", client.private)
+print("office:", office.masked, "bits", office.bits)
+print("contains:", inside.contains, outside.contains)
+print("listener:", listener.host, listener.port, joined)
+
+assert(client.version == 4)
+assert(client.private)
+assert(office.masked == "10.2.0.0/16")
+assert(inside.contains)
+assert(!outside.contains)
+assert(listener.host == "2001:db8::1")
+assert(listener.port == "443")
+assert(joined == "[2001:db8::1]:443")
+
+print("network protocol dialects ok")

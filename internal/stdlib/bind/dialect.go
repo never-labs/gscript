@@ -11,7 +11,7 @@ import (
 // sh`...`, cmd`...`, shellwords`...`, glob`...`, json`...`, prompt`...`,
 // quote { ... }, and small safe data transforms such as path`...`, url`...`, words`...`, nums`...`,
 // mdtable`...`, kv`...`, env`...`, jsonl`...`, semver`...`, html_escape`...`, urlquery`...`, mime`...`,
-// urlpath`...`, duration`...`, tap`...`, junit`...`, base64`...`, and hash`...`.
+// urlpath`...`, duration`...`, tap`...`, junit`...`, ipaddr`...`, cidr`...`, base64`...`, and hash`...`.
 func BuildDialect(opts HostOptions, maxHostResult func() int64, specs ...DialectSpec) *Table {
 	t := markStdlibBoundModule(NewTable())
 
@@ -25,6 +25,7 @@ func BuildDialect(opts HostOptions, maxHostResult func() int64, specs ...Dialect
 	registerDialectShellFS(register, opts, maxHostResult)
 	registerDialectText(register, maxHostResult)
 	registerDialectWeb(register)
+	registerDialectNetwork(register)
 	registerDialectData(register, maxHostResult)
 	registerDialectAI(register)
 	for _, spec := range specs {
@@ -251,6 +252,8 @@ func builtinDialectCategory(name string) string {
 		return "text"
 	case "url", "html_escape", "urlquery", "urlpath", "mime", "headers", "http_headers", "httpmsg", "cookie", "cookies":
 		return "web"
+	case "ipaddr", "cidr", "hostport":
+		return "network"
 	case "base64", "hash", "hex", "base32":
 		return "data"
 	case "prompt", "quote":
