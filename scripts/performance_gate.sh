@@ -53,6 +53,10 @@ SYNTAX_SMOKE_BENCHES=(
     "data/soa_affine_many"
 )
 
+SYNTAX_DIALECT_SMOKE_BENCHES=(
+    "app/dialect_syntax_smoke"
+)
+
 STRICT_SMOKE_BENCHES=(
     "control/sieve"
     "string/string_bench"
@@ -97,7 +101,7 @@ Usage: bash scripts/performance_gate.sh [options]
 
 Options:
   --smoke                 Run a short two-benchmark gate.
-  --syntax-smoke          Run a fast grammar-change hot-path gate without strict pass by default.
+  --syntax-smoke          Run a fast grammar-change hot-path gate plus Leia-only dialect truth smoke.
   --phase-smoke           Run stage-end correctness + performance smoke.
   --quick-phase-smoke     Run an explicit fast phase smoke for local iteration.
   --feature-smoke         Run hot-path smoke coverage for newer language features.
@@ -137,7 +141,7 @@ while [ "$#" -gt 0 ]; do
             MIN_SAMPLE_SECONDS=0.020
             MAX_REPEAT=16
             MIN_WALL_REPEAT=4
-            STRICT=0
+            STRICT=1
             ;;
         --phase-smoke)
             PROFILE="phase_smoke"
@@ -583,7 +587,7 @@ if [ "$STRICT" -eq 1 ]; then
                 STRICT_CMD+=(--bench "$bench")
             done
         elif [ "$PROFILE" = "syntax_smoke" ]; then
-            for bench in "${SYNTAX_SMOKE_BENCHES[@]}"; do
+            for bench in "${SYNTAX_DIALECT_SMOKE_BENCHES[@]}"; do
                 STRICT_CMD+=(--bench "$bench")
             done
         elif [ "$PROFILE" = "phase_smoke" ] || [ "$PROFILE" = "quick_phase_smoke" ]; then

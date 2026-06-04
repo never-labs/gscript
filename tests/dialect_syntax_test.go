@@ -243,6 +243,12 @@ func TestStdlibDataDialectsExecuteThroughStdlib(t *testing.T) {
 				"urlquery_rows := urlquery`q=hello+world&page=2&tag=a&tag=b`\n" +
 				"mime_type := mime`text/html; charset=utf-8; boundary=\"abc def\"`\n" +
 				"mime_encoded := mime {type: \"application/json\", params: {charset: \"utf-8\", version: 2}}\n" +
+				"header_rows := dialect.eval(\"headers\", \"content-type: text/plain\\r\\nset-cookie: a=1\\r\\nset-cookie: b=2\\r\\n\")\n" +
+				"header_to_encode := {}\n" +
+				"header_to_encode[\"x-trace\"] = \"abc\"\n" +
+				"header_encoded := dialect.eval(\"http_headers\", header_to_encode, {mode: \"encode\"})\n" +
+				"cookie_rows := cookie`session=abc123; tag=a; tag=b`\n" +
+				"cookie_encoded := dialect.eval(\"cookies\", {session: \"abc123\", tag: {\"a\", \"b\"}}, {mode: \"encode\"})\n" +
 				"template_text := template`Hello static`\n" +
 				"template_cfg := template { text: \"Score {{.score}}\", data: {score: \"42\"} }\n" +
 				"template_eval := dialect.eval(\"template\", \"Hi {{.name}}\", {data: {name: name}})\n" +
@@ -284,6 +290,10 @@ func TestStdlibDataDialectsExecuteThroughStdlib(t *testing.T) {
 			src += "mime_type_value := mime_type.type\n" +
 				"mime_charset := mime_type.params.charset\n" +
 				"mime_boundary := mime_type.params.boundary\n" +
+				"header_content_type := header_rows[\"Content-Type\"]\n" +
+				"header_second_cookie := header_rows[\"Set-Cookie\"][2]\n" +
+				"cookie_session := cookie_rows.session\n" +
+				"cookie_second_tag := cookie_rows.tag[2]\n" +
 				"bad_json_is_nil := bad_json == nil\n" +
 				"bad_jsonl_is_nil := bad_jsonl == nil\n" +
 				"jsonl_first_name := jsonl_rows[1].name\n" +
@@ -334,6 +344,12 @@ func TestStdlibDataDialectsExecuteThroughStdlib(t *testing.T) {
 			assertGet(t, vm, "mime_charset", "utf-8")
 			assertGet(t, vm, "mime_boundary", "abc def")
 			assertGet(t, vm, "mime_encoded", "application/json; charset=utf-8; version=2")
+			assertGet(t, vm, "header_content_type", "text/plain")
+			assertGet(t, vm, "header_second_cookie", "b=2")
+			assertGet(t, vm, "header_encoded", "X-Trace: abc\r\n")
+			assertGet(t, vm, "cookie_session", "abc123")
+			assertGet(t, vm, "cookie_second_tag", "b")
+			assertGet(t, vm, "cookie_encoded", "session=abc123; tag=a; tag=b")
 			assertGet(t, vm, "template_text", "Hello static")
 			assertGet(t, vm, "template_cfg", "Score 42")
 			assertGet(t, vm, "template_eval", "Hi Leia")

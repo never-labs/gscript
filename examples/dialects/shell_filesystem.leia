@@ -37,11 +37,12 @@ print("cmd stdout:", cmd_result.text)
 print("cmd ok:", cmd_result.ok, "code:", cmd_result.code)
 
 // glob expands a pattern under the configured filesystem root.
-matches := glob`examples/dialects/*.leia`
+entry := process.entry()
+matches := dialect.eval("glob", path.join(entry.dir, "*.leia"))
 found_shell_filesystem := false
 print("glob matches:", #matches)
 for i := 1; i <= #matches; i++ {
-    if matches[i] == "examples/dialects/shell_filesystem.leia" {
+    if path.base(matches[i]) == "shell_filesystem.leia" {
         found_shell_filesystem = true
     }
     print("  match[" .. i .. "]:", matches[i])

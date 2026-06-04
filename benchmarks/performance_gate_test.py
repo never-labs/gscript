@@ -70,6 +70,10 @@ class PerformanceGateValidationTest(unittest.TestCase):
         self.assertEqual(proc.returncode, 0, proc.stdout)
         self.assertIn("Performance gate passed.", proc.stdout)
 
+    def test_syntax_smoke_includes_dialect_guard(self):
+        gate = SCRIPT.read_text()
+        self.assertIn('"app/dialect_syntax_smoke"', gate)
+
     def test_help_documents_syntax_smoke_profile(self):
         proc = subprocess.run(
             ["bash", str(SCRIPT), "--help"],

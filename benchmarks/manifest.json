@@ -1,6 +1,6 @@
 {
   "schema_version": 3,
-  "case_count": 68,
+  "case_count": 69,
   "cases": [
     {
       "id": "app/actors_dispatch_mutation",
@@ -11,6 +11,18 @@
         "kind": "lua",
         "path": "benchmarks/lua_ref/app/actors_dispatch_mutation.lua"
       },
+      "status": "active",
+      "tags": [
+        "app",
+        "benchmark"
+      ]
+    },
+    {
+      "id": "app/dialect_syntax_smoke",
+      "path": "benchmarks/app/dialect_syntax_smoke.leia",
+      "domain": "app",
+      "kind": "benchmark",
+      "reference": null,
       "status": "active",
       "tags": [
         "app",
@@ -2125,6 +2137,21 @@
         "kind": "lua",
         "path": "benchmarks/lua_ref/app/actors_dispatch_mutation.lua"
       },
+      "params": {},
+      "recommended_scale": {
+        "hot": {}
+      },
+      "time_source_hint": "script_time_line",
+      "tags": [
+        "app"
+      ]
+    },
+    {
+      "id": "app/dialect_syntax_smoke",
+      "domain": "app",
+      "name": "dialect_syntax_smoke",
+      "script": "benchmarks/app/dialect_syntax_smoke.leia",
+      "comparison_reference": null,
       "params": {},
       "recommended_scale": {
         "hot": {}

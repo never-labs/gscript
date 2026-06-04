@@ -233,7 +233,7 @@ func TestPlaygroundRepositoryHostCapabilityExampleIsManualRunOnly(t *testing.T) 
 		if example.Requires != "process shell and filesystem host access" {
 			t.Fatalf("requires = %q", example.Requires)
 		}
-		for _, want := range []string{"$`printf", "cmd`printf", "glob`examples/dialects/*.leia`", "path`examples/dialects/../dialects/./shell_filesystem.leia`"} {
+		for _, want := range []string{"$`printf", "cmd`printf", `dialect.eval("glob"`, "path.join(entry.dir", "path`examples/dialects/../dialects/./shell_filesystem.leia`"} {
 			if !strings.Contains(example.Source, want) {
 				t.Fatalf("source missing %q\nsource:\n%s", want, example.Source)
 			}

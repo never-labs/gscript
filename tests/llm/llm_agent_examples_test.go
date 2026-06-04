@@ -109,6 +109,68 @@ func TestLLMAgentScenarioIncidentResponseExampleSmoke(t *testing.T) {
 	}
 }
 
+func TestLLMAgentExampleSmoke(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []leia.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			provider := &mockLLMProvider{results: []llm.TurnResult{
+				{
+					Status: "tool_calls",
+					Calls: []llm.ToolCall{{
+						ID:   "call_lookup_1",
+						Tool: "lookup",
+						Args: map[string]any{"query": "Leia"},
+					}},
+				},
+				{Status: "final_answer", Text: "Leia is documented locally."},
+			}}
+			vm := leia.New(llmScenarioOptions(provider, tc.opts...)...)
+
+			if err := vm.ExecFile(filepath.Join(repoRoot(t), "examples", "llm", "agent.leia")); err != nil {
+				t.Fatalf("ExecFile: %v", err)
+			}
+
+			if len(provider.requests) != 2 {
+				t.Fatalf("requests = %d, want 2", len(provider.requests))
+			}
+			first := provider.requests[0]
+			if first.Model != "mock-demo" || len(first.Tools) != 1 || first.Tools[0].Name != "lookup" {
+				t.Fatalf("first request = %#v", first)
+			}
+			if len(first.Tools[0].Requires) != 1 || first.Tools[0].Requires[0] != "docs.read" {
+				t.Fatalf("first tool metadata = %#v", first.Tools[0])
+			}
+			if len(first.Messages) != 2 ||
+				first.Messages[0].Role != "system" ||
+				first.Messages[0].Text != "Use local documentation when useful." ||
+				first.Messages[1].Role != "user" ||
+				first.Messages[1].Text != "What is Leia?" {
+				t.Fatalf("first messages = %#v", first.Messages)
+			}
+
+			final := provider.requests[1]
+			if final.Model != "mock-demo" || len(final.Tools) != 1 || final.Tools[0].Name != "lookup" {
+				t.Fatalf("final request = %#v", final)
+			}
+			if len(final.Messages) != 4 ||
+				final.Messages[2].Role != "assistant" ||
+				final.Messages[2].ToolCall == nil ||
+				final.Messages[2].ToolCall.ID != "call_lookup_1" ||
+				final.Messages[2].ToolCall.Tool != "lookup" ||
+				final.Messages[3].Role != "tool" ||
+				final.Messages[3].ToolUseID != "call_lookup_1" ||
+				final.Messages[3].Value != "doc:Leia" {
+				t.Fatalf("final messages = %#v", final.Messages)
+			}
+		})
+	}
+}
+
 func TestLLMAgentScenarioManualToolHistoryExampleSmoke(t *testing.T) {
 	for _, tc := range []struct {
 		name string

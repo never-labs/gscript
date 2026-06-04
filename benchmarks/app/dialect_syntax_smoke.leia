@@ -1,0 +1,50 @@
+// Tiny syntax/dialect smoke benchmark for tagged web dialect forms.
+
+N := 2500
+MOD := 1000000007
+
+func mix(sum, v) {
+    return (sum * 131 + v) % MOD
+}
+
+func checksum_text(sum, s) {
+    acc := sum
+    for i := 1; i <= #s; i++ {
+        acc = mix(acc, string.byte(s, i))
+    }
+    return acc
+}
+
+func run_hot(n) {
+    checksum := 0
+    headerRows := headers`content-type: text/plain
+set-cookie: a=1
+set-cookie: b=2
+`
+    cookieRows := cookie`session=abc123; tag=a; tag=b`
+    for i := 1; i <= n; i++ {
+        trace := string.format("trace-%04d", i % 997)
+        headerToEncode := {}
+        headerToEncode["x-trace"] = trace
+        headerEncoded := dialect.eval("http_headers", headerToEncode, {mode: "encode"})
+
+        cookieEncoded := dialect.eval("cookies", {session: trace, tag: {"a", "b"}}, {mode: "encode"})
+
+        checksum = checksum_text(checksum, headerRows["Content-Type"])
+        checksum = checksum_text(checksum, headerRows["Set-Cookie"][2])
+        checksum = checksum_text(checksum, headerEncoded)
+        checksum = checksum_text(checksum, cookieRows.session)
+        checksum = checksum_text(checksum, cookieRows.tag[2])
+        checksum = checksum_text(checksum, cookieEncoded)
+        checksum = mix(checksum, #trace + i % 13)
+    }
+    return checksum
+}
+
+t0 := time.now()
+checksum := run_hot(N)
+elapsed := time.since(t0)
+
+print(string.format("dialect_syntax_smoke n=%d", N))
+print(string.format("checksum: %d", checksum))
+print(string.format("Time: %.3fs", elapsed))

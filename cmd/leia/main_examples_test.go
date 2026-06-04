@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -32,14 +33,19 @@ func TestRunCommandDialectExamples(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{
+	examples := []string{
 		"data_aggregation_report.leia",
 		"data_science_pipeline.leia",
+		"shell_filesystem.leia",
 		"text_parsing.leia",
 		"web_text.leia",
-	} {
+	}
+	dialectDir := filepath.Join(root, "examples", "dialects")
+	covered := make(map[string]bool, len(examples))
+	for _, name := range examples {
+		covered[name] = true
 		t.Run(name, func(t *testing.T) {
-			path := filepath.Join(root, "examples", "dialects", name)
+			path := filepath.Join(dialectDir, name)
 
 			var stdout, stderr bytes.Buffer
 			code := runRunCommand([]string{"--vm", path}, &stdout, &stderr)
@@ -47,6 +53,18 @@ func TestRunCommandDialectExamples(t *testing.T) {
 				t.Fatalf("runRunCommand code = %d, stderr = %q", code, stderr.String())
 			}
 		})
+	}
+	entries, err := os.ReadDir(dialectDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range entries {
+		if entry.IsDir() || filepath.Ext(entry.Name()) != ".leia" {
+			continue
+		}
+		if !covered[entry.Name()] {
+			t.Fatalf("examples/dialects/%s is not covered by TestRunCommandDialectExamples", entry.Name())
+		}
 	}
 }
 
@@ -243,6 +261,40 @@ func TestWorkflowReplayExample(t *testing.T) {
 	}
 }
 
+func TestWorkflowEvaluateListExample(t *testing.T) {
+	root, err := filepath.Abs(filepath.Join("..", ".."))
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := filepath.Join(root, "examples", "workflow")
+
+	var stdout, stderr bytes.Buffer
+	code := runEvaluateCommand([]string{"--json", "--list", dir}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("evaluate command code = %d, stderr = %q stdout = %q", code, stderr.String(), stdout.String())
+	}
+	var report struct {
+		Status  string `json:"status"`
+		Summary struct {
+			Files       int `json:"files"`
+			ParsedFiles int `json:"parsed_files"`
+		} `json:"summary"`
+		Inputs []struct {
+			Path   string `json:"path"`
+			Status string `json:"status"`
+		} `json:"inputs"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
+		t.Fatalf("stdout is not JSON evaluate report: %v; stdout = %q", err, stdout.String())
+	}
+	if report.Status != "ok" || report.Summary.Files != 1 || report.Summary.ParsedFiles != 1 {
+		t.Fatalf("report = %+v, want one parsed workflow file with ok status", report)
+	}
+	if !evaluateReportHasOKInput(report.Inputs, "support_triage_replay.leia") {
+		t.Fatalf("inputs = %+v, want support_triage_replay.leia ok", report.Inputs)
+	}
+}
+
 func containsResolvedRequire(reqs []modpkg.ListRequire, path, version string) bool {
 	for _, req := range reqs {
 		if req.Path == path && req.Version == version {
@@ -279,6 +331,18 @@ func moduleHasPath(modules []modpkg.CapabilityModule, path string) bool {
 func testReportHasPassingFile(report testRunResult, name string) bool {
 	for _, file := range report.Files {
 		if filepath.Base(file.File) == name && file.OK {
+			return true
+		}
+	}
+	return false
+}
+
+func evaluateReportHasOKInput(inputs []struct {
+	Path   string `json:"path"`
+	Status string `json:"status"`
+}, name string) bool {
+	for _, input := range inputs {
+		if filepath.Base(input.Path) == name && input.Status == "ok" {
 			return true
 		}
 	}
