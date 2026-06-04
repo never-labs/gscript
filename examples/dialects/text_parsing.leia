@@ -5,6 +5,7 @@ print("=== Dialects: text parsing ===")
 
 csv_rows := dialect.eval("csv", "name,score\nAda,42\nBob,7\n", {headers: true})
 csv_text := dialect.eval("csv", {{"name", "score"}, {"Ada", 42}, {"Bob", 7}}, {mode: "encode"})
+bad_csv, bad_csv_err := dialect.eval("csv", "\"unterminated\n")
 print("csv rows:", #csv_rows)
 print("csv first:", csv_rows[1].name, csv_rows[1].score)
 print("csv second:", csv_rows[2].name, csv_rows[2].score)
@@ -12,6 +13,7 @@ print("csv encoded:", string.gsub(csv_text, "\n", "|"))
 assert(csv_rows[1].name == "Ada")
 assert(csv_rows[2].score == "7")
 assert(csv_text == "name,score\nAda,42\nBob,7\n")
+assert(bad_csv == nil && bad_csv_err != nil)
 
 tsv_rows := tsv`name	score
 Ada	42
@@ -72,23 +74,29 @@ assert(numbers[3] == 3.5)
 assert(numbers[4] == 40)
 
 matrix_rows := dialect.eval("nums", "1,2,3\n4,5,6\n", {matrix: true})
+bad_number, bad_number_err := dialect.eval("nums", "1 two 3")
+bad_matrix, bad_matrix_err := dialect.eval("nums", "1 2\n3\n", {matrix: true})
 print("nums matrix shape:", #matrix_rows, #matrix_rows[1])
 print("nums matrix bottom-right:", matrix_rows[2][3])
 assert(#matrix_rows == 2)
 assert(#matrix_rows[1] == 3)
 assert(matrix_rows[2][3] == 6)
+assert(bad_number == nil && bad_number_err != nil)
+assert(bad_matrix == nil && bad_matrix_err != nil)
 
 env_vars := env`APP_NAME=leia
 APP_MODE=example
 EMPTY=
 `
 env_text := dialect.eval("env", {APP_NAME: "leia", APP_MODE: "example", EMPTY: ""}, {mode: "encode"})
+bad_env, bad_env_err := dialect.eval("env", "bad-line")
 print("env app:", env_vars.APP_NAME, env_vars.APP_MODE)
 print("env empty value:", env_vars.EMPTY == "")
 print("env encoded:", string.gsub(env_text, "\n", "|"))
 assert(env_vars.APP_NAME == "leia")
 assert(env_vars.EMPTY == "")
 assert(env_text == "APP_MODE=example\nAPP_NAME=leia\nEMPTY=\n")
+assert(bad_env == nil && bad_env_err != nil)
 
 kv_pairs := kv`host=localhost
 port=8080
@@ -109,19 +117,23 @@ assert(rendered == "Hello Ada, score=42")
 
 decoded := json`{"service":"dialects","ok":true,"count":3}`
 encoded := json {service: decoded.service, count: decoded.count}
+bad_json, bad_json_err := dialect.eval("json", "{\"service\":")
 print("json decoded:", decoded.service, decoded.ok, decoded.count)
 print("json encoded:", encoded)
 assert(decoded.service == "dialects")
 assert(encoded == `{"count":3,"service":"dialects"}`)
+assert(bad_json == nil && bad_json_err != nil)
 
 events := jsonl`{"case":"alpha","ok":true}
 {"case":"beta","ok":false}
 `
 events_text := dialect.eval("jsonl", events, {mode: "encode"})
+bad_jsonl, bad_jsonl_err := dialect.eval("jsonl", "{\"case\":\"ok\"}\n\n")
 print("jsonl events:", #events, events[1].case, events[2].ok)
 assert(#events == 2)
 assert(events[1].case == "alpha")
 assert(events_text == "{\"case\":\"alpha\",\"ok\":true}\n{\"case\":\"beta\",\"ok\":false}\n")
+assert(bad_jsonl == nil && bad_jsonl_err != nil)
 
 identifier := regexp!`^[A-Za-z_][A-Za-z0-9_]*$`
 print("regexp valid name:", identifier.match("csv_rows"))

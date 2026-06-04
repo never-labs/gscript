@@ -81,6 +81,58 @@ func TestDialectKVEnvParseAndEncode(t *testing.T) {
 	}
 }
 
+func TestDialectTextInvalidInputsReturnErrors(t *testing.T) {
+	interp := runWithLib(t, `
+		bad_csv, bad_csv_err := dialect.eval("csv", "\"unterminated\n")
+		bad_tsv, bad_tsv_err := dialect.eval("tsv", "a\t\"unterminated\n")
+		bad_json, bad_json_err := dialect.eval("json", "{\"x\":")
+		bad_json_trailing, bad_json_trailing_err := dialect.eval("json", "{\"x\":1} true")
+		bad_jsonl_empty, bad_jsonl_empty_err := dialect.eval("jsonl", "{\"x\":1}\n\n")
+		bad_jsonl_record, bad_jsonl_record_err := dialect.eval("jsonl", "{\"x\":1}\n{\"y\":\n")
+		bad_nums, bad_nums_err := dialect.eval("nums", "1 two 3")
+		bad_matrix, bad_matrix_err := dialect.eval("nums", "1 2\n3\n", {matrix: true})
+		bad_kv, bad_kv_err := dialect.eval("kv", "no separator")
+		bad_env, bad_env_err := dialect.eval("env", "bad-line")
+		bad_logfmt, bad_logfmt_err := dialect.eval("logfmt", "level=info msg=\"oops")
+		bad_mdtable, bad_mdtable_err := dialect.eval("mdtable", "| a |\n| bad |\n")
+		bad_ini, bad_ini_err := dialect.eval("ini", "[broken\nx=1")
+		bad_semver, bad_semver_err := dialect.eval("semver", "1.2")
+		bad_duration, bad_duration_err := dialect.eval("duration", "soon")
+		bad_tap, bad_tap_err := dialect.eval("tap", "not okish")
+		bad_xml, bad_xml_err := dialect.eval("xml", "&#x;", {mode: "decode"})
+	`, "dialect", BuildDialect(HostOptions{}, nil))
+
+	for _, pair := range []struct {
+		value string
+		err   string
+	}{
+		{"bad_csv", "bad_csv_err"},
+		{"bad_tsv", "bad_tsv_err"},
+		{"bad_json", "bad_json_err"},
+		{"bad_json_trailing", "bad_json_trailing_err"},
+		{"bad_jsonl_empty", "bad_jsonl_empty_err"},
+		{"bad_jsonl_record", "bad_jsonl_record_err"},
+		{"bad_nums", "bad_nums_err"},
+		{"bad_matrix", "bad_matrix_err"},
+		{"bad_kv", "bad_kv_err"},
+		{"bad_env", "bad_env_err"},
+		{"bad_logfmt", "bad_logfmt_err"},
+		{"bad_mdtable", "bad_mdtable_err"},
+		{"bad_ini", "bad_ini_err"},
+		{"bad_semver", "bad_semver_err"},
+		{"bad_duration", "bad_duration_err"},
+		{"bad_tap", "bad_tap_err"},
+		{"bad_xml", "bad_xml_err"},
+	} {
+		if !interp.GetGlobal(pair.value).IsNil() {
+			t.Fatalf("%s = %v, want nil", pair.value, interp.GetGlobal(pair.value))
+		}
+		if got := interp.GetGlobal(pair.err); !got.IsString() || got.Str() == "" {
+			t.Fatalf("%s = %v, want non-empty error string", pair.err, got)
+		}
+	}
+}
+
 func TestDialectTextUnknownModesAreReported(t *testing.T) {
 	interp := runWithLib(t, `
 		json_bad, json_bad_err := dialect.eval("json", "{}", {mode: "bogus"})

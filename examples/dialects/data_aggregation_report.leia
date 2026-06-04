@@ -38,6 +38,14 @@ func add_cell(m, row, col, value) {
     matrix.setf(m, row, col, matrix.getf(m, row, col) + value)
 }
 
+func number_or(value, fallback) {
+    parsed := tonumber(value)
+    if parsed == nil {
+        return fallback
+    }
+    return parsed
+}
+
 for i := 1; i <= #sales; i++ {
     meta := segment_meta(sales[i].segment)
     assert(meta != nil)
@@ -75,6 +83,39 @@ report := soa.zip({
     gross_margin: array.f64(gross_margin),
 })
 
+empty_sales := dialect.eval("jsonl", "")
+empty_report := soa.zip({revenue: array.f64({})})
+
+missing_sales := dialect.eval("csv", "segment,revenue,cost,units\nretail,40,,1\npartner,,9,3\n", {headers: true})
+missing_revenue := number_or(missing_sales[2].revenue, 0)
+missing_cost := number_or(missing_sales[1].cost, 0)
+empty_sum_ok, empty_sum_err := pcall(soa.sum, empty_report, "revenue")
+
+segment_groups := {}
+for i := 1; i <= #sales; i++ {
+    row := sales[i]
+    if row.units >= 2 {
+        group := segment_groups[row.segment]
+        if group == nil {
+            group = {segment: row.segment, revenue: 0, units: 0}
+            segment_groups[row.segment] = group
+        }
+        group.revenue = group.revenue + row.revenue
+        group.units = group.units + row.units
+    }
+}
+
+ranked_segments := {}
+for _, group := range pairs(segment_groups) {
+    table.insert(ranked_segments, group)
+}
+table.sort(ranked_segments, func(a, b) {
+    if a.revenue == b.revenue {
+        return a.segment < b.segment
+    }
+    return a.revenue > b.revenue
+})
+
 output_rows := {}
 for i := 1; i <= soa.len(report); i++ {
     row := report[i]
@@ -100,6 +141,19 @@ assert(soa.column(report, "gross_margin")[2] == 45)
 assert(soa.sum(report, "units") == 12)
 assert(matrix.getf(totals, 0, 3) == 560)
 assert(matrix.getf(totals, 1, 3) == 135)
+assert(#empty_sales == 0)
+assert(soa.len(empty_report) == 0)
+assert(empty_sum_ok == false)
+assert(string.find(empty_sum_err, "empty array", 1, true) != nil)
+assert(missing_revenue == 0)
+assert(missing_cost == 0)
+assert(#ranked_segments == 3)
+assert(ranked_segments[1].segment == "enterprise")
+assert(ranked_segments[1].revenue == 300)
+assert(ranked_segments[2].segment == "retail")
+assert(ranked_segments[2].revenue == 200)
+assert(ranked_segments[3].segment == "partner")
+assert(ranked_segments[3].units == 5)
 assert(output == "{\"gross_margin\":200,\"region\":\"north\",\"revenue\":500,\"units\":7,\"weighted_revenue\":560}\n{\"gross_margin\":45,\"region\":\"south\",\"revenue\":150,\"units\":5,\"weighted_revenue\":135}\n")
 
 print("data aggregation report ok")

@@ -622,8 +622,12 @@ func TestDialectBinaryPackUnpackAndSize(t *testing.T) {
 		hexed := dialect.eval("hex", packed)
 		unpacked := dialect.eval("binary", packed, {mode: "unpack", format: "be:u16 bytes:2"})
 		sized := dialect.eval("binary", "", {mode: "size", format: "be:u16 bytes:2"})
+		mixed := dialect.eval("binary", {-1234, 16909060, 1.5, "OK"}, {mode: "pack", format: "le:i16 u32 f32 bytes:2"})
+		mixed_hex := dialect.eval("hex", mixed)
+		mixed_unpacked := dialect.eval("binary", mixed, {mode: "unpack", format: "le:i16 u32 f32 bytes:2"})
+		mixed_size := dialect.eval("binary", "", {mode: "size", format: "le:i16 u32 f32 bytes:2"})
 		var_size, var_err := dialect.eval("binary", "", {mode: "size", format: "string"})
-		bad, bad_err := dialect.eval("binary", "x", {mode: "unpack", format: "u32"})
+		short, short_err := dialect.eval("binary", "x", {mode: "unpack", format: "u32"})
 	`, "dialect", BuildDialect(HostOptions{}, nil))
 
 	if got := interp.GetGlobal("hexed").Str(); got != "0102676f" {
@@ -643,11 +647,62 @@ func TestDialectBinaryPackUnpackAndSize(t *testing.T) {
 	if got := interp.GetGlobal("sized").Int(); got != 4 {
 		t.Fatalf("size = %d, want 4", got)
 	}
+	if got := interp.GetGlobal("mixed_hex").Str(); got != "2efb040302010000c03f4f4b" {
+		t.Fatalf("mixed binary hex = %q, want 2efb040302010000c03f4f4b", got)
+	}
+	mixed := interp.GetGlobal("mixed_unpacked").Table()
+	mixedValues := mixed.RawGetString("values").Table()
+	if got := mixedValues.RawGetInt(1).Int(); got != -1234 {
+		t.Fatalf("mixed unpacked[1] = %d, want -1234", got)
+	}
+	if got := mixedValues.RawGetInt(2).Int(); got != 16909060 {
+		t.Fatalf("mixed unpacked[2] = %d, want 16909060", got)
+	}
+	if got := mixedValues.RawGetInt(3).Number(); got != 1.5 {
+		t.Fatalf("mixed unpacked[3] = %f, want 1.5", got)
+	}
+	if got := mixedValues.RawGetInt(4).Str(); got != "OK" {
+		t.Fatalf("mixed unpacked[4] = %q, want OK", got)
+	}
+	if got := mixed.RawGetString("next").Int(); got != 13 {
+		t.Fatalf("mixed next = %d, want 13", got)
+	}
+	if got := interp.GetGlobal("mixed_size").Int(); got != 12 {
+		t.Fatalf("mixed size = %d, want 12", got)
+	}
 	if !interp.GetGlobal("var_size").IsNil() || !interp.GetGlobal("var_err").IsString() {
 		t.Fatalf("variable size = %v err %v, want nil error string", interp.GetGlobal("var_size"), interp.GetGlobal("var_err"))
 	}
-	if !interp.GetGlobal("bad").IsNil() || !interp.GetGlobal("bad_err").IsString() {
-		t.Fatalf("bad unpack = %v err %v, want nil error string", interp.GetGlobal("bad"), interp.GetGlobal("bad_err"))
+	if !interp.GetGlobal("short").IsNil() || !strings.Contains(interp.GetGlobal("short_err").Str(), "binary dialect: data too short") {
+		t.Fatalf("short unpack = %v err %v, want nil data too short", interp.GetGlobal("short"), interp.GetGlobal("short_err"))
+	}
+
+	for name, tc := range map[string]struct {
+		source string
+		want   string
+	}{
+		"format parse error": {
+			source: `dialect.eval("binary", "", {mode: "size", format: "bytes:nope"})`,
+			want:   `binary: invalid field size "nope"`,
+		},
+		"unknown mode": {
+			source: `dialect.eval("binary", "", {mode: "bogus", format: "u8"})`,
+			want:   "binary dialect: unknown mode",
+		},
+		"bad size": {
+			source: `dialect.eval("binary", {"abc"}, {mode: "pack", format: "bytes:2"})`,
+			want:   "binary dialect: bytes:2 got 3 bytes",
+		},
+	} {
+		interp := New()
+		installTestModule(interp, "dialect", TableValue(BuildDialect(HostOptions{}, nil)))
+		err := execSourceOnInterp(interp, tc.source)
+		if err == nil {
+			t.Fatalf("%s returned nil error", name)
+		}
+		if !strings.Contains(err.Error(), tc.want) {
+			t.Fatalf("%s error = %q, want containing %q", name, err.Error(), tc.want)
+		}
 	}
 }
 
