@@ -39,6 +39,11 @@ func registerDialectText(register dialectRegisterFunc, maxHostResult func() int6
 			return dialectCSV(body.Str(), options)
 		},
 	})
+	register([]string{"tsv"}, dialectHandler{
+		eval: func(body Value, options *Table) ([]Value, error) {
+			return dialectTSV(body.Str(), options)
+		},
+	})
 	register([]string{"lines", "split"}, dialectHandler{
 		eval: func(body Value, options *Table) ([]Value, error) {
 			return dialectLines(body.Str(), options)
@@ -208,7 +213,18 @@ func tableHasAnyKey(tbl *Table) bool {
 }
 
 func dialectCSV(src string, opts *Table) ([]Value, error) {
+	return dialectDelimited(src, opts, 0)
+}
+
+func dialectTSV(src string, opts *Table) ([]Value, error) {
+	return dialectDelimited(src, opts, '\t')
+}
+
+func dialectDelimited(src string, opts *Table, defaultSep rune) ([]Value, error) {
 	csvOpts := csvDialectOptions(opts)
+	if csvOpts.Sep == 0 {
+		csvOpts.Sep = defaultSep
+	}
 	if opts != nil && opts.RawGetString("headers").Truthy() {
 		rows, err := csvlib.ParseWithHeaders(src, csvOpts)
 		if err != nil {

@@ -1,5 +1,5 @@
 // web_text.leia - Built-in dialects for small Web-safe text transforms.
-// Demonstrates: url, html_escape, urlquery, mime, headers, base64, hash
+// Demonstrates: url, html_escape, urlquery, mime, headers, cookie, base64, hash
 
 print("=== Dialects: web text ===")
 
@@ -57,6 +57,15 @@ print("headers second cookie:", parsed_headers["Set-Cookie"][2])
 assert(parsed_headers["Content-Type"] == "text/plain")
 assert(parsed_headers["Set-Cookie"][2] == "b=2")
 assert(encoded_headers == "Content-Type: text/plain\r\nSet-Cookie: a=1\r\nSet-Cookie: b=2\r\nX-Trace: abc\r\n")
+
+parsed_cookies := cookie`session=abc123; theme=light; tag=a; tag=b`
+encoded_cookies := cookie {session: "abc123", theme: "light", tag: {"a", "b"}}
+print("cookie session:", parsed_cookies.session)
+print("cookie second tag:", parsed_cookies.tag[2])
+assert(parsed_cookies.session == "abc123")
+assert(parsed_cookies.theme == "light")
+assert(parsed_cookies.tag[2] == "b")
+assert(encoded_cookies == "session=abc123; tag=a; tag=b; theme=light")
 
 encoded_data := base64`hello-web`
 decoded_data := dialect.eval("base64", encoded_data, {mode: "decode"})

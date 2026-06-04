@@ -10,6 +10,14 @@ print("csv second:", csv_rows[2].name, csv_rows[2].score)
 assert(csv_rows[1].name == "Ada")
 assert(csv_rows[2].score == "7")
 
+tsv_rows := tsv`name	score
+Ada	42
+Bob	7
+`
+print("tsv first:", tsv_rows[2][1], tsv_rows[2][2])
+assert(tsv_rows[2][1] == "Ada")
+assert(tsv_rows[3][2] == "7")
+
 line_rows := lines`alpha
 
 beta

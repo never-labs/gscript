@@ -178,6 +178,168 @@ func TestLLMAgentScenarioManualToolHistoryExampleSmoke(t *testing.T) {
 	}
 }
 
+func TestLLMAgentAsToolExampleSmoke(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []leia.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			provider := &mockLLMProvider{results: []llm.TurnResult{
+				{
+					Status: "tool_calls",
+					Calls: []llm.ToolCall{{
+						ID:   "call_delegate_1",
+						Tool: "extract_research",
+						Args: map[string]any{
+							"domain":  "refunds",
+							"control": "PCI",
+						},
+					}},
+				},
+				{
+					Status: "tool_calls",
+					Calls: []llm.ToolCall{{
+						ID:   "call_policy_1",
+						Tool: "lookup_policy",
+						Args: map[string]any{
+							"domain":  "refunds",
+							"control": "PCI",
+						},
+					}},
+				},
+				{
+					Status: "final_answer",
+					Text:   `{"summary":"PCI review is required for refunds","confidence":0.88,"risk":"high"}`,
+				},
+				{Status: "final_answer", Text: "Do not bypass PCI review; use delegated policy evidence."},
+				{Status: "final_answer", Text: "Audit: delegated answer cites policy-backed evidence."},
+			}}
+			opts := append([]leia.Option{
+				leia.WithLibs(leia.LibAll),
+				leia.WithLLMProvider(provider),
+			}, tc.opts...)
+			vm := leia.New(opts...)
+
+			if err := vm.ExecFile(filepath.Join(repoRoot(t), "examples", "llm", "agent_as_tool.leia")); err != nil {
+				t.Fatalf("ExecFile: %v", err)
+			}
+
+			if len(provider.requests) != 5 {
+				t.Fatalf("requests = %d, want 5", len(provider.requests))
+			}
+
+			supervisorFirst := provider.requests[0]
+			if supervisorFirst.Model != "mock-supervisor" || len(supervisorFirst.Tools) != 1 || supervisorFirst.Tools[0].Name != "extract_research" {
+				t.Fatalf("supervisor first request = %#v", supervisorFirst)
+			}
+			if len(supervisorFirst.Messages) != 3 ||
+				supervisorFirst.Messages[0].Role != "system" ||
+				supervisorFirst.Messages[0].Text != "Delegate policy research before making a decision." ||
+				supervisorFirst.Messages[1].Role != "assistant" ||
+				supervisorFirst.Messages[1].Text != "Previous review: refunds need explicit evidence." ||
+				supervisorFirst.Messages[2].Role != "user" ||
+				supervisorFirst.Messages[2].Text != "Answer with a decision for: Can refunds bypass PCI review?" {
+				t.Fatalf("supervisor first messages = %#v", supervisorFirst.Messages)
+			}
+			if supervisorFirst.Tools[0].Schema != nil {
+				t.Fatalf("agent output shape must not be sent as provider tool input schema: %#v", supervisorFirst.Tools[0].Schema)
+			}
+
+			extractorFirst := provider.requests[1]
+			if extractorFirst.Model != "mock-extractor" || len(extractorFirst.Tools) != 1 || extractorFirst.Tools[0].Name != "lookup_policy" {
+				t.Fatalf("extractor first request = %#v", extractorFirst)
+			}
+			if extractorFirst.Tools[0].Description != "Read deterministic local policy evidence." ||
+				len(extractorFirst.Tools[0].Requires) != 1 ||
+				extractorFirst.Tools[0].Requires[0] != "policies.read" {
+				t.Fatalf("extractor tool metadata = %#v", extractorFirst.Tools[0])
+			}
+			if len(extractorFirst.Messages) != 2 ||
+				extractorFirst.Messages[0].Role != "system" ||
+				extractorFirst.Messages[0].Text != "Extract only claims supported by local policy tool evidence." ||
+				extractorFirst.Messages[1].Role != "user" ||
+				extractorFirst.Messages[1].Text != "Research refunds control PCI." {
+				t.Fatalf("extractor first messages = %#v", extractorFirst.Messages)
+			}
+
+			extractorFinal := provider.requests[2]
+			if extractorFinal.Model != "mock-extractor" || len(extractorFinal.Tools) != 1 {
+				t.Fatalf("extractor final request = %#v", extractorFinal)
+			}
+			if len(extractorFinal.Messages) != 4 ||
+				extractorFinal.Messages[2].Role != "assistant" ||
+				extractorFinal.Messages[2].ToolCall == nil ||
+				extractorFinal.Messages[2].ToolCall.ID != "call_policy_1" ||
+				extractorFinal.Messages[3].Role != "tool" ||
+				extractorFinal.Messages[3].ToolUseID != "call_policy_1" ||
+				extractorFinal.Messages[3].Value != "policy:refunds:PCI=review-required" {
+				t.Fatalf("extractor final messages = %#v", extractorFinal.Messages)
+			}
+			format, ok := extractorFinal.ResponseFormat.(map[string]any)
+			if !ok || format["type"] != "json_object" {
+				t.Fatalf("extractor response_format = %#v", extractorFinal.ResponseFormat)
+			}
+
+			supervisorFinal := provider.requests[3]
+			if supervisorFinal.Model != "mock-supervisor" || len(supervisorFinal.Tools) != 1 {
+				t.Fatalf("supervisor final request = %#v", supervisorFinal)
+			}
+			if len(supervisorFinal.Messages) != 5 ||
+				supervisorFinal.Messages[3].Role != "assistant" ||
+				supervisorFinal.Messages[3].ToolCall == nil ||
+				supervisorFinal.Messages[3].ToolCall.ID != "call_delegate_1" ||
+				supervisorFinal.Messages[4].Role != "tool" ||
+				supervisorFinal.Messages[4].ToolUseID != "call_delegate_1" {
+				t.Fatalf("supervisor final messages = %#v", supervisorFinal.Messages)
+			}
+			toolValue, ok := supervisorFinal.Messages[4].Value.(map[string]any)
+			if !ok ||
+				toolValue["summary"] != "PCI review is required for refunds" ||
+				toolValue["confidence"] != 0.88 ||
+				toolValue["risk"] != "high" {
+				t.Fatalf("supervisor tool value = %#v", supervisorFinal.Messages[4].Value)
+			}
+
+			audit := provider.requests[4]
+			if audit.Model != "mock-audit" || audit.MaxTokens != 96 || len(audit.Tools) != 0 {
+				t.Fatalf("audit request = %#v", audit)
+			}
+			if len(audit.Messages) != 7 ||
+				audit.Messages[4].Role != "tool" ||
+				audit.Messages[5].Role != "assistant" ||
+				audit.Messages[5].Text != "Do not bypass PCI review; use delegated policy evidence." ||
+				audit.Messages[6].Role != "user" ||
+				audit.Messages[6].Text != "Audit delegated answer: Do not bypass PCI review; use delegated policy evidence." {
+				t.Fatalf("audit messages = %#v", audit.Messages)
+			}
+
+			for name, want := range map[string]any{
+				"final_text":           "Do not bypass PCI review; use delegated policy evidence.",
+				"delegated_summary":    "PCI review is required for refunds",
+				"delegated_confidence": 0.88,
+				"delegated_risk":       "high",
+				"tool_history_idx":     int64(5),
+				"task_history_idx":     int64(3),
+				"task_text":            "Answer with a decision for: Can refunds bypass PCI review?",
+				"outer_history_len":    int64(5),
+				"audit_text":           "Audit: delegated answer cites policy-backed evidence.",
+				"audit_history_len":    int64(7),
+			} {
+				got, err := vm.Get(name)
+				if err != nil {
+					t.Fatalf("Get %s: %v", name, err)
+				}
+				if got != want {
+					t.Fatalf("%s = %#v, want %#v", name, got, want)
+				}
+			}
+		})
+	}
+}
+
 func TestLLMDirectTurnExampleSmoke(t *testing.T) {
 	for _, tc := range []struct {
 		name string

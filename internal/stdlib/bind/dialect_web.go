@@ -35,6 +35,10 @@ func registerDialectWeb(register dialectRegisterFunc) {
 		eval:  dialectHeaders,
 		block: dialectHeaders,
 	})
+	register([]string{"cookie", "cookies"}, dialectHandler{
+		eval:  dialectCookie,
+		block: dialectCookie,
+	})
 }
 
 func dialectHTMLEscape(src string, opts *Table) ([]Value, error) {
@@ -173,6 +177,135 @@ func dialectHeaders(body Value, opts *Table) ([]Value, error) {
 		return []Value{NilValue(), StringValue(err.Error())}, nil
 	}
 	return []Value{fields}, nil
+}
+
+func dialectCookie(body Value, opts *Table) ([]Value, error) {
+	mode := ""
+	if opts != nil && opts.RawGetString("mode").IsString() {
+		mode = opts.RawGetString("mode").Str()
+	}
+	if body.IsTable() || mode == "encode" || mode == "format" {
+		text, err := encodeCookiePairs(body)
+		if err != nil {
+			return []Value{NilValue(), StringValue(err.Error())}, nil
+		}
+		return []Value{StringValue(text)}, nil
+	}
+	cookies, err := parseCookiePairs(body.Str())
+	if err != nil {
+		return []Value{NilValue(), StringValue(err.Error())}, nil
+	}
+	return []Value{cookies}, nil
+}
+
+func parseCookiePairs(src string) (Value, error) {
+	out := NewTable()
+	if strings.TrimSpace(src) == "" {
+		return TableValue(out), nil
+	}
+	for _, part := range strings.Split(src, ";") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		name, value, ok := strings.Cut(part, "=")
+		if !ok {
+			return NilValue(), fmt.Errorf("cookie dialect: invalid cookie pair %q", part)
+		}
+		name = strings.TrimSpace(name)
+		value = strings.TrimSpace(value)
+		if !isHeaderFieldName(name) {
+			return NilValue(), fmt.Errorf("cookie dialect: invalid cookie name %q", name)
+		}
+		if !isCookieValue(value) {
+			return NilValue(), fmt.Errorf("cookie dialect: invalid cookie value for %q", name)
+		}
+		addCookieValue(out, name, value)
+	}
+	return TableValue(out), nil
+}
+
+func addCookieValue(out *Table, name, value string) {
+	existing := out.RawGetString(name)
+	if existing.IsNil() {
+		out.RawSetString(name, StringValue(value))
+		return
+	}
+	if existing.IsTable() {
+		arr := existing.Table()
+		arr.RawSetInt(int64(arr.Length()+1), StringValue(value))
+		return
+	}
+	arr := NewAppendArrayTable(2)
+	arr.RawSetInt(1, existing)
+	arr.RawSetInt(2, StringValue(value))
+	out.RawSetString(name, TableValue(arr))
+}
+
+func encodeCookiePairs(body Value) (string, error) {
+	if !body.IsTable() {
+		return "", fmt.Errorf("cookie dialect: table required for encode")
+	}
+	type cookiePair struct {
+		name  string
+		value string
+	}
+	var pairs []cookiePair
+	var invalidName string
+	var invalidValueName string
+	body.Table().ForEachPlainRaw(func(k, v Value) bool {
+		if !k.IsString() {
+			return true
+		}
+		name := k.Str()
+		if !isHeaderFieldName(name) {
+			invalidName = name
+			return false
+		}
+		if v.IsTable() {
+			tbl := v.Table()
+			for i := 1; i <= tbl.Length(); i++ {
+				val := tbl.RawGetInt(int64(i)).String()
+				if !isCookieValue(val) {
+					invalidValueName = name
+					return false
+				}
+				pairs = append(pairs, cookiePair{name: name, value: val})
+			}
+			return true
+		}
+		val := v.String()
+		if !isCookieValue(val) {
+			invalidValueName = name
+			return false
+		}
+		pairs = append(pairs, cookiePair{name: name, value: val})
+		return true
+	})
+	if invalidName != "" {
+		return "", fmt.Errorf("cookie dialect: invalid cookie name %q", invalidName)
+	}
+	if invalidValueName != "" {
+		return "", fmt.Errorf("cookie dialect: invalid cookie value for %q", invalidValueName)
+	}
+	sort.SliceStable(pairs, func(i, j int) bool {
+		return pairs[i].name < pairs[j].name
+	})
+	parts := make([]string, 0, len(pairs))
+	for _, pair := range pairs {
+		parts = append(parts, pair.name+"="+pair.value)
+	}
+	return strings.Join(parts, "; "), nil
+}
+
+func isCookieValue(value string) bool {
+	for i := 0; i < len(value); i++ {
+		c := value[i]
+		if c < 0x21 || c == '"' || c == ',' || c == ';' || c == '\\' || c == 0x7f {
+			return false
+		}
+	}
+	return true
 }
 
 func parseHeaderFields(src string) (Value, error) {

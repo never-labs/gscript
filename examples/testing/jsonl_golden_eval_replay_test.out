@@ -1,0 +1,4 @@
+case:jsonl_golden_eval_replay_test
+commands	3
+covers test evaluate jsonl golden replay
+ok

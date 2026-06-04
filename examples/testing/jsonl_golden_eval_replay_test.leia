@@ -1,0 +1,45 @@
+commands := jsonl`{"id":"golden-json-report","command":"leia test --json --golden=require examples/testing","uses_test":true,"uses_evaluate":false,"uses_jsonl":true,"uses_golden":true,"uses_replay":false}
+{"id":"evaluate-replay-json","command":"leia evaluate --json --replay examples/workflow/support_triage_replay.records.json examples/workflow/support_triage_replay.leia","uses_test":false,"uses_evaluate":true,"uses_jsonl":false,"uses_golden":false,"uses_replay":true}
+{"id":"refresh-golden-explicitly","command":"leia test --golden=update examples/testing/jsonl_workflow_test.leia","uses_test":true,"uses_evaluate":false,"uses_jsonl":false,"uses_golden":true,"uses_replay":false}
+`
+
+func contains(text, needle) {
+    return string.find(text, needle, 1, true) != nil
+}
+
+print("case:jsonl_golden_eval_replay_test")
+
+seen_test := false
+seen_evaluate := false
+seen_jsonl := false
+seen_golden := false
+seen_replay := false
+
+for _, row := range commands {
+    assert(row.id != "")
+    assert(contains(row.command, "leia "))
+    if row.uses_test {
+        assert(contains(row.command, "leia test"))
+        seen_test = true
+    }
+    if row.uses_evaluate {
+        assert(contains(row.command, "leia evaluate"))
+        seen_evaluate = true
+    }
+    if row.uses_jsonl {
+        seen_jsonl = true
+    }
+    if row.uses_golden {
+        assert(contains(row.command, "--golden"))
+        seen_golden = true
+    }
+    if row.uses_replay {
+        assert(contains(row.command, "--replay"))
+        seen_replay = true
+    }
+}
+
+assert(seen_test && seen_evaluate && seen_jsonl && seen_golden && seen_replay)
+print("commands", #commands)
+print("covers test evaluate jsonl golden replay")
+print("ok")

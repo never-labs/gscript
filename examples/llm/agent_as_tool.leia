@@ -1,61 +1,156 @@
-// Agent-as-tool demo.
+// Agent-as-tool handoff with structured evidence and manual history reuse.
 //
-// This shows a supervisor agent delegating to a specialist agent that is
-// listed directly in the supervisor's tools list. The runtime
-// auto-wraps the agent value as a tool whose params/schema are derived from
-// the agent's declared parameters and output: shape; the agent's structured
-// result.value is fed back to the supervisor as the tool result.
-//
-// For the explicit `tool wrapper` form, see TestLLMAgentScenarioAgentAsToolStructuredHandoff.
+// This example is intended for mock/replay execution. The supervisor delegates
+// to a specialist agent listed directly in its tools array. The specialist uses
+// a local deterministic tool for evidence, returns structured JSON, and the
+// supervisor's tool result is then reused in an explicit audit turn.
 
 llm.register_models({
     default: "supervisor"
     supervisor: "mock-supervisor"
     extractor: "mock-extractor"
+    audit: "mock-audit"
 })
 
-extract_research := llm.agent("extract_research", func(topic) {
+func prompt_message(p, fallback_role, tag) {
+    body := p
+    if type(p) == "table" && p.body != nil {
+        body = p.body
+    }
+
+    role := fallback_role
+    if type(body) == "table" && body.role != nil {
+        role = body.role
+    }
+
+    text := nil
+    if type(body) == "table" {
+        text = body.text
+    } else {
+        text = body
+    }
+    if text == nil && type(p) == "table" {
+        text = p.text
+    }
+
+    m := nil
+    if role == "system" {
+        m = msg.system(text)
+    } else if role == "assistant" {
+        m = msg.assistant(text)
+    } else {
+        m = msg.user(text)
+    }
+    m.tag = tag
+    return m
+}
+
+lookup_policy := llm.tool("lookup_policy", func(domain, control) {
+    return "policy:" .. domain .. ":" .. control .. "=review-required", nil
+}, {
+    description: "Read deterministic local policy evidence."
+    params: {"domain", "control"}
+    requires: {"policies.read"}
+    param_docs: {
+        domain: "policy domain"
+        control: "control or requirement"
+    }
+})
+
+func extract_research_config(domain, control) {
+    system_prompt := prompt {
+        role: "system"
+        text: "Extract only claims supported by local policy tool evidence."
+    }
+    task_prompt := prompt`Research ${domain} control ${control}.`
+
     return {
         model: "extractor"
         messages: {
-            llm.system("Extract a structured research handoff."),
-            llm.user("Research " .. topic),
+            prompt_message(system_prompt, "system", "extractor-policy"),
+            prompt_message(task_prompt, "user", "extractor-task"),
         }
+        tools: {lookup_policy}
         output: {
             summary: "short finding"
             confidence: 1
+            risk: "low|medium|high"
         }
+        budget: {turns: 2, calls: 1, tokens: 512}
     }
-}, nil, {
-    params: {"topic"}
-    output: {summary: "short finding", confidence: 1}
-    description: "Extract a structured research handoff."
+}
+
+extract_research := llm.agent("extract_research", extract_research_config, nil, {
+    params: {"domain", "control"}
+    output: {
+        summary: "short finding"
+        confidence: 1
+        risk: "low|medium|high"
+    }
+    description: "Extract structured policy research."
 })
 
-supervisor := llm.agent("supervisor", func(question) {
+func supervisor_config(question) {
+    system_prompt := prompt {
+        role: "system"
+        text: "Delegate policy research before making a decision."
+    }
+    task_prompt := prompt`Answer with a decision for: ${question}`
+
     return {
         model: "supervisor"
         messages: {
-            llm.system("Use delegated specialist agents as tools before answering."),
-            llm.user(question),
+            prompt_message(system_prompt, "system", "supervisor-policy"),
+            msg.assistant("Previous review: refunds need explicit evidence."),
+            prompt_message(task_prompt, "user", "supervisor-task"),
         }
         tools: {extract_research}
+        budget: {turns: 3, calls: 2, tokens: 1024}
     }
-}, nil, {params: {"question"}})
+}
 
-result, err := supervisor("Should this workflow delegate research?")
+supervisor := llm.agent("supervisor", supervisor_config, nil, {
+    params: {"question"}
+    description: "Delegate to policy research before deciding."
+})
+
+result, err := supervisor("Can refunds bypass PCI review?")
 if err != nil {
     print(err.message)
     return
 }
 
-final_text := result.text
-outer_history_len := #result.history
+tool_msg, tool_idx := history.find(result.history, {role: "tool"})
+task_msg, task_idx := history.find(result.history, {tag: "supervisor-task"})
 
-// Use history.find to locate the tool result without depending on index order.
-tool_msg, _ := history.find(result.history, {role: "tool"})
+audit_prompt := prompt`Audit delegated answer: ${result.text}`
+audit_history := chat.merge(result.history, {
+    msg.assistant(result.text),
+    prompt_message(audit_prompt, "user", "audit-task"),
+})
+
+audit, audit_err := llm.turn({
+    model: "audit"
+    messages: audit_history
+    max_tokens: 96
+})
+if audit_err != nil {
+    print(audit_err.message)
+    return
+}
+
+final_text := result.text
 delegated_summary := tool_msg.value.summary
+delegated_confidence := tool_msg.value.confidence
+delegated_risk := tool_msg.value.risk
+tool_history_idx := tool_idx
+task_history_idx := task_idx
+task_text := task_msg.text
+outer_history_len := #result.history
+audit_text := audit.text
+audit_history_len := #audit_history
 
 print("final", final_text)
-print("history", outer_history_len)
 print("delegated", delegated_summary)
+print("risk", delegated_risk)
+print("audit", audit_text)

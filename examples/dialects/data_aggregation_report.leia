@@ -1,0 +1,105 @@
+// data_aggregation_report.leia - CSV/JSONL aggregation with data stdlib shapes.
+// Demonstrates: csv/jsonl input, nums weights, dense matrix accumulators,
+// typed arrays, SoA aggregate columns, and JSONL output.
+
+print("=== Dialects: data aggregation report ===")
+
+segments := dialect.eval("csv", "segment,region\nretail,north\nenterprise,north\npartner,south\n", {headers: true})
+
+sales := jsonl`{"segment":"retail","revenue":120,"cost":72,"units":3}
+{"segment":"enterprise","revenue":300,"cost":180,"units":2}
+{"segment":"partner","revenue":150,"cost":105,"units":5}
+{"segment":"retail","revenue":80,"cost":48,"units":2}
+`
+
+segment_weights := nums`1.00 1.20 0.90`
+regions := {"north", "south"}
+totals := matrix.dense(#regions, 4)
+
+func region_index(name) {
+    for i := 1; i <= #regions; i++ {
+        if regions[i] == name {
+            return i
+        }
+    }
+    return 0
+}
+
+func segment_meta(name) {
+    for i := 1; i <= #segments; i++ {
+        if segments[i].segment == name {
+            return {region: segments[i].region, weight: segment_weights[i]}
+        }
+    }
+    return nil
+}
+
+func add_cell(m, row, col, value) {
+    matrix.setf(m, row, col, matrix.getf(m, row, col) + value)
+}
+
+for i := 1; i <= #sales; i++ {
+    meta := segment_meta(sales[i].segment)
+    assert(meta != nil)
+
+    row := region_index(meta.region) - 1
+    add_cell(totals, row, 0, sales[i].revenue)
+    add_cell(totals, row, 1, sales[i].cost)
+    add_cell(totals, row, 2, sales[i].units)
+    add_cell(totals, row, 3, sales[i].revenue * meta.weight)
+}
+
+region_ids := {}
+revenue := {}
+cost := {}
+units := {}
+weighted_revenue := {}
+gross_margin := {}
+
+for i := 1; i <= #regions; i++ {
+    row := i - 1
+    region_ids[i] = i
+    revenue[i] = matrix.getf(totals, row, 0)
+    cost[i] = matrix.getf(totals, row, 1)
+    units[i] = matrix.getf(totals, row, 2)
+    weighted_revenue[i] = matrix.getf(totals, row, 3)
+    gross_margin[i] = revenue[i] - cost[i]
+}
+
+report := soa.zip({
+    region_id: array.i64(region_ids),
+    revenue: array.f64(revenue),
+    cost: array.f64(cost),
+    units: array.f64(units),
+    weighted_revenue: array.f64(weighted_revenue),
+    gross_margin: array.f64(gross_margin),
+})
+
+output_rows := {}
+for i := 1; i <= soa.len(report); i++ {
+    row := report[i]
+    output_rows[i] = {
+        region: regions[row.region_id],
+        revenue: row.revenue,
+        units: row.units,
+        weighted_revenue: row.weighted_revenue,
+        gross_margin: row.gross_margin,
+    }
+}
+
+output := dialect.eval("jsonl", output_rows, {mode: "encode"})
+
+print(output)
+print(string.format("regions: %d revenue: %.0f margin: %.0f", soa.len(report), soa.sum(report, "revenue"), soa.sum(report, "gross_margin")))
+
+assert(soa.len(report) == 2)
+assert(soa.column(report, "revenue")[1] == 500)
+assert(soa.column(report, "revenue")[2] == 150)
+assert(soa.column(report, "gross_margin")[1] == 200)
+assert(soa.column(report, "gross_margin")[2] == 45)
+assert(soa.sum(report, "units") == 12)
+assert(matrix.getf(totals, 0, 3) == 560)
+assert(matrix.getf(totals, 1, 3) == 135)
+assert(output == "{\"gross_margin\":200,\"region\":\"north\",\"revenue\":500,\"units\":7,\"weighted_revenue\":560}\n{\"gross_margin\":45,\"region\":\"south\",\"revenue\":150,\"units\":5,\"weighted_revenue\":135}\n")
+
+print("data aggregation report ok")

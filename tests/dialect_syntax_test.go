@@ -40,6 +40,7 @@ func TestShellCommandFilesystemDialectSyntaxExecutesThroughStdlib(t *testing.T) 
 				"shell_dollar := $`printf dollar-${name}`\n" +
 				"shell_sh := sh`printf sh-${name}`\n" +
 				"shell_fail := $`printf shellerr 1>&2; exit 7`\n" +
+				"shell_fail_explicit := dialect.eval(\"sh\", \"printf expliciterr 1>&2; exit 6\", {fail_fast: false})\n" +
 				"cmd_out := cmd`printf command-${name}`\n" +
 				"cmd_fail := cmd`/bin/sh -c false`\n" +
 				"matches := glob`" + globPattern + "`\n" +
@@ -53,15 +54,19 @@ func TestShellCommandFilesystemDialectSyntaxExecutesThroughStdlib(t *testing.T) 
 				"shell_fail_ok := shell_fail.ok\n" +
 				"shell_fail_code := shell_fail.code\n" +
 				"shell_fail_stderr := shell_fail.stderr\n" +
+				"shell_fail_explicit_ok := shell_fail_explicit.ok\n" +
+				"shell_fail_explicit_code := shell_fail_explicit.code\n" +
+				"shell_fail_explicit_stderr := shell_fail_explicit.stderr\n" +
 				"cmd_text := cmd_out.text\n" +
 				"cmd_ok := cmd_out.ok\n" +
 				"cmd_fail_ok := cmd_fail.ok\n" +
 				"cmd_fail_code := cmd_fail.code\n" +
 				"glob_count := #matches\n" +
 				"glob_first := matches[1]\n" +
+				"joined := p.join(\"nested\", \"beta.txt\")\n" +
+				"path_match_ok := p.match(\"nested/*.txt\", joined)\n" +
 				"match_ok := digits.match(\"123\")\n" +
-				"identifier_ok := identifier.match(\"name_1\")\n" +
-				"joined := p.join(\"nested\", \"beta.txt\")\n"
+				"identifier_ok := identifier.match(\"name_1\")\n"
 			err := vm.Exec(src)
 			if err != nil {
 				t.Fatalf("Exec: %v", err)
@@ -73,6 +78,9 @@ func TestShellCommandFilesystemDialectSyntaxExecutesThroughStdlib(t *testing.T) 
 			assertGet(t, vm, "shell_fail_ok", false)
 			assertGet(t, vm, "shell_fail_code", int64(7))
 			assertGet(t, vm, "shell_fail_stderr", "shellerr")
+			assertGet(t, vm, "shell_fail_explicit_ok", false)
+			assertGet(t, vm, "shell_fail_explicit_code", int64(6))
+			assertGet(t, vm, "shell_fail_explicit_stderr", "expliciterr")
 			assertGet(t, vm, "cmd_text", "command-leia")
 			assertGet(t, vm, "cmd_ok", true)
 			assertGet(t, vm, "cmd_fail_ok", false)
@@ -83,6 +91,48 @@ func TestShellCommandFilesystemDialectSyntaxExecutesThroughStdlib(t *testing.T) 
 			assertStringContains(t, vm, "glob_first", "beta.txt")
 			assertGet(t, vm, "cleaned", "alpha.txt")
 			assertGet(t, vm, "joined", "nested/beta.txt")
+			assertGet(t, vm, "path_match_ok", true)
+		})
+	}
+}
+
+func TestFilesystemDialectGlobRespectsRootAndPathStaysPure(t *testing.T) {
+	root := t.TempDir()
+	if err := os.Mkdir(filepath.Join(root, "nested"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "nested", "inside.txt"), []byte("inside"), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, tc := range []struct {
+		name string
+		opts []leia.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			vm := leia.New(append([]leia.Option{
+				leia.WithLibs(leia.LibSafe),
+				leia.WithFilesystemRoot(root),
+				leia.WithFilesystemWrite(false),
+			}, tc.opts...)...)
+			src := "matches := glob`nested/*.txt`\n" +
+				"outside, outside_err := dialect.eval(\"glob\", \"../*.txt\")\n" +
+				"cleaned := path`nested/../nested/./inside.txt`\n" +
+				"glob_count := #matches\n" +
+				"glob_first := matches[1]\n" +
+				"outside_is_nil := outside == nil\n" +
+				"path_is_pure := cleaned == \"nested/inside.txt\"\n"
+			if err := vm.Exec(src); err != nil {
+				t.Fatalf("Exec: %v", err)
+			}
+			assertGet(t, vm, "glob_count", int64(1))
+			assertStringContains(t, vm, "glob_first", "inside.txt")
+			assertGet(t, vm, "outside_is_nil", true)
+			assertStringContains(t, vm, "outside_err", "escapes root")
+			assertGet(t, vm, "path_is_pure", true)
 		})
 	}
 }
@@ -172,6 +222,8 @@ func TestStdlibDataDialectsExecuteThroughStdlib(t *testing.T) {
 			src := "name := \"Leia\"\n" +
 				"csv_rows := csv`name,score\nAda,42\nBob,7\n`\n" +
 				"csv_header_rows := dialect.eval(\"csv\", \"name;score\\nAda;42\\n\", {headers: true, sep: \";\"})\n" +
+				"tsv_rows := tsv`name\tscore\nAda\t42\nBob\t7\n`\n" +
+				"tsv_header_rows := dialect.eval(\"tsv\", \"name\\tscore\\nAda\\t42\\n\", {headers: true})\n" +
 				"line_rows := lines`alpha\n\nbeta\n`\n" +
 				"split_rows := split`left\nright\n`\n" +
 				"line_rows_keep_empty := dialect.eval(\"lines\", \"alpha\\n\\nbeta\\n\", {keep_empty: true})\n" +
@@ -198,6 +250,9 @@ func TestStdlibDataDialectsExecuteThroughStdlib(t *testing.T) {
 				"csv_row_2_name := csv_rows[2][1]\n" +
 				"csv_header_name := csv_header_rows[1].name\n" +
 				"csv_header_score := csv_header_rows[1].score\n" +
+				"tsv_row_2_name := tsv_rows[2][1]\n" +
+				"tsv_header_name := tsv_header_rows[1].name\n" +
+				"tsv_header_score := tsv_header_rows[1].score\n" +
 				"line_count := #line_rows\n" +
 				"line_second := line_rows[2]\n" +
 				"split_first := split_rows[1]\n" +
@@ -234,6 +289,9 @@ func TestStdlibDataDialectsExecuteThroughStdlib(t *testing.T) {
 			assertGet(t, vm, "csv_row_2_name", "Ada")
 			assertGet(t, vm, "csv_header_name", "Ada")
 			assertGet(t, vm, "csv_header_score", "42")
+			assertGet(t, vm, "tsv_row_2_name", "Ada")
+			assertGet(t, vm, "tsv_header_name", "Ada")
+			assertGet(t, vm, "tsv_header_score", "42")
 			assertGet(t, vm, "line_count", int64(2))
 			assertGet(t, vm, "line_second", "beta")
 			assertGet(t, vm, "split_first", "left")

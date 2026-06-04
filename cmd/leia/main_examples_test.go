@@ -33,6 +33,7 @@ func TestRunCommandDialectExamples(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, name := range []string{
+		"data_aggregation_report.leia",
 		"data_science_pipeline.leia",
 		"text_parsing.leia",
 		"web_text.leia",
@@ -167,11 +168,14 @@ func TestTestingJSONLWorkflowExample(t *testing.T) {
 	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
 		t.Fatalf("stdout is not JSON test report: %v; stdout = %q", err, stdout.String())
 	}
-	if !report.OK || report.Total != 1 || report.Passed != 1 {
-		t.Fatalf("report = %+v, want one passing JSONL workflow test", report)
+	if !report.OK || report.Total != 2 || report.Passed != 2 {
+		t.Fatalf("report = %+v, want two passing JSONL testing examples", report)
 	}
-	if len(report.Files) != 1 || filepath.Base(report.Files[0].File) != "jsonl_workflow_test.leia" || !report.Files[0].OK {
+	if !testReportHasPassingFile(report, "jsonl_workflow_test.leia") {
 		t.Fatalf("files = %+v, want jsonl_workflow_test.leia to pass", report.Files)
+	}
+	if !testReportHasPassingFile(report, "jsonl_golden_eval_replay_test.leia") {
+		t.Fatalf("files = %+v, want jsonl_golden_eval_replay_test.leia to pass", report.Files)
 	}
 }
 
@@ -202,6 +206,15 @@ func TestWorkflowReplayExample(t *testing.T) {
 func containsResolvedRequire(reqs []modpkg.ListRequire, path, version string) bool {
 	for _, req := range reqs {
 		if req.Path == path && req.Version == version {
+			return true
+		}
+	}
+	return false
+}
+
+func testReportHasPassingFile(report testRunResult, name string) bool {
+	for _, file := range report.Files {
+		if filepath.Base(file.File) == name && file.OK {
 			return true
 		}
 	}

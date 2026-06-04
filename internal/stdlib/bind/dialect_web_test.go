@@ -70,3 +70,71 @@ func TestDialectHeadersInvalidInputReturnsError(t *testing.T) {
 		t.Fatalf("invalid encode value error = %v, want non-empty string", got)
 	}
 }
+
+func TestDialectCookieParseAndEncode(t *testing.T) {
+	interp := runWithLib(t, `
+		parsed := dialect.eval("cookie", "session=abc123; theme=light; tag=a; tag=b")
+		session := parsed.session
+		theme := parsed.theme
+		first_tag := parsed.tag[1]
+		second_tag := parsed.tag[2]
+
+		to_encode := {}
+		to_encode.theme = "light"
+		to_encode.session = "abc123"
+		to_encode.tag = {"a", "b"}
+		encoded := dialect.eval("cookies", to_encode, {mode: "encode"})
+		empty := dialect.eval("cookie", "  ")
+	`, "dialect", BuildDialect(HostOptions{}, nil))
+
+	if got := interp.GetGlobal("session").Str(); got != "abc123" {
+		t.Fatalf("session = %q, want abc123", got)
+	}
+	if got := interp.GetGlobal("theme").Str(); got != "light" {
+		t.Fatalf("theme = %q, want light", got)
+	}
+	if got := interp.GetGlobal("first_tag").Str(); got != "a" {
+		t.Fatalf("first tag = %q, want a", got)
+	}
+	if got := interp.GetGlobal("second_tag").Str(); got != "b" {
+		t.Fatalf("second tag = %q, want b", got)
+	}
+	want := "session=abc123; tag=a; tag=b; theme=light"
+	if got := interp.GetGlobal("encoded").Str(); got != want {
+		t.Fatalf("encoded cookies = %q, want %q", got, want)
+	}
+	if got := interp.GetGlobal("empty"); !got.IsTable() || got.Table().Length() != 0 {
+		t.Fatalf("empty cookies = %v, want empty table", got)
+	}
+}
+
+func TestDialectCookieInvalidInputReturnsError(t *testing.T) {
+	interp := runWithLib(t, `
+		parsed, parse_err := dialect.eval("cookie", "ok=1; missing")
+		bad := {}
+		bad["bad name"] = "x"
+		encoded, encode_err := dialect.eval("cookie", bad, {mode: "encode"})
+		bad_value := {}
+		bad_value.ok = "first;second"
+		encoded_value, encode_value_err := dialect.eval("cookie", bad_value, {mode: "encode"})
+	`, "dialect", BuildDialect(HostOptions{}, nil))
+
+	if !interp.GetGlobal("parsed").IsNil() {
+		t.Fatalf("invalid parse returned non-nil result")
+	}
+	if got := interp.GetGlobal("parse_err"); !got.IsString() || got.Str() == "" {
+		t.Fatalf("invalid parse error = %v, want non-empty string", got)
+	}
+	if !interp.GetGlobal("encoded").IsNil() {
+		t.Fatalf("invalid encode returned non-nil result")
+	}
+	if got := interp.GetGlobal("encode_err"); !got.IsString() || got.Str() == "" {
+		t.Fatalf("invalid encode error = %v, want non-empty string", got)
+	}
+	if !interp.GetGlobal("encoded_value").IsNil() {
+		t.Fatalf("invalid encode value returned non-nil result")
+	}
+	if got := interp.GetGlobal("encode_value_err"); !got.IsString() || got.Str() == "" {
+		t.Fatalf("invalid encode value error = %v, want non-empty string", got)
+	}
+}
