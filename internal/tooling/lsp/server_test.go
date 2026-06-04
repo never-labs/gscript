@@ -521,7 +521,7 @@ func TestSemanticTokensClassifyLeiaSemanticRoles(t *testing.T) {
 	src := strings.Join([]string{
 		`import "go:strings" as strings`,
 		`rows := csv!` + "`a,b\\n1,2\\n`",
-		`out := $` + "`printf ok`",
+		`out := $!` + "`printf ok`",
 		`prompt! { role: "system" }`,
 		`select {`,
 		`case value := <-ch:`,
@@ -545,6 +545,11 @@ func TestSemanticTokensClassifyLeiaSemanticRoles(t *testing.T) {
 	assertSemanticToken(t, tokens, `a,b\n1,2\n`, semanticString, semanticDialectModifier)
 	assertSemanticToken(t, tokens, "$", semanticNamespace, semanticDialectModifier)
 	assertSemanticToken(t, tokens, "printf ok", semanticString, semanticDialectModifier)
+	assertSemanticTokenSequence(t, tokens,
+		semanticTokenForTest{Text: "$", TokenType: semanticNamespace, Modifier: semanticDialectModifier},
+		semanticTokenForTest{Text: "!", TokenType: semanticOperator, Modifier: semanticDialectModifier},
+		semanticTokenForTest{Text: "printf ok", TokenType: semanticString, Modifier: semanticDialectModifier},
+	)
 	assertSemanticToken(t, tokens, "prompt", semanticNamespace, semanticDialectModifier)
 	assertSemanticToken(t, tokens, "select", semanticKeyword, 0)
 	assertSemanticToken(t, tokens, "case", semanticKeyword, 0)
@@ -966,6 +971,23 @@ func assertSemanticToken(t *testing.T, tokens []semanticTokenForTest, text strin
 		}
 	}
 	t.Fatalf("missing semantic token %q type=%d modifier=%d in %#v", text, tokenType, modifier, tokens)
+}
+
+func assertSemanticTokenSequence(t *testing.T, tokens []semanticTokenForTest, want ...semanticTokenForTest) {
+	t.Helper()
+	for i := 0; i+len(want) <= len(tokens); i++ {
+		matched := true
+		for j := range want {
+			if tokens[i+j] != want[j] {
+				matched = false
+				break
+			}
+		}
+		if matched {
+			return
+		}
+	}
+	t.Fatalf("missing semantic token sequence %#v in %#v", want, tokens)
 }
 
 func mustEncodeMessages(t *testing.T, msgs ...any) []byte {

@@ -60,7 +60,11 @@ func Vendor(path string, opts VendorOptions) VendorReport {
 		report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "LEIA9110", Message: err.Error()})
 		return report
 	}
-	for _, req := range transitiveRequirements(abs, manifest, cacheDir) {
+	for _, dep := range dependencyClosure(abs, manifest, cacheDir) {
+		if dep.Kind == "replace" {
+			continue
+		}
+		req := dep.Require
 		entry, err := vendorRequirement(cacheDir, vendorDir, req.Path, req.Version)
 		if err != nil {
 			report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "LEIA9113", Message: err.Error()})

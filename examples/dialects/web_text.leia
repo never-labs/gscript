@@ -1,5 +1,5 @@
 // web_text.leia - Built-in dialects for small Web-safe text transforms.
-// Demonstrates: url, html_escape, urlquery, mime, headers, cookie, base64, hash
+// Demonstrates: url, html_escape, urlquery, urlpath, mime, headers, cookie, base64, hash
 
 print("=== Dialects: web text ===")
 
@@ -24,14 +24,19 @@ encoded_query := urlquery {q: "hello world", page: 2}
 parsed_query := urlquery`q=hello+world&page=2&tag=a&tag=b`
 component := dialect.eval("urlquery", "hello world&x", {mode: "escape"})
 component_decoded := dialect.eval("urlquery", component, {mode: "unescape"})
+escaped_path := urlpath`a b/米`
+decoded_path := dialect.eval("urlpath", escaped_path, {mode: "unescape"})
 print("urlquery encoded:", encoded_query)
 print("urlquery tag 2:", parsed_query.tag[2])
+print("urlpath escaped:", escaped_path)
 assert(encoded_query == "page=2&q=hello+world")
 assert(parsed_query.q == "hello world")
 assert(parsed_query.page == "2")
 assert(parsed_query.tag[2] == "b")
 assert(component == "hello+world%26x")
 assert(component_decoded == "hello world&x")
+assert(escaped_path == "a%20b%2F%E7%B1%B3")
+assert(decoded_path == "a b/米")
 
 content_type := mime`text/html; charset=utf-8; boundary="abc def"`
 encoded_content_type := mime {type: "application/json", params: {charset: "utf-8", version: 2}}

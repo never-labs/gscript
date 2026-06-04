@@ -502,6 +502,52 @@ _ = dep
 	})
 }
 
+func TestDownloadSkipsLocalReplaceAndFetchesItsTransitiveRequires(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "leia.mod"), strings.Join([]string{
+		"module example.com/app",
+		"leia 0.1",
+		"require example.com/lib v1.2.3",
+		"replace example.com/lib v1.2.3 => ./local/lib",
+		"",
+	}, "\n"))
+	writeFile(t, filepath.Join(dir, "local", "lib", "leia.mod"), strings.Join([]string{
+		"module example.com/lib",
+		"leia 0.1",
+		"require github.com/acme/transitive v0.2.0",
+		"",
+	}, "\n"))
+	writeFile(t, filepath.Join(dir, "local", "lib", "pkg.leia"), `import "github.com/acme/transitive/pkg/value" as value
+_ = value
+`)
+	archives := map[string][]byte{
+		"/acme/transitive/archive/refs/tags/v0.2.0.zip": testGitHubZipFiles(t, map[string]string{
+			"transitive-0.2.0/leia.mod":       "module github.com/acme/transitive\nleia 0.1\n",
+			"transitive-0.2.0/pkg/value.leia": "return 2\n",
+		}),
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		archive, ok := archives[r.URL.Path]
+		if !ok {
+			t.Fatalf("unexpected download path = %q", r.URL.Path)
+		}
+		_, _ = w.Write(archive)
+	}))
+	defer server.Close()
+
+	cache := filepath.Join(dir, "cache")
+	report := Download(dir, DownloadOptions{CacheDir: cache, GitHubBaseURL: server.URL})
+	if !report.OK {
+		t.Fatalf("Download OK = false, diagnostics = %#v", report.Diagnostics)
+	}
+	if len(report.Modules) != 1 || report.Modules[0].Path != "github.com/acme/transitive" {
+		t.Fatalf("Download modules = %#v, want only transitive remote module", report.Modules)
+	}
+	if _, err := os.Stat(filepath.Join(cache, "extract", "github.com", "acme", "transitive@v0.2.0", "pkg", "value.leia")); err != nil {
+		t.Fatalf("transitive cache file missing: %v", err)
+	}
+}
+
 func TestDownloadRejectsNonGitHubModules(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, filepath.Join(dir, "leia.mod"), strings.Join([]string{
@@ -587,6 +633,41 @@ _ = value
 	writeFile(t, target, "return 8\n")
 	diags := VerifySumWithOptions(dir, VerifyOptions{CacheDir: cache})
 	assertDiagnostic(t, diags, "LEIA9109", "checksum mismatch for github.com/acme/transitive")
+}
+
+func TestVendorSkipsLocalReplaceAndCopiesTransitiveDownloadedModules(t *testing.T) {
+	dir := t.TempDir()
+	cache := filepath.Join(dir, "cache")
+	writeFile(t, filepath.Join(dir, "leia.mod"), strings.Join([]string{
+		"module example.com/app",
+		"leia 0.1",
+		"require example.com/lib v1.2.3",
+		"replace example.com/lib v1.2.3 => ./local/lib",
+		"",
+	}, "\n"))
+	writeFile(t, filepath.Join(dir, "local", "lib", "leia.mod"), strings.Join([]string{
+		"module example.com/lib",
+		"leia 0.1",
+		"require github.com/acme/transitive v0.2.0",
+		"",
+	}, "\n"))
+	writeFile(t, filepath.Join(cache, "extract", "github.com", "acme", "transitive@v0.2.0", "leia.mod"), "module github.com/acme/transitive\nleia 0.1\n")
+	writeFile(t, filepath.Join(cache, "extract", "github.com", "acme", "transitive@v0.2.0", "pkg", "value.leia"), "return 7\n")
+
+	report := Vendor(dir, VendorOptions{CacheDir: cache})
+	if !report.OK {
+		t.Fatalf("Vendor OK = false, diagnostics = %#v", report.Diagnostics)
+	}
+	if len(report.Modules) != 1 || report.Modules[0].Path != "github.com/acme/transitive" {
+		t.Fatalf("Vendor modules = %#v, want only transitive remote module", report.Modules)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "vendor", "example.com", "lib@v1.2.3")); !os.IsNotExist(err) {
+		t.Fatalf("local replace was vendored: %v", err)
+	}
+	target := filepath.Join(dir, "vendor", "github.com", "acme", "transitive@v0.2.0", "pkg", "value.leia")
+	if data, err := os.ReadFile(target); err != nil || string(data) != "return 7\n" {
+		t.Fatalf("vendored transitive file = %q, %v; want copied source", string(data), err)
+	}
 }
 
 func TestVendorCopiesDownloadedGitHubSubdirModule(t *testing.T) {

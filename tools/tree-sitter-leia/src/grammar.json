@@ -1318,6 +1318,22 @@
                 }
               },
               {
+                "type": "CHOICE",
+                "members": [
+                  {
+                    "type": "FIELD",
+                    "name": "bang",
+                    "content": {
+                      "type": "SYMBOL",
+                      "name": "dialect_bang"
+                    }
+                  },
+                  {
+                    "type": "BLANK"
+                  }
+                ]
+              },
+              {
                 "type": "FIELD",
                 "name": "body",
                 "content": {

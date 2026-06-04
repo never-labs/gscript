@@ -73,7 +73,7 @@
 
 (defconst leia-font-lock-keywords
   `((,(rx "//leia:" (+ (or word "_" "." "-"))) . font-lock-preprocessor-face)
-    (,(rx "$" (* space) "`") . font-lock-preprocessor-face)
+    (,(rx "$" (? "!") (* space) "`") . font-lock-preprocessor-face)
     (,(rx symbol-start (group (+ (or word "_"))) (? "!") (* space) (or "`" "{"))
      1 font-lock-preprocessor-face)
     (,(regexp-opt leia--keywords 'symbols) . font-lock-keyword-face)

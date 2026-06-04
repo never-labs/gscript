@@ -267,6 +267,20 @@
       "perf_hot_case": {"status": "partial", "refs": ["benchmarks/app/stdlib_host.leia", "benchmarks/table/json_table_walk.leia"]}
     },
     {
+      "id": "tagged_dialect_syntax",
+      "name": "Tagged dialect strings, raw blocks, shell shortcut, and web path dialects",
+      "category": "front-end-stdlib",
+      "spec_sections": ["Grammar Appendix", "Lexical Elements", "Expressions", "Statements", "AI-Native Syntax", "Modules And Loading", "Values And Types"],
+      "parser": {"status": "covered", "refs": ["internal/parser/dialect_syntax_test.go", "internal/lexer/lexer_test.go"]},
+      "bytecode": {"status": "semantic_only", "refs": []},
+      "interpreter": {"status": "covered", "refs": ["tests/dialect_syntax_test.go", "internal/stdlib/bind/dialect_test.go", "internal/stdlib/bind/dialect_web_test.go"]},
+      "tier1": {"status": "semantic_only", "refs": []},
+      "tier2": {"status": "semantic_only", "refs": []},
+      "semantic_gate": {"status": "covered", "refs": ["tests/dialect_syntax_test.go", "internal/parser/dialect_syntax_test.go", "tests/architecture/stdlib_boundary_test.go"]},
+      "conformance_case": {"status": "not_applicable", "refs": []},
+      "perf_hot_case": {"status": "not_applicable", "refs": []}
+    },
+    {
       "id": "llm_native_integration",
       "name": "Native LLM turn/tool/msg/chat/loop integration",
       "category": "embedding-ai",
@@ -277,6 +291,20 @@
       "tier1": {"status": "semantic_only", "refs": []},
       "tier2": {"status": "semantic_only", "refs": []},
       "semantic_gate": {"status": "covered", "refs": ["tests/llm/llm_runtime_test.go", "tests/llm/llm_agent_examples_test.go", "examples/embedding/embedding_test.go", "docs/guides/embedding.md"]},
+      "conformance_case": {"status": "not_applicable", "refs": []},
+      "perf_hot_case": {"status": "not_applicable", "refs": []}
+    },
+    {
+      "id": "module_package_management",
+      "name": "Module package verification, download, vendoring, and transitive requirements",
+      "category": "tooling-module",
+      "spec_sections": ["Modules And Loading", "Declarations And Scope", "Values And Types", "Expressions"],
+      "parser": {"status": "not_applicable", "refs": []},
+      "bytecode": {"status": "not_applicable", "refs": []},
+      "interpreter": {"status": "semantic_only", "refs": []},
+      "tier1": {"status": "semantic_only", "refs": []},
+      "tier2": {"status": "semantic_only", "refs": []},
+      "semantic_gate": {"status": "covered", "refs": ["internal/modpkg/modpkg_test.go", "tests/architecture/package_boundary_test.go", "tests/architecture/stdlib_boundary_test.go"]},
       "conformance_case": {"status": "not_applicable", "refs": []},
       "perf_hot_case": {"status": "not_applicable", "refs": []}
     },

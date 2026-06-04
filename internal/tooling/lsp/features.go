@@ -565,9 +565,18 @@ func tokenCanStartDialectExpression(tokens []lexer.Token, index int) bool {
 }
 
 func tokenLooksLikeDialectBang(tokens []lexer.Token, index int) bool {
-	return index > 0 && tokens[index-1].Type == lexer.TOKEN_IDENT && index+1 < len(tokens) &&
-		(tokens[index+1].Type == lexer.TOKEN_STRING || tokens[index+1].Type == lexer.TOKEN_LBRACE) &&
-		tokenLooksLikeDialectTag(tokens, index-1)
+	if index == 0 || index+1 >= len(tokens) {
+		return false
+	}
+	switch tokens[index-1].Type {
+	case lexer.TOKEN_IDENT:
+		return (tokens[index+1].Type == lexer.TOKEN_STRING || tokens[index+1].Type == lexer.TOKEN_LBRACE) &&
+			tokenLooksLikeDialectTag(tokens, index-1)
+	case lexer.TOKEN_DOLLAR:
+		return tokens[index+1].Type == lexer.TOKEN_STRING && tokenLooksLikeShellDialectTag(tokens, index-1)
+	default:
+		return false
+	}
 }
 
 func tokenLooksLikeDialectBody(tokens []lexer.Token, index int) bool {
@@ -577,11 +586,14 @@ func tokenLooksLikeDialectBody(tokens []lexer.Token, index int) bool {
 	if index > 1 && tokens[index-1].Type == lexer.TOKEN_NOT && tokenLooksLikeDialectBang(tokens, index-1) {
 		return true
 	}
-	return index > 0 && tokenLooksLikeShellDialectTag(tokens, index-1)
+	return index > 0 && (tokenLooksLikeShellDialectTag(tokens, index-1) ||
+		(tokens[index-1].Type == lexer.TOKEN_NOT && tokenLooksLikeDialectBang(tokens, index-1)))
 }
 
 func tokenLooksLikeShellDialectTag(tokens []lexer.Token, index int) bool {
-	return tokens[index].Type == lexer.TOKEN_DOLLAR && index+1 < len(tokens) && tokens[index+1].Type == lexer.TOKEN_STRING
+	return tokens[index].Type == lexer.TOKEN_DOLLAR && index+1 < len(tokens) &&
+		(tokens[index+1].Type == lexer.TOKEN_STRING ||
+			(tokens[index+1].Type == lexer.TOKEN_NOT && index+2 < len(tokens) && tokens[index+2].Type == lexer.TOKEN_STRING))
 }
 
 func tokenLooksLikeContextualKeyword(tokens []lexer.Token, index int) bool {

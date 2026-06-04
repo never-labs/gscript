@@ -122,7 +122,7 @@ def check_textmate() -> None:
     leia_mod = load_json(ROOT / "tools/syntax/textmate/leia-mod.tmLanguage.json")
     vscode_leia = load_json(ROOT / "editors/vscode/syntaxes/leia.tmLanguage.json")
     vscode_leia_mod = load_json(ROOT / "editors/vscode/syntaxes/leia-mod.tmLanguage.json")
-    source = (ROOT / "tools/editor/smoke/fixtures/ai_native.leia").read_text(encoding="utf-8")
+    source = (ROOT / "tools/editor/smoke/fixtures/llm_surface.leia").read_text(encoding="utf-8")
     manifest = (ROOT / "tools/editor/smoke/fixtures/leia.mod").read_text(encoding="utf-8")
 
     if leia.get("scopeName") != "source.leia":
@@ -149,6 +149,8 @@ def check_textmate() -> None:
     assert_any_match(leia, "keyword.operator.raw.dialect.leia", "rows := csv!`a,b\\n1,2\\n`")
     assert_match(leia, "meta.dialect.shell.tagged-string.leia", "out := $`printf ok`")
     assert_any_match(leia, "entity.name.tag.shell.leia", "out := $`printf ok`")
+    assert_match(leia, "meta.dialect.shell.tagged-string.leia", "out := $!`printf ok`")
+    assert_any_match(leia, "keyword.operator.raw.dialect.leia", "out := $!`printf ok`")
     assert_any_match(leia, "meta.dialect.tagged-block.leia", 'prompt { role: "system" }')
     assert_match(leia, "meta.dialect.tagged-block.leia", 'prompt! { role: "system" }')
     assert_match(leia, "support.type.primitive.leia", source)
@@ -321,7 +323,7 @@ def check_tree_sitter_assets() -> None:
     for marker in (
         "import \"go:net/http\" as http",
         "csv!`a,b\\n1,2\\n`",
-        "$`printf ok`",
+        "$!`printf ok`",
         "prompt! { role:",
         "(tagged_string_expression",
         "(tagged_block_expression",

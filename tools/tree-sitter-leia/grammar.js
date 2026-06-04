@@ -228,6 +228,7 @@ module.exports = grammar({
       ),
       seq(
         field("tag", $.shell_tag),
+        optional(field("bang", $.dialect_bang)),
         field("body", $.string),
       ),
     )),

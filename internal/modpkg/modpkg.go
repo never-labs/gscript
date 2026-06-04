@@ -1312,19 +1312,33 @@ func remoteSumEntries(root string, manifest modfile.File, cacheDir string) ([]Su
 }
 
 func transitiveRequirements(root string, manifest modfile.File, cacheDir string) []modfile.Require {
-	seen := map[string]bool{}
-	return appendTransitiveRequirements(nil, root, manifest, cacheDir, seen)
+	deps := dependencyClosure(root, manifest, cacheDir)
+	out := make([]modfile.Require, 0, len(deps))
+	for _, dep := range deps {
+		out = append(out, dep.Require)
+	}
+	return out
 }
 
-func appendTransitiveRequirements(out []modfile.Require, root string, manifest modfile.File, cacheDir string, seen map[string]bool) []modfile.Require {
+type dependencyRequirement struct {
+	Require modfile.Require
+	Kind    string
+}
+
+func dependencyClosure(root string, manifest modfile.File, cacheDir string) []dependencyRequirement {
+	seen := map[string]bool{}
+	return appendDependencyClosure(nil, root, manifest, cacheDir, seen)
+}
+
+func appendDependencyClosure(out []dependencyRequirement, root string, manifest modfile.File, cacheDir string, seen map[string]bool) []dependencyRequirement {
 	for _, req := range manifest.Require {
 		key := req.Path + "\x00" + req.Version
 		if seen[key] {
 			continue
 		}
 		seen[key] = true
-		out = append(out, req)
-		depRoot, _, ok := dependencyRootWithCache(root, manifest, req, cacheDir)
+		depRoot, kind, ok := dependencyRootWithCache(root, manifest, req, cacheDir)
+		out = append(out, dependencyRequirement{Require: req, Kind: kind})
 		if !ok {
 			continue
 		}
@@ -1332,7 +1346,7 @@ func appendTransitiveRequirements(out []modfile.Require, root string, manifest m
 		if err != nil {
 			continue
 		}
-		out = appendTransitiveRequirements(out, depRoot, depManifest, cacheDir, seen)
+		out = appendDependencyClosure(out, depRoot, depManifest, cacheDir, seen)
 	}
 	return out
 }

@@ -137,6 +137,37 @@ func TestFilesystemDialectGlobRespectsRootAndPathStaysPure(t *testing.T) {
 	}
 }
 
+func TestTaggedDialectStringsRejectQuotedStringLiterals(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []leia.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, src := range []string{
+				`msg := prompt"hello"`,
+				`msg := prompt!"hello"`,
+				`shell := $"printf hello"`,
+				`shell := $!"printf hello"`,
+			} {
+				t.Run(src, func(t *testing.T) {
+					vm := leia.New(append([]leia.Option{
+						leia.WithLibs(leia.LibAll),
+						leia.WithProcessExecution(false),
+						leia.WithProcessShell(false),
+					}, tc.opts...)...)
+					err := vm.Exec(src)
+					if err == nil {
+						t.Fatalf("Exec(%q) succeeded, want parse error", src)
+					}
+				})
+			}
+		})
+	}
+}
+
 func TestPureDialectSyntaxExecutesThroughStdlib(t *testing.T) {
 	for _, tc := range []struct {
 		name string
@@ -158,6 +189,7 @@ func TestPureDialectSyntaxExecutesThroughStdlib(t *testing.T) {
 				"parsed_url := url`https://example.com:8443/a/b?q=one&tag=two#frag`\n" +
 				"base64_text := base64`Hello ${name}`\n" +
 				"base64_decoded := dialect.eval(\"base64\", base64_text, {mode: \"decode\"})\n" +
+				"raw_line_rows := lines`one\\nnot split`\n" +
 				"base64_url := dialect.eval(\"base64\", \"a/b?\", {mode: \"url_encode\"})\n" +
 				"base64_url_decoded := dialect.eval(\"base64\", base64_url, {mode: \"url_decode\"})\n" +
 				"hash_sha256 := hash`leia`\n" +
@@ -173,6 +205,8 @@ func TestPureDialectSyntaxExecutesThroughStdlib(t *testing.T) {
 				"url_query_q := parsed_url.query.q\n" +
 				"url_query_tag := parsed_url.query.tag\n" +
 				"prompt_text := msg.text\n" +
+				"raw_line_count := #raw_line_rows\n" +
+				"raw_line_first := raw_line_rows[1]\n" +
 				"prompt_cfg_role := prompt_cfg.body.role\n" +
 				"prompt_cfg_text := prompt_cfg.body.text\n" +
 				"quote_cfg_kind := quoted_cfg.kind\n" +
@@ -191,6 +225,8 @@ func TestPureDialectSyntaxExecutesThroughStdlib(t *testing.T) {
 			assertGet(t, vm, "url_query_tag", "two")
 			assertGet(t, vm, "base64_text", "SGVsbG8gbGVpYQ==")
 			assertGet(t, vm, "base64_decoded", "Hello leia")
+			assertGet(t, vm, "raw_line_count", int64(1))
+			assertGet(t, vm, "raw_line_first", `one\nnot split`)
 			assertGet(t, vm, "base64_url", "YS9iPw")
 			assertGet(t, vm, "base64_url_decoded", "a/b?")
 			assertGet(t, vm, "hash_sha256", "b0dea5555379c9e3384dd1e771de9d73db4ee7f9c24725bfe8b757b3768b015f")
@@ -239,6 +275,8 @@ func TestStdlibDataDialectsExecuteThroughStdlib(t *testing.T) {
 				"unescaped_html := dialect.eval(\"html_escape\", escaped_html, {mode: \"unescape\"})\n" +
 				"urlquery_component := dialect.eval(\"urlquery\", \"hello world&x\", {mode: \"escape\"})\n" +
 				"urlquery_component_decoded := dialect.eval(\"urlquery\", urlquery_component, {mode: \"unescape\"})\n" +
+				"urlpath_text := urlpath`a b/米`\n" +
+				"urlpath_decoded := dialect.eval(\"urlpath\", urlpath_text, {mode: \"unescape\"})\n" +
 				"urlquery_text := urlquery {q: \"hello world\", page: 2}\n" +
 				"urlquery_rows := urlquery`q=hello+world&page=2&tag=a&tag=b`\n" +
 				"mime_type := mime`text/html; charset=utf-8; boundary=\"abc def\"`\n" +
@@ -336,6 +374,8 @@ func TestStdlibDataDialectsExecuteThroughStdlib(t *testing.T) {
 			assertGet(t, vm, "unescaped_html", "<b>Ada & Bob</b>")
 			assertGet(t, vm, "urlquery_component", "hello+world%26x")
 			assertGet(t, vm, "urlquery_component_decoded", "hello world&x")
+			assertGet(t, vm, "urlpath_text", "a%20b%2F%E7%B1%B3")
+			assertGet(t, vm, "urlpath_decoded", "a b/米")
 			assertGet(t, vm, "urlquery_text", "page=2&q=hello+world")
 			assertGet(t, vm, "urlquery_q", "hello world")
 			assertGet(t, vm, "urlquery_page", "2")
@@ -396,6 +436,33 @@ func TestProcessDialectsRespectHostCapabilities(t *testing.T) {
 						t.Fatalf("Exec err = %v, want %q", err, blocked.want)
 					}
 				})
+			}
+		})
+	}
+}
+
+func TestShellShortcutBangFailsFast(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []leia.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			vm := leia.New(append([]leia.Option{
+				leia.WithLibs(leia.LibAll),
+				leia.WithProcessExecution(true),
+				leia.WithProcessShell(true),
+			}, tc.opts...)...)
+			if err := vm.Exec("ok := $!`printf shell-ok`\nok_text := ok.text"); err != nil {
+				t.Fatalf("Exec success case: %v", err)
+			}
+			assertGet(t, vm, "ok_text", "shell-ok")
+
+			err := vm.Exec("failed := $!`printf fastfailerr 1>&2; exit 9`")
+			if err == nil || !strings.Contains(err.Error(), "sh dialect failed with exit code 9: fastfailerr") {
+				t.Fatalf("Exec err = %v, want fail-fast shell error", err)
 			}
 		})
 	}

@@ -1,5 +1,5 @@
 // shell_filesystem.leia - Built-in dialects for local process and filesystem work.
-// Demonstrates: $, sh, cmd, glob, path
+// Demonstrates: $, $!, sh, cmd, glob, path
 //leia:cap process.exec,process.shell,fs.read
 
 print("=== Dialects: shell, command, filesystem ===")
@@ -13,6 +13,14 @@ assert(shell_result.code == 0)
 assert(shell_result.text == "hello-Leia")
 print("$ stdout:", shell_result.text)
 print("$ ok:", shell_result.ok, "code:", shell_result.code)
+
+// $! is the fail-fast shell shortcut. A non-zero exit would raise instead of
+// returning a result table; successful commands still expose the same fields.
+shell_fast_result := $!`printf 'fast-%s' '${name}'`
+assert(shell_fast_result.ok == true)
+assert(shell_fast_result.code == 0)
+assert(shell_fast_result.text == "fast-Leia")
+print("$! stdout:", shell_fast_result.text)
 
 // sh is the named form of the same shell dialect.
 sh_result := sh`printf 'alias-%s' '${name}'`

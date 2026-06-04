@@ -82,6 +82,14 @@ func downloadRequirements(root string, manifest modfile.File, cacheDir string, o
 			continue
 		}
 		seen[key] = true
+		if depRoot, kind, ok := dependencyRootWithCache(root, manifest, req, cacheDir); ok && kind == "replace" {
+			depManifest, _, err := ReadFileWithPath(depRoot)
+			if err != nil {
+				continue
+			}
+			modules = append(modules, downloadRequirements(depRoot, depManifest, cacheDir, opts, diags, seen)...)
+			continue
+		}
 		entry, err := downloadRequirement(req.Path, req.Version, cacheDir, opts)
 		if err != nil {
 			*diags = append(*diags, Diagnostic{Severity: "error", Code: "LEIA9111", Message: err.Error()})

@@ -138,6 +138,62 @@ func TestLanguageGrammarAppendixDocumentsStableSyntax(t *testing.T) {
 	}
 }
 
+func TestFeatureMatrixCoversTaggedDialectAndModpkgReleaseGuards(t *testing.T) {
+	root := findRepoRoot(t)
+	features := loadFeatureMatrixFeatureMap(t, root)
+
+	tagged := features["tagged_dialect_syntax"]
+	if tagged == nil {
+		t.Fatal("feature_matrix.json missing tagged_dialect_syntax feature")
+	}
+	requireFeatureCellRefs(t, tagged, "tagged_dialect_syntax", "parser", "internal/parser/dialect_syntax_test.go")
+	requireFeatureCellRefs(t, tagged, "tagged_dialect_syntax", "interpreter", "tests/dialect_syntax_test.go", "internal/stdlib/bind/dialect_web_test.go")
+	requireFeatureCellRefs(t, tagged, "tagged_dialect_syntax", "semantic_gate", "tests/architecture/stdlib_boundary_test.go")
+
+	parserGuard := readFileString(t, filepath.Join(root, "internal", "parser", "dialect_syntax_test.go"))
+	for _, snippet := range []string{
+		"TestTaggedDialectStringsRequireRawStringLiteral",
+		"$!`printf hello`",
+		`{method: "eval_raw", tag: "quote", failFast: true}`,
+	} {
+		if !strings.Contains(parserGuard, snippet) {
+			t.Fatalf("internal/parser/dialect_syntax_test.go must keep tagged syntax guard snippet %q", snippet)
+		}
+	}
+	dialectGuard := readFileString(t, filepath.Join(root, "tests", "dialect_syntax_test.go"))
+	if !strings.Contains(dialectGuard, "urlpath`a b/米`") || !strings.Contains(dialectGuard, `dialect.eval(\"urlpath\"`) {
+		t.Fatal("tests/dialect_syntax_test.go must keep urlpath tagged literal and eval coverage")
+	}
+	stdlibBoundary := readFileString(t, filepath.Join(root, "tests", "architecture", "stdlib_boundary_test.go"))
+	if !strings.Contains(stdlibBoundary, `"urlpath"`) {
+		t.Fatal("stdlib architecture boundary must keep urlpath in the approved web dialect registry")
+	}
+
+	modpkg := features["module_package_management"]
+	if modpkg == nil {
+		t.Fatal("feature_matrix.json missing module_package_management feature")
+	}
+	requireFeatureCellRefs(t, modpkg, "module_package_management", "semantic_gate",
+		"internal/modpkg/modpkg_test.go",
+		"tests/architecture/package_boundary_test.go",
+		"tests/architecture/stdlib_boundary_test.go",
+	)
+	modpkgGuard := readFileString(t, filepath.Join(root, "internal", "modpkg", "modpkg_test.go"))
+	for _, snippet := range []string{
+		"TestVerifyChecksTransitiveDependencyManifests",
+		"TestDownloadFetchesTransitiveGitHubRequires",
+		"TestVendorCopiesTransitiveDownloadedModules",
+	} {
+		if !strings.Contains(modpkgGuard, snippet) {
+			t.Fatalf("internal/modpkg/modpkg_test.go must keep transitive module package guard %q", snippet)
+		}
+	}
+	packageBoundary := readFileString(t, filepath.Join(root, "tests", "architecture", "package_boundary_test.go"))
+	if !strings.Contains(packageBoundary, `internal("modpkg")`) {
+		t.Fatal("package architecture boundary must keep modpkg dependency direction guard")
+	}
+}
+
 func decodeRequiredString(t *testing.T, feature map[string]json.RawMessage, index int, field string) string {
 	t.Helper()
 	raw, ok := feature[field]
@@ -178,6 +234,56 @@ func decodeRequiredStringList(t *testing.T, feature map[string]json.RawMessage, 
 		seen[value] = true
 	}
 	return values
+}
+
+func loadFeatureMatrixFeatureMap(t *testing.T, root string) map[string]map[string]json.RawMessage {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join(root, "tests", "feature_matrix.json"))
+	if err != nil {
+		t.Fatalf("read feature matrix: %v", err)
+	}
+	var matrix struct {
+		Features []map[string]json.RawMessage `json:"features"`
+	}
+	if err := json.Unmarshal(data, &matrix); err != nil {
+		t.Fatalf("decode feature matrix: %v", err)
+	}
+	features := map[string]map[string]json.RawMessage{}
+	for i, feature := range matrix.Features {
+		id := decodeRequiredString(t, feature, i, "id")
+		if features[id] != nil {
+			t.Fatalf("duplicate feature id %q", id)
+		}
+		features[id] = feature
+	}
+	return features
+}
+
+func requireFeatureCellRefs(t *testing.T, feature map[string]json.RawMessage, featureID, field string, refs ...string) {
+	t.Helper()
+	raw, ok := feature[field]
+	if !ok {
+		t.Fatalf("%s missing %s", featureID, field)
+	}
+	var cell struct {
+		Status string   `json:"status"`
+		Refs   []string `json:"refs"`
+	}
+	if err := json.Unmarshal(raw, &cell); err != nil {
+		t.Fatalf("%s.%s: %v", featureID, field, err)
+	}
+	if cell.Status != "covered" {
+		t.Fatalf("%s.%s status = %q, want covered", featureID, field, cell.Status)
+	}
+	have := map[string]bool{}
+	for _, ref := range cell.Refs {
+		have[ref] = true
+	}
+	for _, ref := range refs {
+		if !have[ref] {
+			t.Fatalf("%s.%s refs = %#v, missing %q", featureID, field, cell.Refs, ref)
+		}
+	}
 }
 
 func loadLanguageSpecSections(t *testing.T, root string) map[string]bool {

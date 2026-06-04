@@ -144,7 +144,7 @@ Dialect expressions
 ==================
 
 rows := csv!`a,b\n1,2\n`
-out := $`printf ok`
+out := $!`printf ok`
 prompt! { role: "system" }
 script { print("ok") }
 
@@ -173,6 +173,7 @@ script { print("ok") }
           (expression
             (tagged_string_expression
               tag: (shell_tag)
+              bang: (dialect_bang)
               body: (string)))))))
   (statement
     (simple_statement

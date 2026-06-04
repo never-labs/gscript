@@ -167,12 +167,15 @@
         {
           "name": "meta.dialect.shell.tagged-string.leia",
           "contentName": "string.quoted.raw.shell.leia",
-          "begin": "(\\$)\\s*(`)",
+          "begin": "(\\$)(!)?\\s*(`)",
           "beginCaptures": {
             "1": {
               "name": "entity.name.tag.shell.leia"
             },
             "2": {
+              "name": "keyword.operator.raw.dialect.leia"
+            },
+            "3": {
               "name": "punctuation.definition.string.begin.leia"
             }
           },
