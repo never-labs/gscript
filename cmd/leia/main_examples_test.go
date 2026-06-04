@@ -5,13 +5,15 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"regexp"
 	"sort"
 	"strings"
 	"testing"
 
 	leia "github.com/never-labs/leia"
+	"github.com/never-labs/leia/internal/ast"
+	"github.com/never-labs/leia/internal/lexer"
 	"github.com/never-labs/leia/internal/modpkg"
+	"github.com/never-labs/leia/internal/parser"
 	"github.com/never-labs/leia/internal/stdlib/catalog"
 	"github.com/never-labs/leia/llm"
 )
@@ -375,31 +377,195 @@ func collectDialectExampleTags(t *testing.T, root string) map[string]bool {
 	}
 	sort.Strings(paths)
 
-	evalRe := regexp.MustCompile(`dialect\.eval\("([A-Za-z_][A-Za-z0-9_]*)"`)
-	taggedRe := regexp.MustCompile(`\b([A-Za-z_][A-Za-z0-9_]*)!?\s*(?:` + "`" + `|\{)`)
-	shellShortcutRe := regexp.MustCompile(`\$!?\s*` + "`")
 	tags := map[string]bool{}
 	for _, path := range paths {
 		data, err := os.ReadFile(path)
 		if err != nil {
 			t.Fatalf("read %s: %v", path, err)
 		}
-		source := string(data)
-		if shellShortcutRe.MatchString(source) {
-			tags["sh"] = true
+		tokens, err := lexer.New(string(data)).Tokenize()
+		if err != nil {
+			t.Fatalf("lex %s: %v", path, err)
 		}
-		for _, match := range evalRe.FindAllStringSubmatch(source, -1) {
-			if approved[match[1]] {
-				tags[match[1]] = true
-			}
+		prog, err := parser.New(tokens).Parse()
+		if err != nil {
+			t.Fatalf("parse %s: %v", path, err)
 		}
-		for _, match := range taggedRe.FindAllStringSubmatch(source, -1) {
-			if approved[match[1]] {
-				tags[match[1]] = true
-			}
-		}
+		collectDialectTagsFromProgram(prog, approved, tags)
 	}
 	return tags
+}
+
+func collectDialectTagsFromProgram(prog *ast.Program, approved, tags map[string]bool) {
+	if prog == nil {
+		return
+	}
+	for _, stmt := range prog.Stmts {
+		collectDialectTagsFromStmt(stmt, approved, tags)
+	}
+}
+
+func collectDialectTagsFromStmt(stmt ast.Stmt, approved, tags map[string]bool) {
+	switch s := stmt.(type) {
+	case *ast.AssignStmt:
+		for _, expr := range s.Targets {
+			collectDialectTagsFromExpr(expr, approved, tags)
+		}
+		for _, expr := range s.Values {
+			collectDialectTagsFromExpr(expr, approved, tags)
+		}
+	case *ast.DeclareStmt:
+		for _, expr := range s.Values {
+			collectDialectTagsFromExpr(expr, approved, tags)
+		}
+	case *ast.CompoundAssignStmt:
+		collectDialectTagsFromExpr(s.Target, approved, tags)
+		collectDialectTagsFromExpr(s.Value, approved, tags)
+	case *ast.IncDecStmt:
+		collectDialectTagsFromExpr(s.Target, approved, tags)
+	case *ast.CallStmt:
+		collectDialectTagsFromExpr(s.Call, approved, tags)
+	case *ast.GoStmt:
+		collectDialectTagsFromExpr(s.Call, approved, tags)
+	case *ast.DeferStmt:
+		collectDialectTagsFromExpr(s.Call, approved, tags)
+	case *ast.SendStmt:
+		collectDialectTagsFromExpr(s.Channel, approved, tags)
+		collectDialectTagsFromExpr(s.Value, approved, tags)
+	case *ast.SelectStmt:
+		for _, clause := range s.Cases {
+			collectDialectTagsFromExpr(clause.Channel, approved, tags)
+			collectDialectTagsFromExpr(clause.SendValue, approved, tags)
+			collectDialectTagsFromBlock(clause.Body, approved, tags)
+		}
+		collectDialectTagsFromBlock(s.Default, approved, tags)
+	case *ast.IfStmt:
+		collectDialectTagsFromExpr(s.Cond, approved, tags)
+		collectDialectTagsFromBlock(s.Body, approved, tags)
+		for _, clause := range s.ElseIfs {
+			collectDialectTagsFromExpr(clause.Cond, approved, tags)
+			collectDialectTagsFromBlock(clause.Body, approved, tags)
+		}
+		collectDialectTagsFromBlock(s.ElseBody, approved, tags)
+	case *ast.ForNumStmt:
+		collectDialectTagsFromStmt(s.Init, approved, tags)
+		collectDialectTagsFromExpr(s.Cond, approved, tags)
+		collectDialectTagsFromStmt(s.Post, approved, tags)
+		collectDialectTagsFromBlock(s.Body, approved, tags)
+	case *ast.ForRangeStmt:
+		collectDialectTagsFromExpr(s.Iter, approved, tags)
+		collectDialectTagsFromBlock(s.Body, approved, tags)
+	case *ast.ForStmt:
+		collectDialectTagsFromExpr(s.Cond, approved, tags)
+		collectDialectTagsFromBlock(s.Body, approved, tags)
+	case *ast.ReturnStmt:
+		for _, expr := range s.Values {
+			collectDialectTagsFromExpr(expr, approved, tags)
+		}
+	case *ast.FuncDeclStmt:
+		collectDialectTagsFromBlock(s.Body, approved, tags)
+	case *ast.BlockStmt:
+		collectDialectTagsFromBlock(s, approved, tags)
+	}
+}
+
+func collectDialectTagsFromBlock(block *ast.BlockStmt, approved, tags map[string]bool) {
+	if block == nil {
+		return
+	}
+	for _, stmt := range block.Stmts {
+		collectDialectTagsFromStmt(stmt, approved, tags)
+	}
+}
+
+func collectDialectTagsFromExpr(expr ast.Expr, approved, tags map[string]bool) {
+	switch e := expr.(type) {
+	case nil:
+		return
+	case *ast.TaggedStringExpr:
+		recordDialectTag(e.Tag, approved, tags)
+		collectDialectTagsFromExpr(e.Body, approved, tags)
+	case *ast.TaggedBlockExpr:
+		recordDialectTag(e.Tag, approved, tags)
+		for _, field := range e.Config {
+			collectDialectTagsFromExpr(field.Key, approved, tags)
+			collectDialectTagsFromExpr(field.Value, approved, tags)
+		}
+		collectDialectTagsFromBlock(e.Body, approved, tags)
+	case *ast.InterpolatedStringExpr:
+		for _, part := range e.Parts {
+			collectDialectTagsFromExpr(part.Expr, approved, tags)
+		}
+	case *ast.BinaryExpr:
+		collectDialectTagsFromExpr(e.Left, approved, tags)
+		collectDialectTagsFromExpr(e.Right, approved, tags)
+	case *ast.UnaryExpr:
+		collectDialectTagsFromExpr(e.Operand, approved, tags)
+	case *ast.ParenExpr:
+		collectDialectTagsFromExpr(e.Inner, approved, tags)
+	case *ast.IndexExpr:
+		collectDialectTagsFromExpr(e.Table, approved, tags)
+		collectDialectTagsFromExpr(e.Index, approved, tags)
+	case *ast.FieldExpr:
+		collectDialectTagsFromExpr(e.Table, approved, tags)
+	case *ast.CallExpr:
+		if tag, ok := dialectEvalCallTag(e); ok {
+			recordDialectTag(tag, approved, tags)
+		}
+		collectDialectTagsFromExpr(e.Func, approved, tags)
+		for _, arg := range e.Args {
+			collectDialectTagsFromExpr(arg, approved, tags)
+		}
+	case *ast.MethodCallExpr:
+		collectDialectTagsFromExpr(e.Object, approved, tags)
+		for _, arg := range e.Args {
+			collectDialectTagsFromExpr(arg, approved, tags)
+		}
+	case *ast.FuncLitExpr:
+		collectDialectTagsFromBlock(e.Body, approved, tags)
+	case *ast.ListLitExpr:
+		for _, value := range e.Values {
+			collectDialectTagsFromExpr(value, approved, tags)
+		}
+	case *ast.TableLitExpr:
+		for _, field := range e.Fields {
+			collectDialectTagsFromExpr(field.Key, approved, tags)
+			collectDialectTagsFromExpr(field.Value, approved, tags)
+		}
+	case *ast.DenseLitExpr:
+		for _, value := range e.Values {
+			collectDialectTagsFromExpr(value, approved, tags)
+		}
+	case *ast.RecvExpr:
+		collectDialectTagsFromExpr(e.Channel, approved, tags)
+	case *ast.MakeChanExpr:
+		collectDialectTagsFromExpr(e.Size, approved, tags)
+	}
+}
+
+func dialectEvalCallTag(call *ast.CallExpr) (string, bool) {
+	field, ok := call.Func.(*ast.FieldExpr)
+	if !ok || (field.Field != "eval" && field.Field != "eval_block" && field.Field != "eval_raw") || len(call.Args) == 0 {
+		return "", false
+	}
+	ident, ok := field.Table.(*ast.IdentExpr)
+	if !ok || ident.Name != "dialect" {
+		return "", false
+	}
+	lit, ok := call.Args[0].(*ast.StringLit)
+	if !ok {
+		return "", false
+	}
+	return lit.Value, true
+}
+
+func recordDialectTag(tag string, approved, tags map[string]bool) {
+	if tag == "$" {
+		tag = "sh"
+	}
+	if approved[tag] {
+		tags[tag] = true
+	}
 }
 
 func containsResolvedRequire(reqs []modpkg.ListRequire, path, version string) bool {

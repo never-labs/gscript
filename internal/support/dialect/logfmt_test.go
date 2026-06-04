@@ -23,6 +23,22 @@ func TestParseLogfmtParsesQuotedValuesAndFlags(t *testing.T) {
 	}
 }
 
+func TestParseLogfmtPreservesDuplicateKeys(t *testing.T) {
+	got, err := ParseLogfmt(`tag=first tag=second ok tag="third value"`)
+	if err != nil {
+		t.Fatalf("ParseLogfmt: %v", err)
+	}
+	want := []LogfmtPair{
+		{Key: "tag", Value: "first"},
+		{Key: "tag", Value: "second"},
+		{Key: "ok", Value: "true"},
+		{Key: "tag", Value: "third value"},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("ParseLogfmt = %#v, want %#v", got, want)
+	}
+}
+
 func TestParseLogfmtRejectsUnterminatedQuote(t *testing.T) {
 	if _, err := ParseLogfmt(`level=info msg="oops`); err == nil {
 		t.Fatalf("ParseLogfmt unterminated quote returned nil error")

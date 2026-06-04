@@ -1,6 +1,7 @@
 package bind
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/never-labs/leia/internal/runtime"
@@ -36,5 +37,212 @@ func TestMatrixFastPathsInstalled(t *testing.T) {
 		if gf == nil || gf.Name != "matrix."+tc.name || !tc.ok(gf) {
 			t.Fatalf("matrix.%s fast binding missing: %#v", tc.name, gf)
 		}
+	}
+}
+
+func TestMatrixDenseRejectsInvalidDimensions(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		src  string
+		want string
+	}{
+		{
+			name: "negative rows",
+			src:  `matrix.dense(-1, 2)`,
+			want: "matrix.dense: rows and cols must be non-negative",
+		},
+		{
+			name: "negative cols",
+			src:  `matrix.dense(1, -2)`,
+			want: "matrix.dense: rows and cols must be non-negative",
+		},
+		{
+			name: "float rows",
+			src:  `matrix.dense(1.5, 2)`,
+			want: "matrix.dense: rows and cols must be integers",
+		},
+		{
+			name: "string cols",
+			src:  `matrix.dense(1, "2")`,
+			want: "matrix.dense: rows and cols must be integers",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := runProgramExpectError(t, tc.src)
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("error = %v, want containing %q", err, tc.want)
+			}
+		})
+	}
+}
+
+func TestMatrixGetSetRejectsOutOfRangeIndices(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		src  string
+		want string
+	}{
+		{
+			name: "get negative row",
+			src: `
+m := matrix.dense(2, 3)
+matrix.getf(m, -1, 0)
+`,
+			want: "matrix.getf: index out of range",
+		},
+		{
+			name: "get row past end",
+			src: `
+m := matrix.dense(2, 3)
+matrix.getf(m, 2, 0)
+`,
+			want: "matrix.getf: index out of range",
+		},
+		{
+			name: "get negative col",
+			src: `
+m := matrix.dense(2, 3)
+matrix.getf(m, 0, -1)
+`,
+			want: "matrix.getf: index out of range",
+		},
+		{
+			name: "get col past end",
+			src: `
+m := matrix.dense(2, 3)
+matrix.getf(m, 0, 3)
+`,
+			want: "matrix.getf: index out of range",
+		},
+		{
+			name: "set negative row",
+			src: `
+m := matrix.dense(2, 3)
+matrix.setf(m, -1, 0, 1)
+`,
+			want: "matrix.setf: index out of range",
+		},
+		{
+			name: "set row past end",
+			src: `
+m := matrix.dense(2, 3)
+matrix.setf(m, 2, 0, 1)
+`,
+			want: "matrix.setf: index out of range",
+		},
+		{
+			name: "set negative col",
+			src: `
+m := matrix.dense(2, 3)
+matrix.setf(m, 0, -1, 1)
+`,
+			want: "matrix.setf: index out of range",
+		},
+		{
+			name: "set col past end",
+			src: `
+m := matrix.dense(2, 3)
+matrix.setf(m, 0, 3, 1)
+`,
+			want: "matrix.setf: index out of range",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := runProgramExpectError(t, tc.src)
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("error = %v, want containing %q", err, tc.want)
+			}
+		})
+	}
+}
+
+func TestMatrixGetSetRejectsNonIntegerIndices(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		src  string
+		want string
+	}{
+		{
+			name: "get float row",
+			src: `
+m := matrix.dense(2, 3)
+matrix.getf(m, 0.5, 0)
+`,
+			want: "matrix.getf: row and column must be integers",
+		},
+		{
+			name: "get string col",
+			src: `
+m := matrix.dense(2, 3)
+matrix.getf(m, 0, "1")
+`,
+			want: "matrix.getf: row and column must be integers",
+		},
+		{
+			name: "set float row",
+			src: `
+m := matrix.dense(2, 3)
+matrix.setf(m, 0.5, 0, 1)
+`,
+			want: "matrix.setf: row and column must be integers",
+		},
+		{
+			name: "set string col",
+			src: `
+m := matrix.dense(2, 3)
+matrix.setf(m, 0, "1", 1)
+`,
+			want: "matrix.setf: row and column must be integers",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := runProgramExpectError(t, tc.src)
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("error = %v, want containing %q", err, tc.want)
+			}
+		})
+	}
+}
+
+func TestMatrixSetRejectsNonNumericValues(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		src  string
+	}{
+		{
+			name: "string",
+			src: `
+m := matrix.dense(1, 1)
+matrix.setf(m, 0, 0, "1")
+`,
+		},
+		{
+			name: "bool",
+			src: `
+m := matrix.dense(1, 1)
+matrix.setf(m, 0, 0, true)
+`,
+		},
+		{
+			name: "nil",
+			src: `
+m := matrix.dense(1, 1)
+matrix.setf(m, 0, 0, nil)
+`,
+		},
+		{
+			name: "table",
+			src: `
+m := matrix.dense(1, 1)
+matrix.setf(m, 0, 0, {})
+`,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := runProgramExpectError(t, tc.src)
+			if err == nil || !strings.Contains(err.Error(), "matrix.setf: value must be numeric") {
+				t.Fatalf("error = %v, want matrix.setf numeric error", err)
+			}
+		})
 	}
 }

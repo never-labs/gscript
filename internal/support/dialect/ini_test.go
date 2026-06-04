@@ -32,6 +32,32 @@ port = 5432
 	}
 }
 
+func TestParseINIDuplicateKeysLastValueWins(t *testing.T) {
+	doc, err := ParseINI(`
+app = old
+app = new
+
+[database]
+host = primary
+
+[database]
+host = replica
+port = 5432
+`)
+	if err != nil {
+		t.Fatalf("ParseINI: %v", err)
+	}
+	if got := doc.Root["app"]; got != "new" {
+		t.Fatalf("root app = %q, want new", got)
+	}
+	if got := doc.Sections["database"]["host"]; got != "replica" {
+		t.Fatalf("database.host = %q, want replica", got)
+	}
+	if got := doc.Sections["database"]["port"]; got != "5432" {
+		t.Fatalf("database.port = %q, want 5432", got)
+	}
+}
+
 func TestEncodeINI(t *testing.T) {
 	got, err := EncodeINI(INIDocument{
 		Root: map[string]string{
@@ -51,6 +77,40 @@ func TestEncodeINI(t *testing.T) {
 	want := "app=ledger\nenabled=true\n\n[database]\nhost=db.internal\nport=5432\n"
 	if got != want {
 		t.Fatalf("EncodeINI = %q, want %q", got, want)
+	}
+}
+
+func TestEncodeINIRejectsInvalidInput(t *testing.T) {
+	tests := []struct {
+		name string
+		doc  INIDocument
+		want string
+	}{
+		{
+			name: "root key contains separator",
+			doc:  INIDocument{Root: map[string]string{"bad:key": "value"}},
+			want: `invalid key "bad:key"`,
+		},
+		{
+			name: "root value is multiline",
+			doc:  INIDocument{Root: map[string]string{"key": "line1\nline2"}},
+			want: `invalid multiline value for key "key"`,
+		},
+		{
+			name: "section name contains bracket",
+			doc: INIDocument{Sections: map[string]map[string]string{
+				"bad[section": {"key": "value"},
+			}},
+			want: `invalid section name "bad[section"`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := EncodeINI(tt.doc)
+			if err == nil || !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("EncodeINI error = %v, want containing %q", err, tt.want)
+			}
+		})
 	}
 }
 

@@ -41,6 +41,33 @@ ok 3 - cleanup # SKIP already done
 	}
 }
 
+func TestParseTAPToleratesDiagnosticsAndUnknownDirectives(t *testing.T) {
+	doc, err := ParseTAP(`
+# suite starting
+ok - implicit number # note from harness
+# attached detail
+1..1 # skip no numbered tests
+`)
+	if err != nil {
+		t.Fatalf("ParseTAP: %v", err)
+	}
+	if len(doc.Rows) != 3 {
+		t.Fatalf("rows = %d, want 3", len(doc.Rows))
+	}
+	if got := doc.Rows[0]; got.Kind != "diagnostic" || got.Text != "suite starting" {
+		t.Fatalf("leading diagnostic = %+v", got)
+	}
+	if got := doc.Rows[1]; got.Kind != "test" || !got.OK || got.Number != 0 || got.Name != "implicit number" || got.Directive != "" || got.Reason != "note from harness" {
+		t.Fatalf("test row = %+v", got)
+	}
+	if got := doc.Rows[1].Diagnostics; !reflect.DeepEqual(got, []string{"attached detail"}) {
+		t.Fatalf("diagnostics = %#v", got)
+	}
+	if got := doc.Rows[2]; got.Kind != "plan" || got.Directive != "SKIP" || got.Reason != "no numbered tests" {
+		t.Fatalf("plan row = %+v", got)
+	}
+}
+
 func TestEncodeTAP(t *testing.T) {
 	got, err := EncodeTAP(TAPDocument{Rows: []TAPRow{
 		{Kind: "version", Version: 13},
@@ -54,6 +81,13 @@ func TestEncodeTAP(t *testing.T) {
 	want := "TAP version 13\n1..2\nok 1 - boot\nnot ok 2 - deploy # TODO flaky\n# expected ready\n"
 	if got != want {
 		t.Fatalf("EncodeTAP = %q, want %q", got, want)
+	}
+}
+
+func TestEncodeTAPRejectsUnsupportedRowKind(t *testing.T) {
+	_, err := EncodeTAP(TAPDocument{Rows: []TAPRow{{Kind: "bogus"}}})
+	if err == nil || !strings.Contains(err.Error(), `tap dialect: row 1: unsupported kind "bogus"`) {
+		t.Fatalf("EncodeTAP error = %v", err)
 	}
 }
 
