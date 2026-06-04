@@ -21,56 +21,123 @@ import (
 // env`...`, html_escape`...`, urlquery`...`, base64`...`, and hash`...`.
 func BuildDialect(opts HostOptions, maxHostResult func() int64) *Table {
 	t := markStdlibBoundModule(NewTable())
-	root := func() string { return HostString(opts.FilesystemRoot) }
 
 	set := func(name string, fn func([]Value) ([]Value, error)) {
 		t.RawSetString(name, FunctionValue(&GoFunction{Name: "dialect." + name, Fn: fn}))
 	}
 
-	eval := func(tag string, body Value, options *Table) ([]Value, error) {
-		failFast := options != nil && options.RawGetString("fail_fast").Truthy()
-		switch tag {
-		case "sh":
-			return dialectShell(body.Str(), opts, failFast, maxHostResult)
-		case "cmd":
-			return dialectCommand(body.Str(), opts, failFast, maxHostResult)
-		case "glob":
-			return dialectGlob(body.Str(), root())
-		case "re", "regexp":
-			return dialectRegexp(body.Str(), failFast)
-		case "json":
-			return dialectJSON(body, options)
-		case "csv":
+	handlers := make(map[string]dialectHandler)
+	register := func(names []string, handler dialectHandler) {
+		for _, name := range names {
+			handlers[name] = handler
+		}
+	}
+
+	register([]string{"sh"}, dialectHandler{
+		eval: func(body Value, options *Table) ([]Value, error) {
+			return dialectShell(body.Str(), opts, dialectFailFast(options), maxHostResult)
+		},
+	})
+	register([]string{"cmd"}, dialectHandler{
+		eval: func(body Value, options *Table) ([]Value, error) {
+			return dialectCommand(body.Str(), opts, dialectFailFast(options), maxHostResult)
+		},
+	})
+	register([]string{"glob"}, dialectHandler{
+		eval: func(body Value, _ *Table) ([]Value, error) {
+			return dialectGlob(body.Str(), opts)
+		},
+	})
+	register([]string{"re", "regexp"}, dialectHandler{
+		eval: func(body Value, options *Table) ([]Value, error) {
+			return dialectRegexp(body.Str(), dialectFailFast(options))
+		},
+	})
+	register([]string{"json"}, dialectHandler{
+		eval:  dialectJSON,
+		block: dialectJSON,
+	})
+	register([]string{"csv"}, dialectHandler{
+		eval: func(body Value, options *Table) ([]Value, error) {
 			return dialectCSV(body.Str(), options)
-		case "lines", "split":
+		},
+	})
+	register([]string{"lines", "split"}, dialectHandler{
+		eval: func(body Value, options *Table) ([]Value, error) {
 			return dialectLines(body.Str(), options)
-		case "words":
+		},
+	})
+	register([]string{"words"}, dialectHandler{
+		eval: func(body Value, _ *Table) ([]Value, error) {
 			return dialectWords(body.Str()), nil
-		case "kv":
+		},
+	})
+	register([]string{"kv"}, dialectHandler{
+		eval: func(body Value, options *Table) ([]Value, error) {
 			return dialectKV(body.Str(), options, false)
-		case "env":
+		},
+	})
+	register([]string{"env"}, dialectHandler{
+		eval: func(body Value, options *Table) ([]Value, error) {
 			return dialectKV(body.Str(), options, true)
-		case "template":
+		},
+	})
+	register([]string{"template"}, dialectHandler{
+		eval: func(body Value, options *Table) ([]Value, error) {
 			return dialectTemplate(body, options, maxHostResult)
-		case "path":
+		},
+		block: func(body Value, options *Table) ([]Value, error) {
+			return dialectTemplate(body, options, maxHostResult)
+		},
+	})
+	register([]string{"path"}, dialectHandler{
+		eval: func(body Value, _ *Table) ([]Value, error) {
 			return []Value{StringValue(pathlib.Clean(body.Str()))}, nil
-		case "url":
+		},
+	})
+	register([]string{"url"}, dialectHandler{
+		eval: func(body Value, _ *Table) ([]Value, error) {
 			return dialectURL(body.Str())
-		case "html_escape":
+		},
+	})
+	register([]string{"html_escape"}, dialectHandler{
+		eval: func(body Value, options *Table) ([]Value, error) {
 			return dialectHTMLEscape(body.Str(), options)
-		case "urlquery":
-			return dialectURLQuery(body, options)
-		case "base64":
+		},
+	})
+	register([]string{"urlquery"}, dialectHandler{
+		eval:  dialectURLQuery,
+		block: dialectURLQuery,
+	})
+	register([]string{"base64"}, dialectHandler{
+		eval: func(body Value, options *Table) ([]Value, error) {
 			return dialectBase64(body.Str(), options, maxHostResult)
-		case "hash":
+		},
+	})
+	register([]string{"hash"}, dialectHandler{
+		eval: func(body Value, options *Table) ([]Value, error) {
 			return dialectHash(body.Str(), options)
-		case "prompt":
-			return []Value{dialectPrompt(body, options)}, nil
-		case "quote":
-			return []Value{dialectQuote(tag, body, options)}, nil
-		default:
+		},
+	})
+	register([]string{"prompt"}, dialectHandler{
+		eval:  func(body Value, options *Table) ([]Value, error) { return []Value{dialectPrompt(body, options)}, nil },
+		block: func(body Value, options *Table) ([]Value, error) { return []Value{dialectPrompt(body, options)}, nil },
+	})
+	register([]string{"quote"}, dialectHandler{
+		eval: func(body Value, options *Table) ([]Value, error) {
+			return []Value{dialectQuote("quote", body, options)}, nil
+		},
+		block: func(body Value, options *Table) ([]Value, error) {
+			return []Value{dialectQuote("quote", body, options)}, nil
+		},
+	})
+
+	eval := func(tag string, body Value, options *Table) ([]Value, error) {
+		handler, ok := handlers[tag]
+		if !ok || handler.eval == nil {
 			return nil, fmt.Errorf("unknown dialect %q", tag)
 		}
+		return handler.eval(body, options)
 	}
 
 	set("eval", func(args []Value) ([]Value, error) {
@@ -86,18 +153,10 @@ func BuildDialect(opts HostOptions, maxHostResult func() int64) *Table {
 		}
 		tag := args[0].Str()
 		optsTbl := optionalTableArg(args, 2)
-		switch tag {
-		case "prompt":
-			return []Value{dialectPrompt(args[1], optsTbl)}, nil
-		case "json":
-			return dialectJSON(args[1], optsTbl)
-		case "template":
-			return dialectTemplate(args[1], optsTbl, maxHostResult)
-		case "quote":
-			return []Value{dialectQuote(tag, args[1], optsTbl)}, nil
-		default:
-			return eval(tag, args[1], optsTbl)
+		if handler, ok := handlers[tag]; ok && handler.block != nil {
+			return handler.block(args[1], optsTbl)
 		}
+		return eval(tag, args[1], optsTbl)
 	})
 
 	set("eval_raw", func(args []Value) ([]Value, error) {
@@ -109,6 +168,15 @@ func BuildDialect(opts HostOptions, maxHostResult func() int64) *Table {
 	})
 
 	return t
+}
+
+type dialectHandler struct {
+	eval  func(Value, *Table) ([]Value, error)
+	block func(Value, *Table) ([]Value, error)
+}
+
+func dialectFailFast(opts *Table) bool {
+	return opts != nil && opts.RawGetString("fail_fast").Truthy()
 }
 
 func optionalTableArg(args []Value, idx int) *Table {
@@ -188,8 +256,11 @@ func processResultTable(ok bool, stdout, stderr string, code int) Value {
 	return TableValue(result)
 }
 
-func dialectGlob(pattern, root string) ([]Value, error) {
-	resolved, err := resolveSandboxPath(root, pattern)
+func dialectGlob(pattern string, opts HostOptions) ([]Value, error) {
+	if !HostBool(opts.FilesystemRead, true) {
+		return nil, fmt.Errorf("filesystem read access disabled")
+	}
+	resolved, err := resolveSandboxPath(HostString(opts.FilesystemRoot), pattern)
 	if err != nil {
 		return []Value{NilValue(), StringValue(err.Error())}, nil
 	}

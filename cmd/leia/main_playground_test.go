@@ -218,6 +218,31 @@ func TestPlaygroundRepositoryExamplesExecuteOrExplain(t *testing.T) {
 	}
 }
 
+func TestPlaygroundRepositoryHostCapabilityExampleIsManualRunOnly(t *testing.T) {
+	examples, err := playgroundRepositoryExamples(playgroundExamplesRoot())
+	if err != nil {
+		t.Fatalf("load repository examples: %v", err)
+	}
+	for _, example := range examples {
+		if example.ID != "repo-dialects-shell_filesystem" {
+			continue
+		}
+		if example.Runnable {
+			t.Fatalf("%s should be manual-run only in the playground", example.ID)
+		}
+		if example.Requires != "process shell and filesystem host access" {
+			t.Fatalf("requires = %q", example.Requires)
+		}
+		for _, want := range []string{"$`printf", "cmd`printf", "glob`examples/dialects/*.leia`", "path`examples/dialects/../dialects/./shell_filesystem.leia`"} {
+			if !strings.Contains(example.Source, want) {
+				t.Fatalf("source missing %q\nsource:\n%s", want, example.Source)
+			}
+		}
+		return
+	}
+	t.Fatal("repo-dialects-shell_filesystem example not found")
+}
+
 func TestPlaygroundAIExamplesCoverRunnableWorkflowShapes(t *testing.T) {
 	t.Setenv("LEIA_PLAYGROUND_MOCK_LLM", "1")
 	want := map[string][]string{

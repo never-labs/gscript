@@ -10,6 +10,7 @@ import (
 
 	"github.com/never-labs/leia/internal/runtime"
 	"github.com/never-labs/leia/internal/stdlib/catalog"
+	"github.com/never-labs/leia/internal/support/hostpath"
 	"github.com/never-labs/leia/internal/support/modresolve"
 )
 
@@ -120,6 +121,16 @@ type VM struct {
 	moduleDepth          int64
 	dynamicEval          bool
 	networkAccess        bool
+	filesystemRoot       string
+	filesystemRead       bool
+	filesystemWrite      bool
+	maxFSReadBytes       int64
+	maxFSWriteBytes      int64
+	environmentRead      bool
+	environmentWrite     bool
+	allowedEnv           map[string]bool
+	processExecution     bool
+	processShell         bool
 	debugAccess          bool
 	testkitAccess        bool
 	llmProvider          runtime.LLMProvider
@@ -198,6 +209,76 @@ func (vm *VM) SetDynamicEval(enabled bool) {
 // SetNetworkAccess controls host-backed network APIs in net and http.
 func (vm *VM) SetNetworkAccess(enabled bool) {
 	vm.networkAccess = enabled
+}
+
+// SetFilesystemCapabilities controls script-side filesystem reads and writes
+// for host-backed bytecode stdlib bindings.
+func (vm *VM) SetFilesystemCapabilities(read, write bool) {
+	vm.filesystemRead = read
+	vm.filesystemWrite = write
+}
+
+// SetFilesystemRoot confines host-backed filesystem paths to root when root is
+// not empty.
+func (vm *VM) SetFilesystemRoot(root string) {
+	vm.filesystemRoot = root
+}
+
+func (vm *VM) FilesystemRoot() string {
+	if vm == nil {
+		return ""
+	}
+	return vm.filesystemRoot
+}
+
+func (vm *VM) ResolveFilesystemPath(path string) (string, error) {
+	if vm == nil {
+		return path, nil
+	}
+	return hostpath.ResolveSandboxPath(vm.filesystemRoot, path)
+}
+
+func (vm *VM) SetMaxFilesystemReadBytes(max int64) {
+	vm.maxFSReadBytes = max
+}
+
+func (vm *VM) SetMaxFilesystemWriteBytes(max int64) {
+	vm.maxFSWriteBytes = max
+}
+
+// SetEnvironmentCapabilities controls script-side environment variable reads
+// and writes for host-backed bytecode stdlib bindings.
+func (vm *VM) SetEnvironmentCapabilities(read, write bool) {
+	vm.environmentRead = read
+	vm.environmentWrite = write
+}
+
+func (vm *VM) SetEnvironmentAllowlist(names []string) {
+	if names == nil {
+		vm.allowedEnv = nil
+		return
+	}
+	allowed := make(map[string]bool, len(names))
+	for _, name := range names {
+		allowed[name] = true
+	}
+	vm.allowedEnv = allowed
+}
+
+func (vm *VM) EnvironmentAllowed(name string) bool {
+	return vm == nil || vm.allowedEnv == nil || vm.allowedEnv[name]
+}
+
+// SetProcessExecution controls process.run, process.exec, process.which, and
+// command dialects in bytecode stdlib bindings.
+func (vm *VM) SetProcessExecution(enabled bool) {
+	vm.processExecution = enabled
+}
+
+// SetProcessShell controls process.shell and shell dialects in bytecode stdlib
+// bindings.
+func (vm *VM) SetProcessShell(enabled bool) {
+	vm.processShell = enabled
 }
 
 func (vm *VM) SetLLMProvider(provider runtime.LLMProvider) {
@@ -863,6 +944,12 @@ func New(globals map[string]runtime.Value) *VM {
 		activeGoroutines:   &atomic.Int64{},
 		dynamicEval:        true,
 		networkAccess:      true,
+		filesystemRead:     true,
+		filesystemWrite:    true,
+		environmentRead:    true,
+		environmentWrite:   true,
+		processExecution:   true,
+		processShell:       true,
 		debugAccess:        true,
 		testkitAccess:      true,
 	}
@@ -928,6 +1015,16 @@ func newChildVM(parent *VM, co *VMCoroutine) *VM {
 		moduleDepth:        parent.moduleDepth,
 		dynamicEval:        parent.dynamicEval,
 		networkAccess:      parent.networkAccess,
+		filesystemRoot:     parent.filesystemRoot,
+		filesystemRead:     parent.filesystemRead,
+		filesystemWrite:    parent.filesystemWrite,
+		maxFSReadBytes:     parent.maxFSReadBytes,
+		maxFSWriteBytes:    parent.maxFSWriteBytes,
+		environmentRead:    parent.environmentRead,
+		environmentWrite:   parent.environmentWrite,
+		allowedEnv:         cloneBoolMap(parent.allowedEnv),
+		processExecution:   parent.processExecution,
+		processShell:       parent.processShell,
 		debugAccess:        parent.debugAccess,
 		testkitAccess:      parent.testkitAccess,
 		llmProvider:        parent.llmProvider,
@@ -1020,6 +1117,16 @@ func newIsolatedChildVM(parent *VM) *VM {
 		moduleDepth:        parent.moduleDepth,
 		dynamicEval:        parent.dynamicEval,
 		networkAccess:      parent.networkAccess,
+		filesystemRoot:     parent.filesystemRoot,
+		filesystemRead:     parent.filesystemRead,
+		filesystemWrite:    parent.filesystemWrite,
+		maxFSReadBytes:     parent.maxFSReadBytes,
+		maxFSWriteBytes:    parent.maxFSWriteBytes,
+		environmentRead:    parent.environmentRead,
+		environmentWrite:   parent.environmentWrite,
+		allowedEnv:         cloneBoolMap(parent.allowedEnv),
+		processExecution:   parent.processExecution,
+		processShell:       parent.processShell,
 		debugAccess:        parent.debugAccess,
 		testkitAccess:      parent.testkitAccess,
 	}
@@ -1070,6 +1177,17 @@ func cloneStringMap(src map[string]string) map[string]string {
 		return nil
 	}
 	out := make(map[string]string, len(src))
+	for k, v := range src {
+		out[k] = v
+	}
+	return out
+}
+
+func cloneBoolMap(src map[string]bool) map[string]bool {
+	if len(src) == 0 {
+		return nil
+	}
+	out := make(map[string]bool, len(src))
 	for k, v := range src {
 		out[k] = v
 	}

@@ -308,8 +308,28 @@ func (vm *VM) RunContext(ctx context.Context, prog *Program) error {
 			if vm.opts.maxModuleDepth > 0 {
 				bvm.SetMaxModuleDepth(vm.opts.maxModuleDepth)
 			}
+			if vm.opts.maxFSReadBytes > 0 {
+				bvm.SetMaxFilesystemReadBytes(vm.opts.maxFSReadBytes)
+			}
+			if vm.opts.maxFSWriteBytes > 0 {
+				bvm.SetMaxFilesystemWriteBytes(vm.opts.maxFSWriteBytes)
+			}
 			bvm.SetDynamicEval(vm.opts.dynamicEval)
 			bvm.SetNetworkAccess(vm.opts.networkAccess)
+			bvm.SetFilesystemRoot(vm.opts.filesystemRoot)
+			bvm.SetFilesystemCapabilities(
+				vm.opts.capabilities&CapFilesystemRead != 0,
+				vm.opts.capabilities&CapFilesystemWrite != 0,
+			)
+			bvm.SetEnvironmentCapabilities(
+				vm.opts.capabilities&CapEnvironmentRead != 0,
+				vm.opts.capabilities&CapEnvironmentWrite != 0,
+			)
+			if vm.opts.environmentVars != nil {
+				bvm.SetEnvironmentAllowlist(vm.opts.environmentVars)
+			}
+			bvm.SetProcessExecution(vm.opts.processExec)
+			bvm.SetProcessShell(vm.opts.processShell)
 			bvm.SetDebugAccess(vm.opts.debugAccess)
 			bvm.SetTestkitAccess(vm.opts.testkitAccess)
 			llmProvider := llmbridge.ConfiguredProvider(vm.opts.llmProvider, vm.opts.llmRecordSink)
@@ -350,8 +370,28 @@ func (vm *VM) RunContext(ctx context.Context, prog *Program) error {
 			if vm.opts.maxModuleDepth > 0 {
 				bvm.SetMaxModuleDepth(vm.opts.maxModuleDepth)
 			}
+			if vm.opts.maxFSReadBytes > 0 {
+				bvm.SetMaxFilesystemReadBytes(vm.opts.maxFSReadBytes)
+			}
+			if vm.opts.maxFSWriteBytes > 0 {
+				bvm.SetMaxFilesystemWriteBytes(vm.opts.maxFSWriteBytes)
+			}
 			bvm.SetDynamicEval(vm.opts.dynamicEval)
 			bvm.SetNetworkAccess(vm.opts.networkAccess)
+			bvm.SetFilesystemRoot(vm.opts.filesystemRoot)
+			bvm.SetFilesystemCapabilities(
+				vm.opts.capabilities&CapFilesystemRead != 0,
+				vm.opts.capabilities&CapFilesystemWrite != 0,
+			)
+			bvm.SetEnvironmentCapabilities(
+				vm.opts.capabilities&CapEnvironmentRead != 0,
+				vm.opts.capabilities&CapEnvironmentWrite != 0,
+			)
+			if vm.opts.environmentVars != nil {
+				bvm.SetEnvironmentAllowlist(vm.opts.environmentVars)
+			}
+			bvm.SetProcessExecution(vm.opts.processExec)
+			bvm.SetProcessShell(vm.opts.processShell)
 			bvm.SetDebugAccess(vm.opts.debugAccess)
 			bvm.SetTestkitAccess(vm.opts.testkitAccess)
 		}

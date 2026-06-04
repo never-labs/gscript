@@ -1,13 +1,27 @@
 package tests_test
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	leia "github.com/never-labs/leia"
 )
 
-func TestProcessDialectSyntaxExecutesThroughStdlib(t *testing.T) {
+func TestShellCommandFilesystemDialectSyntaxExecutesThroughStdlib(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "alpha.txt"), []byte("alpha"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(filepath.Join(root, "nested"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "nested", "beta.txt"), []byte("beta"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	globPattern := filepath.ToSlash(filepath.Join(root, "nested", "*.txt"))
+
 	for _, tc := range []struct {
 		name string
 		opts []leia.Option
@@ -21,27 +35,54 @@ func TestProcessDialectSyntaxExecutesThroughStdlib(t *testing.T) {
 				leia.WithProcessExecution(true),
 				leia.WithProcessShell(true),
 			}, tc.opts...)...)
-			src := "import \"json\"\n" +
-				"import p \"path\"\n\n" +
+			src := "import p \"path\"\n\n" +
 				"name := \"leia\"\n" +
-				"shell := $`printf hello-${name}`\n" +
-				"cmd_out := cmd`printf cmd-ok`\n" +
-				"matches := glob`dialect_syntax_test.go`\n" +
+				"shell_dollar := $`printf dollar-${name}`\n" +
+				"shell_sh := sh`printf sh-${name}`\n" +
+				"shell_fail := $`printf shellerr 1>&2; exit 7`\n" +
+				"cmd_out := cmd`printf command-${name}`\n" +
+				"cmd_fail := cmd`/bin/sh -c false`\n" +
+				"matches := glob`" + globPattern + "`\n" +
+				"cleaned := path`./nested/../alpha.txt`\n" +
 				"digits := re!`^[0-9]+$`\n" +
-				"shell_text := shell.text\n" +
+				"identifier := regexp!`^[A-Za-z_][A-Za-z0-9_]*$`\n" +
+				"shell_dollar_text := shell_dollar.text\n" +
+				"shell_dollar_ok := shell_dollar.ok\n" +
+				"shell_sh_text := shell_sh.text\n" +
+				"shell_sh_code := shell_sh.code\n" +
+				"shell_fail_ok := shell_fail.ok\n" +
+				"shell_fail_code := shell_fail.code\n" +
+				"shell_fail_stderr := shell_fail.stderr\n" +
 				"cmd_text := cmd_out.text\n" +
+				"cmd_ok := cmd_out.ok\n" +
+				"cmd_fail_ok := cmd_fail.ok\n" +
+				"cmd_fail_code := cmd_fail.code\n" +
+				"glob_count := #matches\n" +
 				"glob_first := matches[1]\n" +
 				"match_ok := digits.match(\"123\")\n" +
-				"joined := p.join(\"a\", \"b\")\n"
+				"identifier_ok := identifier.match(\"name_1\")\n" +
+				"joined := p.join(\"nested\", \"beta.txt\")\n"
 			err := vm.Exec(src)
 			if err != nil {
 				t.Fatalf("Exec: %v", err)
 			}
-			assertGet(t, vm, "shell_text", "hello-leia")
-			assertGet(t, vm, "cmd_text", "cmd-ok")
+			assertGet(t, vm, "shell_dollar_text", "dollar-leia")
+			assertGet(t, vm, "shell_dollar_ok", true)
+			assertGet(t, vm, "shell_sh_text", "sh-leia")
+			assertGet(t, vm, "shell_sh_code", int64(0))
+			assertGet(t, vm, "shell_fail_ok", false)
+			assertGet(t, vm, "shell_fail_code", int64(7))
+			assertGet(t, vm, "shell_fail_stderr", "shellerr")
+			assertGet(t, vm, "cmd_text", "command-leia")
+			assertGet(t, vm, "cmd_ok", true)
+			assertGet(t, vm, "cmd_fail_ok", false)
+			assertGet(t, vm, "cmd_fail_code", int64(1))
 			assertGet(t, vm, "match_ok", true)
-			assertStringContains(t, vm, "glob_first", "dialect_syntax_test.go")
-			assertGet(t, vm, "joined", "a/b")
+			assertGet(t, vm, "identifier_ok", true)
+			assertGet(t, vm, "glob_count", int64(1))
+			assertStringContains(t, vm, "glob_first", "beta.txt")
+			assertGet(t, vm, "cleaned", "alpha.txt")
+			assertGet(t, vm, "joined", "nested/beta.txt")
 		})
 	}
 }
@@ -132,12 +173,15 @@ func TestStdlibDataDialectsExecuteThroughStdlib(t *testing.T) {
 				"csv_rows := csv`name,score\nAda,42\nBob,7\n`\n" +
 				"csv_header_rows := dialect.eval(\"csv\", \"name;score\\nAda;42\\n\", {headers: true, sep: \";\"})\n" +
 				"line_rows := lines`alpha\n\nbeta\n`\n" +
+				"split_rows := split`left\nright\n`\n" +
 				"line_rows_keep_empty := dialect.eval(\"lines\", \"alpha\\n\\nbeta\\n\", {keep_empty: true})\n" +
 				"words_rows := words`alpha beta gamma`\n" +
 				"kv_rows := dialect.eval(\"kv\", \"name = Ada\\nscore = 42\\n\")\n" +
 				"env_rows := dialect.eval(\"env\", \"TOKEN=\\\"abc 123\\\"\\nEMPTY=\\n\")\n" +
 				"escaped_html := html_escape`<b>Ada & Bob</b>`\n" +
 				"unescaped_html := dialect.eval(\"html_escape\", escaped_html, {mode: \"unescape\"})\n" +
+				"urlquery_component := dialect.eval(\"urlquery\", \"hello world&x\", {mode: \"escape\"})\n" +
+				"urlquery_component_decoded := dialect.eval(\"urlquery\", urlquery_component, {mode: \"unescape\"})\n" +
 				"urlquery_text := urlquery {q: \"hello world\", page: 2}\n" +
 				"urlquery_rows := urlquery`q=hello+world&page=2&tag=a&tag=b`\n" +
 				"template_text := template`Hello static`\n" +
@@ -148,6 +192,8 @@ func TestStdlibDataDialectsExecuteThroughStdlib(t *testing.T) {
 				"csv_header_score := csv_header_rows[1].score\n" +
 				"line_count := #line_rows\n" +
 				"line_second := line_rows[2]\n" +
+				"split_first := split_rows[1]\n" +
+				"split_second := split_rows[2]\n" +
 				"line_keep_empty_count := #line_rows_keep_empty\n" +
 				"line_keep_empty_second := line_rows_keep_empty[2]\n" +
 				"words_second := words_rows[2]\n" +
@@ -167,6 +213,8 @@ func TestStdlibDataDialectsExecuteThroughStdlib(t *testing.T) {
 			assertGet(t, vm, "csv_header_score", "42")
 			assertGet(t, vm, "line_count", int64(2))
 			assertGet(t, vm, "line_second", "beta")
+			assertGet(t, vm, "split_first", "left")
+			assertGet(t, vm, "split_second", "right")
 			assertGet(t, vm, "line_keep_empty_count", int64(3))
 			assertGet(t, vm, "line_keep_empty_second", "")
 			assertGet(t, vm, "words_second", "beta")
@@ -176,6 +224,8 @@ func TestStdlibDataDialectsExecuteThroughStdlib(t *testing.T) {
 			assertGet(t, vm, "env_empty", "")
 			assertGet(t, vm, "escaped_html", "&lt;b&gt;Ada &amp; Bob&lt;/b&gt;")
 			assertGet(t, vm, "unescaped_html", "<b>Ada & Bob</b>")
+			assertGet(t, vm, "urlquery_component", "hello+world%26x")
+			assertGet(t, vm, "urlquery_component_decoded", "hello world&x")
 			assertGet(t, vm, "urlquery_text", "page=2&q=hello+world")
 			assertGet(t, vm, "urlquery_q", "hello world")
 			assertGet(t, vm, "urlquery_page", "2")
@@ -193,22 +243,27 @@ func TestProcessDialectsRespectHostCapabilities(t *testing.T) {
 		opts []leia.Option
 	}{
 		{name: "interpreter"},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			for _, blocked := range []struct {
 				name string
 				src  string
 				want string
+				opts []leia.Option
 			}{
 				{name: "shell", src: "out := $`printf blocked`", want: "process shell access disabled"},
 				{name: "cmd", src: "out := cmd`printf blocked`", want: "process execution access disabled"},
+				{name: "glob", src: "out := glob`*.leia`", want: "filesystem read access disabled", opts: []leia.Option{leia.WithFilesystemRead(false)}},
 			} {
 				t.Run(blocked.name, func(t *testing.T) {
-					vm := leia.New(append([]leia.Option{
+					opts := append([]leia.Option{
 						leia.WithLibs(leia.LibAll),
 						leia.WithProcessExecution(false),
 						leia.WithProcessShell(false),
-					}, tc.opts...)...)
+					}, tc.opts...)
+					opts = append(opts, blocked.opts...)
+					vm := leia.New(opts...)
 					err := vm.Exec(blocked.src)
 					if err == nil || !strings.Contains(err.Error(), blocked.want) {
 						t.Fatalf("Exec err = %v, want %q", err, blocked.want)

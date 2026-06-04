@@ -1,0 +1,52 @@
+// web_text.leia - Built-in dialects for small Web-safe text transforms.
+// Demonstrates: url, html_escape, urlquery, base64, hash
+
+print("=== Dialects: web text ===")
+
+parsed := url`https://user:secret@example.com:8443/search?q=hello+world&tag=web#frag`
+print("url host:", parsed.host)
+print("url path:", parsed.path)
+print("url query q:", parsed.query.q)
+assert(parsed.scheme == "https")
+assert(parsed.host == "example.com")
+assert(parsed.port == "8443")
+assert(parsed.user == "user")
+assert(parsed.password == "secret")
+assert(parsed.query.q == "hello world")
+
+escaped_html := html_escape`<b>Ada & Bob</b>`
+unescaped_html := dialect.eval("html_escape", escaped_html, {mode: "unescape"})
+print("html escaped:", escaped_html)
+assert(escaped_html == "&lt;b&gt;Ada &amp; Bob&lt;/b&gt;")
+assert(unescaped_html == "<b>Ada & Bob</b>")
+
+encoded_query := urlquery {q: "hello world", page: 2}
+parsed_query := urlquery`q=hello+world&page=2&tag=a&tag=b`
+component := dialect.eval("urlquery", "hello world&x", {mode: "escape"})
+component_decoded := dialect.eval("urlquery", component, {mode: "unescape"})
+print("urlquery encoded:", encoded_query)
+print("urlquery tag 2:", parsed_query.tag[2])
+assert(encoded_query == "page=2&q=hello+world")
+assert(parsed_query.q == "hello world")
+assert(parsed_query.page == "2")
+assert(parsed_query.tag[2] == "b")
+assert(component == "hello+world%26x")
+assert(component_decoded == "hello world&x")
+
+encoded_data := base64`hello-web`
+decoded_data := dialect.eval("base64", encoded_data, {mode: "decode"})
+url_data := dialect.eval("base64", "a/b?", {mode: "url_encode"})
+url_data_decoded := dialect.eval("base64", url_data, {mode: "url_decode"})
+print("base64:", encoded_data)
+assert(encoded_data == "aGVsbG8td2Vi")
+assert(decoded_data == "hello-web")
+assert(url_data == "YS9iPw")
+assert(url_data_decoded == "a/b?")
+
+sha256 := hash`web`
+sha1 := dialect.eval("hash", "web", {algo: "sha1"})
+print("hash sha256:", sha256)
+assert(sha256 == "4b5e57f6eb2f42b9039b3d1e13929295f231749c510cbe341cd68036d9af97e2")
+assert(sha1 == "ca84d1343b96baa8137c943ed1860e522cacb238")
+
+print("web dialects ok")

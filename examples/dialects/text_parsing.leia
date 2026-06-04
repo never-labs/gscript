@@ -1,5 +1,5 @@
 // text_parsing.leia - Built-in dialects for small text and data transforms.
-// Demonstrates: csv, lines, words, env, kv, template, json, regexp
+// Demonstrates: csv, lines/split, words, env, kv, template, json, regexp
 
 print("=== Dialects: text parsing ===")
 
@@ -7,6 +7,8 @@ csv_rows := dialect.eval("csv", "name,score\nAda,42\nBob,7\n", {headers: true})
 print("csv rows:", #csv_rows)
 print("csv first:", csv_rows[1].name, csv_rows[1].score)
 print("csv second:", csv_rows[2].name, csv_rows[2].score)
+assert(csv_rows[1].name == "Ada")
+assert(csv_rows[2].score == "7")
 
 line_rows := lines`alpha
 
@@ -16,11 +18,22 @@ print("lines count:", #line_rows)
 for i := 1; i <= #line_rows; i++ {
     print("  line[" .. i .. "]:", line_rows[i])
 }
+assert(#line_rows == 2)
+assert(line_rows[2] == "beta")
+
+split_rows := split`left
+right
+`
+print("split first:", split_rows[1])
+assert(split_rows[1] == "left")
+assert(split_rows[2] == "right")
 
 word_rows := words`  parse   simple text
 with tabs	and newlines  `
 print("words count:", #word_rows)
 print("words joined:", word_rows[1] .. "/" .. word_rows[2] .. "/" .. word_rows[3])
+assert(word_rows[1] == "parse")
+assert(word_rows[3] == "text")
 
 env_vars := env`APP_NAME=leia
 APP_MODE=example
@@ -28,6 +41,8 @@ EMPTY=
 `
 print("env app:", env_vars.APP_NAME, env_vars.APP_MODE)
 print("env empty value:", env_vars.EMPTY == "")
+assert(env_vars.APP_NAME == "leia")
+assert(env_vars.EMPTY == "")
 
 kv_pairs := kv`host=localhost
 port=8080
@@ -36,16 +51,22 @@ enabled=true
 print("kv host:", kv_pairs.host)
 print("kv port:", kv_pairs.port)
 print("kv enabled:", kv_pairs.enabled)
+assert(kv_pairs.host == "localhost")
+assert(kv_pairs.port == "8080")
 
 rendered := template { text: "Hello {{.name}}, score={{.score}}", data: {name: csv_rows[1].name, score: csv_rows[1].score} }
 print("template:", rendered)
+assert(rendered == "Hello Ada, score=42")
 
 decoded := json`{"service":"dialects","ok":true,"count":3}`
 encoded := json {service: decoded.service, count: decoded.count}
 print("json decoded:", decoded.service, decoded.ok, decoded.count)
 print("json encoded:", encoded)
+assert(decoded.service == "dialects")
+assert(encoded == `{"count":3,"service":"dialects"}`)
 
 identifier := regexp!`^[A-Za-z_][A-Za-z0-9_]*$`
 print("regexp valid name:", identifier.match("csv_rows"))
 print("regexp invalid name:", identifier.match("7rows"))
-
+assert(identifier.match("csv_rows") == true)
+assert(identifier.match("7rows") == false)

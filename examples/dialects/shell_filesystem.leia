@@ -8,21 +8,34 @@ name := "Leia"
 
 // $ runs a small shell snippet and returns a process result table.
 shell_result := $`printf 'hello-%s' '${name}'`
+assert(shell_result.ok == true)
+assert(shell_result.code == 0)
+assert(shell_result.text == "hello-Leia")
 print("$ stdout:", shell_result.text)
 print("$ ok:", shell_result.ok, "code:", shell_result.code)
 
 // cmd runs a command without shell interpolation.
 cmd_result := cmd`printf command-ok`
+assert(cmd_result.ok == true)
+assert(cmd_result.code == 0)
+assert(cmd_result.text == "command-ok")
 print("cmd stdout:", cmd_result.text)
 print("cmd ok:", cmd_result.ok, "code:", cmd_result.code)
 
 // glob expands a pattern under the configured filesystem root.
 matches := glob`examples/dialects/*.leia`
+found_shell_filesystem := false
 print("glob matches:", #matches)
 for i := 1; i <= #matches; i++ {
+    if matches[i] == "examples/dialects/shell_filesystem.leia" {
+        found_shell_filesystem = true
+    }
     print("  match[" .. i .. "]:", matches[i])
 }
+assert(found_shell_filesystem == true)
 
 // path cleans a path string without touching the filesystem.
 cleaned := path`examples/dialects/../dialects/./shell_filesystem.leia`
+assert(cleaned == "examples/dialects/shell_filesystem.leia")
 print("path cleaned:", cleaned)
+print("shell/filesystem dialects ok")
