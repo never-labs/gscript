@@ -14,7 +14,7 @@ func TestDialectTagsExposeInstalledHandlers(t *testing.T) {
 
 	got := stringSetFromArray(interp.GetGlobal("tags").Table())
 	want := []string{
-		"base32", "base64", "cidr", "cmd", "cookie", "cookies", "csv", "deflate", "duration", "env", "glob",
+		"base32", "base64", "binary", "cidr", "cmd", "cookie", "cookies", "csv", "deflate", "duration", "env", "glob",
 		"gzip", "hash", "headers", "hex", "hostport", "html_escape", "http_headers", "httpmsg", "ini", "ipaddr", "json", "jsonl",
 		"junit", "kv", "lines", "logfmt", "mdtable", "mime", "numbers", "nums", "path", "prompt",
 		"quote", "re", "regexp", "semver", "sh", "shellwords", "split", "tap", "template", "tsv", "url",
@@ -483,6 +483,41 @@ func TestDialectCompressRoundTrip(t *testing.T) {
 	}
 	if !interp.GetGlobal("bad").IsNil() || !interp.GetGlobal("bad_err").IsString() {
 		t.Fatalf("bad gzip = %v err %v, want nil error string", interp.GetGlobal("bad"), interp.GetGlobal("bad_err"))
+	}
+}
+
+func TestDialectBinaryPackUnpackAndSize(t *testing.T) {
+	interp := runWithLib(t, `
+		packed := dialect.eval("binary", {258, "go"}, {mode: "pack", format: "be:u16 bytes:2"})
+		hexed := dialect.eval("hex", packed)
+		unpacked := dialect.eval("binary", packed, {mode: "unpack", format: "be:u16 bytes:2"})
+		sized := dialect.eval("binary", "", {mode: "size", format: "be:u16 bytes:2"})
+		var_size, var_err := dialect.eval("binary", "", {mode: "size", format: "string"})
+		bad, bad_err := dialect.eval("binary", "x", {mode: "unpack", format: "u32"})
+	`, "dialect", BuildDialect(HostOptions{}, nil))
+
+	if got := interp.GetGlobal("hexed").Str(); got != "0102676f" {
+		t.Fatalf("binary hex = %q, want 0102676f", got)
+	}
+	unpacked := interp.GetGlobal("unpacked").Table()
+	values := unpacked.RawGetString("values").Table()
+	if got := values.RawGetInt(1).Int(); got != 258 {
+		t.Fatalf("unpacked[1] = %d, want 258", got)
+	}
+	if got := values.RawGetInt(2).Str(); got != "go" {
+		t.Fatalf("unpacked[2] = %q, want go", got)
+	}
+	if got := unpacked.RawGetString("next").Int(); got != 5 {
+		t.Fatalf("next = %d, want 5", got)
+	}
+	if got := interp.GetGlobal("sized").Int(); got != 4 {
+		t.Fatalf("size = %d, want 4", got)
+	}
+	if !interp.GetGlobal("var_size").IsNil() || !interp.GetGlobal("var_err").IsString() {
+		t.Fatalf("variable size = %v err %v, want nil error string", interp.GetGlobal("var_size"), interp.GetGlobal("var_err"))
+	}
+	if !interp.GetGlobal("bad").IsNil() || !interp.GetGlobal("bad_err").IsString() {
+		t.Fatalf("bad unpack = %v err %v, want nil error string", interp.GetGlobal("bad"), interp.GetGlobal("bad_err"))
 	}
 }
 

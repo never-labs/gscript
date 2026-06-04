@@ -177,7 +177,7 @@ func TestBuiltinDialectRegistryStaysModular(t *testing.T) {
 		"dialect_text.go":     {"re", "regexp", "json", "jsonl", "csv", "tsv", "mdtable", "lines", "split", "words", "nums", "numbers", "kv", "logfmt", "env", "ini", "semver", "duration", "tap", "junit", "xml", "template"},
 		"dialect_web.go":      {"url", "html_escape", "urlquery", "urlpath", "mime", "headers", "http_headers", "cookie", "cookies", "httpmsg"},
 		"dialect_network.go":  {"ipaddr", "cidr", "hostport"},
-		"dialect_data.go":     {"base64", "hash", "hex", "base32", "uuid", "gzip", "zlib", "deflate"},
+		"dialect_data.go":     {"base64", "hash", "hex", "base32", "uuid", "gzip", "zlib", "deflate", "binary"},
 		"dialect_ai.go":       {"prompt", "quote"},
 	}
 	expectedProjectImportsByFile := map[string][]string{
@@ -202,6 +202,7 @@ func TestBuiltinDialectRegistryStaysModular(t *testing.T) {
 			"github.com/never-labs/leia/internal/stdlib/lib/encoding",
 			"github.com/never-labs/leia/internal/stdlib/lib/hash",
 			"github.com/never-labs/leia/internal/stdlib/lib/uuid",
+			"github.com/never-labs/leia/internal/support/binaryfmt",
 		},
 		"dialect_ai.go": nil,
 	}

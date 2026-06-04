@@ -10,6 +10,7 @@ import (
 	encodinglib "github.com/never-labs/leia/internal/stdlib/lib/encoding"
 	hashlib "github.com/never-labs/leia/internal/stdlib/lib/hash"
 	uuidlib "github.com/never-labs/leia/internal/stdlib/lib/uuid"
+	binfmt "github.com/never-labs/leia/internal/support/binaryfmt"
 )
 
 func registerDialectData(register dialectRegisterFunc, maxHostResult func() int64) {
@@ -51,6 +52,11 @@ func registerDialectData(register dialectRegisterFunc, maxHostResult func() int6
 	register([]string{"deflate"}, dialectHandler{
 		eval: func(body Value, options *Table) ([]Value, error) {
 			return dialectCompress("deflate", body.Str(), options, maxHostResult)
+		},
+	})
+	register([]string{"binary"}, dialectHandler{
+		eval: func(body Value, options *Table) ([]Value, error) {
+			return dialectBinary(body, options, maxHostResult)
 		},
 	})
 }
@@ -272,4 +278,71 @@ func compressDecode(kind, src string, limit int64) (string, error) {
 	default:
 		return compresslib.DeflateDecode(src, readAll)
 	}
+}
+
+func dialectBinary(body Value, opts *Table, maxHostResult func() int64) ([]Value, error) {
+	mode := "unpack"
+	if body.IsTable() {
+		mode = "pack"
+	}
+	if opts != nil && opts.RawGetString("mode").IsString() {
+		mode = opts.RawGetString("mode").Str()
+	}
+	format := ""
+	if opts != nil && opts.RawGetString("format").IsString() {
+		format = opts.RawGetString("format").Str()
+	}
+	if format == "" {
+		return nil, fmt.Errorf("binary dialect: format option required")
+	}
+	switch mode {
+	case "pack", "encode":
+		if !body.IsTable() {
+			return nil, fmt.Errorf("binary dialect: pack expects table body")
+		}
+		packed, err := binfmt.Pack("binary dialect", format, binaryDialectPackValues(body.Table()), hostResultLimit(maxHostResult))
+		if err != nil {
+			return nil, err
+		}
+		return []Value{StringValue(packed)}, nil
+	case "", "unpack", "decode":
+		offset := 1
+		if opts != nil && opts.RawGetString("offset").IsNumber() {
+			offset = int(toInt(opts.RawGetString("offset")))
+		}
+		values, next, err := binfmt.Unpack("binary dialect", format, body.String(), offset)
+		if err != nil {
+			if resultErr, ok := err.(binfmt.ResultError); ok {
+				return []Value{NilValue(), StringValue(resultErr.Error())}, nil
+			}
+			return nil, err
+		}
+		out := NewTable()
+		arr := NewAppendArrayTable(len(values))
+		for i, value := range values {
+			arr.RawSetInt(int64(i+1), binaryUnpackedValue(value))
+		}
+		out.RawSetString("values", TableValue(arr))
+		out.RawSetString("next", IntValue(int64(next)))
+		return []Value{TableValue(out)}, nil
+	case "size":
+		size, fixed, err := binfmt.Size("binary dialect", format)
+		if err != nil {
+			return nil, err
+		}
+		if !fixed {
+			return []Value{NilValue(), StringValue("binary dialect: variable-size field in format")}, nil
+		}
+		return []Value{IntValue(int64(size))}, nil
+	default:
+		return nil, fmt.Errorf("binary dialect: unknown mode %q", mode)
+	}
+}
+
+func binaryDialectPackValues(tbl *Table) []binfmt.PackValue {
+	values := make([]binfmt.PackValue, 0, tbl.Length())
+	for i := 1; i <= tbl.Length(); i++ {
+		values = append(values, binaryPackValue(tbl.RawGetInt(int64(i))))
+	}
+	return values
 }

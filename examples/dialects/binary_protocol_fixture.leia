@@ -1,0 +1,17 @@
+print("=== Dialects: binary protocol fixture ===")
+
+frame := dialect.eval("binary", {258, "OK"}, {mode: "pack", format: "be:u16 bytes:2"})
+frame_hex := dialect.eval("hex", frame)
+decoded := dialect.eval("binary", frame, {mode: "unpack", format: "be:u16 bytes:2"})
+frame_size := dialect.eval("binary", "", {mode: "size", format: "be:u16 bytes:2"})
+
+print("frame hex:", frame_hex)
+print("decoded:", decoded.values[1], decoded.values[2], "next", decoded.next)
+
+assert(frame_hex == "01024f4b")
+assert(decoded.values[1] == 258)
+assert(decoded.values[2] == "OK")
+assert(decoded.next == 5)
+assert(frame_size == 4)
+
+print("binary protocol fixture ok")
