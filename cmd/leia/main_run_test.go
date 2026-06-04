@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"flag"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -145,6 +147,32 @@ func TestEvalCommandReportsUsage(t *testing.T) {
 	}
 	if !strings.Contains(stderr.String(), "usage: leia eval") {
 		t.Fatalf("stderr = %q, want usage", stderr.String())
+	}
+}
+
+func TestDefaultCommandRejectsCPUProfileWithJIT(t *testing.T) {
+	oldArgs := os.Args
+	oldCommandLine := flag.CommandLine
+	defer func() {
+		os.Args = oldArgs
+		flag.CommandLine = oldCommandLine
+	}()
+
+	profile := filepath.Join(t.TempDir(), "cpu.pprof")
+	os.Args = []string{"leia", "-cpuprofile", profile, "-e", "print(1)"}
+	flag.CommandLine = flag.NewFlagSet("leia", flag.ContinueOnError)
+	flag.CommandLine.SetOutput(io.Discard)
+
+	var stdout, stderr bytes.Buffer
+	code := runDefaultCommand(&stdout, &stderr)
+	if code != 1 {
+		t.Fatalf("runDefaultCommand code = %d, want 1", code)
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("stdout = %q, want empty", stdout.String())
+	}
+	if !strings.Contains(stderr.String(), "-cpuprofile is not supported while JIT is enabled") {
+		t.Fatalf("stderr = %q, want JIT/cpuprofile rejection", stderr.String())
 	}
 }
 

@@ -50,6 +50,11 @@ func runDefaultCommand(outw, errw io.Writer) int {
 		return 0
 	}
 
+	resolveVMJITFlags(flag.CommandLine, useVM, useJIT)
+	if *cpuprofile != "" && *useJIT {
+		fmt.Fprintln(errw, "error: -cpuprofile is not supported while JIT is enabled; rerun with --vm or -jit=false")
+		return 1
+	}
 	if *cpuprofile != "" {
 		f, err := os.Create(*cpuprofile)
 		if err != nil {
@@ -72,8 +77,6 @@ func runDefaultCommand(outw, errw io.Writer) int {
 			pprof.WriteHeapProfile(f)
 		}()
 	}
-
-	resolveVMJITFlags(flag.CommandLine, useVM, useJIT)
 
 	runOpts := cliRunOptions{
 		UseVM:        *useVM,
