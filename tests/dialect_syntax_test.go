@@ -176,6 +176,10 @@ func TestStdlibDataDialectsExecuteThroughStdlib(t *testing.T) {
 				"split_rows := split`left\nright\n`\n" +
 				"line_rows_keep_empty := dialect.eval(\"lines\", \"alpha\\n\\nbeta\\n\", {keep_empty: true})\n" +
 				"words_rows := words`alpha beta gamma`\n" +
+				"num_rows := nums`1, 2; 3.5\n4e1`\n" +
+				"number_rows := dialect.eval(\"numbers\", \"-2 0 2.25\")\n" +
+				"num_matrix := dialect.eval(\"nums\", \"1,2,3\\n4,5,6\\n\", {matrix: true})\n" +
+				"bad_nums, bad_nums_err := dialect.eval(\"nums\", \"1 nope 3\")\n" +
 				"kv_rows := dialect.eval(\"kv\", \"name = Ada\\nscore = 42\\n\")\n" +
 				"env_rows := dialect.eval(\"env\", \"TOKEN=\\\"abc 123\\\"\\nEMPTY=\\n\")\n" +
 				"escaped_html := html_escape`<b>Ada & Bob</b>`\n" +
@@ -184,9 +188,13 @@ func TestStdlibDataDialectsExecuteThroughStdlib(t *testing.T) {
 				"urlquery_component_decoded := dialect.eval(\"urlquery\", urlquery_component, {mode: \"unescape\"})\n" +
 				"urlquery_text := urlquery {q: \"hello world\", page: 2}\n" +
 				"urlquery_rows := urlquery`q=hello+world&page=2&tag=a&tag=b`\n" +
+				"mime_type := mime`text/html; charset=utf-8; boundary=\"abc def\"`\n" +
+				"mime_encoded := mime {type: \"application/json\", params: {charset: \"utf-8\", version: 2}}\n" +
 				"template_text := template`Hello static`\n" +
 				"template_cfg := template { text: \"Score {{.score}}\", data: {score: \"42\"} }\n" +
-				"template_eval := dialect.eval(\"template\", \"Hi {{.name}}\", {data: {name: name}})\n\n" +
+				"template_eval := dialect.eval(\"template\", \"Hi {{.name}}\", {data: {name: name}})\n" +
+				"jsonl_rows := jsonl`{\"name\":\"Ada\",\"score\":42}\n{\"name\":\"Bob\",\"score\":7}\n`\n" +
+				"jsonl_text := dialect.eval(\"jsonl\", jsonl_rows, {mode: \"encode\"})\n\n" +
 				"csv_row_2_name := csv_rows[2][1]\n" +
 				"csv_header_name := csv_header_rows[1].name\n" +
 				"csv_header_score := csv_header_rows[1].score\n" +
@@ -197,6 +205,16 @@ func TestStdlibDataDialectsExecuteThroughStdlib(t *testing.T) {
 				"line_keep_empty_count := #line_rows_keep_empty\n" +
 				"line_keep_empty_second := line_rows_keep_empty[2]\n" +
 				"words_second := words_rows[2]\n" +
+				"num_count := #num_rows\n" +
+				"num_first := num_rows[1]\n" +
+				"num_third := num_rows[3]\n" +
+				"num_fourth := num_rows[4]\n" +
+				"number_first := number_rows[1]\n" +
+				"number_third := number_rows[3]\n" +
+				"num_matrix_rows := #num_matrix\n" +
+				"num_matrix_cols := #num_matrix[1]\n" +
+				"num_matrix_last := num_matrix[2][3]\n" +
+				"bad_nums_is_nil := bad_nums == nil\n" +
 				"kv_name := kv_rows.name\n" +
 				"kv_score := kv_rows.score\n" +
 				"env_token := env_rows.TOKEN\n" +
@@ -204,6 +222,11 @@ func TestStdlibDataDialectsExecuteThroughStdlib(t *testing.T) {
 				"urlquery_q := urlquery_rows.q\n" +
 				"urlquery_page := urlquery_rows.page\n" +
 				"urlquery_tag_2 := urlquery_rows.tag[2]\n"
+			src += "mime_type_value := mime_type.type\n" +
+				"mime_charset := mime_type.params.charset\n" +
+				"mime_boundary := mime_type.params.boundary\n" +
+				"jsonl_first_name := jsonl_rows[1].name\n" +
+				"jsonl_second_score := jsonl_rows[2].score\n"
 			err := vm.Exec(src)
 			if err != nil {
 				t.Fatalf("Exec: %v", err)
@@ -218,6 +241,17 @@ func TestStdlibDataDialectsExecuteThroughStdlib(t *testing.T) {
 			assertGet(t, vm, "line_keep_empty_count", int64(3))
 			assertGet(t, vm, "line_keep_empty_second", "")
 			assertGet(t, vm, "words_second", "beta")
+			assertGet(t, vm, "num_count", int64(4))
+			assertGet(t, vm, "num_first", int64(1))
+			assertGet(t, vm, "num_third", 3.5)
+			assertGet(t, vm, "num_fourth", 40.0)
+			assertGet(t, vm, "number_first", int64(-2))
+			assertGet(t, vm, "number_third", 2.25)
+			assertGet(t, vm, "num_matrix_rows", int64(2))
+			assertGet(t, vm, "num_matrix_cols", int64(3))
+			assertGet(t, vm, "num_matrix_last", int64(6))
+			assertGet(t, vm, "bad_nums_is_nil", true)
+			assertStringContains(t, vm, "bad_nums_err", `invalid number "nope"`)
 			assertGet(t, vm, "kv_name", "Ada")
 			assertGet(t, vm, "kv_score", "42")
 			assertGet(t, vm, "env_token", "abc 123")
@@ -230,9 +264,16 @@ func TestStdlibDataDialectsExecuteThroughStdlib(t *testing.T) {
 			assertGet(t, vm, "urlquery_q", "hello world")
 			assertGet(t, vm, "urlquery_page", "2")
 			assertGet(t, vm, "urlquery_tag_2", "b")
+			assertGet(t, vm, "mime_type_value", "text/html")
+			assertGet(t, vm, "mime_charset", "utf-8")
+			assertGet(t, vm, "mime_boundary", "abc def")
+			assertGet(t, vm, "mime_encoded", "application/json; charset=utf-8; version=2")
 			assertGet(t, vm, "template_text", "Hello static")
 			assertGet(t, vm, "template_cfg", "Score 42")
 			assertGet(t, vm, "template_eval", "Hi Leia")
+			assertGet(t, vm, "jsonl_first_name", "Ada")
+			assertGet(t, vm, "jsonl_second_score", int64(7))
+			assertGet(t, vm, "jsonl_text", "{\"name\":\"Ada\",\"score\":42}\n{\"name\":\"Bob\",\"score\":7}\n")
 		})
 	}
 }

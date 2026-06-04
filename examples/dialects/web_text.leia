@@ -1,5 +1,5 @@
 // web_text.leia - Built-in dialects for small Web-safe text transforms.
-// Demonstrates: url, html_escape, urlquery, base64, hash
+// Demonstrates: url, html_escape, urlquery, mime, base64, hash
 
 print("=== Dialects: web text ===")
 
@@ -32,6 +32,15 @@ assert(parsed_query.page == "2")
 assert(parsed_query.tag[2] == "b")
 assert(component == "hello+world%26x")
 assert(component_decoded == "hello world&x")
+
+content_type := mime`text/html; charset=utf-8; boundary="abc def"`
+encoded_content_type := mime {type: "application/json", params: {charset: "utf-8", version: 2}}
+print("mime type:", content_type.type)
+print("mime charset:", content_type.params.charset)
+assert(content_type.type == "text/html")
+assert(content_type.params.charset == "utf-8")
+assert(content_type.params.boundary == "abc def")
+assert(encoded_content_type == "application/json; charset=utf-8; version=2")
 
 encoded_data := base64`hello-web`
 decoded_data := dialect.eval("base64", encoded_data, {mode: "decode"})

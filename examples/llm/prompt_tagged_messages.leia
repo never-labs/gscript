@@ -1,0 +1,65 @@
+// Prompt dialect to tagged LLM messages demo.
+//
+// This example stays on the existing stdlib surface: prompt dialect values are
+// adapted into msg.* tables, tags are ordinary message fields, and history.find
+// can select those tags before a mock/replay provider receives the messages.
+
+name := "Leia"
+system_prompt := prompt {role: "system", text: "Answer using the supplied context."}
+user_prompt := prompt`Summarize ${name} agent history.`
+
+func prompt_message(p, fallback_role, tag) {
+    body := p
+    if type(p) == "table" && p.body != nil {
+        body = p.body
+    }
+
+    role := fallback_role
+    if type(body) == "table" && body.role != nil {
+        role = body.role
+    }
+
+    text := nil
+    if type(body) == "table" {
+        text = body.text
+    } else {
+        text = body
+    }
+    if text == nil && type(p) == "table" {
+        text = p.text
+    }
+
+    m := nil
+    if role == "system" {
+        m = msg.system(text)
+    } else if role == "assistant" {
+        m = msg.assistant(text)
+    } else {
+        m = msg.user(text)
+    }
+    m.tag = tag
+    return m
+}
+
+messages := {
+    prompt_message(system_prompt, "system", "policy"),
+    prompt_message(user_prompt, "user", "task"),
+}
+
+task_msg, task_idx := history.find(messages, {tag: "task"})
+result, err := llm.turn({
+    model: "mock-prompt"
+    messages: messages
+    max_tokens: 96
+})
+if err != nil {
+    print(err.message)
+    return
+}
+
+prompt_tagged_text := result.text
+prompt_tagged_task := task_msg.text
+prompt_tagged_task_idx := task_idx
+prompt_tagged_history_len := #messages
+
+print("prompt-tagged", prompt_tagged_text)

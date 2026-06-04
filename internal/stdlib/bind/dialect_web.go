@@ -1,6 +1,32 @@
 package bind
 
-import dialectlib "github.com/never-labs/leia/internal/support/dialect"
+import (
+	"fmt"
+	"mime"
+
+	dialectlib "github.com/never-labs/leia/internal/support/dialect"
+)
+
+func registerDialectWeb(register dialectRegisterFunc) {
+	register([]string{"url"}, dialectHandler{
+		eval: func(body Value, _ *Table) ([]Value, error) {
+			return dialectURL(body.Str())
+		},
+	})
+	register([]string{"html_escape"}, dialectHandler{
+		eval: func(body Value, options *Table) ([]Value, error) {
+			return dialectHTMLEscape(body.Str(), options)
+		},
+	})
+	register([]string{"urlquery"}, dialectHandler{
+		eval:  dialectURLQuery,
+		block: dialectURLQuery,
+	})
+	register([]string{"mime"}, dialectHandler{
+		eval:  dialectMIME,
+		block: dialectMIME,
+	})
+}
 
 func dialectHTMLEscape(src string, opts *Table) ([]Value, error) {
 	mode := ""
@@ -55,6 +81,70 @@ func dialectURLQuery(body Value, opts *Table) ([]Value, error) {
 		out.RawSetString(key, TableValue(arr))
 	}
 	return []Value{TableValue(out)}, nil
+}
+
+func dialectMIME(body Value, opts *Table) ([]Value, error) {
+	mode := ""
+	if opts != nil && opts.RawGetString("mode").IsString() {
+		mode = opts.RawGetString("mode").Str()
+	}
+	if body.IsTable() || mode == "encode" || mode == "format" {
+		return dialectMIMEEncode(body, opts)
+	}
+
+	mediaType, params, err := mime.ParseMediaType(body.Str())
+	if err != nil {
+		return []Value{NilValue(), StringValue(err.Error())}, nil
+	}
+	result := NewTable()
+	result.RawSetString("type", StringValue(mediaType))
+	result.RawSetString("raw", StringValue(body.Str()))
+	paramTable := NewTable()
+	for key, val := range params {
+		paramTable.RawSetString(key, StringValue(val))
+	}
+	result.RawSetString("params", TableValue(paramTable))
+	return []Value{TableValue(result)}, nil
+}
+
+func dialectMIMEEncode(body Value, opts *Table) ([]Value, error) {
+	mediaType := ""
+	paramsValue := NilValue()
+	if body.IsTable() {
+		tbl := body.Table()
+		if v := tbl.RawGetString("type"); v.IsString() {
+			mediaType = v.Str()
+		}
+		paramsValue = tbl.RawGetString("params")
+	} else {
+		mediaType = body.Str()
+	}
+	if opts != nil {
+		if v := opts.RawGetString("type"); v.IsString() {
+			mediaType = v.Str()
+		}
+		if v := opts.RawGetString("params"); v.IsTable() {
+			paramsValue = v
+		}
+	}
+	if mediaType == "" {
+		return nil, fmt.Errorf("mime dialect: media type required for encode")
+	}
+
+	params := make(map[string]string)
+	if paramsValue.IsTable() {
+		paramsValue.Table().ForEachPlainRaw(func(k, v Value) bool {
+			if k.IsString() {
+				params[k.Str()] = v.String()
+			}
+			return true
+		})
+	}
+	formatted := mime.FormatMediaType(mediaType, params)
+	if formatted == "" {
+		return []Value{NilValue(), StringValue("invalid media type or parameter")}, nil
+	}
+	return []Value{StringValue(formatted)}, nil
 }
 
 func dialectURL(src string) ([]Value, error) {

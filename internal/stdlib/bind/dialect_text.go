@@ -3,13 +3,87 @@ package bind
 import (
 	"encoding/json"
 	"fmt"
+	"io"
+	"math"
+	"regexp"
+	"strconv"
 	"strings"
 	"text/template"
+	"unicode"
 
 	"github.com/never-labs/leia/internal/runtime"
 	csvlib "github.com/never-labs/leia/internal/stdlib/lib/csv"
 	dialectlib "github.com/never-labs/leia/internal/support/dialect"
 )
+
+func registerDialectText(register dialectRegisterFunc, maxHostResult func() int64) {
+	register([]string{"re", "regexp"}, dialectHandler{
+		eval: func(body Value, options *Table) ([]Value, error) {
+			return dialectRegexp(body.Str(), dialectFailFast(options))
+		},
+	})
+	register([]string{"json"}, dialectHandler{
+		eval:  dialectJSON,
+		block: dialectJSON,
+	})
+	register([]string{"jsonl"}, dialectHandler{
+		eval: func(body Value, options *Table) ([]Value, error) {
+			return dialectJSONL(body, options, maxHostResult)
+		},
+		block: func(body Value, options *Table) ([]Value, error) {
+			return dialectJSONL(body, options, maxHostResult)
+		},
+	})
+	register([]string{"csv"}, dialectHandler{
+		eval: func(body Value, options *Table) ([]Value, error) {
+			return dialectCSV(body.Str(), options)
+		},
+	})
+	register([]string{"lines", "split"}, dialectHandler{
+		eval: func(body Value, options *Table) ([]Value, error) {
+			return dialectLines(body.Str(), options)
+		},
+	})
+	register([]string{"words"}, dialectHandler{
+		eval: func(body Value, _ *Table) ([]Value, error) {
+			return dialectWords(body.Str()), nil
+		},
+	})
+	register([]string{"nums", "numbers"}, dialectHandler{
+		eval: func(body Value, options *Table) ([]Value, error) {
+			return dialectNumbers(body.Str(), options)
+		},
+	})
+	register([]string{"kv"}, dialectHandler{
+		eval: func(body Value, options *Table) ([]Value, error) {
+			return dialectKV(body.Str(), options, false)
+		},
+	})
+	register([]string{"env"}, dialectHandler{
+		eval: func(body Value, options *Table) ([]Value, error) {
+			return dialectKV(body.Str(), options, true)
+		},
+	})
+	register([]string{"template"}, dialectHandler{
+		eval: func(body Value, options *Table) ([]Value, error) {
+			return dialectTemplate(body, options, maxHostResult)
+		},
+		block: func(body Value, options *Table) ([]Value, error) {
+			return dialectTemplate(body, options, maxHostResult)
+		},
+	})
+}
+
+func dialectRegexp(pattern string, failFast bool) ([]Value, error) {
+	re, err := regexp.Compile(pattern)
+	if err != nil {
+		if failFast {
+			return nil, fmt.Errorf("re dialect: %v", err)
+		}
+		return []Value{NilValue(), StringValue(err.Error())}, nil
+	}
+	return []Value{TableValue(makeReObject(re))}, nil
+}
 
 func dialectJSON(body Value, opts *Table) ([]Value, error) {
 	mode := ""
@@ -30,6 +104,107 @@ func dialectJSON(body Value, opts *Table) ([]Value, error) {
 		return nil, fmt.Errorf("json dialect: %v", err)
 	}
 	return []Value{StringValue(string(data))}, nil
+}
+
+func dialectJSONL(body Value, opts *Table, maxHostResult func() int64) ([]Value, error) {
+	mode := ""
+	if opts != nil && opts.RawGetString("mode").IsString() {
+		mode = opts.RawGetString("mode").Str()
+	}
+	if mode == "encode" || !body.IsString() {
+		data, err := encodeJSONL(body, hostResultLimit(maxHostResult))
+		if err != nil {
+			return nil, fmt.Errorf("jsonl dialect: %v", err)
+		}
+		return []Value{StringValue(data)}, nil
+	}
+	rows, err := decodeJSONL(body.Str())
+	if err != nil {
+		return []Value{NilValue(), StringValue(err.Error())}, nil
+	}
+	return []Value{rows}, nil
+}
+
+func decodeJSONL(src string) (Value, error) {
+	src = strings.TrimSuffix(src, "\n")
+	src = strings.TrimSuffix(src, "\r")
+	if src == "" {
+		return TableValue(NewAppendArrayTable(0)), nil
+	}
+	lines := strings.Split(src, "\n")
+	out := NewAppendArrayTable(len(lines))
+	for i, line := range lines {
+		line = strings.TrimSuffix(line, "\r")
+		if strings.TrimSpace(line) == "" {
+			return NilValue(), fmt.Errorf("line %d: empty JSONL record", i+1)
+		}
+		val, err := decodeJSONLine(line)
+		if err != nil {
+			return NilValue(), fmt.Errorf("line %d: %v", i+1, err)
+		}
+		out.RawSetInt(int64(i+1), val)
+	}
+	return TableValue(out), nil
+}
+
+func decodeJSONLine(line string) (Value, error) {
+	decoder := json.NewDecoder(strings.NewReader(line))
+	decoder.UseNumber()
+	var goVal any
+	if err := decoder.Decode(&goVal); err != nil {
+		return NilValue(), err
+	}
+	var extra any
+	if err := decoder.Decode(&extra); err != io.EOF {
+		if err == nil {
+			return NilValue(), fmt.Errorf("invalid JSON: trailing data")
+		}
+		return NilValue(), err
+	}
+	return runtime.JSONGoToValue(goVal), nil
+}
+
+func encodeJSONL(body Value, limit int64) (string, error) {
+	if !body.IsTable() {
+		data, err := json.Marshal(runtime.JSONValueToGo(body))
+		if err != nil {
+			return "", err
+		}
+		if err := CheckProjectedHostStringBytes(limit, len(data)+1); err != nil {
+			return "", err
+		}
+		return string(data) + "\n", nil
+	}
+	tbl := body.Table()
+	if tbl.Length() == 0 && tableHasAnyKey(tbl) {
+		data, err := json.Marshal(runtime.JSONValueToGo(body))
+		if err != nil {
+			return "", err
+		}
+		if err := CheckProjectedHostStringBytes(limit, len(data)+1); err != nil {
+			return "", err
+		}
+		return string(data) + "\n", nil
+	}
+	buf := newHostResultBuffer(limit)
+	for i := 1; i <= tbl.Length(); i++ {
+		data, err := json.Marshal(runtime.JSONValueToGo(tbl.RawGetInt(int64(i))))
+		if err != nil {
+			return "", err
+		}
+		if _, err := buf.Write(data); err != nil {
+			return "", err
+		}
+		if _, err := buf.Write([]byte("\n")); err != nil {
+			return "", err
+		}
+	}
+	return buf.String(), nil
+}
+
+func tableHasAnyKey(tbl *Table) bool {
+	_, _, ok := tbl.Next(NilValue())
+	return ok
 }
 
 func dialectCSV(src string, opts *Table) ([]Value, error) {
@@ -110,6 +285,88 @@ func dialectWords(src string) []Value {
 		out.RawSetInt(int64(i+1), StringValue(word))
 	}
 	return []Value{TableValue(out)}
+}
+
+func dialectNumbers(src string, opts *Table) ([]Value, error) {
+	if opts != nil && opts.RawGetString("matrix").Truthy() {
+		matrix, err := parseNumberMatrix(src)
+		if err != nil {
+			return []Value{NilValue(), StringValue(err.Error())}, nil
+		}
+		return []Value{numberMatrixToValue(matrix)}, nil
+	}
+	values, err := parseNumberFields(src)
+	if err != nil {
+		return []Value{NilValue(), StringValue(err.Error())}, nil
+	}
+	return []Value{numberRowToValue(values)}, nil
+}
+
+func parseNumberMatrix(src string) ([][]Value, error) {
+	lines := dialectlib.Lines(src, false, false)
+	rows := make([][]Value, 0, len(lines))
+	width := -1
+	for lineNo, line := range lines {
+		values, err := parseNumberFields(line)
+		if err != nil {
+			return nil, fmt.Errorf("nums dialect line %d: %v", lineNo+1, err)
+		}
+		if width < 0 {
+			width = len(values)
+		} else if len(values) != width {
+			return nil, fmt.Errorf("nums dialect matrix row %d has %d values, want %d", lineNo+1, len(values), width)
+		}
+		rows = append(rows, values)
+	}
+	return rows, nil
+}
+
+func parseNumberFields(src string) ([]Value, error) {
+	fields := strings.FieldsFunc(src, func(r rune) bool {
+		return r == ',' || r == ';' || unicode.IsSpace(r)
+	})
+	values := make([]Value, 0, len(fields))
+	for _, field := range fields {
+		if field == "" {
+			continue
+		}
+		v, err := parseNumberField(field)
+		if err != nil {
+			return nil, err
+		}
+		values = append(values, v)
+	}
+	return values, nil
+}
+
+func parseNumberField(field string) (Value, error) {
+	if !strings.ContainsAny(field, ".eE") {
+		i, err := strconv.ParseInt(field, 10, 64)
+		if err == nil {
+			return IntValue(i), nil
+		}
+	}
+	f, err := strconv.ParseFloat(field, 64)
+	if err != nil || math.IsInf(f, 0) || math.IsNaN(f) {
+		return NilValue(), fmt.Errorf("invalid number %q", field)
+	}
+	return FloatValue(f), nil
+}
+
+func numberRowToValue(values []Value) Value {
+	row := NewAppendArrayTable(len(values))
+	for i, v := range values {
+		row.RawSetInt(int64(i+1), v)
+	}
+	return TableValue(row)
+}
+
+func numberMatrixToValue(rows [][]Value) Value {
+	out := NewAppendArrayTable(len(rows))
+	for i, row := range rows {
+		out.RawSetInt(int64(i+1), numberRowToValue(row))
+	}
+	return TableValue(out)
 }
 
 func dialectKV(src string, opts *Table, envMode bool) ([]Value, error) {

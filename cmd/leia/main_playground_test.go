@@ -243,6 +243,29 @@ func TestPlaygroundRepositoryHostCapabilityExampleIsManualRunOnly(t *testing.T) 
 	t.Fatal("repo-dialects-shell_filesystem example not found")
 }
 
+func TestPlaygroundRepositoryPackageManagedUIExampleIsManualRunOnly(t *testing.T) {
+	examples, err := playgroundRepositoryExamples(playgroundExamplesRoot())
+	if err != nil {
+		t.Fatalf("load repository examples: %v", err)
+	}
+	for _, example := range examples {
+		if example.ID != "repo-ui-package_managed-main" {
+			continue
+		}
+		if example.Runnable {
+			t.Fatalf("%s should be manual-run only in the playground", example.ID)
+		}
+		if example.Requires != "package-managed UI runtime and native window host access" {
+			t.Fatalf("requires = %q", example.Requires)
+		}
+		if !strings.Contains(example.Source, `require("github.com/never-labs/leia-ui/raylib")`) {
+			t.Fatalf("source missing package-managed UI runtime import\nsource:\n%s", example.Source)
+		}
+		return
+	}
+	t.Fatal("repo-ui-package_managed-main example not found")
+}
+
 func TestPlaygroundAIExamplesCoverRunnableWorkflowShapes(t *testing.T) {
 	t.Setenv("LEIA_PLAYGROUND_MOCK_LLM", "1")
 	want := map[string][]string{

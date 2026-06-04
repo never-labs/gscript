@@ -1,0 +1,17 @@
+// Package-managed UI example.
+//leia:cap ui.window,ui.input
+//
+// This file is intentionally a manifest companion, not a runnable UI runtime.
+// UI surfaces should be supplied by a package/native adapter declared in
+// leia.mod instead of becoming a built-in dialect or core stdlib module.
+
+ui := require("github.com/never-labs/leia-ui/raylib")
+
+app := {
+  title: "Package-managed UI",
+  width: 800,
+  height: 450,
+  runtime: ui,
+}
+
+return app
