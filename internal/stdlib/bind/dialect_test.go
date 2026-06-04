@@ -14,8 +14,8 @@ func TestDialectTagsExposeInstalledHandlers(t *testing.T) {
 
 	got := stringSetFromArray(interp.GetGlobal("tags").Table())
 	want := []string{
-		"base64", "cmd", "cookie", "cookies", "csv", "duration", "env", "glob",
-		"hash", "headers", "html_escape", "http_headers", "httpmsg", "ini", "json", "jsonl",
+		"base32", "base64", "cmd", "cookie", "cookies", "csv", "duration", "env", "glob",
+		"hash", "headers", "hex", "html_escape", "http_headers", "httpmsg", "ini", "json", "jsonl",
 		"junit", "kv", "lines", "mdtable", "mime", "numbers", "nums", "path", "prompt",
 		"quote", "re", "regexp", "semver", "sh", "shellwords", "split", "tap", "template", "tsv", "url",
 		"urlpath", "urlquery", "words", "xml",
@@ -364,6 +364,40 @@ func TestDialectXMLEscapeAndUnescape(t *testing.T) {
 	}
 	if got := interp.GetGlobal("bad_err").Str(); !strings.Contains(got, "invalid XML numeric character reference") {
 		t.Fatalf("bad_err = %q", got)
+	}
+}
+
+func TestDialectHexAndBase32RoundTrip(t *testing.T) {
+	interp := runWithLib(t, `
+		hexed := hex`+"`"+`go`+"`"+`
+		hex_decoded, hex_err := dialect.eval("hex", hexed, {mode: "decode"})
+		bad_hex, bad_hex_err := dialect.eval("hex", "xx", {mode: "decode"})
+		base32ed := base32`+"`"+`go`+"`"+`
+		base32_decoded, base32_err := dialect.eval("base32", base32ed, {mode: "decode"})
+		base32hexed := dialect.eval("base32", "go", {mode: "hex_encode"})
+		base32hex_decoded, base32hex_err := dialect.eval("base32", base32hexed, {mode: "hex_decode"})
+	`, "dialect", BuildDialect(HostOptions{}, nil))
+
+	if got := interp.GetGlobal("hexed").Str(); got != "676f" {
+		t.Fatalf("hexed = %q, want 676f", got)
+	}
+	if !interp.GetGlobal("hex_err").IsNil() || interp.GetGlobal("hex_decoded").Str() != "go" {
+		t.Fatalf("hex decode = %v err %v, want go nil", interp.GetGlobal("hex_decoded"), interp.GetGlobal("hex_err"))
+	}
+	if !interp.GetGlobal("bad_hex").IsNil() || !strings.Contains(interp.GetGlobal("bad_hex_err").Str(), "invalid byte") {
+		t.Fatalf("bad hex = %v err %v, want nil invalid byte", interp.GetGlobal("bad_hex"), interp.GetGlobal("bad_hex_err"))
+	}
+	if got := interp.GetGlobal("base32ed").Str(); got != "M5XQ====" {
+		t.Fatalf("base32ed = %q, want M5XQ====", got)
+	}
+	if !interp.GetGlobal("base32_err").IsNil() || interp.GetGlobal("base32_decoded").Str() != "go" {
+		t.Fatalf("base32 decode = %v err %v, want go nil", interp.GetGlobal("base32_decoded"), interp.GetGlobal("base32_err"))
+	}
+	if got := interp.GetGlobal("base32hexed").Str(); got != "CTNG" {
+		t.Fatalf("base32hexed = %q, want CTNG", got)
+	}
+	if !interp.GetGlobal("base32hex_err").IsNil() || interp.GetGlobal("base32hex_decoded").Str() != "go" {
+		t.Fatalf("base32hex decode = %v err %v, want go nil", interp.GetGlobal("base32hex_decoded"), interp.GetGlobal("base32hex_err"))
 	}
 }
 

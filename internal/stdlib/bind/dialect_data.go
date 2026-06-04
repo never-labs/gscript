@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	base64lib "github.com/never-labs/leia/internal/stdlib/lib/base64"
+	encodinglib "github.com/never-labs/leia/internal/stdlib/lib/encoding"
 	hashlib "github.com/never-labs/leia/internal/stdlib/lib/hash"
 )
 
@@ -17,6 +18,16 @@ func registerDialectData(register dialectRegisterFunc, maxHostResult func() int6
 	register([]string{"hash"}, dialectHandler{
 		eval: func(body Value, options *Table) ([]Value, error) {
 			return dialectHash(body.Str(), options)
+		},
+	})
+	register([]string{"hex"}, dialectHandler{
+		eval: func(body Value, options *Table) ([]Value, error) {
+			return dialectHex(body.Str(), options, maxHostResult)
+		},
+	})
+	register([]string{"base32"}, dialectHandler{
+		eval: func(body Value, options *Table) ([]Value, error) {
+			return dialectBase32(body.Str(), options, maxHostResult)
 		},
 	})
 }
@@ -78,5 +89,69 @@ func dialectHash(src string, opts *Table) ([]Value, error) {
 		return []Value{IntValue(int64(hashlib.CRC32(src)))}, nil
 	default:
 		return nil, fmt.Errorf("hash dialect: unknown algorithm %q", algo)
+	}
+}
+
+func dialectHex(src string, opts *Table, maxHostResult func() int64) ([]Value, error) {
+	mode := "encode"
+	if opts != nil && opts.RawGetString("mode").IsString() {
+		mode = opts.RawGetString("mode").Str()
+	}
+	switch mode {
+	case "encode", "":
+		if err := CheckProjectedHostStringBytes(hostResultLimit(maxHostResult), encodinglib.HexEncodedLen(len(src))); err != nil {
+			return nil, err
+		}
+		return []Value{StringValue(encodinglib.HexEncode(src))}, nil
+	case "decode":
+		if err := CheckProjectedHostStringBytes(hostResultLimit(maxHostResult), encodinglib.HexDecodedLen(len(src))); err != nil {
+			return nil, err
+		}
+		decoded, err := encodinglib.HexDecode(src)
+		if err != nil {
+			return []Value{NilValue(), StringValue(err.Error())}, nil
+		}
+		return []Value{StringValue(decoded)}, nil
+	default:
+		return nil, fmt.Errorf("hex dialect: unknown mode %q", mode)
+	}
+}
+
+func dialectBase32(src string, opts *Table, maxHostResult func() int64) ([]Value, error) {
+	mode := "encode"
+	if opts != nil && opts.RawGetString("mode").IsString() {
+		mode = opts.RawGetString("mode").Str()
+	}
+	switch mode {
+	case "encode", "":
+		if err := CheckProjectedHostStringBytes(hostResultLimit(maxHostResult), encodinglib.Base32EncodedLen(len(src))); err != nil {
+			return nil, err
+		}
+		return []Value{StringValue(encodinglib.Base32Encode(src))}, nil
+	case "decode":
+		if err := CheckProjectedHostStringBytes(hostResultLimit(maxHostResult), encodinglib.Base32DecodedLen(len(src))); err != nil {
+			return nil, err
+		}
+		decoded, err := encodinglib.Base32Decode(src)
+		if err != nil {
+			return []Value{NilValue(), StringValue(err.Error())}, nil
+		}
+		return []Value{StringValue(decoded)}, nil
+	case "hex_encode":
+		if err := CheckProjectedHostStringBytes(hostResultLimit(maxHostResult), encodinglib.Base32HexEncodedLen(len(src))); err != nil {
+			return nil, err
+		}
+		return []Value{StringValue(encodinglib.Base32HexEncode(src))}, nil
+	case "hex_decode":
+		if err := CheckProjectedHostStringBytes(hostResultLimit(maxHostResult), encodinglib.Base32HexDecodedLen(len(src))); err != nil {
+			return nil, err
+		}
+		decoded, err := encodinglib.Base32HexDecode(src)
+		if err != nil {
+			return []Value{NilValue(), StringValue(err.Error())}, nil
+		}
+		return []Value{StringValue(decoded)}, nil
+	default:
+		return nil, fmt.Errorf("base32 dialect: unknown mode %q", mode)
 	}
 }

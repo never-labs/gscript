@@ -257,6 +257,10 @@ func TestPureDialectSyntaxExecutesThroughStdlib(t *testing.T) {
 				"raw_line_rows := lines`one\\nnot split`\n" +
 				"base64_url := dialect.eval(\"base64\", \"a/b?\", {mode: \"url_encode\"})\n" +
 				"base64_url_decoded := dialect.eval(\"base64\", base64_url, {mode: \"url_decode\"})\n" +
+				"hex_text := hex`go`\n" +
+				"hex_decoded := dialect.eval(\"hex\", hex_text, {mode: \"decode\"})\n" +
+				"base32_text := base32`go`\n" +
+				"base32_decoded := dialect.eval(\"base32\", base32_text, {mode: \"decode\"})\n" +
 				"hash_sha256 := hash`leia`\n" +
 				"hash_sha1 := dialect.eval(\"hash\", \"leia\", {algo: \"sha1\"})\n" +
 				"msg := prompt`Hello ${name}`\n" +
@@ -294,6 +298,10 @@ func TestPureDialectSyntaxExecutesThroughStdlib(t *testing.T) {
 			assertGet(t, vm, "raw_line_first", `one\nnot split`)
 			assertGet(t, vm, "base64_url", "YS9iPw")
 			assertGet(t, vm, "base64_url_decoded", "a/b?")
+			assertGet(t, vm, "hex_text", "676f")
+			assertGet(t, vm, "hex_decoded", "go")
+			assertGet(t, vm, "base32_text", "M5XQ====")
+			assertGet(t, vm, "base32_decoded", "go")
 			assertGet(t, vm, "hash_sha256", "b0dea5555379c9e3384dd1e771de9d73db4ee7f9c24725bfe8b757b3768b015f")
 			assertGet(t, vm, "hash_sha1", "3ea1ebad1aa28de8fc67188a456b9747bbcca81a")
 			assertGet(t, vm, "prompt_text", "Hello leia")

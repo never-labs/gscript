@@ -83,11 +83,20 @@ encoded_data := base64`hello-web`
 decoded_data := dialect.eval("base64", encoded_data, {mode: "decode"})
 url_data := dialect.eval("base64", "a/b?", {mode: "url_encode"})
 url_data_decoded := dialect.eval("base64", url_data, {mode: "url_decode"})
+hex_data := hex`web`
+hex_decoded := dialect.eval("hex", hex_data, {mode: "decode"})
+base32_data := base32`web`
+base32_decoded := dialect.eval("base32", base32_data, {mode: "decode"})
 print("base64:", encoded_data)
+print("hex/base32:", hex_data, base32_data)
 assert(encoded_data == "aGVsbG8td2Vi")
 assert(decoded_data == "hello-web")
 assert(url_data == "YS9iPw")
 assert(url_data_decoded == "a/b?")
+assert(hex_data == "776562")
+assert(hex_decoded == "web")
+assert(base32_data == "O5SWE===")
+assert(base32_decoded == "web")
 
 sha256 := hash`web`
 sha1 := dialect.eval("hash", "web", {algo: "sha1"})

@@ -251,7 +251,7 @@ func builtinDialectCategory(name string) string {
 		return "text"
 	case "url", "html_escape", "urlquery", "urlpath", "mime", "headers", "http_headers", "httpmsg", "cookie", "cookies":
 		return "web"
-	case "base64", "hash":
+	case "base64", "hash", "hex", "base32":
 		return "data"
 	case "prompt", "quote":
 		return "llm"
