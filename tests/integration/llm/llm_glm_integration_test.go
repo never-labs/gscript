@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -446,5 +447,75 @@ if err != nil {
 		toolName != "extract_memory" || project != "ORCHID" || owner != "ADA" || source != "direct-agent-tool" {
 		t.Fatalf("direct agent tool result mismatch: history=%#v roles=%#v/%#v/%#v/%#v tool=%#v project=%#v owner=%#v source=%#v",
 			historyLen, systemRole, userRole, assistantRole, toolRole, toolName, project, owner, source)
+	}
+}
+
+func TestGLMExamplesRunWithRealProviderIntegration(t *testing.T) {
+	cfg := glmAnthropicCompatibleSmokeConfig(t)
+	t.Setenv("LEIA_GLM_BASE_URL", cfg.Endpoint)
+	t.Setenv("LEIA_GLM_API_KEY", cfg.APIKey)
+	t.Setenv("LEIA_GLM_MODEL", cfg.Model)
+	t.Setenv("SENTINEL_GLM_API_KEY", cfg.APIKey)
+	t.Setenv("GLM_API_KEY", cfg.APIKey)
+	t.Setenv("GLM_MODEL", cfg.Model)
+
+	root := integrationRepoRoot(t)
+	for _, tc := range []struct {
+		path string
+		want []string
+	}{
+		{
+			path: "examples/llm/glm_smoke.leia",
+			want: []string{"stored=", "recalled=", "project=ORCHID", "owner=ADA", "remembered=true", "source=history"},
+		},
+		{
+			path: "examples/llm/glm_direct_agent_tools.leia",
+			want: []string{"text=", "history_len=4", "roles=system/user/assistant/tool", "tool=extract_memory", "project=ORCHID", "owner=ADA", "source=direct-agent-tool"},
+		},
+	} {
+		tc := tc
+		t.Run(filepath.Base(tc.path), func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+			defer cancel()
+			var printed []string
+			vm := leia.New(
+				leia.WithLibs(leia.LibString|leia.LibOS|leia.LibLLM),
+				leia.WithPrint(func(args ...interface{}) {
+					parts := make([]string, len(args))
+					for i, arg := range args {
+						parts[i] = fmt.Sprint(arg)
+					}
+					printed = append(printed, strings.Join(parts, "\t"))
+				}),
+			)
+			if err := vm.ExecFileContext(ctx, filepath.Join(root, filepath.FromSlash(tc.path))); err != nil {
+				t.Fatalf("run %s: %v\nprinted:\n%s", tc.path, err, strings.Join(printed, "\n"))
+			}
+			out := strings.Join(printed, "\n")
+			fmt.Printf("%s output:\n%s\n", tc.path, out)
+			for _, want := range tc.want {
+				if !strings.Contains(out, want) {
+					t.Fatalf("%s output missing %q:\n%s", tc.path, want, out)
+				}
+			}
+		})
+	}
+}
+
+func integrationRepoRoot(t *testing.T) string {
+	t.Helper()
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	for {
+		if _, err := os.Stat(filepath.Join(wd, "go.mod")); err == nil {
+			return wd
+		}
+		parent := filepath.Dir(wd)
+		if parent == wd {
+			t.Fatal("could not find repo root containing go.mod")
+		}
+		wd = parent
 	}
 }

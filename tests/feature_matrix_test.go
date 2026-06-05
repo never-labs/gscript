@@ -237,7 +237,17 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 	embeddingSecurity := requireFeature(t, features, "sandbox_capabilities_module_loading")
 	requireFeatureCellRefs(t, embeddingSecurity, "sandbox_capabilities_module_loading", "semantic_gate",
 		"tests/sdk/leia_test.go",
+		"tests/sdk/security_api_test.go",
 		"docs/testing.md",
+	)
+
+	hostBindings := requireFeature(t, features, "embedding_host_bindings")
+	requireFeatureCellRefs(t, hostBindings, "embedding_host_bindings", "semantic_gate",
+		"tests/sdk/register_api_test.go",
+		"tests/sdk/module_api_test.go",
+		"tests/sdk/error_api_test.go",
+		"tests/sdk/public_api_boundary_test.go",
+		"examples/embedding/embedding_test.go",
 	)
 
 	resourceBudgets := requireFeature(t, features, "embedding_resource_budgets")
@@ -267,6 +277,7 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 		"tests/llm/llm_ai_dialect_test.go",
 		"tests/integration/llm/llm_openai_provider_test.go",
 		"tests/integration/llm/llm_provider_test.go",
+		"tests/integration/llm/llm_glm_integration_test.go",
 		"cmd/leia/main_examples_test.go",
 		"cmd/leia/main_examples_command_test.go",
 		"examples/ai/coding_agent_replay.leia",
