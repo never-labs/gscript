@@ -12,15 +12,20 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	leia "github.com/never-labs/leia"
+	"github.com/never-labs/leia/llm"
 )
 
 type cliExample struct {
-	ID       string `json:"id"`
-	Title    string `json:"title"`
-	Section  string `json:"section"`
-	Path     string `json:"path"`
-	Runnable bool   `json:"runnable"`
-	Requires string `json:"requires,omitempty"`
+	ID        string `json:"id"`
+	Title     string `json:"title"`
+	Section   string `json:"section"`
+	Path      string `json:"path"`
+	Runnable  bool   `json:"runnable"`
+	Checkable bool   `json:"checkable,omitempty"`
+	Runner    string `json:"runner,omitempty"`
+	Requires  string `json:"requires,omitempty"`
 }
 
 type cliExampleCheckResult struct {
@@ -31,6 +36,8 @@ type cliExampleCheckResult struct {
 	Requires string `json:"requires,omitempty"`
 	Error    string `json:"error,omitempty"`
 }
+
+var cliExampleTestRunnerMu sync.Mutex
 
 func runExamplesCommand(args []string, outw, errw io.Writer) int {
 	if len(args) == 0 {
@@ -88,7 +95,9 @@ func runExamplesListCommand(args []string, outw, errw io.Writer) int {
 	}
 	for _, example := range examples {
 		status := "run"
-		if !example.Runnable {
+		if !example.Runnable && example.Checkable {
+			status = "check"
+		} else if !example.Runnable {
 			status = "manual"
 		}
 		if example.Requires != "" {
@@ -248,6 +257,9 @@ func runExamplesRunCommand(args []string, outw, errw io.Writer) int {
 		fmt.Fprintln(errw)
 		return 1
 	}
+	if example.Runner != "" && example.Runner != "playground" {
+		return runCLIExampleRunner(example, path, 2_000_000, outw, errw)
+	}
 	resolveVMJITFlags(fs, useVM, useJIT)
 	return runRunCommand([]string{"--vm=" + boolFlagString(*useVM), "--jit=" + boolFlagString(*useJIT), path}, outw, errw)
 }
@@ -259,14 +271,17 @@ func cliRepositoryExamples() ([]cliExample, error) {
 	}
 	examples := make([]cliExample, 0, len(playgroundExamples))
 	for _, example := range playgroundExamples {
-		examples = append(examples, cliExample{
+		cli := cliExample{
 			ID:       example.ID,
 			Title:    example.Title,
 			Section:  example.Section,
 			Path:     example.Summary,
 			Runnable: example.Runnable,
+			Runner:   "playground",
 			Requires: example.Requires,
-		})
+		}
+		applyCLIExampleRunner(&cli)
+		examples = append(examples, cli)
 	}
 	sort.Slice(examples, func(i, j int) bool {
 		if examples[i].Section != examples[j].Section {
@@ -353,7 +368,7 @@ func checkCLIExample(example cliExample, maxSteps int64, timeout time.Duration) 
 		Status:   "ok",
 		Requires: example.Requires,
 	}
-	if !example.Runnable {
+	if !example.Runnable && !example.Checkable {
 		result.Status = "skipped"
 		return result
 	}
@@ -367,7 +382,7 @@ func checkCLIExample(example cliExample, maxSteps int64, timeout time.Duration) 
 	done := make(chan runResult, 1)
 	go func() {
 		var stdout, stderr bytes.Buffer
-		code := runPlaygroundExecCommand([]string{"--mode=bytecode", "--max-steps=" + fmt.Sprint(maxSteps), path}, &stdout, &stderr)
+		code := runCLIExampleRunner(example, path, maxSteps, &stdout, &stderr)
 		done <- runResult{code: code, stdout: stdout.String(), stderr: stderr.String()}
 	}()
 	var run runResult
@@ -391,6 +406,149 @@ func checkCLIExample(example cliExample, maxSteps int64, timeout time.Duration) 
 		}
 	}
 	return result
+}
+
+func applyCLIExampleRunner(example *cliExample) {
+	switch {
+	case strings.Contains(example.Path, "/evaluate/"):
+		if strings.Contains(example.Path, "/basic_assert.leia") {
+			example.Runnable = true
+			example.Checkable = true
+			example.Runner = "evaluate"
+			example.Requires = ""
+			return
+		}
+		if cliExampleCompanionRecordsExist(example.Path) {
+			example.Runnable = true
+			example.Checkable = true
+			example.Runner = "evaluate-replay"
+			example.Requires = ""
+			return
+		}
+	case strings.Contains(example.Path, "/ai/coding_agent_replay.leia"),
+		strings.Contains(example.Path, "/workflow/support_triage_replay.leia"):
+		if cliExampleCompanionRecordsExist(example.Path) {
+			example.Runnable = true
+			example.Checkable = true
+			example.Runner = "llm-replay"
+			example.Requires = ""
+			return
+		}
+	case strings.Contains(example.Path, "/macos/package_managed/"),
+		strings.Contains(example.Path, "/ui/package_managed/"):
+		example.Checkable = true
+		example.Runner = "mod-check"
+		example.Requires = "package manifest check"
+		return
+	case strings.Contains(example.Path, "/testing/"):
+		example.Checkable = true
+		example.Runner = "test-dir"
+		example.Requires = "leia test CLI"
+		return
+	case strings.Contains(example.Path, "/web/tiny_app.leia"),
+		strings.Contains(example.Path, "/concurrency/context_process.leia"),
+		strings.Contains(example.Path, "/concurrency/goroutine_errors.leia"),
+		strings.Contains(example.Path, "/dialects/shell_filesystem.leia"):
+		example.Runnable = true
+		example.Checkable = true
+		example.Runner = "host-vm"
+		example.Requires = ""
+		return
+	case strings.Contains(example.Path, "/data_processing/data_oriented/particle_integration.leia"),
+		strings.Contains(example.Path, "/game_engine/game_of_life.leia"):
+		example.Runnable = true
+		example.Checkable = true
+		example.Runner = "host-vm-high"
+		example.Requires = ""
+		return
+	}
+	if example.Runner == "" {
+		example.Runner = "playground"
+	}
+}
+
+func runCLIExampleRunner(example cliExample, path string, maxSteps int64, stdout, stderr io.Writer) int {
+	switch example.Runner {
+	case "", "playground":
+		return runPlaygroundExecCommand([]string{"--mode=bytecode", "--max-steps=" + fmt.Sprint(maxSteps), path}, stdout, stderr)
+	case "evaluate":
+		return runEvaluateCommand([]string{"--json", path}, stdout, stderr)
+	case "evaluate-replay":
+		return runEvaluateCommand([]string{"--json", "--replay", cliExampleCompanionRecordsPath(path), path}, stdout, stderr)
+	case "llm-replay":
+		return runCLIExampleLLMReplay(path, stderr)
+	case "test":
+		return runTestCommand([]string{"--json", "--golden=require", path}, cliRunOptions{UseVM: true}, stdout, stderr)
+	case "test-dir":
+		cliExampleTestRunnerMu.Lock()
+		defer cliExampleTestRunnerMu.Unlock()
+		return runTestCommand([]string{"--json", "--golden=require", filepath.Dir(path)}, cliRunOptions{UseVM: true}, stdout, stderr)
+	case "mod-check":
+		return runModCommand([]string{"check", "--json", filepath.Dir(path)}, stdout, stderr)
+	case "host-vm":
+		return runCLIExampleHostVM(path, maxSteps, stdout, stderr)
+	case "host-vm-high":
+		return runCLIExampleHostVM(path, maxSteps*64, stdout, stderr)
+	default:
+		fmt.Fprintf(stderr, "unknown example runner %q for %s\n", example.Runner, example.ID)
+		return 1
+	}
+}
+
+func runCLIExampleHostVM(path string, maxSteps int64, stdout, stderr io.Writer) int {
+	vm := leia.New(
+		leia.WithLibs(leia.LibAll),
+		leia.WithVM(),
+		leia.WithMaxSteps(maxSteps),
+		leia.WithMaxNativeCalls(100_000),
+		leia.WithMaxGoroutines(128),
+		leia.WithMaxChannelCapacity(1024),
+		leia.WithMaxHostResultBytes(1<<20),
+		leia.WithNetworkAccess(true),
+		leia.WithProcessExecution(true),
+		leia.WithProcessShell(true),
+		leia.WithDebugAccess(true),
+		leia.WithPrint(func(args ...interface{}) {
+			parts := make([]string, len(args))
+			for i, arg := range args {
+				parts[i] = fmt.Sprint(arg)
+			}
+			fmt.Fprintln(stdout, strings.Join(parts, "\t"))
+		}),
+	)
+	if err := vm.ExecFile(path); err != nil {
+		fmt.Fprintf(stderr, "run host example: %v\n", err)
+		return 1
+	}
+	return 0
+}
+
+func runCLIExampleLLMReplay(path string, stderr io.Writer) int {
+	records, err := llm.LoadRecords(cliExampleCompanionRecordsPath(path))
+	if err != nil {
+		fmt.Fprintf(stderr, "load replay records: %v\n", err)
+		return 1
+	}
+	vm := leia.New(
+		leia.WithLibs(leia.LibAll),
+		leia.WithLLMReplay(records),
+		leia.WithPrint(func(args ...interface{}) {}),
+		leia.WithVM(),
+	)
+	if err := vm.ExecFile(path); err != nil {
+		fmt.Fprintf(stderr, "run replay example: %v\n", err)
+		return 1
+	}
+	return 0
+}
+
+func cliExampleCompanionRecordsExist(path string) bool {
+	info, err := os.Stat(cliExampleCompanionRecordsPath(filepath.Join(filepath.Dir(playgroundExamplesRoot()), filepath.FromSlash(path))))
+	return err == nil && !info.IsDir()
+}
+
+func cliExampleCompanionRecordsPath(sourcePath string) string {
+	return strings.TrimSuffix(sourcePath, filepath.Ext(sourcePath)) + ".records.json"
 }
 
 func boolFlagString(v bool) string {

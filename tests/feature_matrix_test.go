@@ -262,6 +262,16 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 	requireFeatureCellRefs(t, ai, "llm_native_integration", "semantic_gate",
 		"tests/llm/llm_runtime_test.go",
 		"tests/llm/llm_agent_examples_test.go",
+		"tests/llm/llm_record_replay_test.go",
+		"tests/llm/llm_trace_test.go",
+		"tests/llm/llm_ai_dialect_test.go",
+		"tests/integration/llm/llm_openai_provider_test.go",
+		"tests/integration/llm/llm_provider_test.go",
+		"cmd/leia/main_examples_test.go",
+		"cmd/leia/main_examples_command_test.go",
+		"examples/ai/coding_agent_replay.leia",
+		"examples/evaluate/agent_replay.leia",
+		"examples/workflow/support_triage_replay.leia",
 		"examples/embedding/embedding_test.go",
 	)
 

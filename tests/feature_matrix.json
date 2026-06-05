@@ -302,10 +302,10 @@
       "spec_sections": ["Grammar Appendix", "Declarations And Scope", "Expressions", "Statements", "AI-Native Syntax", "Modules And Loading", "Values And Types"],
       "parser": {"status": "covered", "refs": ["internal/parser/parser_test.go"]},
       "bytecode": {"status": "semantic_only", "refs": []},
-      "interpreter": {"status": "covered", "refs": ["tests/llm/llm_runtime_test.go", "tests/llm/llm_agent_examples_test.go", "examples/embedding/embedding_test.go", "docs/guides/embedding.md", "docs/guides/ai-native.md"]},
+      "interpreter": {"status": "covered", "refs": ["tests/llm/llm_runtime_test.go", "tests/llm/llm_agent_examples_test.go", "tests/llm/llm_record_replay_test.go", "tests/llm/llm_trace_test.go", "tests/llm/llm_ai_dialect_test.go", "tests/integration/llm/llm_openai_provider_test.go", "tests/integration/llm/llm_provider_test.go", "examples/embedding/embedding_test.go", "docs/guides/embedding.md", "docs/guides/ai-native.md"]},
       "tier1": {"status": "semantic_only", "refs": []},
       "tier2": {"status": "semantic_only", "refs": []},
-      "semantic_gate": {"status": "covered", "refs": ["tests/llm/llm_runtime_test.go", "tests/llm/llm_agent_examples_test.go", "examples/embedding/embedding_test.go", "docs/guides/embedding.md"]},
+      "semantic_gate": {"status": "covered", "refs": ["tests/llm/llm_runtime_test.go", "tests/llm/llm_agent_examples_test.go", "tests/llm/llm_record_replay_test.go", "tests/llm/llm_trace_test.go", "tests/llm/llm_ai_dialect_test.go", "tests/integration/llm/llm_openai_provider_test.go", "tests/integration/llm/llm_provider_test.go", "cmd/leia/main_examples_test.go", "cmd/leia/main_examples_command_test.go", "examples/ai/coding_agent_replay.leia", "examples/evaluate/agent_replay.leia", "examples/workflow/support_triage_replay.leia", "examples/embedding/embedding_test.go", "docs/guides/embedding.md"]},
       "conformance_case": {"status": "not_applicable", "refs": []},
       "perf_hot_case": {"status": "partial", "refs": ["benchmarks/app/ai_runtime_smoke.leia"]}
     },

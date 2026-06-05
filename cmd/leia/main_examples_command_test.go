@@ -136,6 +136,95 @@ func TestExamplesCommandChecksSelectedExamples(t *testing.T) {
 	}
 }
 
+func TestExamplesCommandChecksDeterministicSpecialRunners(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := runExamplesCommand([]string{
+		"check",
+		"--jobs=4",
+		"repo-evaluate-basic_assert",
+		"repo-evaluate-llm_replay",
+		"repo-evaluate-agent_replay",
+		"repo-evaluate-multiturn_replay",
+		"repo-ai-coding_agent_replay",
+		"repo-workflow-support_triage_replay",
+		"repo-testing-jsonl_workflow_test",
+		"repo-ui-package_managed-main",
+	}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runExamplesCommand code = %d, stdout = %q stderr = %q", code, stdout.String(), stderr.String())
+	}
+	out := stdout.String()
+	for _, want := range []string{
+		"ok      repo-evaluate-basic_assert",
+		"ok      repo-evaluate-llm_replay",
+		"ok      repo-evaluate-agent_replay",
+		"ok      repo-evaluate-multiturn_replay",
+		"ok      repo-ai-coding_agent_replay",
+		"ok      repo-workflow-support_triage_replay",
+		"ok      repo-testing-jsonl_workflow_test",
+		"ok      repo-ui-package_managed-main",
+		"examples: 8 ok, 0 skipped, 0 failed",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("examples check missing %q\n%s", want, out)
+		}
+	}
+}
+
+func TestExamplesCommandRunsEvaluateReplayExample(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := runExamplesCommand([]string{"run", "repo-evaluate-agent_replay"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runExamplesCommand code = %d, stdout = %q stderr = %q", code, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stdout.String(), `"status": "ok"`) {
+		t.Fatalf("evaluate replay run output = %q, want JSON ok report", stdout.String())
+	}
+}
+
+func TestExamplesCommandKeepsPackageManifestExamplesNonRunnable(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := runExamplesCommand([]string{"run", "repo-ui-package_managed-main"}, &stdout, &stderr)
+	if code == 0 {
+		t.Fatalf("package manifest example unexpectedly ran, stdout = %q", stdout.String())
+	}
+	if !strings.Contains(stderr.String(), "manual example") || !strings.Contains(stderr.String(), "package manifest check") {
+		t.Fatalf("manual package example error missing explanation: %q", stderr.String())
+	}
+}
+
+func TestExamplesCommandChecksDeterministicHostExamples(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := runExamplesCommand([]string{
+		"check",
+		"--jobs=4",
+		"--timeout=10s",
+		"repo-web-tiny_app",
+		"repo-concurrency-context_process",
+		"repo-concurrency-goroutine_errors",
+		"repo-dialects-shell_filesystem",
+		"repo-data_processing-data_oriented-particle_integration",
+		"repo-game_engine-game_of_life",
+	}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runExamplesCommand code = %d, stdout = %q stderr = %q", code, stdout.String(), stderr.String())
+	}
+	out := stdout.String()
+	for _, want := range []string{
+		"ok      repo-web-tiny_app",
+		"ok      repo-concurrency-context_process",
+		"ok      repo-concurrency-goroutine_errors",
+		"ok      repo-dialects-shell_filesystem",
+		"ok      repo-data_processing-data_oriented-particle_integration",
+		"ok      repo-game_engine-game_of_life",
+		"examples: 6 ok, 0 skipped, 0 failed",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("examples check missing %q\n%s", want, out)
+		}
+	}
+}
+
 func TestExamplesCommandChecksSelectedExamplesJSON(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	code := runExamplesCommand([]string{"check", "--json", "repo-hello-counter", "repo-llm-agent"}, &stdout, &stderr)
