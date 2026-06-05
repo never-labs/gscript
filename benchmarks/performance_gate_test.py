@@ -21,6 +21,22 @@ def shell_array_values(text, name):
     return values
 
 
+def feature_cell_refs(feature_id, cell_name):
+    matrix = json.loads((ROOT / "tests" / "feature_matrix.json").read_text())
+    for feature in matrix["features"]:
+        if feature["id"] == feature_id:
+            return feature[cell_name]["refs"]
+    raise AssertionError(f"feature_matrix.json missing {feature_id}")
+
+
+def benchmark_ids_from_feature_refs(feature_id, cell_name):
+    ids = []
+    for ref in feature_cell_refs(feature_id, cell_name):
+        if ref.startswith("benchmarks/") and ref.endswith(".leia"):
+            ids.append(ref.removeprefix("benchmarks/")[: -len(".leia")])
+    return ids
+
+
 def subject(median, status="ok", source="script_repeat", cv=2.0):
     return {
         "status": status,
@@ -145,6 +161,72 @@ class PerformanceGateValidationTest(unittest.TestCase):
             self.assertIn("numeric/matmul_dense", values)
             self.assertIn("data/soa_affine_many", values)
             self.assertIn("data/soa_masked_aggregate", values)
+
+    def test_data_oriented_feature_matrix_hot_refs_are_manifested_with_luajit_refs(self):
+        manifest = json.loads((ROOT / "benchmarks" / "manifest.json").read_text())
+        case_ids = {case["id"] for case in manifest["cases"]}
+        workloads = {workload["id"]: workload for workload in manifest["workloads"]}
+        expected = [
+            "numeric/matmul_dense",
+            "numeric/spectral_norm_dense",
+            "data/soa_affine_many",
+            "data/soa_masked_aggregate",
+            "data/soa_filter_gather",
+            "data/soa_scan",
+        ]
+        hot_refs = benchmark_ids_from_feature_refs("matrix_dense_arrays", "perf_hot_case")
+
+        self.assertEqual(hot_refs, expected)
+        self.assertEqual(sorted(set(hot_refs) - case_ids), [])
+        self.assertEqual(sorted(set(hot_refs) - set(workloads)), [])
+        for benchmark_id in hot_refs:
+            with self.subTest(benchmark_id=benchmark_id):
+                workload = workloads[benchmark_id]
+                self.assertEqual(workload["time_source_hint"], "script_time_line")
+                lua_ref = workload["comparison_reference"]
+                self.assertIsNotNone(lua_ref)
+                self.assertEqual(lua_ref["kind"], "lua")
+                self.assertTrue((ROOT / lua_ref["path"]).exists(), lua_ref["path"])
+
+    def test_full_gate_selectors_cover_data_oriented_feature_refs_without_expanding_quick_gate(self):
+        gate = SCRIPT.read_text()
+        data_hot_refs = set(benchmark_ids_from_feature_refs("matrix_dense_arrays", "perf_hot_case"))
+        full_block = gate.split('if [ "$PROFILE" = "full" ]; then', 1)[1].split("elif", 1)[0]
+        all_groups_block = gate.split("ALL_BENCHMARK_GROUPS=(", 1)[1].split("\n)", 1)[0]
+
+        self.assertIn("TIMING_CMD+=(--all-groups)", full_block)
+        self.assertIn("numeric", all_groups_block)
+        self.assertIn("data", all_groups_block)
+
+        for array_name in ("PHASE_SMOKE_BENCHES", "FEATURE_SMOKE_BENCHES", "STRICT_FEATURE_BENCHES"):
+            values = set(shell_array_values(gate, array_name))
+            self.assertLess(len(values & data_hot_refs), len(data_hot_refs))
+            self.assertIn("numeric/matmul_dense", values)
+            self.assertIn("data/soa_affine_many", values)
+            self.assertIn("data/soa_masked_aggregate", values)
+
+    def test_jit_fallback_luajit_contract_keeps_gate_refs(self):
+        semantic_refs = feature_cell_refs("arm64_jit_runtime_fallback", "semantic_gate")
+        perf_refs = feature_cell_refs("arm64_jit_runtime_fallback", "perf_hot_case")
+        gate = SCRIPT.read_text()
+
+        for ref in (
+            "internal/methodjit/semantic_gate_test.go",
+            "internal/methodjit/diagnose_test.go",
+            "internal/methodjit/exit_resume_check_test.go",
+            "docs/reference/performance/index.md",
+        ):
+            self.assertIn(ref, semantic_refs)
+        for ref in (
+            "scripts/performance_gate.sh",
+            "benchmarks/performance_gate_test.py",
+            "benchmarks/perf_submit_guard_test.py",
+            "benchmarks/manifest.json",
+        ):
+            self.assertIn(ref, perf_refs)
+        self.assertIn("validate_luajit_artifact", gate)
+        self.assertIn("--luajit-threshold", gate)
+        self.assertIn("validate_strict_artifact", gate)
 
     def test_help_documents_syntax_smoke_profile(self):
         proc = subprocess.run(

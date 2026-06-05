@@ -28,6 +28,7 @@ The repository-script mention check covers:
   scripts/editor_check.sh
   scripts/release_artifacts.sh
   scripts/release_artifacts_check.sh
+  scripts/release_distribution_check.sh
   scripts/worktree_audit.sh
 EOF
 }
@@ -104,6 +105,7 @@ script_names = {
     "editor_check": root / "scripts" / "editor_check.sh",
     "release_artifacts": root / "scripts" / "release_artifacts.sh",
     "release_artifacts_check": root / "scripts" / "release_artifacts_check.sh",
+    "release_distribution_check": root / "scripts" / "release_distribution_check.sh",
     "worktree_audit": root / "scripts" / "worktree_audit.sh",
 }
 
@@ -402,6 +404,8 @@ def check_examples_index() -> None:
     examples_dir = root / "examples"
     examples_index = root / "docs" / "examples" / "index.md"
     text = examples_index.read_text(encoding="utf-8")
+    indexed_dirs = set(re.findall(r"`examples/([^`/]+)/`", text))
+    registered_dirs = set()
     for path in sorted(examples_dir.iterdir()):
         if not path.is_dir():
             continue
@@ -410,12 +414,17 @@ def check_examples_index() -> None:
         )
         if not has_registered_source:
             continue
+        registered_dirs.add(path.name)
         checked_examples_index_dirs += 1
         snippet = f"`examples/{path.name}/`"
         if snippet not in text:
             errors.append(
                 f"{examples_index.relative_to(root)}: missing example directory index row: {snippet}"
             )
+    for name in sorted(indexed_dirs - registered_dirs):
+        errors.append(
+            f"{examples_index.relative_to(root)}: indexes missing or unregistered example directory: `examples/{name}/`"
+        )
 
 
 for doc_file in doc_files:

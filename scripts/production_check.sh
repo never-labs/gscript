@@ -321,6 +321,8 @@ add_race_smoke_gate() {
     esac
     add_run "Concurrency Race Smoke" \
         "go test -race ./internal/runtime ./internal/nanbox ./internal/vm ./llm ./tests/sdk ./tests/llm ./cmd/leia -count=1"
+    add_run "Go-style Concurrency Contract" \
+        "go test -race ./tests -run TestGoStyleConcurrencyContract -count=1"
 }
 
 build_quick_plan() {

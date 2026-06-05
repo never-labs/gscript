@@ -312,6 +312,7 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 	requireFeatureCellRefs(t, embeddingSecurity, "sandbox_capabilities_module_loading", "semantic_gate",
 		"tests/sdk/leia_test.go",
 		"tests/sdk/security_api_test.go",
+		"examples/embedding/embedding_test.go",
 		"docs/testing.md",
 		"docs/reference/security/index.md",
 		"docs/reference/embedding/index.md",
@@ -339,6 +340,7 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 		"tests/sdk/resource_budget_concurrency_test.go",
 		"tests/sdk/security_api_test.go",
 		"tests/sdk/error_api_test.go",
+		"examples/embedding/embedding_test.go",
 		"docs/reference/embedding/index.md",
 	)
 
@@ -349,10 +351,37 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 		"tests/sdk/hotloader_instance_rollback_test.go",
 	)
 	requireFeatureCellRefs(t, hotReload, "embedding_hot_reload", "semantic_gate",
+		"examples/embedding/embedding_test.go",
 		"docs/reference/hot-reload/index.md",
 		"docs/reference/embedding/index.md",
 		"docs/guides/embedding.md",
 	)
+
+	embeddingExamples := readFileString(t, filepath.Join(root, "examples", "embedding", "embedding_test.go"))
+	for _, snippet := range []string{
+		"func Example_hostFunctionBinding()",
+		"func Example_hostModuleImport()",
+		"func Example_hotLoader()",
+		"func Example_hotInstance()",
+		"func Example_sandboxAndMaxSteps()",
+		"func Example_securitySandboxAndBudgets()",
+		"leia.SecuritySandbox()",
+		"leia.WithMaxSteps(32)",
+		"leia.WithMaxHostResultBytes(4)",
+	} {
+		if !strings.Contains(embeddingExamples, snippet) {
+			t.Fatalf("embedding examples must keep executable README embedding contract coverage; missing %q", snippet)
+		}
+	}
+	releaseMatrix := readFileString(t, filepath.Join(root, "tests", "release_matrix_test.go"))
+	for _, snippet := range []string{
+		`"go", "test", "./examples/embedding", "-run", "Example", "-count=1"`,
+		"TestReleaseMatrixEmbeddingDocsUsePublicSDKSurface",
+	} {
+		if !strings.Contains(releaseMatrix, snippet) {
+			t.Fatalf("release matrix must keep runnable embedding example gate; missing %q", snippet)
+		}
+	}
 
 	ai := requireFeature(t, features, "llm_native_integration")
 	requireFeatureCellRefs(t, ai, "llm_native_integration", "semantic_gate",
@@ -419,9 +448,11 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 	requireFeatureCellRefs(t, concurrency, "go_style_concurrency", "semantic_gate",
 		"tests/language/go_channel_host_more.leia",
 		"tests/language/go_channel_edges_more.leia",
+		"tests/concurrency_contract_test.go",
 		"tests/sdk/resource_budget_concurrency_test.go",
 		"cmd/leia/main_examples_test.go",
 		"examples/concurrency/select_timeout.leia",
+		"examples/concurrency/context_sleep.leia",
 		"examples/concurrency/sync_group_cancel.leia",
 		"scripts/production_check.sh",
 	)
@@ -429,6 +460,8 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 	for _, snippet := range []string{
 		"Concurrency Race Smoke",
 		"go test -race ./internal/runtime ./internal/nanbox ./internal/vm ./llm ./tests/sdk ./tests/llm ./cmd/leia -count=1",
+		"Go-style Concurrency Contract",
+		"go test -race ./tests -run TestGoStyleConcurrencyContract -count=1",
 	} {
 		if !strings.Contains(productionCheck, snippet) {
 			t.Fatalf("production_check.sh must keep concurrency race gate snippet %q", snippet)

@@ -220,7 +220,7 @@
       "interpreter": {"status": "covered", "refs": ["internal/vm/vm_test.go", "internal/stdlib/bind/sync_test.go", "internal/stdlib/bind/context_test.go"]},
       "tier1": {"status": "semantic_only", "refs": []},
       "tier2": {"status": "semantic_only", "refs": []},
-      "semantic_gate": {"status": "covered", "refs": ["tests/language/go_channel_host_more.leia", "tests/language/go_channel_edges_more.leia", "tests/sdk/resource_budget_concurrency_test.go", "cmd/leia/main_examples_test.go", "examples/concurrency/select_timeout.leia", "examples/concurrency/sync_group_cancel.leia", "scripts/production_check.sh"]},
+      "semantic_gate": {"status": "covered", "refs": ["tests/language/go_channel_host_more.leia", "tests/language/go_channel_edges_more.leia", "tests/concurrency_contract_test.go", "tests/sdk/resource_budget_concurrency_test.go", "cmd/leia/main_examples_test.go", "examples/concurrency/select_timeout.leia", "examples/concurrency/context_sleep.leia", "examples/concurrency/sync_group_cancel.leia", "scripts/production_check.sh"]},
       "conformance_case": {"status": "covered", "refs": ["tests/language/go_channel_host_more.leia", "tests/language/go_channel_edges_more.leia"]},
       "perf_hot_case": {"status": "covered", "refs": ["benchmarks/concurrency/producer_consumer_pipeline.leia", "benchmarks/concurrency/sync_group.leia"]}
     },
@@ -417,7 +417,7 @@
       "interpreter": {"status": "covered", "refs": ["tests/sdk/leia_test.go", "tests/sdk/security_api_test.go", "tests/sdk/filesystem_root_test.go", "tests/sdk/security_host_capability_test.go", "docs/guides/embedding.md", "docs/reference/stdlib/index.md"]},
       "tier1": {"status": "semantic_only", "refs": []},
       "tier2": {"status": "semantic_only", "refs": []},
-      "semantic_gate": {"status": "covered", "refs": ["tests/sdk/leia_test.go", "tests/sdk/security_api_test.go", "tests/sdk/filesystem_root_test.go", "tests/sdk/security_host_capability_test.go", "docs/testing.md", "docs/reference/security/index.md", "docs/reference/embedding/index.md"]},
+      "semantic_gate": {"status": "covered", "refs": ["tests/sdk/leia_test.go", "tests/sdk/security_api_test.go", "tests/sdk/filesystem_root_test.go", "tests/sdk/security_host_capability_test.go", "examples/embedding/embedding_test.go", "docs/testing.md", "docs/reference/security/index.md", "docs/reference/embedding/index.md"]},
       "conformance_case": {"status": "not_applicable", "refs": []},
       "perf_hot_case": {"status": "not_applicable", "refs": []}
     },
@@ -431,7 +431,7 @@
       "interpreter": {"status": "covered", "refs": ["tests/sdk/resource_budget_test.go", "tests/sdk/resource_budget_native_test.go", "tests/sdk/resource_budget_host_result_test.go", "tests/sdk/resource_budget_module_test.go", "tests/sdk/resource_budget_concurrency_test.go", "tests/sdk/filesystem_api_test.go", "tests/sdk/security_api_test.go", "tests/sdk/error_api_test.go"]},
       "tier1": {"status": "semantic_only", "refs": []},
       "tier2": {"status": "semantic_only", "refs": []},
-      "semantic_gate": {"status": "covered", "refs": ["tests/sdk/resource_budget_test.go", "tests/sdk/resource_budget_native_test.go", "tests/sdk/resource_budget_host_result_test.go", "tests/sdk/resource_budget_module_test.go", "tests/sdk/resource_budget_concurrency_test.go", "tests/sdk/filesystem_api_test.go", "tests/sdk/security_api_test.go", "tests/sdk/error_api_test.go", "docs/reference/embedding/index.md"]},
+      "semantic_gate": {"status": "covered", "refs": ["tests/sdk/resource_budget_test.go", "tests/sdk/resource_budget_native_test.go", "tests/sdk/resource_budget_host_result_test.go", "tests/sdk/resource_budget_module_test.go", "tests/sdk/resource_budget_concurrency_test.go", "tests/sdk/filesystem_api_test.go", "tests/sdk/security_api_test.go", "tests/sdk/error_api_test.go", "examples/embedding/embedding_test.go", "docs/reference/embedding/index.md"]},
       "conformance_case": {"status": "not_applicable", "refs": []},
       "perf_hot_case": {"status": "not_applicable", "refs": []}
     },
@@ -445,7 +445,7 @@
       "interpreter": {"status": "covered", "refs": ["tests/sdk/hotloader_test.go", "tests/sdk/hotloader_instance_test.go", "tests/sdk/hotloader_instance_rollback_test.go", "examples/embedding/embedding_test.go"]},
       "tier1": {"status": "semantic_only", "refs": []},
       "tier2": {"status": "semantic_only", "refs": []},
-      "semantic_gate": {"status": "covered", "refs": ["tests/sdk/hotloader_test.go", "tests/sdk/hotloader_instance_test.go", "tests/sdk/hotloader_instance_rollback_test.go", "docs/reference/hot-reload/index.md", "docs/reference/embedding/index.md", "docs/guides/embedding.md"]},
+      "semantic_gate": {"status": "covered", "refs": ["tests/sdk/hotloader_test.go", "tests/sdk/hotloader_instance_test.go", "tests/sdk/hotloader_instance_rollback_test.go", "examples/embedding/embedding_test.go", "docs/reference/hot-reload/index.md", "docs/reference/embedding/index.md", "docs/guides/embedding.md"]},
       "conformance_case": {"status": "not_applicable", "refs": []},
       "perf_hot_case": {"status": "not_applicable", "refs": []}
     },

@@ -635,6 +635,7 @@ func TestReleaseMatrixReadmeToolingPromiseHasEvidence(t *testing.T) {
 		snippet string
 	}{
 		{path: "scripts/docs_check.sh", snippet: "docs_check.sh: checked"},
+		{path: "scripts/docs_check.sh", snippet: `"release_distribution_check": root / "scripts" / "release_distribution_check.sh"`},
 		{path: "scripts/diagnostics_bundle.sh", snippet: "Collects git revision/status"},
 		{path: "scripts/performance_gate.sh", snippet: "benchmarks/timing_compare.py"},
 		{path: "scripts/production_check.sh", snippet: "add_release_smoke"},
@@ -643,6 +644,16 @@ func TestReleaseMatrixReadmeToolingPromiseHasEvidence(t *testing.T) {
 		text := readFileString(t, filepath.Join(root, filepath.FromSlash(item.path)))
 		if !strings.Contains(text, item.snippet) {
 			t.Fatalf("%s must keep README tooling script evidence snippet %q", item.path, item.snippet)
+		}
+	}
+}
+
+func TestReleaseMatrixReadmeToolingCommandsStayInToolingGuide(t *testing.T) {
+	root := findRepoRoot(t)
+	toolingGuide := readFileString(t, filepath.Join(root, "docs", "guides", "tooling.md"))
+	for _, command := range readReleaseReadmeToolingCommands(t, root) {
+		if !strings.Contains(toolingGuide, command) {
+			t.Fatalf("docs/guides/tooling.md must document README Tooling command %q", command)
 		}
 	}
 }
@@ -1168,6 +1179,7 @@ func TestReleaseMatrixExamplesIndexCoversRegisteredDirectories(t *testing.T) {
 	}
 
 	var missing []string
+	registered := map[string]bool{}
 	for _, entry := range entries {
 		if !entry.IsDir() {
 			continue
@@ -1193,6 +1205,7 @@ func TestReleaseMatrixExamplesIndexCoversRegisteredDirectories(t *testing.T) {
 		if !hasRegisteredSource {
 			continue
 		}
+		registered[entry.Name()] = true
 		ref := "`examples/" + entry.Name() + "/`"
 		if !strings.Contains(examplesDoc, ref) {
 			missing = append(missing, ref)
@@ -1201,6 +1214,19 @@ func TestReleaseMatrixExamplesIndexCoversRegisteredDirectories(t *testing.T) {
 	if len(missing) > 0 {
 		sort.Strings(missing)
 		t.Fatalf("docs/examples/index.md must index registered example directories: %s", strings.Join(missing, ", "))
+	}
+
+	indexedRE := regexp.MustCompile("`examples/([^`/]+)/`")
+	var extra []string
+	for _, match := range indexedRE.FindAllStringSubmatch(examplesDoc, -1) {
+		if len(match) != 2 || registered[match[1]] {
+			continue
+		}
+		extra = append(extra, "`examples/"+match[1]+"/`")
+	}
+	if len(extra) > 0 {
+		sort.Strings(extra)
+		t.Fatalf("docs/examples/index.md indexes missing or unregistered example directories: %s", strings.Join(extra, ", "))
 	}
 }
 

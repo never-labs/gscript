@@ -396,6 +396,86 @@ func TestPlaygroundRepositoryWorkflowReplayExampleIsManualRunOnly(t *testing.T) 
 	t.Fatal("repo-workflow-support_triage_replay example not found")
 }
 
+func TestPlaygroundRepositoryAINativeExamplesHaveExplicitGates(t *testing.T) {
+	examples, err := playgroundRepositoryExamples(playgroundExamplesRoot())
+	if err != nil {
+		t.Fatalf("load repository examples: %v", err)
+	}
+	byID := make(map[string]playgroundExample, len(examples))
+	for _, example := range examples {
+		byID[example.ID] = example
+	}
+
+	want := map[string]struct {
+		requires string
+		snippets []string
+	}{
+		"repo-ai-coding_agent_replay": {
+			requires: "local AI playground profile or LLM replay fixture",
+			snippets: []string{"model {", "tool {", "turn {", "tools: {read_file, search_text, apply_patch, run_shell}"},
+		},
+		"repo-ai-tagged_agent_workflow": {
+			requires: "local AI playground profile or LLM replay fixture",
+			snippets: []string{"model {", "tool {", "agent {", "responder("},
+		},
+		"repo-ai-record_replay_trace_project": {
+			requires: "local AI playground profile or LLM replay fixture",
+			snippets: []string{"model {", "turn {", "stream: true", "replay_ready"},
+		},
+		"repo-llm-agent": {
+			requires: "LLM provider",
+			snippets: []string{"llm.register_models({", "llm.agent(\"answer\"", "messages: {"},
+		},
+		"repo-llm-agent_as_tool": {
+			requires: "LLM provider",
+			snippets: []string{"llm.agent(\"extract_research\"", "tools: {extract_research}", "llm.turn({"},
+		},
+		"repo-llm-direct_turn": {
+			requires: "LLM provider",
+			snippets: []string{"llm.turn({", "llm.user(question)", "direct_text"},
+		},
+		"repo-llm-glm_smoke": {
+			requires: "LLM provider",
+			snippets: []string{"protocol: \"anthropic_compatible\"", "LEIA_GLM_API_KEY", "provider_model: os.getenv(\"LEIA_GLM_MODEL\")"},
+		},
+		"repo-evaluate-llm_replay": {
+			requires: "leia evaluate CLI",
+			snippets: []string{"evaluate", "llm.turn({"},
+		},
+		"repo-evaluate-agent_replay": {
+			requires: "leia evaluate CLI",
+			snippets: []string{"evaluate", "llm.agent("},
+		},
+		"repo-evaluate-multiturn_replay": {
+			requires: "leia evaluate CLI",
+			snippets: []string{"evaluate", "llm.turn({"},
+		},
+		"repo-workflow-support_triage_replay": {
+			requires: "LLM replay fixture or provider",
+			snippets: []string{"model: \"mock-fast\"", "llm.turn({"},
+		},
+	}
+	for id, want := range want {
+		t.Run(id, func(t *testing.T) {
+			example, ok := byID[id]
+			if !ok {
+				t.Fatalf("%s example not found", id)
+			}
+			if example.Runnable {
+				t.Fatalf("%s should be manual-run only in the playground", id)
+			}
+			if example.Requires != want.requires {
+				t.Fatalf("%s requires = %q, want %q", id, example.Requires, want.requires)
+			}
+			for _, snippet := range want.snippets {
+				if !strings.Contains(example.Source, snippet) {
+					t.Fatalf("%s source missing %q\nsource:\n%s", id, snippet, example.Source)
+				}
+			}
+		})
+	}
+}
+
 func TestPlaygroundRepositoryGameEngineExampleClassification(t *testing.T) {
 	examples, err := playgroundRepositoryExamples(playgroundExamplesRoot())
 	if err != nil {
