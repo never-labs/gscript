@@ -1,0 +1,52 @@
+events := jsonl`{"run":"wf-10","step":"ingest","status":"ok","ms":12}
+{"run":"wf-10","step":"classify","status":"ok","ms":25}
+{"run":"wf-10","step":"notify","status":"ok","ms":8}
+{"run":"wf-11","step":"ingest","status":"ok","ms":10}
+{"run":"wf-11","step":"classify","status":"fail","ms":31}
+`
+
+func rollup(run_id) {
+    status := "missing"
+    elapsed := 0
+    steps := 0
+    for _, event := range events {
+        if event.run == run_id {
+            steps = steps + 1
+            elapsed = elapsed + event.ms
+            if event.status == "fail" {
+                status = "fail"
+            } else if status != "fail" {
+                status = "ok"
+            }
+        }
+    }
+    return {
+        run: run_id,
+        status: status,
+        elapsed: elapsed,
+        duration: dialect.eval("duration", {milliseconds: elapsed}, {mode: "encode"}),
+        steps: steps,
+    }
+}
+
+happy := rollup("wf-10")
+failed := rollup("wf-11")
+
+tap_text := dialect.eval("tap", {
+    {kind: "version", version: 13},
+    {kind: "plan", first: 1, last: 2},
+    {kind: "test", ok: happy.status == "ok", number: 1, name: "wf-10"},
+    {kind: "test", ok: failed.status == "fail", number: 2, name: "wf-11 expected failure"},
+}, {mode: "encode"})
+tap_rows := dialect.eval("tap", tap_text)
+
+assert(happy.steps == 3)
+assert(happy.duration == "45ms")
+assert(failed.steps == 2)
+assert(failed.status == "fail")
+assert(failed.duration == "41ms")
+assert(tap_rows[2].last == 2)
+assert(tap_rows[4].ok == true)
+
+workflow_summary := string.format("%s=%s/%s %s=%s/%s", happy.run, happy.status, happy.duration, failed.run, failed.status, failed.duration)
+print("workflow", workflow_summary)

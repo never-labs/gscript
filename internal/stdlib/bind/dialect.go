@@ -266,18 +266,20 @@ func stringArrayValue(values []string) Value {
 
 func builtinDialectCategory(name string) string {
 	switch name {
-	case "sh", "cmd", "shellwords", "glob", "path":
-		return "shell"
-	case "json", "jsonptr", "jsonl", "csv", "tsv", "mdtable", "lines", "split", "words", "nums", "numbers", "kv", "logfmt", "env", "ini", "semver", "duration", "tap", "junit", "xml", "template", "re", "regexp":
+	case "sh", "cmd", "glob":
+		return "host"
+	case "shellwords", "path", "json", "jsonptr", "jsonl", "csv", "tsv", "mdtable", "lines", "split", "words", "nums", "numbers", "kv", "logfmt", "env", "ini", "semver", "duration", "tap", "xml", "template", "re", "regexp":
 		return "text"
 	case "url", "html_escape", "urlquery", "urlpath", "mime", "headers", "http_headers", "httpmsg", "cookie", "cookies", "sse", "multipart", "jwt":
-		return "web"
+		return "protocol"
 	case "ipaddr", "cidr", "hostport":
-		return "network"
+		return "protocol"
 	case "base64", "hash", "hex", "base32", "uuid", "gzip", "zlib", "deflate", "binary":
 		return "data"
 	case "prompt", "quote":
 		return "llm"
+	case "junit":
+		return "compat"
 	default:
 		return "user"
 	}

@@ -1,5 +1,5 @@
 // workflow_test_report.leia - Replay workflow events into a test-style report.
-// Demonstrates: JSONL fixtures, TAP and JUnit report parsing, table assertions, template rendering, hash, and JSON output.
+// Demonstrates: JSONL fixtures, TAP report parsing, table assertions, template rendering, hash, and JSON output.
 
 print("=== Dialects: workflow test report ===")
 
@@ -77,10 +77,6 @@ for i := 1; i <= #results; i++ {
 }
 tap_text := dialect.eval("tap", tap_report, {mode: "encode"})
 tap_rows := dialect.eval("tap", tap_text)
-junit_summary := junit`<testsuite name="workflow" tests="2" failures="0" errors="0" skipped="0" time="0.081">
-  <testcase classname="workflow" name="happy path" time="0.043"/>
-  <testcase classname="workflow" name="failure path" time="0.038"/>
-</testsuite>`
 report_json := dialect.eval("json", report, {mode: "encode"})
 fingerprint := dialect.eval("hash", report_json)
 summary := template {
@@ -117,10 +113,6 @@ assert(tap_rows[2].last == 2)
 assert(tap_rows[3].ok == true)
 assert(tap_rows[4].diagnostics[1] == "wf-2 got=fail want=fail elapsed=38ms")
 assert(tap_text == "TAP version 13\n1..2\nok 1 - happy path\n# wf-1 got=ok want=ok elapsed=43ms\nok 2 - failure path\n# wf-2 got=fail want=fail elapsed=38ms\n")
-assert(junit_summary.tests == 2)
-assert(junit_summary.passed == 2)
-assert(junit_summary.suites[1].name == "workflow")
-assert(junit_summary.cases[2].name == "failure path")
 assert(string.sub(fingerprint, 1, 12) == "92929e62ccf6")
 assert(summary == "workflow tests: 2/2 passed, fingerprint=92929e62ccf6")
 

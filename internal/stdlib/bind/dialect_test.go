@@ -60,6 +60,7 @@ func TestDialectInfoAndListExposeMetadata(t *testing.T) {
 		json_info := dialect.info("json")
 		jsonptr_info := dialect.info("jsonptr")
 		logfmt_info := dialect.info("logfmt")
+		junit_info := dialect.info("junit")
 		sse_info := dialect.info("sse")
 		multipart_info := dialect.info("multipart")
 		missing_info := dialect.info("missing")
@@ -67,8 +68,8 @@ func TestDialectInfoAndListExposeMetadata(t *testing.T) {
 	`, "dialect", BuildDialect(HostOptions{}, nil))
 
 	shInfo := interp.GetGlobal("sh_info").Table()
-	if got := shInfo.RawGetString("category").Str(); got != "shell" {
-		t.Fatalf("sh category = %q, want shell", got)
+	if got := shInfo.RawGetString("category").Str(); got != "host" {
+		t.Fatalf("sh category = %q, want host", got)
 	}
 	if !shInfo.RawGetString("builtin").Bool() || !shInfo.RawGetString("eval").Bool() || shInfo.RawGetString("block").Bool() {
 		t.Fatalf("sh info flags = builtin:%v eval:%v block:%v, want builtin eval-only", shInfo.RawGetString("builtin"), shInfo.RawGetString("eval"), shInfo.RawGetString("block"))
@@ -85,12 +86,15 @@ func TestDialectInfoAndListExposeMetadata(t *testing.T) {
 	for name, global := range map[string]string{
 		"jsonptr":   "jsonptr_info",
 		"logfmt":    "logfmt_info",
+		"junit":     "junit_info",
 		"sse":       "sse_info",
 		"multipart": "multipart_info",
 	} {
 		category := "text"
 		if name == "sse" || name == "multipart" {
-			category = "web"
+			category = "protocol"
+		} else if name == "junit" {
+			category = "compat"
 		}
 		if got := interp.GetGlobal(global).Table().RawGetString("category").Str(); got != category {
 			t.Fatalf("%s category = %q, want %s", name, got, category)

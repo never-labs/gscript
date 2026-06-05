@@ -249,7 +249,7 @@ func TestTestingJSONLWorkflowExample(t *testing.T) {
 		t.Fatalf("stdout is not JSON test report: %v; stdout = %q", err, stdout.String())
 	}
 	if !report.OK || report.Total != 2 || report.Passed != 2 {
-		t.Fatalf("report = %+v, want two passing JSONL testing examples", report)
+		t.Fatalf("report = %+v, want two passing testing examples", report)
 	}
 	if !testReportHasPassingFile(report, "jsonl_workflow_test.leia") {
 		t.Fatalf("files = %+v, want jsonl_workflow_test.leia to pass", report.Files)
@@ -283,6 +283,24 @@ func TestWorkflowReplayExample(t *testing.T) {
 	}
 }
 
+func TestWorkflowStatusRollupExample(t *testing.T) {
+	root, err := filepath.Abs(filepath.Join("..", ".."))
+	if err != nil {
+		t.Fatal(err)
+	}
+	vm := leia.New(
+		leia.WithLibs(leia.LibString|leia.LibDialect),
+		leia.WithVM(),
+	)
+	if err := vm.ExecFile(filepath.Join(root, "examples", "workflow", "status_rollup.leia")); err != nil {
+		t.Fatalf("run status rollup workflow example: %v", err)
+	}
+	got, err := vm.Get("workflow_summary")
+	if err != nil || got != "wf-10=ok/45ms wf-11=fail/41ms" {
+		t.Fatalf("workflow_summary = %#v err=%v, want rollup summary", got, err)
+	}
+}
+
 func TestWorkflowEvaluateListExample(t *testing.T) {
 	root, err := filepath.Abs(filepath.Join("..", ".."))
 	if err != nil {
@@ -309,11 +327,14 @@ func TestWorkflowEvaluateListExample(t *testing.T) {
 	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
 		t.Fatalf("stdout is not JSON evaluate report: %v; stdout = %q", err, stdout.String())
 	}
-	if report.Status != "ok" || report.Summary.Files != 1 || report.Summary.ParsedFiles != 1 {
-		t.Fatalf("report = %+v, want one parsed workflow file with ok status", report)
+	if report.Status != "ok" || report.Summary.Files != 2 || report.Summary.ParsedFiles != 2 {
+		t.Fatalf("report = %+v, want two parsed workflow files with ok status", report)
 	}
 	if !evaluateReportHasOKInput(report.Inputs, "support_triage_replay.leia") {
 		t.Fatalf("inputs = %+v, want support_triage_replay.leia ok", report.Inputs)
+	}
+	if !evaluateReportHasOKInput(report.Inputs, "status_rollup.leia") {
+		t.Fatalf("inputs = %+v, want status_rollup.leia ok", report.Inputs)
 	}
 }
 
