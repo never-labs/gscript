@@ -1,0 +1,78 @@
+print("case:oop_class_methods_more")
+
+func Class(parent) {
+    cls := {}
+    cls.__index = cls
+    if parent != nil {
+        setmetatable(cls, {__index: parent})
+    }
+    cls.new = func(...) {
+        instance := {}
+        setmetatable(instance, cls)
+        if cls.init != nil {
+            cls.init(instance, ...)
+        }
+        return instance
+    }
+    return cls
+}
+
+Animal := Class(nil)
+Animal.init = func(self, name) {
+    self.name = name
+}
+Animal.speak = func(self) {
+    return self.name .. " makes a sound"
+}
+
+Dog := Class(Animal)
+Dog.init = func(self, name) {
+    Animal.init(self, name)
+    self.tricks = {}
+}
+Dog.speak = func(self) {
+    return self.name .. " says woof"
+}
+Dog.learn = func(self, trick) {
+    table.insert(self.tricks, trick)
+}
+Dog.trickCount = func(self) {
+    return #self.tricks
+}
+
+func counter(start) {
+    value := start
+    return {
+        add: func(self, n) {
+            value = value + n
+            return value
+        },
+        get: func(self) {
+            return value
+        },
+    }
+}
+
+Named := {
+    label: func(self) {
+        return "named:" .. self.name
+    },
+}
+
+for key, fn := range Named {
+    Dog[key] = fn
+}
+
+rex := Dog.new("Rex")
+print(rex:speak())
+rex:learn("sit")
+rex:learn("stay")
+assert(rex:trickCount() == 2)
+print(rex:label())
+
+c := counter(10)
+assert(c:add(5) == 15)
+assert(c:get() == 15)
+print("counter:" .. c:get())
+
+print("ok")

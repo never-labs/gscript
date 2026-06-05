@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "case_count": 453,
+  "case_count": 454,
   "cases": [
     {
       "id": "language/all_harness_flags_format",
@@ -4330,6 +4330,21 @@
       "reference": {
         "kind": "lua",
         "path": "tests/language/nextvar_table_remove_sequences.lua"
+      },
+      "status": "passing",
+      "tags": [
+        "language",
+        "conformance"
+      ]
+    },
+    {
+      "id": "language/oop_class_methods_more",
+      "path": "tests/language/oop_class_methods_more.leia",
+      "domain": "language",
+      "kind": "test",
+      "reference": {
+        "kind": "lua",
+        "path": "tests/language/oop_class_methods_more.lua"
       },
       "status": "passing",
       "tags": [

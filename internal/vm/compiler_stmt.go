@@ -628,7 +628,18 @@ func (c *compiler) compileCallStmt(s *ast.CallStmt) error {
 	return c.compileCallExprDiscard(s.Call, s.P.Line)
 }
 
-func (c *compiler) compileCallExprDiscard(call *ast.CallExpr, line int) error {
+func (c *compiler) compileCallExprDiscard(expr ast.Expr, line int) error {
+	switch call := expr.(type) {
+	case *ast.CallExpr:
+		return c.compilePlainCallExprDiscard(call, line)
+	case *ast.MethodCallExpr:
+		return c.compileMethodCallExprMulti(call, c.nextReg, 0)
+	default:
+		return fmt.Errorf("line %d: call statement requires a function call", line)
+	}
+}
+
+func (c *compiler) compilePlainCallExprDiscard(call *ast.CallExpr, line int) error {
 	if hasExplicitSpread(call.Args) {
 		return c.compileCallExprMulti(call, c.nextReg, 0)
 	}

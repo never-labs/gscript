@@ -100,10 +100,10 @@ func (s *IncDecStmt) nodeType() string { return "IncDecStmt" }
 func (s *IncDecStmt) GetPos() Pos      { return s.P }
 func (s *IncDecStmt) stmtNode()        {}
 
-// CallStmt wraps a CallExpr as a statement.
+// CallStmt wraps a call expression as a statement.
 type CallStmt struct {
 	P    Pos
-	Call *CallExpr
+	Call Expr // must be *CallExpr or *MethodCallExpr
 }
 
 func (s *CallStmt) nodeType() string { return "CallStmt" }

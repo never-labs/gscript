@@ -155,28 +155,36 @@ func TestTaggedDialectExpressionStatementsLowerToDialectCalls(t *testing.T) {
 		if !ok {
 			t.Fatalf("stmt[%d] = %T, want CallStmt", i, prog.Stmts[i])
 		}
-		field, ok := callStmt.Call.Func.(*ast.FieldExpr)
+		call, ok := callStmt.Call.(*ast.CallExpr)
 		if !ok {
-			t.Fatalf("stmt[%d] func = %T, want FieldExpr", i, callStmt.Call.Func)
+			t.Fatalf("stmt[%d] call = %T, want CallExpr", i, callStmt.Call)
+		}
+		field, ok := call.Func.(*ast.FieldExpr)
+		if !ok {
+			t.Fatalf("stmt[%d] func = %T, want FieldExpr", i, call.Func)
 		}
 		if recv, ok := field.Table.(*ast.IdentExpr); !ok || recv.Name != "dialect" || field.Field != tt.method {
-			t.Fatalf("stmt[%d] call func = %#v, want dialect.%s", i, callStmt.Call.Func, tt.method)
+			t.Fatalf("stmt[%d] call func = %#v, want dialect.%s", i, call.Func, tt.method)
 		}
-		tag, ok := callStmt.Call.Args[0].(*ast.StringLit)
+		tag, ok := call.Args[0].(*ast.StringLit)
 		if !ok || tag.Value != tt.tag {
-			t.Fatalf("stmt[%d] tag arg = %#v, want %q", i, callStmt.Call.Args[0], tt.tag)
+			t.Fatalf("stmt[%d] tag arg = %#v, want %q", i, call.Args[0], tt.tag)
 		}
-		opts, ok := callStmt.Call.Args[2].(*ast.TableLitExpr)
+		opts, ok := call.Args[2].(*ast.TableLitExpr)
 		if !ok || len(opts.Fields) != 1 {
-			t.Fatalf("stmt[%d] opts = %#v, want fail_fast option", i, callStmt.Call.Args[2])
+			t.Fatalf("stmt[%d] opts = %#v, want fail_fast option", i, call.Args[2])
 		}
 		failFast, ok := opts.Fields[0].Value.(*ast.BoolLit)
 		if !ok || failFast.Value != tt.failFast {
 			t.Fatalf("stmt[%d] fail_fast = %#v, want %v", i, opts.Fields[0].Value, tt.failFast)
 		}
 	}
-	if _, ok := prog.Stmts[2].(*ast.CallStmt).Call.Args[1].(*ast.FuncLitExpr); !ok {
-		t.Fatalf("raw block body = %T, want FuncLitExpr", prog.Stmts[2].(*ast.CallStmt).Call.Args[1])
+	rawCall, ok := prog.Stmts[2].(*ast.CallStmt).Call.(*ast.CallExpr)
+	if !ok {
+		t.Fatalf("raw block call = %T, want CallExpr", prog.Stmts[2].(*ast.CallStmt).Call)
+	}
+	if _, ok := rawCall.Args[1].(*ast.FuncLitExpr); !ok {
+		t.Fatalf("raw block body = %T, want FuncLitExpr", rawCall.Args[1])
 	}
 }
 

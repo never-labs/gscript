@@ -370,7 +370,7 @@
       "name": "Dense arrays, SoA, and matrix helpers",
       "category": "runtime-extension",
       "spec_sections": ["Tables And Metatables", "Values And Types", "Expressions", "Implementation Requirements"],
-      "parser": {"status": "not_applicable", "refs": []},
+      "parser": {"status": "covered", "refs": ["internal/parser/parser_test.go"]},
       "bytecode": {"status": "partial", "refs": ["internal/vm/matrix_multiply_specialization.go"]},
       "interpreter": {"status": "covered", "refs": ["internal/runtime/table_dense_matrix_test.go", "internal/stdlib/bind/vec_test.go", "internal/runtime/soa_test.go"]},
       "tier1": {"status": "covered", "refs": ["internal/methodjit/pass_intrinsic_matrix_test.go", "internal/methodjit/pass_matrix_rowptr_test.go"]},
@@ -385,12 +385,12 @@
       "category": "language-extension",
       "spec_sections": ["Grammar Appendix", "Declarations And Scope", "Expressions", "Statements", "Values And Types", "Tables And Metatables"],
       "parser": {"status": "covered", "refs": ["examples/hello/class.leia", "examples/hello/oop.leia"]},
-      "bytecode": {"status": "partial", "refs": ["tests/smoke/12_advanced.leia"]},
-      "interpreter": {"status": "covered", "refs": ["tests/smoke/12_advanced.leia"]},
+      "bytecode": {"status": "covered", "refs": ["tests/language/oop_class_methods_more.leia", "tests/smoke/12_advanced.leia"]},
+      "interpreter": {"status": "covered", "refs": ["tests/language/oop_class_methods_more.leia", "tests/smoke/12_advanced.leia"]},
       "tier1": {"status": "partial", "refs": ["internal/methodjit/tier1_call_regression_test.go"]},
       "tier2": {"status": "partial", "refs": ["internal/methodjit/pass_field_shape_call_split_test.go"]},
-      "semantic_gate": {"status": "partial", "refs": ["tests/smoke/12_advanced.leia"]},
-      "conformance_case": {"status": "not_applicable", "refs": []},
+      "semantic_gate": {"status": "covered", "refs": ["tests/language/oop_class_methods_more.leia", "tests/smoke/12_advanced.leia"]},
+      "conformance_case": {"status": "covered", "refs": ["tests/language/oop_class_methods_more.leia"]},
       "perf_hot_case": {"status": "covered", "refs": ["benchmarks/calls/method_dispatch.leia", "benchmarks/calls/object_creation.leia"]}
     }
   ]

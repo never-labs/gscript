@@ -279,7 +279,7 @@ func (interp *Interpreter) execGo(s *ast.GoStmt, env *Environment) ([]Value, boo
 		if err != nil {
 			return nil, false, false, false, err
 		}
-		method, err := interp.tableGet(obj, StringValue(call.Method))
+		method, err := interp.methodValue(obj, call.Method)
 		if err != nil {
 			return nil, false, false, false, err
 		}
@@ -287,6 +287,7 @@ func (interp *Interpreter) execGo(s *ast.GoStmt, env *Environment) ([]Value, boo
 		if err != nil {
 			return nil, false, false, false, err
 		}
+		args = append([]Value{obj}, args...)
 		if err := interp.StartFunction(method, args, nil); err != nil {
 			return nil, false, false, false, err
 		}

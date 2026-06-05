@@ -1153,14 +1153,10 @@ func (p *Parser) parseExpressionStmt() (ast.Stmt, error) {
 			return &ast.CallStmt{P: pos, Call: taggedCall}, nil
 		}
 		// Method call expression: obj:method(args) used as statement.
-		// We wrap it by converting to an equivalent CallExpr.
+		// Keep the MethodCallExpr so later execution preserves the implicit
+		// receiver argument.
 		if mc, ok := expr.(*ast.MethodCallExpr); ok {
-			callExpr := &ast.CallExpr{
-				P:    mc.P,
-				Func: &ast.FieldExpr{P: mc.P, Table: mc.Object, Field: mc.Method},
-				Args: mc.Args,
-			}
-			return &ast.CallStmt{P: pos, Call: callExpr}, nil
+			return &ast.CallStmt{P: pos, Call: mc}, nil
 		}
 		// Standalone channel receive: <-ch (discard result, used for synchronization)
 		if _, ok := expr.(*ast.RecvExpr); ok {

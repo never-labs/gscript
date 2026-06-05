@@ -19,7 +19,7 @@ The harness compares stdout from:
 
 Set `LEIA_OFFICIAL_CHECK_JIT=1` to also compare `leia -jit *.leia`.
 
-Current translated passing cases: 441.
+Current translated passing cases: 442.
 
 | Case | Source area | Notes |
 |---|---|---|
@@ -53,6 +53,7 @@ Current translated passing cases: 441.
 | `calls_multireturn` | `calls.lua` | Missing argument nils, fixed multi-return assignment, tail recursion. |
 | `calls_multireturn_adjust_more` | `calls.lua`, `constructs.lua`, `vararg.lua` | Parenthesized call adjustment, nested multi-return argument adjustment, recursive multi-return table constructors, and value-bearing vararg tail forwarding. |
 | `calls_nested_method_more` | `calls.lua` | Nested table function assignment and explicit self-style method mutation. |
+| `oop_class_methods_more` | `calls.lua` | Leia class-style metatable pattern, colon method receiver passing, closure-private state, and mixin-style method copy. |
 | `calls_recursion_error_more` | `calls.lua` | Recursive protected error propagation and moderate tail-recursive descent. |
 | `calls_ret2_pack_adjust_more` | `calls.lua` | Recursive multi-return unpack feeding assignment, table constructors, and vararg packing in currently supported positions. |
 | `calls_return_values` | `calls.lua`, `constructs.lua` | Multiple return assignment and nil-return basics. |

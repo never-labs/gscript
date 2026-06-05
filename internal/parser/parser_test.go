@@ -25,6 +25,19 @@ func mustParse(t *testing.T, src string) *ast.Program {
 	return prog
 }
 
+func mustCallStmtCall(t *testing.T, stmt ast.Stmt) *ast.CallExpr {
+	t.Helper()
+	cs, ok := stmt.(*ast.CallStmt)
+	if !ok {
+		t.Fatalf("expected CallStmt, got %T", stmt)
+	}
+	call, ok := cs.Call.(*ast.CallExpr)
+	if !ok {
+		t.Fatalf("expected CallExpr call, got %T", cs.Call)
+	}
+	return call
+}
+
 // helper: lex and parse, expecting a parse error
 func mustFail(t *testing.T, src string) {
 	t.Helper()
@@ -244,8 +257,14 @@ result, err := llm.turn({
 	}
 	if callStmt, ok := prog.Stmts[0].(*ast.CallStmt); !ok {
 		t.Fatalf("model stmt = %T, want CallStmt", prog.Stmts[0])
-	} else if field, ok := callStmt.Call.Func.(*ast.FieldExpr); !ok || field.Field != "register_models" {
-		t.Fatalf("model stmt call = %#v, want llm.register_models", callStmt.Call.Func)
+	} else {
+		call, ok := callStmt.Call.(*ast.CallExpr)
+		if !ok {
+			t.Fatalf("model stmt call = %T, want CallExpr", callStmt.Call)
+		}
+		if field, ok := call.Func.(*ast.FieldExpr); !ok || field.Field != "register_models" {
+			t.Fatalf("model stmt call = %#v, want llm.register_models", call.Func)
+		}
 	}
 	decl, ok := prog.Stmts[1].(*ast.DeclareStmt)
 	if !ok || len(decl.Values) != 1 {
@@ -773,38 +792,29 @@ func TestLabelBeforeCallUsesSemicolonDisambiguation(t *testing.T) {
 
 func TestCallStmt(t *testing.T) {
 	prog := mustParse(t, `print("hello")`)
-	cs, ok := prog.Stmts[0].(*ast.CallStmt)
-	if !ok {
-		t.Fatalf("expected CallStmt, got %T", prog.Stmts[0])
-	}
-	if cs.Call == nil {
-		t.Error("expected non-nil Call")
-	}
-	fn, ok := cs.Call.Func.(*ast.IdentExpr)
+	call := mustCallStmtCall(t, prog.Stmts[0])
+	fn, ok := call.Func.(*ast.IdentExpr)
 	if !ok || fn.Name != "print" {
 		t.Errorf("expected function 'print'")
 	}
-	if len(cs.Call.Args) != 1 {
-		t.Errorf("expected 1 arg, got %d", len(cs.Call.Args))
+	if len(call.Args) != 1 {
+		t.Errorf("expected 1 arg, got %d", len(call.Args))
 	}
 }
 
 func TestCallStmtNoArgs(t *testing.T) {
 	prog := mustParse(t, `foo()`)
-	cs, ok := prog.Stmts[0].(*ast.CallStmt)
-	if !ok {
-		t.Fatalf("expected CallStmt, got %T", prog.Stmts[0])
-	}
-	if len(cs.Call.Args) != 0 {
-		t.Errorf("expected 0 args, got %d", len(cs.Call.Args))
+	call := mustCallStmtCall(t, prog.Stmts[0])
+	if len(call.Args) != 0 {
+		t.Errorf("expected 0 args, got %d", len(call.Args))
 	}
 }
 
 func TestCallStmtMultiArgs(t *testing.T) {
 	prog := mustParse(t, `foo(1, 2, 3)`)
-	cs := prog.Stmts[0].(*ast.CallStmt)
-	if len(cs.Call.Args) != 3 {
-		t.Errorf("expected 3 args, got %d", len(cs.Call.Args))
+	call := mustCallStmtCall(t, prog.Stmts[0])
+	if len(call.Args) != 3 {
+		t.Errorf("expected 3 args, got %d", len(call.Args))
 	}
 }
 
@@ -1661,9 +1671,13 @@ func TestMethodCallStmt(t *testing.T) {
 	prog := mustParse(t, `obj:method(1, 2)`)
 	cs, ok := prog.Stmts[0].(*ast.CallStmt)
 	if !ok {
-		// It might be parsed differently since the parser sees obj:method(1,2) as a MethodCallExpr,
-		// not a CallExpr. Let's check if the parser handles this.
 		t.Fatalf("expected CallStmt, got %T", prog.Stmts[0])
 	}
-	_ = cs
+	mc, ok := cs.Call.(*ast.MethodCallExpr)
+	if !ok {
+		t.Fatalf("expected MethodCallExpr call, got %T", cs.Call)
+	}
+	if mc.Method != "method" || len(mc.Args) != 2 {
+		t.Fatalf("method call = %#v, want method with 2 args", mc)
+	}
 }

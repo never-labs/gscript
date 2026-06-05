@@ -203,7 +203,18 @@ func dialectCall(pos Pos, method, tag string, body Expr, opts Expr, failFast boo
 	)
 }
 
-func desugarCallExpr(e *CallExpr) *CallExpr {
+func desugarCallExpr(e Expr) Expr {
+	switch call := e.(type) {
+	case *CallExpr:
+		return desugarPlainCallExpr(call)
+	case *MethodCallExpr:
+		return &MethodCallExpr{P: call.P, Object: desugarExpr(call.Object), Method: call.Method, Args: desugarExprList(call.Args)}
+	default:
+		return desugarExpr(e)
+	}
+}
+
+func desugarPlainCallExpr(e *CallExpr) *CallExpr {
 	if e == nil {
 		return nil
 	}
