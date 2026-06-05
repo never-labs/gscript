@@ -37,7 +37,7 @@ if err := vm.Exec(`print("hello")`); err != nil {
 For reusable code, compile once and run on a VM:
 
 ```go
-prog, err := leia.Compile(`func add(a, b) { return a + b }`)
+prog, err := leia.Compile(`func add(a, b) { return a + b }`, leia.WithSourceName("math.leia"))
 if err != nil {
     return err
 }
@@ -54,6 +54,13 @@ Context-aware methods exist for compile, run, exec, and call paths:
 checked before starting and after completion. Runtime preemption for
 long-running scripts is controlled separately through sandbox and resource
 budgets.
+
+Use `WithArgs(script, args...)` at construction time, or `VM.SetArgs(script,
+args)` on an existing VM, to set the `arg` table for script entrypoints.
+`arg[0]` is the script name and `arg[1..n]` are user arguments.
+
+`WithPrint(fn)` overrides script `print()` output for tests, games, servers,
+and other hosts that should not write directly to stdout.
 
 ## Host Bindings
 
@@ -74,6 +81,10 @@ packages by import path.
 Host callbacks use reflection conversion rules. Prefer small, auditable
 modules over broad service objects.
 
+`ModuleFrom` and `RegisterModuleFrom` lower-case the first exported Go name rune
+by default. Use `WithModuleExactNames()` to preserve Go names exactly, or
+`WithModuleNameMapper(fn)` to define a host-specific naming policy.
+
 ## Values
 
 Construct public values with:
@@ -87,8 +98,19 @@ leia.String("ok")
 leia.Decode(goValue)
 ```
 
-Convert back with `leia.Encode(v)` or `v.Encode()`. `Value` is useful for
-storing script functions or data without exposing internal runtime types.
+Use `MustDecode(goValue)` only for examples and initialization paths where a
+panic is acceptable. Convert back with `leia.Encode(v)` or `v.Encode()`.
+`Value` is useful for storing script functions or data without exposing
+internal runtime types.
+
+VM globals and function values can stay on the public value boundary:
+
+| API | Purpose |
+|---|---|
+| `Set(name, value)` / `Get(name)` | Convert between Go values and script globals. |
+| `SetPublicValue(name, value)` / `GetPublicValue(name)` | Store or read globals as public `Value`. |
+| `CallValue(fn, args...)` | Call a script function value using Go values. |
+| `CallPublicValue(fn, args...)` | Call a script function value using public `Value` arguments and results. |
 
 ## Standard Library And Capabilities
 
@@ -143,6 +165,24 @@ Setting resource budgets disables JIT execution for that VM so native code
 cannot bypass budget checkpoints. Budget failures are reported as
 `*leia.BudgetError`, which exposes `Resource` and `Limit`.
 
+`WithSecurity(SecurityPolicy{...})` groups the same sandbox controls behind one
+auditable option. The fine-grained switches remain available when a host wants
+to compose its own policy:
+
+| Option | Controls |
+|---|---|
+| `WithSandbox()` | Legacy safe-library and no-filesystem baseline. |
+| `WithModuleLoading(false)` | Filesystem-backed `require()` loading. |
+| `WithFilesystem(false)` | Filesystem read and write together. |
+| `WithFilesystemRead(false)` / `WithFilesystemWrite(false)` | Filesystem reads or writes separately. |
+| `WithEnvironment(false)` | Environment reads and writes together. |
+| `WithEnvironmentRead(false)` / `WithEnvironmentWrite(false)` | Environment reads or writes separately. |
+| `WithEnvironmentAllowlist(names...)` | Environment variables visible to scripts. |
+| `WithDynamicEval(false)` | Script-side string compilation APIs. |
+| `WithNetworkAccess(false)` | Host-backed network APIs in `net` and `http`. |
+| `WithProcessExecution(false)` / `WithProcessShell(false)` | Process execution and shell helpers. |
+| `WithDebugAccess(false)` / `WithTestkitAccess(false)` | Script-visible diagnostics surfaces. |
+
 See [Security and sandboxing](../security/index.md) for the full capability,
 filesystem, process, dynamic-eval, and resource-budget model.
 
@@ -159,8 +199,17 @@ Module-aware embeddings can use:
 | `WithModuleMode(ModuleModeReadonly)` | Record readonly module mode. |
 | `WithModuleMode(ModuleModeVendor)` | Restrict cache resolution to vendor entries. |
 | `ModuleOptionsForScript(path)` | Build options from the nearest `leia.mod`. |
+| `ModuleOptionsForScriptMode(path, mode)` | Build module options with an explicit mode. |
+| `ValidModuleMode(mode)` | Validate user-provided module mode strings. |
 
 See [Modules](../modules/index.md) for the `leia.mod` file format.
+
+## Dialects
+
+`WithDialect(name, handler, opts...)` registers a host-provided tagged dialect.
+`DialectHandler` receives the tagged body and options as public `Value` objects
+and returns public `Value` results. `DialectOptions` can define aliases,
+category metadata, capability labels, and a separate block handler.
 
 ## AI Providers
 

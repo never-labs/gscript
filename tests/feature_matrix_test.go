@@ -269,6 +269,7 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 	root := findRepoRoot(t)
 	readme := readFileString(t, filepath.Join(root, "README.md"))
 	for _, snippet := range []string{
+		"repeatable tests, package metadata, and source-level hot reload.",
 		"Go-flavored syntax with dynamic values, Lua-compatible table and multi-return",
 		"semantics where useful, an embeddable Go API, a bytecode VM, and an ARM64 JIT.",
 		"Go embedding API with sandbox, resource budgets, host bindings, and hot reload.",
@@ -516,6 +517,17 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 		"docs/reference/modules/index.md",
 		"docs/guides/packages.md",
 	)
+	modulesRef := readFileString(t, filepath.Join(root, "docs", "reference", "modules", "index.md"))
+	for _, snippet := range []string{
+		"capability summaries, and optional Go-native binding metadata",
+		"Local metadata commands do not need network access",
+		"`leia mod verify`",
+		"`leia mod list` | Print resolved module metadata.",
+	} {
+		if !strings.Contains(modulesRef, snippet) {
+			t.Fatalf("modules reference must keep README package metadata contract; missing %q", snippet)
+		}
+	}
 
 	bytecodeVM := requireFeature(t, features, "bytecode_vm_execution")
 	requireFeatureCellRefs(t, bytecodeVM, "bytecode_vm_execution", "bytecode",
@@ -541,6 +553,13 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 		"internal/methodjit/emit_tier2_correctness_test.go",
 		"internal/methodjit/exit_resume_check_test.go",
 		"internal/methodjit/op_spec_oracle_test.go",
+	)
+	requireFeatureCellRefs(t, jit, "arm64_jit_runtime_fallback", "semantic_gate",
+		"internal/methodjit/semantic_gate_test.go",
+		"internal/methodjit/diagnose_test.go",
+		"internal/methodjit/exit_resume_check_test.go",
+		"docs/reference/performance/index.md",
+		"docs/reference/platforms/index.md",
 	)
 	requireFeatureCellRefs(t, jit, "arm64_jit_runtime_fallback", "perf_hot_case",
 		"scripts/performance_gate.sh",
@@ -568,6 +587,76 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 		"scripts/release_artifacts_check.sh",
 		"cmd/leia/main_readme_tooling_test.go",
 		"tests/release_matrix_test.go",
+	)
+}
+
+func TestReadmeExecutionPerformanceContractHasReleaseGates(t *testing.T) {
+	root := findRepoRoot(t)
+	readme := readFileString(t, filepath.Join(root, "README.md"))
+	performance := readFileString(t, filepath.Join(root, "docs", "reference", "performance", "index.md"))
+	platforms := readFileString(t, filepath.Join(root, "docs", "reference", "platforms", "index.md"))
+	release := readFileString(t, filepath.Join(root, "docs", "release", "index.md"))
+	gate := readFileString(t, filepath.Join(root, "scripts", "performance_gate.sh"))
+
+	for _, snippet := range []string{
+		"The JIT accelerates supported hot paths and falls back to the VM/runtime",
+		"semantics enforced by the spec, feature matrix, and release gates.",
+	} {
+		if !strings.Contains(readme, snippet) {
+			t.Fatalf("README execution/performance contract missing %q", snippet)
+		}
+	}
+	for _, snippet := range []string{
+		"supported hot paths may run natively, but unsupported",
+		"operations must fall back to the VM/runtime without changing visible results",
+		"The LuaJIT comparison is a release bottom line",
+		"`--luajit-threshold` (default `0.80`)",
+		"Production and release plans keep this bottom line active",
+		"`go run ./cmd/leia ci release --list`",
+	} {
+		if !strings.Contains(performance, snippet) {
+			t.Fatalf("performance reference must stay synced with README execution contract; missing %q", snippet)
+		}
+	}
+	for _, snippet := range []string{
+		"The interpreter defines script behavior. The bytecode VM and JIT are",
+		"accelerators: they must preserve interpreter-visible results, errors,",
+		"Method JIT | Native ARM64 hot-path acceleration.",
+	} {
+		if !strings.Contains(platforms, snippet) {
+			t.Fatalf("platform reference must stay synced with README execution modes; missing %q", snippet)
+		}
+	}
+	for _, snippet := range []string{
+		"bash scripts/performance_gate.sh --full",
+		"state tested platforms and execution modes",
+		"document any experimental language, stdlib, AI, package, or JIT behavior",
+	} {
+		if !strings.Contains(release, snippet) {
+			t.Fatalf("release docs must keep execution/performance release gate; missing %q", snippet)
+		}
+	}
+	for _, snippet := range []string{
+		"LUAJIT_THRESHOLD=0.80",
+		"validate_luajit_artifact",
+		"benchmarks/perf_submit_guard.py",
+		"validate_strict_artifact",
+	} {
+		if !strings.Contains(gate, snippet) {
+			t.Fatalf("performance gate must enforce JIT/LuaJIT bottom line; missing %q", snippet)
+		}
+	}
+
+	jit := requireFeature(t, loadFeatureMatrixFeatureMap(t, root), "arm64_jit_runtime_fallback")
+	requireFeatureCellRefs(t, jit, "arm64_jit_runtime_fallback", "semantic_gate",
+		"docs/reference/performance/index.md",
+		"docs/reference/platforms/index.md",
+	)
+	requireFeatureCellRefs(t, jit, "arm64_jit_runtime_fallback", "perf_hot_case",
+		"scripts/performance_gate.sh",
+		"benchmarks/performance_gate_test.py",
+		"benchmarks/perf_submit_guard_test.py",
+		"benchmarks/manifest.json",
 	)
 }
 

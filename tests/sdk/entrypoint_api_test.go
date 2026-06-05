@@ -100,6 +100,54 @@ func TestCompileFileSetsSourceAndRequireDir(t *testing.T) {
 	}
 }
 
+func TestEntrypointArgsOptionAndSetArgsUpdateArgTable(t *testing.T) {
+	vm := leia.New(leia.WithArgs("initial.leia", "one", "two"))
+	if err := vm.Exec(`
+initial_script := arg[0]
+initial_first := arg[1]
+initial_second := arg[2]
+`); err != nil {
+		t.Fatal(err)
+	}
+	for name, want := range map[string]string{
+		"initial_script": "initial.leia",
+		"initial_first":  "one",
+		"initial_second": "two",
+	} {
+		got, err := vm.Get(name)
+		if err != nil {
+			t.Fatalf("Get(%q): %v", name, err)
+		}
+		if got != want {
+			t.Fatalf("%s = %v (%T), want %q", name, got, got, want)
+		}
+	}
+
+	args := []string{"next"}
+	vm.SetArgs("updated.leia", args)
+	args[0] = "mutated after SetArgs"
+	if err := vm.Exec(`
+updated_script := arg[0]
+updated_first := arg[1]
+updated_second := arg[2]
+`); err != nil {
+		t.Fatal(err)
+	}
+	for name, want := range map[string]any{
+		"updated_script": "updated.leia",
+		"updated_first":  "next",
+		"updated_second": nil,
+	} {
+		got, err := vm.Get(name)
+		if err != nil {
+			t.Fatalf("Get(%q): %v", name, err)
+		}
+		if got != want {
+			t.Fatalf("%s = %v (%T), want %v (%T)", name, got, got, want, want)
+		}
+	}
+}
+
 func TestContextEntrypointsRespectCanceledContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()

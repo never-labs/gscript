@@ -361,7 +361,7 @@
       "interpreter": {"status": "semantic_only", "refs": []},
       "tier1": {"status": "covered", "refs": ["tests/jit_test.go", "tests/jit_loop_control_test.go", "tests/jit_side_exit_test.go", "internal/methodjit/semantic_gate_test.go"]},
       "tier2": {"status": "covered", "refs": ["internal/methodjit/emit_tier2_correctness_test.go", "internal/methodjit/exit_resume_check_test.go", "internal/methodjit/emit_call_exit_test.go", "internal/methodjit/op_spec_oracle_test.go"]},
-      "semantic_gate": {"status": "covered", "refs": ["internal/methodjit/semantic_gate_test.go", "internal/methodjit/diagnose_test.go", "internal/methodjit/exit_resume_check_test.go", "docs/reference/performance/index.md"]},
+      "semantic_gate": {"status": "covered", "refs": ["internal/methodjit/semantic_gate_test.go", "internal/methodjit/diagnose_test.go", "internal/methodjit/exit_resume_check_test.go", "docs/reference/performance/index.md", "docs/reference/platforms/index.md"]},
       "conformance_case": {"status": "not_applicable", "refs": []},
       "perf_hot_case": {"status": "covered", "refs": ["scripts/performance_gate.sh", "benchmarks/performance_gate_test.py", "benchmarks/perf_submit_guard_test.py", "benchmarks/manifest.json"]}
     },

@@ -84,6 +84,41 @@ func TestExamplesCommandDiscoversDialectExamples(t *testing.T) {
 	}
 }
 
+func TestExamplesCommandManifestMatchesPlaygroundRepositoryExamples(t *testing.T) {
+	playgroundExamples, err := playgroundRepositoryExamples(playgroundExamplesRoot())
+	if err != nil {
+		t.Fatalf("load playground repository examples: %v", err)
+	}
+	cliExamples, err := cliRepositoryExamples()
+	if err != nil {
+		t.Fatalf("load CLI repository examples: %v", err)
+	}
+
+	byID := make(map[string]cliExample, len(cliExamples))
+	for _, example := range cliExamples {
+		if _, exists := byID[example.ID]; exists {
+			t.Fatalf("duplicate CLI example id %s", example.ID)
+		}
+		byID[example.ID] = example
+	}
+
+	for _, playground := range playgroundExamples {
+		cli, ok := byID[playground.ID]
+		if !ok {
+			t.Fatalf("CLI examples list is missing playground repository example %s", playground.ID)
+		}
+		if cli.Path != playground.Summary {
+			t.Fatalf("%s CLI path = %q, playground summary = %q", playground.ID, cli.Path, playground.Summary)
+		}
+		if playground.Runnable && !cli.Runnable {
+			t.Fatalf("%s is runnable in the playground manifest but not in the CLI manifest", playground.ID)
+		}
+		if !playground.Runnable && !cli.Runnable && strings.TrimSpace(cli.Requires) == "" {
+			t.Fatalf("%s is manual/check-only in the CLI manifest but has no requires reason", playground.ID)
+		}
+	}
+}
+
 func TestExamplesCommandShowAcceptsIDAndPath(t *testing.T) {
 	for _, selector := range []string{"repo-hello-counter", "examples/hello/counter.leia", "hello/counter.leia"} {
 		t.Run(selector, func(t *testing.T) {
@@ -369,6 +404,48 @@ func TestExamplesCommandChecksConcurrencyContractExamples(t *testing.T) {
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("examples check missing %q\n%s", want, out)
+		}
+	}
+}
+
+func TestExamplesCommandChecksReadmeCapabilityEvidenceExamples(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := runExamplesCommand([]string{
+		"check",
+		"--jobs=2",
+		"--timeout=20s",
+		"repo-embedding-go-doc-examples",
+		"repo-llm-agent",
+		"repo-ai-coding_agent_replay",
+		"repo-evaluate-agent_replay",
+		"repo-concurrency-goroutines_channels",
+		"repo-concurrency-select_timeout",
+		"repo-concurrency-sync_group",
+		"repo-data-q_vector_basics",
+		"repo-data_processing-data_oriented-soa_kernels",
+		"repo-data_processing-data_oriented-dense_matrix_vec_kernels",
+		"repo-performance-execution_modes_matrix",
+	}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runExamplesCommand code = %d, stdout = %q stderr = %q", code, stdout.String(), stderr.String())
+	}
+	out := stdout.String()
+	for _, want := range []string{
+		"ok      repo-embedding-go-doc-examples",
+		"ok      repo-llm-agent",
+		"ok      repo-ai-coding_agent_replay",
+		"ok      repo-evaluate-agent_replay",
+		"ok      repo-concurrency-goroutines_channels",
+		"ok      repo-concurrency-select_timeout",
+		"ok      repo-concurrency-sync_group",
+		"ok      repo-data-q_vector_basics",
+		"ok      repo-data_processing-data_oriented-soa_kernels",
+		"ok      repo-data_processing-data_oriented-dense_matrix_vec_kernels",
+		"ok      repo-performance-execution_modes_matrix",
+		"examples: 11 ok, 0 skipped, 0 failed",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("README capability examples check missing %q\n%s", want, out)
 		}
 	}
 }

@@ -30,9 +30,10 @@ func TestReadmeAndSpecStableContractStayAligned(t *testing.T) {
 	readme := readFileString(t, filepath.Join(root, "README.md"))
 	specIndex := readFileString(t, filepath.Join(root, "docs", "spec", "index.md"))
 	stability := markdownSection(t, specIndex, "Stability Contract")
+	stableContractSource := `The stable contract is the language spec plus\nfeature matrix and release gates.`
 
 	for _, snippet := range []string{
-		"The stable contract is the language spec plus\nfeature matrix and release gates.",
+		strings.ReplaceAll(stableContractSource, `\n`, "\n"),
 		"(docs/spec/index.md)",
 		"Experimental behavior should be documented as\nsuch before users depend on it.",
 	} {

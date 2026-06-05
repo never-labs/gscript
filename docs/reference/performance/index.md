@@ -89,6 +89,25 @@ benchmarks in these modes:
 The strict pass checks output stability, timing quality, suspicious
 benchmark-only wins, and LuaJIT comparisons where references exist.
 
+## Execution Performance Contract
+
+The interpreter is the semantic baseline. The bytecode VM and ARM64 JIT are
+execution accelerators: supported hot paths may run natively, but unsupported
+operations must fall back to the VM/runtime without changing visible results,
+errors, capability checks, resource-budget behavior, or deoptimization behavior.
+
+The LuaJIT comparison is a release bottom line, not a marketing claim. For
+script-timed rows with a Lua reference, `scripts/performance_gate.sh` runs the
+performance submit guard and fails when `current / LuaJIT` exceeds the configured
+`--luajit-threshold` (default `0.80`). Use `--no-luajit` only when LuaJIT is
+unavailable or the selected workload has no meaningful Lua reference, and record
+that limitation in release evidence.
+
+Production and release plans keep this bottom line active through
+`bash scripts/production_check.sh --full`,
+`go run ./cmd/leia ci release --list`, and
+`bash scripts/performance_gate.sh --full`.
+
 ## Artifacts
 
 Benchmark commands can write JSON and Markdown reports:

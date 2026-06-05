@@ -192,10 +192,12 @@ func TestReadmeToolingCommandsMapToCLI(t *testing.T) {
 	}
 
 	oldBenchExecCommand := benchExecCommand
+	oldCheckExecCommand := checkExecCommand
 	oldDiagExecCommand := diagExecCommand
 	oldDocExecCommand := docExecCommand
 	t.Cleanup(func() {
 		benchExecCommand = oldBenchExecCommand
+		checkExecCommand = oldCheckExecCommand
 		diagExecCommand = oldDiagExecCommand
 		docExecCommand = oldDocExecCommand
 	})
@@ -203,6 +205,12 @@ func TestReadmeToolingCommandsMapToCLI(t *testing.T) {
 	benchExecCommand = func(name string, args ...string) *exec.Cmd {
 		benchArgs = append([]string{name}, args...)
 		helper, helperArgs := testHelperCommand(t, "bench")
+		return exec.Command(helper, helperArgs...)
+	}
+	var checkArgs []string
+	checkExecCommand = func(name string, args ...string) *exec.Cmd {
+		checkArgs = append([]string{name}, args...)
+		helper, helperArgs := testHelperCommand(t, "manifest")
 		return exec.Command(helper, helperArgs...)
 	}
 	var diagArgs []string
@@ -224,17 +232,28 @@ func TestReadmeToolingCommandsMapToCLI(t *testing.T) {
 			t.Fatalf("empty README command args for %q", command)
 		}
 		switch args[0] {
-		case "fmt", "lint", "test", "check":
+		case "fmt", "lint", "test":
 			if !knownLeiaCommand(args[0]) {
 				t.Fatalf("README command %q is not registered", args[0])
 			}
-		case "examples":
-			for _, selector := range args[2:] {
-				if strings.HasPrefix(selector, "-") {
-					continue
+		case "check":
+			var stdout, stderr bytes.Buffer
+			if code := runCheckCommand(args[1:], &stdout, &stderr); code != 0 {
+				t.Fatalf("README check command failed: code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+			}
+			for _, want := range []string{"fmt: ok", "lint: ok", "test: ok", "manifest: ok", "docs: skipped", "editor: skipped", "examples: skipped"} {
+				if !strings.Contains(stdout.String(), want) {
+					t.Fatalf("README check stdout = %q, want %q", stdout.String(), want)
 				}
-				if _, _, ok, err := resolveCLIExample(selector); err != nil || !ok {
-					t.Fatalf("README examples selector %q resolved ok=%t err=%v", selector, ok, err)
+			}
+		case "examples":
+			var stdout, stderr bytes.Buffer
+			if code := runExamplesCommand(args[1:], &stdout, &stderr); code != 0 {
+				t.Fatalf("README examples command failed: code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+			}
+			for _, selector := range []string{"repo-hello-fib", "repo-hello-types_demo", "repo-hello-dialects"} {
+				if !strings.Contains(stdout.String(), selector) {
+					t.Fatalf("README examples stdout = %q, want %q", stdout.String(), selector)
 				}
 			}
 		case "bench":
@@ -262,9 +281,17 @@ func TestReadmeToolingCommandsMapToCLI(t *testing.T) {
 			if code := runCICommand(args[1:], &stdout, &stderr); code != 0 {
 				t.Fatalf("README ci command failed: code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
 			}
+			for _, want := range []string{"bash scripts/performance_gate.sh --full", "bash scripts/release_distribution_check.sh", "bash scripts/release_artifacts_check.sh"} {
+				if !strings.Contains(stdout.String(), want) {
+					t.Fatalf("README ci stdout = %q, want %q", stdout.String(), want)
+				}
+			}
 		default:
 			t.Fatalf("README command %q is not part of the tooling audit", args[0])
 		}
+	}
+	if len(checkArgs) < 2 || !strings.HasSuffix(checkArgs[1], filepath.Join("tests", "manifest.py")) || !containsString(checkArgs, "tests") || !containsString(checkArgs, "benchmarks") {
+		t.Fatalf("README check dispatch args = %#v, want manifest coverage via tests/manifest.py", checkArgs)
 	}
 	if len(docArgs) < 2 || !strings.HasSuffix(docArgs[1], filepath.Join("scripts", "docs_check.sh")) {
 		t.Fatalf("README doc dispatch args = %#v, want doc check via scripts/docs_check.sh", docArgs)

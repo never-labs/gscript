@@ -18,6 +18,7 @@ Checks README/docs Markdown for:
   - README stable contract and docs/spec stability contract stay synchronized.
   - docs/spec runnable Leia examples use stable all-mode fence tags and execute.
   - docs examples index lists each registered top-level example directory.
+  - README documented capabilities stay tied to examples docs, manifests, and playground gates.
   - generated reference docs and the checked-in language spec HTML are fresh.
 
 The repository-script mention check covers:
@@ -55,9 +56,10 @@ fi
 TMP_DOCS="$(mktemp -d)"
 trap 'rm -rf "$TMP_DOCS"' EXIT
 go run ./cmd/leia doc generate --layout site --output "$TMP_DOCS" >/dev/null
-for generated in reference/cli/index.md reference/stdlib/index.md; do
-    if ! cmp -s "$TMP_DOCS/$generated" "docs/$generated"; then
-        echo "error: docs/$generated is stale; run: go run ./cmd/leia doc generate --layout site --output docs" >&2
+for generated_doc in docs/reference/cli/index.md docs/reference/stdlib/index.md; do
+    generated="${generated_doc#docs/}"
+    if ! cmp -s "$TMP_DOCS/$generated" "$generated_doc"; then
+        echo "error: $generated_doc is stale; run: go run ./cmd/leia doc generate --layout site --output docs" >&2
         exit 1
     fi
 done
@@ -118,6 +120,9 @@ checked_retired_names = 0
 checked_spec_runnable_examples = 0
 checked_spec_contract_docs = 0
 checked_examples_index_dirs = 0
+checked_examples_capability_drift_gates = 0
+checked_readme_quick_start_gates = 0
+checked_readme_documentation_entrypoints = 0
 spec_runnable_report = ""
 
 retired_paths = {
@@ -242,6 +247,50 @@ def check_script_mentions(path: Path) -> None:
 
     if in_fence:
         errors.append(f"{path.relative_to(root)}:{fence_start}: unclosed fenced code block")
+
+
+def read_readme_documentation_entrypoints() -> list[str]:
+    readme = root / "README.md"
+    text = readme.read_text(encoding="utf-8")
+    start = text.find("## Documentation")
+    if start == -1:
+        errors.append("README.md: missing Documentation section")
+        return []
+    end = text.find("\n## ", start + len("## Documentation"))
+    section = text[start:] if end == -1 else text[start:end]
+
+    refs = []
+    for line in section.splitlines():
+        if not line.startswith("- "):
+            continue
+        match = link_re.search(line)
+        if not match:
+            continue
+        target = strip_link_destination(match.group(1))
+        if not target or is_external(target) or target.startswith("#"):
+            continue
+        target = target.split("#", 1)[0].split("?", 1)[0]
+        if target:
+            refs.append(target)
+    return refs
+
+
+def check_readme_documentation_entrypoints() -> None:
+    global checked_readme_documentation_entrypoints
+    refs = read_readme_documentation_entrypoints()
+    if not refs:
+        errors.append("README.md Documentation section must list documentation entrypoints")
+        return
+    for ref in refs:
+        checked_readme_documentation_entrypoints += 1
+        resolved = (root / unquote(ref)).resolve()
+        try:
+            resolved.relative_to(root)
+        except ValueError:
+            errors.append(f"README.md Documentation entrypoint escapes repo: {ref}")
+            continue
+        if not resolved.is_file():
+            errors.append(f"README.md Documentation entrypoint target is missing: {ref}")
 
 
 def require_snippets(path: Path, snippets: list[str]) -> None:
@@ -427,6 +476,80 @@ def check_examples_index() -> None:
         )
 
 
+def check_examples_capability_drift_gates() -> None:
+    global checked_examples_capability_drift_gates
+    for path, snippets in [
+        (
+            root / "tests" / "release_matrix_test.go",
+            [
+                "TestReleaseMatrixReadmeCapabilitiesStayCoveredByExamples",
+                "Go embedding API with sandbox, resource budgets, host bindings, and hot reload.",
+                "leia examples list --json",
+                "TestExamplesCommandManifestMatchesPlaygroundRepositoryExamples",
+                "TestPlaygroundRepositoryAINativeExamplesHaveExplicitGates",
+            ],
+        ),
+        (
+            root / "cmd" / "leia" / "main_examples_command_test.go",
+            [
+                "TestExamplesCommandManifestMatchesPlaygroundRepositoryExamples",
+                "CLI examples list is missing playground repository example",
+                "manual/check-only in the CLI manifest but has no requires reason",
+            ],
+        ),
+        (
+            root / "cmd" / "leia" / "main_playground_test.go",
+            [
+                "TestPlaygroundRepositoryCoreExampleCoverage",
+                "TestPlaygroundRepositoryAINativeExamplesHaveExplicitGates",
+                "TestPlaygroundRepositoryGameEngineExampleClassification",
+            ],
+        ),
+    ]:
+        checked_examples_capability_drift_gates += 1
+        text = path.read_text(encoding="utf-8")
+        for snippet in snippets:
+            if snippet not in text:
+                errors.append(
+                    f"{path.relative_to(root)}: missing examples capability drift gate snippet: {snippet}"
+                )
+
+
+def check_readme_quick_start_gates() -> None:
+    global checked_readme_quick_start_gates
+    for path, snippets in [
+        (
+            root / "cmd" / "leia" / "main_readme_tooling_test.go",
+            [
+                "TestReadmeQuickStartCommandsStayRunnable",
+                "readmeQuickStartCommands",
+                "README Quick Start command `go run ./cmd/leia %s` failed",
+                "cmd.Run()",
+                "go run ./cmd/leia help",
+                "go run ./cmd/leia eval 'print(\"hello from leia\")'",
+                "go run ./cmd/leia run tests/smoke/01_basic.leia",
+                "go run ./cmd/leia run examples/hello/fib.leia",
+            ],
+        ),
+        (
+            root / "tests" / "release_matrix_test.go",
+            [
+                "TestReleaseMatrixReadmeQuickStartCommandsHaveFocusedGate",
+                "readReleaseReadmeQuickStartCommands",
+                "README.md Quick Start commands changed",
+                "cmd/leia/main_readme_tooling_test.go must keep README Quick Start focused gate",
+            ],
+        ),
+    ]:
+        checked_readme_quick_start_gates += 1
+        text = path.read_text(encoding="utf-8")
+        for snippet in snippets:
+            if snippet not in text:
+                errors.append(
+                    f"{path.relative_to(root)}: missing README Quick Start gate snippet: {snippet}"
+                )
+
+
 for doc_file in doc_files:
     if doc_file.is_file():
         check_markdown_links(doc_file)
@@ -435,9 +558,12 @@ for doc_file in doc_files:
         check_retired_names(doc_file)
 
 check_release_gate_docs()
+check_readme_documentation_entrypoints()
 check_spec_runnable_coverage()
 check_spec_contract_docs()
 check_examples_index()
+check_examples_capability_drift_gates()
+check_readme_quick_start_gates()
 
 if errors:
     print("docs_check.sh found problems:", file=sys.stderr)
@@ -450,8 +576,11 @@ print(
     f"{checked_links} relative documentation links, "
     f"{checked_script_mentions} repository-script code-block mentions, "
     f"{checked_release_gate_docs} release-gate docs, "
+    f"{checked_readme_documentation_entrypoints} README Documentation entrypoints, "
     f"{checked_spec_contract_docs} spec/stable-contract docs, "
     f"{checked_examples_index_dirs} examples index directories, "
+    f"{checked_examples_capability_drift_gates} examples capability drift gates, "
+    f"{checked_readme_quick_start_gates} README Quick Start gates, "
     f"{checked_retired_paths} retired-path mentions, "
     f"{checked_retired_names} retired-name mentions, "
     "2 generated reference docs, "
