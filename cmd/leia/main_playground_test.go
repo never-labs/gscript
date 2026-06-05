@@ -350,6 +350,29 @@ func TestPlaygroundRepositoryPackageManagedDatabaseExampleIsManualRunOnly(t *tes
 	t.Fatal("repo-database-package_managed-main example not found")
 }
 
+func TestPlaygroundRepositoryPackageManagedMacOSExampleIsManualRunOnly(t *testing.T) {
+	examples, err := playgroundRepositoryExamples(playgroundExamplesRoot())
+	if err != nil {
+		t.Fatalf("load repository examples: %v", err)
+	}
+	for _, example := range examples {
+		if example.ID != "repo-macos-package_managed-main" {
+			continue
+		}
+		if example.Runnable {
+			t.Fatalf("%s should be manual-run only in the playground", example.ID)
+		}
+		if example.Requires != "package-managed macOS automation runtime and process host access" {
+			t.Fatalf("requires = %q", example.Requires)
+		}
+		if !strings.Contains(example.Source, `import "github.com/never-labs/leia-macos/automation" as macos`) {
+			t.Fatalf("source missing package-managed macOS runtime import\nsource:\n%s", example.Source)
+		}
+		return
+	}
+	t.Fatal("repo-macos-package_managed-main example not found")
+}
+
 func TestPlaygroundRepositoryWorkflowReplayExampleIsManualRunOnly(t *testing.T) {
 	examples, err := playgroundRepositoryExamples(playgroundExamplesRoot())
 	if err != nil {

@@ -1472,6 +1472,7 @@ func repositoryExampleRunnable(path string) bool {
 		!strings.Contains(path, "/web/") &&
 		!strings.Contains(path, "/database/package_managed/") &&
 		!strings.Contains(path, "/dialects/shell_filesystem.leia") &&
+		!strings.Contains(path, "/macos/package_managed/") &&
 		!strings.Contains(path, "/ui/package_managed/") &&
 		!strings.Contains(path, "/game_engine/") &&
 		!strings.Contains(path, "/concurrency/context_process.leia") &&
@@ -1495,6 +1496,8 @@ func repositoryExampleRequires(path string) string {
 		return "package-managed database runtime and native SQL driver"
 	case strings.Contains(path, "/dialects/shell_filesystem.leia"):
 		return "process shell and filesystem host access"
+	case strings.Contains(path, "/macos/package_managed/"):
+		return "package-managed macOS automation runtime and process host access"
 	case strings.Contains(path, "/ui/package_managed/"):
 		return "package-managed UI runtime and native window host access"
 	case strings.Contains(path, "/game_engine/"):

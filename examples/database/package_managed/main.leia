@@ -1,19 +1,29 @@
 // Package-managed database example.
-//leia:cap db.open,db.query
+//leia:cap db.open,db.exec,db.query
 //
-// This file is intentionally a manifest companion, not a runnable database
-// runtime. Database access should be supplied by a package/native adapter
-// declared in leia.mod instead of becoming a built-in dialect or core stdlib
-// module.
+// This file is a manifest companion that documents the target runtime shape.
+// Database access is supplied by the package/native adapter declared in
+// leia.mod, not by a built-in dialect or core stdlib module.
 
 import "github.com/never-labs/leia-db/sqlite" as sqlite
 
-query := {
+db := sqlite.open({
   driver: "sqlite",
   dsn: "file:example.db?mode=memory&cache=shared",
-  sql: "select id, name from users where active = ?",
-  args: {true},
-  runtime: sqlite,
-}
+  options: {
+    busy_timeout_ms: 2500,
+    foreign_keys: true,
+  },
+})
 
-return query
+db.exec("create table users (id integer primary key, name text not null, active bool not null)")
+db.exec("insert into users (name, active) values (?, ?)", {"Ada", true})
+db.exec("insert into users (name, active) values (?, ?)", {"Grace", false})
+
+active_users := db.query("select id, name from users where active = ? order by id", {true})
+
+return {
+  runtime: sqlite,
+  connection: db,
+  active_users: active_users,
+}

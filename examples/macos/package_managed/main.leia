@@ -1,0 +1,30 @@
+// Package-managed macOS automation example.
+//leia:cap macos.automation,process.exec
+//
+// This file is intentionally a manifest companion, not a runnable osascript
+// runtime. AppleScript and macOS automation should be supplied by a package
+// adapter declared in leia.mod instead of becoming a built-in dialect or core
+// stdlib module.
+
+import "github.com/never-labs/leia-macos/automation" as macos
+
+notification := macos.applescript({
+  target: "System Events",
+  source: "display notification \"Release notes are ready\" with title \"Leia\"",
+  timeout_ms: 1000,
+  dry_run: true,
+})
+
+workflow := macos.plan({
+  name: "release-note-notification",
+  dry_run: true,
+  steps: {
+    notification,
+    macos.open_url({
+      url: "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation",
+      dry_run: true,
+    }),
+  },
+})
+
+return workflow

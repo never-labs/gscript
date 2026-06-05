@@ -114,6 +114,7 @@ func InstallModules(installer runtime.StdlibInstaller, maxHostResult func() int6
 	installer.RegisterTable("matrix", stdbind.BuildMatrix())
 	installer.RegisterTable("math", stdbind.BuildMath())
 	installer.RegisterTable("path", stdbind.BuildPath())
+	installer.RegisterTable("q", stdbind.BuildQ())
 	installer.RegisterTable("rand", stdbind.BuildRand())
 	installer.RegisterTable("regexp", stdbind.BuildRegexp())
 	installer.RegisterTable("sort", stdbind.BuildSortLibWithCallerAndLess(opts.ScriptCaller, opts.Less))

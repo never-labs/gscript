@@ -78,10 +78,12 @@ func TestPracticalExampleProjects(t *testing.T) {
 	}{
 		{"api-offline-client", execExampleProjectGlobal(root, filepath.Join("examples", "api", "offline_client.leia"), "api_client_summary"), "prj-7 2 tickets"},
 		{"data-quality-report", execExampleProjectGlobal(root, filepath.Join("examples", "workflow", "service_quality_report.leia"), "workflow_report_summary"), "services=3 requests=8 errors=3 breaches=2 over_budget=2"},
+		{"column-query-analytics", execExampleProjectGlobal(root, filepath.Join("examples", "data_processing", "column_query", "trade_analytics.leia"), "trade_analytics_summary"), "groups=3 first_notional=1000 alerts=3"},
 		{"release-ci-regression", testExampleProject(root, filepath.Join("examples", "testing")), "release_ci_regression_workflow_test.leia"},
 		{"ai-agent-composition", evaluateReplayExampleProject(root, filepath.Join("examples", "evaluate", "agent_replay.leia"), filepath.Join("examples", "evaluate", "agent_replay.records.json")), "agent consumes replay"},
 		{"concurrency-pipeline", execExampleProjectGlobal(root, filepath.Join("examples", "concurrency", "goroutines_channels.leia"), "workers"), "4"},
 		{"package-managed-database", modCheckExampleProject(root, filepath.Join("examples", "database", "package_managed")), "github.com/never-labs/leia-db/sqlite"},
+		{"package-managed-macos", modCheckExampleProject(root, filepath.Join("examples", "macos", "package_managed")), "github.com/never-labs/leia-macos/automation"},
 	}
 	for _, project := range projects {
 		t.Run(project.name, func(t *testing.T) {
@@ -256,10 +258,33 @@ func TestPackageManagedDatabaseExample(t *testing.T) {
 		t.Fatal(err)
 	}
 	dir := filepath.Join(root, "examples", "database", "package_managed")
+	sourcePath := filepath.Join(dir, "main.leia")
 
 	for _, forbidden := range []string{"database", "db", "sql", "sqlite", "postgres", "mysql"} {
 		if _, ok := catalog.Module(forbidden); ok {
 			t.Fatalf("stdlib catalog contains database-shaped module %q; database runtimes should stay package-managed", forbidden)
+		}
+	}
+	assertLeiaFileParses(t, sourcePath)
+	sourceBytes, err := os.ReadFile(sourcePath)
+	if err != nil {
+		t.Fatalf("read database example source: %v", err)
+	}
+	source := string(sourceBytes)
+	for _, want := range []string{
+		`import "github.com/never-labs/leia-db/sqlite" as sqlite`,
+		"sqlite.open(",
+		"db.exec(",
+		"db.query(",
+		"//leia:cap db.open,db.exec,db.query",
+	} {
+		if !strings.Contains(source, want) {
+			t.Fatalf("database example source missing %q\nsource:\n%s", want, source)
+		}
+	}
+	for _, forbidden := range []string{`import "database"`, `import "db"`, `import "sql"`, `import "sqlite"`} {
+		if strings.Contains(source, forbidden) {
+			t.Fatalf("database example source imports builtin-shaped module %q; database runtimes should stay package-managed", forbidden)
 		}
 	}
 
@@ -313,11 +338,94 @@ func TestPackageManagedDatabaseExample(t *testing.T) {
 	if !caps.OK {
 		t.Fatalf("capability report = %+v, want package-managed database capabilities to report", caps)
 	}
-	if !moduleHasCapabilities(caps.Modules, "example.com/leia/examples/database/package-managed", "db.open", "db.query") {
+	if !moduleHasCapabilities(caps.Modules, "example.com/leia/examples/database/package-managed", "db.open", "db.exec", "db.query") {
 		t.Fatalf("capability modules = %+v, want database domain capabilities on the example manifest", caps.Modules)
 	}
 	if !moduleHasPath(caps.Modules, "github.com/never-labs/leia-db/sqlite") {
 		t.Fatalf("capability modules = %+v, want external package-managed database runtime module", caps.Modules)
+	}
+}
+
+func TestPackageManagedMacOSAutomationExample(t *testing.T) {
+	root, err := filepath.Abs(filepath.Join("..", ".."))
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := filepath.Join(root, "examples", "macos", "package_managed")
+	sourcePath := filepath.Join(dir, "main.leia")
+
+	for _, forbidden := range []string{"applescript", "automation", "macos", "osascript"} {
+		if _, ok := catalog.Module(forbidden); ok {
+			t.Fatalf("stdlib catalog contains macOS automation-shaped module %q; AppleScript automation should stay package-managed", forbidden)
+		}
+	}
+	assertLeiaFileParses(t, sourcePath)
+	sourceBytes, err := os.ReadFile(sourcePath)
+	if err != nil {
+		t.Fatalf("read macOS automation example source: %v", err)
+	}
+	source := string(sourceBytes)
+	for _, want := range []string{
+		`import "github.com/never-labs/leia-macos/automation" as macos`,
+		"macos.applescript(",
+		"macos.plan(",
+		"//leia:cap macos.automation,process.exec",
+	} {
+		if !strings.Contains(source, want) {
+			t.Fatalf("macOS automation example source missing %q\nsource:\n%s", want, source)
+		}
+	}
+	for _, forbidden := range []string{`import "applescript"`, `import "automation"`, `import "macos"`, `import "osascript"`} {
+		if strings.Contains(source, forbidden) {
+			t.Fatalf("macOS automation example source imports builtin-shaped module %q; AppleScript automation should stay package-managed", forbidden)
+		}
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runModCommand([]string{"check", "--json", dir}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("mod check code = %d, stderr = %q stdout = %q", code, stderr.String(), stdout.String())
+	}
+	var verify modVerifyReport
+	if err := json.Unmarshal(stdout.Bytes(), &verify); err != nil {
+		t.Fatalf("stdout is not JSON verify report: %v; stdout = %q", err, stdout.String())
+	}
+	if !verify.OK {
+		t.Fatalf("verify = %+v, want package-managed macOS automation example manifest to verify", verify)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = runModCommand([]string{"list", "--json", dir}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("mod list code = %d, stderr = %q stdout = %q", code, stderr.String(), stdout.String())
+	}
+	var list modListReport
+	if err := json.Unmarshal(stdout.Bytes(), &list); err != nil {
+		t.Fatalf("stdout is not JSON list report: %v; stdout = %q", err, stdout.String())
+	}
+	if !list.OK || !containsResolvedRequire(list.Requires, "github.com/never-labs/leia-macos/automation", "v0.1.0") {
+		t.Fatalf("list = %+v, want external Leia macOS automation runtime requirement", list)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = runModCommand([]string{"capability", "--json", dir}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("mod capability code = %d, stderr = %q stdout = %q", code, stderr.String(), stdout.String())
+	}
+	var caps modCapabilityReport
+	if err := json.Unmarshal(stdout.Bytes(), &caps); err != nil {
+		t.Fatalf("stdout is not JSON capability report: %v; stdout = %q", err, stdout.String())
+	}
+	if !caps.OK {
+		t.Fatalf("capability report = %+v, want package-managed macOS automation capabilities to report", caps)
+	}
+	if !moduleHasCapabilities(caps.Modules, "example.com/leia/examples/macos/package-managed", "macos.automation", "process.exec") {
+		t.Fatalf("capability modules = %+v, want macOS automation capabilities on the example manifest", caps.Modules)
+	}
+	if !moduleHasPath(caps.Modules, "github.com/never-labs/leia-macos/automation") {
+		t.Fatalf("capability modules = %+v, want external package-managed macOS automation runtime module", caps.Modules)
 	}
 }
 
@@ -832,6 +940,21 @@ func moduleHasPath(modules []modpkg.CapabilityModule, path string) bool {
 		}
 	}
 	return false
+}
+
+func assertLeiaFileParses(t *testing.T, path string) {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read %s: %v", path, err)
+	}
+	tokens, err := lexer.New(string(data)).Tokenize()
+	if err != nil {
+		t.Fatalf("lex %s: %v", path, err)
+	}
+	if _, err := parser.New(tokens).Parse(); err != nil {
+		t.Fatalf("parse %s: %v", path, err)
+	}
 }
 
 func testReportHasPassingFile(report testRunResult, name string) bool {

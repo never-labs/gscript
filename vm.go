@@ -547,6 +547,7 @@ func stdlibAllowedNames(libs LibFlags) map[string]bool {
 		"os":        libs&LibOS != 0,
 		"path":      libs&LibPath != 0,
 		"process":   libs&LibProcess != 0,
+		"q":         libs&LibSoA != 0,
 		"rand":      libs&LibRand != 0,
 		"regexp":    libs&LibRegexp != 0,
 		"script":    libs&LibScript != 0,

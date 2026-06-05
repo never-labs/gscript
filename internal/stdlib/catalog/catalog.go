@@ -53,6 +53,7 @@ var modules = []ModuleInfo{
 	{Name: "os", Layer: LayerHost, Description: "Environment, process metadata, temporary names, and Lua-style OS helpers.", Capabilities: []string{"env.read", "env.write"}},
 	{Name: "path", Layer: LayerBase, Description: "Host filepath join, clean, split, match, rel, and separator helpers.", SafeDefault: true},
 	{Name: "process", Layer: LayerHost, Description: "Subprocess execution, shell execution, lookup, args, and entry metadata.", Capabilities: []string{"process.exec", "process.shell"}},
+	{Name: "q", Layer: LayerData, Description: "Table-driven column queries over SoA values for high-level data analysis.", SafeDefault: true},
 	{Name: "rand", Layer: LayerBase, Description: "Pseudo-random values, ranges, bytes, and seedable random helpers.", SafeDefault: true},
 	{Name: "regexp", Layer: LayerBase, Description: "Go RE2 regular expression compile, match, find, replace, and split helpers.", SafeDefault: true},
 	{Name: "script", Layer: LayerHost, Description: "Script compilation, evaluation, loader, source, and entrypoint helpers.", Capabilities: []string{"script.eval", "module.load"}},

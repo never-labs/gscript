@@ -1,0 +1,43 @@
+// Column-query project example.
+// Run with:
+//   go run ./cmd/leia run examples/data_processing/column_query/trade_analytics.leia
+
+trades := soa.zip({
+    sym: []i64{1, 1, 2, 2, 3, 3},
+    price: []f64{10, 12, 7.5, 8, 20, 19.5},
+    size: []f64{100, 50, 200, 150, 25, 80},
+})
+
+large_trades := q.query(trades, {
+    where: {column: "size", op: ">=", value: 80},
+    by: {"sym"},
+    select: {
+        notional: {"*", "price", "size"},
+        volume: "size",
+        fills: 1,
+    },
+    aggregate: {
+        notional: "sum",
+        volume: "sum",
+        fills: "count",
+    },
+})
+
+alert_rows := q.query(trades, {
+    where: soa.mask(trades, "price", ">=", 12),
+    select: {
+        sym: "sym",
+        price: "price",
+        size: "size",
+        notional: {"*", "price", "size"},
+    },
+})
+
+trade_analytics_summary := string.format(
+    "groups=%d first_notional=%.0f alerts=%d",
+    #large_trades,
+    large_trades[1].notional,
+    #alert_rows
+)
+
+print(trade_analytics_summary)

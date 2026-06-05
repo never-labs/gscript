@@ -46,6 +46,7 @@ Generated from `internal/stdlib/catalog`, the code-owned standard-library metada
 | `data` | `binary` | Binary pack/unpack over Leia strings using declarative field formats. | true | none |
 | `data` | `csv` | CSV parse and encode helpers backed by Go's CSV behavior. | true | none |
 | `data` | `matrix` | Dense matrix values and numeric matrix helpers. | true | none |
+| `data` | `q` | Table-driven column queries over SoA values for high-level data analysis. | true | none |
 | `data` | `soa` | Structure-of-arrays records and column-oriented data processing. | true | none |
 | `data` | `vec` | Vector construction, arithmetic, geometry, and numeric helpers. | true | none |
 | `compat` | `bit32` | Lua-compatible 32-bit bit operations. | true | none |
