@@ -116,6 +116,24 @@ func (c Converter) BindStructToInterp(interp *runtime.Interpreter, name string, 
 				return []runtime.Value{runtime.FunctionValue(fn)}, nil
 			}
 
+			// Methods added after BindStruct live on the class table. Bind the
+			// current instance so v.Method() behaves like reflected Go methods.
+			classMember := classTable.RawGet(key)
+			if addedMethod := classMember.GoFunction(); addedMethod != nil {
+				return []runtime.Value{runtime.FunctionValue(&runtime.GoFunction{
+					Name: name + "." + fieldName,
+					Fn: func(callArgs []runtime.Value) ([]runtime.Value, error) {
+						argsWithSelf := make([]runtime.Value, 0, len(callArgs)+1)
+						argsWithSelf = append(argsWithSelf, self)
+						argsWithSelf = append(argsWithSelf, callArgs...)
+						return addedMethod.Fn(argsWithSelf)
+					},
+				})}, nil
+			}
+			if !classMember.IsNil() {
+				return []runtime.Value{classMember}, nil
+			}
+
 			return []runtime.Value{runtime.NilValue()}, nil
 		},
 	}))

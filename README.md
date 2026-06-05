@@ -23,12 +23,12 @@ go run ./cmd/leia run tests/smoke/01_basic.leia
 go run ./cmd/leia run examples/hello/fib.leia
 ```
 
-Install the CLI from the module path when publishing from a tag or commit:
+Install the CLI from a checkout:
 
 ```bash
-go install github.com/never-labs/leia/cmd/leia@latest
+go install ./cmd/leia
 leia version
-leia run path/to/script.leia
+leia run tests/smoke/01_basic.leia
 ```
 
 ## What It Includes
@@ -89,6 +89,8 @@ Start with:
 - [Standard library](docs/reference/stdlib/index.md)
 - [CLI reference](docs/reference/cli/index.md)
 - [Embedding guide](docs/guides/embedding.md)
+- [Package guide](docs/guides/packages.md)
+- [Modules reference](docs/reference/modules/index.md)
 - [AI-native guide](docs/guides/ai-native.md)
 - [Security reference](docs/reference/security/index.md)
 - [Performance reference](docs/reference/performance/index.md)

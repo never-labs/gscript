@@ -123,6 +123,44 @@ func TestBindStruct_methodCall(t *testing.T) {
 	}
 }
 
+func TestBindMethod_appendsMethodToBoundStruct(t *testing.T) {
+	vm := leia.New()
+	if err := vm.BindStruct("Vec2", Vec2{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := vm.BindMethod("Vec2", "Manhattan", func(v Vec2) float64 {
+		return math.Abs(v.X) + math.Abs(v.Y)
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	err := vm.Exec(`
+		v := Vec2.new(-3, 4)
+		result := v.Manhattan()
+	`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := vm.Get("result")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != float64(7) {
+		t.Fatalf("result = %v (%T), want 7", got, got)
+	}
+}
+
+func TestBindMethod_unregisteredClassReturnsError(t *testing.T) {
+	vm := leia.New()
+	err := vm.BindMethod("MissingClass", "Noop", func() {})
+	if err == nil {
+		t.Fatal("expected error for unregistered class")
+	}
+	if !strings.Contains(err.Error(), `"MissingClass" is not a registered class`) {
+		t.Fatalf("error = %q, want unregistered class message", err)
+	}
+}
+
 func TestBindStruct_returnStruct(t *testing.T) {
 	var output []string
 	vm := leia.New(leia.WithPrint(func(args ...interface{}) {

@@ -38,6 +38,20 @@ func TestCICommandPRProfileIncludesExampleCheck(t *testing.T) {
 	}
 }
 
+func TestCICommandReleaseProfileIncludesDistributionCheck(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := runCICommand([]string{"release", "--list"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runCICommand code = %d, stderr = %q", code, stderr.String())
+	}
+	out := stdout.String()
+	for _, want := range []string{"bash scripts/production_check.sh --full", "bash scripts/release_distribution_check.sh", "bash scripts/release_artifacts_check.sh"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("stdout = %q, want %q", out, want)
+		}
+	}
+}
+
 func TestCICommandRunsProfileCommands(t *testing.T) {
 	oldCIExecCommand := ciExecCommand
 	t.Cleanup(func() { ciExecCommand = oldCIExecCommand })
@@ -61,6 +75,28 @@ func TestCICommandRunsProfileCommands(t *testing.T) {
 	}
 }
 
+func TestCICommandRunsReleaseDistributionCheck(t *testing.T) {
+	oldCIExecCommand := ciExecCommand
+	t.Cleanup(func() { ciExecCommand = oldCIExecCommand })
+	var commands []string
+	ciExecCommand = func(name string, args ...string) *exec.Cmd {
+		commands = append(commands, shellJoin(append([]string{name}, args...)))
+		helper, helperArgs := testHelperCommand(t, "ci")
+		return exec.Command(helper, helperArgs...)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runCICommand([]string{"release"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runCICommand code = %d, stderr = %q", code, stderr.String())
+	}
+	for _, want := range []string{"bash scripts/production_check.sh --full", "bash scripts/release_distribution_check.sh", "bash scripts/release_artifacts_check.sh"} {
+		if !containsCommand(commands, want) {
+			t.Fatalf("commands = %#v, want %q", commands, want)
+		}
+	}
+}
+
 func TestCICommandRejectsUnknownProfile(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	code := runCICommand([]string{"nightly"}, &stdout, &stderr)
@@ -73,6 +109,15 @@ func TestCICommandRejectsUnknownProfile(t *testing.T) {
 	if !strings.Contains(stderr.String(), "unknown ci profile") {
 		t.Fatalf("stderr = %q, want unknown profile", stderr.String())
 	}
+}
+
+func containsCommand(commands []string, want string) bool {
+	for _, command := range commands {
+		if command == want {
+			return true
+		}
+	}
+	return false
 }
 
 func TestCheckCommandJSONRunsEnabledSteps(t *testing.T) {

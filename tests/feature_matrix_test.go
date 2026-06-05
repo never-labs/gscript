@@ -385,6 +385,7 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 		"cmd/leia/main_mod_test.go",
 		"cmd/leia/main_bench_test.go",
 		"cmd/leia/main_examples_command_test.go",
+		"cmd/leia/main_readme_tooling_test.go",
 		"docs/guides/tooling.md",
 	)
 
@@ -392,6 +393,50 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 	requireFeatureCellRefs(t, modules, "module_package_management", "semantic_gate",
 		"internal/modpkg/modpkg_test.go",
 		"tests/architecture/package_boundary_test.go",
+		"cmd/leia/main_mod_test.go",
+		"docs/reference/modules/index.md",
+		"docs/guides/packages.md",
+	)
+
+	bytecodeVM := requireFeature(t, features, "bytecode_vm_execution")
+	requireFeatureCellRefs(t, bytecodeVM, "bytecode_vm_execution", "bytecode",
+		"internal/vm/compiler_method_test.go",
+		"internal/vm/opcode_test.go",
+		"internal/vm/vm_test.go",
+	)
+	requireFeatureCellRefs(t, bytecodeVM, "bytecode_vm_execution", "semantic_gate",
+		"cmd/leia/main_metadata_test.go",
+		"cmd/leia/main_run_test.go",
+		"docs/reference/platforms/index.md",
+	)
+
+	jit := requireFeature(t, features, "arm64_jit_runtime_fallback")
+	requireFeatureCellRefs(t, jit, "arm64_jit_runtime_fallback", "tier1",
+		"tests/jit_test.go",
+		"tests/jit_loop_control_test.go",
+		"tests/jit_side_exit_test.go",
+		"internal/methodjit/semantic_gate_test.go",
+	)
+	requireFeatureCellRefs(t, jit, "arm64_jit_runtime_fallback", "tier2",
+		"internal/methodjit/emit_tier2_correctness_test.go",
+		"internal/methodjit/exit_resume_check_test.go",
+		"internal/methodjit/op_spec_oracle_test.go",
+	)
+	requireFeatureCellRefs(t, jit, "arm64_jit_runtime_fallback", "perf_hot_case",
+		"scripts/performance_gate.sh",
+		"benchmarks/performance_gate_test.py",
+		"benchmarks/perf_submit_guard_test.py",
+	)
+
+	releaseEvidence := requireFeature(t, features, "release_evidence_gates")
+	requireFeatureCellRefs(t, releaseEvidence, "release_evidence_gates", "semantic_gate",
+		"tests/release_matrix_test.go",
+		"scripts/docs_check.sh",
+		"scripts/production_check.sh",
+		"scripts/release_artifacts_check.sh",
+		"scripts/release_distribution_check.sh",
+		"cmd/leia/main_ci_test.go",
+		"docs/release/index.md",
 	)
 }
 

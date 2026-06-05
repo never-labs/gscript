@@ -449,8 +449,10 @@ func TestReleaseMatrixCIProfilesKeepExampleImportGuards(t *testing.T) {
 	}
 
 	releaseOut := runCommand(t, root, 30*time.Second, "go", "run", "./cmd/leia", "ci", "release", "--list")
-	if !strings.Contains(releaseOut, "bash scripts/production_check.sh --full") {
-		t.Fatalf("ci release --list must run the full production check; got:\n%s", releaseOut)
+	for _, want := range []string{"bash scripts/production_check.sh --full", "bash scripts/release_distribution_check.sh"} {
+		if !strings.Contains(releaseOut, want) {
+			t.Fatalf("ci release --list must include %q; got:\n%s", want, releaseOut)
+		}
 	}
 
 	productionOut := runCommand(t, root, 30*time.Second, "bash", "scripts/production_check.sh", "--full", "--list")
@@ -536,6 +538,23 @@ func TestReleaseMatrixModuleReferenceDocumentsCommandSurface(t *testing.T) {
 	} {
 		if !strings.Contains(modules, "`"+command+"`") {
 			t.Fatalf("docs/reference/modules/index.md must document %s", command)
+		}
+	}
+
+	packages := readFileString(t, filepath.Join(root, "docs", "guides", "packages.md"))
+	for _, snippet := range []string{
+		"decentralized package model",
+		"no npm-style publish step or central registry",
+		"go run ./cmd/leia mod add github.com/never-labs/leia-raylib@v0.1.0",
+		"go run ./cmd/leia mod download --json",
+		"go run ./cmd/leia mod verify --json",
+		"go run ./cmd/leia mod vendor --json",
+		"go run ./cmd/leia run --mod=vendor main.leia",
+		"go run ./cmd/leia run --mod=readonly main.leia",
+		"go run ./cmd/leia mod gomod",
+	} {
+		if !strings.Contains(packages, snippet) {
+			t.Fatalf("docs/guides/packages.md must document %q", snippet)
 		}
 	}
 }

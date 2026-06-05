@@ -73,14 +73,14 @@ leia mod verify --json
 | `leia mod lock` | Write or refresh `leia.sum` from the current dependency graph. |
 | `leia mod verify` | Validate `leia.mod`, `leia.sum`, and cached module hashes. |
 | `leia mod list` | Print resolved module metadata. |
-| `leia mod graph` | Print dependency edges discovered from `leia.mod` files. |
+| `leia mod graph` | Print dependency edges discovered from static `import` and `require(...)` uses in source files. |
 | `leia mod explain` | Explain where a module path resolves from. |
 | `leia mod capability` | Summarize capability requirements across the module graph. |
 | `leia mod gomod` | Generate a Go `go.mod` view for native binding dependencies. |
 
-`leia.sum` records resolved module hashes for downloaded or vendored modules.
-`vendor/` can be used for offline or hermetic execution through `leia run
---mod=vendor`.
+`leia.sum` records resolved hashes for downloaded modules, vendored modules,
+local collections, and local replacements. `vendor/` can be used for offline or
+hermetic execution through `leia run --mod=vendor`.
 
 ## Design Contract
 

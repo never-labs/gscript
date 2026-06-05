@@ -337,6 +337,52 @@ func TestCapabilityReportsMainAndDirectDependencyCapabilities(t *testing.T) {
 	}
 }
 
+func TestCapabilityReportsTransitiveDependencyCapabilities(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "leia.mod"), strings.Join([]string{
+		"module example.com/app",
+		"leia 0.1",
+		"capability fs.read",
+		"require example.com/lib v1.2.3",
+		"replace example.com/lib v1.2.3 => ./local/lib",
+		"",
+	}, "\n"))
+	writeFile(t, filepath.Join(dir, "local", "lib", "leia.mod"), strings.Join([]string{
+		"module example.com/lib",
+		"leia 0.1",
+		"capability db.query",
+		"require example.com/transitive v0.2.0",
+		"replace example.com/transitive v0.2.0 => ../transitive",
+		"",
+	}, "\n"))
+	writeFile(t, filepath.Join(dir, "local", "transitive", "leia.mod"), strings.Join([]string{
+		"module example.com/transitive",
+		"leia 0.1",
+		"capability net.client",
+		"",
+	}, "\n"))
+
+	report := Capability(dir)
+	if !report.OK {
+		t.Fatalf("Capability OK = false, diagnostics = %#v", report.Diagnostics)
+	}
+	if len(report.Modules) != 3 {
+		t.Fatalf("Capability modules = %#v, want main, direct, and transitive dependencies", report.Modules)
+	}
+	if !containsModpkgString(report.Capabilities, "db.query") || !containsModpkgString(report.Capabilities, "fs.read") || !containsModpkgString(report.Capabilities, "net.client") {
+		t.Fatalf("Capability capabilities = %#v", report.Capabilities)
+	}
+	if !report.Matrix["example.com/app"]["fs.read"] || report.Matrix["example.com/app"]["net.client"] {
+		t.Fatalf("Capability matrix = %#v, want main capability booleans", report.Matrix)
+	}
+	if !report.Matrix["example.com/lib"]["db.query"] || report.Matrix["example.com/lib"]["net.client"] {
+		t.Fatalf("Capability matrix = %#v, want direct dependency capability booleans", report.Matrix)
+	}
+	if !report.Matrix["example.com/transitive"]["net.client"] || report.Matrix["example.com/transitive"]["db.query"] {
+		t.Fatalf("Capability matrix = %#v, want transitive dependency capability booleans", report.Matrix)
+	}
+}
+
 func TestCapabilityWarnsForUnavailableDependency(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, filepath.Join(dir, "leia.mod"), strings.Join([]string{

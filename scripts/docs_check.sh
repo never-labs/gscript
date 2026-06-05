@@ -11,7 +11,7 @@ usage() {
 Usage: scripts/docs_check.sh [--help]
 
 Checks README/docs Markdown for:
-  - relative .md links whose target file exists;
+  - relative .md/.html links whose target file exists;
   - fenced code blocks that mention repository gate scripts whose files exist and are executable.
   - non-archive docs do not reintroduce retired project names.
   - release-readiness docs keep machine-checkable language and AI-native gates.
@@ -153,7 +153,7 @@ def check_markdown_links(path: Path) -> None:
 
             target_no_anchor = target.split("#", 1)[0]
             target_no_query = target_no_anchor.split("?", 1)[0]
-            if not target_no_query.endswith(".md"):
+            if not (target_no_query.endswith(".md") or target_no_query.endswith(".html")):
                 continue
 
             checked_links += 1
@@ -162,12 +162,12 @@ def check_markdown_links(path: Path) -> None:
                 resolved.relative_to(root)
             except ValueError:
                 errors.append(
-                    f"{path.relative_to(root)}:{line_no}: markdown link escapes repo: {target}"
+                    f"{path.relative_to(root)}:{line_no}: documentation link escapes repo: {target}"
                 )
                 continue
             if not resolved.is_file():
                 errors.append(
-                    f"{path.relative_to(root)}:{line_no}: missing markdown link target: {target}"
+                    f"{path.relative_to(root)}:{line_no}: missing documentation link target: {target}"
                 )
 
 
@@ -360,7 +360,7 @@ if errors:
 
 print(
     f"docs_check.sh: checked {len(doc_files)} Markdown files, "
-    f"{checked_links} relative .md links, "
+    f"{checked_links} relative documentation links, "
     f"{checked_script_mentions} repository-script code-block mentions, "
     f"{checked_release_gate_docs} release-gate docs, "
     f"{checked_retired_paths} retired-path mentions, "

@@ -657,10 +657,10 @@ func Capability(path string) CapabilityReport {
 		Capabilities: sortedStrings(manifest.Capability),
 	})
 
-	for _, req := range manifest.Require {
+	for _, dep := range dependencyClosure(abs, manifest, "") {
+		req := dep.Require
 		module := CapabilityModule{Path: req.Path, Version: req.Version, Kind: "module"}
-		root, kind, ok := dependencyRoot(abs, manifest, req)
-		if !ok {
+		if dep.Kind == "" || dep.Root == "" {
 			report.Diagnostics = append(report.Diagnostics, Diagnostic{
 				Severity: "warning",
 				Code:     "LEIA9114",
@@ -669,10 +669,10 @@ func Capability(path string) CapabilityReport {
 			report.Modules = append(report.Modules, module)
 			continue
 		}
-		module.Kind = kind
-		module.Root = root
-		depManifestPath := filepath.Join(root, modfile.FileName)
-		depManifest, err := ReadFile(root)
+		module.Kind = dep.Kind
+		module.Root = dep.Root
+		depManifestPath := filepath.Join(dep.Root, modfile.FileName)
+		depManifest, err := ReadFile(dep.Root)
 		if err != nil {
 			report.Diagnostics = append(report.Diagnostics, Diagnostic{
 				Severity: "warning",
@@ -1323,6 +1323,7 @@ func transitiveRequirements(root string, manifest modfile.File, cacheDir string)
 type dependencyRequirement struct {
 	Require modfile.Require
 	Kind    string
+	Root    string
 }
 
 func dependencyClosure(root string, manifest modfile.File, cacheDir string) []dependencyRequirement {
@@ -1338,7 +1339,7 @@ func appendDependencyClosure(out []dependencyRequirement, root string, manifest 
 		}
 		seen[key] = true
 		depRoot, kind, ok := dependencyRootWithCache(root, manifest, req, cacheDir)
-		out = append(out, dependencyRequirement{Require: req, Kind: kind})
+		out = append(out, dependencyRequirement{Require: req, Kind: kind, Root: depRoot})
 		if !ok {
 			continue
 		}

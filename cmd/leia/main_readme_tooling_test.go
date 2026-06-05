@@ -74,6 +74,54 @@ func TestReadmeQuickStartCommandsStayRunnable(t *testing.T) {
 	}
 }
 
+func TestReadmeInstallCommandsStayRunnable(t *testing.T) {
+	root := repoRootForBoundaryTest(t)
+	data, err := os.ReadFile(filepath.Join(root, "README.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := readmeInstallCommands(string(data))
+	want := []string{
+		"go install ./cmd/leia",
+		"leia version",
+		"leia run tests/smoke/01_basic.leia",
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("README install commands changed:\ngot  %#v\nwant %#v", got, want)
+	}
+
+	gobin := t.TempDir()
+	env := append(os.Environ(), "GOBIN="+gobin)
+	install := exec.Command("go", "install", "./cmd/leia")
+	install.Dir = root
+	install.Env = env
+	var installStdout, installStderr bytes.Buffer
+	install.Stdout = &installStdout
+	install.Stderr = &installStderr
+	if err := install.Run(); err != nil {
+		t.Fatalf("README install command `go install ./cmd/leia` failed: %v\nstdout:\n%s\nstderr:\n%s",
+			err, installStdout.String(), installStderr.String())
+	}
+
+	leia := filepath.Join(gobin, "leia")
+	commands := [][]string{
+		{"version"},
+		{"run", "tests/smoke/01_basic.leia"},
+	}
+	for _, args := range commands {
+		cmd := exec.Command(leia, args...)
+		cmd.Dir = root
+		cmd.Env = env
+		var stdout, stderr bytes.Buffer
+		cmd.Stdout = &stdout
+		cmd.Stderr = &stderr
+		if err := cmd.Run(); err != nil {
+			t.Fatalf("README install command `leia %s` failed: %v\nstdout:\n%s\nstderr:\n%s",
+				strings.Join(args, " "), err, stdout.String(), stderr.String())
+		}
+	}
+}
+
 func TestReadmeToolingCommandsMapToCLI(t *testing.T) {
 	root := repoRootForBoundaryTest(t)
 	data, err := os.ReadFile(filepath.Join(root, "README.md"))
@@ -147,6 +195,33 @@ func TestReadmeToolingCommandsMapToCLI(t *testing.T) {
 
 func readmeQuickStartCommands(readme string) []string {
 	const marker = "## Quick Start"
+	start := strings.Index(readme, marker)
+	if start < 0 {
+		return nil
+	}
+	rest := readme[start+len(marker):]
+	blockStart := strings.Index(rest, "```bash")
+	if blockStart < 0 {
+		return nil
+	}
+	rest = rest[blockStart+len("```bash"):]
+	blockEnd := strings.Index(rest, "```")
+	if blockEnd < 0 {
+		return nil
+	}
+	lines := strings.Split(rest[:blockEnd], "\n")
+	var commands []string
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line != "" {
+			commands = append(commands, line)
+		}
+	}
+	return commands
+}
+
+func readmeInstallCommands(readme string) []string {
+	const marker = "Install the CLI from a checkout:"
 	start := strings.Index(readme, marker)
 	if start < 0 {
 		return nil
