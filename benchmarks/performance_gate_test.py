@@ -138,6 +138,14 @@ class PerformanceGateValidationTest(unittest.TestCase):
         self.assertEqual(sorted(selectors - case_ids), [])
         self.assertEqual(sorted(selectors - workload_ids), [])
 
+    def test_feature_smoke_keeps_data_oriented_dense_and_soa_gate(self):
+        gate = SCRIPT.read_text()
+        for array_name in ("PHASE_SMOKE_BENCHES", "FEATURE_SMOKE_BENCHES", "STRICT_FEATURE_BENCHES"):
+            values = shell_array_values(gate, array_name)
+            self.assertIn("numeric/matmul_dense", values)
+            self.assertIn("data/soa_affine_many", values)
+            self.assertIn("data/soa_masked_aggregate", values)
+
     def test_help_documents_syntax_smoke_profile(self):
         proc = subprocess.run(
             ["bash", str(SCRIPT), "--help"],

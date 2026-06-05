@@ -537,6 +537,116 @@ func TestReleaseMatrixReadmeCLIExperienceCommandsHaveEvidence(t *testing.T) {
 	}
 }
 
+func TestReleaseMatrixReadmeToolingPromiseHasEvidence(t *testing.T) {
+	root := findRepoRoot(t)
+	readme := readFileString(t, filepath.Join(root, "README.md"))
+	if !strings.Contains(readme, "CLI tooling for format, lint, test, docs, diagnostics, modules, benchmarks,\n  and release evidence.") {
+		t.Fatal("README.md must keep the full CLI tooling promise machine-checkable")
+	}
+
+	for _, item := range []struct {
+		category        string
+		readmeCommand   string
+		evidencePath    string
+		evidenceSnippet string
+	}{
+		{
+			category:        "format",
+			readmeCommand:   "go run ./cmd/leia fmt --check tests/smoke/01_basic.leia",
+			evidencePath:    "cmd/leia/main_fmt_test.go",
+			evidenceSnippet: "TestFmtCheckReportsUnformattedFile",
+		},
+		{
+			category:        "lint",
+			readmeCommand:   "go run ./cmd/leia lint tests/smoke/01_basic.leia",
+			evidencePath:    "cmd/leia/main_lint_test.go",
+			evidenceSnippet: "TestLintReportsSyntaxErrors",
+		},
+		{
+			category:        "test",
+			readmeCommand:   "go run ./cmd/leia test tests/smoke/01_basic.leia",
+			evidencePath:    "cmd/leia/main_test_run_test.go",
+			evidenceSnippet: "TestRunTestCommandJSONReportsResults",
+		},
+		{
+			category:        "docs",
+			readmeCommand:   "go run ./cmd/leia doc check",
+			evidencePath:    "cmd/leia/main_doc_test.go",
+			evidenceSnippet: "TestDocCheckDispatchesDocsScript",
+		},
+		{
+			category:        "diagnostics",
+			readmeCommand:   "go run ./cmd/leia diag bundle --output /tmp/leia-diag --skip-benchmarks",
+			evidencePath:    "cmd/leia/main_diag_test.go",
+			evidenceSnippet: "TestDiagCommandDispatchesBundleScript",
+		},
+		{
+			category:        "modules",
+			readmeCommand:   "go run ./cmd/leia mod verify --json examples/ui/package_managed",
+			evidencePath:    "cmd/leia/main_mod_test.go",
+			evidenceSnippet: "TestModInitGraphAndVerify",
+		},
+		{
+			category:        "benchmarks",
+			readmeCommand:   "go run ./cmd/leia bench compare --bench numeric/mandelbrot --runs 3 --warmup 1",
+			evidencePath:    "cmd/leia/main_bench_test.go",
+			evidenceSnippet: "TestBenchCommandDispatchesCompareHarness",
+		},
+		{
+			category:        "examples",
+			readmeCommand:   "go run ./cmd/leia examples check examples/hello/fib.leia examples/hello/types_demo.leia examples/hello/dialects.leia",
+			evidencePath:    "cmd/leia/main_examples_command_test.go",
+			evidenceSnippet: "TestExamplesCommandChecksSelectedExamples",
+		},
+		{
+			category:        "release evidence",
+			readmeCommand:   "go run ./cmd/leia ci release --list",
+			evidencePath:    "cmd/leia/main_ci_test.go",
+			evidenceSnippet: "TestCICommandReleaseProfileIncludesDistributionCheck",
+		},
+	} {
+		if !strings.Contains(readme, item.readmeCommand) {
+			t.Fatalf("README.md Tooling commands must cover %s via %q", item.category, item.readmeCommand)
+		}
+		text := readFileString(t, filepath.Join(root, filepath.FromSlash(item.evidencePath)))
+		if !strings.Contains(text, item.evidenceSnippet) {
+			t.Fatalf("%s must keep focused test evidence for README %s tooling via %q", item.evidencePath, item.category, item.evidenceSnippet)
+		}
+	}
+
+	toolingGuide := readFileString(t, filepath.Join(root, "docs", "guides", "tooling.md"))
+	for _, snippet := range []string{
+		"## Modules",
+		"## Documentation",
+		"## Diagnostics",
+		"## Release Evidence",
+		"go run ./cmd/leia mod verify --json examples/ui/package_managed",
+		"go run ./cmd/leia doc check",
+		"go run ./cmd/leia diag bundle --output /tmp/leia-diag --skip-benchmarks",
+		"bash scripts/release_artifacts_check.sh",
+	} {
+		if !strings.Contains(toolingGuide, snippet) {
+			t.Fatalf("docs/guides/tooling.md must keep README tooling evidence snippet %q", snippet)
+		}
+	}
+
+	for _, item := range []struct {
+		path    string
+		snippet string
+	}{
+		{path: "scripts/docs_check.sh", snippet: "docs_check.sh: checked"},
+		{path: "scripts/diagnostics_bundle.sh", snippet: "Collects git revision/status"},
+		{path: "scripts/performance_gate.sh", snippet: "benchmarks/timing_compare.py"},
+		{path: "scripts/production_check.sh", snippet: "add_release_smoke"},
+		{path: "scripts/release_artifacts_check.sh", snippet: "Default mode runs a dry-run"},
+	} {
+		text := readFileString(t, filepath.Join(root, filepath.FromSlash(item.path)))
+		if !strings.Contains(text, item.snippet) {
+			t.Fatalf("%s must keep README tooling script evidence snippet %q", item.path, item.snippet)
+		}
+	}
+}
+
 func TestReleaseMatrixCommunityEntrypointsAreLinked(t *testing.T) {
 	root := findRepoRoot(t)
 	for _, path := range []string{
@@ -1045,6 +1155,52 @@ func TestReleaseMatrixDocumentedExampleCommandsStayRunnable(t *testing.T) {
 	}
 	for _, args := range commands {
 		runCommand(t, root, 30*time.Second, "go", args...)
+	}
+}
+
+func TestReleaseMatrixExamplesIndexCoversRegisteredDirectories(t *testing.T) {
+	root := findRepoRoot(t)
+	examplesDoc := readFileString(t, filepath.Join(root, "docs", "examples", "index.md"))
+	examplesDir := filepath.Join(root, "examples")
+	entries, err := os.ReadDir(examplesDir)
+	if err != nil {
+		t.Fatalf("read examples directory: %v", err)
+	}
+
+	var missing []string
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		dir := filepath.Join(examplesDir, entry.Name())
+		hasRegisteredSource := false
+		err := filepath.WalkDir(dir, func(path string, child os.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if child.IsDir() {
+				return nil
+			}
+			switch filepath.Ext(path) {
+			case ".leia", ".go":
+				hasRegisteredSource = true
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatalf("walk example directory %s: %v", entry.Name(), err)
+		}
+		if !hasRegisteredSource {
+			continue
+		}
+		ref := "`examples/" + entry.Name() + "/`"
+		if !strings.Contains(examplesDoc, ref) {
+			missing = append(missing, ref)
+		}
+	}
+	if len(missing) > 0 {
+		sort.Strings(missing)
+		t.Fatalf("docs/examples/index.md must index registered example directories: %s", strings.Join(missing, ", "))
 	}
 }
 

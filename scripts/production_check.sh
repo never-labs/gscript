@@ -170,7 +170,7 @@ add_performance_gate() {
 }
 
 add_performance_smoke() {
-    local cmd="bash scripts/performance_gate.sh --smoke"
+    local cmd="bash scripts/performance_gate.sh --smoke --runs 2 --warmup 1"
 
     if ! have_cmd python3; then
         add_skip "Performance Smoke" "missing python3"

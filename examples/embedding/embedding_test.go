@@ -271,6 +271,33 @@ func Example_sandboxAndMaxSteps() {
 	// budget true steps 8
 }
 
+func Example_securitySandboxAndBudgets() {
+	vm := leia.New(
+		leia.SecuritySandbox(),
+		leia.WithMaxSteps(32),
+		leia.WithMaxHostResultBytes(4),
+	)
+	if err := vm.RegisterFunc("payload", func() string {
+		return "12345"
+	}); err != nil {
+		panic(err)
+	}
+
+	fsGlobal, err := vm.Get("fs")
+	if err != nil {
+		panic(err)
+	}
+	err = vm.Exec(`value := payload()`)
+
+	var budgetErr *leia.BudgetError
+	fmt.Println("sandbox fs", fsGlobal)
+	fmt.Println("budget", errors.As(err, &budgetErr), budgetErr.Resource, budgetErr.Limit)
+
+	// Output:
+	// sandbox fs <nil>
+	// budget true host_result_bytes 4
+}
+
 func Example_structuredErrors() {
 	hostFailed := errors.New("host failed")
 	vm := leia.New()

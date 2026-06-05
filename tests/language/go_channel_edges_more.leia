@@ -39,4 +39,40 @@ ok, err := pcall(func() {
 assert(ok == false)
 assert(string.find(err, "send on closed channel", 1, true) != nil)
 
+empty := make(chan, 1)
+selected := "unset"
+select {
+case v := <-empty:
+	selected = string.format("unexpected:%s", tostring(v))
+default:
+	selected = "default"
+}
+assert(selected == "default")
+
+ready := make(chan, 1)
+select {
+case ready <- 7:
+	selected = "sent"
+default:
+	selected = "missed"
+}
+assert(selected == "sent")
+assert(<-ready == 7)
+
+closedSelect := make(chan, 1)
+close(closedSelect)
+select {
+case v, ok := <-closedSelect:
+	if v != nil {
+		error("closed select yielded non-nil value")
+	}
+	if ok != false {
+		error("closed select yielded ok=true")
+	}
+	selected = "closed"
+default:
+	selected = "missed"
+}
+assert(selected == "closed")
+
 print("ok")

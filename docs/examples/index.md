@@ -36,15 +36,28 @@ set.
 | Directory | Focus |
 |---|---|
 | `examples/hello/` | Core syntax, functions, tables, closures, metatables, coroutines, errors, and object-style patterns. |
+| `examples/api/` | Offline API-client style scripts for host-facing workflow examples. |
+| `examples/automation/` | Offline business and release automation workflows. |
 | `examples/dialects/` | Built-in text, protocol, SQL-shaped, Markdown/table, binary, and validation dialect examples. |
 | `examples/data/` | Focused data-language examples, including q/kdb+-style symbolic vectors. |
 | `examples/data_processing/` | Data structures, string processing, dense arrays, and SoA kernels. |
+| `examples/database/` | Package-managed database capability examples. |
 | `examples/concurrency/` | Goroutines, channels, select, sync primitives, context cancellation, and process cancellation. |
 | `examples/ai/` | Tagged AI dialect workflows, replay/trace projects, and coding-agent replay examples. |
 | `examples/llm/` | AI-native models, tools, agents, direct agent-as-tool, custom flow, and live provider smoke scripts. |
 | `examples/embedding/` | Go embedding examples as executable Go doc tests. |
+| `examples/evaluate/` | Deterministic evaluation and replay examples. |
+| `examples/macos/` | Package-managed macOS automation capability examples. |
+| `examples/operations/` | Local operations and release-risk reporting workflows. |
+| `examples/performance/` | Execution mode and benchmark policy examples. |
+| `examples/security/` | Supply-chain and vendor security workflow examples. |
+| `examples/site/` | Static site and release dashboard generation examples. |
+| `examples/testing/` | `leia test` workflow and JSONL golden-evaluation examples. |
+| `examples/tooling/` | Release evidence and diagnostics pipeline examples. |
+| `examples/ui/` | Package-managed UI capability examples. |
 | `examples/web/` | HTTP/server-oriented scripts. |
 | `examples/game_engine/` | Game scripting patterns and larger interactive workloads. |
+| `examples/workflow/` | Service-quality, status-rollup, and support-triage workflows. |
 
 ## Data-Oriented Examples
 

@@ -282,6 +282,25 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 			t.Fatalf("README stable contract changed or missing expected snippet %q", snippet)
 		}
 	}
+	embeddingRef := readFileString(t, filepath.Join(root, "docs", "reference", "embedding", "index.md"))
+	for _, snippet := range []string{
+		"`leia.New(opts ...Option) *VM`",
+		"`RegisterFunc(name, fn)`",
+		"`RegisterModule(name, Module)`",
+		"`SecuritySandbox()`",
+		"`WithMaxSteps(n)`",
+		"`WithMaxNativeCalls(n)`",
+		"`WithMaxGoroutines(n)`",
+		"`WithMaxChannelCapacity(n)`",
+		"`WithMaxHostResultBytes(n)`",
+		"`WithMaxModuleBytes(n)`",
+		"`type HotLoader`",
+		"`*leia.BudgetError`",
+	} {
+		if !strings.Contains(embeddingRef, snippet) {
+			t.Fatalf("embedding reference must cover README embedding contract; missing %q", snippet)
+		}
+	}
 
 	features := loadFeatureMatrixFeatureMap(t, root)
 
@@ -295,6 +314,7 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 		"tests/sdk/security_api_test.go",
 		"docs/testing.md",
 		"docs/reference/security/index.md",
+		"docs/reference/embedding/index.md",
 	)
 
 	hostBindings := requireFeature(t, features, "embedding_host_bindings")
@@ -304,6 +324,7 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 		"tests/sdk/error_api_test.go",
 		"tests/sdk/public_api_boundary_test.go",
 		"examples/embedding/embedding_test.go",
+		"docs/reference/embedding/index.md",
 	)
 	requireFeatureCellRefs(t, hostBindings, "embedding_host_bindings", "perf_hot_case",
 		"tests/sdk/embedding_perf_test.go",
@@ -318,6 +339,7 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 		"tests/sdk/resource_budget_concurrency_test.go",
 		"tests/sdk/security_api_test.go",
 		"tests/sdk/error_api_test.go",
+		"docs/reference/embedding/index.md",
 	)
 
 	hotReload := requireFeature(t, features, "embedding_hot_reload")
@@ -326,20 +348,28 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 		"tests/sdk/hotloader_instance_test.go",
 		"tests/sdk/hotloader_instance_rollback_test.go",
 	)
+	requireFeatureCellRefs(t, hotReload, "embedding_hot_reload", "semantic_gate",
+		"docs/reference/hot-reload/index.md",
+		"docs/reference/embedding/index.md",
+		"docs/guides/embedding.md",
+	)
 
 	ai := requireFeature(t, features, "llm_native_integration")
 	requireFeatureCellRefs(t, ai, "llm_native_integration", "semantic_gate",
 		"tests/llm/llm_runtime_test.go",
 		"tests/llm/llm_agent_examples_test.go",
+		"tests/llm/llm_agent_tools_test.go",
 		"tests/llm/llm_record_replay_test.go",
 		"tests/llm/llm_trace_test.go",
 		"tests/llm/llm_ai_dialect_test.go",
+		"tests/llm/llm_surface_audit_test.go",
 		"tests/integration/llm/llm_openai_provider_test.go",
 		"tests/integration/llm/llm_provider_test.go",
 		"tests/integration/llm/llm_glm_integration_test.go",
 		"cmd/leia/main_examples_test.go",
 		"cmd/leia/main_examples_command_test.go",
 		"cmd/leia/main_evaluate_llm_test.go",
+		"cmd/leia/main_playground_test.go",
 		"examples/ai/coding_agent_replay.leia",
 		"examples/ai/tagged_agent_workflow.leia",
 		"examples/ai/record_replay_trace_project.leia",
@@ -353,10 +383,14 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 		"examples/llm/streaming_turn.leia",
 		"examples/llm/glm_smoke.leia",
 		"examples/llm/glm_direct_agent_tools.leia",
+		"examples/evaluate/llm_replay.leia",
 		"examples/evaluate/agent_replay.leia",
+		"examples/evaluate/multiturn_replay.leia",
 		"examples/workflow/support_triage_replay.leia",
 		"examples/embedding/embedding_test.go",
 		"docs/guides/ai-native.md",
+		"docs/reference/ai/index.md",
+		"docs/reference/evaluate/index.md",
 	)
 
 	stringsPatterns := requireFeature(t, features, "strings_patterns_concat")
@@ -387,19 +421,40 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 		"tests/language/go_channel_edges_more.leia",
 		"tests/sdk/resource_budget_concurrency_test.go",
 		"cmd/leia/main_examples_test.go",
+		"examples/concurrency/select_timeout.leia",
+		"examples/concurrency/sync_group_cancel.leia",
+		"scripts/production_check.sh",
 	)
+	productionCheck := readFileString(t, filepath.Join(root, "scripts", "production_check.sh"))
+	for _, snippet := range []string{
+		"Concurrency Race Smoke",
+		"go test -race ./internal/runtime ./internal/nanbox ./internal/vm ./llm ./tests/sdk ./tests/llm ./cmd/leia -count=1",
+	} {
+		if !strings.Contains(productionCheck, snippet) {
+			t.Fatalf("production_check.sh must keep concurrency race gate snippet %q", snippet)
+		}
+	}
 
 	data := requireFeature(t, features, "matrix_dense_arrays")
 	requireFeatureCellRefs(t, data, "matrix_dense_arrays", "semantic_gate",
 		"tests/language/matrix_host_dense_more.leia",
 		"tests/language/vec_color_geometry_hsl_more.leia",
 		"examples/data_processing/data_oriented/dense_matrix_vec_kernels.leia",
+		"examples/data_processing/data_oriented/soa_kernels.leia",
 	)
 	requireFeatureCellRefs(t, data, "matrix_dense_arrays", "bytecode",
 		"internal/vm/compiler_dense_test.go",
 		"internal/vm/matrix_multiply_specialization_test.go",
 		"internal/vm/spectral_runtime_specialization_test.go",
 		"internal/vm/soa_affine_specialization_test.go",
+	)
+	requireFeatureCellRefs(t, data, "matrix_dense_arrays", "perf_hot_case",
+		"benchmarks/numeric/matmul_dense.leia",
+		"benchmarks/numeric/spectral_norm_dense.leia",
+		"benchmarks/data/soa_affine_many.leia",
+		"benchmarks/data/soa_masked_aggregate.leia",
+		"benchmarks/data/soa_filter_gather.leia",
+		"benchmarks/data/soa_scan.leia",
 	)
 
 	tooling := requireFeature(t, features, "cli_repository_tooling")
@@ -478,6 +533,100 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 		"cmd/leia/main_readme_tooling_test.go",
 		"tests/release_matrix_test.go",
 	)
+}
+
+func TestReadmeAINativeContractHasExplicitGates(t *testing.T) {
+	root := findRepoRoot(t)
+	readme := readFileString(t, filepath.Join(root, "README.md"))
+	for _, snippet := range []string{
+		"AI-native syntax and stdlib support for models, tools, messages, turns,",
+		"agents, replay, and provider adapters.",
+	} {
+		if !strings.Contains(readme, snippet) {
+			t.Fatalf("README AI-native contract missing %q", snippet)
+		}
+	}
+
+	ai := requireFeature(t, loadFeatureMatrixFeatureMap(t, root), "llm_native_integration")
+	requireFeatureCellRefs(t, ai, "llm_native_integration", "interpreter",
+		"tests/llm/llm_runtime_test.go",
+		"tests/llm/llm_agent_tools_test.go",
+		"tests/llm/llm_record_replay_test.go",
+		"tests/llm/llm_ai_dialect_test.go",
+		"tests/llm/llm_surface_audit_test.go",
+		"tests/integration/llm/llm_openai_provider_test.go",
+		"tests/integration/llm/llm_provider_test.go",
+		"docs/reference/ai/index.md",
+	)
+	requireFeatureCellRefs(t, ai, "llm_native_integration", "semantic_gate",
+		"cmd/leia/main_examples_command_test.go",
+		"cmd/leia/main_evaluate_llm_test.go",
+		"cmd/leia/main_playground_test.go",
+		"examples/llm/direct_turn.leia",
+		"examples/llm/agent_as_tool.leia",
+		"examples/llm/prompt_tagged_messages.leia",
+		"examples/ai/coding_agent_replay.leia",
+		"examples/evaluate/llm_replay.leia",
+		"examples/evaluate/agent_replay.leia",
+		"examples/evaluate/multiturn_replay.leia",
+		"docs/guides/ai-native.md",
+		"docs/reference/ai/index.md",
+		"docs/reference/evaluate/index.md",
+	)
+
+	requiredEvidence := map[string]map[string][]string{
+		"models": {
+			"tests/llm/llm_ai_dialect_test.go":                  {"model {", "model: \"mock-fast\""},
+			"tests/integration/llm/llm_provider_test.go":        {"TestLLMModelsProviderConfigPreservesHostProvider", "protocol: \"openai_compatible\""},
+			"tests/integration/llm/llm_openai_provider_test.go": {"TestLLMModelsProviderConfigOpenAICompatible", "provider_model: \"provider-fast\""},
+			"cmd/leia/main_playground_test.go":                  {"TestPlaygroundAIExamplesCoverRunnableWorkflowShapes", "ai-model-alias"},
+			"docs/reference/ai/index.md":                        {"## Model Dialect", "ProviderFactory"},
+		},
+		"tools": {
+			"tests/llm/llm_runtime_test.go":     {"TestLLMTurnWithMockProvider", "llm.dispatch(result.calls[1], tools)"},
+			"tests/llm/llm_agent_tools_test.go": {"TestLLMAgentScenarioAgentAsToolStructuredHandoff", "llm.agent_as_tool"},
+			"examples/llm/agent_as_tool.leia":   {"tools: {extract_research}", "llm.turn({"},
+			"docs/reference/ai/index.md":        {"## Tool Dialect", "`llm.agent_as_tool`"},
+		},
+		"messages": {
+			"tests/llm/llm_runtime_test.go":            {"TestLLMMessageHelpers", "msg.assistant_call(call)"},
+			"examples/llm/prompt_tagged_messages.leia": {"prompt_tagged_history_len", "history.find(messages"},
+			"docs/reference/ai/index.md":               {"## Messages And History", "`msg.tool_error`"},
+		},
+		"turns": {
+			"tests/llm/llm_runtime_test.go": {"TestLLMTurnWithMockProvider", "llm.turn({"},
+			"examples/llm/direct_turn.leia": {"llm.turn({", "direct_text"},
+			"docs/reference/ai/index.md":    {"## Turn Dialect", "performs exactly one provider request"},
+		},
+		"agents": {
+			"tests/llm/llm_agent_examples_test.go": {"TestLLMAgentExampleSmoke", "agent.leia"},
+			"tests/llm/llm_agent_tools_test.go":    {"TestLLMAgentScenarioDirectAgentInToolsList", "llm.run_agent"},
+			"examples/ai/coding_agent_replay.leia": {"coding-agent tools", "tools: {read_file, search_text, apply_patch, run_shell}"},
+			"docs/reference/ai/index.md":           {"## Agent Dialect", "## Agent As Tool"},
+		},
+		"replay": {
+			"tests/llm/llm_record_replay_test.go":     {"TestLLMRecorderAndReplay", "TestLLMReplayRejectsMismatchedRequest"},
+			"cmd/leia/main_evaluate_llm_test.go":      {"TestEvaluateLLMReplayAliasAndFixtureModeGuards", "--llm-replay"},
+			"examples/evaluate/multiturn_replay.leia": {"evaluate \"multiturn replay consumes every turn\"", "llm.turn({"},
+			"docs/reference/evaluate/index.md":        {"--replay tests/agent.records.json tests/agent.leia", "replay-drift findings"},
+		},
+		"provider adapters": {
+			"tests/integration/llm/llm_provider_test.go":        {"TestAnthropicCompatibleLLMProvider", "command.Provider"},
+			"tests/integration/llm/llm_openai_provider_test.go": {"TestOpenAICompatibleLLMProvider", "openai.Provider"},
+			"cmd/leia/main_playground_test.go":                  {"TestPlaygroundExecAIProfileUsesGLMEnv", "LEIA_GLM_MODEL"},
+			"docs/reference/ai/index.md":                        {"Live Provider Tests", "LEIA_ANTHROPIC_COMPAT_BASE_URL"},
+		},
+	}
+	for label, files := range requiredEvidence {
+		for rel, snippets := range files {
+			data := readFileString(t, filepath.Join(root, filepath.FromSlash(rel)))
+			for _, snippet := range snippets {
+				if !strings.Contains(data, snippet) {
+					t.Fatalf("README AI-native %s gate %s missing snippet %q", label, rel, snippet)
+				}
+			}
+		}
+	}
 }
 
 func TestActiveDocsUseLeiaNamingAndNoLegacyAskAgentDesign(t *testing.T) {

@@ -73,6 +73,19 @@ bash scripts/worktree_audit.sh
 The manifest check keeps test and benchmark discovery explicit. The worktree
 audit catches stale or confusing local worktrees before large refactors.
 
+## Modules
+
+```bash
+go run ./cmd/leia mod verify --json examples/ui/package_managed
+go run ./cmd/leia mod graph --json examples/ui/package_managed
+go run ./cmd/leia mod capability --json examples/ui/package_managed
+```
+
+`leia mod` manages local module metadata, require graphs, vendored dependency
+plans, lockfiles, native `go.mod` interop, and declared capability evidence.
+Use the [modules reference](../reference/modules/index.md) for the full command
+surface.
+
 ## Documentation
 
 ```bash

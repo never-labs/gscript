@@ -17,6 +17,7 @@ Checks README/docs Markdown for:
   - release-readiness docs keep machine-checkable language and AI-native gates.
   - README stable contract and docs/spec stability contract stay synchronized.
   - docs/spec runnable Leia examples use stable all-mode fence tags and execute.
+  - docs examples index lists each registered top-level example directory.
   - generated reference docs and the checked-in language spec HTML are fresh.
 
 The repository-script mention check covers:
@@ -114,6 +115,7 @@ checked_retired_paths = 0
 checked_retired_names = 0
 checked_spec_runnable_examples = 0
 checked_spec_contract_docs = 0
+checked_examples_index_dirs = 0
 spec_runnable_report = ""
 
 retired_paths = {
@@ -395,6 +397,27 @@ def check_spec_contract_docs() -> None:
                 errors.append(f"{path}: missing spec/stable-contract snippet: {snippet}")
 
 
+def check_examples_index() -> None:
+    global checked_examples_index_dirs
+    examples_dir = root / "examples"
+    examples_index = root / "docs" / "examples" / "index.md"
+    text = examples_index.read_text(encoding="utf-8")
+    for path in sorted(examples_dir.iterdir()):
+        if not path.is_dir():
+            continue
+        has_registered_source = any(
+            child.suffix in {".leia", ".go"} for child in path.rglob("*") if child.is_file()
+        )
+        if not has_registered_source:
+            continue
+        checked_examples_index_dirs += 1
+        snippet = f"`examples/{path.name}/`"
+        if snippet not in text:
+            errors.append(
+                f"{examples_index.relative_to(root)}: missing example directory index row: {snippet}"
+            )
+
+
 for doc_file in doc_files:
     if doc_file.is_file():
         check_markdown_links(doc_file)
@@ -405,6 +428,7 @@ for doc_file in doc_files:
 check_release_gate_docs()
 check_spec_runnable_coverage()
 check_spec_contract_docs()
+check_examples_index()
 
 if errors:
     print("docs_check.sh found problems:", file=sys.stderr)
@@ -418,6 +442,7 @@ print(
     f"{checked_script_mentions} repository-script code-block mentions, "
     f"{checked_release_gate_docs} release-gate docs, "
     f"{checked_spec_contract_docs} spec/stable-contract docs, "
+    f"{checked_examples_index_dirs} examples index directories, "
     f"{checked_retired_paths} retired-path mentions, "
     f"{checked_retired_names} retired-name mentions, "
     "2 generated reference docs, "

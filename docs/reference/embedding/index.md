@@ -104,7 +104,12 @@ Recommended presets:
 | `LibApp` | Application scripts with common host-facing libraries. |
 | `LibGame` | Game scripting with math, vectors, color, arrays, and time. |
 
-Important sandbox options:
+For untrusted scripts, start with `SecuritySandbox()`. It selects `LibSafe`,
+`CapSafe`, disables dynamic eval and host-backed process/network/debug/testkit
+surfaces, and disables JIT by default. Grant back only the library,
+capability, filesystem, module, and budget knobs that the embedding needs.
+
+Important sandbox and budget options:
 
 ```go
 vm := leia.New(
@@ -112,13 +117,31 @@ vm := leia.New(
     leia.WithMaxSteps(100_000),
     leia.WithMaxNativeCalls(1_000),
     leia.WithMaxCallDepth(128),
+    leia.WithMaxGoroutines(16),
+    leia.WithMaxChannelCapacity(64),
+    leia.WithMaxHostResultBytes(1<<20),
     leia.WithMaxModuleBytes(1<<20),
+    leia.WithMaxModuleDepth(8),
     leia.WithFilesystemRoot("/srv/app/scripts"),
 )
 ```
 
+| Option | Budget |
+|---|---|
+| `WithMaxSteps(n)` | Script execution steps per `Exec`/`Run`. |
+| `WithMaxNativeCalls(n)` | Calls from script into Go callbacks and Go-backed standard-library functions. |
+| `WithMaxCallDepth(n)` | Active script/native call depth. |
+| `WithMaxGoroutines(n)` | Active goroutines started by script `go` statements. |
+| `WithMaxChannelCapacity(n)` | Maximum `make(chan, n)` buffer capacity. |
+| `WithMaxHostResultBytes(n)` | Bytes returned by one Go-backed host or standard-library call. |
+| `WithMaxModuleBytes(n)` | Bytes read by script-side `require`, `dofile`, `loadfile`, and `script.loadFile`. |
+| `WithMaxModuleDepth(n)` | Nested filesystem-backed `require()` depth. |
+| `WithMaxFilesystemReadBytes(n)` | Bytes read by script filesystem APIs. |
+| `WithMaxFilesystemWriteBytes(n)` | Bytes written by script filesystem APIs. |
+
 Setting resource budgets disables JIT execution for that VM so native code
-cannot bypass budget checkpoints.
+cannot bypass budget checkpoints. Budget failures are reported as
+`*leia.BudgetError`, which exposes `Resource` and `Limit`.
 
 See [Security and sandboxing](../security/index.md) for the full capability,
 filesystem, process, dynamic-eval, and resource-budget model.

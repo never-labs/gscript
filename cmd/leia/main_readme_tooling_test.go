@@ -23,8 +23,11 @@ func TestReadmeToolingCommandsDoNotDrift(t *testing.T) {
 		"go run ./cmd/leia test tests/smoke/01_basic.leia",
 		"go run ./cmd/leia check --no-docs --no-editor --no-examples .",
 		"go run ./cmd/leia examples check examples/hello/fib.leia examples/hello/types_demo.leia examples/hello/dialects.leia",
+		"go run ./cmd/leia doc check",
+		"go run ./cmd/leia mod verify --json examples/ui/package_managed",
 		"go run ./cmd/leia bench compare --bench numeric/mandelbrot --runs 3 --warmup 1",
 		"go run ./cmd/leia diag bundle --output /tmp/leia-diag --skip-benchmarks",
+		"go run ./cmd/leia ci release --list",
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("README Tooling commands changed:\ngot  %#v\nwant %#v", got, want)
@@ -167,6 +170,18 @@ func TestReadmeEmbeddingSnippetStaysRunnable(t *testing.T) {
 
 func TestReadmeToolingCommandsMapToCLI(t *testing.T) {
 	root := repoRootForBoundaryTest(t)
+	oldWD, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(root); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := os.Chdir(oldWD); err != nil {
+			t.Fatalf("restore cwd: %v", err)
+		}
+	})
 	data, err := os.ReadFile(filepath.Join(root, "README.md"))
 	if err != nil {
 		t.Fatal(err)
@@ -178,9 +193,11 @@ func TestReadmeToolingCommandsMapToCLI(t *testing.T) {
 
 	oldBenchExecCommand := benchExecCommand
 	oldDiagExecCommand := diagExecCommand
+	oldDocExecCommand := docExecCommand
 	t.Cleanup(func() {
 		benchExecCommand = oldBenchExecCommand
 		diagExecCommand = oldDiagExecCommand
+		docExecCommand = oldDocExecCommand
 	})
 	var benchArgs []string
 	benchExecCommand = func(name string, args ...string) *exec.Cmd {
@@ -192,6 +209,12 @@ func TestReadmeToolingCommandsMapToCLI(t *testing.T) {
 	diagExecCommand = func(name string, args ...string) *exec.Cmd {
 		diagArgs = append([]string{name}, args...)
 		helper, helperArgs := testHelperCommand(t, "diag")
+		return exec.Command(helper, helperArgs...)
+	}
+	var docArgs []string
+	docExecCommand = func(name string, args ...string) *exec.Cmd {
+		docArgs = append([]string{name}, args...)
+		helper, helperArgs := testHelperCommand(t, "doc")
 		return exec.Command(helper, helperArgs...)
 	}
 
@@ -224,9 +247,27 @@ func TestReadmeToolingCommandsMapToCLI(t *testing.T) {
 			if code := runDiagCommand(args[1:], &stdout, &stderr); code != 0 {
 				t.Fatalf("README diag command failed dispatch: code=%d stderr=%q", code, stderr.String())
 			}
+		case "doc":
+			var stdout, stderr bytes.Buffer
+			if code := runDocCommand(args[1:], &stdout, &stderr); code != 0 {
+				t.Fatalf("README doc command failed dispatch: code=%d stderr=%q", code, stderr.String())
+			}
+		case "mod":
+			var stdout, stderr bytes.Buffer
+			if code := runModCommand(args[1:], &stdout, &stderr); code != 0 {
+				t.Fatalf("README mod command failed: code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+			}
+		case "ci":
+			var stdout, stderr bytes.Buffer
+			if code := runCICommand(args[1:], &stdout, &stderr); code != 0 {
+				t.Fatalf("README ci command failed: code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+			}
 		default:
 			t.Fatalf("README command %q is not part of the tooling audit", args[0])
 		}
+	}
+	if len(docArgs) < 2 || !strings.HasSuffix(docArgs[1], filepath.Join("scripts", "docs_check.sh")) {
+		t.Fatalf("README doc dispatch args = %#v, want doc check via scripts/docs_check.sh", docArgs)
 	}
 	if len(benchArgs) == 0 || !containsString(benchArgs, "numeric/mandelbrot") || !containsString(benchArgs, "--runs") {
 		t.Fatalf("README bench dispatch args = %#v, want numeric/mandelbrot compare", benchArgs)
