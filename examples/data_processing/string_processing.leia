@@ -314,8 +314,13 @@ func formatTable(headers, rows) {
         widths[i] = #headers[i]
     }
     for i := 1; i <= #rows; i++ {
-        for j := 1; j <= #rows[i]; j++ {
-            cellLen := #tostring(rows[i][j])
+        row := rows[i]
+        for j := 1; j <= #headers; j++ {
+            cell := ""
+            if row[j] != nil {
+                cell = tostring(row[j])
+            }
+            cellLen := #cell
             if j <= #widths {
                 if cellLen > widths[j] {
                     widths[j] = cellLen
@@ -343,11 +348,12 @@ func formatTable(headers, rows) {
     print("  " .. headerLine)
     print("  " .. separator)
     for i := 1; i <= #rows; i++ {
+        row := rows[i]
         rowParts := {}
         for j := 1; j <= #headers; j++ {
             val := ""
-            if j <= #rows[i] {
-                val = tostring(rows[i][j])
+            if row[j] != nil {
+                val = tostring(row[j])
             }
             table.insert(rowParts, " " .. padRight(val, widths[j]) .. " ")
         }
@@ -356,15 +362,14 @@ func formatTable(headers, rows) {
     print("  " .. separator)
 }
 
-formatTable(
-    {"Name", "Age", "City"},
-    {
-        {"Alice", "30", "New York"},
-        {"Bob", "25", "San Francisco"},
-        {"Charlie", "35", "Chicago"},
-        {"Diana", "28", "Boston"}
-    }
-)
+table_headers := {"Name", "Age", "City"}
+table_rows := {
+    {"Alice", "30", "New York"},
+    {"Bob", "25", "San Francisco"},
+    {"Charlie", "35", "Chicago"},
+    {"Diana", "28", "Boston"}
+}
+formatTable(table_headers, table_rows)
 print()
 
 // -------------------------------------------------------

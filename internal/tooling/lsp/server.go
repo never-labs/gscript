@@ -381,7 +381,27 @@ func completionItems() []completionItem {
 	} {
 		items = append(items, completionItem{Label: label, Kind: functionKind, Detail: "Leia llm stdlib"})
 	}
+	for _, label := range commonDialectCompletionLabels {
+		items = append(items, completionItem{Label: label, Kind: keywordKind, Detail: "Leia dialect tag"})
+	}
 	return items
+}
+
+var commonDialectCompletionLabels = []string{
+	"$`",
+	"cmd",
+	"csv",
+	"env",
+	"glob",
+	"json",
+	"jsonl",
+	"path",
+	"prompt",
+	"regexp",
+	"sh",
+	"template",
+	"url",
+	"urlpath",
 }
 
 func fullDocumentRange(src string) lspRange {

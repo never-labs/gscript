@@ -28,7 +28,7 @@ func cliCommands() []cliCommandSpec {
 		{Name: "eval", Usage: "usage: leia eval [--vm] [--jit=true|false] <source> [args...]", Summary: "Execute source passed on the command line.", Run: runEvalCommand},
 		{Name: "evaluate", Usage: "usage: leia evaluate [--json|--format=text|json|html] [--report FILE] [--gate] [--parallel N] [--baseline FILE|--compare OLD NEW] [--list] [--filter TEXT] [--replay FILE|--record FILE|--update-golden FILE] [path-or-dir...]", Summary: "Run evaluation checks and emit an agent evaluation report.", Run: runEvaluateCommand},
 		{Name: "env", Usage: "usage: leia env [--json] [--path PATH]", Summary: "Report toolchain, project, cache, and platform environment.", Run: runEnvCommand},
-		{Name: "examples", Usage: "usage: leia examples [list|run|show] [--json] [ID-or-path]", Summary: "List, inspect, or run repository example projects.", Run: runExamplesCommand},
+		{Name: "examples", Usage: "usage: leia examples [list|show|run|check] [--json] [ID-or-path]", Summary: "List, inspect, run, or check repository example projects.", Run: runExamplesCommand},
 		{Name: "fmt", Usage: "usage: leia fmt [--check] [--write] [--stdin-file-name FILE] <path-or-dir> [...]", Summary: "Normalize source formatting.", Run: runFmtCommand},
 		{Name: "help", Usage: "usage: leia help [command]", Summary: "Show command help.", Run: runHelpCommand},
 		{Name: "inspect", Usage: "usage: leia inspect bytecode [--proto NAME] <file.leia>\n       leia inspect directives [--json] <file.leia>", Summary: "Inspect compiled artifacts and file directives.", Run: runInspectCommand},

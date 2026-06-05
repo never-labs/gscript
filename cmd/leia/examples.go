@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -9,6 +10,8 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
+	"time"
 )
 
 type cliExample struct {
@@ -18,6 +21,15 @@ type cliExample struct {
 	Path     string `json:"path"`
 	Runnable bool   `json:"runnable"`
 	Requires string `json:"requires,omitempty"`
+}
+
+type cliExampleCheckResult struct {
+	ID       string `json:"id"`
+	Path     string `json:"path"`
+	Status   string `json:"status"`
+	Duration string `json:"duration,omitempty"`
+	Requires string `json:"requires,omitempty"`
+	Error    string `json:"error,omitempty"`
 }
 
 func runExamplesCommand(args []string, outw, errw io.Writer) int {
@@ -30,16 +42,18 @@ func runExamplesCommand(args []string, outw, errw io.Writer) int {
 	switch args[0] {
 	case "list":
 		return runExamplesListCommand(args[1:], outw, errw)
+	case "check":
+		return runExamplesCheckCommand(args[1:], outw, errw)
 	case "run":
 		return runExamplesRunCommand(args[1:], outw, errw)
 	case "show":
 		return runExamplesShowCommand(args[1:], outw, errw)
 	case "-h", "--help", "help":
-		fmt.Fprintln(errw, "usage: leia examples [list|run|show] [--json] [ID-or-path]")
+		fmt.Fprintln(errw, "usage: leia examples [list|show|run|check] [--json] [ID-or-path]")
 		return 0
 	default:
 		fmt.Fprintf(errw, "leia examples: unknown subcommand %q\n", args[0])
-		fmt.Fprintln(errw, "usage: leia examples [list|run|show] [--json] [ID-or-path]")
+		fmt.Fprintln(errw, "usage: leia examples [list|show|run|check] [--json] [ID-or-path]")
 		return 2
 	}
 }
@@ -82,6 +96,83 @@ func runExamplesListCommand(args []string, outw, errw io.Writer) int {
 		} else {
 			fmt.Fprintf(outw, "%-48s %-8s %-18s %s\n", example.ID, status, example.Section, example.Path)
 		}
+	}
+	return 0
+}
+
+func runExamplesCheckCommand(args []string, outw, errw io.Writer) int {
+	fs := flag.NewFlagSet("examples check", flag.ContinueOnError)
+	fs.SetOutput(errw)
+	jsonOut := fs.Bool("json", false, "print check results as JSON")
+	jobs := fs.Int("jobs", 1, "number of runnable examples to check in parallel")
+	maxSteps := fs.Int64("max-steps", 2_000_000, "maximum VM or interpreter steps per example")
+	if code, done := parseCLIFlags(fs, args); done {
+		return code
+	}
+	if *jobs < 1 {
+		fmt.Fprintln(errw, "leia examples check: --jobs must be >= 1")
+		return 2
+	}
+	if *maxSteps < 1 {
+		fmt.Fprintln(errw, "leia examples check: --max-steps must be >= 1")
+		return 2
+	}
+	selectors := fs.Args()
+	examples, err := selectedCLIExamples(selectors)
+	if err != nil {
+		fmt.Fprintf(errw, "leia examples: %v\n", err)
+		return 1
+	}
+	results := checkCLIExamples(examples, *jobs, *maxSteps)
+	failed := 0
+	runnable := 0
+	skipped := 0
+	for _, result := range results {
+		switch result.Status {
+		case "ok":
+			runnable++
+		case "skipped":
+			skipped++
+		default:
+			failed++
+		}
+	}
+	if *jsonOut {
+		enc := json.NewEncoder(outw)
+		enc.SetIndent("", "  ")
+		if err := enc.Encode(struct {
+			SchemaVersion int                     `json:"schema_version"`
+			OK            bool                    `json:"ok"`
+			Runnable      int                     `json:"runnable"`
+			Skipped       int                     `json:"skipped"`
+			Failed        int                     `json:"failed"`
+			Results       []cliExampleCheckResult `json:"results"`
+		}{
+			SchemaVersion: 1,
+			OK:            failed == 0,
+			Runnable:      runnable,
+			Skipped:       skipped,
+			Failed:        failed,
+			Results:       results,
+		}); err != nil {
+			fmt.Fprintf(errw, "leia examples check: write json: %v\n", err)
+			return 1
+		}
+	} else {
+		for _, result := range results {
+			switch result.Status {
+			case "ok":
+				fmt.Fprintf(outw, "ok      %-48s %s\n", result.ID, result.Duration)
+			case "skipped":
+				fmt.Fprintf(outw, "skip    %-48s %s\n", result.ID, result.Requires)
+			default:
+				fmt.Fprintf(outw, "fail    %-48s %s\n", result.ID, result.Error)
+			}
+		}
+		fmt.Fprintf(outw, "examples: %d ok, %d skipped, %d failed\n", runnable, skipped, failed)
+	}
+	if failed != 0 {
+		return 1
 	}
 	return 0
 }
@@ -194,6 +285,89 @@ func resolveCLIExample(selector string) (cliExample, string, bool, error) {
 		}
 	}
 	return cliExample{}, "", false, nil
+}
+
+func selectedCLIExamples(selectors []string) ([]cliExample, error) {
+	all, err := cliRepositoryExamples()
+	if err != nil {
+		return nil, err
+	}
+	if len(selectors) == 0 {
+		return all, nil
+	}
+	selected := make([]cliExample, 0, len(selectors))
+	for _, selector := range selectors {
+		example, _, ok, err := resolveCLIExample(selector)
+		if err != nil {
+			return nil, err
+		}
+		if !ok {
+			return nil, fmt.Errorf("example %q not found", selector)
+		}
+		selected = append(selected, example)
+	}
+	return selected, nil
+}
+
+func checkCLIExamples(examples []cliExample, jobs int, maxSteps int64) []cliExampleCheckResult {
+	type indexedExample struct {
+		index   int
+		example cliExample
+	}
+	results := make([]cliExampleCheckResult, len(examples))
+	work := make(chan indexedExample)
+	var wg sync.WaitGroup
+	workerCount := jobs
+	if workerCount > len(examples) {
+		workerCount = len(examples)
+	}
+	if workerCount < 1 {
+		workerCount = 1
+	}
+	for i := 0; i < workerCount; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for item := range work {
+				results[item.index] = checkCLIExample(item.example, maxSteps)
+			}
+		}()
+	}
+	for index, example := range examples {
+		work <- indexedExample{index: index, example: example}
+	}
+	close(work)
+	wg.Wait()
+	return results
+}
+
+func checkCLIExample(example cliExample, maxSteps int64) cliExampleCheckResult {
+	result := cliExampleCheckResult{
+		ID:       example.ID,
+		Path:     example.Path,
+		Status:   "ok",
+		Requires: example.Requires,
+	}
+	if !example.Runnable {
+		result.Status = "skipped"
+		return result
+	}
+	path := filepath.Join(filepath.Dir(playgroundExamplesRoot()), filepath.FromSlash(example.Path))
+	started := time.Now()
+	var stdout, stderr bytes.Buffer
+	code := runPlaygroundExecCommand([]string{"--mode=bytecode", "--max-steps=" + fmt.Sprint(maxSteps), path}, &stdout, &stderr)
+	result.Duration = time.Since(started).Round(time.Millisecond).String()
+	if code != 0 {
+		result.Status = "failed"
+		result.Error = strings.TrimSpace(stderr.String())
+		if result.Error == "" {
+			result.Error = strings.TrimSpace(stdout.String())
+		}
+		if result.Error == "" {
+			result.Error = fmt.Sprintf("exit code %d", code)
+		}
+	}
+	return result
 }
 
 func boolFlagString(v bool) string {

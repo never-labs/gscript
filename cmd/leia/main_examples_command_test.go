@@ -80,3 +80,43 @@ func TestExamplesCommandRefusesManualExample(t *testing.T) {
 		t.Fatalf("manual example error missing explanation: %q", stderr.String())
 	}
 }
+
+func TestExamplesCommandChecksSelectedExamples(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := runExamplesCommand([]string{"check", "--jobs=2", "repo-hello-counter", "repo-llm-agent"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runExamplesCommand code = %d, stdout = %q stderr = %q", code, stdout.String(), stderr.String())
+	}
+	out := stdout.String()
+	for _, want := range []string{
+		"ok      repo-hello-counter",
+		"skip    repo-llm-agent",
+		"examples: 1 ok, 1 skipped, 0 failed",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("examples check missing %q\n%s", want, out)
+		}
+	}
+}
+
+func TestExamplesCommandChecksSelectedExamplesJSON(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := runExamplesCommand([]string{"check", "--json", "repo-hello-counter", "repo-llm-agent"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runExamplesCommand code = %d, stderr = %q", code, stderr.String())
+	}
+	var payload struct {
+		SchemaVersion int                     `json:"schema_version"`
+		OK            bool                    `json:"ok"`
+		Runnable      int                     `json:"runnable"`
+		Skipped       int                     `json:"skipped"`
+		Failed        int                     `json:"failed"`
+		Results       []cliExampleCheckResult `json:"results"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
+		t.Fatalf("invalid examples check JSON: %v\n%s", err, stdout.String())
+	}
+	if payload.SchemaVersion != 1 || !payload.OK || payload.Runnable != 1 || payload.Skipped != 1 || payload.Failed != 0 {
+		t.Fatalf("unexpected examples check payload: %#v", payload)
+	}
+}

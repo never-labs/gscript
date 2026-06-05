@@ -1469,7 +1469,8 @@ func repositoryExampleRunnable(path string) bool {
 		!strings.Contains(path, "/llm/") &&
 		!strings.Contains(path, "/testing/") &&
 		!strings.Contains(path, "/workflow/support_triage_replay.leia") &&
-		!strings.Contains(path, "/web/") &&
+		!strings.Contains(path, "/web/hello_server.leia") &&
+		!strings.Contains(path, "/web/webserver.leia") &&
 		!strings.Contains(path, "/database/package_managed/") &&
 		!strings.Contains(path, "/dialects/shell_filesystem.leia") &&
 		!strings.Contains(path, "/macos/package_managed/") &&
@@ -1490,7 +1491,7 @@ func repositoryExampleRequires(path string) string {
 		return "leia test CLI"
 	case strings.Contains(path, "/workflow/support_triage_replay.leia"):
 		return "LLM replay fixture or provider"
-	case strings.Contains(path, "/web/"):
+	case strings.Contains(path, "/web/hello_server.leia"), strings.Contains(path, "/web/webserver.leia"):
 		return "network/server host access"
 	case strings.Contains(path, "/database/package_managed/"):
 		return "package-managed database runtime and native SQL driver"

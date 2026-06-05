@@ -1,0 +1,214 @@
+// access_log_report.leia - Offline web operations report.
+// Demonstrates: route inventory, logfmt access logs, cache/error/latency
+// rollups, Markdown/JSON/HTML report generation, and deterministic checks.
+
+routes := dialect.eval("csv", `route,owner,slo_ms,cacheable
+/,platform,120,true
+/api/orders,commerce,250,false
+/api/search,search,180,true
+/static/app.js,frontend,80,true
+`, {headers: true})
+
+access_logs := {
+    logfmt`ts=2026-06-05T09:00:00Z method=GET path=/ status=200 ms=44 bytes=8120 cache=hit ua=browser`,
+    logfmt`ts=2026-06-05T09:00:01Z method=GET path=/api/orders status=200 ms=190 bytes=1432 cache=miss ua=browser`,
+    logfmt`ts=2026-06-05T09:00:02Z method=POST path=/api/orders status=201 ms=310 bytes=980 cache=bypass ua=browser`,
+    logfmt`ts=2026-06-05T09:00:03Z method=GET path=/api/orders status=503 ms=480 bytes=220 cache=bypass ua=worker`,
+    logfmt`ts=2026-06-05T09:00:04Z method=GET path=/api/search status=200 ms=96 bytes=2048 cache=hit ua=browser`,
+    logfmt`ts=2026-06-05T09:00:05Z method=GET path=/api/search status=504 ms=260 bytes=256 cache=miss ua=browser`,
+    logfmt`ts=2026-06-05T09:00:06Z method=GET path=/api/search status=200 ms=175 bytes=1980 cache=hit ua=browser`,
+    logfmt`ts=2026-06-05T09:00:07Z method=GET path=/static/app.js status=200 ms=22 bytes=48120 cache=hit ua=browser`,
+    logfmt`ts=2026-06-05T09:00:08Z method=GET path=/static/app.js status=404 ms=18 bytes=84 cache=miss ua=browser`,
+    logfmt`ts=2026-06-05T09:00:09Z method=GET path=/api/orders status=200 ms=240 bytes=1504 cache=miss ua=browser`,
+}
+
+func number_or(value, fallback) {
+    parsed := tonumber(value)
+    if parsed == nil {
+        return fallback
+    }
+    return parsed
+}
+
+func bool_text(value) {
+    return value == true || value == "true"
+}
+
+func html_text(value) {
+    return dialect.eval("html_escape", tostring(value))
+}
+
+func route_for_path(path) {
+    for i := 1; i <= #routes; i++ {
+        if routes[i].route == path {
+            return routes[i]
+        }
+    }
+    return nil
+}
+
+metrics := {}
+for i := 1; i <= #routes; i++ {
+    route := routes[i]
+    metrics[route.route] = {
+        route: route.route,
+        owner: route.owner,
+        slo_ms: number_or(route.slo_ms, 0),
+        cacheable: bool_text(route.cacheable),
+        requests: 0,
+        errors: 0,
+        slow: 0,
+        cache_hits: 0,
+        cache_misses: 0,
+        bytes: 0,
+        latency_ms: 0,
+    }
+}
+
+total_requests := 0
+total_errors := 0
+total_slow := 0
+total_cache_hits := 0
+total_bytes := 0
+
+for i := 1; i <= #access_logs; i++ {
+    log := access_logs[i]
+    metric := metrics[log.path]
+    assert(metric != nil)
+
+    status := number_or(log.status, 0)
+    latency := number_or(log.ms, 0)
+    bytes := number_or(log.bytes, 0)
+
+    metric.requests = metric.requests + 1
+    metric.latency_ms = metric.latency_ms + latency
+    metric.bytes = metric.bytes + bytes
+    total_requests = total_requests + 1
+    total_bytes = total_bytes + bytes
+
+    if status >= 400 {
+        metric.errors = metric.errors + 1
+        total_errors = total_errors + 1
+    }
+    if latency > metric.slo_ms {
+        metric.slow = metric.slow + 1
+        total_slow = total_slow + 1
+    }
+    if log.cache == "hit" {
+        metric.cache_hits = metric.cache_hits + 1
+        total_cache_hits = total_cache_hits + 1
+    } elseif log.cache == "miss" {
+        metric.cache_misses = metric.cache_misses + 1
+    }
+}
+
+report_rows := {}
+top_route := ""
+top_requests := -1
+for i := 1; i <= #routes; i++ {
+    route := routes[i]
+    metric := metrics[route.route]
+    avg_ms := 0
+    error_rate := 0
+    if metric.requests > 0 {
+        avg_ms = metric.latency_ms / metric.requests
+        error_rate = metric.errors / metric.requests
+    }
+    health := "ok"
+    if metric.errors > 0 || metric.slow > 0 {
+        health = "review"
+    }
+    if metric.requests > top_requests {
+        top_route = metric.route
+        top_requests = metric.requests
+    }
+    report_rows[i] = {
+        Route: metric.route,
+        Owner: metric.owner,
+        Requests: metric.requests,
+        Errors: metric.errors,
+        Slow: metric.slow,
+        AvgMs: string.format("%.1f", avg_ms),
+        ErrorRate: string.format("%.2f", error_rate),
+        CacheHits: metric.cache_hits,
+        Bytes: metric.bytes,
+        Health: health,
+    }
+}
+
+route_table := dialect.eval("mdtable", report_rows, {mode: "encode"})
+summary_logfmt := dialect.eval("logfmt", {
+    routes: #routes,
+    requests: total_requests,
+    errors: total_errors,
+    slow: total_slow,
+    cache_hits: total_cache_hits,
+    top: top_route,
+}, {mode: "encode"})
+
+report_json := dialect.eval("json", {
+    generated_at: "2026-06-05T09:05:00Z",
+    summary: {
+        routes: #routes,
+        requests: total_requests,
+        errors: total_errors,
+        slow: total_slow,
+        cache_hits: total_cache_hits,
+        bytes: total_bytes,
+        top_route: top_route,
+    },
+    routes: report_rows,
+}, {mode: "encode"})
+
+report_html := template {
+    text: `<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>{{.title}}</title></head>
+<body>
+<h1>{{.title}}</h1>
+<p>{{.summary}}</p>
+<pre>{{.table}}</pre>
+</body>
+</html>
+`,
+    data: {
+        title: "Web Access Report",
+        summary: html_text(summary_logfmt),
+        table: html_text(route_table),
+    },
+}
+
+web_access_report_summary := string.format(
+    "routes=%d requests=%d errors=%d slow=%d cache_hits=%d top=%s bytes=%d",
+    #routes,
+    total_requests,
+    total_errors,
+    total_slow,
+    total_cache_hits,
+    top_route,
+    total_bytes
+)
+
+print(route_table)
+print(summary_logfmt)
+print(web_access_report_summary)
+
+assert(#routes == 4)
+assert(#access_logs == 10)
+assert(route_for_path("/api/orders").owner == "commerce")
+assert(total_requests == 10)
+assert(total_errors == 3)
+assert(total_slow == 3)
+assert(total_cache_hits == 4)
+assert(top_route == "/api/orders")
+assert(metrics["/api/orders"].requests == 4)
+assert(metrics["/api/orders"].errors == 1)
+assert(metrics["/api/search"].slow == 1)
+assert(metrics["/static/app.js"].cacheable == true)
+assert(report_rows[2].AvgMs == "305.0")
+assert(report_rows[2].ErrorRate == "0.25")
+assert(string.find(route_table, "/api/orders", 1, true) != nil)
+assert(string.find(summary_logfmt, "requests=10", 1, true) != nil)
+assert(string.find(report_json, `"top_route":"/api/orders"`, 1, true) != nil)
+assert(string.find(report_html, "<h1>Web Access Report</h1>", 1, true) != nil)
+assert(web_access_report_summary == "routes=4 requests=10 errors=3 slow=3 cache_hits=4 top=/api/orders bytes=64744")

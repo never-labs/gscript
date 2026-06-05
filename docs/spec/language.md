@@ -159,6 +159,22 @@ value unless explicitly spread by the language feature in use.
 Function bodies are lexically scoped. Closures capture variables by reference to
 their lexical binding, not by copying the value at declaration time.
 
+```leia run all
+func pair() {
+    return "left", "right"
+}
+
+first, second, missing := pair()
+assert(first == "left" && second == "right" && missing == nil)
+
+count := 0
+func bump() {
+    count += 1
+    return count
+}
+assert(bump() == 1 && bump() == 2)
+```
+
 ## Stability Contract
 
 Stable behavior is behavior covered by this spec plus tests. Experimental

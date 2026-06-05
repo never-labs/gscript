@@ -82,6 +82,7 @@ func TestPracticalExampleProjects(t *testing.T) {
 		{"supply-chain-audit", execExampleProjectGlobal(root, filepath.Join("examples", "security", "supply_chain_audit.leia"), "supply_chain_audit_summary"), "release=2026.06.05 deps=6 direct=3 vulns=4 blockers=2 disallowed=1 fixable=3 risk=27"},
 		{"release-ci-regression", testExampleProject(root, filepath.Join("examples", "testing")), "release_ci_regression_workflow_test.leia"},
 		{"static-site-docs-generation", execExampleProjectGlobal(root, filepath.Join("examples", "site", "static_docs_generator.leia"), "site_generation_summary"), "pages=3 published=2 drafts=1 assets=2"},
+		{"web-access-log-report", execExampleProjectGlobal(root, filepath.Join("examples", "web", "access_log_report.leia"), "web_access_report_summary"), "routes=4 requests=10 errors=3 slow=3 cache_hits=4 top=/api/orders"},
 		{"ai-agent-composition", evaluateReplayExampleProject(root, filepath.Join("examples", "evaluate", "agent_replay.leia"), filepath.Join("examples", "evaluate", "agent_replay.records.json")), "agent consumes replay"},
 		{"concurrency-pipeline", execExampleProjectGlobal(root, filepath.Join("examples", "concurrency", "goroutines_channels.leia"), "workers"), "4"},
 		{"package-managed-database", modCheckExampleProject(root, filepath.Join("examples", "database", "package_managed")), "github.com/never-labs/leia-db/sqlite"},

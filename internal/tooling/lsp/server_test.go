@@ -235,6 +235,11 @@ func TestCompletionReturnsCurrentLeiaSyntaxAndStdlib(t *testing.T) {
 			t.Fatalf("completion labels missing %q: %#v", want, labels)
 		}
 	}
+	for _, want := range []string{"$`", "json", "csv", "path", "url", "prompt", "sh", "template"} {
+		if !labels[want] {
+			t.Fatalf("completion labels missing dialect tag %q: %#v", want, labels)
+		}
+	}
 	for _, old := range []string{"agent", "tool", "evaluate"} {
 		if labels[old] {
 			t.Fatalf("completion labels unexpectedly include old AI keyword %q: %#v", old, labels)
