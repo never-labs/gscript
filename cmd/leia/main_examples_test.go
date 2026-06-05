@@ -177,7 +177,7 @@ func TestRunCommandDialectExamplesCoverApprovedBuiltinTags(t *testing.T) {
 		t.Fatalf("approved builtin dialect tags must be listed in tests/feature_matrix.json or covered by runnable dialect examples; missing %s", strings.Join(missing, ", "))
 	}
 
-	for _, tag := range []string{"sh", "cmd", "glob", "path", "json", "csv", "url", "base64", "prompt", "quote"} {
+	for _, tag := range []string{"sh", "cmd", "glob", "path", "json", "csv", "url", "base64", "sql", "markdown", "prompt", "quote"} {
 		if !exampleTags[tag] {
 			t.Fatalf("runnable dialect examples must keep representative builtin tag %q covered", tag)
 		}
@@ -667,10 +667,10 @@ func TestEvaluateReplayExamplesExecute(t *testing.T) {
 func approvedBuiltinDialectTags() []string {
 	return []string{
 		"sh", "cmd", "shellwords", "glob", "path",
-		"re", "regexp", "json", "jsonptr", "jsonl", "csv", "tsv", "mdtable", "lines", "split", "words", "nums", "numbers", "kv", "logfmt", "env", "ini", "semver", "duration", "tap", "junit", "xml", "template",
+		"re", "regexp", "json", "jsonptr", "jsonl", "csv", "tsv", "mdtable", "markdown", "md", "lines", "split", "words", "nums", "numbers", "kv", "logfmt", "env", "ini", "yaml", "yml", "semver", "duration", "tap", "junit", "xml", "template",
 		"url", "html_escape", "urlquery", "urlpath", "mime", "headers", "http_headers", "cookie", "cookies", "httpmsg", "sse", "multipart", "jwt",
 		"ipaddr", "cidr", "hostport",
-		"base64", "hash", "hex", "base32", "uuid", "gzip", "zlib", "deflate", "binary",
+		"base64", "hash", "hex", "base32", "uuid", "gzip", "zlib", "deflate", "binary", "sql",
 		"prompt", "quote",
 	}
 }

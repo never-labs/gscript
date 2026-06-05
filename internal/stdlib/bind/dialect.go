@@ -10,7 +10,7 @@ import (
 // small native dispatch layer used by tagged literals and tagged blocks:
 // sh`...`, cmd`...`, shellwords`...`, glob`...`, json`...`, prompt`...`,
 // quote { ... }, and small safe data transforms such as path`...`, url`...`, words`...`, nums`...`,
-// mdtable`...`, markdown`...`, kv`...`, logfmt`...`, env`...`, jsonl`...`, semver`...`, html_escape`...`, urlquery`...`, mime`...`,
+// mdtable`...`, markdown`...`, yaml`...`, kv`...`, logfmt`...`, env`...`, jsonl`...`, semver`...`, html_escape`...`, urlquery`...`, mime`...`,
 // urlpath`...`, duration`...`, tap`...`, junit`...`, ipaddr`...`, cidr`...`, base64`...`, and hash`...`.
 func BuildDialect(opts HostOptions, maxHostResult func() int64, specs ...DialectSpec) *Table {
 	t := markStdlibBoundModule(NewTable())
@@ -269,7 +269,7 @@ func builtinDialectCategory(name string) string {
 	switch name {
 	case "sh", "cmd", "glob":
 		return "host"
-	case "shellwords", "path", "json", "jsonptr", "jsonl", "csv", "tsv", "mdtable", "markdown", "md", "lines", "split", "words", "nums", "numbers", "kv", "logfmt", "env", "ini", "semver", "duration", "tap", "xml", "template", "re", "regexp":
+	case "shellwords", "path", "json", "jsonptr", "jsonl", "csv", "tsv", "mdtable", "markdown", "md", "lines", "split", "words", "nums", "numbers", "kv", "logfmt", "env", "ini", "yaml", "yml", "semver", "duration", "tap", "xml", "template", "re", "regexp":
 		return "text"
 	case "url", "html_escape", "urlquery", "urlpath", "mime", "headers", "http_headers", "httpmsg", "cookie", "cookies", "sse", "multipart", "jwt":
 		return "protocol"

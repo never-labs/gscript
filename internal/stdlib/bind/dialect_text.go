@@ -111,6 +111,14 @@ func registerDialectText(register dialectRegisterFunc, maxHostResult func() int6
 		eval:  dialectINI,
 		block: dialectINI,
 	})
+	register([]string{"yaml", "yml"}, dialectHandler{
+		eval: func(body Value, options *Table) ([]Value, error) {
+			return dialectYAML(body, options, maxHostResult)
+		},
+		block: func(body Value, options *Table) ([]Value, error) {
+			return dialectYAML(body, options, maxHostResult)
+		},
+	})
 	register([]string{"semver"}, dialectHandler{
 		eval:  dialectSemVer,
 		block: dialectSemVer,

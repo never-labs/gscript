@@ -175,7 +175,8 @@ func TestBuiltinDialectRegistryStaysModular(t *testing.T) {
 	}
 	expectedTagsByFile := map[string][]string{
 		"dialect_shell_fs.go":         {"sh", "cmd", "shellwords", "glob", "path"},
-		"dialect_text.go":             {"re", "regexp", "json", "jsonptr", "jsonl", "csv", "tsv", "mdtable", "markdown", "md", "lines", "split", "words", "nums", "numbers", "kv", "logfmt", "env", "ini", "semver", "duration", "tap", "junit", "xml", "template"},
+		"dialect_text.go":             {"re", "regexp", "json", "jsonptr", "jsonl", "csv", "tsv", "mdtable", "markdown", "md", "lines", "split", "words", "nums", "numbers", "kv", "logfmt", "env", "ini", "yaml", "yml", "semver", "duration", "tap", "junit", "xml", "template"},
+		"dialect_yaml.go":             nil,
 		"dialect_protocol.go":         {"url", "html_escape", "urlquery", "urlpath", "mime", "headers", "http_headers", "cookie", "cookies", "httpmsg", "sse", "multipart", "jwt"},
 		"dialect_protocol_network.go": {"ipaddr", "cidr", "hostport"},
 		"dialect_data.go":             {"base64", "hash", "hex", "base32", "uuid", "gzip", "zlib", "deflate", "binary"},
@@ -194,6 +195,7 @@ func TestBuiltinDialectRegistryStaysModular(t *testing.T) {
 			"github.com/never-labs/leia/internal/stdlib/lib/encoding",
 			"github.com/never-labs/leia/internal/support/dialect",
 		},
+		"dialect_yaml.go": nil,
 		"dialect_protocol.go": {
 			"github.com/never-labs/leia/internal/support/dialect",
 		},

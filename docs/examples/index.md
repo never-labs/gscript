@@ -15,13 +15,14 @@ registered set, and run one by ID or path:
 
 ```bash
 go run ./cmd/leia examples list
-go run ./cmd/leia examples check examples/hello/fib.leia examples/hello/types_demo.leia
+go run ./cmd/leia examples check examples/hello/fib.leia examples/hello/types_demo.leia examples/hello/dialects.leia
 go run ./cmd/leia examples run repo-hello-fib
 ```
 
 | Directory | Focus |
 |---|---|
 | `examples/hello/` | Core syntax, functions, tables, closures, metatables, coroutines, errors, and object-style patterns. |
+| `examples/dialects/` | Built-in text, protocol, SQL-shaped, Markdown/table, binary, and validation dialect examples. |
 | `examples/data_processing/` | Data structures, string processing, dense arrays, and SoA kernels. |
 | `examples/concurrency/` | Goroutines, channels, select, sync primitives, context cancellation, and process cancellation. |
 | `examples/llm/` | AI-native models, tools, agents, direct agent-as-tool, custom flow, and live provider smoke scripts. |
@@ -49,6 +50,16 @@ go run ./cmd/leia examples run repo-concurrency-sync_group
 ```
 
 Use these with the [concurrency reference](../reference/concurrency/index.md).
+
+## Dialect Examples
+
+```bash
+go run ./cmd/leia examples check examples/hello/dialects.leia examples/dialects/text_parsing.leia examples/dialects/sql_result_analytics.leia
+go run ./cmd/leia examples run repo-dialects-sql_result_analytics
+```
+
+The runnable dialect examples cover the CLI-visible built-in dialect surface,
+including `sql`, `markdown`/`md`, and Markdown table parsing/encoding.
 
 ## AI Examples
 

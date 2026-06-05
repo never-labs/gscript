@@ -1,0 +1,185 @@
+// release_fixture_matrix.leia - Offline release config and test-data processing.
+// Demonstrates: env, ini, csv, jsonl, markdown, mdtable, sql, template, hash, and JSON output.
+
+print("=== Automation: release fixture matrix ===")
+
+env_cfg := env`APP_NAME=checkout-api
+APP_ENV=staging
+RELEASE_CHANNEL=candidate
+`
+
+deploy_cfg := ini`release=2026.06
+region=us-east-1
+
+[limits]
+max_failed_tests=0
+max_p95_ms=250
+
+[feature]
+canary_percent=25
+`
+
+test_cases := dialect.eval("csv", "id,suite,owner,priority,enabled\nT-100,contract,platform,P0,true\nT-101,smoke,qa,P1,true\nT-102,load,performance,P1,true\nT-103,chaos,sre,P2,false\n", {headers: true})
+
+results := jsonl`{"id":"T-100","status":"pass","duration_ms":42}
+{"id":"T-101","status":"pass","duration_ms":18}
+{"id":"T-102","status":"pass","duration_ms":236}
+{"id":"T-103","status":"skip","duration_ms":0}
+`
+
+notes := markdown`# Release Candidate Notes
+
+Offline fixtures model a candidate publication gate.
+
+## Checks
+
+- config
+- publish
+- test-data
+`
+
+audit_query := sql {
+    query: "select id, status, duration_ms from release_results where release = :release and env = :env order by id",
+    params: {release: deploy_cfg.release, env: env_cfg.APP_ENV},
+}
+
+func contains(text, needle) {
+    return string.find(text, needle, 1, true) != nil
+}
+
+func result_for(id) {
+    for i := 1; i <= #results; i++ {
+        if results[i].id == id {
+            return results[i]
+        }
+    }
+    return nil
+}
+
+func priority_rank(priority) {
+    if priority == "P0" {
+        return 0
+    }
+    if priority == "P1" {
+        return 1
+    }
+    return 2
+}
+
+enabled_total := 0
+passed := 0
+failed := 0
+skipped := 0
+slowest_ms := 0
+slowest_id := ""
+matrix := {}
+
+for i := 1; i <= #test_cases; i++ {
+    tc := test_cases[i]
+    row := result_for(tc.id)
+    assert(row != nil)
+
+    enabled := tc.enabled == "true"
+    gate_ok := row.status == "pass" || enabled == false
+    if enabled {
+        enabled_total = enabled_total + 1
+    }
+    if row.status == "pass" {
+        passed = passed + 1
+    } else if row.status == "skip" {
+        skipped = skipped + 1
+    } else {
+        failed = failed + 1
+    }
+    if row.duration_ms > slowest_ms {
+        slowest_ms = row.duration_ms
+        slowest_id = row.id
+    }
+
+    matrix[#matrix + 1] = {
+        id: tc.id,
+        suite: tc.suite,
+        owner: tc.owner,
+        priority: tc.priority,
+        priority_rank: priority_rank(tc.priority),
+        enabled: enabled,
+        status: row.status,
+        duration_ms: row.duration_ms,
+        gate_ok: gate_ok,
+    }
+}
+
+table.sort(matrix, func(a, b) {
+    if a.priority_rank == b.priority_rank {
+        return a.id < b.id
+    }
+    return a.priority_rank < b.priority_rank
+})
+
+gate := {
+    service: env_cfg.APP_NAME,
+    env: env_cfg.APP_ENV,
+    release: deploy_cfg.release,
+    channel: env_cfg.RELEASE_CHANNEL,
+    region: deploy_cfg.region,
+    canary_percent: tonumber(deploy_cfg.feature.canary_percent),
+    enabled_tests: enabled_total,
+    passed: passed,
+    failed: failed,
+    skipped: skipped,
+    slowest_id: slowest_id,
+    slowest_ms: slowest_ms,
+    ok: failed <= tonumber(deploy_cfg.limits.max_failed_tests) && slowest_ms <= tonumber(deploy_cfg.limits.max_p95_ms),
+}
+
+owner_rows := {}
+owner_rows[#owner_rows + 1] = {Owner: "platform", Enabled: "1", Passed: "1", SlowestMs: "42"}
+owner_rows[#owner_rows + 1] = {Owner: "qa", Enabled: "1", Passed: "1", SlowestMs: "18"}
+owner_rows[#owner_rows + 1] = {Owner: "performance", Enabled: "1", Passed: "1", SlowestMs: "236"}
+owner_rows[#owner_rows + 1] = {Owner: "sre", Enabled: "0", Passed: "0", SlowestMs: "0"}
+owner_table := dialect.eval("mdtable", owner_rows, {mode: "encode"})
+
+manifest := template {
+    text: "service={{.service}}\nrelease={{.release}}\nenv={{.env}}\nchannel={{.channel}}\nregion={{.region}}\nok={{.ok}}\n",
+    data: gate,
+}
+
+gate_json := dialect.eval("json", gate, {mode: "encode"})
+matrix_jsonl := dialect.eval("jsonl", matrix, {mode: "encode"})
+fingerprint := string.sub(dialect.eval("hash", gate_json .. matrix_jsonl), 1, 12)
+
+print(manifest)
+print(owner_table)
+print("audit:", audit_query.query)
+print("fingerprint:", fingerprint)
+
+assert(env_cfg.APP_NAME == "checkout-api")
+assert(deploy_cfg.limits.max_failed_tests == "0")
+assert(deploy_cfg.feature.canary_percent == "25")
+assert(notes.title == "Release Candidate Notes")
+assert(notes.list_items == 3)
+assert(#test_cases == 4)
+assert(#results == 4)
+assert(audit_query.query == "select id, status, duration_ms from release_results where release = ? and env = ? order by id")
+assert(audit_query.args[1] == "2026.06")
+assert(audit_query.args[2] == "staging")
+assert(enabled_total == 3)
+assert(passed == 3)
+assert(failed == 0)
+assert(skipped == 1)
+assert(slowest_id == "T-102")
+assert(slowest_ms == 236)
+assert(gate.ok == true)
+assert(matrix[1].id == "T-100")
+assert(matrix[2].id == "T-101")
+assert(matrix[3].id == "T-102")
+assert(matrix[4].id == "T-103")
+assert(matrix[4].gate_ok == true)
+assert(contains(owner_table, "| 1 | performance | 1 | 236 |"))
+assert(manifest == "service=checkout-api\nrelease=2026.06\nenv=staging\nchannel=candidate\nregion=us-east-1\nok=true\n")
+assert(contains(gate_json, "\"service\":\"checkout-api\""))
+assert(contains(gate_json, "\"ok\":true"))
+assert(contains(matrix_jsonl, "\"suite\":\"load\""))
+assert(fingerprint == string.sub(dialect.eval("hash", gate_json .. matrix_jsonl), 1, 12))
+
+print("release fixture matrix ok")

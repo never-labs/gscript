@@ -116,6 +116,63 @@ func TestDialectMarkdownSummary(t *testing.T) {
 	}
 }
 
+func TestDialectYAMLLiteParseAndEncode(t *testing.T) {
+	interp := runWithLib(t, ""+
+		"cfg := yaml`service: api\n"+
+		"enabled: true\n"+
+		"retries: 3\n"+
+		"threshold: 2.5\n"+
+		"owner:\n"+
+		"  name: Ada\n"+
+		"  team: platform\n"+
+		"targets:\n"+
+		"  - web\n"+
+		"  - worker\n"+
+		"checks:\n"+
+		"  - name: unit\n"+
+		"    required: true\n"+
+		"  - name: smoke\n"+
+		"    required: false\n"+
+		"`\n"+
+		"encoded := dialect.eval(\"yml\", {service: \"api\", enabled: true, retries: 3, targets: {\"web\", \"worker\"}}, {mode: \"encode\"})\n"+
+		"roundtrip := dialect.eval(\"yaml\", encoded)\n"+
+		"bad, bad_err := yaml`service api`\n",
+		"dialect", BuildDialect(HostOptions{}, nil))
+
+	cfg := interp.GetGlobal("cfg").Table()
+	if got := cfg.RawGetString("service").Str(); got != "api" {
+		t.Fatalf("yaml service = %q, want api", got)
+	}
+	if !cfg.RawGetString("enabled").Bool() {
+		t.Fatalf("yaml enabled = false, want true")
+	}
+	if got := cfg.RawGetString("retries").Int(); got != 3 {
+		t.Fatalf("yaml retries = %d, want 3", got)
+	}
+	if got := cfg.RawGetString("threshold").Float(); got != 2.5 {
+		t.Fatalf("yaml threshold = %v, want 2.5", got)
+	}
+	if got := cfg.RawGetString("owner").Table().RawGetString("team").Str(); got != "platform" {
+		t.Fatalf("yaml owner.team = %q", got)
+	}
+	if got := cfg.RawGetString("targets").Table().RawGetInt(2).Str(); got != "worker" {
+		t.Fatalf("yaml target 2 = %q", got)
+	}
+	checks := cfg.RawGetString("checks").Table()
+	if got := checks.RawGetInt(2).Table().RawGetString("name").Str(); got != "smoke" {
+		t.Fatalf("yaml check 2 name = %q", got)
+	}
+	if checks.RawGetInt(2).Table().RawGetString("required").Bool() {
+		t.Fatalf("yaml check 2 required = true, want false")
+	}
+	if got := interp.GetGlobal("roundtrip").Table().RawGetString("targets").Table().RawGetInt(1).Str(); got != "web" {
+		t.Fatalf("yaml roundtrip target = %q", got)
+	}
+	if !interp.GetGlobal("bad").IsNil() || !strings.Contains(interp.GetGlobal("bad_err").Str(), "yaml dialect: line 1: missing ':'") {
+		t.Fatalf("bad yaml = %v err %v", interp.GetGlobal("bad"), interp.GetGlobal("bad_err"))
+	}
+}
+
 func TestDialectTextInvalidInputsReturnErrors(t *testing.T) {
 	interp := runWithLib(t, `
 		bad_csv, bad_csv_err := dialect.eval("csv", "\"unterminated\n")

@@ -15,6 +15,14 @@ query := sql {
     query: "select * from examples where tag = :tag and score >= :score",
     params: {tag: "dialect", score: 7},
 }
+cfg := yaml`service: dialect-demo
+enabled: true
+targets:
+  - web
+  - worker
+owner:
+  team: platform
+`
 encoded_name := base64`Hello ${name}`
 decoded_name := dialect.eval("base64", encoded_name, {mode: "decode"})
 sha1 := dialect.eval("hash", "leia", {algo: "sha1"})
@@ -55,6 +63,10 @@ assert(parsed_url.query.tag == "dialect")
 assert(query.query == "select * from examples where tag = ? and score >= ?")
 assert(query.args[1] == "dialect")
 assert(query.args[2] == 7)
+assert(cfg.service == "dialect-demo")
+assert(cfg.enabled == true)
+assert(cfg.targets[2] == "worker")
+assert(cfg.owner.team == "platform")
 assert(decoded_name == "Hello Leia")
 assert(sha1 == "3ea1ebad1aa28de8fc67188a456b9747bbcca81a")
 assert(rows[2][1] == "Ada")
@@ -76,5 +88,6 @@ print("decoded project:", decoded.project)
 print("csv first row:", rows[2][1] .. "=" .. rows[2][2])
 print("markdown title:", doc.title)
 print("sql query:", query.query)
+print("yaml service:", cfg.service)
 print("prompt:", user_prompt.text)
 print("dialects ok")
