@@ -298,6 +298,13 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 	requireFeatureCellRefs(t, data, "matrix_dense_arrays", "semantic_gate",
 		"tests/language/matrix_host_dense_more.leia",
 		"tests/language/vec_color_geometry_hsl_more.leia",
+		"examples/data_processing/data_oriented/dense_matrix_vec_kernels.leia",
+	)
+	requireFeatureCellRefs(t, data, "matrix_dense_arrays", "bytecode",
+		"internal/vm/compiler_dense_test.go",
+		"internal/vm/matrix_multiply_specialization_test.go",
+		"internal/vm/spectral_runtime_specialization_test.go",
+		"internal/vm/soa_affine_specialization_test.go",
 	)
 
 	tooling := requireFeature(t, features, "cli_repository_tooling")

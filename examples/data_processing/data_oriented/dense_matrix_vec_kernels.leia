@@ -1,0 +1,49 @@
+// Dense array, matrix, vector, and SoA helpers in one small data-oriented pass.
+// Run with:
+//   go run ./cmd/leia run examples/data_processing/data_oriented/dense_matrix_vec_kernels.leia
+
+func near(a, b) {
+    return math.abs(a - b) <= 0.000001
+}
+
+func check(name, ok) {
+    assert(ok)
+    print("ok", name)
+}
+
+mass := []f64{2, 3, 5}
+velocity_x := []f64{4, 1, -2}
+velocity_y := []f64{0, 2, 1}
+id := [3]i64{101, 102, 103}
+
+particles := soa.zip({
+    id: id,
+    mass: mass,
+    vx: velocity_x,
+    vy: velocity_y,
+})
+
+check("soa shape", soa.len(particles) == 3 && soa.shape(particles).columns[1].dtype == "i64")
+check("dense column", particles.mass[3] == 5 && particles.vx[1] == 4)
+
+features := matrix.dense(3, 3)
+for i := 1; i <= soa.len(particles); i++ {
+    speed_sq := particles.vx[i] * particles.vx[i] + particles.vy[i] * particles.vy[i]
+    energy := particles.mass[i] * speed_sq / 2
+    matrix.setf(features, i - 1, 0, particles.mass[i])
+    matrix.setf(features, i - 1, 1, speed_sq)
+    matrix.setf(features, i - 1, 2, energy)
+}
+
+check("matrix dense writes", matrix.getf(features, 1, 0) == 3 && matrix.getf(features, 2, 2) == 12.5)
+check("matrix row index", features[1][2] == 7.5)
+
+heading := vec.normalize2(vec.vec2(velocity_x[1], velocity_y[1]))
+wind := vec.normalize2(vec.vec2(1, 1))
+alignment := vec.dot2(heading, wind)
+check("vector normalize/dot", near(heading.x, 1) && near(heading.y, 0) && near(alignment, 0.7071067811865475))
+
+moving := soa.mask(particles, "mass", ">=", 3)
+check("masked aggregate", soa.countWhere(particles, moving) == 2 && soa.sumWhere(particles, "mass", moving) == 8)
+
+print("dense_matrix_vec_kernels smoke passed")
