@@ -28,6 +28,7 @@ import (
 // Only bytecodes that require VM-only control state are blocked:
 //   - GO, MAKECHAN, SEND, RECV, TRYSEND, TRYRECV, SELECT
 //   - DEFER, SETGLOBALRO, CHECKCONST
+//   - pcall/xpcall protected-call frames
 //
 // CALL is no longer blocked here. Instead, compileTier2 runs the inline pass to
 // eliminate calls, then checks the optimized IR with irHasCall. If calls remain
@@ -35,6 +36,9 @@ import (
 // GETGLOBAL is fully native with a per-instruction value cache matching Tier 1.
 func canPromoteToTier2(proto *vm.FuncProto) bool {
 	if !jitTier2CallableGate(proto).Allowed {
+		return false
+	}
+	if protoLoadsProtectedCallBuiltin(proto) {
 		return false
 	}
 	for _, inst := range proto.Code {
@@ -61,6 +65,9 @@ func firstUnsupportedTier2BytecodeGate(proto *vm.FuncProto) GateResult {
 	if gate := jitTier2CallableGate(proto); !gate.Allowed {
 		return gate
 	}
+	if name, ok := firstProtectedCallBuiltinLoad(proto); ok {
+		return blockGate("Tier2Bytecode", name+" protected-call ABI")
+	}
 	for _, inst := range proto.Code {
 		op := vm.DecodeOp(inst)
 		switch op {
@@ -70,6 +77,27 @@ func firstUnsupportedTier2BytecodeGate(proto *vm.FuncProto) GateResult {
 		}
 	}
 	return allowGate("Tier2Bytecode", "all bytecodes supported")
+}
+
+func protoLoadsProtectedCallBuiltin(proto *vm.FuncProto) bool {
+	_, ok := firstProtectedCallBuiltinLoad(proto)
+	return ok
+}
+
+func firstProtectedCallBuiltinLoad(proto *vm.FuncProto) (string, bool) {
+	if proto == nil {
+		return "", false
+	}
+	for _, inst := range proto.Code {
+		if vm.DecodeOp(inst) != vm.OP_GETGLOBAL {
+			continue
+		}
+		switch protoConstString(proto, vm.DecodeBx(inst)) {
+		case "pcall", "xpcall":
+			return protoConstString(proto, vm.DecodeBx(inst)), true
+		}
+	}
+	return "", false
 }
 
 // feedbackHasObservations returns true if any entry has a non-Unobserved
@@ -102,6 +130,9 @@ func canPromoteToTier2NoCalls(proto *vm.FuncProto) bool {
 			vm.OP_DEFER, vm.OP_SETGLOBALRO, vm.OP_CHECKCONST:
 			return false
 		}
+	}
+	if protoLoadsProtectedCallBuiltin(proto) {
+		return false
 	}
 	return true
 }

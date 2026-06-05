@@ -70,6 +70,8 @@ func (e *BaselineJITEngine) handleBaselineOpExit(ctx *ExecContext, regs []runtim
 		return e.handlePow(ctx, regs, base, proto)
 	case vm.OP_ADD, vm.OP_SUB, vm.OP_MUL, vm.OP_DIV, vm.OP_MOD:
 		return e.handleArithmetic(ctx, regs, base, proto)
+	case vm.OP_BAND, vm.OP_BOR, vm.OP_BXOR, vm.OP_BANDN, vm.OP_SHL, vm.OP_SHR, vm.OP_BNOT:
+		return e.handleBitwise(ctx, regs, base, proto)
 	case vm.OP_LT:
 		return e.handleLT(ctx, regs, base, proto)
 	case vm.OP_LE:
@@ -77,6 +79,103 @@ func (e *BaselineJITEngine) handleBaselineOpExit(ctx *ExecContext, regs []runtim
 	default:
 		return fmt.Errorf("unhandled baseline op-exit: %s (%d)", vm.OpName(opCode), opCode)
 	}
+}
+
+func (e *BaselineJITEngine) handleBitwise(ctx *ExecContext, regs []runtime.Value, base int, proto *vm.FuncProto) error {
+	opCode := vm.Opcode(ctx.BaselineOp)
+	a := int(ctx.BaselineA)
+	b := int(ctx.BaselineB)
+	c := int(ctx.BaselineC)
+	absA := base + a
+
+	loadRK := func(idx int) runtime.Value {
+		if idx >= vm.RKBit {
+			return proto.Constants[idx-vm.RKBit]
+		}
+		return regs[base+idx]
+	}
+	bv := loadRK(b)
+
+	if opCode == vm.OP_BNOT {
+		n, err := methodJITBitwiseInt(bv)
+		if err != nil {
+			return err
+		}
+		if absA < len(regs) {
+			regs[absA] = runtime.IntValue(^n)
+		}
+		return nil
+	}
+
+	cv := loadRK(c)
+	x, err := methodJITBitwiseInt(bv)
+	if err != nil {
+		return err
+	}
+	y, err := methodJITBitwiseInt(cv)
+	if err != nil {
+		return err
+	}
+
+	var out int64
+	switch opCode {
+	case vm.OP_BAND:
+		out = x & y
+	case vm.OP_BOR:
+		out = x | y
+	case vm.OP_BXOR:
+		out = x ^ y
+	case vm.OP_BANDN:
+		out = x &^ y
+	case vm.OP_SHL:
+		shift, err := methodJITBitwiseShift(cv)
+		if err != nil {
+			return err
+		}
+		if shift >= 64 {
+			out = 0
+		} else {
+			out = int64(uint64(x) << shift)
+		}
+	case vm.OP_SHR:
+		shift, err := methodJITBitwiseShift(cv)
+		if err != nil {
+			return err
+		}
+		if shift >= 64 {
+			out = 0
+		} else {
+			out = int64(uint64(x) >> shift)
+		}
+	default:
+		return fmt.Errorf("unsupported bitwise opcode for baseline op-exit: %s", vm.OpName(opCode))
+	}
+	if absA < len(regs) {
+		regs[absA] = runtime.IntValue(out)
+	}
+	return nil
+}
+
+func methodJITBitwiseInt(v runtime.Value) (int64, error) {
+	n, ok := v.ToNumber()
+	if !ok {
+		return 0, fmt.Errorf("attempt to perform bitwise operation on %s", v.TypeName())
+	}
+	if n.IsInt() {
+		return n.Int(), nil
+	}
+	return int64(n.Float()), nil
+}
+
+func methodJITBitwiseShift(v runtime.Value) (uint, error) {
+	n, err := methodJITBitwiseInt(v)
+	if err != nil {
+		return 0, err
+	}
+	if n < 0 {
+		return 0, fmt.Errorf("negative shift count")
+	}
+	return uint(n), nil
 }
 
 // handleNativeCallExit handles the case where a callee invoked via native BLR
