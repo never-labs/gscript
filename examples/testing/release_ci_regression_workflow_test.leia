@@ -1,0 +1,124 @@
+// release_ci_regression_workflow_test.leia - Local CI/release gate simulation.
+// Demonstrates: sh, cmd, glob, path, tap, jsonl, evaluate command planning
+//leia:cap process.exec,process.shell,fs.read
+
+print("case:release_ci_regression_workflow_test")
+
+entry := process.entry()
+self_path := path.join(entry.dir, "release_ci_regression_workflow_test.leia")
+assert(path.base(self_path) == "release_ci_regression_workflow_test.leia")
+
+tests := dialect.eval("glob", path.join(entry.dir, "*_test.leia"))
+found_self := false
+for _, test_path := range tests {
+    if path.base(test_path) == "release_ci_regression_workflow_test.leia" {
+        found_self = true
+    }
+}
+assert(found_self == true)
+
+release_plan := jsonl`{"id":"lint","stage":"verify","command":"leia lint examples/testing","required":true,"expected":"pass"}
+{"id":"unit","stage":"test","command":"leia test --golden=require examples/testing","required":true,"expected":"pass"}
+{"id":"agent-eval","stage":"evaluate","command":"leia evaluate --replay examples/evaluate/agent_replay.records.json examples/evaluate/agent_replay.leia","required":true,"expected":"pass"}
+{"id":"package","stage":"release","command":"scripts/release_artifacts_check.sh","required":true,"expected":"pass"}
+`
+
+regression_cases := jsonl`{"id":"checkout-cache","area":"ci","baseline_ms":1200,"current_ms":1080,"failures":0}
+{"id":"golden-stdout","area":"test","baseline_ms":900,"current_ms":940,"failures":0}
+{"id":"agent-replay","area":"evaluate","baseline_ms":1600,"current_ms":1500,"failures":0}
+`
+
+func contains(text, needle) {
+    return string.find(text, needle, 1, true) != nil
+}
+
+func score_regression(row) {
+    delta := row.current_ms - row.baseline_ms
+    if row.failures > 0 {
+        return 0
+    }
+    if delta <= 0 {
+        return 100
+    }
+    if delta <= 50 {
+        return 95
+    }
+    return 80
+}
+
+ci_probe := sh`printf 'lint=ok\ntest=ok\nevaluate=ok\npackage=ok\n'`
+assert(ci_probe.ok == true)
+assert(ci_probe.code == 0)
+assert(contains(ci_probe.text, "evaluate=ok"))
+
+artifact_probe := dialect.eval("cmd", {
+    cmd: "sh",
+    args: {"-c", "printf '%s:%s' \"$RELEASE_CHANNEL\" \"$1\"", "sh", "candidate"},
+    env: {RELEASE_CHANNEL: "stable"},
+    cwd: entry.dir,
+})
+assert(artifact_probe.ok == true)
+assert(artifact_probe.text == "stable:candidate")
+
+required_jobs := 0
+evaluate_jobs := 0
+for _, job := range release_plan {
+    assert(job.id != "")
+    assert(job.expected == "pass")
+    if job.required {
+        required_jobs = required_jobs + 1
+    }
+    if contains(job.command, "leia evaluate") {
+        assert(contains(job.command, "--replay"))
+        evaluate_jobs = evaluate_jobs + 1
+    }
+}
+assert(required_jobs == #release_plan)
+assert(evaluate_jobs == 1)
+
+score_total := 0
+for _, row := range regression_cases {
+    assert(row.failures == 0)
+    score_total = score_total + score_regression(row)
+}
+quality_score := math.floor(score_total / #regression_cases)
+assert(quality_score >= 95)
+
+tap_rows := tap`TAP version 13
+1..4
+ok 1 - lint
+ok 2 - golden stdout
+ok 3 - agent replay # TODO provider parity tracked separately
+ok 4 - release artifacts
+`
+assert(tap_rows[2].last == 4)
+
+tap_ok := 0
+tap_failed := 0
+tap_todo := 0
+for _, row := range tap_rows {
+    if row.kind == "test" {
+        if row.ok {
+            tap_ok = tap_ok + 1
+        } else {
+            tap_failed = tap_failed + 1
+        }
+        if row.directive == "TODO" {
+            tap_todo = tap_todo + 1
+        }
+    }
+}
+assert(tap_ok == 4)
+assert(tap_failed == 0)
+assert(tap_todo == 1)
+
+tap_text := dialect.eval("tap", tap_rows, {mode: "encode"})
+assert(contains(tap_text, "ok 3 - agent replay # TODO provider parity tracked separately"))
+
+print("workflow", "release-2026.06.05")
+print("discovered_self", found_self)
+print("jobs", #release_plan)
+print("tap", "ok", tap_ok, "failed", tap_failed, "todo", tap_todo)
+print("quality_score", quality_score)
+print("gate", "release", "ok")
+print("ok")

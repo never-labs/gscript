@@ -1,0 +1,232 @@
+// service_quality_report.leia - Local data-engineering workflow.
+// Demonstrates: CSV inventory, JSONL events, logfmt request logs,
+// Markdown table rules, SoA aggregations, and template report rendering.
+
+services := dialect.eval("csv", `service,owner,tier,error_budget_ms
+api,payments,gold,400
+worker,operations,silver,700
+search,product,gold,500
+`, {headers: true})
+
+deploy_events := jsonl`{"service":"api","kind":"deploy","status":"ok","version":"2026.06.04.1","duration_ms":94}
+{"service":"api","kind":"deploy","status":"rollback","version":"2026.06.04.2","duration_ms":210}
+{"service":"worker","kind":"deploy","status":"ok","version":"2026.06.04.1","duration_ms":130}
+{"service":"search","kind":"deploy","status":"ok","version":"2026.06.04.3","duration_ms":180}
+{"service":"search","kind":"reindex","status":"ok","version":"idx-884","duration_ms":90}
+`
+
+request_logs := {
+    logfmt`ts=2026-06-04T10:00:00Z service=api route=/checkout status=200 ms=120 bytes=2048`,
+    logfmt`ts=2026-06-04T10:00:01Z service=api route=/checkout status=503 ms=520 bytes=512`,
+    logfmt`ts=2026-06-04T10:00:02Z service=api route=/profile status=200 ms=90 bytes=1024`,
+    logfmt`ts=2026-06-04T10:00:03Z service=worker route=/jobs status=200 ms=240 bytes=256`,
+    logfmt`ts=2026-06-04T10:00:04Z service=worker route=/jobs status=500 ms=260 bytes=128`,
+    logfmt`ts=2026-06-04T10:00:05Z service=search route=/query status=200 ms=80 bytes=4096`,
+    logfmt`ts=2026-06-04T10:00:06Z service=search route=/query status=200 ms=110 bytes=6144`,
+    logfmt`ts=2026-06-04T10:00:07Z service=search route=/query status=504 ms=650 bytes=1024`,
+}
+
+slo_rules := mdtable`| Tier | Max Error Rate | Review |
+| --- | ---: | --- |
+| gold | 0.34 | daily |
+| silver | 0.50 | weekly |
+`
+
+func number_or(value, fallback) {
+    parsed := tonumber(value)
+    if parsed == nil {
+        return fallback
+    }
+    return parsed
+}
+
+func service_index(name) {
+    for i := 1; i <= #services; i++ {
+        if services[i].service == name {
+            return i
+        }
+    }
+    return 0
+}
+
+func rule_for_tier(tier) {
+    for i := 1; i <= #slo_rules; i++ {
+        if slo_rules[i].Tier == tier {
+            return slo_rules[i]
+        }
+    }
+    return nil
+}
+
+metrics := {}
+for i := 1; i <= #services; i++ {
+    row := services[i]
+    metrics[row.service] = {
+        id: i,
+        service: row.service,
+        owner: row.owner,
+        tier: row.tier,
+        error_budget_ms: number_or(row.error_budget_ms, 0),
+        deploys: 0,
+        deploy_failures: 0,
+        requests: 0,
+        errors: 0,
+        latency_ms: 0,
+        bytes: 0,
+    }
+}
+
+for i := 1; i <= #deploy_events; i++ {
+    event := deploy_events[i]
+    metric := metrics[event.service]
+    assert(metric != nil)
+    if event.kind == "deploy" {
+        metric.deploys = metric.deploys + 1
+        if event.status != "ok" {
+            metric.deploy_failures = metric.deploy_failures + 1
+        }
+    }
+}
+
+for i := 1; i <= #request_logs; i++ {
+    log := request_logs[i]
+    metric := metrics[log.service]
+    assert(metric != nil)
+    status := number_or(log.status, 0)
+    ms := number_or(log.ms, 0)
+    metric.requests = metric.requests + 1
+    metric.latency_ms = metric.latency_ms + ms
+    metric.bytes = metric.bytes + number_or(log.bytes, 0)
+    if status >= 500 {
+        metric.errors = metric.errors + 1
+    }
+}
+
+service_id := {}
+request_count := {}
+error_count := {}
+latency_ms := {}
+budget_ms := {}
+deploy_failures := {}
+
+for i := 1; i <= #services; i++ {
+    metric := metrics[services[i].service]
+    service_id[i] = metric.id
+    request_count[i] = metric.requests
+    error_count[i] = metric.errors
+    latency_ms[i] = metric.latency_ms
+    budget_ms[i] = metric.error_budget_ms
+    deploy_failures[i] = metric.deploy_failures
+}
+
+service_facts := soa.zip({
+    service_id: array.i64(service_id),
+    requests: array.f64(request_count),
+    errors: array.f64(error_count),
+    latency_ms: array.f64(latency_ms),
+    budget_ms: array.f64(budget_ms),
+    deploy_failures: array.f64(deploy_failures),
+})
+
+latency_over_budget := soa.mask(service_facts, "latency_ms", ">", "budget_ms")
+erroring_services := soa.mask(service_facts, "errors", ">", 0)
+latency_stats := soa.stats(service_facts, "latency_ms")
+
+report_rows := {}
+breach_count := 0
+for i := 1; i <= soa.len(service_facts); i++ {
+    fact := service_facts[i]
+    meta := services[fact.service_id]
+    rule := rule_for_tier(meta.tier)
+    assert(rule != nil)
+    error_rate := 0
+    if fact.requests > 0 {
+        error_rate = fact.errors / fact.requests
+    }
+    healthy := fact.latency_ms <= fact.budget_ms && error_rate <= number_or(rule["Max Error Rate"], 0)
+    if !healthy {
+        breach_count = breach_count + 1
+    }
+    health := "review"
+    if healthy {
+        health = "ok"
+    }
+    report_rows[i] = {
+        Service: meta.service,
+        Owner: meta.owner,
+        Tier: meta.tier,
+        Requests: fact.requests,
+        Errors: fact.errors,
+        ErrorRate: string.format("%.2f", error_rate),
+        LatencyMs: fact.latency_ms,
+        BudgetMs: fact.budget_ms,
+        DeployFailures: fact.deploy_failures,
+        Health: health,
+    }
+}
+
+report_table := dialect.eval("mdtable", report_rows, {mode: "encode"})
+report_jsonl := dialect.eval("jsonl", report_rows, {mode: "encode"})
+summary_logfmt := dialect.eval("logfmt", {
+    services: soa.len(service_facts),
+    requests: soa.sum(service_facts, "requests"),
+    errors: soa.sum(service_facts, "errors"),
+    breaches: breach_count,
+    over_budget: soa.countWhere(service_facts, latency_over_budget),
+}, {mode: "encode"})
+
+final_report := template {
+    text: `# Service Quality Report
+
+{{.summary}}
+
+Services: {{.services}}
+Requests: {{.requests}}
+Errors: {{.errors}}
+Breaches: {{.breaches}}
+`,
+    data: {
+        summary: summary_logfmt,
+        services: soa.len(service_facts),
+        requests: soa.sum(service_facts, "requests"),
+        errors: soa.sum(service_facts, "errors"),
+        breaches: breach_count,
+    },
+}
+
+workflow_report_summary := string.format(
+    "services=%d requests=%.0f errors=%.0f breaches=%d over_budget=%d",
+    soa.len(service_facts),
+    soa.sum(service_facts, "requests"),
+    soa.sum(service_facts, "errors"),
+    breach_count,
+    soa.countWhere(service_facts, latency_over_budget)
+)
+
+print(report_table)
+print(summary_logfmt)
+assert(#services == 3)
+assert(#deploy_events == 5)
+assert(#request_logs == 8)
+assert(service_index("search") == 3)
+assert(soa.len(service_facts) == 3)
+assert(soa.sum(service_facts, "requests") == 8)
+assert(soa.sum(service_facts, "errors") == 3)
+assert(soa.sumWhere(service_facts, "errors", erroring_services) == 3)
+assert(soa.countWhere(service_facts, latency_over_budget) == 2)
+assert(soa.countWhere(service_facts, erroring_services) == 3)
+assert(latency_stats.max == 840)
+assert(latency_stats.min == 500)
+assert(latency_stats.mean == 690)
+assert(report_rows[1].Health == "review")
+assert(report_rows[2].Health == "ok")
+assert(report_rows[3].Health == "review")
+assert(report_rows[1].ErrorRate == "0.33")
+assert(report_rows[2].DeployFailures == 0)
+assert(string.find(report_table, "| 400.0 | 1.0 | 0.33 | 1.0 | review | 730.0 | payments | 3.0 | api | gold |", 1, true) != nil)
+assert(string.find(report_jsonl, `"Service":"search"`, 1, true) != nil)
+assert(string.find(summary_logfmt, "services=3", 1, true) != nil)
+assert(string.find(final_report, "# Service Quality Report", 1, true) != nil)
+assert(workflow_report_summary == "services=3 requests=8 errors=3 breaches=2 over_budget=2")
+
+print("workflow", workflow_report_summary)

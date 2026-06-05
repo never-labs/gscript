@@ -1,0 +1,8 @@
+case:release_ci_regression_workflow_test
+workflow	release-2026.06.05
+discovered_self	true
+jobs	4
+tap	ok	4	failed	0	todo	1
+quality_score	98
+gate	release	ok
+ok

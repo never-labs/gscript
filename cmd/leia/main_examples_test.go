@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -63,6 +64,94 @@ func TestRunCommandDialectExamples(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestPracticalExampleProjects(t *testing.T) {
+	root, err := filepath.Abs(filepath.Join("..", ".."))
+	if err != nil {
+		t.Fatal(err)
+	}
+	projects := []struct {
+		name     string
+		run      func(t *testing.T) string
+		wantText string
+	}{
+		{"api-offline-client", execExampleProjectGlobal(root, filepath.Join("examples", "api", "offline_client.leia"), "api_client_summary"), "prj-7 2 tickets"},
+		{"data-quality-report", execExampleProjectGlobal(root, filepath.Join("examples", "workflow", "service_quality_report.leia"), "workflow_report_summary"), "services=3 requests=8 errors=3 breaches=2 over_budget=2"},
+		{"release-ci-regression", testExampleProject(root, filepath.Join("examples", "testing")), "release_ci_regression_workflow_test.leia"},
+		{"ai-agent-composition", evaluateReplayExampleProject(root, filepath.Join("examples", "evaluate", "agent_replay.leia"), filepath.Join("examples", "evaluate", "agent_replay.records.json")), "agent consumes replay"},
+		{"concurrency-pipeline", execExampleProjectGlobal(root, filepath.Join("examples", "concurrency", "goroutines_channels.leia"), "workers"), "4"},
+		{"package-managed-database", modCheckExampleProject(root, filepath.Join("examples", "database", "package_managed")), "github.com/never-labs/leia-db/sqlite"},
+	}
+	for _, project := range projects {
+		t.Run(project.name, func(t *testing.T) {
+			stdout := project.run(t)
+			if project.wantText != "" && !strings.Contains(stdout, project.wantText) {
+				t.Fatalf("%s output = %q, want containing %q", project.name, stdout, project.wantText)
+			}
+			if strings.TrimSpace(stdout) == "" {
+				t.Fatalf("%s produced no observable output", project.name)
+			}
+		})
+	}
+}
+
+func execExampleProjectGlobal(root, rel, global string) func(t *testing.T) string {
+	return func(t *testing.T) string {
+		t.Helper()
+		vm := leia.New(
+			leia.WithLibs(leia.LibAll),
+			leia.WithVM(),
+		)
+		if err := vm.ExecFile(filepath.Join(root, rel)); err != nil {
+			t.Fatalf("ExecFile %s: %v", rel, err)
+		}
+		value, err := vm.Get(global)
+		if err != nil {
+			t.Fatalf("get %s from %s: %v", global, rel, err)
+		}
+		return valueString(value)
+	}
+}
+
+func testExampleProject(root, rel string) func(t *testing.T) string {
+	return func(t *testing.T) string {
+		t.Helper()
+		var stdout, stderr bytes.Buffer
+		code := runTestCommand([]string{"--json", "--golden=require", filepath.Join(root, rel)}, cliRunOptions{UseVM: true}, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("test command %s code = %d, stderr = %q stdout = %q", rel, code, stderr.String(), stdout.String())
+		}
+		return stdout.String()
+	}
+}
+
+func evaluateReplayExampleProject(root, rel, recordsRel string) func(t *testing.T) string {
+	return func(t *testing.T) string {
+		t.Helper()
+		var stdout, stderr bytes.Buffer
+		code := runEvaluateCommand([]string{"--json", "--replay", filepath.Join(root, recordsRel), filepath.Join(root, rel)}, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("evaluate replay %s code = %d, stderr = %q stdout = %q", rel, code, stderr.String(), stdout.String())
+		}
+		return stdout.String()
+	}
+}
+
+func modCheckExampleProject(root, rel string) func(t *testing.T) string {
+	return func(t *testing.T) string {
+		t.Helper()
+		var stdout, stderr bytes.Buffer
+		code := runModCommand([]string{"list", "--json", filepath.Join(root, rel)}, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("mod list %s code = %d, stderr = %q stdout = %q", rel, code, stderr.String(), stdout.String())
+		}
+		return stdout.String()
+	}
+}
+
+func valueString(value any) string {
+	return fmt.Sprint(value)
 }
 
 func TestRunCommandDialectExamplesCoverApprovedBuiltinTags(t *testing.T) {
@@ -248,14 +337,17 @@ func TestTestingJSONLWorkflowExample(t *testing.T) {
 	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
 		t.Fatalf("stdout is not JSON test report: %v; stdout = %q", err, stdout.String())
 	}
-	if !report.OK || report.Total != 2 || report.Passed != 2 {
-		t.Fatalf("report = %+v, want two passing testing examples", report)
+	if !report.OK || report.Total != 3 || report.Passed != 3 {
+		t.Fatalf("report = %+v, want three passing testing examples", report)
 	}
 	if !testReportHasPassingFile(report, "jsonl_workflow_test.leia") {
 		t.Fatalf("files = %+v, want jsonl_workflow_test.leia to pass", report.Files)
 	}
 	if !testReportHasPassingFile(report, "jsonl_golden_eval_replay_test.leia") {
 		t.Fatalf("files = %+v, want jsonl_golden_eval_replay_test.leia to pass", report.Files)
+	}
+	if !testReportHasPassingFile(report, "release_ci_regression_workflow_test.leia") {
+		t.Fatalf("files = %+v, want release_ci_regression_workflow_test.leia to pass", report.Files)
 	}
 }
 
@@ -301,6 +393,24 @@ func TestWorkflowStatusRollupExample(t *testing.T) {
 	}
 }
 
+func TestWorkflowServiceQualityReportExample(t *testing.T) {
+	root, err := filepath.Abs(filepath.Join("..", ".."))
+	if err != nil {
+		t.Fatal(err)
+	}
+	vm := leia.New(
+		leia.WithLibs(leia.LibString|leia.LibTable|leia.LibArray|leia.LibSoA|leia.LibDialect),
+		leia.WithVM(),
+	)
+	if err := vm.ExecFile(filepath.Join(root, "examples", "workflow", "service_quality_report.leia")); err != nil {
+		t.Fatalf("run service quality report workflow example: %v", err)
+	}
+	got, err := vm.Get("workflow_report_summary")
+	if err != nil || got != "services=3 requests=8 errors=3 breaches=2 over_budget=2" {
+		t.Fatalf("workflow_report_summary = %#v err=%v, want service quality summary", got, err)
+	}
+}
+
 func TestWorkflowEvaluateListExample(t *testing.T) {
 	root, err := filepath.Abs(filepath.Join("..", ".."))
 	if err != nil {
@@ -327,14 +437,17 @@ func TestWorkflowEvaluateListExample(t *testing.T) {
 	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
 		t.Fatalf("stdout is not JSON evaluate report: %v; stdout = %q", err, stdout.String())
 	}
-	if report.Status != "ok" || report.Summary.Files != 2 || report.Summary.ParsedFiles != 2 {
-		t.Fatalf("report = %+v, want two parsed workflow files with ok status", report)
+	if report.Status != "ok" || report.Summary.Files != 3 || report.Summary.ParsedFiles != 3 {
+		t.Fatalf("report = %+v, want three parsed workflow files with ok status", report)
 	}
 	if !evaluateReportHasOKInput(report.Inputs, "support_triage_replay.leia") {
 		t.Fatalf("inputs = %+v, want support_triage_replay.leia ok", report.Inputs)
 	}
 	if !evaluateReportHasOKInput(report.Inputs, "status_rollup.leia") {
 		t.Fatalf("inputs = %+v, want status_rollup.leia ok", report.Inputs)
+	}
+	if !evaluateReportHasOKInput(report.Inputs, "service_quality_report.leia") {
+		t.Fatalf("inputs = %+v, want service_quality_report.leia ok", report.Inputs)
 	}
 }
 

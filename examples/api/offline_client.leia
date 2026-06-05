@@ -1,0 +1,161 @@
+// offline_api_client.leia - Exercise a realistic Web/API client flow locally.
+// Demonstrates: url, urlquery, urlpath, httpmsg, headers, json, jwt, sse,
+// mime, cookie/cookies, base64, hash, jsonl, template, and duration.
+
+print("=== Dialects: offline API client ===")
+
+base := url`https://api.example.test/v2/projects/prj-7/tickets?status=open&limit=2`
+route := dialect.eval("urlpath", base.path, {template: "/v2/projects/{project}/tickets", mode: "match_template"})
+next_query := urlquery {status: base.query.status, limit: base.query.limit, cursor: "n-2"}
+next_page := base.scheme .. "://" .. base.host .. route.path .. "?" .. next_query
+
+header_json := dialect.eval("json", {alg: "none", typ: "JWT"}, {mode: "encode"})
+payload_json := dialect.eval("json", {
+    sub: "agent-19",
+    tenant: "acme",
+    scope: "tickets:read stream:read",
+    exp: 1893456000,
+}, {mode: "encode"})
+token := dialect.eval("base64", header_json, {mode: "url_encode"}) .. "." .. dialect.eval("base64", payload_json, {mode: "url_encode"}) .. ".local-signature"
+claims := dialect.eval("jwt", token, {mode: "decode"})
+
+request_body := dialect.eval("json", {
+    include: {"comments", "watchers"},
+    client: {name: "leia-offline", retry: true},
+}, {mode: "encode"})
+request_headers := {
+    host: base.host,
+    accept: "application/json",
+    authorization: "Bearer " .. token,
+    cookie: dialect.eval("cookies", {session: "s-local", cohort: "protocol"}, {mode: "encode"}),
+    ["content-type"]: "application/json",
+    ["x-client-trace"]: "trace-9001",
+}
+wire_request := httpmsg {
+    method: "POST",
+    target: base.path .. "?" .. urlquery {status: base.query.status, limit: base.query.limit},
+    headers: request_headers,
+    body: request_body,
+}
+parsed_request := dialect.eval("httpmsg", wire_request, {mode: "parse"})
+parsed_cookies := dialect.eval("cookie", parsed_request.headers.Cookie)
+
+response_media := mime`application/json; charset=utf-8`
+response_body := dialect.eval("json", {
+    ok: true,
+    project: route.params.project,
+    tickets: {
+        {id: "T-100", title: "Login callback fails", priority: 1},
+        {id: "T-101", title: "Retry budget exceeded", priority: 2},
+    },
+    next: next_page,
+}, {mode: "encode"})
+response_headers := {
+    ["content-type"]: response_media.type,
+    ["set-cookie"]: "cursor=n-2; Path=/v2/projects/prj-7",
+    ["x-request-id"]: parsed_request.headers["X-Client-Trace"],
+    link: "<" .. next_page .. ">; rel=\"next\"",
+}
+wire_response := dialect.eval("httpmsg", {
+    type: "response",
+    status: 200,
+    reason: "OK",
+    headers: response_headers,
+    body: response_body,
+}, {mode: "format"})
+parsed_response := dialect.eval("httpmsg", wire_response, {mode: "parse"})
+response_json := dialect.eval("json", parsed_response.body)
+set_cookie := dialect.eval("cookie", parsed_response.headers["Set-Cookie"])
+
+stream := sse`id: evt-1
+event: ticket
+data: {"id":"T-100","state":"open"}
+
+id: evt-2
+event: ticket
+data: {"id":"T-101","state":"open"}
+
+id: evt-3
+event: done
+data: {"cursor":"n-2"}
+
+`
+
+open_count := 0
+last_cursor := ""
+for _, event := range stream {
+    data := dialect.eval("json", event.data)
+    if event.event == "ticket" && data.state == "open" {
+        open_count += 1
+    }
+    if event.event == "done" {
+        last_cursor = data.cursor
+    }
+}
+
+retry_window := duration`250ms`
+audit := dialect.eval("jsonl", {
+    {phase: "request", method: parsed_request.method, target: parsed_request.target, subject: claims.payload.sub},
+    {phase: "response", status: parsed_response.status, media: parsed_response.headers["Content-Type"], next_cursor: set_cookie.cursor},
+    {phase: "stream", events: #stream, open: open_count, cursor: last_cursor},
+}, {mode: "encode"})
+fingerprint := string.sub(dialect.eval("hash", wire_request .. wire_response .. audit, {algo: "sha256"}), 1, 16)
+summary := template {
+    text: "{{.project}} {{.tickets}} tickets cursor={{.cursor}} retry={{.retry}} fp={{.fingerprint}}",
+    data: {
+        project: response_json.project,
+        tickets: #response_json.tickets,
+        cursor: last_cursor,
+        retry: retry_window.text,
+        fingerprint: fingerprint,
+    },
+}
+api_client_summary := summary
+
+print(summary)
+print("request target:", parsed_request.target)
+print("next page:", response_json.next)
+print("audit:")
+print(audit)
+
+assert(base.scheme == "https")
+assert(base.host == "api.example.test")
+assert(base.path == "/v2/projects/prj-7/tickets")
+assert(base.query.status == "open")
+assert(base.query.limit == "2")
+assert(route.params.project == "prj-7")
+assert(route.path == "/v2/projects/prj-7/tickets")
+assert(next_query == "cursor=n-2&limit=2&status=open")
+assert(next_page == "https://api.example.test/v2/projects/prj-7/tickets?cursor=n-2&limit=2&status=open")
+assert(header_json == "{\"alg\":\"none\",\"typ\":\"JWT\"}")
+assert(payload_json == "{\"exp\":1893456000,\"scope\":\"tickets:read stream:read\",\"sub\":\"agent-19\",\"tenant\":\"acme\"}")
+assert(claims.header.alg == "none")
+assert(claims.payload.sub == "agent-19")
+assert(claims.payload.tenant == "acme")
+assert(claims.payload.scope == "tickets:read stream:read")
+assert(claims.verified == false)
+assert(parsed_request.method == "POST")
+assert(parsed_request.target == "/v2/projects/prj-7/tickets?limit=2&status=open")
+assert(parsed_request.headers.Authorization == "Bearer " .. token)
+assert(parsed_request.headers["Content-Type"] == "application/json")
+assert(parsed_request.headers["X-Client-Trace"] == "trace-9001")
+assert(parsed_cookies.session == "s-local")
+assert(parsed_cookies.cohort == "protocol")
+assert(response_media.params.charset == "utf-8")
+assert(parsed_response.status == 200)
+assert(parsed_response.headers["Content-Type"] == "application/json")
+assert(response_json.ok == true)
+assert(response_json.project == "prj-7")
+assert(response_json.tickets[1].id == "T-100")
+assert(response_json.tickets[2].priority == 2)
+assert(response_json.next == next_page)
+assert(set_cookie.cursor == "n-2")
+assert(#stream == 3)
+assert(open_count == 2)
+assert(last_cursor == "n-2")
+assert(retry_window.milliseconds == 250)
+assert(audit == "{\"method\":\"POST\",\"phase\":\"request\",\"subject\":\"agent-19\",\"target\":\"/v2/projects/prj-7/tickets?limit=2\\u0026status=open\"}\n{\"media\":\"application/json\",\"next_cursor\":\"n-2\",\"phase\":\"response\",\"status\":200}\n{\"cursor\":\"n-2\",\"events\":3,\"open\":2,\"phase\":\"stream\"}\n")
+assert(fingerprint == "8a42ba4bd2e77682")
+assert(summary == "prj-7 2 tickets cursor=n-2 retry=250ms fp=" .. fingerprint)
+
+print("offline api client ok")

@@ -1467,6 +1467,7 @@ func playgroundExamplesRoot() string {
 func repositoryExampleRunnable(path string) bool {
 	return !strings.Contains(path, "/evaluate/") &&
 		!strings.Contains(path, "/llm/") &&
+		!strings.Contains(path, "/testing/") &&
 		!strings.Contains(path, "/workflow/support_triage_replay.leia") &&
 		!strings.Contains(path, "/web/") &&
 		!strings.Contains(path, "/database/package_managed/") &&
@@ -1484,6 +1485,8 @@ func repositoryExampleRequires(path string) string {
 		return "leia evaluate CLI"
 	case strings.Contains(path, "/llm/"):
 		return "LLM provider"
+	case strings.Contains(path, "/testing/"):
+		return "leia test CLI"
 	case strings.Contains(path, "/workflow/support_triage_replay.leia"):
 		return "LLM replay fixture or provider"
 	case strings.Contains(path, "/web/"):
