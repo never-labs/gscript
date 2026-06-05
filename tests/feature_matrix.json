@@ -134,7 +134,7 @@
       "parser": {"status": "covered", "refs": ["tests/smoke/06_closures.leia"]},
       "bytecode": {"status": "covered", "refs": ["internal/vm/compiler_method_test.go"]},
       "interpreter": {"status": "covered", "refs": ["internal/runtime/closure_advanced_test.go", "internal/runtime/scope_test.go"]},
-      "tier1": {"status": "partial", "refs": ["internal/methodjit/emit_upval.go", "internal/methodjit/closure_recurrence_test.go"]},
+      "tier1": {"status": "covered", "refs": ["internal/methodjit/tier1_test.go", "internal/methodjit/closure_recurrence_test.go"]},
       "tier2": {"status": "partial", "refs": ["internal/methodjit/pass_inline_test.go", "internal/methodjit/emit_upval.go"]},
       "semantic_gate": {"status": "covered", "refs": ["tests/language/closure_break_upvalues.leia", "tests/language/closure_loop_mutation_more2.leia"]},
       "conformance_case": {"status": "covered", "refs": ["tests/language/closure_identity_more.leia"]},
@@ -204,7 +204,7 @@
       "parser": {"status": "not_applicable", "refs": []},
       "bytecode": {"status": "covered", "refs": ["internal/vm/coroutine_boundary_test.go"]},
       "interpreter": {"status": "covered", "refs": ["internal/runtime/coroutine_test.go", "tests/smoke/08_coroutine.leia"]},
-      "tier1": {"status": "partial", "refs": ["internal/methodjit/coroutine_fusion_test.go"]},
+      "tier1": {"status": "covered", "refs": ["internal/methodjit/coroutine_fusion_test.go", "internal/vm/coroutine_sum_specialization_test.go"]},
       "tier2": {"status": "partial", "refs": ["internal/methodjit/tier2_continuation_test.go"]},
       "semantic_gate": {"status": "covered", "refs": ["tests/language/coroutine_tail_yield_more.leia", "tests/language/coroutine_recursive_yield_more.leia"]},
       "conformance_case": {"status": "covered", "refs": ["tests/language/coroutine_wrap_sieve_more.leia"]},
@@ -278,7 +278,7 @@
       "tier2": {"status": "semantic_only", "refs": []},
       "semantic_gate": {"status": "covered", "refs": ["tests/language/fs_path_glob_cwd_more.leia", "tests/language/fs_path_go_host_more.leia", "tests/language/files_io_read_formats_more.leia", "tests/language/files_io_write_read_lines.leia", "tests/language/io_current_stream_more.leia", "tests/language/net_http_background_roundtrip_more.leia", "tests/language/json_go_host_more.leia", "tests/language/crypto_go_host_more.leia", "tests/language/process_go_host_entry_exit_more.leia", "tests/language/http_background_server_more.leia", "tests/language/db_leia_diagnostics_more.leia"]},
       "conformance_case": {"status": "covered", "refs": ["tests/language/net_http_methods_more.leia", "tests/language/http_router_json_edges_more.leia", "tests/language/process_exec_run_more.leia", "tests/language/db_nested_call_flow_more.leia", "tests/language/db_vm_debug_parity_more.leia", "examples/web/tiny_app.leia"]},
-      "perf_hot_case": {"status": "partial", "refs": ["benchmarks/app/stdlib_host.leia", "benchmarks/app/serve_loopback_smoke.leia", "benchmarks/app/sqlite_memory_smoke.leia", "benchmarks/table/json_table_walk.leia"]}
+      "perf_hot_case": {"status": "covered", "refs": ["benchmarks/app/stdlib_host.leia", "benchmarks/app/serve_loopback_smoke.leia", "benchmarks/app/sqlite_memory_smoke.leia", "benchmarks/table/json_table_walk.leia"]}
     },
     {
       "id": "tagged_dialect_syntax",
@@ -307,7 +307,7 @@
       "tier2": {"status": "semantic_only", "refs": []},
       "semantic_gate": {"status": "covered", "refs": ["tests/llm/llm_runtime_test.go", "tests/llm/llm_agent_examples_test.go", "tests/llm/llm_record_replay_test.go", "tests/llm/llm_trace_test.go", "tests/llm/llm_ai_dialect_test.go", "tests/integration/llm/llm_openai_provider_test.go", "tests/integration/llm/llm_provider_test.go", "tests/integration/llm/llm_glm_integration_test.go", "cmd/leia/main_examples_test.go", "cmd/leia/main_examples_command_test.go", "examples/ai/coding_agent_replay.leia", "examples/evaluate/agent_replay.leia", "examples/workflow/support_triage_replay.leia", "examples/embedding/embedding_test.go", "docs/guides/embedding.md"]},
       "conformance_case": {"status": "not_applicable", "refs": []},
-      "perf_hot_case": {"status": "partial", "refs": ["benchmarks/app/ai_runtime_smoke.leia"]}
+      "perf_hot_case": {"status": "covered", "refs": ["benchmarks/app/ai_runtime_smoke.leia"]}
     },
     {
       "id": "module_package_management",
@@ -349,7 +349,7 @@
       "tier2": {"status": "semantic_only", "refs": []},
       "semantic_gate": {"status": "covered", "refs": ["tests/sdk/register_api_test.go", "tests/sdk/module_api_test.go", "tests/sdk/error_api_test.go", "tests/sdk/public_api_boundary_test.go", "examples/embedding/embedding_test.go"]},
       "conformance_case": {"status": "not_applicable", "refs": []},
-      "perf_hot_case": {"status": "semantic_only", "refs": []}
+      "perf_hot_case": {"status": "covered", "refs": ["tests/sdk/embedding_perf_test.go"]}
     },
     {
       "id": "sandbox_capabilities_module_loading",

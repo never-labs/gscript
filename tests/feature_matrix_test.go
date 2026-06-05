@@ -249,6 +249,9 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 		"tests/sdk/public_api_boundary_test.go",
 		"examples/embedding/embedding_test.go",
 	)
+	requireFeatureCellRefs(t, hostBindings, "embedding_host_bindings", "perf_hot_case",
+		"tests/sdk/embedding_perf_test.go",
+	)
 
 	resourceBudgets := requireFeature(t, features, "embedding_resource_budgets")
 	requireFeatureCellRefs(t, resourceBudgets, "embedding_resource_budgets", "semantic_gate",
