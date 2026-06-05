@@ -25,8 +25,7 @@ their documented output in sync.
 - `Example_structuredErrors` covers structured script and host callback errors
   with standard `errors.As` and `errors.Is` handling.
 - `Example_llmProvider` covers the native `llm` module with a Go-provided
-  model backend, message constructors, tool descriptors, and script-side tool
-  dispatch through the `llm.react` helper.
+  model backend, message constructors, and a script-side `llm.turn` call.
 
 Package-level examples in `../../example_test.go` exercise the same
 public surface from the `leia` package documentation.

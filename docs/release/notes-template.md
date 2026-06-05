@@ -43,16 +43,19 @@ Include command, platform, CPU, Go version, LuaJIT availability, artifact path,
 and caveats.
 
 ```bash
-bash scripts/performance_gate.sh --feature-smoke
+bash scripts/performance_gate.sh --full
 ```
 
 ## Validation
 
 ```bash
-bash scripts/production_check.sh --quick
+go run ./cmd/leia ci release --list
+bash scripts/production_check.sh --full
 go test ./tests -run 'TestFeatureMatrix|TestReleaseMatrix' -count=1
 bash scripts/docs_check.sh
-bash scripts/performance_gate.sh --feature-smoke
+bash scripts/performance_gate.sh --full
+bash scripts/release_distribution_check.sh
+bash scripts/release_artifacts_check.sh
 ```
 
 ## Known Issues

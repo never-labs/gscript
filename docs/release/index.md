@@ -7,10 +7,13 @@ Leia releases need machine-checkable evidence, not hand-written claims.
 Run at least:
 
 ```bash
-bash scripts/production_check.sh --quick
+go run ./cmd/leia ci release --list
+bash scripts/production_check.sh --full
 go test ./tests -run 'TestFeatureMatrix|TestReleaseMatrix' -count=1
 bash scripts/docs_check.sh
-bash scripts/performance_gate.sh --feature-smoke
+bash scripts/performance_gate.sh --full
+bash scripts/release_distribution_check.sh
+bash scripts/release_artifacts_check.sh
 ```
 
 The release evidence should cite:

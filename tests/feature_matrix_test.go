@@ -334,6 +334,8 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 		"cmd/leia/main_examples_test.go",
 		"cmd/leia/main_examples_command_test.go",
 		"examples/ai/coding_agent_replay.leia",
+		"examples/ai/tagged_agent_workflow.leia",
+		"examples/ai/record_replay_trace_project.leia",
 		"examples/evaluate/agent_replay.leia",
 		"examples/workflow/support_triage_replay.leia",
 		"examples/embedding/embedding_test.go",
@@ -394,6 +396,7 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 		"cmd/leia/main_bench_test.go",
 		"cmd/leia/main_examples_command_test.go",
 		"cmd/leia/main_readme_tooling_test.go",
+		"examples/tooling/release_evidence_pipeline.leia",
 		"docs/guides/tooling.md",
 	)
 
@@ -415,6 +418,7 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 	requireFeatureCellRefs(t, bytecodeVM, "bytecode_vm_execution", "semantic_gate",
 		"cmd/leia/main_metadata_test.go",
 		"cmd/leia/main_run_test.go",
+		"examples/performance/execution_modes_matrix.leia",
 		"docs/reference/platforms/index.md",
 	)
 

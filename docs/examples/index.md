@@ -40,6 +40,7 @@ set.
 | `examples/data/` | Focused data-language examples, including q/kdb+-style symbolic vectors. |
 | `examples/data_processing/` | Data structures, string processing, dense arrays, and SoA kernels. |
 | `examples/concurrency/` | Goroutines, channels, select, sync primitives, context cancellation, and process cancellation. |
+| `examples/ai/` | Tagged AI dialect workflows, replay/trace projects, and coding-agent replay examples. |
 | `examples/llm/` | AI-native models, tools, agents, direct agent-as-tool, custom flow, and live provider smoke scripts. |
 | `examples/embedding/` | Go embedding examples as executable Go doc tests. |
 | `examples/web/` | HTTP/server-oriented scripts. |

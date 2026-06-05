@@ -305,7 +305,7 @@
       "interpreter": {"status": "covered", "refs": ["tests/llm/llm_runtime_test.go", "tests/llm/llm_agent_examples_test.go", "tests/llm/llm_record_replay_test.go", "tests/llm/llm_trace_test.go", "tests/llm/llm_ai_dialect_test.go", "tests/integration/llm/llm_openai_provider_test.go", "tests/integration/llm/llm_provider_test.go", "tests/integration/llm/llm_glm_integration_test.go", "examples/embedding/embedding_test.go", "docs/guides/embedding.md", "docs/guides/ai-native.md"]},
       "tier1": {"status": "semantic_only", "refs": []},
       "tier2": {"status": "semantic_only", "refs": []},
-      "semantic_gate": {"status": "covered", "refs": ["tests/llm/llm_runtime_test.go", "tests/llm/llm_agent_examples_test.go", "tests/llm/llm_record_replay_test.go", "tests/llm/llm_trace_test.go", "tests/llm/llm_ai_dialect_test.go", "tests/integration/llm/llm_openai_provider_test.go", "tests/integration/llm/llm_provider_test.go", "tests/integration/llm/llm_glm_integration_test.go", "cmd/leia/main_examples_test.go", "cmd/leia/main_examples_command_test.go", "examples/ai/coding_agent_replay.leia", "examples/evaluate/agent_replay.leia", "examples/workflow/support_triage_replay.leia", "examples/embedding/embedding_test.go", "docs/guides/embedding.md", "docs/guides/ai-native.md"]},
+      "semantic_gate": {"status": "covered", "refs": ["tests/llm/llm_runtime_test.go", "tests/llm/llm_agent_examples_test.go", "tests/llm/llm_record_replay_test.go", "tests/llm/llm_trace_test.go", "tests/llm/llm_ai_dialect_test.go", "tests/integration/llm/llm_openai_provider_test.go", "tests/integration/llm/llm_provider_test.go", "tests/integration/llm/llm_glm_integration_test.go", "cmd/leia/main_examples_test.go", "cmd/leia/main_examples_command_test.go", "examples/ai/coding_agent_replay.leia", "examples/ai/tagged_agent_workflow.leia", "examples/ai/record_replay_trace_project.leia", "examples/evaluate/agent_replay.leia", "examples/workflow/support_triage_replay.leia", "examples/embedding/embedding_test.go", "docs/guides/embedding.md", "docs/guides/ai-native.md"]},
       "conformance_case": {"status": "not_applicable", "refs": []},
       "perf_hot_case": {"status": "covered", "refs": ["benchmarks/app/ai_runtime_smoke.leia"]}
     },
@@ -325,7 +325,7 @@
     },
     {
       "id": "cli_repository_tooling",
-      "name": "CLI tooling for format, lint, test, docs, diagnostics, modules, benchmarks, and examples",
+      "name": "CLI tooling for format, lint, test, docs, diagnostics, modules, benchmarks, examples, and release evidence",
       "category": "tooling-cli",
       "spec_sections": ["Stability Contract", "Modules And Loading", "Implementation Requirements"],
       "parser": {"status": "not_applicable", "refs": []},
@@ -333,7 +333,7 @@
       "interpreter": {"status": "not_applicable", "refs": []},
       "tier1": {"status": "not_applicable", "refs": []},
       "tier2": {"status": "not_applicable", "refs": []},
-      "semantic_gate": {"status": "covered", "refs": ["cmd/leia/main_fmt_test.go", "cmd/leia/main_lint_test.go", "cmd/leia/main_test_run_test.go", "cmd/leia/main_doc_test.go", "cmd/leia/main_diag_test.go", "cmd/leia/main_mod_test.go", "cmd/leia/main_bench_test.go", "cmd/leia/main_examples_command_test.go", "cmd/leia/main_ci_test.go", "cmd/leia/main_readme_tooling_test.go", "docs/guides/tooling.md", "docs/reference/cli/index.md"]},
+      "semantic_gate": {"status": "covered", "refs": ["cmd/leia/main_fmt_test.go", "cmd/leia/main_lint_test.go", "cmd/leia/main_test_run_test.go", "cmd/leia/main_doc_test.go", "cmd/leia/main_diag_test.go", "cmd/leia/main_mod_test.go", "cmd/leia/main_bench_test.go", "cmd/leia/main_examples_command_test.go", "cmd/leia/main_ci_test.go", "cmd/leia/main_readme_tooling_test.go", "examples/tooling/release_evidence_pipeline.leia", "docs/guides/tooling.md", "docs/reference/cli/index.md"]},
       "conformance_case": {"status": "not_applicable", "refs": []},
       "perf_hot_case": {"status": "covered", "refs": ["benchmarks/performance_gate_test.py", "benchmarks/benchmark_discovery_test.py"]}
     },
@@ -347,7 +347,7 @@
       "interpreter": {"status": "covered", "refs": ["internal/runtime/control_flow_test.go", "internal/runtime/arithmetic_test.go"]},
       "tier1": {"status": "semantic_only", "refs": []},
       "tier2": {"status": "semantic_only", "refs": []},
-      "semantic_gate": {"status": "covered", "refs": ["cmd/leia/main_metadata_test.go", "cmd/leia/main_run_test.go", "cmd/leia/main_examples_test.go", "docs/reference/platforms/index.md"]},
+      "semantic_gate": {"status": "covered", "refs": ["cmd/leia/main_metadata_test.go", "cmd/leia/main_run_test.go", "cmd/leia/main_examples_test.go", "examples/performance/execution_modes_matrix.leia", "docs/reference/platforms/index.md"]},
       "conformance_case": {"status": "not_applicable", "refs": []},
       "perf_hot_case": {"status": "not_applicable", "refs": []}
     },

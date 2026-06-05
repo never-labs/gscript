@@ -59,7 +59,7 @@ vm := leia.New(
 ```
 
 File, environment, module loading, native call, step, goroutine, channel, and
-output budgets are separate controls. See the
+host-result-size budgets are separate controls. See the
 [security reference](../reference/security/index.md).
 
 ## Host Modules

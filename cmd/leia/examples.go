@@ -44,6 +44,10 @@ func runExamplesCommand(args []string, outw, errw io.Writer) int {
 	if len(args) == 0 {
 		return runExamplesListCommand(nil, outw, errw)
 	}
+	if args[0] == "-h" || args[0] == "--help" || args[0] == "help" {
+		fmt.Fprintln(errw, "usage: leia examples [list|show|run|check] [--json] [ID-or-path]")
+		return 0
+	}
 	if strings.HasPrefix(args[0], "-") {
 		return runExamplesListCommand(args, outw, errw)
 	}
@@ -56,9 +60,6 @@ func runExamplesCommand(args []string, outw, errw io.Writer) int {
 		return runExamplesRunCommand(args[1:], outw, errw)
 	case "show":
 		return runExamplesShowCommand(args[1:], outw, errw)
-	case "-h", "--help", "help":
-		fmt.Fprintln(errw, "usage: leia examples [list|show|run|check] [--json] [ID-or-path]")
-		return 0
 	default:
 		fmt.Fprintf(errw, "leia examples: unknown subcommand %q\n", args[0])
 		fmt.Fprintln(errw, "usage: leia examples [list|show|run|check] [--json] [ID-or-path]")

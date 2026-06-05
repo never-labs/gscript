@@ -269,9 +269,12 @@ func TestReleaseMatrixSpecGateCommandsStaySynchronized(t *testing.T) {
 	releaseMatrixCmd := "go test ./tests -run 'TestFeatureMatrix|TestReleaseMatrix' -count=1"
 	specExamplesCmd := "go test ./tests -run 'TestSpecRunnableExamples|TestSpecLeiaCodeFencesAreExecutableOrExplicitlyNonExecutable' -count=1"
 	docsCheckCmd := "bash scripts/docs_check.sh"
-	productionQuickCmd := "bash scripts/production_check.sh --quick"
+	ciReleaseListCmd := "go run ./cmd/leia ci release --list"
+	productionFullCmd := "bash scripts/production_check.sh --full"
 	performanceSmokeCmd := "bash scripts/performance_gate.sh --smoke"
 	fullPerfGateCmd := "bash scripts/performance_gate.sh --full"
+	releaseDistributionCmd := "bash scripts/release_distribution_check.sh"
+	releaseArtifactsCmd := "bash scripts/release_artifacts_check.sh"
 
 	for _, item := range []struct {
 		path     string
@@ -291,9 +294,13 @@ func TestReleaseMatrixSpecGateCommandsStaySynchronized(t *testing.T) {
 			path: "docs/release/index.md",
 			snippets: []string{
 				"## Machine-Checkable Release Evidence",
-				productionQuickCmd,
+				ciReleaseListCmd,
+				productionFullCmd,
 				releaseMatrixCmd,
 				docsCheckCmd,
+				fullPerfGateCmd,
+				releaseDistributionCmd,
+				releaseArtifactsCmd,
 				"tests/feature_matrix.json",
 				"docs/spec/index.md",
 			},
@@ -301,9 +308,13 @@ func TestReleaseMatrixSpecGateCommandsStaySynchronized(t *testing.T) {
 		{
 			path: "docs/release/notes-template.md",
 			snippets: []string{
-				productionQuickCmd,
+				ciReleaseListCmd,
+				productionFullCmd,
 				releaseMatrixCmd,
 				docsCheckCmd,
+				fullPerfGateCmd,
+				releaseDistributionCmd,
+				releaseArtifactsCmd,
 			},
 		},
 		{
@@ -467,7 +478,12 @@ func TestReleaseMatrixCIProfilesKeepExampleImportGuards(t *testing.T) {
 	}
 
 	releaseOut := runCommand(t, root, 30*time.Second, "go", "run", "./cmd/leia", "ci", "release", "--list")
-	for _, want := range []string{"bash scripts/production_check.sh --full", "bash scripts/release_distribution_check.sh"} {
+	for _, want := range []string{
+		"bash scripts/performance_gate.sh --full",
+		"bash scripts/production_check.sh --full",
+		"bash scripts/release_distribution_check.sh",
+		"bash scripts/release_artifacts_check.sh",
+	} {
 		if !strings.Contains(releaseOut, want) {
 			t.Fatalf("ci release --list must include %q; got:\n%s", want, releaseOut)
 		}

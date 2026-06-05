@@ -45,10 +45,29 @@ func TestCICommandReleaseProfileIncludesDistributionCheck(t *testing.T) {
 		t.Fatalf("runCICommand code = %d, stderr = %q", code, stderr.String())
 	}
 	out := stdout.String()
-	for _, want := range []string{"bash scripts/production_check.sh --full", "bash scripts/release_distribution_check.sh", "bash scripts/release_artifacts_check.sh"} {
+	for _, want := range []string{
+		"bash scripts/performance_gate.sh --full",
+		"bash scripts/production_check.sh --full",
+		"bash scripts/release_distribution_check.sh",
+		"bash scripts/release_artifacts_check.sh",
+	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("stdout = %q, want %q", out, want)
 		}
+	}
+}
+
+func TestExamplesTopLevelHelpDoesNotShowListFlagHelp(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := runExamplesCommand([]string{"--help"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runExamplesCommand code = %d, stdout = %q stderr = %q", code, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "usage: leia examples [list|show|run|check]") {
+		t.Fatalf("stderr = %q, want top-level examples usage", stderr.String())
+	}
+	if strings.Contains(stderr.String(), "Usage of examples list") {
+		t.Fatalf("stderr = %q, should not show examples list flag help", stderr.String())
 	}
 }
 
@@ -90,7 +109,12 @@ func TestCICommandRunsReleaseDistributionCheck(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("runCICommand code = %d, stderr = %q", code, stderr.String())
 	}
-	for _, want := range []string{"bash scripts/production_check.sh --full", "bash scripts/release_distribution_check.sh", "bash scripts/release_artifacts_check.sh"} {
+	for _, want := range []string{
+		"bash scripts/performance_gate.sh --full",
+		"bash scripts/production_check.sh --full",
+		"bash scripts/release_distribution_check.sh",
+		"bash scripts/release_artifacts_check.sh",
+	} {
 		if !containsCommand(commands, want) {
 			t.Fatalf("commands = %#v, want %q", commands, want)
 		}

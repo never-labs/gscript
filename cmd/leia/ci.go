@@ -93,6 +93,7 @@ func ciProfileCommands(profile string, noLuaJIT bool) ([]ciCommand, error) {
 	case "release":
 		return []ciCommand{
 			{Name: "Module path gate", Args: modulePathGateCommand()},
+			{Name: "Performance gate", Args: []string{"bash", "scripts/performance_gate.sh", "--full"}},
 			{Name: "Production check", Args: []string{"bash", "scripts/production_check.sh", "--full"}},
 			{Name: "Release distribution check", Args: []string{"bash", "scripts/release_distribution_check.sh"}},
 			{Name: "Release artifacts check", Args: []string{"bash", "scripts/release_artifacts_check.sh"}},
