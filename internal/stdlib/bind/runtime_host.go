@@ -21,6 +21,7 @@ type HostOptions struct {
 	ScriptDir             func() string
 	MaxHostResult         func() int64
 	Call                  runtime.ScriptFunctionCaller
+	Global                func(string) Value
 }
 
 func HostBool(fn func() bool, fallback bool) bool {

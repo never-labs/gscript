@@ -157,7 +157,7 @@ func TestFeatureMatrixCoversTaggedDialectAndModpkgReleaseGuards(t *testing.T) {
 		"ipaddr", "cidr", "hostport",
 		"base64", "hash", "hex", "base32", "uuid", "gzip", "zlib", "deflate", "binary", "q", "pem",
 		"sql",
-		"prompt", "quote",
+		"prompt", "quote", "model", "turn", "tool", "agent",
 	)
 
 	parserGuard := readFileString(t, filepath.Join(root, "internal", "parser", "dialect_syntax_test.go"))

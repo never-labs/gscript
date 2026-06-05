@@ -181,7 +181,7 @@ func TestBuiltinDialectRegistryStaysModular(t *testing.T) {
 		"dialect_protocol_network.go": {"ipaddr", "cidr", "hostport"},
 		"dialect_data.go":             {"base64", "hash", "hex", "base32", "uuid", "gzip", "zlib", "deflate", "binary", "q", "pem"},
 		"dialect_database.go":         {"sql"},
-		"dialect_ai.go":               {"prompt", "quote"},
+		"dialect_ai.go":               {"prompt", "quote", "model", "turn", "tool", "agent"},
 	}
 	expectedProjectImportsByFile := map[string][]string{
 		"dialect_shell_fs.go": {

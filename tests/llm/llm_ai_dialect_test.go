@@ -1,0 +1,201 @@
+package leia_test
+
+import (
+	"path/filepath"
+	"testing"
+
+	leia "github.com/never-labs/leia"
+	"github.com/never-labs/leia/llm"
+)
+
+func TestAIDialectUsesLLMStdlibRuntime(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []leia.Option
+	}{
+		{name: "interpreter"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			provider := &mockLLMProvider{results: []llm.TurnResult{
+				{Status: "final_answer", Text: "agent-ok"},
+				{Status: "final_answer", Text: "turn-ok"},
+			}}
+			opts := append([]leia.Option{
+				leia.WithLibs(leia.LibString | leia.LibLLM | leia.LibDialect),
+				leia.WithLLMProvider(provider),
+			}, tc.opts...)
+			vm := leia.New(opts...)
+			err := vm.Exec(`
+model {
+    default: "mock-fast"
+}
+
+read_file := tool {
+    name: "read_file"
+    fn: func(path) { return "file:" .. path, nil }
+    params: {"path"}
+    description: "Read a workspace file."
+}
+
+search_text := tool {
+    name: "search_text"
+    fn: func(query) { return "matches:" .. query, nil }
+    params: {"query"}
+    description: "Search workspace text."
+}
+
+apply_patch := tool {
+    name: "apply_patch"
+    fn: func(patch) { return "patched", nil }
+    params: {"patch"}
+    description: "Apply a patch."
+}
+
+run_shell := tool {
+    name: "run_shell"
+    fn: func(command) { return "ran:" .. command, nil }
+    params: {"command"}
+    description: "Run a shell command."
+}
+
+coding_agent := agent {
+    name: "coding_agent"
+    config: func(task) {
+        return {
+            model: "mock-fast"
+            system: "Use the repository tools."
+            user: task
+            tools: {read_file, search_text, apply_patch, run_shell}
+        }, nil
+    }
+    params: {"task"}
+    description: "Repository coding agent."
+}
+
+agent_result, agent_err := coding_agent("inspect the README")
+turn_result, turn_err := turn {
+    model: "mock-fast"
+    messages: {llm.user("single turn")}
+}
+agent_err_kind := nil
+agent_err_message := nil
+if agent_err != nil {
+    agent_err_kind = agent_err.kind
+    agent_err_message = agent_err.message
+}
+turn_err_kind := nil
+turn_err_message := nil
+if turn_err != nil {
+    turn_err_kind = turn_err.kind
+    turn_err_message = turn_err.message
+}
+agent_text := nil
+turn_text := nil
+if agent_result != nil {
+    agent_text = agent_result.text
+}
+if turn_result != nil {
+    turn_text = turn_result.text
+}
+`)
+			if err != nil {
+				t.Fatalf("Exec: %v", err)
+			}
+			agentText, _ := vm.Get("agent_text")
+			turnText, _ := vm.Get("turn_text")
+			if len(provider.requests) != 2 {
+				agentKind, _ := vm.Get("agent_err_kind")
+				agentMessage, _ := vm.Get("agent_err_message")
+				turnKind, _ := vm.Get("turn_err_kind")
+				turnMessage, _ := vm.Get("turn_err_message")
+				t.Fatalf("requests = %d, want 2; got=%#v agent_text=%#v turn_text=%#v agent_err=%#v/%#v turn_err=%#v/%#v", len(provider.requests), provider.requests, agentText, turnText, agentKind, agentMessage, turnKind, turnMessage)
+			}
+			agentReq := provider.requests[0]
+			if agentReq.Model != "mock-fast" {
+				t.Fatalf("agent model = %q, want mock-fast", agentReq.Model)
+			}
+			wantTools := []string{"read_file", "search_text", "apply_patch", "run_shell"}
+			if len(agentReq.Tools) != len(wantTools) {
+				t.Fatalf("agent tools = %#v", agentReq.Tools)
+			}
+			for i, want := range wantTools {
+				if agentReq.Tools[i].Name != want {
+					t.Fatalf("tool[%d].Name = %q, want %q", i, agentReq.Tools[i].Name, want)
+				}
+			}
+			if provider.requests[1].Messages[0].Text != "single turn" {
+				t.Fatalf("turn request = %#v", provider.requests[1])
+			}
+			if agentText != "agent-ok" || turnText != "turn-ok" {
+				agentKind, _ := vm.Get("agent_err_kind")
+				agentMessage, _ := vm.Get("agent_err_message")
+				turnKind, _ := vm.Get("turn_err_kind")
+				turnMessage, _ := vm.Get("turn_err_message")
+				t.Fatalf("agent_text=%#v turn_text=%#v agent_err=%#v/%#v turn_err=%#v/%#v", agentText, turnText, agentKind, agentMessage, turnKind, turnMessage)
+			}
+		})
+	}
+}
+
+func TestAIDialectTurnWorksOnBytecodeVM(t *testing.T) {
+	provider := &mockLLMProvider{res: llm.TurnResult{Status: "final_answer", Text: "turn-ok"}}
+	vm := leia.New(
+		leia.WithVM(),
+		leia.WithLibs(leia.LibString|leia.LibLLM|leia.LibDialect),
+		leia.WithLLMProvider(provider),
+	)
+	if err := vm.Exec(`
+model {
+    default: "mock-fast"
+}
+
+read_file := tool {
+    name: "read_file"
+    fn: func(path) { return "file:" .. path, nil }
+    params: {"path"}
+}
+
+search_text := tool {
+    name: "search_text"
+    fn: func(query) { return "matches:" .. query, nil }
+    params: {"query"}
+}
+
+result, err := turn {
+    model: "mock-fast"
+    messages: {llm.user("single turn")}
+    tools: {read_file, search_text}
+}
+text := result.text
+`); err != nil {
+		t.Fatalf("Exec: %v", err)
+	}
+	if len(provider.requests) != 1 {
+		t.Fatalf("requests = %d, want 1", len(provider.requests))
+	}
+	if got := []string{provider.requests[0].Tools[0].Name, provider.requests[0].Tools[1].Name}; got[0] != "read_file" || got[1] != "search_text" {
+		t.Fatalf("tool names = %#v", got)
+	}
+	text, _ := vm.Get("text")
+	if text != "turn-ok" {
+		t.Fatalf("text = %#v", text)
+	}
+}
+
+func TestAIDialectReplayExampleIsDeterministic(t *testing.T) {
+	records, err := llm.LoadRecords(filepath.Join("..", "..", "examples", "ai", "coding_agent_replay.records.json"))
+	if err != nil {
+		t.Fatalf("LoadRecords: %v", err)
+	}
+	vm := leia.New(
+		leia.WithLibs(leia.LibString|leia.LibLLM|leia.LibDialect),
+		leia.WithLLMReplay(records),
+	)
+	if err := vm.ExecFile(filepath.Join("..", "..", "examples", "ai", "coding_agent_replay.leia")); err != nil {
+		t.Fatalf("ExecFile: %v", err)
+	}
+	text, _ := vm.Get("summary")
+	if text != "Use read_file, search_text, apply_patch, and run_shell." {
+		t.Fatalf("summary = %#v", text)
+	}
+}

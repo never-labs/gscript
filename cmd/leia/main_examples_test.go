@@ -661,7 +661,7 @@ func approvedBuiltinDialectTags() []string {
 		"url", "html_escape", "html", "urlquery", "form", "urlform", "urlpath", "mime", "mailaddr", "emailaddr", "headers", "http_headers", "cookie", "cookies", "httpmsg", "sse", "multipart", "jwt",
 		"ipaddr", "cidr", "hostport",
 		"base64", "hash", "hex", "base32", "uuid", "gzip", "zlib", "deflate", "binary", "q", "pem", "sql",
-		"prompt", "quote",
+		"prompt", "quote", "model", "turn", "tool", "agent",
 	}
 }
 

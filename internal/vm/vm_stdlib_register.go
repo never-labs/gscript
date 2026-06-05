@@ -89,6 +89,7 @@ func (vm *VM) RegisterStdlibRuntimeModules() {
 			ScriptDir:             vm.ScriptDir,
 			MaxHostResult:         func() int64 { return vm.maxHostResult },
 			Call:                  vm.callValueNoMethodJIT,
+			Global:                vm.GetGlobal,
 		},
 	})
 }

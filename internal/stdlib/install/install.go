@@ -40,6 +40,7 @@ func InstallWithOptions(interp *runtime.Interpreter, extra ModuleOptions) {
 			ScriptDir:             interp.ScriptDir,
 			MaxHostResult:         interp.MaxHostResultBytes,
 			Call:                  interp.CallFunction,
+			Global:                interp.GetGlobal,
 		},
 		Table: stdbind.TableOptions{
 			Call: interp.CallFunction,

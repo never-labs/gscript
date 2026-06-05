@@ -1,0 +1,47 @@
+[
+  {
+    "Request": {
+      "Model": "mock-fast",
+      "Messages": [
+        {
+          "Role": "user",
+          "Text": "Name the repository coding-agent tools."
+        }
+      ],
+      "Tools": [
+        {
+          "Name": "read_file",
+          "Description": "Read a workspace file.",
+          "Params": [
+            "path"
+          ]
+        },
+        {
+          "Name": "search_text",
+          "Description": "Search workspace text.",
+          "Params": [
+            "query"
+          ]
+        },
+        {
+          "Name": "apply_patch",
+          "Description": "Apply a patch.",
+          "Params": [
+            "patch"
+          ]
+        },
+        {
+          "Name": "run_shell",
+          "Description": "Run a shell command.",
+          "Params": [
+            "command"
+          ]
+        }
+      ]
+    },
+    "Result": {
+      "Status": "final_answer",
+      "Text": "Use read_file, search_text, apply_patch, and run_shell."
+    }
+  }
+]
