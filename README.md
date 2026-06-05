@@ -51,7 +51,9 @@ go run ./cmd/leia diag bundle --output /tmp/leia-diag --skip-benchmarks
 ```
 
 Use `leia check .` before submitting changes. It runs formatting, linting,
-manifest checks, tests, and documentation checks unless a skip flag is supplied.
+manifest checks, tests, documentation checks, editor asset checks, and runnable
+example checks unless a skip flag is supplied. Use `leia check --quick .` for a
+fast local loop that skips the slower release-evidence steps.
 
 ## Embedding
 

@@ -13,9 +13,9 @@ their documented output in sync.
   inspection, and encoding a Go value for script use.
 - `Example_hostFunctionBinding` covers registering a reflected Go function with
   `RegisterFunc` and calling it from Leia.
-- `Example_hostModuleRequire` covers `RegisterModule`, `require("go/...")`,
-  and the distinction between explicit host modules and filesystem module
-  loading.
+- `Example_hostModuleImport` covers `RegisterModule`, Go-style
+  `import "go/..."`, and the distinction between explicit host modules and
+  filesystem module loading.
 - `Example_hotLoader` covers `HotLoader`, generation swaps, and failed reloads
   preserving the previous compiled program.
 - `Example_hotInstance` covers online reload with persistent VM state,
