@@ -1,0 +1,197 @@
+// static_docs_generator.leia - Static site/documentation generation workflow.
+// Demonstrates: path planning, Markdown tables, template rendering,
+// HTML escaping, JSON manifests, and deterministic content hashes.
+
+import p "path"
+
+site := {
+    title: "Leia Ops Handbook",
+    base_path: "public//docs/../docs",
+    release: "2026.06",
+}
+
+pages := {
+    {
+        title: "Overview",
+        slug: "index",
+        section: "Guide",
+        source: "content/overview.md",
+        status: "published",
+        body: "Use Leia scripts to turn structured release data into deterministic docs.",
+    },
+    {
+        title: "Runbook",
+        slug: "runbook",
+        section: "Ops",
+        source: "content/runbook.md",
+        status: "published",
+        body: "Escalate incidents with trace IDs, owner routing, and rollback notes.",
+    },
+    {
+        title: "Release Notes",
+        slug: "release-notes",
+        section: "Changelog",
+        source: "content/release-notes.md",
+        status: "draft",
+        body: "Summarize shipped features, known issues, and verification evidence.",
+    },
+}
+
+nav_rows := mdtable`| Label | Href | Section |
+| --- | --- | --- |
+| Overview | index.html | Guide |
+| Runbook | runbook.html | Ops |
+| Release Notes | release-notes.html | Changelog |
+`
+
+assets := json`[
+  {"path":"assets/site.css","kind":"css","bytes":1840},
+  {"path":"assets/search.json","kind":"json","bytes":912}
+]`
+
+func html_text(value) {
+    return dialect.eval("html_escape", tostring(value))
+}
+
+func output_path(page) {
+    return p.join(path`public//docs/../docs`, page.slug .. ".html")
+}
+
+func source_stem(page) {
+    clean := p.clean(page.source)
+    base := p.base(clean)
+    ext := p.ext(base)
+    return string.sub(base, 1, #base - #ext)
+}
+
+func page_template(page, nav_html, asset_href) {
+    return template {
+        text: `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>{{.title}} - {{.site_title}}</title>
+<link rel="stylesheet" href="{{.asset_href}}">
+</head>
+<body>
+<nav>{{.nav_html}}</nav>
+<main>
+<p class="section">{{.section}}</p>
+<h1>{{.title}}</h1>
+<p>{{.body}}</p>
+<p class="source">Source: {{.source}}</p>
+</main>
+</body>
+</html>
+`,
+        data: {
+            title: html_text(page.title),
+            site_title: html_text(site.title),
+            section: html_text(page.section),
+            body: html_text(page.body),
+            source: html_text(page.source),
+            nav_html: nav_html,
+            asset_href: html_text(asset_href),
+        },
+    }
+}
+
+func nav_html(rows) {
+    html := ""
+    for i := 1; i <= #rows; i++ {
+        row := rows[i]
+        html = html .. template {
+            text: `<a href="{{.href}}">{{.label}}</a>`,
+            data: {
+                href: html_text(row.Href),
+                label: html_text(row.Label),
+            },
+        }
+        if i < #rows {
+            html = html .. "\n"
+        }
+    }
+    return html
+}
+
+docs_root := p.clean(site.base_path)
+navigation := nav_html(nav_rows)
+page_outputs := {}
+manifest_pages := {}
+published := 0
+drafts := 0
+
+for i := 1; i <= #pages; i++ {
+    page := pages[i]
+    out := output_path(page)
+    html := page_template(page, navigation, p.join("assets", "site.css"))
+    digest := dialect.eval("hash", html, {algo: "sha1"})
+    page_outputs[i] = {
+        path: out,
+        html: html,
+        digest: digest,
+    }
+    manifest_pages[i] = {
+        title: page.title,
+        section: page.section,
+        status: page.status,
+        source: page.source,
+        source_stem: source_stem(page),
+        output: out,
+        sha1: digest,
+    }
+    if page.status == "published" {
+        published = published + 1
+    } else {
+        drafts = drafts + 1
+    }
+}
+
+asset_manifest := {}
+for i := 1; i <= #assets; i++ {
+    asset := assets[i]
+    asset_manifest[i] = {
+        path: p.join(docs_root, asset.path),
+        kind: asset.kind,
+        bytes: asset.bytes,
+    }
+}
+
+site_manifest := {
+    site: site.title,
+    release: site.release,
+    root: docs_root,
+    pages: manifest_pages,
+    assets: asset_manifest,
+}
+
+manifest_json := dialect.eval("json", site_manifest, {mode: "encode"})
+page_table := dialect.eval("mdtable", manifest_pages, {mode: "encode"})
+
+site_generation_summary := string.format(
+    "site=%s pages=%d published=%d drafts=%d assets=%d root=%s manifest_sha1=%s",
+    site.title,
+    #pages,
+    published,
+    drafts,
+    #assets,
+    docs_root,
+    dialect.eval("hash", manifest_json, {algo: "sha1"})
+)
+
+print(page_table)
+print(site_generation_summary)
+
+assert(docs_root == "public/docs")
+assert(#nav_rows == 3)
+assert(#pages == 3)
+assert(#assets == 2)
+assert(published == 2)
+assert(drafts == 1)
+assert(source_stem(pages[3]) == "release-notes")
+assert(page_outputs[1].path == "public/docs/index.html")
+assert(string.find(page_outputs[1].html, "<h1>Overview</h1>", 1, true) != nil)
+assert(string.find(page_outputs[2].html, "<nav><a href=\"index.html\">Overview</a>", 1, true) != nil)
+assert(string.find(manifest_json, `"root":"public/docs"`, 1, true) != nil)
+assert(string.find(page_table, "| runbook |", 1, true) != nil)
+assert(string.find(site_generation_summary, "pages=3 published=2 drafts=1 assets=2", 1, true) != nil)

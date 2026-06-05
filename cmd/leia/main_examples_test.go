@@ -78,8 +78,9 @@ func TestPracticalExampleProjects(t *testing.T) {
 	}{
 		{"api-offline-client", execExampleProjectGlobal(root, filepath.Join("examples", "api", "offline_client.leia"), "api_client_summary"), "prj-7 2 tickets"},
 		{"data-quality-report", execExampleProjectGlobal(root, filepath.Join("examples", "workflow", "service_quality_report.leia"), "workflow_report_summary"), "services=3 requests=8 errors=3 breaches=2 over_budget=2"},
-		{"column-query-analytics", execExampleProjectGlobal(root, filepath.Join("examples", "data_processing", "column_query", "trade_analytics.leia"), "trade_analytics_summary"), "groups=3 first_notional=1000 alerts=3"},
+		{"column-query-analytics", execExampleProjectGlobal(root, filepath.Join("examples", "data_processing", "column_query", "trade_analytics.leia"), "trade_analytics_summary"), "rows=18 channels=4 best_channel=email roas=10.35 top_day=4 top_roas=15.75 risk_segments=4 enterprise_revenue=29100"},
 		{"release-ci-regression", testExampleProject(root, filepath.Join("examples", "testing")), "release_ci_regression_workflow_test.leia"},
+		{"static-site-docs-generation", execExampleProjectGlobal(root, filepath.Join("examples", "site", "static_docs_generator.leia"), "site_generation_summary"), "pages=3 published=2 drafts=1 assets=2"},
 		{"ai-agent-composition", evaluateReplayExampleProject(root, filepath.Join("examples", "evaluate", "agent_replay.leia"), filepath.Join("examples", "evaluate", "agent_replay.records.json")), "agent consumes replay"},
 		{"concurrency-pipeline", execExampleProjectGlobal(root, filepath.Join("examples", "concurrency", "goroutines_channels.leia"), "workers"), "4"},
 		{"package-managed-database", modCheckExampleProject(root, filepath.Join("examples", "database", "package_managed")), "github.com/never-labs/leia-db/sqlite"},
@@ -178,6 +179,9 @@ func TestRunCommandDialectExamplesCoverApprovedBuiltinTags(t *testing.T) {
 		if !exampleTags[tag] {
 			t.Fatalf("runnable dialect examples must keep representative builtin tag %q covered", tag)
 		}
+	}
+	if exampleTags["junit"] {
+		t.Fatalf("junit is a compat/interop dialect and must not be promoted through runnable workflow examples")
 	}
 }
 

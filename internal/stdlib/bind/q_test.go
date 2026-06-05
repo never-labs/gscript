@@ -86,6 +86,60 @@ ok, err := pcall(func() {
 	}
 }
 
+func TestQQueryOrdersAndLimitsRows(t *testing.T) {
+	interp := runWithQAndSOA(t, `
+trades := soa.zip({
+    sym: []i64{1, 2, 3, 4},
+    price: []f64{10, 30, 20, 40},
+    size: []f64{3, 1, 4, 2},
+})
+
+top_prices := q.query(trades, {
+    select: {sym: "sym", price: "price", size: "size"},
+    order_by: {column: "price", desc: true},
+    limit: 2,
+})
+
+by_size := q.query(trades, {
+    select: {sym: "sym", price: "price", size: "size"},
+    order_by: "size",
+    limit: 3,
+})
+
+notional_by_sym := q.query(trades, {
+    by: {"sym"},
+    select: {notional: {"*", "price", "size"}},
+    aggregate: {notional: "sum"},
+    order_by: {column: "notional", desc: true},
+    limit: 2,
+})
+`)
+	top := interp.GetGlobal("top_prices").Table()
+	if top == nil || top.Length() != 2 {
+		t.Fatalf("top_prices length = %v, want 2", top)
+	}
+	if got := top.RawGetInt(1).Table().RawGetString("sym"); !got.IsInt() || got.Int() != 4 {
+		t.Fatalf("top_prices[1].sym = %v, want 4", got)
+	}
+	if got := top.RawGetInt(2).Table().RawGetString("sym"); !got.IsInt() || got.Int() != 2 {
+		t.Fatalf("top_prices[2].sym = %v, want 2", got)
+	}
+	bySize := interp.GetGlobal("by_size").Table()
+	if got := bySize.RawGetInt(1).Table().RawGetString("sym"); !got.IsInt() || got.Int() != 2 {
+		t.Fatalf("by_size[1].sym = %v, want 2", got)
+	}
+	if got := bySize.RawGetInt(3).Table().RawGetString("sym"); !got.IsInt() || got.Int() != 1 {
+		t.Fatalf("by_size[3].sym = %v, want 1", got)
+	}
+	grouped := interp.GetGlobal("notional_by_sym").Table()
+	if got := grouped.RawGetInt(1).Table().RawGetString("sym"); !got.IsInt() || got.Int() != 3 {
+		t.Fatalf("notional_by_sym[1].sym = %v, want 3", got)
+	}
+	if got := grouped.RawGetInt(2).Table().RawGetString("notional"); !got.IsFloat() || got.Float() != 80 {
+		t.Fatalf("notional_by_sym[2].notional = %v, want 80", got)
+	}
+}
+
 func runWithQAndSOA(t *testing.T, src string) *runtime.Interpreter {
 	t.Helper()
 	interp := runtime.NewCore()

@@ -119,6 +119,7 @@ func TestBuiltinDialectInfoCategoriesAreExplicit(t *testing.T) {
 
 	tags := stringSliceFromArray(interp.GetGlobal("tags").Table())
 	allInfo := interp.GetGlobal("all_info").Table()
+	wantCategories := expectedBuiltinDialectCategories()
 	if got, want := allInfo.Length(), len(tags); got != want {
 		t.Fatalf("dialect.list length = %d, want %d", got, want)
 	}
@@ -131,9 +132,28 @@ func TestBuiltinDialectInfoCategoriesAreExplicit(t *testing.T) {
 			t.Fatalf("builtin dialect %q reports builtin=false", tag)
 		}
 		category := info.RawGetString("category").Str()
-		if category == "" || category == "user" {
-			t.Fatalf("builtin dialect %q category = %q; update builtinDialectCategory", tag, category)
+		wantCategory, ok := wantCategories[tag]
+		if !ok {
+			t.Fatalf("builtin dialect %q has no category gate entry; update expectedBuiltinDialectCategories", tag)
 		}
+		if category != wantCategory {
+			t.Fatalf("builtin dialect %q category = %q; want %q", tag, category, wantCategory)
+		}
+		delete(wantCategories, tag)
+	}
+	if len(wantCategories) > 0 {
+		t.Fatalf("category gate contains dialects not exposed by dialect.tags: %#v", wantCategories)
+	}
+}
+
+func expectedBuiltinDialectCategories() map[string]string {
+	return map[string]string{
+		"sh": "host", "cmd": "host", "glob": "host",
+		"shellwords": "text", "path": "text", "re": "text", "regexp": "text", "json": "text", "jsonptr": "text", "jsonl": "text", "csv": "text", "tsv": "text", "mdtable": "text", "lines": "text", "split": "text", "words": "text", "nums": "text", "numbers": "text", "kv": "text", "logfmt": "text", "env": "text", "ini": "text", "semver": "text", "duration": "text", "tap": "text", "xml": "text", "template": "text",
+		"url": "protocol", "html_escape": "protocol", "urlquery": "protocol", "urlpath": "protocol", "mime": "protocol", "headers": "protocol", "http_headers": "protocol", "cookie": "protocol", "cookies": "protocol", "httpmsg": "protocol", "sse": "protocol", "multipart": "protocol", "jwt": "protocol", "ipaddr": "protocol", "cidr": "protocol", "hostport": "protocol",
+		"base64": "data", "hash": "data", "hex": "data", "base32": "data", "uuid": "data", "gzip": "data", "zlib": "data", "deflate": "data", "binary": "data",
+		"prompt": "llm", "quote": "llm",
+		"junit": "compat",
 	}
 }
 

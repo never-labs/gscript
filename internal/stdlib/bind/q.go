@@ -53,10 +53,16 @@ func qRunQuery(s *SoA, spec *Table) (*Table, error) {
 	if err != nil {
 		return nil, err
 	}
+	var rows *Table
 	if len(aggs) == 0 {
-		return qRows(s, mask, selects)
+		rows, err = qRows(s, mask, selects)
+	} else {
+		rows, err = qGroupedRows(s, mask, by, selects, aggs)
 	}
-	return qGroupedRows(s, mask, by, selects, aggs)
+	if err != nil {
+		return nil, err
+	}
+	return qApplyOrderAndLimit(rows, spec)
 }
 
 func qQueryMask(s *SoA, where Value) (*DenseArray, error) {
@@ -267,6 +273,159 @@ func qGroupedRows(s *SoA, mask *DenseArray, by []string, selects []qSelect, aggs
 		rows.RawSetInt(int64(i+1), TableValue(row))
 	}
 	return rows, nil
+}
+
+type qOrderSpec struct {
+	Column string
+	Desc   bool
+}
+
+func qApplyOrderAndLimit(rows *Table, spec *Table) (*Table, error) {
+	order, err := qOrderSpecs(spec.RawGetString("order_by"))
+	if err != nil {
+		return nil, err
+	}
+	limit, err := qLimit(spec.RawGetString("limit"))
+	if err != nil {
+		return nil, err
+	}
+	if len(order) == 0 && limit < 0 {
+		return rows, nil
+	}
+	values := make([]Value, 0, rows.Length())
+	for i := 1; i <= rows.Length(); i++ {
+		row := rows.RawGetInt(int64(i))
+		if !row.IsNil() {
+			values = append(values, row)
+		}
+	}
+	if len(order) > 0 {
+		sort.SliceStable(values, func(i, j int) bool {
+			left := values[i].Table()
+			right := values[j].Table()
+			for _, ord := range order {
+				cmp := qCompareValues(left.RawGetString(ord.Column), right.RawGetString(ord.Column))
+				if cmp == 0 {
+					continue
+				}
+				if ord.Desc {
+					return cmp > 0
+				}
+				return cmp < 0
+			}
+			return false
+		})
+	}
+	if limit >= 0 && limit < len(values) {
+		values = values[:limit]
+	}
+	out := NewTable()
+	for i, row := range values {
+		out.RawSetInt(int64(i+1), row)
+	}
+	return out, nil
+}
+
+func qOrderSpecs(v Value) ([]qOrderSpec, error) {
+	if v.IsNil() {
+		return nil, nil
+	}
+	if v.IsString() {
+		return []qOrderSpec{{Column: v.Str()}}, nil
+	}
+	if !v.IsTable() {
+		return nil, fmt.Errorf("q.query order_by must be a string, table, or array")
+	}
+	tbl := v.Table()
+	if col := tbl.RawGetString("column"); col.IsString() {
+		return []qOrderSpec{{
+			Column: col.Str(),
+			Desc:   qTruthy(tbl.RawGetString("desc")),
+		}}, nil
+	}
+	n := tbl.Length()
+	out := make([]qOrderSpec, 0, n)
+	for i := 1; i <= n; i++ {
+		item := tbl.RawGetInt(int64(i))
+		switch {
+		case item.IsString():
+			out = append(out, qOrderSpec{Column: item.Str()})
+		case item.IsTable():
+			col := item.Table().RawGetString("column")
+			if !col.IsString() {
+				return nil, fmt.Errorf("q.query order_by item %d must provide column", i)
+			}
+			out = append(out, qOrderSpec{
+				Column: col.Str(),
+				Desc:   qTruthy(item.Table().RawGetString("desc")),
+			})
+		default:
+			return nil, fmt.Errorf("q.query order_by item %d must be a string or table", i)
+		}
+	}
+	return out, nil
+}
+
+func qLimit(v Value) (int, error) {
+	if v.IsNil() {
+		return -1, nil
+	}
+	if !v.IsInt() {
+		return 0, fmt.Errorf("q.query limit must be an integer")
+	}
+	if v.Int() < 0 {
+		return 0, fmt.Errorf("q.query limit must be non-negative")
+	}
+	return int(v.Int()), nil
+}
+
+func qCompareValues(left, right Value) int {
+	switch {
+	case left.IsNumber() && right.IsNumber():
+		lf, rf := left.Number(), right.Number()
+		if lf < rf {
+			return -1
+		}
+		if lf > rf {
+			return 1
+		}
+		return 0
+	case left.IsString() && right.IsString():
+		if left.Str() < right.Str() {
+			return -1
+		}
+		if left.Str() > right.Str() {
+			return 1
+		}
+		return 0
+	case left.IsBool() && right.IsBool():
+		if left.Bool() == right.Bool() {
+			return 0
+		}
+		if !left.Bool() {
+			return -1
+		}
+		return 1
+	case left.IsNil() && right.IsNil():
+		return 0
+	case left.IsNil():
+		return -1
+	case right.IsNil():
+		return 1
+	default:
+		ls, rs := left.String(), right.String()
+		if ls < rs {
+			return -1
+		}
+		if ls > rs {
+			return 1
+		}
+		return 0
+	}
+}
+
+func qTruthy(v Value) bool {
+	return !(v.IsNil() || (v.IsBool() && !v.Bool()))
 }
 
 type qGroup struct {
