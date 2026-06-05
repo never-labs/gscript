@@ -8,11 +8,10 @@ services.
 These should run from a clean checkout without secrets:
 
 ```bash
-go run ../cmd/leia run hello/fib.leia
-go run ../cmd/leia run hello/types_demo.leia
-go run ../cmd/leia run hello/dialects.leia
-go run ../cmd/leia run data_processing/data_oriented/soa_kernels.leia
-go run ../cmd/leia run concurrency/select_timeout.leia
+go run ../cmd/leia examples list
+go run ../cmd/leia examples check hello/fib.leia hello/types_demo.leia hello/dialects.leia
+go run ../cmd/leia examples run data_processing/data_oriented/soa_kernels.leia
+go run ../cmd/leia examples run concurrency/select_timeout.leia
 ```
 
 Directories:

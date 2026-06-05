@@ -82,6 +82,7 @@ func ciProfileCommands(profile string, noLuaJIT bool) ([]ciCommand, error) {
 			{Name: "All Go tests", Args: []string{"go", "test", "./...", "-count=1"}},
 			{Name: "Manifest coverage", Args: manifestCoverageCommand()},
 			{Name: "Module path gate", Args: modulePathGateCommand()},
+			{Name: "Example projects check", Args: []string{"go", "run", "./cmd/leia", "examples", "check", "--jobs=6"}},
 			{Name: "Docs check", Args: []string{"go", "run", "./cmd/leia", "doc", "check"}},
 			{Name: "Performance smoke", Args: appendNoLuaJIT([]string{"bash", "scripts/performance_gate.sh", "--smoke"}, noLuaJIT)},
 		}, nil

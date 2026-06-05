@@ -6,7 +6,7 @@ Generated from the current `leia` binary capabilities.
 |---|---|
 | `bench` | Run benchmark and benchmark-diagnostic harnesses. |
 | `capabilities` | Report binary capabilities, stdlib modules, and supported tooling formats. |
-| `check` | Run formatter, linter, manifest, tests, and docs checks as one local gate. |
+| `check` | Run formatter, linter, manifest, tests, docs, editor, and example checks as one local gate. |
 | `ci` | Run canonical local CI profiles. |
 | `config` | Discover and validate project configuration. |
 | `diag` | Run production diagnostic dump and bundle tools. |

@@ -36,6 +36,7 @@ func runCheckCommand(args []string, outw, errw io.Writer) int {
 	noManifest := fs.Bool("no-manifest", false, "skip test and benchmark manifest coverage check")
 	noDocs := fs.Bool("no-docs", false, "skip docs check")
 	noEditor := fs.Bool("no-editor", false, "skip editor asset check")
+	noExamples := fs.Bool("no-examples", false, "skip repository example project check")
 	if code, done := parseCLIFlags(fs, args); done {
 		return code
 	}
@@ -44,7 +45,7 @@ func runCheckCommand(args []string, outw, errw io.Writer) int {
 		paths = []string{"."}
 	}
 	if len(paths) != 1 {
-		fmt.Fprintln(errw, "usage: leia check [--json] [--no-fmt] [--no-lint] [--no-test] [--no-manifest] [--no-docs] [--no-editor] [path-or-dir]")
+		fmt.Fprintln(errw, "usage: leia check [--json] [--no-fmt] [--no-lint] [--no-test] [--no-manifest] [--no-docs] [--no-editor] [--no-examples] [path-or-dir]")
 		return 2
 	}
 
@@ -91,6 +92,13 @@ func runCheckCommand(args []string, outw, errw io.Writer) int {
 			editorOut = errw
 		}
 		return runEditorCheck(editorOut, errw)
+	})
+	runStep("examples", *noExamples, func() int {
+		examplesOut := outw
+		if *jsonOut {
+			examplesOut = errw
+		}
+		return runExamplesCheckCommand([]string{"--jobs=6"}, examplesOut, errw)
 	})
 
 	if *jsonOut {

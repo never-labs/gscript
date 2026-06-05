@@ -25,18 +25,19 @@ bash scripts/install.sh --version v0.1.0 --bin-dir "$HOME/bin" --dry-run
 
 ## Run Examples
 
-Start with small scripts:
+Start with the repository example entrypoints:
 
 ```bash
-go run ./cmd/leia run examples/hello/fib.leia
-go run ./cmd/leia run examples/hello/types_demo.leia
+go run ./cmd/leia examples list
+go run ./cmd/leia examples check examples/hello/fib.leia examples/hello/types_demo.leia
+go run ./cmd/leia examples run repo-hello-fib
 ```
 
 Then try the product-direction examples:
 
 ```bash
-go run ./cmd/leia run examples/concurrency/goroutines_channels.leia
-go run ./cmd/leia run examples/data_processing/data_oriented/soa_kernels.leia
+go run ./cmd/leia examples run examples/concurrency/goroutines_channels.leia
+go run ./cmd/leia examples run examples/data_processing/data_oriented/soa_kernels.leia
 ```
 
 AI examples require a host provider or model configuration. Keep API keys in

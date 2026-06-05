@@ -9,11 +9,13 @@ The repository-local example policy and dependency notes live in
 
 ## First Examples
 
+Use the repository example entrypoints to discover runnable scripts, check the
+registered set, and run one by ID or path:
+
 ```bash
-go run ./cmd/leia run examples/hello/fib.leia
-go run ./cmd/leia run examples/hello/types_demo.leia
-go run ./cmd/leia run examples/hello/counter.leia
-go run ./cmd/leia run examples/hello/functional.leia
+go run ./cmd/leia examples list
+go run ./cmd/leia examples check examples/hello/fib.leia examples/hello/types_demo.leia
+go run ./cmd/leia examples run repo-hello-fib
 ```
 
 | Directory | Focus |
@@ -29,19 +31,20 @@ go run ./cmd/leia run examples/hello/functional.leia
 ## Data-Oriented Examples
 
 ```bash
-go run ./cmd/leia run examples/data_processing/data_oriented/soa_kernels.leia
-go run ./cmd/leia run examples/data_processing/data_oriented/particle_integration.leia
+go run ./cmd/leia examples run examples/data_processing/data_oriented/soa_kernels.leia
+go run ./cmd/leia examples check examples/data_processing/data_oriented/particle_integration.leia
 ```
 
 Use these with the [data-oriented reference](../reference/data-oriented/index.md)
-and `benchmarks/data/` when evaluating numeric or SoA-heavy code.
+and `benchmarks/data/` when evaluating numeric or SoA-heavy code. The
+particle integration example is listed as manual because it needs a higher
+step budget than the default examples runner.
 
 ## Concurrency Examples
 
 ```bash
-go run ./cmd/leia run examples/concurrency/goroutines_channels.leia
-go run ./cmd/leia run examples/concurrency/select_timeout.leia
-go run ./cmd/leia run examples/concurrency/sync_group_cancel.leia
+go run ./cmd/leia examples check examples/concurrency/goroutines_channels.leia examples/concurrency/select_timeout.leia
+go run ./cmd/leia examples run repo-concurrency-sync_group_cancel
 ```
 
 Use these with the [concurrency reference](../reference/concurrency/index.md).

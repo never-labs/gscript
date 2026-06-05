@@ -1475,7 +1475,7 @@ func repositoryExampleRunnable(path string) bool {
 		!strings.Contains(path, "/dialects/shell_filesystem.leia") &&
 		!strings.Contains(path, "/macos/package_managed/") &&
 		!strings.Contains(path, "/ui/package_managed/") &&
-		!strings.Contains(path, "/game_engine/") &&
+		(!strings.Contains(path, "/game_engine/") || strings.Contains(path, "/game_engine/event_system.leia")) &&
 		!strings.Contains(path, "/concurrency/context_process.leia") &&
 		!strings.Contains(path, "/concurrency/goroutine_errors.leia") &&
 		!strings.Contains(path, "/data_processing/data_oriented/particle_integration.leia")
@@ -1501,6 +1501,12 @@ func repositoryExampleRequires(path string) string {
 		return "package-managed macOS automation runtime and process host access"
 	case strings.Contains(path, "/ui/package_managed/"):
 		return "package-managed UI runtime and native window host access"
+	case strings.Contains(path, "/game_engine/game_of_life.leia"),
+		strings.Contains(path, "/game_engine/chess_bench.leia"),
+		strings.Contains(path, "/game_engine/chess_bench_parallel.leia"):
+		return "higher playground step budget"
+	case strings.Contains(path, "/game_engine/event_system.leia"):
+		return ""
 	case strings.Contains(path, "/game_engine/"):
 		return "game/window host access"
 	case strings.Contains(path, "/concurrency/context_process.leia"):

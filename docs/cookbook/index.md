@@ -8,7 +8,7 @@ checked-in example or command that can be run locally.
 Use tables for record-like data and standard-library helpers for cleanup.
 
 ```bash
-go run ./cmd/leia run examples/data_processing/string_processing.leia
+go run ./cmd/leia examples run examples/data_processing/string_processing.leia
 ```
 
 Related references:
@@ -69,14 +69,13 @@ Related references:
 Use goroutines and channels for fan-out/fan-in workloads.
 
 ```bash
-go run ./cmd/leia run examples/concurrency/goroutines_channels.leia
-go run ./cmd/leia run examples/concurrency/select_timeout.leia
+go run ./cmd/leia examples check examples/concurrency/goroutines_channels.leia examples/concurrency/select_timeout.leia
 ```
 
 Use cancellation-aware host operations for long-running scripts.
 
 ```bash
-go run ./cmd/leia run examples/concurrency/context_cancel.leia
+go run ./cmd/leia examples run examples/concurrency/context_cancel.leia
 ```
 
 Related reference:
@@ -88,8 +87,8 @@ Related reference:
 Use dense arrays and SoA helpers for numeric kernels or column-oriented data.
 
 ```bash
-go run ./cmd/leia run examples/data_processing/data_oriented/soa_kernels.leia
-go run ./cmd/leia run examples/data_processing/data_oriented/particle_integration.leia
+go run ./cmd/leia examples run examples/data_processing/data_oriented/soa_kernels.leia
+go run ./cmd/leia examples check examples/data_processing/data_oriented/particle_integration.leia
 ```
 
 Related references:

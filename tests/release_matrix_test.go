@@ -433,9 +433,18 @@ func TestReleaseMatrixCIProfilesKeepExampleImportGuards(t *testing.T) {
 	root := findRepoRoot(t)
 
 	smokeOut := runCommand(t, root, 30*time.Second, "go", "run", "./cmd/leia", "ci", "smoke", "--list")
-	for _, want := range []string{"go test", "./cmd/leia", "python3 tests/manifest.py check tests benchmarks"} {
+	for _, want := range []string{"go test ./cmd/leia", "python3 tests/manifest.py check tests benchmarks"} {
 		if !strings.Contains(smokeOut, want) {
 			t.Fatalf("ci smoke --list must include %q so example/import guards stay in the smoke test matrix; got:\n%s", want, smokeOut)
+		}
+	}
+	examplesCommandGate := readFileString(t, filepath.Join(root, "cmd", "leia", "main_examples_command_test.go"))
+	for _, snippet := range []string{
+		`runExamplesCommand([]string{"check",`,
+		`runExamplesCommand([]string{"check", "--json",`,
+	} {
+		if !strings.Contains(examplesCommandGate, snippet) {
+			t.Fatalf("cmd/leia/main_examples_command_test.go must keep release-gated `leia examples check` coverage snippet %q", snippet)
 		}
 	}
 
@@ -947,11 +956,11 @@ func documentedExampleRunCommands(t *testing.T, doc string) [][]string {
 	var commands [][]string
 	for _, line := range strings.Split(doc, "\n") {
 		line = strings.TrimSpace(line)
-		if !strings.HasPrefix(line, "go run ./cmd/leia run examples/") {
+		if !strings.HasPrefix(line, "go run ./cmd/leia examples ") {
 			continue
 		}
 		fields := strings.Fields(line)
-		if len(fields) != 5 {
+		if len(fields) < 5 {
 			t.Fatalf("unexpected documented example command shape %q", line)
 		}
 		commands = append(commands, fields[1:])
@@ -964,11 +973,11 @@ func documentedExamplesReadmeRunCommands(t *testing.T, doc string) [][]string {
 	var commands [][]string
 	for _, line := range strings.Split(doc, "\n") {
 		line = strings.TrimSpace(line)
-		if !strings.HasPrefix(line, "go run ../cmd/leia run ") {
+		if !strings.HasPrefix(line, "go run ../cmd/leia examples ") {
 			continue
 		}
 		fields := strings.Fields(line)
-		if len(fields) != 5 {
+		if len(fields) < 5 {
 			t.Fatalf("unexpected examples README command shape %q", line)
 		}
 		commands = append(commands, fields[1:])

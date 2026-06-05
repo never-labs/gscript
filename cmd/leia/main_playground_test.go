@@ -396,6 +396,44 @@ func TestPlaygroundRepositoryWorkflowReplayExampleIsManualRunOnly(t *testing.T) 
 	t.Fatal("repo-workflow-support_triage_replay example not found")
 }
 
+func TestPlaygroundRepositoryGameEngineExampleClassification(t *testing.T) {
+	examples, err := playgroundRepositoryExamples(playgroundExamplesRoot())
+	if err != nil {
+		t.Fatalf("load repository examples: %v", err)
+	}
+	byID := make(map[string]playgroundExample, len(examples))
+	for _, example := range examples {
+		byID[example.ID] = example
+	}
+	want := map[string]struct {
+		runnable bool
+		requires string
+	}{
+		"repo-game_engine-event_system":         {runnable: true},
+		"repo-game_engine-game_of_life":         {requires: "higher playground step budget"},
+		"repo-game_engine-chess_bench":          {requires: "higher playground step budget"},
+		"repo-game_engine-chess_bench_parallel": {requires: "higher playground step budget"},
+		"repo-game_engine-chess":                {requires: "game/window host access"},
+		"repo-game_engine-chess_ai":             {requires: "game/window host access"},
+		"repo-game_engine-game":                 {requires: "game/window host access"},
+		"repo-game_engine-tetris":               {requires: "game/window host access"},
+	}
+	for id, want := range want {
+		t.Run(id, func(t *testing.T) {
+			example, ok := byID[id]
+			if !ok {
+				t.Fatalf("%s example not found", id)
+			}
+			if example.Runnable != want.runnable {
+				t.Fatalf("runnable = %t, want %t", example.Runnable, want.runnable)
+			}
+			if example.Requires != want.requires {
+				t.Fatalf("requires = %q, want %q", example.Requires, want.requires)
+			}
+		})
+	}
+}
+
 func TestPlaygroundAIExamplesCoverRunnableWorkflowShapes(t *testing.T) {
 	t.Setenv("LEIA_PLAYGROUND_MOCK_LLM", "1")
 	want := map[string][]string{
