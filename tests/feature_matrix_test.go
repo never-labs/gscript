@@ -367,7 +367,9 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 		"func Example_securitySandboxAndBudgets()",
 		"leia.SecuritySandbox()",
 		"leia.WithMaxSteps(32)",
-		"leia.WithMaxHostResultBytes(4)",
+		"leia.WithMaxHostResultBytes(8)",
+		"safeLib := type(json)",
+		"safe lib table",
 	} {
 		if !strings.Contains(embeddingExamples, snippet) {
 			t.Fatalf("embedding examples must keep executable README embedding contract coverage; missing %q", snippet)
@@ -472,6 +474,7 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 	requireFeatureCellRefs(t, data, "matrix_dense_arrays", "semantic_gate",
 		"tests/language/matrix_host_dense_more.leia",
 		"tests/language/vec_color_geometry_hsl_more.leia",
+		"internal/stdlib/bind/soa_test.go",
 		"examples/data_processing/data_oriented/dense_matrix_vec_kernels.leia",
 		"examples/data_processing/data_oriented/soa_kernels.leia",
 	)

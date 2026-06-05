@@ -282,16 +282,29 @@ func matrixMultiplySpecializationSpecForProto(p *FuncProto) (*matrixMultiplySpec
 		return nil, false
 	}
 	fp := runtimeSpecializationFingerprintForProto(p)
+	p.RuntimeSpecs.mu.Lock()
 	cache := p.RuntimeSpecs.MatrixMultiplySpecialization
 	if cache != nil && cache.fingerprint == fp {
+		p.RuntimeSpecs.mu.Unlock()
 		return cache.spec, cache.spec != nil
 	}
+	p.RuntimeSpecs.mu.Unlock()
+
 	spec, ok := analyzeMatrixMultiplySpecializationSpec(p)
+	cache = &matrixMultiplySpecializationCache{fingerprint: fp}
+	if ok {
+		cache.spec = spec
+	}
+	p.RuntimeSpecs.mu.Lock()
+	if existing := p.RuntimeSpecs.MatrixMultiplySpecialization; existing != nil && existing.fingerprint == fp {
+		p.RuntimeSpecs.mu.Unlock()
+		return existing.spec, existing.spec != nil
+	}
+	p.RuntimeSpecs.MatrixMultiplySpecialization = cache
+	p.RuntimeSpecs.mu.Unlock()
 	if !ok {
-		p.RuntimeSpecs.MatrixMultiplySpecialization = &matrixMultiplySpecializationCache{fingerprint: fp}
 		return nil, false
 	}
-	p.RuntimeSpecs.MatrixMultiplySpecialization = &matrixMultiplySpecializationCache{fingerprint: fp, spec: spec}
 	return spec, true
 }
 

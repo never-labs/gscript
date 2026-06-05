@@ -275,11 +275,16 @@ func Example_securitySandboxAndBudgets() {
 	vm := leia.New(
 		leia.SecuritySandbox(),
 		leia.WithMaxSteps(32),
-		leia.WithMaxHostResultBytes(4),
+		leia.WithMaxHostResultBytes(8),
 	)
 	if err := vm.RegisterFunc("payload", func() string {
-		return "12345"
+		return "123456789"
 	}); err != nil {
+		panic(err)
+	}
+	if err := vm.Exec(`
+safeLib := type(json)
+`); err != nil {
 		panic(err)
 	}
 
@@ -287,15 +292,21 @@ func Example_securitySandboxAndBudgets() {
 	if err != nil {
 		panic(err)
 	}
+	safeLib, err := vm.Get("safeLib")
+	if err != nil {
+		panic(err)
+	}
 	err = vm.Exec(`value := payload()`)
 
 	var budgetErr *leia.BudgetError
 	fmt.Println("sandbox fs", fsGlobal)
+	fmt.Println("safe lib", safeLib)
 	fmt.Println("budget", errors.As(err, &budgetErr), budgetErr.Resource, budgetErr.Limit)
 
 	// Output:
 	// sandbox fs <nil>
-	// budget true host_result_bytes 4
+	// safe lib table
+	// budget true host_result_bytes 8
 }
 
 func Example_structuredErrors() {

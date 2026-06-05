@@ -45,16 +45,29 @@ func permutationFlipChecksumSpecializationSpecForProto(p *FuncProto) (*permutati
 		return nil, false
 	}
 	fp := runtimeSpecializationFingerprintForProto(p)
+	p.RuntimeSpecs.mu.Lock()
 	cache := p.RuntimeSpecs.PermutationFlipChecksumSpecialization
 	if cache != nil && cache.fingerprint == fp {
+		p.RuntimeSpecs.mu.Unlock()
 		return cache.spec, cache.spec != nil
 	}
+	p.RuntimeSpecs.mu.Unlock()
+
 	spec, ok := analyzePermutationFlipChecksumSpecializationSpec(p)
+	cache = &permutationFlipChecksumSpecializationCache{fingerprint: fp}
+	if ok {
+		cache.spec = spec
+	}
+	p.RuntimeSpecs.mu.Lock()
+	if existing := p.RuntimeSpecs.PermutationFlipChecksumSpecialization; existing != nil && existing.fingerprint == fp {
+		p.RuntimeSpecs.mu.Unlock()
+		return existing.spec, existing.spec != nil
+	}
+	p.RuntimeSpecs.PermutationFlipChecksumSpecialization = cache
+	p.RuntimeSpecs.mu.Unlock()
 	if !ok {
-		p.RuntimeSpecs.PermutationFlipChecksumSpecialization = &permutationFlipChecksumSpecializationCache{fingerprint: fp}
 		return nil, false
 	}
-	p.RuntimeSpecs.PermutationFlipChecksumSpecialization = &permutationFlipChecksumSpecializationCache{fingerprint: fp, spec: spec}
 	return spec, true
 }
 

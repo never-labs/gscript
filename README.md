@@ -90,6 +90,7 @@ Start with:
 - [Language specification HTML](docs/spec/index.html)
 - [Getting started](docs/tutorial/getting-started.md)
 - [Standard library](docs/reference/stdlib/index.md)
+- [Data-oriented programming](docs/reference/data-oriented/index.md)
 - [CLI reference](docs/reference/cli/index.md)
 - [Embedding guide](docs/guides/embedding.md)
 - [Package guide](docs/guides/packages.md)

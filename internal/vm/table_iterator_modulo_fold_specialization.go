@@ -25,19 +25,37 @@ func cachedTableIteratorModuloFoldSpecForProto(p *FuncProto) (tableIteratorModul
 	if p == nil {
 		return tableIteratorModuloFoldSpec{}, false
 	}
+	p.RuntimeSpecs.mu.Lock()
 	switch p.RuntimeSpecs.TableIteratorModuloFoldShape {
 	case 1:
-		return p.RuntimeSpecs.TableIteratorModuloFoldSpec, true
+		spec := p.RuntimeSpecs.TableIteratorModuloFoldSpec
+		p.RuntimeSpecs.mu.Unlock()
+		return spec, true
 	case -1:
+		p.RuntimeSpecs.mu.Unlock()
 		return tableIteratorModuloFoldSpec{}, false
 	}
+	p.RuntimeSpecs.mu.Unlock()
+
 	spec, ok := tableIteratorModuloFoldSpecForProto(p)
+	p.RuntimeSpecs.mu.Lock()
+	if p.RuntimeSpecs.TableIteratorModuloFoldShape == 1 {
+		existing := p.RuntimeSpecs.TableIteratorModuloFoldSpec
+		p.RuntimeSpecs.mu.Unlock()
+		return existing, true
+	}
+	if p.RuntimeSpecs.TableIteratorModuloFoldShape == -1 {
+		p.RuntimeSpecs.mu.Unlock()
+		return tableIteratorModuloFoldSpec{}, false
+	}
 	if ok {
 		p.RuntimeSpecs.TableIteratorModuloFoldSpec = spec
 		p.RuntimeSpecs.TableIteratorModuloFoldShape = 1
+		p.RuntimeSpecs.mu.Unlock()
 		return spec, true
 	}
 	p.RuntimeSpecs.TableIteratorModuloFoldShape = -1
+	p.RuntimeSpecs.mu.Unlock()
 	return tableIteratorModuloFoldSpec{}, false
 }
 

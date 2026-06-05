@@ -38,6 +38,11 @@ func TestGoStyleConcurrencyContract(t *testing.T) {
 			rel:      filepath.Join("examples", "concurrency", "sync_group_cancel.leia"),
 			wantText: []string{"ok=false", "failures=1", "sleep_ok=false", "err=cancelled"},
 		},
+		{
+			name:     "example_sync_group",
+			rel:      filepath.Join("examples", "concurrency", "sync_group.leia"),
+			wantText: []string{"sum=30", "failures=0"},
+		},
 	}
 
 	for _, tc := range cases {

@@ -52,15 +52,25 @@ func rawIntNestedSpecializationPlanForProto(proto *FuncProto) *rawIntNestedSpeci
 		return nil
 	}
 	fp := runtimeSpecializationFingerprintForProto(proto)
+	proto.RuntimeSpecs.mu.Lock()
 	cache := proto.RuntimeSpecs.RawIntNestedSpecialization
 	if cache != nil && cache.analyzed && cache.fingerprint == fp {
+		proto.RuntimeSpecs.mu.Unlock()
 		return cache
 	}
+	proto.RuntimeSpecs.mu.Unlock()
+
 	cache = &rawIntNestedSpecializationCache{fingerprint: fp, analyzed: true}
 	if plan, ok := analyzeRawIntNestedSpecialization(proto); ok {
 		cache.plan = plan
 	}
+	proto.RuntimeSpecs.mu.Lock()
+	if existing := proto.RuntimeSpecs.RawIntNestedSpecialization; existing != nil && existing.analyzed && existing.fingerprint == fp {
+		proto.RuntimeSpecs.mu.Unlock()
+		return existing
+	}
 	proto.RuntimeSpecs.RawIntNestedSpecialization = cache
+	proto.RuntimeSpecs.mu.Unlock()
 	return cache
 }
 

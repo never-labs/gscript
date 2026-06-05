@@ -339,6 +339,40 @@ func TestExamplesCommandChecksDeterministicHostExamples(t *testing.T) {
 	}
 }
 
+func TestExamplesCommandChecksConcurrencyContractExamples(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := runExamplesCommand([]string{
+		"check",
+		"--jobs=1",
+		"--timeout=10s",
+		"repo-concurrency-goroutines_channels",
+		"repo-concurrency-select_timeout",
+		"repo-concurrency-select_default",
+		"repo-concurrency-sync_group",
+		"repo-concurrency-context_sleep",
+		"repo-concurrency-context_cancel",
+		"repo-concurrency-sync_group_cancel",
+	}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runExamplesCommand code = %d, stdout = %q stderr = %q", code, stdout.String(), stderr.String())
+	}
+	out := stdout.String()
+	for _, want := range []string{
+		"ok      repo-concurrency-goroutines_channels",
+		"ok      repo-concurrency-select_timeout",
+		"ok      repo-concurrency-select_default",
+		"ok      repo-concurrency-sync_group",
+		"ok      repo-concurrency-context_sleep",
+		"ok      repo-concurrency-context_cancel",
+		"ok      repo-concurrency-sync_group_cancel",
+		"examples: 7 ok, 0 skipped, 0 failed",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("examples check missing %q\n%s", want, out)
+		}
+	}
+}
+
 func TestExamplesCommandChecksSelectedExamplesJSON(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	code := runExamplesCommand([]string{"check", "--json", "repo-hello-counter", "repo-llm-agent"}, &stdout, &stderr)

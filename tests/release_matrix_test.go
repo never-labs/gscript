@@ -722,6 +722,7 @@ func TestReleaseMatrixReadmeDocumentationEntrypointsStayLinked(t *testing.T) {
 		"docs/spec/index.html",
 		"docs/tutorial/getting-started.md",
 		"docs/reference/stdlib/index.md",
+		"docs/reference/data-oriented/index.md",
 		"docs/reference/cli/index.md",
 		"docs/guides/embedding.md",
 		"docs/guides/packages.md",

@@ -22,8 +22,9 @@ their documented output in sync.
   automatic non-function global preservation, and function replacement.
 - `Example_sandboxAndMaxSteps` covers `WithSandbox`, disabled filesystem
   globals, and statement/instruction budgeting with `WithMaxSteps`.
-- `Example_securitySandboxAndBudgets` covers `SecuritySandbox`, explicit host
-  callback registration, and host-result resource budgeting.
+- `Example_securitySandboxAndBudgets` covers `SecuritySandbox`, its `LibSafe`
+  baseline, explicit host callback registration, disabled unsafe globals, and
+  host-result resource budgeting.
 - `Example_structuredErrors` covers structured script and host callback errors
   with standard `errors.As` and `errors.Is` handling.
 - `Example_llmProvider` covers the native `llm` module with a Go-provided

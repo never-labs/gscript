@@ -54,6 +54,31 @@ func TestDocGenerateWritesSiteLayout(t *testing.T) {
 	}
 }
 
+func TestCheckedInReferenceDocsStayGenerated(t *testing.T) {
+	root := repoRootForBoundaryTest(t)
+	for _, item := range []struct {
+		path string
+		want []byte
+	}{
+		{
+			path: filepath.Join("docs", "reference", "cli", "index.md"),
+			want: generateCLIReferenceMarkdown(),
+		},
+		{
+			path: filepath.Join("docs", "reference", "stdlib", "index.md"),
+			want: generateStdlibInventoryMarkdown(),
+		},
+	} {
+		got, err := os.ReadFile(filepath.Join(root, item.path))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !bytes.Equal(got, item.want) {
+			t.Fatalf("%s is stale; run `go run ./cmd/leia doc generate --layout site --output docs`", item.path)
+		}
+	}
+}
+
 func TestDocGenerateWritesJSONReferenceFiles(t *testing.T) {
 	dir := t.TempDir()
 	var stdout, stderr bytes.Buffer
