@@ -797,9 +797,54 @@
     "type": "import_declaration",
     "named": true,
     "fields": {
+      "group": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "import_group",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": false,
+      "required": false,
+      "types": [
+        {
+          "type": "import_spec",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "import_group",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "import_spec",
+          "named": true
+        },
+        {
+          "type": "separator",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "import_spec",
+    "named": true,
+    "fields": {
       "alias": {
         "multiple": false,
-        "required": true,
+        "required": false,
         "types": [
           {
             "type": "identifier",

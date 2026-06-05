@@ -63,6 +63,11 @@ if ! cmp -s "$TMP_DOCS/spec-preview.html" "docs/spec/index.html"; then
     exit 1
 fi
 
+if ! go test ./tests -run 'TestSpecRunnableExamples|TestSpecLeiaCodeFencesAreExecutableOrExplicitlyNonExecutable' -count=1; then
+    echo "error: docs/spec runnable Leia example gate failed" >&2
+    exit 1
+fi
+
 python3 - <<'PY'
 import os
 import re
@@ -93,6 +98,8 @@ checked_script_mentions = 0
 checked_release_gate_docs = 0
 checked_retired_paths = 0
 checked_retired_names = 0
+checked_spec_runnable_examples = 0
+spec_runnable_report = ""
 
 retired_paths = {
     "docs/language-spec.md": "docs/spec/index.md",
@@ -279,6 +286,53 @@ def check_release_gate_docs() -> None:
     )
 
 
+def check_spec_runnable_coverage() -> None:
+    global checked_spec_runnable_examples, spec_runnable_report
+    spec_dir = root / "docs" / "spec"
+    by_file = {}
+    files_without_examples = []
+
+    for path in sorted(spec_dir.glob("*.md")):
+        run = 0
+        fail = 0
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if not line.startswith("```"):
+                continue
+            info = line[3:].strip()
+            if info == "leia run all":
+                run += 1
+            elif info == "leia fail all":
+                fail += 1
+        if run or fail:
+            by_file[path.name] = {"run": run, "fail": fail}
+            checked_spec_runnable_examples += run + fail
+        else:
+            files_without_examples.append(path.name)
+
+    if checked_spec_runnable_examples == 0:
+        errors.append("docs/spec must contain at least one runnable Leia example fence")
+        return
+
+    total_run = sum(item["run"] for item in by_file.values())
+    total_fail = sum(item["fail"] for item in by_file.values())
+    lines = [
+        (
+            "docs/spec runnable Leia coverage: "
+            f"{checked_spec_runnable_examples} examples "
+            f"({total_run} run, {total_fail} fail) across {len(by_file)} files"
+        )
+    ]
+    lines.extend(
+        f"  {name}: {counts['run']} run, {counts['fail']} fail"
+        for name, counts in by_file.items()
+    )
+    if files_without_examples:
+        lines.append(
+            "  no runnable examples: " + ", ".join(files_without_examples)
+        )
+    spec_runnable_report = "\n".join(lines)
+
+
 for doc_file in doc_files:
     if doc_file.is_file():
         check_markdown_links(doc_file)
@@ -287,6 +341,7 @@ for doc_file in doc_files:
         check_retired_names(doc_file)
 
 check_release_gate_docs()
+check_spec_runnable_coverage()
 
 if errors:
     print("docs_check.sh found problems:", file=sys.stderr)
@@ -302,6 +357,8 @@ print(
     f"{checked_retired_paths} retired-path mentions, "
     f"{checked_retired_names} retired-name mentions, "
     "2 generated reference docs, "
-    "1 generated spec HTML."
+    "1 generated spec HTML, "
+    f"{checked_spec_runnable_examples} runnable spec examples."
 )
+print(spec_runnable_report)
 PY

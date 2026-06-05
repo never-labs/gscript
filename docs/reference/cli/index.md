@@ -15,6 +15,7 @@ Generated from the current `leia` binary capabilities.
 | `env` | Report toolchain, project, cache, and platform environment. |
 | `eval` | Execute source passed on the command line. |
 | `evaluate` | Run evaluation checks and emit an agent evaluation report. |
+| `examples` | List, inspect, or run repository example projects. |
 | `fmt` | Normalize source formatting. |
 | `help` | Show command help. |
 | `inspect` | Inspect compiled artifacts and file directives. |

@@ -1,6 +1,7 @@
 package tests_test
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -15,6 +16,7 @@ func TestSpecRunnableExamples(t *testing.T) {
 	if len(examples) == 0 {
 		t.Fatal("docs/spec must contain at least one stable runnable example fence: ```leia run all")
 	}
+	t.Log(specRunnableCoverageReport(examples))
 	leiaBin := filepath.Join(t.TempDir(), "leia")
 	runCommand(t, root, 60*time.Second, "go", "build", "-o", leiaBin, "./cmd/leia")
 	for _, example := range examples {
@@ -90,6 +92,9 @@ func TestSpecLeiaCodeFencesAreExecutableOrExplicitlyNonExecutable(t *testing.T) 
 
 type runnableSpecExample struct {
 	name   string
+	file   string
+	line   int
+	info   string
 	source string
 	modes  []specExampleMode
 }
@@ -125,6 +130,9 @@ func collectRunnableSpecExamples(t *testing.T, root string) []runnableSpecExampl
 				if inRunnableFence {
 					examples = append(examples, runnableSpecExample{
 						name:   strings.TrimSuffix(entry.Name(), ".md") + "_line_" + strconv.Itoa(startLine),
+						file:   entry.Name(),
+						line:   startLine,
+						info:   strings.TrimSpace(strings.TrimPrefix(lines[startLine-1], "```")),
 						source: strings.Join(block, "\n") + "\n",
 						modes:  append([]specExampleMode(nil), currentModes...),
 					})
@@ -151,6 +159,40 @@ func collectRunnableSpecExamples(t *testing.T, root string) []runnableSpecExampl
 		}
 	}
 	return examples
+}
+
+func specRunnableCoverageReport(examples []runnableSpecExample) string {
+	type fileCoverage struct {
+		run  int
+		fail int
+	}
+
+	byFile := make(map[string]fileCoverage)
+	var run, fail int
+	for _, example := range examples {
+		coverage := byFile[example.file]
+		if strings.HasPrefix(example.info, "leia fail") {
+			fail++
+			coverage.fail++
+		} else {
+			run++
+			coverage.run++
+		}
+		byFile[example.file] = coverage
+	}
+
+	var b strings.Builder
+	fmt.Fprintf(&b, "docs/spec runnable Leia coverage: %d examples (%d run, %d fail) across %d files", len(examples), run, fail, len(byFile))
+	emitted := make(map[string]bool)
+	for _, example := range examples {
+		if emitted[example.file] {
+			continue
+		}
+		coverage := byFile[example.file]
+		fmt.Fprintf(&b, "\n  %s: %d run, %d fail", example.file, coverage.run, coverage.fail)
+		emitted[example.file] = true
+	}
+	return b.String()
 }
 
 func specExampleModes(info string) ([]specExampleMode, bool) {

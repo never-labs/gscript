@@ -267,7 +267,14 @@ def check_tree_sitter_assets() -> None:
         fail("tree-sitter.json has the wrong file types")
 
     named_types = {item["type"] for item in node_types if item.get("named")}
-    for node_type in ("import_declaration", "dense_literal", "tagged_string_expression", "tagged_block_expression"):
+    for node_type in (
+        "import_declaration",
+        "import_group",
+        "import_spec",
+        "dense_literal",
+        "tagged_string_expression",
+        "tagged_block_expression",
+    ):
         if node_type not in named_types:
             fail(f"tree-sitter node-types missing {node_type}")
     for old_node_type in (
