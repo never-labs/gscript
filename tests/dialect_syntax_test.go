@@ -591,6 +591,43 @@ func TestStdlibDataDialectsExecuteThroughStdlib(t *testing.T) {
 	}
 }
 
+func TestQSymbolicDialectMilestone1ExecutesThroughStdlib(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []leia.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			vm := leia.New(append([]leia.Option{
+				leia.WithLibs(leia.LibAll),
+			}, tc.opts...)...)
+			src := "v := q`1 2 3`\n" +
+				"plus := q`2+1 2 3`\n" +
+				"over := q`+/1 2 3`\n" +
+				"scan := q`+\\1 2 3`\n" +
+				"dict := dialect.eval(\"q\", \"`a`b!10 20\")\n" +
+				"v1 := v[1]\n" +
+				"v_sum := array.sum(v)\n" +
+				"plus3 := plus[3]\n" +
+				"scan3 := scan[3]\n" +
+				"dict_a := dict.a\n" +
+				"dict_b := dict.b\n"
+			if err := vm.Exec(src); err != nil {
+				t.Fatalf("Exec: %v", err)
+			}
+			assertGet(t, vm, "v1", int64(1))
+			assertGet(t, vm, "v_sum", int64(6))
+			assertGet(t, vm, "plus3", int64(5))
+			assertGet(t, vm, "over", int64(6))
+			assertGet(t, vm, "scan3", int64(6))
+			assertGet(t, vm, "dict_a", int64(10))
+			assertGet(t, vm, "dict_b", int64(20))
+		})
+	}
+}
+
 func TestKVEnvDialectsEncodeThroughStdlib(t *testing.T) {
 	for _, tc := range []struct {
 		name string
@@ -811,6 +848,25 @@ func TestShellShortcutBangFailsFast(t *testing.T) {
 			if err == nil || !strings.Contains(err.Error(), "sh dialect failed with exit code 9: fastfailerr") {
 				t.Fatalf("Exec err = %v, want fail-fast shell error", err)
 			}
+		})
+	}
+}
+
+func TestRawStringInterpolationExecutesThroughInterpreterAndBytecode(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []leia.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			vm := leia.New(tc.opts...)
+			if err := vm.Exec("name := \"Ada\"\nscore := 42\nraw := `user=${name};score=${score};next=${score + 1}`\nquoted := \"user=${name}\""); err != nil {
+				t.Fatalf("Exec: %v", err)
+			}
+			assertGet(t, vm, "raw", "user=Ada;score=42;next=43")
+			assertGet(t, vm, "quoted", "user=${name}")
 		})
 	}
 }

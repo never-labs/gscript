@@ -1717,6 +1717,9 @@ func (p *Parser) parsePrimary() (ast.Expr, error) {
 
 	case lexer.TOKEN_STRING:
 		p.advance()
+		if tok.IsRawString {
+			return p.interpolatedStringExpr(p.tokenPos(tok), tok.Value)
+		}
 		return &ast.StringLit{P: p.tokenPos(tok), Value: tok.Value}, nil
 
 	case lexer.TOKEN_TRUE:

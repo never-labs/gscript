@@ -1,5 +1,10 @@
 package runtime
 
+// DenseArrayScan returns the prefix sum scan of a numeric dense array.
+func DenseArrayScan(src *DenseArray) (*DenseArray, error) {
+	return denseArrayScan(src)
+}
+
 func denseArrayScan(src *DenseArray) (*DenseArray, error) {
 	if src == nil {
 		return nil, ErrDenseArrayOperand

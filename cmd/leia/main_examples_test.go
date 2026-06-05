@@ -668,9 +668,9 @@ func approvedBuiltinDialectTags() []string {
 	return []string{
 		"sh", "cmd", "shellwords", "glob", "path",
 		"re", "regexp", "json", "jsonptr", "jsonl", "csv", "tsv", "mdtable", "markdown", "md", "lines", "split", "words", "nums", "numbers", "kv", "logfmt", "env", "ini", "yaml", "yml", "semver", "duration", "timestamp", "rfc3339", "tap", "junit", "xml", "template",
-		"url", "html_escape", "html", "urlquery", "urlpath", "mime", "mailaddr", "emailaddr", "headers", "http_headers", "cookie", "cookies", "httpmsg", "sse", "multipart", "jwt",
+		"url", "html_escape", "html", "urlquery", "form", "urlform", "urlpath", "mime", "mailaddr", "emailaddr", "headers", "http_headers", "cookie", "cookies", "httpmsg", "sse", "multipart", "jwt",
 		"ipaddr", "cidr", "hostport",
-		"base64", "hash", "hex", "base32", "uuid", "gzip", "zlib", "deflate", "binary", "pem", "sql",
+		"base64", "hash", "hex", "base32", "uuid", "gzip", "zlib", "deflate", "binary", "q", "pem", "sql",
 		"prompt", "quote",
 	}
 }

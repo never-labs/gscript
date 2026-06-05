@@ -68,8 +68,11 @@ func TestDialectURLQueryBoundaryModes(t *testing.T) {
 		to_encode.page = 2
 		encoded := dialect.eval("urlquery", to_encode)
 		parsed := dialect.eval("urlquery", "tag=b&tag=a&empty=&space=a+b")
+		form_encoded := dialect.eval("form", to_encode)
+		form_parsed := dialect.eval("urlform", "tag=b&tag=a&empty=&space=a+b")
 		bad_component, bad_component_err := dialect.eval("urlquery", "%zz", {mode: "unescape"})
 		bad_query, bad_query_err := dialect.eval("urlquery", "ok=1&bad=%zz")
+		bad_form, bad_form_err := dialect.eval("form", "a=1", {mode: "bogus"})
 	`, "dialect", BuildDialect(HostOptions{}, nil))
 
 	if got, want := interp.GetGlobal("encoded").Str(), "empty=&page=2&tag=b&tag=a"; got != want {
@@ -100,6 +103,18 @@ func TestDialectURLQueryBoundaryModes(t *testing.T) {
 	}
 	if got := interp.GetGlobal("bad_query_err"); !got.IsString() || got.Str() == "" {
 		t.Fatalf("invalid query error = %v, want non-empty string", got)
+	}
+	if got, want := interp.GetGlobal("form_encoded").Str(), "empty=&page=2&tag=b&tag=a"; got != want {
+		t.Fatalf("encoded form = %q, want %q", got, want)
+	}
+	if got := interp.GetGlobal("form_parsed").Table().RawGetString("tag").Table().RawGetInt(2).Str(); got != "a" {
+		t.Fatalf("form parsed second tag = %q, want a", got)
+	}
+	if !interp.GetGlobal("bad_form").IsNil() {
+		t.Fatalf("invalid form mode returned non-nil result")
+	}
+	if got := interp.GetGlobal("bad_form_err"); !got.IsString() || got.Str() == "" {
+		t.Fatalf("invalid form error = %v, want non-empty string", got)
 	}
 }
 
@@ -382,6 +397,7 @@ func TestDialectProtocolUnknownModesAreReported(t *testing.T) {
 	interp := runWithLib(t, `
 		html_bad, html_bad_err := dialect.eval("html_escape", "<x>", {mode: "bogus"})
 		urlquery_bad, urlquery_bad_err := dialect.eval("urlquery", "a=1", {mode: "bogus"})
+		form_bad, form_bad_err := dialect.eval("form", "a=1", {mode: "bogus"})
 		mime_bad, mime_bad_err := dialect.eval("mime", "text/plain", {mode: "bogus"})
 		headers_bad, headers_bad_err := dialect.eval("headers", "X-Test: ok\r\n", {mode: "bogus"})
 		cookie_bad, cookie_bad_err := dialect.eval("cookie", "a=1", {mode: "bogus"})
@@ -393,6 +409,7 @@ func TestDialectProtocolUnknownModesAreReported(t *testing.T) {
 
 	assertDialectModeError(t, interp.GetGlobal("html_bad"), interp.GetGlobal("html_bad_err"), "html_escape dialect: unknown mode")
 	assertDialectModeError(t, interp.GetGlobal("urlquery_bad"), interp.GetGlobal("urlquery_bad_err"), "urlquery dialect: unknown mode")
+	assertDialectModeError(t, interp.GetGlobal("form_bad"), interp.GetGlobal("form_bad_err"), "form dialect: unknown mode")
 	assertDialectModeError(t, interp.GetGlobal("mime_bad"), interp.GetGlobal("mime_bad_err"), "mime dialect: unknown mode")
 	assertDialectModeError(t, interp.GetGlobal("headers_bad"), interp.GetGlobal("headers_bad_err"), "headers dialect: unknown mode")
 	assertDialectModeError(t, interp.GetGlobal("cookie_bad"), interp.GetGlobal("cookie_bad_err"), "cookie dialect: unknown mode")
@@ -409,6 +426,8 @@ func TestDialectProtocolModeAliasesKeepDirectionInference(t *testing.T) {
 		query_encoded := dialect.eval("urlquery", {q: "a b"}, {mode: "format"})
 		query_decoded := dialect.eval("urlquery", "q=a+b", {mode: "decode"})
 		query_component := dialect.eval("urlquery", "a b", {mode: "escape"})
+		form_encoded := dialect.eval("form", {q: "a b"}, {mode: "format"})
+		form_decoded := dialect.eval("urlform", "q=a+b", {mode: "decode"})
 		mime_encoded := dialect.eval("mime", {type: "text/plain", params: {charset: "utf-8"}}, {mode: "format"})
 		mime_parsed := dialect.eval("mime", "text/plain; charset=utf-8", {mode: "parse"})
 		headers_encoded := dialect.eval("headers", {x_test: "ok"}, {mode: "format"})
@@ -437,6 +456,12 @@ func TestDialectProtocolModeAliasesKeepDirectionInference(t *testing.T) {
 	}
 	if got := interp.GetGlobal("query_component").Str(); got != "a+b" {
 		t.Fatalf("query component = %q, want a+b", got)
+	}
+	if got := interp.GetGlobal("form_encoded").Str(); got != "q=a+b" {
+		t.Fatalf("form encoded = %q, want q=a+b", got)
+	}
+	if got := interp.GetGlobal("form_decoded").Table().RawGetString("q").Str(); got != "a b" {
+		t.Fatalf("form decoded q = %q, want a b", got)
 	}
 	if got := interp.GetGlobal("mime_encoded").Str(); got != "text/plain; charset=utf-8" {
 		t.Fatalf("mime encoded = %q, want formatted media type", got)

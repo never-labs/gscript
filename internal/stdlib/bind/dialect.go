@@ -10,7 +10,7 @@ import (
 // small native dispatch layer used by tagged literals and tagged blocks:
 // sh`...`, cmd`...`, shellwords`...`, glob`...`, json`...`, prompt`...`,
 // quote { ... }, and small safe data transforms such as path`...`, url`...`, words`...`, nums`...`,
-// mdtable`...`, markdown`...`, yaml`...`, kv`...`, logfmt`...`, env`...`, jsonl`...`, semver`...`, html_escape`...`, urlquery`...`, mime`...`, mailaddr`...`,
+// mdtable`...`, markdown`...`, yaml`...`, kv`...`, logfmt`...`, env`...`, jsonl`...`, semver`...`, html_escape`...`, urlquery`...`, form`...`, mime`...`, mailaddr`...`,
 // urlpath`...`, duration`...`, tap`...`, junit`...`, ipaddr`...`, cidr`...`, base64`...`, pem`...`, and hash`...`.
 func BuildDialect(opts HostOptions, maxHostResult func() int64, specs ...DialectSpec) *Table {
 	t := markStdlibBoundModule(NewTable())
@@ -271,11 +271,11 @@ func builtinDialectCategory(name string) string {
 		return "host"
 	case "shellwords", "path", "json", "jsonptr", "jsonl", "csv", "tsv", "mdtable", "markdown", "md", "lines", "split", "words", "nums", "numbers", "kv", "logfmt", "env", "ini", "yaml", "yml", "semver", "duration", "timestamp", "rfc3339", "tap", "xml", "template", "re", "regexp":
 		return "text"
-	case "url", "html_escape", "html", "urlquery", "urlpath", "mime", "mailaddr", "emailaddr", "headers", "http_headers", "httpmsg", "cookie", "cookies", "sse", "multipart", "jwt":
+	case "url", "html_escape", "html", "urlquery", "form", "urlform", "urlpath", "mime", "mailaddr", "emailaddr", "headers", "http_headers", "httpmsg", "cookie", "cookies", "sse", "multipart", "jwt":
 		return "protocol"
 	case "ipaddr", "cidr", "hostport":
 		return "protocol"
-	case "base64", "hash", "hex", "base32", "uuid", "gzip", "zlib", "deflate", "binary", "pem":
+	case "base64", "hash", "hex", "base32", "uuid", "gzip", "zlib", "deflate", "binary", "q", "pem":
 		return "data"
 	case "sql":
 		return "database"

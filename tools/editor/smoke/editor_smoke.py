@@ -167,6 +167,7 @@ def check_textmate() -> None:
     if "%=" in str(operator_pattern.get("match", "")):
         fail("Leia TextMate grammar still exposes unsupported %= compound assignment")
     assert_match(leia, "entity.name.function.leia", source)
+    assert_match(leia, "support.module.leia", "joined := bytes.concat(parts)")
 
     assert_match(leia_mod, "keyword.control.leia-mod", manifest)
     assert_match(leia_mod, "keyword.operator.arrow.leia-mod", manifest)

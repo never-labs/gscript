@@ -177,9 +177,9 @@ func TestBuiltinDialectRegistryStaysModular(t *testing.T) {
 		"dialect_shell_fs.go":         {"sh", "cmd", "shellwords", "glob", "path"},
 		"dialect_text.go":             {"re", "regexp", "json", "jsonptr", "jsonl", "csv", "tsv", "mdtable", "markdown", "md", "lines", "split", "words", "nums", "numbers", "kv", "logfmt", "env", "ini", "yaml", "yml", "semver", "duration", "timestamp", "rfc3339", "tap", "junit", "xml", "template"},
 		"dialect_yaml.go":             nil,
-		"dialect_protocol.go":         {"url", "html_escape", "html", "urlquery", "urlpath", "mime", "mailaddr", "emailaddr", "headers", "http_headers", "cookie", "cookies", "httpmsg", "sse", "multipart", "jwt"},
+		"dialect_protocol.go":         {"url", "html_escape", "html", "urlquery", "form", "urlform", "urlpath", "mime", "mailaddr", "emailaddr", "headers", "http_headers", "cookie", "cookies", "httpmsg", "sse", "multipart", "jwt"},
 		"dialect_protocol_network.go": {"ipaddr", "cidr", "hostport"},
-		"dialect_data.go":             {"base64", "hash", "hex", "base32", "uuid", "gzip", "zlib", "deflate", "binary", "pem"},
+		"dialect_data.go":             {"base64", "hash", "hex", "base32", "uuid", "gzip", "zlib", "deflate", "binary", "q", "pem"},
 		"dialect_database.go":         {"sql"},
 		"dialect_ai.go":               {"prompt", "quote"},
 	}

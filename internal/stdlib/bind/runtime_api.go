@@ -4,6 +4,7 @@ import "github.com/never-labs/leia/internal/runtime"
 
 type (
 	DenseArray           = runtime.DenseArray
+	DenseArrayBinaryOp   = runtime.DenseArrayBinaryOp
 	DenseArrayDType      = runtime.DenseArrayDType
 	Channel              = runtime.Channel
 	Interpreter          = runtime.Interpreter
@@ -53,10 +54,16 @@ var (
 	ConcatOperandString           = runtime.ConcatOperandString
 	ContextCancelledValue         = runtime.ContextCancelledValue
 	DenseArrayBool                = runtime.DenseArrayBool
+	DenseArrayAdd                 = runtime.DenseArrayAdd
+	DenseArraySub                 = runtime.DenseArraySub
+	DenseArrayMul                 = runtime.DenseArrayMul
+	DenseArrayDiv                 = runtime.DenseArrayDiv
+	DenseArrayElementwise         = runtime.DenseArrayElementwise
 	DenseArrayF64                 = runtime.DenseArrayF64
 	DenseArrayI64                 = runtime.DenseArrayI64
 	DenseArrayReduce              = runtime.DenseArrayReduce
 	DenseArrayReduceSum           = runtime.DenseArrayReduceSum
+	DenseArrayScan                = runtime.DenseArrayScan
 	DenseArrayValue               = runtime.DenseArrayValue
 	FloatValue                    = runtime.FloatValue
 	FunctionValue                 = runtime.FunctionValue

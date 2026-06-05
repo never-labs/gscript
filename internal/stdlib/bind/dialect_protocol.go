@@ -40,6 +40,10 @@ func registerDialectProtocol(register dialectRegisterFunc, maxHostResult func() 
 		eval:  dialectURLQuery,
 		block: dialectURLQuery,
 	})
+	register([]string{"form", "urlform"}, dialectHandler{
+		eval:  dialectURLForm,
+		block: dialectURLForm,
+	})
 	register([]string{"urlpath"}, dialectHandler{
 		eval:  dialectURLPath,
 		block: dialectURLPath,
@@ -253,9 +257,17 @@ func isHTMLVoidElement(tag string) bool {
 }
 
 func dialectURLQuery(body Value, opts *Table) ([]Value, error) {
+	return dialectURLQueryNamed("urlquery", body, opts)
+}
+
+func dialectURLForm(body Value, opts *Table) ([]Value, error) {
+	return dialectURLQueryNamed("form", body, opts)
+}
+
+func dialectURLQueryNamed(name string, body Value, opts *Table) ([]Value, error) {
 	mode := dialectMode(opts)
 	if !dialectModeAllowed(mode, "", "parse", "decode", "encode", "format", "escape", "encode_component", "unescape", "decode_component") {
-		return dialectUnknownMode("urlquery", mode)
+		return dialectUnknownMode(name, mode)
 	}
 	if body.IsTable() && mode != "decode" && mode != "parse" {
 		values := url.Values{}

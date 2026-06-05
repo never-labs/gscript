@@ -125,6 +125,34 @@ func TestStringLiteral(t *testing.T) {
 	}
 }
 
+func TestRawStringInterpolationParses(t *testing.T) {
+	prog := mustParse(t, "name := \"Ada\"\ns := `hello ${name}`")
+	decl := prog.Stmts[1].(*ast.DeclareStmt)
+	interp, ok := decl.Values[0].(*ast.InterpolatedStringExpr)
+	if !ok {
+		t.Fatalf("expected InterpolatedStringExpr, got %T", decl.Values[0])
+	}
+	if len(interp.Parts) != 2 || interp.Parts[0].Text != "hello " {
+		t.Fatalf("unexpected interpolation parts: %#v", interp.Parts)
+	}
+	ident, ok := interp.Parts[1].Expr.(*ast.IdentExpr)
+	if !ok || ident.Name != "name" {
+		t.Fatalf("interpolation expr = %#v, want name ident", interp.Parts[1].Expr)
+	}
+}
+
+func TestQuotedStringDoesNotInterpolate(t *testing.T) {
+	prog := mustParse(t, `s := "hello ${name}"`)
+	decl := prog.Stmts[0].(*ast.DeclareStmt)
+	str, ok := decl.Values[0].(*ast.StringLit)
+	if !ok {
+		t.Fatalf("expected StringLit, got %T", decl.Values[0])
+	}
+	if str.Value != "hello ${name}" {
+		t.Fatalf("quoted string = %q, want literal interpolation marker", str.Value)
+	}
+}
+
 func TestBoolLiterals(t *testing.T) {
 	prog := mustParse(t, `a := true; b := false`)
 	decl1 := prog.Stmts[0].(*ast.DeclareStmt)

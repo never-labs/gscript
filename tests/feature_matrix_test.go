@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"testing"
@@ -152,9 +153,9 @@ func TestFeatureMatrixCoversTaggedDialectAndModpkgReleaseGuards(t *testing.T) {
 	requireFeatureStringList(t, tagged, "tagged_dialect_syntax", "builtin_dialect_tags",
 		"sh", "cmd", "shellwords", "glob", "path",
 		"re", "regexp", "json", "jsonptr", "jsonl", "csv", "tsv", "mdtable", "markdown", "md", "lines", "split", "words", "nums", "numbers", "kv", "logfmt", "env", "ini", "yaml", "yml", "semver", "duration", "timestamp", "rfc3339", "tap", "junit", "xml", "template",
-		"url", "html_escape", "html", "urlquery", "urlpath", "mime", "mailaddr", "emailaddr", "headers", "http_headers", "cookie", "cookies", "httpmsg", "sse", "multipart", "jwt",
+		"url", "html_escape", "html", "urlquery", "form", "urlform", "urlpath", "mime", "mailaddr", "emailaddr", "headers", "http_headers", "cookie", "cookies", "httpmsg", "sse", "multipart", "jwt",
 		"ipaddr", "cidr", "hostport",
-		"base64", "hash", "hex", "base32", "uuid", "gzip", "zlib", "deflate", "binary", "pem",
+		"base64", "hash", "hex", "base32", "uuid", "gzip", "zlib", "deflate", "binary", "q", "pem",
 		"sql",
 		"prompt", "quote",
 	)
@@ -172,6 +173,9 @@ func TestFeatureMatrixCoversTaggedDialectAndModpkgReleaseGuards(t *testing.T) {
 	dialectGuard := readFileString(t, filepath.Join(root, "tests", "dialect_syntax_test.go"))
 	if !strings.Contains(dialectGuard, "urlpath`a b/米`") || !strings.Contains(dialectGuard, `dialect.eval(\"urlpath\"`) {
 		t.Fatal("tests/dialect_syntax_test.go must keep urlpath tagged literal and eval coverage")
+	}
+	if !strings.Contains(dialectGuard, "TestQSymbolicDialectMilestone1ExecutesThroughStdlib") || !strings.Contains(dialectGuard, "q`+/1 2 3`") {
+		t.Fatal("tests/dialect_syntax_test.go must keep q symbolic vector dialect coverage")
 	}
 	stdlibBoundary := readFileString(t, filepath.Join(root, "tests", "architecture", "stdlib_boundary_test.go"))
 	if !strings.Contains(stdlibBoundary, `"urlpath"`) {
@@ -210,6 +214,122 @@ func TestFeatureMatrixCoversTaggedDialectAndModpkgReleaseGuards(t *testing.T) {
 	packageBoundary := readFileString(t, filepath.Join(root, "tests", "architecture", "package_boundary_test.go"))
 	if !strings.Contains(packageBoundary, `internal("modpkg")`) {
 		t.Fatal("package architecture boundary must keep modpkg dependency direction guard")
+	}
+}
+
+func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
+	root := findRepoRoot(t)
+	readme := readFileString(t, filepath.Join(root, "README.md"))
+	for _, snippet := range []string{
+		"Go embedding API with sandbox, resource budgets, host bindings, and hot reload.",
+		"AI-native syntax and stdlib support for models, tools, messages, turns,",
+		"Go-style concurrency primitives: `go`, channels, `select`, sync helpers",
+		"Data-oriented helpers for dense arrays, matrices, vectors, and SoA layouts.",
+		"CLI tooling for format, lint, test, docs, diagnostics, modules, benchmarks,",
+	} {
+		if !strings.Contains(readme, snippet) {
+			t.Fatalf("README stable contract changed or missing expected snippet %q", snippet)
+		}
+	}
+
+	features := loadFeatureMatrixFeatureMap(t, root)
+
+	embeddingSecurity := requireFeature(t, features, "sandbox_capabilities_module_loading")
+	requireFeatureCellRefs(t, embeddingSecurity, "sandbox_capabilities_module_loading", "semantic_gate",
+		"tests/sdk/leia_test.go",
+		"docs/testing.md",
+	)
+
+	hotReload := requireFeature(t, features, "embedding_hot_reload")
+	requireFeatureCellRefs(t, hotReload, "embedding_hot_reload", "interpreter",
+		"tests/sdk/hotloader_test.go",
+		"tests/sdk/hotloader_instance_test.go",
+		"tests/sdk/hotloader_instance_rollback_test.go",
+	)
+
+	ai := requireFeature(t, features, "llm_native_integration")
+	requireFeatureCellRefs(t, ai, "llm_native_integration", "semantic_gate",
+		"tests/llm/llm_runtime_test.go",
+		"tests/llm/llm_agent_examples_test.go",
+		"examples/embedding/embedding_test.go",
+	)
+
+	concurrency := requireFeature(t, features, "go_style_concurrency")
+	requireFeatureCellRefs(t, concurrency, "go_style_concurrency", "semantic_gate",
+		"tests/language/go_channel_host_more.leia",
+		"tests/language/go_channel_edges_more.leia",
+		"tests/sdk/resource_budget_concurrency_test.go",
+		"cmd/leia/main_examples_test.go",
+	)
+
+	data := requireFeature(t, features, "matrix_dense_arrays")
+	requireFeatureCellRefs(t, data, "matrix_dense_arrays", "semantic_gate",
+		"tests/language/matrix_host_dense_more.leia",
+		"tests/language/vec_color_geometry_hsl_more.leia",
+	)
+
+	tooling := requireFeature(t, features, "cli_repository_tooling")
+	requireFeatureCellRefs(t, tooling, "cli_repository_tooling", "semantic_gate",
+		"cmd/leia/main_fmt_test.go",
+		"cmd/leia/main_lint_test.go",
+		"cmd/leia/main_test_run_test.go",
+		"cmd/leia/main_doc_test.go",
+		"cmd/leia/main_diag_test.go",
+		"cmd/leia/main_mod_test.go",
+		"cmd/leia/main_bench_test.go",
+		"cmd/leia/main_examples_command_test.go",
+		"docs/guides/tooling.md",
+	)
+
+	modules := requireFeature(t, features, "module_package_management")
+	requireFeatureCellRefs(t, modules, "module_package_management", "semantic_gate",
+		"internal/modpkg/modpkg_test.go",
+		"tests/architecture/package_boundary_test.go",
+	)
+}
+
+func TestActiveDocsUseLeiaNamingAndNoLegacyAskAgentDesign(t *testing.T) {
+	root := findRepoRoot(t)
+	legacyProjectName := regexp.MustCompile(`(?i)\b(gscript|gs)\b`)
+	var offenders []string
+	for _, base := range []string{"README.md", "docs"} {
+		start := filepath.Join(root, filepath.FromSlash(base))
+		err := filepath.WalkDir(start, func(path string, entry os.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			rel, err := filepath.Rel(root, path)
+			if err != nil {
+				return err
+			}
+			rel = filepath.ToSlash(rel)
+			if entry.IsDir() {
+				if strings.HasPrefix(rel, "docs/archive") {
+					return filepath.SkipDir
+				}
+				return nil
+			}
+			if filepath.Ext(path) != ".md" && filepath.Ext(path) != ".html" {
+				return nil
+			}
+			data := readFileString(t, path)
+			if legacyProjectName.MatchString(data) {
+				offenders = append(offenders, rel+": legacy project name")
+			}
+			for _, oldAI := range []string{"agent ask(", "llm.ask("} {
+				if strings.Contains(data, oldAI) {
+					offenders = append(offenders, rel+": legacy AI ask surface "+oldAI)
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatalf("walk %s: %v", base, err)
+		}
+	}
+	if len(offenders) > 0 {
+		sort.Strings(offenders)
+		t.Fatalf("active docs must use Leia names and avoid legacy ask-style AI design:\n%s", strings.Join(offenders, "\n"))
 	}
 }
 
@@ -276,6 +396,15 @@ func loadFeatureMatrixFeatureMap(t *testing.T, root string) map[string]map[strin
 		features[id] = feature
 	}
 	return features
+}
+
+func requireFeature(t *testing.T, features map[string]map[string]json.RawMessage, id string) map[string]json.RawMessage {
+	t.Helper()
+	feature := features[id]
+	if feature == nil {
+		t.Fatalf("feature_matrix.json missing %s feature", id)
+	}
+	return feature
 }
 
 func requireFeatureCellRefs(t *testing.T, feature map[string]json.RawMessage, featureID, field string, refs ...string) {

@@ -3,13 +3,13 @@ package bind
 import (
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 )
 
-// BuildQ creates the "q" column-query helper library. It intentionally
-// accepts ordinary Leia tables as query plans and executes over SoA columns so
-// data-heavy scripts can stay concise without introducing a second query
-// language into the core grammar.
+// BuildQ creates the "q" column-query helper library. q.query keeps the
+// ordinary Leia table-plan API, while q.eval and q`...` expose a small
+// q/kdb+-style symbolic vector subset.
 func BuildQ() *Table {
 	t := NewTable()
 	set := func(name string, fn func([]Value) ([]Value, error)) {
@@ -28,7 +28,264 @@ func BuildQ() *Table {
 		}
 		return []Value{TableValue(out)}, nil
 	})
+	set("eval", func(args []Value) ([]Value, error) {
+		if len(args) < 1 || !args[0].IsString() {
+			return nil, fmt.Errorf("q.eval: argument 1 must be a q source string")
+		}
+		return qEvalSymbolic(args[0].Str())
+	})
 	return t
+}
+
+func dialectQ(body Value, opts *Table) ([]Value, error) {
+	mode := dialectMode(opts)
+	if mode != "" && mode != "eval" && mode != "parse" {
+		return dialectUnknownMode("q", mode)
+	}
+	return qEvalSymbolic(body.String())
+}
+
+func qEvalSymbolic(src string) ([]Value, error) {
+	v, err := qParseSymbolic(strings.TrimSpace(src))
+	if err != nil {
+		return nil, fmt.Errorf("q dialect: %w", err)
+	}
+	return []Value{v}, nil
+}
+
+func qParseSymbolic(src string) (Value, error) {
+	if src == "" {
+		return NilValue(), fmt.Errorf("empty q expression")
+	}
+	if bang := strings.IndexByte(src, '!'); bang >= 0 {
+		keys, err := qParseSymbolList(strings.TrimSpace(src[:bang]))
+		if err != nil {
+			return NilValue(), err
+		}
+		values, err := qParseSymbolic(strings.TrimSpace(src[bang+1:]))
+		if err != nil {
+			return NilValue(), err
+		}
+		return qSymbolDict(keys, values)
+	}
+	if strings.HasPrefix(src, "+/") {
+		v, err := qParseSymbolic(strings.TrimSpace(src[2:]))
+		if err != nil {
+			return NilValue(), err
+		}
+		if !v.IsDenseArray() {
+			return NilValue(), fmt.Errorf("+/ expects a numeric vector")
+		}
+		return DenseArrayReduce(DenseArrayReduceSum, v.DenseArray())
+	}
+	if strings.HasPrefix(src, "+\\") {
+		v, err := qParseSymbolic(strings.TrimSpace(src[2:]))
+		if err != nil {
+			return NilValue(), err
+		}
+		if !v.IsDenseArray() {
+			return NilValue(), fmt.Errorf("+\\ expects a numeric vector")
+		}
+		scan, err := DenseArrayScan(v.DenseArray())
+		if err != nil {
+			return NilValue(), err
+		}
+		return DenseArrayValue(scan), nil
+	}
+	if strings.HasPrefix(src, "`") {
+		keys, err := qParseSymbolList(src)
+		if err != nil {
+			return NilValue(), err
+		}
+		return qSymbolListValue(keys), nil
+	}
+	if idx, op, ok := qFindDyadic(src); ok {
+		left, err := qParseSymbolic(strings.TrimSpace(src[:idx]))
+		if err != nil {
+			return NilValue(), err
+		}
+		right, err := qParseSymbolic(strings.TrimSpace(src[idx+1:]))
+		if err != nil {
+			return NilValue(), err
+		}
+		return qApplyDyadic(op, left, right)
+	}
+	return qParseNumericAtom(src)
+}
+
+func qParseNumericAtom(src string) (Value, error) {
+	fields := strings.Fields(src)
+	if len(fields) == 0 {
+		return NilValue(), fmt.Errorf("empty q expression")
+	}
+	values := make([]Value, len(fields))
+	hasFloat := false
+	for i, field := range fields {
+		v, isFloat, err := qParseNumber(field)
+		if err != nil {
+			return NilValue(), err
+		}
+		values[i] = v
+		hasFloat = hasFloat || isFloat
+	}
+	if len(values) == 1 {
+		return values[0], nil
+	}
+	if hasFloat {
+		xs := make([]float64, len(values))
+		for i, v := range values {
+			xs[i] = v.Number()
+		}
+		return DenseArrayValue(NewDenseArrayF64(xs)), nil
+	}
+	xs := make([]int64, len(values))
+	for i, v := range values {
+		xs[i] = v.Int()
+	}
+	return DenseArrayValue(NewDenseArrayI64(xs)), nil
+}
+
+func qParseNumber(src string) (Value, bool, error) {
+	if strings.ContainsAny(src, ".eE") {
+		f, err := strconv.ParseFloat(src, 64)
+		if err != nil {
+			return NilValue(), false, fmt.Errorf("invalid number %q", src)
+		}
+		return FloatValue(f), true, nil
+	}
+	i, err := strconv.ParseInt(src, 10, 64)
+	if err != nil {
+		return NilValue(), false, fmt.Errorf("invalid number %q", src)
+	}
+	return IntValue(i), false, nil
+}
+
+func qFindDyadic(src string) (int, byte, bool) {
+	for i := 1; i < len(src); i++ {
+		switch src[i] {
+		case '+', '-', '*', '%':
+			if (src[i] == '+' || src[i] == '-') && (src[i-1] == 'e' || src[i-1] == 'E') {
+				continue
+			}
+			return i, src[i], true
+		}
+	}
+	return 0, 0, false
+}
+
+func qApplyDyadic(op byte, left, right Value) (Value, error) {
+	if left.IsDenseArray() || right.IsDenseArray() {
+		denseOp, err := qDenseArrayOp(op)
+		if err != nil {
+			return NilValue(), err
+		}
+		return DenseArrayElementwise(denseOp, left, right)
+	}
+	if !left.IsNumber() || !right.IsNumber() {
+		return NilValue(), fmt.Errorf("operator %q expects numeric operands", string(op))
+	}
+	if left.IsInt() && right.IsInt() && op != '%' {
+		switch op {
+		case '+':
+			return IntValue(left.Int() + right.Int()), nil
+		case '-':
+			return IntValue(left.Int() - right.Int()), nil
+		case '*':
+			return IntValue(left.Int() * right.Int()), nil
+		}
+	}
+	switch op {
+	case '+':
+		return FloatValue(left.Number() + right.Number()), nil
+	case '-':
+		return FloatValue(left.Number() - right.Number()), nil
+	case '*':
+		return FloatValue(left.Number() * right.Number()), nil
+	case '%':
+		return FloatValue(left.Number() / right.Number()), nil
+	default:
+		return NilValue(), fmt.Errorf("operator %q is not supported", string(op))
+	}
+}
+
+func qDenseArrayOp(op byte) (DenseArrayBinaryOp, error) {
+	switch op {
+	case '+':
+		return DenseArrayAdd, nil
+	case '-':
+		return DenseArraySub, nil
+	case '*':
+		return DenseArrayMul, nil
+	case '%':
+		return DenseArrayDiv, nil
+	default:
+		return DenseArrayAdd, fmt.Errorf("operator %q is not supported for dense arrays", string(op))
+	}
+}
+
+func qParseSymbolList(src string) ([]string, error) {
+	if !strings.HasPrefix(src, "`") {
+		return nil, fmt.Errorf("symbol list must start with `")
+	}
+	var out []string
+	for len(src) > 0 {
+		if src[0] != '`' {
+			return nil, fmt.Errorf("malformed symbol list near %q", src)
+		}
+		src = src[1:]
+		next := strings.IndexByte(src, '`')
+		var sym string
+		if next < 0 {
+			sym = strings.TrimSpace(src)
+			src = ""
+		} else {
+			sym = strings.TrimSpace(src[:next])
+			src = src[next:]
+		}
+		if sym == "" {
+			return nil, fmt.Errorf("empty symbol")
+		}
+		out = append(out, sym)
+	}
+	return out, nil
+}
+
+func qSymbolListValue(keys []string) Value {
+	out := NewAppendArrayTable(len(keys))
+	for i, key := range keys {
+		out.RawSetInt(int64(i+1), StringValue(key))
+	}
+	return TableValue(out)
+}
+
+func qSymbolDict(keys []string, values Value) (Value, error) {
+	out := NewTable()
+	switch {
+	case values.IsDenseArray():
+		if values.DenseArray().Len() != len(keys) {
+			return NilValue(), fmt.Errorf("dict key/value length mismatch")
+		}
+		for i, key := range keys {
+			v, err := values.DenseArray().At(i)
+			if err != nil {
+				return NilValue(), err
+			}
+			out.RawSetString(key, v)
+		}
+	case values.IsTable():
+		if values.Table().Length() != len(keys) {
+			return NilValue(), fmt.Errorf("dict key/value length mismatch")
+		}
+		for i, key := range keys {
+			out.RawSetString(key, values.Table().RawGetInt(int64(i+1)))
+		}
+	default:
+		if len(keys) != 1 {
+			return NilValue(), fmt.Errorf("dict key/value length mismatch")
+		}
+		out.RawSetString(keys[0], values)
+	}
+	return TableValue(out), nil
 }
 
 func qRunQuery(s *SoA, spec *Table) (*Table, error) {

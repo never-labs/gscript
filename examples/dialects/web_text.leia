@@ -1,5 +1,5 @@
 // web_text.leia - Built-in dialects for small Web-safe text transforms.
-// Demonstrates: url, html_escape, urlquery, urlpath, mime, headers, cookie, base64, hash
+// Demonstrates: url, html_escape, urlquery, form, urlpath, mime, headers, cookie, base64, hash
 
 print("=== Dialects: web text ===")
 
@@ -33,12 +33,16 @@ encoded_query := dialect.eval("urlquery", {q: "hello world", page: 2}, {mode: "f
 parsed_query := dialect.eval("urlquery", "q=hello+world&page=2&tag=a&tag=b", {mode: "parse"})
 component := dialect.eval("urlquery", "hello world&x", {mode: "escape"})
 component_decoded := dialect.eval("urlquery", component, {mode: "unescape"})
+form_encoded := form {q: "hello world", page: 2}
+form_parsed := urlform`q=hello+world&page=2&tag=a&tag=b`
 escaped_path := urlpath`a b/米`
 decoded_path := dialect.eval("urlpath", escaped_path, {mode: "unescape"})
 route_match := dialect.eval("urlpath", "/v1/users/ada/files/docs/readme.md", {template: "/v1/users/{id}/files/{*rest}", mode: "match_template"})
 route_path := dialect.eval("urlpath", {id: route_match.params.id, rest: "docs/read me.md"}, {template: "/v1/users/{id}/files/{*rest}", mode: "encode_template"})
 print("urlquery encoded:", encoded_query)
 print("urlquery tag 2:", parsed_query.tag[2])
+print("form encoded:", form_encoded)
+print("form tag 2:", form_parsed.tag[2])
 print("urlpath escaped:", escaped_path)
 print("route id:", route_match.params.id)
 assert(encoded_query == "page=2&q=hello+world")
@@ -47,6 +51,9 @@ assert(parsed_query.page == "2")
 assert(parsed_query.tag[2] == "b")
 assert(component == "hello+world%26x")
 assert(component_decoded == "hello world&x")
+assert(form_encoded == "page=2&q=hello+world")
+assert(form_parsed.page == "2")
+assert(form_parsed.tag[2] == "b")
 assert(escaped_path == "a%20b%2F%E7%B1%B3")
 assert(decoded_path == "a b/米")
 assert(route_match.matched == true)

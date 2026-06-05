@@ -60,6 +60,9 @@ func registerDialectData(register dialectRegisterFunc, maxHostResult func() int6
 			return dialectBinary(body, options, maxHostResult)
 		},
 	})
+	register([]string{"q"}, dialectHandler{
+		eval: dialectQ,
+	})
 	register([]string{"pem"}, dialectHandler{
 		eval: func(body Value, options *Table) ([]Value, error) {
 			return dialectPEM(body, options, maxHostResult)

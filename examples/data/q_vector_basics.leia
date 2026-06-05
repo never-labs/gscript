@@ -1,0 +1,20 @@
+// q_vector_basics.leia - q/kdb+-style symbolic vector subset.
+// Run:
+//   go run ./cmd/leia run examples/data/q_vector_basics.leia
+
+prices := q`10 20 30`
+shifted := q`2+10 20 30`
+total := q`+/10 20 30`
+running := q`+\10 20 30`
+
+labels := dialect.eval("q", "`bid`ask!10 20")
+
+assert(prices[1] == 10)
+assert(shifted[3] == 32)
+assert(total == 60)
+assert(running[3] == 60)
+assert(labels.bid == 10)
+assert(labels.ask == 20)
+
+q_vector_basics_summary := "q vector total=" .. total .. " running_last=" .. running[3] .. " bid=" .. labels.bid
+print(q_vector_basics_summary)

@@ -274,7 +274,7 @@
         },
         {
           "name": "support.module.leia",
-          "match": "\\b(?:string|table|math|json|time|os|env|fs|http|process|debug|llm|msg|history|loop|soa|matrix|vec|csv|binary|bits|bit32|regexp|url|path|uuid|base64|hash|compress|sync)\\b(?=\\.)"
+          "match": "\\b(?:string|table|math|json|time|os|env|fs|http|process|debug|llm|msg|history|loop|soa|matrix|vec|csv|binary|bits|bit32|bytes|regexp|url|path|uuid|base64|hash|compress|sync)\\b(?=\\.)"
         }
       ]
     },
