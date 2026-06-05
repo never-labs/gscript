@@ -145,7 +145,7 @@ implementations live under `github.com/never-labs/leia/llm/...`.
 | API | Purpose |
 |---|---|
 | `WithLLMProvider(provider)` | Install the provider used by `llm.turn`. |
-| `WithLLMProviderFactory(factory)` | Construct providers for script-declared `models {}` configs. |
+| `WithLLMProviderFactory(factory)` | Construct providers for script-declared `model {}` aliases. |
 | `WithLLMTrace(sink)` | Receive metadata trace events. |
 | `WithLLMRecorder(sink)` | Record provider turns for tests or offline review. |
 | `WithLLMReplay(records)` | Replay recorded turns deterministically. |

@@ -42,8 +42,9 @@ truth.
   sequence behavior, metatables, and metamethods.
 - [Concurrency](concurrency.md): goroutine-like tasks, channels, select, sync,
   cancellation, and host scheduling boundaries.
-- [AI-Native Syntax](ai-native.md): models, tools, agents, turns, messages,
-  flows, budgets, output validation, providers, trace, and replay.
+- [AI-Native Syntax](ai-native.md): model, tool, agent, and turn dialects;
+  messages, budgets, output validation, providers, trace, replay, and
+  evaluation.
 - [Modules And Loading](modules.md): `require`, `import "go:..."`, `leia.mod`,
   `leia.sum`, vendoring, module caches, and capabilities.
 - [Errors And Diagnostics](errors.md): runtime errors, recoverable errors,

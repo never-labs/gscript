@@ -219,16 +219,16 @@ assert(rawlen(boxed) == 0)
 
 ## Literals
 
-Table literals, list literals, dense array literals, function literals,
-anonymous agent expressions, `turn` expressions, and `messages` blocks are
-expressions. Their specific syntax is listed in [grammar.ebnf](grammar.ebnf).
+Table literals, list literals, dense array literals, function literals, and
+tagged dialect forms are expressions. Their specific syntax is listed in
+[grammar.ebnf](grammar.ebnf).
 
 Literal operands are evaluated left-to-right. A literal that constructs an
 identity-bearing value creates a fresh identity each time the literal is
-evaluated. This applies to table literals, function literals, anonymous agent
-expressions, `turn` request objects, `messages` arrays, and dense arrays. Calls,
-index expressions, and member selections do not imply freshness: a call returns
-the callee's result, and selection returns the stored member or indexed value.
+evaluated. This applies to table literals, function literals, and dense arrays.
+Calls, tagged dialect evaluations, index expressions, and member selections do
+not imply freshness by themselves: they return the callee or dialect result, and
+selection returns the stored member or indexed value.
 
 Table fields are evaluated in source order. For stable v1.0 programs, avoid
 depending on duplicate keys or on subtle interleaving between list-style and
@@ -237,9 +237,8 @@ constructor subset. List literals evaluate each element in order and store the
 results as a new 1-based array table. Dense array literals evaluate each
 element in order, convert each element according to the dense element type, and
 raise a runtime error if a value cannot be represented by that element type.
-Function and agent literals capture their lexical environment by reference.
-`messages` blocks evaluate role fields in order and create a new ordered
-message array.
+Function literals capture their lexical environment by reference. Tagged
+dialect forms evaluate according to their registered dialect contract.
 
 ```leia run all
 events := {}

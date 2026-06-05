@@ -225,6 +225,10 @@ if true {
 
 ## AI Declarations
 
-`models`, `tool`, `agent defaults`, and named `agent` declarations are
-module-level or block-level declarations according to their source position.
-Their detailed semantics are specified in [AI-Native Syntax](ai-native.md).
+AI model, tool, turn, and agent forms are tagged dialect expressions, not
+declarations with special binding rules. Assign their result to a name when a
+script needs a reusable value.
+
+`evaluate "name" { ... }` is a source-level regression declaration discovered
+by `leia evaluate`; it has no effect during ordinary script execution. Detailed
+semantics are specified in [AI-Native Syntax](ai-native.md).

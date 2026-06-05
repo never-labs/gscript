@@ -144,7 +144,7 @@ footer { color:var(--muted); border-top:1px solid var(--line); margin-top:42px; 
 <li><a href="#">Functions</a>: functions, closures, varargs, multi-return, tail behavior, and callable values.</li>
 <li><a href="#">Tables And Metatables</a>: table identity, constructors, raw access, sequence behavior, metatables, and metamethods.</li>
 <li><a href="#">Concurrency</a>: goroutine-like tasks, channels, select, sync, cancellation, and host scheduling boundaries.</li>
-<li><a href="#">AI-Native Syntax</a>: models, tools, agents, turns, messages, flows, budgets, output validation, providers, trace, and replay.</li>
+<li><a href="#">AI-Native Syntax</a>: model, tool, agent, and turn dialects; messages, budgets, output validation, providers, trace, replay, and evaluation.</li>
 <li><a href="#">Modules And Loading</a>: <code>require</code>, <code>import &quot;go:...&quot;</code>, <code>leia.mod</code>, <code>leia.sum</code>, vendoring, module caches, and capabilities.</li>
 <li><a href="#">Errors And Diagnostics</a>: runtime errors, recoverable errors, diagnostics, protected calls, and host failure reporting.</li>
 <li><a href="#">Implementation Requirements</a>: interpreter baseline, bytecode VM, JIT, optimization correctness, sandboxing, and release gates.</li>
@@ -247,16 +247,16 @@ iffoo <span class="tok-operator">:=</span> <span class="tok-number">7</span>
 <span class="tok-builtin">assert</span>(returning <span class="tok-operator">==</span> <span class="tok-constant">true</span>)
 <span class="tok-builtin">assert</span>(iffoo <span class="tok-operator">==</span> <span class="tok-number">7</span>)</code></pre>
 <pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-keyword">func</span> <span class="tok-operator">:=</span> <span class="tok-string">&quot;reserved&quot;</span></code></pre>
-<p>AI-native words such as <code>agent</code>, <code>models</code>, <code>tool</code>, <code>turn</code>, <code>messages</code>, <code>evaluate</code>, <code>case</code>, <code>expect</code>, <code>flow</code>, and <code>budget</code> are contextual syntax words, not lexical keywords. They scan as identifiers outside grammar positions that assign them AI-native meaning.</p>
+<p>AI-native words such as <code>model</code>, <code>tool</code>, <code>turn</code>, <code>agent</code>, and <code>evaluate</code> are contextual syntax words, not lexical keywords. They scan as identifiers outside grammar positions that assign them AI-native or dialect meaning.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code">agent <span class="tok-operator">:=</span> <span class="tok-string">&quot;identifier&quot;</span>
 tool <span class="tok-operator">:=</span> <span class="tok-string">&quot;identifier&quot;</span>
 turn <span class="tok-operator">:=</span> <span class="tok-number">1</span>
-budget <span class="tok-operator">:=</span> <span class="tok-number">2</span>
+model <span class="tok-operator">:=</span> <span class="tok-number">2</span>
 
 <span class="tok-builtin">assert</span>(agent <span class="tok-operator">==</span> <span class="tok-string">&quot;identifier&quot;</span>)
 <span class="tok-builtin">assert</span>(tool <span class="tok-operator">==</span> <span class="tok-string">&quot;identifier&quot;</span>)
-<span class="tok-builtin">assert</span>(turn <span class="tok-operator">+</span> budget <span class="tok-operator">==</span> <span class="tok-number">3</span>)</code></pre>
-<p>In grammar positions that define AI-native forms, contextual words are consumed by that syntax rather than bound as ordinary identifiers. See <a href="#">AI-Native Constructs</a> for the stable forms.</p>
+<span class="tok-builtin">assert</span>(turn <span class="tok-operator">+</span> model <span class="tok-operator">==</span> <span class="tok-number">3</span>)</code></pre>
+<p>In grammar positions that define tagged dialect forms or evaluate blocks, contextual words are consumed by that syntax rather than bound as ordinary identifiers. See <a href="#">AI-Native Constructs</a> for the stable forms.</p>
 <h3 id="lexical-elements-numeric-literals">Numeric Literals</h3>
 <p>Numeric literals are unsigned tokens. Unary <code>+</code> and <code>-</code> are separate operators. The stable v1.0 numeric forms are decimal integers, decimal floats, and base-prefixed integers.</p>
 <pre class="language-ebnf"><code class="language-ebnf">number_lit  = decimal_int [ fraction ] [ exponent ]
@@ -464,7 +464,8 @@ again:</code></pre>
     inner:
 }</code></pre>
 <h3 id="declarations-and-scope-ai-declarations">AI Declarations</h3>
-<p><code>models</code>, <code>tool</code>, <code>agent defaults</code>, and named <code>agent</code> declarations are module-level or block-level declarations according to their source position. Their detailed semantics are specified in <a href="#">AI-Native Syntax</a>.</p></section><section><h2 id="values-and-types">Values And Types</h2>
+<p>AI model, tool, turn, and agent forms are tagged dialect expressions, not declarations with special binding rules. Assign their result to a name when a script needs a reusable value.</p>
+<p><code>evaluate &quot;name&quot; { ... }</code> is a source-level regression declaration discovered by <code>leia evaluate</code>; it has no effect during ordinary script execution. Detailed semantics are specified in <a href="#">AI-Native Syntax</a>.</p></section><section><h2 id="values-and-types">Values And Types</h2>
 <p>Leia is dynamically typed. Types are properties of runtime values, not declared static variable slots.</p>
 <p>Stable value categories are:</p>
 <ul>
@@ -804,9 +805,9 @@ user[<span class="tok-string">&quot;score&quot;</span>] <span class="tok-operato
 <span class="tok-builtin">assert</span>(<span class="tok-operator">#</span>boxed <span class="tok-operator">==</span> <span class="tok-number">9</span>)
 <span class="tok-builtin">assert</span>(<span class="tok-builtin">rawlen</span>(boxed) <span class="tok-operator">==</span> <span class="tok-number">0</span>)</code></pre>
 <h3 id="expressions-literals">Literals</h3>
-<p>Table literals, list literals, dense array literals, function literals, anonymous agent expressions, <code>turn</code> expressions, and <code>messages</code> blocks are expressions. Their specific syntax is listed in <a href="#">grammar.ebnf</a>.</p>
-<p>Literal operands are evaluated left-to-right. A literal that constructs an identity-bearing value creates a fresh identity each time the literal is evaluated. This applies to table literals, function literals, anonymous agent expressions, <code>turn</code> request objects, <code>messages</code> arrays, and dense arrays. Calls, index expressions, and member selections do not imply freshness: a call returns the callee&#x27;s result, and selection returns the stored member or indexed value.</p>
-<p>Table fields are evaluated in source order. For stable v1.0 programs, avoid depending on duplicate keys or on subtle interleaving between list-style and keyed fields; <a href="#">Tables And Metatables</a> defines the portable constructor subset. List literals evaluate each element in order and store the results as a new 1-based array table. Dense array literals evaluate each element in order, convert each element according to the dense element type, and raise a runtime error if a value cannot be represented by that element type. Function and agent literals capture their lexical environment by reference. <code>messages</code> blocks evaluate role fields in order and create a new ordered message array.</p>
+<p>Table literals, list literals, dense array literals, function literals, and tagged dialect forms are expressions. Their specific syntax is listed in <a href="#">grammar.ebnf</a>.</p>
+<p>Literal operands are evaluated left-to-right. A literal that constructs an identity-bearing value creates a fresh identity each time the literal is evaluated. This applies to table literals, function literals, and dense arrays. Calls, tagged dialect evaluations, index expressions, and member selections do not imply freshness by themselves: they return the callee or dialect result, and selection returns the stored member or indexed value.</p>
+<p>Table fields are evaluated in source order. For stable v1.0 programs, avoid depending on duplicate keys or on subtle interleaving between list-style and keyed fields; <a href="#">Tables And Metatables</a> defines the portable constructor subset. List literals evaluate each element in order and store the results as a new 1-based array table. Dense array literals evaluate each element in order, convert each element according to the dense element type, and raise a runtime error if a value cannot be represented by that element type. Function literals capture their lexical environment by reference. Tagged dialect forms evaluate according to their registered dialect contract.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code">events <span class="tok-operator">:=</span> {}
 <span class="tok-keyword">func</span> mark(name, value) {
     events[<span class="tok-operator">#</span>events <span class="tok-operator">+</span> <span class="tok-number">1</span>] <span class="tok-operator">=</span> name
@@ -1767,514 +1768,194 @@ last <span class="tok-operator">:=</span> <span class="tok-number">0</span>
 <h3 id="concurrency-optimization-contract">Optimization Contract</h3>
 <p>JIT, bytecode, and interpreter execution must preserve concurrency-visible behavior: communication order, channel close behavior, synchronization results, select readiness, protected error boundaries, and host cancellation boundaries must not change when optimizations are enabled. Optimizers must not move ordinary reads, writes, calls, defers, channel operations, <code>select</code>, <code>close</code>, task start, or protected-call boundaries across a synchronization or error boundary in a way that changes the behavior described in this chapter.</p>
 <p>Optimizations may change timing, scheduling, batching, or whether a task reaches a cancellation checkpoint before another task, except where the program has established ordering through channels or a specified synchronization library. JIT side exits and deoptimization must resume with the same observable channel, defer, cancellation, and protected-error state as interpreter execution.</p></section><section><h2 id="ai-native-syntax">AI-Native Syntax</h2>
-<p>Leia&#x27;s AI-native syntax is a language layer over the <code>llm</code>, <code>msg</code>, <code>history</code>, and <code>loop</code> standard-library modules. The syntax is stable only when it uses the same provider, tracing, record/replay, cancellation, budget, and capability paths as direct library calls. Implementations must desugar the syntax to those runtime paths rather than maintaining a separate AI execution engine.</p>
-<p>An AI operation is deterministic until it reaches a provider, host callback, or tool body with side effects. Tests and replay fixtures should therefore record provider turns at the host boundary.</p>
+<p>Leia&#x27;s AI-native surface is a standard-library runtime exposed through tagged dialect forms and ordinary modules. The language implementation must route these forms through the same <code>llm</code>, <code>msg</code>, <code>history</code>, <code>dialect</code>, and host-provider paths as direct library calls. There is no separate AI execution engine.</p>
+<p>An AI operation is deterministic until it reaches a provider, host callback, or tool body with side effects. Conformance tests that need stable behavior should use host-side replay records or mock providers.</p>
 <h3 id="ai-native-syntax-stable-contract">Stable Contract</h3>
 <p>The stable AI-native contract is the following lowering boundary:</p>
 <div class="table-wrap"><table>
 <thead><tr><th>Source construct</th><th>Stable runtime meaning</th></tr></thead>
 <tbody>
-<tr><td><code>agent</code> without <code>flow</code></td><td>A callable frame that runs the built-in loop.</td></tr>
-<tr><td><code>agent</code> with <code>flow</code></td><td>A callable frame whose body is exactly the user flow.</td></tr>
-<tr><td><code>turn { ... }</code></td><td>One provider request. It does not dispatch tools.</td></tr>
-<tr><td><code>messages { ... }</code> / history</td><td>The ordered transcript carried between turns.</td></tr>
-<tr><td><code>tool</code></td><td>A callable tool table checked against declared capabilities.</td></tr>
-<tr><td><code>evaluate</code></td><td>A source-level regression case discovered by <code>leia evaluate</code>.</td></tr>
+<tr><td><code>model { ... }</code></td><td>Register model aliases through <code>llm.register_models</code>.</td></tr>
+<tr><td><code>tool { ... }</code></td><td>Build a tool descriptor through <code>llm.tool</code>.</td></tr>
+<tr><td><code>turn { ... }</code></td><td>Perform exactly one provider request through <code>llm.turn</code>.</td></tr>
+<tr><td><code>agent { ... }</code></td><td>Build a callable agent through <code>llm.agent</code>.</td></tr>
+<tr><td><code>evaluate &quot;name&quot; { ... }</code></td><td>Declare a regression case discovered by <code>leia evaluate</code>.</td></tr>
+<tr><td><code>llm.*</code>, <code>msg.*</code>, <code>history.*</code></td><td>Lower-level helpers for custom flows and message history.</td></tr>
 </tbody></table></div>
-<p>An agent frame owns ambient configuration: <code>model</code>, <code>system</code>, <code>user</code>, <code>tools</code>, budget, capabilities, output shape, tracing, cancellation, replay, and provider selection. A <code>turn</code> may inherit from that frame, but the turn remains a single provider boundary operation. Tool dispatch is a separate operation performed either by the built-in agent loop or by explicit user code.</p>
-<p><code>history</code> and <code>messages</code> name the same stable data shape: an ordered list of normalized message tables. <code>messages { ... }</code> constructs such a list; a history variable is just a program variable holding that list. Histories, not tool lists or ambient config, are the durable evidence passed from one provider turn to the next.</p>
-<h3 id="ai-native-syntax-evaluate-blocks">Evaluate Blocks</h3>
-<p><code>evaluate &quot;case name&quot; { ... }</code> declares a source-level agent regression case. The case name is a required string literal. The block body uses ordinary Leia statements, so tools can parse declarations, setup code, agent calls, and later assertion syntax without relying on an external fixture format.</p>
-<p>In ordinary script execution an evaluate block has no runtime effect. The <code>leia evaluate</code> command owns discovery and evaluation semantics. The runner discovers cases, reports their source position, validates the body with the same parser and AI-native syntax checks used for normal code, then executes the body as ordinary Leia code under the evaluation harness. Built-in <code>assert</code> failures or other runtime errors mark that case failed.</p>
-<p>During <code>leia evaluate</code>, the harness installs an <code>eval</code> module for dataset-style regression tests. This module is not part of ordinary script execution.</p>
-<div class="table-wrap"><table>
-<thead><tr><th>Function</th><th>Meaning</th></tr></thead>
-<tbody>
-<tr><td><code>eval.case(id, fn)</code></td><td>Run one named subcase. Runtime errors inside <code>fn</code> fail that subcase but do not stop later subcases. Returns <code>(ok, err)</code>.</td></tr>
-<tr><td><code>eval.metric(name, value)</code></td><td>Record a bool, number, string, nil, or JSON-like value on the active subcase, or on the outer evaluate block when no subcase is active.</td></tr>
-<tr><td><code>eval.load_jsonl(path)</code></td><td>Load a JSON Lines corpus relative to the evaluate source file and return an array table of decoded rows.</td></tr>
-<tr><td><code>eval.skip_if(cond, reason)</code></td><td>If <code>cond</code> is truthy, mark the active subcase skipped and return true. The caller should usually <code>return</code> after it.</td></tr>
-<tr><td><code>eval.fail_if(cond, message)</code></td><td>If <code>cond</code> is truthy, raise a runtime error with <code>message</code>.</td></tr>
-<tr><td><code>eval.usage()</code></td><td>Return current case LLM usage, including <code>turns</code>, token counts, latency, cost, tool calls, stream events, and provider errors.</td></tr>
-<tr><td><code>eval.budget(table)</code></td><td>Raise a runtime error when current LLM usage exceeds a positive limit in <code>table</code>. Supported limits are <code>turns</code>, <code>tokens</code>, <code>input_tokens</code>, <code>output_tokens</code>, <code>latency_ms</code>, <code>cost</code>, and <code>money</code>.</td></tr>
-<tr><td><code>eval.judge(options)</code></td><td>Run a bounded judge turn by calling <code>llm.turn(options)</code>. Missing <code>max_tokens</code> defaults to <code>200</code>; missing <code>budget</code> defaults to <code>{tokens: 512, turns: 1}</code>. Provider usage is recorded as <code>judge_*</code> metrics.</td></tr>
-</tbody></table></div>
-<p>The evaluation report preserves raw metrics on each case and subcase and also includes top-level metric summaries. Boolean metrics are summarized as true, false, and pass-rate counts. Numeric metrics are summarized as count, mean, min, and max. String metrics are summarized as category counts. Skipped subcases do not contribute to metric summaries.</p>
-<p>The <code>leia evaluate</code> command may install a deterministic LLM replay provider or record provider turns into a golden fixture. Replay fixtures are strict: a request mismatch, an exhausted fixture, or leftover unconsumed turns is an evaluation failure. Updating a golden fixture is an explicit command-line mode, not an ordinary script side effect.</p>
-<p>Evaluate cases should be written so their non-provider behavior is deterministic. Runnable examples in this spec use local tools, custom flows, replay, or validation helpers rather than live network LLMs.</p>
-<pre class="language-text"><code class="language-text">//leia:requires none
-tool lookup(topic) {
-    return &quot;docs:&quot; .. topic, nil
-}
-
-agent answer(question) {
-    model: &quot;mock&quot;
-    user: question
-    tools: [lookup]
-}
-
-evaluate &quot;answer can use lookup&quot; {
-    result, err := lookup(&quot;evaluate&quot;)
-    assert(err == nil)
-    assert(result == &quot;docs:evaluate&quot;)
-}
-
-return lookup.name</code></pre>
-<p>Inside an evaluation run, subcases and metrics can be recorded with the harness module:</p>
-<pre class="language-text"><code class="language-text">evaluate &quot;answer corpus&quot; {
-    rows := eval.load_jsonl(&quot;answer_cases.jsonl&quot;)
-    for _, row := range rows {
-        ok, err := eval.case(row.id, func() {
-            if eval.skip_if(row.skip, &quot;fixture disabled&quot;) {
-                return
-            }
-            result, err := lookup(row.topic)
-            assert(err == nil)
-            eval.metric(&quot;correct&quot;, result == row.expected)
-        })
-        assert(ok || err != nil)
-    }
-}</code></pre>
+<p>The dialect forms are not declarations with hidden lexical rules. Each form evaluates to an ordinary Leia value or result pair according to its runtime helper. Tools and agents are ordinary values that can be assigned, passed, returned, inspected, and stored in tables.</p>
+<p>The implementation must not fork behavior between dialect syntax and stdlib calls. For example, a tool created with <code>tool { ... }</code> and a tool created with <code>llm.tool(...)</code> must go through the same tool validation, capability metadata, dispatch, tracing, and replay paths.</p>
 <h3 id="ai-native-syntax-models">Models</h3>
-<p><code>models { ... }</code> declares module-scoped model aliases and provider configuration. A field key is the public alias used by script code. A field value is either another alias string or a provider configuration table.</p>
-<pre class="language-text"><code class="language-text">models {
+<p><code>model { ... }</code> registers script-visible aliases for the current VM.</p>
+<pre class="language-text"><code class="language-text">model {
     default: &quot;fast&quot;
     fast: {
         protocol: &quot;anthropic_compatible&quot;
-        provider_model: &quot;glm-4.5&quot;
+        base_url: os.getenv(&quot;LEIA_LLM_BASE_URL&quot;)
+        api_key: os.getenv(&quot;LEIA_LLM_API_KEY&quot;)
+        provider_model: os.getenv(&quot;LEIA_LLM_MODEL&quot;)
     }
 }</code></pre>
-<p><code>default</code> is the model used when neither a <code>turn</code> nor an ambient agent configuration supplies <code>model</code>. <code>default</code> may point to another alias. Alias cycles are validation errors. If an alias maps to a provider configuration, the host&#x27;s provider factory may resolve it to an actual provider model name; if no factory is installed, the configuration is still visible to tooling but cannot perform live requests.</p>
-<p>Source code must not embed API keys as string literals. Credentials belong in environment variables, host-provided configuration, or host-owned provider factories.</p>
-<h3 id="ai-native-syntax-tools">Tools</h3>
-<p><code>tool name(params) { body }</code> declares a callable tool value in the surrounding lexical scope. The declaration desugars to a runtime tool table containing the tool name, function, parameter names, description, and required capabilities. The body follows ordinary function rules and should return <code>(value, nil)</code> on success or <code>(nil, err)</code> on recoverable failure.</p>
-<p>Leading <code>//leia:</code> comments immediately above the declaration define stable tool metadata:</p>
-<div class="table-wrap"><table>
-<thead><tr><th>Directive</th><th>Meaning</th></tr></thead>
-<tbody>
-<tr><td><code>//leia:requires none</code></td><td>The tool requires no host capability.</td></tr>
-<tr><td><code>//leia:requires a,b</code></td><td>The tool requires every listed capability.</td></tr>
-<tr><td><code>//leia:param name text</code></td><td>Describes one declared parameter.</td></tr>
-</tbody></table></div>
-<p>Every stable <code>tool</code> declaration must have an explicit <code>//leia:requires</code> directive. Duplicate tool names, duplicate parameter docs, unknown parameter docs, malformed capability names, and <code>none</code> mixed with other capabilities are validation errors.</p>
-<pre class="language-text"><code class="language-text">// Searches local project notes.
-//leia:requires none
-//leia:param topic topic to search
-tool search_notes(topic) {
-    return &quot;notes:&quot; .. topic, nil
-}
-
-value, err := search_notes.fn(&quot;runtime&quot;)
-return search_notes.name, value, err</code></pre>
-<p>Tool values are ordinary values. They can be placed in <code>tools</code> lists, passed to <code>llm.dispatch</code>, inspected with <code>llm.tool_caps</code>, or constructed dynamically with <code>llm.tool</code> and <code>llm.toolof</code> when syntax is not convenient.</p>
-<h3 id="ai-native-syntax-agents">Agents</h3>
-<p>An <code>agent</code> is a callable workflow value. Calling an agent returns <code>(result, err)</code>. Without a custom <code>flow</code>, the runtime executes the built-in ReAct-style loop: synthesize an initial message history from configuration, perform turns, dispatch requested tools, append tool results, and stop on a final answer, provider stop, budget error, approval pause, cancellation, or unrecoverable tool/provider error.</p>
-<p>The built-in loop is the default because an agent declaration is normally a complete workflow specification. Adding <code>flow { ... }</code> replaces that loop with the supplied code. It does not customize one step of the default loop; it owns the whole workflow body.</p>
-<p>Every agent call creates a fresh agent frame. The frame is visible to nested <code>turn {}</code> calls as ambient configuration and to nested agent-as-tool calls as shared provider, trace, replay, budget, cancellation, and approval context.</p>
-<p>Named agents bind their name in the current scope:</p>
-<pre class="language-text"><code class="language-text">agent summarize(text) {
-    system: &quot;Return one concise paragraph.&quot;
-    user: text
-}</code></pre>
-<p>Anonymous agents are expressions and may be assigned, passed, or immediately called:</p>
-<pre class="language-text"><code class="language-text">echo := agent(text) {
-    model: &quot;mock&quot;
-    user: text
-} flow {
-    return {text: text, model_seen: model}, nil
-}
-
-out, err := echo(&quot;hello&quot;)
-return out.text, out.model_seen, err</code></pre>
-<p>The no-parameter form <code>agent { ... }</code> is equivalent to an anonymous agent with an empty parameter list.</p>
-<h3 id="ai-native-syntax-agents-and-turns">Agents And Turns</h3>
-<p><code>agent</code> and <code>turn</code> are different layers:</p>
-<ul>
-<li>an **agent** is a callable workflow frame with configuration, defaults, budget, tools, output handling, tracing, replay, and optional custom <code>flow</code>;</li>
-<li>a **turn** is one provider request made from inside or outside such a frame;</li>
-<li>a built-in agent, meaning an agent without <code>flow</code>, repeatedly performs turns and dispatches tools for the caller;</li>
-<li>a custom-flow agent, meaning an agent with <code>flow</code>, performs no hidden turns and no hidden tool dispatch. It runs ordinary Leia code, and the author must call <code>turn { ... }</code>, <code>llm.dispatch</code>, or other helpers explicitly.</li>
-</ul>
-<p>The stable invariants are:</p>
-<ol>
-<li>A <code>turn</code> consumes a request table and produces one provider result or error.</li>
-<li>Passing <code>tools</code> to a turn only serializes available tool schemas into that provider request.</li>
-<li>A provider tool-call result is data. It has no effect until dispatched.</li>
-<li>Dispatch results become model-visible only after the surrounding code appends paired assistant-call and tool-result or tool-error messages to history.</li>
-<li>A later turn sees prior work only through its <code>messages</code> field.</li>
-</ol>
-<p>The default agent loop can be understood as this conceptual shape:</p>
-<pre class="language-text"><code class="language-text">agent answer(question) {
-    model: &quot;fast&quot;
-    system: &quot;Use tools when useful.&quot;
-    user: question
-    tools: [lookup]
-}
-
-// Calling the agent runs the built-in loop:
-// 1. build messages from system + user;
-// 2. call turn { model, messages, tools };
-// 3. if result.status == &quot;tool_calls&quot;, dispatch requested tools;
-// 4. append tool results to history;
-// 5. call another turn with the updated history;
-// 6. validate structured output when configured;
-// 7. stop on final answer, provider stop, budget, approval, cancellation, or error.
-result, err := answer(&quot;What changed?&quot;)</code></pre>
-<p>The same structure can be written manually with a custom <code>flow</code> when the program needs precise multi-turn control:</p>
-<pre class="language-text"><code class="language-text">agent answer(question) {
-    model: &quot;fast&quot;
-    system: &quot;Use tools when useful.&quot;
-    tools: [lookup]
-} flow {
-    history := messages {
-        system: system
-        user: question
-    }
-
-    first, err := turn {
-        messages: history
-        tools: tools
-    }
-    if err != nil {
-        return nil, err
-    }
-
-    if first.status == &quot;tool_calls&quot; {
-        call := first.calls[1]
-        value, tool_err := llm.dispatch(call, tools)
-        if tool_err != nil {
-            history[#history + 1] = msg.tool_error(call.id, tool_err.message)
-        } else {
-            history[#history + 1] = msg.assistant_call(call)
-            history[#history + 1] = msg.tool_result(call.id, value)
-        }
-        return turn { messages: history }
-    }
-
-    return first, nil
-}</code></pre>
-<p>Both examples use the same <code>turn</code> operation at the provider boundary. The difference is where the loop policy lives: in the built-in agent loop, or in user-written <code>flow</code> code.</p>
-<pre class="language-text"><code class="language-text">agent scripted(question) {
-    model: &quot;local&quot;
-    system: &quot;s&quot;
-    tools: [{name: &quot;lookup&quot;}]
-} flow {
-    planned := messages {
-        system: system
-        user: question
-    }
-    return {
-        inherited_model: model,
-        inherited_tools: #tools,
-        message_count: #planned,
-    }, nil
-}
-
-out, err := scripted(&quot;hello&quot;)
-return out.inherited_model, out.inherited_tools, out.message_count, err</code></pre>
-<p>An important consequence is that <code>turn {}</code> never calls tools by itself. Passing <code>tools</code> to a turn only tells the provider which tool schemas are available. If the provider responds with tool calls, either the built-in agent loop or custom flow code must dispatch them and then make a later turn with the updated history.</p>
-<p>Agent results from the built-in loop include the final provider data and the history accumulated by the loop. The stable fields are:</p>
-<div class="table-wrap"><table>
-<thead><tr><th>Field</th><th>Meaning</th></tr></thead>
-<tbody>
-<tr><td><code>status</code></td><td><code>done</code>, <code>tool_calls</code>, <code>stop</code>, <code>approval_pending</code>, or error-specific status.</td></tr>
-<tr><td><code>text</code></td><td>Final answer text when available.</td></tr>
-<tr><td><code>value</code></td><td>Structured value when <code>output</code> validation succeeds.</td></tr>
-<tr><td><code>history</code></td><td>Final message history accumulated by the loop.</td></tr>
-<tr><td><code>usage</code></td><td>Aggregated provider usage when available.</td></tr>
-</tbody></table></div>
-<p>Custom-flow agents return whatever the flow returns. They do not receive the built-in agent result wrapper unless the flow constructs it explicitly.</p>
-<h3 id="ai-native-syntax-agent-configuration">Agent Configuration</h3>
-<p>Agent configuration is a table-like field block. The stable fields are:</p>
-<div class="table-wrap"><table>
-<thead><tr><th>Field</th><th>Meaning</th></tr></thead>
-<tbody>
-<tr><td><code>model</code></td><td>Model alias or provider model name.</td></tr>
-<tr><td><code>system</code></td><td>System prompt used when messages are synthesized.</td></tr>
-<tr><td><code>user</code></td><td>User prompt or expression used when messages are synthesized.</td></tr>
-<tr><td><code>tools</code></td><td>Ordered list of tool values or agent values.</td></tr>
-<tr><td><code>capabilities</code> / <code>caps</code></td><td>Capability names available to the agent frame.</td></tr>
-<tr><td><code>budget</code></td><td><code>{turns, calls, tokens, time}</code> limits for the agent frame.</td></tr>
-<tr><td><code>output</code></td><td>Example output shape for structured validation.</td></tr>
-<tr><td><code>output_retries</code></td><td>Number of structured-output repair attempts.</td></tr>
-<tr><td><code>output_repair</code></td><td>Repair prompt or truthy flag for default repair prompt.</td></tr>
-<tr><td><code>response_format</code></td><td>Provider response-format hint.</td></tr>
-<tr><td><code>max_tokens</code></td><td>Provider output token hint.</td></tr>
-<tr><td><code>temperature</code> / <code>top_p</code></td><td>Sampling hints.</td></tr>
-<tr><td><code>metadata</code></td><td>Host/provider metadata.</td></tr>
-<tr><td><code>description</code></td><td>Tool-facing agent description when used as a tool.</td></tr>
-<tr><td><code>approve_when</code></td><td>HITL predicate for tool calls.</td></tr>
-</tbody></table></div>
-<p><code>agent defaults { ... }</code> declares module-level defaults for later agents in the same module. There may be at most one defaults declaration per module. Defaults are merged when an agent is called:</p>
-<ol>
-<li>host defaults and registered <code>models</code>;</li>
-<li>module <code>agent defaults</code>;</li>
-<li>the agent&#x27;s own configuration;</li>
-<li>explicit fields on an inner <code>turn</code>.</li>
-</ol>
-<p>For scalar fields, later values replace earlier values. <code>tools</code> is inherited as one ordered list; an agent that sets <code>tools</code> replaces the default list rather than appending to it. <code>budget</code> dimensions compose by taking every specified limit from the closest frame and leaving unspecified dimensions inherited. The merged configuration is ambient for <code>turn {}</code> inheritance. Flow-local identifier injection, described below, is generated from fields written directly in the agent declaration or literal.</p>
-<p>Ambient configuration is not a lexical scope. It is a request-construction input read by AI runtime operations. In particular:</p>
-<div class="table-wrap"><table>
-<thead><tr><th>Item</th><th>Ambient inheritance</th><th>Flow-local identifier</th></tr></thead>
-<tbody>
-<tr><td><code>model</code></td><td>yes</td><td>only when explicit</td></tr>
-<tr><td><code>system</code></td><td>yes</td><td>only when explicit</td></tr>
-<tr><td><code>user</code></td><td>yes, for synthesized messages</td><td>no</td></tr>
-<tr><td><code>tools</code></td><td>yes</td><td>only when explicit</td></tr>
-<tr><td><code>budget</code></td><td>yes</td><td>no</td></tr>
-<tr><td><code>output</code></td><td>yes</td><td>only when explicit</td></tr>
-<tr><td>provider hints</td><td>yes</td><td>no</td></tr>
-</tbody></table></div>
-<pre class="language-text"><code class="language-text">agent defaults {
-    model: &quot;fast&quot;
-    system: &quot;default system&quot;
-    budget: {turns: 2}
-}
-
-agent probe(q) {
-    model: &quot;fast&quot;
-    system: &quot;agent system&quot;
-    user: q
-} flow {
-    return {system: system, model: model}, nil
-}
-
-out, err := probe(&quot;hello&quot;)
-return out.system, out.model, err</code></pre>
-<h3 id="ai-native-syntax-flow-scope">Flow Scope</h3>
-<p><code>flow { ... }</code> supplies a custom agent body. The flow body is ordinary lexical code with a small, explicit set of generated locals from the agent&#x27;s explicit configuration block:</p>
-<div class="table-wrap"><table>
-<thead><tr><th>Injected local</th><th>Source</th></tr></thead>
-<tbody>
-<tr><td><code>model</code></td><td>explicit <code>model</code> field</td></tr>
-<tr><td><code>system</code></td><td>explicit <code>system</code> field</td></tr>
-<tr><td><code>tools</code></td><td>explicit <code>tools</code> field</td></tr>
-<tr><td><code>capabilities</code></td><td>explicit <code>capabilities</code> field</td></tr>
-<tr><td><code>caps</code></td><td>explicit <code>caps</code> field</td></tr>
-<tr><td><code>output</code></td><td>explicit <code>output</code> field</td></tr>
-</tbody></table></div>
-<p>Only fields present in that explicit block create locals; omitted fields do not create <code>nil</code> locals. Defaults can still affect ambient <code>turn {}</code> behavior, but they do not create flow-local identifiers. No other config field is injected. In particular, <code>user</code>, <code>budget</code>, <code>response_format</code>, <code>metadata</code>, <code>max_tokens</code>, and sampling fields remain ambient configuration for <code>turn {}</code> but are not local variables. User declarations may shadow injected locals under the normal lexical scoping rules.</p>
-<p>The flow receives ordinary call parameters through its lexical scope. For prompt inputs, prefer using parameters directly (<code>q</code> in the examples) over relying on the <code>user</code> config field, because <code>user</code> is ambient prompt configuration and is not injected as a local.</p>
-<pre class="language-text"><code class="language-text">user := &quot;outer&quot;
-
-agent scope(q) {
-    model: &quot;m&quot;
-    system: &quot;s&quot;
-    capabilities: [&quot;read&quot;]
-    user: q
-} flow {
-    observed := model .. &quot;|&quot; .. system .. &quot;|&quot; .. capabilities[1] .. &quot;|&quot; .. user
-    model := &quot;local&quot;
-    return {observed: observed, shadowed: model}, nil
-}
-
-out, err := scope(&quot;inner&quot;)
-return out.observed, out.shadowed, err</code></pre>
-<h3 id="ai-native-syntax-messages">Messages</h3>
-<p><code>messages { ... }</code> constructs an ordered message list. A history is any value with that same ordered list shape. Role fields are converted to normalized message tables:</p>
-<pre class="language-text"><code class="language-text">history := messages {
-    system: &quot;Use evidence.&quot;
-    user: &quot;Find release notes.&quot;
-}</code></pre>
-<p>The stable shorthand roles are <code>system</code>, <code>user</code>, and <code>assistant</code>. A field whose key is not one of those roles becomes <code>{role: key, text: value}</code>. A field without a key is inserted as-is, which allows incremental histories to mix message helper results in the same block.</p>
-<p>The stable normalized fields are:</p>
-<div class="table-wrap"><table>
-<thead><tr><th>Message kind</th><th>Required stable fields</th></tr></thead>
-<tbody>
-<tr><td>text message</td><td><code>role</code>, <code>text</code></td></tr>
-<tr><td>assistant tool call</td><td><code>role: &quot;assistant&quot;</code>, <code>tool_call</code></td></tr>
-<tr><td>tool result</td><td><code>role: &quot;tool&quot;</code>, <code>tool_use_id</code>, <code>value</code></td></tr>
-<tr><td>tool error</td><td><code>role: &quot;tool&quot;</code>, <code>tool_use_id</code>, <code>error</code> or error text</td></tr>
-</tbody></table></div>
-<p>Implementations may carry provider-specific metadata, but code that wants to be portable must preserve at least these fields.</p>
-<pre class="language-text"><code class="language-text">call := {id: &quot;call_1&quot;, tool: &quot;lookup&quot;, args: {query: &quot;leia&quot;}}
-history := messages {
-    system: &quot;Use tool evidence.&quot;
-    user: &quot;Find docs.&quot;
-    msg.assistant_call(call)
-    msg.tool_result(&quot;call_1&quot;, {summary: &quot;found&quot;})
-    user: &quot;Summarize.&quot;
-}
-
-return #history, history[1].role, history[3].tool_call.tool, history[4].value.summary</code></pre>
-<p>For histories built across multiple turns, append helper results explicitly: <code>msg.system</code>, <code>msg.user</code>, <code>msg.assistant</code>, <code>msg.assistant_call</code>, <code>msg.tool_result</code>, and <code>msg.tool_error</code>.</p>
-<p>Histories are the only stable handoff between provider turns. A tool list in a request is schema/context for the provider; it is not evidence by itself. When a provider requests a tool call, the call and its result become visible to a later turn only if the surrounding agent loop or custom flow appends both an assistant tool-call message and a matching tool-result or tool-error message to the next history.</p>
-<p>Tool-call messages and tool-result messages are paired by call id. The assistant message records the provider&#x27;s requested tool name and arguments. The tool message records the local dispatch result, recoverable dispatch error, and the same call id. Implementations must preserve this pairing when lowering the built-in agent loop, and user-written flows should preserve it when constructing manual histories.</p>
-<pre class="language-text"><code class="language-text">history := messages {
-    system: &quot;s&quot;
-    user: &quot;u&quot;
+<p>A model field value may be a string alias or a provider configuration table. The alias named <code>default</code> is used when a request does not specify a model and the host has not installed a more specific default. Alias cycles are invalid.</p>
+<p>Source code must not embed API keys as string literals. Credentials belong in environment variables, host-provided configuration, or a host-owned provider factory. Hosts decide whether script-declared provider configuration is honored.</p>
+<h3 id="ai-native-syntax-messages-and-history">Messages And History</h3>
+<p>Provider requests carry an ordered array of normalized message tables. Leia does not require a special message block syntax. Scripts may build message arrays directly or through the <code>llm</code> and <code>msg</code> helper modules.</p>
+<pre class="language-text"><code class="language-text">history := {
+    llm.system(&quot;Answer concisely.&quot;),
+    llm.user(&quot;Summarize this incident.&quot;),
 }
 
 history[#history + 1] = msg.assistant(&quot;draft&quot;)
-history[#history + 1] = msg.user(&quot;revise&quot;)
-
-return #history, history[3].role, history[4].text</code></pre>
-<pre class="language-text"><code class="language-text">//leia:requires none
-//leia:param topic topic to look up
-tool lookup(topic) {
-    return &quot;note:&quot; .. topic, nil
-}
-
-history := messages {
-    system: &quot;Use tool evidence.&quot;
-    user: &quot;Find docs for Leia.&quot;
-}
-
-first := {
-    status: &quot;tool_calls&quot;,
-    calls: {{
-        id: &quot;call_lookup_1&quot;,
-        tool: &quot;lookup&quot;,
-        args: {topic: &quot;Leia&quot;},
-    }},
-}
-
-call := first.calls[1]
-value, err := llm.dispatch(call, [lookup])
-if err != nil {
-    history[#history + 1] = msg.tool_error(call.id, err.message)
-} else {
-    history[#history + 1] = msg.assistant_call(call)
-    history[#history + 1] = msg.tool_result(call.id, value)
-}
-
-return #history, history[3].tool_call.tool, history[4].tool_use_id, history[4].value, err</code></pre>
+history[#history + 1] = msg.user(&quot;Now include the owner.&quot;)</code></pre>
+<p>Stable roles are <code>system</code>, <code>user</code>, <code>assistant</code>, and <code>tool</code>. Tool-call and tool-result messages are paired by provider call id. A later turn observes prior work only through the <code>messages</code> value supplied to that turn.</p>
+<h3 id="ai-native-syntax-tools">Tools</h3>
+<p><code>tool { ... }</code> returns a tool descriptor backed by a Leia function.</p>
+<pre class="language-text"><code class="language-text">search_runbook := tool {
+    name: &quot;search_runbook&quot;
+    params: {&quot;service&quot;}
+    description: &quot;Search local runbooks.&quot;
+    requires: {&quot;docs.read&quot;}
+    fn: func(service) {
+        return &quot;runbook:&quot; .. service, nil
+    }
+}</code></pre>
+<p>The required fields are:</p>
+<div class="table-wrap"><table>
+<thead><tr><th>Field</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td><code>name</code></td><td>Provider-visible tool name.</td></tr>
+<tr><td><code>fn</code></td><td>Function called when the tool is dispatched.</td></tr>
+</tbody></table></div>
+<p>The optional fields are:</p>
+<div class="table-wrap"><table>
+<thead><tr><th>Field</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td><code>params</code></td><td>Ordered parameter names.</td></tr>
+<tr><td><code>description</code></td><td>Provider-visible description.</td></tr>
+<tr><td><code>requires</code></td><td>Capability labels for host policy and audit.</td></tr>
+</tbody></table></div>
+<p>The tool function should return <code>(value, nil)</code> on success or <code>(nil, err)</code> on a recoverable tool failure. Tool descriptors may be placed in <code>tools</code> lists, passed to <code>llm.dispatch</code>, inspected with <code>llm.tool_caps</code>, or generated from ordinary functions with lower-level helpers.</p>
 <h3 id="ai-native-syntax-turns">Turns</h3>
-<p><code>turn { ... }</code> performs exactly one provider request and returns <code>(result, err)</code>. It never dispatches tools by itself. If the provider returns tool calls, the result has <code>status: &quot;tool_calls&quot;</code> and the caller or surrounding agent loop decides whether to dispatch them.</p>
-<p>The operation is equivalent to:</p>
-<ol>
-<li>merge explicit request fields over ambient agent configuration, if any;</li>
-<li>synthesize <code>messages</code> from <code>system</code> and <code>user</code> only when <code>messages</code> is absent;</li>
-<li>normalize tools, including agent-as-tool wrappers;</li>
-<li>check budget and cancellation;</li>
-<li>call the provider once;</li>
-<li>return the provider result or a structured error.</li>
-</ol>
-<p>No step above calls <code>llm.dispatch</code>.</p>
-<p>Stable request fields include:</p>
+<p><code>turn { ... }</code> performs exactly one provider request and returns <code>(result, err)</code>. It does not dispatch tools by itself.</p>
+<pre class="language-text"><code class="language-text">result, err := turn {
+    model: &quot;fast&quot;
+    messages: {llm.user(&quot;Reply exactly: ok&quot;)}
+    tools: {search_runbook}
+    max_tokens: 32
+    temperature: 0
+}</code></pre>
+<p>Important request fields are:</p>
 <div class="table-wrap"><table>
 <thead><tr><th>Field</th><th>Meaning</th></tr></thead>
 <tbody>
 <tr><td><code>model</code></td><td>Alias or provider model name.</td></tr>
-<tr><td><code>messages</code></td><td>Ordered message list.</td></tr>
-<tr><td><code>user</code></td><td>Shorthand for a one-message user history when <code>messages</code> is absent.</td></tr>
-<tr><td><code>tools</code></td><td>Ordered tool list; agent values are auto-wrapped as tools.</td></tr>
-<tr><td><code>force_tool</code></td><td>Request one named tool when supported by the provider.</td></tr>
-<tr><td><code>max_tokens</code></td><td>Output token hint.</td></tr>
-<tr><td><code>temperature</code> / <code>top_p</code></td><td>Sampling hints.</td></tr>
+<tr><td><code>messages</code></td><td>Ordered message array.</td></tr>
+<tr><td><code>user</code></td><td>Shorthand for a one-message user request when <code>messages</code> is absent.</td></tr>
+<tr><td><code>system</code></td><td>System prompt used with <code>user</code> when <code>messages</code> is absent.</td></tr>
+<tr><td><code>tools</code></td><td>Tool descriptors or supported agent-as-tool values.</td></tr>
+<tr><td><code>force_tool</code></td><td>Force one tool by name when supported by the provider.</td></tr>
+<tr><td><code>max_tokens</code></td><td>Output token limit.</td></tr>
+<tr><td><code>temperature</code>, <code>top_p</code></td><td>Sampling controls.</td></tr>
 <tr><td><code>response_format</code></td><td>Provider response-format hint.</td></tr>
 <tr><td><code>stream</code></td><td>Request incremental provider output when supported.</td></tr>
-<tr><td><code>on_stream</code> / <code>onStream</code></td><td>Optional script callback for streaming events. The callback receives one event table per provider event and automatically enables <code>stream</code>.</td></tr>
+<tr><td><code>on_stream</code>, <code>onStream</code></td><td>Optional callback for streaming events.</td></tr>
 <tr><td><code>stop</code></td><td>Stop sequences.</td></tr>
-<tr><td><code>metadata</code></td><td>Host/provider metadata.</td></tr>
+<tr><td><code>metadata</code></td><td>String metadata passed to the provider.</td></tr>
 </tbody></table></div>
-<p>When <code>stream</code> is true and the installed provider implements streaming, the host trace sink receives <code>turn_stream</code> events for incremental text tokens. Streaming does not change script-level return values: <code>turn { ... }</code> still returns one complete result table and one error value after the provider finishes. If the provider does not support streaming, the field is a provider hint and the turn falls back to the ordinary complete-result path.</p>
-<p>When <code>on_stream</code> is a function, the implementation calls it with an event table containing <code>type</code>, <code>token</code>, <code>text</code>, <code>status</code>, <code>reason</code>, and <code>usage</code>. The callback is best used for UI updates, logs, or incremental buffers; the final turn result remains authoritative.</p>
-<p>If a <code>turn</code> runs inside an agent, absent <code>model</code>, <code>tools</code>, <code>budget</code>, <code>response_format</code>, <code>metadata</code>, <code>max_tokens</code>, and sampling fields inherit from the ambient agent configuration. If both <code>messages</code> and <code>user</code> are absent, an ambient agent <code>system</code> and <code>user</code> are used to synthesize messages. Outside an agent, a <code>turn</code> must have explicit <code>messages</code> or <code>user</code>, unless the host installs a provider layer with different documented behavior.</p>
-<p>Inside a custom <code>flow</code>, inheritance and local variables are related but not the same thing. Ambient inheritance affects <code>turn {}</code> request construction. Flow-local injection only creates identifiers such as <code>model</code>, <code>system</code>, and <code>tools</code> for fields explicitly written in the agent configuration. For example:</p>
-<pre class="language-text"><code class="language-text">agent inherit(q) {
-    model: &quot;fast&quot;
-    system: &quot;Brief.&quot;
-    user: q
-} flow {
-    // Uses inherited model, system, and user to build the request.
-    first, err := turn {}
-
-    // Equivalent explicit form for the message list, while still inheriting
-    // model and other omitted request fields.
-    second, err := turn {
-        messages: messages {
-            system: system
-            user: q
-        }
+<p>With streaming, callbacks and trace events may receive incremental token data. The script still receives one complete final result table after the provider finishes. A provider that does not support streaming may ignore <code>stream</code> or return a provider error according to its implementation.</p>
+<p>Result fields include <code>status</code>, <code>text</code>, <code>calls</code>, <code>reason</code>, and <code>usage</code>. Provider or validation failures are ordinary error values, usually tables with at least <code>kind</code> and <code>message</code>.</p>
+<h3 id="ai-native-syntax-agents">Agents</h3>
+<p><code>agent { ... }</code> returns a callable workflow value. The <code>config</code> function builds the request configuration for each call.</p>
+<pre class="language-text"><code class="language-text">answer := agent {
+    name: &quot;answer&quot;
+    params: {&quot;question&quot;}
+    description: &quot;Answer with local documentation when useful.&quot;
+    config: func(question) {
+        return {
+            model: &quot;fast&quot;
+            system: &quot;Use tool evidence when it helps.&quot;
+            user: question
+            tools: {search_runbook}
+        }, nil
     }
+}
 
-    return second, err
-}</code></pre>
-<p>Outside an agent there is no ambient frame, so request construction must be explicit:</p>
-<pre class="language-text"><code class="language-text">result, err := turn {
-    model: &quot;fast&quot;
-    messages: messages {
-        system: &quot;Brief.&quot;
-        user: &quot;Explain Leia.&quot;
-    }
-}</code></pre>
-<p>Result fields are stable:</p>
+result, err := answer(&quot;How do I restart search?&quot;)</code></pre>
+<p>The required fields are:</p>
 <div class="table-wrap"><table>
 <thead><tr><th>Field</th><th>Meaning</th></tr></thead>
 <tbody>
-<tr><td><code>status</code></td><td><code>final_answer</code>, <code>tool_calls</code>, <code>stop</code>, or provider-specific status.</td></tr>
-<tr><td><code>text</code></td><td>Final text when available.</td></tr>
-<tr><td><code>calls</code></td><td>Tool calls requested by the provider.</td></tr>
-<tr><td><code>reason</code></td><td>Stop reason.</td></tr>
-<tr><td><code>usage</code></td><td>Usage metadata such as token counts.</td></tr>
+<tr><td><code>name</code></td><td>Runtime and provider-visible agent name.</td></tr>
+<tr><td><code>config</code> or <code>fn</code></td><td>Function that returns an agent request table and optional error.</td></tr>
 </tbody></table></div>
-<p>Recoverable failures return <code>nil, err</code>; see <a href="#">Errors</a> for error object conventions.</p>
-<h3 id="ai-native-syntax-structured-output">Structured Output</h3>
-<p><code>output</code> is an example shape, not a static type declaration. When a built-in agent loop receives a final text response and <code>output</code> is present, it parses the text as JSON, validates that the decoded table has the same required fields and primitive shapes as the example, and returns the parsed value in the agent result. Missing fields, type mismatches, non-object JSON, trailing JSON, and invalid JSON are validation errors.</p>
-<p>The stable validation rule is structural:</p>
-<div class="table-wrap"><table>
-<thead><tr><th>Example value</th><th>Accepted decoded value</th></tr></thead>
-<tbody>
-<tr><td>string</td><td>string</td></tr>
-<tr><td>number</td><td>number</td></tr>
-<tr><td>boolean</td><td>boolean</td></tr>
-<tr><td>table object</td><td>table with the same required keys recursively validated</td></tr>
-</tbody></table></div>
-<p>Extra fields may be preserved. Missing required fields fail. Arrays and richer schemas are provider or library extensions until specified separately.</p>
-<p>If <code>output_retries</code> or <code>output_repair</code> is configured, the built-in loop may perform additional repair turns before returning a validation error. Repair turns consume normal turn and token budgets.</p>
-<p>A custom <code>flow</code> that returns arbitrary values is not automatically validated. Inside a flow, use <code>llm.validate_output(value, output)</code> when the flow wants to enforce the same shape explicitly. A <code>turn {}</code> inside a flow still inherits an ambient <code>output</code> as a provider <code>response_format</code> hint when no explicit <code>response_format</code> is supplied.</p>
-<pre class="language-text"><code class="language-text">ok, ok_msg := llm.validate_output({summary: &quot;done&quot;, score: 1}, {summary: &quot;x&quot;, score: 0})
-bad, bad_msg := llm.validate_output({summary: 1}, {summary: &quot;x&quot;})
-json_ok, _ := llm.validate_output(&quot;{\&quot;summary\&quot;:\&quot;done\&quot;}&quot;, {summary: &quot;x&quot;})
-return ok, ok_msg, bad, bad_msg != &quot;&quot;, json_ok</code></pre>
+<p>Optional fields include <code>params</code>, <code>description</code>, <code>output</code>, and <code>flow</code>. Without a custom <code>flow</code> function, Leia executes the built-in loop:</p>
+<ol>
+<li>call the config function for the current agent arguments;</li>
+<li>synthesize <code>messages</code> from <code>system</code> and <code>user</code> when <code>messages</code> is absent;</li>
+<li>perform a provider turn;</li>
+<li>dispatch requested tools through <code>llm.dispatch</code>;</li>
+<li>append assistant-call and tool-result or tool-error messages;</li>
+<li>repeat until a final answer, provider stop, budget error, approval pause, cancellation, or unrecoverable provider/tool error.</li>
+</ol>
+<p>When the <code>flow</code> field is present, its function owns the workflow. No hidden turn or tool dispatch happens. Custom flows should call <code>llm.turn</code>, <code>llm.dispatch</code>, <code>msg.assistant_call</code>, <code>msg.tool_result</code>, and <code>msg.tool_error</code> explicitly.</p>
+<p>For complex flows that need exact control over metadata or call parameters, scripts may use the lower-level helper directly:</p>
+<pre class="language-text"><code class="language-text">incident := llm.agent(&quot;incident&quot;, incident_config, incident_flow, {
+    params: {&quot;service&quot;}
+})</code></pre>
 <h3 id="ai-native-syntax-agent-as-tool">Agent As Tool</h3>
-<p>An agent value may appear directly in another agent&#x27;s <code>tools</code> list or in a <code>turn</code> tools list. The runtime wraps it as a tool at the boundary. The wrapper derives the tool name from the named agent when available, derives parameter names from the agent signature, uses <code>description</code> or <code>system</code> as the tool description, and uses <code>output</code> as the tool-result shape.</p>
-<p>When the wrapper calls the delegated agent:</p>
-<ol>
-<li>tool call arguments are mapped to agent parameters by name;</li>
-<li>the agent is executed under the same provider, budget, trace, replay, and cancellation paths as an ordinary agent call;</li>
-<li>successful agent results are unwrapped so structured <code>result.value</code> becomes the tool result;</li>
-<li>pending approval, cancellation, provider, validation, and tool failures are returned as structured tool errors.</li>
-</ol>
-<p>Wrapping an agent does not make it a provider request. It is still a local tool dispatch path until that tool is advertised to a provider by a later <code>turn</code> or built-in agent loop.</p>
-<pre class="language-text"><code class="language-text">agent extract(topic) {
-    description: &quot;Extract one finding.&quot;
-    output: {summary: &quot;short finding&quot;}
-} flow {
-    return {value: {summary: &quot;finding:&quot; .. topic}}, nil
-}
-
-wrapped := llm.agent_as_tool(extract)
-value, err := wrapped.fn(&quot;runtime&quot;)
-return wrapped.name, value.summary, err</code></pre>
-<h3 id="ai-native-syntax-budgets-cancellation-and-errors">Budgets, Cancellation, And Errors</h3>
-<p>Public budget dimensions are <code>turns</code>, <code>calls</code>, <code>tokens</code>, and <code>time</code>. Provider usage may include cost metadata, but money accounting is not a stable script-level budget dimension.</p>
-<pre class="language-text"><code class="language-text">budget { turns: 2, calls: 4, tokens: 1000, time: 30 } {
-    result, err := turn { user: &quot;short answer&quot; }
-}</code></pre>
-<p>Budgets are checked before turns, before tool calls, and after provider usage is charged. Cancellation is checked before each provider turn and before each tool dispatch. Recoverable provider, budget, validation, cancellation, approval, and tool failures return structured <code>nil, err</code> results unless a specific API documents a runtime error.</p>
-<p>Trace events must avoid prompt text and tool-result values unless explicitly configured by the host. The stable trace surface is metadata such as event type, model, step, status, message count, tool count, tool name, and usage.</p>
-<h3 id="ai-native-syntax-record-replay-and-evaluate">Record, Replay, And Evaluate</h3>
-<p>Record/replay observes provider turns, not agents, tools, or arbitrary runtime values. A recorded turn contains the normalized request sent to the provider and the provider result or provider error returned from that exact boundary. Local tool execution is represented indirectly: the next recorded request contains any assistant-call and tool-result messages that the loop or flow appended to history.</p>
-<p>Replay is strict and ordered:</p>
-<ol>
-<li>each provider request must match the next fixture request after model alias resolution and request normalization;</li>
-<li>replay returns the fixture result instead of calling a live provider;</li>
-<li>an unexpected request, exhausted fixture, or unconsumed fixture record is an evaluation failure;</li>
-<li>replay does not hide local tool, validation, budget, or cancellation errors.</li>
-</ol>
-<p><code>leia evaluate</code> composes this with source-level cases. Each <code>evaluate</code> block is a named regression case. The harness may run the case with a live provider in explicit record mode, then persist the provider turns as a golden fixture. In normal replay mode, the same case must consume that fixture exactly. Fixture updates are command-driven and must never occur as a side effect of <code>leia run</code>.</p>
-<pre class="language-text"><code class="language-text">record := {
-    request: {
-        model: &quot;mock-chat&quot;
-        messages: messages { user: &quot;draft&quot; }
-        tools: {}
+<p>An agent can be exposed as a tool with <code>llm.agent_as_tool(agent_value)</code>. The wrapper preserves the agent&#x27;s name and metadata where available.</p>
+<pre class="language-text"><code class="language-text">supervisor := agent {
+    name: &quot;supervisor&quot;
+    params: {&quot;question&quot;}
+    config: func(question) {
+        return {
+            model: &quot;fast&quot;
+            user: question
+            tools: {llm.agent_as_tool(answer)}
+        }, nil
     }
-    result: {status: &quot;final_answer&quot;, text: &quot;ok&quot;}
-}
-
-return record.request.model, record.request.messages[1].text, record.result.text</code></pre></section><section><h2 id="modules-and-loading">Modules And Loading</h2>
+}</code></pre>
+<h3 id="ai-native-syntax-output-validation">Output Validation</h3>
+<p>Agents and turns may request structured output through request fields such as <code>output</code> or provider response-format hints. Built-in agent execution validates known output shapes when configured to do so. Custom flows that return arbitrary values are responsible for calling <code>llm.validate_output(value, schema)</code> if they want the same check.</p>
+<p>Validation failures are runtime errors or <code>(nil, err)</code> results according to the helper being used. They must not be silently converted to provider text.</p>
+<h3 id="ai-native-syntax-budgets-cancellation-and-approval">Budgets, Cancellation, And Approval</h3>
+<p>Budgets may be attached to agent or turn option tables and may also be enforced by the host. Stable dimensions include turn count, call count, token count, and time. Provider usage may include cost metadata, but Leia does not promise money accounting as a stable script-level budget dimension.</p>
+<p>Hosts may cancel a running AI operation through the VM context or provider context. Cancellation should stop future provider/tool calls and return a recoverable error when possible.</p>
+<p>Human approval and pause/resume state are runtime features of the <code>llm</code> helper layer. Dialect syntax must preserve those hooks by lowering through the helper layer instead of bypassing it.</p>
+<h3 id="ai-native-syntax-trace-record-and-replay">Trace, Record, And Replay</h3>
+<p>Hosts can install trace sinks, recorders, or replay providers. Trace events are metadata-oriented and should avoid prompt text and tool result values unless an explicit host policy permits capture.</p>
+<p>Replay fixtures are strict. A request mismatch, exhausted fixture, or leftover unconsumed turn is a failure. Updating a replay fixture is an explicit command or host action, not an ordinary script side effect.</p>
+<h3 id="ai-native-syntax-evaluate-blocks">Evaluate Blocks</h3>
+<p><code>evaluate &quot;case name&quot; { ... }</code> declares a source-level regression case. The case name is a required string literal. In ordinary script execution an evaluate block has no runtime effect. The <code>leia evaluate</code> command owns discovery and evaluation semantics.</p>
+<p>During evaluation, the harness installs an <code>eval</code> module for dataset-style regression tests:</p>
+<div class="table-wrap"><table>
+<thead><tr><th>Function</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td><code>eval.case(id, fn)</code></td><td>Run one named subcase. Runtime errors inside <code>fn</code> fail that subcase but do not stop later subcases.</td></tr>
+<tr><td><code>eval.metric(name, value)</code></td><td>Record a bool, number, string, nil, or JSON-like metric.</td></tr>
+<tr><td><code>eval.load_jsonl(path)</code></td><td>Load a JSON Lines corpus relative to the evaluate source file.</td></tr>
+<tr><td><code>eval.skip_if(cond, reason)</code></td><td>Mark the active subcase skipped when <code>cond</code> is truthy.</td></tr>
+<tr><td><code>eval.fail_if(cond, message)</code></td><td>Raise a runtime error when <code>cond</code> is truthy.</td></tr>
+<tr><td><code>eval.usage()</code></td><td>Return current case LLM usage.</td></tr>
+<tr><td><code>eval.budget(table)</code></td><td>Raise when current usage exceeds a positive limit.</td></tr>
+<tr><td><code>eval.judge(options)</code></td><td>Run a bounded judge turn by calling <code>llm.turn(options)</code>.</td></tr>
+</tbody></table></div>
+<pre class="language-text"><code class="language-text">evaluate &quot;answer corpus&quot; {
+    rows := eval.load_jsonl(&quot;answer_cases.jsonl&quot;)
+    for _, row := range rows {
+        ok, err := eval.case(row.id, func() {
+            result, err := answer(row.question)
+            assert(err == nil)
+            eval.metric(&quot;correct&quot;, result.text == row.expected)
+        })
+        assert(ok || err != nil)
+    }
+}</code></pre>
+<p>Evaluation reports preserve raw metrics on each case and include top-level metric summaries. Boolean metrics are summarized as pass rates. Numeric metrics are summarized as count, mean, min, and max. String metrics are summarized as category counts. Skipped subcases do not contribute to metric summaries.</p>
+<h3 id="ai-native-syntax-capability-checks">Capability Checks</h3>
+<p>AI dialects declare <code>llm.turn</code> capability usage. Tool descriptors may declare additional <code>requires</code> labels. A host may reject scripts or tool exposure when the requested capabilities exceed policy.</p>
+<p>Capability failure is a host/runtime error. It must not be hidden as a provider answer.</p>
+<h3 id="ai-native-syntax-live-provider-tests">Live Provider Tests</h3>
+<p>Live LLM tests must be opt-in and must not commit tokens. Integration tests should read credentials from environment variables and skip when credentials are absent.</p></section><section><h2 id="modules-and-loading">Modules And Loading</h2>
 <h3 id="modules-and-loading-require">Require</h3>
 <p><code>require(name)</code> loads enabled standard-library modules, host-registered modules, and filesystem-backed project modules according to runtime module options. <code>name</code> must be a string. Loaded module results are cached in <code>package.loaded</code>.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code">json <span class="tok-operator">:=</span> <span class="tok-builtin">require</span>(<span class="tok-string">&quot;json&quot;</span>)

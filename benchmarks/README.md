@@ -23,6 +23,9 @@ LuaJIT references live under `benchmarks/lua_ref/<domain>/`.
 bash scripts/performance_gate.sh --syntax-smoke --no-luajit
 
 # Current worktree vs clean HEAD vs LuaJIT.
+bash scripts/performance_gate.sh --full
+
+# Investigation-only current worktree vs clean HEAD vs LuaJIT.
 python3 benchmarks/timing_compare.py --all-groups --runs=5 --warmup=1 \
   --time-source=auto --min-sample-seconds=0.100 --max-repeat=128 \
   --sort=luajit-gap \

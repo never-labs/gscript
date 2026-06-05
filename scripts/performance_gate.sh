@@ -19,6 +19,7 @@ MAX_REPEAT=128
 MIN_WALL_REPEAT=8
 THRESHOLD=0.12
 WALL_THRESHOLD=0.30
+LUAJIT_THRESHOLD=0.80
 OUT_DIR="${TMPDIR:-/tmp}/leia_performance_gate"
 HEAD_REF="HEAD"
 PROFILE="core"
@@ -121,6 +122,7 @@ Options:
   --timeout N             Timeout per command invocation. Default: 120.
   --threshold F           Script-timed current/HEAD regression limit. Default: 0.12.
   --wall-threshold F      Wall-timed current/HEAD regression limit. Default: 0.30.
+  --luajit-threshold F    Script-timed current/LuaJIT limit. Default: 0.80.
   --out-dir DIR           Artifact directory. Default: ${TMPDIR:-/tmp}/leia_performance_gate.
   --head-ref REF          Clean baseline ref for timing_compare.py. Default: HEAD.
   --no-luajit             Skip LuaJIT timing.
@@ -201,6 +203,10 @@ while [ "$#" -gt 0 ]; do
         --wall-threshold)
             shift
             WALL_THRESHOLD="$1"
+            ;;
+        --luajit-threshold)
+            shift
+            LUAJIT_THRESHOLD="$1"
             ;;
         --out-dir)
             shift
@@ -461,8 +467,18 @@ print("Strict gate passed.")
 PY
 }
 
+validate_luajit_artifact() {
+    local json_path="$1"
+    if [ "$NO_LUAJIT" -eq 1 ]; then
+        echo "LuaJIT performance submit guard skipped (--no-luajit)."
+        return 0
+    fi
+    python3 benchmarks/perf_submit_guard.py "$json_path" --ratio-threshold "$LUAJIT_THRESHOLD"
+}
+
 if [ -n "$VALIDATE_ONLY" ]; then
     validate_artifact "$VALIDATE_ONLY"
+    validate_luajit_artifact "$VALIDATE_ONLY"
     exit $?
 fi
 
@@ -566,6 +582,7 @@ printf '\n'
 
 echo
 validate_artifact "$TIMING_JSON"
+validate_luajit_artifact "$TIMING_JSON"
 
 if [ "$STRICT" -eq 1 ]; then
     STRICT_CMD=(

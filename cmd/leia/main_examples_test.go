@@ -64,6 +64,12 @@ func TestRunCommandDialectExamples(t *testing.T) {
 			}
 		})
 	}
+	t.Run("data/q_vector_basics.leia", func(t *testing.T) {
+		stdout := execExampleProjectGlobal(root, filepath.Join("examples", "data", "q_vector_basics.leia"), "q_vector_basics_summary")(t)
+		if !strings.Contains(stdout, "q vector total=") {
+			t.Fatalf("summary = %q, want q vector summary", stdout)
+		}
+	})
 }
 
 func TestPracticalExampleProjects(t *testing.T) {
@@ -702,6 +708,7 @@ func collectDialectExampleTags(t *testing.T, root string) map[string]bool {
 		approved[tag] = true
 	}
 	paths := []string{filepath.Join(root, "examples", "hello", "dialects.leia")}
+	paths = append(paths, filepath.Join(root, "examples", "data", "q_vector_basics.leia"))
 	dialectDir := filepath.Join(root, "examples", "dialects")
 	entries, err := os.ReadDir(dialectDir)
 	if err != nil {

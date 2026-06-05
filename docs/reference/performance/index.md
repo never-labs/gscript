@@ -50,7 +50,9 @@ bash scripts/performance_gate.sh --full
 ```
 
 Use `--no-luajit` when LuaJIT is not installed or the workload has no useful
-Lua reference.
+Lua reference. Without `--no-luajit`, script-timed current/LuaJIT rows are a
+hard gate: `scripts/performance_gate.sh` fails when `current / LuaJIT` exceeds
+`--luajit-threshold` (default `0.80`).
 
 `--syntax-smoke` is the fastest guard for lexer, parser, or grammar-only
 changes. It runs a small current-vs-HEAD hot-path subset across control, calls,

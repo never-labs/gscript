@@ -84,25 +84,24 @@ assert(iffoo == 7)
 func := "reserved"
 ```
 
-AI-native words such as `agent`, `models`, `tool`, `turn`, `messages`,
-`evaluate`, `case`, `expect`, `flow`, and `budget` are contextual syntax words,
-not lexical keywords. They scan as identifiers outside grammar positions that
-assign them AI-native meaning.
+AI-native words such as `model`, `tool`, `turn`, `agent`, and `evaluate` are
+contextual syntax words, not lexical keywords. They scan as identifiers outside
+grammar positions that assign them AI-native or dialect meaning.
 
 ```leia run all
 agent := "identifier"
 tool := "identifier"
 turn := 1
-budget := 2
+model := 2
 
 assert(agent == "identifier")
 assert(tool == "identifier")
-assert(turn + budget == 3)
+assert(turn + model == 3)
 ```
 
-In grammar positions that define AI-native forms, contextual words are consumed
-by that syntax rather than bound as ordinary identifiers. See
-[AI-Native Constructs](ai-native.md) for the stable forms.
+In grammar positions that define tagged dialect forms or evaluate blocks,
+contextual words are consumed by that syntax rather than bound as ordinary
+identifiers. See [AI-Native Constructs](ai-native.md) for the stable forms.
 
 ## Numeric Literals
 

@@ -32,9 +32,18 @@ customer_profile := load_customer(id)
 Tool and agent names should read like capabilities or actions:
 
 ```leia
-tool lookup_order(id) { ... }
+lookup_order := tool {
+    name: "lookup_order"
+    params: ["id"]
+    fn: fn(id) { ... }
+}
 
-agent support_triage(message) { ... }
+support_triage := agent {
+    name: "support_triage"
+    config: fn(message) {
+        return { user: message }
+    }
+}
 ```
 
 ## Data Shapes
@@ -89,14 +98,19 @@ file directives.
 //leia:feature ai-native
 ```
 
-For tools, describe parameters with directives so hosts, docs, and editor
-integrations can surface useful metadata.
+For tools, keep the public name, parameter list, capability requirements, and
+implementation in the tool value so hosts, docs, and editor integrations can
+surface useful metadata.
 
 ```leia
-//leia:requires orders.read
-//leia:param id order id
-tool lookup_order(id) {
-    return orders[id], nil
+lookup_order := tool {
+    name: "lookup_order"
+    params: ["id"]
+    requires: ["orders.read"]
+    description: "Look up an order by id."
+    fn: fn(id) {
+        return orders[id], nil
+    }
 }
 ```
 
@@ -105,17 +119,17 @@ tool lookup_order(id) {
 Use the simplest AI construct that fits the job:
 
 - `turn { user: ... }` for one request.
-- `agent name(args) { ... }` for reusable prompt capsules.
-- `flow { ... }` only when you need custom multi-step control.
+- `agent { name: ..., config: fn(...) { ... } }` for reusable prompt capsules.
+- `llm.agent(name, config_fn, flow_fn, opts)` only when you need custom multi-step control.
 - `evaluate` blocks for regression checks.
 
 Prefer explicit message history when memory matters.
 
 ```leia
-history := messages {
-    system: "Remember facts exactly."
-    user: "project=ORCHID owner=ADA"
-}
+history := [
+    { role: "system", text: "Remember facts exactly." },
+    { role: "user", text: "project=ORCHID owner=ADA" },
+]
 
 first, err := turn { messages: history }
 if err != nil { return nil, err }
@@ -155,4 +169,3 @@ contract is agent behavior, replay drift, or prompt regression.
 go run ./cmd/leia test --json --output test-report.json tests
 go run ./cmd/leia evaluate --replay examples/evaluate/agent_replay.records.json examples/evaluate/agent_replay.leia
 ```
-

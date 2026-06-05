@@ -47,21 +47,39 @@ func TestPublicSDKRecommendedAPISignaturesHideInternalRuntime(t *testing.T) {
 	}
 
 	for name, fn := range map[string]interface{}{
-		"New":         leia.New,
-		"Compile":     leia.Compile,
-		"CompileFile": leia.CompileFile,
-		"Decode":      leia.Decode,
-		"Encode":      leia.Encode,
-		"Nil":         leia.Nil,
-		"Bool":        leia.Bool,
-		"Int":         leia.Int,
-		"Float":       leia.Float,
-		"String":      leia.String,
-		"WithDialect": leia.WithDialect,
+		"New":                         leia.New,
+		"Compile":                     leia.Compile,
+		"CompileFile":                 leia.CompileFile,
+		"Decode":                      leia.Decode,
+		"Encode":                      leia.Encode,
+		"Nil":                         leia.Nil,
+		"Bool":                        leia.Bool,
+		"Int":                         leia.Int,
+		"Float":                       leia.Float,
+		"String":                      leia.String,
+		"WithDialect":                 leia.WithDialect,
+		"WithSandbox":                 leia.WithSandbox,
+		"SecuritySandbox":             leia.SecuritySandbox,
+		"WithSecurity":                leia.WithSecurity,
+		"WithMaxSteps":                leia.WithMaxSteps,
+		"WithMaxNativeCalls":          leia.WithMaxNativeCalls,
+		"WithMaxCallDepth":            leia.WithMaxCallDepth,
+		"WithMaxGoroutines":           leia.WithMaxGoroutines,
+		"WithMaxChannelCapacity":      leia.WithMaxChannelCapacity,
+		"WithMaxHostResultBytes":      leia.WithMaxHostResultBytes,
+		"WithMaxModuleBytes":          leia.WithMaxModuleBytes,
+		"WithMaxModuleDepth":          leia.WithMaxModuleDepth,
+		"WithMaxFilesystemReadBytes":  leia.WithMaxFilesystemReadBytes,
+		"WithMaxFilesystemWriteBytes": leia.WithMaxFilesystemWriteBytes,
+		"NewHotLoader":                leia.NewHotLoader,
 	} {
 		assertNoInternalRuntimeType(t, name, reflect.TypeOf(fn))
 	}
 	assertNoInternalRuntimeType(t, "DialectHandler", reflect.TypeOf((*leia.DialectHandler)(nil)).Elem())
+	assertNoInternalRuntimeType(t, "SecurityPolicy", reflect.TypeOf(leia.SecurityPolicy{}))
+	assertNoInternalRuntimeType(t, "BudgetError", reflect.TypeOf((*leia.BudgetError)(nil)).Elem())
+	assertNoInternalRuntimeType(t, "HotLoader", reflect.TypeOf((*leia.HotLoader)(nil)).Elem())
+	assertNoInternalRuntimeType(t, "HotInstance", reflect.TypeOf((*leia.HotInstance)(nil)).Elem())
 }
 
 func TestPublicSDKRawRuntimeMethodsAreNotExported(t *testing.T) {

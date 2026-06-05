@@ -123,17 +123,17 @@ contract. The bang form is fail-fast and raises a runtime error when the dialect
 cannot parse or execute the form.
 
 The AI surface is a standard-library layer rather than a separate execution
-engine. Use `llm.turn({...})` for model calls and
-`llm.register_models({...})` for model configuration. Tools, agents, messages,
-history manipulation, output validation, record/replay, tracing, and
-cancellation are ordinary calls on the `llm`, `msg`, `history`, and `loop`
-modules. This keeps scripted and embedded agents on the same runtime path.
+engine. Use `turn { ... }` or `llm.turn({...})` for model calls and
+`model { ... }` or `llm.register_models({...})` for model configuration. Tools,
+agents, messages, history manipulation, output validation, record/replay,
+tracing, and cancellation are ordinary values and calls on the `llm`, `msg`,
+`history`, and `loop` modules. This keeps scripted and embedded agents on the
+same runtime path.
 
-An agent is a callable value produced by `llm.agent`. Its configuration fields
-are defaults for the turns executed by that agent. Explicit fields in the table
-returned by the agent body override agent defaults, and agent defaults override
-process or host defaults. There is no implicit flow scope: agent bodies are
-ordinary lexical functions, and all configuration values that the body needs
+An agent is a callable value produced by `agent { ... }` or `llm.agent`. Its
+configuration function returns the turn fields for each call. There is no
+implicit flow scope: custom flow functions are ordinary lexical functions, and
+all configuration values that the body needs
 must be passed or closed over explicitly.
 
 Messages are ordinary ordered tables, usually built with `llm.system`,

@@ -39,7 +39,9 @@ bash scripts/performance_gate.sh --full --no-luajit
 ```
 
 Use `--no-luajit` only when LuaJIT is not installed or the workload has no
-meaningful Lua reference. Say so in the PR.
+meaningful Lua reference. Say so in the PR. Otherwise the submit gate enforces
+the script-timed current/LuaJIT threshold in addition to current-vs-HEAD
+regression checks.
 
 ## Reporting Format
 

@@ -37,6 +37,7 @@ set.
 |---|---|
 | `examples/hello/` | Core syntax, functions, tables, closures, metatables, coroutines, errors, and object-style patterns. |
 | `examples/dialects/` | Built-in text, protocol, SQL-shaped, Markdown/table, binary, and validation dialect examples. |
+| `examples/data/` | Focused data-language examples, including q/kdb+-style symbolic vectors. |
 | `examples/data_processing/` | Data structures, string processing, dense arrays, and SoA kernels. |
 | `examples/concurrency/` | Goroutines, channels, select, sync primitives, context cancellation, and process cancellation. |
 | `examples/llm/` | AI-native models, tools, agents, direct agent-as-tool, custom flow, and live provider smoke scripts. |
@@ -48,6 +49,7 @@ set.
 
 ```bash
 go run ./cmd/leia examples run examples/data_processing/data_oriented/soa_kernels.leia
+go run ./cmd/leia examples check examples/data/q_vector_basics.leia
 go run ./cmd/leia examples check examples/data_processing/data_oriented/particle_integration.leia
 ```
 

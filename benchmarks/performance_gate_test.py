@@ -32,7 +32,16 @@ def subject(median, status="ok", source="script_repeat", cv=2.0):
     }
 
 
-def timing_payload(current, head, *, current_status="ok", head_status="ok", source="script_repeat"):
+def timing_payload(
+    current,
+    head,
+    *,
+    luajit=2.0,
+    current_status="ok",
+    head_status="ok",
+    luajit_status="ok",
+    source="script_repeat",
+):
     return {
         "modes": ["default"],
         "results": [
@@ -43,6 +52,7 @@ def timing_payload(current, head, *, current_status="ok", head_status="ok", sour
                     "default": {
                         "current": subject(current, current_status, source),
                         "head": subject(head, head_status, source),
+                        "luajit": subject(luajit, luajit_status, source),
                     }
                 },
             }
@@ -120,6 +130,13 @@ class PerformanceGateValidationTest(unittest.TestCase):
         self.assertEqual(proc.returncode, 1, proc.stdout)
         self.assertIn("Performance gate violations", proc.stdout)
         self.assertIn("numeric/hot_loop", proc.stdout)
+
+    def test_validate_only_rejects_luajit_ratio_above_threshold(self):
+        proc = run_validate(timing_payload(0.81, 1.00, luajit=1.00))
+        self.assertEqual(proc.returncode, 1, proc.stdout)
+        self.assertIn("Guard violations", proc.stdout)
+        self.assertIn("numeric/hot_loop", proc.stdout)
+        self.assertIn("luajit", proc.stdout)
 
     def test_validate_only_rejects_low_resolution_rows(self):
         proc = run_validate(timing_payload(None, 1.00, current_status="low_resolution"))
