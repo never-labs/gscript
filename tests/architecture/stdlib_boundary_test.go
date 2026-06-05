@@ -170,6 +170,7 @@ func TestBuiltinDialectRegistryStaysModular(t *testing.T) {
 		"registerDialectProtocol",
 		"registerDialectProtocolNetwork",
 		"registerDialectData",
+		"registerDialectDatabase",
 		"registerDialectAI",
 	}
 	expectedTagsByFile := map[string][]string{
@@ -178,6 +179,7 @@ func TestBuiltinDialectRegistryStaysModular(t *testing.T) {
 		"dialect_protocol.go":         {"url", "html_escape", "urlquery", "urlpath", "mime", "headers", "http_headers", "cookie", "cookies", "httpmsg", "sse", "multipart", "jwt"},
 		"dialect_protocol_network.go": {"ipaddr", "cidr", "hostport"},
 		"dialect_data.go":             {"base64", "hash", "hex", "base32", "uuid", "gzip", "zlib", "deflate", "binary"},
+		"dialect_database.go":         {"sql"},
 		"dialect_ai.go":               {"prompt", "quote"},
 	}
 	expectedProjectImportsByFile := map[string][]string{
@@ -196,6 +198,7 @@ func TestBuiltinDialectRegistryStaysModular(t *testing.T) {
 			"github.com/never-labs/leia/internal/support/dialect",
 		},
 		"dialect_protocol_network.go": nil,
+		"dialect_database.go":         nil,
 		"dialect_data.go": {
 			"github.com/never-labs/leia/internal/stdlib/lib/base64",
 			"github.com/never-labs/leia/internal/stdlib/lib/compress",
@@ -499,6 +502,8 @@ func expectedDialectFileForFunc(funcName string) string {
 		return "dialect_protocol_network.go"
 	case "registerDialectData":
 		return "dialect_data.go"
+	case "registerDialectDatabase":
+		return "dialect_database.go"
 	case "registerDialectAI":
 		return "dialect_ai.go"
 	default:

@@ -155,6 +155,7 @@ func TestFeatureMatrixCoversTaggedDialectAndModpkgReleaseGuards(t *testing.T) {
 		"url", "html_escape", "urlquery", "urlpath", "mime", "headers", "http_headers", "cookie", "cookies", "httpmsg", "sse", "multipart", "jwt",
 		"ipaddr", "cidr", "hostport",
 		"base64", "hash", "hex", "base32", "uuid", "gzip", "zlib", "deflate", "binary",
+		"sql",
 		"prompt", "quote",
 	)
 

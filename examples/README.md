@@ -8,6 +8,7 @@ services.
 These should run from a clean checkout without secrets:
 
 ```bash
+# from the examples/ directory
 go run ../cmd/leia examples list
 go run ../cmd/leia examples check hello/fib.leia hello/types_demo.leia hello/dialects.leia
 go run ../cmd/leia examples run data_processing/data_oriented/soa_kernels.leia
@@ -44,6 +45,7 @@ environment variables and must never commit API keys.
 Evaluate examples live under `evaluate/`. Run replay-backed agent checks with:
 
 ```bash
+# from the examples/ directory
 go run ../cmd/leia evaluate --replay evaluate/agent_replay.records.json evaluate/agent_replay.leia
 go run ../cmd/leia evaluate --replay evaluate/multiturn_replay.records.json evaluate/multiturn_replay.leia
 ```

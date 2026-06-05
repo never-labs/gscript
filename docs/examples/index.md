@@ -6,6 +6,7 @@ code, concurrency, web scripts, and game-style programs.
 
 The repository-local example policy and dependency notes live in
 [`../../examples/README.md`](../../examples/README.md).
+Commands on this page assume the current directory is the repository root.
 
 ## First Examples
 
@@ -37,8 +38,8 @@ go run ./cmd/leia examples check examples/data_processing/data_oriented/particle
 
 Use these with the [data-oriented reference](../reference/data-oriented/index.md)
 and `benchmarks/data/` when evaluating numeric or SoA-heavy code. The
-particle integration example is listed as manual because it needs a higher
-step budget than the default examples runner.
+particle integration example is listed as manual, so `examples check` reports it
+as skipped unless it is run through a dedicated higher-step-budget path.
 
 ## Concurrency Examples
 

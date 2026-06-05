@@ -1,0 +1,218 @@
+// release_risk_digest.leia - Offline release note parser and risk digest.
+// Demonstrates: CSV rules, JSONL build events, text token matching,
+// deduplication, scoring, ranking, logfmt summaries, and Markdown output.
+
+print("=== Automation: release risk digest ===")
+
+weights := dialect.eval("csv", `area,base_score,owner
+payments,50,revenue
+auth,45,identity
+search,25,platform
+docs,5,enablement
+`, {headers: true})
+
+changes := dialect.eval("csv", `id,area,type,title,body
+CHG-10,payments,fix,Retry failed card captures,"Adds retry guards around card capture timeout handling"
+CHG-11,auth,feature,Session risk banner,"Shows a banner for suspicious admin sign in events"
+CHG-12,search,chore,Index worker cleanup,"Removes unused queue counters from search indexing"
+CHG-13,docs,docs,Webhook guide refresh,"Clarifies webhook retries and example payloads"
+CHG-10,payments,fix,Duplicate card capture alert,"Duplicate note for the same capture timeout"
+CHG-14,auth,fix,Password reset audit,"Logs password reset token rotation for admins"
+`, {headers: true})
+
+build_events := jsonl`{"id":"CHG-10","stage":"unit","status":"ok","ms":1200}
+{"id":"CHG-10","stage":"integration","status":"fail","ms":4100}
+{"id":"CHG-11","stage":"unit","status":"ok","ms":980}
+{"id":"CHG-11","stage":"smoke","status":"ok","ms":1350}
+{"id":"CHG-12","stage":"unit","status":"ok","ms":610}
+{"id":"CHG-14","stage":"unit","status":"ok","ms":1020}
+{"id":"CHG-14","stage":"smoke","status":"fail","ms":2300}
+`
+
+func number_or(value, fallback) {
+    parsed := tonumber(value)
+    if parsed == nil {
+        return fallback
+    }
+    return parsed
+}
+
+func area_rule(area) {
+    for i := 1; i <= #weights; i++ {
+        row := weights[i]
+        if row.area == area {
+            return {
+                base_score: number_or(row.base_score, 0),
+                owner: row.owner,
+            }
+        }
+    }
+    return {base_score: 0, owner: "unassigned"}
+}
+
+func contains_any(text, tokens) {
+    lower := string.lower(text)
+    for i := 1; i <= #tokens; i++ {
+        if string.find(lower, tokens[i], 1, true) != nil {
+            return true
+        }
+    }
+    return false
+}
+
+func build_rollup(change_id) {
+    stages := 0
+    failed := 0
+    elapsed := 0
+    for i := 1; i <= #build_events; i++ {
+        event := build_events[i]
+        if event.id == change_id {
+            stages = stages + 1
+            elapsed = elapsed + event.ms
+            if event.status == "fail" {
+                failed = failed + 1
+            }
+        }
+    }
+    return {stages: stages, failed: failed, elapsed: elapsed}
+}
+
+func type_bonus(kind) {
+    if kind == "feature" {
+        return 12
+    }
+    if kind == "fix" {
+        return 8
+    }
+    return 0
+}
+
+seen := {}
+duplicates := {}
+items := {}
+owner_counts := {}
+failures := 0
+
+for i := 1; i <= #changes; i++ {
+    change := changes[i]
+    rule := area_rule(change.area)
+    if seen[change.id] != nil {
+        table.insert(duplicates, change.id)
+    } else {
+        seen[change.id] = true
+        text := change.title .. " " .. change.body
+        build := build_rollup(change.id)
+        sensitive := contains_any(text, {"payment", "card", "admin", "password", "token"})
+        score := rule.base_score + type_bonus(change.type)
+        if sensitive {
+            score = score + 15
+        }
+        if build.failed > 0 {
+            score = score + 40
+            failures = failures + build.failed
+        }
+
+        item := {
+            id: change.id,
+            area: change.area,
+            kind: change.type,
+            owner: rule.owner,
+            sensitive: sensitive,
+            build_failed: build.failed,
+            build_duration: dialect.eval("duration", {milliseconds: build.elapsed}, {mode: "encode"}),
+            risk: score,
+            title: change.title,
+        }
+        table.insert(items, item)
+
+        if owner_counts[rule.owner] == nil {
+            owner_counts[rule.owner] = 0
+        }
+        owner_counts[rule.owner] = owner_counts[rule.owner] + 1
+    }
+}
+
+table.sort(items, func(a, b) {
+    if a.risk == b.risk {
+        return a.id < b.id
+    }
+    return a.risk > b.risk
+})
+
+owners := {}
+for owner, count := range pairs(owner_counts) {
+    table.insert(owners, {owner: owner, count: count})
+}
+table.sort(owners, func(a, b) {
+    if a.count == b.count {
+        return a.owner < b.owner
+    }
+    return a.count > b.count
+})
+
+top_rows := {}
+limit := 3
+if #items < limit {
+    limit = #items
+}
+for i := 1; i <= limit; i++ {
+    item := items[i]
+    top_rows[i] = {
+        rank: i,
+        id: item.id,
+        owner: item.owner,
+        area: item.area,
+        risk: item.risk,
+        failed: item.build_failed,
+        duration: item.build_duration,
+    }
+}
+
+summary := dialect.eval("logfmt", {
+    unique: #items,
+    duplicates: #duplicates,
+    failures: failures,
+    top: items[1].id,
+    top_risk: items[1].risk,
+    busiest_owner: owners[1].owner,
+}, {mode: "encode"})
+
+report := template {
+    text: "Release digest: {{.unique}} changes, {{.failures}} failed stages, top risk {{.top}}={{.risk}}",
+    data: {unique: #items, failures: failures, top: items[1].id, risk: items[1].risk},
+}
+
+markdown := dialect.eval("mdtable", top_rows, {
+    mode: "encode",
+    headers: {"rank", "id", "owner", "area", "risk", "failed", "duration"},
+})
+
+jsonl_report := dialect.eval("jsonl", top_rows, {mode: "encode"})
+
+print(report)
+print("summary:", summary)
+print(markdown)
+print(jsonl_report)
+
+assert(#changes == 6)
+assert(#items == 5)
+assert(#duplicates == 1)
+assert(duplicates[1] == "CHG-10")
+assert(failures == 2)
+assert(items[1].id == "CHG-10")
+assert(items[1].risk == 113)
+assert(items[1].build_duration == "5.3s")
+assert(items[2].id == "CHG-14")
+assert(items[2].risk == 108)
+assert(items[3].id == "CHG-11")
+assert(items[3].risk == 72)
+assert(owners[1].owner == "identity")
+assert(owners[1].count == 2)
+assert(top_rows[1].failed == 1)
+assert(string.find(summary, "duplicates=1", 1, true) != nil)
+assert(string.find(summary, "top=CHG-10", 1, true) != nil)
+assert(report == "Release digest: 5 changes, 2 failed stages, top risk CHG-10=113")
+assert(string.find(markdown, "| 1 | CHG-10 | revenue | payments | 113 | 1 | 5.3s |", 1, true) != nil)
+assert(string.find(jsonl_report, `"id":"CHG-14"`, 1, true) != nil)
+
+print("release risk digest ok")

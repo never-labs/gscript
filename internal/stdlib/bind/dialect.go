@@ -27,6 +27,7 @@ func BuildDialect(opts HostOptions, maxHostResult func() int64, specs ...Dialect
 	registerDialectProtocol(register, maxHostResult)
 	registerDialectProtocolNetwork(register)
 	registerDialectData(register, maxHostResult)
+	registerDialectDatabase(register)
 	registerDialectAI(register)
 	for _, spec := range specs {
 		names, handler, err := dialectSpecHandler(spec)
@@ -276,6 +277,8 @@ func builtinDialectCategory(name string) string {
 		return "protocol"
 	case "base64", "hash", "hex", "base32", "uuid", "gzip", "zlib", "deflate", "binary":
 		return "data"
+	case "sql":
+		return "database"
 	case "prompt", "quote":
 		return "llm"
 	case "junit":

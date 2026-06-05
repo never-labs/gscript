@@ -11,6 +11,10 @@ encoded := json {project: name, ok: true}
 clean_path := path`examples//hello/../hello/dialects.leia`
 joined_path := p.join("examples", "hello", "dialects.leia")
 parsed_url := url`https://example.com:8443/search?q=leia&tag=dialect#demo`
+query := sql {
+    query: "select * from examples where tag = :tag and score >= :score",
+    params: {tag: "dialect", score: 7},
+}
 encoded_name := base64`Hello ${name}`
 decoded_name := dialect.eval("base64", encoded_name, {mode: "decode"})
 sha1 := dialect.eval("hash", "leia", {algo: "sha1"})
@@ -48,6 +52,9 @@ assert(parsed_url.host == "example.com")
 assert(parsed_url.port == "8443")
 assert(parsed_url.query.q == "leia")
 assert(parsed_url.query.tag == "dialect")
+assert(query.query == "select * from examples where tag = ? and score >= ?")
+assert(query.args[1] == "dialect")
+assert(query.args[2] == 7)
 assert(decoded_name == "Hello Leia")
 assert(sha1 == "3ea1ebad1aa28de8fc67188a456b9747bbcca81a")
 assert(rows[2][1] == "Ada")
@@ -68,5 +75,6 @@ assert(quoted.kind == "function")
 print("decoded project:", decoded.project)
 print("csv first row:", rows[2][1] .. "=" .. rows[2][2])
 print("markdown title:", doc.title)
+print("sql query:", query.query)
 print("prompt:", user_prompt.text)
 print("dialects ok")
