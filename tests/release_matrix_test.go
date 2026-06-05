@@ -2,6 +2,7 @@ package tests_test
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -518,6 +519,23 @@ func TestReleaseMatrixCommunityEntrypointsAreLinked(t *testing.T) {
 	}
 }
 
+func TestReleaseMatrixLicenseNoticeMatchesRepositoryState(t *testing.T) {
+	root := findRepoRoot(t)
+	readme := readFileString(t, filepath.Join(root, "README.md"))
+	_, licenseErr := os.Stat(filepath.Join(root, "LICENSE"))
+	hasLicense := licenseErr == nil
+	if licenseErr != nil && !errors.Is(licenseErr, os.ErrNotExist) {
+		t.Fatalf("stat LICENSE: %v", licenseErr)
+	}
+	unlicensedNotice := "No license has been selected in this repository yet."
+	if hasLicense && strings.Contains(readme, unlicensedNotice) {
+		t.Fatal("README.md still says no license has been selected even though LICENSE exists")
+	}
+	if !hasLicense && !strings.Contains(readme, unlicensedNotice) {
+		t.Fatal("README.md must keep the no-license notice until a root LICENSE exists")
+	}
+}
+
 func TestReleaseMatrixModuleReferenceDocumentsCommandSurface(t *testing.T) {
 	root := findRepoRoot(t)
 	modules := readFileString(t, filepath.Join(root, "docs", "reference", "modules", "index.md"))
@@ -861,6 +879,7 @@ func TestReleaseMatrixGettingStartedExamplesStayRunnable(t *testing.T) {
 		"examples/hello/types_demo.leia",
 		"examples/concurrency/goroutines_channels.leia",
 		"examples/data_processing/data_oriented/soa_kernels.leia",
+		"examples/data_processing/data_oriented/dense_matrix_vec_kernels.leia",
 	} {
 		runCommand(t, root, 30*time.Second, "go", "run", "./cmd/leia", "run", example)
 	}

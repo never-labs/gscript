@@ -380,6 +380,20 @@
       "perf_hot_case": {"status": "covered", "refs": ["scripts/performance_gate.sh", "benchmarks/performance_gate_test.py"]}
     },
     {
+      "id": "release_distribution_surface",
+      "name": "Small deployment surface, release artifacts, and install checks",
+      "category": "release-engineering",
+      "spec_sections": ["Implementation Requirements", "Stability Contract"],
+      "parser": {"status": "not_applicable", "refs": []},
+      "bytecode": {"status": "not_applicable", "refs": []},
+      "interpreter": {"status": "not_applicable", "refs": []},
+      "tier1": {"status": "not_applicable", "refs": []},
+      "tier2": {"status": "not_applicable", "refs": []},
+      "semantic_gate": {"status": "covered", "refs": ["README.md", ".goreleaser.yaml", "scripts/install.sh", "scripts/release_distribution_check.sh", "scripts/release_artifacts_check.sh", "cmd/leia/main_readme_tooling_test.go", "tests/release_matrix_test.go"]},
+      "conformance_case": {"status": "not_applicable", "refs": []},
+      "perf_hot_case": {"status": "not_applicable", "refs": []}
+    },
+    {
       "id": "embedding_host_bindings",
       "name": "Go embedding host function and module bindings",
       "category": "embedding-api",

@@ -122,6 +122,49 @@ func TestReadmeInstallCommandsStayRunnable(t *testing.T) {
 	}
 }
 
+func TestReadmeEmbeddingSnippetStaysRunnable(t *testing.T) {
+	root := repoRootForBoundaryTest(t)
+	data, err := os.ReadFile(filepath.Join(root, "README.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	snippet := readmeEmbeddingGoSnippet(string(data))
+	if snippet == "" {
+		t.Fatal("README Embedding section must contain a Go snippet")
+	}
+	for _, want := range []string{
+		`import leia "github.com/never-labs/leia"`,
+		"leia.New(leia.WithLibs(leia.LibSafe))",
+		`vm.Exec(`,
+	} {
+		if !strings.Contains(snippet, want) {
+			t.Fatalf("README embedding snippet missing %q:\n%s", want, snippet)
+		}
+	}
+
+	dir := t.TempDir()
+	goMod := "module readme_embedding_smoke\n\ngo 1.24\n\nrequire github.com/never-labs/leia v0.0.0\n\nreplace github.com/never-labs/leia => " + filepath.ToSlash(root) + "\n"
+	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte(goMod), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "main.go"), []byte(snippet), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cmd := exec.Command("go", "run", "-mod=mod", ".")
+	cmd.Dir = dir
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("README embedding snippet failed: %v\nstdout:\n%s\nstderr:\n%s",
+			err, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "hello from embedded leia") {
+		t.Fatalf("README embedding snippet stdout = %q, want embedded hello", stdout.String())
+	}
+}
+
 func TestReadmeToolingCommandsMapToCLI(t *testing.T) {
 	root := repoRootForBoundaryTest(t)
 	data, err := os.ReadFile(filepath.Join(root, "README.md"))
@@ -191,6 +234,25 @@ func TestReadmeToolingCommandsMapToCLI(t *testing.T) {
 	if len(diagArgs) == 0 || !containsString(diagArgs, "--skip-benchmarks") {
 		t.Fatalf("README diag dispatch args = %#v, want bundle --skip-benchmarks", diagArgs)
 	}
+}
+
+func readmeEmbeddingGoSnippet(readme string) string {
+	const marker = "## Embedding"
+	start := strings.Index(readme, marker)
+	if start < 0 {
+		return ""
+	}
+	rest := readme[start+len(marker):]
+	blockStart := strings.Index(rest, "```go")
+	if blockStart < 0 {
+		return ""
+	}
+	rest = rest[blockStart+len("```go"):]
+	blockEnd := strings.Index(rest, "```")
+	if blockEnd < 0 {
+		return ""
+	}
+	return strings.TrimSpace(rest[:blockEnd]) + "\n"
 }
 
 func readmeQuickStartCommands(readme string) []string {

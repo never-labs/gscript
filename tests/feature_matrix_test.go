@@ -438,6 +438,17 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 		"cmd/leia/main_ci_test.go",
 		"docs/release/index.md",
 	)
+
+	distribution := requireFeature(t, features, "release_distribution_surface")
+	requireFeatureCellRefs(t, distribution, "release_distribution_surface", "semantic_gate",
+		"README.md",
+		".goreleaser.yaml",
+		"scripts/install.sh",
+		"scripts/release_distribution_check.sh",
+		"scripts/release_artifacts_check.sh",
+		"cmd/leia/main_readme_tooling_test.go",
+		"tests/release_matrix_test.go",
+	)
 }
 
 func TestActiveDocsUseLeiaNamingAndNoLegacyAskAgentDesign(t *testing.T) {
