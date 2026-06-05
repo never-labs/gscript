@@ -44,7 +44,7 @@ step budget than the default examples runner.
 
 ```bash
 go run ./cmd/leia examples check examples/concurrency/goroutines_channels.leia examples/concurrency/select_timeout.leia
-go run ./cmd/leia examples run repo-concurrency-sync_group_cancel
+go run ./cmd/leia examples run repo-concurrency-sync_group
 ```
 
 Use these with the [concurrency reference](../reference/concurrency/index.md).

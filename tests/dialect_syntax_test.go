@@ -689,6 +689,30 @@ func TestReportAndRouteDialectsExecuteThroughStdlib(t *testing.T) {
 	}
 }
 
+func TestStdlibMarkdownDialectCodeBlocksExecuteThroughStdlib(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []leia.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			vm := leia.New(append([]leia.Option{leia.WithLibs(leia.LibAll)}, tc.opts...)...)
+			src := "doc := markdown`# Notes\n\n~~~leia\nprint(\"ok\")\n~~~\n`\n" +
+				"code_count := #doc.code_blocks\n" +
+				"code_info := doc.code_blocks[1].info\n" +
+				"code_text := doc.code_blocks[1].text\n"
+			if err := vm.Exec(src); err != nil {
+				t.Fatalf("Exec: %v", err)
+			}
+			assertGet(t, vm, "code_count", int64(1))
+			assertGet(t, vm, "code_info", "leia")
+			assertGet(t, vm, "code_text", `print("ok")`)
+		})
+	}
+}
+
 func TestStdlibSemVerDialectExecutesThroughStdlib(t *testing.T) {
 	for _, tc := range []struct {
 		name string

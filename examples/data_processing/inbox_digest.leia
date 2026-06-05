@@ -1,0 +1,228 @@
+// inbox_digest.leia - Offline ticket inbox parser and digest generator.
+// Demonstrates: CSV parsing, text normalization, duplicate detection,
+// owner/SLA rollups, ranking, and encoded JSONL/logfmt summaries.
+
+print("=== Inbox Digest ===")
+
+rules := dialect.eval("csv", `severity,base_score,sla_minutes
+critical,100,15
+high,70,60
+normal,35,240
+low,10,720
+`, {headers: true})
+
+tickets := dialect.eval("csv", `id,owner,severity,age_minutes,subject,body
+INC-100,platform,critical,18,Checkout failing,"Payment timeout seen on checkout retry flow"
+INC-101,security,high,44,Suspicious login spike,"MFA prompts increased for admin users"
+INC-102,platform,normal,180,Slow search,"Search latency above usual baseline"
+INC-100,platform,critical,19,Checkout failing duplicate,"Second alert for same checkout timeout"
+INC-103,billing,high,92,Invoice export broken,"CSV export returns 500 for enterprise accounts"
+INC-104,security,normal,21,Password reset question,"Customer asks about password reset email"
+INC-105,billing,low,640,Tax label typo,"Receipt footer uses old tax label"
+INC-106,platform,high,75,Worker retry backlog,"Async jobs retry after queue throttle"
+`, {headers: true})
+
+func number_or(value, fallback) {
+    parsed := tonumber(value)
+    if parsed == nil {
+        return fallback
+    }
+    return parsed
+}
+
+func rule_for(severity) {
+    for i := 1; i <= #rules; i++ {
+        row := rules[i]
+        if row != nil {
+            if row.severity == severity {
+                return {
+                    base_score: number_or(row.base_score, 0),
+                    sla_minutes: number_or(row.sla_minutes, 0),
+                }
+            }
+        }
+    }
+    return {base_score: 0, sla_minutes: 999999}
+}
+
+func contains_any(text, words) {
+    lower := string.lower(text)
+    for i := 1; i <= #words; i++ {
+        if string.find(lower, words[i], 1, true) != nil {
+            return true
+        }
+    }
+    return false
+}
+
+func classify_queue(row) {
+    text := row.subject .. " " .. row.body
+    if contains_any(text, {"checkout", "payment", "invoice", "receipt", "tax"}) {
+        return "revenue"
+    }
+    if contains_any(text, {"login", "mfa", "password", "admin"}) {
+        return "identity"
+    }
+    if contains_any(text, {"latency", "search", "worker", "queue", "retry"}) {
+        return "reliability"
+    }
+    return "general"
+}
+
+func new_owner_summary(owner) {
+    return {
+        owner: owner,
+        tickets: 0,
+        duplicates: 0,
+        breaches: 0,
+        score: 0,
+        max_age: 0,
+    }
+}
+
+seen := {}
+deduped := {}
+duplicates := {}
+owners := {}
+queue_counts := {}
+breaches := 0
+total_score := 0
+
+for i := 1; i <= #tickets; i++ {
+    row := tickets[i]
+    owner_summary := owners[row.owner]
+    if owner_summary == nil {
+        owner_summary = new_owner_summary(row.owner)
+        owners[row.owner] = owner_summary
+    }
+
+    if seen[row.id] != nil {
+        owner_summary.duplicates = owner_summary.duplicates + 1
+        table.insert(duplicates, row.id)
+    } else {
+        seen[row.id] = true
+        rule := rule_for(row.severity)
+        age := number_or(row.age_minutes, 0)
+        queue := classify_queue(row)
+        breached := age > rule.sla_minutes
+        escalation := 0
+        if breached {
+            escalation = 30
+            breaches = breaches + 1
+            owner_summary.breaches = owner_summary.breaches + 1
+        }
+        priority := rule.base_score + math.floor(age / 30) + escalation
+
+        item := {
+            id: row.id,
+            owner: row.owner,
+            severity: row.severity,
+            age_minutes: age,
+            queue: queue,
+            breached: breached,
+            priority: priority,
+            subject: row.subject,
+        }
+        table.insert(deduped, item)
+
+        owner_summary.tickets = owner_summary.tickets + 1
+        owner_summary.score = owner_summary.score + priority
+        if age > owner_summary.max_age {
+            owner_summary.max_age = age
+        }
+
+        if queue_counts[queue] == nil {
+            queue_counts[queue] = 0
+        }
+        queue_counts[queue] = queue_counts[queue] + 1
+        total_score = total_score + priority
+    }
+}
+
+table.sort(deduped, func(a, b) {
+    if a.priority == b.priority {
+        return a.id < b.id
+    }
+    return a.priority > b.priority
+})
+
+owner_rows := {}
+for _, owner := range pairs(owners) {
+    table.insert(owner_rows, owner)
+}
+table.sort(owner_rows, func(a, b) {
+    if a.score == b.score {
+        return a.owner < b.owner
+    }
+    return a.score > b.score
+})
+
+queue_rows := {}
+for queue, count := range pairs(queue_counts) {
+    table.insert(queue_rows, {queue: queue, count: count})
+}
+table.sort(queue_rows, func(a, b) {
+    if a.count == b.count {
+        return a.queue < b.queue
+    }
+    return a.count > b.count
+})
+
+digest_rows := {}
+limit := 4
+if #deduped < limit {
+    limit = #deduped
+}
+for i := 1; i <= limit; i++ {
+    ticket := deduped[i]
+    digest_rows[i] = {
+        rank: i,
+        id: ticket.id,
+        owner: ticket.owner,
+        severity: ticket.severity,
+        queue: ticket.queue,
+        priority: ticket.priority,
+        breached: ticket.breached,
+    }
+}
+
+digest_jsonl := dialect.eval("jsonl", digest_rows, {mode: "encode"})
+summary := dialect.eval("logfmt", {
+    input: #tickets,
+    unique: #deduped,
+    duplicates: #duplicates,
+    breaches: breaches,
+    top: deduped[1].id,
+    owner: owner_rows[1].owner,
+    queue: queue_rows[1].queue,
+    score: total_score,
+}, {mode: "encode"})
+
+print(digest_jsonl)
+print("summary:", summary)
+print(string.format(
+    "owner=%s tickets=%d breaches=%d queue=%s top=%s",
+    owner_rows[1].owner,
+    owner_rows[1].tickets,
+    owner_rows[1].breaches,
+    queue_rows[1].queue,
+    deduped[1].id
+))
+
+assert(#tickets == 8)
+assert(#deduped == 7)
+assert(#duplicates == 1)
+assert(duplicates[1] == "INC-100")
+assert(breaches == 3)
+assert(deduped[1].id == "INC-100")
+assert(deduped[1].priority == 130)
+assert(deduped[2].id == "INC-103")
+assert(owner_rows[1].owner == "platform")
+assert(owner_rows[1].tickets == 3)
+assert(owner_rows[1].breaches == 2)
+assert(queue_rows[1].queue == "revenue")
+assert(queue_rows[1].count == 3)
+assert(string.find(summary, "unique=7", 1, true) != nil)
+assert(string.find(digest_jsonl, `"id":"INC-100"`, 1, true) != nil)
+
+print("inbox digest ok")

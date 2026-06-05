@@ -18,6 +18,15 @@ rows := csv`name,score
 Ada,42
 Bob,7
 `
+doc := markdown`# Dialect Notes
+
+Leia can parse [examples](https://example.test/examples).
+
+## Topics
+
+- shell
+- data
+`
 nonempty_lines := lines`alpha
 
 beta
@@ -43,6 +52,10 @@ assert(decoded_name == "Hello Leia")
 assert(sha1 == "3ea1ebad1aa28de8fc67188a456b9747bbcca81a")
 assert(rows[2][1] == "Ada")
 assert(rows[3][2] == "7")
+assert(doc.title == "Dialect Notes")
+assert(#doc.headings == 2)
+assert(doc.links[1].url == "https://example.test/examples")
+assert(doc.list_items == 2)
 assert(#nonempty_lines == 2)
 assert(nonempty_lines[2] == "beta")
 assert(templated == "Hello Leia")
@@ -54,5 +67,6 @@ assert(quoted.kind == "function")
 
 print("decoded project:", decoded.project)
 print("csv first row:", rows[2][1] .. "=" .. rows[2][2])
+print("markdown title:", doc.title)
 print("prompt:", user_prompt.text)
 print("dialects ok")

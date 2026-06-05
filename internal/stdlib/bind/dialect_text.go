@@ -64,6 +64,10 @@ func registerDialectText(register dialectRegisterFunc, maxHostResult func() int6
 			return dialectMarkdownTable(body, options, maxHostResult)
 		},
 	})
+	register([]string{"markdown", "md"}, dialectHandler{
+		eval:  dialectMarkdown,
+		block: dialectMarkdown,
+	})
 	register([]string{"lines", "split"}, dialectHandler{
 		eval: func(body Value, options *Table) ([]Value, error) {
 			return dialectLines(body.Str(), options)
@@ -729,6 +733,67 @@ func markdownTableSortedRowHeaders(row *Table) []string {
 		}
 	}
 	return sortedStringKeys(keys)
+}
+
+func dialectMarkdown(body Value, opts *Table) ([]Value, error) {
+	mode := dialectMode(opts)
+	if !dialectModeAllowed(mode, "", "summary", "parse", "text", "plain") {
+		return dialectUnknownMode("markdown", mode)
+	}
+	summary := dialectlib.ParseMarkdownSummary(body.Str())
+	if mode == "text" || mode == "plain" {
+		return []Value{StringValue(summary.PlainText)}, nil
+	}
+	return []Value{TableValue(markdownSummaryToTable(summary))}, nil
+}
+
+func markdownSummaryToTable(summary dialectlib.MarkdownSummary) *Table {
+	out := NewTable()
+	out.RawSetString("title", StringValue(summary.Title))
+	out.RawSetString("headings", TableValue(markdownHeadingsToTable(summary.Headings)))
+	out.RawSetString("links", TableValue(markdownLinksToTable(summary.Links)))
+	codeBlocks := markdownCodeBlocksToTable(summary.CodeBlocks)
+	out.RawSetString("code_blocks", TableValue(codeBlocks))
+	out.RawSetString("codeBlocks", TableValue(codeBlocks))
+	out.RawSetString("list_items", IntValue(int64(summary.ListItems)))
+	out.RawSetString("listItems", IntValue(int64(summary.ListItems)))
+	out.RawSetString("paragraphs", IntValue(int64(summary.Paragraphs)))
+	out.RawSetString("plain_text", StringValue(summary.PlainText))
+	out.RawSetString("plainText", StringValue(summary.PlainText))
+	return out
+}
+
+func markdownHeadingsToTable(headings []dialectlib.MarkdownHeading) *Table {
+	out := NewAppendArrayTable(len(headings))
+	for i, heading := range headings {
+		item := NewTable()
+		item.RawSetString("level", IntValue(int64(heading.Level)))
+		item.RawSetString("text", StringValue(heading.Text))
+		out.RawSetInt(int64(i+1), TableValue(item))
+	}
+	return out
+}
+
+func markdownLinksToTable(links []dialectlib.MarkdownLink) *Table {
+	out := NewAppendArrayTable(len(links))
+	for i, link := range links {
+		item := NewTable()
+		item.RawSetString("text", StringValue(link.Text))
+		item.RawSetString("url", StringValue(link.URL))
+		out.RawSetInt(int64(i+1), TableValue(item))
+	}
+	return out
+}
+
+func markdownCodeBlocksToTable(blocks []dialectlib.MarkdownCodeBlock) *Table {
+	out := NewAppendArrayTable(len(blocks))
+	for i, block := range blocks {
+		item := NewTable()
+		item.RawSetString("info", StringValue(block.Info))
+		item.RawSetString("text", StringValue(block.Text))
+		out.RawSetInt(int64(i+1), TableValue(item))
+	}
+	return out
 }
 
 func dialectLines(src string, opts *Table) ([]Value, error) {

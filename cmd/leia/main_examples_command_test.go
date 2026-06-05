@@ -3,6 +3,9 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"os"
+	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 )
@@ -43,6 +46,39 @@ func TestExamplesCommandListsJSON(t *testing.T) {
 	}
 	if len(payload.Examples) == 0 {
 		t.Fatal("examples JSON is empty")
+	}
+}
+
+func TestExamplesCommandDiscoversDialectExamples(t *testing.T) {
+	root := filepath.Dir(playgroundExamplesRoot())
+	dialectDir := filepath.Join(root, "examples", "dialects")
+	entries, err := os.ReadDir(dialectDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	examples, err := cliRepositoryExamples()
+	if err != nil {
+		t.Fatal(err)
+	}
+	discovered := make(map[string]bool, len(examples))
+	for _, example := range examples {
+		discovered[example.Path] = true
+	}
+
+	var missing []string
+	for _, entry := range entries {
+		if entry.IsDir() || filepath.Ext(entry.Name()) != ".leia" {
+			continue
+		}
+		path := filepath.ToSlash(filepath.Join("examples", "dialects", entry.Name()))
+		if !discovered[path] {
+			missing = append(missing, path)
+		}
+	}
+	if len(missing) > 0 {
+		sort.Strings(missing)
+		t.Fatalf("examples CLI must discover runnable dialect gate inputs; missing %s", strings.Join(missing, ", "))
 	}
 }
 

@@ -81,6 +81,41 @@ func TestDialectKVEnvParseAndEncode(t *testing.T) {
 	}
 }
 
+func TestDialectMarkdownSummary(t *testing.T) {
+	interp := runWithLib(t, ""+
+		"doc := markdown`# Release Notes\n\n"+
+		"Leia ships [examples](https://example.test/examples).\n\n"+
+		"## Changes\n\n"+
+		"- dialects\n"+
+		"- tooling\n\n"+
+		"~~~leia\n"+
+		"print(\"ok\")\n"+
+		"~~~\n"+
+		"`\n"+
+		"plain := dialect.eval(\"md\", doc.plain_text, {mode: \"plain\"})\n",
+		"dialect", BuildDialect(HostOptions{}, nil))
+
+	doc := interp.GetGlobal("doc").Table()
+	if got := doc.RawGetString("title").Str(); got != "Release Notes" {
+		t.Fatalf("markdown title = %q, want Release Notes", got)
+	}
+	if got := doc.RawGetString("headings").Table().Length(); got != 2 {
+		t.Fatalf("markdown headings = %d, want 2", got)
+	}
+	if got := doc.RawGetString("links").Table().RawGetInt(1).Table().RawGetString("url").Str(); got != "https://example.test/examples" {
+		t.Fatalf("markdown link url = %q", got)
+	}
+	if got := doc.RawGetString("list_items").Int(); got != 2 {
+		t.Fatalf("markdown list_items = %d, want 2", got)
+	}
+	if got := doc.RawGetString("code_blocks").Table().RawGetInt(1).Table().RawGetString("info").Str(); got != "leia" {
+		t.Fatalf("markdown code info = %q, want leia", got)
+	}
+	if got := interp.GetGlobal("plain").Str(); !strings.Contains(got, "Release Notes") || strings.Contains(got, "```") {
+		t.Fatalf("markdown plain text = %q", got)
+	}
+}
+
 func TestDialectTextInvalidInputsReturnErrors(t *testing.T) {
 	interp := runWithLib(t, `
 		bad_csv, bad_csv_err := dialect.eval("csv", "\"unterminated\n")
