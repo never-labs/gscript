@@ -1,5 +1,5 @@
 // text_parsing.leia - Built-in dialects for small text and data transforms.
-// Demonstrates: csv, mdtable, lines/split, words, nums, env, kv, template, json/jsonl, regexp, xml
+// Demonstrates: csv, mdtable, lines/split, words, nums, env, kv, template, json/jsonl, timestamp, regexp, xml
 
 print("=== Dialects: text parsing ===")
 
@@ -134,6 +134,15 @@ assert(#events == 2)
 assert(events[1].case == "alpha")
 assert(events_text == "{\"case\":\"alpha\",\"ok\":true}\n{\"case\":\"beta\",\"ok\":false}\n")
 assert(bad_jsonl == nil && bad_jsonl_err != nil)
+
+release_time := timestamp`2026-06-05T12:34:56+08:00`
+release_time_text := dialect.eval("timestamp", {unix: release_time.unix}, {mode: "format"})
+release_time_nano := rfc3339`2026-06-05T04:34:56.123456789Z`
+print("timestamp utc:", release_time.rfc3339, release_time.date, release_time.time)
+assert(release_time.rfc3339 == "2026-06-05T04:34:56Z")
+assert(release_time_text == "2026-06-05T04:34:56Z")
+assert(dialect.eval("timestamp", "1780648496", {mode: "unix"}) == 1780648496)
+assert(dialect.eval("timestamp", {unix: release_time_nano.unix, nsec: 123456789}, {mode: "format", nano: true}) == "2026-06-05T04:34:56.123456789Z")
 
 identifier := regexp!`^[A-Za-z_][A-Za-z0-9_]*$`
 print("regexp valid name:", identifier.match("csv_rows"))

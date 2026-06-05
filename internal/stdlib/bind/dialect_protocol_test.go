@@ -509,6 +509,69 @@ func TestDialectMIMEBoundaryParseAndEncode(t *testing.T) {
 	}
 }
 
+func TestDialectMailAddressParseListAndEncode(t *testing.T) {
+	interp := runWithLib(t, `
+		single := mailaddr`+"`"+`Ada Lovelace <ada@example.org>`+"`"+`
+		alias := dialect.eval("emailaddr", "ops@example.net")
+		explicit_list := dialect.eval("mailaddr", "Ada <ada@example.org>, Bob <bob@example.net>", {list: true})
+		auto_list := dialect.eval("mailaddr", "Ada <ada@example.org>, Bob <bob@example.net>")
+		encoded := dialect.eval("mailaddr", {name: "Ada Lovelace", address: "ada@example.org"}, {mode: "format"})
+		encoded_list := dialect.eval("emailaddr", {
+			{name: "Ada Lovelace", address: "ada@example.org"},
+			{address: "bob@example.net"},
+		}, {mode: "encode"})
+		roundtrip := dialect.eval("mailaddr", encoded_list, {mode: "parse"})
+		bad_parse, bad_parse_err := dialect.eval("mailaddr", "not an address")
+		bad_encode, bad_encode_err := dialect.eval("mailaddr", {name: "Missing"}, {mode: "encode"})
+	`, "dialect", BuildDialect(HostOptions{}, nil))
+
+	single := interp.GetGlobal("single").Table()
+	if got := single.RawGetString("name").Str(); got != "Ada Lovelace" {
+		t.Fatalf("single name = %q, want Ada Lovelace", got)
+	}
+	if got := single.RawGetString("address").Str(); got != "ada@example.org" {
+		t.Fatalf("single address = %q, want ada@example.org", got)
+	}
+	if got := single.RawGetString("local").Str(); got != "ada" {
+		t.Fatalf("single local = %q, want ada", got)
+	}
+	if got := single.RawGetString("domain").Str(); got != "example.org" {
+		t.Fatalf("single domain = %q, want example.org", got)
+	}
+	if got := single.RawGetString("raw").Str(); got != "Ada Lovelace <ada@example.org>" {
+		t.Fatalf("single raw = %q, want original input", got)
+	}
+	if got := interp.GetGlobal("alias").Table().RawGetString("address").Str(); got != "ops@example.net" {
+		t.Fatalf("emailaddr alias address = %q, want ops@example.net", got)
+	}
+	if got := interp.GetGlobal("explicit_list").Table().Length(); got != 2 {
+		t.Fatalf("explicit list length = %d, want 2", got)
+	}
+	autoList := interp.GetGlobal("auto_list").Table()
+	if got := autoList.RawGetInt(2).Table().RawGetString("local").Str(); got != "bob" {
+		t.Fatalf("auto list second local = %q, want bob", got)
+	}
+	if got := interp.GetGlobal("encoded").Str(); got != `"Ada Lovelace" <ada@example.org>` {
+		t.Fatalf("encoded = %q, want quoted display name", got)
+	}
+	if got := interp.GetGlobal("encoded_list").Str(); got != `"Ada Lovelace" <ada@example.org>, <bob@example.net>` {
+		t.Fatalf("encoded list = %q, want formatted list", got)
+	}
+	roundtrip := interp.GetGlobal("roundtrip").Table()
+	if got := roundtrip.RawGetInt(1).Table().RawGetString("name").Str(); got != "Ada Lovelace" {
+		t.Fatalf("roundtrip first name = %q, want Ada Lovelace", got)
+	}
+	if got := roundtrip.RawGetInt(2).Table().RawGetString("address").Str(); got != "bob@example.net" {
+		t.Fatalf("roundtrip second address = %q, want bob@example.net", got)
+	}
+	if !interp.GetGlobal("bad_parse").IsNil() || !strings.Contains(interp.GetGlobal("bad_parse_err").Str(), "mailaddr dialect:") {
+		t.Fatalf("bad parse = %v err %v", interp.GetGlobal("bad_parse"), interp.GetGlobal("bad_parse_err"))
+	}
+	if !interp.GetGlobal("bad_encode").IsNil() || !strings.Contains(interp.GetGlobal("bad_encode_err").Str(), "address field required") {
+		t.Fatalf("bad encode = %v err %v", interp.GetGlobal("bad_encode"), interp.GetGlobal("bad_encode_err"))
+	}
+}
+
 func TestDialectHeadersParseAndEncode(t *testing.T) {
 	interp := runWithLib(t, `
 		parsed := dialect.eval("headers", "content-type: text/plain\r\nset-cookie: a=1\r\nset-cookie: b=2\r\nx-trace:  abc  \r\n")

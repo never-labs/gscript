@@ -173,6 +173,42 @@ func TestDialectYAMLLiteParseAndEncode(t *testing.T) {
 	}
 }
 
+func TestDialectTimestampParseAndEncode(t *testing.T) {
+	interp := runWithLib(t, `
+		parsed := timestamp`+"`"+`2026-06-05T12:34:56+08:00`+"`"+`
+		nano := rfc3339`+"`"+`2026-06-05T04:34:56.123456789Z`+"`"+`
+		unix_value := dialect.eval("timestamp", "1780648496", {mode: "unix"})
+		encoded := dialect.eval("timestamp", {unix: parsed.unix}, {mode: "format"})
+		encoded_nano := dialect.eval("timestamp", {unix: nano.unix, nsec: 123456789}, {mode: "format", nano: true})
+		bad, bad_err := dialect.eval("timestamp", "not a timestamp")
+		bad_mode, bad_mode_err := dialect.eval("timestamp", "2026-06-05T00:00:00Z", {mode: "bogus"})
+	`, "dialect", BuildDialect(HostOptions{}, nil))
+
+	parsed := interp.GetGlobal("parsed").Table()
+	if got := parsed.RawGetString("rfc3339").Str(); got != "2026-06-05T04:34:56Z" {
+		t.Fatalf("timestamp rfc3339 = %q", got)
+	}
+	if got := parsed.RawGetString("date").Str(); got != "2026-06-05" {
+		t.Fatalf("timestamp date = %q", got)
+	}
+	if got := parsed.RawGetString("time").Str(); got != "04:34:56" {
+		t.Fatalf("timestamp time = %q", got)
+	}
+	if got := interp.GetGlobal("unix_value").Int(); got != 1780648496 {
+		t.Fatalf("timestamp unix mode = %d", got)
+	}
+	if got := interp.GetGlobal("encoded").Str(); got != "2026-06-05T04:34:56Z" {
+		t.Fatalf("timestamp encoded = %q", got)
+	}
+	if got := interp.GetGlobal("encoded_nano").Str(); got != "2026-06-05T04:34:56.123456789Z" {
+		t.Fatalf("timestamp encoded_nano = %q", got)
+	}
+	if !interp.GetGlobal("bad").IsNil() || !strings.Contains(interp.GetGlobal("bad_err").Str(), "invalid RFC3339") {
+		t.Fatalf("bad timestamp = %v err %v", interp.GetGlobal("bad"), interp.GetGlobal("bad_err"))
+	}
+	assertDialectModeError(t, interp.GetGlobal("bad_mode"), interp.GetGlobal("bad_mode_err"), "timestamp dialect: unknown mode")
+}
+
 func TestDialectTextInvalidInputsReturnErrors(t *testing.T) {
 	interp := runWithLib(t, `
 		bad_csv, bad_csv_err := dialect.eval("csv", "\"unterminated\n")

@@ -1,0 +1,28 @@
+print("=== Dialects: mail address fixture ===")
+
+primary := mailaddr`Ada Lovelace <ada@example.org>`
+ops := emailaddr`ops@example.net`
+team := dialect.eval("mailaddr", "Ada <ada@example.org>, Bob <bob@example.net>", {list: true})
+auto_team := dialect.eval("emailaddr", "Ada <ada@example.org>, Bob <bob@example.net>")
+
+encoded := dialect.eval("mailaddr", {name: "Ada Lovelace", address: "ada@example.org"}, {mode: "format"})
+encoded_list := dialect.eval("emailaddr", {
+    {name: "Ada Lovelace", address: "ada@example.org"},
+    {address: "bob@example.net"},
+}, {mode: "encode"})
+roundtrip := dialect.eval("mailaddr", encoded_list, {mode: "parse"})
+
+print("mailaddr:", primary.address, "team", #team)
+assert(primary.name == "Ada Lovelace")
+assert(primary.address == "ada@example.org")
+assert(primary.local == "ada")
+assert(primary.domain == "example.org")
+assert(ops.address == "ops@example.net")
+assert(#team == 2)
+assert(team[2].address == "bob@example.net")
+assert(#auto_team == 2)
+assert(encoded == "\"Ada Lovelace\" <ada@example.org>")
+assert(roundtrip[1].name == "Ada Lovelace")
+assert(roundtrip[2].address == "bob@example.net")
+
+print("mailaddr fixture ok")

@@ -1,0 +1,362 @@
+// local_ops_report.leia - Offline project-level operations report.
+// Demonstrates: service inventory joins, logfmt event rollups, backup hygiene,
+// deploy risk scoring, Markdown/HTML/JSON report generation, and deterministic
+// assertions without network access, secrets, or host services.
+
+print("=== Operations: local ops report ===")
+
+services := dialect.eval("csv", `service,owner,tier,slo_ms,rpo_minutes
+checkout,commerce,1,250,15
+search,platform,2,180,60
+billing,finance,1,220,30
+docs,platform,3,500,1440
+`, {headers: true})
+
+events := {
+    logfmt`ts=2026-06-05T08:00:00Z host=edge-1 service=checkout route=/checkout status=200 ms=180 bytes=1840`,
+    logfmt`ts=2026-06-05T08:01:00Z host=edge-1 service=checkout route=/checkout status=504 ms=620 bytes=320`,
+    logfmt`ts=2026-06-05T08:02:00Z host=edge-2 service=checkout route=/checkout status=200 ms=245 bytes=1770`,
+    logfmt`ts=2026-06-05T08:03:00Z host=api-1 service=search route=/search status=200 ms=90 bytes=2500`,
+    logfmt`ts=2026-06-05T08:04:00Z host=api-1 service=search route=/search status=200 ms=170 bytes=2450`,
+    logfmt`ts=2026-06-05T08:05:00Z host=api-2 service=search route=/search status=503 ms=260 bytes=300`,
+    logfmt`ts=2026-06-05T08:06:00Z host=api-3 service=billing route=/invoices status=200 ms=210 bytes=1120`,
+    logfmt`ts=2026-06-05T08:07:00Z host=api-3 service=billing route=/invoices status=500 ms=340 bytes=260`,
+    logfmt`ts=2026-06-05T08:08:00Z host=api-4 service=billing route=/invoices status=200 ms=190 bytes=1090`,
+    logfmt`ts=2026-06-05T08:09:00Z host=web-1 service=docs route=/docs status=200 ms=80 bytes=5120`,
+    logfmt`ts=2026-06-05T08:10:00Z host=web-1 service=docs route=/missing status=404 ms=40 bytes=128`,
+    logfmt`ts=2026-06-05T08:11:00Z host=web-2 service=docs route=/docs status=200 ms=55 bytes=5090`,
+}
+
+backups := dialect.eval("csv", `service,snapshot,age_minutes,verified
+checkout,snap-checkout-20260605,12,true
+search,snap-search-20260605,85,true
+billing,snap-billing-20260605,20,false
+docs,snap-docs-20260605,1600,true
+`, {headers: true})
+
+deploys := jsonl`{"service":"checkout","version":"2026.06.1","change":"payment retry guard","risk":4}
+{"service":"search","version":"2026.06.2","change":"index cache tuning","risk":2}
+{"service":"billing","version":"2026.06.1","change":"invoice export rewrite","risk":3}
+{"service":"docs","version":"2026.06.0","change":"content refresh","risk":1}
+`
+
+runbook_rules := mdtable`| severity | min_score | action |
+| --- | ---: | --- |
+| critical | 80 | page-owner-and-freeze |
+| warning | 50 | schedule-same-day-review |
+| monitor | 0 | watch-next-window |
+`
+
+func number_or(value, fallback) {
+    parsed := tonumber(value)
+    if parsed == nil {
+        return fallback
+    }
+    return parsed
+}
+
+func bool_text(value) {
+    return value == true || value == "true"
+}
+
+func html_text(value) {
+    return dialect.eval("html_escape", tostring(value))
+}
+
+func service_by_name(name) {
+    for i := 1; i <= #services; i++ {
+        if services[i].service == name {
+            return services[i]
+        }
+    }
+    return nil
+}
+
+func backup_by_service(name) {
+    for i := 1; i <= #backups; i++ {
+        if backups[i].service == name {
+            return backups[i]
+        }
+    }
+    return nil
+}
+
+func deploy_by_service(name) {
+    for i := 1; i <= #deploys; i++ {
+        if deploys[i].service == name {
+            return deploys[i]
+        }
+    }
+    return nil
+}
+
+func tier_penalty(tier) {
+    if tier == 1 {
+        return 10
+    }
+    if tier == 2 {
+        return 5
+    }
+    return 0
+}
+
+func severity_for(score) {
+    for i := 1; i <= #runbook_rules; i++ {
+        rule := runbook_rules[i]
+        if score >= number_or(rule.min_score, 0) {
+            return rule.severity, rule.action
+        }
+    }
+    return "monitor", "watch-next-window"
+}
+
+metrics := {}
+for i := 1; i <= #services; i++ {
+    svc := services[i]
+    metrics[svc.service] = {
+        service: svc.service,
+        owner: svc.owner,
+        tier: number_or(svc.tier, 0),
+        slo_ms: number_or(svc.slo_ms, 0),
+        rpo_minutes: number_or(svc.rpo_minutes, 0),
+        requests: 0,
+        server_errors: 0,
+        client_errors: 0,
+        slow: 0,
+        bytes: 0,
+        latency_ms: 0,
+    }
+}
+
+total_requests := 0
+total_server_errors := 0
+total_slow := 0
+total_bytes := 0
+
+for i := 1; i <= #events; i++ {
+    event := events[i]
+    metric := metrics[event.service]
+    assert(metric != nil)
+
+    status := number_or(event.status, 0)
+    latency := number_or(event.ms, 0)
+    bytes := number_or(event.bytes, 0)
+
+    metric.requests = metric.requests + 1
+    metric.latency_ms = metric.latency_ms + latency
+    metric.bytes = metric.bytes + bytes
+    total_requests = total_requests + 1
+    total_bytes = total_bytes + bytes
+
+    if status >= 500 {
+        metric.server_errors = metric.server_errors + 1
+        total_server_errors = total_server_errors + 1
+    } else if status >= 400 {
+        metric.client_errors = metric.client_errors + 1
+    }
+    if latency > metric.slo_ms {
+        metric.slow = metric.slow + 1
+        total_slow = total_slow + 1
+    }
+}
+
+rows := {}
+owner_rollups := {}
+backup_alerts := 0
+top_service := ""
+top_score := -1
+
+for i := 1; i <= #services; i++ {
+    svc := services[i]
+    metric := metrics[svc.service]
+    backup := backup_by_service(svc.service)
+    deploy := deploy_by_service(svc.service)
+    assert(backup != nil)
+    assert(deploy != nil)
+
+    backup_age := number_or(backup.age_minutes, 0)
+    backup_verified := bool_text(backup.verified)
+    backup_stale := backup_age > metric.rpo_minutes
+    deploy_risk := number_or(deploy.risk, 0)
+
+    if backup_stale || !backup_verified {
+        backup_alerts = backup_alerts + 1
+    }
+
+    avg_ms := 0
+    if metric.requests > 0 {
+        avg_ms = metric.latency_ms / metric.requests
+    }
+
+    score := metric.server_errors * 25
+        + metric.client_errors * 2
+        + metric.slow * 10
+        + deploy_risk * 5
+        + tier_penalty(metric.tier)
+    if backup_stale {
+        score = score + 20
+    }
+    if !backup_verified {
+        score = score + 30
+    }
+
+    severity, action := severity_for(score)
+
+    if owner_rollups[metric.owner] == nil {
+        owner_rollups[metric.owner] = {owner: metric.owner, services: 0, risk: 0, alerts: 0}
+    }
+    owner_rollups[metric.owner].services = owner_rollups[metric.owner].services + 1
+    owner_rollups[metric.owner].risk = owner_rollups[metric.owner].risk + score
+    if severity != "monitor" {
+        owner_rollups[metric.owner].alerts = owner_rollups[metric.owner].alerts + 1
+    }
+
+    if score > top_score {
+        top_score = score
+        top_service = metric.service
+    }
+
+    table.insert(rows, {
+        Service: metric.service,
+        Owner: metric.owner,
+        Tier: metric.tier,
+        Requests: metric.requests,
+        Errors: metric.server_errors,
+        Slow: metric.slow,
+        AvgMs: string.format("%.1f", avg_ms),
+        BackupAge: backup_age,
+        BackupOK: backup_verified && !backup_stale,
+        DeployRisk: deploy_risk,
+        Score: score,
+        Severity: severity,
+        Action: action,
+    })
+}
+
+table.sort(rows, func(a, b) {
+    if a.Score == b.Score {
+        return a.Service < b.Service
+    }
+    return a.Score > b.Score
+})
+
+owner_rows := {}
+for _, owner := range pairs(owner_rollups) {
+    table.insert(owner_rows, owner)
+}
+table.sort(owner_rows, func(a, b) {
+    if a.risk == b.risk {
+        return a.owner < b.owner
+    }
+    return a.risk > b.risk
+})
+
+report_table := dialect.eval("mdtable", rows, {mode: "encode"})
+owner_table := dialect.eval("mdtable", owner_rows, {mode: "encode"})
+manifest_json := dialect.eval("json", {
+    generated_at: "2026-06-05T08:15:00Z",
+    source: "offline-local-ops-fixture",
+    services: #services,
+    events: #events,
+    requests: total_requests,
+    server_errors: total_server_errors,
+    slow: total_slow,
+    backup_alerts: backup_alerts,
+    bytes: total_bytes,
+    top_service: top_service,
+    top_owner: owner_rows[1].owner,
+}, {mode: "encode"})
+
+summary_logfmt := dialect.eval("logfmt", {
+    services: #services,
+    events: #events,
+    requests: total_requests,
+    server_errors: total_server_errors,
+    slow: total_slow,
+    backup_alerts: backup_alerts,
+    top_service: top_service,
+    top_score: top_score,
+    top_owner: owner_rows[1].owner,
+}, {mode: "encode"})
+
+fingerprint := string.sub(dialect.eval("hash", report_table .. owner_table .. manifest_json, {algo: "sha256"}), 1, 16)
+
+report_html := template {
+    text: `<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>{{.title}}</title></head>
+<body>
+<h1>{{.title}}</h1>
+<p>{{.summary}}</p>
+<h2>Services</h2>
+<pre>{{.services}}</pre>
+<h2>Owners</h2>
+<pre>{{.owners}}</pre>
+</body>
+</html>
+`,
+    data: {
+        title: "Local Operations Report",
+        summary: html_text(summary_logfmt),
+        services: html_text(report_table),
+        owners: html_text(owner_table),
+    },
+}
+
+local_ops_report_summary := template {
+    text: "services={{.services}} events={{.events}} requests={{.requests}} errors={{.errors}} slow={{.slow}} backup_alerts={{.backup_alerts}} top_service={{.top_service}} top_owner={{.top_owner}} fp={{.fp}}",
+    data: {
+        services: #services,
+        events: #events,
+        requests: total_requests,
+        errors: total_server_errors,
+        slow: total_slow,
+        backup_alerts: backup_alerts,
+        top_service: top_service,
+        top_owner: owner_rows[1].owner,
+        fp: fingerprint,
+    },
+}
+
+print(report_table)
+print(owner_table)
+print(summary_logfmt)
+print(local_ops_report_summary)
+
+assert(#services == 4)
+assert(#events == 12)
+assert(#backups == 4)
+assert(#deploys == 4)
+assert(#runbook_rules == 3)
+assert(service_by_name("billing").owner == "finance")
+assert(total_requests == 12)
+assert(total_server_errors == 3)
+assert(total_slow == 3)
+assert(total_bytes == 21988)
+assert(backup_alerts == 3)
+assert(metrics.checkout.requests == 3)
+assert(metrics.checkout.server_errors == 1)
+assert(metrics.search.slow == 1)
+assert(metrics.docs.client_errors == 1)
+assert(rows[1].Service == "billing")
+assert(rows[1].Score == 90)
+assert(rows[1].Severity == "critical")
+assert(rows[2].Service == "search")
+assert(rows[2].Score == 70)
+assert(rows[3].Service == "checkout")
+assert(rows[3].Score == 65)
+assert(rows[4].Service == "docs")
+assert(rows[4].Score == 27)
+assert(top_service == "billing")
+assert(top_score == 90)
+assert(owner_rows[1].owner == "platform")
+assert(owner_rows[1].risk == 97)
+assert(string.find(report_table, "page-owner-and-freeze", 1, true) != nil)
+assert(string.find(owner_table, "platform", 1, true) != nil)
+assert(string.find(manifest_json, `"top_service":"billing"`, 1, true) != nil)
+assert(string.find(summary_logfmt, "backup_alerts=3", 1, true) != nil)
+assert(string.find(report_html, "<h1>Local Operations Report</h1>", 1, true) != nil)
+assert(#fingerprint == 16)
+assert(local_ops_report_summary == "services=4 events=12 requests=12 errors=3 slow=3 backup_alerts=3 top_service=billing top_owner=platform fp=" .. fingerprint)
+
+print("local ops report ok")

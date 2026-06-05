@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"text/template"
+	"time"
 	"unicode"
 
 	"github.com/never-labs/leia/internal/runtime"
@@ -126,6 +127,10 @@ func registerDialectText(register dialectRegisterFunc, maxHostResult func() int6
 	register([]string{"duration"}, dialectHandler{
 		eval:  dialectDuration,
 		block: dialectDuration,
+	})
+	register([]string{"timestamp", "rfc3339"}, dialectHandler{
+		eval:  dialectTimestamp,
+		block: dialectTimestamp,
 	})
 	register([]string{"tap"}, dialectHandler{
 		eval:  dialectTAP,
@@ -1196,6 +1201,103 @@ func stringArrayToValue(values []string) Value {
 		out.RawSetInt(int64(i+1), StringValue(value))
 	}
 	return TableValue(out)
+}
+
+func dialectTimestamp(body Value, opts *Table) ([]Value, error) {
+	mode := dialectMode(opts)
+	if !dialectModeAllowed(mode, "", "parse", "decode", "encode", "format", "unix") {
+		return dialectUnknownMode("timestamp", mode)
+	}
+	if body.IsTable() || mode == "encode" || mode == "format" {
+		tm, err := timestampFromValue(body)
+		if err != nil {
+			return []Value{NilValue(), StringValue(err.Error())}, nil
+		}
+		layout := time.RFC3339
+		if opts != nil && opts.RawGetString("nano").Truthy() {
+			layout = time.RFC3339Nano
+		}
+		if opts != nil && opts.RawGetString("layout").IsString() {
+			layout = opts.RawGetString("layout").Str()
+		}
+		return []Value{StringValue(tm.UTC().Format(layout))}, nil
+	}
+	tm, err := parseTimestamp(body)
+	if err != nil {
+		return []Value{NilValue(), StringValue(err.Error())}, nil
+	}
+	if mode == "unix" {
+		return []Value{IntValue(tm.Unix())}, nil
+	}
+	return []Value{TableValue(timestampToTable(tm))}, nil
+}
+
+func parseTimestamp(v Value) (time.Time, error) {
+	if v.IsInt() {
+		return time.Unix(v.Int(), 0).UTC(), nil
+	}
+	if v.IsFloat() {
+		sec := int64(v.Float())
+		nsec := int64((v.Float() - float64(sec)) * 1e9)
+		return time.Unix(sec, nsec).UTC(), nil
+	}
+	text := strings.TrimSpace(v.String())
+	if text == "" {
+		return time.Time{}, fmt.Errorf("timestamp dialect: empty timestamp")
+	}
+	if i, err := strconv.ParseInt(text, 10, 64); err == nil {
+		return time.Unix(i, 0).UTC(), nil
+	}
+	if f, err := strconv.ParseFloat(text, 64); err == nil && strings.Contains(text, ".") {
+		sec := int64(f)
+		nsec := int64((f - float64(sec)) * 1e9)
+		return time.Unix(sec, nsec).UTC(), nil
+	}
+	for _, layout := range []string{time.RFC3339Nano, time.RFC3339} {
+		if tm, err := time.Parse(layout, text); err == nil {
+			return tm, nil
+		}
+	}
+	return time.Time{}, fmt.Errorf("timestamp dialect: invalid RFC3339 or unix timestamp %q", text)
+}
+
+func timestampFromValue(v Value) (time.Time, error) {
+	if !v.IsTable() {
+		return parseTimestamp(v)
+	}
+	tbl := v.Table()
+	if raw := firstStringField(tbl, "rfc3339", "time", "timestamp", "value"); raw != "" {
+		return parseTimestamp(StringValue(raw))
+	}
+	if unix := tbl.RawGetString("unix"); unix.IsNumber() {
+		nsec := int64(0)
+		if nano := tbl.RawGetString("nsec"); nano.IsNumber() {
+			nsec = toInt(nano)
+		} else if nano := tbl.RawGetString("nano"); nano.IsNumber() {
+			nsec = toInt(nano)
+		}
+		return time.Unix(toInt(unix), nsec).UTC(), nil
+	}
+	if unixNano := tbl.RawGetString("unix_nano"); unixNano.IsNumber() {
+		nsec := toInt(unixNano)
+		return time.Unix(nsec/int64(time.Second), nsec%int64(time.Second)).UTC(), nil
+	}
+	return time.Time{}, fmt.Errorf("timestamp dialect: rfc3339, unix, or unix_nano field required")
+}
+
+func timestampToTable(tm time.Time) *Table {
+	out := NewTable()
+	utc := tm.UTC()
+	zoneName, zoneOffset := tm.Zone()
+	out.RawSetString("rfc3339", StringValue(utc.Format(time.RFC3339)))
+	out.RawSetString("rfc3339_nano", StringValue(utc.Format(time.RFC3339Nano)))
+	out.RawSetString("unix", IntValue(utc.Unix()))
+	out.RawSetString("unix_nano", IntValue(utc.UnixNano()))
+	out.RawSetString("date", StringValue(utc.Format("2006-01-02")))
+	out.RawSetString("time", StringValue(utc.Format("15:04:05")))
+	out.RawSetString("zone", StringValue(zoneName))
+	out.RawSetString("zone_offset", IntValue(int64(zoneOffset)))
+	return out
 }
 
 func dialectTAP(body Value, opts *Table) ([]Value, error) {

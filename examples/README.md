@@ -13,6 +13,7 @@ go run ../cmd/leia examples list
 go run ../cmd/leia examples check hello/fib.leia hello/types_demo.leia hello/dialects.leia
 go run ../cmd/leia examples check dialects/text_parsing.leia dialects/sql_result_analytics.leia
 go run ../cmd/leia examples check automation/invoice_reconciliation.leia
+go run ../cmd/leia examples check operations/local_ops_report.leia
 go run ../cmd/leia examples run data_processing/data_oriented/soa_kernels.leia
 go run ../cmd/leia examples run concurrency/select_timeout.leia
 ```
@@ -24,6 +25,7 @@ Directories:
 | `hello/` | Core language features and small idioms. |
 | `dialects/` | Runnable checks for built-in text, protocol, SQL-shaped, Markdown/table, binary, and validation dialects. |
 | `automation/` | Project-level offline workflows for release, fixture, and business-ops automation. |
+| `operations/` | Project-level offline workflows for local logs, backup hygiene, deploy risk, and ops reporting. |
 | `data_processing/` | Strings, containers, dense data, vectors, matrices, and SoA. |
 | `concurrency/` | Goroutine-like tasks, channels, select, sync, and context helpers. |
 | `game_engine/` | Larger script examples for event loops and game-style state. |

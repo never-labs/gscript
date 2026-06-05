@@ -8,6 +8,7 @@ import (
 	htmlpkg "html"
 	"io"
 	"mime"
+	"net/mail"
 	"net/textproto"
 	"net/url"
 	"sort"
@@ -46,6 +47,10 @@ func registerDialectProtocol(register dialectRegisterFunc, maxHostResult func() 
 	register([]string{"mime"}, dialectHandler{
 		eval:  dialectMIME,
 		block: dialectMIME,
+	})
+	register([]string{"mailaddr", "emailaddr"}, dialectHandler{
+		eval:  dialectMailAddress,
+		block: dialectMailAddress,
 	})
 	register([]string{"headers", "http_headers"}, dialectHandler{
 		eval:  dialectHeaders,
@@ -443,6 +448,131 @@ func dialectMIMEEncode(body Value, opts *Table) ([]Value, error) {
 		return []Value{NilValue(), StringValue("invalid media type or parameter")}, nil
 	}
 	return []Value{StringValue(formatted)}, nil
+}
+
+func dialectMailAddress(body Value, opts *Table) ([]Value, error) {
+	mode := dialectMode(opts)
+	if !dialectModeAllowed(mode, "", "parse", "decode", "encode", "format") {
+		return dialectUnknownMode("mailaddr", mode)
+	}
+	if body.IsTable() || mode == "encode" || mode == "format" {
+		text, err := encodeMailAddressValue(body)
+		if err != nil {
+			return []Value{NilValue(), StringValue(err.Error())}, nil
+		}
+		return []Value{StringValue(text)}, nil
+	}
+	parsed, err := parseMailAddressValue(body.String(), opts)
+	if err != nil {
+		return []Value{NilValue(), StringValue(err.Error())}, nil
+	}
+	return []Value{parsed}, nil
+}
+
+func parseMailAddressValue(src string, opts *Table) (Value, error) {
+	if opts != nil && opts.RawGetString("list").Truthy() {
+		return parseMailAddressList(src)
+	}
+	addr, err := mail.ParseAddress(src)
+	if err == nil {
+		return TableValue(mailAddressToTable(addr, src)), nil
+	}
+	listValue, listErr := parseMailAddressList(src)
+	if listErr == nil {
+		return listValue, nil
+	}
+	return NilValue(), fmt.Errorf("mailaddr dialect: %v", err)
+}
+
+func parseMailAddressList(src string) (Value, error) {
+	addrs, err := mail.ParseAddressList(src)
+	if err != nil {
+		return NilValue(), fmt.Errorf("mailaddr dialect: %v", err)
+	}
+	out := NewAppendArrayTable(len(addrs))
+	for i, addr := range addrs {
+		out.RawSetInt(int64(i+1), TableValue(mailAddressToTable(addr, addr.String())))
+	}
+	return TableValue(out), nil
+}
+
+func mailAddressToTable(addr *mail.Address, raw string) *Table {
+	out := NewTable()
+	out.RawSetString("name", StringValue(addr.Name))
+	out.RawSetString("address", StringValue(addr.Address))
+	local, domain, _ := strings.Cut(addr.Address, "@")
+	out.RawSetString("local", StringValue(local))
+	out.RawSetString("domain", StringValue(domain))
+	out.RawSetString("raw", StringValue(raw))
+	return out
+}
+
+func encodeMailAddressValue(body Value) (string, error) {
+	if !body.IsTable() {
+		return "", fmt.Errorf("mailaddr dialect: table required for encode")
+	}
+	tbl := body.Table()
+	if isMailAddressArray(tbl) {
+		parts := make([]string, 0, tbl.Length())
+		for i := 1; i <= tbl.Length(); i++ {
+			text, err := encodeSingleMailAddress(tbl.RawGetInt(int64(i)), i)
+			if err != nil {
+				return "", err
+			}
+			parts = append(parts, text)
+		}
+		return strings.Join(parts, ", "), nil
+	}
+	return encodeSingleMailAddress(body, 0)
+}
+
+func isMailAddressArray(tbl *Table) bool {
+	if tbl.Length() == 0 {
+		return false
+	}
+	if !tbl.RawGetString("address").IsNil() || !tbl.RawGetString("raw").IsNil() {
+		return false
+	}
+	return true
+}
+
+func encodeSingleMailAddress(value Value, index int) (string, error) {
+	if value.IsString() {
+		addr, err := mail.ParseAddress(value.Str())
+		if err != nil {
+			return "", fmt.Errorf("mailaddr dialect: address %d: %v", index, err)
+		}
+		return addr.String(), nil
+	}
+	if !value.IsTable() {
+		if index > 0 {
+			return "", fmt.Errorf("mailaddr dialect: address %d must be table or string", index)
+		}
+		return "", fmt.Errorf("mailaddr dialect: table required for encode")
+	}
+	tbl := value.Table()
+	if raw := tbl.RawGetString("raw"); raw.IsString() {
+		addr, err := mail.ParseAddress(raw.Str())
+		if err != nil {
+			return "", fmt.Errorf("mailaddr dialect: %v", err)
+		}
+		return addr.String(), nil
+	}
+	address := tbl.RawGetString("address")
+	if !address.IsString() || address.Str() == "" {
+		if index > 0 {
+			return "", fmt.Errorf("mailaddr dialect: address %d field required for encode", index)
+		}
+		return "", fmt.Errorf("mailaddr dialect: address field required for encode")
+	}
+	addr := mail.Address{Address: address.Str()}
+	if name := tbl.RawGetString("name"); name.IsString() {
+		addr.Name = name.Str()
+	}
+	if _, err := mail.ParseAddress(addr.String()); err != nil {
+		return "", fmt.Errorf("mailaddr dialect: %v", err)
+	}
+	return addr.String(), nil
 }
 
 func dialectHeaders(body Value, opts *Table) ([]Value, error) {
