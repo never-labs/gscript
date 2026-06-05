@@ -2,7 +2,7 @@ package bind
 
 import "testing"
 
-func TestDialectNetworkParsesIPCIDRAndHostPort(t *testing.T) {
+func TestDialectProtocolNetworkParsesIPCIDRAndHostPort(t *testing.T) {
 	interp := runWithLib(t, `
 		ip := ipaddr`+"`"+`10.2.3.4`+"`"+`
 		ip_in_net := dialect.eval("ipaddr", "10.2.3.4", {cidr: "10.2.0.0/16"})

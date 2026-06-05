@@ -753,6 +753,92 @@ func TestCodeLensAndInlayHintDoNotReturnLegacyAIActions(t *testing.T) {
 	}
 }
 
+func TestCodeLensReturnsEvaluateCaseActions(t *testing.T) {
+	src := strings.Join([]string{
+		`evaluate "basic assertion" {`,
+		`    assert(true)`,
+		`}`,
+		`evaluate "second case" {`,
+		`    assert(true)`,
+		`}`,
+		"",
+	}, "\n")
+	lenses := collectCodeLens("file:///tmp/eval.leia", src)
+	if len(lenses) != 2 {
+		t.Fatalf("code lenses = %#v, want two evaluate cases", lenses)
+	}
+	if lenses[0].Range.Start.Line != 0 || lenses[0].Command.Command != "leia.evaluate.case" || lenses[0].Command.Title != "Run evaluate: basic assertion" {
+		t.Fatalf("first lens = %#v", lenses[0])
+	}
+	if len(lenses[0].Command.Arguments) != 2 || lenses[0].Command.Arguments[0] != "file:///tmp/eval.leia" || lenses[0].Command.Arguments[1] != "basic assertion" {
+		t.Fatalf("first lens args = %#v", lenses[0].Command.Arguments)
+	}
+	if lenses[1].Range.Start.Line != 3 || lenses[1].Command.Arguments[1] != "second case" {
+		t.Fatalf("second lens = %#v", lenses[1])
+	}
+}
+
+func TestInlayHintsReturnLocalCallParametersAndStdlibImports(t *testing.T) {
+	src := strings.Join([]string{
+		`json := require("json")`,
+		`import "math"`,
+		`func add(left, right) {`,
+		`    return left + right`,
+		`}`,
+		`result := add(1, 2)`,
+		`again := add(left, 3)`,
+		"",
+	}, "\n")
+	hints := collectInlayHints(src, fullDocumentRange(src))
+	labelsByLine := map[int][]string{}
+	tooltipsByLabel := map[string]string{}
+	for _, hint := range hints {
+		labelsByLine[hint.Position.Line] = append(labelsByLine[hint.Position.Line], hint.Label)
+		tooltipsByLabel[hint.Label] = hint.Tooltip
+	}
+	for _, want := range []struct {
+		line  int
+		label string
+	}{
+		{0, ": stdlib base"},
+		{1, ": stdlib base"},
+		{5, "left:"},
+		{5, "right:"},
+		{6, "right:"},
+	} {
+		if !containsString(labelsByLine[want.line], want.label) {
+			t.Fatalf("hints by line = %#v, missing %q on line %d", labelsByLine, want.label, want.line)
+		}
+	}
+	if containsString(labelsByLine[6], "left:") {
+		t.Fatalf("line 6 hints = %#v, should skip argument already named left", labelsByLine[6])
+	}
+	if !strings.Contains(tooltipsByLabel[": stdlib base"], "JSON") && !strings.Contains(tooltipsByLabel[": stdlib base"], "Numeric") {
+		t.Fatalf("stdlib tooltip = %q, want catalog description", tooltipsByLabel[": stdlib base"])
+	}
+}
+
+func TestInlayHintsHonorRequestedRange(t *testing.T) {
+	src := strings.Join([]string{
+		`func add(left, right) { return left + right }`,
+		`first := add(1, 2)`,
+		`second := add(3, 4)`,
+		"",
+	}, "\n")
+	hints := collectInlayHints(src, lspRange{
+		Start: position{Line: 2, Character: 0},
+		End:   position{Line: 2, Character: 80},
+	})
+	if len(hints) != 2 {
+		t.Fatalf("range hints = %#v, want two hints for second call only", hints)
+	}
+	for _, hint := range hints {
+		if hint.Position.Line != 2 {
+			t.Fatalf("hint outside requested range: %#v", hint)
+		}
+	}
+}
+
 func TestDefinitionReferencesAndRename(t *testing.T) {
 	src := strings.Join([]string{
 		"func add(a, b) {",
@@ -1006,6 +1092,15 @@ func assertSemanticTokenSequence(t *testing.T, tokens []semanticTokenForTest, wa
 		}
 	}
 	t.Fatalf("missing semantic token sequence %#v in %#v", want, tokens)
+}
+
+func containsString(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }
 
 func mustEncodeMessages(t *testing.T, msgs ...any) []byte {

@@ -167,18 +167,18 @@ func TestBuiltinDialectRegistryStaysModular(t *testing.T) {
 	expectedCalls := []string{
 		"registerDialectShellFS",
 		"registerDialectText",
-		"registerDialectWeb",
-		"registerDialectNetwork",
+		"registerDialectProtocol",
+		"registerDialectProtocolNetwork",
 		"registerDialectData",
 		"registerDialectAI",
 	}
 	expectedTagsByFile := map[string][]string{
-		"dialect_shell_fs.go": {"sh", "cmd", "shellwords", "glob", "path"},
-		"dialect_text.go":     {"re", "regexp", "json", "jsonptr", "jsonl", "csv", "tsv", "mdtable", "lines", "split", "words", "nums", "numbers", "kv", "logfmt", "env", "ini", "semver", "duration", "tap", "junit", "xml", "template"},
-		"dialect_web.go":      {"url", "html_escape", "urlquery", "urlpath", "mime", "headers", "http_headers", "cookie", "cookies", "httpmsg", "sse", "multipart", "jwt"},
-		"dialect_network.go":  {"ipaddr", "cidr", "hostport"},
-		"dialect_data.go":     {"base64", "hash", "hex", "base32", "uuid", "gzip", "zlib", "deflate", "binary"},
-		"dialect_ai.go":       {"prompt", "quote"},
+		"dialect_shell_fs.go":         {"sh", "cmd", "shellwords", "glob", "path"},
+		"dialect_text.go":             {"re", "regexp", "json", "jsonptr", "jsonl", "csv", "tsv", "mdtable", "lines", "split", "words", "nums", "numbers", "kv", "logfmt", "env", "ini", "semver", "duration", "tap", "junit", "xml", "template"},
+		"dialect_protocol.go":         {"url", "html_escape", "urlquery", "urlpath", "mime", "headers", "http_headers", "cookie", "cookies", "httpmsg", "sse", "multipart", "jwt"},
+		"dialect_protocol_network.go": {"ipaddr", "cidr", "hostport"},
+		"dialect_data.go":             {"base64", "hash", "hex", "base32", "uuid", "gzip", "zlib", "deflate", "binary"},
+		"dialect_ai.go":               {"prompt", "quote"},
 	}
 	expectedProjectImportsByFile := map[string][]string{
 		"dialect_shell_fs.go": {
@@ -192,10 +192,10 @@ func TestBuiltinDialectRegistryStaysModular(t *testing.T) {
 			"github.com/never-labs/leia/internal/stdlib/lib/encoding",
 			"github.com/never-labs/leia/internal/support/dialect",
 		},
-		"dialect_web.go": {
+		"dialect_protocol.go": {
 			"github.com/never-labs/leia/internal/support/dialect",
 		},
-		"dialect_network.go": nil,
+		"dialect_protocol_network.go": nil,
 		"dialect_data.go": {
 			"github.com/never-labs/leia/internal/stdlib/lib/base64",
 			"github.com/never-labs/leia/internal/stdlib/lib/compress",
@@ -493,10 +493,10 @@ func expectedDialectFileForFunc(funcName string) string {
 		return "dialect_shell_fs.go"
 	case "registerDialectText":
 		return "dialect_text.go"
-	case "registerDialectWeb":
-		return "dialect_web.go"
-	case "registerDialectNetwork":
-		return "dialect_network.go"
+	case "registerDialectProtocol":
+		return "dialect_protocol.go"
+	case "registerDialectProtocolNetwork":
+		return "dialect_protocol_network.go"
 	case "registerDialectData":
 		return "dialect_data.go"
 	case "registerDialectAI":

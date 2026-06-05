@@ -344,7 +344,7 @@ func TestDialectJWTUnverifiedDecode(t *testing.T) {
 	}
 }
 
-func TestDialectWebUnknownModesAreReported(t *testing.T) {
+func TestDialectProtocolUnknownModesAreReported(t *testing.T) {
 	interp := runWithLib(t, `
 		html_bad, html_bad_err := dialect.eval("html_escape", "<x>", {mode: "bogus"})
 		urlquery_bad, urlquery_bad_err := dialect.eval("urlquery", "a=1", {mode: "bogus"})
@@ -368,7 +368,7 @@ func TestDialectWebUnknownModesAreReported(t *testing.T) {
 	assertDialectModeError(t, interp.GetGlobal("jwt_bad"), interp.GetGlobal("jwt_bad_err"), "jwt dialect: unknown mode")
 }
 
-func TestDialectWebModeAliasesKeepDirectionInference(t *testing.T) {
+func TestDialectProtocolModeAliasesKeepDirectionInference(t *testing.T) {
 	interp := runWithLib(t, `
 		html_escaped := dialect.eval("html_escape", "<x>", {mode: "encode"})
 		html_unescaped := dialect.eval("html_escape", "&lt;x&gt;", {mode: "decode"})

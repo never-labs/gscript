@@ -5,7 +5,7 @@ import (
 	"net/netip"
 )
 
-func registerDialectNetwork(register dialectRegisterFunc) {
+func registerDialectProtocolNetwork(register dialectRegisterFunc) {
 	register([]string{"ipaddr"}, dialectHandler{
 		eval: func(body Value, options *Table) ([]Value, error) {
 			return dialectIPAddr(body, options)

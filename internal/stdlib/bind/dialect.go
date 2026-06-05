@@ -24,8 +24,8 @@ func BuildDialect(opts HostOptions, maxHostResult func() int64, specs ...Dialect
 
 	registerDialectShellFS(register, opts, maxHostResult)
 	registerDialectText(register, maxHostResult)
-	registerDialectWeb(register, maxHostResult)
-	registerDialectNetwork(register)
+	registerDialectProtocol(register, maxHostResult)
+	registerDialectProtocolNetwork(register)
 	registerDialectData(register, maxHostResult)
 	registerDialectAI(register)
 	for _, spec := range specs {

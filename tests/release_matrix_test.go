@@ -263,6 +263,76 @@ func TestReleaseMatrixKnownGapDocsAreReleaseGateInputs(t *testing.T) {
 	}
 }
 
+func TestReleaseMatrixSpecGateCommandsStaySynchronized(t *testing.T) {
+	root := findRepoRoot(t)
+	releaseMatrixCmd := "go test ./tests -run 'TestFeatureMatrixSchema|TestReleaseMatrix' -count=1"
+	specExamplesCmd := "go test ./tests -run 'TestSpecRunnableExamples|TestSpecLeiaCodeFencesAreExecutableOrExplicitlyNonExecutable' -count=1"
+	docsCheckCmd := "bash scripts/docs_check.sh"
+	productionQuickCmd := "bash scripts/production_check.sh --quick"
+
+	for _, item := range []struct {
+		path     string
+		snippets []string
+	}{
+		{
+			path: "docs/testing.md",
+			snippets: []string{
+				releaseMatrixCmd,
+				specExamplesCmd,
+				docsCheckCmd,
+				"tests/feature_matrix.json",
+				"docs/spec/index.md",
+			},
+		},
+		{
+			path: "docs/release/index.md",
+			snippets: []string{
+				"## Machine-Checkable Release Evidence",
+				productionQuickCmd,
+				releaseMatrixCmd,
+				docsCheckCmd,
+				"tests/feature_matrix.json",
+				"docs/spec/index.md",
+			},
+		},
+		{
+			path: "docs/release/notes-template.md",
+			snippets: []string{
+				productionQuickCmd,
+				releaseMatrixCmd,
+				docsCheckCmd,
+			},
+		},
+		{
+			path: "scripts/docs_check.sh",
+			snippets: []string{
+				releaseMatrixCmd,
+				specExamplesCmd,
+				"docs/spec/index.md",
+				"tests/feature_matrix.json",
+			},
+		},
+	} {
+		text := readFileString(t, filepath.Join(root, filepath.FromSlash(item.path)))
+		for _, snippet := range item.snippets {
+			if !strings.Contains(text, snippet) {
+				t.Fatalf("%s must keep release/spec gate snippet %q", item.path, snippet)
+			}
+		}
+	}
+
+	productionOut := runCommand(t, root, 30*time.Second, "bash", "scripts/production_check.sh", "--quick", "--list")
+	for _, snippet := range []string{
+		releaseMatrixCmd,
+		specExamplesCmd,
+		docsCheckCmd,
+	} {
+		if !strings.Contains(productionOut, snippet) {
+			t.Fatalf("production_check.sh --quick --list must keep release/spec gate %q; got:\n%s", snippet, productionOut)
+		}
+	}
+}
+
 func TestReleaseMatrixDocCommandSurfaceIsUsable(t *testing.T) {
 	root := findRepoRoot(t)
 	for _, args := range [][]string{

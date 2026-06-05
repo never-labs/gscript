@@ -805,13 +805,398 @@ func pathToFileURI(path string) string {
 }
 
 func collectCodeLens(uri, src string) []codeLens {
-	_, _ = uri, src
-	return []codeLens{}
+	prog, ok := parseLSPProgram(src)
+	if !ok {
+		return []codeLens{}
+	}
+	var out []codeLens
+	collectCodeLensFromStmts(uri, src, prog.Stmts, &out)
+	return out
 }
 
 func collectInlayHints(src string, requested lspRange) []inlayHint {
-	_, _ = src, requested
-	return []inlayHint{}
+	prog, ok := parseLSPProgram(src)
+	if !ok {
+		return []inlayHint{}
+	}
+	sigs := map[string][]ast.FuncParam{}
+	collectFunctionSignatures(prog.Stmts, sigs)
+	var out []inlayHint
+	collectInlayHintsFromStmts(src, prog.Stmts, sigs, requested, &out)
+	sort.SliceStable(out, func(i, j int) bool {
+		if out[i].Position.Line != out[j].Position.Line {
+			return out[i].Position.Line < out[j].Position.Line
+		}
+		if out[i].Position.Character != out[j].Position.Character {
+			return out[i].Position.Character < out[j].Position.Character
+		}
+		return out[i].Label < out[j].Label
+	})
+	return out
+}
+
+func parseLSPProgram(src string) (*ast.Program, bool) {
+	tokens, err := lexer.New(src).Tokenize()
+	if err != nil {
+		return nil, false
+	}
+	prog, err := parser.New(tokens).Parse()
+	if err != nil {
+		return nil, false
+	}
+	return prog, true
+}
+
+func collectCodeLensFromStmts(uri, src string, stmts []ast.Stmt, out *[]codeLens) {
+	for _, stmt := range stmts {
+		switch st := stmt.(type) {
+		case *ast.EvaluateStmt:
+			title := "Run evaluate case"
+			if strings.TrimSpace(st.Name) != "" {
+				title = "Run evaluate: " + st.Name
+			}
+			*out = append(*out, codeLens{
+				Range: lineRange(src, st.P.Line-1),
+				Command: command{
+					Title:     title,
+					Command:   "leia.evaluate.case",
+					Arguments: []any{uri, st.Name},
+				},
+			})
+			if st.Body != nil {
+				collectCodeLensFromStmts(uri, src, st.Body.Stmts, out)
+			}
+		case *ast.BlockStmt:
+			collectCodeLensFromStmts(uri, src, st.Stmts, out)
+		case *ast.FuncDeclStmt:
+			if st.Body != nil {
+				collectCodeLensFromStmts(uri, src, st.Body.Stmts, out)
+			}
+		case *ast.IfStmt:
+			if st.Body != nil {
+				collectCodeLensFromStmts(uri, src, st.Body.Stmts, out)
+			}
+			for _, elseif := range st.ElseIfs {
+				if elseif.Body != nil {
+					collectCodeLensFromStmts(uri, src, elseif.Body.Stmts, out)
+				}
+			}
+			if st.ElseBody != nil {
+				collectCodeLensFromStmts(uri, src, st.ElseBody.Stmts, out)
+			}
+		case *ast.ForStmt:
+			if st.Body != nil {
+				collectCodeLensFromStmts(uri, src, st.Body.Stmts, out)
+			}
+		case *ast.ForNumStmt:
+			if st.Body != nil {
+				collectCodeLensFromStmts(uri, src, st.Body.Stmts, out)
+			}
+		case *ast.ForRangeStmt:
+			if st.Body != nil {
+				collectCodeLensFromStmts(uri, src, st.Body.Stmts, out)
+			}
+		case *ast.SelectStmt:
+			for _, clause := range st.Cases {
+				if clause.Body != nil {
+					collectCodeLensFromStmts(uri, src, clause.Body.Stmts, out)
+				}
+			}
+			if st.Default != nil {
+				collectCodeLensFromStmts(uri, src, st.Default.Stmts, out)
+			}
+		}
+	}
+}
+
+func collectFunctionSignatures(stmts []ast.Stmt, out map[string][]ast.FuncParam) {
+	for _, stmt := range stmts {
+		switch st := stmt.(type) {
+		case *ast.FuncDeclStmt:
+			out[st.Name] = append([]ast.FuncParam(nil), st.Params...)
+			if st.Body != nil {
+				collectFunctionSignatures(st.Body.Stmts, out)
+			}
+		case *ast.BlockStmt:
+			collectFunctionSignatures(st.Stmts, out)
+		case *ast.IfStmt:
+			if st.Body != nil {
+				collectFunctionSignatures(st.Body.Stmts, out)
+			}
+			for _, elseif := range st.ElseIfs {
+				if elseif.Body != nil {
+					collectFunctionSignatures(elseif.Body.Stmts, out)
+				}
+			}
+			if st.ElseBody != nil {
+				collectFunctionSignatures(st.ElseBody.Stmts, out)
+			}
+		case *ast.ForStmt:
+			if st.Body != nil {
+				collectFunctionSignatures(st.Body.Stmts, out)
+			}
+		case *ast.ForNumStmt:
+			if st.Body != nil {
+				collectFunctionSignatures(st.Body.Stmts, out)
+			}
+		case *ast.ForRangeStmt:
+			if st.Body != nil {
+				collectFunctionSignatures(st.Body.Stmts, out)
+			}
+		case *ast.EvaluateStmt:
+			if st.Body != nil {
+				collectFunctionSignatures(st.Body.Stmts, out)
+			}
+		case *ast.SelectStmt:
+			for _, clause := range st.Cases {
+				if clause.Body != nil {
+					collectFunctionSignatures(clause.Body.Stmts, out)
+				}
+			}
+			if st.Default != nil {
+				collectFunctionSignatures(st.Default.Stmts, out)
+			}
+		}
+	}
+}
+
+func collectInlayHintsFromStmts(src string, stmts []ast.Stmt, sigs map[string][]ast.FuncParam, requested lspRange, out *[]inlayHint) {
+	for _, stmt := range stmts {
+		switch st := stmt.(type) {
+		case *ast.DeclareStmt:
+			collectStdlibRequireHint(st, requested, out)
+			for _, value := range st.Values {
+				collectInlayHintsFromExpr(value, sigs, requested, out)
+			}
+		case *ast.AssignStmt:
+			for _, value := range st.Values {
+				collectInlayHintsFromExpr(value, sigs, requested, out)
+			}
+		case *ast.CompoundAssignStmt:
+			collectInlayHintsFromExpr(st.Target, sigs, requested, out)
+			collectInlayHintsFromExpr(st.Value, sigs, requested, out)
+		case *ast.IncDecStmt:
+			collectInlayHintsFromExpr(st.Target, sigs, requested, out)
+		case *ast.CallStmt:
+			collectInlayHintsFromExpr(st.Call, sigs, requested, out)
+		case *ast.GoStmt:
+			collectInlayHintsFromExpr(st.Call, sigs, requested, out)
+		case *ast.DeferStmt:
+			collectInlayHintsFromExpr(st.Call, sigs, requested, out)
+		case *ast.SendStmt:
+			collectInlayHintsFromExpr(st.Channel, sigs, requested, out)
+			collectInlayHintsFromExpr(st.Value, sigs, requested, out)
+		case *ast.SelectStmt:
+			for _, clause := range st.Cases {
+				collectInlayHintsFromExpr(clause.Channel, sigs, requested, out)
+				collectInlayHintsFromExpr(clause.SendValue, sigs, requested, out)
+				if clause.Body != nil {
+					collectInlayHintsFromStmts(src, clause.Body.Stmts, sigs, requested, out)
+				}
+			}
+			if st.Default != nil {
+				collectInlayHintsFromStmts(src, st.Default.Stmts, sigs, requested, out)
+			}
+		case *ast.IfStmt:
+			collectInlayHintsFromExpr(st.Cond, sigs, requested, out)
+			if st.Body != nil {
+				collectInlayHintsFromStmts(src, st.Body.Stmts, sigs, requested, out)
+			}
+			for _, elseif := range st.ElseIfs {
+				collectInlayHintsFromExpr(elseif.Cond, sigs, requested, out)
+				if elseif.Body != nil {
+					collectInlayHintsFromStmts(src, elseif.Body.Stmts, sigs, requested, out)
+				}
+			}
+			if st.ElseBody != nil {
+				collectInlayHintsFromStmts(src, st.ElseBody.Stmts, sigs, requested, out)
+			}
+		case *ast.ForStmt:
+			collectInlayHintsFromExpr(st.Cond, sigs, requested, out)
+			if st.Body != nil {
+				collectInlayHintsFromStmts(src, st.Body.Stmts, sigs, requested, out)
+			}
+		case *ast.ForNumStmt:
+			collectInlayHintsFromStmts(src, []ast.Stmt{st.Init, st.Post}, sigs, requested, out)
+			collectInlayHintsFromExpr(st.Cond, sigs, requested, out)
+			if st.Body != nil {
+				collectInlayHintsFromStmts(src, st.Body.Stmts, sigs, requested, out)
+			}
+		case *ast.ForRangeStmt:
+			collectInlayHintsFromExpr(st.Iter, sigs, requested, out)
+			if st.Body != nil {
+				collectInlayHintsFromStmts(src, st.Body.Stmts, sigs, requested, out)
+			}
+		case *ast.ReturnStmt:
+			for _, value := range st.Values {
+				collectInlayHintsFromExpr(value, sigs, requested, out)
+			}
+		case *ast.EvaluateStmt:
+			if st.Body != nil {
+				collectInlayHintsFromStmts(src, st.Body.Stmts, sigs, requested, out)
+			}
+		case *ast.FuncDeclStmt:
+			if st.Body != nil {
+				collectInlayHintsFromStmts(src, st.Body.Stmts, sigs, requested, out)
+			}
+		case *ast.BlockStmt:
+			collectInlayHintsFromStmts(src, st.Stmts, sigs, requested, out)
+		}
+	}
+}
+
+func collectStdlibRequireHint(stmt *ast.DeclareStmt, requested lspRange, out *[]inlayHint) {
+	if len(stmt.Names) != 1 || len(stmt.Values) != 1 {
+		return
+	}
+	call, ok := stmt.Values[0].(*ast.CallExpr)
+	if !ok || len(call.Args) != 1 {
+		return
+	}
+	fn, ok := call.Func.(*ast.IdentExpr)
+	if !ok || fn.Name != "require" {
+		return
+	}
+	arg, ok := call.Args[0].(*ast.StringLit)
+	if !ok {
+		return
+	}
+	module, ok := catalog.Module(arg.Value)
+	if !ok {
+		return
+	}
+	pos := positionFromOneBased(arg.P.Line, arg.P.Column+len(arg.Value)+2)
+	if stmt.P.Line == fn.P.Line && stmt.P.Column < fn.P.Column {
+		pos = positionFromOneBased(stmt.P.Line, stmt.P.Column+len(stmt.Names[0]))
+	}
+	if !positionInRequestedRange(pos, requested) {
+		return
+	}
+	*out = append(*out, inlayHint{
+		Position: pos,
+		Label:    ": stdlib " + module.Layer,
+		Kind:     1,
+		Tooltip:  module.Description,
+	})
+}
+
+func collectInlayHintsFromExpr(expr ast.Expr, sigs map[string][]ast.FuncParam, requested lspRange, out *[]inlayHint) {
+	if expr == nil {
+		return
+	}
+	switch e := expr.(type) {
+	case *ast.BinaryExpr:
+		collectInlayHintsFromExpr(e.Left, sigs, requested, out)
+		collectInlayHintsFromExpr(e.Right, sigs, requested, out)
+	case *ast.UnaryExpr:
+		collectInlayHintsFromExpr(e.Operand, sigs, requested, out)
+	case *ast.ParenExpr:
+		collectInlayHintsFromExpr(e.Inner, sigs, requested, out)
+	case *ast.IndexExpr:
+		collectInlayHintsFromExpr(e.Table, sigs, requested, out)
+		collectInlayHintsFromExpr(e.Index, sigs, requested, out)
+	case *ast.FieldExpr:
+		collectInlayHintsFromExpr(e.Table, sigs, requested, out)
+	case *ast.CallExpr:
+		collectCallParamHints(e, sigs, requested, out)
+		collectInlayHintsFromExpr(e.Func, sigs, requested, out)
+		for _, arg := range e.Args {
+			collectInlayHintsFromExpr(arg, sigs, requested, out)
+		}
+	case *ast.MethodCallExpr:
+		collectInlayHintsFromExpr(e.Object, sigs, requested, out)
+		for _, arg := range e.Args {
+			collectInlayHintsFromExpr(arg, sigs, requested, out)
+		}
+	case *ast.FuncLitExpr:
+		if e.Body != nil {
+			collectInlayHintsFromStmts("", e.Body.Stmts, sigs, requested, out)
+		}
+	case *ast.ListLitExpr:
+		for _, value := range e.Values {
+			collectInlayHintsFromExpr(value, sigs, requested, out)
+		}
+	case *ast.TableLitExpr:
+		for _, field := range e.Fields {
+			collectInlayHintsFromExpr(field.Key, sigs, requested, out)
+			collectInlayHintsFromExpr(field.Value, sigs, requested, out)
+		}
+	case *ast.DenseLitExpr:
+		for _, value := range e.Values {
+			collectInlayHintsFromExpr(value, sigs, requested, out)
+		}
+	case *ast.RecvExpr:
+		collectInlayHintsFromExpr(e.Channel, sigs, requested, out)
+	case *ast.MakeChanExpr:
+		collectInlayHintsFromExpr(e.Size, sigs, requested, out)
+	case *ast.TaggedStringExpr:
+		collectInlayHintsFromExpr(e.Body, sigs, requested, out)
+	case *ast.TaggedBlockExpr:
+		for _, field := range e.Config {
+			collectInlayHintsFromExpr(field.Key, sigs, requested, out)
+			collectInlayHintsFromExpr(field.Value, sigs, requested, out)
+		}
+		if e.Body != nil {
+			collectInlayHintsFromStmts("", e.Body.Stmts, sigs, requested, out)
+		}
+	case *ast.InterpolatedStringExpr:
+		for _, part := range e.Parts {
+			collectInlayHintsFromExpr(part.Expr, sigs, requested, out)
+		}
+	}
+}
+
+func collectCallParamHints(call *ast.CallExpr, sigs map[string][]ast.FuncParam, requested lspRange, out *[]inlayHint) {
+	ident, ok := call.Func.(*ast.IdentExpr)
+	if !ok {
+		return
+	}
+	params := sigs[ident.Name]
+	for i := 0; i < len(call.Args) && i < len(params); i++ {
+		param := params[i]
+		if param.Name == "" || param.Name == "_" || param.Name == "..." || param.IsVarArg {
+			continue
+		}
+		if argIdent, ok := call.Args[i].(*ast.IdentExpr); ok && argIdent.Name == param.Name {
+			continue
+		}
+		pos := positionFromOneBased(call.Args[i].GetPos().Line, call.Args[i].GetPos().Column)
+		if !positionInRequestedRange(pos, requested) {
+			continue
+		}
+		*out = append(*out, inlayHint{
+			Position: pos,
+			Label:    param.Name + ":",
+			Kind:     2,
+			Tooltip:  "Parameter for " + ident.Name + "(" + formatParams(params) + ")",
+		})
+	}
+}
+
+func positionInRequestedRange(pos position, requested lspRange) bool {
+	if requested == (lspRange{}) {
+		return true
+	}
+	if comparePosition(pos, requested.Start) < 0 {
+		return false
+	}
+	return comparePosition(pos, requested.End) <= 0
+}
+
+func comparePosition(a, b position) int {
+	if a.Line < b.Line {
+		return -1
+	}
+	if a.Line > b.Line {
+		return 1
+	}
+	if a.Character < b.Character {
+		return -1
+	}
+	if a.Character > b.Character {
+		return 1
+	}
+	return 0
 }
 
 func hoverText(src, word string) string {

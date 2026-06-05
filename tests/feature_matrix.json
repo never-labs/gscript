@@ -274,7 +274,7 @@
       "builtin_dialect_tags": ["sh", "cmd", "shellwords", "glob", "path", "re", "regexp", "json", "jsonptr", "jsonl", "csv", "tsv", "mdtable", "lines", "split", "words", "nums", "numbers", "kv", "logfmt", "env", "ini", "semver", "duration", "tap", "junit", "xml", "template", "url", "html_escape", "urlquery", "urlpath", "mime", "headers", "http_headers", "cookie", "cookies", "httpmsg", "sse", "multipart", "jwt", "ipaddr", "cidr", "hostport", "base64", "hash", "hex", "base32", "uuid", "gzip", "zlib", "deflate", "binary", "prompt", "quote"],
       "parser": {"status": "covered", "refs": ["internal/parser/dialect_syntax_test.go", "internal/lexer/lexer_test.go"]},
       "bytecode": {"status": "semantic_only", "refs": []},
-      "interpreter": {"status": "covered", "refs": ["tests/dialect_syntax_test.go", "internal/stdlib/bind/dialect_test.go", "internal/stdlib/bind/dialect_web_test.go"]},
+      "interpreter": {"status": "covered", "refs": ["tests/dialect_syntax_test.go", "internal/stdlib/bind/dialect_test.go", "internal/stdlib/bind/dialect_protocol_test.go"]},
       "tier1": {"status": "semantic_only", "refs": []},
       "tier2": {"status": "semantic_only", "refs": []},
       "semantic_gate": {"status": "covered", "refs": ["tests/dialect_syntax_test.go", "internal/parser/dialect_syntax_test.go", "tests/architecture/stdlib_boundary_test.go", "cmd/leia/main_examples_test.go"]},

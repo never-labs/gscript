@@ -231,6 +231,7 @@ def require_snippets(path: Path, snippets: list[str]) -> None:
 
 def check_release_gate_docs() -> None:
     release_matrix_cmd = "go test ./tests -run 'TestFeatureMatrixSchema|TestReleaseMatrix' -count=1"
+    spec_examples_cmd = "go test ./tests -run 'TestSpecRunnableExamples|TestSpecLeiaCodeFencesAreExecutableOrExplicitlyNonExecutable' -count=1"
     require_snippets(
         root / "docs" / "release" / "index.md",
         [
@@ -263,6 +264,17 @@ def check_release_gate_docs() -> None:
             "docs/reference/data-oriented/index.md",
             "examples/README.md",
             "state tested platforms and execution modes",
+        ],
+    )
+    require_snippets(
+        root / "docs" / "testing.md",
+        [
+            "Runnable examples embedded in `docs/spec/*.md`",
+            release_matrix_cmd,
+            spec_examples_cmd,
+            "bash scripts/docs_check.sh",
+            "tests/feature_matrix.json",
+            "docs/spec/index.md",
         ],
     )
 

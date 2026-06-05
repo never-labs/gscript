@@ -15,7 +15,7 @@ import (
 	dialectlib "github.com/never-labs/leia/internal/support/dialect"
 )
 
-func registerDialectWeb(register dialectRegisterFunc, maxHostResult func() int64) {
+func registerDialectProtocol(register dialectRegisterFunc, maxHostResult func() int64) {
 	register([]string{"url"}, dialectHandler{
 		eval: func(body Value, _ *Table) ([]Value, error) {
 			return dialectURL(body.Str())

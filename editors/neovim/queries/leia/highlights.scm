@@ -55,17 +55,14 @@
 (import_declaration
   "import" @keyword.control.import)
 
-(import_spec
-  path: (string) @string.special.import
-  "as" @keyword.control.import.as
-  alias: (identifier) @namespace.import)
+(import_declaration
+  (string) @string.special.import)
 
-(import_spec
-  alias: (identifier) @namespace.import
-  path: (string) @string.special.import)
+(import_declaration
+  "as" @keyword.control.import.as)
 
-(import_spec
-  path: (string) @string.special.import)
+(import_declaration
+  (identifier) @namespace.import)
 
 (unary_expression
   operator: "!" @operator)
