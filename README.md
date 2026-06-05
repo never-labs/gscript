@@ -8,6 +8,10 @@ Leia is designed for host applications that need scriptability without giving up
 Go operational habits: explicit capabilities, small deployment surface,
 repeatable tests, package metadata, and source-level hot reload.
 
+The JIT accelerates supported hot paths and falls back to the VM/runtime for
+unsupported operations. The language contract is the shared interpreter/VM
+semantics enforced by the spec, feature matrix, and release gates.
+
 ## Quick Start
 
 From a checkout:
