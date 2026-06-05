@@ -24,7 +24,7 @@ Release-gate commands:
 
 ```bash
 time bash scripts/performance_gate.sh --syntax-smoke --no-luajit
-go test ./tests -run 'TestFeatureMatrixSchema|TestReleaseMatrix' -count=1
+go test ./tests -run 'TestFeatureMatrix|TestReleaseMatrix' -count=1
 go test ./tests -run 'TestSpecRunnableExamples|TestSpecLeiaCodeFencesAreExecutableOrExplicitlyNonExecutable' -count=1
 go test ./tests -run 'TestFeatureMatrix|TestLanguageConformanceTranslatedCases' -count=1
 go test ./...

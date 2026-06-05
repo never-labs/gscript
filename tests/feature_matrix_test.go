@@ -104,6 +104,48 @@ func TestFeatureMatrixSchema(t *testing.T) {
 	assertLanguageSpecSectionsCovered(t, specSections, referencedSpecSections)
 }
 
+func TestFeatureMatrixHasNoIncompleteCells(t *testing.T) {
+	root := findRepoRoot(t)
+	path := filepath.Join(root, "tests", "feature_matrix.json")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read feature matrix: %v", err)
+	}
+
+	var matrix struct {
+		RequiredFields []string                     `json:"required_fields"`
+		Features       []map[string]json.RawMessage `json:"features"`
+	}
+	if err := json.Unmarshal(data, &matrix); err != nil {
+		t.Fatalf("decode feature matrix: %v", err)
+	}
+
+	var incomplete []string
+	for i, feature := range matrix.Features {
+		id := decodeRequiredString(t, feature, i, "id")
+		for _, field := range matrix.RequiredFields {
+			raw, ok := feature[field]
+			if !ok {
+				t.Fatalf("features[%d] %s missing required field %q", i, id, field)
+			}
+			var cell struct {
+				Status string `json:"status"`
+			}
+			if err := json.Unmarshal(raw, &cell); err != nil {
+				t.Fatalf("features[%d] %s.%s: %v", i, id, field, err)
+			}
+			switch cell.Status {
+			case "partial", "missing":
+				incomplete = append(incomplete, id+"."+field+"="+cell.Status)
+			}
+		}
+	}
+	if len(incomplete) > 0 {
+		sort.Strings(incomplete)
+		t.Fatalf("feature_matrix.json must not ship incomplete README/stable-contract cells: %s", strings.Join(incomplete, ", "))
+	}
+}
+
 func TestLanguageGrammarAppendixDocumentsStableSyntax(t *testing.T) {
 	root := findRepoRoot(t)
 	spec := readFileString(t, filepath.Join(root, "docs", "spec", "language.md"))
@@ -226,6 +268,7 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 		"Go-style concurrency primitives: `go`, channels, `select`, sync helpers",
 		"Data-oriented helpers for dense arrays, matrices, vectors, and SoA layouts.",
 		"CLI tooling for format, lint, test, docs, diagnostics, modules, benchmarks,",
+		"The JIT accelerates supported hot paths and falls back to the VM/runtime",
 	} {
 		if !strings.Contains(readme, snippet) {
 			t.Fatalf("README stable contract changed or missing expected snippet %q", snippet)
@@ -287,6 +330,28 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 		"examples/evaluate/agent_replay.leia",
 		"examples/workflow/support_triage_replay.leia",
 		"examples/embedding/embedding_test.go",
+	)
+
+	stringsPatterns := requireFeature(t, features, "strings_patterns_concat")
+	requireFeatureCellRefs(t, stringsPatterns, "strings_patterns_concat", "tier2",
+		"internal/methodjit/string_patterns_feature_matrix_test.go",
+		"internal/methodjit/string_tier2_test.go",
+	)
+
+	errorsDefer := requireFeature(t, features, "errors_pcall_xpcall_defer")
+	requireFeatureCellRefs(t, errorsDefer, "errors_pcall_xpcall_defer", "tier1",
+		"internal/methodjit/errors_defer_feature_matrix_test.go",
+		"internal/methodjit/exit_resume_check_test.go",
+	)
+	requireFeatureCellRefs(t, errorsDefer, "errors_pcall_xpcall_defer", "tier2",
+		"internal/methodjit/errors_defer_feature_matrix_test.go",
+		"internal/methodjit/tier2_entry_deopt_test.go",
+	)
+
+	bitwise := requireFeature(t, features, "bitwise_bit32")
+	requireFeatureCellRefs(t, bitwise, "bitwise_bit32", "tier1",
+		"internal/methodjit/bitwise_feature_matrix_test.go",
+		"internal/methodjit/emit_ops_test.go",
 	)
 
 	concurrency := requireFeature(t, features, "go_style_concurrency")

@@ -246,7 +246,7 @@ def require_snippets(path: Path, snippets: list[str]) -> None:
 
 
 def check_release_gate_docs() -> None:
-    release_matrix_cmd = "go test ./tests -run 'TestFeatureMatrixSchema|TestReleaseMatrix' -count=1"
+    release_matrix_cmd = "go test ./tests -run 'TestFeatureMatrix|TestReleaseMatrix' -count=1"
     spec_examples_cmd = "go test ./tests -run 'TestSpecRunnableExamples|TestSpecLeiaCodeFencesAreExecutableOrExplicitlyNonExecutable' -count=1"
     require_snippets(
         root / "docs" / "release" / "index.md",

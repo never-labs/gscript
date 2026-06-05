@@ -143,7 +143,7 @@ collect environment, docs/test status, and optional benchmark summaries.
 
 ```bash
 bash scripts/production_check.sh --quick
-go test ./tests -run 'TestFeatureMatrixSchema|TestReleaseMatrix' -count=1
+go test ./tests -run 'TestFeatureMatrix|TestReleaseMatrix' -count=1
 bash scripts/release_artifacts_check.sh
 ```
 

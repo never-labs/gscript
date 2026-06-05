@@ -8,7 +8,7 @@ Run at least:
 
 ```bash
 bash scripts/production_check.sh --quick
-go test ./tests -run 'TestFeatureMatrixSchema|TestReleaseMatrix' -count=1
+go test ./tests -run 'TestFeatureMatrix|TestReleaseMatrix' -count=1
 bash scripts/docs_check.sh
 bash scripts/performance_gate.sh --feature-smoke
 ```

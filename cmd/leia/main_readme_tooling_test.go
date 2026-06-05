@@ -31,6 +31,49 @@ func TestReadmeToolingCommandsDoNotDrift(t *testing.T) {
 	}
 }
 
+func TestReadmeQuickStartCommandsStayRunnable(t *testing.T) {
+	root := repoRootForBoundaryTest(t)
+	data, err := os.ReadFile(filepath.Join(root, "README.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := readmeQuickStartCommands(string(data))
+	want := []string{
+		"go run ./cmd/leia help",
+		`go run ./cmd/leia eval 'print("hello from leia")'`,
+		"go run ./cmd/leia run tests/smoke/01_basic.leia",
+		"go run ./cmd/leia run examples/hello/fib.leia",
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("README Quick Start commands changed:\ngot  %#v\nwant %#v", got, want)
+	}
+
+	commands := []struct {
+		args       []string
+		wantStdout string
+	}{
+		{args: []string{"help"}, wantStdout: "usage: leia"},
+		{args: []string{"eval", `print("hello from leia")`}, wantStdout: "hello from leia"},
+		{args: []string{"run", "tests/smoke/01_basic.leia"}},
+		{args: []string{"run", "examples/hello/fib.leia"}},
+	}
+	for _, command := range commands {
+		cmd := exec.Command("go", append([]string{"run", "./cmd/leia"}, command.args...)...)
+		cmd.Dir = root
+		var stdout, stderr bytes.Buffer
+		cmd.Stdout = &stdout
+		cmd.Stderr = &stderr
+		if err := cmd.Run(); err != nil {
+			t.Fatalf("README Quick Start command `go run ./cmd/leia %s` failed: %v\nstdout:\n%s\nstderr:\n%s",
+				strings.Join(command.args, " "), err, stdout.String(), stderr.String())
+		}
+		if command.wantStdout != "" && !strings.Contains(stdout.String(), command.wantStdout) {
+			t.Fatalf("README Quick Start command `go run ./cmd/leia %s` stdout = %q, want %q",
+				strings.Join(command.args, " "), stdout.String(), command.wantStdout)
+		}
+	}
+}
+
 func TestReadmeToolingCommandsMapToCLI(t *testing.T) {
 	root := repoRootForBoundaryTest(t)
 	data, err := os.ReadFile(filepath.Join(root, "README.md"))
@@ -100,6 +143,33 @@ func TestReadmeToolingCommandsMapToCLI(t *testing.T) {
 	if len(diagArgs) == 0 || !containsString(diagArgs, "--skip-benchmarks") {
 		t.Fatalf("README diag dispatch args = %#v, want bundle --skip-benchmarks", diagArgs)
 	}
+}
+
+func readmeQuickStartCommands(readme string) []string {
+	const marker = "## Quick Start"
+	start := strings.Index(readme, marker)
+	if start < 0 {
+		return nil
+	}
+	rest := readme[start+len(marker):]
+	blockStart := strings.Index(rest, "```bash")
+	if blockStart < 0 {
+		return nil
+	}
+	rest = rest[blockStart+len("```bash"):]
+	blockEnd := strings.Index(rest, "```")
+	if blockEnd < 0 {
+		return nil
+	}
+	lines := strings.Split(rest[:blockEnd], "\n")
+	var commands []string
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line != "" {
+			commands = append(commands, line)
+		}
+	}
+	return commands
 }
 
 func readmeToolingCommands(readme string) []string {

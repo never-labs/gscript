@@ -291,7 +291,7 @@ build_quick_plan() {
     add_go_test "Feature Matrix and Integration" \
         "go test ./tests -run 'TestFeatureMatrix|TestIntegration' -count=1"
     add_go_test "Release Matrix Metadata" \
-        "go test ./tests -run 'TestFeatureMatrixSchema|TestReleaseMatrix' -count=1"
+        "go test ./tests -run 'TestFeatureMatrix|TestReleaseMatrix' -count=1"
     add_go_test "Spec Runnable Examples" \
         "go test ./tests -run 'TestSpecRunnableExamples|TestSpecLeiaCodeFencesAreExecutableOrExplicitlyNonExecutable' -count=1"
     add_go_test "Stdlib Contract" \

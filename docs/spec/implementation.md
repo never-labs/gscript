@@ -79,7 +79,7 @@ Stable syntax and runtime behavior must be represented in
 must carry `parser`, `bytecode`, `interpreter`, `tier1`, `tier2`,
 `semantic_gate`, `conformance_case`, and `perf_hot_case` status according to
 the matrix schema. The schema and referenced files are checked by
-`go test ./tests -run 'TestFeatureMatrixSchema|TestReleaseMatrix' -count=1`.
+`go test ./tests -run 'TestFeatureMatrix|TestReleaseMatrix' -count=1`.
 
 Changes to stable syntax require:
 

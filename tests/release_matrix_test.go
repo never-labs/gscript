@@ -265,7 +265,7 @@ func TestReleaseMatrixKnownGapDocsAreReleaseGateInputs(t *testing.T) {
 
 func TestReleaseMatrixSpecGateCommandsStaySynchronized(t *testing.T) {
 	root := findRepoRoot(t)
-	releaseMatrixCmd := "go test ./tests -run 'TestFeatureMatrixSchema|TestReleaseMatrix' -count=1"
+	releaseMatrixCmd := "go test ./tests -run 'TestFeatureMatrix|TestReleaseMatrix' -count=1"
 	specExamplesCmd := "go test ./tests -run 'TestSpecRunnableExamples|TestSpecLeiaCodeFencesAreExecutableOrExplicitlyNonExecutable' -count=1"
 	docsCheckCmd := "bash scripts/docs_check.sh"
 	productionQuickCmd := "bash scripts/production_check.sh --quick"
@@ -1073,7 +1073,7 @@ func decodeReleaseCoverageCell(t *testing.T, feature map[string]json.RawMessage,
 }
 
 func releaseGateStatus(status string) bool {
-	return status == "covered" || status == "partial"
+	return status == "covered"
 }
 
 func releaseIgnoredSpecSections() map[string]string {
