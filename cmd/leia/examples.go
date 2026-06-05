@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -445,6 +446,13 @@ func applyCLIExampleRunner(example *cliExample) {
 		example.Runner = "test-dir"
 		example.Requires = "leia test CLI"
 		return
+	case strings.Contains(example.Path, "/web/hello_server.leia"),
+		strings.Contains(example.Path, "/web/webserver.leia"):
+		example.Runnable = true
+		example.Checkable = true
+		example.Runner = "web-loopback"
+		example.Requires = ""
+		return
 	case strings.Contains(example.Path, "/web/tiny_app.leia"),
 		strings.Contains(example.Path, "/concurrency/context_process.leia"),
 		strings.Contains(example.Path, "/concurrency/goroutine_errors.leia"),
@@ -459,6 +467,12 @@ func applyCLIExampleRunner(example *cliExample) {
 		example.Runnable = true
 		example.Checkable = true
 		example.Runner = "host-vm-high"
+		example.Requires = ""
+		return
+	case strings.Contains(example.Path, "/llm/") && cliExampleLLMMockFriendly(example.Path):
+		example.Runnable = true
+		example.Checkable = true
+		example.Runner = "llm-mock"
 		example.Requires = ""
 		return
 	}
@@ -485,10 +499,14 @@ func runCLIExampleRunner(example cliExample, path string, maxSteps int64, stdout
 		return runTestCommand([]string{"--json", "--golden=require", filepath.Dir(path)}, cliRunOptions{UseVM: true}, stdout, stderr)
 	case "mod-check":
 		return runModCommand([]string{"check", "--json", filepath.Dir(path)}, stdout, stderr)
+	case "web-loopback":
+		return runCLIExampleWebLoopback(example, path, maxSteps, stdout, stderr)
 	case "host-vm":
 		return runCLIExampleHostVM(path, maxSteps, stdout, stderr)
 	case "host-vm-high":
 		return runCLIExampleHostVM(path, maxSteps*64, stdout, stderr)
+	case "llm-mock":
+		return runCLIExampleLLMMock(path, maxSteps, stdout, stderr)
 	default:
 		fmt.Fprintf(stderr, "unknown example runner %q for %s\n", example.Runner, example.ID)
 		return 1
@@ -521,6 +539,255 @@ func runCLIExampleHostVM(path string, maxSteps int64, stdout, stderr io.Writer) 
 		return 1
 	}
 	return 0
+}
+
+func runCLIExampleWebLoopback(example cliExample, path string, maxSteps int64, stdout, stderr io.Writer) int {
+	src, err := os.ReadFile(path)
+	if err != nil {
+		fmt.Fprintf(stderr, "read web example: %v\n", err)
+		return 1
+	}
+	testSrc, err := cliExampleWebLoopbackSource(example.Path, string(src))
+	if err != nil {
+		fmt.Fprintf(stderr, "prepare web loopback example: %v\n", err)
+		return 1
+	}
+	vm := leia.New(
+		leia.WithLibs(leia.LibAll),
+		leia.WithVM(),
+		leia.WithMaxSteps(maxSteps),
+		leia.WithMaxNativeCalls(100_000),
+		leia.WithMaxGoroutines(128),
+		leia.WithMaxChannelCapacity(1024),
+		leia.WithMaxHostResultBytes(1<<20),
+		leia.WithNetworkAccess(true),
+		leia.WithPrint(func(args ...interface{}) {
+			parts := make([]string, len(args))
+			for i, arg := range args {
+				parts[i] = fmt.Sprint(arg)
+			}
+			fmt.Fprintln(stdout, strings.Join(parts, "\t"))
+		}),
+	)
+	if err := vm.Exec(testSrc); err != nil {
+		fmt.Fprintf(stderr, "run web loopback example: %v\n", err)
+		return 1
+	}
+	return 0
+}
+
+func cliExampleWebLoopbackSource(path, src string) (string, error) {
+	switch {
+	case strings.Contains(path, "/web/hello_server.leia"):
+		const oldListen = `http.listen(":8080", func(req, res) {`
+		if !strings.Contains(src, oldListen) {
+			return "", fmt.Errorf("hello_server listen shape changed")
+		}
+		src = strings.Replace(src, oldListen, `__leia_example_server := http.listen("127.0.0.1:0", func(req, res) {`, 1)
+		src = strings.TrimRight(src, " \t\r\n")
+		if !strings.HasSuffix(src, "})") {
+			return "", fmt.Errorf("hello_server handler close shape changed")
+		}
+		src = strings.TrimSuffix(src, "})") + `}, {background: true})
+
+__leia_example_resp := http.get(__leia_example_server.url .. "/loopback")
+assert(__leia_example_resp.status == 200)
+assert(__leia_example_resp.body == "Hello from Leia!\nMethod: GET\nPath: /loopback\n")
+__leia_example_closed, __leia_example_close_err := __leia_example_server.close()
+assert(__leia_example_closed == true)
+assert(__leia_example_close_err == nil)
+__leia_example_waited, __leia_example_wait_err := __leia_example_server.wait()
+assert(__leia_example_waited == true)
+assert(__leia_example_wait_err == nil)
+`
+		return src, nil
+	case strings.Contains(path, "/web/webserver.leia"):
+		const oldListen = `router.listen(":9988")`
+		if !strings.Contains(src, oldListen) {
+			return "", fmt.Errorf("webserver listen shape changed")
+		}
+		src = strings.Replace(src, oldListen, `__leia_example_server := router.listen("127.0.0.1:0", {background: true})`, 1)
+		src += `
+
+__leia_example_root := http.get(__leia_example_server.url .. "/")
+assert(__leia_example_root.status == 200)
+assert(string.find(__leia_example_root.body, "<h1>Welcome to Leia Web Server!</h1>", 1, true) != nil)
+
+__leia_example_hello := http.get(__leia_example_server.url .. "/hello?name=Ada")
+assert(__leia_example_hello.status == 200)
+assert(__leia_example_hello.body == "Hello, Ada!")
+
+__leia_example_counter1 := http.get(__leia_example_server.url .. "/counter")
+__leia_example_counter2 := http.get(__leia_example_server.url .. "/counter")
+assert(__leia_example_counter1.body == "Counter: 1")
+assert(__leia_example_counter2.body == "Counter: 2")
+
+__leia_example_json := http.get(__leia_example_server.url .. "/json")
+assert(__leia_example_json.status == 200)
+assert(string.find(__leia_example_json.body, "\"language\":\"Leia\"", 1, true) != nil)
+assert(string.find(__leia_example_json.body, "\"counter\":2", 1, true) != nil)
+
+__leia_example_echo := http.get(__leia_example_server.url .. "/echo?msg=loop")
+assert(__leia_example_echo.body == "Echo: loop")
+
+__leia_example_fib := http.get(__leia_example_server.url .. "/fib?n=7")
+assert(__leia_example_fib.body == "fib(7) = 13")
+
+__leia_example_closed, __leia_example_close_err := __leia_example_server.shutdown()
+assert(__leia_example_closed == true)
+assert(__leia_example_close_err == nil)
+__leia_example_waited, __leia_example_wait_err := __leia_example_server.wait()
+assert(__leia_example_waited == true)
+assert(__leia_example_wait_err == nil)
+`
+		return src, nil
+	default:
+		return "", fmt.Errorf("unsupported web loopback example %s", path)
+	}
+}
+
+func cliExampleLLMMockFriendly(path string) bool {
+	name := filepath.Base(path)
+	return name != "glm_smoke.leia" && name != "glm_direct_agent_tools.leia"
+}
+
+func runCLIExampleLLMMock(path string, maxSteps int64, stdout, stderr io.Writer) int {
+	vm := leia.New(
+		leia.WithLibs(leia.LibAll),
+		leia.WithVM(),
+		leia.WithMaxSteps(maxSteps),
+		leia.WithMaxNativeCalls(100_000),
+		leia.WithMaxGoroutines(128),
+		leia.WithMaxChannelCapacity(1024),
+		leia.WithMaxHostResultBytes(1<<20),
+		leia.WithLLMProvider(cliExampleMockLLMProvider{}),
+		leia.WithPrint(func(args ...interface{}) {
+			parts := make([]string, len(args))
+			for i, arg := range args {
+				parts[i] = fmt.Sprint(arg)
+			}
+			fmt.Fprintln(stdout, strings.Join(parts, "\t"))
+		}),
+	)
+	if err := vm.ExecFile(path); err != nil {
+		fmt.Fprintf(stderr, "run mock llm example: %v\n", err)
+		return 1
+	}
+	return 0
+}
+
+type cliExampleMockLLMProvider struct{}
+
+func (cliExampleMockLLMProvider) Turn(_ context.Context, req llm.TurnRequest) (llm.TurnResult, error) {
+	switch req.Model {
+	case "mock-fast":
+		return llm.TurnResult{Status: "final_answer", Text: "Direct llm.turn keeps examples simple."}, nil
+	case "mock-stream":
+		return llm.TurnResult{Status: "final_answer", Text: "hello stream"}, nil
+	}
+	if len(req.Messages) > 0 && req.Messages[len(req.Messages)-1].Role == "tool" {
+		return cliExampleMockFinalAfterTool(req), nil
+	}
+	if len(req.Tools) > 0 {
+		tool := req.Tools[0]
+		return llm.TurnResult{
+			Status: "tool_calls",
+			Calls: []llm.ToolCall{{
+				ID:   "call_" + tool.Name + "_1",
+				Tool: tool.Name,
+				Args: cliExampleMockToolArgs(tool),
+			}},
+		}, nil
+	}
+	if req.ResponseFormat != nil || strings.Contains(strings.ToLower(fmt.Sprint(req.ResponseFormat)), "summary") {
+		return llm.TurnResult{Status: "final_answer", Text: `{"summary":"mock evidence accepted","confidence":1,"risk":"low"}`}, nil
+	}
+	return llm.TurnResult{Status: "final_answer", Text: cliExampleMockText(req)}, nil
+}
+
+func (p cliExampleMockLLMProvider) StreamTurn(ctx context.Context, req llm.TurnRequest, sink llm.StreamSink) (llm.TurnResult, error) {
+	res, err := p.Turn(ctx, req)
+	if err != nil || sink == nil {
+		return res, err
+	}
+	tokens := []string{"hello", " ", "stream"}
+	if res.Text != "hello stream" {
+		tokens = strings.Fields(res.Text)
+	}
+	for _, token := range tokens {
+		if err := sink(llm.StreamEvent{Type: "token", Token: token, Text: token}); err != nil {
+			return llm.TurnResult{}, err
+		}
+	}
+	return res, nil
+}
+
+func cliExampleMockToolArgs(tool llm.Tool) map[string]any {
+	args := make(map[string]any, len(tool.Params))
+	for _, param := range tool.Params {
+		switch param {
+		case "domain":
+			args[param] = "pci"
+		case "control":
+			args[param] = "refunds"
+		case "service":
+			args[param] = "checkout"
+		case "severity":
+			args[param] = "sev2"
+		case "symptom":
+			args[param] = "p95 latency spike"
+		case "topic":
+			args[param] = "agent history"
+		case "question":
+			args[param] = "Can refunds bypass PCI review?"
+		default:
+			args[param] = "mock"
+		}
+	}
+	return args
+}
+
+func cliExampleMockFinalAfterTool(req llm.TurnRequest) llm.TurnResult {
+	if req.ResponseFormat != nil || strings.Contains(strings.ToLower(fmt.Sprint(req.ResponseFormat)), "summary") {
+		return llm.TurnResult{Status: "final_answer", Text: `{"summary":"mock policy evidence","confidence":1,"risk":"low"}`}
+	}
+	switch req.Model {
+	case "mock-manual":
+		return llm.TurnResult{Status: "final_answer", Text: "Manual history used local documentation evidence."}
+	case "mock-rich-agent":
+		return llm.TurnResult{Status: "final_answer", Text: "Checkout sev2 requires payment queue triage."}
+	case "mock-planner":
+		return llm.TurnResult{Status: "final_answer", Text: "Checkout latency is elevated; follow runbook and watch error rate."}
+	default:
+		return llm.TurnResult{Status: "final_answer", Text: "Mock tool evidence reviewed."}
+	}
+}
+
+func cliExampleMockText(req llm.TurnRequest) string {
+	switch req.Model {
+	case "mock-prompt":
+		return "Leia agent history keeps tagged prompt messages searchable."
+	case "mock-audit":
+		return "Delegated answer audited with mock evidence."
+	case "mock-ops":
+		return "Checkout incidents are owned by the operations responder."
+	case "mock-planner":
+		return "Checkout latency is elevated; follow runbook and watch error rate."
+	default:
+		if strings.Contains(cliExampleMockRequestText(req), "audit delegated answer") {
+			return "Delegated answer audited with mock evidence."
+		}
+		return "Mock LLM example completed."
+	}
+}
+
+func cliExampleMockRequestText(req llm.TurnRequest) string {
+	var b strings.Builder
+	for _, msg := range req.Messages {
+		b.WriteString(strings.ToLower(msg.Text))
+		b.WriteByte('\n')
+	}
+	return b.String()
 }
 
 func runCLIExampleLLMReplay(path string, stderr io.Writer) int {

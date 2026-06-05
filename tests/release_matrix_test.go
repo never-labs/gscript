@@ -793,6 +793,35 @@ func TestReleaseMatrixDocumentedSmokeCommandsStayRunnable(t *testing.T) {
 	runCommand(t, root, 30*time.Second, "go", "run", "./cmd/leia", "test", "tests/smoke/01_basic.leia")
 }
 
+func TestReleaseMatrixReadmeToolingCommandsStayRunnable(t *testing.T) {
+	root := findRepoRoot(t)
+	commands := readReleaseReadmeToolingCommands(t, root)
+	if len(commands) == 0 {
+		t.Fatal("README.md must contain runnable Tooling commands")
+	}
+
+	diagDir := filepath.Join(os.TempDir(), "leia-diag")
+	_ = os.RemoveAll(diagDir)
+	t.Cleanup(func() {
+		_ = os.RemoveAll(diagDir)
+	})
+
+	for _, command := range commands {
+		fields := strings.Fields(command)
+		if len(fields) < 4 || fields[0] != "go" || fields[1] != "run" || fields[2] != "./cmd/leia" {
+			t.Fatalf("README Tooling command must use `go run ./cmd/leia ...`: %q", command)
+		}
+		timeout := 60 * time.Second
+		if len(fields) > 3 {
+			switch fields[3] {
+			case "bench", "diag":
+				timeout = 180 * time.Second
+			}
+		}
+		runCommand(t, root, timeout, fields[0], fields[1:]...)
+	}
+}
+
 func TestReleaseMatrixGettingStartedExamplesStayRunnable(t *testing.T) {
 	root := findRepoRoot(t)
 	gettingStarted := readFileString(t, filepath.Join(root, "docs", "tutorial", "getting-started.md"))
@@ -981,6 +1010,35 @@ func documentedExamplesReadmeRunCommands(t *testing.T, doc string) [][]string {
 			t.Fatalf("unexpected examples README command shape %q", line)
 		}
 		commands = append(commands, fields[1:])
+	}
+	return commands
+}
+
+func readReleaseReadmeToolingCommands(t *testing.T, root string) []string {
+	t.Helper()
+	readme := readFileString(t, filepath.Join(root, "README.md"))
+	const marker = "## Tooling"
+	start := strings.Index(readme, marker)
+	if start < 0 {
+		t.Fatal("README.md must contain a Tooling section")
+	}
+	rest := readme[start+len(marker):]
+	blockStart := strings.Index(rest, "```bash")
+	if blockStart < 0 {
+		t.Fatal("README.md Tooling section must contain a bash command block")
+	}
+	rest = rest[blockStart+len("```bash"):]
+	blockEnd := strings.Index(rest, "```")
+	if blockEnd < 0 {
+		t.Fatal("README.md Tooling bash command block is unterminated")
+	}
+	var commands []string
+	for _, line := range strings.Split(rest[:blockEnd], "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		commands = append(commands, line)
 	}
 	return commands
 }
