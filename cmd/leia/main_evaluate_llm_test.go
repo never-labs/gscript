@@ -1,0 +1,218 @@
+package main
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"strings"
+	"sync"
+	"testing"
+
+	"github.com/never-labs/leia/llm"
+)
+
+func TestEvaluateLLMRecordModeWritesGlobalAndCaseFixtures(t *testing.T) {
+	type anthropicRequest struct {
+		Model    string `json:"model"`
+		Stream   bool   `json:"stream"`
+		Messages []struct {
+			Role    string `json:"role"`
+			Content any    `json:"content"`
+		} `json:"messages"`
+	}
+	var (
+		mu       sync.Mutex
+		requests []anthropicRequest
+	)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req anthropicRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Errorf("decode request: %v", err)
+		}
+		mu.Lock()
+		requests = append(requests, req)
+		mu.Unlock()
+		if req.Stream {
+			w.Header().Set("Content-Type", "text/event-stream")
+			fmt.Fprint(w, `data: {"type":"message_start","message":{"usage":{"input_tokens":7}}}`+"\n\n")
+			fmt.Fprint(w, `data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"OK"}}`+"\n\n")
+			fmt.Fprint(w, `data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"-"}}`+"\n\n")
+			fmt.Fprint(w, `data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"1"}}`+"\n\n")
+			fmt.Fprint(w, `data: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"input_tokens":7,"output_tokens":3}}`+"\n\n")
+			fmt.Fprint(w, `data: {"type":"message_stop"}`+"\n\n")
+			fmt.Fprint(w, "data: [DONE]\n\n")
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{"content":[{"type":"text","text":"OK-2"}],"stop_reason":"end_turn","usage":{"input_tokens":5,"output_tokens":2}}`)
+	}))
+	defer server.Close()
+
+	dir := t.TempDir()
+	sourcePath := filepath.Join(dir, "evaluate_llm_record.leia")
+	recordPath := filepath.Join(dir, "turns.records.json")
+	source := `
+llm.register_models({
+    default: "local"
+    local: {
+        protocol: "anthropic_compatible"
+        base_url: os.getenv("LEIA_LLM_BASE_URL")
+        api_key: os.getenv("LEIA_LLM_API_KEY")
+        provider_model: os.getenv("LEIA_LLM_MODEL")
+    }
+})
+
+evaluate "streamed record case" {
+    result, err := llm.turn({
+        messages: {llm.user("stream one")}
+        stream: true
+        max_tokens: 16
+    })
+    assert(err == nil)
+    assert(result.text == "OK-1")
+    assert(eval.usage().stream_events == 3)
+}
+
+evaluate "plain record case" {
+    result, err := llm.turn({
+        messages: {llm.user("plain two")}
+        max_tokens: 16
+    })
+    assert(err == nil)
+    assert(result.text == "OK-2")
+}
+`
+	if err := os.WriteFile(sourcePath, []byte(source), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("LEIA_LLM_BASE_URL", server.URL)
+	t.Setenv("LEIA_LLM_API_KEY", "test-key")
+	t.Setenv("LEIA_LLM_MODEL", "mock-model")
+
+	var stdout, stderr bytes.Buffer
+	code := runEvaluateCommand([]string{"--json", "--parallel=4", "--llm-record", recordPath, sourcePath}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("evaluate --llm-record code = %d, stderr = %q stdout = %q", code, stderr.String(), stdout.String())
+	}
+	var report struct {
+		Status string `json:"status"`
+		LLM    *struct {
+			Mode          string `json:"mode"`
+			RecordPath    string `json:"record_path"`
+			RecordedTurns int    `json:"recorded_turns"`
+			Turns         int    `json:"turns"`
+			InputTokens   int64  `json:"input_tokens"`
+			OutputTokens  int64  `json:"output_tokens"`
+		} `json:"llm"`
+		Cases []struct {
+			Name   string `json:"name"`
+			Status string `json:"status"`
+			LLM    *struct {
+				RecordPath   string `json:"record_path"`
+				Turns        int    `json:"turns"`
+				StreamEvents int    `json:"stream_events"`
+			} `json:"llm"`
+		} `json:"cases"`
+		Notes []string `json:"notes"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
+		t.Fatalf("stdout is not JSON evaluate report: %v; stdout = %q", err, stdout.String())
+	}
+	if report.Status != "ok" || report.LLM == nil || report.LLM.Mode != "record" || report.LLM.RecordPath != recordPath || report.LLM.RecordedTurns != 2 || report.LLM.Turns != 2 {
+		t.Fatalf("llm report = %+v, want record mode with two turns", report.LLM)
+	}
+	if report.LLM.InputTokens != 12 || report.LLM.OutputTokens != 5 {
+		t.Fatalf("llm tokens = %d/%d, want 12/5", report.LLM.InputTokens, report.LLM.OutputTokens)
+	}
+	if !containsEvaluateLLMString(report.Notes, "parallel evaluate execution disabled for deterministic LLM fixture mode") {
+		t.Fatalf("notes = %#v, want deterministic fixture parallel guard note", report.Notes)
+	}
+	if len(report.Cases) != 2 || report.Cases[0].Status != "passed" || report.Cases[1].Status != "passed" {
+		t.Fatalf("cases = %+v, want two passed cases", report.Cases)
+	}
+	if report.Cases[0].LLM == nil || report.Cases[0].LLM.StreamEvents != 3 || report.Cases[0].LLM.Turns != 1 {
+		t.Fatalf("streamed case llm = %+v, want one turn and three stream events", report.Cases[0].LLM)
+	}
+	if report.Cases[1].LLM == nil || report.Cases[1].LLM.StreamEvents != 0 || report.Cases[1].LLM.Turns != 1 {
+		t.Fatalf("plain case llm = %+v, want one non-streaming turn", report.Cases[1].LLM)
+	}
+	for _, c := range report.Cases {
+		if c.LLM == nil || c.LLM.RecordPath == "" {
+			t.Fatalf("case %q missing per-case record path: %+v", c.Name, c.LLM)
+		}
+		if _, err := os.Stat(c.LLM.RecordPath); err != nil {
+			t.Fatalf("case record %s missing: %v", c.LLM.RecordPath, err)
+		}
+	}
+	records, err := llm.LoadRecords(recordPath)
+	if err != nil {
+		t.Fatalf("load global record: %v", err)
+	}
+	if len(records) != 2 || !records[0].Request.Stream || records[0].Result.Text != "OK-1" || records[1].Request.Stream {
+		t.Fatalf("records = %#v, want first streaming turn and second plain turn", records)
+	}
+	mu.Lock()
+	gotRequests := append([]anthropicRequest(nil), requests...)
+	mu.Unlock()
+	if len(gotRequests) != 2 || gotRequests[0].Model != "mock-model" || gotRequests[1].Model != "mock-model" {
+		t.Fatalf("requests = %#v, want two mock-model requests", gotRequests)
+	}
+}
+
+func TestEvaluateLLMReplayAliasAndFixtureModeGuards(t *testing.T) {
+	root, err := filepath.Abs(filepath.Join("..", ".."))
+	if err != nil {
+		t.Fatal(err)
+	}
+	sourcePath := filepath.Join(root, "examples", "evaluate", "multiturn_replay.leia")
+	replayPath := filepath.Join(root, "examples", "evaluate", "multiturn_replay.records.json")
+
+	var stdout, stderr bytes.Buffer
+	code := runEvaluateCommand([]string{"--json", "--parallel=4", "--llm-replay", replayPath, sourcePath}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("evaluate --llm-replay code = %d, stderr = %q stdout = %q", code, stderr.String(), stdout.String())
+	}
+	var report struct {
+		Status string `json:"status"`
+		LLM    *struct {
+			Mode           string `json:"mode"`
+			ReplayPath     string `json:"replay_path"`
+			LoadedTurns    int    `json:"loaded_turns"`
+			ReplayedTurns  int    `json:"replayed_turns"`
+			RemainingTurns int    `json:"remaining_turns"`
+		} `json:"llm"`
+		Notes []string `json:"notes"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
+		t.Fatalf("stdout is not JSON evaluate report: %v; stdout = %q", err, stdout.String())
+	}
+	if report.Status != "ok" || report.LLM == nil || report.LLM.Mode != "replay" || report.LLM.ReplayPath != replayPath || report.LLM.LoadedTurns != 2 || report.LLM.ReplayedTurns != 2 || report.LLM.RemainingTurns != 0 {
+		t.Fatalf("llm report = %+v, want replay alias to consume both turns", report.LLM)
+	}
+	if !containsEvaluateLLMString(report.Notes, "parallel evaluate execution disabled for deterministic LLM fixture mode") {
+		t.Fatalf("notes = %#v, want deterministic fixture parallel guard note", report.Notes)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = runEvaluateCommand([]string{"--record", filepath.Join(t.TempDir(), "new.records.json"), "--llm-replay", replayPath, sourcePath}, &stdout, &stderr)
+	if code == 0 {
+		t.Fatalf("evaluate accepted conflicting fixture modes, stdout = %q", stdout.String())
+	}
+	if !strings.Contains(stderr.String(), "llm record, replay, and update-golden modes are mutually exclusive") {
+		t.Fatalf("stderr = %q, want mutually exclusive fixture mode error", stderr.String())
+	}
+}
+
+func containsEvaluateLLMString(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
+}

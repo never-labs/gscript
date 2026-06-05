@@ -191,7 +191,13 @@ func TestFeatureMatrixCoversTaggedDialectAndModpkgReleaseGuards(t *testing.T) {
 	}
 	requireFeatureCellRefs(t, tagged, "tagged_dialect_syntax", "parser", "internal/parser/dialect_syntax_test.go")
 	requireFeatureCellRefs(t, tagged, "tagged_dialect_syntax", "interpreter", "tests/dialect_syntax_test.go", "internal/stdlib/bind/dialect_protocol_test.go")
-	requireFeatureCellRefs(t, tagged, "tagged_dialect_syntax", "semantic_gate", "tests/architecture/stdlib_boundary_test.go", "cmd/leia/main_examples_test.go")
+	requireFeatureCellRefs(t, tagged, "tagged_dialect_syntax", "semantic_gate",
+		"tests/architecture/stdlib_boundary_test.go",
+		"cmd/leia/main_examples_test.go",
+		"cmd/leia/main_examples_command_test.go",
+		"examples/dialects/shell_filesystem.leia",
+		"examples/dialects/web_text.leia",
+	)
 	requireFeatureStringList(t, tagged, "tagged_dialect_syntax", "builtin_dialect_tags",
 		"sh", "cmd", "shellwords", "glob", "path",
 		"re", "regexp", "json", "jsonptr", "jsonl", "csv", "tsv", "mdtable", "markdown", "md", "lines", "split", "words", "nums", "numbers", "kv", "logfmt", "env", "ini", "yaml", "yml", "semver", "duration", "timestamp", "rfc3339", "tap", "junit", "xml", "template",
@@ -333,9 +339,20 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 		"tests/integration/llm/llm_glm_integration_test.go",
 		"cmd/leia/main_examples_test.go",
 		"cmd/leia/main_examples_command_test.go",
+		"cmd/leia/main_evaluate_llm_test.go",
 		"examples/ai/coding_agent_replay.leia",
 		"examples/ai/tagged_agent_workflow.leia",
 		"examples/ai/record_replay_trace_project.leia",
+		"examples/llm/agent.leia",
+		"examples/llm/agent_as_tool.leia",
+		"examples/llm/direct_turn.leia",
+		"examples/llm/incident_response.leia",
+		"examples/llm/manual_tool_history.leia",
+		"examples/llm/prompt_tagged_messages.leia",
+		"examples/llm/rich_agent_demo.leia",
+		"examples/llm/streaming_turn.leia",
+		"examples/llm/glm_smoke.leia",
+		"examples/llm/glm_direct_agent_tools.leia",
 		"examples/evaluate/agent_replay.leia",
 		"examples/workflow/support_triage_replay.leia",
 		"examples/embedding/embedding_test.go",

@@ -53,6 +53,7 @@ COVERAGE: dict[str, FamilyCoverage] = {
     "locals": FamilyCoverage("covered", ("recursion/fibonacci_iterative", "numeric/sum_primes"), "local-slot integer loops are covered"),
     "math": FamilyCoverage("covered", ("numeric/math_intensive", "numeric/spectral_norm", "numeric/mandelbrot", "string/math_bit_utf8"), "integer, float, transcendental, conversion, and loop-heavy math are covered"),
     "nextvar": FamilyCoverage("covered", ("table/table_array_access", "table/json_table_walk", "table/nextvar_table", "calls/call_len_pairs_metamethod"), "array/table traversal and pairs/next mutation-order variants are covered"),
+    "oop": FamilyCoverage("covered", ("calls/method_dispatch", "calls/object_creation"), "class-style method dispatch and object construction are covered"),
     "pm": FamilyCoverage("covered", ("string/string_bench", "string/log_tokenize_format", "string/strings_patterns"), "string search/format and Lua pattern capture/gsub/gmatch are covered"),
     "regexp": FamilyCoverage("covered", ("string/regexp_random",), "Go regexp compile/match/split hot paths are covered separately from Lua pattern matching"),
     "sort": FamilyCoverage("covered", ("table/sort", "table/sort_mixed_numeric", "table/table_sort_proxy"), "numeric, mixed, and proxy table sort hot paths are covered"),

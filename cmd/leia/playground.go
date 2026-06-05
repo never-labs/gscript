@@ -906,6 +906,37 @@ print(task.body.user)`,
 func playgroundAIExamples() []playgroundExample {
 	return []playgroundExample{
 		{
+			ID:       "ai-model-alias",
+			Title:    "Model Alias",
+			Section:  "AI Basics",
+			Summary:  "Register a script-side model alias so turns and agents can target a named provider profile.",
+			Runnable: true,
+			Requires: "LLM provider",
+			Concepts: []string{
+				"`llm.register_models` maps script aliases to provider configuration.",
+				"`default` selects the fallback alias for turns and agents that omit `model`.",
+				"The host decides whether the provider config is honored or replaced by a mock/replay provider.",
+			},
+			Source: `profile := {}
+profile["provider"] = "glm"
+profile["protocol"] = "anthropic_compatible"
+profile["base_url"] = __leia_playground_env_first("LEIA_GLM_BASE_URL", "ANTHROPIC_BASE_URL", "", "https://open.bigmodel.cn/api/anthropic")
+profile["api_key"] = __leia_playground_env_first("LEIA_GLM_API_KEY", "SENTINEL_GLM_API_KEY", "GLM_API_KEY", "")
+profile["provider_model"] = __leia_playground_env_first("LEIA_GLM_MODEL", "GLM_MODEL", "ANTHROPIC_MODEL", "glm-5.1")
+
+models := {default: "playground-fast"}
+models["playground-fast"] = profile
+llm.register_models(models)
+
+result, err := llm.turn({
+    messages: {llm.user("Reply exactly: LEIA_GLM_OK")}
+    max_tokens: 16
+    temperature: 0
+})
+if err != nil { print(err.message); return }
+print("model alias", result.text)`,
+		},
+		{
 			ID:       "ai-one-line",
 			Title:    "One-Line Turn",
 			Section:  "AI Basics",

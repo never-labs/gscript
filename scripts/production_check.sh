@@ -264,6 +264,27 @@ add_release_smoke() {
         "go run ./cmd/leia $SMOKE_SCRIPT && go run ./cmd/leia -jit benchmarks/table/table_field_access.leia && go run ./cmd/leia inspect bytecode $SMOKE_SCRIPT"
 }
 
+add_cli_experience_gate() {
+    if ! have_cmd go; then
+        add_skip "CLI Experience" "missing go"
+        return
+    fi
+    if [ ! -f "$SMOKE_SCRIPT" ]; then
+        add_skip "CLI Experience" "missing $SMOKE_SCRIPT"
+        return
+    fi
+    if [ ! -f examples/hello/fib.leia ] || [ ! -f examples/hello/types_demo.leia ] || [ ! -f examples/hello/dialects.leia ]; then
+        add_skip "CLI Experience" "missing hello examples"
+        return
+    fi
+    if [ ! -f examples/evaluate/basic_assert.leia ]; then
+        add_skip "CLI Experience" "missing examples/evaluate/basic_assert.leia"
+        return
+    fi
+    add_run "CLI Experience" \
+        "cli_tmp=\$(mktemp -d \"\${TMPDIR:-/tmp}/leia-cli-experience.XXXXXX\") && trap 'rm -rf \"\$cli_tmp\"' EXIT && go run ./cmd/leia run $SMOKE_SCRIPT && go run ./cmd/leia test $SMOKE_SCRIPT && go run ./cmd/leia check --quick $SMOKE_SCRIPT && go run ./cmd/leia examples check --jobs=6 examples/hello/fib.leia examples/hello/types_demo.leia examples/hello/dialects.leia && go run ./cmd/leia evaluate --json examples/evaluate/basic_assert.leia && go run ./cmd/leia mod init --module example.com/cli-experience --dir \"\$cli_tmp\" && go run ./cmd/leia mod check --json \"\$cli_tmp\" && go run ./cmd/leia playground --help"
+}
+
 add_methodjit_regression_gate() {
     if ! have_cmd go; then
         add_skip "MethodJIT Regression" "missing go"
@@ -341,6 +362,7 @@ build_full_plan() {
     add_editor_assets
     add_performance_gate
     add_release_smoke
+    add_cli_experience_gate
 }
 
 if [ "$MODE" = "quick" ]; then

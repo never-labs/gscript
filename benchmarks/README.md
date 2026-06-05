@@ -13,6 +13,7 @@ Benchmarks are grouped by capability domain:
 | `data` | data-oriented and SoA kernels |
 | `app` | larger application-shaped workloads |
 | `control` | control-flow and protected execution |
+| `precision` | numeric precision checks and stability probes |
 
 LuaJIT references live under `benchmarks/lua_ref/<domain>/`.
 
@@ -54,8 +55,8 @@ bash benchmarks/coverage_guard.sh
 
 Use `--syntax-smoke` after lexer/parser/grammar-only work when you need a
 quick current-vs-HEAD check over control, calls, table, string, and data hot
-paths without starting the longer strict truth pass. Add `--strict` if the
-change also needs VM/default/no-filter output stability evidence.
+paths plus the Leia-only dialect truth pass. Add `--no-strict` only when the
+change does not need VM/default/no-filter output stability evidence.
 
 ## Diagnostics
 

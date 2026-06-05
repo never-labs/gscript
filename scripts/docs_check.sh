@@ -15,6 +15,7 @@ Checks README/docs Markdown for:
   - fenced code blocks that mention repository gate scripts whose files exist and are executable.
   - non-archive docs do not reintroduce retired project names.
   - release-readiness docs keep machine-checkable language and AI-native gates.
+  - README stable contract and docs/spec stability contract stay synchronized.
   - docs/spec runnable Leia examples use stable all-mode fence tags and execute.
   - generated reference docs and the checked-in language spec HTML are fresh.
 
@@ -72,6 +73,10 @@ if ! go test ./tests -run 'TestSpecRunnableExamples|TestSpecLeiaCodeFencesAreExe
     echo "error: docs/spec runnable Leia example gate failed" >&2
     exit 1
 fi
+if ! go test ./tests/docs/spec -count=1; then
+    echo "error: docs/spec contract gate failed" >&2
+    exit 1
+fi
 
 python3 - <<'PY'
 import os
@@ -108,6 +113,7 @@ checked_release_gate_docs = 0
 checked_retired_paths = 0
 checked_retired_names = 0
 checked_spec_runnable_examples = 0
+checked_spec_contract_docs = 0
 spec_runnable_report = ""
 
 retired_paths = {
@@ -349,6 +355,46 @@ def check_spec_runnable_coverage() -> None:
     spec_runnable_report = "\n".join(lines)
 
 
+def check_spec_contract_docs() -> None:
+    global checked_spec_contract_docs
+    docs_check = (root / "scripts" / "docs_check.sh").read_text(encoding="utf-8")
+    readme = (root / "README.md").read_text(encoding="utf-8")
+    spec_index = (root / "docs" / "spec" / "index.md").read_text(encoding="utf-8")
+    for path, text, snippets in [
+        (
+            "scripts/docs_check.sh",
+            docs_check,
+            [
+                "go test ./tests/docs/spec -count=1",
+                "README stable contract and docs/spec stability contract",
+            ],
+        ),
+        (
+            "README.md",
+            readme,
+            [
+                "The stable contract is the language spec plus\nfeature matrix and release gates.",
+                "(docs/spec/index.md)",
+            ],
+        ),
+        (
+            "docs/spec/index.md",
+            spec_index,
+            [
+                "## Stability Contract",
+                "`tests/feature_matrix.json`",
+                "at least one semantic or conformance gate",
+                "release notes or migration notes",
+                "must not be advertised as stable",
+            ],
+        ),
+    ]:
+        checked_spec_contract_docs += 1
+        for snippet in snippets:
+            if snippet not in text:
+                errors.append(f"{path}: missing spec/stable-contract snippet: {snippet}")
+
+
 for doc_file in doc_files:
     if doc_file.is_file():
         check_markdown_links(doc_file)
@@ -358,6 +404,7 @@ for doc_file in doc_files:
 
 check_release_gate_docs()
 check_spec_runnable_coverage()
+check_spec_contract_docs()
 
 if errors:
     print("docs_check.sh found problems:", file=sys.stderr)
@@ -370,6 +417,7 @@ print(
     f"{checked_links} relative documentation links, "
     f"{checked_script_mentions} repository-script code-block mentions, "
     f"{checked_release_gate_docs} release-gate docs, "
+    f"{checked_spec_contract_docs} spec/stable-contract docs, "
     f"{checked_retired_paths} retired-path mentions, "
     f"{checked_retired_names} retired-name mentions, "
     "2 generated reference docs, "

@@ -112,6 +112,32 @@ class PerformanceGateValidationTest(unittest.TestCase):
             gate,
         )
 
+    def test_builtin_gate_selectors_are_registered_manifest_workloads(self):
+        gate = SCRIPT.read_text()
+        manifest = json.loads((ROOT / "benchmarks" / "manifest.json").read_text())
+        case_ids = {case["id"] for case in manifest["cases"]}
+        workload_ids = {workload["id"] for workload in manifest["workloads"]}
+        array_names = (
+            "CORE_BENCHES",
+            "SMOKE_BENCHES",
+            "SYNTAX_SMOKE_BENCHES",
+            "SYNTAX_DIALECT_SMOKE_BENCHES",
+            "STRICT_SMOKE_BENCHES",
+            "PHASE_SMOKE_BENCHES",
+            "FEATURE_SMOKE_BENCHES",
+            "STRICT_CORE_BENCHES",
+            "STRICT_FEATURE_BENCHES",
+        )
+
+        selectors = {
+            selector
+            for name in array_names
+            for selector in shell_array_values(gate, name)
+        }
+
+        self.assertEqual(sorted(selectors - case_ids), [])
+        self.assertEqual(sorted(selectors - workload_ids), [])
+
     def test_help_documents_syntax_smoke_profile(self):
         proc = subprocess.run(
             ["bash", str(SCRIPT), "--help"],

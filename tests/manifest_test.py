@@ -175,7 +175,9 @@ class ManifestTest(unittest.TestCase):
             manifest.ROOT = root
             try:
                 generated = manifest.generated_manifest("benchmarks")
-                self.assertEqual(generated["workloads"], [])
+                self.assertEqual(len(generated["workloads"]), 1)
+                self.assertEqual(generated["workloads"][0]["id"], "numeric/case")
+                self.assertEqual(generated["workloads"][0]["script"], "benchmarks/numeric/case.leia")
                 self.assertNotIn("benchmarks", generated)
             finally:
                 manifest.ROOT = original_root

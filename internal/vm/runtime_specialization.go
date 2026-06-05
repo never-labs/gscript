@@ -708,18 +708,12 @@ func cachedRuntimeSpecializationBits(proto *FuncProto) uint64 {
 	if proto == nil {
 		return 0
 	}
-	if cache := proto.RuntimeSpecs.RuntimeSpecialization; cache != nil {
-		return cache.recognized
-	}
 	return runtimeSpecializationCacheForProto(proto).recognized
 }
 
 func cachedCallSiteNoResultRuntimeSpecializationBits(proto *FuncProto) uint64 {
 	if proto == nil {
 		return 0
-	}
-	if cache := proto.RuntimeSpecs.CallSiteNoResultRuntime; cache != nil {
-		return cache.recognized
 	}
 	return callSiteNoResultRuntimeSpecializationCacheForProto(proto).recognized
 }
@@ -747,10 +741,14 @@ func hotCallSiteNoResultRuntimeSpecializationRecognized(proto *FuncProto, id int
 
 func runtimeSpecializationCacheForProto(proto *FuncProto) *runtimeSpecializationProtoCache {
 	fp := runtimeSpecializationFingerprintForProto(proto)
+	proto.RuntimeSpecs.mu.Lock()
 	cache := proto.RuntimeSpecs.RuntimeSpecialization
 	if cache != nil && cache.fingerprint == fp {
+		proto.RuntimeSpecs.mu.Unlock()
 		return cache
 	}
+	proto.RuntimeSpecs.mu.Unlock()
+
 	cache = &runtimeSpecializationProtoCache{fingerprint: fp}
 	for i, entry := range callSiteValueRuntimeSpecializationRegistry {
 		if entry.Info.Name == "" || entry.Recognize == nil {
@@ -760,16 +758,26 @@ func runtimeSpecializationCacheForProto(proto *FuncProto) *runtimeSpecialization
 			cache.recognized |= uint64(1) << uint(i)
 		}
 	}
+	proto.RuntimeSpecs.mu.Lock()
+	if existing := proto.RuntimeSpecs.RuntimeSpecialization; existing != nil && existing.fingerprint == fp {
+		proto.RuntimeSpecs.mu.Unlock()
+		return existing
+	}
 	proto.RuntimeSpecs.RuntimeSpecialization = cache
+	proto.RuntimeSpecs.mu.Unlock()
 	return cache
 }
 
 func callSiteNoResultRuntimeSpecializationCacheForProto(proto *FuncProto) *runtimeSpecializationProtoCache {
 	fp := runtimeSpecializationFingerprintForProto(proto)
+	proto.RuntimeSpecs.mu.Lock()
 	cache := proto.RuntimeSpecs.CallSiteNoResultRuntime
 	if cache != nil && cache.fingerprint == fp {
+		proto.RuntimeSpecs.mu.Unlock()
 		return cache
 	}
+	proto.RuntimeSpecs.mu.Unlock()
+
 	cache = &runtimeSpecializationProtoCache{fingerprint: fp}
 	for i, entry := range callSiteNoResultRuntimeSpecializationRegistry {
 		if entry.Info.Name == "" || entry.Recognize == nil {
@@ -779,6 +787,12 @@ func callSiteNoResultRuntimeSpecializationCacheForProto(proto *FuncProto) *runti
 			cache.recognized |= uint64(1) << uint(i)
 		}
 	}
+	proto.RuntimeSpecs.mu.Lock()
+	if existing := proto.RuntimeSpecs.CallSiteNoResultRuntime; existing != nil && existing.fingerprint == fp {
+		proto.RuntimeSpecs.mu.Unlock()
+		return existing
+	}
 	proto.RuntimeSpecs.CallSiteNoResultRuntime = cache
+	proto.RuntimeSpecs.mu.Unlock()
 	return cache
 }

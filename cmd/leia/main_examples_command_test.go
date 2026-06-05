@@ -19,6 +19,7 @@ func TestExamplesCommandListsRepositoryExamples(t *testing.T) {
 	out := stdout.String()
 	for _, want := range []string{
 		"repo-hello-counter",
+		"repo-embedding-go-doc-examples",
 		"repo-site-static_docs_generator",
 		"repo-security-supply_chain_audit",
 		"repo-security-vendor_onboarding_audit",
@@ -96,6 +97,23 @@ func TestExamplesCommandShowAcceptsIDAndPath(t *testing.T) {
 				t.Fatalf("unexpected show output for %s:\n%s", selector, out)
 			}
 		})
+	}
+}
+
+func TestExamplesCommandChecksEmbeddingDocExamples(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := runExamplesCommand([]string{"check", "repo-embedding-go-doc-examples"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runExamplesCommand code = %d, stdout = %q stderr = %q", code, stdout.String(), stderr.String())
+	}
+	out := stdout.String()
+	for _, want := range []string{
+		"ok      repo-embedding-go-doc-examples",
+		"examples: 1 ok, 0 skipped, 0 failed",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("examples check missing %q\n%s", want, out)
+		}
 	}
 }
 

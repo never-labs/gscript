@@ -497,6 +497,46 @@ func TestReleaseMatrixCIProfilesKeepExampleImportGuards(t *testing.T) {
 	}
 }
 
+func TestReleaseMatrixReadmeCLIExperienceCommandsHaveEvidence(t *testing.T) {
+	root := findRepoRoot(t)
+	for _, item := range []struct {
+		command string
+		path    string
+		snippet string
+	}{
+		{command: "leia check", path: "cmd/leia/main_ci_test.go", snippet: `runCheckCommand([]string{"--json"`},
+		{command: "leia test", path: "cmd/leia/main_test_run_test.go", snippet: `runTestCommand([]string{"--manifest-check"`},
+		{command: "leia ci", path: "cmd/leia/main_ci_test.go", snippet: `runCICommand([]string{"release", "--list"`},
+		{command: "leia examples", path: "cmd/leia/main_examples_command_test.go", snippet: `runExamplesCommand([]string{"check"`},
+		{command: "leia playground", path: "cmd/leia/main_playground_test.go", snippet: `func TestPlaygroundRunAPI`},
+		{command: "leia evaluate", path: "cmd/leia/main_examples_test.go", snippet: `runEvaluateCommand([]string{"--json"`},
+		{command: "leia mod", path: "cmd/leia/main_mod_test.go", snippet: `runModCommand([]string{"check"`},
+		{command: "leia run", path: "cmd/leia/main_run_test.go", snippet: `runRunCommand([]string{"--vm"`},
+	} {
+		text := readFileString(t, filepath.Join(root, filepath.FromSlash(item.path)))
+		if !strings.Contains(text, item.snippet) {
+			t.Fatalf("%s must keep focused test evidence for %s via snippet %q", item.path, item.command, item.snippet)
+		}
+	}
+
+	productionOut := runCommand(t, root, 30*time.Second, "bash", "scripts/production_check.sh", "--full", "--list")
+	for _, want := range []string{
+		"CLI Experience",
+		"go run ./cmd/leia run tests/smoke/01_basic.leia",
+		"go run ./cmd/leia test tests/smoke/01_basic.leia",
+		"go run ./cmd/leia check --quick tests/smoke/01_basic.leia",
+		"go run ./cmd/leia examples check --jobs=6 examples/hello/fib.leia examples/hello/types_demo.leia examples/hello/dialects.leia",
+		"go run ./cmd/leia evaluate --json examples/evaluate/basic_assert.leia",
+		"go run ./cmd/leia mod init --module example.com/cli-experience",
+		"go run ./cmd/leia mod check --json",
+		"go run ./cmd/leia playground --help",
+	} {
+		if !strings.Contains(productionOut, want) {
+			t.Fatalf("production_check.sh --full --list must keep README CLI experience gate %q; got:\n%s", want, productionOut)
+		}
+	}
+}
+
 func TestReleaseMatrixCommunityEntrypointsAreLinked(t *testing.T) {
 	root := findRepoRoot(t)
 	for _, path := range []string{

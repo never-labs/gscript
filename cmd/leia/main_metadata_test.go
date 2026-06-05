@@ -56,8 +56,34 @@ func TestCapabilitiesJSON(t *testing.T) {
 			t.Fatalf("llm runtime primitives = %#v, want %q", caps.LLM.RuntimePrimitives, want)
 		}
 	}
-	if !containsString(caps.Commands, "bench") || !containsString(caps.Commands, "capabilities") || !containsString(caps.Commands, "check") || !containsString(caps.Commands, "ci") || !containsString(caps.Commands, "config") || !containsString(caps.Commands, "diag") || !containsString(caps.Commands, "doc") || !containsString(caps.Commands, "env") || !containsString(caps.Commands, "eval") || !containsString(caps.Commands, "fmt") || !containsString(caps.Commands, "help") || !containsString(caps.Commands, "inspect") || !containsString(caps.Commands, "lint") || !containsString(caps.Commands, "lsp") || !containsString(caps.Commands, "mod") || !containsString(caps.Commands, "repl") || !containsString(caps.Commands, "run") || !containsString(caps.Commands, "test") || !containsString(caps.Commands, "version") {
-		t.Fatalf("commands = %#v, want core command set", caps.Commands)
+	for _, want := range []string{
+		"bench",
+		"capabilities",
+		"check",
+		"ci",
+		"config",
+		"diag",
+		"diagnose",
+		"doc",
+		"env",
+		"eval",
+		"evaluate",
+		"examples",
+		"fmt",
+		"help",
+		"inspect",
+		"lint",
+		"lsp",
+		"mod",
+		"playground",
+		"repl",
+		"run",
+		"test",
+		"version",
+	} {
+		if !containsString(caps.Commands, want) {
+			t.Fatalf("commands = %#v, want %q", caps.Commands, want)
+		}
 	}
 	if !containsString(caps.Tooling.Linter.Formats, "json") || !containsString(caps.Tooling.Linter.Formats, "sarif") || !containsString(caps.Tooling.Linter.Codes, "LEIA1001") {
 		t.Fatalf("linter capabilities = %+v, want json and LEIA1001", caps.Tooling.Linter)

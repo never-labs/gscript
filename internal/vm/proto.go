@@ -84,6 +84,8 @@ type FuncProtoFeedbackState struct {
 // layout fields such as entry pointers, call counters, and inline caches on
 // FuncProto itself because ARM64 code reads them by object offset.
 type FuncProtoRuntimeSpecializations struct {
+	mu sync.Mutex
+
 	RuntimeSpecialization                 *runtimeSpecializationProtoCache
 	CallSiteNoResultRuntime               *runtimeSpecializationProtoCache
 	PermutationFlipChecksumSpecialization *permutationFlipChecksumSpecializationCache

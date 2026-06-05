@@ -437,6 +437,7 @@ func TestPlaygroundRepositoryGameEngineExampleClassification(t *testing.T) {
 func TestPlaygroundAIExamplesCoverRunnableWorkflowShapes(t *testing.T) {
 	t.Setenv("LEIA_PLAYGROUND_MOCK_LLM", "1")
 	want := map[string][]string{
+		"ai-model-alias":       {"model alias\tLEIA_GLM_OK"},
 		"ai-one-line":          {"LEIA_GLM_OK"},
 		"ai-agent-shape":       {"MOCK_AI_OK"},
 		"ai-structured-output": {"\"product\":\"playground\""},

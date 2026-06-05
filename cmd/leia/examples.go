@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -285,6 +286,7 @@ func cliRepositoryExamples() ([]cliExample, error) {
 		applyCLIExampleRunner(&cli)
 		examples = append(examples, cli)
 	}
+	examples = append(examples, cliCuratedProjectExamples()...)
 	sort.Slice(examples, func(i, j int) bool {
 		if examples[i].Section != examples[j].Section {
 			return examples[i].Section < examples[j].Section
@@ -292,6 +294,20 @@ func cliRepositoryExamples() ([]cliExample, error) {
 		return examples[i].ID < examples[j].ID
 	})
 	return examples, nil
+}
+
+func cliCuratedProjectExamples() []cliExample {
+	return []cliExample{
+		{
+			ID:        "repo-embedding-go-doc-examples",
+			Title:     "Go Embedding Doc Examples",
+			Section:   "Embedding",
+			Path:      "examples/embedding/embedding_test.go",
+			Runnable:  true,
+			Checkable: true,
+			Runner:    "go-test",
+		},
+	}
 }
 
 func resolveCLIExample(selector string) (cliExample, string, bool, error) {
@@ -515,10 +531,36 @@ func runCLIExampleRunner(example cliExample, path string, maxSteps int64, stdout
 		return runCLIExampleHostVM(path, maxSteps*64, stdout, stderr)
 	case "llm-mock":
 		return runCLIExampleLLMMock(path, maxSteps, stdout, stderr)
+	case "go-test":
+		return runCLIExampleGoTest(example, stdout, stderr)
 	default:
 		fmt.Fprintf(stderr, "unknown example runner %q for %s\n", example.Runner, example.ID)
 		return 1
 	}
+}
+
+func runCLIExampleGoTest(example cliExample, stdout, stderr io.Writer) int {
+	root := filepath.Dir(playgroundExamplesRoot())
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	pkgDir := filepath.ToSlash(filepath.Dir(example.Path))
+	if pkgDir == "." || pkgDir == "" {
+		fmt.Fprintf(stderr, "run %s: go-test runner needs a package path\n", example.ID)
+		return 1
+	}
+	cmd := exec.CommandContext(ctx, "go", "test", "./"+pkgDir, "-run", "Example", "-count=1")
+	cmd.Dir = root
+	cmd.Stdout = stdout
+	cmd.Stderr = stderr
+	if err := cmd.Run(); err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			fmt.Fprintf(stderr, "run %s: timed out\n", example.ID)
+			return 1
+		}
+		fmt.Fprintf(stderr, "run %s: %v\n", example.ID, err)
+		return 1
+	}
+	return 0
 }
 
 func runCLIExampleHostVM(path string, maxSteps int64, stdout, stderr io.Writer) int {
