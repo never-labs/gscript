@@ -240,6 +240,17 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 		"docs/testing.md",
 	)
 
+	resourceBudgets := requireFeature(t, features, "embedding_resource_budgets")
+	requireFeatureCellRefs(t, resourceBudgets, "embedding_resource_budgets", "semantic_gate",
+		"tests/sdk/resource_budget_test.go",
+		"tests/sdk/resource_budget_native_test.go",
+		"tests/sdk/resource_budget_host_result_test.go",
+		"tests/sdk/resource_budget_module_test.go",
+		"tests/sdk/resource_budget_concurrency_test.go",
+		"tests/sdk/security_api_test.go",
+		"tests/sdk/error_api_test.go",
+	)
+
 	hotReload := requireFeature(t, features, "embedding_hot_reload")
 	requireFeatureCellRefs(t, hotReload, "embedding_hot_reload", "interpreter",
 		"tests/sdk/hotloader_test.go",

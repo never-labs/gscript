@@ -273,11 +273,11 @@
       "spec_sections": ["Values And Types", "Expressions", "Modules And Loading", "Declarations And Scope"],
       "parser": {"status": "not_applicable", "refs": []},
       "bytecode": {"status": "not_applicable", "refs": []},
-      "interpreter": {"status": "covered", "refs": ["internal/stdlib/bind/json_test.go", "internal/stdlib/bind/fs_behavior_test.go", "internal/stdlib/bind/net_behavior_test.go", "internal/stdlib/bind/serve_behavior_test.go"]},
+      "interpreter": {"status": "covered", "refs": ["internal/stdlib/bind/fs_behavior_test.go", "internal/stdlib/bind/io_behavior_test.go", "internal/stdlib/bind/net_behavior_test.go", "internal/stdlib/bind/json_test.go", "internal/stdlib/bind/crypto_test.go", "internal/stdlib/bind/process_test.go", "internal/stdlib/bind/serve_behavior_test.go", "internal/stdlib/bind/db_test.go"]},
       "tier1": {"status": "semantic_only", "refs": []},
       "tier2": {"status": "semantic_only", "refs": []},
-      "semantic_gate": {"status": "covered", "refs": ["tests/language/json_go_host_more.leia", "tests/language/fs_path_glob_cwd_more.leia"]},
-      "conformance_case": {"status": "covered", "refs": ["tests/language/net_http_methods_more.leia", "tests/language/process_exec_run_more.leia", "examples/web/tiny_app.leia"]},
+      "semantic_gate": {"status": "covered", "refs": ["tests/language/fs_path_glob_cwd_more.leia", "tests/language/fs_path_go_host_more.leia", "tests/language/files_io_read_formats_more.leia", "tests/language/files_io_write_read_lines.leia", "tests/language/io_current_stream_more.leia", "tests/language/net_http_background_roundtrip_more.leia", "tests/language/json_go_host_more.leia", "tests/language/crypto_go_host_more.leia", "tests/language/process_go_host_entry_exit_more.leia", "tests/language/http_background_server_more.leia", "tests/language/db_leia_diagnostics_more.leia"]},
+      "conformance_case": {"status": "covered", "refs": ["tests/language/net_http_methods_more.leia", "tests/language/http_router_json_edges_more.leia", "tests/language/process_exec_run_more.leia", "tests/language/db_nested_call_flow_more.leia", "tests/language/db_vm_debug_parity_more.leia", "examples/web/tiny_app.leia"]},
       "perf_hot_case": {"status": "partial", "refs": ["benchmarks/app/stdlib_host.leia", "benchmarks/app/serve_loopback_smoke.leia", "benchmarks/app/sqlite_memory_smoke.leia", "benchmarks/table/json_table_walk.leia"]}
     },
     {
@@ -352,6 +352,20 @@
       "perf_hot_case": {"status": "not_applicable", "refs": []}
     },
     {
+      "id": "embedding_resource_budgets",
+      "name": "Embedding resource budgets for execution, native calls, host results, modules, and concurrency",
+      "category": "embedding-runtime",
+      "spec_sections": ["Stability Contract", "Implementation Requirements", "Concurrency", "Modules And Loading"],
+      "parser": {"status": "not_applicable", "refs": []},
+      "bytecode": {"status": "semantic_only", "refs": []},
+      "interpreter": {"status": "covered", "refs": ["tests/sdk/resource_budget_test.go", "tests/sdk/resource_budget_native_test.go", "tests/sdk/resource_budget_host_result_test.go", "tests/sdk/resource_budget_module_test.go", "tests/sdk/resource_budget_concurrency_test.go", "tests/sdk/security_api_test.go", "tests/sdk/error_api_test.go"]},
+      "tier1": {"status": "semantic_only", "refs": []},
+      "tier2": {"status": "semantic_only", "refs": []},
+      "semantic_gate": {"status": "covered", "refs": ["tests/sdk/resource_budget_test.go", "tests/sdk/resource_budget_native_test.go", "tests/sdk/resource_budget_host_result_test.go", "tests/sdk/resource_budget_module_test.go", "tests/sdk/resource_budget_concurrency_test.go", "tests/sdk/security_api_test.go", "tests/sdk/error_api_test.go"]},
+      "conformance_case": {"status": "not_applicable", "refs": []},
+      "perf_hot_case": {"status": "not_applicable", "refs": []}
+    },
+    {
       "id": "embedding_hot_reload",
       "name": "Embedding hot reload handles, persistent instances, and rollback semantics",
       "category": "embedding-runtime",
@@ -372,12 +386,12 @@
       "spec_sections": ["Tables And Metatables", "Values And Types", "Expressions", "Implementation Requirements"],
       "parser": {"status": "covered", "refs": ["internal/parser/parser_test.go"]},
       "bytecode": {"status": "partial", "refs": ["internal/vm/matrix_multiply_specialization.go"]},
-      "interpreter": {"status": "covered", "refs": ["internal/runtime/table_dense_matrix_test.go", "internal/stdlib/bind/vec_test.go", "internal/runtime/soa_test.go"]},
+      "interpreter": {"status": "covered", "refs": ["internal/runtime/table_dense_matrix_test.go", "internal/stdlib/bind/vec_test.go", "internal/runtime/soa_test.go", "internal/stdlib/bind/soa_test.go"]},
       "tier1": {"status": "covered", "refs": ["internal/methodjit/pass_intrinsic_matrix_test.go", "internal/methodjit/pass_matrix_rowptr_test.go"]},
       "tier2": {"status": "covered", "refs": ["internal/methodjit/emit_matrix_codegen_test.go", "internal/methodjit/pass_matrix_lower.go"]},
-      "semantic_gate": {"status": "covered", "refs": ["tests/language/matrix_host_dense_more.leia", "tests/language/vec_color_geometry_hsl_more.leia"]},
-      "conformance_case": {"status": "covered", "refs": ["tests/language/matrix_host_dense_more.leia"]},
-      "perf_hot_case": {"status": "covered", "refs": ["benchmarks/numeric/matmul_dense.leia", "benchmarks/numeric/spectral_norm_dense.leia"]}
+      "semantic_gate": {"status": "covered", "refs": ["tests/language/matrix_host_dense_more.leia", "tests/language/vec_color_geometry_hsl_more.leia", "internal/stdlib/bind/soa_test.go"]},
+      "conformance_case": {"status": "covered", "refs": ["tests/language/matrix_host_dense_more.leia", "internal/runtime/soa_test.go"]},
+      "perf_hot_case": {"status": "covered", "refs": ["benchmarks/numeric/matmul_dense.leia", "benchmarks/numeric/spectral_norm_dense.leia", "benchmarks/data/soa_affine_many.leia", "benchmarks/data/soa_masked_aggregate.leia", "benchmarks/data/soa_filter_gather.leia", "benchmarks/data/soa_scan.leia"]}
     },
     {
       "id": "classes_methods_oop",
