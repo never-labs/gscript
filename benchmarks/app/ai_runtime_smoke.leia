@@ -1,0 +1,96 @@
+// Local AI runtime substrate smoke benchmark. This intentionally exercises
+// message/tool/agent metadata without requiring a network LLM provider.
+
+N := 4500
+MOD := 1000000007
+
+func mix(sum, v) {
+    return (sum * 131 + v) % MOD
+}
+
+func checksum_text(sum, s) {
+    acc := sum
+    for i := 1; i <= #s; i++ {
+        acc = mix(acc, string.byte(s, i))
+    }
+    return acc
+}
+
+lookup := tool {
+    name: "lookup"
+    description: "Lookup local knowledge."
+    params: {"query"}
+    requires: {"docs.read"}
+    fn: func(query) {
+        return "hit:" .. query, nil
+    }
+}
+
+summarize := tool {
+    name: "summarize"
+    description: "Summarize local text."
+    params: {"text"}
+    requires: {"docs.read", "text.write"}
+    fn: func(text) {
+        return string.sub(text, 1, 24), nil
+    }
+}
+
+reviewer := agent {
+    name: "reviewer"
+    description: "Review local findings."
+    params: {"task"}
+    output: {summary: "", risk: "low"}
+    config: func(task) {
+        return {
+            model: "mock-fast"
+            messages: {
+                llm.system("Review concise local findings.")
+                llm.user(task)
+            }
+            tools: {lookup, summarize}
+        }, nil
+    }
+}
+
+review_tool := llm.agent_as_tool(reviewer, {name: "reviewer_tool", description: "Delegate a local review."})
+tools := {lookup, summarize, review_tool}
+caps := llm.tool_caps(tools)
+ok, checkErr := llm.check_tools(tools, {"docs.read", "text.write", "cap.all"})
+assert(ok == true)
+assert(checkErr == nil)
+
+t0 := time.now()
+checksum := 0
+
+for i := 1; i <= N; i++ {
+    topic := string.format("case-%04d", i % 997)
+    sys := llm.system("System " .. topic)
+    user := llm.user("User asks about " .. topic)
+    assistant := llm.assistant("Assistant draft " .. topic)
+    call := {id: "call-" .. tostring(i), tool: "lookup", args: {query: topic}}
+    callMsg := llm.assistant_call(call)
+    resultMsg := llm.tool_result(call.id, {summary: "hit:" .. topic, score: i % 17})
+    errorMsg := llm.tool_error(call.id, "retryable")
+
+    checksum = checksum_text(checksum, sys.role)
+    checksum = checksum_text(checksum, user.text)
+    checksum = checksum_text(checksum, assistant.text)
+    checksum = checksum_text(checksum, callMsg.tool_call.tool)
+    checksum = checksum_text(checksum, resultMsg.value.summary)
+    checksum = checksum_text(checksum, errorMsg.error)
+    checksum = mix(checksum, #caps + #tools + (i % 23))
+
+    if i % 75 == 0 {
+        allowed, err := llm.check_tools({lookup, summarize}, caps)
+        assert(allowed == true)
+        assert(err == nil)
+        checksum = mix(checksum, #llm.tool_caps({lookup, summarize}))
+    }
+}
+
+elapsed := time.since(t0)
+
+print(string.format("ai_runtime_smoke n=%d", N))
+print(string.format("checksum: %d", checksum))
+print(string.format("Time: %.3fs", elapsed))

@@ -1,0 +1,70 @@
+// Minimal local serve/http loopback smoke benchmark.
+
+N := 180
+MOD := 1000000007
+
+func mix(sum, v) {
+    return (sum * 131 + v) % MOD
+}
+
+func checksum_text(sum, s) {
+    acc := sum
+    for i := 1; i <= #s; i++ {
+        acc = mix(acc, string.byte(s, i))
+    }
+    return acc
+}
+
+app := serve.app({
+    listen: "127.0.0.1:0",
+    routes: {
+        {method: "GET", path: "/ping/:id", handler: func(req) {
+            return "pong:" .. req.params.id .. ":" .. req.query.step
+        }},
+        {method: "POST", path: "/echo", handler: func(req) {
+            body, err := req.json()
+            if err != nil {
+                return {error: err}
+            }
+            return {id: body.id, name: body.name, ok: true}
+        }},
+    },
+})
+
+t0 := time.now()
+checksum := 0
+headers := {}
+headers["Content-Type"] = "application/json"
+
+for i := 1; i <= N; i++ {
+    id := tostring(i % 97)
+    step := tostring((i * 7) % 31)
+
+    getResp := http.get(app.url .. "/ping/" .. id .. "?step=" .. step)
+    assert(getResp.status == 200)
+    checksum = checksum_text(checksum, getResp.body)
+
+    payload := string.format("{\"id\":%d,\"name\":\"user-%03d\"}", i, i % 1000)
+    postResp, postErr := net.post(app.url .. "/echo", payload, {headers: headers})
+    assert(postErr == nil)
+    assert(postResp.status == 200)
+    posted, jsonErr := postResp.json()
+    assert(jsonErr == nil)
+    assert(posted.id == i)
+    assert(posted.name == string.format("user-%03d", i % 1000))
+    assert(posted.ok == true)
+    checksum = checksum_text(mix(checksum, posted.id), postResp.body)
+}
+
+elapsed := time.since(t0)
+
+closed, closeErr := app.close()
+assert(closed == true)
+assert(closeErr == nil)
+waited, waitErr := app.wait()
+assert(waited == true)
+assert(waitErr == nil)
+
+print(string.format("serve_loopback_smoke n=%d", N))
+print(string.format("checksum: %d", checksum))
+print(string.format("Time: %.3fs", elapsed))

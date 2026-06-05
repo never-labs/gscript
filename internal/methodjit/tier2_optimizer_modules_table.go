@@ -17,7 +17,8 @@ func init() {
 func tier2TableObjectPreparationModules(globals map[string]*vm.FuncProto) []Tier2OptimizerModule {
 	fixedShapeFacts := fixedShapeTableFacts()
 	fixedShapeAllowed := allowedDomainsForModule(nil, nil, fixedShapeFacts)
-	escapePostAllowed := allowedDomainsForModule(analysisFacts(AnalysisFactFixedShapeTables), nil, nil)
+	escapePostOptionalReads := analysisFacts(AnalysisFactGlobals)
+	escapePostAllowed := allowedDomainsForModule(analysisFacts(AnalysisFactFixedShapeTables), nil, nil, escapePostOptionalReads)
 	return []Tier2OptimizerModule{
 		tier2PassModuleWith("TablePreallocHint", Tier2PhaseTableObjectPrep, nil, nil, TablePreallocHintPass),
 		tier2PassModuleWith("TypeSpecialize (post-table-prealloc)", Tier2PhaseTableObjectPrep, nil, nil, TypeSpecializePass),
@@ -37,10 +38,11 @@ func tier2TableObjectPreparationModules(globals map[string]*vm.FuncProto) []Tier
 		tier2PassModuleWithCtx("FixedTableConstructorLowering", Tier2PhaseTableObjectPrep, analysisFacts(AnalysisFactFixedShapeTables, AnalysisFactFixedTableConstructors), nil, FixedTableConstructorLoweringPassCtx),
 		tier2PassModuleWith("TablePreallocHint (post-fixed-table-lowering)", Tier2PhaseTableObjectPrep, nil, nil, TablePreallocHintPass),
 		{
-			Name:     "EscapeAnalysis (post-fixed-table-lowering)",
-			Phase:    Tier2PhaseTableObjectPrep,
-			Requires: analysisFacts(AnalysisFactFixedShapeTables),
-			Provides: nil,
+			Name:          "EscapeAnalysis (post-fixed-table-lowering)",
+			Phase:         Tier2PhaseTableObjectPrep,
+			Requires:      analysisFacts(AnalysisFactFixedShapeTables),
+			Provides:      nil,
+			OptionalReads: escapePostOptionalReads,
 			RunWithContext: func(fn *Function, opts *Tier2PipelineOpts, optCtx *Tier2OptimizerContext) (*Function, error) {
 				if !hasFixedTableScalarReplacementCandidate(fn) {
 					return fn, nil

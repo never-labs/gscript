@@ -132,7 +132,35 @@ def generated_manifest(root_name: str) -> dict[str, Any]:
                 if key in existing:
                     manifest[key] = existing[key]
             existing_workloads = existing.get("workloads")
-            manifest["workloads"] = existing_workloads if isinstance(existing_workloads, list) else []
+            if isinstance(existing_workloads, list):
+                workloads = [
+                    row
+                    for row in existing_workloads
+                    if isinstance(row, dict)
+                    and isinstance(row.get("script"), str)
+                    and (ROOT / row["script"]).exists()
+                ]
+            else:
+                workloads = []
+            workload_ids = {row.get("id") for row in workloads if isinstance(row.get("id"), str)}
+            for case in cases:
+                case_id_value = case["id"]
+                if case_id_value in workload_ids:
+                    continue
+                workload = {
+                    "id": case_id_value,
+                    "domain": case["domain"],
+                    "name": Path(case["path"]).stem,
+                    "script": case["path"],
+                    "comparison_reference": case["reference"],
+                    "params": {},
+                    "recommended_scale": {"hot": {}},
+                    "time_source_hint": "script_time_line",
+                    "tags": [case["domain"]],
+                }
+                workloads.append(workload)
+                workload_ids.add(case_id_value)
+            manifest["workloads"] = workloads
         else:
             manifest["workloads"] = []
     return manifest
@@ -179,6 +207,30 @@ def validate_manifest(root_name: str) -> list[str]:
 
     if manifest.get("case_count") != len(cases):
         errors.append(f"{repo_rel(manifest_path)}: case_count does not match cases length")
+
+    if root_name == "benchmarks":
+        workloads = manifest.get("workloads")
+        if not isinstance(workloads, list):
+            errors.append(f"{repo_rel(manifest_path)}: missing workloads array")
+        else:
+            workload_ids: set[str] = set()
+            for index, row in enumerate(workloads):
+                if not isinstance(row, dict):
+                    errors.append(f"{repo_rel(manifest_path)}: workloads[{index}] is not an object")
+                    continue
+                row_id = row.get("id")
+                if not isinstance(row_id, str):
+                    errors.append(f"{repo_rel(manifest_path)}: workloads[{index}] has non-string id")
+                elif row_id in workload_ids:
+                    errors.append(f"{repo_rel(manifest_path)}: duplicate workload id {row_id}")
+                else:
+                    workload_ids.add(row_id)
+                script = row.get("script")
+                if not isinstance(script, str):
+                    errors.append(f"{repo_rel(manifest_path)}: workloads[{index}] has non-string script")
+                    continue
+                if not (ROOT / script).exists():
+                    errors.append(f"{repo_rel(manifest_path)}: workload script does not exist: {script}")
 
     for expected in discovered_by_path.values():
         actual = manifest_by_path.get(expected["path"])

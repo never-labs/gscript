@@ -51,7 +51,6 @@ SYNTAX_SMOKE_BENCHES=(
     "table/table_array_access"
     "string/string_bench"
     "data/soa_affine_many"
-    "app/dialect_syntax_smoke"
 )
 
 SYNTAX_DIALECT_SMOKE_BENCHES=(
@@ -69,6 +68,9 @@ PHASE_SMOKE_BENCHES=(
     "concurrency/producer_consumer_pipeline"
     "calls/calls_vararg_coroutine"
     "app/stdlib_host"
+    "app/ai_runtime_smoke"
+    "app/serve_loopback_smoke"
+    "app/sqlite_memory_smoke"
     "data/soa_affine_many"
     "data/soa_masked_aggregate"
 )
@@ -77,6 +79,9 @@ FEATURE_SMOKE_BENCHES=(
     "concurrency/producer_consumer_pipeline"
     "calls/calls_vararg_coroutine"
     "app/stdlib_host"
+    "app/ai_runtime_smoke"
+    "app/serve_loopback_smoke"
+    "app/sqlite_memory_smoke"
     "data/soa_affine_many"
     "data/soa_masked_aggregate"
 )
@@ -92,6 +97,9 @@ STRICT_FEATURE_BENCHES=(
     "concurrency/producer_consumer_pipeline"
     "calls/calls_vararg_coroutine"
     "app/stdlib_host"
+    "app/ai_runtime_smoke"
+    "app/serve_loopback_smoke"
+    "app/sqlite_memory_smoke"
     "data/soa_affine_many"
     "data/soa_masked_aggregate"
 )

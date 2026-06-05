@@ -1,0 +1,86 @@
+// Local SQLite/sql dialect smoke benchmark for app-level data workflows.
+
+N := 9000
+MOD := 1000000007
+
+func mix(sum, v) {
+    return (sum * 131 + v) % MOD
+}
+
+func checksum_text(sum, s) {
+    acc := sum
+    for i := 1; i <= #s; i++ {
+        acc = mix(acc, string.byte(s, i))
+    }
+    return acc
+}
+
+conn := db.memory()
+conn.exec(sql`create table events (
+    id integer primary key,
+    actor text not null,
+    kind text not null,
+    score integer not null,
+    note text not null
+)`)
+
+t0 := time.now()
+checksum := 0
+
+for i := 1; i <= N; i++ {
+    actor := string.format("npc-%03d", i % 71)
+    kind := "talk"
+    if i % 5 == 0 {
+        kind = "work"
+    } else if i % 7 == 0 {
+        kind = "visit"
+    }
+    score := (i * 37 + #actor * 11) % 1000
+    note := string.format("%s/%s/%d", actor, kind, score)
+
+    _, err := conn.exec(sql {
+        query: "insert into events (actor, kind, score, note) values (:actor, :kind, :score, :note)"
+        params: {actor: actor, kind: kind, score: score, note: note}
+    })
+    assert(err == nil)
+
+    if i % 30 == 0 {
+        rows, qerr := conn.query(sql {
+            query: "select kind, count(*) as n, sum(score) as total from events where actor = :actor group by kind order by kind"
+            params: {actor: actor}
+        })
+        assert(qerr == nil)
+        for j := 1; j <= #rows; j++ {
+            row := rows[j]
+            checksum = checksum_text(mix(checksum, row.n + row.total), row.kind)
+        }
+    }
+}
+
+topRows, topErr := conn.query(sql`
+    select actor, count(*) as n, sum(score) as total
+    from events
+    group by actor
+    order by total desc, actor asc
+    limit 8
+`)
+assert(topErr == nil)
+
+for i := 1; i <= #topRows; i++ {
+    row := topRows[i]
+    checksum = checksum_text(mix(checksum, row.n + row.total), row.actor)
+}
+
+summary, summaryErr := conn.one(sql`select count(*) as n, sum(score) as total from events`)
+assert(summaryErr == nil)
+checksum = mix(checksum, summary.n + summary.total)
+
+elapsed := time.since(t0)
+
+closed, closeErr := conn.close()
+assert(closed == true)
+assert(closeErr == nil)
+
+print(string.format("sqlite_memory_smoke n=%d", N))
+print(string.format("checksum: %d", checksum))
+print(string.format("Time: %.3fs", elapsed))

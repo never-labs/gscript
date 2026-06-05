@@ -1,6 +1,6 @@
 {
   "schema_version": 3,
-  "case_count": 69,
+  "case_count": 72,
   "cases": [
     {
       "id": "app/actors_dispatch_mutation",
@@ -11,6 +11,18 @@
         "kind": "lua",
         "path": "benchmarks/lua_ref/app/actors_dispatch_mutation.lua"
       },
+      "status": "active",
+      "tags": [
+        "app",
+        "benchmark"
+      ]
+    },
+    {
+      "id": "app/ai_runtime_smoke",
+      "path": "benchmarks/app/ai_runtime_smoke.leia",
+      "domain": "app",
+      "kind": "benchmark",
+      "reference": null,
       "status": "active",
       "tags": [
         "app",
@@ -38,6 +50,30 @@
         "kind": "lua",
         "path": "benchmarks/lua_ref/app/mixed_inventory_sim.lua"
       },
+      "status": "active",
+      "tags": [
+        "app",
+        "benchmark"
+      ]
+    },
+    {
+      "id": "app/serve_loopback_smoke",
+      "path": "benchmarks/app/serve_loopback_smoke.leia",
+      "domain": "app",
+      "kind": "benchmark",
+      "reference": null,
+      "status": "active",
+      "tags": [
+        "app",
+        "benchmark"
+      ]
+    },
+    {
+      "id": "app/sqlite_memory_smoke",
+      "path": "benchmarks/app/sqlite_memory_smoke.leia",
+      "domain": "app",
+      "kind": "benchmark",
+      "reference": null,
       "status": "active",
       "tags": [
         "app",
@@ -2231,6 +2267,51 @@
       "time_source_hint": "script_time_line",
       "tags": [
         "control"
+      ]
+    },
+    {
+      "id": "app/ai_runtime_smoke",
+      "domain": "app",
+      "name": "ai_runtime_smoke",
+      "script": "benchmarks/app/ai_runtime_smoke.leia",
+      "comparison_reference": null,
+      "params": {},
+      "recommended_scale": {
+        "hot": {}
+      },
+      "time_source_hint": "script_time_line",
+      "tags": [
+        "app"
+      ]
+    },
+    {
+      "id": "app/serve_loopback_smoke",
+      "domain": "app",
+      "name": "serve_loopback_smoke",
+      "script": "benchmarks/app/serve_loopback_smoke.leia",
+      "comparison_reference": null,
+      "params": {},
+      "recommended_scale": {
+        "hot": {}
+      },
+      "time_source_hint": "script_time_line",
+      "tags": [
+        "app"
+      ]
+    },
+    {
+      "id": "app/sqlite_memory_smoke",
+      "domain": "app",
+      "name": "sqlite_memory_smoke",
+      "script": "benchmarks/app/sqlite_memory_smoke.leia",
+      "comparison_reference": null,
+      "params": {},
+      "recommended_scale": {
+        "hot": {}
+      },
+      "time_source_hint": "script_time_line",
+      "tags": [
+        "app"
       ]
     }
   ]
