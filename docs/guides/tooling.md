@@ -9,11 +9,12 @@ go run ./cmd/leia fmt --check tests/smoke/01_basic.leia
 go run ./cmd/leia lint tests/smoke/01_basic.leia
 go run ./cmd/leia test tests/smoke/01_basic.leia
 go run ./cmd/leia test --json --output test-report.json tests/smoke/01_basic.leia
-go run ./cmd/leia check --no-docs .
+go run ./cmd/leia check --no-docs --no-editor --no-examples .
 ```
 
 `leia check` runs formatter, linter, `.leia` tests, manifest coverage, and docs
-checks. Use skip flags only while iterating:
+checks, editor asset checks, and runnable repository example checks. Use skip
+flags only while iterating:
 
 ```bash
 go run ./cmd/leia check --no-test --no-docs tests/smoke/01_basic.leia
@@ -82,8 +83,37 @@ bash scripts/docs_check.sh
 ```
 
 Generated reference pages are checked in. `scripts/docs_check.sh` verifies
-generated CLI/stdlib references, Markdown links, release reference coverage,
-and retired naming.
+generated CLI/stdlib references, spec HTML freshness, spec runnable examples,
+Markdown links, release reference coverage, retired naming, and documented
+repository script entrypoints.
+
+## Editors
+
+```bash
+bash scripts/editor_check.sh
+bash scripts/editor_check.sh --require-tree-sitter
+python3 -m unittest tools.editor.smoke.editor_check_test
+```
+
+The editor gate validates shared TextMate grammars, VS Code syntax assets,
+snippets, language configuration, extension JavaScript syntax, the spec preview
+helper, editor smoke fixtures, and tree-sitter corpus tests when the CLI is
+available. Use `--require-tree-sitter` in environments where the tree-sitter
+dependency is expected to be installed.
+
+## Examples
+
+```bash
+go run ./cmd/leia examples list
+go run ./cmd/leia examples show repo-hello-fib
+go run ./cmd/leia examples check examples/hello/fib.leia examples/hello/types_demo.leia examples/hello/dialects.leia
+go run ./cmd/leia examples run repo-hello-fib
+```
+
+`leia examples check` is the same checker used by the repository-wide
+`leia check` examples step. Runnable examples execute locally; manual examples
+are reported as skipped with their required host capability, service,
+credential, or step-budget reason.
 
 ## Performance
 

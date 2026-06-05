@@ -12,16 +12,21 @@ Usage: scripts/docs_check.sh [--help]
 
 Checks README/docs Markdown for:
   - relative .md links whose target file exists;
-  - fenced code blocks that mention release scripts whose files exist and are executable.
+  - fenced code blocks that mention repository gate scripts whose files exist and are executable.
   - non-archive docs do not reintroduce retired project names.
   - release-readiness docs keep machine-checkable language and AI-native gates.
+  - docs/spec runnable Leia examples use stable all-mode fence tags and execute.
   - generated reference docs and the checked-in language spec HTML are fresh.
 
-The release-script check covers:
+The repository-script mention check covers:
   scripts/production_check.sh
   scripts/performance_gate.sh
   scripts/diagnostics_bundle.sh
+  scripts/docs_check.sh
+  scripts/editor_check.sh
   scripts/release_artifacts.sh
+  scripts/release_artifacts_check.sh
+  scripts/worktree_audit.sh
 EOF
 }
 
@@ -89,7 +94,11 @@ script_names = {
     "production_check": root / "scripts" / "production_check.sh",
     "performance_gate": root / "scripts" / "performance_gate.sh",
     "diagnostics_bundle": root / "scripts" / "diagnostics_bundle.sh",
+    "docs_check": root / "scripts" / "docs_check.sh",
+    "editor_check": root / "scripts" / "editor_check.sh",
     "release_artifacts": root / "scripts" / "release_artifacts.sh",
+    "release_artifacts_check": root / "scripts" / "release_artifacts_check.sh",
+    "worktree_audit": root / "scripts" / "worktree_audit.sh",
 }
 
 errors = []
@@ -352,7 +361,7 @@ if errors:
 print(
     f"docs_check.sh: checked {len(doc_files)} Markdown files, "
     f"{checked_links} relative .md links, "
-    f"{checked_script_mentions} release-script code-block mentions, "
+    f"{checked_script_mentions} repository-script code-block mentions, "
     f"{checked_release_gate_docs} release-gate docs, "
     f"{checked_retired_paths} retired-path mentions, "
     f"{checked_retired_names} retired-name mentions, "

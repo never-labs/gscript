@@ -164,6 +164,40 @@ func TestDialectURLPathTemplateMatchAndEncode(t *testing.T) {
 	}
 }
 
+func TestDialectHTMLValueEncoder(t *testing.T) {
+	interp := runWithLib(t, `
+		escaped := html`+"`"+`<b>Ada & Bob</b>`+"`"+`
+		bad_attrs := {}
+		bad_attrs["bad attr"] = "x"
+		page := html {
+			tag: "main",
+			attrs: {class: "card", hidden: false, data_id: "x&1"},
+			children: {
+				{tag: "h1", text: "Release <ok>"},
+				{tag: "p", children: {"Status: ", {tag: "strong", text: "green"}}},
+				{tag: "input", attrs: {disabled: true, value: "ship"}},
+				{raw: "<!-- generated -->"},
+			},
+		}
+		bad_tag, bad_tag_err := dialect.eval("html", {tag: "script src"})
+		bad_attr, bad_attr_err := dialect.eval("html", {tag: "div", attrs: bad_attrs})
+	`, "dialect", BuildDialect(HostOptions{}, nil))
+
+	if got, want := interp.GetGlobal("escaped").Str(), "&lt;b&gt;Ada &amp; Bob&lt;/b&gt;"; got != want {
+		t.Fatalf("html escaped = %q, want %q", got, want)
+	}
+	wantPage := `<main class="card" data_id="x&amp;1"><h1>Release &lt;ok&gt;</h1><p>Status: <strong>green</strong></p><input disabled value="ship"><!-- generated --></main>`
+	if got := interp.GetGlobal("page").Str(); got != wantPage {
+		t.Fatalf("html page = %q, want %q", got, wantPage)
+	}
+	if !interp.GetGlobal("bad_tag").IsNil() || !strings.Contains(interp.GetGlobal("bad_tag_err").Str(), "invalid tag") {
+		t.Fatalf("bad tag = %v err %v", interp.GetGlobal("bad_tag"), interp.GetGlobal("bad_tag_err"))
+	}
+	if !interp.GetGlobal("bad_attr").IsNil() || !strings.Contains(interp.GetGlobal("bad_attr_err").Str(), "invalid attribute") {
+		t.Fatalf("bad attr = %v err %v", interp.GetGlobal("bad_attr"), interp.GetGlobal("bad_attr_err"))
+	}
+}
+
 func TestDialectSSEParseAndEncode(t *testing.T) {
 	interp := runWithLib(t, `
 		events := sse`+"`"+`: keepalive

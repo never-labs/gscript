@@ -1,6 +1,7 @@
 package bind
 
 import (
+	"encoding/pem"
 	"fmt"
 	"io"
 	"strings"
@@ -57,6 +58,11 @@ func registerDialectData(register dialectRegisterFunc, maxHostResult func() int6
 	register([]string{"binary"}, dialectHandler{
 		eval: func(body Value, options *Table) ([]Value, error) {
 			return dialectBinary(body, options, maxHostResult)
+		},
+	})
+	register([]string{"pem"}, dialectHandler{
+		eval: func(body Value, options *Table) ([]Value, error) {
+			return dialectPEM(body, options, maxHostResult)
 		},
 	})
 }
@@ -345,4 +351,162 @@ func binaryDialectPackValues(tbl *Table) []binfmt.PackValue {
 		values = append(values, binaryPackValue(tbl.RawGetInt(int64(i))))
 	}
 	return values
+}
+
+func dialectPEM(body Value, opts *Table, maxHostResult func() int64) ([]Value, error) {
+	mode := "parse"
+	if body.IsTable() {
+		mode = "encode"
+	}
+	if opts != nil && opts.RawGetString("mode").IsString() {
+		mode = opts.RawGetString("mode").Str()
+	}
+	switch mode {
+	case "", "parse", "decode":
+		blocks, err := parsePEMBlocks(body.String(), hostResultLimit(maxHostResult))
+		if err != nil {
+			return []Value{NilValue(), StringValue(err.Error())}, nil
+		}
+		if opts != nil && opts.RawGetString("single").Truthy() {
+			if len(blocks) != 1 {
+				return []Value{NilValue(), StringValue(fmt.Sprintf("pem dialect: expected exactly one block, got %d", len(blocks)))}, nil
+			}
+			return []Value{pemBlockToValue(blocks[0])}, nil
+		}
+		out := NewAppendArrayTable(len(blocks))
+		for i, block := range blocks {
+			out.RawSetInt(int64(i+1), pemBlockToValue(block))
+		}
+		return []Value{TableValue(out)}, nil
+	case "encode", "format":
+		blocks, err := pemBlocksFromValue(body)
+		if err != nil {
+			return nil, err
+		}
+		var out strings.Builder
+		for _, block := range blocks {
+			encoded := pem.EncodeToMemory(block)
+			if encoded == nil {
+				return nil, fmt.Errorf("pem dialect: encode failed")
+			}
+			out.Write(encoded)
+		}
+		text := out.String()
+		if err := CheckProjectedHostStringBytes(hostResultLimit(maxHostResult), len(text)); err != nil {
+			return nil, err
+		}
+		return []Value{StringValue(text)}, nil
+	default:
+		return dialectUnknownMode("pem", mode)
+	}
+}
+
+func parsePEMBlocks(src string, limit int64) ([]*pem.Block, error) {
+	rest := []byte(src)
+	var blocks []*pem.Block
+	totalStrings := 0
+	for len(strings.TrimSpace(string(rest))) > 0 {
+		block, next := pem.Decode(rest)
+		if block == nil {
+			return nil, fmt.Errorf("pem dialect: no PEM block found")
+		}
+		blocks = append(blocks, block)
+		totalStrings += len(block.Type) + len(block.Bytes)
+		for k, v := range block.Headers {
+			totalStrings += len(k) + len(v)
+		}
+		if raw := pem.EncodeToMemory(block); raw != nil {
+			totalStrings += len(raw)
+		}
+		if err := CheckProjectedHostStringBytes(limit, totalStrings); err != nil {
+			return nil, err
+		}
+		rest = next
+	}
+	if len(blocks) == 0 {
+		return nil, fmt.Errorf("pem dialect: no PEM block found")
+	}
+	return blocks, nil
+}
+
+func pemBlockToValue(block *pem.Block) Value {
+	out := NewTable()
+	out.RawSetString("type", StringValue(block.Type))
+	headers := NewTable()
+	for key, value := range block.Headers {
+		headers.RawSetString(key, StringValue(value))
+	}
+	body := string(block.Bytes)
+	out.RawSetString("headers", TableValue(headers))
+	out.RawSetString("body", StringValue(body))
+	out.RawSetString("text", StringValue(body))
+	out.RawSetString("raw", StringValue(string(pem.EncodeToMemory(block))))
+	return TableValue(out)
+}
+
+func pemBlocksFromValue(v Value) ([]*pem.Block, error) {
+	if !v.IsTable() {
+		return nil, fmt.Errorf("pem dialect: table or block array expected for encode")
+	}
+	tbl := v.Table()
+	if tbl.RawGetString("type").IsString() {
+		block, err := pemBlockFromTable(tbl, 1)
+		if err != nil {
+			return nil, err
+		}
+		return []*pem.Block{block}, nil
+	}
+	blocks := make([]*pem.Block, 0, tbl.Length())
+	for i := 1; i <= tbl.Length(); i++ {
+		item := tbl.RawGetInt(int64(i))
+		if !item.IsTable() {
+			return nil, fmt.Errorf("pem dialect: block %d must be table", i)
+		}
+		block, err := pemBlockFromTable(item.Table(), i)
+		if err != nil {
+			return nil, err
+		}
+		blocks = append(blocks, block)
+	}
+	if len(blocks) == 0 {
+		return nil, fmt.Errorf("pem dialect: at least one block required for encode")
+	}
+	return blocks, nil
+}
+
+func pemBlockFromTable(tbl *Table, index int) (*pem.Block, error) {
+	typeValue := tbl.RawGetString("type")
+	if !typeValue.IsString() || typeValue.Str() == "" {
+		return nil, fmt.Errorf("pem dialect: block %d type string required", index)
+	}
+	bodyValue := tbl.RawGetString("body")
+	if bodyValue.IsNil() {
+		bodyValue = tbl.RawGetString("text")
+	}
+	if bodyValue.IsNil() {
+		return nil, fmt.Errorf("pem dialect: block %d body string required", index)
+	}
+	headers, err := pemHeadersFromValue(tbl.RawGetString("headers"), index)
+	if err != nil {
+		return nil, err
+	}
+	return &pem.Block{Type: typeValue.Str(), Headers: headers, Bytes: []byte(bodyValue.String())}, nil
+}
+
+func pemHeadersFromValue(v Value, index int) (map[string]string, error) {
+	if v.IsNil() {
+		return nil, nil
+	}
+	if !v.IsTable() {
+		return nil, fmt.Errorf("pem dialect: block %d headers must be table", index)
+	}
+	headers := make(map[string]string)
+	tbl := v.Table()
+	for key, val, ok := tbl.Next(NilValue()); ok; key, val, ok = tbl.Next(key) {
+		if !key.IsString() {
+			return nil, fmt.Errorf("pem dialect: block %d header key must be string", index)
+		}
+		headers[key.Str()] = val.String()
+	}
+	return headers, nil
 }

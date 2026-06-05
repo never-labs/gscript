@@ -15,8 +15,8 @@ func TestDialectTagsExposeInstalledHandlers(t *testing.T) {
 	got := stringSetFromArray(interp.GetGlobal("tags").Table())
 	want := []string{
 		"base32", "base64", "binary", "cidr", "cmd", "cookie", "cookies", "csv", "deflate", "duration", "env", "glob",
-		"gzip", "hash", "headers", "hex", "hostport", "html_escape", "http_headers", "httpmsg", "ini", "ipaddr", "json", "jsonl", "jsonptr",
-		"junit", "jwt", "kv", "lines", "logfmt", "markdown", "md", "mdtable", "mime", "multipart", "numbers", "nums", "path", "prompt",
+		"gzip", "hash", "headers", "hex", "hostport", "html", "html_escape", "http_headers", "httpmsg", "ini", "ipaddr", "json", "jsonl", "jsonptr",
+		"junit", "jwt", "kv", "lines", "logfmt", "markdown", "md", "mdtable", "mime", "multipart", "numbers", "nums", "path", "pem", "prompt",
 		"quote", "re", "regexp", "semver", "sh", "shellwords", "split", "sql", "sse", "tap", "template", "tsv", "url",
 		"urlpath", "urlquery", "uuid", "words", "xml", "yaml", "yml", "zlib",
 	}
@@ -150,8 +150,8 @@ func expectedBuiltinDialectCategories() map[string]string {
 	return map[string]string{
 		"sh": "host", "cmd": "host", "glob": "host",
 		"shellwords": "text", "path": "text", "re": "text", "regexp": "text", "json": "text", "jsonptr": "text", "jsonl": "text", "csv": "text", "tsv": "text", "mdtable": "text", "markdown": "text", "md": "text", "lines": "text", "split": "text", "words": "text", "nums": "text", "numbers": "text", "kv": "text", "logfmt": "text", "env": "text", "ini": "text", "yaml": "text", "yml": "text", "semver": "text", "duration": "text", "tap": "text", "xml": "text", "template": "text",
-		"url": "protocol", "html_escape": "protocol", "urlquery": "protocol", "urlpath": "protocol", "mime": "protocol", "headers": "protocol", "http_headers": "protocol", "cookie": "protocol", "cookies": "protocol", "httpmsg": "protocol", "sse": "protocol", "multipart": "protocol", "jwt": "protocol", "ipaddr": "protocol", "cidr": "protocol", "hostport": "protocol",
-		"base64": "data", "hash": "data", "hex": "data", "base32": "data", "uuid": "data", "gzip": "data", "zlib": "data", "deflate": "data", "binary": "data",
+		"url": "protocol", "html_escape": "protocol", "html": "protocol", "urlquery": "protocol", "urlpath": "protocol", "mime": "protocol", "headers": "protocol", "http_headers": "protocol", "cookie": "protocol", "cookies": "protocol", "httpmsg": "protocol", "sse": "protocol", "multipart": "protocol", "jwt": "protocol", "ipaddr": "protocol", "cidr": "protocol", "hostport": "protocol",
+		"base64": "data", "hash": "data", "hex": "data", "base32": "data", "uuid": "data", "gzip": "data", "zlib": "data", "deflate": "data", "binary": "data", "pem": "data",
 		"sql":    "database",
 		"prompt": "llm", "quote": "llm",
 		"junit": "compat",

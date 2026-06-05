@@ -492,7 +492,7 @@ footer {{ color:var(--muted); border-top:1px solid var(--line); margin-top:42px;
 <p class="subtitle">A Go-spec-inspired preview generated from <code>docs/spec/</code>. Markdown remains the source of truth.</p>
 </header>
 {sections}
-<footer>Generated locally from the current worktree: <code>{spec_dir}</code>.</footer>
+<footer>Generated locally from the current worktree: <code>docs/spec/</code>.</footer>
 </main>
 </div>
 </body>

@@ -9,3 +9,9 @@ Run the release risk digest example with:
 ```bash
 go run ./cmd/leia examples check --jobs=6 examples/automation/release_risk_digest.leia
 ```
+
+Run the invoice reconciliation example with:
+
+```bash
+go run ./cmd/leia examples check --jobs=6 examples/automation/invoice_reconciliation.leia
+```

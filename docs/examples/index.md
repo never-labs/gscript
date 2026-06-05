@@ -15,9 +15,23 @@ registered set, and run one by ID or path:
 
 ```bash
 go run ./cmd/leia examples list
+go run ./cmd/leia examples show repo-hello-fib
 go run ./cmd/leia examples check examples/hello/fib.leia examples/hello/types_demo.leia examples/hello/dialects.leia
 go run ./cmd/leia examples run repo-hello-fib
 ```
+
+For tooling and CI, the same surface has stable JSON output:
+
+```bash
+go run ./cmd/leia examples list --json
+go run ./cmd/leia examples check --json examples/hello/fib.leia examples/hello/types_demo.leia examples/hello/dialects.leia
+```
+
+`examples check` executes runnable examples and reports manual examples as
+skipped with their `requires` reason. `examples show` prints the registered
+metadata followed by source, which is the quickest way to inspect the exact
+entrypoint behind an example ID. Use `--jobs=N` when checking a larger selected
+set.
 
 | Directory | Focus |
 |---|---|
@@ -100,10 +114,11 @@ See [Embedding Leia](../guides/embedding.md).
 
 Game and web examples are source references for larger host integrations,
 long-running servers, graphical bindings, and interactive workloads. They are
-not first-run smoke commands.
+not first-run smoke commands unless `examples list` marks an entry as runnable.
 
 Review these files directly when working on those areas:
 
+- `examples/game_engine/event_system.leia`
 - `examples/game_engine/game_of_life.leia`
 - `examples/game_engine/tetris.leia`
 - `examples/web/hello_server.leia`

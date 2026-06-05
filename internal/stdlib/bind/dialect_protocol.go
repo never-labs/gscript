@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	htmlpkg "html"
 	"io"
 	"mime"
 	"net/textproto"
@@ -24,6 +25,14 @@ func registerDialectProtocol(register dialectRegisterFunc, maxHostResult func() 
 	register([]string{"html_escape"}, dialectHandler{
 		eval: func(body Value, options *Table) ([]Value, error) {
 			return dialectHTMLEscape(body.Str(), options)
+		},
+	})
+	register([]string{"html"}, dialectHandler{
+		eval: func(body Value, opts *Table) ([]Value, error) {
+			return dialectHTML(body, opts, maxHostResult)
+		},
+		block: func(body Value, opts *Table) ([]Value, error) {
+			return dialectHTML(body, opts, maxHostResult)
 		},
 	})
 	register([]string{"urlquery"}, dialectHandler{
@@ -77,6 +86,165 @@ func dialectHTMLEscape(src string, opts *Table) ([]Value, error) {
 		return []Value{StringValue(dialectlib.HTMLUnescape(src))}, nil
 	}
 	return []Value{StringValue(dialectlib.HTMLEscape(src))}, nil
+}
+
+func dialectHTML(body Value, opts *Table, maxHostResult func() int64) ([]Value, error) {
+	mode := dialectMode(opts)
+	if !dialectModeAllowed(mode, "", "encode", "format", "escape", "text") {
+		return dialectUnknownMode("html", mode)
+	}
+	if !body.IsTable() || mode == "escape" || mode == "text" {
+		return []Value{StringValue(htmlpkg.EscapeString(body.String()))}, nil
+	}
+	text, err := encodeHTMLValue(body)
+	if err != nil {
+		return []Value{NilValue(), StringValue(err.Error())}, nil
+	}
+	if err := CheckProjectedHostStringBytes(hostResultLimit(maxHostResult), len(text)); err != nil {
+		return nil, err
+	}
+	return []Value{StringValue(text)}, nil
+}
+
+func encodeHTMLValue(v Value) (string, error) {
+	if v.IsNil() {
+		return "", nil
+	}
+	if !v.IsTable() {
+		return htmlpkg.EscapeString(v.String()), nil
+	}
+	tbl := v.Table()
+	if tbl.Length() > 0 && firstStringField(tbl, "tag", "name", "el", "element") == "" {
+		var b strings.Builder
+		for i := 1; i <= tbl.Length(); i++ {
+			part, err := encodeHTMLValue(tbl.RawGetInt(int64(i)))
+			if err != nil {
+				return "", err
+			}
+			b.WriteString(part)
+		}
+		return b.String(), nil
+	}
+	return encodeHTMLElement(tbl)
+}
+
+func encodeHTMLElement(tbl *Table) (string, error) {
+	if raw := tbl.RawGetString("raw"); raw.IsString() {
+		return raw.Str(), nil
+	}
+	tag := firstStringField(tbl, "tag", "name", "el", "element")
+	if tag == "" {
+		if text := tbl.RawGetString("text"); !text.IsNil() {
+			return htmlpkg.EscapeString(text.String()), nil
+		}
+		return "", nil
+	}
+	if !isSafeHTMLTag(tag) {
+		return "", fmt.Errorf("html dialect: invalid tag %q", tag)
+	}
+	var b strings.Builder
+	b.WriteByte('<')
+	b.WriteString(tag)
+	attrs := tbl.RawGetString("attrs")
+	if attrs.IsNil() {
+		attrs = tbl.RawGetString("attributes")
+	}
+	if attrs.IsTable() {
+		attrText, err := encodeHTMLAttrs(attrs.Table())
+		if err != nil {
+			return "", err
+		}
+		b.WriteString(attrText)
+	}
+	if isHTMLVoidElement(tag) {
+		b.WriteByte('>')
+		return b.String(), nil
+	}
+	b.WriteByte('>')
+	if text := tbl.RawGetString("text"); !text.IsNil() {
+		b.WriteString(htmlpkg.EscapeString(text.String()))
+	}
+	if children := tbl.RawGetString("children"); !children.IsNil() {
+		part, err := encodeHTMLValue(children)
+		if err != nil {
+			return "", err
+		}
+		b.WriteString(part)
+	}
+	for i := 1; i <= tbl.Length(); i++ {
+		part, err := encodeHTMLValue(tbl.RawGetInt(int64(i)))
+		if err != nil {
+			return "", err
+		}
+		b.WriteString(part)
+	}
+	b.WriteString("</")
+	b.WriteString(tag)
+	b.WriteByte('>')
+	return b.String(), nil
+}
+
+func encodeHTMLAttrs(attrs *Table) (string, error) {
+	keys := make([]string, 0)
+	attrs.ForEachPlainRaw(func(k, _ Value) bool {
+		if k.IsString() {
+			keys = append(keys, k.Str())
+		}
+		return true
+	})
+	sort.Strings(keys)
+	var b strings.Builder
+	for _, key := range keys {
+		if !isSafeHTMLAttr(key) {
+			return "", fmt.Errorf("html dialect: invalid attribute %q", key)
+		}
+		value := attrs.RawGetString(key)
+		if value.IsNil() || (value.IsBool() && !value.Bool()) {
+			continue
+		}
+		b.WriteByte(' ')
+		b.WriteString(key)
+		if value.IsBool() && value.Bool() {
+			continue
+		}
+		b.WriteString(`="`)
+		b.WriteString(htmlpkg.EscapeString(value.String()))
+		b.WriteByte('"')
+	}
+	return b.String(), nil
+}
+
+func isSafeHTMLTag(tag string) bool {
+	if tag == "" {
+		return false
+	}
+	for _, r := range tag {
+		if !(r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || r == '-' || r == ':') {
+			return false
+		}
+	}
+	return true
+}
+
+func isSafeHTMLAttr(attr string) bool {
+	if attr == "" {
+		return false
+	}
+	for _, r := range attr {
+		if !(r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || r == '-' || r == ':' || r == '_') {
+			return false
+		}
+	}
+	return true
+}
+
+func isHTMLVoidElement(tag string) bool {
+	switch strings.ToLower(tag) {
+	case "area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track", "wbr":
+		return true
+	default:
+		return false
+	}
 }
 
 func dialectURLQuery(body Value, opts *Table) ([]Value, error) {

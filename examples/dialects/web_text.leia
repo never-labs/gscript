@@ -16,9 +16,18 @@ assert(parsed.query.q == "hello world")
 
 escaped_html := html_escape`<b>Ada & Bob</b>`
 unescaped_html := dialect.eval("html_escape", escaped_html, {mode: "decode"})
+html_card := html {
+    tag: "article",
+    attrs: {class: "note", data_id: "web-1"},
+    children: {
+        {tag: "h2", text: "Web <safe>"},
+        {tag: "p", text: "Ada & Bob"},
+    },
+}
 print("html escaped:", escaped_html)
 assert(escaped_html == "&lt;b&gt;Ada &amp; Bob&lt;/b&gt;")
 assert(unescaped_html == "<b>Ada & Bob</b>")
+assert(html_card == "<article class=\"note\" data_id=\"web-1\"><h2>Web &lt;safe&gt;</h2><p>Ada &amp; Bob</p></article>")
 
 encoded_query := dialect.eval("urlquery", {q: "hello world", page: 2}, {mode: "format"})
 parsed_query := dialect.eval("urlquery", "q=hello+world&page=2&tag=a&tag=b", {mode: "parse"})

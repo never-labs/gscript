@@ -1,0 +1,47 @@
+print("=== Dialects: PEM certificate fixture ===")
+
+certificate_headers := {}
+certificate_headers["X-Owner"] = "platform"
+certificate_headers["Proc-Type"] = "4,ENCRYPTED"
+certificate_headers["X-Fingerprint"] = "sha256:fixture"
+
+certificate := {
+    type: "CERTIFICATE",
+    headers: certificate_headers,
+    body: "certificate fixture\n",
+}
+private_key := {
+    type: "PRIVATE KEY",
+    text: "private key fixture",
+}
+
+pem_text := dialect.eval("pem", {certificate, private_key}, {mode: "encode"})
+blocks := dialect.eval("pem", pem_text)
+single := dialect.eval("pem", blocks[1].raw, {single: true})
+roundtrip := dialect.eval("pem", blocks, {mode: "format"})
+
+expected_certificate := "-----BEGIN CERTIFICATE-----\n" ..
+    "Proc-Type: 4,ENCRYPTED\n" ..
+    "X-Fingerprint: sha256:fixture\n" ..
+    "X-Owner: platform\n" ..
+    "\n" ..
+    "Y2VydGlmaWNhdGUgZml4dHVyZQo=\n" ..
+    "-----END CERTIFICATE-----\n"
+
+print("blocks:", #blocks)
+print("first type:", blocks[1].type)
+print("second type:", blocks[2].type)
+
+assert(#blocks == 2)
+assert(blocks[1].type == "CERTIFICATE")
+assert(blocks[1].body == "certificate fixture\n")
+assert(blocks[1].text == blocks[1].body)
+assert(blocks[1].headers["X-Owner"] == "platform")
+assert(blocks[1].raw == expected_certificate)
+assert(blocks[2].type == "PRIVATE KEY")
+assert(blocks[2].body == "private key fixture")
+assert(single.type == "CERTIFICATE")
+assert(single.raw == expected_certificate)
+assert(roundtrip == pem_text)
+
+print("pem certificate fixture ok")
