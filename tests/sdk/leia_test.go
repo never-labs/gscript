@@ -116,6 +116,7 @@ func TestEachPublicLibFlagExposesNamedGlobal(t *testing.T) {
 		{"url", leia.LibURL, "url"},
 		{"bits", leia.LibBits, "bits"},
 		{"csv", leia.LibCSV, "csv"},
+		{"db", leia.LibDB, "db"},
 		{"uuid", leia.LibUUID, "uuid"},
 		{"matrix", leia.LibMatrix, "matrix"},
 		{"compress", leia.LibCompress, "compress"},

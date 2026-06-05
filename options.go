@@ -50,6 +50,7 @@ const (
 	LibSoA                            // soa.* structure-of-arrays
 	LibLLM                            // llm.* native model/tool integration
 	LibDialect                        // dialect.* built-in language dialects
+	LibDB                             // db.* built-in SQLite runtime
 
 	// LibAll includes every library (default).
 	LibAll = LibString | LibTable | LibMath | LibIO | LibOS | LibCoroutine |
@@ -59,7 +60,7 @@ const (
 		LibBinary | LibBits | LibBytes | LibCSV | LibURL | LibUUID |
 		LibProcess | LibScript | LibDebug | LibTestkit | LibMatrix |
 		LibRand | LibSort | LibEncoding | LibCompress | LibCrypto |
-		LibContainer | LibLog | LibArray | LibSoA | LibLLM | LibDialect
+		LibContainer | LibLog | LibArray | LibSoA | LibLLM | LibDialect | LibDB
 
 	// LibSafe is a sandboxed subset with no I/O, network, or system access.
 	LibSafe = LibString | LibTable | LibMath | LibCoroutine |
@@ -76,7 +77,7 @@ const (
 		LibBytes | LibCSV | LibURL | LibUUID | LibProcess | LibScript |
 		LibDebug | LibMatrix | LibRand | LibSort | LibEncoding |
 		LibCompress | LibCrypto | LibContainer | LibLog | LibArray | LibSoA |
-		LibLLM | LibDialect
+		LibLLM | LibDialect | LibDB
 
 	// LibGame is a preset for game development (no I/O, includes vec/color).
 	LibGame = LibString | LibTable | LibMath | LibCoroutine |

@@ -327,7 +327,7 @@ func TestPlaygroundRepositoryPackageManagedUIExampleIsManualRunOnly(t *testing.T
 	t.Fatal("repo-ui-package_managed-main example not found")
 }
 
-func TestPlaygroundRepositoryPackageManagedDatabaseExampleIsManualRunOnly(t *testing.T) {
+func TestPlaygroundRepositoryBuiltinDatabaseExampleIsRunnable(t *testing.T) {
 	examples, err := playgroundRepositoryExamples(playgroundExamplesRoot())
 	if err != nil {
 		t.Fatalf("load repository examples: %v", err)
@@ -336,14 +336,14 @@ func TestPlaygroundRepositoryPackageManagedDatabaseExampleIsManualRunOnly(t *tes
 		if example.ID != "repo-database-package_managed-main" {
 			continue
 		}
-		if example.Runnable {
-			t.Fatalf("%s should be manual-run only in the playground", example.ID)
+		if !example.Runnable {
+			t.Fatalf("%s should be runnable in the playground, requires = %q", example.ID, example.Requires)
 		}
-		if example.Requires != "package-managed database runtime and native SQL driver" {
+		if example.Requires != "" {
 			t.Fatalf("requires = %q", example.Requires)
 		}
-		if !strings.Contains(example.Source, `import "github.com/never-labs/leia-db/sqlite" as sqlite`) {
-			t.Fatalf("source missing package-managed database runtime import\nsource:\n%s", example.Source)
+		if !strings.Contains(example.Source, "conn := db.memory()") || !strings.Contains(example.Source, "conn.query(") {
+			t.Fatalf("source missing built-in database runtime usage\nsource:\n%s", example.Source)
 		}
 		return
 	}

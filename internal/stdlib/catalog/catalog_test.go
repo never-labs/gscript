@@ -50,7 +50,7 @@ func TestRegistryLayerQueries(t *testing.T) {
 		LayerLLM:    {"chat", "history", "llm", "loop", "msg"},
 		LayerCompat: {"bit32"},
 		LayerData:   {"array", "binary", "csv", "matrix", "q", "soa", "vec"},
-		LayerHost:   {"debug", "fs", "http", "io", "log", "net", "os", "process", "script", "testkit"},
+		LayerHost:   {"db", "debug", "fs", "http", "io", "log", "net", "os", "process", "script", "testkit"},
 		LayerVendor: nil,
 	}
 	for layer, want := range cases {

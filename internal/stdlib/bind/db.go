@@ -1,0 +1,338 @@
+package bind
+
+import (
+	"database/sql"
+	"fmt"
+	"net/url"
+	"path/filepath"
+	"strings"
+	"sync"
+	"time"
+
+	_ "modernc.org/sqlite"
+)
+
+type dbConnection struct {
+	db *sql.DB
+}
+
+// BuildDB creates the built-in SQLite-backed "db" standard-library module.
+func BuildDB(opts HostOptions) *Table {
+	t := markStdlibBoundModule(NewTable())
+	var defaultOnce sync.Once
+	var defaultConn *dbConnection
+	var defaultErr error
+
+	getDefault := func() (*dbConnection, error) {
+		defaultOnce.Do(func() {
+			defaultConn, defaultErr = openSQLite(":memory:", opts)
+		})
+		return defaultConn, defaultErr
+	}
+	set := func(name string, fn func([]Value) ([]Value, error)) {
+		t.RawSetString(name, FunctionValue(&GoFunction{Name: "db." + name, Fn: fn}))
+	}
+
+	set("open", func(args []Value) ([]Value, error) {
+		conn, err := openDBFromArgs(args, opts)
+		if err != nil {
+			return []Value{NilValue(), StringValue(err.Error())}, nil
+		}
+		return []Value{TableValue(dbConnectionTable(conn))}, nil
+	})
+	set("memory", func(args []Value) ([]Value, error) {
+		conn, err := openSQLite(":memory:", opts)
+		if err != nil {
+			return []Value{NilValue(), StringValue(err.Error())}, nil
+		}
+		return []Value{TableValue(dbConnectionTable(conn))}, nil
+	})
+	set("default", func(args []Value) ([]Value, error) {
+		conn, err := getDefault()
+		if err != nil {
+			return []Value{NilValue(), StringValue(err.Error())}, nil
+		}
+		return []Value{TableValue(dbConnectionTable(conn))}, nil
+	})
+	for _, name := range []string{"exec", "query", "one", "frame"} {
+		method := name
+		set(method, func(args []Value) ([]Value, error) {
+			conn, err := getDefault()
+			if err != nil {
+				return []Value{NilValue(), StringValue(err.Error())}, nil
+			}
+			return conn.call(method, args)
+		})
+	}
+	return t
+}
+
+func dbConnectionTable(conn *dbConnection) *Table {
+	t := NewTable()
+	t.RawSetString("__db_connection", BoolValue(true))
+	for _, name := range []string{"exec", "query", "one", "frame"} {
+		method := name
+		t.RawSetString(method, FunctionValue(&GoFunction{
+			Name: "db.connection." + method,
+			Fn: func(args []Value) ([]Value, error) {
+				return conn.call(method, args)
+			},
+		}))
+	}
+	t.RawSetString("close", FunctionValue(&GoFunction{
+		Name: "db.connection.close",
+		Fn: func(args []Value) ([]Value, error) {
+			if err := conn.db.Close(); err != nil {
+				return []Value{NilValue(), StringValue(err.Error())}, nil
+			}
+			return []Value{BoolValue(true)}, nil
+		},
+	}))
+	return t
+}
+
+func (conn *dbConnection) call(name string, args []Value) ([]Value, error) {
+	switch name {
+	case "exec":
+		return conn.exec(args)
+	case "query", "frame":
+		return conn.query(args)
+	case "one":
+		rows, err := conn.query(args)
+		if err != nil {
+			return nil, err
+		}
+		if len(rows) == 0 || !rows[0].IsTable() {
+			return []Value{NilValue()}, nil
+		}
+		first := rows[0].Table().RawGetInt(1)
+		if first.IsNil() {
+			return []Value{NilValue()}, nil
+		}
+		return []Value{first}, nil
+	default:
+		return nil, fmt.Errorf("unknown db method %q", name)
+	}
+}
+
+func (conn *dbConnection) exec(args []Value) ([]Value, error) {
+	query, sqlArgs, err := dbSQLInput(args)
+	if err != nil {
+		return nil, err
+	}
+	result, err := conn.db.Exec(query, sqlArgs...)
+	if err != nil {
+		return []Value{NilValue(), StringValue(err.Error())}, nil
+	}
+	out := NewTable()
+	if affected, err := result.RowsAffected(); err == nil {
+		out.RawSetString("rows_affected", IntValue(affected))
+	}
+	if id, err := result.LastInsertId(); err == nil {
+		out.RawSetString("last_insert_id", IntValue(id))
+	}
+	return []Value{TableValue(out)}, nil
+}
+
+func (conn *dbConnection) query(args []Value) ([]Value, error) {
+	query, sqlArgs, err := dbSQLInput(args)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := conn.db.Query(query, sqlArgs...)
+	if err != nil {
+		return []Value{NilValue(), StringValue(err.Error())}, nil
+	}
+	defer rows.Close()
+	table, err := leiaRows(rows)
+	if err != nil {
+		return []Value{NilValue(), StringValue(err.Error())}, nil
+	}
+	return []Value{TableValue(table)}, nil
+}
+
+func openDBFromArgs(args []Value, opts HostOptions) (*dbConnection, error) {
+	if len(args) == 0 || args[0].IsNil() {
+		return openSQLite(":memory:", opts)
+	}
+	if args[0].IsString() {
+		return openSQLite(args[0].Str(), opts)
+	}
+	if !args[0].IsTable() {
+		return nil, fmt.Errorf("db.open: string or options table expected")
+	}
+	t := args[0].Table()
+	driver := "sqlite"
+	if v := t.RawGetString("driver"); v.IsString() && v.Str() != "" {
+		driver = v.Str()
+	}
+	if driver != "sqlite" && driver != "sqlite3" {
+		return nil, fmt.Errorf("db.open: built-in runtime supports sqlite only")
+	}
+	dsn := firstSQLString(t, "dsn", "path", "database", "file")
+	if dsn == "" {
+		dsn = ":memory:"
+	}
+	return openSQLite(dsn, opts)
+}
+
+func openSQLite(dsn string, opts HostOptions) (*dbConnection, error) {
+	resolved, err := resolveDBDSN(dsn, opts)
+	if err != nil {
+		return nil, err
+	}
+	db, err := sql.Open("sqlite", resolved)
+	if err != nil {
+		return nil, err
+	}
+	db.SetMaxOpenConns(1)
+	if err := db.Ping(); err != nil {
+		_ = db.Close()
+		return nil, err
+	}
+	return &dbConnection{db: db}, nil
+}
+
+func resolveDBDSN(dsn string, opts HostOptions) (string, error) {
+	dsn = strings.TrimSpace(dsn)
+	if dsn == "" || dsn == ":memory:" || strings.HasPrefix(dsn, "file:") {
+		return dsn, nil
+	}
+	if strings.Contains(dsn, "://") {
+		u, err := url.Parse(dsn)
+		if err != nil || u.Scheme != "" {
+			return dsn, nil
+		}
+	}
+	if !HostBool(opts.FilesystemRead, true) || !HostBool(opts.FilesystemWrite, true) {
+		return "", fmt.Errorf("database filesystem access disabled")
+	}
+	root := HostString(opts.FilesystemRoot)
+	if root == "" && HostString(opts.ScriptDir) != "" && !filepath.IsAbs(dsn) {
+		root = HostString(opts.ScriptDir)
+	}
+	return resolveSandboxPath(root, dsn)
+}
+
+func dbSQLInput(args []Value) (string, []any, error) {
+	if len(args) == 0 {
+		return "", nil, fmt.Errorf("bad argument #1 to 'db' (SQL string or sql value expected)")
+	}
+	query := ""
+	var argTable *Table
+	first := args[0]
+	if first.IsString() {
+		query = first.Str()
+	} else if first.IsTable() {
+		t := first.Table()
+		query = firstSQLString(t, "query", "text", "sql")
+		if v := t.RawGetString("args"); v.IsTable() {
+			argTable = v.Table()
+		}
+	} else {
+		return "", nil, fmt.Errorf("bad argument #1 to 'db' (SQL string or sql value expected)")
+	}
+	if strings.TrimSpace(query) == "" {
+		return "", nil, fmt.Errorf("db: SQL query string required")
+	}
+	if len(args) >= 2 {
+		if !args[1].IsTable() {
+			return "", nil, fmt.Errorf("bad argument #2 to 'db' (args table expected)")
+		}
+		argTable = args[1].Table()
+	}
+	sqlArgs, err := dbArgs(argTable)
+	if err != nil {
+		return "", nil, err
+	}
+	return query, sqlArgs, nil
+}
+
+func dbArgs(args *Table) ([]any, error) {
+	if args == nil {
+		return nil, nil
+	}
+	out := make([]any, 0, args.Length())
+	for i := int64(1); i <= int64(args.Length()); i++ {
+		val := args.RawGetInt(i)
+		if val.IsNil() {
+			out = append(out, nil)
+			continue
+		}
+		arg, err := leiaToSQLValue(val)
+		if err != nil {
+			return nil, fmt.Errorf("db args[%d]: %w", i, err)
+		}
+		out = append(out, arg)
+	}
+	return out, nil
+}
+
+func leiaToSQLValue(v Value) (any, error) {
+	switch {
+	case v.IsNil():
+		return nil, nil
+	case v.IsBool():
+		return v.Bool(), nil
+	case v.IsInt():
+		return v.Int(), nil
+	case v.IsFloat():
+		return v.Float(), nil
+	case v.IsString():
+		return v.Str(), nil
+	default:
+		return nil, fmt.Errorf("nil, bool, number, or string expected")
+	}
+}
+
+func leiaRows(rows *sql.Rows) (*Table, error) {
+	columns, err := rows.Columns()
+	if err != nil {
+		return nil, err
+	}
+	out := NewAppendArrayTable(0)
+	rowIndex := int64(1)
+	for rows.Next() {
+		values := make([]any, len(columns))
+		ptrs := make([]any, len(columns))
+		for i := range values {
+			ptrs[i] = &values[i]
+		}
+		if err := rows.Scan(ptrs...); err != nil {
+			return nil, err
+		}
+		row := NewTableSized(len(columns), len(columns))
+		for i, col := range columns {
+			val := sqlToLeiaValue(values[i])
+			row.RawSetString(col, val)
+			row.RawSetInt(int64(i+1), val)
+		}
+		out.RawSetInt(rowIndex, TableValue(row))
+		rowIndex++
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func sqlToLeiaValue(v any) Value {
+	switch x := v.(type) {
+	case nil:
+		return NilValue()
+	case bool:
+		return BoolValue(x)
+	case int64:
+		return IntValue(x)
+	case float64:
+		return FloatValue(x)
+	case string:
+		return StringValue(x)
+	case []byte:
+		return StringValue(string(x))
+	case time.Time:
+		return StringValue(x.Format(time.RFC3339Nano))
+	default:
+		return StringValue(fmt.Sprint(x))
+	}
+}

@@ -329,6 +329,7 @@ func runPlaygroundExecCommand(args []string, outw, errw io.Writer) int {
 	}
 	opts := []leia.Option{
 		leia.SecuritySandbox(),
+		leia.WithLibs(leia.LibSafe | leia.LibDB),
 		leia.WithMaxSteps(*maxSteps),
 		leia.WithMaxNativeCalls(100_000),
 		leia.WithMaxCallDepth(1024),
@@ -1471,7 +1472,6 @@ func repositoryExampleRunnable(path string) bool {
 		!strings.Contains(path, "/workflow/support_triage_replay.leia") &&
 		!strings.Contains(path, "/web/hello_server.leia") &&
 		!strings.Contains(path, "/web/webserver.leia") &&
-		!strings.Contains(path, "/database/package_managed/") &&
 		!strings.Contains(path, "/dialects/shell_filesystem.leia") &&
 		!strings.Contains(path, "/macos/package_managed/") &&
 		!strings.Contains(path, "/ui/package_managed/") &&
@@ -1493,8 +1493,6 @@ func repositoryExampleRequires(path string) string {
 		return "LLM replay fixture or provider"
 	case strings.Contains(path, "/web/hello_server.leia"), strings.Contains(path, "/web/webserver.leia"):
 		return "network/server host access"
-	case strings.Contains(path, "/database/package_managed/"):
-		return "package-managed database runtime and native SQL driver"
 	case strings.Contains(path, "/dialects/shell_filesystem.leia"):
 		return "process shell and filesystem host access"
 	case strings.Contains(path, "/macos/package_managed/"):

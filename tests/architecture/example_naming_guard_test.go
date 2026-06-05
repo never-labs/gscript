@@ -88,6 +88,12 @@ func TestExampleDialectAndPackageManagedNamingGuards(t *testing.T) {
 				t.Fatalf("%s package-managed import example must use main.leia as its runnable entrypoint, found %s", filepath.ToSlash(rel), entry.Name())
 			}
 			source := readFileString(t, filepath.Join(dir, entry.Name()))
+			if parent == "database" {
+				if !strings.Contains(source, "db.memory()") {
+					t.Fatalf("%s/main.leia must demonstrate the built-in database runtime", filepath.ToSlash(rel))
+				}
+				continue
+			}
 			if !strings.Contains(source, `import "github.com/never-labs/leia-`) {
 				t.Fatalf("%s/main.leia must demonstrate an external Leia package import", filepath.ToSlash(rel))
 			}

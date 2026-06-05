@@ -528,6 +528,7 @@ func stdlibAllowedNames(libs LibFlags) map[string]bool {
 		"context":   true,
 		"crypto":    libs&LibCrypto != 0,
 		"csv":       libs&LibCSV != 0,
+		"db":        libs&LibDB != 0,
 		"dialect":   libs&LibDialect != 0,
 		"debug":     libs&LibDebug != 0,
 		"encoding":  libs&LibEncoding != 0,

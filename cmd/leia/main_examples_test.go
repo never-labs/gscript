@@ -85,7 +85,7 @@ func TestPracticalExampleProjects(t *testing.T) {
 		{"web-access-log-report", execExampleProjectGlobal(root, filepath.Join("examples", "web", "access_log_report.leia"), "web_access_report_summary"), "routes=4 requests=10 errors=3 slow=3 cache_hits=4 top=/api/orders"},
 		{"ai-agent-composition", evaluateReplayExampleProject(root, filepath.Join("examples", "evaluate", "agent_replay.leia"), filepath.Join("examples", "evaluate", "agent_replay.records.json")), "agent consumes replay"},
 		{"concurrency-pipeline", execExampleProjectGlobal(root, filepath.Join("examples", "concurrency", "goroutines_channels.leia"), "workers"), "4"},
-		{"package-managed-database", modCheckExampleProject(root, filepath.Join("examples", "database", "package_managed")), "github.com/never-labs/leia-db/sqlite"},
+		{"builtin-database", execExampleProjectGlobal(root, filepath.Join("examples", "database", "package_managed", "main.leia"), "database_summary"), "Ada"},
 		{"package-managed-macos", modCheckExampleProject(root, filepath.Join("examples", "macos", "package_managed")), "github.com/never-labs/leia-macos/automation"},
 	}
 	for _, project := range projects {
@@ -258,7 +258,7 @@ func TestPackageManagedUIExample(t *testing.T) {
 	}
 }
 
-func TestPackageManagedDatabaseExample(t *testing.T) {
+func TestBuiltinDatabaseExample(t *testing.T) {
 	root, err := filepath.Abs(filepath.Join("..", ".."))
 	if err != nil {
 		t.Fatal(err)
@@ -266,9 +266,12 @@ func TestPackageManagedDatabaseExample(t *testing.T) {
 	dir := filepath.Join(root, "examples", "database", "package_managed")
 	sourcePath := filepath.Join(dir, "main.leia")
 
-	for _, forbidden := range []string{"database", "db", "sql", "sqlite", "postgres", "mysql"} {
+	if _, ok := catalog.Module("db"); !ok {
+		t.Fatal("stdlib catalog must include built-in db module")
+	}
+	for _, forbidden := range []string{"database", "sqlite", "postgres", "mysql"} {
 		if _, ok := catalog.Module(forbidden); ok {
-			t.Fatalf("stdlib catalog contains database-shaped module %q; database runtimes should stay package-managed", forbidden)
+			t.Fatalf("stdlib catalog contains external database runtime module %q; non-default database runtimes should stay package-managed", forbidden)
 		}
 	}
 	assertLeiaFileParses(t, sourcePath)
@@ -278,19 +281,19 @@ func TestPackageManagedDatabaseExample(t *testing.T) {
 	}
 	source := string(sourceBytes)
 	for _, want := range []string{
-		`import "github.com/never-labs/leia-db/sqlite" as sqlite`,
-		"sqlite.open(",
-		"db.exec(",
-		"db.query(",
+		"conn := db.memory()",
+		"conn.exec(",
+		"conn.query(",
+		"sql {query:",
 		"//leia:cap db.open,db.exec,db.query",
 	} {
 		if !strings.Contains(source, want) {
 			t.Fatalf("database example source missing %q\nsource:\n%s", want, source)
 		}
 	}
-	for _, forbidden := range []string{`import "database"`, `import "db"`, `import "sql"`, `import "sqlite"`} {
+	for _, forbidden := range []string{`import "github.com/never-labs/leia-db/sqlite"`, `import "database"`, `import "db"`, `import "sqlite"`} {
 		if strings.Contains(source, forbidden) {
-			t.Fatalf("database example source imports builtin-shaped module %q; database runtimes should stay package-managed", forbidden)
+			t.Fatalf("database example source imports obsolete database runtime module %q", forbidden)
 		}
 	}
 
@@ -304,7 +307,7 @@ func TestPackageManagedDatabaseExample(t *testing.T) {
 		t.Fatalf("stdout is not JSON verify report: %v; stdout = %q", err, stdout.String())
 	}
 	if !verify.OK {
-		t.Fatalf("verify = %+v, want package-managed database example manifest to verify", verify)
+		t.Fatalf("verify = %+v, want built-in database example manifest to verify", verify)
 	}
 
 	stdout.Reset()
@@ -317,18 +320,8 @@ func TestPackageManagedDatabaseExample(t *testing.T) {
 	if err := json.Unmarshal(stdout.Bytes(), &list); err != nil {
 		t.Fatalf("stdout is not JSON list report: %v; stdout = %q", err, stdout.String())
 	}
-	if !list.OK || !containsResolvedRequire(list.Requires, "github.com/never-labs/leia-db/sqlite", "v0.1.0") {
-		t.Fatalf("list = %+v, want external Leia database runtime requirement", list)
-	}
-
-	stdout.Reset()
-	stderr.Reset()
-	code = runModCommand([]string{"gomod", dir}, &stdout, &stderr)
-	if code != 0 {
-		t.Fatalf("mod gomod code = %d, stderr = %q stdout = %q", code, stderr.String(), stdout.String())
-	}
-	if got := stdout.String(); !strings.Contains(got, "modernc.org/sqlite v1.38.2") {
-		t.Fatalf("generated go.mod = %q, want native SQLite adapter dependency", got)
+	if !list.OK || containsResolvedRequire(list.Requires, "github.com/never-labs/leia-db/sqlite", "v0.1.0") {
+		t.Fatalf("list = %+v, want no external Leia SQLite runtime requirement", list)
 	}
 
 	stdout.Reset()
@@ -346,9 +339,6 @@ func TestPackageManagedDatabaseExample(t *testing.T) {
 	}
 	if !moduleHasCapabilities(caps.Modules, "example.com/leia/examples/database/package-managed", "db.open", "db.exec", "db.query") {
 		t.Fatalf("capability modules = %+v, want database domain capabilities on the example manifest", caps.Modules)
-	}
-	if !moduleHasPath(caps.Modules, "github.com/never-labs/leia-db/sqlite") {
-		t.Fatalf("capability modules = %+v, want external package-managed database runtime module", caps.Modules)
 	}
 }
 

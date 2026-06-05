@@ -35,6 +35,7 @@ var modules = []ModuleInfo{
 	{Name: "context", Layer: LayerBase, Description: "Cancellation, timeout, and done-channel helpers.", SafeDefault: true},
 	{Name: "crypto", Layer: LayerBase, Description: "Secure random data and high-level cryptographic primitives.", SafeDefault: true},
 	{Name: "csv", Layer: LayerData, Description: "CSV parse and encode helpers backed by Go's CSV behavior.", SafeDefault: true},
+	{Name: "db", Layer: LayerHost, Description: "Built-in SQLite database runtime for executing parameterized SQL values.", Capabilities: []string{"db.open", "db.exec", "db.query"}},
 	{Name: "debug", Layer: LayerHost, Description: "Runtime stack, globals, hook, and diagnostic helpers.", Capabilities: []string{"debug"}},
 	{Name: "encoding", Layer: LayerBase, Description: "Text and byte encoding conversion helpers.", SafeDefault: true},
 	{Name: "fs", Layer: LayerHost, Description: "Filesystem read, write, stat, directory, glob, and path-affecting operations.", Capabilities: []string{"fs.read", "fs.write"}},

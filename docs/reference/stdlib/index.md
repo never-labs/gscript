@@ -27,6 +27,7 @@ Generated from `internal/stdlib/catalog`, the code-owned standard-library metada
 | `base` | `url` | URL parse, escape, query, and construction helpers. | true | none |
 | `base` | `utf8` | UTF-8 validation, codepoint, length, and offset helpers. | true | none |
 | `base` | `uuid` | UUID generation, parsing, validation, and metadata helpers. | true | none |
+| `host` | `db` | Built-in SQLite database runtime for executing parameterized SQL values. | false | db.open, db.exec, db.query |
 | `host` | `debug` | Runtime stack, globals, hook, and diagnostic helpers. | false | debug |
 | `host` | `fs` | Filesystem read, write, stat, directory, glob, and path-affecting operations. | false | fs.read, fs.write |
 | `host` | `http` | HTTP client/server helpers and request/response adaptation. | false | net.listen |

@@ -1,29 +1,17 @@
-// Package-managed database example.
+// Built-in SQLite database example.
 //leia:cap db.open,db.exec,db.query
-//
-// This file is a manifest companion that documents the target runtime shape.
-// Database access is supplied by the package/native adapter declared in
-// leia.mod, not by a built-in dialect or core stdlib module.
 
-import "github.com/never-labs/leia-db/sqlite" as sqlite
+conn := db.memory()
+conn.exec(sql`create table users (id integer primary key, name text not null, active bool not null)`)
+conn.exec(sql {query: "insert into users (name, active) values (:name, :active)", params: {name: "Ada", active: true}})
+conn.exec(sql {query: "insert into users (name, active) values (:name, :active)", params: {name: "Grace", active: false}})
 
-db := sqlite.open({
-  driver: "sqlite",
-  dsn: "file:example.db?mode=memory&cache=shared",
-  options: {
-    busy_timeout_ms: 2500,
-    foreign_keys: true,
-  },
-})
-
-db.exec("create table users (id integer primary key, name text not null, active bool not null)")
-db.exec("insert into users (name, active) values (?, ?)", {"Ada", true})
-db.exec("insert into users (name, active) values (?, ?)", {"Grace", false})
-
-active_users := db.query("select id, name from users where active = ? order by id", {true})
+active_users := conn.query(sql {query: "select id, name from users where active = :active order by id", params: {active: true}})
+database_summary := active_users[1].name
+print(database_summary)
 
 return {
-  runtime: sqlite,
-  connection: db,
+  connection: conn,
   active_users: active_users,
+  summary: database_summary,
 }
