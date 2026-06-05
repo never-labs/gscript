@@ -1,0 +1,359 @@
+// vendor_onboarding_audit.leia - Offline vendor onboarding risk report.
+// Demonstrates: yaml policy, csv inventory, jsonl evidence, logfmt findings,
+// sql-shaped audit query, timestamp age checks, PEM metadata, mailaddr parsing,
+// Markdown/HTML/JSON/logfmt output, ranking, and deterministic assertions.
+
+print("=== Security: vendor onboarding audit ===")
+
+policy := yaml`program: vendor-onboarding
+generated_at: 2026-06-05T09:00:00Z
+thresholds:
+  critical_score: 80
+  warning_score: 45
+  evidence_max_age_days: 45
+required_controls:
+  - soc2
+  - dpa
+  - subprocessor_list
+reviewers:
+  security: Security Review <security@example.test>
+  procurement: Procurement Ops <procurement@example.test>
+`
+
+vendors := dialect.eval("csv", `id,name,owner,contact_email,tier,data_class,region,status
+V-100,Acme Payments,commerce,Jane Doe <jane@acme.example>,1,pci,EU,review
+V-101,Cloud Tasks,platform,ops@cloudtasks.example,2,pii,US,review
+V-102,Docs CDN,enablement,Docs Team <support@docscdn.example>,3,public,US,approved
+V-103,Health Metrics,health,Ada Health <ada@healthmetrics.example>,1,phi,EU,blocked
+`, {headers: true})
+
+evidence := jsonl`{"vendor":"V-100","control":"soc2","status":"pass","received":"2026-05-20T10:00:00Z"}
+{"vendor":"V-100","control":"dpa","status":"pass","received":"2026-05-22T12:00:00Z"}
+{"vendor":"V-100","control":"subprocessor_list","status":"pass","received":"2026-05-24T09:30:00Z"}
+{"vendor":"V-101","control":"soc2","status":"pass","received":"2026-04-01T08:00:00Z"}
+{"vendor":"V-101","control":"subprocessor_list","status":"pass","received":"2026-04-02T08:00:00Z"}
+{"vendor":"V-102","control":"soc2","status":"pass","received":"2026-06-01T08:00:00Z"}
+{"vendor":"V-102","control":"dpa","status":"pass","received":"2026-06-01T08:30:00Z"}
+{"vendor":"V-102","control":"subprocessor_list","status":"pass","received":"2026-06-01T09:00:00Z"}
+{"vendor":"V-103","control":"dpa","status":"pass","received":"2026-03-01T08:00:00Z"}
+`
+
+findings := {
+    logfmt`ts=2026-06-05T07:00:00Z vendor=V-100 severity=high status=open item=key_rotation`,
+    logfmt`ts=2026-06-05T07:10:00Z vendor=V-100 severity=medium status=closed item=saml_metadata`,
+    logfmt`ts=2026-06-05T07:20:00Z vendor=V-101 severity=low status=open item=questionnaire_note`,
+    logfmt`ts=2026-06-05T07:30:00Z vendor=V-103 severity=high status=open item=hipaa_baa_missing`,
+    logfmt`ts=2026-06-05T07:40:00Z vendor=V-103 severity=medium status=open item=audit_logs`,
+}
+
+certificate_pem := dialect.eval("pem", {
+    {type: "CERTIFICATE", headers: {Vendor: "V-100", NotAfter: "2026-06-20T00:00:00Z"}, body: "acme payments fixture\n"},
+    {type: "CERTIFICATE", headers: {Vendor: "V-101", NotAfter: "2026-08-15T00:00:00Z"}, body: "cloud tasks fixture\n"},
+    {type: "CERTIFICATE", headers: {Vendor: "V-102", NotAfter: "2027-01-15T00:00:00Z"}, body: "docs cdn fixture\n"},
+    {type: "CERTIFICATE", headers: {Vendor: "V-103", NotAfter: "2026-05-30T00:00:00Z"}, body: "health metrics fixture\n"},
+}, {mode: "encode"})
+certificates := dialect.eval("pem", certificate_pem)
+
+reviewers := dialect.eval("mailaddr", policy.reviewers.security .. ", " .. policy.reviewers.procurement, {list: true})
+
+audit_query := sql {
+    query: "select id, name, score from vendor_reviews where status = :status and score >= :score order by score desc",
+    params: {status: "review", score: policy.thresholds.warning_score},
+}
+
+runbook := mdtable`| Severity | Min Score | Action |
+| --- | ---: | --- |
+| critical | 80 | block-contract-and-page-security |
+| warning | 45 | request-remediation-plan |
+| monitor | 0 | continue-standard-review |
+`
+
+now := timestamp`2026-06-05T09:00:00Z`
+
+func number_or(value, fallback) {
+    parsed := tonumber(value)
+    if parsed == nil {
+        return fallback
+    }
+    return parsed
+}
+
+func html_text(value) {
+    return dialect.eval("html_escape", tostring(value))
+}
+
+func contains(text, needle) {
+    return string.find(text, needle, 1, true) != nil
+}
+
+func days_between(a, b) {
+    return math.floor((a.unix - b.unix) / 86400)
+}
+
+func tier_score(tier) {
+    if tier == 1 {
+        return 30
+    }
+    if tier == 2 {
+        return 20
+    }
+    return 10
+}
+
+func data_score(data_class) {
+    if data_class == "pci" || data_class == "phi" {
+        return 15
+    }
+    if data_class == "pii" {
+        return 10
+    }
+    return 0
+}
+
+func status_score(status) {
+    if status == "blocked" {
+        return 20
+    }
+    if status == "review" {
+        return 5
+    }
+    return 0
+}
+
+func finding_score(severity) {
+    if severity == "high" {
+        return 30
+    }
+    if severity == "medium" {
+        return 15
+    }
+    if severity == "low" {
+        return 5
+    }
+    return 0
+}
+
+func cert_for(vendor_id) {
+    for i := 1; i <= #certificates; i++ {
+        block := certificates[i]
+        if block.headers.Vendor == vendor_id {
+            return block
+        }
+    }
+    return nil
+}
+
+func evidence_for(vendor_id, control) {
+    newest := nil
+    for i := 1; i <= #evidence; i++ {
+        row := evidence[i]
+        if row.vendor == vendor_id && row.control == control && row.status == "pass" {
+            parsed := dialect.eval("timestamp", row.received)
+            if newest == nil || parsed.unix > newest.unix {
+                newest = parsed
+            }
+        }
+    }
+    return newest
+}
+
+func severity_for(score) {
+    for i := 1; i <= #runbook; i++ {
+        rule := runbook[i]
+        if score >= number_or(rule["Min Score"], 0) {
+            return rule.Severity, rule.Action
+        }
+    }
+    return "monitor", "continue-standard-review"
+}
+
+rows := {}
+owner_rollups := {}
+open_findings := 0
+missing_controls := 0
+expired_certs := 0
+stale_evidence := 0
+
+for i := 1; i <= #vendors; i++ {
+    vendor := vendors[i]
+    tier := number_or(vendor.tier, 0)
+    contact := dialect.eval("mailaddr", vendor.contact_email)
+    score := tier_score(tier) + data_score(vendor.data_class) + status_score(vendor.status)
+    missing := 0
+    stale := 0
+    open_count := 0
+
+    for c := 1; c <= #policy.required_controls; c++ {
+        control := policy.required_controls[c]
+        received := evidence_for(vendor.id, control)
+        if received == nil {
+            missing = missing + 1
+            missing_controls = missing_controls + 1
+            score = score + 20
+        } else if days_between(now, received) > number_or(policy.thresholds.evidence_max_age_days, 45) {
+            stale = stale + 1
+            stale_evidence = stale_evidence + 1
+            score = score + 10
+        }
+    }
+
+    for f := 1; f <= #findings; f++ {
+        finding := findings[f]
+        if finding.vendor == vendor.id && finding.status == "open" {
+            open_count = open_count + 1
+            open_findings = open_findings + 1
+            score = score + finding_score(finding.severity)
+        }
+    }
+
+    cert := cert_for(vendor.id)
+    assert(cert != nil)
+    not_after := dialect.eval("timestamp", cert.headers.NotAfter)
+    cert_days := days_between(not_after, now)
+    cert_state := "valid"
+    if cert_days < 0 {
+        cert_state = "expired"
+        expired_certs = expired_certs + 1
+        score = score + 25
+    } else if cert_days <= 30 {
+        cert_state = "renew-soon"
+        score = score + 10
+    }
+
+    severity, action := severity_for(score)
+
+    if owner_rollups[vendor.owner] == nil {
+        owner_rollups[vendor.owner] = {owner: vendor.owner, vendors: 0, risk: 0, critical: 0}
+    }
+    owner_rollups[vendor.owner].vendors = owner_rollups[vendor.owner].vendors + 1
+    owner_rollups[vendor.owner].risk = owner_rollups[vendor.owner].risk + score
+    if severity == "critical" {
+        owner_rollups[vendor.owner].critical = owner_rollups[vendor.owner].critical + 1
+    }
+
+    table.insert(rows, {
+        ID: vendor.id,
+        Vendor: vendor.name,
+        Owner: vendor.owner,
+        Contact: contact.address,
+        Tier: tier,
+        Data: vendor.data_class,
+        Missing: missing,
+        Stale: stale,
+        OpenFindings: open_count,
+        Cert: cert_state,
+        Score: score,
+        Severity: severity,
+        Action: action,
+    })
+}
+
+table.sort(rows, func(a, b) {
+    if a.Score == b.Score {
+        return a.ID < b.ID
+    }
+    return a.Score > b.Score
+})
+
+owner_rows := {}
+for _, owner := range pairs(owner_rollups) {
+    table.insert(owner_rows, owner)
+}
+table.sort(owner_rows, func(a, b) {
+    if a.risk == b.risk {
+        return a.owner < b.owner
+    }
+    return a.risk > b.risk
+})
+
+report_table := dialect.eval("mdtable", rows, {mode: "encode"})
+owner_table := dialect.eval("mdtable", owner_rows, {mode: "encode"})
+summary_logfmt := dialect.eval("logfmt", {
+    vendors: #vendors,
+    evidence: #evidence,
+    open_findings: open_findings,
+    missing_controls: missing_controls,
+    stale_evidence: stale_evidence,
+    expired_certs: expired_certs,
+    top_vendor: rows[1].ID,
+    top_score: rows[1].Score,
+    reviewer: reviewers[1].address,
+}, {mode: "encode"})
+vendor_onboarding_audit_summary := summary_logfmt
+
+manifest_json := dialect.eval("json", {
+    program: policy.program,
+    generated_at: policy.generated_at,
+    vendors: #vendors,
+    reviewers: #reviewers,
+    top_vendor: rows[1].ID,
+    top_score: rows[1].Score,
+    audit_query: audit_query.query,
+}, {mode: "encode"})
+
+report_html := template {
+    text: `<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>{{.title}}</title></head>
+<body>
+<h1>{{.title}}</h1>
+<p>{{.summary}}</p>
+<h2>Vendors</h2>
+<pre>{{.vendors}}</pre>
+<h2>Owners</h2>
+<pre>{{.owners}}</pre>
+</body>
+</html>
+`,
+    data: {
+        title: "Vendor Onboarding Audit",
+        summary: html_text(summary_logfmt),
+        vendors: html_text(report_table),
+        owners: html_text(owner_table),
+    },
+}
+
+fingerprint := string.sub(dialect.eval("hash", report_table .. owner_table .. manifest_json, {algo: "sha256"}), 1, 16)
+
+print(report_table)
+print(owner_table)
+print(summary_logfmt)
+print("audit:", audit_query.query)
+print("fingerprint:", fingerprint)
+
+assert(policy.program == "vendor-onboarding")
+assert(policy.required_controls[3] == "subprocessor_list")
+assert(policy.thresholds.warning_score == 45)
+assert(#vendors == 4)
+assert(#evidence == 9)
+assert(#findings == 5)
+assert(#certificates == 4)
+assert(#reviewers == 2)
+assert(reviewers[1].address == "security@example.test")
+assert(audit_query.query == "select id, name, score from vendor_reviews where status = ? and score >= ? order by score desc")
+assert(audit_query.args[1] == "review")
+assert(audit_query.args[2] == 45)
+assert(open_findings == 4)
+assert(missing_controls == 3)
+assert(stale_evidence == 3)
+assert(expired_certs == 1)
+assert(rows[1].ID == "V-103")
+assert(rows[1].Score == 185)
+assert(rows[1].Severity == "critical")
+assert(rows[2].ID == "V-100")
+assert(rows[2].Score == 90)
+assert(rows[3].ID == "V-101")
+assert(rows[3].Score == 80)
+assert(rows[3].Severity == "critical")
+assert(rows[4].ID == "V-102")
+assert(rows[4].Score == 10)
+assert(owner_rows[1].owner == "health")
+assert(owner_rows[1].critical == 1)
+assert(contains(report_table, "| block-contract-and-page-security | expired | ada@healthmetrics.example | phi | V-103 | 2 | 2 | health | 185 | critical | 1 | 1 | Health Metrics |"))
+assert(contains(owner_table, "| 1 | health | 185 | 1 |"))
+assert(contains(summary_logfmt, "top_vendor=V-103"))
+assert(contains(manifest_json, `"top_vendor":"V-103"`))
+assert(contains(report_html, "<h1>Vendor Onboarding Audit</h1>"))
+assert(#fingerprint == 16)
+
+print("vendor onboarding audit ok")

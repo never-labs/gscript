@@ -21,6 +21,7 @@ func TestExamplesCommandListsRepositoryExamples(t *testing.T) {
 		"repo-hello-counter",
 		"repo-site-static_docs_generator",
 		"repo-security-supply_chain_audit",
+		"repo-security-vendor_onboarding_audit",
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("examples list missing %q\n%s", want, out)
