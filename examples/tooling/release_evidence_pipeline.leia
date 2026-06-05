@@ -1,0 +1,32 @@
+// release_evidence_pipeline.leia - Local release evidence planner.
+// Demonstrates: JSONL fixtures, command planning, gate summaries
+
+print("case:release_evidence_pipeline")
+
+checks := jsonl`{"id":"fmt","command":"leia fmt --check .","required":true}
+{"id":"docs","command":"bash scripts/docs_check.sh","required":true}
+{"id":"feature-perf","command":"bash scripts/performance_gate.sh --feature-smoke","required":true}
+{"id":"release-perf","command":"bash scripts/performance_gate.sh --full","required":true}
+`
+
+probe := "fmt=ok\ndocs=ok\nfeature-perf=tracked\nrelease-perf=required\n"
+
+required := 0
+perf_gates := 0
+for _, check := range checks {
+    if check.required {
+        required = required + 1
+    }
+    if string.find(check.command, "performance_gate.sh", 1, true) != nil {
+        perf_gates = perf_gates + 1
+    }
+}
+
+assert(required == #checks)
+assert(perf_gates == 2)
+assert(string.find(probe, "feature-perf=tracked", 1, true) != nil)
+assert(string.find(probe, "release-perf=required", 1, true) != nil)
+
+print("checks", #checks)
+print("perf_gates", perf_gates)
+print("ok")

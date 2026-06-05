@@ -1,0 +1,38 @@
+// tagged_agent_workflow.leia - Project-level AI dialect workflow.
+// Demonstrates: model {}, tool {}, agent {}, structured assertions
+
+model {
+    default: "mock-fast"
+}
+
+lookup_signal := tool {
+    name: "lookup_signal"
+    fn: func(service) {
+        return "service=" .. service .. "; severity=sev2; queue=payments", nil
+    }
+    params: {"service"}
+    description: "Look up the current incident signal for a service."
+}
+
+responder := agent {
+    name: "incident_responder"
+    config: func(issue) {
+        return {
+            model: "mock-fast"
+            system: "Write a concise incident response."
+            user: issue
+        }, nil
+    }
+    params: {"issue"}
+    description: "Triage a production incident with local evidence."
+}
+
+result, err := responder("checkout p95 latency is elevated")
+assert(err == nil)
+assert(result != nil)
+assert(result.status == "done")
+assert(result.text == "Direct llm.turn keeps examples simple.")
+
+print("agent", "incident_responder")
+print("text", result.text)
+print("ok")

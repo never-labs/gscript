@@ -597,6 +597,67 @@ func TestEvaluateBasicExampleExecutes(t *testing.T) {
 	}
 }
 
+func TestEvaluateAdvancedCLIOptionsStayUsable(t *testing.T) {
+	root, err := filepath.Abs(filepath.Join("..", ".."))
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(root, "examples", "evaluate", "basic_assert.leia")
+	dir := t.TempDir()
+	jsonReport := filepath.Join(dir, "eval.json")
+	htmlReport := filepath.Join(dir, "eval.html")
+
+	var stdout, stderr bytes.Buffer
+	code := runEvaluateCommand([]string{"--json", "--report", jsonReport, "--gate", path}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("evaluate --json --report --gate code = %d, stderr = %q stdout = %q", code, stderr.String(), stdout.String())
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("stdout = %q, want empty when --report writes JSON", stdout.String())
+	}
+	reportBytes, err := os.ReadFile(jsonReport)
+	if err != nil {
+		t.Fatalf("read JSON report: %v", err)
+	}
+	if !strings.Contains(string(reportBytes), `"status": "ok"`) {
+		t.Fatalf("JSON report missing ok status:\n%s", string(reportBytes))
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = runEvaluateCommand([]string{"--format=text", "--filter", "basic", "--parallel=2", "--baseline", jsonReport, "--regression-threshold", "0.05", path}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("evaluate text/filter/baseline code = %d, stderr = %q stdout = %q", code, stderr.String(), stdout.String())
+	}
+	if !strings.Contains(stdout.String(), "evaluate: ok") || !strings.Contains(stdout.String(), "PASS basic assert") {
+		t.Fatalf("text report missing expected summary:\n%s", stdout.String())
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = runEvaluateCommand([]string{"--format=html", "--output", htmlReport, path}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("evaluate --format=html --output code = %d, stderr = %q stdout = %q", code, stderr.String(), stdout.String())
+	}
+	htmlBytes, err := os.ReadFile(htmlReport)
+	if err != nil {
+		t.Fatalf("read HTML report: %v", err)
+	}
+	if !strings.Contains(string(htmlBytes), "<!doctype html>") || !strings.Contains(string(htmlBytes), "basic assert") {
+		t.Fatalf("HTML report missing expected content:\n%s", string(htmlBytes))
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = runEvaluateCommand([]string{"--compare", jsonReport, jsonReport}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("evaluate --compare code = %d, stderr = %q stdout = %q", code, stderr.String(), stdout.String())
+	}
+	if !strings.Contains(stdout.String(), `"status": "ok"`) {
+		t.Fatalf("compare report missing ok status:\n%s", stdout.String())
+	}
+}
+
 func TestEvaluateReplayExamplesExecute(t *testing.T) {
 	root, err := filepath.Abs(filepath.Join("..", ".."))
 	if err != nil {

@@ -1426,6 +1426,24 @@ func TestInlineTableLiteralCallArgsStayContiguous(t *testing.T) {
 	}
 }
 
+func TestTableLiteralNestedTempDoesNotLeakIntoMultiReturn(t *testing.T) {
+	g := compileAndRun(t, `
+		x := "nested"
+		func build() {
+			return {a: 1, b: {x}, c: 3}, nil
+		}
+		first, second := build()
+		second_is_nil := second == nil
+		nested := first.b[1]
+	`)
+	if got := g["second_is_nil"]; !got.IsBool() || !got.Bool() {
+		t.Fatalf("second_is_nil = %v, want true", got)
+	}
+	if got := g["nested"]; !got.IsString() || got.Str() != "nested" {
+		t.Fatalf("nested = %v, want nested", got)
+	}
+}
+
 func TestTableMovePlainArrayFastPathPreservesZeroSlot(t *testing.T) {
 	g := compileAndRun(t, `
 		src := {}

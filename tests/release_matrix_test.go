@@ -270,6 +270,8 @@ func TestReleaseMatrixSpecGateCommandsStaySynchronized(t *testing.T) {
 	specExamplesCmd := "go test ./tests -run 'TestSpecRunnableExamples|TestSpecLeiaCodeFencesAreExecutableOrExplicitlyNonExecutable' -count=1"
 	docsCheckCmd := "bash scripts/docs_check.sh"
 	productionQuickCmd := "bash scripts/production_check.sh --quick"
+	performanceSmokeCmd := "bash scripts/performance_gate.sh --smoke"
+	fullPerfGateCmd := "bash scripts/performance_gate.sh --full"
 
 	for _, item := range []struct {
 		path     string
@@ -327,10 +329,21 @@ func TestReleaseMatrixSpecGateCommandsStaySynchronized(t *testing.T) {
 		releaseMatrixCmd,
 		specExamplesCmd,
 		docsCheckCmd,
+		performanceSmokeCmd,
 	} {
 		if !strings.Contains(productionOut, snippet) {
 			t.Fatalf("production_check.sh --quick --list must keep release/spec gate %q; got:\n%s", snippet, productionOut)
 		}
+	}
+	if strings.Contains(productionOut, "--no-luajit") {
+		t.Fatalf("production_check.sh --quick --list must not weaken performance gates with --no-luajit; got:\n%s", productionOut)
+	}
+	fullOut := runCommand(t, root, 30*time.Second, "bash", "scripts/production_check.sh", "--full", "--list")
+	if !strings.Contains(fullOut, fullPerfGateCmd) {
+		t.Fatalf("production_check.sh --full --list must keep full LuaJIT performance gate %q; got:\n%s", fullPerfGateCmd, fullOut)
+	}
+	if strings.Contains(fullOut, "--no-luajit") {
+		t.Fatalf("production_check.sh --full --list must not weaken release performance gates with --no-luajit; got:\n%s", fullOut)
 	}
 }
 
@@ -351,17 +364,21 @@ func TestReleaseMatrixTopLevelCommandHelpIsSuccessful(t *testing.T) {
 	root := findRepoRoot(t)
 	for _, command := range []string{
 		"eval",
+		"evaluate",
 		"run",
 		"repl",
 		"fmt",
 		"lint",
 		"test",
+		"examples",
 		"version",
 		"env",
 		"config",
 		"check",
 		"capabilities",
 		"ci",
+		"playground",
+		"lsp",
 		"diag",
 		"diagnose",
 		"inspect",
@@ -515,6 +532,37 @@ func TestReleaseMatrixCommunityEntrypointsAreLinked(t *testing.T) {
 	} {
 		if !strings.Contains(release, snippet) {
 			t.Fatalf("docs/release/index.md must mention %q", snippet)
+		}
+	}
+}
+
+func TestReleaseMatrixReadmeDocumentationEntrypointsStayLinked(t *testing.T) {
+	root := findRepoRoot(t)
+	readme := readFileString(t, filepath.Join(root, "README.md"))
+	for _, ref := range []string{
+		"docs/index.md",
+		"docs/spec/index.md",
+		"docs/spec/index.html",
+		"docs/tutorial/getting-started.md",
+		"docs/reference/stdlib/index.md",
+		"docs/reference/cli/index.md",
+		"docs/guides/embedding.md",
+		"docs/guides/packages.md",
+		"docs/reference/modules/index.md",
+		"docs/guides/ai-native.md",
+		"docs/reference/security/index.md",
+		"docs/reference/performance/index.md",
+		"docs/reference/platforms/index.md",
+		"docs/examples/index.md",
+		"SECURITY.md",
+		"CONTRIBUTING.md",
+		"CODE_OF_CONDUCT.md",
+	} {
+		if !strings.Contains(readme, "("+ref+")") {
+			t.Fatalf("README.md Documentation section must link %s", ref)
+		}
+		if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(ref))); err != nil {
+			t.Fatalf("README.md Documentation link target %s is missing: %v", ref, err)
 		}
 	}
 }

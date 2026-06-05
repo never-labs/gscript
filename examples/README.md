@@ -27,6 +27,8 @@ Directories:
 | `dialects/` | Runnable checks for built-in text, protocol, SQL-shaped, Markdown/table, binary, and validation dialects. |
 | `automation/` | Project-level offline workflows for release, fixture, and business-ops automation. |
 | `operations/` | Project-level offline workflows for local logs, backup hygiene, deploy risk, and ops reporting. |
+| `tooling/` | Project-level offline workflows for release evidence, diagnostics, and CLI gate planning. |
+| `performance/` | User-facing execution mode and benchmark policy examples. |
 | `data/` | Focused data-language examples, including q/kdb+-style symbolic vector evaluation. |
 | `data_processing/` | Strings, containers, dense data, vectors, matrices, and SoA. |
 | `concurrency/` | Goroutine-like tasks, channels, select, sync, and context helpers. |

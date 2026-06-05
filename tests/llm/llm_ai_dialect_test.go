@@ -14,6 +14,7 @@ func TestAIDialectUsesLLMStdlibRuntime(t *testing.T) {
 		opts []leia.Option
 	}{
 		{name: "interpreter"},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			provider := &mockLLMProvider{results: []llm.TurnResult{
@@ -179,6 +180,38 @@ text := result.text
 	text, _ := vm.Get("text")
 	if text != "turn-ok" {
 		t.Fatalf("text = %#v", text)
+	}
+}
+
+func TestEvaluateStatementIsNoopOutsideEvaluateCLI(t *testing.T) {
+	source := `
+before := "kept"
+evaluate "noop outside evaluate CLI" {
+    before = "changed"
+    missing_call()
+}
+after := before
+`
+	for _, tc := range []struct {
+		name string
+		opts []leia.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			vm := leia.New(tc.opts...)
+			if err := vm.Exec(source); err != nil {
+				t.Fatalf("Exec: %v", err)
+			}
+			got, err := vm.Get("after")
+			if err != nil {
+				t.Fatalf("Get after: %v", err)
+			}
+			if got != "kept" {
+				t.Fatalf("after = %#v, want evaluate block to be skipped", got)
+			}
+		})
 	}
 }
 

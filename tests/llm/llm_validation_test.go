@@ -155,3 +155,28 @@ llm.register_models({
 		})
 	}
 }
+
+func TestLLMStdlibValidationRejectsModelAliasCycles(t *testing.T) {
+	for _, mode := range []struct {
+		name string
+		opts []leia.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
+	} {
+		t.Run(mode.name, func(t *testing.T) {
+			opts := append([]leia.Option{leia.WithLibs(leia.LibString | leia.LibLLM)}, mode.opts...)
+			vm := leia.New(opts...)
+			err := vm.Exec(`
+llm.register_models({
+    default: "fast"
+    fast: "cheap"
+    cheap: "fast"
+})
+`)
+			if err == nil || !strings.Contains(err.Error(), "llm model alias cycle: fast -> cheap -> fast") {
+				t.Fatalf("Exec error = %v, want model alias cycle", err)
+			}
+		})
+	}
+}

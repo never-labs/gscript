@@ -21,9 +21,9 @@ Usage: scripts/production_check.sh [--quick] [--full] [--list] [--out-dir DIR] [
 Runs the release-gate commands from docs/release/index.md.
 
 Options:
-  --quick   Run short correctness gates only: core packages, feature matrix,
-            integration, release matrix metadata, and stdlib contract. Skips
-            long performance passes.
+  --quick   Run short correctness gates plus core performance smoke: core
+            packages, feature matrix, integration, release matrix metadata,
+            stdlib contract, and representative stable hot paths.
   --full    Run the available Required Commands subset. This is the default.
   --list    Print the commands that would run without executing them.
   --out-dir DIR
@@ -166,10 +166,29 @@ add_performance_gate() {
         add_skip "Performance Gate" "missing benchmarks/strict_guard.py"
         return
     fi
-    if ! have_cmd luajit; then
-        cmd="$cmd --no-luajit"
-    fi
     add_run "Performance Gate" "$cmd"
+}
+
+add_performance_smoke() {
+    local cmd="bash scripts/performance_gate.sh --smoke"
+
+    if ! have_cmd python3; then
+        add_skip "Performance Smoke" "missing python3"
+        return
+    fi
+    if [ ! -f scripts/performance_gate.sh ]; then
+        add_skip "Performance Smoke" "missing scripts/performance_gate.sh"
+        return
+    fi
+    if [ ! -f benchmarks/timing_compare.py ]; then
+        add_skip "Performance Smoke" "missing benchmarks/timing_compare.py"
+        return
+    fi
+    if [ ! -f benchmarks/strict_guard.py ]; then
+        add_skip "Performance Smoke" "missing benchmarks/strict_guard.py"
+        return
+    fi
+    add_run "Performance Smoke" "$cmd"
 }
 
 add_documentation_references() {
@@ -298,6 +317,7 @@ build_quick_plan() {
         "go test ./tests -run TestStdlibContract -count=1"
     add_manifest_coverage
     add_module_path_gate
+    add_performance_smoke
     add_documentation_references
     add_editor_assets
 }
@@ -341,7 +361,7 @@ if [ -n "$OUT_DIR" ]; then
     echo "Artifact output: $OUT_DIR"
 fi
 if ! have_cmd luajit; then
-    echo "LuaJIT not found; benchmark commands that support it will use --no-luajit."
+    echo "LuaJIT not found; performance gates that compare against LuaJIT are expected to fail."
 fi
 echo
 

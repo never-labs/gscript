@@ -429,6 +429,9 @@ func BuildLLMLib(call ScriptFunctionCaller, provider func() LLMProvider, provide
 		if len(args) < 1 || !args[0].IsTable() {
 			return nil, fmt.Errorf("bad argument #1 to 'llm.register_models' (table expected)")
 		}
+		if err := llmValidateModelAliases(args[0].Table()); err != nil {
+			return nil, err
+		}
 		agentConfigMu.Lock()
 		modelAliases = llmCloneTable(args[0].Table())
 		agentConfigMu.Unlock()
@@ -573,6 +576,38 @@ func llmCopyTable(dst, src *Table, overwrite bool) {
 		}
 		dst.RawSet(key, val)
 	}
+}
+
+func llmValidateModelAliases(aliases *Table) error {
+	if aliases == nil {
+		return nil
+	}
+	for _, key := range aliases.PairsKeysSnapshot() {
+		if !key.IsString() {
+			continue
+		}
+		name := key.Str()
+		alias := aliases.RawGetString(name)
+		if !alias.IsString() || alias.Str() == "" {
+			continue
+		}
+		seen := map[string]int{name: 0}
+		path := []string{name}
+		for next := alias.Str(); next != ""; {
+			if idx, ok := seen[next]; ok {
+				cycle := append(append([]string{}, path[idx:]...), next)
+				return fmt.Errorf("llm model alias cycle: %s", strings.Join(cycle, " -> "))
+			}
+			seen[next] = len(path)
+			path = append(path, next)
+			v := aliases.RawGetString(next)
+			if !v.IsString() || v.Str() == "" {
+				break
+			}
+			next = v.Str()
+		}
+	}
+	return nil
 }
 
 func llmResolveModelAlias(opts, aliases *Table) {

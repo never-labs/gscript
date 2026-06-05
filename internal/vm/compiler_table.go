@@ -69,6 +69,7 @@ func (c *compiler) compileTableLitExpr(e *ast.TableLitExpr, dest int) error {
 		return err
 	}
 
+	entryNextReg := c.nextReg
 	arrayCount := 0
 	hashCount := 0
 	for _, f := range e.Fields {
@@ -214,6 +215,7 @@ func (c *compiler) compileTableLitExpr(e *ast.TableLitExpr, dest int) error {
 		}
 	}
 
+	c.nextReg = entryNextReg
 	return nil
 }
 

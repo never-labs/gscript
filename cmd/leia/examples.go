@@ -427,6 +427,8 @@ func applyCLIExampleRunner(example *cliExample) {
 			return
 		}
 	case strings.Contains(example.Path, "/ai/coding_agent_replay.leia"),
+		strings.Contains(example.Path, "/ai/tagged_agent_workflow.leia"),
+		strings.Contains(example.Path, "/ai/record_replay_trace_project.leia"),
 		strings.Contains(example.Path, "/workflow/support_triage_replay.leia"):
 		if cliExampleCompanionRecordsExist(example.Path) {
 			example.Runnable = true
@@ -435,6 +437,11 @@ func applyCLIExampleRunner(example *cliExample) {
 			example.Requires = ""
 			return
 		}
+		example.Runnable = true
+		example.Checkable = true
+		example.Runner = "llm-mock"
+		example.Requires = ""
+		return
 	case strings.Contains(example.Path, "/macos/package_managed/"),
 		strings.Contains(example.Path, "/ui/package_managed/"):
 		example.Checkable = true

@@ -58,6 +58,8 @@ func (c *compiler) compileStmt(stmt ast.Stmt) error {
 		return c.compileSendStmt(s)
 	case *ast.SelectStmt:
 		return c.compileSelectStmt(s)
+	case *ast.EvaluateStmt:
+		return nil
 	default:
 		return fmt.Errorf("line %d: unsupported statement type %T", stmt.GetPos().Line, stmt)
 	}

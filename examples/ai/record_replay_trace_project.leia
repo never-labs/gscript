@@ -1,0 +1,39 @@
+// record_replay_trace_project.leia - Offline trace-friendly AI turn workflow.
+// Demonstrates: turn {}, streaming callback, usage fields suitable for replay reports
+
+model {
+    default: "mock-stream"
+}
+
+streamed := ""
+events := 0
+
+result, err := turn {
+    model: "mock-stream"
+    messages: {
+        llm.system("Stream exactly the provider response."),
+        llm.user("Say hello stream."),
+    }
+    stream: true
+    on_stream: func(event) {
+        streamed = streamed .. event.token
+        events = events + 1
+    }
+}
+
+assert(err == nil)
+assert(result.status == "final_answer")
+assert(result.text == "hello stream")
+assert(streamed == "hello stream")
+assert(events == 3)
+
+usage := {
+    turns: 1,
+    stream_events: events,
+    replay_ready: true,
+}
+
+print("turns", usage.turns)
+print("stream_events", usage.stream_events)
+print("replay_ready", usage.replay_ready)
+print("ok")

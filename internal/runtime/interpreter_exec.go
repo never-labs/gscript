@@ -180,6 +180,8 @@ func (interp *Interpreter) execStmtRaw(stmt ast.Stmt, env *Environment) ([]Value
 		return interp.execSend(s, env)
 	case *ast.SelectStmt:
 		return interp.execSelect(s, env)
+	case *ast.EvaluateStmt:
+		return nil, false, false, false, nil
 	default:
 		return nil, false, false, false, fmt.Errorf("unknown statement type: %T", stmt)
 	}

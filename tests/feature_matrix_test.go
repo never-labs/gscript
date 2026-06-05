@@ -263,6 +263,8 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 	root := findRepoRoot(t)
 	readme := readFileString(t, filepath.Join(root, "README.md"))
 	for _, snippet := range []string{
+		"Go-flavored syntax with dynamic values, Lua-compatible table and multi-return",
+		"semantics where useful, an embeddable Go API, a bytecode VM, and an ARM64 JIT.",
 		"Go embedding API with sandbox, resource budgets, host bindings, and hot reload.",
 		"AI-native syntax and stdlib support for models, tools, messages, turns,",
 		"Go-style concurrency primitives: `go`, channels, `select`, sync helpers",
@@ -277,11 +279,16 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 
 	features := loadFeatureMatrixFeatureMap(t, root)
 
+	requireFeature(t, features, "literals_and_constants")
+	requireFeature(t, features, "tables_arrays_fields")
+	requireFeature(t, features, "varargs_multireturn")
+
 	embeddingSecurity := requireFeature(t, features, "sandbox_capabilities_module_loading")
 	requireFeatureCellRefs(t, embeddingSecurity, "sandbox_capabilities_module_loading", "semantic_gate",
 		"tests/sdk/leia_test.go",
 		"tests/sdk/security_api_test.go",
 		"docs/testing.md",
+		"docs/reference/security/index.md",
 	)
 
 	hostBindings := requireFeature(t, features, "embedding_host_bindings")
@@ -330,6 +337,7 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 		"examples/evaluate/agent_replay.leia",
 		"examples/workflow/support_triage_replay.leia",
 		"examples/embedding/embedding_test.go",
+		"docs/guides/ai-native.md",
 	)
 
 	stringsPatterns := requireFeature(t, features, "strings_patterns_concat")
