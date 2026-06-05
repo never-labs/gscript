@@ -44,3 +44,37 @@ assert(points.missing == nil)
 		})
 	}
 }
+
+func TestDenseArrayElementwiseArithmeticRunsInInterpreterVMAndJIT(t *testing.T) {
+	source := `
+a := []f64{1, 2, 3}
+b := []f64{10, 20, 30}
+c := a * 2
+d := 10 - a
+e := a + b
+f := b / 10
+assert(c[2] == 4)
+assert(d[3] == 7)
+assert(e[1] == 11)
+assert(f[3] == 3)
+`
+	for _, tc := range []struct {
+		name string
+		run  func(*runtime.Interpreter, string) error
+	}{
+		{name: "interpreter", run: runString},
+		{name: "bytecode", run: func(interp *runtime.Interpreter, src string) error {
+			return runStringVM(interp, src, false, false, jitCLIOptions{})
+		}},
+		{name: "jit", run: func(interp *runtime.Interpreter, src string) error {
+			return runStringVM(interp, src, true, false, jitCLIOptions{})
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			interp := newCLIInterpreter()
+			if err := tc.run(interp, source); err != nil {
+				t.Fatalf("run: %v", err)
+			}
+		})
+	}
+}

@@ -541,6 +541,11 @@ func vmToInt(v runtime.Value) int64 {
 // ---- Arithmetic helpers ----
 
 func (vm *VM) arith(a, b runtime.Value, metamethod string, op func(float64, float64) float64) (runtime.Value, error) {
+	if a.IsDenseArray() || b.IsDenseArray() {
+		if denseOp, ok := denseArrayBinaryOpForMetamethod(metamethod); ok {
+			return runtime.DenseArrayElementwise(denseOp, a, b)
+		}
+	}
 	if a.IsInt() && b.IsInt() {
 		switch metamethod {
 		case "__add":
@@ -583,6 +588,21 @@ func (vm *VM) arith(a, b runtime.Value, metamethod string, op func(float64, floa
 		return runtime.NilValue(), nil
 	}
 	return runtime.NilValue(), fmt.Errorf("attempt to perform arithmetic on %s and %s", a.TypeName(), b.TypeName())
+}
+
+func denseArrayBinaryOpForMetamethod(metamethod string) (runtime.DenseArrayBinaryOp, bool) {
+	switch metamethod {
+	case "__add":
+		return runtime.DenseArrayAdd, true
+	case "__sub":
+		return runtime.DenseArraySub, true
+	case "__mul":
+		return runtime.DenseArrayMul, true
+	case "__div":
+		return runtime.DenseArrayDiv, true
+	default:
+		return 0, false
+	}
 }
 
 func (vm *VM) arithMod(a, b runtime.Value) (runtime.Value, error) {
