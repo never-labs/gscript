@@ -109,6 +109,7 @@ func InstallModules(installer runtime.StdlibInstaller, maxHostResult func() int6
 		installer.RegisterTable("net", stdbind.BuildNet(hostOpts))
 		installer.RegisterTable("os", stdbind.BuildOSWithPolicy(hostOpts))
 		installer.RegisterTable("process", stdbind.BuildProcessWithPolicy(hostOpts))
+		installer.RegisterTable("serve", stdbind.BuildServe(hostOpts))
 	}
 	installer.RegisterTable("hash", stdbind.BuildHash())
 	installer.RegisterTable("json", stdbind.BuildJSON())

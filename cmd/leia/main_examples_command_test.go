@@ -156,3 +156,17 @@ func TestExamplesCommandChecksSelectedExamplesJSON(t *testing.T) {
 		t.Fatalf("unexpected examples check payload: %#v", payload)
 	}
 }
+
+func TestExamplesCommandCheckRejectsInvalidTimeout(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := runExamplesCommand([]string{"check", "--timeout=0s", "repo-hello-counter"}, &stdout, &stderr)
+	if code != 2 {
+		t.Fatalf("runExamplesCommand code = %d, want 2", code)
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("stdout = %q, want empty", stdout.String())
+	}
+	if !strings.Contains(stderr.String(), "--timeout must be positive") {
+		t.Fatalf("stderr = %q, want timeout validation", stderr.String())
+	}
+}

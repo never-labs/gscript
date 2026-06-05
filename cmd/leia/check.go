@@ -30,6 +30,8 @@ func runCheckCommand(args []string, outw, errw io.Writer) int {
 	fs := flag.NewFlagSet("check", flag.ContinueOnError)
 	fs.SetOutput(errw)
 	jsonOut := fs.Bool("json", false, "print check results as JSON")
+	quick := fs.Bool("quick", false, "run the fast local gate: fmt, lint, and test only")
+	full := fs.Bool("full", false, "run the full local gate")
 	noFmt := fs.Bool("no-fmt", false, "skip formatter check")
 	noLint := fs.Bool("no-lint", false, "skip lint")
 	noTest := fs.Bool("no-test", false, "skip tests")
@@ -40,12 +42,22 @@ func runCheckCommand(args []string, outw, errw io.Writer) int {
 	if code, done := parseCLIFlags(fs, args); done {
 		return code
 	}
+	if *quick && *full {
+		fmt.Fprintln(errw, "leia check: --quick and --full are mutually exclusive")
+		return 2
+	}
+	if *quick {
+		*noManifest = true
+		*noDocs = true
+		*noEditor = true
+		*noExamples = true
+	}
 	paths := fs.Args()
 	if len(paths) == 0 {
 		paths = []string{"."}
 	}
 	if len(paths) != 1 {
-		fmt.Fprintln(errw, "usage: leia check [--json] [--no-fmt] [--no-lint] [--no-test] [--no-manifest] [--no-docs] [--no-editor] [--no-examples] [path-or-dir]")
+		fmt.Fprintln(errw, "usage: leia check [--json] [--quick|--full] [--no-fmt] [--no-lint] [--no-test] [--no-manifest] [--no-docs] [--no-editor] [--no-examples] [path-or-dir]")
 		return 2
 	}
 

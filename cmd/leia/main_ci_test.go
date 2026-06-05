@@ -147,6 +147,47 @@ func TestCheckCommandReportsFailureAndSkips(t *testing.T) {
 	}
 }
 
+func TestCheckCommandQuickSkipsSlowSteps(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "ok.leia")
+	if err := os.WriteFile(path, []byte("print(\"ok\")\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(strings.TrimSuffix(path, ".leia")+".out", []byte("ok\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runCheckCommand([]string{"--json", "--quick", dir}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runCheckCommand code = %d, stderr = %q", code, stderr.String())
+	}
+	var report checkReport
+	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
+		t.Fatalf("stdout is not JSON check report: %v; stdout = %q", err, stdout.String())
+	}
+	if !report.OK || len(report.Steps) != 7 {
+		t.Fatalf("report = %+v, want seven passing steps", report)
+	}
+	for i, step := range report.Steps {
+		wantSkipped := i >= 3
+		if step.Skipped != wantSkipped || !step.OK {
+			t.Fatalf("step[%d] = %+v, want skipped=%t and ok", i, step, wantSkipped)
+		}
+	}
+}
+
+func TestCheckCommandRejectsConflictingProfiles(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := runCheckCommand([]string{"--quick", "--full", "."}, &stdout, &stderr)
+	if code != 2 {
+		t.Fatalf("runCheckCommand code = %d, want 2", code)
+	}
+	if !strings.Contains(stderr.String(), "mutually exclusive") {
+		t.Fatalf("stderr = %q, want mutually exclusive", stderr.String())
+	}
+}
+
 func TestCheckCommandUsesSmokeSourceForRepositoryRootTooling(t *testing.T) {
 	root := repoRootForBoundaryTest(t)
 	got := checkToolingPath(root)

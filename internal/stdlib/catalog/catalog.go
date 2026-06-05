@@ -58,6 +58,7 @@ var modules = []ModuleInfo{
 	{Name: "rand", Layer: LayerBase, Description: "Pseudo-random values, ranges, bytes, and seedable random helpers.", SafeDefault: true},
 	{Name: "regexp", Layer: LayerBase, Description: "Go RE2 regular expression compile, match, find, replace, and split helpers.", SafeDefault: true},
 	{Name: "script", Layer: LayerHost, Description: "Script compilation, evaluation, loader, source, and entrypoint helpers.", Capabilities: []string{"script.eval", "module.load"}},
+	{Name: "serve", Layer: LayerHost, Description: "High-level HTTP application router with parameter routes and automatic responses.", Capabilities: []string{"net.listen"}},
 	{Name: "soa", Layer: LayerData, Description: "Structure-of-arrays records and column-oriented data processing.", SafeDefault: true},
 	{Name: "sort", Layer: LayerBase, Description: "Sort helpers for arrays, numbers, tables, and callback-based ordering.", SafeDefault: true},
 	{Name: "string", Layer: LayerBase, Description: "Lua-style byte-string helpers plus Go-style string utilities.", SafeDefault: true},

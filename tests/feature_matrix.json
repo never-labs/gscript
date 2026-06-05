@@ -268,16 +268,16 @@
     },
     {
       "id": "host_stdlibs",
-      "name": "Host stdlibs: fs, io, net, json, crypto, process, and helpers",
+      "name": "Host stdlibs: fs, io, net, json, crypto, process, serve, and helpers",
       "category": "stdlib-host",
       "spec_sections": ["Values And Types", "Expressions", "Modules And Loading", "Declarations And Scope"],
       "parser": {"status": "not_applicable", "refs": []},
       "bytecode": {"status": "not_applicable", "refs": []},
-      "interpreter": {"status": "covered", "refs": ["internal/stdlib/bind/json_test.go", "internal/stdlib/bind/fs_behavior_test.go", "internal/stdlib/bind/net_behavior_test.go"]},
+      "interpreter": {"status": "covered", "refs": ["internal/stdlib/bind/json_test.go", "internal/stdlib/bind/fs_behavior_test.go", "internal/stdlib/bind/net_behavior_test.go", "internal/stdlib/bind/serve_behavior_test.go"]},
       "tier1": {"status": "semantic_only", "refs": []},
       "tier2": {"status": "semantic_only", "refs": []},
       "semantic_gate": {"status": "covered", "refs": ["tests/language/json_go_host_more.leia", "tests/language/fs_path_glob_cwd_more.leia"]},
-      "conformance_case": {"status": "covered", "refs": ["tests/language/net_http_methods_more.leia", "tests/language/process_exec_run_more.leia"]},
+      "conformance_case": {"status": "covered", "refs": ["tests/language/net_http_methods_more.leia", "tests/language/process_exec_run_more.leia", "examples/web/tiny_app.leia"]},
       "perf_hot_case": {"status": "partial", "refs": ["benchmarks/app/stdlib_host.leia", "benchmarks/table/json_table_walk.leia"]}
     },
     {

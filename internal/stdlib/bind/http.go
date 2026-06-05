@@ -8,6 +8,7 @@ import (
 	hostnet "github.com/never-labs/leia/internal/stdlib/lib/net"
 	"net"
 	"net/http"
+	"strings"
 	"sync"
 )
 
@@ -59,7 +60,7 @@ func BuildHTTPWithCallerAndPolicy(call ScriptFunctionCaller, networkAllowed func
 				return
 			}
 			// Build res table
-			res := buildResponseTable(w, r)
+			res, _ := buildResponseTableWithState(w, r)
 
 			_, err = callHTTPHandler(call, &handlerMu, handler, req, res)
 			if err != nil {
@@ -140,6 +141,7 @@ func buildRequestTable(r *http.Request, maxHostResult int64) (Value, error) {
 	t.RawSet(StringValue("headers"), TableValue(headers))
 
 	t.RawSet(StringValue("body"), StringValue(string(reqInfo.Body)))
+	t.RawSet(StringValue("params"), TableValue(NewTable()))
 
 	// req.param(name) - get query param
 	t.RawSet(StringValue("param"), FunctionValue(&GoFunction{
@@ -172,21 +174,30 @@ func buildRequestTable(r *http.Request, maxHostResult int64) (Value, error) {
 }
 
 // buildResponseTable creates a Leia table representing an HTTP response writer.
+type httpResponseState struct {
+	written   bool
+	statusSet bool
+}
+
 func buildResponseTable(w http.ResponseWriter, r *http.Request) Value {
+	res, _ := buildResponseTableWithState(w, r)
+	return res
+}
+
+func buildResponseTableWithState(w http.ResponseWriter, r *http.Request) (Value, *httpResponseState) {
 	t := NewTable()
-	written := false
-	statusSet := false
+	state := &httpResponseState{}
 
 	// res.write(body) - write response body
 	t.RawSet(StringValue("write"), FunctionValue(&GoFunction{
 		Name: "res.write",
 		Fn: func(args []Value) ([]Value, error) {
-			if !statusSet {
+			if !state.statusSet {
 				w.WriteHeader(200)
-				statusSet = true
+				state.statusSet = true
 			}
 			if len(args) > 0 {
-				written = true
+				state.written = true
 				fmt.Fprint(w, args[0].String())
 			}
 			return nil, nil
@@ -197,12 +208,12 @@ func buildResponseTable(w http.ResponseWriter, r *http.Request) Value {
 	t.RawSet(StringValue("writeln"), FunctionValue(&GoFunction{
 		Name: "res.writeln",
 		Fn: func(args []Value) ([]Value, error) {
-			if !statusSet {
+			if !state.statusSet {
 				w.WriteHeader(200)
-				statusSet = true
+				state.statusSet = true
 			}
 			if len(args) > 0 {
-				written = true
+				state.written = true
 				fmt.Fprintln(w, args[0].String())
 			}
 			return nil, nil
@@ -214,9 +225,9 @@ func buildResponseTable(w http.ResponseWriter, r *http.Request) Value {
 		Name: "res.json",
 		Fn: func(args []Value) ([]Value, error) {
 			w.Header().Set("Content-Type", "application/json")
-			if !statusSet {
+			if !state.statusSet {
 				w.WriteHeader(200)
-				statusSet = true
+				state.statusSet = true
 			}
 			if len(args) > 0 {
 				data := leiaToGo(args[0])
@@ -224,7 +235,7 @@ func buildResponseTable(w http.ResponseWriter, r *http.Request) Value {
 				if err != nil {
 					return nil, err
 				}
-				written = true
+				state.written = true
 				w.Write(jsonBytes)
 			}
 			return nil, nil
@@ -235,10 +246,10 @@ func buildResponseTable(w http.ResponseWriter, r *http.Request) Value {
 	t.RawSet(StringValue("status"), FunctionValue(&GoFunction{
 		Name: "res.status",
 		Fn: func(args []Value) ([]Value, error) {
-			if len(args) > 0 && !written {
+			if len(args) > 0 && !state.written {
 				code := int(args[0].Int())
 				w.WriteHeader(code)
-				statusSet = true
+				state.statusSet = true
 			}
 			return []Value{TableValue(t)}, nil // return res for chaining
 		},
@@ -267,18 +278,38 @@ func buildResponseTable(w http.ResponseWriter, r *http.Request) Value {
 				code = int(args[1].Int())
 			}
 			http.Redirect(w, r, args[0].Str(), code)
+			state.written = true
+			state.statusSet = true
 			return nil, nil
 		},
 	}))
 
-	_ = written
-	return TableValue(t)
+	return TableValue(t), state
 }
 
 // buildRouterTable creates a router with route registration.
 func buildRouterTable(call ScriptFunctionCaller, maxHostResult func() int64) *Table {
+	return newHTTPRouter(call, maxHostResult, httpRouterOptions{}).table
+}
+
+type httpRouterOptions struct {
+	autoRespond bool
+}
+
+type httpRouteEntry struct {
+	method  string
+	pattern string
+	handler Value
+}
+
+type httpRouter struct {
+	table  *Table
+	mu     sync.RWMutex
+	routes []httpRouteEntry
+}
+
+func newHTTPRouter(call ScriptFunctionCaller, maxHostResult func() int64, opts httpRouterOptions) *httpRouter {
 	t := NewTable()
-	mux := http.NewServeMux()
 	var handlerMu sync.Mutex
 	hostResultLimit := func() int64 {
 		if maxHostResult == nil {
@@ -286,23 +317,10 @@ func buildRouterTable(call ScriptFunctionCaller, maxHostResult func() int64) *Ta
 		}
 		return maxHostResult()
 	}
+	router := &httpRouter{table: t}
 
 	registerRoute := func(method, pattern string, handler Value) {
-		mux.HandleFunc(pattern, func(w http.ResponseWriter, r *http.Request) {
-			if method != "" && r.Method != method {
-				http.Error(w, "Method Not Allowed", 405)
-				return
-			}
-			req, err := buildRequestTable(r, hostResultLimit())
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusRequestEntityTooLarge)
-				return
-			}
-			res := buildResponseTable(w, r)
-			if _, err := callHTTPHandler(call, &handlerMu, handler, req, res); err != nil {
-				http.Error(w, err.Error(), 500)
-			}
-		})
+		router.addRoute(method, pattern, handler)
 	}
 
 	// router.get(pattern, handler)
@@ -347,11 +365,152 @@ func buildRouterTable(call ScriptFunctionCaller, maxHostResult func() int64) *Ta
 				addr = args[0].Str()
 			}
 			background := httpListenBackground(args, 1)
-			return startHTTPServer(addr, mux, background)
+			return startHTTPServer(addr, router.handler(call, &handlerMu, hostResultLimit, opts), background)
 		},
 	}))
 
-	return t
+	return router
+}
+
+func (router *httpRouter) addRoute(method, pattern string, handler Value) {
+	router.mu.Lock()
+	router.routes = append(router.routes, httpRouteEntry{method: method, pattern: pattern, handler: handler})
+	router.mu.Unlock()
+}
+
+func (router *httpRouter) handler(call ScriptFunctionCaller, handlerMu *sync.Mutex, hostResultLimit func() int64, opts httpRouterOptions) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		route, params, methodAllowed := router.match(r.Method, r.URL.Path)
+		if route == nil {
+			if methodAllowed {
+				http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+				return
+			}
+			http.NotFound(w, r)
+			return
+		}
+		req, err := buildRequestTable(r, hostResultLimit())
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusRequestEntityTooLarge)
+			return
+		}
+		setRequestParams(req, params)
+		res, state := buildResponseTableWithState(w, r)
+		values, err := callHTTPHandler(call, handlerMu, route.handler, req, res)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if opts.autoRespond {
+			if err := writeHTTPAutoResponse(w, state, values); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+			}
+		}
+	})
+}
+
+func (router *httpRouter) match(method, path string) (*httpRouteEntry, map[string]string, bool) {
+	router.mu.RLock()
+	defer router.mu.RUnlock()
+	methodAllowed := false
+	for i := range router.routes {
+		route := &router.routes[i]
+		params, ok := matchHTTPRoutePath(route.pattern, path)
+		if !ok {
+			continue
+		}
+		if route.method == "" || route.method == method {
+			return route, params, false
+		}
+		methodAllowed = true
+	}
+	return nil, nil, methodAllowed
+}
+
+func matchHTTPRoutePath(pattern, path string) (map[string]string, bool) {
+	if pattern == path && !strings.Contains(pattern, ":") {
+		return nil, true
+	}
+	pSegs := splitHTTPRoutePath(pattern)
+	pathSegs := splitHTTPRoutePath(path)
+	if len(pSegs) != len(pathSegs) {
+		return nil, false
+	}
+	var params map[string]string
+	for i, pseg := range pSegs {
+		if strings.HasPrefix(pseg, ":") && len(pseg) > 1 {
+			if params == nil {
+				params = make(map[string]string)
+			}
+			params[pseg[1:]] = pathSegs[i]
+			continue
+		}
+		if pseg != pathSegs[i] {
+			return nil, false
+		}
+	}
+	return params, true
+}
+
+func splitHTTPRoutePath(path string) []string {
+	if path == "/" {
+		return nil
+	}
+	return strings.Split(strings.Trim(path, "/"), "/")
+}
+
+func setRequestParams(req Value, params map[string]string) {
+	if !req.IsTable() {
+		return
+	}
+	t := NewTable()
+	for key, val := range params {
+		t.RawSetString(key, StringValue(val))
+	}
+	req.Table().RawSetString("params", TableValue(t))
+}
+
+func writeHTTPAutoResponse(w http.ResponseWriter, state *httpResponseState, values []Value) error {
+	if state == nil || state.written || len(values) == 0 || values[0].IsNil() {
+		return nil
+	}
+	value := values[0]
+	if value.IsTable() {
+		w.Header().Set("Content-Type", "application/json")
+		data, err := json.Marshal(leiaToGo(value))
+		if err != nil {
+			return err
+		}
+		if !state.statusSet {
+			w.WriteHeader(http.StatusOK)
+			state.statusSet = true
+		}
+		state.written = true
+		_, err = w.Write(data)
+		return err
+	}
+	body := value.String()
+	if w.Header().Get("Content-Type") == "" {
+		if looksLikeHTML(body) {
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		} else {
+			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		}
+	}
+	if !state.statusSet {
+		w.WriteHeader(http.StatusOK)
+		state.statusSet = true
+	}
+	state.written = true
+	_, err := fmt.Fprint(w, body)
+	return err
+}
+
+func looksLikeHTML(body string) bool {
+	trimmed := strings.TrimSpace(body)
+	return strings.HasPrefix(trimmed, "<!doctype html") ||
+		strings.HasPrefix(trimmed, "<html") ||
+		strings.HasPrefix(trimmed, "<")
 }
 
 type httpServerHandle struct {

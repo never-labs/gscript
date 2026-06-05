@@ -34,6 +34,11 @@ func runBenchCommand(args []string, outw, errw io.Writer) int {
 		mode = "compare"
 		harnessArgs = append([]string{"--bench", args[0]}, args[1:]...)
 	}
+	if mode == "compare" {
+		if profileMode, profileArgs, rest, ok := benchProfileArgs(harnessArgs); ok && profileMode == "compare" {
+			harnessArgs = append(profileArgs, rest...)
+		}
+	}
 
 	return runBenchHarness(mode, harnessArgs, outw, errw)
 }

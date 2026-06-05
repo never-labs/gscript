@@ -10,7 +10,7 @@ func TestInstallUsesStdlibBoundHostIOModules(t *testing.T) {
 	interp := runtime.NewCore()
 	Install(interp)
 
-	for _, name := range []string{"fs", "http", "io", "net", "os"} {
+	for _, name := range []string{"fs", "http", "io", "net", "os", "serve"} {
 		global := interp.GetGlobal(name)
 		if !global.IsTable() {
 			t.Fatalf("%s global is not a table", name)

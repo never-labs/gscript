@@ -133,6 +133,29 @@ func TestBenchCommandDispatchesProfiles(t *testing.T) {
 	}
 }
 
+func TestBenchCommandDispatchesCompareQuickProfile(t *testing.T) {
+	oldBenchExecCommand := benchExecCommand
+	t.Cleanup(func() { benchExecCommand = oldBenchExecCommand })
+	var gotArgs []string
+	benchExecCommand = func(name string, args ...string) *exec.Cmd {
+		gotArgs = append([]string(nil), args...)
+		helper, helperArgs := testHelperCommand(t, "bench")
+		return exec.Command(helper, helperArgs...)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runBenchCommand([]string{"compare", "--quick"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runBenchCommand code = %d, stderr = %q", code, stderr.String())
+	}
+	if !strings.HasSuffix(gotArgs[0], filepath.Join("benchmarks", "timing_compare.py")) ||
+		!containsString(gotArgs, "control/sieve") ||
+		!containsString(gotArgs, "table/table_array_access") ||
+		!containsString(gotArgs, "--timeout") {
+		t.Fatalf("args = %#v, want timing_compare.py quick compare profile", gotArgs)
+	}
+}
+
 func TestBenchCommandDispatchesStrictHarness(t *testing.T) {
 	oldBenchExecCommand := benchExecCommand
 	t.Cleanup(func() { benchExecCommand = oldBenchExecCommand })

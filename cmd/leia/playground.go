@@ -1467,10 +1467,12 @@ func playgroundExamplesRoot() string {
 
 func repositoryExampleRunnable(path string) bool {
 	return !strings.Contains(path, "/evaluate/") &&
+		!strings.Contains(path, "/ai/") &&
 		!strings.Contains(path, "/llm/") &&
 		!strings.Contains(path, "/testing/") &&
 		!strings.Contains(path, "/workflow/support_triage_replay.leia") &&
 		!strings.Contains(path, "/web/hello_server.leia") &&
+		!strings.Contains(path, "/web/tiny_app.leia") &&
 		!strings.Contains(path, "/web/webserver.leia") &&
 		!strings.Contains(path, "/dialects/shell_filesystem.leia") &&
 		!strings.Contains(path, "/macos/package_managed/") &&
@@ -1485,13 +1487,15 @@ func repositoryExampleRequires(path string) string {
 	switch {
 	case strings.Contains(path, "/evaluate/"):
 		return "leia evaluate CLI"
+	case strings.Contains(path, "/ai/"):
+		return "local AI playground profile or LLM replay fixture"
 	case strings.Contains(path, "/llm/"):
 		return "LLM provider"
 	case strings.Contains(path, "/testing/"):
 		return "leia test CLI"
 	case strings.Contains(path, "/workflow/support_triage_replay.leia"):
 		return "LLM replay fixture or provider"
-	case strings.Contains(path, "/web/hello_server.leia"), strings.Contains(path, "/web/webserver.leia"):
+	case strings.Contains(path, "/web/hello_server.leia"), strings.Contains(path, "/web/tiny_app.leia"), strings.Contains(path, "/web/webserver.leia"):
 		return "network/server host access"
 	case strings.Contains(path, "/dialects/shell_filesystem.leia"):
 		return "process shell and filesystem host access"

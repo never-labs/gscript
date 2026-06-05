@@ -106,6 +106,7 @@ func runExamplesCheckCommand(args []string, outw, errw io.Writer) int {
 	jsonOut := fs.Bool("json", false, "print check results as JSON")
 	jobs := fs.Int("jobs", 1, "number of runnable examples to check in parallel")
 	maxSteps := fs.Int64("max-steps", 2_000_000, "maximum VM or interpreter steps per example")
+	timeout := fs.Duration("timeout", 30*time.Second, "wall-clock timeout per runnable example")
 	if code, done := parseCLIFlags(fs, args); done {
 		return code
 	}
@@ -117,13 +118,17 @@ func runExamplesCheckCommand(args []string, outw, errw io.Writer) int {
 		fmt.Fprintln(errw, "leia examples check: --max-steps must be >= 1")
 		return 2
 	}
+	if *timeout <= 0 {
+		fmt.Fprintln(errw, "leia examples check: --timeout must be positive")
+		return 2
+	}
 	selectors := fs.Args()
 	examples, err := selectedCLIExamples(selectors)
 	if err != nil {
 		fmt.Fprintf(errw, "leia examples: %v\n", err)
 		return 1
 	}
-	results := checkCLIExamples(examples, *jobs, *maxSteps)
+	results := checkCLIExamples(examples, *jobs, *maxSteps, *timeout)
 	failed := 0
 	runnable := 0
 	skipped := 0
@@ -309,7 +314,7 @@ func selectedCLIExamples(selectors []string) ([]cliExample, error) {
 	return selected, nil
 }
 
-func checkCLIExamples(examples []cliExample, jobs int, maxSteps int64) []cliExampleCheckResult {
+func checkCLIExamples(examples []cliExample, jobs int, maxSteps int64, timeout time.Duration) []cliExampleCheckResult {
 	type indexedExample struct {
 		index   int
 		example cliExample
@@ -329,7 +334,7 @@ func checkCLIExamples(examples []cliExample, jobs int, maxSteps int64) []cliExam
 		go func() {
 			defer wg.Done()
 			for item := range work {
-				results[item.index] = checkCLIExample(item.example, maxSteps)
+				results[item.index] = checkCLIExample(item.example, maxSteps, timeout)
 			}
 		}()
 	}
@@ -341,7 +346,7 @@ func checkCLIExamples(examples []cliExample, jobs int, maxSteps int64) []cliExam
 	return results
 }
 
-func checkCLIExample(example cliExample, maxSteps int64) cliExampleCheckResult {
+func checkCLIExample(example cliExample, maxSteps int64, timeout time.Duration) cliExampleCheckResult {
 	result := cliExampleCheckResult{
 		ID:       example.ID,
 		Path:     example.Path,
@@ -354,17 +359,35 @@ func checkCLIExample(example cliExample, maxSteps int64) cliExampleCheckResult {
 	}
 	path := filepath.Join(filepath.Dir(playgroundExamplesRoot()), filepath.FromSlash(example.Path))
 	started := time.Now()
-	var stdout, stderr bytes.Buffer
-	code := runPlaygroundExecCommand([]string{"--mode=bytecode", "--max-steps=" + fmt.Sprint(maxSteps), path}, &stdout, &stderr)
-	result.Duration = time.Since(started).Round(time.Millisecond).String()
-	if code != 0 {
+	type runResult struct {
+		code   int
+		stdout string
+		stderr string
+	}
+	done := make(chan runResult, 1)
+	go func() {
+		var stdout, stderr bytes.Buffer
+		code := runPlaygroundExecCommand([]string{"--mode=bytecode", "--max-steps=" + fmt.Sprint(maxSteps), path}, &stdout, &stderr)
+		done <- runResult{code: code, stdout: stdout.String(), stderr: stderr.String()}
+	}()
+	var run runResult
+	select {
+	case run = <-done:
+	case <-time.After(timeout):
+		result.Duration = time.Since(started).Round(time.Millisecond).String()
 		result.Status = "failed"
-		result.Error = strings.TrimSpace(stderr.String())
+		result.Error = fmt.Sprintf("timed out after %s", timeout)
+		return result
+	}
+	result.Duration = time.Since(started).Round(time.Millisecond).String()
+	if run.code != 0 {
+		result.Status = "failed"
+		result.Error = strings.TrimSpace(run.stderr)
 		if result.Error == "" {
-			result.Error = strings.TrimSpace(stdout.String())
+			result.Error = strings.TrimSpace(run.stdout)
 		}
 		if result.Error == "" {
-			result.Error = fmt.Sprintf("exit code %d", code)
+			result.Error = fmt.Sprintf("exit code %d", run.code)
 		}
 	}
 	return result

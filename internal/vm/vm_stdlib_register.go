@@ -742,12 +742,19 @@ func (vm *VM) RegisterLLMLib() {
 
 func (vm *VM) RegisterHTTPLib() {
 	std := vm.newStdlibInstallContext()
-	httpLib := runtime.TableValue(stdbind.BuildHTTPWithCallerAndPolicy(vm.callValueNoMethodJIT, func() bool {
-		return vm.networkAccess
-	}, func() int64 {
-		return vm.maxHostResult
-	}))
+	hostOpts := stdbind.HostOptions{
+		Call: vm.callValueNoMethodJIT,
+		NetworkAllowed: func() bool {
+			return vm.networkAccess
+		},
+		MaxHostResult: func() int64 {
+			return vm.maxHostResult
+		},
+	}
+	httpLib := runtime.TableValue(stdbind.BuildHTTPWithCallerAndPolicy(hostOpts.Call, hostOpts.NetworkAllowed, hostOpts.MaxHostResult))
 	std.RegisterModule("http", httpLib)
+	serveLib := runtime.TableValue(stdbind.BuildServe(hostOpts))
+	std.RegisterModule("serve", serveLib)
 }
 
 func (vm *VM) RegisterSyncLib() {

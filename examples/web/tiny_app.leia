@@ -1,0 +1,20 @@
+app := serve.app({
+    listen: "127.0.0.1:0",
+    routes: {
+        {method: "GET", path: "/", handler: func(req) {
+            return "hello from Leia"
+        }},
+        {method: "GET", path: "/users/:name", handler: func(req) {
+            return {name: req.params.name, ok: true}
+        }},
+    },
+})
+
+root := http.get(app.url .. "/")
+user := http.get(app.url .. "/users/ada")
+
+print(root.body)
+print(user.body)
+
+app.close()
+app.wait()

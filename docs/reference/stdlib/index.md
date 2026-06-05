@@ -37,6 +37,7 @@ Generated from `internal/stdlib/catalog`, the code-owned standard-library metada
 | `host` | `os` | Environment, process metadata, temporary names, and Lua-style OS helpers. | false | env.read, env.write |
 | `host` | `process` | Subprocess execution, shell execution, lookup, args, and entry metadata. | false | process.exec, process.shell |
 | `host` | `script` | Script compilation, evaluation, loader, source, and entrypoint helpers. | false | script.eval, module.load |
+| `host` | `serve` | High-level HTTP application router with parameter routes and automatic responses. | false | net.listen |
 | `host` | `testkit` | Conformance and diagnostic helpers intended for tests. | false | testkit |
 | `llm` | `chat` | Lightweight chat and conversation helpers for AI-native scripts. | false | llm.turn |
 | `llm` | `history` | Conversation history search, append, and recall helpers. | false | none |

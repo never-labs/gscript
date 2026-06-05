@@ -552,6 +552,7 @@ func stdlibAllowedNames(libs LibFlags) map[string]bool {
 		"rand":      libs&LibRand != 0,
 		"regexp":    libs&LibRegexp != 0,
 		"script":    libs&LibScript != 0,
+		"serve":     libs&LibHTTP != 0,
 		"soa":       libs&LibSoA != 0,
 		"sort":      libs&LibSort != 0,
 		"string":    libs&LibString != 0,
