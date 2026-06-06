@@ -1933,7 +1933,7 @@ func TestReleaseMatrixReadmeCapabilitiesStayCoveredByExamples(t *testing.T) {
 			capability: "concurrency",
 			dirs:       []string{"`examples/concurrency/`"},
 			docTerms:   []string{"goroutines", "channels", "select", "context cancellation"},
-			cliIDs:     []string{"repo-concurrency-goroutines_channels", "repo-concurrency-select_timeout", "repo-concurrency-sync_group"},
+			cliIDs:     []string{"repo-concurrency-goroutines_channels", "repo-concurrency-select_timeout", "repo-concurrency-sync_group", "repo-concurrency-pipeline_project-main"},
 			featureIDs: []string{"go_style_concurrency"},
 			docRefs:    []string{"docs/reference/concurrency/index.md"},
 		},
@@ -2173,12 +2173,14 @@ func TestReleaseMatrixReadmeAINativeConcurrencyDataPromisesHaveGates(t *testing.
 				"cmd/leia/main_examples_command_test.go",
 				"docs/reference/concurrency/index.md",
 				"tests/concurrency_contract_test.go",
+				"examples/concurrency/pipeline_project/main.leia",
 				"scripts/production_check.sh",
 			},
 			exampleIDs: []string{
 				"repo-concurrency-goroutines_channels",
 				"repo-concurrency-select_timeout",
 				"repo-concurrency-sync_group",
+				"repo-concurrency-pipeline_project-main",
 			},
 			docSnippets: map[string][]string{
 				"docs/reference/concurrency/index.md": {"Leia exposes Go-style concurrency", "examples/concurrency/"},

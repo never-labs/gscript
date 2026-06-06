@@ -774,6 +774,10 @@ func TestPlaygroundRepositoryAINativeExamplesHaveExplicitGates(t *testing.T) {
 			requires: "local AI playground profile or LLM replay fixture",
 			snippets: []string{"model {", "tool {", "turn {", "tools: {read_file, search_text, apply_patch, run_shell}"},
 		},
+		"repo-ai-coding_agent_project-main": {
+			requires: "local AI playground profile or LLM replay fixture",
+			snippets: []string{"llm.run_agent({", "read_file := tool {", "search_text := tool {", "apply_patch := tool {", "run_shell := tool {", "test_runs == 2"},
+		},
 		"repo-ai-tagged_agent_workflow": {
 			requires: "local AI playground profile or LLM replay fixture",
 			snippets: []string{"model {", "tool {", "agent {", "responder("},

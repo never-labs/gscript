@@ -69,6 +69,10 @@ canonical replay input.
 `leia evaluate` installs an `eval` module only while it executes evaluate
 blocks. Ordinary script execution does not install this module.
 
+The `cost` and `money` keys below are evaluate harness and report metrics only.
+They let evaluation jobs gate on provider-reported cost metadata when available;
+they do not make money accounting a stable script-level AI budget dimension.
+
 | Function | Meaning |
 |---|---|
 | `eval.case(id, fn)` | Run one named subcase. Runtime errors inside `fn` fail that subcase and return `(false, err)` without stopping later subcases. |

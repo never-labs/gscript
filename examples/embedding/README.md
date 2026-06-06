@@ -5,6 +5,10 @@ public `leia` package. The examples live in
 [`embedding_test.go`](embedding_test.go), so `go test` keeps the snippets and
 their documented output in sync.
 
+[`hot_reload_project/`](hot_reload_project/) is a small host-side project test
+that loads a real Leia file, edits it through reload scenarios, and gates the
+project-level embedding claim outside package-level doc tests.
+
 ## Coverage
 
 - `Example_compileRun` covers compiling source with `Compile`, preserving a
@@ -23,6 +27,9 @@ their documented output in sync.
 - `Example_productionEmbedding` covers the recommended production embedding
   shape: `SecuritySandbox`, resource budgets, an explicit `WithGoImports`
   allowlist, rejected unauthorized Go imports, and hot reload preserving state.
+- `hot_reload_project` covers a project-level host integration with persistent
+  state, function replacement, failed reload rollback, explicit host import
+  allowlisting, and host-result budget preservation.
 - `Example_sandboxAndMaxSteps` covers `WithSandbox`, disabled filesystem
   globals, and statement/instruction budgeting with `WithMaxSteps`.
 - `Example_securitySandboxAndBudgets` covers `SecuritySandbox`, its `LibSafe`
@@ -41,5 +48,6 @@ public surface from the `leia` package documentation.
 From the repository root:
 
 ```sh
-go test ./examples/embedding .
+go test ./examples/embedding -run Example -count=1
+go test ./examples/embedding/hot_reload_project -count=1
 ```

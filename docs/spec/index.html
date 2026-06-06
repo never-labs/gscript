@@ -1804,6 +1804,25 @@ last <span class="tok-operator">:=</span> <span class="tok-number">0</span>
 </tbody></table></div>
 <p>The dialect forms are not declarations with hidden lexical rules. Each form evaluates to an ordinary Leia value or result pair according to its runtime helper. Tools and agents are ordinary values that can be assigned, passed, returned, inspected, and stored in tables.</p>
 <p>The implementation must not fork behavior between dialect syntax and stdlib calls. For example, a tool created with <code>tool { ... }</code> and a tool created with <code>llm.tool(...)</code> must go through the same tool validation, capability metadata, dispatch, tracing, and replay paths.</p>
+<p>This stable lowering is observable without a live provider. A tagged tool must preserve helper-visible capability metadata:</p>
+<pre class="language-leia leia-code"><code class="language-leia leia-code">search_runbook <span class="tok-operator">:=</span> tool {
+    name: <span class="tok-string">&quot;search_runbook&quot;</span>
+    params: {<span class="tok-string">&quot;service&quot;</span>}
+    description: <span class="tok-string">&quot;Search local runbooks.&quot;</span>
+    requires: {<span class="tok-string">&quot;docs.read&quot;</span>, <span class="tok-string">&quot;runbooks.read&quot;</span>}
+    fn: <span class="tok-keyword">func</span>(service) {
+        <span class="tok-keyword">return</span> <span class="tok-string">&quot;runbook:&quot;</span> <span class="tok-operator">..</span> service, <span class="tok-constant">nil</span>
+    }
+}
+
+caps <span class="tok-operator">:=</span> llm.tool_caps({search_runbook})
+<span class="tok-builtin">assert</span>(<span class="tok-operator">#</span>caps <span class="tok-operator">==</span> <span class="tok-number">2</span>)
+<span class="tok-builtin">assert</span>(caps[<span class="tok-number">1</span>] <span class="tok-operator">==</span> <span class="tok-string">&quot;docs.read&quot;</span>)
+<span class="tok-builtin">assert</span>(caps[<span class="tok-number">2</span>] <span class="tok-operator">==</span> <span class="tok-string">&quot;runbooks.read&quot;</span>)
+
+ok, err <span class="tok-operator">:=</span> llm.check_tools({search_runbook}, {<span class="tok-string">&quot;docs.read&quot;</span>, <span class="tok-string">&quot;runbooks.read&quot;</span>})
+<span class="tok-builtin">assert</span>(ok <span class="tok-operator">==</span> <span class="tok-constant">true</span>)
+<span class="tok-builtin">assert</span>(err <span class="tok-operator">==</span> <span class="tok-constant">nil</span>)</code></pre>
 <h3 id="ai-native-syntax-models">Models</h3>
 <p><code>model { ... }</code> registers script-visible aliases for the current VM.</p>
 <pre class="language-text"><code class="language-text">model {

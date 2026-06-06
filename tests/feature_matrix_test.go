@@ -463,6 +463,7 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 		"tests/sdk/leia_test.go",
 		"tests/sdk/security_api_test.go",
 		"examples/embedding/embedding_test.go",
+		"examples/embedding/hot_reload_project/hot_reload_project_test.go",
 		"docs/testing.md",
 		"docs/reference/security/index.md",
 		"docs/reference/embedding/index.md",
@@ -477,6 +478,7 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 		"tests/sdk/public_api_boundary_test.go",
 		"tests/sdk/embedding_r1_test.go",
 		"examples/embedding/embedding_test.go",
+		"examples/embedding/hot_reload_project/hot_reload_project_test.go",
 		"docs/reference/embedding/index.md",
 	)
 	requireFeatureCellRefs(t, hostBindings, "embedding_host_bindings", "perf_hot_case",
@@ -494,6 +496,7 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 		"tests/sdk/error_api_test.go",
 		"tests/sdk/embedding_r1_test.go",
 		"examples/embedding/embedding_test.go",
+		"examples/embedding/hot_reload_project/hot_reload_project_test.go",
 		"docs/reference/embedding/index.md",
 	)
 
@@ -503,10 +506,12 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 		"tests/sdk/hotloader_test.go",
 		"tests/sdk/hotloader_instance_test.go",
 		"tests/sdk/hotloader_instance_rollback_test.go",
+		"examples/embedding/hot_reload_project/hot_reload_project_test.go",
 	)
 	requireFeatureCellRefs(t, hotReload, "embedding_hot_reload", "semantic_gate",
 		"tests/sdk/embedding_r1_test.go",
 		"examples/embedding/embedding_test.go",
+		"examples/embedding/hot_reload_project/hot_reload_project_test.go",
 		"docs/reference/hot-reload/index.md",
 		"docs/reference/embedding/index.md",
 		"docs/guides/embedding.md",
@@ -559,6 +564,7 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 		"cmd/leia/main_evaluate_llm_test.go",
 		"cmd/leia/main_playground_test.go",
 		"examples/ai/coding_agent_replay.leia",
+		"examples/ai/coding_agent_project/main.leia",
 		"examples/ai/tagged_agent_workflow.leia",
 		"examples/ai/record_replay_trace_project.leia",
 		"examples/llm/agent.leia",
@@ -616,6 +622,7 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 		"examples/concurrency/select_timeout.leia",
 		"examples/concurrency/context_sleep.leia",
 		"examples/concurrency/sync_group_cancel.leia",
+		"examples/concurrency/pipeline_project/main.leia",
 		"docs/reference/concurrency/index.md",
 		"scripts/production_check.sh",
 	)
@@ -904,6 +911,7 @@ func TestReadmeAINativeContractHasExplicitGates(t *testing.T) {
 		"examples/llm/agent_as_tool.leia",
 		"examples/llm/prompt_tagged_messages.leia",
 		"examples/ai/coding_agent_replay.leia",
+		"examples/ai/coding_agent_project/main.leia",
 		"examples/evaluate/llm_replay.leia",
 		"examples/evaluate/agent_replay.leia",
 		"examples/evaluate/multiturn_replay.leia",
@@ -940,10 +948,11 @@ func TestReadmeAINativeContractHasExplicitGates(t *testing.T) {
 			"docs/reference/ai/index.md":    {"## Turn Dialect", "performs exactly one provider request"},
 		},
 		"agents": {
-			"tests/llm/llm_agent_examples_test.go": {"TestLLMAgentExampleSmoke", "agent.leia"},
-			"tests/llm/llm_agent_tools_test.go":    {"TestLLMAgentScenarioDirectAgentInToolsList", "llm.run_agent"},
-			"examples/ai/coding_agent_replay.leia": {"coding-agent tools", "tools: {read_file, search_text, apply_patch, run_shell}"},
-			"docs/reference/ai/index.md":           {"## Agent Dialect", "## Agent As Tool"},
+			"tests/llm/llm_agent_examples_test.go":       {"TestLLMAgentExampleSmoke", "agent.leia"},
+			"tests/llm/llm_agent_tools_test.go":          {"TestLLMAgentScenarioDirectAgentInToolsList", "llm.run_agent"},
+			"examples/ai/coding_agent_replay.leia":       {"coding-agent tools", "tools: {read_file, search_text, apply_patch, run_shell}"},
+			"examples/ai/coding_agent_project/main.leia": {"llm.run_agent({", "read_file := tool {", "run_shell := tool {", "test_runs == 2"},
+			"docs/reference/ai/index.md":                 {"## Agent Dialect", "## Agent As Tool"},
 		},
 		"replay": {
 			"tests/llm/llm_record_replay_test.go":                     {"TestLLMRecorderAndReplay", "TestLLMReplayRejectsMismatchedRequest"},

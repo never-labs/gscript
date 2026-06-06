@@ -1,0 +1,117 @@
+// coding_agent_project/main.leia - Replay-backed project-level coding agent.
+// Demonstrates coding-agent tools plus a plan/test/retry loop without network.
+
+model {
+    default: "mock-coder"
+}
+
+workspace := {
+    ["src/checkout.leia"]: "func refund_cents(total_cents, fee_cents) {\n    if total_cents > 1000 {\n        return total_cents - fee_cents - 1\n    }\n    return total_cents - fee_cents\n}\n",
+    ["tests/checkout_refund_test.leia"]: "assert(refund_cents(1250, 25) == 1225)\nassert(refund_cents(800, 25) == 775)\n",
+}
+
+patches := {}
+test_runs := 0
+tool_events := {}
+
+func record_tool_event(kind, detail) {
+    tool_events[#tool_events + 1] = kind .. ":" .. detail
+}
+
+read_file := tool {
+    name: "read_file"
+    fn: func(path) {
+        record_tool_event("read_file", path)
+        if workspace[path] == nil {
+            return nil, {kind: "not_found", message: "missing file: " .. path}
+        }
+        return workspace[path], nil
+    }
+    params: {"path"}
+    requires: {"workspace.read"}
+    description: "Read a file from the fixture workspace."
+}
+
+search_text := tool {
+    name: "search_text"
+    fn: func(query) {
+        record_tool_event("search_text", query)
+        return "tests/checkout_refund_test.leia:1:assert(refund_cents(1250, 25) == 1225)\ntests/checkout_refund_test.leia:2:assert(refund_cents(800, 25) == 775)", nil
+    }
+    params: {"query"}
+    requires: {"workspace.search"}
+    description: "Search fixture workspace text."
+}
+
+apply_patch := tool {
+    name: "apply_patch"
+    fn: func(patch) {
+        patches[#patches + 1] = patch
+        record_tool_event("apply_patch", "patch-" .. #patches)
+        if #patches == 1 {
+            return {
+                patch_id: "patch-1",
+                files: {"src/checkout.leia"},
+                changed_lines: 1,
+                note: "removed one-cent adjustment but left high-value branch"
+            }, nil
+        }
+        workspace["src/checkout.leia"] = "func refund_cents(total_cents, fee_cents) {\n    return total_cents - fee_cents\n}\n"
+        return {
+            patch_id: "patch-2",
+            files: {"src/checkout.leia"},
+            changed_lines: 4,
+            note: "collapsed branch after failed test"
+        }, nil
+    }
+    params: {"patch"}
+    requires: {"workspace.write"}
+    description: "Apply a bounded patch to the fixture workspace."
+}
+
+run_shell := tool {
+    name: "run_shell"
+    fn: func(command) {
+        test_runs = test_runs + 1
+        record_tool_event("run_shell", command)
+        if test_runs == 1 {
+            return {
+                command: command,
+                status: "failed",
+                output: "FAIL checkout_refund_test: refund_cents(1250, 25) got 1224 want 1225"
+            }, nil
+        }
+        return {
+            command: command,
+            status: "passed",
+            output: "PASS checkout_refund_test (2 assertions)"
+        }, nil
+    }
+    params: {"command"}
+    requires: {"process.exec"}
+    description: "Run a deterministic local command in the fixture workspace."
+}
+
+agent_result, agent_err := llm.run_agent({
+    model: "mock-coder",
+    messages: {
+        llm.system("You are a coding agent. Use read_file, search_text, apply_patch, and run_shell. Iterate once if tests fail."),
+        llm.user("Fix the checkout refund rounding bug and prove the focused tests pass."),
+    },
+    tools: {read_file, search_text, apply_patch, run_shell},
+    budget: {turns: 8, calls: 8, tokens: 4000, time: 30},
+    max_steps: 8,
+    max_tokens: 240,
+})
+
+assert(agent_err == nil)
+assert(agent_result.status == "done")
+assert(agent_result.text == "Fixed refund_cents by removing the stale high-value branch; focused checkout refund tests pass after one retry.")
+assert(#patches == 2)
+assert(test_runs == 2)
+assert(#agent_result.history == 14)
+assert(#tool_events == 6)
+
+coding_agent_project_summary := "coding_agent_project tools=4 patches=" .. #patches .. " test_runs=" .. test_runs .. " history=" .. #agent_result.history .. " final=pass"
+
+print(coding_agent_project_summary)

@@ -1,0 +1,204 @@
+// pipeline_project - Offline incident intake workflow using Go-style concurrency.
+
+func severity_weight(severity) {
+    if severity == "sev1" {
+        return 50
+    }
+    if severity == "sev2" {
+        return 30
+    }
+    return 10
+}
+
+func source(records, out, audit) {
+    dropped := 0
+    sent := 0
+    for i := 1; i <= #records; i++ {
+        record := records[i]
+        select {
+            case audit <- record.id:
+            sent = sent + 1
+            default:
+            dropped = dropped + 1
+        }
+        out <- record
+    }
+    close(out)
+    return {sent: sent, dropped: dropped}
+}
+
+func decode_worker(ctx, input, output) {
+    for record := range input {
+        select {
+            case <-ctx.done:
+            return;
+            default:
+        }
+        output <- {
+            id: record.id,
+            service: record.service,
+            owner: record.owner,
+            severity: record.severity,
+            region: record.region,
+            signals: #record.signals,
+            minutes: record.minutes,
+        }
+    }
+}
+
+func score_worker(ctx, input, output) {
+    for incident := range input {
+        select {
+            case <-ctx.done:
+            return;
+            default:
+        }
+        score := severity_weight(incident.severity) + incident.signals * 3 + incident.minutes
+        if incident.region == "edge" {
+            score = score + 7
+        }
+        incident.score = score
+        output <- incident
+    }
+}
+
+func aggregate(input) {
+    summary := {
+        total: 0,
+        sev1: 0,
+        score: 0,
+        top_id: "",
+        top_score: -1,
+        checkout: 0,
+        edge: 0,
+    }
+    for incident := range input {
+        summary.total = summary.total + 1
+        summary.score = summary.score + incident.score
+        if incident.severity == "sev1" {
+            summary.sev1 = summary.sev1 + 1
+        }
+        if incident.service == "checkout" {
+            summary.checkout = summary.checkout + 1
+        }
+        if incident.region == "edge" {
+            summary.edge = summary.edge + 1
+        }
+        if incident.score > summary.top_score || (incident.score == summary.top_score && incident.id < summary.top_id) {
+            summary.top_score = incident.score
+            summary.top_id = incident.id
+        }
+    }
+    return summary
+}
+
+func run_cancel_probe() {
+    group := sync.group()
+    cancelled := make(chan, 2)
+
+    group.start(func(ctx) {
+        error("fixture checksum mismatch")
+    })
+    group.start(func(ctx) {
+        ok, err := time.sleep(ctx, 1.0)
+        cancelled <- {ok: ok, err: err}
+    })
+
+    ok, err, failures := group.wait()
+    sleep := <-cancelled
+    return {
+        ok: ok,
+        err: err,
+        failures: failures,
+        sleep_ok: sleep.ok,
+        sleep_err: sleep.err,
+    }
+}
+
+records := {
+    {id: "INC-101", service: "checkout", owner: "payments", severity: "sev2", region: "core", minutes: 9, signals: {"latency", "error"}},
+    {id: "INC-102", service: "search", owner: "discovery", severity: "sev3", region: "edge", minutes: 5, signals: {"timeout"}},
+    {id: "INC-103", service: "checkout", owner: "payments", severity: "sev1", region: "edge", minutes: 11, signals: {"latency", "error", "queue"}},
+    {id: "INC-104", service: "billing", owner: "finance", severity: "sev2", region: "core", minutes: 4, signals: {"error"}},
+    {id: "INC-105", service: "checkout", owner: "payments", severity: "sev3", region: "edge", minutes: 3, signals: {"saturation", "retry"}},
+    {id: "INC-106", service: "profile", owner: "identity", severity: "sev2", region: "core", minutes: 6, signals: {"latency"}},
+}
+
+raw := make(chan, 8)
+decoded := make(chan, 8)
+scored := make(chan, 8)
+audit := make(chan, 1)
+source_result := source(records, raw, audit)
+
+decode_group := sync.group()
+for worker := 1; worker <= 3; worker++ {
+    decode_group.start(func(ctx) {
+        decode_worker(ctx, raw, decoded)
+    })
+}
+decode_ok, decode_err, decode_failures := decode_group.wait()
+if !decode_ok {
+    error(decode_err)
+}
+close(decoded)
+
+score_group := sync.group()
+for worker := 1; worker <= 2; worker++ {
+    score_group.start(func(ctx) {
+        score_worker(ctx, decoded, scored)
+    })
+}
+score_ok, score_err, score_failures := score_group.wait()
+if !score_ok {
+    error(score_err)
+}
+close(scored)
+
+pipeline := aggregate(scored)
+timeout_probe := make(chan)
+timeout_state := "unset"
+select {
+    case <-timeout_probe:
+    timeout_state = "unexpected"
+    case <-time.after(0.001):
+    timeout_state = "timeout"
+}
+
+cancel_probe := run_cancel_probe()
+audit_first := <-audit
+
+assert(source_result.sent == 1)
+assert(source_result.dropped == #records - 1)
+assert(audit_first == "INC-101")
+assert(decode_failures == 0)
+assert(score_failures == 0)
+assert(pipeline.total == 6)
+assert(pipeline.sev1 == 1)
+assert(pipeline.checkout == 3)
+assert(pipeline.edge == 3)
+assert(pipeline.score == 249)
+assert(pipeline.top_id == "INC-103")
+assert(pipeline.top_score == 77)
+assert(timeout_state == "timeout")
+assert(cancel_probe.ok == false)
+assert(cancel_probe.failures == 1)
+assert(cancel_probe.sleep_ok == false)
+assert(cancel_probe.sleep_err == "cancelled")
+
+pipeline_project_summary := string.format(
+"pipeline_project incidents=%d sev1=%d checkout=%d edge=%d score=%d top=%s top_score=%d audit_sent=%d audit_dropped=%d timeout=%s cancel_failures=%d cancel_sleep=%s",
+pipeline.total,
+pipeline.sev1,
+pipeline.checkout,
+pipeline.edge,
+pipeline.score,
+pipeline.top_id,
+pipeline.top_score,
+source_result.sent,
+source_result.dropped,
+timeout_state,
+cancel_probe.failures,
+cancel_probe.sleep_err
+)
+
+print(pipeline_project_summary)

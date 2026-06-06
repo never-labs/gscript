@@ -307,6 +307,15 @@ func cliCuratedProjectExamples() []cliExample {
 			Checkable: true,
 			Runner:    "go-test",
 		},
+		{
+			ID:        "repo-embedding-hot_reload_project",
+			Title:     "Embedding Hot Reload Project",
+			Section:   "Embedding",
+			Path:      "examples/embedding/hot_reload_project/hot_reload_project_test.go",
+			Runnable:  true,
+			Checkable: true,
+			Runner:    "go-test",
+		},
 	}
 }
 
@@ -504,6 +513,7 @@ func applyCLIExampleRunner(example *cliExample) {
 		example.Requires = ""
 		return
 	case strings.Contains(example.Path, "/ai/coding_agent_replay.leia"),
+		strings.Contains(example.Path, "/ai/coding_agent_project/"),
 		strings.Contains(example.Path, "/ai/tagged_agent_workflow.leia"),
 		strings.Contains(example.Path, "/ai/record_replay_trace_project.leia"),
 		strings.Contains(example.Path, "/workflow/support_triage_replay.leia"):
@@ -619,7 +629,11 @@ func runCLIExampleGoTest(example cliExample, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "run %s: go-test runner needs a package path\n", example.ID)
 		return 1
 	}
-	cmd := exec.CommandContext(ctx, "go", "test", "./"+pkgDir, "-run", "Example", "-count=1")
+	args := []string{"test", "./" + pkgDir, "-count=1"}
+	if strings.Contains(filepath.Base(example.Path), "embedding_test.go") {
+		args = append(args, "-run", "Example")
+	}
+	cmd := exec.CommandContext(ctx, "go", args...)
 	cmd.Dir = root
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr

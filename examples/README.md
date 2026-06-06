@@ -15,12 +15,14 @@ go run ../cmd/leia examples check dialects/text_parsing.leia dialects/sql_result
 go run ../cmd/leia examples check data/q_vector_basics.leia
 go run ../cmd/leia examples check data/db_q_frame_project
 go run ../cmd/leia examples check automation/invoice_reconciliation.leia
+go run ../cmd/leia examples check ai/coding_agent_project
 go run ../cmd/leia examples check operations/local_ops_report.leia
 go run ../cmd/leia examples check database/package_managed
 go run ../cmd/leia examples check web/serve_dialect_app.leia
 go run ../cmd/leia examples check web/tiny_fullstack_app.leia
 go run ../cmd/leia examples run data_processing/data_oriented/soa_kernels.leia
 go run ../cmd/leia examples run concurrency/select_timeout.leia
+go run ../cmd/leia examples check concurrency/pipeline_project
 ```
 
 Directories:
@@ -30,6 +32,7 @@ Directories:
 | `hello/` | Core language features and small idioms. |
 | `dialects/` | Runnable checks for built-in shell/env, text, protocol, SQL-shaped, Markdown/table, binary, and validation dialects. |
 | `automation/` | Project-level offline workflows for release, fixture, and business-ops automation. |
+| `ai/` | Replay-backed AI workflows, including a project-level coding-agent repair loop. |
 | `operations/` | Project-level offline workflows for local logs, backup hygiene, deploy risk, and ops reporting. |
 | `tooling/` | Project-level offline workflows for release evidence, diagnostics, and CLI gate planning. |
 | `performance/` | User-facing execution mode and benchmark policy examples. |
@@ -45,17 +48,20 @@ The Go embedding examples are executable doc tests:
 
 ```bash
 go test ./embedding -run Example -count=1
+go test ./embedding/hot_reload_project -count=1
 ```
 
 They cover public value conversion, host functions, host modules, LLM provider
-injection, hot reload, and persistent instances.
+injection, hot reload, persistent instances, and a project-level reload gate
+with rollback, host import allowlisting, and budget preservation.
 
 ## AI And Host-Backed Examples
 
-AI examples live under `llm/`. Most are intended to work with a mock or replay
-provider in tests. `llm/direct_turn.leia` shows the ordinary `llm.turn` request
-shape without an agent wrapper. Live-provider examples require opt-in
-environment variables and must never commit API keys.
+AI examples live under `ai/` and `llm/`. Most are intended to work with a mock
+or replay provider in tests. `ai/coding_agent_project/main.leia` is the
+project-level offline coding-agent gate, while `llm/direct_turn.leia` shows the
+ordinary `llm.turn` request shape without an agent wrapper. Live-provider examples
+require opt-in environment variables and must never commit API keys.
 
 Evaluate examples live under `evaluate/`. Run replay-backed agent checks with:
 

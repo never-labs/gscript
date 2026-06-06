@@ -20,6 +20,7 @@ func TestExamplesCommandListsRepositoryExamples(t *testing.T) {
 	for _, want := range []string{
 		"repo-hello-counter",
 		"repo-embedding-go-doc-examples",
+		"repo-embedding-hot_reload_project",
 		"repo-site-static_docs_generator",
 		"repo-tooling-package_manager_workflow-main",
 		"repo-security-supply_chain_audit",
@@ -390,14 +391,15 @@ func TestExamplesCommandShowAcceptsIDAndPath(t *testing.T) {
 
 func TestExamplesCommandChecksEmbeddingDocExamples(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	code := runExamplesCommand([]string{"check", "repo-embedding-go-doc-examples"}, &stdout, &stderr)
+	code := runExamplesCommand([]string{"check", "repo-embedding-go-doc-examples", "repo-embedding-hot_reload_project"}, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("runExamplesCommand code = %d, stdout = %q stderr = %q", code, stdout.String(), stderr.String())
 	}
 	out := stdout.String()
 	for _, want := range []string{
 		"ok      repo-embedding-go-doc-examples",
-		"examples: 1 ok, 0 skipped, 0 failed",
+		"ok      repo-embedding-hot_reload_project",
+		"examples: 2 ok, 0 skipped, 0 failed",
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("examples check missing %q\n%s", want, out)
@@ -538,6 +540,7 @@ func TestExamplesCommandChecksDeterministicSpecialRunners(t *testing.T) {
 		"repo-evaluate-multiturn_replay",
 		"repo-evaluate-project_agent_regression",
 		"repo-ai-coding_agent_replay",
+		"repo-ai-coding_agent_project-main",
 		"repo-ai-tagged_agent_workflow",
 		"repo-ai-record_replay_trace_project",
 		"repo-workflow-support_triage_replay",
@@ -559,6 +562,7 @@ func TestExamplesCommandChecksDeterministicSpecialRunners(t *testing.T) {
 		"ok      repo-evaluate-multiturn_replay",
 		"ok      repo-evaluate-project_agent_regression",
 		"ok      repo-ai-coding_agent_replay",
+		"ok      repo-ai-coding_agent_project-main",
 		"ok      repo-ai-tagged_agent_workflow",
 		"ok      repo-ai-record_replay_trace_project",
 		"ok      repo-workflow-support_triage_replay",
@@ -567,7 +571,7 @@ func TestExamplesCommandChecksDeterministicSpecialRunners(t *testing.T) {
 		"ok      repo-tooling-release_gate_project-main",
 		"ok      repo-performance-execution_modes_matrix",
 		"ok      repo-ui-package_managed-main",
-		"examples: 15 ok, 0 skipped, 0 failed",
+		"examples: 16 ok, 0 skipped, 0 failed",
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("examples check missing %q\n%s", want, out)
@@ -652,6 +656,7 @@ func TestExamplesCommandChecksConcurrencyContractExamples(t *testing.T) {
 		"repo-concurrency-context_sleep",
 		"repo-concurrency-context_cancel",
 		"repo-concurrency-sync_group_cancel",
+		"repo-concurrency-pipeline_project-main",
 	}, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("runExamplesCommand code = %d, stdout = %q stderr = %q", code, stdout.String(), stderr.String())
@@ -665,7 +670,8 @@ func TestExamplesCommandChecksConcurrencyContractExamples(t *testing.T) {
 		"ok      repo-concurrency-context_sleep",
 		"ok      repo-concurrency-context_cancel",
 		"ok      repo-concurrency-sync_group_cancel",
-		"examples: 7 ok, 0 skipped, 0 failed",
+		"ok      repo-concurrency-pipeline_project-main",
+		"examples: 8 ok, 0 skipped, 0 failed",
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("examples check missing %q\n%s", want, out)
@@ -680,8 +686,10 @@ func TestExamplesCommandChecksReadmeCapabilityEvidenceExamples(t *testing.T) {
 		"--jobs=2",
 		"--timeout=20s",
 		"repo-embedding-go-doc-examples",
+		"repo-embedding-hot_reload_project",
 		"repo-llm-agent",
 		"repo-ai-coding_agent_replay",
+		"repo-ai-coding_agent_project-main",
 		"repo-evaluate-agent_replay",
 		"repo-automation-invoice_reconciliation",
 		"repo-automation-release_fixture_matrix",
@@ -691,6 +699,7 @@ func TestExamplesCommandChecksReadmeCapabilityEvidenceExamples(t *testing.T) {
 		"repo-concurrency-goroutines_channels",
 		"repo-concurrency-select_timeout",
 		"repo-concurrency-sync_group",
+		"repo-concurrency-pipeline_project-main",
 		"repo-data-q_vector_basics",
 		"repo-data-db_q_frame_project-main",
 		"repo-data-q_trade_analytics_project-main",
@@ -712,8 +721,10 @@ func TestExamplesCommandChecksReadmeCapabilityEvidenceExamples(t *testing.T) {
 	out := stdout.String()
 	for _, want := range []string{
 		"ok      repo-embedding-go-doc-examples",
+		"ok      repo-embedding-hot_reload_project",
 		"ok      repo-llm-agent",
 		"ok      repo-ai-coding_agent_replay",
+		"ok      repo-ai-coding_agent_project-main",
 		"ok      repo-evaluate-agent_replay",
 		"ok      repo-automation-invoice_reconciliation",
 		"ok      repo-automation-release_fixture_matrix",
@@ -723,6 +734,7 @@ func TestExamplesCommandChecksReadmeCapabilityEvidenceExamples(t *testing.T) {
 		"ok      repo-concurrency-goroutines_channels",
 		"ok      repo-concurrency-select_timeout",
 		"ok      repo-concurrency-sync_group",
+		"ok      repo-concurrency-pipeline_project-main",
 		"ok      repo-data-q_vector_basics",
 		"ok      repo-data-db_q_frame_project-main",
 		"ok      repo-data-q_trade_analytics_project-main",
@@ -737,7 +749,7 @@ func TestExamplesCommandChecksReadmeCapabilityEvidenceExamples(t *testing.T) {
 		"ok      repo-macos-package_managed-main",
 		"ok      repo-macos-package_managed-adapter-automation",
 		"ok      repo-performance-execution_modes_matrix",
-		"examples: 26 ok, 0 skipped, 0 failed",
+		"examples: 29 ok, 0 skipped, 0 failed",
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("README capability examples check missing %q\n%s", want, out)

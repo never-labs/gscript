@@ -1,0 +1,1200 @@
+[
+  {
+    "Request": {
+      "Model": "mock-coder",
+      "Messages": [
+        {
+          "Role": "system",
+          "Text": "You are a coding agent. Use read_file, search_text, apply_patch, and run_shell. Iterate once if tests fail.",
+          "ToolCall": null,
+          "ToolUseID": "",
+          "Value": null,
+          "Error": ""
+        },
+        {
+          "Role": "user",
+          "Text": "Fix the checkout refund rounding bug and prove the focused tests pass.",
+          "ToolCall": null,
+          "ToolUseID": "",
+          "Value": null,
+          "Error": ""
+        }
+      ],
+      "Tools": [
+        {
+          "Name": "read_file",
+          "Description": "Read a file from the fixture workspace.",
+          "Params": [
+            "path"
+          ],
+          "Requires": [
+            "workspace.read"
+          ],
+          "Schema": null
+        },
+        {
+          "Name": "search_text",
+          "Description": "Search fixture workspace text.",
+          "Params": [
+            "query"
+          ],
+          "Requires": [
+            "workspace.search"
+          ],
+          "Schema": null
+        },
+        {
+          "Name": "apply_patch",
+          "Description": "Apply a bounded patch to the fixture workspace.",
+          "Params": [
+            "patch"
+          ],
+          "Requires": [
+            "workspace.write"
+          ],
+          "Schema": null
+        },
+        {
+          "Name": "run_shell",
+          "Description": "Run a deterministic local command in the fixture workspace.",
+          "Params": [
+            "command"
+          ],
+          "Requires": [
+            "process.exec"
+          ],
+          "Schema": null
+        }
+      ],
+      "ForceTool": "",
+      "MaxTokens": 240,
+      "Temperature": null,
+      "TopP": null,
+      "ResponseFormat": null,
+      "Stream": false,
+      "Stop": null,
+      "Metadata": null
+    },
+    "Result": {
+      "Status": "tool_calls",
+      "Text": "",
+      "Calls": [
+        {
+          "ID": "call_read_file_1",
+          "Tool": "read_file",
+          "Args": {
+            "path": "src/checkout.leia"
+          }
+        }
+      ],
+      "Reason": "",
+      "Usage": {
+        "InputTokens": 0,
+        "OutputTokens": 0,
+        "Cost": 0,
+        "LatencyMS": 0
+      }
+    },
+    "Error": ""
+  },
+  {
+    "Request": {
+      "Model": "mock-coder",
+      "Messages": [
+        {
+          "Role": "system",
+          "Text": "You are a coding agent. Use read_file, search_text, apply_patch, and run_shell. Iterate once if tests fail.",
+          "ToolCall": null,
+          "ToolUseID": "",
+          "Value": null,
+          "Error": ""
+        },
+        {
+          "Role": "user",
+          "Text": "Fix the checkout refund rounding bug and prove the focused tests pass.",
+          "ToolCall": null,
+          "ToolUseID": "",
+          "Value": null,
+          "Error": ""
+        },
+        {
+          "Role": "assistant",
+          "Text": "",
+          "ToolCall": {
+            "ID": "call_read_file_1",
+            "Tool": "read_file",
+            "Args": {
+              "path": "src/checkout.leia"
+            }
+          },
+          "ToolUseID": "",
+          "Value": null,
+          "Error": ""
+        },
+        {
+          "Role": "tool",
+          "Text": "",
+          "ToolCall": null,
+          "ToolUseID": "call_read_file_1",
+          "Value": "func refund_cents(total_cents, fee_cents) {\n    if total_cents \u003e 1000 {\n        return total_cents - fee_cents - 1\n    }\n    return total_cents - fee_cents\n}\n",
+          "Error": ""
+        }
+      ],
+      "Tools": [
+        {
+          "Name": "read_file",
+          "Description": "Read a file from the fixture workspace.",
+          "Params": [
+            "path"
+          ],
+          "Requires": [
+            "workspace.read"
+          ],
+          "Schema": null
+        },
+        {
+          "Name": "search_text",
+          "Description": "Search fixture workspace text.",
+          "Params": [
+            "query"
+          ],
+          "Requires": [
+            "workspace.search"
+          ],
+          "Schema": null
+        },
+        {
+          "Name": "apply_patch",
+          "Description": "Apply a bounded patch to the fixture workspace.",
+          "Params": [
+            "patch"
+          ],
+          "Requires": [
+            "workspace.write"
+          ],
+          "Schema": null
+        },
+        {
+          "Name": "run_shell",
+          "Description": "Run a deterministic local command in the fixture workspace.",
+          "Params": [
+            "command"
+          ],
+          "Requires": [
+            "process.exec"
+          ],
+          "Schema": null
+        }
+      ],
+      "ForceTool": "",
+      "MaxTokens": 240,
+      "Temperature": null,
+      "TopP": null,
+      "ResponseFormat": null,
+      "Stream": false,
+      "Stop": null,
+      "Metadata": null
+    },
+    "Result": {
+      "Status": "tool_calls",
+      "Text": "",
+      "Calls": [
+        {
+          "ID": "call_search_text_1",
+          "Tool": "search_text",
+          "Args": {
+            "query": "refund_cents"
+          }
+        }
+      ],
+      "Reason": "",
+      "Usage": {
+        "InputTokens": 0,
+        "OutputTokens": 0,
+        "Cost": 0,
+        "LatencyMS": 0
+      }
+    },
+    "Error": ""
+  },
+  {
+    "Request": {
+      "Model": "mock-coder",
+      "Messages": [
+        {
+          "Role": "system",
+          "Text": "You are a coding agent. Use read_file, search_text, apply_patch, and run_shell. Iterate once if tests fail.",
+          "ToolCall": null,
+          "ToolUseID": "",
+          "Value": null,
+          "Error": ""
+        },
+        {
+          "Role": "user",
+          "Text": "Fix the checkout refund rounding bug and prove the focused tests pass.",
+          "ToolCall": null,
+          "ToolUseID": "",
+          "Value": null,
+          "Error": ""
+        },
+        {
+          "Role": "assistant",
+          "Text": "",
+          "ToolCall": {
+            "ID": "call_read_file_1",
+            "Tool": "read_file",
+            "Args": {
+              "path": "src/checkout.leia"
+            }
+          },
+          "ToolUseID": "",
+          "Value": null,
+          "Error": ""
+        },
+        {
+          "Role": "tool",
+          "Text": "",
+          "ToolCall": null,
+          "ToolUseID": "call_read_file_1",
+          "Value": "func refund_cents(total_cents, fee_cents) {\n    if total_cents \u003e 1000 {\n        return total_cents - fee_cents - 1\n    }\n    return total_cents - fee_cents\n}\n",
+          "Error": ""
+        },
+        {
+          "Role": "assistant",
+          "Text": "",
+          "ToolCall": {
+            "ID": "call_search_text_1",
+            "Tool": "search_text",
+            "Args": {
+              "query": "refund_cents"
+            }
+          },
+          "ToolUseID": "",
+          "Value": null,
+          "Error": ""
+        },
+        {
+          "Role": "tool",
+          "Text": "",
+          "ToolCall": null,
+          "ToolUseID": "call_search_text_1",
+          "Value": "tests/checkout_refund_test.leia:1:assert(refund_cents(1250, 25) == 1225)\ntests/checkout_refund_test.leia:2:assert(refund_cents(800, 25) == 775)",
+          "Error": ""
+        }
+      ],
+      "Tools": [
+        {
+          "Name": "read_file",
+          "Description": "Read a file from the fixture workspace.",
+          "Params": [
+            "path"
+          ],
+          "Requires": [
+            "workspace.read"
+          ],
+          "Schema": null
+        },
+        {
+          "Name": "search_text",
+          "Description": "Search fixture workspace text.",
+          "Params": [
+            "query"
+          ],
+          "Requires": [
+            "workspace.search"
+          ],
+          "Schema": null
+        },
+        {
+          "Name": "apply_patch",
+          "Description": "Apply a bounded patch to the fixture workspace.",
+          "Params": [
+            "patch"
+          ],
+          "Requires": [
+            "workspace.write"
+          ],
+          "Schema": null
+        },
+        {
+          "Name": "run_shell",
+          "Description": "Run a deterministic local command in the fixture workspace.",
+          "Params": [
+            "command"
+          ],
+          "Requires": [
+            "process.exec"
+          ],
+          "Schema": null
+        }
+      ],
+      "ForceTool": "",
+      "MaxTokens": 240,
+      "Temperature": null,
+      "TopP": null,
+      "ResponseFormat": null,
+      "Stream": false,
+      "Stop": null,
+      "Metadata": null
+    },
+    "Result": {
+      "Status": "tool_calls",
+      "Text": "",
+      "Calls": [
+        {
+          "ID": "call_apply_patch_1",
+          "Tool": "apply_patch",
+          "Args": {
+            "patch": "remove the one-cent high-value adjustment"
+          }
+        }
+      ],
+      "Reason": "",
+      "Usage": {
+        "InputTokens": 0,
+        "OutputTokens": 0,
+        "Cost": 0,
+        "LatencyMS": 0
+      }
+    },
+    "Error": ""
+  },
+  {
+    "Request": {
+      "Model": "mock-coder",
+      "Messages": [
+        {
+          "Role": "system",
+          "Text": "You are a coding agent. Use read_file, search_text, apply_patch, and run_shell. Iterate once if tests fail.",
+          "ToolCall": null,
+          "ToolUseID": "",
+          "Value": null,
+          "Error": ""
+        },
+        {
+          "Role": "user",
+          "Text": "Fix the checkout refund rounding bug and prove the focused tests pass.",
+          "ToolCall": null,
+          "ToolUseID": "",
+          "Value": null,
+          "Error": ""
+        },
+        {
+          "Role": "assistant",
+          "Text": "",
+          "ToolCall": {
+            "ID": "call_read_file_1",
+            "Tool": "read_file",
+            "Args": {
+              "path": "src/checkout.leia"
+            }
+          },
+          "ToolUseID": "",
+          "Value": null,
+          "Error": ""
+        },
+        {
+          "Role": "tool",
+          "Text": "",
+          "ToolCall": null,
+          "ToolUseID": "call_read_file_1",
+          "Value": "func refund_cents(total_cents, fee_cents) {\n    if total_cents \u003e 1000 {\n        return total_cents - fee_cents - 1\n    }\n    return total_cents - fee_cents\n}\n",
+          "Error": ""
+        },
+        {
+          "Role": "assistant",
+          "Text": "",
+          "ToolCall": {
+            "ID": "call_search_text_1",
+            "Tool": "search_text",
+            "Args": {
+              "query": "refund_cents"
+            }
+          },
+          "ToolUseID": "",
+          "Value": null,
+          "Error": ""
+        },
+        {
+          "Role": "tool",
+          "Text": "",
+          "ToolCall": null,
+          "ToolUseID": "call_search_text_1",
+          "Value": "tests/checkout_refund_test.leia:1:assert(refund_cents(1250, 25) == 1225)\ntests/checkout_refund_test.leia:2:assert(refund_cents(800, 25) == 775)",
+          "Error": ""
+        },
+        {
+          "Role": "assistant",
+          "Text": "",
+          "ToolCall": {
+            "ID": "call_apply_patch_1",
+            "Tool": "apply_patch",
+            "Args": {
+              "patch": "remove the one-cent high-value adjustment"
+            }
+          },
+          "ToolUseID": "",
+          "Value": null,
+          "Error": ""
+        },
+        {
+          "Role": "tool",
+          "Text": "",
+          "ToolCall": null,
+          "ToolUseID": "call_apply_patch_1",
+          "Value": {
+            "changed_lines": 1,
+            "files": [
+              "src/checkout.leia"
+            ],
+            "note": "removed one-cent adjustment but left high-value branch",
+            "patch_id": "patch-1"
+          },
+          "Error": ""
+        }
+      ],
+      "Tools": [
+        {
+          "Name": "read_file",
+          "Description": "Read a file from the fixture workspace.",
+          "Params": [
+            "path"
+          ],
+          "Requires": [
+            "workspace.read"
+          ],
+          "Schema": null
+        },
+        {
+          "Name": "search_text",
+          "Description": "Search fixture workspace text.",
+          "Params": [
+            "query"
+          ],
+          "Requires": [
+            "workspace.search"
+          ],
+          "Schema": null
+        },
+        {
+          "Name": "apply_patch",
+          "Description": "Apply a bounded patch to the fixture workspace.",
+          "Params": [
+            "patch"
+          ],
+          "Requires": [
+            "workspace.write"
+          ],
+          "Schema": null
+        },
+        {
+          "Name": "run_shell",
+          "Description": "Run a deterministic local command in the fixture workspace.",
+          "Params": [
+            "command"
+          ],
+          "Requires": [
+            "process.exec"
+          ],
+          "Schema": null
+        }
+      ],
+      "ForceTool": "",
+      "MaxTokens": 240,
+      "Temperature": null,
+      "TopP": null,
+      "ResponseFormat": null,
+      "Stream": false,
+      "Stop": null,
+      "Metadata": null
+    },
+    "Result": {
+      "Status": "tool_calls",
+      "Text": "",
+      "Calls": [
+        {
+          "ID": "call_run_shell_1",
+          "Tool": "run_shell",
+          "Args": {
+            "command": "leia test tests/checkout_refund_test.leia"
+          }
+        }
+      ],
+      "Reason": "",
+      "Usage": {
+        "InputTokens": 0,
+        "OutputTokens": 0,
+        "Cost": 0,
+        "LatencyMS": 0
+      }
+    },
+    "Error": ""
+  },
+  {
+    "Request": {
+      "Model": "mock-coder",
+      "Messages": [
+        {
+          "Role": "system",
+          "Text": "You are a coding agent. Use read_file, search_text, apply_patch, and run_shell. Iterate once if tests fail.",
+          "ToolCall": null,
+          "ToolUseID": "",
+          "Value": null,
+          "Error": ""
+        },
+        {
+          "Role": "user",
+          "Text": "Fix the checkout refund rounding bug and prove the focused tests pass.",
+          "ToolCall": null,
+          "ToolUseID": "",
+          "Value": null,
+          "Error": ""
+        },
+        {
+          "Role": "assistant",
+          "Text": "",
+          "ToolCall": {
+            "ID": "call_read_file_1",
+            "Tool": "read_file",
+            "Args": {
+              "path": "src/checkout.leia"
+            }
+          },
+          "ToolUseID": "",
+          "Value": null,
+          "Error": ""
+        },
+        {
+          "Role": "tool",
+          "Text": "",
+          "ToolCall": null,
+          "ToolUseID": "call_read_file_1",
+          "Value": "func refund_cents(total_cents, fee_cents) {\n    if total_cents \u003e 1000 {\n        return total_cents - fee_cents - 1\n    }\n    return total_cents - fee_cents\n}\n",
+          "Error": ""
+        },
+        {
+          "Role": "assistant",
+          "Text": "",
+          "ToolCall": {
+            "ID": "call_search_text_1",
+            "Tool": "search_text",
+            "Args": {
+              "query": "refund_cents"
+            }
+          },
+          "ToolUseID": "",
+          "Value": null,
+          "Error": ""
+        },
+        {
+          "Role": "tool",
+          "Text": "",
+          "ToolCall": null,
+          "ToolUseID": "call_search_text_1",
+          "Value": "tests/checkout_refund_test.leia:1:assert(refund_cents(1250, 25) == 1225)\ntests/checkout_refund_test.leia:2:assert(refund_cents(800, 25) == 775)",
+          "Error": ""
+        },
+        {
+          "Role": "assistant",
+          "Text": "",
+          "ToolCall": {
+            "ID": "call_apply_patch_1",
+            "Tool": "apply_patch",
+            "Args": {
+              "patch": "remove the one-cent high-value adjustment"
+            }
+          },
+          "ToolUseID": "",
+          "Value": null,
+          "Error": ""
+        },
+        {
+          "Role": "tool",
+          "Text": "",
+          "ToolCall": null,
+          "ToolUseID": "call_apply_patch_1",
+          "Value": {
+            "changed_lines": 1,
+            "files": [
+              "src/checkout.leia"
+            ],
+            "note": "removed one-cent adjustment but left high-value branch",
+            "patch_id": "patch-1"
+          },
+          "Error": ""
+        },
+        {
+          "Role": "assistant",
+          "Text": "",
+          "ToolCall": {
+            "ID": "call_run_shell_1",
+            "Tool": "run_shell",
+            "Args": {
+              "command": "leia test tests/checkout_refund_test.leia"
+            }
+          },
+          "ToolUseID": "",
+          "Value": null,
+          "Error": ""
+        },
+        {
+          "Role": "tool",
+          "Text": "",
+          "ToolCall": null,
+          "ToolUseID": "call_run_shell_1",
+          "Value": {
+            "command": "leia test tests/checkout_refund_test.leia",
+            "output": "FAIL checkout_refund_test: refund_cents(1250, 25) got 1224 want 1225",
+            "status": "failed"
+          },
+          "Error": ""
+        }
+      ],
+      "Tools": [
+        {
+          "Name": "read_file",
+          "Description": "Read a file from the fixture workspace.",
+          "Params": [
+            "path"
+          ],
+          "Requires": [
+            "workspace.read"
+          ],
+          "Schema": null
+        },
+        {
+          "Name": "search_text",
+          "Description": "Search fixture workspace text.",
+          "Params": [
+            "query"
+          ],
+          "Requires": [
+            "workspace.search"
+          ],
+          "Schema": null
+        },
+        {
+          "Name": "apply_patch",
+          "Description": "Apply a bounded patch to the fixture workspace.",
+          "Params": [
+            "patch"
+          ],
+          "Requires": [
+            "workspace.write"
+          ],
+          "Schema": null
+        },
+        {
+          "Name": "run_shell",
+          "Description": "Run a deterministic local command in the fixture workspace.",
+          "Params": [
+            "command"
+          ],
+          "Requires": [
+            "process.exec"
+          ],
+          "Schema": null
+        }
+      ],
+      "ForceTool": "",
+      "MaxTokens": 240,
+      "Temperature": null,
+      "TopP": null,
+      "ResponseFormat": null,
+      "Stream": false,
+      "Stop": null,
+      "Metadata": null
+    },
+    "Result": {
+      "Status": "tool_calls",
+      "Text": "",
+      "Calls": [
+        {
+          "ID": "call_apply_patch_2",
+          "Tool": "apply_patch",
+          "Args": {
+            "patch": "retry by collapsing refund_cents to total_cents - fee_cents"
+          }
+        }
+      ],
+      "Reason": "",
+      "Usage": {
+        "InputTokens": 0,
+        "OutputTokens": 0,
+        "Cost": 0,
+        "LatencyMS": 0
+      }
+    },
+    "Error": ""
+  },
+  {
+    "Request": {
+      "Model": "mock-coder",
+      "Messages": [
+        {
+          "Role": "system",
+          "Text": "You are a coding agent. Use read_file, search_text, apply_patch, and run_shell. Iterate once if tests fail.",
+          "ToolCall": null,
+          "ToolUseID": "",
+          "Value": null,
+          "Error": ""
+        },
+        {
+          "Role": "user",
+          "Text": "Fix the checkout refund rounding bug and prove the focused tests pass.",
+          "ToolCall": null,
+          "ToolUseID": "",
+          "Value": null,
+          "Error": ""
+        },
+        {
+          "Role": "assistant",
+          "Text": "",
+          "ToolCall": {
+            "ID": "call_read_file_1",
+            "Tool": "read_file",
+            "Args": {
+              "path": "src/checkout.leia"
+            }
+          },
+          "ToolUseID": "",
+          "Value": null,
+          "Error": ""
+        },
+        {
+          "Role": "tool",
+          "Text": "",
+          "ToolCall": null,
+          "ToolUseID": "call_read_file_1",
+          "Value": "func refund_cents(total_cents, fee_cents) {\n    if total_cents \u003e 1000 {\n        return total_cents - fee_cents - 1\n    }\n    return total_cents - fee_cents\n}\n",
+          "Error": ""
+        },
+        {
+          "Role": "assistant",
+          "Text": "",
+          "ToolCall": {
+            "ID": "call_search_text_1",
+            "Tool": "search_text",
+            "Args": {
+              "query": "refund_cents"
+            }
+          },
+          "ToolUseID": "",
+          "Value": null,
+          "Error": ""
+        },
+        {
+          "Role": "tool",
+          "Text": "",
+          "ToolCall": null,
+          "ToolUseID": "call_search_text_1",
+          "Value": "tests/checkout_refund_test.leia:1:assert(refund_cents(1250, 25) == 1225)\ntests/checkout_refund_test.leia:2:assert(refund_cents(800, 25) == 775)",
+          "Error": ""
+        },
+        {
+          "Role": "assistant",
+          "Text": "",
+          "ToolCall": {
+            "ID": "call_apply_patch_1",
+            "Tool": "apply_patch",
+            "Args": {
+              "patch": "remove the one-cent high-value adjustment"
+            }
+          },
+          "ToolUseID": "",
+          "Value": null,
+          "Error": ""
+        },
+        {
+          "Role": "tool",
+          "Text": "",
+          "ToolCall": null,
+          "ToolUseID": "call_apply_patch_1",
+          "Value": {
+            "changed_lines": 1,
+            "files": [
+              "src/checkout.leia"
+            ],
+            "note": "removed one-cent adjustment but left high-value branch",
+            "patch_id": "patch-1"
+          },
+          "Error": ""
+        },
+        {
+          "Role": "assistant",
+          "Text": "",
+          "ToolCall": {
+            "ID": "call_run_shell_1",
+            "Tool": "run_shell",
+            "Args": {
+              "command": "leia test tests/checkout_refund_test.leia"
+            }
+          },
+          "ToolUseID": "",
+          "Value": null,
+          "Error": ""
+        },
+        {
+          "Role": "tool",
+          "Text": "",
+          "ToolCall": null,
+          "ToolUseID": "call_run_shell_1",
+          "Value": {
+            "command": "leia test tests/checkout_refund_test.leia",
+            "output": "FAIL checkout_refund_test: refund_cents(1250, 25) got 1224 want 1225",
+            "status": "failed"
+          },
+          "Error": ""
+        },
+        {
+          "Role": "assistant",
+          "Text": "",
+          "ToolCall": {
+            "ID": "call_apply_patch_2",
+            "Tool": "apply_patch",
+            "Args": {
+              "patch": "retry by collapsing refund_cents to total_cents - fee_cents"
+            }
+          },
+          "ToolUseID": "",
+          "Value": null,
+          "Error": ""
+        },
+        {
+          "Role": "tool",
+          "Text": "",
+          "ToolCall": null,
+          "ToolUseID": "call_apply_patch_2",
+          "Value": {
+            "changed_lines": 4,
+            "files": [
+              "src/checkout.leia"
+            ],
+            "note": "collapsed branch after failed test",
+            "patch_id": "patch-2"
+          },
+          "Error": ""
+        }
+      ],
+      "Tools": [
+        {
+          "Name": "read_file",
+          "Description": "Read a file from the fixture workspace.",
+          "Params": [
+            "path"
+          ],
+          "Requires": [
+            "workspace.read"
+          ],
+          "Schema": null
+        },
+        {
+          "Name": "search_text",
+          "Description": "Search fixture workspace text.",
+          "Params": [
+            "query"
+          ],
+          "Requires": [
+            "workspace.search"
+          ],
+          "Schema": null
+        },
+        {
+          "Name": "apply_patch",
+          "Description": "Apply a bounded patch to the fixture workspace.",
+          "Params": [
+            "patch"
+          ],
+          "Requires": [
+            "workspace.write"
+          ],
+          "Schema": null
+        },
+        {
+          "Name": "run_shell",
+          "Description": "Run a deterministic local command in the fixture workspace.",
+          "Params": [
+            "command"
+          ],
+          "Requires": [
+            "process.exec"
+          ],
+          "Schema": null
+        }
+      ],
+      "ForceTool": "",
+      "MaxTokens": 240,
+      "Temperature": null,
+      "TopP": null,
+      "ResponseFormat": null,
+      "Stream": false,
+      "Stop": null,
+      "Metadata": null
+    },
+    "Result": {
+      "Status": "tool_calls",
+      "Text": "",
+      "Calls": [
+        {
+          "ID": "call_run_shell_2",
+          "Tool": "run_shell",
+          "Args": {
+            "command": "leia test tests/checkout_refund_test.leia"
+          }
+        }
+      ],
+      "Reason": "",
+      "Usage": {
+        "InputTokens": 0,
+        "OutputTokens": 0,
+        "Cost": 0,
+        "LatencyMS": 0
+      }
+    },
+    "Error": ""
+  },
+  {
+    "Request": {
+      "Model": "mock-coder",
+      "Messages": [
+        {
+          "Role": "system",
+          "Text": "You are a coding agent. Use read_file, search_text, apply_patch, and run_shell. Iterate once if tests fail.",
+          "ToolCall": null,
+          "ToolUseID": "",
+          "Value": null,
+          "Error": ""
+        },
+        {
+          "Role": "user",
+          "Text": "Fix the checkout refund rounding bug and prove the focused tests pass.",
+          "ToolCall": null,
+          "ToolUseID": "",
+          "Value": null,
+          "Error": ""
+        },
+        {
+          "Role": "assistant",
+          "Text": "",
+          "ToolCall": {
+            "ID": "call_read_file_1",
+            "Tool": "read_file",
+            "Args": {
+              "path": "src/checkout.leia"
+            }
+          },
+          "ToolUseID": "",
+          "Value": null,
+          "Error": ""
+        },
+        {
+          "Role": "tool",
+          "Text": "",
+          "ToolCall": null,
+          "ToolUseID": "call_read_file_1",
+          "Value": "func refund_cents(total_cents, fee_cents) {\n    if total_cents \u003e 1000 {\n        return total_cents - fee_cents - 1\n    }\n    return total_cents - fee_cents\n}\n",
+          "Error": ""
+        },
+        {
+          "Role": "assistant",
+          "Text": "",
+          "ToolCall": {
+            "ID": "call_search_text_1",
+            "Tool": "search_text",
+            "Args": {
+              "query": "refund_cents"
+            }
+          },
+          "ToolUseID": "",
+          "Value": null,
+          "Error": ""
+        },
+        {
+          "Role": "tool",
+          "Text": "",
+          "ToolCall": null,
+          "ToolUseID": "call_search_text_1",
+          "Value": "tests/checkout_refund_test.leia:1:assert(refund_cents(1250, 25) == 1225)\ntests/checkout_refund_test.leia:2:assert(refund_cents(800, 25) == 775)",
+          "Error": ""
+        },
+        {
+          "Role": "assistant",
+          "Text": "",
+          "ToolCall": {
+            "ID": "call_apply_patch_1",
+            "Tool": "apply_patch",
+            "Args": {
+              "patch": "remove the one-cent high-value adjustment"
+            }
+          },
+          "ToolUseID": "",
+          "Value": null,
+          "Error": ""
+        },
+        {
+          "Role": "tool",
+          "Text": "",
+          "ToolCall": null,
+          "ToolUseID": "call_apply_patch_1",
+          "Value": {
+            "changed_lines": 1,
+            "files": [
+              "src/checkout.leia"
+            ],
+            "note": "removed one-cent adjustment but left high-value branch",
+            "patch_id": "patch-1"
+          },
+          "Error": ""
+        },
+        {
+          "Role": "assistant",
+          "Text": "",
+          "ToolCall": {
+            "ID": "call_run_shell_1",
+            "Tool": "run_shell",
+            "Args": {
+              "command": "leia test tests/checkout_refund_test.leia"
+            }
+          },
+          "ToolUseID": "",
+          "Value": null,
+          "Error": ""
+        },
+        {
+          "Role": "tool",
+          "Text": "",
+          "ToolCall": null,
+          "ToolUseID": "call_run_shell_1",
+          "Value": {
+            "command": "leia test tests/checkout_refund_test.leia",
+            "output": "FAIL checkout_refund_test: refund_cents(1250, 25) got 1224 want 1225",
+            "status": "failed"
+          },
+          "Error": ""
+        },
+        {
+          "Role": "assistant",
+          "Text": "",
+          "ToolCall": {
+            "ID": "call_apply_patch_2",
+            "Tool": "apply_patch",
+            "Args": {
+              "patch": "retry by collapsing refund_cents to total_cents - fee_cents"
+            }
+          },
+          "ToolUseID": "",
+          "Value": null,
+          "Error": ""
+        },
+        {
+          "Role": "tool",
+          "Text": "",
+          "ToolCall": null,
+          "ToolUseID": "call_apply_patch_2",
+          "Value": {
+            "changed_lines": 4,
+            "files": [
+              "src/checkout.leia"
+            ],
+            "note": "collapsed branch after failed test",
+            "patch_id": "patch-2"
+          },
+          "Error": ""
+        },
+        {
+          "Role": "assistant",
+          "Text": "",
+          "ToolCall": {
+            "ID": "call_run_shell_2",
+            "Tool": "run_shell",
+            "Args": {
+              "command": "leia test tests/checkout_refund_test.leia"
+            }
+          },
+          "ToolUseID": "",
+          "Value": null,
+          "Error": ""
+        },
+        {
+          "Role": "tool",
+          "Text": "",
+          "ToolCall": null,
+          "ToolUseID": "call_run_shell_2",
+          "Value": {
+            "command": "leia test tests/checkout_refund_test.leia",
+            "output": "PASS checkout_refund_test (2 assertions)",
+            "status": "passed"
+          },
+          "Error": ""
+        }
+      ],
+      "Tools": [
+        {
+          "Name": "read_file",
+          "Description": "Read a file from the fixture workspace.",
+          "Params": [
+            "path"
+          ],
+          "Requires": [
+            "workspace.read"
+          ],
+          "Schema": null
+        },
+        {
+          "Name": "search_text",
+          "Description": "Search fixture workspace text.",
+          "Params": [
+            "query"
+          ],
+          "Requires": [
+            "workspace.search"
+          ],
+          "Schema": null
+        },
+        {
+          "Name": "apply_patch",
+          "Description": "Apply a bounded patch to the fixture workspace.",
+          "Params": [
+            "patch"
+          ],
+          "Requires": [
+            "workspace.write"
+          ],
+          "Schema": null
+        },
+        {
+          "Name": "run_shell",
+          "Description": "Run a deterministic local command in the fixture workspace.",
+          "Params": [
+            "command"
+          ],
+          "Requires": [
+            "process.exec"
+          ],
+          "Schema": null
+        }
+      ],
+      "ForceTool": "",
+      "MaxTokens": 240,
+      "Temperature": null,
+      "TopP": null,
+      "ResponseFormat": null,
+      "Stream": false,
+      "Stop": null,
+      "Metadata": null
+    },
+    "Result": {
+      "Status": "final_answer",
+      "Text": "Fixed refund_cents by removing the stale high-value branch; focused checkout refund tests pass after one retry.",
+      "Calls": [],
+      "Reason": "",
+      "Usage": {
+        "InputTokens": 0,
+        "OutputTokens": 0,
+        "Cost": 0,
+        "LatencyMS": 0
+      }
+    },
+    "Error": ""
+  }
+]

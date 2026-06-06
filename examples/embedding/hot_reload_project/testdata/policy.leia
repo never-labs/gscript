@@ -1,0 +1,8 @@
+import "go:host/policy" as host
+
+state := { accepted: 0 }
+
+func handle(input) {
+	state.accepted += 1
+	return host.label(input, state.accepted)
+}

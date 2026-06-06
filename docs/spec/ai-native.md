@@ -33,6 +33,30 @@ calls. For example, a tool created with `tool { ... }` and a tool created with
 `llm.tool(...)` must go through the same tool validation, capability metadata,
 dispatch, tracing, and replay paths.
 
+This stable lowering is observable without a live provider. A tagged tool must
+preserve helper-visible capability metadata:
+
+```leia run all
+search_runbook := tool {
+    name: "search_runbook"
+    params: {"service"}
+    description: "Search local runbooks."
+    requires: {"docs.read", "runbooks.read"}
+    fn: func(service) {
+        return "runbook:" .. service, nil
+    }
+}
+
+caps := llm.tool_caps({search_runbook})
+assert(#caps == 2)
+assert(caps[1] == "docs.read")
+assert(caps[2] == "runbooks.read")
+
+ok, err := llm.check_tools({search_runbook}, {"docs.read", "runbooks.read"})
+assert(ok == true)
+assert(err == nil)
+```
+
 ## Models
 
 `model { ... }` registers script-visible aliases for the current VM.

@@ -4,6 +4,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestGoStyleConcurrencyContract(t *testing.T) {
@@ -55,5 +56,18 @@ func TestGoStyleConcurrencyContract(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestGoStyleConcurrencyProjectExampleGate(t *testing.T) {
+	root := findRepoRoot(t)
+	out := runCommand(t, root, 30*time.Second, "go", "run", "./cmd/leia", "examples", "check", "--timeout=10s", "repo-concurrency-pipeline_project-main")
+	for _, want := range []string{
+		"ok      repo-concurrency-pipeline_project-main",
+		"examples: 1 ok, 0 skipped, 0 failed",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("pipeline project examples gate output = %q, want containing %q", out, want)
+		}
 	}
 }

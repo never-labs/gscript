@@ -1785,6 +1785,9 @@ func playgroundRepositoryExamples(root string) ([]playgroundExample, error) {
 			return err
 		}
 		if d.IsDir() {
+			if d.Name() == "testdata" {
+				return filepath.SkipDir
+			}
 			return nil
 		}
 		if filepath.Ext(path) != ".leia" {

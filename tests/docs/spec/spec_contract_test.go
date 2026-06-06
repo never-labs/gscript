@@ -109,6 +109,7 @@ func TestRunnableSpecFencesKeepStableAllModeCoverage(t *testing.T) {
 	}
 
 	var runAll, failAll int
+	var aiNativeRunAll int
 	var bad []string
 	for _, entry := range entries {
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".md") {
@@ -123,6 +124,9 @@ func TestRunnableSpecFencesKeepStableAllModeCoverage(t *testing.T) {
 			switch info {
 			case "leia run all":
 				runAll++
+				if entry.Name() == "ai-native.md" {
+					aiNativeRunAll++
+				}
 			case "leia fail all":
 				failAll++
 			case "leia run", "leia fail":
@@ -137,6 +141,9 @@ func TestRunnableSpecFencesKeepStableAllModeCoverage(t *testing.T) {
 	}
 	if runAll == 0 || failAll == 0 {
 		t.Fatalf("docs/spec runnable fence coverage must include success and failure examples; got %d run all, %d fail all", runAll, failAll)
+	}
+	if aiNativeRunAll == 0 {
+		t.Fatal("docs/spec/ai-native.md must include at least one stable runnable Leia example")
 	}
 }
 
