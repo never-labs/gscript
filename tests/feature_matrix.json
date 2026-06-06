@@ -220,7 +220,7 @@
       "interpreter": {"status": "covered", "refs": ["internal/vm/vm_test.go", "internal/stdlib/bind/sync_test.go", "internal/stdlib/bind/context_test.go"]},
       "tier1": {"status": "semantic_only", "refs": []},
       "tier2": {"status": "semantic_only", "refs": []},
-      "semantic_gate": {"status": "covered", "refs": ["tests/language/go_channel_host_more.leia", "tests/language/go_channel_edges_more.leia", "tests/concurrency_contract_test.go", "tests/sdk/resource_budget_concurrency_test.go", "cmd/leia/main_examples_test.go", "examples/concurrency/select_timeout.leia", "examples/concurrency/context_sleep.leia", "examples/concurrency/sync_group_cancel.leia", "scripts/production_check.sh"]},
+      "semantic_gate": {"status": "covered", "refs": ["tests/language/go_channel_host_more.leia", "tests/language/go_channel_edges_more.leia", "tests/concurrency_contract_test.go", "tests/sdk/resource_budget_concurrency_test.go", "cmd/leia/main_examples_test.go", "cmd/leia/main_examples_command_test.go", "examples/concurrency/select_timeout.leia", "examples/concurrency/context_sleep.leia", "examples/concurrency/sync_group_cancel.leia", "docs/reference/concurrency/index.md", "scripts/production_check.sh"]},
       "conformance_case": {"status": "covered", "refs": ["tests/language/go_channel_host_more.leia", "tests/language/go_channel_edges_more.leia"]},
       "perf_hot_case": {"status": "covered", "refs": ["benchmarks/concurrency/producer_consumer_pipeline.leia", "benchmarks/concurrency/sync_group.leia"]}
     },
@@ -459,7 +459,7 @@
       "interpreter": {"status": "covered", "refs": ["internal/runtime/table_dense_matrix_test.go", "internal/stdlib/bind/vec_test.go", "internal/runtime/soa_test.go", "internal/stdlib/bind/soa_test.go"]},
       "tier1": {"status": "covered", "refs": ["internal/methodjit/pass_intrinsic_matrix_test.go", "internal/methodjit/pass_matrix_rowptr_test.go"]},
       "tier2": {"status": "covered", "refs": ["internal/methodjit/emit_matrix_codegen_test.go", "internal/methodjit/pass_matrix_lower.go"]},
-      "semantic_gate": {"status": "covered", "refs": ["tests/language/matrix_host_dense_more.leia", "tests/language/vec_color_geometry_hsl_more.leia", "internal/stdlib/bind/soa_test.go", "examples/data_processing/data_oriented/dense_matrix_vec_kernels.leia", "examples/data_processing/data_oriented/soa_kernels.leia"]},
+      "semantic_gate": {"status": "covered", "refs": ["tests/language/matrix_host_dense_more.leia", "tests/language/vec_color_geometry_hsl_more.leia", "internal/stdlib/bind/soa_test.go", "cmd/leia/main_examples_command_test.go", "examples/data_processing/data_oriented/dense_matrix_vec_kernels.leia", "examples/data_processing/data_oriented/soa_kernels.leia", "docs/reference/data-oriented/index.md"]},
       "conformance_case": {"status": "covered", "refs": ["tests/language/matrix_host_dense_more.leia", "internal/runtime/soa_test.go"]},
       "perf_hot_case": {"status": "covered", "refs": ["benchmarks/numeric/matmul_dense.leia", "benchmarks/numeric/spectral_norm_dense.leia", "benchmarks/data/soa_affine_many.leia", "benchmarks/data/soa_masked_aggregate.leia", "benchmarks/data/soa_filter_gather.leia", "benchmarks/data/soa_scan.leia"]}
     },

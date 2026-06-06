@@ -269,6 +269,7 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 	root := findRepoRoot(t)
 	readme := readFileString(t, filepath.Join(root, "README.md"))
 	for _, snippet := range []string{
+		"Leia is a Go-native, AI-native, hot-reloadable scripting language.",
 		"repeatable tests, package metadata, and source-level hot reload.",
 		"Go-flavored syntax with dynamic values, Lua-compatible table and multi-return",
 		"semantics where useful, an embeddable Go API, a bytecode VM, and an ARM64 JIT.",
@@ -278,6 +279,7 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 		"Data-oriented helpers for dense arrays, matrices, vectors, and SoA layouts.",
 		"CLI tooling for format, lint, test, docs, diagnostics, modules, benchmarks,",
 		"The JIT accelerates supported hot paths and falls back to the VM/runtime",
+		"The stable contract is the language spec plus\nfeature matrix and release gates.",
 	} {
 		if !strings.Contains(readme, snippet) {
 			t.Fatalf("README stable contract changed or missing expected snippet %q", snippet)
@@ -305,9 +307,34 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 
 	features := loadFeatureMatrixFeatureMap(t, root)
 
-	requireFeature(t, features, "literals_and_constants")
-	requireFeature(t, features, "tables_arrays_fields")
-	requireFeature(t, features, "varargs_multireturn")
+	literals := requireFeature(t, features, "literals_and_constants")
+	requireFeatureSpecSections(t, literals, "literals_and_constants", "Grammar Appendix", "Declarations And Scope", "Values And Types")
+	requireFeatureCellRefs(t, literals, "literals_and_constants", "parser",
+		"internal/parser/parser_test.go",
+		"tests/language/literals_strings_basic.leia",
+	)
+	requireFeatureCellRefs(t, literals, "literals_and_constants", "semantic_gate",
+		"tests/language/literals_long_brackets_more.leia",
+		"tests/language/literals_control_escapes_more.leia",
+	)
+	tables := requireFeature(t, features, "tables_arrays_fields")
+	requireFeatureSpecSections(t, tables, "tables_arrays_fields", "Grammar Appendix", "Values And Types", "Tables And Metatables")
+	requireFeatureCellRefs(t, tables, "tables_arrays_fields", "semantic_gate",
+		"tests/language/table_raw_helpers_more.leia",
+		"tests/language/nextvar_table_remove_sequences.leia",
+	)
+	requireFeatureCellRefs(t, tables, "tables_arrays_fields", "conformance_case",
+		"tests/language/sort_table_insert_remove_concat.leia",
+	)
+	multireturn := requireFeature(t, features, "varargs_multireturn")
+	requireFeatureSpecSections(t, multireturn, "varargs_multireturn", "Grammar Appendix", "Functions", "Tables And Metatables")
+	requireFeatureCellRefs(t, multireturn, "varargs_multireturn", "interpreter",
+		"internal/runtime/multireturn_test.go",
+	)
+	requireFeatureCellRefs(t, multireturn, "varargs_multireturn", "semantic_gate",
+		"tests/language/vararg_pack.leia",
+		"tests/language/vararg_select.leia",
+	)
 
 	embeddingSecurity := requireFeature(t, features, "sandbox_capabilities_module_loading")
 	requireFeatureCellRefs(t, embeddingSecurity, "sandbox_capabilities_module_loading", "semantic_gate",
@@ -320,6 +347,7 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 	)
 
 	hostBindings := requireFeature(t, features, "embedding_host_bindings")
+	requireFeatureSpecSections(t, hostBindings, "embedding_host_bindings", "Modules And Loading", "Values And Types", "Functions", "Errors And Diagnostics")
 	requireFeatureCellRefs(t, hostBindings, "embedding_host_bindings", "semantic_gate",
 		"tests/sdk/register_api_test.go",
 		"tests/sdk/module_api_test.go",
@@ -346,6 +374,7 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 	)
 
 	hotReload := requireFeature(t, features, "embedding_hot_reload")
+	requireFeatureSpecSections(t, hotReload, "embedding_hot_reload", "Stability Contract", "Modules And Loading", "Implementation Requirements")
 	requireFeatureCellRefs(t, hotReload, "embedding_hot_reload", "interpreter",
 		"tests/sdk/hotloader_test.go",
 		"tests/sdk/hotloader_instance_test.go",
@@ -387,6 +416,7 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 	}
 
 	ai := requireFeature(t, features, "llm_native_integration")
+	requireFeatureSpecSections(t, ai, "llm_native_integration", "Grammar Appendix", "AI-Native Syntax", "Values And Types")
 	requireFeatureCellRefs(t, ai, "llm_native_integration", "semantic_gate",
 		"tests/llm/llm_runtime_test.go",
 		"tests/llm/llm_agent_examples_test.go",
@@ -454,9 +484,11 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 		"tests/concurrency_contract_test.go",
 		"tests/sdk/resource_budget_concurrency_test.go",
 		"cmd/leia/main_examples_test.go",
+		"cmd/leia/main_examples_command_test.go",
 		"examples/concurrency/select_timeout.leia",
 		"examples/concurrency/context_sleep.leia",
 		"examples/concurrency/sync_group_cancel.leia",
+		"docs/reference/concurrency/index.md",
 		"scripts/production_check.sh",
 	)
 	productionCheck := readFileString(t, filepath.Join(root, "scripts", "production_check.sh"))
@@ -476,8 +508,10 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 		"tests/language/matrix_host_dense_more.leia",
 		"tests/language/vec_color_geometry_hsl_more.leia",
 		"internal/stdlib/bind/soa_test.go",
+		"cmd/leia/main_examples_command_test.go",
 		"examples/data_processing/data_oriented/dense_matrix_vec_kernels.leia",
 		"examples/data_processing/data_oriented/soa_kernels.leia",
+		"docs/reference/data-oriented/index.md",
 	)
 	requireFeatureCellRefs(t, data, "matrix_dense_arrays", "bytecode",
 		"internal/vm/compiler_dense_test.go",
@@ -510,6 +544,7 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 	)
 
 	modules := requireFeature(t, features, "module_package_management")
+	requireFeatureSpecSections(t, modules, "module_package_management", "Modules And Loading", "Values And Types")
 	requireFeatureCellRefs(t, modules, "module_package_management", "semantic_gate",
 		"internal/modpkg/modpkg_test.go",
 		"tests/architecture/package_boundary_test.go",
@@ -530,6 +565,7 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 	}
 
 	bytecodeVM := requireFeature(t, features, "bytecode_vm_execution")
+	requireFeatureSpecSections(t, bytecodeVM, "bytecode_vm_execution", "Implementation Requirements", "Stability Contract")
 	requireFeatureCellRefs(t, bytecodeVM, "bytecode_vm_execution", "bytecode",
 		"internal/vm/compiler_method_test.go",
 		"internal/vm/opcode_test.go",
@@ -543,6 +579,7 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 	)
 
 	jit := requireFeature(t, features, "arm64_jit_runtime_fallback")
+	requireFeatureSpecSections(t, jit, "arm64_jit_runtime_fallback", "Implementation Requirements", "Stability Contract")
 	requireFeatureCellRefs(t, jit, "arm64_jit_runtime_fallback", "tier1",
 		"tests/jit_test.go",
 		"tests/jit_loop_control_test.go",
@@ -568,6 +605,7 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 	)
 
 	releaseEvidence := requireFeature(t, features, "release_evidence_gates")
+	requireFeatureSpecSections(t, releaseEvidence, "release_evidence_gates", "Implementation Requirements", "Stability Contract")
 	requireFeatureCellRefs(t, releaseEvidence, "release_evidence_gates", "semantic_gate",
 		"tests/release_matrix_test.go",
 		"scripts/docs_check.sh",
@@ -597,6 +635,8 @@ func TestReadmeExecutionPerformanceContractHasReleaseGates(t *testing.T) {
 	platforms := readFileString(t, filepath.Join(root, "docs", "reference", "platforms", "index.md"))
 	release := readFileString(t, filepath.Join(root, "docs", "release", "index.md"))
 	gate := readFileString(t, filepath.Join(root, "scripts", "performance_gate.sh"))
+	productionCheck := readFileString(t, filepath.Join(root, "scripts", "production_check.sh"))
+	benchmarkGateTest := readFileString(t, filepath.Join(root, "benchmarks", "performance_gate_test.py"))
 
 	for _, snippet := range []string{
 		"The JIT accelerates supported hot paths and falls back to the VM/runtime",
@@ -644,6 +684,29 @@ func TestReadmeExecutionPerformanceContractHasReleaseGates(t *testing.T) {
 	} {
 		if !strings.Contains(gate, snippet) {
 			t.Fatalf("performance gate must enforce JIT/LuaJIT bottom line; missing %q", snippet)
+		}
+	}
+	for _, snippet := range []string{
+		`local cmd="bash scripts/performance_gate.sh --smoke --runs 2 --warmup 1"`,
+		`local cmd="bash scripts/performance_gate.sh --full"`,
+		"add_performance_smoke",
+		"add_performance_gate",
+	} {
+		if !strings.Contains(productionCheck, snippet) {
+			t.Fatalf("production_check.sh must keep README execution/performance gate snippet %q", snippet)
+		}
+	}
+	if strings.Contains(productionCheck, "--no-luajit") {
+		t.Fatal("production_check.sh must not weaken README execution/performance gates with --no-luajit")
+	}
+	for _, snippet := range []string{
+		"test_jit_fallback_luajit_contract_keeps_gate_refs",
+		"test_validate_only_rejects_luajit_ratio_above_threshold",
+		"test_builtin_gate_selectors_are_registered_manifest_workloads",
+		"benchmarks/perf_submit_guard_test.py",
+	} {
+		if !strings.Contains(benchmarkGateTest, snippet) {
+			t.Fatalf("benchmark tests must keep README execution/performance gate snippet %q", snippet)
 		}
 	}
 
@@ -896,6 +959,27 @@ func requireFeatureCellRefs(t *testing.T, feature map[string]json.RawMessage, fe
 	for _, ref := range refs {
 		if !have[ref] {
 			t.Fatalf("%s.%s refs = %#v, missing %q", featureID, field, cell.Refs, ref)
+		}
+	}
+}
+
+func requireFeatureSpecSections(t *testing.T, feature map[string]json.RawMessage, featureID string, sections ...string) {
+	t.Helper()
+	raw, ok := feature["spec_sections"]
+	if !ok {
+		t.Fatalf("%s missing spec_sections", featureID)
+	}
+	var got []string
+	if err := json.Unmarshal(raw, &got); err != nil {
+		t.Fatalf("%s.spec_sections: %v", featureID, err)
+	}
+	have := map[string]bool{}
+	for _, section := range got {
+		have[section] = true
+	}
+	for _, section := range sections {
+		if !have[section] {
+			t.Fatalf("%s.spec_sections = %#v, missing %q", featureID, got, section)
 		}
 	}
 }

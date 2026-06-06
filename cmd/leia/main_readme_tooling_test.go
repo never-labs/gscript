@@ -231,10 +231,15 @@ func TestReadmeToolingCommandsMapToCLI(t *testing.T) {
 		if len(args) == 0 {
 			t.Fatalf("empty README command args for %q", command)
 		}
+		spec, ok := lookupCLICommand(args[0])
+		if !ok {
+			t.Fatalf("README command %q is not registered", args[0])
+		}
 		switch args[0] {
 		case "fmt", "lint", "test":
-			if !knownLeiaCommand(args[0]) {
-				t.Fatalf("README command %q is not registered", args[0])
+			var stdout, stderr bytes.Buffer
+			if code := spec.Run(args[1:], &stdout, &stderr); code != 0 {
+				t.Fatalf("README %s command failed: code=%d stdout=%q stderr=%q", args[0], code, stdout.String(), stderr.String())
 			}
 		case "check":
 			var stdout, stderr bytes.Buffer

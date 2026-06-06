@@ -19,6 +19,7 @@ Checks README/docs Markdown for:
   - docs/spec runnable Leia examples use stable all-mode fence tags and execute.
   - docs examples index lists each registered top-level example directory.
   - README documented capabilities stay tied to examples docs, manifests, and playground gates.
+  - README Quick Start, install, and Embedding snippets keep focused execution gates.
   - generated reference docs and the checked-in language spec HTML are fresh.
 
 The repository-script mention check covers:
@@ -121,7 +122,7 @@ checked_spec_runnable_examples = 0
 checked_spec_contract_docs = 0
 checked_examples_index_dirs = 0
 checked_examples_capability_drift_gates = 0
-checked_readme_quick_start_gates = 0
+checked_readme_user_facing_gates = 0
 checked_readme_documentation_entrypoints = 0
 spec_runnable_report = ""
 
@@ -515,8 +516,8 @@ def check_examples_capability_drift_gates() -> None:
                 )
 
 
-def check_readme_quick_start_gates() -> None:
-    global checked_readme_quick_start_gates
+def check_readme_user_facing_gates() -> None:
+    global checked_readme_user_facing_gates
     for path, snippets in [
         (
             root / "cmd" / "leia" / "main_readme_tooling_test.go",
@@ -524,31 +525,51 @@ def check_readme_quick_start_gates() -> None:
                 "TestReadmeQuickStartCommandsStayRunnable",
                 "readmeQuickStartCommands",
                 "README Quick Start command `go run ./cmd/leia %s` failed",
-                "cmd.Run()",
+                'exec.Command("go", append([]string{"run", "./cmd/leia"}, command.args...)...)',
                 "go run ./cmd/leia help",
                 "go run ./cmd/leia eval 'print(\"hello from leia\")'",
                 "go run ./cmd/leia run tests/smoke/01_basic.leia",
                 "go run ./cmd/leia run examples/hello/fib.leia",
+                "TestReadmeInstallCommandsStayRunnable",
+                "readmeInstallCommands",
+                "README install command `go install ./cmd/leia` failed",
+                "README install command `leia %s` failed",
+                'exec.Command("go", "install", "./cmd/leia")',
+                "exec.Command(leia, args...)",
+                "go install ./cmd/leia",
+                "leia version",
+                "leia run tests/smoke/01_basic.leia",
+                "TestReadmeEmbeddingSnippetStaysRunnable",
+                "readmeEmbeddingGoSnippet",
+                "README embedding snippet failed",
+                "README embedding snippet stdout",
+                'exec.Command("go", "run", "-mod=mod", ".")',
+                "replace github.com/never-labs/leia => ",
             ],
         ),
         (
             root / "tests" / "release_matrix_test.go",
             [
-                "TestReleaseMatrixReadmeQuickStartCommandsHaveFocusedGate",
+                "TestReleaseMatrixReadmeUserFacingSnippetsHaveFocusedGate",
                 "readReleaseReadmeQuickStartCommands",
+                "readReleaseReadmeInstallCommands",
+                "readReleaseReadmeEmbeddingGoSnippet",
                 "README.md Quick Start commands changed",
                 "cmd/leia/main_readme_tooling_test.go must keep README Quick Start focused gate",
+                "README.md install commands changed",
+                "cmd/leia/main_readme_tooling_test.go must keep README install focused gate",
+                "README.md Embedding snippet changed or lost executable public SDK surface",
+                "cmd/leia/main_readme_tooling_test.go must keep README Embedding focused gate",
             ],
         ),
     ]:
-        checked_readme_quick_start_gates += 1
+        checked_readme_user_facing_gates += 1
         text = path.read_text(encoding="utf-8")
         for snippet in snippets:
             if snippet not in text:
                 errors.append(
-                    f"{path.relative_to(root)}: missing README Quick Start gate snippet: {snippet}"
+                    f"{path.relative_to(root)}: missing README user-facing gate snippet: {snippet}"
                 )
-
 
 for doc_file in doc_files:
     if doc_file.is_file():
@@ -563,7 +584,7 @@ check_spec_runnable_coverage()
 check_spec_contract_docs()
 check_examples_index()
 check_examples_capability_drift_gates()
-check_readme_quick_start_gates()
+check_readme_user_facing_gates()
 
 if errors:
     print("docs_check.sh found problems:", file=sys.stderr)
@@ -580,7 +601,7 @@ print(
     f"{checked_spec_contract_docs} spec/stable-contract docs, "
     f"{checked_examples_index_dirs} examples index directories, "
     f"{checked_examples_capability_drift_gates} examples capability drift gates, "
-    f"{checked_readme_quick_start_gates} README Quick Start gates, "
+    f"{checked_readme_user_facing_gates} README user-facing gates, "
     f"{checked_retired_paths} retired-path mentions, "
     f"{checked_retired_names} retired-name mentions, "
     "2 generated reference docs, "
