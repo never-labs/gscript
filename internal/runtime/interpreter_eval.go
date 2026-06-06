@@ -899,7 +899,14 @@ func (interp *Interpreter) callFunction(fn Value, args []Value) ([]Value, error)
 		for i := start; i < len(args); i++ {
 			varargs.RawSet(IntValue(int64(i-start+1)), args[i])
 		}
-		callEnv.Define("...", TableValue(varargs))
+		varargValue := TableValue(varargs)
+		callEnv.Define("...", varargValue)
+		if len(proto.Params) > 0 {
+			name := proto.Params[len(proto.Params)-1]
+			if name != "" && name != "..." {
+				callEnv.Define(name, varargValue)
+			}
+		}
 	}
 
 	retVals, isRet, _, _, err := interp.execBlockInEnv(proto.Body, callEnv)

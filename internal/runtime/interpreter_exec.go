@@ -460,9 +460,7 @@ func (interp *Interpreter) assignTarget(target ast.Expr, val Value, env *Environ
 			return fmt.Errorf("cannot assign to readonly variable %q", t.Name)
 		}
 		if !env.Set(t.Name, val) {
-			// If variable doesn't exist anywhere, create it in the current env
-			// (like a global implicit declaration)
-			env.Define(t.Name, val)
+			return fmt.Errorf("undefined variable: %s", t.Name)
 		}
 		return nil
 	case *ast.IndexExpr:

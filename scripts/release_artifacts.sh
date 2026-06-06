@@ -5,7 +5,7 @@ usage() {
   cat <<'USAGE'
 Usage: scripts/release_artifacts.sh [--output-dir DIR] [--version VERSION] [--dry-run]
 
-Build the current-platform leia CLI release artifact locally.
+Build the current-platform Leia CLI and LSP release artifacts locally.
 
 Options:
   -o, --output-dir DIR  Write artifacts under DIR instead of dist/
@@ -17,6 +17,7 @@ Options:
 
 Outputs:
   DIR/leia_<version>_<goos>_<goarch>[.exe]
+  DIR/leia-lsp_<version>_<goos>_<goarch>[.exe]
   DIR/leia_<version>_<goos>_<goarch>_metadata.txt
   DIR/SHA256SUMS
 
@@ -141,14 +142,18 @@ fi
 
 artifact_base="leia_${version}_${goos}_${goarch}"
 binary_name="${artifact_base}${exe_ext}"
+lsp_artifact_base="leia-lsp_${version}_${goos}_${goarch}"
+lsp_binary_name="${lsp_artifact_base}${exe_ext}"
 metadata_name="${artifact_base}_metadata.txt"
 binary_path="$out_dir/$binary_name"
+lsp_binary_path="$out_dir/$lsp_binary_name"
 metadata_path="$out_dir/$metadata_name"
 checksums_path="$out_dir/SHA256SUMS"
 build_time_utc="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
 
 write_metadata() {
   echo "artifact=$binary_name"
+  echo "lsp_artifact=$lsp_binary_name"
   echo "module=$module_path"
   echo "version=$version"
   echo "git_commit=$commit"
@@ -169,6 +174,7 @@ write_metadata() {
 
 if [[ "$dry_run" == "true" ]]; then
   echo "dry-run: would write $binary_path"
+  echo "dry-run: would write $lsp_binary_path"
   echo "dry-run: would write $metadata_path"
   echo "dry-run: would write $checksums_path"
   echo
@@ -179,15 +185,19 @@ fi
 
 echo "building $binary_name"
 go build -trimpath -ldflags="-s -w" -o "$binary_path" ./cmd/leia
+echo "building $lsp_binary_name"
+go build -trimpath -ldflags="-s -w" -o "$lsp_binary_path" ./cmd/leia-lsp
 
 write_metadata >"$metadata_path"
 
 (
   cd "$out_dir"
   sha256_file "$binary_name"
+  sha256_file "$lsp_binary_name"
   sha256_file "$metadata_name"
 ) >"$checksums_path"
 
 echo "wrote $binary_path"
+echo "wrote $lsp_binary_path"
 echo "wrote $metadata_path"
 echo "wrote $checksums_path"

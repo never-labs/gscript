@@ -660,6 +660,9 @@ func (c *compiler) compileGotoStmt(s *ast.GotoStmt) error {
 
 func (c *compiler) compileFuncDeclStmt(s *ast.FuncDeclStmt) error {
 	line := s.P.Line
+	if c.isMainTopLevel() {
+		c.declareGlobal(s.Name)
+	}
 	protoIdx, err := c.compileFunction(s.Name, s.Params, s.Body, line)
 	if err != nil {
 		return err

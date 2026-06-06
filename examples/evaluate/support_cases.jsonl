@@ -1,0 +1,3 @@
+{"id":"refund-damaged","input":"package arrived damaged and customer asks for refund","expected":"refund","skip":false}
+{"id":"shipping-delay","input":"tracking is late but customer wants delivery status","expected":"shipping","skip":false}
+{"id":"wip-edge","input":"ambiguous request marked as work in progress","expected":"other","skip":true}

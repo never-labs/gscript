@@ -234,24 +234,23 @@ for i := 1; i <= 50000; i++ { r = step(i) }
 }
 
 // ---------------------------------------------------------------------------
-// 3. Hazard B — create NEW globals mid-run while hot-storing an existing one.
+// 3. Explicit global slot stress.
 //
-// step() repeatedly SetGlobals the existing global `acc`, and at several
-// distinct iterations assigns to names never declared at top level
-// (`late_a`, `late_b`, `late_c`). In Leia such assignments create brand-new
-// globals, which append to (and may realloc) vm.globalArray DURING the hot
-// loop. If a native store held `acc` through a base pointer captured before a
-// realloc, subsequent stores would land in the stale backing array and be
-// lost. We assert acc's final value (and the new globals' presence/values)
-// match the oracle. Catch confidence: HIGH for hazard B — the global set
-// provably grows three times across the hot region while acc keeps being
-// stored, so a captured-base lost-write would leave acc behind.
+// Leia no longer creates globals implicitly from function-local assignment:
+// every script-written global must be declared at top level. This test keeps
+// the cross-tier safety net for writing several global slots from a hot
+// function while repeatedly updating an existing accumulator. It no longer
+// claims to exercise global-array growth; any future explicit global-definition
+// API should add a separate reallocation test at that API boundary.
 // ---------------------------------------------------------------------------
 
-func TestSetGlobal_CrossTier_HazardB_NewGlobalReallocation(t *testing.T) {
+func TestSetGlobal_CrossTier_ExplicitGlobalSlotStress(t *testing.T) {
 	t.Setenv("LEIA_TIER2_NO_FILTER", "1")
 	src := `
 acc := 0
+late_a := 0
+late_b := 0
+late_c := 0
 func step(i) {
     acc = acc + i
     if i == 10000 { late_a = 111 }
@@ -265,13 +264,6 @@ for i := 1; i <= 50000; i++ { r = step(i) }
 	oracle := runVMFull(t, src)
 	jit, entered, failed := runTier2Globals(t, src)
 	requireTier2(t, entered, failed)
-	// Sanity: the oracle itself must have grown the global set (otherwise the
-	// hazard is not actually exercised).
-	for _, k := range []string{"late_a", "late_b", "late_c"} {
-		if _, ok := oracle[k]; !ok {
-			t.Fatalf("oracle did not create new global %q; hazard B not exercised", k)
-		}
-	}
 	diffGlobals(t, oracle, jit)
 }
 

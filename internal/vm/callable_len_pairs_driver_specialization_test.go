@@ -59,9 +59,9 @@ func driver(groups, reps) {
             checksum = (checksum + item.callable(i + b, i % 7) + #item.proxy * 17) % M
             if i % EVERY == 0 {
                 iter, state, last := getmetatable(item.proxy).__pairs(item.proxy)
-                _ = iter
-                _ = state
-                _ = last
+                _ := iter
+                _ := state
+                _ := last
                 checksum = (checksum + 99) % M
             }
         }

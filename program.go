@@ -121,6 +121,18 @@ func compileSource(src, filename, scriptDir string) (*Program, error) {
 }
 
 func (p *Program) bytecodeProto() (*bytecodevm.FuncProto, error) {
+	return p.bytecodeProtoWithGlobals(nil)
+}
+
+func (p *Program) bytecodeProtoWithGlobals(globals []string) (*bytecodevm.FuncProto, error) {
+	if len(globals) != 0 {
+		proto, err := bytecodevm.CompileWithGlobals(p.ast, globals)
+		if err != nil {
+			return nil, err
+		}
+		setBytecodeSource(proto, p.sourceName)
+		return proto, nil
+	}
 	p.protoMu.Lock()
 	defer p.protoMu.Unlock()
 	if p.proto != nil {

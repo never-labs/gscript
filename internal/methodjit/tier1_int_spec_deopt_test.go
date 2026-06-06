@@ -24,13 +24,13 @@ import (
 // VM produces counter=1. JIT without fix: counter=2 (replay). JIT with fix: counter=1.
 func TestTier1IntSpec_OverflowDeoptNoSideEffectReplay(t *testing.T) {
 	compareVMvsJIT(t, `
-counter = 0
+counter := 0
 func f(a, b) {
     counter = counter + 1
     return a + b
 }
-large = 100000000000000
-r = f(large, large)
+large := 100000000000000
+r := f(large, large)
 `, "counter")
 }
 
@@ -40,8 +40,8 @@ r = f(large, large)
 func TestTier1IntSpec_OverflowDeoptReturnValue(t *testing.T) {
 	compareVMvsJIT(t, `
 func f(a, b) { return a + b }
-large = 100000000000000
-r = f(large, large)
+large := 100000000000000
+r := f(large, large)
 `, "r")
 }
 
@@ -49,14 +49,14 @@ r = f(large, large)
 // when there are multiple side effects before the overflow.
 func TestTier1IntSpec_OverflowDeoptMultipleSideEffects(t *testing.T) {
 	compareVMvsJIT(t, `
-c1 = 0
-c2 = 0
+c1 := 0
+c2 := 0
 func f(a, b) {
     c1 = c1 + 1
     c2 = c2 + 1
     return a + b
 }
-large = 100000000000000
-r = f(large, large)
+large := 100000000000000
+r := f(large, large)
 `, "c1")
 }

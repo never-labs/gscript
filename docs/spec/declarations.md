@@ -65,6 +65,27 @@ if true {
 assert(value == 1)
 ```
 
+Assigning to an identifier that does not resolve to an existing binding is a
+runtime error. Leia does not create global variables implicitly with `=`.
+Top-level declarations, imports, builtins, enabled standard-library modules,
+and host-provided globals are all existing bindings for this rule.
+
+```leia fail all
+missing = 1
+```
+
+Dynamic script APIs that execute code with a host-provided environment follow
+the same rule: code may update names that are already present in that
+environment, but must declare new names with `:=`.
+
+```leia run all
+script := require("script")
+
+env := {count: 1}
+assert(script.eval("count = count + 1; return count", {env: env}) == 2)
+assert(env.count == 2)
+```
+
 Same-block redeclaration is reserved by the v1.0 contract: portable programs
 must not declare the same identifier twice in one lexical block unless a later
 spec section explicitly permits a narrower form. The current implementation

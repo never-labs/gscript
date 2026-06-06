@@ -1,14 +1,14 @@
 // sql_result_analytics.leia - Model a database result set locally.
-// Demonstrates: SQL-shaped text, CSV rows, regexp validation, SoA analytics, JSON output.
+// Demonstrates: SQL tagged literals, CSV rows, regexp validation, SoA analytics, JSON output.
 
 print("=== Dialects: SQL result analytics ===")
 
-query := lines`SELECT region, status, amount
+query := sql`SELECT region, status, amount
 FROM invoices
 WHERE status IN ('paid', 'late')
 ORDER BY region, status;
 `
-sql_text := table.concat(query, " ")
+sql_text := string.gsub(query.query, "%s+", " ")
 
 identifier := regexp!`^[A-Za-z_][A-Za-z0-9_]*$`
 assert(identifier.match("invoices") == true)
@@ -65,6 +65,7 @@ print(string.format("paid rows: %.0f late rows: %.0f", soa.sum(result_set, "paid
 print(encoded_summary)
 
 assert(sql_text == "SELECT region, status, amount FROM invoices WHERE status IN ('paid', 'late') ORDER BY region, status;")
+assert(#query.args == 0)
 assert(#rows == 5)
 assert(soa.len(result_set) == 5)
 assert(soa.sum(result_set, "amount") == 330)

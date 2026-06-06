@@ -491,13 +491,6 @@ func cliExampleModuleRoot(path string) (string, bool) {
 func applyCLIExampleRunner(example *cliExample) {
 	switch {
 	case strings.Contains(example.Path, "/evaluate/"):
-		if strings.Contains(example.Path, "/basic_assert.leia") {
-			example.Runnable = true
-			example.Checkable = true
-			example.Runner = "evaluate"
-			example.Requires = ""
-			return
-		}
 		if cliExampleCompanionRecordsExist(example.Path) {
 			example.Runnable = true
 			example.Checkable = true
@@ -505,6 +498,11 @@ func applyCLIExampleRunner(example *cliExample) {
 			example.Requires = ""
 			return
 		}
+		example.Runnable = true
+		example.Checkable = true
+		example.Runner = "evaluate"
+		example.Requires = ""
+		return
 	case strings.Contains(example.Path, "/ai/coding_agent_replay.leia"),
 		strings.Contains(example.Path, "/ai/tagged_agent_workflow.leia"),
 		strings.Contains(example.Path, "/ai/record_replay_trace_project.leia"),

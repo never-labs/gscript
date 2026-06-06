@@ -263,11 +263,11 @@ func (vm *VM) RunContext(ctx context.Context, prog *Program) error {
 	defer vm.installRunContext(nil)
 	if vm.opts.useVM {
 		// Bytecode VM path
-		proto, err := prog.bytecodeProto()
+		globals := vm.interp.ExportGlobals()
+		proto, err := prog.bytecodeProtoWithGlobals(globalNames(globals))
 		if err != nil {
 			return runtimeError(err, prog.sourceName)
 		}
-		globals := vm.interp.ExportGlobals()
 		// Reuse existing bytecode VM if available (preserves JIT state)
 		bvm := vm.bvm
 		if bvm == nil {
@@ -419,6 +419,17 @@ func (vm *VM) RunContext(ctx context.Context, prog *Program) error {
 		return err
 	}
 	return nil
+}
+
+func globalNames(globals map[string]runtime.Value) []string {
+	if len(globals) == 0 {
+		return nil
+	}
+	names := make([]string, 0, len(globals))
+	for name := range globals {
+		names = append(names, name)
+	}
+	return names
 }
 
 func (vm *VM) applyBytecodeCapabilities(bvm *bytecodevm.VM) {

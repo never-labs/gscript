@@ -41,7 +41,7 @@ for i := 1; i <= 15; i++ {
     x = x * 13 + 1
 }
 result := x
-_ = string.format("trigger t2: %d", x)
+_ := string.format("trigger t2: %d", x)
 `
 	compareTier2Result(t, src, "result")
 }

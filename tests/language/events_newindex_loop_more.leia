@@ -1,6 +1,6 @@
 print("case:events_newindex_loop_more")
 
-T, K, V = nil
+T, K, V := nil
 grandparent := {}
 grandparent.__newindex = func(t, k, v) { T = t; K = k; V = v }
 parent := {}

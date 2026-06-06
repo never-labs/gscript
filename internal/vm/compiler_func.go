@@ -35,6 +35,12 @@ func (c *compiler) compileFunction(name string, params []ast.FuncParam, body *as
 
 	for _, p := range params {
 		if p.IsVarArg {
+			if p.Name != "" && p.Name != "..." {
+				reg := child.addLocal(p.Name)
+				child.emitABC(OP_NEWTABLE, reg, 0, 0, line)
+				child.emitABC(OP_VARARG, reg+1, 0, 0, line)
+				child.emitABC(OP_SETLIST, reg, 0, 1, line)
+			}
 			break
 		}
 		child.addLocal(p.Name)

@@ -1,5 +1,7 @@
 package runtime
 
+import "strings"
+
 import (
 	"testing"
 )
@@ -242,18 +244,18 @@ func TestFuncAssignToOuterVar(t *testing.T) {
 	}
 }
 
-func TestFuncUndeclaredVarIsLocal(t *testing.T) {
-	// Assigning to undeclared var inside function creates a local in function env
-	interp := runProgram(t, `
+func TestFuncUndeclaredVarErrors(t *testing.T) {
+	err := runProgramExpectError(t, `
 		func setLocal() {
 			localVar = 42
 		}
 		setLocal()
 	`)
-	v := interp.GetGlobal("localVar")
-	// localVar is not accessible at global scope
-	if !v.IsNil() {
-		t.Errorf("expected nil (local not visible), got %v", v)
+	if err == nil {
+		t.Fatal("expected error for assignment to undeclared variable")
+	}
+	if !strings.Contains(err.Error(), "undefined variable") {
+		t.Fatalf("error = %v, want undefined variable", err)
 	}
 }
 

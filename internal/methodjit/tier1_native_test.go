@@ -601,6 +601,7 @@ func make_counter() {
     return inc
 }
 counter := make_counter()
+result := 0
 for i := 1; i <= 200; i++ {
     result = counter()
 }

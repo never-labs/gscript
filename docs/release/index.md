@@ -13,7 +13,7 @@ go test ./tests -run 'TestFeatureMatrix|TestReleaseMatrix' -count=1
 bash scripts/docs_check.sh
 bash scripts/performance_gate.sh --full
 bash scripts/release_distribution_check.sh
-bash scripts/release_artifacts_check.sh
+bash scripts/release_artifacts_check.sh --build
 ```
 
 The release evidence should cite:
@@ -48,6 +48,11 @@ dry-run matrix even when GitHub workflow files are intentionally absent:
 bash scripts/release_distribution_check.sh
 bash scripts/install.sh --version v0.1.0 --os darwin --arch arm64 --dry-run
 ```
+
+Release archives must include both executables:
+
+- `leia`, the CLI and script runner;
+- `leia-lsp`, the shared language server used by editor integrations.
 
 Use [`notes-template.md`](notes-template.md) for release candidates and public
 tags so compatibility, security, performance, validation, and artifact evidence

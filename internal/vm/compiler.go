@@ -14,11 +14,24 @@ import (
 
 // Compile compiles a top-level program into a FuncProto.
 func Compile(prog *ast.Program) (*FuncProto, error) {
+	return CompileWithGlobals(prog, nil)
+}
+
+// CompileWithGlobals compiles a top-level program while treating the supplied
+// names as existing global bindings. It is used by host/dynamic script loaders
+// so strict assignment still permits writes to variables explicitly provided by
+// the embedding environment.
+func CompileWithGlobals(prog *ast.Program, globals []string) (*FuncProto, error) {
 	prog = ast.DesugarSyntax(prog)
 	if err := ast.ValidateLabelControl(prog); err != nil {
 		return nil, err
 	}
 	c := newCompiler(nil, "<main>", 0, false)
+	for _, name := range globals {
+		if name != "" {
+			c.declareGlobal(name)
+		}
+	}
 	c.collectFunctionArities(prog.Stmts)
 	c.collectFunctionResults(prog.Stmts)
 	c.collectLabelDepths(prog.Stmts, c.depth)
@@ -32,6 +45,20 @@ func Compile(prog *ast.Program) (*FuncProto, error) {
 	}
 	c.emitReturn(0, 1)
 	return c.finish(), nil
+}
+
+var predeclaredGlobalNames = []string{
+	"arg", "assert", "cap", "close", "collectgarbage", "coroutine", "dofile",
+	"error", "getmetatable", "ipairs", "len", "load", "loadfile", "loadstring",
+	"next", "package", "pairs", "pcall", "print", "rawequal", "rawget", "rawlen",
+	"rawset", "require", "select", "setmetatable", "spread", "tonumber",
+	"tostring", "type", "unpack", "xpcall",
+
+	"array", "base64", "binary", "bit32", "bytes", "channel", "cmd",
+	"context", "crypto", "csv", "debug", "dialect", "encoding", "eval", "fs",
+	"http", "io", "json", "llm", "math", "matrix", "os", "path", "process",
+	"q", "rand", "regexp", "runtime", "serve", "soa", "string", "sync",
+	"table", "testkit", "time", "utf8",
 }
 
 // --------------------------------------------------------------------
@@ -60,23 +87,24 @@ type upvalInfo struct {
 }
 
 type compiler struct {
-	parent         *compiler
-	proto          *FuncProto
-	locals         []localVar
-	upvals         []upvalInfo
-	readOnlyLocals map[int]string
-	nextReg        int
-	maxReg         int
-	depth          int
-	loops          []loopInfo
-	isVarArg       bool
-	labels         map[string]compiledLabel
-	labelDepths    map[string]int
-	gotos          []compiledGoto
-	funcArities    map[string]functionArity
-	funcResults    map[string]functionResult
-	arityScopes    []map[string]*functionArity
-	resultScopes   []map[string]*functionResult
+	parent          *compiler
+	proto           *FuncProto
+	locals          []localVar
+	upvals          []upvalInfo
+	readOnlyLocals  map[int]string
+	nextReg         int
+	maxReg          int
+	depth           int
+	loops           []loopInfo
+	isVarArg        bool
+	labels          map[string]compiledLabel
+	labelDepths     map[string]int
+	gotos           []compiledGoto
+	funcArities     map[string]functionArity
+	funcResults     map[string]functionResult
+	declaredGlobals map[string]struct{}
+	arityScopes     []map[string]*functionArity
+	resultScopes    []map[string]*functionResult
 }
 
 type compiledLabel struct {
@@ -104,9 +132,11 @@ type functionResult struct {
 func newCompiler(parent *compiler, name string, line int, isVarArg bool) *compiler {
 	var arities map[string]functionArity
 	var results map[string]functionResult
+	var declaredGlobals map[string]struct{}
 	if parent != nil {
 		arities = parent.funcArities
 		results = parent.funcResults
+		declaredGlobals = parent.declaredGlobals
 	}
 	if arities == nil {
 		arities = make(map[string]functionArity)
@@ -114,17 +144,24 @@ func newCompiler(parent *compiler, name string, line int, isVarArg bool) *compil
 	if results == nil {
 		results = make(map[string]functionResult)
 	}
+	if declaredGlobals == nil {
+		declaredGlobals = make(map[string]struct{})
+		for _, name := range predeclaredGlobalNames {
+			declaredGlobals[name] = struct{}{}
+		}
+	}
 	return &compiler{
 		parent: parent,
 		proto: &FuncProto{
 			Name:        name,
 			LineDefined: line,
 		},
-		isVarArg:    isVarArg,
-		labels:      make(map[string]compiledLabel),
-		labelDepths: make(map[string]int),
-		funcArities: arities,
-		funcResults: results,
+		isVarArg:        isVarArg,
+		labels:          make(map[string]compiledLabel),
+		labelDepths:     make(map[string]int),
+		funcArities:     arities,
+		funcResults:     results,
+		declaredGlobals: declaredGlobals,
 	}
 }
 
@@ -132,6 +169,20 @@ func newCompiler(parent *compiler, name string, line int, isVarArg bool) *compil
 // Declarations at this level create globals rather than locals.
 func (c *compiler) isMainTopLevel() bool {
 	return c.parent == nil && c.depth == 0
+}
+
+func (c *compiler) declareGlobal(name string) {
+	if c.declaredGlobals != nil {
+		c.declaredGlobals[name] = struct{}{}
+	}
+}
+
+func (c *compiler) isDeclaredGlobal(name string) bool {
+	if c.declaredGlobals == nil {
+		return false
+	}
+	_, ok := c.declaredGlobals[name]
+	return ok
 }
 
 func (c *compiler) collectFunctionArities(stmts []ast.Stmt) {

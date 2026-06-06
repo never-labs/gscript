@@ -60,9 +60,11 @@ func runDocGenerateCommand(args []string, outw, errw io.Writer) int {
 
 	cliDoc := generateCLIReferenceMarkdown()
 	stdlibDoc := generateStdlibInventoryMarkdown()
+	dialectDoc := generateDialectReferenceMarkdown()
 	if *format == "json" {
 		cliDoc = generateCLIReferenceJSON()
 		stdlibDoc = generateStdlibInventoryJSON()
+		dialectDoc = generateDialectReferenceJSON()
 	}
 	if *outputDir == "" {
 		if *format == "json" {
@@ -84,13 +86,21 @@ func runDocGenerateCommand(args []string, outw, errw io.Writer) int {
 			fmt.Fprintf(errw, "leia doc generate: %v\n", err)
 			return 1
 		}
+		if _, err := outw.Write([]byte("\n")); err != nil {
+			fmt.Fprintf(errw, "leia doc generate: %v\n", err)
+			return 1
+		}
+		if _, err := outw.Write(dialectDoc); err != nil {
+			fmt.Fprintf(errw, "leia doc generate: %v\n", err)
+			return 1
+		}
 		return 0
 	}
 	if err := os.MkdirAll(*outputDir, 0755); err != nil {
 		fmt.Fprintf(errw, "leia doc generate: %v\n", err)
 		return 1
 	}
-	files := generatedDocFiles(*layout, *format, cliDoc, stdlibDoc)
+	files := generatedDocFiles(*layout, *format, cliDoc, stdlibDoc, dialectDoc)
 	for name, content := range files {
 		path := filepath.Join(*outputDir, name)
 		if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
@@ -106,20 +116,22 @@ func runDocGenerateCommand(args []string, outw, errw io.Writer) int {
 	return 0
 }
 
-func generatedDocFiles(layout, format string, cliDoc, stdlibDoc []byte) map[string][]byte {
+func generatedDocFiles(layout, format string, cliDoc, stdlibDoc, dialectDoc []byte) map[string][]byte {
 	ext := "md"
 	if format == "json" {
 		ext = "json"
 	}
 	if layout == "site" {
 		return map[string][]byte{
-			filepath.Join("reference", "cli", "index."+ext):    cliDoc,
-			filepath.Join("reference", "stdlib", "index."+ext): stdlibDoc,
+			filepath.Join("reference", "cli", "index."+ext):      cliDoc,
+			filepath.Join("reference", "stdlib", "index."+ext):   stdlibDoc,
+			filepath.Join("reference", "dialects", "index."+ext): dialectDoc,
 		}
 	}
 	return map[string][]byte{
-		"cli." + ext:    cliDoc,
-		"stdlib." + ext: stdlibDoc,
+		"cli." + ext:      cliDoc,
+		"stdlib." + ext:   stdlibDoc,
+		"dialects." + ext: dialectDoc,
 	}
 }
 
@@ -139,10 +151,16 @@ type docStdlibInventory struct {
 	Layers        []cliStdlibLayer `json:"layers"`
 }
 
+type docDialectReference struct {
+	SchemaVersion int                    `json:"schema_version"`
+	Dialects      []cliDialectCapability `json:"dialects"`
+}
+
 type docReferenceBundle struct {
-	SchemaVersion int                `json:"schema_version"`
-	CLI           docCLIReference    `json:"cli"`
-	Stdlib        docStdlibInventory `json:"stdlib"`
+	SchemaVersion int                 `json:"schema_version"`
+	CLI           docCLIReference     `json:"cli"`
+	Stdlib        docStdlibInventory  `json:"stdlib"`
+	Dialects      docDialectReference `json:"dialects"`
 }
 
 func runDocCheckCommand(args []string, outw, errw io.Writer) int {
@@ -219,6 +237,90 @@ func generateStdlibInventoryJSON() []byte {
 	})
 }
 
+func generateDialectReferenceMarkdown() []byte {
+	caps := buildCapabilities()
+	var b bytes.Buffer
+	fmt.Fprintln(&b, "# Leia Tagged Dialects")
+	fmt.Fprintln(&b)
+	fmt.Fprintln(&b, "Generated from the current `leia` binary dialect registry.")
+	fmt.Fprintln(&b)
+	fmt.Fprintln(&b, "Leia supports DSL-native tagged dialects for compact host automation, data format handling, web routing, q-style analytics, spreadsheets, and AI workflows. A dialect is an explicit tagged expression that returns an ordinary Leia value.")
+	fmt.Fprintln(&b)
+	fmt.Fprintln(&b, "## Forms")
+	fmt.Fprintln(&b)
+	fmt.Fprintln(&b, "```leia")
+	fmt.Fprintln(&b, "status := sh`git status --short`")
+	fmt.Fprintln(&b, "checked := sh!`printf checked`")
+	fmt.Fprintln(&b, "out := $`printf hello`")
+	fmt.Fprintln(&b, "files := glob`examples/**/*.leia`")
+	fmt.Fprintln(&b, "data := json`{\"name\": ${name}}`")
+	fmt.Fprintln(&b, "reviewer := agent {")
+	fmt.Fprintln(&b, "    name: \"release_reviewer\"")
+	fmt.Fprintln(&b, "    config: func(summary) {")
+	fmt.Fprintln(&b, "        return {model: \"mock-fast\", user: summary}, nil")
+	fmt.Fprintln(&b, "    }")
+	fmt.Fprintln(&b, "    params: {\"summary\"}")
+	fmt.Fprintln(&b, "}")
+	fmt.Fprintln(&b, "```")
+	fmt.Fprintln(&b)
+	fmt.Fprintln(&b, "`${expr}` is the interpolation form inside tagged strings. Each dialect decides how interpolated values are encoded. `tag!` is the fail-fast form for dialects that support recoverable errors.")
+	fmt.Fprintln(&b)
+	fmt.Fprintln(&b, "## Built-In Dialects")
+	fmt.Fprintln(&b)
+	fmt.Fprintln(&b, "| Tag | Category | Eval | Block | Capabilities | Aliases |")
+	fmt.Fprintln(&b, "|---|---|---|---|---|---|")
+	for _, dialect := range caps.Dialects {
+		capabilities := "none"
+		if len(dialect.Capabilities) > 0 {
+			capabilities = strings.Join(dialect.Capabilities, ", ")
+		}
+		aliases := "none"
+		if len(dialect.Aliases) > 0 {
+			aliases = strings.Join(dialect.Aliases, ", ")
+		}
+		fmt.Fprintf(&b, "| `%s` | `%s` | %t | %t | %s | %s |\n", dialect.Name, dialect.Category, dialect.Eval, dialect.Block, capabilities, aliases)
+	}
+	fmt.Fprintln(&b)
+	fmt.Fprintln(&b, "## Capability Categories")
+	fmt.Fprintln(&b)
+	fmt.Fprintln(&b, "- Host automation tags such as `sh`, `cmd`, `glob`, and `env` use host filesystem, process, or environment capabilities.")
+	fmt.Fprintln(&b, "- Web and network-facing tags such as `serve` must be denied when the embedding host has not granted the relevant network capability.")
+	fmt.Fprintln(&b, "- AI tags such as `model`, `turn`, `tool`, and `agent` use the same `llm.turn` policy as the `llm` standard library.")
+	fmt.Fprintln(&b, "- Pure text, protocol, and data tags return ordinary values and should be covered by examples before being promoted in README-facing claims.")
+	fmt.Fprintln(&b)
+	fmt.Fprintln(&b, "## Important Result Shapes")
+	fmt.Fprintln(&b)
+	fmt.Fprintln(&b, "| Dialect | Result shape |")
+	fmt.Fprintln(&b, "|---|---|")
+	fmt.Fprintln(&b, "| `sh`, `$` | Command result table with `ok`, `code`, `stdout`, `stderr`, `text`, and `lines`. |")
+	fmt.Fprintln(&b, "| `cmd` | Argv-safe command result table with the same command result shape as `sh`. |")
+	fmt.Fprintln(&b, "| `glob` | Sorted path array. |")
+	fmt.Fprintln(&b, "| `sql` | `{query, args, names}` with named parameters lowered to positional placeholders. |")
+	fmt.Fprintln(&b, "| `q` | q-style vector/table value or query result, depending on expression and input mode. |")
+	fmt.Fprintln(&b, "| `xlsx` encode | Workbook byte string suitable for writing or decoding with `excel`. |")
+	fmt.Fprintln(&b, "| `excel` decode | Row array; with `{headers: true}`, rows are tables keyed by the first worksheet row. |")
+	fmt.Fprintln(&b, "| `serve` | Route server descriptor/loopback result as documented by runnable web examples. |")
+	fmt.Fprintln(&b, "| `turn` | `(result, err)` for a single LLM provider request. |")
+	fmt.Fprintln(&b, "| `agent` | Callable agent value. |")
+	fmt.Fprintln(&b)
+	fmt.Fprintln(&b, "## Examples And Gates")
+	fmt.Fprintln(&b)
+	fmt.Fprintln(&b, "```bash")
+	fmt.Fprintln(&b, "go run ./cmd/leia examples check examples/hello/dialects.leia examples/dialects/text_parsing.leia")
+	fmt.Fprintln(&b, "go run ./cmd/leia examples run repo-tooling-release_gate_project-main")
+	fmt.Fprintln(&b, "```")
+	fmt.Fprintln(&b)
+	fmt.Fprintln(&b, "The release gate project combines fixture discovery, shell/process dialects, SQLite frames, q-style aggregation, spreadsheet round-tripping, a mocked AI agent, and a loopback web route. It is tracked by the feature matrix so the README dialect promise stays tied to executable evidence.")
+	return b.Bytes()
+}
+
+func generateDialectReferenceJSON() []byte {
+	return marshalGeneratedDoc(docDialectReference{
+		SchemaVersion: 1,
+		Dialects:      buildDialectCapabilities(),
+	})
+}
+
 func generateCombinedReferenceJSON() []byte {
 	return marshalGeneratedDoc(docReferenceBundle{
 		SchemaVersion: 1,
@@ -229,6 +331,10 @@ func generateCombinedReferenceJSON() []byte {
 		Stdlib: docStdlibInventory{
 			SchemaVersion: 1,
 			Layers:        buildStdlibLayerCapabilities(),
+		},
+		Dialects: docDialectReference{
+			SchemaVersion: 1,
+			Dialects:      buildDialectCapabilities(),
 		},
 	})
 }

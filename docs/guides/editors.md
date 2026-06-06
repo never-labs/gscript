@@ -22,18 +22,19 @@ Current LSP capabilities:
 
 | Capability | Status |
 |---|---|
-| Diagnostics | Parses open documents and publishes syntax and AI-native diagnostics. |
+| Diagnostics | Parses open documents and publishes syntax diagnostics. |
 | Formatting | Reuses the same formatter path as `leia fmt`. |
-| Completion | Provides keywords, standard-library modules, declarations, and AI-native forms. |
+| Completion | Provides keywords, standard-library modules, and declarations. |
 | Hover | Shows keyword, standard-library, and local declaration summaries. |
-| Document symbols | Exposes `func`, `tool`, and `agent` declarations. |
+| Document symbols | Exposes function declarations. |
 | Definition and references | Supports single-document symbol navigation. |
 | Rename | Supports single-document symbol rename. |
-| Code lens | Adds runnable command hints for source-level workflows. |
-| Inlay hints | Adds lightweight hints for AI-native and declaration forms. |
+| Code lens | Reserved for future source-level workflow hints. |
+| Inlay hints | Reserved for future semantic hints. |
 
 The current server intentionally keeps state in memory and operates on open
-documents. Workspace-wide indexing can be added later without changing editor
+documents. It treats AI dialects and other tagged forms as normal Leia syntax
+today; richer semantic diagnostics can be added later without changing editor
 integration points.
 
 ## Syntax Highlighting
@@ -104,6 +105,8 @@ These should point to the local tree-sitter grammar until a public
 Before a public release:
 
 - `bash scripts/editor_check.sh` should pass.
+- release archives and `scripts/install.sh` should install both `leia` and
+  `leia-lsp`.
 - VS Code metadata should be marketplace-ready even if publication is delayed.
 - Emacs mode should load without package-manager-specific assumptions.
 - Tree-sitter metadata should use grammar name `leia`, file type `leia`, and

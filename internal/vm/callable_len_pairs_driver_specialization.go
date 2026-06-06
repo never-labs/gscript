@@ -65,7 +65,7 @@ func (vm *VM) runCallableLenPairsDriverRuntimeSpecialization(cl *Closure, args [
 
 func callableLenPairsDriverSpecForProto(p *FuncProto) (callableLenPairsDriverSpec, bool) {
 	var spec callableLenPairsDriverSpec
-	if p == nil || p.NumParams != 2 || p.IsVarArg || len(p.Code) != 67 {
+	if p == nil || p.NumParams != 2 || p.IsVarArg || len(p.Code) < 60 {
 		return spec, false
 	}
 	code := p.Code
@@ -83,8 +83,11 @@ func callableLenPairsDriverSpecForProto(p *FuncProto) (callableLenPairsDriverSpe
 		opcodeAt{pc: 41, op: OP_GETGLOBAL},
 		opcodeAt{pc: 46, op: OP_GETGLOBAL},
 		opcodeAt{pc: 49, op: OP_GETFIELD},
-		opcodeAt{pc: 58, op: OP_LOADINT},
 	) || DecodeB(code[27]) != 11 || DecodeB(code[33]) != 11 {
+		return spec, false
+	}
+	pairAddPC, foundPairAdd := callableLenPairsPairAddPC(code)
+	if !foundPairAdd {
 		return spec, false
 	}
 	var ok bool
@@ -109,11 +112,23 @@ func callableLenPairsDriverSpecForProto(p *FuncProto) (callableLenPairsDriverSpe
 	spec.pairProxyLen = int64(DecodesBx(code[10]))
 	spec.argModulo = int64(DecodesBx(code[29]))
 	spec.lenScale = int64(DecodesBx(code[35]))
-	spec.pairAdd = int64(DecodesBx(code[58]))
+	spec.pairAdd = int64(DecodesBx(code[pairAddPC]))
 	if spec.pairProxyLen < 0 || spec.argModulo == 0 || spec.lenScale < 0 || spec.pairAdd < 0 {
 		return spec, false
 	}
 	return spec, true
+}
+
+func callableLenPairsPairAddPC(code []uint32) (int, bool) {
+	for pc := 52; pc+4 < len(code); pc++ {
+		if DecodeOp(code[pc]) != OP_LOADINT || DecodeOp(code[pc+1]) != OP_ADD ||
+			DecodeOp(code[pc+2]) != OP_GETGLOBAL || DecodeOp(code[pc+3]) != OP_MOD ||
+			DecodeOp(code[pc+4]) != OP_MOVE {
+			continue
+		}
+		return pc, true
+	}
+	return 0, false
 }
 
 func callableLenPairsDriverRuntimeGuards(vm *VM, spec callableLenPairsDriverSpec) (callableLenPairsDriverSpec, bool) {

@@ -274,7 +274,7 @@ func TestReleaseMatrixSpecGateCommandsStaySynchronized(t *testing.T) {
 	performanceSmokeCmd := "bash scripts/performance_gate.sh --smoke"
 	fullPerfGateCmd := "bash scripts/performance_gate.sh --full"
 	releaseDistributionCmd := "bash scripts/release_distribution_check.sh"
-	releaseArtifactsCmd := "bash scripts/release_artifacts_check.sh"
+	releaseArtifactsCmd := "bash scripts/release_artifacts_check.sh --build"
 
 	for _, item := range []struct {
 		path     string
@@ -588,6 +588,76 @@ func TestReleaseMatrixDocumentedCIProfilesAreInspectable(t *testing.T) {
 	}
 }
 
+func TestReleaseMatrixReleaseArtifactsInstallSharedLSP(t *testing.T) {
+	root := findRepoRoot(t)
+	for _, item := range []struct {
+		path     string
+		snippets []string
+	}{
+		{
+			path: ".goreleaser.yaml",
+			snippets: []string{
+				"id: leia-lsp",
+				"main: ./cmd/leia-lsp",
+				"- leia-lsp",
+			},
+		},
+		{
+			path: "scripts/release_artifacts.sh",
+			snippets: []string{
+				"leia-lsp_${version}_${goos}_${goarch}",
+				"go build -trimpath -ldflags=\"-s -w\" -o \"$lsp_binary_path\" ./cmd/leia-lsp",
+				"lsp_artifact=$lsp_binary_name",
+			},
+		},
+		{
+			path: "scripts/release_artifacts_check.sh",
+			snippets: []string{
+				"expected 3 checksum entries",
+				"\"$lsp_binary_path\" --help >/dev/null",
+				"lsp_artifact=$lsp_binary_name",
+			},
+		},
+		{
+			path: "scripts/install.sh",
+			snippets: []string{
+				"lsp_binary_name=\"leia-lsp\"",
+				"lsp_install_path=",
+				"install -m 0755 \"$extract_dir/$lsp_binary_name\" \"$lsp_install_path\"",
+			},
+		},
+		{
+			path: "scripts/release_distribution_check.sh",
+			snippets: []string{
+				"expected_lsp_path=",
+				"lsp_install_path=/tmp/leia-bin/leia-lsp",
+			},
+		},
+		{
+			path: "docs/guides/editors.md",
+			snippets: []string{
+				"leia-lsp",
+				"syntax diagnostics",
+				"release archives and `scripts/install.sh` should install both `leia` and",
+			},
+		},
+		{
+			path: "docs/release/index.md",
+			snippets: []string{
+				"Release archives must include both executables",
+				"`leia-lsp`, the shared language server",
+			},
+		},
+	} {
+		text := readFileString(t, filepath.Join(root, filepath.FromSlash(item.path)))
+		for _, snippet := range item.snippets {
+			if !strings.Contains(text, snippet) {
+				t.Fatalf("%s must keep shared LSP release evidence snippet %q", item.path, snippet)
+			}
+		}
+	}
+}
+
 func TestReleaseMatrixCIProfilesKeepExampleImportGuards(t *testing.T) {
 	root := findRepoRoot(t)
 
@@ -612,7 +682,7 @@ func TestReleaseMatrixCIProfilesKeepExampleImportGuards(t *testing.T) {
 		"bash scripts/performance_gate.sh --full",
 		"bash scripts/production_check.sh --full",
 		"bash scripts/release_distribution_check.sh",
-		"bash scripts/release_artifacts_check.sh",
+		"bash scripts/release_artifacts_check.sh --build",
 	} {
 		if !strings.Contains(releaseOut, want) {
 			t.Fatalf("ci release --list must include %q; got:\n%s", want, releaseOut)
@@ -1733,7 +1803,7 @@ func TestReleaseMatrixReadmeAINativeConcurrencyDataPromisesHaveGates(t *testing.
 				"repo-tooling-release_gate_project-main",
 			},
 			docSnippets: map[string][]string{
-				"docs/reference/dialects/index.md": {"Leia supports DSL-native tagged dialects", "## Core Built-In Categories"},
+				"docs/reference/dialects/index.md": {"Leia supports DSL-native tagged dialects", "## Built-In Dialects"},
 			},
 		},
 		{

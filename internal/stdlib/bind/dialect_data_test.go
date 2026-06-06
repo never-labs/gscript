@@ -134,6 +134,52 @@ func TestDialectXLSXParsesFirstWorksheet(t *testing.T) {
 	}
 }
 
+func TestDialectXLSXEncodesHeaderRowsAndExcelAliasRoundTrips(t *testing.T) {
+	eval := BuildDialect(HostOptions{}, nil).RawGetString("eval").GoFunction()
+	if eval == nil {
+		t.Fatalf("dialect.eval is not a Go function")
+	}
+	rows := NewAppendArrayTable(1)
+	rows.RawSetInt(1, TableValue(testTableFromMap(map[string]Value{
+		"name":  StringValue("Ada"),
+		"score": IntValue(42),
+	})))
+	headers := NewAppendArrayTable(2)
+	headers.RawSetInt(1, StringValue("name"))
+	headers.RawSetInt(2, StringValue("score"))
+	encodeOpts := testTableFromMap(map[string]Value{
+		"mode":    StringValue("encode"),
+		"headers": TableValue(headers),
+		"sheet":   StringValue("Summary"),
+	})
+	encoded, err := eval.Fn([]Value{StringValue("xlsx"), TableValue(rows), TableValue(encodeOpts)})
+	if err != nil {
+		t.Fatalf("xlsx encode: %v", err)
+	}
+	if len(encoded) != 1 || !encoded[0].IsString() || encoded[0].Str() == "" {
+		t.Fatalf("encoded xlsx = %#v, want non-empty byte string", encoded)
+	}
+	decoded, err := eval.Fn([]Value{
+		StringValue("excel"),
+		encoded[0],
+		TableValue(testTableFromMap(map[string]Value{"headers": BoolValue(true)})),
+	})
+	if err != nil {
+		t.Fatalf("excel alias decode: %v", err)
+	}
+	gotRows := decoded[0].Table()
+	if gotRows.Length() != 1 {
+		t.Fatalf("decoded rows = %d, want 1", gotRows.Length())
+	}
+	row := gotRows.RawGetInt(1).Table()
+	if got := row.RawGetString("name").Str(); got != "Ada" {
+		t.Fatalf("decoded name = %q, want Ada", got)
+	}
+	if got := row.RawGetString("score").Str(); got != "42" {
+		t.Fatalf("decoded score = %q, want 42", got)
+	}
+}
+
 func testXLSXWorkbook(t *testing.T) string {
 	t.Helper()
 	var buf bytes.Buffer

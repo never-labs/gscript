@@ -11,7 +11,7 @@ prog[#prog + 1] = string.format("assert(y[%d] == %d)", lim + 1, lim)
 prog[#prog + 1] = "X = y"
 prog[#prog + 1] = "return #y"
 
-env := {assert: assert}
+env := {assert: assert, X: false}
 result := script.eval(table.concat(prog, ";"), {env: env, sourceName: "generated-big.leia"})
 assert(result == lim + 1)
 assert(env.X[lim] == lim - 1 && env.X[lim + 1] == lim)

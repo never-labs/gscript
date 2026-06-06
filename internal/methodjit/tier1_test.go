@@ -829,6 +829,7 @@ func bump_array_then_newtable(t) {
 }
 bag := {}
 bag[0] = 0
+result := 0
 for i := 1; i <= 200; i++ {
     result = bump_array_then_newtable(bag)
 }
@@ -865,6 +866,7 @@ func bump_field_then_newtable(t) {
     return t.count
 }
 bag := {count: 0}
+result := 0
 for i := 1; i <= 200; i++ {
     result = bump_field_then_newtable(bag)
 }

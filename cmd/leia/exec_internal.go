@@ -282,12 +282,12 @@ func runStringVMWithSource(interp *runtime.Interpreter, src, sourceName string, 
 	if err != nil {
 		return fmt.Errorf("parse error: %w", err)
 	}
-	proto, err := bytecodevm.Compile(prog)
+	globals := interp.ExportGlobals()
+	proto, err := bytecodevm.CompileWithGlobals(prog, runtimeGlobalNames(globals))
 	if err != nil {
 		return fmt.Errorf("compile error: %w", err)
 	}
 	setProtoSource(proto, sourceName)
-	globals := interp.ExportGlobals()
 	bvm := bytecodevm.New(globals)
 	bvm.SetScriptDir(interp.ScriptDir())
 	bvm.SetLLMProviderFactory(cliDefaultLLMProviderFactory)
@@ -416,6 +416,17 @@ func runStringVMWithSource(interp *runtime.Interpreter, src, sourceName string, 
 		return statsErr
 	}
 	return nil
+}
+
+func runtimeGlobalNames(globals map[string]runtime.Value) []string {
+	if len(globals) == 0 {
+		return nil
+	}
+	names := make([]string, 0, len(globals))
+	for name := range globals {
+		names = append(names, name)
+	}
+	return names
 }
 
 func setProtoSource(proto *bytecodevm.FuncProto, sourceName string) {

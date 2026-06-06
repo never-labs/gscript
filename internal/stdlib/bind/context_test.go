@@ -36,7 +36,7 @@ case <-time.after(0.01):
 func TestContextWithTimeout(t *testing.T) {
 	interp := contextInterp(t, `
 ctx, cancel := context.withTimeout(0.001)
-_ = cancel
+_ := cancel
 result := "none"
 select {
 case <-ctx.done:
@@ -66,7 +66,7 @@ ok, err := time.sleep(ctx, 0.001)
 func TestContextSleepCancelled(t *testing.T) {
 	interp := contextInterp(t, `
 ctx, cancel := context.withTimeout(0.001)
-_ = cancel
+_ := cancel
 t0 := time.now()
 ok, err := time.sleep(ctx, 0.05)
 elapsed := time.since(t0)

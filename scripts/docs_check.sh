@@ -57,7 +57,7 @@ fi
 TMP_DOCS="$(mktemp -d)"
 trap 'rm -rf "$TMP_DOCS"' EXIT
 go run ./cmd/leia doc generate --layout site --output "$TMP_DOCS" >/dev/null
-for generated_doc in docs/reference/cli/index.md docs/reference/stdlib/index.md; do
+for generated_doc in docs/reference/cli/index.md docs/reference/stdlib/index.md docs/reference/dialects/index.md; do
     generated="${generated_doc#docs/}"
     if ! cmp -s "$TMP_DOCS/$generated" "$generated_doc"; then
         echo "error: $generated_doc is stale; run: go run ./cmd/leia doc generate --layout site --output docs" >&2
@@ -317,7 +317,7 @@ def check_release_gate_docs() -> None:
             release_matrix_cmd,
             "bash scripts/performance_gate.sh --full",
             "bash scripts/release_distribution_check.sh",
-            "bash scripts/release_artifacts_check.sh",
+            "bash scripts/release_artifacts_check.sh --build",
             "tests/feature_matrix.json",
             "docs/spec/index.md",
             "tests/language/MISSING_CAPABILITIES.md",
@@ -339,7 +339,7 @@ def check_release_gate_docs() -> None:
             "scripts/docs_check.sh",
             "bash scripts/performance_gate.sh --full",
             "bash scripts/release_distribution_check.sh",
-            "bash scripts/release_artifacts_check.sh",
+            "bash scripts/release_artifacts_check.sh --build",
             "tests/language/MANIFEST.md",
             "tests/language/KNOWN_FAILURES.md",
             "docs/reference/hot-reload/index.md",
@@ -604,7 +604,7 @@ print(
     f"{checked_readme_user_facing_gates} README user-facing gates, "
     f"{checked_retired_paths} retired-path mentions, "
     f"{checked_retired_names} retired-name mentions, "
-    "2 generated reference docs, "
+    "3 generated reference docs, "
     "1 generated spec HTML, "
     f"{checked_spec_runnable_examples} runnable spec examples."
 )

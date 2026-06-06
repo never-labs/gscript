@@ -626,6 +626,50 @@ func TestVariableAssignment(t *testing.T) {
 	expectGlobalInt(t, g, "x", 20)
 }
 
+func TestAssignmentToUndefinedVariableErrors(t *testing.T) {
+	for _, src := range []string{
+		`missing = 1`,
+		`if true { hidden = 1 }`,
+		`func f() { y = 2 }; f()`,
+	} {
+		err := compileAndRunExpectError(t, src)
+		if err == nil {
+			t.Fatalf("source %q: expected undefined assignment error", src)
+		}
+		if !strings.Contains(err.Error(), "undefined variable") {
+			t.Fatalf("source %q: error = %v, want undefined variable", src, err)
+		}
+	}
+}
+
+func TestAssignmentUpdatesDeclaredOuterVariable(t *testing.T) {
+	g := compileAndRun(t, `
+		x := 0
+		if true {
+			x = 1
+		}
+		func set_x() {
+			x = 2
+		}
+		set_x()
+	`)
+	expectGlobalInt(t, g, "x", 2)
+}
+
+func TestNamedVarargBindsCollector(t *testing.T) {
+	g := compileAndRun(t, `
+		func f(a, rest...) {
+			all := {...}
+			return rest[1], rest[2], all[1], all[2]
+		}
+		a, b, c, d := f(1, 2, 3)
+	`)
+	expectGlobalInt(t, g, "a", 2)
+	expectGlobalInt(t, g, "b", 3)
+	expectGlobalInt(t, g, "c", 2)
+	expectGlobalInt(t, g, "d", 3)
+}
+
 func TestCompoundAssignment(t *testing.T) {
 	g := compileAndRun(t, `
 		x := 10
@@ -1671,7 +1715,7 @@ func TestStringNumberCoercion(t *testing.T) {
 	expectGlobalInt(t, g, "neg", -42)
 }
 
-// compileAndRunExpectError compiles and runs, expecting a runtime error.
+// compileAndRunExpectError compiles and runs, expecting a compile or runtime error.
 func compileAndRunExpectError(t *testing.T, src string) error {
 	t.Helper()
 	tokens, err := lexer.New(src).Tokenize()
@@ -1684,7 +1728,7 @@ func compileAndRunExpectError(t *testing.T, src string) error {
 	}
 	proto, err := Compile(prog)
 	if err != nil {
-		t.Fatalf("compile error: %v", err)
+		return err
 	}
 
 	globals := vmtest.NewInterpreterGlobals()
@@ -2234,8 +2278,8 @@ setmetatable(target, {
 
 co := coroutine.create(func() {
 	for k, v := range pairs(target) {
-		_ = k
-		_ = v
+		_ := k
+		_ := v
 	}
 })
 
@@ -2586,7 +2630,7 @@ func TestSelectBlockingSend(t *testing.T) {
 	g := compileAndRun(t, `
 ch := make(chan)
 go func() {
-	_ = <-ch
+	_ := <-ch
 }()
 result := 0
 select {

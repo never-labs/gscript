@@ -23,11 +23,28 @@ builds:
       - -trimpath
     ldflags:
       - -s -w
+  - id: leia-lsp
+    main: ./cmd/leia-lsp
+    binary: leia-lsp
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+      - linux
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
 
 archives:
   - id: leia
     ids:
       - leia
+      - leia-lsp
     name_template: "{{ .ProjectName }}_{{ .Tag }}_{{ .Os }}_{{ .Arch }}"
     formats:
       - tar.gz

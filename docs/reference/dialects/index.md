@@ -1,108 +1,136 @@
-# Tagged Dialects
+# Leia Tagged Dialects
 
-Leia supports DSL-native tagged dialects for compact host automation, data
-format handling, web routing, q-style analytics, spreadsheets, and AI workflows.
-A dialect is not a separate language mode for the whole file. It is an explicit
-tagged expression that returns an ordinary Leia value.
+Generated from the current `leia` binary dialect registry.
+
+Leia supports DSL-native tagged dialects for compact host automation, data format handling, web routing, q-style analytics, spreadsheets, and AI workflows. A dialect is an explicit tagged expression that returns an ordinary Leia value.
 
 ## Forms
 
-Tagged string literals pass raw text plus interpolation metadata to the dialect:
-
 ```leia
 status := sh`git status --short`
-files := glob`examples/**/*.leia`
-pattern := re`\bagent\s+\w+`
-```
-
-`tag!` is the fail-fast form. The dialect receives the same payload, but errors
-raise instead of returning a recoverable result when the dialect supports that
-mode:
-
-```leia
-sh!`printf checked`
-```
-
-The `$` tag is the shell shortcut and follows the same result shape as `sh`:
-
-```leia
+checked := sh!`printf checked`
 out := $`printf hello`
-assert(out.ok && out.text == "hello")
-```
-
-Tagged blocks are configuration-style dialect forms. The block is evaluated as
-dialect input, and the dialect validates fields, defaults, capabilities, and
-result shape:
-
-```leia
+files := glob`examples/**/*.leia`
+data := json`{"name": ${name}}`
 reviewer := agent {
     name: "release_reviewer"
     config: func(summary) {
-        return {
-            model: "mock-fast",
-            system: "Review the release gate summary.",
-            user: summary,
-        }, nil
+        return {model: "mock-fast", user: summary}, nil
     }
     params: {"summary"}
 }
 ```
 
-## Interpolation
+`${expr}` is the interpolation form inside tagged strings. Each dialect decides how interpolated values are encoded. `tag!` is the fail-fast form for dialects that support recoverable errors.
 
-`${expr}` is the interpolation form inside tagged strings. Dialects decide how
-the expression is encoded. Shell-oriented dialects preserve structured command
-results and must avoid treating ordinary interpolation as a license to bypass
-the host capability policy. Data dialects encode values according to their
-format rules.
+## Built-In Dialects
 
-```leia
-name := "Leia"
-encoded := json`{"name": ${name}}`
-assert(encoded.name == "Leia")
-```
+| Tag | Category | Eval | Block | Capabilities | Aliases |
+|---|---|---|---|---|---|
+| `agent` | `llm` | false | true | llm.turn | none |
+| `base32` | `data` | true | false | none | none |
+| `base64` | `data` | true | false | none | none |
+| `binary` | `data` | true | false | none | none |
+| `cidr` | `protocol` | true | false | none | none |
+| `cmd` | `host` | true | false | process.exec | none |
+| `cookie` | `protocol` | true | true | none | cookies |
+| `cookies` | `protocol` | true | true | none | cookie |
+| `csv` | `text` | true | true | none | none |
+| `deflate` | `data` | true | false | none | none |
+| `duration` | `text` | true | true | none | none |
+| `emailaddr` | `protocol` | true | true | none | mailaddr |
+| `env` | `host` | true | true | env.read | none |
+| `excel` | `data` | true | false | none | xlsx |
+| `form` | `protocol` | true | true | none | urlform |
+| `glob` | `host` | true | false | fs.read | none |
+| `gzip` | `data` | true | false | none | none |
+| `hash` | `data` | true | false | none | none |
+| `headers` | `protocol` | true | true | none | http_headers |
+| `hex` | `data` | true | false | none | none |
+| `hostport` | `protocol` | true | false | none | none |
+| `html` | `protocol` | true | true | none | none |
+| `html_escape` | `protocol` | true | false | none | none |
+| `http_headers` | `protocol` | true | true | none | headers |
+| `httpmsg` | `protocol` | true | true | none | none |
+| `ini` | `text` | true | true | none | none |
+| `ipaddr` | `protocol` | true | false | none | none |
+| `json` | `text` | true | true | none | none |
+| `jsonl` | `text` | true | true | none | none |
+| `jsonptr` | `text` | true | true | none | none |
+| `junit` | `compat` | true | false | none | none |
+| `jwt` | `protocol` | true | true | none | none |
+| `kv` | `text` | true | true | none | none |
+| `lines` | `text` | true | false | none | split |
+| `logfmt` | `text` | true | true | none | none |
+| `mailaddr` | `protocol` | true | true | none | emailaddr |
+| `markdown` | `text` | true | true | none | md |
+| `md` | `text` | true | true | none | markdown |
+| `mdtable` | `text` | true | true | none | none |
+| `mime` | `protocol` | true | true | none | none |
+| `model` | `llm` | false | true | llm.turn | none |
+| `multipart` | `protocol` | true | true | none | none |
+| `numbers` | `text` | true | false | none | nums |
+| `nums` | `text` | true | false | none | numbers |
+| `path` | `text` | true | false | none | none |
+| `pem` | `data` | true | false | none | none |
+| `prompt` | `llm` | true | true | none | none |
+| `q` | `data` | true | false | none | none |
+| `quote` | `llm` | true | true | none | none |
+| `re` | `text` | true | false | none | regexp |
+| `regexp` | `text` | true | false | none | re |
+| `rfc3339` | `text` | true | true | none | timestamp |
+| `semver` | `text` | true | true | none | none |
+| `serve` | `web` | true | true | network.listen | none |
+| `sh` | `host` | true | false | process.shell | none |
+| `shellwords` | `text` | true | true | none | none |
+| `split` | `text` | true | false | none | lines |
+| `sql` | `database` | true | true | none | none |
+| `sse` | `protocol` | true | true | none | none |
+| `tap` | `text` | true | true | none | none |
+| `template` | `text` | true | true | none | none |
+| `timestamp` | `text` | true | true | none | rfc3339 |
+| `tool` | `llm` | false | true | llm.turn | none |
+| `tsv` | `text` | true | true | none | none |
+| `turn` | `llm` | false | true | llm.turn | none |
+| `url` | `protocol` | true | false | none | none |
+| `urlform` | `protocol` | true | true | none | form |
+| `urlpath` | `protocol` | true | true | none | none |
+| `urlquery` | `protocol` | true | true | none | none |
+| `uuid` | `data` | true | false | none | none |
+| `words` | `text` | true | false | none | none |
+| `xlsx` | `data` | true | false | none | excel |
+| `xml` | `text` | true | true | none | none |
+| `yaml` | `text` | true | true | none | yml |
+| `yml` | `text` | true | true | none | yaml |
+| `zlib` | `data` | true | false | none | none |
 
-## Core Built-In Categories
+## Capability Categories
 
-The built-in registry is intentionally broad but still explicit. Use
-`leia capabilities --json` to inspect the exact dialect list for a binary.
+- Host automation tags such as `sh`, `cmd`, `glob`, and `env` use host filesystem, process, or environment capabilities.
+- Web and network-facing tags such as `serve` must be denied when the embedding host has not granted the relevant network capability.
+- AI tags such as `model`, `turn`, `tool`, and `agent` use the same `llm.turn` policy as the `llm` standard library.
+- Pure text, protocol, and data tags return ordinary values and should be covered by examples before being promoted in README-facing claims.
 
-| Category | Representative tags | Purpose |
-|---|---|---|
-| Host automation | `sh`, `cmd`, `$`, `glob`, `path`, `env` | Shell-compatible commands, argv-safe commands, file discovery, paths, and environment lookup. |
-| Text and formats | `re`, `json`, `jsonl`, `csv`, `tsv`, `yaml`, `xml`, `template` | Parsing, encoding, validation, and compact data literals. |
-| Protocols | `url`, `httpmsg`, `headers`, `cookie`, `sse`, `multipart`, `jwt`, `pem` | Structured protocol fixtures and validation. |
-| Web | `html`, `urlpath`, `serve` | HTML/text helpers and high-level route declarations. |
-| Data | `sql`, `q`, `xlsx`, `excel`, `binary` | SQL-shaped input, q-style analytics, spreadsheet round-tripping, and binary fixtures. |
-| AI | `model`, `turn`, `tool`, `agent`, `prompt`, `quote` | AI provider configuration, turns, tools, agents, and prompt/quote values. |
+## Important Result Shapes
 
-## Capabilities
-
-Dialects participate in the same host capability model as ordinary standard
-library calls. Examples:
-
-| Dialect | Typical capability |
+| Dialect | Result shape |
 |---|---|
-| `sh` | `process.shell` |
-| `cmd` | `process.exec` |
-| `glob` | `fs.read` |
-| `serve` | `network.listen` |
-| `turn` / `agent` | `llm.turn` |
-
-Embedding hosts can disable process execution, shell execution, network access,
-filesystem access, or LLM providers. A disabled capability must fail the dialect
-instead of silently falling back to a less restricted path.
+| `sh`, `$` | Command result table with `ok`, `code`, `stdout`, `stderr`, `text`, and `lines`. |
+| `cmd` | Argv-safe command result table with the same command result shape as `sh`. |
+| `glob` | Sorted path array. |
+| `sql` | `{query, args, names}` with named parameters lowered to positional placeholders. |
+| `q` | q-style vector/table value or query result, depending on expression and input mode. |
+| `xlsx` encode | Workbook byte string suitable for writing or decoding with `excel`. |
+| `excel` decode | Row array; with `{headers: true}`, rows are tables keyed by the first worksheet row. |
+| `serve` | Route server descriptor/loopback result as documented by runnable web examples. |
+| `turn` | `(result, err)` for a single LLM provider request. |
+| `agent` | Callable agent value. |
 
 ## Examples And Gates
-
-The example tree contains both small dialect examples and cross-domain projects:
 
 ```bash
 go run ./cmd/leia examples check examples/hello/dialects.leia examples/dialects/text_parsing.leia
 go run ./cmd/leia examples run repo-tooling-release_gate_project-main
 ```
 
-The release gate project combines fixture discovery, shell/process dialects,
-SQLite frames, q-style aggregation, spreadsheet round-tripping, a mocked AI
-agent, and a loopback web route. It is tracked by the feature matrix so the
-README dialect promise stays tied to executable evidence.
+The release gate project combines fixture discovery, shell/process dialects, SQLite frames, q-style aggregation, spreadsheet round-tripping, a mocked AI agent, and a loopback web route. It is tracked by the feature matrix so the README dialect promise stays tied to executable evidence.

@@ -96,7 +96,7 @@ func ciProfileCommands(profile string, noLuaJIT bool) ([]ciCommand, error) {
 			{Name: "Performance gate", Args: []string{"bash", "scripts/performance_gate.sh", "--full"}},
 			{Name: "Production check", Args: []string{"bash", "scripts/production_check.sh", "--full"}},
 			{Name: "Release distribution check", Args: []string{"bash", "scripts/release_distribution_check.sh"}},
-			{Name: "Release artifacts check", Args: []string{"bash", "scripts/release_artifacts_check.sh"}},
+			{Name: "Release artifacts check", Args: []string{"bash", "scripts/release_artifacts_check.sh", "--build"}},
 		}, nil
 	default:
 		return nil, fmt.Errorf("unknown ci profile %q (want smoke, pr, perf, or release)", profile)

@@ -22,7 +22,7 @@ x = false
 i := 0
 tmp = {true, false, true, false}
 for k, v := range ipairs(tmp) {
-    _ = k
+    _ := k
     i = i + 1
     x = !x
     assert(x == v)

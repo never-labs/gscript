@@ -388,6 +388,14 @@ x <span class="tok-operator">=</span> x <span class="tok-operator">+</span> <spa
 }
 
 <span class="tok-builtin">assert</span>(value <span class="tok-operator">==</span> <span class="tok-number">1</span>)</code></pre>
+<p>Assigning to an identifier that does not resolve to an existing binding is a runtime error. Leia does not create global variables implicitly with <code>=</code>. Top-level declarations, imports, builtins, enabled standard-library modules, and host-provided globals are all existing bindings for this rule.</p>
+<pre class="language-leia leia-code"><code class="language-leia leia-code">missing <span class="tok-operator">=</span> <span class="tok-number">1</span></code></pre>
+<p>Dynamic script APIs that execute code with a host-provided environment follow the same rule: code may update names that are already present in that environment, but must declare new names with <code>:=</code>.</p>
+<pre class="language-leia leia-code"><code class="language-leia leia-code">script <span class="tok-operator">:=</span> <span class="tok-builtin">require</span>(<span class="tok-string">&quot;script&quot;</span>)
+
+env <span class="tok-operator">:=</span> {count: <span class="tok-number">1</span>}
+<span class="tok-builtin">assert</span>(script.eval(<span class="tok-string">&quot;count = count + 1; return count&quot;</span>, {env: env}) <span class="tok-operator">==</span> <span class="tok-number">2</span>)
+<span class="tok-builtin">assert</span>(env.count <span class="tok-operator">==</span> <span class="tok-number">2</span>)</code></pre>
 <p>Same-block redeclaration is reserved by the v1.0 contract: portable programs must not declare the same identifier twice in one lexical block unless a later spec section explicitly permits a narrower form. The current implementation accepts some same-block redeclarations, including repeated <code>:=</code> and repeated <code>func</code> declarations, but interpreter and VM capture behavior is not part of the stable contract for those programs. Implementations may reject same-block redeclarations in stable mode.</p>
 <h3 id="declarations-and-scope-constants">Constants</h3>
 <pre class="language-ebnf"><code class="language-ebnf">const_decl = &quot;const&quot; identifier ( &quot;=&quot; | &quot;:=&quot; ) expr ;</code></pre>

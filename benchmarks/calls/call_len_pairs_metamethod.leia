@@ -48,9 +48,9 @@ func run(groups, reps) {
 			checksum = (checksum + item.callable(i + b, i % 11) + #item.proxy * 13) % MOD
 			if i % PAIR_EVERY == 0 {
 				iter, state, last := getmetatable(item.proxy).__pairs(item.proxy)
-				_ = iter
-				_ = state
-				_ = last
+				_ := iter
+				_ := state
+				_ := last
 				checksum = (checksum + 252) % MOD
 			}
 		}

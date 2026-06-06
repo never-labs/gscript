@@ -11,8 +11,8 @@ Checks scripts/release_artifacts.sh without changing its implementation.
 
 Default mode runs a dry-run and verifies the planned artifact names and metadata.
 With --build, the script builds into a temporary output directory unless
---output-dir is provided, then verifies SHA256SUMS and runs the built binary
-against tests/smoke/01_basic.leia.
+--output-dir is provided, then verifies SHA256SUMS, runs the built CLI against
+tests/smoke/01_basic.leia, and checks that the LSP binary starts in help mode.
 
 Options:
       --build           Run a real local build after the dry-run check
@@ -144,8 +144,8 @@ verify_checksums() {
     checked=$((checked + 1))
   done < "$sums"
 
-  if [[ "$checked" -ne 2 ]]; then
-    echo "error: expected 2 checksum entries, found $checked" >&2
+  if [[ "$checked" -ne 3 ]]; then
+    echo "error: expected 3 checksum entries, found $checked" >&2
     exit 1
   fi
 }
@@ -171,6 +171,8 @@ fi
 
 artifact_base="leia_${version}_${goos}_${goarch}"
 binary_name="${artifact_base}${exe_ext}"
+lsp_artifact_base="leia-lsp_${version}_${goos}_${goarch}"
+lsp_binary_name="${lsp_artifact_base}${exe_ext}"
 metadata_name="${artifact_base}_metadata.txt"
 
 dry_run_dir="$(mktemp -d "${TMPDIR:-/tmp}/leia-release-artifacts-check-dry-run.XXXXXX")"
@@ -186,10 +188,12 @@ if [[ -e "$dry_run_dir" ]]; then
 fi
 
 require_contains "$dry_run_log" "dry-run: would write $dry_run_dir/$binary_name"
+require_contains "$dry_run_log" "dry-run: would write $dry_run_dir/$lsp_binary_name"
 require_contains "$dry_run_log" "dry-run: would write $dry_run_dir/$metadata_name"
 require_contains "$dry_run_log" "dry-run: would write $dry_run_dir/SHA256SUMS"
 require_contains "$dry_run_log" "metadata:"
 require_contains "$dry_run_log" "artifact=$binary_name"
+require_contains "$dry_run_log" "lsp_artifact=$lsp_binary_name"
 require_contains "$dry_run_log" "module=$expected_module_path"
 require_contains "$dry_run_log" "version=$version"
 require_contains "$dry_run_log" "goos=$goos"
@@ -221,10 +225,12 @@ trap cleanup EXIT
 bash "$release_script" --version "$version" --output-dir "$out_dir"
 
 binary_path="$out_dir/$binary_name"
+lsp_binary_path="$out_dir/$lsp_binary_name"
 metadata_path="$out_dir/$metadata_name"
 checksums_path="$out_dir/SHA256SUMS"
 
 require_file "$binary_path"
+require_file "$lsp_binary_path"
 require_file "$metadata_path"
 require_file "$checksums_path"
 
@@ -232,8 +238,13 @@ if [[ ! -x "$binary_path" ]]; then
   echo "error: built binary is not executable: $binary_path" >&2
   exit 1
 fi
+if [[ ! -x "$lsp_binary_path" ]]; then
+  echo "error: built LSP binary is not executable: $lsp_binary_path" >&2
+  exit 1
+fi
 
 require_contains "$metadata_path" "artifact=$binary_name"
+require_contains "$metadata_path" "lsp_artifact=$lsp_binary_name"
 require_contains "$metadata_path" "module=$expected_module_path"
 require_contains "$metadata_path" "version=$version"
 require_contains "$metadata_path" "goos=$goos"
@@ -241,6 +252,7 @@ require_contains "$metadata_path" "goarch=$goarch"
 
 verify_checksums "$out_dir"
 "$binary_path" "$smoke_script" >/dev/null
+"$lsp_binary_path" --help >/dev/null
 
 echo "release_artifacts_check.sh: build artifacts verified in $out_dir"
 echo "release_artifacts_check.sh: pass"

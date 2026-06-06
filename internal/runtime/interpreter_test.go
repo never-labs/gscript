@@ -696,6 +696,54 @@ func TestUndefinedVariable(t *testing.T) {
 	}
 }
 
+func TestAssignmentToUndefinedVariableErrors(t *testing.T) {
+	for _, src := range []string{
+		`missing = 1`,
+		`if true { hidden = 1 }`,
+		`func f() { y = 2 }; f()`,
+	} {
+		err := runCoreProgramExpectError(t, src)
+		if err == nil {
+			t.Fatalf("source %q: expected undefined assignment error", src)
+		}
+		if !strings.Contains(err.Error(), "undefined variable") {
+			t.Fatalf("source %q: error = %v, want undefined variable", src, err)
+		}
+	}
+}
+
+func TestAssignmentUpdatesDeclaredOuterVariable(t *testing.T) {
+	interp := runCoreProgram(t, `
+		x := 0
+		if true {
+			x = 1
+		}
+		func set_x() {
+			x = 2
+		}
+		set_x()
+	`)
+	if got := interp.GetGlobal("x"); !got.IsInt() || got.Int() != 2 {
+		t.Fatalf("x = %v, want 2", got)
+	}
+}
+
+func TestNamedVarargBindsCollector(t *testing.T) {
+	interp := runCoreProgram(t, `
+		func f(a, rest...) {
+			all := {...}
+			return rest[1], rest[2], all[1], all[2]
+		}
+		a, b, c, d := f(1, 2, 3)
+	`)
+	for name, want := range map[string]int64{"a": 2, "b": 3, "c": 2, "d": 3} {
+		got := interp.GetGlobal(name)
+		if !got.IsInt() || got.Int() != want {
+			t.Fatalf("%s = %v, want %d", name, got, want)
+		}
+	}
+}
+
 func TestTypeErrorArithmetic(t *testing.T) {
 	err := runCoreProgramExpectError(t, `result := "hello" + 1`)
 	if err == nil {

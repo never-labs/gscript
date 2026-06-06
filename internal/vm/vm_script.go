@@ -27,7 +27,7 @@ func (vm *VM) compileScriptChunk(src string, opt runtime.Value, defaultSource st
 	if err != nil {
 		return nil, err
 	}
-	proto, err := compileScriptSource(src, cfg.sourceName)
+	proto, err := vm.compileScriptSource(src, cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -95,21 +95,47 @@ func (vm *VM) checkModuleFileBudget(filename string) error {
 	return nil
 }
 
-func compileScriptSource(src string, sourceName string) (*FuncProto, error) {
+func (vm *VM) compileScriptSource(src string, cfg vmScriptConfig) (*FuncProto, error) {
 	tokens, err := lexer.New(src).Tokenize()
 	if err != nil {
-		return nil, wrapScriptCompileSourceError(err, sourceName)
+		return nil, wrapScriptCompileSourceError(err, cfg.sourceName)
 	}
 	prog, err := parser.New(tokens).Parse()
 	if err != nil {
-		return nil, wrapScriptCompileSourceError(err, sourceName)
+		return nil, wrapScriptCompileSourceError(err, cfg.sourceName)
 	}
-	proto, err := Compile(prog)
+	proto, err := CompileWithGlobals(prog, vm.scriptDeclaredGlobalNames(cfg))
 	if err != nil {
-		return nil, wrapScriptCompileSourceError(err, sourceName)
+		return nil, wrapScriptCompileSourceError(err, cfg.sourceName)
 	}
-	setProtoSource(proto, sourceName)
+	setProtoSource(proto, cfg.sourceName)
 	return proto, nil
+}
+
+func (vm *VM) scriptDeclaredGlobalNames(cfg vmScriptConfig) []string {
+	seen := make(map[string]struct{})
+	if !cfg.sandbox {
+		for name := range vm.globals {
+			seen[name] = struct{}{}
+		}
+	}
+	if cfg.env != nil {
+		k, _, ok := cfg.env.Next(runtime.NilValue())
+		for ok {
+			if k.IsString() {
+				seen[k.Str()] = struct{}{}
+			}
+			k, _, ok = cfg.env.Next(k)
+		}
+	}
+	if len(seen) == 0 {
+		return nil
+	}
+	names := make([]string, 0, len(seen))
+	for name := range seen {
+		names = append(names, name)
+	}
+	return names
 }
 
 func wrapScriptCompileSourceError(err error, sourceName string) error {

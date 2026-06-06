@@ -113,6 +113,7 @@ func (c *compiler) compileDeclareGlobals(s *ast.DeclareStmt) error {
 				return err
 			}
 			for i, name := range s.Names {
+				c.declareGlobal(name)
 				nameK := c.stringConst(name)
 				if s.ReadOnly {
 					c.emitABx(OP_SETGLOBALRO, tempBase+i, nameK, s.P.Line)
@@ -133,6 +134,7 @@ func (c *compiler) compileDeclareGlobals(s *ast.DeclareStmt) error {
 				c.maxReg = c.nextReg
 			}
 			for i, name := range s.Names {
+				c.declareGlobal(name)
 				nameK := c.stringConst(name)
 				if s.ReadOnly {
 					c.emitABx(OP_SETGLOBALRO, tempBase+i, nameK, s.P.Line)
@@ -153,6 +155,7 @@ func (c *compiler) compileDeclareGlobals(s *ast.DeclareStmt) error {
 				c.maxReg = c.nextReg
 			}
 			for i, name := range s.Names {
+				c.declareGlobal(name)
 				nameK := c.stringConst(name)
 				if s.ReadOnly {
 					c.emitABx(OP_SETGLOBALRO, tempBase+i, nameK, s.P.Line)
@@ -171,6 +174,7 @@ func (c *compiler) compileDeclareGlobals(s *ast.DeclareStmt) error {
 	}
 	for i := 0; i < nNames; i++ {
 		reg := tempBase + i
+		c.declareGlobal(s.Names[i])
 		nameK := c.stringConst(s.Names[i])
 		if s.ReadOnly {
 			c.emitABx(OP_SETGLOBALRO, reg, nameK, s.P.Line)
@@ -380,6 +384,9 @@ func (c *compiler) compileAssignTarget(target ast.Expr, valueReg int, line int) 
 			return nil
 		}
 		nameK := c.stringConst(t.Name)
+		if !c.isDeclaredGlobal(t.Name) {
+			return fmt.Errorf("line %d: undefined variable: %s", line, t.Name)
+		}
 		c.emitABx(OP_SETGLOBAL, valueReg, nameK, line)
 		return nil
 

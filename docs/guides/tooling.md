@@ -163,7 +163,7 @@ collect environment, docs/test status, and optional benchmark summaries.
 ```bash
 bash scripts/production_check.sh --quick
 go test ./tests -run 'TestFeatureMatrix|TestReleaseMatrix' -count=1
-bash scripts/release_artifacts_check.sh
+bash scripts/release_artifacts_check.sh --build
 ```
 
 The release process is documented in [Release Process](../release/index.md).

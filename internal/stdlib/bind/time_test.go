@@ -67,7 +67,7 @@ case <-deadline:
 }
 
 ctx, cancel := context.withTimeout(0.001)
-_ = cancel
+_ := cancel
 t0 := time.now()
 ok, err := time.sleep(ctx, 0.05)
 elapsed := time.since(t0)

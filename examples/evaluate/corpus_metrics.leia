@@ -1,0 +1,32 @@
+// corpus_metrics.leia - Evaluate harness corpus, subcase, metric, skip, and budget demo.
+
+func classify_support(text) {
+    lower := string.lower(text)
+    if string.find(lower, "refund", 1, true) != nil || string.find(lower, "damaged", 1, true) != nil {
+        return "refund"
+    }
+    if string.find(lower, "tracking", 1, true) != nil || string.find(lower, "delivery", 1, true) != nil {
+        return "shipping"
+    }
+    return "other"
+}
+
+evaluate "support classifier corpus metrics" {
+    cases := eval.load_jsonl("support_cases.jsonl")
+    eval.fail_if(#cases == 0, "support corpus is empty")
+
+    for _, row := range ipairs(cases) {
+        eval.case(row.id, func() {
+            if eval.skip_if(row.skip, "fixture marked work-in-progress") {
+                return
+            }
+
+            predicted := classify_support(row.input)
+            eval.metric("correct", predicted == row.expected)
+            eval.metric("input_chars", #row.input)
+            eval.metric("label", predicted)
+            eval.budget({turns: 0, tokens: 0})
+            assert(predicted == row.expected)
+        })
+    }
+}

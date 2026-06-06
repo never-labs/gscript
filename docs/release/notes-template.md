@@ -55,7 +55,7 @@ go test ./tests -run 'TestFeatureMatrix|TestReleaseMatrix' -count=1
 bash scripts/docs_check.sh
 bash scripts/performance_gate.sh --full
 bash scripts/release_distribution_check.sh
-bash scripts/release_artifacts_check.sh
+bash scripts/release_artifacts_check.sh --build
 ```
 
 ## Known Issues

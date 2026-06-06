@@ -27,7 +27,7 @@ assert(iInner == 1000)
 assert(iOuter == 10)
 if iOuter != 10 {
     iBranch := 20
-    _ = iBranch
+    _ := iBranch
 } else {
     iBranch := 30
     assert(iBranch == 30)
@@ -38,7 +38,7 @@ func f(a) {
     x := 3
     b := a
     c, d := a, b
-    _ = c
+    _ := c
     if d == b {
         x2 := "q"
         x2 = b
@@ -50,7 +50,7 @@ func f(a) {
 }
 
 b := 10
-_ = b
+_ := b
 a := nil
 for {
     b2 := nil

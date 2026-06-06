@@ -25,11 +25,18 @@ func TestDocGenerateWritesReferenceFiles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	dialectDoc, err := os.ReadFile(filepath.Join(dir, "dialects.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
 	if !bytes.Contains(cliDoc, []byte("`run`")) || !bytes.Contains(cliDoc, []byte("`doc`")) {
 		t.Fatalf("cli.md = %q, want command reference", string(cliDoc))
 	}
 	if !bytes.Contains(stdlibDoc, []byte("`json`")) || !bytes.Contains(stdlibDoc, []byte("JSON encode/decode")) || !bytes.Contains(stdlibDoc, []byte("Safe default")) {
 		t.Fatalf("stdlib.md = %q, want stdlib inventory", string(stdlibDoc))
+	}
+	if !bytes.Contains(dialectDoc, []byte("`sh`")) || !bytes.Contains(dialectDoc, []byte("`agent`")) || !bytes.Contains(dialectDoc, []byte("Built-In Dialects")) {
+		t.Fatalf("dialects.md = %q, want dialect reference", string(dialectDoc))
 	}
 }
 
@@ -42,6 +49,7 @@ func TestDocGenerateWritesSiteLayout(t *testing.T) {
 	}
 	cliPath := filepath.Join(dir, "reference", "cli", "index.md")
 	stdlibPath := filepath.Join(dir, "reference", "stdlib", "index.md")
+	dialectPath := filepath.Join(dir, "reference", "dialects", "index.md")
 	if _, err := os.Stat(cliPath); err != nil {
 		t.Fatalf("missing site cli doc: %v", err)
 	}
@@ -51,6 +59,13 @@ func TestDocGenerateWritesSiteLayout(t *testing.T) {
 	}
 	if !bytes.Contains(stdlibDoc, []byte("Generated from `internal/stdlib/catalog`")) {
 		t.Fatalf("stdlib site doc = %q, want generated stdlib inventory", string(stdlibDoc))
+	}
+	dialectDoc, err := os.ReadFile(dialectPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(dialectDoc, []byte("Generated from the current `leia` binary dialect registry")) {
+		t.Fatalf("dialect site doc = %q, want generated dialect reference", string(dialectDoc))
 	}
 }
 
@@ -67,6 +82,10 @@ func TestCheckedInReferenceDocsStayGenerated(t *testing.T) {
 		{
 			path: filepath.Join("docs", "reference", "stdlib", "index.md"),
 			want: generateStdlibInventoryMarkdown(),
+		},
+		{
+			path: filepath.Join("docs", "reference", "dialects", "index.md"),
+			want: generateDialectReferenceMarkdown(),
 		},
 	} {
 		got, err := os.ReadFile(filepath.Join(root, item.path))
@@ -108,6 +127,17 @@ func TestDocGenerateWritesJSONReferenceFiles(t *testing.T) {
 	if stdlibRef.SchemaVersion != 1 || len(stdlibRef.Layers) == 0 || len(stdlibRef.Layers[0].Modules) == 0 {
 		t.Fatalf("stdlib json = %#v, want versioned stdlib inventory", stdlibRef)
 	}
+	dialectDoc, err := os.ReadFile(filepath.Join(dir, "reference", "dialects", "index.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var dialectRef docDialectReference
+	if err := json.Unmarshal(dialectDoc, &dialectRef); err != nil {
+		t.Fatalf("decode dialect json: %v", err)
+	}
+	if dialectRef.SchemaVersion != 1 || len(dialectRef.Dialects) == 0 {
+		t.Fatalf("dialect json = %#v, want versioned dialect reference", dialectRef)
+	}
 }
 
 func TestDocGenerateWritesCombinedJSONToStdout(t *testing.T) {
@@ -120,7 +150,7 @@ func TestDocGenerateWritesCombinedJSONToStdout(t *testing.T) {
 	if err := json.Unmarshal(stdout.Bytes(), &bundle); err != nil {
 		t.Fatalf("decode combined json: %v", err)
 	}
-	if bundle.SchemaVersion != 1 || len(bundle.CLI.Commands) == 0 || len(bundle.Stdlib.Layers) == 0 {
+	if bundle.SchemaVersion != 1 || len(bundle.CLI.Commands) == 0 || len(bundle.Stdlib.Layers) == 0 || len(bundle.Dialects.Dialects) == 0 {
 		t.Fatalf("bundle = %#v, want CLI and stdlib references", bundle)
 	}
 }

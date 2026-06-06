@@ -56,10 +56,12 @@ for target in darwin/amd64 darwin/arm64 linux/amd64 linux/arm64 windows/amd64 wi
     windows)
       expected_asset="asset=leia_v0.0.0_${goos}_${goarch}.zip"
       expected_path="install_path=/tmp/leia-bin/leia.exe"
+      expected_lsp_path="lsp_install_path=/tmp/leia-bin/leia-lsp.exe"
       ;;
     *)
       expected_asset="asset=leia_v0.0.0_${goos}_${goarch}.tar.gz"
       expected_path="install_path=/tmp/leia-bin/leia"
+      expected_lsp_path="lsp_install_path=/tmp/leia-bin/leia-lsp"
       ;;
   esac
   if ! grep -Fq -- "$expected_asset" <<<"$output"; then
@@ -69,6 +71,11 @@ for target in darwin/amd64 darwin/arm64 linux/amd64 linux/arm64 windows/amd64 wi
   fi
   if ! grep -Fq -- "$expected_path" <<<"$output"; then
     echo "error: install dry-run for $target did not plan $expected_path" >&2
+    echo "$output" >&2
+    exit 1
+  fi
+  if ! grep -Fq -- "$expected_lsp_path" <<<"$output"; then
+    echo "error: install dry-run for $target did not plan $expected_lsp_path" >&2
     echo "$output" >&2
     exit 1
   fi

@@ -1,5 +1,5 @@
 ctx, cancel := context.withTimeout(0.005)
-_ = cancel
+_ := cancel
 
 t0 := time.now()
 ok, err := time.sleep(ctx, 0.05)

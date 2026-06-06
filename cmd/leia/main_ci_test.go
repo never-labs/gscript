@@ -49,7 +49,7 @@ func TestCICommandReleaseProfileIncludesDistributionCheck(t *testing.T) {
 		"bash scripts/performance_gate.sh --full",
 		"bash scripts/production_check.sh --full",
 		"bash scripts/release_distribution_check.sh",
-		"bash scripts/release_artifacts_check.sh",
+		"bash scripts/release_artifacts_check.sh --build",
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("stdout = %q, want %q", out, want)
@@ -113,7 +113,7 @@ func TestCICommandRunsReleaseDistributionCheck(t *testing.T) {
 		"bash scripts/performance_gate.sh --full",
 		"bash scripts/production_check.sh --full",
 		"bash scripts/release_distribution_check.sh",
-		"bash scripts/release_artifacts_check.sh",
+		"bash scripts/release_artifacts_check.sh --build",
 	} {
 		if !containsCommand(commands, want) {
 			t.Fatalf("commands = %#v, want %q", commands, want)

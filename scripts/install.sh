@@ -5,7 +5,7 @@ usage() {
   cat <<'USAGE'
 Usage: scripts/install.sh [--version VERSION] [--bin-dir DIR] [--repo OWNER/REPO] [--dry-run]
 
-Install the Leia CLI from GitHub release artifacts.
+Install the Leia CLI and LSP from GitHub release artifacts.
 
 Options:
       --version VERSION  Release tag to install, for example v0.1.0.
@@ -147,9 +147,11 @@ fi
 
 archive_ext="tar.gz"
 binary_name="leia"
+lsp_binary_name="leia-lsp"
 if [[ "$goos" == "windows" ]]; then
   archive_ext="zip"
   binary_name="leia.exe"
+  lsp_binary_name="leia-lsp.exe"
 fi
 
 asset="leia_${version}_${goos}_${goarch}.${archive_ext}"
@@ -157,6 +159,7 @@ base_url="https://github.com/${repo}/releases/download/${version}"
 asset_url="${base_url}/${asset}"
 checksums_url="${base_url}/SHA256SUMS"
 install_path="${bin_dir}/${binary_name}"
+lsp_install_path="${bin_dir}/${lsp_binary_name}"
 
 if [[ "$dry_run" == "true" ]]; then
   echo "version=$version"
@@ -166,6 +169,7 @@ if [[ "$dry_run" == "true" ]]; then
   echo "url=$asset_url"
   echo "checksums=$checksums_url"
   echo "install_path=$install_path"
+  echo "lsp_install_path=$lsp_install_path"
   exit 0
 fi
 
@@ -216,7 +220,13 @@ if [[ ! -f "$extract_dir/$binary_name" ]]; then
   echo "error: archive did not contain $binary_name" >&2
   exit 1
 fi
+if [[ ! -f "$extract_dir/$lsp_binary_name" ]]; then
+  echo "error: archive did not contain $lsp_binary_name" >&2
+  exit 1
+fi
 
 mkdir -p "$bin_dir"
 install -m 0755 "$extract_dir/$binary_name" "$install_path"
+install -m 0755 "$extract_dir/$lsp_binary_name" "$lsp_install_path"
 echo "installed $install_path"
+echo "installed $lsp_install_path"

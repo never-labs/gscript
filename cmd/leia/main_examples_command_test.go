@@ -440,6 +440,7 @@ func TestExamplesCommandChecksDeterministicSpecialRunners(t *testing.T) {
 		"repo-evaluate-basic_assert",
 		"repo-evaluate-llm_replay",
 		"repo-evaluate-agent_replay",
+		"repo-evaluate-corpus_metrics",
 		"repo-evaluate-multiturn_replay",
 		"repo-evaluate-project_agent_regression",
 		"repo-ai-coding_agent_replay",
@@ -460,6 +461,7 @@ func TestExamplesCommandChecksDeterministicSpecialRunners(t *testing.T) {
 		"ok      repo-evaluate-basic_assert",
 		"ok      repo-evaluate-llm_replay",
 		"ok      repo-evaluate-agent_replay",
+		"ok      repo-evaluate-corpus_metrics",
 		"ok      repo-evaluate-multiturn_replay",
 		"ok      repo-evaluate-project_agent_regression",
 		"ok      repo-ai-coding_agent_replay",
@@ -471,7 +473,7 @@ func TestExamplesCommandChecksDeterministicSpecialRunners(t *testing.T) {
 		"ok      repo-tooling-release_gate_project-main",
 		"ok      repo-performance-execution_modes_matrix",
 		"ok      repo-ui-package_managed-main",
-		"examples: 14 ok, 0 skipped, 0 failed",
+		"examples: 15 ok, 0 skipped, 0 failed",
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("examples check missing %q\n%s", want, out)

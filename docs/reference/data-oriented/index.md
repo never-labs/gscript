@@ -76,8 +76,12 @@ columns when feeding `q.query` or SoA kernels. Spreadsheet dialects complete the
 round trip:
 
 ```leia
-xlsx`write report.xlsx ${total.rows}`
-roundtrip := excel`report.xlsx`
+workbook := dialect.eval("xlsx", total.rows, {
+    mode: "encode"
+    headers: {"channel", "amount"}
+    sheet: "summary"
+})
+roundtrip := dialect.eval("excel", workbook, {headers: true})
 ```
 
 The runnable project `examples/data/db_q_frame_project` exercises SQLite
