@@ -320,6 +320,123 @@ require github.com/acme/toolkit v1.2.3
 	}
 }
 
+func TestModPackageWorkflowCoversDocsRuntimeModes(t *testing.T) {
+	dir := t.TempDir()
+	cache := filepath.Join(dir, "cache")
+	t.Setenv("LEIA_CACHE", cache)
+	if err := os.WriteFile(filepath.Join(dir, "leia.mod"), []byte(`module example.com/demo
+leia 0.1
+capability app.main
+require github.com/acme/toolkit v1.2.3
+`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	mainPath := filepath.Join(dir, "main.leia")
+	if err := os.WriteFile(mainPath, []byte(`import "github.com/acme/toolkit/pkg/util" as util
+assert(util.value == 42)
+`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	archive := testCommandGitHubZipFiles(t, map[string]string{
+		"toolkit-1.2.3/leia.mod":      "module github.com/acme/toolkit\nleia 0.1\ncapability net.client\n",
+		"toolkit-1.2.3/pkg/util.leia": "return { value: 42 }\n",
+	})
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/acme/toolkit/archive/refs/tags/v1.2.3.zip" {
+			t.Fatalf("download path = %q", r.URL.Path)
+		}
+		_, _ = w.Write(archive)
+	}))
+	defer server.Close()
+
+	var stdout, stderr bytes.Buffer
+	code := runModCommand([]string{"download", "--json", "--github-base", server.URL, dir}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("mod download code = %d, stderr = %q stdout = %q", code, stderr.String(), stdout.String())
+	}
+	sumPath := filepath.Join(dir, "leia.sum")
+	if data, err := os.ReadFile(sumPath); err != nil || !strings.Contains(string(data), "module github.com/acme/toolkit v1.2.3 github.com/acme/toolkit@v1.2.3 h1:") {
+		t.Fatalf("leia.sum = %q, %v; want downloaded module sum", string(data), err)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = runModCommand([]string{"verify", "--json", dir}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("mod verify after download code = %d, stderr = %q stdout = %q", code, stderr.String(), stdout.String())
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = runModCommand([]string{"capability", "--json", dir}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("mod capability code = %d, stderr = %q stdout = %q", code, stderr.String(), stdout.String())
+	}
+	var capability modCapabilityReport
+	if err := json.Unmarshal(stdout.Bytes(), &capability); err != nil {
+		t.Fatalf("stdout is not JSON capability report: %v; stdout = %q", err, stdout.String())
+	}
+	if !capability.OK || !capability.Matrix["example.com/demo"]["app.main"] || !capability.Matrix["github.com/acme/toolkit"]["net.client"] {
+		t.Fatalf("capability report = %+v, want root and downloaded dependency capabilities", capability)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = runRunCommand([]string{"--vm", "--mod=readonly", mainPath}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("run --mod=readonly code = %d, stderr = %q stdout = %q", code, stderr.String(), stdout.String())
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = runModCommand([]string{"vendor", "--json", dir}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("mod vendor code = %d, stderr = %q stdout = %q", code, stderr.String(), stdout.String())
+	}
+	vendoredUtil := filepath.Join(dir, "vendor", "github.com", "acme", "toolkit@v1.2.3", "pkg", "util.leia")
+	if _, err := os.Stat(vendoredUtil); err != nil {
+		t.Fatalf("vendored module file missing: %v", err)
+	}
+
+	cachedUtil := filepath.Join(cache, "extract", "github.com", "acme", "toolkit@v1.2.3", "pkg", "util.leia")
+	if err := os.WriteFile(cachedUtil, []byte("return { value: 0 }\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	stdout.Reset()
+	stderr.Reset()
+	code = runRunCommand([]string{"--vm", "--mod=vendor", mainPath}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("run --mod=vendor code = %d, stderr = %q stdout = %q", code, stderr.String(), stdout.String())
+	}
+
+	if err := os.WriteFile(cachedUtil, []byte("return { value: 42 }\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(vendoredUtil, []byte("return { value: 43 }\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	stdout.Reset()
+	stderr.Reset()
+	code = runModCommand([]string{"verify", "--json", dir}, &stdout, &stderr)
+	if code != 1 {
+		t.Fatalf("mod verify after vendored mutation code = %d, want 1; stderr = %q stdout = %q", code, stderr.String(), stdout.String())
+	}
+	var verify modVerifyReport
+	if err := json.Unmarshal(stdout.Bytes(), &verify); err != nil {
+		t.Fatalf("stdout is not JSON verify report: %v; stdout = %q", err, stdout.String())
+	}
+	found := false
+	for _, diag := range verify.Diagnostics {
+		if diag.Code == "LEIA9109" && strings.Contains(diag.Message, "checksum mismatch") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("verify diagnostics = %+v, want checksum mismatch for vendored module", verify.Diagnostics)
+	}
+}
+
 func TestModVendorCopiesCache(t *testing.T) {
 	dir := t.TempDir()
 	cache := filepath.Join(dir, "cache")
@@ -541,14 +658,22 @@ _ = dep
 func testCommandGitHubZip(t *testing.T, name, data string) []byte {
 	t.Helper()
 
+	return testCommandGitHubZipFiles(t, map[string]string{name: data})
+}
+
+func testCommandGitHubZipFiles(t *testing.T, files map[string]string) []byte {
+	t.Helper()
+
 	var buf bytes.Buffer
 	zw := zip.NewWriter(&buf)
-	w, err := zw.Create(name)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := fmt.Fprint(w, data); err != nil {
-		t.Fatal(err)
+	for name, data := range files {
+		w, err := zw.Create(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := fmt.Fprint(w, data); err != nil {
+			t.Fatal(err)
+		}
 	}
 	if err := zw.Close(); err != nil {
 		t.Fatal(err)

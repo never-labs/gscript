@@ -9,6 +9,7 @@ cd "$ROOT"
 MODE="full"
 LIST_ONLY=0
 OUT_DIR=""
+RELEASE_PROFILE=0
 ARTIFACT_PLAN=""
 ARTIFACT_COMMAND_LOG=""
 SMOKE_SCRIPT="tests/smoke/01_basic.leia"
@@ -16,7 +17,7 @@ EXPECTED_MODULE_PATH="github.com/never-labs/leia"
 
 usage() {
     cat <<'EOF'
-Usage: scripts/production_check.sh [--quick] [--full] [--list] [--out-dir DIR] [--help]
+Usage: scripts/production_check.sh [--quick] [--full] [--release-profile] [--list] [--out-dir DIR] [--help]
 
 Runs the release-gate commands from docs/release/index.md.
 
@@ -25,6 +26,11 @@ Options:
             packages, feature matrix, integration, release matrix metadata,
             stdlib contract, and representative stable hot paths.
   --full    Run the available Required Commands subset. This is the default.
+  --release-profile
+            Treat release-only tool checks as required: editor tree-sitter
+            corpus, distribution configuration, and artifact dry-run evidence.
+            This avoids silent skips for local release validation while keeping
+            ordinary contributor machines able to run --full.
   --list    Print the commands that would run without executing them.
   --out-dir DIR
             Write the resolved plan and command logs to DIR. Defaults to no
@@ -40,6 +46,10 @@ while [ "$#" -gt 0 ]; do
             ;;
         --full)
             MODE="full"
+            ;;
+        --release-profile)
+            MODE="full"
+            RELEASE_PROFILE=1
             ;;
         --list)
             LIST_ONLY=1
@@ -116,6 +126,7 @@ write_plan_artifact() {
     {
         echo "production_check.sh plan"
         echo "mode: $MODE"
+        echo "release_profile: $RELEASE_PROFILE"
         echo "list_only: $LIST_ONLY"
         echo
         echo "Runnable checks:"
@@ -208,6 +219,10 @@ add_editor_assets() {
         add_skip "Editor Assets" "missing scripts/editor_check.sh"
         return
     fi
+    if [ "$RELEASE_PROFILE" -eq 1 ]; then
+        add_run "Editor Assets" "bash scripts/editor_check.sh --require-tree-sitter"
+        return
+    fi
     if ! have_cmd python3; then
         add_skip "Editor Assets" "missing python3"
         return
@@ -217,6 +232,34 @@ add_editor_assets() {
         return
     fi
     add_run "Editor Assets" "bash scripts/editor_check.sh"
+}
+
+add_release_distribution_gate() {
+    if [ ! -f scripts/release_distribution_check.sh ]; then
+        add_skip "Release Distribution" "missing scripts/release_distribution_check.sh"
+        return
+    fi
+    if [ "$RELEASE_PROFILE" -eq 1 ]; then
+        add_run "Release Distribution" "bash scripts/release_distribution_check.sh --require-goreleaser"
+    else
+        add_run "Release Distribution" "bash scripts/release_distribution_check.sh"
+    fi
+}
+
+add_release_artifacts_gate() {
+    if [ ! -f scripts/release_artifacts_check.sh ]; then
+        add_skip "Release Artifacts" "missing scripts/release_artifacts_check.sh"
+        return
+    fi
+    if [ "$RELEASE_PROFILE" -eq 1 ]; then
+        add_run "Release Artifacts" "bash scripts/release_artifacts_check.sh"
+        return
+    fi
+    if ! have_cmd go; then
+        add_skip "Release Artifacts" "missing go"
+        return
+    fi
+    add_run "Release Artifacts" "bash scripts/release_artifacts_check.sh"
 }
 
 add_manifest_coverage() {
@@ -365,6 +408,10 @@ build_full_plan() {
     add_performance_gate
     add_release_smoke
     add_cli_experience_gate
+    if [ "$RELEASE_PROFILE" -eq 1 ]; then
+        add_release_distribution_gate
+        add_release_artifacts_gate
+    fi
 }
 
 if [ "$MODE" = "quick" ]; then
@@ -381,6 +428,9 @@ init_artifacts
 write_plan_artifact
 
 echo "=== production_check.sh ($MODE) ==="
+if [ "$RELEASE_PROFILE" -eq 1 ]; then
+    echo "Release profile: critical release tool skips are treated as failures."
+fi
 if [ -n "$OUT_DIR" ]; then
     echo "Artifact output: $OUT_DIR"
 fi

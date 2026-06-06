@@ -50,11 +50,11 @@ bash scripts/performance_gate.sh --full
 
 ```bash
 go run ./cmd/leia ci release --list
-bash scripts/production_check.sh --full
+bash scripts/production_check.sh --full --release-profile
 go test ./tests -run 'TestFeatureMatrix|TestReleaseMatrix' -count=1
 bash scripts/docs_check.sh
 bash scripts/performance_gate.sh --full
-bash scripts/release_distribution_check.sh
+bash scripts/release_distribution_check.sh --require-goreleaser
 bash scripts/release_artifacts_check.sh --build
 ```
 

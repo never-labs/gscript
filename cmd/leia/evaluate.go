@@ -36,6 +36,7 @@ func runEvaluateCommand(args []string, outw, errw io.Writer) int {
 	updateGolden := fs.String("update-golden", "", "rewrite an LLM replay JSON file from a live evaluation run")
 	output := fs.String("output", "", "write the evaluate report to this file instead of stdout")
 	reportPathFlag := fs.String("report", "", "alias for --output")
+	args = normalizeEvaluateCompareArgs(args)
 	if code, done := parseCLIFlags(fs, args); done {
 		return code
 	}
@@ -121,6 +122,50 @@ func coalesceEvaluatePathFlag(shortName, shortValue, longName, longValue string)
 		return shortValue, nil
 	}
 	return "", fmt.Errorf("--%s and --%s specify different files", shortName, longName)
+}
+
+func normalizeEvaluateCompareArgs(args []string) []string {
+	hasCompare := false
+	for _, arg := range args {
+		if arg == "--compare" || arg == "-compare" {
+			hasCompare = true
+			break
+		}
+	}
+	if !hasCompare {
+		return args
+	}
+	flags := make([]string, 0, len(args))
+	positionals := make([]string, 0, len(args))
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		if arg == "--" {
+			positionals = append(positionals, args[i+1:]...)
+			break
+		}
+		if strings.HasPrefix(arg, "-") && arg != "-" {
+			flags = append(flags, arg)
+			name := strings.TrimLeft(arg, "-")
+			if before, _, ok := strings.Cut(name, "="); ok {
+				name = before
+			} else if evaluateFlagTakesValue(name) && i+1 < len(args) {
+				i++
+				flags = append(flags, args[i])
+			}
+			continue
+		}
+		positionals = append(positionals, arg)
+	}
+	return append(flags, positionals...)
+}
+
+func evaluateFlagTakesValue(name string) bool {
+	switch name {
+	case "format", "filter", "baseline", "parallel", "regression-threshold", "record", "replay", "llm-record", "llm-replay", "update-golden", "output", "report":
+		return true
+	default:
+		return false
+	}
 }
 
 func loadEvaluateReport(path string) (evaluate.Report, error) {

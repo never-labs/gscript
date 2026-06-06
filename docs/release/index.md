@@ -8,11 +8,11 @@ Run at least:
 
 ```bash
 go run ./cmd/leia ci release --list
-bash scripts/production_check.sh --full
+bash scripts/production_check.sh --full --release-profile
 go test ./tests -run 'TestFeatureMatrix|TestReleaseMatrix' -count=1
 bash scripts/docs_check.sh
 bash scripts/performance_gate.sh --full
-bash scripts/release_distribution_check.sh
+bash scripts/release_distribution_check.sh --require-goreleaser
 bash scripts/release_artifacts_check.sh --build
 ```
 
@@ -45,7 +45,7 @@ presence. The local check validates GoReleaser metadata and the install script
 dry-run matrix even when GitHub workflow files are intentionally absent:
 
 ```bash
-bash scripts/release_distribution_check.sh
+bash scripts/release_distribution_check.sh --require-goreleaser
 bash scripts/install.sh --version v0.1.0 --os darwin --arch arm64 --dry-run
 ```
 

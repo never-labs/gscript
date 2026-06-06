@@ -290,7 +290,7 @@ func TestReadmeToolingCommandsMapToCLI(t *testing.T) {
 			if code := runCICommand(args[1:], &stdout, &stderr); code != 0 {
 				t.Fatalf("README ci command failed: code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
 			}
-			for _, want := range []string{"bash scripts/performance_gate.sh --full", "bash scripts/release_distribution_check.sh", "bash scripts/release_artifacts_check.sh --build"} {
+			for _, want := range []string{"bash scripts/performance_gate.sh --full", "bash scripts/production_check.sh --full --release-profile", "bash scripts/release_distribution_check.sh --require-goreleaser", "bash scripts/release_artifacts_check.sh --build"} {
 				if !strings.Contains(stdout.String(), want) {
 					t.Fatalf("README ci stdout = %q, want %q", stdout.String(), want)
 				}

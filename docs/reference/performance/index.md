@@ -104,7 +104,7 @@ unavailable or the selected workload has no meaningful Lua reference, and record
 that limitation in release evidence.
 
 Production and release plans keep this bottom line active through
-`bash scripts/production_check.sh --full`,
+`bash scripts/production_check.sh --full --release-profile`,
 `go run ./cmd/leia ci release --list`, and
 `bash scripts/performance_gate.sh --full`.
 

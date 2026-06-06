@@ -270,10 +270,10 @@ func TestReleaseMatrixSpecGateCommandsStaySynchronized(t *testing.T) {
 	specExamplesCmd := "go test ./tests -run 'TestSpecRunnableExamples|TestSpecLeiaCodeFencesAreExecutableOrExplicitlyNonExecutable' -count=1"
 	docsCheckCmd := "bash scripts/docs_check.sh"
 	ciReleaseListCmd := "go run ./cmd/leia ci release --list"
-	productionFullCmd := "bash scripts/production_check.sh --full"
+	productionFullCmd := "bash scripts/production_check.sh --full --release-profile"
 	performanceSmokeCmd := "bash scripts/performance_gate.sh --smoke"
 	fullPerfGateCmd := "bash scripts/performance_gate.sh --full"
-	releaseDistributionCmd := "bash scripts/release_distribution_check.sh"
+	releaseDistributionCmd := "bash scripts/release_distribution_check.sh --require-goreleaser"
 	releaseArtifactsCmd := "bash scripts/release_artifacts_check.sh --build"
 
 	for _, item := range []struct {
@@ -349,7 +349,7 @@ func TestReleaseMatrixSpecGateCommandsStaySynchronized(t *testing.T) {
 	if strings.Contains(productionOut, "--no-luajit") {
 		t.Fatalf("production_check.sh --quick --list must not weaken performance gates with --no-luajit; got:\n%s", productionOut)
 	}
-	fullOut := runCommand(t, root, 30*time.Second, "bash", "scripts/production_check.sh", "--full", "--list")
+	fullOut := runCommand(t, root, 30*time.Second, "bash", "scripts/production_check.sh", "--full", "--release-profile", "--list")
 	if !strings.Contains(fullOut, fullPerfGateCmd) {
 		t.Fatalf("production_check.sh --full --list must keep full LuaJIT performance gate %q; got:\n%s", fullPerfGateCmd, fullOut)
 	}
@@ -680,8 +680,8 @@ func TestReleaseMatrixCIProfilesKeepExampleImportGuards(t *testing.T) {
 	releaseOut := runCommand(t, root, 30*time.Second, "go", "run", "./cmd/leia", "ci", "release", "--list")
 	for _, want := range []string{
 		"bash scripts/performance_gate.sh --full",
-		"bash scripts/production_check.sh --full",
-		"bash scripts/release_distribution_check.sh",
+		"bash scripts/production_check.sh --full --release-profile",
+		"bash scripts/release_distribution_check.sh --require-goreleaser",
 		"bash scripts/release_artifacts_check.sh --build",
 	} {
 		if !strings.Contains(releaseOut, want) {

@@ -307,16 +307,18 @@ def require_snippets(path: Path, snippets: list[str]) -> None:
 
 def check_release_gate_docs() -> None:
     release_matrix_cmd = "go test ./tests -run 'TestFeatureMatrix|TestReleaseMatrix' -count=1"
+    release_profile_cmd = "bash scripts/production_check.sh --full --release-profile"
+    release_distribution_cmd = "bash scripts/release_distribution_check.sh --require-goreleaser"
     spec_examples_cmd = "go test ./tests -run 'TestSpecRunnableExamples|TestSpecLeiaCodeFencesAreExecutableOrExplicitlyNonExecutable' -count=1"
     require_snippets(
         root / "docs" / "release" / "index.md",
         [
             "## Machine-Checkable Release Evidence",
             "go run ./cmd/leia ci release --list",
-            "bash scripts/production_check.sh --full",
+            release_profile_cmd,
             release_matrix_cmd,
             "bash scripts/performance_gate.sh --full",
-            "bash scripts/release_distribution_check.sh",
+            release_distribution_cmd,
             "bash scripts/release_artifacts_check.sh --build",
             "tests/feature_matrix.json",
             "docs/spec/index.md",
@@ -334,11 +336,11 @@ def check_release_gate_docs() -> None:
         [
             "## Machine-Checkable Release Evidence",
             "go run ./cmd/leia ci release --list",
-            "bash scripts/production_check.sh --full",
+            release_profile_cmd,
             release_matrix_cmd,
             "scripts/docs_check.sh",
             "bash scripts/performance_gate.sh --full",
-            "bash scripts/release_distribution_check.sh",
+            release_distribution_cmd,
             "bash scripts/release_artifacts_check.sh --build",
             "tests/language/MANIFEST.md",
             "tests/language/KNOWN_FAILURES.md",

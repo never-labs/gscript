@@ -1,3 +1,4 @@
+import os
 import subprocess
 import sys
 import unittest
@@ -82,6 +83,58 @@ class ScriptEntrypointConsistencyTest(unittest.TestCase):
         self.assertNotIn('add_go_test "Feature Matrix"', full_plan)
         self.assertNotIn('add_go_test "Language Conformance Surface"', full_plan)
         self.assertNotIn('add_go_test "Release Matrix Metadata"', full_plan)
+
+    def test_release_profile_requires_release_only_tool_smokes(self):
+        production = (ROOT / "scripts" / "production_check.sh").read_text()
+        distribution = (ROOT / "scripts" / "release_distribution_check.sh").read_text()
+        ci = (ROOT / "cmd" / "leia" / "ci.go").read_text()
+
+        self.assertIn("--release-profile", production)
+        self.assertIn("bash scripts/editor_check.sh --require-tree-sitter", production)
+        self.assertIn("bash scripts/release_distribution_check.sh --require-goreleaser", production)
+        self.assertIn("bash scripts/release_artifacts_check.sh", production)
+        self.assertIn("--require-goreleaser", distribution)
+        self.assertIn("goreleaser CLI is required for release distribution profile", distribution)
+        self.assertIn('"--full", "--release-profile"', ci)
+        self.assertIn('"--require-goreleaser"', ci)
+
+    def test_production_release_profile_list_includes_required_tool_flags(self):
+        proc = subprocess.run(
+            ["bash", "scripts/production_check.sh", "--full", "--release-profile", "--list"],
+            cwd=ROOT,
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+        )
+
+        self.assertIn("Release profile: critical release tool skips are treated as failures.", proc.stdout)
+        self.assertIn("bash scripts/editor_check.sh --require-tree-sitter", proc.stdout)
+        self.assertIn("bash scripts/release_distribution_check.sh --require-goreleaser", proc.stdout)
+        self.assertIn("bash scripts/release_artifacts_check.sh", proc.stdout)
+
+    def test_release_distribution_require_goreleaser_fails_without_cli(self):
+        env = os.environ.copy()
+        env["PATH"] = "/usr/bin:/bin"
+        if subprocess.run(
+            ["bash", "-lc", "command -v goreleaser >/dev/null 2>&1"],
+            env=env,
+            check=False,
+        ).returncode == 0:
+            self.skipTest("goreleaser is available on the restricted PATH")
+
+        proc = subprocess.run(
+            ["bash", "scripts/release_distribution_check.sh", "--require-goreleaser"],
+            cwd=ROOT,
+            env=env,
+            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+        )
+
+        self.assertEqual(proc.returncode, 1, proc.stdout)
+        self.assertIn("goreleaser CLI is required for release distribution profile", proc.stdout)
 
     def test_scripts_have_valid_type_specific_syntax(self):
         scripts = sorted(path for path in (ROOT / "scripts").iterdir() if path.is_file())

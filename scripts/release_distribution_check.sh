@@ -3,6 +3,43 @@ set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 repo_root="$(cd "$script_dir/.." && pwd -P)"
+require_goreleaser="false"
+require_workflows="false"
+
+usage() {
+  cat <<'USAGE'
+Usage: scripts/release_distribution_check.sh [--require-goreleaser] [--require-workflows] [--help]
+
+Checks release distribution configuration and install-script planning.
+
+Options:
+  --require-goreleaser  Fail if the goreleaser CLI is not available locally
+  --require-workflows   Fail if hosted release/distribution workflows are absent
+  -h, --help            Show this help
+USAGE
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --require-goreleaser)
+      require_goreleaser="true"
+      shift
+      ;;
+    --require-workflows)
+      require_workflows="true"
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "error: unknown argument: $1" >&2
+      usage >&2
+      exit 2
+      ;;
+  esac
+done
 
 cd "$repo_root"
 
@@ -29,6 +66,9 @@ optional_workflow() {
   local file="$1"
   if [[ -f "$file" ]]; then
     echo "release_distribution_check.sh: found $file"
+  elif [[ "$require_workflows" == "true" ]]; then
+    echo "error: required hosted workflow not found: $file" >&2
+    exit 1
   else
     echo "release_distribution_check.sh: $file not present; skipping hosted workflow check"
   fi
@@ -90,6 +130,9 @@ echo "release_distribution_check.sh: install script dry-run matrix verified"
 
 if command -v goreleaser >/dev/null 2>&1; then
   goreleaser check
+elif [[ "$require_goreleaser" == "true" ]]; then
+  echo "error: goreleaser CLI is required for release distribution profile" >&2
+  exit 1
 else
   echo "release_distribution_check.sh: goreleaser not installed; skipping local goreleaser check"
 fi
