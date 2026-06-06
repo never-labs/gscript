@@ -178,6 +178,17 @@ while [ "$#" -gt 0 ]; do
             RUNS=2
             WARMUP=1
             TIMEOUT=90
+            # Feature smoke includes loopback/http/sqlite/data workloads whose
+            # individual script timings are short enough that 0.1s samples can
+            # make current-vs-HEAD comparisons fail on measurement noise alone.
+            MIN_SAMPLE_SECONDS=0.300
+            MAX_REPEAT=256
+            # Keep the mixed feature smoke serial by default. These workloads
+            # compare current, clean HEAD, and LuaJIT binaries; running several
+            # calibrated samples at once measures local CPU contention more
+            # than language/runtime performance. A caller can still pass
+            # --jobs=N explicitly when using the profile for exploratory runs.
+            MAX_JOBS=1
             ;;
         --full)
             PROFILE="full"

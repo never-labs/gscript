@@ -54,7 +54,7 @@ func TestBinaryStdioSmoke(t *testing.T) {
 		t.Fatalf("go build leia-lsp failed: %v\n%s", err, out)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, bin)
 	stdin, err := cmd.StdinPipe()

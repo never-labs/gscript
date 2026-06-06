@@ -884,6 +884,33 @@ func TestShellShortcutBangFailsFast(t *testing.T) {
 	}
 }
 
+func TestCommandDialectBangFailsFast(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []leia.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			vm := leia.New(append([]leia.Option{
+				leia.WithLibs(leia.LibAll),
+				leia.WithProcessExecution(true),
+				leia.WithProcessShell(true),
+			}, tc.opts...)...)
+			if err := vm.Exec("ok := cmd!`printf command-ok`\nok_text := ok.text"); err != nil {
+				t.Fatalf("Exec success case: %v", err)
+			}
+			assertGet(t, vm, "ok_text", "command-ok")
+
+			err := vm.Exec("failed := cmd!`sh -c 'printf cmdfailerr 1>&2; exit 8'`")
+			if err == nil || !strings.Contains(err.Error(), "cmd dialect failed with exit code 8: cmdfailerr") {
+				t.Fatalf("Exec err = %v, want fail-fast cmd error", err)
+			}
+		})
+	}
+}
+
 func TestRawStringInterpolationExecutesThroughInterpreterAndBytecode(t *testing.T) {
 	for _, tc := range []struct {
 		name string

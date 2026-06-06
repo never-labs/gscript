@@ -180,6 +180,28 @@ class PerformanceGateValidationTest(unittest.TestCase):
             values = set(shell_array_values(gate, array_name))
             self.assertEqual(sorted(q_hot_refs - values), [])
 
+    def test_feature_smoke_uses_stable_sampling_for_short_app_workloads(self):
+        gate = SCRIPT.read_text()
+        self.assertIn(
+            '--feature-smoke)\n'
+            '            PROFILE="feature_smoke"\n'
+            "            RUNS=2\n"
+            "            WARMUP=1\n"
+            "            TIMEOUT=90\n"
+            "            # Feature smoke includes loopback/http/sqlite/data workloads whose\n"
+            "            # individual script timings are short enough that 0.1s samples can\n"
+            "            # make current-vs-HEAD comparisons fail on measurement noise alone.\n"
+            "            MIN_SAMPLE_SECONDS=0.300\n"
+            "            MAX_REPEAT=256\n"
+            "            # Keep the mixed feature smoke serial by default. These workloads\n"
+            "            # compare current, clean HEAD, and LuaJIT binaries; running several\n"
+            "            # calibrated samples at once measures local CPU contention more\n"
+            "            # than language/runtime performance. A caller can still pass\n"
+            "            # --jobs=N explicitly when using the profile for exploratory runs.\n"
+            "            MAX_JOBS=1",
+            gate,
+        )
+
     def test_q_analytics_feature_matrix_hot_refs_include_runnable_q_query_smoke(self):
         manifest = json.loads((ROOT / "benchmarks" / "manifest.json").read_text())
         case_ids = {case["id"] for case in manifest["cases"]}

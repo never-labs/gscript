@@ -9,6 +9,7 @@ Leia supports DSL-native tagged dialects for compact host automation, data forma
 ```leia
 status := sh`git status --short`
 checked := sh!`printf checked`
+argv_checked := cmd!`printf checked`
 out := $`printf hello`
 files := glob`examples/**/*.leia`
 data := json`{"name": ${name}}`
@@ -21,7 +22,7 @@ reviewer := agent {
 }
 ```
 
-`${expr}` is the interpolation form inside tagged strings. Each dialect decides how interpolated values are encoded. `tag!` is the fail-fast form for dialects that support recoverable errors.
+`${expr}` is the interpolation form inside tagged strings. Each dialect decides how interpolated values are encoded. `tag!` is the fail-fast form for dialects that support recoverable errors; `sh!` and `cmd!` raise on non-zero command exits while preserving the same result shape for successful commands.
 
 ## Built-In Dialects
 

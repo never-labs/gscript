@@ -59,6 +59,12 @@ changes. It runs a small current-vs-HEAD hot-path subset across control, calls,
 table, string, and data workloads, uses shorter calibration, and skips the
 strict truth pass unless `--strict` is added.
 
+`--feature-smoke` covers newer feature families such as concurrency, AI runtime
+smoke, loopback serving, sqlite, q-style data processing, and SoA kernels. It
+uses longer script samples and runs the mixed workload set serially by default
+so current-vs-HEAD-vs-LuaJIT comparisons measure the hot paths instead of local
+CPU contention. Pass `--jobs N` explicitly only for exploratory timing runs.
+
 ## Timing Modes
 
 `timing_compare.py` is the main optimization harness. It compares:

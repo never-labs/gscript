@@ -494,6 +494,69 @@ func TestPlaygroundRepositoryCoreExampleCoverage(t *testing.T) {
 	}
 }
 
+func TestPlaygroundWebExamplesKeepRouteServerCoverage(t *testing.T) {
+	playgroundExamples, err := playgroundRepositoryExamples(playgroundExamplesRoot())
+	if err != nil {
+		t.Fatalf("load repository examples: %v", err)
+	}
+	cliExamples, err := cliRepositoryExamples()
+	if err != nil {
+		t.Fatalf("load CLI examples: %v", err)
+	}
+	byPlaygroundID := make(map[string]playgroundExample, len(playgroundExamples))
+	for _, example := range playgroundExamples {
+		byPlaygroundID[example.ID] = example
+	}
+	byCLIPath := make(map[string]cliExample, len(cliExamples))
+	for _, example := range cliExamples {
+		byCLIPath[example.Path] = example
+	}
+
+	required := map[string][]string{
+		"repo-web-route_workbench": {
+			`serve.app({`,
+			`path: "/api/items/:id"`,
+			`net.put(`,
+			`net.delete(`,
+		},
+		"repo-web-serve_dialect_app": {
+			`app := serve {`,
+			`path: "/orders/:id"`,
+			`wrong_method.status == 405`,
+		},
+		"repo-web-tiny_fullstack_app": {
+			`conn := db.memory()`,
+			`path: "/api/posts/:id"`,
+			`Content-Type`,
+			`app.close()`,
+		},
+	}
+	for id, snippets := range required {
+		example, ok := byPlaygroundID[id]
+		if !ok {
+			t.Fatalf("playground repository examples missing %s", id)
+		}
+		if example.Section != "Web" {
+			t.Fatalf("%s section = %q, want Web", id, example.Section)
+		}
+		if example.Runnable || !strings.Contains(example.Requires, "host access") {
+			t.Fatalf("%s playground metadata = %#v, want manual host-access explanation", id, example)
+		}
+		cli, ok := byCLIPath[example.Summary]
+		if !ok {
+			t.Fatalf("%s path %s missing from examples CLI metadata", id, example.Summary)
+		}
+		if !cli.Runnable || !cli.Checkable {
+			t.Fatalf("%s CLI metadata = %#v, want runnable and checkable", id, cli)
+		}
+		for _, snippet := range snippets {
+			if !strings.Contains(example.Source, snippet) {
+				t.Fatalf("%s source missing %q\nsource:\n%s", id, snippet, example.Source)
+			}
+		}
+	}
+}
+
 func TestPlaygroundRepositoryCoversDocumentedExampleDirectories(t *testing.T) {
 	root := filepath.Dir(playgroundExamplesRoot())
 	playgroundExamples, err := playgroundRepositoryExamples(playgroundExamplesRoot())

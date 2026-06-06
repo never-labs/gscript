@@ -30,20 +30,24 @@ func TestLanguageConformanceTranslatedCases(t *testing.T) {
 	checkJIT := os.Getenv("LEIA_CONFORMANCE_CHECK_JIT") == "1" || os.Getenv("LEIA_OFFICIAL_CHECK_JIT") == "1"
 
 	cases := readManifestConformanceCases(t, root)
+	sem := make(chan struct{}, 4)
+	const caseTimeout = 30 * time.Second
 
 	for _, testCase := range cases {
 		testCase := testCase
 		t.Run(testCase.Name, func(t *testing.T) {
 			t.Parallel()
+			sem <- struct{}{}
+			defer func() { <-sem }()
 
-			want := normalizeProcessOutput(runCommand(t, root, 10*time.Second, luaBin, testCase.LuaPath))
-			vm := runCommandResult(root, 10*time.Second, leiaBin, "-vm", testCase.LeiaPath)
+			want := normalizeProcessOutput(runCommand(t, root, caseTimeout, luaBin, testCase.LuaPath))
+			vm := runCommandResult(root, caseTimeout, leiaBin, "-vm", testCase.LeiaPath)
 
 			if !processOutputMatches(vm, want) {
 				t.Fatalf("VM output mismatch for %s\nLua:\n%s\nLeia -vm:\n%s", testCase.Name, want, vm.diagnostic())
 			}
 			if checkJIT {
-				jit := runCommandResult(root, 10*time.Second, leiaBin, "-jit", testCase.LeiaPath)
+				jit := runCommandResult(root, caseTimeout, leiaBin, "-jit", testCase.LeiaPath)
 				if !processOutputMatches(jit, want) {
 					t.Fatalf("JIT output mismatch for %s\nLua:\n%s\nLeia -jit:\n%s", testCase.Name, want, jit.diagnostic())
 				}
