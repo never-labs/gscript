@@ -523,6 +523,109 @@ func TestFilterOperator(t *testing.T) {
 	}
 }
 
+func TestUpdateWhereReturnsNewFrame(t *testing.T) {
+	frame := mustFrame(t,
+		NewColumn("sym", []any{Symbol("a"), Symbol("b"), Symbol("a")}),
+		NewColumn("qty", []any{2, 5, 3}),
+		NewColumn("status", []any{"new", "new", "new"}),
+	)
+
+	got, err := UpdateWhere(frame,
+		Binary{Op: OpEQ, Left: ColumnRef{Name: "sym"}, Right: Literal{Value: Symbol("a")}},
+		map[Symbol]Expr{
+			"qty":    Binary{Op: OpAdd, Left: ColumnRef{Name: "qty"}, Right: Literal{Value: 10}},
+			"status": Literal{Value: "done"},
+		},
+	)
+	if err != nil {
+		t.Fatalf("UpdateWhere returned error: %v", err)
+	}
+
+	assertColumnNames(t, got, []Symbol{"sym", "qty", "status"})
+	assertColumnValues(t, got, "sym", []any{Symbol("a"), Symbol("b"), Symbol("a")})
+	assertColumnValues(t, got, "qty", []any{12.0, 5.0, 13.0})
+	assertColumnValues(t, got, "status", []any{"done", "new", "done"})
+	assertColumnValues(t, frame, "qty", []any{int64(2), int64(5), int64(3)})
+	assertColumnValues(t, frame, "status", []any{"new", "new", "new"})
+}
+
+func TestUpdatePredicateReturnsNewFrame(t *testing.T) {
+	frame := mustFrame(t,
+		NewColumn("sym", []any{Symbol("a"), Symbol("b"), Symbol("c")}),
+		NewColumn("qty", []any{1, 3, 2}),
+	)
+
+	got, err := Update(frame,
+		func(row map[Symbol]any) (bool, error) {
+			return row["qty"].(int64) >= 2, nil
+		},
+		map[Symbol]func(row map[Symbol]any) (any, error){
+			"sym": func(row map[Symbol]any) (any, error) {
+				return Symbol("x"), nil
+			},
+		},
+	)
+	if err != nil {
+		t.Fatalf("Update returned error: %v", err)
+	}
+
+	assertColumnValues(t, got, "sym", []any{Symbol("a"), Symbol("x"), Symbol("x")})
+	assertColumnValues(t, got, "qty", []any{int64(1), int64(3), int64(2)})
+	assertColumnValues(t, frame, "sym", []any{Symbol("a"), Symbol("b"), Symbol("c")})
+}
+
+func TestUpdateRejectsInvalidInputs(t *testing.T) {
+	frame := mustFrame(t,
+		NewColumn("sym", []any{Symbol("a")}),
+		NewColumn("qty", []any{1}),
+	)
+
+	if _, err := Update(frame, nil, map[Symbol]func(row map[Symbol]any) (any, error){
+		"qty": func(row map[Symbol]any) (any, error) { return int64(2), nil },
+	}); err == nil {
+		t.Fatal("Update accepted nil predicate")
+	}
+	if _, err := UpdateWhere(frame, nil, nil); err == nil {
+		t.Fatal("UpdateWhere accepted empty assignments")
+	}
+	if _, err := UpdateWhere(frame, nil, map[Symbol]Expr{"missing": Literal{Value: 1}}); err == nil {
+		t.Fatal("UpdateWhere accepted missing assignment column")
+	}
+	if _, err := UpdateWhere(frame, Literal{Value: "yes"}, map[Symbol]Expr{"qty": Literal{Value: 2}}); err == nil {
+		t.Fatal("UpdateWhere accepted non-bool where expression")
+	}
+}
+
+func TestDeleteWhereAndPredicateReturnNewFrame(t *testing.T) {
+	frame := mustFrame(t,
+		NewColumn("sym", []any{Symbol("a"), Symbol("b"), Symbol("c"), Symbol("d")}),
+		NewColumn("qty", []any{1, 3, 2, 4}),
+	)
+
+	whereDeleted, err := DeleteWhere(frame, Binary{Op: OpGE, Left: ColumnRef{Name: "qty"}, Right: Literal{Value: int64(3)}})
+	if err != nil {
+		t.Fatalf("DeleteWhere returned error: %v", err)
+	}
+	assertColumnValues(t, whereDeleted, "sym", []any{Symbol("a"), Symbol("c")})
+	assertColumnValues(t, whereDeleted, "qty", []any{int64(1), int64(2)})
+	assertColumnValues(t, frame, "sym", []any{Symbol("a"), Symbol("b"), Symbol("c"), Symbol("d")})
+
+	predicateDeleted, err := Delete(frame, func(row map[Symbol]any) (bool, error) {
+		return row["sym"] == Symbol("a") || row["sym"] == Symbol("d"), nil
+	})
+	if err != nil {
+		t.Fatalf("Delete returned error: %v", err)
+	}
+	assertColumnValues(t, predicateDeleted, "sym", []any{Symbol("b"), Symbol("c")})
+	assertColumnValues(t, predicateDeleted, "qty", []any{int64(3), int64(2)})
+	if _, err := Delete(frame, nil); err == nil {
+		t.Fatal("Delete accepted nil predicate")
+	}
+	if _, err := DeleteWhere(frame, Literal{Value: "yes"}); err == nil {
+		t.Fatal("DeleteWhere accepted non-bool where expression")
+	}
+}
+
 func TestDistinctOperator(t *testing.T) {
 	frame := mustFrame(t,
 		NewColumn("sym", []any{Symbol("a"), Symbol("a"), Symbol("b"), Symbol("a"), nil}),
@@ -547,6 +650,111 @@ func TestDistinctOperator(t *testing.T) {
 	}
 	if _, err := Distinct(frame, "missing"); err == nil {
 		t.Fatal("Distinct accepted missing key column")
+	}
+}
+
+func TestInnerJoinOnSameNameKeysPreservesOrderAndNamesConflicts(t *testing.T) {
+	left := mustFrame(t,
+		NewColumn("sym", []any{Symbol("a"), Symbol("b"), Symbol("a"), Symbol("c")}),
+		NewColumn("qty", []any{10, 20, 30, 40}),
+		NewColumn("venue_right", []any{"left-a", "left-b", "left-c", "left-d"}),
+	)
+	right := mustFrame(t,
+		NewColumn("sym", []any{Symbol("a"), Symbol("a"), Symbol("d")}),
+		NewColumn("qty", []any{1, 2, 3}),
+		NewColumn("venue_right", []any{"rx", "ry", "rz"}),
+	)
+
+	got, err := InnerJoin(left, right, "sym")
+	if err != nil {
+		t.Fatalf("InnerJoin returned error: %v", err)
+	}
+
+	assertColumnNames(t, got, []Symbol{"sym", "qty", "venue_right", "qty_right", "venue_right_right"})
+	assertColumnValues(t, got, "sym", []any{Symbol("a"), Symbol("a"), Symbol("a"), Symbol("a")})
+	assertColumnValues(t, got, "qty", []any{int64(10), int64(10), int64(30), int64(30)})
+	assertColumnValues(t, got, "venue_right", []any{"left-a", "left-a", "left-c", "left-c"})
+	assertColumnValues(t, got, "qty_right", []any{int64(1), int64(2), int64(1), int64(2)})
+	assertColumnValues(t, got, "venue_right_right", []any{"rx", "ry", "rx", "ry"})
+}
+
+func TestInnerJoinOnSpecifiedKeyColumns(t *testing.T) {
+	left := mustFrame(t,
+		NewColumn("id", []any{1, 2, 3}),
+		NewColumn("left_value", []any{"one", "two", "three"}),
+	)
+	right := mustFrame(t,
+		NewColumn("account_id", []any{3, 1, 1}),
+		NewColumn("right_value", []any{"tres", "uno", "one-again"}),
+	)
+
+	got, err := InnerJoinOn(left, right, JoinKey{Left: "id", Right: "account_id"})
+	if err != nil {
+		t.Fatalf("InnerJoinOn returned error: %v", err)
+	}
+
+	assertColumnNames(t, got, []Symbol{"id", "left_value", "right_value"})
+	assertColumnValues(t, got, "id", []any{int64(1), int64(1), int64(3)})
+	assertColumnValues(t, got, "left_value", []any{"one", "one", "three"})
+	assertColumnValues(t, got, "right_value", []any{"uno", "one-again", "tres"})
+	if _, ok := got.Column("account_id"); ok {
+		t.Fatal("InnerJoinOn included duplicate right key column")
+	}
+}
+
+func TestInnerJoinOnMultipleKeysAndEmptyResultKeepsSchema(t *testing.T) {
+	left := mustFrame(t,
+		NewColumn("sym", []any{Symbol("a"), Symbol("a"), Symbol("b")}),
+		NewColumn("venue", []any{"x", "y", "x"}),
+		NewColumn("qty", []any{10, 20, 30}),
+	)
+	right := mustFrame(t,
+		NewColumn("sym", []any{Symbol("a"), Symbol("a"), Symbol("b")}),
+		NewColumn("venue", []any{"z", "x", "y"}),
+		NewColumn("price", []any{100, 200, 300}),
+	)
+
+	got, err := InnerJoin(left, right, "sym", "venue")
+	if err != nil {
+		t.Fatalf("InnerJoin returned error: %v", err)
+	}
+	assertColumnNames(t, got, []Symbol{"sym", "venue", "qty", "price"})
+	assertColumnValues(t, got, "sym", []any{Symbol("a")})
+	assertColumnValues(t, got, "venue", []any{"x"})
+	assertColumnValues(t, got, "qty", []any{int64(10)})
+	assertColumnValues(t, got, "price", []any{int64(200)})
+
+	empty, err := InnerJoinOn(left, right,
+		JoinKey{Left: "sym", Right: "venue"},
+		JoinKey{Left: "venue", Right: "sym"},
+	)
+	if err != nil {
+		t.Fatalf("empty InnerJoin returned error: %v", err)
+	}
+	assertColumnNames(t, empty, []Symbol{"sym", "venue", "qty", "price"})
+	if got := empty.Len(); got != 0 {
+		t.Fatalf("empty join length = %d, want 0", got)
+	}
+	if got, ok := empty.Schema().Kind("qty"); !ok || got != KindI64 {
+		t.Fatalf("empty join qty kind = %s, ok %v; want %s", got, ok, KindI64)
+	}
+}
+
+func TestInnerJoinRejectsInvalidKeys(t *testing.T) {
+	left := mustFrame(t, NewColumn("id", []any{1}))
+	right := mustFrame(t, NewColumn("id", []any{1}))
+
+	if _, err := InnerJoin(left, right); err == nil {
+		t.Fatal("InnerJoin accepted no keys")
+	}
+	if _, err := InnerJoin(left, right, "missing"); err == nil {
+		t.Fatal("InnerJoin accepted missing key")
+	}
+	if _, err := InnerJoinOn(left, right, JoinKey{Left: "id", Right: ""}); err == nil {
+		t.Fatal("InnerJoinOn accepted empty key")
+	}
+	if _, err := InnerJoinOn(left, right, JoinKey{Left: "id", Right: "id"}, JoinKey{Left: "id", Right: "id"}); err == nil {
+		t.Fatal("InnerJoinOn accepted duplicate key pair")
 	}
 }
 

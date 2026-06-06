@@ -226,10 +226,65 @@ func TestLowerDistinctAndTakePlan(t *testing.T) {
 	}
 }
 
-func TestLowerRejectsUpdateDeleteSkeletons(t *testing.T) {
+func TestLowerUpdateMutationPlan(t *testing.T) {
+	query := mustParse(t, "update price:price*1.1,size:size+1 from trades where sym=`AAPL")
+	lowered, err := Lower(query)
+	if err != nil {
+		t.Fatalf("Lower returned error: %v", err)
+	}
+
+	if lowered.Op != UpdateQuery || lowered.Source != "trades" || lowered.Original != query {
+		t.Fatalf("lowered header = %#v", lowered)
+	}
+	if lowered.Mutation == nil || lowered.Mutation.Kind != UpdateQuery {
+		t.Fatalf("mutation = %#v", lowered.Mutation)
+	}
+	if lowered.Mutation.Where == nil {
+		t.Fatalf("mutation where is nil")
+	}
+	if len(lowered.Mutation.Assignments) != 2 {
+		t.Fatalf("assignments = %#v", lowered.Mutation.Assignments)
+	}
+	if lowered.Mutation.Assignments[0].Name != "price" || lowered.Mutation.Assignments[1].Name != "size" {
+		t.Fatalf("assignment names = %#v", lowered.Mutation.Assignments)
+	}
+	if _, ok := lowered.Mutation.Assignments[0].Expr.(data.Binary); !ok {
+		t.Fatalf("price assignment expr = %#v", lowered.Mutation.Assignments[0].Expr)
+	}
+}
+
+func TestLowerDeleteMutationPlans(t *testing.T) {
+	rowDelete, err := Lower(mustParse(t, "delete from trades where price<100"))
+	if err != nil {
+		t.Fatalf("Lower row delete returned error: %v", err)
+	}
+	if rowDelete.Mutation == nil || rowDelete.Mutation.Kind != DeleteQuery {
+		t.Fatalf("row delete mutation = %#v", rowDelete.Mutation)
+	}
+	if rowDelete.Mutation.Where == nil {
+		t.Fatalf("row delete where is nil")
+	}
+	if len(rowDelete.Mutation.DeleteColumns) != 0 {
+		t.Fatalf("row delete columns = %#v", rowDelete.Mutation.DeleteColumns)
+	}
+
+	columnDelete, err := Lower(mustParse(t, "delete price,size from trades"))
+	if err != nil {
+		t.Fatalf("Lower column delete returned error: %v", err)
+	}
+	if columnDelete.Mutation == nil || columnDelete.Mutation.Kind != DeleteQuery {
+		t.Fatalf("column delete mutation = %#v", columnDelete.Mutation)
+	}
+	if len(columnDelete.Mutation.DeleteColumns) != 2 || columnDelete.Mutation.DeleteColumns[0] != "price" || columnDelete.Mutation.DeleteColumns[1] != "size" {
+		t.Fatalf("delete columns = %#v", columnDelete.Mutation.DeleteColumns)
+	}
+}
+
+func TestLowerRejectsInvalidMutationShapes(t *testing.T) {
 	for _, src := range []string{
-		"update price:price*1.1 from trades where sym=`AAPL",
-		"delete from trades where price<100",
+		"update price:sum size from trades",
+		"delete px:price from trades",
+		"delete price*size from trades",
 	} {
 		if _, err := Lower(mustParse(t, src)); err == nil {
 			t.Fatalf("Lower(%q) returned nil error", src)

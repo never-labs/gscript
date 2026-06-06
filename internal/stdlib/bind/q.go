@@ -62,7 +62,7 @@ func BuildQ() *Table {
 		if err != nil {
 			return nil, err
 		}
-		out, err := qRunSQL(frameValue, src, resolveSource)
+		out, err := qRunSQL(name, frameValue, src, resolveSource)
 		if err != nil {
 			return nil, err
 		}
@@ -768,8 +768,8 @@ func qRunQuery(s *SoA, spec *Table) (*Table, error) {
 	return qApplyOrderAndLimit(rows, spec)
 }
 
-func qRunSQL(frameValue Value, src string, resolveSource bool) (*Table, error) {
-	tmpl, err := qSQLCachedPlanTemplate(src)
+func qRunSQL(name string, frameValue Value, src string, resolveSource bool) (*Table, error) {
+	tmpl, err := qSQLCachedPlanTemplate(name, src)
 	if err != nil {
 		return nil, err
 	}
@@ -779,18 +779,18 @@ func qRunSQL(frameValue Value, src string, resolveSource bool) (*Table, error) {
 	}
 	frame, err := qDataFrameFromValue(frameValue, sourceName)
 	if err != nil {
-		return nil, fmt.Errorf("q.sql: %w", err)
+		return nil, fmt.Errorf("%s: %w", name, err)
 	}
 	plan := qSQLPlanForFrame(src, tmpl.plan, frame)
 	plan.Source = frame
 	out, err := plan.Exec()
 	if err != nil {
-		return nil, fmt.Errorf("q.sql: exec: %w", err)
+		return nil, fmt.Errorf("%s: exec: %w", name, err)
 	}
 	return qRowsFromDataFrame(out)
 }
 
-func qSQLCachedPlanTemplate(src string) (qSQLPlanTemplate, error) {
+func qSQLCachedPlanTemplate(name, src string) (qSQLPlanTemplate, error) {
 	qSQLTemplateCacheMu.Lock()
 	if tmpl, ok := qSQLTemplateCache[src]; ok {
 		qSQLTemplateCacheMu.Unlock()
@@ -801,11 +801,17 @@ func qSQLCachedPlanTemplate(src string) (qSQLPlanTemplate, error) {
 
 	query, err := stdq.Parse(strings.TrimSpace(src))
 	if err != nil {
-		return qSQLPlanTemplate{}, fmt.Errorf("q.sql: parse: %w", err)
+		if qSQLHasJoinToken(src) {
+			return qSQLPlanTemplate{}, fmt.Errorf("%s: parse: q joins are not supported", name)
+		}
+		return qSQLPlanTemplate{}, fmt.Errorf("%s: parse: %w", name, err)
+	}
+	if query.Kind != stdq.SelectQuery && query.Kind != stdq.ExecQuery {
+		return qSQLPlanTemplate{}, fmt.Errorf("%s: lower: q %s queries are not implemented", name, query.Kind)
 	}
 	lowered, err := stdq.Lower(query)
 	if err != nil {
-		return qSQLPlanTemplate{}, fmt.Errorf("q.sql: lower: %w", err)
+		return qSQLPlanTemplate{}, fmt.Errorf("%s: lower: %w", name, err)
 	}
 	if lowered.Distinct {
 		lowered.Plan.Distinct = true
@@ -823,6 +829,67 @@ func qSQLCachedPlanTemplate(src string) (qSQLPlanTemplate, error) {
 
 	tmpl.plan = qCloneDataQueryPlan(tmpl.plan)
 	return tmpl, nil
+}
+
+func qSQLHasJoinToken(src string) bool {
+	for _, tok := range qSQLBareTokens(src) {
+		switch strings.ToLower(tok) {
+		case "join", "lj", "ij", "uj", "aj", "wj", "pj":
+			return true
+		}
+	}
+	return false
+}
+
+func qSQLBareTokens(src string) []string {
+	var toks []string
+	start := -1
+	flush := func(end int) {
+		if start >= 0 {
+			toks = append(toks, src[start:end])
+			start = -1
+		}
+	}
+	for i := 0; i < len(src); i++ {
+		c := src[i]
+		if c == '"' {
+			flush(i)
+			i++
+			for i < len(src) {
+				if src[i] == '\\' {
+					i += 2
+					continue
+				}
+				if src[i] == '"' {
+					break
+				}
+				i++
+			}
+			continue
+		}
+		if c == '`' {
+			flush(i)
+			i++
+			for i < len(src) && !qSQLTokenDelimiter(src[i]) {
+				i++
+			}
+			i--
+			continue
+		}
+		if qSQLTokenDelimiter(c) {
+			flush(i)
+			continue
+		}
+		if start < 0 {
+			start = i
+		}
+	}
+	flush(len(src))
+	return toks
+}
+
+func qSQLTokenDelimiter(c byte) bool {
+	return c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == ',' || c == ':' || c == '(' || c == ')' || c == ';'
 }
 
 func qSQLPlanForFrame(src string, tmpl data.QueryPlan, frame data.Frame) data.QueryPlan {

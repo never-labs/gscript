@@ -1,6 +1,6 @@
 {
   "schema_version": 3,
-  "case_count": 75,
+  "case_count": 76,
   "cases": [
     {
       "id": "app/actors_dispatch_mutation",
@@ -362,6 +362,18 @@
       "status": "active",
       "tags": [
         "control",
+        "benchmark"
+      ]
+    },
+    {
+      "id": "data/frame_qsql_distinct_take",
+      "path": "benchmarks/data/frame_qsql_distinct_take.leia",
+      "domain": "data",
+      "kind": "benchmark",
+      "reference": null,
+      "status": "active",
+      "tags": [
+        "data",
         "benchmark"
       ]
     },
@@ -2348,6 +2360,21 @@
       "time_source_hint": "script_time_line",
       "tags": [
         "app"
+      ]
+    },
+    {
+      "id": "data/frame_qsql_distinct_take",
+      "domain": "data",
+      "name": "frame_qsql_distinct_take",
+      "script": "benchmarks/data/frame_qsql_distinct_take.leia",
+      "comparison_reference": null,
+      "params": {},
+      "recommended_scale": {
+        "hot": {}
+      },
+      "time_source_hint": "script_time_line",
+      "tags": [
+        "data"
       ]
     },
     {

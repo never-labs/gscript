@@ -1,6 +1,7 @@
 package bind
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/never-labs/leia/internal/runtime"
@@ -514,6 +515,34 @@ func TestQSQLExposesLibQExecOrderLimitAndLiterals(t *testing.T) {
 	}
 }
 
+func TestQSQLRejectsUnimplementedUpdateDeleteAndJoinSemantics(t *testing.T) {
+	interp := runtime.NewCore()
+	installTestModule(interp, "array", runtime.TableValue(BuildArray()))
+	installTestModule(interp, "data", runtime.TableValue(BuildData()))
+	installTestModule(interp, "q", runtime.TableValue(BuildQ()))
+	execOnInterp(t, interp,
+		"trades := data.frame({\n"+
+			"    sym: {\"AAPL\", \"MSFT\"},\n"+
+			"    price: array.f64({100, 80}),\n"+
+			"})\n"+
+			"trades.column_kinds = {sym: \"symbol\", price: \"f64\"}\n"+
+			"quotes := data.frame({sym: {\"AAPL\"}, bid: array.f64({99})})\n"+
+			"quotes.column_kinds = {sym: \"symbol\", bid: \"f64\"}\n"+
+			"update_ok, update_err := pcall(func() {\n"+
+			"    return q.sql(trades, \"update price:price*1.1 from trades where sym=`AAPL\")\n"+
+			"})\n"+
+			"delete_ok, delete_err := pcall(func() {\n"+
+			"    return q.select(trades, \"delete from trades where price<100\")\n"+
+			"})\n"+
+			"join_ok, join_err := pcall(func() {\n"+
+			"    return q.sql(\"select sym,price from trades join quotes\", {trades: trades, quotes: quotes})\n"+
+			"})\n")
+
+	assertPCallErrorContains(t, interp, "update", "q.sql: lower: q update queries are not implemented")
+	assertPCallErrorContains(t, interp, "delete", "q.select: lower: q delete queries are not implemented")
+	assertPCallErrorContains(t, interp, "join", "q.sql: parse: q joins are not supported")
+}
+
 func TestQSQLPlanCachesDoNotStoreFrameData(t *testing.T) {
 	qSQLTemplateCacheMu.Lock()
 	qSQLTemplateCache = make(map[string]qSQLPlanTemplate)
@@ -563,6 +592,21 @@ func TestQSQLPlanCachesDoNotStoreFrameData(t *testing.T) {
 		if len(plan.Source.Schema().Names()) != 0 {
 			t.Fatalf("aligned cache %q stored source schema", key)
 		}
+	}
+}
+
+func assertPCallErrorContains(t *testing.T, interp *runtime.Interpreter, prefix, want string) {
+	t.Helper()
+	ok := interp.GetGlobal(prefix + "_ok")
+	if !ok.IsBool() || ok.Bool() {
+		t.Fatalf("%s_ok = %v, %s_err = %v, want false", prefix, ok, prefix, interp.GetGlobal(prefix+"_err"))
+	}
+	errValue := interp.GetGlobal(prefix + "_err")
+	if !errValue.IsString() {
+		t.Fatalf("%s_err = %v (%s), want string", prefix, errValue, errValue.TypeName())
+	}
+	if got := errValue.Str(); !strings.Contains(got, want) {
+		t.Fatalf("%s_err = %q, want substring %q", prefix, got, want)
 	}
 }
 

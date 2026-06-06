@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "case_count": 458,
+  "case_count": 459,
   "cases": [
     {
       "id": "language/all_harness_flags_format",
@@ -4862,6 +4862,18 @@
     {
       "id": "language/q_data_complex_examples_tdd",
       "path": "tests/language/q_data_complex_examples_tdd.leia",
+      "domain": "language",
+      "kind": "test",
+      "reference": null,
+      "status": "passing",
+      "tags": [
+        "language",
+        "conformance"
+      ]
+    },
+    {
+      "id": "language/q_data_join_mutation_tdd",
+      "path": "tests/language/q_data_join_mutation_tdd.leia",
       "domain": "language",
       "kind": "test",
       "reference": null,

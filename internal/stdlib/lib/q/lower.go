@@ -12,19 +12,40 @@ type Lowered struct {
 	Source   string
 	Distinct bool
 	Plan     data.QueryPlan
+	Mutation *MutationPlan
 	Original *Query
+}
+
+type MutationPlan struct {
+	Kind          QueryKind
+	Where         data.Expr
+	Assignments   []MutationAssignment
+	DeleteColumns []data.Symbol
+}
+
+type MutationAssignment struct {
+	Name data.Symbol
+	Expr data.Expr
 }
 
 func Lower(query *Query) (*Lowered, error) {
 	if query == nil {
 		return nil, fmt.Errorf("nil q query")
 	}
-	if query.Kind != SelectQuery && query.Kind != ExecQuery {
-		return nil, fmt.Errorf("unsupported q query kind %q", query.Kind)
-	}
 	if query.From == "" {
 		return nil, fmt.Errorf("q query missing from source")
 	}
+	switch query.Kind {
+	case SelectQuery, ExecQuery:
+		return lowerRead(query)
+	case UpdateQuery, DeleteQuery:
+		return lowerMutation(query)
+	default:
+		return nil, fmt.Errorf("unsupported q query kind %q", query.Kind)
+	}
+}
+
+func lowerRead(query *Query) (*Lowered, error) {
 	if len(query.Columns) == 0 {
 		return nil, fmt.Errorf("q query missing projection")
 	}
@@ -104,6 +125,58 @@ func Lower(query *Query) (*Lowered, error) {
 		Source:   query.From,
 		Distinct: plan.Distinct,
 		Plan:     plan,
+		Original: query,
+	}, nil
+}
+
+func lowerMutation(query *Query) (*Lowered, error) {
+	if query.Distinct || len(query.By) > 0 || len(query.OrderBy) > 0 || query.Limit != nil || query.Take != nil {
+		return nil, fmt.Errorf("q %s does not support distinct, by, order, limit, or take", query.Kind)
+	}
+
+	mutation := &MutationPlan{Kind: query.Kind}
+	if query.Where != nil {
+		filter, err := lowerExpr(query.Where)
+		if err != nil {
+			return nil, err
+		}
+		mutation.Where = filter
+	}
+
+	switch query.Kind {
+	case UpdateQuery:
+		if len(query.Columns) == 0 {
+			return nil, fmt.Errorf("q update requires at least one assignment")
+		}
+		for _, column := range query.Columns {
+			if column.Name == "" {
+				return nil, fmt.Errorf("q update requires a target column name")
+			}
+			expr, err := lowerExpr(column.Expr)
+			if err != nil {
+				return nil, err
+			}
+			mutation.Assignments = append(mutation.Assignments, MutationAssignment{
+				Name: data.Symbol(column.Name),
+				Expr: expr,
+			})
+		}
+	case DeleteQuery:
+		for _, column := range query.Columns {
+			ident, ok := column.Expr.(Ident)
+			if !ok || column.Name != ident.Name {
+				return nil, fmt.Errorf("q delete column list must contain column identifiers")
+			}
+			mutation.DeleteColumns = append(mutation.DeleteColumns, data.Symbol(ident.Name))
+		}
+	default:
+		return nil, fmt.Errorf("unsupported q mutation kind %q", query.Kind)
+	}
+
+	return &Lowered{
+		Op:       query.Kind,
+		Source:   query.From,
+		Mutation: mutation,
 		Original: query,
 	}, nil
 }

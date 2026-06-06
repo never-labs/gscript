@@ -1,0 +1,103 @@
+// q_data_join_mutation_project - join/update/delete/distinct/take data workflow.
+// Run:
+//   go run ./cmd/leia run examples/data/q_data_join_mutation_project/main.leia
+
+func check(name, ok) {
+    assert(ok)
+    print("ok", name)
+}
+
+trades := data.frame({
+    id: data.i64({1, 2, 3, 4, 5, 6}),
+    sym: data.symbols({"AAPL", "MSFT", "AAPL", "NVDA", "MSFT", "TSLA"}),
+    side: data.symbols({"buy", "sell", "buy", "buy", "sell", "buy"}),
+    venue: data.strings({"XNAS", "XNYS", "XNAS", "ARCX", "BATS", "XNAS"}),
+    price: data.f64({100.0, 101.5, 100.75, 102.25, 103.0, 98.0}),
+    size: data.i64({100, 120, 80, 150, 90, 40}),
+})
+
+distinct_syms := q.sql(trades, "select distinct sym from trades order by sym asc")
+top_trades := q.sql(trades, "select sym,venue,notional:price*size from trades order by notional desc take 3")
+hash_take := q.sql(trades, "2#select sym,price from trades order by price desc")
+
+check("qsql distinct", #distinct_syms == 4 && distinct_syms[1].sym == "AAPL")
+check("qsql take", #top_trades == 3 && top_trades[1].sym == "NVDA")
+check("qsql hash take", #hash_take == 2 && hash_take[1].price == 103.0)
+
+conn := db.memory()
+conn.exec(sql`create table trades (
+    id integer primary key,
+    sym text not null,
+    side text not null,
+    venue text not null,
+    price real not null,
+    size integer not null
+)`)
+conn.exec(sql`create table venues (
+    venue text primary key,
+    mic_name text not null,
+    region text not null
+)`)
+
+for i := 1; i <= trades.len; i++ {
+    conn.exec(sql {
+        query: "insert into trades (id, sym, side, venue, price, size) values (:id, :sym, :side, :venue, :price, :size)",
+        params: {
+            id: trades.id[i],
+            sym: trades.sym[i],
+            side: trades.side[i],
+            venue: trades.venue[i],
+            price: trades.price[i],
+            size: trades.size[i],
+        },
+    })
+}
+
+conn.exec(sql`insert into venues values ('XNAS', 'Nasdaq', 'US')`)
+conn.exec(sql`insert into venues values ('XNYS', 'NYSE', 'US')`)
+conn.exec(sql`insert into venues values ('ARCX', 'NYSE Arca', 'US')`)
+conn.exec(sql`insert into venues values ('BATS', 'Cboe BZX', 'US')`)
+
+conn.exec(sql`update trades set price = price + 1.0 where sym = 'AAPL'`)
+conn.exec(sql`delete from trades where sym = 'TSLA'`)
+
+joined := conn.query(sql`
+    select t.sym, t.venue, v.mic_name, t.price, t.size, t.price * t.size as notional
+    from trades t
+    join venues v on v.venue = t.venue
+    order by notional desc, t.sym asc
+`)
+joined_frame := conn.frame(sql`
+    select t.sym, t.side, t.venue, v.mic_name, t.price, t.size
+    from trades t
+    join venues v on v.venue = t.venue
+    order by t.id
+`)
+rollup := q.sql(joined_frame, "select notional:sum price*size, fills:count i by sym from trades where price>=101 order by notional desc")
+venue_sample := q.sql(joined_frame, "select distinct venue,mic_name from trades order by venue asc take 3")
+
+check("sql join mutation", #joined == 5 && joined[1].sym == "NVDA" && joined[5].sym == "AAPL")
+check("joined frame", joined_frame.len == 5 && joined_frame.columns.price[1] == 101.0 && joined_frame.columns.price[3] == 101.75)
+check("joined frame qsql", #rollup == 3 && rollup[1].sym == "MSFT" && rollup[1].notional == 21450.0)
+check("distinct take venues", #venue_sample == 3 && venue_sample[1].venue == "ARCX" && venue_sample[3].mic_name == "Nasdaq")
+
+q_data_join_mutation_summary := string.format(
+    "q_data_join_mutation rows=%d symbols=%d top=%s notional=%.1f venues=%d",
+    joined_frame.len,
+    #distinct_syms,
+    rollup[1].sym,
+    rollup[1].notional,
+    #venue_sample
+)
+print(q_data_join_mutation_summary)
+
+return {
+    trades: trades,
+    distinct_syms: distinct_syms,
+    top_trades: top_trades,
+    joined: joined,
+    joined_frame: joined_frame,
+    rollup: rollup,
+    venue_sample: venue_sample,
+    summary: q_data_join_mutation_summary,
+}

@@ -415,6 +415,135 @@ func Filter(frame Frame, keep func(row map[Symbol]any) (bool, error)) (Frame, er
 	return frame.Gather(indexes)
 }
 
+func Update(frame Frame, match func(row map[Symbol]any) (bool, error), assignments map[Symbol]func(row map[Symbol]any) (any, error)) (Frame, error) {
+	if match == nil {
+		return Frame{}, fmt.Errorf("update predicate is nil")
+	}
+	if len(assignments) == 0 {
+		return Frame{}, fmt.Errorf("update requires at least one assignment")
+	}
+	for name, assign := range assignments {
+		if assign == nil {
+			return Frame{}, fmt.Errorf("update assignment for column %q is nil", name)
+		}
+		if _, ok := frame.Column(name); !ok {
+			return Frame{}, fmt.Errorf("update column %q does not exist", name)
+		}
+	}
+	matched := make([]bool, frame.Len())
+	rowValues := make([]map[Symbol]any, frame.Len())
+	for row := 0; row < frame.Len(); row++ {
+		values, err := frame.Row(row)
+		if err != nil {
+			return Frame{}, err
+		}
+		ok, err := match(values)
+		if err != nil {
+			return Frame{}, err
+		}
+		matched[row] = ok
+		rowValues[row] = values
+	}
+	cols := make([]Column, 0, len(frame.schema.names))
+	for _, name := range frame.schema.names {
+		values := frame.columns[name].Values()
+		assign, ok := assignments[name]
+		if ok {
+			for row := 0; row < frame.Len(); row++ {
+				if !matched[row] {
+					continue
+				}
+				v, err := assign(rowValues[row])
+				if err != nil {
+					return Frame{}, err
+				}
+				values[row] = v
+			}
+		}
+		cols = append(cols, NewColumn(name, values))
+	}
+	return NewFrame(cols...)
+}
+
+func UpdateWhere(frame Frame, where Expr, assignments map[Symbol]Expr) (Frame, error) {
+	if len(assignments) == 0 {
+		return Frame{}, fmt.Errorf("update requires at least one assignment")
+	}
+	for name, expr := range assignments {
+		if expr == nil {
+			return Frame{}, fmt.Errorf("update assignment for column %q is nil", name)
+		}
+		if _, ok := frame.Column(name); !ok {
+			return Frame{}, fmt.Errorf("update column %q does not exist", name)
+		}
+	}
+	indexes, err := filterIndexes(frame, where)
+	if err != nil {
+		return Frame{}, err
+	}
+	matched := make([]bool, frame.Len())
+	for _, row := range indexes {
+		matched[row] = true
+	}
+	cols := make([]Column, 0, len(frame.schema.names))
+	for _, name := range frame.schema.names {
+		values := frame.columns[name].Values()
+		if expr, ok := assignments[name]; ok {
+			for row := 0; row < frame.Len(); row++ {
+				if !matched[row] {
+					continue
+				}
+				v, err := expr.EvalRow(frame, row)
+				if err != nil {
+					return Frame{}, err
+				}
+				values[row] = v
+			}
+		}
+		cols = append(cols, NewColumn(name, values))
+	}
+	return NewFrame(cols...)
+}
+
+func Delete(frame Frame, match func(row map[Symbol]any) (bool, error)) (Frame, error) {
+	if match == nil {
+		return Frame{}, fmt.Errorf("delete predicate is nil")
+	}
+	indexes := make([]int, 0, frame.Len())
+	for row := 0; row < frame.Len(); row++ {
+		rowValues, err := frame.Row(row)
+		if err != nil {
+			return Frame{}, err
+		}
+		matched, err := match(rowValues)
+		if err != nil {
+			return Frame{}, err
+		}
+		if !matched {
+			indexes = append(indexes, row)
+		}
+	}
+	return frame.Gather(indexes)
+}
+
+func DeleteWhere(frame Frame, where Expr) (Frame, error) {
+	deleteIndexes, err := filterIndexes(frame, where)
+	if err != nil {
+		return Frame{}, err
+	}
+	deleted := make([]bool, frame.Len())
+	for _, row := range deleteIndexes {
+		deleted[row] = true
+	}
+	indexes := make([]int, 0, frame.Len()-len(deleteIndexes))
+	for row := 0; row < frame.Len(); row++ {
+		if !deleted[row] {
+			indexes = append(indexes, row)
+		}
+	}
+	return frame.Gather(indexes)
+}
+
 func Distinct(frame Frame, columns ...Symbol) (Frame, error) {
 	keyColumns := append([]Symbol(nil), columns...)
 	if len(keyColumns) == 0 {
@@ -439,6 +568,79 @@ func Distinct(frame Frame, columns ...Symbol) (Frame, error) {
 		indexes = append(indexes, row)
 	}
 	return frame.Gather(indexes)
+}
+
+type JoinKey struct {
+	Left  Symbol
+	Right Symbol
+}
+
+func InnerJoin(left, right Frame, keys ...Symbol) (Frame, error) {
+	joinKeys := make([]JoinKey, len(keys))
+	for i, key := range keys {
+		joinKeys[i] = JoinKey{Left: key, Right: key}
+	}
+	return InnerJoinOn(left, right, joinKeys...)
+}
+
+func InnerJoinOn(left, right Frame, keys ...JoinKey) (Frame, error) {
+	if len(keys) == 0 {
+		return Frame{}, fmt.Errorf("inner join requires at least one key")
+	}
+	if err := validateJoinKeys(left, right, keys); err != nil {
+		return Frame{}, err
+	}
+
+	rightRowsByKey := make(map[string][]int, right.Len())
+	rightKeyCols := make([]Symbol, len(keys))
+	for i, key := range keys {
+		rightKeyCols[i] = key.Right
+	}
+	for row := 0; row < right.Len(); row++ {
+		key, err := rowKey(right, row, rightKeyCols)
+		if err != nil {
+			return Frame{}, err
+		}
+		rightRowsByKey[key] = append(rightRowsByKey[key], row)
+	}
+
+	leftIndexes := make([]int, 0)
+	rightIndexes := make([]int, 0)
+	leftKeyCols := make([]Symbol, len(keys))
+	for i, key := range keys {
+		leftKeyCols[i] = key.Left
+	}
+	for row := 0; row < left.Len(); row++ {
+		key, err := rowKey(left, row, leftKeyCols)
+		if err != nil {
+			return Frame{}, err
+		}
+		for _, rightRow := range rightRowsByKey[key] {
+			leftIndexes = append(leftIndexes, row)
+			rightIndexes = append(rightIndexes, rightRow)
+		}
+	}
+
+	cols := make([]Column, 0, len(left.schema.names)+len(right.schema.names))
+	usedNames := make(map[Symbol]struct{}, len(left.schema.names)+len(right.schema.names))
+	for _, name := range left.schema.names {
+		cols = append(cols, Column{Name: name, Data: left.columns[name].Gather(leftIndexes)})
+		usedNames[name] = struct{}{}
+	}
+
+	rightKeys := make(map[Symbol]struct{}, len(keys))
+	for _, key := range keys {
+		rightKeys[key.Right] = struct{}{}
+	}
+	for _, name := range right.schema.names {
+		if _, isJoinKey := rightKeys[name]; isJoinKey {
+			continue
+		}
+		outName := rightJoinColumnName(name, usedNames)
+		cols = append(cols, Column{Name: outName, Data: right.columns[name].Gather(rightIndexes)})
+		usedNames[outName] = struct{}{}
+	}
+	return NewFrame(cols...)
 }
 
 type Expr interface {
@@ -1397,6 +1599,42 @@ func takeIndexes(length, n int) ([]int, error) {
 		n = length
 	}
 	return allIndexes(n), nil
+}
+
+func validateJoinKeys(left, right Frame, keys []JoinKey) error {
+	seen := make(map[JoinKey]struct{}, len(keys))
+	for i, key := range keys {
+		if key.Left == "" || key.Right == "" {
+			return fmt.Errorf("inner join key %d must not be empty", i+1)
+		}
+		if _, ok := seen[key]; ok {
+			return fmt.Errorf("inner join key %q=%q is duplicated", key.Left, key.Right)
+		}
+		seen[key] = struct{}{}
+		if _, ok := left.Column(key.Left); !ok {
+			return fmt.Errorf("inner join left key column %q does not exist", key.Left)
+		}
+		if _, ok := right.Column(key.Right); !ok {
+			return fmt.Errorf("inner join right key column %q does not exist", key.Right)
+		}
+	}
+	return nil
+}
+
+func rightJoinColumnName(name Symbol, used map[Symbol]struct{}) Symbol {
+	if _, ok := used[name]; !ok {
+		return name
+	}
+	base := Symbol(string(name) + "_right")
+	if _, ok := used[base]; !ok {
+		return base
+	}
+	for i := 2; ; i++ {
+		candidate := Symbol(fmt.Sprintf("%s%d", base, i))
+		if _, ok := used[candidate]; !ok {
+			return candidate
+		}
+	}
 }
 
 func rowKey(frame Frame, row int, columns []Symbol) (string, error) {

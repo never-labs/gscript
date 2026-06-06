@@ -1,0 +1,67 @@
+// In-memory frame qSQL distinct/take benchmark. The hot loop stays on q.sql
+// with cached qSQL lowering over frame-backed columns.
+
+N := 8192
+REPS := 520
+MOD := 1000000007
+
+func make_i64(n, mod, offset) {
+    t := {}
+    for i := 1; i <= n; i++ {
+        t[i] = offset + (i % mod)
+    }
+    return array.i64(t)
+}
+
+func make_score(n) {
+    t := {}
+    for i := 1; i <= n; i++ {
+        t[i] = 50.0 + (i % 173) * 2.5
+    }
+    return array.f64(t)
+}
+
+func make_weight(n) {
+    t := {}
+    for i := 1; i <= n; i++ {
+        t[i] = 1.0 + (i % 23) * 0.5
+    }
+    return array.f64(t)
+}
+
+func mix(sum, v) {
+    return (sum * 131 + v) % MOD
+}
+
+events := data.frame({
+    account_id: make_i64(N, 1021, 1000),
+    segment_id: make_i64(N, 37, 10),
+    region_id: make_i64(N, 19, 100),
+    bucket_id: make_i64(N, 11, 1),
+    score: make_score(N),
+    weight: make_weight(N),
+})
+
+qsql_distinct_take := "select distinct segment_id,region_id,bucket_id from events where score>=240 order by segment_id asc, region_id desc, bucket_id asc take 18"
+
+func run_hot(frame, qsql_distinct_take, reps) {
+    checksum := 0
+    for r := 1; r <= reps; r++ {
+        rows := q.sql(frame, qsql_distinct_take)
+        top := rows[1]
+        tail := rows[#rows]
+        checksum = mix(checksum, #rows + top.segment_id * 17 + top.region_id * 31 + top.bucket_id)
+        checksum = mix(checksum, tail.segment_id * 13 + tail.region_id * 7 + tail.bucket_id)
+    }
+    return checksum
+}
+
+warm := run_hot(events, qsql_distinct_take, 2)
+collectgarbage("collect")
+t0 := time.now()
+checksum := run_hot(events, qsql_distinct_take, REPS)
+elapsed := time.since(t0)
+
+print(string.format("frame_qsql_distinct_take_hot n=%d reps=%d", N, REPS))
+print(string.format("checksum: %d", mix(checksum, warm)))
+print(string.format("Time: %.3fs", elapsed))
