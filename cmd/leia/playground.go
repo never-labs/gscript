@@ -1509,6 +1509,7 @@ func repositoryExampleRunnable(path string) bool {
 		!strings.Contains(path, "/web/tiny_fullstack_app.leia") &&
 		!strings.Contains(path, "/web/webserver.leia") &&
 		!strings.Contains(path, "/dialects/shell_filesystem.leia") &&
+		!strings.Contains(path, "/tooling/release_gate_project/") &&
 		!strings.Contains(path, "/macos/package_managed/") &&
 		!strings.Contains(path, "/ui/package_managed/") &&
 		(!strings.Contains(path, "/game_engine/") || strings.Contains(path, "/game_engine/event_system.leia")) &&
@@ -1538,6 +1539,8 @@ func repositoryExampleRequires(path string) string {
 		return "network/server host access"
 	case strings.Contains(path, "/dialects/shell_filesystem.leia"):
 		return "process shell and filesystem host access"
+	case strings.Contains(path, "/tooling/release_gate_project/"):
+		return "examples CLI release-gate-project runner"
 	case strings.Contains(path, "/macos/package_managed/"):
 		return "package-managed macOS automation runtime and process host access"
 	case strings.Contains(path, "/ui/package_managed/"):

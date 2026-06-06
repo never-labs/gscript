@@ -83,7 +83,10 @@ roundtrip := excel`report.xlsx`
 The runnable project `examples/data/db_q_frame_project` exercises SQLite
 `db.frame`, SoA-backed `q.query`, and `xlsx`/`excel` import/export together. It
 is intentionally tracked by the feature matrix so README data claims stay tied
-to an executable example.
+to an executable example. The larger
+`examples/tooling/release_gate_project` workflow uses the same bridge alongside
+shell, AI, and web dialects; string categories are mapped to stable numeric ids
+before entering the SoA/q aggregation path.
 
 ## Shape And Schema
 

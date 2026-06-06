@@ -146,6 +146,58 @@ func TestFeatureMatrixHasNoIncompleteCells(t *testing.T) {
 	}
 }
 
+func TestFeatureMatrixCoveredRefsDoNotUseAllSkippedGoTestFiles(t *testing.T) {
+	root := findRepoRoot(t)
+	data, err := os.ReadFile(filepath.Join(root, "tests", "feature_matrix.json"))
+	if err != nil {
+		t.Fatalf("read feature matrix: %v", err)
+	}
+
+	var matrix struct {
+		RequiredFields []string                     `json:"required_fields"`
+		Features       []map[string]json.RawMessage `json:"features"`
+	}
+	if err := json.Unmarshal(data, &matrix); err != nil {
+		t.Fatalf("decode feature matrix: %v", err)
+	}
+
+	var offenders []string
+	checked := map[string]bool{}
+	for i, feature := range matrix.Features {
+		id := decodeRequiredString(t, feature, i, "id")
+		for _, field := range matrix.RequiredFields {
+			raw, ok := feature[field]
+			if !ok {
+				t.Fatalf("features[%d] %s missing required field %q", i, id, field)
+			}
+			var cell struct {
+				Status string   `json:"status"`
+				Refs   []string `json:"refs"`
+			}
+			if err := json.Unmarshal(raw, &cell); err != nil {
+				t.Fatalf("features[%d] %s.%s: %v", i, id, field, err)
+			}
+			if cell.Status != "covered" {
+				continue
+			}
+			for _, ref := range cell.Refs {
+				if checked[ref] || !strings.HasSuffix(ref, "_test.go") {
+					continue
+				}
+				checked[ref] = true
+				source := readFileString(t, filepath.Join(root, filepath.FromSlash(ref)))
+				if goTestFileHasTests(source) && goTestFileAllTestsUnconditionallySkip(source) {
+					offenders = append(offenders, ref)
+				}
+			}
+		}
+	}
+	if len(offenders) > 0 {
+		sort.Strings(offenders)
+		t.Fatalf("covered feature matrix refs must not point at all-skipped Go test files: %s", strings.Join(offenders, ", "))
+	}
+}
+
 func TestLanguageGrammarAppendixDocumentsStableSyntax(t *testing.T) {
 	root := findRepoRoot(t)
 	spec := readFileString(t, filepath.Join(root, "docs", "spec", "language.md"))
@@ -198,6 +250,7 @@ func TestFeatureMatrixCoversTaggedDialectAndModpkgReleaseGuards(t *testing.T) {
 		"cmd/leia/main_examples_command_test.go",
 		"examples/dialects/shell_filesystem.leia",
 		"examples/dialects/web_text.leia",
+		"examples/tooling/release_gate_project/main.leia",
 	)
 	requireFeatureStringList(t, tagged, "tagged_dialect_syntax", "builtin_dialect_tags",
 		"sh", "cmd", "shellwords", "glob", "path",
@@ -527,6 +580,7 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 		"examples/data_processing/data_oriented/dense_matrix_vec_kernels.leia",
 		"examples/data_processing/data_oriented/soa_kernels.leia",
 		"examples/data/db_q_frame_project/main.leia",
+		"examples/tooling/release_gate_project/main.leia",
 		"docs/reference/data-oriented/index.md",
 	)
 	requireFeatureCellRefs(t, data, "matrix_dense_arrays", "bytecode",
@@ -556,6 +610,7 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 		"cmd/leia/main_examples_command_test.go",
 		"cmd/leia/main_readme_tooling_test.go",
 		"examples/tooling/release_evidence_pipeline.leia",
+		"examples/tooling/release_gate_project/main.leia",
 		"docs/guides/tooling.md",
 	)
 	examplesCommandGate := readFileString(t, filepath.Join(root, "cmd", "leia", "main_examples_command_test.go"))
@@ -783,6 +838,7 @@ func TestReadmeAINativeContractHasExplicitGates(t *testing.T) {
 		"examples/evaluate/llm_replay.leia",
 		"examples/evaluate/agent_replay.leia",
 		"examples/evaluate/multiturn_replay.leia",
+		"examples/tooling/release_gate_project/main.leia",
 		"docs/guides/ai-native.md",
 		"docs/reference/ai/index.md",
 		"docs/reference/evaluate/index.md",
@@ -1101,5 +1157,47 @@ func assertRepoRelativeFileRef(t *testing.T, root, featureID, field, ref string)
 	}
 	if _, err := os.Stat(filepath.Join(root, clean)); err != nil {
 		t.Fatalf("%s.%s ref %q does not resolve to a file: %v", featureID, field, ref, err)
+	}
+}
+
+func goTestFileHasTests(source string) bool {
+	return regexp.MustCompile(`(?m)^func Test[A-Za-z0-9_]*\s*\(`).FindStringIndex(source) != nil
+}
+
+func goTestFileAllTestsUnconditionallySkip(source string) bool {
+	testDecls := regexp.MustCompile(`(?m)^func Test[A-Za-z0-9_]*\s*\(`).FindAllStringIndex(source, -1)
+	if len(testDecls) == 0 {
+		return false
+	}
+	for i, loc := range testDecls {
+		start := loc[0]
+		end := len(source)
+		if i+1 < len(testDecls) {
+			end = testDecls[i+1][0]
+		}
+		chunk := source[start:end]
+		brace := strings.Index(chunk, "{")
+		if brace < 0 {
+			return false
+		}
+		body := stripLeadingGoCommentsAndWhitespace(chunk[brace+1:])
+		if !strings.HasPrefix(body, "t.Skip(") && !strings.HasPrefix(body, "t.Skipf(") {
+			return false
+		}
+	}
+	return true
+}
+
+func stripLeadingGoCommentsAndWhitespace(source string) string {
+	for {
+		source = strings.TrimLeft(source, " \t\r\n")
+		if !strings.HasPrefix(source, "//") {
+			return source
+		}
+		newline := strings.IndexByte(source, '\n')
+		if newline < 0 {
+			return ""
+		}
+		source = source[newline+1:]
 	}
 }

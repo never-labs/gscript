@@ -8,11 +8,11 @@ The command parses Leia source, runs existing AI-native source validation, and
 discovers `evaluate "case name" { ... }` blocks. For each case it executes the
 file's top-level setup code and then the evaluate body, so normal Leia
 assertions such as `assert(result == "ok")` determine whether the case passes.
-It also counts static declarations such as `agent`, `tool`, `models`, and
-`budget`, and reports local `TODO` lines as informational findings. During the
-run, the harness-only `eval` module can load JSONL corpora, run named subcases,
-record metrics, inspect LLM usage, enforce local budgets, run bounded judge
-turns, skip fixtures, and fail gates without adding more syntax.
+It reports local `TODO` lines as informational findings and summarizes evaluate
+blocks, selected cases, executed cases, assertions, metrics, and LLM usage.
+During the run, the harness-only `eval` module can load JSONL corpora, run named
+subcases, record metrics, inspect LLM usage, enforce local budgets, run bounded
+judge turns, skip fixtures, and fail gates without adding more syntax.
 
 ```sh
 leia evaluate --json path/to/script.leia
@@ -104,7 +104,7 @@ The JSON report is versioned with `schema_version: 1` and includes:
 | `status` | `ok` or `failed`. Syntax, validation, and case runtime errors make the report fail. |
 | `started_at` | UTC RFC3339 timestamp for the evaluation run. |
 | `runtime` | Leia and Go runtime metadata: version, OS/arch, and build VCS fields when available. |
-| `summary` | File, parse, AI declaration, TODO, selected/skipped case, pass/fail/list, assertion, duration, and pass-rate counts. |
+| `summary` | File, parse, TODO, selected/skipped case, pass/fail/list, assertion, duration, and pass-rate counts. |
 | `llm` | Optional LLM metadata: mode, fixture paths, loaded/replayed/remaining/recorded turn counts, aggregate turn count, provider errors, input/output tokens, latency, and cost. |
 | `inputs` | Per-input file status. |
 | `cases` | Evaluate blocks with `case_id`, `name`, source path, range, status, per-case `started_at`, duration, optional per-case `llm` stats and `llm.record_path`, raw metrics, subcases, assertions, and diagnostics. |

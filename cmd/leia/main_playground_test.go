@@ -507,6 +507,10 @@ func TestPlaygroundRepositoryHighLevelReleaseExamplesAreExposed(t *testing.T) {
 			requires: "network/server host access",
 			snippets: []string{"serve {", "db.memory()", "http.get(", "net.post(", "/static/:name"},
 		},
+		"repo-tooling-release_gate_project-main": {
+			requires: "examples CLI release-gate-project runner",
+			snippets: []string{"release_gate_project", "sh`printf release-gate`", "q.query(", "dialect.eval(\"xlsx\"", "agent {", "serve {"},
+		},
 	}
 	for id, want := range want {
 		t.Run(id, func(t *testing.T) {

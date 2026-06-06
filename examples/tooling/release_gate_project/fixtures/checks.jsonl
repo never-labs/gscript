@@ -1,0 +1,6 @@
+{"id":"fmt","domain":"tooling","status":"pass","duration_ms":41,"required":true}
+{"id":"docs","domain":"docs","status":"pass","duration_ms":211,"required":true}
+{"id":"examples","domain":"examples","status":"pass","duration_ms":512,"required":true}
+{"id":"performance-smoke","domain":"performance","status":"pass","duration_ms":3770,"required":true}
+{"id":"llm-replay","domain":"ai","status":"pass","duration_ms":88,"required":true}
+{"id":"web-loopback","domain":"web","status":"pass","duration_ms":64,"required":true}

@@ -447,15 +447,17 @@ if true {
 }
 ```
 
-## Budget Statements
+## Budget Control
 
-`budget { ... } { ... }` applies an AI budget to the enclosed block. Public
-budget dimensions are specified in [AI-Native Syntax](ai-native.md).
+Leia does not define a standalone `budget { ... } { ... }` statement. Budget
+control is expressed through ordinary values at the boundary that consumes the
+budget:
 
-Non-executable AI budget sketch:
+- Go embedding options enforce VM, native-call, host-result, module, and
+  concurrency budgets.
+- AI `turn`, `agent`, and loop option tables may carry AI budget fields.
+- `leia evaluate` exposes `eval.budget(table)` for per-case evaluation gates.
 
-```text
-budget { turns: 1, tokens: 256, time: 30 } {
-    result, err := answer("short task")
-}
-```
+Because budgets are ordinary option tables rather than a statement form, their
+scope and error behavior are defined by the host API, AI runtime, or evaluation
+harness that receives the table.

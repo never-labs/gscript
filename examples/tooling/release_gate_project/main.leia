@@ -1,0 +1,147 @@
+// release_gate_project - End-to-end release feature project.
+// Demonstrates: fixture loading, glob/fs, sh/cmd, SQLite frames, q aggregation,
+// xlsx/excel, serve loopback, and AI agent mock execution in one workflow.
+
+func check(name, ok) {
+    if !ok {
+        error("check failed: " .. name)
+    }
+    print("ok", name)
+}
+
+entry := process.entry()
+project_dir := entry.dir
+
+fixture_matches := dialect.eval("glob", path.join(project_dir, "fixtures", "*.jsonl"))
+check("fixture discovery", #fixture_matches == 1 && path.base(fixture_matches[1]) == "checks.jsonl")
+
+fixture_text := fs.readfile(path.join(project_dir, "fixtures", "checks.jsonl"))
+checks := dialect.eval("jsonl", fixture_text)
+check("fixture parse", #checks == 6 && checks[1].id == "fmt")
+
+shell_probe := sh`printf release-gate`
+cmd_probe := cmd`printf cmd-ok`
+check("shell dialect", shell_probe.ok == true && shell_probe.text == "release-gate")
+check("cmd dialect", cmd_probe.ok == true && cmd_probe.text == "cmd-ok")
+
+conn := db.memory()
+conn.exec(sql`create table checks (
+    id text not null,
+    domain text not null,
+    domain_id integer not null,
+    status text not null,
+    duration_ms real not null,
+    required integer not null
+)`)
+
+domain_ids := {
+    tooling: 1,
+    docs: 2,
+    examples: 3,
+    performance: 4,
+    ai: 5,
+    web: 6,
+}
+
+for _, item := range ipairs(checks) {
+    conn.exec(sql {
+        query: "insert into checks values (:id, :domain, :domain_id, :status, :duration_ms, :required)",
+        params: {
+            id: item.id,
+            domain: item.domain,
+            domain_id: domain_ids[item.domain],
+            status: item.status,
+            duration_ms: item.duration_ms,
+            required: item.required,
+        },
+    })
+}
+
+frame := conn.frame(sql`select domain, domain_id, status, duration_ms, required from checks order by domain, id`)
+check("db frame", frame.len == 6 && soa.len(frame.soa) == 6)
+
+rollup := q.query(frame.soa, {
+    by: {"domain_id"},
+    select: {
+        duration_ms: "duration_ms",
+        gates: 1,
+        required: "required",
+    },
+    aggregate: {
+        duration_ms: "sum",
+        gates: "count",
+        required: "sum",
+    },
+    order_by: {column: "duration_ms", desc: true},
+})
+
+top := rollup[1]
+top_domain := frame.rows[4].domain
+check("q rollup", #rollup == 6 && top.domain_id == 4 && top_domain == "performance" && top.duration_ms == 3770)
+
+workbook := dialect.eval("xlsx", rollup, {
+    mode: "encode",
+    headers: {"domain_id", "duration_ms", "gates", "required"},
+    sheet: "release",
+})
+roundtrip := dialect.eval("excel", workbook, {headers: true})
+check("spreadsheet roundtrip", #roundtrip == #rollup && roundtrip[1].domain_id == "4")
+
+reviewer := agent {
+    name: "release_reviewer"
+    config: func(summary) {
+        return {
+            model: "mock-fast",
+            system: "Review the release gate summary and answer in one sentence.",
+            user: summary,
+        }, nil
+    }
+    params: {"summary"}
+    description: "Review release gate evidence."
+}
+
+agent_result, agent_err := reviewer(string.format("gates=%d top=%s", #checks, top.domain))
+check("agent mock", agent_err == nil && agent_result.text == "Direct llm.turn keeps examples simple.")
+
+app := serve {
+    listen: "127.0.0.1:0"
+    routes: {
+        {method: "GET", path: "/summary", handler: func(req) {
+            return {
+                gates: #checks,
+                domains: #rollup,
+                top: top_domain,
+                agent: agent_result.text,
+            }
+        }},
+    },
+}
+
+summary_resp := http.get(app.url .. "/summary")
+summary_body := json.decode(summary_resp.body)
+check("serve loopback", summary_resp.status == 200 && summary_body.gates == 6 && summary_body.top == "performance")
+
+closed, close_err := app.close()
+waited, wait_err := app.wait()
+check("serve shutdown", closed == true && close_err == nil && waited == true && wait_err == nil)
+
+release_gate_project_summary := string.format(
+    "release_gate_project checks=%d domains=%d top=%s ms=%.0f excel_rows=%d web=%d agent=%s shell=%s cmd=%s",
+    #checks,
+    #rollup,
+    top_domain,
+    top.duration_ms,
+    #roundtrip,
+    summary_resp.status,
+    agent_result.status,
+    shell_probe.text,
+    cmd_probe.text
+)
+
+print(release_gate_project_summary)
+
+return {
+    checks: checks,
+    rollup: rollup,
+    summary: release_gate_project_summary,
+}

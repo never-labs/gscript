@@ -448,6 +448,7 @@ func TestExamplesCommandChecksDeterministicSpecialRunners(t *testing.T) {
 		"repo-workflow-support_triage_replay",
 		"repo-testing-jsonl_workflow_test",
 		"repo-tooling-release_evidence_pipeline",
+		"repo-tooling-release_gate_project-main",
 		"repo-performance-execution_modes_matrix",
 		"repo-ui-package_managed-main",
 	}, &stdout, &stderr)
@@ -467,9 +468,10 @@ func TestExamplesCommandChecksDeterministicSpecialRunners(t *testing.T) {
 		"ok      repo-workflow-support_triage_replay",
 		"ok      repo-testing-jsonl_workflow_test",
 		"ok      repo-tooling-release_evidence_pipeline",
+		"ok      repo-tooling-release_gate_project-main",
 		"ok      repo-performance-execution_modes_matrix",
 		"ok      repo-ui-package_managed-main",
-		"examples: 13 ok, 0 skipped, 0 failed",
+		"examples: 14 ok, 0 skipped, 0 failed",
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("examples check missing %q\n%s", want, out)

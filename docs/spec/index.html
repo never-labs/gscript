@@ -1151,12 +1151,14 @@ i <span class="tok-operator">=</span> i <span class="tok-operator">+</span> <spa
     inside:
     <span class="tok-builtin">print</span>(<span class="tok-string">&quot;unreachable&quot;</span>)
 }</code></pre>
-<h3 id="statements-budget-statements">Budget Statements</h3>
-<p><code>budget { ... } { ... }</code> applies an AI budget to the enclosed block. Public budget dimensions are specified in <a href="#">AI-Native Syntax</a>.</p>
-<p>Non-executable AI budget sketch:</p>
-<pre class="language-text"><code class="language-text">budget { turns: 1, tokens: 256, time: 30 } {
-    result, err := answer(&quot;short task&quot;)
-}</code></pre></section><section><h2 id="functions">Functions</h2>
+<h3 id="statements-budget-control">Budget Control</h3>
+<p>Leia does not define a standalone <code>budget { ... } { ... }</code> statement. Budget control is expressed through ordinary values at the boundary that consumes the budget:</p>
+<ul>
+<li>Go embedding options enforce VM, native-call, host-result, module, and concurrency budgets.</li>
+<li>AI <code>turn</code>, <code>agent</code>, and loop option tables may carry AI budget fields.</li>
+<li><code>leia evaluate</code> exposes <code>eval.budget(table)</code> for per-case evaluation gates.</li>
+</ul>
+<p>Because budgets are ordinary option tables rather than a statement form, their scope and error behavior are defined by the host API, AI runtime, or evaluation harness that receives the table.</p></section><section><h2 id="functions">Functions</h2>
 <p>Functions are first-class callable values. They may be named declarations or anonymous literals.</p>
 <h3 id="functions-parameters">Parameters</h3>
 <p>Parameters are lexical bindings initialized from call arguments. Missing arguments become <code>nil</code>; extra arguments are discarded unless the function has a vararg parameter. The call does not expose an argument count to fixed parameters; a fixed parameter that receives an explicit <code>nil</code> is indistinguishable from one filled because the argument is missing.</p>

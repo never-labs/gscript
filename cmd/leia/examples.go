@@ -543,12 +543,17 @@ func applyCLIExampleRunner(example *cliExample) {
 		strings.Contains(example.Path, "/web/tiny_fullstack_app.leia"),
 		strings.Contains(example.Path, "/web/serve_dialect_app.leia"),
 		strings.Contains(example.Path, "/web/route_workbench.leia"),
+		strings.Contains(example.Path, "/tooling/release_gate_project/"),
 		strings.Contains(example.Path, "/concurrency/context_process.leia"),
 		strings.Contains(example.Path, "/concurrency/goroutine_errors.leia"),
 		strings.Contains(example.Path, "/dialects/shell_filesystem.leia"):
 		example.Runnable = true
 		example.Checkable = true
-		example.Runner = "host-vm"
+		if strings.Contains(example.Path, "/tooling/release_gate_project/") {
+			example.Runner = "release-gate-project"
+		} else {
+			example.Runner = "host-vm"
+		}
 		example.Requires = ""
 		return
 	case strings.Contains(example.Path, "/data_processing/data_oriented/particle_integration.leia"),
@@ -596,6 +601,8 @@ func runCLIExampleRunner(example cliExample, path string, maxSteps int64, stdout
 		return runCLIExampleHostVM(path, maxSteps*64, stdout, stderr)
 	case "llm-mock":
 		return runCLIExampleLLMMock(path, maxSteps, stdout, stderr)
+	case "release-gate-project":
+		return runCLIExampleReleaseGateProject(path, maxSteps, stdout, stderr)
 	case "go-test":
 		return runCLIExampleGoTest(example, stdout, stderr)
 	default:
@@ -759,6 +766,35 @@ assert(__leia_example_wait_err == nil)
 	default:
 		return "", fmt.Errorf("unsupported web loopback example %s", path)
 	}
+}
+
+func runCLIExampleReleaseGateProject(path string, maxSteps int64, stdout, stderr io.Writer) int {
+	vm := leia.New(
+		leia.WithLibs(leia.LibAll),
+		leia.WithVM(),
+		leia.WithMaxSteps(maxSteps*4),
+		leia.WithMaxNativeCalls(100_000),
+		leia.WithMaxGoroutines(128),
+		leia.WithMaxChannelCapacity(1024),
+		leia.WithMaxHostResultBytes(1<<20),
+		leia.WithFilesystem(true),
+		leia.WithNetworkAccess(true),
+		leia.WithProcessExecution(true),
+		leia.WithProcessShell(true),
+		leia.WithLLMProvider(cliExampleMockLLMProvider{}),
+		leia.WithPrint(func(args ...interface{}) {
+			parts := make([]string, len(args))
+			for i, arg := range args {
+				parts[i] = fmt.Sprint(arg)
+			}
+			fmt.Fprintln(stdout, strings.Join(parts, "\t"))
+		}),
+	)
+	if err := vm.ExecFile(path); err != nil {
+		fmt.Fprintf(stderr, "run release gate project example: %v\n", err)
+		return 1
+	}
+	return 0
 }
 
 func cliExampleLLMMockFriendly(path string) bool {

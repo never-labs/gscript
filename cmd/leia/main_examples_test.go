@@ -92,6 +92,9 @@ func TestPracticalExampleProjects(t *testing.T) {
 		{"web-access-log-report", execExampleProjectGlobal(root, filepath.Join("examples", "web", "access_log_report.leia"), "web_access_report_summary"), "routes=4 requests=10 errors=3 slow=3 cache_hits=4 top=/api/orders"},
 		{"web-route-workbench", execExampleProjectGlobal(root, filepath.Join("examples", "web", "route_workbench.leia"), "web_route_workbench_summary"), "routes=5 events=6 created=bk-303 updated_stock=8 deleted=bk-202 method_status=405 html=200"},
 		{"web-serve-dialect-app", execExampleProjectGlobal(root, filepath.Join("examples", "web", "serve_dialect_app.leia"), "serve_dialect_app_summary"), "serve routes=3 events=4 status=delivered method_status=405 html=200"},
+		{"db-q-frame-project", execExampleProjectGlobal(root, filepath.Join("examples", "data", "db_q_frame_project", "main.leia"), "db_q_frame_summary"), "db_q_frame rows=4 channels=3 best=1 revenue=550 excel_rows=3"},
+		{"q-trade-analytics-project", execExampleProjectGlobal(root, filepath.Join("examples", "data", "q_trade_analytics_project", "main.leia"), "q_trade_analytics_summary"), "trades=5 symbols=3 leader=MSFT notional=21360.0 total_size=540 large=3"},
+		{"release-gate-project", runCLIExampleByID("repo-tooling-release_gate_project-main"), "release_gate_project checks=6 domains=6 top=performance ms=3770 excel_rows=6 web=200 agent=done shell=release-gate cmd=cmd-ok"},
 		{"ai-agent-composition", evaluateReplayExampleProject(root, filepath.Join("examples", "evaluate", "agent_replay.leia"), filepath.Join("examples", "evaluate", "agent_replay.records.json")), "agent consumes replay"},
 		{"ai-project-regression", evaluateReplayExampleProject(root, filepath.Join("examples", "evaluate", "project_agent_regression.leia"), filepath.Join("examples", "evaluate", "project_agent_regression.records.json")), "project agent regression consumes replay"},
 		{"concurrency-pipeline", execExampleProjectGlobal(root, filepath.Join("examples", "concurrency", "goroutines_channels.leia"), "workers"), "4"},
@@ -108,6 +111,18 @@ func TestPracticalExampleProjects(t *testing.T) {
 				t.Fatalf("%s produced no observable output", project.name)
 			}
 		})
+	}
+}
+
+func runCLIExampleByID(id string) func(t *testing.T) string {
+	return func(t *testing.T) string {
+		t.Helper()
+		var stdout, stderr bytes.Buffer
+		code := runExamplesCommand([]string{"run", id}, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("examples run %s code = %d, stderr = %q stdout = %q", id, code, stderr.String(), stdout.String())
+		}
+		return stdout.String()
 	}
 }
 

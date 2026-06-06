@@ -53,7 +53,7 @@ set.
 | `examples/security/` | Supply-chain and vendor security workflow examples. |
 | `examples/site/` | Static site and release dashboard generation examples. |
 | `examples/testing/` | `leia test` workflow and JSONL golden-evaluation examples. |
-| `examples/tooling/` | Release evidence and diagnostics pipeline examples. |
+| `examples/tooling/` | Release evidence, diagnostics, and cross-domain release-gate project examples. |
 | `examples/ui/` | Package-managed UI capability examples. |
 | `examples/web/` | HTTP/server-oriented scripts, including high-level `serve { ... }` route dialect examples. |
 | `examples/game_engine/` | Game scripting patterns and larger interactive workloads. |
@@ -65,15 +65,19 @@ set.
 go run ./cmd/leia examples run examples/data_processing/data_oriented/soa_kernels.leia
 go run ./cmd/leia examples check examples/data/q_vector_basics.leia
 go run ./cmd/leia examples check examples/data/db_q_frame_project
+go run ./cmd/leia examples run repo-tooling-release_gate_project-main
 go run ./cmd/leia examples check examples/data_processing/data_oriented/particle_integration.leia
 ```
 
 Use these with the [data-oriented reference](../reference/data-oriented/index.md)
 and `benchmarks/data/` when evaluating numeric or SoA-heavy code. The
 `db_q_frame_project` example exercises SQLite `db.frame`, SoA-backed `q.query`,
-and `xlsx`/`excel` round-tripping as one runnable data workflow. The particle
-integration example is listed as manual, so `examples check` reports it as
-skipped unless it is run through a dedicated higher-step-budget path.
+and `xlsx`/`excel` round-tripping as one runnable data workflow. The
+`release_gate_project` example combines fixture globbing, shell/process
+dialects, SQLite, q-style columnar aggregation, Excel round-tripping, AI agent
+mocking, and a loopback web route in one runnable release-gate workflow. The
+particle integration example is listed as manual, so `examples check` reports
+it as skipped unless it is run through a dedicated higher-step-budget path.
 
 ## Concurrency Examples
 
@@ -94,6 +98,12 @@ go run ./cmd/leia examples run repo-dialects-sql_result_analytics
 The runnable dialect examples cover the CLI-visible built-in dialect surface,
 including shell/process literals, `env` lookup literals, `sql`,
 `markdown`/`md`, and Markdown table parsing/encoding.
+
+For a larger cross-domain dialect example:
+
+```bash
+go run ./cmd/leia examples run repo-tooling-release_gate_project-main
+```
 
 ## AI Examples
 
