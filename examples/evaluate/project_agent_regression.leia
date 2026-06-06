@@ -1,0 +1,125 @@
+// project_agent_regression.leia - Project-style agent regression fixture.
+//
+// Demonstrates: agent wrapper, local tools, memory/history assembly, a streamed
+// final turn request, and deterministic replay-backed evaluate checks.
+
+memory := {
+    last_owner: "ops",
+    release: "2026.06",
+    incidents: {
+        {id: "INC-17", service: "checkout", severity: "sev2", symptom: "p95 latency spike"},
+        {id: "INC-18", service: "search", severity: "sev3", symptom: "cache misses"}
+    }
+}
+
+func memory_summary(service) {
+    for _, incident := range ipairs(memory.incidents) {
+        if incident.service == service {
+            return incident.id .. " " .. incident.severity .. " " .. incident.symptom
+        }
+    }
+    return "no prior incident"
+}
+
+func find_message(messages, query) {
+    for idx, candidate := range ipairs(messages) {
+        matched := true
+        for key, value := range pairs(query) {
+            if candidate[key] != value {
+                matched = false
+                break
+            }
+        }
+        if matched {
+            return candidate, idx
+        }
+    }
+    return nil, nil
+}
+
+lookup_runbook := llm.tool("lookup_runbook", func(service, severity) {
+    return "runbook:" .. service .. ":" .. severity .. ":restart-workers:false:notify:oncall", nil
+}, {
+    description: "Lookup deterministic runbook evidence."
+    params: {"service", "severity"}
+    requires: {"runbooks.read"}
+    param_docs: {
+        service: "service name"
+        severity: "incident severity"
+    }
+})
+
+func incident_config(service, severity) {
+    return {
+        model: "mock-project"
+        messages: {
+            llm.system("Use memory and runbook evidence. Return a concise incident regression note."),
+            msg.assistant("Memory: owner=" .. memory.last_owner .. " release=" .. memory.release),
+            llm.user("Investigate " .. service .. " " .. severity .. " with " .. memory_summary(service)),
+        }
+        tools: {lookup_runbook}
+        budget: {turns: 2, calls: 1, tokens: 512}
+    }
+}
+
+incident_agent := llm.agent("incident_agent", incident_config, func(service, severity) {
+    cfg := incident_config(service, severity)
+    transcript := cfg.messages
+    task_msg, task_idx := find_message(transcript, {role: "user"})
+
+    first, first_err := llm.turn({
+        model: cfg.model
+        messages: transcript
+        tools: cfg.tools
+        force_tool: "lookup_runbook"
+    })
+    if first_err != nil {
+        return nil, first_err
+    }
+
+    call := first.calls[1]
+    evidence, dispatch_err := llm.dispatch(call, cfg.tools)
+    transcript[#transcript + 1] = msg.assistant_call(call)
+    if dispatch_err != nil {
+        transcript[#transcript + 1] = msg.tool_error(call.id, dispatch_err.message)
+    } else {
+        transcript[#transcript + 1] = msg.tool_result(call.id, evidence)
+    }
+
+    final, final_err := llm.turn({
+        model: cfg.model
+        messages: transcript
+        tools: cfg.tools
+        stream: true
+        max_tokens: 160
+    })
+    if final_err != nil {
+        return nil, final_err
+    }
+
+    tool_msg, _ := find_message(transcript, {role: "tool"})
+    return {
+        status: final.status,
+        text: final.text,
+        evidence: tool_msg.value,
+        history_len: #transcript,
+        task: task_msg.text,
+        task_idx: task_idx,
+    }, nil
+}, {params: {"service", "severity"}})
+
+evaluate "project agent regression consumes replay" {
+    result, err := incident_agent("checkout", "sev2")
+    assert(err == nil)
+    assert(result.status == "final_answer")
+    assert(result.text == "Checkout sev2 owned by ops; keep workers running and notify oncall.")
+    assert(result.evidence == "runbook:checkout:sev2:restart-workers:false:notify:oncall")
+    assert(result.history_len == 5)
+    assert(result.task_idx == 3)
+    assert(string.find(result.task, "INC-17 sev2 p95 latency spike", 1, true) != nil)
+}
+
+evaluate "project memory summary stays stable" {
+    assert(memory_summary("checkout") == "INC-17 sev2 p95 latency spike")
+    assert(memory_summary("billing") == "no prior incident")
+}

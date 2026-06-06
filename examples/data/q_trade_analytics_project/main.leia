@@ -1,0 +1,93 @@
+// q_trade_analytics_project - compact q/kdb+-style trade analytics.
+// Run:
+//   go run ./cmd/leia run examples/data/q_trade_analytics_project/main.leia
+
+func check(name, ok) {
+    assert(ok)
+    print("ok", name)
+}
+
+symbols := q.eval("`AAPL`MSFT`NVDA")
+book := q.eval("`bid`ask`last!(99.5 100;100.5 101;100 101.5)")
+
+prices := q.eval("100 101.5 100.75 102.25 103")
+previous := q.eval("99.5 100 101.5 100.75 102.25")
+price_delta := q.eval("100 101.5 100.75 102.25 103 - 99.5 100 101.5 100.75 102.25")
+total_size := q.eval("+/100 120 80 150 90")
+running_notional := q.eval("+\\10100 12090 8060 15337.5 9270")
+large_trade_indexes := q.eval("where 10100 12090 8060 15337.5 9270>10000")
+large_trade_count := q.count(large_trade_indexes)
+top_two_prices := q.eval("2#103 102.25 101.5")
+
+trades := q.eval("flip `sym`side`price`size`notional!(`AAPL`MSFT`AAPL`NVDA`MSFT;`buy`sell`buy`buy`sell;100 101.5 100.75 102.25 103;100 120 80 150 90;10100 12090 8060 15337.5 9270)")
+
+check("symbol list", symbols[2] == "MSFT")
+check("dict vectors", book.ask[2] == 101)
+check("vector arithmetic", price_delta[4] == 1.5)
+check("reduce", total_size == 540)
+check("scan", running_notional[5] == 54857.5)
+check("where", large_trade_indexes[1] == 1 && large_trade_indexes[3] == 4)
+check("take", top_two_prices[2] == 102.25)
+check("flip table", #trades == 5 && trades[4].sym == "NVDA" && trades[4].notional == 15337.5)
+
+aapl_notional := 0
+msft_notional := 0
+nvda_notional := 0
+buy_size := 0
+sell_size := 0
+
+for i := 1; i <= #trades; i++ {
+    row := trades[i]
+    if row.sym == "AAPL" {
+        aapl_notional += row.notional
+    }
+    if row.sym == "MSFT" {
+        msft_notional += row.notional
+    }
+    if row.sym == "NVDA" {
+        nvda_notional += row.notional
+    }
+    if row.side == "buy" {
+        buy_size += row.size
+    } else {
+        sell_size += row.size
+    }
+}
+
+leader := "AAPL"
+leader_notional := aapl_notional
+if msft_notional > leader_notional {
+    leader = "MSFT"
+    leader_notional = msft_notional
+}
+if nvda_notional > leader_notional {
+    leader = "NVDA"
+    leader_notional = nvda_notional
+}
+
+check("rollup", leader == "MSFT" && leader_notional == 21360)
+check("side totals", buy_size == 330 && sell_size == 210)
+
+q_trade_analytics_summary := string.format(
+"trades=%d symbols=%d leader=%s notional=%.1f total_size=%d large=%d last_running=%.1f delta4=%.2f",
+#trades,
+#symbols,
+leader,
+leader_notional,
+total_size,
+large_trade_count,
+running_notional[5],
+price_delta[4]
+)
+
+print(q_trade_analytics_summary)
+
+return {
+    symbols: symbols,
+    book: book,
+    trades: trades,
+    leader: leader,
+    leader_notional: leader_notional,
+    running_notional: running_notional,
+    summary: q_trade_analytics_summary,
+}

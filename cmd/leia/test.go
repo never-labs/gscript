@@ -10,9 +10,13 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
+	leia "github.com/never-labs/leia"
 	toolsource "github.com/never-labs/leia/internal/support/source"
 )
+
+var cliStdoutRedirectMu sync.Mutex
 
 func runTestCommand(args []string, opts cliRunOptions, outw, errw io.Writer) int {
 	fs := flag.NewFlagSet("test", flag.ContinueOnError)
@@ -299,6 +303,13 @@ func testGoldenOutputFile(filename string) (string, bool, error) {
 }
 
 func runScriptFileCapturingStdout(filename string, opts cliRunOptions) ([]byte, error) {
+	if canUsePublicRunPath(opts) {
+		return runPublicScriptFileCapturingPrint(filename, nil, opts)
+	}
+
+	cliStdoutRedirectMu.Lock()
+	defer cliStdoutRedirectMu.Unlock()
+
 	r, w, err := os.Pipe()
 	if err != nil {
 		return nil, err
@@ -319,10 +330,6 @@ func runScriptFileCapturingStdout(filename string, opts cliRunOptions) ([]byte, 
 		defer func() {
 			os.Stdout = oldStdout
 		}()
-		if canUsePublicRunPath(opts) {
-			runErr = runPublicScriptFile(filename, nil, opts)
-			return
-		}
 		interp := newCLIInterpreter()
 		runErr = runScriptFile(interp, filename, nil, opts)
 	}()
@@ -339,6 +346,21 @@ func runScriptFileCapturingStdout(filename string, opts cliRunOptions) ([]byte, 
 		return stdout.Bytes(), copyErr
 	}
 	return stdout.Bytes(), nil
+}
+
+func runPublicScriptFileCapturingPrint(filename string, args []string, opts cliRunOptions) ([]byte, error) {
+	var stdout bytes.Buffer
+	leiaOpts := publicRunOptions(opts, filename, args)
+	leiaOpts = append(leiaOpts, leia.WithPrint(func(args ...interface{}) {
+		parts := make([]string, len(args))
+		for i, arg := range args {
+			parts[i] = fmt.Sprint(arg)
+		}
+		fmt.Fprintln(&stdout, strings.Join(parts, "\t"))
+	}))
+	vm := leia.New(leiaOpts...)
+	err := vm.ExecFile(filename)
+	return stdout.Bytes(), err
 }
 
 func stdoutDiff(expected, got []byte) string {

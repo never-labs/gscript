@@ -9,22 +9,30 @@
 import "github.com/never-labs/leia-macos/automation" as macos
 
 notification := macos.applescript({
-  target: "System Events",
-  source: "display notification \"Release notes are ready\" with title \"Leia\"",
-  timeout_ms: 1000,
-  dry_run: true,
+    target: "System Events",
+    source: "display notification \"Release notes are ready\" with title \"Leia\"",
+    timeout_ms: 1000,
+    dry_run: true,
+})
+
+clipboard_probe := macos.applescript({
+    target: "System Events",
+    source: "return the clipboard as text",
+    timeout_ms: 500,
+    dry_run: true,
 })
 
 workflow := macos.plan({
-  name: "release-note-notification",
-  dry_run: true,
-  steps: {
-    notification,
-    macos.open_url({
-      url: "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation",
-      dry_run: true,
-    }),
-  },
+    name: "release-note-notification",
+    dry_run: true,
+    steps: {
+        notification,
+        clipboard_probe,
+        macos.open_url({
+            url: "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation",
+            dry_run: true,
+        }),
+    },
 })
 
 return workflow

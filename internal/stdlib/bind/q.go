@@ -34,6 +34,12 @@ func BuildQ() *Table {
 		}
 		return qEvalSymbolic(args[0].Str())
 	})
+	set("count", func(args []Value) ([]Value, error) {
+		if len(args) < 1 {
+			return nil, fmt.Errorf("q.count: argument 1 required")
+		}
+		return []Value{IntValue(int64(qCount(args[0])))}, nil
+	})
 	return t
 }
 
@@ -57,7 +63,24 @@ func qParseSymbolic(src string) (Value, error) {
 	if src == "" {
 		return NilValue(), fmt.Errorf("empty q expression")
 	}
-	if bang := strings.IndexByte(src, '!'); bang >= 0 {
+	if qEnclosed(src, '(', ')') {
+		return qParseSymbolic(strings.TrimSpace(src[1 : len(src)-1]))
+	}
+	if strings.HasPrefix(src, "flip ") {
+		v, err := qParseSymbolic(strings.TrimSpace(src[len("flip "):]))
+		if err != nil {
+			return NilValue(), err
+		}
+		return qFlip(v)
+	}
+	if strings.HasPrefix(src, "where ") {
+		v, err := qParseSymbolic(strings.TrimSpace(src[len("where "):]))
+		if err != nil {
+			return NilValue(), err
+		}
+		return qWhere(v)
+	}
+	if bang := qFindTopLevel(src, "!"); bang >= 0 {
 		keys, err := qParseSymbolList(strings.TrimSpace(src[:bang]))
 		if err != nil {
 			return NilValue(), err
@@ -67,6 +90,20 @@ func qParseSymbolic(src string) (Value, error) {
 			return NilValue(), err
 		}
 		return qSymbolDict(keys, values)
+	}
+	if hash := qFindTopLevel(src, "#"); hash >= 0 {
+		n, _, err := qParseNumber(strings.TrimSpace(src[:hash]))
+		if err != nil {
+			return NilValue(), fmt.Errorf("# left operand must be an integer count")
+		}
+		if !n.IsInt() {
+			return NilValue(), fmt.Errorf("# left operand must be an integer count")
+		}
+		v, err := qParseSymbolic(strings.TrimSpace(src[hash+1:]))
+		if err != nil {
+			return NilValue(), err
+		}
+		return qTake(int(n.Int()), v)
 	}
 	if strings.HasPrefix(src, "+/") {
 		v, err := qParseSymbolic(strings.TrimSpace(src[2:]))
@@ -92,6 +129,17 @@ func qParseSymbolic(src string) (Value, error) {
 		}
 		return DenseArrayValue(scan), nil
 	}
+	if parts := qSplitTopLevel(src, ';'); len(parts) > 1 {
+		out := NewAppendArrayTable(len(parts))
+		for i, part := range parts {
+			v, err := qParseSymbolic(part)
+			if err != nil {
+				return NilValue(), err
+			}
+			out.RawSetInt(int64(i+1), v)
+		}
+		return TableValue(out), nil
+	}
 	if strings.HasPrefix(src, "`") {
 		keys, err := qParseSymbolList(src)
 		if err != nil {
@@ -111,6 +159,83 @@ func qParseSymbolic(src string) (Value, error) {
 		return qApplyDyadic(op, left, right)
 	}
 	return qParseNumericAtom(src)
+}
+
+func qEnclosed(src string, open, close byte) bool {
+	if len(src) < 2 || src[0] != open || src[len(src)-1] != close {
+		return false
+	}
+	depth := 0
+	for i := 0; i < len(src); i++ {
+		switch src[i] {
+		case open:
+			depth++
+		case close:
+			depth--
+			if depth == 0 && i != len(src)-1 {
+				return false
+			}
+			if depth < 0 {
+				return false
+			}
+		}
+	}
+	return depth == 0
+}
+
+func qFindTopLevel(src, ops string) int {
+	depth := 0
+	for i := 0; i < len(src); i++ {
+		switch src[i] {
+		case '(':
+			depth++
+		case ')':
+			depth--
+		default:
+			if depth == 0 && strings.ContainsRune(ops, rune(src[i])) {
+				if (src[i] == '+' || src[i] == '-') && qIsSign(src, i) {
+					continue
+				}
+				return i
+			}
+		}
+	}
+	return -1
+}
+
+func qSplitTopLevel(src string, sep byte) []string {
+	var parts []string
+	depth := 0
+	start := 0
+	for i := 0; i < len(src); i++ {
+		switch src[i] {
+		case '(':
+			depth++
+		case ')':
+			depth--
+		case sep:
+			if depth == 0 {
+				parts = append(parts, strings.TrimSpace(src[start:i]))
+				start = i + 1
+			}
+		}
+	}
+	if len(parts) == 0 {
+		return nil
+	}
+	parts = append(parts, strings.TrimSpace(src[start:]))
+	return parts
+}
+
+func qIsSign(src string, i int) bool {
+	if i+1 >= len(src) || (src[i+1] < '0' || src[i+1] > '9') {
+		return false
+	}
+	if i == 0 {
+		return true
+	}
+	prev := src[i-1]
+	return prev == ' ' || prev == '\t' || prev == '\n' || prev == '(' || prev == ';'
 }
 
 func qParseNumericAtom(src string) (Value, error) {
@@ -161,13 +286,9 @@ func qParseNumber(src string) (Value, bool, error) {
 }
 
 func qFindDyadic(src string) (int, byte, bool) {
-	for i := 1; i < len(src); i++ {
-		switch src[i] {
-		case '+', '-', '*', '%':
-			if (src[i] == '+' || src[i] == '-') && (src[i-1] == 'e' || src[i-1] == 'E') {
-				continue
-			}
-			return i, src[i], true
+	for _, ops := range []string{"=<>", "+-", "*%"} {
+		if idx := qFindTopLevel(src, ops); idx >= 0 {
+			return idx, src[idx], true
 		}
 	}
 	return 0, 0, false
@@ -175,6 +296,9 @@ func qFindDyadic(src string) (int, byte, bool) {
 
 func qApplyDyadic(op byte, left, right Value) (Value, error) {
 	if left.IsDenseArray() || right.IsDenseArray() {
+		if op == '=' || op == '<' || op == '>' {
+			return qCompareVector(op, left, right)
+		}
 		denseOp, err := qDenseArrayOp(op)
 		if err != nil {
 			return NilValue(), err
@@ -192,6 +316,12 @@ func qApplyDyadic(op byte, left, right Value) (Value, error) {
 			return IntValue(left.Int() - right.Int()), nil
 		case '*':
 			return IntValue(left.Int() * right.Int()), nil
+		case '=':
+			return BoolValue(left.Int() == right.Int()), nil
+		case '<':
+			return BoolValue(left.Int() < right.Int()), nil
+		case '>':
+			return BoolValue(left.Int() > right.Int()), nil
 		}
 	}
 	switch op {
@@ -203,9 +333,68 @@ func qApplyDyadic(op byte, left, right Value) (Value, error) {
 		return FloatValue(left.Number() * right.Number()), nil
 	case '%':
 		return FloatValue(left.Number() / right.Number()), nil
+	case '=':
+		return BoolValue(left.Number() == right.Number()), nil
+	case '<':
+		return BoolValue(left.Number() < right.Number()), nil
+	case '>':
+		return BoolValue(left.Number() > right.Number()), nil
 	default:
 		return NilValue(), fmt.Errorf("operator %q is not supported", string(op))
 	}
+}
+
+func qCompareVector(op byte, left, right Value) (Value, error) {
+	la, ra := left.DenseArray(), right.DenseArray()
+	n := 0
+	switch {
+	case la != nil && ra != nil:
+		if la.Len() != ra.Len() {
+			return NilValue(), fmt.Errorf("comparison length mismatch")
+		}
+		n = la.Len()
+	case la != nil:
+		n = la.Len()
+	case ra != nil:
+		n = ra.Len()
+	default:
+		return qApplyDyadic(op, left, right)
+	}
+	out, err := NewDenseArrayOfLen(DenseArrayBool, n)
+	if err != nil {
+		return NilValue(), err
+	}
+	for i := 0; i < n; i++ {
+		lv, rv := left, right
+		if la != nil {
+			lv, err = la.At(i)
+			if err != nil {
+				return NilValue(), err
+			}
+		}
+		if ra != nil {
+			rv, err = ra.At(i)
+			if err != nil {
+				return NilValue(), err
+			}
+		}
+		if !lv.IsNumber() || !rv.IsNumber() {
+			return NilValue(), fmt.Errorf("operator %q expects numeric operands", string(op))
+		}
+		var ok bool
+		switch op {
+		case '=':
+			ok = lv.Number() == rv.Number()
+		case '<':
+			ok = lv.Number() < rv.Number()
+		case '>':
+			ok = lv.Number() > rv.Number()
+		}
+		if err := out.Set(i, BoolValue(ok)); err != nil {
+			return NilValue(), err
+		}
+	}
+	return DenseArrayValue(out), nil
 }
 
 func qDenseArrayOp(op byte) (DenseArrayBinaryOp, error) {
@@ -286,6 +475,169 @@ func qSymbolDict(keys []string, values Value) (Value, error) {
 		out.RawSetString(keys[0], values)
 	}
 	return TableValue(out), nil
+}
+
+func qFlip(v Value) (Value, error) {
+	if !v.IsTable() {
+		return NilValue(), fmt.Errorf("flip expects a dictionary")
+	}
+	dict := v.Table()
+	names := make([]string, 0, dict.Length())
+	ok := dict.ForEachPlainRaw(func(key, val Value) bool {
+		if !key.IsString() {
+			return false
+		}
+		switch {
+		case val.IsDenseArray(), val.IsTable():
+			names = append(names, key.Str())
+			return true
+		default:
+			return false
+		}
+	})
+	if !ok {
+		return NilValue(), fmt.Errorf("flip expects a plain dictionary of vectors")
+	}
+	sort.Strings(names)
+	rows := -1
+	for _, name := range names {
+		n := qVectorLen(dict.RawGetString(name))
+		if rows < 0 {
+			rows = n
+		} else if rows != n {
+			return NilValue(), fmt.Errorf("flip column length mismatch")
+		}
+	}
+	out := NewAppendArrayTable(rows)
+	for i := 0; i < rows; i++ {
+		row := NewTable()
+		for _, name := range names {
+			item, err := qVectorAt(dict.RawGetString(name), i)
+			if err != nil {
+				return NilValue(), err
+			}
+			row.RawSetString(name, item)
+		}
+		out.RawSetInt(int64(i+1), TableValue(row))
+	}
+	return TableValue(out), nil
+}
+
+func qVectorLen(v Value) int {
+	if v.IsDenseArray() {
+		return v.DenseArray().Len()
+	}
+	if v.IsTable() {
+		return v.Table().Length()
+	}
+	return 0
+}
+
+func qCount(v Value) int {
+	switch {
+	case v.IsNil():
+		return 0
+	case v.IsDenseArray(), v.IsTable():
+		return qVectorLen(v)
+	case v.IsString():
+		return len(v.Str())
+	default:
+		return 1
+	}
+}
+
+func qVectorAt(v Value, i int) (Value, error) {
+	if v.IsDenseArray() {
+		return v.DenseArray().At(i)
+	}
+	if v.IsTable() {
+		return v.Table().RawGetInt(int64(i + 1)), nil
+	}
+	return NilValue(), fmt.Errorf("not a vector")
+}
+
+func qWhere(v Value) (Value, error) {
+	if !v.IsDenseArray() || v.DenseArray().DType() != DenseArrayBool {
+		return NilValue(), fmt.Errorf("where expects a bool vector")
+	}
+	var indexes []int64
+	for i := 0; i < v.DenseArray().Len(); i++ {
+		item, err := v.DenseArray().At(i)
+		if err != nil {
+			return NilValue(), err
+		}
+		if item.IsBool() && item.Bool() {
+			indexes = append(indexes, int64(i+1))
+		}
+	}
+	return DenseArrayValue(NewDenseArrayI64(indexes)), nil
+}
+
+func qTake(n int, v Value) (Value, error) {
+	if n < 0 {
+		return NilValue(), fmt.Errorf("# negative counts are not supported")
+	}
+	switch {
+	case v.IsDenseArray():
+		if n > v.DenseArray().Len() {
+			n = v.DenseArray().Len()
+		}
+		switch v.DenseArray().DType() {
+		case DenseArrayI64:
+			out := make([]int64, n)
+			for i := 0; i < n; i++ {
+				item, err := v.DenseArray().At(i)
+				if err != nil {
+					return NilValue(), err
+				}
+				out[i] = item.Int()
+			}
+			return DenseArrayValue(NewDenseArrayI64(out)), nil
+		case DenseArrayF64:
+			out := make([]float64, n)
+			for i := 0; i < n; i++ {
+				item, err := v.DenseArray().At(i)
+				if err != nil {
+					return NilValue(), err
+				}
+				out[i] = item.Number()
+			}
+			return DenseArrayValue(NewDenseArrayF64(out)), nil
+		default:
+			out, err := NewDenseArrayOfLen(DenseArrayBool, n)
+			if err != nil {
+				return NilValue(), err
+			}
+			for i := 0; i < n; i++ {
+				item, err := v.DenseArray().At(i)
+				if err != nil {
+					return NilValue(), err
+				}
+				if err := out.Set(i, item); err != nil {
+					return NilValue(), err
+				}
+			}
+			return DenseArrayValue(out), nil
+		}
+	case v.IsTable():
+		if n > v.Table().Length() {
+			n = v.Table().Length()
+		}
+		out := NewAppendArrayTable(n)
+		for i := 1; i <= n; i++ {
+			out.RawSetInt(int64(i), v.Table().RawGetInt(int64(i)))
+		}
+		return TableValue(out), nil
+	default:
+		if n == 0 {
+			return TableValue(NewAppendArrayTable(0)), nil
+		}
+		out := NewAppendArrayTable(n)
+		for i := 1; i <= n; i++ {
+			out.RawSetInt(int64(i), v)
+		}
+		return TableValue(out), nil
+	}
 }
 
 func qRunQuery(s *SoA, spec *Table) (*Table, error) {

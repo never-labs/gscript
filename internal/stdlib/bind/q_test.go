@@ -140,6 +140,55 @@ notional_by_sym := q.query(trades, {
 	}
 }
 
+func TestQSymbolicCoreDataForms(t *testing.T) {
+	interp := runWithQAndSOA(t,
+		"syms := q.eval(\"`AAPL`MSFT`NVDA\")\n"+
+			"spread := q.eval(\"100 101.5 103 - 99.5 100 101\")\n"+
+			"running := q.eval(\"+\\\\100 101.5 103\")\n"+
+			"total := q.eval(\"+/10 20 30 40\")\n"+
+			"idx := q.eval(\"where 100 101.5 103>100\")\n"+
+			"idx_count := q.count(idx)\n"+
+			"first_two := q.eval(\"2#10 20 30\")\n"+
+			"dict := q.eval(\"`bid`ask`last!(99.5 100;100.5 101;100 101.5)\")\n"+
+			"trades := q.eval(\"flip `sym`side`price`size!(`AAPL`MSFT`AAPL;`buy`sell`buy;100.5 200 101;10 15 20)\")\n")
+
+	if got := interp.GetGlobal("syms").Table().RawGetInt(2); !got.IsString() || got.Str() != "MSFT" {
+		t.Fatalf("syms[2] = %v, want MSFT", got)
+	}
+	if got, _ := interp.GetGlobal("spread").DenseArray().At(2); !got.IsFloat() || got.Float() != 2 {
+		t.Fatalf("spread[3] = %v, want 2", got)
+	}
+	if got, _ := interp.GetGlobal("running").DenseArray().At(2); !got.IsFloat() || got.Float() != 304.5 {
+		t.Fatalf("running[3] = %v, want 304.5", got)
+	}
+	if got := interp.GetGlobal("total"); !got.IsInt() || got.Int() != 100 {
+		t.Fatalf("total = %v, want 100", got)
+	}
+	if got, _ := interp.GetGlobal("idx").DenseArray().At(0); !got.IsInt() || got.Int() != 2 {
+		t.Fatalf("idx[1] = %v, want 2", got)
+	}
+	if got := interp.GetGlobal("idx_count"); !got.IsInt() || got.Int() != 2 {
+		t.Fatalf("idx_count = %v, want 2", got)
+	}
+	if got, _ := interp.GetGlobal("first_two").DenseArray().At(1); !got.IsInt() || got.Int() != 20 {
+		t.Fatalf("first_two[2] = %v, want 20", got)
+	}
+	dict := interp.GetGlobal("dict").Table()
+	if got, _ := dict.RawGetString("ask").DenseArray().At(1); !got.IsFloat() || got.Float() != 101 {
+		t.Fatalf("dict.ask[2] = %v, want 101", got)
+	}
+	trades := interp.GetGlobal("trades").Table()
+	if trades == nil || trades.Length() != 3 {
+		t.Fatalf("trades length = %v, want 3", trades)
+	}
+	if got := trades.RawGetInt(2).Table().RawGetString("sym"); !got.IsString() || got.Str() != "MSFT" {
+		t.Fatalf("trades[2].sym = %v, want MSFT", got)
+	}
+	if got := trades.RawGetInt(3).Table().RawGetString("price"); !got.IsFloat() || got.Float() != 101 {
+		t.Fatalf("trades[3].price = %v, want 101", got)
+	}
+}
+
 func runWithQAndSOA(t *testing.T, src string) *runtime.Interpreter {
 	t.Helper()
 	interp := runtime.NewCore()

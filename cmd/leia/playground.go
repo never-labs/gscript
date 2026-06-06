@@ -1503,6 +1503,7 @@ func repositoryExampleRunnable(path string) bool {
 		!strings.Contains(path, "/testing/") &&
 		!strings.Contains(path, "/workflow/support_triage_replay.leia") &&
 		!strings.Contains(path, "/web/hello_server.leia") &&
+		!strings.Contains(path, "/web/route_workbench.leia") &&
 		!strings.Contains(path, "/web/tiny_app.leia") &&
 		!strings.Contains(path, "/web/webserver.leia") &&
 		!strings.Contains(path, "/dialects/shell_filesystem.leia") &&
@@ -1526,7 +1527,10 @@ func repositoryExampleRequires(path string) string {
 		return "leia test CLI"
 	case strings.Contains(path, "/workflow/support_triage_replay.leia"):
 		return "LLM replay fixture or provider"
-	case strings.Contains(path, "/web/hello_server.leia"), strings.Contains(path, "/web/tiny_app.leia"), strings.Contains(path, "/web/webserver.leia"):
+	case strings.Contains(path, "/web/hello_server.leia"),
+		strings.Contains(path, "/web/route_workbench.leia"),
+		strings.Contains(path, "/web/tiny_app.leia"),
+		strings.Contains(path, "/web/webserver.leia"):
 		return "network/server host access"
 	case strings.Contains(path, "/dialects/shell_filesystem.leia"):
 		return "process shell and filesystem host access"

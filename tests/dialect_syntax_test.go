@@ -608,12 +608,25 @@ func TestQSymbolicDialectMilestone1ExecutesThroughStdlib(t *testing.T) {
 				"over := q`+/1 2 3`\n" +
 				"scan := q`+\\1 2 3`\n" +
 				"dict := dialect.eval(\"q\", \"`a`b!10 20\")\n" +
+				"syms := dialect.eval(\"q\", \"`AAPL`MSFT`NVDA\")\n" +
+				"spread := dialect.eval(\"q\", \"100 101.5 103 - 99.5 100 101\")\n" +
+				"idx := dialect.eval(\"q\", \"where 100 101.5 103>100\")\n" +
+				"first_two := dialect.eval(\"q\", \"2#10 20 30\")\n" +
+				"book := dialect.eval(\"q\", \"`bid`ask!(99.5 100;100.5 101)\")\n" +
+				"trades := dialect.eval(\"q\", \"flip `sym`side`price`size!(`AAPL`MSFT`AAPL;`buy`sell`buy;100.5 200 101;10 15 20)\")\n" +
 				"v1 := v[1]\n" +
 				"v_sum := array.sum(v)\n" +
 				"plus3 := plus[3]\n" +
 				"scan3 := scan[3]\n" +
 				"dict_a := dict.a\n" +
-				"dict_b := dict.b\n"
+				"dict_b := dict.b\n" +
+				"sym2 := syms[2]\n" +
+				"spread3 := spread[3]\n" +
+				"idx1 := idx[1]\n" +
+				"first_two2 := first_two[2]\n" +
+				"book_ask2 := book.ask[2]\n" +
+				"trade2_sym := trades[2].sym\n" +
+				"trade3_price := trades[3].price\n"
 			if err := vm.Exec(src); err != nil {
 				t.Fatalf("Exec: %v", err)
 			}
@@ -624,6 +637,13 @@ func TestQSymbolicDialectMilestone1ExecutesThroughStdlib(t *testing.T) {
 			assertGet(t, vm, "scan3", int64(6))
 			assertGet(t, vm, "dict_a", int64(10))
 			assertGet(t, vm, "dict_b", int64(20))
+			assertGet(t, vm, "sym2", "MSFT")
+			assertGet(t, vm, "spread3", float64(2))
+			assertGet(t, vm, "idx1", int64(2))
+			assertGet(t, vm, "first_two2", int64(20))
+			assertGet(t, vm, "book_ask2", float64(101))
+			assertGet(t, vm, "trade2_sym", "MSFT")
+			assertGet(t, vm, "trade3_price", float64(101))
 		})
 	}
 }

@@ -84,6 +84,35 @@ func TestExamplesCommandDiscoversDialectExamples(t *testing.T) {
 	}
 }
 
+func TestExamplesCommandDiscoversPackageManagedProjectEntrypoints(t *testing.T) {
+	root := filepath.Dir(playgroundExamplesRoot())
+	examples, err := cliRepositoryExamples()
+	if err != nil {
+		t.Fatal(err)
+	}
+	discovered := make(map[string]bool, len(examples))
+	for _, example := range examples {
+		discovered[example.Path] = true
+	}
+
+	projectRoots := []string{
+		filepath.Join("examples", "database", "package_managed"),
+		filepath.Join("examples", "macos", "package_managed"),
+		filepath.Join("examples", "ui", "package_managed"),
+	}
+	for _, projectRoot := range projectRoots {
+		t.Run(filepath.ToSlash(projectRoot), func(t *testing.T) {
+			if _, err := os.Stat(filepath.Join(root, projectRoot, "leia.mod")); err != nil {
+				t.Fatalf("project manifest missing: %v", err)
+			}
+			path := filepath.ToSlash(filepath.Join(projectRoot, "main.leia"))
+			if !discovered[path] {
+				t.Fatalf("examples CLI must discover package-managed project entrypoint %s", path)
+			}
+		})
+	}
+}
+
 func TestExamplesCommandManifestMatchesPlaygroundRepositoryExamples(t *testing.T) {
 	playgroundExamples, err := playgroundRepositoryExamples(playgroundExamplesRoot())
 	if err != nil {
@@ -115,6 +144,23 @@ func TestExamplesCommandManifestMatchesPlaygroundRepositoryExamples(t *testing.T
 		}
 		if !playground.Runnable && !cli.Runnable && strings.TrimSpace(cli.Requires) == "" {
 			t.Fatalf("%s is manual/check-only in the CLI manifest but has no requires reason", playground.ID)
+		}
+	}
+}
+
+func TestExamplesCommandChecksSubdirectoryProjectSelector(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := runExamplesCommand([]string{"check", "--timeout=20s", "database/package_managed"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runExamplesCommand code = %d, stdout = %q stderr = %q", code, stdout.String(), stderr.String())
+	}
+	out := stdout.String()
+	for _, want := range []string{
+		"ok      repo-database-package_managed-main",
+		"examples: 1 ok, 0 skipped, 0 failed",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("examples check missing %q\n%s", want, out)
 		}
 	}
 }
@@ -282,6 +328,7 @@ func TestExamplesCommandChecksDeterministicSpecialRunners(t *testing.T) {
 		"repo-evaluate-llm_replay",
 		"repo-evaluate-agent_replay",
 		"repo-evaluate-multiturn_replay",
+		"repo-evaluate-project_agent_regression",
 		"repo-ai-coding_agent_replay",
 		"repo-ai-tagged_agent_workflow",
 		"repo-ai-record_replay_trace_project",
@@ -300,6 +347,7 @@ func TestExamplesCommandChecksDeterministicSpecialRunners(t *testing.T) {
 		"ok      repo-evaluate-llm_replay",
 		"ok      repo-evaluate-agent_replay",
 		"ok      repo-evaluate-multiturn_replay",
+		"ok      repo-evaluate-project_agent_regression",
 		"ok      repo-ai-coding_agent_replay",
 		"ok      repo-ai-tagged_agent_workflow",
 		"ok      repo-ai-record_replay_trace_project",
@@ -308,7 +356,7 @@ func TestExamplesCommandChecksDeterministicSpecialRunners(t *testing.T) {
 		"ok      repo-tooling-release_evidence_pipeline",
 		"ok      repo-performance-execution_modes_matrix",
 		"ok      repo-ui-package_managed-main",
-		"examples: 12 ok, 0 skipped, 0 failed",
+		"examples: 13 ok, 0 skipped, 0 failed",
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("examples check missing %q\n%s", want, out)
@@ -345,6 +393,7 @@ func TestExamplesCommandChecksDeterministicHostExamples(t *testing.T) {
 		"--jobs=4",
 		"--timeout=10s",
 		"repo-web-hello_server",
+		"repo-web-route_workbench",
 		"repo-web-tiny_app",
 		"repo-web-webserver",
 		"repo-concurrency-context_process",
@@ -359,6 +408,7 @@ func TestExamplesCommandChecksDeterministicHostExamples(t *testing.T) {
 	out := stdout.String()
 	for _, want := range []string{
 		"ok      repo-web-hello_server",
+		"ok      repo-web-route_workbench",
 		"ok      repo-web-tiny_app",
 		"ok      repo-web-webserver",
 		"ok      repo-concurrency-context_process",
@@ -366,7 +416,7 @@ func TestExamplesCommandChecksDeterministicHostExamples(t *testing.T) {
 		"ok      repo-dialects-shell_filesystem",
 		"ok      repo-data_processing-data_oriented-particle_integration",
 		"ok      repo-game_engine-game_of_life",
-		"examples: 8 ok, 0 skipped, 0 failed",
+		"examples: 9 ok, 0 skipped, 0 failed",
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("examples check missing %q\n%s", want, out)

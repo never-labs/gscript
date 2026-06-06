@@ -90,9 +90,11 @@ func TestPracticalExampleProjects(t *testing.T) {
 		{"release-ci-regression", testExampleProject(root, filepath.Join("examples", "testing")), "release_ci_regression_workflow_test.leia"},
 		{"static-site-docs-generation", execExampleProjectGlobal(root, filepath.Join("examples", "site", "static_docs_generator.leia"), "site_generation_summary"), "pages=3 published=2 drafts=1 assets=2"},
 		{"web-access-log-report", execExampleProjectGlobal(root, filepath.Join("examples", "web", "access_log_report.leia"), "web_access_report_summary"), "routes=4 requests=10 errors=3 slow=3 cache_hits=4 top=/api/orders"},
+		{"web-route-workbench", execExampleProjectGlobal(root, filepath.Join("examples", "web", "route_workbench.leia"), "web_route_workbench_summary"), "routes=5 events=6 created=bk-303 updated_stock=8 deleted=bk-202 method_status=405 html=200"},
 		{"ai-agent-composition", evaluateReplayExampleProject(root, filepath.Join("examples", "evaluate", "agent_replay.leia"), filepath.Join("examples", "evaluate", "agent_replay.records.json")), "agent consumes replay"},
+		{"ai-project-regression", evaluateReplayExampleProject(root, filepath.Join("examples", "evaluate", "project_agent_regression.leia"), filepath.Join("examples", "evaluate", "project_agent_regression.records.json")), "project agent regression consumes replay"},
 		{"concurrency-pipeline", execExampleProjectGlobal(root, filepath.Join("examples", "concurrency", "goroutines_channels.leia"), "workers"), "4"},
-		{"builtin-database", execExampleProjectGlobal(root, filepath.Join("examples", "database", "package_managed", "main.leia"), "database_summary"), "Ada"},
+		{"builtin-database", execExampleProjectGlobal(root, filepath.Join("examples", "database", "package_managed", "main.leia"), "database_summary"), "ledger accounts=5 entries=10 top_account=rev top_total=2510.00 top_project=alpha net=2290.00 uncleared=4 error=constraint"},
 		{"package-managed-macos", modCheckExampleProject(root, filepath.Join("examples", "macos", "package_managed")), "github.com/never-labs/leia-macos/automation"},
 	}
 	for _, project := range projects {
@@ -291,8 +293,14 @@ func TestBuiltinDatabaseExample(t *testing.T) {
 		"conn := db.memory()",
 		"conn.exec(",
 		"conn.query(",
-		"sql {query:",
-		"//leia:cap db.open,db.exec,db.query",
+		"conn.one(",
+		"create table accounts",
+		"create table ledger_entries",
+		"group by",
+		"duplicate_account_err",
+		"query: \"insert into",
+		"params:",
+		"//leia:cap db.open,db.exec,db.query,db.one",
 	} {
 		if !strings.Contains(source, want) {
 			t.Fatalf("database example source missing %q\nsource:\n%s", want, source)
@@ -344,7 +352,7 @@ func TestBuiltinDatabaseExample(t *testing.T) {
 	if !caps.OK {
 		t.Fatalf("capability report = %+v, want package-managed database capabilities to report", caps)
 	}
-	if !moduleHasCapabilities(caps.Modules, "example.com/leia/examples/database/package-managed", "db.open", "db.exec", "db.query") {
+	if !moduleHasCapabilities(caps.Modules, "example.com/leia/examples/database/package-managed", "db.open", "db.exec", "db.query", "db.one") {
 		t.Fatalf("capability modules = %+v, want database domain capabilities on the example manifest", caps.Modules)
 	}
 }
@@ -372,6 +380,7 @@ func TestPackageManagedMacOSAutomationExample(t *testing.T) {
 		`import "github.com/never-labs/leia-macos/automation" as macos`,
 		"macos.applescript(",
 		"macos.plan(",
+		"clipboard_probe",
 		"//leia:cap macos.automation,process.exec",
 	} {
 		if !strings.Contains(source, want) {
@@ -399,6 +408,19 @@ func TestPackageManagedMacOSAutomationExample(t *testing.T) {
 
 	stdout.Reset()
 	stderr.Reset()
+	code = runModCommand([]string{"verify", "--json", dir}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("mod verify code = %d, stderr = %q stdout = %q", code, stderr.String(), stdout.String())
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &verify); err != nil {
+		t.Fatalf("stdout is not JSON verify report: %v; stdout = %q", err, stdout.String())
+	}
+	if !verify.OK {
+		t.Fatalf("verify = %+v, want explicit package-managed macOS automation verify to pass", verify)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
 	code = runModCommand([]string{"list", "--json", dir}, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("mod list code = %d, stderr = %q stdout = %q", code, stderr.String(), stdout.String())
@@ -409,6 +431,29 @@ func TestPackageManagedMacOSAutomationExample(t *testing.T) {
 	}
 	if !list.OK || !containsResolvedRequire(list.Requires, "github.com/never-labs/leia-macos/automation", "v0.1.0") {
 		t.Fatalf("list = %+v, want external Leia macOS automation runtime requirement", list)
+	}
+	if len(list.Requires) != 1 || list.Requires[0].Kind != "replace" ||
+		len(list.Replaces) != 1 || !list.Replaces[0].Local ||
+		!strings.HasSuffix(list.Replaces[0].Root, filepath.Join("package_managed", "adapter")) {
+		t.Fatalf("list requires = %+v replaces = %+v, want local replace-backed macOS automation adapter", list.Requires, list.Replaces)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = runModCommand([]string{"gomod", dir}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("mod gomod code = %d, stderr = %q stdout = %q", code, stderr.String(), stdout.String())
+	}
+	for _, want := range []string{
+		"module example.com/leia/examples/macos/package-managed\n",
+		"go 1.25\n",
+		"github.com/never-labs/leia-macos/automation v0.1.0",
+		"github.com/never-labs/leia v0.0.0-20260601065425-1c9cadbd856f",
+		"replace github.com/never-labs/leia-macos/automation v0.1.0 => ./adapter",
+	} {
+		if got := stdout.String(); !strings.Contains(got, want) {
+			t.Fatalf("generated go.mod missing %q in:\n%s", want, got)
+		}
 	}
 
 	stdout.Reset()
@@ -427,8 +472,12 @@ func TestPackageManagedMacOSAutomationExample(t *testing.T) {
 	if !moduleHasCapabilities(caps.Modules, "example.com/leia/examples/macos/package-managed", "macos.automation", "process.exec") {
 		t.Fatalf("capability modules = %+v, want macOS automation capabilities on the example manifest", caps.Modules)
 	}
-	if !moduleHasPath(caps.Modules, "github.com/never-labs/leia-macos/automation") {
-		t.Fatalf("capability modules = %+v, want external package-managed macOS automation runtime module", caps.Modules)
+	if !moduleHasCapabilities(caps.Modules, "github.com/never-labs/leia-macos/automation", "macos.automation", "process.exec") {
+		t.Fatalf("capability modules = %+v, want external package-managed macOS automation runtime module capabilities", caps.Modules)
+	}
+	if !caps.Matrix["example.com/leia/examples/macos/package-managed"]["macos.automation"] ||
+		!caps.Matrix["github.com/never-labs/leia-macos/automation"]["process.exec"] {
+		t.Fatalf("capability matrix = %+v, want root and adapter capability summary", caps.Matrix)
 	}
 }
 
@@ -673,6 +722,7 @@ func TestEvaluateReplayExamplesExecute(t *testing.T) {
 		{name: "llm", source: "llm_replay.leia", records: "llm_replay.records.json", replayedTurns: 1},
 		{name: "agent", source: "agent_replay.leia", records: "agent_replay.records.json", replayedTurns: 1},
 		{name: "multiturn", source: "multiturn_replay.leia", records: "multiturn_replay.records.json", replayedTurns: 2},
+		{name: "project-agent-regression", source: "project_agent_regression.leia", records: "project_agent_regression.records.json", replayedTurns: 2},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var stdout, stderr bytes.Buffer
@@ -706,11 +756,16 @@ func TestEvaluateReplayExamplesExecute(t *testing.T) {
 			if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
 				t.Fatalf("stdout is not JSON evaluate report: %v; stdout = %q", err, stdout.String())
 			}
-			if report.Status != "ok" || report.Summary.EvaluateBlocks != 1 || report.Summary.CasesSelected != 1 || report.Summary.CasesPassed != 1 || report.Summary.CasesFailed != 0 {
-				t.Fatalf("report = %+v, want one passing evaluate case", report)
+			if report.Status != "ok" || report.Summary.EvaluateBlocks < 1 || report.Summary.CasesSelected != report.Summary.EvaluateBlocks || report.Summary.CasesPassed != report.Summary.CasesSelected || report.Summary.CasesFailed != 0 {
+				t.Fatalf("report = %+v, want passing evaluate cases", report)
 			}
-			if len(report.Cases) != 1 || report.Cases[0].Status != "passed" {
-				t.Fatalf("cases = %+v, want one passed case", report.Cases)
+			if len(report.Cases) != report.Summary.CasesSelected {
+				t.Fatalf("cases = %+v summary=%+v, want all selected cases reported", report.Cases, report.Summary)
+			}
+			for _, c := range report.Cases {
+				if c.Status != "passed" {
+					t.Fatalf("cases = %+v, want all passed", report.Cases)
+				}
 			}
 			if report.LLM == nil || report.LLM.ReplayedTurns != tc.replayedTurns || report.LLM.RemainingTurns != 0 {
 				t.Fatalf("llm = %+v, want replayed=%d remaining=0", report.LLM, tc.replayedTurns)

@@ -5,3 +5,4 @@ go 1.25
 capability db.open
 capability db.exec
 capability db.query
+capability db.one

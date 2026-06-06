@@ -339,12 +339,43 @@ func selectedCLIExamples(selectors []string) ([]cliExample, error) {
 		if err != nil {
 			return nil, err
 		}
-		if !ok {
+		if ok {
+			selected = append(selected, example)
+			continue
+		}
+		matches := cliExamplesInDirectory(all, selector)
+		if len(matches) == 0 {
 			return nil, fmt.Errorf("example %q not found", selector)
 		}
-		selected = append(selected, example)
+		selected = append(selected, matches...)
 	}
 	return selected, nil
+}
+
+func cliExamplesInDirectory(examples []cliExample, selector string) []cliExample {
+	dir := normalizeCLIExampleSelector(selector)
+	if dir == "" {
+		return nil
+	}
+	var matches []cliExample
+	for _, example := range examples {
+		path := normalizeCLIExampleSelector(example.Path)
+		if strings.HasPrefix(path, dir+"/") {
+			matches = append(matches, example)
+		}
+	}
+	return matches
+}
+
+func normalizeCLIExampleSelector(selector string) string {
+	normalized := filepath.ToSlash(selector)
+	normalized = strings.TrimPrefix(normalized, "./")
+	normalized = strings.TrimPrefix(normalized, "examples/")
+	normalized = strings.Trim(normalized, "/")
+	if normalized == "." {
+		return ""
+	}
+	return normalized
 }
 
 func checkCLIExamples(examples []cliExample, jobs int, maxSteps int64, timeout time.Duration) []cliExampleCheckResult {
@@ -478,6 +509,7 @@ func applyCLIExampleRunner(example *cliExample) {
 		example.Requires = ""
 		return
 	case strings.Contains(example.Path, "/web/tiny_app.leia"),
+		strings.Contains(example.Path, "/web/route_workbench.leia"),
 		strings.Contains(example.Path, "/concurrency/context_process.leia"),
 		strings.Contains(example.Path, "/concurrency/goroutine_errors.leia"),
 		strings.Contains(example.Path, "/dialects/shell_filesystem.leia"):

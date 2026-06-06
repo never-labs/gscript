@@ -1,0 +1,158 @@
+// route_workbench.leia - Runnable local web routing project.
+// Demonstrates: serve.app, route params, JSON/HTML responses, method routing,
+// request JSON, query params, and loopback smoke checks.
+
+items := {
+    ["bk-101"]: {id: "bk-101", name: "Compiler Field Notes", stock: 3},
+    ["bk-202"]: {id: "bk-202", name: "Routing Tables", stock: 7},
+}
+
+events := {}
+
+func record_event(method, path, detail) {
+    events[#events + 1] = {
+        method: method,
+        path: path,
+        detail: detail,
+    }
+}
+
+func json_headers() {
+    headers := {}
+    headers["Content-Type"] = "application/json"
+    return headers
+}
+
+func item_or_error(id) {
+    item := items[id]
+    if item == nil {
+        return {error: "not_found", id: id}
+    }
+    return item
+}
+
+app := serve.app({
+    listen: "127.0.0.1:0",
+    routes: {
+        {method: "GET", path: "/", handler: func(req) {
+                record_event(req.method, req.path, "home")
+                return "<!doctype html><html><body><h1>Leia Route Workbench</h1><p>items=" .. tostring(#events) .. "</p></body></html>"
+            }},
+        {method: "GET", path: "/api/items/:id", handler: func(req) {
+                record_event(req.method, req.path, req.params.id)
+                item := item_or_error(req.params.id)
+                if item.error != nil {
+                    return item
+                }
+                return {
+                    id: item.id,
+                    name: item.name,
+                    stock: item.stock,
+                    expand: req.query.expand,
+                    param: req.params.id,
+                }
+            }},
+        {method: "POST", path: "/api/items", handler: func(req) {
+                body, err := req.json()
+                if err != nil {
+                    return {error: "bad_json", detail: err}
+                }
+                items[body.id] = {id: body.id, name: body.name, stock: body.stock}
+                record_event(req.method, req.path, body.id)
+                return {created: true, id: body.id, count: 3}
+            }},
+        {method: "PUT", path: "/api/items/:id", handler: func(req) {
+                body, err := req.json()
+                if err != nil {
+                    return {error: "bad_json", detail: err}
+                }
+                item := item_or_error(req.params.id)
+                if item.error != nil {
+                    return item
+                }
+                item.stock = body.stock
+                record_event(req.method, req.path, req.params.id)
+                return {updated: true, id: req.params.id, stock: item.stock}
+            }},
+        {method: "DELETE", path: "/api/items/:id", handler: func(req) {
+                id := req.params.id
+                items[id] = nil
+                record_event(req.method, req.path, id)
+                return {deleted: true, id: id}
+            }},
+    },
+})
+
+home := http.get(app.url .. "/")
+assert(home.status == 200)
+assert(string.find(home.headers["Content-Type"], "text/html", 1, true) != nil)
+assert(string.find(home.body, "Leia Route Workbench", 1, true) != nil)
+
+read_resp := http.get(app.url .. "/api/items/bk-101?expand=audit")
+assert(read_resp.status == 200)
+read_item := json.decode(read_resp.body)
+assert(read_item.id == "bk-101")
+assert(read_item.param == "bk-101")
+assert(read_item.expand == "audit")
+assert(read_item.stock == 3)
+
+create_resp, create_err := net.post(
+app.url .. "/api/items",
+"{\"id\":\"bk-303\",\"name\":\"HTTP Smoke Tests\",\"stock\":5}",
+{headers: json_headers()}
+)
+assert(create_err == nil)
+assert(create_resp.status == 200)
+created, created_err := create_resp.json()
+assert(created_err == nil)
+assert(created.created == true)
+assert(created.id == "bk-303")
+
+update_resp, update_err := net.put(
+app.url .. "/api/items/bk-303",
+"{\"stock\":8}",
+{headers: json_headers()}
+)
+assert(update_err == nil)
+assert(update_resp.status == 200)
+updated, updated_err := update_resp.json()
+assert(updated_err == nil)
+assert(updated.updated == true)
+assert(updated.stock == 8)
+
+delete_resp, delete_err := net.delete(app.url .. "/api/items/bk-202")
+assert(delete_err == nil)
+assert(delete_resp.status == 200)
+deleted, deleted_err := delete_resp.json()
+assert(deleted_err == nil)
+assert(deleted.deleted == true)
+assert(deleted.id == "bk-202")
+
+wrong_method, wrong_method_err := net.post(app.url .. "/api/items/bk-101", "wrong", {headers: json_headers()})
+assert(wrong_method_err == nil)
+assert(wrong_method.status == 405)
+assert(string.find(wrong_method.body, "Method Not Allowed", 1, true) != nil)
+
+missing := http.get(app.url .. "/api/items/nope")
+missing_json := json.decode(missing.body)
+assert(missing_json.error == "not_found")
+assert(missing_json.id == "nope")
+
+closed, close_err := app.close()
+assert(closed == true)
+assert(close_err == nil)
+waited, wait_err := app.wait()
+assert(waited == true)
+assert(wait_err == nil)
+
+web_route_workbench_summary := string.format(
+"routes=5 events=%d created=%s updated_stock=%d deleted=%s method_status=%d html=%d",
+#events,
+created.id,
+updated.stock,
+deleted.id,
+wrong_method.status,
+home.status
+)
+
+print(web_route_workbench_summary)

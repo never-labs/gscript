@@ -58,8 +58,8 @@ func serveRegisterRoute(router *httpRouter, value Value) error {
 	}
 	route := value.Table()
 	method := strings.ToUpper(route.RawGetString("method").Str())
-	if method != http.MethodGet && method != http.MethodPost {
-		return fmt.Errorf("serve route method must be GET or POST")
+	if !serveRouteMethodAllowed(method) {
+		return fmt.Errorf("serve route method must be a standard HTTP method")
 	}
 	path := route.RawGetString("path")
 	if !path.IsString() || path.Str() == "" {
@@ -71,4 +71,19 @@ func serveRegisterRoute(router *httpRouter, value Value) error {
 	}
 	router.addRoute(method, path.Str(), handler)
 	return nil
+}
+
+func serveRouteMethodAllowed(method string) bool {
+	switch method {
+	case http.MethodGet,
+		http.MethodHead,
+		http.MethodPost,
+		http.MethodPut,
+		http.MethodPatch,
+		http.MethodDelete,
+		http.MethodOptions:
+		return true
+	default:
+		return false
+	}
 }

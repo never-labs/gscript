@@ -1,0 +1,102 @@
+[
+  {
+    "Request": {
+      "Model": "mock-project",
+      "Messages": [
+        {
+          "Role": "system",
+          "Text": "Use memory and runbook evidence. Return a concise incident regression note."
+        },
+        {
+          "Role": "assistant",
+          "Text": "Memory: owner=ops release=2026.06"
+        },
+        {
+          "Role": "user",
+          "Text": "Investigate checkout sev2 with INC-17 sev2 p95 latency spike"
+        }
+      ],
+      "Tools": [
+        {
+          "Name": "lookup_runbook",
+          "Description": "Lookup deterministic runbook evidence.",
+          "Params": [
+            "service",
+            "severity"
+          ],
+          "Requires": [
+            "runbooks.read"
+          ]
+        }
+      ],
+      "ForceTool": "lookup_runbook"
+    },
+    "Result": {
+      "Status": "tool_calls",
+      "Calls": [
+        {
+          "ID": "call_lookup_runbook_1",
+          "Tool": "lookup_runbook",
+          "Args": {
+            "service": "checkout",
+            "severity": "sev2"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "Request": {
+      "Model": "mock-project",
+      "Messages": [
+        {
+          "Role": "system",
+          "Text": "Use memory and runbook evidence. Return a concise incident regression note."
+        },
+        {
+          "Role": "assistant",
+          "Text": "Memory: owner=ops release=2026.06"
+        },
+        {
+          "Role": "user",
+          "Text": "Investigate checkout sev2 with INC-17 sev2 p95 latency spike"
+        },
+        {
+          "Role": "assistant",
+          "ToolCall": {
+            "ID": "call_lookup_runbook_1",
+            "Tool": "lookup_runbook",
+            "Args": {
+              "service": "checkout",
+              "severity": "sev2"
+            }
+          }
+        },
+        {
+          "Role": "tool",
+          "ToolUseID": "call_lookup_runbook_1",
+          "Value": "runbook:checkout:sev2:restart-workers:false:notify:oncall"
+        }
+      ],
+      "Tools": [
+        {
+          "Name": "lookup_runbook",
+          "Description": "Lookup deterministic runbook evidence.",
+          "Params": [
+            "service",
+            "severity"
+          ],
+          "Requires": [
+            "runbooks.read"
+          ]
+        }
+      ],
+      "MaxTokens": 160,
+      "Stream": true
+    },
+    "Result": {
+      "Status": "final_answer",
+      "Text": "Checkout sev2 owned by ops; keep workers running and notify oncall."
+    }
+  }
+]

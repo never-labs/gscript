@@ -1,0 +1,45 @@
+// Package-managed macOS automation adapter surface.
+//
+// This stub keeps the example checkable on any OS. A real package can bind
+// these calls to osascript on darwin while keeping AppleScript out of stdlib.
+
+func applescript(spec) {
+    return {
+        kind: "applescript",
+        target: spec.target,
+        source: spec.source,
+        timeout_ms: spec.timeout_ms,
+        dry_run: spec.dry_run,
+        command: {
+            program: "osascript",
+            args: {"-e", spec.source},
+        },
+    }
+}
+
+func open_url(spec) {
+    return {
+        kind: "open_url",
+        url: spec.url,
+        dry_run: spec.dry_run,
+        command: {
+            program: "open",
+            args: {spec.url},
+        },
+    }
+}
+
+func plan(spec) {
+    return {
+        kind: "macos_automation_plan",
+        name: spec.name,
+        dry_run: spec.dry_run,
+        steps: spec.steps,
+    }
+}
+
+return {
+    applescript: applescript,
+    open_url: open_url,
+    plan: plan,
+}

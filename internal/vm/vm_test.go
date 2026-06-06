@@ -1,15 +1,16 @@
 package vm
 
 import (
-	"github.com/never-labs/leia/internal/testutil/vmtest"
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/never-labs/leia/internal/ast"
 	"github.com/never-labs/leia/internal/lexer"
 	"github.com/never-labs/leia/internal/parser"
 	"github.com/never-labs/leia/internal/runtime"
+	"github.com/never-labs/leia/internal/testutil/vmtest"
 )
 
 // compileAndRun compiles Leia source to bytecode and runs it in the VM.
@@ -2469,8 +2470,7 @@ for i := 1; i <= workers; i++ {
 		t.Fatalf("Execute: %v", err)
 	}
 	v.Close()
-	after := runtime.GCRootScannerCount()
-	if after != before {
+	if after := waitForGCRootScannerCount(before); after != before {
 		t.Fatalf("active VM root scanners = %d after go workers exit, want %d", after, before)
 	}
 	expectGlobalInt(t, globals, "sum", 36)
@@ -2496,7 +2496,7 @@ ctxCancelled := group.context().cancelled()
 		t.Fatalf("Execute: %v", err)
 	}
 	v.Close()
-	if after := runtime.GCRootScannerCount(); after != before {
+	if after := waitForGCRootScannerCount(before); after != before {
 		t.Fatalf("active VM root scanners = %d after sync.group workers exit, want %d", after, before)
 	}
 	if got := globals["ok"]; !got.IsBool() || got.Bool() {
@@ -2509,6 +2509,16 @@ ctxCancelled := group.context().cancelled()
 	if got := globals["ctxCancelled"]; !got.IsBool() || !got.Bool() {
 		t.Fatalf("ctxCancelled = %v, want true", got)
 	}
+}
+
+func waitForGCRootScannerCount(want int) int {
+	deadline := time.Now().Add(2 * time.Second)
+	last := runtime.GCRootScannerCount()
+	for last != want && time.Now().Before(deadline) {
+		time.Sleep(time.Millisecond)
+		last = runtime.GCRootScannerCount()
+	}
+	return last
 }
 
 func TestSelectDefaultWhenNoChannelReady(t *testing.T) {

@@ -95,3 +95,71 @@ func TestHTTPRouterColonParams(t *testing.T) {
 		t.Fatalf("resp body = %q, want JSON id", got)
 	}
 }
+
+func TestServeAppSupportsStandardHTTPMethods(t *testing.T) {
+	interp := New()
+	hostOpts := HostOptions{
+		Call:           interp.CallFunction,
+		NetworkAllowed: interp.NetworkAccessEnabled,
+		MaxHostResult:  interp.MaxHostResultBytes,
+	}
+	httpModule := TableValue(BuildHTTP(hostOpts))
+	netModule := TableValue(BuildNet(hostOpts))
+	serveModule := TableValue(BuildServe(hostOpts))
+	interp.SetGlobal("http", httpModule)
+	interp.SetModule("http", httpModule)
+	interp.SetGlobal("net", netModule)
+	interp.SetModule("net", netModule)
+	interp.SetGlobal("serve", serveModule)
+	interp.SetModule("serve", serveModule)
+
+	src := `
+		server := serve.app({
+			listen: "127.0.0.1:0",
+			routes: {
+				{method: "GET", path: "/items/:id", handler: func(req) {
+					return "<html><body>item:" .. req.params.id .. "</body></html>"
+				}},
+				{method: "PUT", path: "/items/:id", handler: func(req) {
+					data, err := req.json()
+					assert(err == nil)
+					return {id: req.params.id, name: data.name, method: req.method}
+				}},
+				{method: "DELETE", path: "/items/:id", handler: func(req) {
+					return {id: req.params.id, deleted: true, method: req.method}
+				}},
+			},
+		})
+		htmlResp := http.get(server.url .. "/items/a-1")
+		putResp, putErr := net.put(server.url .. "/items/a-1", "{\"name\":\"alpha\"}", {headers: {["Content-Type"]: "application/json"}})
+		deleteResp, deleteErr := net.delete(server.url .. "/items/a-1")
+		postResp, postErr := net.post(server.url .. "/items/a-1", "")
+		closed, closeErr := server.close()
+		waited, waitErr := server.wait()
+	`
+	if _, err := interp.ExecString(src); err != nil {
+		t.Fatalf("ExecString: %v", err)
+	}
+	if got := interp.GetGlobal("htmlResp").Table().RawGetString("headers").Table().RawGetString("Content-Type").Str(); got != "text/html; charset=utf-8" {
+		t.Fatalf("html content-type = %q, want text/html", got)
+	}
+	if got := interp.GetGlobal("putResp").Table().RawGetString("body").Str(); got != `{"id":"a-1","method":"PUT","name":"alpha"}` {
+		t.Fatalf("put body = %q, want JSON update", got)
+	}
+	if got := interp.GetGlobal("deleteResp").Table().RawGetString("body").Str(); got != `{"deleted":true,"id":"a-1","method":"DELETE"}` {
+		t.Fatalf("delete body = %q, want JSON delete", got)
+	}
+	if got := interp.GetGlobal("postResp").Table().RawGetString("status").Int(); got != 405 {
+		t.Fatalf("post status = %d, want 405", got)
+	}
+	for _, name := range []string{"putErr", "deleteErr", "postErr", "closeErr", "waitErr"} {
+		if got := interp.GetGlobal(name); !got.IsNil() {
+			t.Fatalf("%s = %v, want nil", name, got)
+		}
+	}
+	for _, name := range []string{"closed", "waited"} {
+		if got := interp.GetGlobal(name); !got.IsBool() || !got.Bool() {
+			t.Fatalf("%s = %v, want true", name, got)
+		}
+	}
+}

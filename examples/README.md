@@ -15,6 +15,7 @@ go run ../cmd/leia examples check dialects/text_parsing.leia dialects/sql_result
 go run ../cmd/leia examples check data/q_vector_basics.leia
 go run ../cmd/leia examples check automation/invoice_reconciliation.leia
 go run ../cmd/leia examples check operations/local_ops_report.leia
+go run ../cmd/leia examples check database/package_managed
 go run ../cmd/leia examples run data_processing/data_oriented/soa_kernels.leia
 go run ../cmd/leia examples run concurrency/select_timeout.leia
 ```
@@ -31,6 +32,7 @@ Directories:
 | `performance/` | User-facing execution mode and benchmark policy examples. |
 | `data/` | Focused data-language examples, including q/kdb+-style symbolic vector evaluation. |
 | `data_processing/` | Strings, containers, dense data, vectors, matrices, and SoA. |
+| `database/` | Package-managed SQLite ledger analytics project. |
 | `concurrency/` | Goroutine-like tasks, channels, select, sync, and context helpers. |
 | `game_engine/` | Larger script examples for event loops and game-style state. |
 
