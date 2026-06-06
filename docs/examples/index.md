@@ -79,8 +79,9 @@ round-tripping as one runnable data workflow. The
 `release_gate_project` example combines fixture globbing, shell/process
 dialects, SQLite, q-style columnar aggregation, Excel round-tripping, AI agent
 mocking, and a loopback web route in one runnable release-gate workflow. The
-particle integration example is listed as manual, so `examples check` reports
-it as skipped unless it is run through a dedicated higher-step-budget path.
+particle integration example runs through the repository's higher-step-budget
+example runner; use the explicit `examples check` command above instead of the
+playground's default step budget when validating it.
 
 ## Concurrency Examples
 

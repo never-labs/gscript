@@ -96,7 +96,7 @@ bash scripts/docs_check.sh
 ```
 
 Generated reference pages are checked in. `scripts/docs_check.sh` verifies
-generated CLI/stdlib references, spec HTML freshness, spec runnable examples,
+generated CLI/stdlib/dialect references, spec HTML freshness, spec runnable examples,
 Markdown links, release reference coverage, retired naming, and documented
 repository script entrypoints.
 

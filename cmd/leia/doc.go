@@ -194,10 +194,10 @@ func generateCLIReferenceMarkdown() []byte {
 	fmt.Fprintln(&b)
 	fmt.Fprintln(&b, "Generated from the current `leia` binary capabilities.")
 	fmt.Fprintln(&b)
-	fmt.Fprintln(&b, "| Command | Summary |")
-	fmt.Fprintln(&b, "|---|---|")
+	fmt.Fprintln(&b, "| Command | Usage | Summary |")
+	fmt.Fprintln(&b, "|---|---|---|")
 	for _, command := range cliReferenceData() {
-		fmt.Fprintf(&b, "| `%s` | %s |\n", command.Name, command.Summary)
+		fmt.Fprintf(&b, "| `%s` | `%s` | %s |\n", command.Name, command.Usage, command.Summary)
 	}
 	return b.Bytes()
 }
@@ -242,7 +242,7 @@ func generateDialectReferenceMarkdown() []byte {
 	var b bytes.Buffer
 	fmt.Fprintln(&b, "# Leia Tagged Dialects")
 	fmt.Fprintln(&b)
-	fmt.Fprintln(&b, "Generated from the current `leia` binary dialect registry.")
+	fmt.Fprintln(&b, "The registry table is generated from the current `leia` binary dialect registry; explanatory sections below are maintained with the generated reference.")
 	fmt.Fprintln(&b)
 	fmt.Fprintln(&b, "Leia supports DSL-native tagged dialects for compact host automation, data format handling, web routing, q-style analytics, spreadsheets, and AI workflows. A dialect is an explicit tagged expression that returns an ordinary Leia value.")
 	fmt.Fprintln(&b)

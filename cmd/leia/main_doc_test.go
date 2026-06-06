@@ -64,7 +64,7 @@ func TestDocGenerateWritesSiteLayout(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.Contains(dialectDoc, []byte("Generated from the current `leia` binary dialect registry")) {
+	if !bytes.Contains(dialectDoc, []byte("The registry table is generated from the current `leia` binary dialect registry")) {
 		t.Fatalf("dialect site doc = %q, want generated dialect reference", string(dialectDoc))
 	}
 }

@@ -345,7 +345,7 @@ func builtinDialectCapabilities(name string) []string {
 	case "env":
 		return []string{"env.read"}
 	case "serve":
-		return []string{"network.listen"}
+		return []string{"net.listen"}
 	default:
 		return []string{}
 	}

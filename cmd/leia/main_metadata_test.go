@@ -57,7 +57,7 @@ func TestCapabilitiesJSON(t *testing.T) {
 		{name: "cmd", category: "host", capabilities: []string{"process.exec"}, eval: true},
 		{name: "glob", category: "host", capabilities: []string{"fs.read"}, eval: true},
 		{name: "env", category: "host", capabilities: []string{"env.read"}, eval: true, block: true},
-		{name: "serve", category: "web", capabilities: []string{"network.listen"}, eval: true, block: true},
+		{name: "serve", category: "web", capabilities: []string{"net.listen"}, eval: true, block: true},
 		{name: "sql", category: "database", eval: true, block: true},
 		{name: "q", category: "data", eval: true},
 		{name: "xlsx", category: "data", eval: true},

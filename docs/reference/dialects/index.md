@@ -1,6 +1,6 @@
 # Leia Tagged Dialects
 
-Generated from the current `leia` binary dialect registry.
+The registry table is generated from the current `leia` binary dialect registry; explanatory sections below are maintained with the generated reference.
 
 Leia supports DSL-native tagged dialects for compact host automation, data format handling, web routing, q-style analytics, spreadsheets, and AI workflows. A dialect is an explicit tagged expression that returns an ordinary Leia value.
 
@@ -80,7 +80,7 @@ reviewer := agent {
 | `regexp` | `text` | true | false | none | re |
 | `rfc3339` | `text` | true | true | none | timestamp |
 | `semver` | `text` | true | true | none | none |
-| `serve` | `web` | true | true | network.listen | none |
+| `serve` | `web` | true | true | net.listen | none |
 | `sh` | `host` | true | false | process.shell | none |
 | `shellwords` | `text` | true | true | none | none |
 | `split` | `text` | true | false | none | lines |
