@@ -94,7 +94,8 @@ func TestExampleDialectAndPackageManagedNamingGuards(t *testing.T) {
 				}
 				continue
 			}
-			if !strings.Contains(source, `import "github.com/never-labs/leia-`) {
+			externalLeiaImport := regexp.MustCompile(`(?m)^\s*import\s+(?:[A-Za-z_][A-Za-z0-9_]*\s+)?"github\.com/never-labs/leia-`)
+			if !externalLeiaImport.MatchString(source) {
 				t.Fatalf("%s/main.leia must demonstrate an external Leia package import", filepath.ToSlash(rel))
 			}
 		}

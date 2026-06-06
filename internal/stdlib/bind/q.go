@@ -80,6 +80,20 @@ func qParseSymbolic(src string) (Value, error) {
 		}
 		return qWhere(v)
 	}
+	if strings.HasPrefix(src, "sums ") {
+		v, err := qParseSymbolic(strings.TrimSpace(src[len("sums "):]))
+		if err != nil {
+			return NilValue(), err
+		}
+		return qSums(v)
+	}
+	if strings.HasPrefix(src, "sum ") {
+		v, err := qParseSymbolic(strings.TrimSpace(src[len("sum "):]))
+		if err != nil {
+			return NilValue(), err
+		}
+		return qSum(v)
+	}
 	if bang := qFindTopLevel(src, "!"); bang >= 0 {
 		keys, err := qParseSymbolList(strings.TrimSpace(src[:bang]))
 		if err != nil {
@@ -110,24 +124,14 @@ func qParseSymbolic(src string) (Value, error) {
 		if err != nil {
 			return NilValue(), err
 		}
-		if !v.IsDenseArray() {
-			return NilValue(), fmt.Errorf("+/ expects a numeric vector")
-		}
-		return DenseArrayReduce(DenseArrayReduceSum, v.DenseArray())
+		return qSum(v)
 	}
 	if strings.HasPrefix(src, "+\\") {
 		v, err := qParseSymbolic(strings.TrimSpace(src[2:]))
 		if err != nil {
 			return NilValue(), err
 		}
-		if !v.IsDenseArray() {
-			return NilValue(), fmt.Errorf("+\\ expects a numeric vector")
-		}
-		scan, err := DenseArrayScan(v.DenseArray())
-		if err != nil {
-			return NilValue(), err
-		}
-		return DenseArrayValue(scan), nil
+		return qSums(v)
 	}
 	if parts := qSplitTopLevel(src, ';'); len(parts) > 1 {
 		out := NewAppendArrayTable(len(parts))
@@ -544,6 +548,30 @@ func qCount(v Value) int {
 	default:
 		return 1
 	}
+}
+
+func qSum(v Value) (Value, error) {
+	if v.IsNumber() {
+		return v, nil
+	}
+	if !v.IsDenseArray() {
+		return NilValue(), fmt.Errorf("sum expects a numeric vector")
+	}
+	return DenseArrayReduce(DenseArrayReduceSum, v.DenseArray())
+}
+
+func qSums(v Value) (Value, error) {
+	if v.IsNumber() {
+		return v, nil
+	}
+	if !v.IsDenseArray() {
+		return NilValue(), fmt.Errorf("sums expects a numeric vector")
+	}
+	scan, err := DenseArrayScan(v.DenseArray())
+	if err != nil {
+		return NilValue(), err
+	}
+	return DenseArrayValue(scan), nil
 }
 
 func qVectorAt(v Value, i int) (Value, error) {

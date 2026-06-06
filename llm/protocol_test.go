@@ -49,6 +49,57 @@ func TestRecorderAndReplayProvider(t *testing.T) {
 	}
 }
 
+func TestReplayProviderStreamsRecordedEvents(t *testing.T) {
+	record := llm.Record{
+		Request: llm.TurnRequest{
+			Model:    "mock-fast",
+			Messages: []llm.Message{{Role: "user", Text: "hello"}},
+			Stream:   true,
+		},
+		Result: llm.TurnResult{Status: "final_answer", Text: "hello stream"},
+		StreamEvents: []llm.StreamEvent{
+			{Type: "token", Token: "hello", Text: "hello"},
+			{Type: "token", Token: " ", Text: " "},
+			{Type: "token", Token: "stream", Text: "stream"},
+		},
+	}
+	replay := llm.NewReplayProvider([]llm.Record{record})
+	var tokens []string
+	res, err := replay.StreamTurn(context.Background(), record.Request, func(event llm.StreamEvent) error {
+		tokens = append(tokens, event.Token)
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("StreamTurn: %v", err)
+	}
+	if res.Text != "hello stream" || len(tokens) != 3 || tokens[0]+tokens[1]+tokens[2] != "hello stream" {
+		t.Fatalf("res=%#v tokens=%#v", res, tokens)
+	}
+}
+
+func TestReplayProviderSynthesizesLegacyStreamEvent(t *testing.T) {
+	record := llm.Record{
+		Request: llm.TurnRequest{
+			Model:    "mock-fast",
+			Messages: []llm.Message{{Role: "user", Text: "hello"}},
+			Stream:   true,
+		},
+		Result: llm.TurnResult{Status: "final_answer", Text: "legacy stream"},
+	}
+	replay := llm.NewReplayProvider([]llm.Record{record})
+	var tokens []string
+	res, err := replay.StreamTurn(context.Background(), record.Request, func(event llm.StreamEvent) error {
+		tokens = append(tokens, event.Token)
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("StreamTurn: %v", err)
+	}
+	if res.Text != "legacy stream" || len(tokens) != 1 || tokens[0] != "legacy stream" {
+		t.Fatalf("res=%#v tokens=%#v", res, tokens)
+	}
+}
+
 func TestReplayTypedErrors(t *testing.T) {
 	replay := llm.NewReplayProvider([]llm.Record{{
 		Request: llm.TurnRequest{

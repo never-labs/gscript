@@ -122,7 +122,7 @@ func Example_hostModuleImport() {
 	}
 
 	if err := vm.Exec(`
-import "go/strings" as strings
+import strings "go/strings"
 result := strings.upper("hello")
 `); err != nil {
 		panic(err)

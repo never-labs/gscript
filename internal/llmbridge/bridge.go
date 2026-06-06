@@ -354,9 +354,20 @@ func (p recordingProvider) StreamTurn(ctx context.Context, req llm.TurnRequest, 
 	if !ok {
 		return p.Turn(ctx, req)
 	}
-	res, err := streaming.StreamTurn(ctx, req, sink)
+	var events []llm.StreamEvent
+	res, err := streaming.StreamTurn(ctx, req, func(event llm.StreamEvent) error {
+		events = append(events, event)
+		if sink == nil {
+			return nil
+		}
+		return sink(event)
+	})
 	if p.sink != nil {
-		record := llm.Record{Request: cloneLLMRequest(req), Result: cloneLLMResult(res)}
+		record := llm.Record{
+			Request:      cloneLLMRequest(req),
+			Result:       cloneLLMResult(res),
+			StreamEvents: append([]llm.StreamEvent(nil), events...),
+		}
 		if err != nil {
 			record.Error = err.Error()
 		}

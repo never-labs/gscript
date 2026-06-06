@@ -101,6 +101,17 @@ for i := 1; i <= #matches; i++ {
 }
 assert(found_shell_filesystem == true)
 
+// Recursive glob uses ** and can subtract excluded patterns with ! lines.
+recursive_matches := dialect.eval("glob", path.join(entry.dir, "**", "*.leia") .. "\n!" .. path.join(entry.dir, "missing", "**"))
+found_recursive_shell_filesystem := false
+for i := 1; i <= #recursive_matches; i++ {
+    if path.base(recursive_matches[i]) == "shell_filesystem.leia" {
+        found_recursive_shell_filesystem = true
+    }
+}
+assert(found_recursive_shell_filesystem == true)
+print("recursive glob matches:", #recursive_matches)
+
 // path cleans a path string without touching the filesystem.
 cleaned := path`examples/dialects/../dialects/./shell_filesystem.leia`
 assert(cleaned == "examples/dialects/shell_filesystem.leia")

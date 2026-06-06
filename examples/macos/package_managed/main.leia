@@ -6,7 +6,7 @@
 // adapter declared in leia.mod instead of becoming a built-in dialect or core
 // stdlib module.
 
-import "github.com/never-labs/leia-macos/automation" as macos
+import macos "github.com/never-labs/leia-macos/automation"
 
 notification := macos.applescript({
     target: "System Events",

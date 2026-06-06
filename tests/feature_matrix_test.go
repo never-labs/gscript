@@ -193,6 +193,7 @@ func TestFeatureMatrixCoversTaggedDialectAndModpkgReleaseGuards(t *testing.T) {
 	requireFeatureCellRefs(t, tagged, "tagged_dialect_syntax", "interpreter", "tests/dialect_syntax_test.go", "internal/stdlib/bind/dialect_protocol_test.go")
 	requireFeatureCellRefs(t, tagged, "tagged_dialect_syntax", "semantic_gate",
 		"tests/architecture/stdlib_boundary_test.go",
+		"internal/stdlib/bind/dialect_data_test.go",
 		"cmd/leia/main_examples_test.go",
 		"cmd/leia/main_examples_command_test.go",
 		"examples/dialects/shell_filesystem.leia",
@@ -203,7 +204,7 @@ func TestFeatureMatrixCoversTaggedDialectAndModpkgReleaseGuards(t *testing.T) {
 		"re", "regexp", "json", "jsonptr", "jsonl", "csv", "tsv", "mdtable", "markdown", "md", "lines", "split", "words", "nums", "numbers", "kv", "logfmt", "env", "ini", "yaml", "yml", "semver", "duration", "timestamp", "rfc3339", "tap", "junit", "xml", "template",
 		"url", "html_escape", "html", "urlquery", "form", "urlform", "urlpath", "mime", "mailaddr", "emailaddr", "headers", "http_headers", "cookie", "cookies", "httpmsg", "sse", "multipart", "jwt",
 		"ipaddr", "cidr", "hostport",
-		"base64", "hash", "hex", "base32", "uuid", "gzip", "zlib", "deflate", "binary", "q", "pem",
+		"base64", "hash", "hex", "base32", "uuid", "gzip", "zlib", "deflate", "binary", "q", "pem", "xlsx", "excel",
 		"sql",
 		"prompt", "quote", "model", "turn", "tool", "agent",
 	)
@@ -228,6 +229,16 @@ func TestFeatureMatrixCoversTaggedDialectAndModpkgReleaseGuards(t *testing.T) {
 	stdlibBoundary := readFileString(t, filepath.Join(root, "tests", "architecture", "stdlib_boundary_test.go"))
 	if !strings.Contains(stdlibBoundary, `"urlpath"`) {
 		t.Fatal("stdlib architecture boundary must keep urlpath in the approved web dialect registry")
+	}
+	dialectDataGuard := readFileString(t, filepath.Join(root, "internal", "stdlib", "bind", "dialect_data_test.go"))
+	for _, snippet := range []string{
+		"TestDialectXLSXParsesFirstWorksheet",
+		`StringValue("xlsx")`,
+		`StringValue("excel")`,
+	} {
+		if !strings.Contains(dialectDataGuard, snippet) {
+			t.Fatalf("internal/stdlib/bind/dialect_data_test.go must keep xlsx/excel dialect gate snippet %q", snippet)
+		}
 	}
 	exampleGate := readFileString(t, filepath.Join(root, "cmd", "leia", "main_examples_test.go"))
 	for _, snippet := range []string{

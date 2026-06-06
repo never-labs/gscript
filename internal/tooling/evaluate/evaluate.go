@@ -1308,6 +1308,20 @@ func (m *replayMonitor) Turn(ctx context.Context, req llm.TurnRequest) (llm.Turn
 	return res, err
 }
 
+func (m *replayMonitor) StreamTurn(ctx context.Context, req llm.TurnRequest, sink llm.StreamSink) (llm.TurnResult, error) {
+	res, err := m.provider.StreamTurn(ctx, req, sink)
+	if err != nil {
+		var mismatch *llm.ReplayMismatchError
+		var exhausted *llm.ReplayExhaustedError
+		if errors.As(err, &mismatch) || errors.As(err, &exhausted) {
+			m.mu.Lock()
+			m.errors = append(m.errors, replayError{err: err, item: m.active})
+			m.mu.Unlock()
+		}
+	}
+	return res, err
+}
+
 func (m *replayMonitor) SetActiveCase(item replayCaseRef) {
 	if m == nil {
 		return
@@ -1493,11 +1507,19 @@ func (p recordingProvider) StreamTurn(ctx context.Context, req runtime.LLMTurnRe
 	if !ok {
 		return p.Turn(ctx, req)
 	}
-	res, err := streaming.StreamTurn(ctx, req, sink)
+	var events []llm.StreamEvent
+	res, err := streaming.StreamTurn(ctx, req, func(event runtime.LLMStreamEvent) error {
+		events = append(events, llmbridge.PublicStreamEvent(event))
+		if sink == nil {
+			return nil
+		}
+		return sink(event)
+	})
 	if p.sink != nil {
 		record := llm.Record{
-			Request: llmbridge.PublicTurnRequest(req),
-			Result:  llmbridge.PublicTurnResult(res),
+			Request:      llmbridge.PublicTurnRequest(req),
+			Result:       llmbridge.PublicTurnResult(res),
+			StreamEvents: events,
 		}
 		if err != nil {
 			record.Error = err.Error()

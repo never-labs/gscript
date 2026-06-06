@@ -6,7 +6,6 @@ import (
 	"github.com/never-labs/leia/internal/support/hostpath"
 	"io"
 	"os"
-	"path/filepath"
 )
 
 func resolveSandboxPath(root, path string) (string, error) {
@@ -343,11 +342,7 @@ func BuildFSWithPolicy(opts HostOptions) *Table {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument #1 to 'fs.glob' (string expected)")
 		}
-		pattern, err := resolveSandboxPath(root(), args[0].Str())
-		if err != nil {
-			return []Value{NilValue(), StringValue(err.Error())}, nil
-		}
-		matches, err := filepath.Glob(pattern)
+		matches, err := expandHostGlobSpec(root(), args[0].Str())
 		if err != nil {
 			return []Value{NilValue(), StringValue(err.Error())}, nil
 		}

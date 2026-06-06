@@ -12,9 +12,21 @@ app := serve.app({
 
 root := http.get(app.url .. "/")
 user := http.get(app.url .. "/users/ada")
+user_json := json.decode(user.body)
+
+assert(root.status == 200)
+assert(root.body == "hello from Leia")
+assert(user.status == 200)
+assert(user_json.name == "ada")
+assert(user_json.ok == true)
 
 print(root.body)
 print(user.body)
+print("tiny_app routes=2 user=" .. user_json.name .. " ok=" .. tostring(user_json.ok))
 
-app.close()
-app.wait()
+closed, close_err := app.close()
+assert(closed == true)
+assert(close_err == nil)
+waited, wait_err := app.wait()
+assert(waited == true)
+assert(wait_err == nil)

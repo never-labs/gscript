@@ -151,24 +151,57 @@ func LoadRecords(path string) ([]Record, error) {
 }
 
 func (p *ReplayProvider) Turn(_ context.Context, req TurnRequest) (TurnResult, error) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	if p.next >= len(p.records) {
-		return TurnResult{}, &ReplayExhaustedError{Turn: p.next}
-	}
-	record := p.records[p.next]
-	p.next++
-	if !requestsEqual(req, record.Request) {
-		return TurnResult{}, &ReplayMismatchError{
-			Turn:     p.next - 1,
-			Expected: cloneRequest(record.Request),
-			Actual:   cloneRequest(req),
-		}
+	record, err := p.nextRecord(req)
+	if err != nil {
+		return TurnResult{}, err
 	}
 	if record.Error != "" {
 		return TurnResult{}, fmt.Errorf("%s", record.Error)
 	}
 	return cloneResult(record.Result), nil
+}
+
+// StreamTurn replays recorded stream events before returning the recorded final
+// result. Older fixtures without StreamEvents synthesize one token event from
+// the final text so stream callbacks and trace accounting still run offline.
+func (p *ReplayProvider) StreamTurn(_ context.Context, req TurnRequest, sink StreamSink) (TurnResult, error) {
+	record, err := p.nextRecord(req)
+	if err != nil {
+		return TurnResult{}, err
+	}
+	if record.Error != "" {
+		return TurnResult{}, fmt.Errorf("%s", record.Error)
+	}
+	events := cloneStreamEvents(record.StreamEvents)
+	if len(events) == 0 && req.Stream && record.Result.Text != "" {
+		events = []StreamEvent{{Type: "token", Token: record.Result.Text, Text: record.Result.Text}}
+	}
+	for _, event := range events {
+		if sink != nil {
+			if err := sink(event); err != nil {
+				return TurnResult{}, err
+			}
+		}
+	}
+	return cloneResult(record.Result), nil
+}
+
+func (p *ReplayProvider) nextRecord(req TurnRequest) (Record, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.next >= len(p.records) {
+		return Record{}, &ReplayExhaustedError{Turn: p.next}
+	}
+	record := p.records[p.next]
+	p.next++
+	if !requestsEqual(req, record.Request) {
+		return Record{}, &ReplayMismatchError{
+			Turn:     p.next - 1,
+			Expected: cloneRequest(record.Request),
+			Actual:   cloneRequest(req),
+		}
+	}
+	return cloneRecord(record), nil
 }
 
 func (p *ReplayProvider) Remaining() int {
@@ -201,10 +234,20 @@ func (p *ReplayProvider) Records() []Record {
 
 func cloneRecord(record Record) Record {
 	return Record{
-		Request: cloneRequest(record.Request),
-		Result:  cloneResult(record.Result),
-		Error:   record.Error,
+		Request:      cloneRequest(record.Request),
+		Result:       cloneResult(record.Result),
+		StreamEvents: cloneStreamEvents(record.StreamEvents),
+		Error:        record.Error,
 	}
+}
+
+func cloneStreamEvents(events []StreamEvent) []StreamEvent {
+	if len(events) == 0 {
+		return nil
+	}
+	out := make([]StreamEvent, len(events))
+	copy(out, events)
+	return out
 }
 
 func cloneRequest(req TurnRequest) TurnRequest {
@@ -283,9 +326,10 @@ func cloneAny(v any) any {
 
 func normalizeRecordJSON(record Record) Record {
 	return Record{
-		Request: normalizeRequestJSON(record.Request),
-		Result:  normalizeResultJSON(record.Result),
-		Error:   record.Error,
+		Request:      normalizeRequestJSON(record.Request),
+		Result:       normalizeResultJSON(record.Result),
+		StreamEvents: cloneStreamEvents(record.StreamEvents),
+		Error:        record.Error,
 	}
 }
 

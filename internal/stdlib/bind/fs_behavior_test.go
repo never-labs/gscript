@@ -431,6 +431,40 @@ func TestFS_Glob(t *testing.T) {
 	}
 }
 
+func TestFS_GlobRecursiveAndExclude(t *testing.T) {
+	interp, tmpDir := runWithFSPath(t, `
+		fs.mkdirAll(tmpDir .. "/a/skip")
+		fs.mkdirAll(tmpDir .. "/b")
+		fs.writefile(tmpDir .. "/root.txt", "root")
+		fs.writefile(tmpDir .. "/a/one.txt", "one")
+		fs.writefile(tmpDir .. "/a/skip/two.txt", "two")
+		fs.writefile(tmpDir .. "/b/three.log", "three")
+		pattern := tmpDir .. "/**/*.txt" .. "\n!" .. tmpDir .. "/a/skip/**"
+		matches := fs.glob(pattern)
+		count := #matches
+		first := matches[1]
+		second := matches[2]
+	`)
+	defer os.RemoveAll(tmpDir)
+	if got := interp.GetGlobal("count").Int(); got != 2 {
+		t.Fatalf("recursive excluded glob count = %d, want 2", got)
+	}
+	first, err := filepath.Rel(tmpDir, interp.GetGlobal("first").Str())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := filepath.ToSlash(first); got != "a/one.txt" {
+		t.Fatalf("first match = %q, want a/one.txt", got)
+	}
+	second, err := filepath.Rel(tmpDir, interp.GetGlobal("second").Str())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := filepath.ToSlash(second); got != "root.txt" {
+		t.Fatalf("second match = %q, want root.txt", got)
+	}
+}
+
 // ==================================================================
 // fs.copy
 // ==================================================================

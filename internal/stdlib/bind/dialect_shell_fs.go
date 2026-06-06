@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -304,11 +303,7 @@ func dialectGlob(pattern string, opts HostOptions) ([]Value, error) {
 	if !HostBool(opts.FilesystemRead, true) {
 		return nil, fmt.Errorf("filesystem read access disabled")
 	}
-	resolved, err := resolveSandboxPath(HostString(opts.FilesystemRoot), pattern)
-	if err != nil {
-		return []Value{NilValue(), StringValue(err.Error())}, nil
-	}
-	matches, err := filepath.Glob(resolved)
+	matches, err := expandHostGlobSpec(HostString(opts.FilesystemRoot), pattern)
 	if err != nil {
 		return []Value{NilValue(), StringValue(err.Error())}, nil
 	}

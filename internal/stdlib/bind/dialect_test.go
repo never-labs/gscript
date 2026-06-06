@@ -2,6 +2,8 @@ package bind
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -14,11 +16,11 @@ func TestDialectTagsExposeInstalledHandlers(t *testing.T) {
 
 	got := stringSetFromArray(interp.GetGlobal("tags").Table())
 	want := []string{
-		"agent", "base32", "base64", "binary", "cidr", "cmd", "cookie", "cookies", "csv", "deflate", "duration", "emailaddr", "env", "form", "glob",
+		"agent", "base32", "base64", "binary", "cidr", "cmd", "cookie", "cookies", "csv", "deflate", "duration", "emailaddr", "env", "excel", "form", "glob",
 		"gzip", "hash", "headers", "hex", "hostport", "html", "html_escape", "http_headers", "httpmsg", "ini", "ipaddr", "json", "jsonl", "jsonptr",
 		"junit", "jwt", "kv", "lines", "logfmt", "mailaddr", "markdown", "md", "mdtable", "mime", "model", "multipart", "numbers", "nums", "path", "pem", "prompt",
 		"q", "quote", "re", "regexp", "rfc3339", "semver", "sh", "shellwords", "split", "sql", "sse", "tap", "template", "timestamp", "tool", "tsv",
-		"turn", "url", "urlform", "urlpath", "urlquery", "uuid", "words", "xml", "yaml", "yml", "zlib",
+		"turn", "url", "urlform", "urlpath", "urlquery", "uuid", "words", "xlsx", "xml", "yaml", "yml", "zlib",
 	}
 	for _, name := range want {
 		if !got[name] {
@@ -151,7 +153,7 @@ func expectedBuiltinDialectCategories() map[string]string {
 		"sh": "host", "cmd": "host", "glob": "host",
 		"shellwords": "text", "path": "text", "re": "text", "regexp": "text", "json": "text", "jsonptr": "text", "jsonl": "text", "csv": "text", "tsv": "text", "mdtable": "text", "markdown": "text", "md": "text", "lines": "text", "split": "text", "words": "text", "nums": "text", "numbers": "text", "kv": "text", "logfmt": "text", "env": "text", "ini": "text", "yaml": "text", "yml": "text", "semver": "text", "duration": "text", "timestamp": "text", "rfc3339": "text", "tap": "text", "xml": "text", "template": "text",
 		"url": "protocol", "html_escape": "protocol", "html": "protocol", "urlquery": "protocol", "form": "protocol", "urlform": "protocol", "urlpath": "protocol", "mime": "protocol", "mailaddr": "protocol", "emailaddr": "protocol", "headers": "protocol", "http_headers": "protocol", "cookie": "protocol", "cookies": "protocol", "httpmsg": "protocol", "sse": "protocol", "multipart": "protocol", "jwt": "protocol", "ipaddr": "protocol", "cidr": "protocol", "hostport": "protocol",
-		"base64": "data", "hash": "data", "hex": "data", "base32": "data", "uuid": "data", "gzip": "data", "zlib": "data", "deflate": "data", "binary": "data", "q": "data", "pem": "data",
+		"base64": "data", "hash": "data", "hex": "data", "base32": "data", "uuid": "data", "gzip": "data", "zlib": "data", "deflate": "data", "binary": "data", "q": "data", "pem": "data", "xlsx": "data", "excel": "data",
 		"sql":   "database",
 		"agent": "llm", "model": "llm", "prompt": "llm", "quote": "llm", "tool": "llm", "turn": "llm",
 		"junit": "compat",
@@ -487,6 +489,53 @@ func TestDialectGlobEmptyAndInvalidPattern(t *testing.T) {
 	}
 	if !interp.GetGlobal("bad").IsNil() || !strings.Contains(interp.GetGlobal("bad_err").Str(), "syntax error in pattern") {
 		t.Fatalf("bad glob = %v err %v, want nil syntax error", interp.GetGlobal("bad"), interp.GetGlobal("bad_err"))
+	}
+}
+
+func TestDialectGlobRecursiveAndExclude(t *testing.T) {
+	tmpDir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(tmpDir, "nested", "skip"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	for name, body := range map[string]string{
+		"root.leia":                    "root",
+		"nested/keep.leia":             "keep",
+		"nested/skip/drop.leia":        "drop",
+		"nested/skip/not-a-match.txt":  "txt",
+		"nested/skip/deeper/drop.leia": "drop deeper",
+	} {
+		path := filepath.Join(tmpDir, filepath.FromSlash(name))
+		if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(body), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	pattern := filepath.Join(tmpDir, "**", "*.leia") + "\n!" + filepath.Join(tmpDir, "nested", "skip", "**")
+	interp := runWithLib(t, fmt.Sprintf(`
+		matches := dialect.eval("glob", %q)
+		count := #matches
+		first := matches[1]
+		second := matches[2]
+	`, pattern), "dialect", BuildDialect(HostOptions{}, nil))
+
+	if got := interp.GetGlobal("count").Int(); got != 2 {
+		t.Fatalf("recursive excluded dialect glob count = %d, want 2", got)
+	}
+	first, err := filepath.Rel(tmpDir, interp.GetGlobal("first").Str())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := filepath.ToSlash(first); got != "nested/keep.leia" {
+		t.Fatalf("first dialect match = %q, want nested/keep.leia", got)
+	}
+	second, err := filepath.Rel(tmpDir, interp.GetGlobal("second").Str())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := filepath.ToSlash(second); got != "root.leia" {
+		t.Fatalf("second dialect match = %q, want root.leia", got)
 	}
 }
 

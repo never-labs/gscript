@@ -95,11 +95,33 @@ func TestExamplesCommandDiscoversPackageManagedProjectEntrypoints(t *testing.T) 
 		discovered[example.Path] = true
 	}
 
-	projectRoots := []string{
-		filepath.Join("examples", "database", "package_managed"),
-		filepath.Join("examples", "macos", "package_managed"),
-		filepath.Join("examples", "ui", "package_managed"),
+	var projectRoots []string
+	if err := filepath.WalkDir(filepath.Join(root, "examples"), func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if !d.IsDir() {
+			return nil
+		}
+		if _, err := os.Stat(filepath.Join(path, "leia.mod")); err != nil {
+			return nil
+		}
+		if _, err := os.Stat(filepath.Join(path, "main.leia")); err != nil {
+			return nil
+		}
+		rel, err := filepath.Rel(root, path)
+		if err != nil {
+			return err
+		}
+		projectRoots = append(projectRoots, rel)
+		return nil
+	}); err != nil {
+		t.Fatal(err)
 	}
+	if len(projectRoots) == 0 {
+		t.Fatal("no package-managed example projects found")
+	}
+	sort.Strings(projectRoots)
 	for _, projectRoot := range projectRoots {
 		t.Run(filepath.ToSlash(projectRoot), func(t *testing.T) {
 			if _, err := os.Stat(filepath.Join(root, projectRoot, "leia.mod")); err != nil {
@@ -108,6 +130,34 @@ func TestExamplesCommandDiscoversPackageManagedProjectEntrypoints(t *testing.T) 
 			path := filepath.ToSlash(filepath.Join(projectRoot, "main.leia"))
 			if !discovered[path] {
 				t.Fatalf("examples CLI must discover package-managed project entrypoint %s", path)
+			}
+		})
+	}
+}
+
+func TestExamplesCommandDirectorySelectorsCoverExampleProjects(t *testing.T) {
+	root := filepath.Dir(playgroundExamplesRoot())
+	entries, err := os.ReadDir(filepath.Join(root, "examples"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		dir := filepath.ToSlash(filepath.Join("examples", entry.Name()))
+		t.Run(dir, func(t *testing.T) {
+			matches, err := selectedCLIExamples([]string{dir})
+			if err != nil {
+				t.Fatalf("select examples in %s: %v", dir, err)
+			}
+			if len(matches) == 0 {
+				t.Fatalf("directory selector %s matched no examples", dir)
+			}
+			for _, example := range matches {
+				if !strings.HasPrefix(example.Path, dir+"/") {
+					t.Fatalf("directory selector %s returned %s", dir, example.Path)
+				}
 			}
 		})
 	}

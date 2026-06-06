@@ -6,6 +6,8 @@ prices := q`10 20 30`
 shifted := q`2+10 20 30`
 total := q`+/10 20 30`
 running := q`+\10 20 30`
+named_total := q`sum 10 20 30`
+named_running := q`sums 10 20 30`
 
 labels := dialect.eval("q", "`bid`ask!10 20")
 
@@ -13,6 +15,8 @@ assert(prices[1] == 10)
 assert(shifted[3] == 32)
 assert(total == 60)
 assert(running[3] == 60)
+assert(named_total == 60)
+assert(named_running[3] == 60)
 assert(labels.bid == 10)
 assert(labels.ask == 20)
 

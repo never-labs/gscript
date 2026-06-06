@@ -155,11 +155,44 @@ evaluate "plain record case" {
 	if len(records) != 2 || !records[0].Request.Stream || records[0].Result.Text != "OK-1" || records[1].Request.Stream {
 		t.Fatalf("records = %#v, want first streaming turn and second plain turn", records)
 	}
+	if len(records[0].StreamEvents) != 3 || records[0].StreamEvents[0].Token != "OK" || records[0].StreamEvents[2].Token != "1" {
+		t.Fatalf("stream record events = %#v, want recorded stream tokens", records[0].StreamEvents)
+	}
 	mu.Lock()
 	gotRequests := append([]anthropicRequest(nil), requests...)
 	mu.Unlock()
 	if len(gotRequests) != 2 || gotRequests[0].Model != "mock-model" || gotRequests[1].Model != "mock-model" {
 		t.Fatalf("requests = %#v, want two mock-model requests", gotRequests)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = runEvaluateCommand([]string{"--json", "--llm-replay", recordPath, sourcePath}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("evaluate --llm-replay code = %d, stderr = %q stdout = %q", code, stderr.String(), stdout.String())
+	}
+	var replayReport struct {
+		Status string `json:"status"`
+		LLM    *struct {
+			Mode           string `json:"mode"`
+			ReplayedTurns  int    `json:"replayed_turns"`
+			RemainingTurns int    `json:"remaining_turns"`
+		} `json:"llm"`
+		Cases []struct {
+			Name string `json:"name"`
+			LLM  *struct {
+				StreamEvents int `json:"stream_events"`
+			} `json:"llm"`
+		} `json:"cases"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &replayReport); err != nil {
+		t.Fatalf("replay stdout is not JSON evaluate report: %v; stdout = %q", err, stdout.String())
+	}
+	if replayReport.Status != "ok" || replayReport.LLM == nil || replayReport.LLM.Mode != "replay" || replayReport.LLM.ReplayedTurns != 2 || replayReport.LLM.RemainingTurns != 0 {
+		t.Fatalf("replay llm report = %+v", replayReport.LLM)
+	}
+	if len(replayReport.Cases) != 2 || replayReport.Cases[0].LLM == nil || replayReport.Cases[0].LLM.StreamEvents != 3 {
+		t.Fatalf("replay cases = %+v, want streamed case to replay three stream events", replayReport.Cases)
 	}
 }
 

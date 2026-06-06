@@ -1,6 +1,8 @@
 package bind
 
 import (
+	"archive/zip"
+	"bytes"
 	"strings"
 	"testing"
 )
@@ -92,4 +94,75 @@ func TestDialectPEMEncodeDeterministicBlocks(t *testing.T) {
 	if got := gotValues[0].Str(); !strings.Contains(got, "-----END CERTIFICATE-----\n-----BEGIN PRIVATE KEY-----") || !strings.Contains(got, "d29ybGQ=") {
 		t.Fatalf("formatted array PEM = %q, want concatenated blocks", got)
 	}
+}
+
+func TestDialectXLSXParsesFirstWorksheet(t *testing.T) {
+	eval := BuildDialect(HostOptions{}, nil).RawGetString("eval").GoFunction()
+	if eval == nil {
+		t.Fatalf("dialect.eval is not a Go function")
+	}
+	xlsx := testXLSXWorkbook(t)
+	gotValues, err := eval.Fn([]Value{StringValue("xlsx"), StringValue(xlsx)})
+	if err != nil {
+		t.Fatalf("xlsx parse: %v", err)
+	}
+	rows := gotValues[0].Table()
+	if got := rows.Length(); got != 2 {
+		t.Fatalf("rows length = %d, want 2", got)
+	}
+	header := rows.RawGetInt(1).Table()
+	if got := header.RawGetInt(1).Str(); got != "name" {
+		t.Fatalf("A1 = %q, want name", got)
+	}
+	if got := header.RawGetInt(2).Str(); got != "score" {
+		t.Fatalf("B1 = %q, want score", got)
+	}
+	row := rows.RawGetInt(2).Table()
+	if got := row.RawGetInt(1).Str(); got != "Ada" {
+		t.Fatalf("A2 = %q, want Ada", got)
+	}
+	if got := row.RawGetInt(2).Str(); got != "42" {
+		t.Fatalf("B2 = %q, want 42", got)
+	}
+
+	badValues, err := eval.Fn([]Value{StringValue("excel"), StringValue("not zip")})
+	if err != nil {
+		t.Fatalf("excel bad parse: %v", err)
+	}
+	if !badValues[0].IsNil() || !strings.Contains(badValues[1].Str(), "xlsx dialect: open zip") {
+		t.Fatalf("bad xlsx = %v err = %q, want invalid zip tuple", badValues[0], badValues[1].Str())
+	}
+}
+
+func testXLSXWorkbook(t *testing.T) string {
+	t.Helper()
+	var buf bytes.Buffer
+	zw := zip.NewWriter(&buf)
+	writeZipFile := func(name, body string) {
+		t.Helper()
+		w, err := zw.Create(name)
+		if err != nil {
+			t.Fatalf("create %s: %v", name, err)
+		}
+		if _, err := w.Write([]byte(body)); err != nil {
+			t.Fatalf("write %s: %v", name, err)
+		}
+	}
+	writeZipFile("xl/sharedStrings.xml", `<?xml version="1.0" encoding="UTF-8"?>
+<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <si><t>name</t></si>
+  <si><t>score</t></si>
+  <si><t>Ada</t></si>
+</sst>`)
+	writeZipFile("xl/worksheets/sheet1.xml", `<?xml version="1.0" encoding="UTF-8"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <sheetData>
+    <row r="1"><c r="A1" t="s"><v>0</v></c><c r="B1" t="s"><v>1</v></c></row>
+    <row r="2"><c r="A2" t="s"><v>2</v></c><c r="B2"><v>42</v></c></row>
+  </sheetData>
+</worksheet>`)
+	if err := zw.Close(); err != nil {
+		t.Fatalf("close xlsx zip: %v", err)
+	}
+	return buf.String()
 }

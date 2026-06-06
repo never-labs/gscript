@@ -68,6 +68,11 @@ func registerDialectData(register dialectRegisterFunc, maxHostResult func() int6
 			return dialectPEM(body, options, maxHostResult)
 		},
 	})
+	register([]string{"xlsx", "excel"}, dialectHandler{
+		eval: func(body Value, options *Table) ([]Value, error) {
+			return dialectXLSX(body, options, maxHostResult)
+		},
+	})
 }
 
 func dialectBase64(src string, opts *Table, maxHostResult func() int64) ([]Value, error) {

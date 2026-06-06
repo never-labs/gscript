@@ -59,6 +59,103 @@ usage := result.usage.output_tokens
 	}
 }
 
+func TestLLMRecorderAndReplayStreamingEvents(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []leia.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			provider := &streamingTraceProvider{}
+			recorder := llm.NewRecorder()
+			recordOpts := append([]leia.Option{
+				leia.WithLibs(leia.LibString | leia.LibLLM),
+				leia.WithLLMProvider(provider),
+				leia.WithLLMRecorder(recorder.Record),
+			}, tc.opts...)
+			recordVM := leia.New(recordOpts...)
+			if err := recordVM.Exec(`
+streamed := ""
+result, err := llm.turn({
+    model: "mock-fast",
+    messages: {llm.user("hello")},
+    on_stream: func(event) {
+        streamed = streamed .. event.token
+    },
+})
+`); err != nil {
+				t.Fatalf("record Exec: %v", err)
+			}
+			records := recorder.Records()
+			if len(records) != 1 || len(records[0].StreamEvents) != 3 {
+				t.Fatalf("records = %#v, want one record with three stream events", records)
+			}
+			if records[0].StreamEvents[0].Token != "hello" || records[0].StreamEvents[2].Token != "stream" {
+				t.Fatalf("stream events = %#v", records[0].StreamEvents)
+			}
+
+			replayOpts := append([]leia.Option{
+				leia.WithLibs(leia.LibString | leia.LibLLM),
+				leia.WithLLMReplay(records),
+			}, tc.opts...)
+			replayVM := leia.New(replayOpts...)
+			if err := replayVM.Exec(`
+streamed := ""
+count := 0
+result, err := llm.turn({
+    model: "mock-fast",
+    messages: {llm.user("hello")},
+    on_stream: func(event) {
+        streamed = streamed .. event.token
+        count = count + 1
+    },
+})
+text := result.text
+`); err != nil {
+				t.Fatalf("replay Exec: %v", err)
+			}
+			for name, want := range map[string]any{
+				"text":     "hello stream",
+				"streamed": "hello stream",
+				"count":    int64(3),
+			} {
+				got, err := replayVM.Get(name)
+				if err != nil {
+					t.Fatalf("Get %s: %v", name, err)
+				}
+				if got != want {
+					t.Fatalf("%s = %#v, want %#v", name, got, want)
+				}
+			}
+		})
+	}
+}
+
+func TestLLMReplaySynthesizesStreamEventForOldFixtures(t *testing.T) {
+	record := llm.Record{
+		Request: llm.TurnRequest{
+			Model:    "mock-fast",
+			Messages: []llm.Message{{Role: "user", Text: "hello"}},
+			Stream:   true,
+		},
+		Result: llm.TurnResult{Status: "final_answer", Text: "legacy stream"},
+	}
+	replay := llm.NewReplayProvider([]llm.Record{record})
+	var tokens []string
+	res, err := replay.StreamTurn(context.Background(), record.Request, func(event llm.StreamEvent) error {
+		tokens = append(tokens, event.Token)
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("StreamTurn: %v", err)
+	}
+	if res.Text != "legacy stream" || len(tokens) != 1 || tokens[0] != "legacy stream" {
+		t.Fatalf("res=%#v tokens=%#v, want synthesized legacy token", res, tokens)
+	}
+}
+
 func TestLLMRecorderHelper(t *testing.T) {
 	provider := &mockLLMProvider{res: llm.TurnResult{
 		Status: "final_answer",

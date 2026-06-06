@@ -1,30 +1,21 @@
-// Data-oriented design demo: particle integration.
-//
-// Current runnable path: table/AoS particles using existing Leia syntax.
-// Pending backend path: typed-array/SoA columns for x/y/z/vx/vy/vz/mass.
+// Data-oriented design demo: particle integration over structure-of-arrays.
+// Run with:
+//   go run ./cmd/leia run examples/data_processing/data_oriented/particle_integration.leia
 
-func new_particle(i) {
-    f := 1.0 * i
-    return {
-        x: 0.001 * f,
-        y: 0.002 * ((i % 97) + 1),
-        z: 0.003 * ((i % 53) + 1),
-        vx: 0.01 + 0.00001 * f,
-        vy: -0.02 + 0.00002 * (i % 31),
-        vz: 0.015 - 0.00001 * (i % 17),
-        mass: 0.5 + 0.001 * (i % 23)
-    }
+func make_particles() {
+    return soa.zip({
+        x: []f64{0.001, 0.002, 0.003, 0.004, 0.005, 0.006, 0.007, 0.008},
+        y: []f64{0.004, 0.006, 0.008, 0.010, 0.012, 0.014, 0.016, 0.018},
+        z: []f64{0.006, 0.009, 0.012, 0.015, 0.018, 0.021, 0.024, 0.027},
+        vx: []f64{0.01001, 0.01002, 0.01003, 0.01004, 0.01005, 0.01006, 0.01007, 0.01008},
+        vy: []f64{-0.01998, -0.01996, -0.01994, -0.01992, -0.01990, -0.01988, -0.01986, -0.01984},
+        vz: []f64{0.01499, 0.01498, 0.01497, 0.01496, 0.01495, 0.01494, 0.01493, 0.01492},
+        mass: []f64{0.501, 0.502, 0.503, 0.504, 0.505, 0.506, 0.507, 0.508},
+    })
 }
 
-func make_particles(n) {
-    particles := {}
-    for i := 1; i <= n; i++ {
-        particles[i] = new_particle(i)
-    }
-    return particles
-}
-
-func integrate_aos(particles, n, steps, dt) {
+func integrate_soa(particles, steps, dt) {
+    n := soa.len(particles)
     for step := 1; step <= steps; step++ {
         for i := 1; i <= n; i++ {
             p := particles[i]
@@ -37,32 +28,34 @@ func integrate_aos(particles, n, steps, dt) {
             p.x = p.x + p.vx * dt
             p.y = p.y + p.vy * dt
             p.z = p.z + p.vz * dt
+            particles[i] = p
         }
     }
 }
 
-func checksum_aos(particles, n) {
+func checksum_soa(particles) {
     sum := 0.0
-    for i := 1; i <= n; i++ {
-        p := particles[i]
+    for i := 1; i <= soa.len(particles); i++ {
         weight := (i % 7) + 1
-        sum = sum + p.x * weight + p.y * 0.5 + p.z * 0.25 + p.vx * 0.125
+        sum = sum + particles.x[i] * weight + particles.y[i] * 0.5 + particles.z[i] * 0.25 + particles.vx[i] * 0.125
     }
     return sum
 }
 
-N := 8192
+N := 8
 STEPS := 64
 DT := 0.016
 
-particles := make_particles(N)
+particles := make_particles()
+assert(soa.len(particles) == N)
+assert(soa.shape(particles).columns[1].dtype == "f64")
+assert(particles.mass[8] == 0.508)
 
 t0 := time.now()
-integrate_aos(particles, N, STEPS, DT)
+integrate_soa(particles, STEPS, DT)
 elapsed := time.since(t0)
-checksum := checksum_aos(particles, N)
+checksum := checksum_soa(particles)
 
-print(string.format("data_oriented_particle_integration layout=table_aos backend=current n=%d steps=%d", N, STEPS))
+print(string.format("data_oriented_particle_integration layout=soa backend=current n=%d steps=%d", N, STEPS))
 print(string.format("checksum: %.9f", checksum))
-print(string.format("pending_backend: typed_array_soa"))
 print(string.format("Time: %.3fs", elapsed))

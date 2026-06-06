@@ -117,9 +117,10 @@ type ProviderConfig struct {
 type ProviderFactory func(ProviderConfig) (Provider, error)
 
 type Record struct {
-	Request TurnRequest
-	Result  TurnResult
-	Error   string
+	Request      TurnRequest
+	Result       TurnResult
+	StreamEvents []StreamEvent `json:",omitempty"`
+	Error        string
 }
 
 const (

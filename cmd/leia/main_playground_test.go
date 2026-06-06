@@ -319,7 +319,7 @@ func TestPlaygroundRepositoryPackageManagedUIExampleIsManualRunOnly(t *testing.T
 		if example.Requires != "package-managed UI runtime and native window host access" {
 			t.Fatalf("requires = %q", example.Requires)
 		}
-		if !strings.Contains(example.Source, `import "github.com/never-labs/leia-ui/raylib" as ui`) {
+		if !strings.Contains(example.Source, `import ui "github.com/never-labs/leia-ui/raylib"`) {
 			t.Fatalf("source missing package-managed UI runtime import\nsource:\n%s", example.Source)
 		}
 		return
@@ -365,7 +365,7 @@ func TestPlaygroundRepositoryPackageManagedMacOSExampleIsManualRunOnly(t *testin
 		if example.Requires != "package-managed macOS automation runtime and process host access" {
 			t.Fatalf("requires = %q", example.Requires)
 		}
-		if !strings.Contains(example.Source, `import "github.com/never-labs/leia-macos/automation" as macos`) {
+		if !strings.Contains(example.Source, `import macos "github.com/never-labs/leia-macos/automation"`) {
 			t.Fatalf("source missing package-managed macOS runtime import\nsource:\n%s", example.Source)
 		}
 		return

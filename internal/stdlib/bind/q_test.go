@@ -146,6 +146,8 @@ func TestQSymbolicCoreDataForms(t *testing.T) {
 			"spread := q.eval(\"100 101.5 103 - 99.5 100 101\")\n"+
 			"running := q.eval(\"+\\\\100 101.5 103\")\n"+
 			"total := q.eval(\"+/10 20 30 40\")\n"+
+			"named_total := q.eval(\"sum 10 20 30 40\")\n"+
+			"named_running := q.eval(\"sums 100 101.5 103\")\n"+
 			"idx := q.eval(\"where 100 101.5 103>100\")\n"+
 			"idx_count := q.count(idx)\n"+
 			"first_two := q.eval(\"2#10 20 30\")\n"+
@@ -163,6 +165,12 @@ func TestQSymbolicCoreDataForms(t *testing.T) {
 	}
 	if got := interp.GetGlobal("total"); !got.IsInt() || got.Int() != 100 {
 		t.Fatalf("total = %v, want 100", got)
+	}
+	if got := interp.GetGlobal("named_total"); !got.IsInt() || got.Int() != 100 {
+		t.Fatalf("named_total = %v, want 100", got)
+	}
+	if got, _ := interp.GetGlobal("named_running").DenseArray().At(2); !got.IsFloat() || got.Float() != 304.5 {
+		t.Fatalf("named_running[3] = %v, want 304.5", got)
 	}
 	if got, _ := interp.GetGlobal("idx").DenseArray().At(0); !got.IsInt() || got.Int() != 2 {
 		t.Fatalf("idx[1] = %v, want 2", got)

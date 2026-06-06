@@ -179,7 +179,8 @@ func TestBuiltinDialectRegistryStaysModular(t *testing.T) {
 		"dialect_yaml.go":             nil,
 		"dialect_protocol.go":         {"url", "html_escape", "html", "urlquery", "form", "urlform", "urlpath", "mime", "mailaddr", "emailaddr", "headers", "http_headers", "cookie", "cookies", "httpmsg", "sse", "multipart", "jwt"},
 		"dialect_protocol_network.go": {"ipaddr", "cidr", "hostport"},
-		"dialect_data.go":             {"base64", "hash", "hex", "base32", "uuid", "gzip", "zlib", "deflate", "binary", "q", "pem"},
+		"dialect_data.go":             {"base64", "hash", "hex", "base32", "uuid", "gzip", "zlib", "deflate", "binary", "q", "pem", "xlsx", "excel"},
+		"dialect_xlsx.go":             nil,
 		"dialect_database.go":         {"sql"},
 		"dialect_ai.go":               {"prompt", "quote", "model", "turn", "tool", "agent"},
 	}
@@ -209,7 +210,8 @@ func TestBuiltinDialectRegistryStaysModular(t *testing.T) {
 			"github.com/never-labs/leia/internal/stdlib/lib/uuid",
 			"github.com/never-labs/leia/internal/support/binaryfmt",
 		},
-		"dialect_ai.go": nil,
+		"dialect_xlsx.go": nil,
+		"dialect_ai.go":   nil,
 	}
 
 	dialectFile := parseGoFile(t, filepath.Join(bindRoot, "dialect.go"))

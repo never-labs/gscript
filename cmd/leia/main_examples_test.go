@@ -377,7 +377,7 @@ func TestPackageManagedMacOSAutomationExample(t *testing.T) {
 	}
 	source := string(sourceBytes)
 	for _, want := range []string{
-		`import "github.com/never-labs/leia-macos/automation" as macos`,
+		`import macos "github.com/never-labs/leia-macos/automation"`,
 		"macos.applescript(",
 		"macos.plan(",
 		"clipboard_probe",
@@ -783,7 +783,7 @@ func approvedBuiltinDialectTags() []string {
 		"re", "regexp", "json", "jsonptr", "jsonl", "csv", "tsv", "mdtable", "markdown", "md", "lines", "split", "words", "nums", "numbers", "kv", "logfmt", "env", "ini", "yaml", "yml", "semver", "duration", "timestamp", "rfc3339", "tap", "junit", "xml", "template",
 		"url", "html_escape", "html", "urlquery", "form", "urlform", "urlpath", "mime", "mailaddr", "emailaddr", "headers", "http_headers", "cookie", "cookies", "httpmsg", "sse", "multipart", "jwt",
 		"ipaddr", "cidr", "hostport",
-		"base64", "hash", "hex", "base32", "uuid", "gzip", "zlib", "deflate", "binary", "q", "pem", "sql",
+		"base64", "hash", "hex", "base32", "uuid", "gzip", "zlib", "deflate", "binary", "q", "pem", "xlsx", "excel", "sql",
 		"prompt", "quote", "model", "turn", "tool", "agent",
 	}
 }
