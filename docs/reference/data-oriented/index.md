@@ -68,7 +68,12 @@ conn.exec("create table sales(channel text, amount real)")
 conn.exec("insert into sales values (?, ?)", {"web", 120})
 
 frame := conn.frame("select channel, amount from sales", {})
-total := q.query(frame.soa, q`select sum amount by channel`)
+total := q.query(frame.soa, {
+    by: {"channel"}
+    select: {amount: "amount"}
+    aggregate: {amount: "sum"}
+    order_by: {column: "amount", desc: true}
+})
 ```
 
 Use row data when crossing API boundaries, and use `frame.soa` / numeric
@@ -76,7 +81,7 @@ columns when feeding `q.query` or SoA kernels. Spreadsheet dialects complete the
 round trip:
 
 ```leia
-workbook := dialect.eval("xlsx", total.rows, {
+workbook := dialect.eval("xlsx", total, {
     mode: "encode"
     headers: {"channel", "amount"}
     sheet: "summary"

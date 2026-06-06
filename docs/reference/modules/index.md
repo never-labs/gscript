@@ -54,6 +54,10 @@ Dependency commands operate on `require` directives in `leia.mod`. `tidy` may
 remove requirements that are not used by source files, so run it after imports
 or `require(...)` calls exist in the project.
 
+`download` currently resolves GitHub-style module paths. Use `replace`,
+`vendor/`, or local collections for non-GitHub paths until another resolver is
+configured.
+
 ```bash
 leia mod add github.com/never-labs/leia-raylib@v0.1.0
 leia mod tidy

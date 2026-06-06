@@ -85,7 +85,7 @@ func TestReadmeInstallCommandsStayRunnable(t *testing.T) {
 	}
 	got := readmeInstallCommands(string(data))
 	want := []string{
-		"go install ./cmd/leia",
+		"go install ./cmd/leia ./cmd/leia-lsp",
 		"leia version",
 		"leia run tests/smoke/01_basic.leia",
 	}
@@ -95,18 +95,22 @@ func TestReadmeInstallCommandsStayRunnable(t *testing.T) {
 
 	gobin := t.TempDir()
 	env := append(os.Environ(), "GOBIN="+gobin)
-	install := exec.Command("go", "install", "./cmd/leia")
+	install := exec.Command("go", "install", "./cmd/leia", "./cmd/leia-lsp")
 	install.Dir = root
 	install.Env = env
 	var installStdout, installStderr bytes.Buffer
 	install.Stdout = &installStdout
 	install.Stderr = &installStderr
 	if err := install.Run(); err != nil {
-		t.Fatalf("README install command `go install ./cmd/leia` failed: %v\nstdout:\n%s\nstderr:\n%s",
+		t.Fatalf("README install command `go install ./cmd/leia ./cmd/leia-lsp` failed: %v\nstdout:\n%s\nstderr:\n%s",
 			err, installStdout.String(), installStderr.String())
 	}
 
 	leia := filepath.Join(gobin, "leia")
+	leiaLSP := filepath.Join(gobin, "leia-lsp")
+	if _, err := os.Stat(leiaLSP); err != nil {
+		t.Fatalf("README install command did not install leia-lsp at %s: %v", leiaLSP, err)
+	}
 	commands := [][]string{
 		{"version"},
 		{"run", "tests/smoke/01_basic.leia"},
@@ -356,7 +360,7 @@ func readmeQuickStartCommands(readme string) []string {
 }
 
 func readmeInstallCommands(readme string) []string {
-	const marker = "Install the CLI from a checkout:"
+	const marker = "Install the CLI and language server from a checkout:"
 	start := strings.Index(readme, marker)
 	if start < 0 {
 		return nil

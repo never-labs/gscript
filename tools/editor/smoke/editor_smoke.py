@@ -258,6 +258,8 @@ def check_tree_sitter_assets() -> None:
         fail("tree-sitter package metadata has the wrong scope")
     if package_entry.get("file-types") != ["leia"]:
         fail("tree-sitter package metadata has the wrong file types")
+    if package_entry.get("grammar") != "leia":
+        fail("tree-sitter package metadata has the wrong grammar name")
 
     grammar_entry = config.get("grammars", [{}])[0]
     if grammar_entry.get("name") != "leia":

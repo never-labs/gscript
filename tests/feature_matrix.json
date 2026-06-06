@@ -268,7 +268,7 @@
     },
     {
       "id": "host_stdlibs",
-      "name": "Host stdlibs: fs, io, net, json, crypto, process, serve, and helpers",
+      "name": "Host stdlibs: fs, io, net, json, crypto, process, db/sqlite, serve, and helpers",
       "category": "stdlib-host",
       "spec_sections": ["Values And Types", "Expressions", "Modules And Loading", "Declarations And Scope"],
       "parser": {"status": "not_applicable", "refs": []},
@@ -294,6 +294,34 @@
       "semantic_gate": {"status": "covered", "refs": ["tests/dialect_syntax_test.go", "internal/parser/dialect_syntax_test.go", "internal/stdlib/bind/dialect_data_test.go", "internal/stdlib/bind/serve_behavior_test.go", "tests/architecture/stdlib_boundary_test.go", "cmd/leia/main_examples_test.go", "cmd/leia/main_examples_command_test.go", "examples/hello/dialects.leia", "examples/dialects/shell_filesystem.leia", "examples/dialects/web_text.leia", "examples/dialects/sql_result_analytics.leia", "examples/dialects/ai_prompt_quote.leia", "examples/dialects/data_aggregation_report.leia", "examples/dialects/http_protocol_trace.leia", "examples/dialects/sse_stream_fixture.leia", "examples/dialects/multipart_form_fixture.leia", "examples/dialects/pem_certificate_fixture.leia", "examples/dialects/mailaddr_fixture.leia", "examples/data/q_trade_analytics_project/main.leia", "examples/web/serve_dialect_app.leia", "examples/web/route_workbench.leia", "examples/web/tiny_fullstack_app.leia", "examples/tooling/release_gate_project/main.leia", "docs/reference/dialects/index.md"]},
       "conformance_case": {"status": "not_applicable", "refs": []},
       "perf_hot_case": {"status": "covered", "refs": ["benchmarks/app/dialect_syntax_smoke.leia"]}
+    },
+    {
+      "id": "q_analytics_dialect",
+      "name": "q-style vectors, dictionaries, tables, and SoA query plans",
+      "category": "dialect-data",
+      "spec_sections": ["Expressions", "Values And Types", "AI-Native Syntax"],
+      "parser": {"status": "not_applicable", "refs": []},
+      "bytecode": {"status": "not_applicable", "refs": []},
+      "interpreter": {"status": "covered", "refs": ["internal/stdlib/bind/q_test.go", "internal/stdlib/bind/db_test.go"]},
+      "tier1": {"status": "not_applicable", "refs": []},
+      "tier2": {"status": "not_applicable", "refs": []},
+      "semantic_gate": {"status": "covered", "refs": ["internal/stdlib/bind/q_test.go", "internal/stdlib/bind/db_test.go", "examples/data/q_vector_basics.leia", "examples/data/q_trade_analytics_project/main.leia", "examples/data/db_q_frame_project/main.leia", "docs/reference/data-oriented/index.md", "docs/reference/dialects/index.md"]},
+      "conformance_case": {"status": "not_applicable", "refs": []},
+      "perf_hot_case": {"status": "covered", "refs": ["benchmarks/data/soa_affine_many.leia", "benchmarks/data/soa_masked_aggregate.leia", "benchmarks/data/soa_filter_gather.leia", "benchmarks/data/soa_scan.leia"]}
+    },
+    {
+      "id": "spreadsheet_dialects",
+      "name": "Spreadsheet xlsx/excel encode/decode dialects",
+      "category": "dialect-data",
+      "spec_sections": ["Expressions", "Values And Types"],
+      "parser": {"status": "not_applicable", "refs": []},
+      "bytecode": {"status": "not_applicable", "refs": []},
+      "interpreter": {"status": "covered", "refs": ["internal/stdlib/bind/dialect_data_test.go", "internal/stdlib/bind/dialect_xlsx.go"]},
+      "tier1": {"status": "not_applicable", "refs": []},
+      "tier2": {"status": "not_applicable", "refs": []},
+      "semantic_gate": {"status": "covered", "refs": ["internal/stdlib/bind/dialect_data_test.go", "internal/stdlib/bind/dialect_xlsx.go", "examples/data/db_q_frame_project/main.leia", "docs/reference/dialects/index.md", "docs/reference/data-oriented/index.md"]},
+      "conformance_case": {"status": "not_applicable", "refs": []},
+      "perf_hot_case": {"status": "not_applicable", "refs": []}
     },
     {
       "id": "llm_native_integration",
@@ -324,8 +352,22 @@
       "perf_hot_case": {"status": "not_applicable", "refs": []}
     },
     {
+      "id": "module_download_vendor_cache",
+      "name": "Module download, lock, verify, vendor, and transitive dependency evidence",
+      "category": "tooling-module",
+      "spec_sections": ["Modules And Loading", "Stability Contract"],
+      "parser": {"status": "not_applicable", "refs": []},
+      "bytecode": {"status": "not_applicable", "refs": []},
+      "interpreter": {"status": "not_applicable", "refs": []},
+      "tier1": {"status": "not_applicable", "refs": []},
+      "tier2": {"status": "not_applicable", "refs": []},
+      "semantic_gate": {"status": "covered", "refs": ["internal/modpkg/modpkg_test.go", "cmd/leia/main_mod_test.go", "tests/release_matrix_test.go", "docs/reference/modules/index.md", "docs/guides/packages.md"]},
+      "conformance_case": {"status": "not_applicable", "refs": []},
+      "perf_hot_case": {"status": "not_applicable", "refs": []}
+    },
+    {
       "id": "cli_repository_tooling",
-      "name": "CLI tooling for format, lint, test, docs, diagnostics, modules, benchmarks, examples, and release evidence",
+      "name": "CLI command surface for capabilities, format, lint, test, docs, diagnostics, modules, evaluate, playground, benchmarks, examples, and release evidence",
       "category": "tooling-cli",
       "spec_sections": ["Stability Contract", "Modules And Loading", "Implementation Requirements"],
       "parser": {"status": "not_applicable", "refs": []},
@@ -333,9 +375,23 @@
       "interpreter": {"status": "not_applicable", "refs": []},
       "tier1": {"status": "not_applicable", "refs": []},
       "tier2": {"status": "not_applicable", "refs": []},
-      "semantic_gate": {"status": "covered", "refs": ["cmd/leia/main_fmt_test.go", "cmd/leia/main_lint_test.go", "cmd/leia/main_test_run_test.go", "cmd/leia/main_doc_test.go", "cmd/leia/main_diag_test.go", "cmd/leia/main_mod_test.go", "cmd/leia/main_bench_test.go", "cmd/leia/main_examples_command_test.go", "cmd/leia/main_ci_test.go", "cmd/leia/main_readme_tooling_test.go", "examples/tooling/release_evidence_pipeline.leia", "examples/tooling/release_gate_project/main.leia", "docs/guides/tooling.md", "docs/reference/cli/index.md"]},
+      "semantic_gate": {"status": "covered", "refs": ["cmd/leia/main_fmt_test.go", "cmd/leia/main_lint_test.go", "cmd/leia/main_test_run_test.go", "cmd/leia/main_doc_test.go", "cmd/leia/main_diag_test.go", "cmd/leia/main_mod_test.go", "cmd/leia/main_bench_test.go", "cmd/leia/main_examples_command_test.go", "cmd/leia/main_ci_test.go", "cmd/leia/main_readme_tooling_test.go", "cmd/leia/main_metadata_test.go", "cmd/leia/main_evaluate_test.go", "cmd/leia/main_playground_test.go", "cmd/leia-lsp/main_test.go", "examples/tooling/release_evidence_pipeline.leia", "examples/tooling/release_gate_project/main.leia", "docs/guides/tooling.md", "docs/reference/cli/index.md"]},
       "conformance_case": {"status": "not_applicable", "refs": []},
       "perf_hot_case": {"status": "covered", "refs": ["benchmarks/performance_gate_test.py", "benchmarks/benchmark_discovery_test.py"]}
+    },
+    {
+      "id": "editor_lsp_tooling",
+      "name": "Editor integrations, tree-sitter grammar, and LSP server packaging",
+      "category": "tooling-editor",
+      "spec_sections": ["Stability Contract", "Implementation Requirements", "Lexical Elements", "Grammar Appendix"],
+      "parser": {"status": "not_applicable", "refs": []},
+      "bytecode": {"status": "not_applicable", "refs": []},
+      "interpreter": {"status": "not_applicable", "refs": []},
+      "tier1": {"status": "not_applicable", "refs": []},
+      "tier2": {"status": "not_applicable", "refs": []},
+      "semantic_gate": {"status": "covered", "refs": ["cmd/leia-lsp/main_test.go", "tools/editor/smoke/editor_smoke.py", "tools/tree-sitter-leia/package.json", "tools/syntax/textmate/leia.tmLanguage.json", "tools/syntax/textmate/leia-mod.tmLanguage.json", "editors/emacs/leia-mode.el", "scripts/editor_check.sh", "scripts/release_distribution_check.sh", "README.md"]},
+      "conformance_case": {"status": "not_applicable", "refs": []},
+      "perf_hot_case": {"status": "not_applicable", "refs": []}
     },
     {
       "id": "bytecode_vm_execution",

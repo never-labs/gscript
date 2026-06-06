@@ -73,6 +73,7 @@ type playgroundExample struct {
 	Source   string   `json:"source"`
 	Runnable bool     `json:"runnable"`
 	Requires string   `json:"requires,omitempty"`
+	Path     string   `json:"-"`
 }
 
 func runPlaygroundCommand(args []string, outw, errw io.Writer) int {
@@ -381,21 +382,21 @@ func runPlaygroundEvaluateRequest(ctx context.Context, req playgroundEvaluateRun
 	defer os.RemoveAll(dir)
 	example, hasExample := playgroundEvaluateExampleByID(req.ExampleID)
 	sourceName := "main.leia"
-	if hasExample {
-		sourceName = filepath.Base(example.Summary)
+	if hasExample && example.Path != "" {
+		sourceName = filepath.Base(example.Path)
 	}
 	sourcePath := filepath.Join(dir, sourceName)
 	if err := os.WriteFile(sourcePath, []byte(req.Source), 0600); err != nil {
 		return playgroundRunResponse{OK: false, Error: err.Error(), DurationMS: elapsedMillis(start)}
 	}
-	if hasExample {
-		if err := copyPlaygroundEvaluateCompanions(filepath.Dir(example.Summary), dir); err != nil {
+	if hasExample && example.Path != "" {
+		if err := copyPlaygroundEvaluateCompanions(filepath.Dir(example.Path), dir); err != nil {
 			return playgroundRunResponse{OK: false, Error: err.Error(), DurationMS: elapsedMillis(start)}
 		}
 	}
 	args := []string{"--json"}
-	if hasExample {
-		if replay := playgroundEvaluateReplayPath(example.Summary); replay != "" {
+	if hasExample && example.Path != "" {
+		if replay := playgroundEvaluateReplayPath(example.Path); replay != "" {
 			args = append(args, "--replay", filepath.Join(dir, filepath.Base(replay)))
 		}
 	}
@@ -1058,6 +1059,34 @@ print(request)
 print(task.body.user)`,
 			Runnable: true,
 		},
+		{
+			ID:      "data-dialects",
+			Title:   "Data Dialects",
+			Section: "Shell And Data",
+			Summary: "q-style vectors and spreadsheet round-trips are available without shelling out.",
+			Concepts: []string{
+				"`q`...`` parses compact q-style vectors, dictionaries, and tables.",
+				"`xlsx` encodes rows to an in-memory workbook byte string.",
+				"`excel` decodes workbook bytes back into ordinary Leia rows.",
+			},
+			Source: `spread := q` + "`100 101.5 103 - 99.5 100 101`" + `
+symbols := dialect.eval("q", "` + "`bid`ask!99.5 100.5" + `")
+rows := {
+    {channel: "web", amount: 120},
+    {channel: "partner", amount: 80},
+}
+workbook := dialect.eval("xlsx", rows, {
+    mode: "encode"
+    headers: {"channel", "amount"}
+    sheet: "summary"
+})
+roundtrip := dialect.eval("excel", workbook, {headers: true})
+
+print("spread", json.encode(spread))
+print("bid", symbols.bid)
+print("rows", #roundtrip)`,
+			Runnable: true,
+		},
 	}
 }
 
@@ -1108,6 +1137,50 @@ print("model alias", result.text)`,
 			},
 			Source: `result, err := llm.turn({ messages: {llm.user("Reply exactly: LEIA_GLM_OK")} })
 if err != nil { print(err.message); return }
+print(result.text)`,
+		},
+		{
+			ID:       "ai-tagged-dialect",
+			Title:    "Tagged AI Dialect",
+			Section:  "AI Basics",
+			Summary:  "Use model, tool, agent, and turn tags as the concise public AI syntax.",
+			Runnable: true,
+			Requires: "LLM provider",
+			Concepts: []string{
+				"`model {}` registers script-visible model defaults.",
+				"`tool {}` wraps ordinary Leia functions with model-facing metadata.",
+				"`agent {}` returns a callable value while lowering through the same llm runtime.",
+			},
+			Source: `model {
+    default: "mock-fast"
+}
+
+lookup_signal := tool {
+    name: "lookup_signal"
+    params: {"service"}
+    description: "Look up a local incident signal."
+    fn: func(service) {
+        return "service=" .. service .. "; severity=sev2", nil
+    }
+}
+
+responder := agent {
+    name: "incident_responder"
+    params: {"issue"}
+    description: "Triage a production incident with local evidence."
+    config: func(issue) {
+        return {
+            model: "mock-fast"
+            system: "Write a concise incident response."
+            user: issue
+            tools: {lookup_signal}
+        }, nil
+    }
+}
+
+result, err := responder("checkout p95 latency is elevated")
+if err != nil { print(err.message); return }
+print(result.status)
 print(result.text)`,
 		},
 		{
@@ -1630,6 +1703,26 @@ func playgroundEvaluateExamples(root string) ([]playgroundExample, error) {
 				"Replay turns make agent regressions runnable without credentials.",
 			},
 		},
+		"llm_replay.leia": {
+			title:   "Replay-Backed Turn",
+			section: "Replay",
+			summary: "Run one deterministic provider turn through a companion replay file.",
+			concepts: []string{
+				"`llm.turn` request shape stays identical to live-provider code.",
+				"`leia evaluate --replay` catches prompt/request drift.",
+				"Replay examples keep CI independent from credentials.",
+			},
+		},
+		"multiturn_replay.leia": {
+			title:   "Multi-Turn Replay",
+			section: "Replay",
+			summary: "Replay a short history-building conversation and require every recorded turn.",
+			concepts: []string{
+				"History is ordinary Leia data.",
+				"Each provider turn consumes one replay record.",
+				"Unconsumed or mismatched records fail the evaluate report.",
+			},
+		},
 		"project_agent_regression.leia": {
 			title:   "Project Agent Regression",
 			section: "Replay",
@@ -1641,7 +1734,7 @@ func playgroundEvaluateExamples(root string) ([]playgroundExample, error) {
 			},
 		},
 	}
-	files := []string{"basic_assert.leia", "corpus_metrics.leia", "agent_replay.leia", "project_agent_regression.leia"}
+	files := []string{"basic_assert.leia", "corpus_metrics.leia", "llm_replay.leia", "agent_replay.leia", "multiturn_replay.leia", "project_agent_regression.leia"}
 	out := make([]playgroundExample, 0, len(files))
 	for _, name := range files {
 		path := filepath.Join(root, name)
@@ -1655,10 +1748,11 @@ func playgroundEvaluateExamples(root string) ([]playgroundExample, error) {
 			ID:       "evaluate-" + strings.ReplaceAll(id, "_", "-"),
 			Title:    meta.title,
 			Section:  meta.section,
-			Summary:  path,
+			Summary:  meta.summary,
 			Concepts: meta.concepts,
 			Source:   string(src),
 			Runnable: true,
+			Path:     path,
 		})
 	}
 	return out, nil
@@ -2122,10 +2216,9 @@ let activeTab = "playground";
 let currentItems = [];
 
 const leiaKeywords = new Set([
-  "and", "break", "case", "const", "continue", "default",
-  "defer", "do", "else", "elseif", "end", "false", "for",
-  "func", "go", "if", "import", "in", "local", "nil",
-  "not", "or", "return", "select", "then", "true"
+  "break", "chan", "const", "continue", "defer", "else",
+  "elseif", "false", "for", "func", "go", "goto", "if",
+  "in", "nil", "range", "return", "true", "var"
 ]);
 const leiaBuiltins = new Set([
   "print", "pairs", "ipairs", "range", "len", "type", "tostring", "tonumber",

@@ -38,13 +38,18 @@ optional_workflow .github/workflows/release.yml
 optional_workflow .github/workflows/distribution-check.yml
 
 require_contains .goreleaser.yaml "version: 2"
+require_contains .goreleaser.yaml "id: leia"
 require_contains .goreleaser.yaml "main: ./cmd/leia"
+require_contains .goreleaser.yaml "id: leia-lsp"
+require_contains .goreleaser.yaml "main: ./cmd/leia-lsp"
+require_contains .goreleaser.yaml "binary: leia-lsp"
 require_contains .goreleaser.yaml "- darwin"
 require_contains .goreleaser.yaml "- linux"
 require_contains .goreleaser.yaml "- windows"
 require_contains .goreleaser.yaml "- amd64"
 require_contains .goreleaser.yaml "- arm64"
 require_contains .goreleaser.yaml "name_template: \"{{ .ProjectName }}_{{ .Tag }}_{{ .Os }}_{{ .Arch }}\""
+require_contains .goreleaser.yaml "- leia-lsp"
 
 bash -n scripts/install.sh
 

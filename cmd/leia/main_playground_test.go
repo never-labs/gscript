@@ -103,18 +103,20 @@ func TestPlaygroundPageSyntaxSurfaceMatchesLeia(t *testing.T) {
 	}
 	body := rec.Body.String()
 	for _, want := range []string{
-		`"import"`,
-		`"select"`,
+		`"chan"`,
+		`"goto"`,
+		`"var"`,
 		`"model"`,
-		`"select"`,
 		`ch === "/" && next === "/"`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("playground page missing %q", want)
 		}
 	}
-	if strings.Contains(body, `"while"`) {
-		t.Fatalf("playground page still advertises unsupported while keyword")
+	for _, stale := range []string{`"and"`, `"do"`, `"end"`, `"local"`, `"not"`, `"or"`, `"then"`, `"while"`} {
+		if strings.Contains(body, stale) {
+			t.Fatalf("playground page still advertises unsupported keyword %s", stale)
+		}
 	}
 }
 
@@ -180,7 +182,9 @@ func TestPlaygroundEvaluateAPI(t *testing.T) {
 	want := map[string][]string{
 		"evaluate-basic-assert":             {"evaluate \"basic assert\"", "assert(slug == \"leia-checks\")"},
 		"evaluate-corpus-metrics":           {"eval.load_jsonl", "eval.metric"},
+		"evaluate-llm-replay":               {"llm.turn({", "Deterministic agent checks with replay"},
 		"evaluate-agent-replay":             {"llm.agent(\"classify_support\"", "result.text == \"refund\""},
+		"evaluate-multiturn-replay":         {"run_multiturn_replay", "Leia checks now support deterministic replay."},
 		"evaluate-project-agent-regression": {"eval.usage().turns", "eval.usage().stream_events"},
 	}
 	for id, snippets := range want {
@@ -700,6 +704,7 @@ func TestPlaygroundAIExamplesCoverRunnableWorkflowShapes(t *testing.T) {
 	want := map[string][]string{
 		"ai-model-alias":       {"model alias\tLEIA_GLM_OK"},
 		"ai-one-line":          {"LEIA_GLM_OK"},
+		"ai-tagged-dialect":    {"done", "MOCK_TOOL_RESULT service=checkout p95 latency is elevated; severity=sev2"},
 		"ai-agent-shape":       {"MOCK_AI_OK"},
 		"ai-structured-output": {"\"product\":\"playground\""},
 		"ai-streaming":         {"streamed\tLEIA_GLM_OK", "final\tLEIA_GLM_OK"},
@@ -782,6 +787,11 @@ func TestPlaygroundTourExamplesProduceTeachingOutputs(t *testing.T) {
 			"leia serves application/json",
 			"GET /health HTTP/1.1",
 			"Explain dialect",
+		},
+		"data-dialects": {
+			"spread",
+			"bid\t99.5",
+			"rows\t2",
 		},
 	}
 	for _, example := range playgroundTourLessons() {

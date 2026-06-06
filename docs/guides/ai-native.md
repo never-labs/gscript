@@ -70,9 +70,9 @@ lookup_runbook := tool {
 }
 ```
 
-Use `requires: {"none"}` or omit capability checks for pure local tools when
-the host policy allows that. Capability-aware hosts can inspect tool metadata
-before exposing it to a provider.
+Omit `requires` for pure local tools when the host policy allows that.
+Capability-aware hosts can inspect tool metadata before exposing it to a
+provider.
 
 ## Agents
 
@@ -191,6 +191,16 @@ vm = leia.New(leia.WithLLMReplay(records))
 
 Use `llm.NewTraceRecorder()` or `leia.WithLLMTrace` for metadata events. Trace
 events intentionally omit prompt text and tool result values by default.
+
+## Human Review And Resume
+
+The lower-level loop helpers expose pause/resume hooks for human-in-the-loop
+workflows. A loop may return a pending result with a token and payload when an
+`approve_when` policy asks for review; hosts can persist that snapshot and later
+resume it through the matching `loop.resume` helper. Keep this at the helper
+layer for now: tagged `agent` and `turn` syntax lowers through the same runtime
+so future review policies do not bypass provider, tool, budget, trace, or
+replay controls.
 
 ## Live-provider examples
 

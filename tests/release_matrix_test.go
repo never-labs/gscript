@@ -1365,7 +1365,7 @@ func TestReleaseMatrixReadmeUserFacingSnippetsHaveFocusedGate(t *testing.T) {
 
 	installCommands := readReleaseReadmeInstallCommands(t, root)
 	wantInstall := []string{
-		"go install ./cmd/leia",
+		"go install ./cmd/leia ./cmd/leia-lsp",
 		"leia version",
 		"leia run tests/smoke/01_basic.leia",
 	}
@@ -1404,9 +1404,10 @@ func TestReleaseMatrixReadmeUserFacingSnippetsHaveFocusedGate(t *testing.T) {
 	for _, snippet := range append([]string{
 		"TestReadmeInstallCommandsStayRunnable",
 		"readmeInstallCommands",
-		"README install command `go install ./cmd/leia` failed",
+		"README install command `go install ./cmd/leia ./cmd/leia-lsp` failed",
 		"README install command `leia %s` failed",
-		`exec.Command("go", "install", "./cmd/leia")`,
+		`exec.Command("go", "install", "./cmd/leia", "./cmd/leia-lsp")`,
+		"README install command did not install leia-lsp",
 		`exec.Command(leia, args...)`,
 	}, wantInstall...) {
 		if !strings.Contains(focusedGate, snippet) {
@@ -2021,7 +2022,7 @@ func readReleaseReadmeQuickStartCommands(t *testing.T, root string) []string {
 func readReleaseReadmeInstallCommands(t *testing.T, root string) []string {
 	t.Helper()
 	readme := readFileString(t, filepath.Join(root, "README.md"))
-	const marker = "Install the CLI from a checkout:"
+	const marker = "Install the CLI and language server from a checkout:"
 	start := strings.Index(readme, marker)
 	if start == -1 {
 		t.Fatal("README.md must contain install commands")

@@ -17,7 +17,7 @@
       "file-types": [
         "leia"
       ],
-      "grammar": "tree-sitter-leia"
+      "grammar": "leia"
     }
   ],
   "license": "UNLICENSED"

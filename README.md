@@ -23,10 +23,10 @@ go run ./cmd/leia run tests/smoke/01_basic.leia
 go run ./cmd/leia run examples/hello/fib.leia
 ```
 
-Install the CLI from a checkout:
+Install the CLI and language server from a checkout:
 
 ```bash
-go install ./cmd/leia
+go install ./cmd/leia ./cmd/leia-lsp
 leia version
 leia run tests/smoke/01_basic.leia
 ```
