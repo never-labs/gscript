@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "case_count": 457,
+  "case_count": 458,
   "cases": [
     {
       "id": "language/all_harness_flags_format",
@@ -4853,6 +4853,18 @@
         "kind": "lua",
         "path": "tests/language/process_go_host_entry_exit_more.lua"
       },
+      "status": "passing",
+      "tags": [
+        "language",
+        "conformance"
+      ]
+    },
+    {
+      "id": "language/q_data_complex_examples_tdd",
+      "path": "tests/language/q_data_complex_examples_tdd.leia",
+      "domain": "language",
+      "kind": "test",
+      "reference": null,
       "status": "passing",
       "tags": [
         "language",

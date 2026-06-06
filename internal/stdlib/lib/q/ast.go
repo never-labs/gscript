@@ -5,6 +5,8 @@ type QueryKind string
 const (
 	SelectQuery QueryKind = "select"
 	ExecQuery   QueryKind = "exec"
+	UpdateQuery QueryKind = "update"
+	DeleteQuery QueryKind = "delete"
 )
 
 type Expr interface {
@@ -12,13 +14,15 @@ type Expr interface {
 }
 
 type Query struct {
-	Kind    QueryKind
-	Columns []Column
-	By      []Expr
-	From    string
-	Where   Expr
-	OrderBy []OrderTerm
-	Limit   *int
+	Kind     QueryKind
+	Distinct bool
+	Columns  []Column
+	By       []Expr
+	From     string
+	Where    Expr
+	OrderBy  []OrderTerm
+	Limit    *int
+	Take     *int
 }
 
 type Column struct {

@@ -4,6 +4,7 @@ package data
 import (
 	"fmt"
 	"sort"
+	"strings"
 )
 
 type Kind string
@@ -316,6 +317,130 @@ func (f Frame) Gather(indexes []int) (Frame, error) {
 	return NewFrame(cols...)
 }
 
+func Gather(array Array, indexes []int) (Array, error) {
+	if array == nil {
+		return nil, fmt.Errorf("gather array is nil")
+	}
+	if err := validateIndexes(array.Len(), indexes); err != nil {
+		return nil, err
+	}
+	return array.Gather(indexes), nil
+}
+
+func GatherFrame(frame Frame, indexes []int) (Frame, error) {
+	if err := validateIndexes(frame.Len(), indexes); err != nil {
+		return Frame{}, err
+	}
+	return frame.Gather(indexes)
+}
+
+func Take(array Array, n int) (Array, error) {
+	if array == nil {
+		return nil, fmt.Errorf("take array is nil")
+	}
+	indexes, err := takeIndexes(array.Len(), n)
+	if err != nil {
+		return nil, err
+	}
+	return array.Gather(indexes), nil
+}
+
+func TakeFrame(frame Frame, n int) (Frame, error) {
+	indexes, err := takeIndexes(frame.Len(), n)
+	if err != nil {
+		return Frame{}, err
+	}
+	return frame.Gather(indexes)
+}
+
+func WhereMask(mask Array) ([]int, error) {
+	if mask == nil {
+		return nil, fmt.Errorf("where mask is nil")
+	}
+	if mask.Kind() != KindBool {
+		return nil, fmt.Errorf("where mask kind is %s, want %s", mask.Kind(), KindBool)
+	}
+	indexes := make([]int, 0, mask.Len())
+	for i := 0; i < mask.Len(); i++ {
+		v, ok := mask.At(i)
+		if !ok {
+			return nil, fmt.Errorf("where mask row %d out of range", i)
+		}
+		if IsNull(v) {
+			continue
+		}
+		keep, ok := v.(bool)
+		if !ok {
+			return nil, fmt.Errorf("where mask row %d is %T, want bool", i, v)
+		}
+		if keep {
+			indexes = append(indexes, i)
+		}
+	}
+	return indexes, nil
+}
+
+func FilterMask(frame Frame, mask Array) (Frame, error) {
+	if mask == nil {
+		return Frame{}, fmt.Errorf("filter mask is nil")
+	}
+	if mask.Len() != frame.Len() {
+		return Frame{}, fmt.Errorf("filter mask length %d does not match frame length %d", mask.Len(), frame.Len())
+	}
+	indexes, err := WhereMask(mask)
+	if err != nil {
+		return Frame{}, err
+	}
+	return frame.Gather(indexes)
+}
+
+func Filter(frame Frame, keep func(row map[Symbol]any) (bool, error)) (Frame, error) {
+	if keep == nil {
+		return Frame{}, fmt.Errorf("filter predicate is nil")
+	}
+	indexes := make([]int, 0, frame.Len())
+	for i := 0; i < frame.Len(); i++ {
+		row, err := frame.Row(i)
+		if err != nil {
+			return Frame{}, err
+		}
+		ok, err := keep(row)
+		if err != nil {
+			return Frame{}, err
+		}
+		if ok {
+			indexes = append(indexes, i)
+		}
+	}
+	return frame.Gather(indexes)
+}
+
+func Distinct(frame Frame, columns ...Symbol) (Frame, error) {
+	keyColumns := append([]Symbol(nil), columns...)
+	if len(keyColumns) == 0 {
+		keyColumns = frame.schema.Names()
+	}
+	for _, name := range keyColumns {
+		if _, ok := frame.Column(name); !ok {
+			return Frame{}, fmt.Errorf("distinct column %q does not exist", name)
+		}
+	}
+	seen := make(map[string]struct{}, frame.Len())
+	indexes := make([]int, 0, frame.Len())
+	for row := 0; row < frame.Len(); row++ {
+		key, err := rowKey(frame, row, keyColumns)
+		if err != nil {
+			return Frame{}, err
+		}
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		indexes = append(indexes, row)
+	}
+	return frame.Gather(indexes)
+}
+
 type Expr interface {
 	EvalRow(frame Frame, row int) (any, error)
 }
@@ -451,6 +576,7 @@ type QueryPlan struct {
 	Aggregates []Aggregate
 	OrderBy    []OrderSpec
 	LimitN     int
+	Distinct   bool
 }
 
 func From(frame Frame) QueryPlan {
@@ -495,8 +621,18 @@ func (p QueryPlan) OrderByColumn(name Symbol, dir SortDirection) QueryPlan {
 	return p
 }
 
+func (p QueryPlan) OrderByColumns(specs ...OrderSpec) QueryPlan {
+	p.OrderBy = append([]OrderSpec(nil), specs...)
+	return p
+}
+
 func (p QueryPlan) Limit(n int) QueryPlan {
 	p.LimitN = n
+	return p
+}
+
+func (p QueryPlan) DistinctRows() QueryPlan {
+	p.Distinct = true
 	return p
 }
 
@@ -520,6 +656,12 @@ func Exec(frame Frame, plan QueryPlan) (Frame, error) {
 	}
 	if err != nil {
 		return Frame{}, err
+	}
+	if plan.Distinct {
+		out, err = Distinct(out)
+		if err != nil {
+			return Frame{}, err
+		}
 	}
 	if len(plan.OrderBy) > 0 {
 		out, err = orderFrame(out, plan.OrderBy)
@@ -1236,4 +1378,47 @@ func allIndexes(n int) []int {
 		out[i] = i
 	}
 	return out
+}
+
+func validateIndexes(length int, indexes []int) error {
+	for i, row := range indexes {
+		if row < 0 || row >= length {
+			return fmt.Errorf("index %d has row %d out of range for length %d", i, row, length)
+		}
+	}
+	return nil
+}
+
+func takeIndexes(length, n int) ([]int, error) {
+	if n < 0 {
+		return nil, fmt.Errorf("take count %d must not be negative", n)
+	}
+	if n > length {
+		n = length
+	}
+	return allIndexes(n), nil
+}
+
+func rowKey(frame Frame, row int, columns []Symbol) (string, error) {
+	var b strings.Builder
+	for _, name := range columns {
+		col, ok := frame.Column(name)
+		if !ok {
+			return "", fmt.Errorf("key column %q does not exist", name)
+		}
+		v, ok := col.At(row)
+		if !ok {
+			return "", fmt.Errorf("key column %q row %d out of range", name, row)
+		}
+		appendKeyPart(&b, col.Kind(), v)
+	}
+	return b.String(), nil
+}
+
+func appendKeyPart(b *strings.Builder, kind Kind, v any) {
+	if IsNull(v) {
+		fmt.Fprintf(b, "%s:null\x00", kind)
+		return
+	}
+	fmt.Fprintf(b, "%s:%T:%#v\x00", kind, v, v)
 }

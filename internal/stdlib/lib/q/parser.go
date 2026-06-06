@@ -41,6 +41,11 @@ type parser struct {
 }
 
 func (p *parser) parseQuery() (*Query, error) {
+	take, err := p.parseTakePrefix()
+	if err != nil {
+		return nil, err
+	}
+
 	kindTok := p.peek()
 	var kind QueryKind
 	switch strings.ToLower(kindTok.text) {
@@ -48,18 +53,35 @@ func (p *parser) parseQuery() (*Query, error) {
 		kind = SelectQuery
 	case string(ExecQuery):
 		kind = ExecQuery
+	case string(UpdateQuery):
+		kind = UpdateQuery
+	case string(DeleteQuery):
+		kind = DeleteQuery
 	default:
-		return nil, p.errorf(kindTok, "expected select or exec")
+		return nil, p.errorf(kindTok, "expected select, exec, update, or delete")
 	}
 	p.next()
 
-	columns, err := p.parseColumns()
-	if err != nil {
-		return nil, err
+	var distinct bool
+	if kind == SelectQuery || kind == ExecQuery {
+		distinct = p.consumeKeyword("distinct")
+	}
+
+	var columns []Column
+	if kind != DeleteQuery || !p.isKeyword("from") {
+		columns, err = p.parseColumns()
+		if err != nil {
+			return nil, err
+		}
+	}
+	if distinct {
+		for i := range columns {
+			columns[i].Expr = Call{Func: "distinct", Arg: columns[i].Expr}
+		}
 	}
 
 	var by []Expr
-	if p.consumeKeyword("by") {
+	if (kind == SelectQuery || kind == ExecQuery) && p.consumeKeyword("by") {
 		by, err = p.parseExprListUntil("from")
 		if err != nil {
 			return nil, err
@@ -84,7 +106,7 @@ func (p *parser) parseQuery() (*Query, error) {
 	}
 
 	var orderBy []OrderTerm
-	if p.consumeKeyword("order") {
+	if (kind == SelectQuery || kind == ExecQuery) && p.consumeKeyword("order") {
 		if !p.consumeKeyword("by") {
 			return nil, p.errorf(p.peek(), "expected by after order")
 		}
@@ -102,20 +124,55 @@ func (p *parser) parseQuery() (*Query, error) {
 		}
 		limit = &n
 	}
+	if p.consumeKeyword("take") {
+		if take != nil {
+			return nil, p.errorf(p.peek(), "take specified more than once")
+		}
+		if limit != nil {
+			return nil, p.errorf(p.peek(), "limit and take cannot both be specified")
+		}
+		n, err := p.parseLimit()
+		if err != nil {
+			return nil, err
+		}
+		take = &n
+	}
 
 	if p.peek().kind != tokenEOF {
 		return nil, p.errorf(p.peek(), "unexpected token %q", p.peek().text)
 	}
 
 	return &Query{
-		Kind:    kind,
-		Columns: columns,
-		By:      by,
-		From:    fromTok.text,
-		Where:   where,
-		OrderBy: orderBy,
-		Limit:   limit,
+		Kind:     kind,
+		Distinct: distinct,
+		Columns:  columns,
+		By:       by,
+		From:     fromTok.text,
+		Where:    where,
+		OrderBy:  orderBy,
+		Limit:    limit,
+		Take:     take,
 	}, nil
+}
+
+func (p *parser) parseTakePrefix() (*int, error) {
+	if p.consumeKeyword("take") {
+		n, err := p.parseLimit()
+		if err != nil {
+			return nil, err
+		}
+		return &n, nil
+	}
+	if p.peek().kind == tokenNumber && p.look(1).kind == tokenOp && p.look(1).text == "#" {
+		tok := p.next()
+		p.next()
+		n, err := parseNonNegativeInt(tok)
+		if err != nil {
+			return nil, p.errorf(tok, "expected non-negative integer take")
+		}
+		return &n, nil
+	}
+	return nil, nil
 }
 
 func (p *parser) parseColumns() ([]Column, error) {
@@ -177,7 +234,7 @@ func (p *parser) parseExprListUntil(keyword string) ([]Expr, error) {
 func (p *parser) parseOrderBy() ([]OrderTerm, error) {
 	var terms []OrderTerm
 	for {
-		if p.peek().kind == tokenEOF || p.isKeyword("limit") {
+		if p.peek().kind == tokenEOF || p.isKeyword("limit") || p.isKeyword("take") {
 			break
 		}
 		tok := p.peek()
@@ -208,9 +265,17 @@ func (p *parser) parseLimit() (int, error) {
 		return 0, p.errorf(tok, "expected limit count")
 	}
 	p.next()
+	n, err := parseNonNegativeInt(tok)
+	if err != nil {
+		return 0, p.errorf(tok, "expected non-negative integer limit")
+	}
+	return n, nil
+}
+
+func parseNonNegativeInt(tok token) (int, error) {
 	n, err := strconv.Atoi(tok.text)
 	if err != nil || n < 0 || strconv.Itoa(n) != tok.text {
-		return 0, p.errorf(tok, "expected non-negative integer limit")
+		return 0, fmt.Errorf("invalid integer")
 	}
 	return n, nil
 }
@@ -289,7 +354,7 @@ func (p *parser) canStartCallArg() bool {
 	tok := p.peek()
 	if tok.kind == tokenIdent {
 		switch strings.ToLower(tok.text) {
-		case "asc", "by", "desc", "from", "limit", "order", "where":
+		case "asc", "by", "delete", "desc", "distinct", "from", "limit", "order", "select", "take", "update", "where":
 			return false
 		}
 	}
@@ -401,7 +466,7 @@ func lex(src string) ([]token, error) {
 				return nil, fmt.Errorf("q parse error at %d: invalid string literal", start)
 			}
 			tokens = append(tokens, token{kind: tokenString, text: value, pos: start})
-		case '+', '-', '*', '/', '=', '<', '>':
+		case '+', '-', '*', '/', '=', '<', '>', '#':
 			start := pos
 			pos++
 			if pos < len(src) && (src[start] == '<' || src[start] == '>') && src[pos] == '=' {

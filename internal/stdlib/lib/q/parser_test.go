@@ -95,6 +95,58 @@ func TestParseWhereLiteralsAndOrderLimit(t *testing.T) {
 	}
 }
 
+func TestParseDistinctAndTake(t *testing.T) {
+	query := mustParse(t, "select distinct sym,price from trades order by price desc take 2")
+
+	if !query.Distinct {
+		t.Fatalf("distinct = false")
+	}
+	if len(query.Columns) != 2 || query.Columns[0].Name != "sym" || query.Columns[1].Name != "price" {
+		t.Fatalf("columns = %#v", query.Columns)
+	}
+	if len(query.OrderBy) != 1 || query.OrderBy[0].Column != "price" || !query.OrderBy[0].Desc {
+		t.Fatalf("order by = %#v", query.OrderBy)
+	}
+	if query.Take == nil || *query.Take != 2 {
+		t.Fatalf("take = %#v", query.Take)
+	}
+}
+
+func TestParseHashTakePrefix(t *testing.T) {
+	query := mustParse(t, "2#select sym,price from trades")
+
+	if query.Take == nil || *query.Take != 2 {
+		t.Fatalf("take = %#v", query.Take)
+	}
+	if query.Kind != SelectQuery || query.From != "trades" {
+		t.Fatalf("query header = %#v", query)
+	}
+}
+
+func TestParseUpdateAndDeleteSkeleton(t *testing.T) {
+	update := mustParse(t, "update price:price*1.1 from trades where sym=`AAPL")
+	if update.Kind != UpdateQuery || update.From != "trades" {
+		t.Fatalf("update header = %#v", update)
+	}
+	if len(update.Columns) != 1 || update.Columns[0].Name != "price" {
+		t.Fatalf("update columns = %#v", update.Columns)
+	}
+	if _, ok := update.Where.(Binary); !ok {
+		t.Fatalf("update where = %#v", update.Where)
+	}
+
+	del := mustParse(t, "delete from trades where price<100")
+	if del.Kind != DeleteQuery || del.From != "trades" {
+		t.Fatalf("delete header = %#v", del)
+	}
+	if len(del.Columns) != 0 {
+		t.Fatalf("delete columns = %#v", del.Columns)
+	}
+	if _, ok := del.Where.(Binary); !ok {
+		t.Fatalf("delete where = %#v", del.Where)
+	}
+}
+
 func TestParseWhereScalarComparisons(t *testing.T) {
 	tests := []struct {
 		src   string
@@ -153,6 +205,35 @@ func TestLowerOrderLimitPlan(t *testing.T) {
 	}
 	if lowered.Plan.LimitN != 2 {
 		t.Fatalf("limit = %d, want 2", lowered.Plan.LimitN)
+	}
+}
+
+func TestLowerDistinctAndTakePlan(t *testing.T) {
+	query := mustParse(t, "select distinct sym,price from trades order by price desc take 2")
+	lowered, err := Lower(query)
+	if err != nil {
+		t.Fatalf("Lower returned error: %v", err)
+	}
+
+	if !lowered.Distinct {
+		t.Fatalf("distinct = false")
+	}
+	if lowered.Plan.LimitN != 2 {
+		t.Fatalf("limit = %d, want 2", lowered.Plan.LimitN)
+	}
+	if len(lowered.Plan.Select) != 2 || lowered.Plan.Select[0].Name != "sym" || lowered.Plan.Select[1].Name != "price" {
+		t.Fatalf("select = %#v", lowered.Plan.Select)
+	}
+}
+
+func TestLowerRejectsUpdateDeleteSkeletons(t *testing.T) {
+	for _, src := range []string{
+		"update price:price*1.1 from trades where sym=`AAPL",
+		"delete from trades where price<100",
+	} {
+		if _, err := Lower(mustParse(t, src)); err == nil {
+			t.Fatalf("Lower(%q) returned nil error", src)
+		}
 	}
 }
 

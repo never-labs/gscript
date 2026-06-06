@@ -316,12 +316,12 @@
       "spec_sections": ["Expressions", "Values And Types", "Tables And Metatables", "Implementation Requirements"],
       "parser": {"status": "covered", "refs": ["internal/stdlib/lib/q/parser_test.go"]},
       "bytecode": {"status": "not_applicable", "refs": []},
-      "interpreter": {"status": "covered", "refs": ["internal/stdlib/lib/data/data_test.go", "internal/stdlib/bind/q_test.go"]},
+      "interpreter": {"status": "covered", "refs": ["internal/stdlib/lib/data/data_test.go", "internal/stdlib/bind/q_test.go", "tests/language/data_frame_construction_tdd.leia", "tests/language/qsql_query_tdd.leia", "tests/language/q_data_complex_examples_tdd.leia"]},
       "tier1": {"status": "semantic_only", "refs": []},
       "tier2": {"status": "semantic_only", "refs": []},
-      "semantic_gate": {"status": "covered", "refs": ["internal/stdlib/lib/data/data_test.go", "internal/stdlib/lib/q/parser_test.go", "internal/stdlib/bind/q_test.go", "docs/reference/data-oriented/index.md", "docs/reference/stdlib/index.md"]},
-      "conformance_case": {"status": "covered", "refs": ["internal/stdlib/bind/q_test.go"]},
-      "perf_hot_case": {"status": "semantic_only", "refs": []}
+      "semantic_gate": {"status": "covered", "refs": ["internal/stdlib/lib/data/data_test.go", "internal/stdlib/lib/q/parser_test.go", "internal/stdlib/bind/q_test.go", "tests/language/q_data_complex_examples_tdd.leia", "docs/reference/data-oriented/index.md", "docs/reference/stdlib/index.md"]},
+      "conformance_case": {"status": "covered", "refs": ["internal/stdlib/bind/q_test.go", "tests/language/qsql_query_tdd.leia", "tests/language/q_data_complex_examples_tdd.leia"]},
+      "perf_hot_case": {"status": "covered", "refs": ["benchmarks/data/q_query_rollup.leia", "benchmarks/data/frame_qsql_rollup.leia", "benchmarks/data/q_operator_pipeline.leia"]}
     },
     {
       "id": "spreadsheet_dialects",

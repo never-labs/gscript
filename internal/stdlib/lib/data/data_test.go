@@ -392,6 +392,164 @@ func TestQueryOrderLimit(t *testing.T) {
 	assertColumnValues(t, got, "qty", []any{int64(5), int64(3)})
 }
 
+func TestQueryDistinctRows(t *testing.T) {
+	frame := mustFrame(t,
+		NewColumn("sym", []any{Symbol("a"), Symbol("b"), Symbol("a"), Symbol("a")}),
+		NewColumn("qty", []any{2, 5, 2, 3}),
+	)
+
+	got, err := From(frame).
+		SelectColumns("sym", "qty").
+		DistinctRows().
+		Exec()
+	if err != nil {
+		t.Fatalf("Exec returned error: %v", err)
+	}
+
+	assertColumnValues(t, got, "sym", []any{Symbol("a"), Symbol("b"), Symbol("a")})
+	assertColumnValues(t, got, "qty", []any{int64(2), int64(5), int64(3)})
+}
+
+func TestQueryOrderByMultipleColumns(t *testing.T) {
+	frame := mustFrame(t,
+		NewColumn("sym", []any{Symbol("a"), Symbol("b"), Symbol("a"), Symbol("b")}),
+		NewColumn("qty", []any{2, 2, 5, 1}),
+		NewColumn("seq", []any{1, 2, 3, 4}),
+	)
+
+	got, err := From(frame).
+		OrderByColumns(
+			OrderSpec{Column: "sym"},
+			OrderSpec{Column: "qty", Desc: true},
+		).
+		Exec()
+	if err != nil {
+		t.Fatalf("Exec returned error: %v", err)
+	}
+
+	assertColumnValues(t, got, "sym", []any{Symbol("a"), Symbol("a"), Symbol("b"), Symbol("b")})
+	assertColumnValues(t, got, "qty", []any{int64(5), int64(2), int64(2), int64(1)})
+	assertColumnValues(t, got, "seq", []any{int64(3), int64(1), int64(2), int64(4)})
+}
+
+func TestGatherAndTakeOperators(t *testing.T) {
+	array := NewI64([]int64{10, 20, 30})
+	gathered, err := Gather(array, []int{2, 0, 2})
+	if err != nil {
+		t.Fatalf("Gather returned error: %v", err)
+	}
+	if got, want := gathered.Values(), []any{int64(30), int64(10), int64(30)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("gathered values = %#v, want %#v", got, want)
+	}
+	if _, err := Gather(array, []int{3}); err == nil {
+		t.Fatal("Gather accepted out-of-range index")
+	}
+
+	taken, err := Take(array, 2)
+	if err != nil {
+		t.Fatalf("Take returned error: %v", err)
+	}
+	if got, want := taken.Values(), []any{int64(10), int64(20)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("taken values = %#v, want %#v", got, want)
+	}
+	if _, err := Take(array, -1); err == nil {
+		t.Fatal("Take accepted negative count")
+	}
+}
+
+func TestFrameGatherTakeAndFilterMask(t *testing.T) {
+	frame := mustFrame(t,
+		NewColumn("sym", []any{Symbol("a"), Symbol("b"), Symbol("c"), Symbol("d")}),
+		NewColumn("qty", []any{1, 2, 3, 4}),
+	)
+
+	gathered, err := GatherFrame(frame, []int{3, 1})
+	if err != nil {
+		t.Fatalf("GatherFrame returned error: %v", err)
+	}
+	assertColumnValues(t, gathered, "sym", []any{Symbol("d"), Symbol("b")})
+	assertColumnValues(t, gathered, "qty", []any{int64(4), int64(2)})
+	if _, err := GatherFrame(frame, []int{-1}); err == nil {
+		t.Fatal("GatherFrame accepted negative index")
+	}
+
+	taken, err := TakeFrame(frame, 10)
+	if err != nil {
+		t.Fatalf("TakeFrame returned error: %v", err)
+	}
+	if got := taken.Len(); got != frame.Len() {
+		t.Fatalf("TakeFrame length = %d, want %d", got, frame.Len())
+	}
+
+	filtered, err := FilterMask(frame, NewColumn("mask", []any{true, nil, false, true}).Data)
+	if err != nil {
+		t.Fatalf("FilterMask returned error: %v", err)
+	}
+	assertColumnValues(t, filtered, "sym", []any{Symbol("a"), Symbol("d")})
+	if _, err := FilterMask(frame, NewBool([]bool{true})); err == nil {
+		t.Fatal("FilterMask accepted mismatched mask length")
+	}
+}
+
+func TestWhereMaskRejectsNonBoolMask(t *testing.T) {
+	indexes, err := WhereMask(NewColumn("mask", []any{true, nil, false, true}).Data)
+	if err != nil {
+		t.Fatalf("WhereMask returned error: %v", err)
+	}
+	if got, want := indexes, []int{0, 3}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("WhereMask indexes = %v, want %v", got, want)
+	}
+	if _, err := WhereMask(NewString([]string{"true"})); err == nil {
+		t.Fatal("WhereMask accepted non-bool mask")
+	}
+}
+
+func TestFilterOperator(t *testing.T) {
+	frame := mustFrame(t,
+		NewColumn("sym", []any{Symbol("a"), Symbol("b"), Symbol("c")}),
+		NewColumn("qty", []any{1, 3, 2}),
+	)
+
+	got, err := Filter(frame, func(row map[Symbol]any) (bool, error) {
+		return row["qty"].(int64) >= 2, nil
+	})
+	if err != nil {
+		t.Fatalf("Filter returned error: %v", err)
+	}
+	assertColumnValues(t, got, "sym", []any{Symbol("b"), Symbol("c")})
+	assertColumnValues(t, got, "qty", []any{int64(3), int64(2)})
+	if _, err := Filter(frame, nil); err == nil {
+		t.Fatal("Filter accepted nil predicate")
+	}
+}
+
+func TestDistinctOperator(t *testing.T) {
+	frame := mustFrame(t,
+		NewColumn("sym", []any{Symbol("a"), Symbol("a"), Symbol("b"), Symbol("a"), nil}),
+		NewColumn("venue", []any{"x", "x", "x", "y", "x"}),
+		NewColumn("qty", []any{1, 2, 3, 4, 5}),
+	)
+
+	got, err := Distinct(frame, "sym", "venue")
+	if err != nil {
+		t.Fatalf("Distinct returned error: %v", err)
+	}
+	assertColumnValues(t, got, "sym", []any{Symbol("a"), Symbol("b"), Symbol("a"), NullValue})
+	assertColumnValues(t, got, "venue", []any{"x", "x", "y", "x"})
+	assertColumnValues(t, got, "qty", []any{int64(1), int64(3), int64(4), int64(5)})
+
+	all, err := Distinct(frame)
+	if err != nil {
+		t.Fatalf("Distinct all columns returned error: %v", err)
+	}
+	if got := all.Len(); got != frame.Len() {
+		t.Fatalf("Distinct all columns length = %d, want %d", got, frame.Len())
+	}
+	if _, err := Distinct(frame, "missing"); err == nil {
+		t.Fatal("Distinct accepted missing key column")
+	}
+}
+
 func mustFrame(t *testing.T, cols ...Column) Frame {
 	t.Helper()
 	frame, err := NewFrame(cols...)

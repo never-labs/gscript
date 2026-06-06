@@ -10,6 +10,7 @@ import (
 type Lowered struct {
 	Op       QueryKind
 	Source   string
+	Distinct bool
 	Plan     data.QueryPlan
 	Original *Query
 }
@@ -28,7 +29,7 @@ func Lower(query *Query) (*Lowered, error) {
 		return nil, fmt.Errorf("q query missing projection")
 	}
 
-	plan := data.QueryPlan{LimitN: -1}
+	plan := data.QueryPlan{LimitN: -1, Distinct: query.Distinct}
 	if query.Where != nil {
 		filter, err := lowerExpr(query.Where)
 		if err != nil {
@@ -44,6 +45,22 @@ func Lower(query *Query) (*Lowered, error) {
 		plan.By = append(plan.By, data.Symbol(ident.Name))
 	}
 	for _, column := range query.Columns {
+		if call, ok := column.Expr.(Call); ok && call.Func == "distinct" {
+			plan.Distinct = true
+			expr, err := lowerExpr(call.Arg)
+			if err != nil {
+				return nil, err
+			}
+			name := data.Symbol(column.Name)
+			if name == "" {
+				name = data.Symbol(columnName(call.Arg))
+			}
+			if name == "" {
+				return nil, fmt.Errorf("q projection requires an alias for computed expressions")
+			}
+			plan.Select = append(plan.Select, data.SelectItem{Name: name, Expr: expr})
+			continue
+		}
 		if call, ok := column.Expr.(Call); ok && isAggregate(call.Func) {
 			name := data.Symbol(column.Name)
 			if name == "" {
@@ -79,9 +96,13 @@ func Lower(query *Query) (*Lowered, error) {
 	if query.Limit != nil {
 		plan.LimitN = *query.Limit
 	}
+	if query.Take != nil {
+		plan.LimitN = *query.Take
+	}
 	return &Lowered{
 		Op:       query.Kind,
 		Source:   query.From,
+		Distinct: plan.Distinct,
 		Plan:     plan,
 		Original: query,
 	}, nil

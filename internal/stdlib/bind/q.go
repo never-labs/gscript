@@ -799,11 +799,7 @@ func qSQLCachedPlanTemplate(src string) (qSQLPlanTemplate, error) {
 	}
 	qSQLTemplateCacheMu.Unlock()
 
-	baseSrc, opts, err := qSQLSourceAndOptions(src)
-	if err != nil {
-		return qSQLPlanTemplate{}, fmt.Errorf("q.sql: %w", err)
-	}
-	query, err := stdq.Parse(baseSrc)
+	query, err := stdq.Parse(strings.TrimSpace(src))
 	if err != nil {
 		return qSQLPlanTemplate{}, fmt.Errorf("q.sql: parse: %w", err)
 	}
@@ -811,8 +807,10 @@ func qSQLCachedPlanTemplate(src string) (qSQLPlanTemplate, error) {
 	if err != nil {
 		return qSQLPlanTemplate{}, fmt.Errorf("q.sql: lower: %w", err)
 	}
+	if lowered.Distinct {
+		lowered.Plan.Distinct = true
+	}
 	qNormalizePlanLiterals(&lowered.Plan)
-	opts.apply(&lowered.Plan)
 	lowered.Plan.Source = data.Frame{}
 	tmpl := qSQLPlanTemplate{
 		source: lowered.Source,

@@ -1,6 +1,6 @@
 {
   "schema_version": 3,
-  "case_count": 74,
+  "case_count": 75,
   "cases": [
     {
       "id": "app/actors_dispatch_mutation",
@@ -380,6 +380,18 @@
     {
       "id": "data/q_query_rollup",
       "path": "benchmarks/data/q_query_rollup.leia",
+      "domain": "data",
+      "kind": "benchmark",
+      "reference": null,
+      "status": "active",
+      "tags": [
+        "data",
+        "benchmark"
+      ]
+    },
+    {
+      "id": "data/q_operator_pipeline",
+      "path": "benchmarks/data/q_operator_pipeline.leia",
       "domain": "data",
       "kind": "benchmark",
       "reference": null,
@@ -2358,6 +2370,21 @@
       "domain": "data",
       "name": "q_query_rollup",
       "script": "benchmarks/data/q_query_rollup.leia",
+      "comparison_reference": null,
+      "params": {},
+      "recommended_scale": {
+        "hot": {}
+      },
+      "time_source_hint": "script_time_line",
+      "tags": [
+        "data"
+      ]
+    },
+    {
+      "id": "data/q_operator_pipeline",
+      "domain": "data",
+      "name": "q_operator_pipeline",
+      "script": "benchmarks/data/q_operator_pipeline.leia",
       "comparison_reference": null,
       "params": {},
       "recommended_scale": {

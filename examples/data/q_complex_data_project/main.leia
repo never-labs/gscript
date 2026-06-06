@@ -1,0 +1,107 @@
+// q_complex_data_project - runnable q/kdb+-style data workflow.
+// Run:
+//   go run ./cmd/leia run examples/data/q_complex_data_project/main.leia
+
+func check(name, ok) {
+    assert(ok)
+    print("ok", name)
+}
+
+func stable_distinct(values) {
+    seen := {}
+    out := {}
+    for i := 1; i <= #values; i++ {
+        value := values[i]
+        key := tostring(value)
+        if !seen[key] {
+            seen[key] = true
+            out[#out + 1] = value
+        }
+    }
+    return out
+}
+
+// q.eval currently covers vector arithmetic, where, and take. distinct is
+// modeled here with ordinary Leia tables to keep the example runnable.
+rich_indexes := q.eval("where 100 101.5 100.75 102.25 103 99.5>100")
+top_prices := q.eval("3#103 102.25 101.5 100.75")
+symbols := stable_distinct({"AAPL", "MSFT", "AAPL", "NVDA", "MSFT", "AAPL"})
+
+check("filter indexes", q.count(rich_indexes) == 4 && rich_indexes[1] == 2 && rich_indexes[4] == 5)
+check("take prices", q.count(top_prices) == 3 && top_prices[1] == 103 && top_prices[3] == 101.5)
+check("stable distinct", #symbols == 3 && symbols[1] == "AAPL" && symbols[3] == "NVDA")
+
+trades := data.frame({
+    sym: data.symbols({"AAPL", "MSFT", "AAPL", "NVDA", "MSFT", "AAPL"}),
+    side: data.symbols({"buy", "sell", "buy", "buy", "sell", "sell"}),
+    venue: data.strings({"XNAS", "XNYS", "XNAS", "ARCX", "BATS", "XNAS"}),
+    price: data.f64({100.0, 101.5, 100.75, 102.25, 103.0, 99.5}),
+    size: data.i64({100, 120, 80, 150, 90, 50}),
+})
+
+leaders := q.sql(trades, "select sym,side,venue,notional:price*size from trades where price>100 order by notional desc,sym asc limit 3")
+rollup := q.sql(trades, "select notional:sum price*size, fills:count i by sym from trades where price>100 order by notional desc,sym asc")
+side_rollup := q.sql(trades, "select qty:sum size, fills:count i by side from trades where price>100 order by qty desc")
+
+check("filter order take over frame", #leaders == 3 && leaders[1].sym == "NVDA" && leaders[3].venue == "BATS")
+check("group order over frame", #rollup == 3 && rollup[1].sym == "MSFT" && rollup[1].notional == 21450.0)
+check("side group", #side_rollup == 2 && side_rollup[1].side == "buy" && side_rollup[1].qty == 230.0)
+
+conn := db.memory()
+conn.exec(sql`create table trade_events (
+    id integer primary key,
+    sym text not null,
+    side text not null,
+    venue text not null,
+    price real not null,
+    size integer not null
+)`)
+
+for i := 1; i <= trades.len; i++ {
+    conn.exec(sql {
+        query: "insert into trade_events (id, sym, side, venue, price, size) values (:id, :sym, :side, :venue, :price, :size)",
+        params: {
+            id: i,
+            sym: trades.sym[i],
+            side: trades.side[i],
+            venue: trades.venue[i],
+            price: trades.price[i],
+            size: trades.size[i],
+        },
+    })
+}
+
+db_trades := conn.frame(sql`select sym,side,venue,price,size from trade_events order by id`)
+db_rollup := q.sql(db_trades, "select notional:sum price*size, fills:count i by sym from trade_events where price>100 order by notional desc,sym asc")
+
+conn.exec(sql`create table q_rollup (rank integer primary key, sym text not null, notional real not null, fills integer not null)`)
+for i := 1; i <= #db_rollup; i++ {
+    row := db_rollup[i]
+    conn.exec(sql {
+        query: "insert into q_rollup (rank, sym, notional, fills) values (:rank, :sym, :notional, :fills)",
+        params: {rank: i, sym: row.sym, notional: row.notional, fills: row.fills},
+    })
+}
+
+roundtrip := conn.query(sql`select sym,notional,fills from q_rollup order by rank`)
+check("db frame qsql sqlite roundtrip", #roundtrip == 3 && roundtrip[1].sym == "MSFT" && roundtrip[1].fills == 2)
+
+q_complex_data_summary := string.format(
+    "q_complex_data symbols=%d filtered=%d top=%s notional=%.1f db_rows=%d",
+    #symbols,
+    q.count(rich_indexes),
+    rollup[1].sym,
+    rollup[1].notional,
+    #roundtrip
+)
+print(q_complex_data_summary)
+
+return {
+    symbols: symbols,
+    leaders: leaders,
+    rollup: rollup,
+    side_rollup: side_rollup,
+    db_rollup: db_rollup,
+    roundtrip: roundtrip,
+    summary: q_complex_data_summary,
+}

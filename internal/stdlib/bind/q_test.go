@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/never-labs/leia/internal/runtime"
+	"github.com/never-labs/leia/internal/stdlib/lib/data"
 )
 
 func TestQQueryFiltersSelectsAndGroupsSOA(t *testing.T) {
@@ -444,6 +445,124 @@ func TestQSQLOrderByAndLimit(t *testing.T) {
 	}
 	if got := bottom.RawGetInt(1).Table().RawGetString("sym"); !got.IsString() || got.Str() != "MSFT" {
 		t.Fatalf("bottom[1].sym = %v, want MSFT", got)
+	}
+}
+
+func TestQSQLExposesLibQExecOrderLimitAndLiterals(t *testing.T) {
+	interp := runtime.NewCore()
+	installTestModule(interp, "array", runtime.TableValue(BuildArray()))
+	installTestModule(interp, "data", runtime.TableValue(BuildData()))
+	installTestModule(interp, "q", runtime.TableValue(BuildQ()))
+	execOnInterp(t, interp,
+		"events := data.frame({\n"+
+			"    sym: {\"AAPL\", \"MSFT\", \"NVDA\", \"IBM\"},\n"+
+			"    venue: {\"XNYS\", \"XNAS\", \"XNYS\", \"XNYS\"},\n"+
+			"    active: array.bool({true, true, true, false}),\n"+
+			"    price: array.f64({100, 80, 120, 90}),\n"+
+			"    note: {nil, \"open\", \"open\", \"halted\"},\n"+
+			"})\n"+
+			"events.column_kinds = {sym: \"symbol\", venue: \"string\", active: \"bool\", price: \"f64\", note: \"string\"}\n"+
+			"prices := q.sql(events, \"exec price,sym from events where venue=\\\"XNYS\\\" order by price desc limit 2\")\n"+
+			"nulls := q.select(\"exec sym,note from events where note=null\", {events: events})\n"+
+			"live := q.sql(events, \"select sym,active from events where active=true order by sym asc limit 1\")\n"+
+			"venues := q.sql(events, \"select distinct venue from events order by venue asc take 1\")\n"+
+			"prefix := q.select(\"2#select sym,price from events order by price desc\", {events: events})\n")
+
+	prices := interp.GetGlobal("prices").Table()
+	if prices == nil || prices.Length() != 2 {
+		t.Fatalf("prices len = %v, want 2", prices)
+	}
+	if got := prices.RawGetInt(1).Table().RawGetString("sym"); !got.IsString() || got.Str() != "NVDA" {
+		t.Fatalf("prices[1].sym = %v, want NVDA", got)
+	}
+	if got := prices.RawGetInt(2).Table().RawGetString("price"); !got.IsFloat() || got.Float() != 100 {
+		t.Fatalf("prices[2].price = %v, want 100", got)
+	}
+	nulls := interp.GetGlobal("nulls").Table()
+	if nulls == nil || nulls.Length() != 1 {
+		t.Fatalf("nulls len = %v, want 1", nulls)
+	}
+	if got := nulls.RawGetInt(1).Table().RawGetString("sym"); !got.IsString() || got.Str() != "AAPL" {
+		t.Fatalf("nulls[1].sym = %v, want AAPL", got)
+	}
+	if got := nulls.RawGetInt(1).Table().RawGetString("note"); !got.IsNil() {
+		t.Fatalf("nulls[1].note = %v, want nil", got)
+	}
+	live := interp.GetGlobal("live").Table()
+	if live == nil || live.Length() != 1 {
+		t.Fatalf("live len = %v, want 1", live)
+	}
+	if got := live.RawGetInt(1).Table().RawGetString("sym"); !got.IsString() || got.Str() != "AAPL" {
+		t.Fatalf("live[1].sym = %v, want AAPL", got)
+	}
+	venues := interp.GetGlobal("venues").Table()
+	if venues == nil || venues.Length() != 1 {
+		t.Fatalf("venues len = %v, want 1", venues)
+	}
+	if got := venues.RawGetInt(1).Table().RawGetString("venue"); !got.IsString() || got.Str() != "XNAS" {
+		t.Fatalf("venues[1].venue = %v, want XNAS", got)
+	}
+	prefix := interp.GetGlobal("prefix").Table()
+	if prefix == nil || prefix.Length() != 2 {
+		t.Fatalf("prefix len = %v, want 2", prefix)
+	}
+	if got := prefix.RawGetInt(1).Table().RawGetString("sym"); !got.IsString() || got.Str() != "NVDA" {
+		t.Fatalf("prefix[1].sym = %v, want NVDA", got)
+	}
+	if got := prefix.RawGetInt(2).Table().RawGetString("sym"); !got.IsString() || got.Str() != "AAPL" {
+		t.Fatalf("prefix[2].sym = %v, want AAPL", got)
+	}
+}
+
+func TestQSQLPlanCachesDoNotStoreFrameData(t *testing.T) {
+	qSQLTemplateCacheMu.Lock()
+	qSQLTemplateCache = make(map[string]qSQLPlanTemplate)
+	qSQLTemplateOrder = nil
+	qSQLTemplateCacheMu.Unlock()
+
+	qSQLAlignedPlanCacheMu.Lock()
+	qSQLAlignedPlanCache = make(map[string]data.QueryPlan)
+	qSQLAlignedPlanOrder = nil
+	qSQLAlignedPlanCacheMu.Unlock()
+
+	interp := runtime.NewCore()
+	installTestModule(interp, "array", runtime.TableValue(BuildArray()))
+	installTestModule(interp, "data", runtime.TableValue(BuildData()))
+	installTestModule(interp, "q", runtime.TableValue(BuildQ()))
+	execOnInterp(t, interp,
+		"events := data.frame({\n"+
+			"    sym: {\"AAPL\", \"MSFT\", \"NVDA\"},\n"+
+			"    price: array.f64({100, 80, 120}),\n"+
+			"})\n"+
+			"events.column_kinds = {sym: \"symbol\", price: \"f64\"}\n"+
+			"rows := q.sql(events, \"select sym,price from events where price>=100 order by price desc limit 1\")\n")
+
+	qSQLTemplateCacheMu.Lock()
+	defer qSQLTemplateCacheMu.Unlock()
+	if len(qSQLTemplateCache) != 1 {
+		t.Fatalf("template cache entries = %d, want 1", len(qSQLTemplateCache))
+	}
+	for key, tmpl := range qSQLTemplateCache {
+		if got := tmpl.plan.Source.Len(); got != 0 {
+			t.Fatalf("template cache %q Source.Len() = %d, want zero frame", key, got)
+		}
+		if len(tmpl.plan.Source.Schema().Names()) != 0 {
+			t.Fatalf("template cache %q stored source schema", key)
+		}
+	}
+
+	qSQLAlignedPlanCacheMu.Lock()
+	defer qSQLAlignedPlanCacheMu.Unlock()
+	if len(qSQLAlignedPlanCache) != 1 {
+		t.Fatalf("aligned cache entries = %d, want 1", len(qSQLAlignedPlanCache))
+	}
+	for key, plan := range qSQLAlignedPlanCache {
+		if got := plan.Source.Len(); got != 0 {
+			t.Fatalf("aligned cache %q Source.Len() = %d, want zero frame", key, got)
+		}
+		if len(plan.Source.Schema().Names()) != 0 {
+			t.Fatalf("aligned cache %q stored source schema", key)
+		}
 	}
 }
 
