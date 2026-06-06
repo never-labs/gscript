@@ -1,6 +1,6 @@
 // shell_filesystem.leia - Built-in dialects for local process and filesystem work.
 // Demonstrates: $, $!, sh, cmd, shellwords, glob, path
-//leia:cap process.exec,process.shell,fs.read,env.read
+//leia:cap process.exec,process.shell,fs.read,env.read,env.write
 
 print("=== Dialects: shell, command, filesystem ===")
 

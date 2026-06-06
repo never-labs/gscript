@@ -156,6 +156,13 @@ Game and web examples are source references for larger host integrations,
 long-running servers, graphical bindings, and interactive workloads. They are
 not first-run smoke commands unless `examples list` marks an entry as runnable.
 
+The deterministic web routing and `serve { ... }` examples are checkable from a
+clean checkout:
+
+```bash
+go run ./cmd/leia examples check repo-web-route_workbench repo-web-serve_dialect_app repo-web-tiny_fullstack_app examples/web/fullstack_project
+```
+
 Review these files directly when working on those areas:
 
 - `examples/game_engine/event_system.leia`

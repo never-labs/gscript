@@ -102,11 +102,15 @@ go run ./cmd/leia mod verify --json examples/database/package_managed
 go run ./cmd/leia mod verify --json examples/macos/package_managed
 go run ./cmd/leia mod verify --json examples/ui/package_managed
 go run ./cmd/leia mod verify --json examples/tooling/release_gate_project
+go run ./cmd/leia mod verify --json examples/tooling/package_manager_workflow
 ```
 
 The same projects are referenced from `tests/feature_matrix.json` under
 `module_package_management`, alongside `internal/modpkg/modpkg_test.go`,
 `tests/architecture/package_boundary_test.go`, and `cmd/leia/main_mod_test.go`.
+The `module_download_vendor_cache` row also points at the CLI/runtime resolver
+tests that cover `leia mod download`, `leia mod vendor`, `leia mod verify`,
+`leia run --mod=readonly`, and `leia run --mod=vendor`.
 
 ## Design Contract
 

@@ -77,6 +77,7 @@ audit catches stale or confusing local worktrees before large refactors.
 
 ```bash
 go run ./cmd/leia mod verify --json examples/ui/package_managed
+go run ./cmd/leia mod verify --json examples/tooling/package_manager_workflow
 go run ./cmd/leia mod graph --json examples/ui/package_managed
 go run ./cmd/leia mod capability --json examples/ui/package_managed
 ```

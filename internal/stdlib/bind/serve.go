@@ -69,8 +69,7 @@ func serveRegisterRoute(router *httpRouter, value Value) error {
 	if !handler.IsFunction() {
 		return fmt.Errorf("serve route requires handler function")
 	}
-	router.addRoute(method, path.Str(), handler)
-	return nil
+	return router.addRoute(method, path.Str(), handler)
 }
 
 func serveRouteMethodAllowed(method string) bool {

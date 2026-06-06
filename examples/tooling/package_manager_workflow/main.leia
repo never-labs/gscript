@@ -5,6 +5,7 @@
 //   leia mod verify --json examples/tooling/package_manager_workflow
 //   leia mod graph --json examples/tooling/package_manager_workflow
 //   leia mod capability --json examples/tooling/package_manager_workflow
+//   leia run --mod=readonly examples/tooling/package_manager_workflow/main.leia
 //
 //leia:cap fs.read,process.exec,module.graph,module.verify,module.capability
 
@@ -22,6 +23,8 @@ module_plan := metadata.workflow({
         "leia mod verify --json .",
         "leia mod graph --json .",
         "leia mod capability --json .",
+        "leia run --mod=readonly main.leia",
+        "leia run --mod=vendor main.leia",
     },
 })
 

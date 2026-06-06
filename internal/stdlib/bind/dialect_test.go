@@ -58,6 +58,7 @@ func TestDialectInfoAndListExposeMetadata(t *testing.T) {
 	interp := runWithLib(t, `
 		tags := dialect.tags()
 		sh_info := dialect.info("sh")
+		cmd_info := dialect.info("cmd")
 		glob_info := dialect.info("glob")
 		env_info := dialect.info("env")
 		json_info := dialect.info("json")
@@ -80,6 +81,9 @@ func TestDialectInfoAndListExposeMetadata(t *testing.T) {
 	}
 	if got := stringSliceFromArray(shInfo.RawGetString("capabilities").Table()); !reflect.DeepEqual(got, []string{"process.shell"}) {
 		t.Fatalf("sh capabilities = %#v, want process.shell", got)
+	}
+	if got := stringSliceFromArray(interp.GetGlobal("cmd_info").Table().RawGetString("capabilities").Table()); !reflect.DeepEqual(got, []string{"process.exec", "env.write"}) {
+		t.Fatalf("cmd capabilities = %#v, want process.exec and env.write", got)
 	}
 	if got := stringSliceFromArray(interp.GetGlobal("glob_info").Table().RawGetString("capabilities").Table()); !reflect.DeepEqual(got, []string{"fs.read"}) {
 		t.Fatalf("glob capabilities = %#v, want fs.read", got)

@@ -1,0 +1,27 @@
+[
+  {
+    "Request": {
+      "Model": "mock-fast",
+      "Messages": [
+        {
+          "Role": "system",
+          "Text": "Score whether the answer satisfies the rubric. Return pass or fail."
+        },
+        {
+          "Role": "user",
+          "Text": "Rubric: mentions deterministic replay. Answer: deterministic replay keeps checks stable."
+        }
+      ],
+      "MaxTokens": 200
+    },
+    "Result": {
+      "Status": "final_answer",
+      "Text": "pass",
+      "Usage": {
+        "InputTokens": 4,
+        "OutputTokens": 3,
+        "Cost": 0.004
+      }
+    }
+  }
+]

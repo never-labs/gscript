@@ -79,6 +79,7 @@ Evaluate examples live under `evaluate/`. Run replay-backed agent checks with:
 ```bash
 # from the examples/ directory
 go run ../cmd/leia evaluate --replay evaluate/agent_replay.records.json evaluate/agent_replay.leia
+go run ../cmd/leia evaluate --replay evaluate/judge_replay.records.json evaluate/judge_replay.leia
 go run ../cmd/leia evaluate --replay evaluate/multiturn_replay.records.json evaluate/multiturn_replay.leia
 go run ../cmd/leia evaluate --replay evaluate/project_agent_regression.records.json evaluate/project_agent_regression.leia
 ```

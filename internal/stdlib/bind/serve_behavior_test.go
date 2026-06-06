@@ -431,3 +431,100 @@ func TestServeAppSupportsStandardHTTPMethods(t *testing.T) {
 		}
 	}
 }
+
+func TestHTTPRouterGETFallbackHEADAndAutomaticOPTIONS(t *testing.T) {
+	interp := New()
+	hostOpts := HostOptions{
+		Call:           interp.CallFunction,
+		NetworkAllowed: interp.NetworkAccessEnabled,
+		MaxHostResult:  interp.MaxHostResultBytes,
+	}
+	httpModule := TableValue(BuildHTTP(hostOpts))
+	netModule := TableValue(BuildNet(hostOpts))
+	interp.SetGlobal("http", httpModule)
+	interp.SetModule("http", httpModule)
+	interp.SetGlobal("net", netModule)
+	interp.SetModule("net", netModule)
+
+	src := `
+		router := http.newRouter()
+		router.get("/items/:id", func(req, res) {
+			res.header("X-Route-Method", req.method).write("item:" .. req.params.id)
+		})
+		server := router.listen("127.0.0.1:0", {background: true})
+		headResp, headErr := net.request({method: "HEAD", url: server.url .. "/items/a-1"})
+		optionsResp, optionsErr := net.request({method: "OPTIONS", url: server.url .. "/items/a-1"})
+		postResp, postErr := net.post(server.url .. "/items/a-1", "")
+		closed, closeErr := server.close()
+		waited, waitErr := server.wait()
+	`
+	if _, err := interp.ExecString(src); err != nil {
+		t.Fatalf("ExecString: %v", err)
+	}
+	headResp := interp.GetGlobal("headResp").Table()
+	if got := headResp.RawGetString("status").Int(); got != 200 {
+		t.Fatalf("head status = %d, want 200", got)
+	}
+	if got := headResp.RawGetString("headers").Table().RawGetString("X-Route-Method").Str(); got != "HEAD" {
+		t.Fatalf("head X-Route-Method = %q, want HEAD", got)
+	}
+	if got := headResp.RawGetString("body").Str(); got != "" {
+		t.Fatalf("head body = %q, want empty", got)
+	}
+	optionsResp := interp.GetGlobal("optionsResp").Table()
+	if got := optionsResp.RawGetString("status").Int(); got != 204 {
+		t.Fatalf("options status = %d, want 204", got)
+	}
+	if got := optionsResp.RawGetString("headers").Table().RawGetString("Allow").Str(); got != "GET, HEAD, OPTIONS" {
+		t.Fatalf("options Allow = %q, want GET, HEAD, OPTIONS", got)
+	}
+	postResp := interp.GetGlobal("postResp").Table()
+	if got := postResp.RawGetString("status").Int(); got != 405 {
+		t.Fatalf("post status = %d, want 405", got)
+	}
+	if got := postResp.RawGetString("headers").Table().RawGetString("Allow").Str(); got != "GET, HEAD, OPTIONS" {
+		t.Fatalf("post Allow = %q, want GET, HEAD, OPTIONS", got)
+	}
+	for _, name := range []string{"headErr", "optionsErr", "postErr", "closeErr", "waitErr"} {
+		if got := interp.GetGlobal(name); !got.IsNil() {
+			t.Fatalf("%s = %v, want nil", name, got)
+		}
+	}
+	for _, name := range []string{"closed", "waited"} {
+		if got := interp.GetGlobal(name); !got.IsBool() || !got.Bool() {
+			t.Fatalf("%s = %v, want true", name, got)
+		}
+	}
+}
+
+func TestServeAppRejectsConflictingRoutes(t *testing.T) {
+	interp := New()
+	hostOpts := HostOptions{
+		Call:           interp.CallFunction,
+		NetworkAllowed: interp.NetworkAccessEnabled,
+		MaxHostResult:  interp.MaxHostResultBytes,
+	}
+	serveModule := TableValue(BuildServe(hostOpts))
+	interp.SetGlobal("serve", serveModule)
+	interp.SetModule("serve", serveModule)
+
+	src := `
+		ok, err := pcall(func() {
+			return serve.app({
+				routes: {
+					{method: "GET", path: "/users/:id", handler: func(req) { return "one" }},
+					{method: "GET", path: "/users/:name", handler: func(req) { return "two" }},
+				},
+			})
+		})
+	`
+	if _, err := interp.ExecString(src); err != nil {
+		t.Fatalf("ExecString: %v", err)
+	}
+	if got := interp.GetGlobal("ok"); !got.IsBool() || got.Bool() {
+		t.Fatalf("ok = %v, want false", got)
+	}
+	if got := interp.GetGlobal("err"); !got.IsString() || !strings.Contains(got.Str(), "route conflict") {
+		t.Fatalf("err = %v, want route conflict string", got)
+	}
+}

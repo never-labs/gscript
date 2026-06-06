@@ -26,11 +26,13 @@ Current LSP capabilities:
 | Formatting | Reuses the same formatter path as `leia fmt`. |
 | Completion | Provides keywords, standard-library modules, and declarations. |
 | Hover | Shows keyword, standard-library, and local declaration summaries. |
+| Document links | Links local module import and require paths. |
 | Document symbols | Exposes function declarations. |
 | Definition and references | Supports single-document symbol navigation. |
 | Rename | Supports single-document symbol rename. |
 | Code lens | Adds evaluate-case actions for source-level regression checks. |
 | Inlay hints | Shows local call parameter names and stdlib import hints. |
+| Semantic tokens | Highlights keywords, declarations, stdlib namespaces, imports, dialects, and read-only const bindings. |
 
 The current server intentionally keeps state in memory and operates on open
 documents. It treats AI dialects and other tagged forms as normal Leia syntax

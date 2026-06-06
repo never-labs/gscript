@@ -25,6 +25,7 @@ func TestReadmeToolingCommandsDoNotDrift(t *testing.T) {
 		"go run ./cmd/leia examples check examples/hello/fib.leia examples/hello/types_demo.leia examples/hello/dialects.leia",
 		"go run ./cmd/leia doc check",
 		"go run ./cmd/leia mod verify --json examples/ui/package_managed",
+		"go run ./cmd/leia mod verify --json examples/tooling/package_manager_workflow",
 		"go run ./cmd/leia bench compare --bench numeric/mandelbrot --runs 3 --warmup 1",
 		"go run ./cmd/leia diag bundle --output /tmp/leia-diag --skip-benchmarks",
 		"go run ./cmd/leia ci release --list",

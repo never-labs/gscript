@@ -319,8 +319,8 @@ func newHTTPRouter(call ScriptFunctionCaller, maxHostResult func() int64, opts h
 	}
 	router := &httpRouter{table: t}
 
-	registerRoute := func(method, pattern string, handler Value) {
-		router.addRoute(method, pattern, handler)
+	registerRoute := func(method, pattern string, handler Value) error {
+		return router.addRoute(method, pattern, handler)
 	}
 
 	registerMethod := func(name, method string) {
@@ -328,7 +328,9 @@ func newHTTPRouter(call ScriptFunctionCaller, maxHostResult func() int64, opts h
 			Name: "router." + name,
 			Fn: func(args []Value) ([]Value, error) {
 				if len(args) >= 2 {
-					registerRoute(method, args[0].Str(), args[1])
+					if err := registerRoute(method, args[0].Str(), args[1]); err != nil {
+						return nil, err
+					}
 				}
 				return []Value{TableValue(t)}, nil
 			},
@@ -348,7 +350,9 @@ func newHTTPRouter(call ScriptFunctionCaller, maxHostResult func() int64, opts h
 		Name: "router.any",
 		Fn: func(args []Value) ([]Value, error) {
 			if len(args) >= 2 {
-				registerRoute("", args[0].Str(), args[1])
+				if err := registerRoute("", args[0].Str(), args[1]); err != nil {
+					return nil, err
+				}
 			}
 			return []Value{TableValue(t)}, nil
 		},
@@ -370,17 +374,28 @@ func newHTTPRouter(call ScriptFunctionCaller, maxHostResult func() int64, opts h
 	return router
 }
 
-func (router *httpRouter) addRoute(method, pattern string, handler Value) {
+func (router *httpRouter) addRoute(method, pattern string, handler Value) error {
 	router.mu.Lock()
+	defer router.mu.Unlock()
+	for _, route := range router.routes {
+		if httpRoutesConflict(route.method, route.pattern, method, pattern) {
+			return fmt.Errorf("route conflict: %s %s conflicts with %s %s", httpRouteMethodName(method), pattern, httpRouteMethodName(route.method), route.pattern)
+		}
+	}
 	router.routes = append(router.routes, httpRouteEntry{method: method, pattern: pattern, handler: handler})
-	router.mu.Unlock()
+	return nil
 }
 
 func (router *httpRouter) handler(call ScriptFunctionCaller, handlerMu *sync.Mutex, hostResultLimit func() int64, opts httpRouterOptions) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		route, params, methodAllowed := router.match(r.Method, r.URL.Path)
+		route, params, allow := router.match(r.Method, r.URL.Path)
 		if route == nil {
-			if methodAllowed {
+			if len(allow) > 0 {
+				w.Header().Set("Allow", strings.Join(allow, ", "))
+				if r.Method == http.MethodOptions {
+					w.WriteHeader(http.StatusNoContent)
+					return
+				}
 				http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 				return
 			}
@@ -407,10 +422,10 @@ func (router *httpRouter) handler(call ScriptFunctionCaller, handlerMu *sync.Mut
 	})
 }
 
-func (router *httpRouter) match(method, path string) (*httpRouteEntry, map[string]string, bool) {
+func (router *httpRouter) match(method, path string) (*httpRouteEntry, map[string]string, []string) {
 	router.mu.RLock()
 	defer router.mu.RUnlock()
-	methodAllowed := false
+	var allowSet map[string]bool
 	for i := range router.routes {
 		route := &router.routes[i]
 		params, ok := matchHTTPRoutePath(route.pattern, path)
@@ -418,11 +433,21 @@ func (router *httpRouter) match(method, path string) (*httpRouteEntry, map[strin
 			continue
 		}
 		if route.method == "" || route.method == method {
-			return route, params, false
+			return route, params, nil
 		}
-		methodAllowed = true
+		if method == http.MethodHead && route.method == http.MethodGet {
+			return route, params, nil
+		}
+		if allowSet == nil {
+			allowSet = make(map[string]bool)
+		}
+		addHTTPAllowedMethod(allowSet, route.method)
 	}
-	return nil, nil, methodAllowed
+	if len(allowSet) == 0 {
+		return nil, nil, nil
+	}
+	allowSet[http.MethodOptions] = true
+	return nil, nil, sortedHTTPAllowMethods(allowSet)
 }
 
 func matchHTTPRoutePath(pattern, path string) (map[string]string, bool) {
@@ -455,6 +480,72 @@ func splitHTTPRoutePath(path string) []string {
 		return nil
 	}
 	return strings.Split(strings.Trim(path, "/"), "/")
+}
+
+func httpRoutesConflict(methodA, patternA, methodB, patternB string) bool {
+	if methodA != "" && methodB != "" && methodA != methodB {
+		return false
+	}
+	aSegs := splitHTTPRoutePath(patternA)
+	bSegs := splitHTTPRoutePath(patternB)
+	if len(aSegs) != len(bSegs) {
+		return false
+	}
+	for i := range aSegs {
+		if httpRouteSegmentParam(aSegs[i]) || httpRouteSegmentParam(bSegs[i]) {
+			continue
+		}
+		if aSegs[i] != bSegs[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func httpRouteSegmentParam(segment string) bool {
+	return strings.HasPrefix(segment, ":") && len(segment) > 1
+}
+
+func httpRouteMethodName(method string) string {
+	if method == "" {
+		return "ANY"
+	}
+	return method
+}
+
+func addHTTPAllowedMethod(allow map[string]bool, method string) {
+	if method == "" {
+		for _, standard := range standardHTTPAllowMethods() {
+			allow[standard] = true
+		}
+		return
+	}
+	allow[method] = true
+	if method == http.MethodGet {
+		allow[http.MethodHead] = true
+	}
+}
+
+func sortedHTTPAllowMethods(allow map[string]bool) []string {
+	var out []string
+	for _, method := range standardHTTPAllowMethods() {
+		if allow[method] {
+			out = append(out, method)
+		}
+	}
+	return out
+}
+
+func standardHTTPAllowMethods() []string {
+	return []string{
+		http.MethodGet,
+		http.MethodHead,
+		http.MethodPost,
+		http.MethodPut,
+		http.MethodPatch,
+		http.MethodDelete,
+		http.MethodOptions,
+	}
 }
 
 func setRequestParams(req Value, params map[string]string) {

@@ -111,6 +111,37 @@ func TestDBAggregateOneAndConstraintError(t *testing.T) {
 	}
 }
 
+func TestDBDirectSQLTableAcceptsParamAliases(t *testing.T) {
+	interp := runtime.NewCore()
+	installTestModules(interp)
+	execOnInterp(t, interp, `
+		conn := db.memory()
+		conn.exec("create table metrics (name text not null, value integer not null)")
+		conn.exec({query: "insert into metrics (name, value) values (?, ?)", params: {"alpha", 7}})
+		conn.exec({query: "insert into metrics (name, value) values (?, ?)", bindings: {"beta", 11}})
+		alpha := conn.one({query: "select value from metrics where name = ?", params: {"alpha"}})
+		beta := conn.one({query: "select value from metrics where name = ?", bindings: {"beta"}})
+		bad, bad_err := pcall(func() {
+			return conn.query({query: "select value from metrics where name = ?", params: "alpha"})
+		})
+	`)
+
+	alpha := interp.GetGlobal("alpha").Table()
+	if got := alpha.RawGetString("value"); !got.IsInt() || got.Int() != 7 {
+		t.Fatalf("alpha.value = %v, want 7", got)
+	}
+	beta := interp.GetGlobal("beta").Table()
+	if got := beta.RawGetString("value"); !got.IsInt() || got.Int() != 11 {
+		t.Fatalf("beta.value = %v, want 11", got)
+	}
+	if got := interp.GetGlobal("bad"); !got.IsBool() || got.Bool() {
+		t.Fatalf("bad = %v, want false", got)
+	}
+	if got := interp.GetGlobal("bad_err"); !got.IsString() || !strings.Contains(got.Str(), "args table expected") {
+		t.Fatalf("bad_err = %v, want args table diagnostic", got)
+	}
+}
+
 func TestDBFrameFeedsColumnarQQuery(t *testing.T) {
 	interp := runtime.NewCore()
 	installTestModules(interp)

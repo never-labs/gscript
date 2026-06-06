@@ -738,9 +738,11 @@ func TestEvaluateReplayExamplesExecute(t *testing.T) {
 		records       string
 		replayedTurns int
 		streamEvents  int
+		metricNames   []string
 	}{
 		{name: "llm", source: "llm_replay.leia", records: "llm_replay.records.json", replayedTurns: 1},
 		{name: "agent", source: "agent_replay.leia", records: "agent_replay.records.json", replayedTurns: 1},
+		{name: "judge", source: "judge_replay.leia", records: "judge_replay.records.json", replayedTurns: 1, metricNames: []string{"judge_passed", "judge_cost", "judge_input_tokens", "judge_output_tokens", "judge_tokens"}},
 		{name: "multiturn", source: "multiturn_replay.leia", records: "multiturn_replay.records.json", replayedTurns: 2},
 		{name: "project-agent-regression", source: "project_agent_regression.leia", records: "project_agent_regression.records.json", replayedTurns: 2, streamEvents: 4},
 	} {
@@ -773,6 +775,9 @@ func TestEvaluateReplayExamplesExecute(t *testing.T) {
 						StreamEvents int `json:"stream_events"`
 					} `json:"llm"`
 				} `json:"cases"`
+				Metrics []struct {
+					Name string `json:"name"`
+				} `json:"metrics"`
 				Findings []struct {
 					Kind string `json:"kind"`
 				} `json:"findings"`
@@ -804,6 +809,18 @@ func TestEvaluateReplayExamplesExecute(t *testing.T) {
 			}
 			if len(report.Findings) != 0 {
 				t.Fatalf("findings = %+v, want none", report.Findings)
+			}
+			for _, want := range tc.metricNames {
+				found := false
+				for _, metric := range report.Metrics {
+					if metric.Name == want {
+						found = true
+						break
+					}
+				}
+				if !found {
+					t.Fatalf("metrics = %+v, missing %q", report.Metrics, want)
+				}
 			}
 		})
 	}

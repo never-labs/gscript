@@ -339,7 +339,7 @@ func builtinDialectCapabilities(name string) []string {
 	case "sh":
 		return []string{"process.shell"}
 	case "cmd":
-		return []string{"process.exec"}
+		return []string{"process.exec", "env.write"}
 	case "glob":
 		return []string{"fs.read"}
 	case "env":

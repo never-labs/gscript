@@ -54,7 +54,7 @@ func TestCapabilitiesJSON(t *testing.T) {
 		block        bool
 	}{
 		{name: "sh", category: "host", capabilities: []string{"process.shell"}, eval: true},
-		{name: "cmd", category: "host", capabilities: []string{"process.exec"}, eval: true},
+		{name: "cmd", category: "host", capabilities: []string{"process.exec", "env.write"}, eval: true},
 		{name: "glob", category: "host", capabilities: []string{"fs.read"}, eval: true},
 		{name: "env", category: "host", capabilities: []string{"env.read"}, eval: true, block: true},
 		{name: "serve", category: "web", capabilities: []string{"net.listen"}, eval: true, block: true},

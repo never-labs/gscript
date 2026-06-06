@@ -466,6 +466,8 @@ func semanticTokenKind(tokens []lexer.Token, index int) (int, int, bool) {
 			return semanticFunction, semanticDeclarationModifier, true
 		case tokenIsParameterDeclaration(tokens, index):
 			return semanticParameter, semanticDeclarationModifier, true
+		case tokenIsConstDeclarationName(tokens, index):
+			return semanticVariable, semanticDeclarationModifier | semanticReadonlyModifier, true
 		case tokenLooksLikeMethodCall(tokens, index):
 			return semanticMethod, 0, true
 		case tokenLooksLikeProperty(tokens, index):
@@ -668,6 +670,10 @@ func tokenIsParameterDeclaration(tokens []lexer.Token, index int) bool {
 		}
 	}
 	return true
+}
+
+func tokenIsConstDeclarationName(tokens []lexer.Token, index int) bool {
+	return index > 0 && tokens[index].Type == lexer.TOKEN_IDENT && tokens[index-1].Type == lexer.TOKEN_CONST
 }
 
 func tokenLooksLikeMethodCall(tokens []lexer.Token, index int) bool {

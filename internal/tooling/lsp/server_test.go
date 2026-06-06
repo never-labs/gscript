@@ -114,6 +114,11 @@ func TestDocumentedCapabilitiesStaySynchronizedWithInitialize(t *testing.T) {
 				t.Fatalf("Hover documented but hoverProvider is not true: %#v", caps)
 			}
 		},
+		"Document links": func(t *testing.T) {
+			if caps["documentLinkProvider"] == nil {
+				t.Fatalf("Document links documented but documentLinkProvider is missing: %#v", caps)
+			}
+		},
 		"Document symbols": func(t *testing.T) {
 			if caps["documentSymbolProvider"] != true {
 				t.Fatalf("Document symbols documented but documentSymbolProvider is not true: %#v", caps)
@@ -138,6 +143,12 @@ func TestDocumentedCapabilitiesStaySynchronizedWithInitialize(t *testing.T) {
 		"Inlay hints": func(t *testing.T) {
 			if caps["inlayHintProvider"] != true {
 				t.Fatalf("Inlay hints documented but inlayHintProvider is not true: %#v", caps)
+			}
+		},
+		"Semantic tokens": func(t *testing.T) {
+			semanticProvider, ok := caps["semanticTokensProvider"].(map[string]any)
+			if !ok || semanticProvider["full"] != true {
+				t.Fatalf("Semantic tokens documented but semanticTokensProvider is incomplete: %#v", caps["semanticTokensProvider"])
 			}
 		},
 	}
@@ -686,6 +697,7 @@ func TestSemanticTokensClassifyLeiaSemanticRoles(t *testing.T) {
 		`func add(a, b) {`,
 		`    return math.floor(a + b)`,
 		`}`,
+		`const limit := 10`,
 		`object:run()`,
 		"",
 	}, "\n")
@@ -717,6 +729,7 @@ func TestSemanticTokensClassifyLeiaSemanticRoles(t *testing.T) {
 	assertSemanticToken(t, tokens, "a", semanticParameter, semanticDeclarationModifier)
 	assertSemanticToken(t, tokens, "math", semanticNamespace, semanticDefaultLibraryModifier)
 	assertSemanticToken(t, tokens, "floor", semanticProperty, 0)
+	assertSemanticToken(t, tokens, "limit", semanticVariable, semanticDeclarationModifier|semanticReadonlyModifier)
 	assertSemanticToken(t, tokens, "run", semanticMethod, 0)
 }
 

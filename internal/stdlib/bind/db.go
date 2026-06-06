@@ -245,7 +245,10 @@ func dbSQLInput(args []Value) (string, []any, error) {
 	} else if first.IsTable() {
 		t := first.Table()
 		query = firstSQLString(t, "query", "text", "sql")
-		if v := t.RawGetString("args"); v.IsTable() {
+		if v := firstSQLParams(t); !v.IsNil() {
+			if !v.IsTable() {
+				return "", nil, fmt.Errorf("bad argument #1 to 'db' (args table expected)")
+			}
 			argTable = v.Table()
 		}
 	} else {
@@ -265,6 +268,16 @@ func dbSQLInput(args []Value) (string, []any, error) {
 		return "", nil, err
 	}
 	return query, sqlArgs, nil
+}
+
+func firstSQLParams(tbl *Table) Value {
+	for _, key := range []string{"args", "params", "bindings"} {
+		value := tbl.RawGetString(key)
+		if !value.IsNil() {
+			return value
+		}
+	}
+	return NilValue()
 }
 
 func dbArgs(args *Table) ([]any, error) {

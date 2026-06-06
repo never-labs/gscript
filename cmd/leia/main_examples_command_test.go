@@ -387,6 +387,9 @@ func TestExamplesDocsIndexCommandsReferenceRegisteredExamples(t *testing.T) {
 		"repo-tooling-release_gate_project-main",
 		"repo-dialects-sql_result_analytics",
 		"repo-concurrency-sync_group",
+		"repo-web-route_workbench",
+		"repo-web-serve_dialect_app",
+		"repo-web-tiny_fullstack_app",
 	} {
 		if !mentionedIDs[requiredID] {
 			t.Fatalf("docs/examples/index.md must keep a registered command for %s", requiredID)
@@ -693,6 +696,7 @@ func TestExamplesCommandChecksDeterministicSpecialRunners(t *testing.T) {
 		"repo-evaluate-basic_assert",
 		"repo-evaluate-llm_replay",
 		"repo-evaluate-agent_replay",
+		"repo-evaluate-judge_replay",
 		"repo-evaluate-corpus_metrics",
 		"repo-evaluate-multiturn_replay",
 		"repo-evaluate-project_agent_regression",
@@ -715,6 +719,7 @@ func TestExamplesCommandChecksDeterministicSpecialRunners(t *testing.T) {
 		"ok      repo-evaluate-basic_assert",
 		"ok      repo-evaluate-llm_replay",
 		"ok      repo-evaluate-agent_replay",
+		"ok      repo-evaluate-judge_replay",
 		"ok      repo-evaluate-corpus_metrics",
 		"ok      repo-evaluate-multiturn_replay",
 		"ok      repo-evaluate-project_agent_regression",
@@ -728,7 +733,7 @@ func TestExamplesCommandChecksDeterministicSpecialRunners(t *testing.T) {
 		"ok      repo-tooling-release_gate_project-main",
 		"ok      repo-performance-execution_modes_matrix",
 		"ok      repo-ui-package_managed-main",
-		"examples: 16 ok, 0 skipped, 0 failed",
+		"examples: 17 ok, 0 skipped, 0 failed",
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("examples check missing %q\n%s", want, out)

@@ -32,7 +32,7 @@ reviewer := agent {
 | `base64` | `data` | true | false | none | none |
 | `binary` | `data` | true | false | none | none |
 | `cidr` | `protocol` | true | false | none | none |
-| `cmd` | `host` | true | false | process.exec | none |
+| `cmd` | `host` | true | false | process.exec, env.write | none |
 | `cookie` | `protocol` | true | true | none | cookies |
 | `cookies` | `protocol` | true | true | none | cookie |
 | `csv` | `text` | true | true | none | none |

@@ -1,0 +1,20 @@
+// judge_replay.leia - Replay-backed eval.judge scoring and metric demo.
+
+evaluate "judge replay records scoring metrics" {
+    result, err := eval.judge({
+        model: "mock-fast",
+        messages: {
+            llm.system("Score whether the answer satisfies the rubric. Return pass or fail."),
+            llm.user("Rubric: mentions deterministic replay. Answer: deterministic replay keeps checks stable."),
+        },
+    })
+    assert(err == nil)
+    assert(result.text == "pass")
+
+    usage := eval.usage()
+    assert(usage.turns == 1)
+    assert(usage.tokens == 7)
+
+    eval.metric("judge_passed", result.text == "pass")
+    eval.budget({turns: 1, tokens: 8, cost: 0.01})
+}
