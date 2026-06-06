@@ -1212,6 +1212,15 @@ func TestReadmeAINativeContractHasExplicitGates(t *testing.T) {
 			"examples/llm/direct_turn.leia": {"llm.turn({", "direct_text"},
 			"docs/reference/ai/index.md":    {"## Turn Dialect", "performs exactly one provider request"},
 		},
+		"stream": {
+			"tests/llm/llm_trace_test.go":         {"TestLLMTurnStreamsToScriptCallback", "on_stream: func(event)"},
+			"tests/llm/llm_ai_dialect_test.go":    {"TestAIDialectTaggedLiteralRawBlockAgentToolTurnAndStreaming", "streamReq.Stream"},
+			"tests/llm/llm_record_replay_test.go": {"TestLLMRecorderAndReplayStreamingEvents", "StreamEvents"},
+			"cmd/leia/main_evaluate_llm_test.go":  {"TestEvaluateLLMRecordModeWritesGlobalAndCaseFixtures", "eval.usage().stream_events"},
+			"examples/llm/streaming_turn.leia":    {"stream: true", "on_stream: func(event)"},
+			"docs/reference/ai/index.md":          {"`stream`", "`on_stream` / `onStream`"},
+			"docs/reference/evaluate/index.md":    {"`stream_events`", "`eval.usage()`"},
+		},
 		"agents": {
 			"tests/llm/llm_agent_examples_test.go":       {"TestLLMAgentExampleSmoke", "agent.leia"},
 			"tests/llm/llm_agent_tools_test.go":          {"TestLLMAgentScenarioDirectAgentInToolsList", "llm.run_agent"},

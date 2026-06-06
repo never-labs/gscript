@@ -265,12 +265,28 @@ func xlsxDecodeRows(data []byte, limit int64) ([][]string, error) {
 }
 
 func xlsxFirstWorksheet(zr *zip.Reader) *zip.File {
+	var first *zip.File
+	firstIndex := int(^uint(0) >> 1)
 	for _, f := range zr.File {
 		if strings.HasPrefix(f.Name, "xl/worksheets/sheet") && strings.HasSuffix(f.Name, ".xml") {
-			return f
+			index := xlsxWorksheetIndex(f.Name)
+			if first == nil || index < firstIndex || (index == firstIndex && f.Name < first.Name) {
+				first = f
+				firstIndex = index
+			}
 		}
 	}
-	return nil
+	return first
+}
+
+func xlsxWorksheetIndex(name string) int {
+	base := strings.TrimPrefix(name, "xl/worksheets/sheet")
+	base = strings.TrimSuffix(base, ".xml")
+	index, err := strconv.Atoi(base)
+	if err != nil || index <= 0 {
+		return int(^uint(0) >> 1)
+	}
+	return index
 }
 
 func xlsxSharedStrings(zr *zip.Reader, limit int64) ([]string, error) {

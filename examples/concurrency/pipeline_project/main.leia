@@ -53,7 +53,12 @@ func score_worker(ctx, input, output) {
             return;
             default:
         }
-        score := severity_weight(incident.severity) + incident.signals * 3 + incident.minutes
+        signals := tonumber(incident.signals)
+        minutes := tonumber(incident.minutes)
+        if signals == nil || minutes == nil {
+            error("incident score fields must be numeric")
+        }
+        score := severity_weight(incident.severity) + signals * 3 + minutes
         if incident.region == "edge" {
             score = score + 7
         }

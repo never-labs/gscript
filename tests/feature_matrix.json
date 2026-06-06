@@ -498,10 +498,10 @@
       "spec_sections": ["Stability Contract", "Modules And Loading", "Implementation Requirements"],
       "parser": {"status": "not_applicable", "refs": []},
       "bytecode": {"status": "semantic_only", "refs": []},
-      "interpreter": {"status": "covered", "refs": ["tests/sdk/hotloader_test.go", "tests/sdk/hotloader_instance_test.go", "tests/sdk/hotloader_instance_rollback_test.go", "tests/sdk/embedding_r1_test.go", "examples/embedding/embedding_test.go", "examples/embedding/hot_reload_project/hot_reload_project_test.go"]},
+      "interpreter": {"status": "covered", "refs": ["tests/sdk/hotloader_test.go", "modconfig_test.go", "tests/sdk/hotloader_instance_test.go", "tests/sdk/hotloader_instance_rollback_test.go", "tests/sdk/embedding_r1_test.go", "examples/embedding/embedding_test.go", "examples/embedding/hot_reload_project/hot_reload_project_test.go"]},
       "tier1": {"status": "semantic_only", "refs": []},
       "tier2": {"status": "semantic_only", "refs": []},
-      "semantic_gate": {"status": "covered", "refs": ["tests/sdk/hotloader_test.go", "tests/sdk/hotloader_instance_test.go", "tests/sdk/hotloader_instance_rollback_test.go", "tests/sdk/embedding_r1_test.go", "examples/embedding/embedding_test.go", "examples/embedding/hot_reload_project/hot_reload_project_test.go", "docs/reference/hot-reload/index.md", "docs/reference/embedding/index.md", "docs/guides/embedding.md"]},
+      "semantic_gate": {"status": "covered", "refs": ["tests/sdk/hotloader_test.go", "modconfig_test.go", "tests/sdk/hotloader_instance_test.go", "tests/sdk/hotloader_instance_rollback_test.go", "tests/sdk/embedding_r1_test.go", "examples/embedding/embedding_test.go", "examples/embedding/hot_reload_project/hot_reload_project_test.go", "docs/reference/hot-reload/index.md", "docs/reference/embedding/index.md", "docs/guides/embedding.md"]},
       "conformance_case": {"status": "not_applicable", "refs": []},
       "perf_hot_case": {"status": "not_applicable", "refs": []}
     },

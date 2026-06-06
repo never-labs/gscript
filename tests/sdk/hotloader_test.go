@@ -123,6 +123,37 @@ func TestHotLoaderReloadIfChangedSkipsSameSource(t *testing.T) {
 	}
 }
 
+func TestHotLoaderInstanceUsesModuleOptionsForScript(t *testing.T) {
+	dir := t.TempDir()
+	vendor := filepath.Join(dir, "vendor")
+	if err := os.MkdirAll(filepath.Join(vendor, "policy"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "leia.mod"), []byte("module example.com/hot\nleia 0.1\ncollection vendor ./vendor\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(vendor, "policy", "labels.leia"), []byte(`return { value: "managed" }`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, "logic.leia")
+	if err := os.WriteFile(path, []byte(`
+import "vendor:policy.labels" as labels
+
+func label() {
+	return labels.value
+}
+`), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	loader := leia.NewHotLoader(leia.WithHotLoaderVMOptions(leia.ModuleOptionsForScript(path)...))
+	inst, err := loader.LoadInstance(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertCallResult(t, inst, "label", "managed")
+}
+
 func writeScript(t *testing.T, path, src string) {
 	t.Helper()
 	if err := os.WriteFile(path, []byte(strings.TrimSpace(src)), 0644); err != nil {

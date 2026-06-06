@@ -3,6 +3,8 @@
 package tests_test
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"math"
 	"testing"
@@ -29,6 +31,8 @@ func assertVMEqualsJIT(t *testing.T, src string, vars ...string) {
 		err      error
 		panicVal interface{}
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 	done := make(chan jitResult, 1)
 	go func() {
 		defer func() {
@@ -37,7 +41,7 @@ func assertVMEqualsJIT(t *testing.T, src string, vars ...string) {
 			}
 		}()
 		jitVM := leia.New(leia.WithJIT())
-		err := jitVM.Exec(src)
+		err := jitVM.ExecContext(ctx, src)
 		done <- jitResult{vm: jitVM, err: err}
 	}()
 
@@ -51,8 +55,23 @@ func assertVMEqualsJIT(t *testing.T, src string, vars ...string) {
 			t.Fatalf("JIT exec error: %v", res.err)
 		}
 		jitInstance = res.vm
-	case <-time.After(5 * time.Second):
-		t.Fatal("JIT execution hung (timeout)")
+	case <-ctx.Done():
+		select {
+		case res := <-done:
+			if res.panicVal != nil {
+				t.Fatalf("JIT panic: %v", res.panicVal)
+			}
+			if errors.Is(res.err, context.DeadlineExceeded) || errors.Is(res.err, context.Canceled) {
+				t.Fatal("JIT execution hung (timeout)")
+				return
+			}
+			if res.err != nil {
+				t.Fatalf("JIT exec error: %v", res.err)
+			}
+			jitInstance = res.vm
+		case <-time.After(500 * time.Millisecond):
+			t.Fatal("JIT execution hung and did not observe context cancellation")
+		}
 		return
 	}
 

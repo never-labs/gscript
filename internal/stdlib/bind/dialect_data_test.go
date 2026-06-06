@@ -210,6 +210,26 @@ func TestDialectXLSXDecodePreservesSparseCellColumns(t *testing.T) {
 	}
 }
 
+func TestDialectXLSXDecodeSelectsSheetOneIndependentOfZipOrder(t *testing.T) {
+	eval := BuildDialect(HostOptions{}, nil).RawGetString("eval").GoFunction()
+	if eval == nil {
+		t.Fatalf("dialect.eval is not a Go function")
+	}
+	xlsx := testOutOfOrderSheetsXLSXWorkbook(t)
+	decoded, err := eval.Fn([]Value{StringValue("xlsx"), StringValue(xlsx)})
+	if err != nil {
+		t.Fatalf("xlsx out-of-order sheets decode: %v", err)
+	}
+	rows := decoded[0].Table()
+	if got := rows.Length(); got != 1 {
+		t.Fatalf("rows length = %d, want 1", got)
+	}
+	row := rows.RawGetInt(1).Table()
+	if got := row.RawGetInt(1).Str(); got != "sheet-one" {
+		t.Fatalf("decoded first worksheet = %q, want sheet-one", got)
+	}
+}
+
 func testXLSXWorkbook(t *testing.T) string {
 	t.Helper()
 	var buf bytes.Buffer
@@ -239,6 +259,34 @@ func testXLSXWorkbook(t *testing.T) string {
 </worksheet>`)
 	if err := zw.Close(); err != nil {
 		t.Fatalf("close xlsx zip: %v", err)
+	}
+	return buf.String()
+}
+
+func testOutOfOrderSheetsXLSXWorkbook(t *testing.T) string {
+	t.Helper()
+	var buf bytes.Buffer
+	zw := zip.NewWriter(&buf)
+	writeZipFile := func(name, body string) {
+		t.Helper()
+		w, err := zw.Create(name)
+		if err != nil {
+			t.Fatalf("create %s: %v", name, err)
+		}
+		if _, err := w.Write([]byte(body)); err != nil {
+			t.Fatalf("write %s: %v", name, err)
+		}
+	}
+	writeZipFile("xl/worksheets/sheet2.xml", `<?xml version="1.0" encoding="UTF-8"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>sheet-two</t></is></c></row></sheetData>
+</worksheet>`)
+	writeZipFile("xl/worksheets/sheet1.xml", `<?xml version="1.0" encoding="UTF-8"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>sheet-one</t></is></c></row></sheetData>
+</worksheet>`)
+	if err := zw.Close(); err != nil {
+		t.Fatalf("close out-of-order xlsx zip: %v", err)
 	}
 	return buf.String()
 }

@@ -3,6 +3,8 @@
 package tests_test
 
 import (
+	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -12,16 +14,28 @@ import (
 // runWithTimeout executes Leia source with JIT enabled and fails if it hangs.
 func runWithTimeout(t *testing.T, src string, timeoutSecs int) error {
 	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutSecs)*time.Second)
+	defer cancel()
+
 	done := make(chan error, 1)
 	go func() {
 		vm := leia.New(leia.WithJIT())
-		done <- vm.Exec(src)
+		done <- vm.ExecContext(ctx, src)
 	}()
 	select {
 	case err := <-done:
 		return err
-	case <-time.After(time.Duration(timeoutSecs) * time.Second):
-		t.Fatal("execution hung (timeout)")
+	case <-ctx.Done():
+		select {
+		case err := <-done:
+			if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+				t.Fatal("execution hung (timeout)")
+				return nil
+			}
+			return err
+		case <-time.After(500 * time.Millisecond):
+			t.Fatal("execution hung and did not observe context cancellation")
+		}
 		return nil
 	}
 }
