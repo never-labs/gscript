@@ -872,6 +872,8 @@ func TestExamplesCommandChecksReadmeCapabilityEvidenceExamples(t *testing.T) {
 		"repo-database-package_managed-main",
 		"repo-web-serve_dialect_app",
 		"repo-web-tiny_fullstack_app",
+		"repo-site-static_docs_generator",
+		"repo-site-release_dashboard",
 		"repo-tooling-package_manager_workflow-main",
 		"repo-tooling-package_manager_workflow-local-metadata-report",
 		"repo-tooling-release_gate_project-main",
@@ -907,13 +909,15 @@ func TestExamplesCommandChecksReadmeCapabilityEvidenceExamples(t *testing.T) {
 		"ok      repo-database-package_managed-main",
 		"ok      repo-web-serve_dialect_app",
 		"ok      repo-web-tiny_fullstack_app",
+		"ok      repo-site-static_docs_generator",
+		"ok      repo-site-release_dashboard",
 		"ok      repo-tooling-package_manager_workflow-main",
 		"ok      repo-tooling-package_manager_workflow-local-metadata-report",
 		"ok      repo-tooling-release_gate_project-main",
 		"ok      repo-macos-package_managed-main",
 		"ok      repo-macos-package_managed-adapter-automation",
 		"ok      repo-performance-execution_modes_matrix",
-		"examples: 29 ok, 0 skipped, 0 failed",
+		"examples: 31 ok, 0 skipped, 0 failed",
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("README capability examples check missing %q\n%s", want, out)

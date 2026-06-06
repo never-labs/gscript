@@ -109,8 +109,10 @@ func TestPlaygroundPageSyntaxSurfaceMatchesLeia(t *testing.T) {
 		`"var"`,
 		`"model"`,
 		`const leiaDialectTags = new Set([`,
-		`"agent", "cmd", "csv", "db", "env", "evaluate", "glob", "html", "http",`,
-		`"json", "model", "path", "prompt", "q", "re", "serve", "sh", "sql",`,
+		`"sh", "cmd", "shellwords", "glob", "path", "re", "regexp", "json", "jsonptr",`,
+		`"httpmsg", "sse", "multipart", "jwt", "ipaddr", "cidr", "hostport", "serve",`,
+		`"binary", "q", "pem", "xlsx", "excel", "sql", "prompt", "quote", "model",`,
+		`"turn", "tool", "agent"`,
 		`const bt = String.fromCharCode(96);`,
 		`ch === "$" && (next === bt || (next === "!" && text[i + 2] === bt))`,
 		`leiaDialectTags.has(word) && (text[payloadStart] === bt || text[payloadStart] === "{")`,
@@ -238,6 +240,69 @@ func TestPlaygroundTourAndAIAPI(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestPlaygroundAIExamplesCoverReadmeAINativeSurface(t *testing.T) {
+	root := filepath.Dir(playgroundExamplesRoot())
+	readme, err := os.ReadFile(filepath.Join(root, "README.md"))
+	if err != nil {
+		t.Fatalf("read README: %v", err)
+	}
+	readmeText := string(readme)
+	for _, claim := range []string{
+		"AI-native syntax and stdlib support for models, tools, messages, turns,\n  agents, replay, and provider adapters.",
+		"Browser playground with runnable Tour, Examples, Evaluate, and AI tabs",
+	} {
+		if !strings.Contains(readmeText, claim) {
+			t.Fatalf("README missing AI playground claim %q", claim)
+		}
+	}
+
+	byID := make(map[string]playgroundExample)
+	for _, example := range playgroundAIExamples() {
+		byID[example.ID] = example
+	}
+	want := map[string][]string{
+		"ai-model-alias": {
+			"llm.register_models",
+			"provider_model",
+			"anthropic_compatible",
+		},
+		"ai-tagged-dialect": {
+			"model {",
+			"tool {",
+			"agent {",
+		},
+		"ai-memory": {
+			"llm.system",
+			"llm.user",
+			"msg.assistant",
+			"msg.user",
+		},
+		"ai-agent-tool": {
+			"tools: {extract_memory}",
+		},
+		"ai-replay-trace": {
+			"turn {",
+			"stream: true",
+			"on_stream",
+			"replay_ready: true",
+		},
+	}
+	for id, snippets := range want {
+		example, ok := byID[id]
+		if !ok {
+			t.Fatalf("AI playground examples missing %s", id)
+		}
+		if !example.Runnable {
+			t.Fatalf("%s should be runnable through the AI playground profile", id)
+		}
+		for _, snippet := range snippets {
+			if !strings.Contains(example.Source, snippet) {
+				t.Fatalf("%s source missing %q\nsource:\n%s", id, snippet, example.Source)
+			}
+		}
 	}
 }
 
@@ -1127,6 +1192,7 @@ func TestPlaygroundAIExamplesCoverRunnableWorkflowShapes(t *testing.T) {
 		"ai-agent-shape":       {"MOCK_AI_OK"},
 		"ai-structured-output": {"\"product\":\"playground\""},
 		"ai-streaming":         {"streamed\tLEIA_GLM_OK", "final\tLEIA_GLM_OK"},
+		"ai-replay-trace":      {"turns\t1", "stream_events\t3", "replay_ready\ttrue"},
 		"ai-tool":              {"MOCK_TOOL_RESULT"},
 		"ai-memory":            {"project=ORCHID"},
 		"ai-agent-tool":        {"MOCK_TOOL_RESULT"},

@@ -617,6 +617,9 @@ func (playgroundMockLLMProvider) Turn(_ context.Context, req llm.TurnRequest) (l
 	if requestContains(req, "MEMORY_STORED") {
 		return llm.TurnResult{Status: "final_answer", Text: "MEMORY_STORED"}, nil
 	}
+	if requestContains(req, "hello stream") {
+		return llm.TurnResult{Status: "final_answer", Text: "hello stream"}, nil
+	}
 	if requestContains(req, "LEIA_GLM_OK") {
 		return llm.TurnResult{Status: "final_answer", Text: "LEIA_GLM_OK"}, nil
 	}
@@ -1255,6 +1258,54 @@ result, err := llm.turn({
 if err != nil { print(err.message); return }
 print("streamed", streamed)
 print("final", result.text)`,
+		},
+		{
+			ID:       "ai-replay-trace",
+			Title:    "Replay-Ready Trace",
+			Section:  "Evaluation",
+			Summary:  "Shape a streaming turn so hosts can record provider turns, replay them later, and trace metadata without prompt text.",
+			Runnable: true,
+			Requires: "LLM provider",
+			Concepts: []string{
+				"`turn {}` uses the same runtime as `llm.turn`.",
+				"Streaming callbacks expose token events that hosts can also trace.",
+				"Record/replay stays host-side, while scripts keep deterministic request and usage assertions.",
+			},
+			Source: `model {
+    default: "mock-stream"
+}
+
+streamed := ""
+events := 0
+
+result, err := turn {
+    model: "mock-stream"
+    messages: {
+        llm.system("Stream exactly the provider response."),
+        llm.user("Say hello stream."),
+    }
+    stream: true
+    on_stream: func(event) {
+        streamed = streamed .. event.token
+        events = events + 1
+    }
+}
+
+if err != nil { print(err.message); return }
+assert(result.status == "final_answer")
+assert(result.text == "hello stream")
+assert(streamed == "hello stream")
+assert(events == 3)
+
+usage := {
+    turns: 1,
+    stream_events: events,
+    replay_ready: true,
+}
+
+print("turns", usage.turns)
+print("stream_events", usage.stream_events)
+print("replay_ready", usage.replay_ready)`,
 		},
 		{
 			ID:       "ai-tool",
@@ -2240,9 +2291,16 @@ const leiaAgentFields = new Set([
   "temperature", "max_tokens", "stream", "on_stream", "response_format"
 ]);
 const leiaDialectTags = new Set([
-  "agent", "cmd", "csv", "db", "env", "evaluate", "glob", "html", "http",
-  "json", "model", "path", "prompt", "q", "re", "serve", "sh", "sql",
-  "tool", "turn", "xlsx"
+  "sh", "cmd", "shellwords", "glob", "path", "re", "regexp", "json", "jsonptr",
+  "jsonl", "csv", "tsv", "mdtable", "markdown", "md", "lines", "split", "words",
+  "nums", "numbers", "kv", "logfmt", "env", "ini", "yaml", "yml", "semver",
+  "duration", "timestamp", "rfc3339", "tap", "junit", "xml", "template", "url",
+  "html_escape", "html", "urlquery", "form", "urlform", "urlpath", "mime",
+  "mailaddr", "emailaddr", "headers", "http_headers", "cookie", "cookies",
+  "httpmsg", "sse", "multipart", "jwt", "ipaddr", "cidr", "hostport", "serve",
+  "base64", "hash", "hex", "base32", "uuid", "gzip", "zlib", "deflate",
+  "binary", "q", "pem", "xlsx", "excel", "sql", "prompt", "quote", "model",
+  "turn", "tool", "agent"
 ]);
 
 function escapeHTML(text) {

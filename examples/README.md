@@ -20,6 +20,7 @@ go run ../cmd/leia examples check operations/local_ops_report.leia
 go run ../cmd/leia examples check database/package_managed
 go run ../cmd/leia examples check web/serve_dialect_app.leia
 go run ../cmd/leia examples check web/tiny_fullstack_app.leia
+go run ../cmd/leia examples check site/static_docs_generator.leia site/release_dashboard.leia
 go run ../cmd/leia examples run data_processing/data_oriented/soa_kernels.leia
 go run ../cmd/leia examples run concurrency/select_timeout.leia
 go run ../cmd/leia examples check concurrency/pipeline_project
