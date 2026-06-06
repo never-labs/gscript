@@ -13,9 +13,12 @@ go run ../cmd/leia examples list
 go run ../cmd/leia examples check hello/fib.leia hello/types_demo.leia hello/dialects.leia
 go run ../cmd/leia examples check dialects/text_parsing.leia dialects/sql_result_analytics.leia
 go run ../cmd/leia examples check data/q_vector_basics.leia
+go run ../cmd/leia examples check data/db_q_frame_project
 go run ../cmd/leia examples check automation/invoice_reconciliation.leia
 go run ../cmd/leia examples check operations/local_ops_report.leia
 go run ../cmd/leia examples check database/package_managed
+go run ../cmd/leia examples check web/serve_dialect_app.leia
+go run ../cmd/leia examples check web/tiny_fullstack_app.leia
 go run ../cmd/leia examples run data_processing/data_oriented/soa_kernels.leia
 go run ../cmd/leia examples run concurrency/select_timeout.leia
 ```
@@ -25,12 +28,12 @@ Directories:
 | Directory | Purpose |
 |---|---|
 | `hello/` | Core language features and small idioms. |
-| `dialects/` | Runnable checks for built-in text, protocol, SQL-shaped, Markdown/table, binary, and validation dialects. |
+| `dialects/` | Runnable checks for built-in shell/env, text, protocol, SQL-shaped, Markdown/table, binary, and validation dialects. |
 | `automation/` | Project-level offline workflows for release, fixture, and business-ops automation. |
 | `operations/` | Project-level offline workflows for local logs, backup hygiene, deploy risk, and ops reporting. |
 | `tooling/` | Project-level offline workflows for release evidence, diagnostics, and CLI gate planning. |
 | `performance/` | User-facing execution mode and benchmark policy examples. |
-| `data/` | Focused data-language examples, including q/kdb+-style symbolic vector evaluation. |
+| `data/` | Focused data-language examples, including q/kdb+-style symbolic vector evaluation and SQLite-to-columnar q analytics. |
 | `data_processing/` | Strings, containers, dense data, vectors, matrices, and SoA. |
 | `database/` | Package-managed SQLite ledger analytics project. |
 | `concurrency/` | Goroutine-like tasks, channels, select, sync, and context helpers. |
@@ -60,10 +63,15 @@ Evaluate examples live under `evaluate/`. Run replay-backed agent checks with:
 # from the examples/ directory
 go run ../cmd/leia evaluate --replay evaluate/agent_replay.records.json evaluate/agent_replay.leia
 go run ../cmd/leia evaluate --replay evaluate/multiturn_replay.records.json evaluate/multiturn_replay.leia
+go run ../cmd/leia evaluate --replay evaluate/project_agent_regression.records.json evaluate/project_agent_regression.leia
 ```
 
 Examples that open network listeners or touch host resources, such as `web/`,
-should be run intentionally and reviewed with the security reference.
+should be run intentionally and reviewed with the security reference. The
+`web/serve_dialect_app.leia` example is the deterministic smoke for the
+high-level `serve { ... }` route dialect; `web/tiny_fullstack_app.leia`
+combines `serve`, SQLite, HTML, JSON, form handling, and static assets in one
+runnable full-stack smoke.
 
 ## Release Expectations
 

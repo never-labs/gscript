@@ -245,6 +245,81 @@ func inc() {
 	// 1 2 12
 }
 
+func Example_productionEmbedding() {
+	dir, err := os.MkdirTemp("", "leia-production-embedding-*")
+	if err != nil {
+		panic(err)
+	}
+	defer os.RemoveAll(dir)
+
+	path := filepath.Join(dir, "policy.leia")
+	if err := os.WriteFile(path, []byte(`
+import "go:host/safe" as host
+
+state := { accepted: 0 }
+
+func handle(input) {
+	state.accepted += 1
+	return host.label(input, state.accepted)
+}
+`), 0644); err != nil {
+		panic(err)
+	}
+
+	loader := leia.NewHotLoader(leia.WithHotLoaderVMOptions(
+		leia.SecuritySandbox(),
+		leia.WithLibs(leia.LibSafe),
+		leia.WithGoImports(map[string]any{
+			"go:host/safe": leia.Module{
+				"label": func(name string, n int64) string {
+					return fmt.Sprintf("%s-%02d", strings.ToUpper(name), n)
+				},
+			},
+		}),
+		leia.WithEnvironmentAllowlist("LEIA_EMBEDDING_MODE"),
+		leia.WithMaxSteps(2_000),
+		leia.WithMaxNativeCalls(32),
+		leia.WithMaxHostResultBytes(64),
+	))
+	inst, err := loader.LoadInstance(path)
+	if err != nil {
+		panic(err)
+	}
+	first, err := inst.Call("handle", "job")
+	if err != nil {
+		panic(err)
+	}
+
+	err = inst.VM().Exec(`import "go:os" as os`)
+	fmt.Println("blocked import", err != nil && strings.Contains(err.Error(), `go import "go:os" is not allowed`))
+
+	if err := os.WriteFile(path, []byte(`
+import "go:host/safe" as host
+
+state := { accepted: 0 }
+
+func handle(input) {
+	state.accepted += 10
+	return host.label(input, state.accepted)
+}
+`), 0644); err != nil {
+		panic(err)
+	}
+	if err := inst.Reload(); err != nil {
+		panic(err)
+	}
+	second, err := inst.Call("handle", "job")
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println(first[0], second[0], inst.Generation())
+
+	// Output:
+	// blocked import true
+	// JOB-01 JOB-11 2
+}
+
 func Example_sandboxAndMaxSteps() {
 	sandbox := leia.New(leia.WithSandbox())
 	if err := sandbox.Exec(`safe := true`); err != nil {

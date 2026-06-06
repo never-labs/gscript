@@ -39,7 +39,7 @@ set.
 | `examples/api/` | Offline API-client style scripts for host-facing workflow examples. |
 | `examples/automation/` | Offline business and release automation workflows. |
 | `examples/dialects/` | Built-in text, protocol, SQL-shaped, Markdown/table, binary, and validation dialect examples. |
-| `examples/data/` | Focused data-language examples, including q/kdb+-style symbolic vectors. |
+| `examples/data/` | Focused data-language examples, including q/kdb+-style symbolic vectors and SQLite-to-columnar analytics projects. |
 | `examples/data_processing/` | Data structures, string processing, dense arrays, and SoA kernels. |
 | `examples/database/` | Package-managed database capability examples. |
 | `examples/concurrency/` | Goroutines, channels, select, sync primitives, context cancellation, and process cancellation. |
@@ -55,7 +55,7 @@ set.
 | `examples/testing/` | `leia test` workflow and JSONL golden-evaluation examples. |
 | `examples/tooling/` | Release evidence and diagnostics pipeline examples. |
 | `examples/ui/` | Package-managed UI capability examples. |
-| `examples/web/` | HTTP/server-oriented scripts. |
+| `examples/web/` | HTTP/server-oriented scripts, including high-level `serve { ... }` route dialect examples. |
 | `examples/game_engine/` | Game scripting patterns and larger interactive workloads. |
 | `examples/workflow/` | Service-quality, status-rollup, and support-triage workflows. |
 
@@ -64,13 +64,16 @@ set.
 ```bash
 go run ./cmd/leia examples run examples/data_processing/data_oriented/soa_kernels.leia
 go run ./cmd/leia examples check examples/data/q_vector_basics.leia
+go run ./cmd/leia examples check examples/data/db_q_frame_project
 go run ./cmd/leia examples check examples/data_processing/data_oriented/particle_integration.leia
 ```
 
 Use these with the [data-oriented reference](../reference/data-oriented/index.md)
 and `benchmarks/data/` when evaluating numeric or SoA-heavy code. The
-particle integration example is listed as manual, so `examples check` reports it
-as skipped unless it is run through a dedicated higher-step-budget path.
+`db_q_frame_project` example exercises SQLite `db.frame`, SoA-backed `q.query`,
+and `xlsx`/`excel` round-tripping as one runnable data workflow. The particle
+integration example is listed as manual, so `examples check` reports it as
+skipped unless it is run through a dedicated higher-step-budget path.
 
 ## Concurrency Examples
 
@@ -84,12 +87,13 @@ Use these with the [concurrency reference](../reference/concurrency/index.md).
 ## Dialect Examples
 
 ```bash
-go run ./cmd/leia examples check examples/hello/dialects.leia examples/dialects/text_parsing.leia examples/dialects/sql_result_analytics.leia
+go run ./cmd/leia examples check examples/hello/dialects.leia examples/dialects/text_parsing.leia examples/dialects/sql_result_analytics.leia examples/dialects/shell_filesystem.leia
 go run ./cmd/leia examples run repo-dialects-sql_result_analytics
 ```
 
 The runnable dialect examples cover the CLI-visible built-in dialect surface,
-including `sql`, `markdown`/`md`, and Markdown table parsing/encoding.
+including shell/process literals, `env` lookup literals, `sql`,
+`markdown`/`md`, and Markdown table parsing/encoding.
 
 ## AI Examples
 
@@ -107,11 +111,14 @@ See [AI-native Leia](../guides/ai-native.md).
 go run ./cmd/leia evaluate --replay examples/evaluate/agent_replay.records.json examples/evaluate/agent_replay.leia
 go run ./cmd/leia evaluate --replay examples/evaluate/llm_replay.records.json examples/evaluate/llm_replay.leia
 go run ./cmd/leia evaluate --replay examples/evaluate/multiturn_replay.records.json examples/evaluate/multiturn_replay.leia
+go run ./cmd/leia evaluate --replay examples/evaluate/project_agent_regression.records.json examples/evaluate/project_agent_regression.leia
 ```
 
 Evaluate examples are source-level regression checks. Some are ordinary local
 assertions; LLM examples pair the `.leia` source with a replay fixture so they
-run deterministically without provider credentials.
+run deterministically without provider credentials. The project agent regression
+fixture covers memory/history behavior, tool dispatch, and streaming replay
+usage accounting.
 
 ## Embedding Examples
 
@@ -137,6 +144,8 @@ Review these files directly when working on those areas:
 - `examples/game_engine/event_system.leia`
 - `examples/game_engine/game_of_life.leia`
 - `examples/game_engine/tetris.leia`
+- `examples/web/serve_dialect_app.leia`
+- `examples/web/tiny_fullstack_app.leia`
 - `examples/web/hello_server.leia`
 
 Prefer the smoke, SDK, and integration tests for deterministic correctness

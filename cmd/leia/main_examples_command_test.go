@@ -135,6 +135,69 @@ func TestExamplesCommandDiscoversPackageManagedProjectEntrypoints(t *testing.T) 
 	}
 }
 
+func TestExamplesCommandVerifiesPackageManagedProjects(t *testing.T) {
+	root := filepath.Dir(playgroundExamplesRoot())
+	examples, err := cliRepositoryExamples()
+	if err != nil {
+		t.Fatal(err)
+	}
+	discovered := make(map[string]cliExample, len(examples))
+	for _, example := range examples {
+		discovered[example.Path] = example
+	}
+
+	var moduleRoots []string
+	if err := filepath.WalkDir(filepath.Join(root, "examples"), func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			if d.Name() == "vendor" || strings.HasPrefix(d.Name(), ".") {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if d.Name() != "leia.mod" {
+			return nil
+		}
+		rel, err := filepath.Rel(root, filepath.Dir(path))
+		if err != nil {
+			return err
+		}
+		moduleRoots = append(moduleRoots, filepath.ToSlash(rel))
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if len(moduleRoots) == 0 {
+		t.Fatal("no package-managed example projects found")
+	}
+	sort.Strings(moduleRoots)
+
+	for _, moduleRoot := range moduleRoots {
+		t.Run(moduleRoot, func(t *testing.T) {
+			var stdout, stderr bytes.Buffer
+			code := runModCommand([]string{"verify", "--json", filepath.Join(root, filepath.FromSlash(moduleRoot))}, &stdout, &stderr)
+			if code != 0 {
+				t.Fatalf("mod verify %s code = %d stdout = %q stderr = %q", moduleRoot, code, stdout.String(), stderr.String())
+			}
+			var report modVerifyReport
+			if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
+				t.Fatalf("mod verify %s did not return JSON: %v\n%s", moduleRoot, err, stdout.String())
+			}
+			if !report.OK {
+				t.Fatalf("mod verify %s report = %+v", moduleRoot, report)
+			}
+			mainPath := filepath.ToSlash(filepath.Join(moduleRoot, "main.leia"))
+			if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(mainPath))); err == nil {
+				if _, ok := discovered[mainPath]; !ok {
+					t.Fatalf("package-managed project main is not discoverable by examples CLI: %s", mainPath)
+				}
+			}
+		})
+	}
+}
+
 func TestExamplesCommandDirectorySelectorsCoverExampleProjects(t *testing.T) {
 	root := filepath.Dir(playgroundExamplesRoot())
 	entries, err := os.ReadDir(filepath.Join(root, "examples"))
@@ -446,6 +509,7 @@ func TestExamplesCommandChecksDeterministicHostExamples(t *testing.T) {
 		"repo-web-route_workbench",
 		"repo-web-serve_dialect_app",
 		"repo-web-tiny_app",
+		"repo-web-tiny_fullstack_app",
 		"repo-web-webserver",
 		"repo-concurrency-context_process",
 		"repo-concurrency-goroutine_errors",
@@ -462,13 +526,14 @@ func TestExamplesCommandChecksDeterministicHostExamples(t *testing.T) {
 		"ok      repo-web-route_workbench",
 		"ok      repo-web-serve_dialect_app",
 		"ok      repo-web-tiny_app",
+		"ok      repo-web-tiny_fullstack_app",
 		"ok      repo-web-webserver",
 		"ok      repo-concurrency-context_process",
 		"ok      repo-concurrency-goroutine_errors",
 		"ok      repo-dialects-shell_filesystem",
 		"ok      repo-data_processing-data_oriented-particle_integration",
 		"ok      repo-game_engine-game_of_life",
-		"examples: 10 ok, 0 skipped, 0 failed",
+		"examples: 11 ok, 0 skipped, 0 failed",
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("examples check missing %q\n%s", want, out)

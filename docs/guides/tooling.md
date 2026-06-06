@@ -126,7 +126,10 @@ go run ./cmd/leia examples run repo-hello-fib
 `leia examples check` is the same checker used by the repository-wide
 `leia check` examples step. Runnable examples execute locally; manual examples
 are reported as skipped with their required host capability, service,
-credential, or step-budget reason.
+credential, or step-budget reason. When an example lives inside a directory
+with `leia.mod`, the checker validates that module with `leia mod verify --json`
+before running the example so package metadata cannot drift away from runnable
+project examples.
 
 ## Performance
 

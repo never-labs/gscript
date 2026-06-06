@@ -131,6 +131,29 @@ For untrusted scripts, start with `SecuritySandbox()`. It selects `LibSafe`,
 surfaces, and disables JIT by default. Grant back only the library,
 capability, filesystem, module, and budget knobs that the embedding needs.
 
+For long-lived embedded policies or game/server scripts, put those controls on
+the hot-loader VM options so every reload keeps the same security envelope:
+
+```go
+loader := leia.NewHotLoader(leia.WithHotLoaderVMOptions(
+    leia.SecuritySandbox(),
+    leia.WithLibs(leia.LibSafe),
+    leia.WithGoImports(map[string]any{
+        "go:host/safe": leia.Module{"label": safeLabel},
+    }),
+    leia.WithMaxSteps(100_000),
+    leia.WithMaxNativeCalls(1_000),
+    leia.WithMaxHostResultBytes(1<<20),
+))
+inst, err := loader.LoadInstance("policy.leia")
+```
+
+Source syntax such as `import "go:host/safe" as host` succeeds only for
+bindings in `WithGoImports` or `RegisterModule`; `import "go:os" as os` remains
+rejected unless the host explicitly provided that binding. `HotInstance`
+reloads changed code while preserving compatible script state under the same
+sandbox and budget limits.
+
 Important sandbox and budget options:
 
 ```go

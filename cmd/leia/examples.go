@@ -431,6 +431,12 @@ func checkCLIExample(example cliExample, maxSteps int64, timeout time.Duration) 
 	done := make(chan runResult, 1)
 	go func() {
 		var stdout, stderr bytes.Buffer
+		if moduleRoot, ok := cliExampleModuleRoot(path); ok {
+			if code := runModCommand([]string{"verify", "--json", moduleRoot}, io.Discard, &stderr); code != 0 {
+				done <- runResult{code: code, stdout: stdout.String(), stderr: "module verify failed: " + strings.TrimSpace(stderr.String())}
+				return
+			}
+		}
 		code := runCLIExampleRunner(example, path, maxSteps, &stdout, &stderr)
 		done <- runResult{code: code, stdout: stdout.String(), stderr: stderr.String()}
 	}()
@@ -455,6 +461,31 @@ func checkCLIExample(example cliExample, maxSteps int64, timeout time.Duration) 
 		}
 	}
 	return result
+}
+
+func cliExampleModuleRoot(path string) (string, bool) {
+	root := filepath.Dir(playgroundExamplesRoot())
+	examplesRoot := filepath.Join(root, "examples")
+	dir := path
+	if info, err := os.Stat(dir); err == nil && !info.IsDir() {
+		dir = filepath.Dir(dir)
+	}
+	for {
+		if rel, err := filepath.Rel(examplesRoot, dir); err != nil || strings.HasPrefix(rel, "..") || filepath.IsAbs(rel) {
+			return "", false
+		}
+		if info, err := os.Stat(filepath.Join(dir, "leia.mod")); err == nil && !info.IsDir() {
+			return dir, true
+		}
+		if filepath.Clean(dir) == filepath.Clean(examplesRoot) {
+			return "", false
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return "", false
+		}
+		dir = parent
+	}
 }
 
 func applyCLIExampleRunner(example *cliExample) {
@@ -509,6 +540,7 @@ func applyCLIExampleRunner(example *cliExample) {
 		example.Requires = ""
 		return
 	case strings.Contains(example.Path, "/web/tiny_app.leia"),
+		strings.Contains(example.Path, "/web/tiny_fullstack_app.leia"),
 		strings.Contains(example.Path, "/web/serve_dialect_app.leia"),
 		strings.Contains(example.Path, "/web/route_workbench.leia"),
 		strings.Contains(example.Path, "/concurrency/context_process.leia"),

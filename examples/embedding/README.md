@@ -20,6 +20,9 @@ their documented output in sync.
   preserving the previous compiled program.
 - `Example_hotInstance` covers online reload with persistent VM state,
   automatic non-function global preservation, and function replacement.
+- `Example_productionEmbedding` covers the recommended production embedding
+  shape: `SecuritySandbox`, resource budgets, an explicit `WithGoImports`
+  allowlist, rejected unauthorized Go imports, and hot reload preserving state.
 - `Example_sandboxAndMaxSteps` covers `WithSandbox`, disabled filesystem
   globals, and statement/instruction budgeting with `WithMaxSteps`.
 - `Example_securitySandboxAndBudgets` covers `SecuritySandbox`, its `LibSafe`

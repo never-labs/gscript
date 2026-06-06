@@ -1506,6 +1506,7 @@ func repositoryExampleRunnable(path string) bool {
 		!strings.Contains(path, "/web/route_workbench.leia") &&
 		!strings.Contains(path, "/web/serve_dialect_app.leia") &&
 		!strings.Contains(path, "/web/tiny_app.leia") &&
+		!strings.Contains(path, "/web/tiny_fullstack_app.leia") &&
 		!strings.Contains(path, "/web/webserver.leia") &&
 		!strings.Contains(path, "/dialects/shell_filesystem.leia") &&
 		!strings.Contains(path, "/macos/package_managed/") &&
@@ -1532,6 +1533,7 @@ func repositoryExampleRequires(path string) string {
 		strings.Contains(path, "/web/route_workbench.leia"),
 		strings.Contains(path, "/web/serve_dialect_app.leia"),
 		strings.Contains(path, "/web/tiny_app.leia"),
+		strings.Contains(path, "/web/tiny_fullstack_app.leia"),
 		strings.Contains(path, "/web/webserver.leia"):
 		return "network/server host access"
 	case strings.Contains(path, "/dialects/shell_filesystem.leia"):

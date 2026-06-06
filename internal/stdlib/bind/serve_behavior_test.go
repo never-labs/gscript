@@ -129,6 +129,87 @@ func TestServeDialectTaggedBlockRoundTrip(t *testing.T) {
 	}
 }
 
+func TestServeDialectSQLiteFormAndStaticRoundTrip(t *testing.T) {
+	interp := New()
+	hostOpts := HostOptions{
+		Call:           interp.CallFunction,
+		NetworkAllowed: interp.NetworkAccessEnabled,
+		MaxHostResult:  interp.MaxHostResultBytes,
+	}
+	for name, module := range map[string]Value{
+		"db":      TableValue(BuildDB(hostOpts)),
+		"dialect": TableValue(BuildDialect(hostOpts, interp.MaxHostResultBytes)),
+		"http":    TableValue(BuildHTTP(hostOpts)),
+		"net":     TableValue(BuildNet(hostOpts)),
+	} {
+		interp.SetGlobal(name, module)
+		interp.SetModule(name, module)
+	}
+
+	src := `
+		conn := db.memory()
+		conn.exec(sql` + "`" + `create table posts (id integer primary key autoincrement, title text not null, body text not null)` + "`" + `)
+		conn.exec(sql {query: "insert into posts (title, body) values (:title, :body)", params: {title: "seed", body: "hello"}})
+		app := serve {
+			listen: "127.0.0.1:0"
+			routes: {
+				{method: "GET", path: "/static/:name", handler: func(req) {
+					return "asset:" .. req.params.name
+				}},
+				{method: "GET", path: "/api/posts/:id", handler: func(req) {
+					rows := conn.query(sql {query: "select id, title, body from posts where id = :id", params: {id: req.params.id}})
+					row := rows[1]
+					return {id: row.id, title: row.title, body: row.body}
+				}},
+				{method: "POST", path: "/posts", handler: func(req) {
+					form_body := dialect.eval("form", req.body, {mode: "parse"})
+					inserted := conn.exec(sql {
+						query: "insert into posts (title, body) values (:title, :body)",
+						params: {title: form_body.title, body: form_body.body},
+					})
+					rows := conn.query(sql {query: "select id, title, body from posts where id = :id", params: {id: inserted.last_insert_id}})
+					row := rows[1]
+					return {id: row.id, title: row.title, body: row.body}
+				}},
+			}
+		}
+		static_resp := http.get(app.url .. "/static/app.css")
+		api_resp := http.get(app.url .. "/api/posts/1")
+		form_resp, form_err := net.post(app.url .. "/posts", form {title: "form title", body: "form body"}, {headers: {["Content-Type"]: "application/x-www-form-urlencoded"}})
+		count_row := conn.one(sql` + "`" + `select count(*) as n from posts` + "`" + `)
+		closed, close_err := app.close()
+		waited, wait_err := app.wait()
+	`
+	if _, err := interp.ExecString(src); err != nil {
+		t.Fatalf("ExecString: %v", err)
+	}
+	if got := interp.GetGlobal("static_resp").Table().RawGetString("body").Str(); got != "asset:app.css" {
+		t.Fatalf("static body = %q, want asset", got)
+	}
+	if got := interp.GetGlobal("api_resp").Table().RawGetString("body").Str(); got != `{"body":"hello","id":1,"title":"seed"}` {
+		t.Fatalf("api body = %q, want SQLite JSON row", got)
+	}
+	if got := interp.GetGlobal("form_resp").Table().RawGetString("body").Str(); got != `{"body":"form body","id":2,"title":"form title"}` {
+		t.Fatalf("form body = %q, want inserted form row", got)
+	}
+	if got := interp.GetGlobal("form_err"); !got.IsNil() {
+		t.Fatalf("form_err = %v, want nil", got)
+	}
+	if got := interp.GetGlobal("count_row").Table().RawGetString("n").Int(); got != 2 {
+		t.Fatalf("count_row.n = %d, want 2", got)
+	}
+	for _, name := range []string{"closed", "waited"} {
+		if got := interp.GetGlobal(name); !got.IsBool() || !got.Bool() {
+			t.Fatalf("%s = %v, want true", name, got)
+		}
+	}
+	for _, name := range []string{"close_err", "wait_err"} {
+		if got := interp.GetGlobal(name); !got.IsNil() {
+			t.Fatalf("%s = %v, want nil", name, got)
+		}
+	}
+}
+
 func TestHTTPRouterColonParams(t *testing.T) {
 	interp := New()
 	hostOpts := HostOptions{

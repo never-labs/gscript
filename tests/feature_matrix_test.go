@@ -553,6 +553,16 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 		"examples/tooling/release_evidence_pipeline.leia",
 		"docs/guides/tooling.md",
 	)
+	examplesCommandGate := readFileString(t, filepath.Join(root, "cmd", "leia", "main_examples_command_test.go"))
+	for _, snippet := range []string{
+		"TestExamplesCommandVerifiesPackageManagedProjects",
+		"runModCommand([]string{\"verify\", \"--json\"",
+		"package-managed project main is not discoverable by examples CLI",
+	} {
+		if !strings.Contains(examplesCommandGate, snippet) {
+			t.Fatalf("examples command gate must keep package-managed project verification snippet %q", snippet)
+		}
+	}
 
 	modules := requireFeature(t, features, "module_package_management")
 	requireFeatureSpecSections(t, modules, "module_package_management", "Modules And Loading", "Values And Types")

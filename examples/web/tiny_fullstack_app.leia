@@ -1,0 +1,180 @@
+// tiny_fullstack_app.leia - Project-level Web app with SQLite-backed routes.
+// Demonstrates: serve dialect, SQLite, HTML, JSON API, form POST, static assets,
+// path params, method routing, and in-process loopback assertions.
+
+func check(name, ok) {
+    if !ok {
+        error("check failed: " .. name)
+    }
+}
+
+func json_headers() {
+    return {["Content-Type"]: "application/json"}
+}
+
+func form_headers() {
+    return {["Content-Type"]: "application/x-www-form-urlencoded"}
+}
+
+conn := db.memory()
+conn.exec(sql`create table posts (
+    id integer primary key autoincrement,
+    title text not null,
+    body text not null,
+    status text not null default 'draft'
+)`)
+conn.exec(sql {
+    query: "insert into posts (title, body, status) values (:title, :body, :status)",
+    params: {title: "Hello Leia", body: "serve + sqlite", status: "published"},
+})
+conn.exec(sql {
+    query: "insert into posts (title, body, status) values (:title, :body, :status)",
+    params: {title: "Draft Notes", body: "hidden until published", status: "draft"},
+})
+
+func post_row(id) {
+    rows := conn.query(sql {
+        query: "select id, title, body, status from posts where id = :id",
+        params: {id: id},
+    })
+    row := rows[1]
+    if row == nil {
+        return nil
+    }
+    return {id: row.id, title: row.title, body: row.body, status: row.status}
+}
+
+func post_payload(post) {
+    if post == nil {
+        return nil
+    }
+    return {id: post.id, title: post.title, body: post.body, status: post.status}
+}
+
+func post_count() {
+    row := conn.one(sql`select count(*) as n from posts`)
+    return row.n
+}
+
+func render_home() {
+    posts := conn.query(sql`select id, title, status from posts order by id`)
+    items := {}
+    for _, post := range ipairs(posts) {
+        items[#items + 1] = {
+            tag: "li",
+            children: {
+                {tag: "a", attrs: {href: "/posts/" .. tostring(post.id)}, text: post.title},
+                {tag: "span", text: " [" .. post.status .. "]"},
+            },
+        }
+    }
+    return html {
+        tag: "main",
+        attrs: {class: "page"},
+        children: {
+            {tag: "h1", text: "Leia Tiny Fullstack"},
+            {tag: "ul", children: items},
+            {tag: "form", attrs: {method: "post", action: "/posts"}, children: {
+                {tag: "input", attrs: {name: "title", value: "New Post"}},
+                {tag: "input", attrs: {name: "body", value: "from form"}},
+                {tag: "button", text: "Create"},
+            }},
+        },
+    }
+}
+
+app := serve {
+    listen: "127.0.0.1:0"
+    routes: {
+        {method: "GET", path: "/", handler: func(req) {
+            return render_home()
+        }},
+        {method: "GET", path: "/static/:name", handler: func(req) {
+            if req.params.name == "app.css" {
+                return "body{font-family:sans-serif}.page{max-width:48rem}"
+            }
+            return {error: "static_not_found", name: req.params.name}
+        }},
+        {method: "GET", path: "/api/posts/:id", handler: func(req) {
+            post := post_row(req.params.id)
+            if post == nil {
+                return {error: "not_found", id: req.params.id}
+            }
+            return post_payload(post)
+        }},
+        {method: "POST", path: "/api/posts", handler: func(req) {
+            body, err := req.json()
+            if err != nil {
+                return {error: "bad_json", detail: err}
+            }
+            inserted := conn.exec(sql {
+                query: "insert into posts (title, body, status) values (:title, :body, :status)",
+                params: {title: body.title, body: body.body, status: "published"},
+            })
+            post := post_row(inserted.last_insert_id)
+            return {created: true, post: post_payload(post), count: post_count()}
+        }},
+        {method: "POST", path: "/posts", handler: func(req) {
+            form_body := dialect.eval("form", req.body, {mode: "parse"})
+            inserted := conn.exec(sql {
+                query: "insert into posts (title, body, status) values (:title, :body, :status)",
+                params: {title: form_body.title, body: form_body.body, status: "draft"},
+            })
+            post := post_row(inserted.last_insert_id)
+            return {created: true, id: post.id, title: post.title, status: post.status}
+        }},
+    }
+}
+
+home := http.get(app.url .. "/")
+check("home status", home.status == 200)
+check("home html type", string.find(home.headers["Content-Type"], "text/html", 1, true) != nil)
+check("home body", string.find(home.body, "Leia Tiny Fullstack", 1, true) != nil)
+
+static_resp := http.get(app.url .. "/static/app.css")
+check("static status", static_resp.status == 200)
+check("static body", string.find(static_resp.body, "font-family", 1, true) != nil)
+
+api_resp := http.get(app.url .. "/api/posts/1?include=body")
+check("api status", api_resp.status == 200)
+api_post := json.decode(api_resp.body)
+check("api path param", api_post.id == 1 && api_post.title == "Hello Leia")
+
+json_created_resp, json_created_err := net.post(
+    app.url .. "/api/posts",
+    json {title: "JSON API Post", body: "created through API"},
+    {headers: json_headers()}
+)
+check("json post err", json_created_err == nil)
+json_created := json.decode(json_created_resp.body)
+check("json created", json_created.created == true && json_created.post.id == 3 && json_created.count == 3)
+
+form_body := form {title: "Form Post", body: "created through form"}
+form_created_resp, form_created_err := net.post(app.url .. "/posts", form_body, {headers: form_headers()})
+check("form post err", form_created_err == nil)
+form_created := json.decode(form_created_resp.body)
+check("form created", form_created.created == true && form_created.id == 4 && form_created.status == "draft")
+
+verify := conn.one(sql`select count(*) as n, sum(case when status = 'published' then 1 else 0 end) as published from posts`)
+check("sqlite verify", verify.n == 4 && verify.published == 2)
+
+wrong_method, wrong_method_err := net.delete(app.url .. "/api/posts/1")
+check("method err", wrong_method_err == nil)
+check("method status", wrong_method.status == 405)
+
+closed, close_err := app.close()
+waited, wait_err := app.wait()
+check("closed", closed == true && close_err == nil)
+check("waited", waited == true && wait_err == nil)
+
+tiny_fullstack_summary := string.format(
+    "tiny_fullstack posts=%d published=%d json=%d form=%d static=%d method=%d",
+    verify.n,
+    verify.published,
+    json_created.post.id,
+    form_created.id,
+    static_resp.status,
+    wrong_method.status
+)
+
+print(tiny_fullstack_summary)

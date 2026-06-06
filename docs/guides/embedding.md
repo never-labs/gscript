@@ -62,6 +62,30 @@ File, environment, module loading, native call, step, goroutine, channel, and
 host-result-size budgets are separate controls. See the
 [security reference](../reference/security/index.md).
 
+A production embedding usually combines the sandbox, budgets, explicit host
+bindings, and hot reload in one place:
+
+```go
+loader := leia.NewHotLoader(leia.WithHotLoaderVMOptions(
+	leia.SecuritySandbox(),
+	leia.WithLibs(leia.LibSafe),
+	leia.WithGoImports(map[string]any{
+		"go:host/safe": leia.Module{
+			"label": safeLabel,
+		},
+	}),
+	leia.WithMaxSteps(100_000),
+	leia.WithMaxNativeCalls(1_000),
+	leia.WithMaxHostResultBytes(1<<20),
+))
+
+inst, err := loader.LoadInstance("policy.leia")
+```
+
+The script can import only the allowlisted `go:host/safe` module. Reloading the
+`HotInstance` swaps changed function bodies while preserving compatible script
+state.
+
 ## Host Modules
 
 Expose Go capabilities explicitly:
