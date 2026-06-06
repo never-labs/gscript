@@ -324,6 +324,9 @@ func TestReleaseMatrixSpecGateCommandsStaySynchronized(t *testing.T) {
 				specExamplesCmd,
 				"docs/spec/index.md",
 				"tests/feature_matrix.json",
+				"find reference -type f -name '*.md' | sort",
+				"generated reference doc is missing from docs",
+				"GENERATED_REFERENCE_COUNT",
 			},
 		},
 	} {
@@ -938,6 +941,8 @@ func TestReleaseMatrixReadmeDocumentationEntrypointsStayGated(t *testing.T) {
 		"check_readme_documentation_entrypoints",
 		"README Documentation entrypoints",
 		"check_markdown_links(doc_file)",
+		"find reference -type f -name '*.md' | sort",
+		"generated reference doc is missing from docs",
 	} {
 		if !strings.Contains(docsCheck, snippet) {
 			t.Fatalf("scripts/docs_check.sh must keep README Documentation gate snippet %q", snippet)
@@ -962,7 +967,7 @@ func TestReleaseMatrixReadmeDocumentationEntrypointsStayGated(t *testing.T) {
 	for _, ref := range refs {
 		if generator, ok := generatedEntrypoints[ref]; ok {
 			seenGenerated[ref] = true
-			for _, snippet := range []string{ref, "stale", generator} {
+			for _, snippet := range []string{"stale", generator, "find reference -type f -name '*.md' | sort", "generated_doc=\"docs/$generated\""} {
 				if !strings.Contains(docsCheck, snippet) {
 					t.Fatalf("scripts/docs_check.sh must keep generated/stale gate for README Documentation entrypoint %s via %q", ref, snippet)
 				}

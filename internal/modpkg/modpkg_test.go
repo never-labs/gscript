@@ -453,6 +453,36 @@ func TestDownloadFetchesGitHubTagArchiveIntoCache(t *testing.T) {
 	}
 }
 
+func TestDownloadRejectsInvalidGitHubZipArchive(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "leia.mod"), strings.Join([]string{
+		"module example.com/app",
+		"leia 0.1",
+		"require github.com/acme/toolkit v1.2.3",
+		"",
+	}, "\n"))
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/acme/toolkit/archive/refs/tags/v1.2.3.zip" {
+			t.Fatalf("download path = %q", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/zip")
+		_, _ = w.Write([]byte("not a zip archive"))
+	}))
+	defer server.Close()
+
+	report := Download(dir, DownloadOptions{CacheDir: filepath.Join(dir, "cache"), GitHubBaseURL: server.URL})
+
+	if report.OK || len(report.Diagnostics) != 1 || report.Diagnostics[0].Code != "LEIA9111" {
+		t.Fatalf("Download = %#v, want invalid zip diagnostic", report)
+	}
+	if !strings.Contains(report.Diagnostics[0].Message, "not a valid zip file") {
+		t.Fatalf("Download diagnostic = %#v, want zip validation failure", report.Diagnostics[0])
+	}
+	if _, err := os.Stat(filepath.Join(dir, SumFileName)); !os.IsNotExist(err) {
+		t.Fatalf("Download wrote sum file after invalid zip: %v", err)
+	}
+}
+
 func TestDownloadWritesRemoteModuleSumAndVerifyChecksCache(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, filepath.Join(dir, "leia.mod"), strings.Join([]string{

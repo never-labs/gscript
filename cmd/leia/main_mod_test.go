@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/never-labs/leia/internal/modpkg"
 )
 
 func TestModInitGraphAndVerify(t *testing.T) {
@@ -320,6 +322,56 @@ require github.com/acme/toolkit v1.2.3
 	}
 }
 
+func TestModLockWritesLocalReplaceAndVendorSums(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "leia.mod"), []byte(`module example.com/demo
+leia 0.1
+require example.com/lib v1.2.3
+replace example.com/lib v1.2.3 => ./local/lib
+collection vendor ./vendor
+`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(dir, "local", "lib"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "local", "lib", "lib.leia"), []byte("return 1\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(dir, "vendor"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "vendor", "tool.leia"), []byte("return 2\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runModCommand([]string{"lock", "--json", dir}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("mod lock code = %d, stderr = %q stdout = %q", code, stderr.String(), stdout.String())
+	}
+	var report modpkg.SumReport
+	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
+		t.Fatalf("stdout is not JSON lock report: %v; stdout = %q", err, stdout.String())
+	}
+	if !report.OK || len(report.Entries) != 2 {
+		t.Fatalf("lock report = %+v, want collection and replace sums", report)
+	}
+	sumData, err := os.ReadFile(filepath.Join(dir, "leia.sum"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := string(sumData)
+	for _, want := range []string{
+		"collection vendor ./vendor h1:",
+		"replace example.com/lib v1.2.3 ./local/lib h1:",
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("leia.sum = %q, missing %q", got, want)
+		}
+	}
+}
+
 func TestModPackageWorkflowCoversDocsRuntimeModes(t *testing.T) {
 	dir := t.TempDir()
 	cache := filepath.Join(dir, "cache")
@@ -434,6 +486,62 @@ assert(util.value == 42)
 	}
 	if !found {
 		t.Fatalf("verify diagnostics = %+v, want checksum mismatch for vendored module", verify.Diagnostics)
+	}
+}
+
+func TestModVendorCopiesTransitiveDownloadedModules(t *testing.T) {
+	dir := t.TempDir()
+	cache := filepath.Join(dir, "cache")
+	if err := os.WriteFile(filepath.Join(dir, "leia.mod"), []byte(`module example.com/demo
+leia 0.1
+require github.com/acme/toolkit v1.2.3
+`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	archive := testCommandGitHubZipFiles(t, map[string]string{
+		"toolkit-1.2.3/leia.mod":  "module github.com/acme/toolkit\nleia 0.1\nrequire github.com/acme/transitive v0.2.0\n",
+		"toolkit-1.2.3/main.leia": "return 1\n",
+	})
+	transitiveArchive := testCommandGitHubZipFiles(t, map[string]string{
+		"transitive-0.2.0/leia.mod":       "module github.com/acme/transitive\nleia 0.1\n",
+		"transitive-0.2.0/pkg/value.leia": "return 2\n",
+	})
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/acme/toolkit/archive/refs/tags/v1.2.3.zip":
+			_, _ = w.Write(archive)
+		case "/acme/transitive/archive/refs/tags/v0.2.0.zip":
+			_, _ = w.Write(transitiveArchive)
+		default:
+			t.Fatalf("unexpected download path = %q", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	var stdout, stderr bytes.Buffer
+	code := runModCommand([]string{"download", "--json", "--cache", cache, "--github-base", server.URL, dir}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("mod download code = %d, stderr = %q stdout = %q", code, stderr.String(), stdout.String())
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = runModCommand([]string{"vendor", "--json", "--cache", cache, dir}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("mod vendor code = %d, stderr = %q stdout = %q", code, stderr.String(), stdout.String())
+	}
+	var report modVendorReport
+	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
+		t.Fatalf("stdout is not JSON vendor report: %v; stdout = %q", err, stdout.String())
+	}
+	if !report.OK || len(report.Modules) != 2 {
+		t.Fatalf("vendor report = %+v, want direct and transitive modules", report)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "vendor", "github.com", "acme", "toolkit@v1.2.3", "main.leia")); err != nil {
+		t.Fatalf("direct vendored file missing: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "vendor", "github.com", "acme", "transitive@v0.2.0", "pkg", "value.leia")); err != nil {
+		t.Fatalf("transitive vendored file missing: %v", err)
 	}
 }
 

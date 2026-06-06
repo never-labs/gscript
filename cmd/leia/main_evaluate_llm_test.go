@@ -241,6 +241,121 @@ func TestEvaluateLLMReplayAliasAndFixtureModeGuards(t *testing.T) {
 	}
 }
 
+func TestEvaluateLLMReplayReportsDeterministicFixtureDrift(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		source      string
+		records     []llm.Record
+		wantFinding string
+	}{
+		{
+			name: "mismatch",
+			source: `
+evaluate "replay mismatch case" {
+    result, err := llm.turn({
+        model: "mock-fast"
+        messages: {llm.user("actual prompt")}
+    })
+    assert(err == nil)
+    _ = result
+}
+`,
+			records: []llm.Record{{
+				Request: llm.TurnRequest{
+					Model:    "mock-fast",
+					Messages: []llm.Message{{Role: "user", Text: "expected prompt"}},
+				},
+				Result: llm.TurnResult{Status: "final_answer", Text: "ok"},
+			}},
+			wantFinding: "llm_replay_mismatch",
+		},
+		{
+			name: "unconsumed",
+			source: `
+evaluate "replay unconsumed case" {
+    assert(true)
+}
+`,
+			records: []llm.Record{{
+				Request: llm.TurnRequest{
+					Model:    "mock-fast",
+					Messages: []llm.Message{{Role: "user", Text: "unused prompt"}},
+				},
+				Result: llm.TurnResult{Status: "final_answer", Text: "unused"},
+			}},
+			wantFinding: "llm_replay_unconsumed",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			sourcePath := filepath.Join(dir, "drift.leia")
+			replayPath := filepath.Join(dir, "drift.records.json")
+			if err := os.WriteFile(sourcePath, []byte(tc.source), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			if err := llm.SaveRecords(replayPath, tc.records); err != nil {
+				t.Fatal(err)
+			}
+
+			var stdout, stderr bytes.Buffer
+			code := runEvaluateCommand([]string{"--json", "--llm-replay", replayPath, sourcePath}, &stdout, &stderr)
+			if code != 1 {
+				t.Fatalf("evaluate --llm-replay code = %d, want 1; stderr = %q stdout = %q", code, stderr.String(), stdout.String())
+			}
+			var report struct {
+				Status string `json:"status"`
+				LLM    *struct {
+					Mode           string `json:"mode"`
+					LoadedTurns    int    `json:"loaded_turns"`
+					ReplayedTurns  int    `json:"replayed_turns"`
+					RemainingTurns int    `json:"remaining_turns"`
+				} `json:"llm"`
+				Findings []struct {
+					Kind    string         `json:"kind"`
+					Path    string         `json:"path"`
+					Details map[string]any `json:"details"`
+				} `json:"findings"`
+			}
+			if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
+				t.Fatalf("stdout is not JSON evaluate report: %v; stdout = %q", err, stdout.String())
+			}
+			if report.Status != "failed" || report.LLM == nil || report.LLM.Mode != "replay" || report.LLM.LoadedTurns != 1 {
+				t.Fatalf("report status/llm = %q/%+v, want failed replay report", report.Status, report.LLM)
+			}
+			if tc.wantFinding == "llm_replay_mismatch" && (report.LLM.ReplayedTurns != 1 || report.LLM.RemainingTurns != 0) {
+				t.Fatalf("mismatch llm report = %+v, want consumed mismatched turn", report.LLM)
+			}
+			if tc.wantFinding == "llm_replay_unconsumed" && (report.LLM.ReplayedTurns != 0 || report.LLM.RemainingTurns != 1) {
+				t.Fatalf("unconsumed llm report = %+v, want one remaining turn", report.LLM)
+			}
+			if !evaluateReportHasFinding(report.Findings, tc.wantFinding, sourcePath, replayPath) {
+				t.Fatalf("findings = %+v, want %s tied to replay/source path", report.Findings, tc.wantFinding)
+			}
+		})
+	}
+}
+
+func evaluateReportHasFinding(findings []struct {
+	Kind    string         `json:"kind"`
+	Path    string         `json:"path"`
+	Details map[string]any `json:"details"`
+}, wantKind, sourcePath, replayPath string) bool {
+	for _, finding := range findings {
+		if finding.Kind != wantKind {
+			continue
+		}
+		switch wantKind {
+		case "llm_replay_mismatch":
+			return finding.Path == sourcePath && finding.Details["case_name"] == "replay mismatch case"
+		case "llm_replay_unconsumed":
+			return finding.Path == replayPath && finding.Details["remaining_turns"] == float64(1)
+		default:
+			return true
+		}
+	}
+	return false
+}
+
 func containsEvaluateLLMString(values []string, want string) bool {
 	for _, value := range values {
 		if value == want {

@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -404,6 +405,154 @@ func TestPlaygroundRepositoryCoreExampleCoverage(t *testing.T) {
 				t.Fatal(err)
 			}
 		})
+	}
+}
+
+func TestPlaygroundRepositoryCoversDocumentedExampleDirectories(t *testing.T) {
+	playgroundExamples, err := playgroundRepositoryExamples(playgroundExamplesRoot())
+	if err != nil {
+		t.Fatalf("load repository examples: %v", err)
+	}
+	cliExamples, err := cliRepositoryExamples()
+	if err != nil {
+		t.Fatalf("load CLI examples: %v", err)
+	}
+
+	playgroundDirs := make(map[string]int)
+	for _, example := range playgroundExamples {
+		parts := strings.Split(example.Summary, "/")
+		if len(parts) >= 3 && parts[0] == "examples" {
+			playgroundDirs[parts[1]]++
+		}
+	}
+	cliIDs := make(map[string]bool, len(cliExamples))
+	for _, example := range cliExamples {
+		cliIDs[example.ID] = true
+	}
+
+	// Keep this list in sync with the directory matrix in docs/examples/index.md.
+	wantPlaygroundDirs := []string{
+		"ai",
+		"api",
+		"automation",
+		"concurrency",
+		"data",
+		"data_processing",
+		"database",
+		"dialects",
+		"evaluate",
+		"game_engine",
+		"hello",
+		"llm",
+		"macos",
+		"operations",
+		"performance",
+		"security",
+		"site",
+		"testing",
+		"tooling",
+		"ui",
+		"web",
+		"workflow",
+	}
+	var missing []string
+	for _, dir := range wantPlaygroundDirs {
+		if playgroundDirs[dir] == 0 {
+			missing = append(missing, "examples/"+dir+"/")
+		}
+	}
+	if len(missing) > 0 {
+		sort.Strings(missing)
+		t.Fatalf("playground repository examples missing documented directories: %s", strings.Join(missing, ", "))
+	}
+	if !cliIDs["repo-embedding-go-doc-examples"] {
+		t.Fatal("examples/embedding/ is documented but missing from examples CLI curated metadata")
+	}
+}
+
+func TestPlaygroundAndExamplesCoverFeatureMatrixExampleRefs(t *testing.T) {
+	root := filepath.Dir(playgroundExamplesRoot())
+	matrixPath := filepath.Join(root, "tests", "feature_matrix.json")
+	data, err := os.ReadFile(matrixPath)
+	if err != nil {
+		t.Fatalf("read feature matrix: %v", err)
+	}
+	var matrix struct {
+		RequiredFields []string                     `json:"required_fields"`
+		Features       []map[string]json.RawMessage `json:"features"`
+	}
+	if err := json.Unmarshal(data, &matrix); err != nil {
+		t.Fatalf("decode feature matrix: %v", err)
+	}
+
+	playgroundExamples, err := playgroundRepositoryExamples(playgroundExamplesRoot())
+	if err != nil {
+		t.Fatalf("load repository examples: %v", err)
+	}
+	playgroundPaths := make(map[string]bool, len(playgroundExamples))
+	for _, example := range playgroundExamples {
+		playgroundPaths[example.Summary] = true
+	}
+	cliExamples, err := cliRepositoryExamples()
+	if err != nil {
+		t.Fatalf("load CLI examples: %v", err)
+	}
+	cliPaths := make(map[string]cliExample, len(cliExamples))
+	for _, example := range cliExamples {
+		cliPaths[example.Path] = example
+	}
+
+	var missing []string
+	var uncheckable []string
+	seen := map[string]bool{}
+	for i, feature := range matrix.Features {
+		id := ""
+		if raw, ok := feature["id"]; ok {
+			_ = json.Unmarshal(raw, &id)
+		}
+		for _, field := range matrix.RequiredFields {
+			raw, ok := feature[field]
+			if !ok {
+				continue
+			}
+			var cell struct {
+				Refs []string `json:"refs"`
+			}
+			if err := json.Unmarshal(raw, &cell); err != nil {
+				t.Fatalf("features[%d] %s.%s: %v", i, id, field, err)
+			}
+			for _, ref := range cell.Refs {
+				if seen[ref] || !strings.HasPrefix(ref, "examples/") {
+					continue
+				}
+				seen[ref] = true
+				switch filepath.Ext(ref) {
+				case ".leia":
+					if !playgroundPaths[ref] {
+						missing = append(missing, ref)
+					}
+					if cli, ok := cliPaths[ref]; !ok {
+						missing = append(missing, ref+" (CLI)")
+					} else if !cli.Runnable && !cli.Checkable && strings.TrimSpace(cli.Requires) == "" {
+						uncheckable = append(uncheckable, ref)
+					}
+				case ".go":
+					if cli, ok := cliPaths[ref]; !ok {
+						missing = append(missing, ref+" (CLI)")
+					} else if !cli.Runnable && !cli.Checkable && strings.TrimSpace(cli.Requires) == "" {
+						uncheckable = append(uncheckable, ref)
+					}
+				}
+			}
+		}
+	}
+	if len(missing) > 0 {
+		sort.Strings(missing)
+		t.Fatalf("feature matrix example refs missing from playground or examples metadata: %s", strings.Join(missing, ", "))
+	}
+	if len(uncheckable) > 0 {
+		sort.Strings(uncheckable)
+		t.Fatalf("feature matrix example refs must be runnable or checkable in examples metadata: %s", strings.Join(uncheckable, ", "))
 	}
 }
 

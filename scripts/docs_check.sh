@@ -57,13 +57,24 @@ fi
 TMP_DOCS="$(mktemp -d)"
 trap 'rm -rf "$TMP_DOCS"' EXIT
 go run ./cmd/leia doc generate --layout site --output "$TMP_DOCS" >/dev/null
-for generated_doc in docs/reference/cli/index.md docs/reference/stdlib/index.md docs/reference/dialects/index.md; do
-    generated="${generated_doc#docs/}"
+generated_reference_count=0
+while IFS= read -r generated; do
+    generated_doc="docs/$generated"
+    generated_reference_count=$((generated_reference_count + 1))
+    if [ ! -f "$generated_doc" ]; then
+        echo "error: generated reference doc is missing from docs: $generated_doc; run: go run ./cmd/leia doc generate --layout site --output docs" >&2
+        exit 1
+    fi
     if ! cmp -s "$TMP_DOCS/$generated" "$generated_doc"; then
         echo "error: $generated_doc is stale; run: go run ./cmd/leia doc generate --layout site --output docs" >&2
         exit 1
     fi
-done
+done < <(cd "$TMP_DOCS" && find reference -type f -name '*.md' | sort)
+if [ "$generated_reference_count" -eq 0 ]; then
+    echo "error: docs generator produced no reference Markdown output" >&2
+    exit 1
+fi
+export GENERATED_REFERENCE_COUNT="$generated_reference_count"
 python3 scripts/spec_preview.py --output "$TMP_DOCS/spec-preview.html" >/dev/null
 if [ ! -s "$TMP_DOCS/spec-preview.html" ]; then
     echo "error: spec preview generator produced no output" >&2
@@ -607,7 +618,7 @@ print(
     f"{checked_readme_user_facing_gates} README user-facing gates, "
     f"{checked_retired_paths} retired-path mentions, "
     f"{checked_retired_names} retired-name mentions, "
-    "3 generated reference docs, "
+    f"{os.environ['GENERATED_REFERENCE_COUNT']} generated reference docs, "
     "1 generated spec HTML, "
     f"{checked_spec_runnable_examples} runnable spec examples."
 )
