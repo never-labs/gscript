@@ -74,6 +74,7 @@ type LLMRun struct {
 	ReplayedTurns  int     `json:"replayed_turns,omitempty"`
 	RemainingTurns int     `json:"remaining_turns,omitempty"`
 	Turns          int     `json:"turns,omitempty"`
+	StreamEvents   int     `json:"stream_events,omitempty"`
 	Errors         int     `json:"errors,omitempty"`
 	InputTokens    int64   `json:"input_tokens,omitempty"`
 	OutputTokens   int64   `json:"output_tokens,omitempty"`
@@ -551,6 +552,7 @@ func finalizeLLMSummary(report *Report) {
 			continue
 		}
 		summary.Turns += c.LLM.Turns
+		summary.StreamEvents += c.LLM.StreamEvents
 		summary.Errors += c.LLM.Errors
 		summary.InputTokens += c.LLM.InputTokens
 		summary.OutputTokens += c.LLM.OutputTokens
@@ -564,6 +566,7 @@ func finalizeLLMSummary(report *Report) {
 		report.LLM = &LLMRun{Mode: "live"}
 	}
 	report.LLM.Turns = summary.Turns
+	report.LLM.StreamEvents = summary.StreamEvents
 	report.LLM.Errors = summary.Errors
 	report.LLM.InputTokens = summary.InputTokens
 	report.LLM.OutputTokens = summary.OutputTokens
@@ -1763,9 +1766,10 @@ func FormatText(report Report) string {
 		}
 	}
 	if report.LLM != nil && (report.LLM.Turns > 0 || report.LLM.Errors > 0) {
-		fmt.Fprintf(&b, "llm: mode=%s turns=%d errors=%d input_tokens=%d output_tokens=%d latency_ms=%d cost=%.4g\n",
+		fmt.Fprintf(&b, "llm: mode=%s turns=%d stream_events=%d errors=%d input_tokens=%d output_tokens=%d latency_ms=%d cost=%.4g\n",
 			report.LLM.Mode,
 			report.LLM.Turns,
+			report.LLM.StreamEvents,
 			report.LLM.Errors,
 			report.LLM.InputTokens,
 			report.LLM.OutputTokens,

@@ -74,11 +74,19 @@ func ModuleOptionsForScriptMode(script string, mode ModuleMode) []Option {
 }
 
 func vendorModulesForManifest(root string, manifest modfile.File, includeMissing bool) []modresolve.CacheModule {
-	modules := make([]modresolve.CacheModule, 0, len(manifest.Require))
+	return appendVendorModulesForManifest(nil, root, manifest, includeMissing, map[string]bool{})
+}
+
+func appendVendorModulesForManifest(modules []modresolve.CacheModule, root string, manifest modfile.File, includeMissing bool, seen map[string]bool) []modresolve.CacheModule {
 	for _, req := range manifest.Require {
 		if req.Version == "" {
 			continue
 		}
+		key := req.Path + "\x00" + req.Version + "\x00vendor"
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
 		vendorRoot := filepath.Join(root, "vendor", filepath.FromSlash(req.Path+"@"+req.Version))
 		if !includeMissing {
 			if _, err := os.Stat(vendorRoot); err != nil {
@@ -89,16 +97,29 @@ func vendorModulesForManifest(root string, manifest modfile.File, includeMissing
 			continue
 		}
 		modules = append(modules, modresolve.CacheModule{Path: req.Path, Version: req.Version, Root: vendorRoot, Kind: "vendor"})
+		depManifest, err := modpkg.ReadFile(vendorRoot)
+		if err != nil {
+			continue
+		}
+		modules = appendVendorModulesForManifest(modules, root, depManifest, includeMissing, seen)
 	}
 	return modules
 }
 
 func cacheModulesForManifest(cacheDir string, manifest modfile.File) []modresolve.CacheModule {
-	modules := make([]modresolve.CacheModule, 0, len(manifest.Require))
+	return appendCacheModulesForManifest(nil, cacheDir, manifest, map[string]bool{})
+}
+
+func appendCacheModulesForManifest(modules []modresolve.CacheModule, cacheDir string, manifest modfile.File, seen map[string]bool) []modresolve.CacheModule {
 	for _, req := range manifest.Require {
 		if !strings.HasPrefix(req.Path, "github.com/") || req.Version == "" {
 			continue
 		}
+		key := req.Path + "\x00" + req.Version + "\x00cache"
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
 		root := githubCacheRoot(cacheDir, req.Path, req.Version)
 		if _, err := os.Stat(root); err != nil {
 			// A missing cache entry is not an error here. Runtime loading remains
@@ -106,6 +127,11 @@ func cacheModulesForManifest(cacheDir string, manifest modfile.File) []modresolv
 			continue
 		}
 		modules = append(modules, modresolve.CacheModule{Path: req.Path, Version: req.Version, Root: root, Kind: "cache"})
+		depManifest, err := modpkg.ReadFile(root)
+		if err != nil {
+			continue
+		}
+		modules = appendCacheModulesForManifest(modules, cacheDir, depManifest, seen)
 	}
 	return modules
 }

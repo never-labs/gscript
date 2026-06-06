@@ -240,6 +240,7 @@ func renderEvaluateHTML(report evaluate.Report) string {
 	writeHTMLStat(&b, "Assertions", fmt.Sprintf("%d", report.Summary.Assertions))
 	if report.LLM != nil && (report.LLM.Turns > 0 || report.LLM.Errors > 0) {
 		writeHTMLStat(&b, "LLM turns", fmt.Sprintf("%d", report.LLM.Turns))
+		writeHTMLStat(&b, "LLM stream events", fmt.Sprintf("%d", report.LLM.StreamEvents))
 		writeHTMLStat(&b, "LLM tokens", fmt.Sprintf("%d/%d", report.LLM.InputTokens, report.LLM.OutputTokens))
 		writeHTMLStat(&b, "LLM cost", fmt.Sprintf("%.4g", report.LLM.Cost))
 	}

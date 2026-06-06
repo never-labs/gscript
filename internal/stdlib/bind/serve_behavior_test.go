@@ -280,6 +280,90 @@ func TestHTTPRouterColonParams(t *testing.T) {
 	}
 }
 
+func TestHTTPRouterSupportsStandardHTTPMethods(t *testing.T) {
+	interp := New()
+	hostOpts := HostOptions{
+		Call:           interp.CallFunction,
+		NetworkAllowed: interp.NetworkAccessEnabled,
+		MaxHostResult:  interp.MaxHostResultBytes,
+	}
+	httpModule := TableValue(BuildHTTP(hostOpts))
+	netModule := TableValue(BuildNet(hostOpts))
+	interp.SetGlobal("http", httpModule)
+	interp.SetModule("http", httpModule)
+	interp.SetGlobal("net", netModule)
+	interp.SetModule("net", netModule)
+
+	src := `
+		router := http.newRouter()
+		router
+			.put("/items/:id", func(req, res) {
+				data, err := req.json()
+				assert(err == nil)
+				res.json({method: req.method, id: req.params.id, name: data.name})
+			})
+			.patch("/items/:id", func(req, res) {
+				res.status(202).json({method: req.method, id: req.params.id, body: req.body})
+			})
+			.delete("/items/:id", func(req, res) {
+				res.json({method: req.method, id: req.params.id, deleted: true})
+			})
+			.options("/items/:id", func(req, res) {
+				res.header("Allow", "GET,PUT,PATCH,DELETE,OPTIONS,HEAD").write("")
+			})
+			.head("/items/:id", func(req, res) {
+				res.header("X-Route-Id", req.params.id).write("head body ignored")
+			})
+		server := router.listen("127.0.0.1:0", {background: true})
+		putResp, putErr := net.put(server.url .. "/items/a-1", "{\"name\":\"alpha\"}", {headers: {["Content-Type"]: "application/json"}})
+		patchResp, patchErr := net.patch(server.url .. "/items/a-1", "delta")
+		deleteResp, deleteErr := net.delete(server.url .. "/items/a-1")
+		optionsResp, optionsErr := net.request({method: "OPTIONS", url: server.url .. "/items/a-1"})
+		headResp, headErr := net.request({method: "HEAD", url: server.url .. "/items/a-1"})
+		postResp, postErr := net.post(server.url .. "/items/a-1", "")
+		closed, closeErr := server.close()
+		waited, waitErr := server.wait()
+	`
+	if _, err := interp.ExecString(src); err != nil {
+		t.Fatalf("ExecString: %v", err)
+	}
+	if got := interp.GetGlobal("putResp").Table().RawGetString("body").Str(); got != `{"id":"a-1","method":"PUT","name":"alpha"}` {
+		t.Fatalf("put body = %q, want JSON update", got)
+	}
+	if got := interp.GetGlobal("patchResp").Table().RawGetString("status").Int(); got != 202 {
+		t.Fatalf("patch status = %d, want 202", got)
+	}
+	if got := interp.GetGlobal("patchResp").Table().RawGetString("body").Str(); got != `{"body":"delta","id":"a-1","method":"PATCH"}` {
+		t.Fatalf("patch body = %q, want JSON patch", got)
+	}
+	if got := interp.GetGlobal("deleteResp").Table().RawGetString("body").Str(); got != `{"deleted":true,"id":"a-1","method":"DELETE"}` {
+		t.Fatalf("delete body = %q, want JSON delete", got)
+	}
+	if got := interp.GetGlobal("optionsResp").Table().RawGetString("headers").Table().RawGetString("Allow").Str(); got != "GET,PUT,PATCH,DELETE,OPTIONS,HEAD" {
+		t.Fatalf("options Allow = %q, want registered method list", got)
+	}
+	headResp := interp.GetGlobal("headResp").Table()
+	if got := headResp.RawGetString("headers").Table().RawGetString("X-Route-Id").Str(); got != "a-1" {
+		t.Fatalf("head X-Route-Id = %q, want a-1", got)
+	}
+	if got := headResp.RawGetString("body").Str(); got != "" {
+		t.Fatalf("head body = %q, want empty response body", got)
+	}
+	if got := interp.GetGlobal("postResp").Table().RawGetString("status").Int(); got != 405 {
+		t.Fatalf("post status = %d, want 405", got)
+	}
+	for _, name := range []string{"putErr", "patchErr", "deleteErr", "optionsErr", "headErr", "postErr", "closeErr", "waitErr"} {
+		if got := interp.GetGlobal(name); !got.IsNil() {
+			t.Fatalf("%s = %v, want nil", name, got)
+		}
+	}
+	for _, name := range []string{"closed", "waited"} {
+		if got := interp.GetGlobal(name); !got.IsBool() || !got.Bool() {
+			t.Fatalf("%s = %v, want true", name, got)
+		}
+	}
+}
+
 func TestServeAppSupportsStandardHTTPMethods(t *testing.T) {
 	interp := New()
 	hostOpts := HostOptions{

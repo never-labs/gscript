@@ -323,27 +323,25 @@ func newHTTPRouter(call ScriptFunctionCaller, maxHostResult func() int64, opts h
 		router.addRoute(method, pattern, handler)
 	}
 
-	// router.get(pattern, handler)
-	t.RawSet(StringValue("get"), FunctionValue(&GoFunction{
-		Name: "router.get",
-		Fn: func(args []Value) ([]Value, error) {
-			if len(args) >= 2 {
-				registerRoute("GET", args[0].Str(), args[1])
-			}
-			return []Value{TableValue(t)}, nil
-		},
-	}))
+	registerMethod := func(name, method string) {
+		t.RawSet(StringValue(name), FunctionValue(&GoFunction{
+			Name: "router." + name,
+			Fn: func(args []Value) ([]Value, error) {
+				if len(args) >= 2 {
+					registerRoute(method, args[0].Str(), args[1])
+				}
+				return []Value{TableValue(t)}, nil
+			},
+		}))
+	}
 
-	// router.post(pattern, handler)
-	t.RawSet(StringValue("post"), FunctionValue(&GoFunction{
-		Name: "router.post",
-		Fn: func(args []Value) ([]Value, error) {
-			if len(args) >= 2 {
-				registerRoute("POST", args[0].Str(), args[1])
-			}
-			return []Value{TableValue(t)}, nil
-		},
-	}))
+	registerMethod("get", http.MethodGet)
+	registerMethod("head", http.MethodHead)
+	registerMethod("post", http.MethodPost)
+	registerMethod("put", http.MethodPut)
+	registerMethod("patch", http.MethodPatch)
+	registerMethod("delete", http.MethodDelete)
+	registerMethod("options", http.MethodOptions)
 
 	// router.any(pattern, handler)
 	t.RawSet(StringValue("any"), FunctionValue(&GoFunction{

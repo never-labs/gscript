@@ -765,6 +765,7 @@ func TestEvaluateReplayExamplesExecute(t *testing.T) {
 				LLM *struct {
 					ReplayedTurns  int `json:"replayed_turns"`
 					RemainingTurns int `json:"remaining_turns"`
+					StreamEvents   int `json:"stream_events"`
 				} `json:"llm"`
 				Cases []struct {
 					Status string `json:"status"`
@@ -794,6 +795,9 @@ func TestEvaluateReplayExamplesExecute(t *testing.T) {
 				t.Fatalf("llm = %+v, want replayed=%d remaining=0", report.LLM, tc.replayedTurns)
 			}
 			if tc.streamEvents > 0 {
+				if report.LLM.StreamEvents != tc.streamEvents {
+					t.Fatalf("llm stream_events = %d, want %d", report.LLM.StreamEvents, tc.streamEvents)
+				}
 				if len(report.Cases) == 0 || report.Cases[0].LLM == nil || report.Cases[0].LLM.StreamEvents != tc.streamEvents {
 					t.Fatalf("cases = %+v, want first case to report %d stream events", report.Cases, tc.streamEvents)
 				}

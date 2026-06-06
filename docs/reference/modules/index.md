@@ -86,6 +86,12 @@ leia mod verify --json
 local collections, and local replacements. `vendor/` can be used for offline or
 hermetic execution through `leia run --mod=vendor`.
 
+`leia run --mod=readonly` and `leia run --mod=vendor` do not download or rewrite
+module metadata. They build the runtime resolver from the already-present cache
+or `vendor/` tree, including transitive dependencies recorded in each resolved
+dependency's `leia.mod`. A missing transitive dependency is therefore reported
+as a local resolution error instead of silently falling back to network access.
+
 ## Example Evidence
 
 Package-managed examples exercise module metadata, capability summaries, and

@@ -109,7 +109,7 @@ The JSON report is versioned with `schema_version: 1` and includes:
 | `started_at` | UTC RFC3339 timestamp for the evaluation run. |
 | `runtime` | Leia and Go runtime metadata: version, OS/arch, and build VCS fields when available. |
 | `summary` | File, parse, TODO, selected/skipped case, pass/fail/list, assertion, duration, and pass-rate counts. |
-| `llm` | Optional LLM metadata: mode, fixture paths, loaded/replayed/remaining/recorded turn counts, aggregate turn count, provider errors, input/output tokens, latency, and cost. |
+| `llm` | Optional LLM metadata: mode, fixture paths, loaded/replayed/remaining/recorded turn counts, aggregate turn count, streamed event count, provider errors, input/output tokens, latency, and cost. |
 | `inputs` | Per-input file status. |
 | `cases` | Evaluate blocks with `case_id`, `name`, source path, range, status, per-case `started_at`, duration, optional per-case `llm` stats and `llm.record_path`, raw metrics, subcases, assertions, and diagnostics. |
 | `metrics` | Top-level summaries aggregated from `eval.metric` values. Bool metrics report pass rate, true, and false counts. Number metrics report mean, min, and max. String metrics report category counts. |

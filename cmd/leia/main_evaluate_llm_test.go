@@ -105,6 +105,7 @@ evaluate "plain record case" {
 			RecordPath    string `json:"record_path"`
 			RecordedTurns int    `json:"recorded_turns"`
 			Turns         int    `json:"turns"`
+			StreamEvents  int    `json:"stream_events"`
 			InputTokens   int64  `json:"input_tokens"`
 			OutputTokens  int64  `json:"output_tokens"`
 		} `json:"llm"`
@@ -127,6 +128,9 @@ evaluate "plain record case" {
 	}
 	if report.LLM.InputTokens != 12 || report.LLM.OutputTokens != 5 {
 		t.Fatalf("llm tokens = %d/%d, want 12/5", report.LLM.InputTokens, report.LLM.OutputTokens)
+	}
+	if report.LLM.StreamEvents != 3 {
+		t.Fatalf("llm stream_events = %d, want 3", report.LLM.StreamEvents)
 	}
 	if !containsEvaluateLLMString(report.Notes, "parallel evaluate execution disabled for deterministic LLM fixture mode") {
 		t.Fatalf("notes = %#v, want deterministic fixture parallel guard note", report.Notes)
@@ -177,6 +181,7 @@ evaluate "plain record case" {
 			Mode           string `json:"mode"`
 			ReplayedTurns  int    `json:"replayed_turns"`
 			RemainingTurns int    `json:"remaining_turns"`
+			StreamEvents   int    `json:"stream_events"`
 		} `json:"llm"`
 		Cases []struct {
 			Name string `json:"name"`
@@ -190,6 +195,9 @@ evaluate "plain record case" {
 	}
 	if replayReport.Status != "ok" || replayReport.LLM == nil || replayReport.LLM.Mode != "replay" || replayReport.LLM.ReplayedTurns != 2 || replayReport.LLM.RemainingTurns != 0 {
 		t.Fatalf("replay llm report = %+v", replayReport.LLM)
+	}
+	if replayReport.LLM.StreamEvents != 3 {
+		t.Fatalf("replay llm stream_events = %d, want 3", replayReport.LLM.StreamEvents)
 	}
 	if len(replayReport.Cases) != 2 || replayReport.Cases[0].LLM == nil || replayReport.Cases[0].LLM.StreamEvents != 3 {
 		t.Fatalf("replay cases = %+v, want streamed case to replay three stream events", replayReport.Cases)

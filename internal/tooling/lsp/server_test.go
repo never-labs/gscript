@@ -6,6 +6,8 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -83,6 +85,76 @@ func TestServerInitializeShutdown(t *testing.T) {
 	}
 }
 
+func TestDocumentedCapabilitiesStaySynchronizedWithInitialize(t *testing.T) {
+	root := findRepoRoot(t)
+	doc := readFileString(t, filepath.Join(root, "docs", "guides", "editors.md"))
+	table := markdownSection(t, doc, "Language Server")
+	result := initializeResult()
+	caps := result["capabilities"].(map[string]any)
+
+	want := map[string]func(t *testing.T){
+		"Diagnostics": func(t *testing.T) {
+			sync, ok := caps["textDocumentSync"].(map[string]any)
+			if !ok || sync["openClose"] != true || sync["change"] == nil {
+				t.Fatalf("Diagnostics documented but textDocumentSync is incomplete: %#v", caps["textDocumentSync"])
+			}
+		},
+		"Formatting": func(t *testing.T) {
+			if caps["documentFormattingProvider"] != true {
+				t.Fatalf("Formatting documented but documentFormattingProvider is not true: %#v", caps)
+			}
+		},
+		"Completion": func(t *testing.T) {
+			if caps["completionProvider"] == nil {
+				t.Fatalf("Completion documented but completionProvider is missing: %#v", caps)
+			}
+		},
+		"Hover": func(t *testing.T) {
+			if caps["hoverProvider"] != true {
+				t.Fatalf("Hover documented but hoverProvider is not true: %#v", caps)
+			}
+		},
+		"Document symbols": func(t *testing.T) {
+			if caps["documentSymbolProvider"] != true {
+				t.Fatalf("Document symbols documented but documentSymbolProvider is not true: %#v", caps)
+			}
+		},
+		"Definition and references": func(t *testing.T) {
+			if caps["definitionProvider"] != true || caps["referencesProvider"] != true {
+				t.Fatalf("Definition/references documented but navigation capabilities are incomplete: %#v", caps)
+			}
+		},
+		"Rename": func(t *testing.T) {
+			rename, ok := caps["renameProvider"].(map[string]any)
+			if !ok || rename["prepareProvider"] != true {
+				t.Fatalf("Rename documented but renameProvider is incomplete: %#v", caps["renameProvider"])
+			}
+		},
+		"Code lens": func(t *testing.T) {
+			if caps["codeLensProvider"] == nil {
+				t.Fatalf("Code lens documented but codeLensProvider is missing: %#v", caps)
+			}
+		},
+		"Inlay hints": func(t *testing.T) {
+			if caps["inlayHintProvider"] != true {
+				t.Fatalf("Inlay hints documented but inlayHintProvider is not true: %#v", caps)
+			}
+		},
+	}
+
+	documented := documentedCapabilityNames(t, table)
+	if len(documented) != len(want) {
+		t.Fatalf("documented LSP capability rows = %d, want %d: %v", len(documented), len(want), documented)
+	}
+	for _, name := range documented {
+		check, ok := want[name]
+		if !ok {
+			t.Fatalf("docs/guides/editors.md documents unsupported LSP capability %q", name)
+		}
+		t.Run(name, check)
+	}
+}
+
 func TestDidOpenPublishesSyntaxDiagnostics(t *testing.T) {
 	input := mustEncodeMessages(t,
 		map[string]any{
@@ -123,6 +195,70 @@ func TestDidOpenPublishesSyntaxDiagnostics(t *testing.T) {
 	if diag["message"] == "" {
 		t.Fatalf("diagnostic missing message: %#v", diag)
 	}
+}
+
+func documentedCapabilityNames(t *testing.T, section string) []string {
+	t.Helper()
+	var names []string
+	for _, line := range strings.Split(section, "\n") {
+		if !strings.HasPrefix(line, "| ") || strings.HasPrefix(line, "| Capability ") || strings.HasPrefix(line, "|---") {
+			continue
+		}
+		parts := strings.Split(line, "|")
+		if len(parts) < 3 {
+			continue
+		}
+		name := strings.TrimSpace(parts[1])
+		if name != "" {
+			names = append(names, name)
+		}
+	}
+	if len(names) == 0 {
+		t.Fatal("docs/guides/editors.md Language Server section must document LSP capabilities")
+	}
+	return names
+}
+
+func findRepoRoot(t *testing.T) string {
+	t.Helper()
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	for {
+		if _, err := os.Stat(filepath.Join(wd, "go.mod")); err == nil {
+			return wd
+		}
+		parent := filepath.Dir(wd)
+		if parent == wd {
+			t.Fatal("could not find repo root containing go.mod")
+		}
+		wd = parent
+	}
+}
+
+func readFileString(t *testing.T, path string) string {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read %s: %v", path, err)
+	}
+	return string(data)
+}
+
+func markdownSection(t *testing.T, doc, title string) string {
+	t.Helper()
+	marker := "## " + title
+	start := strings.Index(doc, marker)
+	if start < 0 {
+		t.Fatalf("markdown document must contain section %q", title)
+	}
+	rest := doc[start+len(marker):]
+	next := strings.Index(rest, "\n## ")
+	if next >= 0 {
+		rest = rest[:next]
+	}
+	return rest
 }
 
 func TestDidChangeClearsSyntaxDiagnostics(t *testing.T) {

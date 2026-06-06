@@ -163,6 +163,61 @@ require github.com/acme/toolkit/pkg v1.2.3
 	}
 }
 
+func TestModuleOptionsForScriptLoadsTransitiveDownloadedGitHubCache(t *testing.T) {
+	dir := t.TempDir()
+	cache := filepath.Join(dir, "cache")
+	t.Setenv("LEIA_CACHE", cache)
+	if err := os.MkdirAll(filepath.Join(cache, "extract", "github.com", "acme", "toolkit@v1.2.3", "pkg"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(cache, "extract", "github.com", "acme", "toolkit@v1.2.3", "leia.mod"), []byte(`module github.com/acme/toolkit
+leia 0.1
+require github.com/acme/transitive v0.2.0
+`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(cache, "extract", "github.com", "acme", "toolkit@v1.2.3", "pkg", "util.leia"), []byte(`import "github.com/acme/transitive/pkg/value" as value
+return { value: value.value }
+`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(cache, "extract", "github.com", "acme", "transitive@v0.2.0", "pkg"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(cache, "extract", "github.com", "acme", "transitive@v0.2.0", "leia.mod"), []byte("module github.com/acme/transitive\nleia 0.1\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(cache, "extract", "github.com", "acme", "transitive@v0.2.0", "pkg", "value.leia"), []byte(`return { value: 94 }`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "leia.mod"), []byte(`module example.com/app
+leia 0.1
+require github.com/acme/toolkit v1.2.3
+`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	mainPath := filepath.Join(dir, "main.leia")
+	if err := os.WriteFile(mainPath, []byte(`u := require("github.com/acme/toolkit/pkg/util"); result := u.value`), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, mode := range []ModuleMode{ModuleModeMod, ModuleModeReadonly} {
+		t.Run(string(mode), func(t *testing.T) {
+			vm := New(ModuleOptionsForScriptMode(mainPath, mode)...)
+			if err := vm.ExecFile(mainPath); err != nil {
+				t.Fatal(err)
+			}
+			got, err := vm.Get("result")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got != int64(94) {
+				t.Fatalf("result = %#v, want transitive cache module value", got)
+			}
+		})
+	}
+}
+
 func TestModuleOptionsForScriptPrefersVendorOverCache(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("LEIA_CACHE", filepath.Join(dir, "cache"))
@@ -241,5 +296,61 @@ require github.com/acme/toolkit v1.2.3
 	vm := New(ModuleOptionsForScriptMode(mainPath, ModuleModeVendor)...)
 	if err := vm.ExecFile(mainPath); err == nil {
 		t.Fatal("vendor mode unexpectedly loaded cache-only module")
+	}
+}
+
+func TestModuleOptionsForScriptModeVendorLoadsTransitiveVendor(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("LEIA_CACHE", filepath.Join(dir, "cache"))
+	if err := os.MkdirAll(filepath.Join(dir, "vendor", "github.com", "acme", "toolkit@v1.2.3", "pkg"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "vendor", "github.com", "acme", "toolkit@v1.2.3", "leia.mod"), []byte(`module github.com/acme/toolkit
+leia 0.1
+require github.com/acme/transitive v0.2.0
+`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "vendor", "github.com", "acme", "toolkit@v1.2.3", "pkg", "util.leia"), []byte(`import "github.com/acme/transitive/pkg/value" as value
+return { value: value.value }
+`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(dir, "vendor", "github.com", "acme", "transitive@v0.2.0", "pkg"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "vendor", "github.com", "acme", "transitive@v0.2.0", "leia.mod"), []byte("module github.com/acme/transitive\nleia 0.1\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "vendor", "github.com", "acme", "transitive@v0.2.0", "pkg", "value.leia"), []byte(`return { value: 95 }`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(dir, "cache", "extract", "github.com", "acme", "transitive@v0.2.0", "pkg"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "cache", "extract", "github.com", "acme", "transitive@v0.2.0", "pkg", "value.leia"), []byte(`return { value: 0 }`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "leia.mod"), []byte(`module example.com/app
+leia 0.1
+require github.com/acme/toolkit v1.2.3
+`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	mainPath := filepath.Join(dir, "main.leia")
+	if err := os.WriteFile(mainPath, []byte(`u := require("github.com/acme/toolkit/pkg/util"); result := u.value`), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	vm := New(ModuleOptionsForScriptMode(mainPath, ModuleModeVendor)...)
+	if err := vm.ExecFile(mainPath); err != nil {
+		t.Fatal(err)
+	}
+	got, err := vm.Get("result")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != int64(95) {
+		t.Fatalf("result = %#v, want transitive vendor module value", got)
 	}
 }

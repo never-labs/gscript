@@ -394,6 +394,50 @@ func TestExamplesDocsIndexCommandsReferenceRegisteredExamples(t *testing.T) {
 	}
 }
 
+func TestExamplesDocsIndexKeepsDataProjectWorkflowGate(t *testing.T) {
+	root := filepath.Dir(playgroundExamplesRoot())
+	data, err := os.ReadFile(filepath.Join(root, "docs", "examples", "index.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	index := string(data)
+	commands := documentedExamplesCommands(index)
+
+	for _, selector := range []string{
+		"examples/data/q_vector_basics.leia",
+		"examples/data/q_trade_analytics_project",
+		"examples/data/db_q_frame_project",
+		"repo-tooling-release_gate_project-main",
+	} {
+		if !documentedExamplesCommandsContainSelector(commands, selector) {
+			t.Fatalf("docs/examples/index.md must keep a registered data workflow command for %s", selector)
+		}
+	}
+
+	for _, snippet := range []string{
+		"q/kdb+-style symbolic vectors",
+		"SQLite `db.frame`",
+		"SoA-backed `q.query`",
+		"`xlsx`/`excel`",
+		"Excel round-tripping",
+	} {
+		if !strings.Contains(index, snippet) {
+			t.Fatalf("docs/examples/index.md must keep data workflow coverage text %q", snippet)
+		}
+	}
+}
+
+func documentedExamplesCommandsContainSelector(commands [][]string, selector string) bool {
+	for _, command := range commands {
+		for _, token := range command[1:] {
+			if token == selector {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func documentedExamplesCommands(markdown string) [][]string {
 	commandRE := regexp.MustCompile(`^go run \./cmd/leia examples (.+)$`)
 	var commands [][]string
