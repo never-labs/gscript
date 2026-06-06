@@ -2239,6 +2239,11 @@ const leiaAgentFields = new Set([
   "model", "tools", "system", "user", "output", "example", "history", "messages",
   "temperature", "max_tokens", "stream", "on_stream", "response_format"
 ]);
+const leiaDialectTags = new Set([
+  "agent", "cmd", "csv", "db", "env", "evaluate", "glob", "html", "http",
+  "json", "model", "path", "prompt", "q", "re", "serve", "sh", "sql",
+  "tool", "turn", "xlsx"
+]);
 
 function escapeHTML(text) {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -2251,9 +2256,22 @@ function span(cls, text) {
 function highlightLeia(text) {
   let out = "";
   let i = 0;
+  const bt = String.fromCharCode(96);
   while (i < text.length) {
     const ch = text[i];
     const next = text[i + 1] || "";
+    if (ch === "$" && (next === bt || (next === "!" && text[i + 2] === bt))) {
+      const tagEnd = next === "!" ? i + 2 : i + 1;
+      out += span("tok-agent", text.slice(i, tagEnd));
+      let j = tagEnd;
+      do {
+        j++;
+      } while (j < text.length && text[j] !== bt);
+      if (j < text.length) j++;
+      out += span("tok-string", text.slice(tagEnd, j));
+      i = j;
+      continue;
+    }
     if ((ch === "-" && next === "-") || (ch === "/" && next === "/")) {
       let j = i + 2;
       while (j < text.length && text[j] !== "\n") j++;
@@ -2296,6 +2314,28 @@ function highlightLeia(text) {
       const word = text.slice(i, j);
       const k = j;
       while (j < text.length && /[ \t]/.test(text[j])) j++;
+      const bangPos = j;
+      const hasBang = text[bangPos] === "!";
+      let payloadStart = hasBang ? bangPos + 1 : bangPos;
+      while (payloadStart < text.length && /[ \t]/.test(text[payloadStart])) payloadStart++;
+      if (leiaDialectTags.has(word) && (text[payloadStart] === bt || text[payloadStart] === "{")) {
+        out += span("tok-agent", word);
+        out += escapeHTML(text.slice(k, bangPos));
+        if (hasBang) out += span("tok-op", "!");
+        out += escapeHTML(text.slice(hasBang ? bangPos + 1 : bangPos, payloadStart));
+        if (text[payloadStart] === bt) {
+          let end = payloadStart;
+          do {
+            end++;
+          } while (end < text.length && text[end] !== bt);
+          if (end < text.length) end++;
+          out += span("tok-string", text.slice(payloadStart, end));
+          i = end;
+          continue;
+        }
+        i = payloadStart;
+        continue;
+      }
       const isField = leiaAgentFields.has(word) && text[j] === ":";
       if (isField) out += span("tok-agent", word);
       else if (leiaKeywords.has(word)) out += span("tok-keyword", word);

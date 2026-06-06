@@ -64,6 +64,10 @@ scripts and are disabled by `WithSandbox()` and `SecuritySandbox()`.
 JIT is disabled whenever runtime resource budgets require checkpoints that
 native code could otherwise bypass.
 
+`SecurityPolicy{}` keeps zero-valued fields at their existing defaults. To make
+a grouped policy explicitly use `CapSafe`, set both `Capabilities: CapSafe` and
+`CapabilitiesSet: true`.
+
 ## Filesystem And Environment
 
 Constrain path access with a filesystem root:

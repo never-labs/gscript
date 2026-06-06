@@ -155,6 +155,7 @@ type vmOptions struct {
 type SecurityPolicy struct {
 	Libs                    LibFlags
 	Capabilities            CapabilityFlags
+	CapabilitiesSet         bool
 	MaxSteps                int64
 	MaxNativeCalls          int64
 	MaxCallDepth            int64
@@ -413,7 +414,7 @@ func WithSecurity(policy SecurityPolicy) Option {
 		if policy.Libs != 0 {
 			o.libs = policy.Libs
 		}
-		if policy.Capabilities != 0 || policy.DisableModuleLoading {
+		if policy.CapabilitiesSet || policy.Capabilities != 0 || policy.DisableModuleLoading {
 			o.capabilities = policy.Capabilities
 		}
 		if policy.DisableModuleLoading {

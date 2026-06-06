@@ -108,6 +108,12 @@ func TestPlaygroundPageSyntaxSurfaceMatchesLeia(t *testing.T) {
 		`"goto"`,
 		`"var"`,
 		`"model"`,
+		`const leiaDialectTags = new Set([`,
+		`"agent", "cmd", "csv", "db", "env", "evaluate", "glob", "html", "http",`,
+		`"json", "model", "path", "prompt", "q", "re", "serve", "sh", "sql",`,
+		`const bt = String.fromCharCode(96);`,
+		`ch === "$" && (next === bt || (next === "!" && text[i + 2] === bt))`,
+		`leiaDialectTags.has(word) && (text[payloadStart] === bt || text[payloadStart] === "{")`,
 		`ch === "/" && next === "/"`,
 	} {
 		if !strings.Contains(body, want) {

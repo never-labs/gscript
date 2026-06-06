@@ -165,6 +165,7 @@ func TestWithSecurityAppliesSandboxAndBudgets(t *testing.T) {
 	vm := leia.New(leia.WithJIT(), leia.WithSecurity(leia.SecurityPolicy{
 		Libs:                    leia.LibSafe,
 		Capabilities:            leia.CapSafe,
+		CapabilitiesSet:         true,
 		DisableModuleLoading:    true,
 		DisableJIT:              true,
 		MaxSteps:                32,
@@ -202,6 +203,53 @@ func TestWithSecurityAppliesSandboxAndBudgets(t *testing.T) {
 	err = vm.Exec(`for {}`)
 	if !errors.As(err, &budgetErr) || budgetErr.Resource != "steps" || budgetErr.Limit != 32 {
 		t.Fatalf("expected steps budget 32, got %T %v", err, err)
+	}
+}
+
+func TestWithSecurityCanExplicitlyApplyCapSafe(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "helper.leia"), []byte(`return { value: 42 }`), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, tc := range []struct {
+		name string
+		opts []leia.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			opts := append([]leia.Option{
+				leia.WithRequirePath(dir),
+				leia.WithSecurity(leia.SecurityPolicy{
+					Capabilities:    leia.CapSafe,
+					CapabilitiesSet: true,
+				}),
+			}, tc.opts...)
+			vm := leia.New(opts...)
+
+			for _, src := range []string{
+				`fs.readfile("x")`,
+				`os.getenv("PATH")`,
+				`require("helper")`,
+			} {
+				if err := vm.Exec(src); err == nil {
+					t.Fatalf("WithSecurity CapSafe allowed %s", src)
+				}
+			}
+
+			if err := vm.Exec(`result := type(require("json"))`); err != nil {
+				t.Fatalf("stdlib require should remain available under CapSafe: %v", err)
+			}
+			got, err := vm.Get("result")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got != "table" {
+				t.Fatalf("stdlib require result = %v, want table", got)
+			}
+		})
 	}
 }
 

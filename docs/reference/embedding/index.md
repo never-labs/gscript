@@ -192,6 +192,10 @@ cannot bypass budget checkpoints. Budget failures are reported as
 auditable option. The fine-grained switches remain available when a host wants
 to compose its own policy:
 
+`SecurityPolicy{}` keeps existing defaults for zero-valued fields. Because
+`CapSafe` is the zero value for capabilities, set `CapabilitiesSet: true` when
+the grouped policy should explicitly apply `Capabilities: CapSafe`.
+
 | Option | Controls |
 |---|---|
 | `WithSandbox()` | Legacy safe-library and no-filesystem baseline. |
