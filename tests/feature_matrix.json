@@ -325,7 +325,7 @@
     },
     {
       "id": "llm_native_integration",
-      "name": "Native LLM turn/tool/msg/chat/loop integration",
+      "name": "Native LLM model/turn/tool/msg/chat/loop/agent/stream/replay/provider integration",
       "category": "embedding-ai",
       "spec_sections": ["Grammar Appendix", "Declarations And Scope", "Expressions", "Statements", "AI-Native Syntax", "Modules And Loading", "Values And Types"],
       "parser": {"status": "covered", "refs": ["internal/parser/parser_test.go"]},

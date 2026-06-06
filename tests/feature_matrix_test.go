@@ -573,6 +573,12 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 	}
 
 	ai := requireFeature(t, features, "llm_native_integration")
+	aiName := decodeRequiredString(t, ai, -1, "name")
+	for _, snippet := range []string{"model", "turn", "tool", "msg", "chat", "loop", "agent", "stream", "replay", "provider"} {
+		if !strings.Contains(aiName, snippet) {
+			t.Fatalf("llm_native_integration name must expose README AI evidence scope; missing %q in %q", snippet, aiName)
+		}
+	}
 	requireFeatureSpecSections(t, ai, "llm_native_integration", "Grammar Appendix", "AI-Native Syntax", "Values And Types")
 	requireFeatureCellRefs(t, ai, "llm_native_integration", "semantic_gate",
 		"tests/llm/llm_runtime_test.go",
@@ -614,6 +620,73 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 		"docs/reference/ai/index.md",
 		"docs/reference/evaluate/index.md",
 	)
+	aiRuntime := readFileString(t, filepath.Join(root, "tests", "llm", "llm_runtime_test.go"))
+	for _, snippet := range []string{
+		"TestLLMTurnWithMockProvider",
+		"llm.turn({",
+		"msg.assistant_call(call)",
+		"chat.merge(history, more)",
+	} {
+		if !strings.Contains(aiRuntime, snippet) {
+			t.Fatalf("tests/llm/llm_runtime_test.go must keep README AI tool/message/chat evidence snippet %q", snippet)
+		}
+	}
+	aiDialect := readFileString(t, filepath.Join(root, "tests", "llm", "llm_ai_dialect_test.go"))
+	for _, snippet := range []string{
+		"TestAIDialectUsesLLMStdlibRuntime",
+		"TestAIDialectTaggedLiteralRawBlockAgentToolTurnAndStreaming",
+		"model {",
+		"tool {",
+		"agent {",
+		"turn {",
+		"on_stream: func(event)",
+	} {
+		if !strings.Contains(aiDialect, snippet) {
+			t.Fatalf("tests/llm/llm_ai_dialect_test.go must keep README AI-native syntax evidence snippet %q", snippet)
+		}
+	}
+	aiExamples := readFileString(t, filepath.Join(root, "tests", "llm", "llm_agent_examples_test.go"))
+	for _, snippet := range []string{
+		"examples\", \"llm\", \"agent.leia\"",
+		"examples\", \"llm\", \"agent_as_tool.leia\"",
+		"examples\", \"llm\", \"streaming_turn.leia\"",
+		"provider did not receive streaming request",
+	} {
+		if !strings.Contains(aiExamples, snippet) {
+			t.Fatalf("tests/llm/llm_agent_examples_test.go must keep runnable LLM example evidence snippet %q", snippet)
+		}
+	}
+	replayGate := readFileString(t, filepath.Join(root, "tests", "llm", "llm_record_replay_test.go"))
+	for _, snippet := range []string{
+		"TestLLMRecorderAndReplay",
+		"TestLLMRecorderAndReplayStreamingEvents",
+		"TestLLMReplaySynthesizesStreamEventForOldFixtures",
+	} {
+		if !strings.Contains(replayGate, snippet) {
+			t.Fatalf("tests/llm/llm_record_replay_test.go must keep README replay/stream evidence snippet %q", snippet)
+		}
+	}
+	providerGate := readFileString(t, filepath.Join(root, "tests", "integration", "llm", "llm_provider_test.go"))
+	for _, snippet := range []string{
+		"TestLLMCommandProvider",
+		"TestAnthropicCompatibleLLMProvider",
+		"TestAnthropicCompatibleLLMProviderStreamsContent",
+		"TestAnthropicCompatibleLLMProviderStreamsToolUse",
+	} {
+		if !strings.Contains(providerGate, snippet) {
+			t.Fatalf("tests/integration/llm/llm_provider_test.go must keep README provider-adapter evidence snippet %q", snippet)
+		}
+	}
+	openAIGate := readFileString(t, filepath.Join(root, "tests", "integration", "llm", "llm_openai_provider_test.go"))
+	for _, snippet := range []string{
+		"TestOpenAICompatibleLLMProvider",
+		"TestOpenAICompatibleLLMProviderStreamsContent",
+		"TestOpenAIProviderThroughEmbeddingOption",
+	} {
+		if !strings.Contains(openAIGate, snippet) {
+			t.Fatalf("tests/integration/llm/llm_openai_provider_test.go must keep README OpenAI provider evidence snippet %q", snippet)
+		}
+	}
 
 	stringsPatterns := requireFeature(t, features, "strings_patterns_concat")
 	requireFeatureCellRefs(t, stringsPatterns, "strings_patterns_concat", "tier2",
