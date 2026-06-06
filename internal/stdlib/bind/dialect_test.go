@@ -525,6 +525,90 @@ func TestDialectCommandHostPoliciesAndFailFast(t *testing.T) {
 	}
 }
 
+func TestDialectHostAutomationResultShapesAndCapabilityGates(t *testing.T) {
+	interp := runWithLib(t, `
+		sh_ok := dialect.eval("sh", "printf out; printf err 1>&2")
+		sh_fail := dialect.eval("sh", "printf bad 1>&2; exit 7", {fail_fast: false})
+		sh_fast_ok, sh_fast_err := pcall(func() {
+			return sh!`+"`"+`printf bad 1>&2; exit 7`+"`"+`
+		})
+		cmd_ok := dialect.eval("cmd", {"printf", "cmd-out"})
+	`, "dialect", BuildDialect(HostOptions{}, nil))
+
+	shOK := interp.GetGlobal("sh_ok").Table()
+	if !shOK.RawGetString("ok").Bool() || shOK.RawGetString("code").Int() != 0 {
+		t.Fatalf("sh_ok = %v, want ok code 0", shOK)
+	}
+	if got := shOK.RawGetString("stdout").Str(); got != "out" {
+		t.Fatalf("sh_ok.stdout = %q, want out", got)
+	}
+	if got := shOK.RawGetString("stderr").Str(); got != "err" {
+		t.Fatalf("sh_ok.stderr = %q, want err", got)
+	}
+	if got := shOK.RawGetString("text").Str(); got != "out" {
+		t.Fatalf("sh_ok.text = %q, want stdout alias", got)
+	}
+	shFail := interp.GetGlobal("sh_fail").Table()
+	if shFail.RawGetString("ok").Bool() || shFail.RawGetString("code").Int() != 7 {
+		t.Fatalf("sh_fail = %v, want ok=false code 7", shFail)
+	}
+	if interp.GetGlobal("sh_fast_ok").Bool() {
+		t.Fatalf("sh! failure succeeded, want pcall false")
+	}
+	if got := interp.GetGlobal("sh_fast_err").Str(); !strings.Contains(got, "sh dialect failed with exit code 7: bad") {
+		t.Fatalf("sh! error = %q, want exit code and stderr", got)
+	}
+	cmdOK := interp.GetGlobal("cmd_ok").Table()
+	if !cmdOK.RawGetString("ok").Bool() || cmdOK.RawGetString("code").Int() != 0 {
+		t.Fatalf("cmd_ok = %v, want ok code 0", cmdOK)
+	}
+	if got := cmdOK.RawGetString("stdout").Str(); got != "cmd-out" {
+		t.Fatalf("cmd_ok.stdout = %q, want cmd-out", got)
+	}
+	if got := cmdOK.RawGetString("text").Str(); got != "cmd-out" {
+		t.Fatalf("cmd_ok.text = %q, want stdout alias", got)
+	}
+
+	cases := []struct {
+		name string
+		opts HostOptions
+		tag  string
+		body Value
+		want string
+	}{
+		{
+			name: "sh requires process shell",
+			opts: HostOptions{ProcessShell: func() bool { return false }},
+			tag:  "sh",
+			body: StringValue("printf no"),
+			want: "process shell access disabled",
+		},
+		{
+			name: "cmd requires process execution",
+			opts: HostOptions{ProcessExecution: func() bool { return false }},
+			tag:  "cmd",
+			body: StringValue("printf no"),
+			want: "process execution access disabled",
+		},
+		{
+			name: "glob requires filesystem read",
+			opts: HostOptions{FilesystemRead: func() bool { return false }},
+			tag:  "glob",
+			body: StringValue("*.leia"),
+			want: "filesystem read access disabled",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			eval := BuildDialect(tc.opts, nil).RawGetString("eval").GoFunction()
+			_, err := eval.Fn([]Value{StringValue(tc.tag), tc.body})
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("%s err = %v, want %q", tc.tag, err, tc.want)
+			}
+		})
+	}
+}
+
 func TestDialectShellwordsArgumentErrors(t *testing.T) {
 	eval := BuildDialect(HostOptions{}, nil).RawGetString("eval").GoFunction()
 	for _, tc := range []struct {

@@ -307,7 +307,7 @@
       "tier2": {"status": "not_applicable", "refs": []},
       "semantic_gate": {"status": "covered", "refs": ["internal/stdlib/bind/q_test.go", "internal/stdlib/bind/db_test.go", "examples/data/q_vector_basics.leia", "examples/data/q_trade_analytics_project/main.leia", "examples/data/db_q_frame_project/main.leia", "docs/reference/data-oriented/index.md", "docs/reference/dialects/index.md"]},
       "conformance_case": {"status": "not_applicable", "refs": []},
-      "perf_hot_case": {"status": "covered", "refs": ["benchmarks/data/soa_affine_many.leia", "benchmarks/data/soa_masked_aggregate.leia", "benchmarks/data/soa_filter_gather.leia", "benchmarks/data/soa_scan.leia"]}
+      "perf_hot_case": {"status": "covered", "refs": ["benchmarks/data/q_query_rollup.leia", "benchmarks/data/soa_affine_many.leia", "benchmarks/data/soa_masked_aggregate.leia", "benchmarks/data/soa_filter_gather.leia", "benchmarks/data/soa_scan.leia"]}
     },
     {
       "id": "spreadsheet_dialects",

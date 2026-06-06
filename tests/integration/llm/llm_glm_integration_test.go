@@ -2,7 +2,10 @@ package leia_test
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -500,6 +503,123 @@ func TestGLMExamplesRunWithRealProviderIntegration(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGLMExamplesRunAgainstLocalAnthropicCompatibleProvider(t *testing.T) {
+	root := integrationRepoRoot(t)
+	for _, tc := range []struct {
+		name string
+		path string
+		want []string
+	}{
+		{
+			name: "memory-smoke",
+			path: "examples/llm/glm_smoke.leia",
+			want: []string{"stored=MEMORY_STORED", "recalled=project=ORCHID;owner=ADA", "project=ORCHID", "owner=ADA", "remembered=true", "source=history"},
+		},
+		{
+			name: "direct-agent-tools",
+			path: "examples/llm/glm_direct_agent_tools.leia",
+			want: []string{"text=DIRECT_AGENT_TOOL_OK via extract_memory.", "history_len=4", "roles=system/user/assistant/tool", "tool=extract_memory", "project=ORCHID", "owner=ADA", "source=direct-agent-tool"},
+		},
+	} {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			server := newLocalGLMAnthropicCompatibleServer(t)
+			defer server.Close()
+			t.Setenv("LEIA_GLM_BASE_URL", server.URL)
+			t.Setenv("LEIA_GLM_API_KEY", "test-key")
+			t.Setenv("LEIA_GLM_MODEL", "mock-glm")
+			t.Setenv("SENTINEL_GLM_API_KEY", "test-key")
+			t.Setenv("GLM_API_KEY", "test-key")
+			t.Setenv("GLM_MODEL", "mock-glm")
+
+			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+			defer cancel()
+			var printed []string
+			vm := leia.New(
+				leia.WithLibs(leia.LibString|leia.LibOS|leia.LibLLM),
+				leia.WithPrint(func(args ...interface{}) {
+					parts := make([]string, len(args))
+					for i, arg := range args {
+						parts[i] = fmt.Sprint(arg)
+					}
+					printed = append(printed, strings.Join(parts, "\t"))
+				}),
+			)
+			if err := vm.ExecFileContext(ctx, filepath.Join(root, filepath.FromSlash(tc.path))); err != nil {
+				t.Fatalf("run %s: %v\nprinted:\n%s", tc.path, err, strings.Join(printed, "\n"))
+			}
+			out := strings.Join(printed, "\n")
+			for _, want := range tc.want {
+				if !strings.Contains(out, want) {
+					t.Fatalf("%s output missing %q:\n%s", tc.path, want, out)
+				}
+			}
+		})
+	}
+}
+
+func newLocalGLMAnthropicCompatibleServer(t *testing.T) *httptest.Server {
+	t.Helper()
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			t.Fatalf("method = %s, want POST", r.Method)
+		}
+		if auth := r.Header.Get("Authorization"); auth != "Bearer test-key" {
+			t.Fatalf("Authorization = %q, want Bearer test-key", auth)
+		}
+		var req struct {
+			Model    string `json:"model"`
+			Messages []struct {
+				Role    string          `json:"role"`
+				Content json.RawMessage `json:"content"`
+			} `json:"messages"`
+			Tools []struct {
+				Name string `json:"name"`
+			} `json:"tools"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Fatalf("decode request: %v", err)
+		}
+		if req.Model != "mock-glm" {
+			t.Fatalf("model = %q, want mock-glm", req.Model)
+		}
+		prompt := string(req.Messages[len(req.Messages)-1].Content)
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case strings.Contains(prompt, "Store this memory"):
+			writeAnthropicTextResponse(w, "MEMORY_STORED")
+		case strings.Contains(prompt, "Using only the stored memory"):
+			writeAnthropicTextResponse(w, "project=ORCHID;owner=ADA")
+		case strings.Contains(prompt, "Convert this memory recall into JSON"):
+			writeAnthropicTextResponse(w, `{"project":"ORCHID","owner":"ADA","remembered":true,"meta":{"source":"history"}}`)
+		case len(req.Tools) > 0 && !strings.Contains(string(mustMarshalGLMRequestMessages(t, req.Messages)), "tool_result"):
+			writeAnthropicToolUseResponse(w)
+		default:
+			writeAnthropicTextResponse(w, "DIRECT_AGENT_TOOL_OK via extract_memory.")
+		}
+	}))
+}
+
+func mustMarshalGLMRequestMessages(t *testing.T, messages []struct {
+	Role    string          `json:"role"`
+	Content json.RawMessage `json:"content"`
+}) []byte {
+	t.Helper()
+	data, err := json.Marshal(messages)
+	if err != nil {
+		t.Fatalf("marshal request messages: %v", err)
+	}
+	return data
+}
+
+func writeAnthropicTextResponse(w http.ResponseWriter, text string) {
+	fmt.Fprintf(w, `{"id":"msg_test","type":"message","role":"assistant","stop_reason":"end_turn","content":[{"type":"text","text":%q}],"usage":{"input_tokens":1,"output_tokens":1}}`, text)
+}
+
+func writeAnthropicToolUseResponse(w http.ResponseWriter) {
+	fmt.Fprint(w, `{"id":"msg_test","type":"message","role":"assistant","stop_reason":"tool_use","content":[{"type":"tool_use","id":"call_extract_1","name":"extract_memory","input":{"note":"project codename is ORCHID and owner is ADA"}}],"usage":{"input_tokens":1,"output_tokens":1}}`)
 }
 
 func integrationRepoRoot(t *testing.T) string {

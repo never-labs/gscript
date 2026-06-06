@@ -15,6 +15,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+ROOT = Path(__file__).resolve().parents[1]
+
 
 @dataclass(frozen=True)
 class PerfRow:
@@ -152,20 +154,40 @@ def load_rows(path: Path, *, mode: str = "default") -> dict[str, PerfRow]:
     return rows
 
 
+def load_luajit_required_benchmarks(manifest_path: Path | None = None) -> set[str]:
+    manifest_path = manifest_path or ROOT / "benchmarks" / "manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    workloads = manifest.get("workloads")
+    if not isinstance(workloads, list):
+        return set()
+    required: set[str] = set()
+    for workload in workloads:
+        if not isinstance(workload, dict):
+            continue
+        benchmark_id = workload.get("id")
+        if isinstance(benchmark_id, str) and workload.get("comparison_reference") is not None:
+            required.add(benchmark_id)
+    return required
+
+
 def check_rows(
     candidate: dict[str, PerfRow],
     *,
     baseline: dict[str, PerfRow] | None = None,
+    luajit_required: set[str] | None = None,
     ratio_threshold: float = 0.8,
     regression_tolerance: float = 0.03,
 ) -> list[Violation]:
     violations: list[Violation] = []
     for name, row in sorted(candidate.items()):
+        require_luajit = luajit_required is None or name in luajit_required
         ratio = row.ratio
-        if not row.has_timed_luajit_pair:
+        if require_luajit and not row.has_timed_luajit_pair:
             violations.append(
                 Violation("missing", name, f"current={row.current_status} luajit={row.luajit_status}", "timed current+luajit")
             )
+        elif not require_luajit:
+            pass
         elif not row.has_comparable_luajit_timing:
             pass
         elif ratio > ratio_threshold:
@@ -216,9 +238,11 @@ def main(argv: list[str] | None = None) -> int:
 
     candidate = load_rows(args.candidate, mode=args.mode)
     baseline = load_rows(args.baseline, mode=args.mode) if args.baseline else None
+    luajit_required = load_luajit_required_benchmarks()
     violations = check_rows(
         candidate,
         baseline=baseline,
+        luajit_required=luajit_required,
         ratio_threshold=args.ratio_threshold,
         regression_tolerance=args.regression_tolerance,
     )

@@ -35,6 +35,24 @@ def timing_payload(rows):
     return {"results": results}
 
 
+def timing_payload_with_luajit_status(name, current, luajit_status):
+    group, bench = name.split("/", 1)
+    return {
+        "results": [
+            {
+                "benchmark": bench,
+                "group": group,
+                "modes": {
+                    "default": {
+                        "current": {"status": "ok", "stats": {"median": current}, "source": "script_repeat"},
+                        "luajit": {"status": luajit_status, "source": ""},
+                    }
+                },
+            }
+        ]
+    }
+
+
 class PerfSubmitGuardTest(unittest.TestCase):
     def test_rejects_luajit_ratio_above_threshold(self):
         rows = guard.load_rows(write_json(timing_payload([("numeric/a", 0.81, 1.0)])))
@@ -64,6 +82,18 @@ class PerfSubmitGuardTest(unittest.TestCase):
             guard.check_rows(candidate, baseline=baseline, ratio_threshold=0.8, regression_tolerance=0.03),
             [],
         )
+
+    def test_skips_luajit_requirement_for_manifested_leia_only_benchmarks(self):
+        rows = guard.load_rows(write_json(timing_payload_with_luajit_status("data/q_query_rollup", 0.42, "missing")))
+        self.assertEqual(
+            guard.check_rows(rows, luajit_required=guard.load_luajit_required_benchmarks(), ratio_threshold=0.8),
+            [],
+        )
+
+    def test_keeps_luajit_requirement_for_manifested_comparison_benchmarks(self):
+        rows = guard.load_rows(write_json(timing_payload_with_luajit_status("numeric/matmul_dense", 0.01, "missing")))
+        violations = guard.check_rows(rows, luajit_required=guard.load_luajit_required_benchmarks(), ratio_threshold=0.8)
+        self.assertEqual([(v.kind, v.name) for v in violations], [("missing", "numeric/matmul_dense")])
 
 
 def write_json(payload):

@@ -52,6 +52,7 @@ def timing_payload(
     current,
     head,
     *,
+    benchmark_id="numeric/hot_loop",
     luajit=2.0,
     current_status="ok",
     head_status="ok",
@@ -62,8 +63,8 @@ def timing_payload(
         "modes": ["default"],
         "results": [
             {
-                "group": "numeric",
-                "benchmark": "hot_loop",
+                "group": benchmark_id.split("/", 1)[0],
+                "benchmark": benchmark_id.split("/", 1)[1],
                 "modes": {
                     "default": {
                         "current": subject(current, current_status, source),
@@ -95,6 +96,12 @@ class PerformanceGateValidationTest(unittest.TestCase):
         proc = run_validate(timing_payload(1.05, 1.00))
         self.assertEqual(proc.returncode, 0, proc.stdout)
         self.assertIn("Performance gate current/HEAD ranking", proc.stdout)
+        self.assertIn("Performance gate passed.", proc.stdout)
+
+    def test_validate_only_accepts_current_only_new_benchmark(self):
+        proc = run_validate(timing_payload(1.05, None, benchmark_id="data/q_query_rollup", head_status="missing"))
+        self.assertEqual(proc.returncode, 0, proc.stdout)
+        self.assertIn("current_only_new_benchmark", proc.stdout)
         self.assertIn("Performance gate passed.", proc.stdout)
 
     def test_quick_phase_smoke_is_explicit_parseable_profile(self):
@@ -161,6 +168,22 @@ class PerformanceGateValidationTest(unittest.TestCase):
             self.assertIn("numeric/matmul_dense", values)
             self.assertIn("data/soa_affine_many", values)
             self.assertIn("data/soa_masked_aggregate", values)
+        for array_name in ("FEATURE_SMOKE_BENCHES", "STRICT_FEATURE_BENCHES"):
+            values = shell_array_values(gate, array_name)
+            self.assertIn("data/q_query_rollup", values)
+
+    def test_q_analytics_feature_matrix_hot_refs_include_runnable_q_query_smoke(self):
+        manifest = json.loads((ROOT / "benchmarks" / "manifest.json").read_text())
+        case_ids = {case["id"] for case in manifest["cases"]}
+        workloads = {workload["id"]: workload for workload in manifest["workloads"]}
+        hot_refs = benchmark_ids_from_feature_refs("q_analytics_dialect", "perf_hot_case")
+
+        self.assertIn("data/q_query_rollup", hot_refs)
+        self.assertEqual(sorted(set(hot_refs) - case_ids), [])
+        self.assertEqual(sorted(set(hot_refs) - set(workloads)), [])
+        workload = workloads["data/q_query_rollup"]
+        self.assertEqual(workload["time_source_hint"], "script_time_line")
+        self.assertIsNone(workload["comparison_reference"])
 
     def test_data_oriented_feature_matrix_hot_refs_are_manifested_with_luajit_refs(self):
         manifest = json.loads((ROOT / "benchmarks" / "manifest.json").read_text())
@@ -248,10 +271,10 @@ class PerformanceGateValidationTest(unittest.TestCase):
         self.assertIn("numeric/hot_loop", proc.stdout)
 
     def test_validate_only_rejects_luajit_ratio_above_threshold(self):
-        proc = run_validate(timing_payload(0.81, 1.00, luajit=1.00))
+        proc = run_validate(timing_payload(0.81, 1.00, benchmark_id="numeric/matmul_dense", luajit=1.00))
         self.assertEqual(proc.returncode, 1, proc.stdout)
         self.assertIn("Guard violations", proc.stdout)
-        self.assertIn("numeric/hot_loop", proc.stdout)
+        self.assertIn("numeric/matmul_dense", proc.stdout)
         self.assertIn("luajit", proc.stdout)
 
     def test_validate_only_rejects_low_resolution_rows(self):

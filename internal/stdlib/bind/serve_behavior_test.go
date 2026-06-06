@@ -1,6 +1,9 @@
 package bind
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestServeAppRoutesBackgroundRoundTrip(t *testing.T) {
 	interp := New()
@@ -207,6 +210,45 @@ func TestServeDialectSQLiteFormAndStaticRoundTrip(t *testing.T) {
 		if got := interp.GetGlobal(name); !got.IsNil() {
 			t.Fatalf("%s = %v, want nil", name, got)
 		}
+	}
+}
+
+func TestServeDialectRequiresNetworkCapabilityWhenListening(t *testing.T) {
+	interp := New()
+	dialectModule := TableValue(BuildDialect(HostOptions{
+		Call:           interp.CallFunction,
+		NetworkAllowed: func() bool { return false },
+		MaxHostResult:  interp.MaxHostResultBytes,
+	}, interp.MaxHostResultBytes))
+	interp.SetGlobal("dialect", dialectModule)
+	interp.SetModule("dialect", dialectModule)
+
+	src := `
+		ok, err := pcall(func() {
+			return serve {
+				listen: "127.0.0.1:0"
+				routes: {
+					{method: "GET", path: "/", handler: func(req) { return "blocked" }},
+				}
+			}
+		})
+		router_only := serve {
+			routes: {
+				{method: "GET", path: "/", handler: func(req) { return "ok" }},
+			}
+		}
+	`
+	if _, err := interp.ExecString(src); err != nil {
+		t.Fatalf("ExecString: %v", err)
+	}
+	if interp.GetGlobal("ok").Bool() {
+		t.Fatalf("serve listen succeeded with network disabled, want pcall false")
+	}
+	if got := interp.GetGlobal("err").Str(); !strings.Contains(got, "network access disabled") {
+		t.Fatalf("serve listen err = %q, want network access disabled", got)
+	}
+	if got := interp.GetGlobal("router_only"); !got.IsTable() {
+		t.Fatalf("router_only = %v, want router table without listen", got)
 	}
 }
 

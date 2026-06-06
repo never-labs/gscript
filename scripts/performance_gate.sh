@@ -85,6 +85,7 @@ FEATURE_SMOKE_BENCHES=(
     "app/serve_loopback_smoke"
     "app/sqlite_memory_smoke"
     "numeric/matmul_dense"
+    "data/q_query_rollup"
     "data/soa_affine_many"
     "data/soa_masked_aggregate"
 )
@@ -104,6 +105,7 @@ STRICT_FEATURE_BENCHES=(
     "app/serve_loopback_smoke"
     "app/sqlite_memory_smoke"
     "numeric/matmul_dense"
+    "data/q_query_rollup"
     "data/soa_affine_many"
     "data/soa_masked_aggregate"
 )
@@ -343,6 +345,8 @@ for raw in rows:
         if cur_status == "low_resolution" or head_status == "low_resolution":
             note.append("low_resolution")
             unreliable.append((name, mode, cur_status, head_status, cur_source, head_source))
+        elif cur_status in {"ok", "partial"} and head_status == "missing" and head_s is None:
+            note.append("current_only_new_benchmark")
         elif cur_status not in {"ok", "partial"} or head_status not in {"ok", "partial"}:
             note.append(f"status={cur_status}/{head_status}")
             unreliable.append((name, mode, cur_status, head_status, cur_source, head_source))
