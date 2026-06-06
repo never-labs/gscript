@@ -513,6 +513,17 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 	requireFeatureCellRefs(t, hostBindings, "embedding_host_bindings", "perf_hot_case",
 		"benchmarks/app/stdlib_host.leia",
 	)
+	hostBindingGate := readFileString(t, filepath.Join(root, "tests", "sdk", "module_api_test.go"))
+	for _, snippet := range []string{
+		"TestWithGoImportsRequireAllowlist",
+		"TestWithGoImportsImportSyntax",
+		"TestWithGoImportsRejectsUnauthorizedGoImport",
+		"TestRegisterModuleFromService",
+	} {
+		if !strings.Contains(hostBindingGate, snippet) {
+			t.Fatalf("tests/sdk/module_api_test.go must keep host binding/import guard %q", snippet)
+		}
+	}
 
 	resourceBudgets := requireFeature(t, features, "embedding_resource_budgets")
 	requireFeatureCellRefs(t, resourceBudgets, "embedding_resource_budgets", "semantic_gate",
@@ -545,6 +556,19 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 		"docs/reference/embedding/index.md",
 		"docs/guides/embedding.md",
 	)
+	hotLoaderGate := readFileString(t, filepath.Join(root, "tests", "sdk", "hotloader_test.go"))
+	for _, snippet := range []string{
+		"TestHotLoaderReloadSwapsProgram",
+		"TestHotLoaderReloadFailureKeepsPreviousProgram",
+		"TestHotLoaderReloadIfChangedSkipsSameSource",
+		"TestHotLoaderInstanceUsesModuleOptionsForScript",
+		"WithHotLoaderVMOptions",
+		"ModuleOptionsForScript",
+	} {
+		if !strings.Contains(hotLoaderGate, snippet) {
+			t.Fatalf("tests/sdk/hotloader_test.go must keep hot reload/module option guard %q", snippet)
+		}
+	}
 
 	embeddingExamples := readFileString(t, filepath.Join(root, "examples", "embedding", "embedding_test.go"))
 	for _, snippet := range []string{
@@ -953,6 +977,19 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 	} {
 		if !strings.Contains(modconfigGate, snippet) {
 			t.Fatalf("modconfig_test.go must keep module runtime resolver guard %q", snippet)
+		}
+	}
+	modCommandGate := readFileString(t, filepath.Join(root, "cmd", "leia", "main_mod_test.go"))
+	for _, snippet := range []string{
+		"TestModGraphTidyAndVerifyUseGoStyleImports",
+		"TestModGraphTidyAndVerifyUseStaticRequireCalls",
+		"TestModPackageWorkflowCoversDocsRuntimeModes",
+		"TestModVendorCopiesTransitiveDownloadedModules",
+		"TestModDownloadFetchesGitHubArchive",
+		"TestModLockWritesSumAndVerifyDetectsLocalMutation",
+	} {
+		if !strings.Contains(modCommandGate, snippet) {
+			t.Fatalf("cmd/leia/main_mod_test.go must keep module command contract guard %q", snippet)
 		}
 	}
 	downloadVendor := requireFeature(t, features, "module_download_vendor_cache")
