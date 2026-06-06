@@ -1,0 +1,142 @@
+// qsql_frame_project - in-memory frame analytics with qSQL.
+// Run:
+//   go run ./cmd/leia run examples/data/qsql_frame_project/main.leia
+
+func check(name, ok) {
+    assert(ok)
+    print("ok", name)
+}
+
+columns := {
+    sym: {"AAPL", "MSFT", "AAPL", "NVDA", "MSFT"},
+    venue: {"XNAS", "XNYS", "XNAS", "ARCX", "BATS"},
+    active: {true, false, true, nil, true},
+    note: {"open", nil, "close", "halt", "resume"},
+    trade_date: {"2026-06-01", "2026-06-01", "2026-06-02", "2026-06-02", data.null},
+    session_time: {"09:30:00", "09:31:00", "15:59:00", "10:05:00", "16:00:00"},
+    event_ts: {"2026-06-01T09:30:00Z", "2026-06-01T09:31:00Z", "2026-06-02T15:59:00Z", "2026-06-02T10:05:00Z", data.null},
+    price: []f64{100.5, 90.0, 101.0, 200.0, 120.0},
+    size: []i64{10, 15, 20, 5, 11},
+}
+
+trades := data.frame({
+    sym: data.symbols(columns.sym),
+    venue: data.string(columns.venue),
+    active: data.bool(columns.active),
+    note: data.string(columns.note),
+    trade_date: data.date(columns.trade_date),
+    session_time: data.time(columns.session_time),
+    event_ts: data.timestamp(columns.event_ts),
+    price: data.f64(columns.price),
+    size: data.i64(columns.size),
+})
+
+kinds := trades.column_kinds
+
+projected := q.sql(trades, "select sym,venue,active,note,trade_date,session_time,event_ts,price,size from trades where price>=100 order by price desc")
+rollup := q.sql(trades, "select notional:sum price*size, fills:count i by sym from trades where price>=100 order by notional desc")
+null_notes := q.sql(trades, "select sym,note,trade_date,event_ts from trades where note=null")
+opening := q.sql(trades, "select sym,trade_date,session_time,event_ts,price from trades where session_time=\"09:30:00\"")
+
+top := rollup[1]
+first_projection := projected[1]
+null_note := null_notes[1]
+opening_trade := opening[1]
+
+check("frame metadata", trades.len == 5 && trades.column_names[1] == "sym" && trades.column_names[9] == "size")
+check("column kinds", kinds.sym == "symbol" && kinds.venue == "string" && kinds.active == "bool" && kinds.note == "string" && kinds.trade_date == "date" && kinds.session_time == "time" && kinds.event_ts == "timestamp")
+check("string symbol bool null columns", trades.columns.sym[2] == "MSFT" && trades.columns.venue[2] == "XNYS" && trades.columns.active[2] == false && trades.columns.note[2] == nil)
+check("temporal columns pass through frame", trades.columns.trade_date[1] == "2026-06-01" && trades.columns.session_time[5] == "16:00:00" && trades.columns.event_ts[5] == data.null)
+check("qsql projection keeps mixed columns", #projected == 4 && first_projection.sym == "NVDA" && first_projection.note == "halt" && first_projection.active == nil && first_projection.event_ts == "2026-06-02T10:05:00Z")
+check("qsql rollup", #rollup == 3 && top.sym == "AAPL" && top.notional == 3025.0 && top.fills == 2)
+check("qsql null where", #null_notes == 1 && null_note.sym == "MSFT" && null_note.note == nil && null_note.trade_date == "2026-06-01")
+check("qsql temporal where", #opening == 1 && opening_trade.sym == "AAPL" && opening_trade.trade_date == "2026-06-01" && opening_trade.event_ts == "2026-06-01T09:30:00Z")
+
+func db_value(value, fallback) {
+    if value == nil || value == data.null {
+        return fallback
+    }
+    return value
+}
+
+conn := db.memory()
+conn.exec(sql`create table trade_events (
+    id integer primary key,
+    sym text not null,
+    venue text not null,
+    active bool,
+    note text,
+    trade_date text,
+    session_time text,
+    event_ts text,
+    price real not null,
+    size integer not null
+)`)
+
+for i := 1; i <= trades.len; i++ {
+    conn.exec(sql {
+        query: "insert into trade_events (id, sym, venue, active, note, trade_date, session_time, event_ts, price, size) values (:id, :sym, :venue, :active, :note, :trade_date, :session_time, :event_ts, :price, :size)",
+        params: {
+            id: i,
+            sym: trades.columns.sym[i],
+            venue: trades.columns.venue[i],
+            active: db_value(trades.columns.active[i], false),
+            note: db_value(trades.columns.note[i], ""),
+            trade_date: db_value(trades.columns.trade_date[i], ""),
+            session_time: trades.columns.session_time[i],
+            event_ts: db_value(trades.columns.event_ts[i], ""),
+            price: trades.columns.price[i],
+            size: trades.columns.size[i],
+        },
+    })
+}
+
+conn.exec(sql`update trade_events set note = null where id = 2`)
+conn.exec(sql`update trade_events set active = null where id = 4`)
+conn.exec(sql`update trade_events set trade_date = null, event_ts = null where id = 5`)
+
+db_trades := conn.frame(sql`select sym,venue,coalesce(active, false) as active,coalesce(note, '') as note,coalesce(trade_date, '') as trade_date,session_time,coalesce(event_ts, '') as event_ts,price,size from trade_events order by id`)
+db_rollup := q.sql(db_trades, "select notional:sum price*size, fills:count i by sym from trade_events where price>=100 order by notional desc")
+db_nulls := conn.query(sql`select sym,note,trade_date,event_ts from trade_events where event_ts is null`)
+db_top := db_rollup[1]
+db_null := db_nulls[1]
+
+check("db frame roundtrip schema", db_trades.len == 5 && db_trades.schema.kinds.sym == "string" && db_trades.schema.kinds.price == "f64" && db_trades.schema.kinds.size == "i64")
+check("db qsql roundtrip rollup", #db_rollup == 3 && db_top.sym == "AAPL" && db_top.notional == 3025.0 && db_top.fills == 2)
+check("db null temporal roundtrip", #db_nulls == 1 && db_null.sym == "MSFT" && db_null.note == "resume" && db_null.trade_date == nil && db_null.event_ts == nil)
+
+mixed_output := string.format(
+    "mixed_output symbol=%s string=%s bool=%s null=%s temporal=%s/%s/%s",
+    trades.columns.sym[2],
+    trades.columns.venue[2],
+    tostring(trades.columns.active[2]),
+    tostring(trades.columns.note[2]),
+    trades.columns.trade_date[1],
+    trades.columns.session_time[1],
+    trades.columns.event_ts[1]
+)
+print(mixed_output)
+
+qsql_frame_summary := string.format(
+    "qsql_frame rows=%d projected=%d top_sym=%s notional=%.0f db_top=%s db_notional=%.0f source=data.frame+db.frame",
+    trades.len,
+    #projected,
+    top.sym,
+    top.notional,
+    db_top.sym,
+    db_top.notional
+)
+print(qsql_frame_summary)
+
+return {
+    frame: trades,
+    projected: projected,
+    rollup: rollup,
+    null_notes: null_notes,
+    opening: opening,
+    db_frame: db_trades,
+    db_rollup: db_rollup,
+    db_nulls: db_nulls,
+    mixed: mixed_output,
+    summary: qsql_frame_summary,
+}
