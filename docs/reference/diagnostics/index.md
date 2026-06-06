@@ -49,7 +49,7 @@ if errors.As(err, &budgetErr) {
 | `leia check --json` | Aggregate check report with step status and exit codes. |
 | `leia inspect directives --json` | Parsed `//leia:` file directives. |
 | `leia mod ... --json` | Module graph, list, verify, capability, and vendoring reports. |
-| `leia capabilities --json` | Binary feature, command, stdlib, LLM, and tooling capabilities. |
+| `leia capabilities --json` | Binary feature, command, stdlib, builtin dialect, LLM, and tooling capabilities. |
 
 Current lint codes:
 

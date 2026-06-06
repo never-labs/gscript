@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/never-labs/leia/internal/stdlib/bind"
 	"github.com/never-labs/leia/internal/stdlib/catalog"
 )
 
@@ -19,6 +20,7 @@ type cliCapabilities struct {
 	Commands      []string               `json:"commands"`
 	StdlibModules []string               `json:"stdlib_modules"`
 	StdlibLayers  []cliStdlibLayer       `json:"stdlib_layers"`
+	Dialects      []cliDialectCapability `json:"dialects"`
 	LLM           cliLLMCapability       `json:"llm"`
 	Tooling       cliToolingCapability   `json:"tooling"`
 }
@@ -45,6 +47,16 @@ type cliStdlibModule struct {
 	Description  string   `json:"description"`
 	Capabilities []string `json:"capabilities,omitempty"`
 	SafeDefault  bool     `json:"safe_default,omitempty"`
+}
+
+type cliDialectCapability struct {
+	Name         string   `json:"name"`
+	Category     string   `json:"category"`
+	Capabilities []string `json:"capabilities,omitempty"`
+	Builtin      bool     `json:"builtin"`
+	Eval         bool     `json:"eval"`
+	Block        bool     `json:"block"`
+	Aliases      []string `json:"aliases,omitempty"`
 }
 
 type cliLLMCapability struct {
@@ -110,6 +122,7 @@ func runCapabilitiesCommand(args []string, outw, errw io.Writer) int {
 	fmt.Fprintf(outw, "llm: %t (%s)\n", caps.LLM.Enabled, strings.Join(caps.LLM.Syntax, ", "))
 	fmt.Fprintf(outw, "commands: %s\n", strings.Join(caps.Commands, ", "))
 	fmt.Fprintf(outw, "stdlib modules: %d\n", len(caps.StdlibModules))
+	fmt.Fprintf(outw, "dialects: %d\n", len(caps.Dialects))
 	return 0
 }
 
@@ -131,6 +144,7 @@ func buildCapabilities() cliCapabilities {
 		Commands:      cliCommandNames(),
 		StdlibModules: modules,
 		StdlibLayers:  buildStdlibLayerCapabilities(),
+		Dialects:      buildDialectCapabilities(),
 		LLM: cliLLMCapability{
 			Enabled: true,
 			Syntax: []string{
@@ -233,4 +247,24 @@ func buildStdlibLayerCapabilities() []cliStdlibLayer {
 		layers = append(layers, cliStdlibLayer{Name: name, Modules: modules})
 	}
 	return layers
+}
+
+func buildDialectCapabilities() []cliDialectCapability {
+	infos := bind.BuiltinDialectInfos()
+	dialects := make([]cliDialectCapability, 0, len(infos))
+	for _, info := range infos {
+		dialects = append(dialects, cliDialectCapability{
+			Name:         info.Name,
+			Category:     info.Category,
+			Capabilities: append([]string(nil), info.Capabilities...),
+			Builtin:      info.Builtin,
+			Eval:         info.Eval,
+			Block:        info.Block,
+			Aliases:      append([]string(nil), info.Aliases...),
+		})
+	}
+	sort.Slice(dialects, func(i, j int) bool {
+		return dialects[i].Name < dialects[j].Name
+	})
+	return dialects
 }

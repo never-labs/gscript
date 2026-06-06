@@ -161,6 +161,49 @@ type DialectSpec struct {
 	Block        func(Value, *Table) ([]Value, error)
 }
 
+// DialectInfo describes an installed dialect tag without exposing runtime
+// handler internals. It is used by CLI metadata and architecture gates.
+type DialectInfo struct {
+	Name         string
+	Category     string
+	Capabilities []string
+	Builtin      bool
+	Eval         bool
+	Block        bool
+	Aliases      []string
+}
+
+// BuiltinDialectInfos returns the builtin dialect registry metadata in the
+// same shape exposed by dialect.list(). Keep CLI/reporting users on this path
+// so feature metadata cannot drift from the runtime registry.
+func BuiltinDialectInfos() []DialectInfo {
+	registry := newDialectRegistry()
+	register := registry.register
+	registerDialectShellFS(register, HostOptions{}, nil)
+	registerDialectText(register, HostOptions{}, nil)
+	registerDialectProtocol(register, nil)
+	registerDialectProtocolNetwork(register)
+	registerDialectWeb(register, HostOptions{}, nil)
+	registerDialectData(register, nil)
+	registerDialectDatabase(register)
+	registerDialectAI(register, HostOptions{})
+
+	infos := make([]DialectInfo, 0, len(registry.names))
+	for _, name := range registry.names {
+		handler := registry.handlers[name]
+		infos = append(infos, DialectInfo{
+			Name:         name,
+			Category:     handler.meta.Category,
+			Capabilities: append([]string(nil), handler.meta.Capabilities...),
+			Builtin:      handler.meta.Builtin,
+			Eval:         handler.eval != nil,
+			Block:        handler.block != nil,
+			Aliases:      append([]string(nil), registry.aliases[name]...),
+		})
+	}
+	return infos
+}
+
 type dialectRegisterFunc func([]string, dialectHandler)
 
 type dialectRegistry struct {

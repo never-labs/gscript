@@ -56,6 +56,35 @@ soa.setRow(points, 2, row)
 Prefer column kernels for hot paths. Row materialization is useful at API
 boundaries but usually less efficient.
 
+## Database Frames And Data Projects
+
+The built-in `db` module can bridge host-facing SQLite workflows into the same
+columnar data path. `db.frame(sql, params)` returns a result object with normal
+row tables for compatibility and column-oriented fields for analysis:
+
+```leia
+conn := db.open(":memory:")
+conn.exec("create table sales(channel text, amount real)")
+conn.exec("insert into sales values (?, ?)", {"web", 120})
+
+frame := conn.frame("select channel, amount from sales", {})
+total := q.query(frame.soa, q`select sum amount by channel`)
+```
+
+Use row data when crossing API boundaries, and use `frame.soa` / numeric
+columns when feeding `q.query` or SoA kernels. Spreadsheet dialects complete the
+round trip:
+
+```leia
+xlsx`write report.xlsx ${total.rows}`
+roundtrip := excel`report.xlsx`
+```
+
+The runnable project `examples/data/db_q_frame_project` exercises SQLite
+`db.frame`, SoA-backed `q.query`, and `xlsx`/`excel` import/export together. It
+is intentionally tracked by the feature matrix so README data claims stay tied
+to an executable example.
+
 ## Shape And Schema
 
 | API | Purpose |

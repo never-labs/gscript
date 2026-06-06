@@ -364,6 +364,7 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 		"tests/sdk/module_api_test.go",
 		"tests/sdk/error_api_test.go",
 		"tests/sdk/public_api_boundary_test.go",
+		"tests/sdk/embedding_r1_test.go",
 		"examples/embedding/embedding_test.go",
 		"docs/reference/embedding/index.md",
 	)
@@ -380,6 +381,7 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 		"tests/sdk/resource_budget_concurrency_test.go",
 		"tests/sdk/security_api_test.go",
 		"tests/sdk/error_api_test.go",
+		"tests/sdk/embedding_r1_test.go",
 		"examples/embedding/embedding_test.go",
 		"docs/reference/embedding/index.md",
 	)
@@ -392,6 +394,7 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 		"tests/sdk/hotloader_instance_rollback_test.go",
 	)
 	requireFeatureCellRefs(t, hotReload, "embedding_hot_reload", "semantic_gate",
+		"tests/sdk/embedding_r1_test.go",
 		"examples/embedding/embedding_test.go",
 		"docs/reference/hot-reload/index.md",
 		"docs/reference/embedding/index.md",
@@ -406,6 +409,7 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 		"func Example_hotInstance()",
 		"func Example_sandboxAndMaxSteps()",
 		"func Example_securitySandboxAndBudgets()",
+		"func Example_productionEmbedding()",
 		"leia.SecuritySandbox()",
 		"leia.WithMaxSteps(32)",
 		"leia.WithMaxHostResultBytes(8)",
@@ -522,6 +526,7 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 		"cmd/leia/main_examples_command_test.go",
 		"examples/data_processing/data_oriented/dense_matrix_vec_kernels.leia",
 		"examples/data_processing/data_oriented/soa_kernels.leia",
+		"examples/data/db_q_frame_project/main.leia",
 		"docs/reference/data-oriented/index.md",
 	)
 	requireFeatureCellRefs(t, data, "matrix_dense_arrays", "bytecode",

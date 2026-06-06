@@ -129,7 +129,8 @@ go test ./examples/embedding -run Example -count=1
 ```
 
 These cover compilation, public values, host functions, host modules, LLM
-provider injection, `HotLoader`, and `HotInstance`.
+provider injection, `SecuritySandbox`, Go import allowlists, host result
+budgets, `HotLoader`, and `HotInstance` state-preserving reloads.
 
 See [Embedding Leia](../guides/embedding.md).
 

@@ -43,6 +43,41 @@ func TestCapabilitiesJSON(t *testing.T) {
 	if !capabilitiesHaveStdlibModule(caps.StdlibLayers, "llm", "llm") || !capabilitiesHaveStdlibModule(caps.StdlibLayers, "host", "fs") || !capabilitiesHaveStdlibModule(caps.StdlibLayers, "data", "soa") {
 		t.Fatalf("stdlib_layers = %#v, want llm/llm, host/fs, and data/soa", caps.StdlibLayers)
 	}
+	if len(caps.Dialects) == 0 {
+		t.Fatal("dialects is empty")
+	}
+	for _, tc := range []struct {
+		name         string
+		category     string
+		capabilities []string
+		eval         bool
+		block        bool
+	}{
+		{name: "sh", category: "host", capabilities: []string{"process.shell"}, eval: true},
+		{name: "cmd", category: "host", capabilities: []string{"process.exec"}, eval: true},
+		{name: "glob", category: "host", capabilities: []string{"fs.read"}, eval: true},
+		{name: "env", category: "host", capabilities: []string{"env.read"}, eval: true, block: true},
+		{name: "serve", category: "web", capabilities: []string{"network.listen"}, eval: true, block: true},
+		{name: "sql", category: "database", eval: true, block: true},
+		{name: "q", category: "data", eval: true},
+		{name: "xlsx", category: "data", eval: true},
+		{name: "excel", category: "data", eval: true},
+		{name: "turn", category: "llm", capabilities: []string{"llm.turn"}, block: true},
+		{name: "agent", category: "llm", capabilities: []string{"llm.turn"}, block: true},
+	} {
+		dialect, ok := capabilitiesDialect(caps.Dialects, tc.name)
+		if !ok {
+			t.Fatalf("dialects = %#v, want tag %q", caps.Dialects, tc.name)
+		}
+		if dialect.Category != tc.category || !dialect.Builtin || dialect.Eval != tc.eval || dialect.Block != tc.block {
+			t.Fatalf("dialect %q = %+v, want category=%q builtin=true eval=%t block=%t", tc.name, dialect, tc.category, tc.eval, tc.block)
+		}
+		for _, want := range tc.capabilities {
+			if !containsString(dialect.Capabilities, want) {
+				t.Fatalf("dialect %q capabilities = %#v, want %q", tc.name, dialect.Capabilities, want)
+			}
+		}
+	}
 	for _, want := range []string{"tagged_strings", "tagged_blocks", "shell_strings", "llm_stdlib_calls", "dialect_eval"} {
 		if !caps.LLM.Enabled || !containsString(caps.LLM.Syntax, want) {
 			t.Fatalf("llm syntax = %#v, want %q", caps.LLM.Syntax, want)
@@ -93,6 +128,36 @@ func TestCapabilitiesJSON(t *testing.T) {
 	}
 	if caps.Tooling.Config.FileName != "leia.toml" || !containsString(caps.Tooling.Config.Formats, "json") {
 		t.Fatalf("config capabilities = %+v, want leia.toml/json", caps.Tooling.Config)
+	}
+}
+
+func capabilitiesDialect(dialects []cliDialectCapability, name string) (cliDialectCapability, bool) {
+	for _, dialect := range dialects {
+		if dialect.Name == name {
+			return dialect, true
+		}
+	}
+	return cliDialectCapability{}, false
+}
+
+func TestCapabilitiesDialectsCoverFeatureMatrixBuiltinTags(t *testing.T) {
+	root, err := filepath.Abs(filepath.Join("..", ".."))
+	if err != nil {
+		t.Fatal(err)
+	}
+	matrixTags := loadFeatureMatrixBuiltinDialectTags(t, root)
+	caps := buildCapabilities()
+	reportTags := make(map[string]bool, len(caps.Dialects))
+	for _, dialect := range caps.Dialects {
+		if dialect.Name == "" || dialect.Category == "" {
+			t.Fatalf("dialect capability = %+v, want name and category", dialect)
+		}
+		reportTags[dialect.Name] = true
+	}
+	for tag := range matrixTags {
+		if !reportTags[tag] {
+			t.Fatalf("capabilities dialects missing feature matrix builtin tag %q", tag)
+		}
 	}
 }
 

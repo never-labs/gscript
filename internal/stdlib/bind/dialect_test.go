@@ -125,6 +125,59 @@ func TestDialectInfoAndListExposeMetadata(t *testing.T) {
 	}
 }
 
+func TestBuiltinDialectInfosMatchRuntimeListMetadata(t *testing.T) {
+	infos := BuiltinDialectInfos()
+	if len(infos) == 0 {
+		t.Fatal("BuiltinDialectInfos is empty")
+	}
+	infoByName := make(map[string]DialectInfo, len(infos))
+	for _, info := range infos {
+		if info.Name == "" || info.Category == "" {
+			t.Fatalf("info = %+v, want name and category", info)
+		}
+		if !info.Builtin {
+			t.Fatalf("info = %+v, want builtin dialect metadata", info)
+		}
+		infoByName[info.Name] = info
+	}
+
+	values, err := BuildDialect(HostOptions{}, nil).RawGetString("list").GoFunction().Fn(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	list := values[0].Table()
+	if list.Length() != len(infos) {
+		t.Fatalf("dialect.list length = %d, BuiltinDialectInfos length = %d", list.Length(), len(infos))
+	}
+	for i := 1; i <= list.Length(); i++ {
+		runtimeInfo := list.RawGetInt(int64(i)).Table()
+		name := runtimeInfo.RawGetString("name").Str()
+		exported, ok := infoByName[name]
+		if !ok {
+			t.Fatalf("dialect.list includes %q missing from BuiltinDialectInfos", name)
+		}
+		if exported.Category != runtimeInfo.RawGetString("category").Str() || exported.Eval != runtimeInfo.RawGetString("eval").Bool() || exported.Block != runtimeInfo.RawGetString("block").Bool() {
+			t.Fatalf("metadata for %q: exported=%+v runtime category=%q eval=%t block=%t", name, exported, runtimeInfo.RawGetString("category").Str(), runtimeInfo.RawGetString("eval").Bool(), runtimeInfo.RawGetString("block").Bool())
+		}
+		gotCapabilities := stringSliceFromArray(runtimeInfo.RawGetString("capabilities").Table())
+		wantCapabilities := exported.Capabilities
+		if wantCapabilities == nil {
+			wantCapabilities = []string{}
+		}
+		if !reflect.DeepEqual(gotCapabilities, wantCapabilities) {
+			t.Fatalf("capabilities for %q: runtime=%#v exported=%#v", name, gotCapabilities, exported.Capabilities)
+		}
+		gotAliases := stringSliceFromArray(runtimeInfo.RawGetString("aliases").Table())
+		wantAliases := exported.Aliases
+		if wantAliases == nil {
+			wantAliases = []string{}
+		}
+		if !reflect.DeepEqual(gotAliases, wantAliases) {
+			t.Fatalf("aliases for %q: runtime=%#v exported=%#v", name, gotAliases, exported.Aliases)
+		}
+	}
+}
+
 func TestBuiltinDialectInfoCategoriesAreExplicit(t *testing.T) {
 	interp := runWithLib(t, `
 		tags := dialect.tags()

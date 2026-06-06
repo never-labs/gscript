@@ -476,6 +476,59 @@ func TestPlaygroundRepositoryAINativeExamplesHaveExplicitGates(t *testing.T) {
 	}
 }
 
+func TestPlaygroundRepositoryHighLevelReleaseExamplesAreExposed(t *testing.T) {
+	examples, err := playgroundRepositoryExamples(playgroundExamplesRoot())
+	if err != nil {
+		t.Fatalf("load repository examples: %v", err)
+	}
+	byID := make(map[string]playgroundExample, len(examples))
+	for _, example := range examples {
+		byID[example.ID] = example
+	}
+
+	want := map[string]struct {
+		runnable bool
+		requires string
+		snippets []string
+	}{
+		"repo-data-db_q_frame_project-main": {
+			runnable: true,
+			snippets: []string{"conn.frame(", "q.query(", "dialect.eval(\"xlsx\"", "dialect.eval(\"excel\""},
+		},
+		"repo-evaluate-project_agent_regression": {
+			requires: "leia evaluate CLI",
+			snippets: []string{"stream: true", "on_stream:", "eval.usage().turns", "eval.usage().stream_events"},
+		},
+		"repo-web-serve_dialect_app": {
+			requires: "network/server host access",
+			snippets: []string{"serve {", "routes:", "http.get(", "net.post(", "method_status"},
+		},
+		"repo-web-tiny_fullstack_app": {
+			requires: "network/server host access",
+			snippets: []string{"serve {", "db.memory()", "http.get(", "net.post(", "/static/:name"},
+		},
+	}
+	for id, want := range want {
+		t.Run(id, func(t *testing.T) {
+			example, ok := byID[id]
+			if !ok {
+				t.Fatalf("%s example not exposed through playground repository examples", id)
+			}
+			if example.Runnable != want.runnable {
+				t.Fatalf("%s runnable = %t, want %t", id, example.Runnable, want.runnable)
+			}
+			if example.Requires != want.requires {
+				t.Fatalf("%s requires = %q, want %q", id, example.Requires, want.requires)
+			}
+			for _, snippet := range want.snippets {
+				if !strings.Contains(example.Source, snippet) {
+					t.Fatalf("%s source missing %q\nsource:\n%s", id, snippet, example.Source)
+				}
+			}
+		})
+	}
+}
+
 func TestPlaygroundRepositoryGameEngineExampleClassification(t *testing.T) {
 	examples, err := playgroundRepositoryExamples(playgroundExamplesRoot())
 	if err != nil {

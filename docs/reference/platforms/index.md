@@ -23,6 +23,27 @@ Use `leia capabilities --json` to inspect a built binary:
 go run ./cmd/leia capabilities --json
 ```
 
+The JSON report includes execution modes, commands, standard-library layers,
+tooling surfaces, LLM support, and builtin dialect metadata. The `dialects`
+array is derived from the runtime dialect registry and is the supported
+machine-readable way for editors, playgrounds, and release gates to discover
+which tagged literals and tagged blocks are installed:
+
+```json
+{
+  "dialects": [
+    {
+      "name": "sh",
+      "category": "host",
+      "capabilities": ["process.shell"],
+      "builtin": true,
+      "eval": true,
+      "block": false
+    }
+  ]
+}
+```
+
 ## JIT Expectations
 
 The JIT is an implementation detail, not a language feature. Programs must not
