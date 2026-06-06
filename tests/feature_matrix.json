@@ -310,6 +310,20 @@
       "perf_hot_case": {"status": "covered", "refs": ["benchmarks/data/q_query_rollup.leia", "benchmarks/data/soa_affine_many.leia", "benchmarks/data/soa_masked_aggregate.leia", "benchmarks/data/soa_filter_gather.leia"]}
     },
     {
+      "id": "data_stdlib_qsql",
+      "name": "Data stdlib frames and qSQL lowering substrate",
+      "category": "stdlib-data",
+      "spec_sections": ["Expressions", "Values And Types", "Tables And Metatables", "Implementation Requirements"],
+      "parser": {"status": "covered", "refs": ["internal/stdlib/lib/q/parser_test.go"]},
+      "bytecode": {"status": "not_applicable", "refs": []},
+      "interpreter": {"status": "covered", "refs": ["internal/stdlib/lib/data/data_test.go", "internal/stdlib/bind/q_test.go"]},
+      "tier1": {"status": "semantic_only", "refs": []},
+      "tier2": {"status": "semantic_only", "refs": []},
+      "semantic_gate": {"status": "covered", "refs": ["internal/stdlib/lib/data/data_test.go", "internal/stdlib/lib/q/parser_test.go", "internal/stdlib/bind/q_test.go", "docs/reference/data-oriented/index.md", "docs/reference/stdlib/index.md"]},
+      "conformance_case": {"status": "covered", "refs": ["internal/stdlib/bind/q_test.go"]},
+      "perf_hot_case": {"status": "semantic_only", "refs": []}
+    },
+    {
       "id": "spreadsheet_dialects",
       "name": "Spreadsheet xlsx/excel encode/decode dialects",
       "category": "dialect-data",

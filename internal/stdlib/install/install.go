@@ -99,6 +99,7 @@ func InstallModules(installer runtime.StdlibInstaller, maxHostResult func() int6
 	installer.RegisterTable("context", stdbind.BuildContext())
 	installer.RegisterTable("crypto", stdbind.BuildCrypto(maxHostResult))
 	installer.RegisterTable("csv", stdbind.BuildCSV(maxHostResult))
+	installer.RegisterTable("data", buildDataModule())
 	installer.RegisterTable("db", stdbind.BuildDB(hostOpts))
 	installer.RegisterTable("dialect", stdbind.BuildDialect(hostOpts, maxHostResult, opts.Dialects...))
 	installer.RegisterTable("encoding", stdbind.BuildEncoding(maxHostResult))
@@ -135,6 +136,10 @@ func InstallModules(installer runtime.StdlibInstaller, maxHostResult func() int6
 	installer.RegisterTable("utf8", stdbind.BuildUTF8(maxHostResult))
 	installer.RegisterTable("uuid", stdbind.BuildUUID())
 	installer.RegisterTable("vec", stdbind.BuildVec())
+}
+
+func buildDataModule() *runtime.Table {
+	return stdbind.BuildData()
 }
 
 func InstallLLM(interp *runtime.Interpreter) {

@@ -1228,6 +1228,10 @@ func releaseFeatureDocCoverageMap() map[string]releaseFeatureDocCoverage {
 			specSections: []string{"Grammar Appendix", "Expressions", "Values And Types"},
 			docPaths:     []string{"docs/spec/index.md", "docs/reference/data-oriented/index.md", "docs/reference/dialects/index.md"},
 		},
+		"data_stdlib_qsql": {
+			specSections: []string{"Expressions", "Values And Types", "Tables And Metatables", "Implementation Requirements"},
+			docPaths:     []string{"docs/spec/index.md", "docs/reference/data-oriented/index.md", "docs/reference/stdlib/index.md"},
+		},
 		"spreadsheet_dialects": {
 			specSections: []string{"Expressions", "Values And Types"},
 			docPaths:     []string{"docs/spec/index.md", "docs/reference/data-oriented/index.md", "docs/reference/dialects/index.md"},

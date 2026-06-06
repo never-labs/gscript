@@ -322,6 +322,7 @@ func leiaRows(rows *sql.Rows) (*Table, error) {
 	if err != nil {
 		return nil, err
 	}
+	columnTypes, _ := rows.ColumnTypes()
 	out := NewAppendArrayTable(0)
 	rowIndex := int64(1)
 	for rows.Next() {
@@ -335,7 +336,7 @@ func leiaRows(rows *sql.Rows) (*Table, error) {
 		}
 		row := NewTableSized(len(columns), len(columns))
 		for i, col := range columns {
-			val := sqlToLeiaValue(values[i])
+			val := sqlToLeiaFrameValue(values[i], dbColumnTypeName(columnTypes, i))
 			row.RawSetString(col, val)
 			row.RawSetInt(int64(i+1), val)
 		}
@@ -353,6 +354,7 @@ func leiaFrame(rows *sql.Rows) (*Table, error) {
 	if err != nil {
 		return nil, err
 	}
+	columnTypes, _ := rows.ColumnTypes()
 	scanned := make([][]Value, 0)
 	rowTable := NewAppendArrayTable(0)
 	for rows.Next() {
@@ -367,7 +369,7 @@ func leiaFrame(rows *sql.Rows) (*Table, error) {
 		record := make([]Value, len(columns))
 		row := NewTableSized(len(columns), len(columns))
 		for i, col := range columns {
-			val := sqlToLeiaValue(values[i])
+			val := sqlToLeiaFrameValue(values[i], dbColumnTypeName(columnTypes, i))
 			record[i] = val
 			row.RawSetString(col, val)
 			row.RawSetInt(int64(i+1), val)
@@ -383,6 +385,8 @@ func leiaFrame(rows *sql.Rows) (*Table, error) {
 	columnsTable := NewTable()
 	numericColumns := NewAppendArrayTable(0)
 	numericTable := NewTable()
+	schemaColumns := NewAppendArrayTable(len(columns))
+	kindsTable := NewTable()
 	soaColumns := make(map[string]*DenseArray)
 
 	for colIndex, name := range columns {
@@ -392,15 +396,36 @@ func leiaFrame(rows *sql.Rows) (*Table, error) {
 			values[rowIndex] = record[colIndex]
 		}
 		columnValue := dbColumnValue(values)
+		kind := dbColumnKind(columnValue)
 		columnsTable.RawSetString(name, columnValue)
-		if columnValue.IsDenseArray() {
+		kindsTable.RawSetString(name, StringValue(kind))
+		schemaColumns.RawSetInt(int64(colIndex+1), TableValue(dbSchemaColumn(name, kind, columnValue, values)))
+		if dbColumnIsNumericDense(columnValue) {
 			numericTable.RawSetString(name, columnValue)
 			numericColumns.RawSetInt(int64(numericColumns.Length()+1), StringValue(name))
+		}
+		if columnValue.IsDenseArray() {
 			soaColumns[name] = columnValue.DenseArray()
 		}
 	}
 
+	schema := NewTable()
+	schema.RawSetString("columns", TableValue(schemaColumns))
+	schema.RawSetString("names", TableValue(columnNames))
+	schema.RawSetString("kinds", TableValue(kindsTable))
+
+	shape := NewTable()
+	shape.RawSetString("rows", IntValue(int64(len(scanned))))
+	shape.RawSetString("columns", IntValue(int64(len(columns))))
+
 	frame := NewTable()
+	frame.RawSetString("kind", StringValue("data_frame"))
+	frame.RawSetString("type", StringValue("data_frame"))
+	frame.RawSetString("data", TableValue(columnsTable))
+	frame.RawSetString("schema", TableValue(schema))
+	frame.RawSetString("shape", TableValue(shape))
+	frame.RawSetString("nrows", IntValue(int64(len(scanned))))
+	frame.RawSetString("ncols", IntValue(int64(len(columns))))
 	frame.RawSetString("rows", TableValue(rowTable))
 	frame.RawSetString("columns", TableValue(columnsTable))
 	frame.RawSetString("column_names", TableValue(columnNames))
@@ -415,6 +440,40 @@ func leiaFrame(rows *sql.Rows) (*Table, error) {
 		frame.RawSetString("soa", SoAValue(soa))
 	}
 	return frame, nil
+}
+
+func dbColumnTypeName(columnTypes []*sql.ColumnType, index int) string {
+	if index < 0 || index >= len(columnTypes) || columnTypes[index] == nil {
+		return ""
+	}
+	return strings.ToLower(columnTypes[index].DatabaseTypeName())
+}
+
+func sqlToLeiaFrameValue(v any, columnType string) Value {
+	if dbColumnTypeIsBool(columnType) {
+		switch x := v.(type) {
+		case bool:
+			return BoolValue(x)
+		case int64:
+			return BoolValue(x != 0)
+		case float64:
+			return BoolValue(x != 0)
+		case []byte:
+			return BoolValue(string(x) != "" && string(x) != "0")
+		case string:
+			return BoolValue(x != "" && x != "0")
+		}
+	}
+	return sqlToLeiaValue(v)
+}
+
+func dbColumnTypeIsBool(columnType string) bool {
+	switch strings.ToLower(columnType) {
+	case "bool", "boolean":
+		return true
+	default:
+		return false
+	}
 }
 
 func dbColumnValue(values []Value) Value {
@@ -471,6 +530,86 @@ func dbPlainColumn(values []Value) Value {
 		out.RawSetInt(int64(i+1), v)
 	}
 	return TableValue(out)
+}
+
+func dbColumnKind(columnValue Value) string {
+	if columnValue.IsDenseArray() {
+		return columnValue.DenseArray().DType().String()
+	}
+	if !columnValue.IsTable() {
+		return "any"
+	}
+	values := columnValue.Table()
+	kind := ""
+	for i := int64(1); i <= int64(values.Length()); i++ {
+		valueKind := dbScalarKind(values.RawGetInt(i))
+		if valueKind == "null" {
+			continue
+		}
+		if kind == "" {
+			kind = valueKind
+			continue
+		}
+		if kind != valueKind {
+			return "any"
+		}
+	}
+	if kind == "" {
+		return "any"
+	}
+	return kind
+}
+
+func dbSchemaColumn(name, kind string, columnValue Value, values []Value) *Table {
+	out := NewTable()
+	out.RawSetString("name", StringValue(name))
+	out.RawSetString("kind", StringValue(kind))
+	out.RawSetString("nullable", BoolValue(dbColumnNullable(values)))
+	out.RawSetString("dense", BoolValue(columnValue.IsDenseArray()))
+	if columnValue.IsDenseArray() {
+		out.RawSetString("dtype", StringValue(columnValue.DenseArray().DType().String()))
+	} else {
+		out.RawSetString("dtype", StringValue(kind))
+	}
+	return out
+}
+
+func dbColumnNullable(values []Value) bool {
+	for _, value := range values {
+		if value.IsNil() {
+			return true
+		}
+	}
+	return false
+}
+
+func dbColumnIsNumericDense(value Value) bool {
+	if !value.IsDenseArray() {
+		return false
+	}
+	switch value.DenseArray().DType() {
+	case DenseArrayI64, DenseArrayF64:
+		return true
+	default:
+		return false
+	}
+}
+
+func dbScalarKind(value Value) string {
+	switch {
+	case value.IsNil():
+		return "null"
+	case value.IsBool():
+		return "bool"
+	case value.IsInt():
+		return "i64"
+	case value.IsFloat():
+		return "f64"
+	case value.IsString():
+		return "string"
+	default:
+		return "any"
+	}
 }
 
 func sqlToLeiaValue(v any) Value {

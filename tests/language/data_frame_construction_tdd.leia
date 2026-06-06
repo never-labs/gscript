@@ -1,0 +1,37 @@
+print("case:data_frame_construction_tdd")
+
+func check(name, ok) {
+  assert(ok)
+  print("ok", name)
+}
+
+trades := data.frame({
+  sym: data.symbols({"AAPL", "MSFT", "AAPL"}),
+  price: data.f64({100.5, 90.0, 101.0}),
+  size: data.i64({10, 15, 20}),
+  venue: data.strings({"XNAS", "XNYS", "XNAS"}),
+  active: data.bool({true, false, true}),
+  trade_date: data.date({"2026-06-01", "2026-06-01", data.null}),
+  session_time: data.time({"09:30:00", "09:31:00", "15:59:00"}),
+  event_ts: data.timestamp({"2026-06-01T09:30:00Z", "2026-06-01T09:31:00Z", data.null}),
+})
+
+check("frame length", trades.len == 3)
+check("schema preserves order", trades.schema.names[1] == "sym" && trades.schema.names[8] == "event_ts")
+check("schema kinds", trades.schema.kinds.sym == "symbol" && trades.schema.kinds.price == "f64" && trades.schema.kinds.trade_date == "date" && trades.schema.kinds.session_time == "time" && trades.schema.kinds.event_ts == "timestamp")
+check("column field access", trades.columns.sym[2] == "MSFT" && trades.price[3] == 101.0)
+check("temporal null passthrough", trades.trade_date[1] == "2026-06-01" && trades.session_time[3] == "15:59:00" && trades.event_ts[3] == data.null)
+
+row := trades:row(3)
+check("row materialization", row.sym == "AAPL" && row.size == 20 && row.active == true && row.trade_date == data.null && row.event_ts == data.null)
+
+subset := trades:gather({3, 1})
+check("gather preserves columns", subset.len == 2 && subset.sym[1] == "AAPL" && subset.price[2] == 100.5 && subset.event_ts[1] == data.null && subset.trade_date[2] == "2026-06-01")
+
+ok, err := pcall(data.frame, {
+  a: data.i64({1, 2}),
+  b: data.i64({1}),
+})
+check("length diagnostics", ok == false && string.find(tostring(err), "column \"b\" length 1", 1, true) != nil)
+
+print("ok")

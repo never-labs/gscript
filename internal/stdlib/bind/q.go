@@ -5,6 +5,29 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
+
+	"github.com/never-labs/leia/internal/stdlib/lib/data"
+	stdq "github.com/never-labs/leia/internal/stdlib/lib/q"
+)
+
+const qSymbolVectorMarker = "__q_symbol_vector"
+
+const qSQLPlanCacheLimit = 128
+
+type qSQLPlanTemplate struct {
+	source string
+	plan   data.QueryPlan
+}
+
+var (
+	qSQLTemplateCacheMu sync.Mutex
+	qSQLTemplateCache   = make(map[string]qSQLPlanTemplate)
+	qSQLTemplateOrder   []string
+
+	qSQLAlignedPlanCacheMu sync.Mutex
+	qSQLAlignedPlanCache   = make(map[string]data.QueryPlan)
+	qSQLAlignedPlanOrder   []string
 )
 
 // BuildQ creates the "q" column-query helper library. q.query keeps the
@@ -34,6 +57,23 @@ func BuildQ() *Table {
 		}
 		return qEvalSymbolic(args[0].Str())
 	})
+	qsql := func(name string, args []Value) ([]Value, error) {
+		frameValue, src, resolveSource, err := qSQLArgs(name, args)
+		if err != nil {
+			return nil, err
+		}
+		out, err := qRunSQL(frameValue, src, resolveSource)
+		if err != nil {
+			return nil, err
+		}
+		return []Value{TableValue(out)}, nil
+	}
+	set("sql", func(args []Value) ([]Value, error) {
+		return qsql("q.sql", args)
+	})
+	set("select", func(args []Value) ([]Value, error) {
+		return qsql("q.select", args)
+	})
 	set("count", func(args []Value) ([]Value, error) {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("q.count: argument 1 required")
@@ -41,6 +81,19 @@ func BuildQ() *Table {
 		return []Value{IntValue(int64(qCount(args[0])))}, nil
 	})
 	return t
+}
+
+func qSQLArgs(name string, args []Value) (Value, string, bool, error) {
+	if len(args) < 2 {
+		return NilValue(), "", false, fmt.Errorf("%s: expected (frame, qSQL source) or (qSQL source, frames)", name)
+	}
+	if args[0].IsString() {
+		return args[1], args[0].Str(), true, nil
+	}
+	if args[1].IsString() {
+		return args[0], args[1].Str(), false, nil
+	}
+	return NilValue(), "", false, fmt.Errorf("%s: expected one qSQL source string argument", name)
 }
 
 func dialectQ(body Value, opts *Table) ([]Value, error) {
@@ -448,7 +501,12 @@ func qSymbolListValue(keys []string) Value {
 	for i, key := range keys {
 		out.RawSetInt(int64(i+1), StringValue(key))
 	}
+	out.RawSetString(qSymbolVectorMarker, BoolValue(true))
 	return TableValue(out)
+}
+
+func qIsSymbolVector(v Value) bool {
+	return v.IsTable() && v.Table().RawGetString(qSymbolVectorMarker).Truthy()
 }
 
 func qSymbolDict(keys []string, values Value) (Value, error) {
@@ -513,16 +571,24 @@ func qFlip(v Value) (Value, error) {
 		}
 	}
 	out := NewAppendArrayTable(rows)
+	kinds := NewTable()
 	for i := 0; i < rows; i++ {
 		row := NewTable()
 		for _, name := range names {
-			item, err := qVectorAt(dict.RawGetString(name), i)
+			source := dict.RawGetString(name)
+			if qIsSymbolVector(source) {
+				kinds.RawSetString(name, StringValue(string(data.KindSymbol)))
+			}
+			item, err := qVectorAt(source, i)
 			if err != nil {
 				return NilValue(), err
 			}
 			row.RawSetString(name, item)
 		}
 		out.RawSetInt(int64(i+1), TableValue(row))
+	}
+	if kinds.Length() > 0 {
+		out.RawSetString("column_kinds", TableValue(kinds))
 	}
 	return TableValue(out), nil
 }
@@ -700,6 +766,835 @@ func qRunQuery(s *SoA, spec *Table) (*Table, error) {
 		return nil, err
 	}
 	return qApplyOrderAndLimit(rows, spec)
+}
+
+func qRunSQL(frameValue Value, src string, resolveSource bool) (*Table, error) {
+	tmpl, err := qSQLCachedPlanTemplate(src)
+	if err != nil {
+		return nil, err
+	}
+	sourceName := ""
+	if resolveSource {
+		sourceName = tmpl.source
+	}
+	frame, err := qDataFrameFromValue(frameValue, sourceName)
+	if err != nil {
+		return nil, fmt.Errorf("q.sql: %w", err)
+	}
+	plan := qSQLPlanForFrame(src, tmpl.plan, frame)
+	plan.Source = frame
+	out, err := plan.Exec()
+	if err != nil {
+		return nil, fmt.Errorf("q.sql: exec: %w", err)
+	}
+	return qRowsFromDataFrame(out)
+}
+
+func qSQLCachedPlanTemplate(src string) (qSQLPlanTemplate, error) {
+	qSQLTemplateCacheMu.Lock()
+	if tmpl, ok := qSQLTemplateCache[src]; ok {
+		qSQLTemplateCacheMu.Unlock()
+		tmpl.plan = qCloneDataQueryPlan(tmpl.plan)
+		return tmpl, nil
+	}
+	qSQLTemplateCacheMu.Unlock()
+
+	baseSrc, opts, err := qSQLSourceAndOptions(src)
+	if err != nil {
+		return qSQLPlanTemplate{}, fmt.Errorf("q.sql: %w", err)
+	}
+	query, err := stdq.Parse(baseSrc)
+	if err != nil {
+		return qSQLPlanTemplate{}, fmt.Errorf("q.sql: parse: %w", err)
+	}
+	lowered, err := stdq.Lower(query)
+	if err != nil {
+		return qSQLPlanTemplate{}, fmt.Errorf("q.sql: lower: %w", err)
+	}
+	qNormalizePlanLiterals(&lowered.Plan)
+	opts.apply(&lowered.Plan)
+	lowered.Plan.Source = data.Frame{}
+	tmpl := qSQLPlanTemplate{
+		source: lowered.Source,
+		plan:   qCloneDataQueryPlan(lowered.Plan),
+	}
+
+	qSQLTemplateCacheMu.Lock()
+	qSQLTemplateCacheStoreLocked(src, tmpl)
+	qSQLTemplateCacheMu.Unlock()
+
+	tmpl.plan = qCloneDataQueryPlan(tmpl.plan)
+	return tmpl, nil
+}
+
+func qSQLPlanForFrame(src string, tmpl data.QueryPlan, frame data.Frame) data.QueryPlan {
+	key := src + "\x00" + qDataFrameSchemaSignature(frame)
+	qSQLAlignedPlanCacheMu.Lock()
+	if plan, ok := qSQLAlignedPlanCache[key]; ok {
+		qSQLAlignedPlanCacheMu.Unlock()
+		return qCloneDataQueryPlan(plan)
+	}
+	qSQLAlignedPlanCacheMu.Unlock()
+
+	plan := qCloneDataQueryPlan(tmpl)
+	qAlignPlanLiteralsToFrame(&plan, frame)
+
+	qSQLAlignedPlanCacheMu.Lock()
+	qSQLAlignedPlanCacheStoreLocked(key, plan)
+	qSQLAlignedPlanCacheMu.Unlock()
+
+	return qCloneDataQueryPlan(plan)
+}
+
+func qSQLTemplateCacheStoreLocked(key string, tmpl qSQLPlanTemplate) {
+	if _, ok := qSQLTemplateCache[key]; !ok {
+		qSQLTemplateOrder = append(qSQLTemplateOrder, key)
+	}
+	tmpl.plan = qCloneDataQueryPlan(tmpl.plan)
+	qSQLTemplateCache[key] = tmpl
+	for len(qSQLTemplateOrder) > qSQLPlanCacheLimit {
+		evict := qSQLTemplateOrder[0]
+		qSQLTemplateOrder = qSQLTemplateOrder[1:]
+		delete(qSQLTemplateCache, evict)
+	}
+}
+
+func qSQLAlignedPlanCacheStoreLocked(key string, plan data.QueryPlan) {
+	if _, ok := qSQLAlignedPlanCache[key]; !ok {
+		qSQLAlignedPlanOrder = append(qSQLAlignedPlanOrder, key)
+	}
+	qSQLAlignedPlanCache[key] = qCloneDataQueryPlan(plan)
+	for len(qSQLAlignedPlanOrder) > qSQLPlanCacheLimit {
+		evict := qSQLAlignedPlanOrder[0]
+		qSQLAlignedPlanOrder = qSQLAlignedPlanOrder[1:]
+		delete(qSQLAlignedPlanCache, evict)
+	}
+}
+
+func qDataFrameSchemaSignature(frame data.Frame) string {
+	schema := frame.Schema()
+	names := schema.Names()
+	var b strings.Builder
+	for i, name := range names {
+		if i > 0 {
+			b.WriteByte('|')
+		}
+		b.WriteString(string(name))
+		b.WriteByte(':')
+		if kind, ok := schema.Kind(name); ok {
+			b.WriteString(string(kind))
+		}
+	}
+	return b.String()
+}
+
+func qCloneDataQueryPlan(plan data.QueryPlan) data.QueryPlan {
+	plan.Source = data.Frame{}
+	plan.Where = qCloneDataExpr(plan.Where)
+	plan.By = append([]data.Symbol(nil), plan.By...)
+	plan.OrderBy = append([]data.OrderSpec(nil), plan.OrderBy...)
+	if plan.Select != nil {
+		selects := make([]data.SelectItem, len(plan.Select))
+		for i, item := range plan.Select {
+			selects[i] = data.SelectItem{Name: item.Name, Expr: qCloneDataExpr(item.Expr)}
+		}
+		plan.Select = selects
+	}
+	if plan.Aggregates != nil {
+		aggs := make([]data.Aggregate, len(plan.Aggregates))
+		for i, agg := range plan.Aggregates {
+			aggs[i] = data.Aggregate{Name: agg.Name, Func: agg.Func, Expr: qCloneDataExpr(agg.Expr)}
+		}
+		plan.Aggregates = aggs
+	}
+	return plan
+}
+
+func qCloneDataExpr(expr data.Expr) data.Expr {
+	switch x := expr.(type) {
+	case nil:
+		return nil
+	case data.Binary:
+		x.Left = qCloneDataExpr(x.Left)
+		x.Right = qCloneDataExpr(x.Right)
+		return x
+	default:
+		return expr
+	}
+}
+
+func qAlignPlanLiteralsToFrame(plan *data.QueryPlan, frame data.Frame) {
+	if plan == nil {
+		return
+	}
+	schema := frame.Schema()
+	plan.Where = qAlignDataExpr(plan.Where, schema)
+	for i := range plan.Select {
+		plan.Select[i].Expr = qAlignDataExpr(plan.Select[i].Expr, schema)
+	}
+	for i := range plan.Aggregates {
+		plan.Aggregates[i].Expr = qAlignDataExpr(plan.Aggregates[i].Expr, schema)
+	}
+}
+
+func qAlignDataExpr(expr data.Expr, schema data.Schema) data.Expr {
+	switch x := expr.(type) {
+	case data.Binary:
+		x.Left = qAlignDataExpr(x.Left, schema)
+		x.Right = qAlignDataExpr(x.Right, schema)
+		if x.Op == data.OpEQ || x.Op == data.OpNE {
+			x.Left, x.Right = qAlignBinaryLiteral(x.Left, x.Right, schema)
+			x.Right, x.Left = qAlignBinaryLiteral(x.Right, x.Left, schema)
+		}
+		return x
+	default:
+		return expr
+	}
+}
+
+func qAlignBinaryLiteral(left, right data.Expr, schema data.Schema) (data.Expr, data.Expr) {
+	col, ok := left.(data.ColumnRef)
+	if !ok {
+		return left, right
+	}
+	lit, ok := right.(data.Literal)
+	if !ok {
+		return left, right
+	}
+	kind, ok := schema.Kind(col.Name)
+	if !ok {
+		return left, right
+	}
+	switch kind {
+	case data.KindString:
+		if sym, ok := lit.Value.(data.Symbol); ok {
+			right = data.Literal{Value: string(sym)}
+		}
+	case data.KindSymbol:
+		if s, ok := lit.Value.(string); ok {
+			right = data.Literal{Value: data.Symbol(s)}
+		}
+	}
+	return left, right
+}
+
+func qNormalizePlanLiterals(plan *data.QueryPlan) {
+	if plan == nil {
+		return
+	}
+	plan.Where = qNormalizeDataExpr(plan.Where)
+	for i := range plan.Select {
+		plan.Select[i].Expr = qNormalizeDataExpr(plan.Select[i].Expr)
+	}
+	for i := range plan.Aggregates {
+		plan.Aggregates[i].Expr = qNormalizeDataExpr(plan.Aggregates[i].Expr)
+	}
+}
+
+func qNormalizeDataExpr(expr data.Expr) data.Expr {
+	switch x := expr.(type) {
+	case nil:
+		return nil
+	case data.ColumnRef:
+		switch strings.ToLower(string(x.Name)) {
+		case "true":
+			return data.Literal{Value: true}
+		case "false":
+			return data.Literal{Value: false}
+		case "null":
+			return data.Literal{Value: nil}
+		default:
+			return x
+		}
+	case data.Binary:
+		x.Left = qNormalizeDataExpr(x.Left)
+		x.Right = qNormalizeDataExpr(x.Right)
+		return x
+	default:
+		return x
+	}
+}
+
+type qSQLOptions struct {
+	order []data.OrderSpec
+	limit int
+}
+
+func (o qSQLOptions) apply(plan *data.QueryPlan) {
+	if len(o.order) > 0 {
+		plan.OrderBy = o.order
+	}
+	if o.limit >= 0 {
+		plan.LimitN = o.limit
+	}
+}
+
+func qSQLSourceAndOptions(src string) (string, qSQLOptions, error) {
+	opts := qSQLOptions{limit: -1}
+	base := strings.TrimSpace(src)
+	if idx := qLastKeywordIndex(base, "limit"); idx >= 0 {
+		n, err := strconv.Atoi(strings.TrimSpace(base[idx+len("limit"):]))
+		if err != nil || n < 0 {
+			return "", opts, fmt.Errorf("limit must be a non-negative integer")
+		}
+		opts.limit = n
+		base = strings.TrimSpace(base[:idx])
+	}
+	if idx := qLastKeywordIndex(base, "order by"); idx >= 0 {
+		specs, err := qSQLOrderSpecs(strings.TrimSpace(base[idx+len("order by"):]))
+		if err != nil {
+			return "", opts, err
+		}
+		opts.order = specs
+		base = strings.TrimSpace(base[:idx])
+	}
+	return base, opts, nil
+}
+
+func qLastKeywordIndex(src, keyword string) int {
+	fields := strings.Fields(src)
+	if len(fields) == 0 {
+		return -1
+	}
+	lowerKeyword := strings.Fields(strings.ToLower(keyword))
+	positions := make([]int, 0, len(fields))
+	pos := 0
+	for _, field := range fields {
+		idx := strings.Index(src[pos:], field)
+		if idx < 0 {
+			return -1
+		}
+		pos += idx
+		positions = append(positions, pos)
+		pos += len(field)
+	}
+	for i := len(fields) - len(lowerKeyword); i >= 0; i-- {
+		match := true
+		for j, want := range lowerKeyword {
+			if strings.ToLower(fields[i+j]) != want {
+				match = false
+				break
+			}
+		}
+		if match {
+			return positions[i]
+		}
+	}
+	return -1
+}
+
+func qSQLOrderSpecs(src string) ([]data.OrderSpec, error) {
+	if src == "" {
+		return nil, fmt.Errorf("order by requires at least one column")
+	}
+	parts := strings.Split(src, ",")
+	specs := make([]data.OrderSpec, 0, len(parts))
+	for _, part := range parts {
+		fields := strings.Fields(strings.TrimSpace(part))
+		if len(fields) == 0 || len(fields) > 2 {
+			return nil, fmt.Errorf("invalid order by specification %q", part)
+		}
+		spec := data.OrderSpec{Column: data.Symbol(fields[0])}
+		if len(fields) == 2 {
+			switch strings.ToLower(fields[1]) {
+			case "asc":
+			case "desc":
+				spec.Desc = true
+			default:
+				return nil, fmt.Errorf("invalid order direction %q", fields[1])
+			}
+		}
+		specs = append(specs, spec)
+	}
+	return specs, nil
+}
+
+func qDataFrameFromValue(v Value, sourceName string) (data.Frame, error) {
+	if sourceName != "" && v.IsTable() && !qLooksLikeFrame(v.Table()) {
+		source := v.Table().RawGetString(sourceName)
+		if source.IsNil() {
+			return data.Frame{}, fmt.Errorf("source %q not found", sourceName)
+		}
+		return qDataFrameFromValue(source, "")
+	}
+	if v.IsSoA() {
+		return qDataFrameFromSoA(v.SoA())
+	}
+	if !v.IsTable() {
+		return data.Frame{}, fmt.Errorf("argument 1 must be a frame table or soa")
+	}
+	tbl := v.Table()
+	if cols := tbl.RawGetString("columns"); cols.IsTable() {
+		if names := tbl.RawGetString("column_names"); names.IsTable() {
+			return qDataFrameFromColumns(cols.Table(), names.Table(), qFrameColumnKinds(tbl))
+		}
+	}
+	if soa := tbl.RawGetString("soa"); soa.IsSoA() {
+		return qDataFrameFromSoA(soa.SoA())
+	}
+	return qDataFrameFromRowTable(tbl)
+}
+
+func qLooksLikeFrame(tbl *Table) bool {
+	if tbl == nil {
+		return false
+	}
+	if isDataFrameTable(tbl) {
+		return true
+	}
+	if kind := tbl.RawGetString("kind"); kind.IsString() && kind.Str() == "data_frame" {
+		return true
+	}
+	if typ := tbl.RawGetString("type"); typ.IsString() && typ.Str() == "data_frame" {
+		return true
+	}
+	return tbl.RawGetString("columns").IsTable() && tbl.RawGetString("column_names").IsTable()
+}
+
+func qDataFrameFromSoA(s *SoA) (data.Frame, error) {
+	if s == nil {
+		return data.Frame{}, fmt.Errorf("soa is nil")
+	}
+	cols := make([]data.Column, 0, len(s.ColumnNames()))
+	for _, name := range s.ColumnNames() {
+		col, ok := s.Column(name)
+		if !ok {
+			return data.Frame{}, fmt.Errorf("soa column %q not found", name)
+		}
+		array, err := qDataArrayFromDense(col)
+		if err != nil {
+			return data.Frame{}, fmt.Errorf("column %q: %w", name, err)
+		}
+		cols = append(cols, data.Column{Name: data.Symbol(name), Data: array})
+	}
+	return data.NewFrame(cols...)
+}
+
+func qDataFrameFromColumns(columns, columnNames *Table, kinds map[string]data.Kind) (data.Frame, error) {
+	cols := make([]data.Column, 0, columnNames.Length())
+	for i := 1; i <= columnNames.Length(); i++ {
+		nameValue := columnNames.RawGetInt(int64(i))
+		if !nameValue.IsString() {
+			return data.Frame{}, fmt.Errorf("frame column_names[%d] must be a string", i)
+		}
+		name := nameValue.Str()
+		col, err := qDataColumnFromVector(data.Symbol(name), columns.RawGetString(name), kinds[name])
+		if err != nil {
+			return data.Frame{}, fmt.Errorf("column %q: %w", name, err)
+		}
+		cols = append(cols, col)
+	}
+	return data.NewFrame(cols...)
+}
+
+func qFrameColumnKinds(frame *Table) map[string]data.Kind {
+	if frame == nil {
+		return nil
+	}
+	out := map[string]data.Kind{}
+	addKinds := func(v Value) {
+		if !v.IsTable() {
+			return
+		}
+		v.Table().ForEachPlainRaw(func(key, val Value) bool {
+			if key.IsString() && val.IsString() {
+				if kind, ok := qDataKind(val.Str()); ok {
+					out[key.Str()] = kind
+				}
+			}
+			return true
+		})
+	}
+	addKinds(frame.RawGetString("column_kinds"))
+	addKinds(frame.RawGetString("kinds"))
+	if schema := frame.RawGetString("schema"); schema.IsTable() {
+		addKinds(schema.Table().RawGetString("kinds"))
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+func qDataKind(kind string) (data.Kind, bool) {
+	switch strings.ToLower(kind) {
+	case "i64", "int", "integer":
+		return data.KindI64, true
+	case "f64", "float", "real", "number":
+		return data.KindF64, true
+	case "bool", "boolean":
+		return data.KindBool, true
+	case "string", "text":
+		return data.KindString, true
+	case "symbol":
+		return data.KindSymbol, true
+	case "date", "time", "timestamp":
+		return data.KindString, true
+	case "null":
+		return data.KindAny, true
+	case "any":
+		return data.KindAny, true
+	default:
+		return "", false
+	}
+}
+
+func qDataColumnFromVector(name data.Symbol, v Value, kind data.Kind) (data.Column, error) {
+	values, err := qAnyValuesFromVector(v)
+	if err != nil {
+		return data.Column{}, err
+	}
+	if kind == "" || kind == data.KindAny {
+		return data.NewColumn(name, values), nil
+	}
+	array, ok := qTypedDataArray(values, kind)
+	if !ok {
+		return data.NewColumn(name, values), nil
+	}
+	return data.Column{Name: name, Data: array}, nil
+}
+
+func qTypedDataArray(values []any, kind data.Kind) (data.Array, bool) {
+	for _, v := range values {
+		if data.IsNull(v) {
+			return data.NewAny(qCoerceDataValues(values, kind)), true
+		}
+	}
+	switch kind {
+	case data.KindBool:
+		xs := make([]bool, len(values))
+		for i, v := range values {
+			b, ok := v.(bool)
+			if !ok {
+				return nil, false
+			}
+			xs[i] = b
+		}
+		return data.NewBool(xs), true
+	case data.KindI64:
+		xs := make([]int64, len(values))
+		for i, v := range values {
+			switch n := v.(type) {
+			case int:
+				xs[i] = int64(n)
+			case int64:
+				xs[i] = n
+			default:
+				return nil, false
+			}
+		}
+		return data.NewI64(xs), true
+	case data.KindF64:
+		xs := make([]float64, len(values))
+		for i, v := range values {
+			n, ok := qNumericAny(v)
+			if !ok {
+				return nil, false
+			}
+			xs[i] = n
+		}
+		return data.NewF64(xs), true
+	case data.KindString:
+		xs := make([]string, len(values))
+		for i, v := range values {
+			s, ok := v.(string)
+			if !ok {
+				return nil, false
+			}
+			xs[i] = s
+		}
+		return data.NewString(xs), true
+	case data.KindSymbol:
+		xs := make([]string, len(values))
+		for i, v := range values {
+			switch s := v.(type) {
+			case data.Symbol:
+				xs[i] = string(s)
+			case string:
+				xs[i] = s
+			default:
+				return nil, false
+			}
+		}
+		return data.NewSymbols(xs), true
+	default:
+		return nil, false
+	}
+}
+
+func qCoerceDataValues(values []any, kind data.Kind) []any {
+	out := append([]any(nil), values...)
+	if kind == data.KindSymbol {
+		for i, v := range out {
+			if s, ok := v.(string); ok {
+				out[i] = data.Symbol(s)
+			}
+		}
+	}
+	return out
+}
+
+func qNumericAny(v any) (float64, bool) {
+	switch n := v.(type) {
+	case int:
+		return float64(n), true
+	case int64:
+		return float64(n), true
+	case float32:
+		return float64(n), true
+	case float64:
+		return n, true
+	default:
+		return 0, false
+	}
+}
+
+func qDataFrameFromRowTable(rows *Table) (data.Frame, error) {
+	if rows == nil || rows.Length() == 0 {
+		return data.Frame{}, fmt.Errorf("frame requires at least one row")
+	}
+	first := rows.RawGetInt(1)
+	if !first.IsTable() {
+		return data.Frame{}, fmt.Errorf("frame rows must be tables")
+	}
+	names, err := qRowColumnNames(first.Table())
+	if err != nil {
+		return data.Frame{}, err
+	}
+	values := make(map[string][]any, len(names))
+	for _, name := range names {
+		values[name] = make([]any, 0, rows.Length())
+	}
+	for i := 1; i <= rows.Length(); i++ {
+		rowValue := rows.RawGetInt(int64(i))
+		if !rowValue.IsTable() {
+			return data.Frame{}, fmt.Errorf("frame row %d must be a table", i)
+		}
+		row := rowValue.Table()
+		for _, name := range names {
+			values[name] = append(values[name], qValueToAny(row.RawGetString(name)))
+		}
+	}
+	cols := make([]data.Column, 0, len(names))
+	kinds := qFrameColumnKinds(rows)
+	for _, name := range names {
+		kind := data.Kind("")
+		if kinds != nil {
+			kind = kinds[name]
+		}
+		if kind != "" && kind != data.KindAny {
+			if array, ok := qTypedDataArray(values[name], kind); ok {
+				cols = append(cols, data.Column{Name: data.Symbol(name), Data: array})
+				continue
+			}
+		}
+		cols = append(cols, data.NewColumn(data.Symbol(name), values[name]))
+	}
+	return data.NewFrame(cols...)
+}
+
+func qRowColumnNames(row *Table) ([]string, error) {
+	names := make([]string, 0, row.Length())
+	ok := row.ForEachPlainRaw(func(key, val Value) bool {
+		if !key.IsString() {
+			return false
+		}
+		names = append(names, key.Str())
+		return true
+	})
+	if !ok {
+		return nil, fmt.Errorf("frame row must be a plain string-keyed table")
+	}
+	sort.Strings(names)
+	return names, nil
+}
+
+func qDataArrayFromDense(col *DenseArray) (data.Array, error) {
+	switch col.DType() {
+	case DenseArrayF64:
+		xs := make([]float64, col.Len())
+		for i := range xs {
+			v, err := col.At(i)
+			if err != nil {
+				return nil, err
+			}
+			xs[i] = v.Number()
+		}
+		return data.NewF64(xs), nil
+	case DenseArrayI64:
+		xs := make([]int64, col.Len())
+		for i := range xs {
+			v, err := col.At(i)
+			if err != nil {
+				return nil, err
+			}
+			xs[i] = v.Int()
+		}
+		return data.NewI64(xs), nil
+	case DenseArrayBool:
+		xs := make([]bool, col.Len())
+		for i := range xs {
+			v, err := col.At(i)
+			if err != nil {
+				return nil, err
+			}
+			xs[i] = v.Bool()
+		}
+		return data.NewBool(xs), nil
+	default:
+		return nil, fmt.Errorf("unsupported dense array type %s", col.DType())
+	}
+}
+
+func qAnyValuesFromVector(v Value) ([]any, error) {
+	if v.IsDenseArray() {
+		col := v.DenseArray()
+		out := make([]any, col.Len())
+		for i := range out {
+			item, err := col.At(i)
+			if err != nil {
+				return nil, err
+			}
+			out[i] = qValueToAny(item)
+		}
+		return out, nil
+	}
+	if v.IsTable() {
+		tbl := v.Table()
+		out := make([]any, tbl.Length())
+		for i := range out {
+			out[i] = qValueToAny(tbl.RawGetInt(int64(i + 1)))
+		}
+		return out, nil
+	}
+	return nil, fmt.Errorf("must be a dense array or array table")
+}
+
+func qRowsFromDataFrame(frame data.Frame) (*Table, error) {
+	names := frame.Schema().Names()
+	cols := NewTable()
+	for _, name := range names {
+		col, ok := frame.Column(name)
+		if !ok {
+			return nil, fmt.Errorf("column %q not found", name)
+		}
+		values := NewAppendArrayTable(frame.Len())
+		for i := 0; i < frame.Len(); i++ {
+			v, ok := col.At(i)
+			if !ok {
+				return nil, fmt.Errorf("column %q row %d out of range", name, i)
+			}
+			values.RawSetInt(int64(i+1), qAnyToColumnValue(v))
+		}
+		cols.RawSetString(string(name), dataColumnValue(col.Kind(), TableValue(values)))
+	}
+	frameValue, err := dataFrameFromColumns(cols)
+	if err != nil {
+		return nil, err
+	}
+	out := frameValue.Table()
+	rowTable := NewAppendArrayTable(frame.Len())
+	for i := 0; i < frame.Len(); i++ {
+		row := NewTable()
+		for _, name := range names {
+			col, ok := frame.Column(name)
+			if !ok {
+				return nil, fmt.Errorf("column %q not found", name)
+			}
+			v, ok := col.At(i)
+			if !ok {
+				return nil, fmt.Errorf("column %q row %d out of range", name, i)
+			}
+			row.RawSetString(string(name), qAnyToValue(v))
+		}
+		rowValue := TableValue(row)
+		out.RawSetInt(int64(i+1), rowValue)
+		rowTable.RawSetInt(int64(i+1), rowValue)
+	}
+	qDecorateDataFrameTable(out, rowTable)
+	return out, nil
+}
+
+func qDecorateDataFrameTable(frame, rows *Table) {
+	if frame == nil {
+		return
+	}
+	nrows := int64(0)
+	if lenValue := frame.RawGetString("len"); lenValue.IsInt() {
+		nrows = lenValue.Int()
+	}
+	ncols := int64(0)
+	if names := frame.RawGetString("column_names"); names.IsTable() {
+		ncols = int64(names.Table().Length())
+	}
+	columns := frame.RawGetString("columns")
+	frame.RawSetString("kind", StringValue("data_frame"))
+	frame.RawSetString("type", StringValue("data_frame"))
+	if columns.IsTable() {
+		frame.RawSetString("data", columns)
+	}
+	if rows != nil {
+		frame.RawSetString("rows", TableValue(rows))
+	}
+	frame.RawSetString("nrows", IntValue(nrows))
+	frame.RawSetString("ncols", IntValue(ncols))
+	shape := NewTable()
+	shape.RawSetString("rows", IntValue(nrows))
+	shape.RawSetString("columns", IntValue(ncols))
+	frame.RawSetString("shape", TableValue(shape))
+}
+
+func qValueToAny(v Value) any {
+	switch {
+	case v.IsNil():
+		return nil
+	case isDataNullValue(v):
+		return data.NullValue
+	case v.IsBool():
+		return v.Bool()
+	case v.IsInt():
+		return v.Int()
+	case v.IsFloat():
+		return v.Float()
+	case v.IsString():
+		return v.Str()
+	case v.IsTable() && v.Table().Length() == 0:
+		return nil
+	default:
+		return v.String()
+	}
+}
+
+func qAnyToValue(v any) Value {
+	switch x := v.(type) {
+	case nil:
+		return NilValue()
+	case data.Null:
+		return NilValue()
+	case bool:
+		return BoolValue(x)
+	case int:
+		return IntValue(int64(x))
+	case int64:
+		return IntValue(x)
+	case float32:
+		return FloatValue(float64(x))
+	case float64:
+		return FloatValue(x)
+	case string:
+		return StringValue(x)
+	case data.Symbol:
+		return StringValue(string(x))
+	default:
+		return StringValue(fmt.Sprint(x))
+	}
+}
+
+func qAnyToColumnValue(v any) Value {
+	if data.IsNull(v) {
+		return dataNullValue()
+	}
+	return qAnyToValue(v)
 }
 
 func qQueryMask(s *SoA, where Value) (*DenseArray, error) {

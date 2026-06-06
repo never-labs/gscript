@@ -1,0 +1,33 @@
+print("case:qsql_error_diagnostics_tdd")
+
+func contains(haystack, needle) {
+  return string.find(tostring(haystack), needle, 1, true) != nil
+}
+
+func check(name, ok) {
+  assert(ok)
+  print("ok", name)
+}
+
+trades := data.frame({
+  sym: data.symbols({"AAPL"}),
+  price: data.f64({100.5}),
+  size: data.i64({10}),
+})
+
+ok, err := pcall(q.sql, "select notional:sum price*size by sym from trades where price>", {
+  trades: trades,
+})
+check("parse error message", ok == false && type(err) == "string" && contains(err, "q.sql: parse: q parse error at 62: expected expression"))
+
+ok, err = pcall(q.sql, "select total:sum missing by sym from trades", {
+  trades: trades,
+})
+check("unknown column message", ok == false && type(err) == "string" && contains(err, "q.sql: exec: unknown column \"missing\""))
+
+ok, err = pcall(q.sql, "select price from missing_table", {
+  trades: trades,
+})
+check("unknown source message", ok == false && type(err) == "string" && contains(err, "q.sql: source \"missing_table\" not found"))
+
+print("ok")

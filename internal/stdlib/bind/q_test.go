@@ -140,6 +140,313 @@ notional_by_sym := q.query(trades, {
 	}
 }
 
+func TestQSQLSelectWhereByOverFrame(t *testing.T) {
+	interp := runWithQAndSOA(t,
+		"trades := q.eval(\"flip `sym`price`size!(`AAPL`MSFT`AAPL`MSFT;100 80 120 110;10 20 30 40)\")\n"+
+			"rollup := q.sql(trades, \"select notional:sum price*size, fills:count i by sym from trades where price>=100\")\n"+
+			"also := q.select(trades, \"select px:price, qty:size from trades where sym=`AAPL\")\n")
+
+	rollup := interp.GetGlobal("rollup").Table()
+	if rollup == nil || rollup.Length() != 2 {
+		t.Fatalf("rollup length = %v, want 2", rollup)
+	}
+	first := rollup.RawGetInt(1).Table()
+	if got := first.RawGetString("sym"); !got.IsString() || got.Str() != "AAPL" {
+		t.Fatalf("rollup[1].sym = %v, want AAPL", got)
+	}
+	if got := first.RawGetString("notional"); !got.IsFloat() || got.Float() != 4600 {
+		t.Fatalf("rollup[1].notional = %v, want 4600", got)
+	}
+	if got := first.RawGetString("fills"); !got.IsInt() || got.Int() != 2 {
+		t.Fatalf("rollup[1].fills = %v, want 2", got)
+	}
+	second := rollup.RawGetInt(2).Table()
+	if got := second.RawGetString("sym"); !got.IsString() || got.Str() != "MSFT" {
+		t.Fatalf("rollup[2].sym = %v, want MSFT", got)
+	}
+	if got := second.RawGetString("notional"); !got.IsFloat() || got.Float() != 4400 {
+		t.Fatalf("rollup[2].notional = %v, want 4400", got)
+	}
+
+	also := interp.GetGlobal("also").Table()
+	if also == nil || also.Length() != 2 {
+		t.Fatalf("also length = %v, want 2", also)
+	}
+	if got := also.RawGetInt(2).Table().RawGetString("qty"); !got.IsInt() || got.Int() != 30 {
+		t.Fatalf("also[2].qty = %v, want 30", got)
+	}
+}
+
+func TestQSQLWhereGreaterThanIsStrict(t *testing.T) {
+	interp := runtime.NewCore()
+	installTestModule(interp, "array", runtime.TableValue(BuildArray()))
+	installTestModule(interp, "data", runtime.TableValue(BuildData()))
+	installTestModule(interp, "q", runtime.TableValue(BuildQ()))
+	execOnInterp(t, interp, `
+frame := data.frame({
+    sym: {"low", "edge", "high"},
+    price: array.i64({99, 100, 101}),
+})
+rows := q.sql(frame, "select sym,price from frame where price>100")
+`)
+	rows := interp.GetGlobal("rows").Table()
+	if rows == nil || rows.Length() != 1 {
+		t.Fatalf("rows len = %v, want 1", rows)
+	}
+	if got := rows.RawGetInt(1).Table().RawGetString("sym"); !got.IsString() || got.Str() != "high" {
+		t.Fatalf("rows[1].sym = %v, want high", got)
+	}
+}
+
+func TestQSQLAcceptsSQLFirstNamedFrame(t *testing.T) {
+	interp := runtime.NewCore()
+	installTestModule(interp, "array", runtime.TableValue(BuildArray()))
+	installTestModule(interp, "data", runtime.TableValue(BuildData()))
+	installTestModule(interp, "q", runtime.TableValue(BuildQ()))
+	execOnInterp(t, interp,
+		"trades := data.frame({\n"+
+			"    sym: {\"AAPL\", \"MSFT\", \"AAPL\"},\n"+
+			"    price: array.i64({100, 80, 120}),\n"+
+			"})\n"+
+			"trades.column_kinds = {sym: \"symbol\", price: \"i64\"}\n"+
+			"rows := q.sql(\"select sym,price from trades where sym=`AAPL\", {trades: trades})\n"+
+			"also := q.select(\"select price from trades where sym=`MSFT\", {trades: trades})\n")
+
+	rows := interp.GetGlobal("rows").Table()
+	if rows == nil || rows.Length() != 2 {
+		t.Fatalf("rows len = %v, want 2", rows)
+	}
+	if got := rows.RawGetInt(1).Table().RawGetString("sym"); !got.IsString() || got.Str() != "AAPL" {
+		t.Fatalf("rows[1].sym = %v, want AAPL", got)
+	}
+	if got := rows.RawGetInt(2).Table().RawGetString("price"); !got.IsInt() || got.Int() != 120 {
+		t.Fatalf("rows[2].price = %v, want 120", got)
+	}
+	also := interp.GetGlobal("also").Table()
+	if also == nil || also.Length() != 1 {
+		t.Fatalf("also len = %v, want 1", also)
+	}
+	if got := also.RawGetInt(1).Table().RawGetString("price"); !got.IsInt() || got.Int() != 80 {
+		t.Fatalf("also[1].price = %v, want 80", got)
+	}
+}
+
+func TestQSQLTypedFrameWhereAndOutputSemantics(t *testing.T) {
+	interp := runtime.NewCore()
+	installTestModule(interp, "array", runtime.TableValue(BuildArray()))
+	installTestModule(interp, "data", runtime.TableValue(BuildData()))
+	installTestModule(interp, "q", runtime.TableValue(BuildQ()))
+	execOnInterp(t, interp,
+		"frame := data.frame({\n"+
+			"    sym: {\"AAPL\", \"MSFT\", \"AAPL\", \"IBM\"},\n"+
+			"    venue: {\"XNYS\", \"XNAS\", \"BATS\", \"XNYS\"},\n"+
+			"    active: array.bool({true, false, true, true}),\n"+
+			"    price: array.f64({100.5, 80.25, 120.0, 90.0}),\n"+
+			"})\n"+
+			"frame.column_kinds = {\n"+
+			"    sym: \"symbol\",\n"+
+			"    venue: \"string\",\n"+
+			"    active: \"bool\",\n"+
+			"    price: \"f64\",\n"+
+			"}\n"+
+			"symbol_rows := q.sql(frame, \"select sym,price from frame where sym=`AAPL\")\n"+
+			"string_rows := q.sql(frame, \"select venue from frame where venue=`XNYS\")\n"+
+			"bool_rows := q.sql(frame, \"select sym,active from frame where active=true\")\n")
+
+	symbolRows := interp.GetGlobal("symbol_rows").Table()
+	if symbolRows == nil || symbolRows.Length() != 2 {
+		t.Fatalf("symbol_rows len = %v, want 2", symbolRows)
+	}
+	if got := symbolRows.RawGetInt(2).Table().RawGetString("price"); !got.IsFloat() || got.Float() != 120 {
+		t.Fatalf("symbol_rows[2].price = %v, want 120", got)
+	}
+	stringRows := interp.GetGlobal("string_rows").Table()
+	if stringRows == nil || stringRows.Length() != 2 {
+		t.Fatalf("string_rows len = %v, want 2", stringRows)
+	}
+	if got := stringRows.RawGetInt(1).Table().RawGetString("venue"); !got.IsString() || got.Str() != "XNYS" {
+		t.Fatalf("string_rows[1].venue = %v, want XNYS", got)
+	}
+	boolRows := interp.GetGlobal("bool_rows").Table()
+	if boolRows == nil || boolRows.Length() != 3 {
+		t.Fatalf("bool_rows len = %v, want 3", boolRows)
+	}
+	if got := boolRows.RawGetInt(1).Table().RawGetString("active"); !got.IsBool() || !got.Bool() {
+		t.Fatalf("bool_rows[1].active = %v, want true", got)
+	}
+}
+
+func TestQSQLPlanCacheKeepsSchemaLiteralAlignmentSeparate(t *testing.T) {
+	interp := runtime.NewCore()
+	installTestModule(interp, "array", runtime.TableValue(BuildArray()))
+	installTestModule(interp, "data", runtime.TableValue(BuildData()))
+	installTestModule(interp, "q", runtime.TableValue(BuildQ()))
+	execOnInterp(t, interp,
+		"symbol_frame := data.frame({name: {\"AAPL\", \"MSFT\"}})\n"+
+			"symbol_frame.column_kinds = {name: \"symbol\"}\n"+
+			"string_frame := data.frame({name: {\"AAPL\", \"MSFT\"}})\n"+
+			"string_frame.column_kinds = {name: \"string\"}\n"+
+			"src := \"select name from frame where name=`AAPL\"\n"+
+			"symbol_rows := q.sql(symbol_frame, src)\n"+
+			"string_rows := q.sql(string_frame, src)\n")
+
+	symbolRows := interp.GetGlobal("symbol_rows").Table()
+	if symbolRows == nil || symbolRows.Length() != 1 {
+		t.Fatalf("symbol_rows len = %v, want 1", symbolRows)
+	}
+	if got := symbolRows.RawGetInt(1).Table().RawGetString("name"); !got.IsString() || got.Str() != "AAPL" {
+		t.Fatalf("symbol_rows[1].name = %v, want AAPL", got)
+	}
+	stringRows := interp.GetGlobal("string_rows").Table()
+	if stringRows == nil || stringRows.Length() != 1 {
+		t.Fatalf("string_rows len = %v, want 1", stringRows)
+	}
+	if got := stringRows.RawGetInt(1).Table().RawGetString("name"); !got.IsString() || got.Str() != "AAPL" {
+		t.Fatalf("string_rows[1].name = %v, want AAPL", got)
+	}
+}
+
+func TestQSQLReturnsDataFrameCompatibleRowsAndTemporalStrings(t *testing.T) {
+	interp := runtime.NewCore()
+	installTestModule(interp, "array", runtime.TableValue(BuildArray()))
+	installTestModule(interp, "data", runtime.TableValue(BuildData()))
+	installTestModule(interp, "q", runtime.TableValue(BuildQ()))
+	execOnInterp(t, interp,
+		"events := data.frame({\n"+
+			"    day: {\"2026-06-05\", \"2026-06-06\"},\n"+
+			"    ts: {\"2026-06-05T09:30:00Z\", \"2026-06-06T09:30:00Z\"},\n"+
+			"    active: array.bool({true, false}),\n"+
+			"    qty: array.i64({10, 20}),\n"+
+			"    px: array.f64({1.5, 2.25}),\n"+
+			"    note: {nil, \"close\"},\n"+
+			"})\n"+
+			"events.column_kinds = {day: \"date\", ts: \"timestamp\", active: \"bool\", qty: \"i64\", px: \"f64\", note: \"string\"}\n"+
+			"rows := q.sql(events, \"select day,ts,active,qty,px,note from events where active=true\")\n"+
+			"data_rows := data.rows(rows)\n")
+
+	rows := interp.GetGlobal("rows").Table()
+	if rows == nil {
+		t.Fatalf("rows = nil")
+	}
+	if got := rows.RawGetString("kind"); !got.IsString() || got.Str() != "data_frame" {
+		t.Fatalf("rows.kind = %v, want data_frame", got)
+	}
+	if got := rows.RawGetString("len"); !got.IsInt() || got.Int() != 1 {
+		t.Fatalf("rows.len = %v, want 1", got)
+	}
+	if got := rows.RawGetString("ncols"); !got.IsInt() || got.Int() != 6 {
+		t.Fatalf("rows.ncols = %v, want 6", got)
+	}
+	oldRow := rows.RawGetInt(1).Table()
+	if got := oldRow.RawGetString("day"); !got.IsString() || got.Str() != "2026-06-05" {
+		t.Fatalf("rows[1].day = %v, want 2026-06-05", got)
+	}
+	if got := oldRow.RawGetString("ts"); !got.IsString() || got.Str() != "2026-06-05T09:30:00Z" {
+		t.Fatalf("rows[1].ts = %v, want timestamp string", got)
+	}
+	if got := oldRow.RawGetString("active"); !got.IsBool() || !got.Bool() {
+		t.Fatalf("rows[1].active = %v, want true", got)
+	}
+	if got := oldRow.RawGetString("qty"); !got.IsInt() || got.Int() != 10 {
+		t.Fatalf("rows[1].qty = %v, want 10", got)
+	}
+	if got := oldRow.RawGetString("px"); !got.IsFloat() || got.Float() != 1.5 {
+		t.Fatalf("rows[1].px = %v, want 1.5", got)
+	}
+	if got := oldRow.RawGetString("note"); !got.IsNil() {
+		t.Fatalf("rows[1].note = %v, want nil", got)
+	}
+	if got := rows.RawGetString("rows").Table().RawGetInt(1).Table().RawGetString("day"); !got.IsString() || got.Str() != "2026-06-05" {
+		t.Fatalf("rows.rows[1].day = %v, want 2026-06-05", got)
+	}
+	if got := rows.RawGetString("column_kinds").Table().RawGetString("day"); !got.IsString() || got.Str() != "string" {
+		t.Fatalf("rows.column_kinds.day = %v, want string", got)
+	}
+	if got := rows.RawGetString("schema").Table().RawGetString("kinds").Table().RawGetString("ts"); !got.IsString() || got.Str() != "string" {
+		t.Fatalf("rows.schema.kinds.ts = %v, want string", got)
+	}
+	dataRows := interp.GetGlobal("data_rows").Table()
+	if got := dataRows.RawGetInt(1).Table().RawGetString("day"); !got.IsString() || got.Str() != "2026-06-05" {
+		t.Fatalf("data.rows(rows)[1].day = %v, want 2026-06-05", got)
+	}
+}
+
+func TestQSQLNullOutputFromTypedFrameWrapper(t *testing.T) {
+	frame := NewTable()
+	columns := NewTable()
+	names := NewAppendArrayTable(2)
+	kinds := NewTable()
+	sym := NewAppendArrayTable(3)
+	note := NewAppendArrayTable(3)
+	for i, value := range []Value{StringValue("AAPL"), StringValue("MSFT"), StringValue("IBM")} {
+		sym.RawSetInt(int64(i+1), value)
+	}
+	note.RawSetInt(1, StringValue("open"))
+	note.RawSetInt(2, NilValue())
+	note.RawSetInt(3, StringValue("close"))
+	columns.RawSetString("sym", TableValue(sym))
+	columns.RawSetString("note", TableValue(note))
+	names.RawSetInt(1, StringValue("sym"))
+	names.RawSetInt(2, StringValue("note"))
+	kinds.RawSetString("sym", StringValue("symbol"))
+	kinds.RawSetString("note", StringValue("string"))
+	frame.RawSetString(dataFrameMarker, BoolValue(true))
+	frame.RawSetString("len", IntValue(3))
+	frame.RawSetString("columns", TableValue(columns))
+	frame.RawSetString("column_names", TableValue(names))
+	frame.RawSetString("column_kinds", TableValue(kinds))
+
+	fn := BuildQ().RawGetString("sql").GoFunction()
+	out, err := fn.Fn([]Value{TableValue(frame), StringValue("select sym,note from frame where note=null")})
+	if err != nil {
+		t.Fatalf("q.sql returned error: %v", err)
+	}
+	nullRows := out[0].Table()
+	if nullRows == nil || nullRows.Length() != 1 {
+		t.Fatalf("null_rows len = %v, want 1", nullRows)
+	}
+	if got := nullRows.RawGetInt(1).Table().RawGetString("sym"); !got.IsString() || got.Str() != "MSFT" {
+		t.Fatalf("null_rows[1].sym = %v, want MSFT", got)
+	}
+	if got := nullRows.RawGetInt(1).Table().RawGetString("note"); !got.IsNil() {
+		t.Fatalf("null_rows[1].note = %v (%s), want nil", got, got.TypeName())
+	}
+}
+
+func TestQSQLOrderByAndLimit(t *testing.T) {
+	interp := runtime.NewCore()
+	installTestModule(interp, "array", runtime.TableValue(BuildArray()))
+	installTestModule(interp, "data", runtime.TableValue(BuildData()))
+	installTestModule(interp, "q", runtime.TableValue(BuildQ()))
+	execOnInterp(t, interp,
+		"trades := data.frame({\n"+
+			"    sym: {\"AAPL\", \"MSFT\", \"NVDA\", \"IBM\"},\n"+
+			"    price: array.f64({100, 80, 120, 90}),\n"+
+			"    active: array.bool({true, false, true, true}),\n"+
+			"})\n"+
+			"trades.column_kinds = {sym: \"symbol\", price: \"f64\", active: \"bool\"}\n"+
+			"top := q.sql(trades, \"select sym,price from trades where active=true order by price desc limit 2\")\n"+
+			"bottom := q.sql(\"select sym,price from trades order by price asc limit 1\", {trades: trades})\n")
+
+	top := interp.GetGlobal("top").Table()
+	if top == nil || top.Length() != 2 {
+		t.Fatalf("top len = %v, want 2", top)
+	}
+	if got := top.RawGetInt(1).Table().RawGetString("sym"); !got.IsString() || got.Str() != "NVDA" {
+		t.Fatalf("top[1].sym = %v, want NVDA", got)
+	}
+	if got := top.RawGetInt(2).Table().RawGetString("sym"); !got.IsString() || got.Str() != "AAPL" {
+		t.Fatalf("top[2].sym = %v, want AAPL", got)
+	}
+	bottom := interp.GetGlobal("bottom").Table()
+	if bottom == nil || bottom.Length() != 1 {
+		t.Fatalf("bottom len = %v, want 1", bottom)
+	}
+	if got := bottom.RawGetInt(1).Table().RawGetString("sym"); !got.IsString() || got.Str() != "MSFT" {
+		t.Fatalf("bottom[1].sym = %v, want MSFT", got)
+	}
+}
+
 func TestQSymbolicCoreDataForms(t *testing.T) {
 	interp := runWithQAndSOA(t,
 		"syms := q.eval(\"`AAPL`MSFT`NVDA\")\n"+

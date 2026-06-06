@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "case_count": 454,
+  "case_count": 457,
   "cases": [
     {
       "id": "language/all_harness_flags_format",
@@ -1541,6 +1541,18 @@
         "kind": "lua",
         "path": "tests/language/csv_options_quotes_more.lua"
       },
+      "status": "passing",
+      "tags": [
+        "language",
+        "conformance"
+      ]
+    },
+    {
+      "id": "language/data_frame_construction_tdd",
+      "path": "tests/language/data_frame_construction_tdd.leia",
+      "domain": "language",
+      "kind": "test",
+      "reference": null,
       "status": "passing",
       "tags": [
         "language",
@@ -4841,6 +4853,30 @@
         "kind": "lua",
         "path": "tests/language/process_go_host_entry_exit_more.lua"
       },
+      "status": "passing",
+      "tags": [
+        "language",
+        "conformance"
+      ]
+    },
+    {
+      "id": "language/qsql_error_diagnostics_tdd",
+      "path": "tests/language/qsql_error_diagnostics_tdd.leia",
+      "domain": "language",
+      "kind": "test",
+      "reference": null,
+      "status": "passing",
+      "tags": [
+        "language",
+        "conformance"
+      ]
+    },
+    {
+      "id": "language/qsql_query_tdd",
+      "path": "tests/language/qsql_query_tdd.leia",
+      "domain": "language",
+      "kind": "test",
+      "reference": null,
       "status": "passing",
       "tags": [
         "language",

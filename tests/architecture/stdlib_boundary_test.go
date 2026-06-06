@@ -19,7 +19,7 @@ func TestInternalStdlibLayerStaysBelowRuntime(t *testing.T) {
 	stdlibRoot := filepath.Join(root, "internal", "stdlib")
 	libRoot := filepath.Join(stdlibRoot, "lib")
 
-	for _, module := range []string{"catalog", "lib/llm", "lib/table", "lib/soa", "lib/fs", "lib/http", "bind", "install"} {
+	for _, module := range []string{"catalog", "lib/data", "lib/llm", "lib/table", "lib/soa", "lib/fs", "lib/http", "bind", "install"} {
 		dir := filepath.Join(stdlibRoot, filepath.FromSlash(module))
 		info, err := os.Stat(dir)
 		if err != nil {

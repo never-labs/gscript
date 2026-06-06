@@ -3,6 +3,7 @@ package bind
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/never-labs/leia/internal/runtime"
 )
@@ -186,12 +187,27 @@ func TestDBFrameFeedsColumnarQQuery(t *testing.T) {
 	if got := frame.RawGetString("len"); !got.IsInt() || got.Int() != 4 {
 		t.Fatalf("frame.len = %v, want 4", got)
 	}
+	if got := frame.RawGetString("kind"); !got.IsString() || got.Str() != "data_frame" {
+		t.Fatalf("frame.kind = %v, want data_frame", got)
+	}
+	if got := frame.RawGetString("nrows"); !got.IsInt() || got.Int() != 4 {
+		t.Fatalf("frame.nrows = %v, want 4", got)
+	}
+	if got := frame.RawGetString("ncols"); !got.IsInt() || got.Int() != 6 {
+		t.Fatalf("frame.ncols = %v, want 6", got)
+	}
 	rows := frame.RawGetString("rows").Table()
 	if got := rows.RawGetInt(1).Table().RawGetString("label").Str(); got != "search" {
 		t.Fatalf("frame.rows[1].label = %q, want search", got)
 	}
 	if got := frame.RawGetString("columns").Table().RawGetString("label").Table().RawGetInt(2).Str(); got != "email" {
 		t.Fatalf("frame.columns.label[2] = %q, want email", got)
+	}
+	if got := frame.RawGetString("data").Table().RawGetString("label").Table().RawGetInt(2).Str(); got != "email" {
+		t.Fatalf("frame.data.label[2] = %q, want email", got)
+	}
+	if got := frame.RawGetString("schema").Table().RawGetString("kinds").Table().RawGetString("label").Str(); got != "string" {
+		t.Fatalf("frame.schema.kinds.label = %q, want string", got)
 	}
 	revenueColumn := frame.RawGetString("numeric").Table().RawGetString("revenue")
 	if !revenueColumn.IsDenseArray() {
@@ -217,5 +233,288 @@ func TestDBFrameFeedsColumnarQQuery(t *testing.T) {
 	}
 	if got := first.RawGetString("conversions"); !got.IsFloat() || got.Float() != 11 {
 		t.Fatalf("first.conversions = %v, want 11", got)
+	}
+}
+
+func TestDBFrameWrapperCoversScalarColumnKinds(t *testing.T) {
+	interp := runtime.NewCore()
+	installTestModules(interp)
+	installTestModule(interp, "dialect", runtime.TableValue(BuildDialect(HostOptions{}, interp.MaxHostResultBytes)))
+	execOnInterp(t, interp, `
+		conn := db.memory()
+		conn.exec(sql`+"`"+`create table typed_values (
+			name text not null,
+			active boolean not null,
+			count integer not null,
+			ratio real not null,
+			missing text
+		)`+"`"+`)
+		conn.exec(sql`+"`"+`insert into typed_values values
+			('alpha', true, 7, 1.5, null),
+			('beta', false, 11, 2.25, null)`+"`"+`)
+		query_rows := conn.query(sql`+"`"+`select name, active, count, ratio, missing from typed_values order by count`+"`"+`)
+		frame := conn.frame(sql`+"`"+`select name, active, count, ratio, missing from typed_values order by count`+"`"+`)
+	`)
+
+	queryRows := interp.GetGlobal("query_rows").Table()
+	queryFirst := queryRows.RawGetInt(1).Table()
+	if got := queryFirst.RawGetString("name"); !got.IsString() || got.Str() != "alpha" {
+		t.Fatalf("query_rows[1].name = %v, want alpha", got)
+	}
+	if got := queryFirst.RawGetString("active"); !got.IsBool() || !got.Bool() {
+		t.Fatalf("query_rows[1].active = %v, want true", got)
+	}
+	if got := queryFirst.RawGetString("count"); !got.IsInt() || got.Int() != 7 {
+		t.Fatalf("query_rows[1].count = %v, want 7", got)
+	}
+	if got := queryFirst.RawGetString("ratio"); !got.IsFloat() || got.Float() != 1.5 {
+		t.Fatalf("query_rows[1].ratio = %v, want 1.5", got)
+	}
+	if got := queryFirst.RawGetString("missing"); !got.IsNil() {
+		t.Fatalf("query_rows[1].missing = %v, want nil", got)
+	}
+	querySecond := queryRows.RawGetInt(2).Table()
+	if got := querySecond.RawGetString("active"); !got.IsBool() || got.Bool() {
+		t.Fatalf("query_rows[2].active = %v, want false", got)
+	}
+
+	frame := interp.GetGlobal("frame").Table()
+	if got := frame.RawGetString("len"); !got.IsInt() || got.Int() != 2 {
+		t.Fatalf("frame.len = %v, want 2", got)
+	}
+	if got := frame.RawGetString("type"); !got.IsString() || got.Str() != "data_frame" {
+		t.Fatalf("frame.type = %v, want data_frame", got)
+	}
+	shape := frame.RawGetString("shape").Table()
+	if got := shape.RawGetString("rows"); !got.IsInt() || got.Int() != 2 {
+		t.Fatalf("frame.shape.rows = %v, want 2", got)
+	}
+	if got := shape.RawGetString("columns"); !got.IsInt() || got.Int() != 5 {
+		t.Fatalf("frame.shape.columns = %v, want 5", got)
+	}
+
+	columns := frame.RawGetString("columns").Table()
+	if got := columns.RawGetString("name").Table().RawGetInt(1); !got.IsString() || got.Str() != "alpha" {
+		t.Fatalf("frame.columns.name[1] = %v, want alpha", got)
+	}
+	activeColumn := columns.RawGetString("active")
+	if !activeColumn.IsDenseArray() || activeColumn.DenseArray().DType() != DenseArrayBool {
+		t.Fatalf("frame.columns.active = %v, want bool dense array", activeColumn)
+	}
+	if got, _ := activeColumn.DenseArray().At(1); !got.IsBool() || got.Bool() {
+		t.Fatalf("frame.columns.active[2] = %v, want false", got)
+	}
+	countColumn := columns.RawGetString("count")
+	if !countColumn.IsDenseArray() || countColumn.DenseArray().DType() != DenseArrayI64 {
+		t.Fatalf("frame.columns.count = %v, want i64 dense array", countColumn)
+	}
+	if got, _ := countColumn.DenseArray().At(1); !got.IsInt() || got.Int() != 11 {
+		t.Fatalf("frame.columns.count[2] = %v, want 11", got)
+	}
+	ratioColumn := columns.RawGetString("ratio")
+	if !ratioColumn.IsDenseArray() || ratioColumn.DenseArray().DType() != DenseArrayF64 {
+		t.Fatalf("frame.columns.ratio = %v, want f64 dense array", ratioColumn)
+	}
+	if got, _ := ratioColumn.DenseArray().At(0); !got.IsFloat() || got.Float() != 1.5 {
+		t.Fatalf("frame.columns.ratio[1] = %v, want 1.5", got)
+	}
+	if got := columns.RawGetString("missing").Table().RawGetInt(1); !got.IsNil() {
+		t.Fatalf("frame.columns.missing[1] = %v, want nil", got)
+	}
+
+	kinds := frame.RawGetString("schema").Table().RawGetString("kinds").Table()
+	for name, want := range map[string]string{
+		"name":    "string",
+		"active":  "bool",
+		"count":   "i64",
+		"ratio":   "f64",
+		"missing": "any",
+	} {
+		if got := kinds.RawGetString(name); !got.IsString() || got.Str() != want {
+			t.Fatalf("frame.schema.kinds.%s = %v, want %s", name, got, want)
+		}
+	}
+	numericColumns := frame.RawGetString("numeric_columns").Table()
+	if got := numericColumns.Length(); got != 2 {
+		t.Fatalf("frame.numeric_columns length = %d, want 2", got)
+	}
+	if got := numericColumns.RawGetInt(1).Str(); got != "count" {
+		t.Fatalf("frame.numeric_columns[1] = %q, want count", got)
+	}
+	if got := numericColumns.RawGetInt(2).Str(); got != "ratio" {
+		t.Fatalf("frame.numeric_columns[2] = %q, want ratio", got)
+	}
+	if got := frame.RawGetString("numeric").Table().RawGetString("active"); !got.IsNil() {
+		t.Fatalf("frame.numeric.active = %v, want nil", got)
+	}
+	if !frame.RawGetString("soa").IsSoA() {
+		t.Fatalf("frame.soa missing")
+	}
+}
+
+func TestDBQueryAndFrameScalarBoundaryTypes(t *testing.T) {
+	conn, err := openSQLite(":memory:", HostOptions{})
+	if err != nil {
+		t.Fatalf("openSQLite: %v", err)
+	}
+	defer conn.db.Close()
+
+	when := time.Date(2026, 6, 6, 12, 34, 56, 789000000, time.UTC)
+	if _, err := conn.db.Exec(`create table typed_boundary (
+		flag boolean,
+		nullable_flag boolean,
+		count integer,
+		nullable_count integer,
+		ratio real,
+		nullable_ratio real,
+		label text,
+		nullable_label text,
+		created_at timestamp,
+		missing text
+	)`); err != nil {
+		t.Fatalf("create table: %v", err)
+	}
+	if _, err := conn.db.Exec(`insert into typed_boundary values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		true, nil, int64(42), nil, 3.25, nil, "alpha", nil, when, nil); err != nil {
+		t.Fatalf("insert typed row: %v", err)
+	}
+
+	queryValues, err := conn.query([]Value{StringValue(`select
+		flag, nullable_flag, count, nullable_count, ratio, nullable_ratio, label, nullable_label, created_at, missing
+		from typed_boundary`)})
+	if err != nil {
+		t.Fatalf("conn.query Go error: %v", err)
+	}
+	if len(queryValues) != 1 || !queryValues[0].IsTable() {
+		t.Fatalf("conn.query = %v, want rows table", queryValues)
+	}
+	queryRow := queryValues[0].Table().RawGetInt(1).Table()
+	if got := queryRow.RawGetString("flag"); !got.IsBool() || !got.Bool() {
+		t.Fatalf("query flag = %v, want true bool", got)
+	}
+	if got := queryRow.RawGetString("nullable_flag"); !got.IsNil() {
+		t.Fatalf("query nullable_flag = %v, want nil", got)
+	}
+	if got := queryRow.RawGetString("count"); !got.IsInt() || got.Int() != 42 {
+		t.Fatalf("query count = %v, want 42 i64", got)
+	}
+	if got := queryRow.RawGetString("nullable_count"); !got.IsNil() {
+		t.Fatalf("query nullable_count = %v, want nil", got)
+	}
+	if got := queryRow.RawGetString("ratio"); !got.IsFloat() || got.Float() != 3.25 {
+		t.Fatalf("query ratio = %v, want 3.25 f64", got)
+	}
+	if got := queryRow.RawGetString("nullable_ratio"); !got.IsNil() {
+		t.Fatalf("query nullable_ratio = %v, want nil", got)
+	}
+	if got := queryRow.RawGetString("label"); !got.IsString() || got.Str() != "alpha" {
+		t.Fatalf("query label = %v, want alpha string", got)
+	}
+	if got := queryRow.RawGetString("nullable_label"); !got.IsNil() {
+		t.Fatalf("query nullable_label = %v, want nil", got)
+	}
+	if got := queryRow.RawGetString("created_at"); !got.IsString() || got.Str() != when.Format(time.RFC3339Nano) {
+		t.Fatalf("query created_at = %v, want RFC3339Nano string", got)
+	}
+	if got := queryRow.RawGetString("missing"); !got.IsNil() {
+		t.Fatalf("query missing = %v, want nil", got)
+	}
+
+	frameValues, err := conn.frame([]Value{StringValue(`select
+		flag, nullable_flag, count, nullable_count, ratio, nullable_ratio, label, nullable_label, created_at, missing
+		from typed_boundary`)})
+	if err != nil {
+		t.Fatalf("conn.frame Go error: %v", err)
+	}
+	if len(frameValues) != 1 || !frameValues[0].IsTable() {
+		t.Fatalf("conn.frame = %v, want frame table", frameValues)
+	}
+	frame := frameValues[0].Table()
+	columns := frame.RawGetString("columns").Table()
+	if got := columns.RawGetString("flag"); !got.IsDenseArray() || got.DenseArray().DType() != DenseArrayBool {
+		t.Fatalf("frame flag column = %v, want bool dense array", got)
+	}
+	if got := columns.RawGetString("nullable_flag").Table().RawGetInt(1); !got.IsNil() {
+		t.Fatalf("frame nullable_flag[1] = %v, want nil", got)
+	}
+	if got := columns.RawGetString("count"); !got.IsDenseArray() || got.DenseArray().DType() != DenseArrayI64 {
+		t.Fatalf("frame count column = %v, want i64 dense array", got)
+	}
+	if got := columns.RawGetString("nullable_count").Table().RawGetInt(1); !got.IsNil() {
+		t.Fatalf("frame nullable_count[1] = %v, want nil", got)
+	}
+	if got := columns.RawGetString("ratio"); !got.IsDenseArray() || got.DenseArray().DType() != DenseArrayF64 {
+		t.Fatalf("frame ratio column = %v, want f64 dense array", got)
+	}
+	if got := columns.RawGetString("nullable_ratio").Table().RawGetInt(1); !got.IsNil() {
+		t.Fatalf("frame nullable_ratio[1] = %v, want nil", got)
+	}
+	if got := columns.RawGetString("label").Table().RawGetInt(1); !got.IsString() || got.Str() != "alpha" {
+		t.Fatalf("frame label[1] = %v, want alpha string", got)
+	}
+	if got := columns.RawGetString("nullable_label").Table().RawGetInt(1); !got.IsNil() {
+		t.Fatalf("frame nullable_label[1] = %v, want nil", got)
+	}
+	if got := columns.RawGetString("created_at").Table().RawGetInt(1); !got.IsString() || got.Str() != when.Format(time.RFC3339Nano) {
+		t.Fatalf("frame created_at[1] = %v, want RFC3339Nano string", got)
+	}
+	if got := columns.RawGetString("missing").Table().RawGetInt(1); !got.IsNil() {
+		t.Fatalf("frame missing[1] = %v, want nil", got)
+	}
+
+	kinds := frame.RawGetString("schema").Table().RawGetString("kinds").Table()
+	for name, want := range map[string]string{
+		"flag":           "bool",
+		"nullable_flag":  "any",
+		"count":          "i64",
+		"nullable_count": "any",
+		"ratio":          "f64",
+		"nullable_ratio": "any",
+		"label":          "string",
+		"nullable_label": "any",
+		"created_at":     "string",
+		"missing":        "any",
+	} {
+		if got := kinds.RawGetString(name); !got.IsString() || got.Str() != want {
+			t.Fatalf("frame schema kind %s = %v, want %s", name, got, want)
+		}
+	}
+}
+
+func TestDBQueryAndFrameArgumentErrorsAreStable(t *testing.T) {
+	conn, err := openSQLite(":memory:", HostOptions{})
+	if err != nil {
+		t.Fatalf("openSQLite: %v", err)
+	}
+	defer conn.db.Close()
+
+	for _, tt := range []struct {
+		name string
+		call func([]Value) ([]Value, error)
+	}{
+		{name: "query", call: conn.query},
+		{name: "frame", call: conn.frame},
+	} {
+		t.Run(tt.name+"_missing_sql", func(t *testing.T) {
+			_, err := tt.call(nil)
+			if err == nil || err.Error() != "bad argument #1 to 'db' (SQL string or sql value expected)" {
+				t.Fatalf("%s missing SQL error = %v", tt.name, err)
+			}
+		})
+		t.Run(tt.name+"_empty_sql", func(t *testing.T) {
+			_, err := tt.call([]Value{StringValue("  ")})
+			if err == nil || err.Error() != "db: SQL query string required" {
+				t.Fatalf("%s empty SQL error = %v", tt.name, err)
+			}
+		})
+		t.Run(tt.name+"_bad_args", func(t *testing.T) {
+			input := NewTable()
+			input.RawSetString("query", StringValue("select ?"))
+			input.RawSetString("params", StringValue("bad"))
+			_, err := tt.call([]Value{TableValue(input)})
+			if err == nil || err.Error() != "bad argument #1 to 'db' (args table expected)" {
+				t.Fatalf("%s bad args error = %v", tt.name, err)
+			}
+		})
 	}
 }

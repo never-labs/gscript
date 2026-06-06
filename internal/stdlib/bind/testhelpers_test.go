@@ -77,6 +77,7 @@ func installTestModules(interp *runtime.Interpreter) {
 	installTestModule(interp, "context", runtime.TableValue(BuildContext()))
 	installTestModule(interp, "crypto", runtime.TableValue(BuildCrypto(interp.MaxHostResultBytes)))
 	installTestModule(interp, "csv", runtime.TableValue(BuildCSV(interp.MaxHostResultBytes)))
+	installTestModule(interp, "data", runtime.TableValue(BuildData()))
 	installTestModule(interp, "db", runtime.TableValue(BuildDB(HostOptions{})))
 	installTestModule(interp, "encoding", runtime.TableValue(BuildEncoding(interp.MaxHostResultBytes)))
 	installTestModule(interp, "hash", runtime.TableValue(BuildHash()))

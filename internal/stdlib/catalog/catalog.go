@@ -35,6 +35,7 @@ var modules = []ModuleInfo{
 	{Name: "context", Layer: LayerBase, Description: "Cancellation, timeout, and done-channel helpers.", SafeDefault: true},
 	{Name: "crypto", Layer: LayerBase, Description: "Secure random data and high-level cryptographic primitives.", SafeDefault: true},
 	{Name: "csv", Layer: LayerData, Description: "CSV parse and encode helpers backed by Go's CSV behavior.", SafeDefault: true},
+	{Name: "data", Layer: LayerData, Description: "Column arrays, frames, query plans, and qSQL lowering substrate.", SafeDefault: true},
 	{Name: "db", Layer: LayerHost, Description: "Built-in SQLite database runtime for parameterized SQL and columnar query frames.", Capabilities: []string{"db.open", "db.exec", "db.query", "db.one", "db.frame"}},
 	{Name: "debug", Layer: LayerHost, Description: "Runtime stack, globals, hook, and diagnostic helpers.", Capabilities: []string{"debug"}},
 	{Name: "encoding", Layer: LayerBase, Description: "Text and byte encoding conversion helpers.", SafeDefault: true},
