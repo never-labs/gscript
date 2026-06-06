@@ -533,6 +533,7 @@ func TestGLMExamplesRunAgainstLocalAnthropicCompatibleProvider(t *testing.T) {
 			t.Setenv("SENTINEL_GLM_API_KEY", "test-key")
 			t.Setenv("GLM_API_KEY", "test-key")
 			t.Setenv("GLM_MODEL", "mock-glm")
+			t.Setenv("LEIA_LLM_INTEGRATION", "1")
 
 			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 			defer cancel()

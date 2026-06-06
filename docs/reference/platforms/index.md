@@ -46,10 +46,11 @@ which tagged literals and tagged blocks are installed:
 
 ## JIT Expectations
 
-The JIT is an implementation detail, not a language feature. Programs must not
-depend on a function being compiled natively. Hosts that need strict resource
-budget checkpoints, untrusted-script sandboxing, or deterministic fallback may
-disable JIT.
+The JIT is an implementation detail, not a language feature or whole-language
+native-code contract. Programs must not depend on a function being compiled
+natively; unsupported operations and non-hot paths must continue through the
+VM/runtime fallback. Hosts that need strict resource budget checkpoints,
+untrusted-script sandboxing, or deterministic fallback may disable JIT.
 
 JIT-sensitive changes need correctness tests and performance evidence. See
 [`../../contributing/performance.md`](../../contributing/performance.md).

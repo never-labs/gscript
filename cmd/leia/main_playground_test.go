@@ -213,6 +213,145 @@ func TestReadmePlaygroundTabsMatchAPISurface(t *testing.T) {
 	}
 }
 
+func TestPlaygroundHTTPSmokeCoversBrowserSurface(t *testing.T) {
+	var gotRun *playgroundRunRequest
+	var gotEvaluate *playgroundEvaluateRunRequest
+	handler := newPlaygroundHandler(playgroundOptions{
+		Timeout:        time.Second,
+		MaxSourceBytes: defaultPlaygroundMaxSourceBytes,
+		Runner: func(ctx context.Context, req playgroundRunRequest, opts playgroundOptions) playgroundRunResponse {
+			copyReq := req
+			gotRun = &copyReq
+			return playgroundRunResponse{OK: true, Stdout: "run ok\n", DurationMS: 1}
+		},
+		EvaluateRunner: func(ctx context.Context, req playgroundEvaluateRunRequest, opts playgroundOptions) playgroundRunResponse {
+			copyReq := req
+			gotEvaluate = &copyReq
+			return playgroundRunResponse{OK: true, Stdout: `{"cases_passed":1}` + "\n", DurationMS: 1}
+		},
+	})
+
+	pageReq := httptest.NewRequest(http.MethodGet, "/", nil)
+	pageRec := httptest.NewRecorder()
+	handler.ServeHTTP(pageRec, pageReq)
+	if pageRec.Code != http.StatusOK {
+		t.Fatalf("page status = %d, body = %s", pageRec.Code, pageRec.Body.String())
+	}
+	page := pageRec.Body.String()
+	for _, want := range []string{
+		`<nav class="tabs" aria-label="Playground sections">`,
+		`<button class="tab-button active" data-tab="playground" type="button">Playground</button>`,
+		`<button class="tab-button" data-tab="tour" type="button">Tour</button>`,
+		`<button class="tab-button" data-tab="examples" type="button">Examples</button>`,
+		`<button class="tab-button" data-tab="evaluate" type="button">Evaluate</button>`,
+		`<button class="tab-button" data-tab="ai" type="button">AI</button>`,
+		`<select id="examples" aria-label="Examples"></select>`,
+		`<select id="mode" aria-label="Execution mode">`,
+		`<button class="primary" id="run">Run</button>`,
+		`const source = document.getElementById("source");`,
+		`const tabButtons = document.querySelectorAll(".tab-button");`,
+		`const tabConfig = {`,
+		`playground: {`,
+		`tour: {`,
+		`url: "/api/tour"`,
+		`examples: {`,
+		`url: "/api/examples"`,
+		`evaluate: {`,
+		`url: "/api/evaluate"`,
+		`ai: {`,
+		`url: "/api/ai"`,
+		`button.addEventListener("click", () => setActiveItem(item.id));`,
+		`examples.addEventListener("change", () => {`,
+		`runButton.disabled = !item.runnable;`,
+		`const runURL = activeTab === "evaluate" ? "/api/evaluate/run" : "/api/run";`,
+		`? {source: source.value, example_id: activeItemID}`,
+		`: {source: source.value, mode: mode.value, profile: activeTab === "ai" ? "ai" : "sandbox"};`,
+		`method: "POST"`,
+		`headers: {"Content-Type": "application/json"}`,
+		`runButton.addEventListener("click", run);`,
+		`button.addEventListener("click", () => loadTab(button.dataset.tab));`,
+		`loadTab("playground");`,
+	} {
+		if !strings.Contains(page, want) {
+			t.Fatalf("playground HTML/JS missing browser smoke marker %q", want)
+		}
+	}
+
+	apiIDs := map[string]string{
+		"/api/tour":     "welcome",
+		"/api/examples": "repo-hello-counter",
+		"/api/evaluate": "evaluate-basic-assert",
+		"/api/ai":       "ai-one-line",
+	}
+	for path, wantID := range apiIDs {
+		t.Run("GET "+path, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, path, nil)
+			rec := httptest.NewRecorder()
+			handler.ServeHTTP(rec, req)
+			if rec.Code != http.StatusOK {
+				t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
+			}
+			if ct := rec.Header().Get("Content-Type"); !strings.Contains(ct, "application/json") {
+				t.Fatalf("content-type = %q, want JSON", ct)
+			}
+			var examples []playgroundExample
+			if err := json.Unmarshal(rec.Body.Bytes(), &examples); err != nil {
+				t.Fatalf("decode %s: %v", path, err)
+			}
+			found := false
+			for _, example := range examples {
+				if example.ID == "" || example.Title == "" || example.Section == "" || strings.TrimSpace(example.Source) == "" {
+					t.Fatalf("%s returned incomplete browser option: %#v", path, example)
+				}
+				if example.ID == wantID {
+					found = true
+				}
+			}
+			if !found {
+				t.Fatalf("%s missing smoke example %s", path, wantID)
+			}
+		})
+	}
+
+	runPayload := []byte(`{"source":"print(\"browser smoke\")","mode":"bytecode","profile":"ai"}`)
+	runReq := httptest.NewRequest(http.MethodPost, "/api/run", bytes.NewReader(runPayload))
+	runReq.Header.Set("Content-Type", "application/json")
+	runRec := httptest.NewRecorder()
+	handler.ServeHTTP(runRec, runReq)
+	if runRec.Code != http.StatusOK {
+		t.Fatalf("run status = %d, body = %s", runRec.Code, runRec.Body.String())
+	}
+	var runResp playgroundRunResponse
+	if err := json.Unmarshal(runRec.Body.Bytes(), &runResp); err != nil {
+		t.Fatalf("decode run response: %v", err)
+	}
+	if !runResp.OK || runResp.Stdout != "run ok\n" {
+		t.Fatalf("run response = %#v", runResp)
+	}
+	if gotRun == nil || gotRun.Source != `print("browser smoke")` || gotRun.Mode != "bytecode" || gotRun.Profile != "ai" {
+		t.Fatalf("run request = %#v", gotRun)
+	}
+
+	evaluatePayload := []byte(`{"source":"evaluate \"smoke\" { assert(true) }","example_id":"evaluate-basic-assert"}`)
+	evaluateReq := httptest.NewRequest(http.MethodPost, "/api/evaluate/run", bytes.NewReader(evaluatePayload))
+	evaluateReq.Header.Set("Content-Type", "application/json")
+	evaluateRec := httptest.NewRecorder()
+	handler.ServeHTTP(evaluateRec, evaluateReq)
+	if evaluateRec.Code != http.StatusOK {
+		t.Fatalf("evaluate run status = %d, body = %s", evaluateRec.Code, evaluateRec.Body.String())
+	}
+	var evaluateResp playgroundRunResponse
+	if err := json.Unmarshal(evaluateRec.Body.Bytes(), &evaluateResp); err != nil {
+		t.Fatalf("decode evaluate response: %v", err)
+	}
+	if !evaluateResp.OK || !strings.Contains(evaluateResp.Stdout, `"cases_passed":1`) {
+		t.Fatalf("evaluate response = %#v", evaluateResp)
+	}
+	if gotEvaluate == nil || gotEvaluate.Source != `evaluate "smoke" { assert(true) }` || gotEvaluate.ExampleID != "evaluate-basic-assert" {
+		t.Fatalf("evaluate request = %#v", gotEvaluate)
+	}
+}
+
 func TestPlaygroundTourAndAIAPI(t *testing.T) {
 	handler := newPlaygroundHandler(playgroundOptions{
 		Runner: func(context.Context, playgroundRunRequest, playgroundOptions) playgroundRunResponse {

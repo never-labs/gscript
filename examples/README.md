@@ -73,7 +73,8 @@ AI examples live under `ai/` and `llm/`. Most are intended to work with a mock
 or replay provider in tests. `ai/coding_agent_project/main.leia` is the
 project-level offline coding-agent gate, while `llm/direct_turn.leia` shows the
 ordinary `llm.turn` request shape without an agent wrapper. Live-provider examples
-require opt-in environment variables and must never commit API keys.
+require `LEIA_LLM_INTEGRATION=1` plus provider environment variables and must
+never commit API keys.
 
 Evaluate examples live under `evaluate/`. Run replay-backed agent checks with:
 

@@ -6,7 +6,7 @@
 //   model:    LEIA_GLM_MODEL or GLM_MODEL, default glm-5.1
 //
 // Run without committing tokens:
-//   LEIA_GLM_API_KEY=... leia -jit=false examples/llm/glm_direct_agent_tools.leia
+//   LEIA_LLM_INTEGRATION=1 LEIA_GLM_API_KEY=... leia run examples/llm/glm_direct_agent_tools.leia
 
 func env_first(a, b, c, fallback) {
     v := os.getenv(a)
@@ -36,6 +36,10 @@ llm.register_models({
 })
 
 glm_api_key := env_first("LEIA_GLM_API_KEY", "SENTINEL_GLM_API_KEY", "GLM_API_KEY", "")
+if os.getenv("LEIA_LLM_INTEGRATION") != "1" {
+    print("set LEIA_LLM_INTEGRATION=1 to run this real GLM example")
+    return
+}
 if glm_api_key == nil || glm_api_key == "" {
     print("set LEIA_GLM_API_KEY, SENTINEL_GLM_API_KEY, or GLM_API_KEY to run this GLM example")
     return

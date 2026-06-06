@@ -9,6 +9,7 @@
 //   LEIA_GLM_BASE_URL=https://open.bigmodel.cn/api/anthropic \
 //   LEIA_GLM_API_KEY=... \
 //   LEIA_GLM_MODEL=glm-5.1 \
+//   LEIA_LLM_INTEGRATION=1 \
 //   leia run examples/llm/glm_smoke.leia
 
 func env_first(a, b, c, fallback) {
@@ -39,6 +40,10 @@ llm.register_models({
 })
 
 glm_api_key := env_first("LEIA_GLM_API_KEY", "SENTINEL_GLM_API_KEY", "GLM_API_KEY", "")
+if os.getenv("LEIA_LLM_INTEGRATION") != "1" {
+    print("set LEIA_LLM_INTEGRATION=1 to run this real GLM smoke example")
+    return
+}
 if glm_api_key == nil || glm_api_key == "" {
     print("set LEIA_GLM_API_KEY, SENTINEL_GLM_API_KEY, or GLM_API_KEY to run this GLM smoke example")
     return

@@ -422,7 +422,7 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 		"Leia is a Go-native, AI-native, hot-reloadable scripting language.",
 		"repeatable tests, package metadata, and source-level hot reload.",
 		"Go-flavored syntax with dynamic values, Lua-compatible table and multi-return",
-		"semantics where useful, an embeddable Go API, a bytecode VM, and an ARM64 JIT.",
+		"semantics where useful, an embeddable Go API, a bytecode VM, and an ARM64 JIT\nfor supported hot paths.",
 		"Go embedding API with sandbox, resource budgets, host bindings, and hot reload.",
 		"AI-native syntax and stdlib support for models, tools, messages, turns,",
 		"DSL-native tagged dialects for shell commands, data formats, web routes,",

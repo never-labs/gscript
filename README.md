@@ -2,7 +2,8 @@
 
 Leia is a Go-native, AI-native, hot-reloadable scripting language. It uses
 Go-flavored syntax with dynamic values, Lua-compatible table and multi-return
-semantics where useful, an embeddable Go API, a bytecode VM, and an ARM64 JIT.
+semantics where useful, an embeddable Go API, a bytecode VM, and an ARM64 JIT
+for supported hot paths.
 
 Leia is designed for host applications that need scriptability without giving up
 Go operational habits: explicit capabilities, small deployment surface,

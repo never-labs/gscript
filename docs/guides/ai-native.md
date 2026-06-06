@@ -215,12 +215,22 @@ LEIA_ANTHROPIC_COMPAT_MODEL=...
 ```
 
 The GLM smoke path also accepts `LEIA_GLM_BASE_URL`, `LEIA_GLM_API_KEY`, and
-`LEIA_GLM_MODEL`.
+`LEIA_GLM_MODEL`. It also accepts the local convenience aliases
+`SENTINEL_GLM_API_KEY`, `GLM_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, `GLM_MODEL`, and
+`ANTHROPIC_MODEL`.
 
 Offline examples such as `examples/llm/agent.leia` and
 `examples/llm/incident_response.leia` are runnable without network access.
 Live-provider examples are kept separate; use `examples/llm/glm_smoke.leia`
-only when the local GLM-compatible environment variables are configured.
+only when the local GLM-compatible environment variables are configured and
+`LEIA_LLM_INTEGRATION=1` is set.
+
+```bash
+LEIA_LLM_INTEGRATION=1 \
+LEIA_GLM_API_KEY=... \
+LEIA_GLM_MODEL=glm-5.1 \
+go test ./tests/integration/llm -run 'Test(GLMAnthropicCompatibleLLMIntegration|LLMSyntaxGLMIntegration|LLMSyntaxGLMStreamingIntegration|LLMSyntaxGLMDirectAgentToolsIntegration|GLMExamplesRunWithRealProviderIntegration)$' -count=1 -v
+```
 
 ## Evidence
 

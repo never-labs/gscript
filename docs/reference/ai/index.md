@@ -215,7 +215,22 @@ LEIA_ANTHROPIC_COMPAT_MODEL=...
 ```
 
 The GLM smoke path also accepts `LEIA_GLM_BASE_URL`, `LEIA_GLM_API_KEY`, and
-`LEIA_GLM_MODEL`.
+`LEIA_GLM_MODEL`. For compatibility with existing local setups, the GLM path
+also accepts `SENTINEL_GLM_API_KEY`, `GLM_API_KEY`, `ANTHROPIC_AUTH_TOKEN`,
+`GLM_MODEL`, and `ANTHROPIC_MODEL`.
+
+Run the live GLM smoke suite explicitly:
+
+```bash
+LEIA_LLM_INTEGRATION=1 \
+LEIA_GLM_API_KEY=... \
+LEIA_GLM_MODEL=glm-5.1 \
+go test ./tests/integration/llm -run 'Test(GLMAnthropicCompatibleLLMIntegration|LLMSyntaxGLMIntegration|LLMSyntaxGLMStreamingIntegration|LLMSyntaxGLMDirectAgentToolsIntegration|GLMExamplesRunWithRealProviderIntegration)$' -count=1 -v
+```
+
+`leia examples check` skips live-provider examples by default. Directly running
+`examples/llm/glm_smoke.leia` or `examples/llm/glm_direct_agent_tools.leia`
+requires both `LEIA_LLM_INTEGRATION=1` and a configured GLM key.
 
 ## Evidence
 

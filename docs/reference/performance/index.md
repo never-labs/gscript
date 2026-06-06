@@ -89,7 +89,7 @@ benchmarks in these modes:
 |---|---|
 | `vm` | Bytecode VM without JIT. |
 | `default` | Normal execution with configured accelerators. |
-| `no_filter` | JIT path with optimization filters disabled where supported. |
+| `no_filter` | JIT-enabled path with optimization filters disabled where supported. |
 | `luajit` | External LuaJIT reference when available. |
 
 The strict pass checks output stability, timing quality, suspicious
@@ -98,7 +98,8 @@ benchmark-only wins, and LuaJIT comparisons where references exist.
 ## Execution Performance Contract
 
 The interpreter is the semantic baseline. The bytecode VM and ARM64 JIT are
-execution accelerators: supported hot paths may run natively, but unsupported
+execution accelerators, not a promise that every language feature or function
+runs as native code: supported hot paths may run natively, but unsupported
 operations must fall back to the VM/runtime without changing visible results,
 errors, capability checks, resource-budget behavior, or deoptimization behavior.
 
