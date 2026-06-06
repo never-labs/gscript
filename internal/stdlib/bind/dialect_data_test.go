@@ -180,6 +180,36 @@ func TestDialectXLSXEncodesHeaderRowsAndExcelAliasRoundTrips(t *testing.T) {
 	}
 }
 
+func TestDialectXLSXDecodePreservesSparseCellColumns(t *testing.T) {
+	eval := BuildDialect(HostOptions{}, nil).RawGetString("eval").GoFunction()
+	if eval == nil {
+		t.Fatalf("dialect.eval is not a Go function")
+	}
+	xlsx := testSparseXLSXWorkbook(t)
+	decoded, err := eval.Fn([]Value{
+		StringValue("xlsx"),
+		StringValue(xlsx),
+		TableValue(testTableFromMap(map[string]Value{"headers": BoolValue(true)})),
+	})
+	if err != nil {
+		t.Fatalf("xlsx sparse decode: %v", err)
+	}
+	rows := decoded[0].Table()
+	if got := rows.Length(); got != 1 {
+		t.Fatalf("rows length = %d, want 1", got)
+	}
+	row := rows.RawGetInt(1).Table()
+	if got := row.RawGetString("name").Str(); got != "Ada" {
+		t.Fatalf("decoded name = %q, want Ada", got)
+	}
+	if got := row.RawGetString("score").Str(); got != "" {
+		t.Fatalf("decoded sparse score = %q, want empty string", got)
+	}
+	if got := row.RawGetString("note").Str(); got != "promoted" {
+		t.Fatalf("decoded note = %q, want promoted", got)
+	}
+}
+
 func testXLSXWorkbook(t *testing.T) string {
 	t.Helper()
 	var buf bytes.Buffer
@@ -209,6 +239,41 @@ func testXLSXWorkbook(t *testing.T) string {
 </worksheet>`)
 	if err := zw.Close(); err != nil {
 		t.Fatalf("close xlsx zip: %v", err)
+	}
+	return buf.String()
+}
+
+func testSparseXLSXWorkbook(t *testing.T) string {
+	t.Helper()
+	var buf bytes.Buffer
+	zw := zip.NewWriter(&buf)
+	writeZipFile := func(name, body string) {
+		t.Helper()
+		w, err := zw.Create(name)
+		if err != nil {
+			t.Fatalf("create %s: %v", name, err)
+		}
+		if _, err := w.Write([]byte(body)); err != nil {
+			t.Fatalf("write %s: %v", name, err)
+		}
+	}
+	writeZipFile("xl/sharedStrings.xml", `<?xml version="1.0" encoding="UTF-8"?>
+<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <si><t>name</t></si>
+  <si><t>score</t></si>
+  <si><t>note</t></si>
+  <si><t>Ada</t></si>
+  <si><t>promoted</t></si>
+</sst>`)
+	writeZipFile("xl/worksheets/sheet1.xml", `<?xml version="1.0" encoding="UTF-8"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <sheetData>
+    <row r="1"><c r="A1" t="s"><v>0</v></c><c r="B1" t="s"><v>1</v></c><c r="C1" t="s"><v>2</v></c></row>
+    <row r="2"><c r="A2" t="s"><v>3</v></c><c r="C2" t="s"><v>4</v></c></row>
+  </sheetData>
+</worksheet>`)
+	if err := zw.Close(); err != nil {
+		t.Fatalf("close sparse xlsx zip: %v", err)
 	}
 	return buf.String()
 }

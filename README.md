@@ -42,7 +42,9 @@ leia run tests/smoke/01_basic.leia
   cancellation-oriented host integration.
 - Data-oriented helpers for dense arrays, matrices, vectors, and SoA layouts.
 - CLI tooling for format, lint, test, docs, diagnostics, modules, benchmarks,
-  and release evidence.
+  playground, examples, and release evidence.
+- Browser playground with runnable Tour, Examples, Evaluate, and AI tabs backed
+  by the repository examples and local execution APIs.
 
 ## Tooling
 
@@ -57,6 +59,7 @@ go run ./cmd/leia mod verify --json examples/ui/package_managed
 go run ./cmd/leia mod verify --json examples/tooling/package_manager_workflow
 go run ./cmd/leia bench compare --bench numeric/mandelbrot --runs 3 --warmup 1
 go run ./cmd/leia diag bundle --output /tmp/leia-diag --skip-benchmarks
+go run ./cmd/leia playground --help
 go run ./cmd/leia ci release --list
 ```
 

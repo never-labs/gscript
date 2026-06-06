@@ -248,7 +248,16 @@ func xlsxDecodeRows(data []byte, limit int64) ([][]string, error) {
 	for _, row := range sheet.SheetData.Rows {
 		record := make([]string, 0, len(row.Cells))
 		for _, cell := range row.Cells {
-			record = append(record, xlsxCellText(cell, shared))
+			text := xlsxCellText(cell, shared)
+			col := xlsxColumnIndex(cell.Ref)
+			if col <= 0 {
+				record = append(record, text)
+				continue
+			}
+			for len(record) < col {
+				record = append(record, "")
+			}
+			record[col-1] = text
 		}
 		rows = append(rows, record)
 	}
@@ -322,6 +331,25 @@ func xlsxCellText(cell xlsxCell, shared []string) string {
 	}
 }
 
+func xlsxColumnIndex(ref string) int {
+	col := 0
+	for i := 0; i < len(ref); i++ {
+		ch := ref[i]
+		switch {
+		case ch >= 'A' && ch <= 'Z':
+			col = col*26 + int(ch-'A'+1)
+		case ch >= 'a' && ch <= 'z':
+			col = col*26 + int(ch-'a'+1)
+		default:
+			if col == 0 {
+				return 0
+			}
+			return col
+		}
+	}
+	return col
+}
+
 type xlsxWorksheet struct {
 	SheetData struct {
 		Rows []xlsxRow `xml:"row"`
@@ -333,6 +361,7 @@ type xlsxRow struct {
 }
 
 type xlsxCell struct {
+	Ref    string         `xml:"r,attr"`
 	Type   string         `xml:"t,attr"`
 	Value  string         `xml:"v"`
 	Inline xlsxInlineText `xml:"is"`

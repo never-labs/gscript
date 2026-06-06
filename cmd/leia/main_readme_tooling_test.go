@@ -28,11 +28,21 @@ func TestReadmeToolingCommandsDoNotDrift(t *testing.T) {
 		"go run ./cmd/leia mod verify --json examples/tooling/package_manager_workflow",
 		"go run ./cmd/leia bench compare --bench numeric/mandelbrot --runs 3 --warmup 1",
 		"go run ./cmd/leia diag bundle --output /tmp/leia-diag --skip-benchmarks",
+		"go run ./cmd/leia playground --help",
 		"go run ./cmd/leia ci release --list",
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("README Tooling commands changed:\ngot  %#v\nwant %#v", got, want)
 	}
+}
+
+func readFileString(t *testing.T, path string) string {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(data)
 }
 
 func TestReadmeQuickStartCommandsStayRunnable(t *testing.T) {
@@ -275,6 +285,22 @@ func TestReadmeToolingCommandsMapToCLI(t *testing.T) {
 			var stdout, stderr bytes.Buffer
 			if code := runDiagCommand(args[1:], &stdout, &stderr); code != 0 {
 				t.Fatalf("README diag command failed dispatch: code=%d stderr=%q", code, stderr.String())
+			}
+		case "playground":
+			if len(args) != 2 || args[1] != "--help" {
+				t.Fatalf("README playground command args = %#v, want --help", args)
+			}
+			playgroundGate := readFileString(t, filepath.Join(root, "cmd", "leia", "main_playground_test.go"))
+			for _, want := range []string{
+				"TestReadmePlaygroundTabsMatchAPISurface",
+				"go run ./cmd/leia playground --help",
+				`data-tab="evaluate"`,
+				`url: "/api/examples"`,
+				`url: "/api/ai"`,
+			} {
+				if !strings.Contains(playgroundGate, want) {
+					t.Fatalf("playground README guard missing %q", want)
+				}
 			}
 		case "doc":
 			var stdout, stderr bytes.Buffer

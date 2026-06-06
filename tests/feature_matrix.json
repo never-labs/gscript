@@ -222,7 +222,7 @@
       "tier2": {"status": "semantic_only", "refs": []},
       "semantic_gate": {"status": "covered", "refs": ["tests/language/go_channel_host_more.leia", "tests/language/go_channel_edges_more.leia", "tests/concurrency_contract_test.go", "tests/sdk/resource_budget_concurrency_test.go", "cmd/leia/main_examples_test.go", "cmd/leia/main_examples_command_test.go", "examples/concurrency/select_timeout.leia", "examples/concurrency/context_sleep.leia", "examples/concurrency/sync_group_cancel.leia", "examples/concurrency/pipeline_project/main.leia", "docs/reference/concurrency/index.md", "scripts/production_check.sh"]},
       "conformance_case": {"status": "covered", "refs": ["tests/language/go_channel_host_more.leia", "tests/language/go_channel_edges_more.leia"]},
-      "perf_hot_case": {"status": "covered", "refs": ["benchmarks/concurrency/sync_group.leia"]}
+      "perf_hot_case": {"status": "covered", "refs": ["benchmarks/concurrency/producer_consumer_pipeline.leia", "benchmarks/concurrency/select_timeout.leia", "benchmarks/concurrency/sync_group.leia"]}
     },
     {
       "id": "bitwise_bit32",
@@ -288,10 +288,10 @@
       "builtin_dialect_tags": ["sh", "cmd", "shellwords", "glob", "path", "re", "regexp", "json", "jsonptr", "jsonl", "csv", "tsv", "mdtable", "markdown", "md", "lines", "split", "words", "nums", "numbers", "kv", "logfmt", "env", "ini", "yaml", "yml", "semver", "duration", "timestamp", "rfc3339", "tap", "junit", "xml", "template", "url", "html_escape", "html", "urlquery", "form", "urlform", "urlpath", "mime", "mailaddr", "emailaddr", "headers", "http_headers", "cookie", "cookies", "httpmsg", "sse", "multipart", "jwt", "ipaddr", "cidr", "hostport", "serve", "base64", "hash", "hex", "base32", "uuid", "gzip", "zlib", "deflate", "binary", "q", "pem", "xlsx", "excel", "sql", "prompt", "quote", "model", "turn", "tool", "agent"],
       "parser": {"status": "covered", "refs": ["internal/parser/dialect_syntax_test.go", "internal/lexer/lexer_test.go"]},
       "bytecode": {"status": "semantic_only", "refs": []},
-      "interpreter": {"status": "covered", "refs": ["tests/dialect_syntax_test.go", "internal/stdlib/bind/dialect_test.go", "internal/stdlib/bind/dialect_data_test.go", "internal/stdlib/bind/dialect_protocol_test.go"]},
+      "interpreter": {"status": "covered", "refs": ["tests/dialect_syntax_test.go", "internal/stdlib/bind/dialect_test.go", "internal/stdlib/bind/dialect_text_test.go", "internal/stdlib/bind/dialect_data_test.go", "internal/stdlib/bind/dialect_protocol_test.go"]},
       "tier1": {"status": "semantic_only", "refs": []},
       "tier2": {"status": "semantic_only", "refs": []},
-      "semantic_gate": {"status": "covered", "refs": ["tests/dialect_syntax_test.go", "internal/parser/dialect_syntax_test.go", "internal/stdlib/bind/dialect_data_test.go", "internal/stdlib/bind/serve_behavior_test.go", "tests/architecture/stdlib_boundary_test.go", "cmd/leia/main_examples_test.go", "cmd/leia/main_examples_command_test.go", "examples/hello/dialects.leia", "examples/dialects/shell_filesystem.leia", "examples/dialects/web_text.leia", "examples/dialects/sql_result_analytics.leia", "examples/dialects/ai_prompt_quote.leia", "examples/dialects/data_aggregation_report.leia", "examples/dialects/http_protocol_trace.leia", "examples/dialects/sse_stream_fixture.leia", "examples/dialects/multipart_form_fixture.leia", "examples/dialects/pem_certificate_fixture.leia", "examples/dialects/mailaddr_fixture.leia", "examples/data/q_trade_analytics_project/main.leia", "examples/data/db_q_frame_project/main.leia", "examples/web/serve_dialect_app.leia", "examples/web/route_workbench.leia", "examples/web/tiny_fullstack_app.leia", "examples/web/fullstack_project/main.leia", "examples/tooling/release_gate_project/main.leia", "docs/reference/dialects/index.md"]},
+      "semantic_gate": {"status": "covered", "refs": ["tests/dialect_syntax_test.go", "internal/parser/dialect_syntax_test.go", "internal/stdlib/bind/dialect_text_test.go", "internal/stdlib/bind/dialect_data_test.go", "internal/stdlib/lib/csv/csv_test.go", "internal/stdlib/bind/serve_behavior_test.go", "tests/architecture/stdlib_boundary_test.go", "cmd/leia/main_examples_test.go", "cmd/leia/main_examples_command_test.go", "examples/hello/dialects.leia", "examples/dialects/shell_filesystem.leia", "examples/dialects/web_text.leia", "examples/dialects/sql_result_analytics.leia", "examples/dialects/ai_prompt_quote.leia", "examples/dialects/data_aggregation_report.leia", "examples/dialects/http_protocol_trace.leia", "examples/dialects/sse_stream_fixture.leia", "examples/dialects/multipart_form_fixture.leia", "examples/dialects/pem_certificate_fixture.leia", "examples/dialects/mailaddr_fixture.leia", "examples/data/q_trade_analytics_project/main.leia", "examples/data/db_q_frame_project/main.leia", "examples/web/serve_dialect_app.leia", "examples/web/route_workbench.leia", "examples/web/tiny_fullstack_app.leia", "examples/web/fullstack_project/main.leia", "examples/tooling/release_gate_project/main.leia", "docs/reference/dialects/index.md"]},
       "conformance_case": {"status": "not_applicable", "refs": []},
       "perf_hot_case": {"status": "covered", "refs": ["benchmarks/app/dialect_syntax_smoke.leia"]}
     },
@@ -347,7 +347,7 @@
       "interpreter": {"status": "semantic_only", "refs": []},
       "tier1": {"status": "semantic_only", "refs": []},
       "tier2": {"status": "semantic_only", "refs": []},
-      "semantic_gate": {"status": "covered", "refs": ["internal/modpkg/modpkg_test.go", "tests/architecture/package_boundary_test.go", "tests/architecture/stdlib_boundary_test.go", "cmd/leia/main_mod_test.go", "cmd/leia/main_examples_command_test.go", "examples/database/package_managed/leia.mod", "examples/macos/package_managed/leia.mod", "examples/ui/package_managed/leia.mod", "examples/tooling/release_gate_project/leia.mod", "examples/tooling/package_manager_workflow/leia.mod", "examples/tooling/package_manager_workflow/main.leia", "examples/tooling/package_manager_workflow/local/metadata/leia.mod", "docs/reference/modules/index.md", "docs/guides/packages.md"]},
+      "semantic_gate": {"status": "covered", "refs": ["internal/modpkg/modpkg_test.go", "modconfig_test.go", "tests/architecture/package_boundary_test.go", "tests/architecture/stdlib_boundary_test.go", "cmd/leia/main_mod_test.go", "cmd/leia/main_examples_command_test.go", "examples/database/package_managed/leia.mod", "examples/macos/package_managed/leia.mod", "examples/ui/package_managed/leia.mod", "examples/tooling/release_gate_project/leia.mod", "examples/tooling/package_manager_workflow/leia.mod", "examples/tooling/package_manager_workflow/main.leia", "examples/tooling/package_manager_workflow/local/metadata/leia.mod", "docs/reference/modules/index.md", "docs/guides/packages.md"]},
       "conformance_case": {"status": "not_applicable", "refs": []},
       "perf_hot_case": {"status": "not_applicable", "refs": []}
     },
@@ -361,7 +361,7 @@
       "interpreter": {"status": "not_applicable", "refs": []},
       "tier1": {"status": "not_applicable", "refs": []},
       "tier2": {"status": "not_applicable", "refs": []},
-      "semantic_gate": {"status": "covered", "refs": ["internal/modpkg/modpkg_test.go", "cmd/leia/main_mod_test.go", "tests/release_matrix_test.go", "docs/reference/modules/index.md", "docs/guides/packages.md"]},
+      "semantic_gate": {"status": "covered", "refs": ["internal/modpkg/modpkg_test.go", "modconfig_test.go", "cmd/leia/main_mod_test.go", "tests/release_matrix_test.go", "docs/reference/modules/index.md", "docs/guides/packages.md"]},
       "conformance_case": {"status": "not_applicable", "refs": []},
       "perf_hot_case": {"status": "not_applicable", "refs": []}
     },
@@ -389,7 +389,7 @@
       "interpreter": {"status": "not_applicable", "refs": []},
       "tier1": {"status": "not_applicable", "refs": []},
       "tier2": {"status": "not_applicable", "refs": []},
-      "semantic_gate": {"status": "covered", "refs": ["cmd/leia-lsp/main_test.go", "internal/tooling/lsp/server_test.go", "tools/editor/smoke/editor_smoke.py", "tools/tree-sitter-leia/package.json", "tools/syntax/textmate/leia.tmLanguage.json", "tools/syntax/textmate/leia-mod.tmLanguage.json", "editors/emacs/leia-mode.el", "scripts/editor_check.sh", "scripts/release_distribution_check.sh", "README.md"]},
+      "semantic_gate": {"status": "covered", "refs": ["cmd/leia-lsp/main_test.go", "internal/tooling/lsp/server_test.go", "tools/editor/smoke/editor_smoke.py", "tools/editor/smoke/editor_check_test.py", "tools/tree-sitter-leia/package.json", "tools/tree-sitter-leia/grammar.js", "tools/tree-sitter-leia/queries/highlights.scm", "tools/syntax/textmate/leia.tmLanguage.json", "tools/syntax/textmate/leia-mod.tmLanguage.json", "editors/vscode/package.json", "editors/vscode/extension.js", "editors/vscode/snippets/leia.json", "editors/emacs/leia-mode.el", "editors/helix/languages.toml", "editors/neovim/queries/leia/highlights.scm", "editors/zed/extension.toml", "scripts/editor_check.sh", "scripts/release_distribution_check.sh", "README.md"]},
       "conformance_case": {"status": "not_applicable", "refs": []},
       "perf_hot_case": {"status": "not_applicable", "refs": []}
     },
@@ -512,10 +512,10 @@
       "spec_sections": ["Tables And Metatables", "Values And Types", "Expressions", "Implementation Requirements"],
       "parser": {"status": "covered", "refs": ["internal/parser/parser_test.go"]},
       "bytecode": {"status": "covered", "refs": ["internal/vm/compiler_dense_test.go", "internal/vm/matrix_multiply_specialization_test.go", "internal/vm/spectral_runtime_specialization_test.go", "internal/vm/soa_affine_specialization_test.go"]},
-      "interpreter": {"status": "covered", "refs": ["internal/runtime/table_dense_matrix_test.go", "internal/stdlib/bind/vec_test.go", "internal/runtime/soa_test.go", "internal/stdlib/bind/soa_test.go"]},
+      "interpreter": {"status": "covered", "refs": ["internal/runtime/table_dense_matrix_test.go", "internal/stdlib/bind/vec_test.go", "internal/stdlib/bind/matrix_test.go", "internal/stdlib/lib/vec/vec_test.go", "internal/stdlib/lib/matrix/matrix_test.go", "internal/stdlib/lib/soa/ops_test.go", "internal/runtime/soa_test.go", "internal/stdlib/bind/soa_test.go"]},
       "tier1": {"status": "covered", "refs": ["internal/methodjit/pass_intrinsic_matrix_test.go", "internal/methodjit/pass_matrix_rowptr_test.go"]},
       "tier2": {"status": "covered", "refs": ["internal/methodjit/emit_matrix_codegen_test.go"]},
-      "semantic_gate": {"status": "covered", "refs": ["tests/language/matrix_host_dense_more.leia", "tests/language/vec_color_geometry_hsl_more.leia", "internal/stdlib/bind/soa_test.go", "internal/stdlib/bind/db_test.go", "cmd/leia/main_examples_command_test.go", "examples/data/q_trade_analytics_project/main.leia", "examples/data/db_q_frame_project/main.leia", "examples/tooling/release_gate_project/main.leia", "examples/data_processing/data_oriented/dense_matrix_vec_kernels.leia", "examples/data_processing/data_oriented/soa_kernels.leia", "docs/reference/data-oriented/index.md"]},
+      "semantic_gate": {"status": "covered", "refs": ["tests/language/matrix_host_dense_more.leia", "tests/language/vec_color_geometry_hsl_more.leia", "internal/stdlib/bind/vec_test.go", "internal/stdlib/bind/matrix_test.go", "internal/stdlib/bind/soa_test.go", "internal/stdlib/bind/db_test.go", "internal/stdlib/lib/vec/vec_test.go", "internal/stdlib/lib/matrix/matrix_test.go", "internal/stdlib/lib/soa/ops_test.go", "cmd/leia/main_examples_command_test.go", "examples/data/q_trade_analytics_project/main.leia", "examples/data/db_q_frame_project/main.leia", "examples/tooling/release_gate_project/main.leia", "examples/data_processing/data_oriented/dense_matrix_vec_kernels.leia", "examples/data_processing/data_oriented/soa_kernels.leia", "docs/reference/data-oriented/index.md"]},
       "conformance_case": {"status": "covered", "refs": ["tests/language/matrix_host_dense_more.leia", "internal/runtime/soa_test.go"]},
       "perf_hot_case": {"status": "covered", "refs": ["benchmarks/numeric/matmul_dense.leia", "benchmarks/numeric/spectral_norm_dense.leia", "benchmarks/data/soa_affine_many.leia", "benchmarks/data/soa_masked_aggregate.leia", "benchmarks/data/soa_filter_gather.leia"]}
     },

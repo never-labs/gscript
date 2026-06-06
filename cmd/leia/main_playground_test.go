@@ -121,6 +121,90 @@ func TestPlaygroundPageSyntaxSurfaceMatchesLeia(t *testing.T) {
 	}
 }
 
+func TestReadmePlaygroundTabsMatchAPISurface(t *testing.T) {
+	root := filepath.Dir(playgroundExamplesRoot())
+	readme, err := os.ReadFile(filepath.Join(root, "README.md"))
+	if err != nil {
+		t.Fatalf("read README: %v", err)
+	}
+	readmeText := string(readme)
+	for _, want := range []string{
+		"playground, examples, and release evidence",
+		"Browser playground with runnable Tour, Examples, Evaluate, and AI tabs",
+		"go run ./cmd/leia playground --help",
+	} {
+		if !strings.Contains(readmeText, want) {
+			t.Fatalf("README missing playground claim %q", want)
+		}
+	}
+
+	handler := newPlaygroundHandler(playgroundOptions{
+		Runner: func(context.Context, playgroundRunRequest, playgroundOptions) playgroundRunResponse {
+			return playgroundRunResponse{}
+		},
+		EvaluateRunner: func(context.Context, playgroundEvaluateRunRequest, playgroundOptions) playgroundRunResponse {
+			return playgroundRunResponse{}
+		},
+	})
+	pageReq := httptest.NewRequest(http.MethodGet, "/", nil)
+	pageRec := httptest.NewRecorder()
+	handler.ServeHTTP(pageRec, pageReq)
+	if pageRec.Code != http.StatusOK {
+		t.Fatalf("page status = %d, body = %s", pageRec.Code, pageRec.Body.String())
+	}
+	page := pageRec.Body.String()
+	for _, want := range []string{
+		`data-tab="playground"`,
+		`data-tab="tour"`,
+		`data-tab="examples"`,
+		`data-tab="evaluate"`,
+		`data-tab="ai"`,
+		`url: "/api/tour"`,
+		`url: "/api/examples"`,
+		`url: "/api/evaluate"`,
+		`url: "/api/ai"`,
+		`activeTab === "evaluate" ? "/api/evaluate/run" : "/api/run"`,
+		`profile: activeTab === "ai" ? "ai" : "sandbox"`,
+	} {
+		if !strings.Contains(page, want) {
+			t.Fatalf("playground page missing %q", want)
+		}
+	}
+
+	wantAPIs := map[string]string{
+		"/api/tour":     "welcome",
+		"/api/examples": "repo-web-route_workbench",
+		"/api/evaluate": "evaluate-agent-replay",
+		"/api/ai":       "ai-coding-agent",
+	}
+	for path, wantID := range wantAPIs {
+		t.Run(path, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, path, nil)
+			rec := httptest.NewRecorder()
+			handler.ServeHTTP(rec, req)
+			if rec.Code != http.StatusOK {
+				t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
+			}
+			var examples []playgroundExample
+			if err := json.Unmarshal(rec.Body.Bytes(), &examples); err != nil {
+				t.Fatalf("decode %s: %v", path, err)
+			}
+			if len(examples) == 0 {
+				t.Fatalf("%s returned no examples", path)
+			}
+			for _, example := range examples {
+				if example.ID == wantID {
+					if strings.TrimSpace(example.Source) == "" {
+						t.Fatalf("%s source is empty", wantID)
+					}
+					return
+				}
+			}
+			t.Fatalf("%s did not expose %s", path, wantID)
+		})
+	}
+}
+
 func TestPlaygroundTourAndAIAPI(t *testing.T) {
 	handler := newPlaygroundHandler(playgroundOptions{
 		Runner: func(context.Context, playgroundRunRequest, playgroundOptions) playgroundRunResponse {
@@ -359,7 +443,7 @@ func TestPlaygroundRepositoryCoreExampleCoverage(t *testing.T) {
 	}
 
 	manualRequires := map[string]string{
-		"repo-concurrency-pipeline_project-main":                   "host VM concurrency runner",
+		"repo-concurrency-pipeline_project-main":                  "host VM concurrency runner",
 		"repo-concurrency-context_process":                        "process host access",
 		"repo-concurrency-goroutine_errors":                       "debug event sink host access",
 		"repo-data-db_q_frame_project-main":                       "SQLite and host VM data runner",
@@ -614,9 +698,10 @@ func TestReadmeFacingFeatureMatrixClaimsKeepRunnableExamples(t *testing.T) {
 		{"source-level hot reload", "embedding_hot_reload", "examples/embedding/embedding_test.go"},
 		{"AI-native syntax", "llm_native_integration", "examples/llm/agent.leia"},
 		{"DSL-native tagged dialects", "tagged_dialect_syntax", "examples/hello/dialects.leia"},
+		{"web routes", "host_stdlibs", "examples/web/route_workbench.leia"},
 		{"Go-style concurrency primitives", "go_style_concurrency", "examples/concurrency/select_timeout.leia"},
 		{"Data-oriented helpers", "matrix_dense_arrays", "examples/data_processing/data_oriented/dense_matrix_vec_kernels.leia"},
-		{"CLI tooling", "cli_repository_tooling", "examples/tooling/release_gate_project/main.leia"},
+		{"playground, examples", "cli_repository_tooling", "examples/tooling/release_gate_project/main.leia"},
 		{"an ARM64 JIT", "arm64_jit_runtime_fallback", "examples/performance/execution_modes_matrix.leia"},
 		{"release evidence", "release_evidence_gates", "examples/tooling/release_evidence_pipeline.leia"},
 	}

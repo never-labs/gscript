@@ -132,6 +132,18 @@ with `leia.mod`, the checker validates that module with `leia mod verify --json`
 before running the example so package metadata cannot drift away from runnable
 project examples.
 
+## Playground
+
+```bash
+go run ./cmd/leia playground --help
+go run ./cmd/leia playground --addr 127.0.0.1:8080
+```
+
+The browser playground serves local execution APIs plus runnable Playground,
+Tour, Examples, Evaluate, and AI tabs. It is backed by checked-in repository
+examples, so playground content is exercised by the same example and release
+evidence gates as command-line examples.
+
 ## Performance
 
 ```bash

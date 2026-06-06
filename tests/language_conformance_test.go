@@ -158,6 +158,7 @@ func runCommandResult(dir string, timeout time.Duration, name string, args ...st
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
+	cmd.WaitDelay = 5 * time.Second
 	err := cmd.Run()
 	return commandResult{
 		stdout:   stdout.String(),

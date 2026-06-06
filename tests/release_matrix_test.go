@@ -775,7 +775,7 @@ func TestReleaseMatrixReadmeCLIExperienceCommandsHaveEvidence(t *testing.T) {
 func TestReleaseMatrixReadmeToolingPromiseHasEvidence(t *testing.T) {
 	root := findRepoRoot(t)
 	readme := readFileString(t, filepath.Join(root, "README.md"))
-	if !strings.Contains(readme, "CLI tooling for format, lint, test, docs, diagnostics, modules, benchmarks,\n  and release evidence.") {
+	if !strings.Contains(readme, "CLI tooling for format, lint, test, docs, diagnostics, modules, benchmarks,\n  playground, examples, and release evidence.") {
 		t.Fatal("README.md must keep the full CLI tooling promise machine-checkable")
 	}
 
@@ -834,6 +834,12 @@ func TestReleaseMatrixReadmeToolingPromiseHasEvidence(t *testing.T) {
 			evidenceSnippet: "TestExamplesCommandChecksSelectedExamples",
 		},
 		{
+			category:        "playground",
+			readmeCommand:   "go run ./cmd/leia playground --help",
+			evidencePath:    "cmd/leia/main_playground_test.go",
+			evidenceSnippet: "TestReadmePlaygroundTabsMatchAPISurface",
+		},
+		{
 			category:        "release evidence",
 			readmeCommand:   "go run ./cmd/leia ci release --list",
 			evidencePath:    "cmd/leia/main_ci_test.go",
@@ -854,10 +860,13 @@ func TestReleaseMatrixReadmeToolingPromiseHasEvidence(t *testing.T) {
 		"## Modules",
 		"## Documentation",
 		"## Diagnostics",
+		"## Playground",
 		"## Release Evidence",
 		"go run ./cmd/leia mod verify --json examples/ui/package_managed",
 		"go run ./cmd/leia doc check",
 		"go run ./cmd/leia diag bundle --output /tmp/leia-diag --skip-benchmarks",
+		"go run ./cmd/leia playground --help",
+		"go run ./cmd/leia playground --addr 127.0.0.1:8080",
 		"bash scripts/release_artifacts_check.sh",
 	} {
 		if !strings.Contains(toolingGuide, snippet) {
@@ -1915,7 +1924,7 @@ func TestReleaseMatrixReadmeCapabilitiesStayCoveredByExamples(t *testing.T) {
 		"DSL-native tagged dialects for shell commands, data formats, web routes,\n  q-style analytics, spreadsheets, and AI workflows.",
 		"Go-style concurrency primitives: `go`, channels, `select`, sync helpers, and\n  cancellation-oriented host integration.",
 		"Data-oriented helpers for dense arrays, matrices, vectors, and SoA layouts.",
-		"CLI tooling for format, lint, test, docs, diagnostics, modules, benchmarks,\n  and release evidence.",
+		"CLI tooling for format, lint, test, docs, diagnostics, modules, benchmarks,\n  playground, examples, and release evidence.",
 	} {
 		if !strings.Contains(readme, promise) {
 			t.Fatalf("README.md What It Includes must keep documented capability promise %q", promise)

@@ -298,10 +298,12 @@ func TestFeatureMatrixCoversTaggedDialectAndModpkgReleaseGuards(t *testing.T) {
 		t.Fatal("feature_matrix.json missing tagged_dialect_syntax feature")
 	}
 	requireFeatureCellRefs(t, tagged, "tagged_dialect_syntax", "parser", "internal/parser/dialect_syntax_test.go")
-	requireFeatureCellRefs(t, tagged, "tagged_dialect_syntax", "interpreter", "tests/dialect_syntax_test.go", "internal/stdlib/bind/dialect_protocol_test.go")
+	requireFeatureCellRefs(t, tagged, "tagged_dialect_syntax", "interpreter", "tests/dialect_syntax_test.go", "internal/stdlib/bind/dialect_text_test.go", "internal/stdlib/bind/dialect_protocol_test.go")
 	requireFeatureCellRefs(t, tagged, "tagged_dialect_syntax", "semantic_gate",
 		"tests/architecture/stdlib_boundary_test.go",
+		"internal/stdlib/bind/dialect_text_test.go",
 		"internal/stdlib/bind/dialect_data_test.go",
+		"internal/stdlib/lib/csv/csv_test.go",
 		"cmd/leia/main_examples_test.go",
 		"cmd/leia/main_examples_command_test.go",
 		"examples/dialects/shell_filesystem.leia",
@@ -369,6 +371,7 @@ func TestFeatureMatrixCoversTaggedDialectAndModpkgReleaseGuards(t *testing.T) {
 	dialectDataGuard := readFileString(t, filepath.Join(root, "internal", "stdlib", "bind", "dialect_data_test.go"))
 	for _, snippet := range []string{
 		"TestDialectXLSXParsesFirstWorksheet",
+		"TestDialectXLSXDecodePreservesSparseCellColumns",
 		`StringValue("xlsx")`,
 		`StringValue("excel")`,
 	} {
@@ -611,6 +614,8 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 		"examples/llm/glm_direct_agent_tools.leia",
 		"examples/evaluate/llm_replay.leia",
 		"examples/evaluate/agent_replay.leia",
+		"examples/evaluate/judge_replay.leia",
+		"examples/evaluate/judge_replay.records.json",
 		"examples/evaluate/multiturn_replay.leia",
 		"examples/evaluate/project_agent_regression.leia",
 		"examples/evaluate/project_agent_regression.records.json",
@@ -725,6 +730,39 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 		"docs/reference/concurrency/index.md",
 		"scripts/production_check.sh",
 	)
+	requireFeatureCellRefs(t, concurrency, "go_style_concurrency", "perf_hot_case",
+		"benchmarks/concurrency/producer_consumer_pipeline.leia",
+		"benchmarks/concurrency/select_timeout.leia",
+		"benchmarks/concurrency/sync_group.leia",
+	)
+	requireConcurrencyPerfHotRefsAreManifested(t, root, concurrency)
+	for path, snippets := range map[string][]string{
+		"benchmarks/concurrency/producer_consumer_pipeline.leia": {
+			"coroutine.create",
+			"coroutine.yield(event)",
+			"coroutine.resume(co)",
+			"N := 650000",
+		},
+		"benchmarks/concurrency/select_timeout.leia": {
+			"select {",
+			"case <-time.after",
+			"case <-never",
+			"Time: %.6fs",
+		},
+		"benchmarks/concurrency/sync_group.leia": {
+			"sync.group()",
+			"group.start(func(ctx, id)",
+			"group.wait()",
+			"make(chan, workers)",
+		},
+	} {
+		source := readFileString(t, filepath.Join(root, filepath.FromSlash(path)))
+		for _, snippet := range snippets {
+			if !strings.Contains(source, snippet) {
+				t.Fatalf("%s must keep concurrency hot-path evidence snippet %q", path, snippet)
+			}
+		}
+	}
 	productionCheck := readFileString(t, filepath.Join(root, "scripts", "production_check.sh"))
 	for _, snippet := range []string{
 		"Concurrency Race Smoke",
@@ -738,10 +776,23 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 	}
 
 	data := requireFeature(t, features, "matrix_dense_arrays")
+	requireFeatureCellRefs(t, data, "matrix_dense_arrays", "interpreter",
+		"internal/stdlib/bind/vec_test.go",
+		"internal/stdlib/bind/matrix_test.go",
+		"internal/stdlib/bind/soa_test.go",
+		"internal/stdlib/lib/vec/vec_test.go",
+		"internal/stdlib/lib/matrix/matrix_test.go",
+		"internal/stdlib/lib/soa/ops_test.go",
+	)
 	requireFeatureCellRefs(t, data, "matrix_dense_arrays", "semantic_gate",
 		"tests/language/matrix_host_dense_more.leia",
 		"tests/language/vec_color_geometry_hsl_more.leia",
+		"internal/stdlib/bind/vec_test.go",
+		"internal/stdlib/bind/matrix_test.go",
 		"internal/stdlib/bind/soa_test.go",
+		"internal/stdlib/lib/vec/vec_test.go",
+		"internal/stdlib/lib/matrix/matrix_test.go",
+		"internal/stdlib/lib/soa/ops_test.go",
 		"cmd/leia/main_examples_command_test.go",
 		"examples/data_processing/data_oriented/dense_matrix_vec_kernels.leia",
 		"examples/data_processing/data_oriented/soa_kernels.leia",
@@ -773,13 +824,35 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 		"cmd/leia/main_mod_test.go",
 		"cmd/leia/main_bench_test.go",
 		"cmd/leia/main_examples_command_test.go",
+		"cmd/leia/main_ci_test.go",
 		"cmd/leia/main_readme_tooling_test.go",
+		"cmd/leia/main_metadata_test.go",
+		"cmd/leia/main_evaluate_test.go",
+		"internal/tooling/evaluate/evaluate_test.go",
+		"cmd/leia/main_playground_test.go",
+		"cmd/leia-lsp/main_test.go",
 		"benchmarks/performance_gate_test.py",
 		"benchmarks/benchmark_discovery_test.py",
 		"examples/tooling/release_evidence_pipeline.leia",
 		"examples/tooling/release_gate_project/main.leia",
 		"docs/guides/tooling.md",
+		"docs/reference/cli/index.md",
 	)
+	readmeToolingGate := readFileString(t, filepath.Join(root, "cmd", "leia", "main_readme_tooling_test.go"))
+	for _, snippet := range []string{
+		"TestReadmeToolingCommandsDoNotDrift",
+		"go run ./cmd/leia fmt --check tests/smoke/01_basic.leia",
+		"go run ./cmd/leia lint tests/smoke/01_basic.leia",
+		"go run ./cmd/leia test tests/smoke/01_basic.leia",
+		"go run ./cmd/leia doc check",
+		"go run ./cmd/leia diag bundle --output /tmp/leia-diag --skip-benchmarks",
+		"go run ./cmd/leia playground --help",
+		"TestReadmeToolingCommandsMapToCLI",
+	} {
+		if !strings.Contains(readmeToolingGate, snippet) {
+			t.Fatalf("README tooling guard must keep CLI command evidence snippet %q", snippet)
+		}
+	}
 	examplesCommandGate := readFileString(t, filepath.Join(root, "cmd", "leia", "main_examples_command_test.go"))
 	for _, snippet := range []string{
 		"TestExamplesCommandVerifiesPackageManagedProjects",
@@ -791,12 +864,103 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 		}
 	}
 
+	editorTooling := requireFeature(t, features, "editor_lsp_tooling")
+	requireFeatureCellRefs(t, editorTooling, "editor_lsp_tooling", "semantic_gate",
+		"cmd/leia-lsp/main_test.go",
+		"internal/tooling/lsp/server_test.go",
+		"tools/editor/smoke/editor_smoke.py",
+		"tools/editor/smoke/editor_check_test.py",
+		"tools/tree-sitter-leia/package.json",
+		"tools/tree-sitter-leia/grammar.js",
+		"tools/tree-sitter-leia/queries/highlights.scm",
+		"tools/syntax/textmate/leia.tmLanguage.json",
+		"tools/syntax/textmate/leia-mod.tmLanguage.json",
+		"editors/vscode/package.json",
+		"editors/vscode/extension.js",
+		"editors/vscode/snippets/leia.json",
+		"editors/emacs/leia-mode.el",
+		"editors/helix/languages.toml",
+		"editors/neovim/queries/leia/highlights.scm",
+		"editors/zed/extension.toml",
+		"scripts/editor_check.sh",
+		"scripts/release_distribution_check.sh",
+		"README.md",
+	)
+	lspServerGate := readFileString(t, filepath.Join(root, "internal", "tooling", "lsp", "server_test.go"))
+	for _, snippet := range []string{
+		"TestServerInitializeShutdown",
+		"TestDocumentedCapabilitiesStaySynchronizedWithInitialize",
+		"documentFormattingProvider",
+		"semanticTokensProvider",
+		"renameProvider",
+		"publishDiagnostics",
+	} {
+		if !strings.Contains(lspServerGate, snippet) {
+			t.Fatalf("LSP server gate must keep capability/diagnostic snippet %q", snippet)
+		}
+	}
+	editorSmoke := readFileString(t, filepath.Join(root, "tools", "editor", "smoke", "editor_smoke.py"))
+	for _, snippet := range []string{
+		"check_vscode()",
+		"check_emacs()",
+		"check_tree_sitter_assets()",
+		"check_packaged_editor_integrations()",
+		"check_downstream_docs()",
+		"leia.restartLanguageServer",
+		"defun leia-eglot-setup",
+		"editors/neovim/queries/leia/highlights.scm",
+		"editors/helix/queries/leia/highlights.scm",
+		"editors/zed/languages/leia/highlights.scm",
+	} {
+		if !strings.Contains(editorSmoke, snippet) {
+			t.Fatalf("editor smoke guard must keep packaged editor evidence snippet %q", snippet)
+		}
+	}
+	vscodePackage := readFileString(t, filepath.Join(root, "editors", "vscode", "package.json"))
+	for _, snippet := range []string{
+		"leia.runFile",
+		"leia.testWorkspace",
+		"leia.formatFile",
+		"leia.lintWorkspace",
+		"leia.checkWorkspace",
+		"leia.previewSpec",
+		"leia.restartLanguageServer",
+		"leia.evaluate.case",
+		"leia.languageServer.executable",
+	} {
+		if !strings.Contains(vscodePackage, snippet) {
+			t.Fatalf("VS Code package must keep command/LSP contribution snippet %q", snippet)
+		}
+	}
+
 	modules := requireFeature(t, features, "module_package_management")
 	requireFeatureSpecSections(t, modules, "module_package_management", "Modules And Loading", "Values And Types")
 	requireFeatureCellRefs(t, modules, "module_package_management", "semantic_gate",
 		"internal/modpkg/modpkg_test.go",
+		"modconfig_test.go",
 		"tests/architecture/package_boundary_test.go",
 		"cmd/leia/main_mod_test.go",
+		"docs/reference/modules/index.md",
+		"docs/guides/packages.md",
+	)
+	modconfigGate := readFileString(t, filepath.Join(root, "modconfig_test.go"))
+	for _, snippet := range []string{
+		"TestModuleOptionsForScriptLoadsLocalReplace",
+		"TestModuleOptionsForScriptLoadsDownloadedGitHubCache",
+		"TestModuleOptionsForScriptLoadsTransitiveDownloadedGitHubCache",
+		"TestModuleOptionsForScriptModeVendorIgnoresCache",
+		"TestModuleOptionsForScriptModeVendorLoadsTransitiveVendor",
+	} {
+		if !strings.Contains(modconfigGate, snippet) {
+			t.Fatalf("modconfig_test.go must keep module runtime resolver guard %q", snippet)
+		}
+	}
+	downloadVendor := requireFeature(t, features, "module_download_vendor_cache")
+	requireFeatureCellRefs(t, downloadVendor, "module_download_vendor_cache", "semantic_gate",
+		"internal/modpkg/modpkg_test.go",
+		"modconfig_test.go",
+		"cmd/leia/main_mod_test.go",
+		"tests/release_matrix_test.go",
 		"docs/reference/modules/index.md",
 		"docs/guides/packages.md",
 	)
@@ -1013,6 +1177,8 @@ func TestReadmeAINativeContractHasExplicitGates(t *testing.T) {
 		"examples/ai/coding_agent_project/main.leia",
 		"examples/evaluate/llm_replay.leia",
 		"examples/evaluate/agent_replay.leia",
+		"examples/evaluate/judge_replay.leia",
+		"examples/evaluate/judge_replay.records.json",
 		"examples/evaluate/multiturn_replay.leia",
 		"examples/evaluate/project_agent_regression.leia",
 		"examples/evaluate/project_agent_regression.records.json",
@@ -1057,6 +1223,8 @@ func TestReadmeAINativeContractHasExplicitGates(t *testing.T) {
 			"tests/llm/llm_record_replay_test.go":                     {"TestLLMRecorderAndReplay", "TestLLMReplayRejectsMismatchedRequest"},
 			"cmd/leia/main_evaluate_llm_test.go":                      {"TestEvaluateLLMReplayAliasAndFixtureModeGuards", "--llm-replay"},
 			"cmd/leia/main_examples_test.go":                          {"TestEvaluateReplayExamplesExecute", "project_agent_regression.records.json"},
+			"examples/evaluate/judge_replay.leia":                     {"eval.judge({", "eval.budget({turns: 1, tokens: 8, cost: 0.01})"},
+			"examples/evaluate/judge_replay.records.json":             {"\"MaxTokens\": 200", "\"Cost\": 0.004"},
 			"examples/evaluate/multiturn_replay.leia":                 {"evaluate \"multiturn replay consumes every turn\"", "llm.turn({"},
 			"examples/evaluate/project_agent_regression.leia":         {"evaluate \"project agent regression consumes replay\"", "eval.usage().stream_events"},
 			"examples/evaluate/project_agent_regression.records.json": {"\"StreamEvents\"", "Checkout sev2 owned by ops"},
@@ -1262,6 +1430,103 @@ func requireFeatureStringList(t *testing.T, feature map[string]json.RawMessage, 
 	if strings.Join(got, ",") != strings.Join(values, ",") {
 		t.Fatalf("%s.%s = %#v, want %#v", featureID, field, got, values)
 	}
+}
+
+func requireConcurrencyPerfHotRefsAreManifested(t *testing.T, root string, feature map[string]json.RawMessage) {
+	t.Helper()
+
+	var manifest struct {
+		Cases []struct {
+			ID     string `json:"id"`
+			Path   string `json:"path"`
+			Domain string `json:"domain"`
+			Status string `json:"status"`
+		} `json:"cases"`
+		Workloads []struct {
+			ID             string `json:"id"`
+			Domain         string `json:"domain"`
+			Script         string `json:"script"`
+			TimeSourceHint string `json:"time_source_hint"`
+		} `json:"workloads"`
+	}
+	data, err := os.ReadFile(filepath.Join(root, "benchmarks", "manifest.json"))
+	if err != nil {
+		t.Fatalf("read benchmark manifest: %v", err)
+	}
+	if err := json.Unmarshal(data, &manifest); err != nil {
+		t.Fatalf("decode benchmark manifest: %v", err)
+	}
+
+	cases := map[string]string{}
+	for _, c := range manifest.Cases {
+		if c.Status == "active" && c.Domain == "concurrency" {
+			cases[c.ID] = c.Path
+		}
+	}
+	workloads := map[string]struct {
+		script         string
+		timeSourceHint string
+	}{}
+	for _, w := range manifest.Workloads {
+		if w.Domain == "concurrency" {
+			workloads[w.ID] = struct {
+				script         string
+				timeSourceHint string
+			}{script: w.Script, timeSourceHint: w.TimeSourceHint}
+		}
+	}
+
+	requiredFamilies := map[string]string{
+		"channel_pipeline": "concurrency/producer_consumer_pipeline",
+		"select_timeout":   "concurrency/select_timeout",
+		"sync_group":       "concurrency/sync_group",
+	}
+	refs := decodeFeatureCellRefs(t, feature, "go_style_concurrency", "perf_hot_case")
+	have := map[string]bool{}
+	for _, ref := range refs {
+		if !strings.HasPrefix(ref, "benchmarks/concurrency/") || !strings.HasSuffix(ref, ".leia") {
+			t.Fatalf("go_style_concurrency.perf_hot_case ref %q must be a concurrency benchmark", ref)
+		}
+		id := strings.TrimSuffix(strings.TrimPrefix(ref, "benchmarks/"), ".leia")
+		have[id] = true
+		if cases[id] != ref {
+			t.Fatalf("go_style_concurrency.perf_hot_case ref %q is not an active manifest case", ref)
+		}
+		workload, ok := workloads[id]
+		if !ok {
+			t.Fatalf("go_style_concurrency.perf_hot_case ref %q is not a manifest workload", ref)
+		}
+		if workload.script != ref {
+			t.Fatalf("manifest workload %s script = %q, want %q", id, workload.script, ref)
+		}
+		if workload.timeSourceHint != "script_time_line" {
+			t.Fatalf("manifest workload %s time_source_hint = %q, want script_time_line", id, workload.timeSourceHint)
+		}
+	}
+	for family, id := range requiredFamilies {
+		if !have[id] {
+			t.Fatalf("go_style_concurrency.perf_hot_case missing %s benchmark %s", family, id)
+		}
+	}
+}
+
+func decodeFeatureCellRefs(t *testing.T, feature map[string]json.RawMessage, featureID, field string) []string {
+	t.Helper()
+	raw, ok := feature[field]
+	if !ok {
+		t.Fatalf("%s missing %s", featureID, field)
+	}
+	var cell struct {
+		Status string   `json:"status"`
+		Refs   []string `json:"refs"`
+	}
+	if err := json.Unmarshal(raw, &cell); err != nil {
+		t.Fatalf("%s.%s: %v", featureID, field, err)
+	}
+	if cell.Status != "covered" {
+		t.Fatalf("%s.%s status = %q, want covered", featureID, field, cell.Status)
+	}
+	return cell.Refs
 }
 
 func loadLanguageSpecSections(t *testing.T, root string) map[string]bool {
