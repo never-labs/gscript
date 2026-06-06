@@ -1949,8 +1949,8 @@ func TestReleaseMatrixReadmeCapabilitiesStayCoveredByExamples(t *testing.T) {
 		{
 			capability: "DSL-native dialects",
 			dirs:       []string{"`examples/dialects/`", "`examples/web/`", "`examples/tooling/`"},
-			docTerms:   []string{"cross-domain release-gate project", "shell/process literals", "q-style columnar aggregation"},
-			cliIDs:     []string{"repo-dialects-shell_filesystem", "repo-web-serve_dialect_app", "repo-tooling-release_gate_project-main"},
+			docTerms:   []string{"cross-domain release-gate project", "shell/process literals", "q-style columnar aggregation", "fullstack_project"},
+			cliIDs:     []string{"repo-dialects-shell_filesystem", "repo-web-serve_dialect_app", "repo-web-fullstack_project-main", "repo-data-db_q_frame_project-main", "repo-tooling-release_gate_project-main"},
 			featureIDs: []string{"tagged_dialect_syntax", "q_analytics_dialect", "spreadsheet_dialects"},
 			docRefs:    []string{"docs/reference/dialects/index.md", "docs/reference/data-oriented/index.md"},
 		},
@@ -2179,11 +2179,15 @@ func TestReleaseMatrixReadmeAINativeConcurrencyDataPromisesHaveGates(t *testing.
 				"docs/reference/dialects/index.md",
 				"examples/dialects/shell_filesystem.leia",
 				"examples/web/serve_dialect_app.leia",
+				"examples/web/fullstack_project/main.leia",
+				"examples/data/db_q_frame_project/main.leia",
 				"examples/tooling/release_gate_project/main.leia",
 			},
 			exampleIDs: []string{
 				"repo-dialects-shell_filesystem",
 				"repo-web-serve_dialect_app",
+				"repo-web-fullstack_project-main",
+				"repo-data-db_q_frame_project-main",
 				"repo-tooling-release_gate_project-main",
 			},
 			docSnippets: map[string][]string{

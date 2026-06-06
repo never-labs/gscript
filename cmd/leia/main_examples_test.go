@@ -83,6 +83,7 @@ func TestPracticalExampleProjects(t *testing.T) {
 		wantText string
 	}{
 		{"api-offline-client", execExampleProjectGlobal(root, filepath.Join("examples", "api", "offline_client.leia"), "api_client_summary"), "prj-7 2 tickets"},
+		{"local-ops-report", execExampleProjectGlobal(root, filepath.Join("examples", "operations", "local_ops_report.leia"), "local_ops_report_summary"), "services=4 events=12 requests=12 errors=3 slow=3 backup_alerts=3 top_service=billing top_owner=platform"},
 		{"data-quality-report", execExampleProjectGlobal(root, filepath.Join("examples", "workflow", "service_quality_report.leia"), "workflow_report_summary"), "services=3 requests=8 errors=3 breaches=2 over_budget=2"},
 		{"column-query-analytics", execExampleProjectGlobal(root, filepath.Join("examples", "data_processing", "column_query", "trade_analytics.leia"), "trade_analytics_summary"), "rows=18 channels=4 best_channel=email roas=10.35 top_day=4 top_roas=15.75 risk_segments=4 enterprise_revenue=29100"},
 		{"supply-chain-audit", execExampleProjectGlobal(root, filepath.Join("examples", "security", "supply_chain_audit.leia"), "supply_chain_audit_summary"), "release=2026.06.05 deps=6 direct=3 vulns=4 blockers=2 disallowed=1 fixable=3 risk=27"},
@@ -99,7 +100,7 @@ func TestPracticalExampleProjects(t *testing.T) {
 		{"release-gate-project", runCLIExampleByID("repo-tooling-release_gate_project-main"), "release_gate_project checks=6 domains=6 top=performance ms=3770 excel_rows=6 web=200 agent=done shell=release-gate cmd=cmd-ok"},
 		{"ai-agent-composition", evaluateReplayExampleProject(root, filepath.Join("examples", "evaluate", "agent_replay.leia"), filepath.Join("examples", "evaluate", "agent_replay.records.json")), "agent consumes replay"},
 		{"ai-project-regression", evaluateReplayExampleProject(root, filepath.Join("examples", "evaluate", "project_agent_regression.leia"), filepath.Join("examples", "evaluate", "project_agent_regression.records.json")), "project agent regression consumes replay"},
-		{"concurrency-pipeline", execExampleProjectGlobal(root, filepath.Join("examples", "concurrency", "pipeline_project", "main.leia"), "pipeline_project_summary"), "pipeline_project incidents=6 sev1=1 checkout=3 edge=3 score=249 top=INC-103 top_score=77 audit_sent=1 audit_dropped=5 timeout=timeout cancel_failures=1 cancel_sleep=cancelled"},
+		{"concurrency-pipeline", runCLIExampleByID("repo-concurrency-pipeline_project-main"), "pipeline_project incidents=6 sev1=1 checkout=3 edge=3 score=249 top=INC-103 top_score=77 audit_sent=1 audit_dropped=5 timeout=timeout cancel_failures=1 cancel_sleep=cancelled"},
 		{"builtin-database", execExampleProjectGlobal(root, filepath.Join("examples", "database", "package_managed", "main.leia"), "database_summary"), "ledger accounts=5 entries=10 top_account=rev top_total=2510.00 top_project=alpha net=2290.00 uncleared=4 error=constraint"},
 		{"package-managed-macos", modCheckExampleProject(root, filepath.Join("examples", "macos", "package_managed")), "github.com/never-labs/leia-macos/automation"},
 	}

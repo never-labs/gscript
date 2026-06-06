@@ -1,12 +1,35 @@
 package leia_test
 
 import (
+	"context"
 	"path/filepath"
 	"testing"
 
 	leia "github.com/never-labs/leia"
 	"github.com/never-labs/leia/llm"
 )
+
+type aiDialectStreamingProvider struct {
+	requests       []llm.TurnRequest
+	streamRequests []llm.TurnRequest
+}
+
+func (p *aiDialectStreamingProvider) Turn(_ context.Context, req llm.TurnRequest) (llm.TurnResult, error) {
+	p.requests = append(p.requests, req)
+	return llm.TurnResult{Status: "final_answer", Text: "agent-ok"}, nil
+}
+
+func (p *aiDialectStreamingProvider) StreamTurn(_ context.Context, req llm.TurnRequest, sink llm.StreamSink) (llm.TurnResult, error) {
+	p.streamRequests = append(p.streamRequests, req)
+	for _, token := range []string{"stream", "-", "ok"} {
+		if sink != nil {
+			if err := sink(llm.StreamEvent{Type: "token", Token: token, Text: token}); err != nil {
+				return llm.TurnResult{}, err
+			}
+		}
+	}
+	return llm.TurnResult{Status: "final_answer", Text: "stream-ok"}, nil
+}
 
 func TestAIDialectUsesLLMStdlibRuntime(t *testing.T) {
 	for _, tc := range []struct {
@@ -180,6 +203,108 @@ text := result.text
 	text, _ := vm.Get("text")
 	if text != "turn-ok" {
 		t.Fatalf("text = %#v", text)
+	}
+}
+
+func TestAIDialectTaggedLiteralRawBlockAgentToolTurnAndStreaming(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []leia.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			provider := &aiDialectStreamingProvider{}
+			opts := append([]leia.Option{
+				leia.WithLibs(leia.LibString | leia.LibLLM | leia.LibDialect),
+				leia.WithLLMProvider(provider),
+			}, tc.opts...)
+			vm := leia.New(opts...)
+			if err := vm.Exec(`
+subject := "leia"
+
+model {
+    default: "mock-fast"
+}
+
+lookup := tool {
+    name: "lookup"
+    fn: func(query) { return "found:" .. query, nil }
+    params: {"query"}
+    description: "Lookup docs."
+}
+
+assistant := agent {
+    name: "assistant"
+    config: func(q) {
+        return {
+            model: "mock-fast"
+            messages: {llm.user(prompt` + "`" + `research ${q}` + "`" + `.text)}
+            tools: {lookup}
+        }, nil
+    }
+    params: {"q"}
+    description: "Prompt-backed research agent."
+}
+
+raw_quote := quote {
+    step := "collect"
+    step = step .. "-evidence"
+}
+
+agent_result, agent_err := assistant(subject)
+streamed := ""
+turn_result, turn_err := turn {
+    model: "mock-fast"
+    messages: {llm.user(prompt` + "`" + `stream ${subject}` + "`" + `.text)}
+    tools: {lookup}
+    force_tool: lookup
+    on_stream: func(event) {
+        streamed = streamed .. event.token
+    }
+}
+
+agent_text := agent_result.text
+turn_text := turn_result.text
+quote_kind := raw_quote.kind
+`); err != nil {
+				t.Fatalf("Exec: %v", err)
+			}
+			if len(provider.requests) != 1 {
+				t.Fatalf("agent requests = %#v, want one non-streaming request", provider.requests)
+			}
+			if got := provider.requests[0].Messages[0].Text; got != "research leia" {
+				t.Fatalf("agent message = %q, want research leia", got)
+			}
+			if len(provider.requests[0].Tools) != 1 || provider.requests[0].Tools[0].Name != "lookup" {
+				t.Fatalf("agent tools = %#v", provider.requests[0].Tools)
+			}
+			if len(provider.streamRequests) != 1 {
+				t.Fatalf("stream requests = %#v, want one streaming turn", provider.streamRequests)
+			}
+			streamReq := provider.streamRequests[0]
+			if !streamReq.Stream || streamReq.ForceTool != "lookup" || streamReq.Messages[0].Text != "stream leia" {
+				t.Fatalf("stream request = %#v", streamReq)
+			}
+			if len(streamReq.Tools) != 1 || streamReq.Tools[0].Name != "lookup" || streamReq.Tools[0].Description != "Lookup docs." {
+				t.Fatalf("stream tools = %#v", streamReq.Tools)
+			}
+			for name, want := range map[string]any{
+				"agent_text": "agent-ok",
+				"turn_text":  "stream-ok",
+				"streamed":   "stream-ok",
+				"quote_kind": "function",
+			} {
+				got, err := vm.Get(name)
+				if err != nil {
+					t.Fatalf("Get %s: %v", name, err)
+				}
+				if got != want {
+					t.Fatalf("%s = %#v, want %#v", name, got, want)
+				}
+			}
+		})
 	}
 }
 

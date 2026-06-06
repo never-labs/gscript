@@ -17,7 +17,8 @@ Checks README/docs Markdown for:
   - release-readiness docs keep machine-checkable language and AI-native gates.
   - README stable contract and docs/spec stability contract stay synchronized.
   - docs/spec runnable Leia examples use stable all-mode fence tags and execute.
-  - docs examples index lists each registered top-level example directory.
+  - docs examples index lists each registered top-level example directory and
+    keeps documented examples CLI selectors registered.
   - README documented capabilities stay tied to examples docs, manifests, and playground gates.
   - README Quick Start, install, and Embedding snippets keep focused execution gates.
   - reference entrypoints stay linked from the docs home.
@@ -96,6 +97,10 @@ if ! go test ./tests/docs/spec -count=1; then
 fi
 if ! go test ./tests -run 'TestReleaseMatrixFeatureDocsStayCoveredBySpecAndReference|TestReleaseMatrixDocsIndexCoversReferenceEntrypoints|TestReleaseMatrixReadmeDocumentationEntrypointsStayGated' -count=1; then
     echo "error: docs release/spec reference gate failed" >&2
+    exit 1
+fi
+if ! go test ./cmd/leia -run 'TestExamplesDocsIndexCoversTopLevelExampleDirectories|TestExamplesDocsIndexCommandsReferenceRegisteredExamples' -count=1; then
+    echo "error: docs examples index gate failed" >&2
     exit 1
 fi
 

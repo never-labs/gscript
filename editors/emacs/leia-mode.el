@@ -63,10 +63,12 @@
     "spread" "tonumber" "tostring" "type" "wait" "xpcall"))
 
 (defconst leia--modules
-  '("base64" "binary" "bits" "bit32" "bytes" "compress" "csv" "debug" "env"
-    "fs" "hash" "history" "http" "json" "llm" "loop" "math" "matrix" "msg"
-    "os" "path" "process" "regexp" "soa" "string" "sync" "table" "time"
-    "url" "uuid" "vec"))
+  '("array" "base64" "binary" "bit32" "bits" "bytes" "chat" "color"
+    "compress" "container" "context" "crypto" "csv" "db" "debug" "encoding"
+    "fs" "hash" "history" "http" "io" "json" "llm" "log" "loop" "math"
+    "matrix" "msg" "net" "os" "path" "process" "q" "rand" "regexp"
+    "script" "serve" "soa" "sort" "string" "sync" "table" "testkit" "time"
+    "url" "utf8" "uuid" "vec"))
 
 (defconst leia--primitive-types
   '("bool" "f32" "f64" "i32" "i64"))

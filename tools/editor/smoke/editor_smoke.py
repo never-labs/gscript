@@ -117,6 +117,27 @@ def assert_js_array_literal(source: str, const_name: str, expected: list[str]) -
         fail(f"VS Code extension {const_name} = {value!r}, want {expected!r}")
 
 
+def elisp_string_list(source: str, const_name: str) -> list[str]:
+    match = re.search(
+        rf"\(defconst\s+{re.escape(const_name)}\s+'\((.*?)\)\)",
+        source,
+        re.DOTALL,
+    )
+    if not match:
+        fail(f"Emacs mode missing {const_name} defconst list")
+    return re.findall(r'"([^"]+)"', match.group(1))
+
+
+def catalog_module_names() -> list[str]:
+    catalog = (ROOT / "internal/stdlib/catalog/catalog.go").read_text(encoding="utf-8")
+    names = re.findall(r'Name:\s*"([^"]+)"', catalog)
+    if not names:
+        fail("stdlib catalog has no parseable module names")
+    if len(names) != len(set(names)):
+        fail("stdlib catalog has duplicate module names")
+    return names
+
+
 def check_textmate() -> None:
     leia = load_json(ROOT / "tools/syntax/textmate/leia.tmLanguage.json")
     leia_mod = load_json(ROOT / "tools/syntax/textmate/leia-mod.tmLanguage.json")
@@ -244,6 +265,36 @@ def check_vscode() -> None:
     for key in ("agent", "tool", "turn"):
         if key in snippets:
             fail(f"VS Code snippets still expose old {key} block snippet")
+
+
+def check_emacs() -> None:
+    mode = (ROOT / "editors/emacs/leia-mode.el").read_text(encoding="utf-8")
+
+    modules = elisp_string_list(mode, "leia--modules")
+    expected_modules = catalog_module_names()
+    if modules != expected_modules:
+        fail(f"Emacs leia--modules drifted from stdlib catalog: got {modules!r}, want {expected_modules!r}")
+
+    for const_name in ("leia--keywords", "leia--declarations", "leia--builtins", "leia--primitive-types"):
+        if not elisp_string_list(mode, const_name):
+            fail(f"Emacs {const_name} must not be empty")
+
+    for marker in (
+        "defcustom leia-lsp-command",
+        "defun leia-eglot-setup",
+        "(require 'eglot)",
+        "eglot-server-programs",
+        "leia-lsp-command",
+        "add-to-list 'auto-mode-alist",
+        "(provide 'leia-mode)",
+    ):
+        if marker not in mode:
+            fail(f"Emacs mode missing {marker}")
+
+    for old_keyword in ("agent", "tool", "evaluate", "models", "messages", "budget"):
+        for const_name in ("leia--keywords", "leia--declarations", "leia--contextual-keywords"):
+            if old_keyword in elisp_string_list(mode, const_name):
+                fail(f"Emacs {const_name} still exposes old AI-native keyword {old_keyword}")
 
 
 def check_tree_sitter_assets() -> None:
@@ -412,6 +463,7 @@ def check_downstream_docs() -> None:
 def main() -> int:
     check_textmate()
     check_vscode()
+    check_emacs()
     check_tree_sitter_assets()
     check_packaged_editor_integrations()
     check_downstream_docs()

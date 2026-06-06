@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"testing"
@@ -319,6 +320,118 @@ func TestExamplesDocsIndexCoversTopLevelExampleDirectories(t *testing.T) {
 			t.Fatalf("docs/examples/index.md is missing top-level example directory %s", dir)
 		}
 	}
+}
+
+func TestExamplesDocsIndexCommandsReferenceRegisteredExamples(t *testing.T) {
+	root := filepath.Dir(playgroundExamplesRoot())
+	data, err := os.ReadFile(filepath.Join(root, "docs", "examples", "index.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	commands := documentedExamplesCommands(string(data))
+	if len(commands) == 0 {
+		t.Fatal("docs/examples/index.md must document at least one leia examples command")
+	}
+	for _, command := range commands {
+		t.Run(strings.Join(command, " "), func(t *testing.T) {
+			switch command[0] {
+			case "list":
+				if len(command) > 1 && command[1] != "--json" {
+					t.Fatalf("unsupported documented examples list command: %q", strings.Join(command, " "))
+				}
+			case "show", "run":
+				if len(command) != 2 {
+					t.Fatalf("documented examples %s command must have exactly one selector: %q", command[0], strings.Join(command, " "))
+				}
+				example, _, ok, err := resolveCLIExample(command[1])
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !ok {
+					t.Fatalf("documented examples %s selector is not registered: %s", command[0], command[1])
+				}
+				if command[0] == "run" && !example.Runnable {
+					t.Fatalf("documented examples run selector is not runnable: %s", command[1])
+				}
+			case "check":
+				selectors := documentedExamplesCheckSelectors(command)
+				if len(selectors) == 0 {
+					t.Fatalf("documented examples check command must select at least one example: %q", strings.Join(command, " "))
+				}
+				for _, selector := range selectors {
+					selected, err := selectedCLIExamples([]string{selector})
+					if err != nil {
+						t.Fatalf("documented examples check selector is not registered: %s: %v", selector, err)
+					}
+					for _, example := range selected {
+						if !example.Runnable && !example.Checkable {
+							t.Fatalf("documented examples check selector %s matched non-checkable example %s", selector, example.ID)
+						}
+					}
+				}
+			default:
+				t.Fatalf("unsupported documented examples command: %q", strings.Join(command, " "))
+			}
+		})
+	}
+
+	mentionedIDs := map[string]bool{}
+	for _, command := range commands {
+		for _, token := range command[1:] {
+			if strings.HasPrefix(token, "repo-") {
+				mentionedIDs[token] = true
+			}
+		}
+	}
+	for _, requiredID := range []string{
+		"repo-tooling-release_gate_project-main",
+		"repo-dialects-sql_result_analytics",
+		"repo-concurrency-sync_group",
+	} {
+		if !mentionedIDs[requiredID] {
+			t.Fatalf("docs/examples/index.md must keep a registered command for %s", requiredID)
+		}
+	}
+}
+
+func documentedExamplesCommands(markdown string) [][]string {
+	commandRE := regexp.MustCompile(`^go run \./cmd/leia examples (.+)$`)
+	var commands [][]string
+	inFence := false
+	for _, line := range strings.Split(markdown, "\n") {
+		if strings.HasPrefix(line, "```") {
+			if inFence {
+				inFence = false
+				continue
+			}
+			info := strings.TrimSpace(strings.TrimPrefix(line, "```"))
+			inFence = info == "bash"
+			continue
+		}
+		if !inFence {
+			continue
+		}
+		match := commandRE.FindStringSubmatch(strings.TrimSpace(line))
+		if len(match) != 2 {
+			continue
+		}
+		fields := strings.Fields(match[1])
+		if len(fields) > 0 {
+			commands = append(commands, fields)
+		}
+	}
+	return commands
+}
+
+func documentedExamplesCheckSelectors(command []string) []string {
+	var selectors []string
+	for _, token := range command[1:] {
+		if strings.HasPrefix(token, "-") {
+			continue
+		}
+		selectors = append(selectors, token)
+	}
+	return selectors
 }
 
 func TestExamplesCommandManifestMatchesPlaygroundRepositoryExamples(t *testing.T) {
