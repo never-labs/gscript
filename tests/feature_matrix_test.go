@@ -251,6 +251,7 @@ func TestFeatureMatrixCoversTaggedDialectAndModpkgReleaseGuards(t *testing.T) {
 		"examples/dialects/shell_filesystem.leia",
 		"examples/dialects/web_text.leia",
 		"examples/tooling/release_gate_project/main.leia",
+		"docs/reference/dialects/index.md",
 	)
 	requireFeatureStringList(t, tagged, "tagged_dialect_syntax", "builtin_dialect_tags",
 		"sh", "cmd", "shellwords", "glob", "path",
@@ -339,6 +340,7 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 		"semantics where useful, an embeddable Go API, a bytecode VM, and an ARM64 JIT.",
 		"Go embedding API with sandbox, resource budgets, host bindings, and hot reload.",
 		"AI-native syntax and stdlib support for models, tools, messages, turns,",
+		"DSL-native tagged dialects for shell commands, data formats, web routes,",
 		"Go-style concurrency primitives: `go`, channels, `select`, sync helpers",
 		"Data-oriented helpers for dense arrays, matrices, vectors, and SoA layouts.",
 		"CLI tooling for format, lint, test, docs, diagnostics, modules, benchmarks,",
@@ -819,6 +821,7 @@ func TestReadmeAINativeContractHasExplicitGates(t *testing.T) {
 	ai := requireFeature(t, loadFeatureMatrixFeatureMap(t, root), "llm_native_integration")
 	requireFeatureCellRefs(t, ai, "llm_native_integration", "interpreter",
 		"tests/llm/llm_runtime_test.go",
+		"tests/llm/llm_loop_test.go",
 		"tests/llm/llm_agent_tools_test.go",
 		"tests/llm/llm_record_replay_test.go",
 		"tests/llm/llm_ai_dialect_test.go",
@@ -831,6 +834,7 @@ func TestReadmeAINativeContractHasExplicitGates(t *testing.T) {
 		"cmd/leia/main_examples_command_test.go",
 		"cmd/leia/main_evaluate_llm_test.go",
 		"cmd/leia/main_playground_test.go",
+		"tests/llm/llm_loop_test.go",
 		"examples/llm/direct_turn.leia",
 		"examples/llm/agent_as_tool.leia",
 		"examples/llm/prompt_tagged_messages.leia",

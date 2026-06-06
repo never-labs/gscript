@@ -36,6 +36,8 @@ leia run tests/smoke/01_basic.leia
 - Go embedding API with sandbox, resource budgets, host bindings, and hot reload.
 - AI-native syntax and stdlib support for models, tools, messages, turns,
   agents, replay, and provider adapters.
+- DSL-native tagged dialects for shell commands, data formats, web routes,
+  q-style analytics, spreadsheets, and AI workflows.
 - Go-style concurrency primitives: `go`, channels, `select`, sync helpers, and
   cancellation-oriented host integration.
 - Data-oriented helpers for dense arrays, matrices, vectors, and SoA layouts.
@@ -90,6 +92,7 @@ Start with:
 - [Language specification HTML](docs/spec/index.html)
 - [Getting started](docs/tutorial/getting-started.md)
 - [Standard library](docs/reference/stdlib/index.md)
+- [Tagged dialects](docs/reference/dialects/index.md)
 - [Data-oriented programming](docs/reference/data-oriented/index.md)
 - [CLI reference](docs/reference/cli/index.md)
 - [Embedding guide](docs/guides/embedding.md)

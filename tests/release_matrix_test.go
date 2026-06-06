@@ -1562,6 +1562,7 @@ func TestReleaseMatrixReadmeCapabilitiesStayCoveredByExamples(t *testing.T) {
 	for _, promise := range []string{
 		"Go embedding API with sandbox, resource budgets, host bindings, and hot reload.",
 		"AI-native syntax and stdlib support for models, tools, messages, turns,\n  agents, replay, and provider adapters.",
+		"DSL-native tagged dialects for shell commands, data formats, web routes,\n  q-style analytics, spreadsheets, and AI workflows.",
 		"Go-style concurrency primitives: `go`, channels, `select`, sync helpers, and\n  cancellation-oriented host integration.",
 		"Data-oriented helpers for dense arrays, matrices, vectors, and SoA layouts.",
 		"CLI tooling for format, lint, test, docs, diagnostics, modules, benchmarks,\n  and release evidence.",
@@ -1588,6 +1589,12 @@ func TestReleaseMatrixReadmeCapabilitiesStayCoveredByExamples(t *testing.T) {
 			dirs:       []string{"`examples/ai/`", "`examples/llm/`", "`examples/evaluate/`", "`examples/workflow/`"},
 			docTerms:   []string{"manual tool history", "replay fixture", "Live-provider examples"},
 			cliIDs:     []string{"repo-llm-agent", "repo-ai-coding_agent_replay", "repo-evaluate-agent_replay", "repo-workflow-support_triage_replay"},
+		},
+		{
+			capability: "DSL-native dialects",
+			dirs:       []string{"`examples/dialects/`", "`examples/web/`", "`examples/tooling/`"},
+			docTerms:   []string{"cross-domain release-gate project", "shell/process literals", "q-style columnar aggregation"},
+			cliIDs:     []string{"repo-dialects-shell_filesystem", "repo-web-serve_dialect_app", "repo-tooling-release_gate_project-main"},
 		},
 		{
 			capability: "concurrency",
@@ -1706,6 +1713,27 @@ func TestReleaseMatrixReadmeAINativeConcurrencyDataPromisesHaveGates(t *testing.
 				"docs/guides/ai-native.md":         {"The stable contract is in the [AI-native reference](../reference/ai/index.md).", "Live-provider examples"},
 				"docs/reference/ai/index.md":       {"Leia's AI-native feature is a standard-library layer", "## Agent Dialect"},
 				"docs/reference/evaluate/index.md": {"replay-drift findings"},
+			},
+		},
+		{
+			capability:   "DSL-native dialects",
+			promise:      "DSL-native tagged dialects for shell commands, data formats, web routes,\n  q-style analytics, spreadsheets, and AI workflows.",
+			featureID:    "tagged_dialect_syntax",
+			specSections: []string{"Grammar Appendix", "Expressions", "Statements"},
+			refs: []string{
+				"cmd/leia/main_examples_command_test.go",
+				"docs/reference/dialects/index.md",
+				"examples/dialects/shell_filesystem.leia",
+				"examples/web/serve_dialect_app.leia",
+				"examples/tooling/release_gate_project/main.leia",
+			},
+			exampleIDs: []string{
+				"repo-dialects-shell_filesystem",
+				"repo-web-serve_dialect_app",
+				"repo-tooling-release_gate_project-main",
+			},
+			docSnippets: map[string][]string{
+				"docs/reference/dialects/index.md": {"Leia supports DSL-native tagged dialects", "## Core Built-In Categories"},
 			},
 		},
 		{

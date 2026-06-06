@@ -1,9 +1,9 @@
 // Real GLM LLM multi-turn memory smoke demo.
 //
 // This mirrors the local glm_cc wrapper's configuration without invoking it:
-//   endpoint: https://open.bigmodel.cn/api/anthropic
-//   key:      SENTINEL_GLM_API_KEY or GLM_API_KEY
-//   model:    GLM_MODEL, default glm-5.1
+//   endpoint: LEIA_GLM_BASE_URL, default https://open.bigmodel.cn/api/anthropic
+//   key:      LEIA_GLM_API_KEY, SENTINEL_GLM_API_KEY, or GLM_API_KEY
+//   model:    LEIA_GLM_MODEL or GLM_MODEL, default glm-5.1
 //
 // Run without committing tokens:
 //   LEIA_GLM_BASE_URL=https://open.bigmodel.cn/api/anthropic \
@@ -11,20 +11,36 @@
 //   LEIA_GLM_MODEL=glm-5.1 \
 //   leia run examples/llm/glm_smoke.leia
 
+func env_first(a, b, c, fallback) {
+    v := os.getenv(a)
+    if v != nil && v != "" {
+        return v
+    }
+    v = os.getenv(b)
+    if v != nil && v != "" {
+        return v
+    }
+    v = os.getenv(c)
+    if v != nil && v != "" {
+        return v
+    }
+    return fallback
+}
+
 llm.register_models({
     default: "glm-smoke",
     ["glm-smoke"]: {
         provider: "glm"
         protocol: "anthropic_compatible"
-        base_url: os.getenv("LEIA_GLM_BASE_URL")
-        api_key: os.getenv("LEIA_GLM_API_KEY")
-        provider_model: os.getenv("LEIA_GLM_MODEL")
+        base_url: env_first("LEIA_GLM_BASE_URL", "ANTHROPIC_BASE_URL", "", "https://open.bigmodel.cn/api/anthropic")
+        api_key: env_first("LEIA_GLM_API_KEY", "SENTINEL_GLM_API_KEY", "GLM_API_KEY", "")
+        provider_model: env_first("LEIA_GLM_MODEL", "GLM_MODEL", "ANTHROPIC_MODEL", "glm-5.1")
     }
 })
 
-glm_api_key := os.getenv("LEIA_GLM_API_KEY")
+glm_api_key := env_first("LEIA_GLM_API_KEY", "SENTINEL_GLM_API_KEY", "GLM_API_KEY", "")
 if glm_api_key == nil || glm_api_key == "" {
-    print("set LEIA_GLM_API_KEY to run this GLM smoke example")
+    print("set LEIA_GLM_API_KEY, SENTINEL_GLM_API_KEY, or GLM_API_KEY to run this GLM smoke example")
     return
 }
 

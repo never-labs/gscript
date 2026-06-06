@@ -16,12 +16,13 @@ covers:
 From this directory:
 
 ```sh
-npm install
+npm ci
 npm test
 ```
 
-If the tree-sitter CLI is already available globally, `tree-sitter generate`
-and `tree-sitter test` are sufficient.
+Use `npm install` while changing dependencies. If the tree-sitter CLI is
+already available globally, `tree-sitter generate` and `tree-sitter test` are
+sufficient for local grammar iteration.
 
 ## Downstream Editor Integration
 

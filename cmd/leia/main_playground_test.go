@@ -436,7 +436,7 @@ func TestPlaygroundRepositoryAINativeExamplesHaveExplicitGates(t *testing.T) {
 		},
 		"repo-llm-glm_smoke": {
 			requires: "LLM provider",
-			snippets: []string{"protocol: \"anthropic_compatible\"", "LEIA_GLM_API_KEY", "provider_model: os.getenv(\"LEIA_GLM_MODEL\")"},
+			snippets: []string{"protocol: \"anthropic_compatible\"", "LEIA_GLM_API_KEY", "SENTINEL_GLM_API_KEY", "provider_model: env_first(\"LEIA_GLM_MODEL\""},
 		},
 		"repo-evaluate-llm_replay": {
 			requires: "leia evaluate CLI",

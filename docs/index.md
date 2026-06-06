@@ -17,6 +17,8 @@ only.
   Leia in a small Go program.
 - [Standard library](reference/stdlib/index.md): generated-style module index
   organized from `internal/stdlib/catalog`.
+- [Tagged dialects](reference/dialects/index.md): shell, data, web, q,
+  spreadsheet, and AI dialect forms.
 - [CLI reference](reference/cli/index.md): stable command surface.
 - [File directives](reference/directives/index.md): `//leia:` metadata consumed
   by tooling.
