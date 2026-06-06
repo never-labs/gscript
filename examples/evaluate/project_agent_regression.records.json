@@ -97,6 +97,28 @@
     "Result": {
       "Status": "final_answer",
       "Text": "Checkout sev2 owned by ops; keep workers running and notify oncall."
-    }
+    },
+    "StreamEvents": [
+      {
+        "Type": "token",
+        "Token": "Checkout sev2 ",
+        "Text": "Checkout sev2 "
+      },
+      {
+        "Type": "token",
+        "Token": "owned by ops; ",
+        "Text": "owned by ops; "
+      },
+      {
+        "Type": "token",
+        "Token": "keep workers running ",
+        "Text": "keep workers running "
+      },
+      {
+        "Type": "token",
+        "Token": "and notify oncall.",
+        "Text": "and notify oncall."
+      }
+    ]
   }
 ]

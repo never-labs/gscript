@@ -68,6 +68,67 @@ func TestServeAppRoutesBackgroundRoundTrip(t *testing.T) {
 	}
 }
 
+func TestServeDialectTaggedBlockRoundTrip(t *testing.T) {
+	interp := New()
+	hostOpts := HostOptions{
+		Call:           interp.CallFunction,
+		NetworkAllowed: interp.NetworkAccessEnabled,
+		MaxHostResult:  interp.MaxHostResultBytes,
+	}
+	httpModule := TableValue(BuildHTTP(hostOpts))
+	netModule := TableValue(BuildNet(hostOpts))
+	dialectModule := TableValue(BuildDialect(hostOpts, interp.MaxHostResultBytes))
+	interp.SetGlobal("http", httpModule)
+	interp.SetModule("http", httpModule)
+	interp.SetGlobal("net", netModule)
+	interp.SetModule("net", netModule)
+	interp.SetGlobal("dialect", dialectModule)
+	interp.SetModule("dialect", dialectModule)
+
+	src := `
+		app := serve {
+			listen: "127.0.0.1:0"
+			routes: {
+				{method: "GET", path: "/pages/:name", handler: func(req) {
+					return "<h1>" .. req.params.name .. ":" .. req.query.mode .. "</h1>"
+				}},
+				{method: "POST", path: "/api/items", handler: func(req) {
+					body, err := req.json()
+					if err != nil { return {error: err} }
+					return {created: body.name, method: req.method}
+				}},
+			}
+		}
+		page := http.get(app.url .. "/pages/home?mode=full")
+		created, createdErr := net.post(app.url .. "/api/items", "{\"name\":\"book\"}", {headers: {["Content-Type"]: "application/json"}})
+		wrong, wrongErr := net.delete(app.url .. "/api/items")
+		closed, closeErr := app.close()
+		waited, waitErr := app.wait()
+	`
+	if _, err := interp.ExecString(src); err != nil {
+		t.Fatalf("ExecString: %v", err)
+	}
+	if got := interp.GetGlobal("page").Table().RawGetString("body").Str(); got != "<h1>home:full</h1>" {
+		t.Fatalf("page body = %q, want tagged serve HTML", got)
+	}
+	if got := interp.GetGlobal("created").Table().RawGetString("body").Str(); got != `{"created":"book","method":"POST"}` {
+		t.Fatalf("created body = %q, want JSON create", got)
+	}
+	if got := interp.GetGlobal("wrong").Table().RawGetString("status").Int(); got != 405 {
+		t.Fatalf("wrong status = %d, want 405", got)
+	}
+	for _, name := range []string{"createdErr", "wrongErr", "closeErr", "waitErr"} {
+		if got := interp.GetGlobal(name); !got.IsNil() {
+			t.Fatalf("%s = %v, want nil", name, got)
+		}
+	}
+	for _, name := range []string{"closed", "waited"} {
+		if got := interp.GetGlobal(name); !got.IsBool() || !got.Bool() {
+			t.Fatalf("%s = %v, want true", name, got)
+		}
+	}
+}
+
 func TestHTTPRouterColonParams(t *testing.T) {
 	interp := New()
 	hostOpts := HostOptions{

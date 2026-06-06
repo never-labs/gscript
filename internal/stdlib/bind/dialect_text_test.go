@@ -81,6 +81,55 @@ func TestDialectKVEnvParseAndEncode(t *testing.T) {
 	}
 }
 
+func TestDialectEnvLookupUsesHostEnvironmentPolicy(t *testing.T) {
+	t.Setenv("LEIA_DIALECT_ENV_ALLOWED", "visible")
+	t.Setenv("LEIA_DIALECT_ENV_BLOCKED", "secret")
+	interp := runWithLib(t, `
+		allowed := env`+"`"+`LEIA_DIALECT_ENV_ALLOWED`+"`"+`
+		missing := env`+"`"+`LEIA_DIALECT_ENV_MISSING`+"`"+`
+		blocked := env`+"`"+`LEIA_DIALECT_ENV_BLOCKED`+"`"+`
+		parsed := env`+"`"+`LEIA_DIALECT_ENV_ALLOWED=parsed`+"`"+`
+		lookup_mode := dialect.eval("env", "LEIA_DIALECT_ENV_ALLOWED", {mode: "lookup"})
+		missing_fast_ok, missing_fast_err := pcall(func() {
+			return env!`+"`"+`LEIA_DIALECT_ENV_MISSING`+"`"+`
+		})
+	`, "dialect", BuildDialect(HostOptions{
+		EnvironmentRead: func() bool { return true },
+		EnvironmentAllowed: func(name string) bool {
+			return name == "LEIA_DIALECT_ENV_ALLOWED" || name == "LEIA_DIALECT_ENV_MISSING"
+		},
+	}, nil))
+
+	if got := interp.GetGlobal("allowed").Str(); got != "visible" {
+		t.Fatalf("allowed env = %q, want visible", got)
+	}
+	if !interp.GetGlobal("missing").IsNil() {
+		t.Fatalf("missing env = %v, want nil", interp.GetGlobal("missing"))
+	}
+	if !interp.GetGlobal("blocked").IsNil() {
+		t.Fatalf("blocked env = %v, want nil", interp.GetGlobal("blocked"))
+	}
+	if got := interp.GetGlobal("parsed").Table().RawGetString("LEIA_DIALECT_ENV_ALLOWED").Str(); got != "parsed" {
+		t.Fatalf("env parser compatibility = %q, want parsed", got)
+	}
+	if got := interp.GetGlobal("lookup_mode").Str(); got != "visible" {
+		t.Fatalf("lookup mode env = %q, want visible", got)
+	}
+	if interp.GetGlobal("missing_fast_ok").Bool() {
+		t.Fatalf("env! missing succeeded, want pcall false")
+	}
+	if got := interp.GetGlobal("missing_fast_err").Str(); !strings.Contains(got, "environment variable not set") {
+		t.Fatalf("env! missing err = %q, want not set", got)
+	}
+
+	eval := BuildDialect(HostOptions{EnvironmentRead: func() bool { return false }}, nil).RawGetString("eval").GoFunction()
+	_, err := eval.Fn([]Value{StringValue("env"), StringValue("LEIA_DIALECT_ENV_ALLOWED")})
+	if err == nil || !strings.Contains(err.Error(), "environment read access disabled") {
+		t.Fatalf("environment read disabled err = %v, want disabled", err)
+	}
+
+}
+
 func TestDialectMarkdownSummary(t *testing.T) {
 	interp := runWithLib(t, ""+
 		"doc := markdown`# Release Notes\n\n"+

@@ -509,6 +509,7 @@ func applyCLIExampleRunner(example *cliExample) {
 		example.Requires = ""
 		return
 	case strings.Contains(example.Path, "/web/tiny_app.leia"),
+		strings.Contains(example.Path, "/web/serve_dialect_app.leia"),
 		strings.Contains(example.Path, "/web/route_workbench.leia"),
 		strings.Contains(example.Path, "/concurrency/context_process.leia"),
 		strings.Contains(example.Path, "/concurrency/goroutine_errors.leia"),

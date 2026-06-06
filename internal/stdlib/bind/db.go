@@ -95,8 +95,10 @@ func (conn *dbConnection) call(name string, args []Value) ([]Value, error) {
 	switch name {
 	case "exec":
 		return conn.exec(args)
-	case "query", "frame":
+	case "query":
 		return conn.query(args)
+	case "frame":
+		return conn.frame(args)
 	case "one":
 		rows, err := conn.query(args)
 		if err != nil {
@@ -149,6 +151,23 @@ func (conn *dbConnection) query(args []Value) ([]Value, error) {
 		return []Value{NilValue(), StringValue(err.Error())}, nil
 	}
 	return []Value{TableValue(table)}, nil
+}
+
+func (conn *dbConnection) frame(args []Value) ([]Value, error) {
+	query, sqlArgs, err := dbSQLInput(args)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := conn.db.Query(query, sqlArgs...)
+	if err != nil {
+		return []Value{NilValue(), StringValue(err.Error())}, nil
+	}
+	defer rows.Close()
+	frame, err := leiaFrame(rows)
+	if err != nil {
+		return []Value{NilValue(), StringValue(err.Error())}, nil
+	}
+	return []Value{TableValue(frame)}, nil
 }
 
 func openDBFromArgs(args []Value, opts HostOptions) (*dbConnection, error) {
@@ -314,6 +333,131 @@ func leiaRows(rows *sql.Rows) (*Table, error) {
 		return nil, err
 	}
 	return out, nil
+}
+
+func leiaFrame(rows *sql.Rows) (*Table, error) {
+	columns, err := rows.Columns()
+	if err != nil {
+		return nil, err
+	}
+	scanned := make([][]Value, 0)
+	rowTable := NewAppendArrayTable(0)
+	for rows.Next() {
+		values := make([]any, len(columns))
+		ptrs := make([]any, len(columns))
+		for i := range values {
+			ptrs[i] = &values[i]
+		}
+		if err := rows.Scan(ptrs...); err != nil {
+			return nil, err
+		}
+		record := make([]Value, len(columns))
+		row := NewTableSized(len(columns), len(columns))
+		for i, col := range columns {
+			val := sqlToLeiaValue(values[i])
+			record[i] = val
+			row.RawSetString(col, val)
+			row.RawSetInt(int64(i+1), val)
+		}
+		scanned = append(scanned, record)
+		rowTable.RawSetInt(int64(len(scanned)), TableValue(row))
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	columnNames := NewAppendArrayTable(len(columns))
+	columnsTable := NewTable()
+	numericColumns := NewAppendArrayTable(0)
+	numericTable := NewTable()
+	soaColumns := make(map[string]*DenseArray)
+
+	for colIndex, name := range columns {
+		columnNames.RawSetInt(int64(colIndex+1), StringValue(name))
+		values := make([]Value, len(scanned))
+		for rowIndex, record := range scanned {
+			values[rowIndex] = record[colIndex]
+		}
+		columnValue := dbColumnValue(values)
+		columnsTable.RawSetString(name, columnValue)
+		if columnValue.IsDenseArray() {
+			numericTable.RawSetString(name, columnValue)
+			numericColumns.RawSetInt(int64(numericColumns.Length()+1), StringValue(name))
+			soaColumns[name] = columnValue.DenseArray()
+		}
+	}
+
+	frame := NewTable()
+	frame.RawSetString("rows", TableValue(rowTable))
+	frame.RawSetString("columns", TableValue(columnsTable))
+	frame.RawSetString("column_names", TableValue(columnNames))
+	frame.RawSetString("numeric", TableValue(numericTable))
+	frame.RawSetString("numeric_columns", TableValue(numericColumns))
+	frame.RawSetString("len", IntValue(int64(len(scanned))))
+	if len(soaColumns) > 0 {
+		soa, err := NewSoA(soaColumns)
+		if err != nil {
+			return nil, err
+		}
+		frame.RawSetString("soa", SoAValue(soa))
+	}
+	return frame, nil
+}
+
+func dbColumnValue(values []Value) Value {
+	if len(values) == 0 {
+		return TableValue(NewAppendArrayTable(0))
+	}
+	allInt := true
+	allNumber := true
+	allBool := true
+	for _, v := range values {
+		if !v.IsInt() {
+			allInt = false
+		}
+		if !v.IsNumber() {
+			allNumber = false
+		}
+		if !v.IsBool() {
+			allBool = false
+		}
+	}
+	switch {
+	case allInt:
+		xs := make([]int64, len(values))
+		for i, v := range values {
+			xs[i] = v.Int()
+		}
+		return DenseArrayValue(NewDenseArrayI64(xs))
+	case allNumber:
+		xs := make([]float64, len(values))
+		for i, v := range values {
+			xs[i] = v.Number()
+		}
+		return DenseArrayValue(NewDenseArrayF64(xs))
+	case allBool:
+		out, err := NewDenseArrayOfLen(DenseArrayBool, len(values))
+		if err != nil {
+			break
+		}
+		for i, v := range values {
+			if err := out.Set(i, v); err != nil {
+				return dbPlainColumn(values)
+			}
+		}
+		return DenseArrayValue(out)
+	default:
+		return dbPlainColumn(values)
+	}
+	return dbPlainColumn(values)
+}
+
+func dbPlainColumn(values []Value) Value {
+	out := NewAppendArrayTable(len(values))
+	for i, v := range values {
+		out.RawSetInt(int64(i+1), v)
+	}
+	return TableValue(out)
 }
 
 func sqlToLeiaValue(v any) Value {

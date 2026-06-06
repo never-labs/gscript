@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"os"
 	"regexp"
 	"sort"
 	"strconv"
@@ -19,7 +20,7 @@ import (
 	dialectlib "github.com/never-labs/leia/internal/support/dialect"
 )
 
-func registerDialectText(register dialectRegisterFunc, maxHostResult func() int64) {
+func registerDialectText(register dialectRegisterFunc, opts HostOptions, maxHostResult func() int64) {
 	register([]string{"re", "regexp"}, dialectHandler{
 		eval: func(body Value, options *Table) ([]Value, error) {
 			return dialectRegexp(body.Str(), dialectFailFast(options))
@@ -102,10 +103,10 @@ func registerDialectText(register dialectRegisterFunc, maxHostResult func() int6
 	})
 	register([]string{"env"}, dialectHandler{
 		eval: func(body Value, options *Table) ([]Value, error) {
-			return dialectKV(body, options, true, maxHostResult)
+			return dialectEnv(body, options, opts, maxHostResult)
 		},
 		block: func(body Value, options *Table) ([]Value, error) {
-			return dialectKV(body, options, true, maxHostResult)
+			return dialectEnv(body, options, opts, maxHostResult)
 		},
 	})
 	register([]string{"ini"}, dialectHandler{
@@ -956,6 +957,63 @@ func dialectKV(body Value, opts *Table, envMode bool, maxHostResult func() int64
 		out.RawSetString(key, StringValue(val))
 	}
 	return []Value{TableValue(out)}, nil
+}
+
+func dialectEnv(body Value, opts *Table, hostOpts HostOptions, maxHostResult func() int64) ([]Value, error) {
+	mode := dialectMode(opts)
+	if !dialectModeAllowed(mode, "", "parse", "decode", "encode", "format", "lookup", "get") {
+		return dialectUnknownMode("env", mode)
+	}
+	if mode == "lookup" || mode == "get" || (mode == "" && body.IsString() && isEnvLookupName(body.Str())) {
+		return dialectEnvLookup(body, opts, hostOpts)
+	}
+	return dialectKV(body, opts, true, maxHostResult)
+}
+
+func dialectEnvLookup(body Value, opts *Table, hostOpts HostOptions) ([]Value, error) {
+	if !body.IsString() {
+		return nil, fmt.Errorf("env dialect: lookup expects variable name string")
+	}
+	name := strings.TrimSpace(body.Str())
+	if !isEnvLookupName(name) {
+		return []Value{NilValue(), StringValue("env dialect: invalid environment variable name")}, nil
+	}
+	if !HostBool(hostOpts.EnvironmentRead, true) {
+		return nil, fmt.Errorf("environment read access disabled")
+	}
+	if hostOpts.EnvironmentAllowed != nil && !hostOpts.EnvironmentAllowed(name) {
+		if dialectFailFast(opts) {
+			return nil, fmt.Errorf("environment variable not allowed: %s", name)
+		}
+		return []Value{NilValue()}, nil
+	}
+	value, ok := os.LookupEnv(name)
+	if !ok {
+		if dialectFailFast(opts) {
+			return nil, fmt.Errorf("environment variable not set: %s", name)
+		}
+		return []Value{NilValue()}, nil
+	}
+	return []Value{StringValue(value)}, nil
+}
+
+func isEnvLookupName(name string) bool {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return false
+	}
+	for i, r := range name {
+		if i == 0 {
+			if r != '_' && !unicode.IsLetter(r) {
+				return false
+			}
+			continue
+		}
+		if r != '_' && !unicode.IsLetter(r) && !unicode.IsDigit(r) {
+			return false
+		}
+	}
+	return true
 }
 
 func dialectLogfmt(body Value, opts *Table, maxHostResult func() int64) ([]Value, error) {

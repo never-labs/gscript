@@ -11,7 +11,7 @@ import (
 // sh`...`, cmd`...`, shellwords`...`, glob`...`, json`...`, prompt`...`,
 // quote { ... }, and small safe data transforms such as path`...`, url`...`, words`...`, nums`...`,
 // mdtable`...`, markdown`...`, yaml`...`, kv`...`, logfmt`...`, env`...`, jsonl`...`, semver`...`, html_escape`...`, urlquery`...`, form`...`, mime`...`, mailaddr`...`,
-// urlpath`...`, duration`...`, tap`...`, junit`...`, ipaddr`...`, cidr`...`, base64`...`, pem`...`, and hash`...`.
+// urlpath`...`, duration`...`, tap`...`, junit`...`, ipaddr`...`, cidr`...`, serve { ... }, base64`...`, pem`...`, and hash`...`.
 func BuildDialect(opts HostOptions, maxHostResult func() int64, specs ...DialectSpec) *Table {
 	t := markStdlibBoundModule(NewTable())
 
@@ -23,9 +23,10 @@ func BuildDialect(opts HostOptions, maxHostResult func() int64, specs ...Dialect
 	register := registry.register
 
 	registerDialectShellFS(register, opts, maxHostResult)
-	registerDialectText(register, maxHostResult)
+	registerDialectText(register, opts, maxHostResult)
 	registerDialectProtocol(register, maxHostResult)
 	registerDialectProtocolNetwork(register)
+	registerDialectWeb(register, opts, maxHostResult)
 	registerDialectData(register, maxHostResult)
 	registerDialectDatabase(register)
 	registerDialectAI(register, opts)
@@ -267,14 +268,16 @@ func stringArrayValue(values []string) Value {
 
 func builtinDialectCategory(name string) string {
 	switch name {
-	case "sh", "cmd", "glob":
+	case "sh", "cmd", "glob", "env":
 		return "host"
-	case "shellwords", "path", "json", "jsonptr", "jsonl", "csv", "tsv", "mdtable", "markdown", "md", "lines", "split", "words", "nums", "numbers", "kv", "logfmt", "env", "ini", "yaml", "yml", "semver", "duration", "timestamp", "rfc3339", "tap", "xml", "template", "re", "regexp":
+	case "shellwords", "path", "json", "jsonptr", "jsonl", "csv", "tsv", "mdtable", "markdown", "md", "lines", "split", "words", "nums", "numbers", "kv", "logfmt", "ini", "yaml", "yml", "semver", "duration", "timestamp", "rfc3339", "tap", "xml", "template", "re", "regexp":
 		return "text"
 	case "url", "html_escape", "html", "urlquery", "form", "urlform", "urlpath", "mime", "mailaddr", "emailaddr", "headers", "http_headers", "httpmsg", "cookie", "cookies", "sse", "multipart", "jwt":
 		return "protocol"
 	case "ipaddr", "cidr", "hostport":
 		return "protocol"
+	case "serve":
+		return "web"
 	case "base64", "hash", "hex", "base32", "uuid", "gzip", "zlib", "deflate", "binary", "q", "pem", "xlsx", "excel":
 		return "data"
 	case "sql":
@@ -296,6 +299,10 @@ func builtinDialectCapabilities(name string) []string {
 		return []string{"process.exec"}
 	case "glob":
 		return []string{"fs.read"}
+	case "env":
+		return []string{"env.read"}
+	case "serve":
+		return []string{"network.listen"}
 	default:
 		return []string{}
 	}

@@ -19,7 +19,7 @@ func TestDialectTagsExposeInstalledHandlers(t *testing.T) {
 		"agent", "base32", "base64", "binary", "cidr", "cmd", "cookie", "cookies", "csv", "deflate", "duration", "emailaddr", "env", "excel", "form", "glob",
 		"gzip", "hash", "headers", "hex", "hostport", "html", "html_escape", "http_headers", "httpmsg", "ini", "ipaddr", "json", "jsonl", "jsonptr",
 		"junit", "jwt", "kv", "lines", "logfmt", "mailaddr", "markdown", "md", "mdtable", "mime", "model", "multipart", "numbers", "nums", "path", "pem", "prompt",
-		"q", "quote", "re", "regexp", "rfc3339", "semver", "sh", "shellwords", "split", "sql", "sse", "tap", "template", "timestamp", "tool", "tsv",
+		"q", "quote", "re", "regexp", "rfc3339", "semver", "serve", "sh", "shellwords", "split", "sql", "sse", "tap", "template", "timestamp", "tool", "tsv",
 		"turn", "url", "urlform", "urlpath", "urlquery", "uuid", "words", "xlsx", "xml", "yaml", "yml", "zlib",
 	}
 	for _, name := range want {
@@ -59,11 +59,13 @@ func TestDialectInfoAndListExposeMetadata(t *testing.T) {
 		tags := dialect.tags()
 		sh_info := dialect.info("sh")
 		glob_info := dialect.info("glob")
+		env_info := dialect.info("env")
 		json_info := dialect.info("json")
 		jsonptr_info := dialect.info("jsonptr")
-		logfmt_info := dialect.info("logfmt")
-		junit_info := dialect.info("junit")
-		sse_info := dialect.info("sse")
+			logfmt_info := dialect.info("logfmt")
+			junit_info := dialect.info("junit")
+			serve_info := dialect.info("serve")
+			sse_info := dialect.info("sse")
 		multipart_info := dialect.info("multipart")
 		missing_info := dialect.info("missing")
 		all_info := dialect.list()
@@ -82,6 +84,13 @@ func TestDialectInfoAndListExposeMetadata(t *testing.T) {
 	if got := stringSliceFromArray(interp.GetGlobal("glob_info").Table().RawGetString("capabilities").Table()); !reflect.DeepEqual(got, []string{"fs.read"}) {
 		t.Fatalf("glob capabilities = %#v, want fs.read", got)
 	}
+	envInfo := interp.GetGlobal("env_info").Table()
+	if got := envInfo.RawGetString("category").Str(); got != "host" {
+		t.Fatalf("env category = %q, want host", got)
+	}
+	if got := stringSliceFromArray(envInfo.RawGetString("capabilities").Table()); !reflect.DeepEqual(got, []string{"env.read"}) {
+		t.Fatalf("env capabilities = %#v, want env.read", got)
+	}
 	if got := interp.GetGlobal("json_info").Table().RawGetString("category").Str(); got != "text" {
 		t.Fatalf("json category = %q, want text", got)
 	}
@@ -89,12 +98,15 @@ func TestDialectInfoAndListExposeMetadata(t *testing.T) {
 		"jsonptr":   "jsonptr_info",
 		"logfmt":    "logfmt_info",
 		"junit":     "junit_info",
+		"serve":     "serve_info",
 		"sse":       "sse_info",
 		"multipart": "multipart_info",
 	} {
 		category := "text"
 		if name == "sse" || name == "multipart" {
 			category = "protocol"
+		} else if name == "serve" {
+			category = "web"
 		} else if name == "junit" {
 			category = "compat"
 		}
@@ -150,9 +162,10 @@ func TestBuiltinDialectInfoCategoriesAreExplicit(t *testing.T) {
 
 func expectedBuiltinDialectCategories() map[string]string {
 	return map[string]string{
-		"sh": "host", "cmd": "host", "glob": "host",
-		"shellwords": "text", "path": "text", "re": "text", "regexp": "text", "json": "text", "jsonptr": "text", "jsonl": "text", "csv": "text", "tsv": "text", "mdtable": "text", "markdown": "text", "md": "text", "lines": "text", "split": "text", "words": "text", "nums": "text", "numbers": "text", "kv": "text", "logfmt": "text", "env": "text", "ini": "text", "yaml": "text", "yml": "text", "semver": "text", "duration": "text", "timestamp": "text", "rfc3339": "text", "tap": "text", "xml": "text", "template": "text",
+		"sh": "host", "cmd": "host", "glob": "host", "env": "host",
+		"shellwords": "text", "path": "text", "re": "text", "regexp": "text", "json": "text", "jsonptr": "text", "jsonl": "text", "csv": "text", "tsv": "text", "mdtable": "text", "markdown": "text", "md": "text", "lines": "text", "split": "text", "words": "text", "nums": "text", "numbers": "text", "kv": "text", "logfmt": "text", "ini": "text", "yaml": "text", "yml": "text", "semver": "text", "duration": "text", "timestamp": "text", "rfc3339": "text", "tap": "text", "xml": "text", "template": "text",
 		"url": "protocol", "html_escape": "protocol", "html": "protocol", "urlquery": "protocol", "form": "protocol", "urlform": "protocol", "urlpath": "protocol", "mime": "protocol", "mailaddr": "protocol", "emailaddr": "protocol", "headers": "protocol", "http_headers": "protocol", "cookie": "protocol", "cookies": "protocol", "httpmsg": "protocol", "sse": "protocol", "multipart": "protocol", "jwt": "protocol", "ipaddr": "protocol", "cidr": "protocol", "hostport": "protocol",
+		"serve":  "web",
 		"base64": "data", "hash": "data", "hex": "data", "base32": "data", "uuid": "data", "gzip": "data", "zlib": "data", "deflate": "data", "binary": "data", "q": "data", "pem": "data", "xlsx": "data", "excel": "data",
 		"sql":   "database",
 		"agent": "llm", "model": "llm", "prompt": "llm", "quote": "llm", "tool": "llm", "turn": "llm",

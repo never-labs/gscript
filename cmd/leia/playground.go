@@ -1504,6 +1504,7 @@ func repositoryExampleRunnable(path string) bool {
 		!strings.Contains(path, "/workflow/support_triage_replay.leia") &&
 		!strings.Contains(path, "/web/hello_server.leia") &&
 		!strings.Contains(path, "/web/route_workbench.leia") &&
+		!strings.Contains(path, "/web/serve_dialect_app.leia") &&
 		!strings.Contains(path, "/web/tiny_app.leia") &&
 		!strings.Contains(path, "/web/webserver.leia") &&
 		!strings.Contains(path, "/dialects/shell_filesystem.leia") &&
@@ -1529,6 +1530,7 @@ func repositoryExampleRequires(path string) string {
 		return "LLM replay fixture or provider"
 	case strings.Contains(path, "/web/hello_server.leia"),
 		strings.Contains(path, "/web/route_workbench.leia"),
+		strings.Contains(path, "/web/serve_dialect_app.leia"),
 		strings.Contains(path, "/web/tiny_app.leia"),
 		strings.Contains(path, "/web/webserver.leia"):
 		return "network/server host access"

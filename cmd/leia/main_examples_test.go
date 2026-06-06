@@ -91,6 +91,7 @@ func TestPracticalExampleProjects(t *testing.T) {
 		{"static-site-docs-generation", execExampleProjectGlobal(root, filepath.Join("examples", "site", "static_docs_generator.leia"), "site_generation_summary"), "pages=3 published=2 drafts=1 assets=2"},
 		{"web-access-log-report", execExampleProjectGlobal(root, filepath.Join("examples", "web", "access_log_report.leia"), "web_access_report_summary"), "routes=4 requests=10 errors=3 slow=3 cache_hits=4 top=/api/orders"},
 		{"web-route-workbench", execExampleProjectGlobal(root, filepath.Join("examples", "web", "route_workbench.leia"), "web_route_workbench_summary"), "routes=5 events=6 created=bk-303 updated_stock=8 deleted=bk-202 method_status=405 html=200"},
+		{"web-serve-dialect-app", execExampleProjectGlobal(root, filepath.Join("examples", "web", "serve_dialect_app.leia"), "serve_dialect_app_summary"), "serve routes=3 events=4 status=delivered method_status=405 html=200"},
 		{"ai-agent-composition", evaluateReplayExampleProject(root, filepath.Join("examples", "evaluate", "agent_replay.leia"), filepath.Join("examples", "evaluate", "agent_replay.records.json")), "agent consumes replay"},
 		{"ai-project-regression", evaluateReplayExampleProject(root, filepath.Join("examples", "evaluate", "project_agent_regression.leia"), filepath.Join("examples", "evaluate", "project_agent_regression.records.json")), "project agent regression consumes replay"},
 		{"concurrency-pipeline", execExampleProjectGlobal(root, filepath.Join("examples", "concurrency", "goroutines_channels.leia"), "workers"), "4"},
@@ -718,11 +719,12 @@ func TestEvaluateReplayExamplesExecute(t *testing.T) {
 		source        string
 		records       string
 		replayedTurns int
+		streamEvents  int
 	}{
 		{name: "llm", source: "llm_replay.leia", records: "llm_replay.records.json", replayedTurns: 1},
 		{name: "agent", source: "agent_replay.leia", records: "agent_replay.records.json", replayedTurns: 1},
 		{name: "multiturn", source: "multiturn_replay.leia", records: "multiturn_replay.records.json", replayedTurns: 2},
-		{name: "project-agent-regression", source: "project_agent_regression.leia", records: "project_agent_regression.records.json", replayedTurns: 2},
+		{name: "project-agent-regression", source: "project_agent_regression.leia", records: "project_agent_regression.records.json", replayedTurns: 2, streamEvents: 4},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var stdout, stderr bytes.Buffer
@@ -748,6 +750,9 @@ func TestEvaluateReplayExamplesExecute(t *testing.T) {
 				} `json:"llm"`
 				Cases []struct {
 					Status string `json:"status"`
+					LLM    *struct {
+						StreamEvents int `json:"stream_events"`
+					} `json:"llm"`
 				} `json:"cases"`
 				Findings []struct {
 					Kind string `json:"kind"`
@@ -770,6 +775,11 @@ func TestEvaluateReplayExamplesExecute(t *testing.T) {
 			if report.LLM == nil || report.LLM.ReplayedTurns != tc.replayedTurns || report.LLM.RemainingTurns != 0 {
 				t.Fatalf("llm = %+v, want replayed=%d remaining=0", report.LLM, tc.replayedTurns)
 			}
+			if tc.streamEvents > 0 {
+				if len(report.Cases) == 0 || report.Cases[0].LLM == nil || report.Cases[0].LLM.StreamEvents != tc.streamEvents {
+					t.Fatalf("cases = %+v, want first case to report %d stream events", report.Cases, tc.streamEvents)
+				}
+			}
 			if len(report.Findings) != 0 {
 				t.Fatalf("findings = %+v, want none", report.Findings)
 			}
@@ -782,7 +792,7 @@ func approvedBuiltinDialectTags() []string {
 		"sh", "cmd", "shellwords", "glob", "path",
 		"re", "regexp", "json", "jsonptr", "jsonl", "csv", "tsv", "mdtable", "markdown", "md", "lines", "split", "words", "nums", "numbers", "kv", "logfmt", "env", "ini", "yaml", "yml", "semver", "duration", "timestamp", "rfc3339", "tap", "junit", "xml", "template",
 		"url", "html_escape", "html", "urlquery", "form", "urlform", "urlpath", "mime", "mailaddr", "emailaddr", "headers", "http_headers", "cookie", "cookies", "httpmsg", "sse", "multipart", "jwt",
-		"ipaddr", "cidr", "hostport",
+		"ipaddr", "cidr", "hostport", "serve",
 		"base64", "hash", "hex", "base32", "uuid", "gzip", "zlib", "deflate", "binary", "q", "pem", "xlsx", "excel", "sql",
 		"prompt", "quote", "model", "turn", "tool", "agent",
 	}

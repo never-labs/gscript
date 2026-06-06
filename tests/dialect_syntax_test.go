@@ -649,6 +649,7 @@ func TestQSymbolicDialectMilestone1ExecutesThroughStdlib(t *testing.T) {
 }
 
 func TestKVEnvDialectsEncodeThroughStdlib(t *testing.T) {
+	t.Setenv("LEIA_DIALECT_SYNTAX_ENV_ALLOWED", "syntax-visible")
 	for _, tc := range []struct {
 		name string
 		opts []leia.Option
@@ -659,12 +660,19 @@ func TestKVEnvDialectsEncodeThroughStdlib(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			vm := leia.New(append([]leia.Option{
 				leia.WithLibs(leia.LibAll),
+				leia.WithEnvironmentRead(true),
+				leia.WithEnvironmentAllowlist("LEIA_DIALECT_SYNTAX_ENV_ALLOWED", "LEIA_DIALECT_SYNTAX_ENV_MISSING"),
 			}, tc.opts...)...)
 			err := vm.Exec(`
 				kv_text := dialect.eval("kv", {score: 42, name: "Ada"}, {mode: "encode"})
 				kv_roundtrip := dialect.eval("kv", kv_text)
 				env_text := dialect.eval("env", {TOKEN: "abc 123", EMPTY: ""}, {mode: "encode"})
 				env_roundtrip := dialect.eval("env", env_text)
+				host_env := env` + "`" + `LEIA_DIALECT_SYNTAX_ENV_ALLOWED` + "`" + `
+				host_env_missing := env` + "`" + `LEIA_DIALECT_SYNTAX_ENV_MISSING` + "`" + `
+				host_env_missing_fast_ok, host_env_missing_fast_err := pcall(func() {
+					return env!` + "`" + `LEIA_DIALECT_SYNTAX_ENV_MISSING` + "`" + `
+				})
 
 				kv_name := kv_roundtrip.name
 				kv_score := kv_roundtrip.score
@@ -680,6 +688,10 @@ func TestKVEnvDialectsEncodeThroughStdlib(t *testing.T) {
 			assertGet(t, vm, "env_text", "EMPTY=\nTOKEN=abc 123\n")
 			assertGet(t, vm, "env_token", "abc 123")
 			assertGet(t, vm, "env_empty", "")
+			assertGet(t, vm, "host_env", "syntax-visible")
+			assertGet(t, vm, "host_env_missing", nil)
+			assertGet(t, vm, "host_env_missing_fast_ok", false)
+			assertStringContains(t, vm, "host_env_missing_fast_err", "environment variable not set")
 		})
 	}
 }

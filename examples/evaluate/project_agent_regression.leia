@@ -91,6 +91,12 @@ incident_agent := llm.agent("incident_agent", incident_config, func(service, sev
         messages: transcript
         tools: cfg.tools
         stream: true
+        on_stream: func(event) {
+            if transcript.streamed == nil {
+                transcript.streamed = ""
+            }
+            transcript.streamed = transcript.streamed .. event.token
+        }
         max_tokens: 160
     })
     if final_err != nil {
@@ -101,6 +107,7 @@ incident_agent := llm.agent("incident_agent", incident_config, func(service, sev
     return {
         status: final.status,
         text: final.text,
+        streamed: transcript.streamed,
         evidence: tool_msg.value,
         history_len: #transcript,
         task: task_msg.text,
@@ -113,10 +120,13 @@ evaluate "project agent regression consumes replay" {
     assert(err == nil)
     assert(result.status == "final_answer")
     assert(result.text == "Checkout sev2 owned by ops; keep workers running and notify oncall.")
+    assert(result.streamed == result.text)
     assert(result.evidence == "runbook:checkout:sev2:restart-workers:false:notify:oncall")
     assert(result.history_len == 5)
     assert(result.task_idx == 3)
     assert(string.find(result.task, "INC-17 sev2 p95 latency spike", 1, true) != nil)
+    assert(eval.usage().turns == 2)
+    assert(eval.usage().stream_events == 4)
 }
 
 evaluate "project memory summary stays stable" {

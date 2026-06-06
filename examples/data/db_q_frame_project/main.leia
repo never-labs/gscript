@@ -1,0 +1,82 @@
+// db_q_frame_project - SQLite to columnar q analytics with Excel export.
+// Run:
+//   go run ./cmd/leia run examples/data/db_q_frame_project/main.leia
+
+func check(name, ok) {
+    assert(ok)
+    print("ok", name)
+}
+
+conn := db.memory()
+conn.exec(sql`create table campaigns (
+    day integer not null,
+    channel_id integer not null,
+    spend real not null,
+    revenue real not null,
+    conversions integer not null,
+    label text not null
+)`)
+
+conn.exec(sql`insert into campaigns values
+    (1, 1, 100.0, 250.0, 5, 'search'),
+    (1, 2, 80.0, 120.0, 3, 'email'),
+    (2, 1, 120.0, 300.0, 6, 'search'),
+    (2, 2, 70.0, 210.0, 4, 'email'),
+    (3, 3, 160.0, 410.0, 7, 'partner')`)
+
+min_revenue := 150.0
+frame := conn.frame(sql {
+    query: `select day, channel_id, spend, revenue, conversions, label
+            from campaigns
+            where revenue >= :min_revenue
+            order by day, channel_id`,
+    params: {min_revenue: min_revenue},
+})
+
+check("frame rows", frame.len == 4 && frame.rows[1].label == "search")
+check("string columns preserved", frame.columns.label[4] == "partner")
+check("numeric soa available", soa.len(frame.soa) == 4)
+
+rollup := q.query(frame.soa, {
+    by: {"channel_id"},
+    select: {
+        spend: "spend",
+        revenue: "revenue",
+        conversions: "conversions",
+        days: 1,
+    },
+    aggregate: {
+        spend: "sum",
+        revenue: "sum",
+        conversions: "sum",
+        days: "count",
+    },
+    order_by: {column: "revenue", desc: true},
+})
+
+best := rollup[1]
+check("q rollup", #rollup == 3 && best.channel_id == 1 && best.revenue == 550.0)
+
+workbook := dialect.eval("xlsx", rollup, {
+    mode: "encode",
+    headers: {"channel_id", "spend", "revenue", "conversions", "days"},
+    sheet: "rollup",
+})
+roundtrip := dialect.eval("excel", workbook, {headers: true})
+check("xlsx roundtrip", #roundtrip == 3 && roundtrip[1].channel_id == "1" && tonumber(roundtrip[1].revenue) == 550.0)
+
+db_q_frame_summary := string.format(
+    "db_q_frame rows=%d channels=%d best=%d revenue=%.0f excel_rows=%d",
+    frame.len,
+    #rollup,
+    best.channel_id,
+    best.revenue,
+    #roundtrip
+)
+print(db_q_frame_summary)
+
+return {
+    frame: frame,
+    rollup: rollup,
+    summary: db_q_frame_summary,
+}

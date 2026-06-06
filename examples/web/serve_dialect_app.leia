@@ -1,0 +1,111 @@
+// serve_dialect_app.leia - High-level Web app through the serve dialect.
+// Demonstrates: tagged block serve app, params, query values, JSON request
+// bodies, HTML responses, method routing, and loopback shutdown.
+
+orders := {
+    ["ord-100"]: {id: "ord-100", customer: "Ada", status: "packed", total: 42},
+    ["ord-200"]: {id: "ord-200", customer: "Lin", status: "shipped", total: 75},
+}
+
+events := {}
+
+func remember(kind, detail) {
+    events[#events + 1] = {kind: kind, detail: detail}
+}
+
+func json_headers() {
+    return {["Content-Type"]: "application/json"}
+}
+
+app := serve {
+    listen: "127.0.0.1:0"
+    routes: {
+        {method: "GET", path: "/", handler: func(req) {
+            remember("page", req.path)
+            return html {
+                tag: "main",
+                attrs: {class: "app"},
+                children: {
+                    {tag: "h1", text: "Leia Serve Dialect"},
+                    {tag: "p", text: "orders=" .. tostring(#events)},
+                },
+            }
+        }},
+        {method: "GET", path: "/orders/:id", handler: func(req) {
+            id := req.params.id
+            remember("read", id)
+            order := orders[id]
+            if order == nil {
+                return {error: "not_found", id: id}
+            }
+            return {
+                id: order.id,
+                customer: order.customer,
+                status: order.status,
+                total: order.total,
+                view: req.query.view,
+            }
+        }},
+        {method: "POST", path: "/orders/:id/status", handler: func(req) {
+            body, err := req.json()
+            if err != nil {
+                return {error: "bad_json", detail: err}
+            }
+            id := req.params.id
+            order := orders[id]
+            if order == nil {
+                return {error: "not_found", id: id}
+            }
+            order.status = body.status
+            remember("status", id .. ":" .. body.status)
+            return {updated: true, id: id, status: order.status}
+        }},
+    }
+}
+
+home := http.get(app.url .. "/")
+assert(home.status == 200)
+assert(string.find(home.headers["Content-Type"], "text/html", 1, true) != nil)
+assert(string.find(home.body, "Leia Serve Dialect", 1, true) != nil)
+
+read_resp := http.get(app.url .. "/orders/ord-100?view=compact")
+assert(read_resp.status == 200)
+read_order := json.decode(read_resp.body)
+assert(read_order.id == "ord-100")
+assert(read_order.customer == "Ada")
+assert(read_order.view == "compact")
+
+update_resp, update_err := net.post(
+    app.url .. "/orders/ord-100/status",
+    "{\"status\":\"delivered\"}",
+    {headers: json_headers()}
+)
+assert(update_err == nil)
+assert(update_resp.status == 200)
+updated := json.decode(update_resp.body)
+assert(updated.updated == true)
+assert(updated.status == "delivered")
+
+verify := json.decode(http.get(app.url .. "/orders/ord-100").body)
+assert(verify.status == "delivered")
+
+wrong_method, wrong_method_err := net.delete(app.url .. "/orders/ord-100/status")
+assert(wrong_method_err == nil)
+assert(wrong_method.status == 405)
+
+closed, close_err := app.close()
+assert(closed == true)
+assert(close_err == nil)
+waited, wait_err := app.wait()
+assert(waited == true)
+assert(wait_err == nil)
+
+serve_dialect_app_summary := string.format(
+    "serve routes=3 events=%d status=%s method_status=%d html=%d",
+    #events,
+    verify.status,
+    wrong_method.status,
+    home.status
+)
+
+print(serve_dialect_app_summary)

@@ -1,6 +1,6 @@
 // shell_filesystem.leia - Built-in dialects for local process and filesystem work.
 // Demonstrates: $, $!, sh, cmd, shellwords, glob, path
-//leia:cap process.exec,process.shell,fs.read
+//leia:cap process.exec,process.shell,fs.read,env.read
 
 print("=== Dialects: shell, command, filesystem ===")
 
@@ -54,6 +54,14 @@ structured_cmd := dialect.eval("cmd", {
 assert(structured_cmd.ok == true)
 assert(structured_cmd.text == "body:env")
 print("cmd structured:", structured_cmd.text)
+
+// env reads host environment variables directly. Missing variables return nil;
+// env! is the fail-fast form for required settings.
+host_path := env`PATH`
+missing_env := env`LEIA_DIALECT_EXAMPLE_MISSING`
+assert(type(host_path) == "string")
+assert(missing_env == nil)
+print("env PATH length:", #host_path)
 
 entry := process.entry()
 cwd_cmd := dialect.eval("cmd", {
