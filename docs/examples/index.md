@@ -64,6 +64,7 @@ set.
 ```bash
 go run ./cmd/leia examples run examples/data_processing/data_oriented/soa_kernels.leia
 go run ./cmd/leia examples check examples/data/q_vector_basics.leia
+go run ./cmd/leia examples check examples/data/q_trade_analytics_project
 go run ./cmd/leia examples check examples/data/db_q_frame_project
 go run ./cmd/leia examples run repo-tooling-release_gate_project-main
 go run ./cmd/leia examples check examples/data_processing/data_oriented/particle_integration.leia
@@ -71,8 +72,10 @@ go run ./cmd/leia examples check examples/data_processing/data_oriented/particle
 
 Use these with the [data-oriented reference](../reference/data-oriented/index.md)
 and `benchmarks/data/` when evaluating numeric or SoA-heavy code. The
-`db_q_frame_project` example exercises SQLite `db.frame`, SoA-backed `q.query`,
-and `xlsx`/`excel` round-tripping as one runnable data workflow. The
+`q_trade_analytics_project` example covers q/kdb+-style symbolic vectors,
+dictionaries, scans, filters, and table rollups. The `db_q_frame_project`
+example exercises SQLite `db.frame`, SoA-backed `q.query`, and `xlsx`/`excel`
+round-tripping as one runnable data workflow. The
 `release_gate_project` example combines fixture globbing, shell/process
 dialects, SQLite, q-style columnar aggregation, Excel round-tripping, AI agent
 mocking, and a loopback web route in one runnable release-gate workflow. The
@@ -97,7 +100,8 @@ go run ./cmd/leia examples run repo-dialects-sql_result_analytics
 
 The runnable dialect examples cover the CLI-visible built-in dialect surface,
 including shell/process literals, `env` lookup literals, `sql`,
-`markdown`/`md`, and Markdown table parsing/encoding.
+`markdown`/`md`, Markdown table parsing/encoding, AI prompt/quote literals,
+protocol fixtures, and data-format fixtures.
 
 For a larger cross-domain dialect example:
 
@@ -156,8 +160,23 @@ Review these files directly when working on those areas:
 - `examples/game_engine/game_of_life.leia`
 - `examples/game_engine/tetris.leia`
 - `examples/web/serve_dialect_app.leia`
+- `examples/web/route_workbench.leia`
+- `examples/web/access_log_report.leia`
 - `examples/web/tiny_fullstack_app.leia`
 - `examples/web/hello_server.leia`
 
 Prefer the smoke, SDK, and integration tests for deterministic correctness
 checks.
+
+## Package-Managed Examples
+
+Package-managed examples keep `leia.mod` metadata beside the script so package,
+capability, and native binding evidence stays visible:
+
+- `examples/database/package_managed/`
+- `examples/macos/package_managed/`
+- `examples/ui/package_managed/`
+- `examples/tooling/release_gate_project/`
+
+Use these with the [package guide](../guides/packages.md) and
+[modules reference](../reference/modules/index.md).

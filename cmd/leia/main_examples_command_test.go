@@ -21,6 +21,7 @@ func TestExamplesCommandListsRepositoryExamples(t *testing.T) {
 		"repo-hello-counter",
 		"repo-embedding-go-doc-examples",
 		"repo-site-static_docs_generator",
+		"repo-tooling-package_manager_workflow-main",
 		"repo-security-supply_chain_audit",
 		"repo-security-vendor_onboarding_audit",
 	} {
@@ -195,6 +196,76 @@ func TestExamplesCommandVerifiesPackageManagedProjects(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestExamplesCommandVerifiesPackageManagerWorkflowProject(t *testing.T) {
+	root := filepath.Dir(playgroundExamplesRoot())
+	dir := filepath.Join(root, "examples", "tooling", "package_manager_workflow")
+
+	var stdout, stderr bytes.Buffer
+	code := runExamplesCommand([]string{"check", "--timeout=20s", "tooling/package_manager_workflow"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("examples check package_manager_workflow code = %d, stdout = %q stderr = %q", code, stdout.String(), stderr.String())
+	}
+	for _, want := range []string{
+		"ok      repo-tooling-package_manager_workflow-main",
+		"ok      repo-tooling-package_manager_workflow-local-metadata-report",
+		"examples: 2 ok, 0 skipped, 0 failed",
+	} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Fatalf("examples check missing %q\n%s", want, stdout.String())
+		}
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = runModCommand([]string{"graph", "--json", dir}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("mod graph package_manager_workflow code = %d, stdout = %q stderr = %q", code, stdout.String(), stderr.String())
+	}
+	var graph modGraphReport
+	if err := json.Unmarshal(stdout.Bytes(), &graph); err != nil {
+		t.Fatalf("stdout is not JSON graph: %v; stdout = %q", err, stdout.String())
+	}
+	if len(graph.Files) != 1 ||
+		graph.Files[0].File != "main.leia" ||
+		!containsString(graph.Files[0].Requires, "github.com/never-labs/leia-package-workflow/metadata/report") {
+		t.Fatalf("graph = %+v, want root Go-style import edge and local replace source excluded", graph)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = runModCommand([]string{"verify", "--json", dir}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("mod verify package_manager_workflow code = %d, stdout = %q stderr = %q", code, stdout.String(), stderr.String())
+	}
+	var verify modVerifyReport
+	if err := json.Unmarshal(stdout.Bytes(), &verify); err != nil {
+		t.Fatalf("stdout is not JSON verify report: %v; stdout = %q", err, stdout.String())
+	}
+	if !verify.OK {
+		t.Fatalf("verify = %+v, want package_manager_workflow to verify", verify)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = runModCommand([]string{"capability", "--json", dir}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("mod capability package_manager_workflow code = %d, stdout = %q stderr = %q", code, stdout.String(), stderr.String())
+	}
+	var caps modCapabilityReport
+	if err := json.Unmarshal(stdout.Bytes(), &caps); err != nil {
+		t.Fatalf("stdout is not JSON capability report: %v; stdout = %q", err, stdout.String())
+	}
+	if !caps.OK {
+		t.Fatalf("capability report = %+v, want package_manager_workflow capabilities to report", caps)
+	}
+	if !moduleHasCapabilities(caps.Modules, "example.com/leia/examples/tooling/package-manager-workflow", "module.graph", "module.verify", "module.capability") {
+		t.Fatalf("capability modules = %+v, want root module workflow capabilities", caps.Modules)
+	}
+	if !moduleHasCapabilities(caps.Modules, "github.com/never-labs/leia-package-workflow/metadata", "module.metadata", "module.graph", "module.verify", "module.capability") {
+		t.Fatalf("capability modules = %+v, want local replace metadata module capabilities", caps.Modules)
 	}
 }
 

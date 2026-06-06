@@ -1311,19 +1311,13 @@ func TestReleaseMatrixAINativeDocsUsePublicLLMSurface(t *testing.T) {
 func TestReleaseMatrixAINativeExamplesStayRunnable(t *testing.T) {
 	root := findRepoRoot(t)
 	guide := readFileString(t, filepath.Join(root, "docs", "guides", "ai-native.md"))
-	for _, forbidden := range []string{
-		"examples/llm/agent_as_tool.leia",
-	} {
-		if strings.Contains(guide, forbidden) {
-			t.Fatalf("docs/guides/ai-native.md must not recommend currently failing AI example %s", forbidden)
-		}
-	}
 	if !strings.Contains(guide, "Live-provider examples") || !strings.Contains(guide, "examples/llm/glm_smoke.leia") {
 		t.Fatal("AI-native guide must keep live provider examples separated from offline examples")
 	}
 
 	for _, example := range []string{
 		"examples/llm/agent.leia",
+		"examples/llm/agent_as_tool.leia",
 		"examples/llm/incident_response.leia",
 	} {
 		runCommand(t, root, 30*time.Second, "go", "run", "./cmd/leia", "run", example)

@@ -36,15 +36,22 @@ type playgroundOptions struct {
 	MaxSteps       int64
 	Executable     string
 	Runner         playgroundRunner
+	EvaluateRunner playgroundEvaluateRunner
 }
 
 type playgroundRunner func(context.Context, playgroundRunRequest, playgroundOptions) playgroundRunResponse
+type playgroundEvaluateRunner func(context.Context, playgroundEvaluateRunRequest, playgroundOptions) playgroundRunResponse
 
 type playgroundRunRequest struct {
 	Source  string   `json:"source"`
 	Mode    string   `json:"mode"`
 	Profile string   `json:"profile,omitempty"`
 	Args    []string `json:"args,omitempty"`
+}
+
+type playgroundEvaluateRunRequest struct {
+	Source    string `json:"source"`
+	ExampleID string `json:"example_id,omitempty"`
 }
 
 type playgroundRunResponse struct {
@@ -137,6 +144,9 @@ func newPlaygroundHandler(opts playgroundOptions) http.Handler {
 	if opts.Runner == nil {
 		opts.Runner = subprocessPlaygroundRunner
 	}
+	if opts.EvaluateRunner == nil {
+		opts.EvaluateRunner = subprocessPlaygroundEvaluateRunner
+	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/" {
@@ -172,6 +182,19 @@ func newPlaygroundHandler(opts playgroundOptions) http.Handler {
 			return
 		}
 		writePlaygroundJSON(w, http.StatusOK, playgroundAIExamples())
+	})
+	mux.HandleFunc("/api/evaluate", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			w.Header().Set("Allow", http.MethodGet)
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		examples, err := playgroundEvaluateExamples(playgroundEvaluateExamplesRoot())
+		if err != nil {
+			writePlaygroundJSON(w, http.StatusOK, []playgroundExample{})
+			return
+		}
+		writePlaygroundJSON(w, http.StatusOK, examples)
 	})
 	mux.HandleFunc("/api/examples", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
@@ -221,6 +244,33 @@ func newPlaygroundHandler(opts playgroundOptions) http.Handler {
 		ctx, cancel := context.WithTimeout(r.Context(), timeout)
 		defer cancel()
 		writePlaygroundJSON(w, http.StatusOK, opts.Runner(ctx, req, opts))
+	})
+	mux.HandleFunc("/api/evaluate/run", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			w.Header().Set("Allow", http.MethodPost)
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		defer r.Body.Close()
+		var req playgroundEvaluateRunRequest
+		decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, opts.MaxSourceBytes+4096))
+		decoder.DisallowUnknownFields()
+		if err := decoder.Decode(&req); err != nil {
+			writePlaygroundJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+			return
+		}
+		req.Source = strings.TrimPrefix(req.Source, "\ufeff")
+		if int64(len(req.Source)) > opts.MaxSourceBytes {
+			writePlaygroundJSON(w, http.StatusRequestEntityTooLarge, map[string]string{"error": "source exceeds max-source-bytes"})
+			return
+		}
+		if strings.TrimSpace(req.Source) == "" {
+			writePlaygroundJSON(w, http.StatusBadRequest, map[string]string{"error": "source is empty"})
+			return
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), opts.Timeout)
+		defer cancel()
+		writePlaygroundJSON(w, http.StatusOK, opts.EvaluateRunner(ctx, req, opts))
 	})
 	return mux
 }
@@ -290,6 +340,114 @@ func subprocessPlaygroundRunner(ctx context.Context, req playgroundRunRequest, o
 		}
 	}
 	return resp
+}
+
+func subprocessPlaygroundEvaluateRunner(ctx context.Context, req playgroundEvaluateRunRequest, opts playgroundOptions) playgroundRunResponse {
+	return runPlaygroundEvaluateRequest(ctx, req, opts, func(ctx context.Context, dir string, args []string, stdout, stderr io.Writer) error {
+		exe := opts.Executable
+		if exe == "" {
+			var err error
+			exe, err = os.Executable()
+			if err != nil {
+				return err
+			}
+		}
+		cmd := exec.CommandContext(ctx, exe, append([]string{"evaluate"}, args...)...)
+		cmd.Dir = dir
+		cmd.Stdout = stdout
+		cmd.Stderr = stderr
+		return cmd.Run()
+	})
+}
+
+func directPlaygroundEvaluateRunner(ctx context.Context, req playgroundEvaluateRunRequest, opts playgroundOptions) playgroundRunResponse {
+	return runPlaygroundEvaluateRequest(ctx, req, opts, func(ctx context.Context, dir string, args []string, stdout, stderr io.Writer) error {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if code := runEvaluateCommand(args, stdout, stderr); code != 0 {
+			return fmt.Errorf("evaluate exited with code %d", code)
+		}
+		return nil
+	})
+}
+
+func runPlaygroundEvaluateRequest(ctx context.Context, req playgroundEvaluateRunRequest, opts playgroundOptions, run func(context.Context, string, []string, io.Writer, io.Writer) error) playgroundRunResponse {
+	start := time.Now()
+	dir, err := os.MkdirTemp("", "leia-playground-evaluate-*")
+	if err != nil {
+		return playgroundRunResponse{OK: false, Error: err.Error(), DurationMS: elapsedMillis(start)}
+	}
+	defer os.RemoveAll(dir)
+	example, hasExample := playgroundEvaluateExampleByID(req.ExampleID)
+	sourceName := "main.leia"
+	if hasExample {
+		sourceName = filepath.Base(example.Summary)
+	}
+	sourcePath := filepath.Join(dir, sourceName)
+	if err := os.WriteFile(sourcePath, []byte(req.Source), 0600); err != nil {
+		return playgroundRunResponse{OK: false, Error: err.Error(), DurationMS: elapsedMillis(start)}
+	}
+	if hasExample {
+		if err := copyPlaygroundEvaluateCompanions(filepath.Dir(example.Summary), dir); err != nil {
+			return playgroundRunResponse{OK: false, Error: err.Error(), DurationMS: elapsedMillis(start)}
+		}
+	}
+	args := []string{"--json"}
+	if hasExample {
+		if replay := playgroundEvaluateReplayPath(example.Summary); replay != "" {
+			args = append(args, "--replay", filepath.Join(dir, filepath.Base(replay)))
+		}
+	}
+	args = append(args, sourcePath)
+	var stdout, stderr bytes.Buffer
+	err = run(ctx, dir, args, &stdout, &stderr)
+	resp := playgroundRunResponse{
+		OK:         err == nil,
+		Stdout:     stdout.String(),
+		Stderr:     stderr.String(),
+		DurationMS: elapsedMillis(start),
+	}
+	if err != nil {
+		resp.Error = strings.TrimSpace(err.Error())
+		if ctx.Err() == context.DeadlineExceeded {
+			resp.TimedOut = true
+			resp.Error = "execution timed out"
+		}
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			resp.ExitCode = exitErr.ExitCode()
+		}
+	}
+	return resp
+}
+
+func copyPlaygroundEvaluateCompanions(srcDir, dstDir string) error {
+	entries, err := os.ReadDir(srcDir)
+	if err != nil {
+		return err
+	}
+	for _, entry := range entries {
+		if entry.IsDir() || filepath.Ext(entry.Name()) == ".leia" {
+			continue
+		}
+		src := filepath.Join(srcDir, entry.Name())
+		data, err := os.ReadFile(src)
+		if err != nil {
+			return err
+		}
+		if err := os.WriteFile(filepath.Join(dstDir, entry.Name()), data, 0600); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func playgroundEvaluateReplayPath(sourcePath string) string {
+	replay := strings.TrimSuffix(sourcePath, filepath.Ext(sourcePath)) + ".records.json"
+	if info, err := os.Stat(replay); err == nil && !info.IsDir() {
+		return replay
+	}
+	return ""
 }
 
 func runPlaygroundExecCommand(args []string, outw, errw io.Writer) int {
@@ -1435,6 +1593,97 @@ print("local classifier checks passed")`,
 	}
 }
 
+func playgroundEvaluateExamples(root string) ([]playgroundExample, error) {
+	metadata := map[string]struct {
+		title    string
+		section  string
+		summary  string
+		concepts []string
+	}{
+		"basic_assert.leia": {
+			title:   "Basic Assert",
+			section: "Assertions",
+			summary: "Run a minimal evaluate block with ordinary helper code and `assert` checks.",
+			concepts: []string{
+				"`evaluate \"name\" { ... }` declares a named evaluation case.",
+				"`assert` failures become evaluate report failures.",
+				"Pure helper functions keep local regressions cheap to run.",
+			},
+		},
+		"corpus_metrics.leia": {
+			title:   "Corpus Metrics",
+			section: "Corpus",
+			summary: "Load JSONL fixtures, create subcases, emit metrics, and skip work-in-progress rows.",
+			concepts: []string{
+				"`eval.load_jsonl` loads corpus rows next to the source file.",
+				"`eval.case` splits a corpus into named subcases.",
+				"`eval.metric`, `eval.skip_if`, and `eval.budget` enrich the JSON report.",
+			},
+		},
+		"agent_replay.leia": {
+			title:   "Replay-Backed Agent",
+			section: "Replay",
+			summary: "Run an LLM agent evaluation against a deterministic companion replay file.",
+			concepts: []string{
+				"`llm.agent` keeps the agent call path intact.",
+				"The playground passes the matching `.records.json` file to `leia evaluate --replay`.",
+				"Replay turns make agent regressions runnable without credentials.",
+			},
+		},
+		"project_agent_regression.leia": {
+			title:   "Project Agent Regression",
+			section: "Replay",
+			summary: "Exercise a project-style agent with tools, memory, streaming, usage assertions, and replay.",
+			concepts: []string{
+				"Local tools and memory setup stay in normal Leia source.",
+				"`eval.usage()` asserts turn and stream-event counts.",
+				"Replay-backed project fixtures catch behavioral drift without live model calls.",
+			},
+		},
+	}
+	files := []string{"basic_assert.leia", "corpus_metrics.leia", "agent_replay.leia", "project_agent_regression.leia"}
+	out := make([]playgroundExample, 0, len(files))
+	for _, name := range files {
+		path := filepath.Join(root, name)
+		src, err := os.ReadFile(path)
+		if err != nil {
+			return nil, err
+		}
+		meta := metadata[name]
+		id := strings.TrimSuffix(name, ".leia")
+		out = append(out, playgroundExample{
+			ID:       "evaluate-" + strings.ReplaceAll(id, "_", "-"),
+			Title:    meta.title,
+			Section:  meta.section,
+			Summary:  path,
+			Concepts: meta.concepts,
+			Source:   string(src),
+			Runnable: true,
+		})
+	}
+	return out, nil
+}
+
+func playgroundEvaluateExamplesRoot() string {
+	return filepath.Join(playgroundExamplesRoot(), "evaluate")
+}
+
+func playgroundEvaluateExampleByID(id string) (playgroundExample, bool) {
+	if strings.TrimSpace(id) == "" {
+		return playgroundExample{}, false
+	}
+	examples, err := playgroundEvaluateExamples(playgroundEvaluateExamplesRoot())
+	if err != nil {
+		return playgroundExample{}, false
+	}
+	for _, example := range examples {
+		if example.ID == id {
+			return example, true
+		}
+	}
+	return playgroundExample{}, false
+}
+
 func playgroundRepositoryExamples(root string) ([]playgroundExample, error) {
 	var out []playgroundExample
 	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
@@ -1510,6 +1759,7 @@ func repositoryExampleRunnable(path string) bool {
 		!strings.Contains(path, "/web/webserver.leia") &&
 		!strings.Contains(path, "/dialects/shell_filesystem.leia") &&
 		!strings.Contains(path, "/tooling/release_gate_project/") &&
+		!strings.Contains(path, "/tooling/package_manager_workflow/") &&
 		!strings.Contains(path, "/macos/package_managed/") &&
 		!strings.Contains(path, "/ui/package_managed/") &&
 		(!strings.Contains(path, "/game_engine/") || strings.Contains(path, "/game_engine/event_system.leia")) &&
@@ -1541,6 +1791,8 @@ func repositoryExampleRequires(path string) string {
 		return "process shell and filesystem host access"
 	case strings.Contains(path, "/tooling/release_gate_project/"):
 		return "examples CLI release-gate-project runner"
+	case strings.Contains(path, "/tooling/package_manager_workflow/"):
+		return "package manifest check"
 	case strings.Contains(path, "/macos/package_managed/"):
 		return "package-managed macOS automation runtime and process host access"
 	case strings.Contains(path, "/ui/package_managed/"):
@@ -1819,6 +2071,7 @@ pre {
     <button class="tab-button active" data-tab="playground" type="button">Playground</button>
     <button class="tab-button" data-tab="tour" type="button">Tour</button>
     <button class="tab-button" data-tab="examples" type="button">Examples</button>
+    <button class="tab-button" data-tab="evaluate" type="button">Evaluate</button>
     <button class="tab-button" data-tab="ai" type="button">AI</button>
   </nav>
   <div class="meta">Backend execution, timeout {{.Timeout}}, max source {{.MaxKB}} KB</div>
@@ -1980,6 +2233,11 @@ const tabConfig = {
     note: "Examples loaded from the repository. Some require host capabilities or provider setup.",
     url: "/api/examples"
   },
+  evaluate: {
+    title: "Evaluate",
+    note: "Runnable evaluation examples for asserts, corpus metrics, and replay-backed agent regression.",
+    url: "/api/evaluate"
+  },
   ai: {
     title: "AI-Native Leia",
     note: "From a one-line turn to tool-using and coding-agent shapes.",
@@ -2086,10 +2344,14 @@ async function run() {
   statusLine.className = "status";
   output.textContent = "";
   try {
-    const res = await fetch("/api/run", {
+    const runURL = activeTab === "evaluate" ? "/api/evaluate/run" : "/api/run";
+    const payload = activeTab === "evaluate"
+      ? {source: source.value, example_id: activeItemID}
+      : {source: source.value, mode: mode.value, profile: activeTab === "ai" ? "ai" : "sandbox"};
+    const res = await fetch(runURL, {
       method: "POST",
       headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({source: source.value, mode: mode.value, profile: activeTab === "ai" ? "ai" : "sandbox"})
+      body: JSON.stringify(payload)
     });
     const data = await res.json();
     const parts = [];

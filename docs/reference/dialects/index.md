@@ -134,3 +134,11 @@ go run ./cmd/leia examples run repo-tooling-release_gate_project-main
 ```
 
 The release gate project combines fixture discovery, shell/process dialects, SQLite frames, q-style aggregation, spreadsheet round-tripping, a mocked AI agent, and a loopback web route. It is tracked by the feature matrix so the README dialect promise stays tied to executable evidence.
+
+Additional focused evidence lives in:
+
+- `examples/dialects/ai_prompt_quote.leia` for prompt and quote tags.
+- `examples/dialects/data_aggregation_report.leia` for mixed data-format tags.
+- `examples/dialects/http_protocol_trace.leia`, `examples/dialects/sse_stream_fixture.leia`, and `examples/dialects/multipart_form_fixture.leia` for web/protocol tags.
+- `examples/data/q_trade_analytics_project/main.leia` for q-style vectors, dictionaries, scans, filters, and table rollups.
+- `examples/web/serve_dialect_app.leia` and `examples/web/route_workbench.leia` for route/server evidence.

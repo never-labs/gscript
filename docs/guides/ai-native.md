@@ -211,3 +211,23 @@ Offline examples such as `examples/llm/agent.leia` and
 `examples/llm/incident_response.leia` are runnable without network access.
 Live-provider examples are kept separate; use `examples/llm/glm_smoke.leia`
 only when the local GLM-compatible environment variables are configured.
+
+## Evidence
+
+The README AI-native promise is tied to deterministic tests and examples:
+
+- `tests/llm/llm_runtime_test.go`, `tests/llm/llm_agent_tools_test.go`,
+  `tests/llm/llm_record_replay_test.go`, and
+  `tests/llm/llm_ai_dialect_test.go`
+- `tests/integration/llm/llm_provider_test.go`,
+  `tests/integration/llm/llm_openai_provider_test.go`, and
+  `tests/integration/llm/llm_glm_integration_test.go`
+- `examples/llm/direct_turn.leia`, `examples/llm/agent_as_tool.leia`,
+  `examples/llm/prompt_tagged_messages.leia`, and
+  `examples/llm/streaming_turn.leia`
+- `examples/ai/coding_agent_replay.leia`,
+  `examples/ai/tagged_agent_workflow.leia`, and
+  `examples/ai/record_replay_trace_project.leia`
+- `examples/evaluate/llm_replay.leia`,
+  `examples/evaluate/agent_replay.leia`, and
+  `examples/evaluate/multiturn_replay.leia`

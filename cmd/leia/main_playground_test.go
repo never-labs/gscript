@@ -148,6 +148,130 @@ func TestPlaygroundTourAndAIAPI(t *testing.T) {
 	}
 }
 
+func TestPlaygroundEvaluateAPI(t *testing.T) {
+	handler := newPlaygroundHandler(playgroundOptions{
+		Runner: func(context.Context, playgroundRunRequest, playgroundOptions) playgroundRunResponse {
+			return playgroundRunResponse{}
+		},
+		EvaluateRunner: func(context.Context, playgroundEvaluateRunRequest, playgroundOptions) playgroundRunResponse {
+			return playgroundRunResponse{}
+		},
+	})
+	req := httptest.NewRequest(http.MethodGet, "/api/evaluate", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+	var examples []playgroundExample
+	if err := json.Unmarshal(rec.Body.Bytes(), &examples); err != nil {
+		t.Fatalf("decode evaluate examples: %v", err)
+	}
+	byID := make(map[string]playgroundExample, len(examples))
+	for _, example := range examples {
+		byID[example.ID] = example
+		if example.Section == "" || example.Title == "" || example.Summary == "" || strings.TrimSpace(example.Source) == "" {
+			t.Fatalf("incomplete evaluate example: %#v", example)
+		}
+		if !example.Runnable {
+			t.Fatalf("%s should be runnable through the evaluate endpoint", example.ID)
+		}
+	}
+	want := map[string][]string{
+		"evaluate-basic-assert":             {"evaluate \"basic assert\"", "assert(slug == \"leia-checks\")"},
+		"evaluate-corpus-metrics":           {"eval.load_jsonl", "eval.metric"},
+		"evaluate-agent-replay":             {"llm.agent(\"classify_support\"", "result.text == \"refund\""},
+		"evaluate-project-agent-regression": {"eval.usage().turns", "eval.usage().stream_events"},
+	}
+	for id, snippets := range want {
+		example, ok := byID[id]
+		if !ok {
+			t.Fatalf("%s not returned by /api/evaluate", id)
+		}
+		for _, snippet := range snippets {
+			if !strings.Contains(example.Source, snippet) {
+				t.Fatalf("%s source missing %q\nsource:\n%s", id, snippet, example.Source)
+			}
+		}
+	}
+}
+
+func TestPlaygroundEvaluateRunAPIExecutesReplayExample(t *testing.T) {
+	handler := newPlaygroundHandler(playgroundOptions{
+		Timeout:        10 * time.Second,
+		MaxSourceBytes: defaultPlaygroundMaxSourceBytes,
+		EvaluateRunner: directPlaygroundEvaluateRunner,
+		Runner: func(context.Context, playgroundRunRequest, playgroundOptions) playgroundRunResponse {
+			t.Fatal("script runner should not be called for evaluate run")
+			return playgroundRunResponse{}
+		},
+	})
+	example, ok := playgroundEvaluateExampleByID("evaluate-agent-replay")
+	if !ok {
+		t.Fatal("evaluate-agent-replay example not found")
+	}
+	payload, err := json.Marshal(playgroundEvaluateRunRequest{
+		Source:    example.Source,
+		ExampleID: example.ID,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/api/evaluate/run", bytes.NewReader(payload))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+	var resp playgroundRunResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode run response: %v", err)
+	}
+	if !resp.OK {
+		t.Fatalf("evaluate run failed\nstdout:\n%s\nstderr:\n%s\nerror:%s", resp.Stdout, resp.Stderr, resp.Error)
+	}
+	if !strings.Contains(resp.Stdout, `"cases_passed": 1`) || !strings.Contains(resp.Stdout, `"mode": "replay"`) {
+		t.Fatalf("stdout is not a passed replay evaluate report:\n%s", resp.Stdout)
+	}
+}
+
+func TestPlaygroundEvaluateRepositoryMetadataDoesNotConflictWithCLIRunner(t *testing.T) {
+	playgroundExamples, err := playgroundRepositoryExamples(playgroundExamplesRoot())
+	if err != nil {
+		t.Fatalf("load playground repository examples: %v", err)
+	}
+	cliExamples, err := cliRepositoryExamples()
+	if err != nil {
+		t.Fatalf("load CLI repository examples: %v", err)
+	}
+	var playgroundExample playgroundExample
+	foundPlayground := false
+	for _, example := range playgroundExamples {
+		if example.ID == "repo-evaluate-agent_replay" {
+			playgroundExample = example
+			foundPlayground = true
+			break
+		}
+	}
+	if !foundPlayground {
+		t.Fatal("repo-evaluate-agent_replay not found in playground repository examples")
+	}
+	if playgroundExample.Runnable || playgroundExample.Requires != "leia evaluate CLI" {
+		t.Fatalf("playground repository metadata = %#v, want manual evaluate CLI gate", playgroundExample)
+	}
+	for _, example := range cliExamples {
+		if example.ID != "repo-evaluate-agent_replay" {
+			continue
+		}
+		if !example.Runnable || !example.Checkable || example.Runner != "evaluate-replay" || example.Requires != "" {
+			t.Fatalf("CLI metadata = %#v, want runnable evaluate-replay runner", example)
+		}
+		return
+	}
+	t.Fatal("repo-evaluate-agent_replay not found in CLI examples")
+}
+
 func TestPlaygroundExamplesExecute(t *testing.T) {
 	t.Setenv("LEIA_PLAYGROUND_MOCK_LLM", "1")
 	var examples []playgroundExample

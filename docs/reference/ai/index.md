@@ -216,3 +216,16 @@ LEIA_ANTHROPIC_COMPAT_MODEL=...
 
 The GLM smoke path also accepts `LEIA_GLM_BASE_URL`, `LEIA_GLM_API_KEY`, and
 `LEIA_GLM_MODEL`.
+
+## Evidence
+
+Stable AI-native coverage is tracked in `tests/feature_matrix.json` under
+`llm_native_integration`. The main evidence set includes:
+
+| Surface | Evidence |
+|---|---|
+| Models and provider adapters | `tests/llm/llm_ai_dialect_test.go`, `tests/integration/llm/llm_provider_test.go`, `tests/integration/llm/llm_openai_provider_test.go`, `tests/integration/llm/llm_glm_integration_test.go` |
+| Tools and agents | `tests/llm/llm_agent_examples_test.go`, `tests/llm/llm_agent_tools_test.go`, `examples/llm/agent.leia`, `examples/llm/agent_as_tool.leia`, `examples/ai/coding_agent_replay.leia` |
+| Messages, turns, and streaming | `tests/llm/llm_runtime_test.go`, `tests/llm/llm_loop_test.go`, `examples/llm/direct_turn.leia`, `examples/llm/prompt_tagged_messages.leia`, `examples/llm/streaming_turn.leia` |
+| Record, replay, and trace | `tests/llm/llm_record_replay_test.go`, `tests/llm/llm_trace_test.go`, `examples/ai/record_replay_trace_project.leia`, `examples/evaluate/llm_replay.leia`, `examples/evaluate/multiturn_replay.leia` |
+| Tagged AI dialects | `examples/ai/tagged_agent_workflow.leia`, `examples/dialects/ai_prompt_quote.leia` |

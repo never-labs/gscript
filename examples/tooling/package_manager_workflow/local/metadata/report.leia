@@ -1,0 +1,27 @@
+// Local replace-backed metadata helper for package_manager_workflow.
+
+func workflow(spec) {
+    capabilities := {
+        "module.metadata",
+        "module.graph",
+        "module.verify",
+        "module.capability",
+    }
+    return {
+        module: spec.module,
+        require: spec.require,
+        version: spec.version,
+        replace: spec.replace,
+        imports: spec.imports,
+        commands: spec.commands,
+        capabilities: capabilities,
+        local_replace: true,
+    }
+}
+
+package_metadata_summary := "package_metadata module=github.com/never-labs/leia-package-workflow/metadata caps=4"
+
+return {
+    workflow: workflow,
+    summary: package_metadata_summary,
+}

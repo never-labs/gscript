@@ -82,6 +82,22 @@ leia mod verify --json
 local collections, and local replacements. `vendor/` can be used for offline or
 hermetic execution through `leia run --mod=vendor`.
 
+## Example Evidence
+
+Package-managed examples exercise module metadata, capability summaries, and
+native binding declarations:
+
+```bash
+go run ./cmd/leia mod verify --json examples/database/package_managed
+go run ./cmd/leia mod verify --json examples/macos/package_managed
+go run ./cmd/leia mod verify --json examples/ui/package_managed
+go run ./cmd/leia mod verify --json examples/tooling/release_gate_project
+```
+
+The same projects are referenced from `tests/feature_matrix.json` under
+`module_package_management`, alongside `internal/modpkg/modpkg_test.go`,
+`tests/architecture/package_boundary_test.go`, and `cmd/leia/main_mod_test.go`.
+
 ## Design Contract
 
 Leia module management is intentionally smaller than npm-style package systems:

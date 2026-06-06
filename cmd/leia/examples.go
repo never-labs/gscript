@@ -520,6 +520,7 @@ func applyCLIExampleRunner(example *cliExample) {
 		example.Requires = ""
 		return
 	case strings.Contains(example.Path, "/macos/package_managed/"),
+		strings.Contains(example.Path, "/tooling/package_manager_workflow/"),
 		strings.Contains(example.Path, "/ui/package_managed/"):
 		example.Checkable = true
 		example.Runner = "mod-check"

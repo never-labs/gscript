@@ -1,0 +1,42 @@
+// Package manager workflow example.
+// Demonstrates Go-style module metadata, a local replace, Go-style import, and
+// the CLI surfaces that should pass for this project:
+//
+//   leia mod verify --json examples/tooling/package_manager_workflow
+//   leia mod graph --json examples/tooling/package_manager_workflow
+//   leia mod capability --json examples/tooling/package_manager_workflow
+//
+//leia:cap fs.read,process.exec,module.graph,module.verify,module.capability
+
+import metadata "github.com/never-labs/leia-package-workflow/metadata/report"
+
+module_plan := metadata.workflow({
+    module: "example.com/leia/examples/tooling/package-manager-workflow",
+    require: "github.com/never-labs/leia-package-workflow/metadata",
+    version: "v0.2.0",
+    replace: "./local/metadata",
+    imports: {
+        "github.com/never-labs/leia-package-workflow/metadata/report",
+    },
+    commands: {
+        "leia mod verify --json .",
+        "leia mod graph --json .",
+        "leia mod capability --json .",
+    },
+})
+
+package_manager_workflow_summary := string.format(
+    "package_manager_workflow module=%s replace=%s imports=%d commands=%d caps=%d",
+    module_plan.module,
+    module_plan.replace,
+    #module_plan.imports,
+    #module_plan.commands,
+    #module_plan.capabilities
+)
+
+print(package_manager_workflow_summary)
+
+return {
+    plan: module_plan,
+    summary: package_manager_workflow_summary,
+}
