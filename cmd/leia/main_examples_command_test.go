@@ -608,6 +608,7 @@ func TestExamplesCommandChecksDeterministicHostExamples(t *testing.T) {
 		"--jobs=4",
 		"--timeout=10s",
 		"repo-web-hello_server",
+		"repo-web-fullstack_project-main",
 		"repo-web-route_workbench",
 		"repo-web-serve_dialect_app",
 		"repo-web-tiny_app",
@@ -625,6 +626,7 @@ func TestExamplesCommandChecksDeterministicHostExamples(t *testing.T) {
 	out := stdout.String()
 	for _, want := range []string{
 		"ok      repo-web-hello_server",
+		"ok      repo-web-fullstack_project-main",
 		"ok      repo-web-route_workbench",
 		"ok      repo-web-serve_dialect_app",
 		"ok      repo-web-tiny_app",
@@ -635,7 +637,7 @@ func TestExamplesCommandChecksDeterministicHostExamples(t *testing.T) {
 		"ok      repo-dialects-shell_filesystem",
 		"ok      repo-data_processing-data_oriented-particle_integration",
 		"ok      repo-game_engine-game_of_life",
-		"examples: 11 ok, 0 skipped, 0 failed",
+		"examples: 12 ok, 0 skipped, 0 failed",
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("examples check missing %q\n%s", want, out)

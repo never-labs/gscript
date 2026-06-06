@@ -549,12 +549,15 @@ func applyCLIExampleRunner(example *cliExample) {
 		example.Requires = ""
 		return
 	case strings.Contains(example.Path, "/web/tiny_app.leia"),
+		strings.Contains(example.Path, "/web/fullstack_project/"),
 		strings.Contains(example.Path, "/web/tiny_fullstack_app.leia"),
 		strings.Contains(example.Path, "/web/serve_dialect_app.leia"),
 		strings.Contains(example.Path, "/web/route_workbench.leia"),
 		strings.Contains(example.Path, "/tooling/release_gate_project/"),
+		strings.Contains(example.Path, "/concurrency/pipeline_project/"),
 		strings.Contains(example.Path, "/concurrency/context_process.leia"),
 		strings.Contains(example.Path, "/concurrency/goroutine_errors.leia"),
+		strings.Contains(example.Path, "/data/db_q_frame_project/"),
 		strings.Contains(example.Path, "/dialects/shell_filesystem.leia"):
 		example.Runnable = true
 		example.Checkable = true

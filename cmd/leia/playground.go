@@ -1849,6 +1849,7 @@ func repositoryExampleRunnable(path string) bool {
 		!strings.Contains(path, "/testing/") &&
 		!strings.Contains(path, "/workflow/support_triage_replay.leia") &&
 		!strings.Contains(path, "/web/hello_server.leia") &&
+		!strings.Contains(path, "/web/fullstack_project/") &&
 		!strings.Contains(path, "/web/route_workbench.leia") &&
 		!strings.Contains(path, "/web/serve_dialect_app.leia") &&
 		!strings.Contains(path, "/web/tiny_app.leia") &&
@@ -1860,8 +1861,10 @@ func repositoryExampleRunnable(path string) bool {
 		!strings.Contains(path, "/macos/package_managed/") &&
 		!strings.Contains(path, "/ui/package_managed/") &&
 		(!strings.Contains(path, "/game_engine/") || strings.Contains(path, "/game_engine/event_system.leia")) &&
+		!strings.Contains(path, "/concurrency/pipeline_project/") &&
 		!strings.Contains(path, "/concurrency/context_process.leia") &&
 		!strings.Contains(path, "/concurrency/goroutine_errors.leia") &&
+		!strings.Contains(path, "/data/db_q_frame_project/") &&
 		!strings.Contains(path, "/data_processing/data_oriented/particle_integration.leia")
 }
 
@@ -1878,6 +1881,7 @@ func repositoryExampleRequires(path string) string {
 	case strings.Contains(path, "/workflow/support_triage_replay.leia"):
 		return "LLM replay fixture or provider"
 	case strings.Contains(path, "/web/hello_server.leia"),
+		strings.Contains(path, "/web/fullstack_project/"),
 		strings.Contains(path, "/web/route_workbench.leia"),
 		strings.Contains(path, "/web/serve_dialect_app.leia"),
 		strings.Contains(path, "/web/tiny_app.leia"),
@@ -1902,10 +1906,14 @@ func repositoryExampleRequires(path string) string {
 		return ""
 	case strings.Contains(path, "/game_engine/"):
 		return "game/window host access"
+	case strings.Contains(path, "/concurrency/pipeline_project/"):
+		return "host VM concurrency runner"
 	case strings.Contains(path, "/concurrency/context_process.leia"):
 		return "process host access"
 	case strings.Contains(path, "/concurrency/goroutine_errors.leia"):
 		return "debug event sink host access"
+	case strings.Contains(path, "/data/db_q_frame_project/"):
+		return "SQLite and host VM data runner"
 	case strings.Contains(path, "/data_processing/data_oriented/particle_integration.leia"):
 		return "higher playground step budget"
 	default:

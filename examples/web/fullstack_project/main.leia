@@ -1,0 +1,187 @@
+// fullstack_project - Project-level web routing, HTML, data, and loopback demo.
+
+func check(name, ok) {
+    if !ok {
+        error("check failed: " .. name)
+    }
+}
+
+func json_headers() {
+    return {["Content-Type"]: "application/json"}
+}
+
+func form_headers() {
+    return {["Content-Type"]: "application/x-www-form-urlencoded"}
+}
+
+conn := db.memory()
+conn.exec(sql`create table tickets (
+    id integer primary key autoincrement,
+    title text not null,
+    owner text not null,
+    status text not null
+)`)
+conn.exec(sql {
+    query: "insert into tickets (title, owner, status) values (:title, :owner, :status)",
+    params: {title: "Wire routes", owner: "web", status: "open"},
+})
+conn.exec(sql {
+    query: "insert into tickets (title, owner, status) values (:title, :owner, :status)",
+    params: {title: "Persist data", owner: "data", status: "closed"},
+})
+
+func ticket_row(id) {
+    row := conn.one(sql {
+        query: "select id, title, owner, status from tickets where id = :id",
+        params: {id: id},
+    })
+    if row == nil {
+        return nil
+    }
+    return {id: row.id, title: row.title, owner: row.owner, status: row.status}
+}
+
+func ticket_count() {
+    row := conn.one(sql`select count(*) as n from tickets`)
+    return row.n
+}
+
+func render_index() {
+    rows := conn.query(sql`select id, title, status from tickets order by id`)
+    items := {}
+    for _, ticket := range ipairs(rows) {
+        items[#items + 1] = {
+            tag: "li",
+            children: {
+                {tag: "a", attrs: {href: "/tickets/" .. tostring(ticket.id)}, text: ticket.title},
+                {tag: "span", text: " " .. ticket.status},
+            },
+        }
+    }
+    return html {
+        tag: "main",
+        attrs: {class: "fullstack-project"},
+        children: {
+            {tag: "h1", text: "Leia Fullstack Project"},
+            {tag: "ul", children: items},
+            {tag: "form", attrs: {method: "post", action: "/tickets"}, children: {
+                {tag: "input", attrs: {name: "title", value: "Form ticket"}},
+                {tag: "input", attrs: {name: "owner", value: "ops"}},
+                {tag: "button", text: "Create"},
+            }},
+        },
+    }
+}
+
+app := serve {
+    listen: "127.0.0.1:0"
+    routes: {
+        {method: "GET", path: "/", handler: func(req) {
+            return render_index()
+        }},
+        {method: "GET", path: "/tickets/:id", handler: func(req) {
+            ticket := ticket_row(req.params.id)
+            if ticket == nil {
+                return {error: "not_found", id: req.params.id}
+            }
+            return html {
+                tag: "article",
+                children: {
+                    {tag: "h1", text: ticket.title},
+                    {tag: "p", text: ticket.owner .. ":" .. ticket.status},
+                },
+            }
+        }},
+        {method: "GET", path: "/api/tickets/:id", handler: func(req) {
+            ticket := ticket_row(req.params.id)
+            if ticket == nil {
+                return {error: "not_found", id: req.params.id}
+            }
+            return {
+                id: ticket.id,
+                title: ticket.title,
+                owner: ticket.owner,
+                status: ticket.status,
+                expand: req.query.expand,
+                route_id: req.params.id,
+            }
+        }},
+        {method: "POST", path: "/api/tickets", handler: func(req) {
+            body, err := req.json()
+            if err != nil {
+                return {error: "bad_json", detail: err}
+            }
+            inserted := conn.exec(sql {
+                query: "insert into tickets (title, owner, status) values (:title, :owner, :status)",
+                params: {title: body.title, owner: body.owner, status: "open"},
+            })
+            return {created: true, id: inserted.last_insert_id, count: ticket_count()}
+        }},
+        {method: "POST", path: "/tickets", handler: func(req) {
+            body := dialect.eval("form", req.body, {mode: "parse"})
+            inserted := conn.exec(sql {
+                query: "insert into tickets (title, owner, status) values (:title, :owner, :status)",
+                params: {title: body.title, owner: body.owner, status: "triage"},
+            })
+            return {created: true, id: inserted.last_insert_id, status: "triage"}
+        }},
+    }
+}
+
+home := http.get(app.url .. "/")
+check("home status", home.status == 200)
+check("home html", string.find(home.headers["Content-Type"], "text/html", 1, true) != nil)
+check("home body", string.find(home.body, "Leia Fullstack Project", 1, true) != nil)
+
+page := http.get(app.url .. "/tickets/1")
+check("ticket page", page.status == 200 && string.find(page.body, "Wire routes", 1, true) != nil)
+
+api_resp := http.get(app.url .. "/api/tickets/1?expand=audit")
+api_ticket := json.decode(api_resp.body)
+check("api route", api_resp.status == 200 && api_ticket.route_id == "1" && api_ticket.expand == "audit")
+
+json_resp, json_err := net.post(
+    app.url .. "/api/tickets",
+    json {title: "JSON ticket", owner: "api"},
+    {headers: json_headers()}
+)
+check("json post err", json_err == nil)
+json_created := json.decode(json_resp.body)
+check("json post", json_created.created == true && json_created.id == 3 && json_created.count == 3)
+
+form_resp, form_err := net.post(
+    app.url .. "/tickets",
+    form {title: "Form ticket", owner: "ops"},
+    {headers: form_headers()}
+)
+check("form post err", form_err == nil)
+form_created := json.decode(form_resp.body)
+check("form post", form_created.created == true && form_created.id == 4 && form_created.status == "triage")
+
+missing := http.get(app.url .. "/api/tickets/999")
+missing_body := json.decode(missing.body)
+check("missing route", missing_body.error == "not_found" && missing_body.id == "999")
+
+wrong_method, wrong_method_err := net.delete(app.url .. "/api/tickets/1")
+check("method err", wrong_method_err == nil)
+check("method route", wrong_method.status == 405)
+
+verify := conn.one(sql`select count(*) as n, sum(case when status = 'open' then 1 else 0 end) as open from tickets`)
+check("data verify", verify.n == 4 && verify.open == 2)
+
+closed, close_err := app.close()
+waited, wait_err := app.wait()
+check("closed", closed == true && close_err == nil)
+check("waited", waited == true && wait_err == nil)
+
+fullstack_project_summary := string.format(
+    "fullstack_project tickets=%d open=%d api=%d form=%d method=%d html=%d",
+    verify.n,
+    verify.open,
+    json_created.id,
+    form_created.id,
+    wrong_method.status,
+    home.status
+)
+
+print(fullstack_project_summary)

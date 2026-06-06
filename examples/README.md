@@ -30,6 +30,7 @@ Directories:
 | Directory | Purpose |
 |---|---|
 | `hello/` | Core language features and small idioms. |
+| `api/` | Offline API-client style scripts for host-facing workflow examples. |
 | `dialects/` | Runnable checks for built-in shell/env, text, protocol, SQL-shaped, Markdown/table, binary, and validation dialects. |
 | `automation/` | Project-level offline workflows for release, fixture, and business-ops automation. |
 | `ai/` | Replay-backed AI workflows, including a project-level coding-agent repair loop. |
@@ -40,7 +41,17 @@ Directories:
 | `data_processing/` | Strings, containers, dense data, vectors, matrices, and SoA. |
 | `database/` | Package-managed SQLite ledger analytics project. |
 | `concurrency/` | Goroutine-like tasks, channels, select, sync, and context helpers. |
+| `embedding/` | Go embedding examples as executable Go doc tests and hot-reload project tests. |
+| `evaluate/` | Deterministic evaluation and replay examples. |
+| `llm/` | AI-native models, tools, agents, direct turns, streaming, and provider smoke scripts. |
+| `macos/` | Package-managed macOS automation capability examples. |
+| `security/` | Supply-chain and vendor security workflow examples. |
+| `site/` | Static site and release dashboard generation examples. |
+| `testing/` | `leia test` workflow and JSONL golden-evaluation examples. |
+| `ui/` | Package-managed UI capability examples. |
+| `web/` | HTTP/server-oriented scripts, including high-level `serve { ... }` route dialect examples. |
 | `game_engine/` | Larger script examples for event loops and game-style state. |
+| `workflow/` | Service-quality, status-rollup, and support-triage workflows. |
 
 ## Embedding
 

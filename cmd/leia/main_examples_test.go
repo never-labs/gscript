@@ -90,6 +90,7 @@ func TestPracticalExampleProjects(t *testing.T) {
 		{"release-ci-regression", testExampleProject(root, filepath.Join("examples", "testing")), "release_ci_regression_workflow_test.leia"},
 		{"static-site-docs-generation", execExampleProjectGlobal(root, filepath.Join("examples", "site", "static_docs_generator.leia"), "site_generation_summary"), "pages=3 published=2 drafts=1 assets=2"},
 		{"web-access-log-report", execExampleProjectGlobal(root, filepath.Join("examples", "web", "access_log_report.leia"), "web_access_report_summary"), "routes=4 requests=10 errors=3 slow=3 cache_hits=4 top=/api/orders"},
+		{"web-fullstack-project", execExampleProjectGlobal(root, filepath.Join("examples", "web", "fullstack_project", "main.leia"), "fullstack_project_summary"), "fullstack_project tickets=4 open=2 api=3 form=4 method=405 html=200"},
 		{"web-route-workbench", execExampleProjectGlobal(root, filepath.Join("examples", "web", "route_workbench.leia"), "web_route_workbench_summary"), "routes=5 events=6 created=bk-303 updated_stock=8 deleted=bk-202 method_status=405 html=200"},
 		{"web-serve-dialect-app", execExampleProjectGlobal(root, filepath.Join("examples", "web", "serve_dialect_app.leia"), "serve_dialect_app_summary"), "serve routes=3 events=4 status=delivered method_status=405 html=200"},
 		{"web-tiny-fullstack-app", execExampleProjectGlobal(root, filepath.Join("examples", "web", "tiny_fullstack_app.leia"), "tiny_fullstack_summary"), "tiny_fullstack posts=4 published=2 json=3 form=4 static=200 method=405"},

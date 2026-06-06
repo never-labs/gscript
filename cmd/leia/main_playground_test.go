@@ -359,8 +359,10 @@ func TestPlaygroundRepositoryCoreExampleCoverage(t *testing.T) {
 	}
 
 	manualRequires := map[string]string{
+		"repo-concurrency-pipeline_project-main":                   "host VM concurrency runner",
 		"repo-concurrency-context_process":                        "process host access",
 		"repo-concurrency-goroutine_errors":                       "debug event sink host access",
+		"repo-data-db_q_frame_project-main":                       "SQLite and host VM data runner",
 		"repo-data_processing-data_oriented-particle_integration": "higher playground step budget",
 		"repo-dialects-shell_filesystem":                          "process shell and filesystem host access",
 	}
@@ -409,6 +411,7 @@ func TestPlaygroundRepositoryCoreExampleCoverage(t *testing.T) {
 }
 
 func TestPlaygroundRepositoryCoversDocumentedExampleDirectories(t *testing.T) {
+	root := filepath.Dir(playgroundExamplesRoot())
 	playgroundExamples, err := playgroundRepositoryExamples(playgroundExamplesRoot())
 	if err != nil {
 		t.Fatalf("load repository examples: %v", err)
@@ -426,12 +429,17 @@ func TestPlaygroundRepositoryCoversDocumentedExampleDirectories(t *testing.T) {
 		}
 	}
 	cliIDs := make(map[string]bool, len(cliExamples))
+	cliDirs := make(map[string]int)
 	for _, example := range cliExamples {
 		cliIDs[example.ID] = true
+		parts := strings.Split(example.Path, "/")
+		if len(parts) >= 3 && parts[0] == "examples" {
+			cliDirs[parts[1]]++
+		}
 	}
 
-	// Keep this list in sync with the directory matrix in docs/examples/index.md.
-	wantPlaygroundDirs := []string{
+	// Keep this list in sync with the directory matrices in docs/examples/index.md and examples/README.md.
+	wantExampleDirs := []string{
 		"ai",
 		"api",
 		"automation",
@@ -456,17 +464,38 @@ func TestPlaygroundRepositoryCoversDocumentedExampleDirectories(t *testing.T) {
 		"workflow",
 	}
 	var missing []string
-	for _, dir := range wantPlaygroundDirs {
-		if playgroundDirs[dir] == 0 {
+	for _, dir := range wantExampleDirs {
+		if cliDirs[dir] == 0 {
+			missing = append(missing, "examples/"+dir+"/ (CLI)")
+		}
+		if dir != "embedding" && playgroundDirs[dir] == 0 {
 			missing = append(missing, "examples/"+dir+"/")
 		}
 	}
 	if len(missing) > 0 {
 		sort.Strings(missing)
-		t.Fatalf("playground repository examples missing documented directories: %s", strings.Join(missing, ", "))
+		t.Fatalf("repository examples missing documented directories: %s", strings.Join(missing, ", "))
 	}
 	if !cliIDs["repo-embedding-go-doc-examples"] {
 		t.Fatal("examples/embedding/ is documented but missing from examples CLI curated metadata")
+	}
+	docsIndex, err := os.ReadFile(filepath.Join(root, "docs", "examples", "index.md"))
+	if err != nil {
+		t.Fatalf("read docs examples index: %v", err)
+	}
+	examplesReadme, err := os.ReadFile(filepath.Join(root, "examples", "README.md"))
+	if err != nil {
+		t.Fatalf("read examples README: %v", err)
+	}
+	docsText := string(docsIndex)
+	readmeText := string(examplesReadme)
+	for _, dir := range wantExampleDirs {
+		if !strings.Contains(docsText, "| `examples/"+dir+"/` |") {
+			t.Fatalf("docs/examples/index.md missing directory matrix row for examples/%s/", dir)
+		}
+		if !strings.Contains(readmeText, "| `"+dir+"/` |") {
+			t.Fatalf("examples/README.md missing directory matrix row for %s/", dir)
+		}
 	}
 }
 
@@ -856,7 +885,7 @@ func TestPlaygroundRepositoryHighLevelReleaseExamplesAreExposed(t *testing.T) {
 		snippets []string
 	}{
 		"repo-data-db_q_frame_project-main": {
-			runnable: true,
+			requires: "SQLite and host VM data runner",
 			snippets: []string{"conn.frame(", "q.query(", "dialect.eval(\"xlsx\"", "dialect.eval(\"excel\""},
 		},
 		"repo-evaluate-project_agent_regression": {

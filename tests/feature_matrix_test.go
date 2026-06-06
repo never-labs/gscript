@@ -336,6 +336,32 @@ func TestFeatureMatrixCoversTaggedDialectAndModpkgReleaseGuards(t *testing.T) {
 	if !strings.Contains(dialectGuard, "TestQSymbolicDialectMilestone1ExecutesThroughStdlib") || !strings.Contains(dialectGuard, "q`+/1 2 3`") {
 		t.Fatal("tests/dialect_syntax_test.go must keep q symbolic vector dialect coverage")
 	}
+	qAnalytics := requireFeature(t, features, "q_analytics_dialect")
+	requireFeatureCellRefs(t, qAnalytics, "q_analytics_dialect", "semantic_gate",
+		"internal/stdlib/bind/q_test.go",
+		"internal/stdlib/bind/db_test.go",
+		"examples/data/q_vector_basics.leia",
+		"examples/data/q_trade_analytics_project/main.leia",
+		"examples/data/db_q_frame_project/main.leia",
+	)
+	spreadsheet := requireFeature(t, features, "spreadsheet_dialects")
+	requireFeatureCellRefs(t, spreadsheet, "spreadsheet_dialects", "semantic_gate",
+		"internal/stdlib/bind/dialect_data_test.go",
+		"examples/data/db_q_frame_project/main.leia",
+	)
+	dbQFrameExample := readFileString(t, filepath.Join(root, "examples", "data", "db_q_frame_project", "main.leia"))
+	for _, snippet := range []string{
+		"db.memory()",
+		"conn.frame(sql",
+		"soa.len(frame.soa)",
+		"q.query(frame.soa",
+		`dialect.eval("xlsx"`,
+		`dialect.eval("excel"`,
+	} {
+		if !strings.Contains(dbQFrameExample, snippet) {
+			t.Fatalf("db_q_frame_project must keep db/SoA/q/spreadsheet project evidence snippet %q", snippet)
+		}
+	}
 	stdlibBoundary := readFileString(t, filepath.Join(root, "tests", "architecture", "stdlib_boundary_test.go"))
 	if !strings.Contains(stdlibBoundary, `"urlpath"`) {
 		t.Fatal("stdlib architecture boundary must keep urlpath in the approved web dialect registry")

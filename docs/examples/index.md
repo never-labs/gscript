@@ -67,6 +67,7 @@ go run ./cmd/leia examples check examples/data/q_vector_basics.leia
 go run ./cmd/leia examples check examples/data/q_trade_analytics_project
 go run ./cmd/leia examples check examples/data/db_q_frame_project
 go run ./cmd/leia examples run repo-tooling-release_gate_project-main
+go run ./cmd/leia examples check examples/web/fullstack_project
 go run ./cmd/leia examples check examples/data_processing/data_oriented/particle_integration.leia
 ```
 
@@ -164,6 +165,7 @@ Review these files directly when working on those areas:
 - `examples/web/route_workbench.leia`
 - `examples/web/access_log_report.leia`
 - `examples/web/tiny_fullstack_app.leia`
+- `examples/web/fullstack_project/main.leia`
 - `examples/web/hello_server.leia`
 
 Prefer the smoke, SDK, and integration tests for deterministic correctness

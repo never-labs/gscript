@@ -893,6 +893,31 @@ func TestReleaseMatrixReadmeToolingCommandsStayInToolingGuide(t *testing.T) {
 	}
 }
 
+func TestReleaseMatrixReleaseEvidenceExamplesStayFeatureGated(t *testing.T) {
+	root := findRepoRoot(t)
+	features := loadFeatureMatrixFeatureMap(t, root)
+	releaseEvidence := requireFeature(t, features, "release_evidence_gates")
+	requireFeatureCellRefs(t, releaseEvidence, "release_evidence_gates", "semantic_gate",
+		"cmd/leia/main_examples_command_test.go",
+		"examples/tooling/release_evidence_pipeline.leia",
+		"examples/tooling/release_gate_project/main.leia",
+		"examples/automation/release_fixture_matrix.leia",
+		"examples/automation/release_risk_digest.leia",
+	)
+
+	exampleGate := readFileString(t, filepath.Join(root, "cmd", "leia", "main_examples_command_test.go"))
+	for _, snippet := range []string{
+		"repo-tooling-release_evidence_pipeline",
+		"repo-tooling-release_gate_project-main",
+		"repo-automation-release_fixture_matrix",
+		"repo-automation-release_risk_digest",
+	} {
+		if !strings.Contains(exampleGate, snippet) {
+			t.Fatalf("cmd/leia/main_examples_command_test.go must keep release evidence example check %q", snippet)
+		}
+	}
+}
+
 func TestReleaseMatrixCommunityEntrypointsAreLinked(t *testing.T) {
 	root := findRepoRoot(t)
 	for _, path := range []string{
@@ -1908,16 +1933,16 @@ func TestReleaseMatrixReadmeCapabilitiesStayCoveredByExamples(t *testing.T) {
 		{
 			capability: "embedding",
 			dirs:       []string{"`examples/embedding/`"},
-			docTerms:   []string{"Go embedding examples", "go test ./examples/embedding -run Example -count=1"},
-			cliIDs:     []string{"repo-embedding-go-doc-examples"},
+			docTerms:   []string{"Go embedding examples", "go test ./examples/embedding -run Example -count=1", "project-level reload gate"},
+			cliIDs:     []string{"repo-embedding-go-doc-examples", "repo-embedding-hot_reload_project"},
 			featureIDs: []string{"embedding_host_bindings", "sandbox_capabilities_module_loading", "embedding_resource_budgets", "embedding_hot_reload"},
 			docRefs:    []string{"docs/reference/embedding/index.md", "docs/guides/embedding.md"},
 		},
 		{
 			capability: "AI-native",
 			dirs:       []string{"`examples/ai/`", "`examples/llm/`", "`examples/evaluate/`", "`examples/workflow/`"},
-			docTerms:   []string{"manual tool history", "replay fixture", "Live-provider examples"},
-			cliIDs:     []string{"repo-llm-agent", "repo-ai-coding_agent_replay", "repo-evaluate-agent_replay", "repo-workflow-support_triage_replay"},
+			docTerms:   []string{"manual tool history", "replay fixture", "Live-provider examples", "project-level offline coding-agent gate"},
+			cliIDs:     []string{"repo-llm-agent", "repo-ai-coding_agent_replay", "repo-ai-coding_agent_project-main", "repo-evaluate-agent_replay", "repo-workflow-support_triage_replay"},
 			featureIDs: []string{"llm_native_integration"},
 			docRefs:    []string{"docs/reference/ai/index.md", "docs/guides/ai-native.md", "docs/reference/evaluate/index.md"},
 		},
@@ -1940,16 +1965,16 @@ func TestReleaseMatrixReadmeCapabilitiesStayCoveredByExamples(t *testing.T) {
 		{
 			capability: "data-oriented",
 			dirs:       []string{"`examples/data/`", "`examples/data_processing/`", "`examples/performance/`"},
-			docTerms:   []string{"dense arrays", "matrices", "vectors", "SoA"},
-			cliIDs:     []string{"repo-data-q_vector_basics", "repo-data_processing-data_oriented-soa_kernels", "repo-performance-execution_modes_matrix"},
+			docTerms:   []string{"dense arrays", "matrices", "vectors", "SoA", "SQLite `db.frame`", "q/kdb+-style symbolic vectors"},
+			cliIDs:     []string{"repo-data-q_vector_basics", "repo-data-q_trade_analytics_project-main", "repo-data-db_q_frame_project-main", "repo-data_processing-data_oriented-soa_kernels", "repo-performance-execution_modes_matrix"},
 			featureIDs: []string{"matrix_dense_arrays", "q_analytics_dialect"},
 			docRefs:    []string{"docs/reference/data-oriented/index.md"},
 		},
 		{
 			capability: "CLI tooling",
 			dirs:       []string{"`examples/tooling/`", "`examples/testing/`"},
-			docTerms:   []string{"release evidence", "diagnostics", "`leia test`"},
-			cliIDs:     []string{"repo-tooling-release_evidence_pipeline", "repo-testing-jsonl_workflow_test"},
+			docTerms:   []string{"release evidence", "diagnostics", "`leia test`", "cross-domain release-gate project"},
+			cliIDs:     []string{"repo-tooling-release_evidence_pipeline", "repo-tooling-release_gate_project-main", "repo-testing-jsonl_workflow_test"},
 			featureIDs: []string{"cli_repository_tooling", "release_evidence_gates"},
 			docRefs:    []string{"docs/reference/cli/index.md", "docs/guides/tooling.md", "docs/release/index.md"},
 		},
@@ -2135,6 +2160,7 @@ func TestReleaseMatrixReadmeAINativeConcurrencyDataPromisesHaveGates(t *testing.
 			exampleIDs: []string{
 				"repo-llm-agent",
 				"repo-ai-coding_agent_replay",
+				"repo-ai-coding_agent_project-main",
 				"repo-evaluate-agent_replay",
 			},
 			docSnippets: map[string][]string{
@@ -2199,6 +2225,8 @@ func TestReleaseMatrixReadmeAINativeConcurrencyDataPromisesHaveGates(t *testing.
 			},
 			exampleIDs: []string{
 				"repo-data-q_vector_basics",
+				"repo-data-q_trade_analytics_project-main",
+				"repo-data-db_q_frame_project-main",
 				"repo-data_processing-data_oriented-soa_kernels",
 				"repo-data_processing-data_oriented-dense_matrix_vec_kernels",
 			},
