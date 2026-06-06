@@ -20,6 +20,7 @@ Checks README/docs Markdown for:
   - docs examples index lists each registered top-level example directory.
   - README documented capabilities stay tied to examples docs, manifests, and playground gates.
   - README Quick Start, install, and Embedding snippets keep focused execution gates.
+  - reference entrypoints stay linked from the docs home.
   - generated reference docs and the checked-in language spec HTML are fresh.
 
 The repository-script mention check covers:
@@ -93,6 +94,10 @@ if ! go test ./tests/docs/spec -count=1; then
     echo "error: docs/spec contract gate failed" >&2
     exit 1
 fi
+if ! go test ./tests -run 'TestReleaseMatrixFeatureDocsStayCoveredBySpecAndReference|TestReleaseMatrixDocsIndexCoversReferenceEntrypoints|TestReleaseMatrixReadmeDocumentationEntrypointsStayGated' -count=1; then
+    echo "error: docs release/spec reference gate failed" >&2
+    exit 1
+fi
 
 python3 - <<'PY'
 import os
@@ -135,6 +140,7 @@ checked_examples_index_dirs = 0
 checked_examples_capability_drift_gates = 0
 checked_readme_user_facing_gates = 0
 checked_readme_documentation_entrypoints = 0
+checked_reference_entrypoints = 0
 spec_runnable_report = ""
 
 retired_paths = {
@@ -303,6 +309,17 @@ def check_readme_documentation_entrypoints() -> None:
             continue
         if not resolved.is_file():
             errors.append(f"README.md Documentation entrypoint target is missing: {ref}")
+
+
+def check_reference_entrypoints() -> None:
+    global checked_reference_entrypoints
+    docs_index = root / "docs" / "index.md"
+    text = docs_index.read_text(encoding="utf-8")
+    for path in sorted((root / "docs" / "reference").glob("*/index.md")):
+        checked_reference_entrypoints += 1
+        ref = path.relative_to(root / "docs").as_posix()
+        if f"({ref})" not in text:
+            errors.append(f"docs/index.md: missing reference entrypoint link: {ref}")
 
 
 def require_snippets(path: Path, snippets: list[str]) -> None:
@@ -594,6 +611,7 @@ for doc_file in doc_files:
 
 check_release_gate_docs()
 check_readme_documentation_entrypoints()
+check_reference_entrypoints()
 check_spec_runnable_coverage()
 check_spec_contract_docs()
 check_examples_index()
@@ -612,6 +630,7 @@ print(
     f"{checked_script_mentions} repository-script code-block mentions, "
     f"{checked_release_gate_docs} release-gate docs, "
     f"{checked_readme_documentation_entrypoints} README Documentation entrypoints, "
+    f"{checked_reference_entrypoints} reference entrypoints, "
     f"{checked_spec_contract_docs} spec/stable-contract docs, "
     f"{checked_examples_index_dirs} examples index directories, "
     f"{checked_examples_capability_drift_gates} examples capability drift gates, "

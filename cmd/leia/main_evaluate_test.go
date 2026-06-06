@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -67,6 +68,59 @@ func TestEvaluateCorpusMetricsExampleCoversHarnessHelpers(t *testing.T) {
 	assertMetricSummary(t, report.Metrics, "correct", "bool", 2, 1, 0)
 	assertMetricSummary(t, report.Metrics, "input_chars", "number", 2, 0, 0)
 	assertMetricSummary(t, report.Metrics, "label", "string", 2, 0, 0)
+}
+
+func TestExamplesReadmeEvaluateReplayCommandsStayRunnable(t *testing.T) {
+	root, err := filepath.Abs(filepath.Join("..", ".."))
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(filepath.Join(root, "examples", "README.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := examplesReadmeEvaluateCommands(string(data))
+	want := []string{
+		"go run ../cmd/leia evaluate --replay evaluate/agent_replay.records.json evaluate/agent_replay.leia",
+		"go run ../cmd/leia evaluate --replay evaluate/multiturn_replay.records.json evaluate/multiturn_replay.leia",
+		"go run ../cmd/leia evaluate --replay evaluate/project_agent_regression.records.json evaluate/project_agent_regression.leia",
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("examples README evaluate commands changed:\ngot  %#v\nwant %#v", got, want)
+	}
+
+	examplesDir := filepath.Join(root, "examples")
+	for _, command := range got {
+		fields := strings.Fields(command)
+		if len(fields) != 7 {
+			t.Fatalf("unexpected examples README evaluate command shape %q", command)
+		}
+		args := append([]string{"--json"}, fields[4:]...)
+		for i, arg := range args {
+			if strings.HasPrefix(arg, "evaluate/") {
+				args[i] = filepath.Join(examplesDir, filepath.FromSlash(arg))
+			}
+		}
+
+		var stdout, stderr bytes.Buffer
+		code := runEvaluateCommand(args, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("%s failed: code=%d stderr=%q stdout=%q", command, code, stderr.String(), stdout.String())
+		}
+		var report struct {
+			Status string `json:"status"`
+			LLM    *struct {
+				Mode           string `json:"mode"`
+				RemainingTurns int    `json:"remaining_turns"`
+			} `json:"llm"`
+		}
+		if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
+			t.Fatalf("%s stdout is not JSON evaluate report: %v; stdout = %q", command, err, stdout.String())
+		}
+		if report.Status != "ok" || report.LLM == nil || report.LLM.Mode != "replay" || report.LLM.RemainingTurns != 0 {
+			t.Fatalf("%s report status/llm = %q/%+v, want replay ok with no remaining turns", command, report.Status, report.LLM)
+		}
+	}
 }
 
 func TestEvaluateCLIListFilterDoesNotExecuteCases(t *testing.T) {
@@ -293,6 +347,17 @@ func assertMetricSummary(t *testing.T, metrics []struct {
 		return
 	}
 	t.Fatalf("missing metric summary %s in %+v", name, metrics)
+}
+
+func examplesReadmeEvaluateCommands(readme string) []string {
+	var commands []string
+	for _, line := range strings.Split(readme, "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "go run ../cmd/leia evaluate ") {
+			commands = append(commands, line)
+		}
+	}
+	return commands
 }
 
 func containsEvaluateString(values []string, want string) bool {

@@ -136,6 +136,18 @@ quoted := quote {
 	}
 }
 
+func TestTaggedDialectFailFastRawBlockParses(t *testing.T) {
+	prog := mustParse(t, "quoted := quote! {\n    x := 1\n    x += 2\n}\n")
+	decl := prog.Stmts[0].(*ast.DeclareStmt)
+	tagged := decl.Values[0].(*ast.TaggedBlockExpr)
+	if tagged.Tag != "quote" || !tagged.FailFast {
+		t.Fatalf("tag/failFast = %q/%v, want quote/true", tagged.Tag, tagged.FailFast)
+	}
+	if tagged.Body == nil || len(tagged.Body.Stmts) != 2 || len(tagged.Config) != 0 {
+		t.Fatalf("tagged block = %#v, want fail-fast raw block with 2 statements", tagged)
+	}
+}
+
 func TestTaggedDialectExpressionStatementsLowerToDialectCalls(t *testing.T) {
 	prog := mustParse(t, "prompt`hello ${name}`\nprompt {\n    role: \"system\"\n}\nquote! {\n    x := 1\n}\n")
 	if len(prog.Stmts) != 3 {

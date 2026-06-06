@@ -322,8 +322,10 @@ func TestReleaseMatrixSpecGateCommandsStaySynchronized(t *testing.T) {
 			snippets: []string{
 				releaseMatrixCmd,
 				specExamplesCmd,
+				"TestReleaseMatrixFeatureDocsStayCoveredBySpecAndReference|TestReleaseMatrixDocsIndexCoversReferenceEntrypoints|TestReleaseMatrixReadmeDocumentationEntrypointsStayGated",
 				"docs/spec/index.md",
 				"tests/feature_matrix.json",
+				"reference entrypoints",
 				"find reference -type f -name '*.md' | sort",
 				"generated reference doc is missing from docs",
 				"GENERATED_REFERENCE_COUNT",
@@ -959,9 +961,10 @@ func TestReleaseMatrixReadmeDocumentationEntrypointsStayGated(t *testing.T) {
 	}
 
 	generatedEntrypoints := map[string]string{
-		"docs/reference/cli/index.md":    "go run ./cmd/leia doc generate --layout site --output",
-		"docs/reference/stdlib/index.md": "go run ./cmd/leia doc generate --layout site --output",
-		"docs/spec/index.html":           "python3 scripts/spec_preview.py --output",
+		"docs/reference/cli/index.md":      "go run ./cmd/leia doc generate --layout site --output",
+		"docs/reference/dialects/index.md": "go run ./cmd/leia doc generate --layout site --output",
+		"docs/reference/stdlib/index.md":   "go run ./cmd/leia doc generate --layout site --output",
+		"docs/spec/index.html":             "python3 scripts/spec_preview.py --output",
 	}
 	seenGenerated := map[string]bool{}
 	for _, ref := range refs {
@@ -1003,6 +1006,75 @@ func TestReleaseMatrixDocsIndexCoversReadmeDocumentationEntrypoints(t *testing.T
 		}
 		if !strings.Contains(docsIndex, "("+indexRef+")") {
 			t.Fatalf("docs/index.md must link README Documentation entrypoint %s as %s", ref, indexRef)
+		}
+	}
+}
+
+func TestReleaseMatrixDocsIndexCoversReferenceEntrypoints(t *testing.T) {
+	root := findRepoRoot(t)
+	docsIndex := readFileString(t, filepath.Join(root, "docs", "index.md"))
+	entries, err := filepath.Glob(filepath.Join(root, "docs", "reference", "*", "index.md"))
+	if err != nil {
+		t.Fatalf("glob reference entrypoints: %v", err)
+	}
+	if len(entries) == 0 {
+		t.Fatal("docs/reference must contain reference entrypoints")
+	}
+	for _, entry := range entries {
+		ref, err := filepath.Rel(filepath.Join(root, "docs"), entry)
+		if err != nil {
+			t.Fatalf("relative reference path for %s: %v", entry, err)
+		}
+		ref = filepath.ToSlash(ref)
+		if !strings.Contains(docsIndex, "("+ref+")") {
+			t.Fatalf("docs/index.md must link reference entrypoint %s", ref)
+		}
+	}
+}
+
+func TestReleaseMatrixFeatureDocsStayCoveredBySpecAndReference(t *testing.T) {
+	root := findRepoRoot(t)
+	features := loadFeatureMatrixFeatureMap(t, root)
+	docsIndex := readFileString(t, filepath.Join(root, "docs", "index.md"))
+	specIndex := readFileString(t, filepath.Join(root, "docs", "spec", "index.md"))
+
+	for _, item := range []struct {
+		featureID      string
+		specSections   []string
+		referencePaths []string
+	}{
+		{featureID: "go_style_concurrency", specSections: []string{"Concurrency"}, referencePaths: []string{"docs/reference/concurrency/index.md"}},
+		{featureID: "tagged_dialect_syntax", specSections: []string{"Grammar Appendix", "Expressions", "Statements"}, referencePaths: []string{"docs/reference/dialects/index.md"}},
+		{featureID: "q_analytics_dialect", specSections: []string{"Grammar Appendix", "Expressions", "Values And Types"}, referencePaths: []string{"docs/reference/data-oriented/index.md", "docs/reference/dialects/index.md"}},
+		{featureID: "spreadsheet_dialects", specSections: []string{"Expressions", "Values And Types"}, referencePaths: []string{"docs/reference/data-oriented/index.md", "docs/reference/dialects/index.md"}},
+		{featureID: "llm_native_integration", specSections: []string{"AI-Native Syntax"}, referencePaths: []string{"docs/reference/ai/index.md", "docs/reference/evaluate/index.md"}},
+		{featureID: "module_package_management", specSections: []string{"Modules And Loading"}, referencePaths: []string{"docs/reference/modules/index.md"}},
+		{featureID: "module_download_vendor_cache", specSections: []string{"Modules And Loading", "Stability Contract"}, referencePaths: []string{"docs/reference/modules/index.md"}},
+		{featureID: "cli_repository_tooling", specSections: []string{"Stability Contract", "Implementation Requirements"}, referencePaths: []string{"docs/reference/cli/index.md"}},
+		{featureID: "bytecode_vm_execution", specSections: []string{"Implementation Requirements"}, referencePaths: []string{"docs/reference/platforms/index.md"}},
+		{featureID: "arm64_jit_runtime_fallback", specSections: []string{"Implementation Requirements"}, referencePaths: []string{"docs/reference/performance/index.md", "docs/reference/platforms/index.md"}},
+		{featureID: "embedding_host_bindings", specSections: []string{"Modules And Loading", "Values And Types", "Functions", "Errors And Diagnostics"}, referencePaths: []string{"docs/reference/embedding/index.md"}},
+		{featureID: "sandbox_capabilities_module_loading", specSections: []string{"Modules And Loading", "Values And Types"}, referencePaths: []string{"docs/reference/security/index.md", "docs/reference/embedding/index.md"}},
+		{featureID: "embedding_resource_budgets", specSections: []string{"Implementation Requirements", "Concurrency"}, referencePaths: []string{"docs/reference/embedding/index.md"}},
+		{featureID: "embedding_hot_reload", specSections: []string{"Modules And Loading", "Implementation Requirements"}, referencePaths: []string{"docs/reference/hot-reload/index.md", "docs/reference/embedding/index.md"}},
+		{featureID: "matrix_dense_arrays", specSections: []string{"Tables And Metatables", "Values And Types", "Implementation Requirements"}, referencePaths: []string{"docs/reference/data-oriented/index.md"}},
+	} {
+		feature := requireFeature(t, features, item.featureID)
+		requireFeatureSpecSections(t, feature, item.featureID, item.specSections...)
+		requireFeatureCellRefs(t, feature, item.featureID, "semantic_gate", item.referencePaths...)
+		for _, ref := range item.referencePaths {
+			if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(ref))); err != nil {
+				t.Fatalf("%s semantic_gate reference %s is missing: %v", item.featureID, ref, err)
+			}
+			docsIndexRef := strings.TrimPrefix(ref, "docs/")
+			if !strings.Contains(docsIndex, "("+docsIndexRef+")") {
+				t.Fatalf("docs/index.md must link %s referenced by %s", docsIndexRef, item.featureID)
+			}
+		}
+		for _, section := range item.specSections {
+			if !strings.Contains(specIndex, section) {
+				t.Fatalf("docs/spec/index.md must expose %s section %q", item.featureID, section)
+			}
 		}
 	}
 }
@@ -1720,6 +1792,75 @@ func TestReleaseMatrixReadmeCapabilitiesStayCoveredByExamples(t *testing.T) {
 		if !strings.Contains(playgroundGate, snippet) {
 			t.Fatalf("cmd/leia/main_playground_test.go must keep playground examples drift gate %q", snippet)
 		}
+	}
+}
+
+func TestReleaseMatrixFeatureMatrixExampleRefsAreDiscoverable(t *testing.T) {
+	root := findRepoRoot(t)
+	matrix := loadReleaseFeatureMatrix(t, root)
+	examplesList := runCommand(t, root, 30*time.Second, "go", "run", "./cmd/leia", "examples", "list", "--json")
+	var examplesPayload struct {
+		Examples []struct {
+			Path      string `json:"path"`
+			Runnable  bool   `json:"runnable"`
+			Checkable bool   `json:"checkable"`
+			Requires  string `json:"requires"`
+		} `json:"examples"`
+	}
+	if err := json.Unmarshal([]byte(examplesList), &examplesPayload); err != nil {
+		t.Fatalf("decode leia examples list --json: %v\n%s", err, examplesList)
+	}
+	discovered := map[string]struct {
+		runnable  bool
+		checkable bool
+		requires  string
+	}{}
+	for _, example := range examplesPayload.Examples {
+		if example.Path == "" {
+			t.Fatalf("examples list contains entry with empty path: %#v", example)
+		}
+		discovered[example.Path] = struct {
+			runnable  bool
+			checkable bool
+			requires  string
+		}{
+			runnable:  example.Runnable,
+			checkable: example.Checkable,
+			requires:  example.Requires,
+		}
+	}
+
+	var missing []string
+	var inert []string
+	for i, feature := range matrix.Features {
+		id := decodeRequiredString(t, feature, i, "id")
+		for _, field := range matrix.RequiredFields {
+			cell := decodeReleaseCoverageCell(t, feature, i, id, field)
+			if cell.Status != "covered" {
+				continue
+			}
+			for _, ref := range cell.Refs {
+				if !strings.HasPrefix(ref, "examples/") || !strings.HasSuffix(ref, ".leia") {
+					continue
+				}
+				example, ok := discovered[ref]
+				if !ok {
+					missing = append(missing, id+"."+field+" -> "+ref)
+					continue
+				}
+				if !example.runnable && !example.checkable && strings.TrimSpace(example.requires) == "" {
+					inert = append(inert, id+"."+field+" -> "+ref)
+				}
+			}
+		}
+	}
+	if len(missing) > 0 {
+		sort.Strings(missing)
+		t.Fatalf("feature_matrix.json example refs must be discoverable by leia examples list --json: %s", strings.Join(missing, ", "))
+	}
+	if len(inert) > 0 {
+		sort.Strings(inert)
+		t.Fatalf("feature_matrix.json example refs must be runnable, checkable, or explicitly require opt-in state: %s", strings.Join(inert, ", "))
 	}
 }
 

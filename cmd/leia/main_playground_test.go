@@ -556,6 +556,89 @@ func TestPlaygroundAndExamplesCoverFeatureMatrixExampleRefs(t *testing.T) {
 	}
 }
 
+func TestReadmeFacingFeatureMatrixClaimsKeepRunnableExamples(t *testing.T) {
+	root := filepath.Dir(playgroundExamplesRoot())
+	readme, err := os.ReadFile(filepath.Join(root, "README.md"))
+	if err != nil {
+		t.Fatalf("read README: %v", err)
+	}
+	readmeText := string(readme)
+
+	featureExamples := loadFeatureMatrixSemanticExampleRefs(t, root)
+	cliExamples, err := cliRepositoryExamples()
+	if err != nil {
+		t.Fatalf("load CLI examples: %v", err)
+	}
+	cliPaths := make(map[string]cliExample, len(cliExamples))
+	for _, example := range cliExamples {
+		cliPaths[example.Path] = example
+	}
+
+	claims := []struct {
+		readmeSnippet string
+		featureID     string
+		exampleRef    string
+	}{
+		{"Go embedding API", "embedding_host_bindings", "examples/embedding/embedding_test.go"},
+		{"sandbox, resource budgets, host bindings, and hot reload", "sandbox_capabilities_module_loading", "examples/embedding/embedding_test.go"},
+		{"sandbox, resource budgets, host bindings, and hot reload", "embedding_resource_budgets", "examples/embedding/embedding_test.go"},
+		{"source-level hot reload", "embedding_hot_reload", "examples/embedding/embedding_test.go"},
+		{"AI-native syntax", "llm_native_integration", "examples/llm/agent.leia"},
+		{"DSL-native tagged dialects", "tagged_dialect_syntax", "examples/hello/dialects.leia"},
+		{"Go-style concurrency primitives", "go_style_concurrency", "examples/concurrency/select_timeout.leia"},
+		{"Data-oriented helpers", "matrix_dense_arrays", "examples/data_processing/data_oriented/dense_matrix_vec_kernels.leia"},
+		{"CLI tooling", "cli_repository_tooling", "examples/tooling/release_gate_project/main.leia"},
+		{"an ARM64 JIT", "arm64_jit_runtime_fallback", "examples/performance/execution_modes_matrix.leia"},
+		{"release evidence", "release_evidence_gates", "examples/tooling/release_evidence_pipeline.leia"},
+	}
+
+	for _, claim := range claims {
+		if !strings.Contains(readmeText, claim.readmeSnippet) {
+			t.Fatalf("README claim snippet %q missing", claim.readmeSnippet)
+		}
+		if !featureExamples[claim.featureID][claim.exampleRef] {
+			t.Fatalf("README-facing feature %s must keep semantic_gate example ref %s", claim.featureID, claim.exampleRef)
+		}
+		example, ok := cliPaths[claim.exampleRef]
+		if !ok {
+			t.Fatalf("README-facing feature %s example %s missing from examples CLI metadata", claim.featureID, claim.exampleRef)
+		}
+		if !example.Runnable && !example.Checkable {
+			t.Fatalf("README-facing feature %s example %s must be runnable or checkable, metadata = %#v", claim.featureID, claim.exampleRef, example)
+		}
+	}
+}
+
+func loadFeatureMatrixSemanticExampleRefs(t *testing.T, root string) map[string]map[string]bool {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join(root, "tests", "feature_matrix.json"))
+	if err != nil {
+		t.Fatalf("read feature matrix: %v", err)
+	}
+	var matrix struct {
+		Features []struct {
+			ID           string `json:"id"`
+			SemanticGate struct {
+				Refs []string `json:"refs"`
+			} `json:"semantic_gate"`
+		} `json:"features"`
+	}
+	if err := json.Unmarshal(data, &matrix); err != nil {
+		t.Fatalf("decode feature matrix: %v", err)
+	}
+	out := make(map[string]map[string]bool, len(matrix.Features))
+	for _, feature := range matrix.Features {
+		refs := make(map[string]bool)
+		for _, ref := range feature.SemanticGate.Refs {
+			if strings.HasPrefix(ref, "examples/") {
+				refs[ref] = true
+			}
+		}
+		out[feature.ID] = refs
+	}
+	return out
+}
+
 func TestPlaygroundRepositoryHostCapabilityExampleIsManualRunOnly(t *testing.T) {
 	examples, err := playgroundRepositoryExamples(playgroundExamplesRoot())
 	if err != nil {

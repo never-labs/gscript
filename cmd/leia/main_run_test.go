@@ -28,6 +28,62 @@ assert(arg[2] == "two")
 	}
 }
 
+func TestRunCommandExecutesDialectSyntaxFeatureFile(t *testing.T) {
+	dir := t.TempDir()
+	nested := filepath.Join(dir, "nested")
+	if err := os.Mkdir(nested, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(nested, "feature.txt"), []byte("ok"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("LEIA_CLI_DIALECT_TEST", "visible")
+
+	globPattern := filepath.ToSlash(filepath.Join(nested, "*.txt"))
+	path := filepath.Join(dir, "dialects.leia")
+	src := `import "json"
+import p "path"
+
+name := "Leia"
+decoded := json` + "`" + `{"name":"Ada","score":42}` + "`" + `
+encoded := json {ok: true, name: name}
+pattern := re!` + "`" + `^A[a-z]+$` + "`" + `
+alias_pattern := regexp` + "`" + `^[0-9]+$` + "`" + `
+host_env := env` + "`" + `LEIA_CLI_DIALECT_TEST` + "`" + `
+shell := $` + "`" + `printf shell-${name}` + "`" + `
+command := cmd` + "`" + `printf command` + "`" + `
+matches := glob` + "`" + globPattern + "`" + `
+prompt_cfg := prompt { role: "system", text: "Hi" }
+quoted_raw := quote! { x := 1; x += 2 }
+
+assert(decoded.name == "Ada")
+assert(encoded == "{\"name\":\"Leia\",\"ok\":true}")
+assert(pattern.match("Ada"))
+assert(alias_pattern.match("123"))
+assert(regexp.match("^Le", name))
+assert(host_env == "visible")
+assert(shell.text == "shell-Leia")
+assert(command.text == "command")
+assert(#matches == 1)
+assert(p.match("nested/*.txt", p.join("nested", "feature.txt")))
+assert(prompt_cfg.body.role == "system")
+assert(prompt_cfg.body.text == "Hi")
+assert(quoted_raw.kind == "function")
+`
+	if err := os.WriteFile(path, []byte(src), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runRunCommand([]string{"--vm", path}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runRunCommand code = %d, stderr = %q", code, stderr.String())
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("stdout = %q, want empty", stdout.String())
+	}
+}
+
 func TestRunCommandReportsUsage(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	code := runRunCommand(nil, &stdout, &stderr)

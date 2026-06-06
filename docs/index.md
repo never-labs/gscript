@@ -42,6 +42,8 @@ only.
   bytecode VM, JIT, and hosted runner expectations.
 - [AI-native reference](reference/ai/index.md): models, tools, messages, turns,
   agents, budgets, providers, and replay.
+- [Evaluate reference](reference/evaluate/index.md): replay records, judge
+  workflows, drift reports, and regression evaluation commands.
 - [Embedding guide](guides/embedding.md): host integration, sandboxing, and
   reload-oriented runtime usage.
 - [AI-native guide](guides/ai-native.md): agents, tools, models, message
