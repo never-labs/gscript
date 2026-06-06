@@ -28,7 +28,8 @@ statement      = func_decl
 
 func_decl      = "func" identifier param_list block ;
 import_decl    = "import" ( import_spec | "(" { import_spec } ")" ) ;
-import_spec    = [ identifier ] string_lit ;
+import_spec    = [ identifier ] string_lit
+               | string_lit "as" identifier ;
 
 param_list     = "(" [ param { "," param } [ "," vararg_param ]
                      | vararg_param ] ")" ;

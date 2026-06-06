@@ -146,6 +146,62 @@ func TestFeatureMatrixHasNoIncompleteCells(t *testing.T) {
 	}
 }
 
+func TestFeatureMatrixCoverageRefsUseExecutableEvidenceByField(t *testing.T) {
+	root := findRepoRoot(t)
+	path := filepath.Join(root, "tests", "feature_matrix.json")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read feature matrix: %v", err)
+	}
+
+	var matrix struct {
+		Features []map[string]json.RawMessage `json:"features"`
+	}
+	if err := json.Unmarshal(data, &matrix); err != nil {
+		t.Fatalf("decode feature matrix: %v", err)
+	}
+
+	implementationFields := map[string]bool{
+		"parser":      true,
+		"bytecode":    true,
+		"interpreter": true,
+		"tier1":       true,
+		"tier2":       true,
+	}
+
+	var problems []string
+	for i, feature := range matrix.Features {
+		id := decodeRequiredString(t, feature, i, "id")
+		for field := range implementationFields {
+			cell := decodeReleaseCoverageCell(t, feature, i, id, field)
+			if cell.Status != "covered" {
+				continue
+			}
+			for _, ref := range cell.Refs {
+				if featureMatrixRefIsDocumentation(ref) || featureMatrixRefIsPlainSource(ref) {
+					problems = append(problems, id+"."+field+"="+ref)
+				}
+			}
+		}
+
+		cell := decodeReleaseCoverageCell(t, feature, i, id, "perf_hot_case")
+		if cell.Status != "covered" {
+			continue
+		}
+		for _, ref := range cell.Refs {
+			if !strings.HasPrefix(ref, "benchmarks/") || !strings.HasSuffix(ref, ".leia") {
+				problems = append(problems, id+".perf_hot_case="+ref)
+				continue
+			}
+			assertRepoRelativeFileRef(t, root, id, "perf_hot_case", ref)
+		}
+	}
+	if len(problems) > 0 {
+		sort.Strings(problems)
+		t.Fatalf("feature_matrix covered implementation refs must be executable evidence, and perf_hot_case refs must be benchmark workloads: %s", strings.Join(problems, ", "))
+	}
+}
+
 func TestFeatureMatrixCoveredRefsDoNotUseAllSkippedGoTestFiles(t *testing.T) {
 	root := findRepoRoot(t)
 	data, err := os.ReadFile(filepath.Join(root, "tests", "feature_matrix.json"))
@@ -424,7 +480,7 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 		"docs/reference/embedding/index.md",
 	)
 	requireFeatureCellRefs(t, hostBindings, "embedding_host_bindings", "perf_hot_case",
-		"tests/sdk/embedding_perf_test.go",
+		"benchmarks/app/stdlib_host.leia",
 	)
 
 	resourceBudgets := requireFeature(t, features, "embedding_resource_budgets")
@@ -599,7 +655,6 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 		"benchmarks/data/soa_affine_many.leia",
 		"benchmarks/data/soa_masked_aggregate.leia",
 		"benchmarks/data/soa_filter_gather.leia",
-		"benchmarks/data/soa_scan.leia",
 	)
 
 	tooling := requireFeature(t, features, "cli_repository_tooling")
@@ -613,6 +668,8 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 		"cmd/leia/main_bench_test.go",
 		"cmd/leia/main_examples_command_test.go",
 		"cmd/leia/main_readme_tooling_test.go",
+		"benchmarks/performance_gate_test.py",
+		"benchmarks/benchmark_discovery_test.py",
 		"examples/tooling/release_evidence_pipeline.leia",
 		"examples/tooling/release_gate_project/main.leia",
 		"docs/guides/tooling.md",
@@ -680,13 +737,17 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 		"internal/methodjit/semantic_gate_test.go",
 		"internal/methodjit/diagnose_test.go",
 		"internal/methodjit/exit_resume_check_test.go",
+		"scripts/performance_gate.sh",
+		"benchmarks/performance_gate_test.py",
+		"benchmarks/perf_submit_guard_test.py",
+		"benchmarks/manifest.json",
 		"docs/reference/performance/index.md",
 		"docs/reference/platforms/index.md",
 	)
 	requireFeatureCellRefs(t, jit, "arm64_jit_runtime_fallback", "perf_hot_case",
-		"scripts/performance_gate.sh",
-		"benchmarks/performance_gate_test.py",
-		"benchmarks/perf_submit_guard_test.py",
+		"benchmarks/numeric/matmul_dense.leia",
+		"benchmarks/table/table_field_access.leia",
+		"benchmarks/app/mixed_inventory_sim.leia",
 	)
 
 	releaseEvidence := requireFeature(t, features, "release_evidence_gates")
@@ -797,14 +858,17 @@ func TestReadmeExecutionPerformanceContractHasReleaseGates(t *testing.T) {
 
 	jit := requireFeature(t, loadFeatureMatrixFeatureMap(t, root), "arm64_jit_runtime_fallback")
 	requireFeatureCellRefs(t, jit, "arm64_jit_runtime_fallback", "semantic_gate",
-		"docs/reference/performance/index.md",
-		"docs/reference/platforms/index.md",
-	)
-	requireFeatureCellRefs(t, jit, "arm64_jit_runtime_fallback", "perf_hot_case",
 		"scripts/performance_gate.sh",
 		"benchmarks/performance_gate_test.py",
 		"benchmarks/perf_submit_guard_test.py",
 		"benchmarks/manifest.json",
+		"docs/reference/performance/index.md",
+		"docs/reference/platforms/index.md",
+	)
+	requireFeatureCellRefs(t, jit, "arm64_jit_runtime_fallback", "perf_hot_case",
+		"benchmarks/numeric/matmul_dense.leia",
+		"benchmarks/table/table_field_access.leia",
+		"benchmarks/app/mixed_inventory_sim.leia",
 	)
 }
 
@@ -830,7 +894,6 @@ func TestReadmeAINativeContractHasExplicitGates(t *testing.T) {
 		"tests/llm/llm_surface_audit_test.go",
 		"tests/integration/llm/llm_openai_provider_test.go",
 		"tests/integration/llm/llm_provider_test.go",
-		"docs/reference/ai/index.md",
 	)
 	requireFeatureCellRefs(t, ai, "llm_native_integration", "semantic_gate",
 		"cmd/leia/main_examples_command_test.go",
@@ -1170,6 +1233,14 @@ func assertRepoRelativeFileRef(t *testing.T, root, featureID, field, ref string)
 	if _, err := os.Stat(filepath.Join(root, clean)); err != nil {
 		t.Fatalf("%s.%s ref %q does not resolve to a file: %v", featureID, field, ref, err)
 	}
+}
+
+func featureMatrixRefIsDocumentation(ref string) bool {
+	return ref == "README.md" || strings.HasPrefix(ref, "docs/") || strings.HasSuffix(ref, ".md")
+}
+
+func featureMatrixRefIsPlainSource(ref string) bool {
+	return strings.HasSuffix(ref, ".go") && !strings.HasSuffix(ref, "_test.go")
 }
 
 func goTestFileHasTests(source string) bool {

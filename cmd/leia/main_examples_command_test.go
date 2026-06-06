@@ -297,6 +297,29 @@ func TestExamplesCommandDirectorySelectorsCoverExampleProjects(t *testing.T) {
 	}
 }
 
+func TestExamplesDocsIndexCoversTopLevelExampleDirectories(t *testing.T) {
+	root := filepath.Dir(playgroundExamplesRoot())
+	data, err := os.ReadFile(filepath.Join(root, "docs", "examples", "index.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	index := string(data)
+
+	entries, err := os.ReadDir(filepath.Join(root, "examples"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		dir := "examples/" + entry.Name() + "/"
+		if !strings.Contains(index, "`"+dir+"`") {
+			t.Fatalf("docs/examples/index.md is missing top-level example directory %s", dir)
+		}
+	}
+}
+
 func TestExamplesCommandManifestMatchesPlaygroundRepositoryExamples(t *testing.T) {
 	playgroundExamples, err := playgroundRepositoryExamples(playgroundExamplesRoot())
 	if err != nil {
@@ -660,6 +683,9 @@ func TestExamplesCommandChecksReadmeCapabilityEvidenceExamples(t *testing.T) {
 		"repo-llm-agent",
 		"repo-ai-coding_agent_replay",
 		"repo-evaluate-agent_replay",
+		"repo-automation-invoice_reconciliation",
+		"repo-automation-release_fixture_matrix",
+		"repo-automation-release_risk_digest",
 		"repo-dialects-shell_filesystem",
 		"repo-dialects-sql_result_analytics",
 		"repo-concurrency-goroutines_channels",
@@ -670,9 +696,14 @@ func TestExamplesCommandChecksReadmeCapabilityEvidenceExamples(t *testing.T) {
 		"repo-data-q_trade_analytics_project-main",
 		"repo-data_processing-data_oriented-soa_kernels",
 		"repo-data_processing-data_oriented-dense_matrix_vec_kernels",
+		"repo-database-package_managed-main",
 		"repo-web-serve_dialect_app",
 		"repo-web-tiny_fullstack_app",
+		"repo-tooling-package_manager_workflow-main",
+		"repo-tooling-package_manager_workflow-local-metadata-report",
 		"repo-tooling-release_gate_project-main",
+		"repo-macos-package_managed-main",
+		"repo-macos-package_managed-adapter-automation",
 		"repo-performance-execution_modes_matrix",
 	}, &stdout, &stderr)
 	if code != 0 {
@@ -684,6 +715,9 @@ func TestExamplesCommandChecksReadmeCapabilityEvidenceExamples(t *testing.T) {
 		"ok      repo-llm-agent",
 		"ok      repo-ai-coding_agent_replay",
 		"ok      repo-evaluate-agent_replay",
+		"ok      repo-automation-invoice_reconciliation",
+		"ok      repo-automation-release_fixture_matrix",
+		"ok      repo-automation-release_risk_digest",
 		"ok      repo-dialects-shell_filesystem",
 		"ok      repo-dialects-sql_result_analytics",
 		"ok      repo-concurrency-goroutines_channels",
@@ -694,11 +728,16 @@ func TestExamplesCommandChecksReadmeCapabilityEvidenceExamples(t *testing.T) {
 		"ok      repo-data-q_trade_analytics_project-main",
 		"ok      repo-data_processing-data_oriented-soa_kernels",
 		"ok      repo-data_processing-data_oriented-dense_matrix_vec_kernels",
+		"ok      repo-database-package_managed-main",
 		"ok      repo-web-serve_dialect_app",
 		"ok      repo-web-tiny_fullstack_app",
+		"ok      repo-tooling-package_manager_workflow-main",
+		"ok      repo-tooling-package_manager_workflow-local-metadata-report",
 		"ok      repo-tooling-release_gate_project-main",
+		"ok      repo-macos-package_managed-main",
+		"ok      repo-macos-package_managed-adapter-automation",
 		"ok      repo-performance-execution_modes_matrix",
-		"examples: 18 ok, 0 skipped, 0 failed",
+		"examples: 26 ok, 0 skipped, 0 failed",
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("README capability examples check missing %q\n%s", want, out)

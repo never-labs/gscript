@@ -52,6 +52,8 @@ only.
   tree-sitter, VS Code, Emacs, Neovim, Helix, and Zed integration.
 - [Packages and modules](guides/packages.md): decentralized GitHub-path modules,
   `leia.mod`, `leia.sum`, vendoring, verification, and capability summaries.
+- [Tooling guide](guides/tooling.md): formatting, linting, testing, examples,
+  evaluation, diagnostics, playground, LSP, and release evidence commands.
 - [Style guide](guides/style.md): naming, errors, capabilities, AI-native
   patterns, concurrency, and test conventions.
 - [Cookbook](cookbook/index.md): short recipes for testing, evaluate replay,
@@ -62,6 +64,8 @@ only.
   release expectations.
 - [Testing and release gates](testing.md): correctness, docs, and release
   evidence.
+- [Release process](release/index.md): versioning, release readiness, evidence
+  gates, and distribution checklist.
 - [Governance](governance.md): maintainer responsibilities, RFC scope,
   compatibility, and release readiness.
 - [Security policy](../SECURITY.md): supported versions, reporting route, and

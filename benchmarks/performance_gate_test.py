@@ -172,6 +172,14 @@ class PerformanceGateValidationTest(unittest.TestCase):
             values = shell_array_values(gate, array_name)
             self.assertIn("data/q_query_rollup", values)
 
+    def test_feature_smoke_covers_q_analytics_data_hot_refs(self):
+        gate = SCRIPT.read_text()
+        q_hot_refs = set(benchmark_ids_from_feature_refs("q_analytics_dialect", "perf_hot_case"))
+
+        for array_name in ("FEATURE_SMOKE_BENCHES", "STRICT_FEATURE_BENCHES"):
+            values = set(shell_array_values(gate, array_name))
+            self.assertEqual(sorted(q_hot_refs - values), [])
+
     def test_q_analytics_feature_matrix_hot_refs_include_runnable_q_query_smoke(self):
         manifest = json.loads((ROOT / "benchmarks" / "manifest.json").read_text())
         case_ids = {case["id"] for case in manifest["cases"]}
@@ -195,7 +203,6 @@ class PerformanceGateValidationTest(unittest.TestCase):
             "data/soa_affine_many",
             "data/soa_masked_aggregate",
             "data/soa_filter_gather",
-            "data/soa_scan",
         ]
         hot_refs = benchmark_ids_from_feature_refs("matrix_dense_arrays", "perf_hot_case")
 
@@ -221,12 +228,19 @@ class PerformanceGateValidationTest(unittest.TestCase):
         self.assertIn("numeric", all_groups_block)
         self.assertIn("data", all_groups_block)
 
-        for array_name in ("PHASE_SMOKE_BENCHES", "FEATURE_SMOKE_BENCHES", "STRICT_FEATURE_BENCHES"):
+        phase_values = set(shell_array_values(gate, "PHASE_SMOKE_BENCHES"))
+        self.assertLess(len(phase_values & data_hot_refs), len(data_hot_refs))
+        self.assertIn("numeric/matmul_dense", phase_values)
+        self.assertIn("data/soa_affine_many", phase_values)
+        self.assertIn("data/soa_masked_aggregate", phase_values)
+
+        for array_name in ("FEATURE_SMOKE_BENCHES", "STRICT_FEATURE_BENCHES"):
             values = set(shell_array_values(gate, array_name))
             self.assertLess(len(values & data_hot_refs), len(data_hot_refs))
             self.assertIn("numeric/matmul_dense", values)
             self.assertIn("data/soa_affine_many", values)
             self.assertIn("data/soa_masked_aggregate", values)
+            self.assertIn("data/soa_filter_gather", values)
 
     def test_jit_fallback_luajit_contract_keeps_gate_refs(self):
         semantic_refs = feature_cell_refs("arm64_jit_runtime_fallback", "semantic_gate")
@@ -237,14 +251,17 @@ class PerformanceGateValidationTest(unittest.TestCase):
             "internal/methodjit/semantic_gate_test.go",
             "internal/methodjit/diagnose_test.go",
             "internal/methodjit/exit_resume_check_test.go",
-            "docs/reference/performance/index.md",
-        ):
-            self.assertIn(ref, semantic_refs)
-        for ref in (
             "scripts/performance_gate.sh",
             "benchmarks/performance_gate_test.py",
             "benchmarks/perf_submit_guard_test.py",
             "benchmarks/manifest.json",
+            "docs/reference/performance/index.md",
+        ):
+            self.assertIn(ref, semantic_refs)
+        for ref in (
+            "benchmarks/numeric/matmul_dense.leia",
+            "benchmarks/table/table_field_access.leia",
+            "benchmarks/app/mixed_inventory_sim.leia",
         ):
             self.assertIn(ref, perf_refs)
         self.assertIn("validate_luajit_artifact", gate)

@@ -256,10 +256,11 @@ for dense-array literals, SoA layout, masks, and column kernels.
 project/module paths according to runtime module options and the active
 capability policy. Module results are cached in `package.loaded`.
 
-`import "go:..." as name` is source syntax for explicit host-provided Go
-bindings. The import path does not reflect arbitrary Go packages by itself:
-embedders must allow the binding through the Go API, and the active capability
-policy may still reject use at load time or call time.
+`import name "go:..."` is source syntax for explicit host-provided Go bindings.
+The import path does not reflect arbitrary Go packages by itself: embedders must
+allow the binding through the Go API, and the active capability policy may still
+reject use at load time or call time. `import "path"` infers the alias from the
+final path element; `import ( ... )` groups import declarations.
 
 `leia.mod` describes a Leia module. `leia.sum` records remote or vendored module
 hashes when the module toolchain is used. Go imports are explicit host bindings;

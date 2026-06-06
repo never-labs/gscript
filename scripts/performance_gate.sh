@@ -78,7 +78,7 @@ PHASE_SMOKE_BENCHES=(
 )
 
 FEATURE_SMOKE_BENCHES=(
-    "concurrency/producer_consumer_pipeline"
+    "concurrency/sync_group"
     "calls/calls_vararg_coroutine"
     "app/stdlib_host"
     "app/ai_runtime_smoke"
@@ -88,6 +88,7 @@ FEATURE_SMOKE_BENCHES=(
     "data/q_query_rollup"
     "data/soa_affine_many"
     "data/soa_masked_aggregate"
+    "data/soa_filter_gather"
 )
 
 STRICT_CORE_BENCHES=(
@@ -98,7 +99,7 @@ STRICT_CORE_BENCHES=(
 )
 
 STRICT_FEATURE_BENCHES=(
-    "concurrency/producer_consumer_pipeline"
+    "concurrency/sync_group"
     "calls/calls_vararg_coroutine"
     "app/stdlib_host"
     "app/ai_runtime_smoke"
@@ -108,6 +109,7 @@ STRICT_FEATURE_BENCHES=(
     "data/q_query_rollup"
     "data/soa_affine_many"
     "data/soa_masked_aggregate"
+    "data/soa_filter_gather"
 )
 
 usage() {

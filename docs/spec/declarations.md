@@ -186,12 +186,32 @@ function or variable name in its own block.
 ## Imports
 
 ```ebnf
-import_decl = "import" string_lit "as" identifier ;
+import_decl = "import" ( import_spec | "(" { import_spec } ")" ) ;
+import_spec = [ identifier ] string_lit | string_lit "as" identifier ;
 ```
 
-`import "go:..." as name` declares an explicit host-provided Go binding. The
-source path does not reflect arbitrary Go packages by itself; the embedder must
-provide an allowlisted binding through the Go API.
+An import declaration declares one lexical binding whose value is the module
+result for the import path. The canonical forms are Go-style:
+
+```text
+import "json"
+import http "go:net/http"
+import (
+    "json"
+    host "go:host/safe"
+)
+```
+
+When no alias is written, the alias is inferred from the final path element.
+For example, `import "json"` binds `json`, and `import "path/filepath"` binds
+`filepath`. An implementation must reject paths whose alias cannot be inferred.
+
+Leia also accepts `import "path" as name` for explicit aliases in existing
+source. New source should prefer the alias-first form `import name "path"`.
+
+An import path beginning with `go:` names an explicit host-provided Go binding.
+The source path does not reflect arbitrary Go packages by itself; the embedder
+must provide an allowlisted binding through the Go API.
 
 The import alias is a lexical binding in the declaration's scope. It is visible
 only after the import declaration statement completes, and it may be
@@ -202,7 +222,7 @@ An import path names a capability provided by the module loader or embedder.
 The command-line runner rejects unallowlisted Go imports.
 
 ```leia fail all
-import "go:math" as math
+import math "go:math"
 ```
 
 ## Labels

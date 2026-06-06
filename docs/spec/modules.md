@@ -297,15 +297,17 @@ cache. Leia does not require or define a central registry for basic module use.
 
 ## Go Host Imports
 
-`import "go:..." as name` is explicit host binding syntax. It does not
+`import name "go:..."` is explicit host binding syntax. It does not
 automatically reflect arbitrary Go packages; embedders must provide bindings
 through the public Go API and the active capability policy may still reject use.
+The compatibility spelling `import "go:..." as name` is also accepted, but new
+source should prefer the alias-first form.
 
 The following declaration is host-only syntax, not a runnable local spec
 example:
 
 ```text
-import "go:net/http" as http
+import http "go:net/http"
 ```
 
 The declaration above is only valid when the embedder has allowlisted and
@@ -321,7 +323,7 @@ assert(type(err) == "string")
 Go import allowlisting is an embedder contract. `WithGoImports` and
 `RegisterModule("go:...", ...)` expose only named host-provided modules. A
 `go require` directive in `leia.mod`, a Go module path in `go.mod`, or source
-syntax such as `import "go:net/http" as http` never loads arbitrary Go code by
+syntax such as `import http "go:net/http"` never loads arbitrary Go code by
 package path.
 
 ## Module Modes

@@ -264,6 +264,36 @@ func TestReleaseMatrixKnownGapDocsAreReleaseGateInputs(t *testing.T) {
 	}
 }
 
+func TestReleaseMatrixCoveredReleaseCellsHaveExecutableEvidence(t *testing.T) {
+	root := findRepoRoot(t)
+	matrix := loadReleaseFeatureMatrix(t, root)
+
+	var missing []string
+	for i, feature := range matrix.Features {
+		id := decodeRequiredString(t, feature, i, "id")
+		for _, field := range []string{"semantic_gate", "conformance_case", "perf_hot_case"} {
+			cell := decodeReleaseCoverageCell(t, feature, i, id, field)
+			if !releaseGateStatus(cell.Status) {
+				continue
+			}
+			hasExecutable := false
+			for _, ref := range cell.Refs {
+				if releaseMatrixRefIsExecutableGate(ref) {
+					hasExecutable = true
+					break
+				}
+			}
+			if !hasExecutable {
+				missing = append(missing, id+"."+field)
+			}
+		}
+	}
+	if len(missing) > 0 {
+		sort.Strings(missing)
+		t.Fatalf("covered release-facing feature matrix cells need at least one executable test, script, benchmark, or runnable example ref: %s", strings.Join(missing, ", "))
+	}
+}
+
 func TestReleaseMatrixSpecGateCommandsStaySynchronized(t *testing.T) {
 	root := findRepoRoot(t)
 	releaseMatrixCmd := "go test ./tests -run 'TestFeatureMatrix|TestReleaseMatrix' -count=1"
@@ -1034,48 +1064,200 @@ func TestReleaseMatrixDocsIndexCoversReferenceEntrypoints(t *testing.T) {
 
 func TestReleaseMatrixFeatureDocsStayCoveredBySpecAndReference(t *testing.T) {
 	root := findRepoRoot(t)
-	features := loadFeatureMatrixFeatureMap(t, root)
+	matrix := loadReleaseFeatureMatrix(t, root)
 	docsIndex := readFileString(t, filepath.Join(root, "docs", "index.md"))
 	specIndex := readFileString(t, filepath.Join(root, "docs", "spec", "index.md"))
+	coverage := releaseFeatureDocCoverageMap()
 
-	for _, item := range []struct {
-		featureID      string
-		specSections   []string
-		referencePaths []string
-	}{
-		{featureID: "go_style_concurrency", specSections: []string{"Concurrency"}, referencePaths: []string{"docs/reference/concurrency/index.md"}},
-		{featureID: "tagged_dialect_syntax", specSections: []string{"Grammar Appendix", "Expressions", "Statements"}, referencePaths: []string{"docs/reference/dialects/index.md"}},
-		{featureID: "q_analytics_dialect", specSections: []string{"Grammar Appendix", "Expressions", "Values And Types"}, referencePaths: []string{"docs/reference/data-oriented/index.md", "docs/reference/dialects/index.md"}},
-		{featureID: "spreadsheet_dialects", specSections: []string{"Expressions", "Values And Types"}, referencePaths: []string{"docs/reference/data-oriented/index.md", "docs/reference/dialects/index.md"}},
-		{featureID: "llm_native_integration", specSections: []string{"AI-Native Syntax"}, referencePaths: []string{"docs/reference/ai/index.md", "docs/reference/evaluate/index.md"}},
-		{featureID: "module_package_management", specSections: []string{"Modules And Loading"}, referencePaths: []string{"docs/reference/modules/index.md"}},
-		{featureID: "module_download_vendor_cache", specSections: []string{"Modules And Loading", "Stability Contract"}, referencePaths: []string{"docs/reference/modules/index.md"}},
-		{featureID: "cli_repository_tooling", specSections: []string{"Stability Contract", "Implementation Requirements"}, referencePaths: []string{"docs/reference/cli/index.md"}},
-		{featureID: "bytecode_vm_execution", specSections: []string{"Implementation Requirements"}, referencePaths: []string{"docs/reference/platforms/index.md"}},
-		{featureID: "arm64_jit_runtime_fallback", specSections: []string{"Implementation Requirements"}, referencePaths: []string{"docs/reference/performance/index.md", "docs/reference/platforms/index.md"}},
-		{featureID: "embedding_host_bindings", specSections: []string{"Modules And Loading", "Values And Types", "Functions", "Errors And Diagnostics"}, referencePaths: []string{"docs/reference/embedding/index.md"}},
-		{featureID: "sandbox_capabilities_module_loading", specSections: []string{"Modules And Loading", "Values And Types"}, referencePaths: []string{"docs/reference/security/index.md", "docs/reference/embedding/index.md"}},
-		{featureID: "embedding_resource_budgets", specSections: []string{"Implementation Requirements", "Concurrency"}, referencePaths: []string{"docs/reference/embedding/index.md"}},
-		{featureID: "embedding_hot_reload", specSections: []string{"Modules And Loading", "Implementation Requirements"}, referencePaths: []string{"docs/reference/hot-reload/index.md", "docs/reference/embedding/index.md"}},
-		{featureID: "matrix_dense_arrays", specSections: []string{"Tables And Metatables", "Values And Types", "Implementation Requirements"}, referencePaths: []string{"docs/reference/data-oriented/index.md"}},
-	} {
-		feature := requireFeature(t, features, item.featureID)
-		requireFeatureSpecSections(t, feature, item.featureID, item.specSections...)
-		requireFeatureCellRefs(t, feature, item.featureID, "semantic_gate", item.referencePaths...)
-		for _, ref := range item.referencePaths {
+	seenFeatures := map[string]bool{}
+	for i, feature := range matrix.Features {
+		featureID := decodeRequiredString(t, feature, i, "id")
+		seenFeatures[featureID] = true
+		item, ok := coverage[featureID]
+		if !ok {
+			t.Fatalf("feature_matrix.json feature %s needs releaseFeatureDocCoverageMap entry so docs/spec and reference gates cannot miss it", featureID)
+		}
+		if len(item.specSections) == 0 {
+			t.Fatalf("releaseFeatureDocCoverageMap entry %s must name at least one spec section", featureID)
+		}
+		if len(item.docPaths) == 0 {
+			t.Fatalf("releaseFeatureDocCoverageMap entry %s must name at least one documentation entrypoint", featureID)
+		}
+		requireFeatureSpecSections(t, feature, featureID, item.specSections...)
+		for _, section := range item.specSections {
+			if !strings.Contains(specIndex, section) {
+				t.Fatalf("docs/spec/index.md must expose %s section %q", featureID, section)
+			}
+		}
+		for _, ref := range item.docPaths {
 			if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(ref))); err != nil {
-				t.Fatalf("%s semantic_gate reference %s is missing: %v", item.featureID, ref, err)
+				t.Fatalf("%s documentation entrypoint %s is missing: %v", featureID, ref, err)
 			}
 			docsIndexRef := strings.TrimPrefix(ref, "docs/")
 			if !strings.Contains(docsIndex, "("+docsIndexRef+")") {
-				t.Fatalf("docs/index.md must link %s referenced by %s", docsIndexRef, item.featureID)
+				t.Fatalf("docs/index.md must link %s documented for %s", docsIndexRef, featureID)
 			}
 		}
-		for _, section := range item.specSections {
-			if !strings.Contains(specIndex, section) {
-				t.Fatalf("docs/spec/index.md must expose %s section %q", item.featureID, section)
-			}
+	}
+	for featureID := range coverage {
+		if !seenFeatures[featureID] {
+			t.Fatalf("releaseFeatureDocCoverageMap has stale feature entry %s", featureID)
 		}
+	}
+}
+
+type releaseFeatureDocCoverage struct {
+	specSections []string
+	docPaths     []string
+}
+
+func releaseFeatureDocCoverageMap() map[string]releaseFeatureDocCoverage {
+	spec := []string{"docs/spec/index.md"}
+	return map[string]releaseFeatureDocCoverage{
+		"literals_and_constants": {
+			specSections: []string{"Lexical Elements", "Values And Types"},
+			docPaths:     spec,
+		},
+		"numeric_arithmetic": {
+			specSections: []string{"Expressions", "Values And Types"},
+			docPaths:     spec,
+		},
+		"comparison_boolean_control": {
+			specSections: []string{"Expressions", "Statements"},
+			docPaths:     spec,
+		},
+		"loops_numeric_for": {
+			specSections: []string{"Statements", "Grammar Appendix"},
+			docPaths:     spec,
+		},
+		"generic_for_pairs_next": {
+			specSections: []string{"Statements", "Tables And Metatables"},
+			docPaths:     spec,
+		},
+		"functions_calls_returns": {
+			specSections: []string{"Functions", "Statements"},
+			docPaths:     spec,
+		},
+		"varargs_multireturn": {
+			specSections: []string{"Functions", "Tables And Metatables"},
+			docPaths:     spec,
+		},
+		"closures_upvalues": {
+			specSections: []string{"Functions", "Declarations And Scope"},
+			docPaths:     spec,
+		},
+		"tables_arrays_fields": {
+			specSections: []string{"Tables And Metatables", "Values And Types"},
+			docPaths:     spec,
+		},
+		"metatables_metamethods": {
+			specSections: []string{"Tables And Metatables", "Implementation Requirements"},
+			docPaths:     spec,
+		},
+		"strings_patterns_concat": {
+			specSections: []string{"Lexical Elements", "Expressions"},
+			docPaths:     []string{"docs/spec/index.md", "docs/reference/stdlib/index.md"},
+		},
+		"errors_pcall_xpcall_defer": {
+			specSections: []string{"Errors And Diagnostics", "Statements"},
+			docPaths:     []string{"docs/spec/index.md", "docs/reference/diagnostics/index.md"},
+		},
+		"coroutines": {
+			specSections: []string{"Concurrency", "Functions"},
+			docPaths:     []string{"docs/spec/index.md", "docs/reference/concurrency/index.md"},
+		},
+		"go_style_concurrency": {
+			specSections: []string{"Concurrency", "Statements"},
+			docPaths:     []string{"docs/spec/index.md", "docs/reference/concurrency/index.md"},
+		},
+		"bitwise_bit32": {
+			specSections: []string{"Expressions", "Values And Types"},
+			docPaths:     []string{"docs/spec/index.md", "docs/reference/stdlib/index.md"},
+		},
+		"table_sort_stdlib": {
+			specSections: []string{"Tables And Metatables", "Values And Types"},
+			docPaths:     []string{"docs/spec/index.md", "docs/reference/stdlib/index.md"},
+		},
+		"utf8": {
+			specSections: []string{"Values And Types", "Expressions"},
+			docPaths:     []string{"docs/spec/index.md", "docs/reference/stdlib/index.md"},
+		},
+		"host_stdlibs": {
+			specSections: []string{"Modules And Loading", "Values And Types"},
+			docPaths:     []string{"docs/spec/index.md", "docs/reference/stdlib/index.md", "docs/reference/security/index.md"},
+		},
+		"tagged_dialect_syntax": {
+			specSections: []string{"Grammar Appendix", "Expressions", "Statements"},
+			docPaths:     []string{"docs/spec/index.md", "docs/reference/dialects/index.md"},
+		},
+		"q_analytics_dialect": {
+			specSections: []string{"Grammar Appendix", "Expressions", "Values And Types"},
+			docPaths:     []string{"docs/spec/index.md", "docs/reference/data-oriented/index.md", "docs/reference/dialects/index.md"},
+		},
+		"spreadsheet_dialects": {
+			specSections: []string{"Expressions", "Values And Types"},
+			docPaths:     []string{"docs/spec/index.md", "docs/reference/data-oriented/index.md", "docs/reference/dialects/index.md"},
+		},
+		"llm_native_integration": {
+			specSections: []string{"AI-Native Syntax", "Expressions", "Statements"},
+			docPaths:     []string{"docs/spec/index.md", "docs/reference/ai/index.md", "docs/reference/evaluate/index.md"},
+		},
+		"module_package_management": {
+			specSections: []string{"Modules And Loading", "Declarations And Scope"},
+			docPaths:     []string{"docs/spec/index.md", "docs/reference/modules/index.md", "docs/guides/packages.md"},
+		},
+		"module_download_vendor_cache": {
+			specSections: []string{"Modules And Loading", "Stability Contract"},
+			docPaths:     []string{"docs/spec/index.md", "docs/reference/modules/index.md", "docs/guides/packages.md"},
+		},
+		"cli_repository_tooling": {
+			specSections: []string{"Stability Contract", "Implementation Requirements"},
+			docPaths:     []string{"docs/spec/index.md", "docs/reference/cli/index.md", "docs/guides/tooling.md"},
+		},
+		"editor_lsp_tooling": {
+			specSections: []string{"Stability Contract", "Implementation Requirements", "Lexical Elements"},
+			docPaths:     []string{"docs/spec/index.md", "docs/guides/editors.md"},
+		},
+		"bytecode_vm_execution": {
+			specSections: []string{"Implementation Requirements", "Stability Contract"},
+			docPaths:     []string{"docs/spec/index.md", "docs/reference/platforms/index.md"},
+		},
+		"arm64_jit_runtime_fallback": {
+			specSections: []string{"Implementation Requirements", "Stability Contract"},
+			docPaths:     []string{"docs/spec/index.md", "docs/reference/performance/index.md", "docs/reference/platforms/index.md"},
+		},
+		"release_evidence_gates": {
+			specSections: []string{"Implementation Requirements", "Stability Contract"},
+			docPaths:     []string{"docs/spec/index.md", "docs/testing.md", "docs/release/index.md"},
+		},
+		"release_distribution_surface": {
+			specSections: []string{"Implementation Requirements", "Stability Contract"},
+			docPaths:     []string{"docs/spec/index.md", "docs/release/index.md", "docs/reference/platforms/index.md"},
+		},
+		"embedding_host_bindings": {
+			specSections: []string{"Modules And Loading", "Values And Types", "Functions", "Errors And Diagnostics"},
+			docPaths:     []string{"docs/spec/index.md", "docs/reference/embedding/index.md"},
+		},
+		"sandbox_capabilities_module_loading": {
+			specSections: []string{"Modules And Loading", "Values And Types"},
+			docPaths:     []string{"docs/spec/index.md", "docs/reference/security/index.md", "docs/reference/embedding/index.md"},
+		},
+		"embedding_resource_budgets": {
+			specSections: []string{"Implementation Requirements", "Concurrency"},
+			docPaths:     []string{"docs/spec/index.md", "docs/reference/embedding/index.md", "docs/reference/security/index.md"},
+		},
+		"embedding_hot_reload": {
+			specSections: []string{"Modules And Loading", "Implementation Requirements"},
+			docPaths:     []string{"docs/spec/index.md", "docs/reference/hot-reload/index.md", "docs/reference/embedding/index.md"},
+		},
+		"matrix_dense_arrays": {
+			specSections: []string{"Tables And Metatables", "Values And Types", "Implementation Requirements"},
+			docPaths:     []string{"docs/spec/index.md", "docs/reference/data-oriented/index.md"},
+		},
+		"classes_methods_oop": {
+			specSections: []string{"Grammar Appendix", "Declarations And Scope", "Expressions", "Statements"},
+			docPaths:     spec,
+		},
 	}
 }
 
@@ -1700,6 +1882,7 @@ func TestReleaseMatrixReadmeCapabilitiesStayCoveredByExamples(t *testing.T) {
 	for _, example := range examplesPayload.Examples {
 		exampleIDs[example.ID] = true
 	}
+	features := loadFeatureMatrixFeatureMap(t, root)
 
 	for _, promise := range []string{
 		"Go embedding API with sandbox, resource budgets, host bindings, and hot reload.",
@@ -1719,44 +1902,75 @@ func TestReleaseMatrixReadmeCapabilitiesStayCoveredByExamples(t *testing.T) {
 		dirs       []string
 		docTerms   []string
 		cliIDs     []string
+		featureIDs []string
+		docRefs    []string
 	}{
 		{
 			capability: "embedding",
 			dirs:       []string{"`examples/embedding/`"},
 			docTerms:   []string{"Go embedding examples", "go test ./examples/embedding -run Example -count=1"},
 			cliIDs:     []string{"repo-embedding-go-doc-examples"},
+			featureIDs: []string{"embedding_host_bindings", "sandbox_capabilities_module_loading", "embedding_resource_budgets", "embedding_hot_reload"},
+			docRefs:    []string{"docs/reference/embedding/index.md", "docs/guides/embedding.md"},
 		},
 		{
 			capability: "AI-native",
 			dirs:       []string{"`examples/ai/`", "`examples/llm/`", "`examples/evaluate/`", "`examples/workflow/`"},
 			docTerms:   []string{"manual tool history", "replay fixture", "Live-provider examples"},
 			cliIDs:     []string{"repo-llm-agent", "repo-ai-coding_agent_replay", "repo-evaluate-agent_replay", "repo-workflow-support_triage_replay"},
+			featureIDs: []string{"llm_native_integration"},
+			docRefs:    []string{"docs/reference/ai/index.md", "docs/guides/ai-native.md", "docs/reference/evaluate/index.md"},
 		},
 		{
 			capability: "DSL-native dialects",
 			dirs:       []string{"`examples/dialects/`", "`examples/web/`", "`examples/tooling/`"},
 			docTerms:   []string{"cross-domain release-gate project", "shell/process literals", "q-style columnar aggregation"},
 			cliIDs:     []string{"repo-dialects-shell_filesystem", "repo-web-serve_dialect_app", "repo-tooling-release_gate_project-main"},
+			featureIDs: []string{"tagged_dialect_syntax", "q_analytics_dialect", "spreadsheet_dialects"},
+			docRefs:    []string{"docs/reference/dialects/index.md", "docs/reference/data-oriented/index.md"},
 		},
 		{
 			capability: "concurrency",
 			dirs:       []string{"`examples/concurrency/`"},
 			docTerms:   []string{"goroutines", "channels", "select", "context cancellation"},
 			cliIDs:     []string{"repo-concurrency-goroutines_channels", "repo-concurrency-select_timeout", "repo-concurrency-sync_group"},
+			featureIDs: []string{"go_style_concurrency"},
+			docRefs:    []string{"docs/reference/concurrency/index.md"},
 		},
 		{
 			capability: "data-oriented",
 			dirs:       []string{"`examples/data/`", "`examples/data_processing/`", "`examples/performance/`"},
 			docTerms:   []string{"dense arrays", "matrices", "vectors", "SoA"},
 			cliIDs:     []string{"repo-data-q_vector_basics", "repo-data_processing-data_oriented-soa_kernels", "repo-performance-execution_modes_matrix"},
+			featureIDs: []string{"matrix_dense_arrays", "q_analytics_dialect"},
+			docRefs:    []string{"docs/reference/data-oriented/index.md"},
 		},
 		{
 			capability: "CLI tooling",
 			dirs:       []string{"`examples/tooling/`", "`examples/testing/`"},
 			docTerms:   []string{"release evidence", "diagnostics", "`leia test`"},
 			cliIDs:     []string{"repo-tooling-release_evidence_pipeline", "repo-testing-jsonl_workflow_test"},
+			featureIDs: []string{"cli_repository_tooling", "release_evidence_gates"},
+			docRefs:    []string{"docs/reference/cli/index.md", "docs/guides/tooling.md", "docs/release/index.md"},
 		},
 	} {
+		var matrixRefs []string
+		for _, featureID := range item.featureIDs {
+			feature := requireFeature(t, features, featureID)
+			cell := decodeReleaseCoverageCell(t, feature, -1, featureID, "semantic_gate")
+			if !releaseGateStatus(cell.Status) {
+				t.Fatalf("README %s feature %s semantic_gate status = %q, want covered", item.capability, featureID, cell.Status)
+			}
+			matrixRefs = append(matrixRefs, cell.Refs...)
+		}
+		for _, docRef := range item.docRefs {
+			if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(docRef))); err != nil {
+				t.Fatalf("README %s docs binding %s is missing: %v", item.capability, docRef, err)
+			}
+			if !stringListContains(matrixRefs, docRef) {
+				t.Fatalf("feature_matrix.json must bind README %s capability to docs ref %s via semantic_gate refs; got %#v", item.capability, docRef, matrixRefs)
+			}
+		}
 		for _, dir := range item.dirs {
 			if !strings.Contains(examplesDoc, dir) {
 				t.Fatalf("docs/examples/index.md must map README %s capability to %s", item.capability, dir)
@@ -1772,6 +1986,9 @@ func TestReleaseMatrixReadmeCapabilitiesStayCoveredByExamples(t *testing.T) {
 			if !exampleIDs[id] {
 				t.Fatalf("leia examples list --json must include README %s example id %s", item.capability, id)
 			}
+		}
+		if !releaseMatrixRefsBindCapabilityExamples(matrixRefs, item.dirs) {
+			t.Fatalf("feature_matrix.json must bind README %s capability to at least one matching examples/ ref; dirs=%#v refs=%#v", item.capability, item.dirs, matrixRefs)
 		}
 	}
 
@@ -2284,6 +2501,49 @@ func decodeReleaseCoverageCell(t *testing.T, feature map[string]json.RawMessage,
 
 func releaseGateStatus(status string) bool {
 	return status == "covered"
+}
+
+func releaseMatrixRefIsExecutableGate(ref string) bool {
+	switch {
+	case strings.HasSuffix(ref, "_test.go"):
+		return true
+	case strings.HasPrefix(ref, "tests/language/") && strings.HasSuffix(ref, ".leia"):
+		return true
+	case strings.HasPrefix(ref, "tests/smoke/") && strings.HasSuffix(ref, ".leia"):
+		return true
+	case strings.HasPrefix(ref, "examples/") && strings.HasSuffix(ref, ".leia"):
+		return true
+	case strings.HasPrefix(ref, "benchmarks/") && (strings.HasSuffix(ref, ".leia") || strings.HasSuffix(ref, "_test.py") || strings.HasSuffix(ref, "_test.go")):
+		return true
+	case strings.HasPrefix(ref, "scripts/") && strings.HasSuffix(ref, ".sh"):
+		return true
+	default:
+		return false
+	}
+}
+
+func releaseMatrixRefsBindCapabilityExamples(refs, dirs []string) bool {
+	for _, ref := range refs {
+		if !strings.HasPrefix(ref, "examples/") {
+			continue
+		}
+		for _, dir := range dirs {
+			prefix := strings.Trim(dir, "`")
+			if strings.HasPrefix(ref, prefix) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func stringListContains(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }
 
 func releaseIgnoredSpecSections() map[string]string {

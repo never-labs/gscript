@@ -446,11 +446,21 @@ total <span class="tok-operator">:=</span> <span class="tok-number">0</span>
 <span class="tok-builtin">assert</span>(factorial(<span class="tok-number">5</span>) <span class="tok-operator">==</span> <span class="tok-number">120</span>)</code></pre>
 <p>Function declarations follow the same same-block redeclaration portability rule as other declarations. A nested function declaration may shadow an outer function or variable name in its own block.</p>
 <h3 id="declarations-and-scope-imports">Imports</h3>
-<pre class="language-ebnf"><code class="language-ebnf">import_decl = &quot;import&quot; string_lit &quot;as&quot; identifier ;</code></pre>
-<p><code>import &quot;go:...&quot; as name</code> declares an explicit host-provided Go binding. The source path does not reflect arbitrary Go packages by itself; the embedder must provide an allowlisted binding through the Go API.</p>
+<pre class="language-ebnf"><code class="language-ebnf">import_decl = &quot;import&quot; ( import_spec | &quot;(&quot; { import_spec } &quot;)&quot; ) ;
+import_spec = [ identifier ] string_lit | string_lit &quot;as&quot; identifier ;</code></pre>
+<p>An import declaration declares one lexical binding whose value is the module result for the import path. The canonical forms are Go-style:</p>
+<pre class="language-text"><code class="language-text">import &quot;json&quot;
+import http &quot;go:net/http&quot;
+import (
+    &quot;json&quot;
+    host &quot;go:host/safe&quot;
+)</code></pre>
+<p>When no alias is written, the alias is inferred from the final path element. For example, <code>import &quot;json&quot;</code> binds <code>json</code>, and <code>import &quot;path/filepath&quot;</code> binds <code>filepath</code>. An implementation must reject paths whose alias cannot be inferred.</p>
+<p>Leia also accepts <code>import &quot;path&quot; as name</code> for explicit aliases in existing source. New source should prefer the alias-first form <code>import name &quot;path&quot;</code>.</p>
+<p>An import path beginning with <code>go:</code> names an explicit host-provided Go binding. The source path does not reflect arbitrary Go packages by itself; the embedder must provide an allowlisted binding through the Go API.</p>
 <p>The import alias is a lexical binding in the declaration&#x27;s scope. It is visible only after the import declaration statement completes, and it may be shadowed by an inner declaration. Portable programs must avoid same-block alias conflicts with any other declaration.</p>
 <p>An import path names a capability provided by the module loader or embedder. The command-line runner rejects unallowlisted Go imports.</p>
-<pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-keyword">import</span> <span class="tok-string">&quot;go:math&quot;</span> as math</code></pre>
+<pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-keyword">import</span> math <span class="tok-string">&quot;go:math&quot;</span></code></pre>
 <h3 id="declarations-and-scope-labels">Labels</h3>
 <p>Labels are declared with <code>name:</code>. Label names live in a function-level label namespace that is separate from lexical value bindings. A label may have the same spelling as a variable, constant, function, parameter, or import alias. Labels do not shadow lexical bindings, and lexical bindings do not shadow labels. Within a function, each label name may be declared at most once.</p>
 <p>A <code>goto</code> must not jump into a deeper lexical scope or over a local declaration.</p>
@@ -2094,14 +2104,14 @@ module PATH VERSION TARGET h1:BASE64_SHA256</code></pre>
 <p><code>leia.sum</code> is not a package index, registry, or permission grant. It records content that module tooling has already made available locally. Runtime <code>require</code> does not consult a central registry, discover new versions, download missing requirements, or repair mismatched sums.</p>
 <p>The stable package-management boundary is local-first. Module paths may be GitHub-style repository paths because current tooling can cache GitHub archives, but a GitHub-looking path is still only a string in <code>leia.mod</code> until tooling or the user has placed content in a local replace, vendor directory, or module cache. Leia does not require or define a central registry for basic module use.</p>
 <h3 id="modules-and-loading-go-host-imports">Go Host Imports</h3>
-<p><code>import &quot;go:...&quot; as name</code> is explicit host binding syntax. It does not automatically reflect arbitrary Go packages; embedders must provide bindings through the public Go API and the active capability policy may still reject use.</p>
+<p><code>import name &quot;go:...&quot;</code> is explicit host binding syntax. It does not automatically reflect arbitrary Go packages; embedders must provide bindings through the public Go API and the active capability policy may still reject use. The compatibility spelling <code>import &quot;go:...&quot; as name</code> is also accepted, but new source should prefer the alias-first form.</p>
 <p>The following declaration is host-only syntax, not a runnable local spec example:</p>
-<pre class="language-text"><code class="language-text">import &quot;go:net/http&quot; as http</code></pre>
+<pre class="language-text"><code class="language-text">import http &quot;go:net/http&quot;</code></pre>
 <p>The declaration above is only valid when the embedder has allowlisted and registered the <code>go:net/http</code> binding. Source syntax alone never grants host access.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code">ok, err <span class="tok-operator">:=</span> <span class="tok-builtin">pcall</span>(<span class="tok-builtin">require</span>, <span class="tok-string">&quot;go:net/http&quot;</span>)
 <span class="tok-builtin">assert</span>(<span class="tok-operator">!</span>ok)
 <span class="tok-builtin">assert</span>(<span class="tok-builtin">type</span>(err) <span class="tok-operator">==</span> <span class="tok-string">&quot;string&quot;</span>)</code></pre>
-<p>Go import allowlisting is an embedder contract. <code>WithGoImports</code> and <code>RegisterModule(&quot;go:...&quot;, ...)</code> expose only named host-provided modules. A <code>go require</code> directive in <code>leia.mod</code>, a Go module path in <code>go.mod</code>, or source syntax such as <code>import &quot;go:net/http&quot; as http</code> never loads arbitrary Go code by package path.</p>
+<p>Go import allowlisting is an embedder contract. <code>WithGoImports</code> and <code>RegisterModule(&quot;go:...&quot;, ...)</code> expose only named host-provided modules. A <code>go require</code> directive in <code>leia.mod</code>, a Go module path in <code>go.mod</code>, or source syntax such as <code>import http &quot;go:net/http&quot;</code> never loads arbitrary Go code by package path.</p>
 <h3 id="modules-and-loading-module-modes">Module Modes</h3>
 <p>Module mode controls how a discovered manifest is applied at runtime. Runtime module setup is offline: it uses local replaces, already present vendor directories, and already present cache directories; it does not run <code>git</code>, download modules, or rewrite <code>leia.mod</code>.</p>
 <div class="table-wrap"><table>
@@ -2349,7 +2359,8 @@ statement      = func_decl
 
 func_decl      = &quot;func&quot; identifier param_list block ;
 import_decl    = &quot;import&quot; ( import_spec | &quot;(&quot; { import_spec } &quot;)&quot; ) ;
-import_spec    = [ identifier ] string_lit ;
+import_spec    = [ identifier ] string_lit
+               | string_lit &quot;as&quot; identifier ;
 
 param_list     = &quot;(&quot; [ param { &quot;,&quot; param } [ &quot;,&quot; vararg_param ]
                      | vararg_param ] &quot;)&quot; ;
