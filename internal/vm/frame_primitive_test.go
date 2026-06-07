@@ -250,6 +250,54 @@ func TestFrameFilterPrimitiveFiltersSoARows(t *testing.T) {
 	}
 }
 
+func TestFramePrimitivePipelineFiltersProjectsAndLoadsColumn(t *testing.T) {
+	soa, err := runtime.NewSoA(map[string]*runtime.DenseArray{
+		"price": runtime.NewDenseArrayF64([]float64{99, 100.5, 101.25}),
+		"size":  runtime.NewDenseArrayI64([]int64{5, 10, 20}),
+		"flag":  runtime.NewDenseArrayBool([]bool{false, true, true}),
+	})
+	if err != nil {
+		t.Fatalf("NewSoA: %v", err)
+	}
+	frame := runtime.NewTable()
+	frame.SetNativePayloadWithInfo(soa, runtime.NativePayloadInfo{
+		Kind:       runtime.NativePayloadDataFrame,
+		Rows:       soa.Len(),
+		Columns:    3,
+		SchemaHash: "pipeline-frame-test",
+	})
+	names := runtime.NewTable()
+	names.RawSetInt(1, runtime.StringValue("size"))
+	names.RawSetInt(2, runtime.StringValue("price"))
+	proto := &FuncProto{
+		MaxStack:  3,
+		Code:      framePipelinePrimitiveProgram(),
+		Constants: []runtime.Value{runtime.TableValue(frame), runtime.StringValue("price"), runtime.FloatValue(100), runtime.TableValue(names), runtime.StringValue("size")},
+	}
+	proto.EnsureFeedback()
+
+	results, err := New(map[string]runtime.Value{}).Execute(proto)
+	if err != nil {
+		t.Fatalf("Execute frame primitive pipeline: %v", err)
+	}
+	if len(results) != 1 || !results[0].IsDenseArray() {
+		t.Fatalf("frame primitive pipeline result = %#v, want dense array", results)
+	}
+	got, ok := results[0].DenseArray().I64()
+	if !ok || len(got) != 2 || got[0] != 10 || got[1] != 20 {
+		t.Fatalf("pipeline size column = %#v, want [10 20]", got)
+	}
+	if fb := proto.Feedback[1]; fb.Left != FBTable || fb.Result != FBAny {
+		t.Fatalf("pipeline FRAME_COLUMN feedback = left %v result %v, want table/dense bucket", fb.Left, fb.Result)
+	}
+	if fb := proto.Feedback[4]; fb.Left != FBTable || fb.Right != FBAny || fb.Result != FBTable {
+		t.Fatalf("pipeline FRAME_FILTER feedback = left %v right %v result %v, want table/dense bucket/table", fb.Left, fb.Right, fb.Result)
+	}
+	if fb := proto.Feedback[5]; fb.Left != FBTable || fb.Right != FBTable || fb.Result != FBTable {
+		t.Fatalf("pipeline FRAME_PROJECT feedback = left %v right %v result %v, want table/table/table", fb.Left, fb.Right, fb.Result)
+	}
+}
+
 func frameLenPrimitiveProgram() []uint32 {
 	return []uint32{
 		EncodeABx(OP_LOADK, 0, 0),
@@ -273,6 +321,19 @@ func frameFilterPrimitiveProgram() []uint32 {
 		EncodeABx(OP_LOADK, 1, 1),
 		EncodeABC(OP_FRAME_FILTER, 0, 0, 1),
 		EncodeABC(OP_FRAME_COLUMN, 0, 0, 2),
+		EncodeABC(OP_RETURN, 0, 2, 0),
+	}
+}
+
+func framePipelinePrimitiveProgram() []uint32 {
+	return []uint32{
+		EncodeABx(OP_LOADK, 0, 0),
+		EncodeABC(OP_FRAME_COLUMN, 1, 0, 1),
+		EncodeABx(OP_LOADK, 2, 2),
+		EncodeABC(OP_VECTOR_COMPARE, 1, 2, int(runtime.DenseArrayGE)),
+		EncodeABC(OP_FRAME_FILTER, 0, 0, 1),
+		EncodeABC(OP_FRAME_PROJECT, 0, 0, 3),
+		EncodeABC(OP_FRAME_COLUMN, 0, 0, 4),
 		EncodeABC(OP_RETURN, 0, 2, 0),
 	}
 }

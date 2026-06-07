@@ -184,6 +184,47 @@ func TestFrameFilterBytecodeBuildsMethodJITIR(t *testing.T) {
 	}
 }
 
+func TestQFramePrimitivePipelineBuildsMethodJITIR(t *testing.T) {
+	names := runtime.NewTable()
+	names.RawSetInt(1, runtime.StringValue("size"))
+	proto := &vm.FuncProto{
+		Name:      "q_frame_pipeline",
+		NumParams: 1,
+		MaxStack:  3,
+		Constants: []runtime.Value{
+			runtime.StringValue("price"),
+			runtime.FloatValue(100),
+			runtime.TableValue(names),
+			runtime.StringValue("size"),
+		},
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_FRAME_COLUMN, 1, 0, 0),
+			vm.EncodeABx(vm.OP_LOADK, 2, 1),
+			vm.EncodeABC(vm.OP_VECTOR_COMPARE, 1, 2, int(runtime.DenseArrayGE)),
+			vm.EncodeABC(vm.OP_FRAME_FILTER, 0, 0, 1),
+			vm.EncodeABC(vm.OP_FRAME_PROJECT, 0, 0, 2),
+			vm.EncodeABC(vm.OP_FRAME_COLUMN, 0, 0, 3),
+			vm.EncodeABC(vm.OP_RETURN, 0, 2, 0),
+		},
+	}
+
+	fn := BuildGraph(proto)
+	counts := map[Op]int{}
+	for _, block := range fn.Blocks {
+		for _, instr := range block.Instrs {
+			counts[instr.Op]++
+		}
+	}
+	for _, op := range []Op{OpFrameFilter, OpFrameProject, OpVectorCompare} {
+		if counts[op] != 1 {
+			t.Fatalf("%s count = %d, want 1\n%s", op, counts[op], Print(fn))
+		}
+	}
+	if counts[OpFrameColumn] != 2 {
+		t.Fatalf("OpFrameColumn count = %d, want 2\n%s", counts[OpFrameColumn], Print(fn))
+	}
+}
+
 func TestFrameLenBytecodeBuildsMethodJITIR(t *testing.T) {
 	proto := &vm.FuncProto{
 		Name:      "frame_len",
