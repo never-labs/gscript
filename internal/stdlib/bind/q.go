@@ -4013,10 +4013,7 @@ func qSimpleSelectRowsNativeSoA(s *SoA, mask *DenseArray, selects []qSelect) (*S
 	}
 	cols := make(map[string]*DenseArray, len(selects))
 	for _, sel := range selects {
-		if !sel.Expr.IsString() {
-			return nil, false
-		}
-		col, ok := filtered.Column(sel.Expr.Str())
+		col, ok := qEvalNativeExpr(filtered, sel.Expr)
 		if !ok {
 			return nil, false
 		}
@@ -4027,6 +4024,88 @@ func qSimpleSelectRowsNativeSoA(s *SoA, mask *DenseArray, selects []qSelect) (*S
 		return nil, false
 	}
 	return out, true
+}
+
+func qEvalNativeExpr(s *SoA, expr Value) (*DenseArray, bool) {
+	if s == nil {
+		return nil, false
+	}
+	if expr.IsString() {
+		col, ok := s.Column(expr.Str())
+		return col, ok
+	}
+	if !expr.IsTable() {
+		return nil, false
+	}
+	tbl := expr.Table()
+	opValue := tbl.RawGetString("op")
+	if opValue.IsNil() {
+		opValue = tbl.RawGetInt(1)
+	}
+	if !opValue.IsString() {
+		return nil, false
+	}
+	op, ok := qNativeDenseArrayBinaryOp(opValue.Str())
+	if !ok {
+		return nil, false
+	}
+	left := tbl.RawGetString("left")
+	if left.IsNil() {
+		left = tbl.RawGetInt(2)
+	}
+	right := tbl.RawGetString("right")
+	if right.IsNil() {
+		right = tbl.RawGetInt(3)
+	}
+	leftValue, ok := qNativeExprOperand(s, left)
+	if !ok {
+		return nil, false
+	}
+	rightValue, ok := qNativeExprOperand(s, right)
+	if !ok {
+		return nil, false
+	}
+	out, err := DenseArrayElementwise(op, leftValue, rightValue)
+	if err != nil || !out.IsDenseArray() {
+		return nil, false
+	}
+	return out.DenseArray(), true
+}
+
+func qNativeExprOperand(s *SoA, expr Value) (Value, bool) {
+	if expr.IsString() {
+		col, ok := s.Column(expr.Str())
+		if !ok {
+			return NilValue(), false
+		}
+		return DenseArrayValue(col), true
+	}
+	if expr.IsNumber() {
+		return expr, true
+	}
+	if expr.IsTable() {
+		col, ok := qEvalNativeExpr(s, expr)
+		if !ok {
+			return NilValue(), false
+		}
+		return DenseArrayValue(col), true
+	}
+	return NilValue(), false
+}
+
+func qNativeDenseArrayBinaryOp(op string) (DenseArrayBinaryOp, bool) {
+	switch op {
+	case "+":
+		return DenseArrayAdd, true
+	case "-":
+		return DenseArraySub, true
+	case "*":
+		return DenseArrayMul, true
+	case "/":
+		return DenseArrayDiv, true
+	default:
+		return DenseArrayAdd, false
+	}
 }
 
 func qQueryKeepsRowOrder(spec *Table) bool {
