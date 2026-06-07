@@ -775,6 +775,27 @@ func TestQueryKernelPlanFingerprintAvoidsStructuralCollisions(t *testing.T) {
 		t.Fatalf("nested literal list boundary collided: %q", got)
 	}
 
+	typedSymbolSlice := QueryPlan{Where: In{Expr: ColumnRef{Name: "sym"}, Values: []any{[]Symbol{"AAPL", "MSFT"}}}, LimitN: -1}
+	stringSlice := QueryPlan{Where: In{Expr: ColumnRef{Name: "sym"}, Values: []any{[]string{"AAPL", "MSFT"}}}, LimitN: -1}
+	if got := QueryKernelPlanFingerprint(typedSymbolSlice); got == QueryKernelPlanFingerprint(stringSlice) {
+		t.Fatalf("typed symbol/string slice literal collided: %q", got)
+	}
+	typedSliceWithEmbeddedSeparator := QueryPlan{Where: In{Expr: ColumnRef{Name: "sym"}, Values: []any{[]Symbol{"a,b", "c"}}}, LimitN: -1}
+	typedSliceSplitSeparator := QueryPlan{Where: In{Expr: ColumnRef{Name: "sym"}, Values: []any{[]Symbol{"a", "b,c"}}}, LimitN: -1}
+	if got := QueryKernelPlanFingerprint(typedSliceWithEmbeddedSeparator); got == QueryKernelPlanFingerprint(typedSliceSplitSeparator) {
+		t.Fatalf("typed slice literal boundary collided: %q", got)
+	}
+	nilTypedSlice := QueryPlan{Where: In{Expr: ColumnRef{Name: "sym"}, Values: []any{([]Symbol)(nil)}}, LimitN: -1}
+	emptyTypedSlice := QueryPlan{Where: In{Expr: ColumnRef{Name: "sym"}, Values: []any{[]Symbol{}}}, LimitN: -1}
+	if got := QueryKernelPlanFingerprint(nilTypedSlice); got == QueryKernelPlanFingerprint(emptyTypedSlice) {
+		t.Fatalf("nil/empty typed slice literal collided: %q", got)
+	}
+	typedNaNSlice := QueryPlan{Where: In{Expr: ColumnRef{Name: "px"}, Values: []any{[]float64{math.NaN()}}}, LimitN: -1}
+	typedNaNPayloadSlice := QueryPlan{Where: In{Expr: ColumnRef{Name: "px"}, Values: []any{[]float64{math.Float64frombits(0x7ff8000000000001)}}}, LimitN: -1}
+	if got := QueryKernelPlanFingerprint(typedNaNSlice); got != QueryKernelPlanFingerprint(typedNaNPayloadSlice) {
+		t.Fatalf("typed NaN slice literal fingerprint = %q, want canonical NaN fingerprint", got)
+	}
+
 	structLiteralA := QueryPlan{Where: Binary{Op: OpEQ, Left: ColumnRef{Name: "x"}, Right: Literal{Value: struct{ Name string }{Name: "a"}}}, LimitN: -1}
 	structLiteralB := QueryPlan{Where: Binary{Op: OpEQ, Left: ColumnRef{Name: "x"}, Right: Literal{Value: struct{ Name string }{Name: "b"}}}, LimitN: -1}
 	if got := QueryKernelPlanFingerprint(structLiteralA); got == QueryKernelPlanFingerprint(structLiteralB) {

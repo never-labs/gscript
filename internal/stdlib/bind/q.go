@@ -1318,7 +1318,7 @@ func qSQLNativeSourceCarrierFromTable(tbl *Table) (qSQLSourceCarrier, bool, erro
 }
 
 func qSourceCarrierRows(frameRows int, info NativePayloadInfo, hasInfo bool) int {
-	if hasInfo && info.Rows > 0 {
+	if hasInfo && info.Rows == frameRows {
 		return info.Rows
 	}
 	return frameRows

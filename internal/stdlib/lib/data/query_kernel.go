@@ -269,9 +269,27 @@ func writeQueryKernelLiteralFingerprint(b *strings.Builder, value any) {
 			writeQueryKernelLiteralFingerprint(b, item)
 		}
 	default:
+		if writeQueryKernelLiteralSliceFingerprint(b, value) {
+			return
+		}
 		writeQueryKernelFingerprintPart(b, fmt.Sprintf("%T", value))
 		writeQueryKernelFingerprintPart(b, fmt.Sprintf("%#v", value))
 	}
+}
+
+func writeQueryKernelLiteralSliceFingerprint(b *strings.Builder, value any) bool {
+	v := reflect.ValueOf(value)
+	if !v.IsValid() || v.Kind() != reflect.Slice {
+		return false
+	}
+	writeQueryKernelFingerprintPart(b, "slice")
+	writeQueryKernelFingerprintPart(b, v.Type().String())
+	writeQueryKernelFingerprintPart(b, strconv.FormatBool(v.IsNil()))
+	writeQueryKernelFingerprintPart(b, strconv.Itoa(v.Len()))
+	for i := 0; i < v.Len(); i++ {
+		writeQueryKernelLiteralFingerprint(b, v.Index(i).Interface())
+	}
+	return true
 }
 
 func writeQueryKernelFloatFingerprint(b *strings.Builder, value float64, bitSize int) {
