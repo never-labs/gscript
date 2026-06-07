@@ -7,6 +7,7 @@ import (
 
 	"github.com/never-labs/leia/internal/runtime"
 	"github.com/never-labs/leia/internal/stdlib/lib/data"
+	stdq "github.com/never-labs/leia/internal/stdlib/lib/q"
 )
 
 func TestQDataFrameValueKeepsNativeFramePayload(t *testing.T) {
@@ -2621,7 +2622,7 @@ func TestQFallbackStatsAggregateTopReasons(t *testing.T) {
 	if got := codeRows[qFallbackKernelUnsupported]; got != 2 {
 		t.Fatalf("kernel unsupported fallback count = %d, want 2", got)
 	}
-	if got := qTestFallbackDetailCount(rows, "reason_code", qFallbackKernelUnsupported, qKernelReasonUnsupported, ""); got != 2 {
+	if got := qTestFallbackDetailCount(rows, "reason_code", qFallbackKernelUnsupported, stdq.KernelFallbackSelectExpression, ""); got != 2 {
 		t.Fatalf("kernel unsupported reason_code top count = %d, want 2", got)
 	}
 	reason := fmt.Sprintf("select expression %q is not supported by data query kernel: unsupported expression %T", "marker", qFallbackStatsTestExpr{})

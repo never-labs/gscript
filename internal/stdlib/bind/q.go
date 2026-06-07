@@ -1051,7 +1051,7 @@ func qRunSQLPlan(src string, plan data.QueryPlan, frame data.Frame) (data.Frame,
 	}
 	if !ok {
 		_, reason := data.QueryKernelSupportReason(plan)
-		qRecordFallbackReason(qFallbackKernelUnsupported, qKernelReasonUnsupported, reason)
+		qRecordFallbackReason(qFallbackKernelUnsupported, stdq.KernelFallbackReasonCode(reason), reason)
 		kernel = nil
 	}
 	return data.ExecQueryKernelOrPlan(kernel, plan, frame)
@@ -1554,7 +1554,7 @@ func qExplainKernelInfo(args qSQLArgsResult, tmpl qSQLPlanTemplate) qExplainKern
 		return qExplainKernelResult{schema: frame.Schema(), schemaHash: schemaHash, cached: cached, reasonCode: qKernelReasonCompileError, reason: err.Error()}
 	}
 	if !supported {
-		return qExplainKernelResult{schema: frame.Schema(), schemaHash: schemaHash, cached: cached, reasonCode: qKernelReasonUnsupported, reason: reason}
+		return qExplainKernelResult{schema: frame.Schema(), schemaHash: schemaHash, cached: cached, reasonCode: stdq.KernelFallbackReasonCode(reason), reason: reason}
 	}
 	return qExplainKernelResult{schema: frame.Schema(), schemaHash: schemaHash, supported: true, cached: cached, reasonCode: qKernelReasonSupported, reason: reason}
 }
@@ -2272,8 +2272,8 @@ func qRecordFallbackReason(code, reasonCode, reason string) {
 	case qFallbackMutationPlan:
 		qFallbackCounters.Mutation++
 	}
-	reasonCode = qNormalizeFallbackReasonCode(code, reasonCode)
 	reason = qNormalizeFallbackReason(reason)
+	reasonCode = qNormalizeFallbackReasonCode(code, reasonCode, reason)
 	if reasonCode != "" {
 		qFallbackCounters.ByReasonCode[qFallbackReasonCodeKey{Code: code, ReasonCode: reasonCode}]++
 	}
@@ -2394,7 +2394,10 @@ func qFallbackDetailStatsRow(kind, code, reasonCode, reason string, count int) *
 	return row
 }
 
-func qNormalizeFallbackReasonCode(code, reasonCode string) string {
+func qNormalizeFallbackReasonCode(code, reasonCode, reason string) string {
+	if code == qFallbackKernelUnsupported && (reasonCode == "" || reasonCode == qKernelReasonUnsupported) {
+		return stdq.KernelFallbackReasonCode(reason)
+	}
 	if reasonCode != "" {
 		return reasonCode
 	}
