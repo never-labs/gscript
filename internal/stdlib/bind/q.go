@@ -1324,6 +1324,14 @@ func qSourceCarrierRows(frameRows int, info NativePayloadInfo, hasInfo bool) int
 	return frameRows
 }
 
+func qSourceCarrierSchemaHash(frame data.Frame, info NativePayloadInfo, hasInfo bool) string {
+	actual := frame.SchemaFingerprint()
+	if hasInfo && info.SchemaHash == actual {
+		return info.SchemaHash
+	}
+	return actual
+}
+
 func qFramePayloadInfo(tbl *Table, kind NativePayloadKind) (NativePayloadInfo, bool) {
 	if tbl == nil {
 		return NativePayloadInfo{}, false
@@ -1377,7 +1385,7 @@ func qExplainKernelInfo(args qSQLArgsResult, tmpl qSQLPlanTemplate) qExplainKern
 	qSQLAlignedPlanCacheMu.Unlock()
 	schemaHash := ""
 	if hasSource && source.hasInfo {
-		schemaHash = source.info.SchemaHash
+		schemaHash = qSourceCarrierSchemaHash(frame, source.info, source.hasInfo)
 	}
 	supported, reason, err := data.QueryKernelCompileReason(frame, plan)
 	if err != nil {

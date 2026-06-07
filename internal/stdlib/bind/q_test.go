@@ -189,6 +189,58 @@ func TestQSQLSourceCarrierFallsBackToFrameRowsWhenNativeInfoRowsMissing(t *testi
 	}
 }
 
+func TestQExplainFallsBackToFrameSchemaHashWhenNativeInfoHashMissingOrStale(t *testing.T) {
+	qSQLResetPlanCachesForTest()
+	frame, err := data.NewFrame(
+		data.Column{Name: "sym", Data: data.NewSymbols([]string{"AAPL", "MSFT"})},
+		data.Column{Name: "price", Data: data.NewF64([]float64{100.5, 101.25})},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	frameTable := NewTable()
+	frameTable.SetNativePayloadWithInfo(frame, NativePayloadInfo{
+		Kind:    NativePayloadDataFrame,
+		Rows:    frame.Len(),
+		Columns: len(frame.Schema().Names()),
+	})
+	explained, err := qExplainSQL(qSQLArgsResult{
+		frameValue: TableValue(frameTable),
+		source:     "select price from trades where price>=100",
+	})
+	if err != nil {
+		t.Fatalf("explain native frame missing schema hash: %v", err)
+	}
+	if got := explained.Table().RawGetString("source_schema_hash"); !got.IsString() || got.Str() != frame.SchemaFingerprint() {
+		t.Fatalf("frame source_schema_hash = %v, want %s", got, frame.SchemaFingerprint())
+	}
+
+	keyed, err := data.KeyBy(frame, "sym")
+	if err != nil {
+		t.Fatal(err)
+	}
+	keyedTable := NewTable()
+	keyedTable.SetNativePayloadWithInfo(keyed, NativePayloadInfo{
+		Kind:       NativePayloadKeyedFrame,
+		Rows:       frame.Len(),
+		Columns:    len(frame.Schema().Names()),
+		SchemaHash: "stale-schema-hash",
+	})
+	sources := NewTable()
+	sources.RawSetString("trades", TableValue(keyedTable))
+	explained, err = qExplainSQL(qSQLArgsResult{
+		frameValue:    TableValue(sources),
+		source:        "select price from trades where price>=100",
+		resolveSource: true,
+	})
+	if err != nil {
+		t.Fatalf("explain native keyed source map stale schema hash: %v", err)
+	}
+	if got := explained.Table().RawGetString("source_schema_hash"); !got.IsString() || got.Str() != frame.SchemaFingerprint() {
+		t.Fatalf("keyed source_schema_hash = %v, want %s", got, frame.SchemaFingerprint())
+	}
+}
+
 func TestQExplainUsesNativePayloadInfoBeforeWrapperFallback(t *testing.T) {
 	qSQLResetPlanCachesForTest()
 	frame, err := data.NewFrame(
