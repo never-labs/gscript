@@ -1395,6 +1395,23 @@ unsupported := q.explain_query(trades, {
 	if got := supported.RawGetString("source_schema_hash"); !got.IsString() || !strings.HasPrefix(got.Str(), "q.query.kernel:") {
 		t.Fatalf("supported schema hash = %v, want q.query kernel hash", got)
 	}
+	if got := supported.RawGetString("kernel_schema_hash"); !got.IsString() || got.Str() != supported.RawGetString("source_schema_hash").Str() {
+		t.Fatalf("supported kernel_schema_hash = %v, want source_schema_hash alias", got)
+	}
+	kernelSchema := supported.RawGetString("kernel_schema").Table()
+	if kernelSchema == nil || kernelSchema.Length() != 1 {
+		t.Fatalf("supported kernel_schema = %v, want one column", kernelSchema)
+	}
+	kernelColumn := kernelSchema.RawGetInt(1).Table()
+	if kernelColumn == nil {
+		t.Fatal("supported kernel_schema[1] is nil")
+	}
+	if got := kernelColumn.RawGetString("name"); !got.IsString() || got.Str() != "notional" {
+		t.Fatalf("supported kernel_schema[1].name = %v, want notional", got)
+	}
+	if got := kernelColumn.RawGetString("kind"); !got.IsString() || got.Str() != "f64" {
+		t.Fatalf("supported kernel_schema[1].kind = %v, want f64", got)
+	}
 
 	unsupported := interp.GetGlobal("unsupported").Table()
 	if unsupported == nil {
@@ -1405,6 +1422,12 @@ unsupported := q.explain_query(trades, {
 	}
 	if got := unsupported.RawGetString("kernel_reason_code"); !got.IsString() || got.Str() != qQueryKernelReasonSelect {
 		t.Fatalf("unsupported kernel_reason_code = %v, want %s", got, qQueryKernelReasonSelect)
+	}
+	if got := unsupported.RawGetString("kernel_schema_hash"); !got.IsString() || got.Str() != "" {
+		t.Fatalf("unsupported kernel_schema_hash = %v, want empty string", got)
+	}
+	if schema := unsupported.RawGetString("kernel_schema").Table(); schema == nil || schema.Length() != 0 {
+		t.Fatalf("unsupported kernel_schema = %v, want empty table", schema)
 	}
 	stats := qTestFallbackStatsRows(t, qFallbackStatsTable())
 	if got := stats[qFallbackQueryKernel]; got != 0 {

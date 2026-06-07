@@ -1020,6 +1020,8 @@ func qExplainQuery(s *SoA, spec *Table) (*Table, error) {
 		out.RawSetString("kernel_reason_code", StringValue(qQueryKernelReasonUnsupported))
 		out.RawSetString("kernel_reason", StringValue("query native kernel supports non-aggregate selects only"))
 		out.RawSetString("source_schema_hash", StringValue(""))
+		out.RawSetString("kernel_schema_hash", StringValue(""))
+		out.RawSetString("kernel_schema", TableValue(NewAppendArrayTable(0)))
 		out.RawSetString("kernel_rows", IntValue(0))
 		out.RawSetString("kernel_columns", IntValue(0))
 		return out, nil
@@ -1035,14 +1037,19 @@ func qExplainQuery(s *SoA, spec *Table) (*Table, error) {
 		out.RawSetString("kernel_reason_code", StringValue(reasonCode))
 		out.RawSetString("kernel_reason", StringValue(reason))
 		out.RawSetString("source_schema_hash", StringValue(""))
+		out.RawSetString("kernel_schema_hash", StringValue(""))
+		out.RawSetString("kernel_schema", TableValue(NewAppendArrayTable(0)))
 		out.RawSetString("kernel_rows", IntValue(0))
 		out.RawSetString("kernel_columns", IntValue(0))
 		return out, nil
 	}
+	schemaHash := qQueryNativeSoASchemaHash(nativeRows)
 	out.RawSetString("kernel_supported", BoolValue(true))
 	out.RawSetString("kernel_reason_code", StringValue(qKernelReasonSupported))
 	out.RawSetString("kernel_reason", StringValue(qKernelReasonSupported))
-	out.RawSetString("source_schema_hash", StringValue(qQueryNativeSoASchemaHash(nativeRows)))
+	out.RawSetString("source_schema_hash", StringValue(schemaHash))
+	out.RawSetString("kernel_schema_hash", StringValue(schemaHash))
+	out.RawSetString("kernel_schema", qExplainSoASchemaValue(nativeRows))
 	out.RawSetString("kernel_rows", IntValue(int64(nativeRows.Len())))
 	out.RawSetString("kernel_columns", IntValue(int64(len(nativeRows.ColumnNames()))))
 	return out, nil
@@ -1706,6 +1713,22 @@ func qExplainSchemaValue(schema data.Schema) Value {
 		} else {
 			row.RawSetString("kind", StringValue(""))
 		}
+		out.RawSetInt(int64(i+1), TableValue(row))
+	}
+	return TableValue(out)
+}
+
+func qExplainSoASchemaValue(soa *SoA) Value {
+	names := soa.ColumnNames()
+	out := NewAppendArrayTable(len(names))
+	for i, name := range names {
+		row := NewTable()
+		row.RawSetString("name", StringValue(name))
+		kind := ""
+		if col, ok := soa.Column(name); ok && col != nil {
+			kind = col.DType().String()
+		}
+		row.RawSetString("kind", StringValue(kind))
 		out.RawSetInt(int64(i+1), TableValue(row))
 	}
 	return TableValue(out)
