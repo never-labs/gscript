@@ -1077,6 +1077,12 @@ flat := q.query(trades, {
     where: soa.mask(trades, "sym", "==", 1),
     select: {px: "price", qty: "size"},
 })
+
+ordered := q.query(trades, {
+    where: soa.mask(trades, "sym", "==", 1),
+    select: {px: "price", qty: "size"},
+    order_by: {column: "px", desc: true},
+})
 `)
 
 	rows := interp.GetGlobal("rows").Table()
@@ -1121,6 +1127,9 @@ flat := q.query(trades, {
 	if !ok || info.Rows != 2 || info.Columns != 2 {
 		t.Fatalf("flat native frame info = %+v ok=%v, want rows=2 columns=2", info, ok)
 	}
+	if !strings.HasPrefix(info.SchemaHash, "q.query.kernel:") {
+		t.Fatalf("flat schema hash = %q, want q.query kernel payload", info.SchemaHash)
+	}
 	col, handled, err := flatValue.NativeFrameColumn("px")
 	if err != nil {
 		t.Fatalf("flat NativeFrameColumn(px): %v", err)
@@ -1131,6 +1140,20 @@ flat := q.query(trades, {
 	px, ok := col.DenseArray().F64()
 	if !ok || len(px) != 2 || px[0] != 10 || px[1] != 12 {
 		t.Fatalf("flat px column = %#v, want [10 12]", px)
+	}
+	ordered := interp.GetGlobal("ordered").Table()
+	if ordered == nil || ordered.Length() != 2 {
+		t.Fatalf("ordered length = %v, want 2", ordered)
+	}
+	if got := ordered.RawGetInt(1).Table().RawGetString("px"); !got.IsFloat() || got.Float() != 12 {
+		t.Fatalf("ordered[1].px = %v, want 12", got)
+	}
+	orderedInfo, ok := TableValue(ordered).NativeFramePayloadInfo()
+	if !ok {
+		t.Fatal("ordered missing native frame payload info")
+	}
+	if strings.HasPrefix(orderedInfo.SchemaHash, "q.query.kernel:") {
+		t.Fatalf("ordered schema hash = %q, want ordered fallback payload", orderedInfo.SchemaHash)
 	}
 }
 

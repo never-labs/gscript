@@ -932,7 +932,9 @@ func qRunQuery(s *SoA, spec *Table) (*Table, error) {
 		return nil, err
 	}
 	var rows *Table
+	var nativeRows *SoA
 	if len(aggs) == 0 {
+		nativeRows, _ = qSimpleSelectRowsNativeSoA(s, mask, selects)
 		rows, err = qRows(s, mask, selects)
 	} else {
 		rows, err = qGroupedRows(s, mask, by, selects, aggs)
@@ -944,7 +946,11 @@ func qRunQuery(s *SoA, spec *Table) (*Table, error) {
 	if err != nil {
 		return nil, err
 	}
-	qAttachRowsNativeFramePayload(rows)
+	if nativeRows != nil && qQueryKeepsRowOrder(spec) {
+		qAttachRowsNativeSoAPayload(rows, nativeRows)
+	} else {
+		qAttachRowsNativeFramePayload(rows)
+	}
 	return rows, nil
 }
 
@@ -3983,6 +3989,67 @@ func qAttachRowsNativeFramePayload(rows *Table) {
 		return
 	}
 	setDataFrameNativePayload(rows, frame)
+}
+
+func qAttachRowsNativeSoAPayload(rows *Table, soa *SoA) {
+	if rows == nil || soa == nil || rows.Length() != soa.Len() {
+		return
+	}
+	rows.SetNativePayloadWithInfo(soa, NativePayloadInfo{
+		Kind:       NativePayloadDataFrame,
+		Rows:       soa.Len(),
+		Columns:    len(soa.ColumnNames()),
+		SchemaHash: qQueryNativeSoASchemaHash(soa),
+	})
+}
+
+func qSimpleSelectRowsNativeSoA(s *SoA, mask *DenseArray, selects []qSelect) (*SoA, bool) {
+	if s == nil || mask == nil || len(selects) == 0 {
+		return nil, false
+	}
+	filtered, err := s.Filter(mask)
+	if err != nil {
+		return nil, false
+	}
+	cols := make(map[string]*DenseArray, len(selects))
+	for _, sel := range selects {
+		if !sel.Expr.IsString() {
+			return nil, false
+		}
+		col, ok := filtered.Column(sel.Expr.Str())
+		if !ok {
+			return nil, false
+		}
+		cols[sel.Name] = col
+	}
+	out, err := NewSoA(cols)
+	if err != nil {
+		return nil, false
+	}
+	return out, true
+}
+
+func qQueryKeepsRowOrder(spec *Table) bool {
+	if spec == nil {
+		return true
+	}
+	return spec.RawGetString("order_by").IsNil() && spec.RawGetString("limit").IsNil()
+}
+
+func qQueryNativeSoASchemaHash(soa *SoA) string {
+	if soa == nil {
+		return "q.query.kernel:"
+	}
+	names := soa.ColumnNames()
+	parts := make([]string, 0, len(names))
+	for _, name := range names {
+		col, ok := soa.Column(name)
+		if !ok {
+			continue
+		}
+		parts = append(parts, name+":"+col.DType().String())
+	}
+	return "q.query.kernel:" + strings.Join(parts, ",")
 }
 
 func qRowColumnNames(row *Table) ([]string, error) {
