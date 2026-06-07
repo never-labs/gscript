@@ -89,6 +89,7 @@ var opSpecs = [...]OpSpec{
 	OpFrameFilter:                   opSpecArgCount(opSpec("FrameFilter", OpEmitterTable, OpArgFixed, OpSideEffectRead, true), OpFixedCount(2)),
 	OpFrameGather:                   opSpecArgCount(opSpec("FrameGather", OpEmitterTable, OpArgFixed, OpSideEffectRead, true), OpFixedCount(2)),
 	OpFrameSlice:                    opSpecArgCount(opSpec("FrameSlice", OpEmitterTable, OpArgFixed, OpSideEffectRead, true), OpFixedCount(2)),
+	OpFrameOrder:                    opSpecArgCount(opSpec("FrameOrder", OpEmitterTable, OpArgFixedAux, OpSideEffectRead, true), OpFixedCount(1)),
 	OpVectorGather:                  opSpecArgCount(opSpec("VectorGather", OpEmitterTable, OpArgFixed, OpSideEffectRead, true), OpFixedCount(2)),
 	OpVectorCompare:                 opSpecArgCount(opSpec("VectorCompare", OpEmitterTable, OpArgFixedAux, OpSideEffectRead, true), OpFixedCount(2)),
 	OpGetField:                      opSpec("GetField", OpEmitterField, OpArgFixedAux, OpSideEffectRead, true),

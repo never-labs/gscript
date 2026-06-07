@@ -396,6 +396,19 @@ func (tm *TieringManager) executeOpExit(ctx *ExecContext, regs []runtime.Value, 
 		}
 		regs[absSlot] = out
 
+	case OpFrameOrder:
+		if absArg1 >= len(regs) || absSlot >= len(regs) {
+			return fmt.Errorf("FrameOrder op-exit out of register range")
+		}
+		if aux < 0 || proto == nil || aux >= len(proto.Constants) {
+			return fmt.Errorf("FrameOrder spec constant is out of range")
+		}
+		out, err := executeFrameOrderValue(regs[absArg1], proto.Constants[aux])
+		if err != nil {
+			return err
+		}
+		regs[absSlot] = out
+
 	case OpVectorGather:
 		if absArg1 >= len(regs) || absArg2 >= len(regs) || absSlot >= len(regs) {
 			return fmt.Errorf("VectorGather op-exit out of register range")

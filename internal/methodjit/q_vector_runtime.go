@@ -84,6 +84,21 @@ func executeFrameSliceValue(frameVal, endVal runtime.Value) (runtime.Value, erro
 	return out, nil
 }
 
+func executeFrameOrderValue(frameVal runtime.Value, spec runtime.Value) (runtime.Value, error) {
+	names, desc, limit, err := frameOrderSpec(spec)
+	if err != nil {
+		return runtime.NilValue(), err
+	}
+	out, handled, err := frameVal.NativeFrameOrderIndexes(names, desc, limit)
+	if err != nil {
+		return runtime.NilValue(), err
+	}
+	if !handled {
+		return runtime.NilValue(), fmt.Errorf("FrameOrder operand must be native frame (got %s)", frameVal.TypeName())
+	}
+	return out, nil
+}
+
 func frameProjectColumnNames(v runtime.Value) ([]string, error) {
 	if v.IsString() {
 		return []string{v.Str()}, nil
@@ -101,6 +116,55 @@ func frameProjectColumnNames(v runtime.Value) ([]string, error) {
 		names = append(names, item.Str())
 	}
 	return names, nil
+}
+
+func frameOrderSpec(v runtime.Value) ([]string, []bool, int, error) {
+	if v.IsString() {
+		return []string{v.Str()}, []bool{false}, -1, nil
+	}
+	if !v.IsTable() {
+		return nil, nil, -1, fmt.Errorf("FrameOrder spec must be a string or table")
+	}
+	tbl := v.Table()
+	limit := -1
+	if limitValue := tbl.RawGetString("limit"); !limitValue.IsNil() {
+		if !limitValue.IsInt() {
+			return nil, nil, -1, fmt.Errorf("FrameOrder limit must be an integer")
+		}
+		if limitValue.Int() < 0 {
+			return nil, nil, -1, fmt.Errorf("FrameOrder limit must be non-negative")
+		}
+		limit = int(limitValue.Int())
+	}
+	if col := tbl.RawGetString("column"); col.IsString() {
+		return []string{col.Str()}, []bool{frameOrderTruthy(tbl.RawGetString("desc"))}, limit, nil
+	}
+	n := tbl.Length()
+	names := make([]string, 0, n)
+	desc := make([]bool, 0, n)
+	for i := 1; i <= n; i++ {
+		item := tbl.RawGetInt(int64(i))
+		switch {
+		case item.IsString():
+			names = append(names, item.Str())
+			desc = append(desc, false)
+		case item.IsTable():
+			itemTable := item.Table()
+			col := itemTable.RawGetString("column")
+			if !col.IsString() {
+				return nil, nil, -1, fmt.Errorf("FrameOrder item %d must provide column", i)
+			}
+			names = append(names, col.Str())
+			desc = append(desc, frameOrderTruthy(itemTable.RawGetString("desc")))
+		default:
+			return nil, nil, -1, fmt.Errorf("FrameOrder item %d must be a string or table", i)
+		}
+	}
+	return names, desc, limit, nil
+}
+
+func frameOrderTruthy(v runtime.Value) bool {
+	return !(v.IsNil() || (v.IsBool() && !v.Bool()))
 }
 
 func executeFrameLenValue(frameVal runtime.Value) (runtime.Value, error) {

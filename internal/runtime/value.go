@@ -3,6 +3,7 @@ package runtime
 import (
 	"fmt"
 	"math"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -838,6 +839,82 @@ func (v Value) NativeFrameSlice(start, end int) (Value, bool, error) {
 	}
 }
 
+// NativeFrameOrderIndexes returns 1-based row indexes sorted by native frame
+// column values. Desc flags must either be omitted or match the column count.
+// A non-negative limit truncates indexes before returning.
+func (v Value) NativeFrameOrderIndexes(names []string, desc []bool, limit int) (Value, bool, error) {
+	if len(names) == 0 {
+		return NilValue(), true, fmt.Errorf("FRAME_ORDER_INDEXES requires at least one column")
+	}
+	if len(desc) != 0 && len(desc) != len(names) {
+		return NilValue(), true, fmt.Errorf("FRAME_ORDER_INDEXES desc flags must match column count")
+	}
+	if !v.IsTable() {
+		return NilValue(), false, nil
+	}
+	tbl := v.Table()
+	if tbl == nil {
+		return NilValue(), false, nil
+	}
+	payload, _, ok := tbl.NativeFramePayload()
+	if !ok {
+		return NilValue(), false, nil
+	}
+	switch frame := payload.(type) {
+	case *SoA:
+		cols := make([]*DenseArray, len(names))
+		for i, name := range names {
+			if name == "" {
+				return NilValue(), true, fmt.Errorf("FRAME_ORDER_INDEXES column name must not be empty")
+			}
+			col, ok := frame.Column(name)
+			if !ok {
+				return NilValue(), true, fmt.Errorf("FRAME_ORDER_INDEXES unknown column %q", name)
+			}
+			cols[i] = col
+		}
+		indices := make([]int64, frame.Len())
+		for i := range indices {
+			indices[i] = int64(i + 1)
+		}
+		var cmpErr error
+		sort.SliceStable(indices, func(i, j int) bool {
+			leftIdx := int(indices[i] - 1)
+			rightIdx := int(indices[j] - 1)
+			for k, col := range cols {
+				left, err := col.At(leftIdx)
+				if err != nil {
+					cmpErr = err
+					return false
+				}
+				right, err := col.At(rightIdx)
+				if err != nil {
+					cmpErr = err
+					return false
+				}
+				cmp := nativeFrameCompareValues(left, right)
+				if cmp == 0 {
+					continue
+				}
+				if len(desc) > 0 && desc[k] {
+					return cmp > 0
+				}
+				return cmp < 0
+			}
+			return false
+		})
+		if cmpErr != nil {
+			return NilValue(), true, cmpErr
+		}
+		if limit >= 0 && limit < len(indices) {
+			indices = indices[:limit]
+		}
+		return DenseArrayValue(NewDenseArrayI64(indices)), true, nil
+	default:
+		return NilValue(), true, fmt.Errorf("FRAME_ORDER_INDEXES unsupported native frame payload %T", payload)
+	}
+}
+
 func nativeFrameProjectSchemaHash(source string, names []string) string {
 	joined := strings.Join(names, ",")
 	if source == "" {
@@ -865,6 +942,51 @@ func nativeFrameSliceSchemaHash(source string) string {
 		return "slice"
 	}
 	return source + "|slice"
+}
+
+func nativeFrameCompareValues(left, right Value) int {
+	switch {
+	case left.IsNumber() && right.IsNumber():
+		lf, rf := left.Number(), right.Number()
+		if lf < rf {
+			return -1
+		}
+		if lf > rf {
+			return 1
+		}
+		return 0
+	case left.IsString() && right.IsString():
+		if left.Str() < right.Str() {
+			return -1
+		}
+		if left.Str() > right.Str() {
+			return 1
+		}
+		return 0
+	case left.IsBool() && right.IsBool():
+		if left.Bool() == right.Bool() {
+			return 0
+		}
+		if !left.Bool() {
+			return -1
+		}
+		return 1
+	case left.IsNil() && right.IsNil():
+		return 0
+	case left.IsNil():
+		return -1
+	case right.IsNil():
+		return 1
+	default:
+		ls, rs := left.String(), right.String()
+		if ls < rs {
+			return -1
+		}
+		if ls > rs {
+			return 1
+		}
+		return 0
+	}
 }
 
 func (v Value) nativeFramePayloadKind() (NativePayloadKind, bool) {

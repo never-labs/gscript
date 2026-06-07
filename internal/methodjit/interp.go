@@ -1103,6 +1103,17 @@ func (s *interpState) execInstr(instr *Instr, block *Block) ([]runtime.Value, bo
 		}
 		s.values[instr.ID] = out
 
+	case OpFrameOrder:
+		idx := int(instr.Aux)
+		if idx < 0 || idx >= len(s.fn.Proto.Constants) {
+			return nil, false, fmt.Errorf("FrameOrder spec constant is out of range")
+		}
+		out, err := executeFrameOrderValue(s.val(instr.Args[0]), s.fn.Proto.Constants[idx])
+		if err != nil {
+			return nil, false, err
+		}
+		s.values[instr.ID] = out
+
 	case OpVectorGather:
 		out, err := executeVectorGatherValue(s.val(instr.Args[0]), s.val(instr.Args[1]))
 		if err != nil {

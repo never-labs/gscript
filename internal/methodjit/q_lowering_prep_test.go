@@ -249,6 +249,46 @@ func TestFrameSliceBytecodeBuildsMethodJITIR(t *testing.T) {
 	}
 }
 
+func TestFrameOrderBytecodeBuildsMethodJITIR(t *testing.T) {
+	order := runtime.NewTable()
+	order.RawSetString("column", runtime.StringValue("price"))
+	proto := &vm.FuncProto{
+		Name:      "frame_order",
+		NumParams: 1,
+		MaxStack:  2,
+		Constants: []runtime.Value{
+			runtime.TableValue(order),
+		},
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_FRAME_ORDER, 1, 0, 0),
+			vm.EncodeABC(vm.OP_RETURN, 1, 2, 0),
+		},
+	}
+
+	fn := BuildGraph(proto)
+	var orderInstr *Instr
+	for _, block := range fn.Blocks {
+		for _, instr := range block.Instrs {
+			if instr.Op == OpFrameOrder {
+				orderInstr = instr
+				break
+			}
+		}
+	}
+	if orderInstr == nil {
+		t.Fatalf("BuildGraph did not emit OpFrameOrder:\n%s", Print(fn))
+	}
+	if len(orderInstr.Args) != 1 {
+		t.Fatalf("OpFrameOrder arg count = %d, want 1", len(orderInstr.Args))
+	}
+	if orderInstr.Type != TypeAny {
+		t.Fatalf("OpFrameOrder type = %s, want Any", orderInstr.Type)
+	}
+	if orderInstr.Aux != 0 {
+		t.Fatalf("OpFrameOrder Aux = %d, want const index 0", orderInstr.Aux)
+	}
+}
+
 func TestQFramePrimitivePipelineBuildsMethodJITIR(t *testing.T) {
 	names := runtime.NewTable()
 	names.RawSetInt(1, runtime.StringValue("size"))
@@ -334,6 +374,46 @@ func TestQFramePrimitiveHotPathDetectsGatheredRows(t *testing.T) {
 	}
 	if paths[0].Compare.Aux != int64(runtime.DenseArrayGE) {
 		t.Fatalf("q gathered hot path compare Aux = %d, want %d", paths[0].Compare.Aux, runtime.DenseArrayGE)
+	}
+}
+
+func TestQFramePrimitiveHotPathDetectsOrderedRows(t *testing.T) {
+	names := runtime.NewTable()
+	names.RawSetInt(1, runtime.StringValue("size"))
+	order := runtime.NewTable()
+	order.RawSetString("column", runtime.StringValue("price"))
+	order.RawSetString("desc", runtime.BoolValue(true))
+	proto := &vm.FuncProto{
+		Name:      "q_frame_ordered_pipeline",
+		NumParams: 1,
+		MaxStack:  4,
+		Constants: []runtime.Value{
+			runtime.StringValue("price"),
+			runtime.FloatValue(100),
+			runtime.TableValue(order),
+			runtime.TableValue(names),
+			runtime.StringValue("size"),
+		},
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_FRAME_COLUMN, 1, 0, 0),
+			vm.EncodeABx(vm.OP_LOADK, 2, 1),
+			vm.EncodeABC(vm.OP_VECTOR_COMPARE, 1, 2, int(runtime.DenseArrayGE)),
+			vm.EncodeABC(vm.OP_FRAME_FILTER, 0, 0, 1),
+			vm.EncodeABC(vm.OP_FRAME_ORDER, 3, 0, 2),
+			vm.EncodeABC(vm.OP_FRAME_GATHER, 0, 0, 3),
+			vm.EncodeABC(vm.OP_FRAME_PROJECT, 0, 0, 3),
+			vm.EncodeABC(vm.OP_FRAME_COLUMN, 0, 0, 4),
+			vm.EncodeABC(vm.OP_RETURN, 0, 2, 0),
+		},
+	}
+
+	fn := BuildGraph(proto)
+	paths := DetectQQueryHotPaths(fn)
+	if len(paths) != 1 {
+		t.Fatalf("DetectQQueryHotPaths count = %d, want 1\n%s", len(paths), Print(fn))
+	}
+	if paths[0].RowGather == nil || paths[0].RowOrder == nil {
+		t.Fatalf("DetectQQueryHotPaths RowGather=%v RowOrder=%v, want both\n%s", paths[0].RowGather, paths[0].RowOrder, Print(fn))
 	}
 }
 
@@ -582,6 +662,28 @@ func TestTier2GateAllowsFrameSliceThroughOpExit(t *testing.T) {
 	}
 }
 
+func TestTier2GateAllowsFrameOrderThroughOpExit(t *testing.T) {
+	order := runtime.NewTable()
+	order.RawSetString("column", runtime.StringValue("price"))
+	proto := &vm.FuncProto{
+		Name:      "frame_order",
+		NumParams: 1,
+		MaxStack:  2,
+		Constants: []runtime.Value{
+			runtime.TableValue(order),
+		},
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_FRAME_ORDER, 1, 0, 0),
+			vm.EncodeABC(vm.OP_RETURN, 1, 2, 0),
+		},
+	}
+
+	gate := firstUnsupportedTier2BytecodeGate(proto)
+	if !gate.Allowed {
+		t.Fatalf("OP_FRAME_ORDER should be Tier2-eligible via op-exit, got %q", gate.Reason)
+	}
+}
+
 func TestTier2GateAllowsVectorGatherThroughOpExit(t *testing.T) {
 	proto := &vm.FuncProto{
 		Name:     "vector_gather",
@@ -789,6 +891,38 @@ func TestFrameSliceRuntimeHelperUsesRuntimePrimitive(t *testing.T) {
 	got, ok := col.DenseArray().I64()
 	if !ok || len(got) != 2 || got[0] != 100 || got[1] != 200 {
 		t.Fatalf("sliced size values = %#v, want [100 200]", got)
+	}
+}
+
+func TestFrameOrderRuntimeHelperUsesRuntimePrimitive(t *testing.T) {
+	soa, err := runtime.NewSoA(map[string]*runtime.DenseArray{
+		"price": runtime.NewDenseArrayF64([]float64{10.5, 20.25, 30.75}),
+		"size":  runtime.NewDenseArrayI64([]int64{100, 200, 300}),
+	})
+	if err != nil {
+		t.Fatalf("NewSoA: %v", err)
+	}
+	frame := runtime.NewTable()
+	frame.SetNativePayloadWithInfo(soa, runtime.NativePayloadInfo{
+		Kind:    runtime.NativePayloadDataFrame,
+		Rows:    soa.Len(),
+		Columns: 2,
+	})
+	order := runtime.NewTable()
+	order.RawSetString("column", runtime.StringValue("price"))
+	order.RawSetString("desc", runtime.BoolValue(true))
+	order.RawSetString("limit", runtime.IntValue(2))
+
+	result, err := executeFrameOrderValue(runtime.TableValue(frame), runtime.TableValue(order))
+	if err != nil {
+		t.Fatalf("execute frame order: %v", err)
+	}
+	if !result.IsDenseArray() {
+		t.Fatalf("frame order result = %#v, want dense array", result)
+	}
+	got, ok := result.DenseArray().I64()
+	if !ok || len(got) != 2 || got[0] != 3 || got[1] != 2 {
+		t.Fatalf("frame order indexes = %#v, want [3 2]", got)
 	}
 }
 

@@ -331,6 +331,50 @@ func TestFrameSlicePrimitiveSlicesSoARows(t *testing.T) {
 	}
 }
 
+func TestFrameOrderPrimitiveBuildsGatherIndexes(t *testing.T) {
+	soa, err := runtime.NewSoA(map[string]*runtime.DenseArray{
+		"price": runtime.NewDenseArrayF64([]float64{10, 12, 8}),
+		"id":    runtime.NewDenseArrayI64([]int64{10, 20, 30}),
+	})
+	if err != nil {
+		t.Fatalf("NewSoA: %v", err)
+	}
+	frame := runtime.NewTable()
+	frame.SetNativePayloadWithInfo(soa, runtime.NativePayloadInfo{
+		Kind:       runtime.NativePayloadDataFrame,
+		Rows:       soa.Len(),
+		Columns:    2,
+		SchemaHash: "soa-frame-test",
+	})
+	order := runtime.NewTable()
+	order.RawSetString("column", runtime.StringValue("price"))
+	order.RawSetString("desc", runtime.BoolValue(true))
+	order.RawSetString("limit", runtime.IntValue(2))
+	proto := &FuncProto{
+		MaxStack:  2,
+		Code:      frameOrderPrimitiveProgram(),
+		Constants: []runtime.Value{runtime.TableValue(frame), runtime.TableValue(order), runtime.StringValue("id")},
+	}
+	proto.EnsureFeedback()
+
+	results, err := New(map[string]runtime.Value{}).Execute(proto)
+	if err != nil {
+		t.Fatalf("Execute FRAME_ORDER: %v", err)
+	}
+	if len(results) != 1 || !results[0].IsDenseArray() {
+		t.Fatalf("FRAME_ORDER follow-up column result = %#v, want dense array", results)
+	}
+	got, ok := results[0].DenseArray().I64()
+	if !ok || len(got) != 2 || got[0] != 20 || got[1] != 10 {
+		t.Fatalf("ordered id column = %#v, want [20 10]", got)
+	}
+
+	fb := proto.Feedback[1]
+	if fb.Left != FBTable || fb.Right != FBTable || fb.Result != FBAny {
+		t.Fatalf("FRAME_ORDER feedback = left %v right %v result %v, want table/table/dense bucket", fb.Left, fb.Right, fb.Result)
+	}
+}
+
 func TestFramePrimitivePipelineFiltersProjectsAndLoadsColumn(t *testing.T) {
 	soa, err := runtime.NewSoA(map[string]*runtime.DenseArray{
 		"price": runtime.NewDenseArrayF64([]float64{99, 100.5, 101.25}),
@@ -421,6 +465,16 @@ func frameSlicePrimitiveProgram() []uint32 {
 		EncodeABx(OP_LOADK, 0, 0),
 		EncodeABx(OP_LOADK, 1, 1),
 		EncodeABC(OP_FRAME_SLICE, 0, 0, 1),
+		EncodeABC(OP_FRAME_COLUMN, 0, 0, 2),
+		EncodeABC(OP_RETURN, 0, 2, 0),
+	}
+}
+
+func frameOrderPrimitiveProgram() []uint32 {
+	return []uint32{
+		EncodeABx(OP_LOADK, 0, 0),
+		EncodeABC(OP_FRAME_ORDER, 1, 0, 1),
+		EncodeABC(OP_FRAME_GATHER, 0, 0, 1),
 		EncodeABC(OP_FRAME_COLUMN, 0, 0, 2),
 		EncodeABC(OP_RETURN, 0, 2, 0),
 	}

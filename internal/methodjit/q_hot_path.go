@@ -15,6 +15,7 @@ type QQueryHotPath struct {
 	Filter       *Instr
 	RowGather    *Instr
 	RowSlice     *Instr
+	RowOrder     *Instr
 	Project      *Instr
 	ResultColumn *Instr
 }
@@ -43,11 +44,13 @@ func DetectQQueryHotPaths(fn *Function) []QQueryHotPath {
 			filterInput := project.Args[0]
 			var rowGather *Instr
 			var rowSlice *Instr
+			var rowOrder *Instr
 			if gather := valueDef(filterInput, OpFrameGather); gather != nil {
 				if len(gather.Args) != 2 {
 					continue
 				}
 				rowGather = gather
+				rowOrder = valueDef(gather.Args[1], OpFrameOrder)
 				filterInput = gather.Args[0]
 			} else if slice := valueDef(filterInput, OpFrameSlice); slice != nil {
 				if len(slice.Args) != 2 {
@@ -77,6 +80,7 @@ func DetectQQueryHotPaths(fn *Function) []QQueryHotPath {
 				Filter:       filter,
 				RowGather:    rowGather,
 				RowSlice:     rowSlice,
+				RowOrder:     rowOrder,
 				Project:      project,
 				ResultColumn: instr,
 			})
