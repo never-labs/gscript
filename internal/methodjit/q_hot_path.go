@@ -1,5 +1,7 @@
 package methodjit
 
+import "fmt"
+
 // QQueryHotPath describes an IR pattern for the q query primitive pipeline:
 // column load -> typed compare mask -> frame filter -> frame projection ->
 // projected column load.
@@ -57,6 +59,33 @@ func DetectQQueryHotPaths(fn *Function) []QQueryHotPath {
 		}
 	}
 	return out
+}
+
+// QQueryHotPathRemarkPass records visible q query primitive hot paths in the
+// structured optimization remark stream. It does not mutate IR; the remark is a
+// handoff point for diagnostics and future native lowering policy.
+func QQueryHotPathRemarkPass(fn *Function) (*Function, error) {
+	paths := DetectQQueryHotPaths(fn)
+	if len(paths) == 0 {
+		return fn, nil
+	}
+	first := paths[0].ResultColumn
+	blockID, valueID := 0, 0
+	if first != nil {
+		valueID = first.ID
+		if first.Block != nil {
+			blockID = first.Block.ID
+		}
+	}
+	functionRemarks(fn).Add(
+		"QQueryHotPath",
+		"missed",
+		blockID,
+		valueID,
+		OpFrameColumn,
+		fmt.Sprintf("recognized %d q query primitive hot path(s); native lowering pending", len(paths)),
+	)
+	return fn, nil
 }
 
 func qQueryCompareColumn(compare *Instr) *Instr {
