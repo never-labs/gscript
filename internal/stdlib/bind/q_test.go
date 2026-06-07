@@ -925,6 +925,9 @@ func TestQNativeFramePayloadKindMismatchFailsClosed(t *testing.T) {
 	if _, err := qKeyedFrameFromValue(TableValue(frameAsKeyed)); err == nil || !strings.Contains(err.Error(), "native keyed frame payload is invalid") {
 		t.Fatalf("frame payload with keyed kind qKeyedFrameFromValue err = %v, want invalid keyed payload", err)
 	}
+	if _, err := qDataFrameFromValue(TableValue(frameAsKeyed), ""); err == nil || !strings.Contains(err.Error(), "native keyed frame payload is invalid") {
+		t.Fatalf("frame payload with keyed kind qDataFrameFromValue err = %v, want invalid keyed payload", err)
+	}
 
 	keyedAsFrame := NewTable()
 	keyedAsFrame.SetNativePayloadWithInfo(keyed, NativePayloadInfo{

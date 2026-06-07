@@ -2829,6 +2829,16 @@ func qDataFrameFromValue(v Value, sourceName string) (data.Frame, error) {
 		return data.Frame{}, fmt.Errorf("argument 1 must be a frame table or soa")
 	}
 	tbl := v.Table()
+	if qNativeFrameRuntimeKindMatches(tbl, NativePayloadKeyedFrame) {
+		keyed, ok, err := qNativeKeyedFramePayload(tbl)
+		if err != nil {
+			return data.Frame{}, err
+		}
+		if !ok {
+			return data.Frame{}, fmt.Errorf("native keyed frame payload is invalid")
+		}
+		return keyed.Frame(), nil
+	}
 	if native, ok, err := qNativeDataFramePayload(tbl); err != nil {
 		return data.Frame{}, err
 	} else if ok {

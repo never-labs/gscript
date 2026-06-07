@@ -21,6 +21,10 @@ func (e queryKernelFingerprintFallbackExpr) EvalRow(Frame, int) (any, error) {
 	return e.Name, nil
 }
 
+type queryKernelFingerprintHiddenStruct struct {
+	hidden int
+}
+
 func TestTypedKernelRegistryHelpers(t *testing.T) {
 	mask := make([]bool, 4)
 	if ok := typedKernels.CompareMask(NewI32([]int32{1, 2, 3, 2}), OpGE, int32(2), mask); !ok {
@@ -565,6 +569,54 @@ func TestCompiledQueryKernelClonesStructLiterals(t *testing.T) {
 	}
 }
 
+func TestCompiledQueryKernelClonesPointerLiterals(t *testing.T) {
+	type literalStruct struct {
+		Nested []any
+	}
+	type recursiveStruct struct {
+		Next *recursiveStruct
+	}
+	nested := []any{Symbol("AAPL")}
+	recursive := &recursiveStruct{}
+	recursive.Next = recursive
+	plan := QueryPlan{
+		Select: []SelectItem{{
+			Name: "ptr",
+			Expr: Literal{Value: &literalStruct{Nested: nested}},
+		}, {
+			Name: "recursive",
+			Expr: Literal{Value: recursive},
+		}},
+		LimitN: -1,
+	}
+
+	compiled := cloneQueryKernelPlan(plan)
+	nested[0] = Symbol("MSFT")
+	recursive.Next = nil
+
+	got, ok := compiled.Select[0].Expr.(Literal).Value.(*literalStruct)
+	if !ok {
+		t.Fatalf("compiled pointer literal = %T, want *literalStruct", compiled.Select[0].Expr.(Literal).Value)
+	}
+	if got == plan.Select[0].Expr.(Literal).Value.(*literalStruct) {
+		t.Fatal("compiled pointer literal aliases source pointer")
+	}
+	if !reflect.DeepEqual(got.Nested, []any{Symbol("AAPL")}) {
+		t.Fatalf("compiled pointer nested list = %v, want [AAPL]", got.Nested)
+	}
+
+	gotRecursive, ok := compiled.Select[1].Expr.(Literal).Value.(*recursiveStruct)
+	if !ok {
+		t.Fatalf("compiled recursive pointer literal = %T, want *recursiveStruct", compiled.Select[1].Expr.(Literal).Value)
+	}
+	if gotRecursive == recursive {
+		t.Fatal("compiled recursive pointer literal aliases source pointer")
+	}
+	if gotRecursive.Next != gotRecursive {
+		t.Fatal("compiled recursive pointer literal does not point back to cloned pointer")
+	}
+}
+
 func TestCompiledQueryKernelClonesMapLiterals(t *testing.T) {
 	nested := []any{Symbol("AAPL")}
 	recursive := map[string]any{}
@@ -1028,6 +1080,36 @@ func TestQueryKernelPlanFingerprintAvoidsStructuralCollisions(t *testing.T) {
 	structWithSplitNestedList := QueryPlan{Where: In{Expr: ColumnRef{Name: "sym"}, Values: []any{struct{ Values []any }{Values: []any{Symbol("a"), Symbol("b,c")}}}}, LimitN: -1}
 	if got := QueryKernelPlanFingerprint(structWithNestedList); got == QueryKernelPlanFingerprint(structWithSplitNestedList) {
 		t.Fatalf("struct nested list boundary collided: %q", got)
+	}
+	structHiddenA := QueryPlan{Where: In{Expr: ColumnRef{Name: "sym"}, Values: []any{queryKernelFingerprintHiddenStruct{hidden: 1}}}, LimitN: -1}
+	structHiddenB := QueryPlan{Where: In{Expr: ColumnRef{Name: "sym"}, Values: []any{queryKernelFingerprintHiddenStruct{hidden: 2}}}, LimitN: -1}
+	if got := QueryKernelPlanFingerprint(structHiddenA); got == QueryKernelPlanFingerprint(structHiddenB) {
+		t.Fatalf("struct hidden field value collided: %q", got)
+	}
+	type pointerStruct struct {
+		Values []any
+	}
+	pointerWithNestedList := QueryPlan{Where: In{Expr: ColumnRef{Name: "sym"}, Values: []any{&pointerStruct{Values: []any{Symbol("a,b"), Symbol("c")}}}}, LimitN: -1}
+	equivalentPointerWithNestedList := QueryPlan{Where: In{Expr: ColumnRef{Name: "sym"}, Values: []any{&pointerStruct{Values: []any{Symbol("a,b"), Symbol("c")}}}}, LimitN: -1}
+	if got := QueryKernelPlanFingerprint(pointerWithNestedList); got != QueryKernelPlanFingerprint(equivalentPointerWithNestedList) {
+		t.Fatalf("equivalent pointer literal fingerprint = %q, want stable structural fingerprint", got)
+	}
+	pointerWithSplitNestedList := QueryPlan{Where: In{Expr: ColumnRef{Name: "sym"}, Values: []any{&pointerStruct{Values: []any{Symbol("a"), Symbol("b,c")}}}}, LimitN: -1}
+	if got := QueryKernelPlanFingerprint(pointerWithNestedList); got == QueryKernelPlanFingerprint(pointerWithSplitNestedList) {
+		t.Fatalf("pointer nested list boundary collided: %q", got)
+	}
+	type recursivePointerStruct struct {
+		Next *recursivePointerStruct
+	}
+	recursivePointer := &recursivePointerStruct{}
+	recursivePointer.Next = recursivePointer
+	recursivePointerLiteral := QueryPlan{Where: In{Expr: ColumnRef{Name: "sym"}, Values: []any{recursivePointer}}, LimitN: -1}
+	pointerFingerprint := QueryKernelPlanFingerprint(recursivePointerLiteral)
+	if pointerFingerprint == "" {
+		t.Fatal("recursive pointer literal fingerprint is empty")
+	}
+	if got := QueryKernelPlanFingerprint(recursivePointerLiteral); got != pointerFingerprint {
+		t.Fatalf("recursive pointer literal fingerprint = %q, want stable %q", got, pointerFingerprint)
 	}
 	mapLiteralA := QueryPlan{Where: In{Expr: ColumnRef{Name: "sym"}, Values: []any{map[Symbol]any{Symbol("b"): []any{Symbol("MSFT")}, Symbol("a"): []any{Symbol("AAPL")}}}}, LimitN: -1}
 	mapLiteralB := QueryPlan{Where: In{Expr: ColumnRef{Name: "sym"}, Values: []any{map[Symbol]any{Symbol("a"): []any{Symbol("AAPL")}, Symbol("b"): []any{Symbol("MSFT")}}}}, LimitN: -1}

@@ -304,6 +304,9 @@ func writeQueryKernelLiteralFingerprintWithSeen(b *strings.Builder, value any, s
 		if writeQueryKernelLiteralStructFingerprint(b, value, seen) {
 			return
 		}
+		if writeQueryKernelLiteralPointerFingerprint(b, value, seen) {
+			return
+		}
 		writeQueryKernelFingerprintPart(b, fmt.Sprintf("%T", value))
 		writeQueryKernelFingerprintPart(b, fmt.Sprintf("%#v", value))
 	}
@@ -315,7 +318,7 @@ type queryKernelSliceKey struct {
 }
 
 func queryKernelSliceKeyForValue(v reflect.Value) (queryKernelSliceKey, bool) {
-	if !v.IsValid() || (v.Kind() != reflect.Slice && v.Kind() != reflect.Map) || v.IsNil() {
+	if !v.IsValid() || (v.Kind() != reflect.Slice && v.Kind() != reflect.Map && v.Kind() != reflect.Pointer) || v.IsNil() {
 		return queryKernelSliceKey{}, false
 	}
 	return queryKernelSliceKey{typ: v.Type().String(), ptr: v.Pointer()}, true
@@ -431,11 +434,45 @@ func writeQueryKernelLiteralStructFingerprint(b *strings.Builder, value any, see
 		writeQueryKernelFingerprintPart(b, field.Name)
 		writeQueryKernelFingerprintPart(b, item.Type().String())
 		if !item.CanInterface() {
-			writeQueryKernelFingerprintPart(b, "<unexported>")
+			writeQueryKernelFingerprintPart(b, fmt.Sprintf("%#v", item))
 			continue
 		}
 		writeQueryKernelLiteralFingerprintWithSeen(b, item.Interface(), seen)
 	}
+	return true
+}
+
+func writeQueryKernelLiteralPointerFingerprint(b *strings.Builder, value any, seen map[queryKernelSliceKey]struct{}) bool {
+	v := reflect.ValueOf(value)
+	if !v.IsValid() || v.Kind() != reflect.Pointer {
+		return false
+	}
+	writeQueryKernelFingerprintPart(b, "ptr")
+	writeQueryKernelFingerprintPart(b, v.Type().String())
+	writeQueryKernelFingerprintPart(b, strconv.FormatBool(v.IsNil()))
+	if v.IsNil() {
+		return true
+	}
+	key, ok := queryKernelSliceKeyForValue(v)
+	if ok {
+		if _, exists := seen[key]; exists {
+			writeQueryKernelFingerprintPart(b, "recursive_ptr")
+			writeQueryKernelFingerprintPart(b, key.typ)
+			return true
+		}
+		if seen == nil {
+			seen = make(map[queryKernelSliceKey]struct{})
+		}
+		seen[key] = struct{}{}
+		defer delete(seen, key)
+	}
+	item := v.Elem()
+	if !item.CanInterface() {
+		writeQueryKernelFingerprintPart(b, item.Type().String())
+		writeQueryKernelFingerprintPart(b, "<unexported>")
+		return true
+	}
+	writeQueryKernelLiteralFingerprintWithSeen(b, item.Interface(), seen)
 	return true
 }
 
@@ -612,6 +649,9 @@ func cloneQueryKernelLiteralWithSeen(value any, seen map[queryKernelSliceKey]ref
 		if cloned, ok := cloneQueryKernelLiteralStruct(value, seen); ok {
 			return cloned
 		}
+		if cloned, ok := cloneQueryKernelLiteralPointer(value, seen); ok {
+			return cloned
+		}
 		return x
 	}
 }
@@ -731,6 +771,43 @@ func cloneQueryKernelLiteralStruct(value any, seen map[queryKernelSliceKey]refle
 		if clonedValue.IsValid() && clonedValue.Type().AssignableTo(source.Type()) {
 			target.Set(clonedValue)
 		}
+	}
+	return out.Interface(), true
+}
+
+func cloneQueryKernelLiteralPointer(value any, seen map[queryKernelSliceKey]reflect.Value) (any, bool) {
+	v := reflect.ValueOf(value)
+	if !v.IsValid() || v.Kind() != reflect.Pointer {
+		return nil, false
+	}
+	if v.IsNil() {
+		return value, true
+	}
+	key, ok := queryKernelSliceKeyForValue(v)
+	if ok {
+		if cloned, exists := seen[key]; exists {
+			return cloned.Interface(), true
+		}
+		if seen == nil {
+			seen = make(map[queryKernelSliceKey]reflect.Value)
+		}
+	}
+	out := reflect.New(v.Type().Elem())
+	if ok {
+		seen[key] = out
+		defer delete(seen, key)
+	}
+	source := v.Elem()
+	if !source.CanInterface() {
+		out.Elem().Set(source)
+		return out.Interface(), true
+	}
+	cloned := cloneQueryKernelLiteralWithSeen(source.Interface(), seen)
+	clonedValue := reflect.ValueOf(cloned)
+	if clonedValue.IsValid() && clonedValue.Type().AssignableTo(source.Type()) {
+		out.Elem().Set(clonedValue)
+	} else {
+		out.Elem().Set(source)
 	}
 	return out.Interface(), true
 }
