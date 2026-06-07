@@ -1228,7 +1228,7 @@ func qSQLSourceCarrierFromResolvedValue(v Value) (qSQLSourceCarrier, error) {
 		}
 		info, hasInfo := qFramePayloadInfo(tbl, NativePayloadKeyedFrame)
 		native := false
-		if kind, ok := tbl.NativeFramePayloadKind(); ok && kind == NativePayloadKeyedFrame {
+		if qNativeFrameRuntimeKindMatches(tbl, NativePayloadKeyedFrame) {
 			native = true
 		}
 		bridge := "keyed_frame_wrapper"
@@ -1252,7 +1252,7 @@ func qSQLSourceCarrierFromResolvedValue(v Value) (qSQLSourceCarrier, error) {
 	bridge := "row_table"
 	native := false
 	info, hasInfo := qFramePayloadInfo(tbl, NativePayloadDataFrame)
-	if kind, ok := tbl.NativeFramePayloadKind(); ok && kind == NativePayloadDataFrame {
+	if qNativeFrameRuntimeKindMatches(tbl, NativePayloadDataFrame) {
 		bridge = "frame_native"
 		native = true
 	} else if qLooksLikeFrame(tbl) {
@@ -1369,6 +1369,11 @@ func qNativeFrameRuntimeKind(tbl *Table) (NativePayloadKind, bool) {
 	default:
 		return NativePayloadNone, false
 	}
+}
+
+func qNativeFrameRuntimeKindMatches(tbl *Table, want NativePayloadKind) bool {
+	kind, ok := qNativeFrameRuntimeKind(tbl)
+	return ok && kind == want
 }
 
 func qTypedNativeFramePayload(tbl *Table) (any, NativePayloadInfo, bool) {

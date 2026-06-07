@@ -285,6 +285,7 @@ func writeQueryKernelLiteralFingerprintWithSeen(b *strings.Builder, value any, s
 			defer delete(seen, key)
 		}
 		writeQueryKernelFingerprintPart(b, "list")
+		writeQueryKernelFingerprintPart(b, strconv.FormatBool(x == nil))
 		writeQueryKernelFingerprintPart(b, strconv.Itoa(len(x)))
 		for _, item := range x {
 			writeQueryKernelLiteralFingerprintWithSeen(b, item, seen)
@@ -458,8 +459,11 @@ func cloneQueryKernelLiteralList(values []any) []any {
 }
 
 func cloneQueryKernelLiteralListWithSeen(values []any, seen map[queryKernelSliceKey]reflect.Value) []any {
-	if len(values) == 0 {
+	if values == nil {
 		return nil
+	}
+	if len(values) == 0 {
+		return []any{}
 	}
 	key, ok := queryKernelSliceKeyForValue(reflect.ValueOf(values))
 	if ok {

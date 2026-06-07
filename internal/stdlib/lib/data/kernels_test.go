@@ -382,9 +382,18 @@ func TestCompiledQueryKernelClonesPlanMutableFields(t *testing.T) {
 
 func TestCompiledQueryKernelClonesNestedLiteralLists(t *testing.T) {
 	nested := []any{Symbol("AAPL")}
+	empty := []any{}
+	var nilList []any
 	values := []any{nested}
 	plan := QueryPlan{
-		Where:  In{Expr: ColumnRef{Name: "sym"}, Values: values},
+		Where: In{Expr: ColumnRef{Name: "sym"}, Values: values},
+		Select: []SelectItem{{
+			Name: "empty",
+			Expr: Literal{Value: empty},
+		}, {
+			Name: "nil_list",
+			Expr: Literal{Value: nilList},
+		}},
 		LimitN: -1,
 	}
 	compiled := cloneQueryKernelPlan(plan)
@@ -402,6 +411,16 @@ func TestCompiledQueryKernelClonesNestedLiteralLists(t *testing.T) {
 	}
 	if !reflect.DeepEqual(gotNested, []any{Symbol("AAPL")}) {
 		t.Fatalf("compiled nested literal = %v, want [AAPL]", gotNested)
+	}
+	gotEmpty, ok := compiled.Select[0].Expr.(Literal).Value.([]any)
+	if !ok {
+		t.Fatalf("compiled empty literal = %T, want []any", compiled.Select[0].Expr.(Literal).Value)
+	}
+	if gotEmpty == nil || len(gotEmpty) != 0 {
+		t.Fatalf("compiled empty literal = %#v, want non-nil empty []any", gotEmpty)
+	}
+	if gotNil, ok := compiled.Select[1].Expr.(Literal).Value.([]any); !ok || gotNil != nil {
+		t.Fatalf("compiled nil list literal = %#v (%T), want nil []any", compiled.Select[1].Expr.(Literal).Value, compiled.Select[1].Expr.(Literal).Value)
 	}
 }
 
@@ -863,6 +882,11 @@ func TestQueryKernelPlanFingerprintAvoidsStructuralCollisions(t *testing.T) {
 	emptyTypedSlice := QueryPlan{Where: In{Expr: ColumnRef{Name: "sym"}, Values: []any{[]Symbol{}}}, LimitN: -1}
 	if got := QueryKernelPlanFingerprint(nilTypedSlice); got == QueryKernelPlanFingerprint(emptyTypedSlice) {
 		t.Fatalf("nil/empty typed slice literal collided: %q", got)
+	}
+	nilListLiteral := QueryPlan{Where: In{Expr: ColumnRef{Name: "sym"}, Values: []any{([]any)(nil)}}, LimitN: -1}
+	emptyListLiteral := QueryPlan{Where: In{Expr: ColumnRef{Name: "sym"}, Values: []any{[]any{}}}, LimitN: -1}
+	if got := QueryKernelPlanFingerprint(nilListLiteral); got == QueryKernelPlanFingerprint(emptyListLiteral) {
+		t.Fatalf("nil/empty list literal collided: %q", got)
 	}
 	typedNaNSlice := QueryPlan{Where: In{Expr: ColumnRef{Name: "px"}, Values: []any{[]float64{math.NaN()}}}, LimitN: -1}
 	typedNaNPayloadSlice := QueryPlan{Where: In{Expr: ColumnRef{Name: "px"}, Values: []any{[]float64{math.Float64frombits(0x7ff8000000000001)}}}, LimitN: -1}
