@@ -862,7 +862,7 @@ func (v Value) NativeFrameOrderIndexes(names []string, desc []bool, limit int) (
 	}
 	switch frame := payload.(type) {
 	case *SoA:
-		cols := make([]*DenseArray, len(names))
+		comparers := make([]nativeFrameOrderComparer, len(names))
 		for i, name := range names {
 			if name == "" {
 				return NilValue(), true, fmt.Errorf("FRAME_ORDER_INDEXES column name must not be empty")
@@ -871,28 +871,21 @@ func (v Value) NativeFrameOrderIndexes(names []string, desc []bool, limit int) (
 			if !ok {
 				return NilValue(), true, fmt.Errorf("FRAME_ORDER_INDEXES unknown column %q", name)
 			}
-			cols[i] = col
+			comparer, err := nativeFrameOrderComparerFor(col)
+			if err != nil {
+				return NilValue(), true, err
+			}
+			comparers[i] = comparer
 		}
 		indices := make([]int64, frame.Len())
 		for i := range indices {
 			indices[i] = int64(i + 1)
 		}
-		var cmpErr error
 		sort.SliceStable(indices, func(i, j int) bool {
 			leftIdx := int(indices[i] - 1)
 			rightIdx := int(indices[j] - 1)
-			for k, col := range cols {
-				left, err := col.At(leftIdx)
-				if err != nil {
-					cmpErr = err
-					return false
-				}
-				right, err := col.At(rightIdx)
-				if err != nil {
-					cmpErr = err
-					return false
-				}
-				cmp := nativeFrameCompareValues(left, right)
+			for k, comparer := range comparers {
+				cmp := comparer(leftIdx, rightIdx)
 				if cmp == 0 {
 					continue
 				}
@@ -903,15 +896,60 @@ func (v Value) NativeFrameOrderIndexes(names []string, desc []bool, limit int) (
 			}
 			return false
 		})
-		if cmpErr != nil {
-			return NilValue(), true, cmpErr
-		}
 		if limit >= 0 && limit < len(indices) {
 			indices = indices[:limit]
 		}
 		return DenseArrayValue(NewDenseArrayI64(indices)), true, nil
 	default:
 		return NilValue(), true, fmt.Errorf("FRAME_ORDER_INDEXES unsupported native frame payload %T", payload)
+	}
+}
+
+type nativeFrameOrderComparer func(left, right int) int
+
+func nativeFrameOrderComparerFor(col *DenseArray) (nativeFrameOrderComparer, error) {
+	if col == nil {
+		return nil, ErrDenseArrayOperand
+	}
+	switch col.dtype {
+	case DenseArrayF64:
+		values := col.f64
+		return func(left, right int) int {
+			l, r := values[left], values[right]
+			if l < r {
+				return -1
+			}
+			if l > r {
+				return 1
+			}
+			return 0
+		}, nil
+	case DenseArrayI64:
+		values := col.i64
+		return func(left, right int) int {
+			l, r := values[left], values[right]
+			if l < r {
+				return -1
+			}
+			if l > r {
+				return 1
+			}
+			return 0
+		}, nil
+	case DenseArrayBool:
+		values := col.bools
+		return func(left, right int) int {
+			l, r := values[left], values[right]
+			if l == r {
+				return 0
+			}
+			if !l {
+				return -1
+			}
+			return 1
+		}, nil
+	default:
+		return nil, ErrDenseArrayDType
 	}
 }
 
@@ -942,51 +980,6 @@ func nativeFrameSliceSchemaHash(source string) string {
 		return "slice"
 	}
 	return source + "|slice"
-}
-
-func nativeFrameCompareValues(left, right Value) int {
-	switch {
-	case left.IsNumber() && right.IsNumber():
-		lf, rf := left.Number(), right.Number()
-		if lf < rf {
-			return -1
-		}
-		if lf > rf {
-			return 1
-		}
-		return 0
-	case left.IsString() && right.IsString():
-		if left.Str() < right.Str() {
-			return -1
-		}
-		if left.Str() > right.Str() {
-			return 1
-		}
-		return 0
-	case left.IsBool() && right.IsBool():
-		if left.Bool() == right.Bool() {
-			return 0
-		}
-		if !left.Bool() {
-			return -1
-		}
-		return 1
-	case left.IsNil() && right.IsNil():
-		return 0
-	case left.IsNil():
-		return -1
-	case right.IsNil():
-		return 1
-	default:
-		ls, rs := left.String(), right.String()
-		if ls < rs {
-			return -1
-		}
-		if ls > rs {
-			return 1
-		}
-		return 0
-	}
 }
 
 func (v Value) nativeFramePayloadKind() (NativePayloadKind, bool) {

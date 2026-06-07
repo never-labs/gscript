@@ -34,6 +34,18 @@ func TestNativeFrameOrderIndexesSortsAndLimitsRows(t *testing.T) {
 	if !ok || len(got) != 3 || got[0] != 2 || got[1] != 3 || got[2] != 1 {
 		t.Fatalf("order indexes = %#v, want [2 3 1]", got)
 	}
+
+	boolIndexes, handled, err := TableValue(frame).NativeFrameOrderIndexes([]string{"live"}, []bool{false}, -1)
+	if err != nil {
+		t.Fatalf("NativeFrameOrderIndexes bool: %v", err)
+	}
+	if !handled || !boolIndexes.IsDenseArray() {
+		t.Fatalf("NativeFrameOrderIndexes bool = %v handled=%v, want dense array", boolIndexes, handled)
+	}
+	boolGot, ok := boolIndexes.DenseArray().I64()
+	if !ok || len(boolGot) != 4 || boolGot[0] != 2 || boolGot[1] != 1 || boolGot[2] != 3 || boolGot[3] != 4 {
+		t.Fatalf("bool order indexes = %#v, want [2 1 3 4]", boolGot)
+	}
 }
 
 func TestNativeFrameOrderIndexesRejectsMissingColumn(t *testing.T) {
