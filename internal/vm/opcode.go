@@ -109,6 +109,7 @@ const (
 	OP_FRAME_COLUMN   // A B C : R(A) = native frame column Constants[C] from frame R(B)
 	OP_FRAME_PROJECT  // A B C : R(A) = native frame projection Constants[C] from frame R(B)
 	OP_FRAME_FILTER   // A B C : R(A) = native frame R(B) filtered by bool mask R(C)
+	OP_FRAME_GATHER   // A B C : R(A) = native frame R(B) gathered by i64 indexes R(C)
 	OP_VECTOR_COMPARE // A B C : R(A) = compare(R(A), R(B), dense-array op C)
 	OP_VECTOR_GATHER  // A B : R(A) = gather(dense-array R(A), i64-indexes dense-array R(B))
 
@@ -268,6 +269,7 @@ var opNames = [...]string{
 	OP_FRAME_COLUMN:   "FRAME_COLUMN",
 	OP_FRAME_PROJECT:  "FRAME_PROJECT",
 	OP_FRAME_FILTER:   "FRAME_FILTER",
+	OP_FRAME_GATHER:   "FRAME_GATHER",
 	OP_VECTOR_COMPARE: "VECTOR_COMPARE",
 	OP_VECTOR_GATHER:  "VECTOR_GATHER",
 }

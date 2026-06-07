@@ -766,6 +766,42 @@ func (v Value) NativeFrameFilter(mask *DenseArray) (Value, bool, error) {
 	}
 }
 
+// NativeFrameGather returns a new runtime frame facade containing rows selected
+// by 1-based i64 row indexes.
+func (v Value) NativeFrameGather(indices *DenseArray) (Value, bool, error) {
+	if indices == nil {
+		return NilValue(), true, fmt.Errorf("FRAME_GATHER indexes must be an i64 dense array")
+	}
+	if !v.IsTable() {
+		return NilValue(), false, nil
+	}
+	tbl := v.Table()
+	if tbl == nil {
+		return NilValue(), false, nil
+	}
+	payload, info, ok := tbl.NativeFramePayload()
+	if !ok {
+		return NilValue(), false, nil
+	}
+	switch frame := payload.(type) {
+	case *SoA:
+		out, err := frame.Gather(indices)
+		if err != nil {
+			return NilValue(), true, err
+		}
+		gathered := NewTable()
+		gathered.SetNativePayloadWithInfo(out, NativePayloadInfo{
+			Kind:       info.Kind,
+			Rows:       out.Len(),
+			Columns:    info.Columns,
+			SchemaHash: nativeFrameGatherSchemaHash(info.SchemaHash),
+		})
+		return TableValue(gathered), true, nil
+	default:
+		return NilValue(), true, fmt.Errorf("FRAME_GATHER unsupported native frame payload %T", payload)
+	}
+}
+
 func nativeFrameProjectSchemaHash(source string, names []string) string {
 	joined := strings.Join(names, ",")
 	if source == "" {
@@ -779,6 +815,13 @@ func nativeFrameFilterSchemaHash(source string) string {
 		return "filter"
 	}
 	return source + "|filter"
+}
+
+func nativeFrameGatherSchemaHash(source string) string {
+	if source == "" {
+		return "gather"
+	}
+	return source + "|gather"
 }
 
 func (v Value) nativeFramePayloadKind() (NativePayloadKind, bool) {

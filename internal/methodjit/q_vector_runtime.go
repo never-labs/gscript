@@ -56,6 +56,20 @@ func executeFrameFilterValue(frameVal, maskVal runtime.Value) (runtime.Value, er
 	return out, nil
 }
 
+func executeFrameGatherValue(frameVal, indexVal runtime.Value) (runtime.Value, error) {
+	if !indexVal.IsDenseArray() {
+		return runtime.NilValue(), fmt.Errorf("FrameGather indexes must be dense array (got %s)", indexVal.TypeName())
+	}
+	out, handled, err := frameVal.NativeFrameGather(indexVal.DenseArray())
+	if err != nil {
+		return runtime.NilValue(), err
+	}
+	if !handled {
+		return runtime.NilValue(), fmt.Errorf("FrameGather operand must be native frame (got %s)", frameVal.TypeName())
+	}
+	return out, nil
+}
+
 func frameProjectColumnNames(v runtime.Value) ([]string, error) {
 	if v.IsString() {
 		return []string{v.Str()}, nil

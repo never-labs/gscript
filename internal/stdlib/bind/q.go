@@ -4538,11 +4538,29 @@ func qOrderedNativeRowsForResult(nativeRows *SoA, order []qOrderSpec, limit int)
 	if limit >= 0 && limit < len(indices) {
 		indices = indices[:limit]
 	}
-	out, err := nativeRows.Gather(NewDenseArrayI64(indices))
+	carrier := NewTable()
+	carrier.SetNativePayloadWithInfo(nativeRows, NativePayloadInfo{
+		Kind:       NativePayloadDataFrame,
+		Rows:       nativeRows.Len(),
+		Columns:    len(nativeRows.ColumnNames()),
+		SchemaHash: qQueryNativeSoASchemaHash(nativeRows),
+	})
+	gathered, handled, err := TableValue(carrier).NativeFrameGather(NewDenseArrayI64(indices))
 	if err != nil {
 		return nil, false
 	}
-	return out, true
+	if !handled || !gathered.IsTable() {
+		return nil, false
+	}
+	out, _, ok := gathered.Table().NativeFramePayload()
+	if !ok {
+		return nil, false
+	}
+	soa, ok := out.(*SoA)
+	if !ok {
+		return nil, false
+	}
+	return soa, true
 }
 
 func qQueryNativeSoASchemaHash(soa *SoA) string {
