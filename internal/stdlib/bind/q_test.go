@@ -1083,6 +1083,12 @@ calc := q.query(trades, {
     select: {notional: {"*", "price", "size"}, adjusted: {"+", "price", 1.5}},
 })
 
+limited := q.query(trades, {
+    where: {column: "size", op: ">=", value: 50},
+    select: {px: "price", qty: "size"},
+    limit: 2,
+})
+
 ordered := q.query(trades, {
     where: soa.mask(trades, "sym", "==", 1),
     select: {px: "price", qty: "size"},
@@ -1175,6 +1181,25 @@ ordered := q.query(trades, {
 	adjusted, ok := adjustedCol.DenseArray().F64()
 	if !ok || len(adjusted) != 2 || adjusted[0] != 11.5 || adjusted[1] != 13.5 {
 		t.Fatalf("calc adjusted = %#v, want [11.5 13.5]", adjusted)
+	}
+	limited := interp.GetGlobal("limited").Table()
+	if limited == nil || limited.Length() != 2 {
+		t.Fatalf("limited length = %v, want 2", limited)
+	}
+	limitedInfo, ok := TableValue(limited).NativeFramePayloadInfo()
+	if !ok || limitedInfo.Rows != 2 || !strings.HasPrefix(limitedInfo.SchemaHash, "q.query.kernel:") {
+		t.Fatalf("limited native frame info = %+v ok=%v, want 2 q.query kernel rows", limitedInfo, ok)
+	}
+	limitedCol, handled, err := TableValue(limited).NativeFrameColumn("px")
+	if err != nil {
+		t.Fatalf("limited NativeFrameColumn(px): %v", err)
+	}
+	if !handled || !limitedCol.IsDenseArray() {
+		t.Fatalf("limited px column = %v handled=%v, want dense array", limitedCol, handled)
+	}
+	limitedPx, ok := limitedCol.DenseArray().F64()
+	if !ok || len(limitedPx) != 2 || limitedPx[0] != 10 || limitedPx[1] != 12 {
+		t.Fatalf("limited px = %#v, want [10 12]", limitedPx)
 	}
 	ordered := interp.GetGlobal("ordered").Table()
 	if ordered == nil || ordered.Length() != 2 {

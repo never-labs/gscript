@@ -946,7 +946,7 @@ func qRunQuery(s *SoA, spec *Table) (*Table, error) {
 	if err != nil {
 		return nil, err
 	}
-	if nativeRows != nil && qQueryKeepsRowOrder(spec) {
+	if nativeRows, ok := qQueryNativeRowsForResult(spec, nativeRows); ok {
 		qAttachRowsNativeSoAPayload(rows, nativeRows)
 	} else {
 		qAttachRowsNativeFramePayload(rows)
@@ -4108,11 +4108,28 @@ func qNativeDenseArrayBinaryOp(op string) (DenseArrayBinaryOp, bool) {
 	}
 }
 
-func qQueryKeepsRowOrder(spec *Table) bool {
-	if spec == nil {
-		return true
+func qQueryNativeRowsForResult(spec *Table, nativeRows *SoA) (*SoA, bool) {
+	if nativeRows == nil {
+		return nil, false
 	}
-	return spec.RawGetString("order_by").IsNil() && spec.RawGetString("limit").IsNil()
+	if spec == nil {
+		return nativeRows, true
+	}
+	if !spec.RawGetString("order_by").IsNil() {
+		return nil, false
+	}
+	limit, err := qLimit(spec.RawGetString("limit"))
+	if err != nil {
+		return nil, false
+	}
+	if limit < 0 || limit >= nativeRows.Len() {
+		return nativeRows, true
+	}
+	out, err := nativeRows.Slice(0, limit)
+	if err != nil {
+		return nil, false
+	}
+	return out, true
 }
 
 func qQueryNativeSoASchemaHash(soa *SoA) string {
