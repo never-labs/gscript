@@ -515,6 +515,23 @@ func (t *Table) NativeFramePayloadInfo() (NativePayloadInfo, bool) {
 	return info, true
 }
 
+// NativeFramePayload returns the opaque payload plus metadata for native frame
+// facades. It keeps the runtime frame carrier check in one place so callers do
+// not have to separately inspect payload kind and then fetch the payload.
+func (t *Table) NativeFramePayload() (any, NativePayloadInfo, bool) {
+	if t == nil {
+		return nil, NativePayloadInfo{}, false
+	}
+	if t.mu != nil {
+		t.mu.RLock()
+		defer t.mu.RUnlock()
+	}
+	if t.nativePayload == nil || t.nativePayloadInfo == nil || !t.nativePayloadInfo.Kind.IsFrameFacadeKind() {
+		return nil, NativePayloadInfo{}, false
+	}
+	return t.nativePayload, *t.nativePayloadInfo, true
+}
+
 // NativeFramePayloadKind reports whether this table currently carries a native
 // frame or keyed-frame facade payload.
 func (t *Table) NativeFramePayloadKind() (NativePayloadKind, bool) {

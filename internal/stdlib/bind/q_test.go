@@ -123,6 +123,60 @@ func TestQSQLSourceCarrierUsesNativePayloadInfoWithoutFacadeFields(t *testing.T)
 	}
 }
 
+func TestQSQLSourceCarrierUsesLegacyNativePayloadAsRuntimeCarrier(t *testing.T) {
+	frame, err := data.NewFrame(
+		data.Column{Name: "sym", Data: data.NewSymbols([]string{"AAPL", "MSFT"})},
+		data.Column{Name: "price", Data: data.NewF64([]float64{100.5, 101.25})},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	frameTable := NewTable()
+	frameTable.SetNativePayload(frame)
+
+	carrier, err := qSQLSourceCarrierFromValue(TableValue(frameTable), "trades")
+	if err != nil {
+		t.Fatalf("frame carrier: %v", err)
+	}
+	if carrier.bridge != "frame_native" || !carrier.native {
+		t.Fatalf("frame carrier bridge=%q native=%v, want frame_native true", carrier.bridge, carrier.native)
+	}
+	if carrier.rows != frame.Len() {
+		t.Fatalf("frame carrier rows = %d, want %d", carrier.rows, frame.Len())
+	}
+	if !qLooksLikeFrame(frameTable) || qIsKeyedFrameTable(frameTable) {
+		t.Fatalf("legacy native frame classification looksLikeFrame=%v keyed=%v, want true false", qLooksLikeFrame(frameTable), qIsKeyedFrameTable(frameTable))
+	}
+
+	keyed, err := data.KeyBy(frame, "sym")
+	if err != nil {
+		t.Fatal(err)
+	}
+	keyedTable := NewTable()
+	keyedTable.SetNativePayload(keyed)
+
+	keyedCarrier, err := qSQLSourceCarrierFromValue(TableValue(keyedTable), "trades")
+	if err != nil {
+		t.Fatalf("keyed carrier: %v", err)
+	}
+	if keyedCarrier.bridge != "keyed_frame_native" || !keyedCarrier.native || !keyedCarrier.hasKeyed {
+		t.Fatalf("keyed carrier bridge=%q native=%v hasKeyed=%v, want keyed_frame_native true true", keyedCarrier.bridge, keyedCarrier.native, keyedCarrier.hasKeyed)
+	}
+	if keyedCarrier.rows != frame.Len() {
+		t.Fatalf("keyed carrier rows = %d, want %d", keyedCarrier.rows, frame.Len())
+	}
+	if qLooksLikeFrame(keyedTable) || !qIsKeyedFrameTable(keyedTable) {
+		t.Fatalf("legacy native keyed classification looksLikeFrame=%v keyed=%v, want false true", qLooksLikeFrame(keyedTable), qIsKeyedFrameTable(keyedTable))
+	}
+	roundTrip, err := qKeyedFrameFromValue(TableValue(keyedTable))
+	if err != nil {
+		t.Fatalf("qKeyedFrameFromValue legacy native keyed: %v", err)
+	}
+	if keys := roundTrip.Keys(); len(keys) != 1 || keys[0] != "sym" {
+		t.Fatalf("legacy native keyed keys = %v, want [sym]", keys)
+	}
+}
+
 func TestQSQLSourceCarrierFallsBackToFrameRowsWhenNativeInfoRowsMissing(t *testing.T) {
 	frame, err := data.NewFrame(
 		data.Column{Name: "sym", Data: data.NewSymbols([]string{"AAPL", "MSFT"})},
@@ -824,6 +878,21 @@ func TestQFrameKindPrefersNativePayloadInfoOverMarkers(t *testing.T) {
 	}
 	if qIsKeyedFrameTable(frameTable) {
 		t.Fatal("native data frame with keyed marker resolved as keyed frame")
+	}
+
+	columnTable := NewTable()
+	columnTable.RawSetString(dataFrameMarker, BoolValue(true))
+	columnTable.SetNativePayloadWithInfo(frame, NativePayloadInfo{
+		Kind:       NativePayloadDataColumn,
+		Rows:       frame.Len(),
+		Columns:    len(frame.Schema().Names()),
+		SchemaHash: frame.SchemaFingerprint(),
+	})
+	if qLooksLikeFrame(columnTable) {
+		t.Fatal("typed data column payload resolved as frame via concrete payload fallback")
+	}
+	if qIsKeyedFrameTable(columnTable) {
+		t.Fatal("typed data column payload resolved as keyed frame")
 	}
 }
 

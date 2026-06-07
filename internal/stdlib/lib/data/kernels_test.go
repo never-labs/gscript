@@ -405,6 +405,32 @@ func TestCompiledQueryKernelClonesNestedLiteralLists(t *testing.T) {
 	}
 }
 
+func TestCompiledQueryKernelHandlesRecursiveLiteralLists(t *testing.T) {
+	recursive := make([]any, 1)
+	recursive[0] = recursive
+	plan := QueryPlan{
+		Where:  In{Expr: ColumnRef{Name: "sym"}, Values: []any{recursive}},
+		LimitN: -1,
+	}
+
+	fingerprint := QueryKernelPlanFingerprint(plan)
+	if fingerprint == "" {
+		t.Fatal("QueryKernelPlanFingerprint returned empty fingerprint for recursive literal")
+	}
+	if got := QueryKernelPlanFingerprint(plan); got != fingerprint {
+		t.Fatalf("QueryKernelPlanFingerprint recursive literal = %q, want stable %q", got, fingerprint)
+	}
+
+	compiled := cloneQueryKernelPlan(plan)
+	where, ok := compiled.Where.(In)
+	if !ok {
+		t.Fatalf("compiled where = %T, want In", compiled.Where)
+	}
+	if len(where.Values) != 1 {
+		t.Fatalf("compiled where values len = %d, want 1", len(where.Values))
+	}
+}
+
 func TestCompiledQueryKernelClonesTypedSliceLiterals(t *testing.T) {
 	frame := mustFrame(t,
 		Column{Name: "sym", Data: NewSymbols([]string{"AAPL", "MSFT"})},

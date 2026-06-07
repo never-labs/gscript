@@ -122,6 +122,10 @@ func writeQueryKernelSelectFingerprint(b *strings.Builder, items []SelectItem) {
 }
 
 func writeQueryKernelExprFingerprint(b *strings.Builder, expr Expr) {
+	writeQueryKernelExprFingerprintWithSeen(b, expr, nil)
+}
+
+func writeQueryKernelExprFingerprintWithSeen(b *strings.Builder, expr Expr, seen map[queryKernelSliceKey]struct{}) {
 	switch e := expr.(type) {
 	case nil:
 		writeQueryKernelFingerprintPart(b, "nil")
@@ -130,53 +134,53 @@ func writeQueryKernelExprFingerprint(b *strings.Builder, expr Expr) {
 		writeQueryKernelFingerprintPart(b, string(e.Name))
 	case Literal:
 		writeQueryKernelFingerprintPart(b, "lit")
-		writeQueryKernelLiteralFingerprint(b, e.Value)
+		writeQueryKernelLiteralFingerprintWithSeen(b, e.Value, seen)
 	case Binary:
 		writeQueryKernelFingerprintPart(b, "binary")
 		writeQueryKernelFingerprintPart(b, string(e.Op))
-		writeQueryKernelExprFingerprint(b, e.Left)
-		writeQueryKernelExprFingerprint(b, e.Right)
+		writeQueryKernelExprFingerprintWithSeen(b, e.Left, seen)
+		writeQueryKernelExprFingerprintWithSeen(b, e.Right, seen)
 	case Logical:
 		writeQueryKernelFingerprintPart(b, "logical")
 		writeQueryKernelFingerprintPart(b, e.Op)
-		writeQueryKernelExprFingerprint(b, e.Left)
-		writeQueryKernelExprFingerprint(b, e.Right)
+		writeQueryKernelExprFingerprintWithSeen(b, e.Left, seen)
+		writeQueryKernelExprFingerprintWithSeen(b, e.Right, seen)
 	case Not:
 		writeQueryKernelFingerprintPart(b, "not")
-		writeQueryKernelExprFingerprint(b, e.Expr)
+		writeQueryKernelExprFingerprintWithSeen(b, e.Expr, seen)
 	case Conditional:
 		writeQueryKernelFingerprintPart(b, "cond")
-		writeQueryKernelExprFingerprint(b, e.Cond)
-		writeQueryKernelExprFingerprint(b, e.Then)
-		writeQueryKernelExprFingerprint(b, e.Else)
+		writeQueryKernelExprFingerprintWithSeen(b, e.Cond, seen)
+		writeQueryKernelExprFingerprintWithSeen(b, e.Then, seen)
+		writeQueryKernelExprFingerprintWithSeen(b, e.Else, seen)
 	case In:
 		writeQueryKernelFingerprintPart(b, "in")
-		writeQueryKernelExprFingerprint(b, e.Expr)
+		writeQueryKernelExprFingerprintWithSeen(b, e.Expr, seen)
 		writeQueryKernelFingerprintPart(b, strconv.Itoa(len(e.Values)))
 		for _, value := range e.Values {
-			writeQueryKernelLiteralFingerprint(b, value)
+			writeQueryKernelLiteralFingerprintWithSeen(b, value, seen)
 		}
 	case Within:
 		writeQueryKernelFingerprintPart(b, "within")
-		writeQueryKernelExprFingerprint(b, e.Expr)
-		writeQueryKernelLiteralFingerprint(b, e.Low)
-		writeQueryKernelLiteralFingerprint(b, e.High)
+		writeQueryKernelExprFingerprintWithSeen(b, e.Expr, seen)
+		writeQueryKernelLiteralFingerprintWithSeen(b, e.Low, seen)
+		writeQueryKernelLiteralFingerprintWithSeen(b, e.High, seen)
 		writeQueryKernelFingerprintPart(b, strconv.FormatBool(e.HighClosed))
 	case BucketFloorExpr:
 		writeQueryKernelFingerprintPart(b, "bucket")
-		writeQueryKernelLiteralFingerprint(b, e.Interval)
-		writeQueryKernelExprFingerprint(b, e.Expr)
+		writeQueryKernelLiteralFingerprintWithSeen(b, e.Interval, seen)
+		writeQueryKernelExprFingerprintWithSeen(b, e.Expr, seen)
 	case ListAggregateExpr:
 		writeQueryKernelFingerprintPart(b, "listagg")
 		writeQueryKernelFingerprintPart(b, e.Func)
-		writeQueryKernelExprFingerprint(b, e.Expr)
+		writeQueryKernelExprFingerprintWithSeen(b, e.Expr, seen)
 	case VectorTransformExpr:
 		writeQueryKernelFingerprintPart(b, "vector")
 		writeQueryKernelFingerprintPart(b, e.Func)
-		writeQueryKernelExprFingerprint(b, e.Expr)
+		writeQueryKernelExprFingerprintWithSeen(b, e.Expr, seen)
 		writeQueryKernelFingerprintPart(b, strconv.FormatBool(e.Arg != nil))
 		if e.Arg != nil {
-			writeQueryKernelExprFingerprint(b, e.Arg)
+			writeQueryKernelExprFingerprintWithSeen(b, e.Arg, seen)
 		}
 	default:
 		writeQueryKernelFingerprintPart(b, "unsupported")
@@ -186,6 +190,10 @@ func writeQueryKernelExprFingerprint(b *strings.Builder, expr Expr) {
 }
 
 func writeQueryKernelLiteralFingerprint(b *strings.Builder, value any) {
+	writeQueryKernelLiteralFingerprintWithSeen(b, value, nil)
+}
+
+func writeQueryKernelLiteralFingerprintWithSeen(b *strings.Builder, value any, seen map[queryKernelSliceKey]struct{}) {
 	if IsNull(value) {
 		writeQueryKernelFingerprintPart(b, "null")
 		if kind, ok := NullKind(value); ok {
@@ -263,13 +271,26 @@ func writeQueryKernelLiteralFingerprint(b *strings.Builder, value any) {
 		writeQueryKernelFingerprintPart(b, "f64")
 		writeQueryKernelFloatFingerprint(b, x, 64)
 	case []any:
+		key, ok := queryKernelSliceKeyForValue(reflect.ValueOf(x))
+		if ok {
+			if _, exists := seen[key]; exists {
+				writeQueryKernelFingerprintPart(b, "recursive_list")
+				writeQueryKernelFingerprintPart(b, key.typ)
+				return
+			}
+			if seen == nil {
+				seen = make(map[queryKernelSliceKey]struct{})
+			}
+			seen[key] = struct{}{}
+			defer delete(seen, key)
+		}
 		writeQueryKernelFingerprintPart(b, "list")
 		writeQueryKernelFingerprintPart(b, strconv.Itoa(len(x)))
 		for _, item := range x {
-			writeQueryKernelLiteralFingerprint(b, item)
+			writeQueryKernelLiteralFingerprintWithSeen(b, item, seen)
 		}
 	default:
-		if writeQueryKernelLiteralSliceFingerprint(b, value) {
+		if writeQueryKernelLiteralSliceFingerprint(b, value, seen) {
 			return
 		}
 		writeQueryKernelFingerprintPart(b, fmt.Sprintf("%T", value))
@@ -277,17 +298,42 @@ func writeQueryKernelLiteralFingerprint(b *strings.Builder, value any) {
 	}
 }
 
-func writeQueryKernelLiteralSliceFingerprint(b *strings.Builder, value any) bool {
+type queryKernelSliceKey struct {
+	typ string
+	ptr uintptr
+}
+
+func queryKernelSliceKeyForValue(v reflect.Value) (queryKernelSliceKey, bool) {
+	if !v.IsValid() || v.Kind() != reflect.Slice || v.IsNil() {
+		return queryKernelSliceKey{}, false
+	}
+	return queryKernelSliceKey{typ: v.Type().String(), ptr: v.Pointer()}, true
+}
+
+func writeQueryKernelLiteralSliceFingerprint(b *strings.Builder, value any, seen map[queryKernelSliceKey]struct{}) bool {
 	v := reflect.ValueOf(value)
 	if !v.IsValid() || v.Kind() != reflect.Slice {
 		return false
+	}
+	key, ok := queryKernelSliceKeyForValue(v)
+	if ok {
+		if _, exists := seen[key]; exists {
+			writeQueryKernelFingerprintPart(b, "recursive_slice")
+			writeQueryKernelFingerprintPart(b, key.typ)
+			return true
+		}
+		if seen == nil {
+			seen = make(map[queryKernelSliceKey]struct{})
+		}
+		seen[key] = struct{}{}
+		defer delete(seen, key)
 	}
 	writeQueryKernelFingerprintPart(b, "slice")
 	writeQueryKernelFingerprintPart(b, v.Type().String())
 	writeQueryKernelFingerprintPart(b, strconv.FormatBool(v.IsNil()))
 	writeQueryKernelFingerprintPart(b, strconv.Itoa(v.Len()))
 	for i := 0; i < v.Len(); i++ {
-		writeQueryKernelLiteralFingerprint(b, v.Index(i).Interface())
+		writeQueryKernelLiteralFingerprintWithSeen(b, v.Index(i).Interface(), seen)
 	}
 	return true
 }
@@ -408,29 +454,48 @@ func cloneQueryKernelExpr(expr Expr) Expr {
 }
 
 func cloneQueryKernelLiteralList(values []any) []any {
+	return cloneQueryKernelLiteralListWithSeen(values, nil)
+}
+
+func cloneQueryKernelLiteralListWithSeen(values []any, seen map[queryKernelSliceKey]struct{}) []any {
 	if len(values) == 0 {
 		return nil
 	}
+	key, ok := queryKernelSliceKeyForValue(reflect.ValueOf(values))
+	if ok {
+		if _, exists := seen[key]; exists {
+			return values
+		}
+		if seen == nil {
+			seen = make(map[queryKernelSliceKey]struct{})
+		}
+		seen[key] = struct{}{}
+		defer delete(seen, key)
+	}
 	out := make([]any, len(values))
 	for i, value := range values {
-		out[i] = cloneQueryKernelLiteral(value)
+		out[i] = cloneQueryKernelLiteralWithSeen(value, seen)
 	}
 	return out
 }
 
 func cloneQueryKernelLiteral(value any) any {
+	return cloneQueryKernelLiteralWithSeen(value, nil)
+}
+
+func cloneQueryKernelLiteralWithSeen(value any, seen map[queryKernelSliceKey]struct{}) any {
 	switch x := value.(type) {
 	case []any:
-		return cloneQueryKernelLiteralList(x)
+		return cloneQueryKernelLiteralListWithSeen(x, seen)
 	default:
-		if cloned, ok := cloneQueryKernelLiteralSlice(value); ok {
+		if cloned, ok := cloneQueryKernelLiteralSlice(value, seen); ok {
 			return cloned
 		}
 		return x
 	}
 }
 
-func cloneQueryKernelLiteralSlice(value any) (any, bool) {
+func cloneQueryKernelLiteralSlice(value any, seen map[queryKernelSliceKey]struct{}) (any, bool) {
 	v := reflect.ValueOf(value)
 	if !v.IsValid() || v.Kind() != reflect.Slice {
 		return nil, false
@@ -438,10 +503,21 @@ func cloneQueryKernelLiteralSlice(value any) (any, bool) {
 	if v.IsNil() {
 		return value, true
 	}
+	key, ok := queryKernelSliceKeyForValue(v)
+	if ok {
+		if _, exists := seen[key]; exists {
+			return value, true
+		}
+		if seen == nil {
+			seen = make(map[queryKernelSliceKey]struct{})
+		}
+		seen[key] = struct{}{}
+		defer delete(seen, key)
+	}
 	out := reflect.MakeSlice(v.Type(), v.Len(), v.Len())
 	for i := 0; i < v.Len(); i++ {
 		item := v.Index(i)
-		cloned := cloneQueryKernelLiteral(item.Interface())
+		cloned := cloneQueryKernelLiteralWithSeen(item.Interface(), seen)
 		clonedValue := reflect.ValueOf(cloned)
 		if clonedValue.IsValid() && clonedValue.Type().AssignableTo(item.Type()) {
 			out.Index(i).Set(clonedValue)

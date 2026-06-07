@@ -93,6 +93,9 @@ func TestTableNativePayloadTypeNameReflectsFrameKinds(t *testing.T) {
 	if got, ok := frame.NativeFramePayloadInfo(); !ok || got != frameInfo {
 		t.Fatalf("frame NativeFramePayloadInfo() = %#v, %v, want %#v, true", got, ok, frameInfo)
 	}
+	if gotPayload, gotInfo, ok := frame.NativeFramePayload(); !ok || gotPayload == nil || gotInfo != frameInfo {
+		t.Fatalf("frame NativeFramePayload() = %#v, %#v, %v, want payload, %#v, true", gotPayload, gotInfo, ok, frameInfo)
+	}
 	if got, ok := frame.NativeFramePayloadKind(); !ok || got != NativePayloadDataFrame {
 		t.Fatalf("frame NativeFramePayloadKind() = %q, %v, want %q, true", got, ok, NativePayloadDataFrame)
 	}
@@ -123,6 +126,9 @@ func TestTableNativePayloadTypeNameReflectsFrameKinds(t *testing.T) {
 	keyed.SetNativePayloadWithInfo(struct{}{}, keyedInfo)
 	if got, ok := keyed.NativeFramePayloadInfo(); !ok || got != keyedInfo {
 		t.Fatalf("keyed NativeFramePayloadInfo() = %#v, %v, want %#v, true", got, ok, keyedInfo)
+	}
+	if gotPayload, gotInfo, ok := keyed.NativeFramePayload(); !ok || gotPayload == nil || gotInfo != keyedInfo {
+		t.Fatalf("keyed NativeFramePayload() = %#v, %#v, %v, want payload, %#v, true", gotPayload, gotInfo, ok, keyedInfo)
 	}
 	if got, ok := keyed.NativeFramePayloadKind(); !ok || got != NativePayloadKeyedFrame {
 		t.Fatalf("keyed NativeFramePayloadKind() = %q, %v, want %q, true", got, ok, NativePayloadKeyedFrame)
@@ -208,6 +214,9 @@ func TestTableNativeColumnPayloadStaysPlainTable(t *testing.T) {
 	}
 	if got, ok := tbl.NativeFramePayloadKind(); ok {
 		t.Fatalf("NativeFramePayloadKind() = %q, true, want none", got)
+	}
+	if gotPayload, gotInfo, ok := tbl.NativeFramePayload(); ok {
+		t.Fatalf("NativeFramePayload() = %#v, %#v, true, want none", gotPayload, gotInfo)
 	}
 	if !tbl.IsNativeColumn() {
 		t.Fatal("IsNativeColumn() = false, want true")

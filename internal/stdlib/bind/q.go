@@ -1156,9 +1156,12 @@ func qExplainUnavailableBridge(value Value) string {
 		return "unsupported_source"
 	}
 	tbl := value.Table()
-	if kind, ok := tbl.NativeFramePayloadKind(); ok {
-		if kind == NativePayloadKeyedFrame {
+	if kind, ok := qNativeFrameRuntimeKind(tbl); ok {
+		switch kind {
+		case NativePayloadKeyedFrame:
 			return "keyed_frame_unavailable"
+		case NativePayloadDataFrame:
+			return "frame_native_unavailable"
 		}
 		return "frame_native_unavailable"
 	}
@@ -1195,7 +1198,7 @@ func qCanResolveSQLSourceFromTable(v Value) bool {
 		return false
 	}
 	tbl := v.Table()
-	if _, ok := tbl.NativeFramePayloadKind(); ok {
+	if _, ok := qNativeFrameRuntimeKind(tbl); ok {
 		return false
 	}
 	return !qLooksLikeFrame(tbl) && !qIsKeyedFrameTable(tbl)
@@ -1267,7 +1270,7 @@ func qSQLNativeSourceCarrierFromTable(tbl *Table) (qSQLSourceCarrier, bool, erro
 	if tbl == nil {
 		return qSQLSourceCarrier{}, false, nil
 	}
-	kind, ok := tbl.NativeFramePayloadKind()
+	kind, ok := qNativeFrameRuntimeKind(tbl)
 	if !ok {
 		return qSQLSourceCarrier{}, false, nil
 	}
@@ -1341,6 +1344,28 @@ func qFramePayloadInfo(tbl *Table, kind NativePayloadKind) (NativePayloadInfo, b
 		return NativePayloadInfo{}, false
 	}
 	return info, true
+}
+
+func qNativeFrameRuntimeKind(tbl *Table) (NativePayloadKind, bool) {
+	if tbl == nil {
+		return NativePayloadNone, false
+	}
+	if kind, ok := tbl.NativePayloadKind(); ok {
+		switch kind {
+		case NativePayloadDataFrame, NativePayloadKeyedFrame:
+			return kind, true
+		default:
+			return NativePayloadNone, false
+		}
+	}
+	switch tbl.NativePayload().(type) {
+	case data.Frame:
+		return NativePayloadDataFrame, true
+	case data.KeyedFrame:
+		return NativePayloadKeyedFrame, true
+	default:
+		return NativePayloadNone, false
+	}
 }
 
 func qExplainKernelInfo(args qSQLArgsResult, tmpl qSQLPlanTemplate) qExplainKernelResult {
@@ -3111,7 +3136,7 @@ func qLooksLikeFrame(tbl *Table) bool {
 	if tbl == nil {
 		return false
 	}
-	if kind, ok := tbl.NativeFramePayloadKind(); ok {
+	if kind, ok := qNativeFrameRuntimeKind(tbl); ok {
 		return kind == NativePayloadDataFrame
 	}
 	return isDataFrameTable(tbl) || qLooksLikeScriptDataFrameFacade(tbl)
@@ -3134,7 +3159,7 @@ func qIsKeyedFrameTable(tbl *Table) bool {
 	if tbl == nil {
 		return false
 	}
-	if kind, ok := tbl.NativeFramePayloadKind(); ok {
+	if kind, ok := qNativeFrameRuntimeKind(tbl); ok {
 		return kind == NativePayloadKeyedFrame
 	}
 	return tbl.RawGetString(qKeyedFrameMarker).Truthy()

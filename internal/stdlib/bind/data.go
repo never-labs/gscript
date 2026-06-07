@@ -776,15 +776,21 @@ func dataNativeFramePayload(frame *Table) (stddata.Frame, bool, error) {
 	if frame == nil {
 		return stddata.Frame{}, false, nil
 	}
-	if kind, ok := frame.NativePayloadKind(); ok {
-		if kind != NativePayloadDataFrame {
+	if payload, info, ok := frame.NativeFramePayload(); ok {
+		if info.Kind != NativePayloadDataFrame {
 			return stddata.Frame{}, false, fmt.Errorf("argument 1 must be a data frame")
 		}
-		native, hasPayload := frame.NativePayload().(stddata.Frame)
+		native, hasPayload := payload.(stddata.Frame)
 		if !hasPayload {
 			return stddata.Frame{}, false, fmt.Errorf("native data frame payload is invalid")
 		}
 		return native, true, nil
+	}
+	if kind, ok := frame.NativePayloadKind(); ok {
+		if kind != NativePayloadDataFrame {
+			return stddata.Frame{}, false, fmt.Errorf("argument 1 must be a data frame")
+		}
+		return stddata.Frame{}, false, fmt.Errorf("native data frame payload is invalid")
 	}
 	if native, ok := frame.NativePayload().(stddata.Frame); ok {
 		return native, true, nil
