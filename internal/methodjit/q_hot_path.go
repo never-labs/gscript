@@ -2,6 +2,7 @@ package methodjit
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/never-labs/leia/internal/runtime"
@@ -32,6 +33,17 @@ func (p QQueryHotPath) Shape() string {
 	default:
 		return "filter/project/column"
 	}
+}
+
+func CountQQueryHotPathShapes(paths []QQueryHotPath) map[string]int {
+	if len(paths) == 0 {
+		return nil
+	}
+	counts := make(map[string]int)
+	for _, path := range paths {
+		counts[path.Shape()]++
+	}
+	return counts
 }
 
 // DetectQQueryHotPaths returns q query primitive pipelines visible in Method
@@ -137,6 +149,9 @@ func formatQQueryHotPaths(paths []QQueryHotPath) string {
 	}
 	var b strings.Builder
 	fmt.Fprintf(&b, "%d primitive pipeline(s)\n", len(paths))
+	if counts := CountQQueryHotPathShapes(paths); len(counts) > 0 {
+		fmt.Fprintf(&b, "  shapes: %s\n", formatQQueryHotPathShapeCounts(counts))
+	}
 	for i, path := range paths {
 		fmt.Fprintf(&b, "  [%d] shape=%s compare=%s", i, path.Shape(), qQueryHotPathCompareOpName(path.Compare))
 		if path.RowOrder != nil {
@@ -151,6 +166,22 @@ func formatQQueryHotPaths(paths []QQueryHotPath) string {
 		b.WriteByte('\n')
 	}
 	return b.String()
+}
+
+func formatQQueryHotPathShapeCounts(counts map[string]int) string {
+	if len(counts) == 0 {
+		return ""
+	}
+	shapes := make([]string, 0, len(counts))
+	for shape := range counts {
+		shapes = append(shapes, shape)
+	}
+	sort.Strings(shapes)
+	parts := make([]string, 0, len(shapes))
+	for _, shape := range shapes {
+		parts = append(parts, fmt.Sprintf("%s=%d", shape, counts[shape]))
+	}
+	return strings.Join(parts, ", ")
 }
 
 func qQueryHotPathCompareOpName(compare *Instr) string {

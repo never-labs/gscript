@@ -421,6 +421,9 @@ func TestQFramePrimitiveHotPathDetectsOrderedRows(t *testing.T) {
 	if got := formatQQueryHotPaths(paths); !strings.Contains(got, "shape=filter/order/gather/project/column") || !strings.Contains(got, "order_aux=2") {
 		t.Fatalf("ordered hot path format = %q, want shape and order aux", got)
 	}
+	if counts := CountQQueryHotPathShapes(paths); counts["filter/order/gather/project/column"] != 1 {
+		t.Fatalf("ordered hot path shape counts = %+v, want ordered count 1", counts)
+	}
 }
 
 func TestQFramePrimitiveHotPathDetectsSlicedRows(t *testing.T) {
@@ -516,8 +519,14 @@ func TestDiagnoseReportsQQueryHotPath(t *testing.T) {
 	if len(report.QQueryHotPaths) != 1 {
 		t.Fatalf("Diagnose QQueryHotPaths = %d, want 1\n%s", len(report.QQueryHotPaths), report.String())
 	}
+	if report.QQueryHotPathShapes["filter/project/column"] != 1 {
+		t.Fatalf("Diagnose QQueryHotPathShapes = %+v, want filter/project/column count 1", report.QQueryHotPathShapes)
+	}
 	if !strings.Contains(report.String(), "Q query hot paths") {
 		t.Fatalf("diagnostic report missing q hot path section:\n%s", report.String())
+	}
+	if !strings.Contains(report.String(), "shapes: filter/project/column=1") {
+		t.Fatalf("diagnostic report missing q hot path shape summary:\n%s", report.String())
 	}
 	if !strings.Contains(report.String(), "shape=filter/project/column") {
 		t.Fatalf("diagnostic report missing q hot path shape:\n%s", report.String())

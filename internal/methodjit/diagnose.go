@@ -179,6 +179,7 @@ type DiagReport struct {
 	ModuleFactDiffs     []Tier2ModuleFactDiff
 	OptimizationRemarks []OptimizationRemark // structured pass/gate diagnostics
 	QQueryHotPaths      []QQueryHotPath      // q query primitive pipelines visible in final IR
+	QQueryHotPathShapes map[string]int       // q query primitive pipeline count by shape
 	ValidateErrors      []error              // structural invariant violations
 	RegAllocMap         string               // human-readable register assignments
 	InterpResult        []runtime.Value      // IR interpreter output on UNOPTIMIZED IR
@@ -257,6 +258,7 @@ func Diagnose(proto *vm.FuncProto, args []runtime.Value) *DiagReport {
 		r.ModuleFactDiffs = append([]Tier2ModuleFactDiff(nil), collector.moduleFactDiffs...)
 		r.OptimizationRemarks = remarks.List()
 		r.QQueryHotPaths = DetectQQueryHotPaths(fn)
+		r.QQueryHotPathShapes = CountQQueryHotPathShapes(r.QQueryHotPaths)
 		r.NativeError = fmt.Errorf("pipeline error: %w", pipeErr)
 		r.compareResults()
 		return r
@@ -265,6 +267,7 @@ func Diagnose(proto *vm.FuncProto, args []runtime.Value) *DiagReport {
 	r.IRAfter = Print(optimized)
 	r.OptimizationRemarks = remarks.List()
 	r.QQueryHotPaths = DetectQQueryHotPaths(optimized)
+	r.QQueryHotPathShapes = CountQQueryHotPathShapes(r.QQueryHotPaths)
 	r.PipelineStages = collector.timings
 
 	// 4b. Interpret the OPTIMIZED IR. This is the middle of the three-way
