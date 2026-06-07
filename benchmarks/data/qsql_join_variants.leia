@@ -1,0 +1,72 @@
+// qSQL union/plus join variant smoke benchmark over in-memory frame values.
+
+N := 2048
+REPS := 160
+MOD := 1000000007
+
+func make_symbols(n, mod, prefix) {
+    t := {}
+    for i := 1; i <= n; i++ {
+        t[i] = string.format("%s%d", prefix, i % mod)
+    }
+    return data.symbols(t)
+}
+
+func make_i64(n, mod, offset) {
+    t := {}
+    for i := 1; i <= n; i++ {
+        t[i] = offset + (i % mod)
+    }
+    return data.i64(t)
+}
+
+func make_f64(n, mod, offset) {
+    t := {}
+    for i := 1; i <= n; i++ {
+        t[i] = offset + (i % mod) * 1.25
+    }
+    return data.f64(t)
+}
+
+func mix(sum, v) {
+    return (sum * 131 + v) % MOD
+}
+
+left := data.frame({
+    sym: make_symbols(N, 257, "S"),
+    qty: make_i64(N, 97, 1),
+    px: make_f64(N, 251, 80.0),
+})
+
+right := data.frame({
+    sym: make_symbols(N / 2, 311, "S"),
+    qty: make_i64(N / 2, 53, 2),
+    venue: make_symbols(N / 2, 23, "V"),
+})
+
+func run_hot(left, right, reps) {
+    checksum := 0
+    for r := 1; r <= reps; r++ {
+        unioned := q.sql(
+            "select sym,qty,venue from left uj right on sym order by sym asc take 32",
+            {left: left, right: right}
+        )
+        plussed := q.sql(
+            "select sym,qty,venue from left pj right on sym order by sym asc take 32",
+            {left: left, right: right}
+        )
+        checksum = mix(checksum, #unioned + #plussed)
+        checksum = mix(checksum, unioned[1].qty + plussed[1].qty + plussed[#plussed].qty)
+    }
+    return checksum
+}
+
+warm := run_hot(left, right, 2)
+collectgarbage("collect")
+t0 := time.now()
+checksum := run_hot(left, right, REPS)
+elapsed := time.since(t0)
+
+print(string.format("qsql_join_variants_hot n=%d reps=%d", N, REPS))
+print(string.format("checksum: %d", mix(checksum, warm)))
+print(string.format("Time: %.3fs", elapsed))

@@ -264,6 +264,7 @@ func (dst *Table) TryPlainArrayMove(src *Table, first, last, target int64) bool 
 	if target == 0 {
 		dst.arrayZeroValid = true
 	}
+	dst.clearNativePayloadLocked()
 	dst.keysDirty = true
 	dst.bumpArrayVersionLocked()
 	return true
@@ -292,6 +293,7 @@ func (t *Table) TryPlainArraySort(length int64) bool {
 	default:
 		return false
 	}
+	t.clearNativePayloadLocked()
 	t.keysDirty = true
 	t.bumpArrayVersionLocked()
 	return true
@@ -355,6 +357,7 @@ func (t *Table) TryPlainArrayInsertKnownLength(pos int64, val Value, length int6
 	default:
 		return false
 	}
+	t.clearNativePayloadLocked()
 	t.keysDirty = true
 	t.bumpArrayVersionLocked()
 	return true
@@ -425,6 +428,7 @@ func (t *Table) TryPlainArrayRemoveKnownLength(pos int64, length int64) (Value, 
 	default:
 		return NilValue(), false
 	}
+	t.clearNativePayloadLocked()
 	t.keysDirty = true
 	t.bumpArrayVersionLocked()
 	return removed, true
@@ -468,7 +472,10 @@ func (t *Table) RawSetInt(key int64, val Value) {
 	if t.lazyTree != nil {
 		t.materializeLazyTreeLocked()
 	}
+	t.clearNativePayloadLocked()
 	t.maybeClearDenseParentForWrite(key, val)
+	t.lazyIntGetter = nil
+	t.lazyIntLength = 0
 	t.keysDirty = true
 	t.bumpArrayVersionLocked()
 

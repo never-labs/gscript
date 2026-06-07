@@ -1,0 +1,194 @@
+// q/kdb+-style ticks/trades/quotes/bars/asof/window/keyed/rollup benchmark.
+
+N := 4096
+REPS := 120
+MOD := 1000000007
+
+func make_i64(n, mod, offset) {
+    t := {}
+    for i := 1; i <= n; i++ {
+        t[i] = offset + (i % mod)
+    }
+    return array.i64(t)
+}
+
+func make_symbols(n, mod, prefix) {
+    t := {}
+    for i := 1; i <= n; i++ {
+        t[i] = string.format("%s%d", prefix, i % mod)
+    }
+    return data.symbols(t)
+}
+
+func make_ts(n, offset, stride) {
+    t := {}
+    for i := 1; i <= n; i++ {
+        t[i] = offset + i * stride
+    }
+    return array.i64(t)
+}
+
+func make_price(n, base) {
+    t := {}
+    for i := 1; i <= n; i++ {
+        t[i] = base + (i % 251) * 0.25
+    }
+    return array.f64(t)
+}
+
+func make_size(n, base) {
+    t := {}
+    for i := 1; i <= n; i++ {
+        t[i] = base + (i % 89)
+    }
+    return array.i64(t)
+}
+
+func make_bool(n, period) {
+    t := {}
+    for i := 1; i <= n; i++ {
+        t[i] = i % period == 0
+    }
+    return data.bool(t)
+}
+
+func mix(sum, v) {
+    return (sum * 131 + v) % MOD
+}
+
+trades_raw := data.frame({
+    trade_id: make_i64(N, N, 1),
+    order_id: make_i64(N, 1024, 1000),
+    parent_id: make_i64(N, 256, 9000),
+    sym: make_symbols(N, 64, "S"),
+    ts: make_ts(N, 600, 3),
+    price: make_price(N, 90.0),
+    size: make_size(N, 10),
+    desk: make_symbols(N, 8, "D"),
+    venue: make_symbols(N, 4, "V"),
+    cancelled: make_bool(N, 17),
+})
+
+quotes := data.frame({
+    quote_id: make_i64(N, N, 1),
+    sym: make_symbols(N, 64, "S"),
+    ts: make_ts(N, 540, 3),
+    bid: make_price(N, 89.75),
+    ask: make_price(N, 90.25),
+    bid_sz: make_size(N, 100),
+    ask_sz: make_size(N, 90),
+    venue: make_symbols(N, 4, "V"),
+})
+
+refdata := data.frame({
+    sym: make_symbols(64, 64, "S"),
+    sector: make_symbols(64, 6, "sector"),
+    tick_size: make_price(64, 0.01),
+})
+
+fee_schedule := q.eval("`V0`V1`V2`V3!0.00030 0.00020 0.00035 0.00025")
+adverb_probe := q.eval("qty:100 50 30 45 12 5;(+/qty;+\\qty;-':qty;10+/:qty)")
+
+func prepare_trades(raw) {
+    trades := q.sql(raw, "delete from trades where cancelled=true")
+    trades = q.sql(trades, "update notional:price*size from trades where size>0")
+    trades = q.sql(trades, "update fee:notional*0.00025 from trades where size>0")
+    return trades
+}
+
+func run_once(raw, quotes, refdata) {
+    trades := prepare_trades(raw)
+    enriched := q.sql(
+        "select trade_id,order_id,parent_id,sym,ts,price,size,desk,venue,notional,fee,bid,ask,spread:ask-bid,bid_sz from trades asof join quotes on sym,ts",
+        {trades: trades, quotes: quotes}
+    )
+    windowed := q.sql(
+        "select trade_id,sym,ts,bid,bid_sz from trades wj[-120 0] quotes on sym,ts order by trade_id asc take 64",
+        {trades: trades, quotes: quotes}
+    )
+    bars := q.sql(
+        enriched,
+        "select notional:sum notional, shares:sum size, fees:sum fee, fills:count i, avg_spread:avg spread by sym,bucket:xbar 60 ts from trades order by notional desc take 32"
+    )
+    sector_trades := q.sql(
+        "select trade_id,parent_id,sym,sector,desk,price,size,notional,fee,bid,ask,spread from trades left join refdata on sym",
+        {trades: enriched, refdata: refdata}
+    )
+    sector_rollup := q.sql(
+        sector_trades,
+        "select notional:sum notional, shares:sum size, fills:count i by sector,desk from trades order by notional desc take 16"
+    )
+    parent_rollup := q.sql(
+        trades,
+        "select filled:sum size, traded_notional:sum notional by parent_id,sym from trades order by traded_notional desc take 16"
+    )
+    exec_risk := q.sql(
+        sector_trades,
+        "exec trade_id,sym,desk,sector,notional,fee from trades where notional>10000 order by notional desc take 16"
+    )
+    exec_by_desk := q.sql(
+        sector_trades,
+        "exec shares:sum size,gross:sum notional,fees:sum fee by desk from trades order by desk asc take 16"
+    )
+    exec_symbols := q.sql(
+        sector_trades,
+        "exec sym from trades where desk=`D1 order by trade_id asc take 16"
+    )
+    keyed := q.key_by(enriched, "sym")
+    keyed_hit := q.lookup(keyed, "S1")
+    return {
+        trades: trades,
+        enriched: enriched,
+        windowed: windowed,
+        bars: bars,
+        sector_trades: sector_trades,
+        sector_rollup: sector_rollup,
+        parent_rollup: parent_rollup,
+        exec_risk: exec_risk,
+        exec_by_desk: exec_by_desk,
+        exec_symbols: exec_symbols,
+        keyed_hit: keyed_hit,
+    }
+}
+
+func check_semantics(raw, quotes, refdata) {
+    result := run_once(raw, quotes, refdata)
+    assert(#result.trades < N)
+    assert(#result.enriched == #result.trades)
+    assert(#result.windowed == 64)
+    assert(#result.bars == 32)
+    assert(#result.sector_rollup == 16)
+    assert(#result.parent_rollup == 16)
+    assert(q.count(result.exec_risk.trade_id) == 16)
+    assert(q.count(result.exec_by_desk.desk) == 8)
+    assert(q.count(result.exec_symbols) == 16)
+    assert(#result.keyed_hit > 0)
+    assert(result.bars[1].notional >= result.bars[#result.bars].notional)
+    assert(fee_schedule.V1 == 0.0002)
+    assert(adverb_probe[1] == 242 && adverb_probe[2][6] == 242 && adverb_probe[3][3] == -20 && adverb_probe[4][2] == 60)
+}
+
+func run_hot(raw, quotes, refdata, reps) {
+    checksum := 0
+    for r := 1; r <= reps; r++ {
+        result := run_once(raw, quotes, refdata)
+        bar := result.bars[1]
+        parent := result.parent_rollup[1]
+        checksum = mix(checksum, #result.enriched + #result.windowed + #result.keyed_hit)
+        checksum = mix(checksum, math.floor(bar.notional) + bar.fills * 17 + parent.filled)
+        checksum = mix(checksum, q.count(result.exec_risk.trade_id) * 19 + q.count(result.exec_by_desk.desk) * 23 + q.count(result.exec_symbols) * 29)
+        checksum = mix(checksum, math.floor(fee_schedule.V2 * 1000000) + adverb_probe[1] + adverb_probe[2][6])
+    }
+    return checksum
+}
+
+check_semantics(trades_raw, quotes, refdata)
+warm := run_hot(trades_raw, quotes, refdata, 2)
+collectgarbage("collect")
+t0 := time.now()
+checksum := run_hot(trades_raw, quotes, refdata, REPS)
+elapsed := time.since(t0)
+
+print(string.format("q_ticks_bars_asof_project_hot trades=%d quotes=%d reps=%d", N, N, REPS))
+print(string.format("checksum: %d", mix(checksum, warm)))
+print(string.format("Time: %.3fs", elapsed))

@@ -1,0 +1,144 @@
+print("case:q_boundaries_and_gap_closures_project")
+
+func contains(haystack, needle) {
+  return string.find(tostring(haystack), needle, 1, true) != nil
+}
+
+func check(name, ok) {
+  assert(ok)
+  print("ok", name)
+}
+
+trades := data.frame({
+  sym: data.symbols({"AAPL", "MSFT"}),
+  price: data.f64({100.0, 101.0}),
+  size: data.i64({10, 20}),
+})
+
+tail := q.eval("-2#10 20 30")
+take_tail := q.eval("take -2 10 20 30")
+check("negative take returns vector tail", q.count(tail) == 2 && tail[1] == 20 && tail[2] == 30 && take_tail[1] == 20)
+
+ok, err := pcall(q.eval, "1+`a")
+check("symbolic dyadic type error remains unsupported", ok == false && contains(err, "operator \"+\" expects numeric operands"))
+
+ok, err = pcall(q.eval, "flip 10")
+check("flip non-dict remains unsupported", ok == false && contains(err, "flip expects a dictionary"))
+
+port_before := q.eval("\\p")
+port_set := q.eval("\\p 5000")
+port_after := q.eval("\\p")
+ok, err = pcall(q.eval, "\\p 99999")
+check("q port system command is safe metadata only", port_before == 0 && port_set == 5000 && port_after == 0 && ok == false && contains(err, "0..65535"))
+
+load_dir := ".tmp/q_load_script_project"
+assert(fs.mkdirAll(load_dir))
+load_file := load_dir .. "/loaded.q"
+assert(fs.writefile(load_file, "loaded:41;loaded_fn:{x+loaded};loaded_fn[1]"))
+loaded := q.eval("\\l " .. load_file .. ";loaded_fn[2]")
+ok, err = pcall(q.eval, "\\l")
+check("q load system command evaluates local scripts", loaded == 43 && ok == false && contains(err, "expects one file path"))
+
+zp := q.eval(".z.P")
+zd := q.eval(".z.D")
+zt := q.eval(".z.T")
+check("q .z current temporal namespace values", string.find(zp, "T", 1, true) != nil && string.find(zp, "Z", 1, true) != nil && string.len(zd) == 10 && string.len(zt) >= 8)
+
+ok, err = pcall(q.eval, ".z.X")
+check("unsupported q namespace values remain unsupported", ok == false && contains(err, ".z namespace"))
+
+ipc_sum := q.eval("h:hopen \"loopback\";h[\"+/1 2 3\"]")
+ipc_async := q.eval("h:hopen \"loopback\";neg[h][\"x:42\"];h[\"x\"]")
+ipc_list := q.eval("h:hopen \"loopback\";h[(\"x+y\";20;22)]")
+ipc_list_lambda := q.eval("h:hopen \"loopback\";h[({x*y};6;7)]")
+ipc_list_async := q.eval("h:hopen \"loopback\";neg[h][(\"a:x+y\";20;22)];h[\"a\"]")
+ipc_list_args_do_not_leak := q.eval("h:hopen \"loopback\";h[\"x:100\"];h[(\"x+y\";2;3)];h[\"x\"]")
+check("q in-process ipc loopback handles are supported", ipc_sum == 6 && ipc_async == 42 && ipc_list == 42 && ipc_list_lambda == 42 && ipc_list_async == 42 && ipc_list_args_do_not_leak == 100)
+
+ok, err = pcall(q.eval, "hopen `:localhost:5000")
+check("q network ipc targets remain unsupported", ok == false && contains(err, "unsupported q IPC target"))
+
+ok, err = pcall(q.eval, "h:hopen \"loopback\";neg[h][10]")
+check("q ipc non-string message calls remain unsupported", ok == false && contains(err, "expects a string command or message list"))
+
+ok, err = pcall(q.eval, "h:hopen \"loopback\";h[(10;20)]")
+check("q ipc unsupported message-list heads are rejected", ok == false && contains(err, "message list head"))
+
+path_store := ".tmp/q_boundaries_and_gap_closures_project"
+assert(q.save_splayed(trades, "`:" .. path_store .. "/splayed"))
+path_loaded := q.eval("get `:" .. path_store .. "/splayed")
+path_selected := q.sql("select sym,price from `:" .. path_store .. "/splayed", {})
+check("q splayed table paths support Leia columnar stores", q.count(path_loaded) == 2 && #path_selected == 2 && path_selected[1].sym == "AAPL")
+
+assert(q.save_partitioned(trades, "`:" .. path_store .. "/partitioned", "sym"))
+partitioned_path_selected := q.sql("select total:sum size by sym from `:" .. path_store .. "/partitioned", {})
+check("q partitioned table paths support Leia columnar stores", #partitioned_path_selected == 2 && partitioned_path_selected[1].total == 10)
+
+ok, err = pcall(q.eval, "get `:/tmp/leia-q-gap/native-kdb-splayed")
+check("native kdb+ disk paths are not claimed as compatible", ok == false && contains(err, "_leia"))
+
+enum_cast := q.eval("`sym$`AAPL`MSFT")
+enum_repeated := q.eval("`sym$`AAPL`MSFT`AAPL")
+enum_domain_values := q.eval("domain `sym$`AAPL`MSFT`AAPL")
+enum_codes := q.eval("codes `sym$`AAPL`MSFT`AAPL")
+enum_value := q.eval("value `sym$`AAPL`MSFT")
+enum_keys := q.eval("keys `sym$`AAPL`MSFT")
+enum_meta_domain := q.eval("(meta `sym$`AAPL`MSFT)`domain")
+enum_meta_type := q.eval("(meta `sym$`AAPL`MSFT)`type")
+enum_meta_count := q.eval("(meta `sym$`AAPL`MSFT)`count")
+enum_same := q.eval("`sym$`AAPL`MSFT~`sym$`AAPL`MSFT")
+enum_other_domain := q.eval("`sym$`AAPL`MSFT~`venue$`AAPL`MSFT")
+enum_plain := q.eval("`sym$`AAPL`MSFT~`AAPL`MSFT")
+check("q enumeration cast has encoded domain and codes", q.count(enum_cast) == 2 && enum_cast[1] == "AAPL" && enum_repeated[3] == "AAPL" && enum_value[2] == "MSFT" && enum_domain_values[1] == "AAPL" && enum_domain_values[2] == "MSFT" && q.count(enum_domain_values) == 2 && enum_codes[1] == 0 && enum_codes[2] == 1 && enum_codes[3] == 0 && enum_keys[1] == "domain" && enum_keys[2] == "value" && enum_meta_domain == "sym" && enum_meta_type == 11 && enum_meta_count == 2)
+check("q enumeration match preserves domain identity", enum_same == true && enum_other_domain == false && enum_plain == false)
+
+attr_sorted := q.eval("`s#10 20 30")
+attr_grouped := q.eval("`g#10 20 10")
+attr_parted := q.eval("`p#10 20 30")
+attr_unique := q.eval("`u#10 20 30")
+attr_parted_date := q.eval("`p#2026.06.06 2026.06.07")
+attr_unique_sym := q.eval("`u#`AAPL`MSFT")
+attr_keys := q.eval("keys `s#10 20 30")
+attr_meta_keys := q.eval("keys meta `s#10 20 30")
+attr_meta_attribute := q.eval("(meta `s#10 20 30)`attribute")
+attr_meta_type := q.eval("(meta `s#10 20 30)`type")
+attr_meta_count := q.eval("(meta `s#10 20 30)`count")
+check("q attribute markers are transparent vectors", q.count(attr_sorted) == 3 && attr_sorted[1] == 10 && attr_grouped[3] == 10 && attr_parted[2] == 20 && attr_unique[3] == 30)
+check("q attribute marker metadata is inspectable", attr_keys[1] == "attribute" && attr_keys[2] == "value" && attr_meta_keys[1] == "attribute" && attr_meta_attribute == "s" && attr_meta_type == 7 && attr_meta_count == 3)
+check("q temporal and symbol attribute markers are transparent vectors", q.count(attr_parted_date) == 2 && attr_parted_date[1] == "2026-06-06" && q.count(attr_unique_sym) == 2 && attr_unique_sym[2] == "MSFT")
+
+infinities := q.eval("0W 0w -0W")
+check("q infinity literals are supported", q.count(infinities) == 3 && infinities[1] > 9000000000000000000 && infinities[2] > infinities[1] && infinities[3] < -9000000000000000000)
+
+typed_infinities := q.eval("0Wh -0Wh 0Wi -0Wi 0Wj -0Wj 0We -0We 0Wf -0Wf")
+check("q typed infinity literals are supported", q.count(typed_infinities) == 10 && typed_infinities[1] > 30000 && typed_infinities[2] < -30000 && typed_infinities[3] > 2000000000 && typed_infinities[4] < -2000000000 && typed_infinities[5] > 9000000000000000000 && typed_infinities[6] < -9000000000000000000 && typed_infinities[7] > typed_infinities[5] && typed_infinities[8] < typed_infinities[6] && typed_infinities[9] > typed_infinities[5] && typed_infinities[10] < typed_infinities[6])
+
+numeric_nulls := q.eval("0Nh 0Ni 0Nj 0Ne")
+check("q typed numeric null literals", q.count(numeric_nulls) == 4 && data.is_null(numeric_nulls[1]) && data.is_null(numeric_nulls[2]) && data.is_null(numeric_nulls[3]) && data.is_null(numeric_nulls[4]))
+
+month_null := q.eval("0Nm 2024.01")
+minute_null := q.eval("0Nu 09:30")
+second_null := q.eval("0Nv 09:30:00")
+ok, err = pcall(q.eval, "0Nm 0Nu 0Nv")
+check("q month minute second null literals are supported by kind", data.is_null(month_null[1]) && month_null[2] == "2024.01" && data.is_null(minute_null[1]) && minute_null[2] == "09:30" && data.is_null(second_null[1]) && second_null[2] == "09:30:00" && ok == false && contains(err, "mixed temporal"))
+
+threshold := 100.0
+captured := q.sql("select sym,price from trades where price>threshold", {trades: trades, threshold: threshold})
+check("qsql captures scalar env bindings", #captured == 1 && captured[1].sym == "MSFT" && captured[1].price == 101.0)
+
+trimmed := q.sql("delete price from trades", {trades: trades})
+check("column delete removes selected columns", #trimmed == 2 && trimmed[1].sym == "AAPL" && trimmed[1].size == 10 && trimmed[1].price == nil)
+
+left_joined := q.sql("select sym,price,size from trades lj quotes on sym order by sym asc", {trades: trades, quotes: trades})
+check("left join syntax is supported", #left_joined == 2 && left_joined[1].sym == "AAPL" && left_joined[2].sym == "MSFT")
+
+computed := q.sql("select price*size from trades", {trades: trades})
+check("computed projection gets stable default name", #computed == 2 && computed[1]["price*size"] == 1000.0 && computed[2]["price*size"] == 2020.0)
+
+computed_ordered := q.sql("select price*size from trades order by price*size desc", {trades: trades})
+check("order by computed default name", #computed_ordered == 2 && computed_ordered[1]["price*size"] == 2020.0 && computed_ordered[2]["price*size"] == 1000.0)
+
+grouped := q.sql("update avg_price:avg price by sym from trades", {trades: trades})
+check("grouped update writes per-row aggregate", #grouped == 2 && grouped[1].avg_price == 100.0 && grouped[2].avg_price == 101.0)
+
+print("ok")

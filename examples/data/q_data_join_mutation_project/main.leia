@@ -24,6 +24,39 @@ check("qsql distinct", #distinct_syms == 4 && distinct_syms[1].sym == "AAPL")
 check("qsql take", #top_trades == 3 && top_trades[1].sym == "NVDA")
 check("qsql hash take", #hash_take == 2 && hash_take[1].price == 103.0)
 
+venues := data.frame({
+    venue: data.strings({"XNAS", "XNYS", "ARCX", "BATS"}),
+    mic_name: data.strings({"Nasdaq", "NYSE", "NYSE Arca", "Cboe BZX"}),
+    region: data.strings({"US", "US", "US", "US"}),
+})
+
+routes := data.frame({
+    sym: data.symbols({"AAPL", "MSFT", "AAPL", "NVDA", "MSFT"}),
+    venue: data.strings({"XNAS", "XNYS", "BATS", "ARCX", "BATS"}),
+    route: data.strings({"lit-primary", "nyse-close", "dark-sweep", "arca-open", "bzx-close"}),
+    tier: data.i64({1, 1, 2, 1, 2}),
+})
+
+q_updated := q.sql(trades, "update price:price+1.0 from trades where sym=`AAPL")
+q_deleted := q.sql(q_updated, "delete from trades where sym=`TSLA")
+q_joined := q.sql(
+    "select id,sym,venue,mic_name,price,size from trades join venues on venue order by id asc",
+    {trades: q_deleted, venues: venues}
+)
+q_routed := q.sql(
+    "select id,sym,venue,mic_name,route,tier,price,size from trades join routes on sym,venue order by id asc",
+    {trades: q_joined, routes: routes}
+)
+q_rollup := q.sql(q_joined, "select notional:sum price*size, fills:count i by sym from trades where price>=101 order by notional desc")
+q_route_rollup := q.sql(q_routed, "select notional:sum price*size, fills:count i by route from trades order by notional desc take 3")
+
+check("q native update", #q_updated == 6 && q_updated[1].price == 101.0 && q_updated[3].price == 101.75)
+check("q native delete", #q_deleted == 5 && q_deleted[5].sym == "MSFT")
+check("q native join", #q_joined == 5 && q_joined[1].mic_name == "Nasdaq" && q_joined[4].mic_name == "NYSE Arca")
+check("q native route join", #q_routed == 5 && q_routed[1].route == "lit-primary" && q_routed[5].route == "bzx-close")
+check("q native rollup", #q_rollup == 3 && q_rollup[1].sym == "MSFT" && q_rollup[1].notional == 21450.0)
+check("q native route bars", #q_route_rollup == 3 && q_route_rollup[1].route == "lit-primary" && q_route_rollup[3].route == "nyse-close")
+
 conn := db.memory()
 conn.exec(sql`create table trades (
     id integer primary key,
@@ -82,11 +115,12 @@ check("joined frame qsql", #rollup == 3 && rollup[1].sym == "MSFT" && rollup[1].
 check("distinct take venues", #venue_sample == 3 && venue_sample[1].venue == "ARCX" && venue_sample[3].mic_name == "Nasdaq")
 
 q_data_join_mutation_summary := string.format(
-    "q_data_join_mutation rows=%d symbols=%d top=%s notional=%.1f venues=%d",
+    "q_data_join_mutation rows=%d symbols=%d top=%s notional=%.1f routes=%d venues=%d",
     joined_frame.len,
     #distinct_syms,
     rollup[1].sym,
     rollup[1].notional,
+    #q_route_rollup,
     #venue_sample
 )
 print(q_data_join_mutation_summary)
@@ -95,6 +129,12 @@ return {
     trades: trades,
     distinct_syms: distinct_syms,
     top_trades: top_trades,
+    q_updated: q_updated,
+    q_deleted: q_deleted,
+    q_joined: q_joined,
+    q_routed: q_routed,
+    q_rollup: q_rollup,
+    q_route_rollup: q_route_rollup,
     joined: joined,
     joined_frame: joined_frame,
     rollup: rollup,

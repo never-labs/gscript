@@ -1,0 +1,67 @@
+print("case:q_kdb_delta_golden")
+
+func check(name, ok) {
+  assert(ok)
+  print("ok", name)
+}
+
+trades := q.sql(
+  "select trade_id,sym,ts from ([] trade_id:1 2 3; sym:`AAPL`AAPL`MSFT; ts:2026.06.06D09:30:00 2026.06.06D09:30:01 2026.06.06D09:30:00)",
+  {}
+)
+quotes := q.sql(
+  "select sym,ts,bid,seq from ([] sym:`AAPL`AAPL`AAPL`MSFT; ts:2026.06.06D09:30:00 2026.06.06D09:30:00 2026.06.06D09:30:01 2026.06.06D09:29:59; bid:100.0 0N 100.5 80.0; seq:1 2 3 4)",
+  {}
+)
+
+aj := q.sql("select trade_id,sym,ts,bid,seq from trades aj quotes on sym,ts order by trade_id asc", {trades: trades, quotes: quotes})
+aj0 := q.sql("select trade_id,sym,ts,bid,seq from trades aj0 quotes on sym,ts order by trade_id asc", {trades: trades, quotes: quotes})
+ajf := q.sql("select trade_id,sym,ts,bid,seq from trades ajf quotes on sym,ts order by trade_id asc", {trades: trades, quotes: quotes})
+ajf0 := q.sql("select trade_id,sym,ts,bid,seq from trades ajf0 quotes on sym,ts order by trade_id asc", {trades: trades, quotes: quotes})
+wj_zero := q.sql("select trade_id,sym,ts,bid,seq from trades wj[0 0] quotes on sym,ts order by trade_id asc", {trades: trades, quotes: quotes})
+wj_last := q.sql("select trade_id,sym,ts,bid,seq from trades wj1[0 0] quotes on sym,ts order by trade_id asc", {trades: trades, quotes: quotes})
+
+check("q golden aj variants share asof value boundary", #aj == 3 && aj[1].seq == 2 && data.is_null(aj[1].bid) && aj[2].bid == 100.5 && aj[3].bid == 80.0 && aj0[1].seq == aj[1].seq && ajf[1].seq == aj[1].seq && ajf0[2].bid == aj[2].bid)
+check("q golden aj0 ajf0 preserve matched right time", aj[1].ts == "2026-06-06T09:30:00Z" && aj0[1].ts == "2026-06-06T09:30:00Z" && aj[3].ts == "2026-06-06T09:30:00Z" && aj0[3].ts == "2026-06-06T09:29:59Z" && ajf0[3].ts == "2026-06-06T09:29:59Z")
+check("q golden wj boundary keeps duplicate and null rows", #wj_zero == 3 && #wj_zero[1].bid == 2 && wj_zero[1].bid[1] == 100.0 && data.is_null(wj_zero[1].bid[2]) && #wj_zero[2].bid == 1 && #wj_zero[3].bid == 0)
+check("q golden wj1 boundary chooses last in-order row", #wj_last == 3 && wj_last[1].seq == 2 && data.is_null(wj_last[1].bid) && wj_last[2].bid == 100.5 && wj_last[3].bid == nil)
+
+typed := q.sql(
+  "select sym,d,t,ts,qty,px from ([] sym:`AAPL`MSFT; d:2026.06.06 0Nd; t:09:30:00.250 0Nt; ts:2026.06.06D09:30:00.250 0Np; qty:10 0Ni; px:100.5 0N)",
+  {}
+)
+decoded_typed := q.decode(q.encode(typed))
+
+check("q golden typed null columns survive codec", decoded_typed[1].d == "2026-06-06" && decoded_typed[1].t == "09:30:00.250" && decoded_typed[1].ts == "2026-06-06T09:30:00.250Z" && decoded_typed[2].d == nil && decoded_typed[2].t == nil && decoded_typed[2].ts == nil && decoded_typed[2].qty == nil && decoded_typed[2].px == nil)
+
+projection_each := q.eval("({x+y}[10;])'1 2 3")
+projection_over := q.eval("({x+y}[1;])/[2 3 4]")
+projection_scan := q.eval("({x+y}[1;])\\2 3 4")
+projection_prior := q.eval("({x-y}[;1])':10 15 14")
+
+check("q golden adverb projection", projection_each[1] == 11 && projection_each[3] == 13 && projection_over == 4 && projection_scan[1] == 2 && projection_scan[3] == 4 && projection_prior[2] == 14 && projection_prior[3] == 13)
+
+bars := data.frame({
+  sym: data.symbols({"AAPL", "AAPL", "AAPL", "MSFT"}),
+  bucket: data.strings({"09:30", "09:30", "09:31", "09:30"}),
+  seq: data.i64({1, 2, 3, 4}),
+  px: data.f64({100.0, 100.5, 101.0, 80.0}),
+})
+keyed := q.key_by(bars, "sym", "bucket")
+lookup_dup := q.lookup(keyed, "AAPL", "09:30")
+all_dup := q.sql(keyed, "select sym,bucket,seq,px from bars where sym=`AAPL order by seq asc")
+missing_dup := q.lookup(keyed, "IBM", "09:30")
+decoded_keyed := q.decode(q.encode(keyed))
+decoded_lookup := q.lookup(decoded_keyed, "AAPL", "09:30")
+
+check("q golden keyed duplicate rows", #lookup_dup == 1 && lookup_dup[1].seq == 2 && lookup_dup[1].sym == nil && #all_dup == 3 && all_dup[1].seq == 1 && all_dup[2].seq == 2 && all_dup[1].bucket == "09:30" && all_dup[2].bucket == "09:30" && #missing_dup == 0 && missing_dup.column_kinds.px == "f64")
+check("q golden keyed codec roundtrip", q.keys(decoded_keyed)[1] == "sym" && q.keys(decoded_keyed)[2] == "bucket" && #decoded_lookup == 1 && decoded_lookup[1].seq == 2 && decoded_lookup[1].px == 100.5)
+
+dict := q.eval("`b`a!(2 3;`x`y)")
+decoded_dict := q.decode(q.encode(dict))
+decoded_dict_keys := q.keys(decoded_dict)
+decoded_symbols := q.decode(q.encode(q.eval("`AAPL`MSFT`TSLA")))
+
+check("q golden dictionary vector codec roundtrip", decoded_dict_keys[1] == "b" && decoded_dict_keys[2] == "a" && q.value(decoded_dict)[1][2] == 3 && q.value(decoded_dict)[2][1] == "x" && decoded_symbols[3] == "TSLA")
+
+print("ok")

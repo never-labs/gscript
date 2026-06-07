@@ -1,0 +1,14 @@
+print("case:q_market_full_stack_project")
+
+result := dofile("examples/data/q_market_full_stack_project/main.leia")
+
+assert(result.summary != "")
+assert(#result.trades == 6)
+assert(#result.orders == 6)
+assert(#result.enriched == 6)
+assert(#result.windowed == 6)
+assert(#result.last_window == 6)
+assert(#result.bars == 6)
+assert(result.high_value[1].sym == "NVDA")
+
+print("ok")

@@ -1,0 +1,119 @@
+// q_order_book_lifecycle_project - larger q/kdb+-style order book lifecycle.
+// Run:
+//   go run ./cmd/leia run examples/data/q_order_book_lifecycle_project/main.leia
+
+func check(name, ok) {
+    assert(ok)
+    print("ok", name)
+}
+
+fee_by_venue := q.eval("`XNAS`BATS`XNYS`ARCX!0.0003 0.0002 0.00035 0.00025")
+risk_weights := q.eval("1.0 1.2 0.8 1.5*'100 200 300 400")
+running_child_qty := q.eval("+\\100 50 25 25")
+size_deltas := q.eval("-':100 150 130 180")
+size_lookup := q.eval("100 200 300?200 500")
+tick_template := q.eval("flip `event`sym`ts`px`qty!(`order`quote`trade`trade;`AAPL`AAPL`AAPL`MSFT;2026.06.06D09:30:00 2026.06.06D09:30:01 2026.06.06D09:30:30 2026.06.06D09:31:10;100.20 100.25 100.22 250.30;100 0 40 20)")
+
+check("q vector adverb dict setup", fee_by_venue.XNAS == 0.0003 && risk_weights[2] == 240.0 && running_child_qty[4] == 200 && size_deltas[3] == -20 && size_lookup[2] == 3)
+check("q flip tick template", #tick_template == 4 && tick_template[3].event == "trade" && tick_template[4].ts == "2026-06-06T09:31:10Z")
+
+quotes := q.sql(
+    "select quote_id,sym,ts,bid,ask,bid_sz,ask_sz,venue from ([] quote_id:1 2 3 4 5 6 7 8 9; sym:`AAPL`AAPL`AAPL`MSFT`MSFT`NVDA`NVDA`IBM`TSLA; ts:2026.06.06D09:29:59 2026.06.06D09:30:45 2026.06.06D09:32:00 2026.06.06D09:30:10 2026.06.06D09:31:40 2026.06.06D09:30:15 2026.06.06D09:32:15 2026.06.06D09:30:00 2026.06.06D09:31:00; bid:100.00 100.25 100.50 250.00 250.60 880.00 881.50 140.00 205.00; ask:100.20 100.45 100.80 250.40 251.00 881.00 882.50 140.50 206.00; bid_sz:500 450 400 300 320 80 75 150 100; ask_sz:420 430 390 250 310 70 70 130 90; venue:`XNAS`BATS`XNAS`XNYS`ARCX`XNAS`BATS`XNYS`XNAS)",
+    {}
+)
+
+orders := q.sql(
+    "select order_id,parent_id,sym,side,ts,trade_date,session_time,order_qty,limit_px,trader from ([] order_id:1001 1002 1003 1004 1005 1006; parent_id:501 501 502 503 504 505; sym:`AAPL`AAPL`MSFT`NVDA`IBM`AAPL; side:`buy`buy`sell`buy`sell`sell; ts:2026.06.06D09:30:00 2026.06.06D09:31:00 2026.06.06D09:30:20 2026.06.06D09:30:40 2026.06.06D09:30:05 2026.06.06D09:32:10; trade_date:2026.06.06 2026.06.06 2026.06.06 2026.06.06 2026.06.06 2026.06.06; session_time:09:30:00.000000000 09:31:00.000000000 09:30:20.000000000 09:30:40.000000000 09:30:05.000000000 09:32:10.000000000; order_qty:100 60 80 20 50 70; limit_px:100.40 100.55 250.30 881.00 140.20 100.45; trader:`alpha`alpha`beta`gamma`delta`alpha)",
+    {}
+)
+
+raw_trades := q.sql(
+    "select trade_id,order_id,sym,ts,price,size,venue,cancelled from ([] trade_id:2001 2002 2003 2004 2005 2006 2007 2008; order_id:1001 1002 1003 1004 1002 1006 0 1005; sym:`AAPL`AAPL`MSFT`NVDA`AAPL`AAPL`TSLA`IBM; ts:2026.06.06D09:30:30 2026.06.06D09:31:30 2026.06.06D09:30:50 2026.06.06D09:31:20 2026.06.06D09:32:20 2026.06.06D09:32:40 2026.06.06D09:31:30 2026.06.06D09:31:00; price:100.22 100.42 250.20 880.50 100.60 100.35 205.50 140.10; size:40 30 40 10 20 70 30 10; venue:`XNAS`BATS`XNYS`XNAS`XNAS`BATS`XNAS`XNYS; cancelled:false false false false true false false false)",
+    {}
+)
+
+trades := q.sql(raw_trades, "delete from trades where cancelled=true")
+trades = q.sql(trades, "update notional:price*size from trades where size>0")
+
+ticks := q.sql(
+    "select tick_id,event,sym,ts,px,qty,venue from ([] tick_id:1 2 3 4 5 6 7 8 9 10 11 12; event:`order`quote`trade`order`quote`trade`order`trade`quote`trade`cancel`trade; sym:`AAPL`AAPL`AAPL`MSFT`MSFT`MSFT`NVDA`NVDA`AAPL`TSLA`AAPL`IBM; ts:2026.06.06D09:30:00 2026.06.06D09:30:45 2026.06.06D09:30:30 2026.06.06D09:30:20 2026.06.06D09:31:40 2026.06.06D09:30:50 2026.06.06D09:30:40 2026.06.06D09:31:20 2026.06.06D09:32:00 2026.06.06D09:31:30 2026.06.06D09:32:20 2026.06.06D09:31:00; px:100.40 100.45 100.22 250.30 251.00 250.20 881.00 880.50 100.80 205.50 100.60 140.10; qty:100 0 40 80 0 40 20 10 0 30 20 10; venue:`XNAS`BATS`XNAS`XNYS`ARCX`XNYS`XNAS`XNAS`XNAS`XNAS`XNAS`XNYS)",
+    {}
+)
+
+enriched := q.sql(
+    "select trade_id,order_id,sym,ts,price,size,notional,bid,ask,spread:ask-bid,bid_sz,ask_sz,venue from trades asof join quotes on sym,ts order by trade_id asc",
+    {trades: trades, quotes: quotes}
+)
+
+order_fill_rollup := q.sql(
+    trades,
+    "select filled:sum size,traded_notional:sum price*size,fills:count i by order_id,sym from trades where order_id>0 order by order_id asc"
+)
+
+order_lifecycle := q.sql(
+    "select order_id,parent_id,sym,side,order_qty,limit_px,filled,traded_notional,fills,trader from orders pj fills on order_id,sym order by order_id asc",
+    {orders: orders, fills: order_fill_rollup}
+)
+
+order_by_sym := q.sql(orders, "select order_qty:sum order_qty,order_count:count i by sym from trades order by sym asc")
+trade_by_sym := q.sql(trades, "select traded_qty:sum size,traded_notional:sum notional,trade_count:count i by sym from trades order by sym asc")
+symbol_book := q.sql(
+    "select sym,order_qty,order_count,traded_qty,traded_notional,trade_count from orders uj trades on sym order by sym asc",
+    {orders: order_by_sym, trades: trade_by_sym}
+)
+
+bars := q.sql(
+    enriched,
+    "select notional:sum notional,shares:sum size,fills:count i,avg_spread:avg spread,first_px:first price,last_px:last price by sym,bucket:xbar 60000000000 ts from trades order by sym asc,bucket asc"
+)
+
+tick_flow := q.sql(
+    ticks,
+    "select qty:sum qty,events:count i,first_px:first px,last_px:last px by event,sym,bucket:xbar 60000000000 ts from trades order by event asc,sym asc,bucket asc"
+)
+
+opening_orders := q.sql(orders, "select order_id,sym,trade_date,session_time from trades where trade_date=2026.06.06 and session_time=09:30:00.000000000")
+wide_spreads := q.sql(enriched, "select trade_id,sym,spread from trades where spread>=0.5 order by spread desc,trade_id asc")
+tsla_union := q.sql(symbol_book, "select sym,traded_qty,order_qty from trades where sym=`TSLA")
+
+for i := 1; i <= #bars; i++ {
+    row := bars[i]
+    row.vwap = row.notional / row.shares
+}
+
+check("trade quote order tick datasets", #quotes == 9 && #orders == 6 && #trades == 7 && #ticks == 12)
+check("typed temporal orders", #opening_orders == 1 && opening_orders[1].order_id == 1001 && opening_orders[1].trade_date == "2026-06-06" && opening_orders[1].session_time == "09:30:00")
+check("asof enriches trades", #enriched == 7 && enriched[1].bid == 100.0 && enriched[2].bid == 100.25 && enriched[3].ask == 250.4 && enriched[7].bid == 140.0)
+check("pj order lifecycle", #order_lifecycle == 6 && order_lifecycle[1].filled == 40.0 && order_lifecycle[2].filled == 30.0 && order_lifecycle[5].filled == 10.0 && order_lifecycle[6].traded_notional == 7024.5)
+check("uj symbol book includes right only tickers", #symbol_book == 5 && #tsla_union == 1 && tsla_union[1].order_qty == nil && tsla_union[1].traded_qty == 30.0)
+check("xbar bars and vwap", #bars == 7 && bars[1].sym == "AAPL" && bars[1].bucket == "2026-06-06T09:30:00Z" && math.floor(bars[1].vwap * 100) == 10022 && bars[7].sym == "TSLA")
+check("tick flow rollup", #tick_flow == 12 && tick_flow[1].event == "cancel" && tick_flow[2].event == "order" && tick_flow[12].sym == "TSLA")
+check("spread filter", #wide_spreads == 3 && wide_spreads[1].sym == "NVDA" && wide_spreads[3].sym == "IBM")
+
+summary := string.format(
+    "q_order_book_lifecycle orders=%d trades=%d quotes=%d ticks=%d symbols=%d bars=%d top_bar=%s %.1f fees=%.5f",
+    #orders,
+    #trades,
+    #quotes,
+    #ticks,
+    #symbol_book,
+    #bars,
+    bars[1].sym,
+    bars[1].notional,
+    fee_by_venue.BATS
+)
+print(summary)
+
+return {
+    quotes: quotes,
+    orders: orders,
+    trades: trades,
+    ticks: ticks,
+    enriched: enriched,
+    order_lifecycle: order_lifecycle,
+    symbol_book: symbol_book,
+    bars: bars,
+    tick_flow: tick_flow,
+    wide_spreads: wide_spreads,
+    summary: summary,
+}

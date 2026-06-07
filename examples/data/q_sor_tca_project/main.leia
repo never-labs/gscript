@@ -1,0 +1,163 @@
+// q_sor_tca_project - smart order routing and TCA-style q analytics.
+// Run:
+//   go run ./cmd/leia run examples/data/q_sor_tca_project/main.leia
+
+func check(name, ok) {
+    assert(ok)
+    print("ok", name)
+}
+
+fees := q.eval("`XNAS`BATS`XNYS`ARCX!0.00030 0.00020 0.00035 0.00025")
+adverb_pack := q.eval("qty:40 20 30 10;(+/qty;+\\qty;-':qty;qty*qty)")
+risk_limits := q.eval("`alpha`beta`gamma!75000 50000 25000")
+
+check("q dictionaries and adverbs seed routing inputs", fees.BATS == 0.0002 && adverb_pack[1] == 100 && adverb_pack[2][4] == 100 && adverb_pack[3][3] == 10 && adverb_pack[4][2] == 400 && risk_limits.alpha == 75000)
+
+venues := q.sql(
+    "select venue,mic,region,lit,fee_bps from ([venue:`XNAS`BATS`XNYS`ARCX] mic:`NASDAQ`BZX`NYSE`ARCA; region:`US`US`US`US; lit:true true true true; fee_bps:0.30 0.20 0.35 0.25)",
+    {}
+)
+
+route_ref := q.sql(
+    "select sym,venue,preferred,min_fill from ([] sym:`AAPL`AAPL`MSFT`NVDA`TSLA; venue:`XNAS`BATS`XNYS`XNAS`ARCX; preferred:true true true true false; min_fill:25 20 10 5 10)",
+    {}
+)
+
+orders_raw := q.sql(
+    "select order_id,parent_id,desk,acct,sym,side,ts,order_qty,limit_px,urgency,route,cancelled from ([] order_id:7001 7002 7003 7004 7005 7006; parent_id:900 900 901 902 903 904; desk:`alpha`alpha`beta`gamma`beta`omega; acct:`PM1`PM1`PM2`PM3`PM2`PM9; sym:`AAPL`AAPL`MSFT`NVDA`TSLA`IBM; side:`buy`sell`sell`buy`buy`sell; ts:2026.06.06D09:30:00 2026.06.06D09:30:30 2026.06.06D09:31:00 2026.06.06D09:31:30 2026.06.06D09:30:00 2026.06.06D09:32:00; order_qty:100 80 60 20 30 15; limit_px:100.6 100.2 250.4 882.5 206.0 140.0; urgency:`normal`urgent`normal`passive`urgent`normal; route:`XNAS`BATS`XNYS`XNAS`ARCX`XNYS; cancelled:false false false false true false)",
+    {}
+)
+
+quotes := q.sql(
+    "select quote_id,sym,ts,bid,ask,bid_sz,ask_sz,venue from ([] quote_id:1 2 3 4 5 6 7 8; sym:`AAPL`AAPL`AAPL`MSFT`MSFT`NVDA`NVDA`TSLA; ts:2026.06.06D09:29:45 2026.06.06D09:30:30 2026.06.06D09:31:30 2026.06.06D09:30:30 2026.06.06D09:31:30 2026.06.06D09:31:00 2026.06.06D09:32:00 2026.06.06D09:30:30; bid:100.00 100.20 100.35 250.00 250.50 881.00 882.00 205.00; ask:100.20 100.45 100.60 250.30 250.85 882.00 883.00 206.00; bid_sz:500 450 420 300 330 80 75 100; ask_sz:420 430 390 250 310 70 70 90; venue:`XNAS`BATS`XNAS`XNYS`ARCX`XNAS`BATS`ARCX)",
+    {}
+)
+
+fills_raw := q.sql(
+    "select trade_id,order_id,parent_id,sym,side,ts,price,size,venue,busted from ([] trade_id:8001 8002 8003 8004 8005 8006 8007; order_id:7001 7001 7002 7003 7004 7005 7006; parent_id:900 900 900 901 902 903 904; sym:`AAPL`AAPL`AAPL`MSFT`NVDA`TSLA`IBM; side:`buy`buy`sell`sell`buy`buy`sell; ts:2026.06.06D09:30:20 2026.06.06D09:31:00 2026.06.06D09:31:45 2026.06.06D09:31:45 2026.06.06D09:32:10 2026.06.06D09:31:00 2026.06.06D09:32:30; price:100.22 100.40 100.30 250.60 882.40 205.50 140.10; size:40 35 30 25 10 30 5; venue:`XNAS`BATS`BATS`XNYS`XNAS`ARCX`XNYS; busted:false false false false false true false)",
+    {}
+)
+
+orders := q.sql(orders_raw, "delete from trades where cancelled=true")
+orders = q.sql(orders, "update open_qty:order_qty from trades where order_qty>0")
+orders = q.sql(orders, "update child_target:order_qty*0.5 from trades where urgency=`normal")
+orders = q.sql(orders, "update child_target:order_qty from trades where urgency=`urgent")
+orders = q.sql(orders, "update child_target:order_qty*0.25 from trades where urgency=`passive")
+
+fills := q.sql(fills_raw, "delete from trades where busted=true")
+fills = q.sql(fills, "update notional:price*size from trades where size>0")
+fills = q.sql(fills, "update signed_qty:size from trades")
+fills = q.sql(fills, "update signed_qty:0-size from trades where side=`sell")
+fills = q.sql(fills, "update fee:notional*0.00030 from trades where venue=`XNAS")
+fills = q.sql(fills, "update fee:notional*0.00020 from trades where venue=`BATS")
+fills = q.sql(fills, "update fee:notional*0.00035 from trades where venue=`XNYS")
+
+enriched := q.sql(
+    "select trade_id,order_id,parent_id,sym,side,ts,price,size,signed_qty,notional,fee,bid,ask,spread:ask-bid,venue from trades asof join quotes on sym,ts order by trade_id asc",
+    {trades: fills, quotes: quotes}
+)
+
+quote_window := q.sql(
+    "select trade_id,sym,ts,bid,ask,bid_sz,ask_sz from trades wj[-120000000000 0] quotes on sym,ts order by trade_id asc",
+    {trades: fills, quotes: quotes}
+)
+
+last_quote := q.sql(
+    "select trade_id,sym,ts,bid,ask,bid_sz,ask_sz from trades wj1[-120000000000 0] quotes on sym,ts order by trade_id asc",
+    {trades: fills, quotes: quotes}
+)
+
+window_stats := q.sql(
+    "select trade_id,sym,ts,n:count bid,avg_bid:avg bid,first_bid:first bid,last_bid:last bid from trades wj[-120000000000 0] quotes on sym,ts order by trade_id asc",
+    {trades: fills, quotes: quotes}
+)
+
+venue_joined := q.sql(
+    "select trade_id,order_id,parent_id,sym,side,ts,price,size,signed_qty,notional,fee,bid,ask,spread,venue,mic,region from trades left join venues on venue order by trade_id asc",
+    {trades: enriched, venues: venues}
+)
+routed_fills := q.sql(venue_joined, "update route:venue from trades")
+
+order_fills := q.sql(
+    routed_fills,
+    "select filled:sum size,traded_notional:sum notional,fees:sum fee,avg_spread:avg spread,fills:count i by order_id,sym,route from trades where order_id>0 order by order_id asc,route asc"
+)
+
+lifecycle := q.sql(
+    "select order_id,parent_id,desk,acct,sym,side,urgency,route,order_qty,child_target,limit_px,filled,traded_notional,fees,fills from orders pj fills on order_id,sym,route order by order_id asc",
+    {orders: orders, fills: order_fills}
+)
+
+bars := q.sql(
+    venue_joined,
+    "select notional:sum notional,shares:sum size,net_qty:sum signed_qty,fills:count i,avg_spread:avg spread by sym,venue,bucket:xbar 60000000000 ts from trades order by sym asc,venue asc,bucket asc"
+)
+
+route_scores := q.sql(
+    venue_joined,
+    "select notional:sum notional,shares:sum size,fees:sum fee,fills:count i by venue,mic from trades order by notional desc"
+)
+
+exec_notional := q.sql(venue_joined, "exec notional from trades where venue=`BATS order by trade_id asc")
+exec_risk := q.sql(venue_joined, "exec trade_id,sym,venue,notional from trades where notional>5000 order by notional desc")
+exec_by_venue := q.sql(venue_joined, "exec shares:sum size,gross:sum notional by venue from trades order by venue asc")
+
+route_keyed := q.key_by(route_ref, "sym", "venue")
+aapl_bats_rule := q.lookup(route_keyed, "AAPL", "BATS")
+msft_xnys_rule := q.lookup(route_keyed, {sym: "MSFT", venue: "XNYS"})
+missing_rule := q.lookup(route_keyed, "IBM", "XNYS")
+
+lifecycle_keyed := q.key_by(lifecycle, "desk", "sym")
+alpha_aapl := q.lookup(lifecycle_keyed, "alpha", "AAPL")
+beta_msft := q.lookup(lifecycle_keyed, {desk: "beta", sym: "MSFT"})
+keyed_lifecycle_query := q.sql(lifecycle_keyed, "select order_id,desk,sym,filled,traded_notional from trades where desk=`alpha order by order_id asc")
+amended_lifecycle := q.sql(lifecycle_keyed, "update child_target:child_target+5 from trades where urgency=`urgent")
+
+for i := 1; i <= #bars; i++ {
+    row := bars[i]
+    row.vwap = row.notional / row.shares
+}
+
+check("q update/delete order and fill preparation", #orders == 5 && orders[1].child_target == 50.0 && orders[2].child_target == 80.0 && #fills == 6 && fills[3].signed_qty == -30.0 && fills[4].fee > 2.19)
+check("q asof and venue left join for TCA", #enriched == 6 && enriched[1].bid == 100.0 && enriched[2].bid == 100.2 && enriched[3].ask == 100.6 && enriched[6].bid == nil && #venue_joined == 6 && venue_joined[1].mic == "NASDAQ")
+check("q window joins for quote context", #quote_window == 6 && #quote_window[1].bid == 1 && #quote_window[2].bid == 2 && #quote_window[6].bid == 0 && #last_quote == 6 && last_quote[2].bid == 100.2 && last_quote[6].bid == nil)
+check("q window aggregate rows", #window_stats == 6 && window_stats[2].n == 2 && math.floor(window_stats[2].avg_bid * 100) == 10010 && window_stats[6].n == 0)
+check("q keyed reference and lifecycle lookup", #aapl_bats_rule == 1 && aapl_bats_rule[1].min_fill == 20 && #msft_xnys_rule == 1 && #missing_rule == 0 && #alpha_aapl == 1 && alpha_aapl[1].desk == nil && alpha_aapl[1].filled == 30.0 && #beta_msft == 1 && beta_msft[1].filled == 25.0 && q.keys(route_keyed)[2] == "venue")
+check("q keyed query/update preserves wrapper", #keyed_lifecycle_query == 2 && keyed_lifecycle_query[2].order_id == 7002 && q.keys(amended_lifecycle)[1] == "desk")
+check("q exec projections and grouped exec", exec_notional[1] == 3514.0 && exec_notional[2] == 3009.0 && exec_risk.notional[1] == 8824.0 && exec_risk.notional[2] == 6265.0 && exec_by_venue.venue[1] == "BATS" && exec_by_venue.venue[3] == "XNYS" && exec_by_venue.shares[1] == 65.0)
+check("q xbar route bars and score rollup", #bars == 5 && bars[1].sym == "AAPL" && bars[1].venue == "BATS" && math.floor(bars[1].vwap * 100) == 10035 && #route_scores == 3 && route_scores[1].venue == "XNAS")
+
+summary := string.format(
+    "q_sor_tca fills=%d orders=%d windows=%d bars=%d alpha=%d top=%s %.1f",
+    #fills,
+    #orders,
+    #quote_window,
+    #bars,
+    #keyed_lifecycle_query,
+    exec_risk.sym[1],
+    exec_risk.notional[1]
+)
+print(summary)
+
+return {
+    fees: fees,
+    risk_limits: risk_limits,
+    orders: orders,
+    fills: fills,
+    enriched: enriched,
+    quote_window: quote_window,
+    last_quote: last_quote,
+    window_stats: window_stats,
+    venue_joined: venue_joined,
+    routed_fills: routed_fills,
+    lifecycle: lifecycle,
+    bars: bars,
+    route_scores: route_scores,
+    exec_notional: exec_notional,
+    exec_risk: exec_risk,
+    exec_by_venue: exec_by_venue,
+    route_keyed: route_keyed,
+    lifecycle_keyed: lifecycle_keyed,
+    amended_lifecycle: amended_lifecycle,
+    summary: summary,
+}

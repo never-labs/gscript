@@ -639,7 +639,7 @@ func TestQSymbolicDialectMilestone1ExecutesThroughStdlib(t *testing.T) {
 			assertGet(t, vm, "dict_b", int64(20))
 			assertGet(t, vm, "sym2", "MSFT")
 			assertGet(t, vm, "spread3", float64(2))
-			assertGet(t, vm, "idx1", int64(2))
+			assertGet(t, vm, "idx1", int64(1))
 			assertGet(t, vm, "first_two2", int64(20))
 			assertGet(t, vm, "book_ask2", float64(101))
 			assertGet(t, vm, "trade2_sym", "MSFT")

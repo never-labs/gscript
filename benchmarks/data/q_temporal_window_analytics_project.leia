@@ -1,0 +1,156 @@
+// q temporal/window analytics benchmark: wj + asof + keyed lookup + xbar.
+
+N := 1536
+REPS := 80
+MOD := 1000000007
+
+func make_symbols(n, mod, prefix) {
+    t := {}
+    for i := 1; i <= n; i++ {
+        t[i] = string.format("%s%d", prefix, i % mod)
+    }
+    return data.symbols(t)
+}
+
+func make_i64(n, mod, offset) {
+    t := {}
+    for i := 1; i <= n; i++ {
+        t[i] = offset + (i % mod)
+    }
+    return data.i64(t)
+}
+
+func make_f64(n, mod, offset) {
+    t := {}
+    for i := 1; i <= n; i++ {
+        t[i] = offset + (i % mod) * 0.125
+    }
+    return data.f64(t)
+}
+
+func make_ts(n, offset) {
+    t := {}
+    for i := 1; i <= n; i++ {
+        total := offset + i
+        minute_of_day := 9 * 60 + 30 + total / 60
+        hour := minute_of_day / 60
+        minute := minute_of_day % 60
+        second := total % 60
+        t[i] = string.format("2026-06-06T%02d:%02d:%02dZ", hour, minute, second)
+    }
+    return data.timestamp(t)
+}
+
+func mix(sum, v) {
+    return (sum * 131 + v) % MOD
+}
+
+ids := {}
+for i := 1; i <= N; i++ {
+    ids[i] = i
+}
+
+base_ts := 0
+trades := data.frame({
+    trade_id: data.i64(ids),
+    sym: make_symbols(N, 96, "S"),
+    ts: make_ts(N, base_ts + 45),
+    price: make_f64(N, 251, 100.0),
+    size: make_i64(N, 97, 1),
+    venue: make_symbols(N, 8, "V"),
+})
+
+quotes := data.frame({
+    quote_id: data.i64(ids),
+    sym: make_symbols(N, 96, "S"),
+    ts: make_ts(N, base_ts),
+    bid: make_f64(N, 251, 99.75),
+    ask: make_f64(N, 251, 100.25),
+    bid_sz: make_i64(N, 500, 50),
+    ask_sz: make_i64(N, 500, 40),
+    venue: make_symbols(N, 8, "V"),
+})
+
+ref := data.frame({
+    sym: make_symbols(96, 96, "S"),
+    sector: make_symbols(96, 6, "sector"),
+    tier: make_i64(96, 3, 1),
+})
+
+func run_hot(trades, quotes, ref, reps) {
+    checksum := 0
+    scan := q.eval("+\\100 50 25 10")
+    product := q.eval("prd 2 3 5")
+    for r := 1; r <= reps; r++ {
+        enriched := q.sql(
+            "select trade_id,sym,ts,price,size,bid,ask,spread:ask-bid,venue from trades asof join quotes on sym,ts",
+            {trades: trades, quotes: quotes}
+        )
+        windowed := q.sql(
+            "select trade_id,sym,ts,bid,ask,bid_sz from trades wj quotes on sym,ts order by trade_id asc take 32",
+            {trades: trades, quotes: quotes}
+        )
+        bounded_last := q.sql(
+            "select trade_id,sym,ts,bid,ask,bid_sz from trades wj1[-60000000000 0] quotes on sym,ts order by trade_id asc take 32",
+            {trades: trades, quotes: quotes}
+        )
+        timespan_window := q.sql(
+            "select trade_id,sym,ts,bid from trades wj[-0D00:01:00 0D00:00:00] quotes on sym,ts order by trade_id asc take 32",
+            {trades: trades, quotes: quotes}
+        )
+        window_aggs := q.sql(
+            "select trade_id,sym,ts,n:count bid,avg_bid:avg bid,last_bid:last bid from trades wj[-0D00:01:00 0D00:00:00] quotes on sym,ts order by trade_id asc take 32",
+            {trades: trades, quotes: quotes}
+        )
+        with_notional := q.sql(enriched, "update notional:price*size from trades where size>0")
+        joined := q.sql(
+            "select trade_id,sym,sector,tier,price,size,notional,bid,ask,spread,venue from trades left join ref on sym order by trade_id asc take 128",
+            {trades: with_notional, ref: ref}
+        )
+        projection_source := q.sql(
+            with_notional,
+            "select trade_id,sym,ts,price,bid from trades order by sym asc,ts asc"
+        )
+        projection_path := q.sql(
+            projection_source,
+            "select trade_id,sym,ts,price,bid,price_delta:deltas price,price_ratio:ratios price,bid_fill:fills bid,price_mavg3:3 mavg price,price_xprev2:2 xprev price by sym from trades order by sym asc,ts asc take 128"
+        )
+        assert(#projection_path == 128)
+        assert(projection_path[1].sym == "S0")
+        assert(projection_path[2].sym == "S0")
+        assert(projection_path[3].sym == "S0")
+        assert(projection_path[1].price_delta == 112.0)
+        assert(projection_path[2].price_delta == 12.0)
+        assert(projection_path[2].price_ratio > 1.107)
+        assert(projection_path[2].price_ratio < 1.108)
+        assert(projection_path[2].bid_fill == 123.75)
+        assert(projection_path[3].price_mavg3 > 113.54)
+        assert(projection_path[3].price_mavg3 < 113.55)
+        assert(data.is_null(projection_path[1].price_xprev2))
+        assert(data.is_null(projection_path[2].price_xprev2))
+        assert(projection_path[3].price_xprev2 == 112.0)
+        assert(projection_path[17].sym == "S1")
+        assert(projection_path[17].price_delta == 100.125)
+        assert(projection_path[17].bid_fill == 99.875)
+        assert(data.is_null(projection_path[17].price_xprev2))
+        keyed := q.key_by(joined, "sym")
+        rows := q.lookup(keyed, joined[1].sym)
+        bars := q.sql(
+            with_notional,
+            "select notional:sum notional,shares:sum size,fills:count i,avg_spread:avg spread by sym,bucket:xbar 60000000000 ts from trades order by notional desc take 16"
+        )
+        checksum = mix(checksum, #enriched + #windowed + #bounded_last + #timespan_window + #window_aggs + #joined + #projection_path + #rows + #bars + scan[4] + product)
+        checksum = mix(checksum, windowed[1].trade_id + #windowed[1].bid + bounded_last[1].bid + #timespan_window[1].bid + window_aggs[1].n + bars[1].fills + joined[1].trade_id + math.floor(projection_path[1].price_delta))
+    }
+    return checksum
+}
+
+warm := run_hot(trades, quotes, ref, 2)
+collectgarbage("collect")
+t0 := time.now()
+checksum := run_hot(trades, quotes, ref, REPS)
+elapsed := time.since(t0)
+
+print(string.format("q_temporal_window_analytics_hot trades=%d quotes=%d reps=%d", N, N, REPS))
+print(string.format("checksum: %d", mix(checksum, warm)))
+print(string.format("Time: %.3fs", elapsed))

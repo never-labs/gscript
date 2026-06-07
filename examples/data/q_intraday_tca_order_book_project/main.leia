@@ -1,0 +1,192 @@
+// q_intraday_tca_order_book_project - in-memory ticks/trades/quotes/order book
+// analytics with TCA, VWAP, xbar rollups, keyed lookup, joins, updates, deletes,
+// temporal literals, typed nulls, symbols/enums, adverbs, and dictionary each.
+// Run:
+//   go run ./cmd/leia run examples/data/q_intraday_tca_order_book_project/main.leia
+
+func check(name, ok) {
+    if !ok {
+        print("fail", name)
+    }
+    assert(ok)
+    print("ok", name)
+}
+
+func bps(num, den) {
+    return 10000.0 * num / den
+}
+
+calendar := q.sql(
+    "select run_id,trade_date,session_start,session_end,first_ts,last_ts,halt_ts,month_mark from ([] run_id:1 2; trade_date:2026.06.07 0Nd; session_start:09:30:00 0Nt; session_end:16:00:00 0Nt; first_ts:2026.06.07D09:30:00 0Np; last_ts:2026.06.07D09:36:00 0Np; halt_ts:0Np 2026.06.07D09:35:00; month_mark:2026.06 0Nm)",
+    {}
+)
+
+venue_fees := q.eval("`XNAS`BATS`IEX`XNYS!0.00030 0.00020 0.00005 0.00035")
+route_rank := q.eval("`lit`mid`dark!1 2 3")
+enum_probe := q.eval("(codes `venue$`XNAS`BATS`XNAS`IEX;domain `venue$`XNAS`BATS`XNAS`IEX;meta `p#`AAPL`AAPL`MSFT)")
+adverb_path := q.eval("(+/100 50 80 40;+\\100 50 80 40;-':100 130 120 160;({x+y}'[1 2 3;10 20 30]);prd 2 3 5;ratios 100 101 99.99)")
+dict_each_counts := q.eval("count'`lit`dark`mid!(100 50 25;8 13 21 34;5 5)")
+dict_each_distinct := q.eval("(count distinct)'`qty`bucket!(100 50 100 25;1 1 2 2)")
+
+check("temporal literals and typed nulls", #calendar == 2 && calendar[1].trade_date == "2026-06-07" && calendar[2].trade_date == nil && calendar[1].first_ts == "2026-06-07T09:30:00Z" && calendar[2].first_ts == nil && calendar[1].halt_ts == nil)
+check("symbols enums dictionaries", venue_fees.IEX == 0.00005 && route_rank.dark == 3 && enum_probe[1][3] == 0 && enum_probe[2][3] == "IEX" && enum_probe[3].attribute == "p")
+check("adverbs over scan prior each", adverb_path[1] == 270 && adverb_path[2][4] == 270 && adverb_path[3][3] == -10 && adverb_path[4][3] == 33)
+check("adverbs aggregate and dictionary each", adverb_path[5] == 30 && dict_each_counts.dark == 4 && dict_each_distinct.qty == 3 && dict_each_distinct.bucket == 2)
+
+ticks := q.sql(
+    "select tick_id,event,sym,ts,px,qty,venue from ([] tick_id:1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18; event:`quote`book`trade`quote`book`trade`quote`book`trade`quote`book`trade`quote`book`trade`quote`book`trade; sym:`AAPL`AAPL`AAPL`AAPL`AAPL`AAPL`MSFT`MSFT`MSFT`MSFT`MSFT`MSFT`NVDA`NVDA`NVDA`IBM`IBM`IBM; ts:2026.06.07D09:30:00 2026.06.07D09:30:01 2026.06.07D09:30:15 2026.06.07D09:31:00 2026.06.07D09:31:01 2026.06.07D09:31:20 2026.06.07D09:30:05 2026.06.07D09:30:06 2026.06.07D09:30:30 2026.06.07D09:31:30 2026.06.07D09:31:31 2026.06.07D09:31:50 2026.06.07D09:30:10 2026.06.07D09:30:11 2026.06.07D09:30:45 2026.06.07D09:30:20 2026.06.07D09:30:21 2026.06.07D09:31:15; px:100.00 100.02 100.10 100.30 100.32 100.45 250.00 250.05 250.20 250.50 250.55 250.70 880.00 880.20 880.80 140.00 140.05 140.10; qty:0 0 100 0 0 50 0 0 40 0 0 20 0 0 10 0 0 5; venue:`XNAS`XNAS`XNAS`BATS`BATS`BATS`XNYS`XNYS`XNYS`IEX`IEX`IEX`XNAS`XNAS`BATS`XNYS`XNYS`XNYS)",
+    {}
+)
+
+quotes := q.sql(
+    "select quote_id,sym,ts,bid,ask,bid_sz,ask_sz,venue from ([] quote_id:1 2 3 4 5 6 7; sym:`AAPL`AAPL`MSFT`MSFT`NVDA`IBM`IBM; ts:2026.06.07D09:29:55 2026.06.07D09:31:00 2026.06.07D09:30:05 2026.06.07D09:31:30 2026.06.07D09:30:10 2026.06.07D09:30:20 2026.06.07D09:31:00; bid:99.90 100.25 249.90 250.45 879.50 139.90 140.00; ask:100.10 100.55 250.20 250.75 880.50 140.20 140.30; bid_sz:500 450 300 280 80 70 65; ask_sz:420 430 260 260 75 60 55; venue:`XNAS`BATS`XNYS`IEX`XNAS`XNYS`XNYS)",
+    {}
+)
+
+orders_raw := q.sql(
+    "select order_id,parent_id,desk,sym,side,ts,order_qty,limit_px,route,urgent,cancelled from ([] order_id:1001 1002 1003 1004 1005 1006 1007; parent_id:501 501 502 503 504 505 506; desk:`alpha`alpha`beta`gamma`delta`omega`beta; sym:`AAPL`AAPL`MSFT`NVDA`IBM`TSLA`MSFT; side:`buy`sell`sell`buy`buy`buy`buy; ts:2026.06.07D09:30:00 2026.06.07D09:31:00 2026.06.07D09:30:10 2026.06.07D09:30:20 2026.06.07D09:30:20 2026.06.07D09:30:30 2026.06.07D09:31:00; order_qty:120 60 70 20 10 30 50; limit_px:100.40 100.35 250.10 881.00 140.25 205.00 250.80; route:`lit`mid`lit`dark`lit`dark`mid; urgent:true false false true false false true; cancelled:false false false false false false true)",
+    {}
+)
+
+trades_raw := q.sql(
+    "select trade_id,order_id,parent_id,sym,side,ts,price,size,venue,condition from ([] trade_id:2001 2002 2003 2004 2005 2006 2007; order_id:1001 1002 1003 1004 1005 1006 1007; parent_id:501 501 502 503 504 505 506; sym:`AAPL`AAPL`MSFT`NVDA`IBM`TSLA`MSFT; side:`buy`sell`sell`buy`buy`buy`buy; ts:2026.06.07D09:30:15 2026.06.07D09:31:20 2026.06.07D09:30:30 2026.06.07D09:30:45 2026.06.07D09:31:15 2026.06.07D09:31:00 2026.06.07D09:31:50; price:100.10 100.45 250.20 880.80 140.10 205.10 250.70; size:100 50 40 10 5 30 20; venue:`XNAS`BATS`XNYS`BATS`XNYS`IEX`IEX; condition:`regular`regular`regular`regular`oddlot`regular`cancelled)",
+    {}
+)
+
+book_raw := q.sql(
+    "select sym,venue,ts,level,bid,bid_sz,ask,ask_sz from ([] sym:`AAPL`AAPL`AAPL`AAPL`MSFT`MSFT`MSFT`NVDA`NVDA`IBM; venue:`XNAS`XNAS`BATS`BATS`XNYS`IEX`IEX`XNAS`BATS`XNYS; ts:2026.06.07D09:30:01 2026.06.07D09:30:01 2026.06.07D09:31:01 2026.06.07D09:31:01 2026.06.07D09:30:06 2026.06.07D09:31:31 2026.06.07D09:31:31 2026.06.07D09:30:11 2026.06.07D09:30:11 2026.06.07D09:30:21; level:1 2 1 2 1 1 2 1 2 1; bid:99.95 99.90 100.25 100.20 249.95 250.45 250.40 879.70 879.60 139.95; bid_sz:300 200 280 180 200 190 110 45 35 30; ask:100.05 100.10 100.45 100.50 250.15 250.65 250.75 880.40 880.55 140.15; ask_sz:250 220 260 190 180 170 120 50 40 25)",
+    {}
+)
+
+orders := q.sql(orders_raw, "delete from trades where cancelled=true")
+trades := q.sql(trades_raw, "delete from trades where condition in `oddlot`cancelled")
+trades = q.sql(trades, "delete condition from trades")
+trades = q.sql(trades, "update notional:price*size from trades")
+trades = q.sql(trades, "update signed_qty:size from trades")
+trades = q.sql(trades, "update signed_qty:0-size from trades where side=`sell")
+trades = q.sql(trades, "update fee:notional*0.00030 from trades where venue=`XNAS")
+trades = q.sql(trades, "update fee:notional*0.00020 from trades where venue=`BATS")
+trades = q.sql(trades, "update fee:notional*0.00035 from trades where venue=`XNYS")
+trades = q.sql(trades, "update fee:notional*0.00005 from trades where venue=`IEX")
+
+active_book := q.sql(book_raw, "select sym,venue,ts,level,bid,bid_sz,ask,ask_sz,depth:bid_sz+ask_sz,mid:(bid+ask)*0.5 from trades where level in 1 2 order by sym asc,venue asc,level asc")
+top_book := q.sql(active_book, "select best_bid:max bid,best_ask:min ask,depth:sum depth,levels:count i by sym,venue from trades order by sym asc,venue asc")
+book_keyed := q.key_by(top_book, "sym", "venue")
+aapl_bats_book := q.lookup(book_keyed, "AAPL", "BATS")
+missing_book := q.lookup(book_keyed, "TSLA", "IEX")
+
+enriched := q.sql(
+    "select trade_id,order_id,parent_id,sym,side,ts,price,size,signed_qty,notional,fee,bid,ask,spread:ask-bid,bid_sz,ask_sz,venue from trades asof join quotes on sym,ts order by trade_id asc",
+    {trades: trades, quotes: quotes}
+)
+
+quote_window := q.sql(
+    "select trade_id,sym,ts,bid,ask,bid_sz from trades wj[-120000000000 0] quotes on sym,ts order by trade_id asc",
+    {trades: trades, quotes: quotes}
+)
+
+arrival := q.sql(
+    "select order_id,sym,ts,order_qty,limit_px,bid,ask,arrival_mid:(bid+ask)*0.5 from orders asof join quotes on sym,ts order by order_id asc",
+    {orders: orders, quotes: quotes}
+)
+
+fills := q.sql(
+    trades,
+    "select filled:sum size,net_qty:sum signed_qty,traded_notional:sum notional,fees:sum fee,fills:count i by order_id,parent_id,sym from trades order by order_id asc"
+)
+
+order_lifecycle := q.sql(
+    "select order_id,parent_id,desk,sym,side,order_qty,limit_px,route,urgent,filled,net_qty,traded_notional,fees,fills from orders pj fills on order_id,parent_id,sym order by order_id asc",
+    {orders: orders, fills: fills}
+)
+
+tca := q.sql(
+    "select trade_id,order_id,parent_id,sym,side,ts,price,size,signed_qty,notional,fee,arrival_mid,bid,ask,spread,venue from trades left join arrival on order_id,sym order by trade_id asc",
+    {trades: enriched, arrival: arrival}
+)
+
+tca = q.sql(tca, "update slippage_bps:?[side=`buy;price-arrival_mid;arrival_mid-price]*10000.0*reciprocal arrival_mid from trades")
+
+venues := q.sql("select venue,mic,region from ([] venue:`XNAS`BATS`IEX; mic:`NASDAQ`BATS`IEX; region:`US`US`US)", {})
+rebates := q.sql("select venue,rebate from ([] venue:`XNAS`XNAS`BATS`IEX; rebate:0.0010 0.0012 0.0008 0.0004)", {})
+venue_left := q.sql(
+    "select trade_id,sym,venue,mic,region,notional,fee from trades left join venues on venue order by trade_id asc",
+    {trades: trades, venues: venues}
+)
+rebate_inner := q.sql(
+    "select trade_id,sym,venue,rebate from trades inner join rebates on venue order by trade_id asc,rebate asc",
+    {trades: trades, rebates: rebates}
+)
+
+bars := q.sql(
+    tca,
+    "select notional:sum notional,shares:sum size,net_qty:sum signed_qty,fees:sum fee,fills:count i,avg_spread:avg spread,first_px:first price,last_px:last price by sym,bucket:xbar 60000000000 ts from trades order by sym asc,bucket asc"
+)
+
+for i := 1; i <= #bars; i++ {
+    row := bars[i]
+    row.vwap = row.notional / row.shares
+}
+
+daily_rollup := q.sql(
+    tca,
+    "select notional:sum notional,shares:sum size,net_qty:sum signed_qty,fees:sum fee,fills:count i by sym from trades where sym in `AAPL`MSFT`NVDA order by notional desc"
+)
+venue_rollup := q.sql(trades, "select notional:sum notional,shares:sum size,fills:count i by venue from trades order by venue asc")
+liquid_ticks := q.sql(ticks, "select tick_id,event,sym,ts,px,qty,venue from trades where event=`trade,sym in `AAPL`MSFT`NVDA order by px desc")
+high_cost := {}
+for i := 1; i <= #tca; i++ {
+    row := tca[i]
+    if row.slippage_bps != nil && row.slippage_bps > 5 {
+        high_cost[#high_cost + 1] = {trade_id: row.trade_id, sym: row.sym, slippage_bps: row.slippage_bps}
+    }
+}
+
+check("mutation and raw market shapes", #ticks == 18 && #quotes == 7 && #orders == 6 && #trades == 5 && trades.column_kinds.condition == nil && trades[1].notional == 10010.0 && trades[2].signed_qty == -50.0 && trades[5].fee > 0.30 && trades[5].fee < 0.31)
+check("order book keyed table", #active_book == 10 && #top_book == 7 && #aapl_bats_book == 1 && aapl_bats_book[1].best_bid == 100.25 && aapl_bats_book[1].sym == nil && #missing_book == 0 && q.keys(book_keyed)[1] == "sym" && q.keys(book_keyed)[2] == "venue")
+check("asof and window joins", #enriched == 5 && enriched[1].bid == 99.9 && enriched[2].bid == 100.25 && enriched[3].ask == 250.2 && enriched[4].bid == 879.5 && #quote_window[1].bid == 1 && #quote_window[2].bid == 2 && #quote_window[5].bid == 0)
+check("pj lifecycle and TCA", #order_lifecycle == 6 && order_lifecycle[1].filled == 100.0 && order_lifecycle[2].net_qty == -50.0 && order_lifecycle[5].filled == nil && #tca == 5 && tca[1].arrival_mid == 100.0 && tca[1].slippage_bps > 9.99 && tca[1].slippage_bps < 10.01 && tca[2].slippage_bps > -10.0 && tca[4].slippage_bps > 3.0)
+check("left inner joins and where in", #venue_left == 5 && venue_left[3].mic == nil && #rebate_inner == 5 && rebate_inner[1].venue == "XNAS" && rebate_inner[2].rebate > 0.00119 && rebate_inner[2].rebate < 0.00121 && #liquid_ticks == 5 && liquid_ticks[1].sym == "NVDA" && #high_cost == 2 && high_cost[1].sym == "AAPL")
+check("xbar VWAP rollups", #bars == 5 && bars[1].sym == "AAPL" && bars[1].bucket == "2026-06-07T09:30:00Z" && math.floor(bars[1].vwap * 100) == 10010 && bars[2].net_qty == -50.0 && #daily_rollup == 3 && daily_rollup[1].sym == "AAPL" && daily_rollup[1].shares == 150.0 && #venue_rollup == 4)
+
+summary := string.format(
+    "q_intraday_tca_order_book trades=%d quotes=%d orders=%d bars=%d top=%s notional=%.1f",
+    #trades,
+    #quotes,
+    #orders,
+    #bars,
+    daily_rollup[1].sym,
+    daily_rollup[1].notional
+)
+print(summary)
+
+return {
+    calendar: calendar,
+    venue_fees: venue_fees,
+    route_rank: route_rank,
+    enum_probe: enum_probe,
+    adverb_path: adverb_path,
+    dict_each_counts: dict_each_counts,
+    dict_each_distinct: dict_each_distinct,
+    ticks: ticks,
+    quotes: quotes,
+    orders: orders,
+    trades: trades,
+    active_book: active_book,
+    top_book: top_book,
+    book_keyed: book_keyed,
+    enriched: enriched,
+    quote_window: quote_window,
+    arrival: arrival,
+    fills: fills,
+    order_lifecycle: order_lifecycle,
+    tca: tca,
+    venue_left: venue_left,
+    rebate_inner: rebate_inner,
+    bars: bars,
+    daily_rollup: daily_rollup,
+    venue_rollup: venue_rollup,
+    liquid_ticks: liquid_ticks,
+    high_cost: high_cost,
+    summary: summary,
+}

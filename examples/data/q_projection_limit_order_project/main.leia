@@ -1,0 +1,44 @@
+// q_projection_limit_order_project demonstrates qSQL projection, computed
+// columns, ordering, limit/take, and explain output.
+
+func check(name, ok) {
+    assert(ok)
+    print("ok", name)
+}
+
+events := data.frame({
+    id: data.i64({1, 2, 3, 4, 5, 6, 7, 8}),
+    sym: data.symbols({"AAPL", "MSFT", "AAPL", "NVDA", "MSFT", "AAPL", "NVDA", "MSFT"}),
+    bucket: data.i64({10, 11, 10, 12, 12, 11, 10, 13}),
+    price: data.f64({100.0, 250.0, 101.5, 880.0, 251.0, 99.5, 881.0, 249.0}),
+    size: data.i64({10, 20, 30, 5, 25, 40, 6, 15}),
+})
+
+query := "select id,sym,notional:price*size,spread:price-100 from events where bucket within 10 12 order by notional desc take 4"
+top := q.sql(events, query)
+plan := q.explain(events, query)
+rollup := q.sql(events, "select volume:sum size, value:sum price*size by sym from events order by value desc")
+select_star := q.sql(events, "select * from events order by id desc take 2")
+
+check("projection order limit", #top == 4 && top[1].sym == "MSFT" && top[1].notional == 6275.0 && top[4].id == 4)
+check("explain exposes plan", plan.op == "select" && plan.limit == 4 && plan.order_by[1].column == "notional")
+check("group rollup", #rollup == 3 && rollup[1].sym == "MSFT" && rollup[1].volume == 60)
+check("select star", #select_star == 2 && select_star[1].id == 8 && select_star[2].id == 7)
+
+summary := string.format(
+    "q_projection_limit_order top=%d best=%s notional=%.1f groups=%d",
+    #top,
+    top[1].sym,
+    top[1].notional,
+    #rollup
+)
+print(summary)
+
+return {
+    events: events,
+    top: top,
+    plan: plan,
+    rollup: rollup,
+    select_star: select_star,
+    summary: summary,
+}

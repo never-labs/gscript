@@ -82,6 +82,7 @@ func (t *Table) StoreFloatRecordForNumericSpecialization(shapeID uint32, idxs []
 		}
 		t.svals[idx] = FloatValue(vals[i])
 	}
+	t.clearNativePayloadLocked()
 	t.keysDirty = true
 	return true
 }
@@ -98,5 +99,6 @@ func (t *Table) NumericSvalsForRecordSpecialization(shapeID uint32) ([]Value, bo
 // MarkArrayMutationForNumericSpecialization mirrors RawSetInt's observable iteration
 // invalidation for guarded specializations that overwrite existing array slots.
 func (t *Table) MarkArrayMutationForNumericSpecialization() {
+	t.clearNativePayloadLocked()
 	t.keysDirty = true
 }

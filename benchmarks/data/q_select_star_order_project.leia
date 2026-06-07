@@ -1,0 +1,84 @@
+// qSQL select-star and order-before-projection benchmark.
+
+N := 4096
+REPS := 520
+MOD := 1000000007
+
+func make_i64(n, mod, offset) {
+    t := {}
+    for i := 1; i <= n; i++ {
+        t[i] = offset + (i % mod)
+    }
+    return array.i64(t)
+}
+
+func make_symbols(n, mod, prefix) {
+    t := {}
+    for i := 1; i <= n; i++ {
+        t[i] = string.format("%s%d", prefix, i % mod)
+    }
+    return data.symbols(t)
+}
+
+func make_price(n) {
+    t := {}
+    for i := 1; i <= n; i++ {
+        t[i] = 50.0 + (i % 251) * 0.5
+    }
+    return data.f64(t)
+}
+
+func make_size(n) {
+    t := {}
+    for i := 1; i <= n; i++ {
+        t[i] = 1 + (i % 97)
+    }
+    return data.i64(t)
+}
+
+func mix(sum, v) {
+    return (sum * 131 + v) % MOD
+}
+
+trades := data.frame({
+    id: make_i64(N, N, 1),
+    sym: make_symbols(N, 257, "S"),
+    venue: make_symbols(N, 16, "V"),
+    price: make_price(N),
+    size: make_size(N),
+})
+
+func check_rows(star_rows, projected_rows) {
+    assert(#star_rows == 16)
+    assert(#projected_rows == 8)
+    assert(star_rows[1].price >= star_rows[#star_rows].price)
+    assert(star_rows[1].id != nil && star_rows[1].sym != nil && star_rows[1].venue != nil)
+    assert(projected_rows[1].price == nil)
+    assert(projected_rows[1].sym == star_rows[1].sym)
+    assert(projected_rows[1].size == star_rows[1].size)
+}
+
+func run_hot(trades, reps) {
+    checksum := 0
+    for r := 1; r <= reps; r++ {
+        star_rows := q.sql(trades, "select * from trades where venue=`V7 order by price desc,id asc take 16")
+        projected_rows := q.sql(trades, "select sym,size from trades where venue=`V7 order by price desc,id asc take 8")
+        check_rows(star_rows, projected_rows)
+        top := star_rows[1]
+        tail := star_rows[#star_rows]
+        checksum = mix(checksum, #star_rows + #projected_rows + top.id + tail.id)
+        checksum = mix(checksum, string.len(top.sym) + top.size * 17 + math.floor(top.price * 100))
+        checksum = mix(checksum, projected_rows[1].size + string.len(projected_rows[#projected_rows].sym))
+    }
+    return checksum
+}
+
+warm := run_hot(trades, 2)
+collectgarbage("collect")
+t0 := time.now()
+checksum := run_hot(trades, REPS)
+elapsed := time.since(t0)
+
+print(string.format("q_select_star_order_project_hot n=%d reps=%d", N, REPS))
+print(string.format("checksum: %d", mix(checksum, warm)))
+print(string.format("Time: %.3fs", elapsed))

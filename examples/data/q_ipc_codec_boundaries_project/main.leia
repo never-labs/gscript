@@ -1,0 +1,54 @@
+// q_ipc_codec_boundaries_project demonstrates in-process q IPC loopback,
+// portable codec roundtrips, and explicit non-goals for network IPC.
+
+func contains(haystack, needle) {
+    return string.find(tostring(haystack), needle, 1, true) != nil
+}
+
+func check(name, ok) {
+    assert(ok)
+    print("ok", name)
+}
+
+ipc_sum := q.eval("h:hopen \"loopback\";h[\"+/1 2 3\"]")
+ipc_list := q.eval("h:hopen \"loopback\";h[(\"x+y\";20;22)]")
+ipc_lambda := q.eval("h:hopen \"loopback\";h[({x*y};6;7)]")
+ipc_async := q.eval("h:hopen \"loopback\";neg[h][(\"answer:x+y\";20;22)];h[\"answer\"]")
+ipc_args_do_not_leak := q.eval("h:hopen \"loopback\";h[\"x:100\"];h[(\"x+y\";2;3)];h[\"x\"]")
+
+check("loopback ipc commands", ipc_sum == 6 && ipc_list == 42 && ipc_lambda == 42)
+check("loopback async and arg isolation", ipc_async == 42 && ipc_args_do_not_leak == 100)
+
+ok, err := pcall(q.eval, "hopen `:localhost:5000")
+check("network ipc is explicit non-goal", ok == false && contains(err, "unsupported q IPC target"))
+
+frame := q.eval("([] d:2026.06.06 0Nd; ts:2026.06.06D09:30:00 0Np; sym:`AAPL`MSFT; qty:10 0N)")
+encoded := q.encode(frame)
+decoded := q.decode(encoded)
+enum_decoded := q.decode(q.encode(q.eval("`sym$`AAPL`MSFT`AAPL")))
+keyed_decoded := q.decode(q.encode(q.eval("([sym:`AAPL`MSFT] px:100 101; size:10 20)")))
+keyed_values := q.value(keyed_decoded)
+msft_lookup := q.value(q.lookup(keyed_decoded, "MSFT"))
+
+check("portable codec frame", q.count(decoded) == 2 && decoded[1].ts == "2026-06-06T09:30:00Z" && decoded[2].qty == nil)
+check("portable codec enum", enum_decoded[2] == "MSFT" && enum_decoded[3] == "AAPL")
+check("portable codec keyed table", q.count(keyed_values) == 2 && keyed_values[2].px == 101 && q.count(msft_lookup) == 1 && msft_lookup[1].size == 20)
+
+ok, err = pcall(q.decode, "not json")
+check("codec rejects invalid payloads", ok == false && contains(err, "invalid character"))
+
+summary := string.format(
+    "q_ipc_codec loopback=%d encoded=%d decoded_rows=%d",
+    ipc_sum,
+    string.len(encoded),
+    q.count(decoded)
+)
+print(summary)
+
+return {
+    ipc_sum: ipc_sum,
+    decoded: decoded,
+    enum_decoded: enum_decoded,
+    keyed_decoded: keyed_decoded,
+    summary: summary,
+}

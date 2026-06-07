@@ -1,0 +1,56 @@
+// q_columnar_partitioned_store_project demonstrates portable q codec and Leia
+// columnar splayed/partitioned storage used through q path syntax.
+
+func check(name, ok) {
+    assert(ok)
+    print("ok", name)
+}
+
+store := ".tmp/examples_q_columnar_partitioned_store_project"
+trades := q.eval("([] day:1 1 2 2; sym:`AAPL`MSFT`AAPL`MSFT; qty:10 20 30 40; price:100.5 101.25 102.75 103.5)")
+typed := q.eval("([] d:2026.06.06 0Nd; ts:2026.06.06D09:30:00 0Np; sym:`AAPL`MSFT; qty:10 0N)")
+
+decoded_typed := q.decode(q.encode(typed))
+decoded_enum := q.decode(q.encode(q.eval("`sym$`AAPL`MSFT`AAPL")))
+
+check("portable codec typed temporal", q.count(decoded_typed) == 2 && decoded_typed[2].d == nil && decoded_typed[1].ts == "2026-06-06T09:30:00Z")
+check("portable codec enum", decoded_enum[1] == "AAPL" && decoded_enum[3] == "AAPL")
+
+assert(q.save_splayed(trades, "`:" .. store .. "/splayed"))
+loaded := q.load_splayed("`:" .. store .. "/splayed")
+path_loaded := q.eval("get `:" .. store .. "/splayed")
+rollup := q.sql("select total:sum qty, value:sum price*qty by sym from `:" .. store .. "/splayed", {})
+
+check("splayed storage", q.count(loaded) == 4 && q.count(path_loaded) == 4 && #rollup == 2)
+check("splayed rollup", rollup[1].sym == "AAPL" && rollup[1].total == 40 && rollup[2].total == 60)
+
+assert(q.save_splayed(typed, "`:" .. store .. "/typed_splayed"))
+typed_loaded := q.load_splayed("`:" .. store .. "/typed_splayed")
+check("typed splayed storage", q.count(typed_loaded) == 2 && typed_loaded[2].qty == nil && typed_loaded[1].ts == "2026-06-06T09:30:00Z")
+
+assert(q.save_partitioned(trades, "`:" .. store .. "/partitioned", "day", "sym"))
+aapl := q.load_partitioned("`:" .. store .. "/partitioned", {sym: "AAPL"})
+day_two := q.load_partitioned("`:" .. store .. "/partitioned", {day: 2})
+partitioned_rollup := q.sql("select total:sum qty by sym from `:" .. store .. "/partitioned", {})
+
+check("partitioned storage filters", q.count(aapl) == 2 && q.count(day_two) == 2)
+check("partitioned q path query", #partitioned_rollup == 2 && partitioned_rollup[1].total == 40)
+
+summary := string.format(
+    "q_columnar_store rows=%d rollup=%d aapl=%d day2=%d",
+    q.count(trades),
+    #partitioned_rollup,
+    q.count(aapl),
+    q.count(day_two)
+)
+print(summary)
+
+return {
+    trades: trades,
+    typed: typed,
+    loaded: loaded,
+    typed_loaded: typed_loaded,
+    rollup: rollup,
+    partitioned_rollup: partitioned_rollup,
+    summary: summary,
+}

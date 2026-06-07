@@ -16,11 +16,32 @@ trades := data.frame({
 
 distinct_syms := q.sql(trades, "select distinct sym from trades order by sym asc")
 top_trades := q.sql(trades, "select sym,venue,notional:price*size from trades order by notional desc take 3")
+top_default_notional := q.sql(trades, "select price*size from trades order by price*size desc take 2")
 hash_take := q.sql(trades, "2#select sym,price from trades order by price desc")
 
 check("qsql distinct rows", #distinct_syms == 4 && distinct_syms[1].sym == "AAPL" && distinct_syms[4].sym == "TSLA")
 check("qsql take suffix", #top_trades == 3 && top_trades[1].sym == "NVDA" && top_trades[3].venue == "XNAS")
+check("qsql computed default order expression", #top_default_notional == 2 && top_default_notional[1]["price*size"] == 15337.5 && top_default_notional[2]["price*size"] == 12180.0)
 check("qsql hash take prefix", #hash_take == 2 && hash_take[1].sym == "MSFT" && hash_take[2].sym == "NVDA")
+
+venues := data.frame({
+  venue: data.strings({"XNAS", "XNYS", "ARCX", "BATS"}),
+  mic_name: data.strings({"Nasdaq", "NYSE", "NYSE Arca", "Cboe BZX"}),
+  region: data.strings({"US", "US", "US", "US"}),
+})
+
+q_updated := q.sql(trades, "update price:price+1.0 from trades where sym=`AAPL")
+q_deleted := q.sql(q_updated, "delete from trades where sym=`TSLA")
+q_joined := q.sql(
+  "select id,sym,venue,mic_name,price,size from trades join venues on venue order by id asc",
+  {trades: q_deleted, venues: venues}
+)
+q_joined_rollup := q.sql(q_joined, "select notional:sum price*size, fills:count i by sym from trades where price>=101 order by notional desc")
+
+check("q native update preserves rows", #q_updated == 6 && q_updated[1].price == 101.0 && q_updated[3].price == 101.75 && q_updated[6].price == 98.0)
+check("q native delete filters rows", #q_deleted == 5 && q_deleted[5].sym == "MSFT")
+check("q native join rows", #q_joined == 5 && q_joined[1].mic_name == "Nasdaq" && q_joined[4].mic_name == "NYSE Arca")
+check("q native joined rollup", #q_joined_rollup == 3 && q_joined_rollup[1].sym == "MSFT" && q_joined_rollup[1].notional == 21450.0)
 
 conn := db.memory()
 conn.exec(sql`create table trades (

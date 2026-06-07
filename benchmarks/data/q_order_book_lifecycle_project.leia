@@ -1,0 +1,137 @@
+// q order book lifecycle hot benchmark: asof, xbar, uj/pj, ticks, and rollups.
+
+N := 2048
+REPS := 100
+MOD := 1000000007
+
+func make_symbols(n, mod, prefix) {
+    t := {}
+    for i := 1; i <= n; i++ {
+        t[i] = string.format("%s%d", prefix, i % mod)
+    }
+    return data.symbols(t)
+}
+
+func make_i64(n, mod, offset) {
+    t := {}
+    for i := 1; i <= n; i++ {
+        t[i] = offset + (i % mod)
+    }
+    return data.i64(t)
+}
+
+func make_f64(n, mod, offset) {
+    t := {}
+    for i := 1; i <= n; i++ {
+        t[i] = offset + (i % mod) * 0.25
+    }
+    return data.f64(t)
+}
+
+func make_ts(n, offset) {
+    t := {}
+    for i := 1; i <= n; i++ {
+        t[i] = offset + i * 1000000000
+    }
+    return data.timestamp(t)
+}
+
+func make_bool(n) {
+    t := {}
+    for i := 1; i <= n; i++ {
+        t[i] = i % 127 == 0
+    }
+    return data.bool(t)
+}
+
+func mix(sum, v) {
+    return (sum * 131 + v) % MOD
+}
+
+base_ts := 1780738200000000000
+ids := {}
+for i := 1; i <= N; i++ {
+    ids[i] = i
+}
+
+orders := data.frame({
+    order_id: data.i64(ids),
+    parent_id: make_i64(N, 257, 100),
+    sym: make_symbols(N, 128, "S"),
+    side: make_symbols(N, 2, "side"),
+    ts: make_ts(N, base_ts),
+    order_qty: make_i64(N, 113, 10),
+    limit_px: make_f64(N, 211, 100.0),
+    trader: make_symbols(N, 16, "T"),
+})
+
+trades := data.frame({
+    trade_id: data.i64(ids),
+    order_id: make_i64(N, N, 0),
+    sym: make_symbols(N, 160, "S"),
+    ts: make_ts(N, base_ts + 30 * 1000000000),
+    price: make_f64(N, 197, 100.0),
+    size: make_i64(N, 101, 1),
+    venue: make_symbols(N, 8, "V"),
+    cancelled: make_bool(N),
+})
+
+quotes := data.frame({
+    sym: make_symbols(N, 160, "S"),
+    ts: make_ts(N, base_ts),
+    bid: make_f64(N, 197, 99.75),
+    ask: make_f64(N, 197, 100.25),
+    bid_sz: make_i64(N, 500, 50),
+    ask_sz: make_i64(N, 500, 40),
+    venue: make_symbols(N, 8, "V"),
+})
+
+ticks := data.frame({
+    tick_id: data.i64(ids),
+    event: make_symbols(N, 4, "E"),
+    sym: make_symbols(N, 160, "S"),
+    ts: make_ts(N, base_ts + 15 * 1000000000),
+    px: make_f64(N, 197, 100.0),
+    qty: make_i64(N, 101, 0),
+    venue: make_symbols(N, 8, "V"),
+})
+
+func run_hot(orders, trades, quotes, ticks, reps) {
+    checksum := 0
+    fees := q.eval("`V0`V1`V2`V3!0.0003 0.0002 0.00035 0.00025")
+    scan := q.eval("+\\100 50 25 25")
+    for r := 1; r <= reps; r++ {
+        clean := q.sql(trades, "delete from trades where cancelled=true")
+        notional := q.sql(clean, "update notional:price*size from trades where size>0")
+        enriched := q.sql(
+            "select trade_id,order_id,sym,ts,price,size,notional,bid,ask,spread:ask-bid,venue from trades asof join quotes on sym,ts",
+            {trades: notional, quotes: quotes}
+        )
+        fills := q.sql(notional, "select filled:sum size,traded_notional:sum notional,fills:count i by order_id,sym from trades order by order_id asc")
+        lifecycle := q.sql(
+            "select order_id,sym,order_qty,filled,traded_notional,fills from orders pj fills on order_id,sym order by order_id asc take 32",
+            {orders: orders, fills: fills}
+        )
+        order_by_sym := q.sql(orders, "select order_qty:sum order_qty,orders:count i by sym from trades order by sym asc")
+        trade_by_sym := q.sql(notional, "select traded_qty:sum size,traded_notional:sum notional,trades:count i by sym from trades order by sym asc")
+        book := q.sql(
+            "select sym,order_qty,orders,traded_qty,traded_notional,trades from orders uj trades on sym order by sym asc take 32",
+            {orders: order_by_sym, trades: trade_by_sym}
+        )
+        bars := q.sql(enriched, "select notional:sum notional,shares:sum size,fills:count i,avg_spread:avg spread by sym,bucket:xbar 60000000000 ts from trades order by notional desc take 16")
+        flow := q.sql(ticks, "select qty:sum qty,events:count i by event,sym,bucket:xbar 60000000000 ts from trades order by qty desc take 16")
+        checksum = mix(checksum, #clean + #lifecycle + #book + #bars + #flow + scan[4])
+        checksum = mix(checksum, lifecycle[1].order_id + book[1].trades + bars[1].fills + flow[1].events + math.floor(fees.V1 * 1000000))
+    }
+    return checksum
+}
+
+warm := run_hot(orders, trades, quotes, ticks, 2)
+collectgarbage("collect")
+t0 := time.now()
+checksum := run_hot(orders, trades, quotes, ticks, REPS)
+elapsed := time.since(t0)
+
+print(string.format("q_order_book_lifecycle_hot orders=%d trades=%d quotes=%d ticks=%d reps=%d", N, N, N, N, REPS))
+print(string.format("checksum: %d", mix(checksum, warm)))
+print(string.format("Time: %.3fs", elapsed))

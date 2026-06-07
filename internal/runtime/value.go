@@ -24,6 +24,8 @@ const (
 	TypeChannel              // channels
 	TypeDenseArray           // data-oriented dense arrays
 	TypeSoA                  // structure-of-arrays records
+	TypeFrame                // native data frame facade
+	TypeKeyedFrame           // native keyed data frame facade
 )
 
 // ---------------------------------------------------------------------------
@@ -88,6 +90,7 @@ const (
 	ptrSubFixedRecord uint64 = 11 << ptrSubShift // *FixedRecord, materializes to *Table on generic table use
 	ptrSubDenseArray  uint64 = 12 << ptrSubShift // *DenseArray
 	ptrSubSoA         uint64 = 13 << ptrSubShift // *SoA
+
 )
 
 // Value is a NaN-boxed 8-byte representation of all Leia values.
@@ -548,6 +551,11 @@ func (v Value) Type() ValueType {
 		sub := bits & ptrSubMask
 		switch sub {
 		case ptrSubTable, ptrSubFixedRecord:
+			if kind, ok := v.nativeFramePayloadKind(); ok {
+				if typ, ok := kind.ValueType(); ok {
+					return typ
+				}
+			}
 			return TypeTable
 		case ptrSubString, ptrSubLazyString:
 			return TypeString
@@ -624,6 +632,23 @@ func (v Value) AnyCoroutinePointer() unsafe.Pointer {
 
 func (v Value) IsChannel() bool {
 	return uint64(v)&tagMask == tagPtr && v.ptrSubType() == ptrSubChannel
+}
+
+// IsFrame reports whether the value is a native frame facade.
+func (v Value) IsFrame() bool { return v.Type() == TypeFrame }
+
+// IsKeyedFrame reports whether the value is a native keyed frame facade.
+func (v Value) IsKeyedFrame() bool { return v.Type() == TypeKeyedFrame }
+
+func (v Value) nativeFramePayloadKind() (NativePayloadKind, bool) {
+	if !v.IsTable() {
+		return NativePayloadNone, false
+	}
+	tbl := v.Table()
+	if tbl == nil {
+		return NativePayloadNone, false
+	}
+	return tbl.NativeFramePayloadKind()
 }
 
 // ---------------------------------------------------------------------------
@@ -810,6 +835,11 @@ func (v Value) Channel() *Channel {
 // ---------------------------------------------------------------------------
 
 func (v Value) TypeName() string {
+	if kind, ok := v.nativeFramePayloadKind(); ok {
+		if name, ok := kind.TypeName(); ok {
+			return name
+		}
+	}
 	switch v.Type() {
 	case TypeNil:
 		return "nil"
@@ -831,6 +861,10 @@ func (v Value) TypeName() string {
 		return "array"
 	case TypeSoA:
 		return "soa"
+	case TypeFrame:
+		return "frame"
+	case TypeKeyedFrame:
+		return "keyed frame"
 	default:
 		return "unknown"
 	}
@@ -874,7 +908,7 @@ func (v Value) Equal(other Value) bool {
 		return v.Float() == other.Float()
 	case TypeString:
 		return v.Str() == other.Str()
-	case TypeTable, TypeFunction, TypeCoroutine, TypeChannel, TypeDenseArray, TypeSoA:
+	case TypeTable, TypeFunction, TypeCoroutine, TypeChannel, TypeDenseArray, TypeSoA, TypeFrame, TypeKeyedFrame:
 		// Pointer identity: compare the raw address (strip sub-type bits).
 		return v.ptrPayload() == other.ptrPayload()
 	default:
@@ -901,6 +935,11 @@ func (v Value) ToNumber() (Value, bool) {
 // ---------------------------------------------------------------------------
 
 func (v Value) String() string {
+	if kind, ok := v.nativeFramePayloadKind(); ok {
+		if name, ok := kind.TypeName(); ok {
+			return fmt.Sprintf("%s: %p", name, v.ptrPayload())
+		}
+	}
 	switch v.Type() {
 	case TypeNil:
 		return "nil"
@@ -922,6 +961,10 @@ func (v Value) String() string {
 		return v.Str()
 	case TypeTable:
 		return fmt.Sprintf("table: %p", v.ptrPayload())
+	case TypeFrame:
+		return fmt.Sprintf("frame: %p", v.ptrPayload())
+	case TypeKeyedFrame:
+		return fmt.Sprintf("keyed frame: %p", v.ptrPayload())
 	case TypeFunction:
 		if c := v.Closure(); c != nil {
 			return fmt.Sprintf("function: %p", c)

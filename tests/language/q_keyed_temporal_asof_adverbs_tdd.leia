@@ -1,0 +1,224 @@
+print("case:q_keyed_temporal_asof_adverbs_tdd")
+
+func check(name, ok) {
+  assert(ok)
+  print("ok", name)
+}
+
+func contains(haystack, needle) {
+  return string.find(tostring(haystack), needle, 1, true) != nil
+}
+
+running := q.eval("+\\100 120 80 50")
+total := q.eval("+/100 120 80 50")
+each_added := q.eval("1 2 3+'10 20 30")
+deltas := q.eval("-':100 105 103 110")
+left_each := q.eval("10-\\:1 2 3")
+each_scalar_right := q.eval("1 2 3+'10")
+each_scalar_left := q.eval("f:+';f[10;1 2 3]")
+scan_single := q.eval("+\\42")
+over_empty := q.eval("+/()")
+scan_empty_count := q.eval("count (+\\())")
+each_prior_single := q.eval("-':10")
+each_prior_with_seed := q.eval("100-':10 15")
+each_left_empty_count := q.eval("count (10-\\:())")
+each_right_empty_count := q.eval("count ((())-/:10)")
+projected_over := q.eval("f:+/;g:f[10;];g[1 2 3]")
+projected_scan := q.eval("f:+\\;g:f[10;];g[1 2 3]")
+projected_each := q.eval("f:+';g:f[;10];g[1 2 3]")
+projected_prior := q.eval("f:-':;g:f[100;];g[10 15]")
+projected_each_left := q.eval("f:-\\:;g:f[10;];g[1 2 3]")
+projected_each_right := q.eval("f:-/:;g:f[;1];g[10 20 30]")
+each_length_ok, each_length_err := pcall(q.eval, "1 2 3+'()")
+each_left_arity_ok, each_left_arity_err := pcall(q.eval, "(-\\:)[10]")
+over_arity_ok, over_arity_err := pcall(q.eval, "(+/)[1;2;3]")
+
+check("q adverb over scan each", total == 350 && running[1] == 100 && running[4] == 350 && each_added[2] == 22)
+check("q adverb each-prior each-left", deltas[1] == 100 && deltas[2] == 5 && deltas[3] == -2 && left_each[3] == 7)
+check("q adverb scalar empty single boundaries", each_scalar_right[3] == 13 && each_scalar_left[1] == 11 && scan_single == 42 && data.is_null(over_empty) && scan_empty_count == 0 && each_prior_single == 10 && each_prior_with_seed[1] == -90 && each_left_empty_count == 0 && each_right_empty_count == 0)
+check("q adverb projected boundaries", projected_over == 16 && projected_scan[3] == 16 && projected_each[2] == 12 && projected_prior[2] == 5 && projected_each_left[3] == 7 && projected_each_right[2] == 19)
+check("q adverb error diagnostics", each_length_ok == false && contains(each_length_err, "length mismatch") && each_left_arity_ok == false && contains(each_left_arity_err, "expected 2 arguments") && over_arity_ok == false && contains(over_arity_err, "expected 1 or 2 arguments"))
+
+keyed_rows := q.sql(
+  "select sym,price,size from ([sym:`AAPL`MSFT] price:100.0 80.0; size:10 20) where price<100",
+  {}
+)
+
+check("q keyed table literal source", #keyed_rows == 1 && keyed_rows[1].sym == "MSFT" && keyed_rows[1].price == 80.0 && keyed_rows[1].size == 20)
+
+keyed_all := q.sql(
+  "select * from ([sym:`AAPL`MSFT] price:100.0 80.0; size:10 20) where sym=`AAPL",
+  {}
+)
+
+check("q keyed table select all preserves key columns", #keyed_all == 1 && keyed_all[1].sym == "AAPL" && keyed_all[1].price == 100.0 && keyed_all[1].size == 10)
+
+temporal_rows := q.sql(
+  "select sym,d,t,ts from ([] sym:`AAPL`MSFT`NVDA; d:2026.06.06 0Nd 2026.06.07; t:09:30:00 0Nt 09:31:00.250; ts:2026.06.06D09:30:00 0Np 2026.06.07D09:31:00) order by sym asc",
+  {}
+)
+negative_span_before_zero := q.eval("-0D00:01:00 < 0D00:00:00")
+all_null_temporal := q.sql(
+  "select d,ts from ([] d:0Nd 0Nd; ts:0Np 0Np)",
+  {}
+)
+typed_null_types := {
+  i: q.eval("type 0Ni"),
+  b: q.eval("type 0Nb"),
+  x: q.eval("type 0Nx"),
+  c: q.eval("type 0Nc"),
+  d: q.eval("type 0Nd"),
+  p: q.eval("type 0Np"),
+}
+
+check("q temporal literal values", #temporal_rows == 3 && temporal_rows[1].d == "2026-06-06" && temporal_rows[1].t == "09:30:00" && temporal_rows[1].ts == "2026-06-06T09:30:00Z")
+check("q temporal typed nulls", temporal_rows[2].sym == "MSFT" && temporal_rows[2].d == nil && temporal_rows[2].t == nil && temporal_rows[2].ts == nil)
+check("q temporal typed null edge cases", negative_span_before_zero == true && all_null_temporal.column_kinds.d == "date" && all_null_temporal.column_kinds.ts == "timestamp" && data.is_null(all_null_temporal[1].d) && data.is_null(all_null_temporal[1].ts) && typed_null_types.i == -6 && typed_null_types.b == -1 && typed_null_types.x == -4 && typed_null_types.c == -10 && typed_null_types.d == -14 && typed_null_types.p == -12)
+
+quotes := q.sql(
+  "select sym,ts,bid,ask from ([] sym:`AAPL`AAPL`MSFT; ts:2026.06.06D09:30:00 2026.06.06D09:31:00 2026.06.06D09:30:00; bid:100.0 100.5 250.0; ask:100.2 100.7 250.4)",
+  {}
+)
+
+trades := q.sql(
+  "select trade_id,sym,ts,price,size from ([] trade_id:1 2 3; sym:`AAPL`AAPL`MSFT; ts:2026.06.06D09:30:30 2026.06.06D09:31:30 2026.06.06D09:30:30; price:100.1 100.6 250.2; size:10 20 5)",
+  {}
+)
+
+typed_events := data.frame({
+  id: data.i64({1, 2, 3}),
+  sym: data.symbols({"AAPL", "AAPL", "MSFT"}),
+  ts: data.timestamp({"2026-06-06T09:30:00Z", "2026-06-06T09:31:00Z", "2026-06-06T09:30:00Z"}),
+  qty: data.f64({10.0, 20.0, 5.0}),
+})
+typed_keyed := q.key_by(typed_events, "ts")
+typed_lookup_string := q.lookup(typed_keyed, "2026.06.06D09:31:00")
+typed_where_string := q.sql(typed_events, "select id,sym,ts from events where ts=\"2026-06-06T09:30:00Z\" order by id asc")
+typed_in_string := q.sql(typed_events, "select id,sym,ts from events where ts in (\"2026.06.06D09:30:00\" \"2026.06.06D09:31:00\") order by id asc")
+string_ts_events := data.frame({
+  id: data.i64({1, 2}),
+  ts: data.strings({"2026.06.06D09:30:00", "2026.06.06D09:32:00"}),
+})
+typed_ts_ref := data.frame({
+  ts: data.timestamp({"2026-06-06T09:30:00Z"}),
+  bid: data.f64({100.0}),
+})
+joined_temporal_key := q.sql("select id,ts,bid from events left join ref on ts order by id asc", {events: string_ts_events, ref: typed_ts_ref})
+string_sym_trades := data.frame({
+  trade_id: data.i64({1, 2}),
+  sym: data.strings({"AAPL", "MSFT"}),
+  ts: data.timestamp({"2026-06-06T09:30:30Z", "2026-06-06T09:30:30Z"}),
+})
+asof_partition_coerced := q.sql(
+  "select trade_id,sym,ts,bid from trades asof join quotes on sym,ts order by trade_id asc",
+  {trades: string_sym_trades, quotes: quotes}
+)
+
+enriched := q.sql(
+  "select trade_id,sym,ts,price,size,bid,ask,spread:ask-bid from trades asof join quotes on sym,ts order by trade_id asc",
+  {trades: trades, quotes: quotes}
+)
+
+bucket_rollup := q.sql(
+  enriched,
+  "select qty:sum size, fills:count i, avg_spread:avg spread by sym,bucket:xbar 60000000000 ts from trades order by sym asc,bucket asc"
+)
+
+check("q asof join temporal timestamps", #enriched == 3 && enriched[1].bid == 100.0 && enriched[2].bid == 100.5 && enriched[3].ask == 250.4)
+check("q xbar temporal bucket rollup", #bucket_rollup == 3 && bucket_rollup[1].sym == "AAPL" && bucket_rollup[1].bucket == "2026-06-06T09:30:00Z" && bucket_rollup[1].qty == 10.0 && bucket_rollup[3].sym == "MSFT")
+check("q temporal string coercion for keyed where in join", #typed_lookup_string == 1 && typed_lookup_string[1].id == 2 && #typed_where_string == 2 && #typed_in_string == 3 && #joined_temporal_key == 2 && joined_temporal_key[1].bid == 100.0 && joined_temporal_key[2].bid == nil)
+check("q asof partition key coercion", #asof_partition_coerced == 2 && asof_partition_coerced[1].bid == 100.0 && asof_partition_coerced[2].bid == 250.0)
+
+ref := q.sql(
+  "select sym,sector from ([] sym:`AAPL`IBM; sector:`hardware`mainframe)",
+  {}
+)
+
+left_joined := q.sql(
+  "select trade_id,sym,price,sector from trades left join ref on sym order by sym asc,trade_id asc",
+  {trades: trades, ref: ref}
+)
+
+asof_boundary := q.sql(
+  "select trade_id,sym,ts,price,bid from trades asof join quotes on sym,ts order by trade_id asc",
+  {trades: q.sql("select trade_id,sym,ts,price from ([] trade_id:1 2; sym:`AAPL`TSLA; ts:2026.06.06D09:30:00 2026.06.06D09:30:30; price:100.0 200.0)", {}), quotes: quotes}
+)
+
+keyed := q.key_by(trades, "sym")
+aapl_lookup := q.lookup(keyed, "AAPL")
+missing_lookup := q.lookup(keyed, "IBM")
+key_columns := q.keys(keyed)
+key_frame := q.key(keyed)
+plain_keys := q.keys(trades)
+keyed_value := q.value(keyed)
+dict_values := q.value({b: 2, a: 1})
+qdict := q.eval("`b`a!2 1")
+qdict_keys := q.keys(qdict)
+qdict_values := q.value(qdict)
+keyed_cols := q.cols(keyed)
+keyed_meta := q.meta(keyed)
+queried_keyed := q.sql(keyed, "select trade_id,sym,price from trades where sym=`AAPL order by trade_id asc")
+updated_keyed := q.sql(keyed, "update price:price+1 from trades where sym=`AAPL")
+updated_keyed_lookup := q.lookup(updated_keyed, "AAPL")
+deleted_keyed := q.sql(updated_keyed, "delete from trades where price<200")
+selected_from_keyed := q.sql(updated_keyed, "select trade_id,sym,price from trades where sym=`AAPL order by trade_id asc")
+drop_key_ok, drop_key_err := pcall(func() {
+  return q.sql(keyed, "delete sym from trades")
+})
+
+venue_trades := q.sql(
+  "select trade_id,sym,venue,price from ([] trade_id:1 2 3 4; sym:`AAPL`AAPL`AAPL`MSFT; venue:`XNYS`XNYS`XNAS`XNAS; price:100.0 100.5 101.0 80.0)",
+  {}
+)
+venue_keyed := q.key_by(venue_trades, "sym", "venue")
+venue_hit := q.lookup(venue_keyed, "AAPL", "XNYS")
+venue_hit_by_dict := q.lookup(venue_keyed, {sym: "AAPL", venue: "XNAS"})
+venue_hit_by_dict_extra := q.lookup(venue_keyed, {venue: "XNAS", ignored: 1, sym: "AAPL"})
+venue_hit_by_array := q.lookup(venue_keyed, {"AAPL", "XNAS"})
+venue_miss := q.lookup(venue_keyed, "IBM", "XNYS")
+venue_missing_key_ok, venue_missing_key_err := pcall(func() {
+  return q.lookup(venue_keyed, {sym: "AAPL"})
+})
+venue_frame := venue_keyed.frame
+
+updated_none := q.sql(trades, "update price:price+1 from trades where sym=`IBM")
+deleted_none := q.sql(trades, "delete from trades where price>10000")
+deleted_all := q.sql(trades, "delete from trades where price>=100.1")
+
+check("q left join preserves unmatched left row", #left_joined == 3 && left_joined[3].sym == "MSFT" && left_joined[3].sector == nil)
+check("q asof join boundary unmatched", #asof_boundary == 2 && asof_boundary[1].bid == 100.0 && asof_boundary[2].bid == nil)
+check("q keyed lookup boundary", #aapl_lookup == 1 && aapl_lookup[1].trade_id == 2 && aapl_lookup[1].sym == nil && #missing_lookup == 0)
+check("q keyed metadata verbs", key_columns[1] == "sym" && #key_frame == 3 && key_frame[1].sym == "AAPL" && key_frame[1].trade_id == nil && #plain_keys == 0 && #keyed_value == 3 && keyed_value[1].sym == nil && keyed_cols[1] == "trade_id" && keyed_meta[1].c == "trade_id" && keyed_meta[1].t == "i64")
+check("q dictionary value follows sorted keys", #dict_values == 2 && dict_values[1] == 1 && dict_values[2] == 2)
+check("q dictionary literal preserves key order", #qdict_keys == 2 && qdict_keys[1] == "b" && qdict_keys[2] == "a" && qdict_values[1] == 2 && qdict_values[2] == 1)
+check("q keyed frame is query source", #queried_keyed == 2 && queried_keyed[2].trade_id == 2 && queried_keyed[2].price == 100.6)
+check("q keyed mutation preserves wrapper", q.keys(updated_keyed)[1] == "sym" && updated_keyed.frame[1].price == 101.1 && #q.value(updated_keyed) == 3 && #updated_keyed_lookup == 1 && updated_keyed_lookup[1].trade_id == 2 && updated_keyed_lookup[1].price == 101.6)
+check("q keyed delete preserves wrapper", q.keys(deleted_keyed)[1] == "sym" && #deleted_keyed.frame == 1 && deleted_keyed.frame[1].sym == "MSFT")
+check("q keyed select returns plain frame", #q.keys(selected_from_keyed) == 0 && #selected_from_keyed == 2 && selected_from_keyed[2].price == 101.6)
+check("q keyed mutation rejects key removal", drop_key_ok == false && drop_key_err != nil)
+check("q multi-key keyed lookup duplicate missing schema", #venue_hit == 1 && venue_hit[1].trade_id == 2 && venue_hit[1].sym == nil && venue_hit[1].venue == nil && #venue_miss == 0 && venue_miss.column_kinds.trade_id == "i64" && venue_miss.column_kinds.sym == nil)
+check("q multi-key keyed lookup accepts structured keys", #venue_hit_by_dict == 1 && venue_hit_by_dict[1].trade_id == 3 && #venue_hit_by_dict_extra == 1 && venue_hit_by_dict_extra[1].trade_id == 3 && #venue_hit_by_array == 1 && venue_hit_by_array[1].trade_id == 3 && venue_missing_key_ok == false && contains(venue_missing_key_err, "venue"))
+check("q multi-key keyed frame preserves key columns", #venue_frame == 4 && venue_frame[3].sym == "AAPL" && venue_frame[3].venue == "XNAS")
+check("q update delete boundaries", #updated_none == 3 && updated_none[1].price == 100.1 && #deleted_none == 3 && #deleted_all == 0)
+
+golden_over := q.eval("+/100 105 103 110")
+golden_scan := q.eval("+\\100 105 103 110")
+golden_prior := q.eval("-':100 105 103 110")
+golden_each := q.eval("2*100 105 103 110")
+golden_keyed := q.sql("select sym,price from ([sym:`AAPL`MSFT] price:101.5 80.25) where sym=`MSFT", {})
+golden_temporal := q.sql("select d,t,ts from ([] d:2026.06.06 0Nd; t:09:30:00.250 0Nt; ts:2026.06.06D09:30:00.250 0Np)", {})
+golden_wj_quotes := q.sql("select sym,ts,bid from ([] sym:`AAPL`AAPL; ts:2026.06.06D09:30:00 2026.06.06D09:31:00; bid:100.0 100.5)", {})
+golden_wj_trades := q.sql("select id,sym,ts from ([] id:1 2 3; sym:`AAPL`AAPL`AAPL; ts:2026.06.06D09:29:59 2026.06.06D09:30:30 2026.06.06D09:31:30)", {})
+golden_wj := q.sql("select id,sym,ts,bid from trades asof join quotes on sym,ts order by id asc", {trades: golden_wj_trades, quotes: golden_wj_quotes})
+golden_xbar := q.sql(
+  "select qty:sum size by bucket:xbar 60000000000 ts from ([] ts:2026.06.06D09:30:15 2026.06.06D09:30:59 2026.06.06D09:31:01; size:10 20 30) order by bucket asc",
+  {}
+)
+
+check("q golden adverbs over scan prior each", golden_over == 418 && golden_scan[4] == 418 && golden_prior[2] == 5 && golden_each[3] == 206)
+check("q golden keyed table select", #golden_keyed == 1 && golden_keyed[1].sym == "MSFT" && golden_keyed[1].price == 80.25)
+check("q golden temporal nulls and formatting", #golden_temporal == 2 && golden_temporal[1].d == "2026-06-06" && golden_temporal[1].t == "09:30:00.250" && golden_temporal[1].ts == "2026-06-06T09:30:00.250Z" && golden_temporal[2].d == nil && golden_temporal[2].t == nil && golden_temporal[2].ts == nil)
+check("q golden wj/asof boundary", #golden_wj == 3 && golden_wj[1].bid == nil && golden_wj[2].bid == 100.0 && golden_wj[3].bid == 100.5)
+check("q golden xbar timestamp buckets", #golden_xbar == 2 && golden_xbar[1].bucket == "2026-06-06T09:30:00Z" && golden_xbar[1].qty == 30.0 && golden_xbar[2].bucket == "2026-06-06T09:31:00Z" && golden_xbar[2].qty == 30.0)
+
+print("ok")

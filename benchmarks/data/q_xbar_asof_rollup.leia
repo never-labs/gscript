@@ -1,0 +1,128 @@
+// qSQL trade/quote asof join plus xbar bar rollup benchmark over in-memory frames.
+
+N := 4096
+REPS := 180
+MOD := 1000000007
+
+func make_i64(n, mod, offset) {
+    t := {}
+    for i := 1; i <= n; i++ {
+        t[i] = offset + (i % mod)
+    }
+    return array.i64(t)
+}
+
+func make_symbol_strings(n, mod, prefix) {
+    t := {}
+    for i := 1; i <= n; i++ {
+        t[i] = string.format("%s%d", prefix, i % mod)
+    }
+    return data.symbols(t)
+}
+
+func make_trade_ts(n) {
+    t := {}
+    for i := 1; i <= n; i++ {
+        t[i] = 600 + i
+    }
+    return array.i64(t)
+}
+
+func make_quote_ts(n) {
+    t := {}
+    for i := 1; i <= n; i++ {
+        t[i] = 540 + i
+    }
+    return array.i64(t)
+}
+
+func make_price(n) {
+    t := {}
+    for i := 1; i <= n; i++ {
+        t[i] = 90.0 + (i % 251) * 0.35
+    }
+    return array.f64(t)
+}
+
+func make_size(n) {
+    t := {}
+    for i := 1; i <= n; i++ {
+        t[i] = 10 + (i % 97)
+    }
+    return array.i64(t)
+}
+
+func make_bid(n) {
+    t := {}
+    for i := 1; i <= n; i++ {
+        t[i] = 89.75 + (i % 251) * 0.35
+    }
+    return array.f64(t)
+}
+
+func make_ask(n) {
+    t := {}
+    for i := 1; i <= n; i++ {
+        t[i] = 90.25 + (i % 251) * 0.35
+    }
+    return array.f64(t)
+}
+
+func mix(sum, v) {
+    return (sum * 131 + v) % MOD
+}
+
+trades := data.frame({
+    trade_id: make_i64(N, N, 1),
+    sym: make_symbol_strings(N, 64, "S"),
+    ts: make_trade_ts(N),
+    price: make_price(N),
+    size: make_size(N),
+})
+
+quotes := data.frame({
+    sym: make_symbol_strings(N, 64, "S"),
+    ts: make_quote_ts(N),
+    bid: make_bid(N),
+    ask: make_ask(N),
+})
+
+asof_sql := "select trade_id,sym,ts,price,size,bid,ask,spread:ask-bid from trades asof join quotes on sym,ts"
+bar_sql := "select notional:sum price*size, shares:sum size, fills:count i, avg_spread:avg spread by sym,bucket:xbar 60 ts from trades order by notional desc take 16"
+
+func check_rollup_semantics(trades, quotes, asof_sql, bar_sql) {
+    enriched := q.sql(asof_sql, {trades: trades, quotes: quotes})
+    bars := q.sql(enriched, bar_sql)
+    assert(#enriched == N)
+    assert(#bars == 16)
+    assert(enriched[1].bid != nil && enriched[1].ask != nil)
+    assert(enriched[1].spread == 0.5)
+    assert(bars[1].notional >= bars[#bars].notional)
+    assert(bars[1].shares > 0 && bars[1].fills > 0)
+    assert(bars[1].bucket % 60 == 0)
+}
+
+func run_hot(trades, quotes, asof_sql, bar_sql, reps) {
+    checksum := 0
+    for r := 1; r <= reps; r++ {
+        enriched := q.sql(asof_sql, {trades: trades, quotes: quotes})
+        bars := q.sql(enriched, bar_sql)
+        top := bars[1]
+        tail := bars[#bars]
+        top_vwap := top.notional / top.shares
+        checksum = mix(checksum, #enriched + #bars + top.fills * 17 + tail.fills * 31 + top.bucket)
+        checksum = mix(checksum, math.floor(top_vwap * 100) + math.floor(top.avg_spread * 1000))
+    }
+    return checksum
+}
+
+check_rollup_semantics(trades, quotes, asof_sql, bar_sql)
+warm := run_hot(trades, quotes, asof_sql, bar_sql, 2)
+collectgarbage("collect")
+t0 := time.now()
+checksum := run_hot(trades, quotes, asof_sql, bar_sql, REPS)
+elapsed := time.since(t0)
+
+print(string.format("q_xbar_asof_rollup_hot trades=%d quotes=%d reps=%d", N, N, REPS))
+print(string.format("checksum: %d", mix(checksum, warm)))
+print(string.format("Time: %.3fs", elapsed))

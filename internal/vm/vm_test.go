@@ -1,6 +1,7 @@
 package vm
 
 import (
+	"fmt"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -1016,6 +1017,23 @@ func TestTwoFieldTableLiteralRuntimeNilFallsBackToSetFieldSemantics(t *testing.T
 	if !tbl.RawGetString("x").IsNil() {
 		t.Fatalf("runtime nil field should read back as nil")
 	}
+}
+
+func TestLargeConstantIndexFieldAccessFallsBackToTableOps(t *testing.T) {
+	var src strings.Builder
+	for i := 0; i < 300; i++ {
+		fmt.Fprintf(&src, "c%d := %q\n", i, fmt.Sprintf("const-%d", i))
+	}
+	src.WriteString(`
+	grouped := {AAPL: {10, 20}, MSFT: {30}}
+	grouped.GOOG = {40, 50}
+	read_ok := grouped.AAPL[2] == 20 && grouped.MSFT[1] == 30
+	write_ok := grouped.GOOG[1] == 40
+	`)
+
+	g := compileAndRun(t, src.String())
+	expectGlobalBool(t, g, "read_ok", true)
+	expectGlobalBool(t, g, "write_ok", true)
 }
 
 func TestSmallFixedTableLiteralUsesConstructorOpcode(t *testing.T) {

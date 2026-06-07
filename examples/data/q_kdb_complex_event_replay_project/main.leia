@@ -1,0 +1,170 @@
+// q_kdb_complex_event_replay_project - compact kdb+-style event replay.
+// Run:
+//   go run ./cmd/leia run examples/data/q_kdb_complex_event_replay_project/main.leia
+
+func check(name, ok) {
+    assert(ok)
+    print("ok", name)
+}
+
+fees := q.eval("`XNAS`BATS`XNYS!0.00030 0.00020 0.00035")
+adverbs := q.eval("qty:25 40 35 20;(+/qty;+\\qty;-':qty;qty*qty;avg qty fby `AAPL`AAPL`MSFT`MSFT)")
+limits := q.eval("`alpha`beta`gamma!150000 90000 50000")
+verbs := q.eval("(10 20 30+1 2 3;100 90 80-1 2 3;2 3 4*5 6 7;100 80 60%2 4 5)")
+path_audit := q.eval("(prev 100.1 100.5 100.3 250.6 882.4;next 100.1 100.5 100.3 250.6 882.4;deltas 100.1 100.5 100.3 250.6 882.4;fills 0Nf 100.5f 0Nf 101.0f;reverse 1 2 3 4;iasc 100.1 100.5 100.3 250.6 882.4;idesc 100.1 100.5 100.3 250.6 882.4;distinct `XNAS`BATS`BATS`XNYS`XNAS;rank 50 20 30 10 40;2 xprev 10 20 30 40;2 rotate 10 20 30 40;differ `AAPL`AAPL`MSFT`MSFT)")
+encoded_syms := q.eval("`sym$`AAPL`MSFT`AAPL`NVDA")
+encoded_domain := q.eval("domain `sym$`AAPL`MSFT`AAPL`NVDA")
+encoded_codes := q.eval("codes `sym$`AAPL`MSFT`AAPL`NVDA")
+encoded_meta := q.eval("meta `sym$`AAPL`MSFT`AAPL`NVDA")
+sorted_sizes := q.eval("`s#10 20 30 40")
+parted_syms := q.eval("`p#`AAPL`AAPL`MSFT`NVDA")
+attr_meta := q.eval("meta `p#`AAPL`AAPL`MSFT`NVDA")
+
+check("q eval dictionaries and adverbs", fees.BATS == 0.0002 && adverbs[1] == 120 && adverbs[2][4] == 120 && adverbs[3][3] == -5 && adverbs[5][1] == 32.5 && adverbs[5][3] == 27.5 && limits.alpha == 150000)
+check("q dyadic verbs and encoded enum metadata", verbs[1][3] == 33 && verbs[2][2] == 88 && verbs[3][3] == 28 && verbs[4][3] == 12.0 && encoded_syms[3] == "AAPL" && encoded_domain[3] == "NVDA" && encoded_codes[3] == 0 && encoded_meta.domain == "sym" && encoded_meta.count == 4)
+check("q price path adverbs and ordering verbs", path_audit[1][2] == 100.1 && path_audit[2][2] == 100.3 && path_audit[3][2] > 0.39 && path_audit[3][2] < 0.41 && path_audit[4][3] > 100.49 && path_audit[5][1] == 4 && path_audit[6][1] == 0 && path_audit[7][1] == 4 && path_audit[8][2] == "BATS" && path_audit[9][1] == 4 && path_audit[10][3] == 10 && path_audit[11][1] == 30 && path_audit[12][3] == true)
+check("q attribute markers stay transparent and inspectable", q.count(sorted_sizes) == 4 && sorted_sizes[4] == 40 && parted_syms[2] == "AAPL" && attr_meta.attribute == "p" && attr_meta.type == 11 && attr_meta.count == 4)
+
+desks := q.sql(
+    "select desk,sym,risk_limit,max_participation from ([desk:`alpha`alpha`beta`gamma; sym:`AAPL`MSFT`MSFT`NVDA] risk_limit:150000 125000 90000 50000; max_participation:0.15 0.12 0.10 0.08)",
+    {}
+)
+
+orders_raw := q.sql(
+    "select order_id,parent_id,desk,sym,side,ts,order_qty,limit_px,state from ([] order_id:101 102 103 104 105; parent_id:10 10 11 12 13; desk:`alpha`alpha`beta`gamma`omega; sym:`AAPL`AAPL`MSFT`NVDA`IBM; side:`buy`sell`sell`buy`sell; ts:2026.06.06D09:30:00 2026.06.06D09:30:30 2026.06.06D09:31:00 2026.06.06D09:31:30 2026.06.06D09:32:00; order_qty:100 80 60 30 15; limit_px:100.6 100.2 250.4 882.5 140.0; state:`live`live`live`live`cancelled)",
+    {}
+)
+
+quotes := q.sql(
+    "select quote_id,sym,ts,bid,ask,bid_sz,ask_sz,venue from ([] quote_id:1 2 3 4 5 6; sym:`AAPL`AAPL`MSFT`MSFT`NVDA`NVDA; ts:2026.06.06D09:29:45 2026.06.06D09:31:00 2026.06.06D09:30:30 2026.06.06D09:31:30 2026.06.06D09:31:00 2026.06.06D09:32:00; bid:100.0 100.4 250.0 250.5 881.0 882.0; ask:100.2 100.7 250.3 250.8 882.0 883.0; bid_sz:500 420 300 330 80 75; ask_sz:420 390 250 310 70 70; venue:`XNAS`BATS`XNYS`BATS`XNAS`BATS)",
+    {}
+)
+
+fills_raw := q.sql(
+    "select trade_id,order_id,parent_id,desk,sym,side,ts,price,size,venue,busted,audit from ([] trade_id:201 202 203 204 205 206; order_id:101 101 102 103 104 105; parent_id:10 10 10 11 12 13; desk:`alpha`alpha`alpha`beta`gamma`omega; sym:`AAPL`AAPL`AAPL`MSFT`NVDA`IBM; side:`buy`buy`sell`sell`buy`sell; ts:2026.06.06D09:30:20 2026.06.06D09:31:20 2026.06.06D09:31:30 2026.06.06D09:31:45 2026.06.06D09:32:10 2026.06.06D09:32:30; price:100.1 100.5 100.3 250.6 882.4 140.1; size:40 35 30 25 10 5; venue:`XNAS`BATS`BATS`XNYS`XNAS`XNYS; busted:false false false false false true; audit:`ok`ok`ok`ok`ok`drop)",
+    {}
+)
+
+orders := q.sql(orders_raw, "delete from trades where state=`cancelled")
+orders = q.sql(orders, "update open_qty:order_qty from trades")
+orders = q.sql(orders, "update participation_cap:order_qty*0.15 from trades where desk=`alpha")
+orders = q.sql(orders, "update participation_cap:order_qty*0.10 from trades where desk=`beta")
+orders = q.sql(orders, "update participation_cap:order_qty*0.08 from trades where desk=`gamma")
+
+fills := q.sql(fills_raw, "delete from trades where busted=true")
+fills = q.sql(fills, "delete audit from trades")
+fills = q.sql(fills, "update notional:price*size from trades where size>0")
+fills = q.sql(fills, "update signed_qty:size from trades")
+fills = q.sql(fills, "update signed_qty:0-size from trades where side=`sell")
+fills = q.sql(fills, "update fee:notional*0.00030 from trades where venue=`XNAS")
+fills = q.sql(fills, "update fee:notional*0.00020 from trades where venue=`BATS")
+fills = q.sql(fills, "update fee:notional*0.00035 from trades where venue=`XNYS")
+
+enriched := q.sql(
+    "select trade_id,order_id,parent_id,desk,sym,side,ts,price,size,signed_qty,notional,fee,bid,ask,spread:ask-bid,venue from trades asof join quotes on sym,ts order by trade_id asc",
+    {trades: fills, quotes: quotes}
+)
+
+desk_joined := q.sql(
+    "select trade_id,order_id,parent_id,desk,sym,side,ts,price,size,signed_qty,notional,fee,bid,ask,spread,venue,risk_limit,max_participation from trades left join desks on desk,sym order by trade_id asc",
+    {trades: enriched, desks: desks}
+)
+
+fill_rollup := q.sql(
+    desk_joined,
+    "select filled:sum size,gross:sum notional,fees:sum fee,net_qty:sum signed_qty,fills:count i by order_id,desk,sym from trades order by order_id asc"
+)
+
+lifecycle := q.sql(
+    "select order_id,parent_id,desk,sym,side,order_qty,open_qty,participation_cap,filled,gross,fees,net_qty,fills from orders pj fills on order_id,desk,sym order by order_id asc",
+    {orders: orders, fills: fill_rollup}
+)
+
+minute_bars := q.sql(
+    desk_joined,
+    "select notional:sum notional,shares:sum size,net_qty:sum signed_qty,fees:sum fee,avg_spread:avg spread,first_px:first price,last_px:last price,fills:count i by desk,sym,bucket:xbar 60000000000 ts from trades order by desk asc,sym asc,bucket asc"
+)
+
+for i := 1; i <= #minute_bars; i++ {
+    row := minute_bars[i]
+    row.vwap = row.notional / row.shares
+}
+
+event_window := q.sql(desk_joined, "select trade_id,sym,ts,price,size from trades where ts within 2026.06.06D09:30:00 2026.06.06D09:31:30 order by ts asc")
+venue_universe := q.sql(desk_joined, "select distinct venue from trades order by venue asc")
+symbol_venue_universe := q.sql(desk_joined, "select distinct sym,venue from trades order by sym asc,venue asc")
+select_by_sym := q.sql(desk_joined, "select by sym from trades order by sym asc")
+select_by_sym_venue := q.sql(desk_joined, "select by sym,venue from trades order by sym asc,venue asc")
+exec_by_sym := q.sql(desk_joined, "exec by sym from trades order by sym asc")
+exec_risk := q.sql(desk_joined, "exec trade_id,desk,sym,venue,notional,risk_limit from trades where notional>3000 order by notional desc")
+exec_by_desk := q.sql(desk_joined, "exec shares:sum size,gross:sum notional,fees:sum fee by desk from trades order by desk asc")
+exec_symbols := q.sql(desk_joined, "exec sym from trades where desk=`alpha order by trade_id asc")
+
+desk_keyed := q.key_by(desks, "desk", "sym")
+alpha_aapl_rule := q.lookup(desk_keyed, "alpha", "AAPL")
+gamma_nvda_rule := q.lookup(desk_keyed, {desk: "gamma", sym: "NVDA"})
+missing_rule := q.lookup(desk_keyed, "omega", "IBM")
+
+lifecycle_keyed := q.key_by(lifecycle, "desk", "sym")
+alpha_aapl_orders := q.lookup(lifecycle_keyed, "alpha", "AAPL")
+amended_lifecycle := q.sql(lifecycle_keyed, "update participation_cap:participation_cap+1 from trades where desk=`alpha")
+selected_lifecycle := q.sql(amended_lifecycle, "select order_id,desk,sym,participation_cap,filled,gross from trades where desk=`alpha order by order_id asc")
+cached_alpha := q.sql(desk_joined, "select trade_id,sym,notional from trades where desk=`alpha order by trade_id asc limit 3")
+cached_alpha_again := q.sql(desk_joined, "select trade_id,sym,notional from trades where desk=`alpha order by trade_id asc limit 3")
+
+check("q update/delete event cleansing", #orders == 4 && #fills == 5 && fills.column_kinds.audit == nil && fills[3].signed_qty == -30.0 && fills[5].fee > 2.64)
+check("q asof quote enrichment", #enriched == 5 && enriched[1].bid == 100.0 && enriched[2].bid == 100.4 && enriched[4].ask == 250.8 && enriched[5].bid == 882.0)
+check("q left join and pj lifecycle", #desk_joined == 5 && desk_joined[1].risk_limit == 150000 && #lifecycle == 4 && lifecycle[1].filled == 75.0 && lifecycle[2].net_qty == -30.0 && lifecycle[4].filled == 10.0)
+check("q exec dict-shaped projections", exec_risk.notional[1] == 8824.0 && exec_risk.sym[2] == "MSFT" && exec_by_desk.desk[1] == "alpha" && exec_by_desk.shares[1] == 105.0 && exec_symbols[3] == "AAPL")
+check("q keyed reference and lifecycle", #alpha_aapl_rule == 1 && alpha_aapl_rule[1].risk_limit == 150000 && #gamma_nvda_rule == 1 && #missing_rule == 0 && #alpha_aapl_orders == 1 && alpha_aapl_orders[1].desk == nil && q.keys(amended_lifecycle)[2] == "sym" && #selected_lifecycle == 2 && selected_lifecycle[1].participation_cap == 16.0 && selected_lifecycle[2].participation_cap == 13.0)
+check("qSQL cached repeat", #cached_alpha == 3 && #cached_alpha_again == 3 && cached_alpha[2].trade_id == cached_alpha_again[2].trade_id)
+check("q temporal window and distinct universes", #event_window == 3 && event_window[1].trade_id == 201 && event_window[3].trade_id == 203 && #venue_universe == 3 && venue_universe[1].venue == "BATS" && #symbol_venue_universe == 4 && symbol_venue_universe[1].sym == "AAPL")
+check("q select-by key-only projections", #select_by_sym == 3 && select_by_sym[1].sym == "AAPL" && #select_by_sym_venue == 4 && select_by_sym_venue[1].venue == "BATS" && q.count(exec_by_sym) == 3 && exec_by_sym[3] == "NVDA")
+check("q temporal rollup bars", #minute_bars == 4 && minute_bars[1].desk == "alpha" && minute_bars[1].bucket == "2026-06-06T09:30:00Z" && math.floor(minute_bars[1].vwap * 100) == 10010 && minute_bars[1].first_px == 100.1 && minute_bars[2].last_px == 100.3 && minute_bars[2].net_qty == 5.0 && minute_bars[4].sym == "NVDA")
+
+summary := string.format(
+    "q_kdb_complex_event_replay fills=%d orders=%d bars=%d top=%s %.1f",
+    #fills,
+    #orders,
+    #minute_bars,
+    exec_risk.sym[1],
+    exec_risk.notional[1]
+)
+print(summary)
+
+return {
+    fees: fees,
+    adverbs: adverbs,
+    limits: limits,
+    verbs: verbs,
+    path_audit: path_audit,
+    encoded_domain: encoded_domain,
+    encoded_codes: encoded_codes,
+    encoded_meta: encoded_meta,
+    sorted_sizes: sorted_sizes,
+    attr_meta: attr_meta,
+    desks: desks,
+    orders: orders,
+    fills: fills,
+    enriched: enriched,
+    desk_joined: desk_joined,
+    fill_rollup: fill_rollup,
+    lifecycle: lifecycle,
+    minute_bars: minute_bars,
+    event_window: event_window,
+    venue_universe: venue_universe,
+    symbol_venue_universe: symbol_venue_universe,
+    select_by_sym: select_by_sym,
+    select_by_sym_venue: select_by_sym_venue,
+    exec_by_sym: exec_by_sym,
+    exec_risk: exec_risk,
+    exec_by_desk: exec_by_desk,
+    exec_symbols: exec_symbols,
+    desk_keyed: desk_keyed,
+    lifecycle_keyed: lifecycle_keyed,
+    amended_lifecycle: amended_lifecycle,
+    selected_lifecycle: selected_lifecycle,
+    cached_alpha: cached_alpha,
+    cached_alpha_again: cached_alpha_again,
+    summary: summary,
+}

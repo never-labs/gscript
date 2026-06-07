@@ -1,0 +1,296 @@
+print("case:q_join_variants_project")
+
+func contains(haystack, needle) {
+  return string.find(tostring(haystack), needle, 1, true) != nil
+}
+
+func check(name, ok) {
+  assert(ok)
+  print("ok", name)
+}
+
+left := data.frame({
+  sym: data.symbols({"AAPL", "MSFT"}),
+  qty: data.i64({10, 20}),
+})
+
+right := data.frame({
+  sym: data.symbols({"AAPL", "NVDA"}),
+  qty: data.i64({1, 3}),
+  px: data.f64({100.0, 300.0}),
+})
+
+dup_left := data.frame({
+  sym: data.symbols({"AAPL", "AAPL", "MSFT"}),
+  id: data.i64({1, 2, 3}),
+})
+
+dup_right := data.frame({
+  sym: data.symbols({"AAPL", "AAPL", "NVDA"}),
+  venue: data.strings({"XNYS", "XNAS", "BATS"}),
+})
+
+venue_regions := data.frame({
+  venue: data.strings({"XNYS", "XNAS"}),
+  region: data.symbols({"east", "west"}),
+})
+
+inner_dups := q.sql(
+  "select id,sym,venue from dup_left join dup_right on sym order by id asc,venue asc",
+  {dup_left: dup_left, dup_right: dup_right}
+)
+
+inner_dups_alias := q.sql(
+  "select id,sym,venue from dup_left inner join dup_right on sym order by id asc,venue asc",
+  {dup_left: dup_left, dup_right: dup_right}
+)
+
+inner_dups_ij := q.sql(
+  "select id,sym,venue from dup_left ij dup_right on sym order by id asc,venue asc",
+  {dup_left: dup_left, dup_right: dup_right}
+)
+
+inner_distinct_take := q.sql(
+  "select distinct sym,venue from dup_left join dup_right on sym order by venue desc take 1",
+  {dup_left: dup_left, dup_right: dup_right}
+)
+
+alias_left := data.frame({
+  id: data.i64({1, 2, 3}),
+  acct: data.symbols({"a1", "a1", "a2"}),
+  venue: data.strings({"XNYS", "XNAS", "BATS"}),
+})
+
+alias_right := data.frame({
+  account: data.symbols({"a1", "a1", "a3"}),
+  exchange: data.strings({"XNYS", "XNAS", "ARCX"}),
+  label: data.strings({"nyse", "nasdaq", "arca"}),
+})
+
+inner_alias_keys := q.sql(
+  "select id,acct,venue,label from alias_left ij alias_right on acct=account,venue=exchange order by id asc",
+  {alias_left: alias_left, alias_right: alias_right}
+)
+
+left_dups := q.sql(
+  "select id,sym,venue from dup_left left join dup_right on sym order by id asc,venue asc",
+  {dup_left: dup_left, dup_right: dup_right}
+)
+
+left_alias_keys := q.sql(
+  "select id,acct,venue,label from alias_left lj alias_right on acct=account,venue=exchange order by id asc",
+  {alias_left: alias_left, alias_right: alias_right}
+)
+
+unioned := q.sql(
+  "select sym,qty,px from left uj right on sym order by sym asc",
+  {left: left, right: right}
+)
+
+plussed := q.sql(
+  "select sym,qty,px from left pj right on sym order by sym asc",
+  {left: left, right: right}
+)
+
+chained_join := q.sql(
+  "select id,sym,venue,region from dup_left ij dup_right on sym lj venue_regions on venue order by id asc,venue asc",
+  {dup_left: dup_left, dup_right: dup_right, venue_regions: venue_regions}
+)
+
+trades := q.sql(
+  "select trade_id,sym,ts from ([] trade_id:1 2; sym:`AAPL`AAPL; ts:2026.06.06D09:31:00 2026.06.06D09:32:00)",
+  {}
+)
+quotes := q.sql(
+  "select sym,ts,bid from ([] sym:`AAPL`AAPL`AAPL; ts:2026.06.06D09:30:00 2026.06.06D09:31:00 2026.06.06D09:33:00; bid:100.0 100.5 101.0)",
+  {}
+)
+quotes_alias := q.sql(
+  "select sym,quote_time,bid from ([] sym:`AAPL`AAPL`AAPL; quote_time:2026.06.06D09:30:00 2026.06.06D09:31:00 2026.06.06D09:33:00; bid:100.0 100.5 101.0)",
+  {}
+)
+quotes_alias_keys := q.sql(
+  "select ticker,quote_time,bid from ([] ticker:`AAPL`AAPL`AAPL; quote_time:2026.06.06D09:30:00 2026.06.06D09:31:00 2026.06.06D09:33:00; bid:100.0 100.5 101.0)",
+  {}
+)
+asofed := q.sql(
+  "select trade_id,sym,ts,bid from trades aj quotes on sym,ts order by trade_id asc",
+  {trades: trades, quotes: quotes}
+)
+asofed_alias_time := q.sql(
+  "select trade_id,sym,ts,bid from trades aj quotes_alias on sym,ts=quote_time order by trade_id asc",
+  {trades: trades, quotes_alias: quotes_alias}
+)
+asofed_alias_keys := q.sql(
+  "select trade_id,sym,ts,bid from trades aj quotes_alias_keys on sym=ticker,ts=quote_time order by trade_id asc",
+  {trades: trades, quotes_alias_keys: quotes_alias_keys}
+)
+asofed_aj0 := q.sql(
+  "select trade_id,sym,ts,bid from trades aj0 quotes on sym,ts order by trade_id asc",
+  {trades: trades, quotes: quotes}
+)
+asofed_ajf := q.sql(
+  "select trade_id,sym,ts,bid from trades ajf quotes on sym,ts order by trade_id asc",
+  {trades: trades, quotes: quotes}
+)
+asofed_ajf0 := q.sql(
+  "select trade_id,sym,ts,bid from trades ajf0 quotes on sym,ts order by trade_id asc",
+  {trades: trades, quotes: quotes}
+)
+asof_take_prefix := q.sql(
+  "1#select trade_id,sym,ts,bid from trades aj quotes on sym,ts order by trade_id desc",
+  {trades: trades, quotes: quotes}
+)
+global_trades := q.sql(
+  "select trade_id,ts from ([] trade_id:1 2 3; ts:10 20 30)",
+  {}
+)
+global_quotes := q.sql(
+  "select ts,bid from ([] ts:5 15 25; bid:100.0 101.0 102.0)",
+  {}
+)
+global_asof := q.sql(
+  "select trade_id,ts,bid from global_trades aj global_quotes on ts order by trade_id asc",
+  {global_trades: global_trades, global_quotes: global_quotes}
+)
+global_windowed := q.sql(
+  "select trade_id,ts,bid from global_trades wj[-10 0] global_quotes on ts order by trade_id asc",
+  {global_trades: global_trades, global_quotes: global_quotes}
+)
+global_lasted := q.sql(
+  "select trade_id,ts,bid from global_trades wj1[-10 0] global_quotes on ts order by trade_id asc",
+  {global_trades: global_trades, global_quotes: global_quotes}
+)
+windowed := q.sql(
+  "select trade_id,sym,ts,bid from trades wj quotes on sym,ts order by trade_id asc",
+  {trades: trades, quotes: quotes}
+)
+bounded := q.sql(
+  "select trade_id,sym,ts,bid from trades wj[-60000000000 0] quotes on sym,ts order by trade_id asc",
+  {trades: trades, quotes: quotes}
+)
+bounded_comma := q.sql(
+  "select trade_id,sym,ts,bid from trades wj[-60000000000,0] quotes on sym,ts order by trade_id asc",
+  {trades: trades, quotes: quotes}
+)
+windowed_alias_time := q.sql(
+  "select trade_id,sym,ts,bid from trades wj[-0D00:01:00,0D00:00:00] quotes_alias on sym,ts=quote_time order by trade_id asc",
+  {trades: trades, quotes_alias: quotes_alias}
+)
+windowed_alias_keys := q.sql(
+  "select trade_id,sym,ts,bid from trades wj[-0D00:01:00,0D00:00:00] quotes_alias_keys on sym=ticker,ts=quote_time order by trade_id asc",
+  {trades: trades, quotes_alias_keys: quotes_alias_keys}
+)
+lasted := q.sql(
+  "select trade_id,sym,ts,bid from trades wj1[-60000000000 0] quotes on sym,ts order by trade_id asc",
+  {trades: trades, quotes: quotes}
+)
+lasted_alias_time := q.sql(
+  "select trade_id,sym,ts,bid from trades wj1[-0D00:01:00,0D00:00:00] quotes_alias on sym,ts=quote_time order by trade_id asc",
+  {trades: trades, quotes_alias: quotes_alias}
+)
+lasted_alias_keys := q.sql(
+  "select trade_id,sym,ts,bid from trades wj1[-0D00:01:00,0D00:00:00] quotes_alias_keys on sym=ticker,ts=quote_time order by trade_id asc",
+  {trades: trades, quotes_alias_keys: quotes_alias_keys}
+)
+window_last_distinct_take := q.sql(
+  "select distinct sym,bid from trades wj1[-60000000000 0] quotes on sym,ts order by bid desc take 1",
+  {trades: trades, quotes: quotes}
+)
+timespan_bounded := q.sql(
+  "select trade_id,sym,ts,bid from trades wj[-0D00:01:00 0D00:00:00] quotes on sym,ts order by trade_id asc",
+  {trades: trades, quotes: quotes}
+)
+timespan_lasted := q.sql(
+  "select trade_id,sym,ts,bid from trades wj1[-0D00:01:00 0D00:00:00] quotes on sym,ts order by trade_id asc",
+  {trades: trades, quotes: quotes}
+)
+window_aggs := q.sql(
+  "select trade_id,sym,ts,n:count bid,sum_bid:sum bid,avg_bid:avg bid,first_bid:first bid,last_bid:last bid from trades wj quotes on sym,ts order by trade_id asc",
+  {trades: trades, quotes: quotes}
+)
+edge_trades := data.frame({
+  trade_id: data.i64({10, 11, 12}),
+  sym: data.symbols({"AAPL", "AAPL", "AAPL"}),
+  ts: data.i64({10, 11, 20}),
+})
+edge_quotes := data.frame({
+  sym: data.symbols({"AAPL", "AAPL", "AAPL", "AAPL"}),
+  ts: data.i64({10, 10, 11, 30}),
+  bid: data.f64({100.0, nil, 110.0, 300.0}),
+  seq: data.i64({1, 2, 3, 4}),
+})
+edge_windowed := q.sql(
+  "select trade_id,sym,ts,bid,seq from edge_trades wj[0 0] edge_quotes on sym,ts order by trade_id asc",
+  {edge_trades: edge_trades, edge_quotes: edge_quotes}
+)
+edge_lasted := q.sql(
+  "select trade_id,sym,ts,bid,seq from edge_trades wj1[0 0] edge_quotes on sym,ts order by trade_id asc",
+  {edge_trades: edge_trades, edge_quotes: edge_quotes}
+)
+partition_boundary_trades := data.frame({
+  trade_id: data.i64({20}),
+  sym: data.symbols({"MSFT"}),
+  ts: data.i64({11}),
+})
+partition_boundary_quotes := data.frame({
+  sym: data.symbols({"AAPL"}),
+  ts: data.i64({10}),
+  bid: data.f64({100.0}),
+})
+partition_boundary_window := q.sql(
+  "select trade_id,sym,ts,bid from partition_boundary_trades wj[-10 0] partition_boundary_quotes on sym,ts",
+  {partition_boundary_trades: partition_boundary_trades, partition_boundary_quotes: partition_boundary_quotes}
+)
+multikey_trades := q.sql(
+  "select trade_id,sym,venue,ts from ([] trade_id:1 2 3 4 5; sym:`AAPL`AAPL`AAPL`MSFT`AAPL; venue:`XNAS`XNAS`BATS`XNAS`XNAS; ts:2026.06.06D09:30:30 2026.06.06D09:31:00 2026.06.06D09:30:45 2026.06.06D09:30:20 0Np)",
+  {}
+)
+multikey_quotes := q.sql(
+  "select ticker,market,quote_time,bid,bid_size from ([] ticker:`AAPL`AAPL`AAPL`AAPL`MSFT`AAPL`AAPL; market:`XNAS`XNAS`XNAS`BATS`XNAS`XNAS`BATS; quote_time:2026.06.06D09:30:20 2026.06.06D09:30:00 2026.06.06D09:31:10 2026.06.06D09:30:40 2026.06.06D09:30:10 0Np 2026.06.06D09:29:00; bid:101.0 100.0 110.0 200.0 300.0 999.0 190.0; bid_size:20 10 110 50 30 999 19)",
+  {}
+)
+multikey_window_aggs := q.sql(
+  "select trade_id,sym,venue,ts,n:count bid,sum_size:sum bid_size,avg_bid:avg bid,last_bid:last bid from multikey_trades wj[-0D00:00:30,0D00:00:00] multikey_quotes on sym=ticker,venue=market,ts=quote_time order by trade_id asc",
+  {multikey_trades: multikey_trades, multikey_quotes: multikey_quotes}
+)
+
+check("q inner join expands duplicate key matches", #inner_dups == 4 && inner_dups[1].id == 1 && inner_dups[1].venue == "XNAS" && inner_dups[2].venue == "XNYS" && inner_dups[4].id == 2)
+check("q inner join keyword alias matches join", #inner_dups_alias == #inner_dups && inner_dups_alias[1].venue == inner_dups[1].venue && inner_dups_alias[4].id == inner_dups[4].id)
+check("q ij keyword alias matches join", #inner_dups_ij == #inner_dups && inner_dups_ij[1].venue == inner_dups[1].venue && inner_dups_ij[4].id == inner_dups[4].id)
+check("q join supports distinct order take", #inner_distinct_take == 1 && inner_distinct_take[1].sym == "AAPL" && inner_distinct_take[1].venue == "XNYS")
+check("q ij supports aliased multi-key joins", #inner_alias_keys == 2 && inner_alias_keys[1].label == "nyse" && inner_alias_keys[2].label == "nasdaq" && inner_alias_keys[1].account == nil && inner_alias_keys[1].exchange == nil)
+check("q left join expands duplicates and preserves unmatched", #left_dups == 5 && left_dups[4].id == 2 && left_dups[5].id == 3 && left_dups[5].venue == nil)
+check("q lj supports aliased multi-key joins and unmatched rows", #left_alias_keys == 3 && left_alias_keys[1].label == "nyse" && left_alias_keys[2].label == "nasdaq" && left_alias_keys[3].label == nil)
+check("q uj includes unmatched right key", #unioned == 3 && unioned[1].sym == "AAPL" && unioned[2].sym == "MSFT" && unioned[3].sym == "NVDA")
+check("q uj preserves nulls across absent columns", unioned[2].px == nil && unioned[3].qty == nil && unioned[3].px == 300.0)
+check("q pj adds matching numeric columns", #plussed == 2 && plussed[1].sym == "AAPL" && plussed[1].qty == 11.0 && plussed[2].qty == 20.0)
+check("q pj keeps right-only matched values", plussed[1].px == 100.0 && plussed[2].px == nil)
+check("q qsql supports chained multi-source joins", #chained_join == 4 && chained_join[1].region == "west" && chained_join[2].region == "east" && chained_join[4].id == 2)
+check("q aj keyword matches asof join semantics", #asofed == 2 && asofed[1].bid == 100.5 && asofed[2].bid == 100.5)
+check("q aj supports aliased time key", #asofed_alias_time == 2 && asofed_alias_time[1].bid == 100.5 && asofed_alias_time[2].bid == 100.5 && asofed_alias_time[1].quote_time == nil)
+check("q aj supports aliased partition and time keys", #asofed_alias_keys == 2 && asofed_alias_keys[1].bid == 100.5 && asofed_alias_keys[2].bid == 100.5 && asofed_alias_keys[1].ticker == nil && asofed_alias_keys[1].quote_time == nil)
+check("q aj0 ajf ajf0 preserve asof values", #asofed_aj0 == 2 && asofed_aj0[1].bid == asofed[1].bid && asofed_aj0[2].bid == asofed[2].bid && #asofed_ajf == 2 && asofed_ajf[1].bid == asofed[1].bid && asofed_ajf[2].bid == asofed[2].bid && #asofed_ajf0 == 2 && asofed_ajf0[1].bid == asofed[1].bid && asofed_ajf0[2].bid == asofed[2].bid)
+check("q aj0 and ajf0 preserve matched right time", asofed[2].ts == "2026-06-06T09:32:00Z" && asofed_ajf[2].ts == "2026-06-06T09:32:00Z" && asofed_aj0[2].ts == "2026-06-06T09:31:00Z" && asofed_ajf0[2].ts == "2026-06-06T09:31:00Z")
+check("q aj supports prefix take and order", #asof_take_prefix == 1 && asof_take_prefix[1].trade_id == 2 && asof_take_prefix[1].bid == 100.5)
+check("q aj supports global asof without partition key", #global_asof == 3 && global_asof[1].bid == 100.0 && global_asof[2].bid == 101.0 && global_asof[3].bid == 102.0)
+check("q wj supports global bounded window without partition key", #global_windowed == 3 && #global_windowed[1].bid == 1 && global_windowed[1].bid[1] == 100.0 && #global_windowed[3].bid == 1 && global_windowed[3].bid[1] == 102.0)
+check("q wj1 supports global last window without partition key", #global_lasted == 3 && global_lasted[1].bid == 100.0 && global_lasted[2].bid == 101.0 && global_lasted[3].bid == 102.0)
+check("q wj collects same-symbol prior quote windows", #windowed == 2 && #windowed[1].bid == 2 && windowed[1].bid[1] == 100.0 && windowed[1].bid[2] == 100.5 && #windowed[2].bid == 2)
+check("q wj explicit bounds filter the collected window", #bounded == 2 && #bounded[1].bid == 2 && #bounded[2].bid == 1 && bounded[2].bid[1] == 100.5)
+check("q wj comma bounds match space-separated bounds", #bounded_comma == 2 && #bounded_comma[1].bid == #bounded[1].bid && #bounded_comma[2].bid == #bounded[2].bid)
+check("q wj supports aliased time key", #windowed_alias_time == 2 && #windowed_alias_time[1].bid == 2 && #windowed_alias_time[2].bid == 1 && windowed_alias_time[1].quote_time == nil)
+check("q wj supports aliased partition and time keys", #windowed_alias_keys == 2 && #windowed_alias_keys[1].bid == 2 && #windowed_alias_keys[2].bid == 1 && windowed_alias_keys[1].ticker == nil && windowed_alias_keys[1].quote_time == nil)
+check("q wj1 returns the last in-window row as a scalar", #lasted == 2 && lasted[1].bid == 100.5 && lasted[2].bid == 100.5)
+check("q wj1 supports aliased time key", #lasted_alias_time == 2 && lasted_alias_time[1].bid == 100.5 && lasted_alias_time[2].bid == 100.5 && lasted_alias_time[1].quote_time == nil)
+check("q wj1 supports aliased partition and time keys", #lasted_alias_keys == 2 && lasted_alias_keys[1].bid == 100.5 && lasted_alias_keys[2].bid == 100.5 && lasted_alias_keys[1].ticker == nil && lasted_alias_keys[1].quote_time == nil)
+check("q wj1 supports distinct order take", #window_last_distinct_take == 1 && window_last_distinct_take[1].sym == "AAPL" && window_last_distinct_take[1].bid == 100.5)
+check("q wj timespan bounds work against timestamp keys", #timespan_bounded == 2 && #timespan_bounded[1].bid == 2 && timespan_bounded[1].bid[2] == 100.5 && #timespan_bounded[2].bid == 1)
+check("q wj1 timespan bounds return last timestamp-window value", #timespan_lasted == 2 && timespan_lasted[1].bid == 100.5 && timespan_lasted[2].bid == 100.5)
+check("q wj supports per-row window aggregations", #window_aggs == 2 && window_aggs[1].n == 2 && window_aggs[1].sum_bid == 200.5 && window_aggs[1].avg_bid == 100.25 && window_aggs[1].first_bid == 100.0 && window_aggs[1].last_bid == 100.5 && window_aggs[2].n == 2 && window_aggs[2].last_bid == 100.5)
+check("q wj preserves duplicate timestamp order and null list values", #edge_windowed == 3 && #edge_windowed[1].bid == 2 && edge_windowed[1].bid[1] == 100.0 && data.is_null(edge_windowed[1].bid[2]) && edge_windowed[1].seq[1] == 1 && edge_windowed[1].seq[2] == 2 && #edge_windowed[3].seq == 0)
+check("q wj1 preserves duplicate timestamp last row and null on empty windows", #edge_lasted == 3 && data.is_null(edge_lasted[1].bid) && edge_lasted[1].seq == 2 && edge_lasted[2].bid == 110.0 && edge_lasted[3].bid == nil && edge_lasted[3].seq == nil)
+check("q wj does not cross partition boundary", #partition_boundary_window == 1 && #partition_boundary_window[1].bid == 0)
+check("q wj multi-key temporal aggregation handles unsorted quotes and null time", #multikey_window_aggs == 5 && multikey_window_aggs[1].n == 2 && multikey_window_aggs[1].sum_size == 30.0 && multikey_window_aggs[1].avg_bid == 100.5 && multikey_window_aggs[1].last_bid == 101.0 && multikey_window_aggs[2].n == 0 && multikey_window_aggs[2].last_bid == nil && multikey_window_aggs[3].last_bid == 200.0 && multikey_window_aggs[4].last_bid == 300.0 && multikey_window_aggs[5].n == 0)
+
+print("ok")

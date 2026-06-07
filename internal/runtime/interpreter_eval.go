@@ -723,7 +723,7 @@ func (interp *Interpreter) evalUnary(e *ast.UnaryExpr, env *Environment) (Value,
 		switch operand.Type() {
 		case TypeString:
 			return IntValue(int64(StringLen(operand))), nil
-		case TypeTable:
+		case TypeTable, TypeFrame, TypeKeyedFrame:
 			return IntValue(int64(operand.Table().Length())), nil
 		default:
 			return NilValue(), fmt.Errorf("attempt to get length of a %s value", operand.TypeName())

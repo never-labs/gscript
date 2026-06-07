@@ -1,0 +1,279 @@
+print("case:q_conformance_golden_project")
+
+func check(name, ok) {
+  assert(ok)
+  print("ok", name)
+}
+
+func missing(v) {
+  return v == nil || data.is_null(v)
+}
+
+func expect_vec(name, got, expected) {
+  assert(q.count(got) == #expected)
+  for i := 1; i <= #expected; i++ {
+    if expected[i] == nil {
+      assert(missing(got[i]))
+    } else {
+      assert(got[i] == expected[i])
+    }
+  }
+  print("ok", name)
+}
+
+func expect_rows(name, rows, count) {
+  assert(#rows == count)
+  print("ok", name)
+}
+
+typed_nulls := q.eval("0Nh 0Ni 0Nj 0Ne")
+typed_infinities := q.eval("0Wh -0Wh 0Wi -0Wi 0Wj -0Wj 0We -0We 0Wf -0Wf")
+typed_cast_int := q.eval("`int$1 2 0N")
+typed_cast_real := q.eval("`real$1 2 0Nf")
+typed_cast_float := q.eval("`float$1 2 0Ni")
+typed_cast_symbol := q.eval("`symbol$(\"AAPL\";\"MSFT\")")
+typed_cast_string := q.eval("`string$`AAPL`MSFT")
+typed_cast_date := q.eval("`date$\"2026-06-06\" \"2026-06-07\"")
+short_cast_int := q.eval("i$3")
+short_cast_float_null_type := q.eval("type f$0N")
+short_cast_real := q.eval("e$1 2 0Nf")
+short_cast_typed_amend := q.eval("@[(1 2 0Ni);2;:;i$3]")
+temporal_nulls := q.sql(
+  "select d,t,ts from ([] d:2026.06.06 0Nd; t:09:30:00.250 0Nt; ts:2026.06.06D09:30:00.250 0Np)",
+  {}
+)
+temporal_keyed := q.key_by(data.frame({
+  sym: data.symbols({"AAPL", "MSFT"}),
+  bucket: data.timestamp({"2026-06-06T09:30:00Z", "2026-06-06T09:31:00Z"}),
+  notional: data.f64({10012.0, 8050.0}),
+}), "sym", "bucket")
+temporal_keyed_hit := q.lookup(temporal_keyed, {sym: "AAPL", bucket: "2026-06-06T09:30:00Z"})
+temporal_keyed_miss := q.lookup(temporal_keyed, {sym: "AAPL", bucket: "2026-06-06T09:31:00Z"})
+
+check("typed numeric null literals", q.count(typed_nulls) == 4 && data.is_null(typed_nulls[1]) && data.is_null(typed_nulls[2]) && data.is_null(typed_nulls[3]) && data.is_null(typed_nulls[4]))
+check("typed infinity literals", typed_infinities[1] > 30000 && typed_infinities[2] < -30000 && typed_infinities[3] > 2000000000 && typed_infinities[4] < -2000000000 && typed_infinities[5] > 9000000000000000000 && typed_infinities[6] < -9000000000000000000 && typed_infinities[7] > typed_infinities[5] && typed_infinities[8] < typed_infinities[6] && typed_infinities[9] > typed_infinities[5] && typed_infinities[10] < typed_infinities[6])
+check("typed casts preserve scalar and vector semantics", typed_cast_int.kind == "i32" && typed_cast_int[1] == 1 && data.is_null(typed_cast_int[3]) && typed_cast_real.kind == "f32" && typed_cast_real[2] == 2.0 && typed_cast_float.kind == "f64" && typed_cast_float[2] == 2.0 && typed_cast_symbol[2] == "MSFT" && typed_cast_string.kind == "string" && typed_cast_string[1] == "AAPL" && typed_cast_date[1] == "2026-06-06")
+check("q short typed casts and typed amend", short_cast_int == 3 && short_cast_float_null_type == -9 && short_cast_real.kind == "f32" && data.is_null(short_cast_real[3]) && short_cast_typed_amend.kind == "i32" && short_cast_typed_amend[3] == 3)
+check("temporal typed null formatting", #temporal_nulls == 2 && temporal_nulls[1].d == "2026-06-06" && temporal_nulls[1].t == "09:30:00.250" && temporal_nulls[1].ts == "2026-06-06T09:30:00.250Z" && temporal_nulls[2].d == nil && temporal_nulls[2].t == nil && temporal_nulls[2].ts == nil)
+check("temporal keyed lookup coerces timestamp strings", #temporal_keyed_hit == 1 && temporal_keyed_hit[1].notional == 10012.0 && #temporal_keyed_miss == 0 && temporal_keyed_miss.column_kinds.notional == "f64")
+
+expr_add := q.eval("10 20 30+1")
+expr_promote := q.eval("1 2 3+1.5 2.5 3.5")
+expr_null_scan := q.eval("+\\1 0N 2")
+expr_null_deltas := q.eval("deltas 1 0N 3")
+expr_where := q.eval("where false true false true")
+expr_bin := q.eval("10 20 30 bin 5 10 25 40 0N")
+expr_within := q.eval("10 20 30 within 15 30")
+expr_cut := q.eval("0 2_10 20 30 40")
+expr_rank := q.eval("rank 50 20 30 10 40")
+expr_xprev := q.eval("2 xprev 10 20 30 40")
+expr_rotate := q.eval("2 rotate 10 20 30 40")
+expr_prior := q.eval("prior 100 105 103")
+expr_prior_each := q.eval("prior' (10 20 30;100 200)")
+expr_prev := q.eval("prev 100 105 103")
+expr_next := q.eval("next 100 105 103")
+expr_differ := q.eval("differ `AAPL`AAPL`MSFT`MSFT")
+expr_msum := q.eval("3 msum 10 20 30 40")
+expr_mavg := q.eval("3 mavg 10 20 30 40")
+expr_mcount := q.eval("3 mcount 10 0N 30 40")
+expr_mmin := q.eval("3 mmin 30 0N 10 20")
+expr_mmax := q.eval("3 mmax 30 0N 10 20")
+expr_mins := q.eval("mins 30 20 25 10")
+expr_maxs := q.eval("maxs 30 20 35 10")
+expr_avgs := q.eval("avgs 10 0N 30 50")
+
+expect_vec("golden expression scalar-vector arithmetic", expr_add, {11, 21, 31})
+expect_vec("golden expression type promotion", expr_promote, {2.5, 4.5, 6.5})
+expect_vec("golden expression null scan", expr_null_scan, {1, 1, 3})
+check("golden expression null deltas", expr_null_deltas[1] == 1 && missing(expr_null_deltas[2]) && missing(expr_null_deltas[3]))
+expect_vec("golden expression where/bin/within", expr_where, {1, 3})
+expect_vec("golden expression bin", expr_bin, {-1, 0, 1, 2, -1})
+expect_vec("golden expression within", expr_within, {false, true, true})
+check("golden expression cut", q.count(expr_cut) == 2 && expr_cut[1][1] == 10 && expr_cut[1][2] == 20 && expr_cut[2][1] == 30 && expr_cut[2][2] == 40)
+expect_vec("golden expression rank", expr_rank, {4, 1, 2, 0, 3})
+check("golden expression xprev", missing(expr_xprev[1]) && missing(expr_xprev[2]) && expr_xprev[3] == 10 && expr_xprev[4] == 20)
+expect_vec("golden expression rotate", expr_rotate, {30, 40, 10, 20})
+check("golden expression prior alias and each", missing(expr_prior[1]) && expr_prior[2] == 100 && expr_prior[3] == 105 && missing(expr_prior_each[1][1]) && expr_prior_each[1][2] == 10 && expr_prior_each[2][2] == 100)
+check("golden expression prev next differ", missing(expr_prev[1]) && expr_prev[2] == 100 && expr_prev[3] == 105 && expr_next[1] == 105 && expr_next[2] == 103 && missing(expr_next[3]) && expr_differ[1] == true && expr_differ[2] == false && expr_differ[3] == true && expr_differ[4] == false)
+expect_vec("golden expression moving sum", expr_msum, {10, 30, 60, 90})
+expect_vec("golden expression moving avg", expr_mavg, {10.0, 15.0, 20.0, 30.0})
+expect_vec("golden expression moving count", expr_mcount, {1, 1, 2, 2})
+expect_vec("golden expression moving min max", expr_mmin, {30, 30, 10, 10})
+expect_vec("golden expression moving max", expr_mmax, {30, 30, 30, 20})
+expect_vec("golden expression running mins maxs", expr_mins, {30, 20, 20, 10})
+expect_vec("golden expression running maxs", expr_maxs, {30, 30, 35, 35})
+expect_vec("golden expression running avgs nulls", expr_avgs, {10.0, 10.0, 20.0, 30.0})
+
+symbols := q.eval("`AAPL`MSFT`AAPL`NVDA")
+symbol_group := q.eval("group `AAPL`MSFT`AAPL`NVDA")
+enum_cast := q.eval("`sym$`AAPL`MSFT`AAPL")
+enum_domain := q.eval("domain `sym$`AAPL`MSFT`AAPL")
+enum_codes := q.eval("codes `sym$`AAPL`MSFT`AAPL")
+enum_same := q.eval("`sym$`AAPL`MSFT~`sym$`AAPL`MSFT")
+enum_other := q.eval("`sym$`AAPL`MSFT~`venue$`AAPL`MSFT")
+enum_meta := q.eval("meta `sym$`AAPL`MSFT`AAPL")
+callable_enum_domain := q.eval("domain[`sym$`AAPL`MSFT`AAPL]")
+callable_enum_codes := q.eval("codes[`sym$`AAPL`MSFT`AAPL]")
+attr_sorted := q.eval("`s#10 20 30")
+attr_unique := q.eval("`u#`AAPL`MSFT`AAPL")
+attr_parted := q.eval("`p#`AAPL`AAPL`MSFT")
+attr_grouped := q.eval("`g#`AAPL`MSFT`AAPL")
+attr_meta := q.eval("meta `p#`AAPL`AAPL`MSFT")
+attr_unique_meta := q.eval("meta `u#`AAPL`MSFT`AAPL")
+attr_grouped_meta := q.eval("meta `g#`AAPL`MSFT`AAPL")
+
+check("symbols preserve values and grouping", q.count(symbols) == 4 && symbols[1] == "AAPL" && symbols[4] == "NVDA" && symbol_group.AAPL[1] == 0 && symbol_group.AAPL[2] == 2 && symbol_group.MSFT[1] == 1)
+check("enum domain codes and equality", enum_cast[3] == "AAPL" && enum_domain[1] == "AAPL" && enum_domain[2] == "MSFT" && q.count(enum_domain) == 2 && enum_codes[1] == 0 && enum_codes[2] == 1 && enum_codes[3] == 0 && enum_same == true && enum_other == false)
+check("callable enum monads", callable_enum_domain[1] == "AAPL" && callable_enum_domain[2] == "MSFT" && callable_enum_codes[1] == 0 && callable_enum_codes[3] == 0)
+check("enum and attribute metadata", enum_meta.domain == "sym" && enum_meta.type == 11 && enum_meta.count == 3 && attr_sorted[3] == 30 && attr_parted[2] == "AAPL" && attr_unique[2] == "MSFT" && attr_grouped[3] == "AAPL" && attr_meta.attribute == "p" && attr_unique_meta.attribute == "u" && attr_grouped_meta.attribute == "g" && attr_meta.type == 11 && attr_meta.count == 3)
+
+dict := q.eval("`bid`ask`last!(100.0 100.5;101.0 101.5;100.75 101.25)")
+dict_keys := q.keys(dict)
+callable_dict_keys := q.eval("key[`bid`ask`last!(100.0 100.5;101.0 101.5;100.75 101.25)]")
+dict_values := q.value(dict)
+flipped := q.eval("flip `sym`price`size!(`AAPL`MSFT`AAPL;100.0 101.5 99.25;10 20 30)")
+flipped_cols := q.cols(flipped)
+flipped_meta := q.meta(flipped)
+
+bars := data.frame({
+  sym: data.symbols({"AAPL", "AAPL", "MSFT", "AAPL"}),
+  bucket: data.strings({"09:30", "09:30", "09:30", "09:31"}),
+  seq: data.i64({1, 2, 3, 4}),
+  px: data.f64({100.0, 100.5, 80.0, 101.0}),
+})
+keyed := q.key_by(bars, "sym", "bucket")
+keyed_keys := q.keys(keyed)
+keyed_hit := q.lookup(keyed, "AAPL", "09:30")
+keyed_miss := q.lookup(keyed, "IBM", "09:30")
+keyed_select := q.sql(keyed, "select sym,bucket,seq,px from bars where sym=`AAPL order by seq asc")
+
+check("dictionary key order and vector values", dict_keys[1] == "bid" && dict_keys[3] == "last" && callable_dict_keys[2] == "ask" && dict_values[1][2] == 100.5 && dict.last[1] == 100.75)
+check("flip table cols and meta", #flipped == 3 && flipped[2].sym == "MSFT" && flipped[3].size == 30 && flipped_cols[1] == "sym" && flipped_meta[1].c == "sym" && flipped_meta[1].t == "symbol")
+check("keyed table duplicate lookup and query", keyed_keys[1] == "sym" && keyed_keys[2] == "bucket" && #keyed_hit == 1 && keyed_hit[1].seq == 2 && keyed_hit[1].sym == nil && #keyed_miss == 0 && keyed_miss.column_kinds.px == "f64" && #keyed_select == 3 && keyed_select[1].seq == 1 && keyed_select[3].bucket == "09:31")
+
+adverb_over := q.eval("+/100 105 103 110")
+adverb_scan := q.eval("+\\100 105 103 110")
+adverb_each := q.eval("1 2 3+'10 20 30")
+adverb_prior := q.eval("-':100 105 103 110")
+adverb_left := q.eval("10-\\:1 2 3")
+adverb_right := q.eval("10 20 30-/:1")
+adverb_projection := q.eval("({x+y}[10;])'1 2 3")
+adverb_over_seed := q.eval("{x+y}/[10;1 2 3]")
+adverb_scan_seed := q.eval("{x+y}\\[10;1 2 3]")
+adverb_function_value := q.eval("f:+;f/1 2 3 4")
+
+check("adverbs over scan each prior projection", adverb_over == 418 && adverb_scan[4] == 418 && adverb_each[2] == 22 && adverb_prior[2] == 5 && adverb_prior[3] == -2 && adverb_left[3] == 7 && adverb_right[3] == 29 && adverb_projection[3] == 13 && adverb_over_seed == 16 && adverb_scan_seed[3] == 16 && adverb_function_value == 10)
+
+quotes := q.sql(
+  "select sym,ts,bid,ask from ([] sym:`AAPL`AAPL`MSFT; ts:2026.06.06D09:30:00 2026.06.06D09:31:00 2026.06.06D09:30:00; bid:100.0 100.5 80.0; ask:100.2 100.7 80.3)",
+  {}
+)
+quotes_alias_keys := q.sql(
+  "select ticker,quote_time,bid,ask from ([] ticker:`AAPL`AAPL`MSFT; quote_time:2026.06.06D09:30:00 2026.06.06D09:31:00 2026.06.06D09:30:00; bid:100.0 100.5 80.0; ask:100.2 100.7 80.3)",
+  {}
+)
+trades := q.sql(
+  "select trade_id,sym,ts,price,size,venue from ([] trade_id:1 2 3 4; sym:`AAPL`AAPL`MSFT`TSLA; ts:2026.06.06D09:30:30 2026.06.06D09:31:30 2026.06.06D09:30:30 2026.06.06D09:30:30; price:100.1 100.6 80.2 200.0; size:10 20 5 1; venue:`XNAS`XNAS`XNYS`ARCX)",
+  {}
+)
+analytics_projection := q.sql(
+  "select trade_id,sym,ts,prev_px:(prev price),next_px:(next price),delta_px:(deltas price),running_avg:(avgs price),running_min:(mins price),running_max:(maxs price),mov_sum:(2 msum size),mov_avg:(2 mavg price),mov_count:(2 mcount price),mov_min:(2 mmin price),mov_max:(2 mmax price),lag2_px:(2 xprev price) from trades order by trade_id asc",
+  {trades: trades}
+)
+asofed := q.sql(
+  "select trade_id,sym,ts,price,size,bid,ask,spread:ask-bid from trades asof join quotes on sym,ts order by trade_id asc",
+  {trades: trades, quotes: quotes}
+)
+windowed := q.sql(
+  "select trade_id,sym,ts,bid from trades wj[-0D00:01:00 0D00:00:00] quotes on sym,ts order by trade_id asc",
+  {trades: trades, quotes: quotes}
+)
+xbar_rollup := q.sql(
+  asofed,
+  "select qty:sum size, fills:count i, avg_spread:avg spread by sym,bucket:xbar 60000000000 ts from trades order by sym asc,bucket asc"
+)
+windowed_last := q.sql(
+  "select trade_id,sym,ts,bid from trades wj1[-0D00:01:00 0D00:00:00] quotes on sym,ts order by trade_id asc",
+  {trades: trades, quotes: quotes}
+)
+asofed_alias_keys := q.sql(
+  "select trade_id,sym,ts,bid from trades aj quotes_alias_keys on sym=ticker,ts=quote_time order by trade_id asc",
+  {trades: trades, quotes_alias_keys: quotes_alias_keys}
+)
+windowed_alias_keys := q.sql(
+  "select trade_id,sym,ts,bid from trades wj[-0D00:01:00,0D00:00:00] quotes_alias_keys on sym=ticker,ts=quote_time order by trade_id asc",
+  {trades: trades, quotes_alias_keys: quotes_alias_keys}
+)
+windowed_last_alias_keys := q.sql(
+  "select trade_id,sym,ts,bid from trades wj1[-0D00:01:00,0D00:00:00] quotes_alias_keys on sym=ticker,ts=quote_time order by trade_id asc",
+  {trades: trades, quotes_alias_keys: quotes_alias_keys}
+)
+complex_rollup := q.sql(
+  asofed,
+  "select notional:sum price*size, max_px:max price, min_px:min price, avg_spread:avg spread by sym,bucket:xbar 60000000000 ts from trades where size>=5 order by notional desc take 2"
+)
+
+check("qsql time-series analytics projections", #analytics_projection == 4 && analytics_projection[1].prev_px == nil && analytics_projection[2].prev_px == 100.1 && analytics_projection[1].next_px == 100.6 && analytics_projection[4].next_px == nil && analytics_projection[1].delta_px == 100.1 && math.abs(analytics_projection[2].delta_px - 0.5) < 0.000001 && math.abs(analytics_projection[3].delta_px + 20.4) < 0.000001 && math.abs(analytics_projection[4].running_avg - 120.225) < 0.000001 && analytics_projection[3].running_min == 80.2 && analytics_projection[4].running_max == 200.0)
+check("qsql moving analytics projections", analytics_projection[1].mov_sum == 10 && analytics_projection[2].mov_sum == 30 && analytics_projection[3].mov_sum == 25 && analytics_projection[4].mov_sum == 6 && math.abs(analytics_projection[2].mov_avg - 100.35) < 0.000001 && math.abs(analytics_projection[4].mov_avg - 140.1) < 0.000001 && analytics_projection[1].mov_count == 1 && analytics_projection[4].mov_count == 2 && analytics_projection[3].mov_min == 80.2 && analytics_projection[4].mov_max == 200.0 && analytics_projection[1].lag2_px == nil && analytics_projection[2].lag2_px == nil && analytics_projection[3].lag2_px == 100.1 && analytics_projection[4].lag2_px == 100.6)
+check("temporal asof join", #asofed == 4 && asofed[1].bid == 100.0 && asofed[2].bid == 100.5 && asofed[3].ask == 80.3 && asofed[4].bid == nil)
+check("window join and xbar rollup", #windowed == 4 && #windowed[1].bid == 1 && windowed[2].bid[1] == 100.5 && #windowed[4].bid == 0 && #windowed_last == 4 && windowed_last[1].bid == 100.0 && windowed_last[2].bid == 100.5 && windowed_last[4].bid == nil && #xbar_rollup == 4 && xbar_rollup[1].sym == "AAPL" && xbar_rollup[1].bucket == "2026-06-06T09:30:00Z" && xbar_rollup[1].qty == 10.0 && xbar_rollup[4].sym == "TSLA")
+check("aliased aj wj wj1 golden", #asofed_alias_keys == 4 && asofed_alias_keys[1].bid == 100.0 && asofed_alias_keys[2].bid == 100.5 && asofed_alias_keys[4].bid == nil && #windowed_alias_keys == 4 && #windowed_alias_keys[1].bid == 1 && #windowed_alias_keys[4].bid == 0 && #windowed_last_alias_keys == 4 && windowed_last_alias_keys[1].bid == 100.0 && windowed_last_alias_keys[2].bid == 100.5 && windowed_last_alias_keys[4].bid == nil)
+check("complex qsql aggregate order take golden", #complex_rollup == 2 && complex_rollup[1].sym == "AAPL" && complex_rollup[1].notional == 2012.0 && complex_rollup[1].max_px == 100.6 && complex_rollup[2].bucket == "2026-06-06T09:30:00Z" && complex_rollup[2].min_px == 100.1 && complex_rollup[2].avg_spread == 0.20000000000000284)
+
+venues := q.sql(
+  "select venue,mic_name from ([] venue:`XNAS`XNYS; mic_name:`Nasdaq`NYSE)",
+  {}
+)
+updated := q.sql(trades, "update notional:price*size, fee:0.001*price*size from trades where size>=5")
+deleted := q.sql(updated, "delete from trades where sym=`TSLA")
+joined := q.sql(
+  "select trade_id,sym,venue,mic_name,notional,fee from trades left join venues on venue order by trade_id asc",
+  {trades: deleted, venues: venues}
+)
+fees := q.sql("select venue,rebate from ([] venue:`XNAS`XNAS`XNYS; rebate:0.001 0.002 0.003)", {})
+inner_joined := q.sql(
+  "select trade_id,sym,venue,rebate from trades inner join fees on venue order by trade_id asc,rebate asc",
+  {trades: deleted, fees: fees}
+)
+unioned := q.sql(
+  "select sym,size,price from left uj right on sym order by sym asc",
+  {left: q.sql("select sym,size from ([] sym:`AAPL`MSFT; size:10 20)", {}), right: q.sql("select sym,price from ([] sym:`AAPL`NVDA; price:100.0 300.0)", {})}
+)
+plussed := q.sql(
+  "select sym,size,price from left pj right on sym order by sym asc",
+  {left: q.sql("select sym,size from ([] sym:`AAPL`MSFT; size:10 20)", {}), right: q.sql("select sym,size,price from ([] sym:`AAPL`NVDA; size:1 3; price:100.0 300.0)", {})}
+)
+aj_keyword := q.sql(
+  "select trade_id,sym,ts,bid from trades aj quotes on sym,ts order by trade_id asc",
+  {trades: trades, quotes: quotes}
+)
+distinct_venue := q.sql("select distinct venue from trades order by venue asc", {trades: trades})
+select_by_sym := q.sql("select by sym from trades order by sym asc", {trades: trades})
+exec_by_sym := q.sql("exec by sym from trades order by sym asc", {trades: trades})
+
+check("update delete left join", #updated == 4 && updated[1].notional == 1001.0 && updated[4].notional == nil && #deleted == 3 && #joined == 3 && joined[1].mic_name == "Nasdaq" && joined[3].mic_name == "NYSE")
+check("inner join duplicate expansion", #inner_joined == 5 && inner_joined[1].trade_id == 1 && inner_joined[2].rebate == 0.002 && inner_joined[5].trade_id == 3)
+check("uj join null fill", #unioned == 3 && unioned[1].sym == "AAPL" && unioned[2].price == nil && unioned[3].size == nil && unioned[3].price == 300.0)
+check("pj and aj keyword joins", #plussed == 2 && plussed[1].size == 11.0 && plussed[1].price == 100.0 && plussed[2].size == 20.0 && plussed[2].price == nil && #aj_keyword == 4 && aj_keyword[1].bid == 100.0 && aj_keyword[4].bid == nil)
+check("distinct and select by golden", #distinct_venue == 3 && distinct_venue[1].venue == "ARCX" && distinct_venue[3].venue == "XNYS" && #select_by_sym == 3 && select_by_sym[1].sym == "AAPL" && select_by_sym[3].sym == "TSLA" && q.count(exec_by_sym) == 3 && exec_by_sym[1] == "AAPL" && exec_by_sym[3] == "TSLA")
+
+selected := q.sql("select sym,notional:price*size from trades where price>=100 order by notional desc take 2", {trades: trades})
+exec_cols := q.sql("exec trade_id,sym,notional:price*size from trades where price>=100 order by trade_id asc", {trades: trades})
+exec_vec := q.sql("exec price from trades where sym=`AAPL order by price asc", {trades: trades})
+exec_dict := q.sql("exec sym!price from trades where price>=100 order by sym asc", {trades: trades})
+exec_rollup := q.sql("exec qty:sum size, gross:sum price*size by sym from trades order by sym asc", {trades: trades})
+
+check("qsql select computed order take", #selected == 2 && selected[1].sym == "AAPL" && selected[1].notional == 2012.0 && selected[2].notional == 1001.0)
+check("qsql exec table vector dict rollup", #q.keys(exec_cols) == 3 && exec_cols.trade_id[1] == 1 && q.count(exec_vec) == 2 && exec_vec[2] == 100.6 && q.keys(exec_dict)[1] == "AAPL" && q.value(exec_dict)[2] == 100.6 && #exec_rollup.sym == 3 && exec_rollup.gross[1] == 3013.0 && exec_rollup.sym[3] == "TSLA")
+expect_rows("golden qsql selected rows", selected, 2)
+check("golden qsql exec fixed expected", exec_cols.notional[1] == 1001.0 && exec_cols.notional[2] == 2012.0 && exec_cols.notional[3] == 200.0 && exec_rollup.qty[1] == 30.0 && exec_rollup.qty[2] == 5.0 && exec_rollup.qty[3] == 1.0)
+
+decoded_keyed := q.decode(q.encode(keyed))
+decoded_enum := q.decode(q.encode(enum_cast))
+decoded_typed := q.decode(q.encode(temporal_nulls))
+decoded_attr := q.decode(q.encode(attr_parted))
+decoded_attr_unique := q.decode(q.encode(attr_unique))
+
+check("codec keyed enum typed attribute roundtrip", q.keys(decoded_keyed)[1] == "sym" && q.lookup(decoded_keyed, "AAPL", "09:30")[1].seq == 2 && decoded_enum[2] == "MSFT" && decoded_typed[2].d == nil && decoded_typed[1].ts == "2026-06-06T09:30:00.250Z" && decoded_attr[3] == "MSFT" && decoded_attr_unique[2] == "MSFT")
+
+print("ok")

@@ -7,6 +7,8 @@ const (
 	ExecQuery   QueryKind = "exec"
 	UpdateQuery QueryKind = "update"
 	DeleteQuery QueryKind = "delete"
+	InsertQuery QueryKind = "insert"
+	UpsertQuery QueryKind = "upsert"
 )
 
 type Expr interface {
@@ -17,12 +19,33 @@ type Query struct {
 	Kind     QueryKind
 	Distinct bool
 	Columns  []Column
-	By       []Expr
+	Values   []Expr
+	By       []Column
 	From     string
+	FromExpr Expr
+	Join     *Join
+	Joins    []Join
 	Where    Expr
 	OrderBy  []OrderTerm
 	Limit    *int
 	Take     *int
+}
+
+type Join struct {
+	Kind   string
+	Right  string
+	Keys   []JoinKey
+	Window *WindowBounds
+}
+
+type JoinKey struct {
+	Left  string
+	Right string
+}
+
+type WindowBounds struct {
+	Low  Expr
+	High Expr
 }
 
 type Column struct {
@@ -32,6 +55,7 @@ type Column struct {
 
 type OrderTerm struct {
 	Column string
+	Expr   Expr
 	Desc   bool
 }
 
@@ -57,6 +81,17 @@ type Bool struct {
 
 type Null struct{}
 
+type AllColumns struct{}
+
+type Temporal struct {
+	Kind string
+	Text string
+}
+
+type TypedNull struct {
+	Kind string
+}
+
 type Binary struct {
 	Op    string
 	Left  Expr
@@ -72,17 +107,33 @@ type Vector struct {
 	Items []Expr
 }
 
+type DictExpr struct {
+	Keys   Expr
+	Values Expr
+}
+
+type IndexExpr struct {
+	Expr  Expr
+	Index Expr
+}
+
 type Flip struct {
+	Keys    []Column
 	Columns []Column
 }
 
-func (Ident) exprNode()  {}
-func (Number) exprNode() {}
-func (String) exprNode() {}
-func (Symbol) exprNode() {}
-func (Bool) exprNode()   {}
-func (Null) exprNode()   {}
-func (Binary) exprNode() {}
-func (Call) exprNode()   {}
-func (Vector) exprNode() {}
-func (Flip) exprNode()   {}
+func (Ident) exprNode()      {}
+func (Number) exprNode()     {}
+func (String) exprNode()     {}
+func (Symbol) exprNode()     {}
+func (Bool) exprNode()       {}
+func (Null) exprNode()       {}
+func (AllColumns) exprNode() {}
+func (Temporal) exprNode()   {}
+func (TypedNull) exprNode()  {}
+func (Binary) exprNode()     {}
+func (Call) exprNode()       {}
+func (Vector) exprNode()     {}
+func (DictExpr) exprNode()   {}
+func (IndexExpr) exprNode()  {}
+func (Flip) exprNode()       {}

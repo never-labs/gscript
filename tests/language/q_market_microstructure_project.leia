@@ -1,0 +1,11 @@
+print("case:q_market_microstructure_project")
+
+result := dofile("examples/data/q_market_microstructure_project/main.leia")
+
+assert(result.summary != "")
+assert(#result.trades == 8)
+assert(#result.enriched == 8)
+assert(#result.bars == 7)
+assert(result.venue_rollup[1].venue == "XNAS")
+
+print("ok")

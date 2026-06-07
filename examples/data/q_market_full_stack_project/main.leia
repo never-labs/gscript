@@ -1,0 +1,130 @@
+// q_market_full_stack_project - end-to-end q/kdb+-style market data flow.
+// It keeps the scenario small enough to inspect while covering the core
+// semantics used by a real in-memory market analytics script.
+
+func check(name, ok) {
+    assert(ok)
+    print("ok", name)
+}
+
+fees := q.eval("`XNAS`BATS`XNYS`ARCX!0.00030 0.00020 0.00035 0.00025")
+pipeline_notional := q.eval("px:100 101 102;sz:10 20 30;n:px*sz;+/n")
+running_child_qty := q.eval("+\\100 50 25 25")
+size_delta := q.eval("-':100 150 130 180")
+lambda_fill := q.eval("{x+y}[1;][2]")
+lambda_each := q.eval("{x+1}'10 20 30")
+lambda_over := q.eval("{x+y}/1 2 3 4")
+
+check("q.eval pipeline and adverbs", fees.BATS == 0.0002 && pipeline_notional == 6080 && running_child_qty[4] == 200 && size_delta[3] == -20 && lambda_fill == 3 && lambda_each[3] == 31 && lambda_over == 10)
+
+quotes := q.sql(
+    "select quote_id,sym,ts,bid,ask,bid_sz,ask_sz,venue from ([] quote_id:1 2 3 4 5 6 7 8; sym:`AAPL`AAPL`AAPL`MSFT`MSFT`NVDA`NVDA`TSLA; ts:2026.06.06D09:30:00 2026.06.06D09:31:00 2026.06.06D09:32:00 2026.06.06D09:30:00 2026.06.06D09:32:00 2026.06.06D09:30:30 2026.06.06D09:32:30 2026.06.06D09:31:00; bid:100.0 100.3 100.7 250.0 250.8 880.0 882.0 205.0; ask:100.2 100.5 101.0 250.4 251.2 881.0 883.0 206.0; bid_sz:500 450 420 300 330 80 75 100; ask_sz:420 430 390 250 310 70 70 90; venue:`XNAS`BATS`XNAS`XNYS`ARCX`XNAS`BATS`XNAS)",
+    {}
+)
+
+raw_orders := q.sql(
+    "select order_id,parent_id,sym,side,ts,trade_date,session_time,order_qty,limit_px,trader from ([] order_id:1001 1002 1003 1004 1005 1006; parent_id:501 501 502 503 504 505; sym:`AAPL`AAPL`MSFT`NVDA`IBM`TSLA; side:`buy`sell`sell`buy`sell`buy; ts:2026.06.06D09:30:00 2026.06.06D09:31:00 2026.06.06D09:30:30 2026.06.06D09:31:00 2026.06.06D09:30:00 2026.06.06D09:31:00; trade_date:2026.06.06 2026.06.06 2026.06.06 2026.06.06 2026.06.06 2026.06.06; session_time:09:30:00 09:31:00 09:30:30 09:31:00 09:30:00 09:31:00; order_qty:100 80 60 20 50 30; limit_px:100.5 100.4 250.5 881.5 140.0 206.0; trader:`alpha`alpha`beta`gamma`delta`omega)",
+    {}
+)
+
+raw_trades := q.sql(
+    "select trade_id,order_id,sym,ts,price,size,venue,cancelled from ([] trade_id:2001 2002 2003 2004 2005 2006 2007; order_id:1001 1002 1003 1004 1002 1006 0; sym:`AAPL`AAPL`MSFT`NVDA`AAPL`TSLA`IBM; ts:2026.06.06D09:30:30 2026.06.06D09:31:30 2026.06.06D09:31:00 2026.06.06D09:32:00 2026.06.06D09:32:30 2026.06.06D09:31:30 2026.06.06D09:31:00; price:100.1 100.45 250.2 882.2 100.9 205.4 140.1; size:40 30 20 10 25 30 5; venue:`XNAS`BATS`XNYS`XNAS`XNAS`XNAS`XNYS; cancelled:false false false false true false false)",
+    {}
+)
+
+sectors := q.sql(
+    "select sym,sector,tick_size from ([] sym:`AAPL`MSFT`NVDA`IBM; sector:`hardware`software`semis`mainframe; tick_size:0.01 0.01 0.05 0.01)",
+    {}
+)
+
+trades := q.sql(raw_trades, "delete from trades where cancelled=true")
+trades = q.sql(trades, "update notional:price*size from trades where size>0")
+trades = q.sql(trades, "update fee:notional*0.00030 from trades where venue=`XNAS")
+trades = q.sql(trades, "update fee:notional*0.00020 from trades where venue=`BATS")
+trades = q.sql(trades, "update fee:notional*0.00035 from trades where venue=`XNYS")
+
+enriched := q.sql(
+    "select trade_id,order_id,sym,ts,price,size,notional,fee,bid,ask,spread:ask-bid,bid_sz,ask_sz,venue from trades asof join quotes on sym,ts order by trade_id asc",
+    {trades: trades, quotes: quotes}
+)
+
+windowed := q.sql(
+    "select trade_id,sym,ts,bid,ask,bid_sz from trades wj[-120000000000 0] quotes on sym,ts order by trade_id asc",
+    {trades: trades, quotes: quotes}
+)
+
+last_window := q.sql(
+    "select trade_id,sym,ts,bid,ask,bid_sz from trades wj1[-120000000000 0] quotes on sym,ts order by trade_id asc",
+    {trades: trades, quotes: quotes}
+)
+
+fills := q.sql(
+    trades,
+    "select filled:sum size,traded_notional:sum notional,fees:sum fee,fills:count i by order_id,sym from trades where order_id>0 order by order_id asc"
+)
+
+orders := q.sql(
+    "select order_id,parent_id,sym,side,order_qty,limit_px,filled,traded_notional,fees,fills,trader from orders pj fills on order_id,sym order by order_id asc",
+    {orders: raw_orders, fills: fills}
+)
+
+sector_joined := q.sql(
+    "select trade_id,order_id,sym,sector,tick_size,price,size,notional,fee,bid,ask,spread,venue from trades left join sectors on sym order by trade_id asc",
+    {trades: enriched, sectors: sectors}
+)
+
+bars := q.sql(
+    enriched,
+    "select notional:sum notional,shares:sum size,fees:sum fee,fills:count i,avg_spread:avg spread,first_px:first price,last_px:last price by sym,bucket:xbar 60000000000 ts from trades order by sym asc,bucket asc"
+)
+
+for i := 1; i <= #bars; i++ {
+    row := bars[i]
+    row.vwap = row.notional / row.shares
+}
+
+book_by_sym := q.key_by(sector_joined, "sym")
+aapl_rows := q.lookup(book_by_sym, "AAPL")
+aapl_all := q.sql(sector_joined, "select trade_id,sym,sector,price,size from trades where sym=`AAPL order by trade_id asc")
+tsla_rows := q.lookup(book_by_sym, "TSLA")
+ibm_rows := q.lookup(book_by_sym, "IBM")
+book_keys := q.keys(book_by_sym)
+book_value := q.value(book_by_sym)
+
+trimmed := q.sql(sector_joined, "delete tick_size from trades")
+high_value := q.sql(sector_joined, "select trade_id,sym,notional,sector from trades where notional>5000 order by notional desc")
+open_orders := q.sql(raw_orders, "select order_id,sym,trade_date,session_time from trades where trade_date=2026.06.06 and session_time=09:30:00 order by order_id asc")
+
+check("trade order quote base shapes", #quotes == 8 && #raw_orders == 6 && #raw_trades == 7 && #trades == 6)
+check("update delete mutation pipeline", trades[1].notional == 4004.0 && trades[1].fee > 1.20 && trades[1].fee < 1.21 && trades[5].trade_id == 2006)
+check("asof enriches trades", #enriched == 6 && enriched[1].bid == 100.0 && enriched[2].bid == 100.3 && enriched[3].ask == 250.4 && enriched[5].bid == 205.0 && enriched[6].bid == nil)
+check("window joins expose history and last quote", #windowed == 6 && #windowed[1].bid == 1 && #windowed[2].bid == 2 && #windowed[6].bid == 0 && #last_window == 6 && last_window[2].bid == 100.3 && last_window[6].bid == nil)
+check("pj order lifecycle with fills", #orders == 6 && orders[1].filled == 40.0 && orders[2].filled == 30.0 && orders[5].filled == nil && orders[6].traded_notional == 6162.0)
+check("left join sector and keyed lookup", #sector_joined == 6 && #aapl_all == 2 && #aapl_rows == 1 && aapl_rows[1].sym == nil && #tsla_rows == 1 && tsla_rows[1].sector == nil && #ibm_rows == 1 && ibm_rows[1].sector == "mainframe" && book_keys[1] == "sym" && #book_value == 6)
+check("xbar bars and vwap", #bars == 6 && bars[1].sym == "AAPL" && bars[1].bucket == "2026-06-06T09:30:00Z" && math.floor(bars[1].vwap * 100) == 10010 && bars[6].sym == "TSLA")
+check("column delete and temporal filters", trimmed.column_kinds.tick_size == nil && #high_value == 3 && high_value[1].sym == "NVDA" && #open_orders == 2 && open_orders[1].order_id == 1001)
+
+summary := string.format(
+    "q_market_full_stack trades=%d orders=%d quotes=%d bars=%d aapl=%d top=%s notional=%.1f",
+    #trades,
+    #orders,
+    #quotes,
+    #bars,
+    #aapl_all,
+    high_value[1].sym,
+    high_value[1].notional
+)
+print(summary)
+
+return {
+    quotes: quotes,
+    orders: orders,
+    trades: trades,
+    enriched: enriched,
+    windowed: windowed,
+    last_window: last_window,
+    sector_joined: sector_joined,
+    bars: bars,
+    high_value: high_value,
+    summary: summary,
+}

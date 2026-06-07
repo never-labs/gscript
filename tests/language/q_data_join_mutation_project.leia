@@ -1,0 +1,18 @@
+print("case:q_data_join_mutation_project")
+
+result := dofile("examples/data/q_data_join_mutation_project/main.leia")
+
+assert(result.summary != "")
+assert(#result.distinct_syms == 4)
+assert(result.distinct_syms[1].sym == "AAPL")
+assert(#result.top_trades == 3)
+assert(result.top_trades[1].sym == "NVDA")
+assert(#result.q_deleted == 5)
+assert(result.q_joined[4].mic_name == "NYSE Arca")
+assert(result.q_routed[5].route == "bzx-close")
+assert(result.q_rollup[1].sym == "MSFT")
+assert(result.q_rollup[1].notional == 21450.0)
+assert(#result.venue_sample == 3)
+assert(result.venue_sample[3].mic_name == "Nasdaq")
+
+print("ok")

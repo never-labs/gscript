@@ -1,0 +1,1904 @@
+{
+  "schema_version": 1,
+  "purpose": "Sidecar classification for q/kdb+-style examples. Kept outside tests/manifest.json so manifest generation remains mechanical.",
+  "gate_profiles": {
+    "core": "Default q gate scope for in-memory q/qsql core semantics. Excludes dedicated IPC, session/workspace, and filesystem-backed persistence cases.",
+    "extended": "Explicit q gate scope for IPC/session/persistence surface cases that are correctness-owned outside the core progress denominator."
+  },
+  "feature_matrix": [
+    {
+      "id": "adverbs",
+      "status": "supported",
+      "coverage": {
+        "tests": [
+          "tests/language/q_vectors_dicts_flip_project.leia",
+          "tests/language/q_vector_dict_flip_adverbs_project.leia",
+          "tests/language/q_keyed_temporal_asof_adverbs_tdd.leia",
+          "tests/language/q_kdb_complex_event_replay_project.leia",
+          "tests/language/q_kdb_delta_golden.leia",
+          "tests/language/q_keyed_asof_state_replay_project.leia",
+          "tests/language/q_integrated_market_replay_project.leia",
+          "tests/language/q_conformance_golden_project.leia",
+          "tests/language/q_kdb_market_tape_complex_project.leia",
+          "tests/language/q_intraday_tca_order_book_project.leia",
+          "tests/language/q_portfolio_risk_factor_project.leia",
+          "tests/language/q_iot_sensor_telemetry_project.leia"
+        ],
+        "examples": [
+          "examples/data/q_vector_basics.leia",
+          "examples/data/q_sor_tca_project/main.leia",
+          "examples/data/q_kdb_complex_event_replay_project/main.leia",
+          "examples/data/q_kdb_delta_golden.leia",
+          "examples/data/q_keyed_asof_state_replay_project/main.leia",
+          "examples/data/q_integrated_market_replay_project/main.leia",
+          "examples/data/q_conformance_golden_project.leia",
+          "examples/data/q_vector_dict_flip_adverbs_project/main.leia",
+          "examples/data/q_kdb_market_tape_complex_project/main.leia",
+          "examples/data/q_intraday_tca_order_book_project/main.leia",
+          "examples/data/q_portfolio_risk_factor_project/main.leia",
+          "examples/data/q_iot_sensor_telemetry_project/main.leia"
+        ],
+        "benchmarks": [
+          "benchmarks/data/q_vector_adverb_dict.leia",
+          "benchmarks/data/q_sor_tca_project.leia",
+          "benchmarks/data/q_kdb_complex_event_replay_project.leia",
+          "benchmarks/data/q_kdb_delta_golden.leia",
+          "benchmarks/data/q_keyed_asof_state_replay_project.leia",
+          "benchmarks/data/q_integrated_market_replay_project.leia",
+          "benchmarks/data/q_conformance_golden_project.leia",
+          "benchmarks/data/q_kdb_market_tape_complex_project.leia",
+          "benchmarks/data/q_intraday_tca_order_book_project.leia",
+          "benchmarks/data/q_portfolio_risk_factor_project.leia",
+          "benchmarks/data/q_iot_sensor_telemetry_project.leia"
+        ]
+      }
+    },
+    {
+      "id": "dictionary",
+      "status": "supported",
+      "coverage": {
+        "tests": [
+          "tests/language/q_vectors_dicts_flip_project.leia",
+          "tests/language/q_vector_dict_flip_adverbs_project.leia",
+          "tests/language/q_kdb_complex_event_replay_project.leia",
+          "tests/language/q_kdb_delta_golden.leia",
+          "tests/language/q_keyed_asof_state_replay_project.leia",
+          "tests/language/q_integrated_market_replay_project.leia",
+          "tests/language/q_conformance_golden_project.leia",
+          "tests/language/q_kdb_market_tape_complex_project.leia",
+          "tests/language/q_intraday_tca_order_book_project.leia",
+          "tests/language/q_portfolio_risk_factor_project.leia",
+          "tests/language/q_iot_sensor_telemetry_project.leia"
+        ],
+        "examples": [
+          "examples/data/q_vector_basics.leia",
+          "examples/data/q_kdb_complex_event_replay_project/main.leia",
+          "examples/data/q_kdb_delta_golden.leia",
+          "examples/data/q_keyed_asof_state_replay_project/main.leia",
+          "examples/data/q_integrated_market_replay_project/main.leia",
+          "examples/data/q_conformance_golden_project.leia",
+          "examples/data/q_vector_dict_flip_adverbs_project/main.leia",
+          "examples/data/q_kdb_market_tape_complex_project/main.leia",
+          "examples/data/q_intraday_tca_order_book_project/main.leia",
+          "examples/data/q_portfolio_risk_factor_project/main.leia",
+          "examples/data/q_iot_sensor_telemetry_project/main.leia"
+        ],
+        "benchmarks": [
+          "benchmarks/data/q_vector_adverb_dict.leia",
+          "benchmarks/data/q_kdb_complex_event_replay_project.leia",
+          "benchmarks/data/q_kdb_delta_golden.leia",
+          "benchmarks/data/q_keyed_asof_state_replay_project.leia",
+          "benchmarks/data/q_integrated_market_replay_project.leia",
+          "benchmarks/data/q_conformance_golden_project.leia",
+          "benchmarks/data/q_kdb_market_tape_complex_project.leia",
+          "benchmarks/data/q_intraday_tca_order_book_project.leia",
+          "benchmarks/data/q_portfolio_risk_factor_project.leia",
+          "benchmarks/data/q_iot_sensor_telemetry_project.leia"
+        ]
+      }
+    },
+    {
+      "id": "flip",
+      "status": "supported",
+      "coverage": {
+        "tests": [
+          "tests/language/q_vectors_dicts_flip_project.leia",
+          "tests/language/q_vector_dict_flip_adverbs_project.leia",
+          "tests/language/q_conformance_golden_project.leia"
+        ],
+        "examples": [
+          "examples/data/q_conformance_golden_project.leia",
+          "examples/data/q_vector_dict_flip_adverbs_project/main.leia"
+        ],
+        "benchmarks": [
+          "benchmarks/data/q_vector_adverb_dict.leia",
+          "benchmarks/data/q_conformance_golden_project.leia"
+        ]
+      }
+    },
+    {
+      "id": "keyed",
+      "status": "supported",
+      "coverage": {
+        "tests": [
+          "tests/language/q_keyed_temporal_asof_adverbs_tdd.leia",
+          "tests/language/q_keyed_table_semantics.leia",
+          "tests/language/q_native_mutation_join_project.leia",
+          "tests/language/q_temporal_window_analytics_project.leia",
+          "tests/language/q_kdb_complex_event_replay_project.leia",
+          "tests/language/q_kdb_delta_golden.leia",
+          "tests/language/q_keyed_asof_state_replay_project.leia",
+          "tests/language/q_integrated_market_replay_project.leia",
+          "tests/language/q_conformance_golden_project.leia",
+          "tests/language/q_keyed_timestamp_lookup_coercion.leia",
+          "tests/language/q_intraday_tca_order_book_project.leia",
+          "tests/language/q_portfolio_risk_factor_project.leia",
+          "tests/language/q_iot_sensor_telemetry_project.leia"
+        ],
+        "examples": [
+          "examples/data/q_multi_key_join.leia",
+          "examples/data/q_keyed_table_semantics.leia",
+          "examples/data/q_sor_tca_project/main.leia",
+          "examples/data/q_kdb_complex_event_replay_project/main.leia",
+          "examples/data/q_kdb_delta_golden.leia",
+          "examples/data/q_keyed_asof_state_replay_project/main.leia",
+          "examples/data/q_integrated_market_replay_project/main.leia",
+          "examples/data/q_conformance_golden_project.leia",
+          "examples/data/q_intraday_tca_order_book_project/main.leia",
+          "examples/data/q_portfolio_risk_factor_project/main.leia",
+          "examples/data/q_iot_sensor_telemetry_project/main.leia",
+          "examples/data/q_kdb_market_tape_complex_project/main.leia"
+        ],
+        "benchmarks": [
+          "benchmarks/data/q_sor_tca_project.leia",
+          "benchmarks/data/q_kdb_complex_event_replay_project.leia",
+          "benchmarks/data/q_kdb_delta_golden.leia",
+          "benchmarks/data/q_keyed_asof_state_replay_project.leia",
+          "benchmarks/data/q_integrated_market_replay_project.leia",
+          "benchmarks/data/q_conformance_golden_project.leia",
+          "benchmarks/data/q_intraday_tca_order_book_project.leia",
+          "benchmarks/data/q_portfolio_risk_factor_project.leia",
+          "benchmarks/data/q_iot_sensor_telemetry_project.leia",
+          "benchmarks/data/q_kdb_market_tape_complex_project.leia"
+        ]
+      }
+    },
+    {
+      "id": "qsql",
+      "status": "supported",
+      "coverage": {
+        "tests": [
+          "tests/language/q_data_complex_examples_tdd.leia",
+          "tests/language/q_complex_data_project.leia",
+          "tests/language/q_data_join_mutation_tdd.leia",
+          "tests/language/q_projection_limit_order_project.leia",
+          "tests/language/q_kdb_complex_event_replay_project.leia",
+          "tests/language/q_keyed_asof_state_replay_project.leia",
+          "tests/language/q_integrated_market_replay_project.leia",
+          "tests/language/q_conformance_golden_project.leia",
+          "tests/language/qsql_error_diagnostics_tdd.leia",
+          "tests/language/qsql_query_tdd.leia",
+          "tests/language/q_kdb_market_tape_complex_project.leia",
+          "tests/language/q_intraday_tca_order_book_project.leia",
+          "tests/language/q_portfolio_risk_factor_project.leia",
+          "tests/language/q_iot_sensor_telemetry_project.leia"
+        ],
+        "examples": [
+          "examples/data/qsql_frame_project/main.leia",
+          "examples/data/q_complex_data_project/main.leia",
+          "examples/data/q_trade_analytics_project/main.leia",
+          "examples/data/db_q_frame_project/main.leia",
+          "examples/data/q_sor_tca_project/main.leia",
+          "examples/data/q_kdb_complex_event_replay_project/main.leia",
+          "examples/data/q_keyed_asof_state_replay_project/main.leia",
+          "examples/data/q_integrated_market_replay_project/main.leia",
+          "examples/data/q_conformance_golden_project.leia",
+          "examples/data/q_projection_limit_order_project/main.leia",
+          "examples/data/q_kdb_market_tape_complex_project/main.leia",
+          "examples/data/q_intraday_tca_order_book_project/main.leia",
+          "examples/data/q_portfolio_risk_factor_project/main.leia",
+          "examples/data/q_iot_sensor_telemetry_project/main.leia"
+        ],
+        "benchmarks": [
+          "benchmarks/data/q_query_rollup.leia",
+          "benchmarks/data/qsql_join_variants.leia",
+          "benchmarks/data/qsql_join_mutation.leia",
+          "benchmarks/data/q_sor_tca_project.leia",
+          "benchmarks/data/q_kdb_complex_event_replay_project.leia",
+          "benchmarks/data/q_keyed_asof_state_replay_project.leia",
+          "benchmarks/data/q_integrated_market_replay_project.leia",
+          "benchmarks/data/q_conformance_golden_project.leia",
+          "benchmarks/data/frame_qsql_distinct_take.leia",
+          "benchmarks/data/frame_qsql_rollup.leia",
+          "benchmarks/data/q_kdb_market_tape_complex_project.leia",
+          "benchmarks/data/q_intraday_tca_order_book_project.leia",
+          "benchmarks/data/q_portfolio_risk_factor_project.leia",
+          "benchmarks/data/q_iot_sensor_telemetry_project.leia"
+        ]
+      }
+    },
+    {
+      "id": "join",
+      "status": "supported",
+      "coverage": {
+        "tests": [
+          "tests/language/q_join_variants_project.leia",
+          "tests/language/q_data_join_mutation_project.leia",
+          "tests/language/q_data_join_mutation_tdd.leia",
+          "tests/language/q_native_mutation_join_project.leia",
+          "tests/language/q_kdb_complex_event_replay_project.leia",
+          "tests/language/q_kdb_delta_golden.leia",
+          "tests/language/q_keyed_asof_state_replay_project.leia",
+          "tests/language/q_integrated_market_replay_project.leia",
+          "tests/language/q_conformance_golden_project.leia",
+          "tests/language/qsql_query_tdd.leia",
+          "tests/language/q_intraday_tca_order_book_project.leia",
+          "tests/language/q_portfolio_risk_factor_project.leia",
+          "tests/language/q_iot_sensor_telemetry_project.leia"
+        ],
+        "examples": [
+          "examples/data/q_multi_key_join.leia",
+          "examples/data/q_data_join_mutation_project/main.leia",
+          "examples/data/q_market_full_stack_project/main.leia",
+          "examples/data/q_sor_tca_project/main.leia",
+          "examples/data/q_kdb_complex_event_replay_project/main.leia",
+          "examples/data/q_kdb_delta_golden.leia",
+          "examples/data/q_keyed_asof_state_replay_project/main.leia",
+          "examples/data/q_integrated_market_replay_project/main.leia",
+          "examples/data/q_conformance_golden_project.leia",
+          "examples/data/q_intraday_tca_order_book_project/main.leia",
+          "examples/data/q_portfolio_risk_factor_project/main.leia",
+          "examples/data/q_iot_sensor_telemetry_project/main.leia"
+        ],
+        "benchmarks": [
+          "benchmarks/data/qsql_join_variants.leia",
+          "benchmarks/data/qsql_join_mutation.leia",
+          "benchmarks/data/q_native_join_update_delete.leia",
+          "benchmarks/data/q_market_full_stack_project.leia",
+          "benchmarks/data/q_sor_tca_project.leia",
+          "benchmarks/data/q_kdb_complex_event_replay_project.leia",
+          "benchmarks/data/q_kdb_delta_golden.leia",
+          "benchmarks/data/q_keyed_asof_state_replay_project.leia",
+          "benchmarks/data/q_integrated_market_replay_project.leia",
+          "benchmarks/data/q_conformance_golden_project.leia",
+          "benchmarks/data/q_intraday_tca_order_book_project.leia",
+          "benchmarks/data/q_portfolio_risk_factor_project.leia",
+          "benchmarks/data/q_iot_sensor_telemetry_project.leia"
+        ]
+      }
+    },
+    {
+      "id": "asof",
+      "status": "supported",
+      "coverage": {
+        "tests": [
+          "tests/language/q_keyed_temporal_asof_adverbs_tdd.leia",
+          "tests/language/q_join_variants_project.leia",
+          "tests/language/q_complex_data_project.leia",
+          "tests/language/q_ticks_bars_asof_project.leia",
+          "tests/language/q_time_bucket_asof_project.leia",
+          "tests/language/q_kdb_complex_event_replay_project.leia",
+          "tests/language/q_kdb_delta_golden.leia",
+          "tests/language/q_keyed_asof_state_replay_project.leia",
+          "tests/language/q_integrated_market_replay_project.leia",
+          "tests/language/q_conformance_golden_project.leia",
+          "tests/language/q_kdb_market_tape_complex_project.leia",
+          "tests/language/q_intraday_tca_order_book_project.leia",
+          "tests/language/q_portfolio_risk_factor_project.leia",
+          "tests/language/q_iot_sensor_telemetry_project.leia"
+        ],
+        "examples": [
+          "examples/data/q_complex_data_project/main.leia",
+          "examples/data/q_time_bucket_asof_project/main.leia",
+          "examples/data/q_ticks_bars_asof_project/main.leia",
+          "examples/data/q_market_microstructure_project/main.leia",
+          "examples/data/q_sor_tca_project/main.leia",
+          "examples/data/q_kdb_complex_event_replay_project/main.leia",
+          "examples/data/q_kdb_delta_golden.leia",
+          "examples/data/q_keyed_asof_state_replay_project/main.leia",
+          "examples/data/q_integrated_market_replay_project/main.leia",
+          "examples/data/q_conformance_golden_project.leia",
+          "examples/data/q_kdb_market_tape_complex_project/main.leia",
+          "examples/data/q_intraday_tca_order_book_project/main.leia",
+          "examples/data/q_portfolio_risk_factor_project/main.leia",
+          "examples/data/q_iot_sensor_telemetry_project/main.leia"
+        ],
+        "benchmarks": [
+          "benchmarks/data/q_xbar_asof_rollup.leia",
+          "benchmarks/data/q_ticks_bars_asof_project.leia",
+          "benchmarks/data/q_market_microstructure_project.leia",
+          "benchmarks/data/q_sor_tca_project.leia",
+          "benchmarks/data/q_kdb_complex_event_replay_project.leia",
+          "benchmarks/data/q_kdb_delta_golden.leia",
+          "benchmarks/data/q_keyed_asof_state_replay_project.leia",
+          "benchmarks/data/q_integrated_market_replay_project.leia",
+          "benchmarks/data/q_conformance_golden_project.leia",
+          "benchmarks/data/q_kdb_market_tape_complex_project.leia",
+          "benchmarks/data/q_intraday_tca_order_book_project.leia",
+          "benchmarks/data/q_portfolio_risk_factor_project.leia",
+          "benchmarks/data/q_iot_sensor_telemetry_project.leia"
+        ]
+      }
+    },
+    {
+      "id": "xbar",
+      "status": "supported",
+      "coverage": {
+        "tests": [
+          "tests/language/q_keyed_temporal_asof_adverbs_tdd.leia",
+          "tests/language/q_complex_data_project.leia",
+          "tests/language/q_ticks_bars_asof_project.leia",
+          "tests/language/q_temporal_window_analytics_project.leia",
+          "tests/language/q_order_book_lifecycle_project.leia",
+          "tests/language/q_kdb_complex_event_replay_project.leia",
+          "tests/language/q_keyed_asof_state_replay_project.leia",
+          "tests/language/q_integrated_market_replay_project.leia",
+          "tests/language/q_conformance_golden_project.leia",
+          "tests/language/q_kdb_market_tape_complex_project.leia",
+          "tests/language/q_intraday_tca_order_book_project.leia",
+          "tests/language/q_iot_sensor_telemetry_project.leia"
+        ],
+        "examples": [
+          "examples/data/q_complex_data_project/main.leia",
+          "examples/data/q_time_bucket_asof_project/main.leia",
+          "examples/data/q_ticks_bars_asof_project/main.leia",
+          "examples/data/q_temporal_window_analytics_project/main.leia",
+          "examples/data/q_order_book_lifecycle_project/main.leia",
+          "examples/data/q_market_full_stack_project/main.leia",
+          "examples/data/q_sor_tca_project/main.leia",
+          "examples/data/q_kdb_complex_event_replay_project/main.leia",
+          "examples/data/q_keyed_asof_state_replay_project/main.leia",
+          "examples/data/q_integrated_market_replay_project/main.leia",
+          "examples/data/q_conformance_golden_project.leia",
+          "examples/data/q_kdb_market_tape_complex_project/main.leia",
+          "examples/data/q_intraday_tca_order_book_project/main.leia",
+          "examples/data/q_iot_sensor_telemetry_project/main.leia"
+        ],
+        "benchmarks": [
+          "benchmarks/data/q_xbar_asof_rollup.leia",
+          "benchmarks/data/q_ticks_bars_asof_project.leia",
+          "benchmarks/data/q_temporal_window_analytics_project.leia",
+          "benchmarks/data/q_order_book_lifecycle_project.leia",
+          "benchmarks/data/q_market_full_stack_project.leia",
+          "benchmarks/data/q_sor_tca_project.leia",
+          "benchmarks/data/q_kdb_complex_event_replay_project.leia",
+          "benchmarks/data/q_keyed_asof_state_replay_project.leia",
+          "benchmarks/data/q_integrated_market_replay_project.leia",
+          "benchmarks/data/q_conformance_golden_project.leia",
+          "benchmarks/data/q_kdb_market_tape_complex_project.leia",
+          "benchmarks/data/q_intraday_tca_order_book_project.leia",
+          "benchmarks/data/q_iot_sensor_telemetry_project.leia"
+        ]
+      }
+    },
+    {
+      "id": "temporal",
+      "status": "supported",
+      "coverage": {
+        "tests": [
+          "tests/language/q_keyed_temporal_asof_adverbs_tdd.leia",
+          "tests/language/q_temporal_window_analytics_project.leia",
+          "tests/language/q_complex_data_project.leia",
+          "tests/language/q_ticks_bars_asof_project.leia",
+          "tests/language/q_kdb_complex_event_replay_project.leia",
+          "tests/language/q_kdb_delta_golden.leia",
+          "tests/language/q_keyed_asof_state_replay_project.leia",
+          "tests/language/q_integrated_market_replay_project.leia",
+          "tests/language/q_conformance_golden_project.leia",
+          "tests/language/q_keyed_timestamp_lookup_coercion.leia",
+          "tests/language/q_kdb_market_tape_complex_project.leia",
+          "tests/language/q_intraday_tca_order_book_project.leia",
+          "tests/language/q_portfolio_risk_factor_project.leia",
+          "tests/language/q_iot_sensor_telemetry_project.leia"
+        ],
+        "examples": [
+          "examples/data/qsql_frame_project/main.leia",
+          "examples/data/q_complex_data_project/main.leia",
+          "examples/data/q_time_bucket_asof_project/main.leia",
+          "examples/data/q_ticks_bars_asof_project/main.leia",
+          "examples/data/q_temporal_window_analytics_project/main.leia",
+          "examples/data/q_kdb_complex_event_replay_project/main.leia",
+          "examples/data/q_kdb_delta_golden.leia",
+          "examples/data/q_keyed_asof_state_replay_project/main.leia",
+          "examples/data/q_integrated_market_replay_project/main.leia",
+          "examples/data/q_conformance_golden_project.leia",
+          "examples/data/q_columnar_partitioned_store_project/main.leia",
+          "examples/data/q_kdb_market_tape_complex_project/main.leia",
+          "examples/data/q_intraday_tca_order_book_project/main.leia",
+          "examples/data/q_portfolio_risk_factor_project/main.leia",
+          "examples/data/q_iot_sensor_telemetry_project/main.leia"
+        ],
+        "benchmarks": [
+          "benchmarks/data/q_xbar_asof_rollup.leia",
+          "benchmarks/data/q_ticks_bars_asof_project.leia",
+          "benchmarks/data/q_temporal_window_analytics_project.leia",
+          "benchmarks/data/q_kdb_complex_event_replay_project.leia",
+          "benchmarks/data/q_kdb_delta_golden.leia",
+          "benchmarks/data/q_keyed_asof_state_replay_project.leia",
+          "benchmarks/data/q_integrated_market_replay_project.leia",
+          "benchmarks/data/q_conformance_golden_project.leia",
+          "benchmarks/data/q_kdb_market_tape_complex_project.leia",
+          "benchmarks/data/q_intraday_tca_order_book_project.leia",
+          "benchmarks/data/q_portfolio_risk_factor_project.leia",
+          "benchmarks/data/q_iot_sensor_telemetry_project.leia"
+        ]
+      }
+    },
+    {
+      "id": "window",
+      "status": "supported",
+      "coverage": {
+        "tests": [
+          "tests/language/q_join_variants_project.leia",
+          "tests/language/q_temporal_window_analytics_project.leia",
+          "tests/language/q_kdb_delta_golden.leia",
+          "tests/language/q_integrated_market_replay_project.leia",
+          "tests/language/q_conformance_golden_project.leia",
+          "tests/language/q_intraday_tca_order_book_project.leia",
+          "tests/language/q_portfolio_risk_factor_project.leia",
+          "tests/language/q_iot_sensor_telemetry_project.leia"
+        ],
+        "examples": [
+          "examples/data/q_temporal_window_analytics_project/main.leia",
+          "examples/data/q_sor_tca_project/main.leia",
+          "examples/data/q_kdb_delta_golden.leia",
+          "examples/data/q_integrated_market_replay_project/main.leia",
+          "examples/data/q_conformance_golden_project.leia",
+          "examples/data/q_intraday_tca_order_book_project/main.leia",
+          "examples/data/q_portfolio_risk_factor_project/main.leia",
+          "examples/data/q_iot_sensor_telemetry_project/main.leia",
+          "examples/data/q_kdb_market_tape_complex_project/main.leia"
+        ],
+        "benchmarks": [
+          "benchmarks/data/q_temporal_window_analytics_project.leia",
+          "benchmarks/data/q_sor_tca_project.leia",
+          "benchmarks/data/q_kdb_delta_golden.leia",
+          "benchmarks/data/q_integrated_market_replay_project.leia",
+          "benchmarks/data/q_conformance_golden_project.leia",
+          "benchmarks/data/q_intraday_tca_order_book_project.leia",
+          "benchmarks/data/q_portfolio_risk_factor_project.leia",
+          "benchmarks/data/q_iot_sensor_telemetry_project.leia",
+          "benchmarks/data/q_kdb_market_tape_complex_project.leia"
+        ]
+      }
+    },
+    {
+      "id": "rollup",
+      "status": "supported",
+      "coverage": {
+        "tests": [
+          "tests/language/q_data_complex_examples_tdd.leia",
+          "tests/language/q_complex_data_project.leia",
+          "tests/language/q_temporal_window_analytics_project.leia",
+          "tests/language/q_kdb_complex_event_replay_project.leia",
+          "tests/language/q_integrated_market_replay_project.leia",
+          "tests/language/qsql_query_tdd.leia",
+          "tests/language/q_kdb_market_tape_complex_project.leia",
+          "tests/language/q_intraday_tca_order_book_project.leia",
+          "tests/language/q_portfolio_risk_factor_project.leia",
+          "tests/language/q_iot_sensor_telemetry_project.leia"
+        ],
+        "examples": [
+          "examples/data/q_complex_data_project/main.leia",
+          "examples/data/q_kdb_complex_event_replay_project/main.leia",
+          "examples/data/q_integrated_market_replay_project/main.leia",
+          "examples/data/q_kdb_market_tape_complex_project/main.leia",
+          "examples/data/q_intraday_tca_order_book_project/main.leia",
+          "examples/data/q_portfolio_risk_factor_project/main.leia",
+          "examples/data/q_iot_sensor_telemetry_project/main.leia"
+        ],
+        "benchmarks": [
+          "benchmarks/data/q_query_rollup.leia",
+          "benchmarks/data/q_kdb_complex_event_replay_project.leia",
+          "benchmarks/data/q_integrated_market_replay_project.leia",
+          "benchmarks/data/frame_qsql_rollup.leia",
+          "benchmarks/data/q_kdb_market_tape_complex_project.leia",
+          "benchmarks/data/q_intraday_tca_order_book_project.leia",
+          "benchmarks/data/q_portfolio_risk_factor_project.leia",
+          "benchmarks/data/q_iot_sensor_telemetry_project.leia"
+        ]
+      }
+    },
+    {
+      "id": "update",
+      "status": "supported",
+      "coverage": {
+        "tests": [
+          "tests/language/q_data_join_mutation_tdd.leia",
+          "tests/language/q_data_join_mutation_project.leia",
+          "tests/language/q_native_mutation_join_project.leia",
+          "tests/language/q_boundaries_and_gap_closures_project.leia",
+          "tests/language/q_kdb_complex_event_replay_project.leia",
+          "tests/language/q_keyed_asof_state_replay_project.leia",
+          "tests/language/q_integrated_market_replay_project.leia",
+          "tests/language/q_conformance_golden_project.leia",
+          "tests/language/qsql_query_tdd.leia",
+          "tests/language/q_kdb_market_tape_complex_project.leia",
+          "tests/language/q_intraday_tca_order_book_project.leia",
+          "tests/language/q_portfolio_risk_factor_project.leia",
+          "tests/language/q_iot_sensor_telemetry_project.leia"
+        ],
+        "examples": [
+          "examples/data/q_data_join_mutation_project/main.leia",
+          "examples/data/q_sor_tca_project/main.leia",
+          "examples/data/q_kdb_complex_event_replay_project/main.leia",
+          "examples/data/q_keyed_asof_state_replay_project/main.leia",
+          "examples/data/q_integrated_market_replay_project/main.leia",
+          "examples/data/q_conformance_golden_project.leia",
+          "examples/data/q_kdb_market_tape_complex_project/main.leia",
+          "examples/data/q_intraday_tca_order_book_project/main.leia",
+          "examples/data/q_portfolio_risk_factor_project/main.leia",
+          "examples/data/q_iot_sensor_telemetry_project/main.leia"
+        ],
+        "benchmarks": [
+          "benchmarks/data/qsql_join_mutation.leia",
+          "benchmarks/data/q_native_join_update_delete.leia",
+          "benchmarks/data/q_sor_tca_project.leia",
+          "benchmarks/data/q_kdb_complex_event_replay_project.leia",
+          "benchmarks/data/q_keyed_asof_state_replay_project.leia",
+          "benchmarks/data/q_integrated_market_replay_project.leia",
+          "benchmarks/data/q_conformance_golden_project.leia",
+          "benchmarks/data/q_kdb_market_tape_complex_project.leia",
+          "benchmarks/data/q_intraday_tca_order_book_project.leia",
+          "benchmarks/data/q_portfolio_risk_factor_project.leia",
+          "benchmarks/data/q_iot_sensor_telemetry_project.leia"
+        ]
+      }
+    },
+    {
+      "id": "delete",
+      "status": "supported",
+      "coverage": {
+        "tests": [
+          "tests/language/q_data_join_mutation_tdd.leia",
+          "tests/language/q_data_join_mutation_project.leia",
+          "tests/language/q_native_mutation_join_project.leia",
+          "tests/language/q_boundaries_and_gap_closures_project.leia",
+          "tests/language/q_kdb_complex_event_replay_project.leia",
+          "tests/language/q_keyed_asof_state_replay_project.leia",
+          "tests/language/q_integrated_market_replay_project.leia",
+          "tests/language/q_conformance_golden_project.leia",
+          "tests/language/q_kdb_market_tape_complex_project.leia",
+          "tests/language/q_intraday_tca_order_book_project.leia",
+          "tests/language/q_portfolio_risk_factor_project.leia",
+          "tests/language/q_iot_sensor_telemetry_project.leia"
+        ],
+        "examples": [
+          "examples/data/q_data_join_mutation_project/main.leia",
+          "examples/data/q_sor_tca_project/main.leia",
+          "examples/data/q_kdb_complex_event_replay_project/main.leia",
+          "examples/data/q_keyed_asof_state_replay_project/main.leia",
+          "examples/data/q_integrated_market_replay_project/main.leia",
+          "examples/data/q_conformance_golden_project.leia",
+          "examples/data/q_kdb_market_tape_complex_project/main.leia",
+          "examples/data/q_intraday_tca_order_book_project/main.leia",
+          "examples/data/q_portfolio_risk_factor_project/main.leia",
+          "examples/data/q_iot_sensor_telemetry_project/main.leia"
+        ],
+        "benchmarks": [
+          "benchmarks/data/qsql_join_mutation.leia",
+          "benchmarks/data/q_native_join_update_delete.leia",
+          "benchmarks/data/q_sor_tca_project.leia",
+          "benchmarks/data/q_kdb_complex_event_replay_project.leia",
+          "benchmarks/data/q_keyed_asof_state_replay_project.leia",
+          "benchmarks/data/q_integrated_market_replay_project.leia",
+          "benchmarks/data/q_conformance_golden_project.leia",
+          "benchmarks/data/q_kdb_market_tape_complex_project.leia",
+          "benchmarks/data/q_intraday_tca_order_book_project.leia",
+          "benchmarks/data/q_portfolio_risk_factor_project.leia",
+          "benchmarks/data/q_iot_sensor_telemetry_project.leia"
+        ]
+      }
+    },
+    {
+      "id": "analytics",
+      "status": "supported",
+      "coverage": {
+        "tests": [
+          "tests/language/q_trade_analytics_project.leia",
+          "tests/language/q_kdb_market_tape_complex_project.leia",
+          "tests/language/q_intraday_tca_order_book_project.leia",
+          "tests/language/q_portfolio_risk_factor_project.leia",
+          "tests/language/q_iot_sensor_telemetry_project.leia"
+        ],
+        "examples": [
+          "examples/data/q_trade_analytics_project/main.leia",
+          "examples/data/q_kdb_market_tape_complex_project/main.leia",
+          "examples/data/q_intraday_tca_order_book_project/main.leia",
+          "examples/data/q_portfolio_risk_factor_project/main.leia",
+          "examples/data/q_iot_sensor_telemetry_project/main.leia"
+        ],
+        "benchmarks": [
+          "benchmarks/data/q_kdb_market_tape_complex_project.leia",
+          "benchmarks/data/q_intraday_tca_order_book_project.leia",
+          "benchmarks/data/q_portfolio_risk_factor_project.leia",
+          "benchmarks/data/q_iot_sensor_telemetry_project.leia"
+        ]
+      }
+    },
+    {
+      "id": "market-data",
+      "status": "supported",
+      "coverage": {
+        "tests": [
+          "tests/language/q_market_microstructure_project.leia",
+          "tests/language/q_market_full_stack_project.leia",
+          "tests/language/q_kdb_complex_event_replay_project.leia",
+          "tests/language/q_keyed_asof_state_replay_project.leia",
+          "tests/language/q_integrated_market_replay_project.leia",
+          "tests/language/q_kdb_market_tape_complex_project.leia",
+          "tests/language/q_intraday_tca_order_book_project.leia",
+          "tests/language/q_portfolio_risk_factor_project.leia"
+        ],
+        "examples": [
+          "examples/data/q_market_microstructure_project/main.leia",
+          "examples/data/q_market_full_stack_project/main.leia",
+          "examples/data/q_sor_tca_project/main.leia",
+          "examples/data/q_kdb_complex_event_replay_project/main.leia",
+          "examples/data/q_keyed_asof_state_replay_project/main.leia",
+          "examples/data/q_integrated_market_replay_project/main.leia",
+          "examples/data/q_kdb_market_tape_complex_project/main.leia",
+          "examples/data/q_intraday_tca_order_book_project/main.leia",
+          "examples/data/q_portfolio_risk_factor_project/main.leia"
+        ],
+        "benchmarks": [
+          "benchmarks/data/q_market_microstructure_project.leia",
+          "benchmarks/data/q_market_full_stack_project.leia",
+          "benchmarks/data/q_sor_tca_project.leia",
+          "benchmarks/data/q_kdb_complex_event_replay_project.leia",
+          "benchmarks/data/q_keyed_asof_state_replay_project.leia",
+          "benchmarks/data/q_integrated_market_replay_project.leia",
+          "benchmarks/data/q_kdb_market_tape_complex_project.leia",
+          "benchmarks/data/q_intraday_tca_order_book_project.leia",
+          "benchmarks/data/q_portfolio_risk_factor_project.leia"
+        ]
+      }
+    },
+    {
+      "id": "order-book",
+      "status": "supported",
+      "coverage": {
+        "tests": [
+          "tests/language/q_order_book_lifecycle_project.leia",
+          "tests/language/q_intraday_tca_order_book_project.leia"
+        ],
+        "examples": [
+          "examples/data/q_order_book_lifecycle_project/main.leia",
+          "examples/data/q_sor_tca_project/main.leia",
+          "examples/data/q_intraday_tca_order_book_project/main.leia"
+        ],
+        "benchmarks": [
+          "benchmarks/data/q_order_book_lifecycle_project.leia",
+          "benchmarks/data/q_sor_tca_project.leia",
+          "benchmarks/data/q_intraday_tca_order_book_project.leia"
+        ]
+      }
+    },
+    {
+      "id": "ticks",
+      "status": "supported",
+      "coverage": {
+        "tests": [
+          "tests/language/q_complex_data_project.leia",
+          "tests/language/q_ticks_bars_asof_project.leia",
+          "tests/language/q_order_book_lifecycle_project.leia",
+          "tests/language/q_kdb_market_tape_complex_project.leia",
+          "tests/language/q_intraday_tca_order_book_project.leia"
+        ],
+        "examples": [
+          "examples/data/q_complex_data_project/main.leia",
+          "examples/data/q_ticks_bars_asof_project/main.leia",
+          "examples/data/q_order_book_lifecycle_project/main.leia",
+          "examples/data/q_kdb_market_tape_complex_project/main.leia",
+          "examples/data/q_intraday_tca_order_book_project/main.leia"
+        ],
+        "benchmarks": [
+          "benchmarks/data/q_ticks_bars_asof_project.leia",
+          "benchmarks/data/q_order_book_lifecycle_project.leia",
+          "benchmarks/data/q_kdb_market_tape_complex_project.leia",
+          "benchmarks/data/q_intraday_tca_order_book_project.leia"
+        ]
+      }
+    },
+    {
+      "id": "trades",
+      "status": "supported",
+      "coverage": {
+        "tests": [
+          "tests/language/q_complex_data_project.leia",
+          "tests/language/q_ticks_bars_asof_project.leia",
+          "tests/language/q_market_full_stack_project.leia",
+          "tests/language/q_sor_tca_project.leia",
+          "tests/language/q_kdb_complex_event_replay_project.leia",
+          "tests/language/q_integrated_market_replay_project.leia",
+          "tests/language/q_kdb_market_tape_complex_project.leia",
+          "tests/language/q_intraday_tca_order_book_project.leia"
+        ],
+        "examples": [
+          "examples/data/q_complex_data_project/main.leia",
+          "examples/data/q_ticks_bars_asof_project/main.leia",
+          "examples/data/q_market_microstructure_project/main.leia",
+          "examples/data/q_market_full_stack_project/main.leia",
+          "examples/data/q_sor_tca_project/main.leia",
+          "examples/data/q_kdb_complex_event_replay_project/main.leia",
+          "examples/data/q_keyed_asof_state_replay_project/main.leia",
+          "examples/data/q_integrated_market_replay_project/main.leia",
+          "examples/data/q_kdb_market_tape_complex_project/main.leia",
+          "examples/data/q_intraday_tca_order_book_project/main.leia"
+        ],
+        "benchmarks": [
+          "benchmarks/data/q_ticks_bars_asof_project.leia",
+          "benchmarks/data/q_market_microstructure_project.leia",
+          "benchmarks/data/q_market_full_stack_project.leia",
+          "benchmarks/data/q_sor_tca_project.leia",
+          "benchmarks/data/q_kdb_complex_event_replay_project.leia",
+          "benchmarks/data/q_keyed_asof_state_replay_project.leia",
+          "benchmarks/data/q_integrated_market_replay_project.leia",
+          "benchmarks/data/q_kdb_market_tape_complex_project.leia",
+          "benchmarks/data/q_intraday_tca_order_book_project.leia"
+        ]
+      }
+    },
+    {
+      "id": "bars",
+      "status": "supported",
+      "coverage": {
+        "tests": [
+          "tests/language/q_complex_data_project.leia",
+          "tests/language/q_ticks_bars_asof_project.leia",
+          "tests/language/q_temporal_window_analytics_project.leia",
+          "tests/language/q_order_book_lifecycle_project.leia",
+          "tests/language/q_sor_tca_project.leia",
+          "tests/language/q_integrated_market_replay_project.leia",
+          "tests/language/q_kdb_market_tape_complex_project.leia",
+          "tests/language/q_intraday_tca_order_book_project.leia"
+        ],
+        "examples": [
+          "examples/data/q_complex_data_project/main.leia",
+          "examples/data/q_ticks_bars_asof_project/main.leia",
+          "examples/data/q_temporal_window_analytics_project/main.leia",
+          "examples/data/q_order_book_lifecycle_project/main.leia",
+          "examples/data/q_market_full_stack_project/main.leia",
+          "examples/data/q_sor_tca_project/main.leia",
+          "examples/data/q_keyed_asof_state_replay_project/main.leia",
+          "examples/data/q_integrated_market_replay_project/main.leia",
+          "examples/data/q_kdb_market_tape_complex_project/main.leia",
+          "examples/data/q_intraday_tca_order_book_project/main.leia"
+        ],
+        "benchmarks": [
+          "benchmarks/data/q_ticks_bars_asof_project.leia",
+          "benchmarks/data/q_temporal_window_analytics_project.leia",
+          "benchmarks/data/q_order_book_lifecycle_project.leia",
+          "benchmarks/data/q_market_full_stack_project.leia",
+          "benchmarks/data/q_sor_tca_project.leia",
+          "benchmarks/data/q_keyed_asof_state_replay_project.leia",
+          "benchmarks/data/q_integrated_market_replay_project.leia",
+          "benchmarks/data/q_kdb_market_tape_complex_project.leia",
+          "benchmarks/data/q_intraday_tca_order_book_project.leia"
+        ]
+      }
+    },
+    {
+      "id": "sor",
+      "status": "supported",
+      "coverage": {
+        "tests": [
+          "tests/language/q_sor_tca_project.leia"
+        ],
+        "examples": [
+          "examples/data/q_sor_tca_project/main.leia"
+        ],
+        "benchmarks": [
+          "benchmarks/data/q_sor_tca_project.leia"
+        ]
+      }
+    },
+    {
+      "id": "tca",
+      "status": "supported",
+      "coverage": {
+        "tests": [
+          "tests/language/q_sor_tca_project.leia",
+          "tests/language/q_intraday_tca_order_book_project.leia"
+        ],
+        "examples": [
+          "examples/data/q_sor_tca_project/main.leia",
+          "examples/data/q_intraday_tca_order_book_project/main.leia"
+        ],
+        "benchmarks": [
+          "benchmarks/data/q_sor_tca_project.leia",
+          "benchmarks/data/q_intraday_tca_order_book_project.leia"
+        ]
+      }
+    },
+    {
+      "id": "keyed-table",
+      "status": "supported",
+      "coverage": {
+        "tests": [
+          "tests/language/q_keyed_table_semantics.leia",
+          "tests/language/q_keyed_temporal_asof_adverbs_tdd.leia",
+          "tests/language/q_kdb_complex_event_replay_project.leia",
+          "tests/language/q_integrated_market_replay_project.leia",
+          "tests/language/q_keyed_timestamp_lookup_coercion.leia",
+          "tests/language/q_intraday_tca_order_book_project.leia",
+          "tests/language/q_portfolio_risk_factor_project.leia",
+          "tests/language/q_iot_sensor_telemetry_project.leia"
+        ],
+        "examples": [
+          "examples/data/q_keyed_table_semantics.leia",
+          "examples/data/q_kdb_complex_event_replay_project/main.leia",
+          "examples/data/q_keyed_asof_state_replay_project/main.leia",
+          "examples/data/q_integrated_market_replay_project/main.leia",
+          "examples/data/q_ipc_codec_boundaries_project/main.leia",
+          "examples/data/q_intraday_tca_order_book_project/main.leia",
+          "examples/data/q_portfolio_risk_factor_project/main.leia",
+          "examples/data/q_iot_sensor_telemetry_project/main.leia",
+          "examples/data/q_kdb_market_tape_complex_project/main.leia"
+        ],
+        "benchmarks": [
+          "benchmarks/data/q_kdb_complex_event_replay_project.leia",
+          "benchmarks/data/q_keyed_asof_state_replay_project.leia",
+          "benchmarks/data/q_integrated_market_replay_project.leia",
+          "benchmarks/data/q_intraday_tca_order_book_project.leia",
+          "benchmarks/data/q_portfolio_risk_factor_project.leia",
+          "benchmarks/data/q_iot_sensor_telemetry_project.leia",
+          "benchmarks/data/q_kdb_market_tape_complex_project.leia"
+        ]
+      }
+    },
+    {
+      "id": "mutation",
+      "status": "supported",
+      "coverage": {
+        "tests": [
+          "tests/language/q_data_join_mutation_tdd.leia",
+          "tests/language/q_data_join_mutation_project.leia",
+          "tests/language/q_native_mutation_join_project.leia",
+          "tests/language/q_sor_tca_project.leia",
+          "tests/language/q_kdb_complex_event_replay_project.leia",
+          "tests/language/q_integrated_market_replay_project.leia"
+        ],
+        "examples": [
+          "examples/data/q_data_join_mutation_project/main.leia",
+          "examples/data/q_sor_tca_project/main.leia",
+          "examples/data/q_kdb_complex_event_replay_project/main.leia",
+          "examples/data/q_keyed_asof_state_replay_project/main.leia",
+          "examples/data/q_integrated_market_replay_project/main.leia"
+        ],
+        "benchmarks": [
+          "benchmarks/data/qsql_join_mutation.leia",
+          "benchmarks/data/q_native_join_update_delete.leia",
+          "benchmarks/data/q_sor_tca_project.leia",
+          "benchmarks/data/q_kdb_complex_event_replay_project.leia",
+          "benchmarks/data/q_keyed_asof_state_replay_project.leia",
+          "benchmarks/data/q_integrated_market_replay_project.leia"
+        ]
+      }
+    },
+    {
+      "id": "db",
+      "status": "supported",
+      "coverage": {
+        "tests": [
+          "tests/language/q_data_complex_examples_tdd.leia",
+          "tests/language/qsql_query_tdd.leia"
+        ],
+        "examples": [
+          "examples/data/db_q_frame_project/main.leia"
+        ],
+        "benchmarks": [
+          "benchmarks/data/frame_qsql_rollup.leia"
+        ]
+      }
+    },
+    {
+      "id": "operators",
+      "status": "supported",
+      "coverage": {
+        "tests": [
+          "tests/language/q_vectors_dicts_flip_project.leia",
+          "tests/language/q_kdb_complex_event_replay_project.leia"
+        ],
+        "examples": [
+          "examples/data/q_kdb_complex_event_replay_project/main.leia"
+        ],
+        "benchmarks": [
+          "benchmarks/data/q_operator_pipeline.leia",
+          "benchmarks/data/q_kdb_complex_event_replay_project.leia"
+        ]
+      }
+    },
+    {
+      "id": "dyadic-verbs",
+      "status": "supported",
+      "coverage": {
+        "tests": [
+          "tests/language/q_vectors_dicts_flip_project.leia",
+          "tests/language/q_kdb_complex_event_replay_project.leia"
+        ],
+        "examples": [
+          "examples/data/q_kdb_complex_event_replay_project/main.leia"
+        ],
+        "benchmarks": [
+          "benchmarks/data/q_operator_pipeline.leia",
+          "benchmarks/data/q_kdb_complex_event_replay_project.leia"
+        ]
+      }
+    },
+    {
+      "id": "fby",
+      "status": "supported",
+      "coverage": {
+        "tests": [
+          "tests/language/q_vectors_dicts_flip_project.leia",
+          "tests/language/q_kdb_complex_event_replay_project.leia"
+        ],
+        "examples": [
+          "examples/data/q_kdb_complex_event_replay_project/main.leia"
+        ],
+        "benchmarks": [
+          "benchmarks/data/q_kdb_complex_event_replay_project.leia"
+        ]
+      }
+    },
+    {
+      "id": "storage-path",
+      "status": "supported",
+      "gate_scope": "extended",
+      "coverage": {
+        "tests": [
+          "tests/language/q_boundaries_and_gap_closures_project.leia",
+          "tests/language/q_columnar_partitioned_store_project.leia"
+        ],
+        "examples": [
+          "examples/data/q_columnar_partitioned_store_project/main.leia"
+        ]
+      }
+    },
+    {
+      "id": "encoded-enum",
+      "status": "supported",
+      "coverage": {
+        "tests": [
+          "tests/language/q_boundaries_and_gap_closures_project.leia",
+          "tests/language/q_kdb_complex_event_replay_project.leia",
+          "tests/language/q_conformance_golden_project.leia",
+          "tests/language/q_kdb_market_tape_complex_project.leia",
+          "tests/language/q_intraday_tca_order_book_project.leia",
+          "tests/language/q_portfolio_risk_factor_project.leia"
+        ],
+        "examples": [
+          "examples/data/q_kdb_complex_event_replay_project/main.leia",
+          "examples/data/q_conformance_golden_project.leia",
+          "examples/data/q_kdb_market_tape_complex_project/main.leia",
+          "examples/data/q_intraday_tca_order_book_project/main.leia",
+          "examples/data/q_portfolio_risk_factor_project/main.leia"
+        ],
+        "benchmarks": [
+          "benchmarks/data/q_kdb_complex_event_replay_project.leia",
+          "benchmarks/data/q_conformance_golden_project.leia",
+          "benchmarks/data/q_kdb_market_tape_complex_project.leia",
+          "benchmarks/data/q_intraday_tca_order_book_project.leia",
+          "benchmarks/data/q_portfolio_risk_factor_project.leia"
+        ]
+      }
+    },
+    {
+      "id": "symbols-enums",
+      "status": "supported",
+      "coverage": {
+        "tests": [
+          "tests/language/q_conformance_golden_project.leia",
+          "tests/language/q_kdb_market_tape_complex_project.leia",
+          "tests/language/q_intraday_tca_order_book_project.leia",
+          "tests/language/q_portfolio_risk_factor_project.leia",
+          "tests/language/q_iot_sensor_telemetry_project.leia"
+        ],
+        "examples": [
+          "examples/data/q_conformance_golden_project.leia",
+          "examples/data/q_kdb_market_tape_complex_project/main.leia",
+          "examples/data/q_intraday_tca_order_book_project/main.leia",
+          "examples/data/q_portfolio_risk_factor_project/main.leia",
+          "examples/data/q_iot_sensor_telemetry_project/main.leia"
+        ],
+        "benchmarks": [
+          "benchmarks/data/q_conformance_golden_project.leia",
+          "benchmarks/data/q_kdb_market_tape_complex_project.leia",
+          "benchmarks/data/q_intraday_tca_order_book_project.leia",
+          "benchmarks/data/q_portfolio_risk_factor_project.leia",
+          "benchmarks/data/q_iot_sensor_telemetry_project.leia"
+        ]
+      }
+    },
+    {
+      "id": "attributes",
+      "status": "supported",
+      "coverage": {
+        "tests": [
+          "tests/language/q_boundaries_and_gap_closures_project.leia",
+          "tests/language/q_kdb_complex_event_replay_project.leia",
+          "tests/language/q_conformance_golden_project.leia",
+          "tests/language/q_kdb_market_tape_complex_project.leia",
+          "tests/language/q_intraday_tca_order_book_project.leia",
+          "tests/language/q_portfolio_risk_factor_project.leia",
+          "tests/language/q_iot_sensor_telemetry_project.leia"
+        ],
+        "examples": [
+          "examples/data/q_kdb_complex_event_replay_project/main.leia",
+          "examples/data/q_conformance_golden_project.leia",
+          "examples/data/q_kdb_market_tape_complex_project/main.leia",
+          "examples/data/q_intraday_tca_order_book_project/main.leia",
+          "examples/data/q_portfolio_risk_factor_project/main.leia",
+          "examples/data/q_iot_sensor_telemetry_project/main.leia"
+        ],
+        "benchmarks": [
+          "benchmarks/data/q_kdb_complex_event_replay_project.leia",
+          "benchmarks/data/q_conformance_golden_project.leia",
+          "benchmarks/data/q_kdb_market_tape_complex_project.leia",
+          "benchmarks/data/q_intraday_tca_order_book_project.leia",
+          "benchmarks/data/q_portfolio_risk_factor_project.leia",
+          "benchmarks/data/q_iot_sensor_telemetry_project.leia"
+        ]
+      }
+    },
+    {
+      "id": "qsql-cache",
+      "status": "supported",
+      "coverage": {
+        "tests": [
+          "tests/language/q_kdb_complex_event_replay_project.leia",
+          "tests/language/qsql_query_tdd.leia"
+        ],
+        "examples": [
+          "examples/data/q_kdb_complex_event_replay_project/main.leia"
+        ],
+        "benchmarks": [
+          "benchmarks/data/q_projection_limit_cache.leia",
+          "benchmarks/data/q_kdb_complex_event_replay_project.leia"
+        ]
+      }
+    },
+    {
+      "id": "pipeline",
+      "status": "supported",
+      "coverage": {
+        "tests": [
+          "tests/language/q_vectors_dicts_flip_project.leia",
+          "tests/language/q_projection_limit_order_project.leia"
+        ],
+        "examples": [
+          "examples/data/q_projection_limit_order_project/main.leia"
+        ],
+        "benchmarks": [
+          "benchmarks/data/q_operator_pipeline.leia"
+        ]
+      }
+    },
+    {
+      "id": "projection",
+      "status": "supported",
+      "coverage": {
+        "tests": [
+          "tests/language/q_vectors_dicts_flip_project.leia",
+          "tests/language/q_data_complex_examples_tdd.leia",
+          "tests/language/q_kdb_delta_golden.leia",
+          "tests/language/qsql_query_tdd.leia"
+        ],
+        "examples": [
+          "examples/data/q_kdb_delta_golden.leia"
+        ],
+        "benchmarks": [
+          "benchmarks/data/q_projection_limit_cache.leia",
+          "benchmarks/data/q_kdb_delta_golden.leia",
+          "benchmarks/data/frame_qsql_distinct_take.leia"
+        ]
+      }
+    },
+    {
+      "id": "limit",
+      "status": "supported",
+      "coverage": {
+        "tests": [
+          "tests/language/q_data_complex_examples_tdd.leia",
+          "tests/language/q_data_join_mutation_tdd.leia",
+          "tests/language/q_projection_limit_order_project.leia",
+          "tests/language/qsql_query_tdd.leia"
+        ],
+        "examples": [
+          "examples/data/q_projection_limit_order_project/main.leia"
+        ],
+        "benchmarks": [
+          "benchmarks/data/q_projection_limit_cache.leia",
+          "benchmarks/data/frame_qsql_distinct_take.leia"
+        ]
+      }
+    },
+    {
+      "id": "select-star",
+      "status": "supported",
+      "coverage": {
+        "tests": [
+          "tests/language/q_keyed_temporal_asof_adverbs_tdd.leia",
+          "tests/language/q_projection_limit_order_project.leia",
+          "tests/language/qsql_query_tdd.leia"
+        ],
+        "examples": [
+          "examples/data/q_projection_limit_order_project/main.leia"
+        ],
+        "benchmarks": [
+          "benchmarks/data/q_select_star_order_project.leia"
+        ]
+      }
+    },
+    {
+      "id": "order",
+      "status": "supported",
+      "coverage": {
+        "tests": [
+          "tests/language/q_data_complex_examples_tdd.leia",
+          "tests/language/q_join_variants_project.leia",
+          "tests/language/q_projection_limit_order_project.leia",
+          "tests/language/qsql_query_tdd.leia",
+          "tests/language/q_kdb_market_tape_complex_project.leia",
+          "tests/language/q_portfolio_risk_factor_project.leia",
+          "tests/language/q_iot_sensor_telemetry_project.leia"
+        ],
+        "examples": [
+          "examples/data/q_projection_limit_order_project/main.leia",
+          "examples/data/q_kdb_market_tape_complex_project/main.leia",
+          "examples/data/q_portfolio_risk_factor_project/main.leia",
+          "examples/data/q_iot_sensor_telemetry_project/main.leia"
+        ],
+        "benchmarks": [
+          "benchmarks/data/q_select_star_order_project.leia",
+          "benchmarks/data/q_kdb_market_tape_complex_project.leia",
+          "benchmarks/data/q_portfolio_risk_factor_project.leia",
+          "benchmarks/data/q_iot_sensor_telemetry_project.leia"
+        ]
+      }
+    },
+    {
+      "id": "type-errors",
+      "status": "rejected",
+      "coverage": {
+        "tests": [
+          "tests/language/q_boundaries_and_gap_closures_project.leia",
+          "tests/language/q_vectors_dicts_flip_project.leia",
+          "tests/language/qsql_error_diagnostics_tdd.leia"
+        ],
+        "examples": [],
+        "benchmarks": []
+      }
+    },
+    {
+      "id": "ipc",
+      "status": "supported",
+      "gate_scope": "extended",
+      "coverage": {
+        "tests": [
+          "tests/language/q_boundaries_and_gap_closures_project.leia",
+          "tests/language/q_ipc_codec_boundaries_project.leia"
+        ],
+        "examples": [
+          "examples/data/q_ipc_codec_boundaries_project/main.leia"
+        ],
+        "benchmarks": []
+      }
+    },
+    {
+      "id": "serialization",
+      "status": "supported",
+      "gate_scope": "extended",
+      "coverage": {
+        "tests": [
+          "tests/language/q_ipc_codec_boundaries_project.leia",
+          "tests/language/q_columnar_partitioned_store_project.leia",
+          "tests/language/q_boundaries_and_gap_closures_project.leia"
+        ],
+        "examples": [
+          "examples/data/q_ipc_codec_boundaries_project/main.leia",
+          "examples/data/q_columnar_partitioned_store_project/main.leia"
+        ],
+        "benchmarks": []
+      }
+    },
+    {
+      "id": "typed-null",
+      "status": "supported",
+      "coverage": {
+        "tests": [
+          "tests/language/q_kdb_delta_golden.leia",
+          "tests/language/q_conformance_golden_project.leia",
+          "tests/language/q_kdb_market_tape_complex_project.leia",
+          "tests/language/q_intraday_tca_order_book_project.leia",
+          "tests/language/q_portfolio_risk_factor_project.leia",
+          "tests/language/q_iot_sensor_telemetry_project.leia"
+        ],
+        "examples": [
+          "examples/data/q_kdb_delta_golden.leia",
+          "examples/data/q_conformance_golden_project.leia",
+          "examples/data/q_columnar_partitioned_store_project/main.leia",
+          "examples/data/q_ipc_codec_boundaries_project/main.leia",
+          "examples/data/q_kdb_market_tape_complex_project/main.leia",
+          "examples/data/q_intraday_tca_order_book_project/main.leia",
+          "examples/data/q_portfolio_risk_factor_project/main.leia",
+          "examples/data/q_iot_sensor_telemetry_project/main.leia"
+        ],
+        "benchmarks": [
+          "benchmarks/data/q_kdb_delta_golden.leia",
+          "benchmarks/data/q_conformance_golden_project.leia",
+          "benchmarks/data/q_kdb_market_tape_complex_project.leia",
+          "benchmarks/data/q_intraday_tca_order_book_project.leia",
+          "benchmarks/data/q_portfolio_risk_factor_project.leia",
+          "benchmarks/data/q_iot_sensor_telemetry_project.leia"
+        ]
+      }
+    },
+    {
+      "id": "typed-infinity",
+      "status": "supported",
+      "coverage": {
+        "tests": [
+          "tests/language/q_conformance_golden_project.leia"
+        ],
+        "examples": [
+          "examples/data/q_conformance_golden_project.leia"
+        ],
+        "benchmarks": [
+          "benchmarks/data/q_conformance_golden_project.leia"
+        ]
+      }
+    },
+    {
+      "id": "codec",
+      "status": "supported",
+      "coverage": {
+        "tests": [
+          "tests/language/q_kdb_delta_golden.leia",
+          "tests/language/q_conformance_golden_project.leia",
+          "tests/language/q_vector_dict_flip_adverbs_project.leia",
+          "tests/language/q_ipc_codec_boundaries_project.leia",
+          "tests/language/q_columnar_partitioned_store_project.leia",
+          "tests/language/q_boundaries_and_gap_closures_project.leia"
+        ],
+        "examples": [
+          "examples/data/q_kdb_delta_golden.leia",
+          "examples/data/q_conformance_golden_project.leia",
+          "examples/data/q_columnar_partitioned_store_project/main.leia",
+          "examples/data/q_ipc_codec_boundaries_project/main.leia",
+          "examples/data/q_vector_dict_flip_adverbs_project/main.leia"
+        ],
+        "benchmarks": [
+          "benchmarks/data/q_kdb_delta_golden.leia",
+          "benchmarks/data/q_conformance_golden_project.leia"
+        ]
+      }
+    },
+    {
+      "id": "runtime-kernel",
+      "status": "supported",
+      "coverage": {
+        "tests": [
+          "tests/language/q_conformance_golden_project.leia"
+        ],
+        "examples": [
+          "examples/data/q_conformance_golden_project.leia",
+          "examples/data/q_kdb_market_tape_complex_project/main.leia"
+        ],
+        "benchmarks": [
+          "benchmarks/data/q_conformance_golden_project.leia",
+          "benchmarks/data/q_kdb_market_tape_complex_project.leia"
+        ]
+      }
+    },
+    {
+      "id": "workspace",
+      "status": "supported",
+      "gate_scope": "extended",
+      "surfaces": [
+        "q.session",
+        "q.workspace",
+        "q_session.eval",
+        "\\l",
+        "\\p"
+      ],
+      "benchmark_policy": "semantic state/isolation surface; no perf-hot benchmark required",
+      "coverage": {
+        "tests": [
+          "tests/language/q_session_workspace_project.leia",
+          "tests/language/q_workspace_session_project_example.leia",
+          "tests/language/q_boundaries_and_gap_closures_project.leia"
+        ],
+        "examples": [
+          "examples/data/q_workspace_session_project/main.leia"
+        ],
+        "benchmarks": []
+      }
+    },
+    {
+      "id": "portfolio",
+      "status": "supported",
+      "coverage": {
+        "tests": [
+          "tests/language/q_portfolio_risk_factor_project.leia"
+        ],
+        "examples": [
+          "examples/data/q_portfolio_risk_factor_project/main.leia"
+        ],
+        "benchmarks": [
+          "benchmarks/data/q_portfolio_risk_factor_project.leia"
+        ]
+      }
+    },
+    {
+      "id": "risk",
+      "status": "supported",
+      "coverage": {
+        "tests": [
+          "tests/language/q_portfolio_risk_factor_project.leia"
+        ],
+        "examples": [
+          "examples/data/q_portfolio_risk_factor_project/main.leia"
+        ],
+        "benchmarks": [
+          "benchmarks/data/q_portfolio_risk_factor_project.leia"
+        ]
+      }
+    },
+    {
+      "id": "factor",
+      "status": "supported",
+      "coverage": {
+        "tests": [
+          "tests/language/q_portfolio_risk_factor_project.leia"
+        ],
+        "examples": [
+          "examples/data/q_portfolio_risk_factor_project/main.leia"
+        ],
+        "benchmarks": [
+          "benchmarks/data/q_portfolio_risk_factor_project.leia"
+        ]
+      }
+    }
+  ],
+  "cases": [
+    {
+      "id": "q_vector_basics",
+      "path": "examples/data/q_vector_basics.leia",
+      "types": [
+        "smoke",
+        "conformance"
+      ],
+      "features": [
+        "adverbs",
+        "dictionary"
+      ]
+    },
+    {
+      "id": "q_multi_key_join",
+      "path": "examples/data/q_multi_key_join.leia",
+      "types": [
+        "smoke",
+        "conformance"
+      ],
+      "features": [
+        "keyed",
+        "join"
+      ]
+    },
+    {
+      "id": "q_keyed_table_semantics",
+      "path": "examples/data/q_keyed_table_semantics.leia",
+      "types": [
+        "smoke",
+        "conformance"
+      ],
+      "features": [
+        "keyed",
+        "keyed-table"
+      ]
+    },
+    {
+      "id": "qsql_frame_project",
+      "path": "examples/data/qsql_frame_project/main.leia",
+      "types": [
+        "smoke",
+        "conformance"
+      ],
+      "features": [
+        "qsql",
+        "temporal"
+      ]
+    },
+    {
+      "id": "q_complex_data_project",
+      "path": "examples/data/q_complex_data_project/main.leia",
+      "types": [
+        "smoke",
+        "conformance"
+      ],
+      "features": [
+        "qsql",
+        "rollup",
+        "asof",
+        "xbar",
+        "temporal",
+        "ticks",
+        "trades",
+        "bars"
+      ]
+    },
+    {
+      "id": "q_data_join_mutation_project",
+      "path": "examples/data/q_data_join_mutation_project/main.leia",
+      "types": [
+        "smoke",
+        "conformance"
+      ],
+      "features": [
+        "join",
+        "mutation",
+        "update",
+        "delete"
+      ]
+    },
+    {
+      "id": "q_trade_analytics_project",
+      "path": "examples/data/q_trade_analytics_project/main.leia",
+      "types": [
+        "smoke"
+      ],
+      "features": [
+        "qsql",
+        "analytics"
+      ]
+    },
+    {
+      "id": "q_time_bucket_asof_project",
+      "path": "examples/data/q_time_bucket_asof_project/main.leia",
+      "types": [
+        "smoke",
+        "conformance"
+      ],
+      "features": [
+        "asof",
+        "xbar",
+        "temporal"
+      ]
+    },
+    {
+      "id": "q_ticks_bars_asof_project",
+      "path": "examples/data/q_ticks_bars_asof_project/main.leia",
+      "types": [
+        "smoke",
+        "conformance"
+      ],
+      "features": [
+        "asof",
+        "xbar",
+        "temporal",
+        "ticks",
+        "trades",
+        "bars"
+      ]
+    },
+    {
+      "id": "q_temporal_window_analytics_project",
+      "path": "examples/data/q_temporal_window_analytics_project/main.leia",
+      "types": [
+        "smoke",
+        "conformance"
+      ],
+      "features": [
+        "temporal",
+        "window",
+        "xbar",
+        "bars"
+      ]
+    },
+    {
+      "id": "q_market_microstructure_project",
+      "path": "examples/data/q_market_microstructure_project/main.leia",
+      "types": [
+        "smoke"
+      ],
+      "features": [
+        "asof",
+        "market-data",
+        "trades"
+      ]
+    },
+    {
+      "id": "q_order_book_lifecycle_project",
+      "path": "examples/data/q_order_book_lifecycle_project/main.leia",
+      "types": [
+        "smoke"
+      ],
+      "features": [
+        "order-book",
+        "xbar",
+        "ticks",
+        "bars"
+      ]
+    },
+    {
+      "id": "q_market_full_stack_project",
+      "path": "examples/data/q_market_full_stack_project/main.leia",
+      "types": [
+        "smoke"
+      ],
+      "features": [
+        "market-data",
+        "join",
+        "xbar",
+        "trades",
+        "bars"
+      ]
+    },
+    {
+      "id": "q_sor_tca_project",
+      "path": "examples/data/q_sor_tca_project/main.leia",
+      "types": [
+        "smoke",
+        "conformance"
+      ],
+      "features": [
+        "market-data",
+        "order-book",
+        "join",
+        "asof",
+        "window",
+        "xbar",
+        "keyed",
+        "qsql",
+        "adverbs",
+        "trades",
+        "bars",
+        "sor",
+        "tca",
+        "mutation",
+        "update",
+        "delete"
+      ]
+    },
+    {
+      "id": "q_kdb_complex_event_replay_project",
+      "path": "examples/data/q_kdb_complex_event_replay_project/main.leia",
+      "types": [
+        "smoke",
+        "conformance"
+      ],
+      "features": [
+        "market-data",
+        "join",
+        "asof",
+        "xbar",
+        "temporal",
+        "rollup",
+        "keyed",
+        "qsql",
+        "adverbs",
+        "dictionary",
+        "operators",
+        "dyadic-verbs",
+        "fby",
+        "encoded-enum",
+        "attributes",
+        "qsql-cache",
+        "trades",
+        "keyed-table",
+        "mutation",
+        "update",
+        "delete"
+      ]
+    },
+    {
+      "id": "db_q_frame_project",
+      "path": "examples/data/db_q_frame_project/main.leia",
+      "types": [
+        "smoke"
+      ],
+      "features": [
+        "db",
+        "qsql"
+      ]
+    },
+    {
+      "id": "q_kdb_delta_golden",
+      "path": "examples/data/q_kdb_delta_golden.leia",
+      "types": [
+        "smoke",
+        "conformance"
+      ],
+      "features": [
+        "join",
+        "asof",
+        "window",
+        "temporal",
+        "keyed",
+        "adverbs",
+        "dictionary",
+        "projection",
+        "typed-null",
+        "codec"
+      ]
+    },
+    {
+      "id": "q_keyed_asof_state_replay_project",
+      "path": "examples/data/q_keyed_asof_state_replay_project/main.leia",
+      "types": [
+        "smoke",
+        "conformance"
+      ],
+      "features": [
+        "market-data",
+        "join",
+        "asof",
+        "xbar",
+        "temporal",
+        "keyed",
+        "qsql",
+        "adverbs",
+        "dictionary",
+        "trades",
+        "mutation",
+        "update",
+        "delete"
+      ]
+    },
+    {
+      "id": "q_integrated_market_replay_project",
+      "path": "examples/data/q_integrated_market_replay_project/main.leia",
+      "types": [
+        "smoke",
+        "conformance"
+      ],
+      "features": [
+        "market-data",
+        "join",
+        "asof",
+        "window",
+        "xbar",
+        "temporal",
+        "rollup",
+        "keyed",
+        "qsql",
+        "adverbs",
+        "dictionary",
+        "trades",
+        "bars",
+        "keyed-table",
+        "mutation",
+        "update",
+        "delete"
+      ]
+    },
+    {
+      "id": "q_conformance_golden_project",
+      "path": "examples/data/q_conformance_golden_project.leia",
+      "types": [
+        "smoke",
+        "conformance"
+      ],
+      "features": [
+        "typed-null",
+        "typed-infinity",
+        "symbols-enums",
+        "encoded-enum",
+        "dictionary",
+        "flip",
+        "keyed",
+        "adverbs",
+        "temporal",
+        "xbar",
+        "asof",
+        "update",
+        "delete",
+        "join",
+        "qsql",
+        "runtime-kernel",
+        "codec",
+        "window",
+        "attributes"
+      ]
+    },
+    {
+      "id": "q_vector_dict_flip_adverbs_project",
+      "path": "examples/data/q_vector_dict_flip_adverbs_project/main.leia",
+      "types": [
+        "smoke",
+        "conformance"
+      ],
+      "features": [
+        "adverbs",
+        "dictionary",
+        "flip",
+        "codec"
+      ]
+    },
+    {
+      "id": "q_projection_limit_order_project",
+      "path": "examples/data/q_projection_limit_order_project/main.leia",
+      "types": [
+        "smoke",
+        "conformance"
+      ],
+      "features": [
+        "qsql",
+        "limit",
+        "select-star",
+        "order",
+        "pipeline"
+      ]
+    },
+    {
+      "id": "q_columnar_partitioned_store_project",
+      "path": "examples/data/q_columnar_partitioned_store_project/main.leia",
+      "gate_scope": "extended",
+      "types": [
+        "smoke",
+        "conformance"
+      ],
+      "features": [
+        "storage-path",
+        "codec",
+        "serialization",
+        "temporal",
+        "typed-null"
+      ]
+    },
+    {
+      "id": "q_ipc_codec_boundaries_project",
+      "path": "examples/data/q_ipc_codec_boundaries_project/main.leia",
+      "gate_scope": "extended",
+      "types": [
+        "smoke",
+        "conformance"
+      ],
+      "features": [
+        "ipc",
+        "serialization",
+        "codec",
+        "keyed-table",
+        "typed-null"
+      ]
+    },
+    {
+      "id": "q_workspace_session_project",
+      "path": "examples/data/q_workspace_session_project/main.leia",
+      "gate_scope": "extended",
+      "types": [
+        "smoke",
+        "conformance"
+      ],
+      "features": [
+        "workspace"
+      ]
+    },
+    {
+      "id": "q_kdb_market_tape_complex_project",
+      "path": "examples/data/q_kdb_market_tape_complex_project/main.leia",
+      "types": [
+        "smoke",
+        "conformance"
+      ],
+      "features": [
+        "market-data",
+        "ticks",
+        "trades",
+        "bars",
+        "qsql",
+        "asof",
+        "window",
+        "xbar",
+        "temporal",
+        "keyed",
+        "keyed-table",
+        "rollup",
+        "runtime-kernel",
+        "analytics",
+        "adverbs",
+        "dictionary",
+        "typed-null",
+        "symbols-enums",
+        "encoded-enum",
+        "attributes",
+        "update",
+        "delete",
+        "order"
+      ]
+    },
+    {
+      "id": "q_intraday_tca_order_book_project",
+      "path": "examples/data/q_intraday_tca_order_book_project/main.leia",
+      "types": [
+        "smoke",
+        "conformance"
+      ],
+      "features": [
+        "market-data",
+        "ticks",
+        "trades",
+        "bars",
+        "qsql",
+        "asof",
+        "window",
+        "xbar",
+        "temporal",
+        "rollup",
+        "analytics",
+        "adverbs",
+        "dictionary",
+        "typed-null",
+        "symbols-enums",
+        "encoded-enum",
+        "attributes",
+        "keyed",
+        "keyed-table",
+        "join",
+        "update",
+        "delete",
+        "order-book",
+        "tca"
+      ]
+    },
+    {
+      "id": "q_portfolio_risk_factor_project",
+      "path": "examples/data/q_portfolio_risk_factor_project/main.leia",
+      "types": [
+        "smoke",
+        "conformance"
+      ],
+      "features": [
+        "market-data",
+        "qsql",
+        "asof",
+        "window",
+        "temporal",
+        "rollup",
+        "analytics",
+        "adverbs",
+        "dictionary",
+        "typed-null",
+        "symbols-enums",
+        "encoded-enum",
+        "attributes",
+        "keyed",
+        "keyed-table",
+        "join",
+        "update",
+        "delete",
+        "order",
+        "portfolio",
+        "risk",
+        "factor"
+      ]
+    },
+    {
+      "id": "q_iot_sensor_telemetry_project",
+      "path": "examples/data/q_iot_sensor_telemetry_project/main.leia",
+      "types": [
+        "conformance",
+        "smoke"
+      ],
+      "features": [
+        "qsql",
+        "asof",
+        "window",
+        "xbar",
+        "temporal",
+        "rollup",
+        "analytics",
+        "adverbs",
+        "dictionary",
+        "keyed",
+        "keyed-table",
+        "join",
+        "update",
+        "delete",
+        "order"
+      ]
+    }
+  ]
+}

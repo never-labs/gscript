@@ -26,7 +26,7 @@ check("dict vectors", book.ask[2] == 101)
 check("vector arithmetic", price_delta[4] == 1.5)
 check("reduce", total_size == 540)
 check("scan", running_notional[5] == 54857.5)
-check("where", large_trade_indexes[1] == 1 && large_trade_indexes[3] == 4)
+check("where", large_trade_indexes[1] == 0 && large_trade_indexes[3] == 3)
 check("take", top_two_prices[2] == 102.25)
 check("flip table", #trades == 5 && trades[4].sym == "NVDA" && trades[4].notional == 15337.5)
 

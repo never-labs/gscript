@@ -5,6 +5,10 @@ func check(name, ok) {
   print("ok", name)
 }
 
+func contains(haystack, needle) {
+  return string.find(tostring(haystack), needle, 1, true) != nil
+}
+
 trades := data.frame({
   sym: data.symbols({"AAPL", "MSFT", "AAPL"}),
   price: data.f64({100.5, 90.0, 101.0}),
@@ -14,19 +18,122 @@ trades := data.frame({
 fills := q.sql("select notional:sum price*size, fills:count i by sym from trades where price>100", {
   trades: trades,
 })
+stats := q.sql("select avg_price:avg price, var_price:var price, dev_price:dev price, med_price:med price by sym from trades order by sym", {
+  trades: trades,
+})
 
 check("grouped length", fills.len == 1)
-check("group key", fills.sym[1] == "AAPL")
+check("group key", fills[1].sym == "AAPL")
 check("computed aggregate", fills.notional[1] == 3025.0)
 check("count aggregate", fills.fills[1] == 2)
+check("extended aggregates", stats.len == 2 && stats[1].sym == "AAPL" && stats.avg_price[1] == 100.75 && stats.var_price[1] == 0.0625 && stats.dev_price[1] == 0.25 && stats.med_price[1] == 100.75 && stats.var_price[2] == 0.0)
 
 large := q.sql("exec price,size from trades where sym=`AAPL", {trades: trades})
-check("exec projection", large.len == 2 && large.price[1] == 100.5 && large.size[2] == 20)
+check("exec projection", #q.keys(large) == 2 && large.price[1] == 100.5 && large.size[2] == 20)
+
+price_vec := q.sql("exec price from trades where sym=`AAPL order by price asc", {trades: trades})
+check("single column exec returns vector", q.count(price_vec) == 2 && price_vec[1] == 100.5 && price_vec[2] == 101.0)
+
+price_dict := q.sql("exec sym!price from trades where size>=15 order by sym asc", {trades: trades})
+price_dict_keys := q.keys(price_dict)
+price_dict_values := q.value(price_dict)
+check("exec dictionary projection", #price_dict_keys == 2 && price_dict_keys[1] == "AAPL" && price_dict_keys[2] == "MSFT" && price_dict_values[1] == 101.0 && price_dict_values[2] == 90.0 && price_dict.AAPL == 101.0)
+
+distinct_syms := q.sql("select by sym from trades order by sym asc", {trades: trades})
+distinct_sym_vec := q.sql("exec by sym from trades order by sym asc", {trades: trades})
+distinct_keys := q.sql("select by sym,size from trades order by sym asc,size asc", {trades: trades})
+distinct_desc_take := q.sql("select distinct sym from trades order by sym desc take 1", {trades: trades})
+literal_distinct_keys := q.sql("select by sym,bucket from ([sym:`AAPL`AAPL`MSFT; bucket:`m1`m1`m2] px:100 101 80; size:10 11 20) where px>=100,size>=10 order by sym asc,bucket asc take 1", {})
+check("qsql select by without projection", distinct_syms.len == 2 && distinct_syms.sym[1] == "AAPL" && distinct_syms.sym[2] == "MSFT")
+check("qsql exec by without projection", q.count(distinct_sym_vec) == 2 && distinct_sym_vec[1] == "AAPL" && distinct_sym_vec[2] == "MSFT")
+check("qsql select multi-key by without projection", distinct_keys.len == 3 && distinct_keys.sym[1] == "AAPL" && distinct_keys.size[1] == 10 && distinct_keys.sym[3] == "MSFT")
+check("qsql distinct order take combination", distinct_desc_take.len == 1 && distinct_desc_take[1].sym == "MSFT")
+check("qsql literal select by where order take", literal_distinct_keys.len == 1 && literal_distinct_keys[1].sym == "AAPL" && literal_distinct_keys[1].bucket == "m1")
+
+grouped_update := q.sql("update avg_price:avg price, max_size:max size by sym from trades", {trades: trades})
+delete_by_ok, delete_by_err := pcall(q.sql, "delete from trades by sym", {trades: trades})
+check("qsql update by writes grouped aggregates", grouped_update.len == 3 && grouped_update[1].avg_price == 100.75 && grouped_update[3].avg_price == 100.75 && grouped_update[2].max_size == 15.0)
+check("qsql delete rejects by clause", delete_by_ok == false && contains(delete_by_err, "unexpected token"))
 
 ordered := q.sql("select sym,price,size from trades where size>=10 order by price desc limit 2", {
   trades: trades,
 })
 check("order limit", ordered.len == 2 && ordered.price[1] == 101.0 && ordered.sym[2] == "AAPL")
+
+computed_projection := q.sql("select price*size from trades order by price*size desc take 2", {trades: trades})
+check("computed projection default alias order take", computed_projection.len == 2 && computed_projection[1]["price*size"] == 2020.0 && computed_projection[2]["price*size"] == 1350.0)
+
+exec_computed := q.sql("exec notional:price*size from trades order by price*size desc take 1", {trades: trades})
+check("exec computed alias order take", q.count(exec_computed) == 1 && exec_computed[1] == 2020.0)
+
+scalar_cached_low := q.sql("select sym,price from trades where price>threshold order by price asc", {trades: trades, threshold: 100.0})
+scalar_cached_high := q.sql("select sym,price from trades where price>threshold order by price asc", {trades: trades, threshold: 100.75})
+check("qsql scalar cache stays per env", scalar_cached_low.len == 2 && scalar_cached_high.len == 1 && scalar_cached_high[1].price == 101.0)
+
+side_trades := data.frame({
+  side: data.symbols({"buy", "sell", "buy"}),
+  price: data.f64({100.5, 99.5, 101.0}),
+  size: data.i64({10, 15, 20}),
+  arrival_mid: data.f64({100.0, 100.0, 100.0}),
+})
+conditional_select := q.sql("select side,signed_qty:?[side=`buy;size;0-size],slip:?[side=`buy;price-arrival_mid;arrival_mid-price] from trades order by side asc", {trades: side_trades})
+conditional_update := q.sql("update signed_qty:?[side=`buy;size;0-size] from trades", {trades: side_trades})
+check("qsql conditional select columns", conditional_select.len == 3 && conditional_select[1].signed_qty == 10.0 && conditional_select[2].signed_qty == 20.0 && conditional_select[3].signed_qty == -15.0 && conditional_select[3].slip == 0.5)
+check("qsql conditional update assignment", conditional_update.len == 3 && conditional_update[1].signed_qty == 10.0 && conditional_update[2].signed_qty == -15.0 && conditional_update[3].signed_qty == 20.0)
+
+signed_trades := data.frame({
+  sym: data.symbols({"AAPL", "MSFT", "NVDA", "TSLA"}),
+  signed_qty: data.i64({40, -25, 10, data.null}),
+})
+abs_filtered := q.sql("select sym,abs_qty:abs signed_qty from trades where abs signed_qty>20 order by abs signed_qty desc", {trades: signed_trades})
+check("qsql abs prefix projection where order", abs_filtered.len == 2 && abs_filtered[1].sym == "AAPL" && abs_filtered[1].abs_qty == 40.0 && abs_filtered[2].sym == "MSFT" && abs_filtered[2].abs_qty == 25.0)
+
+numeric_trades := data.frame({
+  sym: data.symbols({"ZERO", "ONE", "TWO"}),
+  qty: data.f64({0.0, 1.0, 2.0}),
+})
+exp_zero := q.sql("select sym,e:exp qty from trades where qty=0", {trades: numeric_trades})
+recip_sorted := q.sql("select sym,inv:reciprocal qty from trades where qty>0 order by reciprocal qty asc", {trades: numeric_trades})
+check("qsql exp prefix projection", exp_zero.len == 1 && exp_zero[1].sym == "ZERO" && exp_zero[1].e == 1.0)
+check("qsql reciprocal prefix where order", recip_sorted.len == 2 && recip_sorted[1].sym == "TWO" && recip_sorted[1].inv == 0.5 && recip_sorted[2].sym == "ONE" && recip_sorted[2].inv == 1.0)
+
+nullable_trades := data.frame({
+  sym: data.symbols({"AAPL", "MSFT", "NVDA", "TSLA"}),
+  price: data.f64({100.0, data.null, 250.0, data.null}),
+})
+null_filtered := q.sql("select sym,missing:null price from trades where null price order by sym desc", {trades: nullable_trades})
+check("qsql null prefix projection where order", null_filtered.len == 2 && null_filtered[1].sym == "TSLA" && null_filtered[1].missing == true && null_filtered[2].sym == "MSFT" && null_filtered[2].missing == true)
+
+comma_where := q.sql("select sym,price from trades where sym=`AAPL,price>=101 order by price asc", {
+  trades: trades,
+})
+check("comma where predicates", comma_where.len == 1 && comma_where.price[1] == 101.0)
+
+semicolon_where := q.sql("select sym,price from trades where sym=`AAPL;price>=101 order by price asc", {
+  trades: trades,
+})
+check("semicolon where predicates", semicolon_where.len == 1 && semicolon_where.price[1] == 101.0)
+
+all_cols := q.sql("select * from trades where price>=100 order by price asc", {trades: trades})
+check("select all columns", all_cols.len == 2 && all_cols.sym[1] == "AAPL" && all_cols.price[1] == 100.5 && all_cols.size[2] == 20)
+
+omitted_select := q.sql("select from trades where price>=100 order by price asc", {trades: trades})
+check("select omitted projection all columns", omitted_select.len == 2 && omitted_select.sym[1] == "AAPL" && omitted_select.price[1] == 100.5 && omitted_select.size[2] == 20)
+
+omitted_exec := q.sql("exec from trades where price>=100 order by price asc", {trades: trades})
+check("exec omitted projection all columns", #q.keys(omitted_exec) == 3 && omitted_exec.sym[1] == "AAPL" && omitted_exec.price[1] == 100.5 && omitted_exec.size[2] == 20)
+
+explain_select := q.explain("select notional:sum price*size by sym from trades where price>100 order by sym asc", {trades: trades})
+explain_update := q.explain(trades, "update notional:price*size from trades where sym=`AAPL")
+explain_join := q.explain("select sym,price,bid from trades left join quotes on sym", {
+  trades: trades,
+  quotes: data.frame({
+    sym: data.symbols({"AAPL"}),
+    bid: data.f64({100.0}),
+  }),
+})
+check("q explain select plan", explain_select.op == "select" && explain_select.source == "trades" && explain_select.where == "(price > 100)" && #explain_select.aggregates == 1 && explain_select.aggregates[1].name == "notional" && explain_select.aggregates[1].fn == "sum" && explain_select.by_exprs[1].name == "sym" && explain_select.order_by[1].column == "sym")
+check("q explain mutation and join plan", explain_update.op == "update" && explain_update.mutation.kind == "update" && explain_update.mutation.assignments[1].name == "notional" && explain_join.join.kind == "left" && explain_join.join.right == "quotes" && explain_join.join.keys[1].left == "sym")
 
 conn := db.memory()
 conn.exec(sql`create table trade_events (

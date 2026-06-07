@@ -1,0 +1,60 @@
+// q_kdb_delta_golden.leia - compact golden examples for kdb+ compatibility edges.
+// Run:
+//   go run ./cmd/leia run examples/data/q_kdb_delta_golden.leia
+
+trades := q.sql(
+  "select trade_id,sym,ts from ([] trade_id:1 2 3; sym:`AAPL`AAPL`MSFT; ts:2026.06.06D09:30:00 2026.06.06D09:30:01 2026.06.06D09:30:00)",
+  {}
+)
+quotes := q.sql(
+  "select sym,ts,bid,seq from ([] sym:`AAPL`AAPL`AAPL`MSFT; ts:2026.06.06D09:30:00 2026.06.06D09:30:00 2026.06.06D09:30:01 2026.06.06D09:29:59; bid:100.0 0N 100.5 80.0; seq:1 2 3 4)",
+  {}
+)
+
+aj0 := q.sql("select trade_id,sym,ts,bid,seq from trades aj0 quotes on sym,ts order by trade_id asc", {trades: trades, quotes: quotes})
+ajf := q.sql("select trade_id,sym,ts,bid,seq from trades ajf quotes on sym,ts order by trade_id asc", {trades: trades, quotes: quotes})
+wj_zero := q.sql("select trade_id,sym,ts,bid,seq from trades wj[0 0] quotes on sym,ts order by trade_id asc", {trades: trades, quotes: quotes})
+
+global_trades := q.sql("select trade_id,ts from ([] trade_id:10 11 12; ts:10 20 30)", {})
+global_quotes := q.sql("select ts,bid from ([] ts:5 15 25; bid:100.0 101.0 102.0)", {})
+global_aj := q.sql("select trade_id,ts,bid from global_trades aj global_quotes on ts order by trade_id asc", {global_trades: global_trades, global_quotes: global_quotes})
+global_wj1 := q.sql("select trade_id,ts,bid from global_trades wj1[-10 0] global_quotes on ts order by trade_id asc", {global_trades: global_trades, global_quotes: global_quotes})
+
+typed := q.sql(
+  "select sym,d,t,ts,qty,px from ([] sym:`AAPL`MSFT; d:2026.06.06 0Nd; t:09:30:00.250 0Nt; ts:2026.06.06D09:30:00.250 0Np; qty:10 0Ni; px:100.5 0N)",
+  {}
+)
+decoded_typed := q.decode(q.encode(typed))
+
+projection_each := q.eval("({x+y}[10;])'1 2 3")
+
+bars := data.frame({
+  sym: data.symbols({"AAPL", "AAPL", "AAPL", "MSFT"}),
+  bucket: data.strings({"09:30", "09:30", "09:31", "09:30"}),
+  seq: data.i64({1, 2, 3, 4}),
+  px: data.f64({100.0, 100.5, 101.0, 80.0}),
+})
+keyed := q.key_by(bars, "sym", "bucket")
+lookup_dup := q.lookup(keyed, "AAPL", "09:30")
+decoded_keyed := q.decode(q.encode(keyed))
+decoded_lookup := q.lookup(decoded_keyed, "AAPL", "09:30")
+decoded_dict := q.decode(q.encode(q.eval("`b`a!(2 3;`x`y)")))
+
+assert(aj0[1].seq == 2 && ajf[2].bid == 100.5)
+assert(#wj_zero[1].bid == 2 && data.is_null(wj_zero[1].bid[2]))
+assert(global_aj[3].bid == 102.0 && global_wj1[2].bid == 101.0)
+assert(decoded_typed[2].d == nil && decoded_typed[2].qty == nil && decoded_typed[2].px == nil)
+assert(projection_each[3] == 13)
+assert(#lookup_dup == 1 && lookup_dup[1].seq == 2)
+assert(#decoded_lookup == 1 && decoded_lookup[1].px == 100.5)
+assert(q.keys(decoded_dict)[1] == "b" && q.value(decoded_dict)[2][2] == "y")
+
+print(string.format(
+  "q kdb delta golden aj0_seq=%d ajf_bid=%.1f wj_rows=%d global_bid=%.1f latest_seq=%d projection_tail=%d",
+  aj0[1].seq,
+  ajf[2].bid,
+  #wj_zero[1].bid,
+  global_aj[3].bid,
+  lookup_dup[1].seq,
+  projection_each[3]
+))

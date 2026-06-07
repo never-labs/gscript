@@ -47,24 +47,10 @@ func (interp *Interpreter) registerBuiltins() {
 		},
 	}))
 
-	typeNames := [TypeChannel + 1]Value{
-		TypeNil:       StringValue("nil"),
-		TypeBool:      StringValue("boolean"),
-		TypeInt:       StringValue("number"),
-		TypeFloat:     StringValue("number"),
-		TypeString:    StringValue("string"),
-		TypeTable:     StringValue("table"),
-		TypeFunction:  StringValue("function"),
-		TypeCoroutine: StringValue("coroutine"),
-		TypeChannel:   StringValue("channel"),
-	}
 	unknownTypeName := StringValue("unknown")
 	typeNameValue := func(v Value) Value {
-		t := v.Type()
-		if int(t) < len(typeNames) {
-			if tv := typeNames[t]; !tv.IsNil() {
-				return tv
-			}
+		if name := v.TypeName(); name != "" {
+			return StringValue(name)
 		}
 		return unknownTypeName
 	}
@@ -368,7 +354,7 @@ func (interp *Interpreter) registerBuiltins() {
 			switch a.Type() {
 			case TypeString:
 				return []Value{IntValue(int64(StringLen(a)))}, nil
-			case TypeTable:
+			case TypeTable, TypeFrame, TypeKeyedFrame:
 				return []Value{IntValue(int64(a.Table().Length()))}, nil
 			case TypeChannel:
 				return []Value{IntValue(int64(a.Channel().Len()))}, nil
@@ -380,7 +366,7 @@ func (interp *Interpreter) registerBuiltins() {
 			switch a.Type() {
 			case TypeString:
 				return IntValue(int64(StringLen(a))), nil
-			case TypeTable:
+			case TypeTable, TypeFrame, TypeKeyedFrame:
 				return IntValue(int64(a.Table().Length())), nil
 			case TypeChannel:
 				return IntValue(int64(a.Channel().Len())), nil
@@ -402,7 +388,7 @@ func (interp *Interpreter) registerBuiltins() {
 			switch a.Type() {
 			case TypeString:
 				return []Value{IntValue(int64(StringLen(a)))}, nil
-			case TypeTable:
+			case TypeTable, TypeFrame, TypeKeyedFrame:
 				return []Value{IntValue(int64(a.Table().Length()))}, nil
 			case TypeChannel:
 				return []Value{IntValue(int64(a.Channel().Len()))}, nil
@@ -414,7 +400,7 @@ func (interp *Interpreter) registerBuiltins() {
 			switch a.Type() {
 			case TypeString:
 				return IntValue(int64(StringLen(a))), nil
-			case TypeTable:
+			case TypeTable, TypeFrame, TypeKeyedFrame:
 				return IntValue(int64(a.Table().Length())), nil
 			case TypeChannel:
 				return IntValue(int64(a.Channel().Len())), nil

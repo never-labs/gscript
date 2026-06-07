@@ -27,7 +27,7 @@ rich_indexes := q.eval("where 100 101.5 100.75 102.25 103 99.5>100")
 top_prices := q.eval("3#103 102.25 101.5 100.75")
 symbols := stable_distinct({"AAPL", "MSFT", "AAPL", "NVDA", "MSFT", "AAPL"})
 
-check("filter indexes", q.count(rich_indexes) == 4 && rich_indexes[1] == 2 && rich_indexes[4] == 5)
+check("filter indexes", q.count(rich_indexes) == 4 && rich_indexes[1] == 1 && rich_indexes[4] == 4)
 check("take prices", q.count(top_prices) == 3 && top_prices[1] == 103 && top_prices[3] == 101.5)
 check("stable distinct", #symbols == 3 && symbols[1] == "AAPL" && symbols[3] == "NVDA")
 
@@ -86,13 +86,24 @@ for i := 1; i <= #db_rollup; i++ {
 roundtrip := conn.query(sql`select sym,notional,fills from q_rollup order by rank`)
 check("db frame qsql sqlite roundtrip", #roundtrip == 3 && roundtrip[1].sym == "MSFT" && roundtrip[1].fills == 2)
 
+market := dofile("examples/data/q_ticks_bars_asof_project/main.leia")
+
+check("market ticks trades quotes", #market.ticks == 15 && #market.trades == 6 && #market.quotes == 7)
+check("market asof xbar vwap", #market.enriched == 6 && #market.bars == 6 && market.bars[1].bucket == "2026-06-06T09:30:00Z" && math.floor(market.bars[1].vwap * 100) == 10012)
+check("market rollups", #market.desk_rollup == 4 && market.desk_rollup[1].desk == "alpha" && #market.parent_rollup == 4 && market.parent_rollup[1].filled == 150.0)
+
 q_complex_data_summary := string.format(
-    "q_complex_data symbols=%d filtered=%d top=%s notional=%.1f db_rows=%d",
+    "q_complex_data symbols=%d filtered=%d top=%s notional=%.1f db_rows=%d ticks=%d trades=%d quotes=%d bars=%d vwap=%.4f",
     #symbols,
     q.count(rich_indexes),
     rollup[1].sym,
     rollup[1].notional,
-    #roundtrip
+    #roundtrip,
+    #market.ticks,
+    #market.trades,
+    #market.quotes,
+    #market.bars,
+    market.bars[1].vwap
 )
 print(q_complex_data_summary)
 
@@ -103,5 +114,12 @@ return {
     side_rollup: side_rollup,
     db_rollup: db_rollup,
     roundtrip: roundtrip,
+    market_ticks: market.ticks,
+    market_trades: market.trades,
+    market_quotes: market.quotes,
+    market_enriched: market.enriched,
+    market_bars: market.bars,
+    market_desk_rollup: market.desk_rollup,
+    market_parent_rollup: market.parent_rollup,
     summary: q_complex_data_summary,
 }

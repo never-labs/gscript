@@ -1,0 +1,21 @@
+print("case:q_time_bucket_asof_project")
+
+result := dofile("examples/data/q_time_bucket_asof_project/main.leia")
+
+assert(result.summary != "")
+assert(#result.market_ticks == 12)
+assert(#result.trades == 8)
+assert(#result.quotes == 9)
+assert(#result.enriched == 8)
+assert(#result.bars == 6)
+assert(#result.top_ticks == 4)
+assert(#result.wide_spreads == 5)
+assert(result.enriched[1].bid == 100.0)
+assert(result.enriched[6].ask == 251.4)
+assert(result.bars[1].sym == "AAPL")
+assert(result.bars[1].bucket == 600)
+assert(math.floor(result.bars[1].vwap * 100) == 10027)
+assert(result.top_ticks[1].sym == "NVDA")
+assert(result.wide_spreads[1].sym == "NVDA")
+
+print("ok")

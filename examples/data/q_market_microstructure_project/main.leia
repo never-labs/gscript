@@ -1,0 +1,114 @@
+// q_market_microstructure_project - kdb+-style market data analytics.
+// Run:
+//   go run ./cmd/leia run examples/data/q_market_microstructure_project/main.leia
+
+func check(name, ok) {
+    assert(ok)
+    print("ok", name)
+}
+
+quotes := q.sql(
+    "select quote_id,sym,ts,bid,ask,venue from ([] quote_id:1 2 3 4 5 6 7 8 9 10; sym:`AAPL`AAPL`AAPL`AAPL`MSFT`MSFT`MSFT`NVDA`NVDA`TSLA; ts:2026.06.06D09:30:00 2026.06.06D09:31:00 2026.06.06D09:32:00 2026.06.06D09:34:00 2026.06.06D09:30:30 2026.06.06D09:32:30 2026.06.06D09:33:30 2026.06.06D09:31:00 2026.06.06D09:33:00 2026.06.06D09:31:00; bid:100.0 100.2 100.5 100.4 250.0 250.8 251.0 880.0 882.0 204.5; ask:100.2 100.4 100.8 100.7 250.4 251.3 251.4 881.0 883.0 205.5; venue:`XNAS`XNAS`BATS`XNAS`XNYS`ARCX`XNYS`XNAS`BATS`XNAS)",
+    {}
+)
+
+raw_trades := q.sql(
+    data.frame({
+        trade_id: data.i64({101, 102, 103, 104, 105, 106, 107, 108, 109}),
+        sym: data.symbols({"AAPL", "AAPL", "AAPL", "MSFT", "MSFT", "MSFT", "NVDA", "NVDA", "TSLA"}),
+        ts: data.timestamp({"2026-06-06T09:30:30Z", "2026-06-06T09:31:45Z", "2026-06-06T09:34:30Z", "2026-06-06T09:31:00Z", "2026-06-06T09:32:45Z", "2026-06-06T09:34:00Z", "2026-06-06T09:31:30Z", "2026-06-06T09:33:30Z", "2026-06-06T09:32:00Z"}),
+        session_time: data.time({"09:30:30", "09:31:45", "09:34:30", "09:31:00", "09:32:45", "09:34:00", "09:31:30", "09:33:30", "09:32:00"}),
+        trade_date: data.date({"2026-06-06", "2026-06-06", "2026-06-06", "2026-06-06", "2026-06-06", "2026-06-06", "2026-06-06", "2026-06-06", "2026-06-06"}),
+        price: data.f64({100.1, 100.55, 100.65, 250.2, 251.1, 251.35, 880.6, 882.5, 205.0}),
+        size: data.i64({100, 80, 120, 50, 40, 70, 10, 15, 30}),
+        venue: data.symbols({"XNAS", "BATS", "XNAS", "XNYS", "ARCX", "XNYS", "XNAS", "BATS", "XNAS"}),
+        cancelled: data.bool({false, false, false, false, true, false, false, false, false}),
+    }),
+    "select trade_id,sym,ts,session_time,trade_date,price,size,venue,cancelled from trades"
+)
+
+ref := q.sql(
+    "select sym,sector,tick_size from ([] sym:`AAPL`MSFT`NVDA`IBM; sector:`hardware`software`semis`mainframe; tick_size:0.01 0.01 0.05 0.01)",
+    {}
+)
+
+venues := q.sql(
+    "select venue,mic_name,region from ([] venue:`XNAS`BATS`XNYS`ARCX; mic_name:`Nasdaq`Bats`NYSE`Arca; region:`US`US`US`US)",
+    {}
+)
+
+clean_trades := q.sql(raw_trades, "delete from trades where cancelled=true")
+with_notional := q.sql(clean_trades, "update notional:price*size from trades where price>0")
+all_live := q.sql(with_notional, "select from trades where price>=0 order by trade_id asc")
+
+enriched := q.sql(
+    "select trade_id,sym,ts,session_time,trade_date,price,size,notional,bid,ask,venue from trades asof join quotes on sym,ts order by trade_id asc",
+    {trades: all_live, quotes: quotes}
+)
+
+enriched = q.sql(enriched, "update spread:ask-bid from trades where bid>0")
+
+sector_joined := q.sql(
+    "select trade_id,sym,sector,tick_size,price,size,notional,bid,ask,spread,venue from trades left join ref on sym order by trade_id asc",
+    {trades: enriched, ref: ref}
+)
+
+venue_enriched := q.sql(
+    "select trade_id,sym,sector,venue,mic_name,region,price,size,notional,spread from trades join venues on venue order by trade_id asc",
+    {trades: sector_joined, venues: venues}
+)
+
+bars := q.sql(
+    enriched,
+    "select notional:sum price*size, shares:sum size, fills:count i, avg_spread:avg spread, first_px:first price, last_px:last price by sym,bucket:xbar 120000000000 ts from trades order by sym asc,bucket asc"
+)
+
+venue_rollup := q.sql(
+    venue_enriched,
+    "select notional:sum notional, shares:sum size, fills:count i, avg_spread:avg spread by venue,mic_name from trades order by notional desc"
+)
+
+wide_spreads := q.sql(enriched, "select trade_id,sym,spread from trades where spread>0.35 order by spread desc,trade_id asc")
+opening := q.sql(all_live, "select trade_id,sym,session_time,trade_date,price from trades where session_time=\"09:30:30\"")
+date_slice := q.sql(all_live, "select trade_id,sym,trade_date from trades where trade_date=\"2026-06-06\" order by trade_id asc take 3")
+unknown_sector := q.sql(sector_joined, "select trade_id,sym,sector from trades where sector=null")
+trimmed_columns := q.sql(sector_joined, "delete tick_size from trades")
+
+for i := 1; i <= #bars; i++ {
+    row := bars[i]
+    row.vwap = row.notional / row.shares
+}
+
+check("clean cancelled trades", #raw_trades == 9 && #clean_trades == 8 && #all_live == 8 && all_live[5].trade_id == 106)
+check("typed temporal filters", #opening == 1 && opening[1].trade_id == 101 && #date_slice == 3 && date_slice[3].trade_id == 103)
+check("asof joins quotes by sym timestamp", #enriched == 8 && enriched[1].bid == 100.0 && enriched[2].bid == 100.2 && enriched[4].ask == 250.4 && enriched[8].bid == 204.5)
+check("left join keeps unknown symbol", #sector_joined == 8 && #unknown_sector == 1 && unknown_sector[1].sym == "TSLA")
+check("inner venue join enriches rows", #venue_enriched == 8 && venue_enriched[1].mic_name == "Nasdaq" && venue_enriched[2].mic_name == "Bats")
+check("xbar grouped bars", #bars == 7 && bars[1].sym == "AAPL" && bars[1].bucket == "2026-06-06T09:30:00Z" && bars[7].sym == "TSLA")
+check("bar aggregates and vwap", bars[1].fills == 2 && math.floor(bars[1].vwap * 100) == 10030 && bars[4].fills == 1 && math.floor(bars[4].vwap * 100) == 25135)
+check("venue rollup", #venue_rollup == 3 && venue_rollup[1].venue == "XNAS" && venue_rollup[1].fills == 4)
+check("spread filter and column delete", #wide_spreads == 5 && wide_spreads[1].sym == "NVDA" && wide_spreads[3].sym == "TSLA" && trimmed_columns.column_kinds.tick_size == nil)
+
+summary := string.format(
+    "q_market_microstructure trades=%d quotes=%d enriched=%d bars=%d top_venue=%s notional=%.1f unknown=%d",
+    #all_live,
+    #quotes,
+    #enriched,
+    #bars,
+    venue_rollup[1].venue,
+    venue_rollup[1].notional,
+    #unknown_sector
+)
+print(summary)
+
+return {
+    trades: all_live,
+    quotes: quotes,
+    enriched: enriched,
+    sector_joined: sector_joined,
+    venue_enriched: venue_enriched,
+    bars: bars,
+    venue_rollup: venue_rollup,
+    wide_spreads: wide_spreads,
+    summary: summary,
+}

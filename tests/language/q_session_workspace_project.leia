@@ -1,0 +1,32 @@
+print("case:q_session_workspace_project")
+
+func contains(haystack, needle) {
+  return string.find(tostring(haystack), needle, 1, true) != nil
+}
+
+s := q.session()
+assert(s.kind == "q_session")
+assert(s.eval("x:41") == 41)
+assert(s.eval("x+1") == 42)
+assert(s.eval("\\p") == 0)
+assert(s.eval("\\p 5000") == 5000)
+assert(s.eval("\\p") == 5000)
+
+load_dir := ".tmp/q_session_workspace_project"
+assert(fs.mkdirAll(load_dir))
+load_file := load_dir .. "/loaded.q"
+assert(fs.writefile(load_file, "loaded:10;loaded_fn:{x+loaded};loaded_fn[5]"))
+assert(s.eval("\\l " .. load_file) == 15)
+assert(s.eval("loaded_fn[7]") == 17)
+
+q.eval("stateless:10")
+ok, err := pcall(q.eval, "stateless+1")
+assert(ok == false && string.len(tostring(err)) > 0)
+
+w := q.workspace()
+assert(w.eval("a:3") == 3)
+assert(w.eval("a*4") == 12)
+ok, err = pcall(s.eval, "a")
+assert(ok == false && string.len(tostring(err)) > 0)
+
+print("ok q session workspace")

@@ -1,0 +1,116 @@
+// q market microstructure hot benchmark: clean, enrich, asof, join, bucket, roll up.
+
+N := 2048
+REPS := 120
+MOD := 1000000007
+
+func make_symbols(n, mod, prefix) {
+    t := {}
+    for i := 1; i <= n; i++ {
+        t[i] = string.format("%s%d", prefix, i % mod)
+    }
+    return data.symbols(t)
+}
+
+func make_ts(n, offset) {
+    t := {}
+    for i := 1; i <= n; i++ {
+        t[i] = offset + i * 1000000000
+    }
+    return data.timestamp(t)
+}
+
+func make_price(n, base) {
+    t := {}
+    for i := 1; i <= n; i++ {
+        t[i] = base + (i % 197) * 0.25
+    }
+    return data.f64(t)
+}
+
+func make_size(n) {
+    t := {}
+    for i := 1; i <= n; i++ {
+        t[i] = 1 + (i % 101)
+    }
+    return data.i64(t)
+}
+
+func make_bool(n) {
+    t := {}
+    for i := 1; i <= n; i++ {
+        t[i] = i % 113 == 0
+    }
+    return data.bool(t)
+}
+
+func mix(sum, v) {
+    return (sum * 131 + v) % MOD
+}
+
+base_ts := 1780738200000000000
+ids := {}
+for i := 1; i <= N; i++ {
+    ids[i] = i
+}
+
+trades := data.frame({
+    trade_id: data.i64(ids),
+    sym: make_symbols(N, 96, "S"),
+    ts: make_ts(N, base_ts + 30 * 1000000000),
+    price: make_price(N, 100.0),
+    size: make_size(N),
+    venue: make_symbols(N, 8, "V"),
+    cancelled: make_bool(N),
+})
+
+quotes := data.frame({
+    sym: make_symbols(N, 96, "S"),
+    ts: make_ts(N, base_ts),
+    bid: make_price(N, 99.75),
+    ask: make_price(N, 100.25),
+    venue: make_symbols(N, 8, "V"),
+})
+
+venue_ids := {}
+venue_names := {}
+for i := 1; i <= 8; i++ {
+    venue_ids[i] = string.format("V%d", (i - 1) % 8)
+    venue_names[i] = string.format("Venue-%d", i)
+}
+venues := data.frame({
+    venue: data.symbols(venue_ids),
+    mic_name: data.symbols(venue_names),
+})
+
+func run_hot(trades, quotes, venues, reps) {
+    checksum := 0
+    for r := 1; r <= reps; r++ {
+        clean := q.sql(trades, "delete from trades where cancelled=true")
+        notional := q.sql(clean, "update notional:price*size from trades where price>0")
+        enriched := q.sql(
+            "select trade_id,sym,ts,price,size,notional,bid,ask,spread:ask-bid,venue from trades asof join quotes on sym,ts",
+            {trades: notional, quotes: quotes}
+        )
+        joined := q.sql(
+            "select trade_id,sym,venue,mic_name,price,size,notional,spread from trades join venues on venue order by trade_id asc take 64",
+            {trades: enriched, venues: venues}
+        )
+        bars := q.sql(enriched, "select notional:sum price*size, shares:sum size, fills:count i, avg_spread:avg spread by sym,bucket:xbar 60000000000 ts from trades order by notional desc take 16")
+        first := joined[1]
+        top := bars[1]
+        checksum = mix(checksum, #clean + #joined + #bars + first.trade_id + top.fills * 17)
+        checksum = mix(checksum, math.floor(top.notional) + math.floor(top.avg_spread * 1000))
+    }
+    return checksum
+}
+
+warm := run_hot(trades, quotes, venues, 2)
+collectgarbage("collect")
+t0 := time.now()
+checksum := run_hot(trades, quotes, venues, REPS)
+elapsed := time.since(t0)
+
+print(string.format("q_market_microstructure_hot trades=%d quotes=%d reps=%d", N, N, REPS))
+print(string.format("checksum: %d", mix(checksum, warm)))
+print(string.format("Time: %.3fs", elapsed))

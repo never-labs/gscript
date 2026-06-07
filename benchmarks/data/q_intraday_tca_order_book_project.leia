@@ -1,0 +1,32 @@
+// q intraday TCA/order book smoke benchmark. The heavy semantic assertions live
+// in the example; this wrapper keeps the benchmark gate focused on execution.
+
+REPS := 4
+MOD := 1000000007
+
+func mix(sum, v) {
+    return (sum * 131 + v) % MOD
+}
+
+func run_hot(reps) {
+    checksum := 0
+    for r := 1; r <= reps; r++ {
+        result := dofile("examples/data/q_intraday_tca_order_book_project/main.leia")
+        assert(#result.trades == 5)
+        assert(#result.bars == 5)
+        assert(#result.rebate_inner == 5)
+        checksum = mix(checksum, #result.ticks + #result.quotes + #result.trades + #result.bars)
+        checksum = mix(checksum, math.floor(result.daily_rollup[1].notional) + math.floor(result.bars[1].vwap * 100))
+    }
+    return checksum
+}
+
+warm := run_hot(1)
+collectgarbage("collect")
+t0 := time.now()
+checksum := run_hot(REPS)
+elapsed := time.since(t0)
+
+print(string.format("q_intraday_tca_order_book_project_hot reps=%d", REPS))
+print(string.format("checksum: %d", mix(checksum, warm)))
+print(string.format("Time: %.3fs", elapsed))

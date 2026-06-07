@@ -3,8 +3,12 @@ package data
 
 import (
 	"fmt"
+	"hash/fnv"
+	"math"
 	"sort"
+	"strconv"
 	"strings"
+	"time"
 )
 
 type Kind string
@@ -25,9 +29,25 @@ const (
 	KindF64       Kind = "f64"
 	KindString    Kind = "string"
 	KindSymbol    Kind = "symbol"
+	KindMonth     Kind = "month"
 	KindDate      Kind = "date"
+	KindDateTime  Kind = "datetime"
+	KindTimespan  Kind = "timespan"
+	KindMinute    Kind = "minute"
+	KindSecond    Kind = "second"
 	KindTime      Kind = "time"
 	KindTimestamp Kind = "timestamp"
+)
+
+// RuntimeValueKind names data values when they cross into the runtime through a
+// table facade. The constants live in the data foundation so q/data bindings can
+// agree on stable categories without duplicating marker strings.
+type RuntimeValueKind string
+
+const (
+	RuntimeValueFrame      RuntimeValueKind = "data_frame"
+	RuntimeValueColumn     RuntimeValueKind = "data_column"
+	RuntimeValueKeyedFrame RuntimeValueKind = "data_keyed_frame"
 )
 
 // Symbol is Leia's categorical scalar. q symbols lower to this type, but the
@@ -37,6 +57,22 @@ type Symbol string
 // Date is a calendar date encoded as days since 1970-01-01.
 type Date int64
 
+// Month is a calendar month encoded as months since 1970-01.
+type Month int64
+
+// DateTime is a civil date-time encoded as nanoseconds since 1970-01-01
+// 00:00:00 on the proleptic Gregorian calendar.
+type DateTime int64
+
+// Timespan is a duration encoded as nanoseconds.
+type Timespan int64
+
+// Minute is a time-of-day encoded as minutes since midnight.
+type Minute int64
+
+// Second is a time-of-day encoded as seconds since midnight.
+type Second int64
+
 // Time is a time-of-day encoded as nanoseconds since midnight.
 type Time int64
 
@@ -45,9 +81,33 @@ type Timestamp int64
 
 const nanosPerDay int64 = 24 * 60 * 60 * 1_000_000_000
 
+func MonthFromMonths(months int64) Month { return Month(months) }
+
+func (m Month) Months() int64 { return int64(m) }
+
 func DateFromDays(days int64) Date { return Date(days) }
 
 func (d Date) Days() int64 { return int64(d) }
+
+func DateTimeFromUnixNanos(nanos int64) DateTime { return DateTime(nanos) }
+
+func (d DateTime) UnixNanos() int64 { return int64(d) }
+
+func TimespanFromNanos(nanos int64) Timespan { return Timespan(nanos) }
+
+func (t Timespan) Nanos() int64 { return int64(t) }
+
+func MinuteFromMinutes(minutes int64) Minute { return Minute(minutes) }
+
+func (m Minute) Minutes() int64 { return int64(m) }
+
+func (m Minute) Valid() bool { return m >= 0 && int64(m) < 24*60 }
+
+func SecondFromSeconds(seconds int64) Second { return Second(seconds) }
+
+func (s Second) Seconds() int64 { return int64(s) }
+
+func (s Second) Valid() bool { return s >= 0 && int64(s) < 24*60*60 }
 
 func TimeFromNanos(nanos int64) Time { return Time(nanos) }
 
@@ -65,12 +125,40 @@ type Null struct{}
 
 var NullValue = Null{}
 
+// TypedNull is a missing scalar with an intended data kind. It is useful at
+// expression boundaries, where the source language carries a null's target type
+// before it is normalized into a columnar array.
+type TypedNull struct {
+	Kind Kind
+}
+
+func NullForKind(kind Kind) any {
+	if kind == "" || kind == KindAny || kind == KindNull {
+		return NullValue
+	}
+	return TypedNull{Kind: kind}
+}
+
 func IsNull(v any) bool {
 	if v == nil {
 		return true
 	}
-	_, ok := v.(Null)
-	return ok
+	switch v.(type) {
+	case Null, TypedNull:
+		return true
+	default:
+		return false
+	}
+}
+
+func NullKind(v any) (Kind, bool) {
+	if typed, ok := v.(TypedNull); ok {
+		return typed.Kind, typed.Kind != "" && typed.Kind != KindAny && typed.Kind != KindNull
+	}
+	if IsNull(v) {
+		return KindNull, true
+	}
+	return "", false
 }
 
 type Array interface {
@@ -81,6 +169,207 @@ type Array interface {
 	Gather(indexes []int) Array
 }
 
+const (
+	ArrayAttributeSorted  Symbol = "s"
+	ArrayAttributeGrouped Symbol = "g"
+	ArrayAttributeParted  Symbol = "p"
+	ArrayAttributeUnique  Symbol = "u"
+)
+
+// ArrayMetadata carries optional planner-facing facts about a columnar array.
+// It is intentionally small and runtime-independent: q attributes, future
+// indexes, and typed kernels can all preserve these facts without importing q.
+type ArrayMetadata struct {
+	Attributes []Symbol
+	Indexes    map[Symbol]ArrayIndex
+}
+
+func (m ArrayMetadata) HasAttribute(attr Symbol) bool {
+	for _, existing := range m.Attributes {
+		if existing == attr {
+			return true
+		}
+	}
+	return false
+}
+
+func (m ArrayMetadata) HasIndex(attr Symbol) bool {
+	_, ok := m.Indexes[attr]
+	return ok
+}
+
+func (m ArrayMetadata) Index(attr Symbol) (ArrayIndex, bool) {
+	index, ok := m.Indexes[attr]
+	if !ok {
+		return ArrayIndex{}, false
+	}
+	return index.clone(), true
+}
+
+type arrayMetadataProvider interface {
+	ArrayMetadata() ArrayMetadata
+}
+
+// ArrayIndex is a reusable value-to-rows sidecar for planner attributes such as
+// q's `g#` and `u#`. Keys and row lists preserve first-seen order.
+type ArrayIndex struct {
+	Attribute Symbol
+	Keys      []any
+	Rows      [][]int
+	RowsByKey map[string][]int
+}
+
+func (idx ArrayIndex) clone() ArrayIndex {
+	out := ArrayIndex{
+		Attribute: idx.Attribute,
+		Keys:      append([]any(nil), idx.Keys...),
+		Rows:      make([][]int, len(idx.Rows)),
+	}
+	if idx.RowsByKey != nil {
+		out.RowsByKey = make(map[string][]int, len(idx.RowsByKey))
+	}
+	for i, rows := range idx.Rows {
+		out.Rows[i] = append([]int(nil), rows...)
+	}
+	for key, rows := range idx.RowsByKey {
+		out.RowsByKey[key] = append([]int(nil), rows...)
+	}
+	return out
+}
+
+func (m ArrayMetadata) clone() ArrayMetadata {
+	out := ArrayMetadata{Attributes: append([]Symbol(nil), m.Attributes...)}
+	if len(m.Indexes) > 0 {
+		out.Indexes = make(map[Symbol]ArrayIndex, len(m.Indexes))
+		for attr, index := range m.Indexes {
+			out.Indexes[attr] = index.clone()
+		}
+	}
+	return out
+}
+
+func (m ArrayMetadata) cloneWithoutIndexes() ArrayMetadata {
+	return ArrayMetadata{Attributes: append([]Symbol(nil), m.Attributes...)}
+}
+
+func (m ArrayMetadata) cloneWithRebuiltIndexes(array Array) ArrayMetadata {
+	out := ArrayMetadata{Attributes: append([]Symbol(nil), m.Attributes...)}
+	if len(m.Indexes) == 0 || array == nil {
+		return out
+	}
+	out.Indexes = make(map[Symbol]ArrayIndex, len(m.Indexes))
+	for attr := range m.Indexes {
+		index, err := BuildArrayIndex(array, attr)
+		if err == nil {
+			out.Indexes[attr] = index
+		}
+	}
+	return out
+}
+
+type attributedArray struct {
+	array    Array
+	metadata ArrayMetadata
+}
+
+// WithArrayAttribute returns an Array carrying an additional planner attribute.
+func WithArrayAttribute(array Array, attr Symbol) Array {
+	if array == nil || attr == "" {
+		return array
+	}
+	metadata := ArrayMetadataOf(array)
+	if metadata.HasAttribute(attr) {
+		return attributedArray{array: array, metadata: metadata}
+	}
+	metadata.Attributes = append(metadata.Attributes, attr)
+	if attr == ArrayAttributeGrouped || attr == ArrayAttributeUnique {
+		if index, err := BuildArrayIndex(array, attr); err == nil {
+			if metadata.Indexes == nil {
+				metadata.Indexes = make(map[Symbol]ArrayIndex, 1)
+			}
+			metadata.Indexes[attr] = index
+		}
+	}
+	return attributedArray{array: array, metadata: metadata}
+}
+
+func ArrayMetadataOf(array Array) ArrayMetadata {
+	if array == nil {
+		return ArrayMetadata{}
+	}
+	if provider, ok := array.(arrayMetadataProvider); ok {
+		return provider.ArrayMetadata().clone()
+	}
+	return ArrayMetadata{}
+}
+
+func ArrayHasAttribute(array Array, attr Symbol) bool {
+	return ArrayMetadataOf(array).HasAttribute(attr)
+}
+
+func (a attributedArray) Kind() Kind { return a.array.Kind() }
+
+func (a attributedArray) Len() int { return a.array.Len() }
+
+func (a attributedArray) At(row int) (any, bool) { return a.array.At(row) }
+
+func (a attributedArray) Values() []any { return a.array.Values() }
+
+func (a attributedArray) Gather(indexes []int) Array {
+	gathered := a.array.Gather(indexes)
+	return attributedArray{array: gathered, metadata: a.metadata.cloneWithRebuiltIndexes(gathered)}
+}
+
+func (a attributedArray) ArrayMetadata() ArrayMetadata {
+	return a.metadata.clone()
+}
+
+func BuildArrayIndex(array Array, attr Symbol) (ArrayIndex, error) {
+	if array == nil {
+		return ArrayIndex{}, fmt.Errorf("array index source is nil")
+	}
+	index := ArrayIndex{
+		Attribute: attr,
+		Keys:      make([]any, 0),
+		Rows:      make([][]int, 0),
+		RowsByKey: make(map[string][]int),
+	}
+	positionByKey := make(map[string]int)
+	for row := 0; row < array.Len(); row++ {
+		value, ok := array.At(row)
+		if !ok {
+			return ArrayIndex{}, fmt.Errorf("array index row %d out of range", row)
+		}
+		key := arrayValueKey(array.Kind(), value)
+		if position, ok := positionByKey[key]; ok {
+			index.Rows[position] = append(index.Rows[position], row)
+			index.RowsByKey[key] = append(index.RowsByKey[key], row)
+			continue
+		}
+		positionByKey[key] = len(index.Keys)
+		index.Keys = append(index.Keys, value)
+		index.Rows = append(index.Rows, []int{row})
+		index.RowsByKey[key] = []int{row}
+	}
+	return index, nil
+}
+
+func ArrayIndexFor(array Array, attr Symbol) (ArrayIndex, bool) {
+	if array == nil {
+		return ArrayIndex{}, false
+	}
+	if index, ok := ArrayMetadataOf(array).Index(attr); ok {
+		return index, true
+	}
+	return ArrayIndex{}, false
+}
+
+func arrayValueKey(kind Kind, value any) string {
+	var b strings.Builder
+	appendKeyPart(&b, kind, value)
+	return b.String()
+}
+
 type columnArray[T any] struct {
 	kind Kind
 	data []T
@@ -89,6 +378,20 @@ type columnArray[T any] struct {
 type nullableArray struct {
 	kind Kind
 	data []any
+}
+
+type encodedArray struct {
+	kind   Kind
+	domain []any
+	codes  []int32
+}
+
+// EncodedArrayInfo exposes dictionary-encoded column storage. The decoded
+// values remain visible through Array.At and Array.Values; consumers that can
+// exploit categorical storage can inspect the stable domain and row codes.
+type EncodedArrayInfo interface {
+	EncodedDomain() []any
+	EncodedCodes() []int32
 }
 
 func NewBool(values []bool) Array {
@@ -147,8 +450,28 @@ func NewSymbols(values []string) Array {
 	return columnArray[Symbol]{kind: KindSymbol, data: out}
 }
 
+func NewMonth(values []Month) Array {
+	return columnArray[Month]{kind: KindMonth, data: append([]Month(nil), values...)}
+}
+
 func NewDate(values []Date) Array {
 	return columnArray[Date]{kind: KindDate, data: append([]Date(nil), values...)}
+}
+
+func NewDateTime(values []DateTime) Array {
+	return columnArray[DateTime]{kind: KindDateTime, data: append([]DateTime(nil), values...)}
+}
+
+func NewTimespan(values []Timespan) Array {
+	return columnArray[Timespan]{kind: KindTimespan, data: append([]Timespan(nil), values...)}
+}
+
+func NewMinute(values []Minute) Array {
+	return columnArray[Minute]{kind: KindMinute, data: append([]Minute(nil), values...)}
+}
+
+func NewSecond(values []Second) Array {
+	return columnArray[Second]{kind: KindSecond, data: append([]Second(nil), values...)}
 }
 
 func NewTime(values []Time) Array {
@@ -161,6 +484,52 @@ func NewTimestamp(values []Timestamp) Array {
 
 func NewAny(values []any) Array {
 	return nullableArray{kind: KindAny, data: normalizeNulls(values)}
+}
+
+func NewEncoded(kind Kind, domain []any, codes []int32) (Array, error) {
+	copiedDomain := normalizeNulls(domain)
+	for i, code := range codes {
+		if code < -1 || int(code) >= len(copiedDomain) {
+			return nil, fmt.Errorf("encoded array code %d at row %d outside domain length %d", code, i, len(copiedDomain))
+		}
+	}
+	return encodedArray{kind: kind, domain: copiedDomain, codes: append([]int32(nil), codes...)}, nil
+}
+
+func NewEncodedSymbols(values []Symbol) Array {
+	domain := make([]any, 0, len(values))
+	index := make(map[Symbol]int32, len(values))
+	codes := make([]int32, len(values))
+	for i, value := range values {
+		code, ok := index[value]
+		if !ok {
+			code = int32(len(domain))
+			index[value] = code
+			domain = append(domain, value)
+		}
+		codes[i] = code
+	}
+	array, err := NewEncoded(KindSymbol, domain, codes)
+	if err != nil {
+		panic(err)
+	}
+	return array
+}
+
+func EncodedDomainOf(array Array) ([]any, bool) {
+	encoded, ok := array.(EncodedArrayInfo)
+	if !ok {
+		return nil, false
+	}
+	return encoded.EncodedDomain(), true
+}
+
+func EncodedCodesOf(array Array) ([]int32, bool) {
+	encoded, ok := array.(EncodedArrayInfo)
+	if !ok {
+		return nil, false
+	}
+	return encoded.EncodedCodes(), true
 }
 
 func (a columnArray[T]) Kind() Kind { return a.kind }
@@ -219,6 +588,55 @@ func (a nullableArray) Gather(indexes []int) Array {
 	return nullableArray{kind: a.kind, data: out}
 }
 
+func (a encodedArray) Kind() Kind { return a.kind }
+
+func (a encodedArray) Len() int { return len(a.codes) }
+
+func (a encodedArray) At(row int) (any, bool) {
+	if row < 0 || row >= len(a.codes) {
+		return nil, false
+	}
+	code := a.codes[row]
+	if code < 0 {
+		return NullValue, true
+	}
+	if int(code) >= len(a.domain) {
+		return nil, false
+	}
+	return a.domain[code], true
+}
+
+func (a encodedArray) Values() []any {
+	out := make([]any, len(a.codes))
+	for i := range a.codes {
+		v, ok := a.At(i)
+		if !ok {
+			panic(fmt.Sprintf("encoded array code %d at row %d outside domain length %d", a.codes[i], i, len(a.domain)))
+		}
+		out[i] = v
+	}
+	return out
+}
+
+func (a encodedArray) Gather(indexes []int) Array {
+	out := make([]int32, len(indexes))
+	for i, row := range indexes {
+		if row < 0 || row >= len(a.codes) {
+			panic(fmt.Sprintf("data array gather index %d out of range", row))
+		}
+		out[i] = a.codes[row]
+	}
+	return encodedArray{kind: a.kind, domain: append([]any(nil), a.domain...), codes: out}
+}
+
+func (a encodedArray) EncodedDomain() []any {
+	return append([]any(nil), a.domain...)
+}
+
+func (a encodedArray) EncodedCodes() []int32 {
+	return append([]int32(nil), a.codes...)
+}
+
 type Column struct {
 	Name Symbol
 	Data Array
@@ -226,6 +644,13 @@ type Column struct {
 
 func NewColumn(name Symbol, values []any) Column {
 	return Column{Name: name, Data: InferArray(values)}
+}
+
+// NewColumnWithKind builds a column with an explicit storage kind, preserving
+// that kind even when all values are null. Bindings use it when source metadata
+// already describes the intended column type.
+func NewColumnWithKind(name Symbol, kind Kind, values []any) (Column, error) {
+	return columnWithKind(name, kind, values)
 }
 
 type Schema struct {
@@ -240,6 +665,32 @@ func (s Schema) Names() []Symbol {
 func (s Schema) Kind(name Symbol) (Kind, bool) {
 	kind, ok := s.kinds[name]
 	return kind, ok
+}
+
+func (s Schema) CompatibleWith(other Schema) bool {
+	if len(s.names) != len(other.names) {
+		return false
+	}
+	for i, name := range s.names {
+		if other.names[i] != name {
+			return false
+		}
+		if s.kinds[name] != other.kinds[name] {
+			return false
+		}
+	}
+	return true
+}
+
+func (s Schema) Fingerprint() string {
+	h := fnv.New64a()
+	for _, name := range s.names {
+		_, _ = h.Write([]byte(name))
+		_, _ = h.Write([]byte{0})
+		_, _ = h.Write([]byte(s.kinds[name]))
+		_, _ = h.Write([]byte{0xff})
+	}
+	return fmt.Sprintf("%016x", h.Sum64())
 }
 
 type Frame struct {
@@ -292,6 +743,22 @@ func (f Frame) Schema() Schema {
 	return Schema{names: append([]Symbol(nil), f.schema.names...), kinds: kinds}
 }
 
+func (f Frame) SchemaFingerprint() string {
+	return f.schema.Fingerprint()
+}
+
+func (f Frame) Clone() (Frame, error) {
+	return f.Gather(allIndexes(f.rows))
+}
+
+func (f Frame) Columns() []Column {
+	cols := make([]Column, 0, len(f.schema.names))
+	for _, name := range f.schema.names {
+		cols = append(cols, Column{Name: name, Data: f.columns[name].Gather(allIndexes(f.rows))})
+	}
+	return cols
+}
+
 func (f Frame) Column(name Symbol) (Array, bool) {
 	col, ok := f.columns[name]
 	return col, ok
@@ -334,23 +801,58 @@ func GatherFrame(frame Frame, indexes []int) (Frame, error) {
 	return frame.Gather(indexes)
 }
 
+func EmptyLike(frame Frame) (Frame, error) {
+	return frame.Gather(nil)
+}
+
+func SelectFrameColumns(frame Frame, names ...Symbol) (Frame, error) {
+	if len(names) == 0 {
+		return EmptyLike(frame)
+	}
+	cols := make([]Column, 0, len(names))
+	seen := make(map[Symbol]struct{}, len(names))
+	for _, name := range names {
+		if name == "" {
+			return Frame{}, fmt.Errorf("select column name must not be empty")
+		}
+		if _, ok := seen[name]; ok {
+			return Frame{}, fmt.Errorf("select column %q is duplicated", name)
+		}
+		col, ok := frame.Column(name)
+		if !ok {
+			return Frame{}, fmt.Errorf("select column %q does not exist", name)
+		}
+		cols = append(cols, Column{Name: name, Data: col})
+		seen[name] = struct{}{}
+	}
+	return NewFrame(cols...)
+}
+
+func SameSchema(left, right Frame) bool {
+	return left.schema.CompatibleWith(right.schema)
+}
+
 func Take(array Array, n int) (Array, error) {
 	if array == nil {
 		return nil, fmt.Errorf("take array is nil")
 	}
-	indexes, err := takeIndexes(array.Len(), n)
+	n, err := takeCount(array.Len(), n)
 	if err != nil {
 		return nil, err
 	}
-	return array.Gather(indexes), nil
+	return takeArray(array, n), nil
 }
 
 func TakeFrame(frame Frame, n int) (Frame, error) {
-	indexes, err := takeIndexes(frame.Len(), n)
+	n, err := takeCount(frame.Len(), n)
 	if err != nil {
 		return Frame{}, err
 	}
-	return frame.Gather(indexes)
+	cols := make([]Column, 0, len(frame.schema.names))
+	for _, name := range frame.schema.names {
+		cols = append(cols, Column{Name: name, Data: takeArray(frame.columns[name], n)})
+	}
+	return NewFrame(cols...)
 }
 
 func WhereMask(mask Array) ([]int, error) {
@@ -380,6 +882,101 @@ func WhereMask(mask Array) ([]int, error) {
 	return indexes, nil
 }
 
+func EqualMask(array Array, value any) (Array, error) {
+	return compareMask(array, OpEQ, value)
+}
+
+func CompareMask(array Array, op Op, value any) (Array, error) {
+	switch op {
+	case OpEQ, OpNE, OpLT, OpLE, OpGT, OpGE:
+	default:
+		return nil, fmt.Errorf("compare mask unsupported operator %s", op)
+	}
+	return compareMask(array, op, value)
+}
+
+func WithinMask(array Array, low, high any, highClosed bool) (Array, error) {
+	if array == nil {
+		return nil, fmt.Errorf("within mask array is nil")
+	}
+	out := make([]bool, array.Len())
+	if IsNull(low) || IsNull(high) {
+		return NewBool(out), nil
+	}
+	low = normalizeScalar(array.Kind(), low)
+	high = normalizeScalar(array.Kind(), high)
+	if ok := withinMaskTyped(array, low, high, highClosed, out); ok {
+		return NewBool(out), nil
+	}
+	for row := 0; row < array.Len(); row++ {
+		v, ok := array.At(row)
+		if !ok {
+			return nil, fmt.Errorf("within mask row %d out of range", row)
+		}
+		if IsNull(v) {
+			continue
+		}
+		if compare(v, low) < 0 {
+			continue
+		}
+		if highClosed {
+			out[row] = compare(v, high) <= 0
+		} else {
+			out[row] = compare(v, high) < 0
+		}
+	}
+	return NewBool(out), nil
+}
+
+func compareMask(array Array, op Op, value any) (Array, error) {
+	if array == nil {
+		return nil, fmt.Errorf("compare mask array is nil")
+	}
+	out := make([]bool, array.Len())
+	if IsNull(value) {
+		for row := 0; row < array.Len(); row++ {
+			v, ok := array.At(row)
+			if !ok {
+				return nil, fmt.Errorf("compare mask row %d out of range", row)
+			}
+			eq := IsNull(v)
+			switch op {
+			case OpEQ:
+				out[row] = eq
+			case OpNE:
+				out[row] = !eq
+			default:
+				out[row] = false
+			}
+		}
+		return NewBool(out), nil
+	}
+	value = normalizeScalar(array.Kind(), value)
+	if ok := compareMaskTyped(array, op, value, out); ok {
+		return NewBool(out), nil
+	}
+	for row := 0; row < array.Len(); row++ {
+		v, ok := array.At(row)
+		if !ok {
+			return nil, fmt.Errorf("compare mask row %d out of range", row)
+		}
+		if IsNull(v) {
+			out[row] = op == OpNE
+			continue
+		}
+		result, err := ApplyBinary(op, v, value)
+		if err != nil {
+			return nil, err
+		}
+		keep, ok := result.(bool)
+		if !ok {
+			return nil, fmt.Errorf("compare mask operator %s did not return bool", op)
+		}
+		out[row] = keep
+	}
+	return NewBool(out), nil
+}
+
 func FilterMask(frame Frame, mask Array) (Frame, error) {
 	if mask == nil {
 		return Frame{}, fmt.Errorf("filter mask is nil")
@@ -392,6 +989,78 @@ func FilterMask(frame Frame, mask Array) (Frame, error) {
 		return Frame{}, err
 	}
 	return frame.Gather(indexes)
+}
+
+func BucketFloor(array Array, interval any) (Array, error) {
+	if array == nil {
+		return nil, fmt.Errorf("bucket floor array is nil")
+	}
+	values := make([]any, array.Len())
+	switch array.Kind() {
+	case KindI8, KindI16, KindI32, KindI64, KindMonth, KindDate, KindDateTime, KindTimespan, KindMinute, KindSecond, KindTime, KindTimestamp:
+		width, err := bucketInt64Interval(array.Kind(), interval)
+		if err != nil {
+			return nil, err
+		}
+		for row := 0; row < array.Len(); row++ {
+			v, ok := array.At(row)
+			if !ok {
+				return nil, fmt.Errorf("bucket floor row %d out of range", row)
+			}
+			if IsNull(v) {
+				values[row] = NullValue
+				continue
+			}
+			bucket, err := bucketFloorInt64Value(array.Kind(), v, width)
+			if err != nil {
+				return nil, fmt.Errorf("bucket floor row %d: %w", row, err)
+			}
+			values[row] = bucket
+		}
+	case KindU8, KindU16, KindU32, KindU64:
+		width, err := bucketUint64Interval(interval)
+		if err != nil {
+			return nil, err
+		}
+		for row := 0; row < array.Len(); row++ {
+			v, ok := array.At(row)
+			if !ok {
+				return nil, fmt.Errorf("bucket floor row %d out of range", row)
+			}
+			if IsNull(v) {
+				values[row] = NullValue
+				continue
+			}
+			bucket, err := bucketFloorUint64Value(array.Kind(), v, width)
+			if err != nil {
+				return nil, fmt.Errorf("bucket floor row %d: %w", row, err)
+			}
+			values[row] = bucket
+		}
+	case KindF32, KindF64:
+		width, err := bucketFloat64Interval(interval)
+		if err != nil {
+			return nil, err
+		}
+		for row := 0; row < array.Len(); row++ {
+			v, ok := array.At(row)
+			if !ok {
+				return nil, fmt.Errorf("bucket floor row %d out of range", row)
+			}
+			if IsNull(v) {
+				values[row] = NullValue
+				continue
+			}
+			bucket, err := bucketFloorFloatValue(array.Kind(), v, width)
+			if err != nil {
+				return nil, fmt.Errorf("bucket floor row %d: %w", row, err)
+			}
+			values[row] = bucket
+		}
+	default:
+		return nil, fmt.Errorf("bucket floor kind %s is not supported", array.Kind())
+	}
+	return arrayWithKind(array.Kind(), values)
 }
 
 func Filter(frame Frame, keep func(row map[Symbol]any) (bool, error)) (Frame, error) {
@@ -460,7 +1129,11 @@ func Update(frame Frame, match func(row map[Symbol]any) (bool, error), assignmen
 				values[row] = v
 			}
 		}
-		cols = append(cols, NewColumn(name, values))
+		col, err := columnWithKind(name, frame.columns[name].Kind(), values)
+		if err != nil {
+			return Frame{}, err
+		}
+		cols = append(cols, col)
 	}
 	return NewFrame(cols...)
 }
@@ -472,9 +1145,6 @@ func UpdateWhere(frame Frame, where Expr, assignments map[Symbol]Expr) (Frame, e
 	for name, expr := range assignments {
 		if expr == nil {
 			return Frame{}, fmt.Errorf("update assignment for column %q is nil", name)
-		}
-		if _, ok := frame.Column(name); !ok {
-			return Frame{}, fmt.Errorf("update column %q does not exist", name)
 		}
 	}
 	indexes, err := filterIndexes(frame, where)
@@ -500,7 +1170,145 @@ func UpdateWhere(frame Frame, where Expr, assignments map[Symbol]Expr) (Frame, e
 				values[row] = v
 			}
 		}
+		col, err := columnWithKind(name, frame.columns[name].Kind(), values)
+		if err != nil {
+			return Frame{}, err
+		}
+		cols = append(cols, col)
+	}
+	for name, expr := range assignments {
+		if _, ok := frame.Column(name); ok {
+			continue
+		}
+		values := make([]any, frame.Len())
+		for row := 0; row < frame.Len(); row++ {
+			if !matched[row] {
+				values[row] = NullValue
+				continue
+			}
+			v, err := expr.EvalRow(frame, row)
+			if err != nil {
+				return Frame{}, err
+			}
+			values[row] = v
+		}
 		cols = append(cols, NewColumn(name, values))
+	}
+	return NewFrame(cols...)
+}
+
+func UpdateBy(frame Frame, where Expr, by []SelectItem, assignments []GroupedAssignment) (Frame, error) {
+	if len(by) == 0 {
+		return Frame{}, fmt.Errorf("grouped update requires at least one by expression")
+	}
+	if len(assignments) == 0 {
+		return Frame{}, fmt.Errorf("grouped update requires at least one assignment")
+	}
+	byInputs, err := bindGroupInputs(frame, by)
+	if err != nil {
+		return Frame{}, err
+	}
+	aggs := make([]aggregateInput, len(assignments))
+	for i, assign := range assignments {
+		if assign.Name == "" {
+			return Frame{}, fmt.Errorf("grouped update assignment %d has empty name", i)
+		}
+		if assign.Expr == nil {
+			return Frame{}, fmt.Errorf("grouped update assignment for column %q is nil", assign.Name)
+		}
+		if !isSupportedAggregate(assign.Func) {
+			return Frame{}, fmt.Errorf("unsupported grouped update aggregate %q", assign.Func)
+		}
+		aggs[i].Aggregate = Aggregate{Name: assign.Name, Func: assign.Func, Expr: assign.Expr, Weight: assign.Weight}
+		if ref, ok := assign.Expr.(ColumnRef); ok {
+			col, ok := frame.Column(ref.Name)
+			if !ok {
+				return Frame{}, fmt.Errorf("unknown column %q", ref.Name)
+			}
+			aggs[i].column = col
+		}
+		if ref, ok := assign.Weight.(ColumnRef); ok {
+			col, ok := frame.Column(ref.Name)
+			if !ok {
+				return Frame{}, fmt.Errorf("unknown column %q", ref.Name)
+			}
+			aggs[i].weightColumn = col
+		}
+	}
+	indexes, err := filterIndexes(frame, where)
+	if err != nil {
+		return Frame{}, err
+	}
+	matched := make([]bool, frame.Len())
+	rowKeys := make([]string, frame.Len())
+	groups := map[string]*groupState{}
+	var keyBuilder strings.Builder
+	for _, row := range indexes {
+		matched[row] = true
+		keyVals := make([]any, len(byInputs))
+		keyBuilder.Reset()
+		for i, item := range byInputs {
+			v, err := item.value(frame, row)
+			if err != nil {
+				return Frame{}, err
+			}
+			keyVals[i] = v
+			appendKeyPart(&keyBuilder, item.keyKind(), v)
+		}
+		key := keyBuilder.String()
+		rowKeys[row] = key
+		state := groups[key]
+		if state == nil {
+			state = &groupState{keys: keyVals, aggs: make([]aggregateState, len(aggs))}
+			for i, agg := range aggs {
+				state.aggs[i].fn = agg.Func
+			}
+			groups[key] = state
+		}
+		for i, agg := range aggs {
+			if err := accumulateAggregate(&state.aggs[i], agg, frame, row); err != nil {
+				return Frame{}, err
+			}
+		}
+	}
+	assignmentByName := make(map[Symbol]int, len(assignments))
+	for i, assign := range assignments {
+		if _, ok := assignmentByName[assign.Name]; ok {
+			return Frame{}, fmt.Errorf("duplicate grouped update assignment for column %q", assign.Name)
+		}
+		assignmentByName[assign.Name] = i
+	}
+	cols := make([]Column, 0, len(frame.schema.names)+len(assignments))
+	for _, name := range frame.schema.names {
+		values := frame.columns[name].Values()
+		assignIndex, ok := assignmentByName[name]
+		if ok {
+			for row := 0; row < frame.Len(); row++ {
+				if !matched[row] {
+					continue
+				}
+				values[row] = aggregateResult(groups[rowKeys[row]].aggs[assignIndex])
+			}
+		}
+		col, err := columnWithKind(name, frame.columns[name].Kind(), values)
+		if err != nil {
+			return Frame{}, err
+		}
+		cols = append(cols, col)
+	}
+	for i, assign := range assignments {
+		if _, ok := frame.Column(assign.Name); ok {
+			continue
+		}
+		values := make([]any, frame.Len())
+		for row := 0; row < frame.Len(); row++ {
+			if !matched[row] {
+				values[row] = NullValue
+				continue
+			}
+			values[row] = aggregateResult(groups[rowKeys[row]].aggs[i])
+		}
+		cols = append(cols, NewColumn(assign.Name, values))
 	}
 	return NewFrame(cols...)
 }
@@ -531,6 +1339,12 @@ func DeleteWhere(frame Frame, where Expr) (Frame, error) {
 	if err != nil {
 		return Frame{}, err
 	}
+	if indexes, ok, err := typedKernels.ComplementSortedIndexes(frame.Len(), deleteIndexes); ok || err != nil {
+		if err != nil {
+			return Frame{}, err
+		}
+		return frame.Gather(indexes)
+	}
 	deleted := make([]bool, frame.Len())
 	for _, row := range deleteIndexes {
 		deleted[row] = true
@@ -544,6 +1358,132 @@ func DeleteWhere(frame Frame, where Expr) (Frame, error) {
 	return frame.Gather(indexes)
 }
 
+func DropColumns(frame Frame, names ...Symbol) (Frame, error) {
+	drop := make(map[Symbol]struct{}, len(names))
+	for _, name := range names {
+		if name == "" {
+			return Frame{}, fmt.Errorf("drop column name must not be empty")
+		}
+		if _, ok := frame.Column(name); !ok {
+			return Frame{}, fmt.Errorf("drop column %q does not exist", name)
+		}
+		drop[name] = struct{}{}
+	}
+	if len(drop) == len(frame.schema.names) {
+		return Frame{}, fmt.Errorf("drop would remove all columns")
+	}
+	cols := make([]Column, 0, len(frame.schema.names)-len(drop))
+	for _, name := range frame.schema.names {
+		if _, ok := drop[name]; ok {
+			continue
+		}
+		cols = append(cols, Column{Name: name, Data: frame.columns[name]})
+	}
+	return NewFrame(cols...)
+}
+
+func InsertRow(frame Frame, columns []Symbol, values []any) (Frame, error) {
+	_, row, err := rowMutationRecord(frame, columns, values)
+	if err != nil {
+		return Frame{}, err
+	}
+	cols := make([]Column, 0, len(frame.schema.names))
+	for _, name := range frame.schema.names {
+		current := frame.columns[name]
+		colValues := current.Values()
+		colValues = append(colValues, row[name])
+		col, err := columnWithKind(name, current.Kind(), colValues)
+		if err != nil {
+			return Frame{}, err
+		}
+		cols = append(cols, col)
+	}
+	return NewFrame(cols...)
+}
+
+func UpsertRow(frame Frame, columns []Symbol, values []any) (Frame, error) {
+	return InsertRow(frame, columns, values)
+}
+
+func (k KeyedFrame) InsertRow(columns []Symbol, values []any) (KeyedFrame, error) {
+	if len(k.keys) == 0 {
+		return KeyedFrame{}, fmt.Errorf("keyed frame is not initialized")
+	}
+	if err := rowMutationRequireKeyColumns(k.keys, columns); err != nil {
+		return KeyedFrame{}, err
+	}
+	delta, err := rowMutationDeltaFrame(k.frame, columns, values)
+	if err != nil {
+		return KeyedFrame{}, err
+	}
+	key, _, err := deltaRowKey(k, delta, 0)
+	if err != nil {
+		return KeyedFrame{}, err
+	}
+	if rows := k.rowsByKey[key]; len(rows) > 0 {
+		return KeyedFrame{}, fmt.Errorf("keyed insert duplicate key")
+	}
+	valueColumns, err := rowMutationValueColumns(k.keys, k.frame.schema.names, columns)
+	if err != nil {
+		return KeyedFrame{}, err
+	}
+	return k.Upsert(delta, valueColumns...)
+}
+
+func (k KeyedFrame) UpsertRow(columns []Symbol, values []any) (KeyedFrame, error) {
+	if len(k.keys) == 0 {
+		return KeyedFrame{}, fmt.Errorf("keyed frame is not initialized")
+	}
+	if err := rowMutationRequireKeyColumns(k.keys, columns); err != nil {
+		return KeyedFrame{}, err
+	}
+	delta, err := rowMutationDeltaFrame(k.frame, columns, values)
+	if err != nil {
+		return KeyedFrame{}, err
+	}
+	valueColumns, err := rowMutationValueColumns(k.keys, k.frame.schema.names, columns)
+	if err != nil {
+		return KeyedFrame{}, err
+	}
+	return k.Upsert(delta, valueColumns...)
+}
+
+func InsertRowKeyed(keyed KeyedFrame, columns []Symbol, values []any) (KeyedFrame, error) {
+	return keyed.InsertRow(columns, values)
+}
+
+func UpsertRowKeyed(keyed KeyedFrame, columns []Symbol, values []any) (KeyedFrame, error) {
+	return keyed.UpsertRow(columns, values)
+}
+
+func RenameColumns(frame Frame, renames map[Symbol]Symbol) (Frame, error) {
+	if len(renames) == 0 {
+		return frame.Gather(allIndexes(frame.Len()))
+	}
+	for from, to := range renames {
+		if from == "" || to == "" {
+			return Frame{}, fmt.Errorf("rename column names must not be empty")
+		}
+		if _, ok := frame.Column(from); !ok {
+			return Frame{}, fmt.Errorf("rename column %q does not exist", from)
+		}
+	}
+	seen := make(map[Symbol]struct{}, len(frame.schema.names))
+	cols := make([]Column, 0, len(frame.schema.names))
+	for _, name := range frame.schema.names {
+		outName := name
+		if renamed, ok := renames[name]; ok {
+			outName = renamed
+		}
+		if _, ok := seen[outName]; ok {
+			return Frame{}, fmt.Errorf("rename produces duplicate column %q", outName)
+		}
+		seen[outName] = struct{}{}
+		cols = append(cols, Column{Name: outName, Data: frame.columns[name]})
+	}
+	return NewFrame(cols...)
+}
+
 func Distinct(frame Frame, columns ...Symbol) (Frame, error) {
 	keyColumns := append([]Symbol(nil), columns...)
 	if len(keyColumns) == 0 {
@@ -552,6 +1492,11 @@ func Distinct(frame Frame, columns ...Symbol) (Frame, error) {
 	for _, name := range keyColumns {
 		if _, ok := frame.Column(name); !ok {
 			return Frame{}, fmt.Errorf("distinct column %q does not exist", name)
+		}
+	}
+	if len(keyColumns) == 1 {
+		if indexes, ok := distinctSingleColumnIndexes(frame, keyColumns[0]); ok {
+			return frame.Gather(indexes)
 		}
 	}
 	seen := make(map[string]struct{}, frame.Len())
@@ -570,6 +1515,557 @@ func Distinct(frame Frame, columns ...Symbol) (Frame, error) {
 	return frame.Gather(indexes)
 }
 
+func distinctSingleColumnIndexes(frame Frame, name Symbol) ([]int, bool) {
+	column, ok := frame.Column(name)
+	if !ok {
+		return nil, false
+	}
+	if index, ok := ArrayIndexFor(column, ArrayAttributeUnique); ok {
+		return firstRowsFromArrayIndex(index), true
+	}
+	if index, ok := ArrayIndexFor(column, ArrayAttributeGrouped); ok {
+		return firstRowsFromArrayIndex(index), true
+	}
+	return nil, false
+}
+
+func firstRowsFromArrayIndex(index ArrayIndex) []int {
+	indexes := make([]int, 0, len(index.Rows))
+	for _, rows := range index.Rows {
+		if len(rows) == 0 {
+			continue
+		}
+		indexes = append(indexes, rows[0])
+	}
+	return indexes
+}
+
+// XGroup groups a frame by key columns, producing a keyed frame whose value
+// columns contain nested arrays of each group's original row values.
+func XGroup(frame Frame, keys ...Symbol) (KeyedFrame, error) {
+	if len(keys) == 0 {
+		return KeyedFrame{}, fmt.Errorf("xgroup requires at least one key column")
+	}
+	keyColumns, err := validateKeyColumns(frame, keys, "xgroup")
+	if err != nil {
+		return KeyedFrame{}, err
+	}
+	keySet := make(map[Symbol]struct{}, len(keyColumns))
+	for _, name := range keyColumns {
+		keySet[name] = struct{}{}
+	}
+	valueColumns := make([]Symbol, 0, len(frame.schema.names)-len(keySet))
+	for _, name := range frame.schema.names {
+		if _, ok := keySet[name]; !ok {
+			valueColumns = append(valueColumns, name)
+		}
+	}
+
+	groups := make([][]int, 0)
+	positionByKey := make(map[string]int, frame.Len())
+	for row := 0; row < frame.Len(); row++ {
+		key, err := rowKey(frame, row, keyColumns)
+		if err != nil {
+			return KeyedFrame{}, err
+		}
+		position, ok := positionByKey[key]
+		if !ok {
+			position = len(groups)
+			positionByKey[key] = position
+			groups = append(groups, nil)
+		}
+		groups[position] = append(groups[position], row)
+	}
+
+	cols := make([]Column, 0, len(keyColumns)+len(valueColumns))
+	for _, name := range keyColumns {
+		source, _ := frame.Column(name)
+		values := make([]any, len(groups))
+		for i, rows := range groups {
+			v, ok := source.At(rows[0])
+			if !ok {
+				return KeyedFrame{}, fmt.Errorf("xgroup key column %q row %d out of range", name, rows[0])
+			}
+			values[i] = v
+		}
+		cols = append(cols, NewColumn(name, values))
+	}
+	for _, name := range valueColumns {
+		source, _ := frame.Column(name)
+		values := make([]any, len(groups))
+		for i, rows := range groups {
+			values[i] = source.Gather(rows)
+		}
+		cols = append(cols, NewColumn(name, values))
+	}
+	grouped, err := NewFrame(cols...)
+	if err != nil {
+		return KeyedFrame{}, err
+	}
+	return KeyBy(grouped, keyColumns...)
+}
+
+// Ungroup expands nested array/list columns in a frame. Nested columns in the
+// same source row must have the same length; scalar columns are repeated.
+func Ungroup(frame Frame) (Frame, error) {
+	names := frame.schema.Names()
+	out := make(map[Symbol][]any, len(names))
+	for _, name := range names {
+		out[name] = make([]any, 0, frame.Len())
+	}
+	for row := 0; row < frame.Len(); row++ {
+		width := -1
+		nested := make(map[Symbol]nestedRowValue, len(names))
+		scalars := make(map[Symbol]any, len(names))
+		for _, name := range names {
+			col := frame.columns[name]
+			value, ok := col.At(row)
+			if !ok {
+				return Frame{}, fmt.Errorf("ungroup column %q row %d out of range", name, row)
+			}
+			if n, ok := asNestedRowValue(value); ok {
+				if width < 0 {
+					width = n.Len()
+				} else if width != n.Len() {
+					return Frame{}, fmt.Errorf("ungroup row %d has mismatched nested column lengths", row)
+				}
+				nested[name] = n
+				continue
+			}
+			scalars[name] = value
+		}
+		if width < 0 {
+			width = 1
+		}
+		for i := 0; i < width; i++ {
+			for _, name := range names {
+				if n, ok := nested[name]; ok {
+					value, ok := n.At(i)
+					if !ok {
+						return Frame{}, fmt.Errorf("ungroup column %q nested row %d out of range", name, i)
+					}
+					out[name] = append(out[name], value)
+					continue
+				}
+				out[name] = append(out[name], scalars[name])
+			}
+		}
+	}
+	cols := make([]Column, 0, len(names))
+	for _, name := range names {
+		cols = append(cols, NewColumn(name, out[name]))
+	}
+	return NewFrame(cols...)
+}
+
+type nestedRowValue struct {
+	array dataNestedArray
+	list  []any
+}
+
+type dataNestedArray interface {
+	Len() int
+	At(row int) (any, bool)
+}
+
+func asNestedRowValue(value any) (nestedRowValue, bool) {
+	if array, ok := value.(Array); ok {
+		return nestedRowValue{array: array}, true
+	}
+	if list, ok := value.([]any); ok {
+		return nestedRowValue{list: list}, true
+	}
+	return nestedRowValue{}, false
+}
+
+func (n nestedRowValue) Len() int {
+	if n.array != nil {
+		return n.array.Len()
+	}
+	return len(n.list)
+}
+
+func (n nestedRowValue) At(row int) (any, bool) {
+	if n.array != nil {
+		return n.array.At(row)
+	}
+	if row < 0 || row >= len(n.list) {
+		return nil, false
+	}
+	return n.list[row], true
+}
+
+type KeyedFrame struct {
+	frame     Frame
+	keys      []Symbol
+	rowsByKey map[string][]int
+	index     KeyedIndexMetadata
+}
+
+// KeyedIndexMetadata describes the key index sidecar attached to a KeyedFrame.
+// Frames are immutable values; keyed mutations return a fresh KeyedFrame with a
+// rebuilt index instead of reusing the old rowsByKey map.
+type KeyedIndexMetadata struct {
+	Rows        int
+	Keys        []Symbol
+	SchemaHash  string
+	Fingerprint uint64
+}
+
+func newKeyedFrameWithIndex(frame Frame, keys []Symbol, rowsByKey map[string][]int) (KeyedFrame, error) {
+	index, err := buildKeyedIndexMetadata(frame, keys)
+	if err != nil {
+		return KeyedFrame{}, err
+	}
+	return KeyedFrame{
+		frame:     frame,
+		keys:      append([]Symbol(nil), keys...),
+		rowsByKey: cloneRowsByKey(rowsByKey),
+		index:     index,
+	}, nil
+}
+
+func buildKeyedIndexMetadata(frame Frame, keys []Symbol) (KeyedIndexMetadata, error) {
+	if _, err := validateKeyColumns(frame, keys, "keyed frame index"); err != nil {
+		return KeyedIndexMetadata{}, err
+	}
+	h := fnv.New64a()
+	schemaHash := frame.SchemaFingerprint()
+	_, _ = h.Write([]byte(schemaHash))
+	_, _ = h.Write([]byte{0})
+	for _, key := range keys {
+		_, _ = h.Write([]byte(key))
+		_, _ = h.Write([]byte{0xff})
+	}
+	for row := 0; row < frame.Len(); row++ {
+		key, err := rowKey(frame, row, keys)
+		if err != nil {
+			return KeyedIndexMetadata{}, err
+		}
+		_, _ = h.Write([]byte(key))
+		_, _ = h.Write([]byte{0})
+	}
+	return KeyedIndexMetadata{
+		Rows:        frame.Len(),
+		Keys:        append([]Symbol(nil), keys...),
+		SchemaHash:  schemaHash,
+		Fingerprint: h.Sum64(),
+	}, nil
+}
+
+func cloneRowsByKey(rowsByKey map[string][]int) map[string][]int {
+	out := make(map[string][]int, len(rowsByKey))
+	for key, rows := range rowsByKey {
+		out[key] = append([]int(nil), rows...)
+	}
+	return out
+}
+
+func KeyBy(frame Frame, keys ...Symbol) (KeyedFrame, error) {
+	if len(keys) == 0 {
+		return KeyedFrame{}, fmt.Errorf("keyed frame requires at least one key")
+	}
+	keyColumns, err := validateKeyColumns(frame, keys, "keyed frame")
+	if err != nil {
+		return KeyedFrame{}, err
+	}
+	rowsByKey := make(map[string][]int, frame.Len())
+	if len(keyColumns) == 1 {
+		if keyColumn, ok := frame.Column(keyColumns[0]); ok {
+			if index, ok := ArrayIndexFor(keyColumn, ArrayAttributeUnique); ok {
+				for key, rows := range index.RowsByKey {
+					rowsByKey[key] = append([]int(nil), rows...)
+				}
+				return newKeyedFrameWithIndex(frame, keyColumns, rowsByKey)
+			}
+			if index, ok := ArrayIndexFor(keyColumn, ArrayAttributeGrouped); ok {
+				for key, rows := range index.RowsByKey {
+					rowsByKey[key] = append([]int(nil), rows...)
+				}
+				return newKeyedFrameWithIndex(frame, keyColumns, rowsByKey)
+			}
+		}
+	}
+	for row := 0; row < frame.Len(); row++ {
+		key, err := rowKey(frame, row, keyColumns)
+		if err != nil {
+			return KeyedFrame{}, err
+		}
+		rowsByKey[key] = append(rowsByKey[key], row)
+	}
+	return newKeyedFrameWithIndex(frame, keyColumns, rowsByKey)
+}
+
+func (k KeyedFrame) Frame() Frame {
+	frame, err := k.frame.Gather(allIndexes(k.frame.Len()))
+	if err != nil {
+		panic(err)
+	}
+	return frame
+}
+
+func (k KeyedFrame) ValueFrame() (Frame, error) {
+	if len(k.keys) == 0 {
+		return Frame{}, fmt.Errorf("keyed frame is not initialized")
+	}
+	return DropColumns(k.Frame(), k.keys...)
+}
+
+func (k KeyedFrame) KeyFrame() (Frame, error) {
+	if len(k.keys) == 0 {
+		return Frame{}, fmt.Errorf("keyed frame is not initialized")
+	}
+	cols := make([]Column, 0, len(k.keys))
+	for _, name := range k.keys {
+		col, ok := k.frame.Column(name)
+		if !ok {
+			return Frame{}, fmt.Errorf("key column %q does not exist", name)
+		}
+		cols = append(cols, Column{Name: name, Data: col})
+	}
+	return NewFrame(cols...)
+}
+
+func (k KeyedFrame) LatestFrame() (Frame, error) {
+	if len(k.keys) == 0 {
+		return Frame{}, fmt.Errorf("keyed frame is not initialized")
+	}
+	latest := make([]int, 0, len(k.rowsByKey))
+	positionByKey := make(map[string]int, len(k.rowsByKey))
+	for row := 0; row < k.frame.Len(); row++ {
+		key, err := rowKey(k.frame, row, k.keys)
+		if err != nil {
+			return Frame{}, err
+		}
+		if position, ok := positionByKey[key]; ok {
+			latest[position] = row
+			continue
+		}
+		positionByKey[key] = len(latest)
+		latest = append(latest, row)
+	}
+	return k.frame.Gather(latest)
+}
+
+func (k KeyedFrame) Keys() []Symbol {
+	return append([]Symbol(nil), k.keys...)
+}
+
+func (k KeyedFrame) IndexMetadata() KeyedIndexMetadata {
+	return KeyedIndexMetadata{
+		Rows:        k.index.Rows,
+		Keys:        append([]Symbol(nil), k.index.Keys...),
+		SchemaHash:  k.index.SchemaHash,
+		Fingerprint: k.index.Fingerprint,
+	}
+}
+
+func (k KeyedFrame) ValidateIndex() error {
+	if len(k.keys) == 0 {
+		return fmt.Errorf("keyed frame is not initialized")
+	}
+	if err := k.validateIndexShape(); err != nil {
+		return err
+	}
+	current, err := buildKeyedIndexMetadata(k.frame, k.keys)
+	if err != nil {
+		return err
+	}
+	if current.Fingerprint != k.index.Fingerprint {
+		return fmt.Errorf("keyed frame index fingerprint mismatch")
+	}
+	return nil
+}
+
+func (k KeyedFrame) LookupByKey(values ...any) (Frame, error) {
+	if len(k.keys) == 0 {
+		return Frame{}, fmt.Errorf("keyed frame is not initialized")
+	}
+	if err := k.validateIndexShape(); err != nil {
+		return Frame{}, err
+	}
+	key, err := lookupKey(k.frame, k.keys, values)
+	if err != nil {
+		return Frame{}, err
+	}
+	rows := k.rowsByKey[key]
+	if rows == nil {
+		rows = []int{}
+	}
+	return k.frame.Gather(rows)
+}
+
+func (k KeyedFrame) LookupValueByKey(values ...any) (Frame, error) {
+	frame, err := k.LookupByKey(values...)
+	if err != nil {
+		return Frame{}, err
+	}
+	if frame.Len() > 1 {
+		frame, err = frame.Gather([]int{frame.Len() - 1})
+		if err != nil {
+			return Frame{}, err
+		}
+	}
+	return DropColumns(frame, k.keys...)
+}
+
+func (k KeyedFrame) LookupByKeyRecord(values map[Symbol]any) (Frame, error) {
+	keyValues, err := k.keyValuesFromRecord(values)
+	if err != nil {
+		return Frame{}, err
+	}
+	return k.LookupByKey(keyValues...)
+}
+
+func (k KeyedFrame) LookupValueByKeyRecord(values map[Symbol]any) (Frame, error) {
+	keyValues, err := k.keyValuesFromRecord(values)
+	if err != nil {
+		return Frame{}, err
+	}
+	return k.LookupValueByKey(keyValues...)
+}
+
+func (k KeyedFrame) Amend(delta Frame, valueColumns ...Symbol) (KeyedFrame, error) {
+	return k.mutate(delta, false, valueColumns...)
+}
+
+func (k KeyedFrame) Upsert(delta Frame, valueColumns ...Symbol) (KeyedFrame, error) {
+	return k.mutate(delta, true, valueColumns...)
+}
+
+func LookupByKey(keyed KeyedFrame, values ...any) (Frame, error) {
+	return keyed.LookupByKey(values...)
+}
+
+func LookupValueByKey(keyed KeyedFrame, values ...any) (Frame, error) {
+	return keyed.LookupValueByKey(values...)
+}
+
+func KeyFrame(keyed KeyedFrame) (Frame, error) {
+	return keyed.KeyFrame()
+}
+
+func ValueFrame(keyed KeyedFrame) (Frame, error) {
+	return keyed.ValueFrame()
+}
+
+func KeyValueFrames(keyed KeyedFrame) (Frame, Frame, error) {
+	keys, err := keyed.KeyFrame()
+	if err != nil {
+		return Frame{}, Frame{}, err
+	}
+	values, err := keyed.ValueFrame()
+	if err != nil {
+		return Frame{}, Frame{}, err
+	}
+	return keys, values, nil
+}
+
+func LatestFrame(keyed KeyedFrame) (Frame, error) {
+	return keyed.LatestFrame()
+}
+
+func AmendKeyed(keyed KeyedFrame, delta Frame, valueColumns ...Symbol) (KeyedFrame, error) {
+	return keyed.Amend(delta, valueColumns...)
+}
+
+func UpsertKeyed(keyed KeyedFrame, delta Frame, valueColumns ...Symbol) (KeyedFrame, error) {
+	return keyed.Upsert(delta, valueColumns...)
+}
+
+func (k KeyedFrame) mutate(delta Frame, appendMissing bool, valueColumns ...Symbol) (KeyedFrame, error) {
+	if len(k.keys) == 0 {
+		return KeyedFrame{}, fmt.Errorf("keyed frame is not initialized")
+	}
+	if err := validateMutationKeys(k, delta); err != nil {
+		return KeyedFrame{}, err
+	}
+	valueCols, err := keyedMutationValueColumns(k, delta, valueColumns)
+	if err != nil {
+		return KeyedFrame{}, err
+	}
+	cols, colValues, err := keyedMutationColumns(k, delta, valueCols)
+	if err != nil {
+		return KeyedFrame{}, err
+	}
+	valueSet := make(map[Symbol]struct{}, len(valueCols))
+	for _, name := range valueCols {
+		valueSet[name] = struct{}{}
+	}
+	for row := 0; row < delta.Len(); row++ {
+		key, keyValues, err := deltaRowKey(k, delta, row)
+		if err != nil {
+			return KeyedFrame{}, err
+		}
+		targetRows := k.rowsByKey[key]
+		if len(targetRows) > 0 {
+			for _, targetRow := range targetRows {
+				for _, name := range valueCols {
+					v, _ := delta.columns[name].At(row)
+					colValues[name][targetRow] = v
+				}
+			}
+			continue
+		}
+		if !appendMissing {
+			continue
+		}
+		for _, col := range cols {
+			keyIndex := symbolIndex(k.keys, col.Name)
+			switch {
+			case keyIndex >= 0:
+				colValues[col.Name] = append(colValues[col.Name], keyValues[keyIndex])
+			case hasColumn(delta, col.Name) && hasSymbol(valueSet, col.Name):
+				v, _ := delta.columns[col.Name].At(row)
+				colValues[col.Name] = append(colValues[col.Name], v)
+			default:
+				colValues[col.Name] = append(colValues[col.Name], NullValue)
+			}
+		}
+	}
+	outCols := make([]Column, 0, len(cols))
+	for _, col := range cols {
+		out, err := columnWithKind(col.Name, col.Data.Kind(), colValues[col.Name])
+		if err != nil {
+			return KeyedFrame{}, err
+		}
+		outCols = append(outCols, out)
+	}
+	out, err := NewFrame(outCols...)
+	if err != nil {
+		return KeyedFrame{}, err
+	}
+	return KeyBy(out, k.keys...)
+}
+
+func (k KeyedFrame) keyValuesFromRecord(values map[Symbol]any) ([]any, error) {
+	if len(k.keys) == 0 {
+		return nil, fmt.Errorf("keyed frame is not initialized")
+	}
+	out := make([]any, 0, len(k.keys))
+	for _, key := range k.keys {
+		value, ok := values[key]
+		if !ok {
+			return nil, fmt.Errorf("key %q is missing", key)
+		}
+		out = append(out, value)
+	}
+	return out, nil
+}
+
+func (k KeyedFrame) validateIndexShape() error {
+	if k.index.Rows != k.frame.Len() {
+		return fmt.Errorf("keyed frame index rows mismatch: index has %d rows, frame has %d", k.index.Rows, k.frame.Len())
+	}
+	if k.index.SchemaHash != k.frame.SchemaFingerprint() {
+		return fmt.Errorf("keyed frame index schema mismatch")
+	}
+	if !sameSymbols(k.index.Keys, k.keys) {
+		return fmt.Errorf("keyed frame index key mismatch")
+	}
+	return nil
+}
+
 type JoinKey struct {
 	Left  Symbol
 	Right Symbol
@@ -583,42 +2079,283 @@ func InnerJoin(left, right Frame, keys ...Symbol) (Frame, error) {
 	return InnerJoinOn(left, right, joinKeys...)
 }
 
+func LeftJoin(left, right Frame, keys ...Symbol) (Frame, error) {
+	joinKeys := make([]JoinKey, len(keys))
+	for i, key := range keys {
+		joinKeys[i] = JoinKey{Left: key, Right: key}
+	}
+	return LeftJoinOn(left, right, joinKeys...)
+}
+
+func LeftJoinOn(left, right Frame, keys ...JoinKey) (Frame, error) {
+	return joinOn(left, right, true, keys...)
+}
+
 func InnerJoinOn(left, right Frame, keys ...JoinKey) (Frame, error) {
+	return joinOn(left, right, false, keys...)
+}
+
+func LeftJoinKeyed(left Frame, right KeyedFrame) (Frame, error) {
+	return LeftJoinKeyedOn(left, right)
+}
+
+func InnerJoinKeyed(left Frame, right KeyedFrame) (Frame, error) {
+	return InnerJoinKeyedOn(left, right)
+}
+
+func LeftJoinKeyedOn(left Frame, right KeyedFrame, keys ...JoinKey) (Frame, error) {
+	return joinKeyedOn(left, right, true, keys...)
+}
+
+func InnerJoinKeyedOn(left Frame, right KeyedFrame, keys ...JoinKey) (Frame, error) {
+	return joinKeyedOn(left, right, false, keys...)
+}
+
+func UnionJoinOn(left, right Frame, keys ...JoinKey) (Frame, error) {
 	if len(keys) == 0 {
-		return Frame{}, fmt.Errorf("inner join requires at least one key")
+		return Frame{}, fmt.Errorf("union join requires at least one key")
 	}
 	if err := validateJoinKeys(left, right, keys); err != nil {
 		return Frame{}, err
 	}
-
-	rightRowsByKey := make(map[string][]int, right.Len())
-	rightKeyCols := make([]Symbol, len(keys))
-	for i, key := range keys {
-		rightKeyCols[i] = key.Right
+	rightRowsByKey, _, err := rightRowsByJoinKey(right, keys)
+	if err != nil {
+		return Frame{}, err
 	}
-	for row := 0; row < right.Len(); row++ {
-		key, err := rowKey(right, row, rightKeyCols)
+	leftKeyCols := leftKeyColumns(keys)
+
+	leftIndexes := make([]int, 0, left.Len()+right.Len())
+	rightIndexes := make([]int, 0, left.Len()+right.Len())
+	matchedRight := make([]bool, right.Len())
+	for row := 0; row < left.Len(); row++ {
+		key, err := rowKey(left, row, leftKeyCols)
 		if err != nil {
 			return Frame{}, err
 		}
-		rightRowsByKey[key] = append(rightRowsByKey[key], row)
+		matches := rightRowsByKey[key]
+		if len(matches) == 0 {
+			leftIndexes = append(leftIndexes, row)
+			rightIndexes = append(rightIndexes, -1)
+			continue
+		}
+		for _, rightRow := range matches {
+			leftIndexes = append(leftIndexes, row)
+			rightIndexes = append(rightIndexes, rightRow)
+			matchedRight[rightRow] = true
+		}
+	}
+	for row := 0; row < right.Len(); row++ {
+		if matchedRight[row] {
+			continue
+		}
+		leftIndexes = append(leftIndexes, -1)
+		rightIndexes = append(rightIndexes, row)
 	}
 
-	leftIndexes := make([]int, 0)
-	rightIndexes := make([]int, 0)
-	leftKeyCols := make([]Symbol, len(keys))
-	for i, key := range keys {
-		leftKeyCols[i] = key.Left
+	cols := make([]Column, 0, len(left.schema.names)+len(right.schema.names))
+	usedNames := make(map[Symbol]struct{}, len(left.schema.names)+len(right.schema.names))
+	rightByLeftKey := make(map[Symbol]Symbol, len(keys))
+	rightKeys := make(map[Symbol]struct{}, len(keys))
+	for _, key := range keys {
+		rightByLeftKey[key.Left] = key.Right
+		rightKeys[key.Right] = struct{}{}
+	}
+	for _, name := range left.schema.names {
+		leftCol := left.columns[name]
+		values := make([]any, len(leftIndexes))
+		for i, leftRow := range leftIndexes {
+			if leftRow >= 0 {
+				v, ok := leftCol.At(leftRow)
+				if !ok {
+					return Frame{}, fmt.Errorf("union join left column %q row %d out of range", name, leftRow)
+				}
+				values[i] = v
+				continue
+			}
+			if rightName, ok := rightByLeftKey[name]; ok {
+				rightCol := right.columns[rightName]
+				v, ok := rightCol.At(rightIndexes[i])
+				if !ok {
+					return Frame{}, fmt.Errorf("union join right key column %q row %d out of range", rightName, rightIndexes[i])
+				}
+				values[i] = v
+			} else {
+				values[i] = NullValue
+			}
+		}
+		col, err := columnWithKind(name, leftCol.Kind(), values)
+		if err != nil {
+			return Frame{}, err
+		}
+		cols = append(cols, col)
+		usedNames[name] = struct{}{}
+	}
+	for _, name := range right.schema.names {
+		if _, isJoinKey := rightKeys[name]; isJoinKey {
+			continue
+		}
+		outName := rightJoinColumnName(name, usedNames)
+		cols = append(cols, Column{Name: outName, Data: gatherOptional(right.columns[name], rightIndexes)})
+		usedNames[outName] = struct{}{}
+	}
+	return NewFrame(cols...)
+}
+
+func PlusJoinOn(left, right Frame, keys ...JoinKey) (Frame, error) {
+	if len(keys) == 0 {
+		return Frame{}, fmt.Errorf("plus join requires at least one key")
+	}
+	if err := validateJoinKeys(left, right, keys); err != nil {
+		return Frame{}, err
+	}
+	rightRowsByKey, _, err := rightRowsByJoinKey(right, keys)
+	if err != nil {
+		return Frame{}, err
+	}
+	leftKeyCols := leftKeyColumns(keys)
+	leftKeys := make(map[Symbol]struct{}, len(keys))
+	rightKeys := make(map[Symbol]struct{}, len(keys))
+	for _, key := range keys {
+		leftKeys[key.Left] = struct{}{}
+		rightKeys[key.Right] = struct{}{}
+	}
+
+	matchedRight := make([]int, left.Len())
+	for i := range matchedRight {
+		matchedRight[i] = -1
 	}
 	for row := 0; row < left.Len(); row++ {
 		key, err := rowKey(left, row, leftKeyCols)
 		if err != nil {
 			return Frame{}, err
 		}
-		for _, rightRow := range rightRowsByKey[key] {
-			leftIndexes = append(leftIndexes, row)
-			rightIndexes = append(rightIndexes, rightRow)
+		matches := rightRowsByKey[key]
+		if len(matches) > 0 {
+			matchedRight[row] = matches[0]
 		}
+	}
+
+	cols := make([]Column, 0, len(left.schema.names)+len(right.schema.names))
+	usedNames := make(map[Symbol]struct{}, len(left.schema.names)+len(right.schema.names))
+	for _, name := range left.schema.names {
+		leftCol := left.columns[name]
+		rightCol, hasRight := right.Column(name)
+		_, isLeftKey := leftKeys[name]
+		if hasRight && !isLeftKey {
+			values := make([]any, left.Len())
+			for row := 0; row < left.Len(); row++ {
+				leftValue, ok := leftCol.At(row)
+				if !ok {
+					return Frame{}, fmt.Errorf("plus join left column %q row %d out of range", name, row)
+				}
+				rightRow := matchedRight[row]
+				if rightRow < 0 {
+					values[row] = leftValue
+					continue
+				}
+				rightValue, ok := rightCol.At(rightRow)
+				if !ok {
+					return Frame{}, fmt.Errorf("plus join right column %q row %d out of range", name, rightRow)
+				}
+				sum, err := ApplyBinary(OpAdd, leftValue, rightValue)
+				if err != nil {
+					return Frame{}, fmt.Errorf("plus join column %q: %w", name, err)
+				}
+				values[row] = sum
+			}
+			cols = append(cols, NewColumn(name, values))
+		} else {
+			cols = append(cols, Column{Name: name, Data: leftCol.Gather(allIndexes(left.Len()))})
+		}
+		usedNames[name] = struct{}{}
+	}
+	for _, name := range right.schema.names {
+		if _, isJoinKey := rightKeys[name]; isJoinKey {
+			continue
+		}
+		if _, exists := usedNames[name]; exists {
+			continue
+		}
+		outName := rightJoinColumnName(name, usedNames)
+		cols = append(cols, Column{Name: outName, Data: gatherOptional(right.columns[name], matchedRight)})
+		usedNames[outName] = struct{}{}
+	}
+	return NewFrame(cols...)
+}
+
+func UnionJoin(left, right Frame) (Frame, error) {
+	names := make([]Symbol, 0, len(left.schema.names)+len(right.schema.names))
+	seen := make(map[Symbol]struct{}, len(left.schema.names)+len(right.schema.names))
+	for _, name := range left.schema.names {
+		names = append(names, name)
+		seen[name] = struct{}{}
+	}
+	for _, name := range right.schema.names {
+		if _, ok := seen[name]; ok {
+			continue
+		}
+		names = append(names, name)
+		seen[name] = struct{}{}
+	}
+	cols := make([]Column, 0, len(names))
+	for _, name := range names {
+		leftCol, hasLeft := left.Column(name)
+		rightCol, hasRight := right.Column(name)
+		kind := KindAny
+		switch {
+		case hasLeft && hasRight:
+			if leftCol.Kind() != rightCol.Kind() {
+				return Frame{}, fmt.Errorf("union join column %q kind mismatch: %s vs %s", name, leftCol.Kind(), rightCol.Kind())
+			}
+			kind = leftCol.Kind()
+		case hasLeft:
+			kind = leftCol.Kind()
+		case hasRight:
+			kind = rightCol.Kind()
+		}
+		values := make([]any, 0, left.Len()+right.Len())
+		for row := 0; row < left.Len(); row++ {
+			if !hasLeft {
+				values = append(values, NullValue)
+				continue
+			}
+			v, ok := leftCol.At(row)
+			if !ok {
+				return Frame{}, fmt.Errorf("union join left column %q row %d out of range", name, row)
+			}
+			values = append(values, v)
+		}
+		for row := 0; row < right.Len(); row++ {
+			if !hasRight {
+				values = append(values, NullValue)
+				continue
+			}
+			v, ok := rightCol.At(row)
+			if !ok {
+				return Frame{}, fmt.Errorf("union join right column %q row %d out of range", name, row)
+			}
+			values = append(values, v)
+		}
+		col, err := columnWithKind(name, kind, values)
+		if err != nil {
+			return Frame{}, err
+		}
+		cols = append(cols, col)
+	}
+	return NewFrame(cols...)
+}
+
+func joinOn(left, right Frame, keepUnmatchedLeft bool, keys ...JoinKey) (Frame, error) {
+	if len(keys) == 0 {
+		return Frame{}, fmt.Errorf("join requires at least one key")
+	}
+	if err := validateJoinKeys(left, right, keys); err != nil {
+		return Frame{}, err
+	}
+
+	leftIndexes, rightIndexes, err := typedKernels.JoinIndexes(left, right, keepUnmatchedLeft, keys)
+	if err != nil {
+		return Frame{}, err
 	}
 
 	cols := make([]Column, 0, len(left.schema.names)+len(right.schema.names))
@@ -637,14 +2374,265 @@ func InnerJoinOn(left, right Frame, keys ...JoinKey) (Frame, error) {
 			continue
 		}
 		outName := rightJoinColumnName(name, usedNames)
-		cols = append(cols, Column{Name: outName, Data: right.columns[name].Gather(rightIndexes)})
+		if keepUnmatchedLeft {
+			cols = append(cols, Column{Name: outName, Data: gatherOptional(right.columns[name], rightIndexes)})
+		} else {
+			cols = append(cols, Column{Name: outName, Data: right.columns[name].Gather(rightIndexes)})
+		}
 		usedNames[outName] = struct{}{}
 	}
 	return NewFrame(cols...)
 }
 
+func joinKeyedOn(left Frame, right KeyedFrame, keepUnmatchedLeft bool, keys ...JoinKey) (Frame, error) {
+	if len(right.keys) == 0 {
+		return Frame{}, fmt.Errorf("keyed join right frame is not initialized")
+	}
+	if len(keys) == 0 {
+		keys = make([]JoinKey, len(right.keys))
+		for i, key := range right.keys {
+			keys[i] = JoinKey{Left: key, Right: key}
+		}
+	}
+	if len(keys) != len(right.keys) {
+		return Frame{}, fmt.Errorf("keyed join has %d keys, want %d", len(keys), len(right.keys))
+	}
+	for i, key := range keys {
+		if key.Right != right.keys[i] {
+			return Frame{}, fmt.Errorf("keyed join right key %d is %q, want %q", i+1, key.Right, right.keys[i])
+		}
+	}
+	rightFrame, err := right.LatestFrame()
+	if err != nil {
+		return Frame{}, err
+	}
+	return joinOn(left, rightFrame, keepUnmatchedLeft, keys...)
+}
+
+func AsofJoin(left, right Frame, timeKey Symbol, partitionKeys ...Symbol) (Frame, error) {
+	joinKeys := make([]JoinKey, len(partitionKeys))
+	for i, key := range partitionKeys {
+		joinKeys[i] = JoinKey{Left: key, Right: key}
+	}
+	return AsofJoinOn(left, right, JoinKey{Left: timeKey, Right: timeKey}, joinKeys...)
+}
+
+func AsofJoinOn(left, right Frame, timeKey JoinKey, partitionKeys ...JoinKey) (Frame, error) {
+	return AsofJoinOnWithOptions(left, right, AsofJoinOptions{TimeKey: timeKey, PartitionKeys: partitionKeys})
+}
+
+type AsofJoinOptions struct {
+	TimeKey           JoinKey
+	PartitionKeys     []JoinKey
+	PreserveRightTime bool
+}
+
+func AsofJoinOnWithOptions(left, right Frame, opts AsofJoinOptions) (Frame, error) {
+	timeKey := opts.TimeKey
+	partitionKeys := opts.PartitionKeys
+	if err := validateAsofJoinKeys(left, right, timeKey, partitionKeys); err != nil {
+		return Frame{}, err
+	}
+
+	rightTime, _ := right.Column(timeKey.Right)
+	rightPartitionCols := make([]Symbol, len(partitionKeys))
+	for i, key := range partitionKeys {
+		rightPartitionCols[i] = key.Right
+	}
+	rightByPartition, err := typedKernels.SortedRowsByPartition(right, rightTime, rightPartitionCols)
+	if err != nil {
+		return Frame{}, err
+	}
+
+	leftTime, _ := left.Column(timeKey.Left)
+	leftPartitionCols := make([]Symbol, len(partitionKeys))
+	for i, key := range partitionKeys {
+		leftPartitionCols[i] = key.Left
+	}
+	rightIndexes, err := typedKernels.AsofMatchIndexes(left, leftTime, leftPartitionCols, rightTime, rightByPartition, joinRightKeyKinds(right, partitionKeys))
+	if err != nil {
+		return Frame{}, err
+	}
+
+	cols := make([]Column, 0, len(left.schema.names)+len(right.schema.names))
+	usedNames := make(map[Symbol]struct{}, len(left.schema.names)+len(right.schema.names))
+	for _, name := range left.schema.names {
+		col := left.columns[name]
+		if opts.PreserveRightTime && name == timeKey.Left {
+			col = gatherOptional(right.columns[timeKey.Right], rightIndexes)
+		}
+		cols = append(cols, Column{Name: name, Data: col})
+		usedNames[name] = struct{}{}
+	}
+
+	rightKeys := make(map[Symbol]struct{}, len(partitionKeys)+1)
+	rightKeys[timeKey.Right] = struct{}{}
+	for _, key := range partitionKeys {
+		rightKeys[key.Right] = struct{}{}
+	}
+	for _, name := range right.schema.names {
+		if _, isJoinKey := rightKeys[name]; isJoinKey {
+			continue
+		}
+		outName := rightJoinColumnName(name, usedNames)
+		cols = append(cols, Column{Name: outName, Data: gatherOptional(right.columns[name], rightIndexes)})
+		usedNames[outName] = struct{}{}
+	}
+	return NewFrame(cols...)
+}
+
+func WindowJoinOn(left, right Frame, timeKey JoinKey, partitionKeys ...JoinKey) (Frame, error) {
+	return WindowJoinOnWithOptions(left, right, WindowJoinOptions{TimeKey: timeKey, PartitionKeys: partitionKeys})
+}
+
+type WindowJoinOptions struct {
+	TimeKey       JoinKey
+	PartitionKeys []JoinKey
+	Low           any
+	High          any
+	HasBounds     bool
+	Last          bool
+}
+
+func WindowJoinOnWithOptions(left, right Frame, opts WindowJoinOptions) (Frame, error) {
+	timeKey := opts.TimeKey
+	partitionKeys := opts.PartitionKeys
+	if err := validateAsofJoinKeys(left, right, timeKey, partitionKeys); err != nil {
+		return Frame{}, err
+	}
+
+	rightTime, _ := right.Column(timeKey.Right)
+	rightPartitionCols := make([]Symbol, len(partitionKeys))
+	for i, key := range partitionKeys {
+		rightPartitionCols[i] = key.Right
+	}
+	rightByPartition, err := typedKernels.SortedRowsByPartition(right, rightTime, rightPartitionCols)
+	if err != nil {
+		return Frame{}, err
+	}
+
+	leftTime, _ := left.Column(timeKey.Left)
+	leftPartitionCols := make([]Symbol, len(partitionKeys))
+	for i, key := range partitionKeys {
+		leftPartitionCols[i] = key.Left
+	}
+	rightIndexes, err := typedKernels.WindowMatchIndexes(left, leftTime, leftPartitionCols, rightTime, rightByPartition, opts, joinRightKeyKinds(right, partitionKeys))
+	if err != nil {
+		return Frame{}, err
+	}
+
+	cols := make([]Column, 0, len(left.schema.names)+len(right.schema.names))
+	usedNames := make(map[Symbol]struct{}, len(left.schema.names)+len(right.schema.names))
+	for _, name := range left.schema.names {
+		cols = append(cols, Column{Name: name, Data: left.columns[name]})
+		usedNames[name] = struct{}{}
+	}
+
+	rightKeys := make(map[Symbol]struct{}, len(partitionKeys)+1)
+	rightKeys[timeKey.Right] = struct{}{}
+	for _, key := range partitionKeys {
+		rightKeys[key.Right] = struct{}{}
+	}
+	for _, name := range right.schema.names {
+		if _, isJoinKey := rightKeys[name]; isJoinKey {
+			continue
+		}
+		outName := rightJoinColumnName(name, usedNames)
+		if opts.Last {
+			cols = append(cols, Column{Name: outName, Data: gatherLastOptional(right.columns[name], rightIndexes)})
+		} else {
+			cols = append(cols, Column{Name: outName, Data: gatherWindowLists(right.columns[name], rightIndexes)})
+		}
+		usedNames[outName] = struct{}{}
+	}
+	return NewFrame(cols...)
+}
+
+func windowJoinAbsoluteBounds(timeValue, low, high any) (any, any, error) {
+	lo, err := addWindowDelta(timeValue, low)
+	if err != nil {
+		return nil, nil, fmt.Errorf("lower bound: %w", err)
+	}
+	hi, err := addWindowDelta(timeValue, high)
+	if err != nil {
+		return nil, nil, fmt.Errorf("upper bound: %w", err)
+	}
+	if compare(lo, hi) > 0 {
+		return nil, nil, fmt.Errorf("lower bound is greater than upper bound")
+	}
+	return lo, hi, nil
+}
+
+func addWindowDelta(base, delta any) (any, error) {
+	if IsNull(base) || IsNull(delta) {
+		return nil, fmt.Errorf("null bound")
+	}
+	if d, ok := numeric(delta); ok {
+		if d != float64(int64(d)) {
+			return nil, fmt.Errorf("delta must be an integer for %T", base)
+		}
+		return addWindowIntDelta(base, int64(d))
+	}
+	if d, ok := delta.(Timespan); ok {
+		switch x := base.(type) {
+		case DateTime:
+			return DateTimeFromUnixNanos(x.UnixNanos() + d.Nanos()), nil
+		case Timespan:
+			return TimespanFromNanos(x.Nanos() + d.Nanos()), nil
+		case Time:
+			return TimeFromNanos(x.Nanos() + d.Nanos()), nil
+		case Timestamp:
+			return TimestampFromUnixNanos(x.UnixNanos() + d.Nanos()), nil
+		default:
+			return nil, fmt.Errorf("timespan delta is not valid for %T", base)
+		}
+	}
+	return nil, fmt.Errorf("unsupported delta %T", delta)
+}
+
+func addWindowIntDelta(base any, delta int64) (any, error) {
+	switch x := base.(type) {
+	case int8:
+		return int8(int64(x) + delta), nil
+	case int16:
+		return int16(int64(x) + delta), nil
+	case int32:
+		return int32(int64(x) + delta), nil
+	case int64:
+		return x + delta, nil
+	case int:
+		return x + int(delta), nil
+	case Month:
+		return MonthFromMonths(x.Months() + delta), nil
+	case Date:
+		return DateFromDays(x.Days() + delta), nil
+	case DateTime:
+		return DateTimeFromUnixNanos(x.UnixNanos() + delta), nil
+	case Timespan:
+		return TimespanFromNanos(x.Nanos() + delta), nil
+	case Minute:
+		return MinuteFromMinutes(x.Minutes() + delta), nil
+	case Second:
+		return SecondFromSeconds(x.Seconds() + delta), nil
+	case Time:
+		return TimeFromNanos(x.Nanos() + delta), nil
+	case Timestamp:
+		return TimestampFromUnixNanos(x.UnixNanos() + delta), nil
+	case float32:
+		return float32(float64(x) + float64(delta)), nil
+	case float64:
+		return x + float64(delta), nil
+	default:
+		return nil, fmt.Errorf("unsupported time value %T", base)
+	}
+}
+
 type Expr interface {
 	EvalRow(frame Frame, row int) (any, error)
+}
+
+type vectorProjector interface {
+	EvalRows(frame Frame, indexes []int) (Array, error)
 }
 
 type ColumnRef struct {
@@ -668,6 +2656,410 @@ type Literal struct {
 }
 
 func (e Literal) EvalRow(Frame, int) (any, error) { return e.Value, nil }
+
+type Conditional struct {
+	Cond Expr
+	Then Expr
+	Else Expr
+}
+
+func (e Conditional) EvalRow(frame Frame, row int) (any, error) {
+	if e.Cond == nil || e.Then == nil || e.Else == nil {
+		return nil, fmt.Errorf("conditional expression requires condition, then, and else")
+	}
+	cond, err := e.Cond.EvalRow(frame, row)
+	if err != nil {
+		return nil, err
+	}
+	if IsNull(cond) {
+		return e.Else.EvalRow(frame, row)
+	}
+	keep, ok := cond.(bool)
+	if !ok {
+		return nil, fmt.Errorf("conditional condition must evaluate to bool")
+	}
+	if keep {
+		return e.Then.EvalRow(frame, row)
+	}
+	return e.Else.EvalRow(frame, row)
+}
+
+func (e Conditional) EvalRows(frame Frame, indexes []int) (Array, error) {
+	if e.Cond == nil || e.Then == nil || e.Else == nil {
+		return nil, fmt.Errorf("conditional expression requires condition, then, and else")
+	}
+	conds, err := evalProjectionExprRows(frame, indexes, e.Cond)
+	if err != nil {
+		return nil, err
+	}
+	thens, err := evalProjectionExprRows(frame, indexes, e.Then)
+	if err != nil {
+		return nil, err
+	}
+	elses, err := evalProjectionExprRows(frame, indexes, e.Else)
+	if err != nil {
+		return nil, err
+	}
+	if conds.Len() != len(indexes) || thens.Len() != len(indexes) || elses.Len() != len(indexes) {
+		return nil, fmt.Errorf("conditional expression returned mismatched row counts")
+	}
+	values := make([]any, len(indexes))
+	for i := range indexes {
+		cond, ok := conds.At(i)
+		if !ok {
+			return nil, fmt.Errorf("conditional condition row %d out of range", i)
+		}
+		useThen := false
+		if !IsNull(cond) {
+			keep, ok := cond.(bool)
+			if !ok {
+				return nil, fmt.Errorf("conditional condition row %d is %T, want bool", i, cond)
+			}
+			useThen = keep
+		}
+		var v any
+		if useThen {
+			v, ok = thens.At(i)
+		} else {
+			v, ok = elses.At(i)
+		}
+		if !ok {
+			return nil, fmt.Errorf("conditional branch row %d out of range", i)
+		}
+		values[i] = v
+	}
+	return inferConditionalArray(values, thens.Kind(), elses.Kind()), nil
+}
+
+func inferConditionalArray(values []any, thenKind, elseKind Kind) Array {
+	if conditionalBranchesPreferSymbol(thenKind, elseKind, values) {
+		if array, err := nullableArrayWithKind(KindSymbol, values); err == nil {
+			return array
+		}
+	}
+	return InferArray(values)
+}
+
+func conditionalBranchesPreferSymbol(thenKind, elseKind Kind, values []any) bool {
+	if thenKind != KindSymbol && elseKind != KindSymbol {
+		return false
+	}
+	for _, v := range values {
+		if IsNull(v) {
+			continue
+		}
+		switch v.(type) {
+		case Symbol, string:
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+func hasAnyNull(values []any) bool {
+	for _, v := range values {
+		if IsNull(v) {
+			return true
+		}
+	}
+	return false
+}
+
+// VectorTransformExpr evaluates q-style whole-vector projection verbs in the
+// projection row order. These transforms are order-sensitive, so QueryPlan.Exec
+// calls EvalRows with the filtered/pre-ordered indexes instead of evaluating
+// against the full source column and gathering afterward.
+type VectorTransformExpr struct {
+	Func string
+	Expr Expr
+	Arg  Expr
+}
+
+func (e VectorTransformExpr) EvalRow(frame Frame, row int) (any, error) {
+	indexes := allIndexes(frame.Len())
+	array, err := e.EvalRows(frame, indexes)
+	if err != nil {
+		return nil, err
+	}
+	v, ok := array.At(row)
+	if !ok {
+		return nil, fmt.Errorf("%s row %d out of range", e.Func, row)
+	}
+	return v, nil
+}
+
+func (e VectorTransformExpr) EvalRows(frame Frame, indexes []int) (Array, error) {
+	if e.Expr == nil {
+		return nil, fmt.Errorf("vector transform %q expression is nil", e.Func)
+	}
+	values, err := evalProjectionExprRows(frame, indexes, e.Expr)
+	if err != nil {
+		return nil, err
+	}
+	switch e.Func {
+	case "null":
+		mask := make([]bool, values.Len())
+		if !typedKernels.NullMask(values, mask) {
+			for i := 0; i < values.Len(); i++ {
+				v, ok := values.At(i)
+				if !ok {
+					return nil, fmt.Errorf("null row %d out of range", i)
+				}
+				mask[i] = IsNull(v)
+			}
+		}
+		return NewBool(mask), nil
+	case "abs", "neg", "sqrt", "log", "exp", "reciprocal", "signum", "floor", "ceiling":
+		out, ok, err := typedKernels.NumericUnary(e.Func, values)
+		if err != nil {
+			return nil, err
+		}
+		if !ok {
+			return nil, fmt.Errorf("%s expects numeric values", e.Func)
+		}
+		return out, nil
+	case "prev":
+		return vectorPrev(values), nil
+	case "next":
+		return vectorNext(values), nil
+	case "deltas":
+		return vectorDeltas(values)
+	case "fills":
+		return vectorFills(values), nil
+	case "ratios":
+		return vectorRatios(values)
+	case "sums":
+		return vectorRunningNumeric(values, e.Func)
+	case "prds":
+		return vectorRunningNumeric(values, e.Func)
+	case "mins", "maxs":
+		return vectorRunningMinMax(values, e.Func)
+	case "avgs":
+		return vectorRunningNumeric(values, e.Func)
+	case "xprev":
+		offset, err := e.intArg(frame)
+		if err != nil {
+			return nil, err
+		}
+		return vectorXPrev(values, offset), nil
+	case "moving":
+		window, err := e.intArg(frame)
+		if err != nil {
+			return nil, err
+		}
+		return vectorMoving(values, window)
+	default:
+		return nil, fmt.Errorf("unsupported vector transform %q", e.Func)
+	}
+}
+
+func (e VectorTransformExpr) intArg(frame Frame) (int, error) {
+	if e.Arg == nil {
+		return 0, fmt.Errorf("vector transform %q requires an integer argument", e.Func)
+	}
+	lit, ok := e.Arg.(Literal)
+	if !ok {
+		return 0, fmt.Errorf("vector transform %q requires a literal integer argument", e.Func)
+	}
+	n, ok := coerceInt64Exact(lit.Value)
+	if !ok {
+		return 0, fmt.Errorf("vector transform %q requires an integer argument", e.Func)
+	}
+	return int(n), nil
+}
+
+func vectorPrev(values Array) Array {
+	out := make([]any, values.Len())
+	for i := 0; i < values.Len(); i++ {
+		if i == 0 {
+			out[i] = NullForKind(values.Kind())
+			continue
+		}
+		v, _ := values.At(i - 1)
+		out[i] = v
+	}
+	return InferArray(out)
+}
+
+func vectorNext(values Array) Array {
+	out := make([]any, values.Len())
+	for i := 0; i < values.Len(); i++ {
+		if i == values.Len()-1 {
+			out[i] = NullForKind(values.Kind())
+			continue
+		}
+		v, _ := values.At(i + 1)
+		out[i] = v
+	}
+	return InferArray(out)
+}
+
+func vectorXPrev(values Array, offset int) Array {
+	out := make([]any, values.Len())
+	for i := 0; i < values.Len(); i++ {
+		source := i - offset
+		if source < 0 || source >= values.Len() {
+			out[i] = NullForKind(values.Kind())
+			continue
+		}
+		v, _ := values.At(source)
+		out[i] = v
+	}
+	return InferArray(out)
+}
+
+func vectorDeltas(values Array) (Array, error) {
+	out := make([]any, values.Len())
+	for i := 0; i < values.Len(); i++ {
+		current, _ := values.At(i)
+		if i == 0 {
+			out[i] = current
+			continue
+		}
+		previous, _ := values.At(i - 1)
+		if IsNull(current) || IsNull(previous) {
+			out[i] = NullValue
+			continue
+		}
+		delta, err := ApplyBinary(OpSub, current, previous)
+		if err != nil {
+			return nil, fmt.Errorf("deltas row %d: %w", i, err)
+		}
+		out[i] = delta
+	}
+	return InferArray(out), nil
+}
+
+func vectorRatios(values Array) (Array, error) {
+	out := make([]any, values.Len())
+	for i := 0; i < values.Len(); i++ {
+		if i == 0 {
+			out[i] = NullValue
+			continue
+		}
+		current, _ := values.At(i)
+		previous, _ := values.At(i - 1)
+		if IsNull(current) || IsNull(previous) {
+			out[i] = NullValue
+			continue
+		}
+		ratio, err := ApplyBinary(OpDiv, current, previous)
+		if err != nil {
+			return nil, fmt.Errorf("ratios row %d: %w", i, err)
+		}
+		out[i] = ratio
+	}
+	return InferArray(out), nil
+}
+
+func vectorFills(values Array) Array {
+	out := make([]any, values.Len())
+	var last any
+	hasLast := false
+	for i := 0; i < values.Len(); i++ {
+		v, _ := values.At(i)
+		if IsNull(v) {
+			if hasLast {
+				out[i] = last
+			} else {
+				out[i] = NullForKind(values.Kind())
+			}
+			continue
+		}
+		out[i] = v
+		last = v
+		hasLast = true
+	}
+	return InferArray(out)
+}
+
+func vectorRunningNumeric(values Array, fn string) (Array, error) {
+	out := make([]any, values.Len())
+	sum := 0.0
+	product := 1.0
+	count := int64(0)
+	for i := 0; i < values.Len(); i++ {
+		v, _ := values.At(i)
+		if IsNull(v) {
+			if count == 0 {
+				out[i] = NullValue
+				continue
+			}
+		} else {
+			n, ok := numeric(v)
+			if !ok {
+				return nil, fmt.Errorf("%s row %d expects numeric value, got %T", fn, i, v)
+			}
+			switch fn {
+			case "sums", "avgs":
+				sum += n
+			case "prds":
+				product *= n
+			default:
+				return nil, fmt.Errorf("unsupported running numeric transform %q", fn)
+			}
+			count++
+		}
+		switch fn {
+		case "sums":
+			out[i] = sum
+		case "prds":
+			out[i] = product
+		case "avgs":
+			out[i] = sum / float64(count)
+		}
+	}
+	return InferArray(out), nil
+}
+
+func vectorRunningMinMax(values Array, fn string) (Array, error) {
+	out := make([]any, values.Len())
+	var best any
+	hasBest := false
+	for i := 0; i < values.Len(); i++ {
+		v, _ := values.At(i)
+		if IsNull(v) {
+			if hasBest {
+				out[i] = best
+			} else {
+				out[i] = NullForKind(values.Kind())
+			}
+			continue
+		}
+		if !hasBest {
+			best = v
+			hasBest = true
+		} else {
+			cmp := compare(v, best)
+			if (fn == "mins" && cmp < 0) || (fn == "maxs" && cmp > 0) {
+				best = v
+			}
+		}
+		out[i] = best
+	}
+	return InferArray(out), nil
+}
+
+func vectorMoving(values Array, window int) (Array, error) {
+	if window <= 0 {
+		return nil, fmt.Errorf("moving window must be positive")
+	}
+	out := make([]any, values.Len())
+	for i := 0; i < values.Len(); i++ {
+		start := i - window + 1
+		if start < 0 {
+			start = 0
+		}
+		windowValues := make([]any, 0, i-start+1)
+		for j := start; j <= i; j++ {
+			v, _ := values.At(j)
+			windowValues = append(windowValues, v)
+		}
+		out[i] = windowValues
+	}
+	return NewAny(out), nil
+}
 
 type Op string
 
@@ -702,11 +3094,22 @@ func (e Binary) EvalRow(frame Frame, row int) (any, error) {
 }
 
 func ApplyBinary(op Op, left, right any) (any, error) {
+	if out, ok, err := typedKernels.Dyadic(op, left, right); ok || err != nil {
+		return out, err
+	}
 	switch op {
 	case OpEQ:
 		return equalScalar(left, right), nil
 	case OpNE:
 		return !equalScalar(left, right), nil
+	}
+	if IsNull(left) || IsNull(right) {
+		switch op {
+		case OpAdd, OpSub, OpMul, OpDiv:
+			return promotedNullForBinary(left, right), nil
+		case OpLT, OpLE, OpGT, OpGE:
+			return false, nil
+		}
 	}
 	if cmp, ok := compareSameKind(left, right); ok {
 		switch op {
@@ -747,15 +3150,340 @@ func ApplyBinary(op Op, left, right any) (any, error) {
 	}
 }
 
+func promotedNullForBinary(left, right any) any {
+	if !hasTypedNullKind(left) && !hasTypedNullKind(right) {
+		return NullValue
+	}
+	leftKind, leftOK := NullKind(left)
+	rightKind, rightOK := NullKind(right)
+	if !leftOK {
+		leftKind = kindOfScalar(left)
+	}
+	if !rightOK {
+		rightKind = kindOfScalar(right)
+	}
+	kind := mergeTypedNullArrayKind(leftKind, rightKind)
+	return NullForKind(kind)
+}
+
+func hasTypedNullKind(v any) bool {
+	kind, ok := NullKind(v)
+	return ok && kind != KindNull
+}
+
+type Logical struct {
+	Op          string
+	Left, Right Expr
+}
+
+func (e Logical) EvalRow(frame Frame, row int) (any, error) {
+	left, err := e.Left.EvalRow(frame, row)
+	if err != nil {
+		return nil, err
+	}
+	lb, ok := left.(bool)
+	if !ok {
+		return nil, fmt.Errorf("logical %s expects bool operands", e.Op)
+	}
+	switch e.Op {
+	case "and":
+		if !lb {
+			return false, nil
+		}
+	case "or":
+		if lb {
+			return true, nil
+		}
+	default:
+		return nil, fmt.Errorf("unsupported logical operator %q", e.Op)
+	}
+	right, err := e.Right.EvalRow(frame, row)
+	if err != nil {
+		return nil, err
+	}
+	rb, ok := right.(bool)
+	if !ok {
+		return nil, fmt.Errorf("logical %s expects bool operands", e.Op)
+	}
+	if e.Op == "and" {
+		return lb && rb, nil
+	}
+	return lb || rb, nil
+}
+
+type Not struct {
+	Expr Expr
+}
+
+func (e Not) EvalRow(frame Frame, row int) (any, error) {
+	v, err := e.Expr.EvalRow(frame, row)
+	if err != nil {
+		return nil, err
+	}
+	b, ok := v.(bool)
+	if !ok {
+		return nil, fmt.Errorf("not expects bool operand")
+	}
+	return !b, nil
+}
+
+type In struct {
+	Expr   Expr
+	Values []any
+}
+
+func (e In) EvalRow(frame Frame, row int) (any, error) {
+	v, err := e.Expr.EvalRow(frame, row)
+	if err != nil {
+		return nil, err
+	}
+	for _, candidate := range e.Values {
+		if equalScalar(v, candidate) {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+type Within struct {
+	Expr       Expr
+	Low, High  any
+	HighClosed bool
+}
+
+func (e Within) EvalRow(frame Frame, row int) (any, error) {
+	v, err := e.Expr.EvalRow(frame, row)
+	if err != nil {
+		return nil, err
+	}
+	if compare(v, e.Low) < 0 {
+		return false, nil
+	}
+	if e.HighClosed {
+		return compare(v, e.High) <= 0, nil
+	}
+	return compare(v, e.High) < 0, nil
+}
+
+type BucketFloorExpr struct {
+	Expr     Expr
+	Interval any
+}
+
+func (e BucketFloorExpr) EvalRow(frame Frame, row int) (any, error) {
+	if e.Expr == nil {
+		return nil, fmt.Errorf("bucket floor expression is nil")
+	}
+	v, err := e.Expr.EvalRow(frame, row)
+	if err != nil {
+		return nil, err
+	}
+	if IsNull(v) {
+		return NullValue, nil
+	}
+	bucketed, err := BucketFloor(NewColumn("_", []any{v}).Data, e.Interval)
+	if err != nil {
+		return nil, err
+	}
+	out, ok := bucketed.At(0)
+	if !ok {
+		return nil, fmt.Errorf("bucket floor result row 0 out of range")
+	}
+	return out, nil
+}
+
+func (e BucketFloorExpr) EvalRows(frame Frame, indexes []int) (Array, error) {
+	if e.Expr == nil {
+		return nil, fmt.Errorf("bucket floor expression is nil")
+	}
+	switch expr := e.Expr.(type) {
+	case ColumnRef:
+		col, ok := frame.Column(expr.Name)
+		if !ok {
+			return nil, fmt.Errorf("unknown column %q", expr.Name)
+		}
+		return BucketFloor(col.Gather(indexes), e.Interval)
+	case vectorProjector:
+		array, err := expr.EvalRows(frame, indexes)
+		if err != nil {
+			return nil, err
+		}
+		return BucketFloor(array, e.Interval)
+	}
+	values := make([]any, len(indexes))
+	for i, row := range indexes {
+		v, err := e.Expr.EvalRow(frame, row)
+		if err != nil {
+			return nil, err
+		}
+		values[i] = v
+	}
+	return BucketFloor(NewColumn("_", values).Data, e.Interval)
+}
+
+type ListAggregateExpr struct {
+	Func string
+	Expr Expr
+}
+
+func (e ListAggregateExpr) EvalRow(frame Frame, row int) (any, error) {
+	if e.Expr == nil {
+		return nil, fmt.Errorf("list aggregate expression is nil")
+	}
+	v, err := e.Expr.EvalRow(frame, row)
+	if err != nil {
+		return nil, err
+	}
+	return e.evalValue(v)
+}
+
+func (e ListAggregateExpr) EvalRows(frame Frame, indexes []int) (Array, error) {
+	if e.Expr == nil {
+		return nil, fmt.Errorf("list aggregate expression is nil")
+	}
+	array, err := evalProjectionExprRows(frame, indexes, e.Expr)
+	if err != nil {
+		return nil, err
+	}
+	values := make([]any, array.Len())
+	for i := 0; i < array.Len(); i++ {
+		v, ok := array.At(i)
+		if !ok {
+			return nil, fmt.Errorf("list aggregate row %d out of range", i)
+		}
+		agg, err := e.evalValue(v)
+		if err != nil {
+			return nil, err
+		}
+		values[i] = agg
+	}
+	return InferArray(values), nil
+}
+
+func (e ListAggregateExpr) evalValue(v any) (any, error) {
+	values, ok := listAggregateValues(v)
+	if !ok {
+		if IsNull(v) {
+			values = nil
+		} else {
+			values = []any{v}
+		}
+	}
+	switch e.Func {
+	case "count":
+		return int64(len(values)), nil
+	case "sum", "avg", "var", "dev", "med":
+		var sum float64
+		var sumsq float64
+		var nums []float64
+		var count int64
+		for _, item := range values {
+			if IsNull(item) {
+				continue
+			}
+			n, ok := numeric(item)
+			if !ok {
+				return nil, fmt.Errorf("%s expects numeric values, got %T (%v)", e.Func, item, item)
+			}
+			sum += n
+			sumsq += n * n
+			if e.Func == "med" {
+				nums = append(nums, n)
+			}
+			count++
+		}
+		if e.Func == "sum" {
+			return sum, nil
+		}
+		if count == 0 {
+			return NullValue, nil
+		}
+		switch e.Func {
+		case "avg":
+			return sum / float64(count), nil
+		case "var":
+			mean := sum / float64(count)
+			return sumsq/float64(count) - mean*mean, nil
+		case "dev":
+			mean := sum / float64(count)
+			return math.Sqrt(sumsq/float64(count) - mean*mean), nil
+		case "med":
+			sort.Float64s(nums)
+			mid := len(nums) / 2
+			if len(nums)%2 == 1 {
+				return nums[mid], nil
+			}
+			return (nums[mid-1] + nums[mid]) / 2, nil
+		default:
+			return NullValue, nil
+		}
+	case "min", "max":
+		var best any
+		hasBest := false
+		for _, item := range values {
+			if IsNull(item) {
+				continue
+			}
+			if !hasBest || (e.Func == "min" && compare(item, best) < 0) || (e.Func == "max" && compare(item, best) > 0) {
+				best = item
+				hasBest = true
+			}
+		}
+		if !hasBest {
+			return NullValue, nil
+		}
+		return best, nil
+	case "first":
+		if len(values) == 0 {
+			return NullValue, nil
+		}
+		return normalizeAggregateValue(values[0]), nil
+	case "last":
+		if len(values) == 0 {
+			return NullValue, nil
+		}
+		return normalizeAggregateValue(values[len(values)-1]), nil
+	default:
+		return nil, fmt.Errorf("unsupported list aggregate %q", e.Func)
+	}
+}
+
+func listAggregateValues(v any) ([]any, bool) {
+	switch x := v.(type) {
+	case []any:
+		return x, true
+	case Array:
+		values := make([]any, x.Len())
+		for i := 0; i < x.Len(); i++ {
+			item, ok := x.At(i)
+			if !ok {
+				return nil, false
+			}
+			values[i] = item
+		}
+		return values, true
+	default:
+		return nil, false
+	}
+}
+
 type SelectItem struct {
 	Name Symbol
 	Expr Expr
 }
 
 type Aggregate struct {
-	Name Symbol
-	Func string
-	Expr Expr
+	Name   Symbol
+	Func   string
+	Expr   Expr
+	Weight Expr
+}
+
+type GroupedAssignment struct {
+	Name   Symbol
+	Func   string
+	Expr   Expr
+	Weight Expr
 }
 
 type OrderSpec struct {
@@ -771,14 +3499,16 @@ const (
 )
 
 type QueryPlan struct {
-	Source     Frame
-	Where      Expr
-	By         []Symbol
-	Select     []SelectItem
-	Aggregates []Aggregate
-	OrderBy    []OrderSpec
-	LimitN     int
-	Distinct   bool
+	Source          Frame
+	Where           Expr
+	By              []Symbol
+	ByExprs         []SelectItem
+	Select          []SelectItem
+	Aggregates      []Aggregate
+	OrderBy         []OrderSpec
+	PreProjectOrder bool
+	LimitN          int
+	Distinct        bool
 }
 
 func From(frame Frame) QueryPlan {
@@ -805,6 +3535,13 @@ func (p QueryPlan) SelectColumns(names ...Symbol) QueryPlan {
 
 func (p QueryPlan) GroupBy(names ...Symbol) QueryPlan {
 	p.By = append([]Symbol(nil), names...)
+	p.ByExprs = nil
+	return p
+}
+
+func (p QueryPlan) GroupByExprs(items ...SelectItem) QueryPlan {
+	p.By = nil
+	p.ByExprs = append([]SelectItem(nil), items...)
 	return p
 }
 
@@ -813,8 +3550,48 @@ func (p QueryPlan) Sum(source, as Symbol) QueryPlan {
 	return p
 }
 
+func (p QueryPlan) Min(source, as Symbol) QueryPlan {
+	p.Aggregates = append(p.Aggregates, Aggregate{Name: as, Func: "min", Expr: ColumnRef{Name: source}})
+	return p
+}
+
+func (p QueryPlan) Max(source, as Symbol) QueryPlan {
+	p.Aggregates = append(p.Aggregates, Aggregate{Name: as, Func: "max", Expr: ColumnRef{Name: source}})
+	return p
+}
+
+func (p QueryPlan) First(source, as Symbol) QueryPlan {
+	p.Aggregates = append(p.Aggregates, Aggregate{Name: as, Func: "first", Expr: ColumnRef{Name: source}})
+	return p
+}
+
+func (p QueryPlan) Last(source, as Symbol) QueryPlan {
+	p.Aggregates = append(p.Aggregates, Aggregate{Name: as, Func: "last", Expr: ColumnRef{Name: source}})
+	return p
+}
+
 func (p QueryPlan) Count(as Symbol) QueryPlan {
 	p.Aggregates = append(p.Aggregates, Aggregate{Name: as, Func: "count"})
+	return p
+}
+
+func (p QueryPlan) Var(source, as Symbol) QueryPlan {
+	p.Aggregates = append(p.Aggregates, Aggregate{Name: as, Func: "var", Expr: ColumnRef{Name: source}})
+	return p
+}
+
+func (p QueryPlan) Dev(source, as Symbol) QueryPlan {
+	p.Aggregates = append(p.Aggregates, Aggregate{Name: as, Func: "dev", Expr: ColumnRef{Name: source}})
+	return p
+}
+
+func (p QueryPlan) Med(source, as Symbol) QueryPlan {
+	p.Aggregates = append(p.Aggregates, Aggregate{Name: as, Func: "med", Expr: ColumnRef{Name: source}})
+	return p
+}
+
+func (p QueryPlan) WAvg(weight, source, as Symbol) QueryPlan {
+	p.Aggregates = append(p.Aggregates, Aggregate{Name: as, Func: "wavg", Expr: ColumnRef{Name: source}, Weight: ColumnRef{Name: weight}})
 	return p
 }
 
@@ -850,8 +3627,17 @@ func Exec(frame Frame, plan QueryPlan) (Frame, error) {
 	if err != nil {
 		return Frame{}, err
 	}
+	if len(plan.OrderBy) > 0 && plan.PreProjectOrder {
+		indexes, err = orderIndexes(frame, indexes, plan.OrderBy)
+		if err != nil {
+			return Frame{}, err
+		}
+	}
+	if canLimitBeforeProjection(plan) && plan.LimitN < len(indexes) {
+		indexes = indexes[:plan.LimitN]
+	}
 	var out Frame
-	if len(plan.By) > 0 || len(plan.Aggregates) > 0 {
+	if len(plan.By) > 0 || len(plan.ByExprs) > 0 || len(plan.Aggregates) > 0 {
 		out, err = execGrouped(frame, indexes, plan)
 	} else {
 		out, err = execProject(frame, indexes, plan.Select)
@@ -865,7 +3651,7 @@ func Exec(frame Frame, plan QueryPlan) (Frame, error) {
 			return Frame{}, err
 		}
 	}
-	if len(plan.OrderBy) > 0 {
+	if len(plan.OrderBy) > 0 && !plan.PreProjectOrder {
 		out, err = orderFrame(out, plan.OrderBy)
 		if err != nil {
 			return Frame{}, err
@@ -877,7 +3663,49 @@ func Exec(frame Frame, plan QueryPlan) (Frame, error) {
 	return out, nil
 }
 
+func canLimitBeforeProjection(plan QueryPlan) bool {
+	if plan.LimitN < 0 || plan.Distinct || len(plan.By) > 0 || len(plan.ByExprs) > 0 || len(plan.Aggregates) > 0 {
+		return false
+	}
+	for _, item := range plan.Select {
+		if exprNeedsFullProjectionRows(item.Expr) {
+			return false
+		}
+	}
+	return len(plan.OrderBy) == 0 || plan.PreProjectOrder
+}
+
+func exprNeedsFullProjectionRows(expr Expr) bool {
+	switch e := expr.(type) {
+	case nil, ColumnRef, Literal:
+		return false
+	case vectorProjector:
+		return true
+	case Binary:
+		return exprNeedsFullProjectionRows(e.Left) || exprNeedsFullProjectionRows(e.Right)
+	case Conditional:
+		return exprNeedsFullProjectionRows(e.Cond) || exprNeedsFullProjectionRows(e.Then) || exprNeedsFullProjectionRows(e.Else)
+	case Logical:
+		return exprNeedsFullProjectionRows(e.Left) || exprNeedsFullProjectionRows(e.Right)
+	case Not:
+		return exprNeedsFullProjectionRows(e.Expr)
+	case In:
+		return exprNeedsFullProjectionRows(e.Expr)
+	case Within:
+		return exprNeedsFullProjectionRows(e.Expr)
+	case BucketFloorExpr:
+		return exprNeedsFullProjectionRows(e.Expr)
+	case ListAggregateExpr:
+		return exprNeedsFullProjectionRows(e.Expr)
+	default:
+		return false
+	}
+}
+
 func filterIndexes(frame Frame, where Expr) ([]int, error) {
+	if indexes, ok, err := fastFilterIndexes(frame, where); ok || err != nil {
+		return indexes, err
+	}
 	indexes := make([]int, 0, frame.Len())
 	for i := 0; i < frame.Len(); i++ {
 		if where == nil {
@@ -899,6 +3727,254 @@ func filterIndexes(frame Frame, where Expr) ([]int, error) {
 	return indexes, nil
 }
 
+func fastFilterIndexes(frame Frame, where Expr) ([]int, bool, error) {
+	switch expr := where.(type) {
+	case nil:
+		return nil, false, nil
+	case Binary:
+		if !isComparisonOp(expr.Op) {
+			return nil, false, nil
+		}
+		ref, op, literal, ok := binaryColumnLiteral(expr)
+		if ok {
+			col, ok := frame.Column(ref.Name)
+			if !ok {
+				return nil, true, fmt.Errorf("unknown column %q", ref.Name)
+			}
+			if op == OpEQ {
+				if rows, ok := indexedEqualRows(col, literal.Value); ok {
+					return rows, true, nil
+				}
+			}
+			normalized := normalizeScalar(col.Kind(), literal.Value)
+			if rows, ok := typedKernels.CompareIndexes(col, op, normalized, filterIndexScratch(col.Len())); ok {
+				return rows, true, nil
+			}
+			mask, err := CompareMask(col, op, literal.Value)
+			if err != nil {
+				return nil, true, err
+			}
+			indexes, err := WhereMask(mask)
+			return indexes, true, err
+		}
+		if mask, ok, err := evalBinaryArray(frame, expr); ok || err != nil {
+			if err != nil {
+				return nil, true, err
+			}
+			indexes, err := WhereMask(mask)
+			return indexes, true, err
+		}
+		return nil, false, nil
+	case Within:
+		ref, ok := expr.Expr.(ColumnRef)
+		if !ok {
+			return nil, false, nil
+		}
+		col, ok := frame.Column(ref.Name)
+		if !ok {
+			return nil, true, fmt.Errorf("unknown column %q", ref.Name)
+		}
+		low := normalizeScalar(col.Kind(), expr.Low)
+		high := normalizeScalar(col.Kind(), expr.High)
+		if indexes, ok := typedKernels.WithinIndexes(col, low, high, expr.HighClosed, filterIndexScratch(col.Len())); ok {
+			return indexes, true, nil
+		}
+		mask, err := WithinMask(col, expr.Low, expr.High, expr.HighClosed)
+		if err != nil {
+			return nil, true, err
+		}
+		indexes, err := WhereMask(mask)
+		return indexes, true, err
+	case In:
+		ref, ok := expr.Expr.(ColumnRef)
+		if !ok {
+			return nil, false, nil
+		}
+		col, ok := frame.Column(ref.Name)
+		if !ok {
+			return nil, true, fmt.Errorf("unknown column %q", ref.Name)
+		}
+		if indexes, ok := typedKernels.IndexedInRows(col, expr.Values); ok {
+			return indexes, true, nil
+		}
+		combined := make([]bool, col.Len())
+		for _, value := range expr.Values {
+			mask, err := CompareMask(col, OpEQ, value)
+			if err != nil {
+				return nil, true, err
+			}
+			for row := 0; row < mask.Len(); row++ {
+				v, ok := mask.At(row)
+				if !ok {
+					return nil, true, fmt.Errorf("in mask row %d out of range", row)
+				}
+				if keep, ok := v.(bool); ok && keep {
+					combined[row] = true
+				}
+			}
+		}
+		indexes, err := WhereMask(NewBool(combined))
+		return indexes, true, err
+	default:
+		return nil, false, nil
+	}
+}
+
+func filterIndexScratch(length int) []int {
+	if length <= 0 {
+		return nil
+	}
+	capacity := length / 2
+	if capacity < 16 {
+		capacity = 16
+	}
+	if capacity > length {
+		capacity = length
+	}
+	return make([]int, 0, capacity)
+}
+
+func indexedEqualRows(array Array, value any) ([]int, bool) {
+	uniqueIndex, uniqueOK := ArrayIndexFor(array, ArrayAttributeUnique)
+	groupedIndex, groupedOK := ArrayIndexFor(array, ArrayAttributeGrouped)
+	if !uniqueOK && !groupedOK {
+		return nil, false
+	}
+	normalized, err := normalizeKeyValue(array.Kind(), value)
+	if err != nil {
+		return nil, false
+	}
+	key := arrayValueKey(array.Kind(), normalized)
+	if uniqueOK {
+		return append([]int(nil), uniqueIndex.RowsByKey[key]...), true
+	}
+	if groupedOK {
+		return append([]int(nil), groupedIndex.RowsByKey[key]...), true
+	}
+	return nil, false
+}
+
+func isComparisonOp(op Op) bool {
+	switch op {
+	case OpEQ, OpNE, OpLT, OpLE, OpGT, OpGE:
+		return true
+	default:
+		return false
+	}
+}
+
+func binaryColumnLiteral(expr Binary) (ColumnRef, Op, Literal, bool) {
+	leftRef, leftRefOK := expr.Left.(ColumnRef)
+	rightRef, rightRefOK := expr.Right.(ColumnRef)
+	leftLit, leftLitOK := expr.Left.(Literal)
+	rightLit, rightLitOK := expr.Right.(Literal)
+	switch {
+	case leftRefOK && rightLitOK:
+		return leftRef, expr.Op, rightLit, true
+	case leftLitOK && rightRefOK:
+		return rightRef, reverseComparisonOp(expr.Op), leftLit, true
+	default:
+		return ColumnRef{}, "", Literal{}, false
+	}
+}
+
+func reverseComparisonOp(op Op) Op {
+	switch op {
+	case OpLT:
+		return OpGT
+	case OpLE:
+		return OpGE
+	case OpGT:
+		return OpLT
+	case OpGE:
+		return OpLE
+	default:
+		return op
+	}
+}
+
+func evalExprArray(frame Frame, expr Expr) (Array, bool, error) {
+	switch e := expr.(type) {
+	case vectorProjector:
+		indexes := allIndexes(frame.Len())
+		array, err := e.EvalRows(frame, indexes)
+		return array, true, err
+	case ColumnRef:
+		col, ok := frame.Column(e.Name)
+		if !ok {
+			return nil, true, fmt.Errorf("unknown column %q", e.Name)
+		}
+		return col, true, nil
+	case Binary:
+		return evalBinaryArray(frame, e)
+	default:
+		return nil, false, nil
+	}
+}
+
+func evalBinaryArray(frame Frame, expr Binary) (Array, bool, error) {
+	left, lok, err := evalDyadicOperand(frame, expr.Left)
+	if err != nil || !lok {
+		return nil, lok, err
+	}
+	right, rok, err := evalDyadicOperand(frame, expr.Right)
+	if err != nil || !rok {
+		return nil, rok, err
+	}
+	out, ok, err := typedKernels.Dyadic(expr.Op, left, right)
+	if err != nil || !ok {
+		return nil, ok, err
+	}
+	array, ok := out.(Array)
+	if !ok {
+		return nil, false, nil
+	}
+	return array, true, nil
+}
+
+func evalDyadicOperand(frame Frame, expr Expr) (any, bool, error) {
+	switch e := expr.(type) {
+	case ColumnRef:
+		col, ok := frame.Column(e.Name)
+		if !ok {
+			return nil, true, fmt.Errorf("unknown column %q", e.Name)
+		}
+		return col, true, nil
+	case Literal:
+		return e.Value, true, nil
+	default:
+		return nil, false, nil
+	}
+}
+
+func evalProjectionExprRows(frame Frame, indexes []int, expr Expr) (Array, error) {
+	if projector, ok := expr.(vectorProjector); ok {
+		array, err := projector.EvalRows(frame, indexes)
+		if err != nil {
+			return nil, err
+		}
+		if array.Len() != len(indexes) {
+			return nil, fmt.Errorf("vector projection returned %d rows, want %d", array.Len(), len(indexes))
+		}
+		return array, nil
+	}
+	if array, ok, err := evalExprArray(frame, expr); ok || err != nil {
+		if err != nil {
+			return nil, err
+		}
+		return array.Gather(indexes), nil
+	}
+	values := make([]any, len(indexes))
+	for i, row := range indexes {
+		v, err := expr.EvalRow(frame, row)
+		if err != nil {
+			return nil, err
+		}
+		values[i] = v
+	}
+	return InferArray(values), nil
+}
+
 func execProject(frame Frame, indexes []int, items []SelectItem) (Frame, error) {
 	if len(items) == 0 {
 		items = make([]SelectItem, 0, len(frame.schema.names))
@@ -910,6 +3986,32 @@ func execProject(frame Frame, indexes []int, items []SelectItem) (Frame, error) 
 	for _, item := range items {
 		if item.Name == "" {
 			return Frame{}, fmt.Errorf("select item name must not be empty")
+		}
+		if ref, ok := item.Expr.(ColumnRef); ok {
+			col, ok := frame.Column(ref.Name)
+			if !ok {
+				return Frame{}, fmt.Errorf("unknown column %q", ref.Name)
+			}
+			cols = append(cols, Column{Name: item.Name, Data: col.Gather(indexes)})
+			continue
+		}
+		if projector, ok := item.Expr.(vectorProjector); ok {
+			array, err := projector.EvalRows(frame, indexes)
+			if err != nil {
+				return Frame{}, err
+			}
+			if array.Len() != len(indexes) {
+				return Frame{}, fmt.Errorf("select item %q returned %d rows, want %d", item.Name, array.Len(), len(indexes))
+			}
+			cols = append(cols, Column{Name: item.Name, Data: array})
+			continue
+		}
+		if array, ok, err := evalExprArray(frame, item.Expr); ok || err != nil {
+			if err != nil {
+				return Frame{}, err
+			}
+			cols = append(cols, Column{Name: item.Name, Data: array.Gather(indexes)})
+			continue
 		}
 		values := make([]any, len(indexes))
 		for i, row := range indexes {
@@ -930,129 +4032,756 @@ type groupState struct {
 }
 
 type aggregateState struct {
-	fn    string
-	sum   float64
-	count int64
+	fn         string
+	sum        float64
+	sumsq      float64
+	weight     float64
+	values     []float64
+	count      int64
+	value      any
+	hasValue   bool
+	lastValue  any
+	hasLastVal bool
+}
+
+type aggregateInput struct {
+	Aggregate
+	column       Array
+	weightColumn Array
+}
+
+type groupInput struct {
+	SelectItem
+	column Array
 }
 
 func execGrouped(frame Frame, indexes []int, plan QueryPlan) (Frame, error) {
-	if len(plan.By) == 0 {
+	byItems := groupByItems(plan)
+	if len(byItems) == 0 {
 		return Frame{}, fmt.Errorf("aggregate queries require at least one by column")
 	}
 	if len(plan.Aggregates) == 0 {
+		if planHasVectorProjection(plan) {
+			return execGroupedProjection(frame, indexes, plan, byItems)
+		}
 		return Frame{}, fmt.Errorf("grouped queries require aggregates")
+	}
+	byInputs, err := bindGroupInputs(frame, byItems)
+	if err != nil {
+		return Frame{}, err
+	}
+	aggs := make([]aggregateInput, len(plan.Aggregates))
+	for i, agg := range plan.Aggregates {
+		aggs[i].Aggregate = agg
+		if ref, ok := agg.Expr.(ColumnRef); ok {
+			col, ok := frame.Column(ref.Name)
+			if !ok {
+				return Frame{}, fmt.Errorf("unknown column %q", ref.Name)
+			}
+			aggs[i].column = col
+		}
+		if ref, ok := agg.Weight.(ColumnRef); ok {
+			col, ok := frame.Column(ref.Name)
+			if !ok {
+				return Frame{}, fmt.Errorf("unknown column %q", ref.Name)
+			}
+			aggs[i].weightColumn = col
+		}
+	}
+	if index, ok := groupIndexForSingleColumn(byInputs); ok {
+		if indexesCoverAllRows(indexes, byInputs[0].column.Len()) {
+			return execGroupedFromArrayIndex(frame, byInputs, aggs, index)
+		}
+		if out, ok, err := execGroupedFromFilteredArrayIndex(frame, byInputs, aggs, index, indexes); ok || err != nil {
+			return out, err
+		}
 	}
 	groups := map[string]*groupState{}
 	order := make([]string, 0)
+	var keyBuilder strings.Builder
 	for _, row := range indexes {
-		keyVals := make([]any, len(plan.By))
-		key := ""
-		for i, name := range plan.By {
-			v, err := (ColumnRef{Name: name}).EvalRow(frame, row)
+		keyVals := make([]any, len(byInputs))
+		keyBuilder.Reset()
+		for i, item := range byInputs {
+			v, err := item.value(frame, row)
 			if err != nil {
 				return Frame{}, err
 			}
 			keyVals[i] = v
-			key += fmt.Sprintf("%#v\x00", v)
+			appendKeyPart(&keyBuilder, item.keyKind(), v)
 		}
+		key := keyBuilder.String()
 		state := groups[key]
 		if state == nil {
-			state = &groupState{keys: keyVals, aggs: make([]aggregateState, len(plan.Aggregates))}
-			for i, agg := range plan.Aggregates {
+			state = &groupState{keys: keyVals, aggs: make([]aggregateState, len(aggs))}
+			for i, agg := range aggs {
 				state.aggs[i].fn = agg.Func
 			}
 			groups[key] = state
 			order = append(order, key)
 		}
-		for i, agg := range plan.Aggregates {
-			switch agg.Func {
-			case "count":
-				state.aggs[i].count++
-			case "sum", "avg":
-				v, err := agg.Expr.EvalRow(frame, row)
-				if err != nil {
-					return Frame{}, err
-				}
-				n, ok := numeric(v)
-				if !ok {
-					return Frame{}, fmt.Errorf("aggregate %s expects numeric expression", agg.Func)
-				}
-				state.aggs[i].sum += n
-				state.aggs[i].count++
-			default:
-				return Frame{}, fmt.Errorf("unsupported aggregate %q", agg.Func)
+		for i, agg := range aggs {
+			if err := accumulateAggregate(&state.aggs[i], agg, frame, row); err != nil {
+				return Frame{}, err
 			}
 		}
 	}
 
-	cols := make([]Column, 0, len(plan.By)+len(plan.Aggregates))
-	for i, name := range plan.By {
+	cols := make([]Column, 0, len(byInputs)+len(plan.Aggregates))
+	for i, item := range byInputs {
 		values := make([]any, len(order))
 		for row, key := range order {
 			values[row] = groups[key].keys[i]
 		}
-		cols = append(cols, NewColumn(name, values))
+		cols = append(cols, NewColumn(item.Name, values))
 	}
 	for i, agg := range plan.Aggregates {
 		values := make([]any, len(order))
 		for row, key := range order {
-			state := groups[key].aggs[i]
-			switch agg.Func {
-			case "count":
-				values[row] = state.count
-			case "sum":
-				values[row] = state.sum
-			case "avg":
-				if state.count == 0 {
-					values[row] = float64(0)
-				} else {
-					values[row] = state.sum / float64(state.count)
-				}
+			values[row] = aggregateResult(groups[key].aggs[i])
+		}
+		if kind, ok := aggregateOutputKind(frame, agg); ok {
+			col, err := columnWithKind(agg.Name, kind, values)
+			if err != nil {
+				return Frame{}, err
 			}
+			cols = append(cols, col)
+			continue
 		}
 		cols = append(cols, NewColumn(agg.Name, values))
 	}
 	return NewFrame(cols...)
 }
 
-func orderFrame(frame Frame, specs []OrderSpec) (Frame, error) {
-	for _, spec := range specs {
-		if _, ok := frame.Column(spec.Column); !ok {
-			return Frame{}, fmt.Errorf("order column %q does not exist", spec.Column)
+func planHasVectorProjection(plan QueryPlan) bool {
+	for _, item := range plan.Select {
+		if exprNeedsFullProjectionRows(item.Expr) {
+			return true
 		}
 	}
-	indexes := allIndexes(frame.Len())
-	sort.SliceStable(indexes, func(i, j int) bool {
-		leftRow, rightRow := indexes[i], indexes[j]
-		for _, spec := range specs {
-			col, _ := frame.Column(spec.Column)
-			lv, _ := col.At(leftRow)
-			rv, _ := col.At(rightRow)
-			cmp := compare(lv, rv)
+	return false
+}
+
+type projectionGroup struct {
+	rows      []int
+	positions []int
+}
+
+func execGroupedProjection(frame Frame, indexes []int, plan QueryPlan, byItems []SelectItem) (Frame, error) {
+	byInputs, err := bindGroupInputs(frame, byItems)
+	if err != nil {
+		return Frame{}, err
+	}
+	groups := map[string]*projectionGroup{}
+	order := make([]string, 0)
+	var keyBuilder strings.Builder
+	for pos, row := range indexes {
+		keyBuilder.Reset()
+		for _, item := range byInputs {
+			v, err := item.value(frame, row)
+			if err != nil {
+				return Frame{}, err
+			}
+			appendKeyPart(&keyBuilder, item.keyKind(), v)
+		}
+		key := keyBuilder.String()
+		group := groups[key]
+		if group == nil {
+			group = &projectionGroup{}
+			groups[key] = group
+			order = append(order, key)
+		}
+		group.rows = append(group.rows, row)
+		group.positions = append(group.positions, pos)
+	}
+
+	if len(plan.Select) == 0 {
+		return execProject(frame, indexes, nil)
+	}
+	cols := make([]Column, 0, len(plan.Select))
+	for _, item := range plan.Select {
+		if item.Name == "" {
+			return Frame{}, fmt.Errorf("select item name must not be empty")
+		}
+		if ref, ok := item.Expr.(ColumnRef); ok {
+			col, ok := frame.Column(ref.Name)
+			if !ok {
+				return Frame{}, fmt.Errorf("unknown column %q", ref.Name)
+			}
+			cols = append(cols, Column{Name: item.Name, Data: col.Gather(indexes)})
+			continue
+		}
+		if projector, ok := item.Expr.(vectorProjector); ok {
+			values := make([]any, len(indexes))
+			for _, key := range order {
+				group := groups[key]
+				array, err := projector.EvalRows(frame, group.rows)
+				if err != nil {
+					return Frame{}, err
+				}
+				if array.Len() != len(group.rows) {
+					return Frame{}, fmt.Errorf("select item %q returned %d grouped rows, want %d", item.Name, array.Len(), len(group.rows))
+				}
+				for i, pos := range group.positions {
+					v, ok := array.At(i)
+					if !ok {
+						return Frame{}, fmt.Errorf("select item %q grouped row %d out of range", item.Name, i)
+					}
+					values[pos] = v
+				}
+			}
+			cols = append(cols, NewColumn(item.Name, values))
+			continue
+		}
+		if array, ok, err := evalExprArray(frame, item.Expr); ok || err != nil {
+			if err != nil {
+				return Frame{}, err
+			}
+			cols = append(cols, Column{Name: item.Name, Data: array.Gather(indexes)})
+			continue
+		}
+		values := make([]any, len(indexes))
+		for i, row := range indexes {
+			v, err := item.Expr.EvalRow(frame, row)
+			if err != nil {
+				return Frame{}, err
+			}
+			values[i] = v
+		}
+		cols = append(cols, NewColumn(item.Name, values))
+	}
+	return NewFrame(cols...)
+}
+
+func groupIndexForSingleColumn(byInputs []groupInput) (ArrayIndex, bool) {
+	if len(byInputs) != 1 {
+		return ArrayIndex{}, false
+	}
+	column := byInputs[0].column
+	if column == nil {
+		return ArrayIndex{}, false
+	}
+	if index, ok := ArrayIndexFor(column, ArrayAttributeUnique); ok {
+		return index, true
+	}
+	if index, ok := ArrayIndexFor(column, ArrayAttributeGrouped); ok {
+		return index, true
+	}
+	return ArrayIndex{}, false
+}
+
+func indexesCoverAllRows(indexes []int, n int) bool {
+	if len(indexes) != n {
+		return false
+	}
+	for i, row := range indexes {
+		if row != i {
+			return false
+		}
+	}
+	return true
+}
+
+func aggregateInputsAllCount(aggs []aggregateInput) bool {
+	if len(aggs) == 0 {
+		return false
+	}
+	for _, agg := range aggs {
+		if agg.Func != "count" {
+			return false
+		}
+	}
+	return true
+}
+
+func execGroupedFromArrayIndex(frame Frame, byInputs []groupInput, aggs []aggregateInput, index ArrayIndex) (Frame, error) {
+	if states, ok, err := typedKernels.GroupAggregateStates(index, aggs); ok || err != nil {
+		if err != nil {
+			return Frame{}, err
+		}
+		return buildGroupedAggregateFrame(frame, byInputs, aggs, states, allIndexes(len(states)))
+	}
+	groupCounts, hasGroupCounts := typedKernels.GroupCounts(index)
+	hasRowAggregates := false
+	for _, agg := range aggs {
+		if agg.Func != "count" || !hasGroupCounts {
+			hasRowAggregates = true
+			break
+		}
+	}
+	states := make([]groupState, len(index.Rows))
+	for group, rows := range index.Rows {
+		states[group] = groupState{
+			keys: []any{index.Keys[group]},
+			aggs: make([]aggregateState, len(aggs)),
+		}
+		for i, agg := range aggs {
+			states[group].aggs[i].fn = agg.Func
+			if hasGroupCounts && agg.Func == "count" {
+				states[group].aggs[i].count = groupCounts[group]
+			}
+		}
+		if hasRowAggregates {
+			for _, row := range rows {
+				for i, agg := range aggs {
+					if hasGroupCounts && agg.Func == "count" {
+						continue
+					}
+					if err := accumulateAggregate(&states[group].aggs[i], agg, frame, row); err != nil {
+						return Frame{}, err
+					}
+				}
+			}
+		}
+	}
+
+	return buildGroupedAggregateFrame(frame, byInputs, aggs, states, allIndexes(len(states)))
+}
+
+func execGroupedFromFilteredArrayIndex(frame Frame, byInputs []groupInput, aggs []aggregateInput, index ArrayIndex, indexes []int) (Frame, bool, error) {
+	if groupOrder, states, ok, err := typedKernels.FilteredGroupAggregateStates(index, indexes, aggs); ok || err != nil {
+		if err != nil {
+			return Frame{}, true, err
+		}
+		out, err := buildGroupedAggregateFrame(frame, byInputs, aggs, states, groupOrder)
+		return out, true, err
+	}
+	if !aggregateInputsAllCount(aggs) {
+		return Frame{}, false, nil
+	}
+	groupOrder, groupCounts, ok, err := typedKernels.FilteredGroupCounts(index, indexes)
+	if err != nil || !ok {
+		return Frame{}, ok, err
+	}
+	cols := make([]Column, 0, len(byInputs)+len(aggs))
+	for i, item := range byInputs {
+		if i > 0 {
+			return Frame{}, false, nil
+		}
+		values := make([]any, len(groupOrder))
+		for row, group := range groupOrder {
+			values[row] = index.Keys[group]
+		}
+		cols = append(cols, NewColumn(item.Name, values))
+	}
+	for _, agg := range aggs {
+		values := make([]any, len(groupOrder))
+		for row, group := range groupOrder {
+			values[row] = groupCounts[group]
+		}
+		cols = append(cols, NewColumn(agg.Name, values))
+	}
+	out, err := NewFrame(cols...)
+	return out, true, err
+}
+
+func buildGroupedAggregateFrame(frame Frame, byInputs []groupInput, aggs []aggregateInput, states []groupState, order []int) (Frame, error) {
+	cols := make([]Column, 0, len(byInputs)+len(aggs))
+	for i, item := range byInputs {
+		values := make([]any, len(order))
+		for row, group := range order {
+			values[row] = states[group].keys[i]
+		}
+		cols = append(cols, NewColumn(item.Name, values))
+	}
+	for i, agg := range aggs {
+		values := make([]any, len(order))
+		for row, group := range order {
+			values[row] = aggregateResult(states[group].aggs[i])
+		}
+		if kind, ok := aggregateOutputKind(frame, agg.Aggregate); ok {
+			col, err := columnWithKind(agg.Name, kind, values)
+			if err != nil {
+				return Frame{}, err
+			}
+			cols = append(cols, col)
+			continue
+		}
+		cols = append(cols, NewColumn(agg.Name, values))
+	}
+	return NewFrame(cols...)
+}
+
+func bindGroupInputs(frame Frame, items []SelectItem) ([]groupInput, error) {
+	inputs := make([]groupInput, len(items))
+	for i, item := range items {
+		inputs[i].SelectItem = item
+		if ref, ok := item.Expr.(ColumnRef); ok {
+			col, ok := frame.Column(ref.Name)
+			if !ok {
+				return nil, fmt.Errorf("unknown column %q", ref.Name)
+			}
+			inputs[i].column = col
+		}
+	}
+	return inputs, nil
+}
+
+func (item groupInput) value(frame Frame, row int) (any, error) {
+	if item.column == nil {
+		return item.Expr.EvalRow(frame, row)
+	}
+	v, ok := item.column.At(row)
+	if !ok {
+		ref := item.Expr.(ColumnRef)
+		return nil, fmt.Errorf("column %q row %d out of range", ref.Name, row)
+	}
+	return v, nil
+}
+
+func (item groupInput) keyKind() Kind {
+	if item.column == nil {
+		return KindAny
+	}
+	return item.column.Kind()
+}
+
+func (agg aggregateInput) value(frame Frame, row int) (any, error) {
+	if agg.column == nil {
+		return agg.Expr.EvalRow(frame, row)
+	}
+	v, ok := agg.column.At(row)
+	if !ok {
+		ref := agg.Expr.(ColumnRef)
+		return nil, fmt.Errorf("column %q row %d out of range", ref.Name, row)
+	}
+	return v, nil
+}
+
+func aggregateNumericValue(agg aggregateInput, frame Frame, row int) (float64, bool, error) {
+	if agg.column != nil {
+		return numericAt(agg.column, row)
+	}
+	v, err := agg.value(frame, row)
+	if err != nil {
+		return 0, false, err
+	}
+	if IsNull(v) {
+		return 0, false, nil
+	}
+	n, ok := numeric(v)
+	if !ok {
+		return 0, false, fmt.Errorf("aggregate %s expects numeric expression, got %T (%v)", agg.Func, v, v)
+	}
+	return n, true, nil
+}
+
+func aggregateWeightValue(agg aggregateInput, frame Frame, row int) (float64, bool, error) {
+	if agg.Weight == nil {
+		return 0, false, fmt.Errorf("aggregate wavg expects a weight expression")
+	}
+	if agg.weightColumn != nil {
+		return numericAt(agg.weightColumn, row)
+	}
+	v, err := agg.Weight.EvalRow(frame, row)
+	if err != nil {
+		return 0, false, err
+	}
+	if IsNull(v) {
+		return 0, false, nil
+	}
+	n, ok := numeric(v)
+	if !ok {
+		return 0, false, fmt.Errorf("aggregate wavg expects numeric weight, got %T (%v)", v, v)
+	}
+	return n, true, nil
+}
+
+func isSupportedAggregate(fn string) bool {
+	switch fn {
+	case "count", "sum", "avg", "var", "dev", "med", "wavg", "min", "max", "first", "last":
+		return true
+	default:
+		return false
+	}
+}
+
+func accumulateAggregate(state *aggregateState, agg aggregateInput, frame Frame, row int) error {
+	switch agg.Func {
+	case "count":
+		state.count++
+	case "sum", "avg", "var", "dev", "med":
+		n, ok, err := aggregateNumericValue(agg, frame, row)
+		if err != nil {
+			return err
+		}
+		if !ok {
+			return nil
+		}
+		state.sum += n
+		state.sumsq += n * n
+		if agg.Func == "med" {
+			state.values = append(state.values, n)
+		}
+		state.count++
+	case "wavg":
+		n, nok, err := aggregateNumericValue(agg, frame, row)
+		if err != nil {
+			return err
+		}
+		w, wok, err := aggregateWeightValue(agg, frame, row)
+		if err != nil {
+			return err
+		}
+		if !nok || !wok {
+			return nil
+		}
+		state.sum += n * w
+		state.weight += w
+		state.count++
+	case "min", "max":
+		v, err := agg.value(frame, row)
+		if err != nil {
+			return err
+		}
+		if IsNull(v) {
+			return nil
+		}
+		if !state.hasValue || (agg.Func == "min" && compare(v, state.value) < 0) || (agg.Func == "max" && compare(v, state.value) > 0) {
+			state.value = v
+			state.hasValue = true
+		}
+	case "first":
+		if !state.hasValue {
+			v, err := agg.value(frame, row)
+			if err != nil {
+				return err
+			}
+			state.value = normalizeAggregateValue(v)
+			state.hasValue = true
+		}
+	case "last":
+		v, err := agg.value(frame, row)
+		if err != nil {
+			return err
+		}
+		state.lastValue = normalizeAggregateValue(v)
+		state.hasLastVal = true
+	default:
+		return fmt.Errorf("unsupported aggregate %q", agg.Func)
+	}
+	return nil
+}
+
+func aggregateResult(state aggregateState) any {
+	switch state.fn {
+	case "count":
+		return state.count
+	case "sum":
+		return state.sum
+	case "avg":
+		if state.count == 0 {
+			return float64(0)
+		}
+		return state.sum / float64(state.count)
+	case "var":
+		if state.count == 0 {
+			return float64(0)
+		}
+		mean := state.sum / float64(state.count)
+		return state.sumsq/float64(state.count) - mean*mean
+	case "dev":
+		if state.count == 0 {
+			return float64(0)
+		}
+		mean := state.sum / float64(state.count)
+		return math.Sqrt(state.sumsq/float64(state.count) - mean*mean)
+	case "med":
+		if len(state.values) == 0 {
+			return NullValue
+		}
+		values := append([]float64(nil), state.values...)
+		sort.Float64s(values)
+		mid := len(values) / 2
+		if len(values)%2 == 1 {
+			return values[mid]
+		}
+		return (values[mid-1] + values[mid]) / 2
+	case "wavg":
+		if state.count == 0 || state.weight == 0 {
+			return NullValue
+		}
+		return state.sum / state.weight
+	case "min", "max":
+		if state.hasValue {
+			return state.value
+		}
+		return NullValue
+	case "first":
+		if state.hasValue {
+			return state.value
+		}
+		return NullValue
+	case "last":
+		if state.hasLastVal {
+			return state.lastValue
+		}
+		return NullValue
+	default:
+		return NullValue
+	}
+}
+
+func aggregateOutputKind(frame Frame, agg Aggregate) (Kind, bool) {
+	switch agg.Func {
+	case "min", "max", "first", "last":
+		ref, ok := agg.Expr.(ColumnRef)
+		if !ok {
+			return "", false
+		}
+		return frame.schema.Kind(ref.Name)
+	default:
+		return "", false
+	}
+}
+
+func groupByItems(plan QueryPlan) []SelectItem {
+	if len(plan.ByExprs) > 0 {
+		return plan.ByExprs
+	}
+	items := make([]SelectItem, 0, len(plan.By))
+	for _, name := range plan.By {
+		items = append(items, SelectItem{Name: name, Expr: ColumnRef{Name: name}})
+	}
+	return items
+}
+
+func normalizeAggregateValue(v any) any {
+	if IsNull(v) {
+		return NullValue
+	}
+	return v
+}
+
+func orderFrame(frame Frame, specs []OrderSpec) (Frame, error) {
+	indexes, err := orderIndexes(frame, allIndexes(frame.Len()), specs)
+	if err != nil {
+		return Frame{}, err
+	}
+	return frame.Gather(indexes)
+}
+
+func orderIndexes(frame Frame, indexes []int, specs []OrderSpec) ([]int, error) {
+	bound := make([]boundOrderSpec, len(specs))
+	for i, spec := range specs {
+		col, ok := frame.Column(spec.Column)
+		if !ok {
+			return nil, fmt.Errorf("order column %q does not exist", spec.Column)
+		}
+		bound[i] = boundOrderSpec{spec: spec, column: col}
+	}
+	if out, ok := orderIndexesBySortedAttribute(indexes, bound); ok {
+		return out, nil
+	}
+	out := append([]int(nil), indexes...)
+	sort.SliceStable(out, func(i, j int) bool {
+		leftRow, rightRow := out[i], out[j]
+		for _, spec := range bound {
+			cmp := compareArrayRows(spec.column, leftRow, rightRow)
 			if cmp == 0 {
 				continue
 			}
-			if spec.Desc {
+			if spec.spec.Desc {
 				return cmp > 0
 			}
 			return cmp < 0
 		}
 		return false
 	})
-	return frame.Gather(indexes)
+	return out, nil
+}
+
+func orderIndexesBySortedAttribute(indexes []int, bound []boundOrderSpec) ([]int, bool) {
+	if len(bound) != 1 {
+		return nil, false
+	}
+	spec := bound[0]
+	if !ArrayHasAttribute(spec.column, ArrayAttributeSorted) {
+		return nil, false
+	}
+	out := append([]int(nil), indexes...)
+	if spec.spec.Desc {
+		for left, right := 0, len(out)-1; left < right; left, right = left+1, right-1 {
+			out[left], out[right] = out[right], out[left]
+		}
+	}
+	return out, true
+}
+
+type boundOrderSpec struct {
+	spec   OrderSpec
+	column Array
+}
+
+func compareArrayRows(array Array, leftRow, rightRow int) int {
+	switch a := array.(type) {
+	case attributedArray:
+		return compareArrayRows(a.array, leftRow, rightRow)
+	case columnArray[bool]:
+		return compareBool(a.data[leftRow], a.data[rightRow])
+	case columnArray[int8]:
+		return compareInt64(int64(a.data[leftRow]), int64(a.data[rightRow]))
+	case columnArray[int16]:
+		return compareInt64(int64(a.data[leftRow]), int64(a.data[rightRow]))
+	case columnArray[int32]:
+		return compareInt64(int64(a.data[leftRow]), int64(a.data[rightRow]))
+	case columnArray[int64]:
+		return compareInt64(a.data[leftRow], a.data[rightRow])
+	case columnArray[uint8]:
+		return compareUint64(uint64(a.data[leftRow]), uint64(a.data[rightRow]))
+	case columnArray[uint16]:
+		return compareUint64(uint64(a.data[leftRow]), uint64(a.data[rightRow]))
+	case columnArray[uint32]:
+		return compareUint64(uint64(a.data[leftRow]), uint64(a.data[rightRow]))
+	case columnArray[uint64]:
+		return compareUint64(a.data[leftRow], a.data[rightRow])
+	case columnArray[float32]:
+		return compareFloat64(float64(a.data[leftRow]), float64(a.data[rightRow]))
+	case columnArray[float64]:
+		return compareFloat64(a.data[leftRow], a.data[rightRow])
+	case columnArray[string]:
+		return compareString(a.data[leftRow], a.data[rightRow])
+	case columnArray[Symbol]:
+		return compareString(string(a.data[leftRow]), string(a.data[rightRow]))
+	case columnArray[Month]:
+		return compareInt64(int64(a.data[leftRow]), int64(a.data[rightRow]))
+	case columnArray[Date]:
+		return compareInt64(int64(a.data[leftRow]), int64(a.data[rightRow]))
+	case columnArray[DateTime]:
+		return compareInt64(int64(a.data[leftRow]), int64(a.data[rightRow]))
+	case columnArray[Timespan]:
+		return compareInt64(int64(a.data[leftRow]), int64(a.data[rightRow]))
+	case columnArray[Minute]:
+		return compareInt64(int64(a.data[leftRow]), int64(a.data[rightRow]))
+	case columnArray[Second]:
+		return compareInt64(int64(a.data[leftRow]), int64(a.data[rightRow]))
+	case columnArray[Time]:
+		return compareInt64(int64(a.data[leftRow]), int64(a.data[rightRow]))
+	case columnArray[Timestamp]:
+		return compareInt64(int64(a.data[leftRow]), int64(a.data[rightRow]))
+	default:
+		lv, _ := array.At(leftRow)
+		rv, _ := array.At(rightRow)
+		return compare(lv, rv)
+	}
 }
 
 func InferArray(values []any) Array {
 	hasNull, hasValue := false, false
+	typedNullKind := Kind("")
 	allBool := true
 	allI8, allI16, allI32, allI64 := true, true, true, true
 	allU8, allU16, allU32, allU64 := true, true, true, true
 	allF32, allF64, allNumber := true, true, true
-	allString, allSymbol := true, true
-	allDate, allTime, allTimestamp := true, true, true
+	allString, allSymbol, allStringOrSymbol := true, true, true
+	allMonth, allDate, allDateTime, allTimespan := true, true, true, true
+	allMinute, allSecond, allTime, allTimestamp := true, true, true, true
 	for _, v := range values {
 		if IsNull(v) {
 			hasNull = true
+			if kind, ok := NullKind(v); ok && kind != KindNull {
+				typedNullKind = mergeTypedNullArrayKind(typedNullKind, kind)
+			}
 			continue
 		}
 		hasValue = true
@@ -1100,8 +4829,28 @@ func InferArray(values []any) Array {
 		if _, ok := v.(Symbol); !ok {
 			allSymbol = false
 		}
+		switch v.(type) {
+		case string, Symbol:
+		default:
+			allStringOrSymbol = false
+		}
+		if _, ok := v.(Month); !ok {
+			allMonth = false
+		}
 		if _, ok := v.(Date); !ok {
 			allDate = false
+		}
+		if _, ok := v.(DateTime); !ok {
+			allDateTime = false
+		}
+		if _, ok := v.(Timespan); !ok {
+			allTimespan = false
+		}
+		if _, ok := v.(Minute); !ok {
+			allMinute = false
+		}
+		if _, ok := v.(Second); !ok {
+			allSecond = false
 		}
 		if _, ok := v.(Time); !ok {
 			allTime = false
@@ -1111,7 +4860,17 @@ func InferArray(values []any) Array {
 		}
 	}
 	if !hasValue {
+		if typedNullKind != "" {
+			if array, err := nullableArrayWithKind(typedNullKind, values); err == nil {
+				return array
+			}
+		}
 		return nullableArray{kind: KindNull, data: normalizeNulls(values)}
+	}
+	if typedNullKind != "" {
+		if array, err := arrayWithKind(typedNullKind, values); err == nil {
+			return array
+		}
 	}
 	switch {
 	case allBool:
@@ -1287,6 +5046,35 @@ func InferArray(values []any) Array {
 			return newNullableArray(KindSymbol, values)
 		}
 		return NewSymbols(out)
+	case allStringOrSymbol:
+		out := make([]string, len(values))
+		for i, v := range values {
+			if IsNull(v) {
+				continue
+			}
+			switch x := v.(type) {
+			case string:
+				out[i] = x
+			case Symbol:
+				out[i] = string(x)
+			}
+		}
+		if hasNull {
+			return newNullableArray(KindSymbol, values)
+		}
+		return NewSymbols(out)
+	case allMonth:
+		out := make([]Month, len(values))
+		for i, v := range values {
+			if IsNull(v) {
+				continue
+			}
+			out[i] = v.(Month)
+		}
+		if hasNull {
+			return newNullableArray(KindMonth, values)
+		}
+		return NewMonth(out)
 	case allDate:
 		out := make([]Date, len(values))
 		for i, v := range values {
@@ -1299,6 +5087,54 @@ func InferArray(values []any) Array {
 			return newNullableArray(KindDate, values)
 		}
 		return NewDate(out)
+	case allDateTime:
+		out := make([]DateTime, len(values))
+		for i, v := range values {
+			if IsNull(v) {
+				continue
+			}
+			out[i] = v.(DateTime)
+		}
+		if hasNull {
+			return newNullableArray(KindDateTime, values)
+		}
+		return NewDateTime(out)
+	case allTimespan:
+		out := make([]Timespan, len(values))
+		for i, v := range values {
+			if IsNull(v) {
+				continue
+			}
+			out[i] = v.(Timespan)
+		}
+		if hasNull {
+			return newNullableArray(KindTimespan, values)
+		}
+		return NewTimespan(out)
+	case allMinute:
+		out := make([]Minute, len(values))
+		for i, v := range values {
+			if IsNull(v) {
+				continue
+			}
+			out[i] = v.(Minute)
+		}
+		if hasNull {
+			return newNullableArray(KindMinute, values)
+		}
+		return NewMinute(out)
+	case allSecond:
+		out := make([]Second, len(values))
+		for i, v := range values {
+			if IsNull(v) {
+				continue
+			}
+			out[i] = v.(Second)
+		}
+		if hasNull {
+			return newNullableArray(KindSecond, values)
+		}
+		return NewSecond(out)
 	case allTime:
 		out := make([]Time, len(values))
 		for i, v := range values {
@@ -1328,16 +5164,663 @@ func InferArray(values []any) Array {
 	}
 }
 
+func mergeTypedNullArrayKind(left, right Kind) Kind {
+	if left == "" || left == KindNull || left == KindAny {
+		return right
+	}
+	if right == "" || right == KindNull || right == KindAny || left == right {
+		return left
+	}
+	if isNumericKind(left) && isNumericKind(right) {
+		if left == KindF64 || right == KindF64 || left == KindF32 || right == KindF32 {
+			return KindF64
+		}
+		return KindI64
+	}
+	return ""
+}
+
+func isNumericKind(kind Kind) bool {
+	switch kind {
+	case KindI8, KindI16, KindI32, KindI64, KindU8, KindU16, KindU32, KindU64, KindF32, KindF64:
+		return true
+	default:
+		return false
+	}
+}
+
+func columnWithKind(name Symbol, kind Kind, values []any) (Column, error) {
+	if kind == "" || kind == KindAny {
+		return NewColumn(name, values), nil
+	}
+	array, err := arrayWithKind(kind, values)
+	if err != nil {
+		return Column{}, fmt.Errorf("column %q: %w", name, err)
+	}
+	return Column{Name: name, Data: array}, nil
+}
+
+func arrayWithKind(kind Kind, values []any) (Array, error) {
+	hasNull := false
+	for _, v := range values {
+		if IsNull(v) {
+			hasNull = true
+			break
+		}
+	}
+	if hasNull {
+		return nullableArrayWithKind(kind, values)
+	}
+	switch kind {
+	case KindBool:
+		out := make([]bool, len(values))
+		for i, v := range values {
+			b, ok := v.(bool)
+			if !ok {
+				return nil, fmt.Errorf("value %d must be bool for %s", i+1, kind)
+			}
+			out[i] = b
+		}
+		return NewBool(out), nil
+	case KindI8:
+		out := make([]int8, len(values))
+		for i, v := range values {
+			n, ok := coerceInt64Exact(v)
+			if ok && n >= -128 && n <= 127 {
+				out[i] = int8(n)
+				continue
+			}
+			x, ok := v.(int8)
+			if !ok {
+				return nil, fmt.Errorf("value %d must be i8 for %s", i+1, kind)
+			}
+			out[i] = x
+		}
+		return NewI8(out), nil
+	case KindI16:
+		out := make([]int16, len(values))
+		for i, v := range values {
+			n, ok := coerceInt64Exact(v)
+			if ok && n >= -32768 && n <= 32767 {
+				out[i] = int16(n)
+				continue
+			}
+			x, ok := v.(int16)
+			if !ok {
+				return nil, fmt.Errorf("value %d must be i16 for %s", i+1, kind)
+			}
+			out[i] = x
+		}
+		return NewI16(out), nil
+	case KindI32:
+		out := make([]int32, len(values))
+		for i, v := range values {
+			n, ok := coerceInt64Exact(v)
+			if ok && n >= -2147483648 && n <= 2147483647 {
+				out[i] = int32(n)
+				continue
+			}
+			x, ok := v.(int32)
+			if !ok {
+				return nil, fmt.Errorf("value %d must be i32 for %s", i+1, kind)
+			}
+			out[i] = x
+		}
+		return NewI32(out), nil
+	case KindI64:
+		out := make([]int64, len(values))
+		for i, v := range values {
+			if n, ok := coerceInt64Exact(v); ok {
+				out[i] = n
+				continue
+			}
+			return nil, fmt.Errorf("value %d must be i64-compatible for %s", i+1, kind)
+		}
+		return NewI64(out), nil
+	case KindU8:
+		out := make([]uint8, len(values))
+		for i, v := range values {
+			n, ok := v.(uint8)
+			if !ok {
+				return nil, fmt.Errorf("value %d must be u8 for %s", i+1, kind)
+			}
+			out[i] = n
+		}
+		return NewU8(out), nil
+	case KindU16:
+		out := make([]uint16, len(values))
+		for i, v := range values {
+			n, ok := v.(uint16)
+			if !ok {
+				return nil, fmt.Errorf("value %d must be u16 for %s", i+1, kind)
+			}
+			out[i] = n
+		}
+		return NewU16(out), nil
+	case KindU32:
+		out := make([]uint32, len(values))
+		for i, v := range values {
+			n, ok := v.(uint32)
+			if !ok {
+				return nil, fmt.Errorf("value %d must be u32 for %s", i+1, kind)
+			}
+			out[i] = n
+		}
+		return NewU32(out), nil
+	case KindU64:
+		out := make([]uint64, len(values))
+		for i, v := range values {
+			n, ok := v.(uint64)
+			if !ok {
+				return nil, fmt.Errorf("value %d must be u64 for %s", i+1, kind)
+			}
+			out[i] = n
+		}
+		return NewU64(out), nil
+	case KindF32:
+		out := make([]float32, len(values))
+		for i, v := range values {
+			switch n := v.(type) {
+			case float32:
+				out[i] = n
+			default:
+				return nil, fmt.Errorf("value %d must be f32 for %s", i+1, kind)
+			}
+		}
+		return NewF32(out), nil
+	case KindF64:
+		out := make([]float64, len(values))
+		for i, v := range values {
+			n, ok := numeric(v)
+			if !ok {
+				return nil, fmt.Errorf("value %d must be numeric for %s", i+1, kind)
+			}
+			out[i] = n
+		}
+		return NewF64(out), nil
+	case KindString:
+		out := make([]string, len(values))
+		for i, v := range values {
+			s, ok := v.(string)
+			if !ok {
+				return nil, fmt.Errorf("value %d must be string for %s", i+1, kind)
+			}
+			out[i] = s
+		}
+		return NewString(out), nil
+	case KindSymbol:
+		out := make([]string, len(values))
+		for i, v := range values {
+			switch s := v.(type) {
+			case Symbol:
+				out[i] = string(s)
+			case string:
+				out[i] = s
+			default:
+				return nil, fmt.Errorf("value %d must be symbol-compatible for %s", i+1, kind)
+			}
+		}
+		return NewSymbols(out), nil
+	case KindMonth:
+		out := make([]Month, len(values))
+		for i, v := range values {
+			n, err := normalizeScalarForKind(kind, v, i)
+			if err != nil {
+				return nil, fmt.Errorf("value %d must be month for %s", i+1, kind)
+			}
+			out[i] = n.(Month)
+		}
+		return NewMonth(out), nil
+	case KindDate:
+		out := make([]Date, len(values))
+		for i, v := range values {
+			n, err := normalizeScalarForKind(kind, v, i)
+			if err != nil {
+				return nil, fmt.Errorf("value %d must be date for %s", i+1, kind)
+			}
+			out[i] = n.(Date)
+		}
+		return NewDate(out), nil
+	case KindDateTime:
+		out := make([]DateTime, len(values))
+		for i, v := range values {
+			n, err := normalizeScalarForKind(kind, v, i)
+			if err != nil {
+				return nil, fmt.Errorf("value %d must be datetime for %s", i+1, kind)
+			}
+			out[i] = n.(DateTime)
+		}
+		return NewDateTime(out), nil
+	case KindTimespan:
+		out := make([]Timespan, len(values))
+		for i, v := range values {
+			n, err := normalizeScalarForKind(kind, v, i)
+			if err != nil {
+				return nil, fmt.Errorf("value %d must be timespan for %s", i+1, kind)
+			}
+			out[i] = n.(Timespan)
+		}
+		return NewTimespan(out), nil
+	case KindMinute:
+		out := make([]Minute, len(values))
+		for i, v := range values {
+			n, err := normalizeScalarForKind(kind, v, i)
+			if err != nil {
+				return nil, fmt.Errorf("value %d must be minute for %s", i+1, kind)
+			}
+			out[i] = n.(Minute)
+		}
+		return NewMinute(out), nil
+	case KindSecond:
+		out := make([]Second, len(values))
+		for i, v := range values {
+			n, err := normalizeScalarForKind(kind, v, i)
+			if err != nil {
+				return nil, fmt.Errorf("value %d must be second for %s", i+1, kind)
+			}
+			out[i] = n.(Second)
+		}
+		return NewSecond(out), nil
+	case KindTime:
+		out := make([]Time, len(values))
+		for i, v := range values {
+			n, err := normalizeScalarForKind(kind, v, i)
+			if err != nil {
+				return nil, fmt.Errorf("value %d must be time for %s", i+1, kind)
+			}
+			out[i] = n.(Time)
+		}
+		return NewTime(out), nil
+	case KindTimestamp:
+		out := make([]Timestamp, len(values))
+		for i, v := range values {
+			n, err := normalizeScalarForKind(kind, v, i)
+			if err != nil {
+				return nil, fmt.Errorf("value %d must be timestamp for %s", i+1, kind)
+			}
+			out[i] = n.(Timestamp)
+		}
+		return NewTimestamp(out), nil
+	default:
+		return InferArray(values), nil
+	}
+}
+
+func coerceInt64Exact(v any) (int64, bool) {
+	switch n := v.(type) {
+	case int:
+		return int64(n), true
+	case int8:
+		return int64(n), true
+	case int16:
+		return int64(n), true
+	case int32:
+		return int64(n), true
+	case int64:
+		return n, true
+	case float32:
+		f := float64(n)
+		i := int64(f)
+		return i, float64(i) == f
+	case float64:
+		i := int64(n)
+		return i, float64(i) == n
+	default:
+		return 0, false
+	}
+}
+
+func bucketInt64Interval(kind Kind, interval any) (int64, error) {
+	if width, ok, err := temporalBucketInt64Interval(kind, interval); ok || err != nil {
+		return width, err
+	}
+	width, ok := coerceInt64Exact(interval)
+	if !ok {
+		return 0, fmt.Errorf("bucket floor interval must be an integer width")
+	}
+	if width <= 0 {
+		return 0, fmt.Errorf("bucket floor interval must be positive")
+	}
+	return width, nil
+}
+
+func temporalBucketInt64Interval(kind Kind, interval any) (int64, bool, error) {
+	nanos, nanosOK := temporalIntervalNanos(interval)
+	switch kind {
+	case KindDateTime, KindTimestamp, KindTimespan, KindTime:
+		if nanosOK {
+			if nanos <= 0 {
+				return 0, true, fmt.Errorf("bucket floor interval must be positive")
+			}
+			return nanos, true, nil
+		}
+	case KindSecond:
+		if nanosOK {
+			if nanos <= 0 {
+				return 0, true, fmt.Errorf("bucket floor interval must be positive")
+			}
+			if nanos%1_000_000_000 != 0 {
+				return 0, true, fmt.Errorf("bucket floor interval must align to whole seconds")
+			}
+			return nanos / 1_000_000_000, true, nil
+		}
+	case KindMinute:
+		if nanosOK {
+			if nanos <= 0 {
+				return 0, true, fmt.Errorf("bucket floor interval must be positive")
+			}
+			if nanos%(60*1_000_000_000) != 0 {
+				return 0, true, fmt.Errorf("bucket floor interval must align to whole minutes")
+			}
+			return nanos / (60 * 1_000_000_000), true, nil
+		}
+	case KindDate:
+		if nanosOK {
+			if nanos <= 0 {
+				return 0, true, fmt.Errorf("bucket floor interval must be positive")
+			}
+			if nanos%nanosPerDay != 0 {
+				return 0, true, fmt.Errorf("bucket floor interval must align to whole days")
+			}
+			return nanos / nanosPerDay, true, nil
+		}
+	case KindMonth:
+		if width, ok := interval.(Month); ok {
+			if width.Months() <= 0 {
+				return 0, true, fmt.Errorf("bucket floor interval must be positive")
+			}
+			return width.Months(), true, nil
+		}
+	}
+	return 0, false, nil
+}
+
+func temporalIntervalNanos(interval any) (int64, bool) {
+	switch x := interval.(type) {
+	case Timespan:
+		return x.Nanos(), true
+	case Time:
+		return x.Nanos(), true
+	case Second:
+		return x.Seconds() * 1_000_000_000, true
+	case Minute:
+		return x.Minutes() * 60 * 1_000_000_000, true
+	case string:
+		return parseTimespanNanos(x)
+	default:
+		return 0, false
+	}
+}
+
+func bucketUint64Interval(interval any) (uint64, error) {
+	switch n := interval.(type) {
+	case uint8:
+		if n == 0 {
+			return 0, fmt.Errorf("bucket floor interval must be positive")
+		}
+		return uint64(n), nil
+	case uint16:
+		if n == 0 {
+			return 0, fmt.Errorf("bucket floor interval must be positive")
+		}
+		return uint64(n), nil
+	case uint32:
+		if n == 0 {
+			return 0, fmt.Errorf("bucket floor interval must be positive")
+		}
+		return uint64(n), nil
+	case uint64:
+		if n == 0 {
+			return 0, fmt.Errorf("bucket floor interval must be positive")
+		}
+		return n, nil
+	}
+	width, ok := coerceInt64Exact(interval)
+	if !ok || width <= 0 {
+		if ok {
+			return 0, fmt.Errorf("bucket floor interval must be positive")
+		}
+		return 0, fmt.Errorf("bucket floor interval must be an integer width")
+	}
+	return uint64(width), nil
+}
+
+func bucketFloat64Interval(interval any) (float64, error) {
+	width, ok := numeric(interval)
+	if !ok {
+		return 0, fmt.Errorf("bucket floor interval must be numeric")
+	}
+	if width <= 0 || math.IsNaN(width) || math.IsInf(width, 0) {
+		return 0, fmt.Errorf("bucket floor interval must be finite and positive")
+	}
+	return width, nil
+}
+
+func bucketFloorInt64Value(kind Kind, v any, width int64) (any, error) {
+	value, err := int64BucketInput(kind, v)
+	if err != nil {
+		return nil, err
+	}
+	bucket := floorInt64(value, width)
+	switch kind {
+	case KindI8:
+		if bucket < -128 || bucket > 127 {
+			return nil, fmt.Errorf("bucket %d overflows %s", bucket, kind)
+		}
+		return int8(bucket), nil
+	case KindI16:
+		if bucket < -32768 || bucket > 32767 {
+			return nil, fmt.Errorf("bucket %d overflows %s", bucket, kind)
+		}
+		return int16(bucket), nil
+	case KindI32:
+		if bucket < -2147483648 || bucket > 2147483647 {
+			return nil, fmt.Errorf("bucket %d overflows %s", bucket, kind)
+		}
+		return int32(bucket), nil
+	case KindI64:
+		return bucket, nil
+	case KindMonth:
+		return Month(bucket), nil
+	case KindDate:
+		return Date(bucket), nil
+	case KindDateTime:
+		return DateTime(bucket), nil
+	case KindTimespan:
+		return Timespan(bucket), nil
+	case KindMinute:
+		return Minute(bucket), nil
+	case KindSecond:
+		return Second(bucket), nil
+	case KindTime:
+		return Time(bucket), nil
+	case KindTimestamp:
+		return Timestamp(bucket), nil
+	default:
+		return nil, fmt.Errorf("kind %s is not integer-like", kind)
+	}
+}
+
+func int64BucketInput(kind Kind, v any) (int64, error) {
+	switch kind {
+	case KindI8:
+		n, ok := v.(int8)
+		if !ok {
+			return 0, fmt.Errorf("value must be %s", kind)
+		}
+		return int64(n), nil
+	case KindI16:
+		n, ok := v.(int16)
+		if !ok {
+			return 0, fmt.Errorf("value must be %s", kind)
+		}
+		return int64(n), nil
+	case KindI32:
+		n, ok := v.(int32)
+		if !ok {
+			return 0, fmt.Errorf("value must be %s", kind)
+		}
+		return int64(n), nil
+	case KindI64:
+		n, ok := v.(int64)
+		if !ok {
+			return 0, fmt.Errorf("value must be %s", kind)
+		}
+		return n, nil
+	case KindMonth:
+		n, ok := v.(Month)
+		if !ok {
+			return 0, fmt.Errorf("value must be %s", kind)
+		}
+		return int64(n), nil
+	case KindDate:
+		n, ok := v.(Date)
+		if !ok {
+			return 0, fmt.Errorf("value must be %s", kind)
+		}
+		return int64(n), nil
+	case KindDateTime:
+		n, ok := v.(DateTime)
+		if !ok {
+			return 0, fmt.Errorf("value must be %s", kind)
+		}
+		return int64(n), nil
+	case KindTimespan:
+		n, ok := v.(Timespan)
+		if !ok {
+			return 0, fmt.Errorf("value must be %s", kind)
+		}
+		return int64(n), nil
+	case KindMinute:
+		n, ok := v.(Minute)
+		if !ok {
+			return 0, fmt.Errorf("value must be %s", kind)
+		}
+		return int64(n), nil
+	case KindSecond:
+		n, ok := v.(Second)
+		if !ok {
+			return 0, fmt.Errorf("value must be %s", kind)
+		}
+		return int64(n), nil
+	case KindTime:
+		n, ok := v.(Time)
+		if !ok {
+			return 0, fmt.Errorf("value must be %s", kind)
+		}
+		return int64(n), nil
+	case KindTimestamp:
+		n, ok := v.(Timestamp)
+		if !ok {
+			return 0, fmt.Errorf("value must be %s", kind)
+		}
+		return int64(n), nil
+	default:
+		return 0, fmt.Errorf("kind %s is not integer-like", kind)
+	}
+}
+
+func bucketFloorUint64Value(kind Kind, v any, width uint64) (any, error) {
+	value, err := uint64BucketInput(kind, v)
+	if err != nil {
+		return nil, err
+	}
+	bucket := (value / width) * width
+	switch kind {
+	case KindU8:
+		return uint8(bucket), nil
+	case KindU16:
+		return uint16(bucket), nil
+	case KindU32:
+		return uint32(bucket), nil
+	case KindU64:
+		return bucket, nil
+	default:
+		return nil, fmt.Errorf("kind %s is not unsigned integer-like", kind)
+	}
+}
+
+func uint64BucketInput(kind Kind, v any) (uint64, error) {
+	switch kind {
+	case KindU8:
+		n, ok := v.(uint8)
+		if !ok {
+			return 0, fmt.Errorf("value must be %s", kind)
+		}
+		return uint64(n), nil
+	case KindU16:
+		n, ok := v.(uint16)
+		if !ok {
+			return 0, fmt.Errorf("value must be %s", kind)
+		}
+		return uint64(n), nil
+	case KindU32:
+		n, ok := v.(uint32)
+		if !ok {
+			return 0, fmt.Errorf("value must be %s", kind)
+		}
+		return uint64(n), nil
+	case KindU64:
+		n, ok := v.(uint64)
+		if !ok {
+			return 0, fmt.Errorf("value must be %s", kind)
+		}
+		return n, nil
+	default:
+		return 0, fmt.Errorf("kind %s is not unsigned integer-like", kind)
+	}
+}
+
+func bucketFloorFloatValue(kind Kind, v any, width float64) (any, error) {
+	value, ok := numeric(v)
+	if !ok {
+		return nil, fmt.Errorf("value must be numeric")
+	}
+	if math.IsNaN(value) || math.IsInf(value, 0) {
+		return nil, fmt.Errorf("value must be finite")
+	}
+	bucket := math.Floor(value/width) * width
+	switch kind {
+	case KindF32:
+		return float32(bucket), nil
+	case KindF64:
+		return bucket, nil
+	default:
+		return nil, fmt.Errorf("kind %s is not float-like", kind)
+	}
+}
+
+func floorInt64(value, width int64) int64 {
+	quotient := value / width
+	remainder := value % width
+	if remainder != 0 && value < 0 {
+		quotient--
+	}
+	return quotient * width
+}
+
 func newNullableArray(kind Kind, values []any) Array {
+	array, err := nullableArrayWithKind(kind, values)
+	if err != nil {
+		panic(err)
+	}
+	return array
+}
+
+func nullableArrayWithKind(kind Kind, values []any) (Array, error) {
 	out := make([]any, len(values))
 	for i, v := range values {
 		if IsNull(v) {
 			out[i] = NullValue
 			continue
 		}
-		out[i] = normalizeScalar(kind, v)
+		normalized, err := normalizeScalarForKind(kind, v, i)
+		if err != nil {
+			return nil, err
+		}
+		out[i] = normalized
 	}
-	return nullableArray{kind: kind, data: out}
+	return nullableArray{kind: kind, data: out}, nil
 }
 
 func normalizeNulls(values []any) []any {
@@ -1353,33 +5836,297 @@ func normalizeNulls(values []any) []any {
 }
 
 func normalizeScalar(kind Kind, v any) any {
-	switch kind {
-	case KindI8:
-		return v.(int8)
-	case KindI16:
-		return v.(int16)
-	case KindI32:
-		return v.(int32)
-	case KindI64:
-		if n, ok := v.(int); ok {
-			return int64(n)
-		}
-		return v.(int64)
-	case KindU8:
-		return v.(uint8)
-	case KindU16:
-		return v.(uint16)
-	case KindU32:
-		return v.(uint32)
-	case KindU64:
-		return v.(uint64)
-	case KindF32:
-		return v.(float32)
-	case KindF64:
-		n, _ := numeric(v)
-		return n
+	if normalized, ok := coerceTemporalValue(kind, v); ok {
+		return normalized
+	}
+	normalized, err := NormalizeValueForKind(kind, v)
+	if err == nil {
+		return normalized
 	}
 	return v
+}
+
+func NormalizeValueForKind(kind Kind, v any) (any, error) {
+	if IsNull(v) {
+		if typedKind, ok := NullKind(v); ok && typedKind != KindNull {
+			return NullForKind(kind), nil
+		}
+		return NullValue, nil
+	}
+	if kind == KindAny {
+		return v, nil
+	}
+	if kind == KindNull {
+		return nil, fmt.Errorf("value must be null for %s", kind)
+	}
+	return normalizeScalarForKind(kind, v, 0)
+}
+
+func normalizeScalarForKind(kind Kind, v any, index int) (any, error) {
+	switch kind {
+	case KindBool:
+		b, ok := v.(bool)
+		if !ok {
+			return nil, fmt.Errorf("value %d must be bool for %s", index+1, kind)
+		}
+		return b, nil
+	case KindI8:
+		if n, ok := coerceInt64Exact(v); ok && n >= -128 && n <= 127 {
+			return int8(n), nil
+		}
+		return nil, fmt.Errorf("value %d must be i8 for %s", index+1, kind)
+	case KindI16:
+		if n, ok := coerceInt64Exact(v); ok && n >= -32768 && n <= 32767 {
+			return int16(n), nil
+		}
+		return nil, fmt.Errorf("value %d must be i16 for %s", index+1, kind)
+	case KindI32:
+		if n, ok := coerceInt64Exact(v); ok && n >= -2147483648 && n <= 2147483647 {
+			return int32(n), nil
+		}
+		return nil, fmt.Errorf("value %d must be i32 for %s", index+1, kind)
+	case KindI64:
+		if n, ok := coerceInt64Exact(v); ok {
+			return n, nil
+		}
+		return nil, fmt.Errorf("value %d must be i64-compatible for %s", index+1, kind)
+	case KindU8:
+		if n, ok := v.(uint8); ok {
+			return n, nil
+		}
+		if n, ok := coerceInt64Exact(v); ok && n >= 0 && n <= 255 {
+			return uint8(n), nil
+		}
+		return nil, fmt.Errorf("value %d must be u8-compatible for %s", index+1, kind)
+	case KindU16:
+		n, ok := v.(uint16)
+		if !ok {
+			return nil, fmt.Errorf("value %d must be u16 for %s", index+1, kind)
+		}
+		return n, nil
+	case KindU32:
+		n, ok := v.(uint32)
+		if !ok {
+			return nil, fmt.Errorf("value %d must be u32 for %s", index+1, kind)
+		}
+		return n, nil
+	case KindU64:
+		n, ok := v.(uint64)
+		if !ok {
+			return nil, fmt.Errorf("value %d must be u64 for %s", index+1, kind)
+		}
+		return n, nil
+	case KindF32:
+		if n, ok := v.(float32); ok {
+			return n, nil
+		}
+		n, ok := numeric(v)
+		if !ok {
+			return nil, fmt.Errorf("value %d must be f32 for %s", index+1, kind)
+		}
+		return float32(n), nil
+	case KindF64:
+		n, ok := numeric(v)
+		if !ok {
+			return nil, fmt.Errorf("value %d must be numeric for %s", index+1, kind)
+		}
+		return n, nil
+	case KindString:
+		s, ok := v.(string)
+		if !ok {
+			return nil, fmt.Errorf("value %d must be string for %s", index+1, kind)
+		}
+		return s, nil
+	case KindSymbol:
+		switch s := v.(type) {
+		case Symbol:
+			return s, nil
+		case string:
+			return Symbol(s), nil
+		default:
+			return nil, fmt.Errorf("value %d must be symbol-compatible for %s", index+1, kind)
+		}
+	case KindMonth:
+		if n, ok := coerceTemporalTypedValue(kind, v); ok {
+			return n, nil
+		}
+		return nil, fmt.Errorf("value %d must be month for %s", index+1, kind)
+	case KindDate:
+		if n, ok := coerceTemporalTypedValue(kind, v); ok {
+			return n, nil
+		}
+		return nil, fmt.Errorf("value %d must be date for %s", index+1, kind)
+	case KindDateTime:
+		if n, ok := coerceTemporalTypedValue(kind, v); ok {
+			return n, nil
+		}
+		return nil, fmt.Errorf("value %d must be datetime for %s", index+1, kind)
+	case KindTimespan:
+		if n, ok := coerceTemporalTypedValue(kind, v); ok {
+			return n, nil
+		}
+		return nil, fmt.Errorf("value %d must be timespan for %s", index+1, kind)
+	case KindMinute:
+		if n, ok := coerceTemporalTypedValue(kind, v); ok {
+			return n, nil
+		}
+		return nil, fmt.Errorf("value %d must be minute for %s", index+1, kind)
+	case KindSecond:
+		if n, ok := coerceTemporalTypedValue(kind, v); ok {
+			return n, nil
+		}
+		return nil, fmt.Errorf("value %d must be second for %s", index+1, kind)
+	case KindTime:
+		if n, ok := coerceTemporalTypedValue(kind, v); ok {
+			return n, nil
+		}
+		return nil, fmt.Errorf("value %d must be time for %s", index+1, kind)
+	case KindTimestamp:
+		if n, ok := coerceTemporalTypedValue(kind, v); ok {
+			return n, nil
+		}
+		return nil, fmt.Errorf("value %d must be timestamp for %s", index+1, kind)
+	}
+	return v, nil
+}
+
+func coerceTemporalTypedValue(kind Kind, v any) (any, bool) {
+	switch x := v.(type) {
+	case Month:
+		return x, kind == KindMonth
+	case Date:
+		return x, kind == KindDate
+	case DateTime:
+		return x, kind == KindDateTime
+	case Timespan:
+		return x, kind == KindTimespan
+	case Minute:
+		return x, kind == KindMinute
+	case Second:
+		return x, kind == KindSecond
+	case Time:
+		return x, kind == KindTime
+	case Timestamp:
+		return x, kind == KindTimestamp
+	default:
+		return nil, false
+	}
+}
+
+func coerceTemporalValue(kind Kind, v any) (any, bool) {
+	switch x := v.(type) {
+	case Month:
+		return x, kind == KindMonth
+	case Date:
+		return x, kind == KindDate
+	case DateTime:
+		return x, kind == KindDateTime
+	case Timespan:
+		return x, kind == KindTimespan
+	case Minute:
+		return x, kind == KindMinute
+	case Second:
+		return x, kind == KindSecond
+	case Time:
+		return x, kind == KindTime
+	case Timestamp:
+		return x, kind == KindTimestamp
+	case string:
+		return parseTemporalString(kind, x)
+	}
+	return nil, false
+}
+
+func parseTemporalString(kind Kind, s string) (any, bool) {
+	switch kind {
+	case KindMonth:
+		for _, layout := range []string{"2006.01", "2006-01"} {
+			if tm, err := time.Parse(layout, s); err == nil {
+				return MonthFromMonths(int64((tm.Year()-1970)*12 + int(tm.Month()) - 1)), true
+			}
+		}
+	case KindDate:
+		for _, layout := range []string{"2006.01.02", "2006-01-02"} {
+			if tm, err := time.Parse(layout, s); err == nil {
+				return DateFromDays(tm.Unix() / 86400), true
+			}
+		}
+	case KindDateTime:
+		for _, layout := range temporalTimestampLayouts() {
+			if tm, err := time.Parse(layout, s); err == nil {
+				return DateTimeFromUnixNanos(tm.UnixNano()), true
+			}
+		}
+	case KindTimespan:
+		if nanos, ok := parseTimespanNanos(s); ok {
+			return TimespanFromNanos(nanos), true
+		}
+	case KindMinute:
+		if nanos, ok := parseTimeOfDayNanos(s); ok && nanos%(60*1_000_000_000) == 0 {
+			return MinuteFromMinutes(nanos / (60 * 1_000_000_000)), true
+		}
+	case KindSecond:
+		if nanos, ok := parseTimeOfDayNanos(s); ok && nanos%1_000_000_000 == 0 {
+			return SecondFromSeconds(nanos / 1_000_000_000), true
+		}
+	case KindTime:
+		if nanos, ok := parseTimeOfDayNanos(s); ok {
+			return TimeFromNanos(nanos), true
+		}
+	case KindTimestamp:
+		for _, layout := range temporalTimestampLayouts() {
+			if tm, err := time.Parse(layout, s); err == nil {
+				return TimestampFromUnixNanos(tm.UnixNano()), true
+			}
+		}
+	}
+	return nil, false
+}
+
+func temporalTimestampLayouts() []string {
+	return []string{
+		time.RFC3339Nano,
+		"2006-01-02T15:04:05.999999999",
+		"2006-01-02T15:04:05",
+		"2006.01.02D15:04:05.999999999",
+		"2006.01.02D15:04:05",
+		"2006.01.02T15:04:05.999999999",
+		"2006.01.02T15:04:05",
+	}
+}
+
+func parseTimeOfDayNanos(s string) (int64, bool) {
+	for _, layout := range []string{"15:04", "15:04:05", "15:04:05.999", "15:04:05.999999", "15:04:05.999999999"} {
+		if tm, err := time.Parse(layout, s); err == nil {
+			nanos := int64(tm.Hour())*3600*1_000_000_000 + int64(tm.Minute())*60*1_000_000_000 + int64(tm.Second())*1_000_000_000 + int64(tm.Nanosecond())
+			return nanos, true
+		}
+	}
+	return 0, false
+}
+
+func parseTimespanNanos(s string) (int64, bool) {
+	sign := int64(1)
+	if strings.HasPrefix(s, "-") {
+		sign = -1
+		s = strings.TrimPrefix(s, "-")
+	} else {
+		s = strings.TrimPrefix(s, "+")
+	}
+	days := int64(0)
+	if parts := strings.SplitN(s, "D", 2); len(parts) == 2 {
+		n, err := strconv.ParseInt(parts[0], 10, 64)
+		if err != nil {
+			return 0, false
+		}
+		days = n
+		s = parts[1]
+	}
+	nanos, ok := parseTimeOfDayNanos(s)
+	if !ok {
+		return 0, false
+	}
+	return sign * (days*nanosPerDay + nanos), true
 }
 
 func numeric(v any) (float64, bool) {
@@ -1411,22 +6158,87 @@ func numeric(v any) (float64, bool) {
 	}
 }
 
+func kindOfScalar(v any) Kind {
+	switch v.(type) {
+	case bool:
+		return KindBool
+	case int8:
+		return KindI8
+	case int16:
+		return KindI16
+	case int32:
+		return KindI32
+	case int, int64:
+		return KindI64
+	case uint8:
+		return KindU8
+	case uint16:
+		return KindU16
+	case uint32:
+		return KindU32
+	case uint64:
+		return KindU64
+	case float32:
+		return KindF32
+	case float64:
+		return KindF64
+	case string:
+		return KindString
+	case Symbol:
+		return KindSymbol
+	case Month:
+		return KindMonth
+	case Date:
+		return KindDate
+	case DateTime:
+		return KindDateTime
+	case Timespan:
+		return KindTimespan
+	case Minute:
+		return KindMinute
+	case Second:
+		return KindSecond
+	case Time:
+		return KindTime
+	case Timestamp:
+		return KindTimestamp
+	default:
+		return ""
+	}
+}
+
 func equalScalar(left, right any) bool {
 	if IsNull(left) || IsNull(right) {
 		return IsNull(left) && IsNull(right)
 	}
+	switch left.(type) {
+	case Symbol:
+		_, ok := right.(Symbol)
+		if !ok {
+			return false
+		}
+	case string:
+		_, ok := right.(string)
+		if !ok {
+			return false
+		}
+	}
+	switch right.(type) {
+	case Symbol:
+		_, ok := left.(Symbol)
+		if !ok {
+			return false
+		}
+	case string:
+		_, ok := left.(string)
+		if !ok {
+			return false
+		}
+	}
 	if cmp, ok := compareSameKind(left, right); ok {
 		return cmp == 0
 	}
-	switch l := left.(type) {
-	case Symbol:
-		r, ok := right.(Symbol)
-		return ok && l == r
-	case string:
-		return l == right
-	default:
-		return left == right
-	}
+	return left == right
 }
 
 func compareSameKind(left, right any) (int, bool) {
@@ -1474,8 +6286,23 @@ func compareSameKind(left, right any) (int, bool) {
 	case float64:
 		r, ok := right.(float64)
 		return compareFloat64(l, r), ok
+	case Month:
+		r, ok := right.(Month)
+		return compareInt64(int64(l), int64(r)), ok
 	case Date:
 		r, ok := right.(Date)
+		return compareInt64(int64(l), int64(r)), ok
+	case DateTime:
+		r, ok := right.(DateTime)
+		return compareInt64(int64(l), int64(r)), ok
+	case Timespan:
+		r, ok := right.(Timespan)
+		return compareInt64(int64(l), int64(r)), ok
+	case Minute:
+		r, ok := right.(Minute)
+		return compareInt64(int64(l), int64(r)), ok
+	case Second:
+		r, ok := right.(Second)
 		return compareInt64(int64(l), int64(r)), ok
 	case Time:
 		r, ok := right.(Time)
@@ -1537,6 +6364,36 @@ func compareString(left, right string) int {
 	}
 }
 
+func compareBool(left, right bool) int {
+	switch {
+	case left == right:
+		return 0
+	case !left && right:
+		return -1
+	default:
+		return 1
+	}
+}
+
+func boolCompare(op Op, equal bool, cmp int) bool {
+	switch op {
+	case OpEQ:
+		return equal
+	case OpNE:
+		return !equal
+	case OpLT:
+		return cmp < 0
+	case OpLE:
+		return cmp <= 0
+	case OpGT:
+		return cmp > 0
+	case OpGE:
+		return cmp >= 0
+	default:
+		return false
+	}
+}
+
 func compare(left, right any) int {
 	if IsNull(left) || IsNull(right) {
 		switch {
@@ -1592,13 +6449,210 @@ func validateIndexes(length int, indexes []int) error {
 }
 
 func takeIndexes(length, n int) ([]int, error) {
+	n, err := takeCount(length, n)
+	if err != nil {
+		return nil, err
+	}
+	return allIndexes(n), nil
+}
+
+func takeCount(length, n int) (int, error) {
 	if n < 0 {
-		return nil, fmt.Errorf("take count %d must not be negative", n)
+		return 0, fmt.Errorf("take count %d must not be negative", n)
 	}
 	if n > length {
 		n = length
 	}
-	return allIndexes(n), nil
+	return n, nil
+}
+
+func validateKeyColumns(frame Frame, keys []Symbol, context string) ([]Symbol, error) {
+	out := make([]Symbol, len(keys))
+	seen := make(map[Symbol]struct{}, len(keys))
+	for i, key := range keys {
+		if key == "" {
+			return nil, fmt.Errorf("%s key %d must not be empty", context, i+1)
+		}
+		if _, ok := seen[key]; ok {
+			return nil, fmt.Errorf("%s key column %q is duplicated", context, key)
+		}
+		seen[key] = struct{}{}
+		if _, ok := frame.Column(key); !ok {
+			return nil, fmt.Errorf("%s key column %q does not exist", context, key)
+		}
+		out[i] = key
+	}
+	return out, nil
+}
+
+func validateMutationKeys(keyed KeyedFrame, delta Frame) error {
+	for _, key := range keyed.keys {
+		if _, ok := delta.Column(key); !ok {
+			return fmt.Errorf("keyed mutation delta key column %q does not exist", key)
+		}
+	}
+	return nil
+}
+
+func keyedMutationValueColumns(keyed KeyedFrame, delta Frame, requested []Symbol) ([]Symbol, error) {
+	keySet := make(map[Symbol]struct{}, len(keyed.keys))
+	for _, key := range keyed.keys {
+		keySet[key] = struct{}{}
+	}
+	if len(requested) == 0 {
+		out := make([]Symbol, 0, len(delta.schema.names))
+		for _, name := range delta.schema.names {
+			if _, ok := keySet[name]; ok {
+				continue
+			}
+			out = append(out, name)
+		}
+		return out, nil
+	}
+	out := make([]Symbol, len(requested))
+	seen := make(map[Symbol]struct{}, len(requested))
+	for i, name := range requested {
+		if name == "" {
+			return nil, fmt.Errorf("keyed mutation value column %d must not be empty", i+1)
+		}
+		if _, ok := keySet[name]; ok {
+			return nil, fmt.Errorf("keyed mutation cannot assign key column %q", name)
+		}
+		if _, ok := seen[name]; ok {
+			return nil, fmt.Errorf("keyed mutation value column %q is duplicated", name)
+		}
+		if _, ok := delta.Column(name); !ok {
+			return nil, fmt.Errorf("keyed mutation value column %q does not exist", name)
+		}
+		seen[name] = struct{}{}
+		out[i] = name
+	}
+	return out, nil
+}
+
+func keyedMutationColumns(keyed KeyedFrame, delta Frame, valueColumns []Symbol) ([]Column, map[Symbol][]any, error) {
+	cols := keyed.frame.Columns()
+	values := make(map[Symbol][]any, len(cols)+len(valueColumns))
+	for _, col := range cols {
+		values[col.Name] = col.Data.Values()
+	}
+	seen := make(map[Symbol]struct{}, len(cols)+len(valueColumns))
+	for _, col := range cols {
+		seen[col.Name] = struct{}{}
+	}
+	for _, name := range valueColumns {
+		if _, ok := seen[name]; ok {
+			continue
+		}
+		col, ok := delta.Column(name)
+		if !ok {
+			return nil, nil, fmt.Errorf("keyed mutation value column %q does not exist", name)
+		}
+		initial := make([]any, keyed.frame.Len())
+		for i := range initial {
+			initial[i] = NullValue
+		}
+		cols = append(cols, Column{Name: name, Data: col.Gather(nil)})
+		values[name] = initial
+		seen[name] = struct{}{}
+	}
+	return cols, values, nil
+}
+
+func rowMutationDeltaFrame(frame Frame, columns []Symbol, values []any) (Frame, error) {
+	names, row, err := rowMutationRecord(frame, columns, values)
+	if err != nil {
+		return Frame{}, err
+	}
+	cols := make([]Column, 0, len(names))
+	for _, name := range names {
+		col, ok := frame.Column(name)
+		if !ok {
+			return Frame{}, fmt.Errorf("insert column %q does not exist", name)
+		}
+		out, err := columnWithKind(name, col.Kind(), []any{row[name]})
+		if err != nil {
+			return Frame{}, err
+		}
+		cols = append(cols, out)
+	}
+	return NewFrame(cols...)
+}
+
+func rowMutationRecord(frame Frame, columns []Symbol, values []any) ([]Symbol, map[Symbol]any, error) {
+	if frame.Len() < 0 {
+		return nil, nil, fmt.Errorf("frame is not initialized")
+	}
+	if len(values) == 0 {
+		return nil, nil, fmt.Errorf("insert requires at least one value")
+	}
+	names := frame.schema.names
+	if len(columns) == 0 {
+		if len(values) != len(names) {
+			return nil, nil, fmt.Errorf("insert values count %d does not match table column count %d", len(values), len(names))
+		}
+		columns = names
+	} else if len(columns) != len(values) {
+		return nil, nil, fmt.Errorf("insert column count %d does not match values count %d", len(columns), len(values))
+	}
+	row := make(map[Symbol]any, len(names))
+	for _, name := range names {
+		row[name] = NullValue
+	}
+	seen := make(map[Symbol]struct{}, len(columns))
+	for i, name := range columns {
+		if name == "" {
+			return nil, nil, fmt.Errorf("insert column name must not be empty")
+		}
+		if _, ok := frame.Column(name); !ok {
+			return nil, nil, fmt.Errorf("insert column %q does not exist", name)
+		}
+		if _, ok := seen[name]; ok {
+			return nil, nil, fmt.Errorf("insert column %q is duplicated", name)
+		}
+		seen[name] = struct{}{}
+		row[name] = values[i]
+	}
+	return names, row, nil
+}
+
+func rowMutationValueColumns(keys, names, columns []Symbol) ([]Symbol, error) {
+	keySet := make(map[Symbol]struct{}, len(keys))
+	for _, key := range keys {
+		keySet[key] = struct{}{}
+	}
+	if len(columns) == 0 {
+		columns = names
+	}
+	out := make([]Symbol, 0, len(columns))
+	seen := make(map[Symbol]struct{}, len(columns))
+	for _, name := range columns {
+		if _, ok := keySet[name]; ok {
+			continue
+		}
+		if _, ok := seen[name]; ok {
+			continue
+		}
+		seen[name] = struct{}{}
+		out = append(out, name)
+	}
+	return out, nil
+}
+
+func rowMutationRequireKeyColumns(keys, columns []Symbol) error {
+	if len(columns) == 0 {
+		return nil
+	}
+	present := make(map[Symbol]struct{}, len(columns))
+	for _, name := range columns {
+		present[name] = struct{}{}
+	}
+	for _, key := range keys {
+		if _, ok := present[key]; !ok {
+			return fmt.Errorf("keyed mutation delta key column %q does not exist", key)
+		}
+	}
+	return nil
 }
 
 func validateJoinKeys(left, right Frame, keys []JoinKey) error {
@@ -1619,6 +6673,166 @@ func validateJoinKeys(left, right Frame, keys []JoinKey) error {
 		}
 	}
 	return nil
+}
+
+func leftKeyColumns(keys []JoinKey) []Symbol {
+	cols := make([]Symbol, len(keys))
+	for i, key := range keys {
+		cols[i] = key.Left
+	}
+	return cols
+}
+
+func rightRowsByJoinKey(right Frame, keys []JoinKey) (map[string][]int, []Symbol, error) {
+	rightKeyCols := make([]Symbol, len(keys))
+	for i, key := range keys {
+		rightKeyCols[i] = key.Right
+	}
+	rowsByKey, err := typedKernels.RowsByKey(right, rightKeyCols)
+	if err != nil {
+		return nil, nil, err
+	}
+	return rowsByKey, rightKeyCols, nil
+}
+
+func joinRightKeyKinds(right Frame, keys []JoinKey) []Kind {
+	kinds := make([]Kind, len(keys))
+	for i, key := range keys {
+		if col, ok := right.Column(key.Right); ok {
+			kinds[i] = col.Kind()
+		}
+	}
+	return kinds
+}
+
+func joinLookupKey(left, right Frame, row int, keys []JoinKey) (string, error) {
+	var b strings.Builder
+	for _, key := range keys {
+		leftCol, ok := left.Column(key.Left)
+		if !ok {
+			return "", fmt.Errorf("join left key column %q does not exist", key.Left)
+		}
+		rightCol, ok := right.Column(key.Right)
+		if !ok {
+			return "", fmt.Errorf("join right key column %q does not exist", key.Right)
+		}
+		v, ok := leftCol.At(row)
+		if !ok {
+			return "", fmt.Errorf("join left key column %q row %d out of range", key.Left, row)
+		}
+		normalized, err := normalizeKeyValue(rightCol.Kind(), v)
+		if err != nil {
+			return "\xffjoin-miss", nil
+		}
+		appendKeyPart(&b, rightCol.Kind(), normalized)
+	}
+	return b.String(), nil
+}
+
+func validateAsofJoinKeys(left, right Frame, timeKey JoinKey, partitionKeys []JoinKey) error {
+	if timeKey.Left == "" || timeKey.Right == "" {
+		return fmt.Errorf("asof join time key must not be empty")
+	}
+	leftTime, ok := left.Column(timeKey.Left)
+	if !ok {
+		return fmt.Errorf("asof join left time key column %q does not exist", timeKey.Left)
+	}
+	rightTime, ok := right.Column(timeKey.Right)
+	if !ok {
+		return fmt.Errorf("asof join right time key column %q does not exist", timeKey.Right)
+	}
+	if leftTime.Kind() != rightTime.Kind() {
+		return fmt.Errorf("asof join time key kinds differ: %q is %s and %q is %s", timeKey.Left, leftTime.Kind(), timeKey.Right, rightTime.Kind())
+	}
+	if !isAsofTimeKind(leftTime.Kind()) {
+		return fmt.Errorf("asof join time key %q=%q has non-time kind %s", timeKey.Left, timeKey.Right, leftTime.Kind())
+	}
+	if err := validateJoinKeys(left, right, partitionKeys); err != nil {
+		return err
+	}
+	for _, key := range partitionKeys {
+		if key == timeKey {
+			return fmt.Errorf("asof join time key %q=%q is also a partition key", timeKey.Left, timeKey.Right)
+		}
+	}
+	return nil
+}
+
+func isAsofTimeKind(kind Kind) bool {
+	switch kind {
+	case KindI8, KindI16, KindI32, KindI64, KindU8, KindU16, KindU32, KindU64, KindF32, KindF64,
+		KindMonth, KindDate, KindDateTime, KindTimespan, KindMinute, KindSecond, KindTime, KindTimestamp:
+		return true
+	default:
+		return false
+	}
+}
+
+func gatherOptional(array Array, indexes []int) Array {
+	return typedKernels.GatherOptional(array, indexes)
+}
+
+func takeArray(array Array, n int) Array {
+	switch a := array.(type) {
+	case columnArray[bool]:
+		return takeColumnArray(a, n)
+	case columnArray[int8]:
+		return takeColumnArray(a, n)
+	case columnArray[int16]:
+		return takeColumnArray(a, n)
+	case columnArray[int32]:
+		return takeColumnArray(a, n)
+	case columnArray[int64]:
+		return takeColumnArray(a, n)
+	case columnArray[uint8]:
+		return takeColumnArray(a, n)
+	case columnArray[uint16]:
+		return takeColumnArray(a, n)
+	case columnArray[uint32]:
+		return takeColumnArray(a, n)
+	case columnArray[uint64]:
+		return takeColumnArray(a, n)
+	case columnArray[float32]:
+		return takeColumnArray(a, n)
+	case columnArray[float64]:
+		return takeColumnArray(a, n)
+	case columnArray[string]:
+		return takeColumnArray(a, n)
+	case columnArray[Symbol]:
+		return takeColumnArray(a, n)
+	case columnArray[Month]:
+		return takeColumnArray(a, n)
+	case columnArray[Date]:
+		return takeColumnArray(a, n)
+	case columnArray[DateTime]:
+		return takeColumnArray(a, n)
+	case columnArray[Timespan]:
+		return takeColumnArray(a, n)
+	case columnArray[Minute]:
+		return takeColumnArray(a, n)
+	case columnArray[Second]:
+		return takeColumnArray(a, n)
+	case columnArray[Time]:
+		return takeColumnArray(a, n)
+	case columnArray[Timestamp]:
+		return takeColumnArray(a, n)
+	case nullableArray:
+		return nullableArray{kind: a.kind, data: append([]any(nil), a.data[:n]...)}
+	default:
+		return array.Gather(allIndexes(n))
+	}
+}
+
+func takeColumnArray[T any](array columnArray[T], n int) Array {
+	return columnArray[T]{kind: array.kind, data: append([]T(nil), array.data[:n]...)}
+}
+
+func gatherWindowLists(array Array, indexes [][]int) Array {
+	return typedKernels.GatherWindowLists(array, indexes)
+}
+
+func gatherLastOptional(array Array, indexes [][]int) Array {
+	return typedKernels.GatherLastOptional(array, indexes)
 }
 
 func rightJoinColumnName(name Symbol, used map[Symbol]struct{}) Symbol {
@@ -1653,10 +6867,178 @@ func rowKey(frame Frame, row int, columns []Symbol) (string, error) {
 	return b.String(), nil
 }
 
+func sameSymbols(left, right []Symbol) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	for i := range left {
+		if left[i] != right[i] {
+			return false
+		}
+	}
+	return true
+}
+
+type stringHash interface {
+	Write([]byte) (int, error)
+}
+
+func writeHashString(h stringHash, value string) {
+	_, _ = h.Write([]byte(value))
+	_, _ = h.Write([]byte{0})
+}
+
+func deltaRowKey(keyed KeyedFrame, delta Frame, row int) (string, []any, error) {
+	var b strings.Builder
+	values := make([]any, len(keyed.keys))
+	for i, name := range keyed.keys {
+		targetCol, ok := keyed.frame.Column(name)
+		if !ok {
+			return "", nil, fmt.Errorf("key column %q does not exist", name)
+		}
+		deltaCol, ok := delta.Column(name)
+		if !ok {
+			return "", nil, fmt.Errorf("delta key column %q does not exist", name)
+		}
+		v, ok := deltaCol.At(row)
+		if !ok {
+			return "", nil, fmt.Errorf("delta key column %q row %d out of range", name, row)
+		}
+		normalized, err := normalizeKeyValue(targetCol.Kind(), v)
+		if err != nil {
+			return "", nil, fmt.Errorf("delta key column %q: %w", name, err)
+		}
+		values[i] = normalized
+		appendKeyPart(&b, targetCol.Kind(), normalized)
+	}
+	return b.String(), values, nil
+}
+
+func lookupKey(frame Frame, columns []Symbol, values []any) (string, error) {
+	if len(values) != len(columns) {
+		return "", fmt.Errorf("lookup key has %d values, want %d", len(values), len(columns))
+	}
+	var b strings.Builder
+	for i, name := range columns {
+		col, ok := frame.Column(name)
+		if !ok {
+			return "", fmt.Errorf("key column %q does not exist", name)
+		}
+		v, err := normalizeKeyValue(col.Kind(), values[i])
+		if err != nil {
+			return "", fmt.Errorf("lookup key column %q: %w", name, err)
+		}
+		appendKeyPart(&b, col.Kind(), v)
+	}
+	return b.String(), nil
+}
+
+func hasColumn(frame Frame, name Symbol) bool {
+	_, ok := frame.Column(name)
+	return ok
+}
+
+func hasSymbol(symbols map[Symbol]struct{}, name Symbol) bool {
+	_, ok := symbols[name]
+	return ok
+}
+
+func symbolIndex(names []Symbol, target Symbol) int {
+	for i, name := range names {
+		if name == target {
+			return i
+		}
+	}
+	return -1
+}
+
+func normalizeKeyValue(kind Kind, value any) (any, error) {
+	if normalized, ok := coerceTemporalLookupValue(kind, value); ok {
+		return normalized, nil
+	}
+	return NormalizeValueForKind(kind, value)
+}
+
+func coerceTemporalLookupValue(kind Kind, value any) (any, bool) {
+	if normalized, ok := coerceTemporalValue(kind, value); ok {
+		return normalized, true
+	}
+	if n, ok := coerceInt64Exact(value); ok {
+		switch kind {
+		case KindMonth:
+			return MonthFromMonths(n), true
+		case KindDate:
+			return DateFromDays(n), true
+		case KindDateTime:
+			return DateTimeFromUnixNanos(n), true
+		case KindTimespan:
+			return TimespanFromNanos(n), true
+		case KindMinute:
+			return MinuteFromMinutes(n), true
+		case KindSecond:
+			return SecondFromSeconds(n), true
+		case KindTime:
+			return TimeFromNanos(n), true
+		case KindTimestamp:
+			return TimestampFromUnixNanos(n), true
+		}
+	}
+	return nil, false
+}
+
 func appendKeyPart(b *strings.Builder, kind Kind, v any) {
 	if IsNull(v) {
-		fmt.Fprintf(b, "%s:null\x00", kind)
+		b.WriteString(string(kind))
+		b.WriteString(":null\x00")
 		return
 	}
-	fmt.Fprintf(b, "%s:%T:%#v\x00", kind, v, v)
+	b.WriteString(string(kind))
+	b.WriteByte(':')
+	switch x := v.(type) {
+	case bool:
+		b.WriteString(strconv.FormatBool(x))
+	case int8:
+		b.WriteString(strconv.FormatInt(int64(x), 10))
+	case int16:
+		b.WriteString(strconv.FormatInt(int64(x), 10))
+	case int32:
+		b.WriteString(strconv.FormatInt(int64(x), 10))
+	case int64:
+		b.WriteString(strconv.FormatInt(x, 10))
+	case uint8:
+		b.WriteString(strconv.FormatUint(uint64(x), 10))
+	case uint16:
+		b.WriteString(strconv.FormatUint(uint64(x), 10))
+	case uint32:
+		b.WriteString(strconv.FormatUint(uint64(x), 10))
+	case uint64:
+		b.WriteString(strconv.FormatUint(x, 10))
+	case float32:
+		b.WriteString(strconv.FormatFloat(float64(x), 'g', -1, 32))
+	case float64:
+		b.WriteString(strconv.FormatFloat(x, 'g', -1, 64))
+	case string:
+		b.WriteString(strconv.Quote(x))
+	case Symbol:
+		b.WriteString(strconv.Quote(string(x)))
+	case Month:
+		b.WriteString(strconv.FormatInt(int64(x), 10))
+	case Date:
+		b.WriteString(strconv.FormatInt(int64(x), 10))
+	case DateTime:
+		b.WriteString(strconv.FormatInt(int64(x), 10))
+	case Timespan:
+		b.WriteString(strconv.FormatInt(int64(x), 10))
+	case Minute:
+		b.WriteString(strconv.FormatInt(int64(x), 10))
+	case Second:
+		b.WriteString(strconv.FormatInt(int64(x), 10))
+	case Time:
+		b.WriteString(strconv.FormatInt(int64(x), 10))
+	case Timestamp:
+		b.WriteString(strconv.FormatInt(int64(x), 10))
+	default:
+		fmt.Fprintf(b, "%T:%#v", v, v)
+	}
+	b.WriteByte(0)
 }

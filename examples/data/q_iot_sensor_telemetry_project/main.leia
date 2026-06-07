@@ -1,0 +1,122 @@
+// q_iot_sensor_telemetry_project - in-memory sensor telemetry analytics.
+// Covers keyed device metadata, asof calibration, rolling buckets, conditional
+// anomaly scoring, typed temporal columns, q dictionaries/adverbs, and qSQL
+// mutation/join/rollup paths outside the market-data domain.
+
+func check(name, ok) {
+    if !ok {
+        print("failed", name)
+    }
+    assert(ok)
+    print("ok", name)
+}
+
+sensor_weights := q.eval("`temperature`vibration`pressure!0.50 0.35 0.15")
+daily_energy := q.eval("+\\120 130 125 140 160")
+reading_gaps := q.eval("-':600 900 1200 1800")
+max_gap := q.eval("max 600 900 1200 1800")
+check("q telemetry prelude", sensor_weights.temperature == 0.50 && daily_energy[5] == 675 && reading_gaps[4] == 600 && max_gap == 1800)
+
+devices := q.sql(
+    "select device,site,line,kind,threshold,critical from ([device:`D1`D2`D3`D4] site:`north`north`south`south; line:`L1`L1`L2`L2; kind:`temperature`vibration`temperature`pressure; threshold:75.0 40.0 80.0 55.0; critical:true false true false)",
+    {}
+)
+
+calibration := q.sql(
+    "select device,ts,offset,gain from ([] device:`D1`D1`D2`D3`D4`D4; ts:2026.06.07D10:00:00 2026.06.07D10:05:00 2026.06.07D10:00:00 2026.06.07D10:00:00 2026.06.07D10:00:00 2026.06.07D10:10:00; offset:0.5 1.0 0.0 0.0 3.0 2.0; gain:1.0 1.0 1.0 1.1 0.9 0.9)",
+    {}
+)
+
+readings_raw := q.sql(
+    "select reading_id,device,ts,value,battery,status from ([] reading_id:1 2 3 4 5 6 7 8 9 10; device:`D1`D1`D2`D2`D3`D3`D4`D4`D2`D1; ts:2026.06.07D10:01:00 2026.06.07D10:06:00 2026.06.07D10:02:00 2026.06.07D10:07:00 2026.06.07D10:03:00 2026.06.07D10:08:00 2026.06.07D10:04:00 2026.06.07D10:12:00 2026.06.07D10:09:00 2026.06.07D10:11:00; value:72.0 78.0 39.0 45.0 73.0 77.0 58.0 60.0 44.0 74.0; battery:90 88 70 69 50 49 20 18 10 87; status:`ok`ok`ok`ok`ok`ok`ok`ok`offline`ok)",
+    {}
+)
+
+readings := q.sql(readings_raw, "delete from trades where status=`offline")
+readings = q.sql(readings, "delete status from trades")
+
+calibrated := q.sql(
+    "select reading_id,device,ts,value,battery,offset,gain from readings asof join calibration on device,ts order by reading_id asc",
+    {readings: readings, calibration: calibration}
+)
+calibrated = q.sql(calibrated, "update adjusted:(value+offset)*gain from trades")
+
+enriched := q.sql(
+    "select reading_id,device,site,line,kind,critical,threshold,ts,value,battery,offset,gain,adjusted from trades left join devices on device order by reading_id asc",
+    {trades: calibrated, devices: devices}
+)
+enriched = q.sql(enriched, "update anomaly:adjusted>threshold from trades")
+enriched = q.sql(enriched, "update score:?[adjusted>threshold;adjusted-threshold;0.0] from trades")
+enriched = q.sql(enriched, "update low_battery:battery<25 from trades")
+enriched = q.sql(enriched, "update anomaly_i:?[anomaly;1;0] from trades")
+enriched = q.sql(enriched, "update low_i:?[low_battery;1;0] from trades")
+enriched = q.sql(enriched, "update critical_i:?[critical;1;0] from trades")
+enriched = q.sql(enriched, "update critical_anomaly_i:critical_i*anomaly_i from trades")
+
+calibration_window := q.sql(
+    "select reading_id,device,ts,offset,gain from readings wj[-0D00:10:00,0D00:00:00] calibration on device,ts order by reading_id asc",
+    {readings: readings, calibration: calibration}
+)
+
+anomalies := q.sql(
+    enriched,
+    "select reading_id,device,site,line,kind,ts,adjusted,threshold,score,low_battery from trades where anomaly=true order by score desc"
+)
+
+bucket_rollup := q.sql(
+    enriched,
+    "select rows:count i,avg_adjusted:avg adjusted,max_score:max score,anomalies:sum anomaly_i,low:sum low_i by bucket:xbar 300000000000 ts from trades order by bucket asc"
+)
+
+site_rollup := q.sql(
+    enriched,
+    "select rows:count i,avg_adjusted:avg adjusted,anomalies:sum anomaly_i,critical_anomalies:sum critical_anomaly_i,low:sum low_i,total_score:sum score by site from trades order by site asc"
+)
+
+critical_temp := q.sql(
+    enriched,
+    "select reading_id,device,site,kind,adjusted,score from trades where device in `D1`D3,kind=`temperature order by reading_id asc"
+)
+
+device_keyed := q.key_by(devices, "device")
+d1 := q.lookup(device_keyed, "D1")
+missing := q.lookup(device_keyed, "DX")
+
+check("raw and mutation shapes", #devices == 4 && #calibration == 6 && #readings_raw == 10 && #readings == 9 && readings.column_kinds.status == nil)
+check("asof calibration adjusts readings", #calibrated == 9 && calibrated[1].offset == 0.5 && calibrated[2].offset == 1.0 && calibrated[6].adjusted > 84.6 && calibrated[8].offset == 2.0)
+check("left join metadata and anomaly score", #enriched == 9 && enriched[1].site == "north" && enriched[2].anomaly == true && enriched[5].score > 0.29 && enriched[8].low_battery == true)
+check("window calibration history", #calibration_window == 9 && #calibration_window[1].offset == 1 && #calibration_window[2].offset == 2 && #calibration_window[8].offset == 1)
+check("anomaly ordering and filtering", #anomalies == 5 && anomalies[1].device == "D2" && anomalies[1].score == 5.0 && #critical_temp == 5 && critical_temp[5].device == "D1")
+check("xbar and site rollups", #bucket_rollup == 3 && bucket_rollup[1].rows == 4 && bucket_rollup[1].anomalies == 1 && bucket_rollup[2].anomalies == 3 && bucket_rollup[3].low == 1 && #site_rollup == 2 && site_rollup[1].site == "north" && site_rollup[1].anomalies == 2 && site_rollup[2].critical_anomalies == 2)
+check("keyed metadata lookup", q.keys(device_keyed)[1] == "device" && #d1 == 1 && d1[1].device == nil && d1[1].site == "north" && #missing == 0)
+
+summary := string.format(
+    "q_iot_sensor_telemetry readings=%d anomalies=%d sites=%d buckets=%d top=%s score=%.2f",
+    #readings,
+    #anomalies,
+    #site_rollup,
+    #bucket_rollup,
+    anomalies[1].device,
+    site_rollup[2].total_score
+)
+print(summary)
+
+return {
+    devices: devices,
+    calibration: calibration,
+    readings_raw: readings_raw,
+    readings: readings,
+    calibrated: calibrated,
+    enriched: enriched,
+    calibration_window: calibration_window,
+    anomalies: anomalies,
+    bucket_rollup: bucket_rollup,
+    site_rollup: site_rollup,
+    critical_temp: critical_temp,
+    device_keyed: device_keyed,
+    sensor_weights: sensor_weights,
+    daily_energy: daily_energy,
+    reading_gaps: reading_gaps,
+    max_gap: max_gap,
+    summary: summary,
+}

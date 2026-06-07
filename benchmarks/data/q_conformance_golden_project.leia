@@ -1,0 +1,120 @@
+// q conformance golden hot benchmark: compact coverage over q/kdb+-style
+// nulls, infinities, symbols/enums, keyed tables, adverbs, temporal joins,
+// mutations, joins, and qSQL exec/select.
+
+REPS := 1200
+MOD := 1000000007
+
+bars := data.frame({
+  sym: data.symbols({"AAPL", "AAPL", "MSFT", "AAPL"}),
+  bucket: data.strings({"09:30", "09:30", "09:30", "09:31"}),
+  seq: data.i64({1, 2, 3, 4}),
+  px: data.f64({100.0, 100.5, 80.0, 101.0}),
+})
+keyed := q.key_by(bars, "sym", "bucket")
+temporal_keyed := q.key_by(data.frame({
+  sym: data.symbols({"AAPL", "MSFT"}),
+  bucket: data.timestamp({"2026-06-06T09:30:00Z", "2026-06-06T09:31:00Z"}),
+  notional: data.f64({10012.0, 8050.0}),
+}), "sym", "bucket")
+
+quotes := q.sql(
+  "select sym,ts,bid,ask from ([] sym:`AAPL`AAPL`MSFT; ts:2026.06.06D09:30:00 2026.06.06D09:31:00 2026.06.06D09:30:00; bid:100.0 100.5 80.0; ask:100.2 100.7 80.3)",
+  {}
+)
+quotes_alias_keys := q.sql(
+  "select ticker,quote_time,bid,ask from ([] ticker:`AAPL`AAPL`MSFT; quote_time:2026.06.06D09:30:00 2026.06.06D09:31:00 2026.06.06D09:30:00; bid:100.0 100.5 80.0; ask:100.2 100.7 80.3)",
+  {}
+)
+trades := q.sql(
+  "select trade_id,sym,ts,price,size,venue from ([] trade_id:1 2 3 4; sym:`AAPL`AAPL`MSFT`TSLA; ts:2026.06.06D09:30:30 2026.06.06D09:31:30 2026.06.06D09:30:30 2026.06.06D09:30:30; price:100.1 100.6 80.2 200.0; size:10 20 5 1; venue:`XNAS`XNAS`XNYS`ARCX)",
+  {}
+)
+venues := q.sql("select venue,mic_name from ([] venue:`XNAS`XNYS; mic_name:`Nasdaq`NYSE)", {})
+fees := q.sql("select venue,rebate from ([] venue:`XNAS`XNAS`XNYS; rebate:0.001 0.002 0.003)", {})
+
+func mix(sum, v) {
+  return (sum * 131 + v) % MOD
+}
+
+func run_hot(reps) {
+  checksum := 0
+  for r := 1; r <= reps; r++ {
+    typed_nulls := q.eval("0Nh 0Ni 0Nj 0Ne")
+    typed_infinities := q.eval("0Wi -0Wi 0Wj -0Wj")
+    enum_codes := q.eval("codes `sym$`AAPL`MSFT`AAPL")
+    enum_meta := q.eval("meta `sym$`AAPL`MSFT`AAPL")
+    attr_meta := q.eval("meta `p#`AAPL`AAPL`MSFT")
+    attr_grouped_meta := q.eval("meta `g#`AAPL`MSFT`AAPL")
+    running_avgs := q.eval("avgs 10 0N 30 50")
+    adverb_scan := q.eval("+\\100 105 103 110")
+    adverb_projection := q.eval("({x+y}[10;])'1 2 3")
+    decoded_keyed := q.decode(q.encode(keyed))
+    keyed_hit := q.lookup(decoded_keyed, "AAPL", "09:30")
+    temporal_hit := q.lookup(temporal_keyed, {sym: "AAPL", bucket: "2026-06-06T09:30:00Z"})
+
+    asofed := q.sql(
+      "select trade_id,sym,ts,price,size,bid,ask,spread:ask-bid from trades asof join quotes on sym,ts order by trade_id asc",
+      {trades: trades, quotes: quotes}
+    )
+    xbar_rollup := q.sql(
+      asofed,
+      "select qty:sum size, fills:count i, avg_spread:avg spread by sym,bucket:xbar 60000000000 ts from trades order by sym asc,bucket asc"
+    )
+    complex_rollup := q.sql(
+      asofed,
+      "select notional:sum price*size, max_px:max price, min_px:min price, avg_spread:avg spread by sym,bucket:xbar 60000000000 ts from trades where size>=5 order by notional desc take 2"
+    )
+    updated := q.sql(trades, "update notional:price*size, fee:0.001*price*size from trades where size>=5")
+    deleted := q.sql(updated, "delete from trades where sym=`TSLA")
+    joined := q.sql(
+      "select trade_id,sym,venue,mic_name,notional,fee from trades left join venues on venue order by trade_id asc",
+      {trades: deleted, venues: venues}
+    )
+    inner_joined := q.sql(
+      "select trade_id,sym,venue,rebate from trades inner join fees on venue order by trade_id asc,rebate asc",
+      {trades: deleted, fees: fees}
+    )
+    plussed := q.sql(
+      "select sym,size,price from left pj right on sym order by sym asc",
+      {left: q.sql("select sym,size from ([] sym:`AAPL`MSFT; size:10 20)", {}), right: q.sql("select sym,size,price from ([] sym:`AAPL`NVDA; size:1 3; price:100.0 300.0)", {})}
+    )
+    aj_keyword := q.sql(
+      "select trade_id,sym,ts,bid from trades aj quotes on sym,ts order by trade_id asc",
+      {trades: trades, quotes: quotes}
+    )
+    aj_alias_keys := q.sql(
+      "select trade_id,sym,ts,bid from trades aj quotes_alias_keys on sym=ticker,ts=quote_time order by trade_id asc",
+      {trades: trades, quotes_alias_keys: quotes_alias_keys}
+    )
+    wj_alias_keys := q.sql(
+      "select trade_id,sym,ts,bid from trades wj[-0D00:01:00,0D00:00:00] quotes_alias_keys on sym=ticker,ts=quote_time order by trade_id asc",
+      {trades: trades, quotes_alias_keys: quotes_alias_keys}
+    )
+    wj1_alias_keys := q.sql(
+      "select trade_id,sym,ts,bid from trades wj1[-0D00:01:00,0D00:00:00] quotes_alias_keys on sym=ticker,ts=quote_time order by trade_id asc",
+      {trades: trades, quotes_alias_keys: quotes_alias_keys}
+    )
+    exec_vec := q.sql("exec price from trades where sym=`AAPL order by price asc", {trades: trades})
+    exec_dict := q.sql("exec sym!price from trades where price>=100 order by sym asc", {trades: trades})
+
+    assert(data.is_null(typed_nulls[1]) && typed_infinities[1] > 2000000000 && enum_codes[3] == 0 && enum_meta.domain == "sym" && attr_meta.attribute == "p" && attr_grouped_meta.attribute == "g" && running_avgs[4] == 30.0)
+    assert(adverb_scan[4] == 418 && adverb_projection[3] == 13 && keyed_hit[1].seq == 2 && temporal_hit[1].notional == 10012.0)
+    assert(asofed[1].bid == 100.0 && asofed[4].bid == nil && xbar_rollup[1].qty == 10.0 && complex_rollup[1].notional == 2012.0)
+    assert(joined[1].mic_name == "Nasdaq" && #inner_joined == 5 && plussed[1].size == 11.0 && aj_keyword[1].bid == 100.0 && aj_alias_keys[2].bid == 100.5 && #wj_alias_keys[1].bid == 1 && wj1_alias_keys[2].bid == 100.5 && exec_vec[2] == 100.6 && q.value(exec_dict)[2] == 100.6)
+
+    checksum = mix(checksum, adverb_scan[4] + adverb_projection[3] + keyed_hit[1].seq + math.floor(temporal_hit[1].notional))
+    checksum = mix(checksum, #asofed + #xbar_rollup + #complex_rollup + #joined + #inner_joined + math.floor(exec_vec[2] * 10))
+  }
+  return checksum
+}
+
+warm := run_hot(2)
+collectgarbage("collect")
+t0 := time.now()
+checksum := run_hot(REPS)
+elapsed := time.since(t0)
+
+print(string.format("q_conformance_golden_project_hot reps=%d", REPS))
+print(string.format("checksum: %d", mix(checksum, warm)))
+print(string.format("Time: %.3fs", elapsed))

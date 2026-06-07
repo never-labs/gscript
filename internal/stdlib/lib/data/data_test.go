@@ -1,6 +1,7 @@
 package data
 
 import (
+	"math"
 	"reflect"
 	"strings"
 	"testing"
@@ -37,6 +38,351 @@ func TestNewFramePreservesColumnOrderAndKinds(t *testing.T) {
 	}
 }
 
+func TestFrameSchemaFingerprintCompatibilityAndClone(t *testing.T) {
+	frame := mustFrame(t,
+		Column{Name: "sym", Data: NewSymbols([]string{"AAPL", "MSFT", "AAPL"})},
+		Column{Name: "qty", Data: NewI32([]int32{10, 20, 30})},
+		Column{Name: "price", Data: NewF64([]float64{100.5, 80.25, 101.0})},
+	)
+	hash := frame.SchemaFingerprint()
+	if hash == "" {
+		t.Fatal("schema fingerprint is empty")
+	}
+
+	clone, err := frame.Clone()
+	if err != nil {
+		t.Fatalf("Clone returned error: %v", err)
+	}
+	if !SameSchema(frame, clone) {
+		t.Fatal("Clone changed frame schema")
+	}
+	if clone.SchemaFingerprint() != hash {
+		t.Fatalf("clone schema hash = %s, want %s", clone.SchemaFingerprint(), hash)
+	}
+
+	gathered, err := frame.Gather([]int{2, 0})
+	if err != nil {
+		t.Fatalf("Gather returned error: %v", err)
+	}
+	if !frame.Schema().CompatibleWith(gathered.Schema()) {
+		t.Fatal("Gather changed schema compatibility")
+	}
+	if gathered.SchemaFingerprint() != hash {
+		t.Fatalf("gathered schema hash = %s, want %s", gathered.SchemaFingerprint(), hash)
+	}
+
+	projected, err := SelectFrameColumns(frame, "qty", "sym")
+	if err != nil {
+		t.Fatalf("SelectFrameColumns returned error: %v", err)
+	}
+	if SameSchema(frame, projected) {
+		t.Fatal("projected frame unexpectedly has same schema")
+	}
+	if projected.SchemaFingerprint() == hash {
+		t.Fatalf("projected schema hash = %s, want different from %s", projected.SchemaFingerprint(), hash)
+	}
+
+	sameShapeDifferentRows := mustFrame(t,
+		Column{Name: "sym", Data: NewSymbols([]string{"NVDA"})},
+		Column{Name: "qty", Data: NewI32([]int32{1})},
+		Column{Name: "price", Data: NewF64([]float64{120.75})},
+	)
+	if !frame.Schema().CompatibleWith(sameShapeDifferentRows.Schema()) {
+		t.Fatal("schemas with same column order and kinds should be compatible")
+	}
+	if sameShapeDifferentRows.SchemaFingerprint() != hash {
+		t.Fatalf("same schema hash = %s, want %s", sameShapeDifferentRows.SchemaFingerprint(), hash)
+	}
+}
+
+func TestArrayAttributeMetadataPropagatesThroughFrameGatherAndLookup(t *testing.T) {
+	sorted := WithArrayAttribute(NewTimestamp([]Timestamp{10, 20, 30}), ArrayAttributeSorted)
+	if !ArrayHasAttribute(sorted, ArrayAttributeSorted) {
+		t.Fatal("sorted attribute was not visible on attributed array")
+	}
+	frame := mustFrame(t,
+		Column{Name: "ts", Data: sorted},
+		NewColumn("sym", []any{Symbol("a"), Symbol("b"), Symbol("c")}),
+		NewColumn("qty", []any{10, 20, 30}),
+	)
+	ts, ok := frame.Column("ts")
+	if !ok || !ArrayHasAttribute(ts, ArrayAttributeSorted) {
+		t.Fatalf("frame ts attribute visible = %v, ok %v; want sorted", ArrayMetadataOf(ts), ok)
+	}
+	gathered, err := frame.Gather([]int{0, 2})
+	if err != nil {
+		t.Fatalf("Gather returned error: %v", err)
+	}
+	gatheredTS, _ := gathered.Column("ts")
+	if !ArrayHasAttribute(gatheredTS, ArrayAttributeSorted) {
+		t.Fatalf("gathered ts metadata = %#v, want sorted", ArrayMetadataOf(gatheredTS))
+	}
+	keyed, err := KeyBy(frame, "sym")
+	if err != nil {
+		t.Fatalf("KeyBy returned error: %v", err)
+	}
+	looked, err := keyed.LookupByKey(Symbol("b"))
+	if err != nil {
+		t.Fatalf("LookupByKey returned error: %v", err)
+	}
+	lookedTS, _ := looked.Column("ts")
+	if !ArrayHasAttribute(lookedTS, ArrayAttributeSorted) {
+		t.Fatalf("lookup ts metadata = %#v, want sorted", ArrayMetadataOf(lookedTS))
+	}
+}
+
+func TestGroupedAndUniqueAttributesBuildReusableIndexes(t *testing.T) {
+	grouped := WithArrayAttribute(NewSymbols([]string{"AAPL", "MSFT", "AAPL"}), ArrayAttributeGrouped)
+	index, ok := ArrayIndexFor(grouped, ArrayAttributeGrouped)
+	if !ok {
+		t.Fatalf("grouped metadata = %#v, want index", ArrayMetadataOf(grouped))
+	}
+	if got, want := index.Keys, []any{Symbol("AAPL"), Symbol("MSFT")}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("grouped index keys = %#v, want %#v", got, want)
+	}
+	if got, want := index.Rows, [][]int{{0, 2}, {1}}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("grouped index rows = %#v, want %#v", got, want)
+	}
+
+	frame := mustFrame(t,
+		Column{Name: "sym", Data: grouped},
+		NewColumn("qty", []any{10, 20, 30}),
+	)
+	keyed, err := KeyBy(frame, "sym")
+	if err != nil {
+		t.Fatalf("KeyBy returned error: %v", err)
+	}
+	got, err := keyed.LookupByKey(Symbol("AAPL"))
+	if err != nil {
+		t.Fatalf("LookupByKey returned error: %v", err)
+	}
+	assertColumnValues(t, got, "qty", []any{int64(10), int64(30)})
+
+	unique := WithArrayAttribute(NewI64([]int64{10, 20, 30}), ArrayAttributeUnique)
+	if _, ok := ArrayIndexFor(unique, ArrayAttributeUnique); !ok {
+		t.Fatalf("unique metadata = %#v, want index", ArrayMetadataOf(unique))
+	}
+	gathered := unique.Gather([]int{0, 2})
+	if ArrayHasAttribute(gathered, ArrayAttributeUnique) == false {
+		t.Fatalf("gathered metadata = %#v, want unique attribute", ArrayMetadataOf(gathered))
+	}
+	gatheredIndex, ok := ArrayIndexFor(gathered, ArrayAttributeUnique)
+	if !ok {
+		t.Fatalf("gathered metadata = %#v, want rebuilt unique index", ArrayMetadataOf(gathered))
+	}
+	if got, want := gatheredIndex.Rows, [][]int{{0}, {1}}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("gathered unique rows = %#v, want %#v", got, want)
+	}
+
+	regrouped := grouped.Gather([]int{1, 0, 2})
+	regroupedIndex, ok := ArrayIndexFor(regrouped, ArrayAttributeGrouped)
+	if !ok {
+		t.Fatalf("regrouped metadata = %#v, want rebuilt grouped index", ArrayMetadataOf(regrouped))
+	}
+	if got, want := regroupedIndex.Keys, []any{Symbol("MSFT"), Symbol("AAPL")}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("regrouped keys = %#v, want %#v", got, want)
+	}
+	if got, want := regroupedIndex.Rows, [][]int{{0}, {1, 2}}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("regrouped rows = %#v, want %#v", got, want)
+	}
+}
+
+func TestAttributeIndexSurvivesFrameGatherForFilterAndKeyedLookup(t *testing.T) {
+	grouped := WithArrayAttribute(NewSymbols([]string{"AAPL", "MSFT", "AAPL", "NVDA"}), ArrayAttributeGrouped)
+	frame := mustFrame(t,
+		Column{Name: "sym", Data: grouped},
+		NewColumn("seq", []any{1, 2, 3, 4}),
+	)
+	gathered, err := frame.Gather([]int{2, 0, 1})
+	if err != nil {
+		t.Fatalf("Gather returned error: %v", err)
+	}
+	sym, _ := gathered.Column("sym")
+	index, ok := ArrayIndexFor(sym, ArrayAttributeGrouped)
+	if !ok {
+		t.Fatalf("gathered sym metadata = %#v, want grouped index", ArrayMetadataOf(sym))
+	}
+	aaplKey := arrayValueKey(KindSymbol, Symbol("AAPL"))
+	if got, want := index.RowsByKey[aaplKey], []int{0, 1}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("gathered AAPL rows = %v, want %v", got, want)
+	}
+
+	indexes, err := filterIndexes(gathered, Binary{Op: OpEQ, Left: ColumnRef{Name: "sym"}, Right: Literal{Value: Symbol("AAPL")}})
+	if err != nil {
+		t.Fatalf("filterIndexes returned error: %v", err)
+	}
+	if want := []int{0, 1}; !reflect.DeepEqual(indexes, want) {
+		t.Fatalf("filter indexes = %v, want %v", indexes, want)
+	}
+
+	keyed, err := KeyBy(gathered, "sym")
+	if err != nil {
+		t.Fatalf("KeyBy returned error: %v", err)
+	}
+	hit, err := keyed.LookupByKey("AAPL")
+	if err != nil {
+		t.Fatalf("LookupByKey returned error: %v", err)
+	}
+	assertColumnValues(t, hit, "seq", []any{int64(3), int64(1)})
+}
+
+func TestFilterIndexesUsesTypedIndexKernelsWithNormalizedLiterals(t *testing.T) {
+	frame := mustFrame(t,
+		Column{Name: "qty", Data: NewI32([]int32{10, 20, 30, 40})},
+		Column{Name: "ts", Data: NewTimestamp([]Timestamp{100, 200, 300, 400})},
+	)
+
+	indexes, err := filterIndexes(frame, Binary{
+		Op:    OpGE,
+		Left:  ColumnRef{Name: "qty"},
+		Right: Literal{Value: int64(30)},
+	})
+	if err != nil {
+		t.Fatalf("filterIndexes compare returned error: %v", err)
+	}
+	if want := []int{2, 3}; !reflect.DeepEqual(indexes, want) {
+		t.Fatalf("compare filter indexes = %v, want %v", indexes, want)
+	}
+
+	indexes, err = filterIndexes(frame, Within{
+		Expr:       ColumnRef{Name: "ts"},
+		Low:        Timestamp(150),
+		High:       Timestamp(300),
+		HighClosed: true,
+	})
+	if err != nil {
+		t.Fatalf("filterIndexes within returned error: %v", err)
+	}
+	if want := []int{1, 2}; !reflect.DeepEqual(indexes, want) {
+		t.Fatalf("within filter indexes = %v, want %v", indexes, want)
+	}
+}
+
+func TestFilterIndexesUsesAttributeIndexForIn(t *testing.T) {
+	frame := mustFrame(t,
+		Column{Name: "sym", Data: WithArrayAttribute(NewSymbols([]string{"AAPL", "MSFT", "AAPL", "NVDA", "MSFT"}), ArrayAttributeGrouped)},
+		NewColumn("qty", []any{10, 20, 30, 40, 50}),
+	)
+	indexes, err := filterIndexes(frame, In{
+		Expr:   ColumnRef{Name: "sym"},
+		Values: []any{"MSFT", Symbol("AAPL"), "MSFT"},
+	})
+	if err != nil {
+		t.Fatalf("filterIndexes in returned error: %v", err)
+	}
+	if want := []int{0, 1, 2, 4}; !reflect.DeepEqual(indexes, want) {
+		t.Fatalf("in filter indexes = %v, want %v", indexes, want)
+	}
+
+	got, err := Exec(frame, QueryPlan{
+		Source: frame,
+		Where: In{
+			Expr:   ColumnRef{Name: "sym"},
+			Values: []any{"NVDA", "AAPL"},
+		},
+		Select: []SelectItem{{Name: "qty", Expr: ColumnRef{Name: "qty"}}},
+		LimitN: -1,
+	})
+	if err != nil {
+		t.Fatalf("Exec in returned error: %v", err)
+	}
+	assertColumnValues(t, got, "qty", []any{int64(10), int64(30), int64(40)})
+}
+
+func TestExecFilteredGroupedCountUsesAttributeIndexOrder(t *testing.T) {
+	frame := mustFrame(t,
+		Column{Name: "sym", Data: WithArrayAttribute(NewSymbols([]string{"AAPL", "MSFT", "AAPL", "NVDA", "MSFT"}), ArrayAttributeGrouped)},
+		NewColumn("qty", []any{5, 20, 30, 40, 9}),
+	)
+	got, err := Exec(frame, QueryPlan{
+		Source: frame,
+		Where:  Binary{Op: OpGT, Left: ColumnRef{Name: "qty"}, Right: Literal{Value: int64(10)}},
+		By:     []Symbol{"sym"},
+		Aggregates: []Aggregate{
+			{Name: "rows", Func: "count"},
+			{Name: "fills", Func: "count"},
+		},
+		LimitN: -1,
+	})
+	if err != nil {
+		t.Fatalf("Exec filtered grouped count returned error: %v", err)
+	}
+	assertColumnNames(t, got, []Symbol{"sym", "rows", "fills"})
+	assertColumnValues(t, got, "sym", []any{Symbol("MSFT"), Symbol("AAPL"), Symbol("NVDA")})
+	assertColumnValues(t, got, "rows", []any{int64(1), int64(1), int64(1)})
+	assertColumnValues(t, got, "fills", []any{int64(1), int64(1), int64(1)})
+}
+
+func TestQueryKernelSupportsVectorTransformProjectionInFilteredOrder(t *testing.T) {
+	frame := mustFrame(t,
+		NewColumn("sym", []any{Symbol("AAPL"), Symbol("AAPL"), Symbol("MSFT"), Symbol("AAPL")}),
+		NewColumn("qty", []any{5, 20, 30, 40}),
+		NewColumn("px", []any{100.0, 101.0, 80.0, 103.0}),
+	)
+	plan := QueryPlan{
+		Source: frame,
+		Where:  Binary{Op: OpGT, Left: ColumnRef{Name: "qty"}, Right: Literal{Value: int64(10)}},
+		Select: []SelectItem{
+			{Name: "sym", Expr: ColumnRef{Name: "sym"}},
+			{Name: "prev_px", Expr: VectorTransformExpr{Func: "prev", Expr: ColumnRef{Name: "px"}}},
+			{Name: "running_qty", Expr: VectorTransformExpr{Func: "sums", Expr: ColumnRef{Name: "qty"}}},
+		},
+		LimitN: -1,
+	}
+	kernel, ok, err := CompileQueryKernel(frame, plan)
+	if err != nil {
+		t.Fatalf("CompileQueryKernel returned error: %v", err)
+	}
+	if !ok {
+		_, reason := QueryKernelSupportReason(plan)
+		t.Fatalf("CompileQueryKernel ok = false, reason: %s", reason)
+	}
+	got, err := kernel.Exec(frame)
+	if err != nil {
+		t.Fatalf("kernel Exec returned error: %v", err)
+	}
+	assertColumnNames(t, got, []Symbol{"sym", "prev_px", "running_qty"})
+	assertColumnValues(t, got, "sym", []any{Symbol("AAPL"), Symbol("MSFT"), Symbol("AAPL")})
+	assertColumnValues(t, got, "prev_px", []any{NullValue, 101.0, 80.0})
+	assertColumnValues(t, got, "running_qty", []any{20.0, 50.0, 90.0})
+}
+
+func TestEncodedSymbolsExposeDomainAndCodesWhileDecodingValues(t *testing.T) {
+	array := NewEncodedSymbols([]Symbol{"AAPL", "MSFT", "AAPL", "NVDA", "MSFT"})
+	if got := array.Kind(); got != KindSymbol {
+		t.Fatalf("kind = %s, want %s", got, KindSymbol)
+	}
+	if got, want := array.Values(), []any{Symbol("AAPL"), Symbol("MSFT"), Symbol("AAPL"), Symbol("NVDA"), Symbol("MSFT")}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("values = %#v, want %#v", got, want)
+	}
+	domain, ok := EncodedDomainOf(array)
+	if !ok {
+		t.Fatal("EncodedDomainOf returned ok=false")
+	}
+	if want := []any{Symbol("AAPL"), Symbol("MSFT"), Symbol("NVDA")}; !reflect.DeepEqual(domain, want) {
+		t.Fatalf("domain = %#v, want %#v", domain, want)
+	}
+	codes, ok := EncodedCodesOf(array)
+	if !ok {
+		t.Fatal("EncodedCodesOf returned ok=false")
+	}
+	if want := []int32{0, 1, 0, 2, 1}; !reflect.DeepEqual(codes, want) {
+		t.Fatalf("codes = %#v, want %#v", codes, want)
+	}
+	gathered := array.Gather([]int{4, 2, 3})
+	if got, want := gathered.Values(), []any{Symbol("MSFT"), Symbol("AAPL"), Symbol("NVDA")}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("gathered values = %#v, want %#v", got, want)
+	}
+	gatheredDomain, _ := EncodedDomainOf(gathered)
+	if !reflect.DeepEqual(gatheredDomain, domain) {
+		t.Fatalf("gathered domain = %#v, want preserved %#v", gatheredDomain, domain)
+	}
+	gatheredCodes, _ := EncodedCodesOf(gathered)
+	if want := []int32{1, 0, 2}; !reflect.DeepEqual(gatheredCodes, want) {
+		t.Fatalf("gathered codes = %#v, want %#v", gatheredCodes, want)
+	}
+}
+
 func TestInferArrayRetainsTypedKindsWithNulls(t *testing.T) {
 	tests := []struct {
 		name   string
@@ -57,7 +403,12 @@ func TestInferArrayRetainsTypedKindsWithNulls(t *testing.T) {
 		{name: "f64", values: []any{1.5, nil, float32(2.5)}, kind: KindF64, want: []any{1.5, NullValue, 2.5}},
 		{name: "string", values: []any{"a", nil, "b"}, kind: KindString, want: []any{"a", NullValue, "b"}},
 		{name: "symbol", values: []any{Symbol("a"), nil, Symbol("b")}, kind: KindSymbol, want: []any{Symbol("a"), NullValue, Symbol("b")}},
+		{name: "month", values: []any{MonthFromMonths(1), nil, MonthFromMonths(3)}, kind: KindMonth, want: []any{Month(1), NullValue, Month(3)}},
 		{name: "date", values: []any{DateFromDays(1), nil, DateFromDays(3)}, kind: KindDate, want: []any{Date(1), NullValue, Date(3)}},
+		{name: "datetime", values: []any{DateTimeFromUnixNanos(100), nil, DateTimeFromUnixNanos(300)}, kind: KindDateTime, want: []any{DateTime(100), NullValue, DateTime(300)}},
+		{name: "timespan", values: []any{TimespanFromNanos(100), nil, TimespanFromNanos(300)}, kind: KindTimespan, want: []any{Timespan(100), NullValue, Timespan(300)}},
+		{name: "minute", values: []any{MinuteFromMinutes(10), nil, MinuteFromMinutes(30)}, kind: KindMinute, want: []any{Minute(10), NullValue, Minute(30)}},
+		{name: "second", values: []any{SecondFromSeconds(10), nil, SecondFromSeconds(30)}, kind: KindSecond, want: []any{Second(10), NullValue, Second(30)}},
 		{name: "time", values: []any{TimeFromNanos(10), nil, TimeFromNanos(30)}, kind: KindTime, want: []any{Time(10), NullValue, Time(30)}},
 		{name: "timestamp", values: []any{TimestampFromUnixNanos(100), nil, TimestampFromUnixNanos(300)}, kind: KindTimestamp, want: []any{Timestamp(100), NullValue, Timestamp(300)}},
 	}
@@ -72,6 +423,227 @@ func TestInferArrayRetainsTypedKindsWithNulls(t *testing.T) {
 				t.Fatalf("values = %#v, want %#v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestNormalizeValueForKindAcceptsIntegerByteInputs(t *testing.T) {
+	for _, input := range []any{int(1), int64(2), int32(3), int16(4), int8(5), uint8(6)} {
+		got, err := NormalizeValueForKind(KindU8, input)
+		if err != nil {
+			t.Fatalf("NormalizeValueForKind(u8, %#v) returned error: %v", input, err)
+		}
+		if _, ok := got.(uint8); !ok {
+			t.Fatalf("NormalizeValueForKind(u8, %#v) = %T, want uint8", input, got)
+		}
+	}
+	for _, input := range []any{-1, 256, 1.5} {
+		if _, err := NormalizeValueForKind(KindU8, input); err == nil {
+			t.Fatalf("NormalizeValueForKind(u8, %#v) returned nil error", input)
+		}
+	}
+}
+
+func TestTakePreservesTypedNullableKindsAndSchema(t *testing.T) {
+	ts, err := NewColumnWithKind("ts", KindTimestamp, []any{
+		TimestampFromUnixNanos(100),
+		nil,
+		TimestampFromUnixNanos(300),
+	})
+	if err != nil {
+		t.Fatalf("NewColumnWithKind ts returned error: %v", err)
+	}
+	px, err := NewColumnWithKind("px", KindF64, []any{nil, 10.5, 11.5})
+	if err != nil {
+		t.Fatalf("NewColumnWithKind px returned error: %v", err)
+	}
+	frame := mustFrame(t, ts, px)
+
+	takenArray, err := Take(ts.Data, 2)
+	if err != nil {
+		t.Fatalf("Take returned error: %v", err)
+	}
+	if got := takenArray.Kind(); got != KindTimestamp {
+		t.Fatalf("taken array kind = %s, want %s", got, KindTimestamp)
+	}
+	if got, want := takenArray.Values(), []any{Timestamp(100), NullValue}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("taken array values = %#v, want %#v", got, want)
+	}
+
+	takenFrame, err := TakeFrame(frame, 2)
+	if err != nil {
+		t.Fatalf("TakeFrame returned error: %v", err)
+	}
+	assertColumnNames(t, takenFrame, []Symbol{"ts", "px"})
+	assertColumnValues(t, takenFrame, "ts", []any{Timestamp(100), NullValue})
+	assertColumnValues(t, takenFrame, "px", []any{NullValue, 10.5})
+	if got, ok := takenFrame.Schema().Kind("ts"); !ok || got != KindTimestamp {
+		t.Fatalf("taken frame ts kind = %s, ok %v; want %s", got, ok, KindTimestamp)
+	}
+	if got, ok := takenFrame.Schema().Kind("px"); !ok || got != KindF64 {
+		t.Fatalf("taken frame px kind = %s, ok %v; want %s", got, ok, KindF64)
+	}
+}
+
+func TestNewColumnWithKindValidatesAndNormalizesNullableTypedValues(t *testing.T) {
+	sym, err := NewColumnWithKind("sym", KindSymbol, []any{"a", nil, Symbol("b")})
+	if err != nil {
+		t.Fatalf("NewColumnWithKind symbol returned error: %v", err)
+	}
+	if got := sym.Data.Kind(); got != KindSymbol {
+		t.Fatalf("symbol kind = %s, want %s", got, KindSymbol)
+	}
+	if got, want := sym.Data.Values(), []any{Symbol("a"), NullValue, Symbol("b")}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("symbol values = %#v, want %#v", got, want)
+	}
+
+	i32, err := NewColumnWithKind("qty", KindI32, []any{1, nil, int32(3)})
+	if err != nil {
+		t.Fatalf("NewColumnWithKind i32 returned error: %v", err)
+	}
+	if got, want := i32.Data.Values(), []any{int32(1), NullValue, int32(3)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("i32 values = %#v, want %#v", got, want)
+	}
+
+	if _, err := NewColumnWithKind("bad", KindTimestamp, []any{TimestampFromUnixNanos(1), nil, int64(3)}); err == nil {
+		t.Fatal("NewColumnWithKind accepted incompatible nullable timestamp value")
+	}
+	if _, err := NewColumnWithKind("bad", KindTimestamp, []any{TimestampFromUnixNanos(1), nil, "1970-01-01T00:00:00Z"}); err == nil {
+		t.Fatal("NewColumnWithKind accepted string timestamp value")
+	}
+	if _, err := NewColumnWithKind("bad", KindDate, []any{DateFromDays(1), "1970-01-02"}); err == nil {
+		t.Fatal("NewColumnWithKind accepted string date value")
+	}
+	if _, err := NewColumnWithKind("bad", KindI8, []any{int64(128), nil}); err == nil {
+		t.Fatal("NewColumnWithKind accepted overflowing nullable i8 value")
+	}
+}
+
+func TestInferArrayUsesTypedNullKindHints(t *testing.T) {
+	tests := []struct {
+		name   string
+		values []any
+		kind   Kind
+		want   []any
+	}{
+		{
+			name:   "i32 hint narrows compatible integers",
+			values: []any{int64(1), NullForKind(KindI32), int32(3)},
+			kind:   KindI32,
+			want:   []any{int32(1), NullValue, int32(3)},
+		},
+		{
+			name:   "f32 hint promotes compatible integers",
+			values: []any{int64(1), int64(2), NullForKind(KindF32)},
+			kind:   KindF32,
+			want:   []any{float32(1), float32(2), NullValue},
+		},
+		{
+			name:   "f64 hint promotes compatible integers",
+			values: []any{int64(1), int64(2), NullForKind(KindF64)},
+			kind:   KindF64,
+			want:   []any{1.0, 2.0, NullValue},
+		},
+		{
+			name:   "temporal hint preserves all-null kind",
+			values: []any{NullForKind(KindTimestamp), NullForKind(KindTimestamp)},
+			kind:   KindTimestamp,
+			want:   []any{NullValue, NullValue},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := InferArray(tt.values)
+			if got.Kind() != tt.kind {
+				t.Fatalf("InferArray kind = %s, want %s", got.Kind(), tt.kind)
+			}
+			if values := got.Values(); !reflect.DeepEqual(values, tt.want) {
+				t.Fatalf("InferArray values = %#v, want %#v", values, tt.want)
+			}
+		})
+	}
+}
+
+func TestInferArrayNumericPromotionBoundaries(t *testing.T) {
+	tests := []struct {
+		name   string
+		values []any
+		kind   Kind
+		want   []any
+	}{
+		{
+			name:   "i16 i32 promotes to f64 fallback",
+			values: []any{int16(1), int32(2)},
+			kind:   KindF64,
+			want:   []any{1.0, 2.0},
+		},
+		{
+			name:   "i32 i64 promotes to f64 fallback",
+			values: []any{int32(1), int64(2)},
+			kind:   KindF64,
+			want:   []any{1.0, 2.0},
+		},
+		{
+			name:   "i64 f32 promotes to f64",
+			values: []any{int64(1), float32(2.5)},
+			kind:   KindF64,
+			want:   []any{1.0, 2.5},
+		},
+		{
+			name:   "f32 f64 promotes to f64",
+			values: []any{float32(1.5), float64(2.5)},
+			kind:   KindF64,
+			want:   []any{1.5, 2.5},
+		},
+		{
+			name:   "typed f32 null hints compatible integer nullable",
+			values: []any{int32(1), NullForKind(KindF32)},
+			kind:   KindF32,
+			want:   []any{float32(1), NullValue},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := InferArray(tt.values)
+			if got.Kind() != tt.kind {
+				t.Fatalf("InferArray kind = %s, want %s", got.Kind(), tt.kind)
+			}
+			if values := got.Values(); !reflect.DeepEqual(values, tt.want) {
+				t.Fatalf("InferArray values = %#v, want %#v", values, tt.want)
+			}
+		})
+	}
+}
+
+func TestApplyBinaryTypedNullPromotionAndTypedCompareConsistency(t *testing.T) {
+	got, err := ApplyBinary(OpAdd, NullForKind(KindI32), int16(1))
+	if err != nil {
+		t.Fatalf("ApplyBinary typed i32+i16 returned error: %v", err)
+	}
+	if got != NullForKind(KindI64) {
+		t.Fatalf("ApplyBinary typed i32+i16 = %#v, want typed i64 null", got)
+	}
+
+	got, err = ApplyBinary(OpMul, float32(2), NullForKind(KindF64))
+	if err != nil {
+		t.Fatalf("ApplyBinary f32*typed f64 returned error: %v", err)
+	}
+	if got != NullForKind(KindF64) {
+		t.Fatalf("ApplyBinary f32*typed f64 = %#v, want typed f64 null", got)
+	}
+
+	symbolMask, err := CompareMask(NewSymbols([]string{"AAPL", "MSFT"}), OpEQ, "MSFT")
+	if err != nil {
+		t.Fatalf("symbol CompareMask returned error: %v", err)
+	}
+	if values := symbolMask.Values(); !reflect.DeepEqual(values, []any{false, true}) {
+		t.Fatalf("symbol/string CompareMask = %#v, want [false true]", values)
+	}
+	stringMask, err := CompareMask(NewString([]string{"AAPL", "MSFT"}), OpGT, Symbol("IBM"))
+	if err != nil {
+		t.Fatalf("string CompareMask returned error: %v", err)
+	}
+	if values := stringMask.Values(); !reflect.DeepEqual(values, []any{false, true}) {
+		t.Fatalf("string/symbol CompareMask = %#v, want [false true]", values)
 	}
 }
 
@@ -105,12 +677,58 @@ func TestNumericConstructors(t *testing.T) {
 }
 
 func TestTemporalConstructors(t *testing.T) {
+	month := NewMonth([]Month{MonthFromMonths(1), MonthFromMonths(2)})
+	if got := month.Kind(); got != KindMonth {
+		t.Fatalf("month kind = %s, want %s", got, KindMonth)
+	}
+	if got, want := month.Values(), []any{Month(1), Month(2)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("month values = %#v, want %#v", got, want)
+	}
+
 	date := NewDate([]Date{DateFromDays(1), DateFromDays(2)})
 	if got := date.Kind(); got != KindDate {
 		t.Fatalf("date kind = %s, want %s", got, KindDate)
 	}
 	if got, want := date.Values(), []any{Date(1), Date(2)}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("date values = %#v, want %#v", got, want)
+	}
+
+	datetime := NewDateTime([]DateTime{DateTimeFromUnixNanos(100), DateTimeFromUnixNanos(200)})
+	if got := datetime.Kind(); got != KindDateTime {
+		t.Fatalf("datetime kind = %s, want %s", got, KindDateTime)
+	}
+	if got, want := datetime.Values(), []any{DateTime(100), DateTime(200)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("datetime values = %#v, want %#v", got, want)
+	}
+
+	timespan := NewTimespan([]Timespan{TimespanFromNanos(100), TimespanFromNanos(200)})
+	if got := timespan.Kind(); got != KindTimespan {
+		t.Fatalf("timespan kind = %s, want %s", got, KindTimespan)
+	}
+	if got, want := timespan.Values(), []any{Timespan(100), Timespan(200)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("timespan values = %#v, want %#v", got, want)
+	}
+
+	minute := NewMinute([]Minute{MinuteFromMinutes(10), MinuteFromMinutes(20)})
+	if got := minute.Kind(); got != KindMinute {
+		t.Fatalf("minute kind = %s, want %s", got, KindMinute)
+	}
+	if !MinuteFromMinutes(20).Valid() {
+		t.Fatal("expected in-day minute to be valid")
+	}
+	if MinuteFromMinutes(24 * 60).Valid() {
+		t.Fatal("expected next-midnight minute to be invalid")
+	}
+
+	second := NewSecond([]Second{SecondFromSeconds(10), SecondFromSeconds(20)})
+	if got := second.Kind(); got != KindSecond {
+		t.Fatalf("second kind = %s, want %s", got, KindSecond)
+	}
+	if !SecondFromSeconds(20).Valid() {
+		t.Fatal("expected in-day second to be valid")
+	}
+	if SecondFromSeconds(24 * 60 * 60).Valid() {
+		t.Fatal("expected next-midnight second to be invalid")
 	}
 
 	time := NewTime([]Time{TimeFromNanos(10), TimeFromNanos(20)})
@@ -133,6 +751,305 @@ func TestTemporalConstructors(t *testing.T) {
 	}
 }
 
+func TestColumnarFrameStoreRoundTripPreservesSchemaAndNulls(t *testing.T) {
+	frame := mustFrame(t,
+		NewColumn("sym", []any{Symbol("AAPL"), Symbol("MSFT"), nil}),
+		NewColumn("qty", []any{int64(10), nil, int64(30)}),
+		NewColumn("price", []any{100.5, 101.25, nil}),
+		NewColumn("ts", []any{TimestampFromUnixNanos(100), nil, TimestampFromUnixNanos(300)}),
+	)
+	dir := t.TempDir()
+	if err := SaveFrameDir(dir, frame); err != nil {
+		t.Fatalf("SaveFrameDir returned error: %v", err)
+	}
+	info, err := ReadFrameStoreInfo(dir)
+	if err != nil {
+		t.Fatalf("ReadFrameStoreInfo returned error: %v", err)
+	}
+	if got, want := info.Format, "leia-columnar-frame"; got != want {
+		t.Fatalf("format = %q, want %q", got, want)
+	}
+	if got, want := info.Rows, 3; got != want {
+		t.Fatalf("rows = %d, want %d", got, want)
+	}
+	loaded, err := LoadFrameDir(dir)
+	if err != nil {
+		t.Fatalf("LoadFrameDir returned error: %v", err)
+	}
+	assertColumnNames(t, loaded, []Symbol{"sym", "qty", "price", "ts"})
+	assertColumnValues(t, loaded, "sym", []any{Symbol("AAPL"), Symbol("MSFT"), NullValue})
+	assertColumnValues(t, loaded, "qty", []any{int64(10), NullValue, int64(30)})
+	assertColumnValues(t, loaded, "price", []any{100.5, 101.25, NullValue})
+	assertColumnValues(t, loaded, "ts", []any{Timestamp(100), NullValue, Timestamp(300)})
+	if got, _ := loaded.Schema().Kind("ts"); got != KindTimestamp {
+		t.Fatalf("ts kind = %s, want timestamp", got)
+	}
+}
+
+func TestPartitionedFrameStoreLoadsMatchingPartitions(t *testing.T) {
+	frame := mustFrame(t,
+		NewColumn("date", []any{Date(1), Date(1), Date(2), Date(2)}),
+		NewColumn("sym", []any{Symbol("AAPL"), Symbol("MSFT"), Symbol("AAPL"), Symbol("MSFT")}),
+		NewColumn("qty", []any{int64(10), int64(20), int64(30), int64(40)}),
+	)
+	dir := t.TempDir()
+	if err := SavePartitionedFrameDir(dir, frame, "date", "sym"); err != nil {
+		t.Fatalf("SavePartitionedFrameDir returned error: %v", err)
+	}
+	info, err := ReadPartitionedStoreInfo(dir)
+	if err != nil {
+		t.Fatalf("ReadPartitionedStoreInfo returned error: %v", err)
+	}
+	if got, want := len(info.Partitions), 4; got != want {
+		t.Fatalf("partitions = %d, want %d", got, want)
+	}
+	loaded, err := LoadPartitionedFrameDir(dir, map[Symbol]any{"sym": Symbol("AAPL")})
+	if err != nil {
+		t.Fatalf("LoadPartitionedFrameDir returned error: %v", err)
+	}
+	assertColumnNames(t, loaded, []Symbol{"date", "sym", "qty"})
+	assertColumnValues(t, loaded, "date", []any{Date(1), Date(2)})
+	assertColumnValues(t, loaded, "sym", []any{Symbol("AAPL"), Symbol("AAPL")})
+	assertColumnValues(t, loaded, "qty", []any{int64(10), int64(30)})
+
+	empty, err := LoadPartitionedFrameDir(dir, map[Symbol]any{"sym": Symbol("IBM")})
+	if err != nil {
+		t.Fatalf("LoadPartitionedFrameDir empty returned error: %v", err)
+	}
+	if got := empty.Len(); got != 0 {
+		t.Fatalf("empty filtered frame len = %d, want 0", got)
+	}
+	if got, _ := empty.Schema().Kind("qty"); got != KindI64 {
+		t.Fatalf("empty filtered qty kind = %s, want i64", got)
+	}
+}
+
+func TestBucketFloorNumericValues(t *testing.T) {
+	bucketed, err := BucketFloor(NewColumn("x", []any{int64(-11), int64(-10), int64(-9), nil, int64(0), int64(9), int64(10)}).Data, int64(10))
+	if err != nil {
+		t.Fatalf("BucketFloor returned error: %v", err)
+	}
+	if got := bucketed.Kind(); got != KindI64 {
+		t.Fatalf("bucket kind = %s, want %s", got, KindI64)
+	}
+	if got, want := bucketed.Values(), []any{int64(-20), int64(-10), int64(-10), NullValue, int64(0), int64(0), int64(10)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("bucket values = %#v, want %#v", got, want)
+	}
+
+	floatBucketed, err := BucketFloor(NewF64([]float64{-1.25, -1.0, -0.75, 0, 0.74, 0.75}), 0.5)
+	if err != nil {
+		t.Fatalf("BucketFloor float returned error: %v", err)
+	}
+	if got, want := floatBucketed.Values(), []any{-1.5, -1.0, -1.0, 0.0, 0.5, 0.5}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("float bucket values = %#v, want %#v", got, want)
+	}
+
+	if _, err := BucketFloor(NewString([]string{"a"}), int64(10)); err == nil {
+		t.Fatal("BucketFloor accepted non-bucketable kind")
+	}
+	if _, err := BucketFloor(NewI64([]int64{1}), int64(0)); err == nil {
+		t.Fatal("BucketFloor accepted non-positive interval")
+	}
+}
+
+func TestBucketFloorTemporalValues(t *testing.T) {
+	months, err := BucketFloor(NewMonth([]Month{MonthFromMonths(0), MonthFromMonths(1), MonthFromMonths(2), MonthFromMonths(3)}), int64(3))
+	if err != nil {
+		t.Fatalf("BucketFloor months returned error: %v", err)
+	}
+	if got, want := months.Values(), []any{Month(0), Month(0), Month(0), Month(3)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("month bucket values = %#v, want %#v", got, want)
+	}
+
+	dates, err := BucketFloor(NewColumn("d", []any{DateFromDays(0), DateFromDays(1), DateFromDays(6), DateFromDays(7), nil}).Data, int64(7))
+	if err != nil {
+		t.Fatalf("BucketFloor dates returned error: %v", err)
+	}
+	if got := dates.Kind(); got != KindDate {
+		t.Fatalf("date bucket kind = %s, want %s", got, KindDate)
+	}
+	if got, want := dates.Values(), []any{Date(0), Date(0), Date(0), Date(7), NullValue}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("date bucket values = %#v, want %#v", got, want)
+	}
+
+	minutes, err := BucketFloor(NewMinute([]Minute{
+		MinuteFromMinutes(59),
+		MinuteFromMinutes(60),
+		MinuteFromMinutes(119),
+	}), int64(60))
+	if err != nil {
+		t.Fatalf("BucketFloor minutes returned error: %v", err)
+	}
+	if got, want := minutes.Values(), []any{Minute(0), Minute(60), Minute(60)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("minute bucket values = %#v, want %#v", got, want)
+	}
+
+	seconds, err := BucketFloor(NewSecond([]Second{
+		SecondFromSeconds(59),
+		SecondFromSeconds(60),
+		SecondFromSeconds(119),
+	}), int64(60))
+	if err != nil {
+		t.Fatalf("BucketFloor seconds returned error: %v", err)
+	}
+	if got, want := seconds.Values(), []any{Second(0), Second(60), Second(60)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("second bucket values = %#v, want %#v", got, want)
+	}
+
+	times, err := BucketFloor(NewTime([]Time{
+		TimeFromNanos(999),
+		TimeFromNanos(1_000),
+		TimeFromNanos(1_999),
+	}), int64(1_000))
+	if err != nil {
+		t.Fatalf("BucketFloor times returned error: %v", err)
+	}
+	if got, want := times.Values(), []any{Time(0), Time(1000), Time(1000)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("time bucket values = %#v, want %#v", got, want)
+	}
+
+	timespans, err := BucketFloor(NewTimespan([]Timespan{
+		TimespanFromNanos(-1),
+		TimespanFromNanos(0),
+		TimespanFromNanos(999),
+		TimespanFromNanos(1_000),
+	}), int64(1_000))
+	if err != nil {
+		t.Fatalf("BucketFloor timespans returned error: %v", err)
+	}
+	if got, want := timespans.Values(), []any{Timespan(-1000), Timespan(0), Timespan(0), Timespan(1000)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("timespan bucket values = %#v, want %#v", got, want)
+	}
+
+	datetimes, err := BucketFloor(NewDateTime([]DateTime{
+		DateTimeFromUnixNanos(-1),
+		DateTimeFromUnixNanos(0),
+		DateTimeFromUnixNanos(999),
+		DateTimeFromUnixNanos(1_000),
+	}), int64(1_000))
+	if err != nil {
+		t.Fatalf("BucketFloor datetimes returned error: %v", err)
+	}
+	if got, want := datetimes.Values(), []any{DateTime(-1000), DateTime(0), DateTime(0), DateTime(1000)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("datetime bucket values = %#v, want %#v", got, want)
+	}
+
+	timestamps, err := BucketFloor(NewTimestamp([]Timestamp{
+		TimestampFromUnixNanos(-1),
+		TimestampFromUnixNanos(0),
+		TimestampFromUnixNanos(999),
+		TimestampFromUnixNanos(1_000),
+	}), int64(1_000))
+	if err != nil {
+		t.Fatalf("BucketFloor timestamps returned error: %v", err)
+	}
+	if got, want := timestamps.Values(), []any{Timestamp(-1000), Timestamp(0), Timestamp(0), Timestamp(1000)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("timestamp bucket values = %#v, want %#v", got, want)
+	}
+}
+
+func TestBucketFloorNullableTimePreservesKindAndNull(t *testing.T) {
+	times, err := BucketFloor(NewColumn("time", []any{
+		nil,
+		TimeFromNanos(59_999_999_999),
+		TimeFromNanos(60_000_000_000),
+		TimeFromNanos(119_999_999_999),
+	}).Data, int64(60_000_000_000))
+	if err != nil {
+		t.Fatalf("BucketFloor nullable times returned error: %v", err)
+	}
+	if got := times.Kind(); got != KindTime {
+		t.Fatalf("time bucket kind = %s, want %s", got, KindTime)
+	}
+	if got, want := times.Values(), []any{NullValue, Time(0), Time(60_000_000_000), Time(60_000_000_000)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("time bucket values = %#v, want %#v", got, want)
+	}
+}
+
+func TestBucketFloorExprEvalRowsPreservesTemporalKindAndNull(t *testing.T) {
+	ts, err := NewColumnWithKind("ts", KindTimestamp, []any{
+		TimestampFromUnixNanos(59_999_999_999),
+		NullForKind(KindTimestamp),
+		TimestampFromUnixNanos(60_000_000_000),
+		TimestampFromUnixNanos(119_999_999_999),
+	})
+	if err != nil {
+		t.Fatalf("NewColumnWithKind returned error: %v", err)
+	}
+	frame := mustFrame(t, ts)
+	expr := BucketFloorExpr{
+		Expr:     ColumnRef{Name: "ts"},
+		Interval: TimespanFromNanos(60_000_000_000),
+	}
+	array, err := expr.EvalRows(frame, []int{0, 1, 2, 3})
+	if err != nil {
+		t.Fatalf("EvalRows returned error: %v", err)
+	}
+	if got := array.Kind(); got != KindTimestamp {
+		t.Fatalf("bucket kind = %s, want %s", got, KindTimestamp)
+	}
+	if got, want := array.Values(), []any{
+		TimestampFromUnixNanos(0),
+		NullValue,
+		TimestampFromUnixNanos(60_000_000_000),
+		TimestampFromUnixNanos(60_000_000_000),
+	}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("bucket values = %#v, want %#v", got, want)
+	}
+}
+
+func TestBucketFloorTemporalIntervalsUseColumnUnits(t *testing.T) {
+	seconds, err := BucketFloor(NewSecond([]Second{
+		SecondFromSeconds(34_215),
+		SecondFromSeconds(34_259),
+		SecondFromSeconds(34_260),
+	}), MinuteFromMinutes(1))
+	if err != nil {
+		t.Fatalf("BucketFloor seconds by minute returned error: %v", err)
+	}
+	if got, want := seconds.Values(), []any{Second(34_200), Second(34_200), Second(34_260)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("second minute bucket values = %#v, want %#v", got, want)
+	}
+
+	times, err := BucketFloor(NewTime([]Time{
+		TimeFromNanos(34_215_000_000_000),
+		TimeFromNanos(34_260_000_000_000),
+	}), MinuteFromMinutes(1))
+	if err != nil {
+		t.Fatalf("BucketFloor times by minute returned error: %v", err)
+	}
+	if got, want := times.Values(), []any{Time(34_200_000_000_000), Time(34_260_000_000_000)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("time minute bucket values = %#v, want %#v", got, want)
+	}
+
+	timestamps, err := BucketFloor(NewTimestamp([]Timestamp{
+		TimestampFromUnixNanos(34_215_000_000_000),
+		TimestampFromUnixNanos(34_260_000_000_000),
+	}), TimespanFromNanos(60_000_000_000))
+	if err != nil {
+		t.Fatalf("BucketFloor timestamps by timespan returned error: %v", err)
+	}
+	if got, want := timestamps.Values(), []any{Timestamp(34_200_000_000_000), Timestamp(34_260_000_000_000)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("timestamp timespan bucket values = %#v, want %#v", got, want)
+	}
+
+	dates, err := BucketFloor(NewDate([]Date{
+		DateFromDays(19724),
+		DateFromDays(19730),
+		DateFromDays(19731),
+	}), TimespanFromNanos(7*nanosPerDay))
+	if err != nil {
+		t.Fatalf("BucketFloor dates by timespan returned error: %v", err)
+	}
+	if got, want := dates.Values(), []any{Date(19719), Date(19726), Date(19726)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("date timespan bucket values = %#v, want %#v", got, want)
+	}
+
+	if _, err := BucketFloor(NewMinute([]Minute{MinuteFromMinutes(1)}), SecondFromSeconds(30)); err == nil {
+		t.Fatal("BucketFloor accepted sub-minute interval for minute column")
+	}
+}
+
 func TestInferArrayNullAndMixedKinds(t *testing.T) {
 	nulls := NewColumn("missing", []any{nil, NullValue})
 	if got := nulls.Data.Kind(); got != KindNull {
@@ -143,8 +1060,11 @@ func TestInferArrayNullAndMixedKinds(t *testing.T) {
 	}
 
 	mixed := NewColumn("mixed", []any{"a", nil, Symbol("a")})
-	if got := mixed.Data.Kind(); got != KindAny {
-		t.Fatalf("mixed string/symbol kind = %s, want %s", got, KindAny)
+	if got := mixed.Data.Kind(); got != KindSymbol {
+		t.Fatalf("mixed string/symbol kind = %s, want %s", got, KindSymbol)
+	}
+	if got, want := mixed.Data.Values(), []any{Symbol("a"), NullValue, Symbol("a")}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("mixed string/symbol values = %#v, want %#v", got, want)
 	}
 }
 
@@ -186,10 +1106,17 @@ func TestTemporalEqualityAndComparison(t *testing.T) {
 	}{
 		{name: "date equal", op: OpEQ, left: DateFromDays(2), right: DateFromDays(2), want: true},
 		{name: "date not equal to i64", op: OpEQ, left: DateFromDays(2), right: int64(2), want: false},
+		{name: "month less", op: OpLT, left: MonthFromMonths(1), right: MonthFromMonths(2), want: true},
+		{name: "datetime less", op: OpLT, left: DateTimeFromUnixNanos(1), right: DateTimeFromUnixNanos(2), want: true},
+		{name: "timespan less", op: OpLT, left: TimespanFromNanos(1), right: TimespanFromNanos(2), want: true},
+		{name: "minute less", op: OpLT, left: MinuteFromMinutes(1), right: MinuteFromMinutes(2), want: true},
+		{name: "second less", op: OpLT, left: SecondFromSeconds(1), right: SecondFromSeconds(2), want: true},
 		{name: "time less", op: OpLT, left: TimeFromNanos(1), right: TimeFromNanos(2), want: true},
 		{name: "timestamp greater or equal", op: OpGE, left: TimestampFromUnixNanos(5), right: TimestampFromUnixNanos(5), want: true},
 		{name: "null equal null", op: OpEQ, left: nil, right: NullValue, want: true},
 		{name: "null not equal date", op: OpNE, left: nil, right: DateFromDays(0), want: true},
+		{name: "null arithmetic propagates", op: OpSub, left: nil, right: 1.5, want: NullValue},
+		{name: "null ordered comparison is false", op: OpGT, left: nil, right: 0.35, want: false},
 	}
 
 	for _, tt := range tests {
@@ -271,6 +1198,224 @@ func TestQueryFoundationNumericComparisonAndOrder(t *testing.T) {
 	assertColumnValues(t, ordered, "qty", []any{int32(1), int32(3), int32(3), NullValue})
 }
 
+func TestTypedMaskKernelsAndFastWhere(t *testing.T) {
+	frame := mustFrame(t,
+		Column{Name: "qty", Data: NewI32([]int32{1, 5, 9, 5})},
+		Column{Name: "sym", Data: NewSymbols([]string{"a", "b", "a", "c"})},
+		NewColumn("score", []any{1.5, nil, 3.5, 4.5}),
+	)
+
+	eq, err := EqualMask(mustColumn(t, frame, "qty"), int32(5))
+	if err != nil {
+		t.Fatalf("EqualMask returned error: %v", err)
+	}
+	if got, want := eq.Values(), []any{false, true, false, true}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("EqualMask values = %#v, want %#v", got, want)
+	}
+
+	within, err := WithinMask(mustColumn(t, frame, "score"), 1.5, 4.0, true)
+	if err != nil {
+		t.Fatalf("WithinMask returned error: %v", err)
+	}
+	if got, want := within.Values(), []any{true, false, true, false}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("WithinMask values = %#v, want %#v", got, want)
+	}
+
+	got, err := Exec(frame, QueryPlan{
+		Source: frame,
+		Where:  Binary{Op: OpLE, Left: Literal{Value: int32(5)}, Right: ColumnRef{Name: "qty"}},
+		Select: []SelectItem{{Name: "sym", Expr: ColumnRef{Name: "sym"}}},
+		LimitN: -1,
+	})
+	if err != nil {
+		t.Fatalf("Exec with reversed literal comparison returned error: %v", err)
+	}
+	assertColumnValues(t, got, "sym", []any{Symbol("b"), Symbol("a"), Symbol("c")})
+}
+
+func TestTypedDyadicKernelsInFastWhereAndProjection(t *testing.T) {
+	frame := mustFrame(t,
+		Column{Name: "qty", Data: NewI32([]int32{1, 5, 9, 5})},
+		Column{Name: "limit", Data: NewI64([]int64{2, 5, 8, 7})},
+		NewColumn("px", []any{float64(10), nil, float64(30), float64(40)}),
+		Column{Name: "sym", Data: NewSymbols([]string{"a", "b", "c", "d"})},
+		Column{Name: "ts", Data: NewDate([]Date{DateFromDays(1), DateFromDays(2), DateFromDays(3), DateFromDays(4)})},
+	)
+
+	got, err := Exec(frame, QueryPlan{
+		Source: frame,
+		Where:  Binary{Op: OpLE, Left: ColumnRef{Name: "qty"}, Right: ColumnRef{Name: "limit"}},
+		Select: []SelectItem{
+			{Name: "sym", Expr: ColumnRef{Name: "sym"}},
+			{Name: "notional", Expr: Binary{Op: OpMul, Left: ColumnRef{Name: "qty"}, Right: ColumnRef{Name: "px"}}},
+			{Name: "bumped", Expr: Binary{Op: OpAdd, Left: ColumnRef{Name: "qty"}, Right: Literal{Value: int64(10)}}},
+			{Name: "recent", Expr: Binary{Op: OpGE, Left: ColumnRef{Name: "ts"}, Right: Literal{Value: DateFromDays(2)}}},
+		},
+		LimitN: -1,
+	})
+	if err != nil {
+		t.Fatalf("Exec with typed dyadic kernels returned error: %v", err)
+	}
+	assertColumnValues(t, got, "sym", []any{Symbol("a"), Symbol("b"), Symbol("d")})
+	assertColumnValues(t, got, "notional", []any{10.0, NullValue, 200.0})
+	assertColumnValues(t, got, "bumped", []any{11.0, 15.0, 15.0})
+	assertColumnValues(t, got, "recent", []any{false, true, true})
+}
+
+func TestDivideExpressionsInWhereProjectionOrderAndUpdate(t *testing.T) {
+	frame := mustFrame(t,
+		Column{Name: "sym", Data: NewSymbols([]string{"AAPL", "MSFT", "NVDA"})},
+		Column{Name: "price", Data: NewF64([]float64{100.0, 90.0, 120.0})},
+		Column{Name: "qty", Data: NewI64([]int64{10, 30, 20})},
+	)
+
+	ratio := Binary{Op: OpDiv, Left: ColumnRef{Name: "price"}, Right: ColumnRef{Name: "qty"}}
+	got, err := Exec(frame, QueryPlan{
+		Source:  frame,
+		Where:   Binary{Op: OpGE, Left: ratio, Right: Literal{Value: 6.0}},
+		Select:  []SelectItem{{Name: "sym", Expr: ColumnRef{Name: "sym"}}, {Name: "ratio", Expr: ratio}},
+		OrderBy: []OrderSpec{{Column: "ratio", Desc: true}},
+		LimitN:  -1,
+	})
+	if err != nil {
+		t.Fatalf("Exec divide query returned error: %v", err)
+	}
+	assertColumnValues(t, got, "sym", []any{Symbol("AAPL"), Symbol("NVDA")})
+	assertColumnValues(t, got, "ratio", []any{10.0, 6.0})
+
+	updated, err := UpdateWhere(frame,
+		Binary{Op: OpGE, Left: ratio, Right: Literal{Value: 6.0}},
+		map[Symbol]Expr{"ratio": ratio},
+	)
+	if err != nil {
+		t.Fatalf("UpdateWhere divide returned error: %v", err)
+	}
+	assertColumnValues(t, updated, "ratio", []any{10.0, NullValue, 6.0})
+}
+
+func TestNullableComparisonAndWithinBoundaries(t *testing.T) {
+	tests := []struct {
+		name  string
+		array Array
+		op    Op
+		value any
+		want  []any
+	}{
+		{
+			name:  "string ne skips null equality",
+			array: NewColumn("s", []any{"a", nil, "b"}).Data,
+			op:    OpNE,
+			value: "a",
+			want:  []any{false, true, true},
+		},
+		{
+			name:  "symbol le preserves symbol kind",
+			array: NewColumn("sym", []any{Symbol("a"), NullValue, Symbol("c")}).Data,
+			op:    OpLE,
+			value: Symbol("b"),
+			want:  []any{true, false, false},
+		},
+		{
+			name:  "date ge skips null rows",
+			array: NewColumn("d", []any{DateFromDays(2), nil, DateFromDays(1)}).Data,
+			op:    OpGE,
+			value: DateFromDays(2),
+			want:  []any{true, false, false},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := CompareMask(tt.array, tt.op, tt.value)
+			if err != nil {
+				t.Fatalf("CompareMask returned error: %v", err)
+			}
+			if values := got.Values(); !reflect.DeepEqual(values, tt.want) {
+				t.Fatalf("CompareMask values = %#v, want %#v", values, tt.want)
+			}
+		})
+	}
+
+	stringWithin, err := WithinMask(NewColumn("s", []any{"a", nil, "b", "c"}).Data, "a", "c", false)
+	if err != nil {
+		t.Fatalf("WithinMask string returned error: %v", err)
+	}
+	if got, want := stringWithin.Values(), []any{true, false, true, false}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("WithinMask string values = %#v, want %#v", got, want)
+	}
+
+	nullBound, err := WithinMask(NewColumn("d", []any{DateFromDays(1), nil, DateFromDays(2)}).Data, NullValue, DateFromDays(3), true)
+	if err != nil {
+		t.Fatalf("WithinMask null lower bound returned error: %v", err)
+	}
+	if got, want := nullBound.Values(), []any{false, false, false}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("WithinMask null lower bound values = %#v, want %#v", got, want)
+	}
+}
+
+func TestFrameSchemaStableHelpers(t *testing.T) {
+	frame := mustFrame(t,
+		Column{Name: "sym", Data: NewSymbols([]string{"a", "b", "c"})},
+		Column{Name: "qty", Data: NewI32([]int32{10, 20, 30})},
+		NewColumn("venue", []any{"x", "y", "z"}),
+	)
+
+	projected, err := SelectFrameColumns(frame, "qty", "sym")
+	if err != nil {
+		t.Fatalf("SelectFrameColumns returned error: %v", err)
+	}
+	assertColumnNames(t, projected, []Symbol{"qty", "sym"})
+	if kind, ok := projected.Schema().Kind("qty"); !ok || kind != KindI32 {
+		t.Fatalf("projected qty kind = %s, ok %v; want %s", kind, ok, KindI32)
+	}
+	if kind, ok := projected.Schema().Kind("sym"); !ok || kind != KindSymbol {
+		t.Fatalf("projected sym kind = %s, ok %v; want %s", kind, ok, KindSymbol)
+	}
+
+	empty, err := EmptyLike(frame)
+	if err != nil {
+		t.Fatalf("EmptyLike returned error: %v", err)
+	}
+	if empty.Len() != 0 {
+		t.Fatalf("empty length = %d, want 0", empty.Len())
+	}
+	if !SameSchema(frame, empty) {
+		t.Fatal("EmptyLike did not preserve schema")
+	}
+
+	cols := frame.Columns()
+	if len(cols) != 3 {
+		t.Fatalf("Columns length = %d, want 3", len(cols))
+	}
+	cols[0].Name = "mutated"
+	if got := frame.Schema().Names()[0]; got != "sym" {
+		t.Fatalf("mutating Columns result changed frame schema to %q", got)
+	}
+	if _, err := SelectFrameColumns(frame, "qty", "qty"); err == nil {
+		t.Fatal("SelectFrameColumns accepted duplicate column")
+	}
+}
+
+func TestQueryPreProjectOrderUsesSourceColumns(t *testing.T) {
+	frame := mustFrame(t,
+		NewColumn("sym", []any{Symbol("AAPL"), Symbol("MSFT"), Symbol("AAPL")}),
+		NewColumn("price", []any{100.0, 80.0, 120.0}),
+		NewColumn("trade_id", []any{int64(2), int64(3), int64(1)}),
+	)
+
+	ordered, err := Exec(frame, QueryPlan{
+		Source:          frame,
+		Select:          []SelectItem{{Name: "sym", Expr: ColumnRef{Name: "sym"}}, {Name: "price", Expr: ColumnRef{Name: "price"}}},
+		OrderBy:         []OrderSpec{{Column: "trade_id"}},
+		PreProjectOrder: true,
+		LimitN:          -1,
+	})
+	if err != nil {
+		t.Fatalf("Exec returned error: %v", err)
+	}
+	assertColumnValues(t, ordered, "sym", []any{Symbol("AAPL"), Symbol("AAPL"), Symbol("MSFT")})
+	assertColumnValues(t, ordered, "price", []any{120.0, 100.0, 80.0})
+}
+
 func TestQueryTemporalComparisonGroupingAndOrder(t *testing.T) {
 	frame := mustFrame(t,
 		NewColumn("d", []any{DateFromDays(2), nil, DateFromDays(1), DateFromDays(2)}),
@@ -286,9 +1431,10 @@ func TestQueryTemporalComparisonGroupingAndOrder(t *testing.T) {
 		WhereExpr(Binary{Op: OpGE, Left: ColumnRef{Name: "d"}, Right: Literal{Value: DateFromDays(2)}}).
 		SelectColumns("ts").
 		Exec()
-	if err == nil {
-		t.Fatalf("expected null temporal comparison to fail")
+	if err != nil {
+		t.Fatalf("temporal comparison with null returned error: %v", err)
 	}
+	assertColumnValues(t, filtered, "ts", []any{Timestamp(20), Timestamp(40)})
 
 	filtered, err = From(frame).
 		WhereEq("d", DateFromDays(2)).
@@ -352,6 +1498,207 @@ func TestQueryComputedProjection(t *testing.T) {
 	assertColumnValues(t, got, "notional", []any{30.0, 80.0})
 }
 
+func TestQueryVectorTransformProjection(t *testing.T) {
+	frame := mustFrame(t,
+		NewColumn("v", []any{2, 4, 0, 8}),
+		NewColumn("maybe", []any{NullValue, 3, NullValue, 5}),
+	)
+
+	got, err := Exec(frame, QueryPlan{
+		Source: frame,
+		Select: []SelectItem{
+			{Name: "prev", Expr: VectorTransformExpr{Func: "prev", Expr: ColumnRef{Name: "v"}}},
+			{Name: "next", Expr: VectorTransformExpr{Func: "next", Expr: ColumnRef{Name: "v"}}},
+			{Name: "deltas", Expr: VectorTransformExpr{Func: "deltas", Expr: ColumnRef{Name: "v"}}},
+			{Name: "fills", Expr: VectorTransformExpr{Func: "fills", Expr: ColumnRef{Name: "maybe"}}},
+			{Name: "ratios", Expr: VectorTransformExpr{Func: "ratios", Expr: ColumnRef{Name: "v"}}},
+			{Name: "sums", Expr: VectorTransformExpr{Func: "sums", Expr: ColumnRef{Name: "v"}}},
+			{Name: "prds", Expr: VectorTransformExpr{Func: "prds", Expr: ColumnRef{Name: "v"}}},
+			{Name: "mins", Expr: VectorTransformExpr{Func: "mins", Expr: ColumnRef{Name: "v"}}},
+			{Name: "maxs", Expr: VectorTransformExpr{Func: "maxs", Expr: ColumnRef{Name: "v"}}},
+			{Name: "avgs", Expr: VectorTransformExpr{Func: "avgs", Expr: ColumnRef{Name: "v"}}},
+			{Name: "neg", Expr: VectorTransformExpr{Func: "neg", Expr: ColumnRef{Name: "v"}}},
+			{Name: "sqrt", Expr: VectorTransformExpr{Func: "sqrt", Expr: ColumnRef{Name: "v"}}},
+			{Name: "log", Expr: VectorTransformExpr{Func: "log", Expr: ColumnRef{Name: "v"}}},
+			{Name: "exp", Expr: VectorTransformExpr{Func: "exp", Expr: ColumnRef{Name: "v"}}},
+			{Name: "reciprocal", Expr: VectorTransformExpr{Func: "reciprocal", Expr: ColumnRef{Name: "v"}}},
+			{Name: "signum", Expr: VectorTransformExpr{Func: "signum", Expr: ColumnRef{Name: "v"}}},
+			{Name: "floor", Expr: VectorTransformExpr{Func: "floor", Expr: ColumnRef{Name: "maybe"}}},
+			{Name: "ceiling", Expr: VectorTransformExpr{Func: "ceiling", Expr: ColumnRef{Name: "maybe"}}},
+		},
+		LimitN: -1,
+	})
+	if err != nil {
+		t.Fatalf("Exec returned error: %v", err)
+	}
+
+	assertColumnValues(t, got, "prev", []any{NullValue, int64(2), int64(4), int64(0)})
+	assertColumnValues(t, got, "next", []any{int64(4), int64(0), int64(8), NullValue})
+	assertColumnValues(t, got, "deltas", []any{2.0, 2.0, -4.0, 8.0})
+	assertColumnValues(t, got, "fills", []any{NullValue, int64(3), int64(3), int64(5)})
+	assertColumnValues(t, got, "ratios", []any{NullValue, 2.0, 0.0, math.Inf(1)})
+	assertColumnValues(t, got, "sums", []any{2.0, 6.0, 6.0, 14.0})
+	assertColumnValues(t, got, "prds", []any{2.0, 8.0, 0.0, 0.0})
+	assertColumnValues(t, got, "mins", []any{int64(2), int64(2), int64(0), int64(0)})
+	assertColumnValues(t, got, "maxs", []any{int64(2), int64(4), int64(4), int64(8)})
+	assertColumnValues(t, got, "avgs", []any{2.0, 3.0, 2.0, 3.5})
+	assertColumnValues(t, got, "neg", []any{-2.0, -4.0, -0.0, -8.0})
+	assertColumnValues(t, got, "sqrt", []any{math.Sqrt(2), 2.0, 0.0, math.Sqrt(8)})
+	assertColumnValues(t, got, "log", []any{math.Log(2), math.Log(4), math.Inf(-1), math.Log(8)})
+	assertColumnValues(t, got, "exp", []any{math.Exp(2), math.Exp(4), 1.0, math.Exp(8)})
+	assertColumnValues(t, got, "reciprocal", []any{0.5, 0.25, math.Inf(1), 0.125})
+	assertColumnValues(t, got, "signum", []any{1.0, 1.0, 0.0, 1.0})
+	assertColumnValues(t, got, "floor", []any{NullValue, 3.0, NullValue, 5.0})
+	assertColumnValues(t, got, "ceiling", []any{NullValue, 3.0, NullValue, 5.0})
+}
+
+func TestQueryVectorTransformProjectionUsesFilteredAndOrderedRows(t *testing.T) {
+	frame := mustFrame(t,
+		NewColumn("sym", []any{Symbol("a"), Symbol("b"), Symbol("a"), Symbol("a")}),
+		NewColumn("ts", []any{int64(30), int64(10), int64(20), int64(40)}),
+		NewColumn("price", []any{300, 100, 200, 400}),
+	)
+
+	got, err := Exec(frame, QueryPlan{
+		Source: frame,
+		Where:  Binary{Op: OpEQ, Left: ColumnRef{Name: "sym"}, Right: Literal{Value: Symbol("a")}},
+		Select: []SelectItem{
+			{Name: "ts", Expr: ColumnRef{Name: "ts"}},
+			{Name: "prev_price", Expr: VectorTransformExpr{Func: "prev", Expr: ColumnRef{Name: "price"}}},
+			{Name: "delta", Expr: VectorTransformExpr{Func: "deltas", Expr: ColumnRef{Name: "price"}}},
+		},
+		OrderBy:         []OrderSpec{{Column: "ts"}},
+		PreProjectOrder: true,
+		LimitN:          -1,
+	})
+	if err != nil {
+		t.Fatalf("Exec returned error: %v", err)
+	}
+
+	assertColumnValues(t, got, "ts", []any{int64(20), int64(30), int64(40)})
+	assertColumnValues(t, got, "prev_price", []any{NullValue, int64(200), int64(300)})
+	assertColumnValues(t, got, "delta", []any{200.0, 100.0, 100.0})
+}
+
+func TestQueryVectorTransformProjectionPreventsEarlyLimit(t *testing.T) {
+	frame := mustFrame(t, NewColumn("v", []any{10, 20, 30}))
+
+	got, err := Exec(frame, QueryPlan{
+		Source: frame,
+		Select: []SelectItem{{
+			Name: "next",
+			Expr: VectorTransformExpr{Func: "next", Expr: ColumnRef{Name: "v"}},
+		}},
+		LimitN: 2,
+	})
+	if err != nil {
+		t.Fatalf("Exec returned error: %v", err)
+	}
+
+	assertColumnValues(t, got, "next", []any{int64(20), int64(30)})
+}
+
+func TestQueryVectorTransformXPrevAndMovingFoundation(t *testing.T) {
+	frame := mustFrame(t, NewColumn("v", []any{1, 2, 3, 4}))
+
+	got, err := Exec(frame, QueryPlan{
+		Source: frame,
+		Select: []SelectItem{
+			{Name: "xprev", Expr: VectorTransformExpr{Func: "xprev", Arg: Literal{Value: int64(2)}, Expr: ColumnRef{Name: "v"}}},
+			{Name: "moving", Expr: VectorTransformExpr{Func: "moving", Arg: Literal{Value: int64(3)}, Expr: ColumnRef{Name: "v"}}},
+		},
+		LimitN: -1,
+	})
+	if err != nil {
+		t.Fatalf("Exec returned error: %v", err)
+	}
+
+	assertColumnValues(t, got, "xprev", []any{NullValue, NullValue, int64(1), int64(2)})
+	assertColumnValues(t, got, "moving", []any{
+		[]any{int64(1)},
+		[]any{int64(1), int64(2)},
+		[]any{int64(1), int64(2), int64(3)},
+		[]any{int64(2), int64(3), int64(4)},
+	})
+}
+
+func TestQueryGroupedVectorTransformProjectionUsesGroupAndPreProjectOrder(t *testing.T) {
+	frame := mustFrame(t,
+		NewColumn("sym", []any{Symbol("a"), Symbol("b"), Symbol("a"), Symbol("b"), Symbol("a"), Symbol("b")}),
+		NewColumn("ts", []any{int64(30), int64(20), int64(10), int64(40), int64(50), int64(15)}),
+		NewColumn("price", []any{300, 20, 100, 40, 500, 15}),
+		NewColumn("maybe", []any{NullValue, 2, 1, NullValue, NullValue, 3}),
+	)
+
+	got, err := Exec(frame, QueryPlan{
+		Source: frame,
+		By:     []Symbol{"sym"},
+		Select: []SelectItem{
+			{Name: "sym", Expr: ColumnRef{Name: "sym"}},
+			{Name: "ts", Expr: ColumnRef{Name: "ts"}},
+			{Name: "price", Expr: ColumnRef{Name: "price"}},
+			{Name: "deltas", Expr: VectorTransformExpr{Func: "deltas", Expr: ColumnRef{Name: "price"}}},
+			{Name: "fills", Expr: VectorTransformExpr{Func: "fills", Expr: ColumnRef{Name: "maybe"}}},
+			{Name: "xprev", Expr: VectorTransformExpr{Func: "xprev", Arg: Literal{Value: int64(2)}, Expr: ColumnRef{Name: "price"}}},
+			{Name: "moving", Expr: VectorTransformExpr{Func: "moving", Arg: Literal{Value: int64(2)}, Expr: ColumnRef{Name: "price"}}},
+		},
+		OrderBy:         []OrderSpec{{Column: "ts"}},
+		PreProjectOrder: true,
+		LimitN:          -1,
+	})
+	if err != nil {
+		t.Fatalf("Exec returned error: %v", err)
+	}
+
+	assertColumnNames(t, got, []Symbol{"sym", "ts", "price", "deltas", "fills", "xprev", "moving"})
+	assertColumnValues(t, got, "sym", []any{Symbol("a"), Symbol("b"), Symbol("b"), Symbol("a"), Symbol("b"), Symbol("a")})
+	assertColumnValues(t, got, "ts", []any{int64(10), int64(15), int64(20), int64(30), int64(40), int64(50)})
+	assertColumnValues(t, got, "price", []any{int64(100), int64(15), int64(20), int64(300), int64(40), int64(500)})
+	assertColumnValues(t, got, "deltas", []any{100.0, 15.0, 5.0, 200.0, 20.0, 200.0})
+	assertColumnValues(t, got, "fills", []any{int64(1), int64(3), int64(2), int64(1), int64(2), int64(1)})
+	assertColumnValues(t, got, "xprev", []any{NullValue, NullValue, NullValue, NullValue, int64(15), int64(100)})
+	assertColumnValues(t, got, "moving", []any{
+		[]any{int64(100)},
+		[]any{int64(15)},
+		[]any{int64(15), int64(20)},
+		[]any{int64(100), int64(300)},
+		[]any{int64(20), int64(40)},
+		[]any{int64(300), int64(500)},
+	})
+}
+
+func TestQueryLimitCanRunBeforeProjection(t *testing.T) {
+	frame := mustFrame(t, NewColumn("v", []any{1, 2, 3, 4, 5}))
+	expr := &countingExpr{expr: Binary{Op: OpMul, Left: ColumnRef{Name: "v"}, Right: Literal{Value: int64(10)}}}
+
+	got, err := Exec(frame, QueryPlan{
+		Source: frame,
+		Select: []SelectItem{{
+			Name: "scaled",
+			Expr: expr,
+		}},
+		LimitN: 2,
+	})
+	if err != nil {
+		t.Fatalf("Exec returned error: %v", err)
+	}
+
+	assertColumnValues(t, got, "scaled", []any{10.0, 20.0})
+	if expr.calls != 2 {
+		t.Fatalf("projection evaluated %d rows, want 2", expr.calls)
+	}
+}
+
+type countingExpr struct {
+	expr  Expr
+	calls int
+}
+
+func (e *countingExpr) EvalRow(frame Frame, row int) (any, error) {
+	e.calls++
+	return e.expr.EvalRow(frame, row)
+}
+
 func TestQueryGroupBySymbolSumCount(t *testing.T) {
 	frame := mustFrame(t,
 		NewColumn("sym", []any{Symbol("b"), Symbol("a"), Symbol("b"), Symbol("a")}),
@@ -374,6 +1721,249 @@ func TestQueryGroupBySymbolSumCount(t *testing.T) {
 	assertColumnValues(t, got, "n", []any{int64(2), int64(2)})
 }
 
+func TestQueryGroupBySumAvgSkipNulls(t *testing.T) {
+	frame := mustFrame(t,
+		NewColumn("sym", []any{Symbol("a"), Symbol("a"), Symbol("a"), Symbol("b"), Symbol("b")}),
+		NewColumn("qty", []any{10, nil, 20, nil, 5}),
+	)
+
+	got, err := Exec(frame, QueryPlan{
+		Source: frame,
+		By:     []Symbol{"sym"},
+		Aggregates: []Aggregate{
+			{Name: "total_qty", Func: "sum", Expr: ColumnRef{Name: "qty"}},
+			{Name: "avg_qty", Func: "avg", Expr: ColumnRef{Name: "qty"}},
+			{Name: "fills", Func: "count"},
+		},
+		OrderBy: []OrderSpec{{Column: "sym"}},
+		LimitN:  -1,
+	})
+	if err != nil {
+		t.Fatalf("Exec returned error: %v", err)
+	}
+
+	assertColumnValues(t, got, "sym", []any{Symbol("a"), Symbol("b")})
+	assertColumnValues(t, got, "total_qty", []any{30.0, 5.0})
+	assertColumnValues(t, got, "avg_qty", []any{15.0, 5.0})
+	assertColumnValues(t, got, "fills", []any{int64(3), int64(2)})
+}
+
+func TestQueryGroupByCommonAggregatesNullBoundaries(t *testing.T) {
+	frame := mustFrame(t,
+		NewColumn("sym", []any{Symbol("a"), Symbol("a"), Symbol("b"), Symbol("b")}),
+		NewColumn("qty", []any{nil, nil, 10, nil}),
+		NewColumn("px", []any{NullValue, 20.0, NullValue, 40.0}),
+	)
+
+	got, err := Exec(frame, QueryPlan{
+		Source: frame,
+		By:     []Symbol{"sym"},
+		Aggregates: []Aggregate{
+			{Name: "total_qty", Func: "sum", Expr: ColumnRef{Name: "qty"}},
+			{Name: "avg_qty", Func: "avg", Expr: ColumnRef{Name: "qty"}},
+			{Name: "lo_qty", Func: "min", Expr: ColumnRef{Name: "qty"}},
+			{Name: "hi_qty", Func: "max", Expr: ColumnRef{Name: "qty"}},
+			{Name: "first_px", Func: "first", Expr: ColumnRef{Name: "px"}},
+			{Name: "last_px", Func: "last", Expr: ColumnRef{Name: "px"}},
+			{Name: "fills", Func: "count"},
+		},
+		OrderBy: []OrderSpec{{Column: "sym"}},
+		LimitN:  -1,
+	})
+	if err != nil {
+		t.Fatalf("Exec returned error: %v", err)
+	}
+
+	assertColumnValues(t, got, "sym", []any{Symbol("a"), Symbol("b")})
+	assertColumnValues(t, got, "total_qty", []any{0.0, 10.0})
+	assertColumnValues(t, got, "avg_qty", []any{0.0, 10.0})
+	assertColumnValues(t, got, "lo_qty", []any{NullValue, int64(10)})
+	assertColumnValues(t, got, "hi_qty", []any{NullValue, int64(10)})
+	assertColumnValues(t, got, "first_px", []any{NullValue, NullValue})
+	assertColumnValues(t, got, "last_px", []any{20.0, 40.0})
+	assertColumnValues(t, got, "fills", []any{int64(2), int64(2)})
+}
+
+func TestQueryGroupByExtendedAggregates(t *testing.T) {
+	frame := mustFrame(t,
+		NewColumn("sym", []any{Symbol("a"), Symbol("a"), Symbol("a"), Symbol("b"), Symbol("b")}),
+		NewColumn("price", []any{10.0, 20.0, 30.0, 10.0, NullValue}),
+		NewColumn("size", []any{1, 2, 3, 4, 5}),
+	)
+
+	got, err := From(frame).
+		GroupBy("sym").
+		Var("price", "var_price").
+		Dev("price", "dev_price").
+		Med("price", "med_price").
+		WAvg("size", "price", "wavg_price").
+		OrderByColumn("sym", Asc).
+		Exec()
+	if err != nil {
+		t.Fatalf("Exec returned error: %v", err)
+	}
+
+	assertColumnValues(t, got, "sym", []any{Symbol("a"), Symbol("b")})
+	assertColumnValues(t, got, "var_price", []any{66.66666666666669, 0.0})
+	assertColumnValues(t, got, "dev_price", []any{8.16496580927726, 0.0})
+	assertColumnValues(t, got, "med_price", []any{20.0, 10.0})
+	assertColumnValues(t, got, "wavg_price", []any{23.333333333333332, 10.0})
+}
+
+func TestQueryGroupByColumnRefFastPathPreservesTypedKeys(t *testing.T) {
+	frame := mustFrame(t,
+		NewColumn("channel", []any{int32(2), int32(1), int32(2), int32(1), int32(2)}),
+		NewColumn("ts_bucket", []any{
+			TimestampFromUnixNanos(1_000),
+			TimestampFromUnixNanos(1_000),
+			TimestampFromUnixNanos(2_000),
+			TimestampFromUnixNanos(1_000),
+			TimestampFromUnixNanos(2_000),
+		}),
+		NewColumn("qty", []any{10, 20, 30, 40, 50}),
+	)
+
+	got, err := Exec(frame, QueryPlan{
+		Source: frame,
+		By:     []Symbol{"channel", "ts_bucket"},
+		Aggregates: []Aggregate{
+			{Name: "total_qty", Func: "sum", Expr: ColumnRef{Name: "qty"}},
+		},
+		OrderBy: []OrderSpec{{Column: "channel"}, {Column: "ts_bucket"}},
+		LimitN:  -1,
+	})
+	if err != nil {
+		t.Fatalf("Exec returned error: %v", err)
+	}
+
+	assertColumnNames(t, got, []Symbol{"channel", "ts_bucket", "total_qty"})
+	assertColumnValues(t, got, "channel", []any{int32(1), int32(2), int32(2)})
+	assertColumnValues(t, got, "ts_bucket", []any{
+		TimestampFromUnixNanos(1_000),
+		TimestampFromUnixNanos(1_000),
+		TimestampFromUnixNanos(2_000),
+	})
+	assertColumnValues(t, got, "total_qty", []any{60.0, 10.0, 80.0})
+	if kind, ok := got.Schema().Kind("channel"); !ok || kind != KindI32 {
+		t.Fatalf("channel kind = %s, ok %v; want %s", kind, ok, KindI32)
+	}
+	if kind, ok := got.Schema().Kind("ts_bucket"); !ok || kind != KindTimestamp {
+		t.Fatalf("ts_bucket kind = %s, ok %v; want %s", kind, ok, KindTimestamp)
+	}
+}
+
+type countingMetadataArray struct {
+	array Array
+	ats   int
+}
+
+func (a *countingMetadataArray) Kind() Kind { return a.array.Kind() }
+
+func (a *countingMetadataArray) Len() int { return a.array.Len() }
+
+func (a *countingMetadataArray) At(row int) (any, bool) {
+	a.ats++
+	return a.array.At(row)
+}
+
+func (a *countingMetadataArray) Values() []any { return a.array.Values() }
+
+func (a *countingMetadataArray) Gather(indexes []int) Array {
+	return &countingMetadataArray{array: a.array.Gather(indexes)}
+}
+
+func (a *countingMetadataArray) ArrayMetadata() ArrayMetadata {
+	return ArrayMetadataOf(a.array)
+}
+
+func TestQueryGroupByUsesSingleColumnAttributeIndexForKeys(t *testing.T) {
+	sym := &countingMetadataArray{
+		array: WithArrayAttribute(NewSymbols([]string{"AAPL", "MSFT", "AAPL", "AAPL", "MSFT"}), ArrayAttributeGrouped),
+	}
+	frame := mustFrame(t,
+		Column{Name: "sym", Data: sym},
+		NewColumn("qty", []any{10, 20, 30, 40, 50}),
+	)
+
+	got, err := Exec(frame, QueryPlan{
+		Source: frame,
+		By:     []Symbol{"sym"},
+		Aggregates: []Aggregate{
+			{Name: "total_qty", Func: "sum", Expr: ColumnRef{Name: "qty"}},
+			{Name: "n", Func: "count"},
+		},
+		LimitN: -1,
+	})
+	if err != nil {
+		t.Fatalf("Exec returned error: %v", err)
+	}
+	if sym.ats != 0 {
+		t.Fatalf("group-by key column At called %d times; want indexed key path", sym.ats)
+	}
+	assertColumnValues(t, got, "sym", []any{Symbol("AAPL"), Symbol("MSFT")})
+	assertColumnValues(t, got, "total_qty", []any{80.0, 70.0})
+	assertColumnValues(t, got, "n", []any{int64(3), int64(2)})
+}
+
+func TestQueryGroupByBucket(t *testing.T) {
+	raw := NewColumn("ts", []any{
+		TimestampFromUnixNanos(100),
+		TimestampFromUnixNanos(1_100),
+		TimestampFromUnixNanos(1_900),
+		TimestampFromUnixNanos(2_000),
+		nil,
+	}).Data
+	bucketed, err := BucketFloor(raw, int64(1_000))
+	if err != nil {
+		t.Fatalf("BucketFloor returned error: %v", err)
+	}
+	frame := mustFrame(t,
+		Column{Name: "bucket", Data: bucketed},
+		NewColumn("qty", []any{2, 3, 5, 7, 11}),
+	)
+
+	got, err := From(frame).
+		GroupBy("bucket").
+		Sum("qty", "total_qty").
+		Count("n").
+		OrderByColumn("bucket", Asc).
+		Exec()
+	if err != nil {
+		t.Fatalf("Exec returned error: %v", err)
+	}
+
+	assertColumnValues(t, got, "bucket", []any{NullValue, Timestamp(0), Timestamp(1000), Timestamp(2000)})
+	assertColumnValues(t, got, "total_qty", []any{11.0, 2.0, 8.0, 7.0})
+	assertColumnValues(t, got, "n", []any{int64(1), int64(1), int64(2), int64(1)})
+}
+
+func TestQueryGroupByMinMaxFirstLast(t *testing.T) {
+	frame := mustFrame(t,
+		NewColumn("sym", []any{Symbol("b"), Symbol("a"), Symbol("b"), Symbol("a"), Symbol("c")}),
+		NewColumn("qty", []any{2, nil, 3, 7, nil}),
+		NewColumn("venue", []any{"x", "y", "z", nil, "w"}),
+	)
+
+	got, err := From(frame).
+		GroupBy("sym").
+		Min("qty", "min_qty").
+		Max("qty", "max_qty").
+		First("venue", "first_venue").
+		Last("venue", "last_venue").
+		OrderByColumn("sym", Asc).
+		Exec()
+	if err != nil {
+		t.Fatalf("Exec returned error: %v", err)
+	}
+
+	assertColumnNames(t, got, []Symbol{"sym", "min_qty", "max_qty", "first_venue", "last_venue"})
+	assertColumnValues(t, got, "sym", []any{Symbol("a"), Symbol("b"), Symbol("c")})
+	assertColumnValues(t, got, "min_qty", []any{int64(7), int64(2), NullValue})
+	assertColumnValues(t, got, "max_qty", []any{int64(7), int64(3), NullValue})
+	assertColumnValues(t, got, "first_venue", []any{"y", "x", "w"})
+	assertColumnValues(t, got, "last_venue", []any{NullValue, "z", "w"})
+}
+
 func TestQueryOrderLimit(t *testing.T) {
 	frame := mustFrame(t,
 		NewColumn("sym", []any{"a", "b", "c"}),
@@ -392,6 +1982,321 @@ func TestQueryOrderLimit(t *testing.T) {
 	assertColumnValues(t, got, "qty", []any{int64(5), int64(3)})
 }
 
+func TestQueryLimitBeforeProjectionAvoidsExtraEval(t *testing.T) {
+	frame := mustFrame(t,
+		NewColumn("id", []any{1, 2, 3, 4, 5}),
+		NewColumn("price", []any{10.0, 11.0, 12.0, 13.0, 14.0}),
+		NewColumn("size", []any{2, 3, 4, 5, 6}),
+	)
+	notional := &countingExpr{expr: Binary{Op: OpMul, Left: ColumnRef{Name: "price"}, Right: ColumnRef{Name: "size"}}}
+
+	got, err := Exec(frame, QueryPlan{
+		Source: frame,
+		Select: []SelectItem{
+			{Name: "id", Expr: ColumnRef{Name: "id"}},
+			{Name: "notional", Expr: notional},
+		},
+		LimitN: 2,
+	})
+	if err != nil {
+		t.Fatalf("Exec returned error: %v", err)
+	}
+
+	if got.Len() != 2 {
+		t.Fatalf("limited length = %d, want 2", got.Len())
+	}
+	if notional.calls != 2 {
+		t.Fatalf("computed projection calls = %d, want 2", notional.calls)
+	}
+	assertColumnValues(t, got, "notional", []any{20.0, 33.0})
+}
+
+func TestQueryLimitZeroAfterPreProjectOrderPreservesSchema(t *testing.T) {
+	frame := mustFrame(t,
+		NewColumn("sym", []any{Symbol("b"), Symbol("a"), Symbol("c")}),
+		NewColumn("ts", []any{
+			TimestampFromUnixNanos(200),
+			TimestampFromUnixNanos(100),
+			TimestampFromUnixNanos(300),
+		}),
+		NewColumn("qty", []any{int32(2), int32(1), int32(3)}),
+	)
+
+	got, err := Exec(frame, QueryPlan{
+		Source: frame,
+		Select: []SelectItem{
+			{Name: "sym", Expr: ColumnRef{Name: "sym"}},
+			{Name: "ts", Expr: ColumnRef{Name: "ts"}},
+			{Name: "qty", Expr: ColumnRef{Name: "qty"}},
+		},
+		OrderBy:         []OrderSpec{{Column: "ts"}},
+		PreProjectOrder: true,
+		LimitN:          0,
+	})
+	if err != nil {
+		t.Fatalf("Exec returned error: %v", err)
+	}
+
+	if got.Len() != 0 {
+		t.Fatalf("limited frame length = %d, want 0", got.Len())
+	}
+	assertColumnNames(t, got, []Symbol{"sym", "ts", "qty"})
+	if kind, ok := got.Schema().Kind("sym"); !ok || kind != KindSymbol {
+		t.Fatalf("sym kind = %s, ok %v; want %s", kind, ok, KindSymbol)
+	}
+	if kind, ok := got.Schema().Kind("ts"); !ok || kind != KindTimestamp {
+		t.Fatalf("ts kind = %s, ok %v; want %s", kind, ok, KindTimestamp)
+	}
+	if kind, ok := got.Schema().Kind("qty"); !ok || kind != KindI32 {
+		t.Fatalf("qty kind = %s, ok %v; want %s", kind, ok, KindI32)
+	}
+}
+
+func TestQueryKernelExecMatchesQueryPlanAndRejectsSchemaDrift(t *testing.T) {
+	frame := mustFrame(t,
+		NewColumn("sym", []any{Symbol("AAPL"), Symbol("MSFT"), Symbol("NVDA"), Symbol("AAPL")}),
+		NewColumn("qty", []any{int32(5), int32(4), int32(2), int32(7)}),
+		NewColumn("px", []any{100.0, 101.0, 102.0, 103.0}),
+	)
+	plan := QueryPlan{
+		Where: Logical{Op: "and",
+			Left:  Within{Expr: ColumnRef{Name: "qty"}, Low: int32(2), High: int32(5), HighClosed: true},
+			Right: Not{Expr: In{Expr: ColumnRef{Name: "sym"}, Values: []any{Symbol("MSFT")}}},
+		},
+		Select: []SelectItem{
+			{Name: "sym", Expr: ColumnRef{Name: "sym"}},
+			{Name: "score", Expr: Binary{Op: OpAdd, Left: ColumnRef{Name: "qty"}, Right: Literal{Value: int64(10)}}},
+		},
+		OrderBy:         []OrderSpec{{Column: "qty", Desc: true}},
+		PreProjectOrder: true,
+		LimitN:          2,
+	}
+
+	kernel, ok, err := CompileQueryKernel(frame, plan)
+	if err != nil {
+		t.Fatalf("CompileQueryKernel returned error: %v", err)
+	}
+	if !ok {
+		t.Fatal("CompileQueryKernel did not accept supported projection query")
+	}
+	got, err := kernel.Exec(frame)
+	if err != nil {
+		t.Fatalf("QueryKernel Exec returned error: %v", err)
+	}
+	want, err := Exec(frame, plan)
+	if err != nil {
+		t.Fatalf("Exec returned error: %v", err)
+	}
+	if !SameSchema(got, want) {
+		t.Fatalf("kernel schema = %#v, want %#v", got.Schema(), want.Schema())
+	}
+	assertColumnValues(t, got, "sym", []any{Symbol("AAPL"), Symbol("NVDA")})
+	assertColumnValues(t, got, "score", []any{15.0, 12.0})
+
+	drifted := mustFrame(t,
+		NewColumn("sym", []any{Symbol("AAPL")}),
+		NewColumn("qty", []any{int64(5)}),
+		NewColumn("px", []any{100.0}),
+	)
+	if _, err := kernel.Exec(drifted); err == nil {
+		t.Fatal("QueryKernel Exec accepted a frame with a drifted qty kind")
+	}
+}
+
+func TestQueryKernelOrderBySortedColumnFastPath(t *testing.T) {
+	frame := mustFrame(t,
+		Column{Name: "seq", Data: WithArrayAttribute(NewI64([]int64{
+			100,
+			200,
+			300,
+			400,
+		}), ArrayAttributeSorted)},
+		NewColumn("sym", []any{Symbol("AAPL"), Symbol("AAPL"), Symbol("MSFT"), Symbol("TSLA")}),
+		NewColumn("qty", []any{int32(1), int32(2), int32(3), int32(4)}),
+	)
+	plan := QueryPlan{
+		Select: []SelectItem{
+			{Name: "seq", Expr: ColumnRef{Name: "seq"}},
+			{Name: "sym", Expr: ColumnRef{Name: "sym"}},
+		},
+		OrderBy:         []OrderSpec{{Column: "seq"}},
+		PreProjectOrder: true,
+		LimitN:          -1,
+	}
+	kernel, ok, err := CompileQueryKernel(frame, plan)
+	if err != nil {
+		t.Fatalf("CompileQueryKernel returned error: %v", err)
+	}
+	if !ok {
+		t.Fatal("CompileQueryKernel did not accept sorted order query")
+	}
+	got, err := kernel.Exec(frame)
+	if err != nil {
+		t.Fatalf("QueryKernel Exec returned error: %v", err)
+	}
+	assertColumnValues(t, got, "seq", []any{int64(100), int64(200), int64(300), int64(400)})
+	assertColumnValues(t, got, "sym", []any{Symbol("AAPL"), Symbol("AAPL"), Symbol("MSFT"), Symbol("TSLA")})
+
+	descPlan := plan
+	descPlan.OrderBy = []OrderSpec{{Column: "seq", Desc: true}}
+	descKernel, ok, err := CompileQueryKernel(frame, descPlan)
+	if err != nil {
+		t.Fatalf("CompileQueryKernel desc returned error: %v", err)
+	}
+	if !ok {
+		t.Fatal("CompileQueryKernel did not accept descending sorted order query")
+	}
+	descGot, err := descKernel.Exec(frame)
+	if err != nil {
+		t.Fatalf("descending QueryKernel Exec returned error: %v", err)
+	}
+	assertColumnValues(t, descGot, "seq", []any{int64(400), int64(300), int64(200), int64(100)})
+	assertColumnValues(t, descGot, "sym", []any{Symbol("TSLA"), Symbol("MSFT"), Symbol("AAPL"), Symbol("AAPL")})
+}
+
+func TestOrderIndexesUsesSortedAttributeForFilteredSubset(t *testing.T) {
+	frame := mustFrame(t,
+		Column{Name: "seq", Data: WithArrayAttribute(NewI64([]int64{10, 20, 30, 40, 50}), ArrayAttributeSorted)},
+		NewColumn("sym", []any{Symbol("A"), Symbol("B"), Symbol("C"), Symbol("D"), Symbol("E")}),
+	)
+	subset := []int{1, 3, 4}
+	asc, err := orderIndexes(frame, subset, []OrderSpec{{Column: "seq"}})
+	if err != nil {
+		t.Fatalf("orderIndexes asc returned error: %v", err)
+	}
+	if want := []int{1, 3, 4}; !reflect.DeepEqual(asc, want) {
+		t.Fatalf("orderIndexes asc = %v, want %v", asc, want)
+	}
+	desc, err := orderIndexes(frame, subset, []OrderSpec{{Column: "seq", Desc: true}})
+	if err != nil {
+		t.Fatalf("orderIndexes desc returned error: %v", err)
+	}
+	if want := []int{4, 3, 1}; !reflect.DeepEqual(desc, want) {
+		t.Fatalf("orderIndexes desc = %v, want %v", desc, want)
+	}
+	if want := []int{1, 3, 4}; !reflect.DeepEqual(subset, want) {
+		t.Fatalf("orderIndexes mutated input subset = %v, want %v", subset, want)
+	}
+}
+
+func TestQueryKernelCompileFallbackAndValidation(t *testing.T) {
+	frame := mustFrame(t,
+		NewColumn("sym", []any{Symbol("a"), Symbol("a"), Symbol("b")}),
+		NewColumn("qty", []any{int32(1), int32(1), int32(2)}),
+	)
+	distinctPlan := QueryPlan{
+		Source:   frame,
+		Distinct: true,
+		LimitN:   -1,
+		Select: []SelectItem{
+			{Name: "sym", Expr: ColumnRef{Name: "sym"}},
+			{Name: "qty", Expr: ColumnRef{Name: "qty"}},
+		},
+	}
+	distinctKernel, ok, err := CompileQueryKernel(frame, distinctPlan)
+	if err != nil {
+		t.Fatalf("CompileQueryKernel distinct returned error: %v", err)
+	}
+	if !ok || distinctKernel == nil {
+		t.Fatal("CompileQueryKernel did not accept distinct query")
+	}
+	if reason := distinctKernel.Reason(); !strings.Contains(reason, "distinct projection path") {
+		t.Fatalf("distinct QueryKernel reason = %q, want distinct projection path", reason)
+	}
+	distinctGot, err := distinctKernel.Exec(frame)
+	if err != nil {
+		t.Fatalf("distinct QueryKernel Exec returned error: %v", err)
+	}
+	distinctWant, err := distinctPlan.Exec()
+	if err != nil {
+		t.Fatalf("distinct QueryPlan Exec returned error: %v", err)
+	}
+	if !SameSchema(distinctGot, distinctWant) || distinctGot.Len() != distinctWant.Len() {
+		t.Fatalf("distinct kernel frame schema/len = %#v/%d, want %#v/%d", distinctGot.Schema(), distinctGot.Len(), distinctWant.Schema(), distinctWant.Len())
+	}
+	assertColumnValues(t, distinctGot, "sym", []any{Symbol("a"), Symbol("b")})
+	assertColumnValues(t, distinctGot, "qty", []any{int32(1), int32(2)})
+
+	grouped := QueryPlan{
+		By:         []Symbol{"sym"},
+		Aggregates: []Aggregate{{Name: "n", Func: "count"}},
+	}
+	kernel, ok, err := CompileQueryKernel(frame, grouped)
+	if err != nil {
+		t.Fatalf("CompileQueryKernel grouped returned error: %v", err)
+	}
+	if !ok {
+		t.Fatal("CompileQueryKernel did not accept supported grouped aggregate")
+	}
+	if reason := kernel.Reason(); !strings.Contains(reason, "grouped aggregate path") {
+		t.Fatalf("grouped QueryKernel reason = %q, want grouped aggregate path", reason)
+	}
+	got, err := kernel.Exec(frame)
+	if err != nil {
+		t.Fatalf("grouped QueryKernel Exec returned error: %v", err)
+	}
+	want, err := Exec(frame, grouped)
+	if err != nil {
+		t.Fatalf("grouped Exec returned error: %v", err)
+	}
+	assertColumnValues(t, got, "sym", want.columns["sym"].Values())
+	assertColumnValues(t, got, "n", want.columns["n"].Values())
+
+	mixedFrame := mustFrame(t,
+		Column{Name: "sym", Data: WithArrayAttribute(NewSymbols([]string{"a", "a", "b", "b", "c"}), ArrayAttributeGrouped)},
+		Column{Name: "qty", Data: NewI32([]int32{5, 2, 7, 4, 9})},
+		Column{Name: "px", Data: NewF64([]float64{10, 20, 30, 40, 50})},
+	)
+	mixed := QueryPlan{
+		Where: Binary{Op: OpGE, Left: ColumnRef{Name: "qty"}, Right: Literal{Value: int32(4)}},
+		By:    []Symbol{"sym"},
+		Aggregates: []Aggregate{
+			{Name: "total_qty", Func: "sum", Expr: ColumnRef{Name: "qty"}},
+			{Name: "avg_px", Func: "avg", Expr: ColumnRef{Name: "px"}},
+			{Name: "lo_px", Func: "min", Expr: ColumnRef{Name: "px"}},
+			{Name: "hi_px", Func: "max", Expr: ColumnRef{Name: "px"}},
+			{Name: "fills", Func: "count"},
+		},
+		LimitN: -1,
+	}
+	mixedKernel, ok, err := CompileQueryKernel(mixedFrame, mixed)
+	if err != nil {
+		t.Fatalf("CompileQueryKernel mixed returned error: %v", err)
+	}
+	if !ok {
+		t.Fatal("CompileQueryKernel did not accept indexed grouped mixed aggregate")
+	}
+	if reason := mixedKernel.Reason(); !strings.Contains(reason, "indexed single-column grouped mixed aggregate fast path") {
+		t.Fatalf("QueryKernel reason = %q, want indexed grouped mixed aggregate fast path", reason)
+	}
+	mixedGot, err := mixedKernel.Exec(mixedFrame)
+	if err != nil {
+		t.Fatalf("mixed grouped QueryKernel Exec returned error: %v", err)
+	}
+	assertColumnValues(t, mixedGot, "sym", []any{Symbol("a"), Symbol("b"), Symbol("c")})
+	assertColumnValues(t, mixedGot, "total_qty", []any{5.0, 11.0, 9.0})
+	assertColumnValues(t, mixedGot, "avg_px", []any{10.0, 35.0, 50.0})
+	assertColumnValues(t, mixedGot, "lo_px", []any{10.0, 30.0, 50.0})
+	assertColumnValues(t, mixedGot, "hi_px", []any{10.0, 40.0, 50.0})
+	assertColumnValues(t, mixedGot, "fills", []any{int64(1), int64(2), int64(1)})
+
+	if _, ok, err := CompileQueryKernel(frame, QueryPlan{
+		Select: []SelectItem{{Name: "missing", Expr: ColumnRef{Name: "missing"}}},
+	}); err == nil || !ok {
+		t.Fatalf("CompileQueryKernel missing column err = %v, ok %v; want supported validation error", err, ok)
+	}
+	if _, ok, err := CompileQueryKernel(frame, QueryPlan{
+		Select:  []SelectItem{{Name: "qty", Expr: ColumnRef{Name: "qty"}}},
+		OrderBy: []OrderSpec{{Column: "sym"}},
+	}); err == nil || !ok {
+		t.Fatalf("CompileQueryKernel post-project order err = %v, ok %v; want validation error", err, ok)
+	}
+	var nilKernel *QueryKernel
+	if _, err := nilKernel.Exec(frame); err == nil {
+		t.Fatal("nil QueryKernel Exec returned nil error")
+	}
+}
+
 func TestQueryDistinctRows(t *testing.T) {
 	frame := mustFrame(t,
 		NewColumn("sym", []any{Symbol("a"), Symbol("b"), Symbol("a"), Symbol("a")}),
@@ -408,6 +2313,59 @@ func TestQueryDistinctRows(t *testing.T) {
 
 	assertColumnValues(t, got, "sym", []any{Symbol("a"), Symbol("b"), Symbol("a")})
 	assertColumnValues(t, got, "qty", []any{int64(2), int64(5), int64(3)})
+}
+
+func TestDistinctSingleColumnUsesReusableArrayIndex(t *testing.T) {
+	frame := mustFrame(t,
+		Column{Name: "sym", Data: WithArrayAttribute(NewSymbols([]string{"a", "b", "a", "c", "b"}), ArrayAttributeGrouped)},
+		NewColumn("qty", []any{10, 20, 30, 40, 50}),
+	)
+
+	got, err := Distinct(frame, "sym")
+	if err != nil {
+		t.Fatalf("Distinct returned error: %v", err)
+	}
+
+	assertColumnNames(t, got, []Symbol{"sym", "qty"})
+	assertColumnValues(t, got, "sym", []any{Symbol("a"), Symbol("b"), Symbol("c")})
+	assertColumnValues(t, got, "qty", []any{int64(10), int64(20), int64(40)})
+	sym, ok := got.Column("sym")
+	if !ok {
+		t.Fatal("distinct result is missing sym column")
+	}
+	if _, ok := ArrayIndexFor(sym, ArrayAttributeGrouped); !ok {
+		t.Fatalf("distinct result sym metadata = %#v, want rebuilt grouped index", ArrayMetadataOf(sym))
+	}
+}
+
+func TestQueryKernelDistinctSingleColumnHotPath(t *testing.T) {
+	frame := mustFrame(t,
+		Column{Name: "sym", Data: WithArrayAttribute(NewSymbols([]string{"a", "b", "a", "c", "b"}), ArrayAttributeGrouped)},
+		NewColumn("qty", []any{10, 20, 30, 40, 50}),
+	)
+	plan := From(frame).SelectColumns("sym").DistinctRows()
+	kernel, ok, err := CompileQueryKernel(frame, plan)
+	if err != nil {
+		t.Fatalf("CompileQueryKernel returned error: %v", err)
+	}
+	if !ok {
+		t.Fatal("CompileQueryKernel did not accept distinct single-column query")
+	}
+
+	got, err := kernel.Exec(frame)
+	if err != nil {
+		t.Fatalf("QueryKernel Exec returned error: %v", err)
+	}
+
+	assertColumnNames(t, got, []Symbol{"sym"})
+	assertColumnValues(t, got, "sym", []any{Symbol("a"), Symbol("b"), Symbol("c")})
+	sym, ok := got.Column("sym")
+	if !ok {
+		t.Fatal("kernel distinct result is missing sym column")
+	}
+	if _, ok := ArrayIndexFor(sym, ArrayAttributeGrouped); !ok {
+		t.Fatalf("kernel distinct result metadata = %#v, want rebuilt grouped index", ArrayMetadataOf(sym))
+	}
 }
 
 func TestQueryOrderByMultipleColumns(t *testing.T) {
@@ -430,6 +2388,66 @@ func TestQueryOrderByMultipleColumns(t *testing.T) {
 	assertColumnValues(t, got, "sym", []any{Symbol("a"), Symbol("a"), Symbol("b"), Symbol("b")})
 	assertColumnValues(t, got, "qty", []any{int64(5), int64(2), int64(2), int64(1)})
 	assertColumnValues(t, got, "seq", []any{int64(3), int64(1), int64(2), int64(4)})
+}
+
+func TestDataFoundationGroupJoinAsofAndXbarBasics(t *testing.T) {
+	trades := mustFrame(t,
+		NewColumn("sym", []any{Symbol("AAPL"), Symbol("AAPL"), Symbol("MSFT"), Symbol("AAPL")}),
+		NewColumn("ts", []any{
+			TimestampFromUnixNanos(1_000),
+			TimestampFromUnixNanos(1_900),
+			TimestampFromUnixNanos(2_100),
+			TimestampFromUnixNanos(2_400),
+		}),
+		NewColumn("qty", []any{int64(10), int64(20), int64(5), int64(7)}),
+		NewColumn("venue", []any{Symbol("X"), Symbol("Y"), Symbol("X"), Symbol("X")}),
+	)
+	venues := mustFrame(t,
+		NewColumn("venue", []any{Symbol("X"), Symbol("Y")}),
+		NewColumn("region", []any{"us", "eu"}),
+	)
+	enriched, err := LeftJoin(trades, venues, "venue")
+	if err != nil {
+		t.Fatalf("LeftJoin returned error: %v", err)
+	}
+	assertColumnValues(t, enriched, "region", []any{"us", "eu", "us", "us"})
+
+	quotes := mustFrame(t,
+		NewColumn("sym", []any{Symbol("AAPL"), Symbol("AAPL"), Symbol("MSFT")}),
+		NewColumn("ts", []any{
+			TimestampFromUnixNanos(900),
+			TimestampFromUnixNanos(2_000),
+			TimestampFromUnixNanos(2_000),
+		}),
+		NewColumn("bid", []any{99.5, 100.5, 50.25}),
+	)
+	joined, err := AsofJoin(enriched, quotes, "ts", "sym")
+	if err != nil {
+		t.Fatalf("AsofJoin returned error: %v", err)
+	}
+	assertColumnValues(t, joined, "bid", []any{99.5, 99.5, 50.25, 100.5})
+
+	rollup, err := Exec(joined, QueryPlan{
+		ByExprs: []SelectItem{
+			{Name: "bucket", Expr: BucketFloorExpr{Expr: ColumnRef{Name: "ts"}, Interval: TimespanFromNanos(1_000)}},
+			{Name: "sym", Expr: ColumnRef{Name: "sym"}},
+		},
+		Aggregates: []Aggregate{
+			{Name: "qty", Func: "sum", Expr: ColumnRef{Name: "qty"}},
+			{Name: "last_bid", Func: "last", Expr: ColumnRef{Name: "bid"}},
+			{Name: "fills", Func: "count"},
+		},
+		OrderBy: []OrderSpec{{Column: "bucket"}, {Column: "sym"}},
+		LimitN:  -1,
+	})
+	if err != nil {
+		t.Fatalf("Exec rollup returned error: %v", err)
+	}
+	assertColumnValues(t, rollup, "bucket", []any{Timestamp(1_000), Timestamp(2_000), Timestamp(2_000)})
+	assertColumnValues(t, rollup, "sym", []any{Symbol("AAPL"), Symbol("AAPL"), Symbol("MSFT")})
+	assertColumnValues(t, rollup, "qty", []any{30.0, 7.0, 5.0})
+	assertColumnValues(t, rollup, "last_bid", []any{99.5, 100.5, 50.25})
+	assertColumnValues(t, rollup, "fills", []any{int64(2), int64(1), int64(1)})
 }
 
 func TestGatherAndTakeOperators(t *testing.T) {
@@ -543,10 +2561,226 @@ func TestUpdateWhereReturnsNewFrame(t *testing.T) {
 
 	assertColumnNames(t, got, []Symbol{"sym", "qty", "status"})
 	assertColumnValues(t, got, "sym", []any{Symbol("a"), Symbol("b"), Symbol("a")})
-	assertColumnValues(t, got, "qty", []any{12.0, 5.0, 13.0})
+	assertColumnValues(t, got, "qty", []any{int64(12), int64(5), int64(13)})
 	assertColumnValues(t, got, "status", []any{"done", "new", "done"})
 	assertColumnValues(t, frame, "qty", []any{int64(2), int64(5), int64(3)})
 	assertColumnValues(t, frame, "status", []any{"new", "new", "new"})
+}
+
+func TestConditionalSelectsElementwiseWithScalarBranchesAndNullFalse(t *testing.T) {
+	frame := mustFrame(t,
+		NewColumn("side", []any{Symbol("buy"), Symbol("sell"), NullValue, Symbol("buy")}),
+		NewColumn("price", []any{101.0, 99.0, 100.0, 102.0}),
+		NewColumn("arrival", []any{100.0, 100.0, 100.0, 100.0}),
+	)
+
+	plan := QueryPlan{
+		Source: frame,
+		LimitN: -1,
+		Select: []SelectItem{
+			{Name: "side", Expr: ColumnRef{Name: "side"}},
+			{
+				Name: "slip",
+				Expr: Conditional{
+					Cond: Binary{Op: OpEQ, Left: ColumnRef{Name: "side"}, Right: Literal{Value: Symbol("buy")}},
+					Then: Binary{Op: OpSub, Left: ColumnRef{Name: "price"}, Right: ColumnRef{Name: "arrival"}},
+					Else: Binary{Op: OpSub, Left: ColumnRef{Name: "arrival"}, Right: ColumnRef{Name: "price"}},
+				},
+			},
+			{
+				Name: "label",
+				Expr: Conditional{
+					Cond: Binary{Op: OpEQ, Left: ColumnRef{Name: "side"}, Right: Literal{Value: Symbol("buy")}},
+					Then: Literal{Value: Symbol("paid")},
+					Else: Literal{Value: Symbol("received")},
+				},
+			},
+			{
+				Name: "null_cond",
+				Expr: Conditional{
+					Cond: Literal{Value: NullValue},
+					Then: Literal{Value: "then"},
+					Else: Literal{Value: "else"},
+				},
+			},
+		},
+	}
+	got, err := plan.Exec()
+	if err != nil {
+		t.Fatalf("Exec returned error: %v", err)
+	}
+	assertColumnValues(t, got, "slip", []any{1.0, 1.0, 0.0, 2.0})
+	assertColumnValues(t, got, "label", []any{Symbol("paid"), Symbol("received"), Symbol("received"), Symbol("paid")})
+	assertColumnValues(t, got, "null_cond", []any{"else", "else", "else", "else"})
+}
+
+func TestConditionalPreservesTypedNullsAndBroadcastSemantics(t *testing.T) {
+	frame := mustFrame(t,
+		Column{Name: "take", Data: NewBool([]bool{true, false, true, false})},
+		Column{Name: "qty", Data: NewI32([]int32{10, 20, 30, 40})},
+		Column{Name: "px", Data: NewF64([]float64{1.5, 2.5, 3.5, 4.5})},
+		Column{Name: "sym", Data: NewSymbols([]string{"AAPL", "MSFT", "AAPL", "TSLA"})},
+	)
+
+	got, err := Exec(frame, QueryPlan{
+		Source: frame,
+		LimitN: -1,
+		Select: []SelectItem{
+			{
+				Name: "maybe_qty",
+				Expr: Conditional{
+					Cond: ColumnRef{Name: "take"},
+					Then: ColumnRef{Name: "qty"},
+					Else: Literal{Value: NullForKind(KindI32)},
+				},
+			},
+			{
+				Name: "broadcast_score",
+				Expr: Conditional{
+					Cond: Binary{Op: OpEQ, Left: ColumnRef{Name: "sym"}, Right: Literal{Value: "AAPL"}},
+					Then: Binary{Op: OpMul, Left: ColumnRef{Name: "px"}, Right: Literal{Value: int64(10)}},
+					Else: Binary{Op: OpSub, Left: Literal{Value: 100.0}, Right: ColumnRef{Name: "qty"}},
+				},
+			},
+			{
+				Name: "sym_or_string",
+				Expr: Conditional{
+					Cond: Binary{Op: OpEQ, Left: ColumnRef{Name: "sym"}, Right: Literal{Value: "AAPL"}},
+					Then: Literal{Value: Symbol("hit")},
+					Else: Literal{Value: "miss"},
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("Exec returned error: %v", err)
+	}
+	maybeQty, ok := got.Column("maybe_qty")
+	if !ok {
+		t.Fatal("maybe_qty column missing")
+	}
+	if maybeQty.Kind() != KindI32 {
+		t.Fatalf("maybe_qty kind = %s, want %s", maybeQty.Kind(), KindI32)
+	}
+	assertColumnValues(t, got, "maybe_qty", []any{int32(10), NullValue, int32(30), NullValue})
+	assertColumnValues(t, got, "broadcast_score", []any{15.0, 80.0, 35.0, 60.0})
+	if kind, ok := got.Schema().Kind("sym_or_string"); !ok || kind != KindSymbol {
+		t.Fatalf("sym_or_string kind = %s, ok %v; want %s", kind, ok, KindSymbol)
+	}
+	assertColumnValues(t, got, "sym_or_string", []any{Symbol("hit"), Symbol("miss"), Symbol("hit"), Symbol("miss")})
+}
+
+func TestQueryKernelSupportsConditionalProjectionAndWhere(t *testing.T) {
+	frame := mustFrame(t,
+		Column{Name: "sym", Data: NewSymbols([]string{"AAPL", "MSFT", "AAPL", "TSLA"})},
+		Column{Name: "side", Data: NewSymbols([]string{"buy", "sell", "sell", "buy"})},
+		Column{Name: "price", Data: NewF64([]float64{101.0, 99.0, 98.5, 105.0})},
+		Column{Name: "arrival", Data: NewF64([]float64{100.0, 100.0, 99.0, 104.0})},
+	)
+	plan := QueryPlan{
+		Source: frame,
+		Where: Conditional{
+			Cond: Binary{Op: OpEQ, Left: ColumnRef{Name: "sym"}, Right: Literal{Value: Symbol("AAPL")}},
+			Then: Binary{Op: OpGT, Left: ColumnRef{Name: "price"}, Right: Literal{Value: 100.0}},
+			Else: Binary{Op: OpLT, Left: ColumnRef{Name: "price"}, Right: Literal{Value: 100.0}},
+		},
+		LimitN: -1,
+		Select: []SelectItem{
+			{Name: "sym", Expr: ColumnRef{Name: "sym"}},
+			{
+				Name: "slip",
+				Expr: Conditional{
+					Cond: Binary{Op: OpEQ, Left: ColumnRef{Name: "side"}, Right: Literal{Value: Symbol("buy")}},
+					Then: Binary{Op: OpSub, Left: ColumnRef{Name: "price"}, Right: ColumnRef{Name: "arrival"}},
+					Else: Binary{Op: OpSub, Left: ColumnRef{Name: "arrival"}, Right: ColumnRef{Name: "price"}},
+				},
+			},
+		},
+	}
+	kernel, ok, err := CompileQueryKernel(frame, plan)
+	if err != nil {
+		t.Fatalf("CompileQueryKernel returned error: %v", err)
+	}
+	if !ok {
+		_, reason := QueryKernelSupportReason(plan)
+		t.Fatalf("CompileQueryKernel ok = false, reason: %s", reason)
+	}
+	got, err := kernel.Exec(frame)
+	if err != nil {
+		t.Fatalf("kernel Exec returned error: %v", err)
+	}
+	want, err := plan.Exec()
+	if err != nil {
+		t.Fatalf("fallback Exec returned error: %v", err)
+	}
+	if !reflect.DeepEqual(got.Schema().Names(), want.Schema().Names()) {
+		t.Fatalf("kernel schema = %#v, want %#v", got.Schema().Names(), want.Schema().Names())
+	}
+	assertColumnValues(t, got, "sym", []any{Symbol("AAPL"), Symbol("MSFT")})
+	assertColumnValues(t, got, "slip", []any{1.0, 1.0})
+	assertColumnValues(t, want, "slip", []any{1.0, 1.0})
+}
+
+func TestQueryKernelSupportsBooleanProjectionExpressions(t *testing.T) {
+	frame := mustFrame(t,
+		Column{Name: "sym", Data: NewSymbols([]string{"AAPL", "MSFT", "NVDA", "TSLA"})},
+		Column{Name: "qty", Data: NewI32([]int32{2, 7, 5, 1})},
+		Column{Name: "px", Data: NewF64([]float64{101.0, 99.0, 103.0, 98.5})},
+	)
+	plan := QueryPlan{
+		Source: frame,
+		Where:  Binary{Op: OpGE, Left: ColumnRef{Name: "qty"}, Right: Literal{Value: int32(2)}},
+		LimitN: -1,
+		Select: []SelectItem{
+			{Name: "sym", Expr: ColumnRef{Name: "sym"}},
+			{Name: "liquid", Expr: Within{Expr: ColumnRef{Name: "qty"}, Low: int32(2), High: int32(6), HighClosed: true}},
+			{Name: "tech", Expr: In{Expr: ColumnRef{Name: "sym"}, Values: []any{Symbol("AAPL"), Symbol("NVDA")}}},
+			{Name: "not_msft", Expr: Not{Expr: In{Expr: ColumnRef{Name: "sym"}, Values: []any{Symbol("MSFT")}}}},
+			{
+				Name: "tradable",
+				Expr: Logical{
+					Op: "and",
+					Left: Within{
+						Expr:       ColumnRef{Name: "px"},
+						Low:        100.0,
+						High:       104.0,
+						HighClosed: false,
+					},
+					Right: Logical{
+						Op:    "or",
+						Left:  In{Expr: ColumnRef{Name: "sym"}, Values: []any{Symbol("AAPL")}},
+						Right: In{Expr: ColumnRef{Name: "sym"}, Values: []any{Symbol("NVDA")}},
+					},
+				},
+			},
+		},
+	}
+
+	kernel, ok, err := CompileQueryKernel(frame, plan)
+	if err != nil {
+		t.Fatalf("CompileQueryKernel returned error: %v", err)
+	}
+	if !ok {
+		_, reason := QueryKernelSupportReason(plan)
+		t.Fatalf("CompileQueryKernel ok = false, reason: %s", reason)
+	}
+	got, err := kernel.Exec(frame)
+	if err != nil {
+		t.Fatalf("kernel Exec returned error: %v", err)
+	}
+	want, err := plan.Exec()
+	if err != nil {
+		t.Fatalf("fallback Exec returned error: %v", err)
+	}
+	if !SameSchema(got, want) {
+		t.Fatalf("kernel schema = %#v, want %#v", got.Schema(), want.Schema())
+	}
+	assertColumnValues(t, got, "sym", []any{Symbol("AAPL"), Symbol("MSFT"), Symbol("NVDA")})
+	assertColumnValues(t, got, "liquid", []any{true, false, true})
+	assertColumnValues(t, got, "tech", []any{true, false, true})
+	assertColumnValues(t, got, "not_msft", []any{true, false, true})
+	assertColumnValues(t, got, "tradable", []any{true, false, true})
+	assertColumnValues(t, want, "tradable", []any{true, false, true})
 }
 
 func TestUpdatePredicateReturnsNewFrame(t *testing.T) {
@@ -588,11 +2822,137 @@ func TestUpdateRejectsInvalidInputs(t *testing.T) {
 	if _, err := UpdateWhere(frame, nil, nil); err == nil {
 		t.Fatal("UpdateWhere accepted empty assignments")
 	}
-	if _, err := UpdateWhere(frame, nil, map[Symbol]Expr{"missing": Literal{Value: 1}}); err == nil {
-		t.Fatal("UpdateWhere accepted missing assignment column")
-	}
 	if _, err := UpdateWhere(frame, Literal{Value: "yes"}, map[Symbol]Expr{"qty": Literal{Value: 2}}); err == nil {
 		t.Fatal("UpdateWhere accepted non-bool where expression")
+	}
+}
+
+func TestUpdateWhereAppendsComputedColumns(t *testing.T) {
+	frame := mustFrame(t,
+		NewColumn("sym", []any{Symbol("a"), Symbol("b"), Symbol("a")}),
+		NewColumn("price", []any{100.0, 80.0, 120.0}),
+		NewColumn("size", []any{10, 20, 30}),
+	)
+
+	got, err := UpdateWhere(frame,
+		Binary{Op: OpEQ, Left: ColumnRef{Name: "sym"}, Right: Literal{Value: Symbol("a")}},
+		map[Symbol]Expr{
+			"notional": Binary{Op: OpMul, Left: ColumnRef{Name: "price"}, Right: ColumnRef{Name: "size"}},
+		},
+	)
+	if err != nil {
+		t.Fatalf("UpdateWhere returned error: %v", err)
+	}
+	assertColumnNames(t, got, []Symbol{"sym", "price", "size", "notional"})
+	assertColumnValues(t, got, "notional", []any{1000.0, NullValue, 3600.0})
+	assertColumnValues(t, frame, "sym", []any{Symbol("a"), Symbol("b"), Symbol("a")})
+}
+
+func TestUpdateWhereConditionalAssignment(t *testing.T) {
+	frame := mustFrame(t,
+		NewColumn("side", []any{Symbol("buy"), Symbol("sell"), Symbol("buy")}),
+		NewColumn("size", []any{10, 15, 20}),
+	)
+
+	got, err := UpdateWhere(frame, nil, map[Symbol]Expr{
+		"signed_qty": Conditional{
+			Cond: Binary{Op: OpEQ, Left: ColumnRef{Name: "side"}, Right: Literal{Value: Symbol("buy")}},
+			Then: ColumnRef{Name: "size"},
+			Else: Binary{Op: OpSub, Left: Literal{Value: int64(0)}, Right: ColumnRef{Name: "size"}},
+		},
+	})
+	if err != nil {
+		t.Fatalf("UpdateWhere returned error: %v", err)
+	}
+	assertColumnValues(t, got, "signed_qty", []any{10.0, -15.0, 20.0})
+}
+
+func TestUpdateByWritesGroupedAggregates(t *testing.T) {
+	frame := mustFrame(t,
+		NewColumn("sym", []any{Symbol("a"), Symbol("b"), Symbol("a")}),
+		NewColumn("price", []any{100.0, 80.0, 120.0}),
+		NewColumn("size", []any{10, 20, 30}),
+	)
+
+	got, err := UpdateBy(frame,
+		nil,
+		[]SelectItem{{Name: "sym", Expr: ColumnRef{Name: "sym"}}},
+		[]GroupedAssignment{
+			{Name: "avg_price", Func: "avg", Expr: ColumnRef{Name: "price"}},
+			{Name: "fills", Func: "count", Expr: ColumnRef{Name: "price"}},
+		},
+	)
+	if err != nil {
+		t.Fatalf("UpdateBy returned error: %v", err)
+	}
+	assertColumnNames(t, got, []Symbol{"sym", "price", "size", "avg_price", "fills"})
+	assertColumnValues(t, got, "avg_price", []any{110.0, 80.0, 110.0})
+	assertColumnValues(t, got, "fills", []any{int64(2), int64(1), int64(2)})
+
+	filtered, err := UpdateBy(frame,
+		Binary{Op: OpGT, Left: ColumnRef{Name: "price"}, Right: Literal{Value: 90.0}},
+		[]SelectItem{{Name: "sym", Expr: ColumnRef{Name: "sym"}}},
+		[]GroupedAssignment{{Name: "avg_price", Func: "avg", Expr: ColumnRef{Name: "price"}}},
+	)
+	if err != nil {
+		t.Fatalf("filtered UpdateBy returned error: %v", err)
+	}
+	assertColumnValues(t, filtered, "avg_price", []any{110.0, NullValue, 110.0})
+}
+
+func TestUpdateByWritesExtendedGroupedAggregates(t *testing.T) {
+	frame := mustFrame(t,
+		NewColumn("sym", []any{Symbol("a"), Symbol("a"), Symbol("b")}),
+		NewColumn("price", []any{10.0, 30.0, 20.0}),
+		NewColumn("size", []any{1, 3, 5}),
+	)
+
+	got, err := UpdateBy(frame,
+		nil,
+		[]SelectItem{{Name: "sym", Expr: ColumnRef{Name: "sym"}}},
+		[]GroupedAssignment{
+			{Name: "var_price", Func: "var", Expr: ColumnRef{Name: "price"}},
+			{Name: "dev_price", Func: "dev", Expr: ColumnRef{Name: "price"}},
+			{Name: "med_price", Func: "med", Expr: ColumnRef{Name: "price"}},
+			{Name: "wavg_price", Func: "wavg", Expr: ColumnRef{Name: "price"}, Weight: ColumnRef{Name: "size"}},
+		},
+	)
+	if err != nil {
+		t.Fatalf("UpdateBy returned error: %v", err)
+	}
+	assertColumnValues(t, got, "var_price", []any{100.0, 100.0, 0.0})
+	assertColumnValues(t, got, "dev_price", []any{10.0, 10.0, 0.0})
+	assertColumnValues(t, got, "med_price", []any{20.0, 20.0, 20.0})
+	assertColumnValues(t, got, "wavg_price", []any{25.0, 25.0, 20.0})
+}
+
+func TestUpdatePreservesColumnKindAndRejectsIncompatibleValues(t *testing.T) {
+	frame := mustFrame(t,
+		Column{Name: "sym", Data: NewSymbols([]string{"AAPL", "MSFT"})},
+		Column{Name: "qty", Data: NewI64([]int64{10, 20})},
+	)
+
+	updated, err := UpdateWhere(frame,
+		Binary{Op: OpEQ, Left: ColumnRef{Name: "sym"}, Right: Literal{Value: Symbol("AAPL")}},
+		map[Symbol]Expr{
+			"sym": Literal{Value: "NVDA"},
+			"qty": Literal{Value: int64(11)},
+		},
+	)
+	if err != nil {
+		t.Fatalf("UpdateWhere returned error: %v", err)
+	}
+	if kind, _ := updated.Schema().Kind("sym"); kind != KindSymbol {
+		t.Fatalf("sym kind = %s, want %s", kind, KindSymbol)
+	}
+	if kind, _ := updated.Schema().Kind("qty"); kind != KindI64 {
+		t.Fatalf("qty kind = %s, want %s", kind, KindI64)
+	}
+	assertColumnValues(t, updated, "sym", []any{Symbol("NVDA"), Symbol("MSFT")})
+	assertColumnValues(t, updated, "qty", []any{int64(11), int64(20)})
+
+	if _, err := UpdateWhere(frame, nil, map[Symbol]Expr{"qty": Literal{Value: "bad"}}); err == nil {
+		t.Fatal("UpdateWhere accepted incompatible typed column value")
 	}
 }
 
@@ -626,6 +2986,67 @@ func TestDeleteWhereAndPredicateReturnNewFrame(t *testing.T) {
 	}
 }
 
+func TestDeleteWhereUsesIndexedComplementHotPath(t *testing.T) {
+	sym := &countingMetadataArray{
+		array: WithArrayAttribute(NewSymbols([]string{"AAPL", "MSFT", "AAPL", "NVDA", "AAPL"}), ArrayAttributeGrouped),
+	}
+	frame := mustFrame(t,
+		Column{Name: "sym", Data: sym},
+		NewColumn("qty", []any{10, 20, 30, 40, 50}),
+	)
+
+	got, err := DeleteWhere(frame, Binary{Op: OpEQ, Left: ColumnRef{Name: "sym"}, Right: Literal{Value: Symbol("AAPL")}})
+	if err != nil {
+		t.Fatalf("DeleteWhere returned error: %v", err)
+	}
+	if sym.ats != 0 {
+		t.Fatalf("indexed delete key column At called %d times; want index+complement path", sym.ats)
+	}
+	assertColumnValues(t, got, "sym", []any{Symbol("MSFT"), Symbol("NVDA")})
+	assertColumnValues(t, got, "qty", []any{int64(20), int64(40)})
+}
+
+func TestDropAndRenameColumns(t *testing.T) {
+	frame := mustFrame(t,
+		Column{Name: "sym", Data: NewSymbols([]string{"a", "b"})},
+		Column{Name: "qty", Data: NewI32([]int32{10, 20})},
+		NewColumn("venue", []any{"x", "y"}),
+	)
+
+	dropped, err := DropColumns(frame, "venue")
+	if err != nil {
+		t.Fatalf("DropColumns returned error: %v", err)
+	}
+	assertColumnNames(t, dropped, []Symbol{"sym", "qty"})
+	assertColumnValues(t, dropped, "sym", []any{Symbol("a"), Symbol("b")})
+	if kind, _ := dropped.Schema().Kind("qty"); kind != KindI32 {
+		t.Fatalf("dropped qty kind = %s, want %s", kind, KindI32)
+	}
+	if _, err := DropColumns(frame, "missing"); err == nil {
+		t.Fatal("DropColumns accepted missing column")
+	}
+	if _, err := DropColumns(frame, "sym", "qty", "venue"); err == nil {
+		t.Fatal("DropColumns accepted removing all columns")
+	}
+
+	renamed, err := RenameColumns(frame, map[Symbol]Symbol{"sym": "ticker", "venue": "market"})
+	if err != nil {
+		t.Fatalf("RenameColumns returned error: %v", err)
+	}
+	assertColumnNames(t, renamed, []Symbol{"ticker", "qty", "market"})
+	assertColumnValues(t, renamed, "ticker", []any{Symbol("a"), Symbol("b")})
+	if kind, _ := renamed.Schema().Kind("ticker"); kind != KindSymbol {
+		t.Fatalf("renamed ticker kind = %s, want %s", kind, KindSymbol)
+	}
+	assertColumnNames(t, frame, []Symbol{"sym", "qty", "venue"})
+	if _, err := RenameColumns(frame, map[Symbol]Symbol{"missing": "x"}); err == nil {
+		t.Fatal("RenameColumns accepted missing column")
+	}
+	if _, err := RenameColumns(frame, map[Symbol]Symbol{"sym": "qty"}); err == nil {
+		t.Fatal("RenameColumns accepted duplicate output column")
+	}
+}
+
 func TestDistinctOperator(t *testing.T) {
 	frame := mustFrame(t,
 		NewColumn("sym", []any{Symbol("a"), Symbol("a"), Symbol("b"), Symbol("a"), nil}),
@@ -651,6 +3072,656 @@ func TestDistinctOperator(t *testing.T) {
 	if _, err := Distinct(frame, "missing"); err == nil {
 		t.Fatal("Distinct accepted missing key column")
 	}
+}
+
+func TestKeyedFrameSingleKeyLookup(t *testing.T) {
+	frame := mustFrame(t,
+		NewColumn("sym", []any{Symbol("a"), Symbol("b"), Symbol("a"), Symbol("c")}),
+		NewColumn("qty", []any{10, 20, 30, 40}),
+	)
+
+	keyed, err := KeyBy(frame, "sym")
+	if err != nil {
+		t.Fatalf("KeyBy returned error: %v", err)
+	}
+	if got, want := keyed.Keys(), []Symbol{"sym"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("keys = %v, want %v", got, want)
+	}
+
+	got, err := LookupByKey(keyed, "a")
+	if err != nil {
+		t.Fatalf("LookupByKey returned error: %v", err)
+	}
+	assertColumnValues(t, got, "sym", []any{Symbol("a"), Symbol("a")})
+	assertColumnValues(t, got, "qty", []any{int64(10), int64(30)})
+
+	missing, err := keyed.LookupByKey(Symbol("z"))
+	if err != nil {
+		t.Fatalf("missing LookupByKey returned error: %v", err)
+	}
+	assertColumnNames(t, missing, []Symbol{"sym", "qty"})
+	if got := missing.Len(); got != 0 {
+		t.Fatalf("missing lookup length = %d, want 0", got)
+	}
+	if got, ok := missing.Schema().Kind("qty"); !ok || got != KindI64 {
+		t.Fatalf("missing lookup qty kind = %s, ok %v; want %s", got, ok, KindI64)
+	}
+}
+
+func TestKeyedFrameTemporalLookupCoercesStringKey(t *testing.T) {
+	ts, err := NewColumnWithKind("ts", KindTimestamp, []any{
+		TimestampFromUnixNanos(100),
+		TimestampFromUnixNanos(200),
+		TimestampFromUnixNanos(200),
+	})
+	if err != nil {
+		t.Fatalf("NewColumnWithKind returned error: %v", err)
+	}
+	frame := mustFrame(t,
+		ts,
+		NewColumn("seq", []any{1, 2, 3}),
+	)
+	keyed, err := KeyBy(frame, "ts")
+	if err != nil {
+		t.Fatalf("KeyBy returned error: %v", err)
+	}
+
+	got, err := keyed.LookupByKey("1970-01-01T00:00:00.0000002Z")
+	if err != nil {
+		t.Fatalf("LookupByKey returned error: %v", err)
+	}
+	assertColumnValues(t, got, "seq", []any{int64(2), int64(3)})
+
+	missing, err := keyed.LookupByKey("1970-01-01T00:00:00.0000003Z")
+	if err != nil {
+		t.Fatalf("missing LookupByKey returned error: %v", err)
+	}
+	if got := missing.Len(); got != 0 {
+		t.Fatalf("missing lookup length = %d, want 0", got)
+	}
+	if got, ok := missing.Schema().Kind("ts"); !ok || got != KindTimestamp {
+		t.Fatalf("missing ts kind = %s, ok %v; want %s", got, ok, KindTimestamp)
+	}
+}
+
+func TestKeyedFrameMultiKeyLookup(t *testing.T) {
+	frame := mustFrame(t,
+		NewColumn("sym", []any{Symbol("a"), Symbol("a"), Symbol("b"), nil}),
+		NewColumn("venue", []any{"x", "y", "x", "x"}),
+		NewColumn("qty", []any{10, 20, 30, 40}),
+	)
+
+	keyed, err := KeyBy(frame, "sym", "venue")
+	if err != nil {
+		t.Fatalf("KeyBy returned error: %v", err)
+	}
+	got, err := keyed.LookupByKey("a", "y")
+	if err != nil {
+		t.Fatalf("LookupByKey returned error: %v", err)
+	}
+	assertColumnValues(t, got, "sym", []any{Symbol("a")})
+	assertColumnValues(t, got, "venue", []any{"y"})
+	assertColumnValues(t, got, "qty", []any{int64(20)})
+
+	nullKey, err := keyed.LookupByKey(nil, "x")
+	if err != nil {
+		t.Fatalf("null LookupByKey returned error: %v", err)
+	}
+	assertColumnValues(t, nullKey, "sym", []any{NullValue})
+	assertColumnValues(t, nullKey, "venue", []any{"x"})
+	assertColumnValues(t, nullKey, "qty", []any{int64(40)})
+}
+
+func TestKeyedFrameMultiKeyDuplicateAndMissingLookupKeepsSchema(t *testing.T) {
+	frame := mustFrame(t,
+		NewColumn("sym", []any{Symbol("a"), Symbol("a"), Symbol("a"), Symbol("b")}),
+		NewColumn("venue", []any{Symbol("x"), Symbol("x"), Symbol("y"), Symbol("x")}),
+		NewColumn("qty", []any{10, 20, 30, 40}),
+		NewColumn("note", []any{"first", "second", "other", "miss"}),
+	)
+
+	keyed, err := KeyBy(frame, "sym", "venue")
+	if err != nil {
+		t.Fatalf("KeyBy returned error: %v", err)
+	}
+	got, err := keyed.LookupByKey("a", "x")
+	if err != nil {
+		t.Fatalf("LookupByKey returned error: %v", err)
+	}
+	assertColumnNames(t, got, []Symbol{"sym", "venue", "qty", "note"})
+	assertColumnValues(t, got, "sym", []any{Symbol("a"), Symbol("a")})
+	assertColumnValues(t, got, "venue", []any{Symbol("x"), Symbol("x")})
+	assertColumnValues(t, got, "qty", []any{int64(10), int64(20)})
+	assertColumnValues(t, got, "note", []any{"first", "second"})
+
+	missing, err := keyed.LookupByKey("z", "x")
+	if err != nil {
+		t.Fatalf("missing LookupByKey returned error: %v", err)
+	}
+	assertColumnNames(t, missing, []Symbol{"sym", "venue", "qty", "note"})
+	if got := missing.Len(); got != 0 {
+		t.Fatalf("missing lookup length = %d, want 0", got)
+	}
+	for name, kind := range map[Symbol]Kind{"sym": KindSymbol, "venue": KindSymbol, "qty": KindI64, "note": KindString} {
+		if got, ok := missing.Schema().Kind(name); !ok || got != kind {
+			t.Fatalf("missing lookup %s kind = %s, ok %v; want %s", name, got, ok, kind)
+		}
+	}
+
+	all := keyed.Frame()
+	assertColumnNames(t, all, []Symbol{"sym", "venue", "qty", "note"})
+	assertColumnValues(t, all, "qty", []any{int64(10), int64(20), int64(30), int64(40)})
+
+	valueHit, err := keyed.LookupValueByKey("a", "x")
+	if err != nil {
+		t.Fatalf("LookupValueByKey returned error: %v", err)
+	}
+	assertColumnNames(t, valueHit, []Symbol{"qty", "note"})
+	assertColumnValues(t, valueHit, "qty", []any{int64(20)})
+	assertColumnValues(t, valueHit, "note", []any{"second"})
+
+	valueMissing, err := keyed.LookupValueByKey("z", "x")
+	if err != nil {
+		t.Fatalf("missing LookupValueByKey returned error: %v", err)
+	}
+	assertColumnNames(t, valueMissing, []Symbol{"qty", "note"})
+	if got := valueMissing.Len(); got != 0 {
+		t.Fatalf("missing value lookup length = %d, want 0", got)
+	}
+
+	valueFrame, err := keyed.ValueFrame()
+	if err != nil {
+		t.Fatalf("ValueFrame returned error: %v", err)
+	}
+	assertColumnNames(t, valueFrame, []Symbol{"qty", "note"})
+	assertColumnValues(t, valueFrame, "note", []any{"first", "second", "other", "miss"})
+}
+
+func TestKeyedFrameKeyValueLookupKDBSubsetSemantics(t *testing.T) {
+	frame := mustFrame(t,
+		NewColumn("sym", []any{Symbol("AAPL"), Symbol("AAPL"), Symbol("MSFT")}),
+		NewColumn("bucket", []any{"09:30", "09:30", "09:31"}),
+		NewColumn("seq", []any{1, 2, 3}),
+		NewColumn("px", []any{100.0, 100.5, 80.0}),
+	)
+
+	keyed, err := KeyBy(frame, "sym", "bucket")
+	if err != nil {
+		t.Fatalf("KeyBy returned error: %v", err)
+	}
+
+	keyFrame, err := keyed.KeyFrame()
+	if err != nil {
+		t.Fatalf("KeyFrame returned error: %v", err)
+	}
+	assertColumnNames(t, keyFrame, []Symbol{"sym", "bucket"})
+	assertColumnValues(t, keyFrame, "sym", []any{Symbol("AAPL"), Symbol("AAPL"), Symbol("MSFT")})
+	assertColumnValues(t, keyFrame, "bucket", []any{"09:30", "09:30", "09:31"})
+
+	valueFrame, err := keyed.ValueFrame()
+	if err != nil {
+		t.Fatalf("ValueFrame returned error: %v", err)
+	}
+	assertColumnNames(t, valueFrame, []Symbol{"seq", "px"})
+	assertColumnValues(t, valueFrame, "seq", []any{int64(1), int64(2), int64(3)})
+
+	allRows, err := keyed.LookupByKey("AAPL", "09:30")
+	if err != nil {
+		t.Fatalf("LookupByKey returned error: %v", err)
+	}
+	assertColumnNames(t, allRows, []Symbol{"sym", "bucket", "seq", "px"})
+	assertColumnValues(t, allRows, "seq", []any{int64(1), int64(2)})
+
+	valueRow, err := keyed.LookupValueByKey("AAPL", "09:30")
+	if err != nil {
+		t.Fatalf("LookupValueByKey returned error: %v", err)
+	}
+	assertColumnNames(t, valueRow, []Symbol{"seq", "px"})
+	assertColumnValues(t, valueRow, "seq", []any{int64(2)})
+	assertColumnValues(t, valueRow, "px", []any{100.5})
+
+	missing, err := keyed.LookupValueByKey("AAPL", "09:32")
+	if err != nil {
+		t.Fatalf("missing LookupValueByKey returned error: %v", err)
+	}
+	assertColumnNames(t, missing, []Symbol{"seq", "px"})
+	if got := missing.Len(); got != 0 {
+		t.Fatalf("missing value lookup length = %d, want 0", got)
+	}
+	if got, ok := missing.Schema().Kind("px"); !ok || got != KindF64 {
+		t.Fatalf("missing px kind = %s, ok %v; want %s", got, ok, KindF64)
+	}
+}
+
+func TestKeyedFrameTopLevelKeyValueHelpersAndLatestFrame(t *testing.T) {
+	frame := mustFrame(t,
+		NewColumn("sym", []any{Symbol("AAPL"), Symbol("AAPL"), Symbol("MSFT"), Symbol("AAPL")}),
+		NewColumn("venue", []any{Symbol("XNAS"), Symbol("XNYS"), Symbol("XNYS"), Symbol("XNAS")}),
+		NewColumn("seq", []any{1, 2, 3, 4}),
+		NewColumn("px", []any{100.0, 101.0, 80.0, 102.0}),
+	)
+
+	keyed, err := KeyBy(frame, "sym", "venue")
+	if err != nil {
+		t.Fatalf("KeyBy returned error: %v", err)
+	}
+	keys, values, err := KeyValueFrames(keyed)
+	if err != nil {
+		t.Fatalf("KeyValueFrames returned error: %v", err)
+	}
+	assertColumnNames(t, keys, []Symbol{"sym", "venue"})
+	assertColumnValues(t, keys, "sym", []any{Symbol("AAPL"), Symbol("AAPL"), Symbol("MSFT"), Symbol("AAPL")})
+	assertColumnNames(t, values, []Symbol{"seq", "px"})
+	assertColumnValues(t, values, "seq", []any{int64(1), int64(2), int64(3), int64(4)})
+
+	keyFrame, err := KeyFrame(keyed)
+	if err != nil {
+		t.Fatalf("KeyFrame returned error: %v", err)
+	}
+	valueFrame, err := ValueFrame(keyed)
+	if err != nil {
+		t.Fatalf("ValueFrame returned error: %v", err)
+	}
+	if !SameSchema(keys, keyFrame) || !SameSchema(values, valueFrame) {
+		t.Fatal("top-level key/value helpers did not match method schemas")
+	}
+
+	latest, err := LatestFrame(keyed)
+	if err != nil {
+		t.Fatalf("LatestFrame returned error: %v", err)
+	}
+	assertColumnNames(t, latest, []Symbol{"sym", "venue", "seq", "px"})
+	assertColumnValues(t, latest, "sym", []any{Symbol("AAPL"), Symbol("AAPL"), Symbol("MSFT")})
+	assertColumnValues(t, latest, "venue", []any{Symbol("XNAS"), Symbol("XNYS"), Symbol("XNYS")})
+	assertColumnValues(t, latest, "seq", []any{int64(4), int64(2), int64(3)})
+	assertColumnValues(t, latest, "px", []any{102.0, 101.0, 80.0})
+}
+
+func TestKeyedFrameKeyValueFramesAndRecordLookupPreserveKeyOrder(t *testing.T) {
+	frame := mustFrame(t,
+		NewColumn("venue", []any{Symbol("XNYS"), Symbol("XNYS"), Symbol("XNAS"), Symbol("XNAS")}),
+		NewColumn("sym", []any{Symbol("AAPL"), Symbol("AAPL"), Symbol("AAPL"), Symbol("MSFT")}),
+		NewColumn("trade_id", []any{1, 2, 3, 4}),
+		NewColumn("price", []any{100.0, 100.5, 101.0, 80.0}),
+	)
+
+	keyed, err := KeyBy(frame, "sym", "venue")
+	if err != nil {
+		t.Fatalf("KeyBy returned error: %v", err)
+	}
+	keyFrame, err := keyed.KeyFrame()
+	if err != nil {
+		t.Fatalf("KeyFrame returned error: %v", err)
+	}
+	assertColumnNames(t, keyFrame, []Symbol{"sym", "venue"})
+	assertColumnValues(t, keyFrame, "sym", []any{Symbol("AAPL"), Symbol("AAPL"), Symbol("AAPL"), Symbol("MSFT")})
+	assertColumnValues(t, keyFrame, "venue", []any{Symbol("XNYS"), Symbol("XNYS"), Symbol("XNAS"), Symbol("XNAS")})
+
+	valueFrame, err := keyed.ValueFrame()
+	if err != nil {
+		t.Fatalf("ValueFrame returned error: %v", err)
+	}
+	assertColumnNames(t, valueFrame, []Symbol{"trade_id", "price"})
+	if got, ok := valueFrame.Schema().Kind("price"); !ok || got != KindF64 {
+		t.Fatalf("value frame price kind = %s, ok %v; want %s", got, ok, KindF64)
+	}
+
+	got, err := keyed.LookupByKeyRecord(map[Symbol]any{
+		"venue": Symbol("XNYS"),
+		"sym":   "AAPL",
+		"extra": int64(99),
+	})
+	if err != nil {
+		t.Fatalf("LookupByKeyRecord returned error: %v", err)
+	}
+	assertColumnValues(t, got, "trade_id", []any{int64(1), int64(2)})
+
+	valueHit, err := keyed.LookupValueByKeyRecord(map[Symbol]any{"venue": "XNAS", "sym": "AAPL"})
+	if err != nil {
+		t.Fatalf("LookupValueByKeyRecord returned error: %v", err)
+	}
+	assertColumnNames(t, valueHit, []Symbol{"trade_id", "price"})
+	assertColumnValues(t, valueHit, "trade_id", []any{int64(3)})
+
+	if _, err := keyed.LookupByKeyRecord(map[Symbol]any{"sym": "AAPL"}); err == nil {
+		t.Fatal("LookupByKeyRecord accepted a missing key field")
+	}
+}
+
+func TestKeyedFrameLookupCoercesToKeyColumnKinds(t *testing.T) {
+	frame := mustFrame(t,
+		Column{Name: "id", Data: NewI32([]int32{1, 2})},
+		Column{Name: "sym", Data: NewSymbols([]string{"AAPL", "MSFT"})},
+		NewColumn("qty", []any{10, 20}),
+	)
+
+	keyed, err := KeyBy(frame, "id", "sym")
+	if err != nil {
+		t.Fatalf("KeyBy returned error: %v", err)
+	}
+	got, err := keyed.LookupByKey(2, "MSFT")
+	if err != nil {
+		t.Fatalf("LookupByKey returned error: %v", err)
+	}
+	assertColumnValues(t, got, "id", []any{int32(2)})
+	assertColumnValues(t, got, "sym", []any{Symbol("MSFT")})
+	assertColumnValues(t, got, "qty", []any{int64(20)})
+
+	tsFrame := mustFrame(t,
+		NewColumn("sym", []any{Symbol("AAPL"), Symbol("MSFT")}),
+		Column{Name: "bucket", Data: NewTimestamp([]Timestamp{
+			TimestampFromUnixNanos(1_782_810_000_000_000_000),
+			TimestampFromUnixNanos(1_782_810_060_000_000_000),
+		})},
+		NewColumn("size", []any{100, 200}),
+	)
+	tsKeyed, err := KeyBy(tsFrame, "sym", "bucket")
+	if err != nil {
+		t.Fatalf("timestamp KeyBy returned error: %v", err)
+	}
+	tsGot, err := tsKeyed.LookupByKey("MSFT", "2026-06-30T09:01:00Z")
+	if err != nil {
+		t.Fatalf("timestamp LookupByKey returned error: %v", err)
+	}
+	assertColumnValues(t, tsGot, "sym", []any{Symbol("MSFT")})
+	assertColumnValues(t, tsGot, "bucket", []any{TimestampFromUnixNanos(1_782_810_060_000_000_000)})
+	assertColumnValues(t, tsGot, "size", []any{int64(200)})
+}
+
+func TestKeyedFrameRejectsInvalidInputs(t *testing.T) {
+	frame := mustFrame(t, NewColumn("id", []any{1}))
+
+	if _, err := KeyBy(frame); err == nil {
+		t.Fatal("KeyBy accepted no keys")
+	}
+	if _, err := KeyBy(frame, ""); err == nil {
+		t.Fatal("KeyBy accepted empty key")
+	}
+	if _, err := KeyBy(frame, "missing"); err == nil {
+		t.Fatal("KeyBy accepted missing key")
+	}
+	if _, err := KeyBy(frame, "id", "id"); err == nil {
+		t.Fatal("KeyBy accepted duplicate key")
+	}
+
+	keyed, err := KeyBy(frame, "id")
+	if err != nil {
+		t.Fatalf("KeyBy returned error: %v", err)
+	}
+	if _, err := keyed.LookupByKey(); err == nil {
+		t.Fatal("LookupByKey accepted too few values")
+	}
+	if _, err := keyed.LookupByKey(1, 2); err == nil {
+		t.Fatal("LookupByKey accepted too many values")
+	}
+	if _, err := keyed.LookupByKey("bad"); err == nil {
+		t.Fatal("LookupByKey accepted incompatible key value")
+	}
+}
+
+func TestKeyedFrameUpsertUpdatesMatchesAndAppendsMisses(t *testing.T) {
+	frame := mustFrame(t,
+		Column{Name: "id", Data: NewI32([]int32{1, 2})},
+		NewColumn("qty", []any{10, 20}),
+		NewColumn("note", []any{"old-1", "old-2"}),
+	)
+	keyed, err := KeyBy(frame, "id")
+	if err != nil {
+		t.Fatalf("KeyBy returned error: %v", err)
+	}
+	delta := mustFrame(t,
+		NewColumn("id", []any{2, 3}),
+		NewColumn("qty", []any{25, 30}),
+		NewColumn("note", []any{"new-2", "new-3"}),
+	)
+
+	got, err := keyed.Upsert(delta)
+	if err != nil {
+		t.Fatalf("Upsert returned error: %v", err)
+	}
+	out := got.Frame()
+	assertColumnNames(t, out, []Symbol{"id", "qty", "note"})
+	assertColumnValues(t, out, "id", []any{int32(1), int32(2), int32(3)})
+	assertColumnValues(t, out, "qty", []any{int64(10), int64(25), int64(30)})
+	assertColumnValues(t, out, "note", []any{"old-1", "new-2", "new-3"})
+	if gotKind, ok := out.Schema().Kind("id"); !ok || gotKind != KindI32 {
+		t.Fatalf("id kind = %s, ok %v; want %s", gotKind, ok, KindI32)
+	}
+
+	hit, err := got.LookupValueByKey(3)
+	if err != nil {
+		t.Fatalf("LookupValueByKey returned error: %v", err)
+	}
+	assertColumnValues(t, hit, "qty", []any{int64(30)})
+}
+
+func TestKeyedFrameIndexMetadataRebuiltAfterMutation(t *testing.T) {
+	frame := mustFrame(t,
+		Column{Name: "sym", Data: NewSymbols([]string{"AAPL", "MSFT"})},
+		NewColumn("qty", []any{10, 20}),
+	)
+	keyed, err := KeyBy(frame, "sym")
+	if err != nil {
+		t.Fatalf("KeyBy returned error: %v", err)
+	}
+	if err := keyed.ValidateIndex(); err != nil {
+		t.Fatalf("initial keyed index invalid: %v", err)
+	}
+	before := keyed.IndexMetadata()
+	if before.Rows != 2 || before.SchemaHash != frame.SchemaFingerprint() {
+		t.Fatalf("initial metadata = %#v, want rows=2 schema=%s", before, frame.SchemaFingerprint())
+	}
+
+	upserted, err := keyed.Upsert(mustFrame(t,
+		NewColumn("sym", []any{"MSFT", "TSLA"}),
+		NewColumn("qty", []any{25, 30}),
+	))
+	if err != nil {
+		t.Fatalf("Upsert returned error: %v", err)
+	}
+	if err := upserted.ValidateIndex(); err != nil {
+		t.Fatalf("upserted keyed index invalid: %v", err)
+	}
+	after := upserted.IndexMetadata()
+	if after.Rows != 3 {
+		t.Fatalf("upserted metadata rows = %d, want 3", after.Rows)
+	}
+	if after.Fingerprint == before.Fingerprint {
+		t.Fatalf("upserted metadata fingerprint did not change: %#v", after)
+	}
+	tsla, err := upserted.LookupValueByKey("TSLA")
+	if err != nil {
+		t.Fatalf("upserted LookupValueByKey returned error: %v", err)
+	}
+	assertColumnValues(t, tsla, "qty", []any{int64(30)})
+
+	oldTSLA, err := keyed.LookupValueByKey("TSLA")
+	if err != nil {
+		t.Fatalf("old keyed LookupValueByKey returned error: %v", err)
+	}
+	if oldTSLA.Len() != 0 {
+		t.Fatalf("old keyed index saw new TSLA row; len = %d, want 0", oldTSLA.Len())
+	}
+}
+
+func TestKeyedFrameValidateIndexRejectsStaleSameShapeKeyValues(t *testing.T) {
+	frame := mustFrame(t,
+		Column{Name: "sym", Data: NewSymbols([]string{"AAPL", "MSFT"})},
+		NewColumn("qty", []any{10, 20}),
+	)
+	keyed, err := KeyBy(frame, "sym")
+	if err != nil {
+		t.Fatalf("KeyBy returned error: %v", err)
+	}
+	stale := keyed
+	stale.frame = mustFrame(t,
+		Column{Name: "sym", Data: NewSymbols([]string{"AAPL", "TSLA"})},
+		NewColumn("qty", []any{10, 20}),
+	)
+	if err := stale.ValidateIndex(); err == nil || !strings.Contains(err.Error(), "fingerprint") {
+		t.Fatalf("ValidateIndex stale error = %v, want fingerprint mismatch", err)
+	}
+
+	stale = keyed
+	stale.frame = mustFrame(t,
+		Column{Name: "sym", Data: NewSymbols([]string{"AAPL", "MSFT", "TSLA"})},
+		NewColumn("qty", []any{10, 20, 30}),
+	)
+	if _, err := stale.LookupValueByKey("AAPL"); err == nil || !strings.Contains(err.Error(), "rows mismatch") {
+		t.Fatalf("LookupValueByKey stale shape error = %v, want rows mismatch", err)
+	}
+}
+
+func TestKeyedFrameAmendOnlyUpdatesExistingKeys(t *testing.T) {
+	frame := mustFrame(t,
+		NewColumn("sym", []any{Symbol("AAPL"), Symbol("MSFT")}),
+		NewColumn("qty", []any{10, 20}),
+	)
+	keyed, err := KeyBy(frame, "sym")
+	if err != nil {
+		t.Fatalf("KeyBy returned error: %v", err)
+	}
+	delta := mustFrame(t,
+		NewColumn("sym", []any{"AAPL", "TSLA"}),
+		NewColumn("qty", []any{15, 30}),
+	)
+
+	got, err := keyed.Amend(delta)
+	if err != nil {
+		t.Fatalf("Amend returned error: %v", err)
+	}
+	out := got.Frame()
+	assertColumnValues(t, out, "sym", []any{Symbol("AAPL"), Symbol("MSFT")})
+	assertColumnValues(t, out, "qty", []any{int64(15), int64(20)})
+}
+
+func TestKeyedFrameMutationEmptyDeltaAndSelectedColumns(t *testing.T) {
+	frame := mustFrame(t,
+		NewColumn("sym", []any{Symbol("AAPL"), Symbol("MSFT")}),
+		NewColumn("qty", []any{10, 20}),
+		NewColumn("note", []any{"old-a", "old-m"}),
+	)
+	keyed, err := KeyBy(frame, "sym")
+	if err != nil {
+		t.Fatalf("KeyBy returned error: %v", err)
+	}
+	emptyDelta := mustFrame(t,
+		NewColumn("sym", []any{}),
+		NewColumn("qty", []any{}),
+		NewColumn("note", []any{}),
+	)
+	amended, err := keyed.Amend(emptyDelta)
+	if err != nil {
+		t.Fatalf("Amend empty delta returned error: %v", err)
+	}
+	assertColumnValues(t, amended.Frame(), "qty", []any{int64(10), int64(20)})
+	assertColumnValues(t, amended.Frame(), "note", []any{"old-a", "old-m"})
+
+	upserted, err := keyed.Upsert(mustFrame(t,
+		NewColumn("sym", []any{"AAPL", "TSLA"}),
+		NewColumn("qty", []any{11, 30}),
+		NewColumn("note", []any{"ignored-a", "ignored-t"}),
+	), "qty")
+	if err != nil {
+		t.Fatalf("Upsert selected value columns returned error: %v", err)
+	}
+	out := upserted.Frame()
+	assertColumnNames(t, out, []Symbol{"sym", "qty", "note"})
+	assertColumnValues(t, out, "sym", []any{Symbol("AAPL"), Symbol("MSFT"), Symbol("TSLA")})
+	assertColumnValues(t, out, "qty", []any{int64(11), int64(20), int64(30)})
+	assertColumnValues(t, out, "note", []any{"old-a", "old-m", NullValue})
+
+	noValues, err := keyed.Amend(mustFrame(t, NewColumn("sym", []any{"AAPL"})))
+	if err != nil {
+		t.Fatalf("Amend with no value columns returned error: %v", err)
+	}
+	assertColumnValues(t, noValues.Frame(), "qty", []any{int64(10), int64(20)})
+	assertColumnValues(t, noValues.Frame(), "note", []any{"old-a", "old-m"})
+	if _, err := keyed.Upsert(mustFrame(t,
+		NewColumn("sym", []any{"AAPL"}),
+		NewColumn("qty", []any{11}),
+	), "qty", "qty"); err == nil {
+		t.Fatal("Upsert accepted duplicate selected value column")
+	}
+}
+
+func TestKeyedFrameMutationRejectsKeyColumnChangeAndAddsValueColumns(t *testing.T) {
+	frame := mustFrame(t,
+		NewColumn("sym", []any{Symbol("AAPL"), Symbol("MSFT")}),
+		NewColumn("qty", []any{10, 20}),
+	)
+	keyed, err := KeyBy(frame, "sym")
+	if err != nil {
+		t.Fatalf("KeyBy returned error: %v", err)
+	}
+
+	if _, err := keyed.Upsert(mustFrame(t,
+		NewColumn("sym", []any{Symbol("AAPL")}),
+		NewColumn("qty", []any{11}),
+	), "sym"); err == nil {
+		t.Fatal("Upsert accepted key assignment")
+	}
+
+	got, err := keyed.Upsert(mustFrame(t,
+		NewColumn("sym", []any{"AAPL", "TSLA"}),
+		NewColumn("venue", []any{"XNAS", "XNYS"}),
+	))
+	if err != nil {
+		t.Fatalf("Upsert with new value column returned error: %v", err)
+	}
+	out := got.Frame()
+	assertColumnNames(t, out, []Symbol{"sym", "qty", "venue"})
+	assertColumnValues(t, out, "sym", []any{Symbol("AAPL"), Symbol("MSFT"), Symbol("TSLA")})
+	assertColumnValues(t, out, "qty", []any{int64(10), int64(20), NullValue})
+	assertColumnValues(t, out, "venue", []any{"XNAS", NullValue, "XNYS"})
+	if gotKind, ok := out.Schema().Kind("venue"); !ok || gotKind != KindString {
+		t.Fatalf("venue kind = %s, ok %v; want %s", gotKind, ok, KindString)
+	}
+}
+
+func TestInsertRowAndKeyedUpsertRow(t *testing.T) {
+	frame := mustFrame(t,
+		Column{Name: "sym", Data: NewSymbols([]string{"AAPL", "MSFT"})},
+		Column{Name: "qty", Data: NewI64([]int64{10, 20})},
+		Column{Name: "note", Data: NewString([]string{"old-a", "old-m"})},
+	)
+	inserted, err := InsertRow(frame, []Symbol{"sym", "qty"}, []any{Symbol("TSLA"), int64(30)})
+	if err != nil {
+		t.Fatalf("InsertRow returned error: %v", err)
+	}
+	assertColumnValues(t, inserted, "sym", []any{Symbol("AAPL"), Symbol("MSFT"), Symbol("TSLA")})
+	assertColumnValues(t, inserted, "qty", []any{int64(10), int64(20), int64(30)})
+	assertColumnValues(t, inserted, "note", []any{"old-a", "old-m", NullValue})
+
+	keyed, err := KeyBy(frame, "sym")
+	if err != nil {
+		t.Fatalf("KeyBy returned error: %v", err)
+	}
+	if _, err := keyed.InsertRow([]Symbol{"sym", "qty"}, []any{Symbol("AAPL"), int64(15)}); err == nil {
+		t.Fatalf("keyed InsertRow duplicate returned nil error")
+	}
+	if _, err := keyed.InsertRow([]Symbol{"qty"}, []any{int64(15)}); err == nil {
+		t.Fatalf("keyed InsertRow missing key returned nil error")
+	}
+	if _, err := keyed.UpsertRow([]Symbol{"qty"}, []any{int64(15)}); err == nil {
+		t.Fatalf("keyed UpsertRow missing key returned nil error")
+	}
+	upserted, err := keyed.UpsertRow([]Symbol{"sym", "qty"}, []any{Symbol("AAPL"), int64(15)})
+	if err != nil {
+		t.Fatalf("keyed UpsertRow existing returned error: %v", err)
+	}
+	out := upserted.Frame()
+	assertColumnValues(t, out, "qty", []any{int64(15), int64(20)})
+	assertColumnValues(t, out, "note", []any{"old-a", "old-m"})
+
+	upserted, err = upserted.UpsertRow([]Symbol{"sym", "qty"}, []any{Symbol("TSLA"), int64(40)})
+	if err != nil {
+		t.Fatalf("keyed UpsertRow missing returned error: %v", err)
+	}
+	out = upserted.Frame()
+	assertColumnValues(t, out, "sym", []any{Symbol("AAPL"), Symbol("MSFT"), Symbol("TSLA")})
+	assertColumnValues(t, out, "qty", []any{int64(15), int64(20), int64(40)})
+	assertColumnValues(t, out, "note", []any{"old-a", "old-m", NullValue})
 }
 
 func TestInnerJoinOnSameNameKeysPreservesOrderAndNamesConflicts(t *testing.T) {
@@ -699,6 +3770,58 @@ func TestInnerJoinOnSpecifiedKeyColumns(t *testing.T) {
 	assertColumnValues(t, got, "right_value", []any{"uno", "one-again", "tres"})
 	if _, ok := got.Column("account_id"); ok {
 		t.Fatal("InnerJoinOn included duplicate right key column")
+	}
+}
+
+func TestJoinAsofWindowReuseIndexedRightAttributes(t *testing.T) {
+	left := mustFrame(t,
+		NewColumn("sym", []any{Symbol("AAPL"), Symbol("MSFT"), Symbol("AAPL")}),
+		NewColumn("ts", []any{int64(10), int64(11), int64(12)}),
+		NewColumn("qty", []any{100, 200, 300}),
+	)
+	rightSym := &countingMetadataArray{
+		array: WithArrayAttribute(NewSymbols([]string{"AAPL", "AAPL", "MSFT"}), ArrayAttributeGrouped),
+	}
+	right := mustFrame(t,
+		Column{Name: "sym", Data: rightSym},
+		Column{Name: "ts", Data: WithArrayAttribute(NewI64([]int64{9, 12, 10}), ArrayAttributeSorted)},
+		NewColumn("quote", []any{"a9", "a12", "m10"}),
+	)
+
+	joined, err := InnerJoinOn(left, right, JoinKey{Left: "sym", Right: "sym"})
+	if err != nil {
+		t.Fatalf("InnerJoinOn returned error: %v", err)
+	}
+	if joined.Len() != 5 {
+		t.Fatalf("joined len = %d, want 5", joined.Len())
+	}
+	if rightSym.ats != 0 {
+		t.Fatalf("inner join right key At called %d times; want attribute index path", rightSym.ats)
+	}
+
+	asofed, err := AsofJoinOn(left, right, JoinKey{Left: "ts", Right: "ts"}, JoinKey{Left: "sym", Right: "sym"})
+	if err != nil {
+		t.Fatalf("AsofJoinOn returned error: %v", err)
+	}
+	assertColumnValues(t, asofed, "quote", []any{"a9", "m10", "a12"})
+	if rightSym.ats != 0 {
+		t.Fatalf("asof join right partition At called %d times; want grouped attribute path", rightSym.ats)
+	}
+
+	windowed, err := WindowJoinOnWithOptions(left, right, WindowJoinOptions{
+		TimeKey:       JoinKey{Left: "ts", Right: "ts"},
+		PartitionKeys: []JoinKey{{Left: "sym", Right: "sym"}},
+		Low:           int64(-2),
+		High:          int64(0),
+		HasBounds:     true,
+		Last:          true,
+	})
+	if err != nil {
+		t.Fatalf("WindowJoinOnWithOptions returned error: %v", err)
+	}
+	assertColumnValues(t, windowed, "quote", []any{"a9", "m10", "a12"})
+	if rightSym.ats != 0 {
+		t.Fatalf("window join right partition At called %d times; want grouped attribute path", rightSym.ats)
 	}
 }
 
@@ -758,13 +3881,1018 @@ func TestInnerJoinRejectsInvalidKeys(t *testing.T) {
 	}
 }
 
-func mustFrame(t *testing.T, cols ...Column) Frame {
+func TestKeyedJoinUsesRightLatestValueRows(t *testing.T) {
+	left := mustFrame(t,
+		NewColumn("sym", []any{Symbol("AAPL"), Symbol("MSFT"), Symbol("TSLA")}),
+		NewColumn("qty", []any{10, 20, 30}),
+	)
+	right := mustFrame(t,
+		NewColumn("sym", []any{Symbol("AAPL"), Symbol("AAPL"), Symbol("MSFT")}),
+		NewColumn("lot", []any{1, 2, 3}),
+		NewColumn("px", []any{100.0, 101.0, 80.0}),
+	)
+	keyedRight, err := KeyBy(right, "sym")
+	if err != nil {
+		t.Fatalf("KeyBy right returned error: %v", err)
+	}
+
+	got, err := LeftJoinKeyed(left, keyedRight)
+	if err != nil {
+		t.Fatalf("LeftJoinKeyed returned error: %v", err)
+	}
+	assertColumnNames(t, got, []Symbol{"sym", "qty", "lot", "px"})
+	assertColumnValues(t, got, "sym", []any{Symbol("AAPL"), Symbol("MSFT"), Symbol("TSLA")})
+	assertColumnValues(t, got, "lot", []any{int64(2), int64(3), NullValue})
+	assertColumnValues(t, got, "px", []any{101.0, 80.0, NullValue})
+
+	inner, err := InnerJoinKeyed(left, keyedRight)
+	if err != nil {
+		t.Fatalf("InnerJoinKeyed returned error: %v", err)
+	}
+	assertColumnValues(t, inner, "sym", []any{Symbol("AAPL"), Symbol("MSFT")})
+	assertColumnValues(t, inner, "lot", []any{int64(2), int64(3)})
+}
+
+func TestLeftJoinOnDuplicateRightKeysExpandsInRightOrder(t *testing.T) {
+	left := mustFrame(t,
+		NewColumn("sym", []any{Symbol("AAPL"), Symbol("MSFT"), Symbol("TSLA")}),
+		NewColumn("qty", []any{10, 20, 30}),
+	)
+	right := mustFrame(t,
+		NewColumn("sym", []any{Symbol("AAPL"), Symbol("AAPL"), Symbol("MSFT")}),
+		NewColumn("seq", []any{1, 2, 3}),
+		NewColumn("bid", []any{99.0, 100.0, 79.0}),
+	)
+
+	got, err := LeftJoin(left, right, "sym")
+	if err != nil {
+		t.Fatalf("LeftJoin returned error: %v", err)
+	}
+
+	assertColumnNames(t, got, []Symbol{"sym", "qty", "seq", "bid"})
+	assertColumnValues(t, got, "sym", []any{Symbol("AAPL"), Symbol("AAPL"), Symbol("MSFT"), Symbol("TSLA")})
+	assertColumnValues(t, got, "qty", []any{int64(10), int64(10), int64(20), int64(30)})
+	assertColumnValues(t, got, "seq", []any{int64(1), int64(2), int64(3), NullValue})
+	assertColumnValues(t, got, "bid", []any{99.0, 100.0, 79.0, NullValue})
+}
+
+func TestLeftJoinUsesRightSingleColumnAttributeIndex(t *testing.T) {
+	left := mustFrame(t,
+		NewColumn("sym", []any{Symbol("AAPL"), Symbol("MSFT"), Symbol("TSLA")}),
+		NewColumn("qty", []any{10, 20, 30}),
+	)
+	right := mustFrame(t,
+		NewColumn("sym", []any{Symbol("AAPL"), Symbol("AAPL"), Symbol("MSFT")}),
+		NewColumn("seq", []any{1, 2, 3}),
+	)
+	sym := &countingMetadataArray{
+		array: WithArrayAttribute(NewSymbols([]string{"AAPL", "AAPL", "MSFT"}), ArrayAttributeGrouped),
+	}
+	right.columns["sym"] = sym
+
+	got, err := LeftJoin(left, right, "sym")
+	if err != nil {
+		t.Fatalf("LeftJoin returned error: %v", err)
+	}
+	if sym.ats != 0 {
+		t.Fatalf("right join key At called %d times; want attribute index path", sym.ats)
+	}
+	assertColumnValues(t, got, "sym", []any{Symbol("AAPL"), Symbol("AAPL"), Symbol("MSFT"), Symbol("TSLA")})
+	assertColumnValues(t, got, "seq", []any{int64(1), int64(2), int64(3), NullValue})
+}
+
+func TestKeyedJoinOnSupportsLeftKeyAliasesAndRejectsNonKeyRightColumns(t *testing.T) {
+	left := mustFrame(t,
+		NewColumn("ticker", []any{Symbol("AAPL"), Symbol("MSFT")}),
+		NewColumn("qty", []any{10, 20}),
+	)
+	right := mustFrame(t,
+		NewColumn("sym", []any{Symbol("AAPL"), Symbol("MSFT")}),
+		NewColumn("venue", []any{Symbol("XNAS"), Symbol("XNYS")}),
+		NewColumn("px", []any{100.0, 80.0}),
+	)
+	keyedRight, err := KeyBy(right, "sym")
+	if err != nil {
+		t.Fatalf("KeyBy right returned error: %v", err)
+	}
+
+	got, err := LeftJoinKeyedOn(left, keyedRight, JoinKey{Left: "ticker", Right: "sym"})
+	if err != nil {
+		t.Fatalf("LeftJoinKeyedOn returned error: %v", err)
+	}
+	assertColumnNames(t, got, []Symbol{"ticker", "qty", "venue", "px"})
+	assertColumnValues(t, got, "venue", []any{Symbol("XNAS"), Symbol("XNYS")})
+
+	if _, err := LeftJoinKeyedOn(left, keyedRight, JoinKey{Left: "ticker", Right: "venue"}); err == nil {
+		t.Fatal("LeftJoinKeyedOn accepted a non-key right column")
+	}
+}
+
+func TestUnionJoinOnKeepsMatchedLeftAndUnmatchedRightRows(t *testing.T) {
+	left := mustFrame(t,
+		NewColumn("sym", []any{Symbol("a"), Symbol("b")}),
+		NewColumn("qty", []any{10, 20}),
+	)
+	right := mustFrame(t,
+		NewColumn("sym", []any{Symbol("a"), Symbol("c")}),
+		NewColumn("price", []any{100, 300}),
+	)
+
+	got, err := UnionJoinOn(left, right, JoinKey{Left: "sym", Right: "sym"})
+	if err != nil {
+		t.Fatalf("UnionJoinOn returned error: %v", err)
+	}
+	assertColumnNames(t, got, []Symbol{"sym", "qty", "price"})
+	assertColumnValues(t, got, "sym", []any{Symbol("a"), Symbol("b"), Symbol("c")})
+	assertColumnValues(t, got, "qty", []any{int64(10), int64(20), NullValue})
+	assertColumnValues(t, got, "price", []any{int64(100), NullValue, int64(300)})
+}
+
+func TestUnionJoinOnDuplicateRightKeysAndUnmatchedRightRows(t *testing.T) {
+	left := mustFrame(t,
+		NewColumn("sym", []any{Symbol("a"), Symbol("b")}),
+		NewColumn("qty", []any{10, 20}),
+	)
+	right := mustFrame(t,
+		NewColumn("sym", []any{Symbol("a"), Symbol("a"), Symbol("c")}),
+		NewColumn("price", []any{100, 101, 300}),
+	)
+
+	got, err := UnionJoinOn(left, right, JoinKey{Left: "sym", Right: "sym"})
+	if err != nil {
+		t.Fatalf("UnionJoinOn returned error: %v", err)
+	}
+
+	assertColumnValues(t, got, "sym", []any{Symbol("a"), Symbol("a"), Symbol("b"), Symbol("c")})
+	assertColumnValues(t, got, "qty", []any{int64(10), int64(10), int64(20), NullValue})
+	assertColumnValues(t, got, "price", []any{int64(100), int64(101), NullValue, int64(300)})
+}
+
+func TestPlusJoinOnAddsMatchedSameNameColumns(t *testing.T) {
+	left := mustFrame(t,
+		NewColumn("sym", []any{Symbol("a"), Symbol("b"), Symbol("c")}),
+		NewColumn("qty", []any{10, 20, 30}),
+		NewColumn("px", []any{1.5, 2.5, 3.5}),
+	)
+	right := mustFrame(t,
+		NewColumn("sym", []any{Symbol("a"), Symbol("b")}),
+		NewColumn("qty", []any{1, 2}),
+		NewColumn("venue", []any{"x", "y"}),
+	)
+
+	got, err := PlusJoinOn(left, right, JoinKey{Left: "sym", Right: "sym"})
+	if err != nil {
+		t.Fatalf("PlusJoinOn returned error: %v", err)
+	}
+	assertColumnNames(t, got, []Symbol{"sym", "qty", "px", "venue"})
+	assertColumnValues(t, got, "sym", []any{Symbol("a"), Symbol("b"), Symbol("c")})
+	assertColumnValues(t, got, "qty", []any{float64(11), float64(22), float64(30)})
+	assertColumnValues(t, got, "px", []any{1.5, 2.5, 3.5})
+	assertColumnValues(t, got, "venue", []any{"x", "y", NullValue})
+}
+
+func TestPlusJoinOnDuplicateRightKeysUsesFirstMatch(t *testing.T) {
+	left := mustFrame(t,
+		NewColumn("sym", []any{Symbol("a"), Symbol("b")}),
+		NewColumn("qty", []any{10, 20}),
+	)
+	right := mustFrame(t,
+		NewColumn("sym", []any{Symbol("a"), Symbol("a"), Symbol("b")}),
+		NewColumn("qty", []any{1, 100, 2}),
+		NewColumn("venue", []any{"first", "second", "only"}),
+	)
+
+	got, err := PlusJoinOn(left, right, JoinKey{Left: "sym", Right: "sym"})
+	if err != nil {
+		t.Fatalf("PlusJoinOn returned error: %v", err)
+	}
+
+	assertColumnValues(t, got, "qty", []any{float64(11), float64(22)})
+	assertColumnValues(t, got, "venue", []any{"first", "only"})
+}
+
+func TestAsofJoinOnPartitionsAndLatestRightTime(t *testing.T) {
+	left := mustFrame(t,
+		NewColumn("sym", []any{Symbol("a"), Symbol("a"), Symbol("b"), Symbol("a"), Symbol("c")}),
+		NewColumn("ts", []any{
+			TimestampFromUnixNanos(10),
+			TimestampFromUnixNanos(15),
+			TimestampFromUnixNanos(12),
+			TimestampFromUnixNanos(4),
+			TimestampFromUnixNanos(20),
+		}),
+		NewColumn("qty", []any{100, 150, 120, 40, 200}),
+		NewColumn("price_right", []any{"left-a", "left-b", "left-c", "left-d", "left-e"}),
+	)
+	right := mustFrame(t,
+		NewColumn("ticker", []any{Symbol("a"), Symbol("a"), Symbol("a"), Symbol("b")}),
+		NewColumn("time", []any{
+			TimestampFromUnixNanos(5),
+			TimestampFromUnixNanos(11),
+			TimestampFromUnixNanos(10),
+			TimestampFromUnixNanos(13),
+		}),
+		NewColumn("price", []any{50, 110, 100, 130}),
+		NewColumn("price_right", []any{"ra5", "ra11", "ra10", "rb13"}),
+	)
+
+	got, err := AsofJoinOn(left, right,
+		JoinKey{Left: "ts", Right: "time"},
+		JoinKey{Left: "sym", Right: "ticker"},
+	)
+	if err != nil {
+		t.Fatalf("AsofJoinOn returned error: %v", err)
+	}
+
+	assertColumnNames(t, got, []Symbol{"sym", "ts", "qty", "price_right", "price", "price_right_right"})
+	assertColumnValues(t, got, "sym", []any{Symbol("a"), Symbol("a"), Symbol("b"), Symbol("a"), Symbol("c")})
+	assertColumnValues(t, got, "ts", []any{
+		Timestamp(10),
+		Timestamp(15),
+		Timestamp(12),
+		Timestamp(4),
+		Timestamp(20),
+	})
+	assertColumnValues(t, got, "price", []any{int64(100), int64(110), NullValue, NullValue, NullValue})
+	assertColumnValues(t, got, "price_right_right", []any{"ra10", "ra11", NullValue, NullValue, NullValue})
+	if gotKind, ok := got.Schema().Kind("price"); !ok || gotKind != KindI64 {
+		t.Fatalf("price kind = %s, ok %v; want %s", gotKind, ok, KindI64)
+	}
+}
+
+func TestWindowJoinOnPartitionsAndCollectsPriorRightRows(t *testing.T) {
+	left := mustFrame(t,
+		NewColumn("sym", []any{Symbol("a"), Symbol("a"), Symbol("b"), Symbol("a")}),
+		NewColumn("ts", []any{
+			TimestampFromUnixNanos(10),
+			TimestampFromUnixNanos(15),
+			TimestampFromUnixNanos(12),
+			TimestampFromUnixNanos(4),
+		}),
+		NewColumn("qty", []any{100, 150, 120, 40}),
+	)
+	right := mustFrame(t,
+		NewColumn("ticker", []any{Symbol("a"), Symbol("a"), Symbol("a"), Symbol("b")}),
+		NewColumn("time", []any{
+			TimestampFromUnixNanos(5),
+			TimestampFromUnixNanos(11),
+			TimestampFromUnixNanos(10),
+			TimestampFromUnixNanos(13),
+		}),
+		NewColumn("bid", []any{50, 110, 100, 130}),
+	)
+
+	got, err := WindowJoinOn(left, right,
+		JoinKey{Left: "ts", Right: "time"},
+		JoinKey{Left: "sym", Right: "ticker"},
+	)
+	if err != nil {
+		t.Fatalf("WindowJoinOn returned error: %v", err)
+	}
+
+	assertColumnNames(t, got, []Symbol{"sym", "ts", "qty", "bid"})
+	assertColumnValues(t, got, "bid", []any{
+		[]any{int64(50), int64(100)},
+		[]any{int64(50), int64(100), int64(110)},
+		[]any{},
+		[]any{},
+	})
+	if gotKind, ok := got.Schema().Kind("bid"); !ok || gotKind != KindAny {
+		t.Fatalf("bid kind = %s, ok %v; want %s", gotKind, ok, KindAny)
+	}
+}
+
+func TestWindowJoinOnWithBoundsAndLast(t *testing.T) {
+	left := mustFrame(t,
+		NewColumn("sym", []any{Symbol("a"), Symbol("a")}),
+		NewColumn("ts", []any{int64(10), int64(15)}),
+	)
+	right := mustFrame(t,
+		NewColumn("sym", []any{Symbol("a"), Symbol("a"), Symbol("a"), Symbol("a")}),
+		NewColumn("ts", []any{int64(4), int64(8), int64(10), int64(16)}),
+		NewColumn("bid", []any{40, 80, 100, 160}),
+	)
+
+	windowed, err := WindowJoinOnWithOptions(left, right, WindowJoinOptions{
+		TimeKey:       JoinKey{Left: "ts", Right: "ts"},
+		PartitionKeys: []JoinKey{{Left: "sym", Right: "sym"}},
+		Low:           int64(-2),
+		High:          int64(0),
+		HasBounds:     true,
+	})
+	if err != nil {
+		t.Fatalf("WindowJoinOnWithOptions returned error: %v", err)
+	}
+	assertColumnValues(t, windowed, "bid", []any{
+		[]any{int64(80), int64(100)},
+		[]any{},
+	})
+
+	last, err := WindowJoinOnWithOptions(left, right, WindowJoinOptions{
+		TimeKey:       JoinKey{Left: "ts", Right: "ts"},
+		PartitionKeys: []JoinKey{{Left: "sym", Right: "sym"}},
+		Low:           int64(-10),
+		High:          int64(0),
+		HasBounds:     true,
+		Last:          true,
+	})
+	if err != nil {
+		t.Fatalf("WindowJoinOnWithOptions last returned error: %v", err)
+	}
+	assertColumnValues(t, last, "bid", []any{int64(100), int64(100)})
+	if gotKind, ok := last.Schema().Kind("bid"); !ok || gotKind != KindI64 {
+		t.Fatalf("last bid kind = %s, ok %v; want %s", gotKind, ok, KindI64)
+	}
+}
+
+func TestWindowJoinOnWithBoundsPreservesStableDuplicateTimesAndNulls(t *testing.T) {
+	left := mustFrame(t,
+		NewColumn("sym", []any{Symbol("a"), Symbol("a"), Symbol("a")}),
+		NewColumn("ts", []any{int64(10), int64(11), int64(20)}),
+	)
+	right := mustFrame(t,
+		NewColumn("sym", []any{Symbol("a"), Symbol("a"), Symbol("a"), Symbol("a")}),
+		NewColumn("ts", []any{int64(10), int64(10), int64(11), int64(30)}),
+		NewColumn("bid", []any{100, nil, 110, 300}),
+		NewColumn("seq", []any{1, 2, 3, 4}),
+	)
+
+	windowed, err := WindowJoinOnWithOptions(left, right, WindowJoinOptions{
+		TimeKey:       JoinKey{Left: "ts", Right: "ts"},
+		PartitionKeys: []JoinKey{{Left: "sym", Right: "sym"}},
+		Low:           int64(0),
+		High:          int64(0),
+		HasBounds:     true,
+	})
+	if err != nil {
+		t.Fatalf("WindowJoinOnWithOptions returned error: %v", err)
+	}
+	assertColumnValues(t, windowed, "bid", []any{
+		[]any{int64(100), NullValue},
+		[]any{int64(110)},
+		[]any{},
+	})
+	assertColumnValues(t, windowed, "seq", []any{
+		[]any{int64(1), int64(2)},
+		[]any{int64(3)},
+		[]any{},
+	})
+
+	last, err := WindowJoinOnWithOptions(left, right, WindowJoinOptions{
+		TimeKey:       JoinKey{Left: "ts", Right: "ts"},
+		PartitionKeys: []JoinKey{{Left: "sym", Right: "sym"}},
+		Low:           int64(0),
+		High:          int64(0),
+		HasBounds:     true,
+		Last:          true,
+	})
+	if err != nil {
+		t.Fatalf("WindowJoinOnWithOptions last returned error: %v", err)
+	}
+	assertColumnValues(t, last, "bid", []any{NullValue, int64(110), NullValue})
+	assertColumnValues(t, last, "seq", []any{int64(2), int64(3), NullValue})
+	if gotKind, ok := last.Schema().Kind("bid"); !ok || gotKind != KindI64 {
+		t.Fatalf("last bid kind = %s, ok %v; want %s", gotKind, ok, KindI64)
+	}
+	if gotKind, ok := last.Schema().Kind("seq"); !ok || gotKind != KindI64 {
+		t.Fatalf("last seq kind = %s, ok %v; want %s", gotKind, ok, KindI64)
+	}
+}
+
+func TestWindowJoinOnWithTimespanBoundsForTimestampKey(t *testing.T) {
+	left := mustFrame(t,
+		NewColumn("sym", []any{Symbol("a"), Symbol("a"), Symbol("a")}),
+		NewColumn("ts", []any{
+			TimestampFromUnixNanos(10 * 1_000_000_000),
+			TimestampFromUnixNanos(70 * 1_000_000_000),
+			NullValue,
+		}),
+	)
+	right := mustFrame(t,
+		NewColumn("sym", []any{Symbol("a"), Symbol("a"), Symbol("a"), Symbol("a")}),
+		NewColumn("ts", []any{
+			TimestampFromUnixNanos(0),
+			TimestampFromUnixNanos(10 * 1_000_000_000),
+			TimestampFromUnixNanos(11 * 1_000_000_000),
+			TimestampFromUnixNanos(70 * 1_000_000_000),
+		}),
+		NewColumn("bid", []any{99.0, 100.0, 101.0, 170.0}),
+	)
+
+	windowed, err := WindowJoinOnWithOptions(left, right, WindowJoinOptions{
+		TimeKey:       JoinKey{Left: "ts", Right: "ts"},
+		PartitionKeys: []JoinKey{{Left: "sym", Right: "sym"}},
+		Low:           TimespanFromNanos(-60 * 1_000_000_000),
+		High:          TimespanFromNanos(0),
+		HasBounds:     true,
+	})
+	if err != nil {
+		t.Fatalf("WindowJoinOnWithOptions returned error: %v", err)
+	}
+	assertColumnValues(t, windowed, "bid", []any{
+		[]any{99.0, 100.0},
+		[]any{100.0, 101.0, 170.0},
+		[]any{},
+	})
+
+	last, err := WindowJoinOnWithOptions(left, right, WindowJoinOptions{
+		TimeKey:       JoinKey{Left: "ts", Right: "ts"},
+		PartitionKeys: []JoinKey{{Left: "sym", Right: "sym"}},
+		Low:           TimespanFromNanos(-60 * 1_000_000_000),
+		High:          TimespanFromNanos(0),
+		HasBounds:     true,
+		Last:          true,
+	})
+	if err != nil {
+		t.Fatalf("WindowJoinOnWithOptions last returned error: %v", err)
+	}
+	assertColumnValues(t, last, "bid", []any{100.0, 170.0, NullValue})
+	if gotKind, ok := last.Schema().Kind("bid"); !ok || gotKind != KindF64 {
+		t.Fatalf("last bid kind = %s, ok %v; want %s", gotKind, ok, KindF64)
+	}
+}
+
+func TestWindowJoinMultiKeyUnsortedTemporalNullsAndAggregates(t *testing.T) {
+	left := mustFrame(t,
+		NewColumn("trade_id", []any{1, 2, 3, 4, 5}),
+		NewColumn("sym", []any{Symbol("AAPL"), Symbol("AAPL"), Symbol("AAPL"), Symbol("MSFT"), Symbol("AAPL")}),
+		NewColumn("venue", []any{Symbol("XNAS"), Symbol("XNAS"), Symbol("BATS"), Symbol("XNAS"), Symbol("XNAS")}),
+		NewColumn("ts", []any{
+			TimestampFromUnixNanos(30 * 1_000_000_000),
+			TimestampFromUnixNanos(60 * 1_000_000_000),
+			TimestampFromUnixNanos(45 * 1_000_000_000),
+			TimestampFromUnixNanos(20 * 1_000_000_000),
+			NullForKind(KindTimestamp),
+		}),
+	)
+	right := mustFrame(t,
+		NewColumn("ticker", []any{Symbol("AAPL"), Symbol("AAPL"), Symbol("AAPL"), Symbol("AAPL"), Symbol("MSFT"), Symbol("AAPL"), Symbol("AAPL")}),
+		NewColumn("market", []any{Symbol("XNAS"), Symbol("XNAS"), Symbol("XNAS"), Symbol("BATS"), Symbol("XNAS"), Symbol("XNAS"), Symbol("BATS")}),
+		NewColumn("quote_time", []any{
+			TimestampFromUnixNanos(20 * 1_000_000_000),
+			TimestampFromUnixNanos(0),
+			TimestampFromUnixNanos(70 * 1_000_000_000),
+			TimestampFromUnixNanos(40 * 1_000_000_000),
+			TimestampFromUnixNanos(10 * 1_000_000_000),
+			NullForKind(KindTimestamp),
+			TimestampFromUnixNanos(0),
+		}),
+		NewColumn("bid", []any{101.0, 100.0, 110.0, 200.0, 300.0, 999.0, 190.0}),
+		NewColumn("bid_size", []any{20, 10, 110, 50, 30, 999, 19}),
+	)
+
+	windowed, err := WindowJoinOnWithOptions(left, right, WindowJoinOptions{
+		TimeKey: JoinKey{Left: "ts", Right: "quote_time"},
+		PartitionKeys: []JoinKey{
+			{Left: "sym", Right: "ticker"},
+			{Left: "venue", Right: "market"},
+		},
+		Low:       TimespanFromNanos(-30 * 1_000_000_000),
+		High:      TimespanFromNanos(0),
+		HasBounds: true,
+	})
+	if err != nil {
+		t.Fatalf("WindowJoinOnWithOptions returned error: %v", err)
+	}
+	assertColumnValues(t, windowed, "bid", []any{
+		[]any{100.0, 101.0},
+		[]any{},
+		[]any{200.0},
+		[]any{300.0},
+		[]any{},
+	})
+
+	plan := From(windowed)
+	plan.Select = []SelectItem{
+		{Name: "trade_id", Expr: ColumnRef{Name: "trade_id"}},
+		{Name: "n", Expr: ListAggregateExpr{Func: "count", Expr: ColumnRef{Name: "bid"}}},
+		{Name: "sum_size", Expr: ListAggregateExpr{Func: "sum", Expr: ColumnRef{Name: "bid_size"}}},
+		{Name: "avg_bid", Expr: ListAggregateExpr{Func: "avg", Expr: ColumnRef{Name: "bid"}}},
+		{Name: "last_bid", Expr: ListAggregateExpr{Func: "last", Expr: ColumnRef{Name: "bid"}}},
+	}
+	got, err := plan.Exec()
+	if err != nil {
+		t.Fatalf("window aggregate plan returned error: %v", err)
+	}
+	assertColumnValues(t, got, "trade_id", []any{int64(1), int64(2), int64(3), int64(4), int64(5)})
+	assertColumnValues(t, got, "n", []any{int64(2), int64(0), int64(1), int64(1), int64(0)})
+	assertColumnValues(t, got, "sum_size", []any{30.0, 0.0, 50.0, 30.0, 0.0})
+	assertColumnValues(t, got, "last_bid", []any{101.0, NullValue, 200.0, 300.0, NullValue})
+	assertColumnValues(t, got, "avg_bid", []any{100.5, NullValue, 200.0, 300.0, NullValue})
+}
+
+func TestListAggregateExprAggregatesWindowLists(t *testing.T) {
+	frame := mustFrame(t,
+		NewColumn("sym", []any{Symbol("a"), Symbol("b"), Symbol("c")}),
+		NewColumn("bid", []any{
+			[]any{100.0, NullValue, 101.0},
+			[]any{},
+			[]any{NullValue},
+		}),
+	)
+	plan := From(frame)
+	plan.Select = []SelectItem{
+		{Name: "sym", Expr: ColumnRef{Name: "sym"}},
+		{Name: "n", Expr: ListAggregateExpr{Func: "count", Expr: ColumnRef{Name: "bid"}}},
+		{Name: "sum_bid", Expr: ListAggregateExpr{Func: "sum", Expr: ColumnRef{Name: "bid"}}},
+		{Name: "avg_bid", Expr: ListAggregateExpr{Func: "avg", Expr: ColumnRef{Name: "bid"}}},
+		{Name: "var_bid", Expr: ListAggregateExpr{Func: "var", Expr: ColumnRef{Name: "bid"}}},
+		{Name: "dev_bid", Expr: ListAggregateExpr{Func: "dev", Expr: ColumnRef{Name: "bid"}}},
+		{Name: "med_bid", Expr: ListAggregateExpr{Func: "med", Expr: ColumnRef{Name: "bid"}}},
+		{Name: "min_bid", Expr: ListAggregateExpr{Func: "min", Expr: ColumnRef{Name: "bid"}}},
+		{Name: "max_bid", Expr: ListAggregateExpr{Func: "max", Expr: ColumnRef{Name: "bid"}}},
+		{Name: "first_bid", Expr: ListAggregateExpr{Func: "first", Expr: ColumnRef{Name: "bid"}}},
+		{Name: "last_bid", Expr: ListAggregateExpr{Func: "last", Expr: ColumnRef{Name: "bid"}}},
+	}
+	got, err := plan.Exec()
+	if err != nil {
+		t.Fatalf("ListAggregateExpr query returned error: %v", err)
+	}
+	assertColumnValues(t, got, "n", []any{int64(3), int64(0), int64(1)})
+	assertColumnValues(t, got, "sum_bid", []any{201.0, 0.0, 0.0})
+	assertColumnValues(t, got, "avg_bid", []any{100.5, NullValue, NullValue})
+	assertColumnValues(t, got, "var_bid", []any{0.25, NullValue, NullValue})
+	assertColumnValues(t, got, "dev_bid", []any{0.5, NullValue, NullValue})
+	assertColumnValues(t, got, "med_bid", []any{100.5, NullValue, NullValue})
+	assertColumnValues(t, got, "min_bid", []any{100.0, NullValue, NullValue})
+	assertColumnValues(t, got, "max_bid", []any{101.0, NullValue, NullValue})
+	assertColumnValues(t, got, "first_bid", []any{100.0, NullValue, NullValue})
+	assertColumnValues(t, got, "last_bid", []any{101.0, NullValue, NullValue})
+}
+
+func TestAsofJoinSameNameKeys(t *testing.T) {
+	left := mustFrame(t,
+		NewColumn("sym", []any{Symbol("a"), Symbol("a"), Symbol("b")}),
+		NewColumn("ts", []any{int64(1), int64(3), int64(2)}),
+	)
+	right := mustFrame(t,
+		NewColumn("sym", []any{Symbol("a"), Symbol("a"), Symbol("b")}),
+		NewColumn("ts", []any{int64(2), int64(3), int64(1)}),
+		NewColumn("value", []any{"a2", "a3", "b1"}),
+	)
+
+	got, err := AsofJoin(left, right, "ts", "sym")
+	if err != nil {
+		t.Fatalf("AsofJoin returned error: %v", err)
+	}
+
+	assertColumnNames(t, got, []Symbol{"sym", "ts", "value"})
+	assertColumnValues(t, got, "value", []any{NullValue, "a3", "b1"})
+}
+
+func TestAsofJoinWithoutPartitionUsesGlobalLatestTime(t *testing.T) {
+	left := mustFrame(t,
+		NewColumn("ts", []any{int64(0), int64(5), int64(10), nil, int64(11)}),
+		NewColumn("qty", []any{1, 2, 3, 4, 5}),
+		NewColumn("tag", []any{"l0", "l5", "l10", "lnull", "l11"}),
+	)
+	right := mustFrame(t,
+		NewColumn("ts", []any{int64(10), int64(3), nil, int64(10), int64(7)}),
+		NewColumn("quote", []any{"r10-first", "r3", "rnull", "r10-last", "r7"}),
+		NewColumn("tag", []any{"rt10a", "rt3", "rtnull", "rt10b", "rt7"}),
+	)
+
+	got, err := AsofJoin(left, right, "ts")
+	if err != nil {
+		t.Fatalf("AsofJoin returned error: %v", err)
+	}
+
+	assertColumnNames(t, got, []Symbol{"ts", "qty", "tag", "quote", "tag_right"})
+	assertColumnValues(t, got, "quote", []any{NullValue, "r3", "r10-last", NullValue, "r10-last"})
+	assertColumnValues(t, got, "tag_right", []any{NullValue, "rt3", "rt10b", NullValue, "rt10b"})
+	if gotKind, ok := got.Schema().Kind("quote"); !ok || gotKind != KindString {
+		t.Fatalf("quote kind = %s, ok %v; want %s", gotKind, ok, KindString)
+	}
+}
+
+func TestWindowJoinWithoutPartitionUsesGlobalTimeWindow(t *testing.T) {
+	left := mustFrame(t,
+		NewColumn("ts", []any{int64(0), int64(5), int64(10), nil, int64(11)}),
+		NewColumn("tag", []any{"l0", "l5", "l10", "lnull", "l11"}),
+	)
+	right := mustFrame(t,
+		NewColumn("ts", []any{int64(10), int64(3), nil, int64(10), int64(7)}),
+		NewColumn("quote", []any{"r10-first", "r3", "rnull", "r10-last", "r7"}),
+	)
+
+	windowed, err := WindowJoinOn(left, right, JoinKey{Left: "ts", Right: "ts"})
+	if err != nil {
+		t.Fatalf("WindowJoinOn returned error: %v", err)
+	}
+
+	assertColumnNames(t, windowed, []Symbol{"ts", "tag", "quote"})
+	assertColumnValues(t, windowed, "quote", []any{[]any{}, []any{"r3"}, []any{"r3", "r7", "r10-first", "r10-last"}, []any{}, []any{"r3", "r7", "r10-first", "r10-last"}})
+
+	last, err := WindowJoinOnWithOptions(left, right, WindowJoinOptions{
+		TimeKey: JoinKey{Left: "ts", Right: "ts"},
+		Last:    true,
+	})
+	if err != nil {
+		t.Fatalf("WindowJoinOnWithOptions last returned error: %v", err)
+	}
+	assertColumnValues(t, last, "quote", []any{NullValue, "r3", "r10-last", NullValue, "r10-last"})
+}
+
+func TestAsofJoinDuplicateExactTimesUsesStableLastRightRow(t *testing.T) {
+	left := mustFrame(t,
+		NewColumn("sym", []any{Symbol("a"), Symbol("a"), Symbol("a")}),
+		NewColumn("ts", []any{int64(9), int64(10), int64(11)}),
+	)
+	right := mustFrame(t,
+		NewColumn("sym", []any{Symbol("a"), Symbol("a"), Symbol("a"), Symbol("a")}),
+		NewColumn("ts", []any{int64(8), int64(10), int64(10), int64(12)}),
+		NewColumn("quote", []any{"r8", "r10-first", "r10-last", "r12"}),
+		NewColumn("seq", []any{1, 2, 3, 4}),
+	)
+
+	got, err := AsofJoin(left, right, "ts", "sym")
+	if err != nil {
+		t.Fatalf("AsofJoin returned error: %v", err)
+	}
+
+	assertColumnValues(t, got, "quote", []any{"r8", "r10-last", "r10-last"})
+	assertColumnValues(t, got, "seq", []any{int64(1), int64(3), int64(3)})
+}
+
+func TestAsofAndWindowJoinBoundaryContract(t *testing.T) {
+	left := mustFrame(t,
+		NewColumn("sym", []any{Symbol("a"), Symbol("a"), Symbol("a"), Symbol("b"), Symbol("c")}),
+		NewColumn("ts", []any{int64(7), int64(10), int64(11), int64(10), int64(10)}),
+		NewColumn("trade_id", []any{1, 2, 3, 4, 5}),
+	)
+	right := mustFrame(t,
+		NewColumn("sym", []any{Symbol("a"), Symbol("a"), Symbol("a"), Symbol("b"), Symbol("a")}),
+		NewColumn("ts", []any{int64(8), int64(10), int64(10), int64(11), NullForKind(KindI64)}),
+		NewColumn("quote", []any{"a8", "a10-first", "a10-last", "b11", "a-null"}),
+		NewColumn("seq", []any{1, 2, 3, 4, 5}),
+	)
+
+	asof, err := AsofJoin(left, right, "ts", "sym")
+	if err != nil {
+		t.Fatalf("AsofJoin returned error: %v", err)
+	}
+	assertColumnValues(t, asof, "quote", []any{NullValue, "a10-last", "a10-last", NullValue, NullValue})
+	assertColumnValues(t, asof, "seq", []any{NullValue, int64(3), int64(3), NullValue, NullValue})
+
+	windowed, err := WindowJoinOnWithOptions(left, right, WindowJoinOptions{
+		TimeKey:       JoinKey{Left: "ts", Right: "ts"},
+		PartitionKeys: []JoinKey{{Left: "sym", Right: "sym"}},
+		Low:           int64(0),
+		High:          int64(0),
+		HasBounds:     true,
+	})
+	if err != nil {
+		t.Fatalf("WindowJoinOnWithOptions returned error: %v", err)
+	}
+	assertColumnValues(t, windowed, "quote", []any{
+		[]any{},
+		[]any{"a10-first", "a10-last"},
+		[]any{},
+		[]any{},
+		[]any{},
+	})
+	assertColumnValues(t, windowed, "seq", []any{
+		[]any{},
+		[]any{int64(2), int64(3)},
+		[]any{},
+		[]any{},
+		[]any{},
+	})
+
+	last, err := WindowJoinOnWithOptions(left, right, WindowJoinOptions{
+		TimeKey:       JoinKey{Left: "ts", Right: "ts"},
+		PartitionKeys: []JoinKey{{Left: "sym", Right: "sym"}},
+		Low:           int64(0),
+		High:          int64(0),
+		HasBounds:     true,
+		Last:          true,
+	})
+	if err != nil {
+		t.Fatalf("WindowJoinOnWithOptions last returned error: %v", err)
+	}
+	assertColumnValues(t, last, "quote", []any{NullValue, "a10-last", NullValue, NullValue, NullValue})
+	assertColumnValues(t, last, "seq", []any{NullValue, int64(3), NullValue, NullValue, NullValue})
+	if gotKind, ok := last.Schema().Kind("seq"); !ok || gotKind != KindI64 {
+		t.Fatalf("last seq kind = %s, ok %v; want %s", gotKind, ok, KindI64)
+	}
+}
+
+func TestAsofJoinTemporalTimeKeySkipsNullTimes(t *testing.T) {
+	left := mustFrame(t,
+		NewColumn("sym", []any{Symbol("a"), Symbol("a"), Symbol("a"), Symbol("b")}),
+		NewColumn("time", []any{
+			TimeFromNanos(1_000),
+			TimeFromNanos(2_500),
+			nil,
+			TimeFromNanos(2_500),
+		}),
+	)
+	right := mustFrame(t,
+		NewColumn("sym", []any{Symbol("a"), Symbol("a"), Symbol("a"), Symbol("b")}),
+		NewColumn("time", []any{
+			TimeFromNanos(500),
+			TimeFromNanos(2_000),
+			nil,
+			TimeFromNanos(3_000),
+		}),
+		NewColumn("quote", []any{"a-500", "a-2000", "a-null", "b-3000"}),
+	)
+
+	got, err := AsofJoin(left, right, "time", "sym")
+	if err != nil {
+		t.Fatalf("AsofJoin returned error: %v", err)
+	}
+
+	assertColumnValues(t, got, "time", []any{Time(1_000), Time(2_500), NullValue, Time(2_500)})
+	assertColumnValues(t, got, "quote", []any{"a-500", "a-2000", NullValue, NullValue})
+	if gotKind, ok := got.Schema().Kind("quote"); !ok || gotKind != KindString {
+		t.Fatalf("quote kind = %s, ok %v; want %s", gotKind, ok, KindString)
+	}
+}
+
+func TestQueryMutationJoinAsofTypedBoundary(t *testing.T) {
+	trades := mustFrame(t,
+		NewColumn("trade_id", []any{int64(1), int64(2), int64(3), int64(4)}),
+		NewColumn("sym", []any{Symbol("AAPL"), Symbol("AAPL"), Symbol("MSFT"), Symbol("TSLA")}),
+		NewColumn("venue", []any{"XNAS", "XNYS", "XNYS", "XNAS"}),
+		NewColumn("trade_date", []any{DateFromDays(20), DateFromDays(20), DateFromDays(21), DateFromDays(21)}),
+		NewColumn("event_ts", []any{
+			TimestampFromUnixNanos(1_000),
+			TimestampFromUnixNanos(2_000),
+			TimestampFromUnixNanos(2_500),
+			TimestampFromUnixNanos(3_000),
+		}),
+		NewColumn("price", []any{100.0, 101.0, 80.0, 200.0}),
+		NewColumn("size", []any{int64(10), int64(20), int64(30), int64(5)}),
+	)
+
+	updated, err := UpdateWhere(trades,
+		Binary{Op: OpEQ, Left: ColumnRef{Name: "sym"}, Right: Literal{Value: Symbol("AAPL")}},
+		map[Symbol]Expr{
+			"price": Binary{Op: OpAdd, Left: ColumnRef{Name: "price"}, Right: Literal{Value: 1.0}},
+			"size":  Binary{Op: OpAdd, Left: ColumnRef{Name: "size"}, Right: Literal{Value: int64(1)}},
+		},
+	)
+	if err != nil {
+		t.Fatalf("UpdateWhere returned error: %v", err)
+	}
+	assertColumnValues(t, updated, "price", []any{101.0, 102.0, 80.0, 200.0})
+	assertColumnValues(t, updated, "size", []any{int64(11), int64(21), int64(30), int64(5)})
+	if gotKind, ok := updated.Schema().Kind("event_ts"); !ok || gotKind != KindTimestamp {
+		t.Fatalf("updated event_ts kind = %s, ok %v; want %s", gotKind, ok, KindTimestamp)
+	}
+
+	trimmed, err := DeleteWhere(updated, Binary{Op: OpEQ, Left: ColumnRef{Name: "sym"}, Right: Literal{Value: Symbol("TSLA")}})
+	if err != nil {
+		t.Fatalf("DeleteWhere returned error: %v", err)
+	}
+	assertColumnValues(t, trimmed, "sym", []any{Symbol("AAPL"), Symbol("AAPL"), Symbol("MSFT")})
+
+	venues := mustFrame(t,
+		NewColumn("venue", []any{"XNAS", "XNYS"}),
+		NewColumn("region", []any{Symbol("US"), Symbol("US")}),
+		NewColumn("tier", []any{int64(1), int64(2)}),
+	)
+	enriched, err := LeftJoin(trimmed, venues, "venue")
+	if err != nil {
+		t.Fatalf("LeftJoin returned error: %v", err)
+	}
+	assertColumnValues(t, enriched, "region", []any{Symbol("US"), Symbol("US"), Symbol("US")})
+	if gotKind, ok := enriched.Schema().Kind("region"); !ok || gotKind != KindSymbol {
+		t.Fatalf("region kind = %s, ok %v; want %s", gotKind, ok, KindSymbol)
+	}
+
+	quotes := mustFrame(t,
+		NewColumn("sym", []any{Symbol("AAPL"), Symbol("AAPL"), Symbol("MSFT")}),
+		NewColumn("event_ts", []any{
+			TimestampFromUnixNanos(500),
+			TimestampFromUnixNanos(1_500),
+			TimestampFromUnixNanos(2_000),
+		}),
+		NewColumn("bid", []any{99.0, 100.5, 79.5}),
+	)
+	joined, err := AsofJoin(enriched, quotes, "event_ts", "sym")
+	if err != nil {
+		t.Fatalf("AsofJoin returned error: %v", err)
+	}
+	assertColumnValues(t, joined, "bid", []any{99.0, 100.5, 79.5})
+
+	rollup, err := Exec(joined, QueryPlan{
+		Source: joined,
+		Where:  Within{Expr: ColumnRef{Name: "trade_date"}, Low: DateFromDays(20), High: DateFromDays(21), HighClosed: true},
+		By:     []Symbol{"sym", "trade_date"},
+		Aggregates: []Aggregate{
+			{Name: "notional", Func: "sum", Expr: Binary{Op: OpMul, Left: ColumnRef{Name: "price"}, Right: ColumnRef{Name: "size"}}},
+			{Name: "fills", Func: "count"},
+			{Name: "first_bid", Func: "first", Expr: ColumnRef{Name: "bid"}},
+			{Name: "last_region", Func: "last", Expr: ColumnRef{Name: "region"}},
+		},
+		OrderBy: []OrderSpec{{Column: "sym"}, {Column: "trade_date"}},
+		LimitN:  -1,
+	})
+	if err != nil {
+		t.Fatalf("rollup Exec returned error: %v", err)
+	}
+	assertColumnNames(t, rollup, []Symbol{"sym", "trade_date", "notional", "fills", "first_bid", "last_region"})
+	assertColumnValues(t, rollup, "sym", []any{Symbol("AAPL"), Symbol("MSFT")})
+	assertColumnValues(t, rollup, "trade_date", []any{Date(20), Date(21)})
+	assertColumnValues(t, rollup, "notional", []any{3253.0, 2400.0})
+	assertColumnValues(t, rollup, "fills", []any{int64(2), int64(1)})
+	assertColumnValues(t, rollup, "first_bid", []any{99.0, 79.5})
+	assertColumnValues(t, rollup, "last_region", []any{Symbol("US"), Symbol("US")})
+	if gotKind, ok := rollup.Schema().Kind("trade_date"); !ok || gotKind != KindDate {
+		t.Fatalf("rollup trade_date kind = %s, ok %v; want %s", gotKind, ok, KindDate)
+	}
+}
+
+func TestQueryTypedUnmatchedJoinAsofAndEmptyMutationBoundary(t *testing.T) {
+	trades := mustFrame(t,
+		NewColumn("trade_id", []any{int64(1), int64(2)}),
+		NewColumn("sym", []any{Symbol("AAPL"), Symbol("MSFT")}),
+		NewColumn("venue", []any{"XNAS", "XASE"}),
+		NewColumn("event_ts", []any{
+			TimestampFromUnixNanos(1_000),
+			TimestampFromUnixNanos(2_000),
+		}),
+		NewColumn("price", []any{100.0, 80.0}),
+	)
+
+	updated, err := UpdateWhere(trades,
+		Binary{Op: OpEQ, Left: ColumnRef{Name: "sym"}, Right: Literal{Value: Symbol("IBM")}},
+		map[Symbol]Expr{"price": Binary{Op: OpAdd, Left: ColumnRef{Name: "price"}, Right: Literal{Value: 1.0}}},
+	)
+	if err != nil {
+		t.Fatalf("UpdateWhere returned error: %v", err)
+	}
+	assertColumnValues(t, updated, "price", []any{100.0, 80.0})
+
+	venues := mustFrame(t,
+		NewColumn("venue", []any{"XNAS"}),
+		NewColumn("region", []any{Symbol("US")}),
+	)
+	enriched, err := LeftJoin(updated, venues, "venue")
+	if err != nil {
+		t.Fatalf("LeftJoin returned error: %v", err)
+	}
+	assertColumnValues(t, enriched, "region", []any{Symbol("US"), NullValue})
+	if gotKind, ok := enriched.Schema().Kind("region"); !ok || gotKind != KindSymbol {
+		t.Fatalf("enriched region kind = %s, ok %v; want %s", gotKind, ok, KindSymbol)
+	}
+
+	quotes := mustFrame(t,
+		NewColumn("sym", []any{Symbol("AAPL")}),
+		NewColumn("event_ts", []any{TimestampFromUnixNanos(1_500)}),
+		NewColumn("bid", []any{99.0}),
+	)
+	joined, err := AsofJoin(enriched, quotes, "event_ts", "sym")
+	if err != nil {
+		t.Fatalf("AsofJoin returned error: %v", err)
+	}
+	assertColumnValues(t, joined, "bid", []any{NullValue, NullValue})
+	if gotKind, ok := joined.Schema().Kind("bid"); !ok || gotKind != KindF64 {
+		t.Fatalf("joined bid kind = %s, ok %v; want %s", gotKind, ok, KindF64)
+	}
+
+	rollup, err := Exec(joined, QueryPlan{
+		Source: joined,
+		By:     []Symbol{"region"},
+		Aggregates: []Aggregate{
+			{Name: "fills", Func: "count"},
+			{Name: "first_bid", Func: "first", Expr: ColumnRef{Name: "bid"}},
+		},
+		OrderBy: []OrderSpec{{Column: "region"}},
+		LimitN:  -1,
+	})
+	if err != nil {
+		t.Fatalf("rollup Exec returned error: %v", err)
+	}
+	assertColumnValues(t, rollup, "region", []any{NullValue, Symbol("US")})
+	assertColumnValues(t, rollup, "fills", []any{int64(1), int64(1)})
+	assertColumnValues(t, rollup, "first_bid", []any{NullValue, NullValue})
+
+	empty, err := DeleteWhere(joined, Binary{Op: OpGE, Left: ColumnRef{Name: "price"}, Right: Literal{Value: 0.0}})
+	if err != nil {
+		t.Fatalf("DeleteWhere returned error: %v", err)
+	}
+	if empty.Len() != 0 {
+		t.Fatalf("empty Len = %d, want 0", empty.Len())
+	}
+	if gotKind, ok := empty.Schema().Kind("event_ts"); !ok || gotKind != KindTimestamp {
+		t.Fatalf("empty event_ts kind = %s, ok %v; want %s", gotKind, ok, KindTimestamp)
+	}
+	if gotKind, ok := empty.Schema().Kind("region"); !ok || gotKind != KindSymbol {
+		t.Fatalf("empty region kind = %s, ok %v; want %s", gotKind, ok, KindSymbol)
+	}
+	if gotKind, ok := empty.Schema().Kind("bid"); !ok || gotKind != KindF64 {
+		t.Fatalf("empty bid kind = %s, ok %v; want %s", gotKind, ok, KindF64)
+	}
+}
+
+func TestAsofJoinRejectsInvalidKeys(t *testing.T) {
+	left := mustFrame(t,
+		NewColumn("sym", []any{Symbol("a")}),
+		NewColumn("ts", []any{int64(1)}),
+	)
+	right := mustFrame(t,
+		NewColumn("sym", []any{Symbol("a")}),
+		NewColumn("time", []any{int64(1)}),
+	)
+
+	if _, err := AsofJoinOn(left, right, JoinKey{Left: "ts", Right: "time"}, JoinKey{Left: "missing", Right: "sym"}); err == nil {
+		t.Fatal("AsofJoinOn accepted missing partition key")
+	}
+	if _, err := AsofJoinOn(left, right, JoinKey{Left: "ts", Right: "missing"}, JoinKey{Left: "sym", Right: "sym"}); err == nil {
+		t.Fatal("AsofJoinOn accepted missing time key")
+	}
+	if _, err := AsofJoinOn(left, right, JoinKey{Left: "ts", Right: "time"}, JoinKey{Left: "ts", Right: "time"}); err == nil {
+		t.Fatal("AsofJoinOn accepted time key as a partition key")
+	}
+	if _, err := AsofJoinOn(left, right, JoinKey{Left: "sym", Right: "sym"}); err == nil {
+		t.Fatal("AsofJoinOn accepted non-time symbol key")
+	}
+	if _, err := WindowJoinOn(left, right, JoinKey{Left: "sym", Right: "sym"}); err == nil {
+		t.Fatal("WindowJoinOn accepted non-time symbol key")
+	}
+}
+
+func TestXGroupAndUngroup(t *testing.T) {
+	frame := mustFrame(t,
+		NewColumn("sym", []any{Symbol("AAPL"), Symbol("AAPL"), Symbol("MSFT")}),
+		NewColumn("venue", []any{Symbol("XNYS"), Symbol("XNYS"), Symbol("XNAS")}),
+		NewColumn("price", []any{int64(100), int64(101), int64(80)}),
+		NewColumn("size", []any{int64(10), int64(11), int64(20)}),
+	)
+
+	grouped, err := XGroup(frame, "sym", "venue")
+	if err != nil {
+		t.Fatalf("XGroup returned error: %v", err)
+	}
+	if keys := grouped.Keys(); !reflect.DeepEqual(keys, []Symbol{"sym", "venue"}) {
+		t.Fatalf("grouped keys = %#v, want sym venue", keys)
+	}
+	groupedFrame := grouped.Frame()
+	assertColumnNames(t, groupedFrame, []Symbol{"sym", "venue", "price", "size"})
+	if groupedFrame.Len() != 2 {
+		t.Fatalf("grouped Len = %d, want 2", groupedFrame.Len())
+	}
+	priceCol := mustColumn(t, groupedFrame, "price")
+	firstPrices, ok := mustArrayCell(t, priceCol, 0)
+	if !ok || !reflect.DeepEqual(firstPrices.Values(), []any{int64(100), int64(101)}) {
+		t.Fatalf("first grouped prices = %#v", firstPrices)
+	}
+	secondPrices, ok := mustArrayCell(t, priceCol, 1)
+	if !ok || !reflect.DeepEqual(secondPrices.Values(), []any{int64(80)}) {
+		t.Fatalf("second grouped prices = %#v", secondPrices)
+	}
+
+	ungrouped, err := Ungroup(grouped.Frame())
+	if err != nil {
+		t.Fatalf("Ungroup returned error: %v", err)
+	}
+	assertColumnNames(t, ungrouped, []Symbol{"sym", "venue", "price", "size"})
+	assertColumnValues(t, ungrouped, "sym", []any{Symbol("AAPL"), Symbol("AAPL"), Symbol("MSFT")})
+	assertColumnValues(t, ungrouped, "venue", []any{Symbol("XNYS"), Symbol("XNYS"), Symbol("XNAS")})
+	assertColumnValues(t, ungrouped, "price", []any{int64(100), int64(101), int64(80)})
+	assertColumnValues(t, ungrouped, "size", []any{int64(10), int64(11), int64(20)})
+}
+
+func TestUngroupRejectsMismatchedNestedLengths(t *testing.T) {
+	frame := mustFrame(t,
+		NewColumn("sym", []any{Symbol("AAPL")}),
+		NewColumn("price", []any{NewI64([]int64{100, 101})}),
+		NewColumn("size", []any{NewI64([]int64{10})}),
+	)
+	if _, err := Ungroup(frame); err == nil {
+		t.Fatal("Ungroup accepted mismatched nested column lengths")
+	}
+}
+
+func mustFrame(t testing.TB, cols ...Column) Frame {
 	t.Helper()
 	frame, err := NewFrame(cols...)
 	if err != nil {
 		t.Fatalf("NewFrame returned error: %v", err)
 	}
 	return frame
+}
+
+func mustColumn(t *testing.T, frame Frame, name Symbol) Array {
+	t.Helper()
+	col, ok := frame.Column(name)
+	if !ok {
+		t.Fatalf("missing column %q", name)
+	}
+	return col
+}
+
+func mustArrayCell(t *testing.T, col Array, row int) (Array, bool) {
+	t.Helper()
+	value, ok := col.At(row)
+	if !ok {
+		t.Fatalf("column row %d out of range", row)
+	}
+	array, ok := value.(Array)
+	return array, ok
 }
 
 func assertColumnNames(t *testing.T, frame Frame, want []Symbol) {
@@ -782,5 +4910,231 @@ func assertColumnValues(t *testing.T, frame Frame, name Symbol, want []any) {
 	}
 	if got := col.Values(); !reflect.DeepEqual(got, want) {
 		t.Fatalf("column %q = %#v, want %#v", name, got, want)
+	}
+}
+
+func BenchmarkQueryKernelTypedFilterProjection(b *testing.B) {
+	const rows = 10000
+	syms := make([]string, rows)
+	qty := make([]int64, rows)
+	price := make([]float64, rows)
+	for i := 0; i < rows; i++ {
+		if i%2 == 0 {
+			syms[i] = "AAPL"
+		} else {
+			syms[i] = "MSFT"
+		}
+		qty[i] = int64(i % 100)
+		price[i] = float64(i) * 0.25
+	}
+	frame := mustFrame(b,
+		Column{Name: "sym", Data: NewSymbols(syms)},
+		Column{Name: "qty", Data: NewI64(qty)},
+		Column{Name: "price", Data: NewF64(price)},
+	)
+	plan := QueryPlan{
+		Source: frame,
+		Where:  Binary{Op: OpGE, Left: ColumnRef{Name: "qty"}, Right: Literal{Value: int64(50)}},
+		Select: []SelectItem{
+			{Name: "sym", Expr: ColumnRef{Name: "sym"}},
+			{Name: "qty", Expr: ColumnRef{Name: "qty"}},
+			{Name: "notional", Expr: Binary{Op: OpMul, Left: ColumnRef{Name: "qty"}, Right: ColumnRef{Name: "price"}}},
+		},
+		LimitN: -1,
+	}
+	kernel, ok, err := CompileQueryKernel(frame, plan)
+	if err != nil {
+		b.Fatalf("CompileQueryKernel returned error: %v", err)
+	}
+	if !ok {
+		b.Fatal("CompileQueryKernel returned ok=false")
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		out, err := kernel.Exec(frame)
+		if err != nil {
+			b.Fatalf("kernel Exec returned error: %v", err)
+		}
+		if out.Len() != rows/2 {
+			b.Fatalf("kernel output len = %d, want %d", out.Len(), rows/2)
+		}
+	}
+}
+
+func BenchmarkExecFilteredGroupedCountByIndexedSymbol(b *testing.B) {
+	const rows = 100000
+	syms := make([]string, rows)
+	qty := make([]int64, rows)
+	for i := 0; i < rows; i++ {
+		switch i % 4 {
+		case 0:
+			syms[i] = "AAPL"
+		case 1:
+			syms[i] = "MSFT"
+		case 2:
+			syms[i] = "NVDA"
+		default:
+			syms[i] = "TSLA"
+		}
+		qty[i] = int64(i % 100)
+	}
+	frame := mustFrame(b,
+		Column{Name: "sym", Data: WithArrayAttribute(NewSymbols(syms), ArrayAttributeGrouped)},
+		Column{Name: "qty", Data: NewI64(qty)},
+	)
+	plan := QueryPlan{
+		Source: frame,
+		Where:  Binary{Op: OpGT, Left: ColumnRef{Name: "qty"}, Right: Literal{Value: int64(50)}},
+		By:     []Symbol{"sym"},
+		Aggregates: []Aggregate{
+			{Name: "rows", Func: "count"},
+		},
+		LimitN: -1,
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		out, err := Exec(frame, plan)
+		if err != nil {
+			b.Fatalf("Exec returned error: %v", err)
+		}
+		if out.Len() != 4 {
+			b.Fatalf("Exec output len = %d, want 4", out.Len())
+		}
+	}
+}
+
+func BenchmarkExecIndexedGroupedMixedAggregates(b *testing.B) {
+	const rows = 100000
+	syms := make([]string, rows)
+	qty := make([]int32, rows)
+	price := make([]float64, rows)
+	for i := 0; i < rows; i++ {
+		switch i % 4 {
+		case 0:
+			syms[i] = "AAPL"
+		case 1:
+			syms[i] = "MSFT"
+		case 2:
+			syms[i] = "NVDA"
+		default:
+			syms[i] = "TSLA"
+		}
+		qty[i] = int32(i % 100)
+		price[i] = 100 + float64(i%50)
+	}
+	frame := mustFrame(b,
+		Column{Name: "sym", Data: WithArrayAttribute(NewSymbols(syms), ArrayAttributeGrouped)},
+		Column{Name: "qty", Data: NewI32(qty)},
+		Column{Name: "price", Data: NewF64(price)},
+	)
+	plan := QueryPlan{
+		Source: frame,
+		By:     []Symbol{"sym"},
+		Aggregates: []Aggregate{
+			{Name: "total_qty", Func: "sum", Expr: ColumnRef{Name: "qty"}},
+			{Name: "avg_price", Func: "avg", Expr: ColumnRef{Name: "price"}},
+			{Name: "low_price", Func: "min", Expr: ColumnRef{Name: "price"}},
+			{Name: "high_price", Func: "max", Expr: ColumnRef{Name: "price"}},
+			{Name: "fills", Func: "count"},
+		},
+		LimitN: -1,
+	}
+	kernel, ok, err := CompileQueryKernel(frame, plan)
+	if err != nil {
+		b.Fatalf("CompileQueryKernel returned error: %v", err)
+	}
+	if !ok {
+		b.Fatal("CompileQueryKernel returned ok=false")
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		out, err := kernel.Exec(frame)
+		if err != nil {
+			b.Fatalf("kernel Exec returned error: %v", err)
+		}
+		if out.Len() != 4 {
+			b.Fatalf("kernel output len = %d, want 4", out.Len())
+		}
+	}
+}
+
+func BenchmarkFilterIndexesTypedCompare(b *testing.B) {
+	const rows = 100000
+	qty := make([]int64, rows)
+	for i := 0; i < rows; i++ {
+		qty[i] = int64(i % 100)
+	}
+	frame := mustFrame(b, Column{Name: "qty", Data: NewI64(qty)})
+	where := Binary{Op: OpGE, Left: ColumnRef{Name: "qty"}, Right: Literal{Value: int64(50)}}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		indexes, err := filterIndexes(frame, where)
+		if err != nil {
+			b.Fatalf("filterIndexes returned error: %v", err)
+		}
+		if len(indexes) != rows/2 {
+			b.Fatalf("indexes len = %d, want %d", len(indexes), rows/2)
+		}
+	}
+}
+
+func BenchmarkFilterIndexesTypedWithin(b *testing.B) {
+	const rows = 100000
+	ts := make([]Timestamp, rows)
+	for i := 0; i < rows; i++ {
+		ts[i] = Timestamp(i % 100)
+	}
+	frame := mustFrame(b, Column{Name: "ts", Data: NewTimestamp(ts)})
+	where := Within{Expr: ColumnRef{Name: "ts"}, Low: Timestamp(25), High: Timestamp(75), HighClosed: false}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		indexes, err := filterIndexes(frame, where)
+		if err != nil {
+			b.Fatalf("filterIndexes returned error: %v", err)
+		}
+		if len(indexes) != rows/2 {
+			b.Fatalf("indexes len = %d, want %d", len(indexes), rows/2)
+		}
+	}
+}
+
+func BenchmarkFilterIndexesEncodedSymbolCompare(b *testing.B) {
+	const rows = 100000
+	syms := make([]Symbol, rows)
+	for i := 0; i < rows; i++ {
+		switch i % 4 {
+		case 0:
+			syms[i] = "AAPL"
+		case 1:
+			syms[i] = "MSFT"
+		case 2:
+			syms[i] = "NVDA"
+		default:
+			syms[i] = "TSLA"
+		}
+	}
+	frame := mustFrame(b, Column{Name: "sym", Data: NewEncodedSymbols(syms)})
+	where := Binary{Op: OpEQ, Left: ColumnRef{Name: "sym"}, Right: Literal{Value: Symbol("AAPL")}}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		indexes, err := filterIndexes(frame, where)
+		if err != nil {
+			b.Fatalf("filterIndexes returned error: %v", err)
+		}
+		if len(indexes) != rows/4 {
+			b.Fatalf("indexes len = %d, want %d", len(indexes), rows/4)
+		}
 	}
 }

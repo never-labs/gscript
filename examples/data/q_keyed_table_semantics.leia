@@ -1,0 +1,31 @@
+// q_keyed_table_semantics.leia - keyed table duplicate-key and value lookup subset.
+// Run:
+//   go run ./cmd/leia run examples/data/q_keyed_table_semantics.leia
+
+bars := data.frame({
+  sym: data.symbols({"AAPL", "AAPL", "MSFT"}),
+  bucket: data.strings({"09:30", "09:30", "09:31"}),
+  seq: data.i64({1, 2, 3}),
+  px: data.f64({100.0, 100.5, 80.0}),
+})
+
+keyed := q.key_by(bars, "sym", "bucket")
+key_rows := q.key(keyed)
+value_rows := q.value(keyed)
+latest := q.lookup(keyed, key_rows[1])
+all_aapl := q.sql(keyed, "select sym,bucket,seq,px from bars where sym=`AAPL order by seq asc")
+missing := q.lookup(keyed, "AAPL", "09:32")
+
+assert(#key_rows == 3 && key_rows[1].seq == nil)
+assert(#value_rows == 3 && value_rows[1].sym == nil)
+assert(#latest == 1 && latest[1].seq == 2 && latest[1].sym == nil)
+assert(#all_aapl == 2 && all_aapl[1].seq == 1 && all_aapl[2].seq == 2)
+assert(#missing == 0 && missing.column_kinds.px == "f64")
+
+print(string.format(
+  "q keyed semantics latest_seq=%d duplicate_rows=%d value_cols=%s/%s",
+  latest[1].seq,
+  #all_aapl,
+  q.cols(keyed)[1],
+  q.cols(keyed)[2]
+))

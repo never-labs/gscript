@@ -4,6 +4,9 @@
 // specialize operations (e.g., Add -> AddInt when operands are always integers).
 //
 // Type lattice: Unobserved -> {Int,Float,String,Bool,Table,Function} -> Any.
+// Runtime frame/keyed-frame facades intentionally share the Table bucket: they
+// are table-backed payload facades, while q/data specialization carries the
+// finer schema facts outside this scalar lattice.
 // Monotonic: once a slot observes a second distinct type, it becomes Any and
 // stays there forever to prevent deopt-reopt cycles.
 package vm
@@ -66,6 +69,8 @@ var feedbackFromValueType = [...]FeedbackType{
 	runtime.TypeChannel:    FBAny, // rare; treat as polymorphic
 	runtime.TypeDenseArray: FBAny, // data-oriented values are guarded by their own shape/version facts
 	runtime.TypeSoA:        FBAny, // data-oriented values are guarded by their own shape/version facts
+	runtime.TypeFrame:      FBTable,
+	runtime.TypeKeyedFrame: FBTable,
 }
 
 // Observe records a new type observation. Monotonic: never narrows.

@@ -1,0 +1,15 @@
+print("case:q_vector_dict_flip_adverbs_project")
+
+result := dofile("examples/data/q_vector_dict_flip_adverbs_project/main.leia")
+
+assert(result.summary != "")
+assert(q.count(result.prices) == 4)
+assert(result.prices[2] == 101.5)
+assert(result.sizes[4] == 40)
+assert(result.symbols[3] == "AAPL")
+assert(result.notional[4] == 4080.0)
+assert(q.count(result.table) == 4)
+assert(result.table[2].sym == "MSFT")
+assert(result.metadata[2].c == "price")
+
+print("ok")

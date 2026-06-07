@@ -1,0 +1,30 @@
+// q_multi_key_join.leia - q-style multi-key and aliased-key join over frames.
+// Run:
+//   go run ./cmd/leia run examples/data/q_multi_key_join.leia
+
+positions := data.frame({
+  acct: data.symbols({"a1", "a1", "a2", "a3"}),
+  sym: data.symbols({"AAPL", "MSFT", "AAPL", "NVDA"}),
+  asof: data.strings({"2026-06-01", "2026-06-01", "2026-06-02", "2026-06-02"}),
+  qty: data.i64({11, 21, 15, 5}),
+})
+
+limits := data.frame({
+  account: data.symbols({"a1", "a1", "a2", "a3", "a3"}),
+  effective: data.strings({"2026-06-01", "2026-06-02", "2026-06-02", "2026-06-01", "2026-06-02"}),
+  region: data.strings({"US", "EU", "US", "APAC", "US"}),
+  max_qty: data.i64({100, 200, 150, 50, 75}),
+})
+
+joined := q.sql(
+  "select acct,sym,asof,qty,region,max_qty from positions join limits on acct=account,asof=effective order by acct asc,sym asc",
+  {positions: positions, limits: limits}
+)
+
+assert(#joined == 4)
+assert(joined[1].acct == "a1" && joined[1].region == "US")
+assert(joined[2].sym == "MSFT" && joined[2].max_qty == 100)
+assert(joined[3].sym == "AAPL" && joined[3].max_qty == 150)
+assert(joined[4].sym == "NVDA" && joined[4].max_qty == 75)
+
+print("q multi-key join rows=" .. #joined .. " first_region=" .. joined[1].region .. " last_limit=" .. joined[4].max_qty)

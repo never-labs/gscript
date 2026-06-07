@@ -1,0 +1,123 @@
+// q_temporal_window_analytics_project - q/kdb+-style temporal/window analytics.
+// Run:
+//   go run ./cmd/leia run examples/data/q_temporal_window_analytics_project/main.leia
+
+func check(name, ok) {
+    assert(ok)
+    print("ok", name)
+}
+
+fees := q.eval("`XNAS`BATS`XNYS`ARCX!0.00030 0.00020 0.00035 0.00025")
+running_qty := q.eval("+\\100 50 25 10")
+size_delta := q.eval("-':100 120 90 130")
+mod_buckets := q.eval("mod\\10 3 4")
+volume_product := q.eval("prd 2 3 5")
+volume_products := q.eval("prds 2 3 5")
+price_ratios := q.eval("ratios 100 105 110.25")
+all_flags := q.eval("all 1 1 1")
+any_flags := q.eval("any 0 0 1")
+
+check("q adverbs extended verbs", running_qty[4] == 185 && size_delta[3] == -30 && mod_buckets[3] == 1 && volume_product == 30 && volume_products[3] == 30 && math.floor(price_ratios[3] * 1000) == 1050 && all_flags == true && any_flags == true)
+
+calendar := q.sql(
+    "select sym,mon,dt,span,minute_mark,second_mark,ts from ([] sym:`AAPL`MSFT`NVDA`TSLA; mon:2026.06 2026.06 2026.07 0Nm; dt:2026.06.06T09:30:00.000 2026.06.06T09:31:00.000 2026.07.01T10:00:00.000 0Nz; span:0D00:00:01.000 0D00:00:02.000 1D00:00:00.000 0Nn; minute_mark:09:30 09:31 10:00 0Nu; second_mark:09:30:00 09:31:00 10:00:00 0Nv; ts:2026.06.06D09:30:00 2026.06.06D09:31:00 2026.07.01D10:00:00 0Np)",
+    {}
+)
+
+check("q extended temporal literals", #calendar == 4 && calendar[1].mon == "2026.06" && calendar[1].dt == "2026-06-06T09:30:00" && calendar[1].span == "0D00:00:01" && calendar[1].minute_mark == "09:30" && calendar[1].second_mark == "09:30:00")
+check("q extended temporal typed nulls", calendar[4].mon == nil && calendar[4].dt == nil && calendar[4].span == nil && calendar[4].minute_mark == nil && calendar[4].second_mark == nil && calendar[4].ts == nil)
+
+quotes := q.sql(
+    "select quote_id,sym,ts,bid,ask,bid_sz,ask_sz,venue from ([] quote_id:1 2 3 4 5 6 7; sym:`AAPL`AAPL`AAPL`MSFT`MSFT`NVDA`NVDA; ts:2026.06.06D09:29:30 2026.06.06D09:30:30 2026.06.06D09:31:30 2026.06.06D09:30:00 2026.06.06D09:31:30 2026.07.01D09:59:00 2026.07.01D10:01:00; bid:100.00 100.20 100.50 250.00 250.80 880.00 881.00; ask:100.20 100.45 100.75 250.40 251.10 881.00 882.00; bid_sz:500 450 400 300 320 80 75; ask_sz:420 430 390 250 310 70 70; venue:`XNAS`BATS`XNAS`XNYS`ARCX`XNAS`BATS)",
+    {}
+)
+
+trades := q.sql(
+    "select trade_id,sym,ts,price,size,venue from ([] trade_id:101 102 103 104 105; sym:`AAPL`AAPL`MSFT`NVDA`TSLA; ts:2026.06.06D09:30:45 2026.06.06D09:32:00 2026.06.06D09:31:45 2026.07.01D10:00:30 2026.06.06D09:30:45; price:100.30 100.65 250.90 880.60 205.00; size:100 80 50 10 30; venue:`BATS`XNAS`ARCX`XNAS`XNAS)",
+    {}
+)
+
+ref := q.sql(
+    "select sym,sector,tier from ([sym:`AAPL`MSFT`NVDA] sector:`hardware`software`semis; tier:1 1 2)",
+    {}
+)
+
+enriched := q.sql(
+    "select trade_id,sym,ts,price,size,bid,ask,spread:ask-bid,venue from trades asof join quotes on sym,ts order by trade_id asc",
+    {trades: trades, quotes: quotes}
+)
+
+windowed := q.sql(
+    "select trade_id,sym,ts,bid,ask,bid_sz from trades wj quotes on sym,ts order by trade_id asc",
+    {trades: trades, quotes: quotes}
+)
+
+with_notional := q.sql(enriched, "update notional:price*size from trades where size>0")
+
+analytics_source := q.sql(
+    "select trade_id,sym,ts,price,bid from ([] trade_id:101 102 106 201 202 203 301; sym:`AAPL`AAPL`AAPL`MSFT`MSFT`MSFT`TSLA; ts:2026.06.06D09:30:00 2026.06.06D09:31:00 2026.06.06D09:32:00 2026.06.06D09:30:00 2026.06.06D09:31:00 2026.06.06D09:32:00 2026.06.06D09:30:00; price:100.00 101.00 99.00 250.00 252.00 249.00 205.00; bid:100.20 0Nf 100.50 250.00 0Nf 250.80 0Nf)",
+    {}
+)
+projection_path := q.sql(
+    analytics_source,
+    "select trade_id,sym,ts,price,bid,price_delta:deltas price,price_ratio:ratios price,bid_fill:fills bid,price_mavg3:3 mavg price,price_xprev2:2 xprev price by sym from trades order by sym asc,ts asc"
+)
+sector_joined := q.sql(
+    "select trade_id,sym,sector,tier,price,size,notional,bid,ask,spread,venue from trades left join ref on sym order by trade_id asc",
+    {trades: with_notional, ref: ref}
+)
+
+sector_keyed := q.key_by(sector_joined, "sym")
+aapl_rows := q.lookup(sector_keyed, "AAPL")
+aapl_all := q.sql(sector_joined, "select trade_id,sym,sector,notional from trades where sym=`AAPL order by trade_id asc")
+missing_rows := q.lookup(sector_keyed, "IBM")
+keyed_query := q.sql(sector_keyed, "select trade_id,sym,sector,notional from trades where sym=`AAPL order by trade_id asc")
+
+bars := q.sql(
+    with_notional,
+    "select notional:sum notional,shares:sum size,fills:count i,avg_spread:avg spread,first_px:first price,last_px:last price by sym,bucket:xbar 60000000000 ts from trades order by sym asc,bucket asc"
+)
+
+pruned := q.sql(sector_joined, "delete tier from trades")
+fee_report := q.sql(
+    sector_joined,
+    "select notional:sum notional,shares:sum size,fills:count i by venue from trades order by notional desc"
+)
+
+for i := 1; i <= #bars; i++ {
+    row := bars[i]
+    row.vwap = row.notional / row.shares
+}
+
+check("q asof enrichment with unmatched boundary", #enriched == 5 && enriched[1].bid == 100.2 && enriched[2].bid == 100.5 && enriched[3].ask == 251.1 && enriched[4].bid == 880.0 && enriched[5].bid == nil)
+check("q window join collects prior quotes", #windowed == 5 && #windowed[1].bid == 2 && windowed[1].bid[1] == 100.0 && windowed[1].bid[2] == 100.2 && #windowed[2].bid == 3 && #windowed[5].bid == 0)
+check("qsql projection analytics verbs by sym", #projection_path == 7 && projection_path[1].sym == "AAPL" && projection_path[1].price_delta == 100.0 && data.is_null(projection_path[1].price_ratio) && projection_path[2].price_delta == 1.0 && projection_path[2].price_ratio == 1.01 && projection_path[2].bid_fill == 100.2 && projection_path[2].price_mavg3 == 100.5 && data.is_null(projection_path[1].price_xprev2) && projection_path[3].trade_id == 106 && projection_path[3].price_delta == -2.0 && projection_path[3].price_ratio > 0.980 && projection_path[3].price_ratio < 0.981 && projection_path[3].bid_fill == 100.5 && projection_path[3].price_mavg3 == 100.0 && projection_path[3].price_xprev2 == 100.0 && projection_path[4].sym == "MSFT" && projection_path[4].price_delta == 250.0 && data.is_null(projection_path[4].price_ratio) && data.is_null(projection_path[4].price_xprev2) && projection_path[6].price_delta == -3.0 && projection_path[6].price_mavg3 > 250.33 && projection_path[6].price_mavg3 < 250.34 && projection_path[6].price_xprev2 == 250.0 && projection_path[7].sym == "TSLA" && projection_path[7].price_delta == 205.0 && projection_path[7].bid_fill == nil)
+check("q keyed table lookup and query", #aapl_all == 2 && #aapl_rows == 1 && aapl_rows[1].trade_id == 102 && #missing_rows == 0 && #keyed_query == 2 && keyed_query[1].notional == 10030.0)
+check("q keyed metadata survives", q.keys(sector_keyed)[1] == "sym" && q.cols(sector_keyed)[1] == "trade_id" && q.meta(sector_keyed)[1].t == "i64")
+check("q temporal xbar bars", #bars == 5 && bars[1].sym == "AAPL" && bars[1].bucket == "2026-06-06T09:30:00Z" && math.floor(bars[1].vwap * 100) == 10030 && bars[5].sym == "TSLA")
+check("q delete column and fee rollup", pruned.column_kinds.tier == nil && #fee_report == 3 && fee_report[1].venue == "XNAS" && fees.BATS == 0.0002)
+
+summary := string.format(
+    "q_temporal_window_analytics trades=%d quotes=%d bars=%d aapl=%d window0=%d fee=%.5f",
+    #trades,
+    #quotes,
+    #bars,
+    #aapl_all,
+    #windowed[1].bid,
+    fees.XNAS
+)
+print(summary)
+
+return {
+    calendar: calendar,
+    trades: trades,
+    quotes: quotes,
+    enriched: enriched,
+    windowed: windowed,
+    projection_path: projection_path,
+    sector_joined: sector_joined,
+    sector_keyed: sector_keyed,
+    bars: bars,
+    fee_report: fee_report,
+    summary: summary,
+}

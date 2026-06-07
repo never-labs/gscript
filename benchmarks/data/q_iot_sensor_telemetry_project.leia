@@ -1,0 +1,142 @@
+// q IoT/sensor telemetry hot benchmark over in-memory columnar frames.
+
+N := 720
+REPS := 90
+MOD := 1000000007
+
+func make_symbols(n, mod, prefix) {
+    t := {}
+    for i := 1; i <= n; i++ {
+        t[i] = string.format("%s%d", prefix, i % mod)
+    }
+    return data.symbols(t)
+}
+
+func make_i64(n, mod, offset) {
+    t := {}
+    for i := 1; i <= n; i++ {
+        t[i] = offset + (i % mod)
+    }
+    return data.i64(t)
+}
+
+func make_f64(n, mod, offset) {
+    t := {}
+    for i := 1; i <= n; i++ {
+        t[i] = offset + (i % mod) * 0.5
+    }
+    return data.f64(t)
+}
+
+func make_ts(n, offset) {
+    t := {}
+    for i := 1; i <= n; i++ {
+        t[i] = offset + i * 60000000000
+    }
+    return data.timestamp(t)
+}
+
+func make_bool(n, period) {
+    t := {}
+    for i := 1; i <= n; i++ {
+        t[i] = i % period == 0
+    }
+    return data.bool(t)
+}
+
+func mix(sum, v) {
+    return (sum * 131 + v) % MOD
+}
+
+ids := {}
+for i := 1; i <= N; i++ {
+    ids[i] = i
+}
+
+base_ts := 1780812000000000000
+
+devices := data.frame({
+    device: make_symbols(96, 96, "D"),
+    site: make_symbols(96, 8, "site"),
+    line: make_symbols(96, 12, "line"),
+    kind: make_symbols(96, 3, "kind"),
+    threshold: make_f64(96, 45, 50.0),
+    critical: make_bool(96, 3),
+})
+
+calibration := data.frame({
+    device: make_symbols(N, 96, "D"),
+    ts: make_ts(N, base_ts - 300000000000),
+    offset: make_f64(N, 9, -2.0),
+    gain: make_f64(N, 5, 0.95),
+})
+
+readings_raw := data.frame({
+    reading_id: data.i64(ids),
+    device: make_symbols(N, 96, "D"),
+    ts: make_ts(N, base_ts),
+    value: make_f64(N, 80, 35.0),
+    battery: make_i64(N, 100, 1),
+    offline: make_bool(N, 29),
+})
+
+func run_once() {
+    weights := q.eval("`temperature`vibration`pressure!0.50 0.35 0.15")
+    energy := q.eval("+\\120 130 125 140 160")
+    gaps := q.eval("-':600 900 1200 1800")
+
+    readings := q.sql(readings_raw, "delete from trades where offline=true")
+    readings = q.sql(readings, "delete offline from trades")
+    calibrated := q.sql(
+        "select reading_id,device,ts,value,battery,offset,gain from readings asof join calibration on device,ts order by reading_id asc",
+        {readings: readings, calibration: calibration}
+    )
+    calibrated = q.sql(calibrated, "update adjusted:(value+offset)*gain from trades")
+    enriched := q.sql(
+        "select reading_id,device,site,line,kind,critical,threshold,ts,value,battery,offset,gain,adjusted from trades left join devices on device order by reading_id asc",
+        {trades: calibrated, devices: devices}
+    )
+    enriched = q.sql(enriched, "update anomaly:adjusted>threshold from trades")
+    enriched = q.sql(enriched, "update score:?[adjusted>threshold;adjusted-threshold;0.0] from trades")
+    enriched = q.sql(enriched, "update low_battery:battery<15 from trades")
+    enriched = q.sql(enriched, "update anomaly_i:?[anomaly;1;0] from trades")
+    enriched = q.sql(enriched, "update low_i:?[low_battery;1;0] from trades")
+    enriched = q.sql(enriched, "update critical_i:?[critical;1;0] from trades")
+    enriched = q.sql(enriched, "update critical_anomaly_i:critical_i*anomaly_i from trades")
+
+    calibration_window := q.sql(
+        "select reading_id,device,ts,offset,gain from readings wj[-0D00:10:00,0D00:00:00] calibration on device,ts order by reading_id asc",
+        {readings: readings, calibration: calibration}
+    )
+    anomalies := q.sql(enriched, "select reading_id,device,site,line,kind,ts,adjusted,threshold,score,low_battery from trades where anomaly=true order by score desc")
+    bucket_rollup := q.sql(
+        enriched,
+        "select rows:count i,avg_adjusted:avg adjusted,max_score:max score,anomalies:sum anomaly_i,low:sum low_i by bucket:xbar 300000000000 ts from trades order by bucket asc"
+    )
+    site_rollup := q.sql(
+        enriched,
+        "select rows:count i,avg_adjusted:avg adjusted,anomalies:sum anomaly_i,critical_anomalies:sum critical_anomaly_i,low:sum low_i,total_score:sum score by site from trades order by site asc"
+    )
+    keyed := q.key_by(devices, "device")
+    hit := q.lookup(keyed, "D1")
+
+    checksum := #readings + #calibrated * 3 + #enriched * 5 + #calibration_window * 7 + #anomalies * 11 + #bucket_rollup * 13 + #site_rollup * 17 + #hit * 19
+    checksum = checksum + math.floor(weights.temperature * 100) + energy[5] + gaps[4]
+    if #site_rollup > 0 {
+        checksum = checksum + math.floor(site_rollup[1].total_score * 100)
+    }
+    return checksum
+}
+
+warm := run_once()
+collectgarbage("collect")
+t0 := time.now()
+checksum := 0
+for r := 1; r <= REPS; r++ {
+    checksum = mix(checksum, run_once())
+}
+elapsed := time.since(t0)
+
+print(string.format("q_iot_sensor_telemetry_hot rows=%d reps=%d", N, REPS))
+print(string.format("checksum: %d", mix(checksum, warm)))
+print(string.format("Time: %.3fs", elapsed))

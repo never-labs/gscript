@@ -1,0 +1,98 @@
+// qSQL-native trade mutation, venue join, and post-join rollup benchmark.
+
+N := 4096
+REPS := 220
+MOD := 1000000007
+
+func make_i64(n, mod, offset) {
+    t := {}
+    for i := 1; i <= n; i++ {
+        t[i] = offset + (i % mod)
+    }
+    return array.i64(t)
+}
+
+func make_symbols(n, mod, prefix) {
+    t := {}
+    for i := 1; i <= n; i++ {
+        t[i] = string.format("%s%d", prefix, i % mod)
+    }
+    return data.symbols(t)
+}
+
+func make_strings(n, mod, prefix) {
+    t := {}
+    for i := 1; i <= n; i++ {
+        t[i] = string.format("%s%d", prefix, i % mod)
+    }
+    return data.strings(t)
+}
+
+func make_price(n) {
+    t := {}
+    for i := 1; i <= n; i++ {
+        t[i] = 80.0 + (i % 251) * 0.75
+    }
+    return array.f64(t)
+}
+
+func make_size(n) {
+    t := {}
+    for i := 1; i <= n; i++ {
+        t[i] = 1 + (i % 97)
+    }
+    return array.i64(t)
+}
+
+func mix(sum, v) {
+    return (sum * 131 + v) % MOD
+}
+
+trades := data.frame({
+    id: make_i64(N, N, 1),
+    sym: make_symbols(N, 257, "S"),
+    venue: make_strings(N, 32, "V"),
+    price: make_price(N),
+    size: make_size(N),
+})
+
+venue_ids := {}
+venue_names := {}
+for i := 1; i <= 32; i++ {
+    venue_ids[i] = string.format("V%d", (i - 1) % 32)
+    venue_names[i] = string.format("Venue-%d", i)
+}
+venues := data.frame({
+    venue: data.strings(venue_ids),
+    mic_name: data.strings(venue_names),
+})
+
+func run_hot(trades, venues, reps) {
+    checksum := 0
+    for r := 1; r <= reps; r++ {
+        updated := q.sql(trades, "update price:price+1.0 from trades where sym=`S7")
+        trimmed := q.sql(updated, "delete from trades where price<100")
+        joined := q.sql(
+            "select id,sym,venue,mic_name,price,size from trades join venues on venue order by id asc take 24",
+            {trades: trimmed, venues: venues}
+        )
+        venue_bars := q.sql(joined, "select notional:sum price*size, fills:count i by venue,mic_name from trades order by notional desc take 4")
+        first := joined[1]
+        last := joined[#joined]
+        top_bar := venue_bars[1]
+        checksum = mix(checksum, #joined + #venue_bars + first.id + last.id)
+        checksum = mix(checksum, string.len(first.sym) + string.len(last.mic_name) + math.floor(first.price))
+        checksum = mix(checksum, math.floor(top_bar.notional) + top_bar.fills * 19 + string.len(top_bar.venue))
+    }
+    return checksum
+}
+
+warm := run_hot(trades, venues, 2)
+collectgarbage("collect")
+t0 := time.now()
+checksum := run_hot(trades, venues, REPS)
+elapsed := time.since(t0)
+
+print(string.format("q_native_join_update_delete_hot trades=%d venues=%d reps=%d", N, 32, REPS))
+print(string.format("checksum: %d", mix(checksum, warm)))
+print(string.format("Time: %.3fs", elapsed))

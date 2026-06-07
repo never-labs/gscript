@@ -1,0 +1,10 @@
+print("case:q_workspace_session_project_example")
+
+result := dofile("examples/data/q_workspace_session_project/main.leia")
+
+assert(result.summary != "")
+assert(result.x == 41)
+assert(result.port == 5100)
+assert(result.total == 60)
+
+print("ok")

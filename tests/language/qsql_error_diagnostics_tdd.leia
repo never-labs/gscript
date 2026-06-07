@@ -14,6 +14,10 @@ trades := data.frame({
   price: data.f64({100.5}),
   size: data.i64({10}),
 })
+quotes := data.frame({
+  sym: data.symbols({"AAPL"}),
+  bid: data.f64({100.0}),
+})
 
 ok, err := pcall(q.sql, "select notional:sum price*size by sym from trades where price>", {
   trades: trades,
@@ -29,5 +33,39 @@ ok, err = pcall(q.sql, "select price from missing_table", {
   trades: trades,
 })
 check("unknown source message", ok == false && type(err) == "string" && contains(err, "q.sql: source \"missing_table\" not found"))
+
+ok, err = pcall(q.sql, "exec sym!price,size from trades", {
+  trades: trades,
+})
+check("ambiguous exec dict message", ok == false && type(err) == "string" && contains(err, "q.sql: lower: q exec dictionary projection \"sym!price\" must be the only projection"))
+
+ok, err = pcall(q.sql, "select sym from trades aj quotes on sym", {
+  trades: trades,
+  quotes: quotes,
+})
+check("asof join key diagnostic", ok == false && type(err) == "string" && contains(err, "q.sql: join: asof join time key \"sym\"=\"sym\" has non-time kind symbol"))
+
+ok, err = pcall(q.sql, "select sym from trades wj quotes on sym", {
+  trades: trades,
+  quotes: quotes,
+})
+check("window join key diagnostic", ok == false && type(err) == "string" && contains(err, "q.sql: join: asof join time key \"sym\"=\"sym\" has non-time kind symbol"))
+
+ok, err = pcall(q.sql, "select sym,bid from trades ij missing_quotes on sym", {
+  trades: trades,
+  quotes: quotes,
+})
+check("missing join source diagnostic", ok == false && type(err) == "string" && contains(err, "q.sql: join: source \"missing_quotes\" not found"))
+
+diagnostic := q.explain("select sym,bid from trades aj0 quotes on price", {
+  trades: trades,
+  quotes: quotes,
+})
+join := diagnostic.join
+check("explain source query", diagnostic.source_query == "select sym,bid from trades aj0 quotes on price")
+check("explain join count", diagnostic.join_count == 1)
+check("explain aj0 time key", join.kind == "asof0" && join.time_key == "price" && join.left_time_key == "price" && join.right_time_key == "price")
+check("explain global partition keys", #join.partition_keys == 0)
+check("explain kernel diagnostic", type(diagnostic.kernel_reason) == "string" && contains(diagnostic.kernel_reason, "join"))
 
 print("ok")

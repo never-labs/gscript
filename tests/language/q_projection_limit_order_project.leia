@@ -1,0 +1,19 @@
+print("case:q_projection_limit_order_project")
+
+result := dofile("examples/data/q_projection_limit_order_project/main.leia")
+
+assert(result.summary != "")
+assert(q.count(result.events) == 8)
+assert(#result.top == 4)
+assert(result.top[1].sym == "MSFT")
+assert(result.top[1].notional == 6275.0)
+assert(result.top[4].id == 4)
+assert(result.plan.op == "select")
+assert(result.plan.limit == 4)
+assert(result.plan.order_by[1].column == "notional")
+assert(#result.rollup == 3)
+assert(result.rollup[1].sym == "MSFT")
+assert(result.rollup[1].volume == 60)
+assert(result.select_star[1].id == 8)
+
+print("ok")

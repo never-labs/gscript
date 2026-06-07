@@ -1,0 +1,190 @@
+// q_portfolio_risk_factor_project - portfolio risk and factor exposure replay.
+// Covers keyed tables, aj/wj/wj1, xbar, typed nulls, where in, qSQL
+// update/delete, adverbs, dictionaries, and exp/reciprocal projections.
+
+func check(name, ok) {
+    if !ok {
+        print("failed", name)
+    }
+    assert(ok)
+    print("ok", name)
+}
+
+factor_weight := q.eval("`mkt`value`momentum`quality!0.55 0.20 0.15 0.10")
+running_cash := q.eval("+\\100000 -25000 12000 -8000 5000")
+rebalance_gaps := q.eval("-':93000 93045 93130 93200")
+gross_cut := q.eval("{x+y}/0 250000 180000 90000")
+sector_limits := q.eval("`tech`semis`energy`rates!0.45 0.25 0.15 0.15")
+
+check("q dict and adverb prelude", factor_weight.mkt == 0.55 && running_cash[5] == 84000 && rebalance_gaps[3] == 85 && gross_cut == 520000 && sector_limits.semis == 0.25)
+
+positions_raw := q.sql(
+    "select acct,book,sym,side,asof_ts,qty,avg_cost,borrow_bps,restricted from ([] acct:`CORE`CORE`CORE`CORE`ALT`ALT; book:`LSEQ`LSEQ`LSEQ`LSEQ`PAIR`PAIR; sym:`AAPL`MSFT`NVDA`XOM`TLT`TSLA; side:`long`short`long`long`long`short; asof_ts:2026.06.05D16:00:00 2026.06.05D16:00:00 2026.06.05D16:00:00 2026.06.05D16:00:00 2026.06.05D16:00:00 2026.06.05D16:00:00; qty:1200 700 500 0 900 120; avg_cost:185.0 410.0 1120.0 118.0 92.0 205.0; borrow_bps:15 40 80 0N 5 120; restricted:false false false false false true)",
+    {}
+)
+
+positions := q.sql(positions_raw, "delete from trades where restricted=true")
+positions = q.sql(positions, "update qty:-qty from trades where side=`short")
+positions = q.sql(positions, "update signed_qty:qty from trades")
+positions = q.sql(positions, "update abs_qty:qty from trades where qty>=0")
+positions = q.sql(positions, "update abs_qty:-qty from trades where qty<0")
+positions = q.sql(positions, "update borrow_rate:borrow_bps*0.0001 from trades where borrow_bps>0")
+positions = q.sql(positions, "update borrow_rate:0.0 from trades where borrow_bps=0N")
+
+prices := q.sql(
+    "select sym,ts,px,ret from ([] sym:`AAPL`AAPL`AAPL`MSFT`MSFT`NVDA`NVDA`XOM`TLT`TLT; ts:2026.06.05D15:58:00 2026.06.05D16:00:00 2026.06.06D09:31:00 2026.06.05D15:59:00 2026.06.06D09:30:00 2026.06.05D15:59:30 2026.06.06D09:30:30 2026.06.05D16:00:00 2026.06.05D15:59:00 2026.06.06D09:30:00; px:186.0 187.5 188.2 412.0 409.0 1130.0 1145.0 118.0 91.8 92.4; ret:0.004 0.006 0.003 0.002 0.007 0.010 0.013 0.001 0.002 0.006)",
+    {}
+)
+prices = q.sql(prices, "update ret:-ret from trades where sym=`MSFT")
+
+factor_snap := q.sql(
+    "select sym,ts,mkt,value,momentum,quality from ([] sym:`AAPL`AAPL`MSFT`NVDA`NVDA`XOM`TLT; ts:2026.06.05D15:58:00 2026.06.05D16:00:00 2026.06.05D16:00:00 2026.06.05D15:59:00 2026.06.06D09:30:00 2026.06.05D16:00:00 2026.06.05D16:00:00; mkt:1.10 1.12 1.05 1.30 1.35 0.70 0.20; value:0.20 0.15 0.10 0.45 0.50 0.35 0.80; momentum:0.40 0.42 0.10 0.85 0.90 0.20 0.05; quality:0.70 0.72 0.80 0.65 0.68 0.20 0.10)",
+    {}
+)
+factor_snap = q.sql(factor_snap, "update mkt:-mkt from trades where sym=`TLT")
+factor_snap = q.sql(factor_snap, "update value:-value from trades where sym in `AAPL`NVDA")
+factor_snap = q.sql(factor_snap, "update momentum:-momentum from trades where sym in `MSFT`XOM")
+
+risk_ref := q.sql(
+    "select sym,sector,beta,vol,adv from ([sym:`AAPL`MSFT`NVDA`XOM`TLT] sector:`tech`tech`semis`energy`rates; beta:1.15 1.05 1.45 0.85 0.30; vol:0.22 0.20 0.38 0.24 0.11; adv:68000000 32000000 54000000 25000000 41000000)",
+    {}
+)
+risk_ref = q.sql(risk_ref, "update beta:-beta from trades where sym=`TLT")
+
+rebalance := q.sql(
+    "select acct,book,sym,ts,target_pct from ([] acct:`CORE`CORE`CORE`CORE`ALT; book:`LSEQ`LSEQ`LSEQ`LSEQ`PAIR; sym:`AAPL`MSFT`NVDA`XOM`TLT; ts:2026.06.06D09:29:30 2026.06.06D09:30:20 2026.06.06D09:30:40 2026.06.06D09:31:10 2026.06.06D09:30:00; target_pct:0.32 0.18 0.28 0.00 0.12)",
+    {}
+)
+rebalance = q.sql(rebalance, "update target_pct:-target_pct from trades where sym=`MSFT")
+
+events := q.sql(
+    "select event_id,acct,book,sym,ts,action,qty,px from ([] event_id:1 2 3 4 5 6; acct:`CORE`CORE`CORE`CORE`ALT`CORE; book:`LSEQ`LSEQ`LSEQ`LSEQ`PAIR`LSEQ; sym:`AAPL`MSFT`NVDA`XOM`TLT`IBM; ts:2026.06.06D09:29:45 2026.06.06D09:30:25 2026.06.06D09:30:45 2026.06.06D09:31:20 2026.06.06D09:30:10 2026.06.06D09:30:30; action:`target`target`target`close`target`target; qty:50 25 20 0 10 100; px:188.0 409.5 1144.0 118.1 92.2 140.0)",
+    {}
+)
+events = q.sql(events, "update qty:-qty from trades where sym=`MSFT")
+
+marked := q.sql(
+    "select acct,book,sym,asof_ts,qty,signed_qty,abs_qty,avg_cost,borrow_bps,borrow_rate,px,ret from positions asof join prices on sym,asof_ts=ts order by acct asc,book asc,sym asc",
+    {positions: positions, prices: prices}
+)
+marked = q.sql(marked, "update market_value:qty*px from trades")
+marked = q.sql(marked, "update gross_value:abs_qty*px from trades")
+marked = q.sql(marked, "update pnl:(px-avg_cost)*qty from trades")
+marked = q.sql(marked, "update carry_cost:gross_value*borrow_rate*reciprocal 252.0 from trades")
+
+risk_marked := q.sql(
+    "select acct,book,sym,sector,beta,vol,adv,asof_ts,qty,signed_qty,abs_qty,px,ret,market_value,gross_value,pnl,carry_cost,borrow_rate from trades left join risk_ref on sym order by acct asc,book asc,sym asc",
+    {trades: marked, risk_ref: risk_ref}
+)
+risk_marked = q.sql(risk_marked, "update beta_dollar:market_value*beta from trades")
+risk_marked = q.sql(risk_marked, "update var_1d:gross_value*vol*0.063 from trades")
+risk_marked = q.sql(risk_marked, "update liquidity_days:abs_qty*reciprocal adv from trades")
+risk_marked = q.sql(risk_marked, "update stress_loss:var_1d*exp 0.25 from trades")
+
+factor_marked := q.sql(
+    "select acct,book,sym,sector,asof_ts,qty,market_value,gross_value,pnl,beta_dollar,var_1d,stress_loss,mkt,value,momentum,quality from trades asof join factor_snap on sym,asof_ts=ts order by acct asc,book asc,sym asc",
+    {trades: risk_marked, factor_snap: factor_snap}
+)
+factor_marked = q.sql(factor_marked, "update mkt_dollar:market_value*mkt from trades")
+factor_marked = q.sql(factor_marked, "update value_dollar:market_value*value from trades")
+factor_marked = q.sql(factor_marked, "update momentum_dollar:market_value*momentum from trades")
+factor_marked = q.sql(factor_marked, "update quality_dollar:market_value*quality from trades")
+
+windowed_factors := q.sql(
+    "select acct,book,sym,asof_ts,mkt,momentum from risk_marked wj[-0D00:03:00,0D00:00:00] factor_snap on sym,asof_ts=ts order by sym asc",
+    {risk_marked: risk_marked, factor_snap: factor_snap}
+)
+last_factor := q.sql(
+    "select acct,book,sym,asof_ts,mkt,momentum from risk_marked wj1[-0D00:03:00,0D00:00:00] factor_snap on sym,asof_ts=ts order by sym asc",
+    {risk_marked: risk_marked, factor_snap: factor_snap}
+)
+
+active_symbols := q.sql(
+    risk_marked,
+    "select sym,sector,market_value,gross_value from trades where sym in `AAPL`MSFT`NVDA and sector in `tech`semis order by sym asc"
+)
+
+sector_rollup := q.sql(
+    factor_marked,
+    "select gross:sum gross_value,net:sum market_value,beta:sum beta_dollar,var:sum var_1d,stress:sum stress_loss,rows:count i by sector,bucket:xbar 60000000000 asof_ts from trades order by sector asc"
+)
+sector_rollup = q.sql(sector_rollup, "update stress_ratio:stress*reciprocal gross from trades")
+
+book_rollup := q.sql(
+    factor_marked,
+    "select gross:sum gross_value,net:sum market_value,mkt:sum mkt_dollar,value:sum value_dollar,momentum:sum momentum_dollar,quality:sum quality_dollar by acct,book from trades order by acct asc,book asc"
+)
+
+target_state := q.sql(
+    "select event_id,acct,book,sym,ts,action,qty,px,target_pct from events asof join rebalance on acct,book,sym,ts order by event_id asc",
+    {events: events, rebalance: rebalance}
+)
+
+target_state = q.sql(target_state, "update target_notional:qty*px from trades where action in `target`close")
+target_state_clean := q.sql(target_state, "delete from trades where sym in `IBM")
+target_state_clean = q.sql(target_state_clean, "delete target_pct from trades")
+
+keyed_positions := q.key_by(factor_marked, "acct", "book", "sym")
+aapl_position := q.lookup(keyed_positions, "CORE", "LSEQ", "AAPL")
+nvda_position := q.lookup(keyed_positions, {acct: "CORE", book: "LSEQ", sym: "NVDA"})
+missing_position := q.lookup(keyed_positions, "CORE", "LSEQ", "IBM")
+key_frame := q.key(keyed_positions)
+value_frame := q.value(keyed_positions)
+keyed_updated := q.sql(keyed_positions, "update pnl:pnl+10 from trades where sym=`AAPL")
+updated_aapl := q.lookup(keyed_updated, "CORE", "LSEQ", "AAPL")
+
+typed_nulls := q.sql(
+    "select sym,d,t,ts,borrow_bps from ([] sym:`CASH`HEDGE; d:0Nd 2026.06.06; t:0Nt 09:30:00; ts:0Np 2026.06.06D09:30:00; borrow_bps:0Ni 25)",
+    {}
+)
+
+decoded_keyed := q.decode(q.encode(keyed_positions))
+decoded_lookup := q.lookup(decoded_keyed, "CORE", "LSEQ", "AAPL")
+
+check("mutation cleans and derives positions", #positions_raw == 6 && #positions == 5 && positions[2].signed_qty == -700 && positions[2].abs_qty == 700 && positions[4].borrow_rate == 0.0)
+check("asof price marks positions", #marked == 5 && marked[1].px == 91.8 && marked[2].px == 187.5 && marked[3].market_value == -288400.0 && marked[4].pnl == 5000.0)
+check("risk reference and qsql unary functions", #risk_marked == 5 && risk_marked[2].sector == "tech" && risk_marked[2].liquidity_days > 0.000017 && risk_marked[2].stress_loss > risk_marked[2].var_1d)
+check("factor asof exposure", #factor_marked == 5 && factor_marked[2].mkt == 1.12 && factor_marked[3].value == 0.10 && factor_marked[4].momentum == 0.85 && factor_marked[4].momentum_dollar == 480250.0)
+check("window joins expose factor history", #windowed_factors == 5 && #windowed_factors[1].mkt == 2 && windowed_factors[1].mkt[1] == 1.10 && windowed_factors[1].mkt[2] == 1.12 && #windowed_factors[4].mkt == 1 && last_factor[1].mkt == 1.12)
+check("where in filters thematic book", #active_symbols == 3 && active_symbols[1].sym == "AAPL" && active_symbols[3].sym == "NVDA")
+check("xbar sector and book rollups", #sector_rollup == 4 && sector_rollup[4].sector == "tech" && sector_rollup[4].rows == 2 && sector_rollup[4].gross == 513400.0 && sector_rollup[4].stress_ratio > 0.015 && #book_rollup == 2 && book_rollup[2].book == "LSEQ")
+check("event target state update delete", #target_state == 6 && target_state[2].target_pct == -0.18 && #target_state_clean == 5 && target_state_clean.column_kinds.target_pct == nil)
+check("multi-key keyed lookup and mutation", q.keys(keyed_positions)[1] == "acct" && q.keys(keyed_positions)[3] == "sym" && #aapl_position == 1 && aapl_position[1].acct == nil && #nvda_position == 1 && nvda_position[1].gross_value == 565000.0 && #missing_position == 0 && #key_frame == 5 && key_frame[1].acct == "ALT" && #value_frame == 5 && value_frame[1].acct == nil && updated_aapl[1].pnl == 3010.0)
+check("typed nulls and codec", typed_nulls[1].d == nil && typed_nulls[1].t == nil && typed_nulls[1].ts == nil && typed_nulls[1].borrow_bps == nil && q.keys(decoded_keyed)[1] == "acct" && #decoded_lookup == 1 && decoded_lookup[1].mkt == 1.12)
+
+summary := string.format(
+    "q_portfolio_risk_factor positions=%d factors=%d sectors=%d active=%d stress=%.4f",
+    #positions,
+    #factor_marked,
+    #sector_rollup,
+    #active_symbols,
+    sector_rollup[4].stress_ratio
+)
+print(summary)
+
+return {
+    positions_raw: positions_raw,
+    positions: positions,
+    prices: prices,
+    risk_ref: risk_ref,
+    marked: marked,
+    risk_marked: risk_marked,
+    factor_marked: factor_marked,
+    windowed_factors: windowed_factors,
+    last_factor: last_factor,
+    active_symbols: active_symbols,
+    sector_rollup: sector_rollup,
+    book_rollup: book_rollup,
+    target_state: target_state,
+    target_state_clean: target_state_clean,
+    keyed_positions: keyed_positions,
+    keyed_updated: keyed_updated,
+    decoded_keyed: decoded_keyed,
+    typed_nulls: typed_nulls,
+    factor_weight: factor_weight,
+    running_cash: running_cash,
+    rebalance_gaps: rebalance_gaps,
+    gross_cut: gross_cut,
+    sector_limits: sector_limits,
+    summary: summary,
+}

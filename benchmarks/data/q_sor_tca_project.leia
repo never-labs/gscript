@@ -1,0 +1,177 @@
+// q smart-order-routing/TCA hot benchmark: keyed references + asof + window
+// joins + update/delete + exec projections + q.eval dictionaries/adverbs.
+
+N := 1024
+REPS := 60
+MOD := 1000000007
+
+func make_symbols(n, mod, prefix) {
+    t := {}
+    for i := 1; i <= n; i++ {
+        t[i] = string.format("%s%d", prefix, i % mod)
+    }
+    return data.symbols(t)
+}
+
+func make_i64(n, mod, offset) {
+    t := {}
+    for i := 1; i <= n; i++ {
+        t[i] = offset + (i % mod)
+    }
+    return data.i64(t)
+}
+
+func make_f64(n, mod, offset) {
+    t := {}
+    for i := 1; i <= n; i++ {
+        t[i] = offset + (i % mod) * 0.125
+    }
+    return data.f64(t)
+}
+
+func make_ts(n, offset) {
+    t := {}
+    for i := 1; i <= n; i++ {
+        t[i] = offset + i * 1000000000
+    }
+    return data.timestamp(t)
+}
+
+func make_bool(n, period) {
+    t := {}
+    for i := 1; i <= n; i++ {
+        t[i] = i % period == 0
+    }
+    return data.bool(t)
+}
+
+func mix(sum, v) {
+    return (sum * 131 + v) % MOD
+}
+
+ids := {}
+for i := 1; i <= N; i++ {
+    ids[i] = i
+}
+
+base_ts := 1780738200000000000
+
+quotes := data.frame({
+    quote_id: data.i64(ids),
+    sym: make_symbols(N, 128, "S"),
+    ts: make_ts(N, base_ts),
+    bid: make_f64(N, 251, 99.75),
+    ask: make_f64(N, 251, 100.25),
+    bid_sz: make_i64(N, 500, 50),
+    ask_sz: make_i64(N, 500, 40),
+    venue: make_symbols(N, 8, "V"),
+})
+
+orders := data.frame({
+    order_id: data.i64(ids),
+    parent_id: make_i64(N, 256, 1000),
+    desk: make_symbols(N, 32, "D"),
+    acct: make_symbols(N, 64, "PM"),
+    sym: make_symbols(N, 128, "S"),
+    side: make_symbols(N, 2, "side"),
+    ts: make_ts(N, base_ts + 20 * 1000000000),
+    order_qty: make_i64(N, 97, 10),
+    limit_px: make_f64(N, 251, 100.0),
+    urgency: make_symbols(N, 3, "urg"),
+    route: make_symbols(N, 8, "V"),
+    cancelled: make_bool(N, 29),
+})
+
+fills_raw := data.frame({
+    trade_id: data.i64(ids),
+    order_id: data.i64(ids),
+    parent_id: make_i64(N, 256, 1000),
+    sym: make_symbols(N, 128, "S"),
+    side: make_symbols(N, 2, "side"),
+    ts: make_ts(N, base_ts + 45 * 1000000000),
+    price: make_f64(N, 251, 100.0),
+    size: make_i64(N, 97, 1),
+    venue: make_symbols(N, 8, "V"),
+    busted: make_bool(N, 17),
+})
+
+venues := data.frame({
+    venue: make_symbols(8, 8, "V"),
+    mic: make_symbols(8, 8, "MIC"),
+    region: make_symbols(8, 2, "R"),
+    fee_bps: make_f64(8, 4, 0.20),
+})
+
+route_ref := data.frame({
+    sym: make_symbols(128, 128, "S"),
+    venue: make_symbols(128, 8, "V"),
+    preferred: make_bool(128, 3),
+    min_fill: make_i64(128, 32, 5),
+})
+
+func run_hot(orders_raw, fills_raw, quotes, venues, route_ref, reps) {
+    checksum := 0
+    fee_dict := q.eval("`V0`V1`V2`V3!0.0003 0.0002 0.00035 0.00025")
+    adverbs := q.eval("qty:40 20 30 10;(+/qty;+\\qty;-':qty)")
+    for r := 1; r <= reps; r++ {
+        orders := q.sql(orders_raw, "delete from trades where cancelled=true")
+        orders = q.sql(orders, "update open_qty:order_qty from trades where order_qty>0")
+        orders = q.sql(orders, "update child_target:order_qty*0.5 from trades where order_qty>0")
+
+        fills := q.sql(fills_raw, "delete from trades where busted=true")
+        fills = q.sql(fills, "update notional:price*size from trades where size>0")
+        fills = q.sql(fills, "update signed_qty:size from trades")
+        fills = q.sql(fills, "update signed_qty:0-size from trades where side=`side0")
+        fills = q.sql(fills, "update fee:notional*0.00030 from trades where venue=`V0")
+        fills = q.sql(fills, "update fee:notional*0.00020 from trades where venue=`V1")
+
+        enriched := q.sql(
+            "select trade_id,order_id,parent_id,sym,side,ts,price,size,signed_qty,notional,fee,bid,ask,spread:ask-bid,venue from trades asof join quotes on sym,ts",
+            {trades: fills, quotes: quotes}
+        )
+        windowed := q.sql(
+            "select trade_id,sym,ts,bid,ask,bid_sz from trades wj[-60000000000 0] quotes on sym,ts order by trade_id asc take 64",
+            {trades: fills, quotes: quotes}
+        )
+        window_stats := q.sql(
+            "select trade_id,sym,ts,n:count bid,avg_bid:avg bid,last_bid:last bid from trades wj[-60000000000 0] quotes on sym,ts order by trade_id asc take 64",
+            {trades: fills, quotes: quotes}
+        )
+        joined := q.sql(
+            "select trade_id,order_id,parent_id,sym,side,ts,price,size,signed_qty,notional,fee,bid,ask,spread,venue,mic,region from trades left join venues on venue order by trade_id asc take 512",
+            {trades: enriched, venues: venues}
+        )
+        routed_fills := q.sql(joined, "update route:venue from trades")
+        order_fills := q.sql(
+            routed_fills,
+            "select filled:sum size,traded_notional:sum notional,fees:sum fee,fills:count i by order_id,sym,route from trades where order_id>0 order by order_id asc take 128"
+        )
+        lifecycle := q.sql(
+            "select order_id,parent_id,desk,acct,sym,route,order_qty,child_target,filled,traded_notional,fees,fills from orders pj fills on order_id,sym,route order by order_id asc take 128",
+            {orders: orders, fills: order_fills}
+        )
+        keyed_routes := q.key_by(route_ref, "sym", "venue")
+        route_hit := q.lookup(keyed_routes, joined[1].sym, joined[1].venue)
+        keyed_lifecycle := q.key_by(lifecycle, "desk", "sym")
+        desk_hit := q.lookup(keyed_lifecycle, lifecycle[1].desk, lifecycle[1].sym)
+        exec_risk := q.sql(joined, "exec trade_id,sym,venue,notional from trades where notional>5000 order by notional desc take 16")
+        exec_by_venue := q.sql(joined, "exec shares:sum size,gross:sum notional by venue from trades order by venue asc take 16")
+        bars := q.sql(
+            joined,
+            "select notional:sum notional,shares:sum size,net_qty:sum signed_qty,fills:count i,avg_spread:avg spread by sym,venue,bucket:xbar 60000000000 ts from trades order by notional desc take 32"
+        )
+        checksum = mix(checksum, math.floor(fee_dict.V1 * 1000000) + adverbs[1] + adverbs[2][4] + #fills + #enriched + #windowed + #window_stats + #joined + #order_fills + #lifecycle + #route_hit + #desk_hit + q.count(exec_risk.notional) + #exec_by_venue.venue + #bars)
+        checksum = mix(checksum, joined[1].trade_id + #windowed[1].bid + window_stats[1].n + bars[1].fills + lifecycle[1].order_id)
+    }
+    return checksum
+}
+
+warm := run_hot(orders, fills_raw, quotes, venues, route_ref, 2)
+collectgarbage("collect")
+t0 := time.now()
+checksum := run_hot(orders, fills_raw, quotes, venues, route_ref, REPS)
+elapsed := time.since(t0)
+
+print(string.format("q_sor_tca_hot rows=%d reps=%d", N, REPS))
+print(string.format("checksum: %d", mix(checksum, warm)))
+print(string.format("Time: %.3fs", elapsed))

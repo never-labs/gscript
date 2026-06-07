@@ -1,0 +1,139 @@
+// q_keyed_asof_state_replay_project - complex q/kdb+-style order state replay.
+// Covers temporal filters, asof, keyed lookup, adverbs, dictionaries, joins,
+// and qsql mutation in one inspectable scenario.
+
+func check(name, ok) {
+    assert(ok)
+    print("ok", name)
+}
+
+venue_fee := q.eval("`XNAS`BATS`XNYS`IEX!0.00030 0.00020 0.00035 0.00010")
+running_risk := q.eval("+\\1200 -300 450 -150 600")
+event_gaps := q.eval("-':93000 93005 93009 93020 93030")
+weighted_clip := q.eval("{x+y}/100 25 10 5")
+symbol_weights := q.eval("`AAPL`MSFT`NVDA`TSLA!0.35 0.25 0.30 0.10")
+
+check("q dict and adverb prelude", venue_fee.BATS == 0.0002 && running_risk[5] == 1800 && event_gaps[4] == 11 && weighted_clip == 140 && symbol_weights.NVDA == 0.30)
+
+quotes := q.sql(
+    "select quote_id,sym,ts,bid,ask,bid_sz,ask_sz,venue from ([] quote_id:1 2 3 4 5 6 7 8 9; sym:`AAPL`AAPL`AAPL`MSFT`MSFT`NVDA`NVDA`TSLA`TSLA; ts:2026.06.06D09:30:00 2026.06.06D09:30:20 2026.06.06D09:31:00 2026.06.06D09:30:10 2026.06.06D09:31:00 2026.06.06D09:30:15 2026.06.06D09:31:10 2026.06.06D09:30:30 2026.06.06D09:31:20; bid:100.0 100.2 100.6 250.0 250.4 880.0 881.0 205.0 205.5; ask:100.2 100.4 100.9 250.3 250.8 881.0 882.0 205.8 206.2; bid_sz:500 420 400 300 320 80 75 100 95; ask_sz:430 410 390 250 300 70 70 90 88; venue:`XNAS`BATS`XNAS`XNYS`BATS`XNAS`BATS`IEX`XNAS)",
+    {}
+)
+
+raw_events := q.sql(
+    "select event_id,order_id,parent_id,sym,action,side,ts,event_date,event_time,qty,limit_px,venue,trader,rejected from ([] event_id:10 11 12 13 14 15 16 17 18; order_id:1001 1001 1002 1003 1003 1004 1005 1006 1007; parent_id:501 501 502 503 503 504 505 506 507; sym:`AAPL`AAPL`AAPL`MSFT`MSFT`NVDA`TSLA`IBM`TSLA; action:`new`fill`new`new`fill`fill`new`new`fill; side:`buy`buy`sell`sell`sell`buy`buy`sell`buy; ts:2026.06.06D09:30:05 2026.06.06D09:30:40 2026.06.06D09:30:25 2026.06.06D09:30:15 2026.06.06D09:31:05 2026.06.06D09:30:45 2026.06.06D09:30:35 2026.06.06D09:30:20 2026.06.06D09:31:30; event_date:2026.06.06 2026.06.06 2026.06.06 2026.06.06 2026.06.06 2026.06.06 2026.06.06 2026.06.06 2026.06.06; event_time:09:30:05 09:30:40 09:30:25 09:30:15 09:31:05 09:30:45 09:30:35 09:30:20 09:31:30; qty:100 40 80 60 25 10 30 50 15; limit_px:100.5 100.3 100.2 250.2 250.1 881.5 206.0 140.0 205.7; venue:`XNAS`BATS`BATS`XNYS`XNYS`XNAS`IEX`XNYS`XNAS; trader:`alpha`alpha`alpha`beta`beta`gamma`omega`delta`omega; rejected:false false false false false false false true false)",
+    {}
+)
+
+symbols := q.sql(
+    "select sym,sector,risk_bucket,tick_size from ([] sym:`AAPL`MSFT`NVDA`TSLA; sector:`hardware`software`semis`ev; risk_bucket:`liquid`liquid`volatile`volatile; tick_size:0.01 0.01 0.05 0.01)",
+    {}
+)
+
+events := q.sql(raw_events, "delete from trades where rejected=true")
+events = q.sql(events, "update signed_qty:qty from trades where side=`buy")
+events = q.sql(events, "update signed_qty:-qty from trades where side=`sell")
+events = q.sql(events, "update fill_notional:qty*limit_px from trades where action=`fill")
+events = q.sql(events, "update notional:qty*limit_px from trades where action=`fill")
+events = q.sql(events, "update fee:fill_notional*0.00030 from trades where venue=`XNAS")
+events = q.sql(events, "update fee:fill_notional*0.00020 from trades where venue=`BATS")
+events = q.sql(events, "update fee:fill_notional*0.00035 from trades where venue=`XNYS")
+events = q.sql(events, "update fee:fill_notional*0.00010 from trades where venue=`IEX")
+
+fills := q.sql(
+    events,
+    "select filled:sum qty,fill_notional:sum fill_notional,fees:sum fee,events:count i by order_id,sym from trades where action=`fill order by order_id asc"
+)
+
+order_state := q.sql(
+    "select event_id,order_id,parent_id,sym,action,side,ts,qty,size:qty,signed_qty,limit_px,filled,fill_notional,notional,fees,trader from events pj fills on order_id,sym order by order_id asc,event_id asc",
+    {events: events, fills: fills}
+)
+
+marked := q.sql(
+    "select event_id,order_id,parent_id,sym,action,side,ts,qty,size,signed_qty,limit_px,filled,fill_notional,notional,fees,bid,ask,bid_sz,ask_sz,spread:ask-bid,trader,venue from order_state asof join quotes on sym,ts order by event_id asc",
+    {order_state: order_state, quotes: quotes}
+)
+marked = q.sql(marked, "update quote_mid:(bid+ask)/2 from trades")
+marked = q.sql(marked, "update quote_imbalance:(bid_sz-ask_sz)/(bid_sz+ask_sz) from trades")
+
+sector_marked := q.sql(
+    "select event_id,order_id,parent_id,sym,sector,risk_bucket,tick_size,action,side,ts,qty,size,signed_qty,filled,fill_notional,notional,fees,bid,ask,bid_sz,ask_sz,spread,quote_mid,quote_imbalance,trader,venue from trades left join symbols on sym order by event_id asc",
+    {trades: marked, symbols: symbols}
+)
+
+risk_rollup := q.sql(
+    sector_marked,
+    "select notional:sum notional,shares:sum size,fills:count i,avg_spread:avg spread by sym,bucket:xbar 60000000000 ts from trades order by sym asc,bucket asc"
+)
+risk_rollup = q.sql(risk_rollup, "update vwap:notional/shares from trades")
+
+active_0930 := q.sql(
+    events,
+    "select event_id,order_id,sym,event_date,event_time,action from trades where event_date=2026.06.06 and event_time=09:30:05 order by event_id asc"
+)
+
+without_tick := q.sql(sector_marked, "delete tick_size from trades")
+keyed_by_sym := q.key_by(sector_marked, "sym")
+aapl_rows := q.lookup(keyed_by_sym, "AAPL")
+tsla_rows := q.lookup(keyed_by_sym, "TSLA")
+ibm_rows := q.lookup(keyed_by_sym, "IBM")
+key_names := q.keys(keyed_by_sym)
+all_values := q.value(keyed_by_sym)
+keyed_state := q.key_by(order_state, "order_id", "sym")
+aapl_state := q.lookup(keyed_state, {order_id: 1001, sym: "AAPL"})
+amended_state := q.sql(keyed_state, "update filled:filled+5 from trades where sym=`AAPL")
+selected_state := q.sql(amended_state, "select order_id,sym,filled,fill_notional from trades where sym=`AAPL order by event_id asc")
+decoded_marked := q.decode(q.encode(sector_marked))
+decoded_keyed_state := q.decode(q.encode(keyed_state))
+decoded_rollup := q.decode(q.encode(risk_rollup))
+decoded_aapl_state := q.lookup(decoded_keyed_state, {order_id: 1001, sym: "AAPL"})
+
+check("mutation cleans and derives event state", #raw_events == 9 && #events == 8 && events[2].signed_qty == 40 && events[4].signed_qty == -60 && events[8].fee > 0.45)
+check("pj carries fill state back to order events", #fills == 4 && fills[1].filled == 40.0 && #order_state == 8 && order_state[1].filled == 40.0 && order_state[3].filled == nil)
+check("asof marks event stream against quotes", #marked == 8 && marked[1].bid == 100.0 && marked[1].quote_mid == 100.1 && marked[2].bid == 100.2 && marked[4].ask == 250.3 && marked[8].bid == 205.5 && marked[8].quote_imbalance > 0.03)
+check("left join reference data", #sector_marked == 8 && sector_marked[1].sector == "hardware" && sector_marked[6].risk_bucket == "volatile")
+check("keyed lookup and table value", #aapl_rows == 1 && #tsla_rows == 1 && #ibm_rows == 0 && key_names[1] == "sym" && #all_values == 8)
+check("keyed order state keys", q.keys(keyed_state)[1] == "order_id" && q.keys(keyed_state)[2] == "sym")
+check("keyed order state lookup", #aapl_state == 1 && aapl_state[1].order_id == nil)
+check("keyed order state mutation", #selected_state == 3 && selected_state[1].filled == 45.0 && selected_state[2].filled == 45.0 && selected_state[3].filled == nil)
+check("rollup shape", #risk_rollup > 0 && risk_rollup[1].sym != nil)
+check("rollup vwap", risk_rollup[3].sym == "MSFT" && risk_rollup[3].vwap == 250.1)
+check("temporal filter and column mutation", #active_0930 == 1 && active_0930[1].order_id == 1001 && without_tick.column_kinds.tick_size == nil)
+check("codec round-trips table keyed state and rollups", #decoded_marked == #sector_marked && decoded_marked[1].quote_mid == 100.1 && q.keys(decoded_keyed_state)[1] == "order_id" && #decoded_aapl_state == 1 && decoded_rollup[3].vwap == 250.1)
+
+summary := string.format(
+    "q_keyed_asof_state_replay events=%d marked=%d rollups=%d aapl=%d tsla=%d decoded=%d",
+    #events,
+    #marked,
+    #risk_rollup,
+    #aapl_rows,
+    #tsla_rows,
+    #decoded_marked
+)
+print(summary)
+
+return {
+    quotes: quotes,
+    events: events,
+    fills: fills,
+    order_state: order_state,
+    marked: marked,
+    sector_marked: sector_marked,
+    risk_rollup: risk_rollup,
+    active_0930: active_0930,
+    keyed_by_sym: keyed_by_sym,
+    keyed_state: keyed_state,
+    amended_state: amended_state,
+    selected_state: selected_state,
+    decoded_marked: decoded_marked,
+    decoded_keyed_state: decoded_keyed_state,
+    decoded_rollup: decoded_rollup,
+    decoded_aapl_state: decoded_aapl_state,
+    venue_fee: venue_fee,
+    running_risk: running_risk,
+    event_gaps: event_gaps,
+    weighted_clip: weighted_clip,
+    symbol_weights: symbol_weights,
+    summary: summary,
+}

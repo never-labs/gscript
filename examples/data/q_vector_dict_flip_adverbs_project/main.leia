@@ -1,0 +1,52 @@
+// q_vector_dict_flip_adverbs_project demonstrates q-style vectors,
+// dictionaries, flips, callable verbs, and adverbs.
+
+func check(name, ok) {
+    assert(ok)
+    print("ok", name)
+}
+
+prices := q.eval("100 101.5 99.25 102")
+sizes := q.eval("10 20 30 40")
+symbols := q.eval("`AAPL`MSFT`AAPL`NVDA")
+
+notional := q.eval("100 101.5 99.25 102*10 20 30 40")
+total_notional := q.eval("+/100 101.5 99.25 102*10 20 30 40")
+running_size := q.eval("+\\10 20 30 40")
+prior_move := q.eval("-':100 101.5 99.25 102")
+by_sym := q.eval("group `AAPL`MSFT`AAPL`NVDA")
+labels := q.eval("`bid`ask`last!100.5 101.0 100.75")
+table := q.eval("flip `sym`price`size!(`AAPL`MSFT`AAPL`NVDA;100 101.5 99.25 102;10 20 30 40)")
+metadata := q.eval("meta flip `sym`price`size!(`AAPL`MSFT`AAPL`NVDA;100 101.5 99.25 102;10 20 30 40)")
+unique_symbols := q.eval("?`AAPL`MSFT`AAPL`NVDA")
+domain := q.eval("domain[`sym$`AAPL`MSFT`AAPL`NVDA]")
+codes := q.eval("codes[`sym$`AAPL`MSFT`AAPL`NVDA]")
+raze_items := q.eval("raze[(1 2;3 4;5)]")
+each_counts := q.eval("count'(`AAPL`MSFT;10 20 30;\"abcd\")")
+moving_avg := q.eval("3 mavg 100 101.5 99.25 102")
+
+check("vectors and adverbs", q.count(prices) == 4 && total_notional == 10087.5 && running_size[4] == 100 && prior_move[2] == 1.5)
+check("dictionary and group", labels.bid == 100.5 && by_sym.AAPL[1] == 0 && by_sym.AAPL[2] == 2)
+check("flip table metadata", q.count(table) == 4 && table[2].sym == "MSFT" && metadata[2].c == "price")
+check("enum domain codes", unique_symbols[3] == "NVDA" && domain[2] == "MSFT" && codes[3] == 0)
+check("callable verbs", raze_items[5] == 5 && each_counts[1] == 2 && each_counts[3] == 4)
+check("moving aggregate", moving_avg[1] == 100.0 && moving_avg[4] > 100.9 && moving_avg[4] < 101.0)
+
+summary := string.format(
+    "q_vector_dict_flip rows=%d symbols=%d total_notional=%.1f last_mavg=%.2f",
+    q.count(table),
+    q.count(unique_symbols),
+    total_notional,
+    moving_avg[4]
+)
+print(summary)
+
+return {
+    prices: prices,
+    sizes: sizes,
+    symbols: symbols,
+    notional: notional,
+    table: table,
+    metadata: metadata,
+    summary: summary,
+}

@@ -1,0 +1,15 @@
+print("case:q_ipc_codec_boundaries_project")
+
+result := dofile("examples/data/q_ipc_codec_boundaries_project/main.leia")
+
+assert(result.summary != "")
+assert(result.ipc_sum == 6)
+assert(q.count(result.decoded) == 2)
+assert(result.decoded[1].ts == "2026-06-06T09:30:00Z")
+assert(result.decoded[2].qty == nil)
+assert(result.enum_decoded[2] == "MSFT")
+assert(result.enum_decoded[3] == "AAPL")
+assert(q.keys(result.keyed_decoded)[1] == "sym")
+assert(q.count(q.value(result.keyed_decoded)) == 2)
+
+print("ok")

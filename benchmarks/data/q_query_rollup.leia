@@ -57,6 +57,11 @@ campaigns := soa.zip({
 })
 
 active := soa.mask(campaigns, "revenue", ">=", 80.0)
+campaign_frame := data.frame(campaigns)
+frame_head := data.take(campaign_frame, 16)
+frame_pick := data.gather(campaign_frame, {1, 8, 16})
+assert(data.same_schema(campaign_frame, frame_head))
+assert(data.same_schema(campaign_frame, frame_pick))
 
 func run_hot(campaigns, active, reps) {
     checksum := 0

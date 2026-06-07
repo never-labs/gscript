@@ -1,0 +1,29 @@
+// q_workspace_session_project demonstrates explicit stateful q workspaces.
+
+func check(name, ok) {
+    assert(ok)
+    print("ok", name)
+}
+
+s := q.session()
+check("assignment persists", s.eval("x:41") == 41 && s.eval("x+1") == 42)
+check("system port is workspace local", s.eval("\\p") == 0 && s.eval("\\p 5100") == 5100 && s.eval("\\p") == 5100)
+
+script_dir := ".tmp/q_workspace_session_project"
+assert(fs.mkdirAll(script_dir))
+script_path := script_dir .. "/analytics.q"
+assert(fs.writefile(script_path, "trades:([] sym:`AAPL`MSFT`AAPL; qty:10 20 30); qty:trades`qty; total:{+/x}; total[qty]"))
+check("script load shares workspace", s.eval("\\l " .. script_path) == 60 && s.eval("total[qty]") == 60)
+
+other := q.workspace()
+check("workspaces are isolated", other.eval("x:5") == 5 && other.eval("x+1") == 6 && s.eval("x+1") == 42)
+
+summary := string.format("q_workspace_session x=%d port=%d total=%d", s.eval("x"), s.eval("\\p"), s.eval("total[qty]"))
+print(summary)
+
+return {
+    x: s.eval("x"),
+    port: s.eval("\\p"),
+    total: s.eval("total[qty]"),
+    summary: summary,
+}

@@ -1,0 +1,158 @@
+// q_kdb_market_tape_complex_project - kdb+-style market tape analytics.
+// Run:
+//   go run ./cmd/leia run examples/data/q_kdb_market_tape_complex_project/main.leia
+
+func check(name, ok) {
+    assert(ok)
+    print("ok", name)
+}
+
+fee_by_venue := q.eval("`XNAS`BATS`XNYS`ARCX!0.00030 0.00020 0.00035 0.00025")
+qty_path := q.eval("qty:100 50 75 40 25 10;(+/qty;+\\qty;-':qty;2 msum qty;2 mavg 100.0 100.4 100.2 250.7 881.9 205.5)")
+null_path := q.eval("(null 10 0N 20;+\\1 0N 2;fills 0Nf 100.5 0Nf;prev 2026.06.06D09:30:00 0Np 2026.06.06D09:31:00;next 2026.06.06D09:30:00 0Np 2026.06.06D09:31:00)")
+temporal_buckets := q.eval("xbar[60000000000;2026.06.06D09:30:15 2026.06.06D09:30:59 2026.06.06D09:31:01 0Np]")
+symbol_group := q.eval("group `AAPL`AAPL`MSFT`NVDA`MSFT`TSLA")
+xgroup_like := q.eval("group `AAPL`AAPL`MSFT`NVDA`MSFT`TSLA")
+sorted_probe := q.eval("`sym`ts xasc flip `sym`ts`px!(`MSFT`AAPL`AAPL`NVDA;2026.06.06D09:31:00 2026.06.06D09:30:40 2026.06.06D09:30:10 2026.06.06D09:30:20;250 100.4 100.1 881.9)")
+desc_probe := q.eval("`px xdesc flip `sym`px!(`AAPL`MSFT`NVDA`TSLA;100.4 250.7 881.9 205.5)")
+enum_probe := q.eval("(domain `sym$`AAPL`MSFT`AAPL`NVDA;codes `sym$`AAPL`MSFT`AAPL`NVDA;meta `p#`AAPL`AAPL`MSFT`NVDA)")
+callable_adverbs := q.eval("((+/)[1 0N 2];(+\\)[1 0N 2];(-':)[10 15 14 20];({x+y}'[1 2 3;10 20 30]))")
+corrected_sizes := q.eval("@[100 50 40 20 8 30;1 4;:;55 12]")
+corrected_exposure := q.eval("flow:@[(100 0 0 20 8 0-0 50 40 0 0 30);1 4;:;(0 12-55 0)];+\\flow")
+dict_each_counts := q.eval("count'`fast`slow!(100 50 25;8 13)")
+dict_each_distinct := q.eval("(count distinct)'`venue`sym!(`XNAS`BATS`XNAS`XNYS;`AAPL`AAPL`MSFT`AAPL)")
+
+check("q vector adverb temporal null setup", fee_by_venue.BATS == 0.0002 && qty_path[1] == 300 && qty_path[2][6] == 300 && qty_path[3][3] == 25 && qty_path[4][3] == 125 && null_path[1][2] == true && null_path[2][3] == 3 && null_path[3][3] > 100.49 && null_path[4][1].__data_null_kind == "timestamp" && null_path[4][3].__data_null_kind == "timestamp" && temporal_buckets[1] == "2026-06-06T09:30:00Z" && temporal_buckets[4].__data_null == true)
+check("q xasc xdesc xgroup-like setup", symbol_group.AAPL[1] == 0 && symbol_group.MSFT[2] == 4 && xgroup_like.TSLA[1] == 5 && sorted_probe[1].sym == "AAPL" && sorted_probe[2].ts == "2026-06-06T09:30:40Z" && desc_probe[1].sym == "NVDA")
+check("q enum attrs callable adverbs and tape corrections", enum_probe[1][3] == "NVDA" && enum_probe[2][3] == 0 && enum_probe[3].attribute == "p" && callable_adverbs[1] == 3 && callable_adverbs[2][2] == 1 && callable_adverbs[3][4] == 6 && callable_adverbs[4][3] == 33 && corrected_sizes[2] == 55 && corrected_sizes[5] == 12 && corrected_exposure[2] == 45 && corrected_exposure[5] == 37 && dict_each_counts.fast == 3 && dict_each_counts.slow == 2 && dict_each_distinct.venue == 3 && dict_each_distinct.sym == 2)
+
+ticks := q.sql(
+    "select tick_id,event,sym,ts,px,qty,venue from ([] tick_id:1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16; event:`quote`trade`quote`trade`quote`trade`quote`trade`quote`trade`quote`trade`quote`trade`trade`quote; sym:`AAPL`AAPL`AAPL`AAPL`MSFT`MSFT`MSFT`MSFT`NVDA`NVDA`NVDA`NVDA`TSLA`TSLA`IBM`IBM; ts:2026.06.06D09:30:00 2026.06.06D09:30:15 2026.06.06D09:30:45 2026.06.06D09:31:05 2026.06.06D09:30:05 2026.06.06D09:30:50 2026.06.06D09:31:30 2026.06.06D09:31:50 2026.06.06D09:30:20 2026.06.06D09:30:45 2026.06.06D09:31:10 2026.06.06D09:31:20 2026.06.06D09:30:35 2026.06.06D09:31:40 2026.06.06D09:29:50 2026.06.06D09:31:00; px:100.00 100.10 100.30 100.50 250.00 250.20 250.50 250.80 881.50 881.90 882.10 882.40 205.30 205.50 140.00 140.20; qty:0 100 0 50 0 40 0 20 0 10 0 8 0 30 5 0; venue:`XNAS`XNAS`BATS`BATS`XNYS`XNYS`ARCX`ARCX`XNAS`XNAS`BATS`BATS`XNAS`XNAS`XNYS`XNYS)",
+    {}
+)
+
+quotes := q.sql(
+    "select quote_id,sym,ts,bid,ask,bid_sz,ask_sz,venue from ([] quote_id:1 2 3 4 5 6 7 8 9; sym:`AAPL`AAPL`MSFT`MSFT`NVDA`NVDA`TSLA`IBM`IBM; ts:2026.06.06D09:29:55 2026.06.06D09:30:45 2026.06.06D09:30:05 2026.06.06D09:31:30 2026.06.06D09:30:20 2026.06.06D09:31:10 2026.06.06D09:30:35 2026.06.06D09:30:30 2026.06.06D09:31:00; bid:99.90 100.25 249.90 250.60 881.20 882.00 205.20 140.00 140.10; ask:100.10 100.55 250.15 250.90 882.00 882.70 205.60 140.30 140.40; bid_sz:500 450 300 280 80 75 120 60 55; ask_sz:440 420 260 260 70 70 110 50 45; venue:`XNAS`BATS`XNYS`ARCX`XNAS`BATS`XNAS`XNYS`XNYS)",
+    {}
+)
+
+trades_raw := q.sql(
+    "select trade_id,parent_id,desk,sym,side,ts,price,size,venue,condition from ([] trade_id:101 102 103 104 105 106 107; parent_id:10 10 11 11 12 13 14; desk:`alpha`alpha`beta`beta`gamma`alpha`omega; sym:`AAPL`AAPL`MSFT`MSFT`NVDA`TSLA`IBM; side:`buy`sell`sell`buy`buy`sell`buy; ts:2026.06.06D09:30:15 2026.06.06D09:31:05 2026.06.06D09:30:50 2026.06.06D09:31:50 2026.06.06D09:31:20 2026.06.06D09:31:40 2026.06.06D09:29:50; price:100.10 100.50 250.20 250.80 882.40 205.50 140.00; size:100 50 40 20 8 30 5; venue:`XNAS`BATS`XNYS`ARCX`BATS`XNAS`XNYS; condition:`regular`regular`regular`regular`regular`regular`oddlot)",
+    {}
+)
+
+trades := q.sql(trades_raw, "delete from trades where condition=`oddlot")
+trades = q.sql(trades, "delete condition from trades")
+trades = q.sql(trades, "update notional:price*size from trades")
+trades = q.sql(trades, "update signed_qty:size from trades")
+trades = q.sql(trades, "update signed_qty:0-size from trades where side=`sell")
+trades = q.sql(trades, "update fee:notional*0.00030 from trades where venue=`XNAS")
+trades = q.sql(trades, "update fee:notional*0.00020 from trades where venue=`BATS")
+trades = q.sql(trades, "update fee:notional*0.00035 from trades where venue=`XNYS")
+trades = q.sql(trades, "update fee:notional*0.00025 from trades where venue=`ARCX")
+
+trades_xasc := q.sql(trades, "select trade_id,sym,ts,price,size,notional from trades order by sym asc,ts asc")
+trades_xdesc := q.sql(trades, "select trade_id,sym,ts,price,size,notional from trades order by notional desc")
+large_abs_flow := q.sql(trades, "select trade_id,sym,abs_qty:abs signed_qty from trades where abs signed_qty>25 order by abs signed_qty desc")
+trade_groups := q.sql(trades, "select by sym from trades order by sym asc")
+venue_groups := q.sql(trades, "select fills:count i,qty:sum size,notional:sum notional by venue from trades order by venue asc")
+
+enriched := q.sql(
+    "select trade_id,parent_id,desk,sym,side,ts,price,size,signed_qty,notional,fee,bid,ask,spread:ask-bid,bid_sz,ask_sz,venue from trades asof join quotes on sym,ts order by trade_id asc",
+    {trades: trades, quotes: quotes}
+)
+
+windowed_quotes := q.sql(
+    "select trade_id,sym,ts,bid,ask,bid_sz from trades wj[-0D00:01:00,0D00:00:00] quotes on sym,ts order by trade_id asc",
+    {trades: trades, quotes: quotes}
+)
+
+window_stats := q.sql(
+    "select trade_id,sym,ts,n:count bid,avg_bid:avg bid,last_bid:last bid from trades wj[-0D00:01:00,0D00:00:00] quotes on sym,ts order by trade_id asc",
+    {trades: trades, quotes: quotes}
+)
+
+bars := q.sql(
+    enriched,
+    "select notional:sum notional,shares:sum size,net_qty:sum signed_qty,fees:sum fee,fills:count i,avg_spread:avg spread,first_px:first price,last_px:last price by sym,bucket:xbar 60000000000 ts from trades order by sym asc,bucket asc"
+)
+
+for i := 1; i <= #bars; i++ {
+    row := bars[i]
+    row.vwap = row.notional / row.shares
+}
+
+daily_rollup := q.sql(enriched, "select notional:sum notional,shares:sum size,net_qty:sum signed_qty,fees:sum fee,fills:count i,avg_spread:avg spread by sym from trades order by notional desc")
+risk_math := q.sql(trades, "select trade_id,sym,neg_flow:neg signed_qty,root_size:sqrt size,log_notional:log notional from trades where sym in `AAPL`NVDA order by trade_id asc")
+top_ticks := q.sql(ticks, "select tick_id,event,sym,ts,px,qty,venue from trades where event=`trade order by px desc take 4")
+quote_counts := q.sql(ticks, "select quotes:count i by sym,bucket:xbar 60000000000 ts from trades where event=`quote order by sym asc,bucket asc")
+unmatched_asof := q.sql(enriched, "select trade_id,sym,bid from trades where bid=null order by trade_id asc")
+wide_spreads := q.sql(enriched, "select trade_id,sym,spread from trades where spread>0.35 order by spread desc")
+keyed_bars := q.key_by(bars, "sym", "bucket")
+aapl_0930_bar := q.lookup(keyed_bars, {sym: "AAPL", bucket: "2026-06-06T09:30:00Z"})
+msft_0931_bar := q.lookup(keyed_bars, "MSFT", "2026-06-06T09:31:00Z")
+kernel_query := "select trade_id,sym,notional from trades where notional>5000 order by trade_id asc take 3"
+kernel_before := q.explain(enriched, kernel_query)
+kernel_rows := q.sql(enriched, kernel_query)
+kernel_after := q.explain(enriched, kernel_query)
+
+check("q tick trade quote cleanup", #ticks == 16 && #quotes == 9 && #trades == 6 && trades[1].notional == 10010.0 && trades[2].signed_qty == -50.0)
+check("q xasc xdesc xgroup rollup tables", #trades_xasc == 6 && trades_xasc[1].sym == "AAPL" && trades_xasc[2].trade_id == 102 && trades_xdesc[1].sym == "AAPL" && #large_abs_flow == 4 && large_abs_flow[1].sym == "AAPL" && large_abs_flow[1].abs_qty == 100.0 && #trade_groups == 4 && trade_groups[1].sym == "AAPL" && venue_groups[1].venue == "ARCX" && venue_groups[1].qty == 20.0)
+check("q asof quote enrichment", #enriched == 6 && enriched[1].bid == 99.9 && enriched[2].bid == 100.25 && enriched[3].ask == 250.15 && enriched[5].bid == 882.0 && enriched[6].ask == 205.6)
+check("q window join quote history", #windowed_quotes == 6 && #windowed_quotes[1].bid == 1 && windowed_quotes[2].bid[1] == 100.25 && #windowed_quotes[6].bid == 0 && #window_stats == 6 && window_stats[1].n == 1 && window_stats[2].last_bid == 100.25 && window_stats[6].avg_bid == nil)
+check("q xbar vwap bars", #bars == 6 && bars[1].sym == "AAPL" && bars[1].bucket == "2026-06-06T09:30:00Z" && math.floor(bars[1].vwap * 100) == 10010 && bars[2].net_qty == -50.0 && bars[5].sym == "NVDA")
+check("q rollup and tape filters", #daily_rollup == 4 && daily_rollup[1].sym == "AAPL" && daily_rollup[1].shares == 150.0 && #top_ticks == 4 && top_ticks[1].sym == "NVDA" && #quote_counts == 7 && #unmatched_asof == 0 && #wide_spreads == 2)
+check("q qsql math and in filter probes", #risk_math == 3 && risk_math[1].sym == "AAPL" && risk_math[1].neg_flow == -100.0 && risk_math[2].neg_flow == 50.0 && risk_math[3].sym == "NVDA" && math.floor(risk_math[1].root_size * 1000) == 10000 && risk_math[3].log_notional > 8.8)
+check("q keyed bars and runtime kernel visibility", q.keys(keyed_bars)[1] == "sym" && q.keys(keyed_bars)[2] == "bucket" && #aapl_0930_bar == 1 && aapl_0930_bar[1].notional == 10010.0 && aapl_0930_bar[1].shares == 100.0 && #msft_0931_bar == 1 && msft_0931_bar[1].fills == 1 && kernel_before.kernel_supported == true && kernel_after.kernel_cached == true && #kernel_rows == 3)
+
+summary := string.format(
+    "q_kdb_market_tape_complex trades=%d quotes=%d bars=%d top=%s vwap=%.2f",
+    #trades,
+    #quotes,
+    #bars,
+    daily_rollup[1].sym,
+    bars[1].vwap
+)
+print(summary)
+
+return {
+    fee_by_venue: fee_by_venue,
+    qty_path: qty_path,
+    null_path: null_path,
+    temporal_buckets: temporal_buckets,
+    symbol_group: symbol_group,
+    xgroup_like: xgroup_like,
+    sorted_probe: sorted_probe,
+    desc_probe: desc_probe,
+    enum_probe: enum_probe,
+    callable_adverbs: callable_adverbs,
+    corrected_sizes: corrected_sizes,
+    corrected_exposure: corrected_exposure,
+    dict_each_counts: dict_each_counts,
+    dict_each_distinct: dict_each_distinct,
+    ticks: ticks,
+    quotes: quotes,
+    trades: trades,
+    trades_xasc: trades_xasc,
+    trades_xdesc: trades_xdesc,
+    large_abs_flow: large_abs_flow,
+    trade_groups: trade_groups,
+    venue_groups: venue_groups,
+    enriched: enriched,
+    windowed_quotes: windowed_quotes,
+    window_stats: window_stats,
+    bars: bars,
+    daily_rollup: daily_rollup,
+    risk_math: risk_math,
+    top_ticks: top_ticks,
+    quote_counts: quote_counts,
+    unmatched_asof: unmatched_asof,
+    wide_spreads: wide_spreads,
+    keyed_bars: keyed_bars,
+    aapl_0930_bar: aapl_0930_bar,
+    msft_0931_bar: msft_0931_bar,
+    kernel_before: kernel_before,
+    kernel_rows: kernel_rows,
+    kernel_after: kernel_after,
+    summary: summary,
+}

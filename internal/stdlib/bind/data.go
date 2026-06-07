@@ -3,6 +3,7 @@ package bind
 import (
 	"fmt"
 	"sort"
+	"strings"
 
 	stddata "github.com/never-labs/leia/internal/stdlib/lib/data"
 )
@@ -10,6 +11,7 @@ import (
 const dataFrameMarker = "__data_frame"
 const dataColumnMarker = "__data_column"
 const dataNullMarker = "__data_null"
+const dataNullKindMarker = "__data_null_kind"
 
 // BuildData creates the "data" standard library table.
 func BuildData() *Table {
@@ -69,8 +71,23 @@ func BuildData() *Table {
 	set("symbols", func(args []Value) ([]Value, error) {
 		return dataColumnConstructor("data.symbols", stddata.KindSymbol, args)
 	})
+	set("month", func(args []Value) ([]Value, error) {
+		return dataColumnConstructor("data.month", stddata.KindMonth, args)
+	})
 	set("date", func(args []Value) ([]Value, error) {
 		return dataColumnConstructor("data.date", stddata.KindDate, args)
+	})
+	set("datetime", func(args []Value) ([]Value, error) {
+		return dataColumnConstructor("data.datetime", stddata.KindDateTime, args)
+	})
+	set("timespan", func(args []Value) ([]Value, error) {
+		return dataColumnConstructor("data.timespan", stddata.KindTimespan, args)
+	})
+	set("minute", func(args []Value) ([]Value, error) {
+		return dataColumnConstructor("data.minute", stddata.KindMinute, args)
+	})
+	set("second", func(args []Value) ([]Value, error) {
+		return dataColumnConstructor("data.second", stddata.KindSecond, args)
 	})
 	set("time", func(args []Value) ([]Value, error) {
 		return dataColumnConstructor("data.time", stddata.KindTime, args)
@@ -79,6 +96,12 @@ func BuildData() *Table {
 		return dataColumnConstructor("data.timestamp", stddata.KindTimestamp, args)
 	})
 	t.RawSetString("null", dataNullValue())
+	set("is_null", func(args []Value) ([]Value, error) {
+		if len(args) < 1 {
+			return nil, fmt.Errorf("data.is_null: argument 1 is required")
+		}
+		return []Value{BoolValue(args[0].IsNil() || isDataNullValue(args[0]))}, nil
+	})
 	set("rows", func(args []Value) ([]Value, error) {
 		frame, err := requireDataFrame("data.rows", args, 0)
 		if err != nil {
@@ -111,17 +134,176 @@ func BuildData() *Table {
 		}
 		return []Value{TableValue(copyDataColumnKinds(frame))}, nil
 	})
+	set("schema_hash", func(args []Value) ([]Value, error) {
+		frame, err := dataLibFrameArg("data.schema_hash", args, 0)
+		if err != nil {
+			return nil, err
+		}
+		return []Value{StringValue(frame.SchemaFingerprint())}, nil
+	})
+	set("take", func(args []Value) ([]Value, error) {
+		frame, err := requireDataFrame("data.take", args, 0)
+		if err != nil {
+			return nil, err
+		}
+		if len(args) < 2 || !args[1].IsInt() {
+			return nil, fmt.Errorf("data.take: argument 2 must be row count")
+		}
+		taken, err := dataFrameTake(frame, int(args[1].Int()))
+		if err != nil {
+			return nil, err
+		}
+		return []Value{TableValue(taken)}, nil
+	})
+	set("gather", func(args []Value) ([]Value, error) {
+		frame, err := requireDataFrame("data.gather", args, 0)
+		if err != nil {
+			return nil, err
+		}
+		if len(args) < 2 || !args[1].IsTable() {
+			return nil, fmt.Errorf("data.gather: argument 2 must be an index table")
+		}
+		gathered, err := dataFrameGather(frame, args[1].Table())
+		if err != nil {
+			return nil, err
+		}
+		return []Value{TableValue(gathered)}, nil
+	})
+	set("project", func(args []Value) ([]Value, error) {
+		frame, err := requireDataFrame("data.project", args, 0)
+		if err != nil {
+			return nil, err
+		}
+		names, err := dataProjectNames(args[1:])
+		if err != nil {
+			return nil, err
+		}
+		projected, err := dataFrameProject(frame, names)
+		if err != nil {
+			return nil, err
+		}
+		return []Value{TableValue(projected)}, nil
+	})
+	set("same_schema", func(args []Value) ([]Value, error) {
+		left, err := requireDataFrame("data.same_schema", args, 0)
+		if err != nil {
+			return nil, err
+		}
+		right, err := requireDataFrame("data.same_schema", args, 1)
+		if err != nil {
+			return nil, err
+		}
+		return []Value{BoolValue(dataFrameSameSchema(left, right))}, nil
+	})
+	set("save", func(args []Value) ([]Value, error) {
+		frame, err := dataLibFrameArg("data.save", args, 0)
+		if err != nil {
+			return nil, err
+		}
+		path, err := dataPathStringArg("data.save", args, 1, "path")
+		if err != nil {
+			return nil, err
+		}
+		if err := stddata.SaveFrameDir(path, frame); err != nil {
+			return nil, fmt.Errorf("data.save: %w", err)
+		}
+		return []Value{BoolValue(true)}, nil
+	})
+	set("load", func(args []Value) ([]Value, error) {
+		path, err := dataPathStringArg("data.load", args, 0, "path")
+		if err != nil {
+			return nil, err
+		}
+		frame, err := stddata.LoadFrameDir(path)
+		if err != nil {
+			return nil, fmt.Errorf("data.load: %w", err)
+		}
+		out, err := dataFrameValueFromLib(frame)
+		if err != nil {
+			return nil, fmt.Errorf("data.load: %w", err)
+		}
+		return []Value{out}, nil
+	})
+	set("info", func(args []Value) ([]Value, error) {
+		path, err := dataPathStringArg("data.info", args, 0, "path")
+		if err != nil {
+			return nil, err
+		}
+		if info, err := stddata.ReadPartitionedStoreInfo(path); err == nil {
+			return []Value{TableValue(dataPartitionedInfoTable(info))}, nil
+		}
+		info, err := stddata.ReadFrameStoreInfo(path)
+		if err != nil {
+			return nil, fmt.Errorf("data.info: %w", err)
+		}
+		return []Value{TableValue(dataFrameInfoTable(info))}, nil
+	})
+	set("save_partitioned", func(args []Value) ([]Value, error) {
+		frame, err := dataLibFrameArg("data.save_partitioned", args, 0)
+		if err != nil {
+			return nil, err
+		}
+		path, err := dataPathStringArg("data.save_partitioned", args, 1, "path")
+		if err != nil {
+			return nil, err
+		}
+		cols, err := dataPartitionColumnArgs("data.save_partitioned", args[2:])
+		if err != nil {
+			return nil, err
+		}
+		if err := stddata.SavePartitionedFrameDir(path, frame, cols...); err != nil {
+			return nil, fmt.Errorf("data.save_partitioned: %w", err)
+		}
+		return []Value{BoolValue(true)}, nil
+	})
+	set("load_partitioned", func(args []Value) ([]Value, error) {
+		path, err := dataPathStringArg("data.load_partitioned", args, 0, "path")
+		if err != nil {
+			return nil, err
+		}
+		filters, err := dataPartitionFilters("data.load_partitioned", args[1:])
+		if err != nil {
+			return nil, err
+		}
+		frame, err := stddata.LoadPartitionedFrameDir(path, filters)
+		if err != nil {
+			return nil, fmt.Errorf("data.load_partitioned: %w", err)
+		}
+		out, err := dataFrameValueFromLib(frame)
+		if err != nil {
+			return nil, fmt.Errorf("data.load_partitioned: %w", err)
+		}
+		return []Value{out}, nil
+	})
 	return t
 }
 
 func dataNullValue() Value {
+	return dataTypedNullValue("")
+}
+
+func dataTypedNullValue(kind stddata.Kind) Value {
 	t := NewTable()
 	t.RawSetString(dataNullMarker, BoolValue(true))
+	if kind != "" && kind != stddata.KindAny && kind != stddata.KindNull {
+		t.RawSetString(dataNullKindMarker, StringValue(string(kind)))
+	}
 	return TableValue(t)
 }
 
 func isDataNullValue(v Value) bool {
 	return v.IsTable() && v.Table().RawGetString(dataNullMarker).Truthy()
+}
+
+func dataNullValueKind(v Value) stddata.Kind {
+	if !v.IsTable() {
+		return ""
+	}
+	kind := v.Table().RawGetString(dataNullKindMarker)
+	if !kind.IsString() {
+		return ""
+	}
+	return stddata.Kind(kind.Str())
 }
 
 func dataColumnConstructor(name string, kind stddata.Kind, args []Value) ([]Value, error) {
@@ -179,7 +361,8 @@ func dataValidateColumnKind(name string, kind stddata.Kind, vector Value) error 
 			if !v.IsString() {
 				return fmt.Errorf("%s: item %d must be string or nil", name, i+1)
 			}
-		case stddata.KindDate, stddata.KindTime, stddata.KindTimestamp:
+		case stddata.KindMonth, stddata.KindDate, stddata.KindDateTime, stddata.KindTimespan,
+			stddata.KindMinute, stddata.KindSecond, stddata.KindTime, stddata.KindTimestamp:
 			if !dataTemporalScalar(v) {
 				return fmt.Errorf("%s: item %d must be scalar or nil", name, i+1)
 			}
@@ -250,7 +433,11 @@ func dataFrameFromColumns(cols *Table) (Value, error) {
 		if err != nil {
 			return NilValue(), fmt.Errorf("data.frame column %q: %w", name, err)
 		}
-		libCols = append(libCols, stddata.NewColumn(stddata.Symbol(name), items))
+		col, err := stddata.NewColumnWithKind(stddata.Symbol(name), stddata.Kind(kinds[name]), items)
+		if err != nil {
+			return NilValue(), fmt.Errorf("data.frame column %q: %w", name, err)
+		}
+		libCols = append(libCols, col)
 	}
 	frame, err := stddata.NewFrame(libCols...)
 	if err != nil {
@@ -268,14 +455,98 @@ func dataFrameFromColumns(cols *Table) (Value, error) {
 	for _, name := range names {
 		out.RawSetString(name, values[name])
 	}
+	dataDecorateFrameTable(out, nil)
+	setDataFrameNativePayload(out, frame)
 	return TableValue(out), nil
+}
+
+func dataDecorateFrameTable(frame, rows *Table) {
+	if frame == nil {
+		return
+	}
+	nrows := int64(0)
+	if lenValue := frame.RawGetString("len"); lenValue.IsInt() {
+		nrows = lenValue.Int()
+	}
+	ncols := int64(0)
+	if names := frame.RawGetString("column_names"); names.IsTable() {
+		ncols = int64(names.Table().Length())
+	}
+	columns := frame.RawGetString("columns")
+	frame.RawSetString("kind", StringValue("data_frame"))
+	frame.RawSetString("type", StringValue("data_frame"))
+	if columns.IsTable() {
+		frame.RawSetString("data", columns)
+	}
+	if rows != nil {
+		frame.RawSetString("rows", TableValue(rows))
+		for i := 1; i <= rows.Length(); i++ {
+			frame.RawSetInt(int64(i), rows.RawGetInt(int64(i)))
+		}
+	}
+	frame.RawSetString("nrows", IntValue(nrows))
+	frame.RawSetString("ncols", IntValue(ncols))
+	shape := NewTable()
+	shape.RawSetString("rows", IntValue(nrows))
+	shape.RawSetString("columns", IntValue(ncols))
+	frame.RawSetString("shape", TableValue(shape))
+	if rows == nil {
+		dataInstallLazyFrameRows(frame, int(nrows))
+	}
+}
+
+func dataInstallLazyFrameRows(frame *Table, nrows int) {
+	if frame == nil || nrows <= 0 {
+		return
+	}
+	cache := make(map[int64]Value)
+	getRow := func(key int64) (Value, bool) {
+		if key < 1 || key > int64(nrows) {
+			return NilValue(), false
+		}
+		if row, ok := cache[key]; ok {
+			return row, true
+		}
+		row, err := dataFrameRow(frame, int(key))
+		if err != nil {
+			return NilValue(), false
+		}
+		value := TableValue(row)
+		cache[key] = value
+		return value, true
+	}
+	rows := NewTable()
+	rows.RawSetString("len", IntValue(int64(nrows)))
+	rows.SetLazyIntGetter(nrows, getRow)
+	frame.RawSetString("rows", TableValue(rows))
+	frame.SetLazyIntGetter(nrows, getRow)
 }
 
 func dataSchemaTable(names []string, kinds map[string]string) *Table {
 	schema := NewTable()
 	schema.RawSetString("names", TableValue(dataColumnNamesTable(names)))
 	schema.RawSetString("kinds", TableValue(dataColumnKindsTable(names, kinds)))
+	if frame, err := dataFrameFromSchemaParts(names, kinds, 0); err == nil {
+		schema.RawSetString("hash", StringValue(frame.SchemaFingerprint()))
+	}
 	return schema
+}
+
+func dataFrameFromSchemaParts(names []string, kinds map[string]string, rows int) (stddata.Frame, error) {
+	cols := make([]stddata.Column, 0, len(names))
+	for _, name := range names {
+		kind := stddata.Kind(kinds[name])
+		values := make([]any, rows)
+		for i := range values {
+			values[i] = stddata.NullForKind(kind)
+		}
+		col, err := stddata.NewColumnWithKind(stddata.Symbol(name), kind, values)
+		if err != nil {
+			return stddata.Frame{}, err
+		}
+		cols = append(cols, col)
+	}
+	return stddata.NewFrame(cols...)
 }
 
 func dataFrameRowMethod(frame *Table) func([]Value) ([]Value, error) {
@@ -357,6 +628,464 @@ func dataFrameGather(frame *Table, indexes *Table) (*Table, error) {
 	return frameValue.Table(), nil
 }
 
+func dataFrameTake(frame *Table, n int) (*Table, error) {
+	if n < 0 {
+		return nil, fmt.Errorf("data.take: row count must be non-negative")
+	}
+	frameLen := int(frame.RawGetString("len").Int())
+	if n > frameLen {
+		n = frameLen
+	}
+	indexes := NewAppendArrayTable(n)
+	for i := 1; i <= n; i++ {
+		indexes.RawSetInt(int64(i), IntValue(int64(i)))
+	}
+	return dataFrameGather(frame, indexes)
+}
+
+func dataFrameProject(frame *Table, names []string) (*Table, error) {
+	if len(names) == 0 {
+		return nil, fmt.Errorf("data.project: at least one column is required")
+	}
+	sourceCols := frame.RawGetString("columns")
+	if !sourceCols.IsTable() {
+		return nil, fmt.Errorf("data.project: frame columns are invalid")
+	}
+	kinds := dataColumnKinds(frame)
+	outCols := NewTable()
+	seen := map[string]struct{}{}
+	for _, name := range names {
+		if name == "" {
+			return nil, fmt.Errorf("data.project: column name must not be empty")
+		}
+		if _, ok := seen[name]; ok {
+			return nil, fmt.Errorf("data.project: column %q is duplicated", name)
+		}
+		value := sourceCols.Table().RawGetString(name)
+		if value.IsNil() {
+			return nil, fmt.Errorf("data.project: column %q does not exist", name)
+		}
+		kind := stddata.Kind(kinds[name])
+		if kind == "" || kind == stddata.KindAny {
+			outCols.RawSetString(name, value)
+		} else {
+			outCols.RawSetString(name, dataColumnValue(kind, value))
+		}
+		seen[name] = struct{}{}
+	}
+	frameValue, err := dataFrameFromColumns(outCols)
+	if err != nil {
+		return nil, err
+	}
+	return frameValue.Table(), nil
+}
+
+func dataProjectNames(args []Value) ([]string, error) {
+	if len(args) == 0 {
+		return nil, fmt.Errorf("data.project: at least one column name is required")
+	}
+	if len(args) == 1 && args[0].IsTable() {
+		tbl := args[0].Table()
+		names := make([]string, 0, tbl.Length())
+		for i := 1; i <= tbl.Length(); i++ {
+			name := tbl.RawGetInt(int64(i))
+			if !name.IsString() {
+				return nil, fmt.Errorf("data.project: column name %d must be string", i)
+			}
+			names = append(names, name.Str())
+		}
+		return names, nil
+	}
+	names := make([]string, 0, len(args))
+	for i, arg := range args {
+		if !arg.IsString() {
+			return nil, fmt.Errorf("data.project: argument %d must be column name string", i+2)
+		}
+		names = append(names, arg.Str())
+	}
+	return names, nil
+}
+
+func dataFrameSameSchema(left, right *Table) bool {
+	leftNames := dataColumnNames(left)
+	rightNames := dataColumnNames(right)
+	if len(leftNames) != len(rightNames) {
+		return false
+	}
+	leftKinds := dataColumnKinds(left)
+	rightKinds := dataColumnKinds(right)
+	for i, name := range leftNames {
+		if rightNames[i] != name || leftKinds[name] != rightKinds[name] {
+			return false
+		}
+	}
+	return true
+}
+
+func dataLibFrameArg(name string, args []Value, index int) (stddata.Frame, error) {
+	if len(args) <= index {
+		return stddata.Frame{}, fmt.Errorf("%s: argument %d is required", name, index+1)
+	}
+	frameValue, err := dataFrameValue(args[index])
+	if err != nil {
+		return stddata.Frame{}, fmt.Errorf("%s: %w", name, err)
+	}
+	return dataLibFrameFromTable(frameValue.Table())
+}
+
+func dataLibFrameFromTable(frame *Table) (stddata.Frame, error) {
+	if frame == nil {
+		return stddata.Frame{}, fmt.Errorf("argument 1 must be a data frame")
+	}
+	if native, ok, err := dataNativeFramePayload(frame); err != nil {
+		return stddata.Frame{}, err
+	} else if ok {
+		return native, nil
+	}
+	if !isDataFrameMarkerTable(frame) {
+		return stddata.Frame{}, fmt.Errorf("argument 1 must be a data frame")
+	}
+	names := dataColumnNames(frame)
+	kinds := dataColumnKinds(frame)
+	colsTable := frame.RawGetString("columns")
+	if !colsTable.IsTable() {
+		return stddata.Frame{}, fmt.Errorf("frame columns are invalid")
+	}
+	cols := make([]stddata.Column, 0, len(names))
+	for _, name := range names {
+		kind := stddata.Kind(kinds[name])
+		vector := dataColumnWrappedValues(colsTable.Table().RawGetString(name))
+		if native, ok := dataNativeArrayFromValue(vector); ok {
+			cols = append(cols, stddata.Column{Name: stddata.Symbol(name), Data: native})
+			continue
+		}
+		values, err := dataColumnAnyValuesForKind(vector, kind)
+		if err != nil {
+			return stddata.Frame{}, fmt.Errorf("column %q: %w", name, err)
+		}
+		col, err := stddata.NewColumnWithKind(stddata.Symbol(name), kind, values)
+		if err != nil {
+			return stddata.Frame{}, err
+		}
+		cols = append(cols, col)
+	}
+	return stddata.NewFrame(cols...)
+}
+
+func dataNativeFramePayload(frame *Table) (stddata.Frame, bool, error) {
+	if frame == nil {
+		return stddata.Frame{}, false, nil
+	}
+	if kind, ok := frame.NativePayloadKind(); ok {
+		if kind != NativePayloadDataFrame {
+			return stddata.Frame{}, false, fmt.Errorf("argument 1 must be a data frame")
+		}
+		native, hasPayload := frame.NativePayload().(stddata.Frame)
+		if !hasPayload {
+			return stddata.Frame{}, false, fmt.Errorf("native data frame payload is invalid")
+		}
+		return native, true, nil
+	}
+	if native, ok := frame.NativePayload().(stddata.Frame); ok {
+		return native, true, nil
+	}
+	return stddata.Frame{}, false, nil
+}
+
+func dataFrameValueFromLib(frame stddata.Frame) (Value, error) {
+	return dataFrameFacadeValueFromLib(frame)
+}
+
+func dataFrameFacadeValueFromLib(frame stddata.Frame) (Value, error) {
+	cols := NewTable()
+	names := make([]string, 0, len(frame.Columns()))
+	kinds := make(map[string]string, len(frame.Columns()))
+	for _, col := range frame.Columns() {
+		name := string(col.Name)
+		names = append(names, name)
+		kinds[name] = string(col.Data.Kind())
+		cols.RawSetString(name, dataColumnValue(col.Data.Kind(), dataArrayFacadeValue(col.Data, dataValueFromAny)))
+	}
+	out := NewTable()
+	out.RawSetString(dataFrameMarker, BoolValue(true))
+	out.RawSetString("len", IntValue(int64(frame.Len())))
+	out.RawSetString("columns", TableValue(cols))
+	out.RawSetString("column_names", TableValue(dataColumnNamesTable(names)))
+	out.RawSetString("column_kinds", TableValue(dataColumnKindsTable(names, kinds)))
+	out.RawSetString("schema", TableValue(dataSchemaTable(names, kinds)))
+	out.RawSetString("row", FunctionValue(&GoFunction{Name: "data.frame.row", Fn: dataFrameRowMethod(out)}))
+	out.RawSetString("gather", FunctionValue(&GoFunction{Name: "data.frame.gather", Fn: dataFrameGatherMethod(out)}))
+	for _, name := range names {
+		out.RawSetString(name, dataColumnWrappedValues(cols.RawGetString(name)))
+	}
+	dataDecorateFrameTable(out, nil)
+	setDataFrameNativePayload(out, frame)
+	return TableValue(out), nil
+}
+
+func dataArrayFacadeValue(array stddata.Array, convert func(any) Value) Value {
+	out := NewTable()
+	if array == nil {
+		return TableValue(out)
+	}
+	out.RawSetString("kind", StringValue(string(array.Kind())))
+	out.RawSetString("type", StringValue("data_array"))
+	out.RawSetString("len", IntValue(int64(array.Len())))
+	cache := make(map[int64]Value)
+	out.SetLazyIntGetter(array.Len(), func(key int64) (Value, bool) {
+		if key < 1 || key > int64(array.Len()) {
+			return NilValue(), false
+		}
+		if v, ok := cache[key]; ok {
+			return v, true
+		}
+		item, ok := array.At(int(key - 1))
+		if !ok {
+			return NilValue(), false
+		}
+		if stddata.IsNull(item) {
+			if kind := array.Kind(); kind != "" && kind != stddata.KindAny && kind != stddata.KindNull {
+				item = stddata.NullForKind(kind)
+			}
+		}
+		v := convert(item)
+		cache[key] = v
+		return v, true
+	})
+	meta := NewTable()
+	meta.RawSetString("__tostring", FunctionValue(&GoFunction{Name: "data.array.__tostring", Fn: func(args []Value) ([]Value, error) {
+		return []Value{StringValue(fmt.Sprint(array))}, nil
+	}}))
+	out.SetMetatable(meta)
+	setDataArrayNativePayload(out, array)
+	return TableValue(out)
+}
+
+func setDataFrameNativePayload(table *Table, frame stddata.Frame) {
+	if table == nil {
+		return
+	}
+	table.SetNativePayloadWithInfo(frame, NativePayloadInfo{
+		Kind:       NativePayloadDataFrame,
+		Rows:       frame.Len(),
+		Columns:    len(frame.Schema().Names()),
+		SchemaHash: frame.SchemaFingerprint(),
+	})
+}
+
+func setDataArrayNativePayload(table *Table, array stddata.Array) {
+	if table == nil || array == nil {
+		return
+	}
+	table.SetNativePayloadWithInfo(array, NativePayloadInfo{
+		Kind:       NativePayloadDataColumn,
+		Rows:       array.Len(),
+		ColumnKind: string(array.Kind()),
+	})
+}
+
+func dataNativeArrayFromValue(v Value) (stddata.Array, bool) {
+	if !v.IsTable() {
+		return nil, false
+	}
+	tbl := v.Table()
+	if kind, ok := tbl.NativePayloadKind(); ok {
+		if kind != NativePayloadDataColumn {
+			return nil, false
+		}
+		array, ok := tbl.NativePayload().(stddata.Array)
+		return array, ok
+	}
+	array, ok := tbl.NativePayload().(stddata.Array)
+	return array, ok
+}
+
+func dataValueFromAny(v any) Value {
+	if stddata.IsNull(v) {
+		if kind, ok := stddata.NullKind(v); ok {
+			return dataTypedNullValue(kind)
+		}
+		return dataNullValue()
+	}
+	switch x := v.(type) {
+	case nil:
+		return NilValue()
+	case bool:
+		return BoolValue(x)
+	case int:
+		return IntValue(int64(x))
+	case int8:
+		return IntValue(int64(x))
+	case int16:
+		return IntValue(int64(x))
+	case int32:
+		return IntValue(int64(x))
+	case int64:
+		return IntValue(x)
+	case uint8:
+		return IntValue(int64(x))
+	case uint16:
+		return IntValue(int64(x))
+	case uint32:
+		return IntValue(int64(x))
+	case uint64:
+		return IntValue(int64(x))
+	case float32:
+		return FloatValue(float64(x))
+	case float64:
+		return FloatValue(x)
+	case string:
+		return StringValue(x)
+	case stddata.Symbol:
+		return StringValue(string(x))
+	case stddata.Month:
+		return IntValue(int64(x))
+	case stddata.Date:
+		return IntValue(int64(x))
+	case stddata.DateTime:
+		return IntValue(int64(x))
+	case stddata.Timespan:
+		return IntValue(int64(x))
+	case stddata.Minute:
+		return IntValue(int64(x))
+	case stddata.Second:
+		return IntValue(int64(x))
+	case stddata.Time:
+		return IntValue(int64(x))
+	case stddata.Timestamp:
+		return IntValue(int64(x))
+	default:
+		return StringValue(fmt.Sprint(x))
+	}
+}
+
+func dataStringArg(name string, args []Value, index int, label string) (string, error) {
+	if len(args) <= index || !args[index].IsString() {
+		return "", fmt.Errorf("%s: argument %d must be %s string", name, index+1, label)
+	}
+	return args[index].Str(), nil
+}
+
+func dataPathStringArg(name string, args []Value, index int, label string) (string, error) {
+	path, err := dataStringArg(name, args, index, label)
+	if err != nil {
+		return "", err
+	}
+	return qNormalizePathString(path), nil
+}
+
+func qPathStringArg(name string, args []Value, index int, label string) (string, error) {
+	return dataPathStringArg(name, args, index, label)
+}
+
+func qNormalizePathString(path string) string {
+	path = strings.TrimSpace(path)
+	path = strings.TrimPrefix(path, "`")
+	path = strings.TrimPrefix(path, ":")
+	return path
+}
+
+func dataPartitionColumnArgs(name string, args []Value) ([]stddata.Symbol, error) {
+	if len(args) == 0 {
+		return nil, fmt.Errorf("%s: at least one partition column is required", name)
+	}
+	var out []stddata.Symbol
+	for i, arg := range args {
+		if arg.IsTable() {
+			tbl := arg.Table()
+			for j := 1; j <= tbl.Length(); j++ {
+				item := tbl.RawGetInt(int64(j))
+				if !item.IsString() {
+					return nil, fmt.Errorf("%s: partition column %d must be string", name, j)
+				}
+				out = append(out, stddata.Symbol(item.Str()))
+			}
+			continue
+		}
+		if !arg.IsString() {
+			return nil, fmt.Errorf("%s: argument %d must be partition column string or table", name, i+3)
+		}
+		out = append(out, stddata.Symbol(arg.Str()))
+	}
+	if len(out) == 0 {
+		return nil, fmt.Errorf("%s: at least one partition column is required", name)
+	}
+	return out, nil
+}
+
+func dataPartitionFilters(name string, args []Value) (map[stddata.Symbol]any, error) {
+	if len(args) == 0 || args[0].IsNil() {
+		return nil, nil
+	}
+	if len(args) != 1 || !args[0].IsTable() {
+		return nil, fmt.Errorf("%s: optional argument 2 must be filter table", name)
+	}
+	filters := map[stddata.Symbol]any{}
+	ok := args[0].Table().ForEachPlainRaw(func(key, val Value) bool {
+		if !key.IsString() {
+			return false
+		}
+		filters[stddata.Symbol(key.Str())] = dataValueAny(val)
+		return true
+	})
+	if !ok {
+		return nil, fmt.Errorf("%s: filter table must have string keys", name)
+	}
+	return filters, nil
+}
+
+func dataFrameInfoTable(info stddata.FrameStoreInfo) *Table {
+	out := NewTable()
+	out.RawSetString("format", StringValue(info.Format))
+	out.RawSetString("version", IntValue(int64(info.Version)))
+	out.RawSetString("rows", IntValue(int64(info.Rows)))
+	out.RawSetString("columns", TableValue(dataStoredColumnsTable(info.Columns)))
+	return out
+}
+
+func dataPartitionedInfoTable(info stddata.PartitionedStoreInfo) *Table {
+	out := NewTable()
+	out.RawSetString("format", StringValue(info.Format))
+	out.RawSetString("version", IntValue(int64(info.Version)))
+	out.RawSetString("rows", IntValue(int64(info.Rows)))
+	out.RawSetString("partition_columns", TableValue(dataStringArrayTable(info.PartitionColumns)))
+	out.RawSetString("columns", TableValue(dataStoredColumnsTable(info.Columns)))
+	partitions := NewAppendArrayTable(len(info.Partitions))
+	for i, part := range info.Partitions {
+		row := NewTable()
+		row.RawSetString("path", StringValue(part.Path))
+		row.RawSetString("rows", IntValue(int64(part.Rows)))
+		values := NewTable()
+		for name, value := range part.Values {
+			values.RawSetString(name, dataValueFromAny(value))
+		}
+		row.RawSetString("values", TableValue(values))
+		partitions.RawSetInt(int64(i+1), TableValue(row))
+	}
+	out.RawSetString("partitions", TableValue(partitions))
+	return out
+}
+
+func dataStoredColumnsTable(cols []stddata.StoredColumn) *Table {
+	out := NewAppendArrayTable(len(cols))
+	for i, col := range cols {
+		row := NewTable()
+		row.RawSetString("name", StringValue(col.Name))
+		row.RawSetString("kind", StringValue(string(col.Kind)))
+		row.RawSetString("file", StringValue(col.File))
+		out.RawSetInt(int64(i+1), TableValue(row))
+	}
+	return out
+}
+
+func dataStringArrayTable(values []string) *Table {
+	out := NewAppendArrayTable(len(values))
+	for i, value := range values {
+		out.RawSetInt(int64(i+1), StringValue(value))
+	}
+	return out
+}
+
 func rowsTableToColumns(rows *Table) (*Table, bool) {
 	if rows == nil || rows.Length() == 0 {
 		return nil, false
@@ -396,7 +1125,25 @@ func requireDataFrame(name string, args []Value, index int) (*Table, error) {
 }
 
 func isDataFrameTable(t *Table) bool {
+	if t == nil {
+		return false
+	}
+	if kind, ok := t.NativePayloadKind(); ok {
+		return kind == NativePayloadDataFrame
+	}
+	return isDataFrameMarkerTable(t)
+}
+
+func isDataFrameMarkerTable(t *Table) bool {
 	return t != nil && t.RawGetString(dataFrameMarker).Truthy()
+}
+
+func isNativeDataFrameFacade(t *Table) bool {
+	if t == nil {
+		return false
+	}
+	kind, ok := t.NativeFramePayloadKind()
+	return ok && kind == NativePayloadDataFrame
 }
 
 func isDataColumnValue(v Value) bool {
@@ -637,10 +1384,20 @@ func dataValueAnyForKind(v Value, kind stddata.Kind) any {
 	case v.IsNil():
 		return nil
 	case isDataNullValue(v):
+		if kind := dataNullValueKind(v); kind != "" {
+			return stddata.NullForKind(kind)
+		}
 		return stddata.NullValue
 	case v.IsBool():
 		return v.Bool()
 	case v.IsInt():
+		switch kind {
+		case stddata.KindMonth, stddata.KindDate, stddata.KindDateTime, stddata.KindTimespan,
+			stddata.KindMinute, stddata.KindSecond, stddata.KindTime, stddata.KindTimestamp:
+			if parsed, ok := qParseTemporalAny(kind, v.Int()); ok {
+				return parsed
+			}
+		}
 		if dataKindIsFloat(kind) {
 			if kind == stddata.KindF32 {
 				return float32(v.Int())
@@ -649,11 +1406,25 @@ func dataValueAnyForKind(v Value, kind stddata.Kind) any {
 		}
 		return dataIntAnyForKind(kind, v.Int())
 	case v.IsFloat():
+		switch kind {
+		case stddata.KindMonth, stddata.KindDate, stddata.KindDateTime, stddata.KindTimespan,
+			stddata.KindMinute, stddata.KindSecond, stddata.KindTime, stddata.KindTimestamp:
+			if parsed, ok := qParseTemporalAny(kind, int64(v.Float())); ok {
+				return parsed
+			}
+		}
 		if kind == stddata.KindF32 {
 			return float32(v.Float())
 		}
 		return v.Float()
 	case v.IsString():
+		switch kind {
+		case stddata.KindMonth, stddata.KindDate, stddata.KindDateTime, stddata.KindTimespan,
+			stddata.KindMinute, stddata.KindSecond, stddata.KindTime, stddata.KindTimestamp:
+			if parsed, ok := qParseTemporalAny(kind, v.Str()); ok {
+				return parsed
+			}
+		}
 		if kind == stddata.KindSymbol {
 			return stddata.Symbol(v.Str())
 		}

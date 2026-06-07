@@ -25,7 +25,7 @@ func JSONValueToGo(v Value) any {
 		return f
 	case TypeString:
 		return v.Str()
-	case TypeTable:
+	case TypeTable, TypeFrame, TypeKeyedFrame:
 		return JSONTableToGo(v.Table())
 	default:
 		return v.String()

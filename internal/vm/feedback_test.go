@@ -123,6 +123,7 @@ func TestFeedback_LatticeHomogeneous(t *testing.T) {
 		{runtime.TypeInt, FBInt}, {runtime.TypeFloat, FBFloat},
 		{runtime.TypeString, FBString}, {runtime.TypeBool, FBBool},
 		{runtime.TypeTable, FBTable}, {runtime.TypeFunction, FBFunction},
+		{runtime.TypeFrame, FBTable}, {runtime.TypeKeyedFrame, FBTable},
 	} {
 		var ft FeedbackType
 		ft.Observe(tc.vt)
@@ -140,6 +141,24 @@ func TestFeedback_LatticeHomogeneous(t *testing.T) {
 	ft.Observe(runtime.TypeBool)
 	if ft != FBAny {
 		t.Fatalf("mixed string+bool: expected FBAny, got %d", ft)
+	}
+}
+
+func TestFeedback_LatticeKeepsTableBackedFramesMonomorphic(t *testing.T) {
+	sequences := [][]runtime.ValueType{
+		{runtime.TypeTable, runtime.TypeFrame},
+		{runtime.TypeFrame, runtime.TypeTable},
+		{runtime.TypeFrame, runtime.TypeKeyedFrame},
+		{runtime.TypeKeyedFrame, runtime.TypeTable, runtime.TypeFrame},
+	}
+	for _, seq := range sequences {
+		var ft FeedbackType
+		for _, vt := range seq {
+			ft.Observe(vt)
+		}
+		if ft != FBTable {
+			t.Fatalf("sequence %v observed %v, want FBTable", seq, ft)
+		}
 	}
 }
 

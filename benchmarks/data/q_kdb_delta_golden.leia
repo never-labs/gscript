@@ -1,0 +1,64 @@
+// q kdb+ delta golden benchmark. This keeps conformance edges warm without
+// depending on large fixture data.
+
+REPS := 1500
+MOD := 1000000007
+
+trades := q.sql(
+  "select trade_id,sym,ts from ([] trade_id:1 2 3; sym:`AAPL`AAPL`MSFT; ts:2026.06.06D09:30:00 2026.06.06D09:30:01 2026.06.06D09:30:00)",
+  {}
+)
+quotes := q.sql(
+  "select sym,ts,bid,seq from ([] sym:`AAPL`AAPL`AAPL`MSFT; ts:2026.06.06D09:30:00 2026.06.06D09:30:00 2026.06.06D09:30:01 2026.06.06D09:29:59; bid:100.0 0N 100.5 80.0; seq:1 2 3 4)",
+  {}
+)
+bars := data.frame({
+  sym: data.symbols({"AAPL", "AAPL", "AAPL", "MSFT"}),
+  bucket: data.strings({"09:30", "09:30", "09:31", "09:30"}),
+  seq: data.i64({1, 2, 3, 4}),
+  px: data.f64({100.0, 100.5, 101.0, 80.0}),
+})
+keyed := q.key_by(bars, "sym", "bucket")
+typed := q.sql(
+  "select sym,d,t,ts,qty,px from ([] sym:`AAPL`MSFT; d:2026.06.06 0Nd; t:09:30:00.250 0Nt; ts:2026.06.06D09:30:00.250 0Np; qty:10 0Ni; px:100.5 0N)",
+  {}
+)
+
+func mix(sum, v) {
+  return (sum * 131 + v) % MOD
+}
+
+func run_hot(reps) {
+  checksum := 0
+  for r := 1; r <= reps; r++ {
+    aj0 := q.sql("select trade_id,sym,ts,bid,seq from trades aj0 quotes on sym,ts order by trade_id asc", {trades: trades, quotes: quotes})
+    ajf := q.sql("select trade_id,sym,ts,bid,seq from trades ajf quotes on sym,ts order by trade_id asc", {trades: trades, quotes: quotes})
+    wj_zero := q.sql("select trade_id,sym,ts,bid,seq from trades wj[0 0] quotes on sym,ts order by trade_id asc", {trades: trades, quotes: quotes})
+    projection_each := q.eval("({x+y}[10;])'1 2 3")
+    projection_over := q.eval("({x+y}[1;])/[2 3 4]")
+    decoded_typed := q.decode(q.encode(typed))
+    decoded_keyed := q.decode(q.encode(keyed))
+    decoded_lookup := q.lookup(decoded_keyed, "AAPL", "09:30")
+    decoded_dict := q.decode(q.encode(q.eval("`b`a!(2 3;`x`y)")))
+
+    assert(aj0[1].seq == 2 && ajf[2].bid == 100.5)
+    assert(#wj_zero[1].bid == 2 && data.is_null(wj_zero[1].bid[2]))
+    assert(decoded_typed[2].d == nil && decoded_typed[2].qty == nil)
+    assert(decoded_lookup[1].seq == 2 && q.keys(decoded_dict)[1] == "b")
+
+    checksum = mix(checksum, aj0[1].seq * 17 + math.floor(ajf[2].bid * 10))
+    checksum = mix(checksum, #wj_zero[1].bid * 19 + projection_each[3] * 23 + projection_over * 29)
+    checksum = mix(checksum, decoded_lookup[1].seq * 31 + string.len(q.value(decoded_dict)[2][2]) * 37)
+  }
+  return checksum
+}
+
+warm := run_hot(2)
+collectgarbage("collect")
+t0 := time.now()
+checksum := run_hot(REPS)
+elapsed := time.since(t0)
+
+print(string.format("q_kdb_delta_golden_hot reps=%d", REPS))
+print(string.format("checksum: %d", mix(checksum, warm)))
+print(string.format("Time: %.3fs", elapsed))

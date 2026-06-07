@@ -23,6 +23,49 @@ const initialStringMapCap = 64
 // table representation.
 const SmallFieldCap = smallFieldCap
 
+// NativePayloadKind classifies host-side table facades without exposing the
+// concrete payload type to runtime.
+type NativePayloadKind string
+
+const (
+	NativePayloadNone       NativePayloadKind = ""
+	NativePayloadDataFrame  NativePayloadKind = "data_frame"
+	NativePayloadDataColumn NativePayloadKind = "data_column"
+	NativePayloadKeyedFrame NativePayloadKind = "data_keyed_frame"
+)
+
+// IsFrameFacadeKind reports whether this native payload kind is represented as
+// a first-class runtime frame value instead of a plain table.
+func (k NativePayloadKind) IsFrameFacadeKind() bool {
+	return k == NativePayloadDataFrame || k == NativePayloadKeyedFrame
+}
+
+// ValueType returns the runtime value type carried by this payload kind, when
+// it has one. Column payloads remain table facades from runtime's perspective.
+func (k NativePayloadKind) ValueType() (ValueType, bool) {
+	switch k {
+	case NativePayloadDataFrame:
+		return TypeFrame, true
+	case NativePayloadKeyedFrame:
+		return TypeKeyedFrame, true
+	default:
+		return TypeNil, false
+	}
+}
+
+// TypeName returns the user-facing runtime type name for payload kinds that are
+// promoted to first-class frame values.
+func (k NativePayloadKind) TypeName() (string, bool) {
+	switch k {
+	case NativePayloadDataFrame:
+		return "frame", true
+	case NativePayloadKeyedFrame:
+		return "keyed frame", true
+	default:
+		return "", false
+	}
+}
+
 // Table is Leia's associative array / object type.
 // Tables have an optimized array part for sequential integer keys 1..n,
 // flat slices for small string-keyed tables (most Leia objects),
@@ -89,6 +132,31 @@ type Table struct {
 	nextKey   Value
 	nextIndex int
 	nextValid bool
+
+	// lazyIntGetter exposes a dense integer-keyed view without materializing
+	// the array part. Data-frame bindings use it for row access over columnar
+	// storage: t[1] can build one row while #t still reports the frame length.
+	// Keep this cold field after JIT-verified layout fields.
+	lazyIntGetter func(int64) (Value, bool)
+	lazyIntLength int
+
+	// nativePayload is an optional host-side representation for tables that
+	// primarily expose runtime data through a table facade. It is deliberately
+	// opaque to runtime so packages above runtime can attach columnar frames or
+	// similar payloads without introducing import cycles.
+	nativePayload     any
+	nativePayloadInfo *NativePayloadInfo
+}
+
+// NativePayloadInfo is a small runtime-facing description of an opaque native
+// table payload. It lets stdlib boundaries identify stable value categories and
+// schema facts without importing the payload's owning package.
+type NativePayloadInfo struct {
+	Kind       NativePayloadKind
+	Rows       int
+	Columns    int
+	ColumnKind string
+	SchemaHash string
 }
 
 // SetConcurrent enables or disables mutex protection for concurrent access.
@@ -344,7 +412,159 @@ func (t *Table) RawGetInt(key int64) Value {
 			return v
 		}
 	}
+	if t.lazyIntGetter != nil && key >= 1 && key <= int64(t.lazyIntLength) {
+		if v, ok := t.lazyIntGetter(key); ok {
+			return v
+		}
+	}
 	return NilValue()
+}
+
+// SetLazyIntGetter installs a deferred dense integer-keyed view. Existing
+// concrete integer entries keep priority over the getter. Any later integer
+// write clears the getter to avoid stale derived values.
+func (t *Table) SetLazyIntGetter(length int, getter func(int64) (Value, bool)) {
+	if t == nil {
+		return
+	}
+	if t.mu != nil {
+		t.mu.Lock()
+		defer t.mu.Unlock()
+	}
+	if length <= 0 || getter == nil {
+		t.lazyIntGetter = nil
+		t.lazyIntLength = 0
+		return
+	}
+	t.lazyIntGetter = getter
+	t.lazyIntLength = length
+}
+
+// SetNativePayload attaches an opaque host payload to the table. The payload is
+// invalidated by raw table writes, so callers should install it after finishing
+// visible table decoration.
+func (t *Table) SetNativePayload(payload any) {
+	t.SetNativePayloadWithInfo(payload, NativePayloadInfo{})
+}
+
+// SetNativePayloadWithInfo attaches an opaque host payload with a stable
+// runtime-facing description. The payload and its info are invalidated together
+// by raw table writes.
+func (t *Table) SetNativePayloadWithInfo(payload any, info NativePayloadInfo) {
+	if t == nil {
+		return
+	}
+	if t.mu != nil {
+		t.mu.Lock()
+		defer t.mu.Unlock()
+	}
+	t.nativePayload = payload
+	if info == (NativePayloadInfo{}) {
+		t.nativePayloadInfo = nil
+		return
+	}
+	copied := info
+	t.nativePayloadInfo = &copied
+}
+
+// NativePayload returns the table's opaque host payload, if still valid.
+func (t *Table) NativePayload() any {
+	if t == nil {
+		return nil
+	}
+	if t.mu != nil {
+		t.mu.RLock()
+		defer t.mu.RUnlock()
+	}
+	return t.nativePayload
+}
+
+// NativePayloadInfo returns the current native payload description, if one was
+// installed and the payload has not been invalidated.
+func (t *Table) NativePayloadInfo() (NativePayloadInfo, bool) {
+	if t == nil {
+		return NativePayloadInfo{}, false
+	}
+	if t.mu != nil {
+		t.mu.RLock()
+		defer t.mu.RUnlock()
+	}
+	if t.nativePayload == nil || t.nativePayloadInfo == nil {
+		return NativePayloadInfo{}, false
+	}
+	return *t.nativePayloadInfo, true
+}
+
+// NativePayloadKind reports the stable category attached to the native
+// payload, if one is installed and still valid.
+func (t *Table) NativePayloadKind() (NativePayloadKind, bool) {
+	info, ok := t.NativePayloadInfo()
+	if !ok {
+		return NativePayloadNone, false
+	}
+	return info.Kind, true
+}
+
+// NativeFramePayloadInfo returns native payload metadata only for table
+// facades that runtime promotes to frame/keyed-frame values.
+func (t *Table) NativeFramePayloadInfo() (NativePayloadInfo, bool) {
+	info, ok := t.NativePayloadInfo()
+	if !ok || !info.Kind.IsFrameFacadeKind() {
+		return NativePayloadInfo{}, false
+	}
+	return info, true
+}
+
+// NativeFramePayloadKind reports whether this table currently carries a native
+// frame or keyed-frame facade payload.
+func (t *Table) NativeFramePayloadKind() (NativePayloadKind, bool) {
+	info, ok := t.NativeFramePayloadInfo()
+	if !ok {
+		return NativePayloadNone, false
+	}
+	return info.Kind, true
+}
+
+// HasNativePayloadKind reports whether the table currently carries the
+// requested native payload category.
+func (t *Table) HasNativePayloadKind(kind NativePayloadKind) bool {
+	if kind == NativePayloadNone {
+		return false
+	}
+	got, ok := t.NativePayloadKind()
+	return ok && got == kind
+}
+
+// IsFrameFacade reports whether the table currently carries a runtime frame
+// facade payload.
+func (t *Table) IsFrameFacade() bool {
+	kind, ok := t.NativeFramePayloadKind()
+	return ok && kind == NativePayloadDataFrame
+}
+
+// IsKeyedFrameFacade reports whether the table currently carries a runtime
+// keyed-frame facade payload.
+func (t *Table) IsKeyedFrameFacade() bool {
+	kind, ok := t.NativeFramePayloadKind()
+	return ok && kind == NativePayloadKeyedFrame
+}
+
+// IsNativeFrame reports whether the table currently carries a native frame payload.
+func (t *Table) IsNativeFrame() bool { return t.IsFrameFacade() }
+
+// IsNativeKeyedFrame reports whether the table currently carries a native keyed frame payload.
+func (t *Table) IsNativeKeyedFrame() bool { return t.IsKeyedFrameFacade() }
+
+// IsNativeColumn reports whether the table currently carries a native column payload.
+func (t *Table) IsNativeColumn() bool {
+	return t.HasNativePayloadKind(NativePayloadDataColumn)
+}
+
+func (t *Table) clearNativePayloadLocked() {
+	t.nativePayload = nil
+	t.nativePayloadInfo = nil
+	t.lazyIntGetter = nil
+	t.lazyIntLength = 0
 }
 
 // FieldIndex returns the index of a string key in the skeys slice, or -1 if not found.
@@ -386,6 +606,7 @@ func (t *Table) SvalsGet(i int) Value {
 // Used by the SSA interpreter (golden model) to write fields by index.
 func (t *Table) SvalsSet(i int, v Value) {
 	if i >= 0 && i < len(t.svals) {
+		t.clearNativePayloadLocked()
 		t.svals[i] = v
 		t.keysDirty = true
 	}
@@ -422,6 +643,7 @@ func (t *Table) RawSet(key, val Value) {
 	if t.lazyTree != nil {
 		t.materializeLazyTreeLocked()
 	}
+	t.clearNativePayloadLocked()
 	t.keysDirty = true
 	if t.hash == nil {
 		if val.IsNil() {
@@ -505,33 +727,49 @@ func (t *Table) SampleStringTableValues(limit int, visit func(Value)) {
 
 // Length returns the length of the array part (the # operator).
 func (t *Table) Length() int {
+	lazyLen := 0
+	if t.lazyIntGetter != nil && t.lazyIntLength > 0 {
+		lazyLen = t.lazyIntLength
+	}
 	switch t.arrayKind {
 	case ArrayInt:
 		// All slots are valid (no nil concept for int64), length is always full.
 		if len(t.intArray) == 0 {
-			return 0
+			return lazyLen
 		}
-		return len(t.intArray) - 1
+		if n := len(t.intArray) - 1; n > lazyLen {
+			return n
+		}
+		return lazyLen
 	case ArrayFloat:
 		// All slots are valid for float64 as well.
 		if len(t.floatArray) == 0 {
-			return 0
+			return lazyLen
 		}
-		return len(t.floatArray) - 1
+		if n := len(t.floatArray) - 1; n > lazyLen {
+			return n
+		}
+		return lazyLen
 	case ArrayBool:
 		// Scan backwards past nil sentinels (0 = unset)
 		n := len(t.boolArray) - 1
 		for n > 0 && t.boolArray[n] == 0 {
 			n--
 		}
+		if lazyLen > n {
+			return lazyLen
+		}
 		return n
 	default:
 		if len(t.array) == 0 {
-			return 0
+			return lazyLen
 		}
 		n := len(t.array) - 1
 		for n > 0 && t.array[n].IsNil() {
 			n--
+		}
+		if lazyLen > n {
+			return lazyLen
 		}
 		return n
 	}

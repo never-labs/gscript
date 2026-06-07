@@ -1,0 +1,133 @@
+// q_ticks_bars_asof_project - compact kdb+-style market data workflow.
+// It models a small intraday tape with ticks, trades, quotes, bars, asof
+// enrichment, window joins, keyed lookup, and desk/sector rollups.
+
+func check(name, ok) {
+    assert(ok)
+    print("ok", name)
+}
+
+ticks := q.sql(
+    "select seq,event,sym,ts,px,qty,venue from ([] seq:1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; event:`quote`trade`quote`trade`quote`trade`quote`trade`quote`trade`quote`trade`quote`trade`trade; sym:`AAPL`AAPL`AAPL`AAPL`MSFT`MSFT`MSFT`MSFT`NVDA`NVDA`NVDA`NVDA`TSLA`TSLA`IBM; ts:2026.06.06D09:30:00 2026.06.06D09:30:20 2026.06.06D09:31:00 2026.06.06D09:31:40 2026.06.06D09:30:15 2026.06.06D09:30:50 2026.06.06D09:31:30 2026.06.06D09:31:45 2026.06.06D09:30:30 2026.06.06D09:31:00 2026.06.06D09:32:00 2026.06.06D09:32:20 2026.06.06D09:30:45 2026.06.06D09:31:10 2026.06.06D09:31:00; px:100.10 100.12 100.42 100.50 250.20 250.30 250.80 250.90 880.50 880.80 882.20 882.00 205.40 205.50 140.10; qty:0 100 0 50 0 30 0 45 0 8 0 12 0 20 5; venue:`XNAS`XNAS`BATS`BATS`XNYS`XNYS`ARCX`ARCX`XNAS`XNAS`BATS`BATS`XNAS`XNAS`XNYS)",
+    {}
+)
+
+fee_schedule := q.eval("`XNAS`BATS`XNYS`ARCX!0.00030 0.00020 0.00035 0.00025")
+qty_adverbs := q.eval("qty:100 50 30 45 12 5;(+/qty;+\\qty;-':qty;10+/:qty;qty*qty)")
+desk_limits := q.eval("`alpha`beta`gamma`omega!25000 22000 15000 1000")
+
+quotes := q.sql(
+    "select quote_id,sym,ts,bid,ask,bid_sz,ask_sz,venue from ([] quote_id:101 102 201 202 301 302 401; sym:`AAPL`AAPL`MSFT`MSFT`NVDA`NVDA`TSLA; ts:2026.06.06D09:30:00 2026.06.06D09:31:00 2026.06.06D09:30:15 2026.06.06D09:31:30 2026.06.06D09:30:30 2026.06.06D09:32:00 2026.06.06D09:30:45; bid:100.00 100.35 250.00 250.70 880.00 881.50 205.00; ask:100.20 100.55 250.40 251.00 881.00 882.50 206.00; bid_sz:500 420 300 330 90 70 100; ask_sz:450 400 260 310 75 65 80; venue:`XNAS`BATS`XNYS`ARCX`XNAS`BATS`XNAS)",
+    {}
+)
+
+raw_trades := q.sql(
+    "select trade_id,order_id,parent_id,sym,ts,price,size,desk,venue,cancelled from ([] trade_id:1001 1002 1003 1004 1005 1006 1007; order_id:501 502 503 504 505 506 0; parent_id:9001 9001 9002 9002 9003 9004 9005; sym:`AAPL`AAPL`MSFT`MSFT`NVDA`TSLA`IBM; ts:2026.06.06D09:30:20 2026.06.06D09:31:40 2026.06.06D09:30:50 2026.06.06D09:31:45 2026.06.06D09:32:20 2026.06.06D09:31:10 2026.06.06D09:31:00; price:100.12 100.50 250.30 250.90 882.00 205.50 140.10; size:100 50 30 45 12 20 5; desk:`alpha`alpha`beta`beta`gamma`delta`omega; venue:`XNAS`BATS`XNYS`ARCX`BATS`XNAS`XNYS; cancelled:false false false false false true false)",
+    {}
+)
+
+refdata := q.sql(
+    "select sym,sector,tick_size from ([] sym:`AAPL`MSFT`NVDA`IBM; sector:`hardware`software`semis`mainframe; tick_size:0.01 0.01 0.05 0.01)",
+    {}
+)
+
+trades := q.sql(raw_trades, "delete from trades where cancelled=true")
+trades = q.sql(trades, "update notional:price*size from trades where size>0")
+trades = q.sql(trades, "update fee:notional*0.00030 from trades where venue=`XNAS")
+trades = q.sql(trades, "update fee:notional*0.00020 from trades where venue=`BATS")
+trades = q.sql(trades, "update fee:notional*0.00035 from trades where venue=`XNYS")
+trades = q.sql(trades, "update fee:notional*0.00025 from trades where venue=`ARCX")
+
+enriched := q.sql(
+    "select trade_id,order_id,parent_id,sym,ts,price,size,desk,venue,notional,fee,bid,ask,spread:ask-bid,bid_sz,ask_sz from trades asof join quotes on sym,ts order by trade_id asc",
+    {trades: trades, quotes: quotes}
+)
+
+windowed := q.sql(
+    "select trade_id,sym,ts,bid,ask,bid_sz from trades wj[-120000000000 0] quotes on sym,ts order by trade_id asc",
+    {trades: trades, quotes: quotes}
+)
+
+bars := q.sql(
+    enriched,
+    "select notional:sum notional, shares:sum size, fees:sum fee, fills:count i, avg_spread:avg spread, first_px:first price, last_px:last price by sym,bucket:xbar 60000000000 ts from trades order by sym asc,bucket asc"
+)
+
+for i := 1; i <= #bars; i++ {
+    row := bars[i]
+    row.vwap = row.notional / row.shares
+}
+
+sector_trades := q.sql(
+    "select trade_id,order_id,parent_id,sym,sector,tick_size,desk,venue,ts,price,size,notional,fee,bid,ask,spread from trades left join refdata on sym order by trade_id asc",
+    {trades: enriched, refdata: refdata}
+)
+
+desk_rollup := q.sql(
+    sector_trades,
+    "select notional:sum notional, shares:sum size, fees:sum fee, fills:count i by desk,sector from trades order by desk asc,sector asc"
+)
+
+parent_rollup := q.sql(
+    trades,
+    "select filled:sum size, traded_notional:sum notional, fees:sum fee, fills:count i by parent_id,sym from trades order by parent_id asc,sym asc"
+)
+
+trade_ticks := q.sql(ticks, "select seq,sym,ts,px,qty,venue from trades where event=`trade order by ts asc,seq asc")
+top_ticks := q.sql(trade_ticks, "select seq,sym,ts,px,qty from trades order by px desc take 3")
+exec_trade_dict := q.sql(sector_trades, "exec trade_id,sym,desk,sector,notional,fee from trades where notional>5000 order by notional desc")
+exec_desk_dict := q.sql(sector_trades, "exec shares:sum size,gross:sum notional,fees:sum fee by desk from trades order by desk asc")
+exec_alpha_symbols := q.sql(sector_trades, "exec sym from trades where desk=`alpha order by trade_id asc")
+keyed_by_sym := q.key_by(sector_trades, "sym")
+aapl_trades := q.lookup(keyed_by_sym, "AAPL")
+aapl_all := q.sql(sector_trades, "select trade_id,sym,sector,notional from trades where sym=`AAPL order by trade_id asc")
+tsla_trades := q.lookup(keyed_by_sym, "TSLA")
+ibm_trades := q.lookup(keyed_by_sym, "IBM")
+keyed_bars := q.key_by(bars, "sym", "bucket")
+keyed_bar_values := q.value(keyed_bars)
+
+check("base market tape shapes", #ticks == 15 && #quotes == 7 && #raw_trades == 7 && #trades == 6)
+check("trade cleanup and fee updates", trades[1].notional == 10012.0 && trades[1].fee > 3.00 && trades[1].fee < 3.01 && trades[6].sym == "IBM")
+check("asof trade quote enrichment", #enriched == 6 && enriched[1].bid == 100.0 && enriched[2].bid == 100.35 && enriched[4].ask == 251.0 && enriched[5].bid == 881.5 && enriched[6].bid == nil)
+check("window join quote history", #windowed == 6 && #windowed[1].bid == 1 && #windowed[2].bid == 2 && #windowed[5].bid == 2 && #windowed[6].bid == 0)
+check("xbar bars and vwap", #bars == 6 && bars[1].sym == "AAPL" && bars[1].bucket == "2026-06-06T09:30:00Z" && math.floor(bars[1].vwap * 100) == 10012 && bars[6].sym == "NVDA")
+check("sector and desk rollups", #sector_trades == 6 && sector_trades[6].sector == "mainframe" && #desk_rollup == 4 && desk_rollup[1].desk == "alpha" && desk_rollup[1].fills == 2)
+check("parent rollup", #parent_rollup == 4 && parent_rollup[1].parent_id == 9001 && parent_rollup[1].filled == 150.0 && parent_rollup[4].sym == "IBM")
+check("tick tape top trades", #trade_ticks == 8 && top_ticks[1].sym == "NVDA" && top_ticks[3].sym == "MSFT")
+check("q eval dicts and adverbs", fee_schedule.ARCX == 0.00025 && qty_adverbs[1] == 242 && qty_adverbs[2][6] == 242 && qty_adverbs[3][3] == -20 && qty_adverbs[4][2] == 60 && qty_adverbs[5][1] == 10000 && desk_limits.omega == 1000)
+check("exec dict projections", q.count(exec_trade_dict.trade_id) == 5 && exec_trade_dict.sym[1] == "MSFT" && exec_trade_dict.notional[1] == 11290.5 && exec_desk_dict.desk[1] == "alpha" && exec_desk_dict.shares[1] == 150.0 && exec_alpha_symbols[2] == "AAPL")
+check("keyed lookups", q.keys(keyed_by_sym)[1] == "sym" && q.keys(keyed_bars)[2] == "bucket" && #keyed_bar_values == #bars && #aapl_all == 2 && #aapl_trades == 1 && aapl_trades[1].sym == nil && #tsla_trades == 0 && #ibm_trades == 1)
+
+summary := string.format(
+    "q_ticks_bars_asof ticks=%d trades=%d quotes=%d bars=%d top=%s exec=%d notional=%.1f",
+    #ticks,
+    #trades,
+    #quotes,
+    #bars,
+    top_ticks[1].sym,
+    q.count(exec_trade_dict.trade_id),
+    top_ticks[1].px * top_ticks[1].qty
+)
+print(summary)
+
+return {
+    ticks: ticks,
+    quotes: quotes,
+    trades: trades,
+    enriched: enriched,
+    windowed: windowed,
+    bars: bars,
+    sector_trades: sector_trades,
+    desk_rollup: desk_rollup,
+    parent_rollup: parent_rollup,
+    trade_ticks: trade_ticks,
+    top_ticks: top_ticks,
+    fee_schedule: fee_schedule,
+    qty_adverbs: qty_adverbs,
+    desk_limits: desk_limits,
+    exec_trade_dict: exec_trade_dict,
+    exec_desk_dict: exec_desk_dict,
+    exec_alpha_symbols: exec_alpha_symbols,
+    keyed_bars: keyed_bars,
+    summary: summary,
+}

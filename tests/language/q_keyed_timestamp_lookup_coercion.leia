@@ -1,0 +1,15 @@
+print("case:q_keyed_timestamp_lookup_coercion")
+
+bars := data.frame({
+  sym: data.symbols({"AAPL"}),
+  bucket: data.timestamp({"2026-06-06T09:30:00Z"}),
+  notional: data.f64({10012.0}),
+})
+
+keyed := q.key_by(bars, "sym", "bucket")
+hit := q.lookup(keyed, {sym: "AAPL", bucket: "2026-06-06T09:30:00Z"})
+
+assert(#hit == 1)
+assert(hit[1].notional == 10012.0)
+
+print("ok")

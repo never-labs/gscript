@@ -1,0 +1,16 @@
+print("case:q_trade_analytics_project")
+
+result := dofile("examples/data/q_trade_analytics_project/main.leia")
+
+assert(result.summary != "")
+assert(#result.symbols == 3)
+assert(result.symbols[2] == "MSFT")
+assert(result.book.ask[2] == 101)
+assert(#result.trades == 5)
+assert(result.trades[4].sym == "NVDA")
+assert(result.trades[4].notional == 15337.5)
+assert(result.leader == "MSFT")
+assert(result.leader_notional == 21360.0)
+assert(result.running_notional[5] == 54857.5)
+
+print("ok")

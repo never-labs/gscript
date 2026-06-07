@@ -412,7 +412,7 @@ func (c *compiler) compileAssignTarget(target ast.Expr, valueReg int, line int) 
 			return err
 		}
 		fieldK := c.stringConst(t.Field)
-		c.emitABC(OP_SETFIELD, tableReg, fieldK, valueReg, line)
+		c.emitSetField(tableReg, fieldK, valueReg, line)
 		if tableIsTemp {
 			c.freeReg()
 		}
@@ -510,12 +510,12 @@ func (c *compiler) compileCompoundAssignStmt(s *ast.CompoundAssignStmt) error {
 		}
 		fieldK := c.stringConst(t.Field)
 		oldReg := c.allocReg()
-		c.emitABC(OP_GETFIELD, oldReg, tableReg, fieldK, line)
+		c.emitGetField(oldReg, tableReg, fieldK, line)
 		err = c.emitCompoundOp(opcode, oldReg, s.Value, line, func(int) {})
 		if err != nil {
 			return err
 		}
-		c.emitABC(OP_SETFIELD, tableReg, fieldK, oldReg, line)
+		c.emitSetField(tableReg, fieldK, oldReg, line)
 		c.freeReg() // oldReg
 		if tableIsTemp {
 			c.freeReg()
@@ -618,9 +618,9 @@ func (c *compiler) compileIncDecStmt(s *ast.IncDecStmt) error {
 		}
 		fieldK := c.stringConst(t.Field)
 		oldReg := c.allocReg()
-		c.emitABC(OP_GETFIELD, oldReg, tableReg, fieldK, line)
+		c.emitGetField(oldReg, tableReg, fieldK, line)
 		c.emitABC(opcode, oldReg, oldReg, oneReg, line)
-		c.emitABC(OP_SETFIELD, tableReg, fieldK, oldReg, line)
+		c.emitSetField(tableReg, fieldK, oldReg, line)
 		c.freeRegs(2) // oldReg, tableReg
 		c.freeReg()   // oneReg
 		return nil

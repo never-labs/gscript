@@ -11,16 +11,21 @@ trades := data.frame({
   size: data.i64({10, 15, 20}),
   venue: data.strings({"XNAS", "XNYS", "XNAS"}),
   active: data.bool({true, false, true}),
+  month: data.month({"2026.06", "2026.07", data.null}),
   trade_date: data.date({"2026-06-01", "2026-06-01", data.null}),
+  local_dt: data.datetime({"2026.06.01T09:30:00", "2026.06.01T09:31:00", data.null}),
+  hold: data.timespan({"1D09:30:00", "0D00:01:00", data.null}),
+  minute: data.minute({"09:30", "09:31", "15:59"}),
+  second: data.second({"09:30:00", "09:31:00", "15:59:00"}),
   session_time: data.time({"09:30:00", "09:31:00", "15:59:00"}),
   event_ts: data.timestamp({"2026-06-01T09:30:00Z", "2026-06-01T09:31:00Z", data.null}),
 })
 
 check("frame length", trades.len == 3)
-check("schema preserves order", trades.schema.names[1] == "sym" && trades.schema.names[8] == "event_ts")
-check("schema kinds", trades.schema.kinds.sym == "symbol" && trades.schema.kinds.price == "f64" && trades.schema.kinds.trade_date == "date" && trades.schema.kinds.session_time == "time" && trades.schema.kinds.event_ts == "timestamp")
+check("schema stable order", trades.schema.names[1] == "active" && trades.schema.names[13] == "venue")
+check("schema kinds", trades.schema.kinds.sym == "symbol" && trades.schema.kinds.price == "f64" && trades.schema.kinds.month == "month" && trades.schema.kinds.trade_date == "date" && trades.schema.kinds.local_dt == "datetime" && trades.schema.kinds.hold == "timespan" && trades.schema.kinds.minute == "minute" && trades.schema.kinds.second == "second" && trades.schema.kinds.session_time == "time" && trades.schema.kinds.event_ts == "timestamp")
 check("column field access", trades.columns.sym[2] == "MSFT" && trades.price[3] == 101.0)
-check("temporal null passthrough", trades.trade_date[1] == "2026-06-01" && trades.session_time[3] == "15:59:00" && trades.event_ts[3] == data.null)
+check("temporal null passthrough", trades.month[3] == data.null && trades.trade_date[1] == "2026-06-01" && trades.local_dt[3] == data.null && trades.hold[3] == data.null && trades.minute[3] == "15:59" && trades.second[3] == "15:59:00" && trades.session_time[3] == "15:59:00" && trades.event_ts[3] == data.null)
 
 row := trades:row(3)
 check("row materialization", row.sym == "AAPL" && row.size == 20 && row.active == true && row.trade_date == data.null && row.event_ts == data.null)

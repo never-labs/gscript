@@ -1,0 +1,73 @@
+import "data"
+import "q"
+
+store := ".tmp/q_columnar_partitioned_store_project"
+
+trades := q.eval("([] day:1 1 2 2; sym:`AAPL`MSFT`AAPL`MSFT; qty:10 20 30 40; price:100.5 101.25 102.75 103.5)")
+typed := q.eval("([] d:2026.06.06 0Nd; ts:2026.06.06D09:30:00 0Np; sym:`AAPL`MSFT; qty:10 0N)")
+decoded_typed := q.decode(q.encode(typed))
+decoded_enum := q.decode(q.encode(q.eval("`sym$`AAPL`MSFT`AAPL")))
+assert(q.count(decoded_typed) == 2)
+assert(decoded_typed[2].d == nil)
+assert(decoded_typed[2].ts == nil)
+assert(decoded_typed[1].ts == "2026-06-06T09:30:00Z")
+assert(decoded_enum[2] == "MSFT")
+assert(decoded_enum[3] == "AAPL")
+
+assert(q.save_splayed(trades, "`:" .. store .. "/splayed"))
+loaded := q.load_splayed("`:" .. store .. "/splayed")
+loaded_rollup := q.sql(loaded, "select total:sum qty by sym from trades")
+assert(q.count(loaded_rollup) == 2)
+loaded_get := q.eval("get `:" .. store .. "/splayed")
+loaded_path_rollup := q.sql("select total:sum qty by sym from `:" .. store .. "/splayed", {})
+assert(q.count(loaded_get) == 4)
+assert(q.count(loaded_path_rollup) == 2)
+
+assert(q.save_splayed(typed, "`:" .. store .. "/typed_splayed"))
+typed_loaded := q.load_splayed("`:" .. store .. "/typed_splayed")
+assert(q.count(typed_loaded) == 2)
+assert(typed_loaded[2].d == nil)
+assert(typed_loaded[2].qty == nil)
+assert(typed_loaded[1].ts == "2026-06-06T09:30:00Z")
+
+path_set := q.eval("`:" .. store .. "/path_set set ([] day:1 1 2; sym:`AAPL`AAPL`MSFT; qty:5 7 11)")
+assert(q.count(path_set) == 3)
+path_get := q.eval("get `:" .. store .. "/path_set")
+path_rollup := q.sql("select total:sum qty by sym from `:" .. store .. "/path_set", {})
+assert(q.count(path_get) == 3)
+assert(q.count(path_rollup) == 2)
+
+prefix_set := q.eval("set `:" .. store .. "/prefix_set ([] day:3 3; sym:`IBM`AAPL; qty:13 17)")
+prefix_get := q.eval("get `:" .. store .. "/prefix_set")
+assert(q.count(prefix_set) == 2)
+assert(q.count(prefix_get) == 2)
+
+binding_set := q.set("`:" .. store .. "/binding_set", trades)
+binding_get := q.eval("get `:" .. store .. "/binding_set")
+assert(q.count(binding_set) == 4)
+assert(q.count(binding_get) == 4)
+
+assert(q.save_partitioned(trades, "`:" .. store .. "/partitioned", "day", "sym"))
+aapl := q.load_partitioned("`:" .. store .. "/partitioned", {sym: "AAPL"})
+aapl_rollup := q.sql(aapl, "select total:sum qty by sym from trades")
+assert(q.count(aapl) == 2)
+assert(q.count(aapl_rollup) == 1)
+assert(aapl_rollup[1].sym == "AAPL")
+assert(aapl_rollup[1].total == 40)
+partitioned_all := q.sql("select total:sum qty by sym from `:" .. store .. "/partitioned", {})
+assert(q.count(partitioned_all) == 2)
+
+empty := q.load_partitioned(store .. "/partitioned", {sym: "IBM"})
+assert(q.count(empty) == 0)
+empty_rollup := q.sql(empty, "select total:sum qty by sym from trades")
+assert(q.count(empty_rollup) == 0)
+
+day_two := q.load_partitioned("`:" .. store .. "/partitioned", {day: 2})
+assert(q.count(day_two) == 2)
+
+ok, err := pcall(func() { return q.eval("get `:" .. store .. "/missing") })
+assert(!ok && string.find(err, "get") != nil)
+ok, err = pcall(func() { return q.eval("set `bad ([] a:1 2)") })
+assert(!ok && string.find(err, "path") != nil)
+ok, err = pcall(func() { return q.eval("`:" .. store .. "/bad_scalar set 42") })
+assert(!ok && string.find(err, "table") != nil)

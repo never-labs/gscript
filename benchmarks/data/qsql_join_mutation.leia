@@ -1,0 +1,96 @@
+// qSQL update/delete/join benchmark over in-memory frame values.
+
+N := 4096
+REPS := 220
+MOD := 1000000007
+
+func make_i64(n, mod, offset) {
+    t := {}
+    for i := 1; i <= n; i++ {
+        t[i] = offset + (i % mod)
+    }
+    return array.i64(t)
+}
+
+func make_symbol_strings(n, mod, prefix) {
+    t := {}
+    for i := 1; i <= n; i++ {
+        t[i] = string.format("%s%d", prefix, i % mod)
+    }
+    return data.symbols(t)
+}
+
+func make_strings(n, mod, prefix) {
+    t := {}
+    for i := 1; i <= n; i++ {
+        t[i] = string.format("%s%d", prefix, i % mod)
+    }
+    return data.strings(t)
+}
+
+func make_price(n) {
+    t := {}
+    for i := 1; i <= n; i++ {
+        t[i] = 80.0 + (i % 251) * 0.75
+    }
+    return array.f64(t)
+}
+
+func make_size(n) {
+    t := {}
+    for i := 1; i <= n; i++ {
+        t[i] = 1 + (i % 97)
+    }
+    return array.i64(t)
+}
+
+func mix(sum, v) {
+    return (sum * 131 + v) % MOD
+}
+
+trades := data.frame({
+    id: make_i64(N, N, 1),
+    sym: make_symbol_strings(N, 257, "S"),
+    venue: make_strings(N, 32, "V"),
+    price: make_price(N),
+    size: make_size(N),
+})
+
+venue_count := 32
+venue_ids := {}
+venue_names := {}
+for i := 1; i <= venue_count; i++ {
+    venue_ids[i] = string.format("V%d", (i - 1) % venue_count)
+    venue_names[i] = string.format("Venue-%d", i)
+}
+venues := data.frame({
+    venue: data.strings(venue_ids),
+    mic_name: data.strings(venue_names),
+})
+
+func run_hot(trades, venues, reps) {
+    checksum := 0
+    for r := 1; r <= reps; r++ {
+        updated := q.sql(trades, "update price:price+1.0 from trades where sym=`S7")
+        trimmed := q.sql(updated, "delete from trades where price<100")
+        joined := q.sql(
+            "select id,sym,venue,mic_name,price,size from trades join venues on venue order by id asc take 24",
+            {trades: trimmed, venues: venues}
+        )
+        first := joined[1]
+        last := joined[#joined]
+        checksum = mix(checksum, #joined + first.id + last.id)
+        checksum = mix(checksum, string.len(first.mic_name) + string.len(last.sym))
+    }
+    return checksum
+}
+
+warm := run_hot(trades, venues, 2)
+collectgarbage("collect")
+t0 := time.now()
+checksum := run_hot(trades, venues, REPS)
+elapsed := time.since(t0)
+
+print(string.format("qsql_join_mutation_hot n=%d reps=%d", N, REPS))
+print(string.format("checksum: %d", mix(checksum, warm)))
+print(string.format("Time: %.3fs", elapsed))

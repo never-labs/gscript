@@ -1,0 +1,78 @@
+// qSQL projection limit/cache benchmark. This keeps the hot loop on a
+// schema-stable query where take can be applied before computed projection.
+
+N := 8192
+REPS := 720
+MOD := 1000000007
+
+func make_i64(n, mod, offset) {
+    t := {}
+    for i := 1; i <= n; i++ {
+        t[i] = offset + (i % mod)
+    }
+    return data.i64(t)
+}
+
+func make_f64(n, mod, offset) {
+    t := {}
+    for i := 1; i <= n; i++ {
+        t[i] = offset + (i % mod) * 0.25
+    }
+    return data.f64(t)
+}
+
+func make_symbols(n, mod, prefix) {
+    t := {}
+    for i := 1; i <= n; i++ {
+        t[i] = string.format("%s%d", prefix, i % mod)
+    }
+    return data.symbols(t)
+}
+
+func mix(sum, v) {
+    return (sum * 131 + v) % MOD
+}
+
+events := data.frame({
+    id: make_i64(N, N, 1),
+    sym: make_symbols(N, 257, "S"),
+    bucket: make_i64(N, 64, 0),
+    price: make_f64(N, 251, 80.0),
+    size: make_i64(N, 97, 1),
+})
+event_projection := data.project(events, {"id", "sym", "price", "size"})
+event_projection_head := data.project(data.take(events, 64), {"id", "sym", "price", "size"})
+assert(data.same_schema(event_projection, event_projection_head))
+
+query := "select id,sym,notional:price*size,spread:price-80 from events where bucket within 10 45 take 24"
+
+func check_rows(rows) {
+    assert(#rows == 24)
+    assert(rows[1].id != nil)
+    assert(rows[1].notional > 0)
+    assert(rows[#rows].spread >= 0)
+}
+
+func run_hot(events, query, reps) {
+    checksum := 0
+    for r := 1; r <= reps; r++ {
+        rows := q.sql(events, query)
+        check_rows(rows)
+        first := rows[1]
+        last := rows[#rows]
+        checksum = mix(checksum, #rows + first.id + last.id)
+        checksum = mix(checksum, math.floor(first.notional) + math.floor(last.spread * 100))
+        checksum = mix(checksum, data.len(event_projection_head))
+    }
+    return checksum
+}
+
+warm := run_hot(events, query, 2)
+collectgarbage("collect")
+t0 := time.now()
+checksum := run_hot(events, query, REPS)
+elapsed := time.since(t0)
+
+print(string.format("q_projection_limit_cache_hot n=%d reps=%d", N, REPS))
+print(string.format("checksum: %d", mix(checksum, warm)))
+print(string.format("Time: %.3fs", elapsed))

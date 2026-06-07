@@ -1,0 +1,186 @@
+print("case:q_keyed_table_semantics")
+
+string_find := string.find
+
+func check(name, ok) {
+  assert(ok)
+  print("ok", name)
+}
+
+bars := data.frame({
+  sym: data.symbols({"AAPL", "AAPL", "MSFT"}),
+  bucket: data.strings({"09:30", "09:30", "09:31"}),
+  seq: data.i64({1, 2, 3}),
+  px: data.f64({100.0, 100.5, 80.0}),
+})
+
+keyed := q.key_by(bars, "sym", "bucket")
+reversed_keyed := q.key_by(bars, "bucket", "sym")
+keyed_by_symbol_vector := q.key_by(bars, q.eval("`sym`bucket"))
+key_rows := q.key(keyed)
+reversed_key_rows := q.key(reversed_keyed)
+value_rows := q.value(keyed)
+latest := q.lookup(keyed, "AAPL", "09:30")
+latest_reversed_dict := q.lookup(reversed_keyed, {sym: "AAPL", bucket: "09:30"})
+latest_reversed_positional := q.lookup(reversed_keyed, "09:30", "AAPL")
+latest_by_key_row := q.lookup(keyed, key_rows[1])
+missing := q.lookup(keyed, "AAPL", "09:32")
+missing_reversed := q.lookup(reversed_keyed, "09:32", "AAPL")
+all_duplicate_rows := q.sql(keyed, "select sym,bucket,seq,px from bars where sym=`AAPL order by seq asc")
+keyed_distinct_keys := q.sql(keyed, "select by sym,bucket from bars order by sym asc,bucket asc")
+keyed_distinct_take := q.sql(keyed, "select by sym,bucket from bars where px>=100,seq>=1 order by sym asc,bucket asc take 1")
+symbol_vector_keys := q.keys(keyed_by_symbol_vector)
+symbol_vector_cols := q.cols(keyed_by_symbol_vector)
+symbol_vector_meta := q.meta(keyed_by_symbol_vector)
+ordered_dict := q.eval("`b`a!2 1")
+ordered_dict_keys := q.keys(ordered_dict)
+ordered_dict_values := q.value(ordered_dict)
+null_key_amended := q.eval("@[(0N 1!10 20);0N;:;99]")
+vector_amended := q.eval("@[(10 20 30);1;:;99]")
+vector_amended_many := q.eval("@[(10 20 30);0 2;:;100 300]")
+vector_amended_typed := q.eval("@[(1 2 0Ni);2;:;3]")
+table_row_amended := q.eval("@[(flip `sym`price`size!(`AAPL`MSFT;100 80;10 20));1;:;`price`size!81 21]")
+table_rows_amended := q.eval("@[(flip `sym`price`size!(`AAPL`MSFT`TSLA;100 80 120;10 20 30));0 2;:;flip `price`size!(101 121;11 31)]")
+keyed_functional_amended := q.eval("@[(`sym xkey flip `sym`price`size!(`AAPL`MSFT;100 80;10 20));`AAPL;:;`price`size!101 11]")
+keyed_functional_upserted := q.eval("@[(`sym xkey flip `sym`price`size!(`AAPL`MSFT;100 80;10 20));`TSLA;:;`price`size!120 30]")
+keyed_functional_hit := q.lookup(keyed_functional_amended, "AAPL")
+keyed_functional_insert := q.lookup(keyed_functional_upserted, "TSLA")
+typed_events := data.frame({
+  sym: data.symbols({"AAPL", "MSFT"}),
+  trade_date: data.date({"2026-06-06", data.null}),
+  event_ts: data.timestamp({"2026-06-06T09:30:00Z", data.null}),
+  session_time: data.time({"09:30:00", data.null}),
+})
+native_keyed := q.eval("([venue:`XNYS`XNAS; sym:`AAPL`MSFT] price:100 101; size:10 20)")
+native_keyed_keys := q.eval("key ([venue:`XNYS`XNAS; sym:`AAPL`MSFT] price:100 101; size:10 20)")
+native_keyed_cols := q.eval("cols ([venue:`XNYS`XNAS; sym:`AAPL`MSFT] price:100 101; size:10 20)")
+native_keyed_values := q.eval("value ([venue:`XNYS`XNAS; sym:`AAPL`MSFT] price:100 101; size:10 20)")
+native_keyed_spaced := q.eval(" ( [ venue:`XNYS`XNYS`XNAS; sym:`AAPL`AAPL`MSFT; ] price:100 101 80; size:10 11 20; ) ")
+native_keyed_spaced_cols := q.eval("cols ( [ venue:`XNYS`XNYS`XNAS; sym:`AAPL`AAPL`MSFT; ] price:100 101 80; size:10 11 20; )")
+native_keyed_projected := q.eval("([venue:`XNYS`XNYS`XNAS; sym:`AAPL`AAPL`MSFT] price:100 101 80; size:10 11 20)[`venue`price]")
+native_keyed_lookup := q.eval("([venue:`XNYS`XNYS`XNAS; sym:`AAPL`AAPL`MSFT] price:100 101 80; size:10 11 20)[`XNYS`AAPL]")
+native_keyed_dict_lookup := q.eval("([venue:`XNYS`XNYS`XNAS; sym:`AAPL`AAPL`MSFT] price:100 101 80; size:10 11 20)[`sym`venue!(`AAPL;`XNYS)]")
+count_keyed := q.eval("1!flip `sym`price`size!(`AAPL`MSFT;100 101;10 20)")
+count_keyed_keys := q.keys(count_keyed)
+count_keyed_value := q.value(count_keyed)
+count_keyed_lookup := q.lookup(count_keyed, "MSFT")
+count_keyed_cols := q.cols(count_keyed)
+count_multi_keyed := q.eval("2!flip `sym`venue`price!(`AAPL`AAPL`MSFT;`XNYS`XNAS`XNYS;100 101 80)")
+count_multi_lookup := q.lookup(count_multi_keyed, "AAPL", "XNAS")
+count_unkeyed := q.eval("0!flip `sym`price!(`AAPL`MSFT;100 101)")
+bad_count_ok, bad_count_err := pcall(func() {
+  return q.eval("3!flip `sym`price!(`AAPL`MSFT;100 101)")
+})
+xkey_keyed := q.eval("`sym`venue xkey flip `sym`venue`price`size!(`AAPL`AAPL`MSFT;`XNYS`XNAS`XNYS;100 101 80;10 11 20)")
+xkey_lookup := q.lookup(xkey_keyed, "AAPL", "XNAS")
+xkey_value := q.value(xkey_keyed)
+xkey_rekeyed := q.eval("`venue xkey (`sym xkey flip `sym`venue`price!(`AAPL`MSFT;`XNYS`XNAS;100 80))")
+xkey_bad_key_ok, xkey_bad_key_err := pcall(q.eval, "`missing xkey flip `sym`price!(`AAPL`MSFT;100 101)")
+xkey_bad_table_ok, xkey_bad_table_err := pcall(q.eval, "`sym xkey `a`b!1 2")
+
+check("q key frame keeps duplicate key rows", #key_rows == 3 && key_rows[1].sym == "AAPL" && key_rows[1].bucket == "09:30" && key_rows[1].seq == nil)
+check("q key frame follows declared multi-key order", q.keys(reversed_keyed)[1] == "bucket" && q.keys(reversed_keyed)[2] == "sym" && reversed_key_rows[1].bucket == "09:30" && reversed_key_rows[1].sym == "AAPL" && reversed_key_rows[1].seq == nil)
+check("q value frame drops key columns", #value_rows == 3 && value_rows[1].sym == nil && value_rows[2].seq == 2)
+check("q lookup returns latest value row", #latest == 1 && latest[1].seq == 2 && latest[1].px == 100.5 && latest[1].sym == nil)
+check("q lookup uses declared key order and record names", #latest_reversed_dict == 1 && latest_reversed_dict[1].seq == 2 && #latest_reversed_positional == 1 && latest_reversed_positional[1].seq == 2)
+check("q lookup accepts key row records", #latest_by_key_row == 1 && latest_by_key_row[1].seq == 2)
+check("q missing lookup preserves value schema", #missing == 0 && missing.column_kinds.sym == nil && missing.column_kinds.px == "f64")
+check("q missing reversed lookup preserves value schema", #missing_reversed == 0 && missing_reversed.column_kinds.bucket == nil && missing_reversed.column_kinds.seq == "i64" && missing_reversed.column_kinds.px == "f64")
+check("q keyed source query can inspect all duplicates", #all_duplicate_rows == 2 && all_duplicate_rows[1].seq == 1 && all_duplicate_rows[2].seq == 2)
+check("q keyed source select by without projection", keyed_distinct_keys.len == 2 && keyed_distinct_keys[1].sym == "AAPL" && keyed_distinct_keys[1].bucket == "09:30" && keyed_distinct_keys[2].sym == "MSFT")
+check("q keyed source select by where order take", keyed_distinct_take.len == 1 && keyed_distinct_take[1].sym == "AAPL" && keyed_distinct_take[1].bucket == "09:30")
+check("q symbol vector keyed frame representation", symbol_vector_keys[1] == "sym" && symbol_vector_keys[2] == "bucket" && #symbol_vector_cols == 4 && symbol_vector_cols[1] == "sym" && symbol_vector_cols[2] == "bucket" && symbol_vector_cols[3] == "seq" && symbol_vector_meta[1].c == "sym" && symbol_vector_meta[3].c == "seq" && symbol_vector_meta[3].t == "i64")
+check("q dictionary key order and values", ordered_dict_keys[1] == "b" && ordered_dict_keys[2] == "a" && ordered_dict_values[1] == 2 && ordered_dict_values[2] == 1)
+check("q dictionary null key amend preserves key slot", #q.keys(null_key_amended) == 2 && tostring(q.keys(null_key_amended)[2]) == "1" && q.value(null_key_amended)[1] == 99 && q.value(null_key_amended)[2] == 20)
+check("q vector functional amend", vector_amended[1] == 10 && vector_amended[2] == 99 && vector_amended_many[1] == 100 && vector_amended_many[3] == 300 && vector_amended_typed.kind == "i32" && vector_amended_typed[3] == 3)
+check("q table functional amend", table_row_amended[1].sym == "AAPL" && table_row_amended[2].price == 81 && table_rows_amended[1].price == 101 && table_rows_amended[2].price == 80 && table_rows_amended[3].size == 31)
+check("q keyed table functional amend and upsert", #keyed_functional_hit == 1 && keyed_functional_hit[1].price == 101 && keyed_functional_hit[1].size == 11 && #keyed_functional_insert == 1 && keyed_functional_insert[1].price == 120 && #q.value(keyed_functional_upserted) == 3)
+check("q native keyed table syntax preserves key and value column order", native_keyed != nil && native_keyed_keys[1] == "venue" && native_keyed_keys[2] == "sym" && native_keyed_cols[1] == "venue" && native_keyed_cols[2] == "sym" && native_keyed_cols[3] == "price" && native_keyed_cols[4] == "size" && #native_keyed_values == 2 && native_keyed_values[1].venue == nil && native_keyed_values[1].price == 100 && native_keyed_values[1].size == 10)
+check("q native keyed table lookup and projection preserve value semantics", native_keyed_spaced_cols[1] == "venue" && native_keyed_spaced_cols[4] == "size" && native_keyed_projected[1].venue == "XNYS" && native_keyed_projected[2].price == 101 && #native_keyed_lookup == 1 && native_keyed_lookup[1].venue == nil && native_keyed_lookup[1].price == 101 && native_keyed_lookup[1].size == 11 && #native_keyed_dict_lookup == 1 && native_keyed_dict_lookup[1].price == 101 && native_keyed_dict_lookup[1].size == 11)
+check("q count keyed table syntax", count_keyed_keys[1] == "sym" && count_keyed_cols[1] == "sym" && count_keyed_cols[3] == "size" && #count_keyed_value == 2 && count_keyed_value[1].sym == nil && count_keyed_value[1].price == 100 && #count_keyed_lookup == 1 && count_keyed_lookup[1].price == 101)
+check("q count multi-keyed and unkeyed syntax", q.keys(count_multi_keyed)[2] == "venue" && #count_multi_lookup == 1 && count_multi_lookup[1].price == 101 && #q.keys(count_unkeyed) == 0 && count_unkeyed[1].sym == "AAPL" && bad_count_ok == false && string_find(tostring(bad_count_err), "key count", 1, true) != nil)
+check("q xkey native keyed syntax", q.keys(xkey_keyed)[1] == "sym" && q.keys(xkey_keyed)[2] == "venue" && q.cols(xkey_keyed)[1] == "sym" && q.cols(xkey_keyed)[4] == "size" && #xkey_lookup == 1 && xkey_lookup[1].price == 101 && xkey_lookup[1].sym == nil && #xkey_value == 3 && xkey_value[1].sym == nil && q.keys(xkey_rekeyed)[1] == "venue")
+check("q xkey error boundaries", xkey_bad_key_ok == false && string_find(tostring(xkey_bad_key_err), "does not exist", 1, true) != nil && xkey_bad_table_ok == false && string_find(tostring(xkey_bad_table_err), "expects a table", 1, true) != nil)
+
+decoded_keyed := q.decode(q.encode(keyed_by_symbol_vector))
+decoded_latest := q.lookup(decoded_keyed, "AAPL", "09:30")
+decoded_dict := q.decode(q.encode(ordered_dict))
+decoded_dict_keys := q.keys(decoded_dict)
+decoded_symbols := q.decode(q.encode(q.eval("`AAPL`MSFT`TSLA")))
+decoded_vector := q.decode(q.encode(q.eval("1 2 3")))
+decoded_typed_events := q.decode(q.encode(typed_events))
+nested := q.eval("`frame`keyed`dict!(`placeholder`placeholder`placeholder)")
+nested.frame = typed_events
+nested.keyed = keyed_by_symbol_vector
+nested.dict = ordered_dict
+decoded_nested := q.decode(q.encode(nested))
+decoded_nested_keys := q.keys(decoded_nested)
+decoded_nested_latest := q.lookup(decoded_nested.keyed, "AAPL", "09:30")
+decoded_nested_dict_keys := q.keys(decoded_nested.dict)
+
+check("q encode decode keyed frame", #decoded_latest == 1 && decoded_latest[1].seq == 2 && decoded_latest[1].px == 100.5)
+check("q encode decode dictionary", decoded_dict_keys[1] == "b" && q.value(decoded_dict)[2] == 1)
+check("q encode decode vectors", decoded_symbols[3] == "TSLA" && decoded_vector[3] == 3)
+check("q encode decode typed temporal null frame", decoded_typed_events.column_kinds.trade_date == "date" && decoded_typed_events.column_kinds.event_ts == "timestamp" && decoded_typed_events.column_kinds.session_time == "time" && decoded_typed_events[1].trade_date == "2026-06-06" && decoded_typed_events[1].event_ts == "2026-06-06T09:30:00Z" && data.is_null(decoded_typed_events[2].event_ts))
+check("q encode decode nested frame keyed dict", decoded_nested_keys[1] == "frame" && decoded_nested_keys[2] == "keyed" && decoded_nested_keys[3] == "dict" && decoded_nested.frame[2].sym == "MSFT" && decoded_nested_latest[1].seq == 2 && decoded_nested_dict_keys[1] == "b")
+
+lookup_non_keyed_ok, lookup_non_keyed_err := pcall(func() {
+  return q.lookup(bars, "AAPL", "09:30")
+})
+lookup_missing_key_ok, lookup_missing_key_err := pcall(func() {
+  return q.lookup(keyed, {sym: "AAPL"})
+})
+keys_scalar_ok, keys_scalar_err := pcall(func() {
+  return q.keys(42)
+})
+cols_scalar_ok, cols_scalar_err := pcall(func() {
+  return q.cols(42)
+})
+value_noarg_ok, value_noarg_err := pcall(func() {
+  return q.value()
+})
+encode_noarg_ok, encode_noarg_err := pcall(func() {
+  return q.encode()
+})
+encode_function_ok, encode_function_err := pcall(func() {
+  return q.encode(q.encode)
+})
+decode_type_ok, decode_type_err := pcall(func() {
+  return q.decode(42)
+})
+decode_payload_ok, decode_payload_err := pcall(func() {
+  return q.decode("not-json")
+})
+
+check("q lookup error boundaries", lookup_non_keyed_ok == false && string_find(tostring(lookup_non_keyed_err), "keyed frame", 1, true) != nil && lookup_missing_key_ok == false && string_find(tostring(lookup_missing_key_err), "bucket", 1, true) != nil)
+check("q metadata error boundaries", keys_scalar_ok == false && string_find(tostring(keys_scalar_err), "dictionary", 1, true) != nil && cols_scalar_ok == false && string_find(tostring(cols_scalar_err), "frame", 1, true) != nil && value_noarg_ok == false && string_find(tostring(value_noarg_err), "argument 1 required", 1, true) != nil)
+check("q encode decode error boundaries", encode_noarg_ok == false && string_find(tostring(encode_noarg_err), "argument 1 required", 1, true) != nil && encode_function_ok == false && string_find(tostring(encode_function_err), "unsupported value type", 1, true) != nil && decode_type_ok == false && string_find(tostring(decode_type_err), "encoded string", 1, true) != nil && decode_payload_ok == false && string_find(tostring(decode_payload_err), "invalid character", 1, true) != nil)
+
+amend_delta := data.frame({
+  sym: data.symbols({"AAPL", "TSLA"}),
+  bucket: data.strings({"09:30", "09:32"}),
+  seq: data.i64({9, 10}),
+  px: data.f64({101.0, 120.0}),
+})
+amended := q.amend(keyed_by_symbol_vector, amend_delta, q.eval("`seq`px"))
+upserted := q.upsert(amended, amend_delta, q.eval("`seq`px"))
+updated_keyed := q.sql(keyed_by_symbol_vector, "update px:px+1 from bars where sym=`AAPL")
+deleted_keyed := q.sql(updated_keyed, "delete from bars where bucket=\"09:31\"")
+amend_hit := q.lookup(amended, "AAPL", "09:30")
+amend_miss := q.lookup(amended, "TSLA", "09:32")
+upsert_hit := q.lookup(upserted, "TSLA", "09:32")
+updated_hit := q.lookup(updated_keyed, "AAPL", "09:30")
+deleted_missing := q.lookup(deleted_keyed, "MSFT", "09:31")
+
+bad_amend_ok, bad_amend_err := pcall(func() {
+  return q.amend(keyed, {not: "a frame"})
+})
+bad_upsert_ok, bad_upsert_err := pcall(func() {
+  return q.upsert(keyed, {not: "a frame"})
+})
+
+check("q amend and upsert symbol vector value columns", #amend_hit == 1 && amend_hit[1].seq == 9 && #amend_miss == 0 && #upsert_hit == 1 && upsert_hit[1].px == 120.0)
+check("q keyed update and delete preserve key/value lookup contract", q.keys(updated_keyed)[1] == "sym" && q.keys(updated_keyed)[2] == "bucket" && #updated_hit == 1 && updated_hit[1].px == 101.5 && #deleted_missing == 0 && deleted_missing.column_kinds.seq == "i64" && #q.value(deleted_keyed) == 2)
+check("q amend upsert error boundaries", bad_amend_ok == false && string_find(tostring(bad_amend_err), "delta", 1, true) != nil && bad_upsert_ok == false && string_find(tostring(bad_upsert_err), "delta", 1, true) != nil)
+
+print("ok")

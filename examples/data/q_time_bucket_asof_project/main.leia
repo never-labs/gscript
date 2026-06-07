@@ -1,0 +1,80 @@
+// q_time_bucket_asof_project - project-level q time-series asof/xbar analytics.
+// Run:
+//   go run ./cmd/leia run examples/data/q_time_bucket_asof_project/main.leia
+
+func check(name, ok) {
+    assert(ok)
+    print("ok", name)
+}
+
+quotes := data.frame({
+    sym: data.symbols({"AAPL", "AAPL", "AAPL", "AAPL", "MSFT", "MSFT", "MSFT", "NVDA", "NVDA"}),
+    ts: data.i64({570, 600, 630, 690, 570, 615, 675, 600, 660}),
+    bid: data.f64({99.90, 100.00, 100.30, 100.10, 250.00, 250.50, 251.00, 880.00, 882.00}),
+    ask: data.f64({100.10, 100.20, 100.50, 100.40, 250.30, 250.90, 251.40, 881.00, 883.00}),
+})
+
+trades := data.frame({
+    trade_id: data.i64({1, 2, 3, 4, 5, 6, 7, 8}),
+    sym: data.symbols({"AAPL", "AAPL", "AAPL", "MSFT", "MSFT", "MSFT", "NVDA", "NVDA"}),
+    ts: data.i64({601, 642, 705, 620, 671, 681, 605, 665}),
+    price: data.f64({100.15, 100.42, 100.30, 250.70, 251.10, 251.35, 880.60, 882.50}),
+    size: data.i64({100, 80, 120, 50, 40, 70, 10, 15}),
+})
+
+market_ticks := data.frame({
+    event_id: data.i64({1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12}),
+    event: data.symbols({"quote", "trade", "quote", "trade", "trade", "quote", "trade", "quote", "trade", "trade", "quote", "trade"}),
+    sym: data.symbols({"AAPL", "AAPL", "AAPL", "AAPL", "AAPL", "MSFT", "MSFT", "MSFT", "MSFT", "NVDA", "NVDA", "NVDA"}),
+    ts: data.i64({600, 601, 630, 642, 705, 615, 620, 675, 681, 605, 660, 665}),
+    px: data.f64({100.10, 100.15, 100.40, 100.42, 100.30, 250.70, 250.70, 251.20, 251.35, 880.60, 882.50, 882.50}),
+    qty: data.i64({0, 100, 0, 80, 120, 0, 50, 0, 70, 10, 0, 15}),
+})
+
+enriched := q.sql(
+    "select trade_id,sym,ts,price,size,bid,ask,spread:ask-bid from trades asof join quotes on sym,ts order by trade_id asc",
+    {trades: trades, quotes: quotes}
+)
+
+bars := q.sql(
+    enriched,
+    "select notional:sum price*size, shares:sum size, fills:count i, avg_spread:avg spread by sym,bucket:xbar 60 ts from trades order by sym asc,bucket asc"
+)
+
+top_ticks := q.sql(market_ticks, "select event_id,event,sym,ts,px,qty from trades where event=`trade order by px desc take 4")
+wide_spreads := q.sql(enriched, "select trade_id,sym,spread from trades where spread>0.35 order by spread desc,trade_id asc")
+
+for i := 1; i <= #bars; i++ {
+    row := bars[i]
+    row.vwap = row.notional / row.shares
+}
+
+check("asof join fills quotes", #enriched == 8 && enriched[1].bid == 100.00 && enriched[2].bid == 100.30 && enriched[6].ask == 251.40)
+check("trade tick sample", #top_ticks == 4 && top_ticks[1].sym == "NVDA" && top_ticks[4].sym == "MSFT")
+check("asof spread quality", #wide_spreads == 5 && wide_spreads[1].sym == "NVDA" && wide_spreads[5].trade_id == 6)
+check("xbar bars groups", #bars == 6 && bars[1].sym == "AAPL" && bars[1].bucket == 600 && bars[6].sym == "NVDA")
+check("vwap bars", math.floor(bars[1].vwap * 100) == 10027 && bars[4].fills == 2 && math.floor(bars[4].vwap * 100) == 25125)
+
+q_time_bucket_asof_summary := string.format(
+    "q_time_bucket_asof ticks=%d trades=%d quotes=%d bars=%d first=%s/%d vwap=%.2f notional=%.1f",
+    market_ticks.len,
+    trades.len,
+    quotes.len,
+    #bars,
+    bars[1].sym,
+    bars[1].bucket,
+    bars[1].vwap,
+    bars[1].notional
+)
+print(q_time_bucket_asof_summary)
+
+return {
+    market_ticks: market_ticks,
+    trades: trades,
+    quotes: quotes,
+    enriched: enriched,
+    bars: bars,
+    top_ticks: top_ticks,
+    wide_spreads: wide_spreads,
+    summary: q_time_bucket_asof_summary,
+}

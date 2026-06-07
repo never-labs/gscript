@@ -211,9 +211,14 @@ class PerformanceGateValidationTest(unittest.TestCase):
         self.assertIn("data/q_query_rollup", hot_refs)
         self.assertEqual(sorted(set(hot_refs) - case_ids), [])
         self.assertEqual(sorted(set(hot_refs) - set(workloads)), [])
-        workload = workloads["data/q_query_rollup"]
-        self.assertEqual(workload["time_source_hint"], "script_time_line")
-        self.assertIsNone(workload["comparison_reference"])
+        for benchmark_id in ("data/q_query_rollup", "data/q_operator_pipeline"):
+            with self.subTest(benchmark_id=benchmark_id):
+                workload = workloads[benchmark_id]
+                self.assertEqual(workload["time_source_hint"], "script_time_line")
+                lua_ref = workload["comparison_reference"]
+                self.assertIsNotNone(lua_ref)
+                self.assertEqual(lua_ref["kind"], "lua")
+                self.assertTrue((ROOT / lua_ref["path"]).exists(), lua_ref["path"])
 
     def test_data_oriented_feature_matrix_hot_refs_are_manifested_with_luajit_refs(self):
         manifest = json.loads((ROOT / "benchmarks" / "manifest.json").read_text())

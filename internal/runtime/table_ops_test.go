@@ -50,6 +50,256 @@ func TestNewEmptyTableStartsWithCleanIterationKeys(t *testing.T) {
 	}
 }
 
+func TestTableNativePayloadInvalidatesOnRawMutation(t *testing.T) {
+	tbl := NewTable()
+	payload := struct{ name string }{name: "frame"}
+	info := NativePayloadInfo{Kind: NativePayloadDataFrame, Rows: 2, Columns: 1, SchemaHash: "abc"}
+	tbl.SetNativePayloadWithInfo(payload, info)
+	if got := tbl.NativePayload(); got != payload {
+		t.Fatalf("native payload = %#v, want %#v", got, payload)
+	}
+	if got, ok := tbl.NativePayloadInfo(); !ok || got != info {
+		t.Fatalf("native payload info = %#v, %v, want %#v, true", got, ok, info)
+	}
+
+	tbl.RawSetString("x", IntValue(1))
+	if got := tbl.NativePayload(); got != nil {
+		t.Fatalf("payload after string mutation = %#v, want nil", got)
+	}
+	if got, ok := tbl.NativePayloadInfo(); ok {
+		t.Fatalf("payload info after string mutation = %#v, want none", got)
+	}
+	if got, ok := tbl.NativeFramePayloadInfo(); ok {
+		t.Fatalf("frame payload info after string mutation = %#v, want none", got)
+	}
+	if got := TableValue(tbl).Type(); got != TypeTable {
+		t.Fatalf("type after string mutation = %v, want TypeTable", got)
+	}
+	if got := TableValue(tbl).TypeName(); got != "table" {
+		t.Fatalf("type name after string mutation = %q, want table", got)
+	}
+
+	tbl.SetNativePayload(payload)
+	tbl.RawSetInt(1, IntValue(2))
+	if got := tbl.NativePayload(); got != nil {
+		t.Fatalf("payload after int mutation = %#v, want nil", got)
+	}
+}
+
+func TestTableNativePayloadTypeNameReflectsFrameKinds(t *testing.T) {
+	frame := NewTable()
+	frameInfo := NativePayloadInfo{Kind: NativePayloadDataFrame, Rows: 2, Columns: 1, SchemaHash: "frame-schema"}
+	frame.SetNativePayloadWithInfo(struct{}{}, frameInfo)
+	if got, ok := frame.NativeFramePayloadInfo(); !ok || got != frameInfo {
+		t.Fatalf("frame NativeFramePayloadInfo() = %#v, %v, want %#v, true", got, ok, frameInfo)
+	}
+	if got, ok := frame.NativeFramePayloadKind(); !ok || got != NativePayloadDataFrame {
+		t.Fatalf("frame NativeFramePayloadKind() = %q, %v, want %q, true", got, ok, NativePayloadDataFrame)
+	}
+	if !frame.IsNativeFrame() {
+		t.Fatal("frame IsNativeFrame() = false, want true")
+	}
+	if !frame.IsFrameFacade() {
+		t.Fatal("frame IsFrameFacade() = false, want true")
+	}
+	if frame.IsNativeKeyedFrame() {
+		t.Fatal("frame IsNativeKeyedFrame() = true, want false")
+	}
+	if got := TableValue(frame).Type(); got != TypeFrame {
+		t.Fatalf("frame Type() = %v, want TypeFrame", got)
+	}
+	if got := TableValue(frame).IsFrame(); !got {
+		t.Fatal("frame Value.IsFrame() = false, want true")
+	}
+	if got := TableValue(frame).TypeName(); got != "frame" {
+		t.Fatalf("frame TypeName() = %q, want frame", got)
+	}
+	if got := TableValue(frame).String(); got[:6] != "frame:" {
+		t.Fatalf("frame String() = %q, want frame:*", got)
+	}
+
+	keyed := NewTable()
+	keyedInfo := NativePayloadInfo{Kind: NativePayloadKeyedFrame, Rows: 2, Columns: 3, SchemaHash: "keyed-schema"}
+	keyed.SetNativePayloadWithInfo(struct{}{}, keyedInfo)
+	if got, ok := keyed.NativeFramePayloadInfo(); !ok || got != keyedInfo {
+		t.Fatalf("keyed NativeFramePayloadInfo() = %#v, %v, want %#v, true", got, ok, keyedInfo)
+	}
+	if got, ok := keyed.NativeFramePayloadKind(); !ok || got != NativePayloadKeyedFrame {
+		t.Fatalf("keyed NativeFramePayloadKind() = %q, %v, want %q, true", got, ok, NativePayloadKeyedFrame)
+	}
+	if !keyed.IsNativeKeyedFrame() {
+		t.Fatal("keyed IsNativeKeyedFrame() = false, want true")
+	}
+	if !keyed.IsKeyedFrameFacade() {
+		t.Fatal("keyed IsKeyedFrameFacade() = false, want true")
+	}
+	if keyed.IsNativeFrame() {
+		t.Fatal("keyed IsNativeFrame() = true, want false")
+	}
+	if got := TableValue(keyed).Type(); got != TypeKeyedFrame {
+		t.Fatalf("keyed frame Type() = %v, want TypeKeyedFrame", got)
+	}
+	if got := TableValue(keyed).IsKeyedFrame(); !got {
+		t.Fatal("keyed Value.IsKeyedFrame() = false, want true")
+	}
+	if got := TableValue(keyed).TypeName(); got != "keyed frame" {
+		t.Fatalf("keyed frame TypeName() = %q, want keyed frame", got)
+	}
+	if got := TableValue(keyed).String(); got[:12] != "keyed frame:" {
+		t.Fatalf("keyed frame String() = %q, want keyed frame:*", got)
+	}
+}
+
+func TestNativePayloadKindRuntimeFrameMapping(t *testing.T) {
+	cases := []struct {
+		kind NativePayloadKind
+		typ  ValueType
+		name string
+		ok   bool
+	}{
+		{kind: NativePayloadDataFrame, typ: TypeFrame, name: "frame", ok: true},
+		{kind: NativePayloadKeyedFrame, typ: TypeKeyedFrame, name: "keyed frame", ok: true},
+		{kind: NativePayloadDataColumn, ok: false},
+		{kind: NativePayloadNone, ok: false},
+	}
+
+	for _, tc := range cases {
+		if got := tc.kind.IsFrameFacadeKind(); got != tc.ok {
+			t.Fatalf("%q IsFrameFacadeKind() = %v, want %v", tc.kind, got, tc.ok)
+		}
+		typ, typOK := tc.kind.ValueType()
+		if typOK != tc.ok || (tc.ok && typ != tc.typ) {
+			t.Fatalf("%q ValueType() = %v, %v, want %v, %v", tc.kind, typ, typOK, tc.typ, tc.ok)
+		}
+		name, nameOK := tc.kind.TypeName()
+		if nameOK != tc.ok || (tc.ok && name != tc.name) {
+			t.Fatalf("%q TypeName() = %q, %v, want %q, %v", tc.kind, name, nameOK, tc.name, tc.ok)
+		}
+	}
+}
+
+func TestTableNativePayloadWithoutKindStaysPlainTable(t *testing.T) {
+	tbl := NewTable()
+	tbl.SetNativePayload(struct{}{})
+	value := TableValue(tbl)
+
+	if tbl.IsFrameFacade() || tbl.IsKeyedFrameFacade() || tbl.IsNativeColumn() {
+		t.Fatal("untyped native payload classified as a runtime facade")
+	}
+	if got := value.Type(); got != TypeTable {
+		t.Fatalf("untyped native payload Type() = %v, want TypeTable", got)
+	}
+	if got := value.TypeName(); got != "table" {
+		t.Fatalf("untyped native payload TypeName() = %q, want table", got)
+	}
+}
+
+func TestTableNativeColumnPayloadStaysPlainTable(t *testing.T) {
+	tbl := NewTable()
+	info := NativePayloadInfo{Kind: NativePayloadDataColumn, Rows: 3, ColumnKind: "int"}
+	tbl.SetNativePayloadWithInfo(struct{}{}, info)
+	value := TableValue(tbl)
+
+	if got, ok := tbl.NativePayloadKind(); !ok || got != NativePayloadDataColumn {
+		t.Fatalf("NativePayloadKind() = %q, %v, want %q, true", got, ok, NativePayloadDataColumn)
+	}
+	if got, ok := tbl.NativeFramePayloadInfo(); ok {
+		t.Fatalf("NativeFramePayloadInfo() = %#v, true, want none", got)
+	}
+	if got, ok := tbl.NativeFramePayloadKind(); ok {
+		t.Fatalf("NativeFramePayloadKind() = %q, true, want none", got)
+	}
+	if !tbl.IsNativeColumn() {
+		t.Fatal("IsNativeColumn() = false, want true")
+	}
+	if tbl.IsFrameFacade() || tbl.IsKeyedFrameFacade() {
+		t.Fatal("native column payload classified as frame facade")
+	}
+	if got := value.Type(); got != TypeTable {
+		t.Fatalf("native column Type() = %v, want TypeTable", got)
+	}
+	if got := value.TypeName(); got != "table" {
+		t.Fatalf("native column TypeName() = %q, want table", got)
+	}
+}
+
+func TestTableNativePayloadInvalidatesOnSpecializedMutation(t *testing.T) {
+	payload := struct{ name string }{name: "frame"}
+
+	shaped := NewTable()
+	shaped.RawSetString("x", IntValue(1))
+	shaped.SetNativePayload(payload)
+	shaped.SvalsSet(0, IntValue(2))
+	if got := shaped.NativePayload(); got != nil {
+		t.Fatalf("payload after svals mutation = %#v, want nil", got)
+	}
+
+	ints := NewTableSizedKind(3, 0, ArrayInt)
+	ints.RawSetInt(1, IntValue(3))
+	ints.RawSetInt(2, IntValue(1))
+	ints.RawSetInt(3, IntValue(2))
+	ints.SetNativePayload(payload)
+	if !ints.TryPlainArraySort(3) {
+		t.Fatal("TryPlainArraySort failed")
+	}
+	if got := ints.NativePayload(); got != nil {
+		t.Fatalf("payload after plain array sort = %#v, want nil", got)
+	}
+
+	src := NewTableSizedKind(2, 0, ArrayInt)
+	src.RawSetInt(1, IntValue(10))
+	src.RawSetInt(2, IntValue(20))
+	dst := NewTableSizedKind(2, 0, ArrayInt)
+	dst.SetNativePayload(payload)
+	if !dst.TryPlainArrayMove(src, 1, 2, 1) {
+		t.Fatal("TryPlainArrayMove failed")
+	}
+	if got := dst.NativePayload(); got != nil {
+		t.Fatalf("payload after plain array move = %#v, want nil", got)
+	}
+}
+
+func TestTableLazyIntGetterPreservesNativePayloadUntilMutation(t *testing.T) {
+	tbl := NewTable()
+	payload := struct{ name string }{name: "frame"}
+	tbl.SetLazyIntGetter(2, func(key int64) (Value, bool) {
+		return IntValue(key * 10), true
+	})
+	tbl.SetNativePayload(payload)
+
+	if got := tbl.RawGetInt(1); !got.IsInt() || got.Int() != 10 {
+		t.Fatalf("lazy row = %v, want 10", got)
+	}
+	if got := tbl.NativePayload(); got != payload {
+		t.Fatalf("native payload after lazy read = %#v, want %#v", got, payload)
+	}
+
+	tbl.RawSetInt(1, IntValue(99))
+	if got := tbl.NativePayload(); got != nil {
+		t.Fatalf("native payload after int mutation = %#v, want nil", got)
+	}
+	if got := tbl.RawGetInt(2); !got.IsNil() {
+		t.Fatalf("lazy getter after int mutation = %v, want nil", got)
+	}
+}
+
+func TestTableLazyIntGetterInvalidatesOnStringMutation(t *testing.T) {
+	tbl := NewTable()
+	payload := struct{ name string }{name: "frame"}
+	tbl.SetLazyIntGetter(2, func(key int64) (Value, bool) {
+		return IntValue(key * 10), true
+	})
+	tbl.SetNativePayload(payload)
+
+	tbl.RawSetString("extra", IntValue(1))
+	if got := tbl.NativePayload(); got != nil {
+		t.Fatalf("native payload after string mutation = %#v, want nil", got)
+	}
+	if got := tbl.RawGetInt(1); !got.IsNil() {
+		t.Fatalf("lazy getter after string mutation = %v, want nil", got)
+	}
+}
+
 func TestTableSingleElement(t *testing.T) {
 	v := getGlobal(t, `
 		t := {42}

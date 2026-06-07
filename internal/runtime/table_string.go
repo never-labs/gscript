@@ -188,6 +188,7 @@ func (t *Table) RawSetStringCached(key string, val Value, cache *FieldCacheEntry
 	if valIsNil && t.shapeID == 0 && len(t.skeys) == 0 && t.smap == nil {
 		return
 	}
+	t.clearNativePayloadLocked()
 	t.keysDirty = true
 	if valIsNil && (t.smap != nil || t.stringLookupCache != nil) {
 		t.invalidateStringLookupCacheLocked()
@@ -287,6 +288,7 @@ func (t *Table) RawSetStringDynamicCached(key string, val Value, cache []TableSt
 	if valIsNil && t.shapeID == 0 && len(t.skeys) == 0 && t.smap == nil {
 		return
 	}
+	t.clearNativePayloadLocked()
 	t.keysDirty = true
 	if valIsNil && (t.smap != nil || t.stringLookupCache != nil) {
 		t.invalidateStringLookupCacheLocked()
@@ -455,6 +457,7 @@ func (t *Table) RawSetString(key string, val Value) {
 	if valIsNil && t.shapeID == 0 && len(t.skeys) == 0 && t.smap == nil {
 		return
 	}
+	t.clearNativePayloadLocked()
 	t.keysDirty = true
 	if valIsNil && (t.smap != nil || t.stringLookupCache != nil) {
 		t.invalidateStringLookupCacheLocked()

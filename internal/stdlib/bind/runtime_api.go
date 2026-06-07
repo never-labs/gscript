@@ -23,6 +23,8 @@ type (
 	LLMTurnRequest       = runtime.LLMTurnRequest
 	LLMTurnResult        = runtime.LLMTurnResult
 	LLMTurnUsage         = runtime.LLMTurnUsage
+	NativePayloadInfo    = runtime.NativePayloadInfo
+	NativePayloadKind    = runtime.NativePayloadKind
 	ScriptFunctionCaller = runtime.ScriptFunctionCaller
 	SoA                  = runtime.SoA
 	SoAAffinePlan        = runtime.SoAAffinePlan
@@ -41,6 +43,11 @@ const (
 	TypeTable  = runtime.TypeTable
 
 	NativeKindStdSoAAffineMany = runtime.NativeKindStdSoAAffineMany
+
+	NativePayloadNone       = runtime.NativePayloadNone
+	NativePayloadDataColumn = runtime.NativePayloadDataColumn
+	NativePayloadDataFrame  = runtime.NativePayloadDataFrame
+	NativePayloadKeyedFrame = runtime.NativePayloadKeyedFrame
 
 	LLMProviderErrorProvider = runtime.LLMProviderErrorProvider
 )

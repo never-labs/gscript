@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "case_count": 459,
+  "case_count": 491,
   "cases": [
     {
       "id": "language/all_harness_flags_format",
@@ -4860,6 +4860,54 @@
       ]
     },
     {
+      "id": "language/q_boundaries_and_gap_closures_project",
+      "path": "tests/language/q_boundaries_and_gap_closures_project.leia",
+      "domain": "language",
+      "kind": "test",
+      "reference": null,
+      "status": "passing",
+      "tags": [
+        "language",
+        "conformance"
+      ]
+    },
+    {
+      "id": "language/q_columnar_partitioned_store_project",
+      "path": "tests/language/q_columnar_partitioned_store_project.leia",
+      "domain": "language",
+      "kind": "test",
+      "reference": null,
+      "status": "passing",
+      "tags": [
+        "language",
+        "conformance"
+      ]
+    },
+    {
+      "id": "language/q_complex_data_project",
+      "path": "tests/language/q_complex_data_project.leia",
+      "domain": "language",
+      "kind": "test",
+      "reference": null,
+      "status": "passing",
+      "tags": [
+        "language",
+        "conformance"
+      ]
+    },
+    {
+      "id": "language/q_conformance_golden_project",
+      "path": "tests/language/q_conformance_golden_project.leia",
+      "domain": "language",
+      "kind": "test",
+      "reference": null,
+      "status": "passing",
+      "tags": [
+        "language",
+        "conformance"
+      ]
+    },
+    {
       "id": "language/q_data_complex_examples_tdd",
       "path": "tests/language/q_data_complex_examples_tdd.leia",
       "domain": "language",
@@ -4872,8 +4920,344 @@
       ]
     },
     {
+      "id": "language/q_data_join_mutation_project",
+      "path": "tests/language/q_data_join_mutation_project.leia",
+      "domain": "language",
+      "kind": "test",
+      "reference": null,
+      "status": "passing",
+      "tags": [
+        "language",
+        "conformance"
+      ]
+    },
+    {
       "id": "language/q_data_join_mutation_tdd",
       "path": "tests/language/q_data_join_mutation_tdd.leia",
+      "domain": "language",
+      "kind": "test",
+      "reference": null,
+      "status": "passing",
+      "tags": [
+        "language",
+        "conformance"
+      ]
+    },
+    {
+      "id": "language/q_integrated_market_replay_project",
+      "path": "tests/language/q_integrated_market_replay_project.leia",
+      "domain": "language",
+      "kind": "test",
+      "reference": null,
+      "status": "passing",
+      "tags": [
+        "language",
+        "conformance"
+      ]
+    },
+    {
+      "id": "language/q_intraday_tca_order_book_project",
+      "path": "tests/language/q_intraday_tca_order_book_project.leia",
+      "domain": "language",
+      "kind": "test",
+      "reference": null,
+      "status": "passing",
+      "tags": [
+        "language",
+        "conformance"
+      ]
+    },
+    {
+      "id": "language/q_iot_sensor_telemetry_project",
+      "path": "tests/language/q_iot_sensor_telemetry_project.leia",
+      "domain": "language",
+      "kind": "test",
+      "reference": null,
+      "status": "passing",
+      "tags": [
+        "language",
+        "conformance"
+      ]
+    },
+    {
+      "id": "language/q_ipc_codec_boundaries_project",
+      "path": "tests/language/q_ipc_codec_boundaries_project.leia",
+      "domain": "language",
+      "kind": "test",
+      "reference": null,
+      "status": "passing",
+      "tags": [
+        "language",
+        "conformance"
+      ]
+    },
+    {
+      "id": "language/q_join_variants_project",
+      "path": "tests/language/q_join_variants_project.leia",
+      "domain": "language",
+      "kind": "test",
+      "reference": null,
+      "status": "passing",
+      "tags": [
+        "language",
+        "conformance"
+      ]
+    },
+    {
+      "id": "language/q_kdb_complex_event_replay_project",
+      "path": "tests/language/q_kdb_complex_event_replay_project.leia",
+      "domain": "language",
+      "kind": "test",
+      "reference": null,
+      "status": "passing",
+      "tags": [
+        "language",
+        "conformance"
+      ]
+    },
+    {
+      "id": "language/q_kdb_delta_golden",
+      "path": "tests/language/q_kdb_delta_golden.leia",
+      "domain": "language",
+      "kind": "test",
+      "reference": null,
+      "status": "passing",
+      "tags": [
+        "language",
+        "conformance"
+      ]
+    },
+    {
+      "id": "language/q_kdb_market_tape_complex_project",
+      "path": "tests/language/q_kdb_market_tape_complex_project.leia",
+      "domain": "language",
+      "kind": "test",
+      "reference": null,
+      "status": "passing",
+      "tags": [
+        "language",
+        "conformance"
+      ]
+    },
+    {
+      "id": "language/q_keyed_asof_state_replay_project",
+      "path": "tests/language/q_keyed_asof_state_replay_project.leia",
+      "domain": "language",
+      "kind": "test",
+      "reference": null,
+      "status": "passing",
+      "tags": [
+        "language",
+        "conformance"
+      ]
+    },
+    {
+      "id": "language/q_keyed_table_semantics",
+      "path": "tests/language/q_keyed_table_semantics.leia",
+      "domain": "language",
+      "kind": "test",
+      "reference": null,
+      "status": "passing",
+      "tags": [
+        "language",
+        "conformance"
+      ]
+    },
+    {
+      "id": "language/q_keyed_temporal_asof_adverbs_tdd",
+      "path": "tests/language/q_keyed_temporal_asof_adverbs_tdd.leia",
+      "domain": "language",
+      "kind": "test",
+      "reference": null,
+      "status": "passing",
+      "tags": [
+        "language",
+        "conformance"
+      ]
+    },
+    {
+      "id": "language/q_keyed_timestamp_lookup_coercion",
+      "path": "tests/language/q_keyed_timestamp_lookup_coercion.leia",
+      "domain": "language",
+      "kind": "test",
+      "reference": null,
+      "status": "passing",
+      "tags": [
+        "language",
+        "conformance"
+      ]
+    },
+    {
+      "id": "language/q_market_full_stack_project",
+      "path": "tests/language/q_market_full_stack_project.leia",
+      "domain": "language",
+      "kind": "test",
+      "reference": null,
+      "status": "passing",
+      "tags": [
+        "language",
+        "conformance"
+      ]
+    },
+    {
+      "id": "language/q_market_microstructure_project",
+      "path": "tests/language/q_market_microstructure_project.leia",
+      "domain": "language",
+      "kind": "test",
+      "reference": null,
+      "status": "passing",
+      "tags": [
+        "language",
+        "conformance"
+      ]
+    },
+    {
+      "id": "language/q_native_mutation_join_project",
+      "path": "tests/language/q_native_mutation_join_project.leia",
+      "domain": "language",
+      "kind": "test",
+      "reference": null,
+      "status": "passing",
+      "tags": [
+        "language",
+        "conformance"
+      ]
+    },
+    {
+      "id": "language/q_order_book_lifecycle_project",
+      "path": "tests/language/q_order_book_lifecycle_project.leia",
+      "domain": "language",
+      "kind": "test",
+      "reference": null,
+      "status": "passing",
+      "tags": [
+        "language",
+        "conformance"
+      ]
+    },
+    {
+      "id": "language/q_portfolio_risk_factor_project",
+      "path": "tests/language/q_portfolio_risk_factor_project.leia",
+      "domain": "language",
+      "kind": "test",
+      "reference": null,
+      "status": "passing",
+      "tags": [
+        "language",
+        "conformance"
+      ]
+    },
+    {
+      "id": "language/q_projection_limit_order_project",
+      "path": "tests/language/q_projection_limit_order_project.leia",
+      "domain": "language",
+      "kind": "test",
+      "reference": null,
+      "status": "passing",
+      "tags": [
+        "language",
+        "conformance"
+      ]
+    },
+    {
+      "id": "language/q_session_workspace_project",
+      "path": "tests/language/q_session_workspace_project.leia",
+      "domain": "language",
+      "kind": "test",
+      "reference": null,
+      "status": "passing",
+      "tags": [
+        "language",
+        "conformance"
+      ]
+    },
+    {
+      "id": "language/q_sor_tca_project",
+      "path": "tests/language/q_sor_tca_project.leia",
+      "domain": "language",
+      "kind": "test",
+      "reference": null,
+      "status": "passing",
+      "tags": [
+        "language",
+        "conformance"
+      ]
+    },
+    {
+      "id": "language/q_temporal_window_analytics_project",
+      "path": "tests/language/q_temporal_window_analytics_project.leia",
+      "domain": "language",
+      "kind": "test",
+      "reference": null,
+      "status": "passing",
+      "tags": [
+        "language",
+        "conformance"
+      ]
+    },
+    {
+      "id": "language/q_ticks_bars_asof_project",
+      "path": "tests/language/q_ticks_bars_asof_project.leia",
+      "domain": "language",
+      "kind": "test",
+      "reference": null,
+      "status": "passing",
+      "tags": [
+        "language",
+        "conformance"
+      ]
+    },
+    {
+      "id": "language/q_time_bucket_asof_project",
+      "path": "tests/language/q_time_bucket_asof_project.leia",
+      "domain": "language",
+      "kind": "test",
+      "reference": null,
+      "status": "passing",
+      "tags": [
+        "language",
+        "conformance"
+      ]
+    },
+    {
+      "id": "language/q_trade_analytics_project",
+      "path": "tests/language/q_trade_analytics_project.leia",
+      "domain": "language",
+      "kind": "test",
+      "reference": null,
+      "status": "passing",
+      "tags": [
+        "language",
+        "conformance"
+      ]
+    },
+    {
+      "id": "language/q_vector_dict_flip_adverbs_project",
+      "path": "tests/language/q_vector_dict_flip_adverbs_project.leia",
+      "domain": "language",
+      "kind": "test",
+      "reference": null,
+      "status": "passing",
+      "tags": [
+        "language",
+        "conformance"
+      ]
+    },
+    {
+      "id": "language/q_vectors_dicts_flip_project",
+      "path": "tests/language/q_vectors_dicts_flip_project.leia",
+      "domain": "language",
+      "kind": "test",
+      "reference": null,
+      "status": "passing",
+      "tags": [
+        "language",
+        "conformance"
+      ]
+    },
+    {
+      "id": "language/q_workspace_session_project_example",
+      "path": "tests/language/q_workspace_session_project_example.leia",
       "domain": "language",
       "kind": "test",
       "reference": null,

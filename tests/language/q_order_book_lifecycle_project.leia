@@ -1,0 +1,17 @@
+print("case:q_order_book_lifecycle_project")
+
+result := dofile("examples/data/q_order_book_lifecycle_project/main.leia")
+
+assert(result.summary != "")
+assert(#result.orders == 6)
+assert(#result.trades == 7)
+assert(#result.quotes == 9)
+assert(#result.ticks == 12)
+assert(#result.enriched == 7)
+assert(#result.order_lifecycle == 6)
+assert(#result.symbol_book == 5)
+assert(#result.bars == 7)
+assert(result.symbol_book[5].sym == "TSLA")
+assert(result.order_lifecycle[6].filled == 70.0)
+
+print("ok")

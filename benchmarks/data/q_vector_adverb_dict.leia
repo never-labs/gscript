@@ -1,0 +1,105 @@
+// q symbolic vector, adverb, dictionary, where, take, and flip-table benchmark.
+
+REPS := 9000
+MOD := 1000000007
+
+price_delta_src := "100 101.5 100.75 102.25 103 104.5 104.75 105.25 - 99.5 100 101.5 100.75 102.25 103 103.5 104"
+running_src := "+\\10100 12090 8060 15337.5 9270 13110 16222.5 8875"
+total_src := "+/100 120 80 150 90 125 155 75"
+where_src := "where 10100 12090 8060 15337.5 9270 13110 16222.5 8875>10000"
+take_src := "4#105.25 104.75 104.5 103 102.25 101.5"
+cycle_src := "6#10 20 30 40"
+drop_src := "drop 2 10 20 30 40 50"
+except_src := "`AAPL`MSFT`NVDA`AAPL except `MSFT"
+inter_src := "`AAPL`MSFT`AAPL`NVDA inter `NVDA`AAPL"
+union_src := "`AAPL`MSFT union `MSFT`NVDA`TSLA"
+lambda_seed_src := "{x+y}/[10;1 2 3]"
+lambda_return_src := "{{x+1}}[0][10]"
+lambda_closure_src := "a:10;f:{x+a};a:20;f[1]"
+lambda_return_closure_src := "mk:{[a]{x+a}};add10:mk[10];add20:mk[20];v1:add10[1];v2:add20[1];v1+v2"
+composition_src := "(count distinct)[10 20 10 30]"
+lambda_each_both_src := "{x+y}'[1 2 3;10 20 30]"
+projection_each_src := "({x+y}[1;])'10 20 30"
+projection_nested_closure_src := "a:10;p:{x+y+z+a}[1;;];q:p[;3];a:20;q[2]"
+projection_closure_each_src := "a:10;p:{x+y+a}[1;];a:20;p'10 20 30"
+projection_closure_over_src := "a:10;({x+y+a}[1;])/[2 3 4]"
+projection_closure_scan_src := "a:10;({x+y+a}[1;])\\2 3 4"
+lambda_each_left_src := "{x-y}\\:[10;1 2 3]"
+lambda_each_right_src := "{x-y}/:[10 20 30;1]"
+lambda_each_prior_src := "{x-y}':10 15 14 20"
+typed_promoted_src := "1i 2i 3i+1.5"
+null_scan_callable_src := "(+\\)[1 0N 2]"
+book_src := "`bid`ask`last!(99.5 100 100.5 101;100.5 101 101.5 102;100 100.75 101 101.25)"
+trades_src := "flip `sym`side`price`size!(`AAPL`MSFT`AAPL`NVDA`MSFT`TSLA`NVDA`AAPL;`buy`sell`buy`buy`sell`sell`buy`sell;100 101.5 100.75 102.25 103 99.5 104.5 105.25;100 120 80 150 90 50 155 75)"
+
+func mix(sum, v) {
+    return (sum * 131 + v) % MOD
+}
+
+func check_vector_semantics() {
+    cycled := q.eval(cycle_src)
+    dropped := q.eval(drop_src)
+    excepted := q.eval(except_src)
+    intersected := q.eval(inter_src)
+    unioned := q.eval(union_src)
+    assert(q.count(cycled) == 6 && cycled[1] == 10 && cycled[5] == 10 && cycled[6] == 20)
+    assert(q.count(dropped) == 3 && dropped[1] == 30 && dropped[3] == 50)
+    assert(q.count(excepted) == 3 && excepted[1] == "AAPL" && excepted[2] == "NVDA" && excepted[3] == "AAPL")
+    assert(q.count(intersected) == 2 && intersected[1] == "AAPL" && intersected[2] == "NVDA")
+    assert(q.count(unioned) == 4 && unioned[1] == "AAPL" && unioned[4] == "TSLA")
+}
+
+func run_hot(reps) {
+    checksum := 0
+    for r := 1; r <= reps; r++ {
+        delta := q.eval(price_delta_src)
+        running := q.eval(running_src)
+        total := q.eval(total_src)
+        indexes := q.eval(where_src)
+        top := q.eval(take_src)
+        cycled := q.eval(cycle_src)
+        dropped := q.eval(drop_src)
+        excepted := q.eval(except_src)
+        unioned := q.eval(union_src)
+        lambda_seed := q.eval(lambda_seed_src)
+        lambda_return := q.eval(lambda_return_src)
+        lambda_closure := q.eval(lambda_closure_src)
+        lambda_return_closure := q.eval(lambda_return_closure_src)
+        composition := q.eval(composition_src)
+        lambda_each_both := q.eval(lambda_each_both_src)
+        projection_each := q.eval(projection_each_src)
+        projection_nested_closure := q.eval(projection_nested_closure_src)
+        projection_closure_each := q.eval(projection_closure_each_src)
+        projection_closure_over := q.eval(projection_closure_over_src)
+        projection_closure_scan := q.eval(projection_closure_scan_src)
+        lambda_each_left := q.eval(lambda_each_left_src)
+        lambda_each_right := q.eval(lambda_each_right_src)
+        lambda_each_prior := q.eval(lambda_each_prior_src)
+        typed_promoted := q.eval(typed_promoted_src)
+        null_scan_callable := q.eval(null_scan_callable_src)
+        book := q.eval(book_src)
+        trades := q.eval(trades_src)
+
+        checksum = mix(checksum, math.floor(delta[4] * 100) + math.floor(running[8]) + total)
+        last_index := indexes[q.count(indexes)]
+        checksum = mix(checksum, indexes[1] + last_index * 17 + math.floor(top[4] * 10))
+        checksum = mix(checksum, cycled[5] * 11 + dropped[1] * 13 + string.len(excepted[2]) * 17 + string.len(unioned[4]) * 19)
+        checksum = mix(checksum, lambda_seed * 23 + lambda_return * 29 + lambda_closure * 31 + lambda_return_closure * 37 + composition * 41)
+        checksum = mix(checksum, lambda_each_both[2] * 43 + projection_each[2] * 47 + projection_nested_closure * 53 + projection_closure_each[3] * 59 + projection_closure_over * 61 + projection_closure_scan[3] * 67)
+        checksum = mix(checksum, lambda_each_left[3] * 71 + lambda_each_right[3] * 73 + lambda_each_prior[4] * 79)
+        checksum = mix(checksum, math.floor(typed_promoted[1] * 100) + math.floor(typed_promoted[3] * 100) + null_scan_callable[3] * 83)
+        checksum = mix(checksum, math.floor(book.ask[4] * 10) + string.len(trades[4].sym) + trades[7].size)
+    }
+    return checksum
+}
+
+check_vector_semantics()
+warm := run_hot(2)
+collectgarbage("collect")
+t0 := time.now()
+checksum := run_hot(REPS)
+elapsed := time.since(t0)
+
+print(string.format("q_vector_adverb_dict_hot reps=%d", REPS))
+print(string.format("checksum: %d", mix(checksum, warm)))
+print(string.format("Time: %.3fs", elapsed))

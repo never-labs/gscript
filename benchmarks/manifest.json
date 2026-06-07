@@ -1,6 +1,6 @@
 {
   "schema_version": 3,
-  "case_count": 76,
+  "case_count": 98,
   "cases": [
     {
       "id": "app/actors_dispatch_mutation",
@@ -390,8 +390,128 @@
       ]
     },
     {
-      "id": "data/q_query_rollup",
-      "path": "benchmarks/data/q_query_rollup.leia",
+      "id": "data/q_conformance_golden_project",
+      "path": "benchmarks/data/q_conformance_golden_project.leia",
+      "domain": "data",
+      "kind": "benchmark",
+      "reference": null,
+      "status": "active",
+      "tags": [
+        "data",
+        "benchmark"
+      ]
+    },
+    {
+      "id": "data/q_integrated_market_replay_project",
+      "path": "benchmarks/data/q_integrated_market_replay_project.leia",
+      "domain": "data",
+      "kind": "benchmark",
+      "reference": null,
+      "status": "active",
+      "tags": [
+        "data",
+        "benchmark"
+      ]
+    },
+    {
+      "id": "data/q_intraday_tca_order_book_project",
+      "path": "benchmarks/data/q_intraday_tca_order_book_project.leia",
+      "domain": "data",
+      "kind": "benchmark",
+      "reference": null,
+      "status": "active",
+      "tags": [
+        "data",
+        "benchmark"
+      ]
+    },
+    {
+      "id": "data/q_iot_sensor_telemetry_project",
+      "path": "benchmarks/data/q_iot_sensor_telemetry_project.leia",
+      "domain": "data",
+      "kind": "benchmark",
+      "reference": null,
+      "status": "active",
+      "tags": [
+        "data",
+        "benchmark"
+      ]
+    },
+    {
+      "id": "data/q_kdb_complex_event_replay_project",
+      "path": "benchmarks/data/q_kdb_complex_event_replay_project.leia",
+      "domain": "data",
+      "kind": "benchmark",
+      "reference": null,
+      "status": "active",
+      "tags": [
+        "data",
+        "benchmark"
+      ]
+    },
+    {
+      "id": "data/q_kdb_delta_golden",
+      "path": "benchmarks/data/q_kdb_delta_golden.leia",
+      "domain": "data",
+      "kind": "benchmark",
+      "reference": null,
+      "status": "active",
+      "tags": [
+        "data",
+        "benchmark"
+      ]
+    },
+    {
+      "id": "data/q_kdb_market_tape_complex_project",
+      "path": "benchmarks/data/q_kdb_market_tape_complex_project.leia",
+      "domain": "data",
+      "kind": "benchmark",
+      "reference": null,
+      "status": "active",
+      "tags": [
+        "data",
+        "benchmark"
+      ]
+    },
+    {
+      "id": "data/q_keyed_asof_state_replay_project",
+      "path": "benchmarks/data/q_keyed_asof_state_replay_project.leia",
+      "domain": "data",
+      "kind": "benchmark",
+      "reference": null,
+      "status": "active",
+      "tags": [
+        "data",
+        "benchmark"
+      ]
+    },
+    {
+      "id": "data/q_market_full_stack_project",
+      "path": "benchmarks/data/q_market_full_stack_project.leia",
+      "domain": "data",
+      "kind": "benchmark",
+      "reference": null,
+      "status": "active",
+      "tags": [
+        "data",
+        "benchmark"
+      ]
+    },
+    {
+      "id": "data/q_market_microstructure_project",
+      "path": "benchmarks/data/q_market_microstructure_project.leia",
+      "domain": "data",
+      "kind": "benchmark",
+      "reference": null,
+      "status": "active",
+      "tags": [
+        "data",
+        "benchmark"
+      ]
+    },
+    {
+      "id": "data/q_native_join_update_delete",
+      "path": "benchmarks/data/q_native_join_update_delete.leia",
       "domain": "data",
       "kind": "benchmark",
       "reference": null,
@@ -404,6 +524,156 @@
     {
       "id": "data/q_operator_pipeline",
       "path": "benchmarks/data/q_operator_pipeline.leia",
+      "domain": "data",
+      "kind": "benchmark",
+      "reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/data/q_operator_pipeline.lua"
+      },
+      "status": "active",
+      "tags": [
+        "data",
+        "benchmark"
+      ]
+    },
+    {
+      "id": "data/q_order_book_lifecycle_project",
+      "path": "benchmarks/data/q_order_book_lifecycle_project.leia",
+      "domain": "data",
+      "kind": "benchmark",
+      "reference": null,
+      "status": "active",
+      "tags": [
+        "data",
+        "benchmark"
+      ]
+    },
+    {
+      "id": "data/q_portfolio_risk_factor_project",
+      "path": "benchmarks/data/q_portfolio_risk_factor_project.leia",
+      "domain": "data",
+      "kind": "benchmark",
+      "reference": null,
+      "status": "active",
+      "tags": [
+        "data",
+        "benchmark"
+      ]
+    },
+    {
+      "id": "data/q_projection_limit_cache",
+      "path": "benchmarks/data/q_projection_limit_cache.leia",
+      "domain": "data",
+      "kind": "benchmark",
+      "reference": null,
+      "status": "active",
+      "tags": [
+        "data",
+        "benchmark"
+      ]
+    },
+    {
+      "id": "data/q_query_rollup",
+      "path": "benchmarks/data/q_query_rollup.leia",
+      "domain": "data",
+      "kind": "benchmark",
+      "reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/data/q_query_rollup.lua"
+      },
+      "status": "active",
+      "tags": [
+        "data",
+        "benchmark"
+      ]
+    },
+    {
+      "id": "data/q_select_star_order_project",
+      "path": "benchmarks/data/q_select_star_order_project.leia",
+      "domain": "data",
+      "kind": "benchmark",
+      "reference": null,
+      "status": "active",
+      "tags": [
+        "data",
+        "benchmark"
+      ]
+    },
+    {
+      "id": "data/q_sor_tca_project",
+      "path": "benchmarks/data/q_sor_tca_project.leia",
+      "domain": "data",
+      "kind": "benchmark",
+      "reference": null,
+      "status": "active",
+      "tags": [
+        "data",
+        "benchmark"
+      ]
+    },
+    {
+      "id": "data/q_temporal_window_analytics_project",
+      "path": "benchmarks/data/q_temporal_window_analytics_project.leia",
+      "domain": "data",
+      "kind": "benchmark",
+      "reference": null,
+      "status": "active",
+      "tags": [
+        "data",
+        "benchmark"
+      ]
+    },
+    {
+      "id": "data/q_ticks_bars_asof_project",
+      "path": "benchmarks/data/q_ticks_bars_asof_project.leia",
+      "domain": "data",
+      "kind": "benchmark",
+      "reference": null,
+      "status": "active",
+      "tags": [
+        "data",
+        "benchmark"
+      ]
+    },
+    {
+      "id": "data/q_vector_adverb_dict",
+      "path": "benchmarks/data/q_vector_adverb_dict.leia",
+      "domain": "data",
+      "kind": "benchmark",
+      "reference": null,
+      "status": "active",
+      "tags": [
+        "data",
+        "benchmark"
+      ]
+    },
+    {
+      "id": "data/q_xbar_asof_rollup",
+      "path": "benchmarks/data/q_xbar_asof_rollup.leia",
+      "domain": "data",
+      "kind": "benchmark",
+      "reference": null,
+      "status": "active",
+      "tags": [
+        "data",
+        "benchmark"
+      ]
+    },
+    {
+      "id": "data/qsql_join_mutation",
+      "path": "benchmarks/data/qsql_join_mutation.leia",
+      "domain": "data",
+      "kind": "benchmark",
+      "reference": null,
+      "status": "active",
+      "tags": [
+        "data",
+        "benchmark"
+      ]
+    },
+    {
+      "id": "data/qsql_join_variants",
+      "path": "benchmarks/data/qsql_join_variants.leia",
       "domain": "data",
       "kind": "benchmark",
       "reference": null,
@@ -2397,7 +2667,10 @@
       "domain": "data",
       "name": "q_query_rollup",
       "script": "benchmarks/data/q_query_rollup.leia",
-      "comparison_reference": null,
+      "comparison_reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/data/q_query_rollup.lua"
+      },
       "params": {},
       "recommended_scale": {
         "hot": {}
@@ -2412,6 +2685,339 @@
       "domain": "data",
       "name": "q_operator_pipeline",
       "script": "benchmarks/data/q_operator_pipeline.leia",
+      "comparison_reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/data/q_operator_pipeline.lua"
+      },
+      "params": {},
+      "recommended_scale": {
+        "hot": {}
+      },
+      "time_source_hint": "script_time_line",
+      "tags": [
+        "data"
+      ]
+    },
+    {
+      "id": "data/q_market_microstructure_project",
+      "domain": "data",
+      "name": "q_market_microstructure_project",
+      "script": "benchmarks/data/q_market_microstructure_project.leia",
+      "comparison_reference": null,
+      "params": {},
+      "recommended_scale": {
+        "hot": {}
+      },
+      "time_source_hint": "script_time_line",
+      "tags": [
+        "data"
+      ]
+    },
+    {
+      "id": "data/q_market_full_stack_project",
+      "domain": "data",
+      "name": "q_market_full_stack_project",
+      "script": "benchmarks/data/q_market_full_stack_project.leia",
+      "comparison_reference": null,
+      "params": {},
+      "recommended_scale": {
+        "hot": {}
+      },
+      "time_source_hint": "script_time_line",
+      "tags": [
+        "data"
+      ]
+    },
+    {
+      "id": "data/qsql_join_mutation",
+      "domain": "data",
+      "name": "qsql_join_mutation",
+      "script": "benchmarks/data/qsql_join_mutation.leia",
+      "comparison_reference": null,
+      "params": {},
+      "recommended_scale": {
+        "hot": {}
+      },
+      "time_source_hint": "script_time_line",
+      "tags": [
+        "data"
+      ]
+    },
+    {
+      "id": "data/qsql_join_variants",
+      "domain": "data",
+      "name": "qsql_join_variants",
+      "script": "benchmarks/data/qsql_join_variants.leia",
+      "comparison_reference": null,
+      "params": {},
+      "recommended_scale": {
+        "hot": {}
+      },
+      "time_source_hint": "script_time_line",
+      "tags": [
+        "data"
+      ]
+    },
+    {
+      "id": "data/q_native_join_update_delete",
+      "domain": "data",
+      "name": "q_native_join_update_delete",
+      "script": "benchmarks/data/q_native_join_update_delete.leia",
+      "comparison_reference": null,
+      "params": {},
+      "recommended_scale": {
+        "hot": {}
+      },
+      "time_source_hint": "script_time_line",
+      "tags": [
+        "data"
+      ]
+    },
+    {
+      "id": "data/q_vector_adverb_dict",
+      "domain": "data",
+      "name": "q_vector_adverb_dict",
+      "script": "benchmarks/data/q_vector_adverb_dict.leia",
+      "comparison_reference": null,
+      "params": {},
+      "recommended_scale": {
+        "hot": {}
+      },
+      "time_source_hint": "script_time_line",
+      "tags": [
+        "data"
+      ]
+    },
+    {
+      "id": "data/q_xbar_asof_rollup",
+      "domain": "data",
+      "name": "q_xbar_asof_rollup",
+      "script": "benchmarks/data/q_xbar_asof_rollup.leia",
+      "comparison_reference": null,
+      "params": {},
+      "recommended_scale": {
+        "hot": {}
+      },
+      "time_source_hint": "script_time_line",
+      "tags": [
+        "data"
+      ]
+    },
+    {
+      "id": "data/q_select_star_order_project",
+      "domain": "data",
+      "name": "q_select_star_order_project",
+      "script": "benchmarks/data/q_select_star_order_project.leia",
+      "comparison_reference": null,
+      "params": {},
+      "recommended_scale": {
+        "hot": {}
+      },
+      "time_source_hint": "script_time_line",
+      "tags": [
+        "data"
+      ]
+    },
+    {
+      "id": "data/q_order_book_lifecycle_project",
+      "domain": "data",
+      "name": "q_order_book_lifecycle_project",
+      "script": "benchmarks/data/q_order_book_lifecycle_project.leia",
+      "comparison_reference": null,
+      "params": {},
+      "recommended_scale": {
+        "hot": {}
+      },
+      "time_source_hint": "script_time_line",
+      "tags": [
+        "data"
+      ]
+    },
+    {
+      "id": "data/q_projection_limit_cache",
+      "domain": "data",
+      "name": "q_projection_limit_cache",
+      "script": "benchmarks/data/q_projection_limit_cache.leia",
+      "comparison_reference": null,
+      "params": {},
+      "recommended_scale": {
+        "hot": {}
+      },
+      "time_source_hint": "script_time_line",
+      "tags": [
+        "data"
+      ]
+    },
+    {
+      "id": "data/q_temporal_window_analytics_project",
+      "domain": "data",
+      "name": "q_temporal_window_analytics_project",
+      "script": "benchmarks/data/q_temporal_window_analytics_project.leia",
+      "comparison_reference": null,
+      "params": {},
+      "recommended_scale": {
+        "hot": {}
+      },
+      "time_source_hint": "script_time_line",
+      "tags": [
+        "data"
+      ]
+    },
+    {
+      "id": "data/q_ticks_bars_asof_project",
+      "domain": "data",
+      "name": "q_ticks_bars_asof_project",
+      "script": "benchmarks/data/q_ticks_bars_asof_project.leia",
+      "comparison_reference": null,
+      "params": {},
+      "recommended_scale": {
+        "hot": {}
+      },
+      "time_source_hint": "script_time_line",
+      "tags": [
+        "data"
+      ]
+    },
+    {
+      "id": "data/q_sor_tca_project",
+      "domain": "data",
+      "name": "q_sor_tca_project",
+      "script": "benchmarks/data/q_sor_tca_project.leia",
+      "comparison_reference": null,
+      "params": {},
+      "recommended_scale": {
+        "hot": {}
+      },
+      "time_source_hint": "script_time_line",
+      "tags": [
+        "data"
+      ]
+    },
+    {
+      "id": "data/q_kdb_complex_event_replay_project",
+      "domain": "data",
+      "name": "q_kdb_complex_event_replay_project",
+      "script": "benchmarks/data/q_kdb_complex_event_replay_project.leia",
+      "comparison_reference": null,
+      "params": {},
+      "recommended_scale": {
+        "hot": {}
+      },
+      "time_source_hint": "script_time_line",
+      "tags": [
+        "data"
+      ]
+    },
+    {
+      "id": "data/q_kdb_delta_golden",
+      "domain": "data",
+      "name": "q_kdb_delta_golden",
+      "script": "benchmarks/data/q_kdb_delta_golden.leia",
+      "comparison_reference": null,
+      "params": {},
+      "recommended_scale": {
+        "hot": {}
+      },
+      "time_source_hint": "script_time_line",
+      "tags": [
+        "data"
+      ]
+    },
+    {
+      "id": "data/q_keyed_asof_state_replay_project",
+      "domain": "data",
+      "name": "q_keyed_asof_state_replay_project",
+      "script": "benchmarks/data/q_keyed_asof_state_replay_project.leia",
+      "comparison_reference": null,
+      "params": {},
+      "recommended_scale": {
+        "hot": {}
+      },
+      "time_source_hint": "script_time_line",
+      "tags": [
+        "data"
+      ]
+    },
+    {
+      "id": "data/q_integrated_market_replay_project",
+      "domain": "data",
+      "name": "q_integrated_market_replay_project",
+      "script": "benchmarks/data/q_integrated_market_replay_project.leia",
+      "comparison_reference": null,
+      "params": {},
+      "recommended_scale": {
+        "hot": {}
+      },
+      "time_source_hint": "script_time_line",
+      "tags": [
+        "data"
+      ]
+    },
+    {
+      "id": "data/q_conformance_golden_project",
+      "domain": "data",
+      "name": "q_conformance_golden_project",
+      "script": "benchmarks/data/q_conformance_golden_project.leia",
+      "comparison_reference": null,
+      "params": {},
+      "recommended_scale": {
+        "hot": {}
+      },
+      "time_source_hint": "script_time_line",
+      "tags": [
+        "data"
+      ]
+    },
+    {
+      "id": "data/q_kdb_market_tape_complex_project",
+      "domain": "data",
+      "name": "q_kdb_market_tape_complex_project",
+      "script": "benchmarks/data/q_kdb_market_tape_complex_project.leia",
+      "comparison_reference": null,
+      "params": {},
+      "recommended_scale": {
+        "hot": {}
+      },
+      "time_source_hint": "script_time_line",
+      "tags": [
+        "data"
+      ]
+    },
+    {
+      "id": "data/q_intraday_tca_order_book_project",
+      "domain": "data",
+      "name": "q_intraday_tca_order_book_project",
+      "script": "benchmarks/data/q_intraday_tca_order_book_project.leia",
+      "comparison_reference": null,
+      "params": {},
+      "recommended_scale": {
+        "hot": {}
+      },
+      "time_source_hint": "script_time_line",
+      "tags": [
+        "data"
+      ]
+    },
+    {
+      "id": "data/q_portfolio_risk_factor_project",
+      "domain": "data",
+      "name": "q_portfolio_risk_factor_project",
+      "script": "benchmarks/data/q_portfolio_risk_factor_project.leia",
+      "comparison_reference": null,
+      "params": {},
+      "recommended_scale": {
+        "hot": {}
+      },
+      "time_source_hint": "script_time_line",
+      "tags": [
+        "data"
+      ]
+    },
+    {
+      "id": "data/q_iot_sensor_telemetry_project",
+      "domain": "data",
+      "name": "q_iot_sensor_telemetry_project",
+      "script": "benchmarks/data/q_iot_sensor_telemetry_project.leia",
       "comparison_reference": null,
       "params": {},
       "recommended_scale": {

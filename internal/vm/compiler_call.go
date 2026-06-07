@@ -537,7 +537,7 @@ func (c *compiler) emitArgCount(tableReg, idxReg int, line int) {
 	oneReg := c.allocReg()
 	c.emitAsBx(OP_LOADINT, oneReg, 1, line)
 	c.emitABC(OP_SUB, countReg, idxReg, oneReg, line)
-	c.emitABC(OP_SETFIELD, tableReg, c.stringConst("n"), countReg, line)
+	c.emitSetField(tableReg, c.stringConst("n"), countReg, line)
 	c.freeRegs(2)
 }
 

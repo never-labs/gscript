@@ -1,0 +1,23 @@
+print("case:q_complex_data_project")
+
+result := dofile("examples/data/q_complex_data_project/main.leia")
+
+assert(result.summary != "")
+assert(#result.symbols == 3)
+assert(#result.rollup == 3)
+assert(#result.side_rollup == 2)
+assert(#result.roundtrip == 3)
+
+assert(#result.market_ticks == 15)
+assert(#result.market_trades == 6)
+assert(#result.market_quotes == 7)
+assert(#result.market_enriched == 6)
+assert(#result.market_bars == 6)
+assert(result.market_bars[1].bucket == "2026-06-06T09:30:00Z")
+assert(math.floor(result.market_bars[1].vwap * 100) == 10012)
+assert(#result.market_desk_rollup == 4)
+assert(result.market_desk_rollup[1].desk == "alpha")
+assert(#result.market_parent_rollup == 4)
+assert(result.market_parent_rollup[1].filled == 150.0)
+
+print("ok")

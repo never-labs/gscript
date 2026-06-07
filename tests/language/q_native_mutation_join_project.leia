@@ -1,0 +1,99 @@
+print("case:q_native_mutation_join_project")
+
+func check(name, ok) {
+  assert(ok)
+  print("ok", name)
+}
+
+trades := data.frame({
+  id: data.i64({1, 2, 3, 4, 5}),
+  acct: data.symbols({"a1", "a1", "a2", "a3", "a3"}),
+  sym: data.symbols({"AAPL", "MSFT", "AAPL", "NVDA", "MSFT"}),
+  venue: data.strings({"XNAS", "XNYS", "XNAS", "ARCX", "BATS"}),
+  price: data.f64({100.0, 101.0, 102.0, 99.0, 98.5}),
+  size: data.i64({10, 20, 15, 5, 25}),
+})
+
+updated := q.sql(trades, "update price:price+0.5,size:size+1 from trades where acct=`a1")
+deleted := q.sql(updated, "delete from trades where price<99")
+notionaled := q.sql(trades, "update notional:price*size from trades")
+compound_deleted := q.sql(notionaled, "delete from trades where sym=`AAPL and price>100")
+columns_deleted := q.sql(compound_deleted, "delete size,notional from trades")
+keyed_trades := q.key_by(trades, "acct", "sym")
+keyed_updated := q.sql(keyed_trades, "update size:size+100 from trades where acct=`a1")
+keyed_deleted := q.sql(keyed_updated, "delete from trades where acct=`a3")
+keyed_selected := q.sql(keyed_deleted, "select id,acct,sym,size from trades where acct=`a1 order by id asc")
+keyed_key_frame := q.key(keyed_updated)
+keyed_struct_hit := q.lookup(keyed_updated, {sym: "MSFT", acct: "a1", ignored: 1})
+keyed_array_hit := q.lookup(keyed_updated, {"a1", "MSFT"})
+amend_delta := data.frame({
+  acct: data.symbols({"a1", "a4"}),
+  sym: data.symbols({"AAPL", "TSLA"}),
+  size: data.i64({333, 444}),
+})
+keyed_amended := q.amend(keyed_trades, amend_delta)
+upsert_delta := data.frame({
+  acct: data.symbols({"a1", "a4"}),
+  sym: data.symbols({"MSFT", "TSLA"}),
+  size: data.i64({555, 666}),
+})
+keyed_upserted := q.upsert(keyed_amended, upsert_delta)
+keyed_sql_ordered := q.sql(keyed_trades, "upsert into trades (size,sym,acct) values (777,`MSFT,`a1)")
+amended_hit := q.lookup(keyed_upserted, "a1", "AAPL")
+upserted_existing := q.lookup(keyed_upserted, "a1", "MSFT")
+upserted_new := q.lookup(keyed_upserted, "a4", "TSLA")
+sql_ordered_hit := q.lookup(keyed_sql_ordered, "a1", "MSFT")
+
+check("update mutates matching numeric columns", #updated == 5 && updated[1].price == 100.5 && updated[2].size == 21 && updated[3].price == 102.0)
+check("delete removes matching rows", #deleted == 4 && deleted[4].sym == "NVDA" && deleted[4].price == 99.0)
+check("update can add computed column without where", #notionaled == 5 && notionaled[1].notional == 1000.0 && notionaled[3].notional == 1530.0)
+check("delete supports compound predicate and column pruning", #compound_deleted == 4 && compound_deleted[1].id == 1 && compound_deleted[2].id == 2 && #columns_deleted == 4 && columns_deleted[1].size == nil && columns_deleted[1].notional == nil && columns_deleted[1].price == 100.0)
+check("keyed update keeps keyed wrapper", q.keys(keyed_updated)[1] == "acct" && q.keys(keyed_updated)[2] == "sym" && keyed_updated.frame[1].size == 110 && keyed_updated.frame[2].size == 120)
+check("keyed delete keeps keyed wrapper", q.keys(keyed_deleted)[1] == "acct" && #keyed_deleted.frame == 3 && keyed_deleted.frame[3].acct == "a2")
+check("keyed select is plain rows", #q.keys(keyed_selected) == 0 && #keyed_selected == 2 && keyed_selected[2].size == 120)
+check("keyed structured lookup after mutation", #keyed_key_frame == 5 && keyed_key_frame[1].acct == "a1" && keyed_key_frame[1].sym == "AAPL" && keyed_key_frame[1].size == nil && #keyed_struct_hit == 1 && keyed_struct_hit[1].size == 120 && #keyed_array_hit == 1 && keyed_array_hit[1].size == 120)
+check("q keyed amend upsert api", q.keys(keyed_upserted)[1] == "acct" && #keyed_amended.frame == 5 && #keyed_upserted.frame == 6 && amended_hit[1].size == 333 && upserted_existing[1].size == 555 && upserted_new[1].size == 666)
+check("qsql keyed upsert accepts reordered columns", q.keys(keyed_sql_ordered)[1] == "acct" && #keyed_sql_ordered.frame == 5 && sql_ordered_hit[1].size == 777)
+
+venues := data.frame({
+  venue: data.strings({"XNAS", "XNYS", "ARCX"}),
+  mic_name: data.strings({"Nasdaq", "NYSE", "NYSE Arca"}),
+  tier: data.i64({1, 1, 2}),
+})
+
+joined := q.sql(
+  "select id,acct,sym,venue,mic_name,price,size from trades join venues on venue order by id asc",
+  {trades: deleted, venues: venues}
+)
+
+left_joined := q.sql(
+  "select id,venue,mic_name,tier from trades left join venues on venue order by id asc",
+  {trades: updated, venues: venues}
+)
+
+check("single-key join after mutation", #joined == 4 && joined[1].mic_name == "Nasdaq" && joined[2].mic_name == "NYSE" && joined[4].mic_name == "NYSE Arca")
+check("left join unmatched keeps typed right schema", #left_joined == 5 && left_joined[5].venue == "BATS" && left_joined[5].mic_name == nil && left_joined[5].tier == nil && left_joined.column_kinds.mic_name == "string" && left_joined.schema.kinds.tier == "i64")
+
+positions := data.frame({
+  acct: data.symbols({"a1", "a1", "a2", "a3"}),
+  sym: data.symbols({"AAPL", "MSFT", "AAPL", "NVDA"}),
+  asof: data.strings({"2026-06-01", "2026-06-01", "2026-06-02", "2026-06-02"}),
+  qty: data.i64({11, 21, 15, 5}),
+})
+
+limits := data.frame({
+  account: data.symbols({"a1", "a1", "a2", "a3", "a3"}),
+  effective: data.strings({"2026-06-01", "2026-06-02", "2026-06-02", "2026-06-01", "2026-06-02"}),
+  region: data.strings({"US", "EU", "US", "APAC", "US"}),
+  max_qty: data.i64({100, 200, 150, 50, 75}),
+})
+
+multi_key := q.sql(
+  "select acct,sym,asof,qty,region,max_qty from positions join limits on acct=account,asof=effective order by acct asc,sym asc",
+  {positions: positions, limits: limits}
+)
+
+check("multi-key alias join rows", #multi_key == 4 && multi_key[1].acct == "a1" && multi_key[2].sym == "MSFT" && multi_key[2].region == "US" && multi_key[4].sym == "NVDA" && multi_key[4].max_qty == 75)
+check("alias join omits right key columns", multi_key[1].account == nil && multi_key[1].effective == nil)
+
+print("ok")

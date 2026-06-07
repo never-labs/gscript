@@ -19,7 +19,7 @@ func (c *compiler) compileDenseLitExpr(e *ast.DenseLitExpr, dest int) error {
 	c.nextReg = dest
 	funcReg := c.allocReg()
 	c.emitABx(OP_GETGLOBAL, funcReg, c.stringConst("array"), e.P.Line)
-	c.emitABC(OP_GETFIELD, funcReg, funcReg, c.stringConst(method), e.P.Line)
+	c.emitGetField(funcReg, funcReg, c.stringConst(method), e.P.Line)
 	for _, value := range e.Values {
 		argReg := c.allocReg()
 		savedArgTop := c.nextReg

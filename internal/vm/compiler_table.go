@@ -42,11 +42,33 @@ func (c *compiler) compileFieldExpr(e *ast.FieldExpr, dest int) error {
 	}
 	// GETFIELD A B C: R(A) = R(B)[Constants[C]]
 	fieldK := c.stringConst(e.Field)
-	c.emitABC(OP_GETFIELD, dest, tableReg, fieldK, line)
+	c.emitGetField(dest, tableReg, fieldK, line)
 	if tableIsTemp {
 		c.freeReg() // tableReg
 	}
 	return nil
+}
+
+func (c *compiler) emitGetField(dest, tableReg, fieldK, line int) {
+	if fieldK <= 0xFF {
+		c.emitABC(OP_GETFIELD, dest, tableReg, fieldK, line)
+		return
+	}
+	keyReg := c.allocReg()
+	c.emitABx(OP_LOADK, keyReg, fieldK, line)
+	c.emitABC(OP_GETTABLE, dest, tableReg, keyReg, line)
+	c.freeReg()
+}
+
+func (c *compiler) emitSetField(tableReg, fieldK, valueReg, line int) {
+	if fieldK <= 0xFF {
+		c.emitABC(OP_SETFIELD, tableReg, fieldK, valueReg, line)
+		return
+	}
+	keyReg := c.allocReg()
+	c.emitABx(OP_LOADK, keyReg, fieldK, line)
+	c.emitABC(OP_SETTABLE, tableReg, keyReg, valueReg, line)
+	c.freeReg()
 }
 
 // ---- Table construction ----
@@ -180,7 +202,7 @@ func (c *compiler) compileTableLitExpr(e *ast.TableLitExpr, dest int) error {
 				if err := c.compileExprTo(f.Value, valReg); err != nil {
 					return err
 				}
-				c.emitABC(OP_SETFIELD, dest, fieldK, valReg, line)
+				c.emitSetField(dest, fieldK, valReg, line)
 				c.freeReg()
 			} else if identKey, ok := f.Key.(*ast.IdentExpr); ok {
 				if isNilLiteral(f.Value) {
@@ -191,7 +213,7 @@ func (c *compiler) compileTableLitExpr(e *ast.TableLitExpr, dest int) error {
 				if err := c.compileExprTo(f.Value, valReg); err != nil {
 					return err
 				}
-				c.emitABC(OP_SETFIELD, dest, fieldK, valReg, line)
+				c.emitSetField(dest, fieldK, valReg, line)
 				c.freeReg()
 			} else {
 				keyReg := c.allocReg()
@@ -272,7 +294,7 @@ func (c *compiler) compileTableLitExprWithExplicitSpread(e *ast.TableLitExpr, de
 			if err := c.compileExprTo(f.Value, valReg); err != nil {
 				return err
 			}
-			c.emitABC(OP_SETFIELD, dest, fieldK, valReg, line)
+			c.emitSetField(dest, fieldK, valReg, line)
 			c.freeReg()
 		} else if identKey, ok := f.Key.(*ast.IdentExpr); ok {
 			if isNilLiteral(f.Value) {
@@ -283,7 +305,7 @@ func (c *compiler) compileTableLitExprWithExplicitSpread(e *ast.TableLitExpr, de
 			if err := c.compileExprTo(f.Value, valReg); err != nil {
 				return err
 			}
-			c.emitABC(OP_SETFIELD, dest, fieldK, valReg, line)
+			c.emitSetField(dest, fieldK, valReg, line)
 			c.freeReg()
 		} else {
 			keyReg := c.allocReg()

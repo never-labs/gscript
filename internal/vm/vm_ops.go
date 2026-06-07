@@ -163,11 +163,6 @@ func (vm *VM) tableGetDepth(t runtime.Value, key runtime.Value, depth int) (runt
 	}
 
 	if !t.IsTable() {
-		if t.IsNil() && vm.frameCount > 0 {
-			frame := &vm.frames[vm.frameCount-1]
-			fmt.Printf("[DEBUG] attempt to index nil in %s pc=%d key=%v\n",
-				frame.closure.Proto.Name, frame.pc, key)
-		}
 		return runtime.NilValue(), fmt.Errorf("attempt to index a %s value", t.TypeName())
 	}
 
