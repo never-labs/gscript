@@ -172,6 +172,10 @@ const (
 	// Loads a table row from a mixed outer array, verifies the row array kind,
 	// then loads the inner element without materializing the row table SSA value.
 	OpTableArrayNestedLoad
+	// q/vector runtime primitive. Args = [vector, indexes]; mirrors
+	// OP_VECTOR_GATHER and returns a gathered dense-array value. Current Tier 2
+	// gates keep this in Tier 1 until backend lowering/deopt is implemented.
+	OpVectorGather
 	OpGetField // Args[0].field; Aux = constant pool index for field name
 	// OpGetFieldNumToFloat fuses Args[0].field with numeric widening.
 	// It preserves NumToFloat semantics: int and float fields become raw

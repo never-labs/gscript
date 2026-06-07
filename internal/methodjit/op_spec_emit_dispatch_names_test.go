@@ -18,7 +18,7 @@ func opIntentionallyNotHandledByEmitInstr(op Op) bool {
 	switch op {
 	case OpBoxInt, OpBoxFloat, OpUnboxInt, OpUnboxFloat:
 		return true
-	case OpYield:
+	case OpYield, OpVectorGather:
 		return true
 	default:
 		return false
