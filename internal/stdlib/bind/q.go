@@ -627,6 +627,13 @@ func qQueryKernelSupportCacheProbe(key string) (qQueryKernelSupportCacheEntry, b
 	return entry, ok
 }
 
+func qQueryKernelSupportCachePeek(key string) (qQueryKernelSupportCacheEntry, bool) {
+	qQueryKernelSupportCacheMu.Lock()
+	entry, ok := qQueryKernelSupportCache[key]
+	qQueryKernelSupportCacheMu.Unlock()
+	return entry, ok
+}
+
 func qQueryKernelSupportCacheStore(key string, entry qQueryKernelSupportCacheEntry) {
 	if key == "" {
 		return
@@ -1084,12 +1091,19 @@ func qRunQuery(s *SoA, spec *Table) (*Table, error) {
 	nativeReason := ""
 	nativeCacheKey := ""
 	nativeCacheable := false
+	nativeCacheEntry := qQueryKernelSupportCacheEntry{}
+	nativeCacheHit := false
 	if len(aggs) == 0 {
 		nativeCacheKey, nativeCacheable = qQueryKernelSupportCacheKey(s, spec, selects)
 		if nativeCacheable {
-			qQueryKernelSupportCacheProbe(nativeCacheKey)
+			nativeCacheEntry, nativeCacheHit = qQueryKernelSupportCacheProbe(nativeCacheKey)
 		}
-		nativeRows, nativeReasonCode, nativeReason = qSimpleSelectRowsNativeSoA(s, mask, selects)
+		if nativeCacheHit && !nativeCacheEntry.Supported {
+			nativeReasonCode = nativeCacheEntry.ReasonCode
+			nativeReason = nativeCacheEntry.Reason
+		} else {
+			nativeRows, nativeReasonCode, nativeReason = qSimpleSelectRowsNativeSoA(s, mask, selects)
+		}
 		rows, err = qRows(s, mask, selects)
 	} else {
 		rows, err = qGroupedRows(s, mask, by, selects, aggs)
@@ -1163,6 +1177,13 @@ func qExplainQuery(s *SoA, spec *Table) (*Table, error) {
 	out.RawSetString("select_count", IntValue(int64(len(selects))))
 	out.RawSetString("by_count", IntValue(int64(len(by))))
 	out.RawSetString("aggregate_count", IntValue(int64(len(aggs))))
+	kernelCached := false
+	if len(aggs) == 0 {
+		if key, ok := qQueryKernelSupportCacheKey(s, spec, selects); ok {
+			_, kernelCached = qQueryKernelSupportCachePeek(key)
+		}
+	}
+	out.RawSetString("kernel_cached", BoolValue(kernelCached))
 	if len(aggs) != 0 {
 		out.RawSetString("kernel_supported", BoolValue(false))
 		out.RawSetString("kernel_reason_code", StringValue(qQueryKernelReasonUnsupported))

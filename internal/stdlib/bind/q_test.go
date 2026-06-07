@@ -1364,6 +1364,13 @@ trades := soa.zip({
     size: []f64{100, 50, 200},
 })
 
+primed := q.query(trades, {
+    where: {column: "size", op: ">=", value: 50},
+    select: {notional: {"*", "price", "size"}},
+    order_by: {column: "notional", desc: true},
+    limit: 2,
+})
+
 supported := q.explain_query(trades, {
     where: {column: "size", op: ">=", value: 50},
     select: {notional: {"*", "price", "size"}},
@@ -1376,9 +1383,16 @@ unsupported := q.explain_query(trades, {
 })
 `)
 
+	primed := interp.GetGlobal("primed").Table()
+	if primed == nil || primed.Length() != 2 {
+		t.Fatalf("primed query = %v, want two rows", primed)
+	}
 	supported := interp.GetGlobal("supported").Table()
 	if supported == nil {
 		t.Fatal("supported explain is nil")
+	}
+	if got := supported.RawGetString("kernel_cached"); !got.IsBool() || !got.Bool() {
+		t.Fatalf("supported kernel_cached = %v, want true", got)
 	}
 	if got := supported.RawGetString("kernel_supported"); !got.IsBool() || !got.Bool() {
 		t.Fatalf("supported kernel_supported = %v, want true", got)
@@ -1416,6 +1430,9 @@ unsupported := q.explain_query(trades, {
 	unsupported := interp.GetGlobal("unsupported").Table()
 	if unsupported == nil {
 		t.Fatal("unsupported explain is nil")
+	}
+	if got := unsupported.RawGetString("kernel_cached"); !got.IsBool() || got.Bool() {
+		t.Fatalf("unsupported kernel_cached = %v, want false", got)
 	}
 	if got := unsupported.RawGetString("kernel_supported"); !got.IsBool() || got.Bool() {
 		t.Fatalf("unsupported kernel_supported = %v, want false", got)
@@ -2975,24 +2992,34 @@ func TestQFallbackStatsTrackQueryKernelFallback(t *testing.T) {
 	interp := runWithQAndSOA(t, `
 trades := soa.zip({price: []f64{100, 101}})
 rows := q.query(trades, {select: {price: "price"}, order_by: "missing"})
+again := q.query(trades, {select: {price: "price"}, order_by: "missing"})
 `)
 	rows := interp.GetGlobal("rows").Table()
 	if rows == nil || rows.Length() != 2 {
 		t.Fatalf("rows length = %v, want 2", rows)
 	}
+	again := interp.GetGlobal("again").Table()
+	if again == nil || again.Length() != 2 {
+		t.Fatalf("again length = %v, want 2", again)
+	}
 	if got := rows.RawGetInt(1).Table().RawGetString("price"); !got.IsFloat() || got.Float() != 100 {
 		t.Fatalf("rows[1].price = %v, want 100", got)
 	}
 	stats := qTestFallbackStatsRows(t, qFallbackStatsTable())
-	if got := stats[qFallbackQueryKernel]; got != 1 {
-		t.Fatalf("query kernel fallback count = %d, want 1", got)
+	if got := stats[qFallbackQueryKernel]; got != 2 {
+		t.Fatalf("query kernel fallback count = %d, want 2", got)
 	}
 	if got := stats[qQueryKernelSupported]; got != 0 {
 		t.Fatalf("query kernel hit count = %d, want 0", got)
 	}
 	details := qTestFallbackStatsDetailRows(t, qFallbackStatsTable())
-	if got := qTestFallbackDetailCount(details, "reason_code", qFallbackQueryKernel, qQueryKernelReasonOrder, ""); got != 1 {
-		t.Fatalf("query kernel reason_code count = %d, want 1", got)
+	if got := qTestFallbackDetailCount(details, "reason_code", qFallbackQueryKernel, qQueryKernelReasonOrder, ""); got != 2 {
+		t.Fatalf("query kernel reason_code count = %d, want 2", got)
+	}
+	cacheStats := qTestCacheStatsRows(t, qCacheStatsTable())
+	cache := cacheStats["q_query_kernel"]
+	if cache["entries"] != 1 || cache["hits"] != 1 || cache["misses"] != 1 || cache["evictions"] != 0 {
+		t.Fatalf("q_query_kernel unsupported stats = %#v, want 1 entry, 1 hit, 1 miss, 0 evictions", cache)
 	}
 }
 
@@ -3025,11 +3052,19 @@ func TestQQueryKernelSupportCacheStats(t *testing.T) {
 trades := soa.zip({price: []f64{100, 101}, size: []f64{10, 20}})
 first := q.query(trades, {select: {notional: {"*", "price", "size"}, large: {">=", "size", 15}}})
 second := q.query(trades, {select: {large: {">=", "size", 15}, notional: {"*", "price", "size"}}})
+explained := q.explain_query(trades, {select: {large: {">=", "size", 15}, notional: {"*", "price", "size"}}})
 `)
 	first := interp.GetGlobal("first").Table()
 	second := interp.GetGlobal("second").Table()
 	if first == nil || first.Length() != 2 || second == nil || second.Length() != 2 {
 		t.Fatalf("query results first=%v second=%v, want two rows each", first, second)
+	}
+	explained := interp.GetGlobal("explained").Table()
+	if explained == nil {
+		t.Fatal("explained query kernel cache table is nil")
+	}
+	if got := explained.RawGetString("kernel_cached"); !got.IsBool() || !got.Bool() {
+		t.Fatalf("explained kernel_cached = %v, want true", got)
 	}
 	stats := qTestCacheStatsRows(t, qCacheStatsTable())
 	got := stats["q_query_kernel"]
