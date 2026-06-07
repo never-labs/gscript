@@ -2594,6 +2594,175 @@ func TestQFallbackStatsTrackKernelFallback(t *testing.T) {
 	}
 }
 
+func TestQSQLFastArg2ExecutesTwoArgumentForms(t *testing.T) {
+	qClearCaches()
+	defer qClearCaches()
+
+	frame, err := data.NewFrame(
+		data.Column{Name: "sym", Data: data.NewSymbols([]string{"AAPL", "MSFT"})},
+		data.Column{Name: "price", Data: data.NewF64([]float64{100, 80})},
+	)
+	if err != nil {
+		t.Fatalf("NewFrame: %v", err)
+	}
+	frameValue, err := qDataFrameValue(frame)
+	if err != nil {
+		t.Fatalf("qDataFrameValue: %v", err)
+	}
+
+	q := BuildQ()
+	sql := q.RawGetString("sql").GoFunction()
+	if sql == nil || sql.FastArg2 == nil {
+		t.Fatalf("q.sql FastArg2 missing: %#v", sql)
+	}
+	selected, err := sql.FastArg2(frameValue, StringValue("select sym,price from trades where price>=90"))
+	if err != nil {
+		t.Fatalf("q.sql FastArg2 frame/source: %v", err)
+	}
+	rows := selected.Table()
+	if rows == nil || rows.Length() != 1 {
+		t.Fatalf("q.sql FastArg2 frame/source rows = %v, want one row", rows)
+	}
+	if got := rows.RawGetInt(1).Table().RawGetString("sym"); !got.IsString() || got.Str() != "AAPL" {
+		t.Fatalf("q.sql FastArg2 sym = %v, want AAPL", got)
+	}
+
+	env := NewTable()
+	env.RawSetString("trades", frameValue)
+	fromEnv, err := sql.FastArg2(StringValue("select sym from trades where price<90"), TableValue(env))
+	if err != nil {
+		t.Fatalf("q.sql FastArg2 source/env: %v", err)
+	}
+	envRows := fromEnv.Table()
+	if envRows == nil || envRows.Length() != 1 {
+		t.Fatalf("q.sql FastArg2 source/env rows = %v, want one row", envRows)
+	}
+	if got := envRows.RawGetInt(1).Table().RawGetString("sym"); !got.IsString() || got.Str() != "MSFT" {
+		t.Fatalf("q.sql FastArg2 source/env sym = %v, want MSFT", got)
+	}
+
+	selectFn := q.RawGetString("select").GoFunction()
+	if selectFn == nil || selectFn.FastArg2 == nil {
+		t.Fatalf("q.select FastArg2 missing: %#v", selectFn)
+	}
+	if _, err := selectFn.FastArg2(frameValue, StringValue("select sym from trades")); err != nil {
+		t.Fatalf("q.select FastArg2: %v", err)
+	}
+}
+
+func TestQSQLFastArg2CacheStatsParity(t *testing.T) {
+	qClearCaches()
+	defer qClearCaches()
+
+	frame, err := data.NewFrame(
+		data.Column{Name: "sym", Data: data.NewSymbols([]string{"AAPL", "MSFT"})},
+		data.Column{Name: "price", Data: data.NewF64([]float64{100, 80})},
+		data.Column{Name: "size", Data: data.NewI64([]int64{10, 20})},
+	)
+	if err != nil {
+		t.Fatalf("NewFrame: %v", err)
+	}
+	frameValue, err := qDataFrameValue(frame)
+	if err != nil {
+		t.Fatalf("qDataFrameValue: %v", err)
+	}
+
+	q := BuildQ()
+	sql := q.RawGetString("sql").GoFunction()
+	if sql == nil || sql.FastArg2 == nil {
+		t.Fatalf("q.sql FastArg2 missing: %#v", sql)
+	}
+
+	source := StringValue("select sym,px:price from trades where price>=90")
+	if _, err := sql.FastArg2(frameValue, source); err != nil {
+		t.Fatalf("first q.sql FastArg2: %v", err)
+	}
+	if _, err := sql.FastArg2(frameValue, source); err != nil {
+		t.Fatalf("second q.sql FastArg2: %v", err)
+	}
+
+	stats := qTestCacheStatsRows(t, qCacheStatsTable())
+	for _, name := range []string{"qsql_template", "qsql_aligned", "qsql_kernel"} {
+		got := stats[name]
+		if got["entries"] != 1 || got["hits"] != 1 || got["misses"] != 1 || got["evictions"] != 0 {
+			t.Fatalf("%s stats after q.sql FastArg2 = %#v, want 1 entry, 1 hit, 1 miss, 0 evictions", name, got)
+		}
+	}
+
+	qClearCaches()
+	selectFn := q.RawGetString("select").GoFunction()
+	if selectFn == nil || selectFn.FastArg2 == nil {
+		t.Fatalf("q.select FastArg2 missing: %#v", selectFn)
+	}
+	if _, err := selectFn.FastArg2(frameValue, source); err != nil {
+		t.Fatalf("first q.select FastArg2: %v", err)
+	}
+	if _, err := selectFn.FastArg2(frameValue, source); err != nil {
+		t.Fatalf("second q.select FastArg2: %v", err)
+	}
+
+	stats = qTestCacheStatsRows(t, qCacheStatsTable())
+	for _, name := range []string{"qsql_template", "qsql_aligned", "qsql_kernel"} {
+		got := stats[name]
+		if got["entries"] != 1 || got["hits"] != 1 || got["misses"] != 1 || got["evictions"] != 0 {
+			t.Fatalf("%s stats after q.select FastArg2 = %#v, want 1 entry, 1 hit, 1 miss, 0 evictions", name, got)
+		}
+	}
+}
+
+func TestQSQLArgs2MatchesTwoArgumentSemantics(t *testing.T) {
+	frame := TableValue(NewTable())
+	source := StringValue("select sym from trades")
+	env := TableValue(NewTable())
+	extra := TableValue(NewTable())
+
+	slowFrameSource, err := qSQLArgs("q.sql", []Value{frame, source})
+	if err != nil {
+		t.Fatalf("qSQLArgs frame/source: %v", err)
+	}
+	fastFrameSource, ok, err := qSQLArgs2("q.sql", frame, source)
+	if err != nil || !ok {
+		t.Fatalf("qSQLArgs2 frame/source = ok %v err %v, want ok", ok, err)
+	}
+	if slowFrameSource.frameValue != fastFrameSource.frameValue ||
+		slowFrameSource.source != fastFrameSource.source ||
+		slowFrameSource.resolveSource != fastFrameSource.resolveSource ||
+		slowFrameSource.envValue != fastFrameSource.envValue {
+		t.Fatalf("qSQLArgs2 frame/source = %#v, want %#v", fastFrameSource, slowFrameSource)
+	}
+
+	slowSourceEnv, err := qSQLArgs("q.sql", []Value{source, env})
+	if err != nil {
+		t.Fatalf("qSQLArgs source/env: %v", err)
+	}
+	fastSourceEnv, ok, err := qSQLArgs2("q.sql", source, env)
+	if err != nil || !ok {
+		t.Fatalf("qSQLArgs2 source/env = ok %v err %v, want ok", ok, err)
+	}
+	if slowSourceEnv.frameValue != fastSourceEnv.frameValue ||
+		slowSourceEnv.source != fastSourceEnv.source ||
+		slowSourceEnv.resolveSource != fastSourceEnv.resolveSource ||
+		slowSourceEnv.envValue != fastSourceEnv.envValue {
+		t.Fatalf("qSQLArgs2 source/env = %#v, want %#v", fastSourceEnv, slowSourceEnv)
+	}
+
+	withEnv, err := qSQLArgs("q.sql", []Value{frame, source, extra})
+	if err != nil {
+		t.Fatalf("qSQLArgs frame/source/env: %v", err)
+	}
+	if withEnv.envValue != extra {
+		t.Fatalf("qSQLArgs frame/source/env env = %s, want extra env", withEnv.envValue.String())
+	}
+
+	ignoredExtra, err := qSQLArgs("q.sql", []Value{source, env, extra})
+	if err != nil {
+		t.Fatalf("qSQLArgs source/env/extra: %v", err)
+	}
+	if ignoredExtra.envValue != env {
+		t.Fatalf("qSQLArgs source/env/extra env = %s, want second argument env", ignoredExtra.envValue.String())
+	}
+}
+
 func TestQEvalSkipsCacheForStatefulSources(t *testing.T) {
 	qClearCaches()
 

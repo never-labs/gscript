@@ -295,12 +295,19 @@ func BuildQ() *Table {
 		}
 		return []Value{out}, nil
 	}
-	set("sql", func(args []Value) ([]Value, error) {
-		return qsql("q.sql", args)
-	})
-	set("select", func(args []Value) ([]Value, error) {
-		return qsql("q.select", args)
-	})
+	setQSQL := func(name string) {
+		t.RawSetString(name, FunctionValue(&GoFunction{
+			Name: "q." + name,
+			Fn: func(args []Value) ([]Value, error) {
+				return qsql("q."+name, args)
+			},
+			FastArg2: func(a, b Value) (Value, error) {
+				return qSQLFastArg2("q."+name, a, b)
+			},
+		}))
+	}
+	setQSQL("sql")
+	setQSQL("select")
 	set("explain", func(args []Value) ([]Value, error) {
 		parsed, err := qSQLArgs("q.explain", args)
 		if err != nil {
@@ -433,17 +440,39 @@ func qSQLArgs(name string, args []Value) (qSQLArgsResult, error) {
 	if len(args) < 2 {
 		return qSQLArgsResult{}, fmt.Errorf("%s: expected (frame, qSQL source) or (qSQL source, frames)", name)
 	}
-	if args[0].IsString() {
-		return qSQLArgsResult{frameValue: args[1], source: args[0].Str(), resolveSource: true, envValue: args[1]}, nil
-	}
-	if args[1].IsString() {
-		env := NilValue()
-		if len(args) > 2 {
-			env = args[2]
+	if parsed, ok, err := qSQLArgs2(name, args[0], args[1]); ok || err != nil {
+		if err != nil {
+			return qSQLArgsResult{}, err
 		}
-		return qSQLArgsResult{frameValue: args[0], source: args[1].Str(), envValue: env}, nil
+		env := NilValue()
+		if len(args) > 2 && args[1].IsString() {
+			env = args[2]
+			parsed.envValue = env
+		}
+		return parsed, nil
 	}
 	return qSQLArgsResult{}, fmt.Errorf("%s: expected one qSQL source string argument", name)
+}
+
+func qSQLArgs2(name string, a, b Value) (qSQLArgsResult, bool, error) {
+	if a.IsString() {
+		return qSQLArgsResult{frameValue: b, source: a.Str(), resolveSource: true, envValue: b}, true, nil
+	}
+	if b.IsString() {
+		return qSQLArgsResult{frameValue: a, source: b.Str(), envValue: NilValue()}, true, nil
+	}
+	return qSQLArgsResult{}, false, nil
+}
+
+func qSQLFastArg2(name string, a, b Value) (Value, error) {
+	parsed, ok, err := qSQLArgs2(name, a, b)
+	if err != nil {
+		return NilValue(), err
+	}
+	if !ok {
+		return NilValue(), fmt.Errorf("%s: expected one qSQL source string argument", name)
+	}
+	return qRunSQL(name, parsed)
 }
 
 func dialectQ(body Value, opts *Table) ([]Value, error) {
