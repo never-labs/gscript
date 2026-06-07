@@ -1383,6 +1383,36 @@ func qTypedNativeFramePayload(tbl *Table) (any, NativePayloadInfo, bool) {
 	return tbl.NativeFramePayload()
 }
 
+func qTypedNativeDataFramePayload(tbl *Table) (data.Frame, bool, error) {
+	payload, info, ok := qTypedNativeFramePayload(tbl)
+	if !ok {
+		return data.Frame{}, false, nil
+	}
+	if info.Kind != NativePayloadDataFrame {
+		return data.Frame{}, false, nil
+	}
+	native, hasPayload := payload.(data.Frame)
+	if !hasPayload {
+		return data.Frame{}, false, fmt.Errorf("native data frame payload is invalid")
+	}
+	return native, true, nil
+}
+
+func qTypedNativeKeyedFramePayload(tbl *Table) (data.KeyedFrame, bool, error) {
+	payload, info, ok := qTypedNativeFramePayload(tbl)
+	if !ok {
+		return data.KeyedFrame{}, false, nil
+	}
+	if info.Kind != NativePayloadKeyedFrame {
+		return data.KeyedFrame{}, false, nil
+	}
+	native, hasPayload := payload.(data.KeyedFrame)
+	if !hasPayload {
+		return data.KeyedFrame{}, false, fmt.Errorf("native keyed frame payload is invalid")
+	}
+	return native, true, nil
+}
+
 func qExplainKernelInfo(args qSQLArgsResult, tmpl qSQLPlanTemplate) qExplainKernelResult {
 	if tmpl.mutation != nil {
 		return qExplainKernelResult{reason: "mutation queries use mutation plan cache"}
@@ -2819,15 +2849,8 @@ func qNativeDataFramePayload(tbl *Table) (data.Frame, bool, error) {
 	if tbl == nil {
 		return data.Frame{}, false, nil
 	}
-	if payload, info, ok := qTypedNativeFramePayload(tbl); ok {
-		if info.Kind != NativePayloadDataFrame {
-			return data.Frame{}, false, nil
-		}
-		native, hasPayload := payload.(data.Frame)
-		if !hasPayload {
-			return data.Frame{}, false, fmt.Errorf("native data frame payload is invalid")
-		}
-		return native, true, nil
+	if native, ok, err := qTypedNativeDataFramePayload(tbl); ok || err != nil {
+		return native, ok, err
 	}
 	if kind, ok := tbl.NativePayloadKind(); ok {
 		if kind == NativePayloadDataFrame {
@@ -2957,15 +2980,8 @@ func qNativeKeyedFramePayload(tbl *Table) (data.KeyedFrame, bool, error) {
 	if tbl == nil {
 		return data.KeyedFrame{}, false, nil
 	}
-	if payload, info, ok := qTypedNativeFramePayload(tbl); ok {
-		if info.Kind != NativePayloadKeyedFrame {
-			return data.KeyedFrame{}, false, nil
-		}
-		native, hasPayload := payload.(data.KeyedFrame)
-		if !hasPayload {
-			return data.KeyedFrame{}, false, fmt.Errorf("native keyed frame payload is invalid")
-		}
-		return native, true, nil
+	if native, ok, err := qTypedNativeKeyedFramePayload(tbl); ok || err != nil {
+		return native, ok, err
 	}
 	if kind, ok := tbl.NativePayloadKind(); ok {
 		if kind == NativePayloadKeyedFrame {

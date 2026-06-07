@@ -896,6 +896,48 @@ func TestQFrameKindPrefersNativePayloadInfoOverMarkers(t *testing.T) {
 	}
 }
 
+func TestQNativeFramePayloadKindMismatchFailsClosed(t *testing.T) {
+	frame, err := data.NewFrame(
+		data.Column{Name: "sym", Data: data.NewSymbols([]string{"AAPL"})},
+		data.Column{Name: "price", Data: data.NewF64([]float64{100.5})},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	keyed, err := data.KeyBy(frame, "sym")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	frameAsKeyed := NewTable()
+	frameAsKeyed.SetNativePayloadWithInfo(frame, NativePayloadInfo{
+		Kind:       NativePayloadKeyedFrame,
+		Rows:       frame.Len(),
+		Columns:    len(frame.Schema().Names()),
+		SchemaHash: frame.SchemaFingerprint(),
+	})
+	if qLooksLikeFrame(frameAsKeyed) || !qIsKeyedFrameTable(frameAsKeyed) {
+		t.Fatalf("frame payload with keyed kind classification looksLikeFrame=%v keyed=%v, want false true", qLooksLikeFrame(frameAsKeyed), qIsKeyedFrameTable(frameAsKeyed))
+	}
+	if _, err := qSQLSourceCarrierFromValue(TableValue(frameAsKeyed), "trades"); err == nil || !strings.Contains(err.Error(), "native keyed frame payload is invalid") {
+		t.Fatalf("frame payload with keyed kind carrier err = %v, want invalid keyed payload", err)
+	}
+
+	keyedAsFrame := NewTable()
+	keyedAsFrame.SetNativePayloadWithInfo(keyed, NativePayloadInfo{
+		Kind:       NativePayloadDataFrame,
+		Rows:       frame.Len(),
+		Columns:    len(frame.Schema().Names()),
+		SchemaHash: frame.SchemaFingerprint(),
+	})
+	if !qLooksLikeFrame(keyedAsFrame) || qIsKeyedFrameTable(keyedAsFrame) {
+		t.Fatalf("keyed payload with frame kind classification looksLikeFrame=%v keyed=%v, want true false", qLooksLikeFrame(keyedAsFrame), qIsKeyedFrameTable(keyedAsFrame))
+	}
+	if _, err := qSQLSourceCarrierFromValue(TableValue(keyedAsFrame), "trades"); err == nil || !strings.Contains(err.Error(), "native data frame payload is invalid") {
+		t.Fatalf("keyed payload with frame kind carrier err = %v, want invalid data frame payload", err)
+	}
+}
+
 func TestQDataFrameFromValueDoesNotResolveKeyedFrameAsSourceMap(t *testing.T) {
 	frame, err := data.NewFrame(
 		data.Column{Name: "sym", Data: data.NewSymbols([]string{"AAPL"})},

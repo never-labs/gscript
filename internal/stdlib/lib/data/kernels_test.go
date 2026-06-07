@@ -498,6 +498,42 @@ func TestCompiledQueryKernelHandlesRecursiveLiteralLists(t *testing.T) {
 	}
 }
 
+func TestCompiledQueryKernelClonesArrayLiterals(t *testing.T) {
+	nested := []any{Symbol("AAPL")}
+	symbols := []Symbol{"AAPL"}
+	array := [2]any{nested, symbols}
+	plan := QueryPlan{
+		Select: []SelectItem{{
+			Name: "array",
+			Expr: Literal{Value: array},
+		}},
+		LimitN: -1,
+	}
+
+	compiled := cloneQueryKernelPlan(plan)
+	nested[0] = Symbol("MSFT")
+	symbols[0] = Symbol("MSFT")
+
+	got, ok := compiled.Select[0].Expr.(Literal).Value.([2]any)
+	if !ok {
+		t.Fatalf("compiled array literal = %T, want [2]any", compiled.Select[0].Expr.(Literal).Value)
+	}
+	gotNested, ok := got[0].([]any)
+	if !ok {
+		t.Fatalf("compiled array first element = %T, want []any", got[0])
+	}
+	if !reflect.DeepEqual(gotNested, []any{Symbol("AAPL")}) {
+		t.Fatalf("compiled array nested list = %v, want [AAPL]", gotNested)
+	}
+	gotSymbols, ok := got[1].([]Symbol)
+	if !ok {
+		t.Fatalf("compiled array second element = %T, want []Symbol", got[1])
+	}
+	if !reflect.DeepEqual(gotSymbols, []Symbol{"AAPL"}) {
+		t.Fatalf("compiled array typed slice = %v, want [AAPL]", gotSymbols)
+	}
+}
+
 func TestCompiledQueryKernelClonesTypedSliceLiterals(t *testing.T) {
 	frame := mustFrame(t,
 		Column{Name: "sym", Data: NewSymbols([]string{"AAPL", "MSFT"})},
@@ -892,6 +928,20 @@ func TestQueryKernelPlanFingerprintAvoidsStructuralCollisions(t *testing.T) {
 	typedNaNPayloadSlice := QueryPlan{Where: In{Expr: ColumnRef{Name: "px"}, Values: []any{[]float64{math.Float64frombits(0x7ff8000000000001)}}}, LimitN: -1}
 	if got := QueryKernelPlanFingerprint(typedNaNSlice); got != QueryKernelPlanFingerprint(typedNaNPayloadSlice) {
 		t.Fatalf("typed NaN slice literal fingerprint = %q, want canonical NaN fingerprint", got)
+	}
+	typedSymbolArray := QueryPlan{Where: In{Expr: ColumnRef{Name: "sym"}, Values: []any{[2]Symbol{"AAPL", "MSFT"}}}, LimitN: -1}
+	if got := QueryKernelPlanFingerprint(typedSymbolArray); got == QueryKernelPlanFingerprint(typedSymbolSlice) {
+		t.Fatalf("typed array/slice literal collided: %q", got)
+	}
+	typedArrayWithEmbeddedSeparator := QueryPlan{Where: In{Expr: ColumnRef{Name: "sym"}, Values: []any{[2]Symbol{"a,b", "c"}}}, LimitN: -1}
+	typedArraySplitSeparator := QueryPlan{Where: In{Expr: ColumnRef{Name: "sym"}, Values: []any{[2]Symbol{"a", "b,c"}}}, LimitN: -1}
+	if got := QueryKernelPlanFingerprint(typedArrayWithEmbeddedSeparator); got == QueryKernelPlanFingerprint(typedArraySplitSeparator) {
+		t.Fatalf("typed array literal boundary collided: %q", got)
+	}
+	arrayWithNestedList := QueryPlan{Where: In{Expr: ColumnRef{Name: "sym"}, Values: []any{[1]any{[]any{Symbol("a,b"), Symbol("c")}}}}, LimitN: -1}
+	arrayWithSplitNestedList := QueryPlan{Where: In{Expr: ColumnRef{Name: "sym"}, Values: []any{[1]any{[]any{Symbol("a"), Symbol("b,c")}}}}, LimitN: -1}
+	if got := QueryKernelPlanFingerprint(arrayWithNestedList); got == QueryKernelPlanFingerprint(arrayWithSplitNestedList) {
+		t.Fatalf("array nested list boundary collided: %q", got)
 	}
 
 	structLiteralA := QueryPlan{Where: Binary{Op: OpEQ, Left: ColumnRef{Name: "x"}, Right: Literal{Value: struct{ Name string }{Name: "a"}}}, LimitN: -1}

@@ -294,6 +294,9 @@ func writeQueryKernelLiteralFingerprintWithSeen(b *strings.Builder, value any, s
 		if writeQueryKernelLiteralSliceFingerprint(b, value, seen) {
 			return
 		}
+		if writeQueryKernelLiteralArrayFingerprint(b, value, seen) {
+			return
+		}
 		writeQueryKernelFingerprintPart(b, fmt.Sprintf("%T", value))
 		writeQueryKernelFingerprintPart(b, fmt.Sprintf("%#v", value))
 	}
@@ -335,6 +338,26 @@ func writeQueryKernelLiteralSliceFingerprint(b *strings.Builder, value any, seen
 	writeQueryKernelFingerprintPart(b, strconv.Itoa(v.Len()))
 	for i := 0; i < v.Len(); i++ {
 		writeQueryKernelLiteralFingerprintWithSeen(b, v.Index(i).Interface(), seen)
+	}
+	return true
+}
+
+func writeQueryKernelLiteralArrayFingerprint(b *strings.Builder, value any, seen map[queryKernelSliceKey]struct{}) bool {
+	v := reflect.ValueOf(value)
+	if !v.IsValid() || v.Kind() != reflect.Array {
+		return false
+	}
+	writeQueryKernelFingerprintPart(b, "array")
+	writeQueryKernelFingerprintPart(b, v.Type().String())
+	writeQueryKernelFingerprintPart(b, strconv.Itoa(v.Len()))
+	for i := 0; i < v.Len(); i++ {
+		item := v.Index(i)
+		if !item.CanInterface() {
+			writeQueryKernelFingerprintPart(b, item.Type().String())
+			writeQueryKernelFingerprintPart(b, fmt.Sprintf("%#v", item))
+			continue
+		}
+		writeQueryKernelLiteralFingerprintWithSeen(b, item.Interface(), seen)
 	}
 	return true
 }
@@ -503,6 +526,9 @@ func cloneQueryKernelLiteralWithSeen(value any, seen map[queryKernelSliceKey]ref
 		if cloned, ok := cloneQueryKernelLiteralSlice(value, seen); ok {
 			return cloned
 		}
+		if cloned, ok := cloneQueryKernelLiteralArray(value, seen); ok {
+			return cloned
+		}
 		return x
 	}
 }
@@ -531,6 +557,29 @@ func cloneQueryKernelLiteralSlice(value any, seen map[queryKernelSliceKey]reflec
 	}
 	for i := 0; i < v.Len(); i++ {
 		item := v.Index(i)
+		cloned := cloneQueryKernelLiteralWithSeen(item.Interface(), seen)
+		clonedValue := reflect.ValueOf(cloned)
+		if clonedValue.IsValid() && clonedValue.Type().AssignableTo(item.Type()) {
+			out.Index(i).Set(clonedValue)
+		} else {
+			out.Index(i).Set(item)
+		}
+	}
+	return out.Interface(), true
+}
+
+func cloneQueryKernelLiteralArray(value any, seen map[queryKernelSliceKey]reflect.Value) (any, bool) {
+	v := reflect.ValueOf(value)
+	if !v.IsValid() || v.Kind() != reflect.Array {
+		return nil, false
+	}
+	out := reflect.New(v.Type()).Elem()
+	for i := 0; i < v.Len(); i++ {
+		item := v.Index(i)
+		if !item.CanInterface() {
+			out.Index(i).Set(item)
+			continue
+		}
 		cloned := cloneQueryKernelLiteralWithSeen(item.Interface(), seen)
 		clonedValue := reflect.ValueOf(cloned)
 		if clonedValue.IsValid() && clonedValue.Type().AssignableTo(item.Type()) {
