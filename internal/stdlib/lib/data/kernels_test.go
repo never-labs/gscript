@@ -405,6 +405,60 @@ func TestCompiledQueryKernelClonesNestedLiteralLists(t *testing.T) {
 	}
 }
 
+func TestCompiledQueryKernelClonesTypedSliceLiterals(t *testing.T) {
+	frame := mustFrame(t,
+		Column{Name: "sym", Data: NewSymbols([]string{"AAPL", "MSFT"})},
+	)
+	symbols := []Symbol{"AAPL", "MSFT"}
+	nested := []any{[]Symbol{"AAPL", "MSFT"}}
+	plan := QueryPlan{
+		Select: []SelectItem{{
+			Name: "symbols",
+			Expr: Literal{Value: symbols},
+		}, {
+			Name: "nested",
+			Expr: Literal{Value: nested},
+		}},
+		LimitN: -1,
+	}
+	kernel, ok, err := CompileQueryKernel(frame, plan)
+	if err != nil || !ok || kernel == nil {
+		t.Fatalf("CompileQueryKernel = kernel %v, ok %v, err %v; want compiled kernel", kernel, ok, err)
+	}
+
+	symbols[0] = "NVDA"
+	nested[0].([]Symbol)[0] = "NVDA"
+
+	got, err := kernel.Exec(frame)
+	if err != nil {
+		t.Fatalf("compiled kernel Exec returned error after typed slice literal mutation: %v", err)
+	}
+	symbolCol, ok := got.Column("symbols")
+	if !ok {
+		t.Fatal("compiled kernel result missing symbols column")
+	}
+	nestedCol, ok := got.Column("nested")
+	if !ok {
+		t.Fatal("compiled kernel result missing nested column")
+	}
+	for row := 0; row < got.Len(); row++ {
+		value, ok := symbolCol.At(row)
+		if !ok {
+			t.Fatalf("symbols row %d missing", row)
+		}
+		if !reflect.DeepEqual(value, []Symbol{"AAPL", "MSFT"}) {
+			t.Fatalf("symbols row %d = %#v, want original typed slice", row, value)
+		}
+		nestedValue, ok := nestedCol.At(row)
+		if !ok {
+			t.Fatalf("nested row %d missing", row)
+		}
+		if !reflect.DeepEqual(nestedValue, []any{[]Symbol{"AAPL", "MSFT"}}) {
+			t.Fatalf("nested row %d = %#v, want original nested typed slice", row, nestedValue)
+		}
+	}
+}
+
 func TestCompiledQueryKernelClonesSupportedExprMutableLiterals(t *testing.T) {
 	whereLow := []any{int32(10)}
 	whereHigh := []any{int32(20)}

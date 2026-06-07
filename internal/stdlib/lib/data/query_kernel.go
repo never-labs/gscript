@@ -3,6 +3,7 @@ package data
 import (
 	"fmt"
 	"math"
+	"reflect"
 	"strconv"
 	"strings"
 )
@@ -404,8 +405,33 @@ func cloneQueryKernelLiteral(value any) any {
 	case []any:
 		return cloneQueryKernelLiteralList(x)
 	default:
+		if cloned, ok := cloneQueryKernelLiteralSlice(value); ok {
+			return cloned
+		}
 		return x
 	}
+}
+
+func cloneQueryKernelLiteralSlice(value any) (any, bool) {
+	v := reflect.ValueOf(value)
+	if !v.IsValid() || v.Kind() != reflect.Slice {
+		return nil, false
+	}
+	if v.IsNil() {
+		return value, true
+	}
+	out := reflect.MakeSlice(v.Type(), v.Len(), v.Len())
+	for i := 0; i < v.Len(); i++ {
+		item := v.Index(i)
+		cloned := cloneQueryKernelLiteral(item.Interface())
+		clonedValue := reflect.ValueOf(cloned)
+		if clonedValue.IsValid() && clonedValue.Type().AssignableTo(item.Type()) {
+			out.Index(i).Set(clonedValue)
+		} else {
+			out.Index(i).Set(item)
+		}
+	}
+	return out.Interface(), true
 }
 
 // QueryKernelCompileReason reports whether a plan can compile for a frame and
