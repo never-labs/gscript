@@ -223,6 +223,38 @@ func TestQFramePrimitivePipelineBuildsMethodJITIR(t *testing.T) {
 	if counts[OpFrameColumn] != 2 {
 		t.Fatalf("OpFrameColumn count = %d, want 2\n%s", counts[OpFrameColumn], Print(fn))
 	}
+	paths := DetectQQueryHotPaths(fn)
+	if len(paths) != 1 {
+		t.Fatalf("DetectQQueryHotPaths count = %d, want 1\n%s", len(paths), Print(fn))
+	}
+	if paths[0].Compare.Aux != int64(runtime.DenseArrayGE) {
+		t.Fatalf("q hot path compare Aux = %d, want %d", paths[0].Compare.Aux, runtime.DenseArrayGE)
+	}
+}
+
+func TestQFramePrimitiveHotPathRejectsUnrelatedFrameColumn(t *testing.T) {
+	proto := &vm.FuncProto{
+		Name:      "q_frame_non_pipeline",
+		NumParams: 1,
+		MaxStack:  2,
+		Constants: []runtime.Value{
+			runtime.StringValue("price"),
+			runtime.FloatValue(100),
+			runtime.StringValue("size"),
+		},
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_FRAME_COLUMN, 1, 0, 0),
+			vm.EncodeABx(vm.OP_LOADK, 0, 1),
+			vm.EncodeABC(vm.OP_VECTOR_COMPARE, 1, 0, int(runtime.DenseArrayGE)),
+			vm.EncodeABC(vm.OP_FRAME_COLUMN, 0, 0, 2),
+			vm.EncodeABC(vm.OP_RETURN, 0, 2, 0),
+		},
+	}
+
+	fn := BuildGraph(proto)
+	if paths := DetectQQueryHotPaths(fn); len(paths) != 0 {
+		t.Fatalf("DetectQQueryHotPaths count = %d, want 0\n%s", len(paths), Print(fn))
+	}
 }
 
 func TestFrameLenBytecodeBuildsMethodJITIR(t *testing.T) {
