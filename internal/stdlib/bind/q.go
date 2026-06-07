@@ -1233,10 +1233,7 @@ func qSQLSourceCarrierFromResolvedValue(v Value) (qSQLSourceCarrier, error) {
 			bridge = "keyed_frame_native"
 		}
 		frame := keyed.Frame()
-		rows := frame.Len()
-		if hasInfo {
-			rows = info.Rows
-		}
+		rows := qSourceCarrierRows(frame.Len(), info, hasInfo)
 		return qSQLSourceCarrier{
 			frame:    frame,
 			keyed:    keyed,
@@ -1262,10 +1259,7 @@ func qSQLSourceCarrierFromResolvedValue(v Value) (qSQLSourceCarrier, error) {
 	if err != nil {
 		return qSQLSourceCarrier{}, err
 	}
-	rows := frame.Len()
-	if hasInfo {
-		rows = info.Rows
-	}
+	rows := qSourceCarrierRows(frame.Len(), info, hasInfo)
 	return qSQLSourceCarrier{frame: frame, info: info, hasInfo: hasInfo, bridge: bridge, native: native, rows: rows}, nil
 }
 
@@ -1288,10 +1282,7 @@ func qSQLNativeSourceCarrierFromTable(tbl *Table) (qSQLSourceCarrier, bool, erro
 		}
 		frame := keyed.Frame()
 		info, hasInfo := qFramePayloadInfo(tbl, NativePayloadKeyedFrame)
-		rows := frame.Len()
-		if hasInfo {
-			rows = info.Rows
-		}
+		rows := qSourceCarrierRows(frame.Len(), info, hasInfo)
 		return qSQLSourceCarrier{
 			frame:    frame,
 			keyed:    keyed,
@@ -1312,10 +1303,7 @@ func qSQLNativeSourceCarrierFromTable(tbl *Table) (qSQLSourceCarrier, bool, erro
 			return qSQLSourceCarrier{}, false, fmt.Errorf("native data frame payload is invalid")
 		}
 		info, hasInfo := qFramePayloadInfo(tbl, NativePayloadDataFrame)
-		rows := frame.Len()
-		if hasInfo {
-			rows = info.Rows
-		}
+		rows := qSourceCarrierRows(frame.Len(), info, hasInfo)
 		return qSQLSourceCarrier{
 			frame:   frame,
 			info:    info,
@@ -1327,6 +1315,13 @@ func qSQLNativeSourceCarrierFromTable(tbl *Table) (qSQLSourceCarrier, bool, erro
 	default:
 		return qSQLSourceCarrier{}, false, nil
 	}
+}
+
+func qSourceCarrierRows(frameRows int, info NativePayloadInfo, hasInfo bool) int {
+	if hasInfo && info.Rows > 0 {
+		return info.Rows
+	}
+	return frameRows
 }
 
 func qFramePayloadInfo(tbl *Table, kind NativePayloadKind) (NativePayloadInfo, bool) {

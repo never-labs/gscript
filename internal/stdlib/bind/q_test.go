@@ -123,6 +123,72 @@ func TestQSQLSourceCarrierUsesNativePayloadInfoWithoutFacadeFields(t *testing.T)
 	}
 }
 
+func TestQSQLSourceCarrierFallsBackToFrameRowsWhenNativeInfoRowsMissing(t *testing.T) {
+	frame, err := data.NewFrame(
+		data.Column{Name: "sym", Data: data.NewSymbols([]string{"AAPL", "MSFT"})},
+		data.Column{Name: "price", Data: data.NewF64([]float64{100.5, 101.25})},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	frameTable := NewTable()
+	frameTable.SetNativePayloadWithInfo(frame, NativePayloadInfo{
+		Kind:       NativePayloadDataFrame,
+		Columns:    len(frame.Schema().Names()),
+		SchemaHash: frame.SchemaFingerprint(),
+	})
+
+	carrier, err := qSQLSourceCarrierFromValue(TableValue(frameTable), "")
+	if err != nil {
+		t.Fatalf("frame carrier: %v", err)
+	}
+	if carrier.rows != frame.Len() {
+		t.Fatalf("frame carrier rows = %d, want %d", carrier.rows, frame.Len())
+	}
+	explained, err := qExplainSQL(qSQLArgsResult{
+		frameValue: TableValue(frameTable),
+		source:     "select price from trades where price>=100",
+	})
+	if err != nil {
+		t.Fatalf("explain native frame: %v", err)
+	}
+	if got := explained.Table().RawGetString("source_rows"); !got.IsInt() || got.Int() != int64(frame.Len()) {
+		t.Fatalf("frame source_rows = %v, want %d", got, frame.Len())
+	}
+
+	keyed, err := data.KeyBy(frame, "sym")
+	if err != nil {
+		t.Fatal(err)
+	}
+	keyedTable := NewTable()
+	keyedTable.SetNativePayloadWithInfo(keyed, NativePayloadInfo{
+		Kind:       NativePayloadKeyedFrame,
+		Columns:    len(frame.Schema().Names()),
+		SchemaHash: frame.SchemaFingerprint(),
+	})
+	sources := NewTable()
+	sources.RawSetString("trades", TableValue(keyedTable))
+
+	keyedCarrier, err := qSQLSourceCarrierFromValue(TableValue(sources), "trades")
+	if err != nil {
+		t.Fatalf("keyed carrier: %v", err)
+	}
+	if keyedCarrier.rows != frame.Len() {
+		t.Fatalf("keyed carrier rows = %d, want %d", keyedCarrier.rows, frame.Len())
+	}
+	explained, err = qExplainSQL(qSQLArgsResult{
+		frameValue:    TableValue(sources),
+		source:        "select price from trades where price>=100",
+		resolveSource: true,
+	})
+	if err != nil {
+		t.Fatalf("explain native keyed source map: %v", err)
+	}
+	if got := explained.Table().RawGetString("source_rows"); !got.IsInt() || got.Int() != int64(frame.Len()) {
+		t.Fatalf("keyed source_rows = %v, want %d", got, frame.Len())
+	}
+}
+
 func TestQExplainUsesNativePayloadInfoBeforeWrapperFallback(t *testing.T) {
 	qSQLResetPlanCachesForTest()
 	frame, err := data.NewFrame(

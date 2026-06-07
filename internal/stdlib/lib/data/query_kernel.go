@@ -2,6 +2,7 @@ package data
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 )
@@ -256,10 +257,10 @@ func writeQueryKernelLiteralFingerprint(b *strings.Builder, value any) {
 		writeQueryKernelFingerprintPart(b, strconv.FormatUint(x, 10))
 	case float32:
 		writeQueryKernelFingerprintPart(b, "f32")
-		writeQueryKernelFingerprintPart(b, strconv.FormatFloat(float64(x), 'g', -1, 32))
+		writeQueryKernelFloatFingerprint(b, float64(x), 32)
 	case float64:
 		writeQueryKernelFingerprintPart(b, "f64")
-		writeQueryKernelFingerprintPart(b, strconv.FormatFloat(x, 'g', -1, 64))
+		writeQueryKernelFloatFingerprint(b, x, 64)
 	case []any:
 		writeQueryKernelFingerprintPart(b, "list")
 		writeQueryKernelFingerprintPart(b, strconv.Itoa(len(x)))
@@ -270,6 +271,14 @@ func writeQueryKernelLiteralFingerprint(b *strings.Builder, value any) {
 		writeQueryKernelFingerprintPart(b, fmt.Sprintf("%T", value))
 		writeQueryKernelFingerprintPart(b, fmt.Sprintf("%#v", value))
 	}
+}
+
+func writeQueryKernelFloatFingerprint(b *strings.Builder, value float64, bitSize int) {
+	if math.IsNaN(value) {
+		writeQueryKernelFingerprintPart(b, "NaN")
+		return
+	}
+	writeQueryKernelFingerprintPart(b, strconv.FormatFloat(value, 'g', -1, bitSize))
 }
 
 // CompileQueryKernel compiles a QueryPlan for repeated execution against

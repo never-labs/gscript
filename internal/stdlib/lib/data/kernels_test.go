@@ -689,11 +689,25 @@ func TestQueryKernelPlanFingerprintAvoidsStructuralCollisions(t *testing.T) {
 	if got := QueryKernelPlanFingerprint(typedNull); got == QueryKernelPlanFingerprint(untypedNull) {
 		t.Fatalf("typed/untyped null literal collided: %q", got)
 	}
+	timestampNull := QueryPlan{Where: Binary{Op: OpEQ, Left: ColumnRef{Name: "ts"}, Right: Literal{Value: NullForKind(KindTimestamp)}}, LimitN: -1}
+	dateNull := QueryPlan{Where: Binary{Op: OpEQ, Left: ColumnRef{Name: "ts"}, Right: Literal{Value: NullForKind(KindDate)}}, LimitN: -1}
+	if got := QueryKernelPlanFingerprint(timestampNull); got == QueryKernelPlanFingerprint(dateNull) {
+		t.Fatalf("typed temporal null kind collided: %q", got)
+	}
 
 	nanLiteral := QueryPlan{Where: Binary{Op: OpEQ, Left: ColumnRef{Name: "px"}, Right: Literal{Value: math.NaN()}}, LimitN: -1}
 	nanPayloadLiteral := QueryPlan{Where: Binary{Op: OpEQ, Left: ColumnRef{Name: "px"}, Right: Literal{Value: math.Float64frombits(0x7ff8000000000001)}}, LimitN: -1}
 	if got := QueryKernelPlanFingerprint(nanLiteral); got != QueryKernelPlanFingerprint(nanPayloadLiteral) {
 		t.Fatalf("NaN literal fingerprint = %q, want canonical NaN fingerprint", got)
+	}
+	f32NaNLiteral := QueryPlan{Where: Binary{Op: OpEQ, Left: ColumnRef{Name: "px"}, Right: Literal{Value: math.Float32frombits(0x7fc00000)}}, LimitN: -1}
+	f32NaNPayloadLiteral := QueryPlan{Where: Binary{Op: OpEQ, Left: ColumnRef{Name: "px"}, Right: Literal{Value: math.Float32frombits(0x7fc00001)}}, LimitN: -1}
+	if got := QueryKernelPlanFingerprint(f32NaNLiteral); got != QueryKernelPlanFingerprint(f32NaNPayloadLiteral) {
+		t.Fatalf("float32 NaN literal fingerprint = %q, want canonical NaN fingerprint", got)
+	}
+	f64NaNLiteral := QueryPlan{Where: Binary{Op: OpEQ, Left: ColumnRef{Name: "px"}, Right: Literal{Value: math.Float64frombits(0x7ff8000000000000)}}, LimitN: -1}
+	if got := QueryKernelPlanFingerprint(f32NaNLiteral); got == QueryKernelPlanFingerprint(f64NaNLiteral) {
+		t.Fatalf("float32/float64 NaN literal kind collided: %q", got)
 	}
 	posInfLiteral := QueryPlan{Where: Binary{Op: OpEQ, Left: ColumnRef{Name: "px"}, Right: Literal{Value: math.Inf(1)}}, LimitN: -1}
 	negInfLiteral := QueryPlan{Where: Binary{Op: OpEQ, Left: ColumnRef{Name: "px"}, Right: Literal{Value: math.Inf(-1)}}, LimitN: -1}
