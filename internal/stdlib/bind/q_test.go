@@ -1113,6 +1113,25 @@ flat := q.query(trades, {
 	if got := flat.RawGetInt(2).Table().RawGetString("qty"); !got.IsFloat() || got.Float() != 50 {
 		t.Fatalf("flat[2].qty = %v, want 50", got)
 	}
+	if _, ok := flat.NativePayload().(*runtime.SoA); !ok {
+		t.Fatalf("flat native payload = %T, want *runtime.SoA", flat.NativePayload())
+	}
+	flatValue := TableValue(flat)
+	info, ok := flatValue.NativeFramePayloadInfo()
+	if !ok || info.Rows != 2 || info.Columns != 2 {
+		t.Fatalf("flat native frame info = %+v ok=%v, want rows=2 columns=2", info, ok)
+	}
+	col, handled, err := flatValue.NativeFrameColumn("px")
+	if err != nil {
+		t.Fatalf("flat NativeFrameColumn(px): %v", err)
+	}
+	if !handled || !col.IsDenseArray() {
+		t.Fatalf("flat NativeFrameColumn(px) = %v handled=%v, want dense array", col, handled)
+	}
+	px, ok := col.DenseArray().F64()
+	if !ok || len(px) != 2 || px[0] != 10 || px[1] != 12 {
+		t.Fatalf("flat px column = %#v, want [10 12]", px)
+	}
 }
 
 func TestQModuleRejectsInvalidPlans(t *testing.T) {

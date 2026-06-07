@@ -940,7 +940,12 @@ func qRunQuery(s *SoA, spec *Table) (*Table, error) {
 	if err != nil {
 		return nil, err
 	}
-	return qApplyOrderAndLimit(rows, spec)
+	rows, err = qApplyOrderAndLimit(rows, spec)
+	if err != nil {
+		return nil, err
+	}
+	qAttachRowsNativeFramePayload(rows)
+	return rows, nil
 }
 
 func qRunSQL(name string, args qSQLArgsResult) (Value, error) {
@@ -3967,6 +3972,17 @@ func qDataFrameFromRowTable(rows *Table) (data.Frame, error) {
 		cols = append(cols, data.NewColumn(data.Symbol(name), values[name]))
 	}
 	return data.NewFrame(cols...)
+}
+
+func qAttachRowsNativeFramePayload(rows *Table) {
+	if rows == nil || rows.Length() == 0 {
+		return
+	}
+	frame, err := qDataFrameFromRowTable(rows)
+	if err != nil {
+		return
+	}
+	setDataFrameNativePayload(rows, frame)
 }
 
 func qRowColumnNames(row *Table) ([]string, error) {
