@@ -507,7 +507,7 @@ func (r *DiagReport) String() string {
 		w("\n--- Module fact diffs ---\n%s", FormatTier2ModuleFactDiffs(r.ModuleFactDiffs))
 	}
 	w("\n--- Optimization remarks ---\n%s", formatOptimizationRemarks(r.OptimizationRemarks))
-	w("\n--- Q query hot paths ---\n%d primitive pipeline(s)\n", len(r.QQueryHotPaths))
+	w("\n--- Q query hot paths ---\n%s", formatQQueryHotPaths(r.QQueryHotPaths))
 	w("\n--- IR (after passes) ---\n%s", r.IRAfter)
 	w("\n--- Register Allocation ---\n%s\n", r.RegAllocMap)
 	w("\n--- Validation ---\n")

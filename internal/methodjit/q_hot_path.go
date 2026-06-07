@@ -2,6 +2,7 @@ package methodjit
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/never-labs/leia/internal/runtime"
 )
@@ -18,6 +19,19 @@ type QQueryHotPath struct {
 	RowOrder     *Instr
 	Project      *Instr
 	ResultColumn *Instr
+}
+
+func (p QQueryHotPath) Shape() string {
+	switch {
+	case p.RowOrder != nil && p.RowGather != nil:
+		return "filter/order/gather/project/column"
+	case p.RowGather != nil:
+		return "filter/gather/project/column"
+	case p.RowSlice != nil:
+		return "filter/slice/project/column"
+	default:
+		return "filter/project/column"
+	}
 }
 
 // DetectQQueryHotPaths returns q query primitive pipelines visible in Method
@@ -111,10 +125,32 @@ func QQueryHotPathRemarkPass(fn *Function) (*Function, error) {
 		blockID,
 		valueID,
 		OpFrameColumn,
-		fmt.Sprintf("recognized %d q query primitive hot path(s), first compare %s; native lowering pending",
-			len(paths), qQueryHotPathCompareOpName(paths[0].Compare)),
+		fmt.Sprintf("recognized %d q query primitive hot path(s), first shape %s, compare %s; native lowering pending",
+			len(paths), paths[0].Shape(), qQueryHotPathCompareOpName(paths[0].Compare)),
 	)
 	return fn, nil
+}
+
+func formatQQueryHotPaths(paths []QQueryHotPath) string {
+	if len(paths) == 0 {
+		return "0 primitive pipeline(s)\n"
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "%d primitive pipeline(s)\n", len(paths))
+	for i, path := range paths {
+		fmt.Fprintf(&b, "  [%d] shape=%s compare=%s", i, path.Shape(), qQueryHotPathCompareOpName(path.Compare))
+		if path.RowOrder != nil {
+			fmt.Fprintf(&b, " order_aux=%d", path.RowOrder.Aux)
+		}
+		if path.RowSlice != nil {
+			fmt.Fprintf(&b, " slice=true")
+		}
+		if path.RowGather != nil {
+			fmt.Fprintf(&b, " gather=true")
+		}
+		b.WriteByte('\n')
+	}
+	return b.String()
 }
 
 func qQueryHotPathCompareOpName(compare *Instr) string {

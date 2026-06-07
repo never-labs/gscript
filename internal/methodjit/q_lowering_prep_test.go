@@ -415,6 +415,12 @@ func TestQFramePrimitiveHotPathDetectsOrderedRows(t *testing.T) {
 	if paths[0].RowGather == nil || paths[0].RowOrder == nil {
 		t.Fatalf("DetectQQueryHotPaths RowGather=%v RowOrder=%v, want both\n%s", paths[0].RowGather, paths[0].RowOrder, Print(fn))
 	}
+	if paths[0].Shape() != "filter/order/gather/project/column" {
+		t.Fatalf("ordered hot path shape = %q, want filter/order/gather/project/column", paths[0].Shape())
+	}
+	if got := formatQQueryHotPaths(paths); !strings.Contains(got, "shape=filter/order/gather/project/column") || !strings.Contains(got, "order_aux=2") {
+		t.Fatalf("ordered hot path format = %q, want shape and order aux", got)
+	}
 }
 
 func TestQFramePrimitiveHotPathDetectsSlicedRows(t *testing.T) {
@@ -513,7 +519,11 @@ func TestDiagnoseReportsQQueryHotPath(t *testing.T) {
 	if !strings.Contains(report.String(), "Q query hot paths") {
 		t.Fatalf("diagnostic report missing q hot path section:\n%s", report.String())
 	}
+	if !strings.Contains(report.String(), "shape=filter/project/column") {
+		t.Fatalf("diagnostic report missing q hot path shape:\n%s", report.String())
+	}
 	if !strings.Contains(formatOptimizationRemarks(report.OptimizationRemarks), "QQueryHotPath") ||
+		!strings.Contains(formatOptimizationRemarks(report.OptimizationRemarks), "first shape filter/project/column") ||
 		!strings.Contains(formatOptimizationRemarks(report.OptimizationRemarks), "compare >=") ||
 		!strings.Contains(formatOptimizationRemarks(report.OptimizationRemarks), "native lowering pending") {
 		t.Fatalf("diagnostic remarks missing q hot path handoff:\n%s", formatOptimizationRemarks(report.OptimizationRemarks))
