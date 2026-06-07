@@ -1115,7 +1115,8 @@ func qRunQuery(s *SoA, spec *Table) (*Table, error) {
 	if err != nil {
 		return nil, err
 	}
-	if nativeRows, ok := qQueryNativeRowsForResult(spec, nativeRows); ok {
+	nativeRows, nativeResultOK, nativeResultReasonCode, nativeResultReason := qQueryNativeRowsForResult(spec, nativeRows)
+	if nativeResultOK {
 		qAttachRowsNativeSoAPayload(rows, nativeRows)
 		if len(aggs) == 0 {
 			if nativeCacheable {
@@ -1130,6 +1131,10 @@ func qRunQuery(s *SoA, spec *Table) (*Table, error) {
 		}
 	} else {
 		if len(aggs) == 0 {
+			if nativeReason == "" {
+				nativeReasonCode = nativeResultReasonCode
+				nativeReason = nativeResultReason
+			}
 			if nativeReason == "" {
 				nativeReasonCode = qQueryKernelReasonOrder
 				nativeReason = "query native kernel could not preserve order or limit"
@@ -1196,8 +1201,12 @@ func qExplainQuery(s *SoA, spec *Table) (*Table, error) {
 		return out, nil
 	}
 	nativeRows, reasonCode, reason := qSimpleSelectRowsNativeSoA(s, mask, selects)
-	nativeRows, ok := qQueryNativeRowsForResult(spec, nativeRows)
+	nativeRows, ok, resultReasonCode, resultReason := qQueryNativeRowsForResult(spec, nativeRows)
 	if !ok {
+		if reason == "" {
+			reasonCode = resultReasonCode
+			reason = resultReason
+		}
 		if reason == "" {
 			reasonCode = qQueryKernelReasonOrder
 			reason = "query native kernel could not preserve order or limit"
@@ -4468,58 +4477,69 @@ func qNativeDenseArrayBinaryOp(op string) (DenseArrayBinaryOp, bool) {
 	}
 }
 
-func qQueryNativeRowsForResult(spec *Table, nativeRows *SoA) (*SoA, bool) {
+func qQueryNativeRowsForResult(spec *Table, nativeRows *SoA) (*SoA, bool, string, string) {
 	if nativeRows == nil {
-		return nil, false
+		return nil, false, qQueryKernelReasonUnsupported, "query native kernel produced no native rows"
 	}
 	if spec == nil {
-		return nativeRows, true
+		return nativeRows, true, "", ""
 	}
 	order, err := qOrderSpecs(spec.RawGetString("order_by"))
 	if err != nil {
-		return nil, false
+		return nil, false, qQueryKernelReasonOrder, err.Error()
 	}
 	limit, err := qLimit(spec.RawGetString("limit"))
 	if err != nil {
-		return nil, false
+		return nil, false, qQueryKernelReasonOrder, err.Error()
 	}
 	if len(order) > 0 {
 		return qOrderedNativeRowsForResult(nativeRows, order, limit)
 	}
 	if limit < 0 || limit >= nativeRows.Len() {
-		return nativeRows, true
+		return nativeRows, true, "", ""
 	}
 	sliced, handled, err := qNativeRowsFrameCarrier(nativeRows).NativeFrameSlice(0, limit)
 	if err != nil {
-		return nil, false
+		return nil, false, qQueryKernelReasonOrder, "query native kernel limit failed: " + err.Error()
 	}
 	if !handled {
-		return nil, false
+		return nil, false, qQueryKernelReasonOrder, "query native kernel limit requires native frame payload"
 	}
-	return qNativeRowsFromFrameValue(sliced)
+	out, ok := qNativeRowsFromFrameValue(sliced)
+	if !ok {
+		return nil, false, qQueryKernelReasonOrder, "query native kernel limit produced unsupported native rows"
+	}
+	return out, true, "", ""
 }
 
-func qOrderedNativeRowsForResult(nativeRows *SoA, order []qOrderSpec, limit int) (*SoA, bool) {
+func qOrderedNativeRowsForResult(nativeRows *SoA, order []qOrderSpec, limit int) (*SoA, bool, string, string) {
 	if nativeRows == nil || len(order) == 0 {
-		return nativeRows, nativeRows != nil
+		if nativeRows == nil {
+			return nil, false, qQueryKernelReasonUnsupported, "query native kernel produced no native rows"
+		}
+		return nativeRows, true, "", ""
 	}
 	carrier := qNativeRowsFrameCarrier(nativeRows)
 	indexValue, handled, err := carrier.NativeFrameOrderIndexes(qOrderColumns(order), qOrderDescFlags(order), limit)
 	if err != nil {
-		return nil, false
+		return nil, false, qQueryKernelReasonOrder, "query native kernel order failed: " + err.Error()
 	}
 	if !handled || !indexValue.IsDenseArray() {
-		return nil, false
+		return nil, false, qQueryKernelReasonOrder, "query native kernel order requires native frame indexes"
 	}
 	indexes := indexValue.DenseArray()
 	gathered, handled, err := carrier.NativeFrameGather(indexes)
 	if err != nil {
-		return nil, false
+		return nil, false, qQueryKernelReasonOrder, "query native kernel ordered gather failed: " + err.Error()
 	}
 	if !handled {
-		return nil, false
+		return nil, false, qQueryKernelReasonOrder, "query native kernel ordered gather requires native frame payload"
 	}
-	return qNativeRowsFromFrameValue(gathered)
+	out, ok := qNativeRowsFromFrameValue(gathered)
+	if !ok {
+		return nil, false, qQueryKernelReasonOrder, "query native kernel ordered gather produced unsupported native rows"
+	}
+	return out, true, "", ""
 }
 
 func qOrderColumns(order []qOrderSpec) []string {

@@ -3016,6 +3016,10 @@ again := q.query(trades, {select: {price: "price"}, order_by: "missing"})
 	if got := qTestFallbackDetailCount(details, "reason_code", qFallbackQueryKernel, qQueryKernelReasonOrder, ""); got != 2 {
 		t.Fatalf("query kernel reason_code count = %d, want 2", got)
 	}
+	reason := `query native kernel order failed: FRAME_ORDER_INDEXES unknown column "missing"`
+	if got := qTestFallbackDetailCount(details, "reason", qFallbackQueryKernel, "", reason); got != 2 {
+		t.Fatalf("query kernel reason detail count = %d, want 2", got)
+	}
 	cacheStats := qTestCacheStatsRows(t, qCacheStatsTable())
 	cache := cacheStats["q_query_kernel"]
 	if cache["entries"] != 1 || cache["hits"] != 1 || cache["misses"] != 1 || cache["evictions"] != 0 {
