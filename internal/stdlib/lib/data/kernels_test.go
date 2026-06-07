@@ -1407,12 +1407,15 @@ func TestGroupedAttributeMixedAggregateKernel(t *testing.T) {
 	}
 	qty := WithArrayAttribute(NewI32([]int32{10, 20, 30, 40, 50}), ArrayAttributeSorted)
 	px := WithArrayAttribute(NewF64([]float64{100, 200, 110, 300, 210}), ArrayAttributeSorted)
+	venue := NewString([]string{"XNAS", "BATS", "IEX", "ARCX", "EDGX"})
 	aggs := []aggregateInput{
 		{Aggregate: Aggregate{Name: "total_qty", Func: "sum", Expr: ColumnRef{Name: "qty"}}, column: qty},
 		{Aggregate: Aggregate{Name: "avg_px", Func: "avg", Expr: ColumnRef{Name: "px"}}, column: px},
 		{Aggregate: Aggregate{Name: "lo_px", Func: "min", Expr: ColumnRef{Name: "px"}}, column: px},
 		{Aggregate: Aggregate{Name: "hi_px", Func: "max", Expr: ColumnRef{Name: "px"}}, column: px},
 		{Aggregate: Aggregate{Name: "n", Func: "count"}},
+		{Aggregate: Aggregate{Name: "first_venue", Func: "first", Expr: ColumnRef{Name: "venue"}}, column: venue},
+		{Aggregate: Aggregate{Name: "last_venue", Func: "last", Expr: ColumnRef{Name: "venue"}}, column: venue},
 	}
 	states, ok, err := typedKernels.GroupAggregateStates(index, aggs)
 	if err != nil || !ok {
@@ -1433,6 +1436,12 @@ func TestGroupedAttributeMixedAggregateKernel(t *testing.T) {
 	if got, want := aggregateResult(states[2].aggs[4]), int64(1); got != want {
 		t.Fatalf("NVDA count = %v, want %v", got, want)
 	}
+	if got, want := aggregateResult(states[0].aggs[5]), "XNAS"; got != want {
+		t.Fatalf("AAPL first venue = %v, want %v", got, want)
+	}
+	if got, want := aggregateResult(states[1].aggs[6]), "EDGX"; got != want {
+		t.Fatalf("MSFT last venue = %v, want %v", got, want)
+	}
 
 	order, filtered, ok, err := typedKernels.FilteredGroupAggregateStates(index, []int{2, 4, 3}, aggs)
 	if err != nil || !ok {
@@ -1449,6 +1458,12 @@ func TestGroupedAttributeMixedAggregateKernel(t *testing.T) {
 	}
 	if got, want := aggregateResult(filtered[2].aggs[4]), int64(1); got != want {
 		t.Fatalf("filtered NVDA count = %v, want %v", got, want)
+	}
+	if got, want := aggregateResult(filtered[0].aggs[5]), "IEX"; got != want {
+		t.Fatalf("filtered AAPL first venue = %v, want %v", got, want)
+	}
+	if got, want := aggregateResult(filtered[1].aggs[6]), "EDGX"; got != want {
+		t.Fatalf("filtered MSFT last venue = %v, want %v", got, want)
 	}
 }
 

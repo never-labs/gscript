@@ -585,6 +585,10 @@ func groupAggregatesSupportedByTypedIndex(aggs []aggregateInput) bool {
 			if agg.column == nil || !isTypedMinMaxArray(agg.column) {
 				return false
 			}
+		case "first", "last":
+			if agg.column == nil {
+				return false
+			}
 		default:
 			return false
 		}
@@ -648,6 +652,22 @@ func accumulateIndexedAggregateRow(state *aggregateState, agg aggregateInput, ro
 			state.value = v
 			state.hasValue = true
 		}
+	case "first":
+		if !state.hasValue {
+			v, ok := agg.column.At(row)
+			if !ok {
+				return fmt.Errorf("column row %d out of range", row)
+			}
+			state.value = normalizeAggregateValue(v)
+			state.hasValue = true
+		}
+	case "last":
+		v, ok := agg.column.At(row)
+		if !ok {
+			return fmt.Errorf("column row %d out of range", row)
+		}
+		state.lastValue = normalizeAggregateValue(v)
+		state.hasLastVal = true
 	}
 	return nil
 }
