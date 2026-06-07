@@ -1011,6 +1011,16 @@ func (cf *CompiledFunction) executeOpExit(ctx *ExecContext, regs []runtime.Value
 		}
 		regs[slot] = out
 
+	case OpFrameFilter:
+		if arg1 >= len(regs) || arg2 >= len(regs) || slot >= len(regs) {
+			return fmt.Errorf("FrameFilter op-exit out of register range")
+		}
+		out, err := executeFrameFilterValue(regs[arg1], regs[arg2])
+		if err != nil {
+			return err
+		}
+		regs[slot] = out
+
 	case OpVectorGather:
 		if arg1 >= len(regs) || arg2 >= len(regs) || slot >= len(regs) {
 			return fmt.Errorf("VectorGather op-exit out of register range")

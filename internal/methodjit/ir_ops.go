@@ -182,6 +182,9 @@ const (
 	// a string or string-array projection; mirrors OP_FRAME_PROJECT and returns
 	// a projected native frame facade.
 	OpFrameProject
+	// q/frame runtime primitive. Args = [frame, mask]; mirrors OP_FRAME_FILTER
+	// and returns a filtered native frame facade.
+	OpFrameFilter
 	// q/vector runtime primitive. Args = [vector, indexes]; mirrors
 	// OP_VECTOR_GATHER and returns a gathered dense-array value.
 	OpVectorGather

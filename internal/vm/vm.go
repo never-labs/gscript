@@ -2405,6 +2405,30 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 				fb.Result.Observe(out.Type())
 			}
 
+		case OP_FRAME_FILTER:
+			a := DecodeA(inst)
+			b := DecodeB(inst)
+			c := DecodeC(inst)
+			frameVal := vm.regs[base+b]
+			maskVal := vm.regs[base+c]
+			if !maskVal.IsDenseArray() {
+				return nil, wrapLineErr(frame, fmt.Errorf("FRAME_FILTER mask must be dense array (got %s)", maskVal.TypeName()))
+			}
+			out, handled, err := frameVal.NativeFrameFilter(maskVal.DenseArray())
+			if err != nil {
+				return nil, wrapLineErr(frame, err)
+			}
+			if !handled {
+				return nil, wrapLineErr(frame, fmt.Errorf("FRAME_FILTER operand must be native frame (got %s)", frameVal.TypeName()))
+			}
+			vm.regs[base+a] = out
+			if frame.closure.Proto.Feedback != nil {
+				fb := &frame.closure.Proto.Feedback[frame.pc-1]
+				fb.Left.Observe(frameVal.Type())
+				fb.Right.Observe(maskVal.Type())
+				fb.Result.Observe(out.Type())
+			}
+
 		case OP_VECTOR_COMPARE:
 			a := DecodeA(inst)
 			b := DecodeB(inst)

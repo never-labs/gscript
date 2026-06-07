@@ -152,6 +152,38 @@ func TestFrameProjectBytecodeBuildsMethodJITIR(t *testing.T) {
 	}
 }
 
+func TestFrameFilterBytecodeBuildsMethodJITIR(t *testing.T) {
+	proto := &vm.FuncProto{
+		Name:      "frame_filter",
+		NumParams: 2,
+		MaxStack:  2,
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_FRAME_FILTER, 0, 0, 1),
+			vm.EncodeABC(vm.OP_RETURN, 0, 2, 0),
+		},
+	}
+
+	fn := BuildGraph(proto)
+	var filter *Instr
+	for _, block := range fn.Blocks {
+		for _, instr := range block.Instrs {
+			if instr.Op == OpFrameFilter {
+				filter = instr
+				break
+			}
+		}
+	}
+	if filter == nil {
+		t.Fatalf("BuildGraph did not emit OpFrameFilter:\n%s", Print(fn))
+	}
+	if len(filter.Args) != 2 {
+		t.Fatalf("OpFrameFilter arg count = %d, want 2", len(filter.Args))
+	}
+	if filter.Type != TypeAny {
+		t.Fatalf("OpFrameFilter type = %s, want Any", filter.Type)
+	}
+}
+
 func TestFrameLenBytecodeBuildsMethodJITIR(t *testing.T) {
 	proto := &vm.FuncProto{
 		Name:      "frame_len",
@@ -240,6 +272,23 @@ func TestTier2GateAllowsFrameProjectThroughOpExit(t *testing.T) {
 	gate := firstUnsupportedTier2BytecodeGate(proto)
 	if !gate.Allowed {
 		t.Fatalf("OP_FRAME_PROJECT should be Tier2-eligible via op-exit, got %q", gate.Reason)
+	}
+}
+
+func TestTier2GateAllowsFrameFilterThroughOpExit(t *testing.T) {
+	proto := &vm.FuncProto{
+		Name:      "frame_filter",
+		NumParams: 2,
+		MaxStack:  2,
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_FRAME_FILTER, 0, 0, 1),
+			vm.EncodeABC(vm.OP_RETURN, 0, 2, 0),
+		},
+	}
+
+	gate := firstUnsupportedTier2BytecodeGate(proto)
+	if !gate.Allowed {
+		t.Fatalf("OP_FRAME_FILTER should be Tier2-eligible via op-exit, got %q", gate.Reason)
 	}
 }
 
@@ -348,6 +397,41 @@ func TestFrameProjectRuntimeHelperUsesRuntimePrimitive(t *testing.T) {
 	got, ok := col.DenseArray().I64()
 	if !ok || len(got) != 2 || got[0] != 100 || got[1] != 200 {
 		t.Fatalf("projected size values = %#v, want [100 200]", got)
+	}
+}
+
+func TestFrameFilterRuntimeHelperUsesRuntimePrimitive(t *testing.T) {
+	soa, err := runtime.NewSoA(map[string]*runtime.DenseArray{
+		"price": runtime.NewDenseArrayF64([]float64{10.5, 20.25, 30.75}),
+		"size":  runtime.NewDenseArrayI64([]int64{100, 200, 300}),
+	})
+	if err != nil {
+		t.Fatalf("NewSoA: %v", err)
+	}
+	frame := runtime.NewTable()
+	frame.SetNativePayloadWithInfo(soa, runtime.NativePayloadInfo{
+		Kind:    runtime.NativePayloadDataFrame,
+		Rows:    soa.Len(),
+		Columns: 2,
+	})
+
+	result, err := executeFrameFilterValue(
+		runtime.TableValue(frame),
+		runtime.DenseArrayValue(runtime.NewDenseArrayBool([]bool{false, true, true})),
+	)
+	if err != nil {
+		t.Fatalf("execute frame filter: %v", err)
+	}
+	if !result.IsFrame() {
+		t.Fatalf("frame filter result type = %s, want frame", result.TypeName())
+	}
+	col, err := executeFrameColumnValue(result, "size")
+	if err != nil {
+		t.Fatalf("filtered frame column: %v", err)
+	}
+	got, ok := col.DenseArray().I64()
+	if !ok || len(got) != 2 || got[0] != 200 || got[1] != 300 {
+		t.Fatalf("filtered size values = %#v, want [200 300]", got)
 	}
 }
 

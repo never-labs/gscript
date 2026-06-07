@@ -1082,6 +1082,13 @@ func (s *interpState) execInstr(instr *Instr, block *Block) ([]runtime.Value, bo
 		}
 		s.values[instr.ID] = out
 
+	case OpFrameFilter:
+		out, err := executeFrameFilterValue(s.val(instr.Args[0]), s.val(instr.Args[1]))
+		if err != nil {
+			return nil, false, err
+		}
+		s.values[instr.ID] = out
+
 	case OpVectorGather:
 		out, err := executeVectorGatherValue(s.val(instr.Args[0]), s.val(instr.Args[1]))
 		if err != nil {

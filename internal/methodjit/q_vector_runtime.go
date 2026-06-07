@@ -42,6 +42,20 @@ func executeFrameProjectValue(frameVal runtime.Value, names []string) (runtime.V
 	return out, nil
 }
 
+func executeFrameFilterValue(frameVal, maskVal runtime.Value) (runtime.Value, error) {
+	if !maskVal.IsDenseArray() {
+		return runtime.NilValue(), fmt.Errorf("FrameFilter mask must be dense array (got %s)", maskVal.TypeName())
+	}
+	out, handled, err := frameVal.NativeFrameFilter(maskVal.DenseArray())
+	if err != nil {
+		return runtime.NilValue(), err
+	}
+	if !handled {
+		return runtime.NilValue(), fmt.Errorf("FrameFilter operand must be native frame (got %s)", frameVal.TypeName())
+	}
+	return out, nil
+}
+
 func frameProjectColumnNames(v runtime.Value) ([]string, error) {
 	if v.IsString() {
 		return []string{v.Str()}, nil

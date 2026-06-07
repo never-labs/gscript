@@ -730,12 +730,55 @@ func (v Value) NativeFrameProject(names []string) (Value, bool, error) {
 	}
 }
 
+// NativeFrameFilter returns a new runtime frame facade containing rows selected
+// by a bool dense-array mask.
+func (v Value) NativeFrameFilter(mask *DenseArray) (Value, bool, error) {
+	if mask == nil {
+		return NilValue(), true, fmt.Errorf("FRAME_FILTER mask must be a bool dense array")
+	}
+	if !v.IsTable() {
+		return NilValue(), false, nil
+	}
+	tbl := v.Table()
+	if tbl == nil {
+		return NilValue(), false, nil
+	}
+	payload, info, ok := tbl.NativeFramePayload()
+	if !ok {
+		return NilValue(), false, nil
+	}
+	switch frame := payload.(type) {
+	case *SoA:
+		out, err := frame.Filter(mask)
+		if err != nil {
+			return NilValue(), true, err
+		}
+		filtered := NewTable()
+		filtered.SetNativePayloadWithInfo(out, NativePayloadInfo{
+			Kind:       info.Kind,
+			Rows:       out.Len(),
+			Columns:    info.Columns,
+			SchemaHash: nativeFrameFilterSchemaHash(info.SchemaHash),
+		})
+		return TableValue(filtered), true, nil
+	default:
+		return NilValue(), true, fmt.Errorf("FRAME_FILTER unsupported native frame payload %T", payload)
+	}
+}
+
 func nativeFrameProjectSchemaHash(source string, names []string) string {
 	joined := strings.Join(names, ",")
 	if source == "" {
 		return "project:" + joined
 	}
 	return source + "|project:" + joined
+}
+
+func nativeFrameFilterSchemaHash(source string) string {
+	if source == "" {
+		return "filter"
+	}
+	return source + "|filter"
 }
 
 func (v Value) nativeFramePayloadKind() (NativePayloadKind, bool) {
