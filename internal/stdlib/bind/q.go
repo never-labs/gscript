@@ -143,6 +143,19 @@ func BuildQ() *Table {
 		}
 		return []Value{TableValue(out)}, nil
 	})
+	set("explain_query", func(args []Value) ([]Value, error) {
+		if len(args) < 1 || !args[0].IsSoA() {
+			return nil, fmt.Errorf("q.explain_query: argument 1 must be soa")
+		}
+		if len(args) < 2 || !args[1].IsTable() {
+			return nil, fmt.Errorf("q.explain_query: argument 2 must be a query plan table")
+		}
+		out, err := qExplainQuery(args[0].SoA(), args[1].Table())
+		if err != nil {
+			return nil, err
+		}
+		return []Value{TableValue(out)}, nil
+	})
 	set("eval", func(args []Value) ([]Value, error) {
 		if len(args) < 1 || !args[0].IsString() {
 			return nil, fmt.Errorf("q.eval: argument 1 must be a q source string")
@@ -966,6 +979,68 @@ func qRunQuery(s *SoA, spec *Table) (*Table, error) {
 		qAttachRowsNativeFramePayload(rows)
 	}
 	return rows, nil
+}
+
+func qExplainQuery(s *SoA, spec *Table) (*Table, error) {
+	mask, err := qQueryMask(s, spec.RawGetString("where"))
+	if err != nil {
+		return nil, err
+	}
+	selects, err := qQuerySelects(spec.RawGetString("select"))
+	if err != nil {
+		return nil, err
+	}
+	if len(selects) == 0 {
+		for _, name := range s.ColumnNames() {
+			selects = append(selects, qSelect{Name: name, Expr: StringValue(name)})
+		}
+	}
+	by, err := qStringList("q.query by", spec.RawGetString("by"))
+	if err != nil {
+		return nil, err
+	}
+	aggs, err := qAggregates(spec.RawGetString("aggregate"))
+	if err != nil {
+		return nil, err
+	}
+	out := NewTable()
+	out.RawSetString("op", StringValue("query"))
+	out.RawSetString("source_rows", IntValue(int64(s.Len())))
+	out.RawSetString("where_mask_rows", IntValue(int64(mask.Len())))
+	out.RawSetString("select_count", IntValue(int64(len(selects))))
+	out.RawSetString("by_count", IntValue(int64(len(by))))
+	out.RawSetString("aggregate_count", IntValue(int64(len(aggs))))
+	if len(aggs) != 0 {
+		out.RawSetString("kernel_supported", BoolValue(false))
+		out.RawSetString("kernel_reason_code", StringValue(qQueryKernelReasonUnsupported))
+		out.RawSetString("kernel_reason", StringValue("query native kernel supports non-aggregate selects only"))
+		out.RawSetString("source_schema_hash", StringValue(""))
+		out.RawSetString("kernel_rows", IntValue(0))
+		out.RawSetString("kernel_columns", IntValue(0))
+		return out, nil
+	}
+	nativeRows, reasonCode, reason := qSimpleSelectRowsNativeSoA(s, mask, selects)
+	nativeRows, ok := qQueryNativeRowsForResult(spec, nativeRows)
+	if !ok {
+		if reason == "" {
+			reasonCode = qQueryKernelReasonOrder
+			reason = "query native kernel could not preserve order or limit"
+		}
+		out.RawSetString("kernel_supported", BoolValue(false))
+		out.RawSetString("kernel_reason_code", StringValue(reasonCode))
+		out.RawSetString("kernel_reason", StringValue(reason))
+		out.RawSetString("source_schema_hash", StringValue(""))
+		out.RawSetString("kernel_rows", IntValue(0))
+		out.RawSetString("kernel_columns", IntValue(0))
+		return out, nil
+	}
+	out.RawSetString("kernel_supported", BoolValue(true))
+	out.RawSetString("kernel_reason_code", StringValue(qKernelReasonSupported))
+	out.RawSetString("kernel_reason", StringValue(qKernelReasonSupported))
+	out.RawSetString("source_schema_hash", StringValue(qQueryNativeSoASchemaHash(nativeRows)))
+	out.RawSetString("kernel_rows", IntValue(int64(nativeRows.Len())))
+	out.RawSetString("kernel_columns", IntValue(int64(len(nativeRows.ColumnNames()))))
+	return out, nil
 }
 
 func qRunSQL(name string, args qSQLArgsResult) (Value, error) {

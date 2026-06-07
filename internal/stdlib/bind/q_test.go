@@ -1243,6 +1243,64 @@ ok, err := pcall(func() {
 	}
 }
 
+func TestQExplainQueryReportsNativeKernelSupport(t *testing.T) {
+	qClearCaches()
+	defer qClearCaches()
+
+	interp := runWithQAndSOA(t, `
+trades := soa.zip({
+    price: []f64{10, 12, 7.5},
+    size: []f64{100, 50, 200},
+})
+
+supported := q.explain_query(trades, {
+    where: {column: "size", op: ">=", value: 50},
+    select: {notional: {"*", "price", "size"}},
+    order_by: {column: "notional", desc: true},
+    limit: 2,
+})
+
+unsupported := q.explain_query(trades, {
+    select: {price: "price", marker: 1},
+})
+`)
+
+	supported := interp.GetGlobal("supported").Table()
+	if supported == nil {
+		t.Fatal("supported explain is nil")
+	}
+	if got := supported.RawGetString("kernel_supported"); !got.IsBool() || !got.Bool() {
+		t.Fatalf("supported kernel_supported = %v, want true", got)
+	}
+	if got := supported.RawGetString("kernel_reason_code"); !got.IsString() || got.Str() != qKernelReasonSupported {
+		t.Fatalf("supported kernel_reason_code = %v, want %s", got, qKernelReasonSupported)
+	}
+	if got := supported.RawGetString("kernel_rows"); !got.IsInt() || got.Int() != 2 {
+		t.Fatalf("supported kernel_rows = %v, want 2", got)
+	}
+	if got := supported.RawGetString("kernel_columns"); !got.IsInt() || got.Int() != 1 {
+		t.Fatalf("supported kernel_columns = %v, want 1", got)
+	}
+	if got := supported.RawGetString("source_schema_hash"); !got.IsString() || !strings.HasPrefix(got.Str(), "q.query.kernel:") {
+		t.Fatalf("supported schema hash = %v, want q.query kernel hash", got)
+	}
+
+	unsupported := interp.GetGlobal("unsupported").Table()
+	if unsupported == nil {
+		t.Fatal("unsupported explain is nil")
+	}
+	if got := unsupported.RawGetString("kernel_supported"); !got.IsBool() || got.Bool() {
+		t.Fatalf("unsupported kernel_supported = %v, want false", got)
+	}
+	if got := unsupported.RawGetString("kernel_reason_code"); !got.IsString() || got.Str() != qQueryKernelReasonSelect {
+		t.Fatalf("unsupported kernel_reason_code = %v, want %s", got, qQueryKernelReasonSelect)
+	}
+	stats := qTestFallbackStatsRows(t, qFallbackStatsTable())
+	if got := stats[qFallbackQueryKernel]; got != 0 {
+		t.Fatalf("explain_query fallback count = %d, want 0", got)
+	}
+}
+
 func TestQSessionKeepsWorkspaceStateWithoutChangingQEval(t *testing.T) {
 	interp := runWithQAndSOA(t, `
 s := q.session()
