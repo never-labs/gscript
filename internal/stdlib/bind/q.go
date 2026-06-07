@@ -1339,7 +1339,7 @@ func qFramePayloadInfo(tbl *Table, kind NativePayloadKind) (NativePayloadInfo, b
 	if tbl == nil {
 		return NativePayloadInfo{}, false
 	}
-	info, ok := tbl.NativeFramePayloadInfo()
+	_, info, ok := qTypedNativeFramePayload(tbl)
 	if !ok || info.Kind != kind {
 		return NativePayloadInfo{}, false
 	}
@@ -1349,6 +1349,9 @@ func qFramePayloadInfo(tbl *Table, kind NativePayloadKind) (NativePayloadInfo, b
 func qNativeFrameRuntimeKind(tbl *Table) (NativePayloadKind, bool) {
 	if tbl == nil {
 		return NativePayloadNone, false
+	}
+	if _, info, ok := qTypedNativeFramePayload(tbl); ok {
+		return info.Kind, true
 	}
 	if kind, ok := tbl.NativePayloadKind(); ok {
 		switch kind {
@@ -1366,6 +1369,13 @@ func qNativeFrameRuntimeKind(tbl *Table) (NativePayloadKind, bool) {
 	default:
 		return NativePayloadNone, false
 	}
+}
+
+func qTypedNativeFramePayload(tbl *Table) (any, NativePayloadInfo, bool) {
+	if tbl == nil {
+		return nil, NativePayloadInfo{}, false
+	}
+	return tbl.NativeFramePayload()
 }
 
 func qExplainKernelInfo(args qSQLArgsResult, tmpl qSQLPlanTemplate) qExplainKernelResult {
@@ -2804,15 +2814,21 @@ func qNativeDataFramePayload(tbl *Table) (data.Frame, bool, error) {
 	if tbl == nil {
 		return data.Frame{}, false, nil
 	}
-	if kind, ok := tbl.NativeFramePayloadKind(); ok {
-		if kind != NativePayloadDataFrame {
+	if payload, info, ok := qTypedNativeFramePayload(tbl); ok {
+		if info.Kind != NativePayloadDataFrame {
 			return data.Frame{}, false, nil
 		}
-		native, hasPayload := tbl.NativePayload().(data.Frame)
+		native, hasPayload := payload.(data.Frame)
 		if !hasPayload {
 			return data.Frame{}, false, fmt.Errorf("native data frame payload is invalid")
 		}
 		return native, true, nil
+	}
+	if kind, ok := tbl.NativePayloadKind(); ok {
+		if kind == NativePayloadDataFrame {
+			return data.Frame{}, false, fmt.Errorf("native data frame payload is invalid")
+		}
+		return data.Frame{}, false, nil
 	}
 	if native, ok := tbl.NativePayload().(data.Frame); ok {
 		return native, true, nil
@@ -2936,15 +2952,21 @@ func qNativeKeyedFramePayload(tbl *Table) (data.KeyedFrame, bool, error) {
 	if tbl == nil {
 		return data.KeyedFrame{}, false, nil
 	}
-	if kind, ok := tbl.NativeFramePayloadKind(); ok {
-		if kind != NativePayloadKeyedFrame {
+	if payload, info, ok := qTypedNativeFramePayload(tbl); ok {
+		if info.Kind != NativePayloadKeyedFrame {
 			return data.KeyedFrame{}, false, nil
 		}
-		native, hasPayload := tbl.NativePayload().(data.KeyedFrame)
+		native, hasPayload := payload.(data.KeyedFrame)
 		if !hasPayload {
 			return data.KeyedFrame{}, false, fmt.Errorf("native keyed frame payload is invalid")
 		}
 		return native, true, nil
+	}
+	if kind, ok := tbl.NativePayloadKind(); ok {
+		if kind == NativePayloadKeyedFrame {
+			return data.KeyedFrame{}, false, fmt.Errorf("native keyed frame payload is invalid")
+		}
+		return data.KeyedFrame{}, false, nil
 	}
 	if native, ok := tbl.NativePayload().(data.KeyedFrame); ok {
 		return native, true, nil

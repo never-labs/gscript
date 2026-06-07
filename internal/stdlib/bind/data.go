@@ -1134,8 +1134,11 @@ func isDataFrameTable(t *Table) bool {
 	if t == nil {
 		return false
 	}
-	if kind, ok := t.NativePayloadKind(); ok {
-		return kind == NativePayloadDataFrame
+	if t.IsFrameFacade() {
+		return true
+	}
+	if _, ok := t.NativePayloadKind(); ok {
+		return false
 	}
 	return isDataFrameMarkerTable(t)
 }
@@ -1145,11 +1148,7 @@ func isDataFrameMarkerTable(t *Table) bool {
 }
 
 func isNativeDataFrameFacade(t *Table) bool {
-	if t == nil {
-		return false
-	}
-	kind, ok := t.NativeFramePayloadKind()
-	return ok && kind == NativePayloadDataFrame
+	return t != nil && t.IsFrameFacade()
 }
 
 func isDataColumnValue(v Value) bool {

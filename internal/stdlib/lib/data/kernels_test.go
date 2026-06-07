@@ -408,8 +408,14 @@ func TestCompiledQueryKernelClonesNestedLiteralLists(t *testing.T) {
 func TestCompiledQueryKernelHandlesRecursiveLiteralLists(t *testing.T) {
 	recursive := make([]any, 1)
 	recursive[0] = recursive
+	type recursiveSymbols []recursiveSymbols
+	typedRecursive := make(recursiveSymbols, 1)
+	typedRecursive[0] = typedRecursive
 	plan := QueryPlan{
-		Where:  In{Expr: ColumnRef{Name: "sym"}, Values: []any{recursive}},
+		Where: In{Expr: ColumnRef{Name: "sym"}, Values: []any{
+			recursive,
+			typedRecursive,
+		}},
 		LimitN: -1,
 	}
 
@@ -426,8 +432,50 @@ func TestCompiledQueryKernelHandlesRecursiveLiteralLists(t *testing.T) {
 	if !ok {
 		t.Fatalf("compiled where = %T, want In", compiled.Where)
 	}
-	if len(where.Values) != 1 {
-		t.Fatalf("compiled where values len = %d, want 1", len(where.Values))
+	if len(where.Values) != 2 {
+		t.Fatalf("compiled where values len = %d, want 2", len(where.Values))
+	}
+	clonedRecursive, ok := where.Values[0].([]any)
+	if !ok {
+		t.Fatalf("compiled first recursive literal = %T, want []any", where.Values[0])
+	}
+	if len(clonedRecursive) != 1 {
+		t.Fatalf("compiled recursive literal len = %d, want 1", len(clonedRecursive))
+	}
+	if &clonedRecursive[0] == &recursive[0] {
+		t.Fatal("compiled recursive literal aliases source slice")
+	}
+	if clonedRecursive[0] == nil {
+		t.Fatal("compiled recursive literal lost recursive element")
+	}
+	clonedSelf, ok := clonedRecursive[0].([]any)
+	if !ok {
+		t.Fatalf("compiled recursive element = %T, want []any", clonedRecursive[0])
+	}
+	if len(clonedSelf) != 1 || &clonedSelf[0] != &clonedRecursive[0] {
+		t.Fatal("compiled recursive literal does not point back to cloned slice")
+	}
+	recursive[0] = Symbol("MSFT")
+	if clonedSelfAfterMutation, ok := clonedRecursive[0].([]any); !ok || len(clonedSelfAfterMutation) != 1 || &clonedSelfAfterMutation[0] != &clonedRecursive[0] {
+		t.Fatal("compiled recursive literal changed after source slice mutation")
+	}
+
+	clonedTyped, ok := where.Values[1].(recursiveSymbols)
+	if !ok {
+		t.Fatalf("compiled typed recursive literal = %T, want recursiveSymbols", where.Values[1])
+	}
+	if len(clonedTyped) != 1 {
+		t.Fatalf("compiled typed recursive literal len = %d, want 1", len(clonedTyped))
+	}
+	if &clonedTyped[0] == &typedRecursive[0] {
+		t.Fatal("compiled typed recursive literal aliases source slice")
+	}
+	if len(clonedTyped[0]) != 1 || &clonedTyped[0][0] != &clonedTyped[0] {
+		t.Fatal("compiled typed recursive literal does not point back to cloned slice")
+	}
+	typedRecursive[0] = nil
+	if len(clonedTyped[0]) != 1 || &clonedTyped[0][0] != &clonedTyped[0] {
+		t.Fatal("compiled typed recursive literal changed after source slice mutation")
 	}
 }
 

@@ -457,20 +457,28 @@ func cloneQueryKernelLiteralList(values []any) []any {
 	return cloneQueryKernelLiteralListWithSeen(values, nil)
 }
 
-func cloneQueryKernelLiteralListWithSeen(values []any, seen map[queryKernelSliceKey]struct{}) []any {
+func cloneQueryKernelLiteralListWithSeen(values []any, seen map[queryKernelSliceKey]reflect.Value) []any {
 	if len(values) == 0 {
 		return nil
 	}
 	key, ok := queryKernelSliceKeyForValue(reflect.ValueOf(values))
 	if ok {
-		if _, exists := seen[key]; exists {
+		if cloned, exists := seen[key]; exists {
+			if out, ok := cloned.Interface().([]any); ok {
+				return out
+			}
 			return values
 		}
 		if seen == nil {
-			seen = make(map[queryKernelSliceKey]struct{})
+			seen = make(map[queryKernelSliceKey]reflect.Value)
 		}
-		seen[key] = struct{}{}
+		out := make([]any, len(values))
+		seen[key] = reflect.ValueOf(out)
 		defer delete(seen, key)
+		for i, value := range values {
+			out[i] = cloneQueryKernelLiteralWithSeen(value, seen)
+		}
+		return out
 	}
 	out := make([]any, len(values))
 	for i, value := range values {
@@ -483,7 +491,7 @@ func cloneQueryKernelLiteral(value any) any {
 	return cloneQueryKernelLiteralWithSeen(value, nil)
 }
 
-func cloneQueryKernelLiteralWithSeen(value any, seen map[queryKernelSliceKey]struct{}) any {
+func cloneQueryKernelLiteralWithSeen(value any, seen map[queryKernelSliceKey]reflect.Value) any {
 	switch x := value.(type) {
 	case []any:
 		return cloneQueryKernelLiteralListWithSeen(x, seen)
@@ -495,7 +503,7 @@ func cloneQueryKernelLiteralWithSeen(value any, seen map[queryKernelSliceKey]str
 	}
 }
 
-func cloneQueryKernelLiteralSlice(value any, seen map[queryKernelSliceKey]struct{}) (any, bool) {
+func cloneQueryKernelLiteralSlice(value any, seen map[queryKernelSliceKey]reflect.Value) (any, bool) {
 	v := reflect.ValueOf(value)
 	if !v.IsValid() || v.Kind() != reflect.Slice {
 		return nil, false
@@ -505,16 +513,18 @@ func cloneQueryKernelLiteralSlice(value any, seen map[queryKernelSliceKey]struct
 	}
 	key, ok := queryKernelSliceKeyForValue(v)
 	if ok {
-		if _, exists := seen[key]; exists {
-			return value, true
+		if cloned, exists := seen[key]; exists {
+			return cloned.Interface(), true
 		}
 		if seen == nil {
-			seen = make(map[queryKernelSliceKey]struct{})
+			seen = make(map[queryKernelSliceKey]reflect.Value)
 		}
-		seen[key] = struct{}{}
-		defer delete(seen, key)
 	}
 	out := reflect.MakeSlice(v.Type(), v.Len(), v.Len())
+	if ok {
+		seen[key] = out
+		defer delete(seen, key)
+	}
 	for i := 0; i < v.Len(); i++ {
 		item := v.Index(i)
 		cloned := cloneQueryKernelLiteralWithSeen(item.Interface(), seen)
