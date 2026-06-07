@@ -112,6 +112,46 @@ func TestFrameColumnBytecodeBuildsMethodJITIR(t *testing.T) {
 	}
 }
 
+func TestFrameProjectBytecodeBuildsMethodJITIR(t *testing.T) {
+	names := runtime.NewTable()
+	names.RawSetInt(1, runtime.StringValue("price"))
+	proto := &vm.FuncProto{
+		Name:      "frame_project",
+		NumParams: 1,
+		MaxStack:  1,
+		Constants: []runtime.Value{
+			runtime.TableValue(names),
+		},
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_FRAME_PROJECT, 0, 0, 0),
+			vm.EncodeABC(vm.OP_RETURN, 0, 2, 0),
+		},
+	}
+
+	fn := BuildGraph(proto)
+	var project *Instr
+	for _, block := range fn.Blocks {
+		for _, instr := range block.Instrs {
+			if instr.Op == OpFrameProject {
+				project = instr
+				break
+			}
+		}
+	}
+	if project == nil {
+		t.Fatalf("BuildGraph did not emit OpFrameProject:\n%s", Print(fn))
+	}
+	if len(project.Args) != 1 {
+		t.Fatalf("OpFrameProject arg count = %d, want 1", len(project.Args))
+	}
+	if project.Type != TypeAny {
+		t.Fatalf("OpFrameProject type = %s, want Any", project.Type)
+	}
+	if project.Aux != 0 {
+		t.Fatalf("OpFrameProject Aux = %d, want const index 0", project.Aux)
+	}
+}
+
 func TestFrameLenBytecodeBuildsMethodJITIR(t *testing.T) {
 	proto := &vm.FuncProto{
 		Name:      "frame_len",
@@ -178,6 +218,28 @@ func TestTier2GateAllowsFrameColumnThroughOpExit(t *testing.T) {
 	gate := firstUnsupportedTier2BytecodeGate(proto)
 	if !gate.Allowed {
 		t.Fatalf("OP_FRAME_COLUMN should be Tier2-eligible via op-exit, got %q", gate.Reason)
+	}
+}
+
+func TestTier2GateAllowsFrameProjectThroughOpExit(t *testing.T) {
+	names := runtime.NewTable()
+	names.RawSetInt(1, runtime.StringValue("price"))
+	proto := &vm.FuncProto{
+		Name:      "frame_project",
+		NumParams: 1,
+		MaxStack:  1,
+		Constants: []runtime.Value{
+			runtime.TableValue(names),
+		},
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_FRAME_PROJECT, 0, 0, 0),
+			vm.EncodeABC(vm.OP_RETURN, 0, 2, 0),
+		},
+	}
+
+	gate := firstUnsupportedTier2BytecodeGate(proto)
+	if !gate.Allowed {
+		t.Fatalf("OP_FRAME_PROJECT should be Tier2-eligible via op-exit, got %q", gate.Reason)
 	}
 }
 
@@ -254,6 +316,38 @@ func TestFrameColumnRuntimeHelperUsesRuntimePrimitive(t *testing.T) {
 	got, ok := result.DenseArray().F64()
 	if !ok || len(got) != 2 || got[0] != 10.5 || got[1] != 20.25 {
 		t.Fatalf("frame column values = %#v, want [10.5 20.25]", got)
+	}
+}
+
+func TestFrameProjectRuntimeHelperUsesRuntimePrimitive(t *testing.T) {
+	soa, err := runtime.NewSoA(map[string]*runtime.DenseArray{
+		"price": runtime.NewDenseArrayF64([]float64{10.5, 20.25}),
+		"size":  runtime.NewDenseArrayI64([]int64{100, 200}),
+	})
+	if err != nil {
+		t.Fatalf("NewSoA: %v", err)
+	}
+	frame := runtime.NewTable()
+	frame.SetNativePayloadWithInfo(soa, runtime.NativePayloadInfo{
+		Kind:    runtime.NativePayloadDataFrame,
+		Rows:    soa.Len(),
+		Columns: 2,
+	})
+
+	result, err := executeFrameProjectValue(runtime.TableValue(frame), []string{"size"})
+	if err != nil {
+		t.Fatalf("execute frame project: %v", err)
+	}
+	if !result.IsFrame() {
+		t.Fatalf("frame project result type = %s, want frame", result.TypeName())
+	}
+	col, err := executeFrameColumnValue(result, "size")
+	if err != nil {
+		t.Fatalf("projected frame column: %v", err)
+	}
+	got, ok := col.DenseArray().I64()
+	if !ok || len(got) != 2 || got[0] != 100 || got[1] != 200 {
+		t.Fatalf("projected size values = %#v, want [100 200]", got)
 	}
 }
 

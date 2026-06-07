@@ -2378,6 +2378,33 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 				fb.Result.Observe(out.Type())
 			}
 
+		case OP_FRAME_PROJECT:
+			a := DecodeA(inst)
+			b := DecodeB(inst)
+			c := DecodeC(inst)
+			frameVal := vm.regs[base+b]
+			if c >= len(constants) {
+				return nil, wrapLineErr(frame, fmt.Errorf("FRAME_PROJECT column list constant is out of range"))
+			}
+			names, err := frameProjectColumnNames(constants[c])
+			if err != nil {
+				return nil, wrapLineErr(frame, err)
+			}
+			out, handled, err := frameVal.NativeFrameProject(names)
+			if err != nil {
+				return nil, wrapLineErr(frame, err)
+			}
+			if !handled {
+				return nil, wrapLineErr(frame, fmt.Errorf("FRAME_PROJECT operand must be native frame (got %s)", frameVal.TypeName()))
+			}
+			vm.regs[base+a] = out
+			if frame.closure.Proto.Feedback != nil {
+				fb := &frame.closure.Proto.Feedback[frame.pc-1]
+				fb.Left.Observe(frameVal.Type())
+				fb.Right.Observe(constants[c].Type())
+				fb.Result.Observe(out.Type())
+			}
+
 		case OP_VECTOR_COMPARE:
 			a := DecodeA(inst)
 			b := DecodeB(inst)
@@ -3820,4 +3847,23 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 }
 
 func init() {
+}
+
+func frameProjectColumnNames(v runtime.Value) ([]string, error) {
+	if v.IsString() {
+		return []string{v.Str()}, nil
+	}
+	if !v.IsTable() {
+		return nil, fmt.Errorf("FRAME_PROJECT column list must be a string or string array")
+	}
+	tbl := v.Table()
+	names := make([]string, 0, tbl.Length())
+	for i := 1; i <= tbl.Length(); i++ {
+		item := tbl.RawGetInt(int64(i))
+		if !item.IsString() {
+			return nil, fmt.Errorf("FRAME_PROJECT column list item %d must be a string", i)
+		}
+		names = append(names, item.Str())
+	}
+	return names, nil
 }

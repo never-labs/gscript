@@ -107,6 +107,7 @@ const (
 	// Frame/Vector primitive operations
 	OP_FRAME_LEN      // A B : R(A) = native frame row count for frame R(B)
 	OP_FRAME_COLUMN   // A B C : R(A) = native frame column Constants[C] from frame R(B)
+	OP_FRAME_PROJECT  // A B C : R(A) = native frame projection Constants[C] from frame R(B)
 	OP_VECTOR_COMPARE // A B C : R(A) = compare(R(A), R(B), dense-array op C)
 	OP_VECTOR_GATHER  // A B : R(A) = gather(dense-array R(A), i64-indexes dense-array R(B))
 
@@ -264,6 +265,7 @@ var opNames = [...]string{
 	OP_ISNUMBER:       "ISNUMBER",
 	OP_FRAME_LEN:      "FRAME_LEN",
 	OP_FRAME_COLUMN:   "FRAME_COLUMN",
+	OP_FRAME_PROJECT:  "FRAME_PROJECT",
 	OP_VECTOR_COMPARE: "VECTOR_COMPARE",
 	OP_VECTOR_GATHER:  "VECTOR_GATHER",
 }

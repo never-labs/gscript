@@ -85,6 +85,7 @@ var opSpecs = [...]OpSpec{
 	OpTableArrayNestedLoad:          opSpec("TableNestedLoad", OpEmitterTable, OpArgFixedAux, OpSideEffectRead, true),
 	OpFrameLen:                      opSpecArgCount(opSpec("FrameLen", OpEmitterTable, OpArgFixed, OpSideEffectRead, true), OpFixedCount(1)),
 	OpFrameColumn:                   opSpecArgCount(opSpec("FrameColumn", OpEmitterTable, OpArgFixedAux, OpSideEffectRead, true), OpFixedCount(1)),
+	OpFrameProject:                  opSpecArgCount(opSpec("FrameProject", OpEmitterTable, OpArgFixedAux, OpSideEffectRead, true), OpFixedCount(1)),
 	OpVectorGather:                  opSpecArgCount(opSpec("VectorGather", OpEmitterTable, OpArgFixed, OpSideEffectRead, true), OpFixedCount(2)),
 	OpVectorCompare:                 opSpecArgCount(opSpec("VectorCompare", OpEmitterTable, OpArgFixedAux, OpSideEffectRead, true), OpFixedCount(2)),
 	OpGetField:                      opSpec("GetField", OpEmitterField, OpArgFixedAux, OpSideEffectRead, true),

@@ -165,10 +165,63 @@ func TestFrameColumnPrimitiveRejectsUnsupportedPayload(t *testing.T) {
 	}
 }
 
+func TestFrameProjectPrimitiveReadsSoAColumns(t *testing.T) {
+	soa, err := runtime.NewSoA(map[string]*runtime.DenseArray{
+		"x":  runtime.NewDenseArrayF64([]float64{1.5, 2.5}),
+		"id": runtime.NewDenseArrayI64([]int64{10, 20}),
+		"z":  runtime.NewDenseArrayF64([]float64{7, 8}),
+	})
+	if err != nil {
+		t.Fatalf("NewSoA: %v", err)
+	}
+	frame := runtime.NewTable()
+	frame.SetNativePayloadWithInfo(soa, runtime.NativePayloadInfo{
+		Kind:       runtime.NativePayloadDataFrame,
+		Rows:       soa.Len(),
+		Columns:    3,
+		SchemaHash: "soa-frame-test",
+	})
+	names := runtime.NewTable()
+	names.RawSetInt(1, runtime.StringValue("id"))
+	names.RawSetInt(2, runtime.StringValue("x"))
+	proto := &FuncProto{
+		MaxStack:  1,
+		Code:      frameProjectPrimitiveProgram(),
+		Constants: []runtime.Value{runtime.TableValue(frame), runtime.TableValue(names), runtime.StringValue("x")},
+	}
+	proto.EnsureFeedback()
+
+	results, err := New(map[string]runtime.Value{}).Execute(proto)
+	if err != nil {
+		t.Fatalf("Execute FRAME_PROJECT: %v", err)
+	}
+	if len(results) != 1 || !results[0].IsDenseArray() {
+		t.Fatalf("FRAME_PROJECT follow-up column result = %#v, want dense array", results)
+	}
+	got, ok := results[0].DenseArray().F64()
+	if !ok || len(got) != 2 || got[0] != 1.5 || got[1] != 2.5 {
+		t.Fatalf("projected x column = %#v, want [1.5 2.5]", got)
+	}
+
+	fb := proto.Feedback[1]
+	if fb.Left != FBTable || fb.Right != FBTable || fb.Result != FBTable {
+		t.Fatalf("FRAME_PROJECT feedback = left %v right %v result %v, want table/table/table", fb.Left, fb.Right, fb.Result)
+	}
+}
+
 func frameLenPrimitiveProgram() []uint32 {
 	return []uint32{
 		EncodeABx(OP_LOADK, 0, 0),
 		EncodeABC(OP_FRAME_LEN, 0, 0, 0),
+		EncodeABC(OP_RETURN, 0, 2, 0),
+	}
+}
+
+func frameProjectPrimitiveProgram() []uint32 {
+	return []uint32{
+		EncodeABx(OP_LOADK, 0, 0),
+		EncodeABC(OP_FRAME_PROJECT, 0, 0, 1),
+		EncodeABC(OP_FRAME_COLUMN, 0, 0, 2),
 		EncodeABC(OP_RETURN, 0, 2, 0),
 	}
 }

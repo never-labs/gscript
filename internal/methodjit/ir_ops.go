@@ -178,6 +178,10 @@ const (
 	// q/frame runtime primitive. Args = [frame], Aux = constant pool index for
 	// the column name; mirrors OP_FRAME_COLUMN and returns a dense-array column.
 	OpFrameColumn
+	// q/frame runtime primitive. Args = [frame], Aux = constant pool index for
+	// a string or string-array projection; mirrors OP_FRAME_PROJECT and returns
+	// a projected native frame facade.
+	OpFrameProject
 	// q/vector runtime primitive. Args = [vector, indexes]; mirrors
 	// OP_VECTOR_GATHER and returns a gathered dense-array value.
 	OpVectorGather

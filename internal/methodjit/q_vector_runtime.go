@@ -31,6 +31,36 @@ func executeFrameColumnValue(frameVal runtime.Value, name string) (runtime.Value
 	return out, nil
 }
 
+func executeFrameProjectValue(frameVal runtime.Value, names []string) (runtime.Value, error) {
+	out, handled, err := frameVal.NativeFrameProject(names)
+	if err != nil {
+		return runtime.NilValue(), err
+	}
+	if !handled {
+		return runtime.NilValue(), fmt.Errorf("FrameProject operand must be native frame (got %s)", frameVal.TypeName())
+	}
+	return out, nil
+}
+
+func frameProjectColumnNames(v runtime.Value) ([]string, error) {
+	if v.IsString() {
+		return []string{v.Str()}, nil
+	}
+	if !v.IsTable() {
+		return nil, fmt.Errorf("FrameProject column list must be a string or string array")
+	}
+	tbl := v.Table()
+	names := make([]string, 0, tbl.Length())
+	for i := 1; i <= tbl.Length(); i++ {
+		item := tbl.RawGetInt(int64(i))
+		if !item.IsString() {
+			return nil, fmt.Errorf("FrameProject column list item %d must be a string", i)
+		}
+		names = append(names, item.Str())
+	}
+	return names, nil
+}
+
 func executeFrameLenValue(frameVal runtime.Value) (runtime.Value, error) {
 	info, ok := frameVal.NativeFramePayloadInfo()
 	if !ok {

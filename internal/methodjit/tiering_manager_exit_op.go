@@ -349,6 +349,23 @@ func (tm *TieringManager) executeOpExit(ctx *ExecContext, regs []runtime.Value, 
 		}
 		regs[absSlot] = out
 
+	case OpFrameProject:
+		if absArg1 >= len(regs) || absSlot >= len(regs) {
+			return fmt.Errorf("FrameProject op-exit out of register range")
+		}
+		if aux < 0 || proto == nil || aux >= len(proto.Constants) {
+			return fmt.Errorf("FrameProject column list constant is out of range")
+		}
+		names, err := frameProjectColumnNames(proto.Constants[aux])
+		if err != nil {
+			return err
+		}
+		out, err := executeFrameProjectValue(regs[absArg1], names)
+		if err != nil {
+			return err
+		}
+		regs[absSlot] = out
+
 	case OpVectorGather:
 		if absArg1 >= len(regs) || absArg2 >= len(regs) || absSlot >= len(regs) {
 			return fmt.Errorf("VectorGather op-exit out of register range")

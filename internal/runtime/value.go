@@ -683,6 +683,61 @@ func (v Value) NativeFrameColumn(name string) (Value, bool, error) {
 	}
 }
 
+// NativeFrameProject returns a new runtime frame facade that carries a projected
+// subset of a runtime-owned native frame payload.
+func (v Value) NativeFrameProject(names []string) (Value, bool, error) {
+	if len(names) == 0 {
+		return NilValue(), true, fmt.Errorf("FRAME_PROJECT requires at least one column")
+	}
+	if !v.IsTable() {
+		return NilValue(), false, nil
+	}
+	tbl := v.Table()
+	if tbl == nil {
+		return NilValue(), false, nil
+	}
+	payload, info, ok := tbl.NativeFramePayload()
+	if !ok {
+		return NilValue(), false, nil
+	}
+	switch frame := payload.(type) {
+	case *SoA:
+		cols := make(map[string]*DenseArray, len(names))
+		for _, name := range names {
+			if name == "" {
+				return NilValue(), true, fmt.Errorf("FRAME_PROJECT column name must not be empty")
+			}
+			col, ok := frame.Column(name)
+			if !ok {
+				return NilValue(), true, fmt.Errorf("FRAME_PROJECT unknown column %q", name)
+			}
+			cols[name] = col
+		}
+		out, err := NewSoA(cols)
+		if err != nil {
+			return NilValue(), true, err
+		}
+		projected := NewTable()
+		projected.SetNativePayloadWithInfo(out, NativePayloadInfo{
+			Kind:       info.Kind,
+			Rows:       out.Len(),
+			Columns:    len(names),
+			SchemaHash: nativeFrameProjectSchemaHash(info.SchemaHash, names),
+		})
+		return TableValue(projected), true, nil
+	default:
+		return NilValue(), true, fmt.Errorf("FRAME_PROJECT unsupported native frame payload %T", payload)
+	}
+}
+
+func nativeFrameProjectSchemaHash(source string, names []string) string {
+	joined := strings.Join(names, ",")
+	if source == "" {
+		return "project:" + joined
+	}
+	return source + "|project:" + joined
+}
+
 func (v Value) nativeFramePayloadKind() (NativePayloadKind, bool) {
 	if !v.IsTable() {
 		return NativePayloadNone, false
