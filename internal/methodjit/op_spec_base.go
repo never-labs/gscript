@@ -84,6 +84,7 @@ var opSpecs = [...]OpSpec{
 	OpTableIntArrayCopyPrefix:       opSpec("TableIntArrayCopyPrefix", OpEmitterTable, OpArgFixed, OpSideEffectWrite, true),
 	OpTableArrayNestedLoad:          opSpec("TableNestedLoad", OpEmitterTable, OpArgFixedAux, OpSideEffectRead, true),
 	OpVectorGather:                  opSpecArgCount(opSpec("VectorGather", OpEmitterTable, OpArgFixed, OpSideEffectRead, true), OpFixedCount(2)),
+	OpVectorCompare:                 opSpecArgCount(opSpec("VectorCompare", OpEmitterTable, OpArgFixedAux, OpSideEffectRead, true), OpFixedCount(2)),
 	OpGetField:                      opSpec("GetField", OpEmitterField, OpArgFixedAux, OpSideEffectRead, true),
 	OpGetFieldNumToFloat:            opSpec("GetFieldNumToFloat", OpEmitterField, OpArgFixedAux, OpSideEffectRead, true),
 	OpFieldPolyLen:                  opSpecArgCount(opSpec("FieldPolyLen", OpEmitterField, OpArgFixedAux, OpSideEffectRead, true), OpFixedCount(1)),

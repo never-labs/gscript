@@ -12,7 +12,6 @@ var opOracleSupportPolicies = [...]OpOracleSupport{
 	OpMakeChan:              OpOracleUnsupported,
 	OpSend:                  OpOracleUnsupported,
 	OpRecv:                  OpOracleUnsupported,
-	OpVectorGather:          OpOracleUnsupported,
 	OpPhi:                   OpOraclePseudo,
 }
 
@@ -28,5 +27,4 @@ var opOracleUnsupportedReasonPolicies = [...]string{
 	OpMakeChan:              "concurrency",
 	OpSend:                  "concurrency",
 	OpRecv:                  "concurrency",
-	OpVectorGather:          "q-vector-backend-pending",
 }

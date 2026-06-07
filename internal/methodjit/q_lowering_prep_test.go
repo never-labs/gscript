@@ -41,6 +41,40 @@ func TestVectorGatherBytecodeBuildsMethodJITIR(t *testing.T) {
 	}
 }
 
+func TestVectorCompareBytecodeBuildsMethodJITIR(t *testing.T) {
+	proto := &vm.FuncProto{
+		Name:     "vector_compare",
+		MaxStack: 2,
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_VECTOR_COMPARE, 0, 1, int(runtime.DenseArrayGE)),
+			vm.EncodeABC(vm.OP_RETURN, 0, 2, 0),
+		},
+	}
+
+	fn := BuildGraph(proto)
+	var compare *Instr
+	for _, block := range fn.Blocks {
+		for _, instr := range block.Instrs {
+			if instr.Op == OpVectorCompare {
+				compare = instr
+				break
+			}
+		}
+	}
+	if compare == nil {
+		t.Fatalf("BuildGraph did not emit OpVectorCompare:\n%s", Print(fn))
+	}
+	if len(compare.Args) != 2 {
+		t.Fatalf("OpVectorCompare arg count = %d, want 2", len(compare.Args))
+	}
+	if compare.Type != TypeAny {
+		t.Fatalf("OpVectorCompare type = %s, want Any", compare.Type)
+	}
+	if compare.Aux != int64(runtime.DenseArrayGE) {
+		t.Fatalf("OpVectorCompare Aux = %d, want %d", compare.Aux, runtime.DenseArrayGE)
+	}
+}
+
 func TestTier2GateBlocksVectorGatherUntilBackendLowering(t *testing.T) {
 	proto := &vm.FuncProto{
 		Name:     "vector_gather",
@@ -57,6 +91,25 @@ func TestTier2GateBlocksVectorGatherUntilBackendLowering(t *testing.T) {
 	}
 	if !strings.Contains(gate.Reason, "VECTOR_GATHER") {
 		t.Fatalf("gate reason = %q, want VECTOR_GATHER", gate.Reason)
+	}
+}
+
+func TestTier2GateBlocksVectorCompareUntilBackendLowering(t *testing.T) {
+	proto := &vm.FuncProto{
+		Name:     "vector_compare",
+		MaxStack: 2,
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_VECTOR_COMPARE, 0, 1, int(runtime.DenseArrayGE)),
+			vm.EncodeABC(vm.OP_RETURN, 0, 2, 0),
+		},
+	}
+
+	gate := firstUnsupportedTier2BytecodeGate(proto)
+	if gate.Allowed {
+		t.Fatal("OP_VECTOR_COMPARE should stay out of Tier 2 until backend lowering exists")
+	}
+	if !strings.Contains(gate.Reason, "VECTOR_COMPARE") {
+		t.Fatalf("gate reason = %q, want VECTOR_COMPARE", gate.Reason)
 	}
 }
 

@@ -952,6 +952,15 @@ func (b *graphBuilder) emitBlocks() {
 				instr := b.emit(block, OpVectorGather, TypeAny, []*Value{vector, indexes}, 0, 0)
 				b.writeVariable(a, block, instr.Value())
 
+			case vm.OP_VECTOR_COMPARE:
+				a := vm.DecodeA(inst)
+				bOp := vm.DecodeB(inst)
+				c := vm.DecodeC(inst)
+				left := b.readVariable(a, block)
+				right := b.readVariable(bOp, block)
+				instr := b.emit(block, OpVectorCompare, TypeAny, []*Value{left, right}, int64(c), 0)
+				b.writeVariable(a, block, instr.Value())
+
 			case vm.OP_SELF:
 				a := vm.DecodeA(inst)
 				bOp := vm.DecodeB(inst)

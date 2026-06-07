@@ -176,6 +176,9 @@ const (
 	// OP_VECTOR_GATHER and returns a gathered dense-array value. Current Tier 2
 	// gates keep this in Tier 1 until backend lowering/deopt is implemented.
 	OpVectorGather
+	// q/vector compare-mask primitive. Args = [left, right], Aux = runtime
+	// DenseArrayBinaryOp comparison opcode; mirrors OP_VECTOR_COMPARE.
+	OpVectorCompare
 	OpGetField // Args[0].field; Aux = constant pool index for field name
 	// OpGetFieldNumToFloat fuses Args[0].field with numeric widening.
 	// It preserves NumToFloat semantics: int and float fields become raw
