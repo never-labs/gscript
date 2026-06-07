@@ -1080,7 +1080,7 @@ flat := q.query(trades, {
 
 calc := q.query(trades, {
     where: soa.mask(trades, "sym", "==", 1),
-    select: {notional: {"*", "price", "size"}, adjusted: {"+", "price", 1.5}},
+    select: {notional: {"*", "price", "size"}, adjusted: {"+", "price", 1.5}, marker: 1},
 })
 
 limited := q.query(trades, {
@@ -1182,6 +1182,17 @@ ordered := q.query(trades, {
 	if !ok || len(adjusted) != 2 || adjusted[0] != 11.5 || adjusted[1] != 13.5 {
 		t.Fatalf("calc adjusted = %#v, want [11.5 13.5]", adjusted)
 	}
+	markerCol, handled, err := TableValue(calc).NativeFrameColumn("marker")
+	if err != nil {
+		t.Fatalf("calc NativeFrameColumn(marker): %v", err)
+	}
+	if !handled || !markerCol.IsDenseArray() {
+		t.Fatalf("calc marker column = %v handled=%v, want dense array", markerCol, handled)
+	}
+	marker, ok := markerCol.DenseArray().I64()
+	if !ok || len(marker) != 2 || marker[0] != 1 || marker[1] != 1 {
+		t.Fatalf("calc marker = %#v, want [1 1]", marker)
+	}
 	limited := interp.GetGlobal("limited").Table()
 	if limited == nil || limited.Length() != 2 {
 		t.Fatalf("limited length = %v, want 2", limited)
@@ -1261,7 +1272,7 @@ supported := q.explain_query(trades, {
 })
 
 unsupported := q.explain_query(trades, {
-    select: {price: "price", marker: 1},
+    select: {price: "price", marker: true},
 })
 `)
 
@@ -2840,14 +2851,14 @@ func TestQFallbackStatsTrackQueryKernelFallback(t *testing.T) {
 
 	interp := runWithQAndSOA(t, `
 trades := soa.zip({price: []f64{100, 101}})
-rows := q.query(trades, {select: {price: "price", marker: 1}})
+rows := q.query(trades, {select: {price: "price", marker: true}})
 `)
 	rows := interp.GetGlobal("rows").Table()
 	if rows == nil || rows.Length() != 2 {
 		t.Fatalf("rows length = %v, want 2", rows)
 	}
-	if got := rows.RawGetInt(1).Table().RawGetString("marker"); !got.IsInt() || got.Int() != 1 {
-		t.Fatalf("rows[1].marker = %v, want 1", got)
+	if got := rows.RawGetInt(1).Table().RawGetString("marker"); !got.IsBool() || !got.Bool() {
+		t.Fatalf("rows[1].marker = %v, want true", got)
 	}
 	stats := qTestFallbackStatsRows(t, qFallbackStatsTable())
 	if got := stats[qFallbackQueryKernel]; got != 1 {

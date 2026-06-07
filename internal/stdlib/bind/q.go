@@ -4138,6 +4138,26 @@ func qEvalNativeExpr(s *SoA, expr Value) (*DenseArray, bool) {
 		col, ok := s.Column(expr.Str())
 		return col, ok
 	}
+	if expr.IsInt() {
+		out, err := NewDenseArrayOfLen(DenseArrayI64, s.Len())
+		if err != nil {
+			return nil, false
+		}
+		if err := out.Fill(expr); err != nil {
+			return nil, false
+		}
+		return out, true
+	}
+	if expr.IsFloat() {
+		out, err := NewDenseArrayOfLen(DenseArrayF64, s.Len())
+		if err != nil {
+			return nil, false
+		}
+		if err := out.Fill(expr); err != nil {
+			return nil, false
+		}
+		return out, true
+	}
 	if !expr.IsTable() {
 		return nil, false
 	}
