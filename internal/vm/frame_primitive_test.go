@@ -291,6 +291,46 @@ func TestFrameGatherPrimitiveGathersSoARows(t *testing.T) {
 	}
 }
 
+func TestFrameSlicePrimitiveSlicesSoARows(t *testing.T) {
+	soa, err := runtime.NewSoA(map[string]*runtime.DenseArray{
+		"x":  runtime.NewDenseArrayF64([]float64{1.5, 2.5, 3.5}),
+		"id": runtime.NewDenseArrayI64([]int64{10, 20, 30}),
+	})
+	if err != nil {
+		t.Fatalf("NewSoA: %v", err)
+	}
+	frame := runtime.NewTable()
+	frame.SetNativePayloadWithInfo(soa, runtime.NativePayloadInfo{
+		Kind:       runtime.NativePayloadDataFrame,
+		Rows:       soa.Len(),
+		Columns:    2,
+		SchemaHash: "soa-frame-test",
+	})
+	proto := &FuncProto{
+		MaxStack:  2,
+		Code:      frameSlicePrimitiveProgram(),
+		Constants: []runtime.Value{runtime.TableValue(frame), runtime.IntValue(2), runtime.StringValue("id")},
+	}
+	proto.EnsureFeedback()
+
+	results, err := New(map[string]runtime.Value{}).Execute(proto)
+	if err != nil {
+		t.Fatalf("Execute FRAME_SLICE: %v", err)
+	}
+	if len(results) != 1 || !results[0].IsDenseArray() {
+		t.Fatalf("FRAME_SLICE follow-up column result = %#v, want dense array", results)
+	}
+	got, ok := results[0].DenseArray().I64()
+	if !ok || len(got) != 2 || got[0] != 10 || got[1] != 20 {
+		t.Fatalf("sliced id column = %#v, want [10 20]", got)
+	}
+
+	fb := proto.Feedback[2]
+	if fb.Left != FBTable || fb.Right != FBInt || fb.Result != FBTable {
+		t.Fatalf("FRAME_SLICE feedback = left %v right %v result %v, want table/int/table", fb.Left, fb.Right, fb.Result)
+	}
+}
+
 func TestFramePrimitivePipelineFiltersProjectsAndLoadsColumn(t *testing.T) {
 	soa, err := runtime.NewSoA(map[string]*runtime.DenseArray{
 		"price": runtime.NewDenseArrayF64([]float64{99, 100.5, 101.25}),
@@ -371,6 +411,16 @@ func frameGatherPrimitiveProgram() []uint32 {
 		EncodeABx(OP_LOADK, 0, 0),
 		EncodeABx(OP_LOADK, 1, 1),
 		EncodeABC(OP_FRAME_GATHER, 0, 0, 1),
+		EncodeABC(OP_FRAME_COLUMN, 0, 0, 2),
+		EncodeABC(OP_RETURN, 0, 2, 0),
+	}
+}
+
+func frameSlicePrimitiveProgram() []uint32 {
+	return []uint32{
+		EncodeABx(OP_LOADK, 0, 0),
+		EncodeABx(OP_LOADK, 1, 1),
+		EncodeABC(OP_FRAME_SLICE, 0, 0, 1),
 		EncodeABC(OP_FRAME_COLUMN, 0, 0, 2),
 		EncodeABC(OP_RETURN, 0, 2, 0),
 	}

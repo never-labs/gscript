@@ -7,13 +7,14 @@ import (
 )
 
 // QQueryHotPath describes an IR pattern for the q query primitive pipeline:
-// column load -> typed compare mask -> frame filter -> optional row gather ->
-// frame projection -> projected column load.
+// column load -> typed compare mask -> frame filter -> optional row reorder or
+// prefix slice -> frame projection -> projected column load.
 type QQueryHotPath struct {
 	SourceColumn *Instr
 	Compare      *Instr
 	Filter       *Instr
 	RowGather    *Instr
+	RowSlice     *Instr
 	Project      *Instr
 	ResultColumn *Instr
 }
@@ -41,12 +42,19 @@ func DetectQQueryHotPaths(fn *Function) []QQueryHotPath {
 			}
 			filterInput := project.Args[0]
 			var rowGather *Instr
+			var rowSlice *Instr
 			if gather := valueDef(filterInput, OpFrameGather); gather != nil {
 				if len(gather.Args) != 2 {
 					continue
 				}
 				rowGather = gather
 				filterInput = gather.Args[0]
+			} else if slice := valueDef(filterInput, OpFrameSlice); slice != nil {
+				if len(slice.Args) != 2 {
+					continue
+				}
+				rowSlice = slice
+				filterInput = slice.Args[0]
 			}
 			filter := valueDef(filterInput, OpFrameFilter)
 			if filter == nil || len(filter.Args) != 2 {
@@ -68,6 +76,7 @@ func DetectQQueryHotPaths(fn *Function) []QQueryHotPath {
 				Compare:      compare,
 				Filter:       filter,
 				RowGather:    rowGather,
+				RowSlice:     rowSlice,
 				Project:      project,
 				ResultColumn: instr,
 			})

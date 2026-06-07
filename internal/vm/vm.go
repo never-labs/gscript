@@ -2453,6 +2453,30 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 				fb.Result.Observe(out.Type())
 			}
 
+		case OP_FRAME_SLICE:
+			a := DecodeA(inst)
+			b := DecodeB(inst)
+			c := DecodeC(inst)
+			frameVal := vm.regs[base+b]
+			endVal := vm.regs[base+c]
+			if !endVal.IsInt() {
+				return nil, wrapLineErr(frame, fmt.Errorf("FRAME_SLICE end must be int (got %s)", endVal.TypeName()))
+			}
+			out, handled, err := frameVal.NativeFrameSlice(0, int(endVal.Int()))
+			if err != nil {
+				return nil, wrapLineErr(frame, err)
+			}
+			if !handled {
+				return nil, wrapLineErr(frame, fmt.Errorf("FRAME_SLICE operand must be native frame (got %s)", frameVal.TypeName()))
+			}
+			vm.regs[base+a] = out
+			if frame.closure.Proto.Feedback != nil {
+				fb := &frame.closure.Proto.Feedback[frame.pc-1]
+				fb.Left.Observe(frameVal.Type())
+				fb.Right.Observe(endVal.Type())
+				fb.Result.Observe(out.Type())
+			}
+
 		case OP_VECTOR_COMPARE:
 			a := DecodeA(inst)
 			b := DecodeB(inst)

@@ -386,6 +386,16 @@ func (tm *TieringManager) executeOpExit(ctx *ExecContext, regs []runtime.Value, 
 		}
 		regs[absSlot] = out
 
+	case OpFrameSlice:
+		if absArg1 >= len(regs) || absArg2 >= len(regs) || absSlot >= len(regs) {
+			return fmt.Errorf("FrameSlice op-exit out of register range")
+		}
+		out, err := executeFrameSliceValue(regs[absArg1], regs[absArg2])
+		if err != nil {
+			return err
+		}
+		regs[absSlot] = out
+
 	case OpVectorGather:
 		if absArg1 >= len(regs) || absArg2 >= len(regs) || absSlot >= len(regs) {
 			return fmt.Errorf("VectorGather op-exit out of register range")

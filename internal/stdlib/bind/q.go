@@ -4489,11 +4489,14 @@ func qQueryNativeRowsForResult(spec *Table, nativeRows *SoA) (*SoA, bool) {
 	if limit < 0 || limit >= nativeRows.Len() {
 		return nativeRows, true
 	}
-	out, err := nativeRows.Slice(0, limit)
+	sliced, handled, err := qNativeRowsFrameCarrier(nativeRows).NativeFrameSlice(0, limit)
 	if err != nil {
 		return nil, false
 	}
-	return out, true
+	if !handled {
+		return nil, false
+	}
+	return qNativeRowsFromFrameValue(sliced)
 }
 
 func qOrderedNativeRowsForResult(nativeRows *SoA, order []qOrderSpec, limit int) (*SoA, bool) {
@@ -4538,6 +4541,17 @@ func qOrderedNativeRowsForResult(nativeRows *SoA, order []qOrderSpec, limit int)
 	if limit >= 0 && limit < len(indices) {
 		indices = indices[:limit]
 	}
+	gathered, handled, err := qNativeRowsFrameCarrier(nativeRows).NativeFrameGather(NewDenseArrayI64(indices))
+	if err != nil {
+		return nil, false
+	}
+	if !handled {
+		return nil, false
+	}
+	return qNativeRowsFromFrameValue(gathered)
+}
+
+func qNativeRowsFrameCarrier(nativeRows *SoA) Value {
 	carrier := NewTable()
 	carrier.SetNativePayloadWithInfo(nativeRows, NativePayloadInfo{
 		Kind:       NativePayloadDataFrame,
@@ -4545,14 +4559,14 @@ func qOrderedNativeRowsForResult(nativeRows *SoA, order []qOrderSpec, limit int)
 		Columns:    len(nativeRows.ColumnNames()),
 		SchemaHash: qQueryNativeSoASchemaHash(nativeRows),
 	})
-	gathered, handled, err := TableValue(carrier).NativeFrameGather(NewDenseArrayI64(indices))
-	if err != nil {
+	return TableValue(carrier)
+}
+
+func qNativeRowsFromFrameValue(value Value) (*SoA, bool) {
+	if !value.IsTable() {
 		return nil, false
 	}
-	if !handled || !gathered.IsTable() {
-		return nil, false
-	}
-	out, _, ok := gathered.Table().NativeFramePayload()
+	out, _, ok := value.Table().NativeFramePayload()
 	if !ok {
 		return nil, false
 	}

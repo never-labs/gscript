@@ -70,6 +70,20 @@ func executeFrameGatherValue(frameVal, indexVal runtime.Value) (runtime.Value, e
 	return out, nil
 }
 
+func executeFrameSliceValue(frameVal, endVal runtime.Value) (runtime.Value, error) {
+	if !endVal.IsInt() {
+		return runtime.NilValue(), fmt.Errorf("FrameSlice end must be int (got %s)", endVal.TypeName())
+	}
+	out, handled, err := frameVal.NativeFrameSlice(0, int(endVal.Int()))
+	if err != nil {
+		return runtime.NilValue(), err
+	}
+	if !handled {
+		return runtime.NilValue(), fmt.Errorf("FrameSlice operand must be native frame (got %s)", frameVal.TypeName())
+	}
+	return out, nil
+}
+
 func frameProjectColumnNames(v runtime.Value) ([]string, error) {
 	if v.IsString() {
 		return []string{v.Str()}, nil

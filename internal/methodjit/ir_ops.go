@@ -188,6 +188,9 @@ const (
 	// q/frame runtime primitive. Args = [frame, indexes]; mirrors
 	// OP_FRAME_GATHER and returns a gathered native frame facade.
 	OpFrameGather
+	// q/frame runtime primitive. Args = [frame, end]; mirrors OP_FRAME_SLICE
+	// and returns a prefix-sliced native frame facade.
+	OpFrameSlice
 	// q/vector runtime primitive. Args = [vector, indexes]; mirrors
 	// OP_VECTOR_GATHER and returns a gathered dense-array value.
 	OpVectorGather

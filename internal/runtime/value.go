@@ -802,6 +802,42 @@ func (v Value) NativeFrameGather(indices *DenseArray) (Value, bool, error) {
 	}
 }
 
+// NativeFrameSlice returns a new runtime frame facade containing rows in
+// [start, end).
+func (v Value) NativeFrameSlice(start, end int) (Value, bool, error) {
+	if start < 0 || end < start {
+		return NilValue(), true, fmt.Errorf("FRAME_SLICE range out of bounds")
+	}
+	if !v.IsTable() {
+		return NilValue(), false, nil
+	}
+	tbl := v.Table()
+	if tbl == nil {
+		return NilValue(), false, nil
+	}
+	payload, info, ok := tbl.NativeFramePayload()
+	if !ok {
+		return NilValue(), false, nil
+	}
+	switch frame := payload.(type) {
+	case *SoA:
+		out, err := frame.Slice(start, end)
+		if err != nil {
+			return NilValue(), true, err
+		}
+		sliced := NewTable()
+		sliced.SetNativePayloadWithInfo(out, NativePayloadInfo{
+			Kind:       info.Kind,
+			Rows:       out.Len(),
+			Columns:    info.Columns,
+			SchemaHash: nativeFrameSliceSchemaHash(info.SchemaHash),
+		})
+		return TableValue(sliced), true, nil
+	default:
+		return NilValue(), true, fmt.Errorf("FRAME_SLICE unsupported native frame payload %T", payload)
+	}
+}
+
 func nativeFrameProjectSchemaHash(source string, names []string) string {
 	joined := strings.Join(names, ",")
 	if source == "" {
@@ -822,6 +858,13 @@ func nativeFrameGatherSchemaHash(source string) string {
 		return "gather"
 	}
 	return source + "|gather"
+}
+
+func nativeFrameSliceSchemaHash(source string) string {
+	if source == "" {
+		return "slice"
+	}
+	return source + "|slice"
 }
 
 func (v Value) nativeFramePayloadKind() (NativePayloadKind, bool) {
