@@ -1212,8 +1212,19 @@ ordered := q.query(trades, {
 	if !ok {
 		t.Fatal("ordered missing native frame payload info")
 	}
-	if strings.HasPrefix(orderedInfo.SchemaHash, "q.query.kernel:") {
-		t.Fatalf("ordered schema hash = %q, want ordered fallback payload", orderedInfo.SchemaHash)
+	if !strings.HasPrefix(orderedInfo.SchemaHash, "q.query.kernel:") {
+		t.Fatalf("ordered schema hash = %q, want q.query kernel payload", orderedInfo.SchemaHash)
+	}
+	orderedCol, handled, err := TableValue(ordered).NativeFrameColumn("px")
+	if err != nil {
+		t.Fatalf("ordered NativeFrameColumn(px): %v", err)
+	}
+	if !handled || !orderedCol.IsDenseArray() {
+		t.Fatalf("ordered px column = %v handled=%v, want dense array", orderedCol, handled)
+	}
+	orderedPx, ok := orderedCol.DenseArray().F64()
+	if !ok || len(orderedPx) != 2 || orderedPx[0] != 12 || orderedPx[1] != 10 {
+		t.Fatalf("ordered px = %#v, want [12 10]", orderedPx)
 	}
 }
 

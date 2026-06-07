@@ -4115,17 +4115,70 @@ func qQueryNativeRowsForResult(spec *Table, nativeRows *SoA) (*SoA, bool) {
 	if spec == nil {
 		return nativeRows, true
 	}
-	if !spec.RawGetString("order_by").IsNil() {
+	order, err := qOrderSpecs(spec.RawGetString("order_by"))
+	if err != nil {
 		return nil, false
 	}
 	limit, err := qLimit(spec.RawGetString("limit"))
 	if err != nil {
 		return nil, false
 	}
+	if len(order) > 0 {
+		return qOrderedNativeRowsForResult(nativeRows, order, limit)
+	}
 	if limit < 0 || limit >= nativeRows.Len() {
 		return nativeRows, true
 	}
 	out, err := nativeRows.Slice(0, limit)
+	if err != nil {
+		return nil, false
+	}
+	return out, true
+}
+
+func qOrderedNativeRowsForResult(nativeRows *SoA, order []qOrderSpec, limit int) (*SoA, bool) {
+	if nativeRows == nil || len(order) == 0 {
+		return nativeRows, nativeRows != nil
+	}
+	orderCols := make([]*DenseArray, len(order))
+	for i, ord := range order {
+		col, ok := nativeRows.Column(ord.Column)
+		if !ok {
+			return nil, false
+		}
+		orderCols[i] = col
+	}
+	indices := make([]int64, nativeRows.Len())
+	for i := range indices {
+		indices[i] = int64(i + 1)
+	}
+	sort.SliceStable(indices, func(i, j int) bool {
+		leftIdx := int(indices[i] - 1)
+		rightIdx := int(indices[j] - 1)
+		for k, ord := range order {
+			left, err := orderCols[k].At(leftIdx)
+			if err != nil {
+				return false
+			}
+			right, err := orderCols[k].At(rightIdx)
+			if err != nil {
+				return false
+			}
+			cmp := qCompareValues(left, right)
+			if cmp == 0 {
+				continue
+			}
+			if ord.Desc {
+				return cmp > 0
+			}
+			return cmp < 0
+		}
+		return false
+	})
+	if limit >= 0 && limit < len(indices) {
+		indices = indices[:limit]
+	}
+	out, err := nativeRows.Gather(NewDenseArrayI64(indices))
 	if err != nil {
 		return nil, false
 	}
