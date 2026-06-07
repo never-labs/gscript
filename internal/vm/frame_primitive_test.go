@@ -72,10 +72,111 @@ func TestFrameLenPrimitiveRejectsPlainTable(t *testing.T) {
 	}
 }
 
+func TestFrameColumnPrimitiveReadsSoAColumn(t *testing.T) {
+	soa, err := runtime.NewSoA(map[string]*runtime.DenseArray{
+		"x":  runtime.NewDenseArrayF64([]float64{1.5, 2.5, 3.5}),
+		"id": runtime.NewDenseArrayI64([]int64{10, 20, 30}),
+	})
+	if err != nil {
+		t.Fatalf("NewSoA: %v", err)
+	}
+	frame := runtime.NewTable()
+	frame.SetNativePayloadWithInfo(soa, runtime.NativePayloadInfo{
+		Kind:       runtime.NativePayloadDataFrame,
+		Rows:       soa.Len(),
+		Columns:    2,
+		SchemaHash: "soa-frame-test",
+	})
+	proto := &FuncProto{
+		MaxStack:  1,
+		Code:      frameColumnPrimitiveProgram(),
+		Constants: []runtime.Value{runtime.TableValue(frame), runtime.StringValue("x")},
+	}
+	proto.EnsureFeedback()
+
+	results, err := New(map[string]runtime.Value{}).Execute(proto)
+	if err != nil {
+		t.Fatalf("Execute FRAME_COLUMN: %v", err)
+	}
+	if len(results) != 1 || !results[0].IsDenseArray() {
+		t.Fatalf("FRAME_COLUMN result = %#v, want dense array", results)
+	}
+	got, ok := results[0].DenseArray().F64()
+	if !ok {
+		t.Fatalf("FRAME_COLUMN dtype = %s, want f64", results[0].DenseArray().DType())
+	}
+	want := []float64{1.5, 2.5, 3.5}
+	if len(got) != len(want) {
+		t.Fatalf("FRAME_COLUMN len = %d, want %d", len(got), len(want))
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("FRAME_COLUMN[%d] = %v, want %v", i, got[i], want[i])
+		}
+	}
+
+	fb := proto.Feedback[1]
+	if fb.Left != FBTable || fb.Right != FBString || fb.Result != FBAny {
+		t.Fatalf("FRAME_COLUMN feedback = left %v right %v result %v, want frame-as-table/string/dense bucket", fb.Left, fb.Right, fb.Result)
+	}
+}
+
+func TestFrameColumnPrimitiveRejectsMissingColumn(t *testing.T) {
+	soa, err := runtime.NewSoA(map[string]*runtime.DenseArray{
+		"x": runtime.NewDenseArrayF64([]float64{1, 2}),
+	})
+	if err != nil {
+		t.Fatalf("NewSoA: %v", err)
+	}
+	frame := runtime.NewTable()
+	frame.SetNativePayloadWithInfo(soa, runtime.NativePayloadInfo{
+		Kind:    runtime.NativePayloadDataFrame,
+		Rows:    soa.Len(),
+		Columns: 1,
+	})
+	proto := &FuncProto{
+		MaxStack:  1,
+		Code:      frameColumnPrimitiveProgram(),
+		Constants: []runtime.Value{runtime.TableValue(frame), runtime.StringValue("missing")},
+	}
+
+	_, err = New(map[string]runtime.Value{}).Execute(proto)
+	if err == nil || !strings.Contains(err.Error(), `FRAME_COLUMN unknown column "missing"`) {
+		t.Fatalf("FRAME_COLUMN missing column error = %v, want unknown column error", err)
+	}
+}
+
+func TestFrameColumnPrimitiveRejectsUnsupportedPayload(t *testing.T) {
+	frame := runtime.NewTable()
+	frame.SetNativePayloadWithInfo(struct{}{}, runtime.NativePayloadInfo{
+		Kind:    runtime.NativePayloadDataFrame,
+		Rows:    2,
+		Columns: 1,
+	})
+	proto := &FuncProto{
+		MaxStack:  1,
+		Code:      frameColumnPrimitiveProgram(),
+		Constants: []runtime.Value{runtime.TableValue(frame), runtime.StringValue("x")},
+	}
+
+	_, err := New(map[string]runtime.Value{}).Execute(proto)
+	if err == nil || !strings.Contains(err.Error(), "FRAME_COLUMN unsupported native frame payload") {
+		t.Fatalf("FRAME_COLUMN unsupported payload error = %v, want unsupported payload error", err)
+	}
+}
+
 func frameLenPrimitiveProgram() []uint32 {
 	return []uint32{
 		EncodeABx(OP_LOADK, 0, 0),
 		EncodeABC(OP_FRAME_LEN, 0, 0, 0),
+		EncodeABC(OP_RETURN, 0, 2, 0),
+	}
+}
+
+func frameColumnPrimitiveProgram() []uint32 {
+	return []uint32{
+		EncodeABx(OP_LOADK, 0, 0),
+		EncodeABC(OP_FRAME_COLUMN, 0, 0, 1),
 		EncodeABC(OP_RETURN, 0, 2, 0),
 	}
 }

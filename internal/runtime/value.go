@@ -653,6 +653,36 @@ func (v Value) NativeFramePayloadInfo() (NativePayloadInfo, bool) {
 	return tbl.NativeFramePayloadInfo()
 }
 
+// NativeFrameColumn returns a dense column from runtime-owned native frame
+// carriers. It intentionally keeps the VM away from native payload kind
+// branching; unsupported payload implementations can add a runtime carrier here.
+func (v Value) NativeFrameColumn(name string) (Value, bool, error) {
+	if name == "" {
+		return NilValue(), true, fmt.Errorf("FRAME_COLUMN name must not be empty")
+	}
+	if !v.IsTable() {
+		return NilValue(), false, nil
+	}
+	tbl := v.Table()
+	if tbl == nil {
+		return NilValue(), false, nil
+	}
+	payload, _, ok := tbl.NativeFramePayload()
+	if !ok {
+		return NilValue(), false, nil
+	}
+	switch frame := payload.(type) {
+	case *SoA:
+		col, ok := frame.Column(name)
+		if !ok {
+			return NilValue(), true, fmt.Errorf("FRAME_COLUMN unknown column %q", name)
+		}
+		return DenseArrayValue(col), true, nil
+	default:
+		return NilValue(), true, fmt.Errorf("FRAME_COLUMN unsupported native frame payload %T", payload)
+	}
+}
+
 func (v Value) nativeFramePayloadKind() (NativePayloadKind, bool) {
 	if !v.IsTable() {
 		return NativePayloadNone, false

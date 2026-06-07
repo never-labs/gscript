@@ -2355,6 +2355,29 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 				fb.Result.Observe(vm.regs[base+a].Type())
 			}
 
+		case OP_FRAME_COLUMN:
+			a := DecodeA(inst)
+			b := DecodeB(inst)
+			c := DecodeC(inst)
+			frameVal := vm.regs[base+b]
+			if c >= len(constants) || !constants[c].IsString() {
+				return nil, wrapLineErr(frame, fmt.Errorf("FRAME_COLUMN column name must be a string constant"))
+			}
+			out, handled, err := frameVal.NativeFrameColumn(constants[c].Str())
+			if err != nil {
+				return nil, wrapLineErr(frame, err)
+			}
+			if !handled {
+				return nil, wrapLineErr(frame, fmt.Errorf("FRAME_COLUMN operand must be native frame (got %s)", frameVal.TypeName()))
+			}
+			vm.regs[base+a] = out
+			if frame.closure.Proto.Feedback != nil {
+				fb := &frame.closure.Proto.Feedback[frame.pc-1]
+				fb.Left.Observe(frameVal.Type())
+				fb.Right.Observe(constants[c].Type())
+				fb.Result.Observe(out.Type())
+			}
+
 		case OP_VECTOR_COMPARE:
 			a := DecodeA(inst)
 			b := DecodeB(inst)
