@@ -1,6 +1,10 @@
 package methodjit
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/never-labs/leia/internal/runtime"
+)
 
 // QQueryHotPath describes an IR pattern for the q query primitive pipeline:
 // column load -> typed compare mask -> frame filter -> frame projection ->
@@ -83,9 +87,32 @@ func QQueryHotPathRemarkPass(fn *Function) (*Function, error) {
 		blockID,
 		valueID,
 		OpFrameColumn,
-		fmt.Sprintf("recognized %d q query primitive hot path(s); native lowering pending", len(paths)),
+		fmt.Sprintf("recognized %d q query primitive hot path(s), first compare %s; native lowering pending",
+			len(paths), qQueryHotPathCompareOpName(paths[0].Compare)),
 	)
 	return fn, nil
+}
+
+func qQueryHotPathCompareOpName(compare *Instr) string {
+	if compare == nil {
+		return "unknown"
+	}
+	switch runtime.DenseArrayBinaryOp(compare.Aux) {
+	case runtime.DenseArrayEQ:
+		return "=="
+	case runtime.DenseArrayNE:
+		return "!="
+	case runtime.DenseArrayLT:
+		return "<"
+	case runtime.DenseArrayLE:
+		return "<="
+	case runtime.DenseArrayGT:
+		return ">"
+	case runtime.DenseArrayGE:
+		return ">="
+	default:
+		return fmt.Sprintf("op(%d)", compare.Aux)
+	}
 }
 
 func qQueryCompareColumn(compare *Instr) *Instr {

@@ -290,6 +290,7 @@ func TestDiagnoseReportsQQueryHotPath(t *testing.T) {
 		t.Fatalf("diagnostic report missing q hot path section:\n%s", report.String())
 	}
 	if !strings.Contains(formatOptimizationRemarks(report.OptimizationRemarks), "QQueryHotPath") ||
+		!strings.Contains(formatOptimizationRemarks(report.OptimizationRemarks), "compare >=") ||
 		!strings.Contains(formatOptimizationRemarks(report.OptimizationRemarks), "native lowering pending") {
 		t.Fatalf("diagnostic remarks missing q hot path handoff:\n%s", formatOptimizationRemarks(report.OptimizationRemarks))
 	}
