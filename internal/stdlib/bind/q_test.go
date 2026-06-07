@@ -45,6 +45,67 @@ func TestQDataFrameValueKeepsNativeFramePayload(t *testing.T) {
 	}
 }
 
+func TestQDataFrameValueInstallsRuntimeSoAPayloadForDenseFrame(t *testing.T) {
+	frame, err := data.NewFrame(
+		data.Column{Name: "price", Data: data.NewF64([]float64{100.5, 101.25})},
+		data.Column{Name: "size", Data: data.NewI64([]int64{10, 20})},
+		data.Column{Name: "active", Data: data.NewBool([]bool{true, false})},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	value, err := qDataFrameValue(frame)
+	if err != nil {
+		t.Fatal(err)
+	}
+	table := value.Table()
+	if _, ok := table.NativePayload().(*runtime.SoA); !ok {
+		t.Fatalf("q dense frame native payload = %T, want *runtime.SoA", table.NativePayload())
+	}
+	col, handled, err := value.NativeFrameColumn("price")
+	if err != nil {
+		t.Fatalf("NativeFrameColumn(price): %v", err)
+	}
+	if !handled || !col.IsDenseArray() {
+		t.Fatalf("NativeFrameColumn(price) = %v handled=%v, want dense array", col, handled)
+	}
+	got, ok := col.DenseArray().F64()
+	if !ok || len(got) != 2 || got[0] != 100.5 || got[1] != 101.25 {
+		t.Fatalf("price column = %#v, want [100.5 101.25]", got)
+	}
+	roundTrip, err := qDataFrameFromValue(value, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if kind, ok := roundTrip.Schema().Kind("size"); !ok || kind != data.KindI64 {
+		t.Fatalf("round-trip size kind = %q, %v; want i64", kind, ok)
+	}
+}
+
+func TestQDataFrameValueKeepsDataPayloadForNonRuntimeDenseKind(t *testing.T) {
+	frame, err := data.NewFrame(
+		data.Column{Name: "qty", Data: data.NewI32([]int32{10, 20})},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	value, err := qDataFrameValue(frame)
+	if err != nil {
+		t.Fatal(err)
+	}
+	table := value.Table()
+	if _, ok := table.NativePayload().(data.Frame); !ok {
+		t.Fatalf("q i32 frame native payload = %T, want data.Frame", table.NativePayload())
+	}
+	roundTrip, err := qDataFrameFromValue(value, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if kind, ok := roundTrip.Schema().Kind("qty"); !ok || kind != data.KindI32 {
+		t.Fatalf("round-trip qty kind = %q, %v; want i32", kind, ok)
+	}
+}
+
 func TestQDataFrameFromValueUsesNativeFramePayload(t *testing.T) {
 	frame, err := data.NewFrame(
 		data.Column{Name: "sym", Data: data.NewSymbols([]string{"AAPL"})},

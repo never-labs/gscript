@@ -1483,11 +1483,18 @@ func qTypedNativeDataFramePayload(tbl *Table) (data.Frame, bool, error) {
 	if info.Kind != NativePayloadDataFrame {
 		return data.Frame{}, false, nil
 	}
-	native, hasPayload := payload.(data.Frame)
-	if !hasPayload {
+	switch native := payload.(type) {
+	case data.Frame:
+		return native, true, nil
+	case *SoA:
+		frame, err := qDataFrameFromSoA(native)
+		if err != nil {
+			return data.Frame{}, false, err
+		}
+		return frame, true, nil
+	default:
 		return data.Frame{}, false, fmt.Errorf("native data frame payload is invalid")
 	}
-	return native, true, nil
 }
 
 func qTypedNativeKeyedFramePayload(tbl *Table) (data.KeyedFrame, bool, error) {

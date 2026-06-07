@@ -871,12 +871,99 @@ func setDataFrameNativePayload(table *Table, frame stddata.Frame) {
 	if table == nil {
 		return
 	}
-	table.SetNativePayloadWithInfo(frame, NativePayloadInfo{
+	payload := any(frame)
+	if soa, ok := dataFrameRuntimeSoA(frame); ok {
+		payload = soa
+	}
+	table.SetNativePayloadWithInfo(payload, NativePayloadInfo{
 		Kind:       NativePayloadDataFrame,
 		Rows:       frame.Len(),
 		Columns:    len(frame.Schema().Names()),
 		SchemaHash: frame.SchemaFingerprint(),
 	})
+}
+
+func dataFrameRuntimeSoA(frame stddata.Frame) (*SoA, bool) {
+	names := frame.Schema().Names()
+	if len(names) == 0 {
+		return nil, false
+	}
+	cols := make(map[string]*DenseArray, len(names))
+	for _, name := range names {
+		array, ok := frame.Column(name)
+		if !ok {
+			return nil, false
+		}
+		col, ok := dataArrayRuntimeDense(array)
+		if !ok {
+			return nil, false
+		}
+		cols[string(name)] = col
+	}
+	soa, err := NewSoA(cols)
+	if err != nil {
+		return nil, false
+	}
+	return soa, true
+}
+
+func dataArrayRuntimeDense(array stddata.Array) (*DenseArray, bool) {
+	if array == nil || dataArrayHasNull(array) {
+		return nil, false
+	}
+	switch array.Kind() {
+	case stddata.KindI64:
+		xs := make([]int64, array.Len())
+		for i := range xs {
+			v, ok := array.At(i)
+			if !ok {
+				return nil, false
+			}
+			switch n := v.(type) {
+			case int64:
+				xs[i] = n
+			default:
+				return nil, false
+			}
+		}
+		return NewDenseArrayI64(xs), true
+	case stddata.KindF64:
+		xs := make([]float64, array.Len())
+		for i := range xs {
+			v, ok := array.At(i)
+			if !ok {
+				return nil, false
+			}
+			switch n := v.(type) {
+			case float64:
+				xs[i] = n
+			default:
+				return nil, false
+			}
+		}
+		return NewDenseArrayF64(xs), true
+	case stddata.KindBool:
+		out, err := NewDenseArrayOfLen(DenseArrayBool, array.Len())
+		if err != nil {
+			return nil, false
+		}
+		for i := 0; i < array.Len(); i++ {
+			v, ok := array.At(i)
+			if !ok {
+				return nil, false
+			}
+			b, ok := v.(bool)
+			if !ok {
+				return nil, false
+			}
+			if err := out.Set(i, BoolValue(b)); err != nil {
+				return nil, false
+			}
+		}
+		return out, true
+	default:
+		return nil, false
+	}
 }
 
 func setDataArrayNativePayload(table *Table, array stddata.Array) {
