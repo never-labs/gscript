@@ -1056,6 +1056,7 @@ trades := soa.zip({
     sym: []i64{1, 1, 2, 2},
     price: []f64{10, 12, 7.5, 8},
     size: []f64{100, 50, 200, 150},
+    flag: []bool{true, false, true, false},
 })
 
 rows := q.query(trades, {
@@ -1080,7 +1081,7 @@ flat := q.query(trades, {
 
 calc := q.query(trades, {
     where: soa.mask(trades, "sym", "==", 1),
-    select: {notional: {"*", "price", "size"}, adjusted: {"+", "price", 1.5}, marker: 1, active: true},
+    select: {notional: {"*", "price", "size"}, adjusted: {"+", "price", 1.5}, large: {">=", "size", 75}, flagged: {"==", "flag", true}, marker: 1, active: true},
 })
 
 limited := q.query(trades, {
@@ -1181,6 +1182,28 @@ ordered := q.query(trades, {
 	adjusted, ok := adjustedCol.DenseArray().F64()
 	if !ok || len(adjusted) != 2 || adjusted[0] != 11.5 || adjusted[1] != 13.5 {
 		t.Fatalf("calc adjusted = %#v, want [11.5 13.5]", adjusted)
+	}
+	largeCol, handled, err := TableValue(calc).NativeFrameColumn("large")
+	if err != nil {
+		t.Fatalf("calc NativeFrameColumn(large): %v", err)
+	}
+	if !handled || !largeCol.IsDenseArray() {
+		t.Fatalf("calc large column = %v handled=%v, want dense array", largeCol, handled)
+	}
+	large, ok := largeCol.DenseArray().Bool()
+	if !ok || len(large) != 2 || !large[0] || large[1] {
+		t.Fatalf("calc large = %#v, want [true false]", large)
+	}
+	flaggedCol, handled, err := TableValue(calc).NativeFrameColumn("flagged")
+	if err != nil {
+		t.Fatalf("calc NativeFrameColumn(flagged): %v", err)
+	}
+	if !handled || !flaggedCol.IsDenseArray() {
+		t.Fatalf("calc flagged column = %v handled=%v, want dense array", flaggedCol, handled)
+	}
+	flagged, ok := flaggedCol.DenseArray().Bool()
+	if !ok || len(flagged) != 2 || !flagged[0] || flagged[1] {
+		t.Fatalf("calc flagged = %#v, want [true false]", flagged)
 	}
 	markerCol, handled, err := TableValue(calc).NativeFrameColumn("marker")
 	if err != nil {

@@ -67,6 +67,12 @@ var (
 	DenseArraySub                 = runtime.DenseArraySub
 	DenseArrayMul                 = runtime.DenseArrayMul
 	DenseArrayDiv                 = runtime.DenseArrayDiv
+	DenseArrayEQ                  = runtime.DenseArrayEQ
+	DenseArrayNE                  = runtime.DenseArrayNE
+	DenseArrayLT                  = runtime.DenseArrayLT
+	DenseArrayLE                  = runtime.DenseArrayLE
+	DenseArrayGT                  = runtime.DenseArrayGT
+	DenseArrayGE                  = runtime.DenseArrayGE
 	DenseArrayElementwise         = runtime.DenseArrayElementwise
 	DenseArrayF64                 = runtime.DenseArrayF64
 	DenseArrayI64                 = runtime.DenseArrayI64

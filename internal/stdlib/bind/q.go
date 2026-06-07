@@ -4217,6 +4217,9 @@ func qNativeExprOperand(s *SoA, expr Value) (Value, bool) {
 	if expr.IsNumber() {
 		return expr, true
 	}
+	if expr.IsBool() {
+		return expr, true
+	}
 	if expr.IsTable() {
 		col, ok := qEvalNativeExpr(s, expr)
 		if !ok {
@@ -4237,6 +4240,18 @@ func qNativeDenseArrayBinaryOp(op string) (DenseArrayBinaryOp, bool) {
 		return DenseArrayMul, true
 	case "/":
 		return DenseArrayDiv, true
+	case "==":
+		return DenseArrayEQ, true
+	case "!=":
+		return DenseArrayNE, true
+	case "<":
+		return DenseArrayLT, true
+	case "<=":
+		return DenseArrayLE, true
+	case ">":
+		return DenseArrayGT, true
+	case ">=":
+		return DenseArrayGE, true
 	default:
 		return DenseArrayAdd, false
 	}
@@ -5161,18 +5176,63 @@ func qEvalExprAt(s *SoA, expr Value, row int) (Value, error) {
 	if err != nil {
 		return NilValue(), err
 	}
-	if !lv.IsNumber() || !rv.IsNumber() {
-		return NilValue(), fmt.Errorf("operator %q requires numeric operands", op.Str())
-	}
 	switch op.Str() {
 	case "+":
+		if !lv.IsNumber() || !rv.IsNumber() {
+			return NilValue(), fmt.Errorf("operator %q requires numeric operands", op.Str())
+		}
 		return FloatValue(lv.Number() + rv.Number()), nil
 	case "-":
+		if !lv.IsNumber() || !rv.IsNumber() {
+			return NilValue(), fmt.Errorf("operator %q requires numeric operands", op.Str())
+		}
 		return FloatValue(lv.Number() - rv.Number()), nil
 	case "*":
+		if !lv.IsNumber() || !rv.IsNumber() {
+			return NilValue(), fmt.Errorf("operator %q requires numeric operands", op.Str())
+		}
 		return FloatValue(lv.Number() * rv.Number()), nil
 	case "/":
+		if !lv.IsNumber() || !rv.IsNumber() {
+			return NilValue(), fmt.Errorf("operator %q requires numeric operands", op.Str())
+		}
 		return FloatValue(lv.Number() / rv.Number()), nil
+	case "==":
+		if lv.IsBool() && rv.IsBool() {
+			return BoolValue(lv.Bool() == rv.Bool()), nil
+		}
+		if !lv.IsNumber() || !rv.IsNumber() {
+			return NilValue(), fmt.Errorf("operator %q requires numeric operands", op.Str())
+		}
+		return BoolValue(lv.Number() == rv.Number()), nil
+	case "!=":
+		if lv.IsBool() && rv.IsBool() {
+			return BoolValue(lv.Bool() != rv.Bool()), nil
+		}
+		if !lv.IsNumber() || !rv.IsNumber() {
+			return NilValue(), fmt.Errorf("operator %q requires numeric operands", op.Str())
+		}
+		return BoolValue(lv.Number() != rv.Number()), nil
+	case "<":
+		if !lv.IsNumber() || !rv.IsNumber() {
+			return NilValue(), fmt.Errorf("operator %q requires numeric operands", op.Str())
+		}
+		return BoolValue(lv.Number() < rv.Number()), nil
+	case "<=":
+		if !lv.IsNumber() || !rv.IsNumber() {
+			return NilValue(), fmt.Errorf("operator %q requires numeric operands", op.Str())
+		}
+		return BoolValue(lv.Number() <= rv.Number()), nil
+	case ">":
+		if !lv.IsNumber() || !rv.IsNumber() {
+			return NilValue(), fmt.Errorf("operator %q requires numeric operands", op.Str())
+		}
+		return BoolValue(lv.Number() > rv.Number()), nil
+	case ">=":
+		if !lv.IsNumber() || !rv.IsNumber() {
+			return NilValue(), fmt.Errorf("operator %q requires numeric operands", op.Str())
+		}
+		return BoolValue(lv.Number() >= rv.Number()), nil
 	default:
 		return NilValue(), fmt.Errorf("operator %q is not supported", op.Str())
 	}
