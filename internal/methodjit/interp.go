@@ -1049,6 +1049,13 @@ func (s *interpState) execInstr(instr *Instr, block *Block) ([]runtime.Value, bo
 		}
 		s.values[instr.ID] = row.Table().RawGetInt(innerKey.Int())
 
+	case OpFrameLen:
+		out, err := executeFrameLenValue(s.val(instr.Args[0]))
+		if err != nil {
+			return nil, false, err
+		}
+		s.values[instr.ID] = out
+
 	case OpFrameColumn:
 		idx := int(instr.Aux)
 		if idx < 0 || idx >= len(s.fn.Proto.Constants) || !s.fn.Proto.Constants[idx].IsString() {

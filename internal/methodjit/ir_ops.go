@@ -172,6 +172,9 @@ const (
 	// Loads a table row from a mixed outer array, verifies the row array kind,
 	// then loads the inner element without materializing the row table SSA value.
 	OpTableArrayNestedLoad
+	// q/frame runtime primitive. Args = [frame]; mirrors OP_FRAME_LEN and
+	// returns the native frame row count.
+	OpFrameLen
 	// q/frame runtime primitive. Args = [frame], Aux = constant pool index for
 	// the column name; mirrors OP_FRAME_COLUMN and returns a dense-array column.
 	OpFrameColumn

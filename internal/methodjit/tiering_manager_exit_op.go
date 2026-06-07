@@ -326,6 +326,16 @@ func (tm *TieringManager) executeOpExit(ctx *ExecContext, regs []runtime.Value, 
 			}
 		}
 
+	case OpFrameLen:
+		if absArg1 >= len(regs) || absSlot >= len(regs) {
+			return fmt.Errorf("FrameLen op-exit out of register range")
+		}
+		out, err := executeFrameLenValue(regs[absArg1])
+		if err != nil {
+			return err
+		}
+		regs[absSlot] = out
+
 	case OpFrameColumn:
 		if absArg1 >= len(regs) || absSlot >= len(regs) {
 			return fmt.Errorf("FrameColumn op-exit out of register range")

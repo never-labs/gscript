@@ -944,6 +944,13 @@ func (b *graphBuilder) emitBlocks() {
 				val := b.readVariable(bOp, block)
 				b.emit(block, OpAppend, TypeUnknown, []*Value{tbl, val}, 0, 0)
 
+			case vm.OP_FRAME_LEN:
+				a := vm.DecodeA(inst)
+				bOp := vm.DecodeB(inst)
+				frame := b.readVariable(bOp, block)
+				instr := b.emit(block, OpFrameLen, TypeInt, []*Value{frame}, 0, 0)
+				b.writeVariable(a, block, instr.Value())
+
 			case vm.OP_FRAME_COLUMN:
 				a := vm.DecodeA(inst)
 				bOp := vm.DecodeB(inst)

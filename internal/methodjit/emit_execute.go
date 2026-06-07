@@ -971,6 +971,16 @@ func (cf *CompiledFunction) executeOpExit(ctx *ExecContext, regs []runtime.Value
 			}
 		}
 
+	case OpFrameLen:
+		if arg1 >= len(regs) || slot >= len(regs) {
+			return fmt.Errorf("FrameLen op-exit out of register range")
+		}
+		out, err := executeFrameLenValue(regs[arg1])
+		if err != nil {
+			return err
+		}
+		regs[slot] = out
+
 	case OpFrameColumn:
 		if arg1 >= len(regs) || slot >= len(regs) {
 			return fmt.Errorf("FrameColumn op-exit out of register range")

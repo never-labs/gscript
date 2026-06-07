@@ -72,8 +72,7 @@ func firstUnsupportedTier2BytecodeGate(proto *vm.FuncProto) GateResult {
 		op := vm.DecodeOp(inst)
 		switch op {
 		case vm.OP_GO, vm.OP_MAKECHAN, vm.OP_SEND, vm.OP_RECV, vm.OP_RECVOK, vm.OP_TRYSEND, vm.OP_TRYRECV, vm.OP_TRYRECVOK, vm.OP_SELECT,
-			vm.OP_DEFER, vm.OP_SETGLOBALRO, vm.OP_CHECKCONST,
-			vm.OP_FRAME_LEN:
+			vm.OP_DEFER, vm.OP_SETGLOBALRO, vm.OP_CHECKCONST:
 			return blockGate("Tier2Bytecode", vm.OpName(op))
 		}
 	}

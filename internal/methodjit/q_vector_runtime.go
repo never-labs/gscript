@@ -31,6 +31,14 @@ func executeFrameColumnValue(frameVal runtime.Value, name string) (runtime.Value
 	return out, nil
 }
 
+func executeFrameLenValue(frameVal runtime.Value) (runtime.Value, error) {
+	info, ok := frameVal.NativeFramePayloadInfo()
+	if !ok {
+		return runtime.NilValue(), fmt.Errorf("FrameLen operand must be native frame (got %s)", frameVal.TypeName())
+	}
+	return runtime.IntValue(int64(info.Rows)), nil
+}
+
 func executeVectorCompareValue(opCode int, leftVal, rightVal runtime.Value) (runtime.Value, error) {
 	op := runtime.DenseArrayBinaryOp(opCode)
 	if op < runtime.DenseArrayEQ || op > runtime.DenseArrayGE {

@@ -112,6 +112,55 @@ func TestFrameColumnBytecodeBuildsMethodJITIR(t *testing.T) {
 	}
 }
 
+func TestFrameLenBytecodeBuildsMethodJITIR(t *testing.T) {
+	proto := &vm.FuncProto{
+		Name:      "frame_len",
+		NumParams: 1,
+		MaxStack:  1,
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_FRAME_LEN, 0, 0, 0),
+			vm.EncodeABC(vm.OP_RETURN, 0, 2, 0),
+		},
+	}
+
+	fn := BuildGraph(proto)
+	var frameLen *Instr
+	for _, block := range fn.Blocks {
+		for _, instr := range block.Instrs {
+			if instr.Op == OpFrameLen {
+				frameLen = instr
+				break
+			}
+		}
+	}
+	if frameLen == nil {
+		t.Fatalf("BuildGraph did not emit OpFrameLen:\n%s", Print(fn))
+	}
+	if len(frameLen.Args) != 1 {
+		t.Fatalf("OpFrameLen arg count = %d, want 1", len(frameLen.Args))
+	}
+	if frameLen.Type != TypeInt {
+		t.Fatalf("OpFrameLen type = %s, want Int", frameLen.Type)
+	}
+}
+
+func TestTier2GateAllowsFrameLenThroughOpExit(t *testing.T) {
+	proto := &vm.FuncProto{
+		Name:      "frame_len",
+		NumParams: 1,
+		MaxStack:  1,
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_FRAME_LEN, 0, 0, 0),
+			vm.EncodeABC(vm.OP_RETURN, 0, 2, 0),
+		},
+	}
+
+	gate := firstUnsupportedTier2BytecodeGate(proto)
+	if !gate.Allowed {
+		t.Fatalf("OP_FRAME_LEN should be Tier2-eligible via op-exit, got %q", gate.Reason)
+	}
+}
+
 func TestTier2GateAllowsFrameColumnThroughOpExit(t *testing.T) {
 	proto := &vm.FuncProto{
 		Name:      "frame_column",
@@ -161,6 +210,23 @@ func TestTier2GateAllowsVectorCompareThroughOpExit(t *testing.T) {
 	gate := firstUnsupportedTier2BytecodeGate(proto)
 	if !gate.Allowed {
 		t.Fatalf("OP_VECTOR_COMPARE should be Tier2-eligible via op-exit, got %q", gate.Reason)
+	}
+}
+
+func TestFrameLenRuntimeHelperUsesRuntimePrimitive(t *testing.T) {
+	frame := runtime.NewTable()
+	frame.SetNativePayloadWithInfo(struct{}{}, runtime.NativePayloadInfo{
+		Kind:    runtime.NativePayloadDataFrame,
+		Rows:    42,
+		Columns: 3,
+	})
+
+	result, err := executeFrameLenValue(runtime.TableValue(frame))
+	if err != nil {
+		t.Fatalf("execute frame len: %v", err)
+	}
+	if !result.IsInt() || result.Int() != 42 {
+		t.Fatalf("frame len result = %#v, want int 42", result)
 	}
 }
 
