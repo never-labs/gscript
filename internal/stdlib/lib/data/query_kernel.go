@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -297,6 +298,12 @@ func writeQueryKernelLiteralFingerprintWithSeen(b *strings.Builder, value any, s
 		if writeQueryKernelLiteralArrayFingerprint(b, value, seen) {
 			return
 		}
+		if writeQueryKernelLiteralMapFingerprint(b, value, seen) {
+			return
+		}
+		if writeQueryKernelLiteralStructFingerprint(b, value, seen) {
+			return
+		}
 		writeQueryKernelFingerprintPart(b, fmt.Sprintf("%T", value))
 		writeQueryKernelFingerprintPart(b, fmt.Sprintf("%#v", value))
 	}
@@ -308,7 +315,7 @@ type queryKernelSliceKey struct {
 }
 
 func queryKernelSliceKeyForValue(v reflect.Value) (queryKernelSliceKey, bool) {
-	if !v.IsValid() || v.Kind() != reflect.Slice || v.IsNil() {
+	if !v.IsValid() || (v.Kind() != reflect.Slice && v.Kind() != reflect.Map) || v.IsNil() {
 		return queryKernelSliceKey{}, false
 	}
 	return queryKernelSliceKey{typ: v.Type().String(), ptr: v.Pointer()}, true
@@ -355,6 +362,76 @@ func writeQueryKernelLiteralArrayFingerprint(b *strings.Builder, value any, seen
 		if !item.CanInterface() {
 			writeQueryKernelFingerprintPart(b, item.Type().String())
 			writeQueryKernelFingerprintPart(b, fmt.Sprintf("%#v", item))
+			continue
+		}
+		writeQueryKernelLiteralFingerprintWithSeen(b, item.Interface(), seen)
+	}
+	return true
+}
+
+func writeQueryKernelLiteralMapFingerprint(b *strings.Builder, value any, seen map[queryKernelSliceKey]struct{}) bool {
+	v := reflect.ValueOf(value)
+	if !v.IsValid() || v.Kind() != reflect.Map {
+		return false
+	}
+	key, ok := queryKernelSliceKeyForValue(v)
+	if ok {
+		if _, exists := seen[key]; exists {
+			writeQueryKernelFingerprintPart(b, "recursive_map")
+			writeQueryKernelFingerprintPart(b, key.typ)
+			return true
+		}
+		if seen == nil {
+			seen = make(map[queryKernelSliceKey]struct{})
+		}
+		seen[key] = struct{}{}
+		defer delete(seen, key)
+	}
+	writeQueryKernelFingerprintPart(b, "map")
+	writeQueryKernelFingerprintPart(b, v.Type().String())
+	writeQueryKernelFingerprintPart(b, strconv.FormatBool(v.IsNil()))
+	writeQueryKernelFingerprintPart(b, strconv.Itoa(v.Len()))
+	entries := make([]string, 0, v.Len())
+	for _, mapKey := range v.MapKeys() {
+		var entry strings.Builder
+		if mapKey.CanInterface() {
+			writeQueryKernelLiteralFingerprintWithSeen(&entry, mapKey.Interface(), seen)
+		} else {
+			writeQueryKernelFingerprintPart(&entry, mapKey.Type().String())
+			writeQueryKernelFingerprintPart(&entry, "<unexported>")
+		}
+		mapValue := v.MapIndex(mapKey)
+		if mapValue.CanInterface() {
+			writeQueryKernelLiteralFingerprintWithSeen(&entry, mapValue.Interface(), seen)
+		} else {
+			writeQueryKernelFingerprintPart(&entry, mapValue.Type().String())
+			writeQueryKernelFingerprintPart(&entry, "<unexported>")
+		}
+		entries = append(entries, entry.String())
+	}
+	sort.Strings(entries)
+	for _, entry := range entries {
+		writeQueryKernelFingerprintPart(b, entry)
+	}
+	return true
+}
+
+func writeQueryKernelLiteralStructFingerprint(b *strings.Builder, value any, seen map[queryKernelSliceKey]struct{}) bool {
+	v := reflect.ValueOf(value)
+	if !v.IsValid() || v.Kind() != reflect.Struct {
+		return false
+	}
+	t := v.Type()
+	writeQueryKernelFingerprintPart(b, "struct")
+	writeQueryKernelFingerprintPart(b, t.String())
+	writeQueryKernelFingerprintPart(b, strconv.Itoa(v.NumField()))
+	for i := 0; i < v.NumField(); i++ {
+		field := t.Field(i)
+		item := v.Field(i)
+		writeQueryKernelFingerprintPart(b, field.Name)
+		writeQueryKernelFingerprintPart(b, item.Type().String())
+		if !item.CanInterface() {
+			writeQueryKernelFingerprintPart(b, "<unexported>")
 			continue
 		}
 		writeQueryKernelLiteralFingerprintWithSeen(b, item.Interface(), seen)
@@ -529,6 +606,12 @@ func cloneQueryKernelLiteralWithSeen(value any, seen map[queryKernelSliceKey]ref
 		if cloned, ok := cloneQueryKernelLiteralArray(value, seen); ok {
 			return cloned
 		}
+		if cloned, ok := cloneQueryKernelLiteralMap(value, seen); ok {
+			return cloned
+		}
+		if cloned, ok := cloneQueryKernelLiteralStruct(value, seen); ok {
+			return cloned
+		}
 		return x
 	}
 }
@@ -586,6 +669,67 @@ func cloneQueryKernelLiteralArray(value any, seen map[queryKernelSliceKey]reflec
 			out.Index(i).Set(clonedValue)
 		} else {
 			out.Index(i).Set(item)
+		}
+	}
+	return out.Interface(), true
+}
+
+func cloneQueryKernelLiteralMap(value any, seen map[queryKernelSliceKey]reflect.Value) (any, bool) {
+	v := reflect.ValueOf(value)
+	if !v.IsValid() || v.Kind() != reflect.Map {
+		return nil, false
+	}
+	if v.IsNil() {
+		return value, true
+	}
+	key, ok := queryKernelSliceKeyForValue(v)
+	if ok {
+		if cloned, exists := seen[key]; exists {
+			return cloned.Interface(), true
+		}
+		if seen == nil {
+			seen = make(map[queryKernelSliceKey]reflect.Value)
+		}
+	}
+	out := reflect.MakeMapWithSize(v.Type(), v.Len())
+	if ok {
+		seen[key] = out
+		defer delete(seen, key)
+	}
+	for _, mapKey := range v.MapKeys() {
+		clonedKey := cloneQueryKernelLiteralWithSeen(mapKey.Interface(), seen)
+		clonedKeyValue := reflect.ValueOf(clonedKey)
+		if !clonedKeyValue.IsValid() || !clonedKeyValue.Type().AssignableTo(mapKey.Type()) {
+			clonedKeyValue = mapKey
+		}
+		mapValue := v.MapIndex(mapKey)
+		clonedValue := cloneQueryKernelLiteralWithSeen(mapValue.Interface(), seen)
+		clonedMapValue := reflect.ValueOf(clonedValue)
+		if !clonedMapValue.IsValid() || !clonedMapValue.Type().AssignableTo(mapValue.Type()) {
+			clonedMapValue = mapValue
+		}
+		out.SetMapIndex(clonedKeyValue, clonedMapValue)
+	}
+	return out.Interface(), true
+}
+
+func cloneQueryKernelLiteralStruct(value any, seen map[queryKernelSliceKey]reflect.Value) (any, bool) {
+	v := reflect.ValueOf(value)
+	if !v.IsValid() || v.Kind() != reflect.Struct {
+		return nil, false
+	}
+	out := reflect.New(v.Type()).Elem()
+	out.Set(v)
+	for i := 0; i < v.NumField(); i++ {
+		source := v.Field(i)
+		target := out.Field(i)
+		if !source.CanInterface() || !target.CanSet() {
+			continue
+		}
+		cloned := cloneQueryKernelLiteralWithSeen(source.Interface(), seen)
+		clonedValue := reflect.ValueOf(cloned)
+		if clonedValue.IsValid() && clonedValue.Type().AssignableTo(source.Type()) {
+			target.Set(clonedValue)
 		}
 	}
 	return out.Interface(), true

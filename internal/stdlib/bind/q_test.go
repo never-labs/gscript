@@ -922,6 +922,9 @@ func TestQNativeFramePayloadKindMismatchFailsClosed(t *testing.T) {
 	if _, err := qSQLSourceCarrierFromValue(TableValue(frameAsKeyed), "trades"); err == nil || !strings.Contains(err.Error(), "native keyed frame payload is invalid") {
 		t.Fatalf("frame payload with keyed kind carrier err = %v, want invalid keyed payload", err)
 	}
+	if _, err := qKeyedFrameFromValue(TableValue(frameAsKeyed)); err == nil || !strings.Contains(err.Error(), "native keyed frame payload is invalid") {
+		t.Fatalf("frame payload with keyed kind qKeyedFrameFromValue err = %v, want invalid keyed payload", err)
+	}
 
 	keyedAsFrame := NewTable()
 	keyedAsFrame.SetNativePayloadWithInfo(keyed, NativePayloadInfo{
@@ -935,6 +938,9 @@ func TestQNativeFramePayloadKindMismatchFailsClosed(t *testing.T) {
 	}
 	if _, err := qSQLSourceCarrierFromValue(TableValue(keyedAsFrame), "trades"); err == nil || !strings.Contains(err.Error(), "native data frame payload is invalid") {
 		t.Fatalf("keyed payload with frame kind carrier err = %v, want invalid data frame payload", err)
+	}
+	if _, err := qDataFrameFromValue(TableValue(keyedAsFrame), ""); err == nil || !strings.Contains(err.Error(), "native data frame payload is invalid") {
+		t.Fatalf("keyed payload with frame kind qDataFrameFromValue err = %v, want invalid data frame payload", err)
 	}
 }
 

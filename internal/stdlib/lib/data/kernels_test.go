@@ -534,6 +534,81 @@ func TestCompiledQueryKernelClonesArrayLiterals(t *testing.T) {
 	}
 }
 
+func TestCompiledQueryKernelClonesStructLiterals(t *testing.T) {
+	type literalStruct struct {
+		Nested  []any
+		Symbols []Symbol
+	}
+	nested := []any{Symbol("AAPL")}
+	symbols := []Symbol{"AAPL"}
+	plan := QueryPlan{
+		Select: []SelectItem{{
+			Name: "struct",
+			Expr: Literal{Value: literalStruct{Nested: nested, Symbols: symbols}},
+		}},
+		LimitN: -1,
+	}
+
+	compiled := cloneQueryKernelPlan(plan)
+	nested[0] = Symbol("MSFT")
+	symbols[0] = Symbol("MSFT")
+
+	got, ok := compiled.Select[0].Expr.(Literal).Value.(literalStruct)
+	if !ok {
+		t.Fatalf("compiled struct literal = %T, want literalStruct", compiled.Select[0].Expr.(Literal).Value)
+	}
+	if !reflect.DeepEqual(got.Nested, []any{Symbol("AAPL")}) {
+		t.Fatalf("compiled struct nested list = %v, want [AAPL]", got.Nested)
+	}
+	if !reflect.DeepEqual(got.Symbols, []Symbol{"AAPL"}) {
+		t.Fatalf("compiled struct typed slice = %v, want [AAPL]", got.Symbols)
+	}
+}
+
+func TestCompiledQueryKernelClonesMapLiterals(t *testing.T) {
+	nested := []any{Symbol("AAPL")}
+	recursive := map[string]any{}
+	recursive["self"] = recursive
+	plan := QueryPlan{
+		Select: []SelectItem{{
+			Name: "map",
+			Expr: Literal{Value: map[string]any{"symbols": nested}},
+		}, {
+			Name: "recursive",
+			Expr: Literal{Value: recursive},
+		}},
+		LimitN: -1,
+	}
+
+	compiled := cloneQueryKernelPlan(plan)
+	nested[0] = Symbol("MSFT")
+	recursive["self"] = Symbol("MSFT")
+
+	got, ok := compiled.Select[0].Expr.(Literal).Value.(map[string]any)
+	if !ok {
+		t.Fatalf("compiled map literal = %T, want map[string]any", compiled.Select[0].Expr.(Literal).Value)
+	}
+	gotNested, ok := got["symbols"].([]any)
+	if !ok {
+		t.Fatalf("compiled map nested value = %T, want []any", got["symbols"])
+	}
+	if !reflect.DeepEqual(gotNested, []any{Symbol("AAPL")}) {
+		t.Fatalf("compiled map nested list = %v, want [AAPL]", gotNested)
+	}
+
+	gotRecursive, ok := compiled.Select[1].Expr.(Literal).Value.(map[string]any)
+	if !ok {
+		t.Fatalf("compiled recursive map literal = %T, want map[string]any", compiled.Select[1].Expr.(Literal).Value)
+	}
+	gotSelf, ok := gotRecursive["self"].(map[string]any)
+	if !ok {
+		t.Fatalf("compiled recursive map self = %T, want map[string]any", gotRecursive["self"])
+	}
+	if reflect.ValueOf(gotSelf["self"]).Pointer() != reflect.ValueOf(gotRecursive).Pointer() {
+		t.Fatal("compiled recursive map does not point back to cloned map")
+	}
+}
+
 func TestCompiledQueryKernelClonesTypedSliceLiterals(t *testing.T) {
 	frame := mustFrame(t,
 		Column{Name: "sym", Data: NewSymbols([]string{"AAPL", "MSFT"})},
@@ -948,6 +1023,31 @@ func TestQueryKernelPlanFingerprintAvoidsStructuralCollisions(t *testing.T) {
 	structLiteralB := QueryPlan{Where: Binary{Op: OpEQ, Left: ColumnRef{Name: "x"}, Right: Literal{Value: struct{ Name string }{Name: "b"}}}, LimitN: -1}
 	if got := QueryKernelPlanFingerprint(structLiteralA); got == QueryKernelPlanFingerprint(structLiteralB) {
 		t.Fatalf("fallback literal value collided: %q", got)
+	}
+	structWithNestedList := QueryPlan{Where: In{Expr: ColumnRef{Name: "sym"}, Values: []any{struct{ Values []any }{Values: []any{Symbol("a,b"), Symbol("c")}}}}, LimitN: -1}
+	structWithSplitNestedList := QueryPlan{Where: In{Expr: ColumnRef{Name: "sym"}, Values: []any{struct{ Values []any }{Values: []any{Symbol("a"), Symbol("b,c")}}}}, LimitN: -1}
+	if got := QueryKernelPlanFingerprint(structWithNestedList); got == QueryKernelPlanFingerprint(structWithSplitNestedList) {
+		t.Fatalf("struct nested list boundary collided: %q", got)
+	}
+	mapLiteralA := QueryPlan{Where: In{Expr: ColumnRef{Name: "sym"}, Values: []any{map[Symbol]any{Symbol("b"): []any{Symbol("MSFT")}, Symbol("a"): []any{Symbol("AAPL")}}}}, LimitN: -1}
+	mapLiteralB := QueryPlan{Where: In{Expr: ColumnRef{Name: "sym"}, Values: []any{map[Symbol]any{Symbol("a"): []any{Symbol("AAPL")}, Symbol("b"): []any{Symbol("MSFT")}}}}, LimitN: -1}
+	if got := QueryKernelPlanFingerprint(mapLiteralA); got != QueryKernelPlanFingerprint(mapLiteralB) {
+		t.Fatalf("map literal fingerprint = %q, want stable key order", got)
+	}
+	mapWithNestedList := QueryPlan{Where: In{Expr: ColumnRef{Name: "sym"}, Values: []any{map[string]any{"x": []any{Symbol("a,b"), Symbol("c")}}}}, LimitN: -1}
+	mapWithSplitNestedList := QueryPlan{Where: In{Expr: ColumnRef{Name: "sym"}, Values: []any{map[string]any{"x": []any{Symbol("a"), Symbol("b,c")}}}}, LimitN: -1}
+	if got := QueryKernelPlanFingerprint(mapWithNestedList); got == QueryKernelPlanFingerprint(mapWithSplitNestedList) {
+		t.Fatalf("map nested list boundary collided: %q", got)
+	}
+	recursiveMap := map[string]any{}
+	recursiveMap["self"] = recursiveMap
+	recursiveMapLiteral := QueryPlan{Where: In{Expr: ColumnRef{Name: "sym"}, Values: []any{recursiveMap}}, LimitN: -1}
+	fingerprint := QueryKernelPlanFingerprint(recursiveMapLiteral)
+	if fingerprint == "" {
+		t.Fatal("recursive map literal fingerprint is empty")
+	}
+	if got := QueryKernelPlanFingerprint(recursiveMapLiteral); got != fingerprint {
+		t.Fatalf("recursive map literal fingerprint = %q, want stable %q", got, fingerprint)
 	}
 }
 
