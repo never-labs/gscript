@@ -25,6 +25,7 @@ const (
 	qFallbackSourceErr         = "source_error"
 	qFallbackJoinErr           = "join_error"
 	qFallbackMutationPlan      = "mutation_plan"
+	qQueryKernelSupported      = "query_kernel_supported"
 	qFallbackQueryKernel       = "query_kernel_unsupported"
 
 	qKernelReasonSupported         = "kernel_supported"
@@ -76,6 +77,7 @@ type qFallbackStats struct {
 	SourceErr         int
 	JoinErr           int
 	Mutation          int
+	QueryKernelHit    int
 	QueryKernel       int
 	ByReasonCode      map[qFallbackReasonCodeKey]int
 	ByReason          map[qFallbackReasonKey]int
@@ -968,6 +970,9 @@ func qRunQuery(s *SoA, spec *Table) (*Table, error) {
 	}
 	if nativeRows, ok := qQueryNativeRowsForResult(spec, nativeRows); ok {
 		qAttachRowsNativeSoAPayload(rows, nativeRows)
+		if len(aggs) == 0 {
+			qRecordQueryKernelHit()
+		}
 	} else {
 		if len(aggs) == 0 {
 			if nativeReason == "" {
@@ -2359,6 +2364,12 @@ func qRecordFallback(code string) {
 	qRecordFallbackReason(code, "", "")
 }
 
+func qRecordQueryKernelHit() {
+	qFallbackStatsMu.Lock()
+	qFallbackCounters.QueryKernelHit++
+	qFallbackStatsMu.Unlock()
+}
+
 func qRecordFallbackReason(code, reasonCode, reason string) {
 	qFallbackStatsMu.Lock()
 	if qFallbackCounters.ByReasonCode == nil {
@@ -2398,15 +2409,16 @@ func qFallbackStatsTable() *Table {
 	qFallbackStatsMu.Unlock()
 
 	detailRows := qFallbackTopRows(stats, 10)
-	rows := NewAppendArrayTable(6 + len(detailRows))
+	rows := NewAppendArrayTable(7 + len(detailRows))
 	rows.RawSetInt(1, TableValue(qFallbackStatsRow(qFallbackKernelUnsupported, stats.KernelUnsupported)))
 	rows.RawSetInt(2, TableValue(qFallbackStatsRow(qFallbackKernelCompileErr, stats.KernelCompileErr)))
 	rows.RawSetInt(3, TableValue(qFallbackStatsRow(qFallbackSourceErr, stats.SourceErr)))
 	rows.RawSetInt(4, TableValue(qFallbackStatsRow(qFallbackJoinErr, stats.JoinErr)))
 	rows.RawSetInt(5, TableValue(qFallbackStatsRow(qFallbackMutationPlan, stats.Mutation)))
-	rows.RawSetInt(6, TableValue(qFallbackStatsRow(qFallbackQueryKernel, stats.QueryKernel)))
+	rows.RawSetInt(6, TableValue(qFallbackStatsRow(qQueryKernelSupported, stats.QueryKernelHit)))
+	rows.RawSetInt(7, TableValue(qFallbackStatsRow(qFallbackQueryKernel, stats.QueryKernel)))
 	for i, row := range detailRows {
-		rows.RawSetInt(int64(i+7), TableValue(row))
+		rows.RawSetInt(int64(i+8), TableValue(row))
 	}
 	return rows
 }
