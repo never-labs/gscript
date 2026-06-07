@@ -3048,6 +3048,53 @@ rows := q.query(trades, {select: {notional: {"*", "price", "size"}}})
 	}
 }
 
+func TestQFallbackStatsExplainQueryKernelSelectReason(t *testing.T) {
+	qClearCaches()
+	defer qClearCaches()
+
+	trades, err := NewSoA(map[string]*DenseArray{
+		"price": NewDenseArrayF64([]float64{100, 101}),
+	})
+	if err != nil {
+		t.Fatalf("NewSoA: %v", err)
+	}
+	selects := NewTable()
+	selects.RawSetString("bad", FunctionValue(&GoFunction{
+		Name: "bad_select_constant",
+		Fn: func(args []Value) ([]Value, error) {
+			return []Value{NilValue()}, nil
+		},
+	}))
+	spec := NewTable()
+	spec.RawSetString("select", TableValue(selects))
+
+	rows, err := qRunQuery(trades, spec)
+	if err != nil {
+		t.Fatalf("qRunQuery: %v", err)
+	}
+	if rows == nil || rows.Length() != 2 {
+		t.Fatalf("rows length = %v, want 2", rows)
+	}
+	if got := rows.RawGetInt(1).Table().RawGetString("bad"); !got.IsFunction() {
+		t.Fatalf("rows[1].bad = %v, want function", got)
+	}
+	explained, err := qExplainQuery(trades, spec)
+	if err != nil {
+		t.Fatalf("qExplainQuery: %v", err)
+	}
+	if got := explained.RawGetString("kernel_reason_code"); !got.IsString() || got.Str() != qQueryKernelReasonSelect {
+		t.Fatalf("kernel_reason_code = %v, want %s", got, qQueryKernelReasonSelect)
+	}
+	reason := `select expression "bad" is not supported by q query native kernel: expression type function is not native-kernel supported`
+	if got := explained.RawGetString("kernel_reason"); !got.IsString() || got.Str() != reason {
+		t.Fatalf("kernel_reason = %v, want %q", got, reason)
+	}
+	details := qTestFallbackStatsDetailRows(t, qFallbackStatsTable())
+	if got := qTestFallbackDetailCount(details, "reason", qFallbackQueryKernel, "", reason); got != 1 {
+		t.Fatalf("query kernel select reason detail count = %d, want 1", got)
+	}
+}
+
 func TestQQueryKernelSupportCacheStats(t *testing.T) {
 	qClearCaches()
 	defer qClearCaches()

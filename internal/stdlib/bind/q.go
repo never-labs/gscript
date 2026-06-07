@@ -4337,9 +4337,14 @@ func qSimpleSelectRowsNativeSoA(s *SoA, mask *DenseArray, selects []qSelect) (*S
 	}
 	cols := make(map[string]*DenseArray, len(selects))
 	for _, sel := range selects {
-		col, ok := qEvalNativeExpr(filtered, sel.Expr)
+		col, ok, reason := qEvalNativeExprReason(filtered, sel.Expr)
 		if !ok {
-			return nil, qQueryKernelReasonSelect, fmt.Sprintf("select expression %q is not supported by q query native kernel", sel.Name)
+			if reason == "" {
+				reason = fmt.Sprintf("select expression %q is not supported by q query native kernel", sel.Name)
+			} else {
+				reason = fmt.Sprintf("select expression %q is not supported by q query native kernel: %s", sel.Name, reason)
+			}
+			return nil, qQueryKernelReasonSelect, reason
 		}
 		cols[sel.Name] = col
 	}
@@ -4351,45 +4356,53 @@ func qSimpleSelectRowsNativeSoA(s *SoA, mask *DenseArray, selects []qSelect) (*S
 }
 
 func qEvalNativeExpr(s *SoA, expr Value) (*DenseArray, bool) {
+	out, ok, _ := qEvalNativeExprReason(s, expr)
+	return out, ok
+}
+
+func qEvalNativeExprReason(s *SoA, expr Value) (*DenseArray, bool, string) {
 	if s == nil {
-		return nil, false
+		return nil, false, "source is nil"
 	}
 	if expr.IsString() {
 		col, ok := s.Column(expr.Str())
-		return col, ok
+		if !ok {
+			return nil, false, fmt.Sprintf("column %q not found", expr.Str())
+		}
+		return col, true, ""
 	}
 	if expr.IsInt() {
 		out, err := NewDenseArrayOfLen(DenseArrayI64, s.Len())
 		if err != nil {
-			return nil, false
+			return nil, false, err.Error()
 		}
 		if err := out.Fill(expr); err != nil {
-			return nil, false
+			return nil, false, err.Error()
 		}
-		return out, true
+		return out, true, ""
 	}
 	if expr.IsFloat() {
 		out, err := NewDenseArrayOfLen(DenseArrayF64, s.Len())
 		if err != nil {
-			return nil, false
+			return nil, false, err.Error()
 		}
 		if err := out.Fill(expr); err != nil {
-			return nil, false
+			return nil, false, err.Error()
 		}
-		return out, true
+		return out, true, ""
 	}
 	if expr.IsBool() {
 		out, err := NewDenseArrayOfLen(DenseArrayBool, s.Len())
 		if err != nil {
-			return nil, false
+			return nil, false, err.Error()
 		}
 		if err := out.Fill(expr); err != nil {
-			return nil, false
+			return nil, false, err.Error()
 		}
-		return out, true
+		return out, true, ""
 	}
 	if !expr.IsTable() {
-		return nil, false
+		return nil, false, fmt.Sprintf("expression type %s is not native-kernel supported", expr.TypeName())
 	}
 	tbl := expr.Table()
 	opValue := tbl.RawGetString("op")
@@ -4397,11 +4410,11 @@ func qEvalNativeExpr(s *SoA, expr Value) (*DenseArray, bool) {
 		opValue = tbl.RawGetInt(1)
 	}
 	if !opValue.IsString() {
-		return nil, false
+		return nil, false, "expression table must start with an operator"
 	}
 	op, ok := qNativeDenseArrayBinaryOp(opValue.Str())
 	if !ok {
-		return nil, false
+		return nil, false, fmt.Sprintf("operator %q is not native-kernel supported", opValue.Str())
 	}
 	left := tbl.RawGetString("left")
 	if left.IsNil() {
@@ -4411,43 +4424,51 @@ func qEvalNativeExpr(s *SoA, expr Value) (*DenseArray, bool) {
 	if right.IsNil() {
 		right = tbl.RawGetInt(3)
 	}
-	leftValue, ok := qNativeExprOperand(s, left)
+	leftValue, ok, reason := qNativeExprOperandReason(s, left)
 	if !ok {
-		return nil, false
+		return nil, false, "left operand: " + reason
 	}
-	rightValue, ok := qNativeExprOperand(s, right)
+	rightValue, ok, reason := qNativeExprOperandReason(s, right)
 	if !ok {
-		return nil, false
+		return nil, false, "right operand: " + reason
 	}
 	out, err := DenseArrayElementwise(op, leftValue, rightValue)
 	if err != nil || !out.IsDenseArray() {
-		return nil, false
+		if err != nil {
+			return nil, false, err.Error()
+		}
+		return nil, false, "native expression did not produce dense array"
 	}
-	return out.DenseArray(), true
+	return out.DenseArray(), true, ""
 }
 
 func qNativeExprOperand(s *SoA, expr Value) (Value, bool) {
+	out, ok, _ := qNativeExprOperandReason(s, expr)
+	return out, ok
+}
+
+func qNativeExprOperandReason(s *SoA, expr Value) (Value, bool, string) {
 	if expr.IsString() {
 		col, ok := s.Column(expr.Str())
 		if !ok {
-			return NilValue(), false
+			return NilValue(), false, fmt.Sprintf("column %q not found", expr.Str())
 		}
-		return DenseArrayValue(col), true
+		return DenseArrayValue(col), true, ""
 	}
 	if expr.IsNumber() {
-		return expr, true
+		return expr, true, ""
 	}
 	if expr.IsBool() {
-		return expr, true
+		return expr, true, ""
 	}
 	if expr.IsTable() {
-		col, ok := qEvalNativeExpr(s, expr)
+		col, ok, reason := qEvalNativeExprReason(s, expr)
 		if !ok {
-			return NilValue(), false
+			return NilValue(), false, reason
 		}
-		return DenseArrayValue(col), true
+		return DenseArrayValue(col), true, ""
 	}
-	return NilValue(), false
+	return NilValue(), false, fmt.Sprintf("operand type %s is not native-kernel supported", expr.TypeName())
 }
 
 func qNativeDenseArrayBinaryOp(op string) (DenseArrayBinaryOp, bool) {
