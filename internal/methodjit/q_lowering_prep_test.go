@@ -74,6 +74,64 @@ func TestVectorCompareBytecodeBuildsMethodJITIR(t *testing.T) {
 	}
 }
 
+func TestFrameColumnBytecodeBuildsMethodJITIR(t *testing.T) {
+	proto := &vm.FuncProto{
+		Name:      "frame_column",
+		NumParams: 1,
+		MaxStack:  1,
+		Constants: []runtime.Value{
+			runtime.StringValue("price"),
+		},
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_FRAME_COLUMN, 0, 0, 0),
+			vm.EncodeABC(vm.OP_RETURN, 0, 2, 0),
+		},
+	}
+
+	fn := BuildGraph(proto)
+	var column *Instr
+	for _, block := range fn.Blocks {
+		for _, instr := range block.Instrs {
+			if instr.Op == OpFrameColumn {
+				column = instr
+				break
+			}
+		}
+	}
+	if column == nil {
+		t.Fatalf("BuildGraph did not emit OpFrameColumn:\n%s", Print(fn))
+	}
+	if len(column.Args) != 1 {
+		t.Fatalf("OpFrameColumn arg count = %d, want 1", len(column.Args))
+	}
+	if column.Type != TypeAny {
+		t.Fatalf("OpFrameColumn type = %s, want Any", column.Type)
+	}
+	if column.Aux != 0 {
+		t.Fatalf("OpFrameColumn Aux = %d, want const index 0", column.Aux)
+	}
+}
+
+func TestTier2GateAllowsFrameColumnThroughOpExit(t *testing.T) {
+	proto := &vm.FuncProto{
+		Name:      "frame_column",
+		NumParams: 1,
+		MaxStack:  1,
+		Constants: []runtime.Value{
+			runtime.StringValue("price"),
+		},
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_FRAME_COLUMN, 0, 0, 0),
+			vm.EncodeABC(vm.OP_RETURN, 0, 2, 0),
+		},
+	}
+
+	gate := firstUnsupportedTier2BytecodeGate(proto)
+	if !gate.Allowed {
+		t.Fatalf("OP_FRAME_COLUMN should be Tier2-eligible via op-exit, got %q", gate.Reason)
+	}
+}
+
 func TestTier2GateAllowsVectorGatherThroughOpExit(t *testing.T) {
 	proto := &vm.FuncProto{
 		Name:     "vector_gather",
@@ -103,6 +161,33 @@ func TestTier2GateAllowsVectorCompareThroughOpExit(t *testing.T) {
 	gate := firstUnsupportedTier2BytecodeGate(proto)
 	if !gate.Allowed {
 		t.Fatalf("OP_VECTOR_COMPARE should be Tier2-eligible via op-exit, got %q", gate.Reason)
+	}
+}
+
+func TestFrameColumnRuntimeHelperUsesRuntimePrimitive(t *testing.T) {
+	soa, err := runtime.NewSoA(map[string]*runtime.DenseArray{
+		"price": runtime.NewDenseArrayF64([]float64{10.5, 20.25}),
+	})
+	if err != nil {
+		t.Fatalf("NewSoA: %v", err)
+	}
+	frame := runtime.NewTable()
+	frame.SetNativePayloadWithInfo(soa, runtime.NativePayloadInfo{
+		Kind:    runtime.NativePayloadDataFrame,
+		Rows:    soa.Len(),
+		Columns: 1,
+	})
+
+	result, err := executeFrameColumnValue(runtime.TableValue(frame), "price")
+	if err != nil {
+		t.Fatalf("execute frame column: %v", err)
+	}
+	if !result.IsDenseArray() {
+		t.Fatalf("frame column result = %#v, want dense array", result)
+	}
+	got, ok := result.DenseArray().F64()
+	if !ok || len(got) != 2 || got[0] != 10.5 || got[1] != 20.25 {
+		t.Fatalf("frame column values = %#v, want [10.5 20.25]", got)
 	}
 }
 

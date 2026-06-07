@@ -326,6 +326,19 @@ func (tm *TieringManager) executeOpExit(ctx *ExecContext, regs []runtime.Value, 
 			}
 		}
 
+	case OpFrameColumn:
+		if absArg1 >= len(regs) || absSlot >= len(regs) {
+			return fmt.Errorf("FrameColumn op-exit out of register range")
+		}
+		if aux < 0 || proto == nil || aux >= len(proto.Constants) || !proto.Constants[aux].IsString() {
+			return fmt.Errorf("FrameColumn column name must be a string constant")
+		}
+		out, err := executeFrameColumnValue(regs[absArg1], proto.Constants[aux].Str())
+		if err != nil {
+			return err
+		}
+		regs[absSlot] = out
+
 	case OpVectorGather:
 		if absArg1 >= len(regs) || absArg2 >= len(regs) || absSlot >= len(regs) {
 			return fmt.Errorf("VectorGather op-exit out of register range")

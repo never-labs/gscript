@@ -1049,6 +1049,17 @@ func (s *interpState) execInstr(instr *Instr, block *Block) ([]runtime.Value, bo
 		}
 		s.values[instr.ID] = row.Table().RawGetInt(innerKey.Int())
 
+	case OpFrameColumn:
+		idx := int(instr.Aux)
+		if idx < 0 || idx >= len(s.fn.Proto.Constants) || !s.fn.Proto.Constants[idx].IsString() {
+			return nil, false, fmt.Errorf("FrameColumn column name must be a string constant")
+		}
+		out, err := executeFrameColumnValue(s.val(instr.Args[0]), s.fn.Proto.Constants[idx].Str())
+		if err != nil {
+			return nil, false, err
+		}
+		s.values[instr.ID] = out
+
 	case OpVectorGather:
 		out, err := executeVectorGatherValue(s.val(instr.Args[0]), s.val(instr.Args[1]))
 		if err != nil {

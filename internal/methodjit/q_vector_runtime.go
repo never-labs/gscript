@@ -20,6 +20,17 @@ func executeVectorGatherValue(vectorVal, indexVal runtime.Value) (runtime.Value,
 	return runtime.DenseArrayValue(out), nil
 }
 
+func executeFrameColumnValue(frameVal runtime.Value, name string) (runtime.Value, error) {
+	out, handled, err := frameVal.NativeFrameColumn(name)
+	if err != nil {
+		return runtime.NilValue(), err
+	}
+	if !handled {
+		return runtime.NilValue(), fmt.Errorf("FrameColumn operand must be native frame (got %s)", frameVal.TypeName())
+	}
+	return out, nil
+}
+
 func executeVectorCompareValue(opCode int, leftVal, rightVal runtime.Value) (runtime.Value, error) {
 	op := runtime.DenseArrayBinaryOp(opCode)
 	if op < runtime.DenseArrayEQ || op > runtime.DenseArrayGE {

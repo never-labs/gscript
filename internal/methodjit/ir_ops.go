@@ -172,9 +172,11 @@ const (
 	// Loads a table row from a mixed outer array, verifies the row array kind,
 	// then loads the inner element without materializing the row table SSA value.
 	OpTableArrayNestedLoad
+	// q/frame runtime primitive. Args = [frame], Aux = constant pool index for
+	// the column name; mirrors OP_FRAME_COLUMN and returns a dense-array column.
+	OpFrameColumn
 	// q/vector runtime primitive. Args = [vector, indexes]; mirrors
-	// OP_VECTOR_GATHER and returns a gathered dense-array value. Current Tier 2
-	// gates keep this in Tier 1 until backend lowering/deopt is implemented.
+	// OP_VECTOR_GATHER and returns a gathered dense-array value.
 	OpVectorGather
 	// q/vector compare-mask primitive. Args = [left, right], Aux = runtime
 	// DenseArrayBinaryOp comparison opcode; mirrors OP_VECTOR_COMPARE.

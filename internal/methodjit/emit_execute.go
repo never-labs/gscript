@@ -971,6 +971,19 @@ func (cf *CompiledFunction) executeOpExit(ctx *ExecContext, regs []runtime.Value
 			}
 		}
 
+	case OpFrameColumn:
+		if arg1 >= len(regs) || slot >= len(regs) {
+			return fmt.Errorf("FrameColumn op-exit out of register range")
+		}
+		if aux < 0 || cf.Proto == nil || aux >= len(cf.Proto.Constants) || !cf.Proto.Constants[aux].IsString() {
+			return fmt.Errorf("FrameColumn column name must be a string constant")
+		}
+		out, err := executeFrameColumnValue(regs[arg1], cf.Proto.Constants[aux].Str())
+		if err != nil {
+			return err
+		}
+		regs[slot] = out
+
 	case OpVectorGather:
 		if arg1 >= len(regs) || arg2 >= len(regs) || slot >= len(regs) {
 			return fmt.Errorf("VectorGather op-exit out of register range")
