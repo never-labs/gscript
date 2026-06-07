@@ -640,6 +640,19 @@ func (v Value) IsFrame() bool { return v.Type() == TypeFrame }
 // IsKeyedFrame reports whether the value is a native keyed frame facade.
 func (v Value) IsKeyedFrame() bool { return v.Type() == TypeKeyedFrame }
 
+// NativeFramePayloadInfo returns runtime frame metadata for native frame and
+// keyed-frame facade values.
+func (v Value) NativeFramePayloadInfo() (NativePayloadInfo, bool) {
+	if !v.IsTable() {
+		return NativePayloadInfo{}, false
+	}
+	tbl := v.Table()
+	if tbl == nil {
+		return NativePayloadInfo{}, false
+	}
+	return tbl.NativeFramePayloadInfo()
+}
+
 func (v Value) nativeFramePayloadKind() (NativePayloadKind, bool) {
 	if !v.IsTable() {
 		return NativePayloadNone, false

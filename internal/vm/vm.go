@@ -2340,6 +2340,42 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 			bv := vm.regs[base+DecodeB(inst)]
 			vm.regs[base+a] = runtime.BoolValue(bv.IsNumber())
 
+		case OP_FRAME_LEN:
+			a := DecodeA(inst)
+			b := DecodeB(inst)
+			frameVal := vm.regs[base+b]
+			info, ok := frameVal.NativeFramePayloadInfo()
+			if !ok {
+				return nil, wrapLineErr(frame, fmt.Errorf("FRAME_LEN operand must be native frame (got %s)", frameVal.TypeName()))
+			}
+			vm.regs[base+a] = runtime.IntValue(int64(info.Rows))
+			if frame.closure.Proto.Feedback != nil {
+				fb := &frame.closure.Proto.Feedback[frame.pc-1]
+				fb.Left.Observe(frameVal.Type())
+				fb.Result.Observe(vm.regs[base+a].Type())
+			}
+
+		case OP_VECTOR_COMPARE:
+			a := DecodeA(inst)
+			b := DecodeB(inst)
+			op := runtime.DenseArrayBinaryOp(DecodeC(inst))
+			if op < runtime.DenseArrayEQ || op > runtime.DenseArrayGE {
+				return nil, wrapLineErr(frame, fmt.Errorf("VECTOR_COMPARE op %d is not a comparison", op))
+			}
+			leftVal := vm.regs[base+a]
+			rightVal := vm.regs[base+b]
+			out, err := runtime.DenseArrayElementwise(op, leftVal, rightVal)
+			if err != nil {
+				return nil, wrapLineErr(frame, err)
+			}
+			vm.regs[base+a] = out
+			if frame.closure.Proto.Feedback != nil {
+				fb := &frame.closure.Proto.Feedback[frame.pc-1]
+				fb.Left.Observe(leftVal.Type())
+				fb.Right.Observe(rightVal.Type())
+				fb.Result.Observe(out.Type())
+			}
+
 		case OP_VECTOR_GATHER:
 			a := DecodeA(inst)
 			b := DecodeB(inst)
