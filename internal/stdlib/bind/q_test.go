@@ -3017,6 +3017,31 @@ rows := q.query(trades, {select: {notional: {"*", "price", "size"}}})
 	}
 }
 
+func TestQQueryKernelSupportCacheStats(t *testing.T) {
+	qClearCaches()
+	defer qClearCaches()
+
+	interp := runWithQAndSOA(t, `
+trades := soa.zip({price: []f64{100, 101}, size: []f64{10, 20}})
+first := q.query(trades, {select: {notional: {"*", "price", "size"}, large: {">=", "size", 15}}})
+second := q.query(trades, {select: {large: {">=", "size", 15}, notional: {"*", "price", "size"}}})
+`)
+	first := interp.GetGlobal("first").Table()
+	second := interp.GetGlobal("second").Table()
+	if first == nil || first.Length() != 2 || second == nil || second.Length() != 2 {
+		t.Fatalf("query results first=%v second=%v, want two rows each", first, second)
+	}
+	stats := qTestCacheStatsRows(t, qCacheStatsTable())
+	got := stats["q_query_kernel"]
+	if got["entries"] != 1 || got["hits"] != 1 || got["misses"] != 1 || got["evictions"] != 0 {
+		t.Fatalf("q_query_kernel stats = %#v, want 1 entry, 1 hit, 1 miss, 0 evictions", got)
+	}
+	fallback := qTestFallbackStatsRows(t, qFallbackStatsTable())
+	if got := fallback[qQueryKernelSupported]; got != 2 {
+		t.Fatalf("query kernel hit count = %d, want 2", got)
+	}
+}
+
 func TestQFallbackStatsAggregateTopReasons(t *testing.T) {
 	qClearCaches()
 	defer qClearCaches()
@@ -4927,7 +4952,7 @@ func qTestCacheStatsRows(t *testing.T, tbl *Table) map[string]map[string]int64 {
 		}
 		out[name.Str()] = values
 	}
-	for _, name := range []string{"qsql_template", "qsql_aligned", "qsql_kernel", "q_eval"} {
+	for _, name := range []string{"qsql_template", "qsql_aligned", "qsql_kernel", "q_query_kernel", "q_eval"} {
 		if _, ok := out[name]; !ok {
 			t.Fatalf("cache stats missing row %q in %#v", name, out)
 		}

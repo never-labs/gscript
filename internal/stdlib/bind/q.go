@@ -17,6 +17,7 @@ const qKeyedFrameMarker = "__q_keyed_frame"
 const qDictKeysMarker = "__q_dict_keys"
 
 const qSQLPlanCacheLimit = 128
+const qQueryKernelSupportCacheLimit = 128
 const qEvalCacheLimit = 256
 
 const (
@@ -71,6 +72,19 @@ type qEvalCacheStats struct {
 	Evictions int
 }
 
+type qQueryKernelSupportCacheStats struct {
+	Hits      int
+	Misses    int
+	Evictions int
+}
+
+type qQueryKernelSupportCacheEntry struct {
+	Supported  bool
+	ReasonCode string
+	Reason     string
+	SchemaHash string
+}
+
 type qFallbackStats struct {
 	KernelUnsupported int
 	KernelCompileErr  int
@@ -119,6 +133,11 @@ var (
 	qEvalCache      = make(map[string]any)
 	qEvalCacheOrder []string
 	qEvalStats      qEvalCacheStats
+
+	qQueryKernelSupportCacheMu    sync.Mutex
+	qQueryKernelSupportCache      = make(map[string]qQueryKernelSupportCacheEntry)
+	qQueryKernelSupportCacheOrder []string
+	qQueryKernelSupportStats      qQueryKernelSupportCacheStats
 
 	qFallbackStatsMu  sync.Mutex
 	qFallbackCounters qFallbackStats
@@ -596,6 +615,114 @@ func qEvalCacheStoreLocked(src string, value any) {
 	}
 }
 
+func qQueryKernelSupportCacheProbe(key string) (qQueryKernelSupportCacheEntry, bool) {
+	qQueryKernelSupportCacheMu.Lock()
+	entry, ok := qQueryKernelSupportCache[key]
+	if ok {
+		qQueryKernelSupportStats.Hits++
+	} else {
+		qQueryKernelSupportStats.Misses++
+	}
+	qQueryKernelSupportCacheMu.Unlock()
+	return entry, ok
+}
+
+func qQueryKernelSupportCacheStore(key string, entry qQueryKernelSupportCacheEntry) {
+	if key == "" {
+		return
+	}
+	qQueryKernelSupportCacheMu.Lock()
+	if _, ok := qQueryKernelSupportCache[key]; !ok {
+		qQueryKernelSupportCacheOrder = append(qQueryKernelSupportCacheOrder, key)
+	}
+	qQueryKernelSupportCache[key] = entry
+	for len(qQueryKernelSupportCacheOrder) > qQueryKernelSupportCacheLimit {
+		evict := qQueryKernelSupportCacheOrder[0]
+		qQueryKernelSupportCacheOrder = qQueryKernelSupportCacheOrder[1:]
+		delete(qQueryKernelSupportCache, evict)
+		qQueryKernelSupportStats.Evictions++
+	}
+	qQueryKernelSupportCacheMu.Unlock()
+}
+
+func qQueryKernelSupportCacheKey(s *SoA, spec *Table, selects []qSelect) (string, bool) {
+	if s == nil || spec == nil || len(selects) == 0 {
+		return "", false
+	}
+	parts := make([]string, 0, len(selects)+4)
+	parts = append(parts, "source="+qQueryNativeSoASchemaHash(s))
+	for _, sel := range selects {
+		sig, ok := qQueryKernelExprSignature(sel.Expr, 0)
+		if !ok {
+			return "", false
+		}
+		parts = append(parts, "select:"+sel.Name+"="+sig)
+	}
+	order, err := qOrderSpecs(spec.RawGetString("order_by"))
+	if err != nil {
+		return "", false
+	}
+	for _, ord := range order {
+		dir := "asc"
+		if ord.Desc {
+			dir = "desc"
+		}
+		parts = append(parts, "order:"+ord.Column+":"+dir)
+	}
+	limit, err := qLimit(spec.RawGetString("limit"))
+	if err != nil {
+		return "", false
+	}
+	parts = append(parts, "limit="+strconv.Itoa(limit))
+	return strings.Join(parts, "|"), true
+}
+
+func qQueryKernelExprSignature(expr Value, depth int) (string, bool) {
+	if depth > 8 {
+		return "", false
+	}
+	switch {
+	case expr.IsNil():
+		return "nil", true
+	case expr.IsString():
+		return "s:" + strconv.Quote(expr.Str()), true
+	case expr.IsInt():
+		return "i:" + strconv.FormatInt(expr.Int(), 10), true
+	case expr.IsFloat():
+		return "f:" + strconv.FormatFloat(expr.Float(), 'g', -1, 64), true
+	case expr.IsBool():
+		return "b:" + strconv.FormatBool(expr.Bool()), true
+	case expr.IsTable():
+		tbl := expr.Table()
+		op := tbl.RawGetString("op")
+		if op.IsNil() {
+			op = tbl.RawGetInt(1)
+		}
+		if !op.IsString() {
+			return "", false
+		}
+		left := tbl.RawGetString("left")
+		if left.IsNil() {
+			left = tbl.RawGetInt(2)
+		}
+		right := tbl.RawGetString("right")
+		if right.IsNil() {
+			right = tbl.RawGetInt(3)
+		}
+		leftSig, ok := qQueryKernelExprSignature(left, depth+1)
+		if !ok {
+			return "", false
+		}
+		rightSig, ok := qQueryKernelExprSignature(right, depth+1)
+		if !ok {
+			return "", false
+		}
+		return "op:" + strconv.Quote(op.Str()) + "(" + leftSig + "," + rightSig + ")", true
+	default:
+		return "", false
+	}
+}
+
 func qEvalValueToValue(v any) (Value, error) {
 	if data.IsNull(v) {
 		if kind, ok := data.NullKind(v); ok {
@@ -955,7 +1082,13 @@ func qRunQuery(s *SoA, spec *Table) (*Table, error) {
 	var nativeRows *SoA
 	nativeReasonCode := ""
 	nativeReason := ""
+	nativeCacheKey := ""
+	nativeCacheable := false
 	if len(aggs) == 0 {
+		nativeCacheKey, nativeCacheable = qQueryKernelSupportCacheKey(s, spec, selects)
+		if nativeCacheable {
+			qQueryKernelSupportCacheProbe(nativeCacheKey)
+		}
 		nativeRows, nativeReasonCode, nativeReason = qSimpleSelectRowsNativeSoA(s, mask, selects)
 		rows, err = qRows(s, mask, selects)
 	} else {
@@ -971,6 +1104,14 @@ func qRunQuery(s *SoA, spec *Table) (*Table, error) {
 	if nativeRows, ok := qQueryNativeRowsForResult(spec, nativeRows); ok {
 		qAttachRowsNativeSoAPayload(rows, nativeRows)
 		if len(aggs) == 0 {
+			if nativeCacheable {
+				qQueryKernelSupportCacheStore(nativeCacheKey, qQueryKernelSupportCacheEntry{
+					Supported:  true,
+					ReasonCode: qKernelReasonSupported,
+					Reason:     qKernelReasonSupported,
+					SchemaHash: qQueryNativeSoASchemaHash(nativeRows),
+				})
+			}
 			qRecordQueryKernelHit()
 		}
 	} else {
@@ -978,6 +1119,13 @@ func qRunQuery(s *SoA, spec *Table) (*Table, error) {
 			if nativeReason == "" {
 				nativeReasonCode = qQueryKernelReasonOrder
 				nativeReason = "query native kernel could not preserve order or limit"
+			}
+			if nativeCacheable {
+				qQueryKernelSupportCacheStore(nativeCacheKey, qQueryKernelSupportCacheEntry{
+					Supported:  false,
+					ReasonCode: nativeReasonCode,
+					Reason:     nativeReason,
+				})
 			}
 			qRecordFallbackReason(qFallbackQueryKernel, nativeReasonCode, nativeReason)
 		}
@@ -2336,7 +2484,12 @@ func qCacheStatsTable() *Table {
 	evalStats := qEvalStats
 	qEvalCacheMu.Unlock()
 
-	rows := NewAppendArrayTable(4)
+	qQueryKernelSupportCacheMu.Lock()
+	queryKernelEntries := len(qQueryKernelSupportCache)
+	queryKernelStats := qQueryKernelSupportStats
+	qQueryKernelSupportCacheMu.Unlock()
+
+	rows := NewAppendArrayTable(5)
 	rows.RawSetInt(1, TableValue(qCacheStatsRow(
 		"qsql_template",
 		templateEntries,
@@ -2362,6 +2515,14 @@ func qCacheStatsTable() *Table {
 		qSQLPlanCacheLimit,
 	)))
 	rows.RawSetInt(4, TableValue(qCacheStatsRow(
+		"q_query_kernel",
+		queryKernelEntries,
+		queryKernelStats.Hits,
+		queryKernelStats.Misses,
+		queryKernelStats.Evictions,
+		qQueryKernelSupportCacheLimit,
+	)))
+	rows.RawSetInt(5, TableValue(qCacheStatsRow(
 		"q_eval",
 		evalEntries,
 		evalStats.Hits,
@@ -2580,6 +2741,12 @@ func qClearCaches() {
 	qEvalCacheOrder = nil
 	qEvalStats = qEvalCacheStats{}
 	qEvalCacheMu.Unlock()
+
+	qQueryKernelSupportCacheMu.Lock()
+	qQueryKernelSupportCache = make(map[string]qQueryKernelSupportCacheEntry)
+	qQueryKernelSupportCacheOrder = nil
+	qQueryKernelSupportStats = qQueryKernelSupportCacheStats{}
+	qQueryKernelSupportCacheMu.Unlock()
 
 	qFallbackStatsMu.Lock()
 	qFallbackCounters = qFallbackStats{}
