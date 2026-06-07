@@ -326,6 +326,26 @@ func (tm *TieringManager) executeOpExit(ctx *ExecContext, regs []runtime.Value, 
 			}
 		}
 
+	case OpVectorGather:
+		if absArg1 >= len(regs) || absArg2 >= len(regs) || absSlot >= len(regs) {
+			return fmt.Errorf("VectorGather op-exit out of register range")
+		}
+		out, err := executeVectorGatherValue(regs[absArg1], regs[absArg2])
+		if err != nil {
+			return err
+		}
+		regs[absSlot] = out
+
+	case OpVectorCompare:
+		if absArg1 >= len(regs) || absArg2 >= len(regs) || absSlot >= len(regs) {
+			return fmt.Errorf("VectorCompare op-exit out of register range")
+		}
+		out, err := executeVectorCompareValue(aux, regs[absArg1], regs[absArg2])
+		if err != nil {
+			return err
+		}
+		regs[absSlot] = out
+
 	case OpEq:
 		if absArg1 < len(regs) && absArg2 < len(regs) && absSlot < len(regs) {
 			regs[absSlot] = runtime.BoolValue(regs[absArg1].Equal(regs[absArg2]))

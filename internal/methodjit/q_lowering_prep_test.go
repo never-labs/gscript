@@ -3,7 +3,6 @@
 package methodjit
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/never-labs/leia/internal/runtime"
@@ -75,7 +74,7 @@ func TestVectorCompareBytecodeBuildsMethodJITIR(t *testing.T) {
 	}
 }
 
-func TestTier2GateBlocksVectorGatherUntilBackendLowering(t *testing.T) {
+func TestTier2GateAllowsVectorGatherThroughOpExit(t *testing.T) {
 	proto := &vm.FuncProto{
 		Name:     "vector_gather",
 		MaxStack: 2,
@@ -86,15 +85,12 @@ func TestTier2GateBlocksVectorGatherUntilBackendLowering(t *testing.T) {
 	}
 
 	gate := firstUnsupportedTier2BytecodeGate(proto)
-	if gate.Allowed {
-		t.Fatal("OP_VECTOR_GATHER should stay out of Tier 2 until backend lowering exists")
-	}
-	if !strings.Contains(gate.Reason, "VECTOR_GATHER") {
-		t.Fatalf("gate reason = %q, want VECTOR_GATHER", gate.Reason)
+	if !gate.Allowed {
+		t.Fatalf("OP_VECTOR_GATHER should be Tier2-eligible via op-exit, got %q", gate.Reason)
 	}
 }
 
-func TestTier2GateBlocksVectorCompareUntilBackendLowering(t *testing.T) {
+func TestTier2GateAllowsVectorCompareThroughOpExit(t *testing.T) {
 	proto := &vm.FuncProto{
 		Name:     "vector_compare",
 		MaxStack: 2,
@@ -105,11 +101,43 @@ func TestTier2GateBlocksVectorCompareUntilBackendLowering(t *testing.T) {
 	}
 
 	gate := firstUnsupportedTier2BytecodeGate(proto)
-	if gate.Allowed {
-		t.Fatal("OP_VECTOR_COMPARE should stay out of Tier 2 until backend lowering exists")
+	if !gate.Allowed {
+		t.Fatalf("OP_VECTOR_COMPARE should be Tier2-eligible via op-exit, got %q", gate.Reason)
 	}
-	if !strings.Contains(gate.Reason, "VECTOR_COMPARE") {
-		t.Fatalf("gate reason = %q, want VECTOR_COMPARE", gate.Reason)
+}
+
+func TestVectorGatherRuntimeHelperUsesRuntimePrimitive(t *testing.T) {
+	result, err := executeVectorGatherValue(
+		runtime.DenseArrayValue(runtime.NewDenseArrayF64([]float64{10, 20, 30})),
+		runtime.DenseArrayValue(runtime.NewDenseArrayI64([]int64{3, 1})),
+	)
+	if err != nil {
+		t.Fatalf("execute vector gather: %v", err)
+	}
+	if !result.IsDenseArray() {
+		t.Fatalf("vector gather result = %#v, want dense array", result)
+	}
+	got, ok := result.DenseArray().F64()
+	if !ok || len(got) != 2 || got[0] != 30 || got[1] != 10 {
+		t.Fatalf("vector gather values = %#v, want [30 10]", got)
+	}
+}
+
+func TestVectorCompareRuntimeHelperUsesRuntimePrimitive(t *testing.T) {
+	result, err := executeVectorCompareValue(
+		int(runtime.DenseArrayGE),
+		runtime.DenseArrayValue(runtime.NewDenseArrayI64([]int64{1, 4, 6})),
+		runtime.IntValue(4),
+	)
+	if err != nil {
+		t.Fatalf("execute vector compare: %v", err)
+	}
+	if !result.IsDenseArray() {
+		t.Fatalf("vector compare result = %#v, want dense array", result)
+	}
+	got, ok := result.DenseArray().Bool()
+	if !ok || len(got) != 3 || got[0] || !got[1] || !got[2] {
+		t.Fatalf("vector compare values = %#v, want [false true true]", got)
 	}
 }
 

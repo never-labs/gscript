@@ -971,6 +971,26 @@ func (cf *CompiledFunction) executeOpExit(ctx *ExecContext, regs []runtime.Value
 			}
 		}
 
+	case OpVectorGather:
+		if arg1 >= len(regs) || arg2 >= len(regs) || slot >= len(regs) {
+			return fmt.Errorf("VectorGather op-exit out of register range")
+		}
+		out, err := executeVectorGatherValue(regs[arg1], regs[arg2])
+		if err != nil {
+			return err
+		}
+		regs[slot] = out
+
+	case OpVectorCompare:
+		if arg1 >= len(regs) || arg2 >= len(regs) || slot >= len(regs) {
+			return fmt.Errorf("VectorCompare op-exit out of register range")
+		}
+		out, err := executeVectorCompareValue(aux, regs[arg1], regs[arg2])
+		if err != nil {
+			return err
+		}
+		regs[slot] = out
+
 	case OpEq:
 		if arg1 < len(regs) && arg2 < len(regs) && slot < len(regs) {
 			regs[slot] = runtime.BoolValue(regs[arg1].Equal(regs[arg2]))

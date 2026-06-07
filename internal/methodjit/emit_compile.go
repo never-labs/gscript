@@ -635,7 +635,7 @@ func fnHasResultProducingOpExit(fn *Function) bool {
 				continue
 			}
 			switch instr.Op {
-			case OpMatrixDense:
+			case OpMatrixDense, OpVectorGather, OpVectorCompare:
 				return true
 			}
 		}
