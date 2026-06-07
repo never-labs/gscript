@@ -1080,7 +1080,7 @@ flat := q.query(trades, {
 
 calc := q.query(trades, {
     where: soa.mask(trades, "sym", "==", 1),
-    select: {notional: {"*", "price", "size"}, adjusted: {"+", "price", 1.5}, marker: 1},
+    select: {notional: {"*", "price", "size"}, adjusted: {"+", "price", 1.5}, marker: 1, active: true},
 })
 
 limited := q.query(trades, {
@@ -1193,6 +1193,17 @@ ordered := q.query(trades, {
 	if !ok || len(marker) != 2 || marker[0] != 1 || marker[1] != 1 {
 		t.Fatalf("calc marker = %#v, want [1 1]", marker)
 	}
+	activeCol, handled, err := TableValue(calc).NativeFrameColumn("active")
+	if err != nil {
+		t.Fatalf("calc NativeFrameColumn(active): %v", err)
+	}
+	if !handled || !activeCol.IsDenseArray() {
+		t.Fatalf("calc active column = %v handled=%v, want dense array", activeCol, handled)
+	}
+	active, ok := activeCol.DenseArray().Bool()
+	if !ok || len(active) != 2 || !active[0] || !active[1] {
+		t.Fatalf("calc active = %#v, want [true true]", active)
+	}
 	limited := interp.GetGlobal("limited").Table()
 	if limited == nil || limited.Length() != 2 {
 		t.Fatalf("limited length = %v, want 2", limited)
@@ -1272,7 +1283,7 @@ supported := q.explain_query(trades, {
 })
 
 unsupported := q.explain_query(trades, {
-    select: {price: "price", marker: true},
+    select: {price: "price", marker: {"negate", "price"}},
 })
 `)
 
@@ -2851,14 +2862,14 @@ func TestQFallbackStatsTrackQueryKernelFallback(t *testing.T) {
 
 	interp := runWithQAndSOA(t, `
 trades := soa.zip({price: []f64{100, 101}})
-rows := q.query(trades, {select: {price: "price", marker: true}})
+rows := q.query(trades, {select: {price: "price"}, order_by: "missing"})
 `)
 	rows := interp.GetGlobal("rows").Table()
 	if rows == nil || rows.Length() != 2 {
 		t.Fatalf("rows length = %v, want 2", rows)
 	}
-	if got := rows.RawGetInt(1).Table().RawGetString("marker"); !got.IsBool() || !got.Bool() {
-		t.Fatalf("rows[1].marker = %v, want true", got)
+	if got := rows.RawGetInt(1).Table().RawGetString("price"); !got.IsFloat() || got.Float() != 100 {
+		t.Fatalf("rows[1].price = %v, want 100", got)
 	}
 	stats := qTestFallbackStatsRows(t, qFallbackStatsTable())
 	if got := stats[qFallbackQueryKernel]; got != 1 {
@@ -2868,7 +2879,7 @@ rows := q.query(trades, {select: {price: "price", marker: true}})
 		t.Fatalf("query kernel hit count = %d, want 0", got)
 	}
 	details := qTestFallbackStatsDetailRows(t, qFallbackStatsTable())
-	if got := qTestFallbackDetailCount(details, "reason_code", qFallbackQueryKernel, qQueryKernelReasonSelect, ""); got != 1 {
+	if got := qTestFallbackDetailCount(details, "reason_code", qFallbackQueryKernel, qQueryKernelReasonOrder, ""); got != 1 {
 		t.Fatalf("query kernel reason_code count = %d, want 1", got)
 	}
 }
