@@ -1250,6 +1250,72 @@ ordered := q.query(trades, {
 	}
 }
 
+func TestQQueryKernelPayloadFeedsRuntimePrimitivePipeline(t *testing.T) {
+	trades, err := NewSoA(map[string]*DenseArray{
+		"sym":   NewDenseArrayI64([]int64{1, 1, 2, 2}),
+		"price": NewDenseArrayF64([]float64{10, 12, 7.5, 8}),
+		"size":  NewDenseArrayI64([]int64{100, 50, 200, 150}),
+	})
+	if err != nil {
+		t.Fatalf("NewSoA: %v", err)
+	}
+	selects := NewTable()
+	selects.RawSetString("px", StringValue("price"))
+	selects.RawSetString("qty", StringValue("size"))
+	spec := NewTable()
+	spec.RawSetString("where", DenseArrayValue(NewDenseArrayBool([]bool{true, true, false, true})))
+	spec.RawSetString("select", TableValue(selects))
+	rows, err := qRunQuery(trades, spec)
+	if err != nil {
+		t.Fatalf("qRunQuery: %v", err)
+	}
+	value := TableValue(rows)
+	info, ok := value.NativeFramePayloadInfo()
+	if !ok || !strings.HasPrefix(info.SchemaHash, "q.query.kernel:") {
+		t.Fatalf("q.query payload info = %+v ok=%v, want q.query kernel payload", info, ok)
+	}
+
+	price, handled, err := value.NativeFrameColumn("px")
+	if err != nil {
+		t.Fatalf("NativeFrameColumn(px): %v", err)
+	}
+	if !handled || !price.IsDenseArray() {
+		t.Fatalf("NativeFrameColumn(px) = %v handled=%v, want dense array", price, handled)
+	}
+	mask, err := runtime.DenseArrayElementwise(runtime.DenseArrayGE, price, runtime.FloatValue(9))
+	if err != nil {
+		t.Fatalf("DenseArrayElementwise(px >= 9): %v", err)
+	}
+	if !mask.IsDenseArray() {
+		t.Fatalf("compare mask = %v, want dense array", mask)
+	}
+	filtered, handled, err := value.NativeFrameFilter(mask.DenseArray())
+	if err != nil {
+		t.Fatalf("NativeFrameFilter: %v", err)
+	}
+	if !handled {
+		t.Fatal("NativeFrameFilter was not handled")
+	}
+	projected, handled, err := filtered.NativeFrameProject([]string{"qty"})
+	if err != nil {
+		t.Fatalf("NativeFrameProject(qty): %v", err)
+	}
+	if !handled {
+		t.Fatal("NativeFrameProject was not handled")
+	}
+	qty, handled, err := projected.NativeFrameColumn("qty")
+	if err != nil {
+		t.Fatalf("NativeFrameColumn(qty): %v", err)
+	}
+	if !handled || !qty.IsDenseArray() {
+		t.Fatalf("NativeFrameColumn(qty) = %v handled=%v, want dense array", qty, handled)
+	}
+	got, ok := qty.DenseArray().I64()
+	if !ok || len(got) != 2 || got[0] != 100 || got[1] != 50 {
+		t.Fatalf("primitive pipeline qty = %#v, want [100 50]", got)
+	}
+}
+
 func TestQModuleRejectsInvalidPlans(t *testing.T) {
 	interp := runWithQAndSOA(t, `
 trades := soa.zip({x: []f64{1}})

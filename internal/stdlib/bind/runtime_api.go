@@ -80,6 +80,7 @@ var (
 	JSONGoToValue                 = runtime.JSONGoToValue
 	New                           = runtime.NewCore
 	NewAppendArrayTable           = runtime.NewAppendArrayTable
+	NewDenseArrayBool             = runtime.NewDenseArrayBool
 	NewDenseArrayF64              = runtime.NewDenseArrayF64
 	NewDenseArrayI64              = runtime.NewDenseArrayI64
 	NewDenseArrayOfLen            = runtime.NewDenseArrayOfLen
