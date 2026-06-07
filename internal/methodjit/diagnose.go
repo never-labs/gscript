@@ -178,6 +178,7 @@ type DiagReport struct {
 	ModuleReasons       []Tier2ModuleReason
 	ModuleFactDiffs     []Tier2ModuleFactDiff
 	OptimizationRemarks []OptimizationRemark // structured pass/gate diagnostics
+	QQueryHotPaths      []QQueryHotPath      // q query primitive pipelines visible in final IR
 	ValidateErrors      []error              // structural invariant violations
 	RegAllocMap         string               // human-readable register assignments
 	InterpResult        []runtime.Value      // IR interpreter output on UNOPTIMIZED IR
@@ -255,6 +256,7 @@ func Diagnose(proto *vm.FuncProto, args []runtime.Value) *DiagReport {
 		r.ModuleReasons = append([]Tier2ModuleReason(nil), collector.moduleReasons...)
 		r.ModuleFactDiffs = append([]Tier2ModuleFactDiff(nil), collector.moduleFactDiffs...)
 		r.OptimizationRemarks = remarks.List()
+		r.QQueryHotPaths = DetectQQueryHotPaths(fn)
 		r.NativeError = fmt.Errorf("pipeline error: %w", pipeErr)
 		r.compareResults()
 		return r
@@ -262,6 +264,7 @@ func Diagnose(proto *vm.FuncProto, args []runtime.Value) *DiagReport {
 
 	r.IRAfter = Print(optimized)
 	r.OptimizationRemarks = remarks.List()
+	r.QQueryHotPaths = DetectQQueryHotPaths(optimized)
 	r.PipelineStages = collector.timings
 
 	// 4b. Interpret the OPTIMIZED IR. This is the middle of the three-way
@@ -504,6 +507,7 @@ func (r *DiagReport) String() string {
 		w("\n--- Module fact diffs ---\n%s", FormatTier2ModuleFactDiffs(r.ModuleFactDiffs))
 	}
 	w("\n--- Optimization remarks ---\n%s", formatOptimizationRemarks(r.OptimizationRemarks))
+	w("\n--- Q query hot paths ---\n%d primitive pipeline(s)\n", len(r.QQueryHotPaths))
 	w("\n--- IR (after passes) ---\n%s", r.IRAfter)
 	w("\n--- Register Allocation ---\n%s\n", r.RegAllocMap)
 	w("\n--- Validation ---\n")

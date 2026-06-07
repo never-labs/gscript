@@ -3,6 +3,7 @@
 package methodjit
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/never-labs/leia/internal/runtime"
@@ -254,6 +255,39 @@ func TestQFramePrimitiveHotPathRejectsUnrelatedFrameColumn(t *testing.T) {
 	fn := BuildGraph(proto)
 	if paths := DetectQQueryHotPaths(fn); len(paths) != 0 {
 		t.Fatalf("DetectQQueryHotPaths count = %d, want 0\n%s", len(paths), Print(fn))
+	}
+}
+
+func TestDiagnoseReportsQQueryHotPath(t *testing.T) {
+	names := runtime.NewTable()
+	names.RawSetInt(1, runtime.StringValue("size"))
+	proto := &vm.FuncProto{
+		Name:      "q_frame_pipeline_diag",
+		NumParams: 1,
+		MaxStack:  3,
+		Constants: []runtime.Value{
+			runtime.StringValue("price"),
+			runtime.FloatValue(100),
+			runtime.TableValue(names),
+			runtime.StringValue("size"),
+		},
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_FRAME_COLUMN, 1, 0, 0),
+			vm.EncodeABx(vm.OP_LOADK, 2, 1),
+			vm.EncodeABC(vm.OP_VECTOR_COMPARE, 1, 2, int(runtime.DenseArrayGE)),
+			vm.EncodeABC(vm.OP_FRAME_FILTER, 0, 0, 1),
+			vm.EncodeABC(vm.OP_FRAME_PROJECT, 0, 0, 2),
+			vm.EncodeABC(vm.OP_FRAME_COLUMN, 0, 0, 3),
+			vm.EncodeABC(vm.OP_RETURN, 0, 2, 0),
+		},
+	}
+
+	report := Diagnose(proto, []runtime.Value{runtime.TableValue(qHotPathTestFrame(t))})
+	if len(report.QQueryHotPaths) != 1 {
+		t.Fatalf("Diagnose QQueryHotPaths = %d, want 1\n%s", len(report.QQueryHotPaths), report.String())
+	}
+	if !strings.Contains(report.String(), "Q query hot paths") {
+		t.Fatalf("diagnostic report missing q hot path section:\n%s", report.String())
 	}
 }
 
@@ -573,4 +607,23 @@ func TestTier2ProfileConsumesQSQLNativeIdentityFeedback(t *testing.T) {
 		return
 	}
 	t.Fatalf("q.sql native feedback did not produce call_native guard: %+v", profile.Guards)
+}
+
+func qHotPathTestFrame(t *testing.T) *runtime.Table {
+	t.Helper()
+	soa, err := runtime.NewSoA(map[string]*runtime.DenseArray{
+		"price": runtime.NewDenseArrayF64([]float64{99, 100.5, 101.25}),
+		"size":  runtime.NewDenseArrayI64([]int64{5, 10, 20}),
+	})
+	if err != nil {
+		t.Fatalf("NewSoA: %v", err)
+	}
+	frame := runtime.NewTable()
+	frame.SetNativePayloadWithInfo(soa, runtime.NativePayloadInfo{
+		Kind:       runtime.NativePayloadDataFrame,
+		Rows:       soa.Len(),
+		Columns:    2,
+		SchemaHash: "q-hot-path-test",
+	})
+	return frame
 }
