@@ -2529,6 +2529,71 @@ func TestQCacheStatsAndClearPublicAPI(t *testing.T) {
 	}
 }
 
+func TestQFallbackStatsTrackKernelFallback(t *testing.T) {
+	qClearCaches()
+	defer qClearCaches()
+
+	frame, err := data.NewFrame(
+		data.Column{Name: "sym", Data: data.NewSymbols([]string{"AAPL", "AAPL", "MSFT"})},
+		data.Column{Name: "price", Data: data.NewF64([]float64{100, 101, 80})},
+	)
+	if err != nil {
+		t.Fatalf("NewFrame: %v", err)
+	}
+	plan := data.QueryPlan{
+		Select: []data.SelectItem{{Name: "marker", Expr: qFallbackStatsTestExpr{}}},
+		LimitN: -1,
+	}
+	out, err := qRunSQLPlan("fallback-stats-test", plan, frame)
+	if err != nil {
+		t.Fatalf("fallback qRunSQLPlan: %v", err)
+	}
+	marker, ok := out.Column("marker")
+	if !ok {
+		t.Fatal("fallback output missing marker column")
+	}
+	if got, ok := marker.At(1); !ok || got != data.Symbol("fallback") {
+		t.Fatalf("fallback marker row 1 = %v, %v; want fallback symbol", got, ok)
+	}
+
+	stats := qTestFallbackStatsRows(t, qFallbackStatsTable())
+	if got := stats[qFallbackKernelUnsupported]; got != 1 {
+		t.Fatalf("kernel unsupported fallback count = %d, want 1", got)
+	}
+	for _, code := range []string{qFallbackKernelCompileErr, qFallbackSourceErr, qFallbackJoinErr, qFallbackMutationPlan} {
+		if got := stats[code]; got != 0 {
+			t.Fatalf("fallback count %s = %d, want 0", code, got)
+		}
+	}
+
+	frameValue, err := qDataFrameValue(frame)
+	if err != nil {
+		t.Fatalf("qDataFrameValue: %v", err)
+	}
+	explainValue, err := qExplainSQL(qSQLArgsResult{frameValue: frameValue, source: "update price:price+1 from trades"})
+	if err != nil {
+		t.Fatalf("qExplainSQL mutation: %v", err)
+	}
+	explained := explainValue.Table()
+	if explained == nil {
+		t.Fatal("explained table is nil")
+	}
+	if got := explained.RawGetString("kernel_reason_code"); !got.IsString() || got.Str() != qKernelReasonMutationPlan {
+		t.Fatalf("kernel_reason_code = %v, want %s", got, qKernelReasonMutationPlan)
+	}
+	if got := explained.RawGetString("kernel_reason"); !got.IsString() || !strings.Contains(got.Str(), "mutation plan cache") {
+		t.Fatalf("kernel_reason = %v, want mutation plan cache reason", got)
+	}
+
+	qClearCaches()
+	after := qTestFallbackStatsRows(t, qFallbackStatsTable())
+	for code, count := range after {
+		if count != 0 {
+			t.Fatalf("fallback count after clear %s = %d, want 0", code, count)
+		}
+	}
+}
+
 func TestQEvalSkipsCacheForStatefulSources(t *testing.T) {
 	qClearCaches()
 
@@ -4216,6 +4281,47 @@ func qTestCacheStatsRows(t *testing.T, tbl *Table) map[string]map[string]int64 {
 		}
 	}
 	return out
+}
+
+func qTestFallbackStatsRows(t *testing.T, tbl *Table) map[string]int64 {
+	t.Helper()
+	if tbl == nil {
+		t.Fatal("fallback stats table is nil")
+	}
+	out := make(map[string]int64, tbl.Length())
+	for i := 1; i <= tbl.Length(); i++ {
+		row := tbl.RawGetInt(int64(i)).Table()
+		if row == nil {
+			t.Fatalf("fallback stats row %d is nil", i)
+		}
+		code := row.RawGetString("code")
+		if !code.IsString() {
+			t.Fatalf("fallback stats row %d code = %v, want string", i, code)
+		}
+		count := row.RawGetString("count")
+		if !count.IsInt() {
+			t.Fatalf("fallback stats row %s count = %v, want int", code.Str(), count)
+		}
+		out[code.Str()] = count.Int()
+	}
+	for _, code := range []string{
+		qFallbackKernelUnsupported,
+		qFallbackKernelCompileErr,
+		qFallbackSourceErr,
+		qFallbackJoinErr,
+		qFallbackMutationPlan,
+	} {
+		if _, ok := out[code]; !ok {
+			t.Fatalf("fallback stats missing code %q in %#v", code, out)
+		}
+	}
+	return out
+}
+
+type qFallbackStatsTestExpr struct{}
+
+func (qFallbackStatsTestExpr) EvalRow(data.Frame, int) (any, error) {
+	return data.Symbol("fallback"), nil
 }
 
 func TestQSQLTableLiteralSourceExecution(t *testing.T) {
