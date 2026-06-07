@@ -2340,6 +2340,29 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 			bv := vm.regs[base+DecodeB(inst)]
 			vm.regs[base+a] = runtime.BoolValue(bv.IsNumber())
 
+		case OP_VECTOR_GATHER:
+			a := DecodeA(inst)
+			b := DecodeB(inst)
+			vectorVal := vm.regs[base+a]
+			indexVal := vm.regs[base+b]
+			if !vectorVal.IsDenseArray() {
+				return nil, wrapLineErr(frame, fmt.Errorf("VECTOR_GATHER operand must be dense array (got %s)", vectorVal.TypeName()))
+			}
+			if !indexVal.IsDenseArray() {
+				return nil, wrapLineErr(frame, fmt.Errorf("VECTOR_GATHER indexes must be dense array (got %s)", indexVal.TypeName()))
+			}
+			out, err := vectorVal.DenseArray().Gather(indexVal.DenseArray())
+			if err != nil {
+				return nil, wrapLineErr(frame, err)
+			}
+			vm.regs[base+a] = runtime.DenseArrayValue(out)
+			if frame.closure.Proto.Feedback != nil {
+				fb := &frame.closure.Proto.Feedback[frame.pc-1]
+				fb.Left.Observe(vectorVal.Type())
+				fb.Right.Observe(indexVal.Type())
+				fb.Result.Observe(vm.regs[base+a].Type())
+			}
+
 		case OP_LEN:
 			a := DecodeA(inst)
 			bv := vm.regs[base+DecodeB(inst)]

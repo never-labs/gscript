@@ -43,6 +43,8 @@ const (
 	TypeTable  = runtime.TypeTable
 
 	NativeKindStdSoAAffineMany = runtime.NativeKindStdSoAAffineMany
+	NativeKindStdQSQL          = runtime.NativeKindStdQSQL
+	NativeKindStdQSelect       = runtime.NativeKindStdQSelect
 
 	NativePayloadNone       = runtime.NativePayloadNone
 	NativePayloadDataColumn = runtime.NativePayloadDataColumn
@@ -93,5 +95,7 @@ var (
 	SoAValue                      = runtime.SoAValue
 	ScriptContextDoneAndErr       = runtime.ScriptContextDoneAndErr
 	StdSoAAffineManyIdentityPtr   = runtime.StdSoAAffineManyIdentityPtr
+	StdQSQLIdentityPtr            = runtime.StdQSQLIdentityPtr
+	StdQSelectIdentityPtr         = runtime.StdQSelectIdentityPtr
 	TableValue                    = runtime.TableValue
 )

@@ -97,6 +97,22 @@ second_price := rows[2].price
 	}
 }
 
+func TestQSQLNativeCallsRecordStableCallSiteFeedback(t *testing.T) {
+	_, v, proto := compileAndRunQSQLFastNativeFixtureWithProto(t, `
+trades := data.frame({
+    sym: data.symbols({"AAPL", "MSFT"}),
+    price: data.f64({100.0, 80.0}),
+})
+
+sql_rows := q.sql(trades, "select sym from trades where price>=90")
+select_rows := q.select(trades, "select sym from trades where price<90")
+`)
+	defer v.Close()
+
+	assertStableQNativeCallSite(t, proto, runtime.NativeKindStdQSQL, uintptr(runtime.StdQSQLIdentityPtr()), 2, 2)
+	assertStableQNativeCallSite(t, proto, runtime.NativeKindStdQSelect, uintptr(runtime.StdQSelectIdentityPtr()), 2, 2)
+}
+
 func nativeCallBuiltinCounts(stats *runtime.RuntimePathStats, name string) (fast, fallback uint64) {
 	for _, entry := range stats.Snapshot().NativeCall.PerBuiltin {
 		if entry.Name == name {
@@ -107,6 +123,11 @@ func nativeCallBuiltinCounts(stats *runtime.RuntimePathStats, name string) (fast
 }
 
 func compileAndRunQSQLFastNativeFixture(t *testing.T, src string) (map[string]runtime.Value, *VM) {
+	globals, v, _ := compileAndRunQSQLFastNativeFixtureWithProto(t, src)
+	return globals, v
+}
+
+func compileAndRunQSQLFastNativeFixtureWithProto(t *testing.T, src string) (map[string]runtime.Value, *VM, *FuncProto) {
 	t.Helper()
 
 	tokens, err := lexer.New(src).Tokenize()
@@ -121,6 +142,7 @@ func compileAndRunQSQLFastNativeFixture(t *testing.T, src string) (map[string]ru
 	if err != nil {
 		t.Fatalf("compile error: %v", err)
 	}
+	proto.EnsureFeedback()
 
 	globals := vmtest.NewInterpreterGlobals()
 	v := New(globals)
@@ -128,5 +150,27 @@ func compileAndRunQSQLFastNativeFixture(t *testing.T, src string) (map[string]ru
 		v.Close()
 		t.Fatalf("runtime error: %v", err)
 	}
-	return globals, v
+	return globals, v, proto
+}
+
+func assertStableQNativeCallSite(t *testing.T, proto *FuncProto, wantKind uint8, wantData uintptr, wantNArgs uint8, wantResultArity uint8) {
+	t.Helper()
+	if proto == nil || proto.CallSiteFeedback == nil {
+		t.Fatal("proto callsite feedback missing")
+	}
+	for pc, inst := range proto.Code {
+		if DecodeOp(inst) != OP_CALL {
+			continue
+		}
+		cf := proto.CallSiteFeedback[pc]
+		kind, data, ok := cf.StableCalleeNativeIdentity()
+		if !ok || kind != wantKind || data != wantData {
+			continue
+		}
+		if cf.NArgs != wantNArgs || cf.ResultArity != wantResultArity || cf.Flags&(CallSiteCalleePolymorphic|CallSiteArityPolymorphic) != 0 {
+			t.Fatalf("q native callsite feedback kind=%d nArgs=%d resultArity=%d flags=%02x", kind, cf.NArgs, cf.ResultArity, cf.Flags)
+		}
+		return
+	}
+	t.Fatalf("stable q native callsite kind=%d data=%#x missing; feedback=%#v", wantKind, wantData, proto.CallSiteFeedback)
 }

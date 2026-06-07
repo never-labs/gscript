@@ -30,6 +30,8 @@ const (
 	NativeKindStdGetMetatable  uint8 = 113
 	NativeKindStdStringGSub    uint8 = 114
 	NativeKindStdSoAAffineMany uint8 = 115
+	NativeKindStdQSQL          uint8 = 116
+	NativeKindStdQSelect       uint8 = 117
 )
 
 var stdStringFormatIdentity byte
@@ -43,6 +45,8 @@ var stdStringFindIdentity byte
 var stdStringMatchIdentity byte
 var stdStringGSubIdentity byte
 var stdRawGetIdentity byte
+var stdQSQLIdentity byte
+var stdQSelectIdentity byte
 var stdRawSetIdentity byte
 var stdRawLenIdentity byte
 var stdTypeIdentity byte

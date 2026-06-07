@@ -1,6 +1,7 @@
 package bind
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -2594,6 +2595,60 @@ func TestQFallbackStatsTrackKernelFallback(t *testing.T) {
 	}
 }
 
+func TestQFallbackStatsAggregateTopReasons(t *testing.T) {
+	qClearCaches()
+	defer qClearCaches()
+
+	frame, err := data.NewFrame(
+		data.Column{Name: "sym", Data: data.NewSymbols([]string{"AAPL", "AAPL", "MSFT"})},
+		data.Column{Name: "price", Data: data.NewF64([]float64{100, 101, 80})},
+	)
+	if err != nil {
+		t.Fatalf("NewFrame: %v", err)
+	}
+	plan := data.QueryPlan{
+		Select: []data.SelectItem{{Name: "marker", Expr: qFallbackStatsTestExpr{}}},
+		LimitN: -1,
+	}
+	for i := 0; i < 2; i++ {
+		if _, err := qRunSQLPlan("fallback-stats-top-test", plan, frame); err != nil {
+			t.Fatalf("fallback qRunSQLPlan %d: %v", i, err)
+		}
+	}
+
+	rows := qTestFallbackStatsDetailRows(t, qFallbackStatsTable())
+	codeRows := qTestFallbackStatsRows(t, qFallbackStatsTable())
+	if got := codeRows[qFallbackKernelUnsupported]; got != 2 {
+		t.Fatalf("kernel unsupported fallback count = %d, want 2", got)
+	}
+	if got := qTestFallbackDetailCount(rows, "reason_code", qFallbackKernelUnsupported, qKernelReasonUnsupported, ""); got != 2 {
+		t.Fatalf("kernel unsupported reason_code top count = %d, want 2", got)
+	}
+	reason := fmt.Sprintf("select expression %q is not supported by data query kernel: unsupported expression %T", "marker", qFallbackStatsTestExpr{})
+	if got := qTestFallbackDetailCount(rows, "reason", qFallbackKernelUnsupported, "", reason); got != 2 {
+		t.Fatalf("kernel unsupported reason top count = %d, want 2", got)
+	}
+	statsFn := BuildQ().RawGetString("fallback_stats").GoFunction()
+	if statsFn == nil {
+		t.Fatal("q.fallback_stats function missing")
+	}
+	values, err := statsFn.Fn(nil)
+	if err != nil {
+		t.Fatalf("q.fallback_stats: %v", err)
+	}
+	if len(values) != 1 || values[0].Table() == nil {
+		t.Fatalf("q.fallback_stats values = %#v, want one table", values)
+	}
+	if got := qTestFallbackDetailCount(qTestFallbackStatsDetailRows(t, values[0].Table()), "reason", qFallbackKernelUnsupported, "", reason); got != 2 {
+		t.Fatalf("q.fallback_stats reason top count = %d, want 2", got)
+	}
+
+	qClearCaches()
+	if rows := qTestFallbackStatsDetailRows(t, qFallbackStatsTable()); len(rows) != 0 {
+		t.Fatalf("fallback detail rows after clear = %#v, want none", rows)
+	}
+}
+
 func TestQSQLFastArg2ExecutesTwoArgumentForms(t *testing.T) {
 	qClearCaches()
 	defer qClearCaches()
@@ -2614,6 +2669,9 @@ func TestQSQLFastArg2ExecutesTwoArgumentForms(t *testing.T) {
 	sql := q.RawGetString("sql").GoFunction()
 	if sql == nil || sql.FastArg2 == nil {
 		t.Fatalf("q.sql FastArg2 missing: %#v", sql)
+	}
+	if sql.NativeKind != NativeKindStdQSQL || sql.NativeData != StdQSQLIdentityPtr() {
+		t.Fatalf("q.sql native identity kind=%d data=%p, want q sql identity", sql.NativeKind, sql.NativeData)
 	}
 	selected, err := sql.FastArg2(frameValue, StringValue("select sym,price from trades where price>=90"))
 	if err != nil {
@@ -2644,6 +2702,9 @@ func TestQSQLFastArg2ExecutesTwoArgumentForms(t *testing.T) {
 	selectFn := q.RawGetString("select").GoFunction()
 	if selectFn == nil || selectFn.FastArg2 == nil {
 		t.Fatalf("q.select FastArg2 missing: %#v", selectFn)
+	}
+	if selectFn.NativeKind != NativeKindStdQSelect || selectFn.NativeData != StdQSelectIdentityPtr() {
+		t.Fatalf("q.select native identity kind=%d data=%p, want q select identity", selectFn.NativeKind, selectFn.NativeData)
 	}
 	if _, err := selectFn.FastArg2(frameValue, StringValue("select sym from trades")); err != nil {
 		t.Fatalf("q.select FastArg2: %v", err)
@@ -4471,6 +4532,10 @@ func qTestFallbackStatsRows(t *testing.T, tbl *Table) map[string]int64 {
 		if !count.IsInt() {
 			t.Fatalf("fallback stats row %s count = %v, want int", code.Str(), count)
 		}
+		kind := row.RawGetString("kind")
+		if kind.IsString() && kind.Str() != "code" {
+			continue
+		}
 		out[code.Str()] = count.Int()
 	}
 	for _, code := range []string{
@@ -4485,6 +4550,56 @@ func qTestFallbackStatsRows(t *testing.T, tbl *Table) map[string]int64 {
 		}
 	}
 	return out
+}
+
+type qFallbackStatsDetailRow struct {
+	Kind       string
+	Code       string
+	ReasonCode string
+	Reason     string
+	Count      int64
+}
+
+func qTestFallbackStatsDetailRows(t *testing.T, tbl *Table) []qFallbackStatsDetailRow {
+	t.Helper()
+	if tbl == nil {
+		t.Fatal("fallback stats table is nil")
+	}
+	var out []qFallbackStatsDetailRow
+	for i := 1; i <= tbl.Length(); i++ {
+		row := tbl.RawGetInt(int64(i)).Table()
+		if row == nil {
+			t.Fatalf("fallback stats row %d is nil", i)
+		}
+		kind := row.RawGetString("kind")
+		if !kind.IsString() || kind.Str() == "code" {
+			continue
+		}
+		code := row.RawGetString("code")
+		reasonCode := row.RawGetString("reason_code")
+		reason := row.RawGetString("reason")
+		count := row.RawGetString("count")
+		if !code.IsString() || !reasonCode.IsString() || !reason.IsString() || !count.IsInt() {
+			t.Fatalf("fallback stats detail row %d malformed: %#v", i, row)
+		}
+		out = append(out, qFallbackStatsDetailRow{
+			Kind:       kind.Str(),
+			Code:       code.Str(),
+			ReasonCode: reasonCode.Str(),
+			Reason:     reason.Str(),
+			Count:      count.Int(),
+		})
+	}
+	return out
+}
+
+func qTestFallbackDetailCount(rows []qFallbackStatsDetailRow, kind, code, reasonCode, reason string) int64 {
+	for _, row := range rows {
+		if row.Kind == kind && row.Code == code && row.ReasonCode == reasonCode && row.Reason == reason {
+			return row.Count
+		}
+	}
+	return 0
 }
 
 type qFallbackStatsTestExpr struct{}

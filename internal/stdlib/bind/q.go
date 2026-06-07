@@ -72,6 +72,18 @@ type qFallbackStats struct {
 	SourceErr         int
 	JoinErr           int
 	Mutation          int
+	ByReasonCode      map[qFallbackReasonCodeKey]int
+	ByReason          map[qFallbackReasonKey]int
+}
+
+type qFallbackReasonCodeKey struct {
+	Code       string
+	ReasonCode string
+}
+
+type qFallbackReasonKey struct {
+	Code   string
+	Reason string
 }
 
 type qSQLArgsResult struct {
@@ -296,8 +308,16 @@ func BuildQ() *Table {
 		return []Value{out}, nil
 	}
 	setQSQL := func(name string) {
+		nativeKind := NativeKindStdQSQL
+		nativeData := StdQSQLIdentityPtr()
+		if name == "select" {
+			nativeKind = NativeKindStdQSelect
+			nativeData = StdQSelectIdentityPtr()
+		}
 		t.RawSetString(name, FunctionValue(&GoFunction{
-			Name: "q." + name,
+			Name:       "q." + name,
+			NativeKind: nativeKind,
+			NativeData: nativeData,
 			Fn: func(args []Value) ([]Value, error) {
 				return qsql("q."+name, args)
 			},
@@ -940,13 +960,13 @@ func qRunSQL(name string, args qSQLArgsResult) (Value, error) {
 	} else if tmpl.sourcePath != "" {
 		frame, err = data.LoadPartitionedFrameDir(tmpl.sourcePath, nil)
 		if err != nil {
-			qRecordFallback(qFallbackSourceErr)
+			qRecordFallbackReason(qFallbackSourceErr, qKernelReasonSourceUnavailable, err.Error())
 			return NilValue(), fmt.Errorf("%s: load q path source %q: %w", name, tmpl.sourcePath, err)
 		}
 	} else {
 		source, err = qSQLSourceCarrierFromValue(args.frameValue, sourceName)
 		if err != nil {
-			qRecordFallback(qFallbackSourceErr)
+			qRecordFallbackReason(qFallbackSourceErr, qKernelReasonSourceUnavailable, err.Error())
 			return NilValue(), fmt.Errorf("%s: %w", name, err)
 		}
 		frame = source.frame
@@ -954,7 +974,7 @@ func qRunSQL(name string, args qSQLArgsResult) (Value, error) {
 	}
 	bindings := qSQLScalarBindingsFromValue(args.envValue)
 	if tmpl.mutation != nil {
-		qRecordFallback(qFallbackMutationPlan)
+		qRecordFallbackReason(qFallbackMutationPlan, qKernelReasonMutationPlan, "mutation plan cache requires QueryPlan fallback")
 		var keyedSource data.KeyedFrame
 		hasKeyedSource := false
 		if hasSourceCarrier {
@@ -992,14 +1012,15 @@ func qRunSQL(name string, args qSQLArgsResult) (Value, error) {
 	}
 	if len(qSQLTemplateJoins(tmpl)) > 0 {
 		if !args.resolveSource {
-			qRecordFallback(qFallbackJoinErr)
-			return NilValue(), fmt.Errorf("%s: join queries require a source table map", name)
+			err := fmt.Errorf("join queries require a source table map")
+			qRecordFallbackReason(qFallbackJoinErr, qKernelReasonJoinUnavailable, err.Error())
+			return NilValue(), fmt.Errorf("%s: %w", name, err)
 		}
 		for _, join := range qSQLTemplateJoins(tmpl) {
 			var err error
 			frame, err = qApplySQLJoin(args.frameValue, frame, join)
 			if err != nil {
-				qRecordFallback(qFallbackJoinErr)
+				qRecordFallbackReason(qFallbackJoinErr, qKernelReasonJoinUnavailable, err.Error())
 				return NilValue(), fmt.Errorf("%s: join: %w", name, err)
 			}
 		}
@@ -1025,11 +1046,12 @@ func qRunSQL(name string, args qSQLArgsResult) (Value, error) {
 func qRunSQLPlan(src string, plan data.QueryPlan, frame data.Frame) (data.Frame, error) {
 	kernel, ok, err := qSQLKernelForFrame(src, plan, frame)
 	if err != nil {
-		qRecordFallback(qFallbackKernelCompileErr)
+		qRecordFallbackReason(qFallbackKernelCompileErr, qKernelReasonCompileError, err.Error())
 		return data.Frame{}, err
 	}
 	if !ok {
-		qRecordFallback(qFallbackKernelUnsupported)
+		_, reason := data.QueryKernelSupportReason(plan)
+		qRecordFallbackReason(qFallbackKernelUnsupported, qKernelReasonUnsupported, reason)
 		kernel = nil
 	}
 	return data.ExecQueryKernelOrPlan(kernel, plan, frame)
@@ -2227,7 +2249,17 @@ func qCacheStatsRow(name string, entries, hits, misses, evictions, limit int) *T
 }
 
 func qRecordFallback(code string) {
+	qRecordFallbackReason(code, "", "")
+}
+
+func qRecordFallbackReason(code, reasonCode, reason string) {
 	qFallbackStatsMu.Lock()
+	if qFallbackCounters.ByReasonCode == nil {
+		qFallbackCounters.ByReasonCode = make(map[qFallbackReasonCodeKey]int)
+	}
+	if qFallbackCounters.ByReason == nil {
+		qFallbackCounters.ByReason = make(map[qFallbackReasonKey]int)
+	}
 	switch code {
 	case qFallbackKernelUnsupported:
 		qFallbackCounters.KernelUnsupported++
@@ -2240,28 +2272,142 @@ func qRecordFallback(code string) {
 	case qFallbackMutationPlan:
 		qFallbackCounters.Mutation++
 	}
+	reasonCode = qNormalizeFallbackReasonCode(code, reasonCode)
+	reason = qNormalizeFallbackReason(reason)
+	if reasonCode != "" {
+		qFallbackCounters.ByReasonCode[qFallbackReasonCodeKey{Code: code, ReasonCode: reasonCode}]++
+	}
+	if reason != "" {
+		qFallbackCounters.ByReason[qFallbackReasonKey{Code: code, Reason: reason}]++
+	}
 	qFallbackStatsMu.Unlock()
 }
 
 func qFallbackStatsTable() *Table {
 	qFallbackStatsMu.Lock()
-	stats := qFallbackCounters
+	stats := qCloneFallbackStatsLocked()
 	qFallbackStatsMu.Unlock()
 
-	rows := NewAppendArrayTable(5)
+	detailRows := qFallbackTopRows(stats, 10)
+	rows := NewAppendArrayTable(5 + len(detailRows))
 	rows.RawSetInt(1, TableValue(qFallbackStatsRow(qFallbackKernelUnsupported, stats.KernelUnsupported)))
 	rows.RawSetInt(2, TableValue(qFallbackStatsRow(qFallbackKernelCompileErr, stats.KernelCompileErr)))
 	rows.RawSetInt(3, TableValue(qFallbackStatsRow(qFallbackSourceErr, stats.SourceErr)))
 	rows.RawSetInt(4, TableValue(qFallbackStatsRow(qFallbackJoinErr, stats.JoinErr)))
 	rows.RawSetInt(5, TableValue(qFallbackStatsRow(qFallbackMutationPlan, stats.Mutation)))
+	for i, row := range detailRows {
+		rows.RawSetInt(int64(i+6), TableValue(row))
+	}
 	return rows
 }
 
 func qFallbackStatsRow(code string, count int) *Table {
 	row := NewTable()
+	row.RawSetString("kind", StringValue("code"))
 	row.RawSetString("code", StringValue(code))
+	row.RawSetString("reason_code", StringValue(""))
+	row.RawSetString("reason", StringValue(""))
 	row.RawSetString("count", IntValue(int64(count)))
 	return row
+}
+
+func qCloneFallbackStatsLocked() qFallbackStats {
+	stats := qFallbackCounters
+	if len(qFallbackCounters.ByReasonCode) > 0 {
+		stats.ByReasonCode = make(map[qFallbackReasonCodeKey]int, len(qFallbackCounters.ByReasonCode))
+		for key, count := range qFallbackCounters.ByReasonCode {
+			stats.ByReasonCode[key] = count
+		}
+	}
+	if len(qFallbackCounters.ByReason) > 0 {
+		stats.ByReason = make(map[qFallbackReasonKey]int, len(qFallbackCounters.ByReason))
+		for key, count := range qFallbackCounters.ByReason {
+			stats.ByReason[key] = count
+		}
+	}
+	return stats
+}
+
+func qFallbackTopRows(stats qFallbackStats, limit int) []*Table {
+	rows := make([]*Table, 0, len(stats.ByReasonCode)+len(stats.ByReason))
+	reasonCodeRows := make([]qFallbackReasonCodeRow, 0, len(stats.ByReasonCode))
+	for key, count := range stats.ByReasonCode {
+		reasonCodeRows = append(reasonCodeRows, qFallbackReasonCodeRow{Key: key, Count: count})
+	}
+	sort.Slice(reasonCodeRows, func(i, j int) bool {
+		a, b := reasonCodeRows[i], reasonCodeRows[j]
+		if a.Count != b.Count {
+			return a.Count > b.Count
+		}
+		if a.Key.Code != b.Key.Code {
+			return a.Key.Code < b.Key.Code
+		}
+		return a.Key.ReasonCode < b.Key.ReasonCode
+	})
+	for i, item := range reasonCodeRows {
+		if i >= limit {
+			break
+		}
+		rows = append(rows, qFallbackDetailStatsRow("reason_code", item.Key.Code, item.Key.ReasonCode, "", item.Count))
+	}
+
+	reasonRows := make([]qFallbackReasonRow, 0, len(stats.ByReason))
+	for key, count := range stats.ByReason {
+		reasonRows = append(reasonRows, qFallbackReasonRow{Key: key, Count: count})
+	}
+	sort.Slice(reasonRows, func(i, j int) bool {
+		a, b := reasonRows[i], reasonRows[j]
+		if a.Count != b.Count {
+			return a.Count > b.Count
+		}
+		if a.Key.Code != b.Key.Code {
+			return a.Key.Code < b.Key.Code
+		}
+		return a.Key.Reason < b.Key.Reason
+	})
+	for i, item := range reasonRows {
+		if i >= limit {
+			break
+		}
+		rows = append(rows, qFallbackDetailStatsRow("reason", item.Key.Code, "", item.Key.Reason, item.Count))
+	}
+	return rows
+}
+
+type qFallbackReasonCodeRow struct {
+	Key   qFallbackReasonCodeKey
+	Count int
+}
+
+type qFallbackReasonRow struct {
+	Key   qFallbackReasonKey
+	Count int
+}
+
+func qFallbackDetailStatsRow(kind, code, reasonCode, reason string, count int) *Table {
+	row := NewTable()
+	row.RawSetString("kind", StringValue(kind))
+	row.RawSetString("code", StringValue(code))
+	row.RawSetString("reason_code", StringValue(reasonCode))
+	row.RawSetString("reason", StringValue(reason))
+	row.RawSetString("count", IntValue(int64(count)))
+	return row
+}
+
+func qNormalizeFallbackReasonCode(code, reasonCode string) string {
+	if reasonCode != "" {
+		return reasonCode
+	}
+	return code
+}
+
+func qNormalizeFallbackReason(reason string) string {
+	reason = strings.Join(strings.Fields(reason), " ")
+	const maxReasonLen = 240
+	if len(reason) <= maxReasonLen {
+		return reason
+	}
+	return reason[:maxReasonLen]
 }
 
 func qClearCaches() {

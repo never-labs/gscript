@@ -55,6 +55,14 @@ func StdSoAAffineManyIdentityPtr() unsafe.Pointer {
 	return unsafe.Pointer(&stdSoAAffineManyIdentity)
 }
 
+func StdQSQLIdentityPtr() unsafe.Pointer {
+	return unsafe.Pointer(&stdQSQLIdentity)
+}
+
+func StdQSelectIdentityPtr() unsafe.Pointer {
+	return unsafe.Pointer(&stdQSelectIdentity)
+}
+
 func IsStdToNumberFunction(v Value) bool {
 	gf := v.GoFunction()
 	return gf != nil &&
@@ -89,6 +97,22 @@ func IsStdSoAAffineManyFunction(v Value) bool {
 	return gf != nil &&
 		gf.NativeKind == NativeKindStdSoAAffineMany &&
 		gf.NativeData == StdSoAAffineManyIdentityPtr() &&
+		gf.FastArg2 != nil
+}
+
+func IsStdQSQLFunction(v Value) bool {
+	gf := v.GoFunction()
+	return gf != nil &&
+		gf.NativeKind == NativeKindStdQSQL &&
+		gf.NativeData == StdQSQLIdentityPtr() &&
+		gf.FastArg2 != nil
+}
+
+func IsStdQSelectFunction(v Value) bool {
+	gf := v.GoFunction()
+	return gf != nil &&
+		gf.NativeKind == NativeKindStdQSelect &&
+		gf.NativeData == StdQSelectIdentityPtr() &&
 		gf.FastArg2 != nil
 }
 

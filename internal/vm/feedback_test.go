@@ -591,6 +591,28 @@ func TestCallSiteFeedback_StdStringFormatStable(t *testing.T) {
 	}
 }
 
+func TestCallSiteFeedback_QSQLNativeIdentityStable(t *testing.T) {
+	fn := runtime.FunctionValue(&runtime.GoFunction{
+		Name:       "q.sql",
+		NativeKind: runtime.NativeKindStdQSQL,
+		NativeData: runtime.StdQSQLIdentityPtr(),
+		FastArg2: func(runtime.Value, runtime.Value) (runtime.Value, error) {
+			return runtime.NilValue(), nil
+		},
+	})
+	var cf CallSiteFeedback
+	for i := 0; i < 3; i++ {
+		cf.ObserveCall(fn, []runtime.Value{runtime.TableValue(runtime.NewTable()), runtime.StringValue("select from trades")}, 2, 1)
+	}
+	kind, data, ok := cf.StableCalleeNativeIdentity()
+	if !ok || kind != runtime.NativeKindStdQSQL || data != uintptr(runtime.StdQSQLIdentityPtr()) {
+		t.Fatalf("q.sql native identity kind=%d data=%#x ok=%v", kind, data, ok)
+	}
+	if s, ok := cf.StableStringArg(1); !ok || s != "select from trades" {
+		t.Fatalf("stable q.sql source arg=%q ok=%v", s, ok)
+	}
+}
+
 func TestCallSiteFeedback_ReboundCalleePolymorphic(t *testing.T) {
 	proto := compileFeedback(t, `
 		func replacement(pattern, n) {
