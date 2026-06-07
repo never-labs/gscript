@@ -25,6 +25,7 @@ const (
 	qFallbackSourceErr         = "source_error"
 	qFallbackJoinErr           = "join_error"
 	qFallbackMutationPlan      = "mutation_plan"
+	qFallbackQueryKernel       = "query_kernel_unsupported"
 
 	qKernelReasonSupported         = "kernel_supported"
 	qKernelReasonMutationPlan      = "mutation_plan"
@@ -32,6 +33,9 @@ const (
 	qKernelReasonJoinUnavailable   = "join_unavailable"
 	qKernelReasonCompileError      = "kernel_compile_error"
 	qKernelReasonUnsupported       = "kernel_unsupported"
+	qQueryKernelReasonUnsupported  = "query_kernel_unsupported"
+	qQueryKernelReasonSelect       = "query_select_expression"
+	qQueryKernelReasonOrder        = "query_order_expression"
 )
 
 type qSQLPlanTemplate struct {
@@ -72,6 +76,7 @@ type qFallbackStats struct {
 	SourceErr         int
 	JoinErr           int
 	Mutation          int
+	QueryKernel       int
 	ByReasonCode      map[qFallbackReasonCodeKey]int
 	ByReason          map[qFallbackReasonKey]int
 }
@@ -933,8 +938,10 @@ func qRunQuery(s *SoA, spec *Table) (*Table, error) {
 	}
 	var rows *Table
 	var nativeRows *SoA
+	nativeReasonCode := ""
+	nativeReason := ""
 	if len(aggs) == 0 {
-		nativeRows, _ = qSimpleSelectRowsNativeSoA(s, mask, selects)
+		nativeRows, nativeReasonCode, nativeReason = qSimpleSelectRowsNativeSoA(s, mask, selects)
 		rows, err = qRows(s, mask, selects)
 	} else {
 		rows, err = qGroupedRows(s, mask, by, selects, aggs)
@@ -949,6 +956,13 @@ func qRunQuery(s *SoA, spec *Table) (*Table, error) {
 	if nativeRows, ok := qQueryNativeRowsForResult(spec, nativeRows); ok {
 		qAttachRowsNativeSoAPayload(rows, nativeRows)
 	} else {
+		if len(aggs) == 0 {
+			if nativeReason == "" {
+				nativeReasonCode = qQueryKernelReasonOrder
+				nativeReason = "query native kernel could not preserve order or limit"
+			}
+			qRecordFallbackReason(qFallbackQueryKernel, nativeReasonCode, nativeReason)
+		}
 		qAttachRowsNativeFramePayload(rows)
 	}
 	return rows, nil
@@ -2289,6 +2303,8 @@ func qRecordFallbackReason(code, reasonCode, reason string) {
 		qFallbackCounters.JoinErr++
 	case qFallbackMutationPlan:
 		qFallbackCounters.Mutation++
+	case qFallbackQueryKernel:
+		qFallbackCounters.QueryKernel++
 	}
 	reason = qNormalizeFallbackReason(reason)
 	reasonCode = qNormalizeFallbackReasonCode(code, reasonCode, reason)
@@ -2307,14 +2323,15 @@ func qFallbackStatsTable() *Table {
 	qFallbackStatsMu.Unlock()
 
 	detailRows := qFallbackTopRows(stats, 10)
-	rows := NewAppendArrayTable(5 + len(detailRows))
+	rows := NewAppendArrayTable(6 + len(detailRows))
 	rows.RawSetInt(1, TableValue(qFallbackStatsRow(qFallbackKernelUnsupported, stats.KernelUnsupported)))
 	rows.RawSetInt(2, TableValue(qFallbackStatsRow(qFallbackKernelCompileErr, stats.KernelCompileErr)))
 	rows.RawSetInt(3, TableValue(qFallbackStatsRow(qFallbackSourceErr, stats.SourceErr)))
 	rows.RawSetInt(4, TableValue(qFallbackStatsRow(qFallbackJoinErr, stats.JoinErr)))
 	rows.RawSetInt(5, TableValue(qFallbackStatsRow(qFallbackMutationPlan, stats.Mutation)))
+	rows.RawSetInt(6, TableValue(qFallbackStatsRow(qFallbackQueryKernel, stats.QueryKernel)))
 	for i, row := range detailRows {
-		rows.RawSetInt(int64(i+6), TableValue(row))
+		rows.RawSetInt(int64(i+7), TableValue(row))
 	}
 	return rows
 }
@@ -4003,27 +4020,27 @@ func qAttachRowsNativeSoAPayload(rows *Table, soa *SoA) {
 	})
 }
 
-func qSimpleSelectRowsNativeSoA(s *SoA, mask *DenseArray, selects []qSelect) (*SoA, bool) {
+func qSimpleSelectRowsNativeSoA(s *SoA, mask *DenseArray, selects []qSelect) (*SoA, string, string) {
 	if s == nil || mask == nil || len(selects) == 0 {
-		return nil, false
+		return nil, qQueryKernelReasonUnsupported, "query native kernel requires source, mask, and select items"
 	}
 	filtered, err := s.Filter(mask)
 	if err != nil {
-		return nil, false
+		return nil, qKernelReasonUnsupported, "query native kernel filter failed: " + err.Error()
 	}
 	cols := make(map[string]*DenseArray, len(selects))
 	for _, sel := range selects {
 		col, ok := qEvalNativeExpr(filtered, sel.Expr)
 		if !ok {
-			return nil, false
+			return nil, qQueryKernelReasonSelect, fmt.Sprintf("select expression %q is not supported by q query native kernel", sel.Name)
 		}
 		cols[sel.Name] = col
 	}
 	out, err := NewSoA(cols)
 	if err != nil {
-		return nil, false
+		return nil, qQueryKernelReasonSelect, "query native kernel projection failed: " + err.Error()
 	}
-	return out, true
+	return out, "", ""
 }
 
 func qEvalNativeExpr(s *SoA, expr Value) (*DenseArray, bool) {

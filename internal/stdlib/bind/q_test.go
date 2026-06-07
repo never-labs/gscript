@@ -2741,6 +2741,9 @@ func TestQFallbackStatsTrackKernelFallback(t *testing.T) {
 			t.Fatalf("fallback count %s = %d, want 0", code, got)
 		}
 	}
+	if got := stats[qFallbackQueryKernel]; got != 0 {
+		t.Fatalf("query kernel fallback count = %d, want 0", got)
+	}
 
 	frameValue, err := qDataFrameValue(frame)
 	if err != nil {
@@ -2767,6 +2770,31 @@ func TestQFallbackStatsTrackKernelFallback(t *testing.T) {
 		if count != 0 {
 			t.Fatalf("fallback count after clear %s = %d, want 0", code, count)
 		}
+	}
+}
+
+func TestQFallbackStatsTrackQueryKernelFallback(t *testing.T) {
+	qClearCaches()
+	defer qClearCaches()
+
+	interp := runWithQAndSOA(t, `
+trades := soa.zip({price: []f64{100, 101}})
+rows := q.query(trades, {select: {price: "price", marker: 1}})
+`)
+	rows := interp.GetGlobal("rows").Table()
+	if rows == nil || rows.Length() != 2 {
+		t.Fatalf("rows length = %v, want 2", rows)
+	}
+	if got := rows.RawGetInt(1).Table().RawGetString("marker"); !got.IsInt() || got.Int() != 1 {
+		t.Fatalf("rows[1].marker = %v, want 1", got)
+	}
+	stats := qTestFallbackStatsRows(t, qFallbackStatsTable())
+	if got := stats[qFallbackQueryKernel]; got != 1 {
+		t.Fatalf("query kernel fallback count = %d, want 1", got)
+	}
+	details := qTestFallbackStatsDetailRows(t, qFallbackStatsTable())
+	if got := qTestFallbackDetailCount(details, "reason_code", qFallbackQueryKernel, qQueryKernelReasonSelect, ""); got != 1 {
+		t.Fatalf("query kernel reason_code count = %d, want 1", got)
 	}
 }
 
@@ -4719,6 +4747,7 @@ func qTestFallbackStatsRows(t *testing.T, tbl *Table) map[string]int64 {
 		qFallbackSourceErr,
 		qFallbackJoinErr,
 		qFallbackMutationPlan,
+		qFallbackQueryKernel,
 	} {
 		if _, ok := out[code]; !ok {
 			t.Fatalf("fallback stats missing code %q in %#v", code, out)
