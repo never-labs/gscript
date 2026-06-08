@@ -4714,6 +4714,16 @@ func (s *EvalState) applyOverCallable(fn any, initial any, v any) (any, error) {
 	if adverbFn, ok := fn.(qAdverbFunction); ok && adverbFn.verb == "+" && adverbFn.adverb == "/" && initial == nil {
 		return sum(v)
 	}
+	if isCallableAdd(fn) {
+		reduced, err := sum(v)
+		if err != nil {
+			return nil, err
+		}
+		if initial == nil {
+			return reduced, nil
+		}
+		return applyDyadic('+', initial, reduced)
+	}
 	items, err := vectorValues(v)
 	if err != nil {
 		if initial != nil {
@@ -4747,6 +4757,16 @@ func (s *EvalState) applyScanCallable(fn any, initial any, v any) (any, error) {
 	if adverbFn, ok := fn.(qAdverbFunction); ok && adverbFn.verb == "+" && adverbFn.adverb == "\\" && initial == nil {
 		return sums(v)
 	}
+	if isCallableAdd(fn) {
+		scan, err := sums(v)
+		if err != nil {
+			return nil, err
+		}
+		if initial == nil {
+			return scan, nil
+		}
+		return applyDyadic('+', scan, initial)
+	}
 	items, err := vectorValues(v)
 	if err != nil {
 		if initial != nil {
@@ -4777,6 +4797,25 @@ func (s *EvalState) applyScanCallable(fn any, initial any, v any) (any, error) {
 		out[i] = acc
 	}
 	return inferQArray(out, qKindOfValue(initial), qKindOfValue(v)), nil
+}
+
+func isCallableAdd(fn any) bool {
+	switch f := fn.(type) {
+	case qDyadicFunction:
+		return f.name == "+"
+	case qLambda:
+		params, body, err := lambdaSignature(f.body)
+		if err != nil || len(params) < 2 {
+			return false
+		}
+		left, right, ok := splitTopLevelOperator(body, "+")
+		if !ok {
+			return false
+		}
+		return strings.TrimSpace(left) == params[0] && strings.TrimSpace(right) == params[1]
+	default:
+		return false
+	}
 }
 
 func (s *EvalState) applyEachPriorCallable(fn any, initial any, v any) (any, error) {
