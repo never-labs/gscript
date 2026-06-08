@@ -473,6 +473,11 @@ type i64SegmentArray struct {
 	len      int
 }
 
+type i64ProductArray struct {
+	left  i64RangeArray
+	right i64RangeArray
+}
+
 type nullableArray struct {
 	kind Kind
 	data []any
@@ -818,6 +823,48 @@ func (a i64SegmentArray) gatherRange(indexes []int) (Array, bool) {
 		prev = current
 	}
 	return i64RangeArray{start: first, step: step, len: len(indexes)}, true
+}
+
+func (a i64ProductArray) Kind() Kind { return KindI64 }
+
+func (a i64ProductArray) Len() int { return a.left.len }
+
+func (a i64ProductArray) At(row int) (any, bool) {
+	value, ok := a.i64At(row)
+	if !ok {
+		return nil, false
+	}
+	return value, true
+}
+
+func (a i64ProductArray) i64At(row int) (int64, bool) {
+	if row < 0 || row >= a.left.len || row >= a.right.len {
+		return 0, false
+	}
+	left := a.left.start + int64(row)*a.left.step
+	right := a.right.start + int64(row)*a.right.step
+	return left * right, true
+}
+
+func (a i64ProductArray) Values() []any {
+	out := make([]any, a.Len())
+	for i := range out {
+		value, _ := a.i64At(i)
+		out[i] = value
+	}
+	return out
+}
+
+func (a i64ProductArray) Gather(indexes []int) Array {
+	out := make([]int64, len(indexes))
+	for i, row := range indexes {
+		value, ok := a.i64At(row)
+		if !ok {
+			panic(fmt.Sprintf("data product gather index %d out of range", row))
+		}
+		out[i] = value
+	}
+	return columnArray[int64]{kind: KindI64, data: out}
 }
 
 func (a nullableArray) Kind() Kind { return a.kind }

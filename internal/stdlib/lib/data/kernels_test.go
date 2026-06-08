@@ -2058,6 +2058,58 @@ func TestTypedDyadicBroadcastPromotionAndNullPropagation(t *testing.T) {
 	if got, want := integerRangeRight.(Array).Values(), []any{int64(0), int64(6), int64(12), int64(18)}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("TryTypedIntegerDyadic range scalar values = %v, want %v", got, want)
 	}
+	if _, ok := integerRangeRight.(i64RangeArray); !ok {
+		t.Fatalf("TryTypedIntegerDyadic range scalar returned %T, want i64RangeArray", integerRangeRight)
+	}
+
+	rangeLeft, ok, err := TryTypedIntegerDyadic(OpSub, int64(10), NewI64Range(0, 2, 4))
+	if err != nil {
+		t.Fatalf("TryTypedIntegerDyadic scalar-range returned error: %v", err)
+	}
+	if !ok {
+		t.Fatal("TryTypedIntegerDyadic scalar-range did not match numeric range")
+	}
+	if got, want := rangeLeft.(Array).Values(), []any{int64(10), int64(8), int64(6), int64(4)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("TryTypedIntegerDyadic scalar-range values = %v, want %v", got, want)
+	}
+	if _, ok := rangeLeft.(i64RangeArray); !ok {
+		t.Fatalf("TryTypedIntegerDyadic scalar-range returned %T, want i64RangeArray", rangeLeft)
+	}
+
+	rangeRange, ok, err := TryTypedIntegerDyadic(OpAdd, NewI64Range(0, 2, 4), NewI64Range(10, -1, 4))
+	if err != nil {
+		t.Fatalf("TryTypedIntegerDyadic range-range returned error: %v", err)
+	}
+	if !ok {
+		t.Fatal("TryTypedIntegerDyadic range-range did not match numeric ranges")
+	}
+	if got, want := rangeRange.(Array).Values(), []any{int64(10), int64(11), int64(12), int64(13)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("TryTypedIntegerDyadic range-range values = %v, want %v", got, want)
+	}
+	if _, ok := rangeRange.(i64RangeArray); !ok {
+		t.Fatalf("TryTypedIntegerDyadic range-range returned %T, want i64RangeArray", rangeRange)
+	}
+
+	rangeProduct, ok, err := TryTypedIntegerDyadic(OpMul, NewI64Range(1, 1, 4), NewI64Range(10, 10, 4))
+	if err != nil {
+		t.Fatalf("TryTypedIntegerDyadic range product returned error: %v", err)
+	}
+	if !ok {
+		t.Fatal("TryTypedIntegerDyadic range product did not match numeric ranges")
+	}
+	if got, want := rangeProduct.(Array).Values(), []any{int64(10), int64(40), int64(90), int64(160)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("TryTypedIntegerDyadic range product values = %v, want %v", got, want)
+	}
+	if _, ok := rangeProduct.(i64ProductArray); !ok {
+		t.Fatalf("TryTypedIntegerDyadic range product returned %T, want i64ProductArray", rangeProduct)
+	}
+	productSum, handled, err := TryTypedNumericSum(rangeProduct.(Array))
+	if err != nil {
+		t.Fatalf("TryTypedNumericSum range product returned error: %v", err)
+	}
+	if !handled || productSum != int64(300) {
+		t.Fatalf("TryTypedNumericSum range product = %v, %v; want 300, true", productSum, handled)
+	}
 
 	scalarLeft, ok, err := typedKernels.Dyadic(OpSub, float64(10), NewI64([]int64{1, 2, 3}))
 	if err != nil {

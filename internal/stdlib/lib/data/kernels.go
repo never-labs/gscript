@@ -995,6 +995,9 @@ func (typedKernelRegistry) NumericSum(array Array) (float64, int64, bool, error)
 	case i64SegmentArray:
 		sum := i64SegmentSum(a)
 		return float64(sum), int64(a.len), true, nil
+	case i64ProductArray:
+		sum := i64ProductSum(a)
+		return float64(sum), int64(a.Len()), true, nil
 	case columnArray[uint8]:
 		return numericSumSlice(a.data)
 	case columnArray[uint16]:
@@ -1050,6 +1053,8 @@ func (k typedKernelRegistry) NumericSumValue(array Array) (any, bool, error) {
 		return i64RangeSum(a), true, nil
 	case i64SegmentArray:
 		return i64SegmentSum(a), true, nil
+	case i64ProductArray:
+		return i64ProductSum(a), true, nil
 	case columnArray[uint8]:
 		return numericSumUnsignedValue(a.data), true, nil
 	case columnArray[uint16]:
@@ -2077,6 +2082,8 @@ func (typedKernelRegistry) NumericAt(array Array, row int) (float64, bool, error
 		return numericI64RangeAt(a, row)
 	case i64SegmentArray:
 		return numericI64SegmentAt(a, row)
+	case i64ProductArray:
+		return numericI64ProductAt(a, row)
 	case columnArray[uint8]:
 		return numericColumnAt(a.data, row)
 	case columnArray[uint16]:
@@ -2127,6 +2134,14 @@ func numericI64SegmentAt(values i64SegmentArray, row int) (float64, bool, error)
 	return float64(value), true, nil
 }
 
+func numericI64ProductAt(values i64ProductArray, row int) (float64, bool, error) {
+	value, ok := values.i64At(row)
+	if !ok {
+		return 0, false, fmt.Errorf("array row %d out of range", row)
+	}
+	return float64(value), true, nil
+}
+
 func numericValueAt(array Array, row int) (float64, bool) {
 	v, ok := array.At(row)
 	if !ok || IsNull(v) {
@@ -2153,7 +2168,7 @@ func isNumericArray(array Array) bool {
 		return isNumericArray(a.array)
 	case columnArray[int8], columnArray[int16], columnArray[int32], columnArray[int64],
 		columnArray[uint8], columnArray[uint16], columnArray[uint32], columnArray[uint64],
-		columnArray[float32], columnArray[float64], i64RangeArray, i64SegmentArray:
+		columnArray[float32], columnArray[float64], i64RangeArray, i64SegmentArray, i64ProductArray:
 		return true
 	case nullableArray:
 		for i := 0; i < array.Len(); i++ {
@@ -2217,6 +2232,9 @@ func numericDyadic(op Op, left, right any, length int) (Array, bool, error) {
 }
 
 func numericIntegerDyadic(op Op, left, right any, length int) (Array, bool, error) {
+	if out, ok := numericIntegerDyadicRange(op, left, right, length); ok {
+		return out, true, nil
+	}
 	values := make([]int64, length)
 	var nullable []any
 	for i := 0; i < length; i++ {
@@ -2265,6 +2283,72 @@ func numericIntegerDyadic(op Op, left, right any, length int) (Array, bool, erro
 	return columnArray[int64]{kind: KindI64, data: values}, true, nil
 }
 
+func numericIntegerDyadicRange(op Op, left, right any, length int) (Array, bool) {
+	leftRange, leftRangeOK := asI64RangeArray(left)
+	rightRange, rightRangeOK := asI64RangeArray(right)
+	leftScalar, leftScalarOK := integerScalarValue(left)
+	rightScalar, rightScalarOK := integerScalarValue(right)
+	switch {
+	case leftRangeOK && rightScalarOK:
+		if leftRange.len != length {
+			return nil, false
+		}
+		return applyI64RangeScalar(op, leftRange, rightScalar, false)
+	case leftScalarOK && rightRangeOK:
+		if rightRange.len != length {
+			return nil, false
+		}
+		return applyI64RangeScalar(op, rightRange, leftScalar, true)
+	case leftRangeOK && rightRangeOK:
+		if leftRange.len != length || rightRange.len != length || leftRange.len != rightRange.len {
+			return nil, false
+		}
+		return applyI64RangeRange(op, leftRange, rightRange)
+	default:
+		return nil, false
+	}
+}
+
+func asI64RangeArray(value any) (i64RangeArray, bool) {
+	switch a := value.(type) {
+	case attributedArray:
+		return asI64RangeArray(a.array)
+	case i64RangeArray:
+		return a, true
+	default:
+		return i64RangeArray{}, false
+	}
+}
+
+func applyI64RangeScalar(op Op, values i64RangeArray, scalar int64, scalarLeft bool) (Array, bool) {
+	switch op {
+	case OpAdd:
+		return i64RangeArray{start: values.start + scalar, step: values.step, len: values.len}, true
+	case OpSub:
+		if scalarLeft {
+			return i64RangeArray{start: scalar - values.start, step: -values.step, len: values.len}, true
+		}
+		return i64RangeArray{start: values.start - scalar, step: values.step, len: values.len}, true
+	case OpMul:
+		return i64RangeArray{start: values.start * scalar, step: values.step * scalar, len: values.len}, true
+	default:
+		return nil, false
+	}
+}
+
+func applyI64RangeRange(op Op, left, right i64RangeArray) (Array, bool) {
+	switch op {
+	case OpAdd:
+		return i64RangeArray{start: left.start + right.start, step: left.step + right.step, len: left.len}, true
+	case OpSub:
+		return i64RangeArray{start: left.start - right.start, step: left.step - right.step, len: left.len}, true
+	case OpMul:
+		return i64ProductArray{left: left, right: right}, true
+	default:
+		return nil, false
+	}
+}
+
 func numericDyadicNullablePrefix(values []float64, upto int) []any {
 	out := make([]any, len(values))
 	for i := 0; i < upto; i++ {
@@ -2298,7 +2382,7 @@ func isIntegerArray(array Array) bool {
 		return isIntegerArray(a.array)
 	case columnArray[int8], columnArray[int16], columnArray[int32], columnArray[int64],
 		columnArray[uint8], columnArray[uint16], columnArray[uint32], columnArray[uint64],
-		i64RangeArray, i64SegmentArray:
+		i64RangeArray, i64SegmentArray, i64ProductArray:
 		return true
 	case nullableArray:
 		for i := 0; i < array.Len(); i++ {
@@ -2351,6 +2435,12 @@ func integerArrayAt(array Array, row int) (int64, bool, error) {
 		}
 		return a.start + int64(row)*a.step, true, nil
 	case i64SegmentArray:
+		value, ok := a.i64At(row)
+		if !ok {
+			return 0, false, fmt.Errorf("array row %d out of range", row)
+		}
+		return value, true, nil
+	case i64ProductArray:
 		value, ok := a.i64At(row)
 		if !ok {
 			return 0, false, fmt.Errorf("array row %d out of range", row)
@@ -2633,6 +2723,15 @@ func i64SegmentSum(values i64SegmentArray) int64 {
 	var sum int64
 	for _, segment := range values.segments {
 		sum += i64RangeSum(segment)
+	}
+	return sum
+}
+
+func i64ProductSum(values i64ProductArray) int64 {
+	var sum int64
+	for i := 0; i < values.Len(); i++ {
+		value, _ := values.i64At(i)
+		sum += value
 	}
 	return sum
 }

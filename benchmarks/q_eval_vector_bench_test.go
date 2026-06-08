@@ -468,7 +468,19 @@ func appendQEvalSemanticCoverageCases(cases []qEvalVectorCase) []qEvalVectorCase
 				return "(+/1h 2h 3h)+(type 1i)+(type `float$1)+(count where null 1 0N 2 0N)"
 			},
 			goFn: func(rows int) int64 {
-				return 6 - 6 - 9 + 2
+				shorts := []int16{1, 2, 3}
+				var sum int64
+				for _, value := range shorts {
+					sum += int64(value)
+				}
+				nulls := []bool{false, true, false, true}
+				var nullCount int64
+				for _, isNull := range nulls {
+					if isNull {
+						nullCount++
+					}
+				}
+				return sum + int64(-6) + int64(-9) + nullCount
 			},
 		},
 		{
@@ -500,7 +512,16 @@ func appendQEvalSemanticCoverageCases(cases []qEvalVectorCase) []qEvalVectorCase
 				return "(count 0 2 4_10 20 30 40 50)+(count enlist 10 20 30)+sum raze (1 2;3 4;5)"
 			},
 			goFn: func(rows int) int64 {
-				return 3 + 1 + 15
+				cut := [][]int64{{10, 20}, {30, 40}, {50}}
+				enlisted := [][]int64{{10, 20, 30}}
+				nested := [][]int64{{1, 2}, {3, 4}, {5}}
+				var sum int64
+				for _, group := range nested {
+					for _, value := range group {
+						sum += value
+					}
+				}
+				return int64(len(cut)) + int64(len(enlisted)) + sum
 			},
 		},
 		{
