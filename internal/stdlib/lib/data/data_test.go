@@ -3164,6 +3164,24 @@ func TestTryTypedBoolLogical(t *testing.T) {
 	}
 }
 
+func TestTryTypedScalarFill(t *testing.T) {
+	column, err := NewColumnWithKind("x", KindI64, []any{int64(1), NullValue, int64(3), NullValue})
+	if err != nil {
+		t.Fatalf("NewColumnWithKind returned error: %v", err)
+	}
+	source := takeRepeatMust(t, column.Data, 8)
+	out, ok, err := TryTypedScalarFill(int64(0), source)
+	if err != nil || !ok {
+		t.Fatalf("TryTypedScalarFill handled=%v err=%v; want true,nil", ok, err)
+	}
+	if got, want := out.Values(), []any{int64(1), int64(0), int64(3), int64(0), int64(1), int64(0), int64(3), int64(0)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("scalar fill values = %#v, want %#v", got, want)
+	}
+	if sum, ok, err := TryTypedNumericSum(out); err != nil || !ok || sum != int64(8) {
+		t.Fatalf("scalar fill sum = %#v,%v,%v; want 8,true,nil", sum, ok, err)
+	}
+}
+
 func TestTryTypedStringCastAndCasePreserveTiledArrays(t *testing.T) {
 	repeated := takeRepeatMust(t, NewSymbols([]string{"aapl", "msft", "amd", "ask"}), 10)
 	cast, handled, err := TryTypedStringCast(repeated)

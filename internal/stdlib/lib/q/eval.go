@@ -7178,6 +7178,30 @@ func applyVectorDyadic(op byte, left, right any, la, ra data.Array) (data.Array,
 	case ra != nil:
 		n = ra.Len()
 	}
+	if op == '^' {
+		if la == nil && ra != nil {
+			out, handled, err := data.TryTypedScalarFill(left, ra)
+			shape := "scalar-fill/" + string(qRuntimeKernelOperandKind(left, nil)) + "/" + string(ra.Kind())
+			recordRuntimeKernelProbe("ArrayScalarFill", shape, handled, err)
+			if err != nil {
+				return nil, err
+			}
+			if handled {
+				return out, nil
+			}
+		}
+		if la != nil && ra == nil {
+			out, handled, err := data.TryTypedScalarFill(right, la)
+			shape := "scalar-fill/" + string(qRuntimeKernelOperandKind(right, nil)) + "/" + string(la.Kind())
+			recordRuntimeKernelProbe("ArrayScalarFill", shape, handled, err)
+			if err != nil {
+				return nil, err
+			}
+			if handled {
+				return out, nil
+			}
+		}
+	}
 	if dataOp, ok := qDataArithmeticOp(op); ok {
 		shape := qRuntimeKernelVectorDyadicShape(op, left, right, la, ra)
 		typedLeft, typedRight, canUse, err := qVectorDyadicTypedOperands(left, right, la, ra)

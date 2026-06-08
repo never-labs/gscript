@@ -1813,10 +1813,14 @@ func (typedKernelRegistry) NumericSum(array Array) (float64, int64, bool, error)
 	case i64RangeArray:
 		sum := i64RangeSum(a)
 		return float64(sum), int64(a.len), true, nil
+	case i64FillArray:
+		return float64(a.sum()), int64(a.Len()), true, nil
 	case fbyI64BroadcastArray:
 		return float64(a.total()), int64(a.len), true, nil
 	case f64RangeArray:
 		return f64RangeSum(a), int64(a.len), true, nil
+	case f64FillArray:
+		return a.sum(), int64(a.Len()), true, nil
 	case fbyF64BroadcastArray:
 		return a.total(), int64(a.len), true, nil
 	case i64RunningSumArray:
@@ -1867,6 +1871,24 @@ func (typedKernelRegistry) NumericSum(array Array) (float64, int64, bool, error)
 // float or mixed nullable vectors produce a float sum.
 func TryTypedNumericSum(array Array) (any, bool, error) {
 	return typedKernels.NumericSumValue(array)
+}
+
+// TryTypedScalarFill applies q-style scalar fill to an array lazily. It keeps
+// downstream reductions from materializing a dense replacement column.
+func TryTypedScalarFill(fill any, array Array) (Array, bool, error) {
+	if array == nil {
+		return nil, true, fmt.Errorf("fill array is nil")
+	}
+	if IsNull(fill) {
+		return array, true, nil
+	}
+	if n, ok := coerceInt64Exact(fill); ok && isIntegerArray(array) {
+		return i64FillArray{source: array, fill: n}, true, nil
+	}
+	if n, ok := numeric(fill); ok && isNumericArray(array) {
+		return f64FillArray{source: array, fill: n}, true, nil
+	}
+	return nil, false, nil
 }
 
 // TryTypedFbySum broadcasts per-group sums back to the original row shape.
@@ -2037,10 +2059,14 @@ func (k typedKernelRegistry) NumericSumValue(array Array) (any, bool, error) {
 		return numericSumIntegerValue(a.data), true, nil
 	case i64RangeArray:
 		return i64RangeSum(a), true, nil
+	case i64FillArray:
+		return a.sum(), true, nil
 	case fbyI64BroadcastArray:
 		return a.total(), true, nil
 	case f64RangeArray:
 		return f64RangeSum(a), true, nil
+	case f64FillArray:
+		return a.sum(), true, nil
 	case fbyF64BroadcastArray:
 		return a.total(), true, nil
 	case i64RunningSumArray:
@@ -2443,6 +2469,142 @@ func (k typedKernelRegistry) NumericSums(array Array) (Array, bool, error) {
 	default:
 		return nil, false, nil
 	}
+}
+
+type i64FillArray struct {
+	source Array
+	fill   int64
+}
+
+func (a i64FillArray) Kind() Kind { return KindI64 }
+
+func (a i64FillArray) Len() int { return a.source.Len() }
+
+func (a i64FillArray) At(row int) (any, bool) {
+	value, ok, err := a.valueAt(row)
+	if err != nil || !ok {
+		return nil, false
+	}
+	return value, true
+}
+
+func (a i64FillArray) Values() []any {
+	out := make([]any, a.Len())
+	for row := range out {
+		value, ok, err := a.valueAt(row)
+		if err != nil || !ok {
+			panic(fmt.Sprintf("data fill row %d out of range", row))
+		}
+		out[row] = value
+	}
+	return out
+}
+
+func (a i64FillArray) Gather(indexes []int) Array {
+	out := make([]int64, len(indexes))
+	for i, row := range indexes {
+		value, ok, err := a.valueAt(row)
+		if err != nil || !ok {
+			panic(fmt.Sprintf("data fill row %d out of range", row))
+		}
+		out[i] = value
+	}
+	return newI64Trusted(out)
+}
+
+func (a i64FillArray) valueAt(row int) (int64, bool, error) {
+	value, ok := a.source.At(row)
+	if !ok {
+		return 0, false, nil
+	}
+	if IsNull(value) {
+		return a.fill, true, nil
+	}
+	n, ok := coerceInt64Exact(value)
+	if !ok {
+		return 0, false, fmt.Errorf("fill row %d is %T, want integer", row, value)
+	}
+	return n, true, nil
+}
+
+func (a i64FillArray) sum() int64 {
+	var total int64
+	for row := 0; row < a.Len(); row++ {
+		value, ok, err := a.valueAt(row)
+		if err != nil || !ok {
+			return 0
+		}
+		total += value
+	}
+	return total
+}
+
+type f64FillArray struct {
+	source Array
+	fill   float64
+}
+
+func (a f64FillArray) Kind() Kind { return KindF64 }
+
+func (a f64FillArray) Len() int { return a.source.Len() }
+
+func (a f64FillArray) At(row int) (any, bool) {
+	value, ok, err := a.valueAt(row)
+	if err != nil || !ok {
+		return nil, false
+	}
+	return value, true
+}
+
+func (a f64FillArray) Values() []any {
+	out := make([]any, a.Len())
+	for row := range out {
+		value, ok, err := a.valueAt(row)
+		if err != nil || !ok {
+			panic(fmt.Sprintf("data fill row %d out of range", row))
+		}
+		out[row] = value
+	}
+	return out
+}
+
+func (a f64FillArray) Gather(indexes []int) Array {
+	out := make([]float64, len(indexes))
+	for i, row := range indexes {
+		value, ok, err := a.valueAt(row)
+		if err != nil || !ok {
+			panic(fmt.Sprintf("data fill row %d out of range", row))
+		}
+		out[i] = value
+	}
+	return newF64Trusted(out)
+}
+
+func (a f64FillArray) valueAt(row int) (float64, bool, error) {
+	value, ok := a.source.At(row)
+	if !ok {
+		return 0, false, nil
+	}
+	if IsNull(value) {
+		return a.fill, true, nil
+	}
+	n, ok := numeric(value)
+	if !ok {
+		return 0, false, fmt.Errorf("fill row %d is %T, want numeric", row, value)
+	}
+	return n, true, nil
+}
+
+func (a f64FillArray) sum() float64 {
+	var total float64
+	for row := 0; row < a.Len(); row++ {
+		value, ok, err := a.valueAt(row)
+		if err != nil || !ok {
+			return 0
+		}
+		total += value
+	}
+	return total
 }
 
 type fbyI64BroadcastArray struct {
