@@ -889,14 +889,13 @@ func qQueryKernelSupportCacheKey(s *SoA, spec *Table, selects []qSelect) (string
 	if s == nil || spec == nil || len(selects) == 0 {
 		return "", false
 	}
-	parts := make([]string, 0, len(selects)+4)
-	parts = append(parts, "source="+qQueryNativeSoASchemaHash(s))
+	parts := make([]string, 0, len(selects)*3+8)
 	for _, sel := range selects {
 		sig, ok := qQueryKernelExprSignature(sel.Expr, 0)
 		if !ok {
 			return "", false
 		}
-		parts = append(parts, "select:"+sel.Name+"="+sig)
+		parts = append(parts, "select", sel.Name, sig)
 	}
 	order, err := qOrderSpecs(spec.RawGetString("order_by"))
 	if err != nil {
@@ -907,14 +906,47 @@ func qQueryKernelSupportCacheKey(s *SoA, spec *Table, selects []qSelect) (string
 		if ord.Desc {
 			dir = "desc"
 		}
-		parts = append(parts, "order:"+ord.Column+":"+dir)
+		parts = append(parts, "order", ord.Column, dir)
 	}
 	limit, err := qLimit(spec.RawGetString("limit"))
 	if err != nil {
 		return "", false
 	}
-	parts = append(parts, "limit="+strconv.Itoa(limit))
-	return strings.Join(parts, "|"), true
+	parts = append(parts, "limit", strconv.Itoa(limit))
+	return qQuerySchemaStableCacheKey("q.query", "query_kernel", qQueryNativeSoASchemaHash(s), parts...), true
+}
+
+func qQuerySchemaStableCacheKey(namespace, kind, schemaHash string, extra ...string) string {
+	var b strings.Builder
+	qWriteSchemaStableCacheKeyPart(&b, namespace)
+	qWriteSchemaStableCacheKeyPart(&b, kind)
+	qWriteSchemaStableCacheKeyPart(&b, schemaHash)
+	for _, part := range extra {
+		qWriteSchemaStableCacheKeyPart(&b, part)
+	}
+	return b.String()
+}
+
+func qWriteSchemaStableCacheKeyPart(b *strings.Builder, part string) {
+	b.WriteString(strconv.Itoa(len(part)))
+	b.WriteByte(':')
+	b.WriteString(part)
+	b.WriteByte(';')
+}
+
+func qQueryKernelCacheKeyParts(key string) ([]string, string) {
+	if parsed, ok := data.ParseSchemaStableCacheKey(key); ok && parsed.Namespace == "q.query" && parsed.Kind == "query_kernel" {
+		return parsed.Extra, parsed.SchemaHash
+	}
+	parts := strings.Split(key, "|")
+	schemaHash := ""
+	for _, part := range parts {
+		if strings.HasPrefix(part, "source=") {
+			schemaHash = strings.TrimPrefix(part, "source=")
+			break
+		}
+	}
+	return parts, schemaHash
 }
 
 func qQueryKernelShapeFromCacheKey(key string) string {
@@ -924,8 +956,22 @@ func qQueryKernelShapeFromCacheKey(key string) string {
 	selectShapes := make([]string, 0, 4)
 	orderCount := 0
 	limit := "none"
-	for _, part := range strings.Split(key, "|") {
+	parts, _ := qQueryKernelCacheKeyParts(key)
+	for i := 0; i < len(parts); i++ {
+		part := parts[i]
 		switch {
+		case part == "select" && i+2 < len(parts):
+			selectShapes = append(selectShapes, qQueryKernelExprShape(parts[i+2]))
+			i += 2
+		case part == "order" && i+2 < len(parts):
+			orderCount++
+			i += 2
+		case part == "limit" && i+1 < len(parts):
+			limit = parts[i+1]
+			if limit == "-1" {
+				limit = "none"
+			}
+			i++
 		case strings.HasPrefix(part, "select:"):
 			_, sig, ok := strings.Cut(part, "=")
 			if !ok {
@@ -949,12 +995,8 @@ func qQueryKernelShapeFromCacheKey(key string) string {
 }
 
 func qQueryKernelSchemaHashFromCacheKey(key string) string {
-	for _, part := range strings.Split(key, "|") {
-		if strings.HasPrefix(part, "source=") {
-			return strings.TrimPrefix(part, "source=")
-		}
-	}
-	return ""
+	_, schemaHash := qQueryKernelCacheKeyParts(key)
+	return schemaHash
 }
 
 func qQueryKernelExprShape(sig string) string {

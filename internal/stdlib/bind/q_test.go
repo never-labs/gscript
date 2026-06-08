@@ -3501,6 +3501,52 @@ explained := q.explain_query(trades, {select: {large: {">=", "size", 15}, notion
 	}
 }
 
+func TestQQueryKernelSupportCacheKeyIsSchemaStable(t *testing.T) {
+	trades, err := NewSoA(map[string]*DenseArray{
+		"price": NewDenseArrayF64([]float64{100, 101}),
+	})
+	if err != nil {
+		t.Fatalf("NewSoA: %v", err)
+	}
+	spec := NewTable()
+	key, ok := qQueryKernelSupportCacheKey(trades, spec, []qSelect{{
+		Name: "a|b=c",
+		Expr: StringValue("price"),
+	}})
+	if !ok {
+		t.Fatal("qQueryKernelSupportCacheKey returned false")
+	}
+	parsed, ok := data.ParseSchemaStableCacheKey(key)
+	if !ok {
+		t.Fatalf("ParseSchemaStableCacheKey(%q) returned false", key)
+	}
+	if parsed.Namespace != "q.query" || parsed.Kind != "query_kernel" || parsed.SchemaHash != qQueryNativeSoASchemaHash(trades) {
+		t.Fatalf("parsed q query key = %+v, want q.query/query_kernel schema hash", parsed)
+	}
+	wantExtra := []string{"select", "a|b=c", `s:"price"`, "limit", "-1"}
+	if len(parsed.Extra) != len(wantExtra) {
+		t.Fatalf("parsed extra = %#v, want %#v", parsed.Extra, wantExtra)
+	}
+	for i := range wantExtra {
+		if parsed.Extra[i] != wantExtra[i] {
+			t.Fatalf("parsed extra[%d] = %q, want %q; all=%#v", i, parsed.Extra[i], wantExtra[i], parsed.Extra)
+		}
+	}
+	if got := qQueryKernelSchemaHashFromCacheKey(key); got != parsed.SchemaHash {
+		t.Fatalf("qQueryKernelSchemaHashFromCacheKey = %q, want %q", got, parsed.SchemaHash)
+	}
+	if got := qQueryKernelShapeFromCacheKey(key); got != "select=column|order=0|limit=none" {
+		t.Fatalf("qQueryKernelShapeFromCacheKey = %q, want column select shape", got)
+	}
+	legacy := "source=legacy-schema|select:price=s:\"price\"|order:price:asc|limit=2"
+	if got := qQueryKernelSchemaHashFromCacheKey(legacy); got != "legacy-schema" {
+		t.Fatalf("legacy schema hash = %q, want legacy-schema", got)
+	}
+	if got := qQueryKernelShapeFromCacheKey(legacy); got != "select=column|order=1|limit=2" {
+		t.Fatalf("legacy shape = %q, want select=column|order=1|limit=2", got)
+	}
+}
+
 func TestQQueryKernelShapeStatsSplitBySchemaHash(t *testing.T) {
 	qClearCaches()
 	defer qClearCaches()
