@@ -1891,6 +1891,9 @@ func (typedKernelRegistry) NumericSum(array Array) (float64, int64, bool, error)
 	case i64RangeArray:
 		sum := i64RangeSum(a)
 		return float64(sum), int64(a.len), true, nil
+	case i64SparseAmendArray:
+		sum, handled, err := i64SparseAmendSum(a)
+		return float64(sum), int64(a.Len()), handled, err
 	case i64FillArray:
 		return float64(a.sum()), int64(a.Len()), true, nil
 	case fbyI64BroadcastArray:
@@ -2163,6 +2166,8 @@ func (k typedKernelRegistry) NumericSumValue(array Array) (any, bool, error) {
 		return numericSumIntegerValue(a.data), true, nil
 	case i64RangeArray:
 		return i64RangeSum(a), true, nil
+	case i64SparseAmendArray:
+		return i64SparseAmendSum(a)
 	case i64FillArray:
 		return a.sum(), true, nil
 	case fbyI64BroadcastArray:
@@ -3956,6 +3961,12 @@ func (typedKernelRegistry) NumericAt(array Array, row int) (float64, bool, error
 	switch a := array.(type) {
 	case attributedArray:
 		return typedKernels.NumericAt(a.array, row)
+	case i64SparseAmendArray:
+		value, ok, err := a.i64At(row)
+		if err != nil || !ok {
+			return 0, ok, err
+		}
+		return float64(value), true, nil
 	case i64ScalarDyadicArray:
 		value, ok, err := a.i64At(row)
 		if err != nil || !ok {
@@ -4439,6 +4450,8 @@ func isIntegerArray(array Array) bool {
 		return isIntegerArray(a.array)
 	case tiledArray:
 		return isIntegerArray(a.source)
+	case i64SparseAmendArray:
+		return true
 	case i64ScalarDyadicArray:
 		return true
 	case columnArray[int8], columnArray[int16], columnArray[int32], columnArray[int64],
@@ -4470,6 +4483,8 @@ func isDenseIntegerArray(array Array) bool {
 		return isDenseIntegerArray(a.array)
 	case tiledArray:
 		return isDenseIntegerArray(a.source)
+	case i64SparseAmendArray:
+		return true
 	case i64ScalarDyadicArray:
 		return true
 	case columnArray[int8], columnArray[int16], columnArray[int32], columnArray[int64],
@@ -4499,6 +4514,8 @@ func integerArrayAt(array Array, row int) (int64, bool, error) {
 	switch a := array.(type) {
 	case attributedArray:
 		return integerArrayAt(a.array, row)
+	case i64SparseAmendArray:
+		return a.i64At(row)
 	case tiledArray:
 		if row < 0 || row >= a.len || a.source.Len() == 0 {
 			return 0, false, fmt.Errorf("array row %d out of range", row)
@@ -5817,6 +5834,25 @@ func numericSumIntegerArray(array Array) int64 {
 		sum += value
 	}
 	return sum
+}
+
+func i64SparseAmendSum(array i64SparseAmendArray) (int64, bool, error) {
+	base, handled, err := typedKernels.NumericSumValue(array.source)
+	if err != nil || !handled {
+		return 0, handled, err
+	}
+	total, ok := base.(int64)
+	if !ok {
+		return 0, false, nil
+	}
+	for i, index := range array.indexes {
+		old, ok, err := integerArrayAt(array.source, index)
+		if err != nil || !ok {
+			return 0, ok, err
+		}
+		total += array.values[i] - old
+	}
+	return total, true, nil
 }
 
 func numericSumUnsignedValue[T unsignedScalar](values []T) int64 {

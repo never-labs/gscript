@@ -587,12 +587,20 @@ func BuildQ() *Table {
 		}
 		return []Value{TableValue(out)}, nil
 	})
-	set("eval", func(args []Value) ([]Value, error) {
-		if len(args) < 1 || !args[0].IsString() {
-			return nil, fmt.Errorf("q.eval: argument 1 must be a q source string")
-		}
-		return qEvalSymbolic(args[0].Str())
-	})
+	t.RawSetString("eval", FunctionValue(&GoFunction{
+		Name: "q.eval",
+		Fn: func(args []Value) ([]Value, error) {
+			if len(args) < 1 {
+				return nil, fmt.Errorf("q.eval: argument 1 must be a q source string")
+			}
+			v, err := qEvalSymbolicValue(args[0])
+			if err != nil {
+				return nil, err
+			}
+			return []Value{v}, nil
+		},
+		FastArg1: qEvalSymbolicValue,
+	}))
 	set("session", func(args []Value) ([]Value, error) {
 		if len(args) > 0 {
 			return nil, fmt.Errorf("q.session: expected no arguments")
@@ -953,6 +961,21 @@ func dialectQ(body Value, opts *Table) ([]Value, error) {
 }
 
 func qEvalSymbolic(src string) ([]Value, error) {
+	v, err := qEvalSymbolicSource(src)
+	if err != nil {
+		return nil, err
+	}
+	return []Value{v}, nil
+}
+
+func qEvalSymbolicValue(src Value) (Value, error) {
+	if !src.IsString() {
+		return NilValue(), fmt.Errorf("q.eval: argument 1 must be a q source string")
+	}
+	return qEvalSymbolicSource(src.Str())
+}
+
+func qEvalSymbolicSource(src string) (Value, error) {
 	cacheable := stdq.EvalSourceCacheable(src)
 	var out any
 	if cacheable {
@@ -967,14 +990,14 @@ func qEvalSymbolic(src string) ([]Value, error) {
 		if ok {
 			v, err := qEvalValueToValue(cached)
 			if err != nil {
-				return nil, fmt.Errorf("q dialect: %w", err)
+				return NilValue(), fmt.Errorf("q dialect: %w", err)
 			}
-			return []Value{v}, nil
+			return v, nil
 		}
 	}
 	out, err := stdq.Eval(src)
 	if err != nil {
-		return nil, fmt.Errorf("q dialect: %w", err)
+		return NilValue(), fmt.Errorf("q dialect: %w", err)
 	}
 	if cacheable && stdq.EvalValueCacheable(out) {
 		qEvalCacheMu.Lock()
@@ -983,9 +1006,9 @@ func qEvalSymbolic(src string) ([]Value, error) {
 	}
 	v, err := qEvalValueToValue(out)
 	if err != nil {
-		return nil, fmt.Errorf("q dialect: %w", err)
+		return NilValue(), fmt.Errorf("q dialect: %w", err)
 	}
-	return []Value{v}, nil
+	return v, nil
 }
 
 func qSessionValue() *Table {

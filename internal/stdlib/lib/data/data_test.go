@@ -3363,6 +3363,43 @@ func TestTryTypedAmendIndexesI64(t *testing.T) {
 	}
 }
 
+func TestTryTypedAmendIndexesI64SparseOverlay(t *testing.T) {
+	amended, handled, err := TryTypedAmendIndexes(NewI64Range(0, 1, 16), []int{2, 4, 7}, []any{int64(20), int64(40), int64(70)})
+	if err != nil || !handled {
+		t.Fatalf("TryTypedAmendIndexes handled=%v err=%v; want true,nil", handled, err)
+	}
+	if _, ok := amended.(i64SparseAmendArray); !ok {
+		t.Fatalf("TryTypedAmendIndexes returned %T, want i64SparseAmendArray", amended)
+	}
+	if got, want := amended.Values(), []any{int64(0), int64(1), int64(20), int64(3), int64(40), int64(5), int64(6), int64(70), int64(8), int64(9), int64(10), int64(11), int64(12), int64(13), int64(14), int64(15)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("sparse amended values = %#v, want %#v", got, want)
+	}
+	sum, handled, err := TryTypedNumericSum(amended)
+	if err != nil || !handled || sum != int64(237) {
+		t.Fatalf("TryTypedNumericSum sparse amend = %#v,%v,%v; want 237,true,nil", sum, handled, err)
+	}
+	n, ok, err := typedKernels.NumericAt(amended, 4)
+	if err != nil || !ok || n != 40 {
+		t.Fatalf("NumericAt sparse amend = %v,%v,%v; want 40,true,nil", n, ok, err)
+	}
+	if got, want := amended.Gather([]int{7, 0, 4}).Values(), []any{int64(70), int64(0), int64(40)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("sparse amend gather = %#v, want %#v", got, want)
+	}
+}
+
+func TestTryTypedAmendIndexesI64SparseOverlayFallsBackForOrderedSemantics(t *testing.T) {
+	amended, handled, err := TryTypedAmendIndexes(NewI64Range(0, 1, 16), []int{4, 2}, []any{int64(40), int64(20)})
+	if err != nil || !handled {
+		t.Fatalf("TryTypedAmendIndexes handled=%v err=%v; want true,nil", handled, err)
+	}
+	if _, ok := amended.(i64SparseAmendArray); ok {
+		t.Fatal("TryTypedAmendIndexes used sparse overlay for unsorted indexes")
+	}
+	if got, want := amended.Values(), []any{int64(0), int64(1), int64(20), int64(3), int64(40), int64(5), int64(6), int64(7), int64(8), int64(9), int64(10), int64(11), int64(12), int64(13), int64(14), int64(15)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("dense fallback values = %#v, want %#v", got, want)
+	}
+}
+
 func TestFrameGatherTakeAndFilterMask(t *testing.T) {
 	frame := mustFrame(t,
 		NewColumn("sym", []any{Symbol("a"), Symbol("b"), Symbol("c"), Symbol("d")}),

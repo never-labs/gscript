@@ -769,6 +769,18 @@ func buildQEvalVectorCases() []qEvalVectorCase {
 			},
 		},
 		qEvalVectorCase{
+			name:   "FbyCountTerminalProjection",
+			tags:   []string{"fby", "group", "sum", "symbol"},
+			matrix: []string{"aggregate:running-prd-min-max-avg:vector"},
+			shapes: []string{"group:fby-aggregate:row-scaled"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("v:til %d;g:%d#`a`b`c`d;count (sum v fby g)", rows, rows)
+			},
+			goFn: func(rows int) int64 {
+				return int64(rows)
+			},
+		},
+		qEvalVectorCase{
 			name:   "MovingSumAvgRowScaled",
 			tags:   []string{"moving-window", "sum", "avg-var-dev-med"},
 			matrix: []string{"aggregate:running-prd-min-max-avg:vector"},
@@ -952,6 +964,17 @@ func appendQEvalSemanticCoverageCases(cases []qEvalVectorCase) []qEvalVectorCase
 				}
 				avg := float64(sum) / float64(rows)
 				return 1 + int64(rows) + 1 + int64(rows) + int64(avg)
+			},
+		},
+		{
+			name:   "RunningAggregateCountTerminalProjection",
+			tags:   []string{"running-aggregate", "product", "avg-var-dev-med", "min-max"},
+			matrix: []string{"aggregate:running-prd-min-max-avg:vector"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("x:1+til %d;p:%d#1 1 1 1;(count sums x)+(count prds p)+(count mins x)+(count maxs x)+(count avgs x)", rows, rows)
+			},
+			goFn: func(rows int) int64 {
+				return int64(rows * 5)
 			},
 		},
 		{

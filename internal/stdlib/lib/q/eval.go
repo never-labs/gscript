@@ -806,10 +806,13 @@ func (s *EvalState) eval(src string) (any, error) {
 		if out, handled, err := s.tryEvalCountWhereMask(strings.TrimSpace(src[len("count "):])); err != nil || handled {
 			return out, err
 		}
+		if out, handled, err := s.tryEvalCountFby(strings.TrimSpace(src[len("count "):])); err != nil || handled {
+			return out, err
+		}
 		if out, handled, err := s.tryEvalCountReverse(strings.TrimSpace(src[len("count "):])); err != nil || handled {
 			return out, err
 		}
-		if out, handled, err := s.tryEvalCountPrds(strings.TrimSpace(src[len("count "):])); err != nil || handled {
+		if out, handled, err := s.tryEvalCountRunningScan(strings.TrimSpace(src[len("count "):])); err != nil || handled {
 			return out, err
 		}
 		if out, handled, err := s.tryEvalCountXbar(strings.TrimSpace(src[len("count "):])); err != nil || handled {
@@ -3845,29 +3848,78 @@ func (s *EvalState) tryEvalCountWhereMask(src string) (any, bool, error) {
 	return out, true, nil
 }
 
-func (s *EvalState) tryEvalCountPrds(src string) (any, bool, error) {
-	if !strings.HasPrefix(src, "prds ") {
-		return nil, false, nil
-	}
-	value, err := s.eval(strings.TrimSpace(src[len("prds "):]))
-	if err != nil {
-		return nil, true, err
-	}
-	array, ok := value.(data.Array)
-	if !ok {
-		product, err := prds(value)
+func (s *EvalState) tryEvalCountRunningScan(src string) (any, bool, error) {
+	src = stripEnclosingParens(strings.TrimSpace(src))
+	for _, scan := range []struct {
+		word   string
+		kernel string
+		fn     func(any) (any, error)
+	}{
+		{"sums ", "ArrayCountSums", sums},
+		{"prds ", "ArrayCountProducts", prds},
+		{"mins ", "ArrayCountMins", mins},
+		{"maxs ", "ArrayCountMaxs", maxs},
+		{"avgs ", "ArrayCountAvgs", avgs},
+	} {
+		if !strings.HasPrefix(src, scan.word) {
+			continue
+		}
+		value, err := s.eval(strings.TrimSpace(src[len(scan.word):]))
 		if err != nil {
 			return nil, true, err
 		}
-		out, err := count(product)
-		return out, true, err
+		array, ok := value.(data.Array)
+		if !ok {
+			result, err := scan.fn(value)
+			if err != nil {
+				return nil, true, err
+			}
+			out, err := count(result)
+			return out, true, err
+		}
+		shape := "vector-count/" + strings.TrimSpace(scan.word) + "/" + string(array.Kind())
+		if out, handled := data.TryTypedNumericArrayLen(array); handled {
+			recordRuntimeKernelProbe(scan.kernel, shape, true, nil)
+			return out, true, nil
+		}
+		recordRuntimeKernelProbe(scan.kernel, shape, false, nil)
+		return nil, false, nil
 	}
-	if out, handled := data.TryTypedNumericArrayLen(array); handled {
-		recordRuntimeKernelProbe("ArrayCountProducts", "vector-count/prds/"+string(array.Kind()), true, nil)
-		return out, true, nil
-	}
-	recordRuntimeKernelProbe("ArrayCountProducts", "vector-count/prds/"+string(array.Kind()), false, nil)
 	return nil, false, nil
+}
+
+func (s *EvalState) tryEvalCountFby(src string) (any, bool, error) {
+	src = stripEnclosingParens(strings.TrimSpace(src))
+	leftExpr, groupExpr, ok := splitTopLevelWord(src, "fby")
+	if !ok {
+		return nil, false, nil
+	}
+	agg, valueExpr, err := parseFbyAggregate(leftExpr)
+	if err != nil {
+		return nil, true, err
+	}
+	values, err := s.eval(valueExpr)
+	if err != nil {
+		return nil, true, err
+	}
+	valueArray, ok := values.(data.Array)
+	if !ok {
+		return nil, true, fmt.Errorf("fby aggregate value must be a vector")
+	}
+	groups, err := s.eval(groupExpr)
+	if err != nil {
+		return nil, true, err
+	}
+	groupArray, ok := groups.(data.Array)
+	if !ok {
+		return nil, true, fmt.Errorf("fby group must be a vector")
+	}
+	if valueArray.Len() != groupArray.Len() {
+		return nil, true, fmt.Errorf("fby value length %d does not match group length %d", valueArray.Len(), groupArray.Len())
+	}
+	shape := "vector-count/fby-" + agg + "/" + string(valueArray.Kind()) + "/" + string(groupArray.Kind())
+	recordRuntimeKernelProbe("ArrayCountFby", shape, true, nil)
+	return int64(groupArray.Len()), true, nil
 }
 
 func (s *EvalState) tryEvalCountXbar(src string) (any, bool, error) {

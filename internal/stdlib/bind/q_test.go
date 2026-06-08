@@ -4326,6 +4326,39 @@ func TestQSQLFastArg2CacheStatsParity(t *testing.T) {
 	}
 }
 
+func TestQEvalFastArg1ExecutesAndSharesCache(t *testing.T) {
+	qClearCaches()
+	defer qClearCaches()
+
+	eval := BuildQ().RawGetString("eval").GoFunction()
+	if eval == nil || eval.FastArg1 == nil {
+		t.Fatalf("q.eval FastArg1 missing: %#v", eval)
+	}
+	if _, err := eval.FastArg1(IntValue(1)); err == nil {
+		t.Fatal("q.eval FastArg1 accepted non-string source")
+	}
+
+	first, err := eval.FastArg1(StringValue("1+2"))
+	if err != nil {
+		t.Fatalf("first q.eval FastArg1: %v", err)
+	}
+	second, err := eval.FastArg1(StringValue("1+2"))
+	if err != nil {
+		t.Fatalf("second q.eval FastArg1: %v", err)
+	}
+	if !first.IsInt() || first.Int() != 3 || second != first {
+		t.Fatalf("q.eval FastArg1 results = %s/%s, want cached integer 3", first.String(), second.String())
+	}
+
+	qEvalCacheMu.Lock()
+	entries := len(qEvalCache)
+	stats := qEvalStats
+	qEvalCacheMu.Unlock()
+	if entries != 1 || stats.Hits != 1 || stats.Misses != 1 {
+		t.Fatalf("q.eval FastArg1 cache entries=%d stats=%+v, want one miss and one hit", entries, stats)
+	}
+}
+
 func TestQSQLArgs2MatchesTwoArgumentSemantics(t *testing.T) {
 	frame := TableValue(NewTable())
 	source := StringValue("select sym from trades")

@@ -503,6 +503,12 @@ type tiledArray struct {
 	len    int
 }
 
+type i64SparseAmendArray struct {
+	source  Array
+	indexes []int
+	values  []int64
+}
+
 type encodedArray struct {
 	kind   Kind
 	domain []any
@@ -1865,6 +1871,9 @@ func TryTypedAmendIndexes(array Array, indexes []int, values []any) (Array, bool
 	}
 	switch array.Kind() {
 	case KindI64:
+		if out, ok, err := tryTypedSparseI64Amend(array, indexes, values); ok || err != nil {
+			return out, ok, err
+		}
 		out := make([]int64, array.Len())
 		for row := range out {
 			value, ok, err := integerArrayAt(array, row)
@@ -1894,6 +1903,37 @@ func TryTypedAmendIndexes(array Array, indexes []int, values []any) (Array, bool
 	default:
 		return nil, false, nil
 	}
+}
+
+func tryTypedSparseI64Amend(array Array, indexes []int, values []any) (Array, bool, error) {
+	if !isDenseIntegerArray(array) || len(indexes) == 0 || len(indexes)*4 > array.Len() {
+		return nil, false, nil
+	}
+	nextValues := make([]int64, len(values))
+	prev := -1
+	for i, index := range indexes {
+		if index < 0 || index >= array.Len() {
+			return nil, true, fmt.Errorf("amend index %d out of range", index)
+		}
+		if index <= prev {
+			return nil, false, nil
+		}
+		prev = index
+		value, err := normalizeScalarForKind(KindI64, values[i], i)
+		if err != nil {
+			return nil, true, err
+		}
+		next, ok := value.(int64)
+		if !ok {
+			return nil, false, nil
+		}
+		nextValues[i] = next
+	}
+	return i64SparseAmendArray{
+		source:  array,
+		indexes: append([]int(nil), indexes...),
+		values:  nextValues,
+	}, true, nil
 }
 
 func typedCompareIndexRangeI64(array Array, op Op, value any) (Array, bool) {
@@ -4581,6 +4621,53 @@ func vectorPrev(values Array) Array {
 		out[i] = v
 	}
 	return InferArray(out)
+}
+
+func (a i64SparseAmendArray) Kind() Kind { return KindI64 }
+
+func (a i64SparseAmendArray) Len() int { return a.source.Len() }
+
+func (a i64SparseAmendArray) At(row int) (any, bool) {
+	value, ok, err := a.i64At(row)
+	if err != nil || !ok {
+		return nil, false
+	}
+	return value, true
+}
+
+func (a i64SparseAmendArray) Values() []any {
+	out := make([]any, a.Len())
+	for row := range out {
+		value, ok, err := a.i64At(row)
+		if err != nil || !ok {
+			panic(fmt.Sprintf("data sparse amend row %d out of range", row))
+		}
+		out[row] = value
+	}
+	return out
+}
+
+func (a i64SparseAmendArray) Gather(indexes []int) Array {
+	out := make([]int64, len(indexes))
+	for i, row := range indexes {
+		value, ok, err := a.i64At(row)
+		if err != nil || !ok {
+			panic(fmt.Sprintf("data sparse amend gather row %d out of range", row))
+		}
+		out[i] = value
+	}
+	return newI64Trusted(out)
+}
+
+func (a i64SparseAmendArray) i64At(row int) (int64, bool, error) {
+	if row < 0 || row >= a.Len() {
+		return 0, false, fmt.Errorf("array row %d out of range", row)
+	}
+	pos := sort.SearchInts(a.indexes, row)
+	if pos < len(a.indexes) && a.indexes[pos] == row {
+		return a.values[pos], true, nil
+	}
+	return integerArrayAt(a.source, row)
 }
 
 func vectorNext(values Array) Array {
