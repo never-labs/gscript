@@ -5823,8 +5823,45 @@ func TestQEvalHotPlanRecognizesConstantVectorWhereReduce(t *testing.T) {
 	if _, err := QEvalHotPlanRemarkPass(fn); err != nil {
 		t.Fatalf("QEvalHotPlanRemarkPass: %v", err)
 	}
+	if len(fn.QEvalPipelinePlans) != 1 {
+		t.Fatalf("QEvalPipelinePlans = %+v, want one plan ref", fn.QEvalPipelinePlans)
+	}
+	ref := fn.QEvalPipelinePlans[0]
+	if !ref.Valid() || ref.ID != 0 || ref.Kernel != "QEvalWhereReduce" || ref.Shape != "where/vector-reduce" || ref.Backend != "q_pipeline_typed_runtime" {
+		t.Fatalf("QEvalPipelinePlans[0] = %+v, want valid QEvalWhereReduce plan ref", ref)
+	}
+	backend := newQEvalPipelineStaticBackend("test_q_eval_pipeline", fn.QEvalPipelinePlans)
+	if plan, ok := backend.LookupQEvalPipelinePlan(ref); !ok || plan.Ref() != ref {
+		t.Fatalf("LookupQEvalPipelinePlan(%+v) = %+v/%v, want plan hit", ref, plan, ok)
+	}
+	if _, err := QEvalHotPlanRemarkPass(fn); err != nil {
+		t.Fatalf("second QEvalHotPlanRemarkPass: %v", err)
+	}
+	if len(fn.QEvalPipelinePlans) != 1 {
+		t.Fatalf("QEvalPipelinePlans after second pass = %+v, want one reused plan ref", fn.QEvalPipelinePlans)
+	}
 	descriptors := BuildQKernelDescriptors(nil, nil, nil, fn.Remarks.List())
 	assertQKernelDescriptor(t, descriptors, "methodjit_q_eval_lowering", "runtime_kernel", "QEvalWhereReduce", "where/vector-reduce", "hot_plan", "supported", "")
+}
+
+func TestQEvalPipelinePlanRefsCopyToCompiledFunction(t *testing.T) {
+	fn := &Function{
+		QEvalPipelinePlans: []QEvalPipelinePlanRef{{
+			ID:      0,
+			Kernel:  "QEvalVectorReduce",
+			Shape:   "vector-reduce/sum",
+			Source:  "+/til rows",
+			Backend: "q_pipeline_typed_runtime",
+		}},
+	}
+	cf := &CompiledFunction{QEvalPipelinePlans: fn.QEvalPipelinePlans}
+	ref, ok := qEvalPipelinePlanRefByID(cf.QEvalPipelinePlans, 0)
+	if !ok || ref != fn.QEvalPipelinePlans[0] {
+		t.Fatalf("compiled QEvalPipelinePlans lookup = %+v/%v, want %+v", ref, ok, fn.QEvalPipelinePlans[0])
+	}
+	if got := formatQEvalPipelinePlanRefs(cf.QEvalPipelinePlans); !strings.Contains(got, "QEvalVectorReduce") || !strings.Contains(got, "q_pipeline_typed_runtime") {
+		t.Fatalf("formatQEvalPipelinePlanRefs = %q, want kernel/backend", got)
+	}
 }
 
 func TestQEvalHotPlanReportsDynamicSourceFallback(t *testing.T) {
@@ -5832,6 +5869,9 @@ func TestQEvalHotPlanReportsDynamicSourceFallback(t *testing.T) {
 	fn.Remarks = &OptimizationRemarks{}
 	if _, err := QEvalHotPlanRemarkPass(fn); err != nil {
 		t.Fatalf("QEvalHotPlanRemarkPass: %v", err)
+	}
+	if len(fn.QEvalPipelinePlans) != 0 {
+		t.Fatalf("QEvalPipelinePlans = %+v, want none for dynamic source fallback", fn.QEvalPipelinePlans)
 	}
 	descriptors := BuildQKernelDescriptors(nil, nil, nil, fn.Remarks.List())
 	assertQKernelDescriptor(t, descriptors, "methodjit_q_eval_lowering", "fallback", "QEvalVectorPlan", "q-eval/dynamic-source", "hot_plan", "fallback", qEvalHotPlanFallbackDynamicSource)

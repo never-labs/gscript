@@ -210,6 +210,11 @@ type Function struct {
 	// fused runtime-kernel op-exits.
 	QFrameSelectColumnSpecs []QFrameSelectColumnSpec
 
+	// QEvalPipelinePlans records q.eval hot-path plan handles. The handles are
+	// backend references, not evaluator internals, so MethodJIT can lower hot
+	// q.eval calls without depending on q AST/runtime implementation details.
+	QEvalPipelinePlans []QEvalPipelinePlanRef
+
 	// Unpromotable, when true, signals that this function cannot be safely
 	// compiled at Tier 2 because BuildGraph encountered bytecode patterns
 	// it does not model. Set by the graph builder and checked by

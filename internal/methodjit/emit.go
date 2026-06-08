@@ -629,6 +629,10 @@ type CompiledFunction struct {
 	// fused runtime-kernel op-exit handling.
 	QFrameSelectColumnSpecs []QFrameSelectColumnSpec
 
+	// QEvalPipelinePlans keeps q.eval hot-path plan handles alive for future
+	// typed pipeline op-exit/native lowering.
+	QEvalPipelinePlans []QEvalPipelinePlanRef
+
 	// QVectorRuntimeKernelShapesByID keeps q vector runtime-kernel shape
 	// metadata alive for op-exit execution stats.
 	QVectorRuntimeKernelShapesByID map[int]string

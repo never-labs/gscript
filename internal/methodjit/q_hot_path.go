@@ -1172,13 +1172,14 @@ func QEvalHotPlanRemarkPass(fn *Function) (*Function, error) {
 				qEvalHotPlanFallbackRemark(fn, instr, reason, "q-eval/unsupported")
 				continue
 			}
-			qEvalHotPlanSupportedRemark(fn, instr, plan)
+			ref := fn.addQEvalPipelinePlan(source, plan)
+			qEvalHotPlanSupportedRemark(fn, instr, plan, ref)
 		}
 	}
 	return fn, nil
 }
 
-func qEvalHotPlanSupportedRemark(fn *Function, call *Instr, plan qEvalHotPlan) {
+func qEvalHotPlanSupportedRemark(fn *Function, call *Instr, plan qEvalHotPlan, ref QEvalPipelinePlanRef) {
 	blockID, valueID := qRemarkLocation(call)
 	fields := map[string]string{
 		"kind":    "runtime_kernel",
@@ -1190,9 +1191,13 @@ func qEvalHotPlanSupportedRemark(fn *Function, call *Instr, plan qEvalHotPlan) {
 	if plan.Detail != "" {
 		fields["detail"] = plan.Detail
 	}
+	if ref.Valid() {
+		fields["plan_id"] = strconv.Itoa(ref.ID)
+		fields["backend"] = ref.Backend
+	}
 	functionRemarks(fn).AddWithFields("QEvalHotPlan", "changed", blockID, valueID, OpCall,
-		fmt.Sprintf("kernel=%s shape=%s; constant q.eval source is plan-ready for typed vector runtime lowering",
-			plan.Kernel, plan.Shape),
+		fmt.Sprintf("kernel=%s shape=%s plan_id=%d; constant q.eval source is bound to typed pipeline plan interface",
+			plan.Kernel, plan.Shape, ref.ID),
 		fields)
 }
 

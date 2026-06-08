@@ -509,6 +509,7 @@ func CompileWithOptions(fn *Function, alloc *RegAllocation, opts CompileOptions)
 		StringFormatPatterns:           fn.StringFormatPatterns,
 		StringSplitSubSpecs:            fn.StringSplitSubSpecs,
 		QFrameSelectColumnSpecs:        fn.QFrameSelectColumnSpecs,
+		QEvalPipelinePlans:             fn.QEvalPipelinePlans,
 		QVectorRuntimeKernelShapesByID: qVectorRuntimeKernelShapesByID(fn),
 		CallSiteNoResultRuntimeSpecializationBatches: functionCallFacts(fn).CallSiteNoResultRuntimeSpecializationBatchMap(),
 		RecordArrayLoopCaches:                        fn.RecordArrayLoopCaches,
