@@ -1413,11 +1413,137 @@ func TestQVectorWhereHotPathDiagnosesConditionalProjection(t *testing.T) {
 	if report.QVectorWhereHotPathShapes["compare/vector-where"] != 1 {
 		t.Fatalf("Diagnose QVectorWhereHotPathShapes = %+v, want compare/vector-where count 1", report.QVectorWhereHotPathShapes)
 	}
+	if report.QVectorRuntimeKernelShapes["compare/vector-where"] != 1 {
+		t.Fatalf("Diagnose QVectorRuntimeKernelShapes = %+v, want compare/vector-where count 1", report.QVectorRuntimeKernelShapes)
+	}
 	if !strings.Contains(report.String(), "Q vector conditional hot paths") ||
 		!strings.Contains(report.String(), "Q typed vector runtime kernels") ||
 		!strings.Contains(report.String(), "kernel=VectorWhere") ||
 		!strings.Contains(report.String(), "shapes: compare/vector-where=1") {
 		t.Fatalf("diagnostic report missing q vector where typed kernel shape:\n%s", report.String())
+	}
+}
+
+func TestQVectorReduceHotPathDiagnosesAggregateKernel(t *testing.T) {
+	proto := &vm.FuncProto{
+		Name:      "q_vector_reduce_aggregate",
+		NumParams: 1,
+		MaxStack:  2,
+		Constants: []runtime.Value{
+			runtime.StringValue("size"),
+		},
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_FRAME_COLUMN, 1, 0, 0),
+			vm.EncodeABC(vm.OP_VECTOR_REDUCE, 1, 0, int(runtime.DenseArrayReduceSum)),
+			vm.EncodeABC(vm.OP_RETURN, 1, 2, 0),
+		},
+	}
+
+	fn := BuildGraph(proto)
+	paths := DetectQVectorReduceHotPaths(fn)
+	if len(paths) != 1 {
+		t.Fatalf("DetectQVectorReduceHotPaths count = %d, want 1\n%s", len(paths), Print(fn))
+	}
+	if got := paths[0].Shape(); got != "column/vector-reduce" {
+		t.Fatalf("q vector reduce shape = %q, want column/vector-reduce", got)
+	}
+	if got := qVectorReduceOpName(paths[0]); got != "sum" {
+		t.Fatalf("q vector reduce op = %q, want sum", got)
+	}
+	if got := qVectorReduceInputName(paths[0]); got != "frame-column" {
+		t.Fatalf("q vector reduce input = %q, want frame-column", got)
+	}
+
+	report := Diagnose(proto, []runtime.Value{runtime.TableValue(qHotPathTestFrame(t))})
+	if len(report.QVectorReduceHotPaths) != 1 {
+		t.Fatalf("Diagnose QVectorReduceHotPaths = %d, want 1\n%s", len(report.QVectorReduceHotPaths), report.String())
+	}
+	if report.QVectorReduceHotPathShapes["column/vector-reduce"] != 1 {
+		t.Fatalf("Diagnose QVectorReduceHotPathShapes = %+v, want column/vector-reduce count 1", report.QVectorReduceHotPathShapes)
+	}
+	if report.QVectorRuntimeKernelShapes["column/vector-reduce"] != 1 {
+		t.Fatalf("Diagnose QVectorRuntimeKernelShapes = %+v, want column/vector-reduce count 1", report.QVectorRuntimeKernelShapes)
+	}
+	if !strings.Contains(report.String(), "Q typed vector runtime kernels") ||
+		!strings.Contains(report.String(), "kernel=VectorReduce") ||
+		!strings.Contains(report.String(), "op=sum") ||
+		!strings.Contains(report.String(), "shapes: column/vector-reduce=1") {
+		t.Fatalf("diagnostic report missing q vector reduce typed kernel shape:\n%s", report.String())
+	}
+}
+
+func TestQVectorRuntimeKernelsDiagnosePrimitiveShapes(t *testing.T) {
+	proto := &vm.FuncProto{
+		Name:      "q_vector_runtime_kernel_shapes",
+		NumParams: 5,
+		MaxStack:  5,
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_VECTOR_GATHER, 0, 1, 0),
+			vm.EncodeABC(vm.OP_VECTOR_COMPARE, 0, 2, int(runtime.DenseArrayGE)),
+			vm.EncodeABC(vm.OP_VECTOR_MASK, 0, 3, int(runtime.DenseArrayMaskAnd)),
+			vm.EncodeABC(vm.OP_VECTOR_REDUCE, 4, 0, int(runtime.DenseArrayReduceSum)),
+			vm.EncodeABC(vm.OP_RETURN, 0, 5, 0),
+		},
+	}
+	args := []runtime.Value{
+		runtime.DenseArrayValue(runtime.NewDenseArrayI64([]int64{10, 20, 30})),
+		runtime.DenseArrayValue(runtime.NewDenseArrayI64([]int64{1, 3})),
+		runtime.IntValue(15),
+		runtime.DenseArrayValue(runtime.NewDenseArrayBool([]bool{true, true})),
+		runtime.DenseArrayValue(runtime.NewDenseArrayF64([]float64{1, 2, 3})),
+	}
+
+	fn := BuildGraph(proto)
+	kernels := DetectQVectorRuntimeKernels(fn)
+	if len(kernels) != 4 {
+		t.Fatalf("DetectQVectorRuntimeKernels count = %d, want 4\n%s", len(kernels), Print(fn))
+	}
+	counts := CountQVectorRuntimeKernelShapes(kernels)
+	for _, shape := range []string{"vector-gather", "vector-compare", "vector-mask", "vector/vector-reduce"} {
+		if counts[shape] != 1 {
+			t.Fatalf("vector runtime kernel shape counts = %+v, want %s count 1", counts, shape)
+		}
+	}
+
+	report := Diagnose(proto, args)
+	if len(report.QVectorRuntimeKernels) != 3 {
+		t.Fatalf("Diagnose QVectorRuntimeKernels = %d, want 3 live kernels\n%s", len(report.QVectorRuntimeKernels), report.String())
+	}
+	for _, shape := range []string{"vector-gather", "vector-compare", "vector-mask"} {
+		if report.QVectorRuntimeKernelShapes[shape] != 1 {
+			t.Fatalf("Diagnose QVectorRuntimeKernelShapes = %+v, want %s count 1", report.QVectorRuntimeKernelShapes, shape)
+		}
+	}
+	if !strings.Contains(report.String(), "kernel=VectorGather") ||
+		!strings.Contains(report.String(), "kernel=VectorCompare op=>=") ||
+		!strings.Contains(report.String(), "kernel=VectorMask op=and") {
+		t.Fatalf("diagnostic report missing vector runtime kernel details:\n%s", report.String())
+	}
+}
+
+func TestQVectorRuntimeKernelsDiagnoseVectorScan(t *testing.T) {
+	proto := &vm.FuncProto{
+		Name:      "q_vector_scan_kernel_shape",
+		NumParams: 1,
+		MaxStack:  1,
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_VECTOR_SCAN, 0, 0, 0),
+			vm.EncodeABC(vm.OP_RETURN, 0, 2, 0),
+		},
+	}
+
+	report := Diagnose(proto, []runtime.Value{
+		runtime.DenseArrayValue(runtime.NewDenseArrayI64([]int64{2, -1, 4})),
+	})
+	if len(report.QVectorRuntimeKernels) != 1 {
+		t.Fatalf("Diagnose QVectorRuntimeKernels = %d, want one scan kernel\n%s", len(report.QVectorRuntimeKernels), report.String())
+	}
+	if report.QVectorRuntimeKernelShapes["vector-scan"] != 1 {
+		t.Fatalf("Diagnose QVectorRuntimeKernelShapes = %+v, want vector-scan count 1", report.QVectorRuntimeKernelShapes)
+	}
+	if !strings.Contains(report.String(), "kernel=VectorScan") ||
+		!strings.Contains(report.String(), "shapes: vector-scan=1") {
+		t.Fatalf("diagnostic report missing vector scan kernel details:\n%s", report.String())
 	}
 }
 

@@ -54,6 +54,25 @@ type QVectorWhereHotPath struct {
 	Where        *Instr
 }
 
+// QVectorReduceHotPath describes a q vector aggregation primitive. The input
+// may be a frame column, gathered vector, conditional vector, or another dense
+// vector expression that is reduced through a typed runtime op-exit.
+type QVectorReduceHotPath struct {
+	SourceColumn *Instr
+	Gather       *Instr
+	Where        *Instr
+	Reduce       *Instr
+}
+
+// QVectorRuntimeKernel records vector primitives that already execute through
+// typed runtime helpers/op-exits and should be visible in q diagnostics.
+type QVectorRuntimeKernel struct {
+	Instr     *Instr
+	Kernel    string
+	ShapeName string
+	Detail    string
+}
+
 func (p QQueryHotPath) Shape() string {
 	if p.Compare == nil && p.Mask == nil && p.MaskCombine == nil {
 		switch {
@@ -95,6 +114,26 @@ func (p QVectorWhereHotPath) Shape() string {
 	return prefix + "/vector-where"
 }
 
+func (p QVectorReduceHotPath) Shape() string {
+	switch {
+	case p.Where != nil:
+		return "where/vector-reduce"
+	case p.Gather != nil:
+		return "gather/vector-reduce"
+	case p.SourceColumn != nil:
+		return "column/vector-reduce"
+	default:
+		return "vector/vector-reduce"
+	}
+}
+
+func (k QVectorRuntimeKernel) Shape() string {
+	if k.ShapeName == "" {
+		return "unknown"
+	}
+	return k.ShapeName
+}
+
 func CountQQueryHotPathShapes(paths []QQueryHotPath) map[string]int {
 	if len(paths) == 0 {
 		return nil
@@ -113,6 +152,28 @@ func CountQVectorWhereHotPathShapes(paths []QVectorWhereHotPath) map[string]int 
 	counts := make(map[string]int)
 	for _, path := range paths {
 		counts[path.Shape()]++
+	}
+	return counts
+}
+
+func CountQVectorReduceHotPathShapes(paths []QVectorReduceHotPath) map[string]int {
+	if len(paths) == 0 {
+		return nil
+	}
+	counts := make(map[string]int)
+	for _, path := range paths {
+		counts[path.Shape()]++
+	}
+	return counts
+}
+
+func CountQVectorRuntimeKernelShapes(kernels []QVectorRuntimeKernel) map[string]int {
+	if len(kernels) == 0 {
+		return nil
+	}
+	counts := make(map[string]int)
+	for _, kernel := range kernels {
+		counts[kernel.Shape()]++
 	}
 	return counts
 }
@@ -286,6 +347,82 @@ func DetectQVectorWhereHotPaths(fn *Function) []QVectorWhereHotPath {
 				FalseColumn:  valueDef(instr.Args[2], OpFrameColumn),
 				Where:        instr,
 			})
+		}
+	}
+	return out
+}
+
+// DetectQVectorReduceHotPaths returns q vector aggregate primitives visible in
+// Method JIT IR. These already execute through typed runtime op-exits; the
+// diagnostic shape is used to track how much aggregate work still falls back.
+func DetectQVectorReduceHotPaths(fn *Function) []QVectorReduceHotPath {
+	if fn == nil {
+		return nil
+	}
+	var out []QVectorReduceHotPath
+	for _, block := range fn.Blocks {
+		if block == nil {
+			continue
+		}
+		for _, instr := range block.Instrs {
+			if instr == nil || instr.Op != OpVectorReduce || len(instr.Args) != 1 {
+				continue
+			}
+			arg := instr.Args[0]
+			out = append(out, QVectorReduceHotPath{
+				SourceColumn: valueDef(arg, OpFrameColumn),
+				Gather:       valueDef(arg, OpVectorGather),
+				Where:        valueDef(arg, OpVectorWhere),
+				Reduce:       instr,
+			})
+		}
+	}
+	return out
+}
+
+// DetectQVectorRuntimeKernels returns vector primitives that are carried as
+// typed runtime kernels in Method JIT. This intentionally covers standalone
+// vector gather/compare/mask/reduce/scan plus conditional vector projection.
+func DetectQVectorRuntimeKernels(fn *Function) []QVectorRuntimeKernel {
+	if fn == nil {
+		return nil
+	}
+	var out []QVectorRuntimeKernel
+	for _, block := range fn.Blocks {
+		if block == nil {
+			continue
+		}
+		for _, instr := range block.Instrs {
+			if instr == nil {
+				continue
+			}
+			switch instr.Op {
+			case OpVectorGather:
+				out = append(out, QVectorRuntimeKernel{Instr: instr, Kernel: "VectorGather", ShapeName: "vector-gather"})
+			case OpVectorCompare:
+				out = append(out, QVectorRuntimeKernel{Instr: instr, Kernel: "VectorCompare", ShapeName: "vector-compare", Detail: "op=" + qDenseArrayCompareOpName(runtime.DenseArrayBinaryOp(instr.Aux))})
+			case OpVectorMask:
+				out = append(out, QVectorRuntimeKernel{Instr: instr, Kernel: "VectorMask", ShapeName: "vector-mask", Detail: "op=" + qDenseArrayMaskOpName(runtime.DenseArrayMaskOp(instr.Aux))})
+			case OpVectorWhere:
+				shape := "vector-where"
+				detail := ""
+				if path := qVectorWhereHotPath(instr); path.Where != nil {
+					shape = path.Shape()
+					detail = "predicate=" + qVectorWherePredicateName(path)
+				}
+				out = append(out, QVectorRuntimeKernel{Instr: instr, Kernel: "VectorWhere", ShapeName: shape, Detail: detail})
+			case OpVectorReduce:
+				path := qVectorReduceHotPath(instr)
+				shape := "vector/vector-reduce"
+				detail := "op=" + qDenseArrayReduceOpName(runtime.DenseArrayReduceOp(instr.Aux))
+				if path.Reduce != nil {
+					shape = path.Shape()
+					detail = "op=" + qVectorReduceOpName(path) + " input=" + qVectorReduceInputName(path)
+				}
+				out = append(out, QVectorRuntimeKernel{Instr: instr, Kernel: "VectorReduce", ShapeName: shape, Detail: detail})
+			case OpVectorScan:
+				out = append(out, QVectorRuntimeKernel{Instr: instr, Kernel: "VectorScan", ShapeName: "vector-scan"})
+			}
 		}
 	}
 	return out
@@ -649,6 +786,45 @@ func qVectorWherePredicate(value *Value) (*Instr, *Instr, *Instr) {
 	return nil, nil, nil
 }
 
+func qVectorWhereHotPath(instr *Instr) QVectorWhereHotPath {
+	if instr == nil || instr.Op != OpVectorWhere || len(instr.Args) != 3 {
+		return QVectorWhereHotPath{}
+	}
+	compare, mask, maskCombine := qVectorWherePredicate(instr.Args[0])
+	if compare == nil && mask == nil && maskCombine == nil {
+		return QVectorWhereHotPath{}
+	}
+	sourceColumn := (*Instr)(nil)
+	if compare != nil {
+		sourceColumn = qQueryCompareColumn(compare)
+		if sourceColumn == nil {
+			return QVectorWhereHotPath{}
+		}
+	}
+	return QVectorWhereHotPath{
+		SourceColumn: sourceColumn,
+		Compare:      compare,
+		Mask:         mask,
+		MaskCombine:  maskCombine,
+		TrueColumn:   valueDef(instr.Args[1], OpFrameColumn),
+		FalseColumn:  valueDef(instr.Args[2], OpFrameColumn),
+		Where:        instr,
+	}
+}
+
+func qVectorReduceHotPath(instr *Instr) QVectorReduceHotPath {
+	if instr == nil || instr.Op != OpVectorReduce || len(instr.Args) != 1 {
+		return QVectorReduceHotPath{}
+	}
+	arg := instr.Args[0]
+	return QVectorReduceHotPath{
+		SourceColumn: valueDef(arg, OpFrameColumn),
+		Gather:       valueDef(arg, OpVectorGather),
+		Where:        valueDef(arg, OpVectorWhere),
+		Reduce:       instr,
+	}
+}
+
 func qFrameMaskAppendTerm(spec *QFrameSelectColumnSpec, term QFrameMaskTermSpec) int {
 	spec.MaskTerms = append(spec.MaskTerms, term)
 	return len(spec.MaskTerms) - 1
@@ -846,23 +1022,21 @@ func formatQFrameSelectColumnSpecs(specs []QFrameSelectColumnSpec) string {
 	return b.String()
 }
 
-func formatQTypedVectorRuntimeKernels(paths []QVectorWhereHotPath) string {
-	if len(paths) == 0 {
+func formatQTypedVectorRuntimeKernelReport(kernels []QVectorRuntimeKernel) string {
+	if len(kernels) == 0 {
 		return "0 typed vector runtime kernel(s)\n"
 	}
 	var b strings.Builder
-	fmt.Fprintf(&b, "%d typed vector runtime kernel(s)\n", len(paths))
-	if counts := CountQVectorWhereHotPathShapes(paths); len(counts) > 0 {
+	fmt.Fprintf(&b, "%d typed vector runtime kernel(s)\n", len(kernels))
+	if counts := CountQVectorRuntimeKernelShapes(kernels); len(counts) > 0 {
 		fmt.Fprintf(&b, "  shapes: %s\n", formatQQueryHotPathShapeCounts(counts))
 	}
-	for i, path := range paths {
-		fmt.Fprintf(&b, "  [%d] shape=%s kernel=VectorWhere predicate=%s true=%s false=%s\n",
-			i,
-			path.Shape(),
-			qVectorWherePredicateName(path),
-			qVectorWhereOperandName(path.TrueColumn),
-			qVectorWhereOperandName(path.FalseColumn),
-		)
+	for i, kernel := range kernels {
+		fmt.Fprintf(&b, "  [%d] shape=%s kernel=%s", i, kernel.Shape(), kernel.Kernel)
+		if kernel.Detail != "" {
+			fmt.Fprintf(&b, " %s", kernel.Detail)
+		}
+		b.WriteByte('\n')
 	}
 	return b.String()
 }
@@ -907,6 +1081,37 @@ func qVectorWhereOperandName(column *Instr) string {
 	return "frame-column"
 }
 
+func qVectorReduceOpName(path QVectorReduceHotPath) string {
+	if path.Reduce == nil {
+		return "unknown"
+	}
+	switch runtime.DenseArrayReduceOp(path.Reduce.Aux) {
+	case runtime.DenseArrayReduceSum:
+		return "sum"
+	case runtime.DenseArrayReduceMin:
+		return "min"
+	case runtime.DenseArrayReduceMax:
+		return "max"
+	case runtime.DenseArrayReduceMean:
+		return "mean"
+	default:
+		return fmt.Sprintf("op(%d)", path.Reduce.Aux)
+	}
+}
+
+func qVectorReduceInputName(path QVectorReduceHotPath) string {
+	switch {
+	case path.Where != nil:
+		return "vector-where"
+	case path.Gather != nil:
+		return "vector-gather"
+	case path.SourceColumn != nil:
+		return "frame-column"
+	default:
+		return "vector"
+	}
+}
+
 func qDenseArrayCompareOpName(op runtime.DenseArrayBinaryOp) string {
 	switch op {
 	case runtime.DenseArrayEQ:
@@ -921,6 +1126,36 @@ func qDenseArrayCompareOpName(op runtime.DenseArrayBinaryOp) string {
 		return ">"
 	case runtime.DenseArrayGE:
 		return ">="
+	default:
+		return fmt.Sprintf("op(%d)", op)
+	}
+}
+
+func qDenseArrayMaskOpName(op runtime.DenseArrayMaskOp) string {
+	switch op {
+	case runtime.DenseArrayMaskAnd:
+		return "and"
+	case runtime.DenseArrayMaskOr:
+		return "or"
+	case runtime.DenseArrayMaskXor:
+		return "xor"
+	case runtime.DenseArrayMaskAndNot:
+		return "andnot"
+	default:
+		return fmt.Sprintf("op(%d)", op)
+	}
+}
+
+func qDenseArrayReduceOpName(op runtime.DenseArrayReduceOp) string {
+	switch op {
+	case runtime.DenseArrayReduceSum:
+		return "sum"
+	case runtime.DenseArrayReduceMin:
+		return "min"
+	case runtime.DenseArrayReduceMax:
+		return "max"
+	case runtime.DenseArrayReduceMean:
+		return "mean"
 	default:
 		return fmt.Sprintf("op(%d)", op)
 	}
