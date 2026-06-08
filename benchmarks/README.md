@@ -116,3 +116,20 @@ to keep measurements comparable:
 bash benchmarks/q_columnar_suite.sh --runs=5 --warmup=1 \
   --time-source=auto --min-sample-seconds=0.100 --max-repeat=128
 ```
+
+For runtime-level qSQL work, also run the bind/native comparison benchmarks:
+
+```bash
+go test ./internal/stdlib/bind -run '^$' \
+  -bench 'BenchmarkQSQL(Bind|Native)' -benchmem -benchtime=100x
+```
+
+Read the q performance baseline through these ratios:
+
+| Signal | How to read it |
+|---|---|
+| Current Leia vs old Leia | `benchmarks/q_columnar_suite.sh` reports current worktree vs clean `HEAD`; compare `Current`, `HEAD`, and `HEAD delta` |
+| Current Leia vs hand-written Go | compare `BenchmarkQSQLBind...` rows with `BenchmarkQSQLNativeGo...` rows for the same shape |
+| Warm vs cold | compare `BenchmarkQSQLBindRunSQLWarmCache...` with `BenchmarkQSQLBindRunSQLColdCache...` |
+| Typed kernel hit/fallback rate | use `kernel_hit_pct`, `template_hit_pct`, `aligned_hit_pct`, and `fallbacks/op` in the bind benchmark output |
+| Allocation pressure | use `B/op` and `allocs/op`; q columnar hot paths should trend toward low per-row allocation |

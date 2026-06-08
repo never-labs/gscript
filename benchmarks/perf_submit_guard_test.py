@@ -84,7 +84,9 @@ class PerfSubmitGuardTest(unittest.TestCase):
         )
 
     def test_skips_luajit_requirement_for_manifested_leia_only_benchmarks(self):
-        rows = guard.load_rows(write_json(timing_payload_with_luajit_status("data/q_query_rollup", 0.42, "missing")))
+        rows = guard.load_rows(
+            write_json(timing_payload_with_luajit_status("data/q_columnar_qsql_filter_project", 0.42, "missing"))
+        )
         self.assertEqual(
             guard.check_rows(rows, luajit_required=guard.load_luajit_required_benchmarks(), ratio_threshold=0.8),
             [],

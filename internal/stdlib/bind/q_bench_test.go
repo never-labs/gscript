@@ -1,6 +1,7 @@
 package bind
 
 import (
+	"sort"
 	"testing"
 	"time"
 
@@ -8,6 +9,7 @@ import (
 )
 
 var qSQLBindBenchSink Value
+var qSQLNativeBenchSink int64
 
 func BenchmarkQSQLBindRunSQLWarmCacheSelectWhereProject(b *testing.B) {
 	qClearCaches()
@@ -35,6 +37,33 @@ func BenchmarkQSQLBindRunSQLWarmCacheSelectWhereProject(b *testing.B) {
 	}
 	b.StopTimer()
 	qSQLBindBenchReportRows(b, rows, start)
+	qSQLBindBenchReportQStats(b)
+}
+
+func BenchmarkQSQLBindRunSQLColdCacheSelectWhereProject(b *testing.B) {
+	qClearCaches()
+	defer qClearCaches()
+
+	const rows = 8192
+	frame := qSQLBindBenchTradesFrame(b, rows)
+	frameValue := qSQLBindBenchFrameValue(b, frame)
+	query := "select sym,price,size from trades where active=true,price>=100 order by price desc take 128"
+	args := qSQLArgsResult{frameValue: frameValue, source: query}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	start := time.Now()
+	for i := 0; i < b.N; i++ {
+		qClearCaches()
+		out, err := qRunSQL("q.sql", args)
+		if err != nil {
+			b.Fatalf("q.sql: %v", err)
+		}
+		qSQLBindBenchSink = out
+	}
+	b.StopTimer()
+	qSQLBindBenchReportRows(b, rows, start)
+	qSQLBindBenchReportQStats(b)
 }
 
 func BenchmarkQSQLBindFastArg2WarmCacheSelectWhereProject(b *testing.B) {
@@ -66,6 +95,7 @@ func BenchmarkQSQLBindFastArg2WarmCacheSelectWhereProject(b *testing.B) {
 	}
 	b.StopTimer()
 	qSQLBindBenchReportRows(b, rows, start)
+	qSQLBindBenchReportQStats(b)
 }
 
 func BenchmarkQSQLBindRunSQLWarmCacheGroupByAggregate(b *testing.B) {
@@ -94,6 +124,7 @@ func BenchmarkQSQLBindRunSQLWarmCacheGroupByAggregate(b *testing.B) {
 	}
 	b.StopTimer()
 	qSQLBindBenchReportRows(b, rows, start)
+	qSQLBindBenchReportQStats(b)
 }
 
 func BenchmarkQSQLBindRunSQLWarmCacheJoin(b *testing.B) {
@@ -131,26 +162,60 @@ func BenchmarkQSQLBindRunSQLWarmCacheJoin(b *testing.B) {
 	}
 	b.StopTimer()
 	qSQLBindBenchReportRows(b, rows, start)
+	qSQLBindBenchReportQStats(b)
+}
+
+func BenchmarkQSQLNativeGoSelectWhereProject(b *testing.B) {
+	const rows = 8192
+	trades := qSQLNativeBenchTrades(rows)
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	start := time.Now()
+	for i := 0; i < b.N; i++ {
+		qSQLNativeBenchSink = qSQLNativeSelectWhereProject(trades)
+	}
+	b.StopTimer()
+	qSQLBindBenchReportRows(b, rows, start)
+}
+
+func BenchmarkQSQLNativeGoGroupByAggregate(b *testing.B) {
+	const rows = 8192
+	trades := qSQLNativeBenchTrades(rows)
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	start := time.Now()
+	for i := 0; i < b.N; i++ {
+		qSQLNativeBenchSink = qSQLNativeGroupByAggregate(trades)
+	}
+	b.StopTimer()
+	qSQLBindBenchReportRows(b, rows, start)
+}
+
+func BenchmarkQSQLNativeGoJoin(b *testing.B) {
+	const rows = 8192
+	trades := qSQLNativeBenchTrades(rows)
+	quotes := qSQLNativeBenchQuotes()
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	start := time.Now()
+	for i := 0; i < b.N; i++ {
+		qSQLNativeBenchSink = qSQLNativeJoin(trades, quotes)
+	}
+	b.StopTimer()
+	qSQLBindBenchReportRows(b, rows, start)
 }
 
 func qSQLBindBenchTradesFrame(b *testing.B, rows int) data.Frame {
 	b.Helper()
-	symbols := []string{"AAPL", "MSFT", "NVDA", "TSLA", "AMZN", "META", "GOOG", "IBM"}
-	sym := make([]string, rows)
-	price := make([]float64, rows)
-	size := make([]int64, rows)
-	active := make([]bool, rows)
-	for i := 0; i < rows; i++ {
-		sym[i] = symbols[i%len(symbols)]
-		price[i] = 75 + float64((i*17)%220) + float64(i%10)/10
-		size[i] = int64(1 + (i*13)%500)
-		active[i] = i%5 != 0
-	}
+	trades := qSQLNativeBenchTrades(rows)
 	frame, err := data.NewFrame(
-		data.Column{Name: "sym", Data: data.NewSymbols(sym)},
-		data.Column{Name: "price", Data: data.NewF64(price)},
-		data.Column{Name: "size", Data: data.NewI64(size)},
-		data.Column{Name: "active", Data: data.NewBool(active)},
+		data.Column{Name: "sym", Data: data.NewSymbols(trades.sym)},
+		data.Column{Name: "price", Data: data.NewF64(trades.price)},
+		data.Column{Name: "size", Data: data.NewI64(trades.size)},
+		data.Column{Name: "active", Data: data.NewBool(trades.active)},
 	)
 	if err != nil {
 		b.Fatalf("NewFrame trades: %v", err)
@@ -185,4 +250,152 @@ func qSQLBindBenchReportRows(b *testing.B, rows int, start time.Time) {
 	if elapsed := time.Since(start); elapsed > 0 {
 		b.ReportMetric(float64(rows)*float64(b.N)/elapsed.Seconds(), "input_rows/s")
 	}
+}
+
+func qSQLBindBenchReportQStats(b *testing.B) {
+	b.Helper()
+	stats := qSQLPlanCacheStatsSnapshot()
+	b.ReportMetric(qSQLBindBenchHitPct(stats.TemplateHits, stats.TemplateMisses), "template_hit_pct")
+	b.ReportMetric(qSQLBindBenchHitPct(stats.AlignedHits, stats.AlignedMisses), "aligned_hit_pct")
+	b.ReportMetric(qSQLBindBenchHitPct(stats.KernelHits, stats.KernelMisses), "kernel_hit_pct")
+
+	qFallbackStatsMu.Lock()
+	fallbacks := qFallbackCounters.KernelUnsupported +
+		qFallbackCounters.KernelCompileErr +
+		qFallbackCounters.SourceErr +
+		qFallbackCounters.JoinErr +
+		qFallbackCounters.Mutation +
+		qFallbackCounters.QueryKernel
+	queryKernelHits := qFallbackCounters.QueryKernelHit
+	qFallbackStatsMu.Unlock()
+
+	if b.N > 0 {
+		b.ReportMetric(float64(fallbacks)/float64(b.N), "fallbacks/op")
+		b.ReportMetric(float64(queryKernelHits)/float64(b.N), "query_kernel_supported/op")
+	}
+}
+
+func qSQLBindBenchHitPct(hits, misses int) float64 {
+	total := hits + misses
+	if total == 0 {
+		return 0
+	}
+	return 100 * float64(hits) / float64(total)
+}
+
+type qSQLNativeTrades struct {
+	sym    []string
+	price  []float64
+	size   []int64
+	active []bool
+}
+
+type qSQLNativeQuotes struct {
+	bid map[string]float64
+	ask map[string]float64
+}
+
+func qSQLNativeBenchTrades(rows int) qSQLNativeTrades {
+	symbols := []string{"AAPL", "MSFT", "NVDA", "TSLA", "AMZN", "META", "GOOG", "IBM"}
+	trades := qSQLNativeTrades{
+		sym:    make([]string, rows),
+		price:  make([]float64, rows),
+		size:   make([]int64, rows),
+		active: make([]bool, rows),
+	}
+	for i := 0; i < rows; i++ {
+		trades.sym[i] = symbols[i%len(symbols)]
+		trades.price[i] = 75 + float64((i*17)%220) + float64(i%10)/10
+		trades.size[i] = int64(1 + (i*13)%500)
+		trades.active[i] = i%5 != 0
+	}
+	return trades
+}
+
+func qSQLNativeBenchQuotes() qSQLNativeQuotes {
+	return qSQLNativeQuotes{
+		bid: map[string]float64{
+			"AAPL": 100.10,
+			"MSFT": 80.10,
+			"NVDA": 210.10,
+			"TSLA": 190.10,
+			"AMZN": 150.10,
+			"META": 120.10,
+			"GOOG": 130.10,
+			"IBM":  99.10,
+		},
+		ask: map[string]float64{
+			"AAPL": 100.20,
+			"MSFT": 80.20,
+			"NVDA": 210.20,
+			"TSLA": 190.20,
+			"AMZN": 150.20,
+			"META": 120.20,
+			"GOOG": 130.20,
+			"IBM":  99.20,
+		},
+	}
+}
+
+func qSQLNativeSelectWhereProject(trades qSQLNativeTrades) int64 {
+	indexes := make([]int, 0, 128)
+	for i := range trades.price {
+		if trades.active[i] && trades.price[i] >= 100 {
+			indexes = append(indexes, i)
+		}
+	}
+	sort.Slice(indexes, func(i, j int) bool {
+		return trades.price[indexes[i]] > trades.price[indexes[j]]
+	})
+	if len(indexes) > 128 {
+		indexes = indexes[:128]
+	}
+	var checksum int64
+	for _, row := range indexes {
+		checksum += int64(trades.price[row]*100) + trades.size[row] + int64(len(trades.sym[row]))
+	}
+	return checksum
+}
+
+func qSQLNativeGroupByAggregate(trades qSQLNativeTrades) int64 {
+	type group struct {
+		notional float64
+		fills    int64
+	}
+	groups := make(map[string]group, 8)
+	for i := range trades.price {
+		if !trades.active[i] || trades.price[i] < 100 {
+			continue
+		}
+		g := groups[trades.sym[i]]
+		g.notional += trades.price[i] * float64(trades.size[i])
+		g.fills++
+		groups[trades.sym[i]] = g
+	}
+	var checksum int64
+	for sym, g := range groups {
+		checksum += int64(g.notional) + g.fills + int64(len(sym))
+	}
+	return checksum
+}
+
+func qSQLNativeJoin(trades qSQLNativeTrades, quotes qSQLNativeQuotes) int64 {
+	indexes := make([]int, 0, len(trades.price))
+	for i, sym := range trades.sym {
+		if _, ok := quotes.bid[sym]; ok {
+			indexes = append(indexes, i)
+		}
+	}
+	sort.Slice(indexes, func(i, j int) bool {
+		return trades.price[indexes[i]] > trades.price[indexes[j]]
+	})
+	if len(indexes) > 128 {
+		indexes = indexes[:128]
+	}
+	var checksum int64
+	for _, row := range indexes {
+		sym := trades.sym[row]
+		checksum += int64(trades.price[row]*100) + int64(quotes.bid[sym]*100) + int64(quotes.ask[sym]*100)
+	}
+	return checksum
 }
