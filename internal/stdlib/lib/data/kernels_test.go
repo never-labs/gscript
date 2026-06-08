@@ -154,6 +154,67 @@ func TestTryTypedCastIntegerArrays(t *testing.T) {
 	}
 }
 
+func TestTypedRunningAndMovingIntegerKernels(t *testing.T) {
+	mins, handled, err := TryTypedRunningMinMax(NewI64([]int64{4, 3, 5, 2}), false)
+	if err != nil {
+		t.Fatalf("TryTypedRunningMinMax mins returned error: %v", err)
+	}
+	if !handled {
+		t.Fatal("TryTypedRunningMinMax mins did not handle integer array")
+	}
+	if got, want := mins.Values(), []any{int64(4), int64(3), int64(3), int64(2)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("running mins values = %#v, want %#v", got, want)
+	}
+
+	avgs, handled, err := TryTypedAvgs(NewI64Range(1, 1, 4))
+	if err != nil {
+		t.Fatalf("TryTypedAvgs range returned error: %v", err)
+	}
+	if !handled {
+		t.Fatal("TryTypedAvgs range did not handle integer array")
+	}
+	if got, want := avgs.Values(), []any{1.0, 1.5, 2.0, 2.5}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("running avgs values = %#v, want %#v", got, want)
+	}
+
+	counts, handled, err := TryTypedMCount(NewI64Range(1, 1, 5), 3)
+	if err != nil {
+		t.Fatalf("TryTypedMCount returned error: %v", err)
+	}
+	if !handled {
+		t.Fatal("TryTypedMCount did not handle integer array")
+	}
+	if got, want := counts.Values(), []any{int64(1), int64(2), int64(3), int64(3), int64(3)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("mcount values = %#v, want %#v", got, want)
+	}
+
+	if _, handled, err := TryTypedMCount(NewColumn("x", []any{int64(10), nil, int64(30)}).Data, 2); err != nil || handled {
+		t.Fatalf("TryTypedMCount nullable handled=%v err=%v, want fallback", handled, err)
+	}
+
+	mmax, handled, err := TryTypedMovingMinMax(NewI64([]int64{3, 1, 4, 2}), 2, true)
+	if err != nil {
+		t.Fatalf("TryTypedMovingMinMax returned error: %v", err)
+	}
+	if !handled {
+		t.Fatal("TryTypedMovingMinMax did not handle integer array")
+	}
+	if got, want := mmax.Values(), []any{int64(3), int64(3), int64(4), int64(4)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("mmax values = %#v, want %#v", got, want)
+	}
+
+	mmin, handled, err := TryTypedMovingMinMax(NewI64([]int64{5, 3, 4, 2, 6, 1}), 3, false)
+	if err != nil {
+		t.Fatalf("TryTypedMovingMinMax min returned error: %v", err)
+	}
+	if !handled {
+		t.Fatal("TryTypedMovingMinMax min did not handle integer array")
+	}
+	if got, want := mmin.Values(), []any{int64(5), int64(3), int64(3), int64(2), int64(2), int64(1)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("mmin values = %#v, want %#v", got, want)
+	}
+}
+
 func TestTypedBinScalarAndVectorBoundaries(t *testing.T) {
 	domain := WithArrayAttribute(NewI64([]int64{10, 20, 20, 40}), ArrayAttributeSorted)
 	index, ok, err := typedKernels.Bin(domain, int64(20))

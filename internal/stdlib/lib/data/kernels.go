@@ -1186,6 +1186,110 @@ func TryTypedMinMax(array Array, wantMax bool) (value any, handled bool, has boo
 	return typedKernels.Min(array)
 }
 
+func TryTypedRunningMinMax(array Array, wantMax bool) (Array, bool, error) {
+	if !isDenseIntegerArray(array) {
+		return nil, false, nil
+	}
+	out := make([]int64, array.Len())
+	var best int64
+	hasBest := false
+	for row := 0; row < array.Len(); row++ {
+		value, ok, err := integerArrayAt(array, row)
+		if err != nil {
+			return nil, true, err
+		}
+		if !ok {
+			return nil, false, nil
+		}
+		if !hasBest || (wantMax && value > best) || (!wantMax && value < best) {
+			best = value
+			hasBest = true
+		}
+		out[row] = best
+	}
+	return newI64Trusted(out), true, nil
+}
+
+func TryTypedAvgs(array Array) (Array, bool, error) {
+	if !isDenseIntegerArray(array) {
+		return nil, false, nil
+	}
+	out := make([]float64, array.Len())
+	var sum int64
+	for row := 0; row < array.Len(); row++ {
+		value, ok, err := integerArrayAt(array, row)
+		if err != nil {
+			return nil, true, err
+		}
+		if !ok {
+			return nil, false, nil
+		}
+		sum += value
+		out[row] = float64(sum) / float64(row+1)
+	}
+	return newF64Trusted(out), true, nil
+}
+
+func TryTypedMCount(array Array, width int) (Array, bool, error) {
+	if width <= 0 {
+		return nil, true, fmt.Errorf("mcount width must be positive")
+	}
+	if !isDenseIntegerArray(array) {
+		return nil, false, nil
+	}
+	out := make([]int64, array.Len())
+	for row := 0; row < array.Len(); row++ {
+		count := row + 1
+		if count > width {
+			count = width
+		}
+		out[row] = int64(count)
+	}
+	return newI64Trusted(out), true, nil
+}
+
+func TryTypedMovingMinMax(array Array, width int, wantMax bool) (Array, bool, error) {
+	if width <= 0 {
+		return nil, true, fmt.Errorf("moving extrema width must be positive")
+	}
+	if !isDenseIntegerArray(array) {
+		return nil, false, nil
+	}
+	out := make([]int64, array.Len())
+	dequeCap := width
+	if dequeCap > array.Len() {
+		dequeCap = array.Len()
+	}
+	indexes := make([]int, dequeCap)
+	values := make([]int64, dequeCap)
+	head, tail := 0, 0
+	for row := 0; row < array.Len(); row++ {
+		value, ok, err := integerArrayAt(array, row)
+		if err != nil {
+			return nil, true, err
+		}
+		if !ok {
+			return nil, false, nil
+		}
+		expiredBefore := row - width + 1
+		for head < tail && indexes[head%dequeCap] < expiredBefore {
+			head++
+		}
+		for head < tail {
+			last := values[(tail-1)%dequeCap]
+			if (wantMax && last > value) || (!wantMax && last < value) {
+				break
+			}
+			tail--
+		}
+		indexes[tail%dequeCap] = row
+		values[tail%dequeCap] = value
+		tail++
+		out[row] = values[head%dequeCap]
+	}
+	return newI64Trusted(out), true, nil
+}
+
 // TryTypedDeltas applies q-style deltas for dense typed numeric arrays.
 func TryTypedDeltas(array Array) (Array, bool, error) {
 	switch a := array.(type) {
@@ -2472,6 +2576,19 @@ func isIntegerArray(array Array) bool {
 				return false
 			}
 		}
+		return true
+	default:
+		return false
+	}
+}
+
+func isDenseIntegerArray(array Array) bool {
+	switch a := array.(type) {
+	case attributedArray:
+		return isDenseIntegerArray(a.array)
+	case columnArray[int8], columnArray[int16], columnArray[int32], columnArray[int64],
+		columnArray[uint8], columnArray[uint16], columnArray[uint32], columnArray[uint64],
+		i64RangeArray, i64SegmentArray, i64ProductArray:
 		return true
 	default:
 		return false

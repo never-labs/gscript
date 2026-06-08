@@ -7283,6 +7283,12 @@ func runningExtrema(name string, v any, maximum bool) (any, error) {
 	if !ok {
 		return nil, fmt.Errorf("%s expects an ordered vector", name)
 	}
+	if typed, handled, err := data.TryTypedRunningMinMax(array, maximum); handled || err != nil {
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", name, err)
+		}
+		return typed, nil
+	}
 	out := make([]any, array.Len())
 	var best any
 	hasBest := false
@@ -7324,6 +7330,12 @@ func avgs(v any) (any, error) {
 	array, ok := v.(data.Array)
 	if !ok {
 		return nil, fmt.Errorf("avgs expects a numeric vector")
+	}
+	if typed, handled, err := data.TryTypedAvgs(array); handled || err != nil {
+		if err != nil {
+			return nil, fmt.Errorf("avgs: %w", err)
+		}
+		return typed, nil
 	}
 	out := make([]any, array.Len())
 	total := float64(0)
@@ -9207,6 +9219,12 @@ func mcount(width any, v any) (any, error) {
 		}
 		return int64(1), nil
 	}
+	if typed, handled, err := data.TryTypedMCount(array, int(n)); handled || err != nil {
+		if err != nil {
+			return nil, fmt.Errorf("mcount: %w", err)
+		}
+		return typed, nil
+	}
 	out := make([]int64, array.Len())
 	for i := 0; i < array.Len(); i++ {
 		start := i - int(n) + 1
@@ -9244,6 +9262,12 @@ func movingExtremaWindow(name string, width any, v any, wantMax bool) (any, erro
 	array, ok := v.(data.Array)
 	if !ok {
 		return v, nil
+	}
+	if typed, handled, err := data.TryTypedMovingMinMax(array, int(n), wantMax); handled || err != nil {
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", name, err)
+		}
+		return typed, nil
 	}
 	out := make([]any, array.Len())
 	for i := 0; i < array.Len(); i++ {
