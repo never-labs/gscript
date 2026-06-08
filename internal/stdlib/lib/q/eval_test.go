@@ -2565,6 +2565,7 @@ func TestEvalDistinctReversePrevDeltasAndFills(t *testing.T) {
 	assertEvalArray(t, "next 10 20 30", data.KindI64, []any{int64(20), int64(30), data.NullValue})
 	assertEvalArray(t, "next 0Ni 1i 0Ni", data.KindI32, []any{int32(1), data.NullValue, data.NullValue})
 	assertEvalArray(t, "deltas 10 15 14 20", data.KindI64, []any{int64(10), int64(5), int64(-1), int64(6)})
+	assertEvalArray(t, "deltas til 4", data.KindI64, []any{int64(0), int64(1), int64(1), int64(1)})
 	assertEvalArray(t, "deltas 10 12.5 13", data.KindF64, []any{10.0, 2.5, 0.5})
 	assertEvalArray(t, "deltas 1 0N 3", data.KindI64, []any{int64(1), data.NullValue, data.NullValue})
 	assertEvalArray(t, "differ 10 10 20 20 10", data.KindBool, []any{true, false, true, false, true})
@@ -2577,6 +2578,19 @@ func TestEvalDistinctReversePrevDeltasAndFills(t *testing.T) {
 	assertEvalArray(t, "fills 0Ne 1.5e 0Ne", data.KindF32, []any{data.NullValue, float32(1.5), float32(1.5)})
 	assertEvalArray(t, "next[10 20 30]", data.KindI64, []any{int64(20), int64(30), data.NullValue})
 	assertEvalArray(t, "differ[`AAPL`AAPL`MSFT]", data.KindBool, []any{true, false, true})
+}
+
+func TestEvalDeltasRecordsTypedRuntimeKernel(t *testing.T) {
+	ClearRuntimeKernelExecutionStats()
+	t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+	assertEvalArray(t, "deltas til 4", data.KindI64, []any{int64(0), int64(1), int64(1), int64(1)})
+	for _, stat := range RuntimeKernelExecutionStats() {
+		if stat.Kernel == "ArrayDeltas" && stat.Outcome == "hit" && stat.Count > 0 {
+			return
+		}
+	}
+	t.Fatalf("missing ArrayDeltas typed runtime stat: %#v", RuntimeKernelExecutionStats())
 }
 
 func TestEvalXcolsReordersTableAndDictionaryColumns(t *testing.T) {

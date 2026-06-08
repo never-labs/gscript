@@ -2012,6 +2012,17 @@ func TestTypedNumericUnaryBinaryAndAggregates(t *testing.T) {
 	if !handled || !has || max != int64(10) {
 		t.Fatalf("TryTypedMinMax range max = %v, %v, %v; want 10, true, true", max, handled, has)
 	}
+
+	deltas, handled, err := TryTypedDeltas(NewI64Range(3, 2, 4))
+	if err != nil {
+		t.Fatalf("TryTypedDeltas range returned error: %v", err)
+	}
+	if !handled {
+		t.Fatal("TryTypedDeltas range did not handle i64 range")
+	}
+	if got, want := deltas.Values(), []any{int64(3), int64(2), int64(2), int64(2)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("TryTypedDeltas range values = %v, want %v", got, want)
+	}
 }
 
 func TestTypedDyadicBroadcastPromotionAndNullPropagation(t *testing.T) {

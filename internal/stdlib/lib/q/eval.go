@@ -8900,6 +8900,10 @@ func deltas(v any) (any, error) {
 	if !ok {
 		return nil, fmt.Errorf("deltas expects a numeric vector")
 	}
+	if out, handled, err := data.TryTypedDeltas(array); err != nil || handled {
+		recordRuntimeKernelProbe("ArrayDeltas", "vector-scan/deltas/"+string(array.Kind()), handled, err)
+		return out, err
+	}
 	out := make([]any, array.Len())
 	var previous any
 	for i := 0; i < array.Len(); i++ {

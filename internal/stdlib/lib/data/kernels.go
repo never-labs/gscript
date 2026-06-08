@@ -1101,6 +1101,20 @@ func TryTypedMinMax(array Array, wantMax bool) (value any, handled bool, has boo
 	return typedKernels.Min(array)
 }
 
+// TryTypedDeltas applies q-style deltas for dense typed numeric arrays.
+func TryTypedDeltas(array Array) (Array, bool, error) {
+	switch a := array.(type) {
+	case attributedArray:
+		return TryTypedDeltas(a.array)
+	case columnArray[int64]:
+		return deltasI64Slice(a.data), true, nil
+	case i64RangeArray:
+		return deltasI64Range(a), true, nil
+	default:
+		return nil, false, nil
+	}
+}
+
 func (k typedKernelRegistry) NumericSums(array Array) (Array, bool, error) {
 	switch a := array.(type) {
 	case attributedArray:
@@ -2630,6 +2644,30 @@ func numericSumsI64Range(values i64RangeArray) Array {
 	for i := range out {
 		sum += values.start + int64(i)*values.step
 		out[i] = sum
+	}
+	return columnArray[int64]{kind: KindI64, data: out}
+}
+
+func deltasI64Slice(values []int64) Array {
+	out := make([]int64, len(values))
+	for i, value := range values {
+		if i == 0 {
+			out[i] = value
+			continue
+		}
+		out[i] = value - values[i-1]
+	}
+	return columnArray[int64]{kind: KindI64, data: out}
+}
+
+func deltasI64Range(values i64RangeArray) Array {
+	out := make([]int64, values.len)
+	if values.len == 0 {
+		return columnArray[int64]{kind: KindI64, data: out}
+	}
+	out[0] = values.start
+	for i := 1; i < values.len; i++ {
+		out[i] = values.step
 	}
 	return columnArray[int64]{kind: KindI64, data: out}
 }
