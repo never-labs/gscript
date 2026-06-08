@@ -2,6 +2,7 @@ package benchmarks
 
 import (
 	"fmt"
+	"math"
 	"strings"
 	"testing"
 
@@ -17,6 +18,7 @@ type qEvalVectorCase struct {
 	name   string
 	tags   []string
 	matrix []string
+	shapes []string
 	expr   func(rows int) string
 	goFn   func(rows int) int64
 }
@@ -116,6 +118,15 @@ var qEvalRequiredMatrixCoverage = []string{
 	"table:xkey-xgroup-ungroup:keyed-frame",
 	"temporal:xbar:bucket",
 	"ipc:loopback:session",
+}
+
+var qEvalRequiredSemanticShapes = []string{
+	"verb:exp-reciprocal-signum-not:row-scaled",
+	"adverb:initial-over-scan:row-scaled",
+	"index:gather-after-where:row-scaled",
+	"where:compare-count-sum:row-scaled",
+	"amend:functional-vector-where:row-scaled",
+	"string:symbol-string-like:row-scaled",
 }
 
 func buildQEvalVectorCases() []qEvalVectorCase {
@@ -548,6 +559,126 @@ func buildQEvalVectorCases() []qEvalVectorCase {
 		},
 	)
 
+	cases = append(cases,
+		qEvalVectorCase{
+			name:   "NumericMonadExpReciprocalSignumNot",
+			tags:   []string{"numeric-monad", "numeric-vector", "sum", "where"},
+			matrix: []string{"numeric-arithmetic:float-vector:hot"},
+			shapes: []string{"verb:exp-reciprocal-signum-not:row-scaled"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("x:%d#0 1 2 3;r:x mod 2;(+/exp x)+(+/reciprocal 1+x)+(+/signum x-2)+(count where not r)", rows)
+			},
+			goFn: func(rows int) int64 {
+				var total float64
+				var signum, notCount int64
+				for i := 0; i < rows; i++ {
+					x := int64(i % 4)
+					total += math.Exp(float64(x))
+					total += 1 / float64(1+x)
+					switch {
+					case x-2 < 0:
+						signum--
+					case x-2 > 0:
+						signum++
+					}
+					if x%2 == 0 {
+						notCount++
+					}
+				}
+				return int64(total) + signum + notCount
+			},
+		},
+		qEvalVectorCase{
+			name:   "AdverbInitialOverScanProducts",
+			tags:   []string{"adverb-over-scan", "sum", "sums", "product"},
+			matrix: []string{"adverb:over-scan:projection", "aggregate:running-prd-min-max-avg:vector"},
+			shapes: []string{"adverb:initial-over-scan:row-scaled"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("x:1+til %d;p:%d#1;({x+y}/[10;x])+(last ({x+y}\\[10;x]))+(prd p)+(last prds p)", rows, rows)
+			},
+			goFn: func(rows int) int64 {
+				var sum int64 = 10
+				for i := 1; i <= rows; i++ {
+					sum += int64(i)
+				}
+				return sum + sum + 1 + 1
+			},
+		},
+		qEvalVectorCase{
+			name:   "WhereGatherProjectionSum",
+			tags:   []string{"where", "projection", "numeric-vector", "sum"},
+			matrix: []string{"compare:int-vector:where"},
+			shapes: []string{"index:gather-after-where:row-scaled"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("x:til %d;idx:where x>=%d;y:x[idx];(+/y)+first y+last y+count idx", rows, rows/2)
+			},
+			goFn: func(rows int) int64 {
+				start := rows / 2
+				var sum int64
+				for i := start; i < rows; i++ {
+					sum += int64(i)
+				}
+				return sum + int64(start) + int64(rows-1) + int64(rows-start)
+			},
+		},
+		qEvalVectorCase{
+			name:   "WhereCompareCountSumDirect",
+			tags:   []string{"where", "numeric-vector", "sum"},
+			matrix: []string{"compare:int-vector:where"},
+			shapes: []string{"where:compare-count-sum:row-scaled"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("x:til %d;(count where x>=%d)+(+/where x>=%d)", rows, rows/2, rows/2)
+			},
+			goFn: func(rows int) int64 {
+				start := rows / 2
+				var sum, count int64
+				for i := start; i < rows; i++ {
+					count++
+					sum += int64(i)
+				}
+				return count + sum
+			},
+		},
+		qEvalVectorCase{
+			name:   "FunctionalAmendWhereVector",
+			tags:   []string{"dict-amend-upsert", "where", "numeric-vector", "sum"},
+			matrix: []string{"compare:int-vector:where"},
+			shapes: []string{"amend:functional-vector-where:row-scaled"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("x:%d#0;idx:where (til %d)<128;y:@[x;idx;+;128#1];(+/y)+count idx", rows, rows)
+			},
+			goFn: func(rows int) int64 {
+				var sum, count int64
+				for i := 0; i < rows; i++ {
+					if i < 128 {
+						sum++
+						count++
+					}
+				}
+				return sum + count
+			},
+		},
+		qEvalVectorCase{
+			name:   "SymbolStringLikeRowScaled",
+			tags:   []string{"symbol", "string", "match-like", "where"},
+			matrix: []string{"compare:symbol-vector:where", "compare:string-vector:where"},
+			shapes: []string{"string:symbol-string-like:row-scaled"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("syms:%d#`aapl`msft`amd`ask;names:upper string syms;(count where names like \"A*\")+count reverse names", rows)
+			},
+			goFn: func(rows int) int64 {
+				var aCount int64
+				for i := 0; i < rows; i++ {
+					switch i % 4 {
+					case 0, 2, 3:
+						aCount++
+					}
+				}
+				return aCount + int64(rows)
+			},
+		},
+	)
+
 	return appendQEvalSemanticCoverageCases(cases)
 }
 
@@ -958,12 +1089,16 @@ func TestQEvalVectorBenchmarkExpressions(t *testing.T) {
 func TestQEvalVectorBenchmarkCoverageTags(t *testing.T) {
 	covered := make(map[string][]string)
 	matrixCovered := make(map[string][]string)
+	shapeCovered := make(map[string][]string)
 	for _, tc := range qEvalVectorCases {
 		for _, tag := range tc.tags {
 			covered[tag] = append(covered[tag], tc.name)
 		}
 		for _, item := range tc.matrix {
 			matrixCovered[item] = append(matrixCovered[item], tc.name)
+		}
+		for _, shape := range tc.shapes {
+			shapeCovered[shape] = append(shapeCovered[shape], tc.name)
 		}
 	}
 	var missing []string
@@ -983,6 +1118,15 @@ func TestQEvalVectorBenchmarkCoverageTags(t *testing.T) {
 	}
 	if len(missingMatrix) > 0 {
 		t.Fatalf("q.eval performance coverage missing matrix entries: %s", strings.Join(missingMatrix, ", "))
+	}
+	var missingShapes []string
+	for _, shape := range qEvalRequiredSemanticShapes {
+		if len(shapeCovered[shape]) == 0 {
+			missingShapes = append(missingShapes, shape)
+		}
+	}
+	if len(missingShapes) > 0 {
+		t.Fatalf("q.eval performance coverage missing semantic shapes: %s", strings.Join(missingShapes, ", "))
 	}
 }
 

@@ -575,6 +575,9 @@ func (s *EvalState) eval(src string) (any, error) {
 		if right == "" {
 			return qAdverbFunction{verb: "+", adverb: "/"}, nil
 		}
+		if out, handled, err := s.tryEvalSumWhereCompare(right); err != nil || handled {
+			return out, err
+		}
 		if out, handled, err := s.tryEvalTypedUnarySum(right); err != nil || handled {
 			return out, err
 		}
@@ -631,6 +634,9 @@ func (s *EvalState) eval(src string) (any, error) {
 	}
 	if strings.HasPrefix(src, "count ") {
 		if out, handled, err := s.tryEvalCountDistinct(strings.TrimSpace(src[len("count "):])); err != nil || handled {
+			return out, err
+		}
+		if out, handled, err := s.tryEvalCountWhereCompare(strings.TrimSpace(src[len("count "):])); err != nil || handled {
 			return out, err
 		}
 		if out, handled, err := s.tryEvalCountWhereNull(strings.TrimSpace(src[len("count "):])); err != nil || handled {
@@ -3353,6 +3359,58 @@ func (s *EvalState) tryEvalCountDistinct(src string) (any, bool, error) {
 	}
 	value, err := countDistinct(out)
 	return value, true, err
+}
+
+func (s *EvalState) tryEvalCountWhereCompare(src string) (any, bool, error) {
+	indexes, handled, err := s.tryEvalWhereCompareIndexes(src, "compare-to-index-count")
+	if err != nil || !handled {
+		return nil, handled, err
+	}
+	return int64(indexes.Len()), true, nil
+}
+
+func (s *EvalState) tryEvalSumWhereCompare(src string) (any, bool, error) {
+	indexes, handled, err := s.tryEvalWhereCompareIndexes(src, "compare-to-index-sum")
+	if err != nil || !handled {
+		return nil, handled, err
+	}
+	out, handled, err := data.TryTypedNumericSum(indexes)
+	if err != nil || handled {
+		recordRuntimeKernelProbe("ArrayWhereCompareSum", "index-sum/"+string(indexes.Kind()), handled, err)
+		return out, true, err
+	}
+	recordRuntimeKernelProbe("ArrayWhereCompareSum", "index-sum/"+string(indexes.Kind()), handled, err)
+	return nil, false, nil
+}
+
+func (s *EvalState) tryEvalWhereCompareIndexes(src, shapePrefix string) (data.Array, bool, error) {
+	if !strings.HasPrefix(src, "where ") {
+		return nil, false, nil
+	}
+	arg := strings.TrimSpace(src[len("where "):])
+	leftExpr, rightExpr, op, ok := splitWhereCompareExpr(arg)
+	if !ok {
+		return nil, false, nil
+	}
+	left, err := s.eval(leftExpr)
+	if err != nil {
+		return nil, true, err
+	}
+	right, err := s.eval(rightExpr)
+	if err != nil {
+		return nil, true, err
+	}
+	array, scalar, dataOp, ok := qWhereCompareOperands(left, right, op)
+	if !ok {
+		return nil, false, nil
+	}
+	shape := shapePrefix + "/" + op + "/" + string(array.Kind()) + "/" + string(qRuntimeKernelOperandKind(scalar, nil))
+	out, handled, err := data.TryTypedCompareIndexesI64(array, dataOp, scalar)
+	recordRuntimeKernelProbe("ArrayWhereCompare", shape, handled, err)
+	if err != nil || !handled {
+		return nil, handled, err
+	}
+	return out, true, nil
 }
 
 func (s *EvalState) tryEvalCountWhereNull(src string) (any, bool, error) {
