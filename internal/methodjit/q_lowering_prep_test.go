@@ -174,6 +174,37 @@ func TestVectorReduceBytecodeBuildsMethodJITIR(t *testing.T) {
 	}
 }
 
+func TestVectorScanBytecodeBuildsMethodJITIR(t *testing.T) {
+	proto := &vm.FuncProto{
+		Name:     "vector_scan",
+		MaxStack: 1,
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_VECTOR_SCAN, 0, 0, 0),
+			vm.EncodeABC(vm.OP_RETURN, 0, 2, 0),
+		},
+	}
+
+	fn := BuildGraph(proto)
+	var scan *Instr
+	for _, block := range fn.Blocks {
+		for _, instr := range block.Instrs {
+			if instr.Op == OpVectorScan {
+				scan = instr
+				break
+			}
+		}
+	}
+	if scan == nil {
+		t.Fatalf("BuildGraph did not emit OpVectorScan:\n%s", Print(fn))
+	}
+	if len(scan.Args) != 1 {
+		t.Fatalf("OpVectorScan arg count = %d, want 1", len(scan.Args))
+	}
+	if scan.Type != TypeAny {
+		t.Fatalf("OpVectorScan type = %s, want Any", scan.Type)
+	}
+}
+
 func TestFrameColumnBytecodeBuildsMethodJITIR(t *testing.T) {
 	proto := &vm.FuncProto{
 		Name:      "frame_column",
@@ -1831,6 +1862,22 @@ func TestTier2GateAllowsVectorReduceThroughOpExit(t *testing.T) {
 	}
 }
 
+func TestTier2GateAllowsVectorScanThroughOpExit(t *testing.T) {
+	proto := &vm.FuncProto{
+		Name:     "vector_scan",
+		MaxStack: 1,
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_VECTOR_SCAN, 0, 0, 0),
+			vm.EncodeABC(vm.OP_RETURN, 0, 2, 0),
+		},
+	}
+
+	gate := firstUnsupportedTier2BytecodeGate(proto)
+	if !gate.Allowed {
+		t.Fatalf("OP_VECTOR_SCAN should be Tier2-eligible via op-exit, got %q", gate.Reason)
+	}
+}
+
 func TestFrameLenRuntimeHelperUsesRuntimePrimitive(t *testing.T) {
 	frame := runtime.NewTable()
 	frame.SetNativePayloadWithInfo(struct{}{}, runtime.NativePayloadInfo{
@@ -2259,6 +2306,22 @@ func TestVectorReduceRuntimeHelperUsesRuntimePrimitive(t *testing.T) {
 	}
 	if !result.IsFloat() || result.Float() != 6.25 {
 		t.Fatalf("vector reduce result = %#v, want float 6.25", result)
+	}
+}
+
+func TestVectorScanRuntimeHelperUsesRuntimePrimitive(t *testing.T) {
+	result, err := executeVectorScanValue(
+		runtime.DenseArrayValue(runtime.NewDenseArrayI64([]int64{2, -1, 4})),
+	)
+	if err != nil {
+		t.Fatalf("execute vector scan: %v", err)
+	}
+	if !result.IsDenseArray() {
+		t.Fatalf("vector scan result = %#v, want dense array", result)
+	}
+	got, ok := result.DenseArray().I64()
+	if !ok || len(got) != 3 || got[0] != 2 || got[1] != 1 || got[2] != 5 {
+		t.Fatalf("vector scan values = %#v, want [2 1 5]", got)
 	}
 }
 

@@ -99,6 +99,7 @@ var opSpecs = [...]OpSpec{
 	OpVectorMask:                    opSpecArgCount(opSpec("VectorMask", OpEmitterTable, OpArgFixedAux, OpSideEffectRead, true), OpFixedCount(2)),
 	OpVectorWhere:                   opSpecArgCount(opSpec("VectorWhere", OpEmitterTable, OpArgFixed, OpSideEffectRead, true), OpFixedCount(3)),
 	OpVectorReduce:                  opSpecArgCount(opSpec("VectorReduce", OpEmitterTable, OpArgFixedAux, OpSideEffectRead, true), OpFixedCount(1)),
+	OpVectorScan:                    opSpecArgCount(opSpec("VectorScan", OpEmitterTable, OpArgFixed, OpSideEffectRead, true), OpFixedCount(1)),
 	OpQFrameSelectColumn:            opSpec("QFrameSelectColumn", OpEmitterTable, OpArgVariadicAux, OpSideEffectRead, true),
 	OpGetField:                      opSpec("GetField", OpEmitterField, OpArgFixedAux, OpSideEffectRead, true),
 	OpGetFieldNumToFloat:            opSpec("GetFieldNumToFloat", OpEmitterField, OpArgFixedAux, OpSideEffectRead, true),

@@ -223,6 +223,9 @@ const (
 	// q/vector reduce primitive. Args = [vector], Aux = runtime
 	// DenseArrayReduceOp opcode; mirrors OP_VECTOR_REDUCE and returns a scalar.
 	OpVectorReduce
+	// q/vector prefix scan primitive. Args = [vector]; mirrors
+	// OP_VECTOR_SCAN and returns a dense-array value.
+	OpVectorScan
 	// Fused q/frame typed runtime-kernel primitive. Args = [frame] plus at
 	// most one dynamic rhs or row argument; constants and row mode live in
 	// Function.QFrameSelectColumnSpecs[Aux].

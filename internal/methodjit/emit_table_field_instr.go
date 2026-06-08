@@ -45,7 +45,7 @@ func (ec *emitContext) emitTableInstr(instr *Instr) bool {
 		ec.clearTableArrayBoundedKeys()
 	case OpTableArrayNestedLoad:
 		ec.emitTableArrayNestedLoad(instr)
-	case OpFrameLen, OpFrameColumn, OpFrameMask, OpFrameProject, OpFrameFilter, OpFrameFilterProject, OpFrameGather, OpFrameSlice, OpFrameOrder, OpFrameProjectColumn, OpFrameFilterProjectColumn, OpVectorGather, OpVectorCompare, OpVectorMask, OpVectorReduce, OpQFrameSelectColumn:
+	case OpFrameLen, OpFrameColumn, OpFrameMask, OpFrameProject, OpFrameFilter, OpFrameFilterProject, OpFrameGather, OpFrameSlice, OpFrameOrder, OpFrameProjectColumn, OpFrameFilterProjectColumn, OpVectorGather, OpVectorCompare, OpVectorMask, OpVectorReduce, OpVectorScan, OpQFrameSelectColumn:
 		ec.emitOpExit(instr)
 	case OpVectorWhere:
 		ec.emitVectorWhereExit(instr)
