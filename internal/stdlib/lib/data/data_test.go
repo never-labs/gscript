@@ -108,6 +108,82 @@ func TestTryTypedCompareIndexesI64(t *testing.T) {
 	if values := got.Values(); !reflect.DeepEqual(values, []any{int64(0), int64(1)}) {
 		t.Fatalf("TryTypedCompareIndexesI64 symbol values = %#v", values)
 	}
+
+	got, handled, err = TryTypedCompareIndexesI64(NewI64Range(math.MaxInt64-1, 1, 4), OpLT, int64(0))
+	if err != nil {
+		t.Fatalf("TryTypedCompareIndexesI64 wrapped ascending returned error: %v", err)
+	}
+	if !handled {
+		t.Fatal("TryTypedCompareIndexesI64 wrapped ascending did not handle typed compare")
+	}
+	if values := got.Values(); !reflect.DeepEqual(values, []any{int64(2), int64(3)}) {
+		t.Fatalf("TryTypedCompareIndexesI64 wrapped ascending values = %#v", values)
+	}
+
+	got, handled, err = TryTypedCompareIndexesI64(NewI64Range(math.MinInt64+1, -1, 4), OpGT, int64(0))
+	if err != nil {
+		t.Fatalf("TryTypedCompareIndexesI64 wrapped descending returned error: %v", err)
+	}
+	if !handled {
+		t.Fatal("TryTypedCompareIndexesI64 wrapped descending did not handle typed compare")
+	}
+	if values := got.Values(); !reflect.DeepEqual(values, []any{int64(2), int64(3)}) {
+		t.Fatalf("TryTypedCompareIndexesI64 wrapped descending values = %#v", values)
+	}
+}
+
+func TestTryTypedCompareIndexStatsI64(t *testing.T) {
+	count, sum, handled, err := TryTypedCompareIndexStatsI64(NewI64Range(0, 1, 6), OpGE, int64(3))
+	if err != nil {
+		t.Fatalf("TryTypedCompareIndexStatsI64 ascending returned error: %v", err)
+	}
+	if !handled {
+		t.Fatal("TryTypedCompareIndexStatsI64 ascending did not handle typed compare")
+	}
+	if count != 3 || sum != 12 {
+		t.Fatalf("TryTypedCompareIndexStatsI64 ascending = count %d sum %d; want 3, 12", count, sum)
+	}
+
+	count, sum, handled, err = TryTypedCompareIndexStatsI64(NewI64Range(10, -2, 6), OpGT, int64(4))
+	if err != nil {
+		t.Fatalf("TryTypedCompareIndexStatsI64 descending returned error: %v", err)
+	}
+	if !handled {
+		t.Fatal("TryTypedCompareIndexStatsI64 descending did not handle typed compare")
+	}
+	if count != 3 || sum != 3 {
+		t.Fatalf("TryTypedCompareIndexStatsI64 descending = count %d sum %d; want 3, 3", count, sum)
+	}
+
+	count, sum, handled, err = TryTypedCompareIndexStatsI64(NewI64Range(0, 1, 6), OpLT, int64(0))
+	if err != nil {
+		t.Fatalf("TryTypedCompareIndexStatsI64 empty returned error: %v", err)
+	}
+	if !handled {
+		t.Fatal("TryTypedCompareIndexStatsI64 empty did not handle typed compare")
+	}
+	if count != 0 || sum != 0 {
+		t.Fatalf("TryTypedCompareIndexStatsI64 empty = count %d sum %d; want 0, 0", count, sum)
+	}
+
+	count, sum, handled, err = TryTypedCompareIndexStatsI64(NewI64Range(0, 2, 4), OpNE, int64(3))
+	if err != nil {
+		t.Fatalf("TryTypedCompareIndexStatsI64 ne absent returned error: %v", err)
+	}
+	if !handled {
+		t.Fatal("TryTypedCompareIndexStatsI64 ne absent did not handle typed compare")
+	}
+	if count != 4 || sum != 6 {
+		t.Fatalf("TryTypedCompareIndexStatsI64 ne absent = count %d sum %d; want 4, 6", count, sum)
+	}
+
+	_, _, handled, err = TryTypedCompareIndexStatsI64(NewI64Range(0, 1, 6), OpNE, int64(3))
+	if err != nil {
+		t.Fatalf("TryTypedCompareIndexStatsI64 non-contiguous returned error: %v", err)
+	}
+	if handled {
+		t.Fatal("TryTypedCompareIndexStatsI64 non-contiguous NE handled, want fallback")
+	}
 }
 
 func TestNewI64RangeArraySemantics(t *testing.T) {

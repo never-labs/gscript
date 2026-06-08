@@ -1656,6 +1656,53 @@ func TryTypedCompareIndexesI64(array Array, op Op, value any) (Array, bool, erro
 	return newI64Trusted(out), true, nil
 }
 
+// TryTypedCompareIndexStatsI64 returns count and sum of q-style row indexes
+// selected by an array/scalar comparison without materializing the index vector.
+func TryTypedCompareIndexStatsI64(array Array, op Op, value any) (count, sum int64, handled bool, err error) {
+	if array == nil {
+		return 0, 0, true, fmt.Errorf("compare array is nil")
+	}
+	switch a := array.(type) {
+	case attributedArray:
+		return TryTypedCompareIndexStatsI64(a.array, op, value)
+	case i64RangeArray:
+		target, ok := coerceInt64Exact(value)
+		if !ok {
+			return 0, 0, false, nil
+		}
+		indexes, ok := compareI64RangeIndexArray(a, op, target)
+		if !ok {
+			return 0, 0, false, nil
+		}
+		return int64(indexes.Len()), i64IndexArraySum(indexes), true, nil
+	default:
+		return 0, 0, false, nil
+	}
+}
+
+func i64IndexArraySum(array Array) int64 {
+	switch a := array.(type) {
+	case i64RangeArray:
+		return i64RangeSum(a)
+	case i64SegmentArray:
+		return i64SegmentSum(a)
+	default:
+		var total int64
+		for row := 0; row < array.Len(); row++ {
+			value, ok := array.At(row)
+			if !ok {
+				return 0
+			}
+			n, ok := coerceInt64Exact(value)
+			if !ok {
+				return 0
+			}
+			total += n
+		}
+		return total
+	}
+}
+
 // TryGatherByI64IndexArray gathers array rows using a typed i64 index vector
 // without boxing the index array through Values().
 func TryGatherByI64IndexArray(array Array, indexes Array) (Array, bool, error) {
@@ -1875,6 +1922,16 @@ func compareI64RangeIndexArray(values i64RangeArray, op Op, target int64) (Array
 		}
 		return i64RangeArray{len: 0}, true
 	}
+	if !i64RangeIsMonotonic(values) {
+		return compareI64RangeIndexArraySlow(values, op, target)
+	}
+	if values.step > 0 {
+		return compareAscendingI64RangeIndexes(values, op, target)
+	}
+	return compareDescendingI64RangeIndexes(values, op, target)
+}
+
+func compareI64RangeIndexArraySlow(values i64RangeArray, op Op, target int64) (Array, bool) {
 	start := -1
 	end := -1
 	for row := 0; row < values.len; row++ {
@@ -1895,6 +1952,134 @@ func compareI64RangeIndexArray(values i64RangeArray, op Op, target int64) (Array
 		return nil, false
 	}
 	return i64RangeArray{start: int64(start), step: 1, len: end - start + 1}, true
+}
+
+func i64RangeIsMonotonic(values i64RangeArray) bool {
+	if values.len <= 1 || values.step == 0 {
+		return true
+	}
+	offset, ok := checkedI64Mul(int64(values.len-1), values.step)
+	if !ok {
+		return false
+	}
+	last, ok := checkedI64Add(values.start, offset)
+	if !ok {
+		return false
+	}
+	if values.step > 0 {
+		return last >= values.start
+	}
+	return last <= values.start
+}
+
+func checkedI64Mul(a, b int64) (int64, bool) {
+	if a == 0 || b == 0 {
+		return 0, true
+	}
+	if (a == math.MinInt64 && b == -1) || (a == -1 && b == math.MinInt64) {
+		return 0, false
+	}
+	out := a * b
+	if out/b != a {
+		return 0, false
+	}
+	return out, true
+}
+
+func checkedI64Add(a, b int64) (int64, bool) {
+	if b > 0 && a > math.MaxInt64-b {
+		return 0, false
+	}
+	if b < 0 && a < math.MinInt64-b {
+		return 0, false
+	}
+	return a + b, true
+}
+
+func compareAscendingI64RangeIndexes(values i64RangeArray, op Op, target int64) (Array, bool) {
+	switch op {
+	case OpEQ:
+		row, ok := i64RangeRowOf(values, target)
+		if !ok {
+			return i64RangeArray{len: 0}, true
+		}
+		return i64RangeArray{start: int64(row), step: 1, len: 1}, true
+	case OpNE:
+		if _, ok := i64RangeRowOf(values, target); ok {
+			return nil, false
+		}
+		return i64RangeArray{start: 0, step: 1, len: values.len}, true
+	case OpLT:
+		end := firstI64RangeRow(values, func(v int64) bool { return v >= target })
+		return i64RangeArray{start: 0, step: 1, len: end}, true
+	case OpLE:
+		end := firstI64RangeRow(values, func(v int64) bool { return v > target })
+		return i64RangeArray{start: 0, step: 1, len: end}, true
+	case OpGT:
+		start := firstI64RangeRow(values, func(v int64) bool { return v > target })
+		return i64RangeArray{start: int64(start), step: 1, len: values.len - start}, true
+	case OpGE:
+		start := firstI64RangeRow(values, func(v int64) bool { return v >= target })
+		return i64RangeArray{start: int64(start), step: 1, len: values.len - start}, true
+	default:
+		return nil, false
+	}
+}
+
+func compareDescendingI64RangeIndexes(values i64RangeArray, op Op, target int64) (Array, bool) {
+	switch op {
+	case OpEQ:
+		row, ok := i64RangeRowOf(values, target)
+		if !ok {
+			return i64RangeArray{len: 0}, true
+		}
+		return i64RangeArray{start: int64(row), step: 1, len: 1}, true
+	case OpNE:
+		if _, ok := i64RangeRowOf(values, target); ok {
+			return nil, false
+		}
+		return i64RangeArray{start: 0, step: 1, len: values.len}, true
+	case OpLT:
+		start := firstI64RangeRow(values, func(v int64) bool { return v < target })
+		return i64RangeArray{start: int64(start), step: 1, len: values.len - start}, true
+	case OpLE:
+		start := firstI64RangeRow(values, func(v int64) bool { return v <= target })
+		return i64RangeArray{start: int64(start), step: 1, len: values.len - start}, true
+	case OpGT:
+		end := firstI64RangeRow(values, func(v int64) bool { return v <= target })
+		return i64RangeArray{start: 0, step: 1, len: end}, true
+	case OpGE:
+		end := firstI64RangeRow(values, func(v int64) bool { return v < target })
+		return i64RangeArray{start: 0, step: 1, len: end}, true
+	default:
+		return nil, false
+	}
+}
+
+func firstI64RangeRow(values i64RangeArray, pred func(int64) bool) int {
+	lo, hi := 0, values.len
+	for lo < hi {
+		mid := lo + (hi-lo)/2
+		value := values.start + int64(mid)*values.step
+		if pred(value) {
+			hi = mid
+		} else {
+			lo = mid + 1
+		}
+	}
+	return lo
+}
+
+func i64RangeRowOf(values i64RangeArray, target int64) (int, bool) {
+	delta := target - values.start
+	if delta%values.step != 0 {
+		return 0, false
+	}
+	row := delta / values.step
+	if row < 0 || row >= int64(values.len) {
+		return 0, false
+	}
+	return int(row), true
 }
 
 func EqualMask(array Array, value any) (Array, error) {
