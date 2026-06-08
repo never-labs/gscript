@@ -3695,8 +3695,8 @@ func TestQExplainReportsQueryKernelVisibility(t *testing.T) {
 	if len(shapeRows) != 1 {
 		t.Fatalf("qsql_kernel shapes = %+v, want one shape row", shapeRows)
 	}
-	if got := shapeRows[0]; got.Shape != kernelShape.Str() || got.Count != 1 || got.Hits != 1 || got.Misses != 1 || got.Evictions != 0 {
-		t.Fatalf("qsql_kernel shape aggregate = %+v, want shape %q count=1 hits=1 misses=1 evictions=0", got, kernelShape.Str())
+	if got := shapeRows[0]; got.Shape != kernelShape.Str() || got.SchemaHash != frame.SchemaFingerprint() || got.Count != 1 || got.Hits != 1 || got.Misses != 1 || got.Evictions != 0 {
+		t.Fatalf("qsql_kernel shape aggregate = %+v, want shape %q schema %q count=1 hits=1 misses=1 evictions=0", got, kernelShape.Str(), frame.SchemaFingerprint())
 	}
 }
 
@@ -4140,8 +4140,80 @@ func TestQSQLQueryKernelCacheSplitsBoundScalarValues(t *testing.T) {
 	if len(shapeRows) != 1 {
 		t.Fatalf("qsql_kernel shapes = %+v, want one aggregated shape", shapeRows)
 	}
-	if got := shapeRows[0]; got.Shape != stats.KernelKeys[0].Shape || got.Count != 2 || got.Hits != 0 || got.Misses != 2 || got.Evictions != 0 {
-		t.Fatalf("qsql_kernel shape aggregate = %+v, want shape %q count=2 hits=0 misses=2 evictions=0", got, stats.KernelKeys[0].Shape)
+	if got := shapeRows[0]; got.Shape != stats.KernelKeys[0].Shape || got.SchemaHash != frame.SchemaFingerprint() || got.Count != 2 || got.Hits != 0 || got.Misses != 2 || got.Evictions != 0 {
+		t.Fatalf("qsql_kernel shape aggregate = %+v, want shape %q schema %q count=2 hits=0 misses=2 evictions=0", got, stats.KernelKeys[0].Shape, frame.SchemaFingerprint())
+	}
+}
+
+func TestQSQLKernelShapeStatsSplitBySchemaHash(t *testing.T) {
+	qSQLResetPlanCachesForTest()
+
+	frame, err := data.NewFrame(
+		data.Column{Name: "sym", Data: data.NewSymbols([]string{"AAPL", "MSFT", "NVDA"})},
+		data.Column{Name: "price", Data: data.NewF64([]float64{100, 80, 210})},
+		data.Column{Name: "size", Data: data.NewI64([]int64{10, 20, 30})},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reordered, err := data.NewFrame(
+		data.Column{Name: "sym", Data: data.NewSymbols([]string{"AAPL", "MSFT", "NVDA"})},
+		data.Column{Name: "size", Data: data.NewI64([]int64{10, 20, 30})},
+		data.Column{Name: "price", Data: data.NewF64([]float64{100, 80, 210})},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if frame.SchemaFingerprint() == reordered.SchemaFingerprint() {
+		t.Fatalf("test setup schema fingerprints match: %s", frame.SchemaFingerprint())
+	}
+
+	query := "select sym,notional:price*size from trades where price>=90"
+	for name, frame := range map[string]data.Frame{"base": frame, "reordered": reordered} {
+		frameValue, err := qDataFrameValue(frame)
+		if err != nil {
+			t.Fatalf("%s qDataFrameValue: %v", name, err)
+		}
+		out, err := qRunSQL("q.sql", qSQLArgsResult{frameValue: frameValue, source: query})
+		if err != nil {
+			t.Fatalf("%s q.sql: %v", name, err)
+		}
+		rows := out.Table()
+		if rows == nil || rows.Length() != 2 {
+			t.Fatalf("%s rows = %v, want 2", name, rows)
+		}
+	}
+
+	stats := qSQLPlanCacheStatsSnapshot()
+	if stats.KernelMisses != 2 || stats.KernelHits != 0 || len(stats.KernelKeys) != 2 {
+		t.Fatalf("kernel cache stats = %+v, want two schema-split kernel misses", stats)
+	}
+	if stats.KernelKeys[0].Shape == "" || stats.KernelKeys[0].Shape != stats.KernelKeys[1].Shape {
+		t.Fatalf("kernel key shapes = %+v, want same non-empty shape across schemas", stats.KernelKeys)
+	}
+
+	kernelRow := qTestCacheStatsRowTable(t, qCacheStatsTable(), "qsql_kernel")
+	shapeRows := qTestKernelShapeRows(t, kernelRow.RawGetString("shapes").Table())
+	if len(shapeRows) != 2 {
+		t.Fatalf("qsql_kernel shapes = %+v, want one row per schema hash", shapeRows)
+	}
+	wantSchemas := map[string]bool{
+		frame.SchemaFingerprint():     false,
+		reordered.SchemaFingerprint(): false,
+	}
+	for _, row := range shapeRows {
+		if row.Shape != stats.KernelKeys[0].Shape || row.Count != 1 || row.Hits != 0 || row.Misses != 1 || row.Evictions != 0 {
+			t.Fatalf("qsql_kernel shape row = %+v, want schema-local count=1 miss=1", row)
+		}
+		if _, ok := wantSchemas[row.SchemaHash]; !ok {
+			t.Fatalf("qsql_kernel shape schema hash = %q, want one of %#v", row.SchemaHash, wantSchemas)
+		}
+		wantSchemas[row.SchemaHash] = true
+	}
+	for schemaHash, seen := range wantSchemas {
+		if !seen {
+			t.Fatalf("qsql_kernel shape schema hash %q missing from %+v", schemaHash, shapeRows)
+		}
 	}
 }
 
@@ -5382,11 +5454,12 @@ func qTestQueryKernelShapeCount(rows []qQueryKernelShapeRow, supported bool, rea
 }
 
 type qKernelShapeRow struct {
-	Shape     string
-	Count     int64
-	Hits      int64
-	Misses    int64
-	Evictions int64
+	Shape      string
+	SchemaHash string
+	Count      int64
+	Hits       int64
+	Misses     int64
+	Evictions  int64
 }
 
 func qTestKernelShapeRows(t *testing.T, tbl *Table) []qKernelShapeRow {
@@ -5401,19 +5474,21 @@ func qTestKernelShapeRows(t *testing.T, tbl *Table) []qKernelShapeRow {
 			t.Fatalf("qsql_kernel shape row %d is nil", i)
 		}
 		shape := row.RawGetString("shape")
+		schemaHash := row.RawGetString("schema_hash")
 		count := row.RawGetString("count")
 		hits := row.RawGetString("hits")
 		misses := row.RawGetString("misses")
 		evictions := row.RawGetString("evictions")
-		if !shape.IsString() || !count.IsInt() || !hits.IsInt() || !misses.IsInt() || !evictions.IsInt() {
+		if !shape.IsString() || !schemaHash.IsString() || !count.IsInt() || !hits.IsInt() || !misses.IsInt() || !evictions.IsInt() {
 			t.Fatalf("qsql_kernel shape row %d malformed: %#v", i, row)
 		}
 		rows = append(rows, qKernelShapeRow{
-			Shape:     shape.Str(),
-			Count:     count.Int(),
-			Hits:      hits.Int(),
-			Misses:    misses.Int(),
-			Evictions: evictions.Int(),
+			Shape:      shape.Str(),
+			SchemaHash: schemaHash.Str(),
+			Count:      count.Int(),
+			Hits:       hits.Int(),
+			Misses:     misses.Int(),
+			Evictions:  evictions.Int(),
 		})
 	}
 	return rows

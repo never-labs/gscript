@@ -92,11 +92,12 @@ type qSQLKernelCacheKeyStats struct {
 }
 
 type qSQLKernelShapeStat struct {
-	Shape     string
-	Count     int
-	Hits      int
-	Misses    int
-	Evictions int
+	Shape      string
+	SchemaHash string
+	Count      int
+	Hits       int
+	Misses     int
+	Evictions  int
 }
 
 type qSQLKernelDecisionKeyStat struct {
@@ -2942,16 +2943,26 @@ func qSQLKernelShapeStats(stats []qSQLKernelCacheKeyStats) []qSQLKernelShapeStat
 	if len(stats) == 0 {
 		return nil
 	}
-	counts := make(map[string]*qSQLKernelShapeStat)
+	type shapeSchemaKey struct {
+		shape      string
+		schemaHash string
+	}
+	counts := make(map[shapeSchemaKey]*qSQLKernelShapeStat)
 	for _, stat := range stats {
 		shape := stat.Shape
 		if shape == "" {
 			shape = "unknown"
 		}
-		shapeStat := counts[shape]
+		info := qSQLKernelCacheKeyInfo(stat.Key)
+		schemaHash := info.SchemaHash
+		if schemaHash == "" {
+			schemaHash = "unknown"
+		}
+		key := shapeSchemaKey{shape: shape, schemaHash: schemaHash}
+		shapeStat := counts[key]
 		if shapeStat == nil {
-			shapeStat = &qSQLKernelShapeStat{Shape: shape}
-			counts[shape] = shapeStat
+			shapeStat = &qSQLKernelShapeStat{Shape: shape, SchemaHash: schemaHash}
+			counts[key] = shapeStat
 		}
 		shapeStat.Count++
 		shapeStat.Hits += stat.Hits
@@ -2973,7 +2984,10 @@ func qSQLKernelShapeStats(stats []qSQLKernelCacheKeyStats) []qSQLKernelShapeStat
 		if a.Misses != b.Misses {
 			return a.Misses > b.Misses
 		}
-		return a.Shape < b.Shape
+		if a.Shape != b.Shape {
+			return a.Shape < b.Shape
+		}
+		return a.SchemaHash < b.SchemaHash
 	})
 	return out
 }
@@ -2983,6 +2997,7 @@ func qKernelShapeStatsTable(stats []qSQLKernelShapeStat) *Table {
 	for i, stat := range stats {
 		row := NewTable()
 		row.RawSetString("shape", StringValue(stat.Shape))
+		row.RawSetString("schema_hash", StringValue(stat.SchemaHash))
 		row.RawSetString("count", IntValue(int64(stat.Count)))
 		row.RawSetString("hits", IntValue(int64(stat.Hits)))
 		row.RawSetString("misses", IntValue(int64(stat.Misses)))
