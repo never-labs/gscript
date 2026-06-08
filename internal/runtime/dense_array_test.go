@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"errors"
+	"math"
 	"reflect"
 	"testing"
 )
@@ -304,6 +305,167 @@ func TestDenseArrayReduceRejectsBoolAndEmpty(t *testing.T) {
 	}
 	if _, err := DenseArrayReduce(DenseArrayReduceSum, NewDenseArrayF64(nil)); !errors.Is(err, ErrDenseArrayEmpty) {
 		t.Fatalf("empty reduce error = %v, want ErrDenseArrayEmpty", err)
+	}
+}
+
+func TestDenseArrayWhereReduceMatchesWhereThenReduce(t *testing.T) {
+	cases := []struct {
+		name       string
+		op         DenseArrayReduceOp
+		mask       *DenseArray
+		trueValue  Value
+		falseValue Value
+	}{
+		{
+			name:       "i64 sum",
+			op:         DenseArrayReduceSum,
+			mask:       NewDenseArrayBool([]bool{true, false, true}),
+			trueValue:  DenseArrayValue(NewDenseArrayI64([]int64{10, 20, 30})),
+			falseValue: IntValue(7),
+		},
+		{
+			name:       "i64 min keeps false branch rows",
+			op:         DenseArrayReduceMin,
+			mask:       NewDenseArrayBool([]bool{true, false, true}),
+			trueValue:  DenseArrayValue(NewDenseArrayI64([]int64{10, 20, 30})),
+			falseValue: IntValue(-5),
+		},
+		{
+			name:       "i64 max",
+			op:         DenseArrayReduceMax,
+			mask:       NewDenseArrayBool([]bool{false, true, false}),
+			trueValue:  IntValue(12),
+			falseValue: DenseArrayValue(NewDenseArrayI64([]int64{4, 5, 6})),
+		},
+		{
+			name:       "i64 mean",
+			op:         DenseArrayReduceMean,
+			mask:       NewDenseArrayBool([]bool{true, false, false, true}),
+			trueValue:  DenseArrayValue(NewDenseArrayI64([]int64{4, 100, 100, 8})),
+			falseValue: IntValue(2),
+		},
+		{
+			name:       "f64 sum promotes i64",
+			op:         DenseArrayReduceSum,
+			mask:       NewDenseArrayBool([]bool{true, false, true}),
+			trueValue:  DenseArrayValue(NewDenseArrayI64([]int64{1, 2, 3})),
+			falseValue: FloatValue(0.5),
+		},
+		{
+			name:       "f64 min",
+			op:         DenseArrayReduceMin,
+			mask:       NewDenseArrayBool([]bool{false, true, false}),
+			trueValue:  FloatValue(1.25),
+			falseValue: DenseArrayValue(NewDenseArrayF64([]float64{2.5, -10, 0.75})),
+		},
+		{
+			name:       "f64 max",
+			op:         DenseArrayReduceMax,
+			mask:       NewDenseArrayBool([]bool{true, false, true}),
+			trueValue:  DenseArrayValue(NewDenseArrayF64([]float64{-1, 4, 9.5})),
+			falseValue: FloatValue(3),
+		},
+		{
+			name:       "f64 mean",
+			op:         DenseArrayReduceMean,
+			mask:       NewDenseArrayBool([]bool{true, false, true, false}),
+			trueValue:  DenseArrayValue(NewDenseArrayF64([]float64{1, 100, 5, 100})),
+			falseValue: DenseArrayValue(NewDenseArrayI64([]int64{20, 2, 20, 6})),
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			selected, err := DenseArrayWhere(tc.mask, tc.trueValue, tc.falseValue)
+			if err != nil {
+				t.Fatalf("DenseArrayWhere error: %v", err)
+			}
+			want, err := DenseArrayReduce(tc.op, selected)
+			if err != nil {
+				t.Fatalf("DenseArrayReduce error: %v", err)
+			}
+			got, err := DenseArrayWhereReduce(tc.op, tc.mask, tc.trueValue, tc.falseValue)
+			if err != nil {
+				t.Fatalf("DenseArrayWhereReduce error: %v", err)
+			}
+			assertValueEqualOrBothNaN(t, got, want)
+		})
+	}
+}
+
+func TestDenseArrayWhereReduceMatchesWhereThenReduceEdges(t *testing.T) {
+	cases := []struct {
+		name       string
+		op         DenseArrayReduceOp
+		mask       *DenseArray
+		trueValue  Value
+		falseValue Value
+	}{
+		{
+			name:       "f64 min propagates nan like reduce",
+			op:         DenseArrayReduceMin,
+			mask:       NewDenseArrayBool([]bool{true, false, true}),
+			trueValue:  DenseArrayValue(NewDenseArrayF64([]float64{4, 5, math.NaN()})),
+			falseValue: FloatValue(1),
+		},
+		{
+			name:       "f64 max propagates nan like reduce",
+			op:         DenseArrayReduceMax,
+			mask:       NewDenseArrayBool([]bool{false, true, true}),
+			trueValue:  DenseArrayValue(NewDenseArrayF64([]float64{4, math.NaN(), 8})),
+			falseValue: FloatValue(1),
+		},
+		{
+			name:       "i64 sum preserves overflow path",
+			op:         DenseArrayReduceSum,
+			mask:       NewDenseArrayBool([]bool{true, false, true}),
+			trueValue:  DenseArrayValue(NewDenseArrayI64([]int64{math.MaxInt64, 0, 2})),
+			falseValue: IntValue(1),
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			selected, err := DenseArrayWhere(tc.mask, tc.trueValue, tc.falseValue)
+			if err != nil {
+				t.Fatalf("DenseArrayWhere error: %v", err)
+			}
+			want, err := DenseArrayReduce(tc.op, selected)
+			if err != nil {
+				t.Fatalf("DenseArrayReduce error: %v", err)
+			}
+			got, err := DenseArrayWhereReduce(tc.op, tc.mask, tc.trueValue, tc.falseValue)
+			if err != nil {
+				t.Fatalf("DenseArrayWhereReduce error: %v", err)
+			}
+			assertValueEqualOrBothNaN(t, got, want)
+		})
+	}
+}
+
+func assertValueEqualOrBothNaN(t *testing.T, got, want Value) {
+	t.Helper()
+	if got.IsFloat() && want.IsFloat() && math.IsNaN(got.Float()) && math.IsNaN(want.Float()) {
+		return
+	}
+	if !got.Equal(want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+}
+
+func TestDenseArrayWhereReduceErrorsMatchWhereThenReduce(t *testing.T) {
+	if _, err := DenseArrayWhereReduce(DenseArrayReduceSum, NewDenseArrayBool([]bool{true}), DenseArrayValue(NewDenseArrayI64([]int64{10, 20})), IntValue(7)); !errors.Is(err, ErrDenseArrayLength) {
+		t.Fatalf("length error = %v, want ErrDenseArrayLength", err)
+	}
+	if _, err := DenseArrayWhereReduce(DenseArrayReduceSum, NewDenseArrayBool([]bool{true}), BoolValue(true), BoolValue(false)); !errors.Is(err, ErrDenseArrayDType) {
+		t.Fatalf("bool dtype error = %v, want ErrDenseArrayDType", err)
+	}
+	if _, err := DenseArrayWhereReduce(DenseArrayReduceSum, NewDenseArrayBool(nil), IntValue(1), IntValue(2)); !errors.Is(err, ErrDenseArrayEmpty) {
+		t.Fatalf("empty error = %v, want ErrDenseArrayEmpty", err)
+	}
+	if _, err := DenseArrayWhereReduce(DenseArrayReduceOp(99), NewDenseArrayBool([]bool{true}), IntValue(1), IntValue(2)); !errors.Is(err, ErrDenseArrayReduceOp) {
+		t.Fatalf("reduce op error = %v, want ErrDenseArrayReduceOp", err)
+	}
+	if _, err := DenseArrayWhereReduce(DenseArrayReduceSum, NewDenseArrayI64([]int64{1}), IntValue(1), IntValue(2)); err == nil {
+		t.Fatalf("non-bool mask error = nil, want error")
 	}
 }
 

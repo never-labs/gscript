@@ -2309,6 +2309,132 @@ func DenseArrayReduce(op DenseArrayReduceOp, arr *DenseArray) (Value, error) {
 	}
 }
 
+// DenseArrayWhereReduce selects with q where semantics and reduces the selected
+// vector without materializing the intermediate dense array.
+func DenseArrayWhereReduce(op DenseArrayReduceOp, mask *DenseArray, trueValue, falseValue Value) (Value, error) {
+	if mask == nil || mask.dtype != DenseArrayBool {
+		return NilValue(), fmt.Errorf("dense array where mask must be bool")
+	}
+	dtype, err := denseArraySelectDType(trueValue, falseValue, mask.Len())
+	if err != nil {
+		return NilValue(), err
+	}
+	if dtype == DenseArrayBool {
+		return NilValue(), ErrDenseArrayDType
+	}
+	if mask.Len() == 0 {
+		return NilValue(), ErrDenseArrayEmpty
+	}
+	switch dtype {
+	case DenseArrayI64:
+		return denseArrayWhereReduceI64(op, mask.bools, trueValue, falseValue)
+	case DenseArrayF64:
+		return denseArrayWhereReduceF64(op, mask.bools, trueValue, falseValue)
+	default:
+		return NilValue(), ErrDenseArrayDType
+	}
+}
+
+func denseArrayWhereReduceI64(op DenseArrayReduceOp, mask []bool, trueValue, falseValue Value) (Value, error) {
+	tv, fv := denseArrayI64Selector(trueValue), denseArrayI64Selector(falseValue)
+	switch op {
+	case DenseArrayReduceSum:
+		var sum int64
+		for i, keep := range mask {
+			if keep {
+				sum += tv(i)
+			} else {
+				sum += fv(i)
+			}
+		}
+		return IntValue(sum), nil
+	case DenseArrayReduceMin:
+		min := denseArrayWhereI64At(0, mask[0], tv, fv)
+		for i, keep := range mask[1:] {
+			v := denseArrayWhereI64At(i+1, keep, tv, fv)
+			if v < min {
+				min = v
+			}
+		}
+		return IntValue(min), nil
+	case DenseArrayReduceMax:
+		max := denseArrayWhereI64At(0, mask[0], tv, fv)
+		for i, keep := range mask[1:] {
+			v := denseArrayWhereI64At(i+1, keep, tv, fv)
+			if v > max {
+				max = v
+			}
+		}
+		return IntValue(max), nil
+	case DenseArrayReduceMean:
+		var sum float64
+		for i, keep := range mask {
+			if keep {
+				sum += float64(tv(i))
+			} else {
+				sum += float64(fv(i))
+			}
+		}
+		return FloatValue(sum / float64(len(mask))), nil
+	default:
+		return NilValue(), ErrDenseArrayReduceOp
+	}
+}
+
+func denseArrayWhereI64At(i int, keep bool, trueValue, falseValue func(int) int64) int64 {
+	if keep {
+		return trueValue(i)
+	}
+	return falseValue(i)
+}
+
+func denseArrayWhereReduceF64(op DenseArrayReduceOp, mask []bool, trueValue, falseValue Value) (Value, error) {
+	tv, fv := denseArrayF64Selector(trueValue), denseArrayF64Selector(falseValue)
+	switch op {
+	case DenseArrayReduceSum:
+		var sum float64
+		for i, keep := range mask {
+			if keep {
+				sum += tv(i)
+			} else {
+				sum += fv(i)
+			}
+		}
+		return FloatValue(sum), nil
+	case DenseArrayReduceMin:
+		min := denseArrayWhereF64At(0, mask[0], tv, fv)
+		for i, keep := range mask[1:] {
+			min = math.Min(min, denseArrayWhereF64At(i+1, keep, tv, fv))
+		}
+		return FloatValue(min), nil
+	case DenseArrayReduceMax:
+		max := denseArrayWhereF64At(0, mask[0], tv, fv)
+		for i, keep := range mask[1:] {
+			max = math.Max(max, denseArrayWhereF64At(i+1, keep, tv, fv))
+		}
+		return FloatValue(max), nil
+	case DenseArrayReduceMean:
+		var sum float64
+		for i, keep := range mask {
+			if keep {
+				sum += tv(i)
+			} else {
+				sum += fv(i)
+			}
+		}
+		return FloatValue(sum / float64(len(mask))), nil
+	default:
+		return NilValue(), ErrDenseArrayReduceOp
+	}
+}
+
+func denseArrayWhereF64At(i int, keep bool, trueValue, falseValue func(int) float64) float64 {
+	if keep {
+		return trueValue(i)
+	}
+	return falseValue(i)
+}
+
 func denseArrayReduceI64(op DenseArrayReduceOp, xs []int64) (Value, error) {
 	switch op {
 	case DenseArrayReduceSum:
