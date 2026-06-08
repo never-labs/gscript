@@ -674,6 +674,10 @@ type CompiledFunction struct {
 
 	qKernelStatsMu sync.Mutex
 	qKernelStats   map[qKernelExecutionKey]uint64
+
+	qKernelDescriptorCacheMu sync.Mutex
+	qKernelDescriptorCache   map[qKernelDescriptorCacheKey]bool
+	qKernelDescriptorStats   map[qKernelDescriptorCacheKey]qKernelDescriptorCacheCounters
 }
 
 func (cf *CompiledFunction) resumeOffset(instrID int, numericPass bool) (int, bool) {

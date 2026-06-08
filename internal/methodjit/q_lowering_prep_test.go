@@ -3723,6 +3723,7 @@ func TestDiagnoseReportsQQueryHotPath(t *testing.T) {
 	assertQKernelShapeSummary(t, report.QKernelShapeSummary, "methodjit_q_frame_runtime", "runtime_kernel", "compare/filter/project/column", "supported", "", 1)
 	assertQKernelShapeSummaryExecution(t, report.QKernelShapeSummary, "methodjit_q_frame_runtime", "runtime_kernel", "compare/filter/project/column", "supported", 1, 1, 0)
 	assertQKernelExecutionStat(t, report.QKernelExecutionStats, "methodjit_q_frame_runtime", "QFrameSelectColumn", "compare/filter/project/column", "typed_runtime_op_exit", "success", 1)
+	assertQKernelDescriptorCacheStat(t, report.QKernelDescriptorCacheStats, "methodjit_q_frame_runtime", "QFrameSelectColumn", "compare/filter/project/column", "typed_runtime_op_exit", "q-hot-path-test", 1, 0, 1, 0)
 	assertQKernelExecutionRouteSummary(t, report.QKernelExecutionRoutes, "methodjit_q_frame_runtime", "QFrameSelectColumn", "typed_runtime_op_exit", "success", 1)
 	if !strings.Contains(report.String(), "Q query hot paths") {
 		t.Fatalf("diagnostic report missing q hot path section:\n%s", report.String())
@@ -3737,6 +3738,11 @@ func TestDiagnoseReportsQQueryHotPath(t *testing.T) {
 	if !strings.Contains(report.String(), "QFrameSelectColumn") {
 		t.Fatalf("diagnostic report missing lowered q kernel op:\n%s", report.String())
 	}
+	if !strings.Contains(report.String(), "Q kernel descriptor cache stats") ||
+		!strings.Contains(report.String(), "schema_hash=q-hot-path-test") ||
+		!strings.Contains(report.String(), "misses=1") {
+		t.Fatalf("diagnostic report missing q descriptor cache stats:\n%s", report.String())
+	}
 	if !strings.Contains(formatOptimizationRemarks(report.OptimizationRemarks), "QQueryHotPath") ||
 		!strings.Contains(formatOptimizationRemarks(report.OptimizationRemarks), "first shape compare/filter/project/column") ||
 		!strings.Contains(formatOptimizationRemarks(report.OptimizationRemarks), "compare >=") ||
@@ -3745,6 +3751,18 @@ func TestDiagnoseReportsQQueryHotPath(t *testing.T) {
 		!strings.Contains(formatOptimizationRemarks(report.OptimizationRemarks), "typed runtime kernel op-exit") {
 		t.Fatalf("diagnostic remarks missing q hot path lowering handoff:\n%s", formatOptimizationRemarks(report.OptimizationRemarks))
 	}
+}
+
+func TestQKernelDescriptorCacheStatsTrackSchemaStableHits(t *testing.T) {
+	cf := &CompiledFunction{}
+	frame := runtime.TableValue(qHotPathTestFrame(t))
+	cf.recordQKernelExecutionForFrame("methodjit_q_frame_runtime", "QFrameSelectColumn", "compare/filter/project/column", "typed_runtime_op_exit", "success", frame)
+	cf.recordQKernelExecutionForFrame("methodjit_q_frame_runtime", "QFrameSelectColumn", "compare/filter/project/column", "typed_runtime_op_exit", "success", frame)
+	cf.recordQKernelExecutionForFrame("methodjit_q_frame_runtime", "QFrameSelectColumn", "compare/filter/project/column", "typed_runtime_op_exit", "success", runtime.TableValue(qHotPathStringTestFrame(t)))
+
+	assertQKernelDescriptorCacheStat(t, cf.QKernelDescriptorCacheStats(), "methodjit_q_frame_runtime", "QFrameSelectColumn", "compare/filter/project/column", "typed_runtime_op_exit", "q-hot-path-test", 1, 1, 1, 0)
+	assertQKernelDescriptorCacheStat(t, cf.QKernelDescriptorCacheStats(), "methodjit_q_frame_runtime", "QFrameSelectColumn", "compare/filter/project/column", "typed_runtime_op_exit", "q-hot-path-string-test", 1, 0, 1, 0)
+	assertQKernelExecutionStat(t, cf.QKernelExecutionStats(), "methodjit_q_frame_runtime", "QFrameSelectColumn", "compare/filter/project/column", "typed_runtime_op_exit", "success", 3)
 }
 
 func TestDiagnoseReportsQQueryFallbackReasons(t *testing.T) {
@@ -5297,6 +5315,23 @@ func assertQKernelExecutionStat(t *testing.T, rows []QKernelExecutionStat, sourc
 	}
 	t.Fatalf("QKernelExecutionStat missing source=%s kernel=%s shape=%s route=%s outcome=%s; rows=%+v",
 		source, kernel, shape, route, outcome, rows)
+}
+
+func assertQKernelDescriptorCacheStat(t *testing.T, rows []QKernelDescriptorCacheStat, source, kernel, shape, route, schemaHash string, entries, hits, misses, evictions uint64) {
+	t.Helper()
+	for _, row := range rows {
+		if row.Source == source && row.Kernel == kernel && row.Shape == shape && row.Route == route && row.SchemaHash == schemaHash {
+			if row.Entries != entries || row.Hits != hits || row.Misses != misses || row.Evictions != evictions {
+				t.Fatalf("QKernelDescriptorCacheStat %s/%s/%s/%s/%s = entries:%d hits:%d misses:%d evictions:%d, want entries:%d hits:%d misses:%d evictions:%d; rows=%+v",
+					source, kernel, shape, route, schemaHash,
+					row.Entries, row.Hits, row.Misses, row.Evictions,
+					entries, hits, misses, evictions, rows)
+			}
+			return
+		}
+	}
+	t.Fatalf("QKernelDescriptorCacheStat missing source=%s kernel=%s shape=%s route=%s schema_hash=%s; rows=%+v",
+		source, kernel, shape, route, schemaHash, rows)
 }
 
 func assertQKernelExecutionRouteSummary(t *testing.T, rows []QKernelExecutionRouteSummary, source, kernel, route, outcome string, count uint64) {

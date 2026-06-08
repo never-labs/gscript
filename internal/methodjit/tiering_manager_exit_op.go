@@ -522,12 +522,12 @@ func (tm *TieringManager) executeOpExit(ctx *ExecContext, regs []runtime.Value, 
 		out, err := executeFrameGroupAggregateValue(regs[absArg1], regs[absArg2], proto.Constants[aux])
 		if err != nil {
 			if cf != nil {
-				cf.recordQKernelExecution("methodjit_q_frame_runtime", "FrameGroupAggregate", shape, "typed_runtime_op_exit", "error")
+				cf.recordQKernelExecutionForFrame("methodjit_q_frame_runtime", "FrameGroupAggregate", shape, "typed_runtime_op_exit", "error", regs[absArg1])
 			}
 			return err
 		}
 		if cf != nil {
-			cf.recordQKernelExecution("methodjit_q_frame_runtime", "FrameGroupAggregate", shape, "typed_runtime_op_exit", "success")
+			cf.recordQKernelExecutionForFrame("methodjit_q_frame_runtime", "FrameGroupAggregate", shape, "typed_runtime_op_exit", "success", regs[absArg1])
 		}
 		regs[absSlot] = out
 
@@ -551,10 +551,10 @@ func (tm *TieringManager) executeOpExit(ctx *ExecContext, regs []runtime.Value, 
 		shape := qFrameSelectColumnExecutionShape(cf.QFrameSelectColumnSpecs, int(aux))
 		out, err := executeQFrameSelectColumnValue(proto.Constants, cf.QFrameSelectColumnSpecs, int(aux), regs[absArg1], rhs, hasRHS)
 		if err != nil {
-			cf.recordQKernelExecution("methodjit_q_frame_runtime", "QFrameSelectColumn", shape, "typed_runtime_op_exit", "error")
+			cf.recordQKernelExecutionForFrame("methodjit_q_frame_runtime", "QFrameSelectColumn", shape, "typed_runtime_op_exit", "error", regs[absArg1])
 			return err
 		}
-		cf.recordQKernelExecution("methodjit_q_frame_runtime", "QFrameSelectColumn", shape, "typed_runtime_op_exit", "success")
+		cf.recordQKernelExecutionForFrame("methodjit_q_frame_runtime", "QFrameSelectColumn", shape, "typed_runtime_op_exit", "success", regs[absArg1])
 		regs[absSlot] = out
 
 	case OpVectorGather:

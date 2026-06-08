@@ -124,6 +124,20 @@ type QKernelExecutionStat struct {
 	Count   uint64
 }
 
+// QKernelDescriptorCacheStat records schema-stable descriptor cache behavior
+// for q typed-runtime kernels observed during native execution.
+type QKernelDescriptorCacheStat struct {
+	Source     string
+	Kernel     string
+	Shape      string
+	Route      string
+	SchemaHash string
+	Entries    uint64
+	Hits       uint64
+	Misses     uint64
+	Evictions  uint64
+}
+
 // QKernelExecutionStatJSONRow is the stable external row shape for raw q
 // typed-runtime execution observations.
 type QKernelExecutionStatJSONRow struct {
@@ -2542,6 +2556,19 @@ func formatQKernelExecutionStats(rows []QKernelExecutionStat) string {
 	for i, row := range rows {
 		fmt.Fprintf(&b, "  [%d] source=%s kernel=%s shape=%s route=%s outcome=%s count=%d\n",
 			i, row.Source, row.Kernel, row.Shape, row.Route, row.Outcome, row.Count)
+	}
+	return b.String()
+}
+
+func formatQKernelDescriptorCacheStats(rows []QKernelDescriptorCacheStat) string {
+	if len(rows) == 0 {
+		return "0 descriptor cache row(s)\n"
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "%d descriptor cache row(s)\n", len(rows))
+	for i, row := range rows {
+		fmt.Fprintf(&b, "  [%d] source=%s kernel=%s shape=%s route=%s schema_hash=%s entries=%d hits=%d misses=%d evictions=%d\n",
+			i, row.Source, row.Kernel, row.Shape, row.Route, row.SchemaHash, row.Entries, row.Hits, row.Misses, row.Evictions)
 	}
 	return b.String()
 }

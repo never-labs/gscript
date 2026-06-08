@@ -167,43 +167,44 @@ func (sc *snapshotCollector) latestSnapshotIR() string {
 
 // DiagReport is the complete diagnostic output for one function invocation.
 type DiagReport struct {
-	FuncName                   string
-	NumArgs                    int
-	Args                       []runtime.Value
-	IRBefore                   string   // IR after BuildGraph (before passes)
-	IRAfter                    string   // IR after all passes
-	PassDiffs                  []string // diff for each pass that changed the IR
-	PipelineStages             []PipelineStageTiming
-	ModuleContracts            []Tier2ModuleContract
-	ModuleReasons              []Tier2ModuleReason
-	ModuleFactDiffs            []Tier2ModuleFactDiff
-	OptimizationRemarks        []OptimizationRemark     // structured pass/gate diagnostics
-	QQueryHotPaths             []QQueryHotPath          // q query primitive pipelines visible in final IR
-	QQueryHotPathShapes        map[string]int           // q query primitive pipeline count by shape
-	QVectorWhereHotPaths       []QVectorWhereHotPath    // q vector conditional projection pipelines visible in final IR
-	QVectorWhereHotPathShapes  map[string]int           // q vector conditional projection count by shape
-	QVectorReduceHotPaths      []QVectorReduceHotPath   // q vector aggregate pipelines visible in final IR
-	QVectorReduceHotPathShapes map[string]int           // q vector aggregate count by shape
-	QVectorRuntimeKernels      []QVectorRuntimeKernel   // q vector primitives carried by typed runtime op-exits
-	QVectorRuntimeKernelShapes map[string]int           // q vector typed runtime-kernel count by shape
-	QFrameRuntimeKernels       []QFrameRuntimeKernel    // q frame/select projection primitives carried by typed runtime op-exits
-	QFrameRuntimeKernelShapes  map[string]int           // q frame typed runtime-kernel count by shape
-	QTypedRuntimeKernels       []QFrameSelectColumnSpec // q query primitive pipelines lowered to typed runtime-kernel op-exits
-	QTypedRuntimeKernelShapes  map[string]int           // lowered q typed runtime-kernel count by shape
-	QQueryFallbacks            map[string]int           // q native lowering fallback count by reason code
-	QVectorLoweringFallbacks   map[string]int           // q vector native lowering fallback count by reason code
-	QKernelDescriptors         []QKernelDescriptor      // normalized q kernel runtime/fallback observations
-	QKernelExecutionStats      []QKernelExecutionStat   // observed q typed-runtime kernel execution outcomes
-	QKernelExecutionRoutes     []QKernelExecutionRouteSummary
-	QKernelShapeSummary        []QKernelShapeSummary // source-stable q kernel shape/fallback summary
-	ValidateErrors             []error               // structural invariant violations
-	RegAllocMap                string                // human-readable register assignments
-	InterpResult               []runtime.Value       // IR interpreter output on UNOPTIMIZED IR
-	InterpError                error
-	OptInterpResult            []runtime.Value // IR interpreter output on OPTIMIZED IR
-	OptInterpError             error
-	NativeResult               []runtime.Value // compiled ARM64 output (OPTIMIZED IR)
-	NativeError                error
+	FuncName                    string
+	NumArgs                     int
+	Args                        []runtime.Value
+	IRBefore                    string   // IR after BuildGraph (before passes)
+	IRAfter                     string   // IR after all passes
+	PassDiffs                   []string // diff for each pass that changed the IR
+	PipelineStages              []PipelineStageTiming
+	ModuleContracts             []Tier2ModuleContract
+	ModuleReasons               []Tier2ModuleReason
+	ModuleFactDiffs             []Tier2ModuleFactDiff
+	OptimizationRemarks         []OptimizationRemark     // structured pass/gate diagnostics
+	QQueryHotPaths              []QQueryHotPath          // q query primitive pipelines visible in final IR
+	QQueryHotPathShapes         map[string]int           // q query primitive pipeline count by shape
+	QVectorWhereHotPaths        []QVectorWhereHotPath    // q vector conditional projection pipelines visible in final IR
+	QVectorWhereHotPathShapes   map[string]int           // q vector conditional projection count by shape
+	QVectorReduceHotPaths       []QVectorReduceHotPath   // q vector aggregate pipelines visible in final IR
+	QVectorReduceHotPathShapes  map[string]int           // q vector aggregate count by shape
+	QVectorRuntimeKernels       []QVectorRuntimeKernel   // q vector primitives carried by typed runtime op-exits
+	QVectorRuntimeKernelShapes  map[string]int           // q vector typed runtime-kernel count by shape
+	QFrameRuntimeKernels        []QFrameRuntimeKernel    // q frame/select projection primitives carried by typed runtime op-exits
+	QFrameRuntimeKernelShapes   map[string]int           // q frame typed runtime-kernel count by shape
+	QTypedRuntimeKernels        []QFrameSelectColumnSpec // q query primitive pipelines lowered to typed runtime-kernel op-exits
+	QTypedRuntimeKernelShapes   map[string]int           // lowered q typed runtime-kernel count by shape
+	QQueryFallbacks             map[string]int           // q native lowering fallback count by reason code
+	QVectorLoweringFallbacks    map[string]int           // q vector native lowering fallback count by reason code
+	QKernelDescriptors          []QKernelDescriptor      // normalized q kernel runtime/fallback observations
+	QKernelExecutionStats       []QKernelExecutionStat   // observed q typed-runtime kernel execution outcomes
+	QKernelDescriptorCacheStats []QKernelDescriptorCacheStat
+	QKernelExecutionRoutes      []QKernelExecutionRouteSummary
+	QKernelShapeSummary         []QKernelShapeSummary // source-stable q kernel shape/fallback summary
+	ValidateErrors              []error               // structural invariant violations
+	RegAllocMap                 string                // human-readable register assignments
+	InterpResult                []runtime.Value       // IR interpreter output on UNOPTIMIZED IR
+	InterpError                 error
+	OptInterpResult             []runtime.Value // IR interpreter output on OPTIMIZED IR
+	OptInterpError              error
+	NativeResult                []runtime.Value // compiled ARM64 output (OPTIMIZED IR)
+	NativeError                 error
 
 	// Three-way verdicts. The oracle interprets the unoptimized IR, interprets
 	// the optimized IR, and executes the optimized IR as native code. Comparing
@@ -347,6 +348,7 @@ func Diagnose(proto *vm.FuncProto, args []runtime.Value) *DiagReport {
 	r.NativeResult = nativeResult
 	r.NativeError = nativeErr
 	r.QKernelExecutionStats = cf.QKernelExecutionStats()
+	r.QKernelDescriptorCacheStats = cf.QKernelDescriptorCacheStats()
 	r.QKernelExecutionRoutes = BuildQKernelExecutionRouteSummary(r.QKernelExecutionStats)
 	r.QKernelShapeSummary = BuildQKernelShapeSummaryFromDescriptorsAndExecutionStats(r.QKernelDescriptors, r.QKernelExecutionStats)
 	r.compareResults()
@@ -566,6 +568,7 @@ func (r *DiagReport) String() string {
 	w("\n--- Q vector fallback reasons ---\n%s", formatQVectorLoweringFallbackReasons(r.QVectorLoweringFallbacks))
 	w("\n--- Q kernel descriptors ---\n%s", formatQKernelDescriptors(r.QKernelDescriptors))
 	w("\n--- Q kernel execution stats ---\n%s", formatQKernelExecutionStats(r.QKernelExecutionStats))
+	w("\n--- Q kernel descriptor cache stats ---\n%s", formatQKernelDescriptorCacheStats(r.QKernelDescriptorCacheStats))
 	w("\n--- Q kernel execution route summary ---\n%s", formatQKernelExecutionRouteSummary(r.QKernelExecutionRoutes))
 	w("\n--- Q kernel shape summary ---\n%s", formatQKernelShapeSummary(r.QKernelShapeSummary))
 	w("\n--- IR (after passes) ---\n%s", r.IRAfter)

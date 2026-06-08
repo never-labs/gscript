@@ -5,6 +5,7 @@ package methodjit
 import (
 	"sort"
 
+	"github.com/never-labs/leia/internal/runtime"
 	"github.com/never-labs/leia/internal/vm"
 )
 
@@ -64,6 +65,20 @@ func (cf *CompiledFunction) recordQKernelExecution(source, kernel, shape, route,
 	if cf == nil {
 		return
 	}
+	cf.recordQKernelExecutionWithSchema(source, kernel, shape, route, outcome, "")
+}
+
+func (cf *CompiledFunction) recordQKernelExecutionForFrame(source, kernel, shape, route, outcome string, frameVal runtime.Value) {
+	if cf == nil {
+		return
+	}
+	cf.recordQKernelExecutionWithSchema(source, kernel, shape, route, outcome, qKernelSchemaHashForValue(frameVal))
+}
+
+func (cf *CompiledFunction) recordQKernelExecutionWithSchema(source, kernel, shape, route, outcome, schemaHash string) {
+	if cf == nil {
+		return
+	}
 	if source == "" {
 		source = "unknown"
 	}
@@ -79,6 +94,9 @@ func (cf *CompiledFunction) recordQKernelExecution(source, kernel, shape, route,
 	if outcome == "" {
 		outcome = "unknown"
 	}
+	if schemaHash == "" {
+		schemaHash = "unknown"
+	}
 	key := qKernelExecutionKey{
 		source:  source,
 		kernel:  kernel,
@@ -92,6 +110,107 @@ func (cf *CompiledFunction) recordQKernelExecution(source, kernel, shape, route,
 	}
 	cf.qKernelStats[key]++
 	cf.qKernelStatsMu.Unlock()
+	cf.recordQKernelDescriptorCacheLookup(qKernelDescriptorCacheKey{
+		source:     source,
+		kernel:     kernel,
+		shape:      shape,
+		route:      route,
+		schemaHash: schemaHash,
+	})
+}
+
+func qKernelSchemaHashForValue(v runtime.Value) string {
+	info, ok := v.NativeFramePayloadInfo()
+	if !ok || info.SchemaHash == "" {
+		return "unknown"
+	}
+	return info.SchemaHash
+}
+
+type qKernelDescriptorCacheKey struct {
+	source     string
+	kernel     string
+	shape      string
+	route      string
+	schemaHash string
+}
+
+type qKernelDescriptorCacheCounters struct {
+	hits      uint64
+	misses    uint64
+	evictions uint64
+}
+
+func (cf *CompiledFunction) recordQKernelDescriptorCacheLookup(key qKernelDescriptorCacheKey) {
+	if cf == nil {
+		return
+	}
+	cf.qKernelDescriptorCacheMu.Lock()
+	defer cf.qKernelDescriptorCacheMu.Unlock()
+	if cf.qKernelDescriptorCache == nil {
+		cf.qKernelDescriptorCache = make(map[qKernelDescriptorCacheKey]bool)
+	}
+	if cf.qKernelDescriptorStats == nil {
+		cf.qKernelDescriptorStats = make(map[qKernelDescriptorCacheKey]qKernelDescriptorCacheCounters)
+	}
+	counters := cf.qKernelDescriptorStats[key]
+	if cf.qKernelDescriptorCache[key] {
+		counters.hits++
+	} else {
+		cf.qKernelDescriptorCache[key] = true
+		counters.misses++
+	}
+	cf.qKernelDescriptorStats[key] = counters
+}
+
+func (cf *CompiledFunction) QKernelDescriptorCacheStats() []QKernelDescriptorCacheStat {
+	if cf == nil {
+		return nil
+	}
+	cf.qKernelDescriptorCacheMu.Lock()
+	defer cf.qKernelDescriptorCacheMu.Unlock()
+	if len(cf.qKernelDescriptorStats) == 0 {
+		return nil
+	}
+	keys := make([]qKernelDescriptorCacheKey, 0, len(cf.qKernelDescriptorStats))
+	for key := range cf.qKernelDescriptorStats {
+		keys = append(keys, key)
+	}
+	sort.Slice(keys, func(i, j int) bool {
+		if keys[i].source != keys[j].source {
+			return keys[i].source < keys[j].source
+		}
+		if keys[i].kernel != keys[j].kernel {
+			return keys[i].kernel < keys[j].kernel
+		}
+		if keys[i].shape != keys[j].shape {
+			return keys[i].shape < keys[j].shape
+		}
+		if keys[i].route != keys[j].route {
+			return keys[i].route < keys[j].route
+		}
+		return keys[i].schemaHash < keys[j].schemaHash
+	})
+	out := make([]QKernelDescriptorCacheStat, 0, len(keys))
+	for _, key := range keys {
+		counters := cf.qKernelDescriptorStats[key]
+		entries := uint64(0)
+		if cf.qKernelDescriptorCache[key] {
+			entries = 1
+		}
+		out = append(out, QKernelDescriptorCacheStat{
+			Source:     key.source,
+			Kernel:     key.kernel,
+			Shape:      key.shape,
+			Route:      key.route,
+			SchemaHash: key.schemaHash,
+			Entries:    entries,
+			Hits:       counters.hits,
+			Misses:     counters.misses,
+			Evictions:  counters.evictions,
+		})
+	}
+	return out
 }
 
 func (cf *CompiledFunction) QKernelExecutionStats() []QKernelExecutionStat {
