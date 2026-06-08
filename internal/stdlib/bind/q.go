@@ -187,6 +187,7 @@ type qSQLKernelDecisionReasonStat struct {
 
 type qSQLKernelDecisionShapeStat struct {
 	Shape        string
+	SchemaHash   string
 	ReasonCode   string
 	ReasonFamily string
 	Count        int
@@ -3372,8 +3373,10 @@ func qSQLKernelDecisionShapeStatsLocked(keys []qSQLKernelDecisionKeyStat) []qSQL
 		if shape == "" {
 			shape = "unknown"
 		}
+		info := qSQLKernelCacheKeyInfo(key.Key)
 		counts[qSQLKernelDecisionShapeStat{
 			Shape:        shape,
+			SchemaHash:   info.SchemaHash,
 			ReasonCode:   key.ReasonCode,
 			ReasonFamily: key.ReasonFamily,
 		}] += key.Count
@@ -3393,6 +3396,9 @@ func qSQLKernelDecisionShapeStatsLocked(keys []qSQLKernelDecisionKeyStat) []qSQL
 		}
 		if a.ReasonCode != b.ReasonCode {
 			return a.ReasonCode < b.ReasonCode
+		}
+		if a.SchemaHash != b.SchemaHash {
+			return a.SchemaHash < b.SchemaHash
 		}
 		return a.Shape < b.Shape
 	})
@@ -3467,6 +3473,7 @@ func qKernelDecisionShapeStatsTable(stats []qSQLKernelDecisionShapeStat) *Table 
 		row.RawSetString("reason_family", StringValue(stat.ReasonFamily))
 		row.RawSetString("reason_code", StringValue(stat.ReasonCode))
 		row.RawSetString("shape", StringValue(stat.Shape))
+		row.RawSetString("schema_hash", StringValue(stat.SchemaHash))
 		row.RawSetString("count", IntValue(int64(stat.Count)))
 		rows.RawSetInt(int64(i+1), TableValue(row))
 	}
