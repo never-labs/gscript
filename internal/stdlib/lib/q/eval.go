@@ -9411,6 +9411,12 @@ func rotateValue(left any, right any) (any, error) {
 	n := int(n64)
 	switch x := right.(type) {
 	case data.Array:
+		if rotated, handled, err := data.TryTypedRotate(x, n); err != nil || handled {
+			if err != nil {
+				return nil, err
+			}
+			return rotated, nil
+		}
 		return data.Gather(x, rotateIndexes(x.Len(), n))
 	case data.Frame:
 		return data.GatherFrame(x, rotateIndexes(x.Len(), n))

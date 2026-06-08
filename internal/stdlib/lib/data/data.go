@@ -468,6 +468,11 @@ type i64RangeArray struct {
 	len   int
 }
 
+type i64SegmentArray struct {
+	segments []i64RangeArray
+	len      int
+}
+
 type nullableArray struct {
 	kind Kind
 	data []any
@@ -726,6 +731,93 @@ func (a i64RangeArray) gatherRange(indexes []int) (Array, bool) {
 		step:  int64(indexStep) * a.step,
 		len:   len(indexes),
 	}, true
+}
+
+func (a i64SegmentArray) Kind() Kind { return KindI64 }
+
+func (a i64SegmentArray) Len() int { return a.len }
+
+func (a i64SegmentArray) At(row int) (any, bool) {
+	value, ok := a.i64At(row)
+	if !ok {
+		return nil, false
+	}
+	return value, true
+}
+
+func (a i64SegmentArray) i64At(row int) (int64, bool) {
+	if row < 0 || row >= a.len {
+		return 0, false
+	}
+	offset := row
+	for _, segment := range a.segments {
+		if offset < segment.len {
+			return segment.start + int64(offset)*segment.step, true
+		}
+		offset -= segment.len
+	}
+	return 0, false
+}
+
+func (a i64SegmentArray) Values() []any {
+	out := make([]any, a.len)
+	next := 0
+	for _, segment := range a.segments {
+		for i := 0; i < segment.len; i++ {
+			out[next] = segment.start + int64(i)*segment.step
+			next++
+		}
+	}
+	return out
+}
+
+func (a i64SegmentArray) Gather(indexes []int) Array {
+	if gathered, ok := a.gatherRange(indexes); ok {
+		return gathered
+	}
+	out := make([]int64, len(indexes))
+	for i, row := range indexes {
+		value, ok := a.i64At(row)
+		if !ok {
+			panic(fmt.Sprintf("data segment gather index %d out of range", row))
+		}
+		out[i] = value
+	}
+	return columnArray[int64]{kind: KindI64, data: out}
+}
+
+func (a i64SegmentArray) gatherRange(indexes []int) (Array, bool) {
+	switch len(indexes) {
+	case 0:
+		return i64RangeArray{len: 0}, true
+	case 1:
+		value, ok := a.i64At(indexes[0])
+		if !ok {
+			panic(fmt.Sprintf("data segment gather index %d out of range", indexes[0]))
+		}
+		return i64RangeArray{start: value, step: 1, len: 1}, true
+	}
+	first, ok := a.i64At(indexes[0])
+	if !ok {
+		panic(fmt.Sprintf("data segment gather index %d out of range", indexes[0]))
+	}
+	second, ok := a.i64At(indexes[1])
+	if !ok {
+		panic(fmt.Sprintf("data segment gather index %d out of range", indexes[1]))
+	}
+	step := second - first
+	prev := second
+	for _, row := range indexes[2:] {
+		current, ok := a.i64At(row)
+		if !ok {
+			panic(fmt.Sprintf("data segment gather index %d out of range", row))
+		}
+		if current-prev != step {
+			return nil, false
+		}
+		prev = current
+	}
+	return i64RangeArray{start: first, step: step, len: len(indexes)}, true
 }
 
 func (a nullableArray) Kind() Kind { return a.kind }
@@ -3906,6 +3998,60 @@ func TryTypedDyadic(op Op, left, right any) (any, bool, error) {
 // keep integer vector +,-,* results as integer vectors.
 func TryTypedIntegerDyadic(op Op, left, right any) (any, bool, error) {
 	return typedKernels.IntegerDyadic(op, left, right)
+}
+
+// TryTypedRotate returns a lazy typed view for supported array rotations.
+func TryTypedRotate(array Array, n int) (Array, bool, error) {
+	switch a := array.(type) {
+	case attributedArray:
+		rotated, ok, err := TryTypedRotate(a.array, n)
+		if err != nil || !ok {
+			return rotated, ok, err
+		}
+		return attributedArray{array: rotated, metadata: a.metadata}, true, nil
+	case i64RangeArray:
+		if a.len == 0 {
+			return a, true, nil
+		}
+		shift := n % a.len
+		if shift < 0 {
+			shift += a.len
+		}
+		if shift == 0 {
+			return a, true, nil
+		}
+		first := i64RangeArray{
+			start: a.start + int64(shift)*a.step,
+			step:  a.step,
+			len:   a.len - shift,
+		}
+		second := i64RangeArray{
+			start: a.start,
+			step:  a.step,
+			len:   shift,
+		}
+		return newI64SegmentArray(first, second), true, nil
+	default:
+		return nil, false, nil
+	}
+}
+
+func newI64SegmentArray(segments ...i64RangeArray) Array {
+	out := i64SegmentArray{segments: make([]i64RangeArray, 0, len(segments))}
+	for _, segment := range segments {
+		if segment.len <= 0 {
+			continue
+		}
+		out.segments = append(out.segments, segment)
+		out.len += segment.len
+	}
+	if len(out.segments) == 0 {
+		return i64RangeArray{len: 0}
+	}
+	if len(out.segments) == 1 {
+		return out.segments[0]
+	}
+	return out
 }
 
 func promotedNullForBinary(left, right any) any {

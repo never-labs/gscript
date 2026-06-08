@@ -119,6 +119,27 @@ func TestNewI64RangeArraySemantics(t *testing.T) {
 	if got, want := reversed.Values(), []any{int64(18), int64(16), int64(14), int64(12), int64(10)}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("range Gather reverse values = %#v, want %#v", got, want)
 	}
+
+	rotated, handled, err := TryTypedRotate(NewI64Range(0, 1, 5), 2)
+	if err != nil {
+		t.Fatalf("TryTypedRotate returned error: %v", err)
+	}
+	if !handled {
+		t.Fatal("TryTypedRotate did not handle i64 range")
+	}
+	if _, ok := rotated.(i64SegmentArray); !ok {
+		t.Fatalf("TryTypedRotate returned %T, want i64SegmentArray", rotated)
+	}
+	if got, want := rotated.Values(), []any{int64(2), int64(3), int64(4), int64(0), int64(1)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("TryTypedRotate values = %#v, want %#v", got, want)
+	}
+	sum, handled, err := TryTypedNumericSum(rotated)
+	if err != nil {
+		t.Fatalf("TryTypedNumericSum rotated returned error: %v", err)
+	}
+	if !handled || sum != int64(10) {
+		t.Fatalf("TryTypedNumericSum rotated = %v, %v; want 10, true", sum, handled)
+	}
 }
 
 func TestNewFramePreservesColumnOrderAndKinds(t *testing.T) {

@@ -992,6 +992,9 @@ func (typedKernelRegistry) NumericSum(array Array) (float64, int64, bool, error)
 	case i64RangeArray:
 		sum := i64RangeSum(a)
 		return float64(sum), int64(a.len), true, nil
+	case i64SegmentArray:
+		sum := i64SegmentSum(a)
+		return float64(sum), int64(a.len), true, nil
 	case columnArray[uint8]:
 		return numericSumSlice(a.data)
 	case columnArray[uint16]:
@@ -1045,6 +1048,8 @@ func (k typedKernelRegistry) NumericSumValue(array Array) (any, bool, error) {
 		return numericSumIntegerValue(a.data), true, nil
 	case i64RangeArray:
 		return i64RangeSum(a), true, nil
+	case i64SegmentArray:
+		return i64SegmentSum(a), true, nil
 	case columnArray[uint8]:
 		return numericSumUnsignedValue(a.data), true, nil
 	case columnArray[uint16]:
@@ -2070,6 +2075,8 @@ func (typedKernelRegistry) NumericAt(array Array, row int) (float64, bool, error
 		return numericColumnAt(a.data, row)
 	case i64RangeArray:
 		return numericI64RangeAt(a, row)
+	case i64SegmentArray:
+		return numericI64SegmentAt(a, row)
 	case columnArray[uint8]:
 		return numericColumnAt(a.data, row)
 	case columnArray[uint16]:
@@ -2112,6 +2119,14 @@ func numericI64RangeAt(values i64RangeArray, row int) (float64, bool, error) {
 	return float64(values.start + int64(row)*values.step), true, nil
 }
 
+func numericI64SegmentAt(values i64SegmentArray, row int) (float64, bool, error) {
+	value, ok := values.i64At(row)
+	if !ok {
+		return 0, false, fmt.Errorf("array row %d out of range", row)
+	}
+	return float64(value), true, nil
+}
+
 func numericValueAt(array Array, row int) (float64, bool) {
 	v, ok := array.At(row)
 	if !ok || IsNull(v) {
@@ -2138,7 +2153,7 @@ func isNumericArray(array Array) bool {
 		return isNumericArray(a.array)
 	case columnArray[int8], columnArray[int16], columnArray[int32], columnArray[int64],
 		columnArray[uint8], columnArray[uint16], columnArray[uint32], columnArray[uint64],
-		columnArray[float32], columnArray[float64], i64RangeArray:
+		columnArray[float32], columnArray[float64], i64RangeArray, i64SegmentArray:
 		return true
 	case nullableArray:
 		for i := 0; i < array.Len(); i++ {
@@ -2283,7 +2298,7 @@ func isIntegerArray(array Array) bool {
 		return isIntegerArray(a.array)
 	case columnArray[int8], columnArray[int16], columnArray[int32], columnArray[int64],
 		columnArray[uint8], columnArray[uint16], columnArray[uint32], columnArray[uint64],
-		i64RangeArray:
+		i64RangeArray, i64SegmentArray:
 		return true
 	case nullableArray:
 		for i := 0; i < array.Len(); i++ {
@@ -2335,6 +2350,12 @@ func integerArrayAt(array Array, row int) (int64, bool, error) {
 			return 0, false, fmt.Errorf("array row %d out of range", row)
 		}
 		return a.start + int64(row)*a.step, true, nil
+	case i64SegmentArray:
+		value, ok := a.i64At(row)
+		if !ok {
+			return 0, false, fmt.Errorf("array row %d out of range", row)
+		}
+		return value, true, nil
 	case columnArray[uint8]:
 		return integerColumnAt(a.data, row)
 	case columnArray[uint16]:
@@ -2606,6 +2627,14 @@ func i64RangeSum(values i64RangeArray) int64 {
 		return (n / 2) * endpoints
 	}
 	return n * (endpoints / 2)
+}
+
+func i64SegmentSum(values i64SegmentArray) int64 {
+	var sum int64
+	for _, segment := range values.segments {
+		sum += i64RangeSum(segment)
+	}
+	return sum
 }
 
 func numericSumsInteger[T signedScalar](values []T) Array {
