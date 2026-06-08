@@ -1117,6 +1117,57 @@ func TestQFramePrimitiveHotPathRejectsUnrelatedFrameColumn(t *testing.T) {
 	}
 }
 
+func TestQFramePrimitiveHotPathDetectsVectorMaskPredicate(t *testing.T) {
+	proto := &vm.FuncProto{
+		Name:      "q_frame_vector_mask_pipeline",
+		NumParams: 1,
+		MaxStack:  4,
+		Constants: []runtime.Value{
+			runtime.StringValue("price"),
+			runtime.FloatValue(100),
+			qHotPathMaskValue("size", ">=", runtime.IntValue(10)),
+			qHotPathNamesValue("size"),
+			runtime.StringValue("size"),
+		},
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_FRAME_COLUMN, 1, 0, 0),
+			vm.EncodeABx(vm.OP_LOADK, 2, 1),
+			vm.EncodeABC(vm.OP_VECTOR_COMPARE, 1, 2, int(runtime.DenseArrayGE)),
+			vm.EncodeABC(vm.OP_FRAME_MASK, 2, 0, 2),
+			vm.EncodeABC(vm.OP_VECTOR_MASK, 1, 2, int(runtime.DenseArrayMaskAnd)),
+			vm.EncodeABC(vm.OP_FRAME_FILTER, 0, 0, 1),
+			vm.EncodeABC(vm.OP_FRAME_PROJECT, 0, 0, 3),
+			vm.EncodeABC(vm.OP_FRAME_COLUMN, 0, 0, 4),
+			vm.EncodeABC(vm.OP_RETURN, 0, 2, 0),
+		},
+	}
+
+	fn := BuildGraph(proto)
+	paths := DetectQQueryHotPaths(fn)
+	if len(paths) != 1 {
+		t.Fatalf("DetectQQueryHotPaths count = %d, want 1\n%s", len(paths), Print(fn))
+	}
+	if got := paths[0].Shape(); got != "mask-combine/filter/project/column" {
+		t.Fatalf("q vector mask hot path shape = %q, want mask-combine/filter/project/column", got)
+	}
+	if paths[0].MaskCombine == nil {
+		t.Fatalf("q vector mask hot path MaskCombine = nil\n%s", Print(fn))
+	}
+
+	remarks := &OptimizationRemarks{}
+	fn.Remarks = remarks
+	lowered, err := QQueryNativeLoweringPass(fn)
+	if err != nil {
+		t.Fatalf("QQueryNativeLoweringPass: %v", err)
+	}
+	if len(lowered.QFrameSelectColumnSpecs) != 0 {
+		t.Fatalf("QFrameSelectColumnSpecs = %+v, want no fused lowering for mask combine", lowered.QFrameSelectColumnSpecs)
+	}
+	if got := CountQQueryLoweringFallbackReasons(remarks.List()); got[qQueryLoweringFallbackMaskCombineUnsupported] != 1 {
+		t.Fatalf("fallback reasons = %+v, want %s=1", got, qQueryLoweringFallbackMaskCombineUnsupported)
+	}
+}
+
 func TestDiagnoseReportsQQueryHotPath(t *testing.T) {
 	names := runtime.NewTable()
 	names.RawSetInt(1, runtime.StringValue("size"))

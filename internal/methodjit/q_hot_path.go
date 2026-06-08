@@ -22,6 +22,7 @@ const (
 	qQueryLoweringFallbackBadOrderConst           = "bad_order_const"
 	qQueryLoweringFallbackMissingRowValue         = "missing_row_value"
 	qQueryLoweringFallbackOpaqueRowConst          = "opaque_row_const"
+	qQueryLoweringFallbackMaskCombineUnsupported  = "mask_combine_unsupported"
 )
 
 // QQueryHotPath describes an IR pattern for the q query primitive pipeline:
@@ -31,6 +32,7 @@ type QQueryHotPath struct {
 	SourceColumn *Instr
 	Compare      *Instr
 	Mask         *Instr
+	MaskCombine  *Instr
 	Filter       *Instr
 	RowGather    *Instr
 	RowSlice     *Instr
@@ -43,6 +45,8 @@ func (p QQueryHotPath) Shape() string {
 	prefix := "compare/filter"
 	if p.Mask != nil {
 		prefix = "mask/filter"
+	} else if p.MaskCombine != nil {
+		prefix = "mask-combine/filter"
 	}
 	switch {
 	case p.RowOrder != nil && p.RowGather != nil:
@@ -156,6 +160,7 @@ func DetectQQueryHotPaths(fn *Function) []QQueryHotPath {
 			}
 			compare := valueDef(filter.Args[1], OpVectorCompare)
 			mask := valueDef(filter.Args[1], OpFrameMask)
+			maskCombine := valueDef(filter.Args[1], OpVectorMask)
 			var sourceColumn *Instr
 			if compare != nil {
 				if len(compare.Args) != 2 {
@@ -172,6 +177,10 @@ func DetectQQueryHotPaths(fn *Function) []QQueryHotPath {
 				if len(mask.Args) != 1 || filter.Args[0] == nil || mask.Args[0] == nil || filter.Args[0].ID != mask.Args[0].ID {
 					continue
 				}
+			} else if maskCombine != nil {
+				if !qQueryMaskCombineUsesFrame(filter.Args[0], maskCombine) {
+					continue
+				}
 			} else {
 				continue
 			}
@@ -179,6 +188,7 @@ func DetectQQueryHotPaths(fn *Function) []QQueryHotPath {
 				SourceColumn: sourceColumn,
 				Compare:      compare,
 				Mask:         mask,
+				MaskCombine:  maskCombine,
 				Filter:       filter,
 				RowGather:    rowGather,
 				RowSlice:     rowSlice,
@@ -214,7 +224,7 @@ func QQueryHotPathRemarkPass(fn *Function) (*Function, error) {
 		valueID,
 		OpFrameColumn,
 		fmt.Sprintf("recognized %d q query primitive hot path(s), first shape %s, compare %s; native lowering pending",
-			len(paths), paths[0].Shape(), qQueryHotPathCompareOpName(paths[0].Compare)),
+			len(paths), paths[0].Shape(), qQueryHotPathPredicateName(paths[0])),
 	)
 	return fn, nil
 }
@@ -274,7 +284,7 @@ func qQueryLoweringFallbackRemark(fn *Function, path QQueryHotPath, reason strin
 	}
 	functionRemarks(fn).Add("QQueryNativeLowering", "missed", blockID, valueID, OpFrameColumn,
 		fmt.Sprintf("reason_code=%s shape=%s compare=%s; q query hot path remains on primitive fallback",
-			reason, path.Shape(), qQueryHotPathCompareOpName(path.Compare)))
+			reason, path.Shape(), qQueryHotPathPredicateName(path)))
 }
 
 func qQueryValueUseCounts(fn *Function) map[int]int {
@@ -298,7 +308,7 @@ func qQueryValueUseCounts(fn *Function) map[int]int {
 }
 
 func qQueryHotPathSingleUse(path QQueryHotPath, uses map[int]int) bool {
-	for _, instr := range []*Instr{path.SourceColumn, path.Compare, path.Mask, path.RowOrder, path.RowGather, path.RowSlice, path.Project} {
+	for _, instr := range []*Instr{path.SourceColumn, path.Compare, path.Mask, path.MaskCombine, path.RowOrder, path.RowGather, path.RowSlice, path.Project} {
 		if instr != nil && uses[instr.ID] != 1 {
 			return false
 		}
@@ -357,6 +367,8 @@ func qQueryFrameSelectColumnSpec(fn *Function, path QQueryHotPath) (QFrameSelect
 			return QFrameSelectColumnSpec{}, nil, qQueryLoweringFallbackBadMaskSpecConst, false
 		}
 		spec.MaskSpecConst = int(path.Mask.Aux)
+	} else if path.MaskCombine != nil {
+		return QFrameSelectColumnSpec{}, nil, qQueryLoweringFallbackMaskCombineUnsupported, false
 	} else {
 		return QFrameSelectColumnSpec{}, nil, qQueryLoweringFallbackMissingPredicate, false
 	}
@@ -409,6 +421,38 @@ func qQueryOpaqueConst(value *Value) bool {
 	return value != nil && value.Def != nil && value.Def.Op == OpConstNil && value.Def.Type == TypeAny
 }
 
+func qQueryMaskCombineUsesFrame(frame *Value, mask *Instr) bool {
+	if frame == nil || mask == nil || mask.Op != OpVectorMask || len(mask.Args) != 2 {
+		return false
+	}
+	for _, arg := range mask.Args {
+		if !qQueryMaskValueUsesFrame(frame, arg) {
+			return false
+		}
+	}
+	return true
+}
+
+func qQueryMaskValueUsesFrame(frame *Value, value *Value) bool {
+	instr := valueDef(value, OpFrameMask)
+	if instr != nil {
+		return len(instr.Args) == 1 && instr.Args[0] != nil && instr.Args[0].ID == frame.ID
+	}
+	instr = valueDef(value, OpVectorCompare)
+	if instr != nil {
+		sourceColumn := qQueryCompareColumn(instr)
+		return sourceColumn != nil &&
+			len(sourceColumn.Args) == 1 &&
+			sourceColumn.Args[0] != nil &&
+			sourceColumn.Args[0].ID == frame.ID
+	}
+	instr = valueDef(value, OpVectorMask)
+	if instr != nil {
+		return qQueryMaskCombineUsesFrame(frame, instr)
+	}
+	return false
+}
+
 func qQueryConstRuntimeValue(value *Value) (runtime.Value, bool) {
 	if value == nil || value.Def == nil {
 		return runtime.NilValue(), false
@@ -459,7 +503,7 @@ func formatQQueryHotPaths(paths []QQueryHotPath) string {
 		fmt.Fprintf(&b, "  shapes: %s\n", formatQQueryHotPathShapeCounts(counts))
 	}
 	for i, path := range paths {
-		fmt.Fprintf(&b, "  [%d] shape=%s compare=%s", i, path.Shape(), qQueryHotPathCompareOpName(path.Compare))
+		fmt.Fprintf(&b, "  [%d] shape=%s compare=%s", i, path.Shape(), qQueryHotPathPredicateName(path))
 		if path.Mask != nil {
 			fmt.Fprintf(&b, " mask_aux=%d", path.Mask.Aux)
 		}
@@ -596,6 +640,17 @@ func qQueryHotPathCompareOpName(compare *Instr) string {
 		return "frame-mask"
 	}
 	return qDenseArrayCompareOpName(runtime.DenseArrayBinaryOp(compare.Aux))
+}
+
+func qQueryHotPathPredicateName(path QQueryHotPath) string {
+	switch {
+	case path.Compare != nil:
+		return qQueryHotPathCompareOpName(path.Compare)
+	case path.MaskCombine != nil:
+		return "mask-combine"
+	default:
+		return "frame-mask"
+	}
 }
 
 func qQueryCompareColumn(compare *Instr) *Instr {
