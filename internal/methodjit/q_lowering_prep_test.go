@@ -442,6 +442,139 @@ func TestQFramePrimitiveHotPathLowersToTypedRuntimeKernel(t *testing.T) {
 	}
 }
 
+func TestQFramePrimitiveRowHotPathsLowerToTypedRuntimeKernel(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		numParams int
+		constants []runtime.Value
+		code      []uint32
+		args      []runtime.Value
+		shape     string
+		want      []int64
+	}{
+		{
+			name:      "gather",
+			numParams: 2,
+			constants: []runtime.Value{
+				runtime.StringValue("price"),
+				runtime.FloatValue(100),
+				qHotPathNamesValue("size"),
+				runtime.StringValue("size"),
+			},
+			code: []uint32{
+				vm.EncodeABC(vm.OP_FRAME_COLUMN, 2, 0, 0),
+				vm.EncodeABx(vm.OP_LOADK, 3, 1),
+				vm.EncodeABC(vm.OP_VECTOR_COMPARE, 2, 3, int(runtime.DenseArrayGE)),
+				vm.EncodeABC(vm.OP_FRAME_FILTER, 0, 0, 2),
+				vm.EncodeABC(vm.OP_FRAME_GATHER, 0, 0, 1),
+				vm.EncodeABC(vm.OP_FRAME_PROJECT, 0, 0, 2),
+				vm.EncodeABC(vm.OP_FRAME_COLUMN, 0, 0, 3),
+				vm.EncodeABC(vm.OP_RETURN, 0, 2, 0),
+			},
+			args: []runtime.Value{
+				runtime.TableValue(qHotPathTestFrame(t)),
+				runtime.DenseArrayValue(runtime.NewDenseArrayI64([]int64{2, 1})),
+			},
+			shape: "compare/filter/gather/project/column",
+			want:  []int64{20, 10},
+		},
+		{
+			name:      "slice",
+			numParams: 1,
+			constants: []runtime.Value{
+				runtime.StringValue("price"),
+				runtime.FloatValue(100),
+				runtime.IntValue(1),
+				qHotPathNamesValue("size"),
+				runtime.StringValue("size"),
+			},
+			code: []uint32{
+				vm.EncodeABC(vm.OP_FRAME_COLUMN, 1, 0, 0),
+				vm.EncodeABx(vm.OP_LOADK, 2, 1),
+				vm.EncodeABC(vm.OP_VECTOR_COMPARE, 1, 2, int(runtime.DenseArrayGE)),
+				vm.EncodeABC(vm.OP_FRAME_FILTER, 0, 0, 1),
+				vm.EncodeABx(vm.OP_LOADK, 3, 2),
+				vm.EncodeABC(vm.OP_FRAME_SLICE, 0, 0, 3),
+				vm.EncodeABC(vm.OP_FRAME_PROJECT, 0, 0, 3),
+				vm.EncodeABC(vm.OP_FRAME_COLUMN, 0, 0, 4),
+				vm.EncodeABC(vm.OP_RETURN, 0, 2, 0),
+			},
+			args:  []runtime.Value{runtime.TableValue(qHotPathTestFrame(t))},
+			shape: "compare/filter/slice/project/column",
+			want:  []int64{10},
+		},
+		{
+			name:      "order",
+			numParams: 1,
+			constants: []runtime.Value{
+				runtime.StringValue("price"),
+				runtime.FloatValue(100),
+				qHotPathOrderValue("price", true),
+				qHotPathNamesValue("size"),
+				runtime.StringValue("size"),
+			},
+			code: []uint32{
+				vm.EncodeABC(vm.OP_FRAME_COLUMN, 1, 0, 0),
+				vm.EncodeABx(vm.OP_LOADK, 2, 1),
+				vm.EncodeABC(vm.OP_VECTOR_COMPARE, 1, 2, int(runtime.DenseArrayGE)),
+				vm.EncodeABC(vm.OP_FRAME_FILTER, 0, 0, 1),
+				vm.EncodeABC(vm.OP_FRAME_ORDER, 3, 0, 2),
+				vm.EncodeABC(vm.OP_FRAME_GATHER, 0, 0, 3),
+				vm.EncodeABC(vm.OP_FRAME_PROJECT, 0, 0, 3),
+				vm.EncodeABC(vm.OP_FRAME_COLUMN, 0, 0, 4),
+				vm.EncodeABC(vm.OP_RETURN, 0, 2, 0),
+			},
+			args:  []runtime.Value{runtime.TableValue(qHotPathTestFrame(t))},
+			shape: "compare/filter/order/gather/project/column",
+			want:  []int64{20, 10},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			proto := &vm.FuncProto{
+				Name:      "q_frame_row_" + tc.name + "_lowered",
+				NumParams: tc.numParams,
+				MaxStack:  4,
+				Constants: tc.constants,
+				Code:      tc.code,
+			}
+			fn := BuildGraph(proto)
+			lowered, err := QQueryNativeLoweringPass(fn)
+			if err != nil {
+				t.Fatalf("QQueryNativeLoweringPass: %v", err)
+			}
+			counts := map[Op]int{}
+			for _, block := range lowered.Blocks {
+				for _, instr := range block.Instrs {
+					counts[instr.Op]++
+				}
+			}
+			if counts[OpQFrameSelectColumn] != 1 {
+				t.Fatalf("OpQFrameSelectColumn count = %d, want 1\n%s", counts[OpQFrameSelectColumn], Print(lowered))
+			}
+			if len(lowered.QFrameSelectColumnSpecs) != 1 || lowered.QFrameSelectColumnSpecs[0].Shape != tc.shape {
+				t.Fatalf("lowered q specs = %+v, want shape %s", lowered.QFrameSelectColumnSpecs, tc.shape)
+			}
+
+			result, err := Interpret(lowered, tc.args)
+			if err != nil {
+				t.Fatalf("Interpret lowered q hot path: %v", err)
+			}
+			if len(result) != 1 || !result[0].IsDenseArray() {
+				t.Fatalf("lowered result = %#v, want one dense array", result)
+			}
+			got, ok := result[0].DenseArray().I64()
+			if !ok || len(got) != len(tc.want) {
+				t.Fatalf("lowered result values = %#v, want %#v", got, tc.want)
+			}
+			for i := range tc.want {
+				if got[i] != tc.want[i] {
+					t.Fatalf("lowered result values = %#v, want %#v", got, tc.want)
+				}
+			}
+		})
+	}
+}
+
 func TestQFramePrimitiveHotPathDetectsFrameMask(t *testing.T) {
 	names := runtime.NewTable()
 	names.RawSetInt(1, runtime.StringValue("size"))
@@ -1232,4 +1365,19 @@ func qHotPathTestFrame(t *testing.T) *runtime.Table {
 		SchemaHash: "q-hot-path-test",
 	})
 	return frame
+}
+
+func qHotPathNamesValue(names ...string) runtime.Value {
+	tbl := runtime.NewTable()
+	for i, name := range names {
+		tbl.RawSetInt(int64(i+1), runtime.StringValue(name))
+	}
+	return runtime.TableValue(tbl)
+}
+
+func qHotPathOrderValue(column string, desc bool) runtime.Value {
+	tbl := runtime.NewTable()
+	tbl.RawSetString("column", runtime.StringValue(column))
+	tbl.RawSetString("desc", runtime.BoolValue(desc))
+	return runtime.TableValue(tbl)
 }

@@ -118,16 +118,20 @@ func executeFrameOrderValue(frameVal runtime.Value, spec runtime.Value) (runtime
 	return out, nil
 }
 
-func executeQFrameSelectColumnValue(constants []runtime.Value, specs []QFrameSelectColumnSpec, specIdx int, frameVal runtime.Value, rhsVal runtime.Value, hasRHS bool) (runtime.Value, error) {
+func executeQFrameSelectColumnValue(constants []runtime.Value, specs []QFrameSelectColumnSpec, specIdx int, frameVal runtime.Value, argVal runtime.Value, hasArg bool) (runtime.Value, error) {
 	if specIdx < 0 || specIdx >= len(specs) {
 		return runtime.NilValue(), fmt.Errorf("QFrameSelectColumn spec index %d is out of range", specIdx)
 	}
 	spec := specs[specIdx]
-	mask, err := executeQFrameSelectColumnMask(constants, spec, frameVal, rhsVal, hasRHS)
+	mask, err := executeQFrameSelectColumnMask(constants, spec, frameVal, argVal, hasArg)
 	if err != nil {
 		return runtime.NilValue(), err
 	}
-	filtered, err := executeFrameFilterValue(frameVal, mask)
+	rows, err := executeFrameFilterValue(frameVal, mask)
+	if err != nil {
+		return runtime.NilValue(), err
+	}
+	rows, err = executeQFrameSelectColumnRows(constants, spec, rows, argVal, hasArg)
 	if err != nil {
 		return runtime.NilValue(), err
 	}
@@ -138,7 +142,7 @@ func executeQFrameSelectColumnValue(constants []runtime.Value, specs []QFrameSel
 	if err != nil {
 		return runtime.NilValue(), err
 	}
-	projected, err := executeFrameProjectValue(filtered, names)
+	projected, err := executeFrameProjectValue(rows, names)
 	if err != nil {
 		return runtime.NilValue(), err
 	}
@@ -148,7 +152,7 @@ func executeQFrameSelectColumnValue(constants []runtime.Value, specs []QFrameSel
 	return executeFrameColumnValue(projected, constants[spec.ResultColumnConst].Str())
 }
 
-func executeQFrameSelectColumnMask(constants []runtime.Value, spec QFrameSelectColumnSpec, frameVal runtime.Value, rhsVal runtime.Value, hasRHS bool) (runtime.Value, error) {
+func executeQFrameSelectColumnMask(constants []runtime.Value, spec QFrameSelectColumnSpec, frameVal runtime.Value, argVal runtime.Value, hasArg bool) (runtime.Value, error) {
 	if spec.MaskSpecConst >= 0 {
 		if spec.MaskSpecConst >= len(constants) {
 			return runtime.NilValue(), fmt.Errorf("QFrameSelectColumn mask spec constant is out of range")
@@ -170,7 +174,10 @@ func executeQFrameSelectColumnMask(constants []runtime.Value, spec QFrameSelectC
 		}
 		return out, nil
 	}
-	if !hasRHS {
+	rhsVal := argVal
+	if spec.HasCompareRHSConst {
+		rhsVal = spec.CompareRHSConst
+	} else if !hasArg {
 		return runtime.NilValue(), fmt.Errorf("QFrameSelectColumn compare path requires rhs")
 	}
 	if spec.SourceColumnConst < 0 || spec.SourceColumnConst >= len(constants) || !constants[spec.SourceColumnConst].IsString() {
@@ -184,6 +191,34 @@ func executeQFrameSelectColumnMask(constants []runtime.Value, spec QFrameSelectC
 		return runtime.NilValue(), fmt.Errorf("QFrameSelectColumn operand must be native frame (got %s)", frameVal.TypeName())
 	}
 	return out, nil
+}
+
+func executeQFrameSelectColumnRows(constants []runtime.Value, spec QFrameSelectColumnSpec, rows runtime.Value, argVal runtime.Value, hasArg bool) (runtime.Value, error) {
+	switch spec.RowMode {
+	case QFrameSelectColumnRowsNone:
+		return rows, nil
+	case QFrameSelectColumnRowsGather:
+		if !hasArg {
+			return runtime.NilValue(), fmt.Errorf("QFrameSelectColumn gather path requires indexes")
+		}
+		return executeFrameGatherValue(rows, argVal)
+	case QFrameSelectColumnRowsSlice:
+		if !hasArg {
+			return runtime.NilValue(), fmt.Errorf("QFrameSelectColumn slice path requires end")
+		}
+		return executeFrameSliceValue(rows, argVal)
+	case QFrameSelectColumnRowsOrderGather:
+		if spec.RowOrderConst < 0 || spec.RowOrderConst >= len(constants) {
+			return runtime.NilValue(), fmt.Errorf("QFrameSelectColumn order spec constant is out of range")
+		}
+		indexes, err := executeFrameOrderValue(rows, constants[spec.RowOrderConst])
+		if err != nil {
+			return runtime.NilValue(), err
+		}
+		return executeFrameGatherValue(rows, indexes)
+	default:
+		return runtime.NilValue(), fmt.Errorf("QFrameSelectColumn unknown row mode %d", spec.RowMode)
+	}
 }
 
 func frameProjectColumnNames(v runtime.Value) ([]string, error) {

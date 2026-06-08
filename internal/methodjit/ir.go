@@ -60,13 +60,26 @@ type StringSplitSubSpec struct {
 }
 
 type QFrameSelectColumnSpec struct {
-	Shape             string
-	SourceColumnConst int
-	MaskSpecConst     int
-	ProjectConst      int
-	ResultColumnConst int
-	CompareOp         runtime.DenseArrayBinaryOp
+	Shape              string
+	SourceColumnConst  int
+	MaskSpecConst      int
+	RowMode            QFrameSelectColumnRowMode
+	RowOrderConst      int
+	ProjectConst       int
+	ResultColumnConst  int
+	CompareOp          runtime.DenseArrayBinaryOp
+	CompareRHSConst    runtime.Value
+	HasCompareRHSConst bool
 }
+
+type QFrameSelectColumnRowMode uint8
+
+const (
+	QFrameSelectColumnRowsNone QFrameSelectColumnRowMode = iota
+	QFrameSelectColumnRowsGather
+	QFrameSelectColumnRowsSlice
+	QFrameSelectColumnRowsOrderGather
+)
 
 type RecordArraySpecializationSourceKind uint8
 

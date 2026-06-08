@@ -203,9 +203,9 @@ const (
 	// q/vector compare-mask primitive. Args = [left, right], Aux = runtime
 	// DenseArrayBinaryOp comparison opcode; mirrors OP_VECTOR_COMPARE.
 	OpVectorCompare
-	// Fused q/frame typed runtime-kernel primitive. Args = [frame] for
-	// mask/filter/project/column, or [frame, rhs] for compare/filter/project/
-	// column. Aux indexes Function.QFrameSelectColumnSpecs.
+	// Fused q/frame typed runtime-kernel primitive. Args = [frame] plus at
+	// most one dynamic rhs or row argument; constants and row mode live in
+	// Function.QFrameSelectColumnSpecs[Aux].
 	OpQFrameSelectColumn
 	OpGetField // Args[0].field; Aux = constant pool index for field name
 	// OpGetFieldNumToFloat fuses Args[0].field with numeric widening.

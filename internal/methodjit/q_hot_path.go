@@ -2,6 +2,7 @@ package methodjit
 
 import (
 	"fmt"
+	"math"
 	"sort"
 	"strings"
 
@@ -168,9 +169,6 @@ func QQueryNativeLoweringPass(fn *Function) (*Function, error) {
 	}
 	uses := qQueryValueUseCounts(fn)
 	for _, path := range DetectQQueryHotPaths(fn) {
-		if path.RowGather != nil || path.RowSlice != nil || path.RowOrder != nil {
-			continue
-		}
 		if !qQueryHotPathSingleUse(path, uses) {
 			continue
 		}
@@ -190,6 +188,9 @@ func QQueryNativeLoweringPass(fn *Function) (*Function, error) {
 		qQueryNop(path.Compare)
 		qQueryNop(path.Mask)
 		qQueryNop(path.Filter)
+		qQueryNop(path.RowOrder)
+		qQueryNop(path.RowGather)
+		qQueryNop(path.RowSlice)
 		qQueryNop(path.Project)
 		if result.Block != nil {
 			functionRemarks(fn).Add("QQueryNativeLowering", "changed", result.Block.ID, result.ID, OpQFrameSelectColumn,
@@ -220,10 +221,17 @@ func qQueryValueUseCounts(fn *Function) map[int]int {
 }
 
 func qQueryHotPathSingleUse(path QQueryHotPath, uses map[int]int) bool {
-	for _, instr := range []*Instr{path.SourceColumn, path.Compare, path.Mask, path.Filter, path.Project} {
+	for _, instr := range []*Instr{path.SourceColumn, path.Compare, path.Mask, path.RowOrder, path.RowGather, path.RowSlice, path.Project} {
 		if instr != nil && uses[instr.ID] != 1 {
 			return false
 		}
+	}
+	filterUses := 1
+	if path.RowOrder != nil && path.RowGather != nil {
+		filterUses = 2
+	}
+	if path.Filter != nil && uses[path.Filter.ID] != filterUses {
+		return false
 	}
 	return true
 }
@@ -240,10 +248,13 @@ func qQueryFrameSelectColumnSpec(fn *Function, path QQueryHotPath) (QFrameSelect
 		Shape:             path.Shape(),
 		SourceColumnConst: -1,
 		MaskSpecConst:     -1,
+		RowMode:           QFrameSelectColumnRowsNone,
+		RowOrderConst:     -1,
 		ProjectConst:      int(path.Project.Aux),
 		ResultColumnConst: int(path.ResultColumn.Aux),
 	}
 	frameArg := path.Filter.Args[0]
+	args := []*Value{frameArg}
 	if path.Compare != nil {
 		if path.SourceColumn == nil || path.SourceColumn.Aux < 0 || path.SourceColumn.Aux >= int64(len(fn.Proto.Constants)) {
 			return QFrameSelectColumnSpec{}, nil, false
@@ -254,16 +265,69 @@ func qQueryFrameSelectColumnSpec(fn *Function, path QQueryHotPath) (QFrameSelect
 		}
 		spec.SourceColumnConst = int(path.SourceColumn.Aux)
 		spec.CompareOp = runtime.DenseArrayBinaryOp(path.Compare.Aux)
-		return spec, []*Value{frameArg, rhs}, true
-	}
-	if path.Mask != nil {
+		if rhsConst, ok := qQueryConstRuntimeValue(rhs); ok {
+			spec.CompareRHSConst = rhsConst
+			spec.HasCompareRHSConst = true
+		} else if path.RowGather == nil && path.RowSlice == nil && path.RowOrder == nil {
+			args = append(args, rhs)
+		} else {
+			return QFrameSelectColumnSpec{}, nil, false
+		}
+	} else if path.Mask != nil {
 		if path.Mask.Aux < 0 || path.Mask.Aux >= int64(len(fn.Proto.Constants)) {
 			return QFrameSelectColumnSpec{}, nil, false
 		}
 		spec.MaskSpecConst = int(path.Mask.Aux)
-		return spec, []*Value{frameArg}, true
+	} else {
+		return QFrameSelectColumnSpec{}, nil, false
 	}
-	return QFrameSelectColumnSpec{}, nil, false
+	switch {
+	case path.RowOrder != nil && path.RowGather != nil:
+		if path.RowOrder.Aux < 0 || path.RowOrder.Aux >= int64(len(fn.Proto.Constants)) {
+			return QFrameSelectColumnSpec{}, nil, false
+		}
+		spec.RowMode = QFrameSelectColumnRowsOrderGather
+		spec.RowOrderConst = int(path.RowOrder.Aux)
+	case path.RowGather != nil:
+		spec.RowMode = QFrameSelectColumnRowsGather
+		if len(path.RowGather.Args) != 2 || path.RowGather.Args[1] == nil {
+			return QFrameSelectColumnSpec{}, nil, false
+		}
+		if qQueryOpaqueConst(path.RowGather.Args[1]) {
+			return QFrameSelectColumnSpec{}, nil, false
+		}
+		args = append(args, path.RowGather.Args[1])
+	case path.RowSlice != nil:
+		spec.RowMode = QFrameSelectColumnRowsSlice
+		if len(path.RowSlice.Args) != 2 || path.RowSlice.Args[1] == nil {
+			return QFrameSelectColumnSpec{}, nil, false
+		}
+		if qQueryOpaqueConst(path.RowSlice.Args[1]) {
+			return QFrameSelectColumnSpec{}, nil, false
+		}
+		args = append(args, path.RowSlice.Args[1])
+	}
+	return spec, args, true
+}
+
+func qQueryOpaqueConst(value *Value) bool {
+	return value != nil && value.Def != nil && value.Def.Op == OpConstNil && value.Def.Type == TypeAny
+}
+
+func qQueryConstRuntimeValue(value *Value) (runtime.Value, bool) {
+	if value == nil || value.Def == nil {
+		return runtime.NilValue(), false
+	}
+	switch value.Def.Op {
+	case OpConstInt:
+		return runtime.IntValue(value.Def.Aux), true
+	case OpConstFloat:
+		return runtime.FloatValue(math.Float64frombits(uint64(value.Def.Aux))), true
+	case OpConstBool:
+		return runtime.BoolValue(value.Def.Aux != 0), true
+	default:
+		return runtime.NilValue(), false
+	}
 }
 
 func qQueryCompareRHS(compare, sourceColumn *Instr) *Value {
