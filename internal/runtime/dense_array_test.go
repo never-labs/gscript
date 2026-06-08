@@ -535,6 +535,93 @@ func TestDenseArrayWhereReduceErrorsMatchWhereThenReduce(t *testing.T) {
 	}
 }
 
+func TestDenseArrayGatherReduceMatchesGatherThenReduce(t *testing.T) {
+	cases := []struct {
+		name    string
+		op      DenseArrayReduceOp
+		array   *DenseArray
+		indexes *DenseArray
+	}{
+		{"i64 sum", DenseArrayReduceSum, NewDenseArrayI64([]int64{10, -5, 30, 7}), NewDenseArrayI64([]int64{3, 1, 4})},
+		{"i64 min", DenseArrayReduceMin, NewDenseArrayI64([]int64{10, -5, 30, 7}), NewDenseArrayI64([]int64{4, 2, 1})},
+		{"i64 max", DenseArrayReduceMax, NewDenseArrayI64([]int64{10, -5, 30, 7}), NewDenseArrayI64([]int64{2, 4, 1})},
+		{"i64 mean", DenseArrayReduceMean, NewDenseArrayI64([]int64{10, -5, 30, 7}), NewDenseArrayI64([]int64{1, 2, 4})},
+		{"f64 sum", DenseArrayReduceSum, NewDenseArrayF64([]float64{1.5, -2.5, 6, 3}), NewDenseArrayI64([]int64{3, 1})},
+		{"f64 min", DenseArrayReduceMin, NewDenseArrayF64([]float64{1.5, -2.5, 6, 3}), NewDenseArrayI64([]int64{1, 4, 2})},
+		{"f64 max", DenseArrayReduceMax, NewDenseArrayF64([]float64{1.5, -2.5, 6, 3}), NewDenseArrayI64([]int64{2, 3, 1})},
+		{"f64 mean", DenseArrayReduceMean, NewDenseArrayF64([]float64{1.5, -2.5, 6, 3}), NewDenseArrayI64([]int64{1, 3, 4})},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			gathered, err := tc.array.Gather(tc.indexes)
+			if err != nil {
+				t.Fatalf("DenseArray.Gather error: %v", err)
+			}
+			want, err := DenseArrayReduce(tc.op, gathered)
+			if err != nil {
+				t.Fatalf("DenseArrayReduce error: %v", err)
+			}
+			got, err := DenseArrayGatherReduce(tc.op, tc.array, tc.indexes)
+			if err != nil {
+				t.Fatalf("DenseArrayGatherReduce error: %v", err)
+			}
+			assertValueEqualOrBothNaN(t, got, want)
+		})
+	}
+}
+
+func TestDenseArrayGatherReduceErrorsMatchGatherThenReduce(t *testing.T) {
+	if _, err := DenseArrayGatherReduce(DenseArrayReduceSum, NewDenseArrayI64([]int64{1, 2}), NewDenseArrayI64(nil)); !errors.Is(err, ErrDenseArrayEmpty) {
+		t.Fatalf("empty index error = %v, want ErrDenseArrayEmpty", err)
+	}
+	if _, err := DenseArrayGatherReduce(DenseArrayReduceSum, NewDenseArrayBool([]bool{true}), NewDenseArrayI64([]int64{1})); !errors.Is(err, ErrDenseArrayDType) {
+		t.Fatalf("bool dtype error = %v, want ErrDenseArrayDType", err)
+	}
+	if _, err := DenseArrayGatherReduce(DenseArrayReduceSum, NewDenseArrayI64([]int64{1}), NewDenseArrayF64([]float64{1})); err == nil {
+		t.Fatalf("non-i64 index error = nil, want error")
+	}
+	if _, err := DenseArrayGatherReduce(DenseArrayReduceOp(99), NewDenseArrayI64([]int64{1}), NewDenseArrayI64([]int64{1})); !errors.Is(err, ErrDenseArrayReduceOp) {
+		t.Fatalf("reduce op error = %v, want ErrDenseArrayReduceOp", err)
+	}
+	if _, err := DenseArrayGatherReduce(DenseArrayReduceSum, NewDenseArrayI64([]int64{1}), NewDenseArrayI64([]int64{2})); err == nil {
+		t.Fatalf("out-of-range index error = nil, want error")
+	}
+}
+
+func BenchmarkDenseArrayGatherReduce(b *testing.B) {
+	const rows = 8192
+	values := make([]float64, rows)
+	indexes := make([]int64, rows/2)
+	for i := range values {
+		values[i] = float64(i) * 1.25
+	}
+	for i := range indexes {
+		indexes[i] = int64(i*2 + 1)
+	}
+	array := NewDenseArrayF64(values)
+	indexArray := NewDenseArrayI64(indexes)
+	b.Run("GatherThenReduce", func(b *testing.B) {
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			gathered, err := array.Gather(indexArray)
+			if err != nil {
+				b.Fatal(err)
+			}
+			if _, err := DenseArrayReduce(DenseArrayReduceSum, gathered); err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
+	b.Run("Fused", func(b *testing.B) {
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			if _, err := DenseArrayGatherReduce(DenseArrayReduceSum, array, indexArray); err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
+}
+
 func TestDenseArrayIndexFromValue(t *testing.T) {
 	idx, ok, err := DenseArrayIndexFromValue(IntValue(2), 3)
 	if err != nil || !ok || idx != 1 {

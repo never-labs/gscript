@@ -2429,6 +2429,97 @@ func DenseArrayWhereReduce(op DenseArrayReduceOp, mask *DenseArray, trueValue, f
 	}
 }
 
+// DenseArrayGatherReduce gathers q-style 1-based indexes and reduces the
+// selected values without materializing the intermediate dense array.
+func DenseArrayGatherReduce(op DenseArrayReduceOp, arr, indices *DenseArray) (Value, error) {
+	if arr == nil {
+		return NilValue(), ErrDenseArrayOperand
+	}
+	if arr.dtype == DenseArrayBool || arr.dtype == DenseArrayString {
+		return NilValue(), ErrDenseArrayDType
+	}
+	if err := denseArrayValidateGatherIndices(indices, arr.Len()); err != nil {
+		return NilValue(), err
+	}
+	if len(indices.i64) == 0 {
+		return NilValue(), ErrDenseArrayEmpty
+	}
+	switch arr.dtype {
+	case DenseArrayI64:
+		return denseArrayGatherReduceI64(op, arr.i64, indices.i64)
+	case DenseArrayF64:
+		return denseArrayGatherReduceF64(op, arr.f64, indices.i64)
+	default:
+		return NilValue(), ErrDenseArrayDType
+	}
+}
+
+func denseArrayGatherReduceI64(op DenseArrayReduceOp, xs []int64, indices []int64) (Value, error) {
+	switch op {
+	case DenseArrayReduceSum:
+		var sum int64
+		for _, index := range indices {
+			sum += xs[index-1]
+		}
+		return IntValue(sum), nil
+	case DenseArrayReduceMin:
+		min := xs[indices[0]-1]
+		for _, index := range indices[1:] {
+			if v := xs[index-1]; v < min {
+				min = v
+			}
+		}
+		return IntValue(min), nil
+	case DenseArrayReduceMax:
+		max := xs[indices[0]-1]
+		for _, index := range indices[1:] {
+			if v := xs[index-1]; v > max {
+				max = v
+			}
+		}
+		return IntValue(max), nil
+	case DenseArrayReduceMean:
+		var sum float64
+		for _, index := range indices {
+			sum += float64(xs[index-1])
+		}
+		return FloatValue(sum / float64(len(indices))), nil
+	default:
+		return NilValue(), ErrDenseArrayReduceOp
+	}
+}
+
+func denseArrayGatherReduceF64(op DenseArrayReduceOp, xs []float64, indices []int64) (Value, error) {
+	switch op {
+	case DenseArrayReduceSum:
+		var sum float64
+		for _, index := range indices {
+			sum += xs[index-1]
+		}
+		return FloatValue(sum), nil
+	case DenseArrayReduceMin:
+		min := xs[indices[0]-1]
+		for _, index := range indices[1:] {
+			min = math.Min(min, xs[index-1])
+		}
+		return FloatValue(min), nil
+	case DenseArrayReduceMax:
+		max := xs[indices[0]-1]
+		for _, index := range indices[1:] {
+			max = math.Max(max, xs[index-1])
+		}
+		return FloatValue(max), nil
+	case DenseArrayReduceMean:
+		var sum float64
+		for _, index := range indices {
+			sum += xs[index-1]
+		}
+		return FloatValue(sum / float64(len(indices))), nil
+	default:
+		return NilValue(), ErrDenseArrayReduceOp
+	}
+}
+
 func denseArrayWhereReduceI64(op DenseArrayReduceOp, mask []bool, trueValue, falseValue Value) (Value, error) {
 	tv, fv := denseArrayI64Selector(trueValue), denseArrayI64Selector(falseValue)
 	switch op {
