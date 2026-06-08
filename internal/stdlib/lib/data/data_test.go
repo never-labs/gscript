@@ -2397,6 +2397,60 @@ func TestQueryKernelGroupedAggregateWithComputedWhereOrderLimit(t *testing.T) {
 	assertColumnValues(t, want, "notional", []any{3025.0, 2400.0})
 }
 
+func TestQueryKernelGroupedProjectionWithoutAggregates(t *testing.T) {
+	frame := mustFrame(t,
+		Column{Name: "sym", Data: NewSymbols([]string{"AAPL", "AAPL", "MSFT", "MSFT", "NVDA"})},
+		Column{Name: "qty", Data: NewI32([]int32{10, 20, 30, 30, 40})},
+		Column{Name: "px", Data: NewF64([]float64{100, 101, 80, 82, 120})},
+	)
+	plan := QueryPlan{
+		Source: frame,
+		Where:  In{Expr: ColumnRef{Name: "sym"}, Values: []any{Symbol("AAPL"), Symbol("MSFT")}},
+		By:     []Symbol{"sym"},
+		Select: []SelectItem{
+			{Name: "sym", Expr: ColumnRef{Name: "sym"}},
+			{Name: "bucket", Expr: Conditional{
+				Cond: Binary{Op: OpGE, Left: ColumnRef{Name: "qty"}, Right: Literal{Value: int32(30)}},
+				Then: Literal{Value: Symbol("large")},
+				Else: Literal{Value: Symbol("small")},
+			}},
+			{Name: "notional", Expr: Binary{Op: OpMul, Left: ColumnRef{Name: "qty"}, Right: ColumnRef{Name: "px"}}},
+		},
+		Distinct: true,
+		OrderBy:  []OrderSpec{{Column: "notional", Desc: true}},
+		LimitN:   3,
+	}
+
+	ok, reason := QueryKernelSupportReason(plan)
+	if !ok {
+		t.Fatalf("QueryKernelSupportReason rejected grouped projection: %s", reason)
+	}
+	if !strings.Contains(reason, "grouped projection path") || !strings.Contains(reason, "conditional projection") {
+		t.Fatalf("QueryKernelSupportReason = %q, want grouped conditional projection details", reason)
+	}
+	kernel, ok, err := CompileQueryKernel(frame, plan)
+	if err != nil {
+		t.Fatalf("CompileQueryKernel returned error: %v", err)
+	}
+	if !ok {
+		t.Fatal("CompileQueryKernel did not accept grouped projection")
+	}
+	got, err := kernel.Exec(frame)
+	if err != nil {
+		t.Fatalf("QueryKernel Exec returned error: %v", err)
+	}
+	want, err := plan.Exec()
+	if err != nil {
+		t.Fatalf("fallback Exec returned error: %v", err)
+	}
+	if !SameSchema(got, want) || got.Len() != want.Len() {
+		t.Fatalf("kernel schema/len = %#v/%d, want %#v/%d", got.Schema(), got.Len(), want.Schema(), want.Len())
+	}
+	assertColumnValues(t, got, "sym", []any{Symbol("MSFT"), Symbol("MSFT"), Symbol("AAPL")})
+	assertColumnValues(t, got, "bucket", []any{Symbol("large"), Symbol("large"), Symbol("small")})
+	assertColumnValues(t, got, "notional", []any{2460.0, 2400.0, 2020.0})
+}
+
 func TestQueryDistinctRows(t *testing.T) {
 	frame := mustFrame(t,
 		NewColumn("sym", []any{Symbol("a"), Symbol("b"), Symbol("a"), Symbol("a")}),

@@ -1194,6 +1194,21 @@ func TestQueryKernelSupportReasonClassifiesHotExpressionPaths(t *testing.T) {
 			want: []string{"grouped aggregate path", "bucketed by expression", "typed column aggregate"},
 		},
 		{
+			name: "grouped projection",
+			plan: QueryPlan{
+				By: []Symbol{"sym"},
+				Select: []SelectItem{{
+					Name: "side",
+					Expr: Conditional{
+						Cond: Binary{Op: OpGE, Left: ColumnRef{Name: "qty"}, Right: Literal{Value: int32(20)}},
+						Then: Literal{Value: Symbol("large")},
+						Else: Literal{Value: Symbol("small")},
+					},
+				}},
+			},
+			want: []string{"grouped projection path", "conditional projection"},
+		},
+		{
 			name: "list aggregate projection",
 			plan: QueryPlan{
 				Select: []SelectItem{{

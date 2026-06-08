@@ -4064,7 +4064,7 @@ func execGrouped(frame Frame, indexes []int, plan QueryPlan) (Frame, error) {
 		return Frame{}, fmt.Errorf("aggregate queries require at least one by column")
 	}
 	if len(plan.Aggregates) == 0 {
-		if planHasVectorProjection(plan) {
+		if len(plan.Select) > 0 {
 			return execGroupedProjection(frame, indexes, plan, byItems)
 		}
 		return Frame{}, fmt.Errorf("grouped queries require aggregates")
@@ -4154,15 +4154,6 @@ func execGrouped(frame Frame, indexes []int, plan QueryPlan) (Frame, error) {
 		cols = append(cols, NewColumn(agg.Name, values))
 	}
 	return NewFrame(cols...)
-}
-
-func planHasVectorProjection(plan QueryPlan) bool {
-	for _, item := range plan.Select {
-		if exprNeedsFullProjectionRows(item.Expr) {
-			return true
-		}
-	}
-	return false
 }
 
 type projectionGroup struct {

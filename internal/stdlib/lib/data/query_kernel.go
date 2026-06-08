@@ -883,8 +883,8 @@ func QueryKernelCompileReason(frame Frame, plan QueryPlan) (bool, string, error)
 // explain paths; CompileQueryKernel still returns ok=false without an error so
 // callers can preserve QueryPlan.Exec fallback semantics.
 func QueryKernelSupportReason(plan QueryPlan) (bool, string) {
-	if (len(plan.By) > 0 || len(plan.ByExprs) > 0) && len(plan.Aggregates) == 0 && !planHasVectorProjection(plan) {
-		return false, "grouped projection without aggregates requires QueryPlan fallback"
+	if (len(plan.By) > 0 || len(plan.ByExprs) > 0) && len(plan.Aggregates) == 0 && len(plan.Select) == 0 {
+		return false, "grouped query without aggregates or select requires QueryPlan fallback"
 	}
 	for _, item := range plan.ByExprs {
 		if reason := queryKernelExprUnsupportedReason(item.Expr); reason != "" {
@@ -948,6 +948,8 @@ func queryKernelSupportSuccessReason(plan QueryPlan) string {
 	switch {
 	case len(plan.By)+len(plan.ByExprs) > 0 && len(plan.Aggregates) > 0:
 		return queryKernelReason("grouped aggregate path", detail)
+	case len(plan.By)+len(plan.ByExprs) > 0:
+		return queryKernelReason("grouped projection path", detail)
 	case plan.Distinct:
 		return queryKernelReason("distinct projection path", detail)
 	case len(plan.OrderBy) > 0 && plan.PreProjectOrder:
