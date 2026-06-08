@@ -865,6 +865,31 @@ func (v Value) NativeFrameCompareFilterProjectColumn(columnName string, op Dense
 	return DenseArrayValue(out), true, nil
 }
 
+// NativeFrameCompareLiteralFilterProjectColumn computes a typed frame-column
+// comparison against a scalar literal and returns one filtered projected column.
+// String RHS values remain literals instead of being resolved as column names.
+func (v Value) NativeFrameCompareLiteralFilterProjectColumn(columnName string, op DenseArrayBinaryOp, rhs Value, names []string, resultName string) (Value, bool, error) {
+	if columnName == "" {
+		return NilValue(), true, fmt.Errorf("FRAME_COMPARE_LITERAL_FILTER_PROJECT_COLUMN column name must not be empty")
+	}
+	if !isComparisonOp(op) {
+		return NilValue(), true, fmt.Errorf("FRAME_COMPARE_LITERAL_FILTER_PROJECT_COLUMN op %d is not a comparison", op)
+	}
+	frame, col, handled, err := v.nativeFrameProjectedColumn("FRAME_COMPARE_LITERAL_FILTER_PROJECT_COLUMN", names, resultName)
+	if err != nil || !handled {
+		return NilValue(), handled, err
+	}
+	mask, err := frame.MaskLiteralOp(columnName, op, rhs)
+	if err != nil {
+		return NilValue(), true, err
+	}
+	out, err := col.Filter(mask)
+	if err != nil {
+		return NilValue(), true, err
+	}
+	return DenseArrayValue(out), true, nil
+}
+
 func (v Value) nativeFrameProjectedColumn(op string, names []string, resultName string) (*SoA, *DenseArray, bool, error) {
 	if len(names) == 0 {
 		return nil, nil, true, fmt.Errorf("%s requires at least one projected column", op)

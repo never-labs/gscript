@@ -1767,6 +1767,66 @@ func TestQFramePrimitiveBoolMaskLowersToTypedRuntimeKernel(t *testing.T) {
 	}
 }
 
+func TestQFramePrimitiveLiteralMaskLowersToTypedRuntimeKernel(t *testing.T) {
+	names := runtime.NewTable()
+	names.RawSetInt(1, runtime.StringValue("price"))
+	mask := runtime.NewTable()
+	mask.RawSetString("column", runtime.StringValue("sym"))
+	mask.RawSetString("op", runtime.StringValue("=="))
+	mask.RawSetString("value", runtime.StringValue("AAPL"))
+	mask.RawSetString("value_kind", runtime.StringValue("literal"))
+	proto := &vm.FuncProto{
+		Name:      "q_frame_literal_mask_pipeline_lowered",
+		NumParams: 1,
+		MaxStack:  2,
+		Constants: []runtime.Value{
+			runtime.TableValue(mask),
+			runtime.TableValue(names),
+			runtime.StringValue("price"),
+		},
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_FRAME_MASK, 1, 0, 0),
+			vm.EncodeABC(vm.OP_FRAME_FILTER, 0, 0, 1),
+			vm.EncodeABC(vm.OP_FRAME_PROJECT, 0, 0, 1),
+			vm.EncodeABC(vm.OP_FRAME_COLUMN, 0, 0, 2),
+			vm.EncodeABC(vm.OP_RETURN, 0, 2, 0),
+		},
+	}
+
+	fn := BuildGraph(proto)
+	lowered, err := QQueryNativeLoweringPass(fn)
+	if err != nil {
+		t.Fatalf("QQueryNativeLoweringPass: %v", err)
+	}
+	counts := countOps(lowered)
+	if counts[OpQFrameSelectColumn] != 1 {
+		t.Fatalf("OpQFrameSelectColumn count = %d, want 1\n%s", counts[OpQFrameSelectColumn], Print(lowered))
+	}
+	for _, op := range []Op{OpFrameMask, OpFrameFilter, OpFrameProject, OpFrameColumn} {
+		if counts[op] != 0 {
+			t.Fatalf("%s count = %d, want 0 after lowering\n%s", op, counts[op], Print(lowered))
+		}
+	}
+	if len(lowered.QFrameSelectColumnSpecs) != 1 {
+		t.Fatalf("QFrameSelectColumnSpecs count = %d, want 1", len(lowered.QFrameSelectColumnSpecs))
+	}
+	if got := lowered.QFrameSelectColumnSpecs[0].Shape; got != "mask/filter/project/column" {
+		t.Fatalf("lowered q spec shape = %q, want mask/filter/project/column", got)
+	}
+
+	result, err := Interpret(lowered, []runtime.Value{runtime.TableValue(qHotPathStringTestFrame(t))})
+	if err != nil {
+		t.Fatalf("Interpret lowered literal-mask q hot path: %v", err)
+	}
+	if len(result) != 1 || !result[0].IsDenseArray() {
+		t.Fatalf("lowered result = %#v, want one dense array", result)
+	}
+	got, ok := result[0].DenseArray().F64()
+	if !ok || len(got) != 2 || got[0] != 99 || got[1] != 101.25 {
+		t.Fatalf("lowered result values = %#v, want [99 101.25]", got)
+	}
+}
+
 func TestQFramePrimitiveHotPathDetectsGatheredRows(t *testing.T) {
 	names := runtime.NewTable()
 	names.RawSetInt(1, runtime.StringValue("size"))
@@ -4611,6 +4671,49 @@ func TestFrameCompareFilterProjectColumnRuntimeHelperUsesRuntimePrimitive(t *tes
 		"size",
 	); err == nil {
 		t.Fatalf("execute frame compare filter project column accepted arithmetic op")
+	}
+}
+
+func TestQFrameSelectColumnLiteralMaskUsesFusedHelper(t *testing.T) {
+	names := runtime.NewTable()
+	names.RawSetInt(1, runtime.StringValue("price"))
+	mask := runtime.NewTable()
+	mask.RawSetString("column", runtime.StringValue("sym"))
+	mask.RawSetString("op", runtime.StringValue("=="))
+	mask.RawSetString("value", runtime.StringValue("AAPL"))
+	mask.RawSetString("value_kind", runtime.StringValue("literal"))
+	constants := []runtime.Value{
+		runtime.TableValue(mask),
+		runtime.TableValue(names),
+		runtime.StringValue("price"),
+	}
+	spec := QFrameSelectColumnSpec{
+		Shape:             "mask/filter/project/column",
+		MaskSpecConst:     0,
+		SourceColumnConst: -1,
+		ProjectConst:      1,
+		ResultColumnConst: 2,
+		RowMode:           QFrameSelectColumnRowsNone,
+	}
+
+	out, ok, err := executeQFrameSelectColumnCompareFilterProject(
+		constants,
+		spec,
+		runtime.TableValue(qHotPathStringTestFrame(t)),
+		runtime.NilValue(),
+		false,
+		[]string{"price"},
+		"price",
+	)
+	if err != nil {
+		t.Fatalf("execute q frame select-column literal mask: %v", err)
+	}
+	if !ok {
+		t.Fatalf("execute q frame select-column literal mask returned ok=false, want fused helper path")
+	}
+	got, gotOK := out.DenseArray().F64()
+	if !gotOK || len(got) != 2 || got[0] != 99 || got[1] != 101.25 {
+		t.Fatalf("literal mask fused values = %#v, want [99 101.25]", got)
 	}
 }
 

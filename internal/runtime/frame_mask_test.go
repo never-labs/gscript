@@ -297,6 +297,42 @@ func TestNativeFrameCompareFilterProjectColumnFusesTypedRuntimePath(t *testing.T
 	}
 }
 
+func TestNativeFrameCompareLiteralFilterProjectColumnFusesTypedRuntimePath(t *testing.T) {
+	soa, err := NewSoA(map[string]*DenseArray{
+		"sym":   NewDenseArrayString([]string{"AAPL", "MSFT", "AAPL"}),
+		"price": NewDenseArrayF64([]float64{99, 100.5, 101.25}),
+		"AAPL":  NewDenseArrayString([]string{"MSFT", "MSFT", "MSFT"}),
+	})
+	if err != nil {
+		t.Fatalf("NewSoA: %v", err)
+	}
+	frame := NewTable()
+	frame.SetNativePayloadWithInfo(soa, NativePayloadInfo{
+		Kind:       NativePayloadDataFrame,
+		Rows:       soa.Len(),
+		Columns:    2,
+		SchemaHash: "compare-literal-filter-project-column-test",
+	})
+
+	col, handled, err := TableValue(frame).NativeFrameCompareLiteralFilterProjectColumn("sym", DenseArrayEQ, StringValue("AAPL"), []string{"price"}, "price")
+	if err != nil {
+		t.Fatalf("NativeFrameCompareLiteralFilterProjectColumn: %v", err)
+	}
+	if !handled || !col.IsDenseArray() {
+		t.Fatalf("NativeFrameCompareLiteralFilterProjectColumn = %v handled=%v, want dense array", col, handled)
+	}
+	got, ok := col.DenseArray().F64()
+	if !ok || len(got) != 2 || got[0] != 99 || got[1] != 101.25 {
+		t.Fatalf("compare literal filter project column values = %#v, want [99 101.25]", got)
+	}
+	if _, handled, err := TableValue(frame).NativeFrameCompareLiteralFilterProjectColumn("sym", DenseArrayAdd, StringValue("AAPL"), []string{"price"}, "price"); !handled || err == nil {
+		t.Fatalf("NativeFrameCompareLiteralFilterProjectColumn arithmetic op handled=%v err=%v, want handled error", handled, err)
+	}
+	if _, handled, err := TableValue(frame).NativeFrameCompareLiteralFilterProjectColumn("sym", DenseArrayEQ, StringValue("AAPL"), []string{"sym"}, "price"); !handled || err == nil {
+		t.Fatalf("NativeFrameCompareLiteralFilterProjectColumn unprojected result handled=%v err=%v, want handled error", handled, err)
+	}
+}
+
 func TestNativeFrameProjectedColumnValidationKeepsPrimitiveNames(t *testing.T) {
 	soa, err := NewSoA(map[string]*DenseArray{
 		"price": NewDenseArrayF64([]float64{10, 12, 8}),

@@ -164,6 +164,17 @@ func executeFrameCompareFilterProjectColumnValue(frameVal runtime.Value, sourceN
 	return out, nil
 }
 
+func executeFrameCompareLiteralFilterProjectColumnValue(frameVal runtime.Value, sourceName string, op runtime.DenseArrayBinaryOp, rhs runtime.Value, names []string, resultName string) (runtime.Value, error) {
+	out, handled, err := frameVal.NativeFrameCompareLiteralFilterProjectColumn(sourceName, op, rhs, names, resultName)
+	if err != nil {
+		return runtime.NilValue(), err
+	}
+	if !handled {
+		return runtime.NilValue(), fmt.Errorf("FrameCompareLiteralFilterProjectColumn operand must be native frame (got %s)", frameVal.TypeName())
+	}
+	return out, nil
+}
+
 func executeFrameFilterProjectValue(frameVal, maskVal runtime.Value, names []string) (runtime.Value, error) {
 	if !maskVal.IsDenseArray() {
 		return runtime.NilValue(), fmt.Errorf("FrameFilterProject mask must be dense array (got %s)", maskVal.TypeName())
@@ -319,12 +330,13 @@ func executeQFrameSelectColumnCompareFilterProject(constants []runtime.Value, sp
 			out, err := executeFrameBoolMaskFilterProjectColumnValue(frameVal, maskSpec.Name, names, resultName)
 			return out, true, err
 		}
-		if maskSpec.RHSLiteral {
-			return runtime.NilValue(), false, nil
-		}
 		denseOp, err := runtime.DenseArrayCompareOp(maskSpec.Op)
 		if err != nil {
 			return runtime.NilValue(), true, err
+		}
+		if maskSpec.RHSLiteral {
+			out, err := executeFrameCompareLiteralFilterProjectColumnValue(frameVal, maskSpec.Name, denseOp, maskSpec.RHS, names, resultName)
+			return out, true, err
 		}
 		out, err := executeFrameCompareFilterProjectColumnValue(frameVal, maskSpec.Name, denseOp, maskSpec.RHS, names, resultName)
 		return out, true, err
