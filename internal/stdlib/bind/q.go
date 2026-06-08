@@ -97,6 +97,20 @@ type qSQLKernelCacheKeyStats struct {
 	Evictions int
 }
 
+// QSQLKernelCacheKeyStatJSONRow is the stable external row shape for qSQL
+// semantic kernel cache key statistics.
+type QSQLKernelCacheKeyStatJSONRow struct {
+	Key             string `json:"key"`
+	Namespace       string `json:"namespace"`
+	Kind            string `json:"kind"`
+	SchemaHash      string `json:"schema_hash"`
+	PlanFingerprint string `json:"plan_fingerprint"`
+	Shape           string `json:"shape"`
+	Hits            int    `json:"hits"`
+	Misses          int    `json:"misses"`
+	Evictions       int    `json:"evictions"`
+}
+
 type qSQLKernelShapeStat struct {
 	Shape      string
 	SchemaHash string
@@ -138,6 +152,20 @@ type qSQLKernelDecisionKeyStat struct {
 	ReasonCode   string
 	ReasonFamily string
 	Count        int
+}
+
+// QSQLKernelDecisionKeyStatJSONRow is the stable external row shape for qSQL
+// unsupported kernel-decision cache key statistics.
+type QSQLKernelDecisionKeyStatJSONRow struct {
+	Key             string `json:"key"`
+	Namespace       string `json:"namespace"`
+	Kind            string `json:"kind"`
+	SchemaHash      string `json:"schema_hash"`
+	PlanFingerprint string `json:"plan_fingerprint"`
+	Shape           string `json:"shape"`
+	ReasonFamily    string `json:"reason_family"`
+	ReasonCode      string `json:"reason_code"`
+	Count           int    `json:"count"`
 }
 
 var (
@@ -3332,6 +3360,30 @@ func qKernelShapeStatsTable(stats []qSQLKernelShapeStat) *Table {
 	return rows
 }
 
+// QSQLKernelCacheKeyStatJSONRows converts qSQL semantic kernel cache key stats
+// to a schema-stable JSON row shape.
+func QSQLKernelCacheKeyStatJSONRows(stats []qSQLKernelCacheKeyStats) []QSQLKernelCacheKeyStatJSONRow {
+	if len(stats) == 0 {
+		return nil
+	}
+	out := make([]QSQLKernelCacheKeyStatJSONRow, 0, len(stats))
+	for _, stat := range stats {
+		info := qSQLKernelCacheKeyInfo(stat.Key)
+		out = append(out, QSQLKernelCacheKeyStatJSONRow{
+			Key:             stat.Key,
+			Namespace:       info.Namespace,
+			Kind:            info.Kind,
+			SchemaHash:      info.SchemaHash,
+			PlanFingerprint: qSQLKernelCacheKeyPlanFingerprint(info),
+			Shape:           stat.Shape,
+			Hits:            stat.Hits,
+			Misses:          stat.Misses,
+			Evictions:       stat.Evictions,
+		})
+	}
+	return out
+}
+
 func qKernelCacheKeyStatsTable(stats []qSQLKernelCacheKeyStats) *Table {
 	rows := NewAppendArrayTable(len(stats))
 	for i, stat := range stats {
@@ -3341,11 +3393,7 @@ func qKernelCacheKeyStatsTable(stats []qSQLKernelCacheKeyStats) *Table {
 		row.RawSetString("namespace", StringValue(info.Namespace))
 		row.RawSetString("kind", StringValue(info.Kind))
 		row.RawSetString("schema_hash", StringValue(info.SchemaHash))
-		planFingerprint := ""
-		if len(info.Extra) > 0 {
-			planFingerprint = info.Extra[0]
-		}
-		row.RawSetString("plan_fingerprint", StringValue(planFingerprint))
+		row.RawSetString("plan_fingerprint", StringValue(qSQLKernelCacheKeyPlanFingerprint(info)))
 		row.RawSetString("shape", StringValue(stat.Shape))
 		row.RawSetString("hits", IntValue(int64(stat.Hits)))
 		row.RawSetString("misses", IntValue(int64(stat.Misses)))
@@ -3353,6 +3401,13 @@ func qKernelCacheKeyStatsTable(stats []qSQLKernelCacheKeyStats) *Table {
 		rows.RawSetInt(int64(i+1), TableValue(row))
 	}
 	return rows
+}
+
+func qSQLKernelCacheKeyPlanFingerprint(info data.SchemaStableCacheKeyParts) string {
+	if len(info.Extra) == 0 {
+		return ""
+	}
+	return info.Extra[0]
 }
 
 func qSQLKernelDecisionKeyStatsSnapshotLocked() []qSQLKernelDecisionKeyStat {
@@ -3458,11 +3513,7 @@ func qKernelDecisionKeyStatsTable(stats []qSQLKernelDecisionKeyStat) *Table {
 		row.RawSetString("namespace", StringValue(info.Namespace))
 		row.RawSetString("kind", StringValue(info.Kind))
 		row.RawSetString("schema_hash", StringValue(info.SchemaHash))
-		planFingerprint := ""
-		if len(info.Extra) > 0 {
-			planFingerprint = info.Extra[0]
-		}
-		row.RawSetString("plan_fingerprint", StringValue(planFingerprint))
+		row.RawSetString("plan_fingerprint", StringValue(qSQLKernelCacheKeyPlanFingerprint(info)))
 		row.RawSetString("shape", StringValue(stat.Shape))
 		row.RawSetString("reason_family", StringValue(stat.ReasonFamily))
 		row.RawSetString("reason_code", StringValue(stat.ReasonCode))
@@ -3470,6 +3521,30 @@ func qKernelDecisionKeyStatsTable(stats []qSQLKernelDecisionKeyStat) *Table {
 		rows.RawSetInt(int64(i+1), TableValue(row))
 	}
 	return rows
+}
+
+// QSQLKernelDecisionKeyStatJSONRows converts unsupported qSQL kernel decision
+// key stats to a schema-stable JSON row shape.
+func QSQLKernelDecisionKeyStatJSONRows(stats []qSQLKernelDecisionKeyStat) []QSQLKernelDecisionKeyStatJSONRow {
+	if len(stats) == 0 {
+		return nil
+	}
+	out := make([]QSQLKernelDecisionKeyStatJSONRow, 0, len(stats))
+	for _, stat := range stats {
+		info := qSQLKernelCacheKeyInfo(stat.Key)
+		out = append(out, QSQLKernelDecisionKeyStatJSONRow{
+			Key:             stat.Key,
+			Namespace:       info.Namespace,
+			Kind:            info.Kind,
+			SchemaHash:      info.SchemaHash,
+			PlanFingerprint: qSQLKernelCacheKeyPlanFingerprint(info),
+			Shape:           stat.Shape,
+			ReasonFamily:    stat.ReasonFamily,
+			ReasonCode:      stat.ReasonCode,
+			Count:           stat.Count,
+		})
+	}
+	return out
 }
 
 func qKernelDecisionReasonStatsTable(stats []qSQLKernelDecisionReasonStat) *Table {

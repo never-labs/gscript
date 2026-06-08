@@ -1,6 +1,7 @@
 package bind
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
@@ -3980,6 +3981,20 @@ func TestQExplainReportsQueryKernelVisibility(t *testing.T) {
 	if keyStats.Misses != 1 || keyStats.Hits != 1 || keyStats.Evictions != 0 {
 		t.Fatalf("kernel cache key stats = %+v, want one miss, one hit, zero evictions", keyStats)
 	}
+	keyJSONRows := QSQLKernelCacheKeyStatJSONRows(stats.KernelKeys)
+	if len(keyJSONRows) != 1 {
+		t.Fatalf("QSQLKernelCacheKeyStatJSONRows = %+v, want one row", keyJSONRows)
+	}
+	if got := keyJSONRows[0]; got.Key != cacheKey.Str() || got.Namespace != query || got.Kind != "kernel" || got.SchemaHash != frame.SchemaFingerprint() || got.PlanFingerprint != planFingerprint.Str() || got.Shape != kernelShape.Str() || got.Hits != 1 || got.Misses != 1 || got.Evictions != 0 {
+		t.Fatalf("QSQLKernelCacheKeyStatJSONRows[0] = %+v, want stable qsql kernel key row", got)
+	}
+	keyJSON, err := json.Marshal(keyJSONRows)
+	if err != nil {
+		t.Fatalf("marshal QSQLKernelCacheKeyStatJSONRows: %v", err)
+	}
+	if !strings.Contains(string(keyJSON), `"schema_hash"`) || !strings.Contains(string(keyJSON), `"plan_fingerprint"`) || strings.Contains(string(keyJSON), "SchemaHash") || strings.Contains(string(keyJSON), "PlanFingerprint") {
+		t.Fatalf("QSQLKernelCacheKeyStatJSONRows JSON = %s, want snake_case stable fields", keyJSON)
+	}
 	cacheRows := qCacheStatsTable()
 	kernelRow := qTestCacheStatsRowTable(t, cacheRows, "qsql_kernel")
 	keyRows := kernelRow.RawGetString("keys").Table()
@@ -4592,6 +4607,23 @@ func TestQSQLKernelUnsupportedDecisionCacheIsSchemaStable(t *testing.T) {
 	}
 	if keyRows[0].ReasonFamily != qFallbackFamilySelect || keyRows[0].ReasonCode != stdq.KernelFallbackSelectExpression || keyRows[0].Count != 1 {
 		t.Fatalf("qsql_kernel_decision key reason = %+v, want select reason count 1", keyRows[0])
+	}
+	qSQLAlignedPlanCacheMu.Lock()
+	decisionKeyStats := qSQLKernelDecisionKeyStatsSnapshotLocked()
+	qSQLAlignedPlanCacheMu.Unlock()
+	decisionJSONRows := QSQLKernelDecisionKeyStatJSONRows(decisionKeyStats)
+	if len(decisionJSONRows) != 1 {
+		t.Fatalf("QSQLKernelDecisionKeyStatJSONRows = %+v, want one row", decisionJSONRows)
+	}
+	if got := decisionJSONRows[0]; got.Key != keyRows[0].Key || got.Namespace != src || got.Kind != "kernel" || got.SchemaHash != frame.SchemaFingerprint() || got.Shape != keyRows[0].Shape || got.ReasonFamily != qFallbackFamilySelect || got.ReasonCode != stdq.KernelFallbackSelectExpression || got.Count != 1 {
+		t.Fatalf("QSQLKernelDecisionKeyStatJSONRows[0] = %+v, want stable qsql decision key row", got)
+	}
+	decisionJSON, err := json.Marshal(decisionJSONRows)
+	if err != nil {
+		t.Fatalf("marshal QSQLKernelDecisionKeyStatJSONRows: %v", err)
+	}
+	if !strings.Contains(string(decisionJSON), `"schema_hash"`) || !strings.Contains(string(decisionJSON), `"reason_code"`) || strings.Contains(string(decisionJSON), "SchemaHash") || strings.Contains(string(decisionJSON), "ReasonCode") {
+		t.Fatalf("QSQLKernelDecisionKeyStatJSONRows JSON = %s, want snake_case stable fields", decisionJSON)
 	}
 	reasonRows := qTestKernelDecisionReasonRows(t, decisionRow.RawGetString("reasons").Table())
 	if got := qTestKernelDecisionReasonCount(reasonRows, qFallbackFamilySelect, stdq.KernelFallbackSelectExpression); got != 1 {
