@@ -2393,16 +2393,20 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 			if err != nil {
 				return nil, wrapLineErr(frame, err)
 			}
-			denseOp, err := runtime.DenseArrayCompareOp(spec.Op)
-			if err != nil {
-				return nil, wrapLineErr(frame, err)
-			}
 			var out runtime.Value
 			var handled bool
-			if spec.RHSLiteral {
-				out, handled, err = frameVal.NativeFrameMaskLiteralOp(spec.Name, denseOp, spec.RHS)
+			if spec.Mode == "bool_column" {
+				out, handled, err = frameVal.NativeFrameBoolMask(spec.Name)
 			} else {
-				out, handled, err = frameVal.NativeFrameMaskOp(spec.Name, denseOp, spec.RHS)
+				denseOp, denseErr := runtime.DenseArrayCompareOp(spec.Op)
+				if denseErr != nil {
+					return nil, wrapLineErr(frame, denseErr)
+				}
+				if spec.RHSLiteral {
+					out, handled, err = frameVal.NativeFrameMaskLiteralOp(spec.Name, denseOp, spec.RHS)
+				} else {
+					out, handled, err = frameVal.NativeFrameMaskOp(spec.Name, denseOp, spec.RHS)
+				}
 			}
 			if err != nil {
 				return nil, wrapLineErr(frame, err)
@@ -4295,6 +4299,7 @@ type frameMaskSpecData struct {
 	Name       string
 	Op         string
 	RHS        runtime.Value
+	Mode       string
 	RHSLiteral bool
 }
 
@@ -4315,6 +4320,10 @@ func frameMaskSpec(v runtime.Value) (frameMaskSpecData, error) {
 	if rhs.IsNil() {
 		rhs = tbl.RawGetInt(3)
 	}
+	mode := tbl.RawGetString("mode")
+	if mode.IsString() && mode.Str() == "bool_column" && column.IsString() {
+		return frameMaskSpecData{Name: column.Str(), Mode: "bool_column"}, nil
+	}
 	if !column.IsString() || !op.IsString() {
 		return frameMaskSpecData{}, fmt.Errorf("FRAME_MASK spec must provide column and op")
 	}
@@ -4323,8 +4332,16 @@ func frameMaskSpec(v runtime.Value) (frameMaskSpecData, error) {
 		Name:       column.Str(),
 		Op:         op.Str(),
 		RHS:        rhs,
+		Mode:       stringValueOrEmpty(mode),
 		RHSLiteral: valueKind.IsString() && valueKind.Str() == "literal",
 	}, nil
+}
+
+func stringValueOrEmpty(v runtime.Value) string {
+	if v.IsString() {
+		return v.Str()
+	}
+	return ""
 }
 
 func frameOrderSpec(v runtime.Value) ([]string, []bool, int, error) {

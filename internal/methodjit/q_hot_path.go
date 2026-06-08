@@ -1126,6 +1126,7 @@ type qSimpleFramePredicate struct {
 	Column    string
 	Op        string
 	Value     runtime.Value
+	Mode      string
 	ValueKind string
 }
 
@@ -1348,6 +1349,10 @@ func qSimpleIdentifier(name string) bool {
 }
 
 func qParseSimpleFramePredicate(text string) (qSimpleFramePredicate, bool) {
+	text = strings.TrimSpace(text)
+	if qSimpleBareBoolPredicateIdentifier(text) {
+		return qSimpleFramePredicate{Column: text, Mode: "bool_column"}, true
+	}
 	for _, op := range []string{">=", "<=", "!=", "<>", "==", "=", ">", "<"} {
 		idx := strings.Index(text, op)
 		if idx < 0 {
@@ -1373,6 +1378,18 @@ func qParseSimpleFramePredicate(text string) (qSimpleFramePredicate, bool) {
 		return qSimpleFramePredicate{Column: column, Op: op, Value: value, ValueKind: valueKind}, true
 	}
 	return qSimpleFramePredicate{}, false
+}
+
+func qSimpleBareBoolPredicateIdentifier(text string) bool {
+	if !qSimpleIdentifier(text) {
+		return false
+	}
+	switch strings.ToLower(text) {
+	case "true", "false", "null", "nil", "and", "or", "not":
+		return false
+	default:
+		return true
+	}
 }
 
 func qParseSimpleFramePredicateValue(text string) (runtime.Value, string, bool) {
@@ -1467,8 +1484,15 @@ func qInsertGroupAggregateMaskArg(fn *Function, block *Block, before *Instr, fra
 func qFrameMaskSpecValue(predicate qSimpleFramePredicate) runtime.Value {
 	tbl := runtime.NewTable()
 	tbl.RawSetString("column", runtime.StringValue(predicate.Column))
-	tbl.RawSetString("op", runtime.StringValue(predicate.Op))
-	tbl.RawSetString("value", predicate.Value)
+	if predicate.Mode != "" {
+		tbl.RawSetString("mode", runtime.StringValue(predicate.Mode))
+	}
+	if predicate.Op != "" {
+		tbl.RawSetString("op", runtime.StringValue(predicate.Op))
+	}
+	if !predicate.Value.IsNil() {
+		tbl.RawSetString("value", predicate.Value)
+	}
 	if predicate.ValueKind != "" {
 		tbl.RawSetString("value_kind", runtime.StringValue(predicate.ValueKind))
 	}

@@ -143,6 +143,7 @@ func TestNativeFrameMaskOpUsesTypedComparison(t *testing.T) {
 		"price": NewDenseArrayF64([]float64{10, 12, 8}),
 		"limit": NewDenseArrayF64([]float64{9, 12, 9}),
 		"sym":   NewDenseArrayString([]string{"AAPL", "MSFT", "AAPL"}),
+		"live":  NewDenseArrayBool([]bool{true, false, true}),
 	})
 	if err != nil {
 		t.Fatalf("NewSoA: %v", err)
@@ -181,6 +182,18 @@ func TestNativeFrameMaskOpUsesTypedComparison(t *testing.T) {
 	stringGot, ok := stringMask.DenseArray().Bool()
 	if !ok || len(stringGot) != 3 || !stringGot[0] || stringGot[1] || !stringGot[2] {
 		t.Fatalf("string literal mask = %#v, want [true false true]", stringGot)
+	}
+
+	boolMask, handled, err := TableValue(frame).NativeFrameBoolMask("live")
+	if err != nil {
+		t.Fatalf("NativeFrameBoolMask: %v", err)
+	}
+	if !handled || !boolMask.IsDenseArray() {
+		t.Fatalf("NativeFrameBoolMask = %v handled=%v, want dense array", boolMask, handled)
+	}
+	boolGot, ok := boolMask.DenseArray().Bool()
+	if !ok || len(boolGot) != 3 || !boolGot[0] || boolGot[1] || !boolGot[2] {
+		t.Fatalf("bool column mask = %#v, want [true false true]", boolGot)
 	}
 }
 

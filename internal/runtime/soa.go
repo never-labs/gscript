@@ -533,6 +533,25 @@ func (s *SoA) MaskLiteralOp(columnName string, op DenseArrayBinaryOp, rhs Value)
 	return denseArrayCompareMask(left, op, rhs)
 }
 
+// BoolMaskColumn returns a copy of a boolean column as a row mask.
+func (s *SoA) BoolMaskColumn(columnName string) (*DenseArray, error) {
+	if s == nil {
+		return nil, fmt.Errorf("soa is nil")
+	}
+	col, ok := s.Column(columnName)
+	if !ok {
+		return nil, fmt.Errorf("soa column %q not found", columnName)
+	}
+	if col.DType() != DenseArrayBool {
+		return nil, ErrDenseArrayDType
+	}
+	out, err := col.Clone()
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func denseArrayCompareOp(op string) (DenseArrayBinaryOp, error) {
 	switch op {
 	case "==", "eq":

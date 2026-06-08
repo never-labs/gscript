@@ -236,6 +236,43 @@ func TestFrameMaskPrimitiveSupportsStringLiteralSpec(t *testing.T) {
 	}
 }
 
+func TestFrameMaskPrimitiveSupportsBoolColumnSpec(t *testing.T) {
+	soa, err := runtime.NewSoA(map[string]*runtime.DenseArray{
+		"active": runtime.NewDenseArrayBool([]bool{true, false, true}),
+		"id":     runtime.NewDenseArrayI64([]int64{10, 20, 30}),
+	})
+	if err != nil {
+		t.Fatalf("NewSoA: %v", err)
+	}
+	frame := runtime.NewTable()
+	frame.SetNativePayloadWithInfo(soa, runtime.NativePayloadInfo{
+		Kind:       runtime.NativePayloadDataFrame,
+		Rows:       soa.Len(),
+		Columns:    2,
+		SchemaHash: "soa-frame-bool-mask-test",
+	})
+	spec := runtime.NewTable()
+	spec.RawSetString("column", runtime.StringValue("active"))
+	spec.RawSetString("mode", runtime.StringValue("bool_column"))
+	proto := &FuncProto{
+		MaxStack:  2,
+		Code:      frameMaskPrimitiveProgram(),
+		Constants: []runtime.Value{runtime.TableValue(frame), runtime.TableValue(spec), runtime.StringValue("id")},
+	}
+
+	results, err := New(map[string]runtime.Value{}).Execute(proto)
+	if err != nil {
+		t.Fatalf("Execute FRAME_MASK bool column: %v", err)
+	}
+	if len(results) != 1 || !results[0].IsDenseArray() {
+		t.Fatalf("FRAME_MASK bool column follow-up column result = %#v, want dense array", results)
+	}
+	got, ok := results[0].DenseArray().I64()
+	if !ok || len(got) != 2 || got[0] != 10 || got[1] != 30 {
+		t.Fatalf("bool column masked id column = %#v, want [10 30]", got)
+	}
+}
+
 func TestFrameColumnPrimitiveRejectsMissingColumn(t *testing.T) {
 	soa, err := runtime.NewSoA(map[string]*runtime.DenseArray{
 		"x": runtime.NewDenseArrayF64([]float64{1, 2}),

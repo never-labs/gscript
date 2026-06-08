@@ -763,6 +763,22 @@ func (v Value) NativeFrameMaskLiteralOp(name string, op DenseArrayBinaryOp, rhs 
 	return DenseArrayValue(mask), true, nil
 }
 
+// NativeFrameBoolMask returns a boolean frame column as a dense row mask.
+func (v Value) NativeFrameBoolMask(name string) (Value, bool, error) {
+	if name == "" {
+		return NilValue(), true, fmt.Errorf("FRAME_MASK column name must not be empty")
+	}
+	frame, _, handled, err := v.nativeFrameSoA("FRAME_MASK")
+	if err != nil || !handled {
+		return NilValue(), handled, err
+	}
+	mask, err := frame.BoolMaskColumn(name)
+	if err != nil {
+		return NilValue(), true, err
+	}
+	return DenseArrayValue(mask), true, nil
+}
+
 // NativeFrameProject returns a new runtime frame facade that carries a projected
 // subset of a runtime-owned native frame payload.
 func (v Value) NativeFrameProject(names []string) (Value, bool, error) {

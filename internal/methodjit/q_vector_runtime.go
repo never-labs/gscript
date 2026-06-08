@@ -36,6 +36,16 @@ func executeFrameMaskValue(frameVal runtime.Value, spec runtime.Value) (runtime.
 	if err != nil {
 		return runtime.NilValue(), err
 	}
+	if maskSpec.Mode == "bool_column" {
+		out, handled, err := frameVal.NativeFrameBoolMask(maskSpec.Name)
+		if err != nil {
+			return runtime.NilValue(), err
+		}
+		if !handled {
+			return runtime.NilValue(), fmt.Errorf("FrameMask operand must be native frame (got %s)", frameVal.TypeName())
+		}
+		return out, nil
+	}
 	denseOp, err := runtime.DenseArrayCompareOp(maskSpec.Op)
 	if err != nil {
 		return runtime.NilValue(), err
@@ -51,6 +61,9 @@ func executeFrameMaskValue(frameVal runtime.Value, spec runtime.Value) (runtime.
 }
 
 func executeNativeFrameMaskOp(frameVal runtime.Value, spec frameMaskSpecData, denseOp runtime.DenseArrayBinaryOp) (runtime.Value, bool, error) {
+	if spec.Mode == "bool_column" {
+		return frameVal.NativeFrameBoolMask(spec.Name)
+	}
 	if spec.RHSLiteral {
 		return frameVal.NativeFrameMaskLiteralOp(spec.Name, denseOp, spec.RHS)
 	}
@@ -291,7 +304,7 @@ func executeQFrameSelectColumnCompareFilterProject(constants []runtime.Value, sp
 		if err != nil {
 			return runtime.NilValue(), true, err
 		}
-		if maskSpec.RHSLiteral {
+		if maskSpec.Mode == "bool_column" || maskSpec.RHSLiteral {
 			return runtime.NilValue(), false, nil
 		}
 		denseOp, err := runtime.DenseArrayCompareOp(maskSpec.Op)
@@ -536,6 +549,7 @@ type frameMaskSpecData struct {
 	Name       string
 	Op         string
 	RHS        runtime.Value
+	Mode       string
 	RHSLiteral bool
 }
 
@@ -565,15 +579,28 @@ func frameMaskSpecDetails(v runtime.Value) (frameMaskSpecData, error) {
 		rhs = tbl.RawGetInt(3)
 	}
 	if !column.IsString() || !op.IsString() {
+		mode := tbl.RawGetString("mode")
+		if mode.IsString() && mode.Str() == "bool_column" && column.IsString() {
+			return frameMaskSpecData{Name: column.Str(), Mode: "bool_column"}, nil
+		}
 		return frameMaskSpecData{}, fmt.Errorf("FrameMask spec must provide column and op")
 	}
 	valueKind := tbl.RawGetString("value_kind")
+	mode := tbl.RawGetString("mode")
 	return frameMaskSpecData{
 		Name:       column.Str(),
 		Op:         op.Str(),
 		RHS:        rhs,
+		Mode:       stringValueOrEmpty(mode),
 		RHSLiteral: valueKind.IsString() && valueKind.Str() == "literal",
 	}, nil
+}
+
+func stringValueOrEmpty(v runtime.Value) string {
+	if v.IsString() {
+		return v.Str()
+	}
+	return ""
 }
 
 func frameOrderSpec(v runtime.Value) ([]string, []bool, int, error) {
