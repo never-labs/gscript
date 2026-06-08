@@ -3115,6 +3115,7 @@ func TestEvalFirstLastDyadicAvoidsWholeVector(t *testing.T) {
 	assertEvalValue(t, "first (10 20 30)+1", int64(11))
 	assertEvalValue(t, "last 1+10 20 30", int64(31))
 	assertEvalValue(t, "x:til 5;(+/x)+first x+last x", int64(14))
+	assertEvalValue(t, "x:til 5;(+/x)+((sum x) plus 10)+first x", int64(30))
 	assertEvalValue(t, "first (0#10 20)+1", data.NullValue)
 	assertEvalErrorContains(t, "first 1 2 3+10 20", "vector length mismatch")
 }

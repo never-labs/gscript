@@ -920,6 +920,10 @@ func TryTypedQNumericUnarySum(op string, array Array) (any, bool, error) {
 	switch a := array.(type) {
 	case attributedArray:
 		return TryTypedQNumericUnarySum(op, a.array)
+	case i64RangeArray:
+		if out, ok := qNumericUnarySumI64Range(op, a); ok {
+			return out, true, nil
+		}
 	case columnArray[float32]:
 		return qNumericUnarySumFloatSlice(op, a.data)
 	case columnArray[float64]:
@@ -3567,6 +3571,16 @@ func qNumericUnaryDyadicSumRangeScalar(unaryOp string, dyadicOp Op, left, right 
 }
 
 func qNumericUnaryDyadicSumI64RangeScalar(unaryOp string, dyadicOp Op, values i64RangeArray, scalar float64, scalarLeft bool) (any, bool, error) {
+	if unaryOp == NumericUnaryNeg || unaryOp == NumericUnaryAbs {
+		if sum, ok, err := qNumericUnaryDyadicLinearSumI64RangeScalar(unaryOp, dyadicOp, values, scalar, scalarLeft); ok || err != nil {
+			return sum, ok, err
+		}
+	}
+	if unaryOp == NumericUnaryFloor || unaryOp == NumericUnaryCeiling {
+		if sum, ok, err := qNumericUnaryDyadicFloorCeilSumI64RangeScalar(unaryOp, dyadicOp, values, scalar, scalarLeft); ok || err != nil {
+			return sum, ok, err
+		}
+	}
 	switch unaryOp {
 	case NumericUnaryNeg, NumericUnaryAbs, NumericUnaryExp, NumericUnaryRecip:
 		var sum float64
@@ -3619,6 +3633,194 @@ func qNumericUnaryDyadicSumI64RangeScalar(unaryOp string, dyadicOp Op, values i6
 	default:
 		return nil, false, nil
 	}
+}
+
+func qNumericUnarySumI64Range(op string, values i64RangeArray) (any, bool) {
+	switch op {
+	case NumericUnaryNeg:
+		return -i64RangeSum(values), true
+	case NumericUnaryAbs:
+		if values.len == 0 {
+			return int64(0), true
+		}
+		first := values.start
+		last := values.start + int64(values.len-1)*values.step
+		if first >= 0 && last >= 0 {
+			return i64RangeSum(values), true
+		}
+		if first <= 0 && last <= 0 {
+			return -i64RangeSum(values), true
+		}
+	case NumericUnaryFloor, NumericUnaryCeiling:
+		return i64RangeSum(values), true
+	case NumericUnarySignum:
+		if values.len == 0 {
+			return int64(0), true
+		}
+		first := values.start
+		last := values.start + int64(values.len-1)*values.step
+		switch {
+		case first > 0 && last > 0:
+			return int64(values.len), true
+		case first < 0 && last < 0:
+			return -int64(values.len), true
+		case first == 0 && last == 0:
+			return int64(0), true
+		}
+	}
+	return nil, false
+}
+
+func qNumericUnaryDyadicLinearSumI64RangeScalar(unaryOp string, dyadicOp Op, values i64RangeArray, scalar float64, scalarLeft bool) (float64, bool, error) {
+	a, b, denominator, ok, err := rangeScalarLinearRational(values, dyadicOp, scalar, scalarLeft)
+	if err != nil || !ok {
+		return 0, ok, err
+	}
+	sum := linearRationalRangeSum(values.len, a, b, denominator)
+	if unaryOp == NumericUnaryNeg {
+		return -sum, true, nil
+	}
+	if values.len == 0 {
+		return 0, true, nil
+	}
+	first := float64(a) / float64(denominator)
+	last := float64(a+b*int64(values.len-1)) / float64(denominator)
+	if first >= 0 && last >= 0 {
+		return sum, true, nil
+	}
+	if first <= 0 && last <= 0 {
+		return -sum, true, nil
+	}
+	return 0, false, nil
+}
+
+func qNumericUnaryDyadicFloorCeilSumI64RangeScalar(unaryOp string, dyadicOp Op, values i64RangeArray, scalar float64, scalarLeft bool) (int64, bool, error) {
+	a, b, denominator, ok, err := rangeScalarLinearRational(values, dyadicOp, scalar, scalarLeft)
+	if err != nil || !ok {
+		return 0, ok, err
+	}
+	if unaryOp == NumericUnaryCeiling {
+		sum, ok := floorSumArithmetic(values.len, -a, -b, denominator)
+		return -sum, ok, nil
+	}
+	sum, ok := floorSumArithmetic(values.len, a, b, denominator)
+	return sum, ok, nil
+}
+
+func rangeScalarLinearRational(values i64RangeArray, op Op, scalar float64, scalarLeft bool) (int64, int64, int64, bool, error) {
+	num, den, ok := rationalScalarValue(scalar)
+	if !ok {
+		return 0, 0, 0, false, nil
+	}
+	a := values.start * den
+	b := values.step * den
+	switch op {
+	case OpAdd:
+		return a + num, b, den, true, nil
+	case OpSub:
+		if scalarLeft {
+			return num - a, -b, den, true, nil
+		}
+		return a - num, b, den, true, nil
+	case OpMul:
+		return values.start * num, values.step * num, den, true, nil
+	case OpDiv:
+		if scalarLeft {
+			return 0, 0, 0, false, nil
+		}
+		if num == 0 {
+			return 0, 0, 0, true, fmt.Errorf("divide by zero")
+		}
+		linearDen := num
+		linearA := values.start * den
+		linearB := values.step * den
+		if linearDen < 0 {
+			linearA = -linearA
+			linearB = -linearB
+			linearDen = -linearDen
+		}
+		return linearA, linearB, linearDen, true, nil
+	default:
+		return 0, 0, 0, false, nil
+	}
+}
+
+func rationalScalarValue(value float64) (int64, int64, bool) {
+	if math.IsNaN(value) || math.IsInf(value, 0) {
+		return 0, 0, false
+	}
+	for _, den := range []int64{1, 2, 4, 5, 8, 10, 16, 20, 25, 32, 40, 50, 64, 100, 125, 128, 200, 250, 256, 500, 512, 1000, 1024} {
+		scaled := value * float64(den)
+		num := math.Round(scaled)
+		if num < -9223372036854775808.0 || num > 9223372036854775807.0 {
+			return 0, 0, false
+		}
+		if scaled == num {
+			return int64(num), den, true
+		}
+	}
+	return 0, 0, false
+}
+
+func linearRationalRangeSum(n int, constant, step, denominator int64) float64 {
+	if n <= 0 {
+		return 0
+	}
+	count := int64(n)
+	numerator := constant*count + step*count*(count-1)/2
+	return float64(numerator) / float64(denominator)
+}
+
+func floorSumArithmetic(n int, constant, step, m int64) (int64, bool) {
+	if n <= 0 {
+		return 0, true
+	}
+	if m <= 0 {
+		return 0, false
+	}
+	count := int64(n)
+	var total int64
+	if step < 0 || step >= m {
+		q := floorDivInt64(step, m)
+		total += q * count * (count - 1) / 2
+		step -= q * m
+	}
+	if constant < 0 || constant >= m {
+		q := floorDivInt64(constant, m)
+		total += q * count
+		constant -= q * m
+	}
+	return total + floorSumNonNegative(count, m, step, constant), true
+}
+
+func floorSumNonNegative(n, m, a, b int64) int64 {
+	var total int64
+	for {
+		if a >= m {
+			total += (n - 1) * n * (a / m) / 2
+			a %= m
+		}
+		if b >= m {
+			total += n * (b / m)
+			b %= m
+		}
+		yMax := a*n + b
+		if yMax < m {
+			return total
+		}
+		n = yMax / m
+		b = yMax % m
+		m, a = a, m
+	}
+}
+
+func floorDivInt64(value, divisor int64) int64 {
+	quotient := value / divisor
+	remainder := value % divisor
+	if remainder != 0 && ((remainder < 0) != (divisor < 0)) {
+		quotient--
+	}
+	return quotient
 }
 
 func numericRangeScalarValueAt(op Op, values i64RangeArray, scalar float64, scalarLeft bool, row int) (float64, error) {

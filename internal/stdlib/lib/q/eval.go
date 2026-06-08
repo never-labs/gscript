@@ -3219,6 +3219,12 @@ func isScalarAddChainTerm(src string) bool {
 	if src == "" {
 		return false
 	}
+	for _, word := range []string{"plus", "minus", "times", "divide"} {
+		left, right, ok := splitTopLevelWord(src, word)
+		if ok {
+			return isScalarAddChainTerm(left) && isScalarAddChainTerm(right)
+		}
+	}
 	if strings.HasPrefix(src, "+/") {
 		return true
 	}
