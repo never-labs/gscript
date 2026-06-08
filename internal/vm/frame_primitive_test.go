@@ -591,6 +591,69 @@ func TestFrameOrderPrimitiveBuildsGatherIndexes(t *testing.T) {
 	}
 }
 
+func TestFrameOrderGatherPrimitiveOrdersFrameRows(t *testing.T) {
+	soa, err := runtime.NewSoA(map[string]*runtime.DenseArray{
+		"price": runtime.NewDenseArrayF64([]float64{10, 12, 8}),
+		"id":    runtime.NewDenseArrayI64([]int64{10, 20, 30}),
+	})
+	if err != nil {
+		t.Fatalf("NewSoA: %v", err)
+	}
+	frame := runtime.NewTable()
+	frame.SetNativePayloadWithInfo(soa, runtime.NativePayloadInfo{
+		Kind:       runtime.NativePayloadDataFrame,
+		Rows:       soa.Len(),
+		Columns:    2,
+		SchemaHash: "soa-frame-test",
+	})
+	order := runtime.NewTable()
+	order.RawSetString("column", runtime.StringValue("price"))
+	order.RawSetString("desc", runtime.BoolValue(true))
+	order.RawSetString("limit", runtime.IntValue(2))
+	proto := &FuncProto{
+		MaxStack:  1,
+		Code:      frameOrderGatherPrimitiveProgram(),
+		Constants: []runtime.Value{runtime.TableValue(frame), runtime.TableValue(order), runtime.StringValue("id")},
+	}
+	proto.EnsureFeedback()
+
+	results, err := New(map[string]runtime.Value{}).Execute(proto)
+	if err != nil {
+		t.Fatalf("Execute FRAME_ORDER_GATHER: %v", err)
+	}
+	if len(results) != 1 || !results[0].IsDenseArray() {
+		t.Fatalf("FRAME_ORDER_GATHER follow-up column result = %#v, want dense array", results)
+	}
+	got, ok := results[0].DenseArray().I64()
+	if !ok || len(got) != 2 || got[0] != 20 || got[1] != 10 {
+		t.Fatalf("ordered/gathered id column = %#v, want [20 10]", got)
+	}
+
+	fb := proto.Feedback[1]
+	if fb.Left != FBTable || fb.Right != FBTable || fb.Result != FBTable {
+		t.Fatalf("FRAME_ORDER_GATHER feedback = left %v right %v result %v, want table/table/table", fb.Left, fb.Right, fb.Result)
+	}
+}
+
+func TestFrameOrderGatherPrimitiveRejectsNonNativeFrame(t *testing.T) {
+	order := runtime.NewTable()
+	order.RawSetString("column", runtime.StringValue("price"))
+	proto := &FuncProto{
+		MaxStack: 1,
+		Code: []uint32{
+			EncodeABx(OP_LOADK, 0, 0),
+			EncodeABC(OP_FRAME_ORDER_GATHER, 0, 0, 1),
+			EncodeABC(OP_RETURN, 0, 2, 0),
+		},
+		Constants: []runtime.Value{runtime.TableValue(runtime.NewTable()), runtime.TableValue(order)},
+	}
+
+	_, err := New(map[string]runtime.Value{}).Execute(proto)
+	if err == nil || !strings.Contains(err.Error(), "FRAME_ORDER_GATHER operand must be native frame") {
+		t.Fatalf("FRAME_ORDER_GATHER non-frame error = %v, want native frame error", err)
+	}
+}
+
 func TestFramePrimitivePipelineFiltersProjectsAndLoadsColumn(t *testing.T) {
 	soa, err := runtime.NewSoA(map[string]*runtime.DenseArray{
 		"price": runtime.NewDenseArrayF64([]float64{99, 100.5, 101.25}),
@@ -728,6 +791,15 @@ func frameOrderPrimitiveProgram() []uint32 {
 		EncodeABx(OP_LOADK, 0, 0),
 		EncodeABC(OP_FRAME_ORDER, 1, 0, 1),
 		EncodeABC(OP_FRAME_GATHER, 0, 0, 1),
+		EncodeABC(OP_FRAME_COLUMN, 0, 0, 2),
+		EncodeABC(OP_RETURN, 0, 2, 0),
+	}
+}
+
+func frameOrderGatherPrimitiveProgram() []uint32 {
+	return []uint32{
+		EncodeABx(OP_LOADK, 0, 0),
+		EncodeABC(OP_FRAME_ORDER_GATHER, 0, 0, 1),
 		EncodeABC(OP_FRAME_COLUMN, 0, 0, 2),
 		EncodeABC(OP_RETURN, 0, 2, 0),
 	}

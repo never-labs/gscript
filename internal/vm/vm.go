@@ -2534,6 +2534,43 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 				fb.Result.Observe(out.Type())
 			}
 
+		case OP_FRAME_ORDER_GATHER:
+			a := DecodeA(inst)
+			b := DecodeB(inst)
+			c := DecodeC(inst)
+			frameVal := vm.regs[base+b]
+			if c >= len(constants) {
+				return nil, wrapLineErr(frame, fmt.Errorf("FRAME_ORDER_GATHER spec constant is out of range"))
+			}
+			names, desc, limit, err := frameOrderSpec(constants[c])
+			if err != nil {
+				return nil, wrapLineErr(frame, err)
+			}
+			indexes, handled, err := frameVal.NativeFrameOrderIndexes(names, desc, limit)
+			if err != nil {
+				return nil, wrapLineErr(frame, err)
+			}
+			if !handled {
+				return nil, wrapLineErr(frame, fmt.Errorf("FRAME_ORDER_GATHER operand must be native frame (got %s)", frameVal.TypeName()))
+			}
+			if !indexes.IsDenseArray() {
+				return nil, wrapLineErr(frame, fmt.Errorf("FRAME_ORDER_GATHER indexes must be dense array (got %s)", indexes.TypeName()))
+			}
+			out, handled, err := frameVal.NativeFrameGather(indexes.DenseArray())
+			if err != nil {
+				return nil, wrapLineErr(frame, err)
+			}
+			if !handled {
+				return nil, wrapLineErr(frame, fmt.Errorf("FRAME_ORDER_GATHER operand must be native frame (got %s)", frameVal.TypeName()))
+			}
+			vm.regs[base+a] = out
+			if frame.closure.Proto.Feedback != nil {
+				fb := &frame.closure.Proto.Feedback[frame.pc-1]
+				fb.Left.Observe(frameVal.Type())
+				fb.Right.Observe(constants[c].Type())
+				fb.Result.Observe(out.Type())
+			}
+
 		case OP_FRAME_PROJECT_COLUMN:
 			a := DecodeA(inst)
 			b := DecodeB(inst)

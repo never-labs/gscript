@@ -93,4 +93,7 @@ func TestOpName(t *testing.T) {
 	if OpName(OP_RETURN) != "RETURN" {
 		t.Errorf("OpName(OP_RETURN): got %q, want RETURN", OpName(OP_RETURN))
 	}
+	if OpName(OP_FRAME_ORDER_GATHER) != "FRAME_ORDER_GATHER" {
+		t.Errorf("OpName(OP_FRAME_ORDER_GATHER): got %q, want FRAME_ORDER_GATHER", OpName(OP_FRAME_ORDER_GATHER))
+	}
 }

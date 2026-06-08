@@ -191,6 +191,7 @@ type DiagReport struct {
 	QQueryFallbacks            map[string]int           // q native lowering fallback count by reason code
 	QVectorLoweringFallbacks   map[string]int           // q vector native lowering fallback count by reason code
 	QKernelDescriptors         []QKernelDescriptor      // normalized q kernel runtime/fallback observations
+	QKernelExecutionStats      []QKernelExecutionStat   // observed q typed-runtime kernel execution outcomes
 	QKernelShapeSummary        []QKernelShapeSummary    // source-stable q kernel shape/fallback summary
 	ValidateErrors             []error                  // structural invariant violations
 	RegAllocMap                string                   // human-readable register assignments
@@ -338,6 +339,7 @@ func Diagnose(proto *vm.FuncProto, args []runtime.Value) *DiagReport {
 	nativeResult, nativeErr := cf.Execute(args)
 	r.NativeResult = nativeResult
 	r.NativeError = nativeErr
+	r.QKernelExecutionStats = cf.QKernelExecutionStats()
 	r.compareResults()
 	return r
 }
@@ -553,6 +555,7 @@ func (r *DiagReport) String() string {
 	w("\n--- Q query fallback reasons ---\n%s", formatQQueryLoweringFallbackReasons(r.QQueryFallbacks))
 	w("\n--- Q vector fallback reasons ---\n%s", formatQVectorLoweringFallbackReasons(r.QVectorLoweringFallbacks))
 	w("\n--- Q kernel descriptors ---\n%s", formatQKernelDescriptors(r.QKernelDescriptors))
+	w("\n--- Q kernel execution stats ---\n%s", formatQKernelExecutionStats(r.QKernelExecutionStats))
 	w("\n--- Q kernel shape summary ---\n%s", formatQKernelShapeSummary(r.QKernelShapeSummary))
 	w("\n--- IR (after passes) ---\n%s", r.IRAfter)
 	w("\n--- Register Allocation ---\n%s\n", r.RegAllocMap)

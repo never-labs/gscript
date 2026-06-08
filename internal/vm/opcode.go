@@ -113,6 +113,7 @@ const (
 	OP_FRAME_GATHER                // A B C : R(A) = native frame R(B) gathered by i64 indexes R(C)
 	OP_FRAME_SLICE                 // A B C : R(A) = native frame R(B) prefix-sliced to int end R(C)
 	OP_FRAME_ORDER                 // A B C : R(A) = sorted i64 row indexes for native frame R(B), spec Constants[C]
+	OP_FRAME_ORDER_GATHER          // A B C : R(A) = native frame R(B) ordered/gathered by spec Constants[C]
 	OP_FRAME_PROJECT_COLUMN        // A B C : R(A) = projected column from native frame R(B), spec Constants[C]
 	OP_FRAME_FILTER_PROJECT_COLUMN // A B C : R(A) = projected column from native frame R(B) filtered by mask R(A), spec Constants[C]
 	OP_VECTOR_COMPARE              // A B C : R(A) = compare(R(A), R(B), dense-array op C)
@@ -284,6 +285,7 @@ var opNames = [...]string{
 	OP_FRAME_GATHER:                "FRAME_GATHER",
 	OP_FRAME_SLICE:                 "FRAME_SLICE",
 	OP_FRAME_ORDER:                 "FRAME_ORDER",
+	OP_FRAME_ORDER_GATHER:          "FRAME_ORDER_GATHER",
 	OP_FRAME_PROJECT_COLUMN:        "FRAME_PROJECT_COLUMN",
 	OP_FRAME_FILTER_PROJECT_COLUMN: "FRAME_FILTER_PROJECT_COLUMN",
 	OP_VECTOR_COMPARE:              "VECTOR_COMPARE",

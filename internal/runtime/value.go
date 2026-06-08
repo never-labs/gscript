@@ -654,6 +654,25 @@ func (v Value) NativeFramePayloadInfo() (NativePayloadInfo, bool) {
 	return tbl.NativeFramePayloadInfo()
 }
 
+func (v Value) nativeFrameSoA(op string) (*SoA, NativePayloadInfo, bool, error) {
+	if !v.IsTable() {
+		return nil, NativePayloadInfo{}, false, nil
+	}
+	tbl := v.Table()
+	if tbl == nil {
+		return nil, NativePayloadInfo{}, false, nil
+	}
+	payload, info, ok := tbl.NativeFramePayload()
+	if !ok {
+		return nil, NativePayloadInfo{}, false, nil
+	}
+	frame, ok := payload.(*SoA)
+	if !ok {
+		return nil, NativePayloadInfo{}, true, fmt.Errorf("%s unsupported native frame payload %T", op, payload)
+	}
+	return frame, info, true, nil
+}
+
 // NativeFrameLen returns the row count for runtime-owned native frame
 // carriers. It keeps VM/JIT frame length operations from inspecting native
 // payload metadata directly.
@@ -672,27 +691,15 @@ func (v Value) NativeFrameColumn(name string) (Value, bool, error) {
 	if name == "" {
 		return NilValue(), true, fmt.Errorf("FRAME_COLUMN name must not be empty")
 	}
-	if !v.IsTable() {
-		return NilValue(), false, nil
+	frame, _, handled, err := v.nativeFrameSoA("FRAME_COLUMN")
+	if err != nil || !handled {
+		return NilValue(), handled, err
 	}
-	tbl := v.Table()
-	if tbl == nil {
-		return NilValue(), false, nil
-	}
-	payload, _, ok := tbl.NativeFramePayload()
+	col, ok := frame.Column(name)
 	if !ok {
-		return NilValue(), false, nil
+		return NilValue(), true, fmt.Errorf("FRAME_COLUMN unknown column %q", name)
 	}
-	switch frame := payload.(type) {
-	case *SoA:
-		col, ok := frame.Column(name)
-		if !ok {
-			return NilValue(), true, fmt.Errorf("FRAME_COLUMN unknown column %q", name)
-		}
-		return DenseArrayValue(col), true, nil
-	default:
-		return NilValue(), true, fmt.Errorf("FRAME_COLUMN unsupported native frame payload %T", payload)
-	}
+	return DenseArrayValue(col), true, nil
 }
 
 // NativeFrameMask returns a bool dense-array mask computed from a runtime-owned
@@ -704,27 +711,15 @@ func (v Value) NativeFrameMask(name, op string, rhs Value) (Value, bool, error) 
 	if op == "" {
 		return NilValue(), true, fmt.Errorf("FRAME_MASK op must not be empty")
 	}
-	if !v.IsTable() {
-		return NilValue(), false, nil
+	frame, _, handled, err := v.nativeFrameSoA("FRAME_MASK")
+	if err != nil || !handled {
+		return NilValue(), handled, err
 	}
-	tbl := v.Table()
-	if tbl == nil {
-		return NilValue(), false, nil
+	mask, err := frame.Mask(name, op, rhs)
+	if err != nil {
+		return NilValue(), true, err
 	}
-	payload, _, ok := tbl.NativeFramePayload()
-	if !ok {
-		return NilValue(), false, nil
-	}
-	switch frame := payload.(type) {
-	case *SoA:
-		mask, err := frame.Mask(name, op, rhs)
-		if err != nil {
-			return NilValue(), true, err
-		}
-		return DenseArrayValue(mask), true, nil
-	default:
-		return NilValue(), true, fmt.Errorf("FRAME_MASK unsupported native frame payload %T", payload)
-	}
+	return DenseArrayValue(mask), true, nil
 }
 
 // NativeFrameMaskOp returns a bool dense-array mask computed from a runtime
@@ -736,27 +731,15 @@ func (v Value) NativeFrameMaskOp(name string, op DenseArrayBinaryOp, rhs Value) 
 	if !isComparisonOp(op) {
 		return NilValue(), true, fmt.Errorf("FRAME_MASK op %d is not a comparison", op)
 	}
-	if !v.IsTable() {
-		return NilValue(), false, nil
+	frame, _, handled, err := v.nativeFrameSoA("FRAME_MASK")
+	if err != nil || !handled {
+		return NilValue(), handled, err
 	}
-	tbl := v.Table()
-	if tbl == nil {
-		return NilValue(), false, nil
+	mask, err := frame.MaskOp(name, op, rhs)
+	if err != nil {
+		return NilValue(), true, err
 	}
-	payload, _, ok := tbl.NativeFramePayload()
-	if !ok {
-		return NilValue(), false, nil
-	}
-	switch frame := payload.(type) {
-	case *SoA:
-		mask, err := frame.MaskOp(name, op, rhs)
-		if err != nil {
-			return NilValue(), true, err
-		}
-		return DenseArrayValue(mask), true, nil
-	default:
-		return NilValue(), true, fmt.Errorf("FRAME_MASK unsupported native frame payload %T", payload)
-	}
+	return DenseArrayValue(mask), true, nil
 }
 
 // NativeFrameProject returns a new runtime frame facade that carries a projected
@@ -765,45 +748,33 @@ func (v Value) NativeFrameProject(names []string) (Value, bool, error) {
 	if len(names) == 0 {
 		return NilValue(), true, fmt.Errorf("FRAME_PROJECT requires at least one column")
 	}
-	if !v.IsTable() {
-		return NilValue(), false, nil
+	frame, info, handled, err := v.nativeFrameSoA("FRAME_PROJECT")
+	if err != nil || !handled {
+		return NilValue(), handled, err
 	}
-	tbl := v.Table()
-	if tbl == nil {
-		return NilValue(), false, nil
-	}
-	payload, info, ok := tbl.NativeFramePayload()
-	if !ok {
-		return NilValue(), false, nil
-	}
-	switch frame := payload.(type) {
-	case *SoA:
-		cols := make(map[string]*DenseArray, len(names))
-		for _, name := range names {
-			if name == "" {
-				return NilValue(), true, fmt.Errorf("FRAME_PROJECT column name must not be empty")
-			}
-			col, ok := frame.Column(name)
-			if !ok {
-				return NilValue(), true, fmt.Errorf("FRAME_PROJECT unknown column %q", name)
-			}
-			cols[name] = col
+	cols := make(map[string]*DenseArray, len(names))
+	for _, name := range names {
+		if name == "" {
+			return NilValue(), true, fmt.Errorf("FRAME_PROJECT column name must not be empty")
 		}
-		out, err := NewSoA(cols)
-		if err != nil {
-			return NilValue(), true, err
+		col, ok := frame.Column(name)
+		if !ok {
+			return NilValue(), true, fmt.Errorf("FRAME_PROJECT unknown column %q", name)
 		}
-		projected := NewTable()
-		projected.SetNativePayloadWithInfo(out, NativePayloadInfo{
-			Kind:       info.Kind,
-			Rows:       out.Len(),
-			Columns:    len(names),
-			SchemaHash: nativeFrameProjectSchemaHash(info.SchemaHash, names),
-		})
-		return TableValue(projected), true, nil
-	default:
-		return NilValue(), true, fmt.Errorf("FRAME_PROJECT unsupported native frame payload %T", payload)
+		cols[name] = col
 	}
+	out, err := NewSoA(cols)
+	if err != nil {
+		return NilValue(), true, err
+	}
+	projected := NewTable()
+	projected.SetNativePayloadWithInfo(out, NativePayloadInfo{
+		Kind:       info.Kind,
+		Rows:       out.Len(),
+		Columns:    len(names),
+		SchemaHash: nativeFrameProjectSchemaHash(info.SchemaHash, names),
+	})
+	return TableValue(projected), true, nil
 }
 
 // NativeFrameProjectColumn returns a dense column from a projected native frame
@@ -816,42 +787,30 @@ func (v Value) NativeFrameProjectColumn(names []string, resultName string) (Valu
 	if resultName == "" {
 		return NilValue(), true, fmt.Errorf("FRAME_PROJECT_COLUMN result column name must not be empty")
 	}
-	if !v.IsTable() {
-		return NilValue(), false, nil
+	frame, _, handled, err := v.nativeFrameSoA("FRAME_PROJECT_COLUMN")
+	if err != nil || !handled {
+		return NilValue(), handled, err
 	}
-	tbl := v.Table()
-	if tbl == nil {
-		return NilValue(), false, nil
+	found := false
+	for _, name := range names {
+		if name == "" {
+			return NilValue(), true, fmt.Errorf("FRAME_PROJECT_COLUMN column name must not be empty")
+		}
+		if _, ok := frame.Column(name); !ok {
+			return NilValue(), true, fmt.Errorf("FRAME_PROJECT_COLUMN unknown column %q", name)
+		}
+		if name == resultName {
+			found = true
+		}
 	}
-	payload, _, ok := tbl.NativeFramePayload()
+	if !found {
+		return NilValue(), true, fmt.Errorf("FRAME_PROJECT_COLUMN result column %q is not projected", resultName)
+	}
+	col, ok := frame.Column(resultName)
 	if !ok {
-		return NilValue(), false, nil
+		return NilValue(), true, fmt.Errorf("FRAME_PROJECT_COLUMN unknown column %q", resultName)
 	}
-	switch frame := payload.(type) {
-	case *SoA:
-		found := false
-		for _, name := range names {
-			if name == "" {
-				return NilValue(), true, fmt.Errorf("FRAME_PROJECT_COLUMN column name must not be empty")
-			}
-			if _, ok := frame.Column(name); !ok {
-				return NilValue(), true, fmt.Errorf("FRAME_PROJECT_COLUMN unknown column %q", name)
-			}
-			if name == resultName {
-				found = true
-			}
-		}
-		if !found {
-			return NilValue(), true, fmt.Errorf("FRAME_PROJECT_COLUMN result column %q is not projected", resultName)
-		}
-		col, ok := frame.Column(resultName)
-		if !ok {
-			return NilValue(), true, fmt.Errorf("FRAME_PROJECT_COLUMN unknown column %q", resultName)
-		}
-		return DenseArrayValue(col), true, nil
-	default:
-		return NilValue(), true, fmt.Errorf("FRAME_PROJECT_COLUMN unsupported native frame payload %T", payload)
-	}
+	return DenseArrayValue(col), true, nil
 }
 
 // NativeFrameFilterProjectColumn filters a native frame and returns a projected
@@ -867,46 +826,34 @@ func (v Value) NativeFrameFilterProjectColumn(mask *DenseArray, names []string, 
 	if resultName == "" {
 		return NilValue(), true, fmt.Errorf("FRAME_FILTER_PROJECT_COLUMN result column name must not be empty")
 	}
-	if !v.IsTable() {
-		return NilValue(), false, nil
+	frame, _, handled, err := v.nativeFrameSoA("FRAME_FILTER_PROJECT_COLUMN")
+	if err != nil || !handled {
+		return NilValue(), handled, err
 	}
-	tbl := v.Table()
-	if tbl == nil {
-		return NilValue(), false, nil
+	found := false
+	for _, name := range names {
+		if name == "" {
+			return NilValue(), true, fmt.Errorf("FRAME_FILTER_PROJECT_COLUMN column name must not be empty")
+		}
+		if _, ok := frame.Column(name); !ok {
+			return NilValue(), true, fmt.Errorf("FRAME_FILTER_PROJECT_COLUMN unknown column %q", name)
+		}
+		if name == resultName {
+			found = true
+		}
 	}
-	payload, _, ok := tbl.NativeFramePayload()
+	if !found {
+		return NilValue(), true, fmt.Errorf("FRAME_FILTER_PROJECT_COLUMN result column %q is not projected", resultName)
+	}
+	col, ok := frame.Column(resultName)
 	if !ok {
-		return NilValue(), false, nil
+		return NilValue(), true, fmt.Errorf("FRAME_FILTER_PROJECT_COLUMN unknown column %q", resultName)
 	}
-	switch frame := payload.(type) {
-	case *SoA:
-		found := false
-		for _, name := range names {
-			if name == "" {
-				return NilValue(), true, fmt.Errorf("FRAME_FILTER_PROJECT_COLUMN column name must not be empty")
-			}
-			if _, ok := frame.Column(name); !ok {
-				return NilValue(), true, fmt.Errorf("FRAME_FILTER_PROJECT_COLUMN unknown column %q", name)
-			}
-			if name == resultName {
-				found = true
-			}
-		}
-		if !found {
-			return NilValue(), true, fmt.Errorf("FRAME_FILTER_PROJECT_COLUMN result column %q is not projected", resultName)
-		}
-		col, ok := frame.Column(resultName)
-		if !ok {
-			return NilValue(), true, fmt.Errorf("FRAME_FILTER_PROJECT_COLUMN unknown column %q", resultName)
-		}
-		out, err := col.Filter(mask)
-		if err != nil {
-			return NilValue(), true, err
-		}
-		return DenseArrayValue(out), true, nil
-	default:
-		return NilValue(), true, fmt.Errorf("FRAME_FILTER_PROJECT_COLUMN unsupported native frame payload %T", payload)
+	out, err := col.Filter(mask)
+	if err != nil {
+		return NilValue(), true, err
 	}
+	return DenseArrayValue(out), true, nil
 }
 
 // NativeFrameFilterProject filters a native frame and returns a projected frame
@@ -918,49 +865,37 @@ func (v Value) NativeFrameFilterProject(mask *DenseArray, names []string) (Value
 	if len(names) == 0 {
 		return NilValue(), true, fmt.Errorf("FRAME_FILTER_PROJECT requires at least one projected column")
 	}
-	if !v.IsTable() {
-		return NilValue(), false, nil
+	frame, info, handled, err := v.nativeFrameSoA("FRAME_FILTER_PROJECT")
+	if err != nil || !handled {
+		return NilValue(), handled, err
 	}
-	tbl := v.Table()
-	if tbl == nil {
-		return NilValue(), false, nil
-	}
-	payload, info, ok := tbl.NativeFramePayload()
-	if !ok {
-		return NilValue(), false, nil
-	}
-	switch frame := payload.(type) {
-	case *SoA:
-		cols := make(map[string]*DenseArray, len(names))
-		for _, name := range names {
-			if name == "" {
-				return NilValue(), true, fmt.Errorf("FRAME_FILTER_PROJECT column name must not be empty")
-			}
-			col, ok := frame.Column(name)
-			if !ok {
-				return NilValue(), true, fmt.Errorf("FRAME_FILTER_PROJECT unknown column %q", name)
-			}
-			filtered, err := col.Filter(mask)
-			if err != nil {
-				return NilValue(), true, err
-			}
-			cols[name] = filtered
+	cols := make(map[string]*DenseArray, len(names))
+	for _, name := range names {
+		if name == "" {
+			return NilValue(), true, fmt.Errorf("FRAME_FILTER_PROJECT column name must not be empty")
 		}
-		out, err := NewSoA(cols)
+		col, ok := frame.Column(name)
+		if !ok {
+			return NilValue(), true, fmt.Errorf("FRAME_FILTER_PROJECT unknown column %q", name)
+		}
+		filtered, err := col.Filter(mask)
 		if err != nil {
 			return NilValue(), true, err
 		}
-		projected := NewTable()
-		projected.SetNativePayloadWithInfo(out, NativePayloadInfo{
-			Kind:       info.Kind,
-			Rows:       out.Len(),
-			Columns:    len(names),
-			SchemaHash: nativeFrameProjectSchemaHash(nativeFrameFilterSchemaHash(info.SchemaHash), names),
-		})
-		return TableValue(projected), true, nil
-	default:
-		return NilValue(), true, fmt.Errorf("FRAME_FILTER_PROJECT unsupported native frame payload %T", payload)
+		cols[name] = filtered
 	}
+	out, err := NewSoA(cols)
+	if err != nil {
+		return NilValue(), true, err
+	}
+	projected := NewTable()
+	projected.SetNativePayloadWithInfo(out, NativePayloadInfo{
+		Kind:       info.Kind,
+		Rows:       out.Len(),
+		Columns:    len(names),
+		SchemaHash: nativeFrameProjectSchemaHash(nativeFrameFilterSchemaHash(info.SchemaHash), names),
+	})
+	return TableValue(projected), true, nil
 }
 
 // NativeFrameFilter returns a new runtime frame facade containing rows selected
@@ -969,34 +904,22 @@ func (v Value) NativeFrameFilter(mask *DenseArray) (Value, bool, error) {
 	if mask == nil {
 		return NilValue(), true, fmt.Errorf("FRAME_FILTER mask must be a bool dense array")
 	}
-	if !v.IsTable() {
-		return NilValue(), false, nil
+	frame, info, handled, err := v.nativeFrameSoA("FRAME_FILTER")
+	if err != nil || !handled {
+		return NilValue(), handled, err
 	}
-	tbl := v.Table()
-	if tbl == nil {
-		return NilValue(), false, nil
+	out, err := frame.Filter(mask)
+	if err != nil {
+		return NilValue(), true, err
 	}
-	payload, info, ok := tbl.NativeFramePayload()
-	if !ok {
-		return NilValue(), false, nil
-	}
-	switch frame := payload.(type) {
-	case *SoA:
-		out, err := frame.Filter(mask)
-		if err != nil {
-			return NilValue(), true, err
-		}
-		filtered := NewTable()
-		filtered.SetNativePayloadWithInfo(out, NativePayloadInfo{
-			Kind:       info.Kind,
-			Rows:       out.Len(),
-			Columns:    info.Columns,
-			SchemaHash: nativeFrameFilterSchemaHash(info.SchemaHash),
-		})
-		return TableValue(filtered), true, nil
-	default:
-		return NilValue(), true, fmt.Errorf("FRAME_FILTER unsupported native frame payload %T", payload)
-	}
+	filtered := NewTable()
+	filtered.SetNativePayloadWithInfo(out, NativePayloadInfo{
+		Kind:       info.Kind,
+		Rows:       out.Len(),
+		Columns:    info.Columns,
+		SchemaHash: nativeFrameFilterSchemaHash(info.SchemaHash),
+	})
+	return TableValue(filtered), true, nil
 }
 
 // NativeFrameGather returns a new runtime frame facade containing rows selected
@@ -1005,34 +928,22 @@ func (v Value) NativeFrameGather(indices *DenseArray) (Value, bool, error) {
 	if indices == nil {
 		return NilValue(), true, fmt.Errorf("FRAME_GATHER indexes must be an i64 dense array")
 	}
-	if !v.IsTable() {
-		return NilValue(), false, nil
+	frame, info, handled, err := v.nativeFrameSoA("FRAME_GATHER")
+	if err != nil || !handled {
+		return NilValue(), handled, err
 	}
-	tbl := v.Table()
-	if tbl == nil {
-		return NilValue(), false, nil
+	out, err := frame.Gather(indices)
+	if err != nil {
+		return NilValue(), true, err
 	}
-	payload, info, ok := tbl.NativeFramePayload()
-	if !ok {
-		return NilValue(), false, nil
-	}
-	switch frame := payload.(type) {
-	case *SoA:
-		out, err := frame.Gather(indices)
-		if err != nil {
-			return NilValue(), true, err
-		}
-		gathered := NewTable()
-		gathered.SetNativePayloadWithInfo(out, NativePayloadInfo{
-			Kind:       info.Kind,
-			Rows:       out.Len(),
-			Columns:    info.Columns,
-			SchemaHash: nativeFrameGatherSchemaHash(info.SchemaHash),
-		})
-		return TableValue(gathered), true, nil
-	default:
-		return NilValue(), true, fmt.Errorf("FRAME_GATHER unsupported native frame payload %T", payload)
-	}
+	gathered := NewTable()
+	gathered.SetNativePayloadWithInfo(out, NativePayloadInfo{
+		Kind:       info.Kind,
+		Rows:       out.Len(),
+		Columns:    info.Columns,
+		SchemaHash: nativeFrameGatherSchemaHash(info.SchemaHash),
+	})
+	return TableValue(gathered), true, nil
 }
 
 // NativeFrameSlice returns a new runtime frame facade containing rows in
@@ -1041,34 +952,22 @@ func (v Value) NativeFrameSlice(start, end int) (Value, bool, error) {
 	if start < 0 || end < start {
 		return NilValue(), true, fmt.Errorf("FRAME_SLICE range out of bounds")
 	}
-	if !v.IsTable() {
-		return NilValue(), false, nil
+	frame, info, handled, err := v.nativeFrameSoA("FRAME_SLICE")
+	if err != nil || !handled {
+		return NilValue(), handled, err
 	}
-	tbl := v.Table()
-	if tbl == nil {
-		return NilValue(), false, nil
+	out, err := frame.Slice(start, end)
+	if err != nil {
+		return NilValue(), true, err
 	}
-	payload, info, ok := tbl.NativeFramePayload()
-	if !ok {
-		return NilValue(), false, nil
-	}
-	switch frame := payload.(type) {
-	case *SoA:
-		out, err := frame.Slice(start, end)
-		if err != nil {
-			return NilValue(), true, err
-		}
-		sliced := NewTable()
-		sliced.SetNativePayloadWithInfo(out, NativePayloadInfo{
-			Kind:       info.Kind,
-			Rows:       out.Len(),
-			Columns:    info.Columns,
-			SchemaHash: nativeFrameSliceSchemaHash(info.SchemaHash),
-		})
-		return TableValue(sliced), true, nil
-	default:
-		return NilValue(), true, fmt.Errorf("FRAME_SLICE unsupported native frame payload %T", payload)
-	}
+	sliced := NewTable()
+	sliced.SetNativePayloadWithInfo(out, NativePayloadInfo{
+		Kind:       info.Kind,
+		Rows:       out.Len(),
+		Columns:    info.Columns,
+		SchemaHash: nativeFrameSliceSchemaHash(info.SchemaHash),
+	})
+	return TableValue(sliced), true, nil
 }
 
 // NativeFrameOrderIndexes returns 1-based row indexes sorted by native frame
@@ -1081,60 +980,48 @@ func (v Value) NativeFrameOrderIndexes(names []string, desc []bool, limit int) (
 	if len(desc) != 0 && len(desc) != len(names) {
 		return NilValue(), true, fmt.Errorf("FRAME_ORDER_INDEXES desc flags must match column count")
 	}
-	if !v.IsTable() {
-		return NilValue(), false, nil
+	frame, _, handled, err := v.nativeFrameSoA("FRAME_ORDER_INDEXES")
+	if err != nil || !handled {
+		return NilValue(), handled, err
 	}
-	tbl := v.Table()
-	if tbl == nil {
-		return NilValue(), false, nil
-	}
-	payload, _, ok := tbl.NativeFramePayload()
-	if !ok {
-		return NilValue(), false, nil
-	}
-	switch frame := payload.(type) {
-	case *SoA:
-		comparers := make([]nativeFrameOrderComparer, len(names))
-		for i, name := range names {
-			if name == "" {
-				return NilValue(), true, fmt.Errorf("FRAME_ORDER_INDEXES column name must not be empty")
-			}
-			col, ok := frame.Column(name)
-			if !ok {
-				return NilValue(), true, fmt.Errorf("FRAME_ORDER_INDEXES unknown column %q", name)
-			}
-			comparer, err := nativeFrameOrderComparerFor(col)
-			if err != nil {
-				return NilValue(), true, err
-			}
-			comparers[i] = comparer
+	comparers := make([]nativeFrameOrderComparer, len(names))
+	for i, name := range names {
+		if name == "" {
+			return NilValue(), true, fmt.Errorf("FRAME_ORDER_INDEXES column name must not be empty")
 		}
-		indices := make([]int64, frame.Len())
-		for i := range indices {
-			indices[i] = int64(i + 1)
+		col, ok := frame.Column(name)
+		if !ok {
+			return NilValue(), true, fmt.Errorf("FRAME_ORDER_INDEXES unknown column %q", name)
 		}
-		sort.SliceStable(indices, func(i, j int) bool {
-			leftIdx := int(indices[i] - 1)
-			rightIdx := int(indices[j] - 1)
-			for k, comparer := range comparers {
-				cmp := comparer(leftIdx, rightIdx)
-				if cmp == 0 {
-					continue
-				}
-				if len(desc) > 0 && desc[k] {
-					return cmp > 0
-				}
-				return cmp < 0
-			}
-			return false
-		})
-		if limit >= 0 && limit < len(indices) {
-			indices = indices[:limit]
+		comparer, err := nativeFrameOrderComparerFor(col)
+		if err != nil {
+			return NilValue(), true, err
 		}
-		return DenseArrayValue(NewDenseArrayI64(indices)), true, nil
-	default:
-		return NilValue(), true, fmt.Errorf("FRAME_ORDER_INDEXES unsupported native frame payload %T", payload)
+		comparers[i] = comparer
 	}
+	indices := make([]int64, frame.Len())
+	for i := range indices {
+		indices[i] = int64(i + 1)
+	}
+	sort.SliceStable(indices, func(i, j int) bool {
+		leftIdx := int(indices[i] - 1)
+		rightIdx := int(indices[j] - 1)
+		for k, comparer := range comparers {
+			cmp := comparer(leftIdx, rightIdx)
+			if cmp == 0 {
+				continue
+			}
+			if len(desc) > 0 && desc[k] {
+				return cmp > 0
+			}
+			return cmp < 0
+		}
+		return false
+	})
+	if limit >= 0 && limit < len(indices) {
+		indices = indices[:limit]
+	}
+	return DenseArrayValue(NewDenseArrayI64(indices)), true, nil
 }
 
 type nativeFrameOrderComparer func(left, right int) int

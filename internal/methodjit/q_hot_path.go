@@ -81,8 +81,21 @@ type QKernelDescriptor struct {
 	Kernel       string
 	Shape        string
 	Route        string
+	Outcome      string
 	ReasonFamily string
 	ReasonCode   string
+}
+
+// QKernelExecutionStat records observed q typed-runtime kernel execution. It
+// uses the same stable source/kernel/shape/route keys as QKernelDescriptor so
+// runtime observations can be joined with lowering-time descriptors.
+type QKernelExecutionStat struct {
+	Source  string
+	Kernel  string
+	Shape   string
+	Route   string
+	Outcome string
+	Count   uint64
 }
 
 // QKernelShapeSummary is a source-stable row for joining MethodJIT q kernel
@@ -91,6 +104,7 @@ type QKernelShapeSummary struct {
 	Source       string
 	Kind         string
 	Shape        string
+	Outcome      string
 	ReasonFamily string
 	ReasonCode   string
 	Count        int
@@ -102,6 +116,7 @@ type QKernelShapeSummary struct {
 const (
 	qVectorWhereReduceFallbackSharedWhere      = "shared_where"
 	qVectorWhereReduceFallbackBadWhereArgCount = "bad_where_arg_count"
+	qVectorWhereReduceFallbackUnsupportedInput = "unsupported_input_shape"
 )
 
 func (p QQueryHotPath) Shape() string {
@@ -291,11 +306,12 @@ func BuildQKernelDescriptors(vectorKernels []QVectorRuntimeKernel, frameKernels 
 			shape = "unknown"
 		}
 		out = append(out, QKernelDescriptor{
-			Source: "methodjit_q_vector_runtime",
-			Kind:   "runtime_kernel",
-			Kernel: kernel.Kernel,
-			Shape:  shape,
-			Route:  "typed_runtime_op_exit",
+			Source:  "methodjit_q_vector_runtime",
+			Kind:    "runtime_kernel",
+			Kernel:  kernel.Kernel,
+			Shape:   shape,
+			Route:   "typed_runtime_op_exit",
+			Outcome: "supported",
 		})
 	}
 	for _, spec := range frameKernels {
@@ -304,11 +320,12 @@ func BuildQKernelDescriptors(vectorKernels []QVectorRuntimeKernel, frameKernels 
 			shape = "unknown"
 		}
 		out = append(out, QKernelDescriptor{
-			Source: "methodjit_q_frame_runtime",
-			Kind:   "runtime_kernel",
-			Kernel: "QFrameSelectColumn",
-			Shape:  shape,
-			Route:  "typed_runtime_op_exit",
+			Source:  "methodjit_q_frame_runtime",
+			Kind:    "runtime_kernel",
+			Kernel:  "QFrameSelectColumn",
+			Shape:   shape,
+			Route:   "typed_runtime_op_exit",
+			Outcome: "supported",
 		})
 	}
 	for _, remark := range remarks {
@@ -336,6 +353,7 @@ func BuildQKernelDescriptors(vectorKernels []QVectorRuntimeKernel, frameKernels 
 			Kernel:       kernel,
 			Shape:        qQueryLoweringFallbackShapeFromRemark(remark.Reason),
 			Route:        "lowering",
+			Outcome:      "fallback",
 			ReasonFamily: "lowering",
 			ReasonCode:   reason,
 		})
@@ -359,6 +377,9 @@ func BuildQKernelDescriptors(vectorKernels []QVectorRuntimeKernel, frameKernels 
 		if out[i].Route != out[j].Route {
 			return out[i].Route < out[j].Route
 		}
+		if out[i].Outcome != out[j].Outcome {
+			return out[i].Outcome < out[j].Outcome
+		}
 		if out[i].ReasonFamily != out[j].ReasonFamily {
 			return out[i].ReasonFamily < out[j].ReasonFamily
 		}
@@ -374,6 +395,7 @@ func BuildQKernelShapeSummaryFromDescriptors(descriptors []QKernelDescriptor) []
 			source:       descriptor.Source,
 			kind:         descriptor.Kind,
 			shape:        descriptor.Shape,
+			outcome:      descriptor.Outcome,
 			reasonFamily: descriptor.ReasonFamily,
 			reasonCode:   descriptor.ReasonCode,
 		}]++
@@ -395,6 +417,9 @@ func BuildQKernelShapeSummaryFromDescriptors(descriptors []QKernelDescriptor) []
 		if keys[i].shape != keys[j].shape {
 			return keys[i].shape < keys[j].shape
 		}
+		if keys[i].outcome != keys[j].outcome {
+			return keys[i].outcome < keys[j].outcome
+		}
 		if keys[i].reasonFamily != keys[j].reasonFamily {
 			return keys[i].reasonFamily < keys[j].reasonFamily
 		}
@@ -406,6 +431,7 @@ func BuildQKernelShapeSummaryFromDescriptors(descriptors []QKernelDescriptor) []
 			Source:       key.source,
 			Kind:         key.kind,
 			Shape:        key.shape,
+			Outcome:      key.outcome,
 			ReasonFamily: key.reasonFamily,
 			ReasonCode:   key.reasonCode,
 			Count:        counts[key],
@@ -422,6 +448,7 @@ type qKernelShapeSummaryKey struct {
 	source       string
 	kind         string
 	shape        string
+	outcome      string
 	reasonFamily string
 	reasonCode   string
 }
@@ -712,7 +739,11 @@ func qVectorWhereReduceLoweringPass(fn *Function, uses map[int]int) {
 		return
 	}
 	for _, path := range DetectQVectorReduceHotPaths(fn) {
-		if path.Reduce == nil || path.Where == nil {
+		if path.Reduce == nil {
+			continue
+		}
+		if path.Where == nil {
+			qVectorWhereReduceLoweringFallbackRemark(fn, path, qVectorWhereReduceFallbackUnsupportedInput)
 			continue
 		}
 		if len(path.Where.Args) != 3 {
@@ -750,13 +781,20 @@ func qVectorWhereReduceLoweringFallbackRemark(fn *Function, path QVectorReduceHo
 			blockID = path.Reduce.Block.ID
 		}
 	}
-	shape := "where/vector-reduce"
-	if path.Where != nil {
-		shape = qVectorWhereReduceShape(path.Where)
-	}
+	shape := qVectorReduceLoweringFallbackShape(path)
 	functionRemarks(fn).Add("QVectorNativeLowering", "missed", blockID, valueID, op,
 		fmt.Sprintf("reason_code=%s shape=%s; q vector where-reduce remains on primitive runtime fallback",
 			reason, shape))
+}
+
+func qVectorReduceLoweringFallbackShape(path QVectorReduceHotPath) string {
+	if path.Where == nil {
+		return path.Shape()
+	}
+	if len(path.Where.Args) != 3 {
+		return "vector-where/vector-reduce"
+	}
+	return qVectorWhereReduceShape(path.Where)
 }
 
 func qQueryLoweringFallbackRemark(fn *Function, path QQueryHotPath, reason string) {
@@ -1297,6 +1335,9 @@ func formatQKernelDescriptors(rows []QKernelDescriptor) string {
 	for i, row := range rows {
 		fmt.Fprintf(&b, "  [%d] source=%s kind=%s kernel=%s shape=%s route=%s",
 			i, row.Source, row.Kind, row.Kernel, row.Shape, row.Route)
+		if row.Outcome != "" {
+			fmt.Fprintf(&b, " outcome=%s", row.Outcome)
+		}
 		if row.ReasonFamily != "" {
 			fmt.Fprintf(&b, " reason_family=%s", row.ReasonFamily)
 		}
@@ -1304,6 +1345,19 @@ func formatQKernelDescriptors(rows []QKernelDescriptor) string {
 			fmt.Fprintf(&b, " reason_code=%s", row.ReasonCode)
 		}
 		b.WriteByte('\n')
+	}
+	return b.String()
+}
+
+func formatQKernelExecutionStats(rows []QKernelExecutionStat) string {
+	if len(rows) == 0 {
+		return "0 execution row(s)\n"
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "%d execution row(s)\n", len(rows))
+	for i, row := range rows {
+		fmt.Fprintf(&b, "  [%d] source=%s kernel=%s shape=%s route=%s outcome=%s count=%d\n",
+			i, row.Source, row.Kernel, row.Shape, row.Route, row.Outcome, row.Count)
 	}
 	return b.String()
 }
@@ -1317,6 +1371,9 @@ func formatQKernelShapeSummary(rows []QKernelShapeSummary) string {
 	for i, row := range rows {
 		fmt.Fprintf(&b, "  [%d] source=%s kind=%s shape=%s count=%d",
 			i, row.Source, row.Kind, row.Shape, row.Count)
+		if row.Outcome != "" {
+			fmt.Fprintf(&b, " outcome=%s", row.Outcome)
+		}
 		if row.ReasonFamily != "" {
 			fmt.Fprintf(&b, " reason_family=%s", row.ReasonFamily)
 		}

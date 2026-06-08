@@ -2,6 +2,27 @@ package runtime
 
 import "testing"
 
+func TestNativeFrameRuntimeCarrierRejectsUnsupportedPayloadOnce(t *testing.T) {
+	plain := NewTable()
+	plain.SetNativePayloadWithInfo("column-payload", NativePayloadInfo{
+		Kind: NativePayloadDataColumn,
+	})
+	if _, handled, err := TableValue(plain).NativeFrameColumn("x"); handled || err != nil {
+		t.Fatalf("NativeFrameColumn non-frame payload handled=%v err=%v, want unhandled nil error", handled, err)
+	}
+
+	frame := NewTable()
+	frame.SetNativePayloadWithInfo("not-soa", NativePayloadInfo{
+		Kind:       NativePayloadDataFrame,
+		Rows:       1,
+		Columns:    1,
+		SchemaHash: "bad-frame-payload",
+	})
+	if _, handled, err := TableValue(frame).NativeFrameColumn("x"); !handled || err == nil {
+		t.Fatalf("NativeFrameColumn unsupported frame payload handled=%v err=%v, want handled error", handled, err)
+	}
+}
+
 func TestNativeFrameMaskBuildsDenseBoolMask(t *testing.T) {
 	soa, err := NewSoA(map[string]*DenseArray{
 		"price": NewDenseArrayF64([]float64{10, 12, 8}),

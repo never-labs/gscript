@@ -21,6 +21,7 @@
 package methodjit
 
 import (
+	"sync"
 	"unsafe"
 
 	"github.com/never-labs/leia/internal/jit"
@@ -666,6 +667,9 @@ type CompiledFunction struct {
 	// typed-peer calls versus fallback/exit recovery.
 	Tier2CallCounters    []uint64
 	Tier2CallCounterMeta []Tier2CallCounterMeta
+
+	qKernelStatsMu sync.Mutex
+	qKernelStats   map[qKernelExecutionKey]uint64
 }
 
 func (cf *CompiledFunction) resumeOffset(instrID int, numericPass bool) (int, bool) {

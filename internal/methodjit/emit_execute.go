@@ -1134,10 +1134,13 @@ func (cf *CompiledFunction) executeOpExit(ctx *ExecContext, regs []runtime.Value
 			rhs = regs[arg2]
 			hasRHS = true
 		}
+		shape := qFrameSelectColumnExecutionShape(cf.QFrameSelectColumnSpecs, int(aux))
 		out, err := executeQFrameSelectColumnValue(cf.Proto.Constants, cf.QFrameSelectColumnSpecs, int(aux), regs[arg1], rhs, hasRHS)
 		if err != nil {
+			cf.recordQKernelExecution("methodjit_q_frame_runtime", "QFrameSelectColumn", shape, "typed_runtime_op_exit", "error")
 			return err
 		}
+		cf.recordQKernelExecution("methodjit_q_frame_runtime", "QFrameSelectColumn", shape, "typed_runtime_op_exit", "success")
 		regs[slot] = out
 
 	case OpVectorGather:
@@ -1200,8 +1203,10 @@ func (cf *CompiledFunction) executeOpExit(ctx *ExecContext, regs []runtime.Value
 		}
 		out, err := executeQVectorWhereReduceValue(aux, regs[tempBase], regs[tempBase+1], regs[tempBase+2])
 		if err != nil {
+			cf.recordQKernelExecution("methodjit_q_vector_runtime", "QVectorWhereReduce", "compare/vector-where/vector-reduce", "typed_runtime_op_exit", "error")
 			return err
 		}
+		cf.recordQKernelExecution("methodjit_q_vector_runtime", "QVectorWhereReduce", "compare/vector-where/vector-reduce", "typed_runtime_op_exit", "success")
 		regs[slot] = out
 
 	case OpVectorScan:

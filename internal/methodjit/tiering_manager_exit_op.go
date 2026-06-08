@@ -490,10 +490,13 @@ func (tm *TieringManager) executeOpExit(ctx *ExecContext, regs []runtime.Value, 
 			rhs = regs[absArg2]
 			hasRHS = true
 		}
+		shape := qFrameSelectColumnExecutionShape(cf.QFrameSelectColumnSpecs, int(aux))
 		out, err := executeQFrameSelectColumnValue(proto.Constants, cf.QFrameSelectColumnSpecs, int(aux), regs[absArg1], rhs, hasRHS)
 		if err != nil {
+			cf.recordQKernelExecution("methodjit_q_frame_runtime", "QFrameSelectColumn", shape, "typed_runtime_op_exit", "error")
 			return err
 		}
+		cf.recordQKernelExecution("methodjit_q_frame_runtime", "QFrameSelectColumn", shape, "typed_runtime_op_exit", "success")
 		regs[absSlot] = out
 
 	case OpVectorGather:
@@ -554,9 +557,16 @@ func (tm *TieringManager) executeOpExit(ctx *ExecContext, regs []runtime.Value, 
 		if absSlot >= len(regs) || tempBase < 0 || nArgs != 3 || tempBase+nArgs > len(regs) {
 			return fmt.Errorf("QVectorWhereReduce op-exit out of register range")
 		}
+		cf, _ := tm.tier2CompiledFor(proto)
 		out, err := executeQVectorWhereReduceValue(aux, regs[tempBase], regs[tempBase+1], regs[tempBase+2])
 		if err != nil {
+			if cf != nil {
+				cf.recordQKernelExecution("methodjit_q_vector_runtime", "QVectorWhereReduce", "compare/vector-where/vector-reduce", "typed_runtime_op_exit", "error")
+			}
 			return err
+		}
+		if cf != nil {
+			cf.recordQKernelExecution("methodjit_q_vector_runtime", "QVectorWhereReduce", "compare/vector-where/vector-reduce", "typed_runtime_op_exit", "success")
 		}
 		regs[absSlot] = out
 
