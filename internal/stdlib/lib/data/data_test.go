@@ -103,6 +103,22 @@ func TestNewI64RangeArraySemantics(t *testing.T) {
 	if got, want := gathered.Values(), []any{int64(18), int64(12), int64(10)}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("range Gather values = %#v, want %#v", got, want)
 	}
+
+	sliced := values.Gather([]int{1, 2, 3})
+	if _, ok := sliced.(i64RangeArray); !ok {
+		t.Fatalf("range Gather consecutive returned %T, want i64RangeArray", sliced)
+	}
+	if got, want := sliced.Values(), []any{int64(12), int64(14), int64(16)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("range Gather consecutive values = %#v, want %#v", got, want)
+	}
+
+	reversed := values.Gather([]int{4, 3, 2, 1, 0})
+	if _, ok := reversed.(i64RangeArray); !ok {
+		t.Fatalf("range Gather reverse returned %T, want i64RangeArray", reversed)
+	}
+	if got, want := reversed.Values(), []any{int64(18), int64(16), int64(14), int64(12), int64(10)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("range Gather reverse values = %#v, want %#v", got, want)
+	}
 }
 
 func TestNewFramePreservesColumnOrderAndKinds(t *testing.T) {

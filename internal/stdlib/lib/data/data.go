@@ -682,6 +682,9 @@ func (a i64RangeArray) Values() []any {
 }
 
 func (a i64RangeArray) Gather(indexes []int) Array {
+	if gathered, ok := a.gatherRange(indexes); ok {
+		return gathered
+	}
 	out := make([]int64, len(indexes))
 	for i, row := range indexes {
 		if row < 0 || row >= a.len {
@@ -690,6 +693,39 @@ func (a i64RangeArray) Gather(indexes []int) Array {
 		out[i] = a.start + int64(row)*a.step
 	}
 	return columnArray[int64]{kind: KindI64, data: out}
+}
+
+func (a i64RangeArray) gatherRange(indexes []int) (Array, bool) {
+	switch len(indexes) {
+	case 0:
+		return i64RangeArray{start: a.start, step: a.step, len: 0}, true
+	case 1:
+		row := indexes[0]
+		if row < 0 || row >= a.len {
+			panic(fmt.Sprintf("data range gather index %d out of range", row))
+		}
+		return i64RangeArray{start: a.start + int64(row)*a.step, step: a.step, len: 1}, true
+	}
+	first := indexes[0]
+	if first < 0 || first >= a.len {
+		panic(fmt.Sprintf("data range gather index %d out of range", first))
+	}
+	indexStep := indexes[1] - indexes[0]
+	for _, row := range indexes[1:] {
+		if row < 0 || row >= a.len {
+			panic(fmt.Sprintf("data range gather index %d out of range", row))
+		}
+	}
+	for i := 2; i < len(indexes); i++ {
+		if indexes[i]-indexes[i-1] != indexStep {
+			return nil, false
+		}
+	}
+	return i64RangeArray{
+		start: a.start + int64(first)*a.step,
+		step:  int64(indexStep) * a.step,
+		len:   len(indexes),
+	}, true
 }
 
 func (a nullableArray) Kind() Kind { return a.kind }
