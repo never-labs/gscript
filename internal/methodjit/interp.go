@@ -1100,6 +1100,21 @@ func (s *interpState) execInstr(instr *Instr, block *Block) ([]runtime.Value, bo
 		}
 		s.values[instr.ID] = out
 
+	case OpFrameFilterProject:
+		idx := int(instr.Aux)
+		if idx < 0 || idx >= len(s.fn.Proto.Constants) {
+			return nil, false, fmt.Errorf("FrameFilterProject column list constant is out of range")
+		}
+		names, err := frameProjectColumnNames(s.fn.Proto.Constants[idx])
+		if err != nil {
+			return nil, false, err
+		}
+		out, err := executeFrameFilterProjectValue(s.val(instr.Args[0]), s.val(instr.Args[1]), names)
+		if err != nil {
+			return nil, false, err
+		}
+		s.values[instr.ID] = out
+
 	case OpFrameGather:
 		out, err := executeFrameGatherValue(s.val(instr.Args[0]), s.val(instr.Args[1]))
 		if err != nil {

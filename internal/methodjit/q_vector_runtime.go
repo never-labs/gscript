@@ -86,6 +86,20 @@ func executeFrameFilterProjectColumnValue(frameVal, maskVal runtime.Value, names
 	return out, nil
 }
 
+func executeFrameFilterProjectValue(frameVal, maskVal runtime.Value, names []string) (runtime.Value, error) {
+	if !maskVal.IsDenseArray() {
+		return runtime.NilValue(), fmt.Errorf("FrameFilterProject mask must be dense array (got %s)", maskVal.TypeName())
+	}
+	out, handled, err := frameVal.NativeFrameFilterProject(maskVal.DenseArray(), names)
+	if err != nil {
+		return runtime.NilValue(), err
+	}
+	if !handled {
+		return runtime.NilValue(), fmt.Errorf("FrameFilterProject operand must be native frame (got %s)", frameVal.TypeName())
+	}
+	return out, nil
+}
+
 func executeFrameFilterValue(frameVal, maskVal runtime.Value) (runtime.Value, error) {
 	if !maskVal.IsDenseArray() {
 		return runtime.NilValue(), fmt.Errorf("FrameFilter mask must be dense array (got %s)", maskVal.TypeName())
@@ -148,11 +162,6 @@ func executeQFrameSelectColumnValue(constants []runtime.Value, specs []QFrameSel
 		return runtime.NilValue(), fmt.Errorf("QFrameSelectColumn spec index %d is out of range", specIdx)
 	}
 	spec := specs[specIdx]
-	rhs, hasRHS := qFrameSelectColumnCompareRHS(spec, argVal, hasArg)
-	mask, err := executeQFrameSelectColumnMask(constants, spec, frameVal, rhs, hasRHS)
-	if err != nil {
-		return runtime.NilValue(), err
-	}
 	if spec.ProjectConst < 0 || spec.ProjectConst >= len(constants) {
 		return runtime.NilValue(), fmt.Errorf("QFrameSelectColumn project constant is out of range")
 	}
@@ -164,6 +173,23 @@ func executeQFrameSelectColumnValue(constants []runtime.Value, specs []QFrameSel
 		return runtime.NilValue(), fmt.Errorf("QFrameSelectColumn result column must be a string constant")
 	}
 	resultName := constants[spec.ResultColumnConst].Str()
+	if !qFrameSelectColumnHasPredicate(spec) {
+		rows := frameVal
+		if spec.RowMode != QFrameSelectColumnRowsNone {
+			rowArg, hasRowArg := qFrameSelectColumnRowArg(spec, argVal, hasArg)
+			var err error
+			rows, err = executeQFrameSelectColumnRows(constants, spec, rows, rowArg, hasRowArg)
+			if err != nil {
+				return runtime.NilValue(), err
+			}
+		}
+		return executeFrameProjectColumnValue(rows, names, resultName)
+	}
+	rhs, hasRHS := qFrameSelectColumnCompareRHS(spec, argVal, hasArg)
+	mask, err := executeQFrameSelectColumnMask(constants, spec, frameVal, rhs, hasRHS)
+	if err != nil {
+		return runtime.NilValue(), err
+	}
 	if spec.RowMode == QFrameSelectColumnRowsNone {
 		return executeFrameFilterProjectColumnValue(frameVal, mask, names, resultName)
 	}
@@ -177,6 +203,10 @@ func executeQFrameSelectColumnValue(constants []runtime.Value, specs []QFrameSel
 		return runtime.NilValue(), err
 	}
 	return executeFrameProjectColumnValue(rows, names, resultName)
+}
+
+func qFrameSelectColumnHasPredicate(spec QFrameSelectColumnSpec) bool {
+	return len(spec.MaskTerms) > 0 || spec.MaskSpecConst >= 0 || spec.SourceColumnConst >= 0
 }
 
 func executeQFrameSelectColumnMask(constants []runtime.Value, spec QFrameSelectColumnSpec, frameVal runtime.Value, rhsVal runtime.Value, hasRHS bool) (runtime.Value, error) {

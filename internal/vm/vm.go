@@ -2589,6 +2589,37 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 				fb.Result.Observe(out.Type())
 			}
 
+		case OP_FRAME_FILTER_PROJECT:
+			a := DecodeA(inst)
+			b := DecodeB(inst)
+			c := DecodeC(inst)
+			maskVal := vm.regs[base+a]
+			frameVal := vm.regs[base+b]
+			if !maskVal.IsDenseArray() {
+				return nil, wrapLineErr(frame, fmt.Errorf("FRAME_FILTER_PROJECT mask must be dense array (got %s)", maskVal.TypeName()))
+			}
+			if c >= len(constants) {
+				return nil, wrapLineErr(frame, fmt.Errorf("FRAME_FILTER_PROJECT column list constant is out of range"))
+			}
+			names, err := frameProjectColumnNames(constants[c])
+			if err != nil {
+				return nil, wrapLineErr(frame, err)
+			}
+			out, handled, err := frameVal.NativeFrameFilterProject(maskVal.DenseArray(), names)
+			if err != nil {
+				return nil, wrapLineErr(frame, err)
+			}
+			if !handled {
+				return nil, wrapLineErr(frame, fmt.Errorf("FRAME_FILTER_PROJECT operand must be native frame (got %s)", frameVal.TypeName()))
+			}
+			vm.regs[base+a] = out
+			if frame.closure.Proto.Feedback != nil {
+				fb := &frame.closure.Proto.Feedback[frame.pc-1]
+				fb.Left.Observe(frameVal.Type())
+				fb.Right.Observe(maskVal.Type())
+				fb.Result.Observe(out.Type())
+			}
+
 		case OP_VECTOR_COMPARE:
 			a := DecodeA(inst)
 			b := DecodeB(inst)

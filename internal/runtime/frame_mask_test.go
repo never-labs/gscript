@@ -139,3 +139,51 @@ func TestNativeFrameFilterProjectColumnFiltersSingleProjectedColumn(t *testing.T
 		t.Fatalf("NativeFrameFilterProjectColumn unprojected result handled=%v err=%v, want handled error", handled, err)
 	}
 }
+
+func TestNativeFrameFilterProjectFiltersProjectedFrame(t *testing.T) {
+	soa, err := NewSoA(map[string]*DenseArray{
+		"price": NewDenseArrayF64([]float64{10, 12, 8}),
+		"size":  NewDenseArrayI64([]int64{100, 200, 300}),
+		"flag":  NewDenseArrayBool([]bool{true, false, true}),
+	})
+	if err != nil {
+		t.Fatalf("NewSoA: %v", err)
+	}
+	frame := NewTable()
+	frame.SetNativePayloadWithInfo(soa, NativePayloadInfo{
+		Kind:       NativePayloadDataFrame,
+		Rows:       soa.Len(),
+		Columns:    3,
+		SchemaHash: "filter-project-test",
+	})
+
+	out, handled, err := TableValue(frame).NativeFrameFilterProject(NewDenseArrayBool([]bool{true, false, true}), []string{"size", "price"})
+	if err != nil {
+		t.Fatalf("NativeFrameFilterProject: %v", err)
+	}
+	if !handled || !out.IsFrame() {
+		t.Fatalf("NativeFrameFilterProject = %v handled=%v, want native frame", out, handled)
+	}
+	payload, info, ok := out.Table().NativeFramePayload()
+	if !ok {
+		t.Fatalf("NativeFrameFilterProject payload missing")
+	}
+	filtered, ok := payload.(*SoA)
+	if !ok {
+		t.Fatalf("NativeFrameFilterProject payload = %T, want *SoA", payload)
+	}
+	if info.Rows != 2 || info.Columns != 2 || info.SchemaHash == "filter-project-test" {
+		t.Fatalf("NativeFrameFilterProject info = %+v, want filtered/projected schema info", info)
+	}
+	if _, ok := filtered.Column("flag"); ok {
+		t.Fatalf("NativeFrameFilterProject kept unprojected flag column")
+	}
+	size, ok := filtered.Column("size")
+	if !ok {
+		t.Fatalf("NativeFrameFilterProject missing size column")
+	}
+	got, ok := size.I64()
+	if !ok || len(got) != 2 || got[0] != 100 || got[1] != 300 {
+		t.Fatalf("filter project size values = %#v, want [100 300]", got)
+	}
+}

@@ -279,6 +279,19 @@ func TestQueryKernelCacheKeyIsSchemaStable(t *testing.T) {
 	}
 
 	key := QueryKernelCacheKey("select sym from trades where qty>=10", frame, plan)
+	keyParts, ok := ParseSchemaStableCacheKey(key)
+	if !ok {
+		t.Fatalf("ParseSchemaStableCacheKey(%q) failed", key)
+	}
+	if keyParts.Namespace != "select sym from trades where qty>=10" || keyParts.Kind != "kernel" || keyParts.SchemaHash != frame.SchemaFingerprint() {
+		t.Fatalf("kernel key parts = %+v, want namespace/query kind/kernel schema hash/%s", keyParts, frame.SchemaFingerprint())
+	}
+	if len(keyParts.Extra) != 1 || keyParts.Extra[0] != QueryKernelPlanFingerprint(plan) {
+		t.Fatalf("kernel key extra = %#v, want plan fingerprint", keyParts.Extra)
+	}
+	if _, ok := ParseSchemaStableCacheKey("3:abc"); ok {
+		t.Fatalf("ParseSchemaStableCacheKey accepted unterminated key")
+	}
 	if got := QueryKernelCacheKey("select sym from trades where qty>=10", sameSchema, plan); got != key {
 		t.Fatalf("same schema key = %q, want %q", got, key)
 	}

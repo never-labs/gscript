@@ -421,6 +421,51 @@ func TestFrameFilterProjectColumnPrimitiveFiltersProjectedColumn(t *testing.T) {
 	}
 }
 
+func TestFrameFilterProjectPrimitiveFiltersProjectedFrame(t *testing.T) {
+	soa, err := runtime.NewSoA(map[string]*runtime.DenseArray{
+		"x":  runtime.NewDenseArrayF64([]float64{1.5, 2.5, 3.5}),
+		"id": runtime.NewDenseArrayI64([]int64{10, 20, 30}),
+		"z":  runtime.NewDenseArrayF64([]float64{7, 8, 9}),
+	})
+	if err != nil {
+		t.Fatalf("NewSoA: %v", err)
+	}
+	frame := runtime.NewTable()
+	frame.SetNativePayloadWithInfo(soa, runtime.NativePayloadInfo{
+		Kind:       runtime.NativePayloadDataFrame,
+		Rows:       soa.Len(),
+		Columns:    3,
+		SchemaHash: "soa-frame-test",
+	})
+	mask := runtime.NewDenseArrayBool([]bool{true, false, true})
+	names := runtime.NewTable()
+	names.RawSetInt(1, runtime.StringValue("id"))
+	names.RawSetInt(2, runtime.StringValue("x"))
+	proto := &FuncProto{
+		MaxStack:  2,
+		Code:      frameFilterProjectPrimitiveProgram(),
+		Constants: []runtime.Value{runtime.TableValue(frame), runtime.DenseArrayValue(mask), runtime.TableValue(names), runtime.StringValue("id")},
+	}
+	proto.EnsureFeedback()
+
+	results, err := New(map[string]runtime.Value{}).Execute(proto)
+	if err != nil {
+		t.Fatalf("Execute FRAME_FILTER_PROJECT: %v", err)
+	}
+	if len(results) != 1 || !results[0].IsDenseArray() {
+		t.Fatalf("FRAME_FILTER_PROJECT follow-up column result = %#v, want dense array", results)
+	}
+	got, ok := results[0].DenseArray().I64()
+	if !ok || len(got) != 2 || got[0] != 10 || got[1] != 30 {
+		t.Fatalf("filtered project id = %#v, want [10 30]", got)
+	}
+
+	fb := proto.Feedback[2]
+	if fb.Left != FBTable || fb.Right != FBAny || fb.Result != FBTable {
+		t.Fatalf("FRAME_FILTER_PROJECT feedback = left %v right %v result %v, want table/dense bucket/table", fb.Left, fb.Right, fb.Result)
+	}
+}
+
 func TestFrameGatherPrimitiveGathersSoARows(t *testing.T) {
 	soa, err := runtime.NewSoA(map[string]*runtime.DenseArray{
 		"x":  runtime.NewDenseArrayF64([]float64{1.5, 2.5, 3.5}),
@@ -644,6 +689,16 @@ func frameFilterProjectColumnPrimitiveProgram() []uint32 {
 		EncodeABx(OP_LOADK, 0, 0),
 		EncodeABx(OP_LOADK, 1, 1),
 		EncodeABC(OP_FRAME_FILTER_PROJECT_COLUMN, 1, 0, 2),
+		EncodeABC(OP_RETURN, 1, 2, 0),
+	}
+}
+
+func frameFilterProjectPrimitiveProgram() []uint32 {
+	return []uint32{
+		EncodeABx(OP_LOADK, 0, 0),
+		EncodeABx(OP_LOADK, 1, 1),
+		EncodeABC(OP_FRAME_FILTER_PROJECT, 1, 0, 2),
+		EncodeABC(OP_FRAME_COLUMN, 1, 1, 3),
 		EncodeABC(OP_RETURN, 1, 2, 0),
 	}
 }

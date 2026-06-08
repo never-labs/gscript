@@ -1034,6 +1034,23 @@ func (cf *CompiledFunction) executeOpExit(ctx *ExecContext, regs []runtime.Value
 		}
 		regs[slot] = out
 
+	case OpFrameFilterProject:
+		if arg1 >= len(regs) || arg2 >= len(regs) || slot >= len(regs) {
+			return fmt.Errorf("FrameFilterProject op-exit out of register range")
+		}
+		if aux < 0 || cf.Proto == nil || aux >= len(cf.Proto.Constants) {
+			return fmt.Errorf("FrameFilterProject column list constant is out of range")
+		}
+		names, err := frameProjectColumnNames(cf.Proto.Constants[aux])
+		if err != nil {
+			return err
+		}
+		out, err := executeFrameFilterProjectValue(regs[arg1], regs[arg2], names)
+		if err != nil {
+			return err
+		}
+		regs[slot] = out
+
 	case OpFrameGather:
 		if arg1 >= len(regs) || arg2 >= len(regs) || slot >= len(regs) {
 			return fmt.Errorf("FrameGather op-exit out of register range")

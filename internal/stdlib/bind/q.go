@@ -1199,9 +1199,11 @@ func qExplainQuery(s *SoA, spec *Table) (*Table, error) {
 	}
 	out.RawSetString("kernel_cached", BoolValue(kernelCached))
 	if len(aggs) != 0 {
+		reason := "query native kernel supports non-aggregate selects only"
 		out.RawSetString("kernel_supported", BoolValue(false))
 		out.RawSetString("kernel_reason_code", StringValue(qQueryKernelReasonUnsupported))
-		out.RawSetString("kernel_reason", StringValue("query native kernel supports non-aggregate selects only"))
+		out.RawSetString("kernel_reason", StringValue(reason))
+		qExplainAttachFallbackStats(out, qFallbackQueryKernel, qQueryKernelReasonUnsupported, reason)
 		out.RawSetString("source_schema_hash", StringValue(""))
 		out.RawSetString("kernel_schema_hash", StringValue(""))
 		out.RawSetString("kernel_schema", TableValue(NewAppendArrayTable(0)))
@@ -1223,6 +1225,7 @@ func qExplainQuery(s *SoA, spec *Table) (*Table, error) {
 		out.RawSetString("kernel_supported", BoolValue(false))
 		out.RawSetString("kernel_reason_code", StringValue(reasonCode))
 		out.RawSetString("kernel_reason", StringValue(reason))
+		qExplainAttachFallbackStats(out, qFallbackQueryKernel, reasonCode, reason)
 		out.RawSetString("source_schema_hash", StringValue(""))
 		out.RawSetString("kernel_schema_hash", StringValue(""))
 		out.RawSetString("kernel_schema", TableValue(NewAppendArrayTable(0)))
@@ -1234,6 +1237,7 @@ func qExplainQuery(s *SoA, spec *Table) (*Table, error) {
 	out.RawSetString("kernel_supported", BoolValue(true))
 	out.RawSetString("kernel_reason_code", StringValue(qKernelReasonSupported))
 	out.RawSetString("kernel_reason", StringValue(qKernelReasonSupported))
+	qExplainAttachFallbackStats(out, "", qKernelReasonSupported, qKernelReasonSupported)
 	out.RawSetString("source_schema_hash", StringValue(schemaHash))
 	out.RawSetString("kernel_schema_hash", StringValue(schemaHash))
 	out.RawSetString("kernel_schema", qExplainSoASchemaValue(nativeRows))
@@ -1463,19 +1467,28 @@ func qExplainSQL(args qSQLArgsResult) (Value, error) {
 	out.RawSetString("kernel_supported", BoolValue(kernelInfo.supported))
 	out.RawSetString("kernel_cached", BoolValue(kernelInfo.cached))
 	out.RawSetString("kernel_cache_key", StringValue(kernelInfo.cacheKey))
+	out.RawSetString("kernel_cache_namespace", StringValue(kernelInfo.cacheNamespace))
+	out.RawSetString("kernel_cache_kind", StringValue(kernelInfo.cacheKind))
+	out.RawSetString("kernel_cache_schema_hash", StringValue(kernelInfo.cacheSchemaHash))
+	out.RawSetString("kernel_plan_fingerprint", StringValue(kernelInfo.planFingerprint))
 	out.RawSetString("kernel_reason_code", StringValue(kernelInfo.reasonCode))
 	out.RawSetString("kernel_reason", StringValue(kernelInfo.reason))
+	qExplainAttachFallbackStats(out, qSQLKernelFallbackStatsCode(kernelInfo), kernelInfo.reasonCode, kernelInfo.reason)
 	return TableValue(out), nil
 }
 
 type qExplainKernelResult struct {
-	schema     data.Schema
-	schemaHash string
-	cacheKey   string
-	supported  bool
-	cached     bool
-	reasonCode string
-	reason     string
+	schema          data.Schema
+	schemaHash      string
+	cacheKey        string
+	cacheNamespace  string
+	cacheKind       string
+	cacheSchemaHash string
+	planFingerprint string
+	supported       bool
+	cached          bool
+	reasonCode      string
+	reason          string
 }
 
 type qExplainSourceBridgeResult struct {
@@ -1850,6 +1863,11 @@ func qExplainKernelInfo(args qSQLArgsResult, tmpl qSQLPlanTemplate) qExplainKern
 	bindings := qSQLScalarBindingsFromValue(args.envValue)
 	plan := qPrepareSQLPlanForFrame(args.source, tmpl.plan, frame, bindings, false)
 	kernelKey := data.QueryKernelCacheKey(args.source, frame, plan)
+	kernelKeyInfo := qSQLKernelCacheKeyInfo(kernelKey)
+	planFingerprint := ""
+	if len(kernelKeyInfo.Extra) > 0 {
+		planFingerprint = kernelKeyInfo.Extra[0]
+	}
 	qSQLAlignedPlanCacheMu.Lock()
 	_, cached := qSQLKernelCache[kernelKey]
 	qSQLAlignedPlanCacheMu.Unlock()
@@ -1859,12 +1877,20 @@ func qExplainKernelInfo(args qSQLArgsResult, tmpl qSQLPlanTemplate) qExplainKern
 	}
 	supported, reason, err := data.QueryKernelCompileReason(frame, plan)
 	if err != nil {
-		return qExplainKernelResult{schema: frame.Schema(), schemaHash: schemaHash, cacheKey: kernelKey, cached: cached, reasonCode: qKernelReasonCompileError, reason: err.Error()}
+		return qExplainKernelResult{schema: frame.Schema(), schemaHash: schemaHash, cacheKey: kernelKey, cacheNamespace: kernelKeyInfo.Namespace, cacheKind: kernelKeyInfo.Kind, cacheSchemaHash: kernelKeyInfo.SchemaHash, planFingerprint: planFingerprint, cached: cached, reasonCode: qKernelReasonCompileError, reason: err.Error()}
 	}
 	if !supported {
-		return qExplainKernelResult{schema: frame.Schema(), schemaHash: schemaHash, cacheKey: kernelKey, cached: cached, reasonCode: stdq.KernelFallbackReasonCode(reason), reason: reason}
+		return qExplainKernelResult{schema: frame.Schema(), schemaHash: schemaHash, cacheKey: kernelKey, cacheNamespace: kernelKeyInfo.Namespace, cacheKind: kernelKeyInfo.Kind, cacheSchemaHash: kernelKeyInfo.SchemaHash, planFingerprint: planFingerprint, cached: cached, reasonCode: stdq.KernelFallbackReasonCode(reason), reason: reason}
 	}
-	return qExplainKernelResult{schema: frame.Schema(), schemaHash: schemaHash, cacheKey: kernelKey, supported: true, cached: cached, reasonCode: qKernelReasonSupported, reason: reason}
+	return qExplainKernelResult{schema: frame.Schema(), schemaHash: schemaHash, cacheKey: kernelKey, cacheNamespace: kernelKeyInfo.Namespace, cacheKind: kernelKeyInfo.Kind, cacheSchemaHash: kernelKeyInfo.SchemaHash, planFingerprint: planFingerprint, supported: true, cached: cached, reasonCode: qKernelReasonSupported, reason: reason}
+}
+
+func qSQLKernelCacheKeyInfo(key string) data.SchemaStableCacheKeyParts {
+	info, ok := data.ParseSchemaStableCacheKey(key)
+	if !ok {
+		return data.SchemaStableCacheKeyParts{}
+	}
+	return info
 }
 
 func qExplainKernelSchemaHash(info qExplainKernelResult) string {
@@ -2621,6 +2647,15 @@ func qKernelCacheKeyStatsTable(stats []qSQLKernelCacheKeyStats) *Table {
 	for i, stat := range stats {
 		row := NewTable()
 		row.RawSetString("key", StringValue(stat.Key))
+		info := qSQLKernelCacheKeyInfo(stat.Key)
+		row.RawSetString("namespace", StringValue(info.Namespace))
+		row.RawSetString("kind", StringValue(info.Kind))
+		row.RawSetString("schema_hash", StringValue(info.SchemaHash))
+		planFingerprint := ""
+		if len(info.Extra) > 0 {
+			planFingerprint = info.Extra[0]
+		}
+		row.RawSetString("plan_fingerprint", StringValue(planFingerprint))
 		row.RawSetString("hits", IntValue(int64(stat.Hits)))
 		row.RawSetString("misses", IntValue(int64(stat.Misses)))
 		row.RawSetString("evictions", IntValue(int64(stat.Evictions)))
@@ -2670,6 +2705,51 @@ func qRecordFallbackReason(code, reasonCode, reason string) {
 		qFallbackCounters.ByReason[qFallbackReasonKey{Code: code, Reason: reason}]++
 	}
 	qFallbackStatsMu.Unlock()
+}
+
+func qExplainAttachFallbackStats(out *Table, code, reasonCode, reason string) {
+	if out == nil {
+		return
+	}
+	reasonCodeCount, reasonCount := qFallbackReasonCountsSnapshot(code, reasonCode, reason)
+	out.RawSetString("kernel_fallback_code", StringValue(code))
+	out.RawSetString("kernel_fallback_reason_code_count", IntValue(int64(reasonCodeCount)))
+	out.RawSetString("kernel_fallback_reason_count", IntValue(int64(reasonCount)))
+}
+
+func qFallbackReasonCountsSnapshot(code, reasonCode, reason string) (reasonCodeCount, reasonCount int) {
+	if code == "" {
+		return 0, 0
+	}
+	reason = qNormalizeFallbackReason(reason)
+	reasonCode = qNormalizeFallbackReasonCode(code, reasonCode, reason)
+	qFallbackStatsMu.Lock()
+	if reasonCode != "" && qFallbackCounters.ByReasonCode != nil {
+		reasonCodeCount = qFallbackCounters.ByReasonCode[qFallbackReasonCodeKey{Code: code, ReasonCode: reasonCode}]
+	}
+	if reason != "" && qFallbackCounters.ByReason != nil {
+		reasonCount = qFallbackCounters.ByReason[qFallbackReasonKey{Code: code, Reason: reason}]
+	}
+	qFallbackStatsMu.Unlock()
+	return reasonCodeCount, reasonCount
+}
+
+func qSQLKernelFallbackStatsCode(info qExplainKernelResult) string {
+	if info.supported {
+		return ""
+	}
+	switch info.reasonCode {
+	case qKernelReasonMutationPlan:
+		return qFallbackMutationPlan
+	case qKernelReasonSourceUnavailable:
+		return qFallbackSourceErr
+	case qKernelReasonJoinUnavailable:
+		return qFallbackJoinErr
+	case qKernelReasonCompileError:
+		return qFallbackKernelCompileErr
+	default:
+		return qFallbackKernelUnsupported
+	}
 }
 
 func qFallbackStatsTable() *Table {

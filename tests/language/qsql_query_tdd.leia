@@ -104,6 +104,17 @@ nullable_trades := data.frame({
 null_filtered := q.sql("select sym,missing:null price from trades where null price order by sym desc", {trades: nullable_trades})
 check("qsql null prefix projection where order", null_filtered.len == 2 && null_filtered[1].sym == "TSLA" && null_filtered[1].missing == true && null_filtered[2].sym == "MSFT" && null_filtered[2].missing == true)
 
+multi_mask_trades := data.frame({
+  sym: data.symbols({"AAPL", "MSFT", "AAPL", "NVDA", "TSLA"}),
+  price: data.f64({100.5, 99.0, 101.0, 120.0, 130.0}),
+  size: data.i64({10, 50, 20, 5, 2}),
+  active: data.bool({true, true, false, true, true}),
+})
+multi_mask := q.sql("select sym,price,size from trades where (sym=`AAPL or sym=`NVDA) and active and price>=100 order by price asc", {
+  trades: multi_mask_trades,
+})
+check("qsql compound boolean where mask", multi_mask.len == 2 && multi_mask[1].sym == "AAPL" && multi_mask[1].price == 100.5 && multi_mask[2].sym == "NVDA" && multi_mask[2].size == 5)
+
 comma_where := q.sql("select sym,price from trades where sym=`AAPL,price>=101 order by price asc", {
   trades: trades,
 })

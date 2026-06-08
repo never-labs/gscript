@@ -302,6 +302,46 @@ func TestFrameFilterBytecodeBuildsMethodJITIR(t *testing.T) {
 	}
 }
 
+func TestFrameFilterProjectBytecodeBuildsMethodJITIR(t *testing.T) {
+	names := runtime.NewTable()
+	names.RawSetInt(1, runtime.StringValue("price"))
+	proto := &vm.FuncProto{
+		Name:      "frame_filter_project",
+		NumParams: 2,
+		MaxStack:  2,
+		Constants: []runtime.Value{
+			runtime.TableValue(names),
+		},
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_FRAME_FILTER_PROJECT, 1, 0, 0),
+			vm.EncodeABC(vm.OP_RETURN, 1, 2, 0),
+		},
+	}
+
+	fn := BuildGraph(proto)
+	var filterProject *Instr
+	for _, block := range fn.Blocks {
+		for _, instr := range block.Instrs {
+			if instr.Op == OpFrameFilterProject {
+				filterProject = instr
+				break
+			}
+		}
+	}
+	if filterProject == nil {
+		t.Fatalf("BuildGraph did not emit OpFrameFilterProject:\n%s", Print(fn))
+	}
+	if len(filterProject.Args) != 2 {
+		t.Fatalf("OpFrameFilterProject arg count = %d, want 2", len(filterProject.Args))
+	}
+	if filterProject.Type != TypeAny {
+		t.Fatalf("OpFrameFilterProject type = %s, want Any", filterProject.Type)
+	}
+	if filterProject.Aux != 0 {
+		t.Fatalf("OpFrameFilterProject Aux = %d, want const index 0", filterProject.Aux)
+	}
+}
+
 func TestFrameFilterProjectColumnBytecodeBuildsMethodJITIR(t *testing.T) {
 	spec := runtime.NewTable()
 	spec.RawSetString("project", runtime.StringValue("price"))
@@ -603,6 +643,56 @@ func TestQFramePrimitiveHotPathLoweringReportsFallbackReason(t *testing.T) {
 		!strings.Contains(got, "reason_code=too_many_dynamic_args") ||
 		!strings.Contains(got, "shape=compare/filter/gather/project/column") {
 		t.Fatalf("q lowering fallback remark = %q, want structured reason and shape", got)
+	}
+}
+
+func TestQFramePrimitiveProjectionOnlyLowersToTypedRuntimeKernel(t *testing.T) {
+	proto := &vm.FuncProto{
+		Name:      "q_frame_projection_only_lowered",
+		NumParams: 1,
+		MaxStack:  1,
+		Constants: []runtime.Value{
+			qHotPathNamesValue("size"),
+			runtime.StringValue("size"),
+		},
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_FRAME_PROJECT, 0, 0, 0),
+			vm.EncodeABC(vm.OP_FRAME_COLUMN, 0, 0, 1),
+			vm.EncodeABC(vm.OP_RETURN, 0, 2, 0),
+		},
+	}
+
+	fn := BuildGraph(proto)
+	paths := DetectQQueryHotPaths(fn)
+	if len(paths) != 1 {
+		t.Fatalf("DetectQQueryHotPaths count = %d, want 1\n%s", len(paths), Print(fn))
+	}
+	if got := paths[0].Shape(); got != "project/column" {
+		t.Fatalf("projection-only hot path shape = %q, want project/column", got)
+	}
+	if got := qQueryHotPathPredicateName(paths[0]); got != "none" {
+		t.Fatalf("projection-only predicate = %q, want none", got)
+	}
+
+	lowered, err := QQueryNativeLoweringPass(fn)
+	if err != nil {
+		t.Fatalf("QQueryNativeLoweringPass: %v", err)
+	}
+	if len(lowered.QFrameSelectColumnSpecs) != 1 {
+		t.Fatalf("QFrameSelectColumnSpecs count = %d, want 1", len(lowered.QFrameSelectColumnSpecs))
+	}
+	spec := lowered.QFrameSelectColumnSpecs[0]
+	if spec.Shape != "project/column" || spec.SourceColumnConst != -1 || spec.MaskSpecConst != -1 || len(spec.MaskTerms) != 0 {
+		t.Fatalf("projection-only lowered spec = %+v, want no predicate", spec)
+	}
+
+	result, err := Interpret(lowered, []runtime.Value{runtime.TableValue(qHotPathTestFrame(t))})
+	if err != nil {
+		t.Fatalf("Interpret lowered projection-only q hot path: %v", err)
+	}
+	got, ok := result[0].DenseArray().I64()
+	if !ok || len(got) != 3 || got[0] != 5 || got[1] != 10 || got[2] != 20 {
+		t.Fatalf("projection-only result values = %#v, want [5 10 20]", got)
 	}
 }
 
@@ -1417,6 +1507,28 @@ func TestTier2GateAllowsFrameFilterThroughOpExit(t *testing.T) {
 	}
 }
 
+func TestTier2GateAllowsFrameFilterProjectThroughOpExit(t *testing.T) {
+	names := runtime.NewTable()
+	names.RawSetInt(1, runtime.StringValue("price"))
+	proto := &vm.FuncProto{
+		Name:      "frame_filter_project",
+		NumParams: 2,
+		MaxStack:  2,
+		Constants: []runtime.Value{
+			runtime.TableValue(names),
+		},
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_FRAME_FILTER_PROJECT, 1, 0, 0),
+			vm.EncodeABC(vm.OP_RETURN, 1, 2, 0),
+		},
+	}
+
+	gate := firstUnsupportedTier2BytecodeGate(proto)
+	if !gate.Allowed {
+		t.Fatalf("OP_FRAME_FILTER_PROJECT should be Tier2-eligible via op-exit, got %q", gate.Reason)
+	}
+}
+
 func TestTier2GateAllowsFrameGatherThroughOpExit(t *testing.T) {
 	proto := &vm.FuncProto{
 		Name:      "frame_gather",
@@ -1671,6 +1783,46 @@ func TestFrameProjectRuntimeHelperUsesRuntimePrimitive(t *testing.T) {
 	got, ok := col.DenseArray().I64()
 	if !ok || len(got) != 2 || got[0] != 100 || got[1] != 200 {
 		t.Fatalf("projected size values = %#v, want [100 200]", got)
+	}
+}
+
+func TestFrameFilterProjectRuntimeHelperUsesRuntimePrimitive(t *testing.T) {
+	soa, err := runtime.NewSoA(map[string]*runtime.DenseArray{
+		"price": runtime.NewDenseArrayF64([]float64{10.5, 20.25, 30.75}),
+		"size":  runtime.NewDenseArrayI64([]int64{100, 200, 300}),
+		"flag":  runtime.NewDenseArrayBool([]bool{true, false, true}),
+	})
+	if err != nil {
+		t.Fatalf("NewSoA: %v", err)
+	}
+	frame := runtime.NewTable()
+	frame.SetNativePayloadWithInfo(soa, runtime.NativePayloadInfo{
+		Kind:    runtime.NativePayloadDataFrame,
+		Rows:    soa.Len(),
+		Columns: 3,
+	})
+
+	result, err := executeFrameFilterProjectValue(
+		runtime.TableValue(frame),
+		runtime.DenseArrayValue(runtime.NewDenseArrayBool([]bool{true, false, true})),
+		[]string{"size", "price"},
+	)
+	if err != nil {
+		t.Fatalf("execute frame filter project: %v", err)
+	}
+	if !result.IsFrame() {
+		t.Fatalf("frame filter project result type = %s, want frame", result.TypeName())
+	}
+	if _, err := executeFrameColumnValue(result, "flag"); err == nil {
+		t.Fatalf("filter project kept unprojected flag column")
+	}
+	col, err := executeFrameColumnValue(result, "size")
+	if err != nil {
+		t.Fatalf("filter projected frame column: %v", err)
+	}
+	got, ok := col.DenseArray().I64()
+	if !ok || len(got) != 2 || got[0] != 100 || got[1] != 300 {
+		t.Fatalf("filter project size values = %#v, want [100 300]", got)
 	}
 }
 

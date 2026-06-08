@@ -119,6 +119,7 @@ const (
 	OP_VECTOR_MASK                 // A B C : R(A) = mask-combine(R(A), R(B), dense-array mask op C)
 	OP_VECTOR_WHERE                // A B C : R(A) = where(bool dense mask R(A), R(B), R(C))
 	OP_VECTOR_GATHER               // A B : R(A) = gather(dense-array R(A), i64-indexes dense-array R(B))
+	OP_FRAME_FILTER_PROJECT        // A B C : R(A) = native frame R(B) filtered by mask R(A), projected by Constants[C]
 
 	OP_MAX // sentinel
 )
@@ -286,6 +287,7 @@ var opNames = [...]string{
 	OP_VECTOR_MASK:                 "VECTOR_MASK",
 	OP_VECTOR_WHERE:                "VECTOR_WHERE",
 	OP_VECTOR_GATHER:               "VECTOR_GATHER",
+	OP_FRAME_FILTER_PROJECT:        "FRAME_FILTER_PROJECT",
 }
 
 // OpName returns the name of an opcode.

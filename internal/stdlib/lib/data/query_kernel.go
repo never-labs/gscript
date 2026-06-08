@@ -21,6 +21,16 @@ type QueryKernel struct {
 	reason string
 }
 
+// SchemaStableCacheKeyParts is the decoded representation of cache keys built
+// by FrameSchemaCacheKey, QueryAlignedPlanCacheKey, QueryAlignedMutationCacheKey
+// and QueryKernelCacheKey.
+type SchemaStableCacheKeyParts struct {
+	Namespace  string
+	Kind       string
+	SchemaHash string
+	Extra      []string
+}
+
 // FrameSchemaCacheKey returns a cache key for artifacts whose validity depends
 // on source identity plus frame schema, but not row values.
 func FrameSchemaCacheKey(namespace string, frame Frame) string {
@@ -62,6 +72,44 @@ func writeQueryCacheKeyPart(b *strings.Builder, part string) {
 	b.WriteByte(':')
 	b.WriteString(part)
 	b.WriteByte(';')
+}
+
+// ParseSchemaStableCacheKey decodes a schema-stable cache key produced by this
+// package. It returns false for malformed keys or keys with fewer than the
+// namespace/kind/schema parts.
+func ParseSchemaStableCacheKey(key string) (SchemaStableCacheKeyParts, bool) {
+	raw, ok := parseQueryCacheKeyParts(key)
+	if !ok || len(raw) < 3 {
+		return SchemaStableCacheKeyParts{}, false
+	}
+	return SchemaStableCacheKeyParts{
+		Namespace:  raw[0],
+		Kind:       raw[1],
+		SchemaHash: raw[2],
+		Extra:      append([]string(nil), raw[3:]...),
+	}, true
+}
+
+func parseQueryCacheKeyParts(key string) ([]string, bool) {
+	var parts []string
+	for len(key) > 0 {
+		colon := strings.IndexByte(key, ':')
+		if colon <= 0 {
+			return nil, false
+		}
+		n, err := strconv.Atoi(key[:colon])
+		if err != nil || n < 0 {
+			return nil, false
+		}
+		start := colon + 1
+		end := start + n
+		if end >= len(key) || key[end] != ';' {
+			return nil, false
+		}
+		parts = append(parts, key[start:end])
+		key = key[end+1:]
+	}
+	return parts, true
 }
 
 // QueryKernelPlanFingerprint returns a stable structural fingerprint for the

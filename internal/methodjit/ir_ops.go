@@ -188,6 +188,10 @@ const (
 	// q/frame runtime primitive. Args = [frame, mask]; mirrors OP_FRAME_FILTER
 	// and returns a filtered native frame facade.
 	OpFrameFilter
+	// q/frame runtime primitive. Args = [frame, mask], Aux = constant pool
+	// index for a projection; mirrors OP_FRAME_FILTER_PROJECT and returns a
+	// filtered/projected native frame facade.
+	OpFrameFilterProject
 	// q/frame runtime primitive. Args = [frame, indexes]; mirrors
 	// OP_FRAME_GATHER and returns a gathered native frame facade.
 	OpFrameGather

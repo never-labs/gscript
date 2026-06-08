@@ -898,6 +898,60 @@ func (v Value) NativeFrameFilterProjectColumn(mask *DenseArray, names []string, 
 	}
 }
 
+// NativeFrameFilterProject filters a native frame and returns a projected frame
+// facade without materializing unprojected filtered columns.
+func (v Value) NativeFrameFilterProject(mask *DenseArray, names []string) (Value, bool, error) {
+	if mask == nil {
+		return NilValue(), true, fmt.Errorf("FRAME_FILTER_PROJECT mask must be a bool dense array")
+	}
+	if len(names) == 0 {
+		return NilValue(), true, fmt.Errorf("FRAME_FILTER_PROJECT requires at least one projected column")
+	}
+	if !v.IsTable() {
+		return NilValue(), false, nil
+	}
+	tbl := v.Table()
+	if tbl == nil {
+		return NilValue(), false, nil
+	}
+	payload, info, ok := tbl.NativeFramePayload()
+	if !ok {
+		return NilValue(), false, nil
+	}
+	switch frame := payload.(type) {
+	case *SoA:
+		cols := make(map[string]*DenseArray, len(names))
+		for _, name := range names {
+			if name == "" {
+				return NilValue(), true, fmt.Errorf("FRAME_FILTER_PROJECT column name must not be empty")
+			}
+			col, ok := frame.Column(name)
+			if !ok {
+				return NilValue(), true, fmt.Errorf("FRAME_FILTER_PROJECT unknown column %q", name)
+			}
+			filtered, err := col.Filter(mask)
+			if err != nil {
+				return NilValue(), true, err
+			}
+			cols[name] = filtered
+		}
+		out, err := NewSoA(cols)
+		if err != nil {
+			return NilValue(), true, err
+		}
+		projected := NewTable()
+		projected.SetNativePayloadWithInfo(out, NativePayloadInfo{
+			Kind:       info.Kind,
+			Rows:       out.Len(),
+			Columns:    len(names),
+			SchemaHash: nativeFrameProjectSchemaHash(nativeFrameFilterSchemaHash(info.SchemaHash), names),
+		})
+		return TableValue(projected), true, nil
+	default:
+		return NilValue(), true, fmt.Errorf("FRAME_FILTER_PROJECT unsupported native frame payload %T", payload)
+	}
+}
+
 // NativeFrameFilter returns a new runtime frame facade containing rows selected
 // by a bool dense-array mask.
 func (v Value) NativeFrameFilter(mask *DenseArray) (Value, bool, error) {

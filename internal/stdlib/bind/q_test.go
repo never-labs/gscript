@@ -2975,6 +2975,15 @@ func TestQFallbackStatsTrackKernelFallback(t *testing.T) {
 	if got := explained.RawGetString("kernel_reason"); !got.IsString() || !strings.Contains(got.Str(), "mutation plan cache") {
 		t.Fatalf("kernel_reason = %v, want mutation plan cache reason", got)
 	}
+	if got := explained.RawGetString("kernel_fallback_code"); !got.IsString() || got.Str() != qFallbackMutationPlan {
+		t.Fatalf("kernel_fallback_code = %v, want %s", got, qFallbackMutationPlan)
+	}
+	if got := explained.RawGetString("kernel_fallback_reason_code_count"); !got.IsInt() || got.Int() != 0 {
+		t.Fatalf("kernel_fallback_reason_code_count = %v, want 0 before mutation execution", got)
+	}
+	if got := explained.RawGetString("kernel_fallback_reason_count"); !got.IsInt() || got.Int() != 0 {
+		t.Fatalf("kernel_fallback_reason_count = %v, want 0 before mutation execution", got)
+	}
 
 	qClearCaches()
 	after := qTestFallbackStatsRows(t, qFallbackStatsTable())
@@ -3088,6 +3097,15 @@ func TestQFallbackStatsExplainQueryKernelSelectReason(t *testing.T) {
 	reason := `select expression "bad" is not supported by q query native kernel: expression type function is not native-kernel supported`
 	if got := explained.RawGetString("kernel_reason"); !got.IsString() || got.Str() != reason {
 		t.Fatalf("kernel_reason = %v, want %q", got, reason)
+	}
+	if got := explained.RawGetString("kernel_fallback_code"); !got.IsString() || got.Str() != qFallbackQueryKernel {
+		t.Fatalf("kernel_fallback_code = %v, want %s", got, qFallbackQueryKernel)
+	}
+	if got := explained.RawGetString("kernel_fallback_reason_code_count"); !got.IsInt() || got.Int() != 1 {
+		t.Fatalf("kernel_fallback_reason_code_count = %v, want 1", got)
+	}
+	if got := explained.RawGetString("kernel_fallback_reason_count"); !got.IsInt() || got.Int() != 1 {
+		t.Fatalf("kernel_fallback_reason_count = %v, want 1", got)
 	}
 	details := qTestFallbackStatsDetailRows(t, qFallbackStatsTable())
 	if got := qTestFallbackDetailCount(details, "reason", qFallbackQueryKernel, "", reason); got != 1 {
@@ -3485,6 +3503,19 @@ func TestQExplainReportsQueryKernelVisibility(t *testing.T) {
 	if !cacheKey.IsString() || cacheKey.Str() == "" {
 		t.Fatalf("kernel_cache_key before = %v, want stable non-empty key", cacheKey)
 	}
+	if got := beforeTable.RawGetString("kernel_cache_namespace"); !got.IsString() || got.Str() != query {
+		t.Fatalf("kernel_cache_namespace before = %v, want %q", got, query)
+	}
+	if got := beforeTable.RawGetString("kernel_cache_kind"); !got.IsString() || got.Str() != "kernel" {
+		t.Fatalf("kernel_cache_kind before = %v, want kernel", got)
+	}
+	if got := beforeTable.RawGetString("kernel_cache_schema_hash"); !got.IsString() || got.Str() != frame.SchemaFingerprint() {
+		t.Fatalf("kernel_cache_schema_hash before = %v, want %s", got, frame.SchemaFingerprint())
+	}
+	planFingerprint := beforeTable.RawGetString("kernel_plan_fingerprint")
+	if !planFingerprint.IsString() || planFingerprint.Str() == "" {
+		t.Fatalf("kernel_plan_fingerprint before = %v, want stable non-empty fingerprint", planFingerprint)
+	}
 	schema := beforeTable.RawGetString("source_schema").Table()
 	if schema == nil || schema.Length() != 3 {
 		t.Fatalf("source_schema len = %v, want 3", schema)
@@ -3572,6 +3603,16 @@ func TestQExplainReportsQueryKernelVisibility(t *testing.T) {
 	}
 	if got := keyRow.RawGetString("key"); !got.IsString() || got.Str() != cacheKey.Str() {
 		t.Fatalf("qsql_kernel keys[1].key = %v, want %s", got, cacheKey.Str())
+	}
+	for field, want := range map[string]string{
+		"namespace":        query,
+		"kind":             "kernel",
+		"schema_hash":      frame.SchemaFingerprint(),
+		"plan_fingerprint": planFingerprint.Str(),
+	} {
+		if got := keyRow.RawGetString(field); !got.IsString() || got.Str() != want {
+			t.Fatalf("qsql_kernel keys[1].%s = %v, want %q", field, got, want)
+		}
 	}
 	for field, want := range map[string]int64{"hits": 1, "misses": 1, "evictions": 0} {
 		if got := keyRow.RawGetString(field); !got.IsInt() || got.Int() != want {
