@@ -157,6 +157,14 @@ func executeFrameOrderValue(frameVal runtime.Value, spec runtime.Value) (runtime
 	return out, nil
 }
 
+func executeFrameOrderGatherValue(frameVal runtime.Value, spec runtime.Value) (runtime.Value, error) {
+	indexes, err := executeFrameOrderValue(frameVal, spec)
+	if err != nil {
+		return runtime.NilValue(), err
+	}
+	return executeFrameGatherValue(frameVal, indexes)
+}
+
 func executeQFrameSelectColumnValue(constants []runtime.Value, specs []QFrameSelectColumnSpec, specIdx int, frameVal runtime.Value, argVal runtime.Value, hasArg bool) (runtime.Value, error) {
 	if specIdx < 0 || specIdx >= len(specs) {
 		return runtime.NilValue(), fmt.Errorf("QFrameSelectColumn spec index %d is out of range", specIdx)

@@ -208,6 +208,62 @@ func TestVectorWhereReduceBytecodeBuildsMethodJITIR(t *testing.T) {
 	}
 }
 
+func TestVectorWhereReduceBytecodeDiagnosesTypedRuntimeKernel(t *testing.T) {
+	proto := &vm.FuncProto{
+		Name:      "vector_where_reduce_primitive_diag",
+		NumParams: 4,
+		MaxStack:  4,
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_VECTOR_COMPARE, 0, 1, int(runtime.DenseArrayGE)),
+			vm.EncodeABC(vm.OP_VECTOR_WHERE_REDUCE, 0, 2, int(runtime.DenseArrayReduceSum)),
+			vm.EncodeABC(vm.OP_RETURN, 0, 2, 0),
+		},
+	}
+	args := []runtime.Value{
+		runtime.DenseArrayValue(runtime.NewDenseArrayI64([]int64{1, 4, 6})),
+		runtime.IntValue(4),
+		runtime.DenseArrayValue(runtime.NewDenseArrayI64([]int64{10, 20, 30})),
+		runtime.IntValue(7),
+	}
+
+	fn := BuildGraph(proto)
+	counts := countOps(fn)
+	if counts[OpQVectorWhereReduce] != 1 {
+		t.Fatalf("BuildGraph OpQVectorWhereReduce count = %d, want 1\n%s", counts[OpQVectorWhereReduce], Print(fn))
+	}
+	if counts[OpVectorWhere] != 0 || counts[OpVectorReduce] != 0 {
+		t.Fatalf("BuildGraph split where/reduce counts = %d/%d, want 0/0 for VM fused primitive\n%s",
+			counts[OpVectorWhere], counts[OpVectorReduce], Print(fn))
+	}
+	kernels := DetectQVectorRuntimeKernels(fn)
+	if got := CountQVectorRuntimeKernelShapes(kernels)["compare/vector-where/vector-reduce"]; got != 1 {
+		t.Fatalf("BuildGraph QVectorRuntimeKernelShapes = %+v, want compare/vector-where/vector-reduce", CountQVectorRuntimeKernelShapes(kernels))
+	}
+
+	report := Diagnose(proto, args)
+	if !report.OptimizerMatch || !report.BackendMatch || !report.Match {
+		t.Fatalf("Diagnose vector where-reduce primitive mismatch: optimizer=%v %s backend=%v %s match=%v %s\n%s",
+			report.OptimizerMatch, report.OptimizerMismatch,
+			report.BackendMatch, report.BackendMismatch,
+			report.Match, report.Mismatch,
+			report.String())
+	}
+	if report.QVectorRuntimeKernelShapes["compare/vector-where/vector-reduce"] != 1 {
+		t.Fatalf("Diagnose QVectorRuntimeKernelShapes = %+v, want compare/vector-where/vector-reduce", report.QVectorRuntimeKernelShapes)
+	}
+	assertQKernelDescriptor(t, report.QKernelDescriptors, "methodjit_q_vector_runtime", "runtime_kernel", "QVectorWhereReduce", "compare/vector-where/vector-reduce", "typed_runtime_op_exit", "supported", "")
+	assertQKernelShapeSummary(t, report.QKernelShapeSummary, "methodjit_q_vector_runtime", "runtime_kernel", "compare/vector-where/vector-reduce", "supported", "", 1)
+	assertQKernelShapeSummaryExecution(t, report.QKernelShapeSummary, "methodjit_q_vector_runtime", "runtime_kernel", "compare/vector-where/vector-reduce", "supported", 1, 1, 0)
+	assertQKernelExecutionStat(t, report.QKernelExecutionStats, "methodjit_q_vector_runtime", "QVectorWhereReduce", "compare/vector-where/vector-reduce", "typed_runtime_op_exit", "success", 1)
+	if len(report.InterpResult) != 1 || !report.InterpResult[0].IsInt() || report.InterpResult[0].Int() != 57 {
+		t.Fatalf("Diagnose vector where-reduce primitive result = %#v, want int 57", report.InterpResult)
+	}
+	if !strings.Contains(report.String(), "kernel=QVectorWhereReduce") ||
+		!strings.Contains(report.String(), "source=methodjit_q_vector_runtime kernel=QVectorWhereReduce shape=compare/vector-where/vector-reduce route=typed_runtime_op_exit outcome=success count=1") {
+		t.Fatalf("diagnostic report missing VM fused primitive typed-kernel evidence:\n%s", report.String())
+	}
+}
+
 func TestVectorScanBytecodeBuildsMethodJITIR(t *testing.T) {
 	proto := &vm.FuncProto{
 		Name:     "vector_scan",
@@ -614,6 +670,85 @@ func TestFrameOrderBytecodeBuildsMethodJITIR(t *testing.T) {
 	}
 	if orderInstr.Aux != 0 {
 		t.Fatalf("OpFrameOrder Aux = %d, want const index 0", orderInstr.Aux)
+	}
+}
+
+func TestFrameOrderGatherBytecodeBuildsMethodJITIR(t *testing.T) {
+	order := runtime.NewTable()
+	order.RawSetString("column", runtime.StringValue("price"))
+	proto := &vm.FuncProto{
+		Name:      "frame_order_gather",
+		NumParams: 1,
+		MaxStack:  1,
+		Constants: []runtime.Value{
+			runtime.TableValue(order),
+		},
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_FRAME_ORDER_GATHER, 0, 0, 0),
+			vm.EncodeABC(vm.OP_RETURN, 0, 2, 0),
+		},
+	}
+
+	fn := BuildGraph(proto)
+	var orderGather *Instr
+	for _, block := range fn.Blocks {
+		for _, instr := range block.Instrs {
+			if instr.Op == OpFrameOrderGather {
+				orderGather = instr
+				break
+			}
+		}
+	}
+	if orderGather == nil {
+		t.Fatalf("BuildGraph did not emit OpFrameOrderGather:\n%s", Print(fn))
+	}
+	if len(orderGather.Args) != 1 {
+		t.Fatalf("OpFrameOrderGather arg count = %d, want 1", len(orderGather.Args))
+	}
+	if orderGather.Type != TypeAny {
+		t.Fatalf("OpFrameOrderGather type = %s, want Any", orderGather.Type)
+	}
+	if orderGather.Aux != 0 {
+		t.Fatalf("OpFrameOrderGather Aux = %d, want const index 0", orderGather.Aux)
+	}
+}
+
+func TestFrameOrderGatherDiagnoseUsesRuntimeOpExit(t *testing.T) {
+	order := runtime.NewTable()
+	order.RawSetString("column", runtime.StringValue("price"))
+	order.RawSetString("desc", runtime.BoolValue(true))
+	order.RawSetString("limit", runtime.IntValue(2))
+	proto := &vm.FuncProto{
+		Name:      "frame_order_gather_diag",
+		NumParams: 1,
+		MaxStack:  1,
+		Constants: []runtime.Value{
+			runtime.TableValue(order),
+			runtime.StringValue("size"),
+		},
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_FRAME_ORDER_GATHER, 0, 0, 0),
+			vm.EncodeABC(vm.OP_FRAME_COLUMN, 0, 0, 1),
+			vm.EncodeABC(vm.OP_RETURN, 0, 2, 0),
+		},
+	}
+
+	report := Diagnose(proto, []runtime.Value{runtime.TableValue(qHotPathTestFrame(t))})
+	if report.NativeError != nil {
+		t.Fatalf("FrameOrderGather native error: %v\n%s", report.NativeError, report.String())
+	}
+	if report.InterpError != nil || report.OptInterpError != nil {
+		t.Fatalf("FrameOrderGather interpreter errors: unopt=%v opt=%v\n%s", report.InterpError, report.OptInterpError, report.String())
+	}
+	if len(report.NativeResult) != 1 || !report.NativeResult[0].IsDenseArray() {
+		t.Fatalf("FrameOrderGather native result = %#v, want dense array", report.NativeResult)
+	}
+	got, ok := report.NativeResult[0].DenseArray().I64()
+	if !ok || len(got) != 2 || got[0] != 20 || got[1] != 10 {
+		t.Fatalf("FrameOrderGather size result = %#v, want [20 10]", got)
+	}
+	if !strings.Contains(report.IRAfter, "FrameOrderGather") {
+		t.Fatalf("FrameOrderGather missing from optimized IR:\n%s", report.IRAfter)
 	}
 }
 
@@ -1344,6 +1479,66 @@ func TestQFramePrimitiveHotPathDetectsOrderedRows(t *testing.T) {
 	}
 }
 
+func TestQFramePrimitiveHotPathKeepsCrossFrameOrderGatherAsGather(t *testing.T) {
+	names := runtime.NewTable()
+	names.RawSetInt(1, runtime.StringValue("size"))
+	order := runtime.NewTable()
+	order.RawSetString("column", runtime.StringValue("price"))
+	order.RawSetString("desc", runtime.BoolValue(true))
+	proto := &vm.FuncProto{
+		Name:      "q_cross_frame_order_gather_pipeline",
+		NumParams: 2,
+		MaxStack:  5,
+		Constants: []runtime.Value{
+			runtime.StringValue("price"),
+			runtime.FloatValue(0),
+			runtime.TableValue(order),
+			runtime.TableValue(names),
+			runtime.StringValue("size"),
+		},
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_FRAME_COLUMN, 2, 0, 0),
+			vm.EncodeABx(vm.OP_LOADK, 3, 1),
+			vm.EncodeABC(vm.OP_VECTOR_COMPARE, 2, 3, int(runtime.DenseArrayGE)),
+			vm.EncodeABC(vm.OP_FRAME_FILTER, 0, 0, 2),
+			vm.EncodeABC(vm.OP_FRAME_ORDER, 4, 1, 2),
+			vm.EncodeABC(vm.OP_FRAME_GATHER, 0, 0, 4),
+			vm.EncodeABC(vm.OP_FRAME_PROJECT, 0, 0, 3),
+			vm.EncodeABC(vm.OP_FRAME_COLUMN, 0, 0, 4),
+			vm.EncodeABC(vm.OP_RETURN, 0, 2, 0),
+		},
+	}
+
+	fn := BuildGraph(proto)
+	paths := DetectQQueryHotPaths(fn)
+	if len(paths) != 1 {
+		t.Fatalf("DetectQQueryHotPaths count = %d, want 1\n%s", len(paths), Print(fn))
+	}
+	if paths[0].RowGather == nil {
+		t.Fatalf("DetectQQueryHotPaths RowGather = nil, want OpFrameGather\n%s", Print(fn))
+	}
+	if paths[0].RowOrder != nil {
+		t.Fatalf("DetectQQueryHotPaths RowOrder = %v, want nil for cross-frame order indexes\n%s", paths[0].RowOrder, Print(fn))
+	}
+	if got := paths[0].Shape(); got != "compare/filter/gather/project/column" {
+		t.Fatalf("cross-frame ordered gather shape = %q, want compare/filter/gather/project/column", got)
+	}
+
+	fn.Remarks = &OptimizationRemarks{}
+	lowered, err := QQueryNativeLoweringPass(fn)
+	if err != nil {
+		t.Fatalf("QQueryNativeLoweringPass: %v", err)
+	}
+	if len(lowered.QFrameSelectColumnSpecs) != 1 {
+		t.Fatalf("QFrameSelectColumnSpecs = %d, want 1\n%s", len(lowered.QFrameSelectColumnSpecs), Print(lowered))
+	}
+	if got := lowered.QFrameSelectColumnSpecs[0].Shape; got != "compare/filter/gather/project/column" {
+		t.Fatalf("lowered cross-frame order-gather shape = %q, want compare/filter/gather/project/column", got)
+	}
+	descriptors := BuildQKernelDescriptors(DetectQVectorRuntimeKernels(lowered), lowered.QFrameSelectColumnSpecs, fn.Remarks.List())
+	assertQKernelDescriptor(t, descriptors, "methodjit_q_frame_runtime", "runtime_kernel", "QFrameSelectColumn", "compare/filter/gather/project/column", "typed_runtime_op_exit", "supported", "")
+}
+
 func TestQFramePrimitiveHotPathDetectsSlicedRows(t *testing.T) {
 	names := runtime.NewTable()
 	names.RawSetInt(1, runtime.StringValue("size"))
@@ -1646,7 +1841,7 @@ func TestQVectorWhereReduceLowersToFusedTypedRuntimeKernel(t *testing.T) {
 		!strings.Contains(report.String(), "Q kernel execution stats") ||
 		!strings.Contains(report.String(), "source=methodjit_q_vector_runtime kernel=QVectorWhereReduce shape=compare/vector-where/vector-reduce route=typed_runtime_op_exit outcome=success count=1") ||
 		!strings.Contains(report.String(), "Q kernel shape summary") ||
-		!strings.Contains(report.String(), "source=methodjit_q_vector_runtime kind=runtime_kernel shape=compare/vector-where/vector-reduce count=1 outcome=supported") {
+		!strings.Contains(report.String(), "source=methodjit_q_vector_runtime kind=runtime_kernel shape=compare/vector-where/vector-reduce count=1 outcome=supported executions=1 successes=1 errors=0") {
 		t.Fatalf("diagnostic report missing q kernel descriptor/summary:\n%s", report.String())
 	}
 
@@ -2036,6 +2231,7 @@ func TestDiagnoseReportsQQueryHotPath(t *testing.T) {
 	}
 	assertQKernelDescriptor(t, report.QKernelDescriptors, "methodjit_q_frame_runtime", "runtime_kernel", "QFrameSelectColumn", "compare/filter/project/column", "typed_runtime_op_exit", "supported", "")
 	assertQKernelShapeSummary(t, report.QKernelShapeSummary, "methodjit_q_frame_runtime", "runtime_kernel", "compare/filter/project/column", "supported", "", 1)
+	assertQKernelShapeSummaryExecution(t, report.QKernelShapeSummary, "methodjit_q_frame_runtime", "runtime_kernel", "compare/filter/project/column", "supported", 1, 1, 0)
 	assertQKernelExecutionStat(t, report.QKernelExecutionStats, "methodjit_q_frame_runtime", "QFrameSelectColumn", "compare/filter/project/column", "typed_runtime_op_exit", "success", 1)
 	if !strings.Contains(report.String(), "Q query hot paths") {
 		t.Fatalf("diagnostic report missing q hot path section:\n%s", report.String())
@@ -2309,6 +2505,28 @@ func TestTier2GateAllowsFrameOrderThroughOpExit(t *testing.T) {
 	gate := firstUnsupportedTier2BytecodeGate(proto)
 	if !gate.Allowed {
 		t.Fatalf("OP_FRAME_ORDER should be Tier2-eligible via op-exit, got %q", gate.Reason)
+	}
+}
+
+func TestTier2GateAllowsFrameOrderGatherThroughOpExit(t *testing.T) {
+	order := runtime.NewTable()
+	order.RawSetString("column", runtime.StringValue("price"))
+	proto := &vm.FuncProto{
+		Name:      "frame_order_gather",
+		NumParams: 1,
+		MaxStack:  1,
+		Constants: []runtime.Value{
+			runtime.TableValue(order),
+		},
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_FRAME_ORDER_GATHER, 0, 0, 0),
+			vm.EncodeABC(vm.OP_RETURN, 0, 2, 0),
+		},
+	}
+
+	gate := firstUnsupportedTier2BytecodeGate(proto)
+	if !gate.Allowed {
+		t.Fatalf("OP_FRAME_ORDER_GATHER should be Tier2-eligible via op-exit, got %q", gate.Reason)
 	}
 }
 
@@ -2817,6 +3035,42 @@ func TestFrameOrderRuntimeHelperUsesRuntimePrimitive(t *testing.T) {
 	}
 }
 
+func TestFrameOrderGatherRuntimeHelperUsesRuntimePrimitives(t *testing.T) {
+	soa, err := runtime.NewSoA(map[string]*runtime.DenseArray{
+		"price": runtime.NewDenseArrayF64([]float64{10.5, 20.25, 30.75}),
+		"size":  runtime.NewDenseArrayI64([]int64{100, 200, 300}),
+	})
+	if err != nil {
+		t.Fatalf("NewSoA: %v", err)
+	}
+	frame := runtime.NewTable()
+	frame.SetNativePayloadWithInfo(soa, runtime.NativePayloadInfo{
+		Kind:    runtime.NativePayloadDataFrame,
+		Rows:    soa.Len(),
+		Columns: 2,
+	})
+	order := runtime.NewTable()
+	order.RawSetString("column", runtime.StringValue("price"))
+	order.RawSetString("desc", runtime.BoolValue(true))
+	order.RawSetString("limit", runtime.IntValue(2))
+
+	result, err := executeFrameOrderGatherValue(runtime.TableValue(frame), runtime.TableValue(order))
+	if err != nil {
+		t.Fatalf("execute frame order gather: %v", err)
+	}
+	if !result.IsFrame() {
+		t.Fatalf("frame order gather result type = %s, want frame", result.TypeName())
+	}
+	col, err := executeFrameColumnValue(result, "size")
+	if err != nil {
+		t.Fatalf("ordered/gathered frame column: %v", err)
+	}
+	got, ok := col.DenseArray().I64()
+	if !ok || len(got) != 2 || got[0] != 300 || got[1] != 200 {
+		t.Fatalf("ordered/gathered size values = %#v, want [300 200]", got)
+	}
+}
+
 func TestVectorGatherRuntimeHelperUsesRuntimePrimitive(t *testing.T) {
 	result, err := executeVectorGatherValue(
 		runtime.DenseArrayValue(runtime.NewDenseArrayF64([]float64{10, 20, 30})),
@@ -2996,6 +3250,23 @@ func assertQKernelShapeSummary(t *testing.T, rows []QKernelShapeSummary, source,
 	}
 	t.Fatalf("QKernelShapeSummary missing source=%s kind=%s shape=%s outcome=%s reason=%s; rows=%+v",
 		source, kind, shape, outcome, reasonCode, rows)
+}
+
+func assertQKernelShapeSummaryExecution(t *testing.T, rows []QKernelShapeSummary, source, kind, shape, outcome string, executions, successes, errors uint64) {
+	t.Helper()
+	for _, row := range rows {
+		if row.Source == source && row.Kind == kind && row.Shape == shape && row.Outcome == outcome {
+			if row.Executions != executions || row.Successes != successes || row.Errors != errors {
+				t.Fatalf("QKernelShapeSummary execution %s/%s/%s/%s = %d/%d/%d, want %d/%d/%d; rows=%+v",
+					source, kind, shape, outcome,
+					row.Executions, row.Successes, row.Errors,
+					executions, successes, errors, rows)
+			}
+			return
+		}
+	}
+	t.Fatalf("QKernelShapeSummary execution missing source=%s kind=%s shape=%s outcome=%s; rows=%+v",
+		source, kind, shape, outcome, rows)
 }
 
 func assertQKernelDescriptor(t *testing.T, rows []QKernelDescriptor, source, kind, kernel, shape, route, outcome, reasonCode string) {

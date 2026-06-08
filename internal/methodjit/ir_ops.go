@@ -202,6 +202,9 @@ const (
 	// an order spec; mirrors OP_FRAME_ORDER and returns sorted i64 row indexes.
 	OpFrameOrder
 	// q/frame runtime primitive. Args = [frame], Aux = constant pool index for
+	// an order spec; mirrors OP_FRAME_ORDER_GATHER and returns ordered frame rows.
+	OpFrameOrderGather
+	// q/frame runtime primitive. Args = [frame], Aux = constant pool index for
 	// a project-column spec; mirrors OP_FRAME_PROJECT_COLUMN and returns a
 	// dense-array column without materializing a projected frame facade.
 	OpFrameProjectColumn

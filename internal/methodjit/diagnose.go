@@ -340,6 +340,7 @@ func Diagnose(proto *vm.FuncProto, args []runtime.Value) *DiagReport {
 	r.NativeResult = nativeResult
 	r.NativeError = nativeErr
 	r.QKernelExecutionStats = cf.QKernelExecutionStats()
+	r.QKernelShapeSummary = BuildQKernelShapeSummaryFromDescriptorsAndExecutionStats(r.QKernelDescriptors, r.QKernelExecutionStats)
 	r.compareResults()
 	return r
 }

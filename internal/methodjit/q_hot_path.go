@@ -108,6 +108,9 @@ type QKernelShapeSummary struct {
 	ReasonFamily string
 	ReasonCode   string
 	Count        int
+	Executions   uint64
+	Successes    uint64
+	Errors       uint64
 	Hits         int
 	Misses       int
 	Evictions    int
@@ -389,7 +392,12 @@ func BuildQKernelDescriptors(vectorKernels []QVectorRuntimeKernel, frameKernels 
 }
 
 func BuildQKernelShapeSummaryFromDescriptors(descriptors []QKernelDescriptor) []QKernelShapeSummary {
+	return BuildQKernelShapeSummaryFromDescriptorsAndExecutionStats(descriptors, nil)
+}
+
+func BuildQKernelShapeSummaryFromDescriptorsAndExecutionStats(descriptors []QKernelDescriptor, executionStats []QKernelExecutionStat) []QKernelShapeSummary {
 	counts := make(map[qKernelShapeSummaryKey]int)
+	executions := make(map[qKernelShapeSummaryKey]qKernelExecutionCounters)
 	for _, descriptor := range descriptors {
 		counts[qKernelShapeSummaryKey{
 			source:       descriptor.Source,
@@ -400,7 +408,27 @@ func BuildQKernelShapeSummaryFromDescriptors(descriptors []QKernelDescriptor) []
 			reasonCode:   descriptor.ReasonCode,
 		}]++
 	}
-	if len(counts) == 0 {
+	for _, stat := range executionStats {
+		key := qKernelShapeSummaryKey{
+			source:  qKernelExecutionSummarySource(stat.Source),
+			kind:    "runtime_kernel",
+			shape:   qKernelExecutionSummaryShape(stat.Shape),
+			outcome: "supported",
+		}
+		counter := executions[key]
+		counter.executions += stat.Count
+		switch stat.Outcome {
+		case "success":
+			counter.successes += stat.Count
+		case "error":
+			counter.errors += stat.Count
+		}
+		executions[key] = counter
+		if _, ok := counts[key]; !ok {
+			counts[key] = 0
+		}
+	}
+	if len(counts) == 0 && len(executions) == 0 {
 		return nil
 	}
 	keys := make([]qKernelShapeSummaryKey, 0, len(counts))
@@ -427,6 +455,7 @@ func BuildQKernelShapeSummaryFromDescriptors(descriptors []QKernelDescriptor) []
 	})
 	out := make([]QKernelShapeSummary, 0, len(keys))
 	for _, key := range keys {
+		execution := executions[key]
 		out = append(out, QKernelShapeSummary{
 			Source:       key.source,
 			Kind:         key.kind,
@@ -435,6 +464,9 @@ func BuildQKernelShapeSummaryFromDescriptors(descriptors []QKernelDescriptor) []
 			ReasonFamily: key.reasonFamily,
 			ReasonCode:   key.reasonCode,
 			Count:        counts[key],
+			Executions:   execution.executions,
+			Successes:    execution.successes,
+			Errors:       execution.errors,
 		})
 	}
 	return out
@@ -442,6 +474,26 @@ func BuildQKernelShapeSummaryFromDescriptors(descriptors []QKernelDescriptor) []
 
 func BuildQKernelShapeSummary(vectorKernels []QVectorRuntimeKernel, frameKernels []QFrameSelectColumnSpec, remarks []OptimizationRemark) []QKernelShapeSummary {
 	return BuildQKernelShapeSummaryFromDescriptors(BuildQKernelDescriptors(vectorKernels, frameKernels, remarks))
+}
+
+func qKernelExecutionSummarySource(source string) string {
+	if source == "" {
+		return "unknown"
+	}
+	return source
+}
+
+func qKernelExecutionSummaryShape(shape string) string {
+	if shape == "" {
+		return "unknown"
+	}
+	return shape
+}
+
+type qKernelExecutionCounters struct {
+	executions uint64
+	successes  uint64
+	errors     uint64
 }
 
 type qKernelShapeSummaryKey struct {
@@ -484,6 +536,9 @@ func DetectQQueryHotPaths(fn *Function) []QQueryHotPath {
 				}
 				rowGather = gather
 				rowOrder = valueDef(gather.Args[1], OpFrameOrder)
+				if rowOrder != nil && !qQueryFrameOrderMatchesGather(gather, rowOrder) {
+					rowOrder = nil
+				}
 				filterInput = gather.Args[0]
 			} else if slice := valueDef(filterInput, OpFrameSlice); slice != nil {
 				if len(slice.Args) != 2 {
@@ -540,6 +595,13 @@ func DetectQQueryHotPaths(fn *Function) []QQueryHotPath {
 		}
 	}
 	return out
+}
+
+func qQueryFrameOrderMatchesGather(gather, order *Instr) bool {
+	if gather == nil || order == nil || len(gather.Args) < 1 || len(order.Args) < 1 {
+		return false
+	}
+	return gather.Args[0] != nil && order.Args[0] != nil && gather.Args[0].ID == order.Args[0].ID
 }
 
 // DetectQVectorWhereHotPaths returns q vector conditional-select pipelines
@@ -1379,6 +1441,9 @@ func formatQKernelShapeSummary(rows []QKernelShapeSummary) string {
 		}
 		if row.ReasonCode != "" {
 			fmt.Fprintf(&b, " reason_code=%s", row.ReasonCode)
+		}
+		if row.Executions != 0 || row.Successes != 0 || row.Errors != 0 {
+			fmt.Fprintf(&b, " executions=%d successes=%d errors=%d", row.Executions, row.Successes, row.Errors)
 		}
 		if row.Hits != 0 || row.Misses != 0 || row.Evictions != 0 {
 			fmt.Fprintf(&b, " hits=%d misses=%d evictions=%d", row.Hits, row.Misses, row.Evictions)

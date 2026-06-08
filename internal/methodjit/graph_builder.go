@@ -1019,6 +1019,14 @@ func (b *graphBuilder) emitBlocks() {
 				instr := b.emit(block, OpFrameOrder, TypeAny, []*Value{frame}, int64(c), 0)
 				b.writeVariable(a, block, instr.Value())
 
+			case vm.OP_FRAME_ORDER_GATHER:
+				a := vm.DecodeA(inst)
+				bOp := vm.DecodeB(inst)
+				c := vm.DecodeC(inst)
+				frame := b.readVariable(bOp, block)
+				instr := b.emit(block, OpFrameOrderGather, TypeAny, []*Value{frame}, int64(c), 0)
+				b.writeVariable(a, block, instr.Value())
+
 			case vm.OP_FRAME_PROJECT_COLUMN:
 				a := vm.DecodeA(inst)
 				bOp := vm.DecodeB(inst)

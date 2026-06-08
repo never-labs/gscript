@@ -1084,6 +1084,19 @@ func (cf *CompiledFunction) executeOpExit(ctx *ExecContext, regs []runtime.Value
 		}
 		regs[slot] = out
 
+	case OpFrameOrderGather:
+		if arg1 >= len(regs) || slot >= len(regs) {
+			return fmt.Errorf("FrameOrderGather op-exit out of register range")
+		}
+		if aux < 0 || cf.Proto == nil || aux >= len(cf.Proto.Constants) {
+			return fmt.Errorf("FrameOrderGather spec constant is out of range")
+		}
+		out, err := executeFrameOrderGatherValue(regs[arg1], cf.Proto.Constants[aux])
+		if err != nil {
+			return err
+		}
+		regs[slot] = out
+
 	case OpFrameProjectColumn:
 		if arg1 >= len(regs) || slot >= len(regs) {
 			return fmt.Errorf("FrameProjectColumn op-exit out of register range")
