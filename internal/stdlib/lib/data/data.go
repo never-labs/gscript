@@ -2619,16 +2619,16 @@ func singleColumnTypedJoinTopKIndexesFor[T comparable](leftKey columnArray[T], r
 			pair := joinTopKPair{left: leftRow, right: rightRow, orderRow: orderRow, seq: seq}
 			seq++
 			if h.Len() < limit {
-				heap.Push(h, pair)
+				h.push(pair)
 				continue
 			}
 			if before(pair, h.items[0]) {
 				h.items[0] = pair
-				heap.Fix(h, 0)
+				h.fixRoot()
 			}
 		}
 	}
-	out := append([]joinTopKPair(nil), h.items...)
+	out := h.items
 	sort.SliceStable(out, func(i, j int) bool {
 		return before(out[i], out[j])
 	})
@@ -2718,16 +2718,41 @@ func (h joinTopKHeap) Less(i, j int) bool {
 
 func (h joinTopKHeap) Swap(i, j int) { h.items[i], h.items[j] = h.items[j], h.items[i] }
 
-func (h *joinTopKHeap) Push(x any) {
-	h.items = append(h.items, x.(joinTopKPair))
+func (h *joinTopKHeap) push(item joinTopKPair) {
+	h.items = append(h.items, item)
+	for child := len(h.items) - 1; child > 0; {
+		parent := (child - 1) / 2
+		if !h.less(child, parent) {
+			break
+		}
+		h.items[child], h.items[parent] = h.items[parent], h.items[child]
+		child = parent
+	}
 }
 
-func (h *joinTopKHeap) Pop() any {
-	old := h.items
-	n := len(old)
-	item := old[n-1]
-	h.items = old[:n-1]
-	return item
+func (h *joinTopKHeap) fixRoot() {
+	for parent := 0; ; {
+		left := parent*2 + 1
+		if left >= len(h.items) {
+			return
+		}
+		child := left
+		if right := left + 1; right < len(h.items) && h.less(right, left) {
+			child = right
+		}
+		if !h.less(child, parent) {
+			return
+		}
+		h.items[parent], h.items[child] = h.items[child], h.items[parent]
+		parent = child
+	}
+}
+
+func (h joinTopKHeap) less(i, j int) bool {
+	if h.before != nil {
+		return h.before(h.items[j], h.items[i])
+	}
+	return joinTopKBefore(h.spec, h.items[j], h.items[i])
 }
 
 func topKJoinPairs(leftIndexes, rightIndexes, orderRows []int, spec boundOrderSpec, limit int) []joinTopKPair {
@@ -2736,15 +2761,15 @@ func topKJoinPairs(leftIndexes, rightIndexes, orderRows []int, spec boundOrderSp
 	for seq, orderRow := range orderRows {
 		pair := joinTopKPair{left: leftIndexes[seq], right: rightIndexes[seq], orderRow: orderRow, seq: seq}
 		if h.Len() < limit {
-			heap.Push(h, pair)
+			h.push(pair)
 			continue
 		}
 		if before(pair, h.items[0]) {
 			h.items[0] = pair
-			heap.Fix(h, 0)
+			h.fixRoot()
 		}
 	}
-	out := append([]joinTopKPair(nil), h.items...)
+	out := h.items
 	sort.SliceStable(out, func(i, j int) bool {
 		return before(out[i], out[j])
 	})
