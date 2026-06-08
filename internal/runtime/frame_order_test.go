@@ -48,6 +48,54 @@ func TestNativeFrameOrderIndexesSortsAndLimitsRows(t *testing.T) {
 	}
 }
 
+func TestNativeFrameOrderGatherSortsRowsWithoutExposingIndexes(t *testing.T) {
+	soa, err := NewSoA(map[string]*DenseArray{
+		"price": NewDenseArrayF64([]float64{10, 12, 12, 8}),
+		"size":  NewDenseArrayI64([]int64{100, 50, 75, 200}),
+	})
+	if err != nil {
+		t.Fatalf("NewSoA: %v", err)
+	}
+	frame := NewTable()
+	frame.SetNativePayloadWithInfo(soa, NativePayloadInfo{
+		Kind:       NativePayloadDataFrame,
+		Rows:       soa.Len(),
+		Columns:    2,
+		SchemaHash: "order-gather-test",
+	})
+
+	out, handled, err := TableValue(frame).NativeFrameOrderGather(
+		[]string{"price", "size"},
+		[]bool{true, false},
+		3,
+	)
+	if err != nil {
+		t.Fatalf("NativeFrameOrderGather: %v", err)
+	}
+	if !handled || !out.IsFrame() {
+		t.Fatalf("NativeFrameOrderGather = %v handled=%v, want native frame", out, handled)
+	}
+	payload, info, ok := out.Table().NativeFramePayload()
+	if !ok {
+		t.Fatalf("NativeFrameOrderGather payload missing")
+	}
+	if info.Rows != 3 || info.Columns != 2 || info.SchemaHash != "order-gather-test|gather" {
+		t.Fatalf("NativeFrameOrderGather info = %+v, want 3 rows, 2 columns, gather schema", info)
+	}
+	ordered, ok := payload.(*SoA)
+	if !ok {
+		t.Fatalf("NativeFrameOrderGather payload = %T, want *SoA", payload)
+	}
+	size, ok := ordered.Column("size")
+	if !ok {
+		t.Fatalf("NativeFrameOrderGather missing size column")
+	}
+	got, ok := size.I64()
+	if !ok || len(got) != 3 || got[0] != 50 || got[1] != 75 || got[2] != 100 {
+		t.Fatalf("ordered/gathered size = %#v, want [50 75 100]", got)
+	}
+}
+
 func TestNativeFrameOrderIndexesRejectsMissingColumn(t *testing.T) {
 	soa, err := NewSoA(map[string]*DenseArray{
 		"price": NewDenseArrayF64([]float64{10, 12}),

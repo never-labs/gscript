@@ -978,28 +978,59 @@ func (v Value) NativeFrameSlice(start, end int) (Value, bool, error) {
 // column values. Desc flags must either be omitted or match the column count.
 // A non-negative limit truncates indexes before returning.
 func (v Value) NativeFrameOrderIndexes(names []string, desc []bool, limit int) (Value, bool, error) {
-	if len(names) == 0 {
-		return NilValue(), true, fmt.Errorf("FRAME_ORDER_INDEXES requires at least one column")
-	}
-	if len(desc) != 0 && len(desc) != len(names) {
-		return NilValue(), true, fmt.Errorf("FRAME_ORDER_INDEXES desc flags must match column count")
-	}
-	frame, _, handled, err := v.nativeFrameSoA("FRAME_ORDER_INDEXES")
+	_, _, indexes, handled, err := v.nativeFrameOrderIndexes("FRAME_ORDER_INDEXES", names, desc, limit)
 	if err != nil || !handled {
 		return NilValue(), handled, err
+	}
+	return DenseArrayValue(indexes), true, nil
+}
+
+// NativeFrameOrderGather returns a new runtime frame facade containing rows
+// sorted by native frame column values. It is the runtime carrier for
+// order+gather frame primitives, so VM/JIT callers do not need to materialize
+// or inspect the intermediate row-index vector.
+func (v Value) NativeFrameOrderGather(names []string, desc []bool, limit int) (Value, bool, error) {
+	frame, info, indexes, handled, err := v.nativeFrameOrderIndexes("FRAME_ORDER_INDEXES", names, desc, limit)
+	if err != nil || !handled {
+		return NilValue(), handled, err
+	}
+	out, err := frame.Gather(indexes)
+	if err != nil {
+		return NilValue(), true, err
+	}
+	gathered := NewTable()
+	gathered.SetNativePayloadWithInfo(out, NativePayloadInfo{
+		Kind:       info.Kind,
+		Rows:       out.Len(),
+		Columns:    info.Columns,
+		SchemaHash: nativeFrameTransformSchemaHash(info.SchemaHash, nativeFrameSchemaGather, nil),
+	})
+	return TableValue(gathered), true, nil
+}
+
+func (v Value) nativeFrameOrderIndexes(op string, names []string, desc []bool, limit int) (*SoA, NativePayloadInfo, *DenseArray, bool, error) {
+	if len(names) == 0 {
+		return nil, NativePayloadInfo{}, nil, true, fmt.Errorf("%s requires at least one column", op)
+	}
+	if len(desc) != 0 && len(desc) != len(names) {
+		return nil, NativePayloadInfo{}, nil, true, fmt.Errorf("%s desc flags must match column count", op)
+	}
+	frame, info, handled, err := v.nativeFrameSoA(op)
+	if err != nil || !handled {
+		return nil, NativePayloadInfo{}, nil, handled, err
 	}
 	comparers := make([]nativeFrameOrderComparer, len(names))
 	for i, name := range names {
 		if name == "" {
-			return NilValue(), true, fmt.Errorf("FRAME_ORDER_INDEXES column name must not be empty")
+			return nil, NativePayloadInfo{}, nil, true, fmt.Errorf("%s column name must not be empty", op)
 		}
 		col, ok := frame.Column(name)
 		if !ok {
-			return NilValue(), true, fmt.Errorf("FRAME_ORDER_INDEXES unknown column %q", name)
+			return nil, NativePayloadInfo{}, nil, true, fmt.Errorf("%s unknown column %q", op, name)
 		}
 		comparer, err := nativeFrameOrderComparerFor(col)
 		if err != nil {
-			return NilValue(), true, err
+			return nil, NativePayloadInfo{}, nil, true, err
 		}
 		comparers[i] = comparer
 	}
@@ -1025,7 +1056,7 @@ func (v Value) NativeFrameOrderIndexes(names []string, desc []bool, limit int) (
 	if limit >= 0 && limit < len(indices) {
 		indices = indices[:limit]
 	}
-	return DenseArrayValue(NewDenseArrayI64(indices)), true, nil
+	return frame, info, NewDenseArrayI64(indices), true, nil
 }
 
 type nativeFrameOrderComparer func(left, right int) int

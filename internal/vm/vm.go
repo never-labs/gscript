@@ -2546,17 +2546,7 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 			if err != nil {
 				return nil, wrapLineErr(frame, err)
 			}
-			indexes, handled, err := frameVal.NativeFrameOrderIndexes(names, desc, limit)
-			if err != nil {
-				return nil, wrapLineErr(frame, err)
-			}
-			if !handled {
-				return nil, wrapLineErr(frame, fmt.Errorf("FRAME_ORDER_GATHER operand must be native frame (got %s)", frameVal.TypeName()))
-			}
-			if !indexes.IsDenseArray() {
-				return nil, wrapLineErr(frame, fmt.Errorf("FRAME_ORDER_GATHER indexes must be dense array (got %s)", indexes.TypeName()))
-			}
-			out, handled, err := frameVal.NativeFrameGather(indexes.DenseArray())
+			out, handled, err := frameVal.NativeFrameOrderGather(names, desc, limit)
 			if err != nil {
 				return nil, wrapLineErr(frame, err)
 			}
