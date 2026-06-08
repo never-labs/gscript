@@ -73,6 +73,20 @@ type QVectorRuntimeKernel struct {
 	Detail    string
 }
 
+// QKernelShapeSummary is a source-stable row for joining MethodJIT q kernel
+// diagnostics with qSQL/data kernel shape statistics.
+type QKernelShapeSummary struct {
+	Source       string
+	Kind         string
+	Shape        string
+	ReasonFamily string
+	ReasonCode   string
+	Count        int
+	Hits         int
+	Misses       int
+	Evictions    int
+}
+
 const (
 	qVectorWhereReduceFallbackSharedWhere      = "shared_where"
 	qVectorWhereReduceFallbackBadWhereArgCount = "bad_where_arg_count"
@@ -217,7 +231,19 @@ func CountQQueryLoweringFallbackReasons(remarks []OptimizationRemark) map[string
 }
 
 func qQueryLoweringFallbackReasonFromRemark(reason string) (string, bool) {
-	const prefix = "reason_code="
+	return qLoweringRemarkField(reason, "reason_code")
+}
+
+func qQueryLoweringFallbackShapeFromRemark(reason string) string {
+	shape, ok := qLoweringRemarkField(reason, "shape")
+	if !ok {
+		return "unknown"
+	}
+	return shape
+}
+
+func qLoweringRemarkField(reason, name string) (string, bool) {
+	prefix := name + "="
 	for _, field := range strings.Fields(reason) {
 		if strings.HasPrefix(field, prefix) {
 			code := strings.TrimRight(strings.TrimPrefix(field, prefix), ",;")
@@ -243,6 +269,99 @@ func CountQVectorLoweringFallbackReasons(remarks []OptimizationRemark) map[strin
 		return nil
 	}
 	return counts
+}
+
+func BuildQKernelShapeSummary(vectorKernels []QVectorRuntimeKernel, frameKernels []QFrameSelectColumnSpec, remarks []OptimizationRemark) []QKernelShapeSummary {
+	counts := make(map[qKernelShapeSummaryKey]int)
+	for _, kernel := range vectorKernels {
+		shape := kernel.Shape()
+		if shape == "" {
+			shape = "unknown"
+		}
+		counts[qKernelShapeSummaryKey{
+			source: "methodjit_q_vector_runtime",
+			kind:   "runtime_kernel",
+			shape:  shape,
+		}]++
+	}
+	for _, spec := range frameKernels {
+		shape := spec.Shape
+		if shape == "" {
+			shape = "unknown"
+		}
+		counts[qKernelShapeSummaryKey{
+			source: "methodjit_q_frame_runtime",
+			kind:   "runtime_kernel",
+			shape:  shape,
+		}]++
+	}
+	for _, remark := range remarks {
+		if remark.Kind != "missed" {
+			continue
+		}
+		var source string
+		switch remark.Pass {
+		case "QQueryNativeLowering":
+			source = "methodjit_q_query_lowering"
+		case "QVectorNativeLowering":
+			source = "methodjit_q_vector_lowering"
+		default:
+			continue
+		}
+		reason, ok := qQueryLoweringFallbackReasonFromRemark(remark.Reason)
+		if !ok {
+			continue
+		}
+		counts[qKernelShapeSummaryKey{
+			source:       source,
+			kind:         "fallback",
+			shape:        qQueryLoweringFallbackShapeFromRemark(remark.Reason),
+			reasonFamily: "lowering",
+			reasonCode:   reason,
+		}]++
+	}
+	if len(counts) == 0 {
+		return nil
+	}
+	keys := make([]qKernelShapeSummaryKey, 0, len(counts))
+	for key := range counts {
+		keys = append(keys, key)
+	}
+	sort.Slice(keys, func(i, j int) bool {
+		if keys[i].source != keys[j].source {
+			return keys[i].source < keys[j].source
+		}
+		if keys[i].kind != keys[j].kind {
+			return keys[i].kind < keys[j].kind
+		}
+		if keys[i].shape != keys[j].shape {
+			return keys[i].shape < keys[j].shape
+		}
+		if keys[i].reasonFamily != keys[j].reasonFamily {
+			return keys[i].reasonFamily < keys[j].reasonFamily
+		}
+		return keys[i].reasonCode < keys[j].reasonCode
+	})
+	out := make([]QKernelShapeSummary, 0, len(keys))
+	for _, key := range keys {
+		out = append(out, QKernelShapeSummary{
+			Source:       key.source,
+			Kind:         key.kind,
+			Shape:        key.shape,
+			ReasonFamily: key.reasonFamily,
+			ReasonCode:   key.reasonCode,
+			Count:        counts[key],
+		})
+	}
+	return out
+}
+
+type qKernelShapeSummaryKey struct {
+	source       string
+	kind         string
+	shape        string
+	reasonFamily string
+	reasonCode   string
 }
 
 // DetectQQueryHotPaths returns q query primitive pipelines visible in Method
@@ -1105,6 +1224,29 @@ func formatQVectorLoweringFallbackReasons(counts map[string]int) string {
 		return "0 fallback reason(s)\n"
 	}
 	return fmt.Sprintf("%d fallback reason(s): %s\n", len(counts), formatQQueryHotPathShapeCounts(counts))
+}
+
+func formatQKernelShapeSummary(rows []QKernelShapeSummary) string {
+	if len(rows) == 0 {
+		return "0 summary row(s)\n"
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "%d summary row(s)\n", len(rows))
+	for i, row := range rows {
+		fmt.Fprintf(&b, "  [%d] source=%s kind=%s shape=%s count=%d",
+			i, row.Source, row.Kind, row.Shape, row.Count)
+		if row.ReasonFamily != "" {
+			fmt.Fprintf(&b, " reason_family=%s", row.ReasonFamily)
+		}
+		if row.ReasonCode != "" {
+			fmt.Fprintf(&b, " reason_code=%s", row.ReasonCode)
+		}
+		if row.Hits != 0 || row.Misses != 0 || row.Evictions != 0 {
+			fmt.Fprintf(&b, " hits=%d misses=%d evictions=%d", row.Hits, row.Misses, row.Evictions)
+		}
+		b.WriteByte('\n')
+	}
+	return b.String()
 }
 
 func formatQFrameSelectColumnSpecs(specs []QFrameSelectColumnSpec) string {

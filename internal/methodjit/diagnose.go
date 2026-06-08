@@ -190,6 +190,7 @@ type DiagReport struct {
 	QTypedRuntimeKernelShapes  map[string]int           // lowered q typed runtime-kernel count by shape
 	QQueryFallbacks            map[string]int           // q native lowering fallback count by reason code
 	QVectorLoweringFallbacks   map[string]int           // q vector native lowering fallback count by reason code
+	QKernelShapeSummary        []QKernelShapeSummary    // source-stable q kernel shape/fallback summary
 	ValidateErrors             []error                  // structural invariant violations
 	RegAllocMap                string                   // human-readable register assignments
 	InterpResult               []runtime.Value          // IR interpreter output on UNOPTIMIZED IR
@@ -279,6 +280,7 @@ func Diagnose(proto *vm.FuncProto, args []runtime.Value) *DiagReport {
 		r.QTypedRuntimeKernelShapes = CountQFrameSelectColumnSpecShapes(r.QTypedRuntimeKernels)
 		r.QQueryFallbacks = CountQQueryLoweringFallbackReasons(r.OptimizationRemarks)
 		r.QVectorLoweringFallbacks = CountQVectorLoweringFallbackReasons(r.OptimizationRemarks)
+		r.QKernelShapeSummary = BuildQKernelShapeSummary(r.QVectorRuntimeKernels, r.QTypedRuntimeKernels, r.OptimizationRemarks)
 		r.NativeError = fmt.Errorf("pipeline error: %w", pipeErr)
 		r.compareResults()
 		return r
@@ -298,6 +300,7 @@ func Diagnose(proto *vm.FuncProto, args []runtime.Value) *DiagReport {
 	r.QTypedRuntimeKernelShapes = CountQFrameSelectColumnSpecShapes(r.QTypedRuntimeKernels)
 	r.QQueryFallbacks = CountQQueryLoweringFallbackReasons(r.OptimizationRemarks)
 	r.QVectorLoweringFallbacks = CountQVectorLoweringFallbackReasons(r.OptimizationRemarks)
+	r.QKernelShapeSummary = BuildQKernelShapeSummary(r.QVectorRuntimeKernels, r.QTypedRuntimeKernels, r.OptimizationRemarks)
 	r.PipelineStages = collector.timings
 
 	// 4b. Interpret the OPTIMIZED IR. This is the middle of the three-way
@@ -546,6 +549,7 @@ func (r *DiagReport) String() string {
 	w("\n--- Q typed vector runtime kernels ---\n%s", formatQTypedVectorRuntimeKernelReport(r.QVectorRuntimeKernels))
 	w("\n--- Q query fallback reasons ---\n%s", formatQQueryLoweringFallbackReasons(r.QQueryFallbacks))
 	w("\n--- Q vector fallback reasons ---\n%s", formatQVectorLoweringFallbackReasons(r.QVectorLoweringFallbacks))
+	w("\n--- Q kernel shape summary ---\n%s", formatQKernelShapeSummary(r.QKernelShapeSummary))
 	w("\n--- IR (after passes) ---\n%s", r.IRAfter)
 	w("\n--- Register Allocation ---\n%s\n", r.RegAllocMap)
 	w("\n--- Validation ---\n")
