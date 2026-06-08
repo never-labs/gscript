@@ -15,6 +15,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 BENCH_RE = re.compile(r"^(Benchmark[^\s]+)\s+(\d+)\s+([0-9.]+)\s+ns/op(?:\s+(.*))?$")
+BENCH_CPU_SUFFIX_RE = re.compile(r"-\d+$")
 
 QSQL_BENCH = (
     "BenchmarkQSQL("
@@ -46,6 +47,7 @@ class CommandResult:
     cmd: list[str]
     exit_code: int
     output: str
+    parsed_benchmark_count: int = 0
 
 
 @dataclass
@@ -63,6 +65,21 @@ class RatioRow:
     denominator: str
     ratio: float | None
     note: str = ""
+
+
+@dataclass
+class QEvalComputeCoverage:
+    session_case_count: int
+    go_baseline_case_count: int
+    result_cache_warm_case_count: int
+    cold_case_count: int
+    matched_go_baseline_count: int
+    matched_result_cache_warm_count: int
+    matched_cold_count: int
+    missing_go_baseline: list[str]
+    missing_result_cache_warm: list[str]
+    missing_cold: list[str]
+    orphan_go_baseline: list[str]
 
 
 def run_command(label: str, cmd: list[str]) -> CommandResult:
@@ -84,7 +101,7 @@ def parse_go_benchmarks(output: str) -> dict[str, BenchRow]:
         if not match:
             continue
         raw_name, iterations, ns_op, rest = match.groups()
-        name = raw_name.split("-", 1)[0]
+        name = normalize_benchmark_name(raw_name)
         rows[name] = BenchRow(
             name=name,
             iterations=int(iterations),
@@ -92,6 +109,10 @@ def parse_go_benchmarks(output: str) -> dict[str, BenchRow]:
             metrics=parse_metric_pairs(rest or ""),
         )
     return rows
+
+
+def normalize_benchmark_name(raw_name: str) -> str:
+    return BENCH_CPU_SUFFIX_RE.sub("", raw_name)
 
 
 def parse_metric_pairs(text: str) -> dict[str, float]:
@@ -116,6 +137,31 @@ def ratio(rows: dict[str, BenchRow], numerator: str, denominator: str) -> float 
     if left is None or right is None or right.ns_op == 0:
         return None
     return left.ns_op / right.ns_op
+
+
+def qeval_cases(rows: dict[str, BenchRow], prefix: str) -> set[str]:
+    marker = prefix + "/"
+    return {name.removeprefix(marker) for name in rows if name.startswith(marker)}
+
+
+def build_qeval_compute_coverage(rows: dict[str, BenchRow]) -> QEvalComputeCoverage:
+    session = qeval_cases(rows, "BenchmarkQSessionEvalVectorWarmExecution")
+    go = qeval_cases(rows, "BenchmarkQEvalVectorGoBaseline")
+    warm = qeval_cases(rows, "BenchmarkQEvalVectorResultCacheWarm")
+    cold = qeval_cases(rows, "BenchmarkQEvalVectorCold")
+    return QEvalComputeCoverage(
+        session_case_count=len(session),
+        go_baseline_case_count=len(go),
+        result_cache_warm_case_count=len(warm),
+        cold_case_count=len(cold),
+        matched_go_baseline_count=len(session & go),
+        matched_result_cache_warm_count=len(session & warm),
+        matched_cold_count=len(session & cold),
+        missing_go_baseline=sorted(session - go),
+        missing_result_cache_warm=sorted(session - warm),
+        missing_cold=sorted(session - cold),
+        orphan_go_baseline=sorted(go - session),
+    )
 
 
 def build_ratios(rows: dict[str, BenchRow]) -> list[RatioRow]:
@@ -244,6 +290,7 @@ def format_float(value: float | None) -> str:
 
 def markdown_report(rows: dict[str, BenchRow], commands: list[CommandResult]) -> str:
     coverage = build_coverage(rows)
+    qeval_compute = build_qeval_compute_coverage(rows)
     ratios = build_ratios(rows)
     lines = [
         "# q Performance Completeness Report",
@@ -265,6 +312,34 @@ def markdown_report(rows: dict[str, BenchRow], commands: list[CommandResult]) ->
     )
     for item in coverage:
         lines.append(f"| {item['signal']} | {item['qSQL']} | {item['q.eval']} | {item['gap']} |")
+    lines.extend(
+        [
+            "",
+            "## Ordinary q Compute Coverage",
+            "",
+            "| Signal | Count |",
+            "|---|---:|",
+            f"| session execution cases | {qeval_compute.session_case_count} |",
+            f"| Go baseline cases | {qeval_compute.go_baseline_case_count} |",
+            f"| result-cache warm cases | {qeval_compute.result_cache_warm_case_count} |",
+            f"| cold cases | {qeval_compute.cold_case_count} |",
+            f"| session cases matched with Go baseline | {qeval_compute.matched_go_baseline_count} |",
+            f"| session cases matched with result-cache warm | {qeval_compute.matched_result_cache_warm_count} |",
+            f"| session cases matched with cold | {qeval_compute.matched_cold_count} |",
+        ]
+    )
+    missing_sections = [
+        ("Missing Go baseline", qeval_compute.missing_go_baseline),
+        ("Missing result-cache warm", qeval_compute.missing_result_cache_warm),
+        ("Missing cold", qeval_compute.missing_cold),
+        ("Go baselines without session execution", qeval_compute.orphan_go_baseline),
+    ]
+    for title, items in missing_sections:
+        lines.extend(["", f"### {title}", ""])
+        if items:
+            lines.extend(f"- `{item}`" for item in items)
+        else:
+            lines.append("- none")
     lines.extend(
         [
             "",
@@ -327,27 +402,41 @@ def main(argv: list[str]) -> int:
     if args.from_output:
         for path in args.from_output:
             output = path.read_text()
-            rows.update(parse_go_benchmarks(output))
-            commands.append(CommandResult(label=f"from-output:{path}", cmd=["cat", str(path)], exit_code=0, output=output))
+            parsed = parse_go_benchmarks(output)
+            rows.update(parsed)
+            commands.append(
+                CommandResult(
+                    label=f"from-output:{path}",
+                    cmd=["cat", str(path)],
+                    exit_code=0,
+                    output=output,
+                    parsed_benchmark_count=len(parsed),
+                )
+            )
     else:
         qsql = run_command(
             "qsql-bind-native",
             ["go", "test", "./internal/stdlib/bind", "-run", "^$", "-bench", QSQL_BENCH, "-benchmem", f"-benchtime={args.benchtime}"],
         )
+        qsql_rows = parse_go_benchmarks(qsql.output)
+        qsql.parsed_benchmark_count = len(qsql_rows)
         commands.append(qsql)
-        rows.update(parse_go_benchmarks(qsql.output))
+        rows.update(qsql_rows)
 
         qeval = run_command(
             "qeval-native",
             ["go", "test", "./benchmarks", "-run", "^$", "-bench", QEVAL_BENCH, "-benchmem", f"-benchtime={args.benchtime}"],
         )
+        qeval_rows = parse_go_benchmarks(qeval.output)
+        qeval.parsed_benchmark_count = len(qeval_rows)
         commands.append(qeval)
-        rows.update(parse_go_benchmarks(qeval.output))
+        rows.update(qeval_rows)
 
     payload = {
         "commands": [asdict(command) for command in commands],
         "benchmarks": {name: asdict(row) for name, row in sorted(rows.items())},
         "coverage": build_coverage(rows),
+        "q_eval_compute_coverage": asdict(build_qeval_compute_coverage(rows)),
         "ratios": [asdict(row) for row in build_ratios(rows)],
     }
 
@@ -358,8 +447,14 @@ def main(argv: list[str]) -> int:
 
     for command in commands:
         if command.exit_code != 0:
-            print(command.output, file=sys.stderr)
-            return command.exit_code
+            print(
+                f"{command.label} exited {command.exit_code}; parsed "
+                f"{command.parsed_benchmark_count} benchmark rows into the report",
+                file=sys.stderr,
+            )
+            if command.parsed_benchmark_count == 0:
+                print(command.output, file=sys.stderr)
+                return command.exit_code
     print(f"wrote {args.markdown}")
     print(f"wrote {args.json}")
     return 0
