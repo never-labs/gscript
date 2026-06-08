@@ -208,11 +208,13 @@ Read the q performance baseline through these ratios:
 ## q.eval Vector/List Compute
 
 `benchmarks/q_eval_vector_bench_test.go` covers ordinary q expressions outside
-qSQL. This suite should be the main non-qSQL q performance matrix: numeric
-vector arithmetic, typed numeric and null behavior, compare masks to `where`
-indexes, selectivity changes, `take`/`drop`/`reverse`/`rotate`, adverb
-scans/reductions, list/set verbs, dictionaries, symbols, temporal values, and
-table-like transforms. Each shape has four benchmark rows:
+qSQL. This suite is the main non-qSQL q performance matrix and now has 88 cases
+plus a required coverage-tag gate. It spans numeric vector arithmetic, typed
+suffix/null/cast/promotion behavior, compare masks to `where`, selectivity
+changes, `take`/`drop`/`cut`/`reverse`/`rotate`, reductions, adverbs,
+list/set verbs, dictionaries and amend/upsert, symbols/enums, temporal values,
+table/keyed-table transforms, safe system commands, and loopback IPC. Each
+shape has four benchmark rows:
 
 | Row | Signal |
 |---|---|
@@ -231,7 +233,9 @@ q compute suite. It keeps the benchmarks under `benchmarks/` while still
 exercising q result-cache warm, session warm execution, cold parse/lower, and
 hand-written Go baseline rows in one command.
 
-The coverage target for q work is at least 50 ordinary `q.eval` cases, 25 qSQL
-Go benchmark rows, and 40 script-level q columnar cases. Keep new benchmark
-cases tied to real q language shapes from the semantic tests rather than to
-individual optimizer implementation details.
+The q coverage target is now gate-based, not just count-based. Ordinary
+`q.eval` coverage must pass `TestQEvalVectorBenchmarkCoverageTags`. qSQL still
+needs an equivalent tag gate across select/group/join/mutation/cache/runtime
+stats before the full q performance suite can be called exhaustive. Keep new
+benchmark cases tied to real q language shapes from the semantic tests rather
+than to individual optimizer implementation details.

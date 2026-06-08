@@ -38,17 +38,17 @@ benchmark set. These categories should drive benchmark case growth.
 
 | Category | Evidence in tests | Benchmark status |
 |---|---|---|
-| Numeric atoms/vectors | numeric literals, typed numeric suffixes, casts, dyadic ops, promotion, null propagation, percent divide | Partially covered by `q_eval_vector_bench_test.go`; needs more typed suffix/null/promotion cases |
-| Boolean masks and `where` | bool vectors, compare masks, scalar comparisons, comma where as and, logical `&`/`|` | Partially covered; needs selectivity matrix and compound predicates |
-| Adverbs | each, each-prior, each-left/right, over, scan, verb adverbs, function projections | Partially covered for sum/sums and some generic adverbs; needs each/prior/left/right matrix |
-| Reductions and scans | `sum`, `sums`, `+/`, `+\`, `min`, `max`, `count`, `avg`, `var`, `dev`, `med`, `wavg` | q.eval covers basic reductions; qSQL covers aggregate families; needs typed/null/grouped variants |
-| Set/list verbs | `distinct`, `group`, `where`, `reverse`, `prev`, `next`, `deltas`, `fills`, `enlist`, `raze`, `cut`, `drop`, sort indexes | Partially covered; needs list-shape and symbol/temporal cases |
-| Dicts | symbol dictionaries, nested dictionaries, lookup, `keys`, `value`, amend/upsert | Semantics covered; benchmark coverage is thin |
-| Table literals | `flip`, native table literal, qSQL-style table literal, keyed table literals | Semantics covered; benchmark coverage mainly qSQL source use |
-| Keyed tables | `xkey`, lookup, keyed amend/upsert, key/value/cols/meta APIs | Semantics covered; needs benchmark cases for lookup/amend/upsert hot paths |
-| Symbols and enums | symbol vectors, enum metadata, grouped/unique/sorted attributes | Semantics covered; benchmarks should include symbol compare/group/sort |
-| Temporal values | date, time, timestamp, timespan, temporal typed nulls, `.z.*` values | qSQL temporal filters/xbar/join covered; q.eval temporal list ops need benchmarks |
-| Table verbs | `xcols`, `xasc`, `xdesc`, `xgroup`, `ungroup`, `meta`, `cols`, `key` | Semantics covered; benchmark coverage is thin |
+| Numeric atoms/vectors | numeric literals, typed numeric suffixes, casts, dyadic ops, promotion, null propagation, percent divide | Covered by q.eval coverage tags; still needs more per-type performance depth |
+| Boolean masks and `where` | bool vectors, compare masks, scalar comparisons, comma where as and, logical `&`/`|` | Covered by q.eval coverage tags and selectivity cases; compound qSQL predicate depth remains open |
+| Adverbs | each, each-prior, each-left/right, over, scan, verb adverbs, function projections | Covered by q.eval coverage tags; more complex list-of-lists cases should be added |
+| Reductions and scans | `sum`, `sums`, `+/`, `+\`, `min`, `max`, `count`, `avg`, `var`, `dev`, `med`, `wavg` | Covered by q.eval coverage tags except deeper `wavg`/null/type matrix |
+| Set/list verbs | `distinct`, `group`, `where`, `reverse`, `prev`, `next`, `deltas`, `fills`, `enlist`, `raze`, `cut`, `drop`, sort indexes | Covered at category level; needs exhaustive verb-by-type matrix |
+| Dicts | symbol dictionaries, nested dictionaries, lookup, `keys`, `value`, amend/upsert | Covered at category level; keyed/table nested hot paths need more rows |
+| Table literals | `flip`, native table literal, qSQL-style table literal, keyed table literals | Covered at category level; large table materialization cases need more rows |
+| Keyed tables | `xkey`, lookup, keyed amend/upsert, key/value/cols/meta APIs | Covered at category level; lookup/amend/upsert hot paths need direct Go baselines |
+| Symbols and enums | symbol vectors, enum metadata, grouped/unique/sorted attributes | Covered at category level; grouped/unique/sorted attribute matrices need more rows |
+| Temporal values | date, time, timestamp, timespan, temporal typed nulls, `.z.*` values | Covered at category level; all temporal kind combinations need expansion |
+| Table verbs | `xcols`, `xasc`, `xdesc`, `xgroup`, `ungroup`, `meta`, `cols`, `key` | Covered at category level; table-size scaling cases remain open |
 | qSQL select/exec | projection, computed projection, filter, order, limit/take, distinct, dict exec | Partially covered by qSQL Go benchmarks and columnar scripts |
 | qSQL grouped analytics | `by`, computed keys, `xbar`, aggregate aliases, extended aggregates | Partially covered; needs more aggregate/key/type combinations |
 | qSQL joins | inner, left, asof variants, union, plus, window joins, chained joins, aliased keys | Asof/join subsets covered; window/union/plus/chained joins need benchmark rows |
@@ -95,7 +95,7 @@ from the original five ordinary q cases and four columnar script cases:
 
 | Target | Minimum breadth |
 |---|---|
-| `q.eval` ordinary compute | 50+ cases across vector arithmetic, where/selectivity, slice/reorder, adverb, dict, symbol, temporal, and table-verb shapes |
+| `q.eval` ordinary compute | 88 cases with a required coverage-tag gate across vector arithmetic, typed/null/cast/promotion, where/selectivity, slice/reorder, adverb, dict, symbol, temporal, table-verb, IPC, and safe-system shapes |
 | qSQL Go benchmarks | 25+ rows across select, group, join, mutation, cache, and direct-runtime baselines |
 | q columnar script suite | 40+ script-level cases drawn from market data, rollup, join, keyed state, and vector/adverb projects |
 | Metrics per case | `ns/op`, `B/op`, `allocs/op`, warm/cold ratio, Go ratio where practical, typed-kernel/fallback stats where available |
@@ -109,7 +109,7 @@ analytics examples under `benchmarks/data`.
 | Gap | Why it matters |
 |---|---|
 | q.eval typed kernel hit/fallback metrics are not yet benchmark-readable per case | We can time q.eval operations, but cannot fully explain whether runtime kernels or interpreter fallback dominated |
-| q.eval coverage is still weaker for dict/keyed/table/temporal operations than numeric vectors | q's compact analytics style often combines vectors with dictionaries, symbols, temporal values, and keyed tables |
+| q.eval coverage is category-complete but not yet exhaustive by operation x type x null x shape matrix | The new tag gate prevents missing whole expression families; the next round must enumerate complex combinations and per-type variants |
 | qSQL cold/warm coverage is select-heavy | Group, join, mutation, and temporal shapes also need cold/warm cache rows |
 | Join benchmarks need more variants | Asof is important, but inner/left/window/union/plus/chained joins exercise different runtime costs |
 | Mutation benchmarks are thin | Update/delete/upsert are core table analytics operations and interact with keyed frames and schema-stable cache |
@@ -121,3 +121,21 @@ When adding a new q semantic feature or optimizing q runtime/JIT, update this
 matrix first, then add benchmark cases in the nearest existing suite. A feature
 is performance-covered only when it has at least one executable benchmark row
 with allocation metrics and a clear ratio target.
+
+## Optimization Rule
+
+Benchmark cases are evidence, not optimization targets. q performance work must
+optimize reusable language/runtime shapes, never specific case names, literal
+values, fixed row counts, or exact source strings. Valid optimization units are
+general mechanisms such as:
+
+- typed vector arithmetic and reduction kernels
+- typed compare mask, `where`, gather/filter, and projection kernels
+- table/frame primitives for group, join, sort, keyed lookup, amend, and upsert
+- expression lowering that recognizes reusable q AST/data-expression shapes
+- JIT calls into typed runtime kernels for stable Frame/Vector shapes
+- allocation elimination through reusable buffers and immutable column views
+- schema-stable caches with explainable fallback and hit-rate statistics
+
+If an optimization cannot be explained as one of these reusable mechanisms, it
+does not belong in the runtime/JIT path even if it improves one benchmark row.

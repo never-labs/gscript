@@ -14,14 +14,68 @@ var qEvalVectorBenchSink int64
 
 type qEvalVectorCase struct {
 	name string
+	tags []string
 	expr func(rows int) string
 	goFn func(rows int) int64
 }
 
 var qEvalVectorCases = buildQEvalVectorCases()
 
+var qEvalRequiredCoverageTags = []string{
+	"numeric-vector",
+	"typed-suffix",
+	"typed-null",
+	"cast",
+	"promotion",
+	"numeric-monad",
+	"word-dyadic",
+	"boolean-logical",
+	"composite-compare",
+	"where",
+	"take",
+	"drop",
+	"cut",
+	"enlist",
+	"raze",
+	"reverse",
+	"rotate",
+	"sum",
+	"sums",
+	"min-max",
+	"avg-var-dev-med",
+	"moving-window",
+	"adverb-each",
+	"adverb-each-prior",
+	"adverb-each-left-right",
+	"adverb-over-scan",
+	"projection",
+	"composition",
+	"distinct",
+	"group",
+	"set-verb",
+	"bin-within-xrank",
+	"dict",
+	"dict-amend-upsert",
+	"symbol",
+	"enum",
+	"string",
+	"temporal",
+	"xbar",
+	"table-literal",
+	"keyed-table",
+	"metadata",
+	"table-reorder",
+	"table-sort",
+	"table-group-ungroup",
+	"fby",
+	"match-like",
+	"null-verb",
+	"safe-system",
+	"ipc-loopback",
+}
+
 func buildQEvalVectorCases() []qEvalVectorCase {
-	cases := make([]qEvalVectorCase, 0, 64)
+	cases := make([]qEvalVectorCase, 0, 128)
 
 	for _, p := range []struct {
 		name string
@@ -38,6 +92,7 @@ func buildQEvalVectorCases() []qEvalVectorCase {
 		p := p
 		cases = append(cases, qEvalVectorCase{
 			name: "VectorAffineSum" + p.name,
+			tags: []string{"numeric-vector", "sum"},
 			expr: func(rows int) string {
 				return fmt.Sprintf("x:til %d;y:(x*%d)+%d;+/y", rows, p.mul, p.add)
 			},
@@ -51,6 +106,7 @@ func buildQEvalVectorCases() []qEvalVectorCase {
 		})
 		cases = append(cases, qEvalVectorCase{
 			name: "VectorSquareSum" + p.name,
+			tags: []string{"numeric-vector", "sum"},
 			expr: func(rows int) string {
 				return fmt.Sprintf("x:til %d;y:(x*%d)+%d;+/y*y", rows, p.mul, p.add)
 			},
@@ -132,6 +188,7 @@ func buildQEvalVectorCases() []qEvalVectorCase {
 		n := n
 		cases = append(cases, qEvalVectorCase{
 			name: fmt.Sprintf("TakeHead%d", n),
+			tags: []string{"take", "sum"},
 			expr: func(rows int) string {
 				return fmt.Sprintf("x:til %d;a:%d#x;+/a", rows, n)
 			},
@@ -149,6 +206,7 @@ func buildQEvalVectorCases() []qEvalVectorCase {
 		n := n
 		cases = append(cases, qEvalVectorCase{
 			name: fmt.Sprintf("DropPrefix%d", n),
+			tags: []string{"drop", "sum"},
 			expr: func(rows int) string {
 				return fmt.Sprintf("x:til %d;a:drop %d x;+/a", rows, n)
 			},
@@ -164,6 +222,7 @@ func buildQEvalVectorCases() []qEvalVectorCase {
 
 	cases = append(cases, qEvalVectorCase{
 		name: "ReverseFirstLastChecksum",
+		tags: []string{"reverse", "sum"},
 		expr: func(rows int) string {
 			return fmt.Sprintf("x:til %d;r:reverse x;(first r)+last r+(+/r)", rows)
 		},
@@ -176,6 +235,7 @@ func buildQEvalVectorCases() []qEvalVectorCase {
 		n := n
 		cases = append(cases, qEvalVectorCase{
 			name: fmt.Sprintf("RotateSum%s", qEvalVectorNameInt(n)),
+			tags: []string{"rotate", "sum"},
 			expr: func(rows int) string {
 				return fmt.Sprintf("x:til %d;r:%d rotate x;(+/r)+first r+last r", rows, n)
 			},
@@ -189,6 +249,7 @@ func buildQEvalVectorCases() []qEvalVectorCase {
 	cases = append(cases,
 		qEvalVectorCase{
 			name: "AdverbSumScanAndNamedSums",
+			tags: []string{"sum", "sums", "adverb-over-scan"},
 			expr: func(rows int) string {
 				return fmt.Sprintf("x:1+til %d;s:+/x;scan:+\\x;named:sums x;s+last scan+last named", rows)
 			},
@@ -217,6 +278,7 @@ func buildQEvalVectorCases() []qEvalVectorCase {
 		},
 		qEvalVectorCase{
 			name: "CompositionCountDistinctAndReverse",
+			tags: []string{"composition", "distinct"},
 			expr: func(rows int) string {
 				return "(count distinct)[10 20 10 30]+(first reverse)[1 2 3]"
 			},
@@ -331,7 +393,153 @@ func buildQEvalVectorCases() []qEvalVectorCase {
 		},
 	)
 
-	return cases
+	return appendQEvalSemanticCoverageCases(cases)
+}
+
+func appendQEvalSemanticCoverageCases(cases []qEvalVectorCase) []qEvalVectorCase {
+	coverage := []qEvalVectorCase{
+		{
+			name: "TypedSuffixNullAndCasts",
+			tags: []string{"typed-suffix", "typed-null", "cast", "promotion", "null-verb"},
+			expr: func(rows int) string {
+				return "(+/1h 2h 3h)+(type 1i)+(type `float$1)+(count where null 1 0N 2 0N)"
+			},
+			goFn: func(rows int) int64 {
+				return 6 - 6 - 9 + 2
+			},
+		},
+		{
+			name: "NumericMonadsAndWordDyadics",
+			tags: []string{"numeric-monad", "word-dyadic"},
+			expr: func(rows int) string {
+				return "(abs -2)+(neg 5)+(signum -7)+(floor 2.9)+(ceiling 2.1)+sum 1 2 3 plus 10"
+			},
+			goFn: func(rows int) int64 {
+				return 2 - 5 - 1 + 2 + 3 + 16
+			},
+		},
+		{
+			name: "BooleanLogicalAndCompositeCompare",
+			tags: []string{"boolean-logical", "composite-compare", "where"},
+			expr: func(rows int) string {
+				return "(count where true false true and true true false)+(count where 10 20 30>=20)+(count where 10 20 30<>20)"
+			},
+			goFn: func(rows int) int64 {
+				return 1 + 2 + 2
+			},
+		},
+		{
+			name: "CutEnlistRazeChecksum",
+			tags: []string{"cut", "enlist", "raze"},
+			expr: func(rows int) string {
+				return "(count 0 2 4_10 20 30 40 50)+(count enlist 10 20 30)+sum raze (1 2;3 4;5)"
+			},
+			goFn: func(rows int) int64 {
+				return 3 + 1 + 15
+			},
+		},
+		{
+			name: "MinMaxAvgVarDevMed",
+			tags: []string{"min-max", "avg-var-dev-med"},
+			expr: func(rows int) string {
+				return "(min 10 20 30)+(max 10 20 30)+(avg 10 20 30)+(var 10 20 30)+(dev 10 20 30)+(med 10 20 30)"
+			},
+			goFn: func(rows int) int64 {
+				return 10 + 30 + 20 + 66 + 8 + 20
+			},
+		},
+		{
+			name: "MovingWindowAggregates",
+			tags: []string{"moving-window"},
+			expr: func(rows int) string {
+				return "(+/3 mcount 10 0N 30 40)+(+/3 mmin 30 0N 10 20)+(+/3 mmax 30 0N 10 20)"
+			},
+			goFn: func(rows int) int64 {
+				return 6 + 80 + 110
+			},
+		},
+		{
+			name: "AdverbMatrix",
+			tags: []string{"adverb-each", "adverb-each-prior", "adverb-each-left-right", "adverb-over-scan", "projection"},
+			expr: func(rows int) string {
+				return "(+/1 2 3+'10 20 30)+(+/-':10 15 14 20)+(+/10-\\:1 2 3)+(+/10 20 30-/:1)+(+/+\\1 2 3 4)+({x+y}/[10;1 2 3])"
+			},
+			goFn: func(rows int) int64 {
+				return 66 + 20 + 24 + 57 + 20 + 16
+			},
+		},
+		{
+			name: "SetBinWithinXrank",
+			tags: []string{"set-verb", "bin-within-xrank"},
+			expr: func(rows int) string {
+				return "(count 1 2 3 except 2)+(count 1 2 1 3 inter 3 1 9)+(count 1 2 1 union 2 3)+(+/10 20 30 bin 5 10 29 30 31)+(count where 10 20 30 within 15 30)+(+/2 xrank 40 10 30 20)"
+			},
+			goFn: func(rows int) int64 {
+				return 2 + 2 + 3 + 4 + 2 + 2
+			},
+		},
+		{
+			name: "DictAmendUpsertAndLookup",
+			tags: []string{"dict", "dict-amend-upsert"},
+			expr: func(rows int) string {
+				return "d:`a`b!10 20;u:@[d;`c;:;30];d[`a]+(lookup d `b)+((@[d;`a;:;99])`a)+u`c"
+			},
+			goFn: func(rows int) int64 {
+				return 10 + 20 + 99 + 30
+			},
+		},
+		{
+			name: "EnumSymbolStringMatchLike",
+			tags: []string{"enum", "symbol", "string", "match-like"},
+			expr: func(rows int) string {
+				return "(count domain `sym$`AAPL`MSFT`AAPL)+(count codes `sym$`AAPL`MSFT`AAPL)+(count where `AAPL`MSFT`AMD like `A*)+(count upper `aapl`msft)"
+			},
+			goFn: func(rows int) int64 {
+				return 2 + 3 + 2 + 2
+			},
+		},
+		{
+			name: "TemporalTypedXbarAndSort",
+			tags: []string{"temporal", "xbar"},
+			expr: func(rows int) string {
+				return "(count 2026.06.06 0Nd 2026.06.07)+(count 00:01 xbar 09:30 09:30:59 09:31:00)+(count where 2026.06.06 2026.06.07>=2026.06.07)"
+			},
+			goFn: func(rows int) int64 {
+				return 3 + 3 + 1
+			},
+		},
+		{
+			name: "TableMetadataReorderSort",
+			tags: []string{"table-literal", "metadata", "table-reorder", "table-sort"},
+			expr: func(rows int) string {
+				return "(count ([] sym:`AAPL`MSFT;price:100 101))+(count cols `price`sym xcols flip `sym`price`size!(`AAPL`MSFT;100 101;10 20))+(count meta `price xasc flip `sym`price!(`MSFT`AAPL;80 101))"
+			},
+			goFn: func(rows int) int64 {
+				return 2 + 3 + 2
+			},
+		},
+		{
+			name: "KeyedTableGroupUngroupFby",
+			tags: []string{"keyed-table", "table-group-ungroup", "fby", "group"},
+			expr: func(rows int) string {
+				return "fb:sum 10 20 30 40 fby `a`a`b`b;(count key `sym xkey flip `sym`price!(`AAPL`MSFT;100 101))+(count ungroup (`sym xgroup flip `sym`price!(`AAPL`AAPL`MSFT;100 101 80)))+(+/fb)"
+			},
+			goFn: func(rows int) int64 {
+				return 1 + 3 + 200
+			},
+		},
+		{
+			name: "SafeSystemAndLoopbackIPC",
+			tags: []string{"safe-system", "ipc-loopback"},
+			expr: func(rows int) string {
+				return "h:hopen \"loopback\";v:\\v;h[(\"x+y\";2;3)]+count v"
+			},
+			goFn: func(rows int) int64 {
+				return 5
+			},
+		},
+	}
+	return append(cases, coverage...)
 }
 
 func TestQEvalVectorBenchmarkExpressions(t *testing.T) {
@@ -346,6 +554,24 @@ func TestQEvalVectorBenchmarkExpressions(t *testing.T) {
 				t.Fatalf("q.eval checksum = %d, want Go baseline %d", got, want)
 			}
 		})
+	}
+}
+
+func TestQEvalVectorBenchmarkCoverageTags(t *testing.T) {
+	covered := make(map[string][]string)
+	for _, tc := range qEvalVectorCases {
+		for _, tag := range tc.tags {
+			covered[tag] = append(covered[tag], tc.name)
+		}
+	}
+	var missing []string
+	for _, tag := range qEvalRequiredCoverageTags {
+		if len(covered[tag]) == 0 {
+			missing = append(missing, tag)
+		}
+	}
+	if len(missing) > 0 {
+		t.Fatalf("q.eval performance coverage missing tags: %s", strings.Join(missing, ", "))
 	}
 }
 
