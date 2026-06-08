@@ -778,6 +778,14 @@ func TestFrameOrderGatherDiagnoseUsesRuntimeOpExit(t *testing.T) {
 	if !strings.Contains(report.IRAfter, "FrameOrderGather") {
 		t.Fatalf("FrameOrderGather missing from optimized IR:\n%s", report.IRAfter)
 	}
+	if got := report.QFrameRuntimeKernelShapes["order/gather"]; got != 1 {
+		t.Fatalf("QFrameRuntimeKernelShapes[order/gather] = %d, want 1; shapes=%+v", got, report.QFrameRuntimeKernelShapes)
+	}
+	assertQKernelDescriptor(t, report.QKernelDescriptors, "methodjit_q_frame_runtime", "runtime_kernel", "FrameOrderGather", "order/gather", "typed_runtime_op_exit", "supported", "")
+	assertQKernelShapeSummary(t, report.QKernelShapeSummary, "methodjit_q_frame_runtime", "runtime_kernel", "order/gather", "supported", "", 1)
+	assertQKernelExecutionStat(t, report.QKernelExecutionStats, "methodjit_q_frame_runtime", "FrameOrderGather", "order/gather", "typed_runtime_op_exit", "success", 1)
+	assertQKernelExecutionRouteSummary(t, report.QKernelExecutionRoutes, "methodjit_q_frame_runtime", "FrameOrderGather", "typed_runtime_op_exit", "success", 1)
+	assertQKernelShapeSummaryExecution(t, report.QKernelShapeSummary, "methodjit_q_frame_runtime", "runtime_kernel", "order/gather", "supported", 1, 1, 0)
 }
 
 func TestQFrameRuntimePrimitiveDiagnoseExecutionStats(t *testing.T) {
@@ -954,7 +962,11 @@ func TestQFrameRuntimePrimitiveDiagnoseExecutionStats(t *testing.T) {
 				t.Fatalf("Diagnose %s errors: native=%v interp=%v opt=%v\n%s",
 					tt.name, report.NativeError, report.InterpError, report.OptInterpError, report.String())
 			}
+			if got := report.QFrameRuntimeKernelShapes[tt.shape]; got != 1 {
+				t.Fatalf("QFrameRuntimeKernelShapes[%s] = %d, want 1; shapes=%+v", tt.shape, got, report.QFrameRuntimeKernelShapes)
+			}
 			assertQKernelDescriptor(t, report.QKernelDescriptors, "methodjit_q_frame_runtime", "runtime_kernel", tt.kernel, tt.shape, "typed_runtime_op_exit", "supported", "")
+			assertQKernelShapeSummary(t, report.QKernelShapeSummary, "methodjit_q_frame_runtime", "runtime_kernel", tt.shape, "supported", "", 1)
 			assertQKernelExecutionStat(t, report.QKernelExecutionStats, "methodjit_q_frame_runtime", tt.kernel, tt.shape, "typed_runtime_op_exit", "success", 1)
 			assertQKernelExecutionRouteSummary(t, report.QKernelExecutionRoutes, "methodjit_q_frame_runtime", tt.kernel, "typed_runtime_op_exit", "success", 1)
 			assertQKernelShapeSummaryExecution(t, report.QKernelShapeSummary, "methodjit_q_frame_runtime", "runtime_kernel", tt.shape, "supported", 1, 1, 0)
