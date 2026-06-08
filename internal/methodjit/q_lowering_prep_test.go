@@ -2969,70 +2969,80 @@ func TestQGroupAggregateNoKeyCallLowersToFrameGroupAggregateKernel(t *testing.T)
 }
 
 func TestQGroupAggregateStringWhereCallLowersToFilteredFrameGroupAggregateKernel(t *testing.T) {
-	const query = "select total:sum price, fills:count i by sym from trades where sym=\"AAPL\""
-	proto := &vm.FuncProto{
-		Name:      "q_group_aggregate_string_where_call",
-		NumParams: 1,
-		MaxStack:  4,
-		Constants: []runtime.Value{
-			runtime.StringValue("q"),
-			runtime.StringValue("sql"),
-			runtime.StringValue(query),
-		},
-		Code: []uint32{
-			vm.EncodeABx(vm.OP_GETGLOBAL, 1, 0),
-			vm.EncodeABC(vm.OP_GETFIELD, 1, 1, 1),
-			vm.EncodeABC(vm.OP_MOVE, 2, 0, 0),
-			vm.EncodeABx(vm.OP_LOADK, 3, 2),
-			vm.EncodeABC(vm.OP_CALL, 1, 3, 2),
-			vm.EncodeABC(vm.OP_RETURN, 1, 2, 0),
-		},
+	tests := []struct {
+		name  string
+		query string
+	}{
+		{name: "string", query: "select total:sum price, fills:count i by sym from trades where sym=\"AAPL\""},
+		{name: "symbol", query: "select total:sum price, fills:count i by sym from trades where sym=`AAPL"},
 	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			proto := &vm.FuncProto{
+				Name:      "q_group_aggregate_string_where_call_" + tt.name,
+				NumParams: 1,
+				MaxStack:  4,
+				Constants: []runtime.Value{
+					runtime.StringValue("q"),
+					runtime.StringValue("sql"),
+					runtime.StringValue(tt.query),
+				},
+				Code: []uint32{
+					vm.EncodeABx(vm.OP_GETGLOBAL, 1, 0),
+					vm.EncodeABC(vm.OP_GETFIELD, 1, 1, 1),
+					vm.EncodeABC(vm.OP_MOVE, 2, 0, 0),
+					vm.EncodeABx(vm.OP_LOADK, 3, 2),
+					vm.EncodeABC(vm.OP_CALL, 1, 3, 2),
+					vm.EncodeABC(vm.OP_RETURN, 1, 2, 0),
+				},
+			}
 
-	fn := BuildGraph(proto)
-	fn.Remarks = &OptimizationRemarks{}
-	lowered, err := QQueryNativeLoweringPass(fn)
-	if err != nil {
-		t.Fatalf("QQueryNativeLoweringPass: %v", err)
-	}
-	counts := countOps(lowered)
-	if counts[OpFrameMask] != 1 || counts[OpFrameGroupAggregate] != 1 || counts[OpCall] != 0 {
-		t.Fatalf("string filtered group aggregate lowering counts FrameMask=%d FrameGroupAggregate=%d OpCall=%d\n%s",
-			counts[OpFrameMask], counts[OpFrameGroupAggregate], counts[OpCall], Print(lowered))
-	}
-	kernels := DetectQFrameRuntimeKernels(lowered)
-	assertQKernelDescriptor(t, BuildQKernelDescriptors(nil, kernels, nil, fn.Remarks.List()),
-		"methodjit_q_frame_runtime", "runtime_kernel", "FrameGroupAggregate", "filter/group/aggregate", "typed_runtime_op_exit", "supported", "")
+			fn := BuildGraph(proto)
+			fn.Remarks = &OptimizationRemarks{}
+			lowered, err := QQueryNativeLoweringPass(fn)
+			if err != nil {
+				t.Fatalf("QQueryNativeLoweringPass: %v", err)
+			}
+			counts := countOps(lowered)
+			if counts[OpFrameMask] != 1 || counts[OpFrameGroupAggregate] != 1 || counts[OpCall] != 0 {
+				t.Fatalf("string filtered group aggregate lowering counts FrameMask=%d FrameGroupAggregate=%d OpCall=%d\n%s",
+					counts[OpFrameMask], counts[OpFrameGroupAggregate], counts[OpCall], Print(lowered))
+			}
+			kernels := DetectQFrameRuntimeKernels(lowered)
+			assertQKernelDescriptor(t, BuildQKernelDescriptors(nil, kernels, nil, fn.Remarks.List()),
+				"methodjit_q_frame_runtime", "runtime_kernel", "FrameGroupAggregate", "filter/group/aggregate", "typed_runtime_op_exit", "supported", "")
 
-	result, err := Interpret(lowered, []runtime.Value{runtime.TableValue(qHotPathStringTestFrame(t))})
-	if err != nil {
-		t.Fatalf("Interpret lowered string filtered q group aggregate: %v", err)
-	}
-	if len(result) != 1 || !result[0].IsTable() {
-		t.Fatalf("lowered string filtered result = %#v, want one native frame table", result)
-	}
-	payload, info, ok := result[0].Table().NativeFramePayload()
-	if !ok || info.Rows != 1 || info.Columns != 3 {
-		t.Fatalf("lowered string filtered result payload = %#v info=%#v ok=%v, want 1x3 native frame", payload, info, ok)
-	}
-	soa, ok := payload.(*runtime.SoA)
-	if !ok {
-		t.Fatalf("lowered string filtered result payload type = %T, want *runtime.SoA", payload)
-	}
-	sym, _ := soa.Column("sym")
-	total, _ := soa.Column("total")
-	fills, _ := soa.Column("fills")
-	symVals, _ := sym.StringValues()
-	totalVals, _ := total.F64()
-	fillVals, _ := fills.I64()
-	if len(symVals) != 1 || symVals[0] != "AAPL" {
-		t.Fatalf("lowered string filtered sym values = %#v, want [AAPL]", symVals)
-	}
-	if len(totalVals) != 1 || totalVals[0] != 200.25 {
-		t.Fatalf("lowered string filtered total values = %#v, want [200.25]", totalVals)
-	}
-	if len(fillVals) != 1 || fillVals[0] != 2 {
-		t.Fatalf("lowered string filtered fills values = %#v, want [2]", fillVals)
+			result, err := Interpret(lowered, []runtime.Value{runtime.TableValue(qHotPathStringTestFrame(t))})
+			if err != nil {
+				t.Fatalf("Interpret lowered string filtered q group aggregate: %v", err)
+			}
+			if len(result) != 1 || !result[0].IsTable() {
+				t.Fatalf("lowered string filtered result = %#v, want one native frame table", result)
+			}
+			payload, info, ok := result[0].Table().NativeFramePayload()
+			if !ok || info.Rows != 1 || info.Columns != 3 {
+				t.Fatalf("lowered string filtered result payload = %#v info=%#v ok=%v, want 1x3 native frame", payload, info, ok)
+			}
+			soa, ok := payload.(*runtime.SoA)
+			if !ok {
+				t.Fatalf("lowered string filtered result payload type = %T, want *runtime.SoA", payload)
+			}
+			sym, _ := soa.Column("sym")
+			total, _ := soa.Column("total")
+			fills, _ := soa.Column("fills")
+			symVals, _ := sym.StringValues()
+			totalVals, _ := total.F64()
+			fillVals, _ := fills.I64()
+			if len(symVals) != 1 || symVals[0] != "AAPL" {
+				t.Fatalf("lowered string filtered sym values = %#v, want [AAPL]", symVals)
+			}
+			if len(totalVals) != 1 || totalVals[0] != 200.25 {
+				t.Fatalf("lowered string filtered total values = %#v, want [200.25]", totalVals)
+			}
+			if len(fillVals) != 1 || fillVals[0] != 2 {
+				t.Fatalf("lowered string filtered fills values = %#v, want [2]", fillVals)
+			}
+		})
 	}
 }
 
@@ -3081,10 +3091,6 @@ func TestQGroupAggregateUnsupportedWhereStaysOnFallback(t *testing.T) {
 		{
 			name:  "column_rhs",
 			query: "select total:sum price by size from trades where price>=limit",
-		},
-		{
-			name:  "symbol_literal",
-			query: "select fills:count i by size from trades where sym=`AAPL",
 		},
 		{
 			name:  "comma_predicate",
@@ -3675,47 +3681,57 @@ func TestDiagnoseReportsFilteredQGroupAggregateRuntimeKernel(t *testing.T) {
 }
 
 func TestDiagnoseReportsStringFilteredQGroupAggregateRuntimeKernel(t *testing.T) {
-	const query = "select total:sum price, fills:count i by sym from trades where sym=\"AAPL\""
-	proto := &vm.FuncProto{
-		Name:      "q_group_aggregate_string_filtered_diag",
-		NumParams: 1,
-		MaxStack:  4,
-		Constants: []runtime.Value{
-			runtime.StringValue("q"),
-			runtime.StringValue("sql"),
-			runtime.StringValue(query),
-		},
-		Code: []uint32{
-			vm.EncodeABx(vm.OP_GETGLOBAL, 1, 0),
-			vm.EncodeABC(vm.OP_GETFIELD, 1, 1, 1),
-			vm.EncodeABC(vm.OP_MOVE, 2, 0, 0),
-			vm.EncodeABx(vm.OP_LOADK, 3, 2),
-			vm.EncodeABC(vm.OP_CALL, 1, 3, 2),
-			vm.EncodeABC(vm.OP_RETURN, 1, 2, 0),
-		},
+	tests := []struct {
+		name  string
+		query string
+	}{
+		{name: "string", query: "select total:sum price, fills:count i by sym from trades where sym=\"AAPL\""},
+		{name: "symbol", query: "select total:sum price, fills:count i by sym from trades where sym=`AAPL"},
 	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			proto := &vm.FuncProto{
+				Name:      "q_group_aggregate_string_filtered_diag_" + tt.name,
+				NumParams: 1,
+				MaxStack:  4,
+				Constants: []runtime.Value{
+					runtime.StringValue("q"),
+					runtime.StringValue("sql"),
+					runtime.StringValue(tt.query),
+				},
+				Code: []uint32{
+					vm.EncodeABx(vm.OP_GETGLOBAL, 1, 0),
+					vm.EncodeABC(vm.OP_GETFIELD, 1, 1, 1),
+					vm.EncodeABC(vm.OP_MOVE, 2, 0, 0),
+					vm.EncodeABx(vm.OP_LOADK, 3, 2),
+					vm.EncodeABC(vm.OP_CALL, 1, 3, 2),
+					vm.EncodeABC(vm.OP_RETURN, 1, 2, 0),
+				},
+			}
 
-	report := Diagnose(proto, []runtime.Value{runtime.TableValue(qHotPathStringTestFrame(t))})
-	if report.NativeError != nil || report.OptInterpError != nil {
-		t.Fatalf("Diagnose string filtered group aggregate errors: native=%v opt=%v\n%s", report.NativeError, report.OptInterpError, report.String())
+			report := Diagnose(proto, []runtime.Value{runtime.TableValue(qHotPathStringTestFrame(t))})
+			if report.NativeError != nil || report.OptInterpError != nil {
+				t.Fatalf("Diagnose string filtered group aggregate errors: native=%v opt=%v\n%s", report.NativeError, report.OptInterpError, report.String())
+			}
+			if report.QQueryFallbacks[qQueryLoweringFallbackGroupAggregateCall] != 0 {
+				t.Fatalf("Diagnose QQueryFallbacks = %+v, want no group aggregate fallback\n%s", report.QQueryFallbacks, report.String())
+			}
+			if got := report.QFrameRuntimeKernelShapes["filter/group/aggregate"]; got != 1 {
+				t.Fatalf("QFrameRuntimeKernelShapes[filter/group/aggregate] = %d, want 1; shapes=%+v\n%s", got, report.QFrameRuntimeKernelShapes, report.String())
+			}
+			if got := report.QFrameRuntimeKernelShapes["mask"]; got != 1 {
+				t.Fatalf("QFrameRuntimeKernelShapes[mask] = %d, want 1; shapes=%+v\n%s", got, report.QFrameRuntimeKernelShapes, report.String())
+			}
+			assertQKernelDescriptor(t, report.QKernelDescriptors, "methodjit_q_frame_runtime", "runtime_kernel", "FrameMask", "mask", "typed_runtime_op_exit", "supported", "")
+			assertQKernelDescriptor(t, report.QKernelDescriptors, "methodjit_q_frame_runtime", "runtime_kernel", "FrameGroupAggregate", "filter/group/aggregate", "typed_runtime_op_exit", "supported", "")
+			assertQKernelShapeSummaryExecution(t, report.QKernelShapeSummary, "methodjit_q_frame_runtime", "runtime_kernel", "mask", "supported", 1, 1, 0)
+			assertQKernelShapeSummaryExecution(t, report.QKernelShapeSummary, "methodjit_q_frame_runtime", "runtime_kernel", "filter/group/aggregate", "supported", 1, 1, 0)
+			assertQKernelExecutionStat(t, report.QKernelExecutionStats, "methodjit_q_frame_runtime", "FrameMask", "mask", "typed_runtime_op_exit", "success", 1)
+			assertQKernelExecutionStat(t, report.QKernelExecutionStats, "methodjit_q_frame_runtime", "FrameGroupAggregate", "filter/group/aggregate", "typed_runtime_op_exit", "success", 1)
+			assertQKernelExecutionRouteSummary(t, report.QKernelExecutionRoutes, "methodjit_q_frame_runtime", "FrameMask", "typed_runtime_op_exit", "success", 1)
+			assertQKernelExecutionRouteSummary(t, report.QKernelExecutionRoutes, "methodjit_q_frame_runtime", "FrameGroupAggregate", "typed_runtime_op_exit", "success", 1)
+		})
 	}
-	if report.QQueryFallbacks[qQueryLoweringFallbackGroupAggregateCall] != 0 {
-		t.Fatalf("Diagnose QQueryFallbacks = %+v, want no group aggregate fallback\n%s", report.QQueryFallbacks, report.String())
-	}
-	if got := report.QFrameRuntimeKernelShapes["filter/group/aggregate"]; got != 1 {
-		t.Fatalf("QFrameRuntimeKernelShapes[filter/group/aggregate] = %d, want 1; shapes=%+v\n%s", got, report.QFrameRuntimeKernelShapes, report.String())
-	}
-	if got := report.QFrameRuntimeKernelShapes["mask"]; got != 1 {
-		t.Fatalf("QFrameRuntimeKernelShapes[mask] = %d, want 1; shapes=%+v\n%s", got, report.QFrameRuntimeKernelShapes, report.String())
-	}
-	assertQKernelDescriptor(t, report.QKernelDescriptors, "methodjit_q_frame_runtime", "runtime_kernel", "FrameMask", "mask", "typed_runtime_op_exit", "supported", "")
-	assertQKernelDescriptor(t, report.QKernelDescriptors, "methodjit_q_frame_runtime", "runtime_kernel", "FrameGroupAggregate", "filter/group/aggregate", "typed_runtime_op_exit", "supported", "")
-	assertQKernelShapeSummaryExecution(t, report.QKernelShapeSummary, "methodjit_q_frame_runtime", "runtime_kernel", "mask", "supported", 1, 1, 0)
-	assertQKernelShapeSummaryExecution(t, report.QKernelShapeSummary, "methodjit_q_frame_runtime", "runtime_kernel", "filter/group/aggregate", "supported", 1, 1, 0)
-	assertQKernelExecutionStat(t, report.QKernelExecutionStats, "methodjit_q_frame_runtime", "FrameMask", "mask", "typed_runtime_op_exit", "success", 1)
-	assertQKernelExecutionStat(t, report.QKernelExecutionStats, "methodjit_q_frame_runtime", "FrameGroupAggregate", "filter/group/aggregate", "typed_runtime_op_exit", "success", 1)
-	assertQKernelExecutionRouteSummary(t, report.QKernelExecutionRoutes, "methodjit_q_frame_runtime", "FrameMask", "typed_runtime_op_exit", "success", 1)
-	assertQKernelExecutionRouteSummary(t, report.QKernelExecutionRoutes, "methodjit_q_frame_runtime", "FrameGroupAggregate", "typed_runtime_op_exit", "success", 1)
 }
 
 func TestDiagnoseReportsQJoinFallbackDescriptor(t *testing.T) {

@@ -1384,6 +1384,9 @@ func qParseSimpleFramePredicateValue(text string) (runtime.Value, string, bool) 
 		}
 		return runtime.StringValue(unquoted), "literal", true
 	}
+	if len(text) >= 2 && text[0] == '`' && qSimpleSymbolLiteral(text[1:]) {
+		return runtime.StringValue(text[1:]), "literal", true
+	}
 	switch strings.ToLower(text) {
 	case "true":
 		return runtime.BoolValue(true), "", true
@@ -1402,6 +1405,20 @@ func qParseSimpleFramePredicateValue(text string) (runtime.Value, string, bool) 
 		return runtime.NilValue(), "", false
 	}
 	return runtime.IntValue(value), "", true
+}
+
+func qSimpleSymbolLiteral(text string) bool {
+	if text == "" {
+		return false
+	}
+	for _, r := range text {
+		isLetter := (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z')
+		isDigit := r >= '0' && r <= '9'
+		if !isLetter && !isDigit && r != '_' && r != '.' && r != '-' {
+			return false
+		}
+	}
+	return true
 }
 
 func qLexQueryTokens(query string) []qQueryToken {
