@@ -933,6 +933,12 @@ func (s *EvalState) eval(src string) (any, error) {
 	if looksLikeLiteralVector(src) {
 		return parseAtomOrVector(src)
 	}
+	if out, handled, err := s.tryEvalScalarAddChain(src); err != nil || handled {
+		return out, err
+	}
+	if out, handled, err := s.tryEvalFirstLastDyadic(src); err != nil || handled {
+		return out, err
+	}
 	if idx, op, ok := findDyadic(src); ok {
 		left, err := s.eval(strings.TrimSpace(src[:idx]))
 		if err != nil {
@@ -3116,6 +3122,213 @@ func (s *EvalState) tryEvalTypedMovingWindowSum(src string) (any, bool, error) {
 		return out, true, err
 	}
 	return nil, false, nil
+}
+
+func (s *EvalState) tryEvalScalarAddChain(src string) (any, bool, error) {
+	terms := splitTopLevelPlusChain(src)
+	if len(terms) < 3 {
+		return nil, false, nil
+	}
+	for _, term := range terms {
+		if !isScalarAddChainTerm(term) {
+			return nil, false, nil
+		}
+	}
+	var acc any
+	for i, term := range terms {
+		value, err := s.eval(term)
+		if err != nil {
+			return nil, true, err
+		}
+		if i == 0 {
+			acc = value
+			continue
+		}
+		acc, err = applyDyadic('+', acc, value)
+		if err != nil {
+			return nil, true, err
+		}
+	}
+	return acc, true, nil
+}
+
+func splitTopLevelPlusChain(src string) []string {
+	var terms []string
+	parenDepth := 0
+	bracketDepth := 0
+	braceDepth := 0
+	inString := false
+	start := 0
+	for i := 0; i < len(src); i++ {
+		ch := src[i]
+		if inString {
+			if ch == '\\' {
+				i++
+				continue
+			}
+			if ch == '"' {
+				inString = false
+			}
+			continue
+		}
+		switch ch {
+		case '"':
+			inString = true
+		case '`':
+			i = qSymbolLiteralEnd(src, i) - 1
+		case '(':
+			parenDepth++
+		case ')':
+			parenDepth--
+		case '[':
+			bracketDepth++
+		case ']':
+			bracketDepth--
+		case '{':
+			braceDepth++
+		case '}':
+			braceDepth--
+		case '+':
+			if parenDepth != 0 || bracketDepth != 0 || braceDepth != 0 || isSign(src, i) {
+				continue
+			}
+			if i+1 < len(src) && (src[i+1] == '/' || src[i+1] == '\\') {
+				continue
+			}
+			term := strings.TrimSpace(src[start:i])
+			if term == "" {
+				return nil
+			}
+			terms = append(terms, term)
+			start = i + 1
+		}
+	}
+	if len(terms) == 0 {
+		return nil
+	}
+	last := strings.TrimSpace(src[start:])
+	if last == "" {
+		return nil
+	}
+	terms = append(terms, last)
+	return terms
+}
+
+func isScalarAddChainTerm(src string) bool {
+	src = strings.TrimSpace(stripEnclosingParens(src))
+	if src == "" {
+		return false
+	}
+	if strings.HasPrefix(src, "+/") {
+		return true
+	}
+	for _, word := range []string{"sum", "prd", "avg", "min", "max", "first", "last", "count"} {
+		if strings.HasPrefix(src, word) && wordBoundary(src, 0, len(word)) && strings.TrimSpace(src[len(word):]) != "" {
+			return true
+		}
+	}
+	if _, _, err := parseNumberOrBool(src); err == nil {
+		return true
+	}
+	return false
+}
+
+func stripEnclosingParens(src string) string {
+	for {
+		src = strings.TrimSpace(src)
+		if !enclosed(src, '(', ')') {
+			return src
+		}
+		src = strings.TrimSpace(src[1 : len(src)-1])
+	}
+}
+
+func (s *EvalState) tryEvalFirstLastDyadic(src string) (any, bool, error) {
+	for _, spec := range []struct {
+		word string
+		last bool
+	}{
+		{word: "first"},
+		{word: "last", last: true},
+	} {
+		if !strings.HasPrefix(src, spec.word) || !wordBoundary(src, 0, len(spec.word)) {
+			continue
+		}
+		arg := strings.TrimSpace(src[len(spec.word):])
+		if arg == "" {
+			continue
+		}
+		idx, op, ok := findDyadic(arg)
+		if !ok {
+			continue
+		}
+		left, err := s.eval(strings.TrimSpace(arg[:idx]))
+		if err != nil {
+			return nil, true, err
+		}
+		right, err := s.eval(strings.TrimSpace(arg[idx+1:]))
+		if err != nil {
+			return nil, true, err
+		}
+		leftArray, leftIsArray := left.(data.Array)
+		rightArray, rightIsArray := right.(data.Array)
+		if leftIsArray && rightIsArray {
+			switch {
+			case leftArray.Len() == rightArray.Len():
+			case leftArray.Len() == 1:
+			case rightArray.Len() == 1:
+			default:
+				return nil, true, fmt.Errorf("vector length mismatch")
+			}
+		}
+		resultLen := -1
+		switch {
+		case leftIsArray && rightIsArray:
+			resultLen = leftArray.Len()
+			if rightArray.Len() > resultLen {
+				resultLen = rightArray.Len()
+			}
+		case leftIsArray:
+			resultLen = leftArray.Len()
+		case rightIsArray:
+			resultLen = rightArray.Len()
+		default:
+			out, err := applyDyadic(op, left, right)
+			return out, true, err
+		}
+		if resultLen == 0 {
+			return data.NullValue, true, nil
+		}
+		row := 0
+		if spec.last {
+			row = resultLen - 1
+		}
+		leftValue, err := firstLastDyadicOperandValue(left, leftArray, leftIsArray, row)
+		if err != nil {
+			return nil, true, err
+		}
+		rightValue, err := firstLastDyadicOperandValue(right, rightArray, rightIsArray, row)
+		if err != nil {
+			return nil, true, err
+		}
+		out, err := applyDyadic(op, leftValue, rightValue)
+		return out, true, err
+	}
+	return nil, false, nil
+}
+
+func firstLastDyadicOperandValue(value any, array data.Array, isArray bool, row int) (any, error) {
+	if !isArray {
+		return value, nil
+	}
+	if array.Len() == 1 {
+		row = 0
+	}
+	item, ok := array.At(row)
+	if !ok {
+		return nil, fmt.Errorf("array row %d out of range", row)
+	}
+	return item, nil
 }
 
 func (s *EvalState) tryEvalCountPrds(src string) (any, bool, error) {
