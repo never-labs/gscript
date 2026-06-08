@@ -103,6 +103,41 @@ func TestQRuntimeKernelLoweringStatsFromMapsExternalRows(t *testing.T) {
 	}
 }
 
+func TestQRuntimeKernelLoweringStatsFromFilteredSkipsExternalRows(t *testing.T) {
+	stats := QRuntimeKernelLoweringStatsFromFiltered([]qRuntimeKernelLoweringExternalStatForTest{
+		{
+			Source:  "methodjit_q_vector_runtime",
+			Kind:    "runtime_kernel",
+			Kernel:  "QVectorGatherReduce",
+			Shape:   "gather/vector-reduce",
+			Route:   "typed_runtime_op_exit",
+			Outcome: "supported",
+			Count:   4,
+		},
+		{
+			Source:     "methodjit_q_vector_lowering",
+			Kernel:     "QVectorGatherReduce",
+			Shape:      "gather/vector-reduce",
+			ReasonCode: "shared_gather",
+			Count:      7,
+		},
+	}, func(stat qRuntimeKernelLoweringExternalStatForTest) (QRuntimeKernelLoweringStat, bool) {
+		if stat.Outcome == "supported" {
+			return QRuntimeKernelLoweringStat{}, false
+		}
+		return qRuntimeKernelLoweringExternalStatToBindForTest(stat), true
+	})
+	if len(stats) != 1 {
+		t.Fatalf("filtered lowering stats length = %d, want 1", len(stats))
+	}
+	if stats[0].Kernel != "QVectorGatherReduce" || stats[0].Count != 7 {
+		t.Fatalf("filtered lowering stat = %#v, want fallback row", stats[0])
+	}
+	if got := QRuntimeKernelLoweringStatsFromFiltered([]qRuntimeKernelLoweringExternalStatForTest{{Count: 1}}, nil); got != nil {
+		t.Fatalf("nil filtered converter mapped lowering stats = %#v, want nil", got)
+	}
+}
+
 func TestMappedQRuntimeKernelExecutionStatsProviderFeedsCacheStats(t *testing.T) {
 	qClearCaches()
 	restore := SetMappedQRuntimeKernelExecutionStatsProvider(func() []qRuntimeKernelExecutionExternalStatForTest {
@@ -286,6 +321,73 @@ func TestMappedQRuntimeKernelLoweringStatsProviderFeedsCacheStats(t *testing.T) 
 	})
 	if got := route.RawGetString("count"); !got.IsInt() || got.Int() != 4 {
 		t.Fatalf("q_runtime_kernel_lowering supported route count = %v, want 4", got)
+	}
+}
+
+func TestMappedQRuntimeKernelLoweringStatsProviderFilteredFeedsCacheStatsWithDefaults(t *testing.T) {
+	qClearCaches()
+	restore := SetMappedQRuntimeKernelLoweringStatsProviderFiltered(func() []qRuntimeKernelLoweringExternalStatForTest {
+		return []qRuntimeKernelLoweringExternalStatForTest{
+			{
+				Source:  "methodjit_q_vector_runtime",
+				Kind:    "runtime_kernel",
+				Kernel:  "QVectorGatherReduce",
+				Shape:   "gather/vector-reduce",
+				Route:   "typed_runtime_op_exit",
+				Outcome: "supported",
+				Count:   4,
+			},
+			{
+				Source: "methodjit_q_vector_lowering",
+				Kernel: "QVectorGatherReduce",
+				Shape:  "gather/vector-reduce",
+				Count:  5,
+			},
+		}
+	}, func(stat qRuntimeKernelLoweringExternalStatForTest) (QRuntimeKernelLoweringStat, bool) {
+		if stat.Outcome == "supported" {
+			return QRuntimeKernelLoweringStat{}, false
+		}
+		return qRuntimeKernelLoweringExternalStatToBindForTest(stat), true
+	})
+	defer restore()
+
+	row := qTestCacheStatsRowTable(t, qCacheStatsTable(), "q_runtime_kernel_lowering")
+	if got := row.RawGetString("lowerings"); !got.IsInt() || got.Int() != 5 {
+		t.Fatalf("q_runtime_kernel_lowering lowerings = %v, want 5", got)
+	}
+	if got := row.RawGetString("fallbacks"); !got.IsInt() || got.Int() != 5 {
+		t.Fatalf("q_runtime_kernel_lowering fallbacks = %v, want 5", got)
+	}
+	stats := row.RawGetString("stats").Table()
+	if stats == nil || stats.Length() != 1 {
+		t.Fatalf("q_runtime_kernel_lowering stats table = %v, want one filtered fallback row", stats)
+	}
+	stat := qTestNestedRowByFields(t, row, "stats", map[string]string{
+		"source":        "methodjit_q_vector_lowering",
+		"kind":          "fallback",
+		"kernel":        "QVectorGatherReduce",
+		"shape":         "gather/vector-reduce",
+		"route":         "lowering",
+		"outcome":       "fallback",
+		"reason_family": "lowering",
+		"reason_code":   "unspecified",
+	})
+	if got := stat.RawGetString("count"); !got.IsInt() || got.Int() != 5 {
+		t.Fatalf("q_runtime_kernel_lowering stats count = %v, want 5", got)
+	}
+	reasonShape := qTestNestedRowByFields(t, row, "reason_shapes", map[string]string{
+		"source":        "methodjit_q_vector_lowering",
+		"kind":          "fallback",
+		"kernel":        "QVectorGatherReduce",
+		"shape":         "gather/vector-reduce",
+		"route":         "lowering",
+		"outcome":       "fallback",
+		"reason_family": "lowering",
+		"reason_code":   "unspecified",
+	})
+	if got := reasonShape.RawGetString("count"); !got.IsInt() || got.Int() != 5 {
+		t.Fatalf("q_runtime_kernel_lowering reason_shapes count = %v, want 5", got)
 	}
 }
 

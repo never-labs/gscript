@@ -40,6 +40,24 @@ func QRuntimeKernelLoweringStatsFrom[T any](stats []T, convert func(T) QRuntimeK
 	return out
 }
 
+// QRuntimeKernelLoweringStatsFromFiltered maps external lowering observations
+// and lets the producer explicitly skip rows that do not belong in the bind
+// lowering stats table.
+func QRuntimeKernelLoweringStatsFromFiltered[T any](stats []T, convert func(T) (QRuntimeKernelLoweringStat, bool)) []QRuntimeKernelLoweringStat {
+	if len(stats) == 0 || convert == nil {
+		return nil
+	}
+	out := make([]QRuntimeKernelLoweringStat, 0, len(stats))
+	for _, stat := range stats {
+		row, ok := convert(stat)
+		if !ok {
+			continue
+		}
+		out = append(out, row)
+	}
+	return out
+}
+
 // SetMappedQRuntimeKernelLoweringStatsProvider adapts a producer-owned
 // lowering fallback type to bind's q.cache_stats row shape. The conversion
 // remains caller-owned so bind does not import MethodJIT or any other producer.
@@ -49,5 +67,16 @@ func SetMappedQRuntimeKernelLoweringStatsProvider[T any](provider func() []T, co
 	}
 	return SetQRuntimeKernelLoweringStatsProvider(func() []QRuntimeKernelLoweringStat {
 		return QRuntimeKernelLoweringStatsFrom(provider(), convert)
+	})
+}
+
+// SetMappedQRuntimeKernelLoweringStatsProviderFiltered adapts producer-owned
+// lowering stats while making row filtering explicit at the bridge boundary.
+func SetMappedQRuntimeKernelLoweringStatsProviderFiltered[T any](provider func() []T, convert func(T) (QRuntimeKernelLoweringStat, bool)) func() {
+	if provider == nil || convert == nil {
+		return SetQRuntimeKernelLoweringStatsProvider(nil)
+	}
+	return SetQRuntimeKernelLoweringStatsProvider(func() []QRuntimeKernelLoweringStat {
+		return QRuntimeKernelLoweringStatsFromFiltered(provider(), convert)
 	})
 }

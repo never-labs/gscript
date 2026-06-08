@@ -3405,15 +3405,17 @@ func qRuntimeKernelLoweringStatsSnapshot() []QRuntimeKernelLoweringStat {
 		if stat.Count == 0 {
 			continue
 		}
+		kind := qNormalizeRuntimeKernelLoweringKind(stat.Kind)
+		outcome := qNormalizeRuntimeKernelLoweringOutcome(stat.Outcome, kind)
 		key := statKey{
 			source:       qNormalizeRuntimeKernelStatPart(stat.Source),
-			kind:         qNormalizeRuntimeKernelStatPart(stat.Kind),
+			kind:         kind,
 			kernel:       qNormalizeRuntimeKernelStatPart(stat.Kernel),
 			shape:        qNormalizeRuntimeKernelStatPart(stat.Shape),
-			route:        qNormalizeRuntimeKernelStatPart(stat.Route),
-			outcome:      qNormalizeRuntimeKernelStatPart(stat.Outcome),
-			reasonFamily: qNormalizeRuntimeKernelStatPart(stat.ReasonFamily),
-			reasonCode:   qNormalizeRuntimeKernelStatPart(stat.ReasonCode),
+			route:        qNormalizeRuntimeKernelLoweringRoute(stat.Route, kind),
+			outcome:      outcome,
+			reasonFamily: qNormalizeRuntimeKernelLoweringReasonFamily(stat.ReasonFamily, outcome),
+			reasonCode:   qNormalizeRuntimeKernelLoweringReasonCode(stat.ReasonCode, outcome),
 		}
 		counts[key] += stat.Count
 	}
@@ -3460,6 +3462,50 @@ func qRuntimeKernelLoweringStatsSnapshot() []QRuntimeKernelLoweringStat {
 		return a.ReasonCode < b.ReasonCode
 	})
 	return out
+}
+
+func qNormalizeRuntimeKernelLoweringKind(kind string) string {
+	if strings.TrimSpace(kind) == "" {
+		return "fallback"
+	}
+	return qNormalizeRuntimeKernelStatPart(kind)
+}
+
+func qNormalizeRuntimeKernelLoweringRoute(route, kind string) string {
+	if strings.TrimSpace(route) == "" && kind == "fallback" {
+		return "lowering"
+	}
+	return qNormalizeRuntimeKernelStatPart(route)
+}
+
+func qNormalizeRuntimeKernelLoweringOutcome(outcome, kind string) string {
+	if strings.TrimSpace(outcome) == "" {
+		if kind == "runtime_kernel" {
+			return "supported"
+		}
+		return "fallback"
+	}
+	return qNormalizeRuntimeKernelStatPart(outcome)
+}
+
+func qNormalizeRuntimeKernelLoweringReasonFamily(reasonFamily, outcome string) string {
+	if strings.TrimSpace(reasonFamily) == "" {
+		if outcome == "supported" {
+			return "supported"
+		}
+		return "lowering"
+	}
+	return qNormalizeRuntimeKernelStatPart(reasonFamily)
+}
+
+func qNormalizeRuntimeKernelLoweringReasonCode(reasonCode, outcome string) string {
+	if strings.TrimSpace(reasonCode) == "" {
+		if outcome == "supported" {
+			return "supported"
+		}
+		return "unspecified"
+	}
+	return qNormalizeRuntimeKernelStatPart(reasonCode)
 }
 
 func qRuntimeKernelExecutionStatsTable(stats []QRuntimeKernelExecutionStat) *Table {

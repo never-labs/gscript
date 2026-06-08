@@ -129,11 +129,11 @@ func TestQRuntimeKernelLoweringStatsProviderMapsMethodJITFallbacks(t *testing.T)
 		t.Fatalf("Diagnose native error: %v\n%s", report.NativeError, report.String())
 	}
 
-	restore := qbind.SetMappedQRuntimeKernelLoweringStatsProvider(func() []QKernelDescriptor {
+	restore := qbind.SetMappedQRuntimeKernelLoweringStatsProviderFiltered(func() []QKernelDescriptor {
 		return report.QKernelDescriptors
-	}, func(stat QKernelDescriptor) qbind.QRuntimeKernelLoweringStat {
+	}, func(stat QKernelDescriptor) (qbind.QRuntimeKernelLoweringStat, bool) {
 		if stat.Kind != "fallback" {
-			return qbind.QRuntimeKernelLoweringStat{}
+			return qbind.QRuntimeKernelLoweringStat{}, false
 		}
 		return qbind.QRuntimeKernelLoweringStat{
 			Source:       stat.Source,
@@ -145,7 +145,7 @@ func TestQRuntimeKernelLoweringStatsProviderMapsMethodJITFallbacks(t *testing.T)
 			ReasonFamily: stat.ReasonFamily,
 			ReasonCode:   stat.ReasonCode,
 			Count:        1,
-		}
+		}, true
 	})
 	defer restore()
 
