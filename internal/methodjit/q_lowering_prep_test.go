@@ -1004,6 +1004,17 @@ func TestQFrameRuntimePrimitiveDiagnoseExecutionStats(t *testing.T) {
 			},
 			args: func(t *testing.T) []runtime.Value { return []runtime.Value{frameArg(t)} },
 		},
+		{
+			name:      "filter_group_aggregate",
+			kernel:    "FrameGroupAggregate",
+			shape:     "filter/group/aggregate",
+			constants: []runtime.Value{runtime.TableValue(groupAggSpec)},
+			code: []uint32{
+				vm.EncodeABC(vm.OP_FRAME_GROUP_AGGREGATE, 1, 0, 0),
+				vm.EncodeABC(vm.OP_RETURN, 1, 2, 0),
+			},
+			args: func(t *testing.T) []runtime.Value { return []runtime.Value{frameArg(t), maskArg} },
+		},
 	}
 
 	for _, tt := range tests {

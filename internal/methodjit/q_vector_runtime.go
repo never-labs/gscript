@@ -108,6 +108,20 @@ func executeFrameGroupAggregateValue(frameVal, maskVal, specVal runtime.Value) (
 	return out, nil
 }
 
+func qFrameGroupAggregateRuntimeShapeFromMaskValue(maskVal runtime.Value) string {
+	if maskVal.IsNil() {
+		return "group/aggregate"
+	}
+	return "filter/group/aggregate"
+}
+
+func qFrameGroupAggregateRuntimeShapeFromInstr(instr *Instr) string {
+	if instr == nil || len(instr.Args) < 2 || valueIsConstNil(instr.Args[1]) {
+		return "group/aggregate"
+	}
+	return "filter/group/aggregate"
+}
+
 func executeFrameCompareFilterProjectColumnValue(frameVal runtime.Value, sourceName string, op runtime.DenseArrayBinaryOp, rhs runtime.Value, names []string, resultName string) (runtime.Value, error) {
 	out, handled, err := frameVal.NativeFrameCompareFilterProjectColumn(sourceName, op, rhs, names, resultName)
 	if err != nil {

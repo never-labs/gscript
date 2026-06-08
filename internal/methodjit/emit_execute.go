@@ -1162,12 +1162,13 @@ func (cf *CompiledFunction) executeOpExit(ctx *ExecContext, regs []runtime.Value
 		if aux < 0 || cf.Proto == nil || aux >= len(cf.Proto.Constants) {
 			return fmt.Errorf("FrameGroupAggregate spec constant is out of range")
 		}
+		shape := qFrameGroupAggregateRuntimeShapeFromMaskValue(regs[arg2])
 		out, err := executeFrameGroupAggregateValue(regs[arg1], regs[arg2], cf.Proto.Constants[aux])
 		if err != nil {
-			cf.recordQRuntimePrimitiveExecution(OpFrameGroupAggregate, "error")
+			cf.recordQKernelExecution("methodjit_q_frame_runtime", "FrameGroupAggregate", shape, "typed_runtime_op_exit", "error")
 			return err
 		}
-		cf.recordQRuntimePrimitiveExecution(OpFrameGroupAggregate, "success")
+		cf.recordQKernelExecution("methodjit_q_frame_runtime", "FrameGroupAggregate", shape, "typed_runtime_op_exit", "success")
 		regs[slot] = out
 
 	case OpQFrameSelectColumn:

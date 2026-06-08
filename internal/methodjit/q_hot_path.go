@@ -1034,6 +1034,9 @@ func DetectQFrameRuntimeKernels(fn *Function) []QFrameRuntimeKernel {
 			if !ok || source != "methodjit_q_frame_runtime" {
 				continue
 			}
+			if instr.Op == OpFrameGroupAggregate {
+				shape = qFrameGroupAggregateRuntimeShapeFromInstr(instr)
+			}
 			out = append(out, QFrameRuntimeKernel{Instr: instr, Kernel: kernel, ShapeName: shape})
 		}
 	}

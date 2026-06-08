@@ -517,12 +517,18 @@ func (tm *TieringManager) executeOpExit(ctx *ExecContext, regs []runtime.Value, 
 		if aux < 0 || proto == nil || aux >= len(proto.Constants) {
 			return fmt.Errorf("FrameGroupAggregate spec constant is out of range")
 		}
+		cf, _ := tm.tier2CompiledFor(proto)
+		shape := qFrameGroupAggregateRuntimeShapeFromMaskValue(regs[absArg2])
 		out, err := executeFrameGroupAggregateValue(regs[absArg1], regs[absArg2], proto.Constants[aux])
 		if err != nil {
-			tm.recordQRuntimePrimitiveExecution(proto, OpFrameGroupAggregate, "error")
+			if cf != nil {
+				cf.recordQKernelExecution("methodjit_q_frame_runtime", "FrameGroupAggregate", shape, "typed_runtime_op_exit", "error")
+			}
 			return err
 		}
-		tm.recordQRuntimePrimitiveExecution(proto, OpFrameGroupAggregate, "success")
+		if cf != nil {
+			cf.recordQKernelExecution("methodjit_q_frame_runtime", "FrameGroupAggregate", shape, "typed_runtime_op_exit", "success")
+		}
 		regs[absSlot] = out
 
 	case OpQFrameSelectColumn:
