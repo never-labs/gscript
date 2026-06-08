@@ -2918,6 +2918,12 @@ func TestQCacheStatsAndClearPublicAPI(t *testing.T) {
 	if got := runtimeRow.RawGetString("cache_backed"); !got.IsBool() || got.Bool() {
 		t.Fatalf("q_runtime_kernel_execution cache_backed = %v, want false", got)
 	}
+	if got := runtimeRow.RawGetString("executions"); !got.IsInt() || got.Int() != 0 {
+		t.Fatalf("q_runtime_kernel_execution executions = %v, want 0", got)
+	}
+	if stats := runtimeRow.RawGetString("stats").Table(); stats == nil || stats.Length() != 0 {
+		t.Fatalf("q_runtime_kernel_execution stats = %v, want empty table until MethodJIT diagnostics are attached", stats)
+	}
 	if shapes := runtimeRow.RawGetString("shapes").Table(); shapes == nil || shapes.Length() != 0 {
 		t.Fatalf("q_runtime_kernel_execution shapes = %v, want empty table until MethodJIT diagnostics are attached", shapes)
 	}
@@ -2944,6 +2950,101 @@ func TestQCacheStatsAndClearPublicAPI(t *testing.T) {
 		if row["entries"] != 0 || row["hits"] != 0 || row["misses"] != 0 || row["evictions"] != 0 {
 			t.Fatalf("after clear %s stats = %#v, want zeroed", name, row)
 		}
+	}
+}
+
+func TestQRuntimeKernelExecutionStatsProviderFeedsCacheStats(t *testing.T) {
+	qClearCaches()
+	restore := SetQRuntimeKernelExecutionStatsProvider(func() []QRuntimeKernelExecutionStat {
+		return []QRuntimeKernelExecutionStat{
+			{
+				Source:  "methodjit_q_frame_runtime",
+				Kernel:  "QFrameSelectColumn",
+				Shape:   "compare/filter/project/column",
+				Route:   "typed_runtime_op_exit",
+				Outcome: "success",
+				Count:   2,
+			},
+			{
+				Source:  "methodjit_q_frame_runtime",
+				Kernel:  "QFrameSelectColumn",
+				Shape:   "compare/filter/project/column",
+				Route:   "typed_runtime_op_exit",
+				Outcome: "fallback",
+				Count:   1,
+			},
+			{
+				Source: "",
+				Kernel: "",
+				Shape:  "",
+				Route:  "",
+				Count:  0,
+			},
+		}
+	})
+	defer restore()
+
+	rows := qTestCacheStatsRows(t, qCacheStatsTable())
+	if got := rows["qsql_kernel"]; got["entries"] != 0 || got["hits"] != 0 || got["misses"] != 0 || got["evictions"] != 0 {
+		t.Fatalf("qsql_kernel stats = %#v, want semantic cache untouched by runtime execution stats", got)
+	}
+	if got := rows["q_runtime_kernel_execution"]; got["entries"] != 2 || got["hits"] != 0 || got["misses"] != 0 || got["evictions"] != 0 || got["limit"] != 0 {
+		t.Fatalf("q_runtime_kernel_execution stats = %#v, want two non-cache execution rows", got)
+	}
+
+	row := qTestCacheStatsRowTable(t, qCacheStatsTable(), "q_runtime_kernel_execution")
+	if got := row.RawGetString("stats_domain"); !got.IsString() || got.Str() != qStatsDomainJITExecution {
+		t.Fatalf("q_runtime_kernel_execution stats_domain = %v, want %s", got, qStatsDomainJITExecution)
+	}
+	if got := row.RawGetString("cache_backed"); !got.IsBool() || got.Bool() {
+		t.Fatalf("q_runtime_kernel_execution cache_backed = %v, want false", got)
+	}
+	if got := row.RawGetString("executions"); !got.IsInt() || got.Int() != 3 {
+		t.Fatalf("q_runtime_kernel_execution executions = %v, want 3", got)
+	}
+
+	stats := row.RawGetString("stats").Table()
+	if stats == nil || stats.Length() != 2 {
+		t.Fatalf("q_runtime_kernel_execution stats table = %v, want two rows", stats)
+	}
+	first := stats.RawGetInt(1).Table()
+	if first == nil {
+		t.Fatal("q_runtime_kernel_execution stats[1] is nil")
+	}
+	for field, want := range map[string]string{
+		"source":  "methodjit_q_frame_runtime",
+		"kernel":  "QFrameSelectColumn",
+		"shape":   "compare/filter/project/column",
+		"route":   "typed_runtime_op_exit",
+		"outcome": "fallback",
+	} {
+		if got := first.RawGetString(field); !got.IsString() || got.Str() != want {
+			t.Fatalf("q_runtime_kernel_execution stats[1].%s = %v, want %q", field, got, want)
+		}
+	}
+	if got := first.RawGetString("count"); !got.IsInt() || got.Int() != 1 {
+		t.Fatalf("q_runtime_kernel_execution stats[1].count = %v, want 1", got)
+	}
+
+	shapes := row.RawGetString("shapes").Table()
+	if shapes == nil || shapes.Length() != 2 {
+		t.Fatalf("q_runtime_kernel_execution shapes table = %v, want two rows", shapes)
+	}
+	top := shapes.RawGetInt(1).Table()
+	if top == nil {
+		t.Fatal("q_runtime_kernel_execution shapes[1] is nil")
+	}
+	if got := top.RawGetString("source"); !got.IsString() || got.Str() != "methodjit_q_frame_runtime" {
+		t.Fatalf("q_runtime_kernel_execution shapes[1].source = %v, want methodjit_q_frame_runtime", got)
+	}
+	if got := top.RawGetString("shape"); !got.IsString() || got.Str() != "compare/filter/project/column" {
+		t.Fatalf("q_runtime_kernel_execution shapes[1].shape = %v, want compare/filter/project/column", got)
+	}
+	if got := top.RawGetString("outcome"); !got.IsString() || got.Str() != "success" {
+		t.Fatalf("q_runtime_kernel_execution shapes[1].outcome = %v, want success", got)
+	}
+	if got := top.RawGetString("count"); !got.IsInt() || got.Int() != 2 {
+		t.Fatalf("q_runtime_kernel_execution shapes[1].count = %v, want 2", got)
 	}
 }
 

@@ -106,12 +106,48 @@ type qSQLKernelShapeStat struct {
 	Evictions  int
 }
 
+// QRuntimeKernelExecutionStat is the q.cache_stats-facing shape for MethodJIT
+// typed-runtime q kernel execution observations. It intentionally stays
+// separate from qSQL semantic cache hit/miss accounting.
+type QRuntimeKernelExecutionStat struct {
+	Source  string
+	Kernel  string
+	Shape   string
+	Route   string
+	Outcome string
+	Count   uint64
+}
+
+type qRuntimeKernelExecutionShapeStat struct {
+	Source  string
+	Shape   string
+	Outcome string
+	Count   uint64
+}
+
 type qSQLKernelDecisionKeyStat struct {
 	Key          string
 	Shape        string
 	ReasonCode   string
 	ReasonFamily string
 	Count        int
+}
+
+var (
+	qRuntimeKernelExecutionStatsProviderMu sync.Mutex
+	qRuntimeKernelExecutionStatsProvider   func() []QRuntimeKernelExecutionStat
+)
+
+func SetQRuntimeKernelExecutionStatsProvider(provider func() []QRuntimeKernelExecutionStat) func() {
+	qRuntimeKernelExecutionStatsProviderMu.Lock()
+	previous := qRuntimeKernelExecutionStatsProvider
+	qRuntimeKernelExecutionStatsProvider = provider
+	qRuntimeKernelExecutionStatsProviderMu.Unlock()
+	return func() {
+		qRuntimeKernelExecutionStatsProviderMu.Lock()
+		qRuntimeKernelExecutionStatsProvider = previous
+		qRuntimeKernelExecutionStatsProviderMu.Unlock()
+	}
 }
 
 type qSQLKernelDecisionReasonStat struct {
@@ -2894,12 +2930,142 @@ func qCacheStatsRow(name string, entries, hits, misses, evictions, limit int) *T
 }
 
 func qRuntimeKernelExecutionStatsRow() *Table {
-	row := qCacheStatsRow("q_runtime_kernel_execution", 0, 0, 0, 0, 0)
+	stats := qRuntimeKernelExecutionStatsSnapshot()
+	executions := uint64(0)
+	for _, stat := range stats {
+		executions += stat.Count
+	}
+	row := qCacheStatsRow("q_runtime_kernel_execution", len(stats), 0, 0, 0, 0)
 	row.RawSetString("stats_domain", StringValue(qStatsDomainJITExecution))
 	row.RawSetString("stats_source", StringValue(qStatsSourceMethodJIT))
 	row.RawSetString("cache_backed", BoolValue(false))
-	row.RawSetString("shapes", TableValue(NewAppendArrayTable(0)))
+	row.RawSetString("executions", qUint64IntValue(executions))
+	row.RawSetString("stats", TableValue(qRuntimeKernelExecutionStatsTable(stats)))
+	row.RawSetString("shapes", TableValue(qRuntimeKernelExecutionShapeStatsTable(qRuntimeKernelExecutionShapeStats(stats))))
 	return row
+}
+
+func qRuntimeKernelExecutionStatsSnapshot() []QRuntimeKernelExecutionStat {
+	qRuntimeKernelExecutionStatsProviderMu.Lock()
+	provider := qRuntimeKernelExecutionStatsProvider
+	qRuntimeKernelExecutionStatsProviderMu.Unlock()
+	if provider == nil {
+		return nil
+	}
+	stats := provider()
+	if len(stats) == 0 {
+		return nil
+	}
+	out := make([]QRuntimeKernelExecutionStat, 0, len(stats))
+	for _, stat := range stats {
+		if stat.Count == 0 {
+			continue
+		}
+		out = append(out, QRuntimeKernelExecutionStat{
+			Source:  qNormalizeRuntimeKernelStatPart(stat.Source),
+			Kernel:  qNormalizeRuntimeKernelStatPart(stat.Kernel),
+			Shape:   qNormalizeRuntimeKernelStatPart(stat.Shape),
+			Route:   qNormalizeRuntimeKernelStatPart(stat.Route),
+			Outcome: qNormalizeRuntimeKernelStatPart(stat.Outcome),
+			Count:   stat.Count,
+		})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		a, b := out[i], out[j]
+		if a.Source != b.Source {
+			return a.Source < b.Source
+		}
+		if a.Kernel != b.Kernel {
+			return a.Kernel < b.Kernel
+		}
+		if a.Shape != b.Shape {
+			return a.Shape < b.Shape
+		}
+		if a.Route != b.Route {
+			return a.Route < b.Route
+		}
+		return a.Outcome < b.Outcome
+	})
+	return out
+}
+
+func qRuntimeKernelExecutionStatsTable(stats []QRuntimeKernelExecutionStat) *Table {
+	rows := NewAppendArrayTable(len(stats))
+	for i, stat := range stats {
+		row := NewTable()
+		row.RawSetString("source", StringValue(stat.Source))
+		row.RawSetString("kernel", StringValue(stat.Kernel))
+		row.RawSetString("shape", StringValue(stat.Shape))
+		row.RawSetString("route", StringValue(stat.Route))
+		row.RawSetString("outcome", StringValue(stat.Outcome))
+		row.RawSetString("count", qUint64IntValue(stat.Count))
+		rows.RawSetInt(int64(i+1), TableValue(row))
+	}
+	return rows
+}
+
+func qRuntimeKernelExecutionShapeStats(stats []QRuntimeKernelExecutionStat) []qRuntimeKernelExecutionShapeStat {
+	type shapeKey struct {
+		source  string
+		shape   string
+		outcome string
+	}
+	counts := make(map[shapeKey]uint64, len(stats))
+	for _, stat := range stats {
+		key := shapeKey{source: stat.Source, shape: stat.Shape, outcome: stat.Outcome}
+		counts[key] += stat.Count
+	}
+	out := make([]qRuntimeKernelExecutionShapeStat, 0, len(counts))
+	for key, count := range counts {
+		out = append(out, qRuntimeKernelExecutionShapeStat{
+			Source:  key.source,
+			Shape:   key.shape,
+			Outcome: key.outcome,
+			Count:   count,
+		})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		a, b := out[i], out[j]
+		if a.Count != b.Count {
+			return a.Count > b.Count
+		}
+		if a.Source != b.Source {
+			return a.Source < b.Source
+		}
+		if a.Shape != b.Shape {
+			return a.Shape < b.Shape
+		}
+		return a.Outcome < b.Outcome
+	})
+	return out
+}
+
+func qRuntimeKernelExecutionShapeStatsTable(stats []qRuntimeKernelExecutionShapeStat) *Table {
+	rows := NewAppendArrayTable(len(stats))
+	for i, stat := range stats {
+		row := NewTable()
+		row.RawSetString("source", StringValue(stat.Source))
+		row.RawSetString("shape", StringValue(stat.Shape))
+		row.RawSetString("outcome", StringValue(stat.Outcome))
+		row.RawSetString("count", qUint64IntValue(stat.Count))
+		rows.RawSetInt(int64(i+1), TableValue(row))
+	}
+	return rows
+}
+
+func qNormalizeRuntimeKernelStatPart(part string) string {
+	if part == "" {
+		return "unknown"
+	}
+	return part
+}
+
+func qUint64IntValue(n uint64) Value {
+	const maxInt64 = uint64(1<<63 - 1)
+	if n > maxInt64 {
+		return IntValue(int64(maxInt64))
+	}
+	return IntValue(int64(n))
 }
 
 func qQueryKernelSupportCacheShapeStatsLocked() []qQueryKernelSupportShapeStat {
