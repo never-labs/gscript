@@ -578,6 +578,9 @@ func (s *EvalState) eval(src string) (any, error) {
 		if out, handled, err := s.tryEvalTypedUnarySum(right); err != nil || handled {
 			return out, err
 		}
+		if out, handled, err := s.tryEvalTypedMovingWindowSum(right); err != nil || handled {
+			return out, err
+		}
 		v, err := s.eval(right)
 		if err != nil {
 			return nil, err
@@ -3009,6 +3012,108 @@ func (s *EvalState) tryEvalTypedUnaryDyadicSum(unaryOp, src string) (any, bool, 
 		return out, true, nil
 	} else {
 		recordRuntimeKernelProbe("ArrayNumericUnaryDyadicSum", "vector-reduce/sum-"+unaryOp+"-dyadic-"+string(dyadicOp), handled, err)
+	}
+	return nil, false, nil
+}
+
+func (s *EvalState) tryEvalTypedMovingWindowSum(src string) (any, bool, error) {
+	for _, spec := range []struct {
+		word    string
+		wantMax bool
+		average bool
+	}{
+		{word: "msum"},
+		{word: "mavg", average: true},
+		{word: "mcount"},
+		{word: "mmin"},
+		{word: "mmax", wantMax: true},
+	} {
+		leftExpr, rightExpr, ok := splitTopLevelWord(src, spec.word)
+		if !ok {
+			continue
+		}
+		widthValue, err := s.eval(leftExpr)
+		if err != nil {
+			return nil, true, err
+		}
+		width, ok := integerValue(widthValue)
+		if !ok || width <= 0 || int64(int(width)) != width {
+			return nil, true, fmt.Errorf("%s width must be a positive integer", spec.word)
+		}
+		value, err := s.eval(rightExpr)
+		if err != nil {
+			return nil, true, err
+		}
+		array, ok := value.(data.Array)
+		if !ok {
+			var moving any
+			switch spec.word {
+			case "msum":
+				moving, err = msum(widthValue, value)
+			case "mavg":
+				moving, err = mavg(widthValue, value)
+			case "mcount":
+				moving, err = mcount(widthValue, value)
+			case "mmin":
+				moving, err = mmin(widthValue, value)
+			case "mmax":
+				moving, err = mmax(widthValue, value)
+			}
+			if err != nil {
+				return nil, true, err
+			}
+			out, err := sum(moving)
+			return out, true, err
+		}
+		if spec.word == "mcount" {
+			if out, handled, err := data.TryTypedMCountSum(array, int(width)); err != nil || handled {
+				recordRuntimeKernelProbe("ArrayMovingWindowSum", "vector-reduce/sum-mcount/"+string(array.Kind()), handled, err)
+				if err != nil {
+					return nil, true, fmt.Errorf("sum mcount: %w", err)
+				}
+				return out, true, nil
+			} else {
+				recordRuntimeKernelProbe("ArrayMovingWindowSum", "vector-reduce/sum-mcount/"+string(array.Kind()), handled, err)
+			}
+		} else if spec.word == "msum" || spec.word == "mavg" {
+			if out, handled, err := data.TryTypedMovingNumericSumSum(array, int(width), spec.average); err != nil || handled {
+				recordRuntimeKernelProbe("ArrayMovingWindowSum", "vector-reduce/sum-"+spec.word+"/"+string(array.Kind()), handled, err)
+				if err != nil {
+					return nil, true, fmt.Errorf("sum %s: %w", spec.word, err)
+				}
+				return out, true, nil
+			} else {
+				recordRuntimeKernelProbe("ArrayMovingWindowSum", "vector-reduce/sum-"+spec.word+"/"+string(array.Kind()), handled, err)
+			}
+		} else {
+			if out, handled, err := data.TryTypedMovingMinMaxSum(array, int(width), spec.wantMax); err != nil || handled {
+				recordRuntimeKernelProbe("ArrayMovingWindowSum", "vector-reduce/sum-"+spec.word+"/"+string(array.Kind()), handled, err)
+				if err != nil {
+					return nil, true, fmt.Errorf("sum %s: %w", spec.word, err)
+				}
+				return out, true, nil
+			} else {
+				recordRuntimeKernelProbe("ArrayMovingWindowSum", "vector-reduce/sum-"+spec.word+"/"+string(array.Kind()), handled, err)
+			}
+		}
+		var moving any
+		switch spec.word {
+		case "msum":
+			moving, err = msum(widthValue, value)
+		case "mavg":
+			moving, err = mavg(widthValue, value)
+		case "mcount":
+			moving, err = mcount(widthValue, value)
+		case "mmin":
+			moving, err = mmin(widthValue, value)
+		case "mmax":
+			moving, err = mmax(widthValue, value)
+		}
+		if err != nil {
+			return nil, true, err
+		}
+		out, err := sum(moving)
+		return out, true, err
 	}
 	return nil, false, nil
 }

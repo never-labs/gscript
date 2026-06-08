@@ -1409,6 +1409,23 @@ func TryTypedMCount(array Array, width int) (Array, bool, error) {
 	return newI64Trusted(out), true, nil
 }
 
+func TryTypedMCountSum(array Array, width int) (int64, bool, error) {
+	if width <= 0 {
+		return 0, true, fmt.Errorf("mcount width must be positive")
+	}
+	if !isDenseIntegerArray(array) {
+		return 0, false, nil
+	}
+	n := array.Len()
+	if n == 0 {
+		return 0, true, nil
+	}
+	if width >= n {
+		return int64(n*(n+1)) / 2, true, nil
+	}
+	return int64(width*(width+1)/2 + (n-width)*width), true, nil
+}
+
 func TryTypedMovingMinMax(array Array, width int, wantMax bool) (Array, bool, error) {
 	if width <= 0 {
 		return nil, true, fmt.Errorf("moving extrema width must be positive")
@@ -1417,6 +1434,9 @@ func TryTypedMovingMinMax(array Array, width int, wantMax bool) (Array, bool, er
 		return nil, false, nil
 	}
 	out := make([]int64, array.Len())
+	if array.Len() == 0 {
+		return newI64Trusted(out), true, nil
+	}
 	dequeCap := width
 	if dequeCap > array.Len() {
 		dequeCap = array.Len()
@@ -1449,6 +1469,130 @@ func TryTypedMovingMinMax(array Array, width int, wantMax bool) (Array, bool, er
 		out[row] = values[head%dequeCap]
 	}
 	return newI64Trusted(out), true, nil
+}
+
+func TryTypedMovingMinMaxSum(array Array, width int, wantMax bool) (int64, bool, error) {
+	if width <= 0 {
+		return 0, true, fmt.Errorf("moving extrema width must be positive")
+	}
+	if !isDenseIntegerArray(array) {
+		return 0, false, nil
+	}
+	if array.Len() == 0 {
+		return 0, true, nil
+	}
+	dequeCap := width
+	if dequeCap > array.Len() {
+		dequeCap = array.Len()
+	}
+	indexes := make([]int, dequeCap)
+	values := make([]int64, dequeCap)
+	head, tail := 0, 0
+	var total int64
+	for row := 0; row < array.Len(); row++ {
+		value, ok, err := integerArrayAt(array, row)
+		if err != nil {
+			return 0, true, err
+		}
+		if !ok {
+			return 0, false, nil
+		}
+		expiredBefore := row - width + 1
+		for head < tail && indexes[head%dequeCap] < expiredBefore {
+			head++
+		}
+		for head < tail {
+			last := values[(tail-1)%dequeCap]
+			if (wantMax && last > value) || (!wantMax && last < value) {
+				break
+			}
+			tail--
+		}
+		indexes[tail%dequeCap] = row
+		values[tail%dequeCap] = value
+		tail++
+		total += values[head%dequeCap]
+	}
+	return total, true, nil
+}
+
+func TryTypedMovingNumericSumSum(array Array, width int, average bool) (any, bool, error) {
+	if width <= 0 {
+		return nil, true, fmt.Errorf("moving numeric width must be positive")
+	}
+	if !isNumericArray(array) {
+		return nil, false, nil
+	}
+	if isDenseIntegerArray(array) {
+		var window int64
+		var totalI int64
+		var totalF float64
+		for row := 0; row < array.Len(); row++ {
+			value, ok, err := integerArrayAt(array, row)
+			if err != nil {
+				return nil, true, err
+			}
+			if !ok {
+				return nil, false, nil
+			}
+			window += value
+			if row >= width {
+				expired, ok, err := integerArrayAt(array, row-width)
+				if err != nil {
+					return nil, true, err
+				}
+				if !ok {
+					return nil, false, nil
+				}
+				window -= expired
+			}
+			if average {
+				count := row + 1
+				if count > width {
+					count = width
+				}
+				totalF += float64(window) / float64(count)
+			} else {
+				totalI += window
+			}
+		}
+		if average {
+			return totalF, true, nil
+		}
+		return totalI, true, nil
+	}
+	var window float64
+	var total float64
+	for row := 0; row < array.Len(); row++ {
+		value, ok, err := typedKernels.NumericAt(array, row)
+		if err != nil {
+			return nil, true, err
+		}
+		if !ok {
+			return nil, false, nil
+		}
+		window += value
+		if row >= width {
+			expired, ok, err := typedKernels.NumericAt(array, row-width)
+			if err != nil {
+				return nil, true, err
+			}
+			if !ok {
+				return nil, false, nil
+			}
+			window -= expired
+		}
+		if average {
+			count := row + 1
+			if count > width {
+				count = width
+			}
+			total += window / float64(count)
+		} else {
+			total += window
+		}
+	}
+	return total, true, nil
 }
 
 // TryTypedDeltas applies q-style deltas for dense typed numeric arrays.

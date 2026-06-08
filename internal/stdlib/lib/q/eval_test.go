@@ -3097,6 +3097,18 @@ func TestEvalMovingExtremaWindow(t *testing.T) {
 	assertEvalErrorContains(t, "0 mmax 10 20", "mmax width must be a positive integer")
 }
 
+func TestEvalMovingWindowOverSum(t *testing.T) {
+	assertEvalValue(t, "+/3 msum 10 20 30 40", int64(190))
+	assertEvalValue(t, "+/3 mavg 10 20 30 40", 75.0)
+	assertEvalValue(t, "+/2 msum 1.5 2.5 3.5", 11.5)
+	assertEvalValue(t, "+/3 mcount 10 20 30 40", int64(9))
+	assertEvalValue(t, "+/2 mmin 3 1 4 2", int64(7))
+	assertEvalValue(t, "+/2 mmax 3 1 4 2", int64(14))
+	assertEvalValue(t, "+/3 mcount 10 0N 30 40", int64(6))
+	assertEvalValue(t, "+/3 mmin 30 0N 10 20", int64(80))
+	assertEvalErrorContains(t, "+/0 msum 10 20", "msum width must be a positive integer")
+}
+
 func TestFillsPropagatesLastNonNullValue(t *testing.T) {
 	got, err := fills(data.NewColumn("x", []any{nil, int64(10), nil, nil, int64(20)}).Data)
 	if err != nil {

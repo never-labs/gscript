@@ -188,6 +188,17 @@ func TestTypedRunningAndMovingIntegerKernels(t *testing.T) {
 		t.Fatalf("mcount values = %#v, want %#v", got, want)
 	}
 
+	countSum, handled, err := TryTypedMCountSum(NewI64Range(1, 1, 5), 3)
+	if err != nil {
+		t.Fatalf("TryTypedMCountSum returned error: %v", err)
+	}
+	if !handled {
+		t.Fatal("TryTypedMCountSum did not handle integer array")
+	}
+	if want := int64(12); countSum != want {
+		t.Fatalf("mcount sum = %d, want %d", countSum, want)
+	}
+
 	if _, handled, err := TryTypedMCount(NewColumn("x", []any{int64(10), nil, int64(30)}).Data, 2); err != nil || handled {
 		t.Fatalf("TryTypedMCount nullable handled=%v err=%v, want fallback", handled, err)
 	}
@@ -203,6 +214,17 @@ func TestTypedRunningAndMovingIntegerKernels(t *testing.T) {
 		t.Fatalf("mmax values = %#v, want %#v", got, want)
 	}
 
+	maxSum, handled, err := TryTypedMovingMinMaxSum(NewI64([]int64{3, 1, 4, 2}), 2, true)
+	if err != nil {
+		t.Fatalf("TryTypedMovingMinMaxSum max returned error: %v", err)
+	}
+	if !handled {
+		t.Fatal("TryTypedMovingMinMaxSum max did not handle integer array")
+	}
+	if want := int64(14); maxSum != want {
+		t.Fatalf("mmax sum = %d, want %d", maxSum, want)
+	}
+
 	mmin, handled, err := TryTypedMovingMinMax(NewI64([]int64{5, 3, 4, 2, 6, 1}), 3, false)
 	if err != nil {
 		t.Fatalf("TryTypedMovingMinMax min returned error: %v", err)
@@ -212,6 +234,50 @@ func TestTypedRunningAndMovingIntegerKernels(t *testing.T) {
 	}
 	if got, want := mmin.Values(), []any{int64(5), int64(3), int64(3), int64(2), int64(2), int64(1)}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("mmin values = %#v, want %#v", got, want)
+	}
+
+	minSum, handled, err := TryTypedMovingMinMaxSum(NewI64([]int64{5, 3, 4, 2, 6, 1}), 3, false)
+	if err != nil {
+		t.Fatalf("TryTypedMovingMinMaxSum min returned error: %v", err)
+	}
+	if !handled {
+		t.Fatal("TryTypedMovingMinMaxSum min did not handle integer array")
+	}
+	if want := int64(16); minSum != want {
+		t.Fatalf("mmin sum = %d, want %d", minSum, want)
+	}
+
+	movingSum, handled, err := TryTypedMovingNumericSumSum(NewI64([]int64{10, 20, 30, 40}), 3, false)
+	if err != nil {
+		t.Fatalf("TryTypedMovingNumericSumSum msum returned error: %v", err)
+	}
+	if !handled {
+		t.Fatal("TryTypedMovingNumericSumSum msum did not handle integer array")
+	}
+	if want := int64(190); movingSum != want {
+		t.Fatalf("msum sum = %#v, want %d", movingSum, want)
+	}
+
+	movingAvg, handled, err := TryTypedMovingNumericSumSum(NewI64([]int64{10, 20, 30, 40}), 3, true)
+	if err != nil {
+		t.Fatalf("TryTypedMovingNumericSumSum mavg returned error: %v", err)
+	}
+	if !handled {
+		t.Fatal("TryTypedMovingNumericSumSum mavg did not handle integer array")
+	}
+	if want := 75.0; movingAvg != want {
+		t.Fatalf("mavg sum = %#v, want %.1f", movingAvg, want)
+	}
+
+	floatMovingSum, handled, err := TryTypedMovingNumericSumSum(NewF64([]float64{1.5, 2.5, 3.5}), 2, false)
+	if err != nil {
+		t.Fatalf("TryTypedMovingNumericSumSum float returned error: %v", err)
+	}
+	if !handled {
+		t.Fatal("TryTypedMovingNumericSumSum float did not handle numeric array")
+	}
+	if want := 11.5; floatMovingSum != want {
+		t.Fatalf("float msum sum = %#v, want %.1f", floatMovingSum, want)
 	}
 }
 
