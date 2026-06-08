@@ -690,6 +690,7 @@ func TestQFramePrimitiveHotPathLowersToTypedRuntimeKernel(t *testing.T) {
 	}
 
 	fn := BuildGraph(proto)
+	fn.Remarks = &OptimizationRemarks{}
 	lowered, err := QQueryNativeLoweringPass(fn)
 	if err != nil {
 		t.Fatalf("QQueryNativeLoweringPass: %v", err)
@@ -757,7 +758,6 @@ func TestQFramePrimitiveSharedPredicateStillLowersToTypedRuntimeKernel(t *testin
 	}
 
 	fn := BuildGraph(proto)
-	fn.Remarks = &OptimizationRemarks{}
 	lowered, err := QQueryNativeLoweringPass(fn)
 	if err != nil {
 		t.Fatalf("QQueryNativeLoweringPass: %v", err)
@@ -822,7 +822,6 @@ func TestQFramePrimitiveHotPathLoweringReportsFallbackReason(t *testing.T) {
 	}
 
 	fn := BuildGraph(proto)
-	fn.Remarks = &OptimizationRemarks{}
 	lowered, err := QQueryNativeLoweringPass(fn)
 	if err != nil {
 		t.Fatalf("QQueryNativeLoweringPass: %v", err)
@@ -1602,6 +1601,7 @@ func TestQVectorWhereReduceLowersToFusedTypedRuntimeKernel(t *testing.T) {
 	}
 
 	fn := BuildGraph(proto)
+	fn.Remarks = &OptimizationRemarks{}
 	lowered, err := QQueryNativeLoweringPass(fn)
 	if err != nil {
 		t.Fatalf("QQueryNativeLoweringPass: %v", err)
@@ -1665,13 +1665,16 @@ func TestQVectorWhereReduceSharedWhereDoesNotLower(t *testing.T) {
 			vm.EncodeABC(vm.OP_FRAME_COLUMN, 2, 0, 2),
 			vm.EncodeABx(vm.OP_LOADK, 3, 3),
 			vm.EncodeABC(vm.OP_VECTOR_WHERE, 1, 2, 3),
-			vm.EncodeABC(vm.OP_VECTOR_REDUCE, 4, 1, int(runtime.DenseArrayReduceSum)),
-			vm.EncodeABC(vm.OP_VECTOR_SCAN, 1, 1, 0),
-			vm.EncodeABC(vm.OP_RETURN, 4, 2, 0),
+			vm.EncodeABC(vm.OP_MOVE, 4, 1, 0),
+			vm.EncodeABC(vm.OP_VECTOR_REDUCE, 1, 1, int(runtime.DenseArrayReduceSum)),
+			vm.EncodeABC(vm.OP_VECTOR_SCAN, 4, 4, 0),
+			vm.EncodeABC(vm.OP_MOVE, 2, 4, 0),
+			vm.EncodeABC(vm.OP_RETURN, 1, 3, 0),
 		},
 	}
 
 	fn := BuildGraph(proto)
+	fn.Remarks = &OptimizationRemarks{}
 	lowered, err := QQueryNativeLoweringPass(fn)
 	if err != nil {
 		t.Fatalf("QQueryNativeLoweringPass: %v", err)
@@ -1683,6 +1686,89 @@ func TestQVectorWhereReduceSharedWhereDoesNotLower(t *testing.T) {
 	if counts[OpVectorWhere] != 1 || counts[OpVectorReduce] != 1 || counts[OpVectorScan] != 1 {
 		t.Fatalf("shared vector primitive counts where/reduce/scan = %d/%d/%d, want 1/1/1\n%s",
 			counts[OpVectorWhere], counts[OpVectorReduce], counts[OpVectorScan], Print(lowered))
+	}
+	vectorFallbacks := CountQVectorLoweringFallbackReasons(fn.Remarks.List())
+	if vectorFallbacks[qVectorWhereReduceFallbackSharedWhere] != 1 {
+		t.Fatalf("q vector lowering fallback counts = %+v, want shared_where=1", vectorFallbacks)
+	}
+	if queryFallbacks := CountQQueryLoweringFallbackReasons(fn.Remarks.List()); len(queryFallbacks) != 0 {
+		t.Fatalf("q query fallback counts = %+v, want none for vector lowering fallback", queryFallbacks)
+	}
+	formatted := formatOptimizationRemarks(fn.Remarks.List())
+	if !strings.Contains(formatted, "QVectorNativeLowering") ||
+		!strings.Contains(formatted, "reason_code=shared_where") ||
+		!strings.Contains(formatted, "shape=compare/vector-where/vector-reduce") {
+		t.Fatalf("q vector lowering fallback remark missing stable reason/shape:\n%s", formatted)
+	}
+
+	report := Diagnose(proto, []runtime.Value{runtime.TableValue(qHotPathTestFrame(t))})
+	if report.QVectorLoweringFallbacks[qVectorWhereReduceFallbackSharedWhere] != 1 {
+		t.Fatalf("Diagnose QVectorLoweringFallbacks = %+v, want shared_where=1\n%s", report.QVectorLoweringFallbacks, report.String())
+	}
+	if len(report.QQueryFallbacks) != 0 {
+		t.Fatalf("Diagnose QQueryFallbacks = %+v, want none for vector fallback", report.QQueryFallbacks)
+	}
+	if !strings.Contains(report.String(), "Q vector fallback reasons") ||
+		!strings.Contains(report.String(), "shared_where=1") {
+		t.Fatalf("diagnostic report missing q vector fallback reason:\n%s", report.String())
+	}
+}
+
+func TestQVectorWhereReduceBadWhereArgCountReportsFallbackReason(t *testing.T) {
+	proto := &vm.FuncProto{
+		Name:      "q_vector_where_reduce_bad_where_args",
+		NumParams: 1,
+		MaxStack:  4,
+		Constants: []runtime.Value{
+			runtime.StringValue("price"),
+			runtime.FloatValue(100),
+			runtime.StringValue("size"),
+			runtime.IntValue(0),
+		},
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_FRAME_COLUMN, 1, 0, 0),
+			vm.EncodeABx(vm.OP_LOADK, 2, 1),
+			vm.EncodeABC(vm.OP_VECTOR_COMPARE, 1, 2, int(runtime.DenseArrayGE)),
+			vm.EncodeABC(vm.OP_FRAME_COLUMN, 2, 0, 2),
+			vm.EncodeABx(vm.OP_LOADK, 3, 3),
+			vm.EncodeABC(vm.OP_VECTOR_WHERE, 1, 2, 3),
+			vm.EncodeABC(vm.OP_VECTOR_REDUCE, 1, 1, int(runtime.DenseArrayReduceSum)),
+			vm.EncodeABC(vm.OP_RETURN, 1, 2, 0),
+		},
+	}
+
+	fn := BuildGraph(proto)
+	fn.Remarks = &OptimizationRemarks{}
+	var where *Instr
+	for _, block := range fn.Blocks {
+		for _, instr := range block.Instrs {
+			if instr.Op == OpVectorWhere {
+				where = instr
+				break
+			}
+		}
+	}
+	if where == nil || len(where.Args) != 3 {
+		t.Fatalf("test setup missing VectorWhere with 3 args:\n%s", Print(fn))
+	}
+	where.Args = where.Args[:2]
+
+	lowered, err := QQueryNativeLoweringPass(fn)
+	if err != nil {
+		t.Fatalf("QQueryNativeLoweringPass: %v", err)
+	}
+	counts := countOps(lowered)
+	if counts[OpQVectorWhereReduce] != 0 {
+		t.Fatalf("OpQVectorWhereReduce count = %d, want 0 for malformed where\n%s", counts[OpQVectorWhereReduce], Print(lowered))
+	}
+	vectorFallbacks := CountQVectorLoweringFallbackReasons(fn.Remarks.List())
+	if vectorFallbacks[qVectorWhereReduceFallbackBadWhereArgCount] != 1 {
+		t.Fatalf("q vector lowering fallback counts = %+v, want bad_where_arg_count=1", vectorFallbacks)
+	}
+	formatted := formatOptimizationRemarks(fn.Remarks.List())
+	if !strings.Contains(formatted, "reason_code=bad_where_arg_count") ||
+		!strings.Contains(formatted, "shape=vector-where/vector-reduce") {
+		t.Fatalf("q vector bad-arg fallback remark missing stable reason/shape:\n%s", formatted)
 	}
 }
 

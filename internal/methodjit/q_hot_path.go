@@ -73,6 +73,11 @@ type QVectorRuntimeKernel struct {
 	Detail    string
 }
 
+const (
+	qVectorWhereReduceFallbackSharedWhere      = "shared_where"
+	qVectorWhereReduceFallbackBadWhereArgCount = "bad_where_arg_count"
+)
+
 func (p QQueryHotPath) Shape() string {
 	if p.Compare == nil && p.Mask == nil && p.MaskCombine == nil {
 		switch {
@@ -220,6 +225,24 @@ func qQueryLoweringFallbackReasonFromRemark(reason string) (string, bool) {
 		}
 	}
 	return "", false
+}
+
+func CountQVectorLoweringFallbackReasons(remarks []OptimizationRemark) map[string]int {
+	counts := make(map[string]int)
+	for _, remark := range remarks {
+		if remark.Pass != "QVectorNativeLowering" || remark.Kind != "missed" {
+			continue
+		}
+		reason, ok := qQueryLoweringFallbackReasonFromRemark(remark.Reason)
+		if !ok {
+			continue
+		}
+		counts[reason]++
+	}
+	if len(counts) == 0 {
+		return nil
+	}
+	return counts
 }
 
 // DetectQQueryHotPaths returns q query primitive pipelines visible in Method
@@ -508,7 +531,15 @@ func qVectorWhereReduceLoweringPass(fn *Function, uses map[int]int) {
 		return
 	}
 	for _, path := range DetectQVectorReduceHotPaths(fn) {
-		if path.Reduce == nil || path.Where == nil || uses[path.Where.ID] != 1 || len(path.Where.Args) != 3 {
+		if path.Reduce == nil || path.Where == nil {
+			continue
+		}
+		if len(path.Where.Args) != 3 {
+			qVectorWhereReduceLoweringFallbackRemark(fn, path, qVectorWhereReduceFallbackBadWhereArgCount)
+			continue
+		}
+		if uses[path.Where.ID] != 1 {
+			qVectorWhereReduceLoweringFallbackRemark(fn, path, qVectorWhereReduceFallbackSharedWhere)
 			continue
 		}
 		reduce := path.Reduce
@@ -523,6 +554,28 @@ func qVectorWhereReduceLoweringPass(fn *Function, uses map[int]int) {
 				fmt.Sprintf("lowered q vector hot path shape %s to fused typed runtime kernel op-exit", qVectorWhereReduceShape(reduce)))
 		}
 	}
+}
+
+func qVectorWhereReduceLoweringFallbackRemark(fn *Function, path QVectorReduceHotPath, reason string) {
+	if reason == "" {
+		reason = "unsupported_shape"
+	}
+	blockID, valueID := 0, 0
+	op := OpVectorReduce
+	if path.Reduce != nil {
+		valueID = path.Reduce.ID
+		op = path.Reduce.Op
+		if path.Reduce.Block != nil {
+			blockID = path.Reduce.Block.ID
+		}
+	}
+	shape := "where/vector-reduce"
+	if path.Where != nil {
+		shape = qVectorWhereReduceShape(path.Where)
+	}
+	functionRemarks(fn).Add("QVectorNativeLowering", "missed", blockID, valueID, op,
+		fmt.Sprintf("reason_code=%s shape=%s; q vector where-reduce remains on primitive runtime fallback",
+			reason, shape))
 }
 
 func qQueryLoweringFallbackRemark(fn *Function, path QQueryHotPath, reason string) {
@@ -1041,6 +1094,13 @@ func formatQQueryHotPathShapeCounts(counts map[string]int) string {
 }
 
 func formatQQueryLoweringFallbackReasons(counts map[string]int) string {
+	if len(counts) == 0 {
+		return "0 fallback reason(s)\n"
+	}
+	return fmt.Sprintf("%d fallback reason(s): %s\n", len(counts), formatQQueryHotPathShapeCounts(counts))
+}
+
+func formatQVectorLoweringFallbackReasons(counts map[string]int) string {
 	if len(counts) == 0 {
 		return "0 fallback reason(s)\n"
 	}
