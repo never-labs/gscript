@@ -997,8 +997,11 @@ func validateFrameGroupAggregateSpec(spec FrameGroupAggregateSpec) error {
 		if agg.Op == "" {
 			return fmt.Errorf("FRAME_GROUP_AGGREGATE aggregate %q op must be non-empty", agg.Name)
 		}
-		if strings.ToLower(agg.Op) == "sum" && agg.Column == "" {
-			return fmt.Errorf("FRAME_GROUP_AGGREGATE aggregate %q sum column must be non-empty", agg.Name)
+		switch strings.ToLower(agg.Op) {
+		case "sum", "min", "max", "avg":
+			if agg.Column == "" {
+				return fmt.Errorf("FRAME_GROUP_AGGREGATE aggregate %q %s column must be non-empty", agg.Name, strings.ToLower(agg.Op))
+			}
 		}
 	}
 	return nil
@@ -1251,6 +1254,74 @@ func nativeFrameGroupedAggregateColumn(frame *SoA, rowGroups []int, groupCount i
 		default:
 			return nil, fmt.Errorf("FRAME_GROUP_AGGREGATE sum column %q must be numeric", agg.Column)
 		}
+	case "min", "max":
+		src, ok := frame.Column(agg.Column)
+		if !ok {
+			return nil, fmt.Errorf("FRAME_GROUP_AGGREGATE unknown %s column %q", agg.Op, agg.Column)
+		}
+		switch src.dtype {
+		case DenseArrayF64:
+			out := make([]float64, groupCount)
+			seen := make([]bool, groupCount)
+			for row, group := range rowGroups {
+				if group < 0 {
+					continue
+				}
+				value := src.f64[row]
+				if !seen[group] || (agg.Op == "min" && value < out[group]) || (agg.Op == "max" && value > out[group]) {
+					out[group] = value
+					seen[group] = true
+				}
+			}
+			return NewDenseArrayF64(out), nil
+		case DenseArrayI64:
+			out := make([]int64, groupCount)
+			seen := make([]bool, groupCount)
+			for row, group := range rowGroups {
+				if group < 0 {
+					continue
+				}
+				value := src.i64[row]
+				if !seen[group] || (agg.Op == "min" && value < out[group]) || (agg.Op == "max" && value > out[group]) {
+					out[group] = value
+					seen[group] = true
+				}
+			}
+			return NewDenseArrayI64(out), nil
+		default:
+			return nil, fmt.Errorf("FRAME_GROUP_AGGREGATE %s column %q must be numeric", agg.Op, agg.Column)
+		}
+	case "avg":
+		src, ok := frame.Column(agg.Column)
+		if !ok {
+			return nil, fmt.Errorf("FRAME_GROUP_AGGREGATE unknown avg column %q", agg.Column)
+		}
+		out := make([]float64, groupCount)
+		counts := make([]int64, groupCount)
+		switch src.dtype {
+		case DenseArrayF64:
+			for row, group := range rowGroups {
+				if group >= 0 {
+					out[group] += src.f64[row]
+					counts[group]++
+				}
+			}
+		case DenseArrayI64:
+			for row, group := range rowGroups {
+				if group >= 0 {
+					out[group] += float64(src.i64[row])
+					counts[group]++
+				}
+			}
+		default:
+			return nil, fmt.Errorf("FRAME_GROUP_AGGREGATE avg column %q must be numeric", agg.Column)
+		}
+		for i, count := range counts {
+			if count > 0 {
+				out[i] /= float64(count)
+			}
+		}
+		return NewDenseArrayF64(out), nil
 	default:
 		return nil, fmt.Errorf("FRAME_GROUP_AGGREGATE aggregate op %q is not supported", agg.Op)
 	}
@@ -1295,6 +1366,76 @@ func nativeFrameNoKeyAggregateColumn(frame *SoA, mask *DenseArray, agg FrameAggr
 		default:
 			return nil, fmt.Errorf("FRAME_GROUP_AGGREGATE sum column %q must be numeric", agg.Column)
 		}
+	case "min", "max":
+		src, ok := frame.Column(agg.Column)
+		if !ok {
+			return nil, fmt.Errorf("FRAME_GROUP_AGGREGATE unknown %s column %q", agg.Op, agg.Column)
+		}
+		switch src.dtype {
+		case DenseArrayF64:
+			var out float64
+			seen := false
+			for i, value := range src.f64 {
+				if mask != nil && !mask.bools[i] {
+					continue
+				}
+				if !seen || (agg.Op == "min" && value < out) || (agg.Op == "max" && value > out) {
+					out = value
+					seen = true
+				}
+			}
+			if !seen {
+				return nil, fmt.Errorf("FRAME_GROUP_AGGREGATE %s column %q has no selected rows", agg.Op, agg.Column)
+			}
+			return NewDenseArrayF64([]float64{out}), nil
+		case DenseArrayI64:
+			var out int64
+			seen := false
+			for i, value := range src.i64 {
+				if mask != nil && !mask.bools[i] {
+					continue
+				}
+				if !seen || (agg.Op == "min" && value < out) || (agg.Op == "max" && value > out) {
+					out = value
+					seen = true
+				}
+			}
+			if !seen {
+				return nil, fmt.Errorf("FRAME_GROUP_AGGREGATE %s column %q has no selected rows", agg.Op, agg.Column)
+			}
+			return NewDenseArrayI64([]int64{out}), nil
+		default:
+			return nil, fmt.Errorf("FRAME_GROUP_AGGREGATE %s column %q must be numeric", agg.Op, agg.Column)
+		}
+	case "avg":
+		src, ok := frame.Column(agg.Column)
+		if !ok {
+			return nil, fmt.Errorf("FRAME_GROUP_AGGREGATE unknown avg column %q", agg.Column)
+		}
+		var sum float64
+		var count int64
+		switch src.dtype {
+		case DenseArrayF64:
+			for i, value := range src.f64 {
+				if mask == nil || mask.bools[i] {
+					sum += value
+					count++
+				}
+			}
+		case DenseArrayI64:
+			for i, value := range src.i64 {
+				if mask == nil || mask.bools[i] {
+					sum += float64(value)
+					count++
+				}
+			}
+		default:
+			return nil, fmt.Errorf("FRAME_GROUP_AGGREGATE avg column %q must be numeric", agg.Column)
+		}
+		if count == 0 {
+			return nil, fmt.Errorf("FRAME_GROUP_AGGREGATE avg column %q has no selected rows", agg.Column)
+		}
+		return NewDenseArrayF64([]float64{sum / float64(count)}), nil
 	default:
 		return nil, fmt.Errorf("FRAME_GROUP_AGGREGATE aggregate op %q is not supported", agg.Op)
 	}

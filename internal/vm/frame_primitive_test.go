@@ -752,6 +752,35 @@ func TestFrameGroupAggregatePrimitiveMultiKey(t *testing.T) {
 	assertI64Column(t, out, "total", []int64{17, 5, 3})
 }
 
+func TestFrameGroupAggregatePrimitiveMinMaxAvg(t *testing.T) {
+	frame := frameGroupAggregateTestFrame(t)
+	spec := frameGroupAggregateSpec("acct", []runtime.FrameAggregateSpec{
+		{Name: "min_qty", Op: "min", Column: "qty"},
+		{Name: "max_amount", Op: "max", Column: "amount"},
+		{Name: "avg_qty", Op: "avg", Column: "qty"},
+	})
+	proto := &FuncProto{
+		MaxStack: 2,
+		Code: []uint32{
+			EncodeABx(OP_LOADK, 0, 0),
+			EncodeABC(OP_LOADNIL, 1, 0, 0),
+			EncodeABC(OP_FRAME_GROUP_AGGREGATE, 1, 0, 1),
+			EncodeABC(OP_RETURN, 1, 2, 0),
+		},
+		Constants: []runtime.Value{runtime.TableValue(frame), runtime.TableValue(spec)},
+	}
+
+	results, err := New(map[string]runtime.Value{}).Execute(proto)
+	if err != nil {
+		t.Fatalf("Execute FRAME_GROUP_AGGREGATE min/max/avg: %v", err)
+	}
+	out := frameGroupAggregateResultSoA(t, results)
+	assertI64Column(t, out, "acct", []int64{1, 2})
+	assertI64Column(t, out, "min_qty", []int64{5, 3})
+	assertF64Column(t, out, "max_amount", []float64{10, 3.5})
+	assertF64Column(t, out, "avg_qty", []float64{22.0 / 3.0, 3})
+}
+
 func TestFrameGroupAggregatePrimitiveRejectsUnsupportedSumColumn(t *testing.T) {
 	frame := frameGroupAggregateTestFrame(t)
 	spec := frameGroupAggregateSpec("", []runtime.FrameAggregateSpec{
