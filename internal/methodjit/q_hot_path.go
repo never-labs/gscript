@@ -1321,25 +1321,58 @@ func qParseSimpleAggregate(text string) (runtime.FrameAggregateSpec, bool) {
 	if !qSimpleIdentifier(name) {
 		return runtime.FrameAggregateSpec{}, false
 	}
-	fields := strings.Fields(strings.TrimSpace(expr))
-	if len(fields) != 2 {
+	exprText := strings.TrimSpace(expr)
+	fields := strings.Fields(exprText)
+	if len(fields) < 2 {
 		return runtime.FrameAggregateSpec{}, false
 	}
 	op := strings.ToLower(fields[0])
+	operand := strings.TrimSpace(exprText[len(fields[0]):])
 	switch op {
 	case "count":
-		if fields[1] != "i" {
+		if operand != "i" {
 			return runtime.FrameAggregateSpec{}, false
 		}
 		return runtime.FrameAggregateSpec{Name: name, Op: op}, true
 	case "sum", "min", "max", "avg":
-		if !qSimpleIdentifier(fields[1]) {
-			return runtime.FrameAggregateSpec{}, false
+		if ident, ok := qParseSimpleAggregateIdentifierExpr(operand); ok {
+			return runtime.FrameAggregateSpec{Name: name, Op: op, Column: ident}, true
 		}
-		return runtime.FrameAggregateSpec{Name: name, Op: op, Column: fields[1]}, true
+		if left, binaryOp, right, ok := qParseSimpleAggregateBinaryExpr(operand); ok && (op == "sum" || op == "avg") {
+			return runtime.FrameAggregateSpec{Name: name, Op: op, Left: left, Right: right, BinaryOp: binaryOp}, true
+		}
+		return runtime.FrameAggregateSpec{}, false
 	default:
 		return runtime.FrameAggregateSpec{}, false
 	}
+}
+
+func qParseSimpleAggregateIdentifierExpr(text string) (string, bool) {
+	text = strings.TrimSpace(text)
+	if !qSimpleIdentifier(text) {
+		return "", false
+	}
+	return text, true
+}
+
+func qParseSimpleAggregateBinaryExpr(text string) (string, string, string, bool) {
+	text = strings.TrimSpace(text)
+	for _, op := range []string{"*", "+", "-", "/"} {
+		idx := strings.Index(text, op)
+		if idx < 0 {
+			continue
+		}
+		if strings.ContainsAny(text[idx+len(op):], "*+-/") {
+			return "", "", "", false
+		}
+		left := strings.TrimSpace(text[:idx])
+		right := strings.TrimSpace(text[idx+len(op):])
+		if !qSimpleIdentifier(left) || !qSimpleIdentifier(right) {
+			return "", "", "", false
+		}
+		return left, op, right, true
+	}
+	return "", "", "", false
 }
 
 func qSimpleIdentifier(name string) bool {
@@ -1531,6 +1564,15 @@ func qFrameGroupAggregateSpecValue(spec qSimpleGroupAggregateQuery) runtime.Valu
 		row.RawSetString("op", runtime.StringValue(agg.Op))
 		if agg.Column != "" {
 			row.RawSetString("column", runtime.StringValue(agg.Column))
+		}
+		if agg.Left != "" {
+			row.RawSetString("left", runtime.StringValue(agg.Left))
+		}
+		if agg.Right != "" {
+			row.RawSetString("right", runtime.StringValue(agg.Right))
+		}
+		if agg.BinaryOp != "" {
+			row.RawSetString("binary_op", runtime.StringValue(agg.BinaryOp))
 		}
 		aggs.RawSetInt(int64(i+1), runtime.TableValue(row))
 	}

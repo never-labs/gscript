@@ -1034,9 +1034,12 @@ func (v Value) NativeFrameFilterProject(mask *DenseArray, names []string) (Value
 }
 
 type FrameAggregateSpec struct {
-	Name   string
-	Op     string
-	Column string
+	Name     string
+	Op       string
+	Column   string
+	Left     string
+	Right    string
+	BinaryOp string
 }
 
 type FrameGroupAggregateSpec struct {
@@ -1120,14 +1123,34 @@ func validateFrameGroupAggregateSpec(spec FrameGroupAggregateSpec) error {
 		if agg.Op == "" {
 			return fmt.Errorf("FRAME_GROUP_AGGREGATE aggregate %q op must be non-empty", agg.Name)
 		}
+		if agg.Column != "" && agg.hasBinaryExpr() {
+			return fmt.Errorf("FRAME_GROUP_AGGREGATE aggregate %q must not mix column and binary expression", agg.Name)
+		}
 		switch strings.ToLower(agg.Op) {
 		case "sum", "min", "max", "avg":
-			if agg.Column == "" {
+			if agg.Column == "" && !agg.hasBinaryExpr() {
 				return fmt.Errorf("FRAME_GROUP_AGGREGATE aggregate %q %s column must be non-empty", agg.Name, strings.ToLower(agg.Op))
+			}
+			if agg.hasBinaryExpr() {
+				if strings.ToLower(agg.Op) != "sum" && strings.ToLower(agg.Op) != "avg" {
+					return fmt.Errorf("FRAME_GROUP_AGGREGATE aggregate %q %s binary expression is not supported", agg.Name, strings.ToLower(agg.Op))
+				}
+				if agg.Left == "" || agg.Right == "" {
+					return fmt.Errorf("FRAME_GROUP_AGGREGATE aggregate %q binary expression columns must be non-empty", agg.Name)
+				}
+				switch agg.BinaryOp {
+				case "*", "+", "-", "/":
+				default:
+					return fmt.Errorf("FRAME_GROUP_AGGREGATE aggregate %q binary op %q is not supported", agg.Name, agg.BinaryOp)
+				}
 			}
 		}
 	}
 	return nil
+}
+
+func (agg FrameAggregateSpec) hasBinaryExpr() bool {
+	return agg.Left != "" || agg.Right != "" || agg.BinaryOp != ""
 }
 
 func decodeFrameGroupAggregateByColumns(v Value) ([]string, error) {
@@ -1177,6 +1200,9 @@ func decodeFrameAggregateSpec(tbl *Table, index int) (FrameAggregateSpec, error)
 	if column.IsNil() {
 		column = tbl.RawGetInt(3)
 	}
+	left := tbl.RawGetString("left")
+	right := tbl.RawGetString("right")
+	binaryOp := tbl.RawGetString("binary_op")
 	if !name.IsString() || name.Str() == "" {
 		return FrameAggregateSpec{}, fmt.Errorf("FRAME_GROUP_AGGREGATE aggregate %d name must be a string", index)
 	}
@@ -1189,6 +1215,20 @@ func decodeFrameAggregateSpec(tbl *Table, index int) (FrameAggregateSpec, error)
 			return FrameAggregateSpec{}, fmt.Errorf("FRAME_GROUP_AGGREGATE aggregate %d column must be a string", index)
 		}
 		agg.Column = column.Str()
+	}
+	if !left.IsNil() || !right.IsNil() || !binaryOp.IsNil() {
+		if !left.IsString() || left.Str() == "" {
+			return FrameAggregateSpec{}, fmt.Errorf("FRAME_GROUP_AGGREGATE aggregate %d left must be a string", index)
+		}
+		if !right.IsString() || right.Str() == "" {
+			return FrameAggregateSpec{}, fmt.Errorf("FRAME_GROUP_AGGREGATE aggregate %d right must be a string", index)
+		}
+		if !binaryOp.IsString() || binaryOp.Str() == "" {
+			return FrameAggregateSpec{}, fmt.Errorf("FRAME_GROUP_AGGREGATE aggregate %d binary_op must be a string", index)
+		}
+		agg.Left = left.Str()
+		agg.Right = right.Str()
+		agg.BinaryOp = binaryOp.Str()
 	}
 	return agg, nil
 }
@@ -1225,7 +1265,11 @@ func frameGroupAggregateSchemaSignature(spec FrameGroupAggregateSpec) []string {
 	out := make([]string, 0, len(spec.Aggregates)+1)
 	out = append(out, "by="+strings.Join(frameGroupAggregateByColumns(spec), "+"))
 	for _, agg := range spec.Aggregates {
-		out = append(out, "agg="+agg.Name+":"+strings.ToLower(agg.Op)+":"+agg.Column)
+		expr := agg.Column
+		if agg.hasBinaryExpr() {
+			expr = agg.Left + agg.BinaryOp + agg.Right
+		}
+		out = append(out, "agg="+agg.Name+":"+strings.ToLower(agg.Op)+":"+expr)
 	}
 	return out
 }
@@ -1361,6 +1405,9 @@ func nativeFrameGroupedAggregateColumn(frame *SoA, rowGroups []int, groupCount i
 		}
 		return NewDenseArrayI64(out), nil
 	case "sum":
+		if agg.hasBinaryExpr() {
+			return nativeFrameGroupedBinaryAggregateColumn(frame, rowGroups, groupCount, agg)
+		}
 		src, ok := frame.Column(agg.Column)
 		if !ok {
 			return nil, fmt.Errorf("FRAME_GROUP_AGGREGATE unknown sum column %q", agg.Column)
@@ -1423,6 +1470,9 @@ func nativeFrameGroupedAggregateColumn(frame *SoA, rowGroups []int, groupCount i
 			return nil, fmt.Errorf("FRAME_GROUP_AGGREGATE %s column %q must be numeric", agg.Op, agg.Column)
 		}
 	case "avg":
+		if agg.hasBinaryExpr() {
+			return nativeFrameGroupedBinaryAggregateColumn(frame, rowGroups, groupCount, agg)
+		}
 		src, ok := frame.Column(agg.Column)
 		if !ok {
 			return nil, fmt.Errorf("FRAME_GROUP_AGGREGATE unknown avg column %q", agg.Column)
@@ -1458,6 +1508,37 @@ func nativeFrameGroupedAggregateColumn(frame *SoA, rowGroups []int, groupCount i
 	}
 }
 
+func nativeFrameGroupedBinaryAggregateColumn(frame *SoA, rowGroups []int, groupCount int, agg FrameAggregateSpec) (*DenseArray, error) {
+	left, right, err := nativeFrameBinaryAggregateColumns(frame, agg)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]float64, groupCount)
+	counts := make([]int64, groupCount)
+	for row, group := range rowGroups {
+		if group < 0 {
+			continue
+		}
+		value, ok, err := nativeFrameBinaryNumericValue(left, right, agg.BinaryOp, row)
+		if err != nil {
+			return nil, err
+		}
+		if !ok {
+			continue
+		}
+		out[group] += value
+		counts[group]++
+	}
+	if agg.Op == "avg" {
+		for i, count := range counts {
+			if count > 0 {
+				out[i] /= float64(count)
+			}
+		}
+	}
+	return NewDenseArrayF64(out), nil
+}
+
 func nativeFrameNoKeyAggregateColumn(frame *SoA, mask *DenseArray, agg FrameAggregateSpec) (*DenseArray, error) {
 	switch agg.Op {
 	case "count":
@@ -1473,6 +1554,9 @@ func nativeFrameNoKeyAggregateColumn(frame *SoA, mask *DenseArray, agg FrameAggr
 		}
 		return NewDenseArrayI64([]int64{count}), nil
 	case "sum":
+		if agg.hasBinaryExpr() {
+			return nativeFrameNoKeyBinaryAggregateColumn(frame, mask, agg)
+		}
 		src, ok := frame.Column(agg.Column)
 		if !ok {
 			return nil, fmt.Errorf("FRAME_GROUP_AGGREGATE unknown sum column %q", agg.Column)
@@ -1539,6 +1623,9 @@ func nativeFrameNoKeyAggregateColumn(frame *SoA, mask *DenseArray, agg FrameAggr
 			return nil, fmt.Errorf("FRAME_GROUP_AGGREGATE %s column %q must be numeric", agg.Op, agg.Column)
 		}
 	case "avg":
+		if agg.hasBinaryExpr() {
+			return nativeFrameNoKeyBinaryAggregateColumn(frame, mask, agg)
+		}
 		src, ok := frame.Column(agg.Column)
 		if !ok {
 			return nil, fmt.Errorf("FRAME_GROUP_AGGREGATE unknown avg column %q", agg.Column)
@@ -1569,6 +1656,95 @@ func nativeFrameNoKeyAggregateColumn(frame *SoA, mask *DenseArray, agg FrameAggr
 		return NewDenseArrayF64([]float64{sum / float64(count)}), nil
 	default:
 		return nil, fmt.Errorf("FRAME_GROUP_AGGREGATE aggregate op %q is not supported", agg.Op)
+	}
+}
+
+func nativeFrameNoKeyBinaryAggregateColumn(frame *SoA, mask *DenseArray, agg FrameAggregateSpec) (*DenseArray, error) {
+	left, right, err := nativeFrameBinaryAggregateColumns(frame, agg)
+	if err != nil {
+		return nil, err
+	}
+	var sum float64
+	var count int64
+	for row := 0; row < frame.Len(); row++ {
+		if mask != nil && !mask.bools[row] {
+			continue
+		}
+		value, ok, err := nativeFrameBinaryNumericValue(left, right, agg.BinaryOp, row)
+		if err != nil {
+			return nil, err
+		}
+		if !ok {
+			continue
+		}
+		sum += value
+		count++
+	}
+	if agg.Op == "avg" {
+		if count == 0 {
+			return nil, fmt.Errorf("FRAME_GROUP_AGGREGATE avg binary expression has no selected rows")
+		}
+		sum /= float64(count)
+	}
+	return NewDenseArrayF64([]float64{sum}), nil
+}
+
+func nativeFrameBinaryAggregateColumns(frame *SoA, agg FrameAggregateSpec) (*DenseArray, *DenseArray, error) {
+	left, ok := frame.Column(agg.Left)
+	if !ok {
+		return nil, nil, fmt.Errorf("FRAME_GROUP_AGGREGATE unknown binary left column %q", agg.Left)
+	}
+	right, ok := frame.Column(agg.Right)
+	if !ok {
+		return nil, nil, fmt.Errorf("FRAME_GROUP_AGGREGATE unknown binary right column %q", agg.Right)
+	}
+	if !nativeFrameNumericDenseArray(left) {
+		return nil, nil, fmt.Errorf("FRAME_GROUP_AGGREGATE binary left column %q must be numeric", agg.Left)
+	}
+	if !nativeFrameNumericDenseArray(right) {
+		return nil, nil, fmt.Errorf("FRAME_GROUP_AGGREGATE binary right column %q must be numeric", agg.Right)
+	}
+	return left, right, nil
+}
+
+func nativeFrameNumericDenseArray(array *DenseArray) bool {
+	return array != nil && (array.dtype == DenseArrayF64 || array.dtype == DenseArrayI64)
+}
+
+func nativeFrameBinaryNumericValue(left, right *DenseArray, op string, row int) (float64, bool, error) {
+	l, ok := nativeFrameNumericValueAt(left, row)
+	if !ok {
+		return 0, false, nil
+	}
+	r, ok := nativeFrameNumericValueAt(right, row)
+	if !ok {
+		return 0, false, nil
+	}
+	switch op {
+	case "*":
+		return l * r, true, nil
+	case "+":
+		return l + r, true, nil
+	case "-":
+		return l - r, true, nil
+	case "/":
+		if r == 0 {
+			return 0, false, nil
+		}
+		return l / r, true, nil
+	default:
+		return 0, false, fmt.Errorf("FRAME_GROUP_AGGREGATE binary op %q is not supported", op)
+	}
+}
+
+func nativeFrameNumericValueAt(array *DenseArray, row int) (float64, bool) {
+	switch array.dtype {
+	case DenseArrayF64:
+		return array.f64[row], true
+	case DenseArrayI64:
+		return float64(array.i64[row]), true
+	default:
+		return 0, false
 	}
 }
 

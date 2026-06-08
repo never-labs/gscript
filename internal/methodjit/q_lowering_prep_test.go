@@ -3233,7 +3233,7 @@ func TestQGroupAggregateBareBoolWhereCallLowersToFilteredFrameGroupAggregateKern
 	}
 }
 
-func TestQGroupAggregateComputedExpressionStaysOnFallback(t *testing.T) {
+func TestQGroupAggregateComputedExpressionLowersToFrameGroupAggregateKernel(t *testing.T) {
 	const query = "select notional:sum price*size by size from trades"
 	proto := &vm.FuncProto{
 		Name:      "q_group_aggregate_computed_call",
@@ -3261,13 +3261,20 @@ func TestQGroupAggregateComputedExpressionStaysOnFallback(t *testing.T) {
 		t.Fatalf("QQueryNativeLoweringPass: %v", err)
 	}
 	counts := countOps(lowered)
-	if counts[OpFrameGroupAggregate] != 0 || counts[OpCall] != 1 {
+	if counts[OpFrameGroupAggregate] != 1 || counts[OpCall] != 0 {
 		t.Fatalf("computed group aggregate lowering counts FrameGroupAggregate=%d OpCall=%d\n%s", counts[OpFrameGroupAggregate], counts[OpCall], Print(lowered))
 	}
-	if fallbacks := CountQQueryLoweringFallbackReasons(fn.Remarks.List()); fallbacks[qQueryLoweringFallbackGroupAggregateCall] != 1 {
-		t.Fatalf("q query fallback counts = %+v, want group_aggregate_call=1", fallbacks)
+	if fallbacks := CountQQueryLoweringFallbackReasons(fn.Remarks.List()); fallbacks[qQueryLoweringFallbackGroupAggregateCall] != 0 {
+		t.Fatalf("q query fallback counts = %+v, want no group_aggregate_call fallback", fallbacks)
 	}
-	assertQLoweringRemarkFields(t, fn.Remarks.List(), "QQueryNativeLowering", "QGroupAggregate", "select/group/aggregate", qQueryLoweringFallbackGroupAggregateCall)
+	assertQKernelDescriptor(t, BuildQKernelDescriptors(nil, DetectQFrameRuntimeKernels(lowered), nil, fn.Remarks.List()),
+		"methodjit_q_frame_runtime", "runtime_kernel", "FrameGroupAggregate", "group/aggregate", "typed_runtime_op_exit", "supported", "")
+
+	report := Diagnose(proto, []runtime.Value{runtime.TableValue(qHotPathTestFrame(t))})
+	if report.NativeError != nil || report.OptInterpError != nil {
+		t.Fatalf("Diagnose computed group aggregate errors: native=%v opt=%v\n%s", report.NativeError, report.OptInterpError, report.String())
+	}
+	assertQKernelExecutionStat(t, report.QKernelExecutionStats, "methodjit_q_frame_runtime", "FrameGroupAggregate", "group/aggregate", "typed_runtime_op_exit", "success", 1)
 }
 
 func TestQGroupAggregateUnsupportedWhereStaysOnFallback(t *testing.T) {

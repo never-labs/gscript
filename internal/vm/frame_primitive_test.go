@@ -857,6 +857,31 @@ func TestFrameGroupAggregatePrimitiveMinMaxAvg(t *testing.T) {
 	assertF64Column(t, out, "avg_qty", []float64{22.0 / 3.0, 3})
 }
 
+func TestFrameGroupAggregatePrimitiveBinarySum(t *testing.T) {
+	frame := frameGroupAggregateTestFrame(t)
+	spec := frameGroupAggregateSpec("acct", []runtime.FrameAggregateSpec{
+		{Name: "notional", Op: "sum", Left: "amount", Right: "qty", BinaryOp: "*"},
+	})
+	proto := &FuncProto{
+		MaxStack: 2,
+		Code: []uint32{
+			EncodeABx(OP_LOADK, 0, 0),
+			EncodeABC(OP_LOADNIL, 1, 0, 0),
+			EncodeABC(OP_FRAME_GROUP_AGGREGATE, 1, 0, 1),
+			EncodeABC(OP_RETURN, 1, 2, 0),
+		},
+		Constants: []runtime.Value{runtime.TableValue(frame), runtime.TableValue(spec)},
+	}
+
+	results, err := New(map[string]runtime.Value{}).Execute(proto)
+	if err != nil {
+		t.Fatalf("Execute FRAME_GROUP_AGGREGATE binary sum: %v", err)
+	}
+	out := frameGroupAggregateResultSoA(t, results)
+	assertI64Column(t, out, "acct", []int64{1, 2})
+	assertF64Column(t, out, "notional", []float64{10*10 + 5*5 + 7.5*7, 3.5 * 3})
+}
+
 func TestFrameGroupAggregatePrimitiveStringKey(t *testing.T) {
 	frame := frameGroupAggregateTestFrame(t)
 	spec := frameGroupAggregateSpec("sym", []runtime.FrameAggregateSpec{
@@ -1042,6 +1067,15 @@ func frameGroupAggregateSetAggs(spec *runtime.Table, aggs []runtime.FrameAggrega
 		row.RawSetString("op", runtime.StringValue(agg.Op))
 		if agg.Column != "" {
 			row.RawSetString("column", runtime.StringValue(agg.Column))
+		}
+		if agg.Left != "" {
+			row.RawSetString("left", runtime.StringValue(agg.Left))
+		}
+		if agg.Right != "" {
+			row.RawSetString("right", runtime.StringValue(agg.Right))
+		}
+		if agg.BinaryOp != "" {
+			row.RawSetString("binary_op", runtime.StringValue(agg.BinaryOp))
 		}
 		aggRows.RawSetInt(int64(i+1), runtime.TableValue(row))
 	}
