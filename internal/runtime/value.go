@@ -843,6 +843,61 @@ func (v Value) NativeFrameProjectColumn(names []string, resultName string) (Valu
 	}
 }
 
+// NativeFrameFilterProjectColumn filters a native frame and returns a projected
+// result column without materializing the full filtered/projected frame when
+// the carrier can answer directly.
+func (v Value) NativeFrameFilterProjectColumn(mask *DenseArray, names []string, resultName string) (Value, bool, error) {
+	if mask == nil {
+		return NilValue(), true, fmt.Errorf("FRAME_FILTER_PROJECT_COLUMN mask must be a bool dense array")
+	}
+	if len(names) == 0 {
+		return NilValue(), true, fmt.Errorf("FRAME_FILTER_PROJECT_COLUMN requires at least one projected column")
+	}
+	if resultName == "" {
+		return NilValue(), true, fmt.Errorf("FRAME_FILTER_PROJECT_COLUMN result column name must not be empty")
+	}
+	if !v.IsTable() {
+		return NilValue(), false, nil
+	}
+	tbl := v.Table()
+	if tbl == nil {
+		return NilValue(), false, nil
+	}
+	payload, _, ok := tbl.NativeFramePayload()
+	if !ok {
+		return NilValue(), false, nil
+	}
+	switch frame := payload.(type) {
+	case *SoA:
+		found := false
+		for _, name := range names {
+			if name == "" {
+				return NilValue(), true, fmt.Errorf("FRAME_FILTER_PROJECT_COLUMN column name must not be empty")
+			}
+			if _, ok := frame.Column(name); !ok {
+				return NilValue(), true, fmt.Errorf("FRAME_FILTER_PROJECT_COLUMN unknown column %q", name)
+			}
+			if name == resultName {
+				found = true
+			}
+		}
+		if !found {
+			return NilValue(), true, fmt.Errorf("FRAME_FILTER_PROJECT_COLUMN result column %q is not projected", resultName)
+		}
+		col, ok := frame.Column(resultName)
+		if !ok {
+			return NilValue(), true, fmt.Errorf("FRAME_FILTER_PROJECT_COLUMN unknown column %q", resultName)
+		}
+		out, err := col.Filter(mask)
+		if err != nil {
+			return NilValue(), true, err
+		}
+		return DenseArrayValue(out), true, nil
+	default:
+		return NilValue(), true, fmt.Errorf("FRAME_FILTER_PROJECT_COLUMN unsupported native frame payload %T", payload)
+	}
+}
+
 // NativeFrameFilter returns a new runtime frame facade containing rows selected
 // by a bool dense-array mask.
 func (v Value) NativeFrameFilter(mask *DenseArray) (Value, bool, error) {

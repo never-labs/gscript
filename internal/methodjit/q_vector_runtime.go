@@ -72,6 +72,20 @@ func executeFrameProjectColumnValue(frameVal runtime.Value, names []string, resu
 	return out, nil
 }
 
+func executeFrameFilterProjectColumnValue(frameVal, maskVal runtime.Value, names []string, resultName string) (runtime.Value, error) {
+	if !maskVal.IsDenseArray() {
+		return runtime.NilValue(), fmt.Errorf("FrameFilterProjectColumn mask must be dense array (got %s)", maskVal.TypeName())
+	}
+	out, handled, err := frameVal.NativeFrameFilterProjectColumn(maskVal.DenseArray(), names, resultName)
+	if err != nil {
+		return runtime.NilValue(), err
+	}
+	if !handled {
+		return runtime.NilValue(), fmt.Errorf("FrameFilterProjectColumn operand must be native frame (got %s)", frameVal.TypeName())
+	}
+	return out, nil
+}
+
 func executeFrameFilterValue(frameVal, maskVal runtime.Value) (runtime.Value, error) {
 	if !maskVal.IsDenseArray() {
 		return runtime.NilValue(), fmt.Errorf("FrameFilter mask must be dense array (got %s)", maskVal.TypeName())
@@ -139,15 +153,6 @@ func executeQFrameSelectColumnValue(constants []runtime.Value, specs []QFrameSel
 	if err != nil {
 		return runtime.NilValue(), err
 	}
-	rows, err := executeFrameFilterValue(frameVal, mask)
-	if err != nil {
-		return runtime.NilValue(), err
-	}
-	rowArg, hasRowArg := qFrameSelectColumnRowArg(spec, argVal, hasArg)
-	rows, err = executeQFrameSelectColumnRows(constants, spec, rows, rowArg, hasRowArg)
-	if err != nil {
-		return runtime.NilValue(), err
-	}
 	if spec.ProjectConst < 0 || spec.ProjectConst >= len(constants) {
 		return runtime.NilValue(), fmt.Errorf("QFrameSelectColumn project constant is out of range")
 	}
@@ -158,7 +163,20 @@ func executeQFrameSelectColumnValue(constants []runtime.Value, specs []QFrameSel
 	if spec.ResultColumnConst < 0 || spec.ResultColumnConst >= len(constants) || !constants[spec.ResultColumnConst].IsString() {
 		return runtime.NilValue(), fmt.Errorf("QFrameSelectColumn result column must be a string constant")
 	}
-	return executeFrameProjectColumnValue(rows, names, constants[spec.ResultColumnConst].Str())
+	resultName := constants[spec.ResultColumnConst].Str()
+	if spec.RowMode == QFrameSelectColumnRowsNone {
+		return executeFrameFilterProjectColumnValue(frameVal, mask, names, resultName)
+	}
+	rows, err := executeFrameFilterValue(frameVal, mask)
+	if err != nil {
+		return runtime.NilValue(), err
+	}
+	rowArg, hasRowArg := qFrameSelectColumnRowArg(spec, argVal, hasArg)
+	rows, err = executeQFrameSelectColumnRows(constants, spec, rows, rowArg, hasRowArg)
+	if err != nil {
+		return runtime.NilValue(), err
+	}
+	return executeFrameProjectColumnValue(rows, names, resultName)
 }
 
 func executeQFrameSelectColumnMask(constants []runtime.Value, spec QFrameSelectColumnSpec, frameVal runtime.Value, rhsVal runtime.Value, hasRHS bool) (runtime.Value, error) {

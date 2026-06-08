@@ -107,3 +107,35 @@ func TestNativeFrameProjectColumnValidatesProjection(t *testing.T) {
 		t.Fatalf("NativeFrameProjectColumn unprojected result handled=%v err=%v, want handled error", handled, err)
 	}
 }
+
+func TestNativeFrameFilterProjectColumnFiltersSingleProjectedColumn(t *testing.T) {
+	soa, err := NewSoA(map[string]*DenseArray{
+		"price": NewDenseArrayF64([]float64{10, 12, 8}),
+		"size":  NewDenseArrayI64([]int64{100, 200, 300}),
+	})
+	if err != nil {
+		t.Fatalf("NewSoA: %v", err)
+	}
+	frame := NewTable()
+	frame.SetNativePayloadWithInfo(soa, NativePayloadInfo{
+		Kind:       NativePayloadDataFrame,
+		Rows:       soa.Len(),
+		Columns:    2,
+		SchemaHash: "filter-project-column-test",
+	})
+
+	col, handled, err := TableValue(frame).NativeFrameFilterProjectColumn(NewDenseArrayBool([]bool{true, false, true}), []string{"size"}, "size")
+	if err != nil {
+		t.Fatalf("NativeFrameFilterProjectColumn: %v", err)
+	}
+	if !handled || !col.IsDenseArray() {
+		t.Fatalf("NativeFrameFilterProjectColumn = %v handled=%v, want dense array", col, handled)
+	}
+	got, ok := col.DenseArray().I64()
+	if !ok || len(got) != 2 || got[0] != 100 || got[1] != 300 {
+		t.Fatalf("filter project column values = %#v, want [100 300]", got)
+	}
+	if _, handled, err := TableValue(frame).NativeFrameFilterProjectColumn(NewDenseArrayBool([]bool{true, false, true}), []string{"price"}, "size"); !handled || err == nil {
+		t.Fatalf("NativeFrameFilterProjectColumn unprojected result handled=%v err=%v, want handled error", handled, err)
+	}
+}
