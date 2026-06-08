@@ -3043,6 +3043,11 @@ again := q.query(trades, {select: {price: "price"}, order_by: "missing"})
 	if cache["entries"] != 1 || cache["hits"] != 1 || cache["misses"] != 1 || cache["evictions"] != 0 {
 		t.Fatalf("q_query_kernel unsupported stats = %#v, want 1 entry, 1 hit, 1 miss, 0 evictions", cache)
 	}
+	queryKernelRow := qTestCacheStatsRowTable(t, qCacheStatsTable(), "q_query_kernel")
+	shapeRows := qTestQueryKernelShapeRows(t, queryKernelRow.RawGetString("shapes").Table())
+	if got := qTestQueryKernelShapeCount(shapeRows, false, qFallbackFamilyOrder, qQueryKernelReasonOrder); got != 1 {
+		t.Fatalf("q_query_kernel order shape count = %d, want 1", got)
+	}
 }
 
 func TestQFallbackStatsTrackQueryKernelHits(t *testing.T) {
@@ -3154,6 +3159,14 @@ explained := q.explain_query(trades, {select: {large: {">=", "size", 15}, notion
 	got := stats["q_query_kernel"]
 	if got["entries"] != 1 || got["hits"] != 1 || got["misses"] != 1 || got["evictions"] != 0 {
 		t.Fatalf("q_query_kernel stats = %#v, want 1 entry, 1 hit, 1 miss, 0 evictions", got)
+	}
+	queryKernelRow := qTestCacheStatsRowTable(t, qCacheStatsTable(), "q_query_kernel")
+	shapeRows := qTestQueryKernelShapeRows(t, queryKernelRow.RawGetString("shapes").Table())
+	if got := qTestQueryKernelShapeCount(shapeRows, true, qFallbackFamilySupported, qKernelReasonSupported); got != 1 {
+		t.Fatalf("q_query_kernel supported shape count = %d, want 1", got)
+	}
+	if shapeRows[0].Shape == "" || !strings.Contains(shapeRows[0].Shape, "select=") {
+		t.Fatalf("q_query_kernel supported shape = %q, want select shape", shapeRows[0].Shape)
 	}
 	fallback := qTestFallbackStatsRows(t, qFallbackStatsTable())
 	if got := fallback[qQueryKernelSupported]; got != 2 {
@@ -3599,6 +3612,12 @@ func TestQExplainReportsQueryKernelVisibility(t *testing.T) {
 	}
 	if got := afterTable.RawGetString("kernel_cached"); !got.IsBool() || !got.Bool() {
 		t.Fatalf("kernel_cached after = %v, want true", got)
+	}
+	if got := afterTable.RawGetString("kernel_decision_cached"); !got.IsBool() || !got.Bool() {
+		t.Fatalf("kernel_decision_cached after = %v, want true", got)
+	}
+	if got := afterTable.RawGetString("kernel_reason"); !got.IsString() || got.Str() != beforeTable.RawGetString("kernel_reason").Str() {
+		t.Fatalf("kernel_reason after = %v, want cached reason %q", got, beforeTable.RawGetString("kernel_reason").Str())
 	}
 	if got := afterTable.RawGetString("kernel_cache_key"); !got.IsString() || got.Str() != cacheKey.Str() {
 		t.Fatalf("kernel_cache_key after = %v, want %s", got, cacheKey.Str())
@@ -5238,6 +5257,53 @@ func qTestCacheStatsRowTable(t *testing.T, tbl *Table, cache string) *Table {
 	}
 	t.Fatalf("cache stats missing row %q", cache)
 	return nil
+}
+
+type qQueryKernelShapeRow struct {
+	Supported    bool
+	ReasonFamily string
+	ReasonCode   string
+	Shape        string
+	Count        int64
+}
+
+func qTestQueryKernelShapeRows(t *testing.T, tbl *Table) []qQueryKernelShapeRow {
+	t.Helper()
+	if tbl == nil {
+		t.Fatal("q_query_kernel shapes table is nil")
+	}
+	rows := make([]qQueryKernelShapeRow, 0, tbl.Length())
+	for i := 1; i <= tbl.Length(); i++ {
+		row := tbl.RawGetInt(int64(i)).Table()
+		if row == nil {
+			t.Fatalf("q_query_kernel shape row %d is nil", i)
+		}
+		supported := row.RawGetString("supported")
+		reasonFamily := row.RawGetString("reason_family")
+		reasonCode := row.RawGetString("reason_code")
+		shape := row.RawGetString("shape")
+		count := row.RawGetString("count")
+		if !supported.IsBool() || !reasonFamily.IsString() || !reasonCode.IsString() || !shape.IsString() || !count.IsInt() {
+			t.Fatalf("q_query_kernel shape row %d malformed: %#v", i, row)
+		}
+		rows = append(rows, qQueryKernelShapeRow{
+			Supported:    supported.Bool(),
+			ReasonFamily: reasonFamily.Str(),
+			ReasonCode:   reasonCode.Str(),
+			Shape:        shape.Str(),
+			Count:        count.Int(),
+		})
+	}
+	return rows
+}
+
+func qTestQueryKernelShapeCount(rows []qQueryKernelShapeRow, supported bool, reasonFamily, reasonCode string) int64 {
+	for _, row := range rows {
+		if row.Supported == supported && row.ReasonFamily == reasonFamily && row.ReasonCode == reasonCode {
+			return row.Count
+		}
+	}
+	return 0
 }
 
 func qTestKernelCacheKeyStats(t *testing.T, stats []qSQLKernelCacheKeyStats, key string) qSQLKernelCacheKeyStats {

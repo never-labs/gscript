@@ -1335,6 +1335,61 @@ func TestQFramePrimitiveHotPathDetectsVectorMaskPredicate(t *testing.T) {
 	}
 }
 
+func TestQVectorWhereHotPathDiagnosesConditionalProjection(t *testing.T) {
+	proto := &vm.FuncProto{
+		Name:      "q_vector_where_conditional_projection",
+		NumParams: 1,
+		MaxStack:  4,
+		Constants: []runtime.Value{
+			runtime.StringValue("price"),
+			runtime.FloatValue(100),
+			runtime.StringValue("size"),
+			runtime.IntValue(0),
+		},
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_FRAME_COLUMN, 1, 0, 0),
+			vm.EncodeABx(vm.OP_LOADK, 2, 1),
+			vm.EncodeABC(vm.OP_VECTOR_COMPARE, 1, 2, int(runtime.DenseArrayGE)),
+			vm.EncodeABC(vm.OP_FRAME_COLUMN, 2, 0, 2),
+			vm.EncodeABx(vm.OP_LOADK, 3, 3),
+			vm.EncodeABC(vm.OP_VECTOR_WHERE, 1, 2, 3),
+			vm.EncodeABC(vm.OP_RETURN, 1, 2, 0),
+		},
+	}
+
+	fn := BuildGraph(proto)
+	paths := DetectQVectorWhereHotPaths(fn)
+	if len(paths) != 1 {
+		t.Fatalf("DetectQVectorWhereHotPaths count = %d, want 1\n%s", len(paths), Print(fn))
+	}
+	if got := paths[0].Shape(); got != "compare/vector-where" {
+		t.Fatalf("q vector where shape = %q, want compare/vector-where", got)
+	}
+	if paths[0].Compare == nil || paths[0].TrueColumn == nil || paths[0].FalseColumn != nil {
+		t.Fatalf("q vector where path = %+v, want compare predicate, frame true column, scalar false operand", paths[0])
+	}
+	if got := formatQVectorWhereHotPaths(paths); !strings.Contains(got, "shape=compare/vector-where") ||
+		!strings.Contains(got, "predicate=compare >=") ||
+		!strings.Contains(got, "true=frame-column") ||
+		!strings.Contains(got, "false=scalar") {
+		t.Fatalf("formatted vector where hot paths missing details:\n%s", got)
+	}
+
+	report := Diagnose(proto, []runtime.Value{runtime.TableValue(qHotPathTestFrame(t))})
+	if len(report.QVectorWhereHotPaths) != 1 {
+		t.Fatalf("Diagnose QVectorWhereHotPaths = %d, want 1\n%s", len(report.QVectorWhereHotPaths), report.String())
+	}
+	if report.QVectorWhereHotPathShapes["compare/vector-where"] != 1 {
+		t.Fatalf("Diagnose QVectorWhereHotPathShapes = %+v, want compare/vector-where count 1", report.QVectorWhereHotPathShapes)
+	}
+	if !strings.Contains(report.String(), "Q vector conditional hot paths") ||
+		!strings.Contains(report.String(), "Q typed vector runtime kernels") ||
+		!strings.Contains(report.String(), "kernel=VectorWhere") ||
+		!strings.Contains(report.String(), "shapes: compare/vector-where=1") {
+		t.Fatalf("diagnostic report missing q vector where typed kernel shape:\n%s", report.String())
+	}
+}
+
 func TestDiagnoseReportsQQueryHotPath(t *testing.T) {
 	names := runtime.NewTable()
 	names.RawSetInt(1, runtime.StringValue("size"))

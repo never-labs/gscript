@@ -180,6 +180,8 @@ type DiagReport struct {
 	OptimizationRemarks       []OptimizationRemark     // structured pass/gate diagnostics
 	QQueryHotPaths            []QQueryHotPath          // q query primitive pipelines visible in final IR
 	QQueryHotPathShapes       map[string]int           // q query primitive pipeline count by shape
+	QVectorWhereHotPaths      []QVectorWhereHotPath    // q vector conditional projection pipelines visible in final IR
+	QVectorWhereHotPathShapes map[string]int           // q vector conditional projection count by shape
 	QTypedRuntimeKernels      []QFrameSelectColumnSpec // q query primitive pipelines lowered to typed runtime-kernel op-exits
 	QTypedRuntimeKernelShapes map[string]int           // lowered q typed runtime-kernel count by shape
 	QQueryFallbacks           map[string]int           // q native lowering fallback count by reason code
@@ -262,6 +264,8 @@ func Diagnose(proto *vm.FuncProto, args []runtime.Value) *DiagReport {
 		r.OptimizationRemarks = remarks.List()
 		r.QQueryHotPaths = DetectQQueryHotPaths(fn)
 		r.QQueryHotPathShapes = CountQQueryHotPathShapes(r.QQueryHotPaths)
+		r.QVectorWhereHotPaths = DetectQVectorWhereHotPaths(fn)
+		r.QVectorWhereHotPathShapes = CountQVectorWhereHotPathShapes(r.QVectorWhereHotPaths)
 		r.QTypedRuntimeKernels = append([]QFrameSelectColumnSpec(nil), fn.QFrameSelectColumnSpecs...)
 		r.QTypedRuntimeKernelShapes = CountQFrameSelectColumnSpecShapes(r.QTypedRuntimeKernels)
 		r.QQueryFallbacks = CountQQueryLoweringFallbackReasons(r.OptimizationRemarks)
@@ -274,6 +278,8 @@ func Diagnose(proto *vm.FuncProto, args []runtime.Value) *DiagReport {
 	r.OptimizationRemarks = remarks.List()
 	r.QQueryHotPaths = DetectQQueryHotPaths(optimized)
 	r.QQueryHotPathShapes = CountQQueryHotPathShapes(r.QQueryHotPaths)
+	r.QVectorWhereHotPaths = DetectQVectorWhereHotPaths(optimized)
+	r.QVectorWhereHotPathShapes = CountQVectorWhereHotPathShapes(r.QVectorWhereHotPaths)
 	r.QTypedRuntimeKernels = append([]QFrameSelectColumnSpec(nil), optimized.QFrameSelectColumnSpecs...)
 	r.QTypedRuntimeKernelShapes = CountQFrameSelectColumnSpecShapes(r.QTypedRuntimeKernels)
 	r.QQueryFallbacks = CountQQueryLoweringFallbackReasons(r.OptimizationRemarks)
@@ -520,7 +526,9 @@ func (r *DiagReport) String() string {
 	}
 	w("\n--- Optimization remarks ---\n%s", formatOptimizationRemarks(r.OptimizationRemarks))
 	w("\n--- Q query hot paths ---\n%s", formatQQueryHotPaths(r.QQueryHotPaths))
+	w("\n--- Q vector conditional hot paths ---\n%s", formatQVectorWhereHotPaths(r.QVectorWhereHotPaths))
 	w("\n--- Q typed runtime kernels ---\n%s", formatQFrameSelectColumnSpecs(r.QTypedRuntimeKernels))
+	w("\n--- Q typed vector runtime kernels ---\n%s", formatQTypedVectorRuntimeKernels(r.QVectorWhereHotPaths))
 	w("\n--- Q query fallback reasons ---\n%s", formatQQueryLoweringFallbackReasons(r.QQueryFallbacks))
 	w("\n--- IR (after passes) ---\n%s", r.IRAfter)
 	w("\n--- Register Allocation ---\n%s\n", r.RegAllocMap)

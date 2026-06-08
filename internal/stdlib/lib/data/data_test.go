@@ -2329,6 +2329,74 @@ func TestQueryKernelCompileFallbackAndValidation(t *testing.T) {
 	}
 }
 
+func TestQueryKernelGroupedAggregateWithComputedWhereOrderLimit(t *testing.T) {
+	frame := mustFrame(t,
+		Column{Name: "sym", Data: NewSymbols([]string{"AAPL", "AAPL", "MSFT", "NVDA", "MSFT", "TSLA"})},
+		Column{Name: "side", Data: NewSymbols([]string{"buy", "sell", "buy", "buy", "sell", "buy"})},
+		Column{Name: "price", Data: NewF64([]float64{100.5, 101.0, 80.0, 120.0, 82.0, 200.0})},
+		Column{Name: "size", Data: NewI64([]int64{10, 20, 30, 5, 50, 1})},
+	)
+	plan := QueryPlan{
+		Source: frame,
+		Where: Logical{
+			Op: "and",
+			Left: In{
+				Expr:   ColumnRef{Name: "sym"},
+				Values: []any{Symbol("AAPL"), Symbol("MSFT"), Symbol("NVDA")},
+			},
+			Right: Logical{
+				Op: "or",
+				Left: Binary{
+					Op:    OpEQ,
+					Left:  ColumnRef{Name: "side"},
+					Right: Literal{Value: Symbol("buy")},
+				},
+				Right: Binary{
+					Op:    OpGE,
+					Left:  ColumnRef{Name: "price"},
+					Right: Literal{Value: 100.0},
+				},
+			},
+		},
+		By: []Symbol{"sym"},
+		Aggregates: []Aggregate{
+			{Name: "notional", Func: "sum", Expr: Binary{Op: OpMul, Left: ColumnRef{Name: "price"}, Right: ColumnRef{Name: "size"}}},
+			{Name: "fills", Func: "count"},
+			{Name: "avg_px", Func: "avg", Expr: ColumnRef{Name: "price"}},
+		},
+		OrderBy: []OrderSpec{{Column: "notional", Desc: true}},
+		LimitN:  2,
+	}
+
+	kernel, ok, err := CompileQueryKernel(frame, plan)
+	if err != nil {
+		t.Fatalf("CompileQueryKernel returned error: %v", err)
+	}
+	if !ok {
+		_, reason := QueryKernelSupportReason(plan)
+		t.Fatalf("CompileQueryKernel ok = false, reason: %s", reason)
+	}
+	if reason := kernel.Reason(); !strings.Contains(reason, "grouped aggregate path") {
+		t.Fatalf("QueryKernel reason = %q, want grouped aggregate path", reason)
+	}
+	got, err := kernel.Exec(frame)
+	if err != nil {
+		t.Fatalf("QueryKernel Exec returned error: %v", err)
+	}
+	want, err := plan.Exec()
+	if err != nil {
+		t.Fatalf("fallback Exec returned error: %v", err)
+	}
+	if !SameSchema(got, want) || got.Len() != want.Len() {
+		t.Fatalf("kernel schema/len = %#v/%d, want %#v/%d", got.Schema(), got.Len(), want.Schema(), want.Len())
+	}
+	assertColumnValues(t, got, "sym", []any{Symbol("AAPL"), Symbol("MSFT")})
+	assertColumnValues(t, got, "notional", []any{3025.0, 2400.0})
+	assertColumnValues(t, got, "fills", []any{int64(2), int64(1)})
+	assertColumnValues(t, got, "avg_px", []any{100.75, 80.0})
+	assertColumnValues(t, want, "notional", []any{3025.0, 2400.0})
+}
+
 func TestQueryDistinctRows(t *testing.T) {
 	frame := mustFrame(t,
 		NewColumn("sym", []any{Symbol("a"), Symbol("b"), Symbol("a"), Symbol("a")}),

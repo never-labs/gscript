@@ -107,6 +107,7 @@ type qQueryKernelSupportCacheEntry struct {
 	ReasonCode string
 	Reason     string
 	SchemaHash string
+	Shape      string
 }
 
 type qFallbackStats struct {
@@ -129,6 +130,18 @@ type qFallbackReasonCodeKey struct {
 type qFallbackReasonKey struct {
 	Code   string
 	Reason string
+}
+
+type qQueryKernelSupportShapeKey struct {
+	Supported    bool
+	ReasonFamily string
+	ReasonCode   string
+	Shape        string
+}
+
+type qQueryKernelSupportShapeStat struct {
+	Key   qQueryKernelSupportShapeKey
+	Count int
 }
 
 type qSQLArgsResult struct {
@@ -665,6 +678,9 @@ func qQueryKernelSupportCacheStore(key string, entry qQueryKernelSupportCacheEnt
 	if key == "" {
 		return
 	}
+	if entry.Shape == "" {
+		entry.Shape = qQueryKernelShapeFromCacheKey(key)
+	}
 	qQueryKernelSupportCacheMu.Lock()
 	if _, ok := qQueryKernelSupportCache[key]; !ok {
 		qQueryKernelSupportCacheOrder = append(qQueryKernelSupportCacheOrder, key)
@@ -709,6 +725,82 @@ func qQueryKernelSupportCacheKey(s *SoA, spec *Table, selects []qSelect) (string
 	}
 	parts = append(parts, "limit="+strconv.Itoa(limit))
 	return strings.Join(parts, "|"), true
+}
+
+func qQueryKernelShapeFromCacheKey(key string) string {
+	if key == "" {
+		return ""
+	}
+	selectShapes := make([]string, 0, 4)
+	orderCount := 0
+	limit := "none"
+	for _, part := range strings.Split(key, "|") {
+		switch {
+		case strings.HasPrefix(part, "select:"):
+			_, sig, ok := strings.Cut(part, "=")
+			if !ok {
+				selectShapes = append(selectShapes, "unknown")
+				continue
+			}
+			selectShapes = append(selectShapes, qQueryKernelExprShape(sig))
+		case strings.HasPrefix(part, "order:"):
+			orderCount++
+		case strings.HasPrefix(part, "limit="):
+			limit = strings.TrimPrefix(part, "limit=")
+			if limit == "-1" {
+				limit = "none"
+			}
+		}
+	}
+	if len(selectShapes) == 0 {
+		selectShapes = append(selectShapes, "none")
+	}
+	return fmt.Sprintf("select=%s|order=%d|limit=%s", strings.Join(selectShapes, ","), orderCount, limit)
+}
+
+func qQueryKernelExprShape(sig string) string {
+	if sig == "" {
+		return "unknown"
+	}
+	switch {
+	case strings.HasPrefix(sig, "s:"):
+		return "column"
+	case strings.HasPrefix(sig, "i:"), strings.HasPrefix(sig, "f:"), strings.HasPrefix(sig, "b:"), strings.HasPrefix(sig, "nil"):
+		return "literal"
+	case strings.HasPrefix(sig, "op:"):
+		op := ""
+		rest := strings.TrimPrefix(sig, "op:")
+		if decoded, remaining, ok := qQueryKernelDecodeQuotedPrefix(rest); ok && strings.HasPrefix(remaining, "(") {
+			op = decoded
+		}
+		switch op {
+		case "=", "!=", "<", "<=", ">", ">=":
+			return "compare"
+		case "+", "-", "*", "/":
+			return "binary"
+		default:
+			return "op"
+		}
+	default:
+		return "unknown"
+	}
+}
+
+func qQueryKernelDecodeQuotedPrefix(src string) (value, rest string, ok bool) {
+	if src == "" || src[0] != '"' {
+		return "", src, false
+	}
+	for i := 1; i <= len(src); i++ {
+		if i == len(src) || src[i-1] != '"' {
+			continue
+		}
+		value, err := strconv.Unquote(src[:i])
+		if err != nil {
+			continue
+		}
+		return value, src[i:], true
+	}
+	return "", src, false
 }
 
 func qQueryKernelExprSignature(expr Value, depth int) (string, bool) {
@@ -1892,9 +1984,16 @@ func qExplainKernelInfo(args qSQLArgsResult, tmpl qSQLPlanTemplate) qExplainKern
 		schemaHash = qSourceCarrierSchemaHash(frame, source.info, source.hasInfo)
 	}
 	qSQLAlignedPlanCacheMu.Lock()
-	_, cached := qSQLKernelCache[kernelKey]
+	cachedKernel, cached := qSQLKernelCache[kernelKey]
 	unsupportedReason, unsupportedCached := qSQLKernelUnsupported[kernelKey]
 	qSQLAlignedPlanCacheMu.Unlock()
+	if cached {
+		reason := cachedKernel.Reason()
+		if reason == "" {
+			reason = qKernelReasonSupported
+		}
+		return qExplainKernelResult{schema: frame.Schema(), schemaHash: schemaHash, cacheKey: kernelKey, cacheNamespace: kernelKeyInfo.Namespace, cacheKind: kernelKeyInfo.Kind, cacheSchemaHash: kernelKeyInfo.SchemaHash, planFingerprint: planFingerprint, supported: true, cached: true, decisionCached: true, reasonCode: qKernelReasonSupported, reason: reason}
+	}
 	if unsupportedCached {
 		return qExplainKernelResult{schema: frame.Schema(), schemaHash: schemaHash, cacheKey: kernelKey, cacheNamespace: kernelKeyInfo.Namespace, cacheKind: kernelKeyInfo.Kind, cacheSchemaHash: kernelKeyInfo.SchemaHash, planFingerprint: planFingerprint, cached: false, decisionCached: true, reasonCode: stdq.KernelFallbackReasonCode(unsupportedReason), reason: unsupportedReason}
 	}
@@ -2639,6 +2738,7 @@ func qCacheStatsTable() *Table {
 	qQueryKernelSupportCacheMu.Lock()
 	queryKernelEntries := len(qQueryKernelSupportCache)
 	queryKernelStats := qQueryKernelSupportStats
+	queryKernelShapeStats := qQueryKernelSupportCacheShapeStatsLocked()
 	qQueryKernelSupportCacheMu.Unlock()
 
 	rows := NewAppendArrayTable(6)
@@ -2676,14 +2776,16 @@ func qCacheStatsTable() *Table {
 		alignedStats.KernelDecisionEvictions,
 		qSQLPlanCacheLimit,
 	)))
-	rows.RawSetInt(5, TableValue(qCacheStatsRow(
+	queryKernelStatsRow := qCacheStatsRow(
 		"q_query_kernel",
 		queryKernelEntries,
 		queryKernelStats.Hits,
 		queryKernelStats.Misses,
 		queryKernelStats.Evictions,
 		qQueryKernelSupportCacheLimit,
-	)))
+	)
+	queryKernelStatsRow.RawSetString("shapes", TableValue(qQueryKernelSupportShapeStatsTable(queryKernelShapeStats)))
+	rows.RawSetInt(5, TableValue(queryKernelStatsRow))
 	rows.RawSetInt(6, TableValue(qCacheStatsRow(
 		"q_eval",
 		evalEntries,
@@ -2704,6 +2806,68 @@ func qCacheStatsRow(name string, entries, hits, misses, evictions, limit int) *T
 	row.RawSetString("evictions", IntValue(int64(evictions)))
 	row.RawSetString("limit", IntValue(int64(limit)))
 	return row
+}
+
+func qQueryKernelSupportCacheShapeStatsLocked() []qQueryKernelSupportShapeStat {
+	counts := make(map[qQueryKernelSupportShapeKey]int, len(qQueryKernelSupportCache))
+	for _, entry := range qQueryKernelSupportCache {
+		reasonCode := entry.ReasonCode
+		if reasonCode == "" {
+			reasonCode = qNormalizeQueryKernelFallbackReasonCode(entry.Reason)
+		}
+		if reasonCode == "" && entry.Supported {
+			reasonCode = qKernelReasonSupported
+		}
+		family := qFallbackReasonFamilyForDetail(qFallbackQueryKernel, reasonCode, entry.Reason)
+		if entry.Supported {
+			family = qFallbackFamilySupported
+		}
+		shape := entry.Shape
+		if shape == "" {
+			shape = "unknown"
+		}
+		counts[qQueryKernelSupportShapeKey{
+			Supported:    entry.Supported,
+			ReasonFamily: family,
+			ReasonCode:   reasonCode,
+			Shape:        shape,
+		}]++
+	}
+	stats := make([]qQueryKernelSupportShapeStat, 0, len(counts))
+	for key, count := range counts {
+		stats = append(stats, qQueryKernelSupportShapeStat{Key: key, Count: count})
+	}
+	sort.Slice(stats, func(i, j int) bool {
+		a, b := stats[i], stats[j]
+		if a.Count != b.Count {
+			return a.Count > b.Count
+		}
+		if a.Key.Supported != b.Key.Supported {
+			return a.Key.Supported
+		}
+		if a.Key.ReasonFamily != b.Key.ReasonFamily {
+			return a.Key.ReasonFamily < b.Key.ReasonFamily
+		}
+		if a.Key.ReasonCode != b.Key.ReasonCode {
+			return a.Key.ReasonCode < b.Key.ReasonCode
+		}
+		return a.Key.Shape < b.Key.Shape
+	})
+	return stats
+}
+
+func qQueryKernelSupportShapeStatsTable(stats []qQueryKernelSupportShapeStat) *Table {
+	rows := NewAppendArrayTable(len(stats))
+	for i, stat := range stats {
+		row := NewTable()
+		row.RawSetString("supported", BoolValue(stat.Key.Supported))
+		row.RawSetString("reason_family", StringValue(stat.Key.ReasonFamily))
+		row.RawSetString("reason_code", StringValue(stat.Key.ReasonCode))
+		row.RawSetString("shape", StringValue(stat.Key.Shape))
+		row.RawSetString("count", IntValue(int64(stat.Count)))
+		rows.RawSetInt(int64(i+1), TableValue(row))
+	}
+	return rows
 }
 
 func qKernelCacheKeyStatsTable(stats []qSQLKernelCacheKeyStats) *Table {

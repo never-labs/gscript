@@ -41,6 +41,19 @@ type QQueryHotPath struct {
 	ResultColumn *Instr
 }
 
+// QVectorWhereHotPath describes a q vector conditional projection:
+// typed mask -> vector where. The true/false operands may be frame columns or
+// scalars; this keeps the shape visible before a later fused vector lowering.
+type QVectorWhereHotPath struct {
+	SourceColumn *Instr
+	Compare      *Instr
+	Mask         *Instr
+	MaskCombine  *Instr
+	TrueColumn   *Instr
+	FalseColumn  *Instr
+	Where        *Instr
+}
+
 func (p QQueryHotPath) Shape() string {
 	if p.Compare == nil && p.Mask == nil && p.MaskCombine == nil {
 		switch {
@@ -72,7 +85,28 @@ func (p QQueryHotPath) Shape() string {
 	}
 }
 
+func (p QVectorWhereHotPath) Shape() string {
+	prefix := "compare"
+	if p.Mask != nil {
+		prefix = "mask"
+	} else if p.MaskCombine != nil {
+		prefix = "mask-combine"
+	}
+	return prefix + "/vector-where"
+}
+
 func CountQQueryHotPathShapes(paths []QQueryHotPath) map[string]int {
+	if len(paths) == 0 {
+		return nil
+	}
+	counts := make(map[string]int)
+	for _, path := range paths {
+		counts[path.Shape()]++
+	}
+	return counts
+}
+
+func CountQVectorWhereHotPathShapes(paths []QVectorWhereHotPath) map[string]int {
 	if len(paths) == 0 {
 		return nil
 	}
@@ -210,6 +244,47 @@ func DetectQQueryHotPaths(fn *Function) []QQueryHotPath {
 				RowOrder:     rowOrder,
 				Project:      project,
 				ResultColumn: instr,
+			})
+		}
+	}
+	return out
+}
+
+// DetectQVectorWhereHotPaths returns q vector conditional-select pipelines
+// visible in Method JIT IR. It is diagnostic metadata today; native lowering
+// still uses OpVectorWhere's typed runtime op-exit.
+func DetectQVectorWhereHotPaths(fn *Function) []QVectorWhereHotPath {
+	if fn == nil {
+		return nil
+	}
+	var out []QVectorWhereHotPath
+	for _, block := range fn.Blocks {
+		if block == nil {
+			continue
+		}
+		for _, instr := range block.Instrs {
+			if instr == nil || instr.Op != OpVectorWhere || len(instr.Args) != 3 {
+				continue
+			}
+			compare, mask, maskCombine := qVectorWherePredicate(instr.Args[0])
+			if compare == nil && mask == nil && maskCombine == nil {
+				continue
+			}
+			sourceColumn := (*Instr)(nil)
+			if compare != nil {
+				sourceColumn = qQueryCompareColumn(compare)
+				if sourceColumn == nil {
+					continue
+				}
+			}
+			out = append(out, QVectorWhereHotPath{
+				SourceColumn: sourceColumn,
+				Compare:      compare,
+				Mask:         mask,
+				MaskCombine:  maskCombine,
+				TrueColumn:   valueDef(instr.Args[1], OpFrameColumn),
+				FalseColumn:  valueDef(instr.Args[2], OpFrameColumn),
+				Where:        instr,
 			})
 		}
 	}
@@ -561,6 +636,19 @@ func qQueryFrameMaskTermSpec(fn *Function, spec *QFrameSelectColumnSpec, value *
 	return -1, qQueryLoweringFallbackMissingPredicate, false
 }
 
+func qVectorWherePredicate(value *Value) (*Instr, *Instr, *Instr) {
+	if compare := valueDef(value, OpVectorCompare); compare != nil {
+		return compare, nil, nil
+	}
+	if mask := valueDef(value, OpFrameMask); mask != nil {
+		return nil, mask, nil
+	}
+	if combine := valueDef(value, OpVectorMask); combine != nil {
+		return nil, nil, combine
+	}
+	return nil, nil, nil
+}
+
 func qFrameMaskAppendTerm(spec *QFrameSelectColumnSpec, term QFrameMaskTermSpec) int {
 	spec.MaskTerms = append(spec.MaskTerms, term)
 	return len(spec.MaskTerms) - 1
@@ -687,6 +775,27 @@ func formatQQueryHotPaths(paths []QQueryHotPath) string {
 	return b.String()
 }
 
+func formatQVectorWhereHotPaths(paths []QVectorWhereHotPath) string {
+	if len(paths) == 0 {
+		return "0 vector conditional pipeline(s)\n"
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "%d vector conditional pipeline(s)\n", len(paths))
+	if counts := CountQVectorWhereHotPathShapes(paths); len(counts) > 0 {
+		fmt.Fprintf(&b, "  shapes: %s\n", formatQQueryHotPathShapeCounts(counts))
+	}
+	for i, path := range paths {
+		fmt.Fprintf(&b, "  [%d] shape=%s predicate=%s true=%s false=%s\n",
+			i,
+			path.Shape(),
+			qVectorWherePredicateName(path),
+			qVectorWhereOperandName(path.TrueColumn),
+			qVectorWhereOperandName(path.FalseColumn),
+		)
+	}
+	return b.String()
+}
+
 func formatQQueryHotPathShapeCounts(counts map[string]int) string {
 	if len(counts) == 0 {
 		return ""
@@ -737,6 +846,27 @@ func formatQFrameSelectColumnSpecs(specs []QFrameSelectColumnSpec) string {
 	return b.String()
 }
 
+func formatQTypedVectorRuntimeKernels(paths []QVectorWhereHotPath) string {
+	if len(paths) == 0 {
+		return "0 typed vector runtime kernel(s)\n"
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "%d typed vector runtime kernel(s)\n", len(paths))
+	if counts := CountQVectorWhereHotPathShapes(paths); len(counts) > 0 {
+		fmt.Fprintf(&b, "  shapes: %s\n", formatQQueryHotPathShapeCounts(counts))
+	}
+	for i, path := range paths {
+		fmt.Fprintf(&b, "  [%d] shape=%s kernel=VectorWhere predicate=%s true=%s false=%s\n",
+			i,
+			path.Shape(),
+			qVectorWherePredicateName(path),
+			qVectorWhereOperandName(path.TrueColumn),
+			qVectorWhereOperandName(path.FalseColumn),
+		)
+	}
+	return b.String()
+}
+
 func qFrameSelectColumnSpecShape(spec QFrameSelectColumnSpec) string {
 	if spec.Shape == "" {
 		return "unknown"
@@ -755,6 +885,26 @@ func qFrameSelectColumnSpecMaskKind(spec QFrameSelectColumnSpec) string {
 		return fmt.Sprintf("compare:%s:%d", qDenseArrayCompareOpName(spec.CompareOp), spec.SourceColumnConst)
 	}
 	return "none"
+}
+
+func qVectorWherePredicateName(path QVectorWhereHotPath) string {
+	switch {
+	case path.Compare != nil:
+		return "compare " + qDenseArrayCompareOpName(runtime.DenseArrayBinaryOp(path.Compare.Aux))
+	case path.Mask != nil:
+		return "frame-mask"
+	case path.MaskCombine != nil:
+		return "mask-combine"
+	default:
+		return "unknown"
+	}
+}
+
+func qVectorWhereOperandName(column *Instr) string {
+	if column == nil {
+		return "scalar"
+	}
+	return "frame-column"
 }
 
 func qDenseArrayCompareOpName(op runtime.DenseArrayBinaryOp) string {
