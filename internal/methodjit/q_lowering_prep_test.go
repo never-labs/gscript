@@ -780,6 +780,188 @@ func TestFrameOrderGatherDiagnoseUsesRuntimeOpExit(t *testing.T) {
 	}
 }
 
+func TestQFrameRuntimePrimitiveDiagnoseExecutionStats(t *testing.T) {
+	projectNames := runtime.NewTable()
+	projectNames.RawSetInt(1, runtime.StringValue("size"))
+	maskSpec := runtime.NewTable()
+	maskSpec.RawSetString("column", runtime.StringValue("price"))
+	maskSpec.RawSetString("op", runtime.StringValue(">="))
+	maskSpec.RawSetString("value", runtime.FloatValue(100))
+	orderSpec := runtime.NewTable()
+	orderSpec.RawSetString("column", runtime.StringValue("price"))
+	orderSpec.RawSetString("desc", runtime.BoolValue(true))
+	orderSpec.RawSetString("limit", runtime.IntValue(2))
+	columnSpec := runtime.NewTable()
+	columnSpec.RawSetString("project", runtime.StringValue("size"))
+	columnSpec.RawSetString("column", runtime.StringValue("size"))
+
+	frameArg := func(t *testing.T) runtime.Value {
+		t.Helper()
+		return runtime.TableValue(qHotPathTestFrame(t))
+	}
+	maskArg := runtime.DenseArrayValue(runtime.NewDenseArrayBool([]bool{false, true, true}))
+	indexArg := runtime.DenseArrayValue(runtime.NewDenseArrayI64([]int64{3, 1}))
+
+	tests := []struct {
+		name      string
+		kernel    string
+		shape     string
+		constants []runtime.Value
+		code      []uint32
+		args      func(*testing.T) []runtime.Value
+	}{
+		{
+			name:   "len",
+			kernel: "FrameLen",
+			shape:  "len",
+			code: []uint32{
+				vm.EncodeABC(vm.OP_FRAME_LEN, 0, 0, 0),
+				vm.EncodeABC(vm.OP_RETURN, 0, 2, 0),
+			},
+			args: func(t *testing.T) []runtime.Value { return []runtime.Value{frameArg(t)} },
+		},
+		{
+			name:      "column",
+			kernel:    "FrameColumn",
+			shape:     "column",
+			constants: []runtime.Value{runtime.StringValue("size")},
+			code: []uint32{
+				vm.EncodeABC(vm.OP_FRAME_COLUMN, 0, 0, 0),
+				vm.EncodeABC(vm.OP_RETURN, 0, 2, 0),
+			},
+			args: func(t *testing.T) []runtime.Value { return []runtime.Value{frameArg(t)} },
+		},
+		{
+			name:      "mask",
+			kernel:    "FrameMask",
+			shape:     "mask",
+			constants: []runtime.Value{runtime.TableValue(maskSpec)},
+			code: []uint32{
+				vm.EncodeABC(vm.OP_FRAME_MASK, 0, 0, 0),
+				vm.EncodeABC(vm.OP_RETURN, 0, 2, 0),
+			},
+			args: func(t *testing.T) []runtime.Value { return []runtime.Value{frameArg(t)} },
+		},
+		{
+			name:      "project",
+			kernel:    "FrameProject",
+			shape:     "project",
+			constants: []runtime.Value{runtime.TableValue(projectNames)},
+			code: []uint32{
+				vm.EncodeABC(vm.OP_FRAME_PROJECT, 0, 0, 0),
+				vm.EncodeABC(vm.OP_RETURN, 0, 2, 0),
+			},
+			args: func(t *testing.T) []runtime.Value { return []runtime.Value{frameArg(t)} },
+		},
+		{
+			name:   "filter",
+			kernel: "FrameFilter",
+			shape:  "filter",
+			code: []uint32{
+				vm.EncodeABC(vm.OP_FRAME_FILTER, 0, 0, 1),
+				vm.EncodeABC(vm.OP_RETURN, 0, 2, 0),
+			},
+			args: func(t *testing.T) []runtime.Value { return []runtime.Value{frameArg(t), maskArg} },
+		},
+		{
+			name:      "filter_project",
+			kernel:    "FrameFilterProject",
+			shape:     "filter/project",
+			constants: []runtime.Value{runtime.TableValue(projectNames)},
+			code: []uint32{
+				vm.EncodeABC(vm.OP_FRAME_FILTER_PROJECT, 1, 0, 0),
+				vm.EncodeABC(vm.OP_RETURN, 1, 2, 0),
+			},
+			args: func(t *testing.T) []runtime.Value { return []runtime.Value{frameArg(t), maskArg} },
+		},
+		{
+			name:   "gather",
+			kernel: "FrameGather",
+			shape:  "gather",
+			code: []uint32{
+				vm.EncodeABC(vm.OP_FRAME_GATHER, 0, 0, 1),
+				vm.EncodeABC(vm.OP_RETURN, 0, 2, 0),
+			},
+			args: func(t *testing.T) []runtime.Value { return []runtime.Value{frameArg(t), indexArg} },
+		},
+		{
+			name:   "slice",
+			kernel: "FrameSlice",
+			shape:  "slice",
+			code: []uint32{
+				vm.EncodeABC(vm.OP_FRAME_SLICE, 0, 0, 1),
+				vm.EncodeABC(vm.OP_RETURN, 0, 2, 0),
+			},
+			args: func(t *testing.T) []runtime.Value { return []runtime.Value{frameArg(t), runtime.IntValue(2)} },
+		},
+		{
+			name:      "order",
+			kernel:    "FrameOrder",
+			shape:     "order",
+			constants: []runtime.Value{runtime.TableValue(orderSpec)},
+			code: []uint32{
+				vm.EncodeABC(vm.OP_FRAME_ORDER, 0, 0, 0),
+				vm.EncodeABC(vm.OP_RETURN, 0, 2, 0),
+			},
+			args: func(t *testing.T) []runtime.Value { return []runtime.Value{frameArg(t)} },
+		},
+		{
+			name:      "order_gather",
+			kernel:    "FrameOrderGather",
+			shape:     "order/gather",
+			constants: []runtime.Value{runtime.TableValue(orderSpec)},
+			code: []uint32{
+				vm.EncodeABC(vm.OP_FRAME_ORDER_GATHER, 0, 0, 0),
+				vm.EncodeABC(vm.OP_RETURN, 0, 2, 0),
+			},
+			args: func(t *testing.T) []runtime.Value { return []runtime.Value{frameArg(t)} },
+		},
+		{
+			name:      "project_column",
+			kernel:    "FrameProjectColumn",
+			shape:     "project/column",
+			constants: []runtime.Value{runtime.TableValue(columnSpec)},
+			code: []uint32{
+				vm.EncodeABC(vm.OP_FRAME_PROJECT_COLUMN, 0, 0, 0),
+				vm.EncodeABC(vm.OP_RETURN, 0, 2, 0),
+			},
+			args: func(t *testing.T) []runtime.Value { return []runtime.Value{frameArg(t)} },
+		},
+		{
+			name:      "filter_project_column",
+			kernel:    "FrameFilterProjectColumn",
+			shape:     "filter/project/column",
+			constants: []runtime.Value{runtime.TableValue(columnSpec)},
+			code: []uint32{
+				vm.EncodeABC(vm.OP_FRAME_FILTER_PROJECT_COLUMN, 1, 0, 0),
+				vm.EncodeABC(vm.OP_RETURN, 1, 2, 0),
+			},
+			args: func(t *testing.T) []runtime.Value { return []runtime.Value{frameArg(t), maskArg} },
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			proto := &vm.FuncProto{
+				Name:      "q_frame_runtime_primitive_" + tt.name,
+				NumParams: len(tt.args(t)),
+				MaxStack:  3,
+				Constants: tt.constants,
+				Code:      tt.code,
+			}
+			report := Diagnose(proto, tt.args(t))
+			if report.NativeError != nil || report.InterpError != nil || report.OptInterpError != nil {
+				t.Fatalf("Diagnose %s errors: native=%v interp=%v opt=%v\n%s",
+					tt.name, report.NativeError, report.InterpError, report.OptInterpError, report.String())
+			}
+			assertQKernelDescriptor(t, report.QKernelDescriptors, "methodjit_q_frame_runtime", "runtime_kernel", tt.kernel, tt.shape, "typed_runtime_op_exit", "supported", "")
+			assertQKernelExecutionStat(t, report.QKernelExecutionStats, "methodjit_q_frame_runtime", tt.kernel, tt.shape, "typed_runtime_op_exit", "success", 1)
+			assertQKernelExecutionRouteSummary(t, report.QKernelExecutionRoutes, "methodjit_q_frame_runtime", tt.kernel, "typed_runtime_op_exit", "success", 1)
+			assertQKernelShapeSummaryExecution(t, report.QKernelShapeSummary, "methodjit_q_frame_runtime", "runtime_kernel", tt.shape, "supported", 1, 1, 0)
+		})
+	}
+}
+
 func TestQFramePrimitivePipelineBuildsMethodJITIR(t *testing.T) {
 	names := runtime.NewTable()
 	names.RawSetInt(1, runtime.StringValue("size"))
@@ -2065,6 +2247,9 @@ func TestQVectorWhereReduceLowersMaskCombineToFusedTypedRuntimeKernel(t *testing
 	}
 	assertQKernelDescriptor(t, report.QKernelDescriptors, "methodjit_q_vector_runtime", "runtime_kernel", "QVectorWhereReduce", "mask-combine/vector-where/vector-reduce", "typed_runtime_op_exit", "supported", "")
 	assertQKernelShapeSummary(t, report.QKernelShapeSummary, "methodjit_q_vector_runtime", "runtime_kernel", "mask-combine/vector-where/vector-reduce", "supported", "", 1)
+	assertQKernelShapeSummaryExecution(t, report.QKernelShapeSummary, "methodjit_q_vector_runtime", "runtime_kernel", "mask-combine/vector-where/vector-reduce", "supported", 1, 1, 0)
+	assertQKernelExecutionStat(t, report.QKernelExecutionStats, "methodjit_q_vector_runtime", "QVectorWhereReduce", "mask-combine/vector-where/vector-reduce", "typed_runtime_op_exit", "success", 1)
+	assertQKernelExecutionRouteSummary(t, report.QKernelExecutionRoutes, "methodjit_q_vector_runtime", "QVectorWhereReduce", "typed_runtime_op_exit", "success", 1)
 	if len(report.QVectorLoweringFallbacks) != 0 {
 		t.Fatalf("Diagnose QVectorLoweringFallbacks = %+v, want none for mask-combine fusion\n%s", report.QVectorLoweringFallbacks, report.String())
 	}
@@ -2138,6 +2323,7 @@ func TestQVectorGatherReduceLowersToFusedTypedRuntimeKernel(t *testing.T) {
 	}
 	assertQKernelDescriptor(t, report.QKernelDescriptors, "methodjit_q_vector_runtime", "runtime_kernel", "QVectorGatherReduce", "gather/vector-reduce", "typed_runtime_op_exit", "supported", "")
 	assertQKernelShapeSummary(t, report.QKernelShapeSummary, "methodjit_q_vector_runtime", "runtime_kernel", "gather/vector-reduce", "supported", "", 1)
+	assertQKernelShapeSummaryExecution(t, report.QKernelShapeSummary, "methodjit_q_vector_runtime", "runtime_kernel", "gather/vector-reduce", "supported", 1, 1, 0)
 	assertQKernelExecutionStat(t, report.QKernelExecutionStats, "methodjit_q_vector_runtime", "QVectorGatherReduce", "gather/vector-reduce", "typed_runtime_op_exit", "success", 1)
 	assertQKernelExecutionRouteSummary(t, report.QKernelExecutionRoutes, "methodjit_q_vector_runtime", "QVectorGatherReduce", "typed_runtime_op_exit", "success", 1)
 
@@ -2658,6 +2844,114 @@ func TestQVectorRuntimeKernelsDiagnoseVectorScan(t *testing.T) {
 	if !strings.Contains(report.String(), "kernel=VectorScan") ||
 		!strings.Contains(report.String(), "shapes: vector-scan=1") {
 		t.Fatalf("diagnostic report missing vector scan kernel details:\n%s", report.String())
+	}
+}
+
+func TestQVectorRuntimePrimitiveDiagnoseExecutionStats(t *testing.T) {
+	tests := []struct {
+		name   string
+		kernel string
+		shape  string
+		code   []uint32
+		args   []runtime.Value
+	}{
+		{
+			name:   "gather",
+			kernel: "VectorGather",
+			shape:  "vector-gather",
+			code: []uint32{
+				vm.EncodeABC(vm.OP_VECTOR_GATHER, 0, 1, 0),
+				vm.EncodeABC(vm.OP_RETURN, 0, 2, 0),
+			},
+			args: []runtime.Value{
+				runtime.DenseArrayValue(runtime.NewDenseArrayI64([]int64{10, 20, 30})),
+				runtime.DenseArrayValue(runtime.NewDenseArrayI64([]int64{3, 1})),
+			},
+		},
+		{
+			name:   "compare",
+			kernel: "VectorCompare",
+			shape:  "vector-compare",
+			code: []uint32{
+				vm.EncodeABC(vm.OP_VECTOR_COMPARE, 0, 1, int(runtime.DenseArrayGE)),
+				vm.EncodeABC(vm.OP_RETURN, 0, 2, 0),
+			},
+			args: []runtime.Value{
+				runtime.DenseArrayValue(runtime.NewDenseArrayI64([]int64{1, 4, 6})),
+				runtime.IntValue(4),
+			},
+		},
+		{
+			name:   "mask",
+			kernel: "VectorMask",
+			shape:  "vector-mask",
+			code: []uint32{
+				vm.EncodeABC(vm.OP_VECTOR_MASK, 0, 1, int(runtime.DenseArrayMaskAnd)),
+				vm.EncodeABC(vm.OP_RETURN, 0, 2, 0),
+			},
+			args: []runtime.Value{
+				runtime.DenseArrayValue(runtime.NewDenseArrayBool([]bool{true, false, true})),
+				runtime.DenseArrayValue(runtime.NewDenseArrayBool([]bool{true, true, false})),
+			},
+		},
+		{
+			name:   "where",
+			kernel: "VectorWhere",
+			shape:  "vector-where",
+			code: []uint32{
+				vm.EncodeABC(vm.OP_VECTOR_WHERE, 0, 1, 2),
+				vm.EncodeABC(vm.OP_RETURN, 0, 2, 0),
+			},
+			args: []runtime.Value{
+				runtime.DenseArrayValue(runtime.NewDenseArrayBool([]bool{true, false, true})),
+				runtime.DenseArrayValue(runtime.NewDenseArrayI64([]int64{10, 20, 30})),
+				runtime.IntValue(7),
+			},
+		},
+		{
+			name:   "reduce",
+			kernel: "VectorReduce",
+			shape:  "vector/vector-reduce",
+			code: []uint32{
+				vm.EncodeABC(vm.OP_VECTOR_REDUCE, 0, 0, int(runtime.DenseArrayReduceSum)),
+				vm.EncodeABC(vm.OP_RETURN, 0, 2, 0),
+			},
+			args: []runtime.Value{
+				runtime.DenseArrayValue(runtime.NewDenseArrayI64([]int64{1, 2, 3})),
+			},
+		},
+		{
+			name:   "scan",
+			kernel: "VectorScan",
+			shape:  "vector-scan",
+			code: []uint32{
+				vm.EncodeABC(vm.OP_VECTOR_SCAN, 0, 0, 0),
+				vm.EncodeABC(vm.OP_RETURN, 0, 2, 0),
+			},
+			args: []runtime.Value{
+				runtime.DenseArrayValue(runtime.NewDenseArrayI64([]int64{2, -1, 4})),
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			proto := &vm.FuncProto{
+				Name:      "q_vector_runtime_primitive_" + tt.name,
+				NumParams: len(tt.args),
+				MaxStack:  3,
+				Code:      tt.code,
+			}
+			report := Diagnose(proto, tt.args)
+			if report.NativeError != nil || report.InterpError != nil || report.OptInterpError != nil {
+				t.Fatalf("Diagnose %s errors: native=%v interp=%v opt=%v\n%s",
+					tt.name, report.NativeError, report.InterpError, report.OptInterpError, report.String())
+			}
+			assertQKernelDescriptor(t, report.QKernelDescriptors, "methodjit_q_vector_runtime", "runtime_kernel", tt.kernel, tt.shape, "typed_runtime_op_exit", "supported", "")
+			assertQKernelExecutionStat(t, report.QKernelExecutionStats, "methodjit_q_vector_runtime", tt.kernel, tt.shape, "typed_runtime_op_exit", "success", 1)
+			assertQKernelExecutionRouteSummary(t, report.QKernelExecutionRoutes, "methodjit_q_vector_runtime", tt.kernel, "typed_runtime_op_exit", "success", 1)
+			assertQKernelShapeSummaryExecution(t, report.QKernelShapeSummary, "methodjit_q_vector_runtime", "runtime_kernel", tt.shape, "supported", 1, 1, 0)
+		})
 	}
 }
 

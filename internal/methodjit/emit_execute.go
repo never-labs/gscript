@@ -1248,12 +1248,13 @@ func (cf *CompiledFunction) executeOpExit(ctx *ExecContext, regs []runtime.Value
 		if slot >= len(regs) || tempBase < 0 || nArgs != 3 || tempBase+nArgs > len(regs) {
 			return fmt.Errorf("QVectorWhereReduce op-exit out of register range")
 		}
+		shape := cf.qVectorRuntimeKernelShape(int(ctx.OpExitID), "compare/vector-where/vector-reduce")
 		out, err := executeQVectorWhereReduceValue(aux, regs[tempBase], regs[tempBase+1], regs[tempBase+2])
 		if err != nil {
-			cf.recordQKernelExecution("methodjit_q_vector_runtime", "QVectorWhereReduce", "compare/vector-where/vector-reduce", "typed_runtime_op_exit", "error")
+			cf.recordQKernelExecution("methodjit_q_vector_runtime", "QVectorWhereReduce", shape, "typed_runtime_op_exit", "error")
 			return err
 		}
-		cf.recordQKernelExecution("methodjit_q_vector_runtime", "QVectorWhereReduce", "compare/vector-where/vector-reduce", "typed_runtime_op_exit", "success")
+		cf.recordQKernelExecution("methodjit_q_vector_runtime", "QVectorWhereReduce", shape, "typed_runtime_op_exit", "success")
 		regs[slot] = out
 
 	case OpQVectorGatherReduce:

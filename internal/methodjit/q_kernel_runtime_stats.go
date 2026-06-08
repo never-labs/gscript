@@ -30,6 +30,36 @@ func (cf *CompiledFunction) recordQRuntimePrimitiveExecution(op Op, outcome stri
 	cf.recordQKernelExecution(source, kernel, shape, route, outcome)
 }
 
+func qVectorRuntimeKernelShapesByID(fn *Function) map[int]string {
+	kernels := DetectQVectorRuntimeKernels(fn)
+	if len(kernels) == 0 {
+		return nil
+	}
+	out := make(map[int]string, len(kernels))
+	for _, kernel := range kernels {
+		if kernel.Instr == nil {
+			continue
+		}
+		if shape := kernel.Shape(); shape != "" && shape != "unknown" {
+			out[kernel.Instr.ID] = shape
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+func (cf *CompiledFunction) qVectorRuntimeKernelShape(instrID int, fallback string) string {
+	if cf == nil || len(cf.QVectorRuntimeKernelShapesByID) == 0 {
+		return fallback
+	}
+	if shape := cf.QVectorRuntimeKernelShapesByID[instrID]; shape != "" {
+		return shape
+	}
+	return fallback
+}
+
 func (cf *CompiledFunction) recordQKernelExecution(source, kernel, shape, route, outcome string) {
 	if cf == nil {
 		return

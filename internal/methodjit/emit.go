@@ -629,6 +629,10 @@ type CompiledFunction struct {
 	// fused runtime-kernel op-exit handling.
 	QFrameSelectColumnSpecs []QFrameSelectColumnSpec
 
+	// QVectorRuntimeKernelShapesByID keeps q vector runtime-kernel shape
+	// metadata alive for op-exit execution stats.
+	QVectorRuntimeKernelShapesByID map[int]string
+
 	// CallSiteNoResultRuntimeSpecializationBatches records loop-tail no-result call-site runtime specialization
 	// sites whose future complete loop iterations can be executed in one
 	// guarded Go-side batch before resuming Tier 2.

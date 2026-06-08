@@ -605,15 +605,19 @@ func (tm *TieringManager) executeOpExit(ctx *ExecContext, regs []runtime.Value, 
 			return fmt.Errorf("QVectorWhereReduce op-exit out of register range")
 		}
 		cf, _ := tm.tier2CompiledFor(proto)
+		shape := "compare/vector-where/vector-reduce"
+		if cf != nil {
+			shape = cf.qVectorRuntimeKernelShape(int(ctx.OpExitID), shape)
+		}
 		out, err := executeQVectorWhereReduceValue(aux, regs[tempBase], regs[tempBase+1], regs[tempBase+2])
 		if err != nil {
 			if cf != nil {
-				cf.recordQKernelExecution("methodjit_q_vector_runtime", "QVectorWhereReduce", "compare/vector-where/vector-reduce", "typed_runtime_op_exit", "error")
+				cf.recordQKernelExecution("methodjit_q_vector_runtime", "QVectorWhereReduce", shape, "typed_runtime_op_exit", "error")
 			}
 			return err
 		}
 		if cf != nil {
-			cf.recordQKernelExecution("methodjit_q_vector_runtime", "QVectorWhereReduce", "compare/vector-where/vector-reduce", "typed_runtime_op_exit", "success")
+			cf.recordQKernelExecution("methodjit_q_vector_runtime", "QVectorWhereReduce", shape, "typed_runtime_op_exit", "success")
 		}
 		regs[absSlot] = out
 
