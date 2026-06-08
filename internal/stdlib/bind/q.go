@@ -64,6 +64,14 @@ type qSQLPlanCacheStats struct {
 	KernelHits        int
 	KernelMisses      int
 	KernelEvictions   int
+	KernelKeys        []qSQLKernelCacheKeyStats
+}
+
+type qSQLKernelCacheKeyStats struct {
+	Key       string
+	Hits      int
+	Misses    int
+	Evictions int
 }
 
 type qEvalCacheStats struct {
@@ -127,6 +135,7 @@ var (
 	qSQLAlignedMutationOrder []string
 	qSQLKernelCache          = make(map[string]*data.QueryKernel)
 	qSQLKernelOrder          []string
+	qSQLKernelStatsByKey     = make(map[string]*qSQLKernelCacheKeyStats)
 	qSQLAlignedStats         qSQLPlanCacheStats
 
 	qEvalCacheMu    sync.Mutex
@@ -2279,6 +2288,7 @@ func qSQLKernelForFrame(src string, plan data.QueryPlan, frame data.Frame) (*dat
 	qSQLAlignedPlanCacheMu.Lock()
 	if kernel, ok := qSQLKernelCache[key]; ok {
 		qSQLAlignedStats.KernelHits++
+		qSQLKernelStatsForKeyLocked(key).Hits++
 		qSQLAlignedPlanCacheMu.Unlock()
 		return kernel, true, nil
 	}
@@ -2292,10 +2302,12 @@ func qSQLKernelForFrame(src string, plan data.QueryPlan, frame data.Frame) (*dat
 	qSQLAlignedPlanCacheMu.Lock()
 	if cached, ok := qSQLKernelCache[key]; ok {
 		qSQLAlignedStats.KernelHits++
+		qSQLKernelStatsForKeyLocked(key).Hits++
 		qSQLAlignedPlanCacheMu.Unlock()
 		return cached, true, nil
 	}
 	qSQLAlignedStats.KernelMisses++
+	qSQLKernelStatsForKeyLocked(key).Misses++
 	qSQLKernelCacheStoreLocked(key, kernel)
 	qSQLAlignedPlanCacheMu.Unlock()
 	return kernel, true, nil
@@ -2479,7 +2491,31 @@ func qSQLKernelCacheStoreLocked(key string, kernel *data.QueryKernel) {
 		qSQLKernelOrder = qSQLKernelOrder[1:]
 		delete(qSQLKernelCache, evict)
 		qSQLAlignedStats.KernelEvictions++
+		qSQLKernelStatsForKeyLocked(evict).Evictions++
 	}
+}
+
+func qSQLKernelStatsForKeyLocked(key string) *qSQLKernelCacheKeyStats {
+	stats := qSQLKernelStatsByKey[key]
+	if stats == nil {
+		stats = &qSQLKernelCacheKeyStats{Key: key}
+		qSQLKernelStatsByKey[key] = stats
+	}
+	return stats
+}
+
+func qSQLKernelStatsByKeySnapshotLocked() []qSQLKernelCacheKeyStats {
+	out := make([]qSQLKernelCacheKeyStats, 0, len(qSQLKernelStatsByKey))
+	for _, stats := range qSQLKernelStatsByKey {
+		if stats == nil {
+			continue
+		}
+		out = append(out, *stats)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		return out[i].Key < out[j].Key
+	})
+	return out
 }
 
 func qSQLPlanCacheStatsSnapshot() qSQLPlanCacheStats {
@@ -2494,6 +2530,7 @@ func qSQLPlanCacheStatsSnapshot() qSQLPlanCacheStats {
 	stats.KernelHits = qSQLAlignedStats.KernelHits
 	stats.KernelMisses = qSQLAlignedStats.KernelMisses
 	stats.KernelEvictions = qSQLAlignedStats.KernelEvictions
+	stats.KernelKeys = qSQLKernelStatsByKeySnapshotLocked()
 	qSQLAlignedPlanCacheMu.Unlock()
 
 	return stats
@@ -2509,6 +2546,7 @@ func qCacheStatsTable() *Table {
 	alignedEntries := len(qSQLAlignedPlanCache) + len(qSQLAlignedMutationCache)
 	kernelEntries := len(qSQLKernelCache)
 	alignedStats := qSQLAlignedStats
+	kernelStatsByKey := qSQLKernelStatsByKeySnapshotLocked()
 	qSQLAlignedPlanCacheMu.Unlock()
 
 	qEvalCacheMu.Lock()
@@ -2538,14 +2576,16 @@ func qCacheStatsTable() *Table {
 		alignedStats.AlignedEvictions,
 		qSQLPlanCacheLimit,
 	)))
-	rows.RawSetInt(3, TableValue(qCacheStatsRow(
+	kernelStatsRow := qCacheStatsRow(
 		"qsql_kernel",
 		kernelEntries,
 		alignedStats.KernelHits,
 		alignedStats.KernelMisses,
 		alignedStats.KernelEvictions,
 		qSQLPlanCacheLimit,
-	)))
+	)
+	kernelStatsRow.RawSetString("keys", TableValue(qKernelCacheKeyStatsTable(kernelStatsByKey)))
+	rows.RawSetInt(3, TableValue(kernelStatsRow))
 	rows.RawSetInt(4, TableValue(qCacheStatsRow(
 		"q_query_kernel",
 		queryKernelEntries,
@@ -2574,6 +2614,19 @@ func qCacheStatsRow(name string, entries, hits, misses, evictions, limit int) *T
 	row.RawSetString("evictions", IntValue(int64(evictions)))
 	row.RawSetString("limit", IntValue(int64(limit)))
 	return row
+}
+
+func qKernelCacheKeyStatsTable(stats []qSQLKernelCacheKeyStats) *Table {
+	rows := NewAppendArrayTable(len(stats))
+	for i, stat := range stats {
+		row := NewTable()
+		row.RawSetString("key", StringValue(stat.Key))
+		row.RawSetString("hits", IntValue(int64(stat.Hits)))
+		row.RawSetString("misses", IntValue(int64(stat.Misses)))
+		row.RawSetString("evictions", IntValue(int64(stat.Evictions)))
+		rows.RawSetInt(int64(i+1), TableValue(row))
+	}
+	return rows
 }
 
 func qRecordFallback(code string) {
@@ -2765,6 +2818,7 @@ func qClearCaches() {
 	qSQLAlignedMutationOrder = nil
 	qSQLKernelCache = make(map[string]*data.QueryKernel)
 	qSQLKernelOrder = nil
+	qSQLKernelStatsByKey = make(map[string]*qSQLKernelCacheKeyStats)
 	qSQLAlignedStats = qSQLPlanCacheStats{}
 	qSQLAlignedPlanCacheMu.Unlock()
 

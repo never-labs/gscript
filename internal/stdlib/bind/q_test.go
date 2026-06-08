@@ -3556,6 +3556,28 @@ func TestQExplainReportsQueryKernelVisibility(t *testing.T) {
 	if stats.KernelMisses != 1 || stats.KernelHits != 1 {
 		t.Fatalf("kernel cache stats = %+v, want q.explain to avoid changing kernel hit/miss counts", stats)
 	}
+	keyStats := qTestKernelCacheKeyStats(t, stats.KernelKeys, cacheKey.Str())
+	if keyStats.Misses != 1 || keyStats.Hits != 1 || keyStats.Evictions != 0 {
+		t.Fatalf("kernel cache key stats = %+v, want one miss, one hit, zero evictions", keyStats)
+	}
+	cacheRows := qCacheStatsTable()
+	kernelRow := qTestCacheStatsRowTable(t, cacheRows, "qsql_kernel")
+	keyRows := kernelRow.RawGetString("keys").Table()
+	if keyRows == nil || keyRows.Length() != 1 {
+		t.Fatalf("qsql_kernel keys = %v, want one per-key stats row", keyRows)
+	}
+	keyRow := keyRows.RawGetInt(1).Table()
+	if keyRow == nil {
+		t.Fatal("qsql_kernel keys[1] is nil")
+	}
+	if got := keyRow.RawGetString("key"); !got.IsString() || got.Str() != cacheKey.Str() {
+		t.Fatalf("qsql_kernel keys[1].key = %v, want %s", got, cacheKey.Str())
+	}
+	for field, want := range map[string]int64{"hits": 1, "misses": 1, "evictions": 0} {
+		if got := keyRow.RawGetString(field); !got.IsInt() || got.Int() != want {
+			t.Fatalf("qsql_kernel keys[1].%s = %v, want %d", field, got, want)
+		}
+	}
 }
 
 func TestQExplainReportsVectorTransformKernelVisibility(t *testing.T) {
@@ -5089,6 +5111,36 @@ func qTestCacheStatsRows(t *testing.T, tbl *Table) map[string]map[string]int64 {
 		}
 	}
 	return out
+}
+
+func qTestCacheStatsRowTable(t *testing.T, tbl *Table, cache string) *Table {
+	t.Helper()
+	if tbl == nil {
+		t.Fatal("cache stats table is nil")
+	}
+	for i := 1; i <= tbl.Length(); i++ {
+		row := tbl.RawGetInt(int64(i)).Table()
+		if row == nil {
+			t.Fatalf("cache stats row %d is nil", i)
+		}
+		name := row.RawGetString("cache")
+		if name.IsString() && name.Str() == cache {
+			return row
+		}
+	}
+	t.Fatalf("cache stats missing row %q", cache)
+	return nil
+}
+
+func qTestKernelCacheKeyStats(t *testing.T, stats []qSQLKernelCacheKeyStats, key string) qSQLKernelCacheKeyStats {
+	t.Helper()
+	for _, stat := range stats {
+		if stat.Key == key {
+			return stat
+		}
+	}
+	t.Fatalf("kernel cache key stats missing key %q in %+v", key, stats)
+	return qSQLKernelCacheKeyStats{}
 }
 
 func qTestFallbackStatsRows(t *testing.T, tbl *Table) map[string]int64 {
