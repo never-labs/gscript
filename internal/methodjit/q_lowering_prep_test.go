@@ -3674,6 +3674,50 @@ func TestDiagnoseReportsFilteredQGroupAggregateRuntimeKernel(t *testing.T) {
 	assertQKernelExecutionRouteSummary(t, report.QKernelExecutionRoutes, "methodjit_q_frame_runtime", "FrameGroupAggregate", "typed_runtime_op_exit", "success", 1)
 }
 
+func TestDiagnoseReportsStringFilteredQGroupAggregateRuntimeKernel(t *testing.T) {
+	const query = "select total:sum price, fills:count i by sym from trades where sym=\"AAPL\""
+	proto := &vm.FuncProto{
+		Name:      "q_group_aggregate_string_filtered_diag",
+		NumParams: 1,
+		MaxStack:  4,
+		Constants: []runtime.Value{
+			runtime.StringValue("q"),
+			runtime.StringValue("sql"),
+			runtime.StringValue(query),
+		},
+		Code: []uint32{
+			vm.EncodeABx(vm.OP_GETGLOBAL, 1, 0),
+			vm.EncodeABC(vm.OP_GETFIELD, 1, 1, 1),
+			vm.EncodeABC(vm.OP_MOVE, 2, 0, 0),
+			vm.EncodeABx(vm.OP_LOADK, 3, 2),
+			vm.EncodeABC(vm.OP_CALL, 1, 3, 2),
+			vm.EncodeABC(vm.OP_RETURN, 1, 2, 0),
+		},
+	}
+
+	report := Diagnose(proto, []runtime.Value{runtime.TableValue(qHotPathStringTestFrame(t))})
+	if report.NativeError != nil || report.OptInterpError != nil {
+		t.Fatalf("Diagnose string filtered group aggregate errors: native=%v opt=%v\n%s", report.NativeError, report.OptInterpError, report.String())
+	}
+	if report.QQueryFallbacks[qQueryLoweringFallbackGroupAggregateCall] != 0 {
+		t.Fatalf("Diagnose QQueryFallbacks = %+v, want no group aggregate fallback\n%s", report.QQueryFallbacks, report.String())
+	}
+	if got := report.QFrameRuntimeKernelShapes["filter/group/aggregate"]; got != 1 {
+		t.Fatalf("QFrameRuntimeKernelShapes[filter/group/aggregate] = %d, want 1; shapes=%+v\n%s", got, report.QFrameRuntimeKernelShapes, report.String())
+	}
+	if got := report.QFrameRuntimeKernelShapes["mask"]; got != 1 {
+		t.Fatalf("QFrameRuntimeKernelShapes[mask] = %d, want 1; shapes=%+v\n%s", got, report.QFrameRuntimeKernelShapes, report.String())
+	}
+	assertQKernelDescriptor(t, report.QKernelDescriptors, "methodjit_q_frame_runtime", "runtime_kernel", "FrameMask", "mask", "typed_runtime_op_exit", "supported", "")
+	assertQKernelDescriptor(t, report.QKernelDescriptors, "methodjit_q_frame_runtime", "runtime_kernel", "FrameGroupAggregate", "filter/group/aggregate", "typed_runtime_op_exit", "supported", "")
+	assertQKernelShapeSummaryExecution(t, report.QKernelShapeSummary, "methodjit_q_frame_runtime", "runtime_kernel", "mask", "supported", 1, 1, 0)
+	assertQKernelShapeSummaryExecution(t, report.QKernelShapeSummary, "methodjit_q_frame_runtime", "runtime_kernel", "filter/group/aggregate", "supported", 1, 1, 0)
+	assertQKernelExecutionStat(t, report.QKernelExecutionStats, "methodjit_q_frame_runtime", "FrameMask", "mask", "typed_runtime_op_exit", "success", 1)
+	assertQKernelExecutionStat(t, report.QKernelExecutionStats, "methodjit_q_frame_runtime", "FrameGroupAggregate", "filter/group/aggregate", "typed_runtime_op_exit", "success", 1)
+	assertQKernelExecutionRouteSummary(t, report.QKernelExecutionRoutes, "methodjit_q_frame_runtime", "FrameMask", "typed_runtime_op_exit", "success", 1)
+	assertQKernelExecutionRouteSummary(t, report.QKernelExecutionRoutes, "methodjit_q_frame_runtime", "FrameGroupAggregate", "typed_runtime_op_exit", "success", 1)
+}
+
 func TestDiagnoseReportsQJoinFallbackDescriptor(t *testing.T) {
 	const query = "select id,value,qty from accounts left join fills on id=account_id,venue=exchange where value>0 order by qty desc"
 	proto := &vm.FuncProto{
