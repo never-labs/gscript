@@ -86,6 +86,17 @@ func executeFrameFilterProjectColumnValue(frameVal, maskVal runtime.Value, names
 	return out, nil
 }
 
+func executeFrameCompareFilterProjectColumnValue(frameVal runtime.Value, sourceName string, op runtime.DenseArrayBinaryOp, rhs runtime.Value, names []string, resultName string) (runtime.Value, error) {
+	out, handled, err := frameVal.NativeFrameCompareFilterProjectColumn(sourceName, op, rhs, names, resultName)
+	if err != nil {
+		return runtime.NilValue(), err
+	}
+	if !handled {
+		return runtime.NilValue(), fmt.Errorf("FrameCompareFilterProjectColumn operand must be native frame (got %s)", frameVal.TypeName())
+	}
+	return out, nil
+}
+
 func executeFrameFilterProjectValue(frameVal, maskVal runtime.Value, names []string) (runtime.Value, error) {
 	if !maskVal.IsDenseArray() {
 		return runtime.NilValue(), fmt.Errorf("FrameFilterProject mask must be dense array (got %s)", maskVal.TypeName())
@@ -188,6 +199,11 @@ func executeQFrameSelectColumnValue(constants []runtime.Value, specs []QFrameSel
 		return runtime.NilValue(), fmt.Errorf("QFrameSelectColumn result column must be a string constant")
 	}
 	resultName := constants[spec.ResultColumnConst].Str()
+	if spec.RowMode == QFrameSelectColumnRowsNone {
+		if out, ok, err := executeQFrameSelectColumnCompareFilterProject(constants, spec, frameVal, argVal, hasArg, names, resultName); ok || err != nil {
+			return out, err
+		}
+	}
 	if !qFrameSelectColumnHasPredicate(spec) {
 		rows := frameVal
 		if spec.RowMode != QFrameSelectColumnRowsNone {
@@ -218,6 +234,39 @@ func executeQFrameSelectColumnValue(constants []runtime.Value, specs []QFrameSel
 		return runtime.NilValue(), err
 	}
 	return executeFrameProjectColumnValue(rows, names, resultName)
+}
+
+func executeQFrameSelectColumnCompareFilterProject(constants []runtime.Value, spec QFrameSelectColumnSpec, frameVal runtime.Value, argVal runtime.Value, hasArg bool, names []string, resultName string) (runtime.Value, bool, error) {
+	if len(spec.MaskTerms) > 0 {
+		return runtime.NilValue(), false, nil
+	}
+	if spec.MaskSpecConst >= 0 {
+		if spec.MaskSpecConst >= len(constants) {
+			return runtime.NilValue(), true, fmt.Errorf("QFrameSelectColumn mask spec constant is out of range")
+		}
+		name, op, rhs, err := frameMaskSpec(constants[spec.MaskSpecConst])
+		if err != nil {
+			return runtime.NilValue(), true, err
+		}
+		denseOp, err := runtime.DenseArrayCompareOp(op)
+		if err != nil {
+			return runtime.NilValue(), true, err
+		}
+		out, err := executeFrameCompareFilterProjectColumnValue(frameVal, name, denseOp, rhs, names, resultName)
+		return out, true, err
+	}
+	if spec.SourceColumnConst < 0 {
+		return runtime.NilValue(), false, nil
+	}
+	if spec.SourceColumnConst >= len(constants) || !constants[spec.SourceColumnConst].IsString() {
+		return runtime.NilValue(), true, fmt.Errorf("QFrameSelectColumn source column must be a string constant")
+	}
+	rhs, hasRHS := qFrameSelectColumnCompareRHS(spec, argVal, hasArg)
+	if !hasRHS {
+		return runtime.NilValue(), true, fmt.Errorf("QFrameSelectColumn compare path requires rhs")
+	}
+	out, err := executeFrameCompareFilterProjectColumnValue(frameVal, constants[spec.SourceColumnConst].Str(), spec.CompareOp, rhs, names, resultName)
+	return out, true, err
 }
 
 func qFrameSelectColumnHasPredicate(spec QFrameSelectColumnSpec) bool {

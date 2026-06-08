@@ -235,6 +235,42 @@ func TestNativeFrameFilterProjectColumnFiltersSingleProjectedColumn(t *testing.T
 	}
 }
 
+func TestNativeFrameCompareFilterProjectColumnFusesTypedRuntimePath(t *testing.T) {
+	soa, err := NewSoA(map[string]*DenseArray{
+		"price": NewDenseArrayF64([]float64{10, 12, 8}),
+		"limit": NewDenseArrayF64([]float64{9, 12, 9}),
+		"size":  NewDenseArrayI64([]int64{100, 200, 300}),
+	})
+	if err != nil {
+		t.Fatalf("NewSoA: %v", err)
+	}
+	frame := NewTable()
+	frame.SetNativePayloadWithInfo(soa, NativePayloadInfo{
+		Kind:       NativePayloadDataFrame,
+		Rows:       soa.Len(),
+		Columns:    3,
+		SchemaHash: "compare-filter-project-column-test",
+	})
+
+	col, handled, err := TableValue(frame).NativeFrameCompareFilterProjectColumn("price", DenseArrayGE, StringValue("limit"), []string{"size"}, "size")
+	if err != nil {
+		t.Fatalf("NativeFrameCompareFilterProjectColumn: %v", err)
+	}
+	if !handled || !col.IsDenseArray() {
+		t.Fatalf("NativeFrameCompareFilterProjectColumn = %v handled=%v, want dense array", col, handled)
+	}
+	got, ok := col.DenseArray().I64()
+	if !ok || len(got) != 2 || got[0] != 100 || got[1] != 200 {
+		t.Fatalf("compare filter project column values = %#v, want [100 200]", got)
+	}
+	if _, handled, err := TableValue(frame).NativeFrameCompareFilterProjectColumn("price", DenseArrayAdd, FloatValue(10), []string{"size"}, "size"); !handled || err == nil {
+		t.Fatalf("NativeFrameCompareFilterProjectColumn arithmetic op handled=%v err=%v, want handled error", handled, err)
+	}
+	if _, handled, err := TableValue(frame).NativeFrameCompareFilterProjectColumn("price", DenseArrayGE, FloatValue(10), []string{"price"}, "size"); !handled || err == nil {
+		t.Fatalf("NativeFrameCompareFilterProjectColumn unprojected result handled=%v err=%v, want handled error", handled, err)
+	}
+}
+
 func TestNativeFrameProjectedColumnValidationKeepsPrimitiveNames(t *testing.T) {
 	soa, err := NewSoA(map[string]*DenseArray{
 		"price": NewDenseArrayF64([]float64{10, 12, 8}),

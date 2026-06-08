@@ -803,6 +803,31 @@ func (v Value) NativeFrameFilterProjectColumn(mask *DenseArray, names []string, 
 	return DenseArrayValue(out), true, nil
 }
 
+// NativeFrameCompareFilterProjectColumn computes a typed frame-column comparison
+// and returns one filtered projected column without materializing an
+// intermediate mask or frame facade for VM/JIT q hot paths.
+func (v Value) NativeFrameCompareFilterProjectColumn(columnName string, op DenseArrayBinaryOp, rhs Value, names []string, resultName string) (Value, bool, error) {
+	if columnName == "" {
+		return NilValue(), true, fmt.Errorf("FRAME_COMPARE_FILTER_PROJECT_COLUMN column name must not be empty")
+	}
+	if !isComparisonOp(op) {
+		return NilValue(), true, fmt.Errorf("FRAME_COMPARE_FILTER_PROJECT_COLUMN op %d is not a comparison", op)
+	}
+	frame, col, handled, err := v.nativeFrameProjectedColumn("FRAME_COMPARE_FILTER_PROJECT_COLUMN", names, resultName)
+	if err != nil || !handled {
+		return NilValue(), handled, err
+	}
+	mask, err := frame.MaskOp(columnName, op, rhs)
+	if err != nil {
+		return NilValue(), true, err
+	}
+	out, err := col.Filter(mask)
+	if err != nil {
+		return NilValue(), true, err
+	}
+	return DenseArrayValue(out), true, nil
+}
+
 func (v Value) nativeFrameProjectedColumn(op string, names []string, resultName string) (*SoA, *DenseArray, bool, error) {
 	if len(names) == 0 {
 		return nil, nil, true, fmt.Errorf("%s requires at least one projected column", op)
