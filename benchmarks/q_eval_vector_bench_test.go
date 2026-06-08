@@ -13,10 +13,11 @@ const qEvalVectorRows = 8192
 var qEvalVectorBenchSink int64
 
 type qEvalVectorCase struct {
-	name string
-	tags []string
-	expr func(rows int) string
-	goFn func(rows int) int64
+	name   string
+	tags   []string
+	matrix []string
+	expr   func(rows int) string
+	goFn   func(rows int) int64
 }
 
 var qEvalVectorCases = buildQEvalVectorCases()
@@ -74,6 +75,34 @@ var qEvalRequiredCoverageTags = []string{
 	"ipc-loopback",
 }
 
+var qEvalRequiredMatrixCoverage = []string{
+	"numeric-arithmetic:int-vector:hot",
+	"numeric-arithmetic:float-vector:hot",
+	"numeric-arithmetic:typed-null:hot",
+	"cast:typed-numeric:scalar-vector",
+	"compare:int-vector:where",
+	"compare:symbol-vector:where",
+	"compare:string-vector:where",
+	"compare:temporal-vector:where",
+	"set:int-vector:union-inter-except",
+	"set:symbol-vector:union-inter-except",
+	"adverb:dyadic-each:vector",
+	"adverb:each-prior:vector",
+	"adverb:each-left-right:vector",
+	"adverb:over-scan:projection",
+	"list:cut-raze-enlist:nested",
+	"list:prev-next-deltas-fills:typed-null",
+	"sort:int-vector:index-rank",
+	"sort:symbol-vector:index-rank",
+	"sort:temporal-vector:index-rank",
+	"dict:lookup-amend-upsert:symbol-key",
+	"table:literal-meta-cols:frame",
+	"table:xcols-xasc-xdesc:frame",
+	"table:xkey-xgroup-ungroup:keyed-frame",
+	"temporal:xbar:bucket",
+	"ipc:loopback:session",
+}
+
 func buildQEvalVectorCases() []qEvalVectorCase {
 	cases := make([]qEvalVectorCase, 0, 128)
 
@@ -91,8 +120,9 @@ func buildQEvalVectorCases() []qEvalVectorCase {
 	} {
 		p := p
 		cases = append(cases, qEvalVectorCase{
-			name: "VectorAffineSum" + p.name,
-			tags: []string{"numeric-vector", "sum"},
+			name:   "VectorAffineSum" + p.name,
+			tags:   []string{"numeric-vector", "sum"},
+			matrix: []string{"numeric-arithmetic:int-vector:hot"},
 			expr: func(rows int) string {
 				return fmt.Sprintf("x:til %d;y:(x*%d)+%d;+/y", rows, p.mul, p.add)
 			},
@@ -105,8 +135,9 @@ func buildQEvalVectorCases() []qEvalVectorCase {
 			},
 		})
 		cases = append(cases, qEvalVectorCase{
-			name: "VectorSquareSum" + p.name,
-			tags: []string{"numeric-vector", "sum"},
+			name:   "VectorSquareSum" + p.name,
+			tags:   []string{"numeric-vector", "sum"},
+			matrix: []string{"numeric-arithmetic:int-vector:hot"},
 			expr: func(rows int) string {
 				return fmt.Sprintf("x:til %d;y:(x*%d)+%d;+/y*y", rows, p.mul, p.add)
 			},
@@ -153,7 +184,8 @@ func buildQEvalVectorCases() []qEvalVectorCase {
 	for _, threshold := range []int64{0, 1, 17, 128, 999, 1000, 2048, 4096, 7000, 8191} {
 		threshold := threshold
 		cases = append(cases, qEvalVectorCase{
-			name: fmt.Sprintf("WhereIndexSumGE%d", threshold),
+			name:   fmt.Sprintf("WhereIndexSumGE%d", threshold),
+			matrix: []string{"compare:int-vector:where"},
 			expr: func(rows int) string {
 				return fmt.Sprintf("x:til %d;idx:where x>=%d;+/idx", rows, threshold)
 			},
@@ -168,7 +200,8 @@ func buildQEvalVectorCases() []qEvalVectorCase {
 			},
 		})
 		cases = append(cases, qEvalVectorCase{
-			name: fmt.Sprintf("WhereIndexCountGE%d", threshold),
+			name:   fmt.Sprintf("WhereIndexCountGE%d", threshold),
+			matrix: []string{"compare:int-vector:where"},
 			expr: func(rows int) string {
 				return fmt.Sprintf("x:til %d;idx:where x>=%d;count idx", rows, threshold)
 			},
@@ -316,7 +349,8 @@ func buildQEvalVectorCases() []qEvalVectorCase {
 
 	cases = append(cases,
 		qEvalVectorCase{
-			name: "FloatVectorArithmetic",
+			name:   "FloatVectorArithmetic",
+			matrix: []string{"numeric-arithmetic:float-vector:hot"},
 			expr: func(rows int) string {
 				return fmt.Sprintf("x:til %d;y:(x*0.5)+1.5;+/y", rows)
 			},
@@ -356,7 +390,8 @@ func buildQEvalVectorCases() []qEvalVectorCase {
 			},
 		},
 		qEvalVectorCase{
-			name: "TemporalXbarCount",
+			name:   "TemporalXbarCount",
+			matrix: []string{"temporal:xbar:bucket"},
 			expr: func(rows int) string {
 				return "count 00:01 xbar 09:30 09:30:59 09:31:00 09:31:30"
 			},
@@ -401,6 +436,10 @@ func appendQEvalSemanticCoverageCases(cases []qEvalVectorCase) []qEvalVectorCase
 		{
 			name: "TypedSuffixNullAndCasts",
 			tags: []string{"typed-suffix", "typed-null", "cast", "promotion", "null-verb"},
+			matrix: []string{
+				"numeric-arithmetic:typed-null:hot",
+				"cast:typed-numeric:scalar-vector",
+			},
 			expr: func(rows int) string {
 				return "(+/1h 2h 3h)+(type 1i)+(type `float$1)+(count where null 1 0N 2 0N)"
 			},
@@ -419,8 +458,9 @@ func appendQEvalSemanticCoverageCases(cases []qEvalVectorCase) []qEvalVectorCase
 			},
 		},
 		{
-			name: "BooleanLogicalAndCompositeCompare",
-			tags: []string{"boolean-logical", "composite-compare", "where"},
+			name:   "BooleanLogicalAndCompositeCompare",
+			tags:   []string{"boolean-logical", "composite-compare", "where"},
+			matrix: []string{"compare:int-vector:where"},
 			expr: func(rows int) string {
 				return "(count where true false true and true true false)+(count where 10 20 30>=20)+(count where 10 20 30<>20)"
 			},
@@ -429,8 +469,9 @@ func appendQEvalSemanticCoverageCases(cases []qEvalVectorCase) []qEvalVectorCase
 			},
 		},
 		{
-			name: "CutEnlistRazeChecksum",
-			tags: []string{"cut", "enlist", "raze"},
+			name:   "CutEnlistRazeChecksum",
+			tags:   []string{"cut", "enlist", "raze"},
+			matrix: []string{"list:cut-raze-enlist:nested"},
 			expr: func(rows int) string {
 				return "(count 0 2 4_10 20 30 40 50)+(count enlist 10 20 30)+sum raze (1 2;3 4;5)"
 			},
@@ -461,6 +502,12 @@ func appendQEvalSemanticCoverageCases(cases []qEvalVectorCase) []qEvalVectorCase
 		{
 			name: "AdverbMatrix",
 			tags: []string{"adverb-each", "adverb-each-prior", "adverb-each-left-right", "adverb-over-scan", "projection"},
+			matrix: []string{
+				"adverb:dyadic-each:vector",
+				"adverb:each-prior:vector",
+				"adverb:each-left-right:vector",
+				"adverb:over-scan:projection",
+			},
 			expr: func(rows int) string {
 				return "(+/1 2 3+'10 20 30)+(+/-':10 15 14 20)+(+/10-\\:1 2 3)+(+/10 20 30-/:1)+(+/+\\1 2 3 4)+({x+y}/[10;1 2 3])"
 			},
@@ -469,8 +516,9 @@ func appendQEvalSemanticCoverageCases(cases []qEvalVectorCase) []qEvalVectorCase
 			},
 		},
 		{
-			name: "SetBinWithinXrank",
-			tags: []string{"set-verb", "bin-within-xrank"},
+			name:   "SetBinWithinXrank",
+			tags:   []string{"set-verb", "bin-within-xrank"},
+			matrix: []string{"set:int-vector:union-inter-except"},
 			expr: func(rows int) string {
 				return "(count 1 2 3 except 2)+(count 1 2 1 3 inter 3 1 9)+(count 1 2 1 union 2 3)+(+/10 20 30 bin 5 10 29 30 31)+(count where 10 20 30 within 15 30)+(+/2 xrank 40 10 30 20)"
 			},
@@ -479,8 +527,46 @@ func appendQEvalSemanticCoverageCases(cases []qEvalVectorCase) []qEvalVectorCase
 			},
 		},
 		{
-			name: "DictAmendUpsertAndLookup",
-			tags: []string{"dict", "dict-amend-upsert"},
+			name:   "SymbolSetVerbs",
+			tags:   []string{"set-verb", "symbol"},
+			matrix: []string{"set:symbol-vector:union-inter-except"},
+			expr: func(rows int) string {
+				return "(count `AAPL`MSFT`AAPL except `MSFT)+(count `AAPL`MSFT`AAPL inter `AAPL`GOOG)+(count `AAPL`MSFT union `MSFT`NVDA`AAPL)"
+			},
+			goFn: func(rows int) int64 {
+				return 2 + 1 + 3
+			},
+		},
+		{
+			name:   "TypedPrevNextDeltasFills",
+			tags:   []string{"typed-null", "adverb-each-prior"},
+			matrix: []string{"list:prev-next-deltas-fills:typed-null"},
+			expr: func(rows int) string {
+				return "(count prev 0Ni 1i 0Ni)+(count next 0Ni 1i 0Ni)+(count deltas 1i 0Ni 3i)+(count fills 0Nf 1.5f 0Nf)"
+			},
+			goFn: func(rows int) int64 {
+				return 3 + 3 + 3 + 3
+			},
+		},
+		{
+			name: "SortRankTypeMatrix",
+			tags: []string{"table-sort", "symbol", "temporal"},
+			matrix: []string{
+				"sort:int-vector:index-rank",
+				"sort:symbol-vector:index-rank",
+				"sort:temporal-vector:index-rank",
+			},
+			expr: func(rows int) string {
+				return "(+/iasc 3 1 2 1)+(+/rank 2 7 3 2 5)+(+/iasc `MSFT`AAPL`AAPL)+(+/rank `x`a`b`z`c)+(+/iasc 2026.06.07 0Nd 2026.06.06)+(+/rank 2026.06.07 0Nd 2026.06.06)"
+			},
+			goFn: func(rows int) int64 {
+				return 6 + 10 + 3 + 10 + 3 + 3
+			},
+		},
+		{
+			name:   "DictAmendUpsertAndLookup",
+			tags:   []string{"dict", "dict-amend-upsert"},
+			matrix: []string{"dict:lookup-amend-upsert:symbol-key"},
 			expr: func(rows int) string {
 				return "d:`a`b!10 20;u:@[d;`c;:;30];d[`a]+(lookup d `b)+((@[d;`a;:;99])`a)+u`c"
 			},
@@ -489,8 +575,9 @@ func appendQEvalSemanticCoverageCases(cases []qEvalVectorCase) []qEvalVectorCase
 			},
 		},
 		{
-			name: "EnumSymbolStringMatchLike",
-			tags: []string{"enum", "symbol", "string", "match-like"},
+			name:   "EnumSymbolStringMatchLike",
+			tags:   []string{"enum", "symbol", "string", "match-like"},
+			matrix: []string{"compare:symbol-vector:where", "compare:string-vector:where"},
 			expr: func(rows int) string {
 				return "(count domain `sym$`AAPL`MSFT`AAPL)+(count codes `sym$`AAPL`MSFT`AAPL)+(count where `AAPL`MSFT`AMD like `A*)+(count upper `aapl`msft)"
 			},
@@ -499,8 +586,9 @@ func appendQEvalSemanticCoverageCases(cases []qEvalVectorCase) []qEvalVectorCase
 			},
 		},
 		{
-			name: "TemporalTypedXbarAndSort",
-			tags: []string{"temporal", "xbar"},
+			name:   "TemporalTypedXbarAndSort",
+			tags:   []string{"temporal", "xbar"},
+			matrix: []string{"compare:temporal-vector:where", "temporal:xbar:bucket"},
 			expr: func(rows int) string {
 				return "(count 2026.06.06 0Nd 2026.06.07)+(count 00:01 xbar 09:30 09:30:59 09:31:00)+(count where 2026.06.06 2026.06.07>=2026.06.07)"
 			},
@@ -509,8 +597,9 @@ func appendQEvalSemanticCoverageCases(cases []qEvalVectorCase) []qEvalVectorCase
 			},
 		},
 		{
-			name: "TableMetadataReorderSort",
-			tags: []string{"table-literal", "metadata", "table-reorder", "table-sort"},
+			name:   "TableMetadataReorderSort",
+			tags:   []string{"table-literal", "metadata", "table-reorder", "table-sort"},
+			matrix: []string{"table:literal-meta-cols:frame", "table:xcols-xasc-xdesc:frame"},
 			expr: func(rows int) string {
 				return "(count ([] sym:`AAPL`MSFT;price:100 101))+(count cols `price`sym xcols flip `sym`price`size!(`AAPL`MSFT;100 101;10 20))+(count meta `price xasc flip `sym`price!(`MSFT`AAPL;80 101))"
 			},
@@ -519,8 +608,9 @@ func appendQEvalSemanticCoverageCases(cases []qEvalVectorCase) []qEvalVectorCase
 			},
 		},
 		{
-			name: "KeyedTableGroupUngroupFby",
-			tags: []string{"keyed-table", "table-group-ungroup", "fby", "group"},
+			name:   "KeyedTableGroupUngroupFby",
+			tags:   []string{"keyed-table", "table-group-ungroup", "fby", "group"},
+			matrix: []string{"table:xkey-xgroup-ungroup:keyed-frame"},
 			expr: func(rows int) string {
 				return "fb:sum 10 20 30 40 fby `a`a`b`b;(count key `sym xkey flip `sym`price!(`AAPL`MSFT;100 101))+(count ungroup (`sym xgroup flip `sym`price!(`AAPL`AAPL`MSFT;100 101 80)))+(+/fb)"
 			},
@@ -529,8 +619,9 @@ func appendQEvalSemanticCoverageCases(cases []qEvalVectorCase) []qEvalVectorCase
 			},
 		},
 		{
-			name: "SafeSystemAndLoopbackIPC",
-			tags: []string{"safe-system", "ipc-loopback"},
+			name:   "SafeSystemAndLoopbackIPC",
+			tags:   []string{"safe-system", "ipc-loopback"},
+			matrix: []string{"ipc:loopback:session"},
 			expr: func(rows int) string {
 				return "h:hopen \"loopback\";v:\\v;h[(\"x+y\";2;3)]+count v"
 			},
@@ -559,9 +650,13 @@ func TestQEvalVectorBenchmarkExpressions(t *testing.T) {
 
 func TestQEvalVectorBenchmarkCoverageTags(t *testing.T) {
 	covered := make(map[string][]string)
+	matrixCovered := make(map[string][]string)
 	for _, tc := range qEvalVectorCases {
 		for _, tag := range tc.tags {
 			covered[tag] = append(covered[tag], tc.name)
+		}
+		for _, item := range tc.matrix {
+			matrixCovered[item] = append(matrixCovered[item], tc.name)
 		}
 	}
 	var missing []string
@@ -572,6 +667,15 @@ func TestQEvalVectorBenchmarkCoverageTags(t *testing.T) {
 	}
 	if len(missing) > 0 {
 		t.Fatalf("q.eval performance coverage missing tags: %s", strings.Join(missing, ", "))
+	}
+	var missingMatrix []string
+	for _, item := range qEvalRequiredMatrixCoverage {
+		if len(matrixCovered[item]) == 0 {
+			missingMatrix = append(missingMatrix, item)
+		}
+	}
+	if len(missingMatrix) > 0 {
+		t.Fatalf("q.eval performance coverage missing matrix entries: %s", strings.Join(missingMatrix, ", "))
 	}
 }
 
