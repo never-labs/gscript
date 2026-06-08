@@ -101,6 +101,7 @@ var opSpecs = [...]OpSpec{
 	OpVectorReduce:                  opSpecArgCount(opSpec("VectorReduce", OpEmitterTable, OpArgFixedAux, OpSideEffectRead, true), OpFixedCount(1)),
 	OpVectorScan:                    opSpecArgCount(opSpec("VectorScan", OpEmitterTable, OpArgFixed, OpSideEffectRead, true), OpFixedCount(1)),
 	OpQFrameSelectColumn:            opSpec("QFrameSelectColumn", OpEmitterTable, OpArgVariadicAux, OpSideEffectRead, true),
+	OpQVectorWhereReduce:            opSpecArgCount(opSpec("QVectorWhereReduce", OpEmitterTable, OpArgFixedAux, OpSideEffectRead, true), OpFixedCount(3)),
 	OpGetField:                      opSpec("GetField", OpEmitterField, OpArgFixedAux, OpSideEffectRead, true),
 	OpGetFieldNumToFloat:            opSpec("GetFieldNumToFloat", OpEmitterField, OpArgFixedAux, OpSideEffectRead, true),
 	OpFieldPolyLen:                  opSpecArgCount(opSpec("FieldPolyLen", OpEmitterField, OpArgFixedAux, OpSideEffectRead, true), OpFixedCount(1)),

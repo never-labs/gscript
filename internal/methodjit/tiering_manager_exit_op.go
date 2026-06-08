@@ -548,6 +548,18 @@ func (tm *TieringManager) executeOpExit(ctx *ExecContext, regs []runtime.Value, 
 		}
 		regs[absSlot] = out
 
+	case OpQVectorWhereReduce:
+		tempBase := absArg1
+		nArgs := int(ctx.OpExitArg2)
+		if absSlot >= len(regs) || tempBase < 0 || nArgs != 3 || tempBase+nArgs > len(regs) {
+			return fmt.Errorf("QVectorWhereReduce op-exit out of register range")
+		}
+		out, err := executeQVectorWhereReduceValue(aux, regs[tempBase], regs[tempBase+1], regs[tempBase+2])
+		if err != nil {
+			return err
+		}
+		regs[absSlot] = out
+
 	case OpVectorScan:
 		if absArg1 >= len(regs) || absSlot >= len(regs) {
 			return fmt.Errorf("VectorScan op-exit out of register range")

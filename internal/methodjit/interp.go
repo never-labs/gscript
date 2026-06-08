@@ -1219,6 +1219,13 @@ func (s *interpState) execInstr(instr *Instr, block *Block) ([]runtime.Value, bo
 		}
 		s.values[instr.ID] = out
 
+	case OpQVectorWhereReduce:
+		out, err := executeQVectorWhereReduceValue(int(instr.Aux), s.val(instr.Args[0]), s.val(instr.Args[1]), s.val(instr.Args[2]))
+		if err != nil {
+			return nil, false, err
+		}
+		s.values[instr.ID] = out
+
 	case OpVectorScan:
 		out, err := executeVectorScanValue(s.val(instr.Args[0]))
 		if err != nil {

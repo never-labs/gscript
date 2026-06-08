@@ -420,6 +420,12 @@ func DetectQVectorRuntimeKernels(fn *Function) []QVectorRuntimeKernel {
 					detail = "op=" + qVectorReduceOpName(path) + " input=" + qVectorReduceInputName(path)
 				}
 				out = append(out, QVectorRuntimeKernel{Instr: instr, Kernel: "VectorReduce", ShapeName: shape, Detail: detail})
+			case OpQVectorWhereReduce:
+				detail := "op=" + qDenseArrayReduceOpName(runtime.DenseArrayReduceOp(instr.Aux))
+				if len(instr.Args) == 3 {
+					detail += " predicate=" + qVectorWherePredicateValueDetail(instr.Args[0])
+				}
+				out = append(out, QVectorRuntimeKernel{Instr: instr, Kernel: "QVectorWhereReduce", ShapeName: qVectorWhereReduceShape(instr), Detail: detail})
 			case OpVectorScan:
 				out = append(out, QVectorRuntimeKernel{Instr: instr, Kernel: "VectorScan", ShapeName: "vector-scan"})
 			}
@@ -493,7 +499,30 @@ func QQueryNativeLoweringPass(fn *Function) (*Function, error) {
 				fmt.Sprintf("lowered q query primitive hot path shape %s to typed runtime kernel op-exit", spec.Shape))
 		}
 	}
+	qVectorWhereReduceLoweringPass(fn, uses)
 	return fn, nil
+}
+
+func qVectorWhereReduceLoweringPass(fn *Function, uses map[int]int) {
+	if fn == nil {
+		return
+	}
+	for _, path := range DetectQVectorReduceHotPaths(fn) {
+		if path.Reduce == nil || path.Where == nil || uses[path.Where.ID] != 1 || len(path.Where.Args) != 3 {
+			continue
+		}
+		reduce := path.Reduce
+		where := path.Where
+		reduce.Op = OpQVectorWhereReduce
+		reduce.Type = TypeAny
+		reduce.Args = append([]*Value(nil), where.Args...)
+		reduce.Aux2 = 0
+		qQueryNop(where)
+		if reduce.Block != nil {
+			functionRemarks(fn).Add("QQueryNativeLowering", "changed", reduce.Block.ID, reduce.ID, OpQVectorWhereReduce,
+				fmt.Sprintf("lowered q vector hot path shape %s to fused typed runtime kernel op-exit", qVectorWhereReduceShape(reduce)))
+		}
+	}
 }
 
 func qQueryLoweringFallbackRemark(fn *Function, path QQueryHotPath, reason string) {
@@ -772,6 +801,41 @@ func qVectorWhereHotPath(instr *Instr) QVectorWhereHotPath {
 		TrueColumn:   valueDef(instr.Args[1], OpFrameColumn),
 		FalseColumn:  valueDef(instr.Args[2], OpFrameColumn),
 		Where:        instr,
+	}
+}
+
+func qVectorWhereReduceShape(instr *Instr) string {
+	if instr == nil || len(instr.Args) != 3 {
+		return "vector-where/vector-reduce"
+	}
+	return qVectorWherePredicateValueName(instr.Args[0]) + "/vector-where/vector-reduce"
+}
+
+func qVectorWherePredicateValueName(value *Value) string {
+	compare, mask, maskCombine := qVectorWherePredicate(value)
+	switch {
+	case compare != nil:
+		return "compare"
+	case mask != nil:
+		return "mask"
+	case maskCombine != nil:
+		return "mask-combine"
+	default:
+		return "vector"
+	}
+}
+
+func qVectorWherePredicateValueDetail(value *Value) string {
+	compare, mask, maskCombine := qVectorWherePredicate(value)
+	switch {
+	case compare != nil:
+		return "compare " + qDenseArrayCompareOpName(runtime.DenseArrayBinaryOp(compare.Aux))
+	case mask != nil:
+		return "mask"
+	case maskCombine != nil:
+		return "mask-combine " + qDenseArrayMaskOpName(runtime.DenseArrayMaskOp(maskCombine.Aux))
+	default:
+		return "vector"
 	}
 }
 

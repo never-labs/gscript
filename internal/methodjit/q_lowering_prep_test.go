@@ -1544,6 +1544,114 @@ func TestQVectorReduceHotPathDiagnosesAggregateKernel(t *testing.T) {
 	}
 }
 
+func TestQVectorWhereReduceLowersToFusedTypedRuntimeKernel(t *testing.T) {
+	proto := &vm.FuncProto{
+		Name:      "q_vector_where_reduce",
+		NumParams: 1,
+		MaxStack:  4,
+		Constants: []runtime.Value{
+			runtime.StringValue("price"),
+			runtime.FloatValue(100),
+			runtime.StringValue("size"),
+			runtime.IntValue(0),
+		},
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_FRAME_COLUMN, 1, 0, 0),
+			vm.EncodeABx(vm.OP_LOADK, 2, 1),
+			vm.EncodeABC(vm.OP_VECTOR_COMPARE, 1, 2, int(runtime.DenseArrayGE)),
+			vm.EncodeABC(vm.OP_FRAME_COLUMN, 2, 0, 2),
+			vm.EncodeABx(vm.OP_LOADK, 3, 3),
+			vm.EncodeABC(vm.OP_VECTOR_WHERE, 1, 2, 3),
+			vm.EncodeABC(vm.OP_VECTOR_REDUCE, 1, 1, int(runtime.DenseArrayReduceSum)),
+			vm.EncodeABC(vm.OP_RETURN, 1, 2, 0),
+		},
+	}
+
+	fn := BuildGraph(proto)
+	lowered, err := QQueryNativeLoweringPass(fn)
+	if err != nil {
+		t.Fatalf("QQueryNativeLoweringPass: %v", err)
+	}
+	counts := countOps(lowered)
+	if counts[OpQVectorWhereReduce] != 1 {
+		t.Fatalf("OpQVectorWhereReduce count = %d, want 1\n%s", counts[OpQVectorWhereReduce], Print(lowered))
+	}
+	if counts[OpVectorWhere] != 0 || counts[OpVectorReduce] != 0 {
+		t.Fatalf("vector where/reduce counts = %d/%d, want 0/0 after fusion\n%s", counts[OpVectorWhere], counts[OpVectorReduce], Print(lowered))
+	}
+	if counts[OpVectorCompare] != 1 {
+		t.Fatalf("OpVectorCompare count = %d, want compare mask retained as fused input\n%s", counts[OpVectorCompare], Print(lowered))
+	}
+
+	kernels := DetectQVectorRuntimeKernels(lowered)
+	if len(kernels) != 2 {
+		t.Fatalf("DetectQVectorRuntimeKernels count = %d, want compare + fused kernel\n%s", len(kernels), Print(lowered))
+	}
+	if got := CountQVectorRuntimeKernelShapes(kernels)["compare/vector-where/vector-reduce"]; got != 1 {
+		t.Fatalf("QVectorRuntimeKernelShapes = %+v, want fused compare/vector-where/vector-reduce", CountQVectorRuntimeKernelShapes(kernels))
+	}
+	if got := formatQTypedVectorRuntimeKernelReport(kernels); !strings.Contains(got, "kernel=QVectorWhereReduce") ||
+		!strings.Contains(got, "shape=compare/vector-where/vector-reduce") ||
+		!strings.Contains(got, "op=sum") ||
+		!strings.Contains(got, "predicate=compare >=") {
+		t.Fatalf("formatted vector runtime kernels missing fused where-reduce:\n%s", got)
+	}
+	report := Diagnose(proto, []runtime.Value{runtime.TableValue(qHotPathTestFrame(t))})
+	if report.QVectorRuntimeKernelShapes["compare/vector-where/vector-reduce"] != 1 {
+		t.Fatalf("Diagnose QVectorRuntimeKernelShapes = %+v, want fused compare/vector-where/vector-reduce", report.QVectorRuntimeKernelShapes)
+	}
+	if !strings.Contains(report.String(), "kernel=QVectorWhereReduce") {
+		t.Fatalf("diagnostic report missing fused q vector where-reduce kernel:\n%s", report.String())
+	}
+
+	result, err := Interpret(lowered, []runtime.Value{runtime.TableValue(qHotPathTestFrame(t))})
+	if err != nil {
+		t.Fatalf("Interpret lowered q vector where-reduce: %v", err)
+	}
+	if len(result) != 1 || !result[0].IsInt() || result[0].Int() != 30 {
+		t.Fatalf("lowered where-reduce result = %#v, want int 30", result)
+	}
+}
+
+func TestQVectorWhereReduceSharedWhereDoesNotLower(t *testing.T) {
+	proto := &vm.FuncProto{
+		Name:      "q_vector_where_reduce_shared",
+		NumParams: 1,
+		MaxStack:  5,
+		Constants: []runtime.Value{
+			runtime.StringValue("price"),
+			runtime.FloatValue(100),
+			runtime.StringValue("size"),
+			runtime.IntValue(0),
+		},
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_FRAME_COLUMN, 1, 0, 0),
+			vm.EncodeABx(vm.OP_LOADK, 2, 1),
+			vm.EncodeABC(vm.OP_VECTOR_COMPARE, 1, 2, int(runtime.DenseArrayGE)),
+			vm.EncodeABC(vm.OP_FRAME_COLUMN, 2, 0, 2),
+			vm.EncodeABx(vm.OP_LOADK, 3, 3),
+			vm.EncodeABC(vm.OP_VECTOR_WHERE, 1, 2, 3),
+			vm.EncodeABC(vm.OP_VECTOR_REDUCE, 4, 1, int(runtime.DenseArrayReduceSum)),
+			vm.EncodeABC(vm.OP_VECTOR_SCAN, 1, 1, 0),
+			vm.EncodeABC(vm.OP_RETURN, 4, 2, 0),
+		},
+	}
+
+	fn := BuildGraph(proto)
+	lowered, err := QQueryNativeLoweringPass(fn)
+	if err != nil {
+		t.Fatalf("QQueryNativeLoweringPass: %v", err)
+	}
+	counts := countOps(lowered)
+	if counts[OpQVectorWhereReduce] != 0 {
+		t.Fatalf("OpQVectorWhereReduce count = %d, want 0 for shared where\n%s", counts[OpQVectorWhereReduce], Print(lowered))
+	}
+	if counts[OpVectorWhere] != 1 || counts[OpVectorReduce] != 1 || counts[OpVectorScan] != 1 {
+		t.Fatalf("shared vector primitive counts where/reduce/scan = %d/%d/%d, want 1/1/1\n%s",
+			counts[OpVectorWhere], counts[OpVectorReduce], counts[OpVectorScan], Print(lowered))
+	}
+}
+
 func TestQVectorRuntimeKernelsDiagnosePrimitiveShapes(t *testing.T) {
 	proto := &vm.FuncProto{
 		Name:      "q_vector_runtime_kernel_shapes",
@@ -2504,6 +2612,21 @@ func TestVectorReduceRuntimeHelperUsesRuntimePrimitive(t *testing.T) {
 	}
 	if !result.IsFloat() || result.Float() != 6.25 {
 		t.Fatalf("vector reduce result = %#v, want float 6.25", result)
+	}
+}
+
+func TestQVectorWhereReduceRuntimeHelperUsesRuntimePrimitives(t *testing.T) {
+	result, err := executeQVectorWhereReduceValue(
+		int(runtime.DenseArrayReduceSum),
+		runtime.DenseArrayValue(runtime.NewDenseArrayBool([]bool{true, false, true})),
+		runtime.DenseArrayValue(runtime.NewDenseArrayI64([]int64{10, 20, 30})),
+		runtime.IntValue(7),
+	)
+	if err != nil {
+		t.Fatalf("execute q vector where-reduce: %v", err)
+	}
+	if !result.IsInt() || result.Int() != 47 {
+		t.Fatalf("q vector where-reduce result = %#v, want int 47", result)
 	}
 }
 

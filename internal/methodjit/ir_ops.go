@@ -230,6 +230,9 @@ const (
 	// most one dynamic rhs or row argument; constants and row mode live in
 	// Function.QFrameSelectColumnSpecs[Aux].
 	OpQFrameSelectColumn
+	// Fused q/vector typed runtime-kernel primitive. Args = [mask, trueValue,
+	// falseValue], Aux = runtime DenseArrayReduceOp; computes where then reduce.
+	OpQVectorWhereReduce
 	OpGetField // Args[0].field; Aux = constant pool index for field name
 	// OpGetFieldNumToFloat fuses Args[0].field with numeric widening.
 	// It preserves NumToFloat semantics: int and float fields become raw

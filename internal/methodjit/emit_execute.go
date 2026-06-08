@@ -1192,6 +1192,18 @@ func (cf *CompiledFunction) executeOpExit(ctx *ExecContext, regs []runtime.Value
 		}
 		regs[slot] = out
 
+	case OpQVectorWhereReduce:
+		tempBase := arg1
+		nArgs := arg2
+		if slot >= len(regs) || tempBase < 0 || nArgs != 3 || tempBase+nArgs > len(regs) {
+			return fmt.Errorf("QVectorWhereReduce op-exit out of register range")
+		}
+		out, err := executeQVectorWhereReduceValue(aux, regs[tempBase], regs[tempBase+1], regs[tempBase+2])
+		if err != nil {
+			return err
+		}
+		regs[slot] = out
+
 	case OpVectorScan:
 		if arg1 >= len(regs) || slot >= len(regs) {
 			return fmt.Errorf("VectorScan op-exit out of register range")

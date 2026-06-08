@@ -202,9 +202,10 @@ func (ec *emitContext) emitConcatExit(instr *Instr) {
 	})
 }
 
-// emitVectorWhereExit emits OpVectorWhere through exit-resume with three
-// operands staged in consecutive temporary slots. The generic op-exit only has
-// two operand channels, so this mirrors the temp-base pattern used by Concat.
+// emitVectorWhereExit emits vector where-shaped runtime ops through
+// exit-resume with three operands staged in consecutive temporary slots. The
+// generic op-exit only has two operand channels, so this mirrors the temp-base
+// pattern used by Concat.
 func (ec *emitContext) emitVectorWhereExit(instr *Instr) {
 	if instr == nil || len(instr.Args) != 3 {
 		ec.emitOpExit(instr)
