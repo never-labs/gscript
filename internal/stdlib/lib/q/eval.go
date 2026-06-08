@@ -2377,6 +2377,12 @@ func qCastKindFromSymbol(sym data.Symbol) (data.Kind, bool) {
 
 func castValue(kind data.Kind, values any) (any, error) {
 	if array, ok := values.(data.Array); ok {
+		if typed, handled, err := data.TryTypedCast(kind, array); handled || err != nil {
+			if err != nil {
+				return nil, fmt.Errorf("q cast `%s: %w", kind, err)
+			}
+			return typed, nil
+		}
 		out := array.Values()
 		for i, value := range out {
 			normalized, err := castScalarValue(kind, value)

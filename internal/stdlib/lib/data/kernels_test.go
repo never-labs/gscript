@@ -126,6 +126,34 @@ func TestTypedWithinMaskOpenClosedAndNullBounds(t *testing.T) {
 	}
 }
 
+func TestTryTypedCastIntegerArrays(t *testing.T) {
+	shorts, handled, err := TryTypedCast(KindI16, NewI64Range(0, 2, 4))
+	if err != nil {
+		t.Fatalf("TryTypedCast i16 range returned error: %v", err)
+	}
+	if !handled {
+		t.Fatal("TryTypedCast i16 range did not handle integer array")
+	}
+	if got, want := shorts.Values(), []any{int16(0), int16(2), int16(4), int16(6)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("TryTypedCast i16 range values = %#v, want %#v", got, want)
+	}
+
+	floats, handled, err := TryTypedCast(KindF64, NewI32([]int32{1, 2, 3}))
+	if err != nil {
+		t.Fatalf("TryTypedCast f64 i32 returned error: %v", err)
+	}
+	if !handled {
+		t.Fatal("TryTypedCast f64 i32 did not handle integer array")
+	}
+	if got, want := floats.Values(), []any{1.0, 2.0, 3.0}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("TryTypedCast f64 i32 values = %#v, want %#v", got, want)
+	}
+
+	if _, handled, err := TryTypedCast(KindI16, NewI64([]int64{32768})); !handled || err == nil {
+		t.Fatalf("TryTypedCast i16 overflow handled=%v err=%v, want handled error", handled, err)
+	}
+}
+
 func TestTypedBinScalarAndVectorBoundaries(t *testing.T) {
 	domain := WithArrayAttribute(NewI64([]int64{10, 20, 20, 40}), ArrayAttributeSorted)
 	index, ok, err := typedKernels.Bin(domain, int64(20))

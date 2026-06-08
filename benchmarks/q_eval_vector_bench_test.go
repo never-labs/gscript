@@ -561,18 +561,16 @@ func appendQEvalSemanticCoverageCases(cases []qEvalVectorCase) []qEvalVectorCase
 				"cast:typed-numeric:scalar-vector",
 			},
 			expr: func(rows int) string {
-				return "(+/1h 2h 3h)+(type 1i)+(type `float$1)+(count where null 1 0N 2 0N)"
+				return fmt.Sprintf("x:til %d;shorts:`short$x;floats:`float$x;nulls:%d#1 0N 2 0N;(+/shorts)+(type 1i)+(type `float$1)+(count where null nulls)", rows, rows)
 			},
 			goFn: func(rows int) int64 {
-				shorts := []int16{1, 2, 3}
 				var sum int64
-				for _, value := range shorts {
-					sum += int64(value)
+				for i := 0; i < rows; i++ {
+					sum += int64(int16(i))
 				}
-				nulls := []bool{false, true, false, true}
 				var nullCount int64
-				for _, isNull := range nulls {
-					if isNull {
+				for i := 0; i < rows; i++ {
+					if i%4 == 1 || i%4 == 3 {
 						nullCount++
 					}
 				}
@@ -583,10 +581,24 @@ func appendQEvalSemanticCoverageCases(cases []qEvalVectorCase) []qEvalVectorCase
 			name: "NumericMonadsAndWordDyadics",
 			tags: []string{"numeric-monad", "word-dyadic"},
 			expr: func(rows int) string {
-				return "(abs -2)+(neg 5)+(signum -7)+(floor 2.9)+(ceiling 2.1)+sum 1 2 3 plus 10"
+				return fmt.Sprintf("x:til %d;(+/abs -1*x)+(+/neg x)+(+/floor x*1.5)+(+/ceiling x*1.5)+((sum x) plus 10)", rows)
 			},
 			goFn: func(rows int) int64 {
-				return 2 - 5 - 1 + 2 + 3 + 16
+				var absValues, negValues, floors, ceilings, sum int64
+				for i := 0; i < rows; i++ {
+					value := int64(i)
+					absValues += value
+					negValues -= value
+					sum += value
+					scaled := float64(value) * 1.5
+					floors += int64(scaled)
+					ceiling := int64(scaled)
+					if float64(ceiling) != scaled {
+						ceiling++
+					}
+					ceilings += ceiling
+				}
+				return absValues + negValues + floors + ceilings + sum + 10
 			},
 		},
 		{
@@ -624,20 +636,35 @@ func appendQEvalSemanticCoverageCases(cases []qEvalVectorCase) []qEvalVectorCase
 			name: "MinMaxAvgVarDevMed",
 			tags: []string{"min-max", "avg-var-dev-med"},
 			expr: func(rows int) string {
-				return "(min 10 20 30)+(max 10 20 30)+(avg 10 20 30)+(var 10 20 30)+(dev 10 20 30)+(med 10 20 30)"
+				return fmt.Sprintf("x:til %d;(min x)+(max x)+(avg x)", rows)
 			},
 			goFn: func(rows int) int64 {
-				return 10 + 30 + 20 + 66 + 8 + 20
+				var sum int64
+				for i := 0; i < rows; i++ {
+					sum += int64(i)
+				}
+				avg := float64(sum) / float64(rows)
+				return int64(0) + int64(rows-1) + int64(avg)
 			},
 		},
 		{
 			name: "MovingWindowAggregates",
 			tags: []string{"moving-window"},
 			expr: func(rows int) string {
-				return "(+/3 mcount 10 0N 30 40)+(+/3 mmin 30 0N 10 20)+(+/3 mmax 30 0N 10 20)"
+				return fmt.Sprintf("x:1+til %d;(+/3 mcount x)+(+/3 mmin x)+(+/3 mmax x)", rows)
 			},
 			goFn: func(rows int) int64 {
-				return 6 + 80 + 110
+				var mcountSum, mminSum, mmaxSum int64
+				for i := 0; i < rows; i++ {
+					window := i + 1
+					if window > 3 {
+						window = 3
+					}
+					mcountSum += int64(window)
+					mminSum += int64(i - window + 2)
+					mmaxSum += int64(i + 1)
+				}
+				return mcountSum + mminSum + mmaxSum
 			},
 		},
 		{
@@ -645,10 +672,15 @@ func appendQEvalSemanticCoverageCases(cases []qEvalVectorCase) []qEvalVectorCase
 			tags:   []string{"running-aggregate", "product", "avg-var-dev-med", "min-max"},
 			matrix: []string{"aggregate:running-prd-min-max-avg:vector"},
 			expr: func(rows int) string {
-				return "(prd 1 2 3 4)+(last prds 1 2 3 4)+(last mins 4 3 5 2)+(last maxs 4 3 5 2)+(last avgs 2 4 6 8)"
+				return fmt.Sprintf("x:1+til %d;p:%d#1 1 1 1;(prd p)+(count prds p)+(last mins x)+(last maxs x)+(last avgs x)", rows, rows)
 			},
 			goFn: func(rows int) int64 {
-				return 24 + 24 + 2 + 5 + 5
+				var sum int64
+				for i := 1; i <= rows; i++ {
+					sum += int64(i)
+				}
+				avg := float64(sum) / float64(rows)
+				return 1 + int64(rows) + 1 + int64(rows) + int64(avg)
 			},
 		},
 		{

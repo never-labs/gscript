@@ -901,6 +901,81 @@ func (typedKernelRegistry) NumericUnary(op string, array Array) (Array, bool, er
 	}
 }
 
+func TryTypedCast(kind Kind, array Array) (Array, bool, error) {
+	if array == nil {
+		return nil, true, fmt.Errorf("typed cast array is nil")
+	}
+	switch a := array.(type) {
+	case attributedArray:
+		return TryTypedCast(kind, a.array)
+	}
+	if !isIntegerArray(array) {
+		return nil, false, nil
+	}
+	switch kind {
+	case KindI16:
+		out := make([]int16, array.Len())
+		for row := 0; row < array.Len(); row++ {
+			value, ok, err := integerArrayAt(array, row)
+			if err != nil {
+				return nil, true, err
+			}
+			if !ok {
+				return nil, false, nil
+			}
+			if value < -32768 || value > 32767 {
+				return nil, true, fmt.Errorf("value %d must be i16 for %s", row+1, kind)
+			}
+			out[row] = int16(value)
+		}
+		return columnArray[int16]{kind: KindI16, data: out}, true, nil
+	case KindI32:
+		out := make([]int32, array.Len())
+		for row := 0; row < array.Len(); row++ {
+			value, ok, err := integerArrayAt(array, row)
+			if err != nil {
+				return nil, true, err
+			}
+			if !ok {
+				return nil, false, nil
+			}
+			if value < -2147483648 || value > 2147483647 {
+				return nil, true, fmt.Errorf("value %d must be i32 for %s", row+1, kind)
+			}
+			out[row] = int32(value)
+		}
+		return columnArray[int32]{kind: KindI32, data: out}, true, nil
+	case KindI64:
+		out := make([]int64, array.Len())
+		for row := 0; row < array.Len(); row++ {
+			value, ok, err := integerArrayAt(array, row)
+			if err != nil {
+				return nil, true, err
+			}
+			if !ok {
+				return nil, false, nil
+			}
+			out[row] = value
+		}
+		return newI64Trusted(out), true, nil
+	case KindF64:
+		out := make([]float64, array.Len())
+		for row := 0; row < array.Len(); row++ {
+			value, ok, err := integerArrayAt(array, row)
+			if err != nil {
+				return nil, true, err
+			}
+			if !ok {
+				return nil, false, nil
+			}
+			out[row] = float64(value)
+		}
+		return newF64Trusted(out), true, nil
+	default:
+		return nil, false, nil
+	}
+}
+
 func aggregateIndexedNumericValue(agg aggregateInput, row int) (float64, bool, error) {
 	if agg.leftColumn != nil && agg.rightColumn != nil {
 		return aggregateBinaryNumericValue(agg, row)
