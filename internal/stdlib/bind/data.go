@@ -1000,6 +1000,16 @@ func dataNativeArrayFromValue(v Value) (stddata.Array, bool) {
 		array, ok := tbl.NativePayload().(stddata.Array)
 		return array, ok
 	}
+	return dataLegacyNativeArrayPayload(tbl)
+}
+
+func dataLegacyNativeArrayPayload(tbl *Table) (stddata.Array, bool) {
+	if tbl == nil {
+		return nil, false
+	}
+	if _, hasInfo := tbl.NativePayloadInfo(); hasInfo {
+		return nil, false
+	}
 	array, ok := tbl.NativePayload().(stddata.Array)
 	return array, ok
 }
