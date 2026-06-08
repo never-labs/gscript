@@ -1172,6 +1172,9 @@ func (s *EvalState) eval(src string) (any, error) {
 		if out, handled, err := s.tryEvalSumWhereCompare(right); err != nil || handled {
 			return out, err
 		}
+		if out, handled, err := s.tryEvalSumDeltas(right); err != nil || handled {
+			return out, err
+		}
 		if out, handled, err := s.tryEvalTypedUnarySum(right); err != nil || handled {
 			return out, err
 		}
@@ -1332,6 +1335,11 @@ func (s *EvalState) eval(src string) (any, error) {
 			arg := strings.TrimSpace(src[len(prefix.word):])
 			if prefix.word == "where " {
 				if out, ok, err := s.evalWhereCompare(arg); ok || err != nil {
+					return out, err
+				}
+			}
+			if prefix.word == "sum " {
+				if out, handled, err := s.tryEvalSumDeltas(arg); err != nil || handled {
 					return out, err
 				}
 			}
@@ -3505,6 +3513,9 @@ func isDyadicOp(b byte) bool {
 
 func (s *EvalState) evalAdverb(expr adverbExpr) (any, error) {
 	if expr.left == "" && expr.adverb == "/" && expr.verb == "+" {
+		if out, handled, err := s.tryEvalSumDeltas(expr.right); err != nil || handled {
+			return out, err
+		}
 		if out, handled, err := s.tryEvalTypedUnarySum(expr.right); err != nil || handled {
 			return out, err
 		}
@@ -4093,6 +4104,34 @@ func (s *EvalState) tryEvalSumWhereCompare(src string) (any, bool, error) {
 		return out, true, err
 	}
 	recordRuntimeKernelProbe("ArrayWhereCompareSum", "index-sum/"+string(indexes.Kind()), handled, err)
+	return nil, false, nil
+}
+
+func (s *EvalState) tryEvalSumDeltas(src string) (any, bool, error) {
+	src = stripEnclosingParens(strings.TrimSpace(src))
+	if !strings.HasPrefix(src, "deltas ") || !wordBoundary(src, 0, len("deltas")) {
+		return nil, false, nil
+	}
+	value, err := s.eval(strings.TrimSpace(src[len("deltas "):]))
+	if err != nil {
+		return nil, true, err
+	}
+	array, ok := value.(data.Array)
+	if !ok {
+		delta, err := deltas(value)
+		if err != nil {
+			return nil, true, err
+		}
+		out, err := sum(delta)
+		return out, true, err
+	}
+	shape := "vector-reduce/sum-deltas/" + string(array.Kind())
+	if out, handled, err := data.TryTypedDeltasSum(array); err != nil || handled {
+		recordRuntimeKernelProbe("ArrayDeltasSum", shape, handled, err)
+		return out, true, err
+	} else {
+		recordRuntimeKernelProbe("ArrayDeltasSum", shape, handled, err)
+	}
 	return nil, false, nil
 }
 

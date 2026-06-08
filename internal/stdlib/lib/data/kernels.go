@@ -2684,6 +2684,48 @@ func TryTypedDeltas(array Array) (Array, bool, error) {
 	}
 }
 
+// TryTypedDeltasSum applies sum deltas x without materializing deltas. The
+// telescoping reduction is valid for dense, null-free numeric arrays; nullable
+// and generic arrays deliberately fall back to the regular deltas + sum path.
+func TryTypedDeltasSum(array Array) (any, bool, error) {
+	switch a := array.(type) {
+	case attributedArray:
+		return TryTypedDeltasSum(a.array)
+	case columnArray[int8]:
+		return lastSignedDeltasSum(a.data), true, nil
+	case columnArray[int16]:
+		return lastSignedDeltasSum(a.data), true, nil
+	case columnArray[int32]:
+		return lastSignedDeltasSum(a.data), true, nil
+	case columnArray[int64]:
+		return lastSignedDeltasSum(a.data), true, nil
+	case i64RangeArray:
+		if a.len == 0 {
+			return NullValue, true, nil
+		}
+		return a.start + int64(a.len-1)*a.step, true, nil
+	case columnArray[uint8]:
+		return lastUnsignedDeltasSum(a.data), true, nil
+	case columnArray[uint16]:
+		return lastUnsignedDeltasSum(a.data), true, nil
+	case columnArray[uint32]:
+		return lastUnsignedDeltasSum(a.data), true, nil
+	case columnArray[uint64]:
+		return lastUnsignedDeltasSum(a.data), true, nil
+	case columnArray[float32]:
+		return lastFloatDeltasSum(a.data), true, nil
+	case columnArray[float64]:
+		return lastFloatDeltasSum(a.data), true, nil
+	case f64RangeArray:
+		if a.len == 0 {
+			return NullValue, true, nil
+		}
+		return a.start + float64(a.len-1)*a.step, true, nil
+	default:
+		return nil, false, nil
+	}
+}
+
 func (k typedKernelRegistry) NumericSums(array Array) (Array, bool, error) {
 	switch a := array.(type) {
 	case attributedArray:
@@ -6386,6 +6428,27 @@ func deltasI64Range(values i64RangeArray) Array {
 		out[i] = values.step
 	}
 	return columnArray[int64]{kind: KindI64, data: out}
+}
+
+func lastSignedDeltasSum[T signedScalar](values []T) any {
+	if len(values) == 0 {
+		return NullValue
+	}
+	return int64(values[len(values)-1])
+}
+
+func lastUnsignedDeltasSum[T unsignedScalar](values []T) any {
+	if len(values) == 0 {
+		return NullValue
+	}
+	return int64(values[len(values)-1])
+}
+
+func lastFloatDeltasSum[T floatScalar](values []T) any {
+	if len(values) == 0 {
+		return NullValue
+	}
+	return float64(values[len(values)-1])
 }
 
 func numericSumRowsSlice[T signedScalar | unsignedScalar | floatScalar](values []T, rows []int) (float64, int64, bool, error) {

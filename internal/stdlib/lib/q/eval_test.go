@@ -2769,14 +2769,25 @@ func TestEvalDeltasRecordsTypedRuntimeKernel(t *testing.T) {
 	t.Cleanup(ClearRuntimeKernelExecutionStats)
 
 	assertEvalArray(t, "deltas til 4", data.KindI64, []any{int64(0), int64(1), int64(1), int64(1)})
+	assertEvalValue(t, "sum deltas til 8", int64(7))
+	assertEvalValue(t, "+/deltas 10 15 14 20", int64(20))
+	assertEvalValue(t, "sum deltas 1 0N 3", int64(1))
 	seenDeltas := false
+	seenDeltasSum := false
+	seenDeltasSumFallback := false
 	for _, stat := range RuntimeKernelExecutionStats() {
 		if stat.Kernel == "ArrayDeltas" && stat.Outcome == "hit" && stat.Count > 0 {
 			seenDeltas = true
 		}
+		if stat.Kernel == "ArrayDeltasSum" && stat.Shape == "vector-reduce/sum-deltas/i64" && stat.Outcome == "hit" && stat.Count > 0 {
+			seenDeltasSum = true
+		}
+		if stat.Kernel == "ArrayDeltasSum" && stat.Outcome == "fallback" && stat.Count > 0 {
+			seenDeltasSumFallback = true
+		}
 	}
-	if !seenDeltas {
-		t.Fatalf("missing ArrayDeltas typed runtime stat: %#v", RuntimeKernelExecutionStats())
+	if !seenDeltas || !seenDeltasSum || !seenDeltasSumFallback {
+		t.Fatalf("missing deltas runtime stats: deltas=%v deltasSum=%v fallback=%v stats=%#v", seenDeltas, seenDeltasSum, seenDeltasSumFallback, RuntimeKernelExecutionStats())
 	}
 }
 

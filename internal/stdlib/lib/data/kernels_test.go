@@ -2579,6 +2579,27 @@ func TestTypedNumericUnaryBinaryAndAggregates(t *testing.T) {
 		t.Fatalf("TryTypedDeltas range values = %v, want %v", got, want)
 	}
 
+	value, ok, err = TryTypedDeltasSum(NewI32([]int32{10, 15, 14, 20}))
+	if err != nil || !ok || value != int64(20) {
+		t.Fatalf("TryTypedDeltasSum i32 = %v, %v, %v; want 20, true, nil", value, ok, err)
+	}
+	value, ok, err = TryTypedDeltasSum(NewI64Range(3, 2, 4))
+	if err != nil || !ok || value != int64(9) {
+		t.Fatalf("TryTypedDeltasSum range = %v, %v, %v; want 9, true, nil", value, ok, err)
+	}
+	value, ok, err = TryTypedDeltasSum(NewF32([]float32{1.5, 2.25, 4.5}))
+	if err != nil || !ok || value != float64(4.5) {
+		t.Fatalf("TryTypedDeltasSum f32 = %v, %v, %v; want 4.5, true, nil", value, ok, err)
+	}
+	value, ok, err = TryTypedDeltasSum(NewI64(nil))
+	if err != nil || !ok || value != NullValue {
+		t.Fatalf("TryTypedDeltasSum empty = %v, %v, %v; want null, true, nil", value, ok, err)
+	}
+	value, ok, err = TryTypedDeltasSum(NewColumn("x", []any{int64(1), NullValue, int64(3)}).Data)
+	if err != nil || ok || value != nil {
+		t.Fatalf("TryTypedDeltasSum nullable = %v, %v, %v; want nil, false, nil", value, ok, err)
+	}
+
 }
 
 func TestTypedDyadicBroadcastPromotionAndNullPropagation(t *testing.T) {
