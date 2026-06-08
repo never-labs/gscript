@@ -2878,6 +2878,96 @@ func TestQGroupAggregateWhereCallLowersToFilteredFrameGroupAggregateKernel(t *te
 	}
 }
 
+func TestQGroupAggregateNoKeyCallLowersToFrameGroupAggregateKernel(t *testing.T) {
+	tests := []struct {
+		name      string
+		query     string
+		wantTotal []float64
+		wantFills []int64
+		wantMasks int
+		wantShape string
+	}{
+		{
+			name:      "all_rows",
+			query:     "select total:sum price, fills:count i from trades",
+			wantTotal: []float64{300.75},
+			wantFills: []int64{3},
+			wantShape: "group/aggregate",
+		},
+		{
+			name:      "filtered",
+			query:     "select total:sum price, fills:count i from trades where price>=100",
+			wantTotal: []float64{201.75},
+			wantFills: []int64{2},
+			wantMasks: 1,
+			wantShape: "filter/group/aggregate",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			proto := &vm.FuncProto{
+				Name:      "q_group_aggregate_no_key_" + tt.name,
+				NumParams: 1,
+				MaxStack:  4,
+				Constants: []runtime.Value{
+					runtime.StringValue("q"),
+					runtime.StringValue("sql"),
+					runtime.StringValue(tt.query),
+				},
+				Code: []uint32{
+					vm.EncodeABx(vm.OP_GETGLOBAL, 1, 0),
+					vm.EncodeABC(vm.OP_GETFIELD, 1, 1, 1),
+					vm.EncodeABC(vm.OP_MOVE, 2, 0, 0),
+					vm.EncodeABx(vm.OP_LOADK, 3, 2),
+					vm.EncodeABC(vm.OP_CALL, 1, 3, 2),
+					vm.EncodeABC(vm.OP_RETURN, 1, 2, 0),
+				},
+			}
+
+			fn := BuildGraph(proto)
+			fn.Remarks = &OptimizationRemarks{}
+			lowered, err := QQueryNativeLoweringPass(fn)
+			if err != nil {
+				t.Fatalf("QQueryNativeLoweringPass: %v", err)
+			}
+			counts := countOps(lowered)
+			if counts[OpFrameMask] != tt.wantMasks || counts[OpFrameGroupAggregate] != 1 || counts[OpCall] != 0 {
+				t.Fatalf("no-key group aggregate lowering counts FrameMask=%d FrameGroupAggregate=%d OpCall=%d\n%s",
+					counts[OpFrameMask], counts[OpFrameGroupAggregate], counts[OpCall], Print(lowered))
+			}
+			kernels := DetectQFrameRuntimeKernels(lowered)
+			assertQKernelDescriptor(t, BuildQKernelDescriptors(nil, kernels, nil, fn.Remarks.List()),
+				"methodjit_q_frame_runtime", "runtime_kernel", "FrameGroupAggregate", tt.wantShape, "typed_runtime_op_exit", "supported", "")
+
+			result, err := Interpret(lowered, []runtime.Value{runtime.TableValue(qHotPathTestFrame(t))})
+			if err != nil {
+				t.Fatalf("Interpret lowered no-key q group aggregate: %v", err)
+			}
+			if len(result) != 1 || !result[0].IsTable() {
+				t.Fatalf("lowered no-key result = %#v, want one native frame table", result)
+			}
+			payload, info, ok := result[0].Table().NativeFramePayload()
+			if !ok || info.Rows != 1 || info.Columns != 2 {
+				t.Fatalf("lowered no-key result payload = %#v info=%#v ok=%v, want 1x2 native frame", payload, info, ok)
+			}
+			soa, ok := payload.(*runtime.SoA)
+			if !ok {
+				t.Fatalf("lowered no-key result payload type = %T, want *runtime.SoA", payload)
+			}
+			total, _ := soa.Column("total")
+			fills, _ := soa.Column("fills")
+			totalVals, _ := total.F64()
+			fillVals, _ := fills.I64()
+			if len(totalVals) != len(tt.wantTotal) || totalVals[0] != tt.wantTotal[0] {
+				t.Fatalf("lowered no-key total values = %#v, want %#v", totalVals, tt.wantTotal)
+			}
+			if len(fillVals) != len(tt.wantFills) || fillVals[0] != tt.wantFills[0] {
+				t.Fatalf("lowered no-key fills values = %#v, want %#v", fillVals, tt.wantFills)
+			}
+		})
+	}
+}
+
 func TestQGroupAggregateComputedExpressionStaysOnFallback(t *testing.T) {
 	const query = "select notional:sum price*size by size from trades"
 	proto := &vm.FuncProto{

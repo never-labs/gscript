@@ -1196,7 +1196,7 @@ func qNopQSQLCallScaffold(call *Instr, uses map[int]int) {
 
 func qParseSimpleGroupAggregateQuery(query string) (qSimpleGroupAggregateQuery, bool) {
 	tokens := qLexQueryTokens(query)
-	if len(tokens) < 6 || tokens[0].lower != "select" {
+	if len(tokens) < 5 || tokens[0].lower != "select" {
 		return qSimpleGroupAggregateQuery{}, false
 	}
 	byIdx, fromIdx := -1, -1
@@ -1222,7 +1222,13 @@ func qParseSimpleGroupAggregateQuery(query string) (qSimpleGroupAggregateQuery, 
 			fromIdx = i
 		}
 	}
-	if byIdx <= 1 || fromIdx <= byIdx+1 {
+	if fromIdx <= 1 {
+		return qSimpleGroupAggregateQuery{}, false
+	}
+	if byIdx >= 0 && (byIdx <= 1 || fromIdx <= byIdx+1) {
+		return qSimpleGroupAggregateQuery{}, false
+	}
+	if byIdx < 0 && fromIdx <= 1 {
 		return qSimpleGroupAggregateQuery{}, false
 	}
 	if whereIdx >= 0 && whereIdx != fromIdx+2 {
@@ -1234,11 +1240,19 @@ func qParseSimpleGroupAggregateQuery(query string) (qSimpleGroupAggregateQuery, 
 	if whereIdx >= 0 && whereIdx+1 >= len(tokens) {
 		return qSimpleGroupAggregateQuery{}, false
 	}
-	selectPart := strings.TrimSpace(query[tokens[0].end:tokens[byIdx].start])
-	byPart := strings.TrimSpace(query[tokens[byIdx].end:tokens[fromIdx].start])
-	byColumns, ok := qParseSimpleIdentifierList(byPart)
-	if !ok || len(byColumns) == 0 {
-		return qSimpleGroupAggregateQuery{}, false
+	selectEnd := tokens[fromIdx].start
+	if byIdx >= 0 {
+		selectEnd = tokens[byIdx].start
+	}
+	selectPart := strings.TrimSpace(query[tokens[0].end:selectEnd])
+	var byColumns []string
+	if byIdx >= 0 {
+		byPart := strings.TrimSpace(query[tokens[byIdx].end:tokens[fromIdx].start])
+		parsed, ok := qParseSimpleIdentifierList(byPart)
+		if !ok || len(parsed) == 0 {
+			return qSimpleGroupAggregateQuery{}, false
+		}
+		byColumns = parsed
 	}
 	aggregates, ok := qParseSimpleAggregateList(selectPart)
 	if !ok || len(aggregates) == 0 {
@@ -1773,16 +1787,19 @@ func qQueryStringLooksLikeQuery(query string) bool {
 
 func qQueryStringHasGroupAggregate(query string) bool {
 	tokens := qQueryStringTokens(query)
-	hasBy, hasAggregate := false, false
-	for _, token := range tokens {
+	if len(tokens) == 0 || tokens[0] != "select" {
+		return false
+	}
+	hasAggregate := false
+	for _, token := range tokens[1:] {
 		if token == "by" {
-			hasBy = true
+			continue
 		}
 		if qQueryAggregateToken(token) {
 			hasAggregate = true
 		}
 	}
-	return hasBy && hasAggregate
+	return hasAggregate
 }
 
 func qQueryStringHasJoin(query string) bool {
