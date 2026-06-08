@@ -23,6 +23,80 @@ func TestNativeFrameRuntimeCarrierRejectsUnsupportedPayloadOnce(t *testing.T) {
 	}
 }
 
+func TestNativeFrameSchemaHashTransformsStayStable(t *testing.T) {
+	soa, err := NewSoA(map[string]*DenseArray{
+		"price": NewDenseArrayF64([]float64{10, 12, 8}),
+		"size":  NewDenseArrayI64([]int64{100, 200, 300}),
+		"flag":  NewDenseArrayBool([]bool{true, false, true}),
+	})
+	if err != nil {
+		t.Fatalf("NewSoA: %v", err)
+	}
+	frame := NewTable()
+	frame.SetNativePayloadWithInfo(soa, NativePayloadInfo{
+		Kind:       NativePayloadDataFrame,
+		Rows:       soa.Len(),
+		Columns:    3,
+		SchemaHash: "base-schema",
+	})
+
+	assertSchema := func(name string, got Value, want string) {
+		t.Helper()
+		_, info, ok := got.Table().NativeFramePayload()
+		if !ok {
+			t.Fatalf("%s payload missing", name)
+		}
+		if info.SchemaHash != want {
+			t.Fatalf("%s schema hash = %q, want %q", name, info.SchemaHash, want)
+		}
+	}
+
+	projected, handled, err := TableValue(frame).NativeFrameProject([]string{"size", "price"})
+	if err != nil {
+		t.Fatalf("NativeFrameProject: %v", err)
+	}
+	if !handled || !projected.IsFrame() {
+		t.Fatalf("NativeFrameProject = %v handled=%v, want native frame", projected, handled)
+	}
+	assertSchema("project", projected, "base-schema|project:size,price")
+
+	filtered, handled, err := TableValue(frame).NativeFrameFilter(NewDenseArrayBool([]bool{true, false, true}))
+	if err != nil {
+		t.Fatalf("NativeFrameFilter: %v", err)
+	}
+	if !handled || !filtered.IsFrame() {
+		t.Fatalf("NativeFrameFilter = %v handled=%v, want native frame", filtered, handled)
+	}
+	assertSchema("filter", filtered, "base-schema|filter")
+
+	filterProject, handled, err := TableValue(frame).NativeFrameFilterProject(NewDenseArrayBool([]bool{true, false, true}), []string{"size", "price"})
+	if err != nil {
+		t.Fatalf("NativeFrameFilterProject: %v", err)
+	}
+	if !handled || !filterProject.IsFrame() {
+		t.Fatalf("NativeFrameFilterProject = %v handled=%v, want native frame", filterProject, handled)
+	}
+	assertSchema("filter-project", filterProject, "base-schema|filter|project:size,price")
+
+	gathered, handled, err := TableValue(frame).NativeFrameGather(NewDenseArrayI64([]int64{3, 1}))
+	if err != nil {
+		t.Fatalf("NativeFrameGather: %v", err)
+	}
+	if !handled || !gathered.IsFrame() {
+		t.Fatalf("NativeFrameGather = %v handled=%v, want native frame", gathered, handled)
+	}
+	assertSchema("gather", gathered, "base-schema|gather")
+
+	sliced, handled, err := TableValue(frame).NativeFrameSlice(0, 2)
+	if err != nil {
+		t.Fatalf("NativeFrameSlice: %v", err)
+	}
+	if !handled || !sliced.IsFrame() {
+		t.Fatalf("NativeFrameSlice = %v handled=%v, want native frame", sliced, handled)
+	}
+	assertSchema("slice", sliced, "base-schema|slice")
+}
+
 func TestNativeFrameMaskBuildsDenseBoolMask(t *testing.T) {
 	soa, err := NewSoA(map[string]*DenseArray{
 		"price": NewDenseArrayF64([]float64{10, 12, 8}),

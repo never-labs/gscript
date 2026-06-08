@@ -772,7 +772,7 @@ func (v Value) NativeFrameProject(names []string) (Value, bool, error) {
 		Kind:       info.Kind,
 		Rows:       out.Len(),
 		Columns:    len(names),
-		SchemaHash: nativeFrameProjectSchemaHash(info.SchemaHash, names),
+		SchemaHash: nativeFrameTransformSchemaHash(info.SchemaHash, nativeFrameSchemaProject, names),
 	})
 	return TableValue(projected), true, nil
 }
@@ -890,10 +890,14 @@ func (v Value) NativeFrameFilterProject(mask *DenseArray, names []string) (Value
 	}
 	projected := NewTable()
 	projected.SetNativePayloadWithInfo(out, NativePayloadInfo{
-		Kind:       info.Kind,
-		Rows:       out.Len(),
-		Columns:    len(names),
-		SchemaHash: nativeFrameProjectSchemaHash(nativeFrameFilterSchemaHash(info.SchemaHash), names),
+		Kind:    info.Kind,
+		Rows:    out.Len(),
+		Columns: len(names),
+		SchemaHash: nativeFrameTransformSchemaHash(
+			nativeFrameTransformSchemaHash(info.SchemaHash, nativeFrameSchemaFilter, nil),
+			nativeFrameSchemaProject,
+			names,
+		),
 	})
 	return TableValue(projected), true, nil
 }
@@ -917,7 +921,7 @@ func (v Value) NativeFrameFilter(mask *DenseArray) (Value, bool, error) {
 		Kind:       info.Kind,
 		Rows:       out.Len(),
 		Columns:    info.Columns,
-		SchemaHash: nativeFrameFilterSchemaHash(info.SchemaHash),
+		SchemaHash: nativeFrameTransformSchemaHash(info.SchemaHash, nativeFrameSchemaFilter, nil),
 	})
 	return TableValue(filtered), true, nil
 }
@@ -941,7 +945,7 @@ func (v Value) NativeFrameGather(indices *DenseArray) (Value, bool, error) {
 		Kind:       info.Kind,
 		Rows:       out.Len(),
 		Columns:    info.Columns,
-		SchemaHash: nativeFrameGatherSchemaHash(info.SchemaHash),
+		SchemaHash: nativeFrameTransformSchemaHash(info.SchemaHash, nativeFrameSchemaGather, nil),
 	})
 	return TableValue(gathered), true, nil
 }
@@ -965,7 +969,7 @@ func (v Value) NativeFrameSlice(start, end int) (Value, bool, error) {
 		Kind:       info.Kind,
 		Rows:       out.Len(),
 		Columns:    info.Columns,
-		SchemaHash: nativeFrameSliceSchemaHash(info.SchemaHash),
+		SchemaHash: nativeFrameTransformSchemaHash(info.SchemaHash, nativeFrameSchemaSlice, nil),
 	})
 	return TableValue(sliced), true, nil
 }
@@ -1072,33 +1076,24 @@ func nativeFrameOrderComparerFor(col *DenseArray) (nativeFrameOrderComparer, err
 	}
 }
 
-func nativeFrameProjectSchemaHash(source string, names []string) string {
-	joined := strings.Join(names, ",")
-	if source == "" {
-		return "project:" + joined
-	}
-	return source + "|project:" + joined
-}
+type nativeFrameSchemaTransform string
 
-func nativeFrameFilterSchemaHash(source string) string {
-	if source == "" {
-		return "filter"
-	}
-	return source + "|filter"
-}
+const (
+	nativeFrameSchemaProject nativeFrameSchemaTransform = "project"
+	nativeFrameSchemaFilter  nativeFrameSchemaTransform = "filter"
+	nativeFrameSchemaGather  nativeFrameSchemaTransform = "gather"
+	nativeFrameSchemaSlice   nativeFrameSchemaTransform = "slice"
+)
 
-func nativeFrameGatherSchemaHash(source string) string {
-	if source == "" {
-		return "gather"
+func nativeFrameTransformSchemaHash(source string, transform nativeFrameSchemaTransform, names []string) string {
+	suffix := string(transform)
+	if transform == nativeFrameSchemaProject {
+		suffix += ":" + strings.Join(names, ",")
 	}
-	return source + "|gather"
-}
-
-func nativeFrameSliceSchemaHash(source string) string {
 	if source == "" {
-		return "slice"
+		return suffix
 	}
-	return source + "|slice"
+	return source + "|" + suffix
 }
 
 func (v Value) nativeFramePayloadKind() (NativePayloadKind, bool) {
