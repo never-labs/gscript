@@ -2802,6 +2802,74 @@ func TestQGroupAggregateCallLowersToFrameGroupAggregateKernel(t *testing.T) {
 	}
 }
 
+func TestQGroupAggregateWhereCallLowersToFilteredFrameGroupAggregateKernel(t *testing.T) {
+	const query = "select total:sum price, fills:count i by size from trades where price>=100"
+	proto := &vm.FuncProto{
+		Name:      "q_group_aggregate_where_call",
+		NumParams: 1,
+		MaxStack:  4,
+		Constants: []runtime.Value{
+			runtime.StringValue("q"),
+			runtime.StringValue("sql"),
+			runtime.StringValue(query),
+		},
+		Code: []uint32{
+			vm.EncodeABx(vm.OP_GETGLOBAL, 1, 0),
+			vm.EncodeABC(vm.OP_GETFIELD, 1, 1, 1),
+			vm.EncodeABC(vm.OP_MOVE, 2, 0, 0),
+			vm.EncodeABx(vm.OP_LOADK, 3, 2),
+			vm.EncodeABC(vm.OP_CALL, 1, 3, 2),
+			vm.EncodeABC(vm.OP_RETURN, 1, 2, 0),
+		},
+	}
+
+	fn := BuildGraph(proto)
+	fn.Remarks = &OptimizationRemarks{}
+	lowered, err := QQueryNativeLoweringPass(fn)
+	if err != nil {
+		t.Fatalf("QQueryNativeLoweringPass: %v", err)
+	}
+	counts := countOps(lowered)
+	if counts[OpFrameMask] != 1 || counts[OpFrameGroupAggregate] != 1 || counts[OpCall] != 0 {
+		t.Fatalf("filtered group aggregate lowering counts FrameMask=%d FrameGroupAggregate=%d OpCall=%d\n%s",
+			counts[OpFrameMask], counts[OpFrameGroupAggregate], counts[OpCall], Print(lowered))
+	}
+	kernels := DetectQFrameRuntimeKernels(lowered)
+	assertQKernelDescriptor(t, BuildQKernelDescriptors(nil, kernels, nil, fn.Remarks.List()),
+		"methodjit_q_frame_runtime", "runtime_kernel", "FrameGroupAggregate", "filter/group/aggregate", "typed_runtime_op_exit", "supported", "")
+
+	result, err := Interpret(lowered, []runtime.Value{runtime.TableValue(qHotPathTestFrame(t))})
+	if err != nil {
+		t.Fatalf("Interpret lowered filtered q group aggregate: %v", err)
+	}
+	if len(result) != 1 || !result[0].IsTable() {
+		t.Fatalf("lowered filtered result = %#v, want one native frame table", result)
+	}
+	payload, info, ok := result[0].Table().NativeFramePayload()
+	if !ok || info.Rows != 2 || info.Columns != 3 {
+		t.Fatalf("lowered filtered result payload = %#v info=%#v ok=%v, want 2x3 native frame", payload, info, ok)
+	}
+	soa, ok := payload.(*runtime.SoA)
+	if !ok {
+		t.Fatalf("lowered filtered result payload type = %T, want *runtime.SoA", payload)
+	}
+	size, _ := soa.Column("size")
+	total, _ := soa.Column("total")
+	fills, _ := soa.Column("fills")
+	sizeVals, _ := size.I64()
+	totalVals, _ := total.F64()
+	fillVals, _ := fills.I64()
+	if len(sizeVals) != 2 || sizeVals[0] != 10 || sizeVals[1] != 20 {
+		t.Fatalf("lowered filtered size values = %#v, want [10 20]", sizeVals)
+	}
+	if len(totalVals) != 2 || totalVals[0] != 100.5 || totalVals[1] != 101.25 {
+		t.Fatalf("lowered filtered total values = %#v, want [100.5 101.25]", totalVals)
+	}
+	if len(fillVals) != 2 || fillVals[0] != 1 || fillVals[1] != 1 {
+		t.Fatalf("lowered filtered fills values = %#v, want [1 1]", fillVals)
+	}
+}
+
 func TestQGroupAggregateComputedExpressionStaysOnFallback(t *testing.T) {
 	const query = "select notional:sum price*size by size from trades"
 	proto := &vm.FuncProto{
@@ -2837,6 +2905,72 @@ func TestQGroupAggregateComputedExpressionStaysOnFallback(t *testing.T) {
 		t.Fatalf("q query fallback counts = %+v, want group_aggregate_call=1", fallbacks)
 	}
 	assertQLoweringRemarkFields(t, fn.Remarks.List(), "QQueryNativeLowering", "QGroupAggregate", "select/group/aggregate", qQueryLoweringFallbackGroupAggregateCall)
+}
+
+func TestQGroupAggregateUnsupportedWhereStaysOnFallback(t *testing.T) {
+	tests := []struct {
+		name  string
+		query string
+	}{
+		{
+			name:  "column_rhs",
+			query: "select total:sum price by size from trades where price>=limit",
+		},
+		{
+			name:  "string_literal",
+			query: "select fills:count i by size from trades where name=\"alpha\"",
+		},
+		{
+			name:  "comma_predicate",
+			query: "select total:sum price by size from trades where price>=100,size>=10",
+		},
+		{
+			name:  "and_predicate",
+			query: "select total:sum price by size from trades where price>=100 and size>=10",
+		},
+		{
+			name:  "reversed_comparison",
+			query: "select total:sum price by size from trades where 100<=price",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			proto := &vm.FuncProto{
+				Name:      "q_group_aggregate_unsupported_where_" + tt.name,
+				NumParams: 1,
+				MaxStack:  4,
+				Constants: []runtime.Value{
+					runtime.StringValue("q"),
+					runtime.StringValue("sql"),
+					runtime.StringValue(tt.query),
+				},
+				Code: []uint32{
+					vm.EncodeABx(vm.OP_GETGLOBAL, 1, 0),
+					vm.EncodeABC(vm.OP_GETFIELD, 1, 1, 1),
+					vm.EncodeABC(vm.OP_MOVE, 2, 0, 0),
+					vm.EncodeABx(vm.OP_LOADK, 3, 2),
+					vm.EncodeABC(vm.OP_CALL, 1, 3, 2),
+					vm.EncodeABC(vm.OP_RETURN, 1, 2, 0),
+				},
+			}
+
+			fn := BuildGraph(proto)
+			fn.Remarks = &OptimizationRemarks{}
+			lowered, err := QQueryNativeLoweringPass(fn)
+			if err != nil {
+				t.Fatalf("QQueryNativeLoweringPass: %v", err)
+			}
+			counts := countOps(lowered)
+			if counts[OpFrameMask] != 0 || counts[OpFrameGroupAggregate] != 0 || counts[OpCall] != 1 {
+				t.Fatalf("unsupported where lowering counts FrameMask=%d FrameGroupAggregate=%d OpCall=%d\n%s",
+					counts[OpFrameMask], counts[OpFrameGroupAggregate], counts[OpCall], Print(lowered))
+			}
+			if fallbacks := CountQQueryLoweringFallbackReasons(fn.Remarks.List()); fallbacks[qQueryLoweringFallbackGroupAggregateCall] != 1 {
+				t.Fatalf("q query fallback counts = %+v, want group_aggregate_call=1", fallbacks)
+			}
+			assertQLoweringRemarkFields(t, fn.Remarks.List(), "QQueryNativeLowering", "QGroupAggregate", "select/where/group/aggregate", qQueryLoweringFallbackGroupAggregateCall)
+		})
+	}
 }
 
 func TestQGroupAggregateCallReportsJoinSelectOrderShape(t *testing.T) {

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/never-labs/leia/internal/runtime"
@@ -1118,6 +1119,13 @@ func QQueryNativeLoweringPass(fn *Function) (*Function, error) {
 type qSimpleGroupAggregateQuery struct {
 	By         []string
 	Aggregates []runtime.FrameAggregateSpec
+	Where      *qSimpleFramePredicate
+}
+
+type qSimpleFramePredicate struct {
+	Column string
+	Op     string
+	Value  runtime.Value
 }
 
 type qQueryToken struct {
@@ -1151,9 +1159,9 @@ func qGroupAggregateNativeLoweringPass(fn *Function) {
 			if frame == nil {
 				continue
 			}
+			mask := qInsertGroupAggregateMaskArg(fn, block, instr, frame, spec)
 			specIdx := len(fn.Proto.Constants)
 			fn.Proto.Constants = append(fn.Proto.Constants, qFrameGroupAggregateSpecValue(spec))
-			mask := qInsertConstNilBefore(fn, block, instr)
 			instr.Op = OpFrameGroupAggregate
 			instr.Type = TypeAny
 			instr.Args = []*Value{frame, mask}
@@ -1171,10 +1179,16 @@ func qParseSimpleGroupAggregateQuery(query string) (qSimpleGroupAggregateQuery, 
 		return qSimpleGroupAggregateQuery{}, false
 	}
 	byIdx, fromIdx := -1, -1
+	whereIdx := -1
 	for i, tok := range tokens {
 		switch tok.lower {
-		case "where", "order", "limit", "distinct", "join", "lj", "ij", "aj", "wj", "update", "delete", "exec":
+		case "order", "limit", "take", "distinct", "join", "lj", "ij", "aj", "wj", "update", "delete", "exec":
 			return qSimpleGroupAggregateQuery{}, false
+		case "where":
+			if whereIdx >= 0 {
+				return qSimpleGroupAggregateQuery{}, false
+			}
+			whereIdx = i
 		case "by":
 			if byIdx >= 0 {
 				return qSimpleGroupAggregateQuery{}, false
@@ -1187,7 +1201,16 @@ func qParseSimpleGroupAggregateQuery(query string) (qSimpleGroupAggregateQuery, 
 			fromIdx = i
 		}
 	}
-	if byIdx <= 1 || fromIdx <= byIdx+1 || fromIdx+2 != len(tokens) {
+	if byIdx <= 1 || fromIdx <= byIdx+1 {
+		return qSimpleGroupAggregateQuery{}, false
+	}
+	if whereIdx >= 0 && whereIdx != fromIdx+2 {
+		return qSimpleGroupAggregateQuery{}, false
+	}
+	if whereIdx < 0 && fromIdx+2 != len(tokens) {
+		return qSimpleGroupAggregateQuery{}, false
+	}
+	if whereIdx >= 0 && whereIdx+1 >= len(tokens) {
 		return qSimpleGroupAggregateQuery{}, false
 	}
 	selectPart := strings.TrimSpace(query[tokens[0].end:tokens[byIdx].start])
@@ -1200,7 +1223,16 @@ func qParseSimpleGroupAggregateQuery(query string) (qSimpleGroupAggregateQuery, 
 	if !ok || len(aggregates) == 0 {
 		return qSimpleGroupAggregateQuery{}, false
 	}
-	return qSimpleGroupAggregateQuery{By: byColumns, Aggregates: aggregates}, true
+	var where *qSimpleFramePredicate
+	if whereIdx >= 0 {
+		wherePart := strings.TrimSpace(query[tokens[whereIdx].end:])
+		predicate, ok := qParseSimpleFramePredicate(wherePart)
+		if !ok {
+			return qSimpleGroupAggregateQuery{}, false
+		}
+		where = &predicate
+	}
+	return qSimpleGroupAggregateQuery{By: byColumns, Aggregates: aggregates, Where: where}, true
 }
 
 func qParseSimpleIdentifierList(text string) ([]string, bool) {
@@ -1279,6 +1311,55 @@ func qSimpleIdentifier(name string) bool {
 	return true
 }
 
+func qParseSimpleFramePredicate(text string) (qSimpleFramePredicate, bool) {
+	for _, op := range []string{">=", "<=", "!=", "<>", "==", "=", ">", "<"} {
+		idx := strings.Index(text, op)
+		if idx < 0 {
+			continue
+		}
+		if strings.Contains(text[idx+len(op):], op) {
+			return qSimpleFramePredicate{}, false
+		}
+		column := strings.TrimSpace(text[:idx])
+		rhsText := strings.TrimSpace(text[idx+len(op):])
+		if !qSimpleIdentifier(column) {
+			return qSimpleFramePredicate{}, false
+		}
+		if op == "=" {
+			op = "=="
+		} else if op == "<>" {
+			op = "!="
+		}
+		value, ok := qParseSimpleFramePredicateValue(rhsText)
+		if !ok {
+			return qSimpleFramePredicate{}, false
+		}
+		return qSimpleFramePredicate{Column: column, Op: op, Value: value}, true
+	}
+	return qSimpleFramePredicate{}, false
+}
+
+func qParseSimpleFramePredicateValue(text string) (runtime.Value, bool) {
+	switch strings.ToLower(strings.TrimSpace(text)) {
+	case "true":
+		return runtime.BoolValue(true), true
+	case "false":
+		return runtime.BoolValue(false), true
+	}
+	if strings.ContainsAny(text, ".eE") {
+		value, err := strconv.ParseFloat(text, 64)
+		if err != nil {
+			return runtime.NilValue(), false
+		}
+		return runtime.FloatValue(value), true
+	}
+	value, err := strconv.ParseInt(text, 10, 64)
+	if err != nil {
+		return runtime.NilValue(), false
+	}
+	return runtime.IntValue(value), true
+}
+
 func qLexQueryTokens(query string) []qQueryToken {
 	var tokens []qQueryToken
 	start := -1
@@ -1303,6 +1384,31 @@ func qLexQueryTokens(query string) []qQueryToken {
 		tokens = append(tokens, qQueryToken{text: text, lower: strings.ToLower(text), start: start, end: len(query)})
 	}
 	return tokens
+}
+
+func qInsertGroupAggregateMaskArg(fn *Function, block *Block, before *Instr, frame *Value, spec qSimpleGroupAggregateQuery) *Value {
+	if spec.Where == nil {
+		return qInsertConstNilBefore(fn, block, before)
+	}
+	maskSpecIdx := len(fn.Proto.Constants)
+	fn.Proto.Constants = append(fn.Proto.Constants, qFrameMaskSpecValue(*spec.Where))
+	maskInstr := &Instr{ID: fn.newValueID(), Op: OpFrameMask, Type: TypeAny, Args: []*Value{frame}, Aux: int64(maskSpecIdx), Block: block}
+	for i, instr := range block.Instrs {
+		if instr == before {
+			block.Instrs = append(block.Instrs[:i], append([]*Instr{maskInstr}, block.Instrs[i:]...)...)
+			return maskInstr.Value()
+		}
+	}
+	block.Instrs = append(block.Instrs, maskInstr)
+	return maskInstr.Value()
+}
+
+func qFrameMaskSpecValue(predicate qSimpleFramePredicate) runtime.Value {
+	tbl := runtime.NewTable()
+	tbl.RawSetString("column", runtime.StringValue(predicate.Column))
+	tbl.RawSetString("op", runtime.StringValue(predicate.Op))
+	tbl.RawSetString("value", predicate.Value)
+	return runtime.TableValue(tbl)
 }
 
 func qFrameGroupAggregateSpecValue(spec qSimpleGroupAggregateQuery) runtime.Value {
