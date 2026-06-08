@@ -4225,7 +4225,7 @@ func TestInnerJoinRejectsInvalidKeys(t *testing.T) {
 	}
 }
 
-func TestJoinCachesRightSingleColumnGroupedIndex(t *testing.T) {
+func TestJoinSingleColumnTypedPathDoesNotRequireGroupedIndex(t *testing.T) {
 	left := mustFrame(t,
 		Column{Name: "sym", Data: NewSymbols([]string{"AAPL", "MSFT", "TSLA"})},
 		Column{Name: "qty", Data: NewI64([]int64{10, 20, 30})},
@@ -4238,13 +4238,17 @@ func TestJoinCachesRightSingleColumnGroupedIndex(t *testing.T) {
 		t.Fatal("right sym unexpectedly starts with grouped attribute")
 	}
 
-	if _, err := InnerJoin(left, right, "sym"); err != nil {
+	got, err := InnerJoin(left, right, "sym")
+	if err != nil {
 		t.Fatalf("InnerJoin returned error: %v", err)
 	}
+	assertColumnValues(t, got, "sym", []any{Symbol("AAPL"), Symbol("AAPL"), Symbol("MSFT")})
+	assertColumnValues(t, got, "qty", []any{int64(10), int64(10), int64(20)})
+	assertColumnValues(t, got, "bid", []any{100.0, 101.0, 80.0})
 
 	sym, _ := right.Column("sym")
-	if _, ok := ArrayIndexFor(sym, ArrayAttributeGrouped); !ok {
-		t.Fatal("right sym grouped index was not cached on frame column")
+	if _, ok := ArrayIndexFor(sym, ArrayAttributeGrouped); ok {
+		t.Fatal("typed single-column join built a grouped string index; want direct typed probe")
 	}
 }
 

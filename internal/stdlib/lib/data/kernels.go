@@ -407,17 +407,17 @@ func (k typedKernelRegistry) WithinIndexes(array Array, low, high any, highClose
 
 func (typedKernelRegistry) IndexedInRows(array Array, values []any) ([]int, bool) {
 	if len(values) == 0 {
-		if _, ok := ArrayIndexFor(array, ArrayAttributeUnique); ok {
+		if _, ok := arrayIndexForBorrowed(array, ArrayAttributeUnique); ok {
 			return []int{}, true
 		}
-		if _, ok := ArrayIndexFor(array, ArrayAttributeGrouped); ok {
+		if _, ok := arrayIndexForBorrowed(array, ArrayAttributeGrouped); ok {
 			return []int{}, true
 		}
 		return nil, false
 	}
-	index, ok := ArrayIndexFor(array, ArrayAttributeUnique)
+	index, ok := arrayIndexForBorrowed(array, ArrayAttributeUnique)
 	if !ok {
-		index, ok = ArrayIndexFor(array, ArrayAttributeGrouped)
+		index, ok = arrayIndexForBorrowed(array, ArrayAttributeGrouped)
 	}
 	if !ok {
 		return nil, false
@@ -627,10 +627,6 @@ func (typedKernelRegistry) FilteredGroupAggregateStates(index ArrayIndex, indexe
 	if !groupAggregatesSupportedByTypedIndex(aggs) {
 		return nil, nil, false, nil
 	}
-	groupOrder, _, ok, err := typedKernels.FilteredGroupCounts(index, indexes)
-	if err != nil || !ok {
-		return nil, nil, ok, err
-	}
 	states := make([]groupState, len(index.Rows))
 	for group := range index.Rows {
 		states[group] = groupState{
@@ -642,12 +638,14 @@ func (typedKernelRegistry) FilteredGroupAggregateStates(index ArrayIndex, indexe
 		}
 	}
 	if len(indexes) == 0 {
-		return groupOrder, states, true, nil
+		return nil, states, true, nil
 	}
 	rowToGroup, err := rowToGroupFromIndex(index)
 	if err != nil {
 		return nil, nil, true, err
 	}
+	seen := make([]bool, len(index.Rows))
+	groupOrder := make([]int, 0, len(index.Rows))
 	for _, row := range indexes {
 		if row < 0 || row >= len(rowToGroup) {
 			return nil, nil, true, fmt.Errorf("filter row %d out of range for grouped index", row)
@@ -655,6 +653,10 @@ func (typedKernelRegistry) FilteredGroupAggregateStates(index ArrayIndex, indexe
 		group := rowToGroup[row]
 		if group < 0 {
 			return nil, nil, true, fmt.Errorf("filter row %d is missing from grouped index", row)
+		}
+		if !seen[group] {
+			seen[group] = true
+			groupOrder = append(groupOrder, group)
 		}
 		for i, agg := range aggs {
 			if err := accumulateIndexedAggregateRow(&states[group].aggs[i], agg, row); err != nil {
@@ -1108,10 +1110,10 @@ func (typedKernelRegistry) Max(array Array) (any, bool, bool, error) {
 func (typedKernelRegistry) RowsByKey(frame Frame, columns []Symbol) (map[string][]int, error) {
 	if len(columns) == 1 {
 		if column, ok := frame.Column(columns[0]); ok {
-			if index, ok := ArrayIndexFor(column, ArrayAttributeUnique); ok {
+			if index, ok := arrayIndexForBorrowed(column, ArrayAttributeUnique); ok {
 				return cloneRowsByKey(index.RowsByKey), nil
 			}
-			if index, ok := ArrayIndexFor(column, ArrayAttributeGrouped); ok {
+			if index, ok := arrayIndexForBorrowed(column, ArrayAttributeGrouped); ok {
 				return cloneRowsByKey(index.RowsByKey), nil
 			}
 		}
@@ -1133,6 +1135,9 @@ func (typedKernelRegistry) RowsByKey(frame Frame, columns []Symbol) (map[string]
 }
 
 func (k typedKernelRegistry) JoinIndexes(left, right Frame, keepUnmatchedLeft bool, keys []JoinKey) ([]int, []int, error) {
+	if leftIndexes, rightIndexes, ok, err := k.singleColumnTypedJoinIndexes(left, right, keepUnmatchedLeft, keys); err != nil || ok {
+		return leftIndexes, rightIndexes, err
+	}
 	rightRowsByKey, rightKeyCols, err := rightRowsByJoinKey(right, keys)
 	if err != nil {
 		return nil, nil, err
@@ -1174,6 +1179,112 @@ func (k typedKernelRegistry) JoinIndexes(left, right Frame, keepUnmatchedLeft bo
 		}
 	}
 	return leftIndexes, rightIndexes, nil
+}
+
+func (typedKernelRegistry) singleColumnTypedJoinIndexes(left, right Frame, keepUnmatchedLeft bool, keys []JoinKey) ([]int, []int, bool, error) {
+	if len(keys) != 1 {
+		return nil, nil, false, nil
+	}
+	leftColumn, ok := left.Column(keys[0].Left)
+	if !ok {
+		return nil, nil, true, fmt.Errorf("join left key column %q does not exist", keys[0].Left)
+	}
+	rightColumn, ok := right.Column(keys[0].Right)
+	if !ok {
+		return nil, nil, true, fmt.Errorf("join right key column %q does not exist", keys[0].Right)
+	}
+	if leftColumn.Kind() != rightColumn.Kind() {
+		return nil, nil, false, nil
+	}
+	return singleColumnTypedJoinIndexes(leftColumn, rightColumn, keepUnmatchedLeft)
+}
+
+func singleColumnTypedJoinIndexes(left, right Array, keepUnmatchedLeft bool) ([]int, []int, bool, error) {
+	switch l := left.(type) {
+	case attributedArray:
+		return singleColumnTypedJoinIndexes(l.array, right, keepUnmatchedLeft)
+	case columnArray[bool]:
+		return singleColumnTypedJoinIndexesFor(l, right, keepUnmatchedLeft)
+	case columnArray[int8]:
+		return singleColumnTypedJoinIndexesFor(l, right, keepUnmatchedLeft)
+	case columnArray[int16]:
+		return singleColumnTypedJoinIndexesFor(l, right, keepUnmatchedLeft)
+	case columnArray[int32]:
+		return singleColumnTypedJoinIndexesFor(l, right, keepUnmatchedLeft)
+	case columnArray[int64]:
+		return singleColumnTypedJoinIndexesFor(l, right, keepUnmatchedLeft)
+	case columnArray[uint8]:
+		return singleColumnTypedJoinIndexesFor(l, right, keepUnmatchedLeft)
+	case columnArray[uint16]:
+		return singleColumnTypedJoinIndexesFor(l, right, keepUnmatchedLeft)
+	case columnArray[uint32]:
+		return singleColumnTypedJoinIndexesFor(l, right, keepUnmatchedLeft)
+	case columnArray[uint64]:
+		return singleColumnTypedJoinIndexesFor(l, right, keepUnmatchedLeft)
+	case columnArray[float32]:
+		return singleColumnTypedJoinIndexesFor(l, right, keepUnmatchedLeft)
+	case columnArray[float64]:
+		return singleColumnTypedJoinIndexesFor(l, right, keepUnmatchedLeft)
+	case columnArray[string]:
+		return singleColumnTypedJoinIndexesFor(l, right, keepUnmatchedLeft)
+	case columnArray[Symbol]:
+		return singleColumnTypedJoinIndexesFor(l, right, keepUnmatchedLeft)
+	case columnArray[Month]:
+		return singleColumnTypedJoinIndexesFor(l, right, keepUnmatchedLeft)
+	case columnArray[Date]:
+		return singleColumnTypedJoinIndexesFor(l, right, keepUnmatchedLeft)
+	case columnArray[DateTime]:
+		return singleColumnTypedJoinIndexesFor(l, right, keepUnmatchedLeft)
+	case columnArray[Timespan]:
+		return singleColumnTypedJoinIndexesFor(l, right, keepUnmatchedLeft)
+	case columnArray[Minute]:
+		return singleColumnTypedJoinIndexesFor(l, right, keepUnmatchedLeft)
+	case columnArray[Second]:
+		return singleColumnTypedJoinIndexesFor(l, right, keepUnmatchedLeft)
+	case columnArray[Time]:
+		return singleColumnTypedJoinIndexesFor(l, right, keepUnmatchedLeft)
+	case columnArray[Timestamp]:
+		return singleColumnTypedJoinIndexesFor(l, right, keepUnmatchedLeft)
+	default:
+		return nil, nil, false, nil
+	}
+}
+
+func singleColumnTypedJoinIndexesFor[T comparable](left columnArray[T], right Array, keepUnmatchedLeft bool) ([]int, []int, bool, error) {
+	right = unwrapAttributedArray(right)
+	r, ok := right.(columnArray[T])
+	if !ok {
+		return nil, nil, false, nil
+	}
+	rowsByKey := make(map[T][]int, len(r.data))
+	for row, value := range r.data {
+		rowsByKey[value] = append(rowsByKey[value], row)
+	}
+	leftIndexes := make([]int, 0, len(left.data))
+	rightIndexes := make([]int, 0, len(left.data))
+	for row, value := range left.data {
+		matches := rowsByKey[value]
+		if keepUnmatchedLeft && len(matches) == 0 {
+			leftIndexes = append(leftIndexes, row)
+			rightIndexes = append(rightIndexes, -1)
+			continue
+		}
+		for _, rightRow := range matches {
+			leftIndexes = append(leftIndexes, row)
+			rightIndexes = append(rightIndexes, rightRow)
+		}
+	}
+	return leftIndexes, rightIndexes, true, nil
+}
+
+func unwrapAttributedArray(array Array) Array {
+	for {
+		attributed, ok := array.(attributedArray)
+		if !ok {
+			return array
+		}
+		array = attributed.array
+	}
 }
 
 func (typedKernelRegistry) Bin(domain Array, query any) (any, bool, error) {
@@ -1229,10 +1340,10 @@ func kdbBinScalar(domain Array, query any) (int64, error) {
 func (typedKernelRegistry) SortedRowsByPartition(frame Frame, timeColumn Array, partitionColumns []Symbol) (map[string][]int, error) {
 	if len(partitionColumns) == 1 {
 		if partition, ok := frame.Column(partitionColumns[0]); ok {
-			if index, ok := ArrayIndexFor(partition, ArrayAttributeUnique); ok {
+			if index, ok := arrayIndexForBorrowed(partition, ArrayAttributeUnique); ok {
 				return sortedRowsByPartitionIndex(timeColumn, index)
 			}
-			if index, ok := ArrayIndexFor(partition, ArrayAttributeGrouped); ok {
+			if index, ok := arrayIndexForBorrowed(partition, ArrayAttributeGrouped); ok {
 				return sortedRowsByPartitionIndex(timeColumn, index)
 			}
 		}

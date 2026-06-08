@@ -207,6 +207,11 @@ func (m ArrayMetadata) Index(attr Symbol) (ArrayIndex, bool) {
 	return index.clone(), true
 }
 
+func (m ArrayMetadata) indexBorrowed(attr Symbol) (ArrayIndex, bool) {
+	index, ok := m.Indexes[attr]
+	return index, ok
+}
+
 type arrayMetadataProvider interface {
 	ArrayMetadata() ArrayMetadata
 }
@@ -363,6 +368,20 @@ func ArrayIndexFor(array Array, attr Symbol) (ArrayIndex, bool) {
 		return index, true
 	}
 	return ArrayIndex{}, false
+}
+
+func arrayIndexForBorrowed(array Array, attr Symbol) (ArrayIndex, bool) {
+	switch a := array.(type) {
+	case attributedArray:
+		return a.metadata.indexBorrowed(attr)
+	case storedAttributedEncodedArray:
+		return a.metadata.indexBorrowed(attr)
+	default:
+		if index, ok := ArrayIndexFor(array, attr); ok {
+			return index, true
+		}
+		return ArrayIndex{}, false
+	}
 }
 
 func arrayValueKey(kind Kind, value any) string {
@@ -701,6 +720,14 @@ type Frame struct {
 }
 
 func NewFrame(cols ...Column) (Frame, error) {
+	return newFrame(cols, true)
+}
+
+func newFrameTrusted(cols ...Column) (Frame, error) {
+	return newFrame(cols, false)
+}
+
+func newFrame(cols []Column, cloneColumns bool) (Frame, error) {
 	if len(cols) == 0 {
 		return Frame{}, fmt.Errorf("frame requires at least one column")
 	}
@@ -729,7 +756,11 @@ func NewFrame(cols ...Column) (Frame, error) {
 		}
 		frame.schema.names = append(frame.schema.names, col.Name)
 		frame.schema.kinds[col.Name] = col.Data.Kind()
-		frame.columns[col.Name] = col.Data.Gather(allIndexes(col.Data.Len()))
+		if cloneColumns {
+			frame.columns[col.Name] = col.Data.Gather(allIndexes(col.Data.Len()))
+		} else {
+			frame.columns[col.Name] = col.Data
+		}
 	}
 	return frame, nil
 }
@@ -853,7 +884,7 @@ func TakeFrame(frame Frame, n int) (Frame, error) {
 	for _, name := range frame.schema.names {
 		cols = append(cols, Column{Name: name, Data: takeArray(frame.columns[name], n)})
 	}
-	return NewFrame(cols...)
+	return newFrameTrusted(cols...)
 }
 
 func WhereMask(mask Array) ([]int, error) {
@@ -1136,7 +1167,7 @@ func Update(frame Frame, match func(row map[Symbol]any) (bool, error), assignmen
 		}
 		cols = append(cols, col)
 	}
-	return NewFrame(cols...)
+	return newFrameTrusted(cols...)
 }
 
 func UpdateWhere(frame Frame, where Expr, assignments map[Symbol]Expr) (Frame, error) {
@@ -1195,7 +1226,7 @@ func UpdateWhere(frame Frame, where Expr, assignments map[Symbol]Expr) (Frame, e
 		}
 		cols = append(cols, NewColumn(name, values))
 	}
-	return NewFrame(cols...)
+	return newFrameTrusted(cols...)
 }
 
 func UpdateBy(frame Frame, where Expr, by []SelectItem, assignments []GroupedAssignment) (Frame, error) {
@@ -1311,7 +1342,7 @@ func UpdateBy(frame Frame, where Expr, by []SelectItem, assignments []GroupedAss
 		}
 		cols = append(cols, NewColumn(assign.Name, values))
 	}
-	return NewFrame(cols...)
+	return newFrameTrusted(cols...)
 }
 
 func Delete(frame Frame, match func(row map[Symbol]any) (bool, error)) (Frame, error) {
@@ -1521,10 +1552,10 @@ func distinctSingleColumnIndexes(frame Frame, name Symbol) ([]int, bool) {
 	if !ok {
 		return nil, false
 	}
-	if index, ok := ArrayIndexFor(column, ArrayAttributeUnique); ok {
+	if index, ok := arrayIndexForBorrowed(column, ArrayAttributeUnique); ok {
 		return firstRowsFromArrayIndex(index), true
 	}
-	if index, ok := ArrayIndexFor(column, ArrayAttributeGrouped); ok {
+	if index, ok := arrayIndexForBorrowed(column, ArrayAttributeGrouped); ok {
 		return firstRowsFromArrayIndex(index), true
 	}
 	return nil, false
@@ -1773,13 +1804,13 @@ func KeyBy(frame Frame, keys ...Symbol) (KeyedFrame, error) {
 	rowsByKey := make(map[string][]int, frame.Len())
 	if len(keyColumns) == 1 {
 		if keyColumn, ok := frame.Column(keyColumns[0]); ok {
-			if index, ok := ArrayIndexFor(keyColumn, ArrayAttributeUnique); ok {
+			if index, ok := arrayIndexForBorrowed(keyColumn, ArrayAttributeUnique); ok {
 				for key, rows := range index.RowsByKey {
 					rowsByKey[key] = append([]int(nil), rows...)
 				}
 				return newKeyedFrameWithIndex(frame, keyColumns, rowsByKey)
 			}
-			if index, ok := ArrayIndexFor(keyColumn, ArrayAttributeGrouped); ok {
+			if index, ok := arrayIndexForBorrowed(keyColumn, ArrayAttributeGrouped); ok {
 				for key, rows := range index.RowsByKey {
 					rowsByKey[key] = append([]int(nil), rows...)
 				}
@@ -2382,7 +2413,7 @@ func joinOn(left, right Frame, keepUnmatchedLeft bool, keys ...JoinKey) (Frame, 
 		}
 		usedNames[outName] = struct{}{}
 	}
-	return NewFrame(cols...)
+	return newFrameTrusted(cols...)
 }
 
 func joinKeyedOn(left Frame, right KeyedFrame, keepUnmatchedLeft bool, keys ...JoinKey) (Frame, error) {
@@ -3816,6 +3847,11 @@ func fastFilterIndexes(frame Frame, where Expr) ([]int, bool, error) {
 		}
 		return nil, false, nil
 	case Logical:
+		if expr.Op == "and" {
+			if indexes, ok, err := fastLogicalAndFilterIndexes(frame, expr); ok || err != nil {
+				return indexes, ok, err
+			}
+		}
 		left, lok, err := fastFilterIndexes(frame, expr.Left)
 		if err != nil || !lok {
 			return nil, lok, err
@@ -3890,6 +3926,174 @@ func fastFilterIndexes(frame Frame, where Expr) ([]int, bool, error) {
 	}
 }
 
+type rowPredicate func(row int) bool
+
+func fastLogicalAndFilterIndexes(frame Frame, expr Logical) ([]int, bool, error) {
+	left, lok, err := comparisonRowPredicate(frame, expr.Left)
+	if err != nil || !lok {
+		return nil, lok, err
+	}
+	right, rok, err := comparisonRowPredicate(frame, expr.Right)
+	if err != nil || !rok {
+		return nil, rok, err
+	}
+	out := filterIndexScratch(frame.Len())
+	for row := 0; row < frame.Len(); row++ {
+		if left(row) && right(row) {
+			out = append(out, row)
+		}
+	}
+	return out, true, nil
+}
+
+func comparisonRowPredicate(frame Frame, expr Expr) (rowPredicate, bool, error) {
+	binary, ok := expr.(Binary)
+	if !ok || !isComparisonOp(binary.Op) {
+		return nil, false, nil
+	}
+	ref, op, literal, ok := binaryColumnLiteral(binary)
+	if !ok {
+		return nil, false, nil
+	}
+	col, ok := frame.Column(ref.Name)
+	if !ok {
+		return nil, true, fmt.Errorf("unknown column %q", ref.Name)
+	}
+	return typedCompareRowPredicate(col, op, normalizeScalar(col.Kind(), literal.Value))
+}
+
+func typedCompareRowPredicate(array Array, op Op, value any) (rowPredicate, bool, error) {
+	switch a := array.(type) {
+	case attributedArray:
+		return typedCompareRowPredicate(a.array, op, value)
+	case columnArray[bool]:
+		target, ok := value.(bool)
+		return compareBoolRowPredicate(a.data, target, ok, op)
+	case columnArray[int8]:
+		target, ok := value.(int8)
+		return compareSignedRowPredicate(a.data, target, ok, op)
+	case columnArray[int16]:
+		target, ok := value.(int16)
+		return compareSignedRowPredicate(a.data, target, ok, op)
+	case columnArray[int32]:
+		target, ok := value.(int32)
+		return compareSignedRowPredicate(a.data, target, ok, op)
+	case columnArray[int64]:
+		target, ok := coerceInt64Exact(value)
+		return compareSignedRowPredicate(a.data, target, ok, op)
+	case columnArray[uint8]:
+		target, ok := value.(uint8)
+		return compareUnsignedRowPredicate(a.data, target, ok, op)
+	case columnArray[uint16]:
+		target, ok := value.(uint16)
+		return compareUnsignedRowPredicate(a.data, target, ok, op)
+	case columnArray[uint32]:
+		target, ok := value.(uint32)
+		return compareUnsignedRowPredicate(a.data, target, ok, op)
+	case columnArray[uint64]:
+		target, ok := value.(uint64)
+		return compareUnsignedRowPredicate(a.data, target, ok, op)
+	case columnArray[float32]:
+		target, ok := value.(float32)
+		return compareFloatRowPredicate(a.data, target, ok, op)
+	case columnArray[float64]:
+		target, ok := numeric(value)
+		return compareFloatRowPredicate(a.data, target, ok, op)
+	case columnArray[string]:
+		target, ok := coerceComparableString(value)
+		return compareStringRowPredicate(a.data, target, ok, op)
+	case columnArray[Symbol]:
+		target, ok := coerceComparableSymbol(value)
+		return compareSymbolRowPredicate(a.data, target, ok, op)
+	case columnArray[Month]:
+		target, ok := value.(Month)
+		return compareSignedRowPredicate(a.data, target, ok, op)
+	case columnArray[Date]:
+		target, ok := value.(Date)
+		return compareSignedRowPredicate(a.data, target, ok, op)
+	case columnArray[DateTime]:
+		target, ok := value.(DateTime)
+		return compareSignedRowPredicate(a.data, target, ok, op)
+	case columnArray[Timespan]:
+		target, ok := value.(Timespan)
+		return compareSignedRowPredicate(a.data, target, ok, op)
+	case columnArray[Minute]:
+		target, ok := value.(Minute)
+		return compareSignedRowPredicate(a.data, target, ok, op)
+	case columnArray[Second]:
+		target, ok := value.(Second)
+		return compareSignedRowPredicate(a.data, target, ok, op)
+	case columnArray[Time]:
+		target, ok := value.(Time)
+		return compareSignedRowPredicate(a.data, target, ok, op)
+	case columnArray[Timestamp]:
+		target, ok := value.(Timestamp)
+		return compareSignedRowPredicate(a.data, target, ok, op)
+	default:
+		return nil, false, nil
+	}
+}
+
+func compareBoolRowPredicate(values []bool, target bool, ok bool, op Op) (rowPredicate, bool, error) {
+	if !ok {
+		return nil, false, nil
+	}
+	return func(row int) bool {
+		v := values[row]
+		return boolCompare(op, v == target, compareBool(v, target))
+	}, true, nil
+}
+
+func compareSignedRowPredicate[T signedScalar](values []T, target T, ok bool, op Op) (rowPredicate, bool, error) {
+	if !ok {
+		return nil, false, nil
+	}
+	return func(row int) bool {
+		v := values[row]
+		return boolCompare(op, int64(v) == int64(target), compareInt64(int64(v), int64(target)))
+	}, true, nil
+}
+
+func compareUnsignedRowPredicate[T unsignedScalar](values []T, target T, ok bool, op Op) (rowPredicate, bool, error) {
+	if !ok {
+		return nil, false, nil
+	}
+	return func(row int) bool {
+		v := values[row]
+		return boolCompare(op, uint64(v) == uint64(target), compareUint64(uint64(v), uint64(target)))
+	}, true, nil
+}
+
+func compareFloatRowPredicate[T floatScalar](values []T, target T, ok bool, op Op) (rowPredicate, bool, error) {
+	if !ok {
+		return nil, false, nil
+	}
+	return func(row int) bool {
+		v := values[row]
+		return boolCompare(op, float64(v) == float64(target), compareFloat64(float64(v), float64(target)))
+	}, true, nil
+}
+
+func compareStringRowPredicate(values []string, target string, ok bool, op Op) (rowPredicate, bool, error) {
+	if !ok {
+		return nil, false, nil
+	}
+	return func(row int) bool {
+		v := values[row]
+		return boolCompare(op, v == target, compareString(v, target))
+	}, true, nil
+}
+
+func compareSymbolRowPredicate(values []Symbol, target Symbol, ok bool, op Op) (rowPredicate, bool, error) {
+	if !ok {
+		return nil, false, nil
+	}
+	return func(row int) bool {
+		v := values[row]
+		return boolCompare(op, v == target, compareString(string(v), string(target)))
+	}, true, nil
+}
+
 func intersectSortedIndexes(left, right []int) []int {
 	out := make([]int, 0, min(len(left), len(right)))
 	i, j := 0, 0
@@ -3945,8 +4149,8 @@ func filterIndexScratch(length int) []int {
 }
 
 func indexedEqualRows(array Array, value any) ([]int, bool) {
-	uniqueIndex, uniqueOK := ArrayIndexFor(array, ArrayAttributeUnique)
-	groupedIndex, groupedOK := ArrayIndexFor(array, ArrayAttributeGrouped)
+	uniqueIndex, uniqueOK := arrayIndexForBorrowed(array, ArrayAttributeUnique)
+	groupedIndex, groupedOK := arrayIndexForBorrowed(array, ArrayAttributeGrouped)
 	if !uniqueOK && !groupedOK {
 		return nil, false
 	}
@@ -4133,7 +4337,7 @@ func execProject(frame Frame, indexes []int, items []SelectItem) (Frame, error) 
 		}
 		cols = append(cols, NewColumn(item.Name, values))
 	}
-	return NewFrame(cols...)
+	return newFrameTrusted(cols...)
 }
 
 type groupState struct {
@@ -4384,15 +4588,15 @@ func groupIndexForSingleColumn(frame Frame, byInputs []groupInput) (ArrayIndex, 
 	if column == nil {
 		return ArrayIndex{}, false, nil
 	}
-	if index, ok := ArrayIndexFor(column, ArrayAttributeUnique); ok {
+	if index, ok := arrayIndexForBorrowed(column, ArrayAttributeUnique); ok {
 		return index, true, nil
 	}
-	if index, ok := ArrayIndexFor(column, ArrayAttributeGrouped); ok {
+	if index, ok := arrayIndexForBorrowed(column, ArrayAttributeGrouped); ok {
 		return index, true, nil
 	}
 	if ref, ok := byInputs[0].Expr.(ColumnRef); ok {
 		indexed := WithArrayAttribute(column, ArrayAttributeGrouped)
-		if index, ok := ArrayIndexFor(indexed, ArrayAttributeGrouped); ok {
+		if index, ok := arrayIndexForBorrowed(indexed, ArrayAttributeGrouped); ok {
 			frame.columns[ref.Name] = indexed
 			byInputs[0].column = indexed
 			return index, true, nil
@@ -4506,7 +4710,7 @@ func execGroupedFromFilteredArrayIndex(frame Frame, byInputs []groupInput, aggs 
 		}
 		cols = append(cols, NewColumn(agg.Name, values))
 	}
-	out, err := NewFrame(cols...)
+	out, err := newFrameTrusted(cols...)
 	return out, true, err
 }
 
@@ -4534,7 +4738,7 @@ func buildGroupedAggregateFrame(frame Frame, byInputs []groupInput, aggs []aggre
 		}
 		cols = append(cols, NewColumn(agg.Name, values))
 	}
-	return NewFrame(cols...)
+	return newFrameTrusted(cols...)
 }
 
 func bindGroupInputs(frame Frame, items []SelectItem) ([]groupInput, error) {
