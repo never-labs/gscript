@@ -28,6 +28,32 @@ func TestQKernelDescriptorsUseStructuredRemarkFields(t *testing.T) {
 	assertQKernelDescriptor(t, descriptors, "methodjit_q_query_lowering", "fallback", "QGroupAggregate", "select/where/group/aggregate/order", "lowering", "fallback", qQueryLoweringFallbackGroupAggregateCall)
 }
 
+func TestQKernelDescriptorsUseStructuredRemarkRouteFields(t *testing.T) {
+	remarks := []OptimizationRemark{
+		{
+			Pass:   "QQueryNativeLowering",
+			Kind:   "missed",
+			Op:     OpCall.String(),
+			Reason: "future route fallback",
+			Fields: map[string]string{
+				"kind":          "fallback",
+				"kernel":        "QJoin",
+				"shape":         "join/inner",
+				"reason_family": "schema",
+				"reason_code":   qQueryLoweringFallbackJoinCall,
+				"route":         "schema_stable_lowering",
+				"outcome":       "fallback",
+			},
+		},
+	}
+
+	descriptors := BuildQKernelDescriptors(nil, nil, nil, remarks)
+	assertQKernelDescriptor(t, descriptors, "methodjit_q_query_lowering", "fallback", "QJoin", "join/inner", "schema_stable_lowering", "fallback", qQueryLoweringFallbackJoinCall)
+	if descriptors[0].ReasonFamily != "schema" {
+		t.Fatalf("descriptor reason family = %q, want schema", descriptors[0].ReasonFamily)
+	}
+}
+
 func TestQVectorLoweringFallbackReasonsUseStructuredRemarkFields(t *testing.T) {
 	remarks := []OptimizationRemark{
 		{

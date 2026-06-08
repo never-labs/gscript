@@ -2400,6 +2400,7 @@ func TestQVectorGatherReduceSharedGatherDoesNotLower(t *testing.T) {
 	if vectorFallbacks[qVectorGatherReduceFallbackSharedGather] != 1 {
 		t.Fatalf("q vector lowering fallback counts = %+v, want shared_gather=1", vectorFallbacks)
 	}
+	assertQLoweringRemarkFields(t, fn.Remarks.List(), "QVectorNativeLowering", "QVectorGatherReduce", "gather/vector-reduce", qVectorGatherReduceFallbackSharedGather)
 	formatted := formatOptimizationRemarks(fn.Remarks.List())
 	if !strings.Contains(formatted, "kernel=QVectorGatherReduce") ||
 		!strings.Contains(formatted, "reason_code=shared_gather") ||
@@ -2628,6 +2629,7 @@ func TestQGroupAggregateCallReportsStructuredFallback(t *testing.T) {
 	if fallbacks[qQueryLoweringFallbackGroupAggregateCall] != 1 {
 		t.Fatalf("q query fallback counts = %+v, want group_aggregate_call=1", fallbacks)
 	}
+	assertQLoweringRemarkFields(t, fn.Remarks.List(), "QQueryNativeLowering", "QGroupAggregate", "select/where/group/aggregate/order", qQueryLoweringFallbackGroupAggregateCall)
 	descriptors := BuildQKernelDescriptors(nil, nil, nil, fn.Remarks.List())
 	assertQKernelDescriptor(t, descriptors, "methodjit_q_query_lowering", "fallback", "QGroupAggregate", "select/where/group/aggregate/order", "lowering", "fallback", qQueryLoweringFallbackGroupAggregateCall)
 	summary := BuildQKernelShapeSummaryFromDescriptors(descriptors)
@@ -2749,6 +2751,7 @@ func TestQJoinCallReportsStructuredFallback(t *testing.T) {
 	if fallbacks[qQueryLoweringFallbackJoinCall] != 1 {
 		t.Fatalf("q query fallback counts = %+v, want join_call=1", fallbacks)
 	}
+	assertQLoweringRemarkFields(t, fn.Remarks.List(), "QQueryNativeLowering", "QJoin", "where/join/left/order", qQueryLoweringFallbackJoinCall)
 	descriptors := BuildQKernelDescriptors(nil, nil, nil, fn.Remarks.List())
 	assertQKernelDescriptor(t, descriptors, "methodjit_q_query_lowering", "fallback", "QJoin", "where/join/left/order", "lowering", "fallback", qQueryLoweringFallbackJoinCall)
 	summary := BuildQKernelShapeSummaryFromDescriptors(descriptors)
@@ -4204,6 +4207,25 @@ func assertQKernelDescriptor(t *testing.T, rows []QKernelDescriptor, source, kin
 	}
 	t.Fatalf("QKernelDescriptor missing source=%s kind=%s kernel=%s shape=%s route=%s outcome=%s reason=%s; rows=%+v",
 		source, kind, kernel, shape, route, outcome, reasonCode, rows)
+}
+
+func assertQLoweringRemarkFields(t *testing.T, rows []OptimizationRemark, pass, kernel, shape, reasonCode string) {
+	t.Helper()
+	for _, row := range rows {
+		if row.Pass != pass || row.Kind != "missed" {
+			continue
+		}
+		if row.Fields["kernel"] == kernel &&
+			row.Fields["shape"] == shape &&
+			row.Fields["kind"] == "fallback" &&
+			row.Fields["route"] == "lowering" &&
+			row.Fields["outcome"] == "fallback" &&
+			row.Fields["reason_family"] == "lowering" &&
+			row.Fields["reason_code"] == reasonCode {
+			return
+		}
+	}
+	t.Fatalf("OptimizationRemark fields missing pass=%s kernel=%s shape=%s reason=%s; rows=%+v", pass, kernel, shape, reasonCode, rows)
 }
 
 func assertQKernelExecutionStat(t *testing.T, rows []QKernelExecutionStat, source, kernel, shape, route, outcome string, count uint64) {

@@ -375,6 +375,13 @@ func qLoweringRemarkFieldFromRemark(remark OptimizationRemark, name string) (str
 	return qLoweringRemarkField(remark.Reason, name)
 }
 
+func qLoweringRemarkFieldOrDefault(remark OptimizationRemark, name, fallback string) string {
+	if value, ok := qLoweringRemarkFieldFromRemark(remark, name); ok {
+		return value
+	}
+	return fallback
+}
+
 func qLoweringRemarkField(reason, name string) (string, bool) {
 	prefix := name + "="
 	for _, field := range strings.Fields(reason) {
@@ -472,12 +479,12 @@ func BuildQKernelDescriptors(vectorKernels []QVectorRuntimeKernel, framePrimitiv
 		}
 		out = append(out, QKernelDescriptor{
 			Source:       source,
-			Kind:         "fallback",
+			Kind:         qLoweringRemarkFieldOrDefault(remark, "kind", "fallback"),
 			Kernel:       kernel,
 			Shape:        qQueryLoweringFallbackShapeFromRemark(remark),
-			Route:        "lowering",
-			Outcome:      "fallback",
-			ReasonFamily: "lowering",
+			Route:        qLoweringRemarkFieldOrDefault(remark, "route", "lowering"),
+			Outcome:      qLoweringRemarkFieldOrDefault(remark, "outcome", "fallback"),
+			ReasonFamily: qLoweringRemarkFieldOrDefault(remark, "reason_family", "lowering"),
 			ReasonCode:   reason,
 		})
 	}
@@ -1306,6 +1313,7 @@ func qJoinFallbackRemark(fn *Function, call *Instr, shape string) {
 
 func qLoweringFallbackRemarkFields(kernel, reasonCode, shape string) map[string]string {
 	return map[string]string{
+		"kind":          "fallback",
 		"kernel":        kernel,
 		"shape":         shape,
 		"reason_family": "lowering",
