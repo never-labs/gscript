@@ -159,6 +159,137 @@ func QQueryHotPathRemarkPass(fn *Function) (*Function, error) {
 	return fn, nil
 }
 
+// QQueryNativeLoweringPass folds simple q primitive hot paths into a single
+// runtime-kernel op-exit. This is the first executable lowering step after
+// recognition; full native codegen can target OpQFrameSelectColumn later.
+func QQueryNativeLoweringPass(fn *Function) (*Function, error) {
+	if fn == nil {
+		return fn, nil
+	}
+	uses := qQueryValueUseCounts(fn)
+	for _, path := range DetectQQueryHotPaths(fn) {
+		if path.RowGather != nil || path.RowSlice != nil || path.RowOrder != nil {
+			continue
+		}
+		if !qQueryHotPathSingleUse(path, uses) {
+			continue
+		}
+		spec, args, ok := qQueryFrameSelectColumnSpec(fn, path)
+		if !ok {
+			continue
+		}
+		specIdx := len(fn.QFrameSelectColumnSpecs)
+		fn.QFrameSelectColumnSpecs = append(fn.QFrameSelectColumnSpecs, spec)
+		result := path.ResultColumn
+		result.Op = OpQFrameSelectColumn
+		result.Type = TypeAny
+		result.Args = args
+		result.Aux = int64(specIdx)
+		result.Aux2 = 0
+		qQueryNop(path.SourceColumn)
+		qQueryNop(path.Compare)
+		qQueryNop(path.Mask)
+		qQueryNop(path.Filter)
+		qQueryNop(path.Project)
+		if result.Block != nil {
+			functionRemarks(fn).Add("QQueryNativeLowering", "changed", result.Block.ID, result.ID, OpQFrameSelectColumn,
+				fmt.Sprintf("lowered q query primitive hot path shape %s to typed runtime kernel op-exit", spec.Shape))
+		}
+	}
+	return fn, nil
+}
+
+func qQueryValueUseCounts(fn *Function) map[int]int {
+	uses := make(map[int]int)
+	for _, block := range fn.Blocks {
+		if block == nil {
+			continue
+		}
+		for _, instr := range block.Instrs {
+			if instr == nil {
+				continue
+			}
+			for _, arg := range instr.Args {
+				if arg != nil {
+					uses[arg.ID]++
+				}
+			}
+		}
+	}
+	return uses
+}
+
+func qQueryHotPathSingleUse(path QQueryHotPath, uses map[int]int) bool {
+	for _, instr := range []*Instr{path.SourceColumn, path.Compare, path.Mask, path.Filter, path.Project} {
+		if instr != nil && uses[instr.ID] != 1 {
+			return false
+		}
+	}
+	return true
+}
+
+func qQueryFrameSelectColumnSpec(fn *Function, path QQueryHotPath) (QFrameSelectColumnSpec, []*Value, bool) {
+	if fn == nil || fn.Proto == nil || path.Filter == nil || path.Project == nil || path.ResultColumn == nil {
+		return QFrameSelectColumnSpec{}, nil, false
+	}
+	if path.ResultColumn.Aux < 0 || path.ResultColumn.Aux >= int64(len(fn.Proto.Constants)) ||
+		path.Project.Aux < 0 || path.Project.Aux >= int64(len(fn.Proto.Constants)) {
+		return QFrameSelectColumnSpec{}, nil, false
+	}
+	spec := QFrameSelectColumnSpec{
+		Shape:             path.Shape(),
+		SourceColumnConst: -1,
+		MaskSpecConst:     -1,
+		ProjectConst:      int(path.Project.Aux),
+		ResultColumnConst: int(path.ResultColumn.Aux),
+	}
+	frameArg := path.Filter.Args[0]
+	if path.Compare != nil {
+		if path.SourceColumn == nil || path.SourceColumn.Aux < 0 || path.SourceColumn.Aux >= int64(len(fn.Proto.Constants)) {
+			return QFrameSelectColumnSpec{}, nil, false
+		}
+		rhs := qQueryCompareRHS(path.Compare, path.SourceColumn)
+		if rhs == nil {
+			return QFrameSelectColumnSpec{}, nil, false
+		}
+		spec.SourceColumnConst = int(path.SourceColumn.Aux)
+		spec.CompareOp = runtime.DenseArrayBinaryOp(path.Compare.Aux)
+		return spec, []*Value{frameArg, rhs}, true
+	}
+	if path.Mask != nil {
+		if path.Mask.Aux < 0 || path.Mask.Aux >= int64(len(fn.Proto.Constants)) {
+			return QFrameSelectColumnSpec{}, nil, false
+		}
+		spec.MaskSpecConst = int(path.Mask.Aux)
+		return spec, []*Value{frameArg}, true
+	}
+	return QFrameSelectColumnSpec{}, nil, false
+}
+
+func qQueryCompareRHS(compare, sourceColumn *Instr) *Value {
+	if compare == nil || sourceColumn == nil {
+		return nil
+	}
+	for _, arg := range compare.Args {
+		if arg == nil || arg.ID == sourceColumn.ID {
+			continue
+		}
+		return arg
+	}
+	return nil
+}
+
+func qQueryNop(instr *Instr) {
+	if instr == nil {
+		return
+	}
+	instr.Op = OpNop
+	instr.Type = TypeUnknown
+	instr.Args = nil
+	instr.Aux = 0
+	instr.Aux2 = 0
+}
+
 func formatQQueryHotPaths(paths []QQueryHotPath) string {
 	if len(paths) == 0 {
 		return "0 primitive pipeline(s)\n"

@@ -1006,6 +1006,7 @@ func TestTier2FinalCallModuleOrder(t *testing.T) {
 		"FieldCallPolyLenFusion",
 		"RangeAnalysis (post-final-call)",
 		"QQueryHotPath",
+		"QQueryNativeLowering",
 	})
 }
 
@@ -1020,6 +1021,7 @@ func TestTier2FinalCallModuleOrderExperimentalFieldShapeSplit(t *testing.T) {
 		"FieldCallPolyLenFusion",
 		"RangeAnalysis (post-final-call)",
 		"QQueryHotPath",
+		"QQueryNativeLowering",
 		"FieldShapeCallSplit (experimental)",
 	})
 }
@@ -1035,6 +1037,7 @@ func TestTier2FinalCallModuleOrderIgnoresOtherFieldShapeSplitValues(t *testing.T
 		"FieldCallPolyLenFusion",
 		"RangeAnalysis (post-final-call)",
 		"QQueryHotPath",
+		"QQueryNativeLowering",
 	})
 }
 

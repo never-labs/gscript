@@ -59,6 +59,15 @@ type StringSplitSubSpec struct {
 	SecondHasEnd bool
 }
 
+type QFrameSelectColumnSpec struct {
+	Shape             string
+	SourceColumnConst int
+	MaskSpecConst     int
+	ProjectConst      int
+	ResultColumnConst int
+	CompareOp         runtime.DenseArrayBinaryOp
+}
+
 type RecordArraySpecializationSourceKind uint8
 
 const (
@@ -149,6 +158,10 @@ type Function struct {
 	// This slice must stay in Function because it owns the cached data
 	// lifetime, not analysis results.
 	RecordArrayLoopCaches []*RecordArrayLoopSpecializationCache
+
+	// QFrameSelectColumnSpecs records q primitive hot-path metadata consumed by
+	// fused runtime-kernel op-exits.
+	QFrameSelectColumnSpecs []QFrameSelectColumnSpec
 
 	// Unpromotable, when true, signals that this function cannot be safely
 	// compiled at Tier 2 because BuildGraph encountered bytecode patterns

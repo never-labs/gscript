@@ -508,6 +508,7 @@ func CompileWithOptions(fn *Function, alloc *RegAllocation, opts CompileOptions)
 		StringConstTables:        fn.StringConstTables,
 		StringFormatPatterns:     fn.StringFormatPatterns,
 		StringSplitSubSpecs:      fn.StringSplitSubSpecs,
+		QFrameSelectColumnSpecs:  fn.QFrameSelectColumnSpecs,
 		CallSiteNoResultRuntimeSpecializationBatches: functionCallFacts(fn).CallSiteNoResultRuntimeSpecializationBatchMap(),
 		RecordArrayLoopCaches:                        fn.RecordArrayLoopCaches,
 		InstrCodeRanges:                              ec.instrCodeRanges,
@@ -635,7 +636,7 @@ func fnHasResultProducingOpExit(fn *Function) bool {
 				continue
 			}
 			switch instr.Op {
-			case OpMatrixDense, OpFrameLen, OpFrameColumn, OpFrameMask, OpFrameProject, OpFrameFilter, OpFrameGather, OpFrameSlice, OpFrameOrder, OpVectorGather, OpVectorCompare:
+			case OpMatrixDense, OpFrameLen, OpFrameColumn, OpFrameMask, OpFrameProject, OpFrameFilter, OpFrameGather, OpFrameSlice, OpFrameOrder, OpVectorGather, OpVectorCompare, OpQFrameSelectColumn:
 				return true
 			}
 		}

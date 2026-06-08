@@ -1067,6 +1067,28 @@ func (cf *CompiledFunction) executeOpExit(ctx *ExecContext, regs []runtime.Value
 		}
 		regs[slot] = out
 
+	case OpQFrameSelectColumn:
+		if arg1 >= len(regs) || slot >= len(regs) {
+			return fmt.Errorf("QFrameSelectColumn op-exit out of register range")
+		}
+		if cf.Proto == nil {
+			return fmt.Errorf("QFrameSelectColumn op-exit missing proto")
+		}
+		rhs := runtime.NilValue()
+		hasRHS := false
+		if arg2 >= 0 {
+			if arg2 >= len(regs) {
+				return fmt.Errorf("QFrameSelectColumn rhs out of register range")
+			}
+			rhs = regs[arg2]
+			hasRHS = true
+		}
+		out, err := executeQFrameSelectColumnValue(cf.Proto.Constants, cf.QFrameSelectColumnSpecs, int(aux), regs[arg1], rhs, hasRHS)
+		if err != nil {
+			return err
+		}
+		regs[slot] = out
+
 	case OpVectorGather:
 		if arg1 >= len(regs) || arg2 >= len(regs) || slot >= len(regs) {
 			return fmt.Errorf("VectorGather op-exit out of register range")

@@ -422,6 +422,29 @@ func (tm *TieringManager) executeOpExit(ctx *ExecContext, regs []runtime.Value, 
 		}
 		regs[absSlot] = out
 
+	case OpQFrameSelectColumn:
+		if absArg1 >= len(regs) || absSlot >= len(regs) {
+			return fmt.Errorf("QFrameSelectColumn op-exit out of register range")
+		}
+		if proto == nil {
+			return fmt.Errorf("QFrameSelectColumn op-exit missing proto")
+		}
+		cf, _ := tm.tier2CompiledFor(proto)
+		if cf == nil {
+			return fmt.Errorf("QFrameSelectColumn op-exit missing compiled function")
+		}
+		rhs := runtime.NilValue()
+		hasRHS := false
+		if absArg2 >= 0 && absArg2 < len(regs) {
+			rhs = regs[absArg2]
+			hasRHS = true
+		}
+		out, err := executeQFrameSelectColumnValue(proto.Constants, cf.QFrameSelectColumnSpecs, int(aux), regs[absArg1], rhs, hasRHS)
+		if err != nil {
+			return err
+		}
+		regs[absSlot] = out
+
 	case OpVectorGather:
 		if absArg1 >= len(regs) || absArg2 >= len(regs) || absSlot >= len(regs) {
 			return fmt.Errorf("VectorGather op-exit out of register range")

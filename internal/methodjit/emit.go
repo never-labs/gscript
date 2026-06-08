@@ -624,6 +624,10 @@ type CompiledFunction struct {
 	// precise Tier 2 op-exit handling.
 	StringSplitSubSpecs []StringSplitSubSpec
 
+	// QFrameSelectColumnSpecs keeps q primitive hot-path metadata alive for
+	// fused runtime-kernel op-exit handling.
+	QFrameSelectColumnSpecs []QFrameSelectColumnSpec
+
 	// CallSiteNoResultRuntimeSpecializationBatches records loop-tail no-result call-site runtime specialization
 	// sites whose future complete loop iterations can be executed in one
 	// guarded Go-side batch before resuming Tier 2.

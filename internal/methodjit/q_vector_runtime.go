@@ -118,6 +118,74 @@ func executeFrameOrderValue(frameVal runtime.Value, spec runtime.Value) (runtime
 	return out, nil
 }
 
+func executeQFrameSelectColumnValue(constants []runtime.Value, specs []QFrameSelectColumnSpec, specIdx int, frameVal runtime.Value, rhsVal runtime.Value, hasRHS bool) (runtime.Value, error) {
+	if specIdx < 0 || specIdx >= len(specs) {
+		return runtime.NilValue(), fmt.Errorf("QFrameSelectColumn spec index %d is out of range", specIdx)
+	}
+	spec := specs[specIdx]
+	mask, err := executeQFrameSelectColumnMask(constants, spec, frameVal, rhsVal, hasRHS)
+	if err != nil {
+		return runtime.NilValue(), err
+	}
+	filtered, err := executeFrameFilterValue(frameVal, mask)
+	if err != nil {
+		return runtime.NilValue(), err
+	}
+	if spec.ProjectConst < 0 || spec.ProjectConst >= len(constants) {
+		return runtime.NilValue(), fmt.Errorf("QFrameSelectColumn project constant is out of range")
+	}
+	names, err := frameProjectColumnNames(constants[spec.ProjectConst])
+	if err != nil {
+		return runtime.NilValue(), err
+	}
+	projected, err := executeFrameProjectValue(filtered, names)
+	if err != nil {
+		return runtime.NilValue(), err
+	}
+	if spec.ResultColumnConst < 0 || spec.ResultColumnConst >= len(constants) || !constants[spec.ResultColumnConst].IsString() {
+		return runtime.NilValue(), fmt.Errorf("QFrameSelectColumn result column must be a string constant")
+	}
+	return executeFrameColumnValue(projected, constants[spec.ResultColumnConst].Str())
+}
+
+func executeQFrameSelectColumnMask(constants []runtime.Value, spec QFrameSelectColumnSpec, frameVal runtime.Value, rhsVal runtime.Value, hasRHS bool) (runtime.Value, error) {
+	if spec.MaskSpecConst >= 0 {
+		if spec.MaskSpecConst >= len(constants) {
+			return runtime.NilValue(), fmt.Errorf("QFrameSelectColumn mask spec constant is out of range")
+		}
+		name, op, rhs, err := frameMaskSpec(constants[spec.MaskSpecConst])
+		if err != nil {
+			return runtime.NilValue(), err
+		}
+		denseOp, err := runtime.DenseArrayCompareOp(op)
+		if err != nil {
+			return runtime.NilValue(), err
+		}
+		out, handled, err := frameVal.NativeFrameMaskOp(name, denseOp, rhs)
+		if err != nil {
+			return runtime.NilValue(), err
+		}
+		if !handled {
+			return runtime.NilValue(), fmt.Errorf("QFrameSelectColumn operand must be native frame (got %s)", frameVal.TypeName())
+		}
+		return out, nil
+	}
+	if !hasRHS {
+		return runtime.NilValue(), fmt.Errorf("QFrameSelectColumn compare path requires rhs")
+	}
+	if spec.SourceColumnConst < 0 || spec.SourceColumnConst >= len(constants) || !constants[spec.SourceColumnConst].IsString() {
+		return runtime.NilValue(), fmt.Errorf("QFrameSelectColumn source column must be a string constant")
+	}
+	out, handled, err := frameVal.NativeFrameMaskOp(constants[spec.SourceColumnConst].Str(), spec.CompareOp, rhsVal)
+	if err != nil {
+		return runtime.NilValue(), err
+	}
+	if !handled {
+		return runtime.NilValue(), fmt.Errorf("QFrameSelectColumn operand must be native frame (got %s)", frameVal.TypeName())
+	}
+	return out, nil
+}
+
 func frameProjectColumnNames(v runtime.Value) ([]string, error) {
 	if v.IsString() {
 		return []string{v.Str()}, nil

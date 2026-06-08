@@ -1125,6 +1125,20 @@ func (s *interpState) execInstr(instr *Instr, block *Block) ([]runtime.Value, bo
 		}
 		s.values[instr.ID] = out
 
+	case OpQFrameSelectColumn:
+		if len(instr.Args) < 1 || len(instr.Args) > 2 {
+			return nil, false, fmt.Errorf("QFrameSelectColumn arg count = %d, want 1 or 2", len(instr.Args))
+		}
+		rhs := runtime.NilValue()
+		if len(instr.Args) == 2 {
+			rhs = s.val(instr.Args[1])
+		}
+		out, err := executeQFrameSelectColumnValue(s.fn.Proto.Constants, s.fn.QFrameSelectColumnSpecs, int(instr.Aux), s.val(instr.Args[0]), rhs, len(instr.Args) == 2)
+		if err != nil {
+			return nil, false, err
+		}
+		s.values[instr.ID] = out
+
 	case OpVectorGather:
 		out, err := executeVectorGatherValue(s.val(instr.Args[0]), s.val(instr.Args[1]))
 		if err != nil {

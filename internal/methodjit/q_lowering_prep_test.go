@@ -379,6 +379,69 @@ func TestQFramePrimitivePipelineBuildsMethodJITIR(t *testing.T) {
 	}
 }
 
+func TestQFramePrimitiveHotPathLowersToTypedRuntimeKernel(t *testing.T) {
+	names := runtime.NewTable()
+	names.RawSetInt(1, runtime.StringValue("size"))
+	proto := &vm.FuncProto{
+		Name:      "q_frame_pipeline_lowered",
+		NumParams: 1,
+		MaxStack:  3,
+		Constants: []runtime.Value{
+			runtime.StringValue("price"),
+			runtime.FloatValue(100),
+			runtime.TableValue(names),
+			runtime.StringValue("size"),
+		},
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_FRAME_COLUMN, 1, 0, 0),
+			vm.EncodeABx(vm.OP_LOADK, 2, 1),
+			vm.EncodeABC(vm.OP_VECTOR_COMPARE, 1, 2, int(runtime.DenseArrayGE)),
+			vm.EncodeABC(vm.OP_FRAME_FILTER, 0, 0, 1),
+			vm.EncodeABC(vm.OP_FRAME_PROJECT, 0, 0, 2),
+			vm.EncodeABC(vm.OP_FRAME_COLUMN, 0, 0, 3),
+			vm.EncodeABC(vm.OP_RETURN, 0, 2, 0),
+		},
+	}
+
+	fn := BuildGraph(proto)
+	lowered, err := QQueryNativeLoweringPass(fn)
+	if err != nil {
+		t.Fatalf("QQueryNativeLoweringPass: %v", err)
+	}
+	counts := map[Op]int{}
+	for _, block := range lowered.Blocks {
+		for _, instr := range block.Instrs {
+			counts[instr.Op]++
+		}
+	}
+	if counts[OpQFrameSelectColumn] != 1 {
+		t.Fatalf("OpQFrameSelectColumn count = %d, want 1\n%s", counts[OpQFrameSelectColumn], Print(lowered))
+	}
+	for _, op := range []Op{OpFrameColumn, OpVectorCompare, OpFrameFilter, OpFrameProject} {
+		if counts[op] != 0 {
+			t.Fatalf("%s count = %d, want 0 after lowering\n%s", op, counts[op], Print(lowered))
+		}
+	}
+	if len(lowered.QFrameSelectColumnSpecs) != 1 {
+		t.Fatalf("QFrameSelectColumnSpecs count = %d, want 1", len(lowered.QFrameSelectColumnSpecs))
+	}
+	if got := lowered.QFrameSelectColumnSpecs[0].Shape; got != "compare/filter/project/column" {
+		t.Fatalf("lowered q spec shape = %q, want compare/filter/project/column", got)
+	}
+
+	result, err := Interpret(lowered, []runtime.Value{runtime.TableValue(qHotPathTestFrame(t))})
+	if err != nil {
+		t.Fatalf("Interpret lowered q hot path: %v", err)
+	}
+	if len(result) != 1 || !result[0].IsDenseArray() {
+		t.Fatalf("lowered result = %#v, want one dense array", result)
+	}
+	got, ok := result[0].DenseArray().I64()
+	if !ok || len(got) != 2 || got[0] != 10 || got[1] != 20 {
+		t.Fatalf("lowered result values = %#v, want [10 20]", got)
+	}
+}
+
 func TestQFramePrimitiveHotPathDetectsFrameMask(t *testing.T) {
 	names := runtime.NewTable()
 	names.RawSetInt(1, runtime.StringValue("size"))
@@ -602,26 +665,25 @@ func TestDiagnoseReportsQQueryHotPath(t *testing.T) {
 	}
 
 	report := Diagnose(proto, []runtime.Value{runtime.TableValue(qHotPathTestFrame(t))})
-	if len(report.QQueryHotPaths) != 1 {
-		t.Fatalf("Diagnose QQueryHotPaths = %d, want 1\n%s", len(report.QQueryHotPaths), report.String())
+	if len(report.QQueryHotPaths) != 0 {
+		t.Fatalf("Diagnose QQueryHotPaths = %d, want 0 after native lowering\n%s", len(report.QQueryHotPaths), report.String())
 	}
-	if report.QQueryHotPathShapes["compare/filter/project/column"] != 1 {
-		t.Fatalf("Diagnose QQueryHotPathShapes = %+v, want compare/filter/project/column count 1", report.QQueryHotPathShapes)
+	if len(report.QQueryHotPathShapes) != 0 {
+		t.Fatalf("Diagnose QQueryHotPathShapes = %+v, want empty after native lowering", report.QQueryHotPathShapes)
 	}
 	if !strings.Contains(report.String(), "Q query hot paths") {
 		t.Fatalf("diagnostic report missing q hot path section:\n%s", report.String())
 	}
-	if !strings.Contains(report.String(), "shapes: compare/filter/project/column=1") {
-		t.Fatalf("diagnostic report missing q hot path shape summary:\n%s", report.String())
-	}
-	if !strings.Contains(report.String(), "shape=compare/filter/project/column") {
-		t.Fatalf("diagnostic report missing q hot path shape:\n%s", report.String())
+	if !strings.Contains(report.String(), "QFrameSelectColumn") {
+		t.Fatalf("diagnostic report missing lowered q kernel op:\n%s", report.String())
 	}
 	if !strings.Contains(formatOptimizationRemarks(report.OptimizationRemarks), "QQueryHotPath") ||
 		!strings.Contains(formatOptimizationRemarks(report.OptimizationRemarks), "first shape compare/filter/project/column") ||
 		!strings.Contains(formatOptimizationRemarks(report.OptimizationRemarks), "compare >=") ||
-		!strings.Contains(formatOptimizationRemarks(report.OptimizationRemarks), "native lowering pending") {
-		t.Fatalf("diagnostic remarks missing q hot path handoff:\n%s", formatOptimizationRemarks(report.OptimizationRemarks))
+		!strings.Contains(formatOptimizationRemarks(report.OptimizationRemarks), "native lowering pending") ||
+		!strings.Contains(formatOptimizationRemarks(report.OptimizationRemarks), "QQueryNativeLowering") ||
+		!strings.Contains(formatOptimizationRemarks(report.OptimizationRemarks), "typed runtime kernel op-exit") {
+		t.Fatalf("diagnostic remarks missing q hot path lowering handoff:\n%s", formatOptimizationRemarks(report.OptimizationRemarks))
 	}
 }
 
