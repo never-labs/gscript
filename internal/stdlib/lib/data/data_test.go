@@ -289,6 +289,38 @@ func TestFilterIndexesUsesAttributeIndexForIn(t *testing.T) {
 	assertColumnValues(t, got, "qty", []any{int64(10), int64(30), int64(40)})
 }
 
+func TestFilterIndexesUsesTypedInKernelWithoutAttributeIndex(t *testing.T) {
+	frame := mustFrame(t,
+		Column{Name: "qty", Data: NewI32([]int32{10, 20, 30, 20, 40})},
+		Column{Name: "sym", Data: NewSymbols([]string{"AAPL", "MSFT", "NVDA", "AAPL", "IBM"})},
+	)
+
+	indexes, err := filterIndexes(frame, In{
+		Expr:   ColumnRef{Name: "qty"},
+		Values: []any{int64(20), int32(40)},
+	})
+	if err != nil {
+		t.Fatalf("filterIndexes typed in returned error: %v", err)
+	}
+	if want := []int{1, 3, 4}; !reflect.DeepEqual(indexes, want) {
+		t.Fatalf("typed in filter indexes = %v, want %v", indexes, want)
+	}
+
+	got, err := Exec(frame, QueryPlan{
+		Source: frame,
+		Where: In{
+			Expr:   ColumnRef{Name: "sym"},
+			Values: []any{"AAPL", Symbol("IBM")},
+		},
+		Select: []SelectItem{{Name: "qty", Expr: ColumnRef{Name: "qty"}}},
+		LimitN: -1,
+	})
+	if err != nil {
+		t.Fatalf("Exec typed in returned error: %v", err)
+	}
+	assertColumnValues(t, got, "qty", []any{int32(10), int32(20), int32(40)})
+}
+
 func TestExecFilteredGroupedCountUsesAttributeIndexOrder(t *testing.T) {
 	frame := mustFrame(t,
 		Column{Name: "sym", Data: WithArrayAttribute(NewSymbols([]string{"AAPL", "MSFT", "AAPL", "NVDA", "MSFT"}), ArrayAttributeGrouped)},

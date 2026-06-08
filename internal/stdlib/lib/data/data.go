@@ -3797,6 +3797,9 @@ func fastFilterIndexes(frame Frame, where Expr) ([]int, bool, error) {
 		if indexes, ok := typedKernels.IndexedInRows(col, expr.Values); ok {
 			return indexes, true, nil
 		}
+		if indexes, ok := typedKernels.InIndexes(col, expr.Values, filterIndexScratch(col.Len())); ok {
+			return indexes, true, nil
+		}
 		combined := make([]bool, col.Len())
 		for _, value := range expr.Values {
 			mask, err := CompareMask(col, OpEQ, value)

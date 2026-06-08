@@ -1336,6 +1336,42 @@ func TestTypedCompareIndexesAndNullMasks(t *testing.T) {
 	}
 }
 
+func TestTypedInIndexesScansNonIndexedColumns(t *testing.T) {
+	indexes, ok := typedKernels.InIndexes(NewI32([]int32{10, 20, 30, 20, 40}), []any{int64(20), int32(40)}, nil)
+	if !ok {
+		t.Fatal("typed in indexes did not match i32 column")
+	}
+	if want := []int{1, 3, 4}; !reflect.DeepEqual(indexes, want) {
+		t.Fatalf("i32 in indexes = %v, want %v", indexes, want)
+	}
+
+	indexes = []int{99}
+	indexes, ok = typedKernels.InIndexes(NewSymbols([]string{"AAPL", "MSFT", "NVDA", "AAPL"}), []any{"NVDA", Symbol("AAPL")}, indexes)
+	if !ok {
+		t.Fatal("typed in indexes did not match symbol column")
+	}
+	if want := []int{0, 2, 3}; !reflect.DeepEqual(indexes, want) {
+		t.Fatalf("symbol in indexes = %v, want %v", indexes, want)
+	}
+
+	indexes, ok = typedKernels.InIndexes(NewTimestamp([]Timestamp{10, 20, 30, 40}), []any{Timestamp(20), Timestamp(40)}, nil)
+	if !ok {
+		t.Fatal("typed in indexes did not match timestamp column")
+	}
+	if want := []int{1, 3}; !reflect.DeepEqual(indexes, want) {
+		t.Fatalf("timestamp in indexes = %v, want %v", indexes, want)
+	}
+
+	encoded := NewEncodedSymbols([]Symbol{"AAPL", "MSFT", "AAPL", "NVDA"})
+	indexes, ok = typedKernels.InIndexes(encoded, []any{"MSFT", Symbol("AAPL")}, nil)
+	if !ok {
+		t.Fatal("typed in indexes did not match encoded symbol column")
+	}
+	if want := []int{0, 1, 2}; !reflect.DeepEqual(indexes, want) {
+		t.Fatalf("encoded symbol in indexes = %v, want %v", indexes, want)
+	}
+}
+
 func TestIndexedInRowsUsesAttributeIndexInRowOrder(t *testing.T) {
 	indexed := WithArrayAttribute(NewSymbols([]string{"AAPL", "MSFT", "AAPL", "NVDA", "MSFT"}), ArrayAttributeGrouped)
 	rows, ok := typedKernels.IndexedInRows(indexed, []any{"MSFT", Symbol("AAPL"), "MSFT"})

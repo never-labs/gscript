@@ -444,6 +444,104 @@ func (typedKernelRegistry) IndexedInRows(array Array, values []any) ([]int, bool
 	return rows, true
 }
 
+func (k typedKernelRegistry) InIndexes(array Array, values []any, out []int) ([]int, bool) {
+	switch a := array.(type) {
+	case attributedArray:
+		return k.InIndexes(a.array, values, out)
+	case encodedArray:
+		return encodedInIndexes(a, values, out)
+	case columnArray[bool]:
+		values = normalizeMembershipValues(array.Kind(), values)
+		set, ok := boolMembership(values)
+		return membershipBoolIndexes(a.data, set, ok, out)
+	case columnArray[int8]:
+		values = normalizeMembershipValues(array.Kind(), values)
+		set, ok := signedMembership[int8](values)
+		return membershipSignedIndexes(a.data, set, ok, out)
+	case columnArray[int16]:
+		values = normalizeMembershipValues(array.Kind(), values)
+		set, ok := signedMembership[int16](values)
+		return membershipSignedIndexes(a.data, set, ok, out)
+	case columnArray[int32]:
+		values = normalizeMembershipValues(array.Kind(), values)
+		set, ok := signedMembership[int32](values)
+		return membershipSignedIndexes(a.data, set, ok, out)
+	case columnArray[int64]:
+		values = normalizeMembershipValues(array.Kind(), values)
+		set, ok := int64Membership(values)
+		return membershipSignedIndexes(a.data, set, ok, out)
+	case columnArray[uint8]:
+		values = normalizeMembershipValues(array.Kind(), values)
+		set, ok := unsignedMembership[uint8](values)
+		return membershipUnsignedIndexes(a.data, set, ok, out)
+	case columnArray[uint16]:
+		values = normalizeMembershipValues(array.Kind(), values)
+		set, ok := unsignedMembership[uint16](values)
+		return membershipUnsignedIndexes(a.data, set, ok, out)
+	case columnArray[uint32]:
+		values = normalizeMembershipValues(array.Kind(), values)
+		set, ok := unsignedMembership[uint32](values)
+		return membershipUnsignedIndexes(a.data, set, ok, out)
+	case columnArray[uint64]:
+		values = normalizeMembershipValues(array.Kind(), values)
+		set, ok := unsignedMembership[uint64](values)
+		return membershipUnsignedIndexes(a.data, set, ok, out)
+	case columnArray[string]:
+		values = normalizeMembershipValues(array.Kind(), values)
+		set, ok := stringMembership(values)
+		return membershipStringIndexes(a.data, set, ok, out)
+	case columnArray[Symbol]:
+		values = normalizeMembershipValues(array.Kind(), values)
+		set, ok := symbolMembership(values)
+		return membershipSymbolIndexes(a.data, set, ok, out)
+	case columnArray[Month]:
+		values = normalizeMembershipValues(array.Kind(), values)
+		set, ok := exactMembership[Month](values)
+		return membershipSignedIndexes(a.data, set, ok, out)
+	case columnArray[Date]:
+		values = normalizeMembershipValues(array.Kind(), values)
+		set, ok := exactMembership[Date](values)
+		return membershipSignedIndexes(a.data, set, ok, out)
+	case columnArray[DateTime]:
+		values = normalizeMembershipValues(array.Kind(), values)
+		set, ok := exactMembership[DateTime](values)
+		return membershipSignedIndexes(a.data, set, ok, out)
+	case columnArray[Timespan]:
+		values = normalizeMembershipValues(array.Kind(), values)
+		set, ok := exactMembership[Timespan](values)
+		return membershipSignedIndexes(a.data, set, ok, out)
+	case columnArray[Minute]:
+		values = normalizeMembershipValues(array.Kind(), values)
+		set, ok := exactMembership[Minute](values)
+		return membershipSignedIndexes(a.data, set, ok, out)
+	case columnArray[Second]:
+		values = normalizeMembershipValues(array.Kind(), values)
+		set, ok := exactMembership[Second](values)
+		return membershipSignedIndexes(a.data, set, ok, out)
+	case columnArray[Time]:
+		values = normalizeMembershipValues(array.Kind(), values)
+		set, ok := exactMembership[Time](values)
+		return membershipSignedIndexes(a.data, set, ok, out)
+	case columnArray[Timestamp]:
+		values = normalizeMembershipValues(array.Kind(), values)
+		set, ok := exactMembership[Timestamp](values)
+		return membershipSignedIndexes(a.data, set, ok, out)
+	default:
+		return nil, false
+	}
+}
+
+func normalizeMembershipValues(kind Kind, values []any) []any {
+	if len(values) == 0 {
+		return values
+	}
+	out := make([]any, len(values))
+	for i, value := range values {
+		out[i] = normalizeScalar(kind, value)
+	}
+	return out
+}
+
 func (typedKernelRegistry) GroupCounts(index ArrayIndex) ([]int64, bool) {
 	counts := make([]int64, len(index.Rows))
 	for group, rows := range index.Rows {
@@ -2059,6 +2157,173 @@ func compareSymbolIndexes(values []Symbol, target Symbol, ok bool, op Op, out []
 	for i, v := range values {
 		if boolCompare(op, v == target, compareString(string(v), string(target))) {
 			out = append(out, i)
+		}
+	}
+	return out, true
+}
+
+func encodedInIndexes(array encodedArray, values []any, out []int) ([]int, bool) {
+	codes := make(map[int32]struct{}, len(values))
+	for _, value := range values {
+		code, ok := encodedComparableCode(array, value)
+		if !ok {
+			return nil, false
+		}
+		codes[code] = struct{}{}
+	}
+	out = out[:0]
+	for row, code := range array.codes {
+		if _, ok := codes[code]; ok {
+			out = append(out, row)
+		}
+	}
+	return out, true
+}
+
+func boolMembership(values []any) (map[bool]struct{}, bool) {
+	set := make(map[bool]struct{}, len(values))
+	for _, value := range values {
+		v, ok := value.(bool)
+		if !ok {
+			return nil, false
+		}
+		set[v] = struct{}{}
+	}
+	return set, true
+}
+
+func exactMembership[T comparable](values []any) (map[T]struct{}, bool) {
+	set := make(map[T]struct{}, len(values))
+	for _, value := range values {
+		v, ok := value.(T)
+		if !ok {
+			return nil, false
+		}
+		set[v] = struct{}{}
+	}
+	return set, true
+}
+
+func int64Membership(values []any) (map[int64]struct{}, bool) {
+	set := make(map[int64]struct{}, len(values))
+	for _, value := range values {
+		v, ok := coerceInt64Exact(value)
+		if !ok {
+			return nil, false
+		}
+		set[v] = struct{}{}
+	}
+	return set, true
+}
+
+func signedMembership[T signedScalar](values []any) (map[T]struct{}, bool) {
+	set := make(map[T]struct{}, len(values))
+	for _, value := range values {
+		v, ok := value.(T)
+		if !ok {
+			return nil, false
+		}
+		set[v] = struct{}{}
+	}
+	return set, true
+}
+
+func unsignedMembership[T unsignedScalar](values []any) (map[T]struct{}, bool) {
+	set := make(map[T]struct{}, len(values))
+	for _, value := range values {
+		v, ok := value.(T)
+		if !ok {
+			return nil, false
+		}
+		set[v] = struct{}{}
+	}
+	return set, true
+}
+
+func stringMembership(values []any) (map[string]struct{}, bool) {
+	set := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		v, ok := coerceComparableString(value)
+		if !ok {
+			return nil, false
+		}
+		set[v] = struct{}{}
+	}
+	return set, true
+}
+
+func symbolMembership(values []any) (map[Symbol]struct{}, bool) {
+	set := make(map[Symbol]struct{}, len(values))
+	for _, value := range values {
+		v, ok := coerceComparableSymbol(value)
+		if !ok {
+			return nil, false
+		}
+		set[v] = struct{}{}
+	}
+	return set, true
+}
+
+func membershipBoolIndexes(values []bool, set map[bool]struct{}, ok bool, out []int) ([]int, bool) {
+	if !ok {
+		return nil, false
+	}
+	out = out[:0]
+	for row, value := range values {
+		if _, matched := set[value]; matched {
+			out = append(out, row)
+		}
+	}
+	return out, true
+}
+
+func membershipSignedIndexes[T signedScalar](values []T, set map[T]struct{}, ok bool, out []int) ([]int, bool) {
+	if !ok {
+		return nil, false
+	}
+	out = out[:0]
+	for row, value := range values {
+		if _, matched := set[value]; matched {
+			out = append(out, row)
+		}
+	}
+	return out, true
+}
+
+func membershipUnsignedIndexes[T unsignedScalar](values []T, set map[T]struct{}, ok bool, out []int) ([]int, bool) {
+	if !ok {
+		return nil, false
+	}
+	out = out[:0]
+	for row, value := range values {
+		if _, matched := set[value]; matched {
+			out = append(out, row)
+		}
+	}
+	return out, true
+}
+
+func membershipStringIndexes(values []string, set map[string]struct{}, ok bool, out []int) ([]int, bool) {
+	if !ok {
+		return nil, false
+	}
+	out = out[:0]
+	for row, value := range values {
+		if _, matched := set[value]; matched {
+			out = append(out, row)
+		}
+	}
+	return out, true
+}
+
+func membershipSymbolIndexes(values []Symbol, set map[Symbol]struct{}, ok bool, out []int) ([]int, bool) {
+	if !ok {
+		return nil, false
+	}
+	out = out[:0]
+	for row, value := range values {
+		if _, matched := set[value]; matched {
+			out = append(out, row)
 		}
 	}
 	return out, true
