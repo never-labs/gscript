@@ -1072,6 +1072,23 @@ func TryTypedWhereMaskI64(mask Array) (Array, bool, error) {
 	}
 }
 
+// TryTypedCompareIndexesI64 returns q-style row indexes for a typed
+// array/scalar comparison without materializing an intermediate boolean mask.
+func TryTypedCompareIndexesI64(array Array, op Op, value any) (Array, bool, error) {
+	if array == nil {
+		return nil, true, fmt.Errorf("compare array is nil")
+	}
+	indexes, ok := typedKernels.CompareIndexes(array, op, value, nil)
+	if !ok {
+		return nil, false, nil
+	}
+	out := make([]int64, len(indexes))
+	for i, index := range indexes {
+		out[i] = int64(index)
+	}
+	return columnArray[int64]{kind: KindI64, data: out}, true, nil
+}
+
 func EqualMask(array Array, value any) (Array, error) {
 	return compareMask(array, OpEQ, value)
 }

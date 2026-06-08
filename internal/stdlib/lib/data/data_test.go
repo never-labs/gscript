@@ -52,6 +52,33 @@ func TestTryTypedWhereMaskI64(t *testing.T) {
 	}
 }
 
+func TestTryTypedCompareIndexesI64(t *testing.T) {
+	got, handled, err := TryTypedCompareIndexesI64(NewI64Range(0, 1, 6), OpGE, int64(3))
+	if err != nil {
+		t.Fatalf("TryTypedCompareIndexesI64 range returned error: %v", err)
+	}
+	if !handled {
+		t.Fatal("TryTypedCompareIndexesI64 range did not handle typed compare")
+	}
+	if got.Kind() != KindI64 {
+		t.Fatalf("TryTypedCompareIndexesI64 kind = %s, want %s", got.Kind(), KindI64)
+	}
+	if values := got.Values(); !reflect.DeepEqual(values, []any{int64(3), int64(4), int64(5)}) {
+		t.Fatalf("TryTypedCompareIndexesI64 range values = %#v", values)
+	}
+
+	got, handled, err = TryTypedCompareIndexesI64(NewSymbols([]string{"AAPL", "MSFT", "NVDA"}), OpLT, "NVDA")
+	if err != nil {
+		t.Fatalf("TryTypedCompareIndexesI64 symbols returned error: %v", err)
+	}
+	if !handled {
+		t.Fatal("TryTypedCompareIndexesI64 symbols did not handle typed compare")
+	}
+	if values := got.Values(); !reflect.DeepEqual(values, []any{int64(0), int64(1)}) {
+		t.Fatalf("TryTypedCompareIndexesI64 symbol values = %#v", values)
+	}
+}
+
 func TestNewI64RangeArraySemantics(t *testing.T) {
 	values := NewI64Range(10, 2, 5)
 	if values.Kind() != KindI64 {

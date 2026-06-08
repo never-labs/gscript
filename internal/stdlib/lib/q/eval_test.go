@@ -1845,13 +1845,21 @@ func TestEvalWhereRecordsTypedRuntimeKernel(t *testing.T) {
 	t.Cleanup(ClearRuntimeKernelExecutionStats)
 
 	assertEvalArray(t, "where 10 20 30>=20", data.KindI64, []any{int64(1), int64(2)})
+	assertEvalArray(t, "where true false true", data.KindI64, []any{int64(0), int64(2)})
 
+	seenWhereCompare := false
+	seenWhereMask := false
 	for _, stat := range RuntimeKernelExecutionStats() {
+		if stat.Kernel == "ArrayWhereCompare" && stat.Shape == "compare-to-index/>=/i64/i64" && stat.Outcome == "hit" && stat.ReasonCode == "typed_kernel" && stat.Count > 0 {
+			seenWhereCompare = true
+		}
 		if stat.Kernel == "ArrayWhere" && stat.Shape == "mask-to-index/i64" && stat.Outcome == "hit" && stat.ReasonCode == "typed_kernel" && stat.Count > 0 {
-			return
+			seenWhereMask = true
 		}
 	}
-	t.Fatalf("missing ArrayWhere typed runtime stat: %#v", RuntimeKernelExecutionStats())
+	if !seenWhereCompare || !seenWhereMask {
+		t.Fatalf("missing where typed runtime stats: compare=%v mask=%v stats=%#v", seenWhereCompare, seenWhereMask, RuntimeKernelExecutionStats())
+	}
 }
 
 func TestEvalVectorArithmeticRecordsTypedRuntimeKernel(t *testing.T) {

@@ -685,7 +685,13 @@ func (s *EvalState) eval(src string) (any, error) {
 		{"any ", anyValue},
 	} {
 		if strings.HasPrefix(src, prefix.word) {
-			v, err := s.eval(strings.TrimSpace(src[len(prefix.word):]))
+			arg := strings.TrimSpace(src[len(prefix.word):])
+			if prefix.word == "where " {
+				if out, ok, err := s.evalWhereCompare(arg); ok || err != nil {
+					return out, err
+				}
+			}
+			v, err := s.eval(arg)
 			if err != nil {
 				return nil, err
 			}
@@ -8114,6 +8120,94 @@ func where(v any) (any, error) {
 		}
 	}
 	return data.NewI64(out), nil
+}
+
+func (s *EvalState) evalWhereCompare(src string) (any, bool, error) {
+	leftExpr, rightExpr, op, ok := splitWhereCompareExpr(src)
+	if !ok {
+		return nil, false, nil
+	}
+	left, err := s.eval(leftExpr)
+	if err != nil {
+		return nil, true, err
+	}
+	right, err := s.eval(rightExpr)
+	if err != nil {
+		return nil, true, err
+	}
+	array, scalar, dataOp, ok := qWhereCompareOperands(left, right, op)
+	if !ok {
+		return nil, false, nil
+	}
+	shape := "compare-to-index/" + op + "/" + string(array.Kind()) + "/" + string(qRuntimeKernelOperandKind(scalar, nil))
+	out, handled, err := data.TryTypedCompareIndexesI64(array, dataOp, scalar)
+	recordRuntimeKernelProbe("ArrayWhereCompare", shape, handled, err)
+	if err != nil {
+		return nil, true, err
+	}
+	if !handled {
+		return nil, false, nil
+	}
+	return out, true, nil
+}
+
+func splitWhereCompareExpr(src string) (string, string, string, bool) {
+	for _, op := range []string{"<>", "<=", ">=", "=", "<", ">"} {
+		if left, right, ok := splitTopLevelOperator(src, op); ok {
+			return left, right, op, true
+		}
+	}
+	return "", "", "", false
+}
+
+func qWhereCompareOperands(left, right any, op string) (data.Array, any, data.Op, bool) {
+	if array, ok := left.(data.Array); ok {
+		if _, rightIsArray := right.(data.Array); rightIsArray {
+			return nil, nil, "", false
+		}
+		dataOp, ok := qDataCompareOpString(op)
+		return array, right, dataOp, ok
+	}
+	array, ok := right.(data.Array)
+	if !ok {
+		return nil, nil, "", false
+	}
+	dataOp, ok := qDataCompareOpString(qReverseCompareOpString(op))
+	return array, left, dataOp, ok
+}
+
+func qDataCompareOpString(op string) (data.Op, bool) {
+	switch op {
+	case "=":
+		return data.OpEQ, true
+	case "<>":
+		return data.OpNE, true
+	case "<":
+		return data.OpLT, true
+	case "<=":
+		return data.OpLE, true
+	case ">":
+		return data.OpGT, true
+	case ">=":
+		return data.OpGE, true
+	default:
+		return "", false
+	}
+}
+
+func qReverseCompareOpString(op string) string {
+	switch op {
+	case "<":
+		return ">"
+	case "<=":
+		return ">="
+	case ">":
+		return "<"
+	case ">=":
+		return "<="
+	default:
+		return op
+	}
 }
 
 func notValue(v any) (any, error) {
