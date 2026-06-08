@@ -752,16 +752,13 @@ func (v Value) NativeFrameProject(names []string) (Value, bool, error) {
 	if err != nil || !handled {
 		return NilValue(), handled, err
 	}
+	projectedCols, err := nativeFrameProjectColumns("FRAME_PROJECT", frame, names)
+	if err != nil {
+		return NilValue(), true, err
+	}
 	cols := make(map[string]*DenseArray, len(names))
-	for _, name := range names {
-		if name == "" {
-			return NilValue(), true, fmt.Errorf("FRAME_PROJECT column name must not be empty")
-		}
-		col, ok := frame.Column(name)
-		if !ok {
-			return NilValue(), true, fmt.Errorf("FRAME_PROJECT unknown column %q", name)
-		}
-		cols[name] = col
+	for i, name := range names {
+		cols[name] = projectedCols[i]
 	}
 	out, err := NewSoA(cols)
 	if err != nil {
@@ -817,26 +814,31 @@ func (v Value) nativeFrameProjectedColumn(op string, names []string, resultName 
 	if err != nil || !handled {
 		return nil, nil, handled, err
 	}
-	found := false
-	for _, name := range names {
-		if name == "" {
-			return nil, nil, true, fmt.Errorf("%s column name must not be empty", op)
-		}
-		if _, ok := frame.Column(name); !ok {
-			return nil, nil, true, fmt.Errorf("%s unknown column %q", op, name)
-		}
+	projectedCols, err := nativeFrameProjectColumns(op, frame, names)
+	if err != nil {
+		return nil, nil, true, err
+	}
+	for i, name := range names {
 		if name == resultName {
-			found = true
+			return frame, projectedCols[i], true, nil
 		}
 	}
-	if !found {
-		return nil, nil, true, fmt.Errorf("%s result column %q is not projected", op, resultName)
+	return nil, nil, true, fmt.Errorf("%s result column %q is not projected", op, resultName)
+}
+
+func nativeFrameProjectColumns(op string, frame *SoA, names []string) ([]*DenseArray, error) {
+	cols := make([]*DenseArray, len(names))
+	for i, name := range names {
+		if name == "" {
+			return nil, fmt.Errorf("%s column name must not be empty", op)
+		}
+		col, ok := frame.Column(name)
+		if !ok {
+			return nil, fmt.Errorf("%s unknown column %q", op, name)
+		}
+		cols[i] = col
 	}
-	col, ok := frame.Column(resultName)
-	if !ok {
-		return nil, nil, true, fmt.Errorf("%s unknown column %q", op, resultName)
-	}
-	return frame, col, true, nil
+	return cols, nil
 }
 
 // NativeFrameFilterProject filters a native frame and returns a projected frame
@@ -852,15 +854,13 @@ func (v Value) NativeFrameFilterProject(mask *DenseArray, names []string) (Value
 	if err != nil || !handled {
 		return NilValue(), handled, err
 	}
+	projectedCols, err := nativeFrameProjectColumns("FRAME_FILTER_PROJECT", frame, names)
+	if err != nil {
+		return NilValue(), true, err
+	}
 	cols := make(map[string]*DenseArray, len(names))
-	for _, name := range names {
-		if name == "" {
-			return NilValue(), true, fmt.Errorf("FRAME_FILTER_PROJECT column name must not be empty")
-		}
-		col, ok := frame.Column(name)
-		if !ok {
-			return NilValue(), true, fmt.Errorf("FRAME_FILTER_PROJECT unknown column %q", name)
-		}
+	for i, name := range names {
+		col := projectedCols[i]
 		filtered, err := col.Filter(mask)
 		if err != nil {
 			return NilValue(), true, err

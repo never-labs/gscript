@@ -257,6 +257,12 @@ func TestNativeFrameProjectedColumnValidationKeepsPrimitiveNames(t *testing.T) {
 	if _, handled, err := TableValue(frame).NativeFrameFilterProjectColumn(NewDenseArrayBool([]bool{true, false, true}), []string{"price"}, "size"); !handled || err == nil || err.Error() != `FRAME_FILTER_PROJECT_COLUMN result column "size" is not projected` {
 		t.Fatalf("NativeFrameFilterProjectColumn validation handled=%v err=%v, want filter-project-column prefix", handled, err)
 	}
+	if _, handled, err := TableValue(frame).NativeFrameProject([]string{"missing"}); !handled || err == nil || err.Error() != `FRAME_PROJECT unknown column "missing"` {
+		t.Fatalf("NativeFrameProject validation handled=%v err=%v, want project prefix", handled, err)
+	}
+	if _, handled, err := TableValue(frame).NativeFrameFilterProject(NewDenseArrayBool([]bool{true, false, true}), []string{"missing"}); !handled || err == nil || err.Error() != `FRAME_FILTER_PROJECT unknown column "missing"` {
+		t.Fatalf("NativeFrameFilterProject validation handled=%v err=%v, want filter-project prefix", handled, err)
+	}
 }
 
 func TestNativeFrameFilterProjectFiltersProjectedFrame(t *testing.T) {
