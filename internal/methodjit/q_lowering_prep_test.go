@@ -694,6 +694,78 @@ func TestQFramePrimitiveHotPathLowersToTypedRuntimeKernel(t *testing.T) {
 	}
 }
 
+func TestQFramePrimitiveSharedPredicateStillLowersToTypedRuntimeKernel(t *testing.T) {
+	names := runtime.NewTable()
+	names.RawSetInt(1, runtime.StringValue("size"))
+	proto := &vm.FuncProto{
+		Name:      "q_frame_shared_predicate_lowered",
+		NumParams: 1,
+		MaxStack:  5,
+		Constants: []runtime.Value{
+			runtime.StringValue("price"),
+			runtime.FloatValue(100),
+			runtime.TableValue(names),
+			runtime.StringValue("size"),
+			runtime.IntValue(0),
+		},
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_FRAME_COLUMN, 1, 0, 0),
+			vm.EncodeABx(vm.OP_LOADK, 2, 1),
+			vm.EncodeABC(vm.OP_VECTOR_COMPARE, 1, 2, int(runtime.DenseArrayGE)),
+			vm.EncodeABC(vm.OP_FRAME_FILTER, 2, 0, 1),
+			vm.EncodeABC(vm.OP_FRAME_PROJECT, 2, 2, 2),
+			vm.EncodeABC(vm.OP_FRAME_COLUMN, 2, 2, 3),
+			vm.EncodeABC(vm.OP_FRAME_COLUMN, 3, 0, 3),
+			vm.EncodeABx(vm.OP_LOADK, 4, 4),
+			vm.EncodeABC(vm.OP_VECTOR_WHERE, 1, 3, 4),
+			vm.EncodeABC(vm.OP_RETURN, 1, 3, 0),
+		},
+	}
+
+	fn := BuildGraph(proto)
+	fn.Remarks = &OptimizationRemarks{}
+	lowered, err := QQueryNativeLoweringPass(fn)
+	if err != nil {
+		t.Fatalf("QQueryNativeLoweringPass: %v", err)
+	}
+	counts := map[Op]int{}
+	for _, block := range lowered.Blocks {
+		for _, instr := range block.Instrs {
+			counts[instr.Op]++
+		}
+	}
+	if counts[OpQFrameSelectColumn] != 1 {
+		t.Fatalf("OpQFrameSelectColumn count = %d, want 1 for shared predicate path\n%s", counts[OpQFrameSelectColumn], Print(lowered))
+	}
+	if counts[OpVectorWhere] != 1 || counts[OpVectorCompare] != 1 {
+		t.Fatalf("shared predicate vector ops = compare %d where %d, want 1/1\n%s", counts[OpVectorCompare], counts[OpVectorWhere], Print(lowered))
+	}
+	for _, op := range []Op{OpFrameFilter, OpFrameProject} {
+		if counts[op] != 0 {
+			t.Fatalf("%s count = %d, want 0 after shared predicate lowering\n%s", op, counts[op], Print(lowered))
+		}
+	}
+	if fallbacks := CountQQueryLoweringFallbackReasons(fn.Remarks.List()); len(fallbacks) != 0 {
+		t.Fatalf("q lowering fallback counts = %+v, want none for shared predicate path", fallbacks)
+	}
+
+	result, err := Interpret(lowered, []runtime.Value{runtime.TableValue(qHotPathTestFrame(t))})
+	if err != nil {
+		t.Fatalf("Interpret lowered shared predicate q hot path: %v", err)
+	}
+	if len(result) != 2 || !result[0].IsDenseArray() || !result[1].IsDenseArray() {
+		t.Fatalf("shared predicate result = %#v, want two dense arrays", result)
+	}
+	whereVals, ok := result[0].DenseArray().I64()
+	if !ok || len(whereVals) != 3 || whereVals[0] != 0 || whereVals[1] != 10 || whereVals[2] != 20 {
+		t.Fatalf("shared predicate vector where values = %#v, want [0 10 20]", whereVals)
+	}
+	selectVals, ok := result[1].DenseArray().I64()
+	if !ok || len(selectVals) != 2 || selectVals[0] != 10 || selectVals[1] != 20 {
+		t.Fatalf("shared predicate q select values = %#v, want [10 20]", selectVals)
+	}
+}
+
 func TestQFramePrimitiveHotPathLoweringReportsFallbackReason(t *testing.T) {
 	proto := &vm.FuncProto{
 		Name:      "q_frame_pipeline_lowering_fallback",

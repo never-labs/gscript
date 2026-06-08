@@ -482,10 +482,7 @@ func QQueryNativeLoweringPass(fn *Function) (*Function, error) {
 		result.Args = args
 		result.Aux = int64(specIdx)
 		result.Aux2 = 0
-		qQueryNop(path.SourceColumn)
-		qQueryNop(path.Compare)
-		qQueryNop(path.Mask)
-		qQueryNopMaskTree(path.MaskCombine)
+		qQueryNopPredicateIfSingleUse(path, uses)
 		qQueryNop(path.Filter)
 		qQueryNop(path.RowOrder)
 		qQueryNop(path.RowGather)
@@ -536,13 +533,10 @@ func qQueryValueUseCounts(fn *Function) map[int]int {
 }
 
 func qQueryHotPathSingleUse(path QQueryHotPath, uses map[int]int) bool {
-	for _, instr := range []*Instr{path.SourceColumn, path.Compare, path.Mask, path.MaskCombine, path.RowOrder, path.RowGather, path.RowSlice, path.Project} {
+	for _, instr := range []*Instr{path.RowOrder, path.RowGather, path.RowSlice, path.Project} {
 		if instr != nil && uses[instr.ID] != 1 {
 			return false
 		}
-	}
-	if path.MaskCombine != nil && !qQueryMaskTreeSingleUse(path.MaskCombine, uses) {
-		return false
 	}
 	filterUses := 1
 	if path.RowOrder != nil && path.RowGather != nil {
@@ -550,37 +544,6 @@ func qQueryHotPathSingleUse(path QQueryHotPath, uses map[int]int) bool {
 	}
 	if path.Filter != nil && uses[path.Filter.ID] != filterUses {
 		return false
-	}
-	return true
-}
-
-func qQueryMaskTreeSingleUse(instr *Instr, uses map[int]int) bool {
-	if instr == nil {
-		return true
-	}
-	for _, arg := range instr.Args {
-		child := valueDef(arg, OpFrameMask)
-		if child == nil {
-			child = valueDef(arg, OpVectorCompare)
-		}
-		if child == nil {
-			child = valueDef(arg, OpVectorMask)
-		}
-		if child == nil {
-			continue
-		}
-		if uses[child.ID] != 1 {
-			return false
-		}
-		if child.Op == OpVectorCompare {
-			sourceColumn := qQueryCompareColumn(child)
-			if sourceColumn != nil && uses[sourceColumn.ID] != 1 {
-				return false
-			}
-		}
-		if child.Op == OpVectorMask && !qQueryMaskTreeSingleUse(child, uses) {
-			return false
-		}
 	}
 	return true
 }
@@ -902,25 +865,50 @@ func qQueryNop(instr *Instr) {
 	instr.Aux2 = 0
 }
 
-func qQueryNopMaskTree(instr *Instr) {
-	if instr == nil {
+func qQueryNopPredicateIfSingleUse(path QQueryHotPath, uses map[int]int) {
+	switch {
+	case path.Compare != nil:
+		qQueryNopCompareIfSingleUse(path.Compare, uses)
+	case path.Mask != nil:
+		qQueryNopIfSingleUse(path.Mask, uses)
+	case path.MaskCombine != nil:
+		qQueryNopMaskTreeIfSingleUse(path.MaskCombine, uses)
+	}
+}
+
+func qQueryNopMaskTreeIfSingleUse(instr *Instr, uses map[int]int) {
+	if instr == nil || uses[instr.ID] != 1 {
 		return
 	}
-	for _, arg := range instr.Args {
+	args := append([]*Value(nil), instr.Args...)
+	for _, arg := range args {
 		if child := valueDef(arg, OpVectorMask); child != nil {
-			qQueryNopMaskTree(child)
+			qQueryNopMaskTreeIfSingleUse(child, uses)
 			continue
 		}
 		if child := valueDef(arg, OpVectorCompare); child != nil {
-			qQueryNop(qQueryCompareColumn(child))
-			qQueryNop(child)
+			qQueryNopCompareIfSingleUse(child, uses)
 			continue
 		}
 		if child := valueDef(arg, OpFrameMask); child != nil {
-			qQueryNop(child)
+			qQueryNopIfSingleUse(child, uses)
 		}
 	}
 	qQueryNop(instr)
+}
+
+func qQueryNopCompareIfSingleUse(compare *Instr, uses map[int]int) {
+	if compare == nil || uses[compare.ID] != 1 {
+		return
+	}
+	qQueryNopIfSingleUse(qQueryCompareColumn(compare), uses)
+	qQueryNop(compare)
+}
+
+func qQueryNopIfSingleUse(instr *Instr, uses map[int]int) {
+	if instr != nil && uses[instr.ID] == 1 {
+		qQueryNop(instr)
+	}
 }
 
 func formatQQueryHotPaths(paths []QQueryHotPath) string {
