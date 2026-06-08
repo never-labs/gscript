@@ -16,6 +16,7 @@ const (
 	DenseArrayF64 DenseArrayDType = iota
 	DenseArrayI64
 	DenseArrayBool
+	DenseArrayString
 )
 
 func (dt DenseArrayDType) String() string {
@@ -26,6 +27,8 @@ func (dt DenseArrayDType) String() string {
 		return "i64"
 	case DenseArrayBool:
 		return "bool"
+	case DenseArrayString:
+		return "string"
 	default:
 		return "unknown"
 	}
@@ -39,6 +42,7 @@ type DenseArray struct {
 	f64     []float64
 	i64     []int64
 	bools   []bool
+	strings []string
 }
 
 func NewDenseArrayF64(values []float64) *DenseArray {
@@ -65,6 +69,14 @@ func NewDenseArrayBool(values []bool) *DenseArray {
 	return a
 }
 
+func NewDenseArrayString(values []string) *DenseArray {
+	a := &DenseArray{dtype: DenseArrayString}
+	if len(values) > 0 {
+		a.strings = append([]string(nil), values...)
+	}
+	return a
+}
+
 func NewDenseArrayOfLen(dtype DenseArrayDType, n int) (*DenseArray, error) {
 	if n < 0 {
 		return nil, fmt.Errorf("dense array length must be non-negative")
@@ -76,6 +88,8 @@ func NewDenseArrayOfLen(dtype DenseArrayDType, n int) (*DenseArray, error) {
 		return &DenseArray{dtype: dtype, i64: make([]int64, n)}, nil
 	case DenseArrayBool:
 		return &DenseArray{dtype: dtype, bools: make([]bool, n)}, nil
+	case DenseArrayString:
+		return &DenseArray{dtype: dtype, strings: make([]string, n)}, nil
 	default:
 		return nil, ErrDenseArrayDType
 	}
@@ -140,6 +154,8 @@ func (a *DenseArray) Len() int {
 		return len(a.i64)
 	case DenseArrayBool:
 		return len(a.bools)
+	case DenseArrayString:
+		return len(a.strings)
 	default:
 		return 0
 	}
@@ -166,6 +182,13 @@ func (a *DenseArray) Bool() ([]bool, bool) {
 	return a.bools, true
 }
 
+func (a *DenseArray) StringValues() ([]string, bool) {
+	if a == nil || a.dtype != DenseArrayString {
+		return nil, false
+	}
+	return a.strings, true
+}
+
 func (a *DenseArray) Clone() (*DenseArray, error) {
 	if a == nil {
 		return nil, ErrDenseArrayOperand
@@ -177,6 +200,8 @@ func (a *DenseArray) Clone() (*DenseArray, error) {
 		return NewDenseArrayI64(a.i64), nil
 	case DenseArrayBool:
 		return NewDenseArrayBool(a.bools), nil
+	case DenseArrayString:
+		return NewDenseArrayString(a.strings), nil
 	default:
 		return nil, ErrDenseArrayDType
 	}
@@ -199,6 +224,8 @@ func (a *DenseArray) Resize(n int) error {
 		a.i64 = denseArrayResize(a.i64, n)
 	case DenseArrayBool:
 		a.bools = denseArrayResize(a.bools, n)
+	case DenseArrayString:
+		a.strings = denseArrayResize(a.strings, n)
 	default:
 		return ErrDenseArrayDType
 	}
@@ -235,6 +262,11 @@ func (a *DenseArray) Append(v Value) error {
 			return fmt.Errorf("dense array bool value must be boolean")
 		}
 		a.bools = append(a.bools, v.Bool())
+	case DenseArrayString:
+		if !v.IsString() {
+			return fmt.Errorf("dense array string value must be string")
+		}
+		a.strings = append(a.strings, v.Str())
 	default:
 		return ErrDenseArrayDType
 	}
@@ -258,6 +290,10 @@ func (a *DenseArray) CanAppend(v Value) error {
 	case DenseArrayBool:
 		if !v.IsBool() {
 			return fmt.Errorf("dense array bool value must be boolean")
+		}
+	case DenseArrayString:
+		if !v.IsString() {
+			return fmt.Errorf("dense array string value must be string")
 		}
 	default:
 		return ErrDenseArrayDType
@@ -284,6 +320,11 @@ func (a *DenseArray) Fill(v Value) error {
 		x := v.Bool()
 		for i := range a.bools {
 			a.bools[i] = x
+		}
+	case DenseArrayString:
+		x := v.Str()
+		for i := range a.strings {
+			a.strings[i] = x
 		}
 	default:
 		return ErrDenseArrayDType
@@ -325,6 +366,13 @@ func (a *DenseArray) FillWhere(mask *DenseArray, v Value) error {
 		for i, keep := range mask.bools {
 			if keep {
 				a.bools[i] = x
+			}
+		}
+	case DenseArrayString:
+		x := v.Str()
+		for i, keep := range mask.bools {
+			if keep {
+				a.strings[i] = x
 			}
 		}
 	default:
@@ -1084,6 +1132,8 @@ func (a *DenseArray) Slice(start, end int) (*DenseArray, error) {
 		return NewDenseArrayI64(a.i64[start:end]), nil
 	case DenseArrayBool:
 		return NewDenseArrayBool(a.bools[start:end]), nil
+	case DenseArrayString:
+		return NewDenseArrayString(a.strings[start:end]), nil
 	default:
 		return nil, ErrDenseArrayDType
 	}
@@ -1137,6 +1187,16 @@ func (a *DenseArray) filterKnownCount(mask *DenseArray, count int) (*DenseArray,
 			}
 		}
 		return &DenseArray{dtype: DenseArrayBool, bools: out}, nil
+	case DenseArrayString:
+		out := make([]string, count)
+		j := 0
+		for i, keep := range mask.bools {
+			if keep {
+				out[j] = a.strings[i]
+				j++
+			}
+		}
+		return &DenseArray{dtype: DenseArrayString, strings: out}, nil
 	default:
 		return nil, ErrDenseArrayDType
 	}
@@ -1178,6 +1238,12 @@ func (a *DenseArray) gatherValidatedI64(indices []int64) (*DenseArray, error) {
 			out[i] = a.bools[index-1]
 		}
 		return &DenseArray{dtype: DenseArrayBool, bools: out}, nil
+	case DenseArrayString:
+		out := make([]string, len(indices))
+		for i, index := range indices {
+			out[i] = a.strings[index-1]
+		}
+		return &DenseArray{dtype: DenseArrayString, strings: out}, nil
 	default:
 		return nil, ErrDenseArrayDType
 	}
@@ -1686,6 +1752,8 @@ func (a *DenseArray) At(i int) (Value, error) {
 		return IntValue(a.i64[i]), nil
 	case DenseArrayBool:
 		return BoolValue(a.bools[i]), nil
+	case DenseArrayString:
+		return StringValue(a.strings[i]), nil
 	default:
 		return NilValue(), ErrDenseArrayDType
 	}
@@ -1714,6 +1782,11 @@ func (a *DenseArray) Set(i int, v Value) error {
 			return fmt.Errorf("dense array bool value must be boolean")
 		}
 		a.bools[i] = v.Bool()
+	case DenseArrayString:
+		if !v.IsString() {
+			return fmt.Errorf("dense array string value must be string")
+		}
+		a.strings[i] = v.Str()
 	default:
 		return ErrDenseArrayDType
 	}
@@ -1740,6 +1813,8 @@ func (a *DenseArray) String() string {
 			b.WriteString(strconv.FormatInt(a.i64[i], 10))
 		case DenseArrayBool:
 			b.WriteString(strconv.FormatBool(a.bools[i]))
+		case DenseArrayString:
+			b.WriteString(strconv.Quote(a.strings[i]))
 		default:
 			b.WriteString("?")
 		}

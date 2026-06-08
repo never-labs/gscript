@@ -6237,6 +6237,16 @@ func qDenseArrayToDataArray(array *DenseArray) (data.Array, error) {
 			xs[i] = v.Bool()
 		}
 		return data.NewBool(xs), nil
+	case DenseArrayString:
+		xs := make([]string, array.Len())
+		for i := range xs {
+			v, err := array.At(i)
+			if err != nil || !v.IsString() {
+				return nil, fmt.Errorf("string array row %d is not string", i)
+			}
+			xs[i] = v.Str()
+		}
+		return data.NewString(xs), nil
 	default:
 		return nil, fmt.Errorf("unsupported dense array dtype %s", array.DType())
 	}
@@ -7140,6 +7150,16 @@ func qDataArrayFromDense(col *DenseArray) (data.Array, error) {
 			xs[i] = v.Bool()
 		}
 		return data.NewBool(xs), nil
+	case DenseArrayString:
+		xs := make([]string, col.Len())
+		for i := range xs {
+			v, err := col.At(i)
+			if err != nil {
+				return nil, err
+			}
+			xs[i] = v.Str()
+		}
+		return data.NewString(xs), nil
 	default:
 		return nil, fmt.Errorf("unsupported dense array type %s", col.DType())
 	}

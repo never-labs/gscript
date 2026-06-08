@@ -33,10 +33,13 @@ func TestDenseArrayValueBasics(t *testing.T) {
 func TestDenseArrayConstructorsCopyInput(t *testing.T) {
 	ints := []int64{1, 2, 3}
 	bools := []bool{true, false}
+	strings := []string{"AAPL", "MSFT"}
 	ia := NewDenseArrayI64(ints)
 	ba := NewDenseArrayBool(bools)
+	sa := NewDenseArrayString(strings)
 	ints[0] = 99
 	bools[0] = false
+	strings[0] = "NVDA"
 
 	gotInts, ok := ia.I64()
 	if !ok || !reflect.DeepEqual(gotInts, []int64{1, 2, 3}) {
@@ -45,6 +48,45 @@ func TestDenseArrayConstructorsCopyInput(t *testing.T) {
 	gotBools, ok := ba.Bool()
 	if !ok || !reflect.DeepEqual(gotBools, []bool{true, false}) {
 		t.Fatalf("Bool() = %v/%v", gotBools, ok)
+	}
+	gotStrings, ok := sa.StringValues()
+	if !ok || !reflect.DeepEqual(gotStrings, []string{"AAPL", "MSFT"}) {
+		t.Fatalf("StringValues() = %v/%v", gotStrings, ok)
+	}
+}
+
+func TestDenseArrayStringBasicOperations(t *testing.T) {
+	arr := NewDenseArrayString([]string{"AAPL", "MSFT", "NVDA"})
+	if arr.DType() != DenseArrayString || arr.Len() != 3 {
+		t.Fatalf("dtype/len = %s/%d, want string/3", arr.DType(), arr.Len())
+	}
+	if got := arr.String(); got != `array<string>["AAPL", "MSFT", "NVDA"]` {
+		t.Fatalf("String() = %q", got)
+	}
+	if v, err := arr.At(2); err != nil || !v.IsString() || v.Str() != "NVDA" {
+		t.Fatalf("At(2) = %#v, %v", v, err)
+	}
+	if err := arr.Set(1, StringValue("IBM")); err != nil {
+		t.Fatalf("Set string: %v", err)
+	}
+	if err := arr.Append(StringValue("ORCL")); err != nil {
+		t.Fatalf("Append string: %v", err)
+	}
+	gathered, err := arr.Gather(NewDenseArrayI64([]int64{4, 2}))
+	if err != nil {
+		t.Fatalf("Gather string: %v", err)
+	}
+	got, ok := gathered.StringValues()
+	if !ok || !reflect.DeepEqual(got, []string{"ORCL", "IBM"}) {
+		t.Fatalf("gathered strings = %#v/%v", got, ok)
+	}
+	filtered, err := arr.Filter(NewDenseArrayBool([]bool{true, false, true, false}))
+	if err != nil {
+		t.Fatalf("Filter string: %v", err)
+	}
+	got, ok = filtered.StringValues()
+	if !ok || !reflect.DeepEqual(got, []string{"AAPL", "NVDA"}) {
+		t.Fatalf("filtered strings = %#v/%v", got, ok)
 	}
 }
 

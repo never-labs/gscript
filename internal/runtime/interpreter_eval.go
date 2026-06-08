@@ -1068,6 +1068,8 @@ func denseDTypeFromLiteral(dtype string) (DenseArrayDType, error) {
 		return DenseArrayI64, nil
 	case "bool":
 		return DenseArrayBool, nil
+	case "string", "str":
+		return DenseArrayString, nil
 	default:
 		return 0, fmt.Errorf("unsupported dense literal dtype %q", dtype)
 	}

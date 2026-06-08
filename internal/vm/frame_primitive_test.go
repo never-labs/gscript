@@ -781,6 +781,33 @@ func TestFrameGroupAggregatePrimitiveMinMaxAvg(t *testing.T) {
 	assertF64Column(t, out, "avg_qty", []float64{22.0 / 3.0, 3})
 }
 
+func TestFrameGroupAggregatePrimitiveStringKey(t *testing.T) {
+	frame := frameGroupAggregateTestFrame(t)
+	spec := frameGroupAggregateSpec("sym", []runtime.FrameAggregateSpec{
+		{Name: "n", Op: "count"},
+		{Name: "total", Op: "sum", Column: "qty"},
+	})
+	proto := &FuncProto{
+		MaxStack: 2,
+		Code: []uint32{
+			EncodeABx(OP_LOADK, 0, 0),
+			EncodeABC(OP_LOADNIL, 1, 0, 0),
+			EncodeABC(OP_FRAME_GROUP_AGGREGATE, 1, 0, 1),
+			EncodeABC(OP_RETURN, 1, 2, 0),
+		},
+		Constants: []runtime.Value{runtime.TableValue(frame), runtime.TableValue(spec)},
+	}
+
+	results, err := New(map[string]runtime.Value{}).Execute(proto)
+	if err != nil {
+		t.Fatalf("Execute FRAME_GROUP_AGGREGATE string key: %v", err)
+	}
+	out := frameGroupAggregateResultSoA(t, results)
+	assertStringColumn(t, out, "sym", []string{"AAPL", "MSFT"})
+	assertI64Column(t, out, "n", []int64{3, 1})
+	assertI64Column(t, out, "total", []int64{20, 5})
+}
+
 func TestFrameGroupAggregatePrimitiveRejectsUnsupportedSumColumn(t *testing.T) {
 	frame := frameGroupAggregateTestFrame(t)
 	spec := frameGroupAggregateSpec("", []runtime.FrameAggregateSpec{
@@ -891,6 +918,7 @@ func frameGroupAggregateTestFrame(t *testing.T) *runtime.Table {
 	t.Helper()
 	soa, err := runtime.NewSoA(map[string]*runtime.DenseArray{
 		"acct":   runtime.NewDenseArrayI64([]int64{1, 1, 2, 1}),
+		"sym":    runtime.NewDenseArrayString([]string{"AAPL", "MSFT", "AAPL", "AAPL"}),
 		"qty":    runtime.NewDenseArrayI64([]int64{10, 5, 3, 7}),
 		"amount": runtime.NewDenseArrayF64([]float64{10, 5, 3.5, 7.5}),
 		"flag":   runtime.NewDenseArrayBool([]bool{true, false, true, true}),
@@ -902,7 +930,7 @@ func frameGroupAggregateTestFrame(t *testing.T) *runtime.Table {
 	frame.SetNativePayloadWithInfo(soa, runtime.NativePayloadInfo{
 		Kind:       runtime.NativePayloadDataFrame,
 		Rows:       soa.Len(),
-		Columns:    4,
+		Columns:    5,
 		SchemaHash: "frame-group-aggregate-test",
 	})
 	return frame
@@ -1016,6 +1044,26 @@ func assertBoolColumn(t *testing.T, soa *runtime.SoA, name string, want []bool) 
 	for i := range want {
 		if got[i] != want[i] {
 			t.Fatalf("column %q[%d] = %v, want %v", name, i, got[i], want[i])
+		}
+	}
+}
+
+func assertStringColumn(t *testing.T, soa *runtime.SoA, name string, want []string) {
+	t.Helper()
+	col, ok := soa.Column(name)
+	if !ok {
+		t.Fatalf("missing string column %q", name)
+	}
+	got, ok := col.StringValues()
+	if !ok {
+		t.Fatalf("column %q dtype = %s, want string", name, col.DType())
+	}
+	if len(got) != len(want) {
+		t.Fatalf("column %q len = %d, want %d", name, len(got), len(want))
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("column %q[%d] = %q, want %q", name, i, got[i], want[i])
 		}
 	}
 }

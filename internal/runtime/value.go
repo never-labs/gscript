@@ -1175,6 +1175,8 @@ func nativeFrameGroupKey(col *DenseArray, row int) string {
 		return "i:" + strconv.FormatInt(col.i64[row], 10)
 	case DenseArrayBool:
 		return "b:" + strconv.FormatBool(col.bools[row])
+	case DenseArrayString:
+		return "s:" + col.strings[row]
 	default:
 		return "unknown"
 	}
@@ -1214,6 +1216,12 @@ func nativeFrameGroupKeyColumn(col *DenseArray, rows []int) (*DenseArray, error)
 			out[i] = col.bools[row]
 		}
 		return NewDenseArrayBool(out), nil
+	case DenseArrayString:
+		out := make([]string, len(rows))
+		for i, row := range rows {
+			out[i] = col.strings[row]
+		}
+		return NewDenseArrayString(out), nil
 	default:
 		return nil, ErrDenseArrayDType
 	}

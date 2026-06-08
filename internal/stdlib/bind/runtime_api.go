@@ -76,6 +76,7 @@ var (
 	DenseArrayElementwise         = runtime.DenseArrayElementwise
 	DenseArrayF64                 = runtime.DenseArrayF64
 	DenseArrayI64                 = runtime.DenseArrayI64
+	DenseArrayString              = runtime.DenseArrayString
 	DenseArrayReduce              = runtime.DenseArrayReduce
 	DenseArrayReduceSum           = runtime.DenseArrayReduceSum
 	DenseArrayScan                = runtime.DenseArrayScan
@@ -89,6 +90,7 @@ var (
 	NewDenseArrayBool             = runtime.NewDenseArrayBool
 	NewDenseArrayF64              = runtime.NewDenseArrayF64
 	NewDenseArrayI64              = runtime.NewDenseArrayI64
+	NewDenseArrayString           = runtime.NewDenseArrayString
 	NewDenseArrayOfLen            = runtime.NewDenseArrayOfLen
 	NewDenseMatrix                = runtime.NewDenseMatrix
 	NewSoA                        = runtime.NewSoA
