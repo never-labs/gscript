@@ -1201,6 +1201,41 @@ func TestQueryBoolComparisonAndGrouping(t *testing.T) {
 	assertColumnValues(t, grouped, "n", []any{int64(1), int64(1), int64(2)})
 }
 
+func TestQueryFilteredSingleColumnGroupBuildsTypedIndex(t *testing.T) {
+	frame := mustFrame(t,
+		NewColumn("sym", []any{Symbol("NVDA"), nil, Symbol("AAPL"), Symbol("MSFT"), Symbol("AAPL")}),
+		Column{Name: "qty", Data: NewI64([]int64{-1, 10, 20, 30, 40})},
+		Column{Name: "px", Data: NewF64([]float64{1, 100, 10, 20, 30})},
+		Column{Name: "venue", Data: NewString([]string{"XNAS", "XASE", "XNYS", "ARCX", "BATS"})},
+	)
+	plan := QueryPlan{
+		Where: Binary{Op: OpGE, Left: ColumnRef{Name: "qty"}, Right: Literal{Value: int64(10)}},
+		By:    []Symbol{"sym"},
+		Aggregates: []Aggregate{
+			{Name: "fills", Func: "count"},
+			{Name: "qty_sum", Func: "sum", Expr: ColumnRef{Name: "qty"}},
+			{Name: "px_avg", Func: "avg", Expr: ColumnRef{Name: "px"}},
+			{Name: "px_min", Func: "min", Expr: ColumnRef{Name: "px"}},
+			{Name: "px_max", Func: "max", Expr: ColumnRef{Name: "px"}},
+			{Name: "first_venue", Func: "first", Expr: ColumnRef{Name: "venue"}},
+			{Name: "last_venue", Func: "last", Expr: ColumnRef{Name: "venue"}},
+		},
+		LimitN: -1,
+	}
+	got, err := Exec(frame, plan)
+	if err != nil {
+		t.Fatalf("Exec returned error: %v", err)
+	}
+	assertColumnValues(t, got, "sym", []any{NullValue, Symbol("AAPL"), Symbol("MSFT")})
+	assertColumnValues(t, got, "fills", []any{int64(1), int64(2), int64(1)})
+	assertColumnValues(t, got, "qty_sum", []any{10.0, 60.0, 30.0})
+	assertColumnValues(t, got, "px_avg", []any{100.0, 20.0, 20.0})
+	assertColumnValues(t, got, "px_min", []any{100.0, 10.0, 20.0})
+	assertColumnValues(t, got, "px_max", []any{100.0, 30.0, 20.0})
+	assertColumnValues(t, got, "first_venue", []any{"XASE", "XNYS", "ARCX"})
+	assertColumnValues(t, got, "last_venue", []any{"XASE", "BATS", "ARCX"})
+}
+
 func TestQueryFoundationNumericComparisonAndOrder(t *testing.T) {
 	frame := mustFrame(t,
 		NewColumn("qty", []any{int32(3), nil, int32(1), int32(3)}),
@@ -2260,8 +2295,8 @@ func TestQueryKernelCompileFallbackAndValidation(t *testing.T) {
 	if !ok {
 		t.Fatal("CompileQueryKernel did not accept supported grouped aggregate")
 	}
-	if reason := kernel.Reason(); !strings.Contains(reason, "grouped aggregate path") {
-		t.Fatalf("grouped QueryKernel reason = %q, want grouped aggregate path", reason)
+	if reason := kernel.Reason(); !strings.Contains(reason, "indexed single-column grouped mixed aggregate fast path") {
+		t.Fatalf("grouped QueryKernel reason = %q, want indexed grouped aggregate fast path", reason)
 	}
 	got, err := kernel.Exec(frame)
 	if err != nil {

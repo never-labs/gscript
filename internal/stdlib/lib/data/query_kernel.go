@@ -947,7 +947,7 @@ func queryKernelFrameReason(frame Frame, plan QueryPlan) string {
 	if len(plan.By)+len(plan.ByExprs) > 0 && len(plan.Aggregates) > 0 {
 		byInputs, err := bindGroupInputs(frame, groupByItems(plan))
 		if err == nil {
-			if _, ok := groupIndexForSingleColumn(byInputs); ok && queryPlanAggregatesAreIndexedMixedFastPath(plan) {
+			if _, ok, err := groupIndexForSingleColumn(byInputs); err == nil && ok && queryPlanAggregatesAreIndexedMixedFastPath(plan) {
 				return "data query kernel supported: indexed single-column grouped mixed aggregate fast path"
 			}
 		}

@@ -4091,7 +4091,9 @@ func execGrouped(frame Frame, indexes []int, plan QueryPlan) (Frame, error) {
 			aggs[i].weightColumn = col
 		}
 	}
-	if index, ok := groupIndexForSingleColumn(byInputs); ok {
+	if index, ok, err := groupIndexForSingleColumn(byInputs); err != nil {
+		return Frame{}, err
+	} else if ok {
 		if indexesCoverAllRows(indexes, byInputs[0].column.Len()) {
 			return execGroupedFromArrayIndex(frame, byInputs, aggs, index)
 		}
@@ -4247,21 +4249,25 @@ func execGroupedProjection(frame Frame, indexes []int, plan QueryPlan, byItems [
 	return NewFrame(cols...)
 }
 
-func groupIndexForSingleColumn(byInputs []groupInput) (ArrayIndex, bool) {
+func groupIndexForSingleColumn(byInputs []groupInput) (ArrayIndex, bool, error) {
 	if len(byInputs) != 1 {
-		return ArrayIndex{}, false
+		return ArrayIndex{}, false, nil
 	}
 	column := byInputs[0].column
 	if column == nil {
-		return ArrayIndex{}, false
+		return ArrayIndex{}, false, nil
 	}
 	if index, ok := ArrayIndexFor(column, ArrayAttributeUnique); ok {
-		return index, true
+		return index, true, nil
 	}
 	if index, ok := ArrayIndexFor(column, ArrayAttributeGrouped); ok {
-		return index, true
+		return index, true, nil
 	}
-	return ArrayIndex{}, false
+	index, err := BuildArrayIndex(column, ArrayAttributeGrouped)
+	if err != nil {
+		return ArrayIndex{}, false, err
+	}
+	return index, true, nil
 }
 
 func indexesCoverAllRows(indexes []int, n int) bool {
