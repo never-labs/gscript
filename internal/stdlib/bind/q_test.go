@@ -3028,6 +3028,9 @@ again := q.query(trades, {select: {price: "price"}, order_by: "missing"})
 		t.Fatalf("query kernel hit count = %d, want 0", got)
 	}
 	details := qTestFallbackStatsDetailRows(t, qFallbackStatsTable())
+	if got := qTestFallbackFamilyCount(details, qFallbackFamilyOrder); got != 2 {
+		t.Fatalf("query kernel order family count = %d, want 2", got)
+	}
 	if got := qTestFallbackDetailCount(details, "reason_code", qFallbackQueryKernel, qQueryKernelReasonOrder, ""); got != 2 {
 		t.Fatalf("query kernel reason_code count = %d, want 2", got)
 	}
@@ -3200,6 +3203,9 @@ func TestQFallbackStatsAggregateTopReasons(t *testing.T) {
 	if got := codeRows[qFallbackKernelUnsupported]; got != 2 {
 		t.Fatalf("kernel unsupported fallback count = %d, want 2", got)
 	}
+	if got := qTestFallbackFamilyCount(rows, qFallbackFamilySelect); got != 2 {
+		t.Fatalf("kernel unsupported select family count = %d, want 2", got)
+	}
 	if got := qTestFallbackDetailCount(rows, "reason_code", qFallbackKernelUnsupported, stdq.KernelFallbackSelectExpression, ""); got != 2 {
 		t.Fatalf("kernel unsupported reason_code top count = %d, want 2", got)
 	}
@@ -3226,6 +3232,9 @@ func TestQFallbackStatsAggregateTopReasons(t *testing.T) {
 	}
 	if got := qTestFallbackDetailCount(qTestFallbackStatsDetailRows(t, values[0].Table()), "reason", qFallbackKernelUnsupported, "", reason); got != 2 {
 		t.Fatalf("q.fallback_stats reason top count = %d, want 2", got)
+	}
+	if got := qTestFallbackFamilyCount(qTestFallbackStatsDetailRows(t, values[0].Table()), qFallbackFamilySelect); got != 2 {
+		t.Fatalf("q.fallback_stats select family count = %d, want 2", got)
 	}
 
 	qClearCaches()
@@ -5530,6 +5539,15 @@ func qTestFallbackDetailFamily(rows []qFallbackStatsDetailRow, kind, code, reaso
 		}
 	}
 	return ""
+}
+
+func qTestFallbackFamilyCount(rows []qFallbackStatsDetailRow, family string) int64 {
+	for _, row := range rows {
+		if row.Kind == "reason_family" && row.ReasonFamily == family {
+			return row.Count
+		}
+	}
+	return 0
 }
 
 type qFallbackStatsTestExpr struct{}

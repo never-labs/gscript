@@ -3096,8 +3096,9 @@ func qFallbackStatsTable() *Table {
 	stats := qCloneFallbackStatsLocked()
 	qFallbackStatsMu.Unlock()
 
+	familyRows := qFallbackFamilyRows(stats)
 	detailRows := qFallbackTopRows(stats, 10)
-	rows := NewAppendArrayTable(7 + len(detailRows))
+	rows := NewAppendArrayTable(7 + len(familyRows) + len(detailRows))
 	rows.RawSetInt(1, TableValue(qFallbackStatsRow(qFallbackKernelUnsupported, stats.KernelUnsupported)))
 	rows.RawSetInt(2, TableValue(qFallbackStatsRow(qFallbackKernelCompileErr, stats.KernelCompileErr)))
 	rows.RawSetInt(3, TableValue(qFallbackStatsRow(qFallbackSourceErr, stats.SourceErr)))
@@ -3105,8 +3106,14 @@ func qFallbackStatsTable() *Table {
 	rows.RawSetInt(5, TableValue(qFallbackStatsRow(qFallbackMutationPlan, stats.Mutation)))
 	rows.RawSetInt(6, TableValue(qFallbackStatsRow(qQueryKernelSupported, stats.QueryKernelHit)))
 	rows.RawSetInt(7, TableValue(qFallbackStatsRow(qFallbackQueryKernel, stats.QueryKernel)))
-	for i, row := range detailRows {
-		rows.RawSetInt(int64(i+8), TableValue(row))
+	next := int64(8)
+	for _, row := range familyRows {
+		rows.RawSetInt(next, TableValue(row))
+		next++
+	}
+	for _, row := range detailRows {
+		rows.RawSetInt(next, TableValue(row))
+		next++
 	}
 	return rows
 }
@@ -3137,6 +3144,49 @@ func qCloneFallbackStatsLocked() qFallbackStats {
 		}
 	}
 	return stats
+}
+
+func qFallbackFamilyRows(stats qFallbackStats) []*Table {
+	counts := make(map[string]int, len(stats.ByReasonCode)+1)
+	for key, count := range stats.ByReasonCode {
+		family := qFallbackReasonFamilyForDetail(key.Code, key.ReasonCode, "")
+		if family == "" {
+			family = qFallbackFamilyKernel
+		}
+		counts[family] += count
+	}
+	if stats.QueryKernelHit > 0 {
+		counts[qFallbackFamilySupported] += stats.QueryKernelHit
+	}
+	families := make([]string, 0, len(counts))
+	for family, count := range counts {
+		if count > 0 {
+			families = append(families, family)
+		}
+	}
+	sort.Slice(families, func(i, j int) bool {
+		a, b := families[i], families[j]
+		if counts[a] != counts[b] {
+			return counts[a] > counts[b]
+		}
+		return a < b
+	})
+	rows := make([]*Table, 0, len(families))
+	for _, family := range families {
+		rows = append(rows, qFallbackFamilyStatsRow(family, counts[family]))
+	}
+	return rows
+}
+
+func qFallbackFamilyStatsRow(family string, count int) *Table {
+	row := NewTable()
+	row.RawSetString("kind", StringValue("reason_family"))
+	row.RawSetString("code", StringValue(""))
+	row.RawSetString("reason_family", StringValue(family))
+	row.RawSetString("reason_code", StringValue(""))
+	row.RawSetString("reason", StringValue(""))
+	row.RawSetString("count", IntValue(int64(count)))
+	return row
 }
 
 func qFallbackTopRows(stats qFallbackStats, limit int) []*Table {
