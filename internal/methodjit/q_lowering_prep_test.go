@@ -4746,6 +4746,145 @@ func TestFrameFilterOrderGatherProjectColumnRuntimeHelperUsesRuntimePrimitive(t 
 	}
 }
 
+func TestQFrameMaskTermDenseRuntimeHelperEvaluatesMaskCombine(t *testing.T) {
+	constants := []runtime.Value{
+		runtime.StringValue("price"),
+		runtime.FloatValue(100),
+		qHotPathMaskValue("size", ">=", runtime.IntValue(10)),
+	}
+	spec := QFrameSelectColumnSpec{
+		MaskTerms: []QFrameMaskTermSpec{
+			{
+				Kind:               QFrameMaskTermCompare,
+				SourceColumnConst:  0,
+				CompareOp:          runtime.DenseArrayGE,
+				CompareRHSConst:    constants[1],
+				HasCompareRHSConst: true,
+				LeftTerm:           -1,
+				RightTerm:          -1,
+			},
+			{
+				Kind:              QFrameMaskTermFrameMask,
+				MaskSpecConst:     2,
+				SourceColumnConst: -1,
+				LeftTerm:          -1,
+				RightTerm:         -1,
+			},
+			{
+				Kind:              QFrameMaskTermCombine,
+				CombineOp:         runtime.DenseArrayMaskAnd,
+				SourceColumnConst: -1,
+				MaskSpecConst:     -1,
+				LeftTerm:          0,
+				RightTerm:         1,
+			},
+		},
+		MaskRoot: 2,
+	}
+
+	mask, err := executeQFrameSelectColumnDenseMask(
+		constants,
+		spec,
+		runtime.TableValue(qHotPathTestFrame(t)),
+		runtime.NilValue(),
+		false,
+	)
+	if err != nil {
+		t.Fatalf("execute dense q frame mask term combine: %v", err)
+	}
+	got, ok := mask.Bool()
+	if !ok || len(got) != 3 || got[0] || !got[1] || !got[2] {
+		t.Fatalf("dense mask-combine values = %#v, want [false true true]", got)
+	}
+
+	wrapped, err := executeQFrameSelectColumnMask(constants, spec, runtime.TableValue(qHotPathTestFrame(t)), runtime.NilValue(), false)
+	if err != nil {
+		t.Fatalf("execute wrapped q frame mask term combine: %v", err)
+	}
+	if !wrapped.IsDenseArray() {
+		t.Fatalf("wrapped mask-combine result = %s, want dense array", wrapped.TypeName())
+	}
+	wrappedVals, ok := wrapped.DenseArray().Bool()
+	if !ok || len(wrappedVals) != len(got) {
+		t.Fatalf("wrapped mask-combine values = %#v, want %#v", wrappedVals, got)
+	}
+	for i := range got {
+		if wrappedVals[i] != got[i] {
+			t.Fatalf("wrapped mask-combine values = %#v, want %#v", wrappedVals, got)
+		}
+	}
+}
+
+func TestQFrameMaskTermDenseRuntimeHelperSupportsBoolColumnCombine(t *testing.T) {
+	boolMask := runtime.NewTable()
+	boolMask.RawSetString("column", runtime.StringValue("active"))
+	boolMask.RawSetString("mode", runtime.StringValue("bool_column"))
+	constants := []runtime.Value{
+		runtime.StringValue("price"),
+		runtime.FloatValue(100),
+		runtime.TableValue(boolMask),
+		qHotPathNamesValue("price"),
+		runtime.StringValue("price"),
+	}
+	spec := QFrameSelectColumnSpec{
+		Shape:             "mask-combine/filter/project/column",
+		ProjectConst:      3,
+		ResultColumnConst: 4,
+		SourceColumnConst: -1,
+		MaskRoot:          2,
+		MaskTerms: []QFrameMaskTermSpec{
+			{
+				Kind:               QFrameMaskTermCompare,
+				SourceColumnConst:  0,
+				CompareOp:          runtime.DenseArrayGE,
+				CompareRHSConst:    constants[1],
+				HasCompareRHSConst: true,
+				LeftTerm:           -1,
+				RightTerm:          -1,
+			},
+			{
+				Kind:              QFrameMaskTermFrameMask,
+				MaskSpecConst:     2,
+				SourceColumnConst: -1,
+				LeftTerm:          -1,
+				RightTerm:         -1,
+			},
+			{
+				Kind:              QFrameMaskTermCombine,
+				CombineOp:         runtime.DenseArrayMaskAnd,
+				SourceColumnConst: -1,
+				MaskSpecConst:     -1,
+				LeftTerm:          0,
+				RightTerm:         1,
+			},
+		},
+	}
+
+	mask, err := executeQFrameSelectColumnDenseMask(
+		constants,
+		spec,
+		runtime.TableValue(qHotPathBoolTestFrame(t)),
+		runtime.NilValue(),
+		false,
+	)
+	if err != nil {
+		t.Fatalf("execute dense bool-column mask combine: %v", err)
+	}
+	maskVals, ok := mask.Bool()
+	if !ok || len(maskVals) != 3 || maskVals[0] || maskVals[1] || !maskVals[2] {
+		t.Fatalf("dense bool-column mask-combine values = %#v, want [false false true]", maskVals)
+	}
+
+	result, err := executeQFrameSelectColumnValue(constants, []QFrameSelectColumnSpec{spec}, 0, runtime.TableValue(qHotPathBoolTestFrame(t)), runtime.NilValue(), false)
+	if err != nil {
+		t.Fatalf("execute q frame select-column bool-column mask combine: %v", err)
+	}
+	got, ok := result.DenseArray().F64()
+	if !ok || len(got) != 1 || got[0] != 101.25 {
+		t.Fatalf("bool-column mask-combine selected values = %#v, want [101.25]", got)
+	}
+}
+
 func TestFrameCompareFilterProjectColumnRuntimeHelperUsesRuntimePrimitive(t *testing.T) {
 	soa, err := runtime.NewSoA(map[string]*runtime.DenseArray{
 		"price": runtime.NewDenseArrayF64([]float64{10.5, 20.25, 30.75}),
