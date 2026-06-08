@@ -342,7 +342,7 @@ func CountQQueryLoweringFallbackReasons(remarks []OptimizationRemark) map[string
 		if remark.Pass != "QQueryNativeLowering" || remark.Kind != "missed" {
 			continue
 		}
-		reason, ok := qQueryLoweringFallbackReasonFromRemark(remark.Reason)
+		reason, ok := qQueryLoweringFallbackReasonFromRemark(remark)
 		if !ok {
 			continue
 		}
@@ -354,16 +354,25 @@ func CountQQueryLoweringFallbackReasons(remarks []OptimizationRemark) map[string
 	return counts
 }
 
-func qQueryLoweringFallbackReasonFromRemark(reason string) (string, bool) {
-	return qLoweringRemarkField(reason, "reason_code")
+func qQueryLoweringFallbackReasonFromRemark(remark OptimizationRemark) (string, bool) {
+	return qLoweringRemarkFieldFromRemark(remark, "reason_code")
 }
 
-func qQueryLoweringFallbackShapeFromRemark(reason string) string {
-	shape, ok := qLoweringRemarkField(reason, "shape")
+func qQueryLoweringFallbackShapeFromRemark(remark OptimizationRemark) string {
+	shape, ok := qLoweringRemarkFieldFromRemark(remark, "shape")
 	if !ok {
 		return "unknown"
 	}
 	return shape
+}
+
+func qLoweringRemarkFieldFromRemark(remark OptimizationRemark, name string) (string, bool) {
+	if remark.Fields != nil {
+		if value := remark.Fields[name]; value != "" {
+			return value, true
+		}
+	}
+	return qLoweringRemarkField(remark.Reason, name)
 }
 
 func qLoweringRemarkField(reason, name string) (string, bool) {
@@ -383,7 +392,7 @@ func CountQVectorLoweringFallbackReasons(remarks []OptimizationRemark) map[strin
 		if remark.Pass != "QVectorNativeLowering" || remark.Kind != "missed" {
 			continue
 		}
-		reason, ok := qQueryLoweringFallbackReasonFromRemark(remark.Reason)
+		reason, ok := qQueryLoweringFallbackReasonFromRemark(remark)
 		if !ok {
 			continue
 		}
@@ -454,18 +463,18 @@ func BuildQKernelDescriptors(vectorKernels []QVectorRuntimeKernel, framePrimitiv
 		default:
 			continue
 		}
-		reason, ok := qQueryLoweringFallbackReasonFromRemark(remark.Reason)
+		reason, ok := qQueryLoweringFallbackReasonFromRemark(remark)
 		if !ok {
 			continue
 		}
-		if remarkKernel, ok := qLoweringRemarkField(remark.Reason, "kernel"); ok {
+		if remarkKernel, ok := qLoweringRemarkFieldFromRemark(remark, "kernel"); ok {
 			kernel = remarkKernel
 		}
 		out = append(out, QKernelDescriptor{
 			Source:       source,
 			Kind:         "fallback",
 			Kernel:       kernel,
-			Shape:        qQueryLoweringFallbackShapeFromRemark(remark.Reason),
+			Shape:        qQueryLoweringFallbackShapeFromRemark(remark),
 			Route:        "lowering",
 			Outcome:      "fallback",
 			ReasonFamily: "lowering",
@@ -1164,9 +1173,11 @@ func qVectorGatherReduceLoweringFallbackRemark(fn *Function, path QVectorReduceH
 			blockID = path.Reduce.Block.ID
 		}
 	}
-	functionRemarks(fn).Add("QVectorNativeLowering", "missed", blockID, valueID, op,
+	shape := path.Shape()
+	functionRemarks(fn).AddWithFields("QVectorNativeLowering", "missed", blockID, valueID, op,
 		fmt.Sprintf("kernel=QVectorGatherReduce reason_code=%s shape=%s; q vector gather-reduce remains on primitive runtime fallback",
-			reason, path.Shape()))
+			reason, shape),
+		qLoweringFallbackRemarkFields("QVectorGatherReduce", reason, shape))
 }
 
 func qVectorWhereReduceLoweringFallbackRemark(fn *Function, path QVectorReduceHotPath, reason string) {
@@ -1183,9 +1194,10 @@ func qVectorWhereReduceLoweringFallbackRemark(fn *Function, path QVectorReduceHo
 		}
 	}
 	shape := qVectorReduceLoweringFallbackShape(path)
-	functionRemarks(fn).Add("QVectorNativeLowering", "missed", blockID, valueID, op,
+	functionRemarks(fn).AddWithFields("QVectorNativeLowering", "missed", blockID, valueID, op,
 		fmt.Sprintf("reason_code=%s shape=%s; q vector where-reduce remains on primitive runtime fallback",
-			reason, shape))
+			reason, shape),
+		qLoweringFallbackRemarkFields("QVectorWhereReduce", reason, shape))
 }
 
 func qVectorReduceLoweringFallbackShape(path QVectorReduceHotPath) string {
@@ -1209,9 +1221,11 @@ func qQueryLoweringFallbackRemark(fn *Function, path QQueryHotPath, reason strin
 			blockID = path.ResultColumn.Block.ID
 		}
 	}
-	functionRemarks(fn).Add("QQueryNativeLowering", "missed", blockID, valueID, OpFrameColumn,
+	shape := path.Shape()
+	functionRemarks(fn).AddWithFields("QQueryNativeLowering", "missed", blockID, valueID, OpFrameColumn,
 		fmt.Sprintf("reason_code=%s shape=%s compare=%s; q query hot path remains on primitive fallback",
-			reason, path.Shape(), qQueryHotPathPredicateName(path)))
+			reason, shape, qQueryHotPathPredicateName(path)),
+		qLoweringFallbackRemarkFields("QFrameSelectColumn", reason, shape))
 }
 
 func qGroupAggregateFallbackRemarkPass(fn *Function) {
@@ -1246,9 +1260,10 @@ func qGroupAggregateFallbackRemark(fn *Function, call *Instr, shape string) {
 			blockID = call.Block.ID
 		}
 	}
-	functionRemarks(fn).Add("QQueryNativeLowering", "missed", blockID, valueID, OpCall,
+	functionRemarks(fn).AddWithFields("QQueryNativeLowering", "missed", blockID, valueID, OpCall,
 		fmt.Sprintf("kernel=QGroupAggregate reason_code=%s shape=%s; grouped q aggregate remains on opaque call fallback",
-			qQueryLoweringFallbackGroupAggregateCall, shape))
+			qQueryLoweringFallbackGroupAggregateCall, shape),
+		qLoweringFallbackRemarkFields("QGroupAggregate", qQueryLoweringFallbackGroupAggregateCall, shape))
 }
 
 func qJoinFallbackRemarkPass(fn *Function) {
@@ -1283,9 +1298,21 @@ func qJoinFallbackRemark(fn *Function, call *Instr, shape string) {
 			blockID = call.Block.ID
 		}
 	}
-	functionRemarks(fn).Add("QQueryNativeLowering", "missed", blockID, valueID, OpCall,
+	functionRemarks(fn).AddWithFields("QQueryNativeLowering", "missed", blockID, valueID, OpCall,
 		fmt.Sprintf("kernel=QJoin reason_code=%s shape=%s; joined q query remains on opaque call fallback",
-			qQueryLoweringFallbackJoinCall, shape))
+			qQueryLoweringFallbackJoinCall, shape),
+		qLoweringFallbackRemarkFields("QJoin", qQueryLoweringFallbackJoinCall, shape))
+}
+
+func qLoweringFallbackRemarkFields(kernel, reasonCode, shape string) map[string]string {
+	return map[string]string{
+		"kernel":        kernel,
+		"shape":         shape,
+		"reason_family": "lowering",
+		"reason_code":   reasonCode,
+		"route":         "lowering",
+		"outcome":       "fallback",
+	}
 }
 
 func qCallIsQQueryEntrypoint(fn *Function, call *Instr) bool {
