@@ -104,6 +104,62 @@ func TestDenseArrayElementwiseBoolComparisons(t *testing.T) {
 	assertDenseBool(t, got, []bool{true, false, true})
 }
 
+func TestDenseArrayMaskCombine(t *testing.T) {
+	left := DenseArrayValue(NewDenseArrayBool([]bool{true, false, true, false}))
+	right := DenseArrayValue(NewDenseArrayBool([]bool{true, true, false, false}))
+
+	got, err := DenseArrayMaskCombine(DenseArrayMaskAnd, left, right)
+	if err != nil {
+		t.Fatalf("mask and error: %v", err)
+	}
+	assertDenseBool(t, DenseArrayValue(got), []bool{true, false, false, false})
+
+	got, err = DenseArrayMaskCombine(DenseArrayMaskOr, left, BoolValue(false))
+	if err != nil {
+		t.Fatalf("mask array-scalar or error: %v", err)
+	}
+	assertDenseBool(t, DenseArrayValue(got), []bool{true, false, true, false})
+
+	got, err = DenseArrayMaskCombine(DenseArrayMaskAndNot, BoolValue(true), right)
+	if err != nil {
+		t.Fatalf("mask scalar-array andNot error: %v", err)
+	}
+	assertDenseBool(t, DenseArrayValue(got), []bool{false, false, true, true})
+
+	got, err = DenseArrayMaskCombine(DenseArrayMaskXor, left, right)
+	if err != nil {
+		t.Fatalf("mask xor error: %v", err)
+	}
+	assertDenseBool(t, DenseArrayValue(got), []bool{false, true, true, false})
+}
+
+func TestDenseArrayMaskCombineRejectsNonMaskOperands(t *testing.T) {
+	_, err := DenseArrayMaskCombine(
+		DenseArrayMaskAnd,
+		DenseArrayValue(NewDenseArrayBool([]bool{true, false})),
+		DenseArrayValue(NewDenseArrayBool([]bool{true})),
+	)
+	if !errors.Is(err, ErrDenseArrayLength) {
+		t.Fatalf("length mismatch error = %v, want ErrDenseArrayLength", err)
+	}
+	_, err = DenseArrayMaskCombine(
+		DenseArrayMaskAnd,
+		DenseArrayValue(NewDenseArrayI64([]int64{1})),
+		BoolValue(true),
+	)
+	if !errors.Is(err, ErrDenseArrayDType) {
+		t.Fatalf("dtype error = %v, want ErrDenseArrayDType", err)
+	}
+	_, err = DenseArrayMaskCombine(DenseArrayMaskAnd, BoolValue(true), BoolValue(false))
+	if !errors.Is(err, ErrDenseArrayOperand) {
+		t.Fatalf("operand error = %v, want ErrDenseArrayOperand", err)
+	}
+	_, err = DenseArrayMaskCombine(DenseArrayMaskOp(255), DenseArrayValue(NewDenseArrayBool([]bool{true})), BoolValue(true))
+	if !errors.Is(err, ErrDenseArrayMaskOp) {
+		t.Fatalf("mask op error = %v, want ErrDenseArrayMaskOp", err)
+	}
+}
+
 func TestDenseArrayElementwiseLengthMismatch(t *testing.T) {
 	_, err := DenseArrayElementwise(
 		DenseArrayAdd,
@@ -112,6 +168,89 @@ func TestDenseArrayElementwiseLengthMismatch(t *testing.T) {
 	)
 	if !errors.Is(err, ErrDenseArrayLength) {
 		t.Fatalf("error = %v, want ErrDenseArrayLength", err)
+	}
+}
+
+func TestDenseArrayMaskCombineArrayArray(t *testing.T) {
+	left := DenseArrayValue(NewDenseArrayBool([]bool{true, true, false, false}))
+	right := DenseArrayValue(NewDenseArrayBool([]bool{true, false, true, false}))
+
+	got, err := DenseArrayMaskCombine(DenseArrayMaskAnd, left, right)
+	if err != nil {
+		t.Fatalf("DenseArrayMaskCombine and error: %v", err)
+	}
+	assertDenseBool(t, DenseArrayValue(got), []bool{true, false, false, false})
+
+	got, err = DenseArrayMaskCombine(DenseArrayMaskOr, left, right)
+	if err != nil {
+		t.Fatalf("DenseArrayMaskCombine or error: %v", err)
+	}
+	assertDenseBool(t, DenseArrayValue(got), []bool{true, true, true, false})
+
+	got, err = DenseArrayMaskCombine(DenseArrayMaskXor, left, right)
+	if err != nil {
+		t.Fatalf("DenseArrayMaskCombine xor error: %v", err)
+	}
+	assertDenseBool(t, DenseArrayValue(got), []bool{false, true, true, false})
+
+	got, err = DenseArrayMaskCombine(DenseArrayMaskAndNot, left, right)
+	if err != nil {
+		t.Fatalf("DenseArrayMaskCombine andNot error: %v", err)
+	}
+	assertDenseBool(t, DenseArrayValue(got), []bool{false, true, false, false})
+}
+
+func TestDenseArrayMaskCombineArrayScalar(t *testing.T) {
+	mask := DenseArrayValue(NewDenseArrayBool([]bool{true, false, true}))
+
+	got, err := DenseArrayMaskCombine(DenseArrayMaskAnd, mask, BoolValue(false))
+	if err != nil {
+		t.Fatalf("DenseArrayMaskCombine mask&&false error: %v", err)
+	}
+	assertDenseBool(t, DenseArrayValue(got), []bool{false, false, false})
+
+	got, err = DenseArrayMaskCombine(DenseArrayMaskAndNot, BoolValue(true), mask)
+	if err != nil {
+		t.Fatalf("DenseArrayMaskCombine true&&!mask error: %v", err)
+	}
+	assertDenseBool(t, DenseArrayValue(got), []bool{false, true, false})
+}
+
+func TestDenseArrayMaskCombineRejectsInvalidOperands(t *testing.T) {
+	_, err := DenseArrayMaskCombine(
+		DenseArrayMaskAnd,
+		DenseArrayValue(NewDenseArrayBool([]bool{true, false})),
+		DenseArrayValue(NewDenseArrayBool([]bool{true})),
+	)
+	if !errors.Is(err, ErrDenseArrayLength) {
+		t.Fatalf("length mismatch error = %v, want ErrDenseArrayLength", err)
+	}
+
+	_, err = DenseArrayMaskCombine(
+		DenseArrayMaskAnd,
+		DenseArrayValue(NewDenseArrayBool([]bool{true})),
+		DenseArrayValue(NewDenseArrayI64([]int64{1})),
+	)
+	if !errors.Is(err, ErrDenseArrayDType) {
+		t.Fatalf("dtype error = %v, want ErrDenseArrayDType", err)
+	}
+
+	_, err = DenseArrayMaskCombine(DenseArrayMaskOp(99), DenseArrayValue(NewDenseArrayBool([]bool{true})), BoolValue(true))
+	if !errors.Is(err, ErrDenseArrayMaskOp) {
+		t.Fatalf("op error = %v, want ErrDenseArrayMaskOp", err)
+	}
+}
+
+func TestDenseArrayWhereExportsTypedSelect(t *testing.T) {
+	mask := NewDenseArrayBool([]bool{true, false, true})
+	got, err := DenseArrayWhere(mask, DenseArrayValue(NewDenseArrayI64([]int64{10, 20, 30})), IntValue(7))
+	if err != nil {
+		t.Fatalf("DenseArrayWhere error: %v", err)
+	}
+	assertDenseI64(t, DenseArrayValue(got), []int64{10, 7, 30})
+
+	if _, err := DenseArrayWhere(NewDenseArrayBool([]bool{true}), DenseArrayValue(NewDenseArrayI64([]int64{10, 20})), IntValue(7)); !errors.Is(err, ErrDenseArrayLength) {
+		t.Fatalf("DenseArrayWhere length error = %v, want ErrDenseArrayLength", err)
 	}
 }
 

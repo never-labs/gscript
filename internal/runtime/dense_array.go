@@ -1763,6 +1763,15 @@ const (
 	DenseArrayGE
 )
 
+type DenseArrayMaskOp uint8
+
+const (
+	DenseArrayMaskAnd DenseArrayMaskOp = iota
+	DenseArrayMaskOr
+	DenseArrayMaskXor
+	DenseArrayMaskAndNot
+)
+
 var (
 	ErrDenseArrayOperand  = errors.New("dense array operation requires at least one dense array operand")
 	ErrDenseArrayLength   = errors.New("dense array length mismatch")
@@ -1770,7 +1779,114 @@ var (
 	ErrDenseArrayScalar   = errors.New("scalar is not supported for dense array operation")
 	ErrDenseArrayEmpty    = errors.New("dense array reduce on empty array")
 	ErrDenseArrayReduceOp = errors.New("dense array reduce operation is not supported")
+	ErrDenseArrayMaskOp   = errors.New("dense array mask operation is not supported")
 )
+
+// DenseArrayWhere selects values from trueValue or falseValue using a bool dense
+// mask. Operands may be dense arrays or scalar Values, matching q where shape.
+func DenseArrayWhere(mask *DenseArray, trueValue, falseValue Value) (*DenseArray, error) {
+	if mask == nil || mask.dtype != DenseArrayBool {
+		return nil, fmt.Errorf("dense array where mask must be bool")
+	}
+	return denseArraySelect(mask, trueValue, falseValue, mask.Len())
+}
+
+// DenseArrayMaskCombine applies a typed boolean mask operation. At least one
+// operand must be a bool dense array; the other may be a bool dense array or a
+// bool scalar.
+func DenseArrayMaskCombine(op DenseArrayMaskOp, left, right Value) (*DenseArray, error) {
+	la, ra := left.DenseArray(), right.DenseArray()
+	switch {
+	case la != nil && ra != nil:
+		return denseArrayMaskArrayArray(op, la, ra)
+	case la != nil:
+		return denseArrayMaskArrayScalar(op, la, right, false)
+	case ra != nil:
+		return denseArrayMaskArrayScalar(op, ra, left, true)
+	default:
+		return nil, ErrDenseArrayOperand
+	}
+}
+
+func denseArrayMaskArrayArray(op DenseArrayMaskOp, left, right *DenseArray) (*DenseArray, error) {
+	if left == nil || right == nil {
+		return nil, ErrDenseArrayOperand
+	}
+	if left.dtype != DenseArrayBool || right.dtype != DenseArrayBool {
+		return nil, ErrDenseArrayDType
+	}
+	if left.Len() != right.Len() {
+		return nil, ErrDenseArrayLength
+	}
+	out := make([]bool, left.Len())
+	if err := denseArrayMaskInto(out, op, left.bools, right.bools); err != nil {
+		return nil, err
+	}
+	return &DenseArray{dtype: DenseArrayBool, bools: out}, nil
+}
+
+func denseArrayMaskArrayScalar(op DenseArrayMaskOp, arr *DenseArray, scalar Value, scalarLeft bool) (*DenseArray, error) {
+	if arr == nil {
+		return nil, ErrDenseArrayOperand
+	}
+	if arr.dtype != DenseArrayBool {
+		return nil, ErrDenseArrayDType
+	}
+	if !scalar.IsBool() {
+		return nil, ErrDenseArrayScalar
+	}
+	out := make([]bool, arr.Len())
+	x := scalar.Bool()
+	switch op {
+	case DenseArrayMaskAnd:
+		for i, v := range arr.bools {
+			out[i] = v && x
+		}
+	case DenseArrayMaskOr:
+		for i, v := range arr.bools {
+			out[i] = v || x
+		}
+	case DenseArrayMaskXor:
+		for i, v := range arr.bools {
+			out[i] = v != x
+		}
+	case DenseArrayMaskAndNot:
+		for i, v := range arr.bools {
+			if scalarLeft {
+				out[i] = x && !v
+			} else {
+				out[i] = v && !x
+			}
+		}
+	default:
+		return nil, ErrDenseArrayMaskOp
+	}
+	return &DenseArray{dtype: DenseArrayBool, bools: out}, nil
+}
+
+func denseArrayMaskInto(out []bool, op DenseArrayMaskOp, left, right []bool) error {
+	switch op {
+	case DenseArrayMaskAnd:
+		for i, v := range left {
+			out[i] = v && right[i]
+		}
+	case DenseArrayMaskOr:
+		for i, v := range left {
+			out[i] = v || right[i]
+		}
+	case DenseArrayMaskXor:
+		for i, v := range left {
+			out[i] = v != right[i]
+		}
+	case DenseArrayMaskAndNot:
+		for i, v := range left {
+			out[i] = v && !right[i]
+		}
+	default:
+		return ErrDenseArrayMaskOp
+	}
+	return nil
+}
 
 // DenseArrayElementwise applies op to array-array, array-scalar, or scalar-array
 // operands. Arithmetic returns an i64 array only for i64+i64 +, -, and *;
