@@ -571,10 +571,14 @@ func (s *EvalState) eval(src string) (any, error) {
 		return s.evalFby(leftExpr, rightExpr)
 	}
 	if strings.HasPrefix(src, "+/") {
-		if strings.TrimSpace(src[2:]) == "" {
+		right := strings.TrimSpace(src[2:])
+		if right == "" {
 			return qAdverbFunction{verb: "+", adverb: "/"}, nil
 		}
-		v, err := s.eval(strings.TrimSpace(src[2:]))
+		if out, handled, err := s.tryEvalTypedUnarySum(right); err != nil || handled {
+			return out, err
+		}
+		v, err := s.eval(right)
 		if err != nil {
 			return nil, err
 		}
@@ -2851,6 +2855,11 @@ func isDyadicOp(b byte) bool {
 }
 
 func (s *EvalState) evalAdverb(expr adverbExpr) (any, error) {
+	if expr.left == "" && expr.adverb == "/" && expr.verb == "+" {
+		if out, handled, err := s.tryEvalTypedUnarySum(expr.right); err != nil || handled {
+			return out, err
+		}
+	}
 	right, err := s.eval(expr.right)
 	if err != nil {
 		return nil, err
@@ -2922,6 +2931,59 @@ func (s *EvalState) evalAdverb(expr adverbExpr) (any, error) {
 	default:
 		return nil, fmt.Errorf("adverb %q is not supported", expr.adverb)
 	}
+}
+
+func (s *EvalState) tryEvalTypedUnarySum(src string) (any, bool, error) {
+	op, arg, ok := splitLeadingNumericUnary(src)
+	if !ok {
+		return nil, false, nil
+	}
+	value, err := s.eval(arg)
+	if err != nil {
+		return nil, true, err
+	}
+	if array, ok := value.(data.Array); ok {
+		if out, handled, err := data.TryTypedQNumericUnarySum(op, array); err != nil || handled {
+			recordRuntimeKernelProbe("ArrayNumericUnarySum", "vector-reduce/sum-"+op+"/"+string(array.Kind()), handled, err)
+			if err != nil {
+				return nil, true, fmt.Errorf("sum %s: %w", op, err)
+			}
+			return out, true, nil
+		} else {
+			recordRuntimeKernelProbe("ArrayNumericUnarySum", "vector-reduce/sum-"+op+"/"+string(array.Kind()), handled, err)
+		}
+	}
+	fn, ok := lookupUnaryVerb(op)
+	if !ok {
+		return nil, false, nil
+	}
+	unary, err := fn(value)
+	if err != nil {
+		return nil, true, err
+	}
+	out, err := sum(unary)
+	return out, true, err
+}
+
+func splitLeadingNumericUnary(src string) (string, string, bool) {
+	src = strings.TrimSpace(src)
+	for _, op := range []string{
+		data.NumericUnaryRecip,
+		data.NumericUnaryCeiling,
+		data.NumericUnarySignum,
+		data.NumericUnaryFloor,
+		data.NumericUnaryAbs,
+		data.NumericUnaryExp,
+		data.NumericUnaryNeg,
+	} {
+		if src == op {
+			return op, "", false
+		}
+		if strings.HasPrefix(src, op) && len(src) > len(op) && isSpace(src[len(op)]) {
+			return op, strings.TrimSpace(src[len(op):]), true
+		}
+	}
+	return "", "", false
 }
 
 func (s *EvalState) evalFby(leftExpr, groupExpr string) (any, error) {
@@ -6903,6 +6965,15 @@ func avg(v any) (any, error) {
 	if !ok {
 		return nil, fmt.Errorf("avg expects a numeric vector")
 	}
+	if out, handled, err := data.TryTypedNumericAvg(array); err != nil || handled {
+		recordRuntimeKernelProbe("ArrayAvg", "vector-reduce/avg/"+string(array.Kind()), handled, err)
+		if err != nil {
+			return nil, err
+		}
+		return out, nil
+	} else {
+		recordRuntimeKernelProbe("ArrayAvg", "vector-reduce/avg/"+string(array.Kind()), handled, err)
+	}
 	total := float64(0)
 	count := 0
 	for i := 0; i < array.Len(); i++ {
@@ -7492,6 +7563,15 @@ func mapNumericUnary(name string, v any, fn func(float64, bool) any) (any, error
 	array, ok := v.(data.Array)
 	if !ok {
 		return nil, fmt.Errorf("%s expects a numeric value or vector", name)
+	}
+	if typed, handled, err := data.TryTypedQNumericUnary(name, array); err != nil || handled {
+		recordRuntimeKernelProbe("ArrayNumericUnary", "vector-unary/"+name+"/"+string(array.Kind()), handled, err)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", name, err)
+		}
+		return typed, nil
+	} else {
+		recordRuntimeKernelProbe("ArrayNumericUnary", "vector-unary/"+name+"/"+string(array.Kind()), handled, err)
 	}
 	out := make([]any, array.Len())
 	hasFloat := false

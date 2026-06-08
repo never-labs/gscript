@@ -1951,6 +1951,50 @@ func TestTypedNumericUnaryBinaryAndAggregates(t *testing.T) {
 		t.Fatalf("ceiling NumericUnary values = %v, want %v", got, want)
 	}
 
+	qNeg, ok, err := TryTypedQNumericUnary(NumericUnaryNeg, NewI32([]int32{2, -3, 0}))
+	if err != nil {
+		t.Fatalf("TryTypedQNumericUnary neg returned error: %v", err)
+	}
+	if !ok {
+		t.Fatal("TryTypedQNumericUnary neg did not match i32 column")
+	}
+	if qNeg.Kind() != KindI64 {
+		t.Fatalf("TryTypedQNumericUnary neg kind = %s, want i64", qNeg.Kind())
+	}
+	if got, want := qNeg.Values(), []any{int64(-2), int64(3), int64(0)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("TryTypedQNumericUnary neg values = %v, want %v", got, want)
+	}
+
+	qFloor, ok, err := TryTypedQNumericUnary(NumericUnaryFloor, NewF64([]float64{-1.2, 1.9, 3}))
+	if err != nil {
+		t.Fatalf("TryTypedQNumericUnary floor returned error: %v", err)
+	}
+	if !ok {
+		t.Fatal("TryTypedQNumericUnary floor did not match f64 column")
+	}
+	if qFloor.Kind() != KindI64 {
+		t.Fatalf("TryTypedQNumericUnary floor kind = %s, want i64", qFloor.Kind())
+	}
+	if got, want := qFloor.Values(), []any{int64(-2), int64(1), int64(3)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("TryTypedQNumericUnary floor values = %v, want %v", got, want)
+	}
+
+	value, ok, err := TryTypedQNumericUnarySum(NumericUnaryAbs, NewI64([]int64{-2, 3, 0}))
+	if err != nil {
+		t.Fatalf("TryTypedQNumericUnarySum abs returned error: %v", err)
+	}
+	if !ok || value != int64(5) {
+		t.Fatalf("TryTypedQNumericUnarySum abs = %v, %v; want 5, true", value, ok)
+	}
+
+	value, ok, err = TryTypedQNumericUnarySum(NumericUnaryFloor, NewF64([]float64{-1.2, 1.9, 3}))
+	if err != nil {
+		t.Fatalf("TryTypedQNumericUnarySum floor returned error: %v", err)
+	}
+	if !ok || value != int64(2) {
+		t.Fatalf("TryTypedQNumericUnarySum floor = %v, %v; want 2, true", value, ok)
+	}
+
 	sum, ok, err := typedKernels.NumericBinary(OpAdd, NewI32([]int32{1, 2, 3}), NewF64([]float64{0.5, 1.5, 2.5}))
 	if err != nil {
 		t.Fatalf("NumericBinary returned error: %v", err)
@@ -1999,7 +2043,7 @@ func TestTypedNumericUnaryBinaryAndAggregates(t *testing.T) {
 		t.Fatal("NumericSumRows accepted row past end")
 	}
 
-	value, ok, err := TryTypedNumericSum(NewI32([]int32{1, 2, 3}))
+	value, ok, err = TryTypedNumericSum(NewI32([]int32{1, 2, 3}))
 	if err != nil {
 		t.Fatalf("TryTypedNumericSum i32 returned error: %v", err)
 	}
@@ -2029,6 +2073,14 @@ func TestTypedNumericUnaryBinaryAndAggregates(t *testing.T) {
 	}
 	if want := int64(8192 * 8191 / 2); !ok || value != want {
 		t.Fatalf("TryTypedNumericSum range = %v, %v; want %d, true", value, ok, want)
+	}
+
+	value, ok, err = TryTypedNumericAvg(NewI64Range(0, 1, 4))
+	if err != nil {
+		t.Fatalf("TryTypedNumericAvg range returned error: %v", err)
+	}
+	if !ok || value != 1.5 {
+		t.Fatalf("TryTypedNumericAvg range = %v, %v; want 1.5, true", value, ok)
 	}
 
 	scan, ok, err := TryTypedNumericSums(NewI64([]int64{1, 2, 3}))
