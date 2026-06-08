@@ -1431,6 +1431,9 @@ unsupported := q.explain_query(trades, {
 	if got := supported.RawGetString("kernel_execution_error_count"); !got.IsInt() || got.Int() != 0 {
 		t.Fatalf("supported kernel_execution_error_count = %v, want 0 without provider stats", got)
 	}
+	if routes := supported.RawGetString("kernel_execution_routes").Table(); routes == nil || routes.Length() != 0 {
+		t.Fatalf("supported kernel_execution_routes = %v, want empty table without provider stats", routes)
+	}
 	if got := supported.RawGetString("kernel_lowering_count"); !got.IsInt() || got.Int() != 0 {
 		t.Fatalf("supported kernel_lowering_count = %v, want 0 without provider stats", got)
 	}
@@ -1445,6 +1448,9 @@ unsupported := q.explain_query(trades, {
 	}
 	if reasonShapes := supported.RawGetString("kernel_lowering_fallback_reason_shapes").Table(); reasonShapes == nil || reasonShapes.Length() != 0 {
 		t.Fatalf("supported kernel_lowering_fallback_reason_shapes = %v, want empty table without provider stats", reasonShapes)
+	}
+	if routes := supported.RawGetString("kernel_lowering_routes").Table(); routes == nil || routes.Length() != 0 {
+		t.Fatalf("supported kernel_lowering_routes = %v, want empty table without provider stats", routes)
 	}
 	if got := supported.RawGetString("kernel_rows"); !got.IsInt() || got.Int() != 2 {
 		t.Fatalf("supported kernel_rows = %v, want 2", got)
@@ -1525,6 +1531,9 @@ unsupported := q.explain_query(trades, {
 	if got := unsupported.RawGetString("kernel_execution_error_count"); !got.IsInt() || got.Int() != 0 {
 		t.Fatalf("unsupported kernel_execution_error_count = %v, want 0 without provider stats", got)
 	}
+	if routes := unsupported.RawGetString("kernel_execution_routes").Table(); routes == nil || routes.Length() != 0 {
+		t.Fatalf("unsupported kernel_execution_routes = %v, want empty table without provider stats", routes)
+	}
 	if got := unsupported.RawGetString("kernel_lowering_count"); !got.IsInt() || got.Int() != 0 {
 		t.Fatalf("unsupported kernel_lowering_count = %v, want 0 without provider stats", got)
 	}
@@ -1539,6 +1548,9 @@ unsupported := q.explain_query(trades, {
 	}
 	if reasonShapes := unsupported.RawGetString("kernel_lowering_fallback_reason_shapes").Table(); reasonShapes == nil || reasonShapes.Length() != 0 {
 		t.Fatalf("unsupported kernel_lowering_fallback_reason_shapes = %v, want empty table without provider stats", reasonShapes)
+	}
+	if routes := unsupported.RawGetString("kernel_lowering_routes").Table(); routes == nil || routes.Length() != 0 {
+		t.Fatalf("unsupported kernel_lowering_routes = %v, want empty table without provider stats", routes)
 	}
 	if schema := unsupported.RawGetString("kernel_schema").Table(); schema == nil || schema.Length() != 0 {
 		t.Fatalf("unsupported kernel_schema = %v, want empty table", schema)
@@ -4212,6 +4224,9 @@ func TestQExplainReportsQueryKernelVisibility(t *testing.T) {
 	if got := beforeTable.RawGetString("kernel_execution_error_count"); !got.IsInt() || got.Int() != 0 {
 		t.Fatalf("kernel_execution_error_count before = %v, want 0 without provider stats", got)
 	}
+	if routes := beforeTable.RawGetString("kernel_execution_routes").Table(); routes == nil || routes.Length() != 0 {
+		t.Fatalf("kernel_execution_routes before = %v, want empty table without provider stats", routes)
+	}
 	if got := beforeTable.RawGetString("kernel_lowering_count"); !got.IsInt() || got.Int() != 0 {
 		t.Fatalf("kernel_lowering_count before = %v, want 0 without provider stats", got)
 	}
@@ -4226,6 +4241,9 @@ func TestQExplainReportsQueryKernelVisibility(t *testing.T) {
 	}
 	if reasonShapes := beforeTable.RawGetString("kernel_lowering_fallback_reason_shapes").Table(); reasonShapes == nil || reasonShapes.Length() != 0 {
 		t.Fatalf("kernel_lowering_fallback_reason_shapes before = %v, want empty table without provider stats", reasonShapes)
+	}
+	if routes := beforeTable.RawGetString("kernel_lowering_routes").Table(); routes == nil || routes.Length() != 0 {
+		t.Fatalf("kernel_lowering_routes before = %v, want empty table without provider stats", routes)
 	}
 	cacheKey := beforeTable.RawGetString("kernel_cache_key")
 	if !cacheKey.IsString() || cacheKey.Str() == "" {
@@ -4368,6 +4386,28 @@ func TestQExplainReportsQueryKernelVisibility(t *testing.T) {
 	if got := withExecutionTable.RawGetString("kernel_execution_error_count"); !got.IsInt() || got.Int() != 1 {
 		t.Fatalf("kernel_execution_error_count with stats = %v, want 1 for current shape", got)
 	}
+	executionRoutes := withExecutionTable.RawGetString("kernel_execution_routes").Table()
+	if executionRoutes == nil || executionRoutes.Length() != 2 {
+		t.Fatalf("kernel_execution_routes with stats = %v, want two current-shape routes", executionRoutes)
+	}
+	executionRoute := qTestNestedRowByFields(t, withExecutionTable, "kernel_execution_routes", map[string]string{
+		"source":  "methodjit_q_frame_runtime",
+		"kernel":  "QFrameSelectColumn",
+		"route":   "typed_runtime_op_exit",
+		"outcome": "success",
+	})
+	if got := executionRoute.RawGetString("count"); !got.IsInt() || got.Int() != 2 {
+		t.Fatalf("kernel_execution_routes success count = %v, want 2", got)
+	}
+	executionRoute = qTestNestedRowByFields(t, withExecutionTable, "kernel_execution_routes", map[string]string{
+		"source":  "methodjit_q_frame_runtime",
+		"kernel":  "QFrameSelectColumn",
+		"route":   "typed_runtime_op_exit",
+		"outcome": "error",
+	})
+	if got := executionRoute.RawGetString("count"); !got.IsInt() || got.Int() != 1 {
+		t.Fatalf("kernel_execution_routes error count = %v, want 1", got)
+	}
 	restoreLoweringStats := SetQRuntimeKernelLoweringStatsProvider(func() []QRuntimeKernelLoweringStat {
 		return []QRuntimeKernelLoweringStat{
 			{
@@ -4417,6 +4457,30 @@ func TestQExplainReportsQueryKernelVisibility(t *testing.T) {
 	}
 	if got := withLoweringTable.RawGetString("kernel_lowering_fallback_count"); !got.IsInt() || got.Int() != 4 {
 		t.Fatalf("kernel_lowering_fallback_count with stats = %v, want 4 for current shape", got)
+	}
+	loweringRoutes := withLoweringTable.RawGetString("kernel_lowering_routes").Table()
+	if loweringRoutes == nil || loweringRoutes.Length() != 2 {
+		t.Fatalf("kernel_lowering_routes with stats = %v, want two current-shape routes", loweringRoutes)
+	}
+	loweringRoute := qTestNestedRowByFields(t, withLoweringTable, "kernel_lowering_routes", map[string]string{
+		"source":  "methodjit_q_frame_runtime",
+		"kind":    "runtime_kernel",
+		"kernel":  "QFrameSelectColumn",
+		"route":   "typed_runtime_op_exit",
+		"outcome": "supported",
+	})
+	if got := loweringRoute.RawGetString("count"); !got.IsInt() || got.Int() != 2 {
+		t.Fatalf("kernel_lowering_routes supported count = %v, want 2", got)
+	}
+	loweringRoute = qTestNestedRowByFields(t, withLoweringTable, "kernel_lowering_routes", map[string]string{
+		"source":  "methodjit_q_frame_lowering",
+		"kind":    "fallback",
+		"kernel":  "QFrameSelectColumn",
+		"route":   "lowering",
+		"outcome": "fallback",
+	})
+	if got := loweringRoute.RawGetString("count"); !got.IsInt() || got.Int() != 4 {
+		t.Fatalf("kernel_lowering_routes fallback count = %v, want 4", got)
 	}
 	reasons := withLoweringTable.RawGetString("kernel_lowering_fallback_reasons").Table()
 	if reasons == nil || reasons.Length() != 1 {

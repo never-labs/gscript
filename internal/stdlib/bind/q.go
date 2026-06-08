@@ -223,6 +223,7 @@ type qRuntimeKernelExecutionShapeSummary struct {
 	Executions uint64
 	Successes  uint64
 	Errors     uint64
+	Routes     []qRuntimeKernelExecutionRouteStat
 }
 
 type qRuntimeKernelLoweringShapeSummary struct {
@@ -231,6 +232,7 @@ type qRuntimeKernelLoweringShapeSummary struct {
 	Fallbacks    uint64
 	Reasons      []qRuntimeKernelLoweringReasonStat
 	ReasonShapes []qRuntimeKernelLoweringReasonShapeStat
+	Routes       []qRuntimeKernelLoweringRouteStat
 }
 
 // QQueryKernelSupportKeyStatJSONRow is the stable external row shape for
@@ -3512,6 +3514,7 @@ func qRuntimeKernelExecutionSummaryForShape(shape string) qRuntimeKernelExecutio
 			out.Errors += stat.Count
 		}
 	}
+	out.Routes = qRuntimeKernelExecutionRouteStatsForShape(stats, shape)
 	return out
 }
 
@@ -3520,6 +3523,7 @@ func qExplainAttachRuntimeKernelExecutionSummary(out *Table, shape string) {
 	out.RawSetString("kernel_execution_count", qUint64IntValue(summary.Executions))
 	out.RawSetString("kernel_execution_success_count", qUint64IntValue(summary.Successes))
 	out.RawSetString("kernel_execution_error_count", qUint64IntValue(summary.Errors))
+	out.RawSetString("kernel_execution_routes", TableValue(qRuntimeKernelExecutionRouteStatsTable(summary.Routes)))
 }
 
 func qRuntimeKernelLoweringSummaryForShape(shape string) qRuntimeKernelLoweringShapeSummary {
@@ -3543,6 +3547,7 @@ func qRuntimeKernelLoweringSummaryForShape(shape string) qRuntimeKernelLoweringS
 	}
 	out.Reasons = qRuntimeKernelLoweringReasonStatsForShape(stats, shape)
 	out.ReasonShapes = qRuntimeKernelLoweringReasonShapeStatsForShape(stats, shape)
+	out.Routes = qRuntimeKernelLoweringRouteStatsForShape(stats, shape)
 	return out
 }
 
@@ -3553,6 +3558,7 @@ func qExplainAttachRuntimeKernelLoweringSummary(out *Table, shape string) {
 	out.RawSetString("kernel_lowering_fallback_count", qUint64IntValue(summary.Fallbacks))
 	out.RawSetString("kernel_lowering_fallback_reasons", TableValue(qRuntimeKernelLoweringReasonStatsTable(summary.Reasons)))
 	out.RawSetString("kernel_lowering_fallback_reason_shapes", TableValue(qRuntimeKernelLoweringReasonShapeStatsTable(summary.ReasonShapes)))
+	out.RawSetString("kernel_lowering_routes", TableValue(qRuntimeKernelLoweringRouteStatsTable(summary.Routes)))
 }
 
 func qRuntimeKernelExecutionShapeStats(stats []QRuntimeKernelExecutionStat) []qRuntimeKernelExecutionShapeStat {
@@ -3654,6 +3660,10 @@ func qRuntimeKernelExecutionKernelStatsTable(stats []qRuntimeKernelExecutionKern
 }
 
 func qRuntimeKernelExecutionRouteStats(stats []QRuntimeKernelExecutionStat) []qRuntimeKernelExecutionRouteStat {
+	return qRuntimeKernelExecutionRouteStatsForShape(stats, "")
+}
+
+func qRuntimeKernelExecutionRouteStatsForShape(stats []QRuntimeKernelExecutionStat, shape string) []qRuntimeKernelExecutionRouteStat {
 	type routeKey struct {
 		source  string
 		kernel  string
@@ -3662,6 +3672,9 @@ func qRuntimeKernelExecutionRouteStats(stats []QRuntimeKernelExecutionStat) []qR
 	}
 	counts := make(map[routeKey]uint64, len(stats))
 	for _, stat := range stats {
+		if shape != "" && stat.Shape != shape {
+			continue
+		}
 		key := routeKey{source: stat.Source, kernel: stat.Kernel, route: stat.Route, outcome: stat.Outcome}
 		counts[key] += stat.Count
 	}
@@ -4025,6 +4038,10 @@ func qRuntimeKernelLoweringReasonShapeStatsTable(stats []qRuntimeKernelLoweringR
 }
 
 func qRuntimeKernelLoweringRouteStats(stats []QRuntimeKernelLoweringStat) []qRuntimeKernelLoweringRouteStat {
+	return qRuntimeKernelLoweringRouteStatsForShape(stats, "")
+}
+
+func qRuntimeKernelLoweringRouteStatsForShape(stats []QRuntimeKernelLoweringStat, shape string) []qRuntimeKernelLoweringRouteStat {
 	type routeKey struct {
 		source  string
 		kind    string
@@ -4034,6 +4051,9 @@ func qRuntimeKernelLoweringRouteStats(stats []QRuntimeKernelLoweringStat) []qRun
 	}
 	counts := make(map[routeKey]uint64, len(stats))
 	for _, stat := range stats {
+		if shape != "" && stat.Shape != shape {
+			continue
+		}
 		key := routeKey{
 			source:  stat.Source,
 			kind:    stat.Kind,
