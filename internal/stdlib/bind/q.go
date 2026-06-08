@@ -68,16 +68,19 @@ type qSQLPlanTemplate struct {
 }
 
 type qSQLPlanCacheStats struct {
-	TemplateHits      int
-	TemplateMisses    int
-	TemplateEvictions int
-	AlignedHits       int
-	AlignedMisses     int
-	AlignedEvictions  int
-	KernelHits        int
-	KernelMisses      int
-	KernelEvictions   int
-	KernelKeys        []qSQLKernelCacheKeyStats
+	TemplateHits            int
+	TemplateMisses          int
+	TemplateEvictions       int
+	AlignedHits             int
+	AlignedMisses           int
+	AlignedEvictions        int
+	KernelHits              int
+	KernelMisses            int
+	KernelEvictions         int
+	KernelDecisionHits      int
+	KernelDecisionMisses    int
+	KernelDecisionEvictions int
+	KernelKeys              []qSQLKernelCacheKeyStats
 }
 
 type qSQLKernelCacheKeyStats struct {
@@ -2339,6 +2342,7 @@ func qSQLKernelForFrame(src string, plan data.QueryPlan, frame data.Frame) (*dat
 		return kernel, true, "", nil
 	}
 	if reason, ok := qSQLKernelUnsupported[key]; ok {
+		qSQLAlignedStats.KernelDecisionHits++
 		qSQLAlignedPlanCacheMu.Unlock()
 		return nil, false, reason, nil
 	}
@@ -2350,6 +2354,7 @@ func qSQLKernelForFrame(src string, plan data.QueryPlan, frame data.Frame) (*dat
 		if !ok && err == nil {
 			_, reason = data.QueryKernelSupportReason(plan)
 			qSQLAlignedPlanCacheMu.Lock()
+			qSQLAlignedStats.KernelDecisionMisses++
 			qSQLKernelUnsupportedStoreLocked(key, reason)
 			qSQLAlignedPlanCacheMu.Unlock()
 		}
@@ -2564,6 +2569,7 @@ func qSQLKernelUnsupportedStoreLocked(key, reason string) {
 		evict := qSQLKernelUnsupportedOrder[0]
 		qSQLKernelUnsupportedOrder = qSQLKernelUnsupportedOrder[1:]
 		delete(qSQLKernelUnsupported, evict)
+		qSQLAlignedStats.KernelDecisionEvictions++
 	}
 }
 
@@ -2602,6 +2608,9 @@ func qSQLPlanCacheStatsSnapshot() qSQLPlanCacheStats {
 	stats.KernelHits = qSQLAlignedStats.KernelHits
 	stats.KernelMisses = qSQLAlignedStats.KernelMisses
 	stats.KernelEvictions = qSQLAlignedStats.KernelEvictions
+	stats.KernelDecisionHits = qSQLAlignedStats.KernelDecisionHits
+	stats.KernelDecisionMisses = qSQLAlignedStats.KernelDecisionMisses
+	stats.KernelDecisionEvictions = qSQLAlignedStats.KernelDecisionEvictions
 	stats.KernelKeys = qSQLKernelStatsByKeySnapshotLocked()
 	qSQLAlignedPlanCacheMu.Unlock()
 
@@ -2617,6 +2626,7 @@ func qCacheStatsTable() *Table {
 	qSQLAlignedPlanCacheMu.Lock()
 	alignedEntries := len(qSQLAlignedPlanCache) + len(qSQLAlignedMutationCache)
 	kernelEntries := len(qSQLKernelCache)
+	kernelDecisionEntries := len(qSQLKernelUnsupported)
 	alignedStats := qSQLAlignedStats
 	kernelStatsByKey := qSQLKernelStatsByKeySnapshotLocked()
 	qSQLAlignedPlanCacheMu.Unlock()
@@ -2631,7 +2641,7 @@ func qCacheStatsTable() *Table {
 	queryKernelStats := qQueryKernelSupportStats
 	qQueryKernelSupportCacheMu.Unlock()
 
-	rows := NewAppendArrayTable(5)
+	rows := NewAppendArrayTable(6)
 	rows.RawSetInt(1, TableValue(qCacheStatsRow(
 		"qsql_template",
 		templateEntries,
@@ -2659,6 +2669,14 @@ func qCacheStatsTable() *Table {
 	kernelStatsRow.RawSetString("keys", TableValue(qKernelCacheKeyStatsTable(kernelStatsByKey)))
 	rows.RawSetInt(3, TableValue(kernelStatsRow))
 	rows.RawSetInt(4, TableValue(qCacheStatsRow(
+		"qsql_kernel_decision",
+		kernelDecisionEntries,
+		alignedStats.KernelDecisionHits,
+		alignedStats.KernelDecisionMisses,
+		alignedStats.KernelDecisionEvictions,
+		qSQLPlanCacheLimit,
+	)))
+	rows.RawSetInt(5, TableValue(qCacheStatsRow(
 		"q_query_kernel",
 		queryKernelEntries,
 		queryKernelStats.Hits,
@@ -2666,7 +2684,7 @@ func qCacheStatsTable() *Table {
 		queryKernelStats.Evictions,
 		qQueryKernelSupportCacheLimit,
 	)))
-	rows.RawSetInt(5, TableValue(qCacheStatsRow(
+	rows.RawSetInt(6, TableValue(qCacheStatsRow(
 		"q_eval",
 		evalEntries,
 		evalStats.Hits,

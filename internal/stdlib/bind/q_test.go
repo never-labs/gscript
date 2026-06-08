@@ -2882,7 +2882,7 @@ func TestQCacheStatsAndClearPublicAPI(t *testing.T) {
 			"after := q.cache_stats()\n")
 
 	before := qTestCacheStatsRows(t, interp.GetGlobal("before").Table())
-	if before["qsql_template"]["entries"] != 0 || before["qsql_aligned"]["entries"] != 0 || before["qsql_kernel"]["entries"] != 0 || before["q_eval"]["entries"] != 0 {
+	if before["qsql_template"]["entries"] != 0 || before["qsql_aligned"]["entries"] != 0 || before["qsql_kernel"]["entries"] != 0 || before["qsql_kernel_decision"]["entries"] != 0 || before["q_eval"]["entries"] != 0 {
 		t.Fatalf("initial cache entries = %#v, want all zero", before)
 	}
 
@@ -2895,6 +2895,9 @@ func TestQCacheStatsAndClearPublicAPI(t *testing.T) {
 	}
 	if got := stats["qsql_kernel"]; got["entries"] != 1 || got["hits"] != 1 || got["misses"] != 1 || got["evictions"] != 0 {
 		t.Fatalf("qsql_kernel stats = %#v, want 1 entry, 1 hit, 1 miss, 0 evictions", got)
+	}
+	if got := stats["qsql_kernel_decision"]; got["entries"] != 0 || got["hits"] != 0 || got["misses"] != 0 || got["evictions"] != 0 {
+		t.Fatalf("qsql_kernel_decision stats = %#v, want no unsupported decisions for supported query", got)
 	}
 	if got := stats["q_eval"]; got["entries"] != 1 || got["hits"] != 1 || got["misses"] != 1 || got["evictions"] != 0 {
 		t.Fatalf("q_eval stats = %#v, want 1 entry, 1 hit, 1 miss, 0 evictions", got)
@@ -4107,6 +4110,13 @@ func TestQSQLKernelUnsupportedDecisionCacheIsSchemaStable(t *testing.T) {
 	if stats.KernelMisses != 0 || stats.KernelHits != 0 || stats.KernelEvictions != 0 {
 		t.Fatalf("positive kernel cache stats = %+v, want unsupported decisions outside hit/miss/eviction stats", stats)
 	}
+	if stats.KernelDecisionMisses != 1 || stats.KernelDecisionHits != 1 || stats.KernelDecisionEvictions != 0 {
+		t.Fatalf("kernel decision cache stats = %+v, want one unsupported decision miss, one hit, zero evictions", stats)
+	}
+	cacheStats := qTestCacheStatsRows(t, qCacheStatsTable())
+	if got := cacheStats["qsql_kernel_decision"]; got["entries"] != 1 || got["hits"] != 1 || got["misses"] != 1 || got["evictions"] != 0 {
+		t.Fatalf("qsql_kernel_decision cache stats = %#v, want 1 entry, 1 hit, 1 miss, 0 evictions", got)
+	}
 }
 
 func TestQSQLAsofJoinExecution(t *testing.T) {
@@ -5203,7 +5213,7 @@ func qTestCacheStatsRows(t *testing.T, tbl *Table) map[string]map[string]int64 {
 		}
 		out[name.Str()] = values
 	}
-	for _, name := range []string{"qsql_template", "qsql_aligned", "qsql_kernel", "q_query_kernel", "q_eval"} {
+	for _, name := range []string{"qsql_template", "qsql_aligned", "qsql_kernel", "qsql_kernel_decision", "q_query_kernel", "q_eval"} {
 		if _, ok := out[name]; !ok {
 			t.Fatalf("cache stats missing row %q in %#v", name, out)
 		}
