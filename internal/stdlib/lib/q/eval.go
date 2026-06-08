@@ -7273,6 +7273,27 @@ func maxDyadic(left, right any) (any, error) {
 }
 
 func applyCompositeDyadic(op string, left, right any) (any, error) {
+	if dataOp, ok := qDataCompositeComparisonOp(op); ok {
+		la, lok := left.(data.Array)
+		ra, rok := right.(data.Array)
+		if lok || rok {
+			shape := qRuntimeKernelCompositeVectorDyadicShape(op, left, right, la, ra)
+			if !qVectorDyadicCanUseTypedCompare(left, right, la, ra) {
+				recordRuntimeKernelExecution("ArrayDyadicCompare", shape, "attempt", "attempt")
+				recordRuntimeKernelExecution("ArrayDyadicCompare", shape, "fallback", "unsupported_shape")
+			} else if out, handled, err := data.TryTypedDyadic(dataOp, left, right); err != nil || handled {
+				recordRuntimeKernelProbe("ArrayDyadicCompare", shape, handled, err)
+				if err != nil {
+					return nil, err
+				}
+				return out, nil
+			} else {
+				recordRuntimeKernelProbe("ArrayDyadicCompare", shape, handled, err)
+			}
+		} else if out, err := data.ApplyBinary(dataOp, left, right); err == nil {
+			return out, nil
+		}
+	}
 	var base any
 	var err error
 	switch op {
@@ -7311,6 +7332,19 @@ func invertBoolResult(v any) (any, error) {
 		return data.NewBool(out), nil
 	default:
 		return nil, fmt.Errorf("composite comparison produced %T", v)
+	}
+}
+
+func qDataCompositeComparisonOp(op string) (data.Op, bool) {
+	switch op {
+	case "<>":
+		return data.OpNE, true
+	case "<=":
+		return data.OpLE, true
+	case ">=":
+		return data.OpGE, true
+	default:
+		return "", false
 	}
 }
 
@@ -7519,6 +7553,12 @@ func qRuntimeKernelVectorDyadicShape(op byte, left, right any, la, ra data.Array
 	leftKind := qRuntimeKernelOperandKind(left, la)
 	rightKind := qRuntimeKernelOperandKind(right, ra)
 	return "vector-dyadic/" + string(op) + "/" + string(leftKind) + "/" + string(rightKind)
+}
+
+func qRuntimeKernelCompositeVectorDyadicShape(op string, left, right any, la, ra data.Array) string {
+	leftKind := qRuntimeKernelOperandKind(left, la)
+	rightKind := qRuntimeKernelOperandKind(right, ra)
+	return "vector-dyadic/" + op + "/" + string(leftKind) + "/" + string(rightKind)
 }
 
 func qVectorDyadicTypedOperands(left, right any, la, ra data.Array) (any, any, bool, error) {

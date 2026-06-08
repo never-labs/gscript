@@ -2316,7 +2316,19 @@ func TestEvalNonNumericComparisons(t *testing.T) {
 func TestEvalCompositeComparisons(t *testing.T) {
 	assertEvalArray(t, "10 20 30<>20", data.KindBool, []any{true, false, true})
 	assertEvalArray(t, "10 20 30<=20", data.KindBool, []any{true, true, false})
+	ClearRuntimeKernelExecutionStats()
 	assertEvalArray(t, "10 20 30>=20", data.KindBool, []any{false, true, true})
+	stats := RuntimeKernelExecutionStats()
+	foundCompositeCompare := false
+	for _, stat := range stats {
+		if stat.Kernel == "ArrayDyadicCompare" && stat.Shape == "vector-dyadic/>=/i64/i64" && stat.Outcome == "hit" {
+			foundCompositeCompare = true
+			break
+		}
+	}
+	if !foundCompositeCompare {
+		t.Fatalf("10 20 30>=20 did not record direct typed composite compare; stats=%#v", stats)
+	}
 	assertEvalArray(t, "where 10 20 30>=20", data.KindI64, []any{int64(1), int64(2)})
 
 	assertEvalArray(t, "`AAPL`MSFT`NVDA<>`MSFT", data.KindBool, []any{true, false, true})
