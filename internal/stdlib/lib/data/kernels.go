@@ -2371,6 +2371,9 @@ func TryTypedMovingMinMaxSum(array Array, width int, wantMax bool) (int64, bool,
 	if array.Len() == 0 {
 		return 0, true, nil
 	}
+	if out, ok := movingMinMaxSumI64Range(array, width, wantMax); ok {
+		return out, true, nil
+	}
 	dequeCap := width
 	if dequeCap > array.Len() {
 		dequeCap = array.Len()
@@ -2404,6 +2407,45 @@ func TryTypedMovingMinMaxSum(array Array, width int, wantMax bool) (int64, bool,
 		total += values[head%dequeCap]
 	}
 	return total, true, nil
+}
+
+func movingMinMaxSumI64Range(array Array, width int, wantMax bool) (int64, bool) {
+	values, ok := asI64RangeArray(array)
+	if !ok || !i64RangeIsMonotonic(values) {
+		return 0, false
+	}
+	if values.step == 0 {
+		return values.start * int64(values.len), true
+	}
+	useWindowStart := (values.step > 0 && !wantMax) || (values.step < 0 && wantMax)
+	if !useWindowStart {
+		return i64RangeSum(values), true
+	}
+	return movingWindowStartSumI64Range(values, width), true
+}
+
+func movingWindowStartSumI64Range(values i64RangeArray, width int) int64 {
+	if values.len == 0 {
+		return 0
+	}
+	if width >= values.len {
+		return values.start * int64(values.len)
+	}
+	repeatFirst := width
+	if repeatFirst > values.len {
+		repeatFirst = values.len
+	}
+	total := values.start * int64(repeatFirst)
+	tailLen := values.len - width
+	if tailLen <= 0 {
+		return total
+	}
+	tail := i64RangeArray{
+		start: values.start + values.step,
+		step:  values.step,
+		len:   tailLen,
+	}
+	return total + i64RangeSum(tail)
 }
 
 func TryTypedMovingNumericSumSum(array Array, width int, average bool) (any, bool, error) {

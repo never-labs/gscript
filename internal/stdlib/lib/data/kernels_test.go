@@ -261,6 +261,35 @@ func TestTypedRunningAndMovingIntegerKernels(t *testing.T) {
 		t.Fatalf("mmin sum = %d, want %d", minSum, want)
 	}
 
+	rangeMinSum, handled, err := TryTypedMovingMinMaxSum(NewI64Range(1, 1, 5), 3, false)
+	if err != nil {
+		t.Fatalf("TryTypedMovingMinMaxSum range min returned error: %v", err)
+	}
+	if !handled || rangeMinSum != 8 {
+		t.Fatalf("TryTypedMovingMinMaxSum range min = %v, %v; want 8, true", rangeMinSum, handled)
+	}
+	rangeMaxSum, handled, err := TryTypedMovingMinMaxSum(NewI64Range(1, 1, 5), 3, true)
+	if err != nil {
+		t.Fatalf("TryTypedMovingMinMaxSum range max returned error: %v", err)
+	}
+	if !handled || rangeMaxSum != 15 {
+		t.Fatalf("TryTypedMovingMinMaxSum range max = %v, %v; want 15, true", rangeMaxSum, handled)
+	}
+	descRangeMaxSum, handled, err := TryTypedMovingMinMaxSum(NewI64Range(5, -1, 5), 3, true)
+	if err != nil {
+		t.Fatalf("TryTypedMovingMinMaxSum descending range max returned error: %v", err)
+	}
+	if !handled || descRangeMaxSum != 22 {
+		t.Fatalf("TryTypedMovingMinMaxSum descending range max = %v, %v; want 22, true", descRangeMaxSum, handled)
+	}
+	wideRangeMinSum, handled, err := TryTypedMovingMinMaxSum(NewI64Range(1, 1, 5), 8, false)
+	if err != nil {
+		t.Fatalf("TryTypedMovingMinMaxSum wide range min returned error: %v", err)
+	}
+	if !handled || wideRangeMinSum != 5 {
+		t.Fatalf("TryTypedMovingMinMaxSum wide range min = %v, %v; want 5, true", wideRangeMinSum, handled)
+	}
+
 	movingSum, handled, err := TryTypedMovingNumericSumSum(NewI64([]int64{10, 20, 30, 40}), 3, false)
 	if err != nil {
 		t.Fatalf("TryTypedMovingNumericSumSum msum returned error: %v", err)
