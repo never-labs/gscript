@@ -3792,6 +3792,17 @@ func (s *EvalState) evalFby(leftExpr, groupExpr string) (any, error) {
 	if valueArray.Len() != groupArray.Len() {
 		return nil, fmt.Errorf("fby value length %d does not match group length %d", valueArray.Len(), groupArray.Len())
 	}
+	if agg == "sum" {
+		out, handled, err := data.TryTypedFbySum(valueArray, groupArray)
+		shape := "fby-sum/" + string(valueArray.Kind()) + "/" + string(groupArray.Kind())
+		recordRuntimeKernelProbe("ArrayFbySum", shape, handled, err)
+		if err != nil {
+			return nil, err
+		}
+		if handled {
+			return out, nil
+		}
+	}
 	groupRows := make(map[string][]int, groupArray.Len())
 	groupOrder := make([]string, 0, groupArray.Len())
 	for row, value := range groupArray.Values() {

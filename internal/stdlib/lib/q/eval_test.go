@@ -1854,6 +1854,7 @@ func TestEvalWhereRecordsTypedRuntimeKernel(t *testing.T) {
 	assertEvalValue(t, "count where 8#`AAPL`MSFT`NVDA`TSLA in `AAPL`MSFT", int64(4))
 	assertEvalValue(t, `count reverse "AAPL" "MSFT" "AMD"`, int64(3))
 	assertEvalArray(t, "x:til 8;x[where x>=4]", data.KindI64, []any{int64(4), int64(5), int64(6), int64(7)})
+	assertEvalArray(t, "sum 1 2 3 4 fby `a`a`b`b", data.KindI64, []any{int64(3), int64(3), int64(7), int64(7)})
 	assertEvalValue(t, "last ({x+y}\\[10;1 2 3])", int64(16))
 	assertEvalArray(t, "x:6#0;@[x;1 4;+;2 3]", data.KindI64, []any{int64(0), int64(2), int64(0), int64(0), int64(3), int64(0)})
 	assertEvalValue(t, "d:(count distinct)'`a`b!(1 1 2;3 3 3);a:d`a;b:d`b;a+b", int64(3))
@@ -1864,6 +1865,7 @@ func TestEvalWhereRecordsTypedRuntimeKernel(t *testing.T) {
 	seenInCount := false
 	seenCountReverse := false
 	seenGather := false
+	seenFbySum := false
 	seenLastCallableScan := false
 	seenAmend := false
 	seenEachCountDistinct := false
@@ -1886,6 +1888,9 @@ func TestEvalWhereRecordsTypedRuntimeKernel(t *testing.T) {
 		if stat.Kernel == "ArrayGatherI64Indexes" && stat.Shape == "gather/i64/i64" && stat.Outcome == "hit" && stat.ReasonCode == "typed_kernel" && stat.Count > 0 {
 			seenGather = true
 		}
+		if stat.Kernel == "ArrayFbySum" && stat.Shape == "fby-sum/i64/symbol" && stat.Outcome == "hit" && stat.ReasonCode == "typed_kernel" && stat.Count > 0 {
+			seenFbySum = true
+		}
 		if stat.Kernel == "CallableLastScan" && stat.Shape == "last-scan/i64" && stat.Outcome == "hit" && stat.ReasonCode == "typed_kernel" && stat.Count > 0 {
 			seenLastCallableScan = true
 		}
@@ -1896,8 +1901,8 @@ func TestEvalWhereRecordsTypedRuntimeKernel(t *testing.T) {
 			seenEachCountDistinct = true
 		}
 	}
-	if !seenWhereCompare || !seenWhereMask || !seenLikeCount || !seenInCount || !seenCountReverse || !seenGather || !seenLastCallableScan || !seenAmend || !seenEachCountDistinct {
-		t.Fatalf("missing where typed runtime stats: compare=%v mask=%v like=%v in=%v reverse=%v gather=%v lastScan=%v amend=%v eachDistinct=%v stats=%#v", seenWhereCompare, seenWhereMask, seenLikeCount, seenInCount, seenCountReverse, seenGather, seenLastCallableScan, seenAmend, seenEachCountDistinct, RuntimeKernelExecutionStats())
+	if !seenWhereCompare || !seenWhereMask || !seenLikeCount || !seenInCount || !seenCountReverse || !seenGather || !seenFbySum || !seenLastCallableScan || !seenAmend || !seenEachCountDistinct {
+		t.Fatalf("missing where typed runtime stats: compare=%v mask=%v like=%v in=%v reverse=%v gather=%v fbySum=%v lastScan=%v amend=%v eachDistinct=%v stats=%#v", seenWhereCompare, seenWhereMask, seenLikeCount, seenInCount, seenCountReverse, seenGather, seenFbySum, seenLastCallableScan, seenAmend, seenEachCountDistinct, RuntimeKernelExecutionStats())
 	}
 }
 

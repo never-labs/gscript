@@ -3115,6 +3115,24 @@ func TestTryTypedInCount(t *testing.T) {
 	}
 }
 
+func TestTryTypedFbySum(t *testing.T) {
+	out, ok, err := TryTypedFbySum(NewI64([]int64{1, 2, 3, 4}), NewSymbols([]string{"a", "a", "b", "b"}))
+	if err != nil || !ok {
+		t.Fatalf("TryTypedFbySum handled=%v err=%v; want true,nil", ok, err)
+	}
+	if got, want := out.Values(), []any{int64(3), int64(3), int64(7), int64(7)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("fby sum values = %#v, want %#v", got, want)
+	}
+	groups := takeRepeatMust(t, NewSymbols([]string{"a", "b"}), 5)
+	out, ok, err = TryTypedFbySum(NewI64Range(0, 1, 5), groups)
+	if err != nil || !ok {
+		t.Fatalf("TryTypedFbySum tiled handled=%v err=%v; want true,nil", ok, err)
+	}
+	if got, want := out.Values(), []any{int64(6), int64(4), int64(6), int64(4), int64(6)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("tiled fby sum values = %#v, want %#v", got, want)
+	}
+}
+
 func TestTryTypedStringCastAndCasePreserveTiledArrays(t *testing.T) {
 	repeated := takeRepeatMust(t, NewSymbols([]string{"aapl", "msft", "amd", "ask"}), 10)
 	cast, handled, err := TryTypedStringCast(repeated)
