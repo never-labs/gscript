@@ -118,6 +118,7 @@ const (
 	OP_VECTOR_COMPARE              // A B C : R(A) = compare(R(A), R(B), dense-array op C)
 	OP_VECTOR_MASK                 // A B C : R(A) = mask-combine(R(A), R(B), dense-array mask op C)
 	OP_VECTOR_WHERE                // A B C : R(A) = where(bool dense mask R(A), R(B), R(C))
+	OP_VECTOR_REDUCE               // A C : R(A) = reduce(dense-array R(A), dense-array reduce op C)
 	OP_VECTOR_GATHER               // A B : R(A) = gather(dense-array R(A), i64-indexes dense-array R(B))
 	OP_FRAME_FILTER_PROJECT        // A B C : R(A) = native frame R(B) filtered by mask R(A), projected by Constants[C]
 
@@ -286,6 +287,7 @@ var opNames = [...]string{
 	OP_VECTOR_COMPARE:              "VECTOR_COMPARE",
 	OP_VECTOR_MASK:                 "VECTOR_MASK",
 	OP_VECTOR_WHERE:                "VECTOR_WHERE",
+	OP_VECTOR_REDUCE:               "VECTOR_REDUCE",
 	OP_VECTOR_GATHER:               "VECTOR_GATHER",
 	OP_FRAME_FILTER_PROJECT:        "FRAME_FILTER_PROJECT",
 }

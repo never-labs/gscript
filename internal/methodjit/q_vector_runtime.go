@@ -533,3 +533,10 @@ func executeVectorWhereValue(maskVal, trueVal, falseVal runtime.Value) (runtime.
 	}
 	return runtime.DenseArrayValue(out), nil
 }
+
+func executeVectorReduceValue(opCode int, vectorVal runtime.Value) (runtime.Value, error) {
+	if !vectorVal.IsDenseArray() {
+		return runtime.NilValue(), fmt.Errorf("VectorReduce operand must be dense array (got %s)", vectorVal.TypeName())
+	}
+	return runtime.DenseArrayReduce(runtime.DenseArrayReduceOp(opCode), vectorVal.DenseArray())
+}

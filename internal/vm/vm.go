@@ -2681,6 +2681,24 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 				fb.Result.Observe(vm.regs[base+a].Type())
 			}
 
+		case OP_VECTOR_REDUCE:
+			a := DecodeA(inst)
+			op := runtime.DenseArrayReduceOp(DecodeC(inst))
+			vectorVal := vm.regs[base+a]
+			if !vectorVal.IsDenseArray() {
+				return nil, wrapLineErr(frame, fmt.Errorf("VECTOR_REDUCE operand must be dense array (got %s)", vectorVal.TypeName()))
+			}
+			out, err := runtime.DenseArrayReduce(op, vectorVal.DenseArray())
+			if err != nil {
+				return nil, wrapLineErr(frame, err)
+			}
+			vm.regs[base+a] = out
+			if frame.closure.Proto.Feedback != nil {
+				fb := &frame.closure.Proto.Feedback[frame.pc-1]
+				fb.Left.Observe(vectorVal.Type())
+				fb.Result.Observe(out.Type())
+			}
+
 		case OP_VECTOR_GATHER:
 			a := DecodeA(inst)
 			b := DecodeB(inst)

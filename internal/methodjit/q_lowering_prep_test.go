@@ -140,6 +140,40 @@ func TestVectorWhereBytecodeBuildsMethodJITIR(t *testing.T) {
 	}
 }
 
+func TestVectorReduceBytecodeBuildsMethodJITIR(t *testing.T) {
+	proto := &vm.FuncProto{
+		Name:     "vector_reduce",
+		MaxStack: 1,
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_VECTOR_REDUCE, 0, 0, int(runtime.DenseArrayReduceSum)),
+			vm.EncodeABC(vm.OP_RETURN, 0, 2, 0),
+		},
+	}
+
+	fn := BuildGraph(proto)
+	var reduce *Instr
+	for _, block := range fn.Blocks {
+		for _, instr := range block.Instrs {
+			if instr.Op == OpVectorReduce {
+				reduce = instr
+				break
+			}
+		}
+	}
+	if reduce == nil {
+		t.Fatalf("BuildGraph did not emit OpVectorReduce:\n%s", Print(fn))
+	}
+	if len(reduce.Args) != 1 {
+		t.Fatalf("OpVectorReduce arg count = %d, want 1", len(reduce.Args))
+	}
+	if reduce.Type != TypeAny {
+		t.Fatalf("OpVectorReduce type = %s, want Any", reduce.Type)
+	}
+	if reduce.Aux != int64(runtime.DenseArrayReduceSum) {
+		t.Fatalf("OpVectorReduce Aux = %d, want %d", reduce.Aux, runtime.DenseArrayReduceSum)
+	}
+}
+
 func TestFrameColumnBytecodeBuildsMethodJITIR(t *testing.T) {
 	proto := &vm.FuncProto{
 		Name:      "frame_column",
@@ -1726,6 +1760,22 @@ func TestTier2GateAllowsVectorWhereThroughOpExit(t *testing.T) {
 	}
 }
 
+func TestTier2GateAllowsVectorReduceThroughOpExit(t *testing.T) {
+	proto := &vm.FuncProto{
+		Name:     "vector_reduce",
+		MaxStack: 1,
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_VECTOR_REDUCE, 0, 0, int(runtime.DenseArrayReduceSum)),
+			vm.EncodeABC(vm.OP_RETURN, 0, 2, 0),
+		},
+	}
+
+	gate := firstUnsupportedTier2BytecodeGate(proto)
+	if !gate.Allowed {
+		t.Fatalf("OP_VECTOR_REDUCE should be Tier2-eligible via op-exit, got %q", gate.Reason)
+	}
+}
+
 func TestFrameLenRuntimeHelperUsesRuntimePrimitive(t *testing.T) {
 	frame := runtime.NewTable()
 	frame.SetNativePayloadWithInfo(struct{}{}, runtime.NativePayloadInfo{
@@ -2141,6 +2191,19 @@ func TestVectorWhereRuntimeHelperUsesRuntimePrimitive(t *testing.T) {
 	got, ok := result.DenseArray().I64()
 	if !ok || len(got) != 3 || got[0] != 10 || got[1] != 7 || got[2] != 30 {
 		t.Fatalf("vector where values = %#v, want [10 7 30]", got)
+	}
+}
+
+func TestVectorReduceRuntimeHelperUsesRuntimePrimitive(t *testing.T) {
+	result, err := executeVectorReduceValue(
+		int(runtime.DenseArrayReduceMax),
+		runtime.DenseArrayValue(runtime.NewDenseArrayF64([]float64{1.5, 6.25, 2.0})),
+	)
+	if err != nil {
+		t.Fatalf("execute vector reduce: %v", err)
+	}
+	if !result.IsFloat() || result.Float() != 6.25 {
+		t.Fatalf("vector reduce result = %#v, want float 6.25", result)
 	}
 }
 
