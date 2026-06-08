@@ -3,6 +3,7 @@ package bind
 import (
 	"container/heap"
 	"sort"
+	"strings"
 	"testing"
 	"time"
 
@@ -13,6 +14,101 @@ var qSQLBindBenchSink Value
 var qSQLNativeBenchSink int64
 var qSQLDataFrameBenchSink data.Frame
 var qSQLNativeJoinRowsBenchSink qSQLNativeJoinRows
+
+type qSQLBenchmarkCase struct {
+	name string
+	tags []string
+}
+
+var qSQLBenchmarkCases = []qSQLBenchmarkCase{
+	{
+		name: "BenchmarkQSQLBindRunSQLWarmCacheSelectWhereProject",
+		tags: []string{"qsql", "bind", "warm-cache", "select", "where", "project", "order", "take", "typed-filter", "kernel-stats"},
+	},
+	{
+		name: "BenchmarkQSQLBindRunSQLColdCacheSelectWhereProject",
+		tags: []string{"qsql", "bind", "cold-cache", "select", "where", "project", "order", "take", "typed-filter", "kernel-stats"},
+	},
+	{
+		name: "BenchmarkQSQLBindFastArg2WarmCacheSelectWhereProject",
+		tags: []string{"qsql", "bind-fastarg", "warm-cache", "select", "where", "project", "order", "take", "typed-filter", "kernel-stats"},
+	},
+	{
+		name: "BenchmarkQSQLBindRunSQLWarmCacheGroupByAggregate",
+		tags: []string{"qsql", "bind", "warm-cache", "group", "aggregate", "computed-aggregate", "symbol-key", "typed-filter", "kernel-stats"},
+	},
+	{
+		name: "BenchmarkQSQLBindRunSQLWarmCacheJoin",
+		tags: []string{"qsql", "bind", "warm-cache", "join", "inner-join", "symbol-key", "order", "take", "kernel-stats"},
+	},
+	{
+		name: "BenchmarkQSQLNativeGoSelectWhereProject",
+		tags: []string{"native-go", "select", "where", "project", "order", "take"},
+	},
+	{
+		name: "BenchmarkQSQLNativeGoGroupByAggregate",
+		tags: []string{"native-go", "group", "aggregate", "computed-aggregate", "symbol-key"},
+	},
+	{
+		name: "BenchmarkQSQLNativeGoJoin",
+		tags: []string{"native-go", "join", "inner-join", "symbol-key", "order", "take"},
+	},
+	{
+		name: "BenchmarkQSQLNativeGoJoinTopK",
+		tags: []string{"native-go", "join", "inner-join", "topk", "symbol-key", "order", "take"},
+	},
+	{
+		name: "BenchmarkQSQLNativeGoJoinTopKMaterialized",
+		tags: []string{"native-go", "join", "inner-join", "topk", "materialized", "symbol-key", "order", "take"},
+	},
+	{
+		name: "BenchmarkQSQLDataRuntimeJoinTopK",
+		tags: []string{"data-runtime", "join", "inner-join", "topk", "frame-primitive", "symbol-key", "order", "take"},
+	},
+}
+
+var qSQLRequiredBenchmarkTags = []string{
+	"qsql",
+	"bind",
+	"warm-cache",
+	"cold-cache",
+	"bind-fastarg",
+	"select",
+	"where",
+	"project",
+	"order",
+	"take",
+	"group",
+	"aggregate",
+	"computed-aggregate",
+	"join",
+	"inner-join",
+	"symbol-key",
+	"typed-filter",
+	"kernel-stats",
+	"native-go",
+	"data-runtime",
+	"topk",
+	"frame-primitive",
+}
+
+func TestQSQLBenchmarkCoverageTags(t *testing.T) {
+	covered := make(map[string][]string)
+	for _, tc := range qSQLBenchmarkCases {
+		for _, tag := range tc.tags {
+			covered[tag] = append(covered[tag], tc.name)
+		}
+	}
+	var missing []string
+	for _, tag := range qSQLRequiredBenchmarkTags {
+		if len(covered[tag]) == 0 {
+			missing = append(missing, tag)
+		}
+	}
+	if len(missing) > 0 {
+		t.Fatalf("qSQL benchmark coverage missing tags: %s", strings.Join(missing, ", "))
+	}
+}
 
 func BenchmarkQSQLBindRunSQLWarmCacheSelectWhereProject(b *testing.B) {
 	qClearCaches()

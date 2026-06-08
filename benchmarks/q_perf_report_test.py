@@ -48,6 +48,15 @@ class QPerfReportTest(unittest.TestCase):
         self.assertIn("q.eval", coverage["fallback rate"]["gap"])
         self.assertEqual(coverage["allocs/op"]["q.eval"], "covered")
 
+    def test_qsql_benchmark_coverage_reports_missing_expected_rows(self):
+        rows = report.parse_go_benchmarks(SAMPLE)
+        coverage = report.build_qsql_benchmark_coverage(rows)
+
+        self.assertEqual(coverage.leia_case_count, 2)
+        self.assertEqual(coverage.native_go_case_count, 1)
+        self.assertEqual(coverage.data_runtime_case_count, 0)
+        self.assertIn("BenchmarkQSQLBindRunSQLWarmCacheGroupByAggregate", coverage.missing_expected)
+
     def test_main_can_write_report_from_existing_output(self):
         with tempfile.TemporaryDirectory() as td:
             td_path = Path(td)
@@ -61,6 +70,7 @@ class QPerfReportTest(unittest.TestCase):
             self.assertEqual(code, 0)
             payload = json.loads(json_path.read_text())
             self.assertIn("BenchmarkQEvalVectorResultCacheWarm/MaskWhere", payload["benchmarks"])
+            self.assertIn("qsql_benchmark_coverage", payload)
             self.assertIn("q Performance Completeness Report", md_path.read_text())
 
 

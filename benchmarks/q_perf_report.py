@@ -82,6 +82,31 @@ class QEvalComputeCoverage:
     orphan_go_baseline: list[str]
 
 
+@dataclass
+class QSQLBenchmarkCoverage:
+    leia_case_count: int
+    native_go_case_count: int
+    data_runtime_case_count: int
+    expected_case_count: int
+    matched_expected_count: int
+    missing_expected: list[str]
+
+
+QSQL_EXPECTED_BENCHMARKS = {
+    "BenchmarkQSQLBindRunSQLWarmCacheSelectWhereProject",
+    "BenchmarkQSQLBindRunSQLColdCacheSelectWhereProject",
+    "BenchmarkQSQLBindFastArg2WarmCacheSelectWhereProject",
+    "BenchmarkQSQLBindRunSQLWarmCacheGroupByAggregate",
+    "BenchmarkQSQLBindRunSQLWarmCacheJoin",
+    "BenchmarkQSQLNativeGoSelectWhereProject",
+    "BenchmarkQSQLNativeGoGroupByAggregate",
+    "BenchmarkQSQLNativeGoJoin",
+    "BenchmarkQSQLNativeGoJoinTopK",
+    "BenchmarkQSQLNativeGoJoinTopKMaterialized",
+    "BenchmarkQSQLDataRuntimeJoinTopK",
+}
+
+
 def run_command(label: str, cmd: list[str]) -> CommandResult:
     proc = subprocess.run(
         cmd,
@@ -161,6 +186,30 @@ def build_qeval_compute_coverage(rows: dict[str, BenchRow]) -> QEvalComputeCover
         missing_result_cache_warm=sorted(session - warm),
         missing_cold=sorted(session - cold),
         orphan_go_baseline=sorted(go - session),
+    )
+
+
+def build_qsql_benchmark_coverage(rows: dict[str, BenchRow]) -> QSQLBenchmarkCoverage:
+    present = set(rows)
+    return QSQLBenchmarkCoverage(
+        leia_case_count=sum(
+            1
+            for name in rows
+            if name.startswith("BenchmarkQSQLBind")
+        ),
+        native_go_case_count=sum(
+            1
+            for name in rows
+            if name.startswith("BenchmarkQSQLNativeGo")
+        ),
+        data_runtime_case_count=sum(
+            1
+            for name in rows
+            if name.startswith("BenchmarkQSQLDataRuntime")
+        ),
+        expected_case_count=len(QSQL_EXPECTED_BENCHMARKS),
+        matched_expected_count=len(QSQL_EXPECTED_BENCHMARKS & present),
+        missing_expected=sorted(QSQL_EXPECTED_BENCHMARKS - present),
     )
 
 
@@ -290,6 +339,7 @@ def format_float(value: float | None) -> str:
 
 def markdown_report(rows: dict[str, BenchRow], commands: list[CommandResult]) -> str:
     coverage = build_coverage(rows)
+    qsql_coverage = build_qsql_benchmark_coverage(rows)
     qeval_compute = build_qeval_compute_coverage(rows)
     ratios = build_ratios(rows)
     lines = [
@@ -312,6 +362,27 @@ def markdown_report(rows: dict[str, BenchRow], commands: list[CommandResult]) ->
     )
     for item in coverage:
         lines.append(f"| {item['signal']} | {item['qSQL']} | {item['q.eval']} | {item['gap']} |")
+    lines.extend(
+        [
+            "",
+            "## qSQL Benchmark Coverage",
+            "",
+            "| Signal | Count |",
+            "|---|---:|",
+            f"| Leia bind cases | {qsql_coverage.leia_case_count} |",
+            f"| native Go baseline cases | {qsql_coverage.native_go_case_count} |",
+            f"| data runtime direct cases | {qsql_coverage.data_runtime_case_count} |",
+            f"| expected qSQL benchmark rows | {qsql_coverage.expected_case_count} |",
+            f"| expected qSQL benchmark rows present | {qsql_coverage.matched_expected_count} |",
+            "",
+            "### Missing qSQL benchmark rows",
+            "",
+        ]
+    )
+    if qsql_coverage.missing_expected:
+        lines.extend(f"- `{item}`" for item in qsql_coverage.missing_expected)
+    else:
+        lines.append("- none")
     lines.extend(
         [
             "",
@@ -436,6 +507,7 @@ def main(argv: list[str]) -> int:
         "commands": [asdict(command) for command in commands],
         "benchmarks": {name: asdict(row) for name, row in sorted(rows.items())},
         "coverage": build_coverage(rows),
+        "qsql_benchmark_coverage": asdict(build_qsql_benchmark_coverage(rows)),
         "q_eval_compute_coverage": asdict(build_qeval_compute_coverage(rows)),
         "ratios": [asdict(row) for row in build_ratios(rows)],
     }
