@@ -659,6 +659,9 @@ func (s *EvalState) eval(src string) (any, error) {
 		if out, handled, err := s.tryEvalLastScan(strings.TrimSpace(src[len("last "):])); err != nil || handled {
 			return out, err
 		}
+		if out, handled, err := s.tryEvalLastCallableScan(strings.TrimSpace(src[len("last "):])); err != nil || handled {
+			return out, err
+		}
 	}
 	for _, prefix := range []struct {
 		word string
@@ -3593,6 +3596,106 @@ func (s *EvalState) tryEvalLastScan(src string) (any, bool, error) {
 		return out, true, err
 	}
 	return nil, false, nil
+}
+
+func (s *EvalState) tryEvalLastCallableScan(src string) (any, bool, error) {
+	fnSrc, initialSrc, valueSrc, ok := parseCallableScanApplication(stripEnclosingParens(src))
+	if !ok {
+		return nil, false, nil
+	}
+	fn, err := s.eval(fnSrc)
+	if err != nil {
+		return nil, true, err
+	}
+	if !isCallable(fn) {
+		return nil, false, nil
+	}
+	var initial any
+	if initialSrc != "" {
+		initial, err = s.eval(initialSrc)
+		if err != nil {
+			return nil, true, err
+		}
+	}
+	value, err := s.eval(valueSrc)
+	if err != nil {
+		return nil, true, err
+	}
+	out, err := s.applyOverCallable(fn, initial, value)
+	recordRuntimeKernelProbe("CallableLastScan", "last-scan/"+string(qRuntimeKernelOperandKind(value, nil)), err == nil, err)
+	return out, true, err
+}
+
+func parseCallableScanApplication(src string) (fnSrc, initialSrc, valueSrc string, ok bool) {
+	if !strings.HasSuffix(src, "]") {
+		return "", "", "", false
+	}
+	open := findMatchingCallOpen(src)
+	if open < 0 {
+		return "", "", "", false
+	}
+	head := strings.TrimSpace(src[:open])
+	if !strings.HasSuffix(head, "\\") {
+		return "", "", "", false
+	}
+	fnSrc = strings.TrimSpace(head[:len(head)-1])
+	if fnSrc == "" {
+		return "", "", "", false
+	}
+	args := splitTopLevel(src[open+1:len(src)-1], ';')
+	switch len(args) {
+	case 1:
+		valueSrc = strings.TrimSpace(args[0])
+	case 2:
+		initialSrc = strings.TrimSpace(args[0])
+		valueSrc = strings.TrimSpace(args[1])
+	default:
+		return "", "", "", false
+	}
+	if valueSrc == "" {
+		return "", "", "", false
+	}
+	return fnSrc, initialSrc, valueSrc, true
+}
+
+func findMatchingCallOpen(src string) int {
+	depthParen, depthBracket, depthBrace := 0, 0, 0
+	inString := false
+	for i := len(src) - 1; i >= 0; i-- {
+		ch := src[i]
+		if inString {
+			if ch == '"' && (i == 0 || src[i-1] != '\\') {
+				inString = false
+			}
+			continue
+		}
+		switch ch {
+		case '"':
+			inString = true
+		case ')':
+			depthParen++
+		case '(':
+			if depthParen > 0 {
+				depthParen--
+			}
+		case '}':
+			depthBrace++
+		case '{':
+			if depthBrace > 0 {
+				depthBrace--
+			}
+		case ']':
+			depthBracket++
+		case '[':
+			if depthBracket > 0 {
+				depthBracket--
+				if depthBracket == 0 && depthParen == 0 && depthBrace == 0 {
+					return i
+				}
+			}
+		}
+	}
+	return -1
 }
 
 func splitTopLevelArithmeticOperator(src string) (string, byte, string, bool) {
@@ -9874,14 +9977,7 @@ func take(n int, v any) (any, error) {
 		if n == 0 {
 			return data.NewAny(nil), nil
 		}
-		if n < 0 {
-			n = -n
-		}
-		out := make([]any, n)
-		for i := range out {
-			out[i] = v
-		}
-		return data.NewAny(out), nil
+		return data.TakeRepeat(inferQArray([]any{v}, qKindOfValue(v)), n)
 	}
 }
 
