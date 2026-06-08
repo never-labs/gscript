@@ -714,6 +714,14 @@ func accumulateIndexedAggregate(state *aggregateState, agg aggregateInput, rows 
 	case "count":
 		state.count = int64(len(rows))
 		return nil
+	case "sum", "avg":
+		sum, count, ok, err := typedKernels.NumericSumRows(agg.column, rows)
+		if err != nil || ok {
+			state.sum = sum
+			state.count = count
+			return err
+		}
+		fallthrough
 	default:
 		for _, row := range rows {
 			if err := accumulateIndexedAggregateRow(state, agg, row); err != nil {
@@ -966,6 +974,54 @@ func (typedKernelRegistry) NumericSum(array Array) (float64, int64, bool, error)
 		var sum float64
 		var count int64
 		for _, v := range a.data {
+			if IsNull(v) {
+				continue
+			}
+			n, ok := numeric(v)
+			if !ok {
+				return 0, 0, true, fmt.Errorf("sum expects numeric values, got %T (%v)", v, v)
+			}
+			sum += n
+			count++
+		}
+		return sum, count, true, nil
+	default:
+		return 0, 0, false, nil
+	}
+}
+
+func (typedKernelRegistry) NumericSumRows(array Array, rows []int) (float64, int64, bool, error) {
+	switch a := array.(type) {
+	case attributedArray:
+		return typedKernels.NumericSumRows(a.array, rows)
+	case columnArray[int8]:
+		return numericSumRowsSlice(a.data, rows)
+	case columnArray[int16]:
+		return numericSumRowsSlice(a.data, rows)
+	case columnArray[int32]:
+		return numericSumRowsSlice(a.data, rows)
+	case columnArray[int64]:
+		return numericSumRowsSlice(a.data, rows)
+	case columnArray[uint8]:
+		return numericSumRowsSlice(a.data, rows)
+	case columnArray[uint16]:
+		return numericSumRowsSlice(a.data, rows)
+	case columnArray[uint32]:
+		return numericSumRowsSlice(a.data, rows)
+	case columnArray[uint64]:
+		return numericSumRowsSlice(a.data, rows)
+	case columnArray[float32]:
+		return numericSumRowsSlice(a.data, rows)
+	case columnArray[float64]:
+		return numericSumRowsSlice(a.data, rows)
+	case nullableArray:
+		var sum float64
+		var count int64
+		for _, row := range rows {
+			if row < 0 || row >= len(a.data) {
+				return 0, 0, true, fmt.Errorf("sum row %d out of range", row)
+			}
+			v := a.data[row]
 			if IsNull(v) {
 				continue
 			}
@@ -1953,6 +2009,17 @@ func numericSumSlice[T signedScalar | unsignedScalar | floatScalar](values []T) 
 		sum += float64(v)
 	}
 	return sum, int64(len(values)), true, nil
+}
+
+func numericSumRowsSlice[T signedScalar | unsignedScalar | floatScalar](values []T, rows []int) (float64, int64, bool, error) {
+	var sum float64
+	for _, row := range rows {
+		if row < 0 || row >= len(values) {
+			return 0, 0, true, fmt.Errorf("sum row %d out of range", row)
+		}
+		sum += float64(values[row])
+	}
+	return sum, int64(len(rows)), true, nil
 }
 
 func minMax(array Array, mode string) (any, bool, bool, error) {

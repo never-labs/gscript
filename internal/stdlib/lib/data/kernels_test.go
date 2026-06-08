@@ -1687,6 +1687,24 @@ func TestTypedNumericUnaryBinaryAndAggregates(t *testing.T) {
 		t.Fatalf("NumericSum = %v, %d, %v; want 5.25, 2, true", total, count, ok)
 	}
 
+	total, count, ok, err = typedKernels.NumericSumRows(NewI32([]int32{10, 20, 30, 40}), []int{2, 0, 2})
+	if err != nil {
+		t.Fatalf("NumericSumRows returned error: %v", err)
+	}
+	if !ok || total != 70 || count != 3 {
+		t.Fatalf("NumericSumRows = %v, %d, %v; want 70, 3, true", total, count, ok)
+	}
+	total, count, ok, err = typedKernels.NumericSumRows(NewColumn("x", []any{float64(1.25), nil, int64(4)}).Data, []int{0, 1, 2})
+	if err != nil {
+		t.Fatalf("nullable NumericSumRows returned error: %v", err)
+	}
+	if !ok || total != 5.25 || count != 2 {
+		t.Fatalf("nullable NumericSumRows = %v, %d, %v; want 5.25, 2, true", total, count, ok)
+	}
+	if _, _, _, err := typedKernels.NumericSumRows(NewI32([]int32{1}), []int{1}); err == nil {
+		t.Fatal("NumericSumRows accepted row past end")
+	}
+
 	min, has, ok, err := typedKernels.Min(NewTimestamp([]Timestamp{30, 10, 20}))
 	if err != nil {
 		t.Fatalf("Min returned error: %v", err)
