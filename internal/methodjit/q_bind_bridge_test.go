@@ -1,9 +1,8 @@
-package bind_test
+package methodjit
 
 import (
 	"testing"
 
-	"github.com/never-labs/leia/internal/methodjit"
 	"github.com/never-labs/leia/internal/runtime"
 	qbind "github.com/never-labs/leia/internal/stdlib/bind"
 	"github.com/never-labs/leia/internal/vm"
@@ -33,7 +32,7 @@ func TestQRuntimeKernelExecutionStatsProviderAggregatesMethodJITDiagnoseRoutesAn
 		runtime.DenseArrayValue(runtime.NewDenseArrayI64([]int64{40, 50, 60})),
 		runtime.IntValue(0),
 	}
-	report := methodjit.Diagnose(proto, args)
+	report := Diagnose(proto, args)
 	if report.NativeError != nil {
 		t.Fatalf("Diagnose native error: %v\n%s", report.NativeError, report.String())
 	}
@@ -41,9 +40,9 @@ func TestQRuntimeKernelExecutionStatsProviderAggregatesMethodJITDiagnoseRoutesAn
 		t.Fatalf("Diagnose QKernelExecutionStats empty:\n%s", report.String())
 	}
 
-	restore := qbind.SetMappedQRuntimeKernelExecutionStatsProvider(func() []methodjit.QKernelExecutionStat {
+	restore := qbind.SetMappedQRuntimeKernelExecutionStatsProvider(func() []QKernelExecutionStat {
 		return report.QKernelExecutionStats
-	}, func(stat methodjit.QKernelExecutionStat) qbind.QRuntimeKernelExecutionStat {
+	}, func(stat QKernelExecutionStat) qbind.QRuntimeKernelExecutionStat {
 		return qbind.QRuntimeKernelExecutionStat{
 			Source:  stat.Source,
 			Kernel:  stat.Kernel,
@@ -55,53 +54,53 @@ func TestQRuntimeKernelExecutionStatsProviderAggregatesMethodJITDiagnoseRoutesAn
 	})
 	defer restore()
 
-	row := qCacheStatsRow(t, qCacheStats(t), "q_runtime_kernel_execution")
-	assertIntField(t, row, "executions", 4)
-	assertIntField(t, row, "successes", 4)
-	assertIntField(t, row, "errors", 0)
+	row := qBindCacheStatsRow(t, qBindCacheStats(t), "q_runtime_kernel_execution")
+	qBindAssertIntField(t, row, "executions", 4)
+	qBindAssertIntField(t, row, "successes", 4)
+	qBindAssertIntField(t, row, "errors", 0)
 
-	stat := nestedRowByFields(t, row, "stats", map[string]string{
+	stat := qBindNestedRowByFields(t, row, "stats", map[string]string{
 		"source":  "methodjit_q_vector_runtime",
 		"kernel":  "QVectorWhereReduce",
 		"shape":   "compare/vector-where/vector-reduce",
 		"route":   "typed_runtime_op_exit",
 		"outcome": "success",
 	})
-	assertIntField(t, stat, "count", 2)
-	stat = nestedRowByFields(t, row, "stats", map[string]string{
+	qBindAssertIntField(t, stat, "count", 2)
+	stat = qBindNestedRowByFields(t, row, "stats", map[string]string{
 		"source":  "methodjit_q_vector_runtime",
 		"kernel":  "VectorCompare",
 		"shape":   "vector-compare",
 		"route":   "typed_runtime_op_exit",
 		"outcome": "success",
 	})
-	assertIntField(t, stat, "count", 2)
+	qBindAssertIntField(t, stat, "count", 2)
 
-	kernel := nestedRowByFields(t, row, "kernels", map[string]string{
+	kernel := qBindNestedRowByFields(t, row, "kernels", map[string]string{
 		"source":  "methodjit_q_vector_runtime",
 		"kernel":  "QVectorWhereReduce",
 		"outcome": "success",
 	})
-	assertIntField(t, kernel, "count", 2)
-	kernel = nestedRowByFields(t, row, "kernels", map[string]string{
+	qBindAssertIntField(t, kernel, "count", 2)
+	kernel = qBindNestedRowByFields(t, row, "kernels", map[string]string{
 		"source":  "methodjit_q_vector_runtime",
 		"kernel":  "VectorCompare",
 		"outcome": "success",
 	})
-	assertIntField(t, kernel, "count", 2)
+	qBindAssertIntField(t, kernel, "count", 2)
 
-	shape := nestedRowByFields(t, row, "shapes", map[string]string{
+	shape := qBindNestedRowByFields(t, row, "shapes", map[string]string{
 		"source":  "methodjit_q_vector_runtime",
 		"shape":   "compare/vector-where/vector-reduce",
 		"outcome": "success",
 	})
-	assertIntField(t, shape, "count", 2)
-	shape = nestedRowByFields(t, row, "shapes", map[string]string{
+	qBindAssertIntField(t, shape, "count", 2)
+	shape = qBindNestedRowByFields(t, row, "shapes", map[string]string{
 		"source":  "methodjit_q_vector_runtime",
 		"shape":   "vector-compare",
 		"outcome": "success",
 	})
-	assertIntField(t, shape, "count", 2)
+	qBindAssertIntField(t, shape, "count", 2)
 }
 
 func TestQRuntimeKernelLoweringStatsProviderMapsMethodJITFallbacks(t *testing.T) {
@@ -125,14 +124,14 @@ func TestQRuntimeKernelLoweringStatsProviderMapsMethodJITFallbacks(t *testing.T)
 		runtime.TableValue(qMethodJITBridgeFrame(t)),
 		runtime.DenseArrayValue(runtime.NewDenseArrayI64([]int64{3, 1})),
 	}
-	report := methodjit.Diagnose(proto, args)
+	report := Diagnose(proto, args)
 	if report.NativeError != nil {
 		t.Fatalf("Diagnose native error: %v\n%s", report.NativeError, report.String())
 	}
 
-	restore := qbind.SetMappedQRuntimeKernelLoweringStatsProvider(func() []methodjit.QKernelDescriptor {
+	restore := qbind.SetMappedQRuntimeKernelLoweringStatsProvider(func() []QKernelDescriptor {
 		return report.QKernelDescriptors
-	}, func(stat methodjit.QKernelDescriptor) qbind.QRuntimeKernelLoweringStat {
+	}, func(stat QKernelDescriptor) qbind.QRuntimeKernelLoweringStat {
 		if stat.Kind != "fallback" {
 			return qbind.QRuntimeKernelLoweringStat{}
 		}
@@ -150,12 +149,12 @@ func TestQRuntimeKernelLoweringStatsProviderMapsMethodJITFallbacks(t *testing.T)
 	})
 	defer restore()
 
-	row := qCacheStatsRow(t, qCacheStats(t), "q_runtime_kernel_lowering")
-	assertIntField(t, row, "lowerings", 1)
-	assertIntField(t, row, "supported", 0)
-	assertIntField(t, row, "fallbacks", 1)
+	row := qBindCacheStatsRow(t, qBindCacheStats(t), "q_runtime_kernel_lowering")
+	qBindAssertIntField(t, row, "lowerings", 1)
+	qBindAssertIntField(t, row, "supported", 0)
+	qBindAssertIntField(t, row, "fallbacks", 1)
 
-	stat := nestedRowByFields(t, row, "stats", map[string]string{
+	stat := qBindNestedRowByFields(t, row, "stats", map[string]string{
 		"source":        "methodjit_q_vector_lowering",
 		"kind":          "fallback",
 		"kernel":        "QVectorGatherReduce",
@@ -165,17 +164,17 @@ func TestQRuntimeKernelLoweringStatsProviderMapsMethodJITFallbacks(t *testing.T)
 		"reason_family": "lowering",
 		"reason_code":   "shared_gather",
 	})
-	assertIntField(t, stat, "count", 1)
+	qBindAssertIntField(t, stat, "count", 1)
 
-	reason := nestedRowByFields(t, row, "reasons", map[string]string{
+	reason := qBindNestedRowByFields(t, row, "reasons", map[string]string{
 		"source":        "methodjit_q_vector_lowering",
 		"kind":          "fallback",
 		"reason_family": "lowering",
 		"reason_code":   "shared_gather",
 	})
-	assertIntField(t, reason, "count", 1)
+	qBindAssertIntField(t, reason, "count", 1)
 
-	reasonShape := nestedRowByFields(t, row, "reason_shapes", map[string]string{
+	reasonShape := qBindNestedRowByFields(t, row, "reason_shapes", map[string]string{
 		"source":        "methodjit_q_vector_lowering",
 		"kind":          "fallback",
 		"kernel":        "QVectorGatherReduce",
@@ -185,16 +184,16 @@ func TestQRuntimeKernelLoweringStatsProviderMapsMethodJITFallbacks(t *testing.T)
 		"reason_family": "lowering",
 		"reason_code":   "shared_gather",
 	})
-	assertIntField(t, reasonShape, "count", 1)
+	qBindAssertIntField(t, reasonShape, "count", 1)
 
-	route := nestedRowByFields(t, row, "routes", map[string]string{
+	route := qBindNestedRowByFields(t, row, "routes", map[string]string{
 		"source":  "methodjit_q_vector_lowering",
 		"kind":    "fallback",
 		"kernel":  "QVectorGatherReduce",
 		"route":   "lowering",
 		"outcome": "fallback",
 	})
-	assertIntField(t, route, "count", 1)
+	qBindAssertIntField(t, route, "count", 1)
 }
 
 func qMethodJITBridgeFrame(t *testing.T) *runtime.Table {
@@ -216,7 +215,7 @@ func qMethodJITBridgeFrame(t *testing.T) *runtime.Table {
 	return frame
 }
 
-func qCacheStats(t *testing.T) *runtime.Table {
+func qBindCacheStats(t *testing.T) *runtime.Table {
 	t.Helper()
 	fn := qbind.BuildQ().RawGetString("cache_stats").GoFunction()
 	if fn == nil {
@@ -232,7 +231,7 @@ func qCacheStats(t *testing.T) *runtime.Table {
 	return values[0].Table()
 }
 
-func qCacheStatsRow(t *testing.T, tbl *runtime.Table, cache string) *runtime.Table {
+func qBindCacheStatsRow(t *testing.T, tbl *runtime.Table, cache string) *runtime.Table {
 	t.Helper()
 	for i := int64(1); i <= int64(tbl.Length()); i++ {
 		row := tbl.RawGetInt(i).Table()
@@ -248,7 +247,7 @@ func qCacheStatsRow(t *testing.T, tbl *runtime.Table, cache string) *runtime.Tab
 	return nil
 }
 
-func nestedRowByFields(t *testing.T, row *runtime.Table, field string, want map[string]string) *runtime.Table {
+func qBindNestedRowByFields(t *testing.T, row *runtime.Table, field string, want map[string]string) *runtime.Table {
 	t.Helper()
 	nested := row.RawGetString(field).Table()
 	if nested == nil {
@@ -275,7 +274,7 @@ func nestedRowByFields(t *testing.T, row *runtime.Table, field string, want map[
 	return nil
 }
 
-func assertIntField(t *testing.T, row *runtime.Table, field string, want int64) {
+func qBindAssertIntField(t *testing.T, row *runtime.Table, field string, want int64) {
 	t.Helper()
 	if got := row.RawGetString(field); !got.IsInt() || got.Int() != want {
 		t.Fatalf("%s = %v, want %d", field, got, want)

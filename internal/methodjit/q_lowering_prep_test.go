@@ -962,6 +962,34 @@ func TestQFrameRuntimePrimitiveDiagnoseExecutionStats(t *testing.T) {
 	}
 }
 
+func TestQTypedRuntimeKernelErrorStatsAreObservable(t *testing.T) {
+	proto := &vm.FuncProto{
+		Name:      "q_runtime_kernel_error_stats",
+		NumParams: 1,
+		MaxStack:  1,
+		Constants: []runtime.Value{
+			runtime.StringValue("missing"),
+		},
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_FRAME_COLUMN, 0, 0, 0),
+			vm.EncodeABC(vm.OP_RETURN, 0, 2, 0),
+		},
+	}
+
+	report := Diagnose(proto, []runtime.Value{runtime.TableValue(qHotPathTestFrame(t))})
+	if report.NativeError == nil {
+		t.Fatalf("Diagnose native error = nil, want missing column error\n%s", report.String())
+	}
+	assertQKernelDescriptor(t, report.QKernelDescriptors, "methodjit_q_frame_runtime", "runtime_kernel", "FrameColumn", "column", "typed_runtime_op_exit", "supported", "")
+	assertQKernelExecutionStat(t, report.QKernelExecutionStats, "methodjit_q_frame_runtime", "FrameColumn", "column", "typed_runtime_op_exit", "error", 1)
+	assertQKernelExecutionRouteSummary(t, report.QKernelExecutionRoutes, "methodjit_q_frame_runtime", "FrameColumn", "typed_runtime_op_exit", "error", 1)
+	assertQKernelShapeSummaryExecution(t, report.QKernelShapeSummary, "methodjit_q_frame_runtime", "runtime_kernel", "column", "supported", 1, 0, 1)
+	if !strings.Contains(report.String(), "source=methodjit_q_frame_runtime kernel=FrameColumn shape=column route=typed_runtime_op_exit outcome=error count=1") ||
+		!strings.Contains(report.String(), "source=methodjit_q_frame_runtime kind=runtime_kernel shape=column count=1 outcome=supported executions=1 successes=0 errors=1") {
+		t.Fatalf("diagnostic report missing typed runtime error stats:\n%s", report.String())
+	}
+}
+
 func TestQFramePrimitivePipelineBuildsMethodJITIR(t *testing.T) {
 	names := runtime.NewTable()
 	names.RawSetInt(1, runtime.StringValue("size"))
