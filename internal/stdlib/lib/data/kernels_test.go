@@ -55,6 +55,34 @@ func TestTypedKernelRegistryHelpers(t *testing.T) {
 	}
 }
 
+func TestTryTypedNumericStatsIntegerAndFloat(t *testing.T) {
+	intStats, handled, err := TryTypedNumericStats(NewI64Range(1, 2, 4))
+	if err != nil {
+		t.Fatalf("TryTypedNumericStats integer returned error: %v", err)
+	}
+	if !handled {
+		t.Fatal("TryTypedNumericStats did not handle integer range")
+	}
+	if intStats.Sum != int64(16) || intStats.Min != int64(1) || intStats.Max != int64(7) || intStats.Count != 4 || !intStats.HasValue {
+		t.Fatalf("integer stats = %#v, want sum=16 min=1 max=7 count=4 has=true", intStats)
+	}
+
+	floatStats, handled, err := TryTypedNumericStats(NewF64([]float64{2.5, -1.5, 4}))
+	if err != nil {
+		t.Fatalf("TryTypedNumericStats float returned error: %v", err)
+	}
+	if !handled {
+		t.Fatal("TryTypedNumericStats did not handle float column")
+	}
+	if floatStats.Sum != 5.0 || floatStats.Min != -1.5 || floatStats.Max != 4.0 || floatStats.Count != 3 || !floatStats.HasValue {
+		t.Fatalf("float stats = %#v, want sum=5 min=-1.5 max=4 count=3 has=true", floatStats)
+	}
+
+	if _, handled, err := TryTypedNumericStats(NewSymbols([]string{"a", "b"})); err != nil || handled {
+		t.Fatalf("symbol stats handled=%v err=%v, want unhandled nil error", handled, err)
+	}
+}
+
 func TestTypedCompareMaskOperatorsAndBounds(t *testing.T) {
 	tests := []struct {
 		name  string
@@ -2550,6 +2578,7 @@ func TestTypedNumericUnaryBinaryAndAggregates(t *testing.T) {
 	if got, want := deltas.Values(), []any{int64(3), int64(2), int64(2), int64(2)}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("TryTypedDeltas range values = %v, want %v", got, want)
 	}
+
 }
 
 func TestTypedDyadicBroadcastPromotionAndNullPropagation(t *testing.T) {

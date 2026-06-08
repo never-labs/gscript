@@ -75,6 +75,11 @@ type qComposition struct {
 	funcs []qUnaryFunction
 }
 
+type qScanView struct {
+	name   string
+	source data.Array
+}
+
 // RuntimeKernelExecutionStat reports q.eval typed-runtime primitive execution.
 // The shape matches bind's q.cache_stats runtime-kernel rows without importing
 // bind into the q evaluator.
@@ -200,10 +205,11 @@ type projectionArg struct {
 // EvalState carries q script bindings through recursive evaluation without
 // relying on package-global state.
 type EvalState struct {
-	env         map[string]any
-	port        int64
-	namespace   string
-	scriptCache map[string]qScriptPlan
+	env                  map[string]any
+	port                 int64
+	namespace            string
+	scriptCache          map[string]qScriptPlan
+	deferScanAssignments map[string]bool
 }
 
 func NewEvalState(env map[string]any) *EvalState {
@@ -303,9 +309,23 @@ func (s *EvalState) evalScript(src string) (any, error) {
 	if len(plan.statements) == 1 {
 		return s.evalScriptStatement(plan.statements[0])
 	}
+	previousDeferredScans := s.deferScanAssignments
+	s.deferScanAssignments = deferredScanAssignments(plan.statements, s)
+	defer func() {
+		s.deferScanAssignments = previousDeferredScans
+	}()
 	var last any
-	for _, stmt := range plan.statements {
+	for i := 0; i < len(plan.statements); i++ {
+		stmt := plan.statements[i]
 		if stmt.src == "" {
+			continue
+		}
+		if value, next, handled, err := s.tryEvalNumericReductionBundle(plan.statements, i); err != nil || handled {
+			if err != nil {
+				return nil, err
+			}
+			last = value
+			i = next - 1
 			continue
 		}
 		v, err := s.evalScriptStatement(stmt)
@@ -472,7 +492,18 @@ func (s *EvalState) evalScriptStatement(stmt qScriptStatement) (any, error) {
 	if stmt.assign != "" {
 		target = stmt.rhs
 	}
-	v, err := s.evalCachedOrString(target, stmt.valueExpr)
+	var v any
+	var err error
+	handled := false
+	if stmt.assign != "" && s.deferScanAssignments[s.resolveAssignmentName(stmt.assign)] {
+		v, handled, err = s.tryEvalDeferredScanAssignment(target)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if !handled {
+		v, err = s.evalCachedOrString(target, stmt.valueExpr)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -480,6 +511,158 @@ func (s *EvalState) evalScriptStatement(stmt qScriptStatement) (any, error) {
 		s.env[s.resolveAssignmentName(stmt.assign)] = v
 	}
 	return v, nil
+}
+
+func deferredScanAssignments(statements []qScriptStatement, state *EvalState) map[string]bool {
+	out := make(map[string]bool)
+	for i, stmt := range statements {
+		if stmt.assign == "" {
+			continue
+		}
+		if _, _, ok := parseDeferredScan(stmt.rhs); !ok {
+			continue
+		}
+		name := state.resolveAssignmentName(stmt.assign)
+		for j := i + 1; j < len(statements); j++ {
+			next := statements[j]
+			if next.assign != "" && state.resolveAssignmentName(next.assign) == name {
+				break
+			}
+			if qExprContainsLastName(next.src, stmt.assign) {
+				out[name] = true
+				break
+			}
+		}
+	}
+	return out
+}
+
+func qExprContainsLastName(src, name string) bool {
+	src = strings.TrimSpace(src)
+	if src == "" || name == "" {
+		return false
+	}
+	needle := "last " + name
+	for start := 0; ; {
+		idx := strings.Index(src[start:], needle)
+		if idx < 0 {
+			return false
+		}
+		pos := start + idx
+		if wordBoundary(src, pos, pos+len("last")) && wordBoundary(src, pos+len("last "), pos+len(needle)) {
+			return true
+		}
+		start = pos + len("last")
+	}
+}
+
+type numericReductionBinding struct {
+	assign string
+	op     string
+	source string
+}
+
+func (s *EvalState) tryEvalNumericReductionBundle(statements []qScriptStatement, start int) (any, int, bool, error) {
+	first, ok := parseNumericReductionBinding(statements[start])
+	if !ok {
+		return nil, start, false, nil
+	}
+	sourceName := s.resolveAssignmentName(first.source)
+	source, ok := s.lookupName(first.source)
+	if !ok {
+		return nil, start, false, nil
+	}
+	array, ok := source.(data.Array)
+	if !ok {
+		return nil, start, false, nil
+	}
+	bindings := []numericReductionBinding{first}
+	next := start + 1
+	for next < len(statements) {
+		binding, ok := parseNumericReductionBinding(statements[next])
+		if !ok || s.resolveAssignmentName(binding.source) != sourceName {
+			break
+		}
+		bindings = append(bindings, binding)
+		next++
+	}
+	if len(bindings) < 2 {
+		return nil, start, false, nil
+	}
+	for _, binding := range bindings {
+		if s.resolveAssignmentName(binding.assign) == sourceName {
+			return nil, start, false, nil
+		}
+	}
+	stats, handled, err := data.TryTypedNumericStats(array)
+	recordRuntimeKernelProbe("ArrayNumericStats", "vector-reduce/bundle/"+string(array.Kind()), handled, err)
+	if err != nil || !handled {
+		return nil, start, handled, err
+	}
+	var last any
+	for _, binding := range bindings {
+		value := numericReductionStatsValue(stats, binding.op)
+		s.env[s.resolveAssignmentName(binding.assign)] = value
+		last = value
+	}
+	return last, next, true, nil
+}
+
+func parseNumericReductionBinding(stmt qScriptStatement) (numericReductionBinding, bool) {
+	if stmt.assign == "" {
+		return numericReductionBinding{}, false
+	}
+	op, source, ok := parseNumericReductionExpr(stmt.rhs)
+	if !ok {
+		return numericReductionBinding{}, false
+	}
+	return numericReductionBinding{assign: stmt.assign, op: op, source: source}, true
+}
+
+func parseNumericReductionExpr(src string) (string, string, bool) {
+	src = strings.TrimSpace(src)
+	if strings.HasPrefix(src, "+/") {
+		source := strings.TrimSpace(src[2:])
+		if isQAssignmentName(source) {
+			return "sum", source, true
+		}
+		return "", "", false
+	}
+	for _, op := range []string{"sum", "min", "max", "count"} {
+		prefix := op + " "
+		if strings.HasPrefix(src, prefix) {
+			source := strings.TrimSpace(src[len(prefix):])
+			if isQAssignmentName(source) {
+				return op, source, true
+			}
+			return "", "", false
+		}
+	}
+	return "", "", false
+}
+
+func numericReductionStatsValue(stats data.NumericStats, op string) any {
+	switch op {
+	case "sum":
+		if stats.HasValue {
+			return stats.Sum
+		}
+		return data.NullValue
+	case "min":
+		if stats.HasValue {
+			return stats.Min
+		}
+		return data.NullValue
+	case "max":
+		if stats.HasValue {
+			return stats.Max
+		}
+		return data.NullValue
+	case "count":
+		return stats.Count
+	default:
+		return data.NullValue
+	}
 }
 
 func (s *EvalState) evalCachedOrString(src string, expr Expr) (any, error) {
@@ -490,6 +673,262 @@ func (s *EvalState) evalCachedOrString(src string, expr Expr) (any, error) {
 		}
 	}
 	return s.eval(src)
+}
+
+func (s *EvalState) tryEvalDeferredScanAssignment(src string) (any, bool, error) {
+	name, arg, ok := parseDeferredScan(src)
+	if !ok {
+		return nil, false, nil
+	}
+	value, err := s.eval(arg)
+	if err != nil {
+		return nil, true, err
+	}
+	array, ok := value.(data.Array)
+	if !ok {
+		return nil, false, nil
+	}
+	return qScanView{name: name, source: array}, true, nil
+}
+
+func parseDeferredScan(src string) (name, arg string, ok bool) {
+	src = stripEnclosingParens(strings.TrimSpace(src))
+	for _, scan := range []struct {
+		prefix string
+		name   string
+	}{
+		{"+\\", "sums"},
+		{"sums ", "sums"},
+		{"prds ", "prds"},
+		{"mins ", "mins"},
+		{"maxs ", "maxs"},
+		{"avgs ", "avgs"},
+	} {
+		if !strings.HasPrefix(src, scan.prefix) {
+			continue
+		}
+		arg = strings.TrimSpace(src[len(scan.prefix):])
+		if arg == "" {
+			return "", "", false
+		}
+		if scan.prefix == "+\\" && strings.HasPrefix(arg, "[") {
+			return "", "", false
+		}
+		return scan.name, arg, true
+	}
+	return "", "", false
+}
+
+func (v qScanView) Kind() data.Kind {
+	if v.name == "avgs" {
+		return data.KindF64
+	}
+	return v.source.Kind()
+}
+
+func (v qScanView) Len() int {
+	return v.source.Len()
+}
+
+func (v qScanView) At(row int) (any, bool) {
+	if row < 0 || row >= v.Len() {
+		return nil, false
+	}
+	value, err := v.prefixAt(row)
+	if err != nil {
+		return nil, false
+	}
+	return value, true
+}
+
+func (v qScanView) Values() []any {
+	out := make([]any, v.Len())
+	for i := range out {
+		value, ok := v.At(i)
+		if !ok {
+			out[i] = data.NullValue
+			continue
+		}
+		out[i] = value
+	}
+	return out
+}
+
+func (v qScanView) Gather(indexes []int) data.Array {
+	out := make([]any, len(indexes))
+	for i, index := range indexes {
+		value, ok := v.At(index)
+		if !ok {
+			out[i] = data.NullValue
+			continue
+		}
+		out[i] = value
+	}
+	return inferQArray(out, v.Kind())
+}
+
+func (v qScanView) prefixAt(row int) (any, error) {
+	switch v.name {
+	case "sums":
+		return qScanPrefixSum(v.source, row)
+	case "prds":
+		return qScanPrefixProduct(v.source, row)
+	case "mins":
+		return qScanPrefixExtrema(v.source, row, false)
+	case "maxs":
+		return qScanPrefixExtrema(v.source, row, true)
+	case "avgs":
+		return qScanPrefixAvg(v.source, row)
+	default:
+		return nil, fmt.Errorf("unknown scan view %q", v.name)
+	}
+}
+
+func (v qScanView) terminal() (any, error) {
+	if v.Len() == 0 {
+		return data.NullValue, nil
+	}
+	switch v.name {
+	case "sums":
+		return sum(v.source)
+	case "prds":
+		return prd(v.source)
+	case "mins":
+		return minValue(v.source)
+	case "maxs":
+		return maxValue(v.source)
+	case "avgs":
+		return avg(v.source)
+	default:
+		return v.prefixAt(v.Len() - 1)
+	}
+}
+
+func qScanPrefixSum(array data.Array, row int) (any, error) {
+	totalI := int64(0)
+	totalF := float64(0)
+	hasFloat := false
+	for i := 0; i <= row; i++ {
+		item, ok := array.At(i)
+		if !ok {
+			return nil, fmt.Errorf("sums row %d out of range", i)
+		}
+		if data.IsNull(item) {
+			continue
+		}
+		if n, ok := integerValue(item); ok {
+			totalI += n
+			totalF += float64(n)
+			continue
+		}
+		switch n := item.(type) {
+		case float32:
+			hasFloat = true
+			totalF += float64(n)
+		case float64:
+			hasFloat = true
+			totalF += n
+		default:
+			return nil, fmt.Errorf("sums expects a numeric vector")
+		}
+	}
+	if hasFloat {
+		return totalF, nil
+	}
+	return totalI, nil
+}
+
+func qScanPrefixProduct(array data.Array, row int) (any, error) {
+	totalI := int64(1)
+	totalF := float64(1)
+	hasFloat := false
+	seen := false
+	for i := 0; i <= row; i++ {
+		item, ok := array.At(i)
+		if !ok {
+			return nil, fmt.Errorf("prds row %d out of range", i)
+		}
+		if data.IsNull(item) {
+			continue
+		}
+		seen = true
+		if n, ok := integerValue(item); ok {
+			totalI *= n
+			totalF *= float64(n)
+			continue
+		}
+		switch n := item.(type) {
+		case float32:
+			hasFloat = true
+			totalF *= float64(n)
+		case float64:
+			hasFloat = true
+			totalF *= n
+		default:
+			return nil, fmt.Errorf("prds expects a numeric vector")
+		}
+	}
+	if !seen {
+		return data.NullValue, nil
+	}
+	if hasFloat {
+		return totalF, nil
+	}
+	return totalI, nil
+}
+
+func qScanPrefixExtrema(array data.Array, row int, maximum bool) (any, error) {
+	var best any
+	hasBest := false
+	for i := 0; i <= row; i++ {
+		item, ok := array.At(i)
+		if !ok {
+			return nil, fmt.Errorf("running extrema row %d out of range", i)
+		}
+		if data.IsNull(item) {
+			continue
+		}
+		if !hasBest {
+			best = item
+			hasBest = true
+			continue
+		}
+		cmp, err := compareOrdered(item, best)
+		if err != nil {
+			return nil, err
+		}
+		if (!maximum && cmp < 0) || (maximum && cmp > 0) {
+			best = item
+		}
+	}
+	if !hasBest {
+		return data.NullValue, nil
+	}
+	return best, nil
+}
+
+func qScanPrefixAvg(array data.Array, row int) (any, error) {
+	total := float64(0)
+	count := 0
+	for i := 0; i <= row; i++ {
+		item, ok := array.At(i)
+		if !ok {
+			return nil, fmt.Errorf("avgs row %d out of range", i)
+		}
+		if data.IsNull(item) {
+			continue
+		}
+		n, ok := numeric(item)
+		if !ok {
+			return nil, fmt.Errorf("avgs expects a numeric vector")
+		}
+		total += n
+		count++
+	}
+	if count == 0 {
+		return data.NullValue, nil
+	}
+	return total / float64(count), nil
 }
 
 func cloneEnv(env map[string]any) map[string]any {
@@ -3851,15 +4290,17 @@ func (s *EvalState) tryEvalCountWhereMask(src string) (any, bool, error) {
 func (s *EvalState) tryEvalCountRunningScan(src string) (any, bool, error) {
 	src = stripEnclosingParens(strings.TrimSpace(src))
 	for _, scan := range []struct {
-		word   string
-		kernel string
-		fn     func(any) (any, error)
+		word    string
+		kernel  string
+		fn      func(any) (any, error)
+		kindOK  func(data.Kind) bool
+		scanErr string
 	}{
-		{"sums ", "ArrayCountSums", sums},
-		{"prds ", "ArrayCountProducts", prds},
-		{"mins ", "ArrayCountMins", mins},
-		{"maxs ", "ArrayCountMaxs", maxs},
-		{"avgs ", "ArrayCountAvgs", avgs},
+		{"sums ", "ArrayCountSums", sums, qKindIsNumeric, "sums expects a numeric vector"},
+		{"prds ", "ArrayCountProducts", prds, qKindIsNumeric, "prds expects a numeric vector"},
+		{"mins ", "ArrayCountMins", mins, qTypedCompareKindOK, "mins expects an ordered vector"},
+		{"maxs ", "ArrayCountMaxs", maxs, qTypedCompareKindOK, "maxs expects an ordered vector"},
+		{"avgs ", "ArrayCountAvgs", avgs, qKindIsNumeric, "avgs expects a numeric vector"},
 	} {
 		if !strings.HasPrefix(src, scan.word) {
 			continue
@@ -3878,12 +4319,13 @@ func (s *EvalState) tryEvalCountRunningScan(src string) (any, bool, error) {
 			return out, true, err
 		}
 		shape := "vector-count/" + strings.TrimSpace(scan.word) + "/" + string(array.Kind())
-		if out, handled := data.TryTypedNumericArrayLen(array); handled {
-			recordRuntimeKernelProbe(scan.kernel, shape, true, nil)
-			return out, true, nil
+		if !scan.kindOK(array.Kind()) {
+			err := fmt.Errorf("%s", scan.scanErr)
+			recordRuntimeKernelProbe(scan.kernel, shape, false, err)
+			return nil, true, err
 		}
-		recordRuntimeKernelProbe(scan.kernel, shape, false, nil)
-		return nil, false, nil
+		recordRuntimeKernelProbe(scan.kernel, shape, true, nil)
+		return int64(array.Len()), true, nil
 	}
 	return nil, false, nil
 }
@@ -8996,6 +9438,11 @@ func first(v any) (any, error) {
 }
 
 func last(v any) (any, error) {
+	if scan, ok := v.(qScanView); ok {
+		out, err := scan.terminal()
+		recordRuntimeKernelProbe("ArrayLastScanView", "vector-last/"+scan.name+"/"+string(scan.source.Kind()), err == nil, err)
+		return out, err
+	}
 	array, ok := v.(data.Array)
 	if !ok {
 		return v, nil

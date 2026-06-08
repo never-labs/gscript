@@ -125,6 +125,7 @@ var qEvalRequiredSemanticShapes = []string{
 	"verb:exp-reciprocal-signum-not:row-scaled",
 	"adverb:initial-over-scan:row-scaled",
 	"index:gather-after-where:row-scaled",
+	"where:gather-reduce-selectivity:row-scaled",
 	"where:compare-count-sum:row-scaled",
 	"amend:functional-vector-where:row-scaled",
 	"string:symbol-string-like:row-scaled",
@@ -246,6 +247,54 @@ func buildQEvalVectorCases() []qEvalVectorCase {
 					}
 				}
 				return count
+			},
+		})
+	}
+
+	for _, p := range []struct {
+		name       string
+		selectRows func(rows int) int
+		expr       func(rows int, selected int) string
+	}{
+		{"Pct0", func(rows int) int { return 0 }, func(rows int, selected int) string {
+			return fmt.Sprintf("x:til %d;y:(x*3)+7;lo:0;hi:%d;idx:where (x>=lo) and x<hi;count y[idx]", rows, selected)
+		}},
+		{"Pct1", func(rows int) int { return rows / 100 }, func(rows int, selected int) string {
+			return fmt.Sprintf("x:til %d;y:(x*3)+7;lo:0;hi:%d;idx:where (x>=lo) and x<hi;+/y[idx]", rows, selected)
+		}},
+		{"Pct50", func(rows int) int { return rows / 2 }, func(rows int, selected int) string {
+			return fmt.Sprintf("x:til %d;y:(x*3)+7;lo:0;hi:%d;idx:where (x>=lo) and x<hi;+/y[idx]", rows, selected)
+		}},
+		{"Pct99", func(rows int) int { return rows * 99 / 100 }, func(rows int, selected int) string {
+			return fmt.Sprintf("x:til %d;y:(x*3)+7;lo:0;hi:%d;idx:where (x>=lo) and x<hi;+/y[idx]", rows, selected)
+		}},
+		{"Pct100", func(rows int) int { return rows }, func(rows int, selected int) string {
+			return fmt.Sprintf("x:til %d;y:(x*3)+7;lo:0;hi:%d;idx:where (x>=lo) and x<hi;+/y[idx]", rows, selected)
+		}},
+	} {
+		p := p
+		cases = append(cases, qEvalVectorCase{
+			name:   "WhereValueGatherReduceSelectivity" + p.name,
+			tags:   []string{"where", "projection", "numeric-vector", "sum", "composite-compare"},
+			matrix: []string{"compare:int-vector:where"},
+			shapes: []string{"where:gather-reduce-selectivity:row-scaled"},
+			expr: func(rows int) string {
+				selected := p.selectRows(rows)
+				return p.expr(rows, selected)
+			},
+			goFn: func(rows int) int64 {
+				selected := p.selectRows(rows)
+				if selected == 0 {
+					return 0
+				}
+				var sum int64
+				for i := 0; i < rows; i++ {
+					if i >= 0 && i < selected {
+						x := int64(i)
+						sum += x*3 + 7
+					}
+				}
+				return sum
 			},
 		})
 	}
@@ -971,7 +1020,7 @@ func appendQEvalSemanticCoverageCases(cases []qEvalVectorCase) []qEvalVectorCase
 			tags:   []string{"running-aggregate", "product", "avg-var-dev-med", "min-max"},
 			matrix: []string{"aggregate:running-prd-min-max-avg:vector"},
 			expr: func(rows int) string {
-				return fmt.Sprintf("x:1+til %d;p:%d#1 1 1 1;(count sums x)+(count prds p)+(count mins x)+(count maxs x)+(count avgs x)", rows, rows)
+				return fmt.Sprintf("x:1+til %d;(count sums x)+(count prds x)+(count mins x)+(count maxs x)+(count avgs x)", rows)
 			},
 			goFn: func(rows int) int64 {
 				return int64(rows * 5)

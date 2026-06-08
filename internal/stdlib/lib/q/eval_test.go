@@ -87,6 +87,51 @@ func TestRuntimeKernelExecutionStatsReportHitAndFallbackOutcomes(t *testing.T) {
 	}
 }
 
+func TestEvalNumericReductionBundleRecordsTypedRuntimeKernel(t *testing.T) {
+	ClearRuntimeKernelExecutionStats()
+	t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+	assertEvalValue(t, "x:1+til 8;s:+/x;named:sum x;mx:max x;mn:min x;cnt:count x;s+named+mx+mn+cnt", int64(89))
+
+	counts := map[string]uint64{}
+	for _, stat := range RuntimeKernelExecutionStats() {
+		if stat.Outcome == "hit" && stat.ReasonCode == "typed_kernel" {
+			counts[stat.Kernel] += stat.Count
+		}
+	}
+	if counts["ArrayNumericStats"] != 1 {
+		t.Fatalf("ArrayNumericStats hits = %d, want 1; stats=%#v", counts["ArrayNumericStats"], RuntimeKernelExecutionStats())
+	}
+	if counts["ArraySum"] != 0 || counts["ArrayMin"] != 0 || counts["ArrayMax"] != 0 {
+		t.Fatalf("individual aggregate kernels hit during bundle: sum=%d min=%d max=%d stats=%#v", counts["ArraySum"], counts["ArrayMin"], counts["ArrayMax"], RuntimeKernelExecutionStats())
+	}
+}
+
+func TestEvalDeferredScanAssignmentTerminalLast(t *testing.T) {
+	ClearRuntimeKernelExecutionStats()
+	t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+	assertEvalValue(t, "x:1+til 8;scan:+\\x;last scan", int64(36))
+	assertEvalValue(t, "x:1+til 8;named:sums x;last named", int64(36))
+	assertEvalValue(t, "x:1+til 5;p:prds x;last p", int64(120))
+	assertEvalValue(t, "x:5 4 0N 2;m:mins x;last m", int64(2))
+	assertEvalValue(t, "x:5 4 0N 7;m:maxs x;last m", int64(7))
+	assertEvalValue(t, "x:1 2 0N 5;a:avgs x;last a", float64(8)/3)
+	assertEvalArray(t, "x:1 2 3;scan:+\\x;scan", data.KindI64, []any{int64(1), int64(3), int64(6)})
+	assertEvalValue(t, "x:1+til 8;scan:+\\x;scan:10 20;last scan", int64(20))
+
+	seen := false
+	for _, stat := range RuntimeKernelExecutionStats() {
+		if stat.Kernel == "ArrayLastScanView" && stat.Outcome == "hit" && stat.ReasonCode == "typed_kernel" && stat.Count > 0 {
+			seen = true
+			break
+		}
+	}
+	if !seen {
+		t.Fatalf("missing ArrayLastScanView typed runtime stat: %#v", RuntimeKernelExecutionStats())
+	}
+}
+
 func TestEvalSymbolVectorAndDictionary(t *testing.T) {
 	assertEvalValue(t, "`AAPL", data.Symbol("AAPL"))
 	assertEvalArray(t, "`AAPL`MSFT`NVDA", data.KindSymbol, []any{
@@ -1798,6 +1843,7 @@ func TestEvalCountSumSumsTakeWhereAndPlusAdverbs(t *testing.T) {
 	assertEvalArray(t, "sums 10 20 30", data.KindI64, []any{int64(10), int64(30), int64(60)})
 	assertEvalValue(t, "count sums 10 20 30", int64(3))
 	assertEvalValue(t, "count (sums 10 20 30)", int64(3))
+	assertEvalErrorContains(t, "count sums `a`b", "sums expects a numeric vector")
 	assertEvalArray(t, "prds 2 3 4", data.KindI64, []any{int64(2), int64(6), int64(24)})
 	assertEvalValue(t, "count prds 2 3 4", int64(3))
 	assertEvalArray(t, "ratios 2 4 10", data.KindF64, []any{2.0, 2.0, 2.5})
@@ -2723,12 +2769,15 @@ func TestEvalDeltasRecordsTypedRuntimeKernel(t *testing.T) {
 	t.Cleanup(ClearRuntimeKernelExecutionStats)
 
 	assertEvalArray(t, "deltas til 4", data.KindI64, []any{int64(0), int64(1), int64(1), int64(1)})
+	seenDeltas := false
 	for _, stat := range RuntimeKernelExecutionStats() {
 		if stat.Kernel == "ArrayDeltas" && stat.Outcome == "hit" && stat.Count > 0 {
-			return
+			seenDeltas = true
 		}
 	}
-	t.Fatalf("missing ArrayDeltas typed runtime stat: %#v", RuntimeKernelExecutionStats())
+	if !seenDeltas {
+		t.Fatalf("missing ArrayDeltas typed runtime stat: %#v", RuntimeKernelExecutionStats())
+	}
 }
 
 func TestEvalXcolsReordersTableAndDictionaryColumns(t *testing.T) {

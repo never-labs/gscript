@@ -1954,6 +1954,144 @@ func TryTypedNumericSum(array Array) (any, bool, error) {
 	return typedKernels.NumericSumValue(array)
 }
 
+type NumericStats struct {
+	Sum      any
+	Min      any
+	Max      any
+	Count    int64
+	HasValue bool
+}
+
+// TryTypedNumericStats computes the common scalar reductions for one numeric
+// array in a single typed pass. Count follows q count semantics and reports the
+// vector length, while sum/min/max ignore null values.
+func TryTypedNumericStats(array Array) (NumericStats, bool, error) {
+	if array == nil {
+		return NumericStats{}, true, fmt.Errorf("numeric stats array is nil")
+	}
+	switch a := array.(type) {
+	case attributedArray:
+		return TryTypedNumericStats(a.array)
+	case i64RangeArray:
+		return numericStatsI64Range(a), true, nil
+	case f64RangeArray:
+		return numericStatsF64Range(a), true, nil
+	}
+	if isDenseIntegerArray(array) {
+		return numericStatsIntegerArray(array)
+	}
+	if !isNumericArray(array) {
+		return NumericStats{}, false, nil
+	}
+	var sum float64
+	var min float64
+	var max float64
+	hasValue := false
+	for row := 0; row < array.Len(); row++ {
+		value, ok, err := typedKernels.NumericAt(array, row)
+		if err != nil {
+			return NumericStats{}, true, err
+		}
+		if !ok {
+			continue
+		}
+		sum += value
+		if !hasValue || value < min {
+			min = value
+		}
+		if !hasValue || value > max {
+			max = value
+		}
+		hasValue = true
+	}
+	if !hasValue {
+		return NumericStats{Count: int64(array.Len())}, true, nil
+	}
+	return NumericStats{
+		Sum:      sum,
+		Min:      min,
+		Max:      max,
+		Count:    int64(array.Len()),
+		HasValue: true,
+	}, true, nil
+}
+
+func numericStatsI64Range(array i64RangeArray) NumericStats {
+	if array.len == 0 {
+		return NumericStats{Count: 0}
+	}
+	first := array.start
+	last := array.start + int64(array.len-1)*array.step
+	min := first
+	max := last
+	if last < first {
+		min = last
+		max = first
+	}
+	return NumericStats{
+		Sum:      i64RangeSum(array),
+		Min:      min,
+		Max:      max,
+		Count:    int64(array.len),
+		HasValue: true,
+	}
+}
+
+func numericStatsF64Range(array f64RangeArray) NumericStats {
+	if array.len == 0 {
+		return NumericStats{Count: 0}
+	}
+	first := array.start
+	last := array.start + float64(array.len-1)*array.step
+	min := first
+	max := last
+	if last < first {
+		min = last
+		max = first
+	}
+	return NumericStats{
+		Sum:      f64RangeSum(array),
+		Min:      min,
+		Max:      max,
+		Count:    int64(array.len),
+		HasValue: true,
+	}
+}
+
+func numericStatsIntegerArray(array Array) (NumericStats, bool, error) {
+	var sum int64
+	var min int64
+	var max int64
+	hasValue := false
+	for row := 0; row < array.Len(); row++ {
+		value, ok, err := integerArrayAt(array, row)
+		if err != nil {
+			return NumericStats{}, true, err
+		}
+		if !ok {
+			continue
+		}
+		sum += value
+		if !hasValue || value < min {
+			min = value
+		}
+		if !hasValue || value > max {
+			max = value
+		}
+		hasValue = true
+	}
+	if !hasValue {
+		return NumericStats{Count: int64(array.Len())}, true, nil
+	}
+	return NumericStats{
+		Sum:      sum,
+		Min:      min,
+		Max:      max,
+		Count:    int64(array.Len()),
+		HasValue: true,
+	}, true, nil
+}
+
 // TryTypedScalarFill applies q-style scalar fill to an array lazily. It keeps
 // downstream reductions from materializing a dense replacement column.
 func TryTypedScalarFill(fill any, array Array) (Array, bool, error) {

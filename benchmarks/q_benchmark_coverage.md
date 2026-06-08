@@ -39,7 +39,7 @@ benchmark set. These categories should drive benchmark case growth.
 | Category | Evidence in tests | Benchmark status |
 |---|---|---|
 | Numeric atoms/vectors | numeric literals, typed numeric suffixes, casts, dyadic ops, promotion, null propagation, percent divide | Covered by q.eval coverage tags; still needs more per-type performance depth |
-| Boolean masks and `where` | bool vectors, compare masks, scalar comparisons, comma where as and, logical `&`/`|` | Covered by q.eval coverage tags and selectivity cases; compound qSQL predicate depth remains open |
+| Boolean masks and `where` | bool vectors, compare masks, scalar comparisons, comma where as and, logical `&`/`|` | Covered by q.eval coverage tags and 0/1/50/99/100% value-gather-reduce selectivity cases; compound qSQL predicate depth remains open |
 | Adverbs | each, each-prior, each-left/right, over, scan, verb adverbs, function projections | Covered by q.eval coverage tags; more complex list-of-lists cases should be added |
 | Reductions and scans | `sum`, `sums`, `+/`, `+\`, `min`, `max`, `count`, `avg`, `var`, `dev`, `med`, `wavg` | Covered by q.eval coverage tags except deeper `wavg`/null/type matrix |
 | Set/list verbs | `distinct`, `group`, `where`, `reverse`, `prev`, `next`, `deltas`, `fills`, `enlist`, `raze`, `cut`, `drop`, sort indexes | Covered at category level; needs exhaustive verb-by-type matrix |
@@ -66,7 +66,7 @@ matrix of q-language operations:
 |---|---|
 | Numeric vector arithmetic | affine sums, mixed arithmetic, square/product expressions, int and float variants |
 | Typed numeric values | short/int/long/real/float suffixes, casts, typed nulls, promotion boundaries |
-| Masks and `where` | low/mid/high selectivity, all true, all false, compound logical predicates |
+| Masks and `where` | 0/1/50/99/100% selectivity, value gather after `where`, reduce after projection, compound logical predicates |
 | Slicing and reordering | `take`, `drop`, `reverse`, positive/negative `rotate`, first/last checksums |
 | Reductions/scans | `sum`, `sums`, `+/`, `+\`, `min`, `max`, `avg`, `count`, null-aware variants |
 | Adverbs | each, each-prior, each-left/right, over, scan, projected functions |
