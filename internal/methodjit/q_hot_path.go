@@ -1109,9 +1109,237 @@ func QQueryNativeLoweringPass(fn *Function) (*Function, error) {
 		}
 	}
 	qVectorWhereReduceLoweringPass(fn, uses)
+	qGroupAggregateNativeLoweringPass(fn)
 	qJoinFallbackRemarkPass(fn)
 	qGroupAggregateFallbackRemarkPass(fn)
 	return fn, nil
+}
+
+type qSimpleGroupAggregateQuery struct {
+	By         []string
+	Aggregates []runtime.FrameAggregateSpec
+}
+
+type qQueryToken struct {
+	text  string
+	lower string
+	start int
+	end   int
+}
+
+func qGroupAggregateNativeLoweringPass(fn *Function) {
+	if fn == nil || fn.Proto == nil {
+		return
+	}
+	for _, block := range fn.Blocks {
+		if block == nil {
+			continue
+		}
+		for _, instr := range block.Instrs {
+			if instr == nil || instr.Op != OpCall || !qCallIsQSQLEntrypoint(fn, instr) {
+				continue
+			}
+			query, ok := qCallQueryString(fn, instr)
+			if !ok || !qQueryStringHasGroupAggregate(query) {
+				continue
+			}
+			spec, ok := qParseSimpleGroupAggregateQuery(query)
+			if !ok {
+				continue
+			}
+			frame := qCallSQLFrameArg(fn, instr)
+			if frame == nil {
+				continue
+			}
+			specIdx := len(fn.Proto.Constants)
+			fn.Proto.Constants = append(fn.Proto.Constants, qFrameGroupAggregateSpecValue(spec))
+			mask := qInsertConstNilBefore(fn, block, instr)
+			instr.Op = OpFrameGroupAggregate
+			instr.Type = TypeAny
+			instr.Args = []*Value{frame, mask}
+			instr.Aux = int64(specIdx)
+			instr.Aux2 = 0
+			functionRemarks(fn).Add("QQueryNativeLowering", "changed", block.ID, instr.ID, OpFrameGroupAggregate,
+				"lowered simple q.sql grouped aggregate to FrameGroupAggregate typed runtime kernel op-exit")
+		}
+	}
+}
+
+func qParseSimpleGroupAggregateQuery(query string) (qSimpleGroupAggregateQuery, bool) {
+	tokens := qLexQueryTokens(query)
+	if len(tokens) < 6 || tokens[0].lower != "select" {
+		return qSimpleGroupAggregateQuery{}, false
+	}
+	byIdx, fromIdx := -1, -1
+	for i, tok := range tokens {
+		switch tok.lower {
+		case "where", "order", "limit", "distinct", "join", "lj", "ij", "aj", "wj", "update", "delete", "exec":
+			return qSimpleGroupAggregateQuery{}, false
+		case "by":
+			if byIdx >= 0 {
+				return qSimpleGroupAggregateQuery{}, false
+			}
+			byIdx = i
+		case "from":
+			if fromIdx >= 0 {
+				return qSimpleGroupAggregateQuery{}, false
+			}
+			fromIdx = i
+		}
+	}
+	if byIdx <= 1 || fromIdx <= byIdx+1 || fromIdx+2 != len(tokens) {
+		return qSimpleGroupAggregateQuery{}, false
+	}
+	selectPart := strings.TrimSpace(query[tokens[0].end:tokens[byIdx].start])
+	byPart := strings.TrimSpace(query[tokens[byIdx].end:tokens[fromIdx].start])
+	byColumns, ok := qParseSimpleIdentifierList(byPart)
+	if !ok || len(byColumns) == 0 {
+		return qSimpleGroupAggregateQuery{}, false
+	}
+	aggregates, ok := qParseSimpleAggregateList(selectPart)
+	if !ok || len(aggregates) == 0 {
+		return qSimpleGroupAggregateQuery{}, false
+	}
+	return qSimpleGroupAggregateQuery{By: byColumns, Aggregates: aggregates}, true
+}
+
+func qParseSimpleIdentifierList(text string) ([]string, bool) {
+	parts := strings.Split(text, ",")
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		name := strings.TrimSpace(part)
+		if !qSimpleIdentifier(name) {
+			return nil, false
+		}
+		out = append(out, name)
+	}
+	return out, true
+}
+
+func qParseSimpleAggregateList(text string) ([]runtime.FrameAggregateSpec, bool) {
+	parts := strings.Split(text, ",")
+	out := make([]runtime.FrameAggregateSpec, 0, len(parts))
+	for _, part := range parts {
+		agg, ok := qParseSimpleAggregate(strings.TrimSpace(part))
+		if !ok {
+			return nil, false
+		}
+		out = append(out, agg)
+	}
+	return out, true
+}
+
+func qParseSimpleAggregate(text string) (runtime.FrameAggregateSpec, bool) {
+	name, expr, ok := strings.Cut(text, ":")
+	if !ok {
+		return runtime.FrameAggregateSpec{}, false
+	}
+	name = strings.TrimSpace(name)
+	if !qSimpleIdentifier(name) {
+		return runtime.FrameAggregateSpec{}, false
+	}
+	fields := strings.Fields(strings.TrimSpace(expr))
+	if len(fields) != 2 {
+		return runtime.FrameAggregateSpec{}, false
+	}
+	op := strings.ToLower(fields[0])
+	switch op {
+	case "count":
+		if fields[1] != "i" {
+			return runtime.FrameAggregateSpec{}, false
+		}
+		return runtime.FrameAggregateSpec{Name: name, Op: op}, true
+	case "sum", "min", "max", "avg":
+		if !qSimpleIdentifier(fields[1]) {
+			return runtime.FrameAggregateSpec{}, false
+		}
+		return runtime.FrameAggregateSpec{Name: name, Op: op, Column: fields[1]}, true
+	default:
+		return runtime.FrameAggregateSpec{}, false
+	}
+}
+
+func qSimpleIdentifier(name string) bool {
+	if name == "" {
+		return false
+	}
+	for i, r := range name {
+		isStart := (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || r == '_'
+		isRest := isStart || (r >= '0' && r <= '9')
+		if i == 0 {
+			if !isStart {
+				return false
+			}
+			continue
+		}
+		if !isRest {
+			return false
+		}
+	}
+	return true
+}
+
+func qLexQueryTokens(query string) []qQueryToken {
+	var tokens []qQueryToken
+	start := -1
+	for i, r := range query {
+		isIdentStart := (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || r == '_'
+		isIdentRest := isIdentStart || (r >= '0' && r <= '9')
+		isIdent := isIdentStart || (start >= 0 && isIdentRest)
+		if isIdent {
+			if start < 0 {
+				start = i
+			}
+			continue
+		}
+		if start >= 0 {
+			text := query[start:i]
+			tokens = append(tokens, qQueryToken{text: text, lower: strings.ToLower(text), start: start, end: i})
+			start = -1
+		}
+	}
+	if start >= 0 {
+		text := query[start:]
+		tokens = append(tokens, qQueryToken{text: text, lower: strings.ToLower(text), start: start, end: len(query)})
+	}
+	return tokens
+}
+
+func qFrameGroupAggregateSpecValue(spec qSimpleGroupAggregateQuery) runtime.Value {
+	tbl := runtime.NewTable()
+	if len(spec.By) == 1 {
+		tbl.RawSetString("by", runtime.StringValue(spec.By[0]))
+	} else {
+		by := runtime.NewAppendArrayTable(len(spec.By))
+		for i, name := range spec.By {
+			by.RawSetInt(int64(i+1), runtime.StringValue(name))
+		}
+		tbl.RawSetString("by", runtime.TableValue(by))
+	}
+	aggs := runtime.NewAppendArrayTable(len(spec.Aggregates))
+	for i, agg := range spec.Aggregates {
+		row := runtime.NewTable()
+		row.RawSetString("name", runtime.StringValue(agg.Name))
+		row.RawSetString("op", runtime.StringValue(agg.Op))
+		if agg.Column != "" {
+			row.RawSetString("column", runtime.StringValue(agg.Column))
+		}
+		aggs.RawSetInt(int64(i+1), runtime.TableValue(row))
+	}
+	tbl.RawSetString("aggregates", runtime.TableValue(aggs))
+	return runtime.TableValue(tbl)
+}
+
+func qInsertConstNilBefore(fn *Function, block *Block, before *Instr) *Value {
+	nilInstr := &Instr{ID: fn.newValueID(), Op: OpConstNil, Type: TypeNil, Block: block}
+	for i, instr := range block.Instrs {
+		if instr == before {
+			block.Instrs = append(block.Instrs[:i], append([]*Instr{nilInstr}, block.Instrs[i:]...)...)
+			return nilInstr.Value()
+		}
+	}
+	block.Instrs = append(block.Instrs, nilInstr)
+	return nilInstr.Value()
 }
 
 func qVectorWhereReduceLoweringPass(fn *Function, uses map[int]int) {
@@ -1344,6 +1572,37 @@ func qCallIsQQueryEntrypoint(fn *Function, call *Instr) bool {
 	}
 	global, ok := qConstStringAt(fn, int(receiver.Aux))
 	return ok && global == "q"
+}
+
+func qCallIsQSQLEntrypoint(fn *Function, call *Instr) bool {
+	if !qCallIsQQueryEntrypoint(fn, call) || call == nil || len(call.Args) == 0 || call.Args[0] == nil {
+		return false
+	}
+	callee := call.Args[0].Def
+	if callee == nil {
+		return false
+	}
+	field, ok := qConstStringAt(fn, int(callee.Aux))
+	return ok && field == "sql"
+}
+
+func qCallSQLFrameArg(fn *Function, call *Instr) *Value {
+	if fn == nil || call == nil || len(call.Args) != 3 {
+		return nil
+	}
+	queryArg := call.Args[2]
+	if queryArg == nil || queryArg.Def == nil || queryArg.Def.Op != OpConstString {
+		return nil
+	}
+	query, ok := qConstStringAt(fn, int(queryArg.Def.Aux))
+	if !ok || !qQueryStringLooksLikeQuery(query) {
+		return nil
+	}
+	frameArg := call.Args[1]
+	if frameArg == nil || frameArg.Def == nil && frameArg.ID < 0 {
+		return nil
+	}
+	return frameArg
 }
 
 func qCallQueryString(fn *Function, call *Instr) (string, bool) {

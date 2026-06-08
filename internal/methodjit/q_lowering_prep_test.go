@@ -2723,6 +2723,122 @@ func TestQGroupAggregateCallReportsStructuredFallback(t *testing.T) {
 	}
 }
 
+func TestQGroupAggregateCallLowersToFrameGroupAggregateKernel(t *testing.T) {
+	const query = "select total:sum price, fills:count i by size from trades"
+	proto := &vm.FuncProto{
+		Name:      "q_group_aggregate_simple_call",
+		NumParams: 1,
+		MaxStack:  4,
+		Constants: []runtime.Value{
+			runtime.StringValue("q"),
+			runtime.StringValue("sql"),
+			runtime.StringValue(query),
+		},
+		Code: []uint32{
+			vm.EncodeABx(vm.OP_GETGLOBAL, 1, 0),
+			vm.EncodeABC(vm.OP_GETFIELD, 1, 1, 1),
+			vm.EncodeABC(vm.OP_MOVE, 2, 0, 0),
+			vm.EncodeABx(vm.OP_LOADK, 3, 2),
+			vm.EncodeABC(vm.OP_CALL, 1, 3, 2),
+			vm.EncodeABC(vm.OP_RETURN, 1, 2, 0),
+		},
+	}
+
+	fn := BuildGraph(proto)
+	fn.Remarks = &OptimizationRemarks{}
+	lowered, err := QQueryNativeLoweringPass(fn)
+	if err != nil {
+		t.Fatalf("QQueryNativeLoweringPass: %v", err)
+	}
+	counts := countOps(lowered)
+	if counts[OpFrameGroupAggregate] != 1 || counts[OpCall] != 0 {
+		t.Fatalf("group aggregate lowering counts FrameGroupAggregate=%d OpCall=%d\n%s", counts[OpFrameGroupAggregate], counts[OpCall], Print(lowered))
+	}
+	if fallbacks := CountQQueryLoweringFallbackReasons(fn.Remarks.List()); fallbacks[qQueryLoweringFallbackGroupAggregateCall] != 0 {
+		t.Fatalf("q query fallback counts = %+v, want no group aggregate fallback", fallbacks)
+	}
+	kernels := DetectQFrameRuntimeKernels(lowered)
+	assertQKernelDescriptor(t, BuildQKernelDescriptors(nil, kernels, nil, fn.Remarks.List()),
+		"methodjit_q_frame_runtime", "runtime_kernel", "FrameGroupAggregate", "group/aggregate", "typed_runtime_op_exit", "supported", "")
+
+	result, err := Interpret(lowered, []runtime.Value{runtime.TableValue(qHotPathTestFrame(t))})
+	if err != nil {
+		t.Fatalf("Interpret lowered q group aggregate: %v", err)
+	}
+	if len(result) != 1 || !result[0].IsTable() {
+		t.Fatalf("lowered result = %#v, want one native frame table", result)
+	}
+	payload, info, ok := result[0].Table().NativeFramePayload()
+	if !ok || info.Rows != 3 || info.Columns != 3 {
+		t.Fatalf("lowered result payload = %#v info=%#v ok=%v, want 3x3 native frame", payload, info, ok)
+	}
+	soa, ok := payload.(*runtime.SoA)
+	if !ok {
+		t.Fatalf("lowered result payload type = %T, want *runtime.SoA", payload)
+	}
+	size, ok := soa.Column("size")
+	if !ok {
+		t.Fatalf("lowered result missing size column")
+	}
+	total, ok := soa.Column("total")
+	if !ok {
+		t.Fatalf("lowered result missing total column")
+	}
+	fills, ok := soa.Column("fills")
+	if !ok {
+		t.Fatalf("lowered result missing fills column")
+	}
+	sizeVals, _ := size.I64()
+	totalVals, _ := total.F64()
+	fillVals, _ := fills.I64()
+	if len(sizeVals) != 3 || sizeVals[0] != 5 || sizeVals[1] != 10 || sizeVals[2] != 20 {
+		t.Fatalf("lowered size values = %#v, want [5 10 20]", sizeVals)
+	}
+	if len(totalVals) != 3 || totalVals[0] != 99 || totalVals[1] != 100.5 || totalVals[2] != 101.25 {
+		t.Fatalf("lowered total values = %#v, want [99 100.5 101.25]", totalVals)
+	}
+	if len(fillVals) != 3 || fillVals[0] != 1 || fillVals[1] != 1 || fillVals[2] != 1 {
+		t.Fatalf("lowered fills values = %#v, want [1 1 1]", fillVals)
+	}
+}
+
+func TestQGroupAggregateComputedExpressionStaysOnFallback(t *testing.T) {
+	const query = "select notional:sum price*size by size from trades"
+	proto := &vm.FuncProto{
+		Name:      "q_group_aggregate_computed_call",
+		NumParams: 1,
+		MaxStack:  4,
+		Constants: []runtime.Value{
+			runtime.StringValue("q"),
+			runtime.StringValue("sql"),
+			runtime.StringValue(query),
+		},
+		Code: []uint32{
+			vm.EncodeABx(vm.OP_GETGLOBAL, 1, 0),
+			vm.EncodeABC(vm.OP_GETFIELD, 1, 1, 1),
+			vm.EncodeABC(vm.OP_MOVE, 2, 0, 0),
+			vm.EncodeABx(vm.OP_LOADK, 3, 2),
+			vm.EncodeABC(vm.OP_CALL, 1, 3, 2),
+			vm.EncodeABC(vm.OP_RETURN, 1, 2, 0),
+		},
+	}
+
+	fn := BuildGraph(proto)
+	fn.Remarks = &OptimizationRemarks{}
+	lowered, err := QQueryNativeLoweringPass(fn)
+	if err != nil {
+		t.Fatalf("QQueryNativeLoweringPass: %v", err)
+	}
+	counts := countOps(lowered)
+	if counts[OpFrameGroupAggregate] != 0 || counts[OpCall] != 1 {
+		t.Fatalf("computed group aggregate lowering counts FrameGroupAggregate=%d OpCall=%d\n%s", counts[OpFrameGroupAggregate], counts[OpCall], Print(lowered))
+	}
+	if fallbacks := CountQQueryLoweringFallbackReasons(fn.Remarks.List()); fallbacks[qQueryLoweringFallbackGroupAggregateCall] != 1 {
+		t.Fatalf("q query fallback counts = %+v, want group_aggregate_call=1", fallbacks)
+	}
+	assertQLoweringRemarkFields(t, fn.Remarks.List(), "QQueryNativeLowering", "QGroupAggregate", "select/group/aggregate", qQueryLoweringFallbackGroupAggregateCall)
+}
+
 func TestQGroupAggregateCallReportsJoinSelectOrderShape(t *testing.T) {
 	const query = "select total:sum amount by acct from trades join accounts on acct where amount>0 order by acct asc"
 	proto := &vm.FuncProto{
