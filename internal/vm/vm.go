@@ -2650,6 +2650,41 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 				fb.Result.Observe(out.Type())
 			}
 
+		case OP_FRAME_GROUP_AGGREGATE:
+			a := DecodeA(inst)
+			b := DecodeB(inst)
+			c := DecodeC(inst)
+			frameVal := vm.regs[base+b]
+			maskVal := vm.regs[base+a]
+			if c >= len(constants) {
+				return nil, wrapLineErr(frame, fmt.Errorf("FRAME_GROUP_AGGREGATE spec constant is out of range"))
+			}
+			spec, err := runtime.DecodeFrameGroupAggregateSpec(constants[c])
+			if err != nil {
+				return nil, wrapLineErr(frame, err)
+			}
+			var mask *runtime.DenseArray
+			if !maskVal.IsNil() {
+				if !maskVal.IsDenseArray() {
+					return nil, wrapLineErr(frame, fmt.Errorf("FRAME_GROUP_AGGREGATE mask must be dense array or nil (got %s)", maskVal.TypeName()))
+				}
+				mask = maskVal.DenseArray()
+			}
+			out, handled, err := frameVal.NativeFrameGroupAggregate(mask, spec)
+			if err != nil {
+				return nil, wrapLineErr(frame, err)
+			}
+			if !handled {
+				return nil, wrapLineErr(frame, fmt.Errorf("FRAME_GROUP_AGGREGATE operand must be native frame (got %s)", frameVal.TypeName()))
+			}
+			vm.regs[base+a] = out
+			if frame.closure.Proto.Feedback != nil {
+				fb := &frame.closure.Proto.Feedback[frame.pc-1]
+				fb.Left.Observe(frameVal.Type())
+				fb.Right.Observe(maskVal.Type())
+				fb.Result.Observe(out.Type())
+			}
+
 		case OP_VECTOR_COMPARE:
 			a := DecodeA(inst)
 			b := DecodeB(inst)

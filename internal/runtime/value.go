@@ -910,6 +910,329 @@ func (v Value) NativeFrameFilterProject(mask *DenseArray, names []string) (Value
 	return TableValue(projected), true, nil
 }
 
+type FrameAggregateSpec struct {
+	Name   string
+	Op     string
+	Column string
+}
+
+type FrameGroupAggregateSpec struct {
+	By         string
+	Aggregates []FrameAggregateSpec
+}
+
+func DecodeFrameGroupAggregateSpec(v Value) (FrameGroupAggregateSpec, error) {
+	if !v.IsTable() {
+		return FrameGroupAggregateSpec{}, fmt.Errorf("FRAME_GROUP_AGGREGATE spec must be a table")
+	}
+	tbl := v.Table()
+	spec := FrameGroupAggregateSpec{}
+	by := tbl.RawGetString("by")
+	if by.IsNil() {
+		by = tbl.RawGetInt(1)
+	}
+	if !by.IsNil() {
+		if !by.IsString() {
+			return FrameGroupAggregateSpec{}, fmt.Errorf("FRAME_GROUP_AGGREGATE by must be a string")
+		}
+		spec.By = by.Str()
+	}
+	aggs := tbl.RawGetString("aggregates")
+	if aggs.IsNil() {
+		aggs = tbl.RawGetString("aggregate")
+	}
+	if aggs.IsNil() {
+		aggs = tbl.RawGetInt(2)
+	}
+	if !aggs.IsTable() {
+		return FrameGroupAggregateSpec{}, fmt.Errorf("FRAME_GROUP_AGGREGATE aggregates must be a table")
+	}
+	aggTable := aggs.Table()
+	spec.Aggregates = make([]FrameAggregateSpec, 0, aggTable.Length())
+	for i := int64(1); i <= int64(aggTable.Length()); i++ {
+		item := aggTable.RawGetInt(i)
+		if !item.IsTable() {
+			return FrameGroupAggregateSpec{}, fmt.Errorf("FRAME_GROUP_AGGREGATE aggregate %d must be a table", i)
+		}
+		agg, err := decodeFrameAggregateSpec(item.Table(), int(i))
+		if err != nil {
+			return FrameGroupAggregateSpec{}, err
+		}
+		spec.Aggregates = append(spec.Aggregates, agg)
+	}
+	if err := validateFrameGroupAggregateSpec(spec); err != nil {
+		return FrameGroupAggregateSpec{}, err
+	}
+	return spec, nil
+}
+
+func validateFrameGroupAggregateSpec(spec FrameGroupAggregateSpec) error {
+	if len(spec.Aggregates) == 0 {
+		return fmt.Errorf("FRAME_GROUP_AGGREGATE requires at least one aggregate")
+	}
+	seenOutputs := make(map[string]struct{}, len(spec.Aggregates)+1)
+	if spec.By != "" {
+		seenOutputs[spec.By] = struct{}{}
+	}
+	for _, agg := range spec.Aggregates {
+		if agg.Name == "" {
+			return fmt.Errorf("FRAME_GROUP_AGGREGATE aggregate output name must be non-empty")
+		}
+		if _, ok := seenOutputs[agg.Name]; ok {
+			return fmt.Errorf("FRAME_GROUP_AGGREGATE duplicate output column %q", agg.Name)
+		}
+		seenOutputs[agg.Name] = struct{}{}
+		if agg.Op == "" {
+			return fmt.Errorf("FRAME_GROUP_AGGREGATE aggregate %q op must be non-empty", agg.Name)
+		}
+		if strings.ToLower(agg.Op) == "sum" && agg.Column == "" {
+			return fmt.Errorf("FRAME_GROUP_AGGREGATE aggregate %q sum column must be non-empty", agg.Name)
+		}
+	}
+	return nil
+}
+
+func decodeFrameAggregateSpec(tbl *Table, index int) (FrameAggregateSpec, error) {
+	name := tbl.RawGetString("name")
+	if name.IsNil() {
+		name = tbl.RawGetInt(1)
+	}
+	op := tbl.RawGetString("op")
+	if op.IsNil() {
+		op = tbl.RawGetInt(2)
+	}
+	column := tbl.RawGetString("column")
+	if column.IsNil() {
+		column = tbl.RawGetInt(3)
+	}
+	if !name.IsString() || name.Str() == "" {
+		return FrameAggregateSpec{}, fmt.Errorf("FRAME_GROUP_AGGREGATE aggregate %d name must be a string", index)
+	}
+	if !op.IsString() || op.Str() == "" {
+		return FrameAggregateSpec{}, fmt.Errorf("FRAME_GROUP_AGGREGATE aggregate %d op must be a string", index)
+	}
+	agg := FrameAggregateSpec{Name: name.Str(), Op: strings.ToLower(op.Str())}
+	if !column.IsNil() {
+		if !column.IsString() || column.Str() == "" {
+			return FrameAggregateSpec{}, fmt.Errorf("FRAME_GROUP_AGGREGATE aggregate %d column must be a string", index)
+		}
+		agg.Column = column.Str()
+	}
+	return agg, nil
+}
+
+func (v Value) NativeFrameGroupAggregate(mask *DenseArray, spec FrameGroupAggregateSpec) (Value, bool, error) {
+	if err := validateFrameGroupAggregateSpec(spec); err != nil {
+		return NilValue(), true, err
+	}
+	if mask != nil && mask.dtype != DenseArrayBool {
+		return NilValue(), true, fmt.Errorf("FRAME_GROUP_AGGREGATE mask must be a bool dense array")
+	}
+	frame, info, handled, err := v.nativeFrameSoA("FRAME_GROUP_AGGREGATE")
+	if err != nil || !handled {
+		return NilValue(), handled, err
+	}
+	if mask != nil && mask.Len() != frame.Len() {
+		return NilValue(), true, fmt.Errorf("FRAME_GROUP_AGGREGATE mask length mismatch")
+	}
+	out, err := nativeFrameGroupAggregate(frame, mask, spec)
+	if err != nil {
+		return NilValue(), true, err
+	}
+	grouped := NewTable()
+	grouped.SetNativePayloadWithInfo(out, NativePayloadInfo{
+		Kind:       info.Kind,
+		Rows:       out.Len(),
+		Columns:    len(out.ColumnNames()),
+		SchemaHash: nativeFrameTransformSchemaHash(info.SchemaHash, nativeFrameSchemaGroupAggregate, frameGroupAggregateSchemaSignature(spec)),
+	})
+	return TableValue(grouped), true, nil
+}
+
+func frameGroupAggregateSchemaSignature(spec FrameGroupAggregateSpec) []string {
+	out := make([]string, 0, len(spec.Aggregates)+1)
+	out = append(out, "by="+spec.By)
+	for _, agg := range spec.Aggregates {
+		out = append(out, "agg="+agg.Name+":"+strings.ToLower(agg.Op)+":"+agg.Column)
+	}
+	return out
+}
+
+func nativeFrameGroupAggregate(frame *SoA, mask *DenseArray, spec FrameGroupAggregateSpec) (*SoA, error) {
+	if spec.By == "" {
+		return nativeFrameNoKeyAggregate(frame, mask, spec.Aggregates)
+	}
+	keyCol, ok := frame.Column(spec.By)
+	if !ok {
+		return nil, fmt.Errorf("FRAME_GROUP_AGGREGATE unknown by column %q", spec.By)
+	}
+	groups := make(map[string]int)
+	order := make([]int, 0)
+	rowGroups := make([]int, frame.Len())
+	for i := 0; i < frame.Len(); i++ {
+		rowGroups[i] = -1
+		if mask != nil && !mask.bools[i] {
+			continue
+		}
+		key := nativeFrameGroupKey(keyCol, i)
+		group, ok := groups[key]
+		if !ok {
+			group = len(order)
+			groups[key] = group
+			order = append(order, i)
+		}
+		rowGroups[i] = group
+	}
+	cols := make(map[string]*DenseArray, len(spec.Aggregates)+1)
+	keyOut, err := nativeFrameGroupKeyColumn(keyCol, order)
+	if err != nil {
+		return nil, err
+	}
+	cols[spec.By] = keyOut
+	for _, agg := range spec.Aggregates {
+		col, err := nativeFrameGroupedAggregateColumn(frame, rowGroups, len(order), agg)
+		if err != nil {
+			return nil, err
+		}
+		cols[agg.Name] = col
+	}
+	return NewSoA(cols)
+}
+
+func nativeFrameNoKeyAggregate(frame *SoA, mask *DenseArray, aggs []FrameAggregateSpec) (*SoA, error) {
+	cols := make(map[string]*DenseArray, len(aggs))
+	for _, agg := range aggs {
+		col, err := nativeFrameNoKeyAggregateColumn(frame, mask, agg)
+		if err != nil {
+			return nil, err
+		}
+		cols[agg.Name] = col
+	}
+	return NewSoA(cols)
+}
+
+func nativeFrameGroupKey(col *DenseArray, row int) string {
+	switch col.dtype {
+	case DenseArrayF64:
+		return "f:" + strconv.FormatFloat(col.f64[row], 'g', -1, 64)
+	case DenseArrayI64:
+		return "i:" + strconv.FormatInt(col.i64[row], 10)
+	case DenseArrayBool:
+		return "b:" + strconv.FormatBool(col.bools[row])
+	default:
+		return "unknown"
+	}
+}
+
+func nativeFrameGroupKeyColumn(col *DenseArray, rows []int) (*DenseArray, error) {
+	switch col.dtype {
+	case DenseArrayF64:
+		out := make([]float64, len(rows))
+		for i, row := range rows {
+			out[i] = col.f64[row]
+		}
+		return NewDenseArrayF64(out), nil
+	case DenseArrayI64:
+		out := make([]int64, len(rows))
+		for i, row := range rows {
+			out[i] = col.i64[row]
+		}
+		return NewDenseArrayI64(out), nil
+	case DenseArrayBool:
+		out := make([]bool, len(rows))
+		for i, row := range rows {
+			out[i] = col.bools[row]
+		}
+		return NewDenseArrayBool(out), nil
+	default:
+		return nil, ErrDenseArrayDType
+	}
+}
+
+func nativeFrameGroupedAggregateColumn(frame *SoA, rowGroups []int, groupCount int, agg FrameAggregateSpec) (*DenseArray, error) {
+	switch agg.Op {
+	case "count":
+		out := make([]int64, groupCount)
+		for _, group := range rowGroups {
+			if group >= 0 {
+				out[group]++
+			}
+		}
+		return NewDenseArrayI64(out), nil
+	case "sum":
+		src, ok := frame.Column(agg.Column)
+		if !ok {
+			return nil, fmt.Errorf("FRAME_GROUP_AGGREGATE unknown sum column %q", agg.Column)
+		}
+		switch src.dtype {
+		case DenseArrayF64:
+			out := make([]float64, groupCount)
+			for row, group := range rowGroups {
+				if group >= 0 {
+					out[group] += src.f64[row]
+				}
+			}
+			return NewDenseArrayF64(out), nil
+		case DenseArrayI64:
+			out := make([]int64, groupCount)
+			for row, group := range rowGroups {
+				if group >= 0 {
+					out[group] += src.i64[row]
+				}
+			}
+			return NewDenseArrayI64(out), nil
+		default:
+			return nil, fmt.Errorf("FRAME_GROUP_AGGREGATE sum column %q must be numeric", agg.Column)
+		}
+	default:
+		return nil, fmt.Errorf("FRAME_GROUP_AGGREGATE aggregate op %q is not supported", agg.Op)
+	}
+}
+
+func nativeFrameNoKeyAggregateColumn(frame *SoA, mask *DenseArray, agg FrameAggregateSpec) (*DenseArray, error) {
+	switch agg.Op {
+	case "count":
+		var count int64
+		if mask == nil {
+			count = int64(frame.Len())
+		} else {
+			for _, ok := range mask.bools {
+				if ok {
+					count++
+				}
+			}
+		}
+		return NewDenseArrayI64([]int64{count}), nil
+	case "sum":
+		src, ok := frame.Column(agg.Column)
+		if !ok {
+			return nil, fmt.Errorf("FRAME_GROUP_AGGREGATE unknown sum column %q", agg.Column)
+		}
+		switch src.dtype {
+		case DenseArrayF64:
+			var sum float64
+			for i, value := range src.f64 {
+				if mask == nil || mask.bools[i] {
+					sum += value
+				}
+			}
+			return NewDenseArrayF64([]float64{sum}), nil
+		case DenseArrayI64:
+			var sum int64
+			for i, value := range src.i64 {
+				if mask == nil || mask.bools[i] {
+					sum += value
+				}
+			}
+			return NewDenseArrayI64([]int64{sum}), nil
+		default:
+			return nil, fmt.Errorf("FRAME_GROUP_AGGREGATE sum column %q must be numeric", agg.Column)
+		}
+	default:
+		return nil, fmt.Errorf("FRAME_GROUP_AGGREGATE aggregate op %q is not supported", agg.Op)
+	}
+}
+
 // NativeFrameFilter returns a new runtime frame facade containing rows selected
 // by a bool dense-array mask.
 func (v Value) NativeFrameFilter(mask *DenseArray) (Value, bool, error) {
@@ -1118,15 +1441,16 @@ func nativeFrameOrderComparerFor(col *DenseArray) (nativeFrameOrderComparer, err
 type nativeFrameSchemaTransform string
 
 const (
-	nativeFrameSchemaProject nativeFrameSchemaTransform = "project"
-	nativeFrameSchemaFilter  nativeFrameSchemaTransform = "filter"
-	nativeFrameSchemaGather  nativeFrameSchemaTransform = "gather"
-	nativeFrameSchemaSlice   nativeFrameSchemaTransform = "slice"
+	nativeFrameSchemaProject        nativeFrameSchemaTransform = "project"
+	nativeFrameSchemaFilter         nativeFrameSchemaTransform = "filter"
+	nativeFrameSchemaGather         nativeFrameSchemaTransform = "gather"
+	nativeFrameSchemaSlice          nativeFrameSchemaTransform = "slice"
+	nativeFrameSchemaGroupAggregate nativeFrameSchemaTransform = "group_aggregate"
 )
 
 func nativeFrameTransformSchemaHash(source string, transform nativeFrameSchemaTransform, names []string) string {
 	suffix := string(transform)
-	if transform == nativeFrameSchemaProject {
+	if transform == nativeFrameSchemaProject || transform == nativeFrameSchemaGroupAggregate {
 		suffix += ":" + strings.Join(names, ",")
 	}
 	if source == "" {

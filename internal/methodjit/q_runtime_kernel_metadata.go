@@ -27,6 +27,8 @@ func qRuntimePrimitiveExecutionMetadata(op Op) (source, kernel, shape, route str
 		return "methodjit_q_frame_runtime", "FrameProjectColumn", "project/column", route, true
 	case OpFrameFilterProjectColumn:
 		return "methodjit_q_frame_runtime", "FrameFilterProjectColumn", "filter/project/column", route, true
+	case OpFrameGroupAggregate:
+		return "methodjit_q_frame_runtime", "FrameGroupAggregate", "group/aggregate", route, true
 	case OpVectorGather:
 		return "methodjit_q_vector_runtime", "VectorGather", "vector-gather", route, true
 	case OpVectorCompare:

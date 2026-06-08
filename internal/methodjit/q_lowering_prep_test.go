@@ -741,6 +741,48 @@ func TestFrameOrderGatherBytecodeBuildsMethodJITIR(t *testing.T) {
 	}
 }
 
+func TestFrameGroupAggregateBytecodeBuildsMethodJITIR(t *testing.T) {
+	spec := qFrameGroupAggregateSpec("size", []runtime.FrameAggregateSpec{
+		{Name: "n", Op: "count"},
+		{Name: "total", Op: "sum", Column: "price"},
+	})
+	proto := &vm.FuncProto{
+		Name:      "frame_group_aggregate",
+		NumParams: 2,
+		MaxStack:  2,
+		Constants: []runtime.Value{
+			runtime.TableValue(spec),
+		},
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_FRAME_GROUP_AGGREGATE, 1, 0, 0),
+			vm.EncodeABC(vm.OP_RETURN, 1, 2, 0),
+		},
+	}
+
+	fn := BuildGraph(proto)
+	var groupAgg *Instr
+	for _, block := range fn.Blocks {
+		for _, instr := range block.Instrs {
+			if instr.Op == OpFrameGroupAggregate {
+				groupAgg = instr
+				break
+			}
+		}
+	}
+	if groupAgg == nil {
+		t.Fatalf("BuildGraph did not emit OpFrameGroupAggregate:\n%s", Print(fn))
+	}
+	if len(groupAgg.Args) != 2 {
+		t.Fatalf("OpFrameGroupAggregate arg count = %d, want 2", len(groupAgg.Args))
+	}
+	if groupAgg.Type != TypeAny {
+		t.Fatalf("OpFrameGroupAggregate type = %s, want Any", groupAgg.Type)
+	}
+	if groupAgg.Aux != 0 {
+		t.Fatalf("OpFrameGroupAggregate Aux = %d, want const index 0", groupAgg.Aux)
+	}
+}
+
 func TestFrameOrderGatherDiagnoseUsesRuntimeOpExit(t *testing.T) {
 	order := runtime.NewTable()
 	order.RawSetString("column", runtime.StringValue("price"))
@@ -802,6 +844,10 @@ func TestQFrameRuntimePrimitiveDiagnoseExecutionStats(t *testing.T) {
 	columnSpec := runtime.NewTable()
 	columnSpec.RawSetString("project", runtime.StringValue("size"))
 	columnSpec.RawSetString("column", runtime.StringValue("size"))
+	groupAggSpec := qFrameGroupAggregateSpec("size", []runtime.FrameAggregateSpec{
+		{Name: "n", Op: "count"},
+		{Name: "total", Op: "sum", Column: "price"},
+	})
 
 	frameArg := func(t *testing.T) runtime.Value {
 		t.Helper()
@@ -945,6 +991,18 @@ func TestQFrameRuntimePrimitiveDiagnoseExecutionStats(t *testing.T) {
 				vm.EncodeABC(vm.OP_RETURN, 1, 2, 0),
 			},
 			args: func(t *testing.T) []runtime.Value { return []runtime.Value{frameArg(t), maskArg} },
+		},
+		{
+			name:      "group_aggregate",
+			kernel:    "FrameGroupAggregate",
+			shape:     "group/aggregate",
+			constants: []runtime.Value{runtime.TableValue(groupAggSpec)},
+			code: []uint32{
+				vm.EncodeABC(vm.OP_LOADNIL, 1, 0, 0),
+				vm.EncodeABC(vm.OP_FRAME_GROUP_AGGREGATE, 1, 0, 0),
+				vm.EncodeABC(vm.OP_RETURN, 1, 2, 0),
+			},
+			args: func(t *testing.T) []runtime.Value { return []runtime.Value{frameArg(t)} },
 		},
 	}
 
@@ -3414,6 +3472,31 @@ func TestTier2GateAllowsFrameOrderGatherThroughOpExit(t *testing.T) {
 	}
 }
 
+func TestTier2GateAllowsFrameGroupAggregateThroughOpExit(t *testing.T) {
+	spec := qFrameGroupAggregateSpec("size", []runtime.FrameAggregateSpec{
+		{Name: "n", Op: "count"},
+		{Name: "total", Op: "sum", Column: "price"},
+	})
+	proto := &vm.FuncProto{
+		Name:      "frame_group_aggregate",
+		NumParams: 1,
+		MaxStack:  2,
+		Constants: []runtime.Value{
+			runtime.TableValue(spec),
+		},
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_LOADNIL, 1, 0, 0),
+			vm.EncodeABC(vm.OP_FRAME_GROUP_AGGREGATE, 1, 0, 0),
+			vm.EncodeABC(vm.OP_RETURN, 1, 2, 0),
+		},
+	}
+
+	gate := firstUnsupportedTier2BytecodeGate(proto)
+	if !gate.Allowed {
+		t.Fatalf("OP_FRAME_GROUP_AGGREGATE should be Tier2-eligible via op-exit, got %q", gate.Reason)
+	}
+}
+
 func TestTier2GateAllowsFrameProjectColumnThroughOpExit(t *testing.T) {
 	spec := runtime.NewTable()
 	spec.RawSetString("project", runtime.StringValue("price"))
@@ -4176,6 +4259,25 @@ func qHotPathTestFrame(t *testing.T) *runtime.Table {
 		SchemaHash: "q-hot-path-test",
 	})
 	return frame
+}
+
+func qFrameGroupAggregateSpec(by string, aggs []runtime.FrameAggregateSpec) *runtime.Table {
+	spec := runtime.NewTable()
+	if by != "" {
+		spec.RawSetString("by", runtime.StringValue(by))
+	}
+	aggRows := runtime.NewAppendArrayTable(len(aggs))
+	for i, agg := range aggs {
+		row := runtime.NewTable()
+		row.RawSetString("name", runtime.StringValue(agg.Name))
+		row.RawSetString("op", runtime.StringValue(agg.Op))
+		if agg.Column != "" {
+			row.RawSetString("column", runtime.StringValue(agg.Column))
+		}
+		aggRows.RawSetInt(int64(i+1), runtime.TableValue(row))
+	}
+	spec.RawSetString("aggregates", runtime.TableValue(aggRows))
+	return spec
 }
 
 func assertQKernelShapeSummary(t *testing.T, rows []QKernelShapeSummary, source, kind, shape, outcome, reasonCode string, count int) {

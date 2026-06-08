@@ -95,6 +95,7 @@ var opSpecs = [...]OpSpec{
 	OpFrameOrderGather:              opSpecArgCount(opSpec("FrameOrderGather", OpEmitterTable, OpArgFixedAux, OpSideEffectRead, true), OpFixedCount(1)),
 	OpFrameProjectColumn:            opSpecArgCount(opSpec("FrameProjectColumn", OpEmitterTable, OpArgFixedAux, OpSideEffectRead, true), OpFixedCount(1)),
 	OpFrameFilterProjectColumn:      opSpecArgCount(opSpec("FrameFilterProjectColumn", OpEmitterTable, OpArgFixedAux, OpSideEffectRead, true), OpFixedCount(2)),
+	OpFrameGroupAggregate:           opSpecArgCount(opSpec("FrameGroupAggregate", OpEmitterTable, OpArgFixedAux, OpSideEffectRead, true), OpFixedCount(2)),
 	OpVectorGather:                  opSpecArgCount(opSpec("VectorGather", OpEmitterTable, OpArgFixed, OpSideEffectRead, true), OpFixedCount(2)),
 	OpVectorCompare:                 opSpecArgCount(opSpec("VectorCompare", OpEmitterTable, OpArgFixedAux, OpSideEffectRead, true), OpFixedCount(2)),
 	OpVectorMask:                    opSpecArgCount(opSpec("VectorMask", OpEmitterTable, OpArgFixedAux, OpSideEffectRead, true), OpFixedCount(2)),

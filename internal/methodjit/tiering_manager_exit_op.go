@@ -510,6 +510,21 @@ func (tm *TieringManager) executeOpExit(ctx *ExecContext, regs []runtime.Value, 
 		tm.recordQRuntimePrimitiveExecution(proto, OpFrameFilterProjectColumn, "success")
 		regs[absSlot] = out
 
+	case OpFrameGroupAggregate:
+		if absArg1 >= len(regs) || absArg2 >= len(regs) || absSlot >= len(regs) {
+			return fmt.Errorf("FrameGroupAggregate op-exit out of register range")
+		}
+		if aux < 0 || proto == nil || aux >= len(proto.Constants) {
+			return fmt.Errorf("FrameGroupAggregate spec constant is out of range")
+		}
+		out, err := executeFrameGroupAggregateValue(regs[absArg1], regs[absArg2], proto.Constants[aux])
+		if err != nil {
+			tm.recordQRuntimePrimitiveExecution(proto, OpFrameGroupAggregate, "error")
+			return err
+		}
+		tm.recordQRuntimePrimitiveExecution(proto, OpFrameGroupAggregate, "success")
+		regs[absSlot] = out
+
 	case OpQFrameSelectColumn:
 		if absArg1 >= len(regs) || absSlot >= len(regs) {
 			return fmt.Errorf("QFrameSelectColumn op-exit out of register range")

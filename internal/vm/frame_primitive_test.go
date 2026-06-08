@@ -654,6 +654,134 @@ func TestFrameOrderGatherPrimitiveRejectsNonNativeFrame(t *testing.T) {
 	}
 }
 
+func TestFrameGroupAggregatePrimitiveNoKeyCountAndSum(t *testing.T) {
+	frame := frameGroupAggregateTestFrame(t)
+	spec := frameGroupAggregateSpec("", []runtime.FrameAggregateSpec{
+		{Name: "n", Op: "count"},
+		{Name: "total", Op: "sum", Column: "qty"},
+	})
+	proto := &FuncProto{
+		MaxStack: 2,
+		Code: []uint32{
+			EncodeABx(OP_LOADK, 0, 0),
+			EncodeABC(OP_LOADNIL, 1, 0, 0),
+			EncodeABC(OP_FRAME_GROUP_AGGREGATE, 1, 0, 1),
+			EncodeABC(OP_RETURN, 1, 2, 0),
+		},
+		Constants: []runtime.Value{runtime.TableValue(frame), runtime.TableValue(spec)},
+	}
+	proto.EnsureFeedback()
+
+	results, err := New(map[string]runtime.Value{}).Execute(proto)
+	if err != nil {
+		t.Fatalf("Execute FRAME_GROUP_AGGREGATE no-key: %v", err)
+	}
+	out := frameGroupAggregateResultSoA(t, results)
+	assertI64Column(t, out, "n", []int64{4})
+	assertI64Column(t, out, "total", []int64{25})
+
+	fb := proto.Feedback[2]
+	if fb.Left != FBTable || fb.Right != FBAny || fb.Result != FBTable {
+		t.Fatalf("FRAME_GROUP_AGGREGATE feedback = left %v right %v result %v, want table/nil-bucket/table", fb.Left, fb.Right, fb.Result)
+	}
+}
+
+func TestFrameGroupAggregatePrimitiveSingleKeyAndMask(t *testing.T) {
+	frame := frameGroupAggregateTestFrame(t)
+	spec := frameGroupAggregateSpec("acct", []runtime.FrameAggregateSpec{
+		{Name: "n", Op: "count"},
+		{Name: "total", Op: "sum", Column: "amount"},
+	})
+	mask := runtime.NewDenseArrayBool([]bool{true, false, true, true})
+	proto := &FuncProto{
+		MaxStack: 3,
+		Code: []uint32{
+			EncodeABx(OP_LOADK, 0, 0),
+			EncodeABx(OP_LOADK, 1, 2),
+			EncodeABC(OP_FRAME_GROUP_AGGREGATE, 1, 0, 1),
+			EncodeABC(OP_RETURN, 1, 2, 0),
+		},
+		Constants: []runtime.Value{
+			runtime.TableValue(frame),
+			runtime.TableValue(spec),
+			runtime.DenseArrayValue(mask),
+		},
+	}
+	proto.EnsureFeedback()
+
+	results, err := New(map[string]runtime.Value{}).Execute(proto)
+	if err != nil {
+		t.Fatalf("Execute FRAME_GROUP_AGGREGATE keyed: %v", err)
+	}
+	out := frameGroupAggregateResultSoA(t, results)
+	assertI64Column(t, out, "acct", []int64{1, 2})
+	assertI64Column(t, out, "n", []int64{2, 1})
+	assertF64Column(t, out, "total", []float64{17.5, 3.5})
+
+	fb := proto.Feedback[2]
+	if fb.Left != FBTable || fb.Right != FBAny || fb.Result != FBTable {
+		t.Fatalf("FRAME_GROUP_AGGREGATE masked feedback = left %v right %v result %v, want table/dense-bucket/table", fb.Left, fb.Right, fb.Result)
+	}
+}
+
+func TestFrameGroupAggregatePrimitiveRejectsUnsupportedSumColumn(t *testing.T) {
+	frame := frameGroupAggregateTestFrame(t)
+	spec := frameGroupAggregateSpec("", []runtime.FrameAggregateSpec{
+		{Name: "bad", Op: "sum", Column: "flag"},
+	})
+	proto := &FuncProto{
+		MaxStack: 2,
+		Code: []uint32{
+			EncodeABx(OP_LOADK, 0, 0),
+			EncodeABC(OP_LOADNIL, 1, 0, 0),
+			EncodeABC(OP_FRAME_GROUP_AGGREGATE, 1, 0, 1),
+			EncodeABC(OP_RETURN, 1, 2, 0),
+		},
+		Constants: []runtime.Value{runtime.TableValue(frame), runtime.TableValue(spec)},
+	}
+
+	_, err := New(map[string]runtime.Value{}).Execute(proto)
+	if err == nil || !strings.Contains(err.Error(), `FRAME_GROUP_AGGREGATE sum column "flag" must be numeric`) {
+		t.Fatalf("FRAME_GROUP_AGGREGATE bool sum error = %v, want numeric error", err)
+	}
+}
+
+func TestFrameGroupAggregateSchemaHashIncludesSpecShape(t *testing.T) {
+	frame := runtime.TableValue(frameGroupAggregateTestFrame(t))
+	countSpec := runtime.FrameGroupAggregateSpec{
+		By: "acct",
+		Aggregates: []runtime.FrameAggregateSpec{
+			{Name: "n", Op: "count"},
+		},
+	}
+	sumSpec := runtime.FrameGroupAggregateSpec{
+		By: "acct",
+		Aggregates: []runtime.FrameAggregateSpec{
+			{Name: "total", Op: "sum", Column: "amount"},
+		},
+	}
+
+	countOut, handled, err := frame.NativeFrameGroupAggregate(nil, countSpec)
+	if err != nil || !handled {
+		t.Fatalf("count NativeFrameGroupAggregate handled=%v err=%v", handled, err)
+	}
+	sumOut, handled, err := frame.NativeFrameGroupAggregate(nil, sumSpec)
+	if err != nil || !handled {
+		t.Fatalf("sum NativeFrameGroupAggregate handled=%v err=%v", handled, err)
+	}
+	countInfo, ok := countOut.NativeFramePayloadInfo()
+	if !ok {
+		t.Fatalf("count aggregate missing native payload info")
+	}
+	sumInfo, ok := sumOut.NativeFramePayloadInfo()
+	if !ok {
+		t.Fatalf("sum aggregate missing native payload info")
+	}
+	if countInfo.SchemaHash == "" || sumInfo.SchemaHash == "" || countInfo.SchemaHash == sumInfo.SchemaHash {
+		t.Fatalf("group aggregate schema hashes = %q/%q, want non-empty distinct hashes", countInfo.SchemaHash, sumInfo.SchemaHash)
+	}
+}
+
 func TestFramePrimitivePipelineFiltersProjectsAndLoadsColumn(t *testing.T) {
 	soa, err := runtime.NewSoA(map[string]*runtime.DenseArray{
 		"price": runtime.NewDenseArrayF64([]float64{99, 100.5, 101.25}),
@@ -699,6 +827,102 @@ func TestFramePrimitivePipelineFiltersProjectsAndLoadsColumn(t *testing.T) {
 	}
 	if fb := proto.Feedback[5]; fb.Left != FBTable || fb.Right != FBTable || fb.Result != FBTable {
 		t.Fatalf("pipeline FRAME_PROJECT feedback = left %v right %v result %v, want table/table/table", fb.Left, fb.Right, fb.Result)
+	}
+}
+
+func frameGroupAggregateTestFrame(t *testing.T) *runtime.Table {
+	t.Helper()
+	soa, err := runtime.NewSoA(map[string]*runtime.DenseArray{
+		"acct":   runtime.NewDenseArrayI64([]int64{1, 1, 2, 1}),
+		"qty":    runtime.NewDenseArrayI64([]int64{10, 5, 3, 7}),
+		"amount": runtime.NewDenseArrayF64([]float64{10, 5, 3.5, 7.5}),
+		"flag":   runtime.NewDenseArrayBool([]bool{true, false, true, true}),
+	})
+	if err != nil {
+		t.Fatalf("NewSoA: %v", err)
+	}
+	frame := runtime.NewTable()
+	frame.SetNativePayloadWithInfo(soa, runtime.NativePayloadInfo{
+		Kind:       runtime.NativePayloadDataFrame,
+		Rows:       soa.Len(),
+		Columns:    4,
+		SchemaHash: "frame-group-aggregate-test",
+	})
+	return frame
+}
+
+func frameGroupAggregateSpec(by string, aggs []runtime.FrameAggregateSpec) *runtime.Table {
+	spec := runtime.NewTable()
+	if by != "" {
+		spec.RawSetString("by", runtime.StringValue(by))
+	}
+	aggRows := runtime.NewAppendArrayTable(len(aggs))
+	for i, agg := range aggs {
+		row := runtime.NewTable()
+		row.RawSetString("name", runtime.StringValue(agg.Name))
+		row.RawSetString("op", runtime.StringValue(agg.Op))
+		if agg.Column != "" {
+			row.RawSetString("column", runtime.StringValue(agg.Column))
+		}
+		aggRows.RawSetInt(int64(i+1), runtime.TableValue(row))
+	}
+	spec.RawSetString("aggregates", runtime.TableValue(aggRows))
+	return spec
+}
+
+func frameGroupAggregateResultSoA(t *testing.T, results []runtime.Value) *runtime.SoA {
+	t.Helper()
+	if len(results) != 1 || !results[0].IsTable() {
+		t.Fatalf("FRAME_GROUP_AGGREGATE result = %#v, want table", results)
+	}
+	payload, _, ok := results[0].Table().NativeFramePayload()
+	if !ok {
+		t.Fatalf("FRAME_GROUP_AGGREGATE result is not a native frame")
+	}
+	soa, ok := payload.(*runtime.SoA)
+	if !ok {
+		t.Fatalf("FRAME_GROUP_AGGREGATE payload = %T, want *runtime.SoA", payload)
+	}
+	return soa
+}
+
+func assertI64Column(t *testing.T, soa *runtime.SoA, name string, want []int64) {
+	t.Helper()
+	col, ok := soa.Column(name)
+	if !ok {
+		t.Fatalf("missing i64 column %q", name)
+	}
+	got, ok := col.I64()
+	if !ok {
+		t.Fatalf("column %q dtype = %s, want i64", name, col.DType())
+	}
+	if len(got) != len(want) {
+		t.Fatalf("column %q len = %d, want %d", name, len(got), len(want))
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("column %q[%d] = %d, want %d", name, i, got[i], want[i])
+		}
+	}
+}
+
+func assertF64Column(t *testing.T, soa *runtime.SoA, name string, want []float64) {
+	t.Helper()
+	col, ok := soa.Column(name)
+	if !ok {
+		t.Fatalf("missing f64 column %q", name)
+	}
+	got, ok := col.F64()
+	if !ok {
+		t.Fatalf("column %q dtype = %s, want f64", name, col.DType())
+	}
+	if len(got) != len(want) {
+		t.Fatalf("column %q len = %d, want %d", name, len(got), len(want))
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("column %q[%d] = %v, want %v", name, i, got[i], want[i])
+		}
 	}
 }
 

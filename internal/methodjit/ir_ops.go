@@ -211,6 +211,9 @@ const (
 	// q/frame runtime primitive. Args = [frame, mask], Aux = constant pool
 	// index for a project-column spec; mirrors OP_FRAME_FILTER_PROJECT_COLUMN.
 	OpFrameFilterProjectColumn
+	// q/frame runtime primitive. Args = [frame, mask], Aux = constant pool
+	// index for a group aggregate spec; mirrors OP_FRAME_GROUP_AGGREGATE.
+	OpFrameGroupAggregate
 	// q/vector runtime primitive. Args = [vector, indexes]; mirrors
 	// OP_VECTOR_GATHER and returns a gathered dense-array value.
 	OpVectorGather

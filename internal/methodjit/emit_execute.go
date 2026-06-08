@@ -1155,6 +1155,21 @@ func (cf *CompiledFunction) executeOpExit(ctx *ExecContext, regs []runtime.Value
 		cf.recordQRuntimePrimitiveExecution(OpFrameFilterProjectColumn, "success")
 		regs[slot] = out
 
+	case OpFrameGroupAggregate:
+		if arg1 >= len(regs) || arg2 >= len(regs) || slot >= len(regs) {
+			return fmt.Errorf("FrameGroupAggregate op-exit out of register range")
+		}
+		if aux < 0 || cf.Proto == nil || aux >= len(cf.Proto.Constants) {
+			return fmt.Errorf("FrameGroupAggregate spec constant is out of range")
+		}
+		out, err := executeFrameGroupAggregateValue(regs[arg1], regs[arg2], cf.Proto.Constants[aux])
+		if err != nil {
+			cf.recordQRuntimePrimitiveExecution(OpFrameGroupAggregate, "error")
+			return err
+		}
+		cf.recordQRuntimePrimitiveExecution(OpFrameGroupAggregate, "success")
+		regs[slot] = out
+
 	case OpQFrameSelectColumn:
 		if arg1 >= len(regs) || slot >= len(regs) {
 			return fmt.Errorf("QFrameSelectColumn op-exit out of register range")

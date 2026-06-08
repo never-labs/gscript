@@ -86,6 +86,28 @@ func executeFrameFilterProjectColumnValue(frameVal, maskVal runtime.Value, names
 	return out, nil
 }
 
+func executeFrameGroupAggregateValue(frameVal, maskVal, specVal runtime.Value) (runtime.Value, error) {
+	spec, err := runtime.DecodeFrameGroupAggregateSpec(specVal)
+	if err != nil {
+		return runtime.NilValue(), err
+	}
+	var mask *runtime.DenseArray
+	if !maskVal.IsNil() {
+		if !maskVal.IsDenseArray() {
+			return runtime.NilValue(), fmt.Errorf("FrameGroupAggregate mask must be dense array or nil (got %s)", maskVal.TypeName())
+		}
+		mask = maskVal.DenseArray()
+	}
+	out, handled, err := frameVal.NativeFrameGroupAggregate(mask, spec)
+	if err != nil {
+		return runtime.NilValue(), err
+	}
+	if !handled {
+		return runtime.NilValue(), fmt.Errorf("FrameGroupAggregate operand must be native frame (got %s)", frameVal.TypeName())
+	}
+	return out, nil
+}
+
 func executeFrameCompareFilterProjectColumnValue(frameVal runtime.Value, sourceName string, op runtime.DenseArrayBinaryOp, rhs runtime.Value, names []string, resultName string) (runtime.Value, error) {
 	out, handled, err := frameVal.NativeFrameCompareFilterProjectColumn(sourceName, op, rhs, names, resultName)
 	if err != nil {

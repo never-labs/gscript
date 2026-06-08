@@ -637,7 +637,7 @@ func fnHasResultProducingOpExit(fn *Function) bool {
 				continue
 			}
 			switch instr.Op {
-			case OpMatrixDense, OpFrameLen, OpFrameColumn, OpFrameMask, OpFrameProject, OpFrameFilter, OpFrameFilterProject, OpFrameGather, OpFrameSlice, OpFrameOrder, OpFrameOrderGather, OpFrameProjectColumn, OpFrameFilterProjectColumn, OpVectorGather, OpVectorCompare, OpVectorMask, OpVectorWhere, OpVectorReduce, OpVectorScan, OpQFrameSelectColumn, OpQVectorWhereReduce, OpQVectorGatherReduce:
+			case OpMatrixDense, OpFrameLen, OpFrameColumn, OpFrameMask, OpFrameProject, OpFrameFilter, OpFrameFilterProject, OpFrameGather, OpFrameSlice, OpFrameOrder, OpFrameOrderGather, OpFrameProjectColumn, OpFrameFilterProjectColumn, OpFrameGroupAggregate, OpVectorGather, OpVectorCompare, OpVectorMask, OpVectorWhere, OpVectorReduce, OpVectorScan, OpQFrameSelectColumn, OpQVectorWhereReduce, OpQVectorGatherReduce:
 				return true
 			}
 		}

@@ -116,6 +116,7 @@ const (
 	OP_FRAME_ORDER_GATHER          // A B C : R(A) = native frame R(B) ordered/gathered by spec Constants[C]
 	OP_FRAME_PROJECT_COLUMN        // A B C : R(A) = projected column from native frame R(B), spec Constants[C]
 	OP_FRAME_FILTER_PROJECT_COLUMN // A B C : R(A) = projected column from native frame R(B) filtered by mask R(A), spec Constants[C]
+	OP_FRAME_GROUP_AGGREGATE       // A B C : R(A) = grouped aggregate native frame from R(B), optional mask R(A), spec Constants[C]
 	OP_VECTOR_COMPARE              // A B C : R(A) = compare(R(A), R(B), dense-array op C)
 	OP_VECTOR_MASK                 // A B C : R(A) = mask-combine(R(A), R(B), dense-array mask op C)
 	OP_VECTOR_WHERE                // A B C : R(A) = where(bool dense mask R(A), R(B), R(C))
@@ -288,6 +289,7 @@ var opNames = [...]string{
 	OP_FRAME_ORDER_GATHER:          "FRAME_ORDER_GATHER",
 	OP_FRAME_PROJECT_COLUMN:        "FRAME_PROJECT_COLUMN",
 	OP_FRAME_FILTER_PROJECT_COLUMN: "FRAME_FILTER_PROJECT_COLUMN",
+	OP_FRAME_GROUP_AGGREGATE:       "FRAME_GROUP_AGGREGATE",
 	OP_VECTOR_COMPARE:              "VECTOR_COMPARE",
 	OP_VECTOR_MASK:                 "VECTOR_MASK",
 	OP_VECTOR_WHERE:                "VECTOR_WHERE",
