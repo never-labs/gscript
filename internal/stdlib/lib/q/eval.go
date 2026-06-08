@@ -8006,7 +8006,7 @@ func applyCompositeDyadic(op string, left, right any) (any, error) {
 			if !qVectorDyadicCanUseTypedCompare(left, right, la, ra) {
 				recordRuntimeKernelExecution("ArrayDyadicCompare", shape, "attempt", "attempt")
 				recordRuntimeKernelExecution("ArrayDyadicCompare", shape, "fallback", "unsupported_shape")
-			} else if out, handled, err := data.TryTypedDyadic(dataOp, left, right); err != nil || handled {
+			} else if out, handled, err := qTryTypedCompareMask(dataOp, left, right, la, ra); err != nil || handled {
 				recordRuntimeKernelProbe("ArrayDyadicCompare", shape, handled, err)
 				if err != nil {
 					return nil, err
@@ -8143,7 +8143,7 @@ func applyVectorDyadic(op byte, left, right any, la, ra data.Array) (data.Array,
 		if !qVectorDyadicCanUseTypedCompare(left, right, la, ra) {
 			recordRuntimeKernelExecution("ArrayDyadicCompare", shape, "attempt", "attempt")
 			recordRuntimeKernelExecution("ArrayDyadicCompare", shape, "fallback", "unsupported_shape")
-		} else if out, handled, err := data.TryTypedDyadic(dataOp, left, right); err != nil || handled {
+		} else if out, handled, err := qTryTypedCompareMask(dataOp, left, right, la, ra); err != nil || handled {
 			recordRuntimeKernelProbe("ArrayDyadicCompare", shape, handled, err)
 			if err != nil {
 				return nil, err
@@ -8264,6 +8264,47 @@ func qTryTypedArithmeticDyadic(op data.Op, left, right any) (any, bool, error) {
 		return data.TryTypedIntegerDyadic(op, left, right)
 	}
 	return data.TryTypedDyadic(op, left, right)
+}
+
+func qTryTypedCompareMask(op data.Op, left, right any, la, ra data.Array) (data.Array, bool, error) {
+	if out, handled, err := data.TryTypedDyadic(op, left, right); err != nil || handled {
+		if err != nil {
+			return nil, handled, err
+		}
+		array, ok := out.(data.Array)
+		return array, ok, nil
+	}
+	switch {
+	case la != nil && ra == nil:
+		out, err := data.CompareMask(la, op, right)
+		return out, err == nil, err
+	case la == nil && ra != nil:
+		reversed, ok := reverseDataCompareOp(op)
+		if !ok {
+			return nil, false, nil
+		}
+		out, err := data.CompareMask(ra, reversed, left)
+		return out, err == nil, err
+	default:
+		return nil, false, nil
+	}
+}
+
+func reverseDataCompareOp(op data.Op) (data.Op, bool) {
+	switch op {
+	case data.OpLT:
+		return data.OpGT, true
+	case data.OpLE:
+		return data.OpGE, true
+	case data.OpGT:
+		return data.OpLT, true
+	case data.OpGE:
+		return data.OpLE, true
+	case data.OpEQ, data.OpNE:
+		return op, true
+	default:
+		return "", false
+	}
 }
 
 func qDataComparisonOp(op byte) (data.Op, bool) {
@@ -10168,6 +10209,12 @@ func (s *EvalState) evalWhereCompare(src string) (any, bool, error) {
 }
 
 func splitWhereCompareExpr(src string) (string, string, string, bool) {
+	if _, _, ok := splitTopLevelWord(src, "and"); ok {
+		return "", "", "", false
+	}
+	if _, _, ok := splitTopLevelWord(src, "or"); ok {
+		return "", "", "", false
+	}
 	for _, op := range []string{"<>", "<=", ">=", "=", "<", ">"} {
 		if left, right, ok := splitTopLevelOperator(src, op); ok {
 			return left, right, op, true
