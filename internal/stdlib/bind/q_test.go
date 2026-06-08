@@ -1443,6 +1443,9 @@ unsupported := q.explain_query(trades, {
 	if reasons := supported.RawGetString("kernel_lowering_fallback_reasons").Table(); reasons == nil || reasons.Length() != 0 {
 		t.Fatalf("supported kernel_lowering_fallback_reasons = %v, want empty table without provider stats", reasons)
 	}
+	if reasonShapes := supported.RawGetString("kernel_lowering_fallback_reason_shapes").Table(); reasonShapes == nil || reasonShapes.Length() != 0 {
+		t.Fatalf("supported kernel_lowering_fallback_reason_shapes = %v, want empty table without provider stats", reasonShapes)
+	}
 	if got := supported.RawGetString("kernel_rows"); !got.IsInt() || got.Int() != 2 {
 		t.Fatalf("supported kernel_rows = %v, want 2", got)
 	}
@@ -1533,6 +1536,9 @@ unsupported := q.explain_query(trades, {
 	}
 	if reasons := unsupported.RawGetString("kernel_lowering_fallback_reasons").Table(); reasons == nil || reasons.Length() != 0 {
 		t.Fatalf("unsupported kernel_lowering_fallback_reasons = %v, want empty table without provider stats", reasons)
+	}
+	if reasonShapes := unsupported.RawGetString("kernel_lowering_fallback_reason_shapes").Table(); reasonShapes == nil || reasonShapes.Length() != 0 {
+		t.Fatalf("unsupported kernel_lowering_fallback_reason_shapes = %v, want empty table without provider stats", reasonShapes)
 	}
 	if schema := unsupported.RawGetString("kernel_schema").Table(); schema == nil || schema.Length() != 0 {
 		t.Fatalf("unsupported kernel_schema = %v, want empty table", schema)
@@ -4218,6 +4224,9 @@ func TestQExplainReportsQueryKernelVisibility(t *testing.T) {
 	if reasons := beforeTable.RawGetString("kernel_lowering_fallback_reasons").Table(); reasons == nil || reasons.Length() != 0 {
 		t.Fatalf("kernel_lowering_fallback_reasons before = %v, want empty table without provider stats", reasons)
 	}
+	if reasonShapes := beforeTable.RawGetString("kernel_lowering_fallback_reason_shapes").Table(); reasonShapes == nil || reasonShapes.Length() != 0 {
+		t.Fatalf("kernel_lowering_fallback_reason_shapes before = %v, want empty table without provider stats", reasonShapes)
+	}
 	cacheKey := beforeTable.RawGetString("kernel_cache_key")
 	if !cacheKey.IsString() || cacheKey.Str() == "" {
 		t.Fatalf("kernel_cache_key before = %v, want stable non-empty key", cacheKey)
@@ -4431,6 +4440,31 @@ func TestQExplainReportsQueryKernelVisibility(t *testing.T) {
 	}
 	if got := reason.RawGetString("count"); !got.IsInt() || got.Int() != 4 {
 		t.Fatalf("kernel_lowering_fallback_reasons[1].count = %v, want 4", got)
+	}
+	reasonShapes := withLoweringTable.RawGetString("kernel_lowering_fallback_reason_shapes").Table()
+	if reasonShapes == nil || reasonShapes.Length() != 1 {
+		t.Fatalf("kernel_lowering_fallback_reason_shapes with stats = %v, want one current-shape fallback reason shape", reasonShapes)
+	}
+	reasonShape := reasonShapes.RawGetInt(1).Table()
+	if reasonShape == nil {
+		t.Fatal("kernel_lowering_fallback_reason_shapes[1] is nil")
+	}
+	for field, want := range map[string]string{
+		"source":        "methodjit_q_frame_lowering",
+		"kind":          "fallback",
+		"kernel":        "QFrameSelectColumn",
+		"shape":         kernelShape.Str(),
+		"route":         "lowering",
+		"outcome":       "fallback",
+		"reason_family": "lowering",
+		"reason_code":   "shared_predicate",
+	} {
+		if got := reasonShape.RawGetString(field); !got.IsString() || got.Str() != want {
+			t.Fatalf("kernel_lowering_fallback_reason_shapes[1].%s = %v, want %q", field, got, want)
+		}
+	}
+	if got := reasonShape.RawGetString("count"); !got.IsInt() || got.Int() != 4 {
+		t.Fatalf("kernel_lowering_fallback_reason_shapes[1].count = %v, want 4", got)
 	}
 	if got := afterTable.RawGetString("kernel_cache_key"); !got.IsString() || got.Str() != cacheKey.Str() {
 		t.Fatalf("kernel_cache_key after = %v, want %s", got, cacheKey.Str())

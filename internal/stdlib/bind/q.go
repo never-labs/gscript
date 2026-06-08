@@ -226,10 +226,11 @@ type qRuntimeKernelExecutionShapeSummary struct {
 }
 
 type qRuntimeKernelLoweringShapeSummary struct {
-	Lowerings uint64
-	Supported uint64
-	Fallbacks uint64
-	Reasons   []qRuntimeKernelLoweringReasonStat
+	Lowerings    uint64
+	Supported    uint64
+	Fallbacks    uint64
+	Reasons      []qRuntimeKernelLoweringReasonStat
+	ReasonShapes []qRuntimeKernelLoweringReasonShapeStat
 }
 
 // QQueryKernelSupportKeyStatJSONRow is the stable external row shape for
@@ -3541,6 +3542,7 @@ func qRuntimeKernelLoweringSummaryForShape(shape string) qRuntimeKernelLoweringS
 		}
 	}
 	out.Reasons = qRuntimeKernelLoweringReasonStatsForShape(stats, shape)
+	out.ReasonShapes = qRuntimeKernelLoweringReasonShapeStatsForShape(stats, shape)
 	return out
 }
 
@@ -3550,6 +3552,7 @@ func qExplainAttachRuntimeKernelLoweringSummary(out *Table, shape string) {
 	out.RawSetString("kernel_lowering_supported_count", qUint64IntValue(summary.Supported))
 	out.RawSetString("kernel_lowering_fallback_count", qUint64IntValue(summary.Fallbacks))
 	out.RawSetString("kernel_lowering_fallback_reasons", TableValue(qRuntimeKernelLoweringReasonStatsTable(summary.Reasons)))
+	out.RawSetString("kernel_lowering_fallback_reason_shapes", TableValue(qRuntimeKernelLoweringReasonShapeStatsTable(summary.ReasonShapes)))
 }
 
 func qRuntimeKernelExecutionShapeStats(stats []QRuntimeKernelExecutionStat) []qRuntimeKernelExecutionShapeStat {
@@ -3924,6 +3927,10 @@ func qRuntimeKernelLoweringReasonStatsTable(stats []qRuntimeKernelLoweringReason
 }
 
 func qRuntimeKernelLoweringReasonShapeStats(stats []QRuntimeKernelLoweringStat) []qRuntimeKernelLoweringReasonShapeStat {
+	return qRuntimeKernelLoweringReasonShapeStatsForShape(stats, "")
+}
+
+func qRuntimeKernelLoweringReasonShapeStatsForShape(stats []QRuntimeKernelLoweringStat, shape string) []qRuntimeKernelLoweringReasonShapeStat {
 	type reasonShapeKey struct {
 		source       string
 		kind         string
@@ -3936,6 +3943,9 @@ func qRuntimeKernelLoweringReasonShapeStats(stats []QRuntimeKernelLoweringStat) 
 	}
 	counts := make(map[reasonShapeKey]uint64, len(stats))
 	for _, stat := range stats {
+		if shape != "" && stat.Shape != shape {
+			continue
+		}
 		if stat.Outcome != "fallback" {
 			continue
 		}
