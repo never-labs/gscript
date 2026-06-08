@@ -1635,13 +1635,16 @@ func TestQVectorWhereReduceLowersToFusedTypedRuntimeKernel(t *testing.T) {
 	if report.QVectorRuntimeKernelShapes["compare/vector-where/vector-reduce"] != 1 {
 		t.Fatalf("Diagnose QVectorRuntimeKernelShapes = %+v, want fused compare/vector-where/vector-reduce", report.QVectorRuntimeKernelShapes)
 	}
+	assertQKernelDescriptor(t, report.QKernelDescriptors, "methodjit_q_vector_runtime", "runtime_kernel", "QVectorWhereReduce", "compare/vector-where/vector-reduce", "typed_runtime_op_exit", "")
 	assertQKernelShapeSummary(t, report.QKernelShapeSummary, "methodjit_q_vector_runtime", "runtime_kernel", "compare/vector-where/vector-reduce", "", 1)
 	if !strings.Contains(report.String(), "kernel=QVectorWhereReduce") {
 		t.Fatalf("diagnostic report missing fused q vector where-reduce kernel:\n%s", report.String())
 	}
-	if !strings.Contains(report.String(), "Q kernel shape summary") ||
+	if !strings.Contains(report.String(), "Q kernel descriptors") ||
+		!strings.Contains(report.String(), "source=methodjit_q_vector_runtime kind=runtime_kernel kernel=QVectorWhereReduce shape=compare/vector-where/vector-reduce route=typed_runtime_op_exit") ||
+		!strings.Contains(report.String(), "Q kernel shape summary") ||
 		!strings.Contains(report.String(), "source=methodjit_q_vector_runtime kind=runtime_kernel shape=compare/vector-where/vector-reduce count=1") {
-		t.Fatalf("diagnostic report missing q kernel shape summary:\n%s", report.String())
+		t.Fatalf("diagnostic report missing q kernel descriptor/summary:\n%s", report.String())
 	}
 
 	result, err := Interpret(lowered, []runtime.Value{runtime.TableValue(qHotPathTestFrame(t))})
@@ -1711,6 +1714,7 @@ func TestQVectorWhereReduceSharedWhereDoesNotLower(t *testing.T) {
 	if report.QVectorLoweringFallbacks[qVectorWhereReduceFallbackSharedWhere] != 1 {
 		t.Fatalf("Diagnose QVectorLoweringFallbacks = %+v, want shared_where=1\n%s", report.QVectorLoweringFallbacks, report.String())
 	}
+	assertQKernelDescriptor(t, report.QKernelDescriptors, "methodjit_q_vector_lowering", "fallback", "QVectorWhereReduce", "compare/vector-where/vector-reduce", "lowering", qVectorWhereReduceFallbackSharedWhere)
 	assertQKernelShapeSummary(t, report.QKernelShapeSummary, "methodjit_q_vector_lowering", "fallback", "compare/vector-where/vector-reduce", qVectorWhereReduceFallbackSharedWhere, 1)
 	if len(report.QQueryFallbacks) != 0 {
 		t.Fatalf("Diagnose QQueryFallbacks = %+v, want none for vector fallback", report.QQueryFallbacks)
@@ -1894,6 +1898,7 @@ func TestDiagnoseReportsQQueryHotPath(t *testing.T) {
 	if report.QTypedRuntimeKernelShapes["compare/filter/project/column"] != 1 {
 		t.Fatalf("Diagnose QTypedRuntimeKernelShapes = %+v, want compare/filter/project/column count 1", report.QTypedRuntimeKernelShapes)
 	}
+	assertQKernelDescriptor(t, report.QKernelDescriptors, "methodjit_q_frame_runtime", "runtime_kernel", "QFrameSelectColumn", "compare/filter/project/column", "typed_runtime_op_exit", "")
 	assertQKernelShapeSummary(t, report.QKernelShapeSummary, "methodjit_q_frame_runtime", "runtime_kernel", "compare/filter/project/column", "", 1)
 	if !strings.Contains(report.String(), "Q query hot paths") {
 		t.Fatalf("diagnostic report missing q hot path section:\n%s", report.String())
@@ -2854,6 +2859,17 @@ func assertQKernelShapeSummary(t *testing.T, rows []QKernelShapeSummary, source,
 	}
 	t.Fatalf("QKernelShapeSummary missing source=%s kind=%s shape=%s reason=%s; rows=%+v",
 		source, kind, shape, reasonCode, rows)
+}
+
+func assertQKernelDescriptor(t *testing.T, rows []QKernelDescriptor, source, kind, kernel, shape, route, reasonCode string) {
+	t.Helper()
+	for _, row := range rows {
+		if row.Source == source && row.Kind == kind && row.Kernel == kernel && row.Shape == shape && row.Route == route && row.ReasonCode == reasonCode {
+			return
+		}
+	}
+	t.Fatalf("QKernelDescriptor missing source=%s kind=%s kernel=%s shape=%s route=%s reason=%s; rows=%+v",
+		source, kind, kernel, shape, route, reasonCode, rows)
 }
 
 func qHotPathNamesValue(names ...string) runtime.Value {
