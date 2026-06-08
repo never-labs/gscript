@@ -1,1 +1,1 @@
-module "github.com/never-labs/leia/examples/data/q_workspace_session_project"
+module example.com/leia/examples/data/q-workspace-session-project

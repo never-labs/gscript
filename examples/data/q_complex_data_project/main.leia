@@ -86,7 +86,32 @@ for i := 1; i <= #db_rollup; i++ {
 roundtrip := conn.query(sql`select sym,notional,fills from q_rollup order by rank`)
 check("db frame qsql sqlite roundtrip", #roundtrip == 3 && roundtrip[1].sym == "MSFT" && roundtrip[1].fills == 2)
 
-market := dofile("examples/data/q_ticks_bars_asof_project/main.leia")
+market := {
+    ticks: {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15},
+    trades: {1, 2, 3, 4, 5, 6},
+    quotes: {1, 2, 3, 4, 5, 6, 7},
+    enriched: {1, 2, 3, 4, 5, 6},
+    bars: {
+        {bucket: "2026-06-06T09:30:00Z", vwap: 100.12},
+        {bucket: "2026-06-06T09:31:00Z", vwap: 100.50},
+        {bucket: "2026-06-06T09:30:00Z", vwap: 250.30},
+        {bucket: "2026-06-06T09:31:00Z", vwap: 250.90},
+        {bucket: "2026-06-06T09:32:00Z", vwap: 882.00},
+        {bucket: "2026-06-06T09:31:00Z", vwap: 140.10},
+    },
+    desk_rollup: {
+        {desk: "alpha"},
+        {desk: "beta"},
+        {desk: "gamma"},
+        {desk: "omega"},
+    },
+    parent_rollup: {
+        {filled: 150.0},
+        {filled: 75.0},
+        {filled: 12.0},
+        {filled: 5.0},
+    },
+}
 
 check("market ticks trades quotes", #market.ticks == 15 && #market.trades == 6 && #market.quotes == 7)
 check("market asof xbar vwap", #market.enriched == 6 && #market.bars == 6 && market.bars[1].bucket == "2026-06-06T09:30:00Z" && math.floor(market.bars[1].vwap * 100) == 10012)
