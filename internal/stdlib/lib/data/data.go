@@ -497,6 +497,12 @@ type nullableArray struct {
 	data []any
 }
 
+type tiledArray struct {
+	source Array
+	start  int
+	len    int
+}
+
 type encodedArray struct {
 	kind   Kind
 	domain []any
@@ -1072,6 +1078,41 @@ func (a nullableArray) Gather(indexes []int) Array {
 	return nullableArray{kind: a.kind, data: out}
 }
 
+func (a tiledArray) Kind() Kind { return a.source.Kind() }
+
+func (a tiledArray) Len() int { return a.len }
+
+func (a tiledArray) At(row int) (any, bool) {
+	if row < 0 || row >= a.len || a.source.Len() == 0 {
+		return nil, false
+	}
+	return a.source.At((a.start + row) % a.source.Len())
+}
+
+func (a tiledArray) Values() []any {
+	out := make([]any, a.len)
+	for i := range out {
+		value, ok := a.At(i)
+		if !ok {
+			panic(fmt.Sprintf("data tiled array row %d out of range", i))
+		}
+		out[i] = value
+	}
+	return out
+}
+
+func (a tiledArray) Gather(indexes []int) Array {
+	out := make([]any, len(indexes))
+	for i, row := range indexes {
+		value, ok := a.At(row)
+		if !ok {
+			panic(fmt.Sprintf("data tiled gather index %d out of range", row))
+		}
+		out[i] = value
+	}
+	return nullableArray{kind: a.Kind(), data: out}
+}
+
 func (a encodedArray) Kind() Kind { return a.kind }
 
 func (a encodedArray) Len() int { return len(a.codes) }
@@ -1288,6 +1329,41 @@ func Gather(array Array, indexes []int) (Array, error) {
 		return nil, err
 	}
 	return array.Gather(indexes), nil
+}
+
+func TakeRepeat(array Array, n int) (Array, error) {
+	if array == nil {
+		return nil, fmt.Errorf("take array is nil")
+	}
+	if n == 0 {
+		return array.Gather(nil), nil
+	}
+	length := array.Len()
+	if length == 0 {
+		return array.Gather(nil), nil
+	}
+	count := n
+	if count < 0 {
+		count = -count
+	}
+	if count > length {
+		start := 0
+		if n < 0 {
+			start = length - count%length
+			if start == length {
+				start = 0
+			}
+		}
+		return tiledArray{source: array, start: start, len: count}, nil
+	}
+	indexes := allIndexes(count)
+	if n < 0 {
+		offset := length - count
+		for i := range indexes {
+			indexes[i] += offset
+		}
+	}
+	return Gather(array, indexes)
 }
 
 func GatherFrame(frame Frame, indexes []int) (Frame, error) {

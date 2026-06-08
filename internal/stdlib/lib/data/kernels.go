@@ -872,6 +872,44 @@ func (k typedKernelRegistry) NonNullCount(array Array) (int64, bool) {
 	return count, true
 }
 
+func TryTypedNullCount(array Array) (int64, bool, error) {
+	switch a := array.(type) {
+	case attributedArray:
+		return TryTypedNullCount(a.array)
+	case tiledArray:
+		sourceLen := a.source.Len()
+		if sourceLen == 0 {
+			return 0, true, nil
+		}
+		var count int64
+		fullCycles := a.len / sourceLen
+		remainder := a.len % sourceLen
+		for row := 0; row < sourceLen; row++ {
+			value, ok := a.source.At((a.start + row) % sourceLen)
+			if !ok {
+				return 0, true, fmt.Errorf("tiled null count source row %d out of range", row)
+			}
+			if IsNull(value) {
+				count += int64(fullCycles)
+				if row < remainder {
+					count++
+				}
+			}
+		}
+		return count, true, nil
+	case nullableArray:
+		var count int64
+		for _, value := range a.data {
+			if IsNull(value) {
+				count++
+			}
+		}
+		return count, true, nil
+	default:
+		return 0, true, nil
+	}
+}
+
 func (typedKernelRegistry) NumericUnary(op string, array Array) (Array, bool, error) {
 	switch a := array.(type) {
 	case columnArray[int8]:
@@ -1023,6 +1061,9 @@ func TryTypedCast(kind Kind, array Array) (Array, bool, error) {
 		}
 		return newI64Trusted(out), true, nil
 	case KindF64:
+		if values, ok := asI64RangeArray(array); ok {
+			return f64RangeArray{start: float64(values.start), step: float64(values.step), len: values.len}, true, nil
+		}
 		out := make([]float64, array.Len())
 		for row := 0; row < array.Len(); row++ {
 			value, ok, err := integerArrayAt(array, row)
@@ -1120,6 +1161,19 @@ func (typedKernelRegistry) NumericSum(array Array) (float64, int64, bool, error)
 	switch a := array.(type) {
 	case attributedArray:
 		return typedKernels.NumericSum(a.array)
+	case tiledArray:
+		if isIntegerArray(a) {
+			sum := int64(0)
+			for row := 0; row < a.Len(); row++ {
+				value, ok, err := integerArrayAt(a, row)
+				if err != nil || !ok {
+					return 0, 0, ok, err
+				}
+				sum += value
+			}
+			return float64(sum), int64(a.Len()), true, nil
+		}
+		return 0, 0, false, nil
 	case columnArray[int8]:
 		return numericSumSlice(a.data)
 	case columnArray[int16]:
@@ -1198,6 +1252,14 @@ func TryTypedNumericProduct(array Array) (any, bool, error) {
 	switch a := array.(type) {
 	case attributedArray:
 		return TryTypedNumericProduct(a.array)
+	case tiledArray:
+		if isIntegerArray(a) {
+			if product, ok := numericProductTiledInteger(a); ok {
+				return product, true, nil
+			}
+			return numericProductIntegerArray(a), true, nil
+		}
+		return nil, false, nil
 	case columnArray[int8]:
 		return numericProductIntegerValue(a.data), true, nil
 	case columnArray[int16]:
@@ -1233,6 +1295,14 @@ func TryTypedNumericProducts(array Array) (Array, bool, error) {
 	switch a := array.(type) {
 	case attributedArray:
 		return TryTypedNumericProducts(a.array)
+	case tiledArray:
+		if isIntegerArray(a) {
+			if products, ok := numericProductsTiledInteger(a); ok {
+				return products, true, nil
+			}
+			return numericProductsIntegerArray(a), true, nil
+		}
+		return nil, false, nil
 	case columnArray[int8]:
 		return numericProductsInteger(a.data), true, nil
 	case columnArray[int16]:
@@ -1275,6 +1345,11 @@ func (k typedKernelRegistry) NumericSumValue(array Array) (any, bool, error) {
 	switch a := array.(type) {
 	case attributedArray:
 		return k.NumericSumValue(a.array)
+	case tiledArray:
+		if isIntegerArray(a) {
+			return numericSumIntegerArray(a), true, nil
+		}
+		return nil, false, nil
 	case columnArray[int8]:
 		return numericSumIntegerValue(a.data), true, nil
 	case columnArray[int16]:
@@ -2560,6 +2635,11 @@ func (typedKernelRegistry) NumericAt(array Array, row int) (float64, bool, error
 	switch a := array.(type) {
 	case attributedArray:
 		return typedKernels.NumericAt(a.array, row)
+	case tiledArray:
+		if row < 0 || row >= a.len || a.source.Len() == 0 {
+			return 0, false, fmt.Errorf("array row %d out of range", row)
+		}
+		return typedKernels.NumericAt(a.source, (a.start+row)%a.source.Len())
 	case columnArray[int8]:
 		return numericColumnAt(a.data, row)
 	case columnArray[int16]:
@@ -2677,6 +2757,8 @@ func isNumericArray(array Array) bool {
 	switch a := array.(type) {
 	case attributedArray:
 		return isNumericArray(a.array)
+	case tiledArray:
+		return isNumericArray(a.source)
 	case columnArray[int8], columnArray[int16], columnArray[int32], columnArray[int64],
 		columnArray[uint8], columnArray[uint16], columnArray[uint32], columnArray[uint64],
 		columnArray[float32], columnArray[float64], i64RangeArray, f64RangeArray, i64RunningSumArray, f64RunningSumArray, i64SegmentArray, i64ProductArray:
@@ -2945,6 +3027,8 @@ func isIntegerArray(array Array) bool {
 	switch a := array.(type) {
 	case attributedArray:
 		return isIntegerArray(a.array)
+	case tiledArray:
+		return isIntegerArray(a.source)
 	case columnArray[int8], columnArray[int16], columnArray[int32], columnArray[int64],
 		columnArray[uint8], columnArray[uint16], columnArray[uint32], columnArray[uint64],
 		i64RangeArray, i64RunningSumArray, i64SegmentArray, i64ProductArray:
@@ -2972,6 +3056,8 @@ func isDenseIntegerArray(array Array) bool {
 	switch a := array.(type) {
 	case attributedArray:
 		return isDenseIntegerArray(a.array)
+	case tiledArray:
+		return isDenseIntegerArray(a.source)
 	case columnArray[int8], columnArray[int16], columnArray[int32], columnArray[int64],
 		columnArray[uint8], columnArray[uint16], columnArray[uint32], columnArray[uint64],
 		i64RangeArray, i64RunningSumArray, i64SegmentArray, i64ProductArray:
@@ -2999,6 +3085,11 @@ func integerArrayAt(array Array, row int) (int64, bool, error) {
 	switch a := array.(type) {
 	case attributedArray:
 		return integerArrayAt(a.array, row)
+	case tiledArray:
+		if row < 0 || row >= a.len || a.source.Len() == 0 {
+			return 0, false, fmt.Errorf("array row %d out of range", row)
+		}
+		return integerArrayAt(a.source, (a.start+row)%a.source.Len())
 	case columnArray[int8]:
 		return integerColumnAt(a.data, row)
 	case columnArray[int16]:
@@ -3934,6 +4025,18 @@ func numericSumIntegerValue[T signedScalar](values []T) int64 {
 	return sum
 }
 
+func numericSumIntegerArray(array Array) int64 {
+	var sum int64
+	for row := 0; row < array.Len(); row++ {
+		value, ok, err := integerArrayAt(array, row)
+		if err != nil || !ok {
+			return 0
+		}
+		sum += value
+	}
+	return sum
+}
+
 func numericSumUnsignedValue[T unsignedScalar](values []T) int64 {
 	var sum int64
 	for _, v := range values {
@@ -3984,6 +4087,29 @@ func numericProductIntegerArray(array Array) int64 {
 		product *= value
 	}
 	return product
+}
+
+func numericProductTiledInteger(array tiledArray) (int64, bool) {
+	if array.len == 0 {
+		return 1, true
+	}
+	allOne := true
+	for row := 0; row < array.source.Len(); row++ {
+		value, ok, err := integerArrayAt(array.source, row)
+		if err != nil || !ok {
+			return 0, false
+		}
+		if value == 0 {
+			return 0, true
+		}
+		if value != 1 {
+			allOne = false
+		}
+	}
+	if allOne {
+		return 1, true
+	}
+	return 0, false
 }
 
 func i64RangeSum(values i64RangeArray) int64 {
@@ -4125,6 +4251,42 @@ func numericProductsIntegerArray(array Array) Array {
 		out[i] = product
 	}
 	return newI64Trusted(out)
+}
+
+func numericProductsTiledInteger(array tiledArray) (Array, bool) {
+	if array.len == 0 {
+		return i64RangeArray{len: 0}, true
+	}
+	allOne := true
+	for row := 0; row < array.source.Len(); row++ {
+		value, ok, err := integerArrayAt(array.source, row)
+		if err != nil || !ok {
+			return nil, false
+		}
+		if value == 0 {
+			out := make([]int64, array.len)
+			product := int64(1)
+			for i := range out {
+				item, ok, err := integerArrayAt(array, i)
+				if err != nil || !ok {
+					return nil, false
+				}
+				product *= item
+				out[i] = product
+				if product == 0 {
+					break
+				}
+			}
+			return newI64Trusted(out), true
+		}
+		if value != 1 {
+			allOne = false
+		}
+	}
+	if allOne {
+		return i64RangeArray{start: 1, step: 0, len: array.len}, true
+	}
+	return nil, false
 }
 
 func deltasI64Slice(values []int64) Array {

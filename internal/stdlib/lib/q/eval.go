@@ -630,6 +630,9 @@ func (s *EvalState) eval(src string) (any, error) {
 		return s.evalDrop(strings.TrimSpace(src[len("drop "):]))
 	}
 	if strings.HasPrefix(src, "count ") {
+		if out, handled, err := s.tryEvalCountWhereNull(strings.TrimSpace(src[len("count "):])); err != nil || handled {
+			return out, err
+		}
 		if out, handled, err := s.tryEvalCountPrds(strings.TrimSpace(src[len("count "):])); err != nil || handled {
 			return out, err
 		}
@@ -3335,6 +3338,46 @@ func firstLastDyadicOperandValue(value any, array data.Array, isArray bool, row 
 		return nil, fmt.Errorf("array row %d out of range", row)
 	}
 	return item, nil
+}
+
+func (s *EvalState) tryEvalCountWhereNull(src string) (any, bool, error) {
+	if !strings.HasPrefix(src, "where ") {
+		return nil, false, nil
+	}
+	arg := strings.TrimSpace(src[len("where "):])
+	if !strings.HasPrefix(arg, "null ") {
+		return nil, false, nil
+	}
+	value, err := s.eval(strings.TrimSpace(arg[len("null "):]))
+	if err != nil {
+		return nil, true, err
+	}
+	array, ok := value.(data.Array)
+	if !ok {
+		if data.IsNull(value) {
+			return int64(1), true, nil
+		}
+		return int64(0), true, nil
+	}
+	if out, handled, err := data.TryTypedNullCount(array); err != nil || handled {
+		recordRuntimeKernelProbe("ArrayNullCount", "null-count/"+string(array.Kind()), handled, err)
+		if err != nil {
+			return nil, true, err
+		}
+		return out, true, nil
+	} else {
+		recordRuntimeKernelProbe("ArrayNullCount", "null-count/"+string(array.Kind()), handled, err)
+	}
+	nulls, err := nullValue(value)
+	if err != nil {
+		return nil, true, err
+	}
+	indexes, err := where(nulls)
+	if err != nil {
+		return nil, true, err
+	}
+	out, err := count(indexes)
+	return out, true, err
 }
 
 func (s *EvalState) tryEvalCountPrds(src string) (any, bool, error) {
@@ -9566,11 +9609,7 @@ func raze(v any) (any, error) {
 func take(n int, v any) (any, error) {
 	switch x := v.(type) {
 	case data.Array:
-		indexes := qTakeIndexes(x.Len(), n)
-		if len(indexes) == 0 && n != 0 && x.Len() == 0 {
-			return x.Gather(nil), nil
-		}
-		return data.Gather(x, indexes)
+		return data.TakeRepeat(x, n)
 	case data.Frame:
 		indexes := qTakeIndexes(x.Len(), n)
 		if len(indexes) == 0 && n != 0 && x.Len() == 0 {

@@ -2981,6 +2981,25 @@ func TestGatherAndTakeOperators(t *testing.T) {
 	if _, err := Take(array, -1); err == nil {
 		t.Fatal("Take accepted negative count")
 	}
+
+	repeated, err := TakeRepeat(NewAny([]any{int64(1), NullValue, int64(2)}), 8)
+	if err != nil {
+		t.Fatalf("TakeRepeat returned error: %v", err)
+	}
+	if got, want := repeated.Values(), []any{int64(1), NullValue, int64(2), int64(1), NullValue, int64(2), int64(1), NullValue}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("TakeRepeat values = %#v, want %#v", got, want)
+	}
+	if count, ok, err := TryTypedNullCount(repeated); err != nil || !ok || count != 3 {
+		t.Fatalf("TakeRepeat null count = %d,%v,%v; want 3,true,nil", count, ok, err)
+	}
+
+	repeatedTail, err := TakeRepeat(NewI64([]int64{10, 20, 30}), -5)
+	if err != nil {
+		t.Fatalf("TakeRepeat negative returned error: %v", err)
+	}
+	if got, want := repeatedTail.Values(), []any{int64(20), int64(30), int64(10), int64(20), int64(30)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("TakeRepeat negative values = %#v, want %#v", got, want)
+	}
 }
 
 func TestFrameGatherTakeAndFilterMask(t *testing.T) {

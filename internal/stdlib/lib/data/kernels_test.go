@@ -149,6 +149,20 @@ func TestTryTypedCastIntegerArrays(t *testing.T) {
 		t.Fatalf("TryTypedCast f64 i32 values = %#v, want %#v", got, want)
 	}
 
+	floatRange, handled, err := TryTypedCast(KindF64, NewI64Range(0, 2, 4))
+	if err != nil {
+		t.Fatalf("TryTypedCast f64 range returned error: %v", err)
+	}
+	if !handled {
+		t.Fatal("TryTypedCast f64 range did not handle integer range")
+	}
+	if _, ok := floatRange.(f64RangeArray); !ok {
+		t.Fatalf("TryTypedCast f64 range type = %T, want f64RangeArray", floatRange)
+	}
+	if got, want := floatRange.Values(), []any{0.0, 2.0, 4.0, 6.0}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("TryTypedCast f64 range values = %#v, want %#v", got, want)
+	}
+
 	if _, handled, err := TryTypedCast(KindI16, NewI64([]int64{32768})); !handled || err == nil {
 		t.Fatalf("TryTypedCast i16 overflow handled=%v err=%v, want handled error", handled, err)
 	}
@@ -1638,6 +1652,12 @@ func TestTypedCompareIndexesAndNullMasks(t *testing.T) {
 	}
 	if count, ok := typedKernels.NonNullCount(NewColumn("x", []any{1, nil, 3}).Data); !ok || count != 2 {
 		t.Fatalf("typed non-null count = %d, %v; want 2, true", count, ok)
+	}
+	if count, ok, err := TryTypedNullCount(NewColumn("x", []any{1, nil, NullValue, 3}).Data); err != nil || !ok || count != 2 {
+		t.Fatalf("typed null count nullable = %d, %v, %v; want 2, true, nil", count, ok, err)
+	}
+	if count, ok, err := TryTypedNullCount(NewI64Range(0, 1, 4)); err != nil || !ok || count != 0 {
+		t.Fatalf("typed null count dense = %d, %v, %v; want 0, true, nil", count, ok, err)
 	}
 }
 
