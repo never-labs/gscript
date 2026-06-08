@@ -24,15 +24,19 @@ type QQueryHotPath struct {
 }
 
 func (p QQueryHotPath) Shape() string {
+	prefix := "compare/filter"
+	if p.Mask != nil {
+		prefix = "mask/filter"
+	}
 	switch {
 	case p.RowOrder != nil && p.RowGather != nil:
-		return "filter/order/gather/project/column"
+		return prefix + "/order/gather/project/column"
 	case p.RowGather != nil:
-		return "filter/gather/project/column"
+		return prefix + "/gather/project/column"
 	case p.RowSlice != nil:
-		return "filter/slice/project/column"
+		return prefix + "/slice/project/column"
 	default:
-		return "filter/project/column"
+		return prefix + "/project/column"
 	}
 }
 

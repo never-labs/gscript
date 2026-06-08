@@ -412,8 +412,14 @@ func TestQFramePrimitiveHotPathDetectsFrameMask(t *testing.T) {
 	if paths[0].Mask == nil || paths[0].Compare != nil {
 		t.Fatalf("DetectQQueryHotPaths Mask=%v Compare=%v, want mask-only path\n%s", paths[0].Mask, paths[0].Compare, Print(fn))
 	}
+	if paths[0].Shape() != "mask/filter/project/column" {
+		t.Fatalf("frame mask hot path shape = %q, want mask/filter/project/column", paths[0].Shape())
+	}
 	if got := formatQQueryHotPaths(paths); !strings.Contains(got, "compare=frame-mask") || !strings.Contains(got, "mask_aux=0") {
 		t.Fatalf("frame mask hot path format = %q, want frame-mask and mask aux", got)
+	}
+	if got := formatQQueryHotPaths(paths); !strings.Contains(got, "shape=mask/filter/project/column") {
+		t.Fatalf("frame mask hot path format = %q, want mask shape", got)
 	}
 }
 
@@ -495,13 +501,13 @@ func TestQFramePrimitiveHotPathDetectsOrderedRows(t *testing.T) {
 	if paths[0].RowGather == nil || paths[0].RowOrder == nil {
 		t.Fatalf("DetectQQueryHotPaths RowGather=%v RowOrder=%v, want both\n%s", paths[0].RowGather, paths[0].RowOrder, Print(fn))
 	}
-	if paths[0].Shape() != "filter/order/gather/project/column" {
-		t.Fatalf("ordered hot path shape = %q, want filter/order/gather/project/column", paths[0].Shape())
+	if paths[0].Shape() != "compare/filter/order/gather/project/column" {
+		t.Fatalf("ordered hot path shape = %q, want compare/filter/order/gather/project/column", paths[0].Shape())
 	}
-	if got := formatQQueryHotPaths(paths); !strings.Contains(got, "shape=filter/order/gather/project/column") || !strings.Contains(got, "order_aux=2") {
+	if got := formatQQueryHotPaths(paths); !strings.Contains(got, "shape=compare/filter/order/gather/project/column") || !strings.Contains(got, "order_aux=2") {
 		t.Fatalf("ordered hot path format = %q, want shape and order aux", got)
 	}
-	if counts := CountQQueryHotPathShapes(paths); counts["filter/order/gather/project/column"] != 1 {
+	if counts := CountQQueryHotPathShapes(paths); counts["compare/filter/order/gather/project/column"] != 1 {
 		t.Fatalf("ordered hot path shape counts = %+v, want ordered count 1", counts)
 	}
 }
@@ -599,20 +605,20 @@ func TestDiagnoseReportsQQueryHotPath(t *testing.T) {
 	if len(report.QQueryHotPaths) != 1 {
 		t.Fatalf("Diagnose QQueryHotPaths = %d, want 1\n%s", len(report.QQueryHotPaths), report.String())
 	}
-	if report.QQueryHotPathShapes["filter/project/column"] != 1 {
-		t.Fatalf("Diagnose QQueryHotPathShapes = %+v, want filter/project/column count 1", report.QQueryHotPathShapes)
+	if report.QQueryHotPathShapes["compare/filter/project/column"] != 1 {
+		t.Fatalf("Diagnose QQueryHotPathShapes = %+v, want compare/filter/project/column count 1", report.QQueryHotPathShapes)
 	}
 	if !strings.Contains(report.String(), "Q query hot paths") {
 		t.Fatalf("diagnostic report missing q hot path section:\n%s", report.String())
 	}
-	if !strings.Contains(report.String(), "shapes: filter/project/column=1") {
+	if !strings.Contains(report.String(), "shapes: compare/filter/project/column=1") {
 		t.Fatalf("diagnostic report missing q hot path shape summary:\n%s", report.String())
 	}
-	if !strings.Contains(report.String(), "shape=filter/project/column") {
+	if !strings.Contains(report.String(), "shape=compare/filter/project/column") {
 		t.Fatalf("diagnostic report missing q hot path shape:\n%s", report.String())
 	}
 	if !strings.Contains(formatOptimizationRemarks(report.OptimizationRemarks), "QQueryHotPath") ||
-		!strings.Contains(formatOptimizationRemarks(report.OptimizationRemarks), "first shape filter/project/column") ||
+		!strings.Contains(formatOptimizationRemarks(report.OptimizationRemarks), "first shape compare/filter/project/column") ||
 		!strings.Contains(formatOptimizationRemarks(report.OptimizationRemarks), "compare >=") ||
 		!strings.Contains(formatOptimizationRemarks(report.OptimizationRemarks), "native lowering pending") {
 		t.Fatalf("diagnostic remarks missing q hot path handoff:\n%s", formatOptimizationRemarks(report.OptimizationRemarks))
