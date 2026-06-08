@@ -24,6 +24,7 @@ const (
 	qQueryLoweringFallbackOpaqueRowConst          = "opaque_row_const"
 	qQueryLoweringFallbackMaskCombineUnsupported  = "mask_combine_unsupported"
 	qQueryLoweringFallbackGroupAggregateCall      = "group_aggregate_call"
+	qQueryLoweringFallbackJoinCall                = "join_call"
 )
 
 // QQueryHotPath describes an IR pattern for the q query primitive pipeline:
@@ -122,6 +123,17 @@ type QKernelExecutionStat struct {
 	Count   uint64
 }
 
+// QKernelExecutionStatJSONRow is the stable external row shape for raw q
+// typed-runtime execution observations.
+type QKernelExecutionStatJSONRow struct {
+	Source  string `json:"source"`
+	Kernel  string `json:"kernel"`
+	Shape   string `json:"shape"`
+	Route   string `json:"route"`
+	Outcome string `json:"outcome"`
+	Count   uint64 `json:"count"`
+}
+
 // QKernelExecutionRouteSummary aggregates q typed-runtime execution outcomes
 // without shape cardinality. It complements QKernelShapeSummary for route-level
 // diagnostics and perf triage.
@@ -159,6 +171,24 @@ type QKernelShapeSummary struct {
 	Hits         int
 	Misses       int
 	Evictions    int
+}
+
+// QKernelShapeSummaryJSONRow is the stable external row shape for q kernel
+// shape summaries.
+type QKernelShapeSummaryJSONRow struct {
+	Source       string `json:"source"`
+	Kind         string `json:"kind"`
+	Shape        string `json:"shape"`
+	Outcome      string `json:"outcome"`
+	ReasonFamily string `json:"reason_family,omitempty"`
+	ReasonCode   string `json:"reason_code,omitempty"`
+	Count        int    `json:"count"`
+	Executions   uint64 `json:"executions,omitempty"`
+	Successes    uint64 `json:"successes,omitempty"`
+	Errors       uint64 `json:"errors,omitempty"`
+	Hits         int    `json:"hits,omitempty"`
+	Misses       int    `json:"misses,omitempty"`
+	Evictions    int    `json:"evictions,omitempty"`
 }
 
 const (
@@ -576,6 +606,24 @@ func QKernelDescriptorJSONRows(rows []QKernelDescriptor) []QKernelDescriptorJSON
 	return out
 }
 
+func QKernelExecutionStatJSONRows(rows []QKernelExecutionStat) []QKernelExecutionStatJSONRow {
+	if len(rows) == 0 {
+		return nil
+	}
+	out := make([]QKernelExecutionStatJSONRow, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, QKernelExecutionStatJSONRow{
+			Source:  row.Source,
+			Kernel:  row.Kernel,
+			Shape:   row.Shape,
+			Route:   row.Route,
+			Outcome: row.Outcome,
+			Count:   row.Count,
+		})
+	}
+	return out
+}
+
 func BuildQKernelExecutionRouteSummary(rows []QKernelExecutionStat) []QKernelExecutionRouteSummary {
 	counts := make(map[qKernelExecutionRouteSummaryKey]uint64)
 	for _, row := range rows {
@@ -630,6 +678,31 @@ func QKernelExecutionRouteSummaryJSONRows(rows []QKernelExecutionRouteSummary) [
 			Route:   row.Route,
 			Outcome: row.Outcome,
 			Count:   row.Count,
+		})
+	}
+	return out
+}
+
+func QKernelShapeSummaryJSONRows(rows []QKernelShapeSummary) []QKernelShapeSummaryJSONRow {
+	if len(rows) == 0 {
+		return nil
+	}
+	out := make([]QKernelShapeSummaryJSONRow, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, QKernelShapeSummaryJSONRow{
+			Source:       row.Source,
+			Kind:         row.Kind,
+			Shape:        row.Shape,
+			Outcome:      row.Outcome,
+			ReasonFamily: row.ReasonFamily,
+			ReasonCode:   row.ReasonCode,
+			Count:        row.Count,
+			Executions:   row.Executions,
+			Successes:    row.Successes,
+			Errors:       row.Errors,
+			Hits:         row.Hits,
+			Misses:       row.Misses,
+			Evictions:    row.Evictions,
 		})
 	}
 	return out
@@ -1014,6 +1087,7 @@ func QQueryNativeLoweringPass(fn *Function) (*Function, error) {
 		}
 	}
 	qVectorWhereReduceLoweringPass(fn, uses)
+	qJoinFallbackRemarkPass(fn)
 	qGroupAggregateFallbackRemarkPass(fn)
 	return fn, nil
 }
@@ -1134,6 +1208,43 @@ func qGroupAggregateFallbackRemark(fn *Function, call *Instr, shape string) {
 			qQueryLoweringFallbackGroupAggregateCall, shape))
 }
 
+func qJoinFallbackRemarkPass(fn *Function) {
+	if fn == nil {
+		return
+	}
+	for _, block := range fn.Blocks {
+		if block == nil {
+			continue
+		}
+		for _, instr := range block.Instrs {
+			if instr == nil || instr.Op != OpCall || !qCallIsQQueryEntrypoint(fn, instr) {
+				continue
+			}
+			query, ok := qCallQueryString(fn, instr)
+			if !ok || !qQueryStringHasJoin(query) {
+				continue
+			}
+			qJoinFallbackRemark(fn, instr, qJoinQueryShape(query))
+		}
+	}
+}
+
+func qJoinFallbackRemark(fn *Function, call *Instr, shape string) {
+	if shape == "" {
+		shape = "join/inner"
+	}
+	blockID, valueID := 0, 0
+	if call != nil {
+		valueID = call.ID
+		if call.Block != nil {
+			blockID = call.Block.ID
+		}
+	}
+	functionRemarks(fn).Add("QQueryNativeLowering", "missed", blockID, valueID, OpCall,
+		fmt.Sprintf("kernel=QJoin reason_code=%s shape=%s; joined q query remains on opaque call fallback",
+			qQueryLoweringFallbackJoinCall, shape))
+}
+
 func qCallIsQQueryEntrypoint(fn *Function, call *Instr) bool {
 	if fn == nil || call == nil || len(call.Args) == 0 || call.Args[0] == nil {
 		return false
@@ -1207,8 +1318,55 @@ func qQueryStringHasGroupAggregate(query string) bool {
 	return hasBy && hasAggregate
 }
 
+func qQueryStringHasJoin(query string) bool {
+	kind, ok := qQueryJoinKind(qQueryStringTokens(query))
+	return ok && kind != ""
+}
+
 func qGroupAggregateQueryShape(query string) string {
 	tokens := qQueryStringTokens(query)
+	hasJoin, hasWhere, hasOrder := false, false, false
+	statement := ""
+	for i, token := range tokens {
+		if i == 0 {
+			switch token {
+			case "select", "exec", "update", "delete":
+				statement = token
+			}
+		}
+		switch token {
+		case "join", "lj", "ij", "aj", "wj", "left", "right", "inner", "outer", "cross":
+			hasJoin = true
+		case "where":
+			hasWhere = true
+		case "order":
+			hasOrder = true
+		}
+	}
+	parts := make([]string, 0, 5)
+	if statement != "" {
+		parts = append(parts, statement)
+	}
+	if hasJoin {
+		parts = append(parts, "join")
+	}
+	if hasWhere {
+		parts = append(parts, "where")
+	}
+	parts = append(parts, "group", "aggregate")
+	shape := strings.Join(parts, "/")
+	if hasOrder {
+		shape += "/order"
+	}
+	return shape
+}
+
+func qJoinQueryShape(query string) string {
+	tokens := qQueryStringTokens(query)
+	kind, ok := qQueryJoinKind(tokens)
+	if !ok || kind == "" {
+		kind = "inner"
+	}
 	hasWhere, hasOrder := false, false
 	for _, token := range tokens {
 		switch token {
@@ -1218,7 +1376,7 @@ func qGroupAggregateQueryShape(query string) string {
 			hasOrder = true
 		}
 	}
-	shape := "group/aggregate"
+	shape := "join/" + kind
 	if hasWhere {
 		shape = "where/" + shape
 	}
@@ -1226,6 +1384,46 @@ func qGroupAggregateQueryShape(query string) string {
 		shape += "/order"
 	}
 	return shape
+}
+
+func qQueryJoinKind(tokens []string) (string, bool) {
+	for i, token := range tokens {
+		switch token {
+		case "ij":
+			return "inner", true
+		case "lj":
+			return "left", true
+		case "uj":
+			return "union", true
+		case "pj":
+			return "plus", true
+		case "aj":
+			return "asof", true
+		case "aj0":
+			return "asof0", true
+		case "ajf":
+			return "asof_fill", true
+		case "ajf0":
+			return "asof_fill0", true
+		case "wj":
+			return "window", true
+		case "wj1":
+			return "window1", true
+		case "join":
+			if i > 0 {
+				switch tokens[i-1] {
+				case "inner":
+					return "inner", true
+				case "left":
+					return "left", true
+				case "asof":
+					return "asof", true
+				}
+			}
+			return "inner", true
+		}
+	}
+	return "", false
 }
 
 func qQueryAggregateToken(token string) bool {
@@ -1242,7 +1440,9 @@ func qQueryStringTokens(query string) []string {
 	lower := strings.ToLower(query)
 	start := -1
 	for i, r := range lower {
-		isIdent := (r >= 'a' && r <= 'z') || r == '_'
+		isIdentStart := (r >= 'a' && r <= 'z') || r == '_'
+		isIdentRest := isIdentStart || (r >= '0' && r <= '9')
+		isIdent := isIdentStart || (start >= 0 && isIdentRest)
 		if isIdent {
 			if start < 0 {
 				start = i
