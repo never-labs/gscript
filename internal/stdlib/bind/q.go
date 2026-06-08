@@ -198,6 +198,18 @@ type qRuntimeKernelLoweringReasonStat struct {
 	Count        uint64
 }
 
+type qRuntimeKernelLoweringReasonShapeStat struct {
+	Source       string
+	Kind         string
+	Kernel       string
+	Shape        string
+	Route        string
+	Outcome      string
+	ReasonFamily string
+	ReasonCode   string
+	Count        uint64
+}
+
 type qRuntimeKernelLoweringRouteStat struct {
 	Source  string
 	Kind    string
@@ -3354,6 +3366,7 @@ func qRuntimeKernelLoweringStatsRow() *Table {
 	row.RawSetString("shapes", TableValue(qRuntimeKernelLoweringShapeStatsTable(qRuntimeKernelLoweringShapeStats(stats))))
 	row.RawSetString("kernels", TableValue(qRuntimeKernelLoweringKernelStatsTable(qRuntimeKernelLoweringKernelStats(stats))))
 	row.RawSetString("reasons", TableValue(qRuntimeKernelLoweringReasonStatsTable(qRuntimeKernelLoweringReasonStats(stats))))
+	row.RawSetString("reason_shapes", TableValue(qRuntimeKernelLoweringReasonShapeStatsTable(qRuntimeKernelLoweringReasonShapeStats(stats))))
 	row.RawSetString("routes", TableValue(qRuntimeKernelLoweringRouteStatsTable(qRuntimeKernelLoweringRouteStats(stats))))
 	return row
 }
@@ -3902,6 +3915,97 @@ func qRuntimeKernelLoweringReasonStatsTable(stats []qRuntimeKernelLoweringReason
 		row := NewTable()
 		row.RawSetString("source", StringValue(stat.Source))
 		row.RawSetString("kind", StringValue(stat.Kind))
+		row.RawSetString("reason_family", StringValue(stat.ReasonFamily))
+		row.RawSetString("reason_code", StringValue(stat.ReasonCode))
+		row.RawSetString("count", qUint64IntValue(stat.Count))
+		rows.RawSetInt(int64(i+1), TableValue(row))
+	}
+	return rows
+}
+
+func qRuntimeKernelLoweringReasonShapeStats(stats []QRuntimeKernelLoweringStat) []qRuntimeKernelLoweringReasonShapeStat {
+	type reasonShapeKey struct {
+		source       string
+		kind         string
+		kernel       string
+		shape        string
+		route        string
+		outcome      string
+		reasonFamily string
+		reasonCode   string
+	}
+	counts := make(map[reasonShapeKey]uint64, len(stats))
+	for _, stat := range stats {
+		if stat.Outcome != "fallback" {
+			continue
+		}
+		key := reasonShapeKey{
+			source:       stat.Source,
+			kind:         stat.Kind,
+			kernel:       stat.Kernel,
+			shape:        stat.Shape,
+			route:        stat.Route,
+			outcome:      stat.Outcome,
+			reasonFamily: stat.ReasonFamily,
+			reasonCode:   stat.ReasonCode,
+		}
+		counts[key] += stat.Count
+	}
+	out := make([]qRuntimeKernelLoweringReasonShapeStat, 0, len(counts))
+	for key, count := range counts {
+		out = append(out, qRuntimeKernelLoweringReasonShapeStat{
+			Source:       key.source,
+			Kind:         key.kind,
+			Kernel:       key.kernel,
+			Shape:        key.shape,
+			Route:        key.route,
+			Outcome:      key.outcome,
+			ReasonFamily: key.reasonFamily,
+			ReasonCode:   key.reasonCode,
+			Count:        count,
+		})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		a, b := out[i], out[j]
+		if a.Count != b.Count {
+			return a.Count > b.Count
+		}
+		if a.Source != b.Source {
+			return a.Source < b.Source
+		}
+		if a.Kind != b.Kind {
+			return a.Kind < b.Kind
+		}
+		if a.Kernel != b.Kernel {
+			return a.Kernel < b.Kernel
+		}
+		if a.Shape != b.Shape {
+			return a.Shape < b.Shape
+		}
+		if a.Route != b.Route {
+			return a.Route < b.Route
+		}
+		if a.Outcome != b.Outcome {
+			return a.Outcome < b.Outcome
+		}
+		if a.ReasonFamily != b.ReasonFamily {
+			return a.ReasonFamily < b.ReasonFamily
+		}
+		return a.ReasonCode < b.ReasonCode
+	})
+	return out
+}
+
+func qRuntimeKernelLoweringReasonShapeStatsTable(stats []qRuntimeKernelLoweringReasonShapeStat) *Table {
+	rows := NewAppendArrayTable(len(stats))
+	for i, stat := range stats {
+		row := NewTable()
+		row.RawSetString("source", StringValue(stat.Source))
+		row.RawSetString("kind", StringValue(stat.Kind))
+		row.RawSetString("kernel", StringValue(stat.Kernel))
+		row.RawSetString("shape", StringValue(stat.Shape))
+		row.RawSetString("route", StringValue(stat.Route))
+		row.RawSetString("outcome", StringValue(stat.Outcome))
 		row.RawSetString("reason_family", StringValue(stat.ReasonFamily))
 		row.RawSetString("reason_code", StringValue(stat.ReasonCode))
 		row.RawSetString("count", qUint64IntValue(stat.Count))

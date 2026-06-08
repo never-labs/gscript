@@ -246,6 +246,23 @@ func TestMappedQRuntimeKernelLoweringStatsProviderFeedsCacheStats(t *testing.T) 
 	if got := reason.RawGetString("count"); !got.IsInt() || got.Int() != 5 {
 		t.Fatalf("q_runtime_kernel_lowering reasons[1].count = %v, want 5", got)
 	}
+	reasonShapes := row.RawGetString("reason_shapes").Table()
+	if reasonShapes == nil || reasonShapes.Length() != 1 {
+		t.Fatalf("q_runtime_kernel_lowering reason_shapes table = %v, want one fallback row", reasonShapes)
+	}
+	reasonShape := qTestNestedRowByFields(t, row, "reason_shapes", map[string]string{
+		"source":        "methodjit_q_vector_lowering",
+		"kind":          "fallback",
+		"kernel":        "QVectorGatherReduce",
+		"shape":         "gather/vector-reduce",
+		"route":         "lowering",
+		"outcome":       "fallback",
+		"reason_family": "lowering",
+		"reason_code":   "shared_gather",
+	})
+	if got := reasonShape.RawGetString("count"); !got.IsInt() || got.Int() != 5 {
+		t.Fatalf("q_runtime_kernel_lowering reason_shapes count = %v, want 5", got)
+	}
 	routes := row.RawGetString("routes").Table()
 	if routes == nil || routes.Length() != 2 {
 		t.Fatalf("q_runtime_kernel_lowering routes table = %v, want two rows", routes)

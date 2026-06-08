@@ -175,6 +175,18 @@ func TestQRuntimeKernelLoweringStatsProviderMapsMethodJITFallbacks(t *testing.T)
 	})
 	assertIntField(t, reason, "count", 1)
 
+	reasonShape := nestedRowByFields(t, row, "reason_shapes", map[string]string{
+		"source":        "methodjit_q_vector_lowering",
+		"kind":          "fallback",
+		"kernel":        "QVectorGatherReduce",
+		"shape":         "gather/vector-reduce",
+		"route":         "lowering",
+		"outcome":       "fallback",
+		"reason_family": "lowering",
+		"reason_code":   "shared_gather",
+	})
+	assertIntField(t, reasonShape, "count", 1)
+
 	route := nestedRowByFields(t, row, "routes", map[string]string{
 		"source":  "methodjit_q_vector_lowering",
 		"kind":    "fallback",

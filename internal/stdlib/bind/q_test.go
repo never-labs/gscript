@@ -3055,6 +3055,9 @@ func TestQCacheStatsAndClearPublicAPI(t *testing.T) {
 	if reasons := loweringRow.RawGetString("reasons").Table(); reasons == nil || reasons.Length() != 0 {
 		t.Fatalf("q_runtime_kernel_lowering reasons = %v, want empty table until MethodJIT diagnostics are attached", reasons)
 	}
+	if reasonShapes := loweringRow.RawGetString("reason_shapes").Table(); reasonShapes == nil || reasonShapes.Length() != 0 {
+		t.Fatalf("q_runtime_kernel_lowering reason_shapes = %v, want empty table until MethodJIT diagnostics are attached", reasonShapes)
+	}
 	if routes := loweringRow.RawGetString("routes").Table(); routes == nil || routes.Length() != 0 {
 		t.Fatalf("q_runtime_kernel_lowering routes = %v, want empty table until MethodJIT diagnostics are attached", routes)
 	}
