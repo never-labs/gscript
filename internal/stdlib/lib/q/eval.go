@@ -8037,6 +8037,20 @@ func extrema(v any, wantMax bool) (any, error) {
 	if !ok {
 		return v, nil
 	}
+	if value, handled, has, err := data.TryTypedMinMax(array, wantMax); err != nil || handled {
+		kernel := "ArrayMin"
+		if wantMax {
+			kernel = "ArrayMax"
+		}
+		recordRuntimeKernelProbe(kernel, "vector-reduce/extrema/"+string(array.Kind()), handled, err)
+		if err != nil {
+			return nil, err
+		}
+		if !has {
+			return data.NullValue, nil
+		}
+		return value, nil
+	}
 	var best any
 	hasBest := false
 	for i := 0; i < array.Len(); i++ {

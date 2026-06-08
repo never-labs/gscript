@@ -1997,6 +1997,21 @@ func TestTypedNumericUnaryBinaryAndAggregates(t *testing.T) {
 	if !ok || !has || max != Symbol("b") {
 		t.Fatalf("Max = %v, %v, %v; want b, true, true", max, has, ok)
 	}
+
+	min, handled, has, err := TryTypedMinMax(NewI64Range(10, -2, 4), false)
+	if err != nil {
+		t.Fatalf("TryTypedMinMax range min returned error: %v", err)
+	}
+	if !handled || !has || min != int64(4) {
+		t.Fatalf("TryTypedMinMax range min = %v, %v, %v; want 4, true, true", min, handled, has)
+	}
+	max, handled, has, err = TryTypedMinMax(NewI64Range(10, -2, 4), true)
+	if err != nil {
+		t.Fatalf("TryTypedMinMax range max returned error: %v", err)
+	}
+	if !handled || !has || max != int64(10) {
+		t.Fatalf("TryTypedMinMax range max = %v, %v, %v; want 10, true, true", max, handled, has)
+	}
 }
 
 func TestTypedDyadicBroadcastPromotionAndNullPropagation(t *testing.T) {

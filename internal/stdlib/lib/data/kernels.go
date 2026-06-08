@@ -1092,6 +1092,15 @@ func TryTypedNumericSums(array Array) (Array, bool, error) {
 	return typedKernels.NumericSums(array)
 }
 
+// TryTypedMinMax applies the shared typed extrema kernel without routing every
+// row through Array.At and interface comparisons.
+func TryTypedMinMax(array Array, wantMax bool) (value any, handled bool, has bool, err error) {
+	if wantMax {
+		return typedKernels.Max(array)
+	}
+	return typedKernels.Min(array)
+}
+
 func (k typedKernelRegistry) NumericSums(array Array) (Array, bool, error) {
 	switch a := array.(type) {
 	case attributedArray:
@@ -2659,6 +2668,8 @@ func minMax(array Array, mode string) (any, bool, bool, error) {
 		return minMaxOrdered(a.data, mode)
 	case columnArray[int64]:
 		return minMaxOrdered(a.data, mode)
+	case i64RangeArray:
+		return minMaxI64Range(a, mode)
 	case columnArray[uint8]:
 		return minMaxOrdered(a.data, mode)
 	case columnArray[uint16]:
@@ -2707,6 +2718,24 @@ func minMax(array Array, mode string) (any, bool, bool, error) {
 	default:
 		return nil, false, false, nil
 	}
+}
+
+func minMaxI64Range(values i64RangeArray, mode string) (any, bool, bool, error) {
+	if values.len == 0 {
+		return nil, false, true, nil
+	}
+	first := values.start
+	last := values.start + int64(values.len-1)*values.step
+	if mode == "min" {
+		if first <= last {
+			return first, true, true, nil
+		}
+		return last, true, true, nil
+	}
+	if first >= last {
+		return first, true, true, nil
+	}
+	return last, true, true, nil
 }
 
 func minMaxOrdered[T any](values []T, mode string) (any, bool, bool, error) {

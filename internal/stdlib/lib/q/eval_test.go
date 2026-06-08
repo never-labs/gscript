@@ -1878,6 +1878,23 @@ func TestEvalVectorArithmeticRecordsTypedRuntimeKernel(t *testing.T) {
 	}
 }
 
+func TestEvalVectorExtremaRecordsTypedRuntimeKernel(t *testing.T) {
+	ClearRuntimeKernelExecutionStats()
+	t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+	assertEvalValue(t, "x:til 8;min x", int64(0))
+	assertEvalValue(t, "x:til 8;max x", int64(7))
+	counts := map[string]uint64{}
+	for _, stat := range RuntimeKernelExecutionStats() {
+		if stat.Outcome == "hit" {
+			counts[stat.Kernel] += stat.Count
+		}
+	}
+	if counts["ArrayMin"] != 1 || counts["ArrayMax"] != 1 {
+		t.Fatalf("typed extrema hits = min %d max %d; stats=%#v", counts["ArrayMin"], counts["ArrayMax"], RuntimeKernelExecutionStats())
+	}
+}
+
 func TestEvalGenericOverAndScanAdverbs(t *testing.T) {
 	assertEvalValue(t, "+/1 0N 2", int64(3))
 	assertEvalArray(t, "+\\1 0N 2", data.KindI64, []any{int64(1), int64(1), int64(3)})

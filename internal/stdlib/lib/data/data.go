@@ -1202,6 +1202,9 @@ func BucketFloor(array Array, interval any) (Array, error) {
 	if array == nil {
 		return nil, fmt.Errorf("bucket floor array is nil")
 	}
+	if bucketed, ok, err := bucketFloorTyped(array, interval); ok || err != nil {
+		return bucketed, err
+	}
 	values := make([]any, array.Len())
 	switch array.Kind() {
 	case KindI8, KindI16, KindI32, KindI64, KindMonth, KindDate, KindDateTime, KindTimespan, KindMinute, KindSecond, KindTime, KindTimestamp:
@@ -1268,6 +1271,43 @@ func BucketFloor(array Array, interval any) (Array, error) {
 		return nil, fmt.Errorf("bucket floor kind %s is not supported", array.Kind())
 	}
 	return arrayWithKind(array.Kind(), values)
+}
+
+func bucketFloorTyped(array Array, interval any) (Array, bool, error) {
+	switch a := array.(type) {
+	case attributedArray:
+		return bucketFloorTyped(a.array, interval)
+	case columnArray[int64]:
+		width, err := bucketInt64Interval(KindI64, interval)
+		if err != nil {
+			return nil, true, err
+		}
+		return bucketFloorI64Slice(a.data, width), true, nil
+	case i64RangeArray:
+		width, err := bucketInt64Interval(KindI64, interval)
+		if err != nil {
+			return nil, true, err
+		}
+		return bucketFloorI64Range(a, width), true, nil
+	default:
+		return nil, false, nil
+	}
+}
+
+func bucketFloorI64Slice(values []int64, width int64) Array {
+	out := make([]int64, len(values))
+	for i, value := range values {
+		out[i] = floorInt64(value, width)
+	}
+	return columnArray[int64]{kind: KindI64, data: out}
+}
+
+func bucketFloorI64Range(values i64RangeArray, width int64) Array {
+	out := make([]int64, values.len)
+	for i := range out {
+		out[i] = floorInt64(values.start+int64(i)*values.step, width)
+	}
+	return columnArray[int64]{kind: KindI64, data: out}
 }
 
 func Filter(frame Frame, keep func(row map[Symbol]any) (bool, error)) (Frame, error) {

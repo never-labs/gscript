@@ -984,6 +984,17 @@ func TestBucketFloorNumericValues(t *testing.T) {
 		t.Fatalf("bucket values = %#v, want %#v", got, want)
 	}
 
+	rangeBucketed, err := BucketFloor(NewI64Range(-3, 1, 7), int64(2))
+	if err != nil {
+		t.Fatalf("BucketFloor range returned error: %v", err)
+	}
+	if got := rangeBucketed.Kind(); got != KindI64 {
+		t.Fatalf("range bucket kind = %s, want %s", got, KindI64)
+	}
+	if got, want := rangeBucketed.Values(), []any{int64(-4), int64(-2), int64(-2), int64(0), int64(0), int64(2), int64(2)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("range bucket values = %#v, want %#v", got, want)
+	}
+
 	floatBucketed, err := BucketFloor(NewF64([]float64{-1.25, -1.0, -0.75, 0, 0.74, 0.75}), 0.5)
 	if err != nil {
 		t.Fatalf("BucketFloor float returned error: %v", err)
