@@ -2931,7 +2931,7 @@ func TestQCacheStatsAndClearPublicAPI(t *testing.T) {
 			"after := q.cache_stats()\n")
 
 	before := qTestCacheStatsRows(t, interp.GetGlobal("before").Table())
-	if before["qsql_template"]["entries"] != 0 || before["qsql_aligned"]["entries"] != 0 || before["qsql_kernel"]["entries"] != 0 || before["qsql_kernel_decision"]["entries"] != 0 || before["q_runtime_kernel_execution"]["entries"] != 0 || before["q_eval"]["entries"] != 0 {
+	if before["qsql_template"]["entries"] != 0 || before["qsql_aligned"]["entries"] != 0 || before["qsql_kernel"]["entries"] != 0 || before["qsql_kernel_decision"]["entries"] != 0 || before["q_runtime_kernel_execution"]["entries"] != 0 || before["q_runtime_kernel_lowering"]["entries"] != 0 || before["q_eval"]["entries"] != 0 {
 		t.Fatalf("initial cache entries = %#v, want all zero", before)
 	}
 
@@ -2981,6 +2981,31 @@ func TestQCacheStatsAndClearPublicAPI(t *testing.T) {
 	}
 	if routes := runtimeRow.RawGetString("routes").Table(); routes == nil || routes.Length() != 0 {
 		t.Fatalf("q_runtime_kernel_execution routes = %v, want empty table until MethodJIT diagnostics are attached", routes)
+	}
+	loweringRow := qTestCacheStatsRowTable(t, interp.GetGlobal("stats").Table(), "q_runtime_kernel_lowering")
+	if got := loweringRow.RawGetString("stats_domain"); !got.IsString() || got.Str() != qStatsDomainJITLowering {
+		t.Fatalf("q_runtime_kernel_lowering stats_domain = %v, want %s", got, qStatsDomainJITLowering)
+	}
+	if got := loweringRow.RawGetString("stats_source"); !got.IsString() || got.Str() != qStatsSourceMethodJIT {
+		t.Fatalf("q_runtime_kernel_lowering stats_source = %v, want %s", got, qStatsSourceMethodJIT)
+	}
+	if got := loweringRow.RawGetString("cache_backed"); !got.IsBool() || got.Bool() {
+		t.Fatalf("q_runtime_kernel_lowering cache_backed = %v, want false", got)
+	}
+	if got := loweringRow.RawGetString("fallbacks"); !got.IsInt() || got.Int() != 0 {
+		t.Fatalf("q_runtime_kernel_lowering fallbacks = %v, want 0", got)
+	}
+	if stats := loweringRow.RawGetString("stats").Table(); stats == nil || stats.Length() != 0 {
+		t.Fatalf("q_runtime_kernel_lowering stats = %v, want empty table until MethodJIT diagnostics are attached", stats)
+	}
+	if shapes := loweringRow.RawGetString("shapes").Table(); shapes == nil || shapes.Length() != 0 {
+		t.Fatalf("q_runtime_kernel_lowering shapes = %v, want empty table until MethodJIT diagnostics are attached", shapes)
+	}
+	if kernels := loweringRow.RawGetString("kernels").Table(); kernels == nil || kernels.Length() != 0 {
+		t.Fatalf("q_runtime_kernel_lowering kernels = %v, want empty table until MethodJIT diagnostics are attached", kernels)
+	}
+	if reasons := loweringRow.RawGetString("reasons").Table(); reasons == nil || reasons.Length() != 0 {
+		t.Fatalf("q_runtime_kernel_lowering reasons = %v, want empty table until MethodJIT diagnostics are attached", reasons)
 	}
 	kernelRow := qTestCacheStatsRowTable(t, interp.GetGlobal("stats").Table(), "qsql_kernel")
 	if got := kernelRow.RawGetString("stats_domain"); !got.IsString() || got.Str() != qStatsDomainSemanticCache {
@@ -5997,7 +6022,7 @@ func qTestCacheStatsRows(t *testing.T, tbl *Table) map[string]map[string]int64 {
 		}
 		out[name.Str()] = values
 	}
-	for _, name := range []string{"qsql_template", "qsql_aligned", "qsql_kernel", "qsql_kernel_decision", "q_query_kernel", "q_runtime_kernel_execution", "q_eval"} {
+	for _, name := range []string{"qsql_template", "qsql_aligned", "qsql_kernel", "qsql_kernel_decision", "q_query_kernel", "q_runtime_kernel_execution", "q_runtime_kernel_lowering", "q_eval"} {
 		if _, ok := out[name]; !ok {
 			t.Fatalf("cache stats missing row %q in %#v", name, out)
 		}

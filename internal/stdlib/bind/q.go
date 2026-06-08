@@ -24,6 +24,7 @@ const (
 	qStatsDomainSemanticCache = "semantic_cache"
 	qStatsDomainEvalCache     = "eval_cache"
 	qStatsDomainJITExecution  = "jit_execution"
+	qStatsDomainJITLowering   = "jit_lowering"
 	qStatsSourceQBind         = "q_bind"
 	qStatsSourceMethodJIT     = "methodjit_diagnose"
 
@@ -132,6 +133,21 @@ type QRuntimeKernelExecutionStat struct {
 	Count   uint64
 }
 
+// QRuntimeKernelLoweringStat is the q.cache_stats-facing shape for MethodJIT
+// q typed-runtime kernel lowering fallbacks. These rows explain why a hot-path
+// shape did not become a typed runtime kernel.
+type QRuntimeKernelLoweringStat struct {
+	Source       string
+	Kind         string
+	Kernel       string
+	Shape        string
+	Route        string
+	Outcome      string
+	ReasonFamily string
+	ReasonCode   string
+	Count        uint64
+}
+
 type qRuntimeKernelExecutionShapeStat struct {
 	Source  string
 	Shape   string
@@ -152,6 +168,34 @@ type qRuntimeKernelExecutionRouteStat struct {
 	Route   string
 	Outcome string
 	Count   uint64
+}
+
+type qRuntimeKernelLoweringShapeStat struct {
+	Source       string
+	Kind         string
+	Shape        string
+	Outcome      string
+	ReasonFamily string
+	ReasonCode   string
+	Count        uint64
+}
+
+type qRuntimeKernelLoweringKernelStat struct {
+	Source       string
+	Kind         string
+	Kernel       string
+	Outcome      string
+	ReasonFamily string
+	ReasonCode   string
+	Count        uint64
+}
+
+type qRuntimeKernelLoweringReasonStat struct {
+	Source       string
+	Kind         string
+	ReasonFamily string
+	ReasonCode   string
+	Count        uint64
 }
 
 type qRuntimeKernelExecutionShapeSummary struct {
@@ -202,6 +246,8 @@ type QSQLKernelDecisionKeyStatJSONRow struct {
 var (
 	qRuntimeKernelExecutionStatsProviderMu      sync.Mutex
 	qRuntimeKernelExecutionStatsProviderCurrent *qRuntimeKernelExecutionStatsProviderState
+	qRuntimeKernelLoweringStatsProviderMu       sync.Mutex
+	qRuntimeKernelLoweringStatsProviderCurrent  *qRuntimeKernelLoweringStatsProviderState
 )
 
 type qRuntimeKernelExecutionStatsProviderState struct {
@@ -232,6 +278,40 @@ func SetQRuntimeKernelExecutionStatsProvider(provider func() []QRuntimeKernelExe
 }
 
 func qRuntimeKernelExecutionStatsNextActiveProvider(state *qRuntimeKernelExecutionStatsProviderState) *qRuntimeKernelExecutionStatsProviderState {
+	for state != nil && !state.active {
+		state = state.previous
+	}
+	return state
+}
+
+type qRuntimeKernelLoweringStatsProviderState struct {
+	provider func() []QRuntimeKernelLoweringStat
+	previous *qRuntimeKernelLoweringStatsProviderState
+	active   bool
+}
+
+func SetQRuntimeKernelLoweringStatsProvider(provider func() []QRuntimeKernelLoweringStat) func() {
+	qRuntimeKernelLoweringStatsProviderMu.Lock()
+	state := &qRuntimeKernelLoweringStatsProviderState{
+		provider: provider,
+		previous: qRuntimeKernelLoweringStatsProviderCurrent,
+		active:   true,
+	}
+	qRuntimeKernelLoweringStatsProviderCurrent = state
+	qRuntimeKernelLoweringStatsProviderMu.Unlock()
+	return func() {
+		qRuntimeKernelLoweringStatsProviderMu.Lock()
+		if state.active {
+			state.active = false
+			if qRuntimeKernelLoweringStatsProviderCurrent == state {
+				qRuntimeKernelLoweringStatsProviderCurrent = qRuntimeKernelLoweringStatsNextActiveProvider(state.previous)
+			}
+		}
+		qRuntimeKernelLoweringStatsProviderMu.Unlock()
+	}
+}
+
+func qRuntimeKernelLoweringStatsNextActiveProvider(state *qRuntimeKernelLoweringStatsProviderState) *qRuntimeKernelLoweringStatsProviderState {
 	for state != nil && !state.active {
 		state = state.previous
 	}
@@ -3047,7 +3127,7 @@ func qCacheStatsTable() *Table {
 	queryKernelShapeStats := qQueryKernelSupportCacheShapeStatsLocked()
 	qQueryKernelSupportCacheMu.Unlock()
 
-	rows := NewAppendArrayTable(7)
+	rows := NewAppendArrayTable(8)
 	rows.RawSetInt(1, TableValue(qCacheStatsRow(
 		"qsql_template",
 		templateEntries,
@@ -3099,6 +3179,7 @@ func qCacheStatsTable() *Table {
 	queryKernelStatsRow.RawSetString("shapes", TableValue(qQueryKernelSupportShapeStatsTable(queryKernelShapeStats)))
 	rows.RawSetInt(5, TableValue(queryKernelStatsRow))
 	rows.RawSetInt(6, TableValue(qRuntimeKernelExecutionStatsRow()))
+	rows.RawSetInt(7, TableValue(qRuntimeKernelLoweringStatsRow()))
 	evalStatsRow := qCacheStatsRow(
 		"q_eval",
 		evalEntries,
@@ -3108,7 +3189,7 @@ func qCacheStatsTable() *Table {
 		qEvalCacheLimit,
 	)
 	evalStatsRow.RawSetString("stats_domain", StringValue(qStatsDomainEvalCache))
-	rows.RawSetInt(7, TableValue(evalStatsRow))
+	rows.RawSetInt(8, TableValue(evalStatsRow))
 	return rows
 }
 
@@ -3224,6 +3305,114 @@ func qRuntimeKernelExecutionStatsSnapshot() []QRuntimeKernelExecutionStat {
 	return out
 }
 
+func qRuntimeKernelLoweringStatsRow() *Table {
+	stats := qRuntimeKernelLoweringStatsSnapshot()
+	fallbacks := uint64(0)
+	for _, stat := range stats {
+		if stat.Outcome == "fallback" {
+			fallbacks += stat.Count
+		}
+	}
+	row := qCacheStatsRow("q_runtime_kernel_lowering", len(stats), 0, 0, 0, 0)
+	row.RawSetString("stats_domain", StringValue(qStatsDomainJITLowering))
+	row.RawSetString("stats_source", StringValue(qStatsSourceMethodJIT))
+	row.RawSetString("cache_backed", BoolValue(false))
+	row.RawSetString("fallbacks", qUint64IntValue(fallbacks))
+	row.RawSetString("stats", TableValue(qRuntimeKernelLoweringStatsTable(stats)))
+	row.RawSetString("shapes", TableValue(qRuntimeKernelLoweringShapeStatsTable(qRuntimeKernelLoweringShapeStats(stats))))
+	row.RawSetString("kernels", TableValue(qRuntimeKernelLoweringKernelStatsTable(qRuntimeKernelLoweringKernelStats(stats))))
+	row.RawSetString("reasons", TableValue(qRuntimeKernelLoweringReasonStatsTable(qRuntimeKernelLoweringReasonStats(stats))))
+	return row
+}
+
+func qRuntimeKernelLoweringStatsSnapshot() []QRuntimeKernelLoweringStat {
+	qRuntimeKernelLoweringStatsProviderMu.Lock()
+	state := qRuntimeKernelLoweringStatsNextActiveProvider(qRuntimeKernelLoweringStatsProviderCurrent)
+	qRuntimeKernelLoweringStatsProviderCurrent = state
+	var provider func() []QRuntimeKernelLoweringStat
+	if state != nil {
+		provider = state.provider
+	}
+	qRuntimeKernelLoweringStatsProviderMu.Unlock()
+	if provider == nil {
+		return nil
+	}
+	stats := provider()
+	if len(stats) == 0 {
+		return nil
+	}
+	type statKey struct {
+		source       string
+		kind         string
+		kernel       string
+		shape        string
+		route        string
+		outcome      string
+		reasonFamily string
+		reasonCode   string
+	}
+	counts := make(map[statKey]uint64, len(stats))
+	for _, stat := range stats {
+		if stat.Count == 0 {
+			continue
+		}
+		key := statKey{
+			source:       qNormalizeRuntimeKernelStatPart(stat.Source),
+			kind:         qNormalizeRuntimeKernelStatPart(stat.Kind),
+			kernel:       qNormalizeRuntimeKernelStatPart(stat.Kernel),
+			shape:        qNormalizeRuntimeKernelStatPart(stat.Shape),
+			route:        qNormalizeRuntimeKernelStatPart(stat.Route),
+			outcome:      qNormalizeRuntimeKernelStatPart(stat.Outcome),
+			reasonFamily: qNormalizeRuntimeKernelStatPart(stat.ReasonFamily),
+			reasonCode:   qNormalizeRuntimeKernelStatPart(stat.ReasonCode),
+		}
+		counts[key] += stat.Count
+	}
+	if len(counts) == 0 {
+		return nil
+	}
+	out := make([]QRuntimeKernelLoweringStat, 0, len(counts))
+	for key, count := range counts {
+		out = append(out, QRuntimeKernelLoweringStat{
+			Source:       key.source,
+			Kind:         key.kind,
+			Kernel:       key.kernel,
+			Shape:        key.shape,
+			Route:        key.route,
+			Outcome:      key.outcome,
+			ReasonFamily: key.reasonFamily,
+			ReasonCode:   key.reasonCode,
+			Count:        count,
+		})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		a, b := out[i], out[j]
+		if a.Source != b.Source {
+			return a.Source < b.Source
+		}
+		if a.Kind != b.Kind {
+			return a.Kind < b.Kind
+		}
+		if a.Kernel != b.Kernel {
+			return a.Kernel < b.Kernel
+		}
+		if a.Shape != b.Shape {
+			return a.Shape < b.Shape
+		}
+		if a.Route != b.Route {
+			return a.Route < b.Route
+		}
+		if a.Outcome != b.Outcome {
+			return a.Outcome < b.Outcome
+		}
+		if a.ReasonFamily != b.ReasonFamily {
+			return a.ReasonFamily < b.ReasonFamily
+		}
+		return a.ReasonCode < b.ReasonCode
+	})
+	return out
+}
+
 func qRuntimeKernelExecutionStatsTable(stats []QRuntimeKernelExecutionStat) *Table {
 	rows := NewAppendArrayTable(len(stats))
 	for i, stat := range stats {
@@ -3233,6 +3422,24 @@ func qRuntimeKernelExecutionStatsTable(stats []QRuntimeKernelExecutionStat) *Tab
 		row.RawSetString("shape", StringValue(stat.Shape))
 		row.RawSetString("route", StringValue(stat.Route))
 		row.RawSetString("outcome", StringValue(stat.Outcome))
+		row.RawSetString("count", qUint64IntValue(stat.Count))
+		rows.RawSetInt(int64(i+1), TableValue(row))
+	}
+	return rows
+}
+
+func qRuntimeKernelLoweringStatsTable(stats []QRuntimeKernelLoweringStat) *Table {
+	rows := NewAppendArrayTable(len(stats))
+	for i, stat := range stats {
+		row := NewTable()
+		row.RawSetString("source", StringValue(stat.Source))
+		row.RawSetString("kind", StringValue(stat.Kind))
+		row.RawSetString("kernel", StringValue(stat.Kernel))
+		row.RawSetString("shape", StringValue(stat.Shape))
+		row.RawSetString("route", StringValue(stat.Route))
+		row.RawSetString("outcome", StringValue(stat.Outcome))
+		row.RawSetString("reason_family", StringValue(stat.ReasonFamily))
+		row.RawSetString("reason_code", StringValue(stat.ReasonCode))
 		row.RawSetString("count", qUint64IntValue(stat.Count))
 		rows.RawSetInt(int64(i+1), TableValue(row))
 	}
@@ -3415,6 +3622,214 @@ func qRuntimeKernelExecutionRouteStatsTable(stats []qRuntimeKernelExecutionRoute
 		row.RawSetString("kernel", StringValue(stat.Kernel))
 		row.RawSetString("route", StringValue(stat.Route))
 		row.RawSetString("outcome", StringValue(stat.Outcome))
+		row.RawSetString("count", qUint64IntValue(stat.Count))
+		rows.RawSetInt(int64(i+1), TableValue(row))
+	}
+	return rows
+}
+
+func qRuntimeKernelLoweringShapeStats(stats []QRuntimeKernelLoweringStat) []qRuntimeKernelLoweringShapeStat {
+	type shapeKey struct {
+		source       string
+		kind         string
+		shape        string
+		outcome      string
+		reasonFamily string
+		reasonCode   string
+	}
+	counts := make(map[shapeKey]uint64, len(stats))
+	for _, stat := range stats {
+		key := shapeKey{
+			source:       stat.Source,
+			kind:         stat.Kind,
+			shape:        stat.Shape,
+			outcome:      stat.Outcome,
+			reasonFamily: stat.ReasonFamily,
+			reasonCode:   stat.ReasonCode,
+		}
+		counts[key] += stat.Count
+	}
+	out := make([]qRuntimeKernelLoweringShapeStat, 0, len(counts))
+	for key, count := range counts {
+		out = append(out, qRuntimeKernelLoweringShapeStat{
+			Source:       key.source,
+			Kind:         key.kind,
+			Shape:        key.shape,
+			Outcome:      key.outcome,
+			ReasonFamily: key.reasonFamily,
+			ReasonCode:   key.reasonCode,
+			Count:        count,
+		})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		a, b := out[i], out[j]
+		if a.Count != b.Count {
+			return a.Count > b.Count
+		}
+		if a.Source != b.Source {
+			return a.Source < b.Source
+		}
+		if a.Kind != b.Kind {
+			return a.Kind < b.Kind
+		}
+		if a.Shape != b.Shape {
+			return a.Shape < b.Shape
+		}
+		if a.Outcome != b.Outcome {
+			return a.Outcome < b.Outcome
+		}
+		if a.ReasonFamily != b.ReasonFamily {
+			return a.ReasonFamily < b.ReasonFamily
+		}
+		return a.ReasonCode < b.ReasonCode
+	})
+	return out
+}
+
+func qRuntimeKernelLoweringShapeStatsTable(stats []qRuntimeKernelLoweringShapeStat) *Table {
+	rows := NewAppendArrayTable(len(stats))
+	for i, stat := range stats {
+		row := NewTable()
+		row.RawSetString("source", StringValue(stat.Source))
+		row.RawSetString("kind", StringValue(stat.Kind))
+		row.RawSetString("shape", StringValue(stat.Shape))
+		row.RawSetString("outcome", StringValue(stat.Outcome))
+		row.RawSetString("reason_family", StringValue(stat.ReasonFamily))
+		row.RawSetString("reason_code", StringValue(stat.ReasonCode))
+		row.RawSetString("count", qUint64IntValue(stat.Count))
+		rows.RawSetInt(int64(i+1), TableValue(row))
+	}
+	return rows
+}
+
+func qRuntimeKernelLoweringKernelStats(stats []QRuntimeKernelLoweringStat) []qRuntimeKernelLoweringKernelStat {
+	type kernelKey struct {
+		source       string
+		kind         string
+		kernel       string
+		outcome      string
+		reasonFamily string
+		reasonCode   string
+	}
+	counts := make(map[kernelKey]uint64, len(stats))
+	for _, stat := range stats {
+		key := kernelKey{
+			source:       stat.Source,
+			kind:         stat.Kind,
+			kernel:       stat.Kernel,
+			outcome:      stat.Outcome,
+			reasonFamily: stat.ReasonFamily,
+			reasonCode:   stat.ReasonCode,
+		}
+		counts[key] += stat.Count
+	}
+	out := make([]qRuntimeKernelLoweringKernelStat, 0, len(counts))
+	for key, count := range counts {
+		out = append(out, qRuntimeKernelLoweringKernelStat{
+			Source:       key.source,
+			Kind:         key.kind,
+			Kernel:       key.kernel,
+			Outcome:      key.outcome,
+			ReasonFamily: key.reasonFamily,
+			ReasonCode:   key.reasonCode,
+			Count:        count,
+		})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		a, b := out[i], out[j]
+		if a.Count != b.Count {
+			return a.Count > b.Count
+		}
+		if a.Source != b.Source {
+			return a.Source < b.Source
+		}
+		if a.Kind != b.Kind {
+			return a.Kind < b.Kind
+		}
+		if a.Kernel != b.Kernel {
+			return a.Kernel < b.Kernel
+		}
+		if a.Outcome != b.Outcome {
+			return a.Outcome < b.Outcome
+		}
+		if a.ReasonFamily != b.ReasonFamily {
+			return a.ReasonFamily < b.ReasonFamily
+		}
+		return a.ReasonCode < b.ReasonCode
+	})
+	return out
+}
+
+func qRuntimeKernelLoweringKernelStatsTable(stats []qRuntimeKernelLoweringKernelStat) *Table {
+	rows := NewAppendArrayTable(len(stats))
+	for i, stat := range stats {
+		row := NewTable()
+		row.RawSetString("source", StringValue(stat.Source))
+		row.RawSetString("kind", StringValue(stat.Kind))
+		row.RawSetString("kernel", StringValue(stat.Kernel))
+		row.RawSetString("outcome", StringValue(stat.Outcome))
+		row.RawSetString("reason_family", StringValue(stat.ReasonFamily))
+		row.RawSetString("reason_code", StringValue(stat.ReasonCode))
+		row.RawSetString("count", qUint64IntValue(stat.Count))
+		rows.RawSetInt(int64(i+1), TableValue(row))
+	}
+	return rows
+}
+
+func qRuntimeKernelLoweringReasonStats(stats []QRuntimeKernelLoweringStat) []qRuntimeKernelLoweringReasonStat {
+	type reasonKey struct {
+		source       string
+		kind         string
+		reasonFamily string
+		reasonCode   string
+	}
+	counts := make(map[reasonKey]uint64, len(stats))
+	for _, stat := range stats {
+		key := reasonKey{
+			source:       stat.Source,
+			kind:         stat.Kind,
+			reasonFamily: stat.ReasonFamily,
+			reasonCode:   stat.ReasonCode,
+		}
+		counts[key] += stat.Count
+	}
+	out := make([]qRuntimeKernelLoweringReasonStat, 0, len(counts))
+	for key, count := range counts {
+		out = append(out, qRuntimeKernelLoweringReasonStat{
+			Source:       key.source,
+			Kind:         key.kind,
+			ReasonFamily: key.reasonFamily,
+			ReasonCode:   key.reasonCode,
+			Count:        count,
+		})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		a, b := out[i], out[j]
+		if a.Count != b.Count {
+			return a.Count > b.Count
+		}
+		if a.Source != b.Source {
+			return a.Source < b.Source
+		}
+		if a.Kind != b.Kind {
+			return a.Kind < b.Kind
+		}
+		if a.ReasonFamily != b.ReasonFamily {
+			return a.ReasonFamily < b.ReasonFamily
+		}
+		return a.ReasonCode < b.ReasonCode
+	})
+	return out
+}
+
+func qRuntimeKernelLoweringReasonStatsTable(stats []qRuntimeKernelLoweringReasonStat) *Table {
+	rows := NewAppendArrayTable(len(stats))
+	for i, stat := range stats {
+		row := NewTable()
+		row.RawSetString("source", StringValue(stat.Source))
+		row.RawSetString("kind", StringValue(stat.Kind))
+		row.RawSetString("reason_family", StringValue(stat.ReasonFamily))
+		row.RawSetString("reason_code", StringValue(stat.ReasonCode))
 		row.RawSetString("count", qUint64IntValue(stat.Count))
 		rows.RawSetInt(int64(i+1), TableValue(row))
 	}

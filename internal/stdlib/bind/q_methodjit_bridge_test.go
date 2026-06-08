@@ -104,6 +104,95 @@ func TestQRuntimeKernelExecutionStatsProviderAggregatesMethodJITDiagnoseRoutesAn
 	assertIntField(t, shape, "count", 2)
 }
 
+func TestQRuntimeKernelLoweringStatsProviderMapsMethodJITFallbacks(t *testing.T) {
+	proto := &vm.FuncProto{
+		Name:      "q_runtime_kernel_lowering_stats_provider_maps_methodjit_fallbacks",
+		NumParams: 2,
+		MaxStack:  4,
+		Constants: []runtime.Value{
+			runtime.StringValue("price"),
+		},
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_FRAME_COLUMN, 2, 0, 0),
+			vm.EncodeABC(vm.OP_VECTOR_GATHER, 2, 1, 0),
+			vm.EncodeABC(vm.OP_MOVE, 3, 2, 0),
+			vm.EncodeABC(vm.OP_VECTOR_REDUCE, 2, 2, int(runtime.DenseArrayReduceSum)),
+			vm.EncodeABC(vm.OP_VECTOR_SCAN, 3, 3, 0),
+			vm.EncodeABC(vm.OP_RETURN, 2, 3, 0),
+		},
+	}
+	args := []runtime.Value{
+		runtime.TableValue(qMethodJITBridgeFrame(t)),
+		runtime.DenseArrayValue(runtime.NewDenseArrayI64([]int64{3, 1})),
+	}
+	report := methodjit.Diagnose(proto, args)
+	if report.NativeError != nil {
+		t.Fatalf("Diagnose native error: %v\n%s", report.NativeError, report.String())
+	}
+
+	restore := qbind.SetMappedQRuntimeKernelLoweringStatsProvider(func() []methodjit.QKernelDescriptor {
+		return report.QKernelDescriptors
+	}, func(stat methodjit.QKernelDescriptor) qbind.QRuntimeKernelLoweringStat {
+		if stat.Kind != "fallback" {
+			return qbind.QRuntimeKernelLoweringStat{}
+		}
+		return qbind.QRuntimeKernelLoweringStat{
+			Source:       stat.Source,
+			Kind:         stat.Kind,
+			Kernel:       stat.Kernel,
+			Shape:        stat.Shape,
+			Route:        stat.Route,
+			Outcome:      stat.Outcome,
+			ReasonFamily: stat.ReasonFamily,
+			ReasonCode:   stat.ReasonCode,
+			Count:        1,
+		}
+	})
+	defer restore()
+
+	row := qCacheStatsRow(t, qCacheStats(t), "q_runtime_kernel_lowering")
+	assertIntField(t, row, "fallbacks", 1)
+
+	stat := nestedRowByFields(t, row, "stats", map[string]string{
+		"source":        "methodjit_q_vector_lowering",
+		"kind":          "fallback",
+		"kernel":        "QVectorGatherReduce",
+		"shape":         "gather/vector-reduce",
+		"route":         "lowering",
+		"outcome":       "fallback",
+		"reason_family": "lowering",
+		"reason_code":   "shared_gather",
+	})
+	assertIntField(t, stat, "count", 1)
+
+	reason := nestedRowByFields(t, row, "reasons", map[string]string{
+		"source":        "methodjit_q_vector_lowering",
+		"kind":          "fallback",
+		"reason_family": "lowering",
+		"reason_code":   "shared_gather",
+	})
+	assertIntField(t, reason, "count", 1)
+}
+
+func qMethodJITBridgeFrame(t *testing.T) *runtime.Table {
+	t.Helper()
+	soa, err := runtime.NewSoA(map[string]*runtime.DenseArray{
+		"price": runtime.NewDenseArrayF64([]float64{99, 100.5, 101.25}),
+		"size":  runtime.NewDenseArrayI64([]int64{5, 10, 20}),
+	})
+	if err != nil {
+		t.Fatalf("NewSoA: %v", err)
+	}
+	frame := runtime.NewTable()
+	frame.SetNativePayloadWithInfo(soa, runtime.NativePayloadInfo{
+		Kind:       runtime.NativePayloadDataFrame,
+		Rows:       soa.Len(),
+		Columns:    2,
+		SchemaHash: "q-methodjit-bridge-test",
+	})
+	return frame
+}
+
 func qCacheStats(t *testing.T) *runtime.Table {
 	t.Helper()
 	fn := qbind.BuildQ().RawGetString("cache_stats").GoFunction()
