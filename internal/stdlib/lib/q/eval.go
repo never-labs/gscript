@@ -4756,6 +4756,17 @@ func (s *EvalState) applyEachCallable(fn any, v any) (any, error) {
 			Keys:   append([]any(nil), dict.Keys...),
 			Values: make([]any, len(dict.Values)),
 		}
+		if isCountDistinctCallable(fn) {
+			for i, item := range dict.Values {
+				value, err := countDistinct(item)
+				if err != nil {
+					return nil, err
+				}
+				out.Values[i] = value
+			}
+			recordRuntimeKernelProbe("CallableEachCountDistinct", "dict", true, nil)
+			return out, nil
+		}
 		for i, item := range dict.Values {
 			value, err := s.applyCallable(fn, []any{item})
 			if err != nil {
@@ -4770,6 +4781,17 @@ func (s *EvalState) applyEachCallable(fn any, v any) (any, error) {
 		return s.applyCallable(fn, []any{v})
 	}
 	out := make([]any, len(items))
+	if isCountDistinctCallable(fn) {
+		for i, item := range items {
+			value, err := countDistinct(item)
+			if err != nil {
+				return nil, err
+			}
+			out[i] = value
+		}
+		recordRuntimeKernelProbe("CallableEachCountDistinct", "vector", true, nil)
+		return inferQArray(out, data.KindI64), nil
+	}
 	for i, item := range items {
 		value, err := s.applyCallable(fn, []any{item})
 		if err != nil {
@@ -4778,6 +4800,11 @@ func (s *EvalState) applyEachCallable(fn any, v any) (any, error) {
 		out[i] = value
 	}
 	return inferQArray(out, qKindOfValue(v)), nil
+}
+
+func isCountDistinctCallable(fn any) bool {
+	composition, ok := fn.(qComposition)
+	return ok && isCountDistinctComposition(composition)
 }
 
 func (s *EvalState) applyEachDyadicCallable(fn any, left any, right any) (any, error) {

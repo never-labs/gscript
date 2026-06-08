@@ -1855,6 +1855,7 @@ func TestEvalWhereRecordsTypedRuntimeKernel(t *testing.T) {
 	assertEvalArray(t, "x:til 8;x[where x>=4]", data.KindI64, []any{int64(4), int64(5), int64(6), int64(7)})
 	assertEvalValue(t, "last ({x+y}\\[10;1 2 3])", int64(16))
 	assertEvalArray(t, "x:6#0;@[x;1 4;+;2 3]", data.KindI64, []any{int64(0), int64(2), int64(0), int64(0), int64(3), int64(0)})
+	assertEvalValue(t, "d:(count distinct)'`a`b!(1 1 2;3 3 3);a:d`a;b:d`b;a+b", int64(3))
 
 	seenWhereCompare := false
 	seenWhereMask := false
@@ -1863,6 +1864,7 @@ func TestEvalWhereRecordsTypedRuntimeKernel(t *testing.T) {
 	seenGather := false
 	seenLastCallableScan := false
 	seenAmend := false
+	seenEachCountDistinct := false
 	for _, stat := range RuntimeKernelExecutionStats() {
 		if stat.Kernel == "ArrayWhereCompare" && stat.Shape == "compare-to-index/>=/i64/i64" && stat.Outcome == "hit" && stat.ReasonCode == "typed_kernel" && stat.Count > 0 {
 			seenWhereCompare = true
@@ -1885,9 +1887,12 @@ func TestEvalWhereRecordsTypedRuntimeKernel(t *testing.T) {
 		if stat.Kernel == "ArrayAmendIndexes" && stat.Shape == "amend-indexes/i64" && stat.Outcome == "hit" && stat.ReasonCode == "typed_kernel" && stat.Count > 0 {
 			seenAmend = true
 		}
+		if stat.Kernel == "CallableEachCountDistinct" && stat.Shape == "dict" && stat.Outcome == "hit" && stat.ReasonCode == "typed_kernel" && stat.Count > 0 {
+			seenEachCountDistinct = true
+		}
 	}
-	if !seenWhereCompare || !seenWhereMask || !seenLikeCount || !seenCountReverse || !seenGather || !seenLastCallableScan || !seenAmend {
-		t.Fatalf("missing where typed runtime stats: compare=%v mask=%v like=%v reverse=%v gather=%v lastScan=%v amend=%v stats=%#v", seenWhereCompare, seenWhereMask, seenLikeCount, seenCountReverse, seenGather, seenLastCallableScan, seenAmend, RuntimeKernelExecutionStats())
+	if !seenWhereCompare || !seenWhereMask || !seenLikeCount || !seenCountReverse || !seenGather || !seenLastCallableScan || !seenAmend || !seenEachCountDistinct {
+		t.Fatalf("missing where typed runtime stats: compare=%v mask=%v like=%v reverse=%v gather=%v lastScan=%v amend=%v eachDistinct=%v stats=%#v", seenWhereCompare, seenWhereMask, seenLikeCount, seenCountReverse, seenGather, seenLastCallableScan, seenAmend, seenEachCountDistinct, RuntimeKernelExecutionStats())
 	}
 }
 
