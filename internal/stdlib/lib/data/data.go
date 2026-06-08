@@ -1191,6 +1191,9 @@ func WhereMask(mask Array) ([]int, error) {
 	if mask.Kind() != KindBool {
 		return nil, fmt.Errorf("where mask kind is %s, want %s", mask.Kind(), KindBool)
 	}
+	if indexes, handled, err := typedWhereMaskIndexes(mask); handled || err != nil {
+		return indexes, err
+	}
 	indexes := make([]int, 0, mask.Len())
 	for i := 0; i < mask.Len(); i++ {
 		v, ok := mask.At(i)
@@ -1220,9 +1223,24 @@ func TryTypedWhereMaskI64(mask Array) (Array, bool, error) {
 	if mask.Kind() != KindBool {
 		return nil, true, fmt.Errorf("where mask kind is %s, want %s", mask.Kind(), KindBool)
 	}
+	indexes, handled, err := typedWhereMaskIndexes(mask)
+	if err != nil {
+		return nil, true, err
+	}
+	if !handled {
+		return nil, false, nil
+	}
+	out := make([]int64, len(indexes))
+	for i, index := range indexes {
+		out[i] = int64(index)
+	}
+	return newI64Trusted(out), true, nil
+}
+
+func typedWhereMaskIndexes(mask Array) ([]int, bool, error) {
 	switch a := mask.(type) {
 	case attributedArray:
-		return TryTypedWhereMaskI64(a.array)
+		return typedWhereMaskIndexes(a.array)
 	case columnArray[bool]:
 		count := 0
 		for _, keep := range a.data {
@@ -1230,17 +1248,17 @@ func TryTypedWhereMaskI64(mask Array) (Array, bool, error) {
 				count++
 			}
 		}
-		out := make([]int64, count)
+		out := make([]int, count)
 		next := 0
 		for row, keep := range a.data {
 			if keep {
-				out[next] = int64(row)
+				out[next] = row
 				next++
 			}
 		}
-		return columnArray[int64]{kind: KindI64, data: out}, true, nil
+		return out, true, nil
 	case nullableArray:
-		out := make([]int64, 0, len(a.data))
+		out := make([]int, 0, len(a.data))
 		for row, value := range a.data {
 			if IsNull(value) {
 				continue
@@ -1250,10 +1268,10 @@ func TryTypedWhereMaskI64(mask Array) (Array, bool, error) {
 				return nil, true, fmt.Errorf("where mask row %d is %T, want bool", row, value)
 			}
 			if keep {
-				out = append(out, int64(row))
+				out = append(out, row)
 			}
 		}
-		return columnArray[int64]{kind: KindI64, data: out}, true, nil
+		return out, true, nil
 	default:
 		return nil, false, nil
 	}

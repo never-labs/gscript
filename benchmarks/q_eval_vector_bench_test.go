@@ -221,13 +221,13 @@ func buildQEvalVectorCases() []qEvalVectorCase {
 				return fmt.Sprintf("x:til %d;idx:where x>=%d;count idx", rows, threshold)
 			},
 			goFn: func(rows int) int64 {
-				if threshold <= 0 {
-					return int64(rows)
+				var count int64
+				for i := int64(0); i < int64(rows); i++ {
+					if i >= threshold {
+						count++
+					}
 				}
-				if threshold >= int64(rows) {
-					return 0
-				}
-				return int64(rows) - threshold
+				return count
 			},
 		})
 	}
@@ -275,7 +275,19 @@ func buildQEvalVectorCases() []qEvalVectorCase {
 			return fmt.Sprintf("x:til %d;r:reverse x;(first r)+last r+(+/r)", rows)
 		},
 		goFn: func(rows int) int64 {
-			return int64(rows-1) + sumTil(rows)
+			var sum int64
+			var first, last int64
+			for i := rows - 1; i >= 0; i-- {
+				value := int64(i)
+				if i == rows-1 {
+					first = value
+				}
+				if i == 0 {
+					last = value
+				}
+				sum += value
+			}
+			return first + last + sum
 		},
 	})
 
@@ -288,8 +300,23 @@ func buildQEvalVectorCases() []qEvalVectorCase {
 				return fmt.Sprintf("x:til %d;r:%d rotate x;(+/r)+first r+last r", rows, n)
 			},
 			goFn: func(rows int) int64 {
-				first, last := rotatedEndpoints(rows, n)
-				return sumTil(rows) + first + last
+				shift := n % rows
+				if shift < 0 {
+					shift += rows
+				}
+				var sum int64
+				var first, last int64
+				for i := 0; i < rows; i++ {
+					value := int64((shift + i) % rows)
+					if i == 0 {
+						first = value
+					}
+					if i == rows-1 {
+						last = value
+					}
+					sum += value
+				}
+				return sum + first + last
 			},
 		})
 	}
@@ -302,8 +329,15 @@ func buildQEvalVectorCases() []qEvalVectorCase {
 				return fmt.Sprintf("x:1+til %d;s:+/x;scan:+\\x;named:sums x;s+last scan+last named", rows)
 			},
 			goFn: func(rows int) int64 {
-				sum := sumOneTo(rows)
-				return sum + sum + sum
+				var sum, scanLast, namedLast int64
+				for i := int64(1); i <= int64(rows); i++ {
+					sum += i
+					scanLast += i
+				}
+				for i := int64(1); i <= int64(rows); i++ {
+					namedLast += i
+				}
+				return sum + scanLast + namedLast
 			},
 		},
 		qEvalVectorCase{
@@ -312,7 +346,18 @@ func buildQEvalVectorCases() []qEvalVectorCase {
 				return fmt.Sprintf("x:til %d;+/deltas x", rows)
 			},
 			goFn: func(rows int) int64 {
-				return int64(rows - 1)
+				var sum int64
+				var prev int64
+				for i := 0; i < rows; i++ {
+					value := int64(i)
+					if i == 0 {
+						sum += value
+					} else {
+						sum += value - prev
+					}
+					prev = value
+				}
+				return sum
 			},
 		},
 		qEvalVectorCase{
@@ -321,17 +366,34 @@ func buildQEvalVectorCases() []qEvalVectorCase {
 				return fmt.Sprintf("x:til %d;s:+/x;named:sum x;mx:max x;mn:min x;cnt:count x;s+named+mx+mn+cnt", rows)
 			},
 			goFn: func(rows int) int64 {
-				return sumTil(rows)*2 + int64(rows-1) + int64(rows)
+				var sum, named int64
+				var max int64
+				for i := 0; i < rows; i++ {
+					value := int64(i)
+					sum += value
+					if i == 0 || value > max {
+						max = value
+					}
+				}
+				for i := 0; i < rows; i++ {
+					named += int64(i)
+				}
+				return sum + named + max + int64(rows)
 			},
 		},
 		qEvalVectorCase{
 			name: "CompositionCountDistinctAndReverse",
 			tags: []string{"composition", "distinct"},
 			expr: func(rows int) string {
-				return "(count distinct)[10 20 10 30]+(first reverse)[1 2 3]"
+				return fmt.Sprintf("x:%d#10 20 10 30;(count distinct)[x]+(first reverse)[til %d]", rows, rows)
 			},
 			goFn: func(rows int) int64 {
-				return 3 + 3
+				seen := make(map[int64]struct{}, 4)
+				pattern := []int64{10, 20, 10, 30}
+				for i := 0; i < rows; i++ {
+					seen[pattern[i%len(pattern)]] = struct{}{}
+				}
+				return int64(len(seen)) + int64(rows-1)
 			},
 		},
 		qEvalVectorCase{
@@ -389,28 +451,44 @@ func buildQEvalVectorCases() []qEvalVectorCase {
 		qEvalVectorCase{
 			name: "FloatXbarCount",
 			expr: func(rows int) string {
-				return "count 0.5 xbar 0.1 0.5 0.9 1.0 -1.25 -1.0 -0.75"
+				return fmt.Sprintf("x:(til %d)*0.5;count 0.5 xbar x", rows)
 			},
 			goFn: func(rows int) int64 {
-				return 7
+				var count int64
+				for i := 0; i < rows; i++ {
+					_ = floorBucketFloat(float64(i)*0.5, 0.5)
+					count++
+				}
+				return count
 			},
 		},
 		qEvalVectorCase{
 			name: "SymbolDistinctCount",
 			expr: func(rows int) string {
-				return "count distinct `AAPL`MSFT`AAPL`NVDA`MSFT`TSLA"
+				return fmt.Sprintf("count distinct %d#`AAPL`MSFT`AAPL`NVDA`MSFT`TSLA", rows)
 			},
 			goFn: func(rows int) int64 {
-				return 4
+				pattern := []string{"AAPL", "MSFT", "AAPL", "NVDA", "MSFT", "TSLA"}
+				seen := make(map[string]struct{}, len(pattern))
+				for i := 0; i < rows; i++ {
+					seen[pattern[i%len(pattern)]] = struct{}{}
+				}
+				return int64(len(seen))
 			},
 		},
 		qEvalVectorCase{
 			name: "SymbolRotateDistinctCount",
 			expr: func(rows int) string {
-				return "count distinct -1 rotate `AAPL`MSFT`NVDA`AAPL`TSLA"
+				return fmt.Sprintf("count distinct -1 rotate %d#`AAPL`MSFT`NVDA`AAPL`TSLA", rows)
 			},
 			goFn: func(rows int) int64 {
-				return 4
+				pattern := []string{"AAPL", "MSFT", "NVDA", "AAPL", "TSLA"}
+				seen := make(map[string]struct{}, len(pattern))
+				shift := rows - 1
+				for i := 0; i < rows; i++ {
+					seen[pattern[(shift+i)%rows%len(pattern)]] = struct{}{}
+				}
+				return int64(len(seen))
 			},
 		},
 		qEvalVectorCase{
@@ -435,19 +513,37 @@ func buildQEvalVectorCases() []qEvalVectorCase {
 		qEvalVectorCase{
 			name: "TableLiteralCount",
 			expr: func(rows int) string {
-				return "count ([] sym:`AAPL`MSFT`NVDA;price:100 101 102;size:10 20 30)"
+				return fmt.Sprintf("syms:%d#`AAPL`MSFT`NVDA;price:til %d;size:1+til %d;count flip `sym`price`size!(syms;price;size)", rows, rows, rows)
 			},
 			goFn: func(rows int) int64 {
-				return 3
+				syms := make([]string, rows)
+				price := make([]int64, rows)
+				size := make([]int64, rows)
+				pattern := []string{"AAPL", "MSFT", "NVDA"}
+				for i := 0; i < rows; i++ {
+					syms[i] = pattern[i%len(pattern)]
+					price[i] = int64(i)
+					size[i] = int64(i + 1)
+				}
+				if len(syms) != len(price) || len(price) != len(size) {
+					return 0
+				}
+				return int64(len(price))
 			},
 		},
 		qEvalVectorCase{
 			name: "XbarStaticMixedSignCount",
 			expr: func(rows int) string {
-				return "count xbar[10;-21 -20 -19 -10 -1 0 1]"
+				return fmt.Sprintf("x:(til %d)-%d;count 10 xbar x", rows, rows/2)
 			},
 			goFn: func(rows int) int64 {
-				return 7
+				var count int64
+				offset := int64(rows / 2)
+				for i := 0; i < rows; i++ {
+					_ = floorBucket(int64(i)-offset, 10)
+					count++
+				}
+				return count
 			},
 		},
 	)
@@ -1016,16 +1112,6 @@ func qEvalVectorNameInt(n int) string {
 	return fmt.Sprintf("Pos%d", n)
 }
 
-func sumTil(rows int) int64 {
-	n := int64(rows)
-	return n * (n - 1) / 2
-}
-
-func sumOneTo(rows int) int64 {
-	n := int64(rows)
-	return n * (n + 1) / 2
-}
-
 func floorBucket(v, width int64) int64 {
 	if v >= 0 {
 		return (v / width) * width
@@ -1033,10 +1119,10 @@ func floorBucket(v, width int64) int64 {
 	return -(((-v + width - 1) / width) * width)
 }
 
-func rotatedEndpoints(rows, n int) (int64, int64) {
-	shift := n % rows
-	if shift < 0 {
-		shift += rows
+func floorBucketFloat(v, width float64) float64 {
+	bucket := float64(int64(v / width))
+	if v < 0 && bucket*width != v {
+		bucket--
 	}
-	return int64(shift), int64((shift + rows - 1) % rows)
+	return bucket * width
 }

@@ -109,6 +109,8 @@ class RuntimeMetricRow:
 class QEvalComputeCoverage:
     session_case_count: int
     go_baseline_case_count: int
+    trusted_go_baseline_count: int
+    untrusted_go_baseline_count: int
     result_cache_warm_case_count: int
     cold_case_count: int
     matched_go_baseline_count: int
@@ -118,6 +120,7 @@ class QEvalComputeCoverage:
     missing_result_cache_warm: list[str]
     missing_cold: list[str]
     orphan_go_baseline: list[str]
+    untrusted_go_baselines: list[str]
 
 
 @dataclass
@@ -323,9 +326,17 @@ def build_qeval_compute_coverage(rows: dict[str, BenchRow]) -> QEvalComputeCover
     go = qeval_cases(rows, "BenchmarkQEvalVectorGoBaseline")
     warm = qeval_cases(rows, "BenchmarkQEvalVectorResultCacheWarm")
     cold = qeval_cases(rows, "BenchmarkQEvalVectorCold")
+    trusted_go = {
+        case
+        for case in go
+        if rows.get(f"BenchmarkQEvalVectorGoBaseline/{case}", BenchRow("", 0, 0)).ns_op >= MIN_TRUSTED_GO_BASELINE_NS
+    }
+    untrusted_go = go - trusted_go
     return QEvalComputeCoverage(
         session_case_count=len(session),
         go_baseline_case_count=len(go),
+        trusted_go_baseline_count=len(trusted_go),
+        untrusted_go_baseline_count=len(untrusted_go),
         result_cache_warm_case_count=len(warm),
         cold_case_count=len(cold),
         matched_go_baseline_count=len(session & go),
@@ -335,6 +346,7 @@ def build_qeval_compute_coverage(rows: dict[str, BenchRow]) -> QEvalComputeCover
         missing_result_cache_warm=sorted(session - warm),
         missing_cold=sorted(session - cold),
         orphan_go_baseline=sorted(go - session),
+        untrusted_go_baselines=sorted(untrusted_go),
     )
 
 
@@ -576,6 +588,8 @@ def markdown_report(rows: dict[str, BenchRow], commands: list[CommandResult], cu
             "|---|---:|",
             f"| session execution cases | {qeval_compute.session_case_count} |",
             f"| Go baseline cases | {qeval_compute.go_baseline_case_count} |",
+            f"| trusted Go performance baselines | {qeval_compute.trusted_go_baseline_count} |",
+            f"| untrusted Go correctness-only baselines | {qeval_compute.untrusted_go_baseline_count} |",
             f"| result-cache warm cases | {qeval_compute.result_cache_warm_case_count} |",
             f"| cold cases | {qeval_compute.cold_case_count} |",
             f"| session cases matched with Go baseline | {qeval_compute.matched_go_baseline_count} |",
@@ -588,6 +602,7 @@ def markdown_report(rows: dict[str, BenchRow], commands: list[CommandResult], cu
         ("Missing result-cache warm", qeval_compute.missing_result_cache_warm),
         ("Missing cold", qeval_compute.missing_cold),
         ("Go baselines without session execution", qeval_compute.orphan_go_baseline),
+        ("Untrusted Go correctness-only baselines", qeval_compute.untrusted_go_baselines),
     ]
     for title, items in missing_sections:
         lines.extend(["", f"### {title}", ""])
