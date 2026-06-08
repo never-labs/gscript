@@ -213,6 +213,13 @@ type qRuntimeKernelExecutionShapeSummary struct {
 	Errors     uint64
 }
 
+type qRuntimeKernelLoweringShapeSummary struct {
+	Lowerings uint64
+	Supported uint64
+	Fallbacks uint64
+	Reasons   []qRuntimeKernelLoweringReasonStat
+}
+
 // QQueryKernelSupportKeyStatJSONRow is the stable external row shape for
 // q.query native-kernel support cache key statistics.
 type QQueryKernelSupportKeyStatJSONRow struct {
@@ -1648,6 +1655,9 @@ func qExplainQuery(s *SoA, spec *Table) (*Table, error) {
 	out.RawSetString("kernel_execution_stats_domain", StringValue(qStatsDomainJITExecution))
 	out.RawSetString("kernel_execution_stats_source", StringValue(qStatsSourceMethodJIT))
 	out.RawSetString("kernel_execution_stats_cache_backed", BoolValue(false))
+	out.RawSetString("kernel_lowering_stats_domain", StringValue(qStatsDomainJITLowering))
+	out.RawSetString("kernel_lowering_stats_source", StringValue(qStatsSourceMethodJIT))
+	out.RawSetString("kernel_lowering_stats_cache_backed", BoolValue(false))
 	kernelCached := false
 	kernelShape := ""
 	if len(aggs) == 0 {
@@ -1664,6 +1674,7 @@ func qExplainQuery(s *SoA, spec *Table) (*Table, error) {
 	out.RawSetString("kernel_cached", BoolValue(kernelCached))
 	out.RawSetString("kernel_shape", StringValue(kernelShape))
 	qExplainAttachRuntimeKernelExecutionSummary(out, kernelShape)
+	qExplainAttachRuntimeKernelLoweringSummary(out, kernelShape)
 	if len(aggs) != 0 {
 		reason := "query native kernel supports non-aggregate selects only"
 		out.RawSetString("kernel_supported", BoolValue(false))
@@ -1954,7 +1965,11 @@ func qExplainSQL(args qSQLArgsResult) (Value, error) {
 	out.RawSetString("kernel_execution_stats_domain", StringValue(qStatsDomainJITExecution))
 	out.RawSetString("kernel_execution_stats_source", StringValue(qStatsSourceMethodJIT))
 	out.RawSetString("kernel_execution_stats_cache_backed", BoolValue(false))
+	out.RawSetString("kernel_lowering_stats_domain", StringValue(qStatsDomainJITLowering))
+	out.RawSetString("kernel_lowering_stats_source", StringValue(qStatsSourceMethodJIT))
+	out.RawSetString("kernel_lowering_stats_cache_backed", BoolValue(false))
 	qExplainAttachRuntimeKernelExecutionSummary(out, kernelInfo.shape)
+	qExplainAttachRuntimeKernelLoweringSummary(out, kernelInfo.shape)
 	qExplainAttachFallbackStats(out, qSQLKernelFallbackStatsCode(kernelInfo), kernelInfo.reasonCode, kernelInfo.reason)
 	return TableValue(out), nil
 }
@@ -3493,6 +3508,37 @@ func qExplainAttachRuntimeKernelExecutionSummary(out *Table, shape string) {
 	out.RawSetString("kernel_execution_error_count", qUint64IntValue(summary.Errors))
 }
 
+func qRuntimeKernelLoweringSummaryForShape(shape string) qRuntimeKernelLoweringShapeSummary {
+	if shape == "" {
+		return qRuntimeKernelLoweringShapeSummary{}
+	}
+	shape = qNormalizeRuntimeKernelStatPart(shape)
+	stats := qRuntimeKernelLoweringStatsSnapshot()
+	var out qRuntimeKernelLoweringShapeSummary
+	for _, stat := range stats {
+		if stat.Shape != shape {
+			continue
+		}
+		out.Lowerings += stat.Count
+		switch stat.Outcome {
+		case "supported":
+			out.Supported += stat.Count
+		case "fallback":
+			out.Fallbacks += stat.Count
+		}
+	}
+	out.Reasons = qRuntimeKernelLoweringReasonStatsForShape(stats, shape)
+	return out
+}
+
+func qExplainAttachRuntimeKernelLoweringSummary(out *Table, shape string) {
+	summary := qRuntimeKernelLoweringSummaryForShape(shape)
+	out.RawSetString("kernel_lowering_count", qUint64IntValue(summary.Lowerings))
+	out.RawSetString("kernel_lowering_supported_count", qUint64IntValue(summary.Supported))
+	out.RawSetString("kernel_lowering_fallback_count", qUint64IntValue(summary.Fallbacks))
+	out.RawSetString("kernel_lowering_fallback_reasons", TableValue(qRuntimeKernelLoweringReasonStatsTable(summary.Reasons)))
+}
+
 func qRuntimeKernelExecutionShapeStats(stats []QRuntimeKernelExecutionStat) []qRuntimeKernelExecutionShapeStat {
 	type shapeKey struct {
 		source  string
@@ -3795,6 +3841,10 @@ func qRuntimeKernelLoweringKernelStatsTable(stats []qRuntimeKernelLoweringKernel
 }
 
 func qRuntimeKernelLoweringReasonStats(stats []QRuntimeKernelLoweringStat) []qRuntimeKernelLoweringReasonStat {
+	return qRuntimeKernelLoweringReasonStatsForShape(stats, "")
+}
+
+func qRuntimeKernelLoweringReasonStatsForShape(stats []QRuntimeKernelLoweringStat, shape string) []qRuntimeKernelLoweringReasonStat {
 	type reasonKey struct {
 		source       string
 		kind         string
@@ -3803,6 +3853,9 @@ func qRuntimeKernelLoweringReasonStats(stats []QRuntimeKernelLoweringStat) []qRu
 	}
 	counts := make(map[reasonKey]uint64, len(stats))
 	for _, stat := range stats {
+		if shape != "" && stat.Shape != shape {
+			continue
+		}
 		if stat.Outcome != "fallback" {
 			continue
 		}

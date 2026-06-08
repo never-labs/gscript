@@ -1413,6 +1413,15 @@ unsupported := q.explain_query(trades, {
 	if got := supported.RawGetString("kernel_execution_stats_cache_backed"); !got.IsBool() || got.Bool() {
 		t.Fatalf("supported kernel_execution_stats_cache_backed = %v, want false", got)
 	}
+	if got := supported.RawGetString("kernel_lowering_stats_domain"); !got.IsString() || got.Str() != qStatsDomainJITLowering {
+		t.Fatalf("supported kernel_lowering_stats_domain = %v, want %s", got, qStatsDomainJITLowering)
+	}
+	if got := supported.RawGetString("kernel_lowering_stats_source"); !got.IsString() || got.Str() != qStatsSourceMethodJIT {
+		t.Fatalf("supported kernel_lowering_stats_source = %v, want %s", got, qStatsSourceMethodJIT)
+	}
+	if got := supported.RawGetString("kernel_lowering_stats_cache_backed"); !got.IsBool() || got.Bool() {
+		t.Fatalf("supported kernel_lowering_stats_cache_backed = %v, want false", got)
+	}
 	if got := supported.RawGetString("kernel_execution_count"); !got.IsInt() || got.Int() != 0 {
 		t.Fatalf("supported kernel_execution_count = %v, want 0 without provider stats", got)
 	}
@@ -1421,6 +1430,18 @@ unsupported := q.explain_query(trades, {
 	}
 	if got := supported.RawGetString("kernel_execution_error_count"); !got.IsInt() || got.Int() != 0 {
 		t.Fatalf("supported kernel_execution_error_count = %v, want 0 without provider stats", got)
+	}
+	if got := supported.RawGetString("kernel_lowering_count"); !got.IsInt() || got.Int() != 0 {
+		t.Fatalf("supported kernel_lowering_count = %v, want 0 without provider stats", got)
+	}
+	if got := supported.RawGetString("kernel_lowering_supported_count"); !got.IsInt() || got.Int() != 0 {
+		t.Fatalf("supported kernel_lowering_supported_count = %v, want 0 without provider stats", got)
+	}
+	if got := supported.RawGetString("kernel_lowering_fallback_count"); !got.IsInt() || got.Int() != 0 {
+		t.Fatalf("supported kernel_lowering_fallback_count = %v, want 0 without provider stats", got)
+	}
+	if reasons := supported.RawGetString("kernel_lowering_fallback_reasons").Table(); reasons == nil || reasons.Length() != 0 {
+		t.Fatalf("supported kernel_lowering_fallback_reasons = %v, want empty table without provider stats", reasons)
 	}
 	if got := supported.RawGetString("kernel_rows"); !got.IsInt() || got.Int() != 2 {
 		t.Fatalf("supported kernel_rows = %v, want 2", got)
@@ -1483,6 +1504,15 @@ unsupported := q.explain_query(trades, {
 	if got := unsupported.RawGetString("kernel_execution_stats_cache_backed"); !got.IsBool() || got.Bool() {
 		t.Fatalf("unsupported kernel_execution_stats_cache_backed = %v, want false", got)
 	}
+	if got := unsupported.RawGetString("kernel_lowering_stats_domain"); !got.IsString() || got.Str() != qStatsDomainJITLowering {
+		t.Fatalf("unsupported kernel_lowering_stats_domain = %v, want %s", got, qStatsDomainJITLowering)
+	}
+	if got := unsupported.RawGetString("kernel_lowering_stats_source"); !got.IsString() || got.Str() != qStatsSourceMethodJIT {
+		t.Fatalf("unsupported kernel_lowering_stats_source = %v, want %s", got, qStatsSourceMethodJIT)
+	}
+	if got := unsupported.RawGetString("kernel_lowering_stats_cache_backed"); !got.IsBool() || got.Bool() {
+		t.Fatalf("unsupported kernel_lowering_stats_cache_backed = %v, want false", got)
+	}
 	if got := unsupported.RawGetString("kernel_execution_count"); !got.IsInt() || got.Int() != 0 {
 		t.Fatalf("unsupported kernel_execution_count = %v, want 0 without provider stats", got)
 	}
@@ -1491,6 +1521,18 @@ unsupported := q.explain_query(trades, {
 	}
 	if got := unsupported.RawGetString("kernel_execution_error_count"); !got.IsInt() || got.Int() != 0 {
 		t.Fatalf("unsupported kernel_execution_error_count = %v, want 0 without provider stats", got)
+	}
+	if got := unsupported.RawGetString("kernel_lowering_count"); !got.IsInt() || got.Int() != 0 {
+		t.Fatalf("unsupported kernel_lowering_count = %v, want 0 without provider stats", got)
+	}
+	if got := unsupported.RawGetString("kernel_lowering_supported_count"); !got.IsInt() || got.Int() != 0 {
+		t.Fatalf("unsupported kernel_lowering_supported_count = %v, want 0 without provider stats", got)
+	}
+	if got := unsupported.RawGetString("kernel_lowering_fallback_count"); !got.IsInt() || got.Int() != 0 {
+		t.Fatalf("unsupported kernel_lowering_fallback_count = %v, want 0 without provider stats", got)
+	}
+	if reasons := unsupported.RawGetString("kernel_lowering_fallback_reasons").Table(); reasons == nil || reasons.Length() != 0 {
+		t.Fatalf("unsupported kernel_lowering_fallback_reasons = %v, want empty table without provider stats", reasons)
 	}
 	if schema := unsupported.RawGetString("kernel_schema").Table(); schema == nil || schema.Length() != 0 {
 		t.Fatalf("unsupported kernel_schema = %v, want empty table", schema)
@@ -4143,6 +4185,15 @@ func TestQExplainReportsQueryKernelVisibility(t *testing.T) {
 	if got := beforeTable.RawGetString("kernel_execution_stats_cache_backed"); !got.IsBool() || got.Bool() {
 		t.Fatalf("kernel_execution_stats_cache_backed before = %v, want false", got)
 	}
+	if got := beforeTable.RawGetString("kernel_lowering_stats_domain"); !got.IsString() || got.Str() != qStatsDomainJITLowering {
+		t.Fatalf("kernel_lowering_stats_domain before = %v, want %s", got, qStatsDomainJITLowering)
+	}
+	if got := beforeTable.RawGetString("kernel_lowering_stats_source"); !got.IsString() || got.Str() != qStatsSourceMethodJIT {
+		t.Fatalf("kernel_lowering_stats_source before = %v, want %s", got, qStatsSourceMethodJIT)
+	}
+	if got := beforeTable.RawGetString("kernel_lowering_stats_cache_backed"); !got.IsBool() || got.Bool() {
+		t.Fatalf("kernel_lowering_stats_cache_backed before = %v, want false", got)
+	}
 	if got := beforeTable.RawGetString("kernel_execution_count"); !got.IsInt() || got.Int() != 0 {
 		t.Fatalf("kernel_execution_count before = %v, want 0 without provider stats", got)
 	}
@@ -4151,6 +4202,18 @@ func TestQExplainReportsQueryKernelVisibility(t *testing.T) {
 	}
 	if got := beforeTable.RawGetString("kernel_execution_error_count"); !got.IsInt() || got.Int() != 0 {
 		t.Fatalf("kernel_execution_error_count before = %v, want 0 without provider stats", got)
+	}
+	if got := beforeTable.RawGetString("kernel_lowering_count"); !got.IsInt() || got.Int() != 0 {
+		t.Fatalf("kernel_lowering_count before = %v, want 0 without provider stats", got)
+	}
+	if got := beforeTable.RawGetString("kernel_lowering_supported_count"); !got.IsInt() || got.Int() != 0 {
+		t.Fatalf("kernel_lowering_supported_count before = %v, want 0 without provider stats", got)
+	}
+	if got := beforeTable.RawGetString("kernel_lowering_fallback_count"); !got.IsInt() || got.Int() != 0 {
+		t.Fatalf("kernel_lowering_fallback_count before = %v, want 0 without provider stats", got)
+	}
+	if reasons := beforeTable.RawGetString("kernel_lowering_fallback_reasons").Table(); reasons == nil || reasons.Length() != 0 {
+		t.Fatalf("kernel_lowering_fallback_reasons before = %v, want empty table without provider stats", reasons)
 	}
 	cacheKey := beforeTable.RawGetString("kernel_cache_key")
 	if !cacheKey.IsString() || cacheKey.Str() == "" {
@@ -4292,6 +4355,79 @@ func TestQExplainReportsQueryKernelVisibility(t *testing.T) {
 	}
 	if got := withExecutionTable.RawGetString("kernel_execution_error_count"); !got.IsInt() || got.Int() != 1 {
 		t.Fatalf("kernel_execution_error_count with stats = %v, want 1 for current shape", got)
+	}
+	restoreLoweringStats := SetQRuntimeKernelLoweringStatsProvider(func() []QRuntimeKernelLoweringStat {
+		return []QRuntimeKernelLoweringStat{
+			{
+				Source:  "methodjit_q_frame_runtime",
+				Kind:    "runtime_kernel",
+				Kernel:  "QFrameSelectColumn",
+				Shape:   kernelShape.Str(),
+				Route:   "typed_runtime_op_exit",
+				Outcome: "supported",
+				Count:   2,
+			},
+			{
+				Source:       "methodjit_q_frame_lowering",
+				Kind:         "fallback",
+				Kernel:       "QFrameSelectColumn",
+				Shape:        kernelShape.Str(),
+				Route:        "lowering",
+				Outcome:      "fallback",
+				ReasonFamily: "lowering",
+				ReasonCode:   "shared_predicate",
+				Count:        4,
+			},
+			{
+				Source:       "methodjit_q_vector_lowering",
+				Kind:         "fallback",
+				Kernel:       "QVectorGatherReduce",
+				Shape:        "gather/vector-reduce",
+				Route:        "lowering",
+				Outcome:      "fallback",
+				ReasonFamily: "lowering",
+				ReasonCode:   "shared_gather",
+				Count:        9,
+			},
+		}
+	})
+	withLowering, err := qExplainSQL(qSQLArgsResult{frameValue: frameValue, source: query})
+	restoreLoweringStats()
+	if err != nil {
+		t.Fatalf("explain with runtime lowering stats: %v", err)
+	}
+	withLoweringTable := withLowering.Table()
+	if got := withLoweringTable.RawGetString("kernel_lowering_count"); !got.IsInt() || got.Int() != 6 {
+		t.Fatalf("kernel_lowering_count with stats = %v, want 6 for current shape", got)
+	}
+	if got := withLoweringTable.RawGetString("kernel_lowering_supported_count"); !got.IsInt() || got.Int() != 2 {
+		t.Fatalf("kernel_lowering_supported_count with stats = %v, want 2 for current shape", got)
+	}
+	if got := withLoweringTable.RawGetString("kernel_lowering_fallback_count"); !got.IsInt() || got.Int() != 4 {
+		t.Fatalf("kernel_lowering_fallback_count with stats = %v, want 4 for current shape", got)
+	}
+	reasons := withLoweringTable.RawGetString("kernel_lowering_fallback_reasons").Table()
+	if reasons == nil || reasons.Length() != 1 {
+		t.Fatalf("kernel_lowering_fallback_reasons with stats = %v, want one current-shape fallback reason", reasons)
+	}
+	reason := reasons.RawGetInt(1).Table()
+	if reason == nil {
+		t.Fatal("kernel_lowering_fallback_reasons[1] is nil")
+	}
+	if got := reason.RawGetString("source"); !got.IsString() || got.Str() != "methodjit_q_frame_lowering" {
+		t.Fatalf("kernel_lowering_fallback_reasons[1].source = %v, want methodjit_q_frame_lowering", got)
+	}
+	if got := reason.RawGetString("kind"); !got.IsString() || got.Str() != "fallback" {
+		t.Fatalf("kernel_lowering_fallback_reasons[1].kind = %v, want fallback", got)
+	}
+	if got := reason.RawGetString("reason_family"); !got.IsString() || got.Str() != "lowering" {
+		t.Fatalf("kernel_lowering_fallback_reasons[1].reason_family = %v, want lowering", got)
+	}
+	if got := reason.RawGetString("reason_code"); !got.IsString() || got.Str() != "shared_predicate" {
+		t.Fatalf("kernel_lowering_fallback_reasons[1].reason_code = %v, want shared_predicate", got)
+	}
+	if got := reason.RawGetString("count"); !got.IsInt() || got.Int() != 4 {
+		t.Fatalf("kernel_lowering_fallback_reasons[1].count = %v, want 4", got)
 	}
 	if got := afterTable.RawGetString("kernel_cache_key"); !got.IsString() || got.Str() != cacheKey.Str() {
 		t.Fatalf("kernel_cache_key after = %v, want %s", got, cacheKey.Str())
