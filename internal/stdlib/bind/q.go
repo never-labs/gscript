@@ -2273,13 +2273,15 @@ func qNativeFrameRuntimeKind(tbl *Table) (NativePayloadKind, bool) {
 	if _, info, ok := qTypedNativeFramePayload(tbl); ok {
 		return info.Kind, true
 	}
-	if kind, ok := tbl.NativePayloadKind(); ok {
-		switch kind {
-		case NativePayloadDataFrame, NativePayloadKeyedFrame:
-			return kind, true
-		default:
-			return NativePayloadNone, false
-		}
+	return qLegacyNativeFramePayloadKind(tbl)
+}
+
+func qLegacyNativeFramePayloadKind(tbl *Table) (NativePayloadKind, bool) {
+	if tbl == nil {
+		return NativePayloadNone, false
+	}
+	if _, hasInfo := tbl.NativePayloadInfo(); hasInfo {
+		return NativePayloadNone, false
 	}
 	switch tbl.NativePayload().(type) {
 	case data.Frame:
@@ -2301,6 +2303,14 @@ func qTypedNativeFramePayload(tbl *Table) (any, NativePayloadInfo, bool) {
 		return nil, NativePayloadInfo{}, false
 	}
 	return tbl.NativeFramePayload()
+}
+
+func qLegacyNativeDataFramePayload(tbl *Table) (data.Frame, bool) {
+	if kind, ok := qLegacyNativeFramePayloadKind(tbl); !ok || kind != NativePayloadDataFrame {
+		return data.Frame{}, false
+	}
+	native, ok := tbl.NativePayload().(data.Frame)
+	return native, ok
 }
 
 func qTypedNativeDataFramePayload(tbl *Table) (data.Frame, bool, error) {
@@ -2338,6 +2348,14 @@ func qTypedNativeKeyedFramePayload(tbl *Table) (data.KeyedFrame, bool, error) {
 		return data.KeyedFrame{}, false, fmt.Errorf("native keyed frame payload is invalid")
 	}
 	return native, true, nil
+}
+
+func qLegacyNativeKeyedFramePayload(tbl *Table) (data.KeyedFrame, bool) {
+	if kind, ok := qLegacyNativeFramePayloadKind(tbl); !ok || kind != NativePayloadKeyedFrame {
+		return data.KeyedFrame{}, false
+	}
+	native, ok := tbl.NativePayload().(data.KeyedFrame)
+	return native, ok
 }
 
 func qExplainKernelInfo(args qSQLArgsResult, tmpl qSQLPlanTemplate) qExplainKernelResult {
@@ -5800,7 +5818,7 @@ func qNativeDataFramePayload(tbl *Table) (data.Frame, bool, error) {
 	if blocks, err := qNativePayloadKindBlocksLegacyFrameFallback(tbl, NativePayloadDataFrame, "native data frame payload is invalid"); blocks || err != nil {
 		return data.Frame{}, false, err
 	}
-	if native, ok := tbl.NativePayload().(data.Frame); ok {
+	if native, ok := qLegacyNativeDataFramePayload(tbl); ok {
 		return native, true, nil
 	}
 	return data.Frame{}, false, nil
@@ -5928,7 +5946,7 @@ func qNativeKeyedFramePayload(tbl *Table) (data.KeyedFrame, bool, error) {
 	if blocks, err := qNativePayloadKindBlocksLegacyFrameFallback(tbl, NativePayloadKeyedFrame, "native keyed frame payload is invalid"); blocks || err != nil {
 		return data.KeyedFrame{}, false, err
 	}
-	if native, ok := tbl.NativePayload().(data.KeyedFrame); ok {
+	if native, ok := qLegacyNativeKeyedFramePayload(tbl); ok {
 		return native, true, nil
 	}
 	return data.KeyedFrame{}, false, nil
