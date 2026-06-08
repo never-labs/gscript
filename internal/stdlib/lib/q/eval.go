@@ -630,6 +630,9 @@ func (s *EvalState) eval(src string) (any, error) {
 		if out, handled, err := s.tryEvalCountPrds(strings.TrimSpace(src[len("count "):])); err != nil || handled {
 			return out, err
 		}
+		if out, handled, err := s.tryEvalCountXbar(strings.TrimSpace(src[len("count "):])); err != nil || handled {
+			return out, err
+		}
 	}
 	if strings.HasPrefix(src, "last ") {
 		if out, handled, err := s.tryEvalLastScan(strings.TrimSpace(src[len("last "):])); err != nil || handled {
@@ -3032,6 +3035,34 @@ func (s *EvalState) tryEvalCountPrds(src string) (any, bool, error) {
 		return out, true, nil
 	}
 	recordRuntimeKernelProbe("ArrayCountProducts", "vector-count/prds/"+string(array.Kind()), false, nil)
+	return nil, false, nil
+}
+
+func (s *EvalState) tryEvalCountXbar(src string) (any, bool, error) {
+	leftExpr, rightExpr, ok := splitTopLevelWord(src, "xbar")
+	if !ok {
+		return nil, false, nil
+	}
+	width, err := s.eval(leftExpr)
+	if err != nil {
+		return nil, true, err
+	}
+	value, err := s.eval(rightExpr)
+	if err != nil {
+		return nil, true, err
+	}
+	array, ok := value.(data.Array)
+	if !ok {
+		return nil, false, nil
+	}
+	normalizedWidth := normalizeXbarIntervalForKind(width, array.Kind())
+	if _, ok := numeric(normalizedWidth); !ok {
+		return nil, false, nil
+	}
+	if out, handled := data.TryTypedNumericArrayLen(array); handled {
+		recordRuntimeKernelProbe("ArrayCountXbar", "vector-count/xbar/"+string(array.Kind()), true, nil)
+		return out, true, nil
+	}
 	return nil, false, nil
 }
 

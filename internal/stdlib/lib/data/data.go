@@ -468,6 +468,12 @@ type i64RangeArray struct {
 	len   int
 }
 
+type f64RangeArray struct {
+	start float64
+	step  float64
+	len   int
+}
+
 type i64SegmentArray struct {
 	segments []i64RangeArray
 	len      int
@@ -835,6 +841,71 @@ func (a i64SegmentArray) gatherRange(indexes []int) (Array, bool) {
 		prev = current
 	}
 	return i64RangeArray{start: first, step: step, len: len(indexes)}, true
+}
+
+func (a f64RangeArray) Kind() Kind { return KindF64 }
+
+func (a f64RangeArray) Len() int { return a.len }
+
+func (a f64RangeArray) At(row int) (any, bool) {
+	if row < 0 || row >= a.len {
+		return nil, false
+	}
+	return a.start + float64(row)*a.step, true
+}
+
+func (a f64RangeArray) Values() []any {
+	out := make([]any, a.len)
+	for i := range out {
+		out[i] = a.start + float64(i)*a.step
+	}
+	return out
+}
+
+func (a f64RangeArray) Gather(indexes []int) Array {
+	if gathered, ok := a.gatherRange(indexes); ok {
+		return gathered
+	}
+	out := make([]float64, len(indexes))
+	for i, row := range indexes {
+		if row < 0 || row >= a.len {
+			panic(fmt.Sprintf("data f64 range gather index %d out of range", row))
+		}
+		out[i] = a.start + float64(row)*a.step
+	}
+	return columnArray[float64]{kind: KindF64, data: out}
+}
+
+func (a f64RangeArray) gatherRange(indexes []int) (Array, bool) {
+	if len(indexes) == 0 {
+		return f64RangeArray{len: 0}, true
+	}
+	firstRow := indexes[0]
+	if firstRow < 0 || firstRow >= a.len {
+		panic(fmt.Sprintf("data f64 range gather index %d out of range", firstRow))
+	}
+	first := a.start + float64(firstRow)*a.step
+	if len(indexes) == 1 {
+		return f64RangeArray{start: first, step: a.step, len: 1}, true
+	}
+	secondRow := indexes[1]
+	if secondRow < 0 || secondRow >= a.len {
+		panic(fmt.Sprintf("data f64 range gather index %d out of range", secondRow))
+	}
+	second := a.start + float64(secondRow)*a.step
+	step := second - first
+	prev := second
+	for _, row := range indexes[2:] {
+		if row < 0 || row >= a.len {
+			panic(fmt.Sprintf("data f64 range gather index %d out of range", row))
+		}
+		current := a.start + float64(row)*a.step
+		if current-prev != step {
+			return nil, false
+		}
+		prev = current
+	}
+	return f64RangeArray{start: first, step: step, len: len(indexes)}, true
 }
 
 func (a i64ProductArray) Kind() Kind { return KindI64 }

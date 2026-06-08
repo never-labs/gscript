@@ -1127,6 +1127,8 @@ func (typedKernelRegistry) NumericSum(array Array) (float64, int64, bool, error)
 	case i64RangeArray:
 		sum := i64RangeSum(a)
 		return float64(sum), int64(a.len), true, nil
+	case f64RangeArray:
+		return f64RangeSum(a), int64(a.len), true, nil
 	case i64SegmentArray:
 		sum := i64SegmentSum(a)
 		return float64(sum), int64(a.len), true, nil
@@ -1274,6 +1276,8 @@ func (k typedKernelRegistry) NumericSumValue(array Array) (any, bool, error) {
 		return numericSumIntegerValue(a.data), true, nil
 	case i64RangeArray:
 		return i64RangeSum(a), true, nil
+	case f64RangeArray:
+		return f64RangeSum(a), true, nil
 	case i64SegmentArray:
 		return i64SegmentSum(a), true, nil
 	case i64ProductArray:
@@ -2407,6 +2411,8 @@ func (typedKernelRegistry) NumericAt(array Array, row int) (float64, bool, error
 		return numericColumnAt(a.data, row)
 	case i64RangeArray:
 		return numericI64RangeAt(a, row)
+	case f64RangeArray:
+		return numericF64RangeAt(a, row)
 	case i64SegmentArray:
 		return numericI64SegmentAt(a, row)
 	case i64ProductArray:
@@ -2453,6 +2459,13 @@ func numericI64RangeAt(values i64RangeArray, row int) (float64, bool, error) {
 	return float64(values.start + int64(row)*values.step), true, nil
 }
 
+func numericF64RangeAt(values f64RangeArray, row int) (float64, bool, error) {
+	if row < 0 || row >= values.len {
+		return 0, false, fmt.Errorf("array row %d out of range", row)
+	}
+	return values.start + float64(row)*values.step, true, nil
+}
+
 func numericI64SegmentAt(values i64SegmentArray, row int) (float64, bool, error) {
 	value, ok := values.i64At(row)
 	if !ok {
@@ -2495,7 +2508,7 @@ func isNumericArray(array Array) bool {
 		return isNumericArray(a.array)
 	case columnArray[int8], columnArray[int16], columnArray[int32], columnArray[int64],
 		columnArray[uint8], columnArray[uint16], columnArray[uint32], columnArray[uint64],
-		columnArray[float32], columnArray[float64], i64RangeArray, i64SegmentArray, i64ProductArray:
+		columnArray[float32], columnArray[float64], i64RangeArray, f64RangeArray, i64SegmentArray, i64ProductArray:
 		return true
 	case nullableArray:
 		for i := 0; i < array.Len(); i++ {
@@ -2517,6 +2530,9 @@ func isNumericArray(array Array) bool {
 }
 
 func numericDyadic(op Op, left, right any, length int) (Array, bool, error) {
+	if out, ok := numericDyadicRange(op, left, right, length); ok {
+		return out, true, nil
+	}
 	values := make([]float64, length)
 	var nullable []any
 	for i := 0; i < length; i++ {
@@ -2556,6 +2572,57 @@ func numericDyadic(op Op, left, right any, length int) (Array, bool, error) {
 		return newNullableArray(KindF64, nullable), true, nil
 	}
 	return columnArray[float64]{kind: KindF64, data: values}, true, nil
+}
+
+func numericDyadicRange(op Op, left, right any, length int) (Array, bool) {
+	if leftRange, ok := asNumericRangeArray(left); ok {
+		if scalar, ok := numericScalarValue(right); ok {
+			return applyF64RangeScalar(op, leftRange, scalar, false, length)
+		}
+	}
+	if rightRange, ok := asNumericRangeArray(right); ok {
+		if scalar, ok := numericScalarValue(left); ok {
+			return applyF64RangeScalar(op, rightRange, scalar, true, length)
+		}
+	}
+	return nil, false
+}
+
+func asNumericRangeArray(value any) (f64RangeArray, bool) {
+	switch a := value.(type) {
+	case attributedArray:
+		return asNumericRangeArray(a.array)
+	case i64RangeArray:
+		return f64RangeArray{start: float64(a.start), step: float64(a.step), len: a.len}, true
+	case f64RangeArray:
+		return a, true
+	default:
+		return f64RangeArray{}, false
+	}
+}
+
+func applyF64RangeScalar(op Op, values f64RangeArray, scalar float64, scalarLeft bool, length int) (Array, bool) {
+	if values.len != length {
+		return nil, false
+	}
+	switch op {
+	case OpAdd:
+		return f64RangeArray{start: values.start + scalar, step: values.step, len: values.len}, true
+	case OpSub:
+		if scalarLeft {
+			return f64RangeArray{start: scalar - values.start, step: -values.step, len: values.len}, true
+		}
+		return f64RangeArray{start: values.start - scalar, step: values.step, len: values.len}, true
+	case OpMul:
+		return f64RangeArray{start: values.start * scalar, step: values.step * scalar, len: values.len}, true
+	case OpDiv:
+		if scalarLeft {
+			return nil, false
+		}
+		return f64RangeArray{start: values.start / scalar, step: values.step / scalar, len: values.len}, true
+	default:
+		return nil, false
+	}
 }
 
 func numericIntegerDyadic(op Op, left, right any, length int) (Array, bool, error) {
@@ -3555,6 +3622,15 @@ func i64RangeSum(values i64RangeArray) int64 {
 		return (n / 2) * endpoints
 	}
 	return n * (endpoints / 2)
+}
+
+func f64RangeSum(values f64RangeArray) float64 {
+	if values.len == 0 {
+		return 0
+	}
+	n := float64(values.len)
+	last := values.start + float64(values.len-1)*values.step
+	return n * (values.start + last) / 2
 }
 
 func i64SegmentSum(values i64SegmentArray) int64 {

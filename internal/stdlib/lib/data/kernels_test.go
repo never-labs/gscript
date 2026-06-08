@@ -2030,6 +2030,31 @@ func TestTypedNumericUnaryBinaryAndAggregates(t *testing.T) {
 		t.Fatalf("NumericBinary values = %v, want %v", got, want)
 	}
 
+	scaled, ok, err := typedKernels.NumericBinary(OpMul, NewI64Range(0, 1, 4), NewF64([]float64{0.5, 0.5, 0.5, 0.5}))
+	if err != nil {
+		t.Fatalf("NumericBinary range*f64 column returned error: %v", err)
+	}
+	if !ok {
+		t.Fatal("NumericBinary range*f64 column did not match numeric arrays")
+	}
+	if got, want := scaled.Values(), []any{0.0, 0.5, 1.0, 1.5}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("NumericBinary range*f64 values = %v, want %v", got, want)
+	}
+
+	affine, ok, err := typedKernels.Dyadic(OpAdd, NewI64Range(0, 1, 4), float64(1.5))
+	if err != nil {
+		t.Fatalf("Dyadic range+float returned error: %v", err)
+	}
+	if !ok {
+		t.Fatal("Dyadic range+float did not match numeric range scalar")
+	}
+	if _, ok := affine.(f64RangeArray); !ok {
+		t.Fatalf("Dyadic range+float returned %T, want f64RangeArray", affine)
+	}
+	if got, want := affine.(Array).Values(), []any{1.5, 2.5, 3.5, 4.5}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("Dyadic range+float values = %v, want %v", got, want)
+	}
+
 	div, ok, err := typedKernels.NumericBinary(OpDiv, NewColumn("x", []any{float64(6), nil, float64(9)}).Data, NewF64([]float64{2, 3, 3}))
 	if err != nil {
 		t.Fatalf("nullable NumericBinary returned error: %v", err)
