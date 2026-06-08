@@ -1873,7 +1873,7 @@ func DenseArrayMaskCombine(op DenseArrayMaskOp, left, right Value) (*DenseArray,
 	la, ra := left.DenseArray(), right.DenseArray()
 	switch {
 	case la != nil && ra != nil:
-		return denseArrayMaskArrayArray(op, la, ra)
+		return DenseArrayMaskCombineArrays(op, la, ra)
 	case la != nil:
 		return denseArrayMaskArrayScalar(op, la, right, false)
 	case ra != nil:
@@ -1881,6 +1881,12 @@ func DenseArrayMaskCombine(op DenseArrayMaskOp, left, right Value) (*DenseArray,
 	default:
 		return nil, ErrDenseArrayOperand
 	}
+}
+
+// DenseArrayMaskCombineArrays applies a typed boolean mask operation to two
+// bool dense-array masks without scalar Value dispatch.
+func DenseArrayMaskCombineArrays(op DenseArrayMaskOp, left, right *DenseArray) (*DenseArray, error) {
+	return denseArrayMaskArrayArray(op, left, right)
 }
 
 func denseArrayMaskArrayArray(op DenseArrayMaskOp, left, right *DenseArray) (*DenseArray, error) {

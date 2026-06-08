@@ -558,7 +558,7 @@ func executeQFrameMaskTermDense(constants []runtime.Value, spec QFrameSelectColu
 		if err != nil {
 			return nil, err
 		}
-		return runtime.DenseArrayMaskCombine(term.CombineOp, runtime.DenseArrayValue(left), runtime.DenseArrayValue(right))
+		return runtime.DenseArrayMaskCombineArrays(term.CombineOp, left, right)
 	default:
 		return nil, fmt.Errorf("QFrameSelectColumn unknown mask term kind %d", term.Kind)
 	}

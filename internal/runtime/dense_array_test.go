@@ -243,6 +243,30 @@ func TestDenseArrayMaskCombineArrayArray(t *testing.T) {
 	assertDenseBool(t, DenseArrayValue(got), []bool{false, true, false, false})
 }
 
+func TestDenseArrayMaskCombineArrays(t *testing.T) {
+	left := NewDenseArrayBool([]bool{true, true, false, false})
+	right := NewDenseArrayBool([]bool{true, false, true, false})
+
+	got, err := DenseArrayMaskCombineArrays(DenseArrayMaskAnd, left, right)
+	if err != nil {
+		t.Fatalf("DenseArrayMaskCombineArrays and error: %v", err)
+	}
+	assertDenseBool(t, DenseArrayValue(got), []bool{true, false, false, false})
+
+	got, err = DenseArrayMaskCombineArrays(DenseArrayMaskOr, left, right)
+	if err != nil {
+		t.Fatalf("DenseArrayMaskCombineArrays or error: %v", err)
+	}
+	assertDenseBool(t, DenseArrayValue(got), []bool{true, true, true, false})
+
+	if _, err := DenseArrayMaskCombineArrays(DenseArrayMaskAnd, left, NewDenseArrayBool([]bool{true})); err == nil {
+		t.Fatalf("DenseArrayMaskCombineArrays accepted length mismatch")
+	}
+	if _, err := DenseArrayMaskCombineArrays(DenseArrayMaskAnd, left, NewDenseArrayI64([]int64{1, 2, 3, 4})); err == nil {
+		t.Fatalf("DenseArrayMaskCombineArrays accepted non-bool rhs")
+	}
+}
+
 func TestDenseArrayMaskCombineArrayScalar(t *testing.T) {
 	mask := DenseArrayValue(NewDenseArrayBool([]bool{true, false, true}))
 
