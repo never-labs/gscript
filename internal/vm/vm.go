@@ -2344,11 +2344,14 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 			a := DecodeA(inst)
 			b := DecodeB(inst)
 			frameVal := vm.regs[base+b]
-			info, ok := frameVal.NativeFramePayloadInfo()
-			if !ok {
+			out, handled, err := frameVal.NativeFrameLen()
+			if err != nil {
+				return nil, wrapLineErr(frame, err)
+			}
+			if !handled {
 				return nil, wrapLineErr(frame, fmt.Errorf("FRAME_LEN operand must be native frame (got %s)", frameVal.TypeName()))
 			}
-			vm.regs[base+a] = runtime.IntValue(int64(info.Rows))
+			vm.regs[base+a] = out
 			if frame.closure.Proto.Feedback != nil {
 				fb := &frame.closure.Proto.Feedback[frame.pc-1]
 				fb.Left.Observe(frameVal.Type())

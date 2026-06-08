@@ -654,6 +654,17 @@ func (v Value) NativeFramePayloadInfo() (NativePayloadInfo, bool) {
 	return tbl.NativeFramePayloadInfo()
 }
 
+// NativeFrameLen returns the row count for runtime-owned native frame
+// carriers. It keeps VM/JIT frame length operations from inspecting native
+// payload metadata directly.
+func (v Value) NativeFrameLen() (Value, bool, error) {
+	info, ok := v.NativeFramePayloadInfo()
+	if !ok {
+		return NilValue(), false, nil
+	}
+	return IntValue(int64(info.Rows)), true, nil
+}
+
 // NativeFrameColumn returns a dense column from runtime-owned native frame
 // carriers. It intentionally keeps the VM away from native payload kind
 // branching; unsupported payload implementations can add a runtime carrier here.

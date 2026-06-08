@@ -156,6 +156,58 @@ func TestTableNativePayloadTypeNameReflectsFrameKinds(t *testing.T) {
 	}
 }
 
+func TestValueNativeFrameLenReadsRuntimeFrameRows(t *testing.T) {
+	frame := NewTable()
+	frame.SetNativePayloadWithInfo(struct{}{}, NativePayloadInfo{
+		Kind:       NativePayloadDataFrame,
+		Rows:       17,
+		Columns:    2,
+		SchemaHash: "frame-schema",
+	})
+
+	out, handled, err := TableValue(frame).NativeFrameLen()
+	if err != nil {
+		t.Fatalf("NativeFrameLen() error = %v", err)
+	}
+	if !handled {
+		t.Fatal("NativeFrameLen() handled = false, want true")
+	}
+	if !out.IsInt() || out.Int() != 17 {
+		t.Fatalf("NativeFrameLen() = %v, want int 17", out)
+	}
+}
+
+func TestValueNativeFrameLenReadsRuntimeKeyedFrameRows(t *testing.T) {
+	keyed := NewTable()
+	keyed.SetNativePayloadWithInfo(struct{}{}, NativePayloadInfo{
+		Kind:       NativePayloadKeyedFrame,
+		Rows:       9,
+		Columns:    4,
+		SchemaHash: "keyed-schema",
+	})
+
+	out, handled, err := TableValue(keyed).NativeFrameLen()
+	if err != nil {
+		t.Fatalf("NativeFrameLen() error = %v", err)
+	}
+	if !handled {
+		t.Fatal("NativeFrameLen() handled = false, want true")
+	}
+	if !out.IsInt() || out.Int() != 9 {
+		t.Fatalf("NativeFrameLen() = %v, want int 9", out)
+	}
+}
+
+func TestValueNativeFrameLenSkipsPlainTable(t *testing.T) {
+	out, handled, err := TableValue(NewTable()).NativeFrameLen()
+	if err != nil {
+		t.Fatalf("NativeFrameLen() error = %v", err)
+	}
+	if handled {
+		t.Fatalf("NativeFrameLen() = %v, true, want unhandled", out)
+	}
+}
+
 func TestNativePayloadKindRuntimeFrameMapping(t *testing.T) {
 	cases := []struct {
 		kind NativePayloadKind
