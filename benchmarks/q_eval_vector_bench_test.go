@@ -533,7 +533,37 @@ func appendQEvalSemanticCoverageCases(cases []qEvalVectorCase) []qEvalVectorCase
 				return "(count where differ `a`a`b`b`c)+(count ratios 2 4 8 16)+(count where all 1 1 1)+(count where any 0 0 1)+(count where (1 0 1) in 1 2)"
 			},
 			goFn: func(rows int) int64 {
-				return 3 + 4 + 1 + 1 + 2
+				syms := []string{"a", "a", "b", "b", "c"}
+				differCount := int64(0)
+				for i, sym := range syms {
+					if i == 0 || sym != syms[i-1] {
+						differCount++
+					}
+				}
+				ratios := []float64{2, 4, 8, 16}
+				ratioCount := int64(len(ratios))
+				allCount := int64(0)
+				all := true
+				for _, value := range []int64{1, 1, 1} {
+					all = all && value != 0
+				}
+				if all {
+					allCount = 1
+				}
+				anyCount := int64(0)
+				for _, value := range []int64{0, 0, 1} {
+					if value != 0 {
+						anyCount = 1
+						break
+					}
+				}
+				inCount := int64(0)
+				for _, value := range []int64{1, 0, 1} {
+					if value == 1 || value == 2 {
+						inCount++
+					}
+				}
+				return differCount + ratioCount + allCount + anyCount + inCount
 			},
 		},
 		{
