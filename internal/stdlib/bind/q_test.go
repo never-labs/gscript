@@ -2978,6 +2978,9 @@ func TestQFallbackStatsTrackKernelFallback(t *testing.T) {
 	if got := explained.RawGetString("kernel_fallback_code"); !got.IsString() || got.Str() != qFallbackMutationPlan {
 		t.Fatalf("kernel_fallback_code = %v, want %s", got, qFallbackMutationPlan)
 	}
+	if got := explained.RawGetString("kernel_fallback_family"); !got.IsString() || got.Str() != qFallbackFamilyMutation {
+		t.Fatalf("kernel_fallback_family = %v, want %s", got, qFallbackFamilyMutation)
+	}
 	if got := explained.RawGetString("kernel_fallback_reason_code_count"); !got.IsInt() || got.Int() != 0 {
 		t.Fatalf("kernel_fallback_reason_code_count = %v, want 0 before mutation execution", got)
 	}
@@ -3024,6 +3027,9 @@ again := q.query(trades, {select: {price: "price"}, order_by: "missing"})
 	details := qTestFallbackStatsDetailRows(t, qFallbackStatsTable())
 	if got := qTestFallbackDetailCount(details, "reason_code", qFallbackQueryKernel, qQueryKernelReasonOrder, ""); got != 2 {
 		t.Fatalf("query kernel reason_code count = %d, want 2", got)
+	}
+	if got := qTestFallbackDetailFamily(details, "reason_code", qFallbackQueryKernel, qQueryKernelReasonOrder, ""); got != qFallbackFamilyOrder {
+		t.Fatalf("query kernel reason_code family = %q, want %s", got, qFallbackFamilyOrder)
 	}
 	reason := `query native kernel order failed: FRAME_ORDER_INDEXES unknown column "missing"`
 	if got := qTestFallbackDetailCount(details, "reason", qFallbackQueryKernel, "", reason); got != 2 {
@@ -3101,6 +3107,9 @@ func TestQFallbackStatsExplainQueryKernelSelectReason(t *testing.T) {
 	if got := explained.RawGetString("kernel_fallback_code"); !got.IsString() || got.Str() != qFallbackQueryKernel {
 		t.Fatalf("kernel_fallback_code = %v, want %s", got, qFallbackQueryKernel)
 	}
+	if got := explained.RawGetString("kernel_fallback_family"); !got.IsString() || got.Str() != qFallbackFamilySelect {
+		t.Fatalf("kernel_fallback_family = %v, want %s", got, qFallbackFamilySelect)
+	}
 	if got := explained.RawGetString("kernel_fallback_reason_code_count"); !got.IsInt() || got.Int() != 1 {
 		t.Fatalf("kernel_fallback_reason_code_count = %v, want 1", got)
 	}
@@ -3110,6 +3119,9 @@ func TestQFallbackStatsExplainQueryKernelSelectReason(t *testing.T) {
 	details := qTestFallbackStatsDetailRows(t, qFallbackStatsTable())
 	if got := qTestFallbackDetailCount(details, "reason", qFallbackQueryKernel, "", reason); got != 1 {
 		t.Fatalf("query kernel select reason detail count = %d, want 1", got)
+	}
+	if got := qTestFallbackDetailFamily(details, "reason", qFallbackQueryKernel, "", reason); got != qFallbackFamilySelect {
+		t.Fatalf("query kernel select reason family = %q, want %s", got, qFallbackFamilySelect)
 	}
 }
 
@@ -3175,9 +3187,15 @@ func TestQFallbackStatsAggregateTopReasons(t *testing.T) {
 	if got := qTestFallbackDetailCount(rows, "reason_code", qFallbackKernelUnsupported, stdq.KernelFallbackSelectExpression, ""); got != 2 {
 		t.Fatalf("kernel unsupported reason_code top count = %d, want 2", got)
 	}
+	if got := qTestFallbackDetailFamily(rows, "reason_code", qFallbackKernelUnsupported, stdq.KernelFallbackSelectExpression, ""); got != qFallbackFamilySelect {
+		t.Fatalf("kernel unsupported reason_code family = %q, want %s", got, qFallbackFamilySelect)
+	}
 	reason := fmt.Sprintf("select expression %q is not supported by data query kernel: unsupported expression %T", "marker", qFallbackStatsTestExpr{})
 	if got := qTestFallbackDetailCount(rows, "reason", qFallbackKernelUnsupported, "", reason); got != 2 {
 		t.Fatalf("kernel unsupported reason top count = %d, want 2", got)
+	}
+	if got := qTestFallbackDetailFamily(rows, "reason", qFallbackKernelUnsupported, "", reason); got != qFallbackFamilySelect {
+		t.Fatalf("kernel unsupported reason family = %q, want %s", got, qFallbackFamilySelect)
 	}
 	statsFn := BuildQ().RawGetString("fallback_stats").GoFunction()
 	if statsFn == nil {
@@ -4049,6 +4067,45 @@ func TestQSQLQueryKernelCacheSplitsBoundScalarValues(t *testing.T) {
 	}
 	if stats.KernelMisses != 2 || stats.KernelHits != 0 {
 		t.Fatalf("kernel cache stats = %+v, want bound scalar values to split kernels", stats)
+	}
+}
+
+func TestQSQLKernelUnsupportedDecisionCacheIsSchemaStable(t *testing.T) {
+	qSQLResetPlanCachesForTest()
+
+	frame, err := data.NewFrame(
+		data.Column{Name: "sym", Data: data.NewSymbols([]string{"AAPL", "MSFT", "NVDA"})},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan := data.QueryPlan{
+		Select: []data.SelectItem{{Name: "marker", Expr: qFallbackStatsTestExpr{}}},
+		LimitN: -1,
+	}
+	src := "unsupported-kernel-decision-cache"
+	for i := 0; i < 2; i++ {
+		if _, err := qRunSQLPlan(src, plan, frame); err != nil {
+			t.Fatalf("unsupported qRunSQLPlan run %d: %v", i+1, err)
+		}
+	}
+
+	qSQLAlignedPlanCacheMu.Lock()
+	if len(qSQLKernelUnsupported) != 1 {
+		t.Fatalf("unsupported kernel decision entries = %d, want 1", len(qSQLKernelUnsupported))
+	}
+	var reason string
+	for _, cachedReason := range qSQLKernelUnsupported {
+		reason = cachedReason
+	}
+	qSQLAlignedPlanCacheMu.Unlock()
+	wantReason := fmt.Sprintf("select expression %q is not supported by data query kernel: unsupported expression %T", "marker", qFallbackStatsTestExpr{})
+	if reason != wantReason {
+		t.Fatalf("unsupported kernel reason = %q, want %q", reason, wantReason)
+	}
+	stats := qSQLPlanCacheStatsSnapshot()
+	if stats.KernelMisses != 0 || stats.KernelHits != 0 || stats.KernelEvictions != 0 {
+		t.Fatalf("positive kernel cache stats = %+v, want unsupported decisions outside hit/miss/eviction stats", stats)
 	}
 }
 
@@ -5226,11 +5283,12 @@ func qTestFallbackStatsRows(t *testing.T, tbl *Table) map[string]int64 {
 }
 
 type qFallbackStatsDetailRow struct {
-	Kind       string
-	Code       string
-	ReasonCode string
-	Reason     string
-	Count      int64
+	Kind         string
+	Code         string
+	ReasonFamily string
+	ReasonCode   string
+	Reason       string
+	Count        int64
 }
 
 func qTestFallbackStatsDetailRows(t *testing.T, tbl *Table) []qFallbackStatsDetailRow {
@@ -5249,18 +5307,20 @@ func qTestFallbackStatsDetailRows(t *testing.T, tbl *Table) []qFallbackStatsDeta
 			continue
 		}
 		code := row.RawGetString("code")
+		reasonFamily := row.RawGetString("reason_family")
 		reasonCode := row.RawGetString("reason_code")
 		reason := row.RawGetString("reason")
 		count := row.RawGetString("count")
-		if !code.IsString() || !reasonCode.IsString() || !reason.IsString() || !count.IsInt() {
+		if !code.IsString() || !reasonFamily.IsString() || !reasonCode.IsString() || !reason.IsString() || !count.IsInt() {
 			t.Fatalf("fallback stats detail row %d malformed: %#v", i, row)
 		}
 		out = append(out, qFallbackStatsDetailRow{
-			Kind:       kind.Str(),
-			Code:       code.Str(),
-			ReasonCode: reasonCode.Str(),
-			Reason:     reason.Str(),
-			Count:      count.Int(),
+			Kind:         kind.Str(),
+			Code:         code.Str(),
+			ReasonFamily: reasonFamily.Str(),
+			ReasonCode:   reasonCode.Str(),
+			Reason:       reason.Str(),
+			Count:        count.Int(),
 		})
 	}
 	return out
@@ -5273,6 +5333,15 @@ func qTestFallbackDetailCount(rows []qFallbackStatsDetailRow, kind, code, reason
 		}
 	}
 	return 0
+}
+
+func qTestFallbackDetailFamily(rows []qFallbackStatsDetailRow, kind, code, reasonCode, reason string) string {
+	for _, row := range rows {
+		if row.Kind == kind && row.Code == code && row.ReasonCode == reasonCode && row.Reason == reason {
+			return row.ReasonFamily
+		}
+	}
+	return ""
 }
 
 type qFallbackStatsTestExpr struct{}

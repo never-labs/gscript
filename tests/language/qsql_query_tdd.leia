@@ -143,8 +143,22 @@ explain_join := q.explain("select sym,price,bid from trades left join quotes on 
     bid: data.f64({100.0}),
   }),
 })
+explain_compound := q.explain("select notional:sum price*size by region,sym from trades left join venues on venue where (sym=`AAPL or sym=`NVDA) and active order by region asc,sym asc", {
+  trades: data.frame({
+    sym: data.symbols({"AAPL", "MSFT", "NVDA"}),
+    venue: data.symbols({"XNAS", "XNYS", "XNAS"}),
+    price: data.f64({100.5, 90.0, 120.0}),
+    size: data.i64({10, 20, 5}),
+    active: data.bool({true, true, false}),
+  }),
+  venues: data.frame({
+    venue: data.symbols({"XNAS", "XNYS"}),
+    region: data.symbols({"US", "US"}),
+  }),
+})
 check("q explain select plan", explain_select.op == "select" && explain_select.source == "trades" && explain_select.where == "(price > 100)" && #explain_select.aggregates == 1 && explain_select.aggregates[1].name == "notional" && explain_select.aggregates[1].fn == "sum" && explain_select.by_exprs[1].name == "sym" && explain_select.order_by[1].column == "sym")
 check("q explain mutation and join plan", explain_update.op == "update" && explain_update.mutation.kind == "update" && explain_update.mutation.assignments[1].name == "notional" && explain_join.join.kind == "left" && explain_join.join.right == "quotes" && explain_join.join.keys[1].left == "sym")
+check("q explain compound join group where plan", explain_compound.join.kind == "left" && explain_compound.join.right == "venues" && explain_compound.join.keys[1].left == "venue" && explain_compound.where == "(((sym = `AAPL) or (sym = `NVDA)) and active)" && #explain_compound.by_exprs == 2 && explain_compound.by_exprs[1].name == "region" && explain_compound.by_exprs[2].name == "sym" && explain_compound.aggregates[1].name == "notional" && explain_compound.order_by[2].column == "sym")
 
 conn := db.memory()
 conn.exec(sql`create table trade_events (
