@@ -1636,6 +1636,74 @@ func TestGroupedAttributeMixedAggregateKernel(t *testing.T) {
 	if got, want := aggregateResult(filtered[1].aggs[6]), "EDGX"; got != want {
 		t.Fatalf("filtered MSFT last venue = %v, want %v", got, want)
 	}
+
+	order, filtered, ok, err = typedKernels.FilteredGroupAggregateStates(index, []int{4, 2, 0, 4}, aggs)
+	if err != nil || !ok {
+		t.Fatalf("FilteredGroupAggregateStates duplicate rows ok %v err %v; want typed aggregate states", ok, err)
+	}
+	if want := []int{1, 0}; !reflect.DeepEqual(order, want) {
+		t.Fatalf("duplicate filtered group order = %v, want %v", order, want)
+	}
+	if got, want := aggregateResult(filtered[1].aggs[0]), 100.0; got != want {
+		t.Fatalf("duplicate filtered MSFT sum = %v, want %v", got, want)
+	}
+	if got, want := aggregateResult(filtered[1].aggs[1]), 210.0; got != want {
+		t.Fatalf("duplicate filtered MSFT avg = %v, want %v", got, want)
+	}
+	if got, want := aggregateResult(filtered[0].aggs[0]), 40.0; got != want {
+		t.Fatalf("duplicate filtered AAPL sum = %v, want %v", got, want)
+	}
+	if got, want := aggregateResult(filtered[0].aggs[1]), 105.0; got != want {
+		t.Fatalf("duplicate filtered AAPL avg = %v, want %v", got, want)
+	}
+	if got, want := aggregateResult(filtered[0].aggs[5]), "IEX"; got != want {
+		t.Fatalf("duplicate filtered AAPL first venue = %v, want %v", got, want)
+	}
+	if got, want := aggregateResult(filtered[0].aggs[6]), "XNAS"; got != want {
+		t.Fatalf("duplicate filtered AAPL last venue = %v, want %v", got, want)
+	}
+}
+
+func TestFilteredGroupedAggregateKernelPreservesNullAndFilteredOrder(t *testing.T) {
+	indexed := WithArrayAttribute(NewSymbols([]string{"AAPL", "AAPL", "MSFT", "MSFT"}), ArrayAttributeGrouped)
+	index, ok := ArrayIndexFor(indexed, ArrayAttributeGrouped)
+	if !ok {
+		t.Fatal("grouped attribute did not expose index")
+	}
+	qty := NewColumn("qty", []any{nil, int64(10), nil, int64(20)}).Data
+	venue := NewColumn("venue", []any{nil, "x", nil, "y"}).Data
+	aggs := []aggregateInput{
+		{Aggregate: Aggregate{Name: "total_qty", Func: "sum", Expr: ColumnRef{Name: "qty"}}, column: qty},
+		{Aggregate: Aggregate{Name: "avg_qty", Func: "avg", Expr: ColumnRef{Name: "qty"}}, column: qty},
+		{Aggregate: Aggregate{Name: "first_venue", Func: "first", Expr: ColumnRef{Name: "venue"}}, column: venue},
+		{Aggregate: Aggregate{Name: "last_venue", Func: "last", Expr: ColumnRef{Name: "venue"}}, column: venue},
+	}
+
+	order, filtered, ok, err := typedKernels.FilteredGroupAggregateStates(index, []int{0, 1, 3, 2}, aggs)
+	if err != nil || !ok {
+		t.Fatalf("FilteredGroupAggregateStates nullable ok %v err %v; want typed aggregate states", ok, err)
+	}
+	if want := []int{0, 1}; !reflect.DeepEqual(order, want) {
+		t.Fatalf("nullable filtered group order = %v, want %v", order, want)
+	}
+	if got, want := aggregateResult(filtered[0].aggs[0]), 10.0; got != want {
+		t.Fatalf("nullable filtered AAPL sum = %v, want %v", got, want)
+	}
+	if got, want := aggregateResult(filtered[0].aggs[1]), 10.0; got != want {
+		t.Fatalf("nullable filtered AAPL avg = %v, want %v", got, want)
+	}
+	if got, want := aggregateResult(filtered[1].aggs[0]), 20.0; got != want {
+		t.Fatalf("nullable filtered MSFT sum = %v, want %v", got, want)
+	}
+	if got, want := aggregateResult(filtered[1].aggs[1]), 20.0; got != want {
+		t.Fatalf("nullable filtered MSFT avg = %v, want %v", got, want)
+	}
+	if got := aggregateResult(filtered[0].aggs[2]); got != NullValue {
+		t.Fatalf("nullable filtered AAPL first venue = %v, want NullValue", got)
+	}
+	if got := aggregateResult(filtered[1].aggs[3]); got != NullValue {
+		t.Fatalf("nullable filtered MSFT last venue = %v, want NullValue from filtered order", got)
+	}
 }
 
 func TestComplementSortedIndexesKernel(t *testing.T) {

@@ -648,6 +648,7 @@ func (typedKernelRegistry) FilteredGroupAggregateStates(index ArrayIndex, indexe
 	if err != nil {
 		return nil, nil, true, err
 	}
+	rowsByGroup := make([][]int, len(index.Rows))
 	for _, row := range indexes {
 		if row < 0 || row >= len(rowToGroup) {
 			return nil, nil, true, fmt.Errorf("filter row %d out of range for grouped index", row)
@@ -656,8 +657,14 @@ func (typedKernelRegistry) FilteredGroupAggregateStates(index ArrayIndex, indexe
 		if group < 0 {
 			return nil, nil, true, fmt.Errorf("filter row %d is missing from grouped index", row)
 		}
+		rowsByGroup[group] = append(rowsByGroup[group], row)
+	}
+	for group, rows := range rowsByGroup {
+		if len(rows) == 0 {
+			continue
+		}
 		for i, agg := range aggs {
-			if err := accumulateIndexedAggregateRow(&states[group].aggs[i], agg, row); err != nil {
+			if err := accumulateIndexedAggregate(&states[group].aggs[i], agg, rows); err != nil {
 				return nil, nil, true, err
 			}
 		}

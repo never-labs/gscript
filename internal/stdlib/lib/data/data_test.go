@@ -2397,6 +2397,57 @@ func TestQueryKernelGroupedAggregateWithComputedWhereOrderLimit(t *testing.T) {
 	assertColumnValues(t, want, "notional", []any{3025.0, 2400.0})
 }
 
+func TestQueryKernelFilteredGroupedAggregateSkipsNullableNumericNulls(t *testing.T) {
+	frame := mustFrame(t,
+		Column{Name: "sym", Data: WithArrayAttribute(NewSymbols([]string{"AAPL", "AAPL", "MSFT", "MSFT", "NVDA"}), ArrayAttributeGrouped)},
+		Column{Name: "qty", Data: NewColumn("qty", []any{nil, int64(10), nil, int64(20), int64(30)}).Data},
+	)
+	plan := QueryPlan{
+		Source: frame,
+		Where: In{
+			Expr:   ColumnRef{Name: "sym"},
+			Values: []any{Symbol("AAPL"), Symbol("MSFT")},
+		},
+		By: []Symbol{"sym"},
+		Aggregates: []Aggregate{
+			{Name: "total_qty", Func: "sum", Expr: ColumnRef{Name: "qty"}},
+			{Name: "avg_qty", Func: "avg", Expr: ColumnRef{Name: "qty"}},
+			{Name: "fills", Func: "count"},
+		},
+		OrderBy: []OrderSpec{{Column: "sym"}},
+		LimitN:  -1,
+	}
+
+	kernel, ok, err := CompileQueryKernel(frame, plan)
+	if err != nil {
+		t.Fatalf("CompileQueryKernel returned error: %v", err)
+	}
+	if !ok {
+		_, reason := QueryKernelSupportReason(plan)
+		t.Fatalf("CompileQueryKernel ok = false, reason: %s", reason)
+	}
+	if reason := kernel.Reason(); !strings.Contains(reason, "indexed single-column grouped mixed aggregate fast path") {
+		t.Fatalf("QueryKernel reason = %q, want indexed grouped aggregate fast path", reason)
+	}
+	got, err := kernel.Exec(frame)
+	if err != nil {
+		t.Fatalf("QueryKernel Exec returned error: %v", err)
+	}
+	want, err := plan.Exec()
+	if err != nil {
+		t.Fatalf("fallback Exec returned error: %v", err)
+	}
+	if !SameSchema(got, want) || got.Len() != want.Len() {
+		t.Fatalf("kernel schema/len = %#v/%d, want %#v/%d", got.Schema(), got.Len(), want.Schema(), want.Len())
+	}
+	assertColumnValues(t, got, "sym", []any{Symbol("AAPL"), Symbol("MSFT")})
+	assertColumnValues(t, got, "total_qty", []any{10.0, 20.0})
+	assertColumnValues(t, got, "avg_qty", []any{10.0, 20.0})
+	assertColumnValues(t, got, "fills", []any{int64(2), int64(2)})
+	assertColumnValues(t, want, "total_qty", []any{10.0, 20.0})
+	assertColumnValues(t, want, "avg_qty", []any{10.0, 20.0})
+}
+
 func TestQueryKernelGroupedProjectionWithoutAggregates(t *testing.T) {
 	frame := mustFrame(t,
 		Column{Name: "sym", Data: NewSymbols([]string{"AAPL", "AAPL", "MSFT", "MSFT", "NVDA"})},
