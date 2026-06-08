@@ -554,34 +554,9 @@ func (typedKernelRegistry) FilteredGroupCounts(index ArrayIndex, indexes []int) 
 	if len(index.Rows) == 0 || len(indexes) == 0 {
 		return nil, make([]int64, len(index.Rows)), true, nil
 	}
-	maxRow := -1
-	for _, rows := range index.Rows {
-		for _, row := range rows {
-			if row < 0 {
-				return nil, nil, false, fmt.Errorf("group index contains negative row %d", row)
-			}
-			if row > maxRow {
-				maxRow = row
-			}
-		}
-	}
-	if maxRow < 0 {
-		return nil, make([]int64, len(index.Rows)), true, nil
-	}
-	rowToGroup := make([]int, maxRow+1)
-	for row := range rowToGroup {
-		rowToGroup[row] = -1
-	}
-	for group, rows := range index.Rows {
-		for _, row := range rows {
-			if row >= len(rowToGroup) {
-				return nil, nil, false, fmt.Errorf("group index row %d out of range", row)
-			}
-			if rowToGroup[row] >= 0 {
-				return nil, nil, false, fmt.Errorf("group index row %d appears in multiple groups", row)
-			}
-			rowToGroup[row] = group
-		}
+	rowToGroup, err := rowToGroupFromIndex(index)
+	if err != nil {
+		return nil, nil, false, err
 	}
 	counts := make([]int64, len(index.Rows))
 	seen := make([]bool, len(index.Rows))

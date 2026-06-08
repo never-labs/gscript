@@ -5320,6 +5320,9 @@ func execGroupedFromArrayIndex(frame Frame, byInputs []groupInput, aggs []aggreg
 }
 
 func execGroupedFromFilteredArrayIndex(frame Frame, byInputs []groupInput, aggs []aggregateInput, index ArrayIndex, indexes []int) (Frame, bool, error) {
+	if out, ok, err := execSimpleFilteredGroupedAggregates(frame, byInputs, aggs, index, indexes, nil); ok || err != nil {
+		return out, ok, err
+	}
 	if groupOrder, states, ok, err := typedKernels.FilteredGroupAggregateStates(index, indexes, aggs); ok || err != nil {
 		if err != nil {
 			return Frame{}, true, err
@@ -5360,6 +5363,9 @@ func execGroupedFromFilteredPredicateIndex(frame Frame, byInputs []groupInput, a
 	if predicate == nil || !groupAggregatesSupportedByTypedIndex(aggs) {
 		return Frame{}, false, nil
 	}
+	if out, ok, err := execSimpleFilteredGroupedAggregates(frame, byInputs, aggs, index, nil, predicate); ok || err != nil {
+		return out, ok, err
+	}
 	states := make([]groupState, len(index.Rows))
 	for group := range index.Rows {
 		states[group] = groupState{
@@ -5399,6 +5405,150 @@ func execGroupedFromFilteredPredicateIndex(frame Frame, byInputs []groupInput, a
 	}
 	out, err := buildGroupedAggregateFrame(frame, byInputs, aggs, states, groupOrder)
 	return out, true, err
+}
+
+type simpleGroupedAggregate struct {
+	input aggregateInput
+	sum   []float64
+	count []int64
+}
+
+func execSimpleFilteredGroupedAggregates(frame Frame, byInputs []groupInput, aggs []aggregateInput, index ArrayIndex, indexes []int, predicate rowPredicate) (Frame, bool, error) {
+	if len(byInputs) != 1 || len(aggs) == 0 || (indexes == nil && predicate == nil) {
+		return Frame{}, false, nil
+	}
+	states := make([]simpleGroupedAggregate, len(aggs))
+	for i, agg := range aggs {
+		switch agg.Func {
+		case "count":
+		case "sum", "avg":
+			if agg.column != nil {
+				if !isNumericArray(agg.column) {
+					return Frame{}, false, nil
+				}
+			} else if agg.leftColumn != nil && agg.rightColumn != nil {
+				if !isNumericBinaryAggregateOp(agg.binaryOp) || !isNumericArray(agg.leftColumn) || !isNumericArray(agg.rightColumn) {
+					return Frame{}, false, nil
+				}
+			} else {
+				return Frame{}, false, nil
+			}
+		default:
+			return Frame{}, false, nil
+		}
+		states[i].input = agg
+		states[i].sum = make([]float64, len(index.Rows))
+		states[i].count = make([]int64, len(index.Rows))
+	}
+	rowToGroup, err := rowToGroupFromIndex(index)
+	if err != nil {
+		return Frame{}, true, err
+	}
+	seen := make([]bool, len(index.Rows))
+	groupOrder := make([]int, 0, len(index.Rows))
+	accumulate := func(row int) error {
+		if row < 0 || row >= len(rowToGroup) {
+			return fmt.Errorf("filter row %d out of range for grouped index", row)
+		}
+		group := rowToGroup[row]
+		if group < 0 {
+			return fmt.Errorf("filter row %d is missing from grouped index", row)
+		}
+		if !seen[group] {
+			seen[group] = true
+			groupOrder = append(groupOrder, group)
+		}
+		for i := range states {
+			agg := states[i].input
+			switch agg.Func {
+			case "count":
+				states[i].count[group]++
+			case "sum", "avg":
+				value, ok, err := simpleGroupedAggregateNumericValue(agg, row)
+				if err != nil {
+					return err
+				}
+				if !ok {
+					continue
+				}
+				states[i].sum[group] += value
+				states[i].count[group]++
+			}
+		}
+		return nil
+	}
+	if predicate != nil {
+		for row := 0; row < frame.Len(); row++ {
+			if !predicate(row) {
+				continue
+			}
+			if err := accumulate(row); err != nil {
+				return Frame{}, true, err
+			}
+		}
+	} else {
+		for _, row := range indexes {
+			if err := accumulate(row); err != nil {
+				return Frame{}, true, err
+			}
+		}
+	}
+	out, err := buildSimpleGroupedAggregateFrame(frame, byInputs, states, index, groupOrder)
+	return out, true, err
+}
+
+func simpleGroupedAggregateNumericValue(agg aggregateInput, row int) (float64, bool, error) {
+	if agg.column != nil {
+		return typedKernels.NumericAt(agg.column, row)
+	}
+	return aggregateBinaryNumericValue(agg, row)
+}
+
+func buildSimpleGroupedAggregateFrame(frame Frame, byInputs []groupInput, aggs []simpleGroupedAggregate, index ArrayIndex, order []int) (Frame, error) {
+	cols := make([]Column, 0, len(byInputs)+len(aggs))
+	for _, item := range byInputs {
+		values := make([]any, len(order))
+		for row, group := range order {
+			values[row] = index.Keys[group]
+		}
+		if kind := item.keyKind(); kind != "" && kind != KindAny {
+			col, err := columnWithKind(item.Name, kind, values)
+			if err != nil {
+				return Frame{}, err
+			}
+			cols = append(cols, col)
+			continue
+		}
+		cols = append(cols, NewColumn(item.Name, values))
+	}
+	for _, state := range aggs {
+		agg := state.input
+		switch agg.Func {
+		case "count":
+			values := make([]int64, len(order))
+			for row, group := range order {
+				values[row] = state.count[group]
+			}
+			cols = append(cols, Column{Name: agg.Name, Data: columnArray[int64]{kind: KindI64, data: values}})
+		case "sum":
+			values := make([]float64, len(order))
+			for row, group := range order {
+				values[row] = state.sum[group]
+			}
+			cols = append(cols, Column{Name: agg.Name, Data: columnArray[float64]{kind: KindF64, data: values}})
+		case "avg":
+			values := make([]float64, len(order))
+			for row, group := range order {
+				if count := state.count[group]; count > 0 {
+					values[row] = state.sum[group] / float64(count)
+				}
+			}
+			cols = append(cols, Column{Name: agg.Name, Data: columnArray[float64]{kind: KindF64, data: values}})
+		default:
+			return Frame{}, fmt.Errorf("unsupported aggregate %q", agg.Func)
+		}
+	}
+	return newFrameTrusted(cols...)
 }
 
 func buildGroupedAggregateFrame(frame Frame, byInputs []groupInput, aggs []aggregateInput, states []groupState, order []int) (Frame, error) {
