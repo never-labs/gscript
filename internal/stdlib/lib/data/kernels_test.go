@@ -1156,9 +1156,10 @@ func TestQueryKernelSupportReasonClassifiesHotExpressionPaths(t *testing.T) {
 	)
 
 	cases := []struct {
-		name string
-		plan QueryPlan
-		want []string
+		name      string
+		plan      QueryPlan
+		want      []string
+		wantShape string
 	}{
 		{
 			name: "typed column literal filter and binary projection",
@@ -1168,8 +1169,10 @@ func TestQueryKernelSupportReasonClassifiesHotExpressionPaths(t *testing.T) {
 					Name: "notional",
 					Expr: Binary{Op: OpMul, Left: ColumnRef{Name: "qty"}, Right: ColumnRef{Name: "px"}},
 				}},
+				LimitN: -1,
 			},
-			want: []string{"filtered projection path", "typed column-literal filter", "typed binary projection"},
+			want:      []string{"filtered projection path", "typed column-literal filter", "typed binary projection"},
+			wantShape: "filtered_projection|where=typed_column_literal|projection=typed_binary",
 		},
 		{
 			name: "boolean projection",
@@ -1179,8 +1182,10 @@ func TestQueryKernelSupportReasonClassifiesHotExpressionPaths(t *testing.T) {
 					Name: "large",
 					Expr: In{Expr: ColumnRef{Name: "sym"}, Values: []any{Symbol("AAPL"), Symbol("NVDA")}},
 				}},
+				LimitN: -1,
 			},
-			want: []string{"filtered projection path", "typed within filter", "boolean projection"},
+			want:      []string{"filtered projection path", "typed within filter", "boolean projection"},
+			wantShape: "filtered_projection|where=typed_within|projection=boolean",
 		},
 		{
 			name: "bucketed grouped aggregate",
@@ -1190,8 +1195,10 @@ func TestQueryKernelSupportReasonClassifiesHotExpressionPaths(t *testing.T) {
 					Expr: BucketFloorExpr{Expr: ColumnRef{Name: "ts"}, Interval: TimespanFromNanos(2_000)},
 				}},
 				Aggregates: []Aggregate{{Name: "n", Func: "count"}},
+				LimitN:     -1,
 			},
-			want: []string{"grouped aggregate path", "bucketed by expression", "typed column aggregate"},
+			want:      []string{"grouped aggregate path", "bucketed by expression", "typed column aggregate"},
+			wantShape: "grouped_aggregate|by=bucketed|aggregate=typed_column",
 		},
 		{
 			name: "grouped projection",
@@ -1205,8 +1212,12 @@ func TestQueryKernelSupportReasonClassifiesHotExpressionPaths(t *testing.T) {
 						Else: Literal{Value: Symbol("small")},
 					},
 				}},
+				Distinct: true,
+				OrderBy:  []OrderSpec{{Column: "side"}},
+				LimitN:   2,
 			},
-			want: []string{"grouped projection path", "conditional projection"},
+			want:      []string{"grouped projection path", "conditional projection", "distinct rows", "post-project order", "limit"},
+			wantShape: "grouped_projection|by=columns|projection=conditional|order=post_project:1|limit=bounded|distinct=true",
 		},
 		{
 			name: "list aggregate projection",
@@ -1215,8 +1226,10 @@ func TestQueryKernelSupportReasonClassifiesHotExpressionPaths(t *testing.T) {
 					Name: "avg_book",
 					Expr: ListAggregateExpr{Func: "avg", Expr: ColumnRef{Name: "book"}},
 				}},
+				LimitN: -1,
 			},
-			want: []string{"projection path", "list aggregate projection"},
+			want:      []string{"projection path", "list aggregate projection"},
+			wantShape: "projection|projection=list_aggregate",
 		},
 	}
 
@@ -1235,6 +1248,12 @@ func TestQueryKernelSupportReasonClassifiesHotExpressionPaths(t *testing.T) {
 			if err != nil || !ok || kernel == nil {
 				t.Fatalf("CompileQueryKernel = kernel %v, ok %v, err %v; want compiled kernel", kernel, ok, err)
 			}
+			if got := QueryKernelPlanShape(tt.plan); got != tt.wantShape {
+				t.Fatalf("QueryKernelPlanShape = %q, want %q", got, tt.wantShape)
+			}
+			if got := kernel.Shape(); got != tt.wantShape {
+				t.Fatalf("compiled kernel shape = %q, want %q", got, tt.wantShape)
+			}
 			for _, want := range tt.want {
 				if !strings.Contains(kernel.Reason(), want) {
 					t.Fatalf("compiled kernel reason = %q, want it to contain %q", kernel.Reason(), want)
@@ -1250,6 +1269,56 @@ func TestQueryKernelSupportReasonClassifiesHotExpressionPaths(t *testing.T) {
 				}
 			}
 		})
+	}
+
+	base := QueryPlan{
+		Where: Binary{Op: OpGE, Left: ColumnRef{Name: "qty"}, Right: Literal{Value: int32(20)}},
+		Select: []SelectItem{{
+			Name: "notional",
+			Expr: Binary{Op: OpMul, Left: ColumnRef{Name: "qty"}, Right: ColumnRef{Name: "px"}},
+		}},
+		LimitN: -1,
+	}
+	changedLiteral := base
+	changedLiteral.Where = Binary{Op: OpGE, Left: ColumnRef{Name: "qty"}, Right: Literal{Value: int32(200)}}
+	if got, want := QueryKernelPlanShape(changedLiteral), QueryKernelPlanShape(base); got != want {
+		t.Fatalf("QueryKernelPlanShape changed with literal value: got %q, want %q", got, want)
+	}
+}
+
+func TestQueryKernelPlanShapeClassifiesCompositePaths(t *testing.T) {
+	frame := mustFrame(t,
+		Column{Name: "sym", Data: NewSymbols([]string{"AAPL", "MSFT", "AAPL", "NVDA"})},
+		Column{Name: "qty", Data: NewI32([]int32{10, 20, 30, 40})},
+	)
+	plan := QueryPlan{
+		By: []Symbol{"sym"},
+		Select: []SelectItem{{
+			Name: "size_bucket",
+			Expr: Conditional{
+				Cond: Binary{Op: OpGE, Left: ColumnRef{Name: "qty"}, Right: Literal{Value: int32(20)}},
+				Then: Literal{Value: Symbol("large")},
+				Else: Literal{Value: Symbol("small")},
+			},
+		}},
+		Distinct: true,
+		OrderBy:  []OrderSpec{{Column: "size_bucket"}},
+		LimitN:   2,
+	}
+	want := "grouped_projection|by=columns|projection=conditional|order=post_project:1|limit=bounded|distinct=true"
+	if got := QueryKernelPlanShape(plan); got != want {
+		t.Fatalf("QueryKernelPlanShape = %q, want %q", got, want)
+	}
+	kernel, ok, err := CompileQueryKernel(frame, plan)
+	if err != nil || !ok || kernel == nil {
+		t.Fatalf("CompileQueryKernel = kernel %v, ok %v, err %v; want compiled kernel", kernel, ok, err)
+	}
+	if got := kernel.Shape(); got != want {
+		t.Fatalf("compiled kernel shape = %q, want %q", got, want)
+	}
+	var nilKernel *QueryKernel
+	if got := nilKernel.Shape(); got != "" {
+		t.Fatalf("nil kernel shape = %q, want empty", got)
 	}
 }
 

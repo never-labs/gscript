@@ -11,14 +11,16 @@ import (
 
 // QueryKernel is a schema-stable executable query plan.
 //
-// It is intentionally narrow: it covers the hot non-grouped projection path
-// first and keeps QueryPlan.Exec as the semantic fallback for broader qSQL.
+// It covers the typed q hot paths that can be described by a stable schema and
+// plan fingerprint, while keeping QueryPlan.Exec as the semantic fallback for
+// unsupported qSQL shapes.
 // The kernel stores a source-free plan so it can be reused across frames with
 // the same schema and compatible literal bindings.
 type QueryKernel struct {
 	plan   QueryPlan
 	schema Schema
 	reason string
+	shape  string
 }
 
 // SchemaStableCacheKeyParts is the decoded representation of cache keys built
@@ -548,7 +550,7 @@ func CompileQueryKernel(frame Frame, plan QueryPlan) (*QueryKernel, bool, error)
 	if frameReason := queryKernelFrameReason(frame, compiled); frameReason != "" {
 		reason = frameReason
 	}
-	return &QueryKernel{plan: compiled, schema: frame.Schema(), reason: reason}, true, nil
+	return &QueryKernel{plan: compiled, schema: frame.Schema(), reason: reason, shape: QueryKernelPlanShape(compiled)}, true, nil
 }
 
 func cloneQueryKernelPlan(plan QueryPlan) QueryPlan {
@@ -931,6 +933,16 @@ func (k *QueryKernel) Reason() string {
 	return k.reason
 }
 
+// Shape returns a stable, machine-readable query-kernel shape captured at
+// compile time. It is intended for cache stats and fallback elimination; use
+// Reason for human-facing explain text.
+func (k *QueryKernel) Shape() string {
+	if k == nil {
+		return ""
+	}
+	return k.shape
+}
+
 func queryKernelFrameReason(frame Frame, plan QueryPlan) string {
 	if len(plan.By)+len(plan.ByExprs) > 0 && len(plan.Aggregates) > 0 {
 		byInputs, err := bindGroupInputs(frame, groupByItems(plan))
@@ -963,6 +975,64 @@ func queryKernelSupportSuccessReason(plan QueryPlan) string {
 	}
 }
 
+// QueryKernelPlanShape returns a stable query-kernel shape string for the
+// supported subset of QueryPlan. It intentionally describes semantic shape,
+// not column names or literal values, so cache and fallback statistics can be
+// compared across compatible schemas and bindings.
+func QueryKernelPlanShape(plan QueryPlan) string {
+	path := queryKernelPlanPath(plan)
+	detail := queryKernelShapeDetail(plan)
+	if len(detail) == 0 {
+		return path
+	}
+	return path + "|" + strings.Join(detail, "|")
+}
+
+func queryKernelPlanPath(plan QueryPlan) string {
+	switch {
+	case len(plan.By)+len(plan.ByExprs) > 0 && len(plan.Aggregates) > 0:
+		return "grouped_aggregate"
+	case len(plan.By)+len(plan.ByExprs) > 0:
+		return "grouped_projection"
+	case plan.Distinct:
+		return "distinct_projection"
+	case len(plan.OrderBy) > 0 && plan.PreProjectOrder:
+		return "pre_project_ordered_projection"
+	case len(plan.OrderBy) > 0:
+		return "post_project_ordered_projection"
+	case plan.Where != nil:
+		return "filtered_projection"
+	default:
+		return "projection"
+	}
+}
+
+func queryKernelShapeDetail(plan QueryPlan) []string {
+	detail := make([]string, 0, 6)
+	if where := queryKernelWhereShape(plan.Where); where != "" {
+		detail = append(detail, "where="+where)
+	}
+	if by := queryKernelByShape(plan); by != "" {
+		detail = append(detail, "by="+by)
+	}
+	if aggs := queryKernelAggregateShape(plan); aggs != "" {
+		detail = append(detail, "aggregate="+aggs)
+	}
+	if projection := queryKernelProjectionShape(plan); projection != "" {
+		detail = append(detail, "projection="+projection)
+	}
+	if len(plan.OrderBy) > 0 {
+		detail = append(detail, "order="+queryKernelOrderShape(plan))
+	}
+	if plan.LimitN >= 0 {
+		detail = append(detail, "limit=bounded")
+	}
+	if plan.Distinct {
+		detail = append(detail, "distinct=true")
+	}
+	return detail
+}
+
 func queryKernelReason(path string, detail []string) string {
 	if len(detail) == 0 {
 		return "data query kernel supported: " + path
@@ -982,7 +1052,7 @@ func joinReasonDetail(detail []string) string {
 }
 
 func queryKernelReasonDetail(plan QueryPlan) []string {
-	detail := make([]string, 0, 4)
+	detail := make([]string, 0, 7)
 	if where := queryKernelWhereReasonDetail(plan.Where); where != "" {
 		detail = append(detail, where)
 	}
@@ -995,6 +1065,7 @@ func queryKernelReasonDetail(plan QueryPlan) []string {
 	if projection := queryKernelProjectionReasonDetail(plan); projection != "" {
 		detail = append(detail, projection)
 	}
+	detail = append(detail, queryKernelModifierReasonDetail(plan)...)
 	return detail
 }
 
@@ -1030,6 +1101,38 @@ func queryKernelWhereReasonDetail(expr Expr) string {
 	}
 }
 
+func queryKernelWhereShape(expr Expr) string {
+	switch e := expr.(type) {
+	case nil:
+		return ""
+	case Binary:
+		if _, _, _, ok := binaryColumnLiteral(e); ok && isComparisonOp(e.Op) {
+			return "typed_column_literal"
+		}
+		return "vectorized_boolean"
+	case Within:
+		if _, ok := e.Expr.(ColumnRef); ok {
+			return "typed_within"
+		}
+		return "within_expression"
+	case In:
+		if _, ok := e.Expr.(ColumnRef); ok {
+			return "typed_in"
+		}
+		return "in_expression"
+	case Logical:
+		return "logical"
+	case Not:
+		return "not"
+	case Conditional:
+		return "conditional"
+	case ColumnRef, Literal:
+		return "scalar"
+	default:
+		return "computed"
+	}
+}
+
 func queryKernelByReasonDetail(plan QueryPlan) string {
 	if len(plan.ByExprs) == 0 {
 		return ""
@@ -1042,6 +1145,26 @@ func queryKernelByReasonDetail(plan QueryPlan) string {
 		}
 	}
 	return "bucketed by expression"
+}
+
+func queryKernelByShape(plan QueryPlan) string {
+	if len(plan.ByExprs) == 0 {
+		if len(plan.By) == 0 {
+			return ""
+		}
+		return "columns"
+	}
+	for _, item := range plan.ByExprs {
+		switch item.Expr.(type) {
+		case BucketFloorExpr:
+		default:
+			return "computed"
+		}
+	}
+	if len(plan.By) > 0 {
+		return "columns_bucketed"
+	}
+	return "bucketed"
 }
 
 func queryKernelAggregateReasonDetail(plan QueryPlan) string {
@@ -1068,6 +1191,33 @@ func queryKernelAggregateReasonDetail(plan QueryPlan) string {
 		return "typed column aggregate"
 	default:
 		return "computed aggregate expression"
+	}
+}
+
+func queryKernelAggregateShape(plan QueryPlan) string {
+	if len(plan.Aggregates) == 0 {
+		return ""
+	}
+	allColumnRefs := true
+	hasWeight := false
+	for _, agg := range plan.Aggregates {
+		if agg.Weight != nil {
+			hasWeight = true
+		}
+		if agg.Func == "count" {
+			continue
+		}
+		if _, ok := agg.Expr.(ColumnRef); !ok {
+			allColumnRefs = false
+		}
+	}
+	switch {
+	case hasWeight:
+		return "weighted"
+	case allColumnRefs:
+		return "typed_column"
+	default:
+		return "computed"
 	}
 }
 
@@ -1123,6 +1273,89 @@ func queryKernelProjectionReasonDetail(plan QueryPlan) string {
 	default:
 		return ""
 	}
+}
+
+func queryKernelProjectionShape(plan QueryPlan) string {
+	if len(plan.Select) == 0 {
+		return ""
+	}
+	hasColumnOnly := false
+	hasBinary := false
+	hasConditional := false
+	hasBoolean := false
+	hasVectorTransform := false
+	hasListAggregate := false
+	hasBucket := false
+	hasOther := false
+	for _, item := range plan.Select {
+		switch item.Expr.(type) {
+		case ColumnRef, Literal:
+			hasColumnOnly = true
+		case Binary:
+			hasBinary = true
+		case Conditional:
+			hasConditional = true
+		case Logical, Not, In, Within:
+			hasBoolean = true
+		case VectorTransformExpr:
+			hasVectorTransform = true
+		case ListAggregateExpr:
+			hasListAggregate = true
+		case BucketFloorExpr:
+			hasBucket = true
+		default:
+			hasOther = true
+		}
+	}
+	switch {
+	case hasVectorTransform:
+		return "vector_transform"
+	case hasListAggregate:
+		return "list_aggregate"
+	case hasConditional:
+		return "conditional"
+	case hasBoolean:
+		return "boolean"
+	case hasBinary:
+		return "typed_binary"
+	case hasBucket:
+		return "bucket"
+	case hasOther:
+		return "computed"
+	case hasColumnOnly:
+		return "columns"
+	default:
+		return ""
+	}
+}
+
+func queryKernelOrderShape(plan QueryPlan) string {
+	if len(plan.OrderBy) == 0 {
+		return ""
+	}
+	mode := "post_project"
+	if plan.PreProjectOrder {
+		mode = "pre_project"
+	}
+	return fmt.Sprintf("%s:%d", mode, len(plan.OrderBy))
+}
+
+func queryKernelModifierReasonDetail(plan QueryPlan) []string {
+	detail := make([]string, 0, 3)
+	if plan.Distinct {
+		detail = append(detail, "distinct rows")
+	}
+	if len(plan.OrderBy) > 0 {
+		if plan.PreProjectOrder {
+			detail = append(detail, "pre-project order")
+		} else {
+			detail = append(detail, "post-project order")
+		}
+	}
+	if plan.LimitN >= 0 {
+		detail = append(detail, "limit")
+	}
+	return detail
 }
 
 func queryPlanAggregatesAreIndexedMixedFastPath(plan QueryPlan) bool {
