@@ -56,6 +56,59 @@ func SetMappedQRuntimeKernelExecutionStatsProviderFiltered[T any](provider func(
 	})
 }
 
+// QRuntimeKernelDescriptorCacheStatsFrom maps external q runtime-kernel
+// descriptor cache observations into the q.cache_stats-facing bind shape
+// without coupling bind to the producer package.
+func QRuntimeKernelDescriptorCacheStatsFrom[T any](stats []T, convert func(T) QRuntimeKernelDescriptorCacheStat) []QRuntimeKernelDescriptorCacheStat {
+	if len(stats) == 0 || convert == nil {
+		return nil
+	}
+	out := make([]QRuntimeKernelDescriptorCacheStat, 0, len(stats))
+	for _, stat := range stats {
+		out = append(out, convert(stat))
+	}
+	return out
+}
+
+// QRuntimeKernelDescriptorCacheStatsFromFiltered maps external descriptor
+// cache observations and lets the producer explicitly skip rows.
+func QRuntimeKernelDescriptorCacheStatsFromFiltered[T any](stats []T, convert func(T) (QRuntimeKernelDescriptorCacheStat, bool)) []QRuntimeKernelDescriptorCacheStat {
+	if len(stats) == 0 || convert == nil {
+		return nil
+	}
+	out := make([]QRuntimeKernelDescriptorCacheStat, 0, len(stats))
+	for _, stat := range stats {
+		row, ok := convert(stat)
+		if !ok {
+			continue
+		}
+		out = append(out, row)
+	}
+	return out
+}
+
+// SetMappedQRuntimeKernelDescriptorCacheStatsProvider adapts producer-owned
+// descriptor cache stats to bind's q.cache_stats row shape.
+func SetMappedQRuntimeKernelDescriptorCacheStatsProvider[T any](provider func() []T, convert func(T) QRuntimeKernelDescriptorCacheStat) func() {
+	if provider == nil || convert == nil {
+		return SetQRuntimeKernelDescriptorCacheStatsProvider(nil)
+	}
+	return SetQRuntimeKernelDescriptorCacheStatsProvider(func() []QRuntimeKernelDescriptorCacheStat {
+		return QRuntimeKernelDescriptorCacheStatsFrom(provider(), convert)
+	})
+}
+
+// SetMappedQRuntimeKernelDescriptorCacheStatsProviderFiltered adapts
+// producer-owned descriptor cache stats while making row filtering explicit.
+func SetMappedQRuntimeKernelDescriptorCacheStatsProviderFiltered[T any](provider func() []T, convert func(T) (QRuntimeKernelDescriptorCacheStat, bool)) func() {
+	if provider == nil || convert == nil {
+		return SetQRuntimeKernelDescriptorCacheStatsProvider(nil)
+	}
+	return SetQRuntimeKernelDescriptorCacheStatsProvider(func() []QRuntimeKernelDescriptorCacheStat {
+		return QRuntimeKernelDescriptorCacheStatsFromFiltered(provider(), convert)
+	})
+}
+
 // QRuntimeKernelLoweringStatsFrom maps external q runtime-kernel lowering
 // decision observations into the q.cache_stats-facing bind shape without
 // coupling bind to the producer package. Use the filtered variant when a

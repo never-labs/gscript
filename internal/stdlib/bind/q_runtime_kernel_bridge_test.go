@@ -11,6 +11,18 @@ type qRuntimeKernelExecutionExternalStatForTest struct {
 	Count   uint64
 }
 
+type qRuntimeKernelDescriptorCacheExternalStatForTest struct {
+	Source     string
+	Kernel     string
+	Shape      string
+	Route      string
+	SchemaHash string
+	Entries    uint64
+	Hits       uint64
+	Misses     uint64
+	Evictions  uint64
+}
+
 type qRuntimeKernelLoweringExternalStatForTest struct {
 	Source       string
 	Kind         string
@@ -31,6 +43,20 @@ func qRuntimeKernelExecutionExternalStatToBindForTest(stat qRuntimeKernelExecuti
 		Route:   stat.Route,
 		Outcome: stat.Outcome,
 		Count:   stat.Count,
+	}
+}
+
+func qRuntimeKernelDescriptorCacheExternalStatToBindForTest(stat qRuntimeKernelDescriptorCacheExternalStatForTest) QRuntimeKernelDescriptorCacheStat {
+	return QRuntimeKernelDescriptorCacheStat{
+		Source:     stat.Source,
+		Kernel:     stat.Kernel,
+		Shape:      stat.Shape,
+		Route:      stat.Route,
+		SchemaHash: stat.SchemaHash,
+		Entries:    stat.Entries,
+		Hits:       stat.Hits,
+		Misses:     stat.Misses,
+		Evictions:  stat.Evictions,
 	}
 }
 
@@ -111,6 +137,60 @@ func TestQRuntimeKernelExecutionStatsFromFilteredSkipsExternalRows(t *testing.T)
 	}
 	if got := QRuntimeKernelExecutionStatsFromFiltered([]qRuntimeKernelExecutionExternalStatForTest{{Count: 1}}, nil); got != nil {
 		t.Fatalf("nil filtered converter mapped execution stats = %#v, want nil", got)
+	}
+}
+
+func TestQRuntimeKernelDescriptorCacheStatsFromMapsExternalRows(t *testing.T) {
+	stats := QRuntimeKernelDescriptorCacheStatsFrom([]qRuntimeKernelDescriptorCacheExternalStatForTest{
+		{
+			Source:     "methodjit_q_frame_runtime",
+			Kernel:     "QFrameSelectColumn",
+			Shape:      "compare/filter/project/column",
+			Route:      "typed_runtime_op_exit",
+			SchemaHash: "schema-a",
+			Entries:    1,
+			Hits:       2,
+			Misses:     1,
+		},
+	}, qRuntimeKernelDescriptorCacheExternalStatToBindForTest)
+	if len(stats) != 1 {
+		t.Fatalf("mapped descriptor cache stats length = %d, want 1", len(stats))
+	}
+	got := stats[0]
+	if got.Source != "methodjit_q_frame_runtime" || got.Kernel != "QFrameSelectColumn" ||
+		got.Shape != "compare/filter/project/column" || got.Route != "typed_runtime_op_exit" ||
+		got.SchemaHash != "schema-a" || got.Entries != 1 || got.Hits != 2 || got.Misses != 1 {
+		t.Fatalf("mapped descriptor cache stat = %#v, want field-preserving conversion", got)
+	}
+	if got := QRuntimeKernelDescriptorCacheStatsFrom([]qRuntimeKernelDescriptorCacheExternalStatForTest{{Hits: 1}}, nil); got != nil {
+		t.Fatalf("nil converter mapped descriptor cache stats = %#v, want nil", got)
+	}
+}
+
+func TestQRuntimeKernelDescriptorCacheStatsFromFilteredSkipsExternalRows(t *testing.T) {
+	stats := QRuntimeKernelDescriptorCacheStatsFromFiltered([]qRuntimeKernelDescriptorCacheExternalStatForTest{
+		{
+			Kernel: "QFrameSelectColumn",
+			Hits:   1,
+		},
+		{
+			Kernel: "FrameGroupAggregate",
+			Misses: 1,
+		},
+	}, func(stat qRuntimeKernelDescriptorCacheExternalStatForTest) (QRuntimeKernelDescriptorCacheStat, bool) {
+		if stat.Kernel != "FrameGroupAggregate" {
+			return QRuntimeKernelDescriptorCacheStat{}, false
+		}
+		return qRuntimeKernelDescriptorCacheExternalStatToBindForTest(stat), true
+	})
+	if len(stats) != 1 {
+		t.Fatalf("filtered descriptor cache stats length = %d, want 1", len(stats))
+	}
+	if stats[0].Kernel != "FrameGroupAggregate" || stats[0].Misses != 1 {
+		t.Fatalf("filtered descriptor cache stat = %#v, want group aggregate row", stats[0])
+	}
+	if got := QRuntimeKernelDescriptorCacheStatsFromFiltered([]qRuntimeKernelDescriptorCacheExternalStatForTest{{Hits: 1}}, nil); got != nil {
+		t.Fatalf("nil filtered converter mapped descriptor cache stats = %#v, want nil", got)
 	}
 }
 
@@ -279,6 +359,87 @@ func TestMappedQRuntimeKernelExecutionStatsProviderFilteredFeedsCacheStats(t *te
 	})
 	if got := stat.RawGetString("count"); !got.IsInt() || got.Int() != 5 {
 		t.Fatalf("q_runtime_kernel_execution filtered stat count = %v, want 5", got)
+	}
+}
+
+func TestMappedQRuntimeKernelDescriptorCacheStatsProviderFeedsCacheStats(t *testing.T) {
+	qClearCaches()
+	restore := SetMappedQRuntimeKernelDescriptorCacheStatsProvider(func() []qRuntimeKernelDescriptorCacheExternalStatForTest {
+		return []qRuntimeKernelDescriptorCacheExternalStatForTest{
+			{
+				Source:     "methodjit_q_frame_runtime",
+				Kernel:     "QFrameSelectColumn",
+				Shape:      "compare/filter/project/column",
+				Route:      "typed_runtime_op_exit",
+				SchemaHash: "schema-a",
+				Entries:    1,
+				Hits:       2,
+				Misses:     1,
+			},
+			{
+				Source:     "methodjit_q_frame_runtime",
+				Kernel:     "QFrameSelectColumn",
+				Shape:      "compare/filter/project/column",
+				Route:      "typed_runtime_op_exit",
+				SchemaHash: "schema-a",
+				Hits:       3,
+			},
+		}
+	}, qRuntimeKernelDescriptorCacheExternalStatToBindForTest)
+	defer restore()
+
+	row := qTestCacheStatsRowTable(t, qCacheStatsTable(), "q_runtime_kernel_descriptor_cache")
+	if got := row.RawGetString("hits"); !got.IsInt() || got.Int() != 5 {
+		t.Fatalf("q_runtime_kernel_descriptor_cache hits = %v, want 5", got)
+	}
+	stat := qTestNestedRowByFields(t, row, "stats", map[string]string{
+		"source":      "methodjit_q_frame_runtime",
+		"kernel":      "QFrameSelectColumn",
+		"shape":       "compare/filter/project/column",
+		"route":       "typed_runtime_op_exit",
+		"schema_hash": "schema-a",
+	})
+	if got := stat.RawGetString("misses"); !got.IsInt() || got.Int() != 1 {
+		t.Fatalf("q_runtime_kernel_descriptor_cache mapped misses = %v, want 1", got)
+	}
+}
+
+func TestMappedQRuntimeKernelDescriptorCacheStatsProviderFilteredFeedsCacheStats(t *testing.T) {
+	qClearCaches()
+	restore := SetMappedQRuntimeKernelDescriptorCacheStatsProviderFiltered(func() []qRuntimeKernelDescriptorCacheExternalStatForTest {
+		return []qRuntimeKernelDescriptorCacheExternalStatForTest{
+			{
+				Kernel: "QFrameSelectColumn",
+				Hits:   9,
+			},
+			{
+				Source:     "methodjit_q_frame_runtime",
+				Kernel:     "FrameGroupAggregate",
+				Shape:      "filter/group/aggregate",
+				Route:      "typed_runtime_op_exit",
+				SchemaHash: "schema-b",
+				Entries:    1,
+				Misses:     1,
+			},
+		}
+	}, func(stat qRuntimeKernelDescriptorCacheExternalStatForTest) (QRuntimeKernelDescriptorCacheStat, bool) {
+		if stat.Kernel != "FrameGroupAggregate" {
+			return QRuntimeKernelDescriptorCacheStat{}, false
+		}
+		return qRuntimeKernelDescriptorCacheExternalStatToBindForTest(stat), true
+	})
+	defer restore()
+
+	row := qTestCacheStatsRowTable(t, qCacheStatsTable(), "q_runtime_kernel_descriptor_cache")
+	if got := row.RawGetString("misses"); !got.IsInt() || got.Int() != 1 {
+		t.Fatalf("q_runtime_kernel_descriptor_cache filtered misses = %v, want 1", got)
+	}
+	stat := qTestNestedRowByFields(t, row, "stats", map[string]string{
+		"kernel":      "FrameGroupAggregate",
+		"schema_hash": "schema-b",
+	})
+	if got := stat.RawGetString("entries"); !got.IsInt() || got.Int() != 1 {
+		t.Fatalf("q_runtime_kernel_descriptor_cache filtered entries = %v, want 1", got)
 	}
 }
 

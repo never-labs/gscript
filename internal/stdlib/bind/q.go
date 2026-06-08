@@ -24,6 +24,7 @@ const (
 	qStatsDomainSemanticCache = "semantic_cache"
 	qStatsDomainEvalCache     = "eval_cache"
 	qStatsDomainJITExecution  = "jit_execution"
+	qStatsDomainJITDescriptor = "jit_descriptor_cache"
 	qStatsDomainJITLowering   = "jit_lowering"
 	qStatsSourceQBind         = "q_bind"
 	qStatsSourceMethodJIT     = "methodjit_diagnose"
@@ -133,6 +134,20 @@ type QRuntimeKernelExecutionStat struct {
 	Count   uint64
 }
 
+// QRuntimeKernelDescriptorCacheStat is the q.cache_stats-facing shape for
+// MethodJIT schema-stable q runtime descriptor cache accounting.
+type QRuntimeKernelDescriptorCacheStat struct {
+	Source     string
+	Kernel     string
+	Shape      string
+	Route      string
+	SchemaHash string
+	Entries    uint64
+	Hits       uint64
+	Misses     uint64
+	Evictions  uint64
+}
+
 // QRuntimeKernelLoweringStat is the q.cache_stats-facing shape for MethodJIT
 // q typed-runtime kernel lowering fallbacks. These rows explain why a hot-path
 // shape did not become a typed runtime kernel.
@@ -168,6 +183,24 @@ type qRuntimeKernelExecutionRouteStat struct {
 	Route   string
 	Outcome string
 	Count   uint64
+}
+
+type qRuntimeKernelDescriptorCacheShapeStat struct {
+	Source    string
+	Shape     string
+	Entries   uint64
+	Hits      uint64
+	Misses    uint64
+	Evictions uint64
+}
+
+type qRuntimeKernelDescriptorCacheKernelStat struct {
+	Source    string
+	Kernel    string
+	Entries   uint64
+	Hits      uint64
+	Misses    uint64
+	Evictions uint64
 }
 
 type qRuntimeKernelLoweringShapeStat struct {
@@ -275,10 +308,12 @@ type QSQLKernelDecisionKeyStatJSONRow struct {
 }
 
 var (
-	qRuntimeKernelExecutionStatsProviderMu      sync.Mutex
-	qRuntimeKernelExecutionStatsProviderCurrent *qRuntimeKernelExecutionStatsProviderState
-	qRuntimeKernelLoweringStatsProviderMu       sync.Mutex
-	qRuntimeKernelLoweringStatsProviderCurrent  *qRuntimeKernelLoweringStatsProviderState
+	qRuntimeKernelExecutionStatsProviderMu            sync.Mutex
+	qRuntimeKernelExecutionStatsProviderCurrent       *qRuntimeKernelExecutionStatsProviderState
+	qRuntimeKernelDescriptorCacheStatsProviderMu      sync.Mutex
+	qRuntimeKernelDescriptorCacheStatsProviderCurrent *qRuntimeKernelDescriptorCacheStatsProviderState
+	qRuntimeKernelLoweringStatsProviderMu             sync.Mutex
+	qRuntimeKernelLoweringStatsProviderCurrent        *qRuntimeKernelLoweringStatsProviderState
 )
 
 type qRuntimeKernelExecutionStatsProviderState struct {
@@ -309,6 +344,40 @@ func SetQRuntimeKernelExecutionStatsProvider(provider func() []QRuntimeKernelExe
 }
 
 func qRuntimeKernelExecutionStatsNextActiveProvider(state *qRuntimeKernelExecutionStatsProviderState) *qRuntimeKernelExecutionStatsProviderState {
+	for state != nil && !state.active {
+		state = state.previous
+	}
+	return state
+}
+
+type qRuntimeKernelDescriptorCacheStatsProviderState struct {
+	provider func() []QRuntimeKernelDescriptorCacheStat
+	previous *qRuntimeKernelDescriptorCacheStatsProviderState
+	active   bool
+}
+
+func SetQRuntimeKernelDescriptorCacheStatsProvider(provider func() []QRuntimeKernelDescriptorCacheStat) func() {
+	qRuntimeKernelDescriptorCacheStatsProviderMu.Lock()
+	state := &qRuntimeKernelDescriptorCacheStatsProviderState{
+		provider: provider,
+		previous: qRuntimeKernelDescriptorCacheStatsProviderCurrent,
+		active:   true,
+	}
+	qRuntimeKernelDescriptorCacheStatsProviderCurrent = state
+	qRuntimeKernelDescriptorCacheStatsProviderMu.Unlock()
+	return func() {
+		qRuntimeKernelDescriptorCacheStatsProviderMu.Lock()
+		if state.active {
+			state.active = false
+			if qRuntimeKernelDescriptorCacheStatsProviderCurrent == state {
+				qRuntimeKernelDescriptorCacheStatsProviderCurrent = qRuntimeKernelDescriptorCacheStatsNextActiveProvider(state.previous)
+			}
+		}
+		qRuntimeKernelDescriptorCacheStatsProviderMu.Unlock()
+	}
+}
+
+func qRuntimeKernelDescriptorCacheStatsNextActiveProvider(state *qRuntimeKernelDescriptorCacheStatsProviderState) *qRuntimeKernelDescriptorCacheStatsProviderState {
 	for state != nil && !state.active {
 		state = state.previous
 	}
@@ -3239,6 +3308,7 @@ func qCacheStatsTable() *Table {
 	rows.RawSetInt(5, TableValue(queryKernelStatsRow))
 	rows.RawSetInt(6, TableValue(qRuntimeKernelExecutionStatsRow()))
 	rows.RawSetInt(7, TableValue(qRuntimeKernelLoweringStatsRow()))
+	rows.RawSetInt(8, TableValue(qRuntimeKernelDescriptorCacheStatsRow()))
 	evalStatsRow := qCacheStatsRow(
 		"q_eval",
 		evalEntries,
@@ -3248,7 +3318,7 @@ func qCacheStatsTable() *Table {
 		qEvalCacheLimit,
 	)
 	evalStatsRow.RawSetString("stats_domain", StringValue(qStatsDomainEvalCache))
-	rows.RawSetInt(8, TableValue(evalStatsRow))
+	rows.RawSetInt(9, TableValue(evalStatsRow))
 	return rows
 }
 
@@ -3360,6 +3430,107 @@ func qRuntimeKernelExecutionStatsSnapshot() []QRuntimeKernelExecutionStat {
 			return a.Route < b.Route
 		}
 		return a.Outcome < b.Outcome
+	})
+	return out
+}
+
+func qRuntimeKernelDescriptorCacheStatsRow() *Table {
+	stats := qRuntimeKernelDescriptorCacheStatsSnapshot()
+	entries := uint64(0)
+	hits := uint64(0)
+	misses := uint64(0)
+	evictions := uint64(0)
+	for _, stat := range stats {
+		entries += stat.Entries
+		hits += stat.Hits
+		misses += stat.Misses
+		evictions += stat.Evictions
+	}
+	row := qCacheStatsRow(
+		"q_runtime_kernel_descriptor_cache",
+		qUint64Int(entries),
+		qUint64Int(hits),
+		qUint64Int(misses),
+		qUint64Int(evictions),
+		0,
+	)
+	row.RawSetString("stats_domain", StringValue(qStatsDomainJITDescriptor))
+	row.RawSetString("stats_source", StringValue(qStatsSourceMethodJIT))
+	row.RawSetString("cache_backed", BoolValue(true))
+	row.RawSetString("stats", TableValue(qRuntimeKernelDescriptorCacheStatsTable(stats)))
+	row.RawSetString("shapes", TableValue(qRuntimeKernelDescriptorCacheShapeStatsTable(qRuntimeKernelDescriptorCacheShapeStats(stats))))
+	row.RawSetString("kernels", TableValue(qRuntimeKernelDescriptorCacheKernelStatsTable(qRuntimeKernelDescriptorCacheKernelStats(stats))))
+	return row
+}
+
+func qRuntimeKernelDescriptorCacheStatsSnapshot() []QRuntimeKernelDescriptorCacheStat {
+	qRuntimeKernelDescriptorCacheStatsProviderMu.Lock()
+	state := qRuntimeKernelDescriptorCacheStatsNextActiveProvider(qRuntimeKernelDescriptorCacheStatsProviderCurrent)
+	qRuntimeKernelDescriptorCacheStatsProviderCurrent = state
+	var provider func() []QRuntimeKernelDescriptorCacheStat
+	if state != nil {
+		provider = state.provider
+	}
+	qRuntimeKernelDescriptorCacheStatsProviderMu.Unlock()
+	if provider == nil {
+		return nil
+	}
+	stats := provider()
+	if len(stats) == 0 {
+		return nil
+	}
+	type statKey struct {
+		source     string
+		kernel     string
+		shape      string
+		route      string
+		schemaHash string
+	}
+	counts := make(map[statKey]QRuntimeKernelDescriptorCacheStat, len(stats))
+	for _, stat := range stats {
+		if stat.Entries == 0 && stat.Hits == 0 && stat.Misses == 0 && stat.Evictions == 0 {
+			continue
+		}
+		key := statKey{
+			source:     qNormalizeRuntimeKernelStatPart(stat.Source),
+			kernel:     qNormalizeRuntimeKernelStatPart(stat.Kernel),
+			shape:      qNormalizeRuntimeKernelStatPart(stat.Shape),
+			route:      qNormalizeRuntimeKernelStatPart(stat.Route),
+			schemaHash: qNormalizeRuntimeKernelStatPart(stat.SchemaHash),
+		}
+		row := counts[key]
+		row.Source = key.source
+		row.Kernel = key.kernel
+		row.Shape = key.shape
+		row.Route = key.route
+		row.SchemaHash = key.schemaHash
+		row.Entries += stat.Entries
+		row.Hits += stat.Hits
+		row.Misses += stat.Misses
+		row.Evictions += stat.Evictions
+		counts[key] = row
+	}
+	if len(counts) == 0 {
+		return nil
+	}
+	out := make([]QRuntimeKernelDescriptorCacheStat, 0, len(counts))
+	for _, row := range counts {
+		out = append(out, row)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Source != out[j].Source {
+			return out[i].Source < out[j].Source
+		}
+		if out[i].Kernel != out[j].Kernel {
+			return out[i].Kernel < out[j].Kernel
+		}
+		if out[i].Shape != out[j].Shape {
+			return out[i].Shape < out[j].Shape
+		}
+		if out[i].Route != out[j].Route {
+			return out[i].Route < out[j].Route
+		}
+		return out[i].SchemaHash < out[j].SchemaHash
 	})
 	return out
 }
@@ -3538,6 +3709,24 @@ func qRuntimeKernelExecutionStatsTable(stats []QRuntimeKernelExecutionStat) *Tab
 		row.RawSetString("route", StringValue(stat.Route))
 		row.RawSetString("outcome", StringValue(stat.Outcome))
 		row.RawSetString("count", qUint64IntValue(stat.Count))
+		rows.RawSetInt(int64(i+1), TableValue(row))
+	}
+	return rows
+}
+
+func qRuntimeKernelDescriptorCacheStatsTable(stats []QRuntimeKernelDescriptorCacheStat) *Table {
+	rows := NewAppendArrayTable(len(stats))
+	for i, stat := range stats {
+		row := NewTable()
+		row.RawSetString("source", StringValue(stat.Source))
+		row.RawSetString("kernel", StringValue(stat.Kernel))
+		row.RawSetString("shape", StringValue(stat.Shape))
+		row.RawSetString("route", StringValue(stat.Route))
+		row.RawSetString("schema_hash", StringValue(stat.SchemaHash))
+		row.RawSetString("entries", qUint64IntValue(stat.Entries))
+		row.RawSetString("hits", qUint64IntValue(stat.Hits))
+		row.RawSetString("misses", qUint64IntValue(stat.Misses))
+		row.RawSetString("evictions", qUint64IntValue(stat.Evictions))
 		rows.RawSetInt(int64(i+1), TableValue(row))
 	}
 	return rows
@@ -3823,6 +4012,104 @@ func qRuntimeKernelExecutionKernelStatsTable(stats []qRuntimeKernelExecutionKern
 		row.RawSetString("kernel", StringValue(stat.Kernel))
 		row.RawSetString("outcome", StringValue(stat.Outcome))
 		row.RawSetString("count", qUint64IntValue(stat.Count))
+		rows.RawSetInt(int64(i+1), TableValue(row))
+	}
+	return rows
+}
+
+func qRuntimeKernelDescriptorCacheShapeStats(stats []QRuntimeKernelDescriptorCacheStat) []qRuntimeKernelDescriptorCacheShapeStat {
+	type shapeKey struct {
+		source string
+		shape  string
+	}
+	counts := make(map[shapeKey]qRuntimeKernelDescriptorCacheShapeStat, len(stats))
+	for _, stat := range stats {
+		key := shapeKey{source: stat.Source, shape: stat.Shape}
+		row := counts[key]
+		row.Source = key.source
+		row.Shape = key.shape
+		row.Entries += stat.Entries
+		row.Hits += stat.Hits
+		row.Misses += stat.Misses
+		row.Evictions += stat.Evictions
+		counts[key] = row
+	}
+	out := make([]qRuntimeKernelDescriptorCacheShapeStat, 0, len(counts))
+	for _, row := range counts {
+		out = append(out, row)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		a, b := out[i], out[j]
+		if a.Hits+a.Misses != b.Hits+b.Misses {
+			return a.Hits+a.Misses > b.Hits+b.Misses
+		}
+		if a.Source != b.Source {
+			return a.Source < b.Source
+		}
+		return a.Shape < b.Shape
+	})
+	return out
+}
+
+func qRuntimeKernelDescriptorCacheShapeStatsTable(stats []qRuntimeKernelDescriptorCacheShapeStat) *Table {
+	rows := NewAppendArrayTable(len(stats))
+	for i, stat := range stats {
+		row := NewTable()
+		row.RawSetString("source", StringValue(stat.Source))
+		row.RawSetString("shape", StringValue(stat.Shape))
+		row.RawSetString("entries", qUint64IntValue(stat.Entries))
+		row.RawSetString("hits", qUint64IntValue(stat.Hits))
+		row.RawSetString("misses", qUint64IntValue(stat.Misses))
+		row.RawSetString("evictions", qUint64IntValue(stat.Evictions))
+		rows.RawSetInt(int64(i+1), TableValue(row))
+	}
+	return rows
+}
+
+func qRuntimeKernelDescriptorCacheKernelStats(stats []QRuntimeKernelDescriptorCacheStat) []qRuntimeKernelDescriptorCacheKernelStat {
+	type kernelKey struct {
+		source string
+		kernel string
+	}
+	counts := make(map[kernelKey]qRuntimeKernelDescriptorCacheKernelStat, len(stats))
+	for _, stat := range stats {
+		key := kernelKey{source: stat.Source, kernel: stat.Kernel}
+		row := counts[key]
+		row.Source = key.source
+		row.Kernel = key.kernel
+		row.Entries += stat.Entries
+		row.Hits += stat.Hits
+		row.Misses += stat.Misses
+		row.Evictions += stat.Evictions
+		counts[key] = row
+	}
+	out := make([]qRuntimeKernelDescriptorCacheKernelStat, 0, len(counts))
+	for _, row := range counts {
+		out = append(out, row)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		a, b := out[i], out[j]
+		if a.Hits+a.Misses != b.Hits+b.Misses {
+			return a.Hits+a.Misses > b.Hits+b.Misses
+		}
+		if a.Source != b.Source {
+			return a.Source < b.Source
+		}
+		return a.Kernel < b.Kernel
+	})
+	return out
+}
+
+func qRuntimeKernelDescriptorCacheKernelStatsTable(stats []qRuntimeKernelDescriptorCacheKernelStat) *Table {
+	rows := NewAppendArrayTable(len(stats))
+	for i, stat := range stats {
+		row := NewTable()
+		row.RawSetString("source", StringValue(stat.Source))
+		row.RawSetString("kernel", StringValue(stat.Kernel))
+		row.RawSetString("entries", qUint64IntValue(stat.Entries))
+		row.RawSetString("hits", qUint64IntValue(stat.Hits))
+		row.RawSetString("misses", qUint64IntValue(stat.Misses))
+		row.RawSetString("evictions", qUint64IntValue(stat.Evictions))
 		rows.RawSetInt(int64(i+1), TableValue(row))
 	}
 	return rows
@@ -4301,6 +4588,14 @@ func qNormalizeRuntimeKernelStatPart(part string) string {
 		return "unknown"
 	}
 	return part
+}
+
+func qUint64Int(n uint64) int {
+	const maxInt = uint64(int(^uint(0) >> 1))
+	if n > maxInt {
+		return int(maxInt)
+	}
+	return int(n)
 }
 
 func qUint64IntValue(n uint64) Value {

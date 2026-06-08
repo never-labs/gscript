@@ -3114,6 +3114,25 @@ func TestQCacheStatsAndClearPublicAPI(t *testing.T) {
 	if routes := loweringRow.RawGetString("routes").Table(); routes == nil || routes.Length() != 0 {
 		t.Fatalf("q_runtime_kernel_lowering routes = %v, want empty table until MethodJIT diagnostics are attached", routes)
 	}
+	descriptorRow := qTestCacheStatsRowTable(t, interp.GetGlobal("stats").Table(), "q_runtime_kernel_descriptor_cache")
+	if got := descriptorRow.RawGetString("stats_domain"); !got.IsString() || got.Str() != qStatsDomainJITDescriptor {
+		t.Fatalf("q_runtime_kernel_descriptor_cache stats_domain = %v, want %s", got, qStatsDomainJITDescriptor)
+	}
+	if got := descriptorRow.RawGetString("stats_source"); !got.IsString() || got.Str() != qStatsSourceMethodJIT {
+		t.Fatalf("q_runtime_kernel_descriptor_cache stats_source = %v, want %s", got, qStatsSourceMethodJIT)
+	}
+	if got := descriptorRow.RawGetString("cache_backed"); !got.IsBool() || !got.Bool() {
+		t.Fatalf("q_runtime_kernel_descriptor_cache cache_backed = %v, want true", got)
+	}
+	if stats := descriptorRow.RawGetString("stats").Table(); stats == nil || stats.Length() != 0 {
+		t.Fatalf("q_runtime_kernel_descriptor_cache stats = %v, want empty table until MethodJIT diagnostics are attached", stats)
+	}
+	if shapes := descriptorRow.RawGetString("shapes").Table(); shapes == nil || shapes.Length() != 0 {
+		t.Fatalf("q_runtime_kernel_descriptor_cache shapes = %v, want empty table until MethodJIT diagnostics are attached", shapes)
+	}
+	if kernels := descriptorRow.RawGetString("kernels").Table(); kernels == nil || kernels.Length() != 0 {
+		t.Fatalf("q_runtime_kernel_descriptor_cache kernels = %v, want empty table until MethodJIT diagnostics are attached", kernels)
+	}
 	kernelRow := qTestCacheStatsRowTable(t, interp.GetGlobal("stats").Table(), "qsql_kernel")
 	if got := kernelRow.RawGetString("stats_domain"); !got.IsString() || got.Str() != qStatsDomainSemanticCache {
 		t.Fatalf("qsql_kernel stats_domain = %v, want %s", got, qStatsDomainSemanticCache)
@@ -3295,6 +3314,87 @@ func TestQRuntimeKernelExecutionStatsProviderFeedsCacheStats(t *testing.T) {
 	}
 	if got := route.RawGetString("count"); !got.IsInt() || got.Int() != 5 {
 		t.Fatalf("q_runtime_kernel_execution routes[1].count = %v, want 5", got)
+	}
+}
+
+func TestQRuntimeKernelDescriptorCacheStatsProviderFeedsCacheStats(t *testing.T) {
+	qClearCaches()
+	restore := SetQRuntimeKernelDescriptorCacheStatsProvider(func() []QRuntimeKernelDescriptorCacheStat {
+		return []QRuntimeKernelDescriptorCacheStat{
+			{
+				Source:     "methodjit_q_frame_runtime",
+				Kernel:     "QFrameSelectColumn",
+				Shape:      "compare/filter/project/column",
+				Route:      "typed_runtime_op_exit",
+				SchemaHash: "schema-a",
+				Entries:    1,
+				Hits:       2,
+				Misses:     1,
+			},
+			{
+				Source:     "methodjit_q_frame_runtime",
+				Kernel:     "QFrameSelectColumn",
+				Shape:      "compare/filter/project/column",
+				Route:      "typed_runtime_op_exit",
+				SchemaHash: "schema-a",
+				Hits:       3,
+			},
+			{
+				Source:     "methodjit_q_frame_runtime",
+				Kernel:     "FrameGroupAggregate",
+				Shape:      "filter/group/aggregate",
+				Route:      "typed_runtime_op_exit",
+				SchemaHash: "schema-b",
+				Entries:    1,
+				Misses:     1,
+			},
+		}
+	})
+	defer restore()
+
+	row := qTestCacheStatsRowTable(t, qCacheStatsTable(), "q_runtime_kernel_descriptor_cache")
+	if got := row.RawGetString("stats_domain"); !got.IsString() || got.Str() != qStatsDomainJITDescriptor {
+		t.Fatalf("q_runtime_kernel_descriptor_cache stats_domain = %v, want %s", got, qStatsDomainJITDescriptor)
+	}
+	if got := row.RawGetString("cache_backed"); !got.IsBool() || !got.Bool() {
+		t.Fatalf("q_runtime_kernel_descriptor_cache cache_backed = %v, want true", got)
+	}
+	if got := row.RawGetString("entries"); !got.IsInt() || got.Int() != 2 {
+		t.Fatalf("q_runtime_kernel_descriptor_cache entries = %v, want 2", got)
+	}
+	if got := row.RawGetString("hits"); !got.IsInt() || got.Int() != 5 {
+		t.Fatalf("q_runtime_kernel_descriptor_cache hits = %v, want 5", got)
+	}
+	if got := row.RawGetString("misses"); !got.IsInt() || got.Int() != 2 {
+		t.Fatalf("q_runtime_kernel_descriptor_cache misses = %v, want 2", got)
+	}
+
+	stat := qTestNestedRowByFields(t, row, "stats", map[string]string{
+		"source":      "methodjit_q_frame_runtime",
+		"kernel":      "QFrameSelectColumn",
+		"shape":       "compare/filter/project/column",
+		"route":       "typed_runtime_op_exit",
+		"schema_hash": "schema-a",
+	})
+	if got := stat.RawGetString("hits"); !got.IsInt() || got.Int() != 5 {
+		t.Fatalf("descriptor cache stat hits = %v, want 5", got)
+	}
+	if got := stat.RawGetString("misses"); !got.IsInt() || got.Int() != 1 {
+		t.Fatalf("descriptor cache stat misses = %v, want 1", got)
+	}
+	shape := qTestNestedRowByFields(t, row, "shapes", map[string]string{
+		"source": "methodjit_q_frame_runtime",
+		"shape":  "compare/filter/project/column",
+	})
+	if got := shape.RawGetString("hits"); !got.IsInt() || got.Int() != 5 {
+		t.Fatalf("descriptor cache shape hits = %v, want 5", got)
+	}
+	kernel := qTestNestedRowByFields(t, row, "kernels", map[string]string{
+		"source": "methodjit_q_frame_runtime",
+		"kernel": "QFrameSelectColumn",
+	})
+	if got := kernel.RawGetString("misses"); !got.IsInt() || got.Int() != 1 {
+		t.Fatalf("descriptor cache kernel misses = %v, want 1", got)
 	}
 }
 

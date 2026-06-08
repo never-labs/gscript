@@ -196,6 +196,69 @@ func TestQRuntimeKernelLoweringStatsProviderMapsMethodJITFallbacks(t *testing.T)
 	qBindAssertIntField(t, route, "count", 1)
 }
 
+func TestQRuntimeKernelDescriptorCacheStatsProviderMapsMethodJITSchemaStats(t *testing.T) {
+	names := runtime.NewTable()
+	names.RawSetInt(1, runtime.StringValue("size"))
+	proto := &vm.FuncProto{
+		Name:      "q_runtime_kernel_descriptor_cache_stats_provider_maps_methodjit",
+		NumParams: 1,
+		MaxStack:  3,
+		Constants: []runtime.Value{
+			runtime.StringValue("price"),
+			runtime.FloatValue(100),
+			runtime.TableValue(names),
+			runtime.StringValue("size"),
+		},
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_FRAME_COLUMN, 1, 0, 0),
+			vm.EncodeABx(vm.OP_LOADK, 2, 1),
+			vm.EncodeABC(vm.OP_VECTOR_COMPARE, 1, 2, int(runtime.DenseArrayGE)),
+			vm.EncodeABC(vm.OP_FRAME_FILTER, 0, 0, 1),
+			vm.EncodeABC(vm.OP_FRAME_PROJECT, 0, 0, 2),
+			vm.EncodeABC(vm.OP_FRAME_COLUMN, 0, 0, 3),
+			vm.EncodeABC(vm.OP_RETURN, 0, 2, 0),
+		},
+	}
+	report := Diagnose(proto, []runtime.Value{runtime.TableValue(qMethodJITBridgeFrame(t))})
+	if report.NativeError != nil {
+		t.Fatalf("Diagnose native error: %v\n%s", report.NativeError, report.String())
+	}
+	if len(report.QKernelDescriptorCacheStats) == 0 {
+		t.Fatalf("Diagnose QKernelDescriptorCacheStats empty:\n%s", report.String())
+	}
+
+	restore := qbind.SetMappedQRuntimeKernelDescriptorCacheStatsProvider(func() []QKernelDescriptorCacheStat {
+		return report.QKernelDescriptorCacheStats
+	}, func(stat QKernelDescriptorCacheStat) qbind.QRuntimeKernelDescriptorCacheStat {
+		return qbind.QRuntimeKernelDescriptorCacheStat{
+			Source:     stat.Source,
+			Kernel:     stat.Kernel,
+			Shape:      stat.Shape,
+			Route:      stat.Route,
+			SchemaHash: stat.SchemaHash,
+			Entries:    stat.Entries,
+			Hits:       stat.Hits,
+			Misses:     stat.Misses,
+			Evictions:  stat.Evictions,
+		}
+	})
+	defer restore()
+
+	row := qBindCacheStatsRow(t, qBindCacheStats(t), "q_runtime_kernel_descriptor_cache")
+	qBindAssertIntField(t, row, "entries", 1)
+	qBindAssertIntField(t, row, "hits", 0)
+	qBindAssertIntField(t, row, "misses", 1)
+	stat := qBindNestedRowByFields(t, row, "stats", map[string]string{
+		"source":      "methodjit_q_frame_runtime",
+		"kernel":      "QFrameSelectColumn",
+		"shape":       "compare/filter/project/column",
+		"route":       "typed_runtime_op_exit",
+		"schema_hash": "q-methodjit-bridge-test",
+	})
+	qBindAssertIntField(t, stat, "entries", 1)
+	qBindAssertIntField(t, stat, "misses", 1)
+}
+
 func qMethodJITBridgeFrame(t *testing.T) *runtime.Table {
 	t.Helper()
 	soa, err := runtime.NewSoA(map[string]*runtime.DenseArray{
