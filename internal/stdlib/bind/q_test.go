@@ -2888,7 +2888,7 @@ func TestQCacheStatsAndClearPublicAPI(t *testing.T) {
 			"after := q.cache_stats()\n")
 
 	before := qTestCacheStatsRows(t, interp.GetGlobal("before").Table())
-	if before["qsql_template"]["entries"] != 0 || before["qsql_aligned"]["entries"] != 0 || before["qsql_kernel"]["entries"] != 0 || before["qsql_kernel_decision"]["entries"] != 0 || before["q_eval"]["entries"] != 0 {
+	if before["qsql_template"]["entries"] != 0 || before["qsql_aligned"]["entries"] != 0 || before["qsql_kernel"]["entries"] != 0 || before["qsql_kernel_decision"]["entries"] != 0 || before["q_runtime_kernel_execution"]["entries"] != 0 || before["q_eval"]["entries"] != 0 {
 		t.Fatalf("initial cache entries = %#v, want all zero", before)
 	}
 
@@ -2907,6 +2907,30 @@ func TestQCacheStatsAndClearPublicAPI(t *testing.T) {
 	}
 	if got := stats["q_eval"]; got["entries"] != 1 || got["hits"] != 1 || got["misses"] != 1 || got["evictions"] != 0 {
 		t.Fatalf("q_eval stats = %#v, want 1 entry, 1 hit, 1 miss, 0 evictions", got)
+	}
+	runtimeRow := qTestCacheStatsRowTable(t, interp.GetGlobal("stats").Table(), "q_runtime_kernel_execution")
+	if got := runtimeRow.RawGetString("stats_domain"); !got.IsString() || got.Str() != qStatsDomainJITExecution {
+		t.Fatalf("q_runtime_kernel_execution stats_domain = %v, want %s", got, qStatsDomainJITExecution)
+	}
+	if got := runtimeRow.RawGetString("stats_source"); !got.IsString() || got.Str() != qStatsSourceMethodJIT {
+		t.Fatalf("q_runtime_kernel_execution stats_source = %v, want %s", got, qStatsSourceMethodJIT)
+	}
+	if got := runtimeRow.RawGetString("cache_backed"); !got.IsBool() || got.Bool() {
+		t.Fatalf("q_runtime_kernel_execution cache_backed = %v, want false", got)
+	}
+	if shapes := runtimeRow.RawGetString("shapes").Table(); shapes == nil || shapes.Length() != 0 {
+		t.Fatalf("q_runtime_kernel_execution shapes = %v, want empty table until MethodJIT diagnostics are attached", shapes)
+	}
+	kernelRow := qTestCacheStatsRowTable(t, interp.GetGlobal("stats").Table(), "qsql_kernel")
+	if got := kernelRow.RawGetString("stats_domain"); !got.IsString() || got.Str() != qStatsDomainSemanticCache {
+		t.Fatalf("qsql_kernel stats_domain = %v, want %s", got, qStatsDomainSemanticCache)
+	}
+	if got := kernelRow.RawGetString("cache_backed"); !got.IsBool() || !got.Bool() {
+		t.Fatalf("qsql_kernel cache_backed = %v, want true", got)
+	}
+	evalRow := qTestCacheStatsRowTable(t, interp.GetGlobal("stats").Table(), "q_eval")
+	if got := evalRow.RawGetString("stats_domain"); !got.IsString() || got.Str() != qStatsDomainEvalCache {
+		t.Fatalf("q_eval stats_domain = %v, want %s", got, qStatsDomainEvalCache)
 	}
 
 	cleared := qTestCacheStatsRows(t, interp.GetGlobal("cleared").Table())
@@ -3551,6 +3575,18 @@ func TestQExplainReportsQueryKernelVisibility(t *testing.T) {
 	}
 	if got := beforeTable.RawGetString("source_schema_hash"); !got.IsString() || got.Str() != frame.SchemaFingerprint() {
 		t.Fatalf("source_schema_hash before = %v, want %s", got, frame.SchemaFingerprint())
+	}
+	if got := beforeTable.RawGetString("kernel_cache_stats_domain"); !got.IsString() || got.Str() != qStatsDomainSemanticCache {
+		t.Fatalf("kernel_cache_stats_domain before = %v, want %s", got, qStatsDomainSemanticCache)
+	}
+	if got := beforeTable.RawGetString("kernel_execution_stats_domain"); !got.IsString() || got.Str() != qStatsDomainJITExecution {
+		t.Fatalf("kernel_execution_stats_domain before = %v, want %s", got, qStatsDomainJITExecution)
+	}
+	if got := beforeTable.RawGetString("kernel_execution_stats_source"); !got.IsString() || got.Str() != qStatsSourceMethodJIT {
+		t.Fatalf("kernel_execution_stats_source before = %v, want %s", got, qStatsSourceMethodJIT)
+	}
+	if got := beforeTable.RawGetString("kernel_execution_stats_cache_backed"); !got.IsBool() || got.Bool() {
+		t.Fatalf("kernel_execution_stats_cache_backed before = %v, want false", got)
 	}
 	cacheKey := beforeTable.RawGetString("kernel_cache_key")
 	if !cacheKey.IsString() || cacheKey.Str() == "" {
@@ -5379,7 +5415,7 @@ func qTestCacheStatsRows(t *testing.T, tbl *Table) map[string]map[string]int64 {
 		}
 		out[name.Str()] = values
 	}
-	for _, name := range []string{"qsql_template", "qsql_aligned", "qsql_kernel", "qsql_kernel_decision", "q_query_kernel", "q_eval"} {
+	for _, name := range []string{"qsql_template", "qsql_aligned", "qsql_kernel", "qsql_kernel_decision", "q_query_kernel", "q_runtime_kernel_execution", "q_eval"} {
 		if _, ok := out[name]; !ok {
 			t.Fatalf("cache stats missing row %q in %#v", name, out)
 		}

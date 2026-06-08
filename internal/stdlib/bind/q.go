@@ -21,6 +21,12 @@ const qQueryKernelSupportCacheLimit = 128
 const qEvalCacheLimit = 256
 
 const (
+	qStatsDomainSemanticCache = "semantic_cache"
+	qStatsDomainEvalCache     = "eval_cache"
+	qStatsDomainJITExecution  = "jit_execution"
+	qStatsSourceQBind         = "q_bind"
+	qStatsSourceMethodJIT     = "methodjit_diagnose"
+
 	qFallbackKernelUnsupported = "kernel_unsupported"
 	qFallbackKernelCompileErr  = "kernel_compile_error"
 	qFallbackSourceErr         = "source_error"
@@ -1613,6 +1619,7 @@ func qExplainSQL(args qSQLArgsResult) (Value, error) {
 	kernelInfo := qExplainKernelInfo(args, tmpl)
 	out.RawSetString("source_schema", qExplainSchemaValue(kernelInfo.schema))
 	out.RawSetString("source_schema_hash", StringValue(qExplainKernelSchemaHash(kernelInfo)))
+	out.RawSetString("kernel_cache_stats_domain", StringValue(qStatsDomainSemanticCache))
 	out.RawSetString("kernel_supported", BoolValue(kernelInfo.supported))
 	out.RawSetString("kernel_cached", BoolValue(kernelInfo.cached))
 	out.RawSetString("kernel_decision_cached", BoolValue(kernelInfo.decisionCached))
@@ -1625,6 +1632,9 @@ func qExplainSQL(args qSQLArgsResult) (Value, error) {
 	out.RawSetString("kernel_shape", StringValue(kernelInfo.shape))
 	out.RawSetString("kernel_reason_code", StringValue(kernelInfo.reasonCode))
 	out.RawSetString("kernel_reason", StringValue(kernelInfo.reason))
+	out.RawSetString("kernel_execution_stats_domain", StringValue(qStatsDomainJITExecution))
+	out.RawSetString("kernel_execution_stats_source", StringValue(qStatsSourceMethodJIT))
+	out.RawSetString("kernel_execution_stats_cache_backed", BoolValue(false))
 	qExplainAttachFallbackStats(out, qSQLKernelFallbackStatsCode(kernelInfo), kernelInfo.reasonCode, kernelInfo.reason)
 	return TableValue(out), nil
 }
@@ -2805,7 +2815,7 @@ func qCacheStatsTable() *Table {
 	queryKernelShapeStats := qQueryKernelSupportCacheShapeStatsLocked()
 	qQueryKernelSupportCacheMu.Unlock()
 
-	rows := NewAppendArrayTable(6)
+	rows := NewAppendArrayTable(7)
 	rows.RawSetInt(1, TableValue(qCacheStatsRow(
 		"qsql_template",
 		templateEntries,
@@ -2855,25 +2865,40 @@ func qCacheStatsTable() *Table {
 	)
 	queryKernelStatsRow.RawSetString("shapes", TableValue(qQueryKernelSupportShapeStatsTable(queryKernelShapeStats)))
 	rows.RawSetInt(5, TableValue(queryKernelStatsRow))
-	rows.RawSetInt(6, TableValue(qCacheStatsRow(
+	rows.RawSetInt(6, TableValue(qRuntimeKernelExecutionStatsRow()))
+	evalStatsRow := qCacheStatsRow(
 		"q_eval",
 		evalEntries,
 		evalStats.Hits,
 		evalStats.Misses,
 		evalStats.Evictions,
 		qEvalCacheLimit,
-	)))
+	)
+	evalStatsRow.RawSetString("stats_domain", StringValue(qStatsDomainEvalCache))
+	rows.RawSetInt(7, TableValue(evalStatsRow))
 	return rows
 }
 
 func qCacheStatsRow(name string, entries, hits, misses, evictions, limit int) *Table {
 	row := NewTable()
 	row.RawSetString("cache", StringValue(name))
+	row.RawSetString("stats_domain", StringValue(qStatsDomainSemanticCache))
+	row.RawSetString("stats_source", StringValue(qStatsSourceQBind))
+	row.RawSetString("cache_backed", BoolValue(true))
 	row.RawSetString("entries", IntValue(int64(entries)))
 	row.RawSetString("hits", IntValue(int64(hits)))
 	row.RawSetString("misses", IntValue(int64(misses)))
 	row.RawSetString("evictions", IntValue(int64(evictions)))
 	row.RawSetString("limit", IntValue(int64(limit)))
+	return row
+}
+
+func qRuntimeKernelExecutionStatsRow() *Table {
+	row := qCacheStatsRow("q_runtime_kernel_execution", 0, 0, 0, 0, 0)
+	row.RawSetString("stats_domain", StringValue(qStatsDomainJITExecution))
+	row.RawSetString("stats_source", StringValue(qStatsSourceMethodJIT))
+	row.RawSetString("cache_backed", BoolValue(false))
+	row.RawSetString("shapes", TableValue(NewAppendArrayTable(0)))
 	return row
 }
 
