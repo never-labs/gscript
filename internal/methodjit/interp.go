@@ -1205,6 +1205,13 @@ func (s *interpState) execInstr(instr *Instr, block *Block) ([]runtime.Value, bo
 		}
 		s.values[instr.ID] = out
 
+	case OpVectorWhere:
+		out, err := executeVectorWhereValue(s.val(instr.Args[0]), s.val(instr.Args[1]), s.val(instr.Args[2]))
+		if err != nil {
+			return nil, false, err
+		}
+		s.values[instr.ID] = out
+
 	case OpGetField:
 		tbl := s.val(instr.Args[0])
 		idx := int(instr.Aux)

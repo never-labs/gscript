@@ -526,6 +526,18 @@ func (tm *TieringManager) executeOpExit(ctx *ExecContext, regs []runtime.Value, 
 		}
 		regs[absSlot] = out
 
+	case OpVectorWhere:
+		tempBase := absArg1
+		nArgs := int(ctx.OpExitArg2)
+		if absSlot >= len(regs) || tempBase < 0 || nArgs != 3 || tempBase+nArgs > len(regs) {
+			return fmt.Errorf("VectorWhere op-exit out of register range")
+		}
+		out, err := executeVectorWhereValue(regs[tempBase], regs[tempBase+1], regs[tempBase+2])
+		if err != nil {
+			return err
+		}
+		regs[absSlot] = out
+
 	case OpEq:
 		if absArg1 < len(regs) && absArg2 < len(regs) && absSlot < len(regs) {
 			regs[absSlot] = runtime.BoolValue(regs[absArg1].Equal(regs[absArg2]))

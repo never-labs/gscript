@@ -109,6 +109,37 @@ func TestVectorMaskBytecodeBuildsMethodJITIR(t *testing.T) {
 	}
 }
 
+func TestVectorWhereBytecodeBuildsMethodJITIR(t *testing.T) {
+	proto := &vm.FuncProto{
+		Name:     "vector_where",
+		MaxStack: 3,
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_VECTOR_WHERE, 0, 1, 2),
+			vm.EncodeABC(vm.OP_RETURN, 0, 2, 0),
+		},
+	}
+
+	fn := BuildGraph(proto)
+	var where *Instr
+	for _, block := range fn.Blocks {
+		for _, instr := range block.Instrs {
+			if instr.Op == OpVectorWhere {
+				where = instr
+				break
+			}
+		}
+	}
+	if where == nil {
+		t.Fatalf("BuildGraph did not emit OpVectorWhere:\n%s", Print(fn))
+	}
+	if len(where.Args) != 3 {
+		t.Fatalf("OpVectorWhere arg count = %d, want 3", len(where.Args))
+	}
+	if where.Type != TypeAny {
+		t.Fatalf("OpVectorWhere type = %s, want Any", where.Type)
+	}
+}
+
 func TestFrameColumnBytecodeBuildsMethodJITIR(t *testing.T) {
 	proto := &vm.FuncProto{
 		Name:      "frame_column",
@@ -1679,6 +1710,22 @@ func TestTier2GateAllowsVectorMaskThroughOpExit(t *testing.T) {
 	}
 }
 
+func TestTier2GateAllowsVectorWhereThroughOpExit(t *testing.T) {
+	proto := &vm.FuncProto{
+		Name:     "vector_where",
+		MaxStack: 3,
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_VECTOR_WHERE, 0, 1, 2),
+			vm.EncodeABC(vm.OP_RETURN, 0, 2, 0),
+		},
+	}
+
+	gate := firstUnsupportedTier2BytecodeGate(proto)
+	if !gate.Allowed {
+		t.Fatalf("OP_VECTOR_WHERE should be Tier2-eligible via op-exit, got %q", gate.Reason)
+	}
+}
+
 func TestFrameLenRuntimeHelperUsesRuntimePrimitive(t *testing.T) {
 	frame := runtime.NewTable()
 	frame.SetNativePayloadWithInfo(struct{}{}, runtime.NativePayloadInfo{
@@ -2076,6 +2123,24 @@ func TestVectorMaskRuntimeHelperUsesRuntimePrimitive(t *testing.T) {
 	got, ok := result.DenseArray().Bool()
 	if !ok || len(got) != 4 || !got[0] || got[1] || got[2] || got[3] {
 		t.Fatalf("vector mask values = %#v, want [true false false false]", got)
+	}
+}
+
+func TestVectorWhereRuntimeHelperUsesRuntimePrimitive(t *testing.T) {
+	result, err := executeVectorWhereValue(
+		runtime.DenseArrayValue(runtime.NewDenseArrayBool([]bool{true, false, true})),
+		runtime.DenseArrayValue(runtime.NewDenseArrayI64([]int64{10, 20, 30})),
+		runtime.IntValue(7),
+	)
+	if err != nil {
+		t.Fatalf("execute vector where: %v", err)
+	}
+	if !result.IsDenseArray() {
+		t.Fatalf("vector where result = %#v, want dense array", result)
+	}
+	got, ok := result.DenseArray().I64()
+	if !ok || len(got) != 3 || got[0] != 10 || got[1] != 7 || got[2] != 30 {
+		t.Fatalf("vector where values = %#v, want [10 7 30]", got)
 	}
 }
 

@@ -522,3 +522,14 @@ func executeVectorMaskValue(opCode int, leftVal, rightVal runtime.Value) (runtim
 	}
 	return runtime.DenseArrayValue(out), nil
 }
+
+func executeVectorWhereValue(maskVal, trueVal, falseVal runtime.Value) (runtime.Value, error) {
+	if !maskVal.IsDenseArray() {
+		return runtime.NilValue(), fmt.Errorf("VectorWhere mask must be dense array (got %s)", maskVal.TypeName())
+	}
+	out, err := runtime.DenseArrayWhere(maskVal.DenseArray(), trueVal, falseVal)
+	if err != nil {
+		return runtime.NilValue(), err
+	}
+	return runtime.DenseArrayValue(out), nil
+}

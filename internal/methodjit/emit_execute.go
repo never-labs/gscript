@@ -1170,6 +1170,18 @@ func (cf *CompiledFunction) executeOpExit(ctx *ExecContext, regs []runtime.Value
 		}
 		regs[slot] = out
 
+	case OpVectorWhere:
+		tempBase := arg1
+		nArgs := arg2
+		if slot >= len(regs) || tempBase < 0 || nArgs != 3 || tempBase+nArgs > len(regs) {
+			return fmt.Errorf("VectorWhere op-exit out of register range")
+		}
+		out, err := executeVectorWhereValue(regs[tempBase], regs[tempBase+1], regs[tempBase+2])
+		if err != nil {
+			return err
+		}
+		regs[slot] = out
+
 	case OpEq:
 		if arg1 < len(regs) && arg2 < len(regs) && slot < len(regs) {
 			regs[slot] = runtime.BoolValue(regs[arg1].Equal(regs[arg2]))
