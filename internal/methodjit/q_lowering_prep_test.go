@@ -3,6 +3,7 @@
 package methodjit
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -256,6 +257,7 @@ func TestVectorWhereReduceBytecodeDiagnosesTypedRuntimeKernel(t *testing.T) {
 	assertQKernelShapeSummaryExecution(t, report.QKernelShapeSummary, "methodjit_q_vector_runtime", "runtime_kernel", "compare/vector-where/vector-reduce", "supported", 1, 1, 0)
 	assertQKernelExecutionStat(t, report.QKernelExecutionStats, "methodjit_q_vector_runtime", "QVectorWhereReduce", "compare/vector-where/vector-reduce", "typed_runtime_op_exit", "success", 1)
 	assertQKernelExecutionRouteSummary(t, report.QKernelExecutionRoutes, "methodjit_q_vector_runtime", "QVectorWhereReduce", "typed_runtime_op_exit", "success", 1)
+	assertQKernelJSONRows(t, report.QKernelDescriptors, report.QKernelExecutionRoutes)
 	if len(report.InterpResult) != 1 || !report.InterpResult[0].IsInt() || report.InterpResult[0].Int() != 57 {
 		t.Fatalf("Diagnose vector where-reduce primitive result = %#v, want int 57", report.InterpResult)
 	}
@@ -2255,6 +2257,86 @@ func TestQVectorReduceColumnInputReportsUnsupportedLoweringShape(t *testing.T) {
 	}
 }
 
+func TestQGroupAggregateCallReportsStructuredFallback(t *testing.T) {
+	const query = "select notional:sum price*size, fills:count i by sym from trades where price>100 order by sym asc"
+	proto := &vm.FuncProto{
+		Name:      "q_group_aggregate_call",
+		NumParams: 1,
+		MaxStack:  4,
+		Constants: []runtime.Value{
+			runtime.StringValue("q"),
+			runtime.StringValue("sql"),
+			runtime.StringValue(query),
+		},
+		Code: []uint32{
+			vm.EncodeABx(vm.OP_GETGLOBAL, 1, 0),
+			vm.EncodeABC(vm.OP_GETFIELD, 1, 1, 1),
+			vm.EncodeABC(vm.OP_MOVE, 2, 0, 0),
+			vm.EncodeABx(vm.OP_LOADK, 3, 2),
+			vm.EncodeABC(vm.OP_CALL, 1, 3, 2),
+			vm.EncodeABC(vm.OP_RETURN, 1, 2, 0),
+		},
+	}
+
+	fn := BuildGraph(proto)
+	fn.Remarks = &OptimizationRemarks{}
+	lowered, err := QQueryNativeLoweringPass(fn)
+	if err != nil {
+		t.Fatalf("QQueryNativeLoweringPass: %v", err)
+	}
+	if counts := countOps(lowered); counts[OpCall] != 1 {
+		t.Fatalf("group aggregate call op count = %d, want opaque OpCall to remain\n%s", counts[OpCall], Print(lowered))
+	}
+	fallbacks := CountQQueryLoweringFallbackReasons(fn.Remarks.List())
+	if fallbacks[qQueryLoweringFallbackGroupAggregateCall] != 1 {
+		t.Fatalf("q query fallback counts = %+v, want group_aggregate_call=1", fallbacks)
+	}
+	descriptors := BuildQKernelDescriptors(nil, nil, nil, fn.Remarks.List())
+	assertQKernelDescriptor(t, descriptors, "methodjit_q_query_lowering", "fallback", "QGroupAggregate", "where/group/aggregate/order", "lowering", "fallback", qQueryLoweringFallbackGroupAggregateCall)
+	summary := BuildQKernelShapeSummaryFromDescriptors(descriptors)
+	assertQKernelShapeSummary(t, summary, "methodjit_q_query_lowering", "fallback", "where/group/aggregate/order", "fallback", qQueryLoweringFallbackGroupAggregateCall, 1)
+	formatted := formatOptimizationRemarks(fn.Remarks.List())
+	if !strings.Contains(formatted, "kernel=QGroupAggregate") ||
+		!strings.Contains(formatted, "reason_code=group_aggregate_call") ||
+		!strings.Contains(formatted, "shape=where/group/aggregate/order") {
+		t.Fatalf("group aggregate fallback remark missing stable taxonomy:\n%s", formatted)
+	}
+}
+
+func TestQGroupAggregateFallbackDoesNotMatchPlainQSelect(t *testing.T) {
+	const query = "select sym,price from trades where price>100"
+	proto := &vm.FuncProto{
+		Name:      "q_plain_select_call",
+		NumParams: 1,
+		MaxStack:  4,
+		Constants: []runtime.Value{
+			runtime.StringValue("q"),
+			runtime.StringValue("select"),
+			runtime.StringValue(query),
+		},
+		Code: []uint32{
+			vm.EncodeABx(vm.OP_GETGLOBAL, 1, 0),
+			vm.EncodeABC(vm.OP_GETFIELD, 1, 1, 1),
+			vm.EncodeABC(vm.OP_MOVE, 2, 0, 0),
+			vm.EncodeABx(vm.OP_LOADK, 3, 2),
+			vm.EncodeABC(vm.OP_CALL, 1, 3, 2),
+			vm.EncodeABC(vm.OP_RETURN, 1, 2, 0),
+		},
+	}
+
+	fn := BuildGraph(proto)
+	fn.Remarks = &OptimizationRemarks{}
+	if _, err := QQueryNativeLoweringPass(fn); err != nil {
+		t.Fatalf("QQueryNativeLoweringPass: %v", err)
+	}
+	if fallbacks := CountQQueryLoweringFallbackReasons(fn.Remarks.List()); len(fallbacks) != 0 {
+		t.Fatalf("plain q.select fallback counts = %+v, want none", fallbacks)
+	}
+	if descriptors := BuildQKernelDescriptors(nil, nil, nil, fn.Remarks.List()); len(descriptors) != 0 {
+		t.Fatalf("plain q.select descriptors = %+v, want none", descriptors)
+	}
+}
+
 func TestQVectorRuntimeKernelsDiagnosePrimitiveShapes(t *testing.T) {
 	proto := &vm.FuncProto{
 		Name:      "q_vector_runtime_kernel_shapes",
@@ -3450,6 +3532,40 @@ func assertQKernelExecutionRouteSummary(t *testing.T, rows []QKernelExecutionRou
 	}
 	t.Fatalf("QKernelExecutionRouteSummary missing source=%s kernel=%s route=%s outcome=%s; rows=%+v",
 		source, kernel, route, outcome, rows)
+}
+
+func assertQKernelJSONRows(t *testing.T, descriptors []QKernelDescriptor, routes []QKernelExecutionRouteSummary) {
+	t.Helper()
+	descriptorJSON, err := json.Marshal(QKernelDescriptorJSONRows(descriptors))
+	if err != nil {
+		t.Fatalf("marshal QKernelDescriptorJSONRows: %v", err)
+	}
+	descriptorText := string(descriptorJSON)
+	if !strings.Contains(descriptorText, `"source":"methodjit_q_vector_runtime"`) ||
+		!strings.Contains(descriptorText, `"route":"typed_runtime_op_exit"`) ||
+		!strings.Contains(descriptorText, `"outcome":"supported"`) {
+		t.Fatalf("descriptor JSON rows missing stable keys:\n%s", descriptorText)
+	}
+	if strings.Contains(descriptorText, `"Source"`) ||
+		strings.Contains(descriptorText, `"ReasonCode"`) ||
+		strings.Contains(descriptorText, `"reason_code"`) {
+		t.Fatalf("descriptor JSON rows leaked Go field names:\n%s", descriptorText)
+	}
+
+	routeJSON, err := json.Marshal(QKernelExecutionRouteSummaryJSONRows(routes))
+	if err != nil {
+		t.Fatalf("marshal QKernelExecutionRouteSummaryJSONRows: %v", err)
+	}
+	routeText := string(routeJSON)
+	if !strings.Contains(routeText, `"route":"typed_runtime_op_exit"`) ||
+		!strings.Contains(routeText, `"outcome":"success"`) ||
+		!strings.Contains(routeText, `"count":1`) {
+		t.Fatalf("route summary JSON rows missing stable keys:\n%s", routeText)
+	}
+	if strings.Contains(routeText, `"Route"`) ||
+		strings.Contains(routeText, `"Outcome"`) {
+		t.Fatalf("route summary JSON rows leaked Go field names:\n%s", routeText)
+	}
 }
 
 func qHotPathNamesValue(names ...string) runtime.Value {
