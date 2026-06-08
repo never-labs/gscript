@@ -5817,6 +5817,64 @@ func assertQKernelShapeSummaryExecution(t *testing.T, rows []QKernelShapeSummary
 		source, kind, shape, outcome, rows)
 }
 
+func TestQEvalHotPlanRecognizesConstantVectorWhereReduce(t *testing.T) {
+	fn := BuildGraph(qEvalHotPlanConstProto("x:til rows;y:x+1;+/y where x>10"))
+	fn.Remarks = &OptimizationRemarks{}
+	if _, err := QEvalHotPlanRemarkPass(fn); err != nil {
+		t.Fatalf("QEvalHotPlanRemarkPass: %v", err)
+	}
+	descriptors := BuildQKernelDescriptors(nil, nil, nil, fn.Remarks.List())
+	assertQKernelDescriptor(t, descriptors, "methodjit_q_eval_lowering", "runtime_kernel", "QEvalWhereReduce", "where/vector-reduce", "hot_plan", "supported", "")
+}
+
+func TestQEvalHotPlanReportsDynamicSourceFallback(t *testing.T) {
+	fn := BuildGraph(qEvalHotPlanDynamicProto())
+	fn.Remarks = &OptimizationRemarks{}
+	if _, err := QEvalHotPlanRemarkPass(fn); err != nil {
+		t.Fatalf("QEvalHotPlanRemarkPass: %v", err)
+	}
+	descriptors := BuildQKernelDescriptors(nil, nil, nil, fn.Remarks.List())
+	assertQKernelDescriptor(t, descriptors, "methodjit_q_eval_lowering", "fallback", "QEvalVectorPlan", "q-eval/dynamic-source", "hot_plan", "fallback", qEvalHotPlanFallbackDynamicSource)
+}
+
+func qEvalHotPlanConstProto(source string) *vm.FuncProto {
+	return &vm.FuncProto{
+		Name:     "q_eval_hot_plan_const",
+		MaxStack: 2,
+		Constants: []runtime.Value{
+			runtime.StringValue("q"),
+			runtime.StringValue("eval"),
+			runtime.StringValue(source),
+		},
+		Code: []uint32{
+			vm.EncodeABx(vm.OP_GETGLOBAL, 0, 0),
+			vm.EncodeABC(vm.OP_GETFIELD, 0, 0, 1),
+			vm.EncodeABx(vm.OP_LOADK, 1, 2),
+			vm.EncodeABC(vm.OP_CALL, 0, 2, 2),
+			vm.EncodeABC(vm.OP_RETURN, 0, 2, 0),
+		},
+	}
+}
+
+func qEvalHotPlanDynamicProto() *vm.FuncProto {
+	return &vm.FuncProto{
+		Name:      "q_eval_hot_plan_dynamic",
+		NumParams: 1,
+		MaxStack:  3,
+		Constants: []runtime.Value{
+			runtime.StringValue("q"),
+			runtime.StringValue("eval"),
+		},
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_MOVE, 2, 0, 0),
+			vm.EncodeABx(vm.OP_GETGLOBAL, 1, 0),
+			vm.EncodeABC(vm.OP_GETFIELD, 1, 1, 1),
+			vm.EncodeABC(vm.OP_CALL, 1, 2, 2),
+			vm.EncodeABC(vm.OP_RETURN, 1, 2, 0),
+		},
+	}
+}
+
 func assertQKernelDescriptor(t *testing.T, rows []QKernelDescriptor, source, kind, kernel, shape, route, outcome, reasonCode string) {
 	t.Helper()
 	for _, row := range rows {

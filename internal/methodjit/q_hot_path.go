@@ -26,6 +26,9 @@ const (
 	qQueryLoweringFallbackMaskCombineUnsupported  = "mask_combine_unsupported"
 	qQueryLoweringFallbackGroupAggregateCall      = "group_aggregate_call"
 	qQueryLoweringFallbackJoinCall                = "join_call"
+	qEvalHotPlanFallbackDynamicSource             = "dynamic_source"
+	qEvalHotPlanFallbackEmptySource               = "empty_source"
+	qEvalHotPlanFallbackUnsupportedShape          = "unsupported_shape"
 )
 
 // QQueryHotPath describes an IR pattern for the q query primitive pipeline:
@@ -168,6 +171,12 @@ type QKernelExecutionRouteSummaryJSONRow struct {
 	Route   string `json:"route"`
 	Outcome string `json:"outcome"`
 	Count   uint64 `json:"count"`
+}
+
+type qEvalHotPlan struct {
+	Kernel string
+	Shape  string
+	Detail string
 }
 
 // QKernelShapeSummary is a source-stable row for joining MethodJIT q kernel
@@ -471,7 +480,7 @@ func BuildQKernelDescriptors(vectorKernels []QVectorRuntimeKernel, framePrimitiv
 		})
 	}
 	for _, remark := range remarks {
-		if remark.Kind != "missed" {
+		if remark.Kind != "missed" && !(remark.Pass == "QEvalHotPlan" && remark.Kind == "changed") {
 			continue
 		}
 		var source, kernel string
@@ -482,12 +491,19 @@ func BuildQKernelDescriptors(vectorKernels []QVectorRuntimeKernel, framePrimitiv
 		case "QVectorNativeLowering":
 			source = "methodjit_q_vector_lowering"
 			kernel = "QVectorWhereReduce"
+		case "QEvalHotPlan":
+			source = "methodjit_q_eval_lowering"
+			kernel = "QEvalVectorPlan"
 		default:
 			continue
 		}
-		reason, ok := qQueryLoweringFallbackReasonFromRemark(remark)
-		if !ok {
-			continue
+		reason := ""
+		if remark.Kind == "missed" {
+			var ok bool
+			reason, ok = qQueryLoweringFallbackReasonFromRemark(remark)
+			if !ok {
+				continue
+			}
 		}
 		if remarkKernel, ok := qLoweringRemarkFieldFromRemark(remark, "kernel"); ok {
 			kernel = remarkKernel
@@ -1128,6 +1144,185 @@ func QQueryNativeLoweringPass(fn *Function) (*Function, error) {
 	qJoinFallbackRemarkPass(fn)
 	qGroupAggregateFallbackRemarkPass(fn)
 	return fn, nil
+}
+
+// QEvalHotPlanRemarkPass records constant q.eval sources that are structurally
+// plan-ready for q vector typed-runtime lowering. It is intentionally read-only:
+// the descriptor gives MethodJIT and benchmark tooling a stable handoff point
+// before execution is lowered into OpQEvalVectorPlan or existing OpVector* ops.
+func QEvalHotPlanRemarkPass(fn *Function) (*Function, error) {
+	if fn == nil {
+		return fn, nil
+	}
+	for _, block := range fn.Blocks {
+		if block == nil {
+			continue
+		}
+		for _, instr := range block.Instrs {
+			if instr == nil || instr.Op != OpCall || !qCallIsQEvalEntrypoint(fn, instr) {
+				continue
+			}
+			source, ok := qCallEvalSourceString(fn, instr)
+			if !ok {
+				qEvalHotPlanFallbackRemark(fn, instr, qEvalHotPlanFallbackDynamicSource, "q-eval/dynamic-source")
+				continue
+			}
+			plan, reason, ok := qClassifyEvalHotPlan(source)
+			if !ok {
+				qEvalHotPlanFallbackRemark(fn, instr, reason, "q-eval/unsupported")
+				continue
+			}
+			qEvalHotPlanSupportedRemark(fn, instr, plan)
+		}
+	}
+	return fn, nil
+}
+
+func qEvalHotPlanSupportedRemark(fn *Function, call *Instr, plan qEvalHotPlan) {
+	blockID, valueID := qRemarkLocation(call)
+	fields := map[string]string{
+		"kind":    "runtime_kernel",
+		"kernel":  plan.Kernel,
+		"shape":   plan.Shape,
+		"route":   "hot_plan",
+		"outcome": "supported",
+	}
+	if plan.Detail != "" {
+		fields["detail"] = plan.Detail
+	}
+	functionRemarks(fn).AddWithFields("QEvalHotPlan", "changed", blockID, valueID, OpCall,
+		fmt.Sprintf("kernel=%s shape=%s; constant q.eval source is plan-ready for typed vector runtime lowering",
+			plan.Kernel, plan.Shape),
+		fields)
+}
+
+func qEvalHotPlanFallbackRemark(fn *Function, call *Instr, reasonCode, shape string) {
+	if reasonCode == "" {
+		reasonCode = qEvalHotPlanFallbackUnsupportedShape
+	}
+	if shape == "" {
+		shape = "q-eval/unsupported"
+	}
+	blockID, valueID := qRemarkLocation(call)
+	functionRemarks(fn).AddWithFields("QEvalHotPlan", "missed", blockID, valueID, OpCall,
+		fmt.Sprintf("kernel=QEvalVectorPlan reason_code=%s shape=%s; q.eval source remains on interpreter fallback",
+			reasonCode, shape),
+		map[string]string{
+			"kind":          "fallback",
+			"kernel":        "QEvalVectorPlan",
+			"shape":         shape,
+			"reason_family": "lowering",
+			"reason_code":   reasonCode,
+			"route":         "hot_plan",
+			"outcome":       "fallback",
+		})
+}
+
+func qRemarkLocation(instr *Instr) (blockID, valueID int) {
+	if instr == nil {
+		return 0, 0
+	}
+	valueID = instr.ID
+	if instr.Block != nil {
+		blockID = instr.Block.ID
+	}
+	return blockID, valueID
+}
+
+func qClassifyEvalHotPlan(source string) (qEvalHotPlan, string, bool) {
+	trimmed := strings.TrimSpace(source)
+	if trimmed == "" {
+		return qEvalHotPlan{}, qEvalHotPlanFallbackEmptySource, false
+	}
+	expr := qEvalFinalExpression(trimmed)
+	normalized := strings.ToLower(strings.Join(strings.Fields(expr), " "))
+	switch {
+	case normalized == "":
+		return qEvalHotPlan{}, qEvalHotPlanFallbackEmptySource, false
+	case strings.Contains(normalized, " where ") && qEvalLooksLikeReduce(normalized):
+		return qEvalHotPlan{Kernel: "QEvalWhereReduce", Shape: "where/vector-reduce", Detail: "source=constant"}, "", true
+	case qEvalLooksLikeReduce(normalized):
+		return qEvalHotPlan{Kernel: "QEvalVectorReduce", Shape: "vector-reduce/" + qEvalReduceOpName(normalized), Detail: "source=constant"}, "", true
+	case strings.Contains(normalized, "+\\") || strings.HasPrefix(normalized, "sums "):
+		return qEvalHotPlan{Kernel: "QEvalVectorScan", Shape: "vector-scan/sum", Detail: "source=constant"}, "", true
+	case strings.Contains(normalized, "-':") || strings.HasPrefix(normalized, "deltas "):
+		return qEvalHotPlan{Kernel: "QEvalVectorScan", Shape: "vector-scan/deltas", Detail: "source=constant"}, "", true
+	case strings.Contains(normalized, " rotate "):
+		return qEvalHotPlan{Kernel: "QEvalVectorTransform", Shape: "vector-transform/rotate", Detail: "source=constant"}, "", true
+	case strings.HasPrefix(normalized, "reverse "):
+		return qEvalHotPlan{Kernel: "QEvalVectorTransform", Shape: "vector-transform/reverse", Detail: "source=constant"}, "", true
+	case strings.HasPrefix(normalized, "where ") || strings.Contains(normalized, " where "):
+		return qEvalHotPlan{Kernel: "QEvalWhere", Shape: "mask-to-index", Detail: "source=constant"}, "", true
+	case qEvalLooksLikeVectorDyadic(normalized):
+		return qEvalHotPlan{Kernel: "QEvalVectorDyadic", Shape: "vector-dyadic", Detail: "source=constant"}, "", true
+	default:
+		return qEvalHotPlan{}, qEvalHotPlanFallbackUnsupportedShape, false
+	}
+}
+
+func qEvalFinalExpression(source string) string {
+	depth := 0
+	start := 0
+	for i, r := range source {
+		switch r {
+		case '(', '[', '{':
+			depth++
+		case ')', ']', '}':
+			if depth > 0 {
+				depth--
+			}
+		case ';':
+			if depth == 0 {
+				start = i + 1
+			}
+		}
+	}
+	expr := strings.TrimSpace(source[start:])
+	if name, rhs, ok := strings.Cut(expr, ":"); ok && qSimpleIdentifier(strings.TrimSpace(name)) {
+		return strings.TrimSpace(rhs)
+	}
+	return expr
+}
+
+func qEvalLooksLikeReduce(expr string) bool {
+	return strings.Contains(expr, "+/") ||
+		strings.HasPrefix(expr, "sum ") ||
+		strings.HasPrefix(expr, "avg ") ||
+		strings.HasPrefix(expr, "min ") ||
+		strings.HasPrefix(expr, "max ") ||
+		strings.HasPrefix(expr, "prd ") ||
+		strings.HasPrefix(expr, "count ")
+}
+
+func qEvalReduceOpName(expr string) string {
+	switch {
+	case strings.Contains(expr, "+/") || strings.HasPrefix(expr, "sum "):
+		return "sum"
+	case strings.HasPrefix(expr, "avg "):
+		return "avg"
+	case strings.HasPrefix(expr, "min "):
+		return "min"
+	case strings.HasPrefix(expr, "max "):
+		return "max"
+	case strings.HasPrefix(expr, "prd "):
+		return "product"
+	case strings.HasPrefix(expr, "count "):
+		return "count"
+	default:
+		return "unknown"
+	}
+}
+
+func qEvalLooksLikeVectorDyadic(expr string) bool {
+	if strings.ContainsAny(expr, "+-*/") {
+		return strings.Contains(expr, "til ") || strings.Contains(expr, " til") || strings.Contains(expr, " 0 ") || strings.Contains(expr, " 1 ")
+	}
+	for _, op := range []string{">=", "<=", "!=", "<>", "=", ">", "<"} {
+		if strings.Contains(expr, op) {
+			return true
+		}
+	}
+	return false
 }
 
 type qSimpleGroupAggregateQuery struct {
@@ -1834,6 +2029,37 @@ func qCallIsQSQLEntrypoint(fn *Function, call *Instr) bool {
 	}
 	field, ok := qConstStringAt(fn, int(callee.Aux))
 	return ok && field == "sql"
+}
+
+func qCallIsQEvalEntrypoint(fn *Function, call *Instr) bool {
+	if fn == nil || call == nil || len(call.Args) == 0 || call.Args[0] == nil {
+		return false
+	}
+	callee := call.Args[0].Def
+	if callee == nil || callee.Op != OpGetField || len(callee.Args) != 1 {
+		return false
+	}
+	field, ok := qConstStringAt(fn, int(callee.Aux))
+	if !ok || field != "eval" {
+		return false
+	}
+	receiver := callee.Args[0].Def
+	if receiver == nil || receiver.Op != OpGetGlobal {
+		return false
+	}
+	global, ok := qConstStringAt(fn, int(receiver.Aux))
+	return ok && global == "q"
+}
+
+func qCallEvalSourceString(fn *Function, call *Instr) (string, bool) {
+	if fn == nil || call == nil || len(call.Args) != 2 {
+		return "", false
+	}
+	arg := call.Args[1]
+	if arg == nil || arg.Def == nil || arg.Def.Op != OpConstString {
+		return "", false
+	}
+	return qConstStringAt(fn, int(arg.Def.Aux))
 }
 
 func qCallSQLFrameArg(fn *Function, call *Instr) *Value {
