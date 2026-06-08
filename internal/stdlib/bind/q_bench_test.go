@@ -42,6 +42,50 @@ var qSQLBenchmarkCases = []qSQLBenchmarkCase{
 		tags: []string{"qsql", "bind", "warm-cache", "join", "inner-join", "symbol-key", "order", "take", "kernel-stats"},
 	},
 	{
+		name: "BenchmarkQSQLBindRunSQLColdCacheJoin",
+		tags: []string{"qsql", "bind", "cold-cache", "join", "inner-join", "symbol-key", "order", "take", "kernel-stats"},
+	},
+	{
+		name: "BenchmarkQSQLBindRunSQLWarmCacheLeftJoin",
+		tags: []string{"qsql", "bind", "warm-cache", "join", "left-join", "symbol-key", "order", "take", "kernel-stats"},
+	},
+	{
+		name: "BenchmarkQSQLBindRunSQLWarmCacheChainedJoin",
+		tags: []string{"qsql", "bind", "warm-cache", "join", "chained-join", "left-join", "inner-join", "symbol-key", "order", "take", "kernel-stats"},
+	},
+	{
+		name: "BenchmarkQSQLBindRunSQLWarmCacheAsofJoin",
+		tags: []string{"qsql", "bind", "warm-cache", "join", "asof-join", "symbol-key", "temporal-key", "order", "take", "kernel-stats"},
+	},
+	{
+		name: "BenchmarkQSQLBindRunSQLWarmCacheWindowJoin",
+		tags: []string{"qsql", "bind", "warm-cache", "join", "window-join", "symbol-key", "temporal-key", "order", "take", "kernel-stats"},
+	},
+	{
+		name: "BenchmarkQSQLBindRunSQLWarmCacheUnionJoin",
+		tags: []string{"qsql", "bind", "warm-cache", "join", "union-join", "symbol-key", "order", "take", "kernel-stats"},
+	},
+	{
+		name: "BenchmarkQSQLBindRunSQLWarmCachePlusJoin",
+		tags: []string{"qsql", "bind", "warm-cache", "join", "plus-join", "symbol-key", "order", "take", "kernel-stats"},
+	},
+	{
+		name: "BenchmarkQSQLBindRunSQLWarmCacheDistinctOrderTake",
+		tags: []string{"qsql", "bind", "warm-cache", "select", "where", "project", "distinct", "order", "take", "typed-filter", "kernel-stats"},
+	},
+	{
+		name: "BenchmarkQSQLBindRunSQLWarmCacheGroupByXbarAggregate",
+		tags: []string{"qsql", "bind", "warm-cache", "group", "by", "aggregate", "computed-aggregate", "xbar", "symbol-key", "temporal-key", "typed-filter", "order", "take", "kernel-stats"},
+	},
+	{
+		name: "BenchmarkQSQLBindRunSQLWarmCacheUpdateWhere",
+		tags: []string{"qsql", "bind", "warm-cache", "update", "where", "mutation", "typed-filter", "kernel-stats"},
+	},
+	{
+		name: "BenchmarkQSQLBindRunSQLWarmCacheDeleteWhere",
+		tags: []string{"qsql", "bind", "warm-cache", "delete", "where", "mutation", "typed-filter", "kernel-stats"},
+	},
+	{
 		name: "BenchmarkQSQLNativeGoSelectWhereProject",
 		tags: []string{"native-go", "select", "where", "project", "order", "take"},
 	},
@@ -79,12 +123,25 @@ var qSQLRequiredBenchmarkTags = []string{
 	"order",
 	"take",
 	"group",
+	"by",
 	"aggregate",
 	"computed-aggregate",
 	"join",
 	"inner-join",
+	"left-join",
+	"chained-join",
+	"asof-join",
+	"window-join",
+	"union-join",
+	"plus-join",
 	"symbol-key",
+	"temporal-key",
 	"typed-filter",
+	"distinct",
+	"xbar",
+	"update",
+	"delete",
+	"mutation",
 	"kernel-stats",
 	"native-go",
 	"data-runtime",
@@ -264,6 +321,178 @@ func BenchmarkQSQLBindRunSQLWarmCacheJoin(b *testing.B) {
 	qSQLBindBenchReportQStats(b)
 }
 
+func BenchmarkQSQLBindRunSQLColdCacheJoin(b *testing.B) {
+	qClearCaches()
+	defer qClearCaches()
+
+	const rows = 8192
+	args := qSQLBindBenchJoinArgs(b, rows, "select sym,price,bid,ask from trades join quotes on sym order by price desc take 128")
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	start := time.Now()
+	for i := 0; i < b.N; i++ {
+		qClearCaches()
+		out, err := qRunSQL("q.sql", args)
+		if err != nil {
+			b.Fatalf("q.sql: %v", err)
+		}
+		qSQLBindBenchSink = out
+	}
+	b.StopTimer()
+	qSQLBindBenchReportRows(b, rows, start)
+	qSQLBindBenchReportQStats(b)
+}
+
+func BenchmarkQSQLBindRunSQLWarmCacheLeftJoin(b *testing.B) {
+	qClearCaches()
+	defer qClearCaches()
+
+	const rows = 8192
+	qSQLBindBenchRunWarmSQL(b, rows, qSQLBindBenchJoinArgs(
+		b,
+		rows,
+		"select sym,price,bid,ask from trades left join quotes on sym order by price desc take 128",
+	))
+}
+
+func BenchmarkQSQLBindRunSQLWarmCacheChainedJoin(b *testing.B) {
+	qClearCaches()
+	defer qClearCaches()
+
+	const rows = 8192
+	tradesValue := qSQLBindBenchFrameValue(b, qSQLBindBenchTradesFrame(b, rows))
+	quotesValue := qSQLBindBenchFrameValue(b, qSQLBindBenchQuotesFrame(b))
+	venuesValue := qSQLBindBenchFrameValue(b, qSQLBindBenchVenuesFrame(b))
+	envValue := qSQLBindBenchEnvValue(map[string]Value{
+		"trades": tradesValue,
+		"quotes": quotesValue,
+		"venues": venuesValue,
+	})
+	qSQLBindBenchRunWarmSQL(b, rows, qSQLArgsResult{
+		frameValue:    envValue,
+		source:        "select sym,venue,price,bid,region from trades ij quotes on sym lj venues on venue order by price desc take 128",
+		resolveSource: true,
+		envValue:      envValue,
+	})
+}
+
+func BenchmarkQSQLBindRunSQLWarmCacheAsofJoin(b *testing.B) {
+	qClearCaches()
+	defer qClearCaches()
+
+	const rows = 8192
+	tradesValue := qSQLBindBenchFrameValue(b, qSQLBindBenchTradesFrame(b, rows))
+	quotesValue := qSQLBindBenchFrameValue(b, qSQLBindBenchTemporalQuotesFrame(b, rows/2))
+	envValue := qSQLBindBenchEnvValue(map[string]Value{"trades": tradesValue, "quotes": quotesValue})
+	qSQLBindBenchRunWarmSQL(b, rows, qSQLArgsResult{
+		frameValue:    envValue,
+		source:        "select sym,ts,price,bid,ask,spread:ask-bid from trades asof join quotes on sym,ts where active=true order by ts asc take 128",
+		resolveSource: true,
+		envValue:      envValue,
+	})
+}
+
+func BenchmarkQSQLBindRunSQLWarmCacheWindowJoin(b *testing.B) {
+	qClearCaches()
+	defer qClearCaches()
+
+	const rows = 8192
+	tradesValue := qSQLBindBenchFrameValue(b, qSQLBindBenchTradesFrame(b, rows))
+	quotesValue := qSQLBindBenchFrameValue(b, qSQLBindBenchTemporalQuotesFrame(b, rows/2))
+	envValue := qSQLBindBenchEnvValue(map[string]Value{"trades": tradesValue, "quotes": quotesValue})
+	qSQLBindBenchRunWarmSQL(b, rows, qSQLArgsResult{
+		frameValue:    envValue,
+		source:        "select sym,ts,bid,ask from trades wj[-60000000000 0] quotes on sym,ts order by ts asc take 128",
+		resolveSource: true,
+		envValue:      envValue,
+	})
+}
+
+func BenchmarkQSQLBindRunSQLWarmCacheUnionJoin(b *testing.B) {
+	qClearCaches()
+	defer qClearCaches()
+
+	const rows = 2048
+	tradesValue := qSQLBindBenchFrameValue(b, qSQLBindBenchTradesFrame(b, rows))
+	fillsValue := qSQLBindBenchFrameValue(b, qSQLBindBenchFillsFrame(b, rows/2))
+	envValue := qSQLBindBenchEnvValue(map[string]Value{"trades": tradesValue, "fills": fillsValue})
+	qSQLBindBenchRunWarmSQL(b, rows, qSQLArgsResult{
+		frameValue:    envValue,
+		source:        "select sym,size,venue from trades uj fills on sym order by sym asc take 128",
+		resolveSource: true,
+		envValue:      envValue,
+	})
+}
+
+func BenchmarkQSQLBindRunSQLWarmCachePlusJoin(b *testing.B) {
+	qClearCaches()
+	defer qClearCaches()
+
+	const rows = 2048
+	tradesValue := qSQLBindBenchFrameValue(b, qSQLBindBenchTradesFrame(b, rows))
+	fillsValue := qSQLBindBenchFrameValue(b, qSQLBindBenchFillSizesFrame(b, rows/2))
+	envValue := qSQLBindBenchEnvValue(map[string]Value{"trades": tradesValue, "fills": fillsValue})
+	qSQLBindBenchRunWarmSQL(b, rows, qSQLArgsResult{
+		frameValue:    envValue,
+		source:        "select sym,size from trades pj fills on sym order by sym asc take 128",
+		resolveSource: true,
+		envValue:      envValue,
+	})
+}
+
+func BenchmarkQSQLBindRunSQLWarmCacheDistinctOrderTake(b *testing.B) {
+	qClearCaches()
+	defer qClearCaches()
+
+	const rows = 8192
+	frame := qSQLBindBenchTradesFrame(b, rows)
+	frameValue := qSQLBindBenchFrameValue(b, frame)
+	qSQLBindBenchRunWarmSQL(b, rows, qSQLArgsResult{
+		frameValue: frameValue,
+		source:     "select distinct sym,venue,active from trades where price>=100 order by sym asc,venue asc take 64",
+	})
+}
+
+func BenchmarkQSQLBindRunSQLWarmCacheGroupByXbarAggregate(b *testing.B) {
+	qClearCaches()
+	defer qClearCaches()
+
+	const rows = 8192
+	frame := qSQLBindBenchTradesFrame(b, rows)
+	frameValue := qSQLBindBenchFrameValue(b, frame)
+	qSQLBindBenchRunWarmSQL(b, rows, qSQLArgsResult{
+		frameValue: frameValue,
+		source:     "select notional:sum price*size,shares:sum size,fills:count i,first_px:first price,last_px:last price by sym,bucket:xbar 60000000000 ts from trades where active=true order by notional desc take 64",
+	})
+}
+
+func BenchmarkQSQLBindRunSQLWarmCacheUpdateWhere(b *testing.B) {
+	qClearCaches()
+	defer qClearCaches()
+
+	const rows = 8192
+	frame := qSQLBindBenchTradesFrame(b, rows)
+	frameValue := qSQLBindBenchFrameValue(b, frame)
+	qSQLBindBenchRunWarmSQL(b, rows, qSQLArgsResult{
+		frameValue: frameValue,
+		source:     "update notional:price*size from trades where active=true,price>=100",
+	})
+}
+
+func BenchmarkQSQLBindRunSQLWarmCacheDeleteWhere(b *testing.B) {
+	qClearCaches()
+	defer qClearCaches()
+
+	const rows = 8192
+	frame := qSQLBindBenchTradesFrame(b, rows)
+	frameValue := qSQLBindBenchFrameValue(b, frame)
+	qSQLBindBenchRunWarmSQL(b, rows, qSQLArgsResult{
+		frameValue: frameValue,
+		source:     "delete from trades where active=false",
+	})
+}
+
 func BenchmarkQSQLNativeGoSelectWhereProject(b *testing.B) {
 	const rows = 8192
 	trades := qSQLNativeBenchTrades(rows)
@@ -371,12 +600,39 @@ func qSQLBindBenchTradesFrame(b *testing.B, rows int) data.Frame {
 	trades := qSQLNativeBenchTrades(rows)
 	frame, err := data.NewFrame(
 		data.Column{Name: "sym", Data: data.NewSymbols(trades.sym)},
+		data.Column{Name: "venue", Data: data.NewString(trades.venue)},
+		data.Column{Name: "ts", Data: data.NewTimestamp(trades.ts)},
 		data.Column{Name: "price", Data: data.NewF64(trades.price)},
 		data.Column{Name: "size", Data: data.NewI64(trades.size)},
 		data.Column{Name: "active", Data: data.NewBool(trades.active)},
 	)
 	if err != nil {
 		b.Fatalf("NewFrame trades: %v", err)
+	}
+	return frame
+}
+
+func qSQLBindBenchTemporalQuotesFrame(b *testing.B, rows int) data.Frame {
+	b.Helper()
+	symbols := []string{"AAPL", "MSFT", "NVDA", "TSLA", "AMZN", "META", "GOOG", "IBM"}
+	sym := make([]string, rows)
+	ts := make([]data.Timestamp, rows)
+	bid := make([]float64, rows)
+	ask := make([]float64, rows)
+	for i := 0; i < rows; i++ {
+		sym[i] = symbols[i%len(symbols)]
+		ts[i] = data.TimestampFromUnixNanos(int64(i/len(symbols))*30_000_000_000 + int64(i%len(symbols)))
+		bid[i] = 75 + float64((i*11)%220) + 0.05
+		ask[i] = bid[i] + 0.1
+	}
+	frame, err := data.NewFrame(
+		data.Column{Name: "sym", Data: data.NewSymbols(sym)},
+		data.Column{Name: "ts", Data: data.NewTimestamp(ts)},
+		data.Column{Name: "bid", Data: data.NewF64(bid)},
+		data.Column{Name: "ask", Data: data.NewF64(ask)},
+	)
+	if err != nil {
+		b.Fatalf("NewFrame temporal quotes: %v", err)
 	}
 	return frame
 }
@@ -394,6 +650,60 @@ func qSQLBindBenchQuotesFrame(b *testing.B) data.Frame {
 	return frame
 }
 
+func qSQLBindBenchFillsFrame(b *testing.B, rows int) data.Frame {
+	b.Helper()
+	symbols := []string{"AAPL", "MSFT", "NVDA", "TSLA", "AMZN", "META", "GOOG", "IBM", "ORCL", "SAP"}
+	venues := []string{"XNAS", "XNYS", "BATS", "IEX"}
+	sym := make([]string, rows)
+	venue := make([]string, rows)
+	size := make([]int64, rows)
+	for i := 0; i < rows; i++ {
+		sym[i] = symbols[i%len(symbols)]
+		venue[i] = venues[(i*3)%len(venues)]
+		size[i] = int64(1 + (i*7)%200)
+	}
+	frame, err := data.NewFrame(
+		data.Column{Name: "sym", Data: data.NewSymbols(sym)},
+		data.Column{Name: "size", Data: data.NewI64(size)},
+		data.Column{Name: "venue", Data: data.NewString(venue)},
+	)
+	if err != nil {
+		b.Fatalf("NewFrame fills: %v", err)
+	}
+	return frame
+}
+
+func qSQLBindBenchFillSizesFrame(b *testing.B, rows int) data.Frame {
+	b.Helper()
+	symbols := []string{"AAPL", "MSFT", "NVDA", "TSLA", "AMZN", "META", "GOOG", "IBM", "ORCL", "SAP"}
+	sym := make([]string, rows)
+	size := make([]int64, rows)
+	for i := 0; i < rows; i++ {
+		sym[i] = symbols[i%len(symbols)]
+		size[i] = int64(1 + (i*7)%200)
+	}
+	frame, err := data.NewFrame(
+		data.Column{Name: "sym", Data: data.NewSymbols(sym)},
+		data.Column{Name: "size", Data: data.NewI64(size)},
+	)
+	if err != nil {
+		b.Fatalf("NewFrame fill sizes: %v", err)
+	}
+	return frame
+}
+
+func qSQLBindBenchVenuesFrame(b *testing.B) data.Frame {
+	b.Helper()
+	frame, err := data.NewFrame(
+		data.Column{Name: "venue", Data: data.NewString([]string{"XNAS", "XNYS", "BATS", "IEX"})},
+		data.Column{Name: "region", Data: data.NewSymbols([]string{"US", "US", "US", "US"})},
+	)
+	if err != nil {
+		b.Fatalf("NewFrame venues: %v", err)
+	}
+	return frame
+}
+
 func qSQLBindBenchFrameValue(b *testing.B, frame data.Frame) Value {
 	b.Helper()
 	value, err := qDataFrameValue(frame)
@@ -401,6 +711,48 @@ func qSQLBindBenchFrameValue(b *testing.B, frame data.Frame) Value {
 		b.Fatalf("qDataFrameValue: %v", err)
 	}
 	return value
+}
+
+func qSQLBindBenchEnvValue(values map[string]Value) Value {
+	env := NewTable()
+	for name, value := range values {
+		env.RawSetString(name, value)
+	}
+	return TableValue(env)
+}
+
+func qSQLBindBenchJoinArgs(b *testing.B, rows int, query string) qSQLArgsResult {
+	b.Helper()
+	tradesValue := qSQLBindBenchFrameValue(b, qSQLBindBenchTradesFrame(b, rows))
+	quotesValue := qSQLBindBenchFrameValue(b, qSQLBindBenchQuotesFrame(b))
+	envValue := qSQLBindBenchEnvValue(map[string]Value{"trades": tradesValue, "quotes": quotesValue})
+	return qSQLArgsResult{
+		frameValue:    envValue,
+		source:        query,
+		resolveSource: true,
+		envValue:      envValue,
+	}
+}
+
+func qSQLBindBenchRunWarmSQL(b *testing.B, rows int, args qSQLArgsResult) {
+	b.Helper()
+	if _, err := qRunSQL("q.sql", args); err != nil {
+		b.Fatalf("warm q.sql: %v", err)
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	start := time.Now()
+	for i := 0; i < b.N; i++ {
+		out, err := qRunSQL("q.sql", args)
+		if err != nil {
+			b.Fatalf("q.sql: %v", err)
+		}
+		qSQLBindBenchSink = out
+	}
+	b.StopTimer()
+	qSQLBindBenchReportRows(b, rows, start)
+	qSQLBindBenchReportQStats(b)
 }
 
 func qSQLBindBenchReportRows(b *testing.B, rows int, start time.Time) {
@@ -443,6 +795,8 @@ func qSQLBindBenchHitPct(hits, misses int) float64 {
 
 type qSQLNativeTrades struct {
 	sym    []string
+	venue  []string
+	ts     []data.Timestamp
 	price  []float64
 	size   []int64
 	active []bool
@@ -455,14 +809,19 @@ type qSQLNativeQuotes struct {
 
 func qSQLNativeBenchTrades(rows int) qSQLNativeTrades {
 	symbols := []string{"AAPL", "MSFT", "NVDA", "TSLA", "AMZN", "META", "GOOG", "IBM"}
+	venues := []string{"XNAS", "XNYS", "BATS", "IEX"}
 	trades := qSQLNativeTrades{
 		sym:    make([]string, rows),
+		venue:  make([]string, rows),
+		ts:     make([]data.Timestamp, rows),
 		price:  make([]float64, rows),
 		size:   make([]int64, rows),
 		active: make([]bool, rows),
 	}
 	for i := 0; i < rows; i++ {
 		trades.sym[i] = symbols[i%len(symbols)]
+		trades.venue[i] = venues[(i*3)%len(venues)]
+		trades.ts[i] = data.TimestampFromUnixNanos(int64(i)*10_000_000_000 + int64(i%len(symbols)))
 		trades.price[i] = 75 + float64((i*17)%220) + float64(i%10)/10
 		trades.size[i] = int64(1 + (i*13)%500)
 		trades.active[i] = i%5 != 0
