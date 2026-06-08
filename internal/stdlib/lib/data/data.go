@@ -4769,6 +4769,7 @@ const (
 	OpSub Op = "-"
 	OpMul Op = "*"
 	OpDiv Op = "/"
+	OpMod Op = "mod"
 	OpEQ  Op = "="
 	OpNE  Op = "!="
 	OpLT  Op = "<"
@@ -4806,7 +4807,7 @@ func ApplyBinary(op Op, left, right any) (any, error) {
 	}
 	if IsNull(left) || IsNull(right) {
 		switch op {
-		case OpAdd, OpSub, OpMul, OpDiv:
+		case OpAdd, OpSub, OpMul, OpDiv, OpMod:
 			return promotedNullForBinary(left, right), nil
 		case OpLT, OpLE, OpGT, OpGE:
 			return false, nil
@@ -4838,6 +4839,11 @@ func ApplyBinary(op Op, left, right any) (any, error) {
 		return lf * rf, nil
 	case OpDiv:
 		return lf / rf, nil
+	case OpMod:
+		if rf == 0 {
+			return NullValue, nil
+		}
+		return lf - rf*math.Floor(lf/rf), nil
 	case OpLT:
 		return lf < rf, nil
 	case OpLE:

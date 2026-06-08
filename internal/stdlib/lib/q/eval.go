@@ -7633,12 +7633,17 @@ func qDataArithmeticOp(op byte) (data.Op, bool) {
 		return data.OpMul, true
 	case '%':
 		return data.OpDiv, true
+	case 'r':
+		return data.OpMod, true
 	default:
 		return "", false
 	}
 }
 
 func qTryTypedArithmeticDyadic(op data.Op, left, right any) (any, bool, error) {
+	if op == data.OpMod && (!qTypedIntegerOperandOK(left) || !qTypedIntegerOperandOK(right)) {
+		return nil, false, nil
+	}
 	if op != data.OpDiv && qTypedIntegerOperandOK(left) && qTypedIntegerOperandOK(right) {
 		return data.TryTypedIntegerDyadic(op, left, right)
 	}
@@ -9602,6 +9607,15 @@ func qReverseCompareOpString(op string) string {
 
 func notValue(v any) (any, error) {
 	if array, ok := v.(data.Array); ok {
+		if out, handled, err := data.TryTypedNot(array); err != nil || handled {
+			recordRuntimeKernelProbe("ArrayNot", "not/"+string(array.Kind()), handled, err)
+			if err != nil {
+				return nil, err
+			}
+			return out, nil
+		} else {
+			recordRuntimeKernelProbe("ArrayNot", "not/"+string(array.Kind()), handled, err)
+		}
 		out := make([]bool, array.Len())
 		for i := 0; i < array.Len(); i++ {
 			item, ok := array.At(i)

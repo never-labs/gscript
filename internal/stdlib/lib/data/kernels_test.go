@@ -2065,6 +2065,150 @@ func TestTypedNumericUnaryBinaryAndAggregates(t *testing.T) {
 		t.Fatalf("TryTypedQNumericUnary floor values = %v, want %v", got, want)
 	}
 
+	tiledInts, err := TakeRepeat(NewI64([]int64{-2, 0, 3}), 10)
+	if err != nil {
+		t.Fatalf("Take tiled ints returned error: %v", err)
+	}
+	tiledNegSum, ok, err := TryTypedQNumericUnarySum(NumericUnaryNeg, tiledInts)
+	if err != nil {
+		t.Fatalf("TryTypedQNumericUnarySum tiled neg returned error: %v", err)
+	}
+	if !ok {
+		t.Fatal("TryTypedQNumericUnarySum tiled neg did not match integer tiled array")
+	}
+	if got, want := tiledNegSum, int64(-1); got != want {
+		t.Fatalf("TryTypedQNumericUnarySum tiled neg = %v (%T), want %v", got, got, want)
+	}
+	tiledSignumSum, ok, err := TryTypedQNumericUnarySum(NumericUnarySignum, tiledInts)
+	if err != nil {
+		t.Fatalf("TryTypedQNumericUnarySum tiled signum returned error: %v", err)
+	}
+	if !ok {
+		t.Fatal("TryTypedQNumericUnarySum tiled signum did not match integer tiled array")
+	}
+	if got, want := tiledSignumSum, int64(-1); got != want {
+		t.Fatalf("TryTypedQNumericUnarySum tiled signum = %v (%T), want %v", got, got, want)
+	}
+
+	rotatedTiledInts := tiledArray{source: NewI64([]int64{1, 2, 3}), start: 1, len: 8}
+	rotatedAbsSum, ok, err := TryTypedQNumericUnarySum(NumericUnaryAbs, rotatedTiledInts)
+	if err != nil {
+		t.Fatalf("TryTypedQNumericUnarySum rotated tiled abs returned error: %v", err)
+	}
+	if !ok {
+		t.Fatal("TryTypedQNumericUnarySum rotated tiled abs did not match integer tiled array")
+	}
+	if got, want := rotatedAbsSum, int64(17); got != want {
+		t.Fatalf("TryTypedQNumericUnarySum rotated tiled abs = %v (%T), want %v", got, got, want)
+	}
+
+	tiledFloats, err := TakeRepeat(NewF64([]float64{0, 1.5}), 7)
+	if err != nil {
+		t.Fatalf("Take tiled floats returned error: %v", err)
+	}
+	tiledExpSum, ok, err := TryTypedQNumericUnarySum(NumericUnaryExp, tiledFloats)
+	if err != nil {
+		t.Fatalf("TryTypedQNumericUnarySum tiled exp returned error: %v", err)
+	}
+	if !ok {
+		t.Fatal("TryTypedQNumericUnarySum tiled exp did not match float tiled array")
+	}
+	wantExp := 4*math.Exp(0) + 3*math.Exp(1.5)
+	if got := tiledExpSum.(float64); math.Abs(got-wantExp) > 1e-12 {
+		t.Fatalf("TryTypedQNumericUnarySum tiled exp = %.17g, want %.17g", got, wantExp)
+	}
+	tiledFloorSum, ok, err := TryTypedQNumericUnarySum(NumericUnaryFloor, tiledFloats)
+	if err != nil {
+		t.Fatalf("TryTypedQNumericUnarySum tiled floor returned error: %v", err)
+	}
+	if !ok {
+		t.Fatal("TryTypedQNumericUnarySum tiled floor did not match float tiled array")
+	}
+	if got, want := tiledFloorSum, int64(3); got != want {
+		t.Fatalf("TryTypedQNumericUnarySum tiled floor = %v (%T), want %v", got, got, want)
+	}
+
+	tiledReciprocalDyadicSum, ok, err := TryTypedQNumericUnaryDyadicSum(NumericUnaryRecip, OpAdd, int64(1), tiledInts)
+	if err != nil {
+		t.Fatalf("TryTypedQNumericUnaryDyadicSum reciprocal scalar+tiled returned error: %v", err)
+	}
+	if !ok {
+		t.Fatal("TryTypedQNumericUnaryDyadicSum reciprocal scalar+tiled did not match")
+	}
+	var wantReciprocal float64
+	for _, value := range []float64{-2, 0, 3, -2, 0, 3, -2, 0, 3, -2} {
+		wantReciprocal += 1 / (1 + value)
+	}
+	if got := tiledReciprocalDyadicSum.(float64); math.Abs(got-wantReciprocal) > 1e-12 {
+		t.Fatalf("TryTypedQNumericUnaryDyadicSum reciprocal scalar+tiled = %.17g, want %.17g", got, wantReciprocal)
+	}
+
+	tiledSignumDyadicSum, ok, err := TryTypedQNumericUnaryDyadicSum(NumericUnarySignum, OpSub, tiledInts, int64(1))
+	if err != nil {
+		t.Fatalf("TryTypedQNumericUnaryDyadicSum signum tiled-scalar returned error: %v", err)
+	}
+	if !ok {
+		t.Fatal("TryTypedQNumericUnaryDyadicSum signum tiled-scalar did not match")
+	}
+	if got, want := tiledSignumDyadicSum, int64(-4); got != want {
+		t.Fatalf("TryTypedQNumericUnaryDyadicSum signum tiled-scalar = %v (%T), want %v", got, got, want)
+	}
+
+	notMaskValue, ok, err := TryTypedNot(tiledInts)
+	if err != nil {
+		t.Fatalf("TryTypedNot tiled ints returned error: %v", err)
+	}
+	if !ok {
+		t.Fatal("TryTypedNot tiled ints did not match")
+	}
+	if got, want := notMaskValue.Values(), []any{false, true, false, false, true, false, false, true, false, false}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("TryTypedNot tiled ints values = %v, want %v", got, want)
+	}
+	notCount, ok, err := TryTypedTrueCount(notMaskValue)
+	if err != nil {
+		t.Fatalf("TryTypedTrueCount not mask returned error: %v", err)
+	}
+	if !ok || notCount != 3 {
+		t.Fatalf("TryTypedTrueCount not mask = %d, %v; want 3, true", notCount, ok)
+	}
+	modInput, err := TakeRepeat(NewI64([]int64{0, 1, 2, 3}), 10)
+	if err != nil {
+		t.Fatalf("TakeRepeat mod input returned error: %v", err)
+	}
+	modTiled, ok, err := TryTypedIntegerDyadic(OpMod, modInput, int64(2))
+	if err != nil {
+		t.Fatalf("TryTypedIntegerDyadic tiled mod returned error: %v", err)
+	}
+	if !ok {
+		t.Fatal("TryTypedIntegerDyadic tiled mod did not match")
+	}
+	if _, ok := modTiled.(i64ScalarDyadicArray); !ok {
+		t.Fatalf("TryTypedIntegerDyadic tiled mod returned %T, want i64ScalarDyadicArray", modTiled)
+	}
+	if got, want := modTiled.(Array).Values(), []any{int64(0), int64(1), int64(0), int64(1), int64(0), int64(1), int64(0), int64(1), int64(0), int64(1)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("TryTypedIntegerDyadic tiled mod values = %v, want %v", got, want)
+	}
+	negativeMod, ok, err := TryTypedIntegerDyadic(OpMod, NewI64([]int64{-3, -2, -1, 0, 1}), int64(2))
+	if err != nil {
+		t.Fatalf("TryTypedIntegerDyadic negative mod returned error: %v", err)
+	}
+	if !ok {
+		t.Fatal("TryTypedIntegerDyadic negative mod did not match")
+	}
+	if got, want := negativeMod.(Array).Values(), []any{int64(1), int64(0), int64(1), int64(0), int64(1)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("TryTypedIntegerDyadic negative mod values = %v, want %v", got, want)
+	}
+	attributedNot, ok, err := TryTypedNot(WithArrayAttribute(NewI64([]int64{0, 1}), ArrayAttributeSorted))
+	if err != nil {
+		t.Fatalf("TryTypedNot attributed returned error: %v", err)
+	}
+	if !ok {
+		t.Fatal("TryTypedNot attributed did not match")
+	}
+	if metadata := ArrayMetadataOf(attributedNot); len(metadata.Attributes) != 0 {
+		t.Fatalf("TryTypedNot preserved attributes = %v, want none", metadata.Attributes)
+	}
+
 	value, ok, err := TryTypedQNumericUnarySum(NumericUnaryAbs, NewI64([]int64{-2, 3, 0}))
 	if err != nil {
 		t.Fatalf("TryTypedQNumericUnarySum abs returned error: %v", err)

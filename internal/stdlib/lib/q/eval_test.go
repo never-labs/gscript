@@ -2267,6 +2267,8 @@ func TestEvalBooleanAndNullVerbs(t *testing.T) {
 	assertEvalValue(t, "not 0", true)
 	assertEvalArray(t, "not true false true", data.KindBool, []any{false, true, false})
 	assertEvalArray(t, "not 0 2 0N", data.KindBool, []any{true, false, true})
+	assertEvalArray(t, "(not 0 1 0) and true true false", data.KindBool, []any{true, false, false})
+	assertEvalValue(t, "x:8#0 1 2 3;r:x mod 2;count where not r", int64(4))
 	assertEvalValue(t, "null 0N", true)
 	assertEvalArray(t, "null 10 0N 20 0n", data.KindBool, []any{false, true, false, true})
 	assertEvalValue(t, "count where null 10 0N 20 0n", int64(2))

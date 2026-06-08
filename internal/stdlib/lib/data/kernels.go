@@ -827,6 +827,34 @@ func (typedKernelRegistry) Count(array Array) (int64, bool) {
 	return int64(array.Len()), true
 }
 
+func TryTypedNot(array Array) (Array, bool, error) {
+	if array == nil {
+		return nil, true, fmt.Errorf("not array is nil")
+	}
+	switch a := array.(type) {
+	case attributedArray:
+		out, handled, err := TryTypedNot(a.array)
+		if err != nil || !handled {
+			return nil, handled, err
+		}
+		return out, true, nil
+	default:
+		if !notMaskAcceptsArray(array) {
+			return nil, false, nil
+		}
+		return notMask{array: array}, true, nil
+	}
+}
+
+func notMaskAcceptsArray(array Array) bool {
+	switch array.Kind() {
+	case KindBool, KindI8, KindI16, KindI32, KindI64, KindU8, KindU16, KindU32, KindU64, KindF32, KindF64:
+		return true
+	default:
+		return false
+	}
+}
+
 func TryTypedTrueCount(mask Array) (int64, bool, error) {
 	if mask == nil {
 		return 0, true, fmt.Errorf("true count mask is nil")
@@ -840,6 +868,8 @@ func TryTypedTrueCount(mask Array) (int64, bool, error) {
 	case i64RangeCompareMask:
 		return a.trueCount(), true, nil
 	case boolLogicalMask:
+		return a.trueCount()
+	case notMask:
 		return a.trueCount()
 	case tiledArray:
 		sourceLen := a.source.Len()
@@ -1586,6 +1616,10 @@ func TryTypedQNumericUnarySum(op string, array Array) (any, bool, error) {
 	switch a := array.(type) {
 	case attributedArray:
 		return TryTypedQNumericUnarySum(op, a.array)
+	case tiledArray:
+		if out, ok, err := qNumericUnarySumTiled(op, a); ok || err != nil {
+			return out, ok, err
+		}
 	case i64RangeArray:
 		if out, ok := qNumericUnarySumI64Range(op, a); ok {
 			return out, true, nil
@@ -1599,6 +1633,47 @@ func TryTypedQNumericUnarySum(op string, array Array) (any, bool, error) {
 		return nil, false, nil
 	}
 	return qNumericUnarySumIntegerArray(op, array)
+}
+
+func qNumericUnarySumTiled(op string, array tiledArray) (any, bool, error) {
+	sourceLen := array.source.Len()
+	if array.len == 0 {
+		if qNumericUnaryTiledSumReturnsFloat(op, array.source) {
+			return float64(0), true, nil
+		}
+		if qNumericUnaryTiledSumReturnsInt(op, array.source) {
+			return int64(0), true, nil
+		}
+		return nil, false, nil
+	}
+	if sourceLen == 0 {
+		return nil, false, nil
+	}
+	cycles := array.len / sourceLen
+	remainder := array.len % sourceLen
+	if qNumericUnaryTiledSumReturnsFloat(op, array.source) {
+		period, ok, err := qNumericUnaryFloatSumWindow(op, array.source, array.start, sourceLen)
+		if err != nil || !ok {
+			return nil, ok, err
+		}
+		tail, ok, err := qNumericUnaryFloatSumWindow(op, array.source, array.start, remainder)
+		if err != nil || !ok {
+			return nil, ok, err
+		}
+		return period*float64(cycles) + tail, true, nil
+	}
+	if qNumericUnaryTiledSumReturnsInt(op, array.source) {
+		period, ok, err := qNumericUnaryIntSumWindow(op, array.source, array.start, sourceLen)
+		if err != nil || !ok {
+			return nil, ok, err
+		}
+		tail, ok, err := qNumericUnaryIntSumWindow(op, array.source, array.start, remainder)
+		if err != nil || !ok {
+			return nil, ok, err
+		}
+		return period*int64(cycles) + tail, true, nil
+	}
+	return nil, false, nil
 }
 
 func TryTypedQNumericUnaryDyadicSum(unaryOp string, dyadicOp Op, left, right any) (any, bool, error) {
@@ -1626,6 +1701,9 @@ func TryTypedQNumericUnaryDyadicSum(unaryOp string, dyadicOp Op, left, right any
 		return nil, false, nil
 	}
 	if out, ok, err := qNumericUnaryDyadicSumRangeScalar(unaryOp, dyadicOp, left, right); ok || err != nil {
+		return out, ok, err
+	}
+	if out, ok, err := qNumericUnaryDyadicSumTiledScalar(unaryOp, dyadicOp, left, right); ok || err != nil {
 		return out, ok, err
 	}
 	return qNumericUnaryDyadicSum(unaryOp, dyadicOp, left, right, length)
@@ -3836,6 +3914,12 @@ func (typedKernelRegistry) NumericAt(array Array, row int) (float64, bool, error
 	switch a := array.(type) {
 	case attributedArray:
 		return typedKernels.NumericAt(a.array, row)
+	case i64ScalarDyadicArray:
+		value, ok, err := a.i64At(row)
+		if err != nil || !ok {
+			return 0, ok, err
+		}
+		return float64(value), true, nil
 	case tiledArray:
 		if row < 0 || row >= a.len || a.source.Len() == 0 {
 			return 0, false, fmt.Errorf("array row %d out of range", row)
@@ -4083,6 +4167,9 @@ func numericIntegerDyadic(op Op, left, right any, length int) (Array, bool, erro
 	if out, ok := numericIntegerDyadicRange(op, left, right, length); ok {
 		return out, true, nil
 	}
+	if out, ok, err := numericIntegerDyadicTiledScalar(op, left, right); ok || err != nil {
+		return out, ok, err
+	}
 	values := make([]int64, length)
 	var nullable []any
 	for i := 0; i < length; i++ {
@@ -4116,6 +4203,15 @@ func numericIntegerDyadic(op Op, left, right any, length int) (Array, bool, erro
 			out = lv - rv
 		case OpMul:
 			out = lv * rv
+		case OpMod:
+			if rv == 0 {
+				if nullable == nil {
+					nullable = numericIntegerDyadicNullablePrefix(values, i)
+				}
+				nullable[i] = NullValue
+				continue
+			}
+			out = qModInt64(lv, rv)
 		default:
 			return nil, false, nil
 		}
@@ -4129,6 +4225,77 @@ func numericIntegerDyadic(op Op, left, right any, length int) (Array, bool, erro
 		return newNullableArray(KindI64, nullable), true, nil
 	}
 	return columnArray[int64]{kind: KindI64, data: values}, true, nil
+}
+
+func numericIntegerDyadicTiledScalar(op Op, left, right any) (Array, bool, error) {
+	leftArray, leftIsArray := left.(Array)
+	rightArray, rightIsArray := right.(Array)
+	switch {
+	case leftIsArray && !rightIsArray:
+		tiled, ok := unwrapTiledArray(leftArray)
+		if !ok {
+			return nil, false, nil
+		}
+		scalar, ok := integerScalarValue(right)
+		if !ok {
+			return nil, false, nil
+		}
+		return applyI64TiledScalar(op, tiled, scalar, false)
+	case rightIsArray && !leftIsArray:
+		tiled, ok := unwrapTiledArray(rightArray)
+		if !ok {
+			return nil, false, nil
+		}
+		scalar, ok := integerScalarValue(left)
+		if !ok {
+			return nil, false, nil
+		}
+		return applyI64TiledScalar(op, tiled, scalar, true)
+	default:
+		return nil, false, nil
+	}
+}
+
+func applyI64TiledScalar(op Op, values tiledArray, scalar int64, scalarLeft bool) (Array, bool, error) {
+	sourceLen := values.source.Len()
+	if sourceLen == 0 {
+		return nil, false, nil
+	}
+	if op == OpMod && !scalarLeft && scalar == 0 {
+		return nil, false, nil
+	}
+	return i64ScalarDyadicArray{source: values, op: op, scalar: scalar, scalarLeft: scalarLeft, len: values.len}, true, nil
+}
+
+func qModInt64(left, right int64) int64 {
+	return left - right*int64(math.Floor(float64(left)/float64(right)))
+}
+
+func applyI64ScalarDyadicValue(op Op, value, scalar int64, scalarLeft bool) (int64, bool, error) {
+	switch op {
+	case OpAdd:
+		return value + scalar, true, nil
+	case OpSub:
+		if scalarLeft {
+			return scalar - value, true, nil
+		}
+		return value - scalar, true, nil
+	case OpMul:
+		return value * scalar, true, nil
+	case OpMod:
+		divisor := scalar
+		dividend := value
+		if scalarLeft {
+			divisor = value
+			dividend = scalar
+		}
+		if divisor == 0 {
+			return 0, false, nil
+		}
+		return qModInt64(dividend, divisor), true, nil
+	default:
+		return 0, false, nil
+	}
 }
 
 func numericIntegerDyadicRange(op Op, left, right any, length int) (Array, bool) {
@@ -4230,6 +4397,8 @@ func isIntegerArray(array Array) bool {
 		return isIntegerArray(a.array)
 	case tiledArray:
 		return isIntegerArray(a.source)
+	case i64ScalarDyadicArray:
+		return true
 	case columnArray[int8], columnArray[int16], columnArray[int32], columnArray[int64],
 		columnArray[uint8], columnArray[uint16], columnArray[uint32], columnArray[uint64],
 		i64RangeArray, i64RunningSumArray, i64SegmentArray, i64ProductArray:
@@ -4259,6 +4428,8 @@ func isDenseIntegerArray(array Array) bool {
 		return isDenseIntegerArray(a.array)
 	case tiledArray:
 		return isDenseIntegerArray(a.source)
+	case i64ScalarDyadicArray:
+		return true
 	case columnArray[int8], columnArray[int16], columnArray[int32], columnArray[int64],
 		columnArray[uint8], columnArray[uint16], columnArray[uint32], columnArray[uint64],
 		i64RangeArray, i64RunningSumArray, i64SegmentArray, i64ProductArray:
@@ -4543,7 +4714,7 @@ func operandAt(value any, row int) (any, bool, error) {
 
 func isArithmeticOp(op Op) bool {
 	switch op {
-	case OpAdd, OpSub, OpMul, OpDiv:
+	case OpAdd, OpSub, OpMul, OpDiv, OpMod:
 		return true
 	default:
 		return false
@@ -4861,6 +5032,295 @@ func qNumericUnarySumFloatSlice[T floatScalar](op string, values []T) (any, bool
 	default:
 		return nil, false, nil
 	}
+}
+
+func qNumericUnaryTiledSumReturnsFloat(op string, source Array) bool {
+	switch op {
+	case NumericUnaryExp, NumericUnaryRecip:
+		return true
+	case NumericUnaryNeg, NumericUnaryAbs:
+		return !isDenseIntegerArray(source)
+	default:
+		return false
+	}
+}
+
+func qNumericUnaryTiledSumReturnsInt(op string, source Array) bool {
+	switch op {
+	case NumericUnaryFloor, NumericUnaryCeiling, NumericUnarySignum:
+		return true
+	case NumericUnaryNeg, NumericUnaryAbs:
+		return isDenseIntegerArray(source)
+	default:
+		return false
+	}
+}
+
+func qNumericUnaryFloatSumWindow(op string, array Array, start, count int) (float64, bool, error) {
+	var sum float64
+	sourceLen := array.Len()
+	for i := 0; i < count; i++ {
+		value, ok, err := numericAt(array, (start+i)%sourceLen)
+		if err != nil {
+			return 0, true, err
+		}
+		if !ok {
+			return 0, false, nil
+		}
+		switch op {
+		case NumericUnaryNeg:
+			sum -= value
+		case NumericUnaryAbs:
+			sum += math.Abs(value)
+		case NumericUnaryExp:
+			sum += math.Exp(value)
+		case NumericUnaryRecip:
+			sum += 1 / value
+		default:
+			return 0, false, nil
+		}
+	}
+	return sum, true, nil
+}
+
+func qNumericUnaryIntSumWindow(op string, array Array, start, count int) (int64, bool, error) {
+	var sum int64
+	sourceLen := array.Len()
+	switch op {
+	case NumericUnaryNeg:
+		for i := 0; i < count; i++ {
+			value, ok, err := integerArrayAt(array, (start+i)%sourceLen)
+			if err != nil {
+				return 0, true, err
+			}
+			if !ok || value == math.MinInt64 {
+				return 0, false, nil
+			}
+			sum -= value
+		}
+		return sum, true, nil
+	case NumericUnaryAbs:
+		for i := 0; i < count; i++ {
+			value, ok, err := integerArrayAt(array, (start+i)%sourceLen)
+			if err != nil {
+				return 0, true, err
+			}
+			if !ok || value == math.MinInt64 {
+				return 0, false, nil
+			}
+			if value < 0 {
+				value = -value
+			}
+			sum += value
+		}
+		return sum, true, nil
+	case NumericUnaryFloor, NumericUnaryCeiling:
+		for i := 0; i < count; i++ {
+			value, ok, err := numericAt(array, (start+i)%sourceLen)
+			if err != nil {
+				return 0, true, err
+			}
+			if !ok {
+				return 0, false, nil
+			}
+			if op == NumericUnaryFloor {
+				sum += int64(math.Floor(value))
+			} else {
+				sum += int64(math.Ceil(value))
+			}
+		}
+		return sum, true, nil
+	case NumericUnarySignum:
+		for i := 0; i < count; i++ {
+			value, ok, err := numericAt(array, (start+i)%sourceLen)
+			if err != nil {
+				return 0, true, err
+			}
+			if !ok {
+				return 0, false, nil
+			}
+			switch {
+			case value < 0:
+				sum--
+			case value > 0:
+				sum++
+			}
+		}
+		return sum, true, nil
+	default:
+		return 0, false, nil
+	}
+}
+
+func qNumericUnaryDyadicSumTiledScalar(unaryOp string, dyadicOp Op, left, right any) (any, bool, error) {
+	leftArray, leftIsArray := left.(Array)
+	rightArray, rightIsArray := right.(Array)
+	switch {
+	case leftIsArray && !rightIsArray:
+		tiled, ok := unwrapTiledArray(leftArray)
+		if !ok {
+			return nil, false, nil
+		}
+		scalar, ok := numericScalarValue(right)
+		if !ok {
+			return nil, false, nil
+		}
+		return qNumericUnaryDyadicSumTiledScalarSide(unaryOp, dyadicOp, tiled, scalar, false)
+	case rightIsArray && !leftIsArray:
+		tiled, ok := unwrapTiledArray(rightArray)
+		if !ok {
+			return nil, false, nil
+		}
+		scalar, ok := numericScalarValue(left)
+		if !ok {
+			return nil, false, nil
+		}
+		return qNumericUnaryDyadicSumTiledScalarSide(unaryOp, dyadicOp, tiled, scalar, true)
+	default:
+		return nil, false, nil
+	}
+}
+
+func unwrapTiledArray(array Array) (tiledArray, bool) {
+	switch a := array.(type) {
+	case attributedArray:
+		return unwrapTiledArray(a.array)
+	case tiledArray:
+		return a, true
+	default:
+		return tiledArray{}, false
+	}
+}
+
+func qNumericUnaryDyadicSumTiledScalarSide(unaryOp string, dyadicOp Op, array tiledArray, scalar float64, scalarLeft bool) (any, bool, error) {
+	sourceLen := array.source.Len()
+	if array.len == 0 {
+		if qNumericUnaryDyadicSumReturnsInt(unaryOp) {
+			return int64(0), true, nil
+		}
+		if qNumericUnaryDyadicSumReturnsFloat(unaryOp) {
+			return float64(0), true, nil
+		}
+		return nil, false, nil
+	}
+	if sourceLen == 0 {
+		return nil, false, nil
+	}
+	cycles := array.len / sourceLen
+	remainder := array.len % sourceLen
+	if qNumericUnaryDyadicSumReturnsInt(unaryOp) {
+		period, ok, err := qNumericUnaryDyadicIntSumWindow(unaryOp, dyadicOp, array.source, array.start, sourceLen, scalar, scalarLeft)
+		if err != nil || !ok {
+			return nil, ok, err
+		}
+		tail, ok, err := qNumericUnaryDyadicIntSumWindow(unaryOp, dyadicOp, array.source, array.start, remainder, scalar, scalarLeft)
+		if err != nil || !ok {
+			return nil, ok, err
+		}
+		return period*int64(cycles) + tail, true, nil
+	}
+	if qNumericUnaryDyadicSumReturnsFloat(unaryOp) {
+		period, ok, err := qNumericUnaryDyadicFloatSumWindow(unaryOp, dyadicOp, array.source, array.start, sourceLen, scalar, scalarLeft)
+		if err != nil || !ok {
+			return nil, ok, err
+		}
+		tail, ok, err := qNumericUnaryDyadicFloatSumWindow(unaryOp, dyadicOp, array.source, array.start, remainder, scalar, scalarLeft)
+		if err != nil || !ok {
+			return nil, ok, err
+		}
+		return period*float64(cycles) + tail, true, nil
+	}
+	return nil, false, nil
+}
+
+func qNumericUnaryDyadicSumReturnsFloat(op string) bool {
+	switch op {
+	case NumericUnaryNeg, NumericUnaryAbs, NumericUnaryExp, NumericUnaryRecip:
+		return true
+	default:
+		return false
+	}
+}
+
+func qNumericUnaryDyadicSumReturnsInt(op string) bool {
+	switch op {
+	case NumericUnaryFloor, NumericUnaryCeiling, NumericUnarySignum:
+		return true
+	default:
+		return false
+	}
+}
+
+func qNumericUnaryDyadicFloatSumWindow(unaryOp string, dyadicOp Op, array Array, start, count int, scalar float64, scalarLeft bool) (float64, bool, error) {
+	var sum float64
+	sourceLen := array.Len()
+	for i := 0; i < count; i++ {
+		base, ok, err := numericAt(array, (start+i)%sourceLen)
+		if err != nil {
+			return 0, true, err
+		}
+		if !ok {
+			return 0, false, nil
+		}
+		value, err := applyTiledScalarDyadic(dyadicOp, base, scalar, scalarLeft)
+		if err != nil {
+			return 0, true, err
+		}
+		switch unaryOp {
+		case NumericUnaryNeg:
+			sum -= value
+		case NumericUnaryAbs:
+			sum += math.Abs(value)
+		case NumericUnaryExp:
+			sum += math.Exp(value)
+		case NumericUnaryRecip:
+			sum += 1 / value
+		default:
+			return 0, false, nil
+		}
+	}
+	return sum, true, nil
+}
+
+func qNumericUnaryDyadicIntSumWindow(unaryOp string, dyadicOp Op, array Array, start, count int, scalar float64, scalarLeft bool) (int64, bool, error) {
+	var sum int64
+	sourceLen := array.Len()
+	for i := 0; i < count; i++ {
+		base, ok, err := numericAt(array, (start+i)%sourceLen)
+		if err != nil {
+			return 0, true, err
+		}
+		if !ok {
+			return 0, false, nil
+		}
+		value, err := applyTiledScalarDyadic(dyadicOp, base, scalar, scalarLeft)
+		if err != nil {
+			return 0, true, err
+		}
+		switch unaryOp {
+		case NumericUnaryFloor:
+			sum += int64(math.Floor(value))
+		case NumericUnaryCeiling:
+			sum += int64(math.Ceil(value))
+		case NumericUnarySignum:
+			switch {
+			case value < 0:
+				sum--
+			case value > 0:
+				sum++
+			}
+		default:
+			return 0, false, nil
+		}
+	}
+	return sum, true, nil
+}
+
+func applyTiledScalarDyadic(op Op, value, scalar float64, scalarLeft bool) (float64, error) {
+	if scalarLeft {
+		return applyNumericBinaryFloat(op, scalar, value)
+	}
+	return applyNumericBinaryFloat(op, value, scalar)
 }
 
 func qNumericUnaryDyadicSum(unaryOp string, dyadicOp Op, left, right any, length int) (any, bool, error) {
@@ -6260,6 +6720,139 @@ type boolLogicalMask struct {
 	len           int
 }
 
+type notMask struct {
+	array Array
+}
+
+type i64ScalarDyadicArray struct {
+	source     Array
+	op         Op
+	scalar     int64
+	scalarLeft bool
+	len        int
+}
+
+func (a i64ScalarDyadicArray) Kind() Kind { return KindI64 }
+
+func (a i64ScalarDyadicArray) Len() int { return a.len }
+
+func (a i64ScalarDyadicArray) At(row int) (any, bool) {
+	value, ok, err := a.i64At(row)
+	if err != nil || !ok {
+		return nil, false
+	}
+	return value, true
+}
+
+func (a i64ScalarDyadicArray) Values() []any {
+	out := make([]any, a.len)
+	for row := range out {
+		value, ok, err := a.i64At(row)
+		if err != nil || !ok {
+			panic(fmt.Sprintf("data scalar dyadic row %d out of range", row))
+		}
+		out[row] = value
+	}
+	return out
+}
+
+func (a i64ScalarDyadicArray) Gather(indexes []int) Array {
+	out := make([]int64, len(indexes))
+	for i, row := range indexes {
+		value, ok, err := a.i64At(row)
+		if err != nil || !ok {
+			panic(fmt.Sprintf("data scalar dyadic gather row %d out of range", row))
+		}
+		out[i] = value
+	}
+	return newI64Trusted(out)
+}
+
+func (a i64ScalarDyadicArray) i64At(row int) (int64, bool, error) {
+	if row < 0 || row >= a.len {
+		return 0, false, fmt.Errorf("array row %d out of range", row)
+	}
+	value, ok, err := integerArrayAt(a.source, row)
+	if err != nil || !ok {
+		return 0, ok, err
+	}
+	return applyI64ScalarDyadicValue(a.op, value, a.scalar, a.scalarLeft)
+}
+
+func (a notMask) Kind() Kind { return KindBool }
+
+func (a notMask) Len() int { return a.array.Len() }
+
+func (a notMask) At(row int) (any, bool) {
+	if row < 0 || row >= a.Len() {
+		return nil, false
+	}
+	value, ok, err := a.valueAt(row)
+	if err != nil || !ok {
+		return nil, false
+	}
+	return value, true
+}
+
+func (a notMask) Values() []any {
+	out := make([]any, a.Len())
+	for row := range out {
+		value, ok, err := a.valueAt(row)
+		if err != nil || !ok {
+			panic(fmt.Sprintf("data not mask row %d out of range", row))
+		}
+		out[row] = value
+	}
+	return out
+}
+
+func (a notMask) Gather(indexes []int) Array {
+	out := make([]bool, len(indexes))
+	for i, row := range indexes {
+		if row < 0 || row >= a.Len() {
+			panic(fmt.Sprintf("data not mask gather index %d out of range", row))
+		}
+		value, ok, err := a.valueAt(row)
+		if err != nil || !ok {
+			panic(fmt.Sprintf("data not mask row %d out of range", row))
+		}
+		out[i] = value
+	}
+	return newBoolTrusted(out)
+}
+
+func (a notMask) valueAt(row int) (bool, bool, error) {
+	if a.array.Kind() == KindBool {
+		value, ok, err := boolArrayAt(a.array, row)
+		if err != nil || !ok {
+			return false, ok, err
+		}
+		return !value, true, nil
+	}
+	value, ok, err := numericAt(a.array, row)
+	if err != nil {
+		return false, true, err
+	}
+	if !ok {
+		return true, true, nil
+	}
+	return value == 0, true, nil
+}
+
+func (a notMask) trueCount() (int64, bool, error) {
+	var count int64
+	for row := 0; row < a.Len(); row++ {
+		value, ok, err := a.valueAt(row)
+		if err != nil || !ok {
+			return 0, ok, err
+		}
+		if value {
+			count++
+		}
+	}
+	return count, true, nil
+}
+
 func (a boolLogicalMask) Kind() Kind { return KindBool }
 
 func (a boolLogicalMask) Len() int { return a.len }
@@ -6495,6 +7088,8 @@ func boolArrayAt(array Array, row int) (bool, bool, error) {
 		}
 		return value.(bool), true, nil
 	case boolLogicalMask:
+		return a.valueAt(row)
+	case notMask:
 		return a.valueAt(row)
 	case tiledArray:
 		sourceLen := a.source.Len()
