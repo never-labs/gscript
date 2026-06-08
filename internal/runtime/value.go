@@ -840,6 +840,56 @@ func (v Value) NativeFrameFilterProjectColumn(mask *DenseArray, names []string, 
 	return DenseArrayValue(out), true, nil
 }
 
+// NativeFrameFilterGatherProjectColumn filters a native frame, gathers filtered
+// rows by 1-based indexes, and returns one projected result column without
+// materializing intermediate frame facades.
+func (v Value) NativeFrameFilterGatherProjectColumn(mask, indices *DenseArray, names []string, resultName string) (Value, bool, error) {
+	if mask == nil {
+		return NilValue(), true, fmt.Errorf("FRAME_FILTER_GATHER_PROJECT_COLUMN mask must be a bool dense array")
+	}
+	if indices == nil {
+		return NilValue(), true, fmt.Errorf("FRAME_FILTER_GATHER_PROJECT_COLUMN indexes must be an i64 dense array")
+	}
+	_, col, handled, err := v.nativeFrameProjectedColumn("FRAME_FILTER_GATHER_PROJECT_COLUMN", names, resultName)
+	if err != nil || !handled {
+		return NilValue(), handled, err
+	}
+	filtered, err := col.Filter(mask)
+	if err != nil {
+		return NilValue(), true, err
+	}
+	out, err := filtered.Gather(indices)
+	if err != nil {
+		return NilValue(), true, err
+	}
+	return DenseArrayValue(out), true, nil
+}
+
+// NativeFrameFilterSliceProjectColumn filters a native frame, slices filtered
+// rows, and returns one projected result column without materializing
+// intermediate frame facades.
+func (v Value) NativeFrameFilterSliceProjectColumn(mask *DenseArray, start, end int, names []string, resultName string) (Value, bool, error) {
+	if mask == nil {
+		return NilValue(), true, fmt.Errorf("FRAME_FILTER_SLICE_PROJECT_COLUMN mask must be a bool dense array")
+	}
+	if start < 0 || end < start {
+		return NilValue(), true, fmt.Errorf("FRAME_FILTER_SLICE_PROJECT_COLUMN range out of bounds")
+	}
+	_, col, handled, err := v.nativeFrameProjectedColumn("FRAME_FILTER_SLICE_PROJECT_COLUMN", names, resultName)
+	if err != nil || !handled {
+		return NilValue(), handled, err
+	}
+	filtered, err := col.Filter(mask)
+	if err != nil {
+		return NilValue(), true, err
+	}
+	out, err := filtered.Slice(start, end)
+	if err != nil {
+		return NilValue(), true, err
+	}
+	return DenseArrayValue(out), true, nil
+}
+
 // NativeFrameCompareFilterProjectColumn computes a typed frame-column comparison
 // and returns one filtered projected column without materializing an
 // intermediate mask or frame facade for VM/JIT q hot paths.

@@ -4631,6 +4631,62 @@ func TestFrameFilterProjectColumnRuntimeHelperUsesRuntimePrimitive(t *testing.T)
 	}
 }
 
+func TestFrameFilterRowsProjectColumnRuntimeHelpersUseRuntimePrimitive(t *testing.T) {
+	soa, err := runtime.NewSoA(map[string]*runtime.DenseArray{
+		"price": runtime.NewDenseArrayF64([]float64{10.5, 20.25, 30.75}),
+		"size":  runtime.NewDenseArrayI64([]int64{100, 200, 300}),
+	})
+	if err != nil {
+		t.Fatalf("NewSoA: %v", err)
+	}
+	frame := runtime.NewTable()
+	frame.SetNativePayloadWithInfo(soa, runtime.NativePayloadInfo{
+		Kind:    runtime.NativePayloadDataFrame,
+		Rows:    soa.Len(),
+		Columns: 2,
+	})
+	mask := runtime.DenseArrayValue(runtime.NewDenseArrayBool([]bool{true, true, false}))
+
+	gathered, err := executeFrameFilterGatherProjectColumnValue(
+		runtime.TableValue(frame),
+		mask,
+		runtime.DenseArrayValue(runtime.NewDenseArrayI64([]int64{2, 1})),
+		[]string{"size"},
+		"size",
+	)
+	if err != nil {
+		t.Fatalf("execute frame filter gather project column: %v", err)
+	}
+	gatheredVals, ok := gathered.DenseArray().I64()
+	if !ok || len(gatheredVals) != 2 || gatheredVals[0] != 200 || gatheredVals[1] != 100 {
+		t.Fatalf("filter gather project column values = %#v, want [200 100]", gatheredVals)
+	}
+
+	sliced, err := executeFrameFilterSliceProjectColumnValue(
+		runtime.TableValue(frame),
+		mask,
+		runtime.IntValue(1),
+		[]string{"size"},
+		"size",
+	)
+	if err != nil {
+		t.Fatalf("execute frame filter slice project column: %v", err)
+	}
+	slicedVals, ok := sliced.DenseArray().I64()
+	if !ok || len(slicedVals) != 1 || slicedVals[0] != 100 {
+		t.Fatalf("filter slice project column values = %#v, want [100]", slicedVals)
+	}
+	if _, err := executeFrameFilterGatherProjectColumnValue(
+		runtime.TableValue(frame),
+		mask,
+		runtime.DenseArrayValue(runtime.NewDenseArrayI64([]int64{3})),
+		[]string{"size"},
+		"size",
+	); err == nil {
+		t.Fatalf("execute frame filter gather project column accepted out-of-range filtered index")
+	}
+}
+
 func TestFrameCompareFilterProjectColumnRuntimeHelperUsesRuntimePrimitive(t *testing.T) {
 	soa, err := runtime.NewSoA(map[string]*runtime.DenseArray{
 		"price": runtime.NewDenseArrayF64([]float64{10.5, 20.25, 30.75}),

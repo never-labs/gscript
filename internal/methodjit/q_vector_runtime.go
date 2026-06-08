@@ -106,6 +106,40 @@ func executeFrameFilterProjectColumnValue(frameVal, maskVal runtime.Value, names
 	return out, nil
 }
 
+func executeFrameFilterGatherProjectColumnValue(frameVal, maskVal, indexVal runtime.Value, names []string, resultName string) (runtime.Value, error) {
+	if !maskVal.IsDenseArray() {
+		return runtime.NilValue(), fmt.Errorf("FrameFilterGatherProjectColumn mask must be dense array (got %s)", maskVal.TypeName())
+	}
+	if !indexVal.IsDenseArray() {
+		return runtime.NilValue(), fmt.Errorf("FrameFilterGatherProjectColumn indexes must be dense array (got %s)", indexVal.TypeName())
+	}
+	out, handled, err := frameVal.NativeFrameFilterGatherProjectColumn(maskVal.DenseArray(), indexVal.DenseArray(), names, resultName)
+	if err != nil {
+		return runtime.NilValue(), err
+	}
+	if !handled {
+		return runtime.NilValue(), fmt.Errorf("FrameFilterGatherProjectColumn operand must be native frame (got %s)", frameVal.TypeName())
+	}
+	return out, nil
+}
+
+func executeFrameFilterSliceProjectColumnValue(frameVal, maskVal, endVal runtime.Value, names []string, resultName string) (runtime.Value, error) {
+	if !maskVal.IsDenseArray() {
+		return runtime.NilValue(), fmt.Errorf("FrameFilterSliceProjectColumn mask must be dense array (got %s)", maskVal.TypeName())
+	}
+	if !endVal.IsInt() {
+		return runtime.NilValue(), fmt.Errorf("FrameFilterSliceProjectColumn end must be int (got %s)", endVal.TypeName())
+	}
+	out, handled, err := frameVal.NativeFrameFilterSliceProjectColumn(maskVal.DenseArray(), 0, int(endVal.Int()), names, resultName)
+	if err != nil {
+		return runtime.NilValue(), err
+	}
+	if !handled {
+		return runtime.NilValue(), fmt.Errorf("FrameFilterSliceProjectColumn operand must be native frame (got %s)", frameVal.TypeName())
+	}
+	return out, nil
+}
+
 func executeFrameBoolMaskFilterProjectColumnValue(frameVal runtime.Value, maskName string, names []string, resultName string) (runtime.Value, error) {
 	maskVal, handled, err := frameVal.NativeFrameBoolMask(maskName)
 	if err != nil {
@@ -302,11 +336,23 @@ func executeQFrameSelectColumnValue(constants []runtime.Value, specs []QFrameSel
 	if spec.RowMode == QFrameSelectColumnRowsNone {
 		return executeFrameFilterProjectColumnValue(frameVal, mask, names, resultName)
 	}
+	rowArg, hasRowArg := qFrameSelectColumnRowArg(spec, argVal, hasArg)
+	switch spec.RowMode {
+	case QFrameSelectColumnRowsGather:
+		if !hasRowArg {
+			return runtime.NilValue(), fmt.Errorf("QFrameSelectColumn gather path requires indexes")
+		}
+		return executeFrameFilterGatherProjectColumnValue(frameVal, mask, rowArg, names, resultName)
+	case QFrameSelectColumnRowsSlice:
+		if !hasRowArg {
+			return runtime.NilValue(), fmt.Errorf("QFrameSelectColumn slice path requires end")
+		}
+		return executeFrameFilterSliceProjectColumnValue(frameVal, mask, rowArg, names, resultName)
+	}
 	rows, err := executeFrameFilterValue(frameVal, mask)
 	if err != nil {
 		return runtime.NilValue(), err
 	}
-	rowArg, hasRowArg := qFrameSelectColumnRowArg(spec, argVal, hasArg)
 	rows, err = executeQFrameSelectColumnRows(constants, spec, rows, rowArg, hasRowArg)
 	if err != nil {
 		return runtime.NilValue(), err

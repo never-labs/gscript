@@ -261,6 +261,52 @@ func TestNativeFrameFilterProjectColumnFiltersSingleProjectedColumn(t *testing.T
 	}
 }
 
+func TestNativeFrameFilterRowsProjectColumnFusesTypedRuntimePath(t *testing.T) {
+	soa, err := NewSoA(map[string]*DenseArray{
+		"price": NewDenseArrayF64([]float64{10, 12, 8}),
+		"size":  NewDenseArrayI64([]int64{100, 200, 300}),
+	})
+	if err != nil {
+		t.Fatalf("NewSoA: %v", err)
+	}
+	frame := NewTable()
+	frame.SetNativePayloadWithInfo(soa, NativePayloadInfo{
+		Kind:       NativePayloadDataFrame,
+		Rows:       soa.Len(),
+		Columns:    2,
+		SchemaHash: "filter-rows-project-column-test",
+	})
+	mask := NewDenseArrayBool([]bool{true, true, false})
+
+	gathered, handled, err := TableValue(frame).NativeFrameFilterGatherProjectColumn(mask, NewDenseArrayI64([]int64{2, 1}), []string{"size"}, "size")
+	if err != nil {
+		t.Fatalf("NativeFrameFilterGatherProjectColumn: %v", err)
+	}
+	if !handled || !gathered.IsDenseArray() {
+		t.Fatalf("NativeFrameFilterGatherProjectColumn = %v handled=%v, want dense array", gathered, handled)
+	}
+	gatheredVals, ok := gathered.DenseArray().I64()
+	if !ok || len(gatheredVals) != 2 || gatheredVals[0] != 200 || gatheredVals[1] != 100 {
+		t.Fatalf("filter gather project column values = %#v, want [200 100]", gatheredVals)
+	}
+
+	sliced, handled, err := TableValue(frame).NativeFrameFilterSliceProjectColumn(mask, 0, 1, []string{"size"}, "size")
+	if err != nil {
+		t.Fatalf("NativeFrameFilterSliceProjectColumn: %v", err)
+	}
+	if !handled || !sliced.IsDenseArray() {
+		t.Fatalf("NativeFrameFilterSliceProjectColumn = %v handled=%v, want dense array", sliced, handled)
+	}
+	slicedVals, ok := sliced.DenseArray().I64()
+	if !ok || len(slicedVals) != 1 || slicedVals[0] != 100 {
+		t.Fatalf("filter slice project column values = %#v, want [100]", slicedVals)
+	}
+
+	if _, handled, err := TableValue(frame).NativeFrameFilterGatherProjectColumn(mask, NewDenseArrayI64([]int64{3}), []string{"size"}, "size"); !handled || err == nil {
+		t.Fatalf("NativeFrameFilterGatherProjectColumn accepted out-of-range filtered index handled=%v err=%v", handled, err)
+	}
+}
+
 func TestNativeFrameCompareFilterProjectColumnFusesTypedRuntimePath(t *testing.T) {
 	soa, err := NewSoA(map[string]*DenseArray{
 		"price": NewDenseArrayF64([]float64{10, 12, 8}),
