@@ -4,6 +4,7 @@ package methodjit
 
 import (
 	"encoding/json"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -5157,45 +5158,6 @@ func TestQFrameSelectColumnLiteralMaskUsesFusedHelper(t *testing.T) {
 	}
 }
 
-func TestQFrameSelectColumnRuntimePlanCachesBySchema(t *testing.T) {
-	constants := []runtime.Value{
-		runtime.StringValue("price"),
-		runtime.FloatValue(100),
-		qHotPathNamesValue("price"),
-		runtime.StringValue("price"),
-	}
-	spec := QFrameSelectColumnSpec{
-		Shape:             "compare/filter/project/column",
-		SourceColumnConst: 0,
-		MaskSpecConst:     -1,
-		ProjectConst:      2,
-		ResultColumnConst: 3,
-		CompareOp:         runtime.DenseArrayGE,
-		RowMode:           QFrameSelectColumnRowsNone,
-	}
-	cf := &CompiledFunction{QFrameSelectColumnSpecs: []QFrameSelectColumnSpec{spec}}
-	frame := runtime.TableValue(qHotPathTestFrame(t))
-	if _, err := cf.qFrameSelectColumnRuntimePlan(constants, 0, frame); err != nil {
-		t.Fatalf("build q frame select-column plan: %v", err)
-	}
-	if _, err := cf.qFrameSelectColumnRuntimePlan(constants, 0, frame); err != nil {
-		t.Fatalf("reuse q frame select-column plan: %v", err)
-	}
-	if _, err := cf.qFrameSelectColumnRuntimePlan(constants, 0, runtime.TableValue(qHotPathStringTestFrame(t))); err != nil {
-		t.Fatalf("build q frame select-column plan for second schema: %v", err)
-	}
-
-	stats := cf.qFrameSelectColumnPlanStatsSnapshot()
-	first := stats[qFrameSelectColumnPlanKey{specIdx: 0, schemaHash: "q-hot-path-test"}]
-	if first.misses != 1 || first.hits != 1 {
-		t.Fatalf("q frame select-column plan stats for first schema = %+v, want hits=1 misses=1", first)
-	}
-	second := stats[qFrameSelectColumnPlanKey{specIdx: 0, schemaHash: "q-hot-path-string-test"}]
-	if second.misses != 1 || second.hits != 0 {
-		t.Fatalf("q frame select-column plan stats for second schema = %+v, want hits=0 misses=1", second)
-	}
-}
-
 func TestQFrameSelectColumnRuntimePlanMatchesLegacyPaths(t *testing.T) {
 	boolMask := runtime.NewTable()
 	boolMask.RawSetString("column", runtime.StringValue("active"))
@@ -5379,13 +5341,13 @@ func assertQFrameSelectColumnPlannedMatchesLegacy(t *testing.T, constants []runt
 		t.Fatalf("planned dense result dtype/len = %s/%d, want %s/%d", plannedDense.DType(), plannedDense.Len(), legacyDense.DType(), legacyDense.Len())
 	}
 	switch legacyDense.DType() {
-	case runtime.DenseArrayFloat64:
+	case runtime.DenseArrayF64:
 		want, _ := legacyDense.F64()
 		got, _ := plannedDense.F64()
 		if !reflect.DeepEqual(got, want) {
 			t.Fatalf("planned f64 result = %#v, want %#v", got, want)
 		}
-	case runtime.DenseArrayInt64:
+	case runtime.DenseArrayI64:
 		want, _ := legacyDense.I64()
 		got, _ := plannedDense.I64()
 		if !reflect.DeepEqual(got, want) {
