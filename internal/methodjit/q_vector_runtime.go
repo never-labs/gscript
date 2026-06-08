@@ -407,3 +407,12 @@ func executeVectorCompareValue(opCode int, leftVal, rightVal runtime.Value) (run
 	}
 	return runtime.DenseArrayElementwise(op, leftVal, rightVal)
 }
+
+func executeVectorMaskValue(opCode int, leftVal, rightVal runtime.Value) (runtime.Value, error) {
+	op := runtime.DenseArrayMaskOp(opCode)
+	out, err := runtime.DenseArrayMaskCombine(op, leftVal, rightVal)
+	if err != nil {
+		return runtime.NilValue(), err
+	}
+	return runtime.DenseArrayValue(out), nil
+}

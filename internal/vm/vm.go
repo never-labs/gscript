@@ -2610,6 +2610,24 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 				fb.Result.Observe(out.Type())
 			}
 
+		case OP_VECTOR_MASK:
+			a := DecodeA(inst)
+			b := DecodeB(inst)
+			op := runtime.DenseArrayMaskOp(DecodeC(inst))
+			leftVal := vm.regs[base+a]
+			rightVal := vm.regs[base+b]
+			out, err := runtime.DenseArrayMaskCombine(op, leftVal, rightVal)
+			if err != nil {
+				return nil, wrapLineErr(frame, err)
+			}
+			vm.regs[base+a] = runtime.DenseArrayValue(out)
+			if frame.closure.Proto.Feedback != nil {
+				fb := &frame.closure.Proto.Feedback[frame.pc-1]
+				fb.Left.Observe(leftVal.Type())
+				fb.Right.Observe(rightVal.Type())
+				fb.Result.Observe(vm.regs[base+a].Type())
+			}
+
 		case OP_VECTOR_GATHER:
 			a := DecodeA(inst)
 			b := DecodeB(inst)

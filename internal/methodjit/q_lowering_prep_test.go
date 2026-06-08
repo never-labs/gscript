@@ -75,6 +75,40 @@ func TestVectorCompareBytecodeBuildsMethodJITIR(t *testing.T) {
 	}
 }
 
+func TestVectorMaskBytecodeBuildsMethodJITIR(t *testing.T) {
+	proto := &vm.FuncProto{
+		Name:     "vector_mask",
+		MaxStack: 2,
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_VECTOR_MASK, 0, 1, int(runtime.DenseArrayMaskAnd)),
+			vm.EncodeABC(vm.OP_RETURN, 0, 2, 0),
+		},
+	}
+
+	fn := BuildGraph(proto)
+	var mask *Instr
+	for _, block := range fn.Blocks {
+		for _, instr := range block.Instrs {
+			if instr.Op == OpVectorMask {
+				mask = instr
+				break
+			}
+		}
+	}
+	if mask == nil {
+		t.Fatalf("BuildGraph did not emit OpVectorMask:\n%s", Print(fn))
+	}
+	if len(mask.Args) != 2 {
+		t.Fatalf("OpVectorMask arg count = %d, want 2", len(mask.Args))
+	}
+	if mask.Type != TypeAny {
+		t.Fatalf("OpVectorMask type = %s, want Any", mask.Type)
+	}
+	if mask.Aux != int64(runtime.DenseArrayMaskAnd) {
+		t.Fatalf("OpVectorMask Aux = %d, want %d", mask.Aux, runtime.DenseArrayMaskAnd)
+	}
+}
+
 func TestFrameColumnBytecodeBuildsMethodJITIR(t *testing.T) {
 	proto := &vm.FuncProto{
 		Name:      "frame_column",
@@ -1454,6 +1488,22 @@ func TestTier2GateAllowsVectorCompareThroughOpExit(t *testing.T) {
 	}
 }
 
+func TestTier2GateAllowsVectorMaskThroughOpExit(t *testing.T) {
+	proto := &vm.FuncProto{
+		Name:     "vector_mask",
+		MaxStack: 2,
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_VECTOR_MASK, 0, 1, int(runtime.DenseArrayMaskAnd)),
+			vm.EncodeABC(vm.OP_RETURN, 0, 2, 0),
+		},
+	}
+
+	gate := firstUnsupportedTier2BytecodeGate(proto)
+	if !gate.Allowed {
+		t.Fatalf("OP_VECTOR_MASK should be Tier2-eligible via op-exit, got %q", gate.Reason)
+	}
+}
+
 func TestFrameLenRuntimeHelperUsesRuntimePrimitive(t *testing.T) {
 	frame := runtime.NewTable()
 	frame.SetNativePayloadWithInfo(struct{}{}, runtime.NativePayloadInfo{
@@ -1793,6 +1843,24 @@ func TestVectorCompareRuntimeHelperUsesRuntimePrimitive(t *testing.T) {
 	got, ok := result.DenseArray().Bool()
 	if !ok || len(got) != 3 || got[0] || !got[1] || !got[2] {
 		t.Fatalf("vector compare values = %#v, want [false true true]", got)
+	}
+}
+
+func TestVectorMaskRuntimeHelperUsesRuntimePrimitive(t *testing.T) {
+	result, err := executeVectorMaskValue(
+		int(runtime.DenseArrayMaskAndNot),
+		runtime.DenseArrayValue(runtime.NewDenseArrayBool([]bool{true, false, true, false})),
+		runtime.DenseArrayValue(runtime.NewDenseArrayBool([]bool{false, true, true, false})),
+	)
+	if err != nil {
+		t.Fatalf("execute vector mask: %v", err)
+	}
+	if !result.IsDenseArray() {
+		t.Fatalf("vector mask result = %#v, want dense array", result)
+	}
+	got, ok := result.DenseArray().Bool()
+	if !ok || len(got) != 4 || !got[0] || got[1] || got[2] || got[3] {
+		t.Fatalf("vector mask values = %#v, want [true false false false]", got)
 	}
 }
 

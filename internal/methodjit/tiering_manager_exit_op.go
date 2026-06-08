@@ -499,6 +499,16 @@ func (tm *TieringManager) executeOpExit(ctx *ExecContext, regs []runtime.Value, 
 		}
 		regs[absSlot] = out
 
+	case OpVectorMask:
+		if absArg1 >= len(regs) || absArg2 >= len(regs) || absSlot >= len(regs) {
+			return fmt.Errorf("VectorMask op-exit out of register range")
+		}
+		out, err := executeVectorMaskValue(aux, regs[absArg1], regs[absArg2])
+		if err != nil {
+			return err
+		}
+		regs[absSlot] = out
+
 	case OpEq:
 		if absArg1 < len(regs) && absArg2 < len(regs) && absSlot < len(regs) {
 			regs[absSlot] = runtime.BoolValue(regs[absArg1].Equal(regs[absArg2]))

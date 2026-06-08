@@ -116,6 +116,7 @@ const (
 	OP_FRAME_PROJECT_COLUMN        // A B C : R(A) = projected column from native frame R(B), spec Constants[C]
 	OP_FRAME_FILTER_PROJECT_COLUMN // A B C : R(A) = projected column from native frame R(B) filtered by mask R(A), spec Constants[C]
 	OP_VECTOR_COMPARE              // A B C : R(A) = compare(R(A), R(B), dense-array op C)
+	OP_VECTOR_MASK                 // A B C : R(A) = mask-combine(R(A), R(B), dense-array mask op C)
 	OP_VECTOR_GATHER               // A B : R(A) = gather(dense-array R(A), i64-indexes dense-array R(B))
 
 	OP_MAX // sentinel
@@ -281,6 +282,7 @@ var opNames = [...]string{
 	OP_FRAME_PROJECT_COLUMN:        "FRAME_PROJECT_COLUMN",
 	OP_FRAME_FILTER_PROJECT_COLUMN: "FRAME_FILTER_PROJECT_COLUMN",
 	OP_VECTOR_COMPARE:              "VECTOR_COMPARE",
+	OP_VECTOR_MASK:                 "VECTOR_MASK",
 	OP_VECTOR_GATHER:               "VECTOR_GATHER",
 }
 

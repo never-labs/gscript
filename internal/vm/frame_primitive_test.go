@@ -72,6 +72,40 @@ func TestFrameLenPrimitiveRejectsPlainTable(t *testing.T) {
 	}
 }
 
+func TestVectorMaskPrimitiveCombinesDenseBoolMasks(t *testing.T) {
+	proto := &FuncProto{
+		MaxStack: 2,
+		Code: []uint32{
+			EncodeABx(OP_LOADK, 0, 0),
+			EncodeABx(OP_LOADK, 1, 1),
+			EncodeABC(OP_VECTOR_MASK, 0, 1, int(runtime.DenseArrayMaskOr)),
+			EncodeABC(OP_RETURN, 0, 2, 0),
+		},
+		Constants: []runtime.Value{
+			runtime.DenseArrayValue(runtime.NewDenseArrayBool([]bool{true, false, false})),
+			runtime.DenseArrayValue(runtime.NewDenseArrayBool([]bool{false, true, false})),
+		},
+	}
+	proto.EnsureFeedback()
+
+	results, err := New(map[string]runtime.Value{}).Execute(proto)
+	if err != nil {
+		t.Fatalf("Execute VECTOR_MASK: %v", err)
+	}
+	if len(results) != 1 || !results[0].IsDenseArray() {
+		t.Fatalf("VECTOR_MASK result = %#v, want dense array", results)
+	}
+	got, ok := results[0].DenseArray().Bool()
+	if !ok || len(got) != 3 || !got[0] || !got[1] || got[2] {
+		t.Fatalf("VECTOR_MASK values = %#v, want [true true false]", got)
+	}
+
+	fb := proto.Feedback[2]
+	if fb.Left != FBAny || fb.Right != FBAny || fb.Result != FBAny {
+		t.Fatalf("VECTOR_MASK feedback = left %v right %v result %v, want any/any/any", fb.Left, fb.Right, fb.Result)
+	}
+}
+
 func TestFrameColumnPrimitiveReadsSoAColumn(t *testing.T) {
 	soa, err := runtime.NewSoA(map[string]*runtime.DenseArray{
 		"x":  runtime.NewDenseArrayF64([]float64{1.5, 2.5, 3.5}),

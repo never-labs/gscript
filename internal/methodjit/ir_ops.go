@@ -210,6 +210,9 @@ const (
 	// q/vector compare-mask primitive. Args = [left, right], Aux = runtime
 	// DenseArrayBinaryOp comparison opcode; mirrors OP_VECTOR_COMPARE.
 	OpVectorCompare
+	// q/vector mask-combine primitive. Args = [left, right], Aux = runtime
+	// DenseArrayMaskOp opcode; mirrors OP_VECTOR_MASK.
+	OpVectorMask
 	// Fused q/frame typed runtime-kernel primitive. Args = [frame] plus at
 	// most one dynamic rhs or row argument; constants and row mode live in
 	// Function.QFrameSelectColumnSpecs[Aux].
