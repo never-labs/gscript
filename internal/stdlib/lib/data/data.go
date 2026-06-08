@@ -474,6 +474,14 @@ type f64RangeArray struct {
 	len   int
 }
 
+type i64RunningSumArray struct {
+	source i64RangeArray
+}
+
+type f64RunningSumArray struct {
+	source f64RangeArray
+}
+
 type i64SegmentArray struct {
 	segments []i64RangeArray
 	len      int
@@ -906,6 +914,94 @@ func (a f64RangeArray) gatherRange(indexes []int) (Array, bool) {
 		prev = current
 	}
 	return f64RangeArray{start: first, step: step, len: len(indexes)}, true
+}
+
+func (a i64RunningSumArray) Kind() Kind { return KindI64 }
+
+func (a i64RunningSumArray) Len() int { return a.source.len }
+
+func (a i64RunningSumArray) At(row int) (any, bool) {
+	value, ok := a.i64At(row)
+	if !ok {
+		return nil, false
+	}
+	return value, true
+}
+
+func (a i64RunningSumArray) i64At(row int) (int64, bool) {
+	if row < 0 || row >= a.source.len {
+		return 0, false
+	}
+	n := int64(row + 1)
+	last := a.source.start + int64(row)*a.source.step
+	endpoints := a.source.start + last
+	if n%2 == 0 {
+		return (n / 2) * endpoints, true
+	}
+	return n * (endpoints / 2), true
+}
+
+func (a i64RunningSumArray) Values() []any {
+	out := make([]any, a.Len())
+	for i := range out {
+		value, _ := a.i64At(i)
+		out[i] = value
+	}
+	return out
+}
+
+func (a i64RunningSumArray) Gather(indexes []int) Array {
+	out := make([]int64, len(indexes))
+	for i, row := range indexes {
+		value, ok := a.i64At(row)
+		if !ok {
+			panic(fmt.Sprintf("data running sum gather index %d out of range", row))
+		}
+		out[i] = value
+	}
+	return columnArray[int64]{kind: KindI64, data: out}
+}
+
+func (a f64RunningSumArray) Kind() Kind { return KindF64 }
+
+func (a f64RunningSumArray) Len() int { return a.source.len }
+
+func (a f64RunningSumArray) At(row int) (any, bool) {
+	value, ok := a.f64At(row)
+	if !ok {
+		return nil, false
+	}
+	return value, true
+}
+
+func (a f64RunningSumArray) f64At(row int) (float64, bool) {
+	if row < 0 || row >= a.source.len {
+		return 0, false
+	}
+	n := float64(row + 1)
+	last := a.source.start + float64(row)*a.source.step
+	return n * (a.source.start + last) / 2, true
+}
+
+func (a f64RunningSumArray) Values() []any {
+	out := make([]any, a.Len())
+	for i := range out {
+		value, _ := a.f64At(i)
+		out[i] = value
+	}
+	return out
+}
+
+func (a f64RunningSumArray) Gather(indexes []int) Array {
+	out := make([]float64, len(indexes))
+	for i, row := range indexes {
+		value, ok := a.f64At(row)
+		if !ok {
+			panic(fmt.Sprintf("data running sum gather index %d out of range", row))
+		}
+		out[i] = value
+	}
+	return columnArray[float64]{kind: KindF64, data: out}
 }
 
 func (a i64ProductArray) Kind() Kind { return KindI64 }

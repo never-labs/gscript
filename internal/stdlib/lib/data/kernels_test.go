@@ -2169,6 +2169,9 @@ func TestTypedNumericUnaryBinaryAndAggregates(t *testing.T) {
 	if !ok || scan.Kind() != KindI64 {
 		t.Fatalf("TryTypedNumericSums range kind = %s, %v; want i64, true", scan.Kind(), ok)
 	}
+	if _, ok := scan.(i64RunningSumArray); !ok {
+		t.Fatalf("TryTypedNumericSums range returned %T, want i64RunningSumArray", scan)
+	}
 	if got, want := scan.Values(), []any{int64(0), int64(1), int64(3), int64(6)}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("TryTypedNumericSums range values = %v, want %v", got, want)
 	}

@@ -1129,6 +1129,11 @@ func (typedKernelRegistry) NumericSum(array Array) (float64, int64, bool, error)
 		return float64(sum), int64(a.len), true, nil
 	case f64RangeArray:
 		return f64RangeSum(a), int64(a.len), true, nil
+	case i64RunningSumArray:
+		sum := i64RunningSumSum(a)
+		return float64(sum), int64(a.Len()), true, nil
+	case f64RunningSumArray:
+		return f64RunningSumSum(a), int64(a.Len()), true, nil
 	case i64SegmentArray:
 		sum := i64SegmentSum(a)
 		return float64(sum), int64(a.len), true, nil
@@ -1278,6 +1283,10 @@ func (k typedKernelRegistry) NumericSumValue(array Array) (any, bool, error) {
 		return i64RangeSum(a), true, nil
 	case f64RangeArray:
 		return f64RangeSum(a), true, nil
+	case i64RunningSumArray:
+		return i64RunningSumSum(a), true, nil
+	case f64RunningSumArray:
+		return f64RunningSumSum(a), true, nil
 	case i64SegmentArray:
 		return i64SegmentSum(a), true, nil
 	case i64ProductArray:
@@ -1469,7 +1478,9 @@ func (k typedKernelRegistry) NumericSums(array Array) (Array, bool, error) {
 	case columnArray[int64]:
 		return numericSumsInteger(a.data), true, nil
 	case i64RangeArray:
-		return numericSumsI64Range(a), true, nil
+		return i64RunningSumArray{source: a}, true, nil
+	case f64RangeArray:
+		return f64RunningSumArray{source: a}, true, nil
 	case columnArray[uint8]:
 		return numericSumsUnsigned(a.data), true, nil
 	case columnArray[uint16]:
@@ -2413,6 +2424,18 @@ func (typedKernelRegistry) NumericAt(array Array, row int) (float64, bool, error
 		return numericI64RangeAt(a, row)
 	case f64RangeArray:
 		return numericF64RangeAt(a, row)
+	case i64RunningSumArray:
+		value, ok := a.i64At(row)
+		if !ok {
+			return 0, false, fmt.Errorf("array row %d out of range", row)
+		}
+		return float64(value), true, nil
+	case f64RunningSumArray:
+		value, ok := a.f64At(row)
+		if !ok {
+			return 0, false, fmt.Errorf("array row %d out of range", row)
+		}
+		return value, true, nil
 	case i64SegmentArray:
 		return numericI64SegmentAt(a, row)
 	case i64ProductArray:
@@ -2508,7 +2531,7 @@ func isNumericArray(array Array) bool {
 		return isNumericArray(a.array)
 	case columnArray[int8], columnArray[int16], columnArray[int32], columnArray[int64],
 		columnArray[uint8], columnArray[uint16], columnArray[uint32], columnArray[uint64],
-		columnArray[float32], columnArray[float64], i64RangeArray, f64RangeArray, i64SegmentArray, i64ProductArray:
+		columnArray[float32], columnArray[float64], i64RangeArray, f64RangeArray, i64RunningSumArray, f64RunningSumArray, i64SegmentArray, i64ProductArray:
 		return true
 	case nullableArray:
 		for i := 0; i < array.Len(); i++ {
@@ -2776,7 +2799,7 @@ func isIntegerArray(array Array) bool {
 		return isIntegerArray(a.array)
 	case columnArray[int8], columnArray[int16], columnArray[int32], columnArray[int64],
 		columnArray[uint8], columnArray[uint16], columnArray[uint32], columnArray[uint64],
-		i64RangeArray, i64SegmentArray, i64ProductArray:
+		i64RangeArray, i64RunningSumArray, i64SegmentArray, i64ProductArray:
 		return true
 	case nullableArray:
 		for i := 0; i < array.Len(); i++ {
@@ -2803,7 +2826,7 @@ func isDenseIntegerArray(array Array) bool {
 		return isDenseIntegerArray(a.array)
 	case columnArray[int8], columnArray[int16], columnArray[int32], columnArray[int64],
 		columnArray[uint8], columnArray[uint16], columnArray[uint32], columnArray[uint64],
-		i64RangeArray, i64SegmentArray, i64ProductArray:
+		i64RangeArray, i64RunningSumArray, i64SegmentArray, i64ProductArray:
 		return true
 	default:
 		return false
@@ -2841,6 +2864,12 @@ func integerArrayAt(array Array, row int) (int64, bool, error) {
 			return 0, false, fmt.Errorf("array row %d out of range", row)
 		}
 		return a.start + int64(row)*a.step, true, nil
+	case i64RunningSumArray:
+		value, ok := a.i64At(row)
+		if !ok {
+			return 0, false, fmt.Errorf("array row %d out of range", row)
+		}
+		return value, true, nil
 	case i64SegmentArray:
 		value, ok := a.i64At(row)
 		if !ok {
@@ -3631,6 +3660,24 @@ func f64RangeSum(values f64RangeArray) float64 {
 	n := float64(values.len)
 	last := values.start + float64(values.len-1)*values.step
 	return n * (values.start + last) / 2
+}
+
+func i64RunningSumSum(values i64RunningSumArray) int64 {
+	var sum int64
+	for i := 0; i < values.Len(); i++ {
+		value, _ := values.i64At(i)
+		sum += value
+	}
+	return sum
+}
+
+func f64RunningSumSum(values f64RunningSumArray) float64 {
+	var sum float64
+	for i := 0; i < values.Len(); i++ {
+		value, _ := values.f64At(i)
+		sum += value
+	}
+	return sum
 }
 
 func i64SegmentSum(values i64SegmentArray) int64 {
