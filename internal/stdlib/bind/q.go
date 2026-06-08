@@ -2673,7 +2673,7 @@ func qSQLKernelCacheStoreLocked(key string, kernel *data.QueryKernel) {
 		qSQLKernelOrder = qSQLKernelOrder[1:]
 		delete(qSQLKernelCache, evict)
 		qSQLAlignedStats.KernelEvictions++
-		qSQLKernelStatsForKeyLocked(evict).Evictions++
+		delete(qSQLKernelStatsByKey, evict)
 	}
 }
 

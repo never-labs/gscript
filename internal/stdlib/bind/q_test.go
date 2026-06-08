@@ -6017,6 +6017,68 @@ func TestQSQLPlanCacheEvictsOldestEntriesAndStats(t *testing.T) {
 	}
 }
 
+func TestQSQLKernelCacheEvictionPrunesPerKeyStats(t *testing.T) {
+	qSQLResetPlanCachesForTest()
+
+	frame, err := data.NewFrame(
+		data.Column{Name: "sym", Data: data.NewSymbols([]string{"AAPL"})},
+		data.Column{Name: "price", Data: data.NewF64([]float64{100})},
+	)
+	if err != nil {
+		t.Fatalf("NewFrame: %v", err)
+	}
+	plan := data.QueryPlan{
+		Select: []data.SelectItem{{Name: "sym", Expr: data.ColumnRef{Name: "sym"}}},
+		LimitN: -1,
+	}
+	firstKey := data.QueryKernelCacheKey("kernel-evict-0", frame, plan)
+	lastKey := ""
+
+	qSQLAlignedPlanCacheMu.Lock()
+	for i := 0; i < qSQLPlanCacheLimit+2; i++ {
+		key := data.QueryKernelCacheKey(fmt.Sprintf("kernel-evict-%d", i), frame, plan)
+		lastKey = key
+		qSQLKernelStatsForKeyLocked(key).Misses++
+		qSQLKernelCacheStoreLocked(key, nil)
+	}
+	if len(qSQLKernelCache) != qSQLPlanCacheLimit {
+		t.Fatalf("kernel cache entries = %d, want %d", len(qSQLKernelCache), qSQLPlanCacheLimit)
+	}
+	if len(qSQLKernelStatsByKey) != qSQLPlanCacheLimit {
+		t.Fatalf("kernel per-key stats entries = %d, want %d active keys", len(qSQLKernelStatsByKey), qSQLPlanCacheLimit)
+	}
+	if _, ok := qSQLKernelCache[firstKey]; ok {
+		t.Fatalf("kernel cache kept oldest entry")
+	}
+	if _, ok := qSQLKernelStatsByKey[firstKey]; ok {
+		t.Fatalf("kernel per-key stats kept evicted oldest key")
+	}
+	if _, ok := qSQLKernelCache[lastKey]; !ok {
+		t.Fatalf("kernel cache dropped newest entry")
+	}
+	if _, ok := qSQLKernelStatsByKey[lastKey]; !ok {
+		t.Fatalf("kernel per-key stats dropped newest key")
+	}
+	qSQLAlignedPlanCacheMu.Unlock()
+
+	stats := qSQLPlanCacheStatsSnapshot()
+	if stats.KernelEvictions != 2 {
+		t.Fatalf("kernel cache evictions = %d, want 2", stats.KernelEvictions)
+	}
+	if len(stats.KernelKeys) != qSQLPlanCacheLimit {
+		t.Fatalf("kernel key stats rows = %d, want %d active keys", len(stats.KernelKeys), qSQLPlanCacheLimit)
+	}
+
+	row := qTestCacheStatsRowTable(t, qCacheStatsTable(), "qsql_kernel")
+	keys := row.RawGetString("keys").Table()
+	if keys == nil || keys.Length() != qSQLPlanCacheLimit {
+		t.Fatalf("qsql_kernel keys rows = %v, want %d active keys", keys, qSQLPlanCacheLimit)
+	}
+	if got := qTestKernelCacheKeyStats(t, stats.KernelKeys, lastKey); got.Misses != 1 {
+		t.Fatalf("newest kernel key stats = %+v, want one miss", got)
+	}
+}
+
 func BenchmarkQSQLRepeatedMutationPlanCacheSmoke(b *testing.B) {
 	qSQLResetPlanCachesForTest()
 
