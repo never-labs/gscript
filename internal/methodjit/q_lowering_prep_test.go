@@ -2754,6 +2754,10 @@ func TestQGroupAggregateCallLowersToFrameGroupAggregateKernel(t *testing.T) {
 	if counts[OpFrameGroupAggregate] != 1 || counts[OpCall] != 0 {
 		t.Fatalf("group aggregate lowering counts FrameGroupAggregate=%d OpCall=%d\n%s", counts[OpFrameGroupAggregate], counts[OpCall], Print(lowered))
 	}
+	if counts[OpGetGlobal] != 0 || counts[OpGetField] != 0 || counts[OpConstString] != 0 {
+		t.Fatalf("group aggregate lowering left q.sql scaffold GetGlobal=%d GetField=%d ConstString=%d\n%s",
+			counts[OpGetGlobal], counts[OpGetField], counts[OpConstString], Print(lowered))
+	}
 	if fallbacks := CountQQueryLoweringFallbackReasons(fn.Remarks.List()); fallbacks[qQueryLoweringFallbackGroupAggregateCall] != 0 {
 		t.Fatalf("q query fallback counts = %+v, want no group aggregate fallback", fallbacks)
 	}
@@ -2833,6 +2837,10 @@ func TestQGroupAggregateWhereCallLowersToFilteredFrameGroupAggregateKernel(t *te
 	if counts[OpFrameMask] != 1 || counts[OpFrameGroupAggregate] != 1 || counts[OpCall] != 0 {
 		t.Fatalf("filtered group aggregate lowering counts FrameMask=%d FrameGroupAggregate=%d OpCall=%d\n%s",
 			counts[OpFrameMask], counts[OpFrameGroupAggregate], counts[OpCall], Print(lowered))
+	}
+	if counts[OpGetGlobal] != 0 || counts[OpGetField] != 0 || counts[OpConstString] != 0 {
+		t.Fatalf("filtered group aggregate lowering left q.sql scaffold GetGlobal=%d GetField=%d ConstString=%d\n%s",
+			counts[OpGetGlobal], counts[OpGetField], counts[OpConstString], Print(lowered))
 	}
 	kernels := DetectQFrameRuntimeKernels(lowered)
 	assertQKernelDescriptor(t, BuildQKernelDescriptors(nil, kernels, nil, fn.Remarks.List()),
@@ -3462,6 +3470,50 @@ func TestDiagnoseReportsQGroupAggregateFallbackDescriptor(t *testing.T) {
 		!strings.Contains(report.String(), "shape=select/where/group/aggregate/order") {
 		t.Fatalf("diagnostic report missing group fallback descriptor:\n%s", report.String())
 	}
+}
+
+func TestDiagnoseReportsFilteredQGroupAggregateRuntimeKernel(t *testing.T) {
+	const query = "select total:sum price, fills:count i by size from trades where price>=100"
+	proto := &vm.FuncProto{
+		Name:      "q_group_aggregate_filtered_diag",
+		NumParams: 1,
+		MaxStack:  4,
+		Constants: []runtime.Value{
+			runtime.StringValue("q"),
+			runtime.StringValue("sql"),
+			runtime.StringValue(query),
+		},
+		Code: []uint32{
+			vm.EncodeABx(vm.OP_GETGLOBAL, 1, 0),
+			vm.EncodeABC(vm.OP_GETFIELD, 1, 1, 1),
+			vm.EncodeABC(vm.OP_MOVE, 2, 0, 0),
+			vm.EncodeABx(vm.OP_LOADK, 3, 2),
+			vm.EncodeABC(vm.OP_CALL, 1, 3, 2),
+			vm.EncodeABC(vm.OP_RETURN, 1, 2, 0),
+		},
+	}
+
+	report := Diagnose(proto, []runtime.Value{runtime.TableValue(qHotPathTestFrame(t))})
+	if report.NativeError != nil || report.OptInterpError != nil {
+		t.Fatalf("Diagnose filtered group aggregate errors: native=%v opt=%v\n%s", report.NativeError, report.OptInterpError, report.String())
+	}
+	if report.QQueryFallbacks[qQueryLoweringFallbackGroupAggregateCall] != 0 {
+		t.Fatalf("Diagnose QQueryFallbacks = %+v, want no group aggregate fallback\n%s", report.QQueryFallbacks, report.String())
+	}
+	if got := report.QFrameRuntimeKernelShapes["filter/group/aggregate"]; got != 1 {
+		t.Fatalf("QFrameRuntimeKernelShapes[filter/group/aggregate] = %d, want 1; shapes=%+v\n%s", got, report.QFrameRuntimeKernelShapes, report.String())
+	}
+	if got := report.QFrameRuntimeKernelShapes["mask"]; got != 1 {
+		t.Fatalf("QFrameRuntimeKernelShapes[mask] = %d, want 1; shapes=%+v\n%s", got, report.QFrameRuntimeKernelShapes, report.String())
+	}
+	assertQKernelDescriptor(t, report.QKernelDescriptors, "methodjit_q_frame_runtime", "runtime_kernel", "FrameMask", "mask", "typed_runtime_op_exit", "supported", "")
+	assertQKernelDescriptor(t, report.QKernelDescriptors, "methodjit_q_frame_runtime", "runtime_kernel", "FrameGroupAggregate", "filter/group/aggregate", "typed_runtime_op_exit", "supported", "")
+	assertQKernelShapeSummaryExecution(t, report.QKernelShapeSummary, "methodjit_q_frame_runtime", "runtime_kernel", "mask", "supported", 1, 1, 0)
+	assertQKernelShapeSummaryExecution(t, report.QKernelShapeSummary, "methodjit_q_frame_runtime", "runtime_kernel", "filter/group/aggregate", "supported", 1, 1, 0)
+	assertQKernelExecutionStat(t, report.QKernelExecutionStats, "methodjit_q_frame_runtime", "FrameMask", "mask", "typed_runtime_op_exit", "success", 1)
+	assertQKernelExecutionStat(t, report.QKernelExecutionStats, "methodjit_q_frame_runtime", "FrameGroupAggregate", "filter/group/aggregate", "typed_runtime_op_exit", "success", 1)
+	assertQKernelExecutionRouteSummary(t, report.QKernelExecutionRoutes, "methodjit_q_frame_runtime", "FrameMask", "typed_runtime_op_exit", "success", 1)
+	assertQKernelExecutionRouteSummary(t, report.QKernelExecutionRoutes, "methodjit_q_frame_runtime", "FrameGroupAggregate", "typed_runtime_op_exit", "success", 1)
 }
 
 func TestDiagnoseReportsQJoinFallbackDescriptor(t *testing.T) {

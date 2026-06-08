@@ -1139,6 +1139,7 @@ func qGroupAggregateNativeLoweringPass(fn *Function) {
 	if fn == nil || fn.Proto == nil {
 		return
 	}
+	uses := qQueryValueUseCounts(fn)
 	for _, block := range fn.Blocks {
 		if block == nil {
 			continue
@@ -1162,6 +1163,7 @@ func qGroupAggregateNativeLoweringPass(fn *Function) {
 			mask := qInsertGroupAggregateMaskArg(fn, block, instr, frame, spec)
 			specIdx := len(fn.Proto.Constants)
 			fn.Proto.Constants = append(fn.Proto.Constants, qFrameGroupAggregateSpecValue(spec))
+			qNopQSQLCallScaffold(instr, uses)
 			instr.Op = OpFrameGroupAggregate
 			instr.Type = TypeAny
 			instr.Args = []*Value{frame, mask}
@@ -1171,6 +1173,25 @@ func qGroupAggregateNativeLoweringPass(fn *Function) {
 				"lowered simple q.sql grouped aggregate to FrameGroupAggregate typed runtime kernel op-exit")
 		}
 	}
+}
+
+func qNopQSQLCallScaffold(call *Instr, uses map[int]int) {
+	if call == nil {
+		return
+	}
+	var callee, receiver, query *Instr
+	if len(call.Args) > 0 && call.Args[0] != nil {
+		callee = call.Args[0].Def
+		if callee != nil && len(callee.Args) == 1 && callee.Args[0] != nil {
+			receiver = callee.Args[0].Def
+		}
+	}
+	if len(call.Args) > 2 && call.Args[2] != nil {
+		query = call.Args[2].Def
+	}
+	qQueryNopIfSingleUse(query, uses)
+	qQueryNopIfSingleUse(callee, uses)
+	qQueryNopIfSingleUse(receiver, uses)
 }
 
 func qParseSimpleGroupAggregateQuery(query string) (qSimpleGroupAggregateQuery, bool) {
