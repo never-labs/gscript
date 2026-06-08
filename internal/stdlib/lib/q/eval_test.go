@@ -1854,6 +1854,7 @@ func TestEvalWhereRecordsTypedRuntimeKernel(t *testing.T) {
 	assertEvalValue(t, `count reverse "AAPL" "MSFT" "AMD"`, int64(3))
 	assertEvalArray(t, "x:til 8;x[where x>=4]", data.KindI64, []any{int64(4), int64(5), int64(6), int64(7)})
 	assertEvalValue(t, "last ({x+y}\\[10;1 2 3])", int64(16))
+	assertEvalArray(t, "x:6#0;@[x;1 4;+;2 3]", data.KindI64, []any{int64(0), int64(2), int64(0), int64(0), int64(3), int64(0)})
 
 	seenWhereCompare := false
 	seenWhereMask := false
@@ -1861,6 +1862,7 @@ func TestEvalWhereRecordsTypedRuntimeKernel(t *testing.T) {
 	seenCountReverse := false
 	seenGather := false
 	seenLastCallableScan := false
+	seenAmend := false
 	for _, stat := range RuntimeKernelExecutionStats() {
 		if stat.Kernel == "ArrayWhereCompare" && stat.Shape == "compare-to-index/>=/i64/i64" && stat.Outcome == "hit" && stat.ReasonCode == "typed_kernel" && stat.Count > 0 {
 			seenWhereCompare = true
@@ -1880,9 +1882,12 @@ func TestEvalWhereRecordsTypedRuntimeKernel(t *testing.T) {
 		if stat.Kernel == "CallableLastScan" && stat.Shape == "last-scan/i64" && stat.Outcome == "hit" && stat.ReasonCode == "typed_kernel" && stat.Count > 0 {
 			seenLastCallableScan = true
 		}
+		if stat.Kernel == "ArrayAmendIndexes" && stat.Shape == "amend-indexes/i64" && stat.Outcome == "hit" && stat.ReasonCode == "typed_kernel" && stat.Count > 0 {
+			seenAmend = true
+		}
 	}
-	if !seenWhereCompare || !seenWhereMask || !seenLikeCount || !seenCountReverse || !seenGather || !seenLastCallableScan {
-		t.Fatalf("missing where typed runtime stats: compare=%v mask=%v like=%v reverse=%v gather=%v lastScan=%v stats=%#v", seenWhereCompare, seenWhereMask, seenLikeCount, seenCountReverse, seenGather, seenLastCallableScan, RuntimeKernelExecutionStats())
+	if !seenWhereCompare || !seenWhereMask || !seenLikeCount || !seenCountReverse || !seenGather || !seenLastCallableScan || !seenAmend {
+		t.Fatalf("missing where typed runtime stats: compare=%v mask=%v like=%v reverse=%v gather=%v lastScan=%v amend=%v stats=%#v", seenWhereCompare, seenWhereMask, seenLikeCount, seenCountReverse, seenGather, seenLastCallableScan, seenAmend, RuntimeKernelExecutionStats())
 	}
 }
 

@@ -1807,6 +1807,48 @@ func checkedI64Index(value int64) (int, error) {
 	return int(value), nil
 }
 
+// TryTypedAmendIndexes applies indexed updates without materializing the source
+// array as boxed []any values.
+func TryTypedAmendIndexes(array Array, indexes []int, values []any) (Array, bool, error) {
+	if array == nil {
+		return nil, true, fmt.Errorf("amend array is nil")
+	}
+	if len(indexes) != len(values) {
+		return nil, true, fmt.Errorf("amend value length mismatch")
+	}
+	switch array.Kind() {
+	case KindI64:
+		out := make([]int64, array.Len())
+		for row := range out {
+			value, ok, err := integerArrayAt(array, row)
+			if err != nil {
+				return nil, true, err
+			}
+			if !ok {
+				return nil, false, nil
+			}
+			out[row] = value
+		}
+		for i, index := range indexes {
+			if index < 0 || index >= len(out) {
+				return nil, true, fmt.Errorf("amend index %d out of range", index)
+			}
+			value, err := normalizeScalarForKind(KindI64, values[i], i)
+			if err != nil {
+				return nil, true, err
+			}
+			next, ok := value.(int64)
+			if !ok {
+				return nil, false, nil
+			}
+			out[index] = next
+		}
+		return columnArray[int64]{kind: KindI64, data: out}, true, nil
+	default:
+		return nil, false, nil
+	}
+}
+
 func typedCompareIndexRangeI64(array Array, op Op, value any) (Array, bool) {
 	switch a := array.(type) {
 	case attributedArray:

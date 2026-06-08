@@ -6397,6 +6397,15 @@ func vectorAmendIndexes(array data.Array, indexes []int, values []any) (data.Arr
 	if len(indexes) != len(values) {
 		return nil, fmt.Errorf("amend value length mismatch")
 	}
+	if typed, handled, err := data.TryTypedAmendIndexes(array, indexes, values); err != nil || handled {
+		recordRuntimeKernelProbe("ArrayAmendIndexes", "amend-indexes/"+string(array.Kind()), handled, err)
+		if err != nil {
+			return nil, err
+		}
+		return typed, nil
+	} else {
+		recordRuntimeKernelProbe("ArrayAmendIndexes", "amend-indexes/"+string(array.Kind()), handled, err)
+	}
 	out := array.Values()
 	for i, index := range indexes {
 		if index < 0 || index >= len(out) {

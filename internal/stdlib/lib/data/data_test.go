@@ -3143,6 +3143,17 @@ func TestTryGatherByI64IndexArrayPreservesRanges(t *testing.T) {
 	}
 }
 
+func TestTryTypedAmendIndexesI64(t *testing.T) {
+	values := takeRepeatMust(t, NewI64([]int64{0}), 6)
+	amended, handled, err := TryTypedAmendIndexes(values, []int{1, 4}, []any{int64(10), int64(20)})
+	if err != nil || !handled {
+		t.Fatalf("TryTypedAmendIndexes handled=%v err=%v; want true,nil", handled, err)
+	}
+	if got, want := amended.Values(), []any{int64(0), int64(10), int64(0), int64(0), int64(20), int64(0)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("amended values = %#v, want %#v", got, want)
+	}
+}
+
 func TestFrameGatherTakeAndFilterMask(t *testing.T) {
 	frame := mustFrame(t,
 		NewColumn("sym", []any{Symbol("a"), Symbol("b"), Symbol("c"), Symbol("d")}),
