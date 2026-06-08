@@ -491,16 +491,23 @@ func (s *SoA) IndicesWhere(mask *DenseArray) (*DenseArray, error) {
 }
 
 func (s *SoA) Mask(columnName, op string, rhs Value) (*DenseArray, error) {
+	denseOp, err := DenseArrayCompareOp(op)
+	if err != nil {
+		return nil, err
+	}
+	return s.MaskOp(columnName, denseOp, rhs)
+}
+
+// MaskOp builds a boolean mask for a column comparison using a typed dense-array
+// opcode. It is the JIT-friendly equivalent of Mask, which parses q-style
+// operator strings before reaching the typed kernel.
+func (s *SoA) MaskOp(columnName string, op DenseArrayBinaryOp, rhs Value) (*DenseArray, error) {
 	if s == nil {
 		return nil, fmt.Errorf("soa is nil")
 	}
 	left, ok := s.Column(columnName)
 	if !ok {
 		return nil, fmt.Errorf("soa column %q not found", columnName)
-	}
-	denseOp, err := denseArrayCompareOp(op)
-	if err != nil {
-		return nil, err
 	}
 	right := rhs
 	if rhs.IsString() {
@@ -510,7 +517,7 @@ func (s *SoA) Mask(columnName, op string, rhs Value) (*DenseArray, error) {
 		}
 		right = DenseArrayValue(col)
 	}
-	return denseArrayCompareMask(left, denseOp, right)
+	return denseArrayCompareMask(left, op, right)
 }
 
 func denseArrayCompareOp(op string) (DenseArrayBinaryOp, error) {
@@ -530,6 +537,12 @@ func denseArrayCompareOp(op string) (DenseArrayBinaryOp, error) {
 	default:
 		return DenseArrayEQ, fmt.Errorf("soa mask comparison %q is not supported", op)
 	}
+}
+
+// DenseArrayCompareOp converts q-style comparison operator strings to typed
+// dense-array comparison opcodes.
+func DenseArrayCompareOp(op string) (DenseArrayBinaryOp, error) {
+	return denseArrayCompareOp(op)
 }
 
 func (s *SoA) Gather(indices *DenseArray) (*SoA, error) {

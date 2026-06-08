@@ -36,7 +36,11 @@ func executeFrameMaskValue(frameVal runtime.Value, spec runtime.Value) (runtime.
 	if err != nil {
 		return runtime.NilValue(), err
 	}
-	out, handled, err := frameVal.NativeFrameMask(name, op, rhs)
+	denseOp, err := runtime.DenseArrayCompareOp(op)
+	if err != nil {
+		return runtime.NilValue(), err
+	}
+	out, handled, err := frameVal.NativeFrameMaskOp(name, denseOp, rhs)
 	if err != nil {
 		return runtime.NilValue(), err
 	}

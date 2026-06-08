@@ -42,3 +42,36 @@ func TestNativeFrameMaskBuildsDenseBoolMask(t *testing.T) {
 		t.Fatalf("column mask = %#v, want [true true false]", colGot)
 	}
 }
+
+func TestNativeFrameMaskOpUsesTypedComparison(t *testing.T) {
+	soa, err := NewSoA(map[string]*DenseArray{
+		"price": NewDenseArrayF64([]float64{10, 12, 8}),
+		"limit": NewDenseArrayF64([]float64{9, 12, 9}),
+	})
+	if err != nil {
+		t.Fatalf("NewSoA: %v", err)
+	}
+	frame := NewTable()
+	frame.SetNativePayloadWithInfo(soa, NativePayloadInfo{
+		Kind:       NativePayloadDataFrame,
+		Rows:       soa.Len(),
+		Columns:    2,
+		SchemaHash: "mask-op-test",
+	})
+
+	mask, handled, err := TableValue(frame).NativeFrameMaskOp("price", DenseArrayGE, StringValue("limit"))
+	if err != nil {
+		t.Fatalf("NativeFrameMaskOp: %v", err)
+	}
+	if !handled || !mask.IsDenseArray() {
+		t.Fatalf("NativeFrameMaskOp = %v handled=%v, want dense array", mask, handled)
+	}
+	got, ok := mask.DenseArray().Bool()
+	if !ok || len(got) != 3 || !got[0] || !got[1] || got[2] {
+		t.Fatalf("typed op mask = %#v, want [true true false]", got)
+	}
+
+	if _, handled, err := TableValue(frame).NativeFrameMaskOp("price", DenseArrayAdd, FloatValue(10)); !handled || err == nil {
+		t.Fatalf("NativeFrameMaskOp arithmetic op handled=%v err=%v, want handled error", handled, err)
+	}
+}
