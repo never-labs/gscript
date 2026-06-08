@@ -61,6 +61,17 @@ func executeFrameProjectValue(frameVal runtime.Value, names []string) (runtime.V
 	return out, nil
 }
 
+func executeFrameProjectColumnValue(frameVal runtime.Value, names []string, resultName string) (runtime.Value, error) {
+	out, handled, err := frameVal.NativeFrameProjectColumn(names, resultName)
+	if err != nil {
+		return runtime.NilValue(), err
+	}
+	if !handled {
+		return runtime.NilValue(), fmt.Errorf("FrameProjectColumn operand must be native frame (got %s)", frameVal.TypeName())
+	}
+	return out, nil
+}
+
 func executeFrameFilterValue(frameVal, maskVal runtime.Value) (runtime.Value, error) {
 	if !maskVal.IsDenseArray() {
 		return runtime.NilValue(), fmt.Errorf("FrameFilter mask must be dense array (got %s)", maskVal.TypeName())
@@ -144,14 +155,10 @@ func executeQFrameSelectColumnValue(constants []runtime.Value, specs []QFrameSel
 	if err != nil {
 		return runtime.NilValue(), err
 	}
-	projected, err := executeFrameProjectValue(rows, names)
-	if err != nil {
-		return runtime.NilValue(), err
-	}
 	if spec.ResultColumnConst < 0 || spec.ResultColumnConst >= len(constants) || !constants[spec.ResultColumnConst].IsString() {
 		return runtime.NilValue(), fmt.Errorf("QFrameSelectColumn result column must be a string constant")
 	}
-	return executeFrameColumnValue(projected, constants[spec.ResultColumnConst].Str())
+	return executeFrameProjectColumnValue(rows, names, constants[spec.ResultColumnConst].Str())
 }
 
 func executeQFrameSelectColumnMask(constants []runtime.Value, spec QFrameSelectColumnSpec, frameVal runtime.Value, rhsVal runtime.Value, hasRHS bool) (runtime.Value, error) {
