@@ -1286,6 +1286,44 @@ func TestQueryKernelSupportReasonClassifiesHotExpressionPaths(t *testing.T) {
 	}
 }
 
+func TestQueryKernelPlanShapeAggregatesFingerprintSplitPlans(t *testing.T) {
+	frame := mustFrame(t,
+		Column{Name: "sym", Data: NewSymbols([]string{"AAPL", "MSFT", "NVDA", "TSLA"})},
+		Column{Name: "qty", Data: NewI32([]int32{10, 20, 30, 40})},
+		Column{Name: "px", Data: NewF64([]float64{100, 80, 210, 190})},
+	)
+	base := QueryPlan{
+		Where: Binary{Op: OpGE, Left: ColumnRef{Name: "qty"}, Right: Literal{Value: int32(20)}},
+		Select: []SelectItem{{
+			Name: "notional",
+			Expr: Binary{Op: OpMul, Left: ColumnRef{Name: "qty"}, Right: ColumnRef{Name: "px"}},
+		}},
+		LimitN: -1,
+	}
+	changedLiteral := base
+	changedLiteral.Where = Binary{Op: OpGE, Left: ColumnRef{Name: "qty"}, Right: Literal{Value: int32(30)}}
+
+	if got, want := QueryKernelPlanShape(changedLiteral), QueryKernelPlanShape(base); got != want {
+		t.Fatalf("QueryKernelPlanShape changed with literal value: got %q, want %q", got, want)
+	}
+	if got := QueryKernelPlanFingerprint(changedLiteral); got == QueryKernelPlanFingerprint(base) {
+		t.Fatalf("QueryKernelPlanFingerprint did not split changed literal: %q", got)
+	}
+	if got := QueryKernelCacheKey("source", frame, changedLiteral); got == QueryKernelCacheKey("source", frame, base) {
+		t.Fatalf("QueryKernelCacheKey did not split changed literal: %q", got)
+	}
+
+	for name, plan := range map[string]QueryPlan{"base": base, "changed_literal": changedLiteral} {
+		kernel, ok, err := CompileQueryKernel(frame, plan)
+		if err != nil || !ok || kernel == nil {
+			t.Fatalf("%s CompileQueryKernel = kernel %v, ok %v, err %v; want compiled kernel", name, kernel, ok, err)
+		}
+		if got, want := kernel.Shape(), QueryKernelPlanShape(base); got != want {
+			t.Fatalf("%s kernel shape = %q, want %q", name, got, want)
+		}
+	}
+}
+
 func TestQueryKernelPlanShapeClassifiesCompositePaths(t *testing.T) {
 	frame := mustFrame(t,
 		Column{Name: "sym", Data: NewSymbols([]string{"AAPL", "MSFT", "AAPL", "NVDA"})},

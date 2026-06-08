@@ -85,6 +85,7 @@ type qSQLPlanCacheStats struct {
 
 type qSQLKernelCacheKeyStats struct {
 	Key       string
+	Shape     string
 	Hits      int
 	Misses    int
 	Evictions int
@@ -1315,12 +1316,20 @@ func qExplainQuery(s *SoA, spec *Table) (*Table, error) {
 	out.RawSetString("by_count", IntValue(int64(len(by))))
 	out.RawSetString("aggregate_count", IntValue(int64(len(aggs))))
 	kernelCached := false
+	kernelShape := ""
 	if len(aggs) == 0 {
 		if key, ok := qQueryKernelSupportCacheKey(s, spec, selects); ok {
-			_, kernelCached = qQueryKernelSupportCachePeek(key)
+			entry, cached := qQueryKernelSupportCachePeek(key)
+			kernelCached = cached
+			if entry.Shape != "" {
+				kernelShape = entry.Shape
+			} else {
+				kernelShape = qQueryKernelShapeFromCacheKey(key)
+			}
 		}
 	}
 	out.RawSetString("kernel_cached", BoolValue(kernelCached))
+	out.RawSetString("kernel_shape", StringValue(kernelShape))
 	if len(aggs) != 0 {
 		reason := "query native kernel supports non-aggregate selects only"
 		out.RawSetString("kernel_supported", BoolValue(false))
@@ -1595,6 +1604,7 @@ func qExplainSQL(args qSQLArgsResult) (Value, error) {
 	out.RawSetString("kernel_cache_schema_hash", StringValue(kernelInfo.cacheSchemaHash))
 	out.RawSetString("kernel_cache_schema_match", BoolValue(qExplainKernelCacheSchemaMatches(kernelInfo)))
 	out.RawSetString("kernel_plan_fingerprint", StringValue(kernelInfo.planFingerprint))
+	out.RawSetString("kernel_shape", StringValue(kernelInfo.shape))
 	out.RawSetString("kernel_reason_code", StringValue(kernelInfo.reasonCode))
 	out.RawSetString("kernel_reason", StringValue(kernelInfo.reason))
 	qExplainAttachFallbackStats(out, qSQLKernelFallbackStatsCode(kernelInfo), kernelInfo.reasonCode, kernelInfo.reason)
@@ -1609,6 +1619,7 @@ type qExplainKernelResult struct {
 	cacheKind       string
 	cacheSchemaHash string
 	planFingerprint string
+	shape           string
 	supported       bool
 	cached          bool
 	decisionCached  bool
@@ -2006,7 +2017,11 @@ func qExplainKernelInfo(args qSQLArgsResult, tmpl qSQLPlanTemplate) qExplainKern
 		if reason == "" {
 			reason = qKernelReasonSupported
 		}
-		return qExplainKernelResult{schema: frame.Schema(), schemaHash: schemaHash, cacheKey: kernelKey, cacheNamespace: kernelKeyInfo.Namespace, cacheKind: kernelKeyInfo.Kind, cacheSchemaHash: kernelKeyInfo.SchemaHash, planFingerprint: planFingerprint, supported: true, cached: true, decisionCached: true, reasonCode: qKernelReasonSupported, reason: reason}
+		shape := ""
+		if cachedKernel != nil {
+			shape = cachedKernel.Shape()
+		}
+		return qExplainKernelResult{schema: frame.Schema(), schemaHash: schemaHash, cacheKey: kernelKey, cacheNamespace: kernelKeyInfo.Namespace, cacheKind: kernelKeyInfo.Kind, cacheSchemaHash: kernelKeyInfo.SchemaHash, planFingerprint: planFingerprint, shape: shape, supported: true, cached: true, decisionCached: true, reasonCode: qKernelReasonSupported, reason: reason}
 	}
 	if unsupportedCached {
 		return qExplainKernelResult{schema: frame.Schema(), schemaHash: schemaHash, cacheKey: kernelKey, cacheNamespace: kernelKeyInfo.Namespace, cacheKind: kernelKeyInfo.Kind, cacheSchemaHash: kernelKeyInfo.SchemaHash, planFingerprint: planFingerprint, cached: false, decisionCached: true, reasonCode: stdq.KernelFallbackReasonCode(unsupportedReason), reason: unsupportedReason}
@@ -2018,7 +2033,7 @@ func qExplainKernelInfo(args qSQLArgsResult, tmpl qSQLPlanTemplate) qExplainKern
 	if !supported {
 		return qExplainKernelResult{schema: frame.Schema(), schemaHash: schemaHash, cacheKey: kernelKey, cacheNamespace: kernelKeyInfo.Namespace, cacheKind: kernelKeyInfo.Kind, cacheSchemaHash: kernelKeyInfo.SchemaHash, planFingerprint: planFingerprint, cached: cached, decisionCached: cached, reasonCode: stdq.KernelFallbackReasonCode(reason), reason: reason}
 	}
-	return qExplainKernelResult{schema: frame.Schema(), schemaHash: schemaHash, cacheKey: kernelKey, cacheNamespace: kernelKeyInfo.Namespace, cacheKind: kernelKeyInfo.Kind, cacheSchemaHash: kernelKeyInfo.SchemaHash, planFingerprint: planFingerprint, supported: true, cached: cached, decisionCached: cached, reasonCode: qKernelReasonSupported, reason: reason}
+	return qExplainKernelResult{schema: frame.Schema(), schemaHash: schemaHash, cacheKey: kernelKey, cacheNamespace: kernelKeyInfo.Namespace, cacheKind: kernelKeyInfo.Kind, cacheSchemaHash: kernelKeyInfo.SchemaHash, planFingerprint: planFingerprint, shape: data.QueryKernelPlanShape(plan), supported: true, cached: cached, decisionCached: cached, reasonCode: qKernelReasonSupported, reason: reason}
 }
 
 func qSQLKernelCacheKeyInfo(key string) data.SchemaStableCacheKeyParts {
@@ -2668,6 +2683,9 @@ func qSQLKernelCacheStoreLocked(key string, kernel *data.QueryKernel) {
 		qSQLKernelOrder = append(qSQLKernelOrder, key)
 	}
 	qSQLKernelCache[key] = kernel
+	if kernel != nil {
+		qSQLKernelStatsForKeyLocked(key).Shape = kernel.Shape()
+	}
 	for len(qSQLKernelOrder) > qSQLPlanCacheLimit {
 		evict := qSQLKernelOrder[0]
 		qSQLKernelOrder = qSQLKernelOrder[1:]
@@ -2910,6 +2928,7 @@ func qKernelCacheKeyStatsTable(stats []qSQLKernelCacheKeyStats) *Table {
 			planFingerprint = info.Extra[0]
 		}
 		row.RawSetString("plan_fingerprint", StringValue(planFingerprint))
+		row.RawSetString("shape", StringValue(stat.Shape))
 		row.RawSetString("hits", IntValue(int64(stat.Hits)))
 		row.RawSetString("misses", IntValue(int64(stat.Misses)))
 		row.RawSetString("evictions", IntValue(int64(stat.Evictions)))

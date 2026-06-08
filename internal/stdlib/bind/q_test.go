@@ -1400,6 +1400,9 @@ unsupported := q.explain_query(trades, {
 	if got := supported.RawGetString("kernel_reason_code"); !got.IsString() || got.Str() != qKernelReasonSupported {
 		t.Fatalf("supported kernel_reason_code = %v, want %s", got, qKernelReasonSupported)
 	}
+	if got := supported.RawGetString("kernel_shape"); !got.IsString() || !strings.Contains(got.Str(), "select=") {
+		t.Fatalf("supported kernel_shape = %v, want stable q.query select shape", got)
+	}
 	if got := supported.RawGetString("kernel_rows"); !got.IsInt() || got.Int() != 2 {
 		t.Fatalf("supported kernel_rows = %v, want 2", got)
 	}
@@ -1442,6 +1445,9 @@ unsupported := q.explain_query(trades, {
 	}
 	if got := unsupported.RawGetString("kernel_schema_hash"); !got.IsString() || got.Str() != "" {
 		t.Fatalf("unsupported kernel_schema_hash = %v, want empty string", got)
+	}
+	if got := unsupported.RawGetString("kernel_shape"); !got.IsString() || !strings.Contains(got.Str(), "select=") {
+		t.Fatalf("unsupported kernel_shape = %v, want stable fallback select shape", got)
 	}
 	if schema := unsupported.RawGetString("kernel_schema").Table(); schema == nil || schema.Length() != 0 {
 		t.Fatalf("unsupported kernel_schema = %v, want empty table", schema)
@@ -3527,6 +3533,10 @@ func TestQExplainReportsQueryKernelVisibility(t *testing.T) {
 	if got := beforeTable.RawGetString("kernel_reason"); !got.IsString() || !strings.Contains(got.Str(), "post-project ordered projection path") {
 		t.Fatalf("kernel_reason before = %v, want specific ordered projection kernel reason", got)
 	}
+	kernelShape := beforeTable.RawGetString("kernel_shape")
+	if !kernelShape.IsString() || kernelShape.Str() != "post_project_ordered_projection|where=typed_column_literal|projection=typed_binary|order=post_project:1|limit=bounded" {
+		t.Fatalf("kernel_shape before = %v, want stable filtered ordered projection shape", kernelShape)
+	}
 	if got := beforeTable.RawGetString("source_bridge"); !got.IsString() || got.Str() != "frame_native" {
 		t.Fatalf("source_bridge before = %v, want frame_native", got)
 	}
@@ -3637,6 +3647,9 @@ func TestQExplainReportsQueryKernelVisibility(t *testing.T) {
 	if got := afterTable.RawGetString("kernel_reason"); !got.IsString() || got.Str() != beforeTable.RawGetString("kernel_reason").Str() {
 		t.Fatalf("kernel_reason after = %v, want cached reason %q", got, beforeTable.RawGetString("kernel_reason").Str())
 	}
+	if got := afterTable.RawGetString("kernel_shape"); !got.IsString() || got.Str() != kernelShape.Str() {
+		t.Fatalf("kernel_shape after = %v, want cached shape %q", got, kernelShape.Str())
+	}
 	if got := afterTable.RawGetString("kernel_cache_key"); !got.IsString() || got.Str() != cacheKey.Str() {
 		t.Fatalf("kernel_cache_key after = %v, want %s", got, cacheKey.Str())
 	}
@@ -3667,6 +3680,7 @@ func TestQExplainReportsQueryKernelVisibility(t *testing.T) {
 		"kind":             "kernel",
 		"schema_hash":      frame.SchemaFingerprint(),
 		"plan_fingerprint": planFingerprint.Str(),
+		"shape":            kernelShape.Str(),
 	} {
 		if got := keyRow.RawGetString(field); !got.IsString() || got.Str() != want {
 			t.Fatalf("qsql_kernel keys[1].%s = %v, want %q", field, got, want)
