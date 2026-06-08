@@ -2992,6 +2992,12 @@ func TestQCacheStatsAndClearPublicAPI(t *testing.T) {
 	if got := loweringRow.RawGetString("cache_backed"); !got.IsBool() || got.Bool() {
 		t.Fatalf("q_runtime_kernel_lowering cache_backed = %v, want false", got)
 	}
+	if got := loweringRow.RawGetString("lowerings"); !got.IsInt() || got.Int() != 0 {
+		t.Fatalf("q_runtime_kernel_lowering lowerings = %v, want 0", got)
+	}
+	if got := loweringRow.RawGetString("supported"); !got.IsInt() || got.Int() != 0 {
+		t.Fatalf("q_runtime_kernel_lowering supported = %v, want 0", got)
+	}
 	if got := loweringRow.RawGetString("fallbacks"); !got.IsInt() || got.Int() != 0 {
 		t.Fatalf("q_runtime_kernel_lowering fallbacks = %v, want 0", got)
 	}
@@ -3006,6 +3012,9 @@ func TestQCacheStatsAndClearPublicAPI(t *testing.T) {
 	}
 	if reasons := loweringRow.RawGetString("reasons").Table(); reasons == nil || reasons.Length() != 0 {
 		t.Fatalf("q_runtime_kernel_lowering reasons = %v, want empty table until MethodJIT diagnostics are attached", reasons)
+	}
+	if routes := loweringRow.RawGetString("routes").Table(); routes == nil || routes.Length() != 0 {
+		t.Fatalf("q_runtime_kernel_lowering routes = %v, want empty table until MethodJIT diagnostics are attached", routes)
 	}
 	kernelRow := qTestCacheStatsRowTable(t, interp.GetGlobal("stats").Table(), "qsql_kernel")
 	if got := kernelRow.RawGetString("stats_domain"); !got.IsString() || got.Str() != qStatsDomainSemanticCache {
@@ -3252,6 +3261,82 @@ func TestQRuntimeKernelExecutionStatsProviderCleanupIsGenerationGuarded(t *testi
 	empty := qTestCacheStatsRowTable(t, qCacheStatsTable(), "q_runtime_kernel_execution")
 	if got := empty.RawGetString("executions"); !got.IsInt() || got.Int() != 0 {
 		t.Fatalf("q_runtime_kernel_execution executions after current restore = %v, want 0", got)
+	}
+}
+
+func TestQRuntimeKernelLoweringStatsProviderCleanupIsGenerationGuarded(t *testing.T) {
+	qClearCaches()
+	restoreA := SetQRuntimeKernelLoweringStatsProvider(func() []QRuntimeKernelLoweringStat {
+		return []QRuntimeKernelLoweringStat{{
+			Source:       "methodjit_q_vector_lowering",
+			Kind:         "fallback",
+			Kernel:       "QVectorGatherReduce",
+			Shape:        "gather/vector-reduce",
+			Route:        "lowering",
+			Outcome:      "fallback",
+			ReasonFamily: "lowering",
+			ReasonCode:   "shared_gather",
+			Count:        1,
+		}}
+	})
+	restoreB := SetQRuntimeKernelLoweringStatsProvider(func() []QRuntimeKernelLoweringStat {
+		return []QRuntimeKernelLoweringStat{
+			{
+				Source:       "methodjit_q_vector_lowering",
+				Kind:         "fallback",
+				Kernel:       "QVectorGatherReduce",
+				Shape:        "gather/vector-reduce",
+				Route:        "lowering",
+				Outcome:      "fallback",
+				ReasonFamily: "lowering",
+				ReasonCode:   "shared_gather",
+				Count:        2,
+			},
+			{
+				Source:       "methodjit_q_vector_lowering",
+				Kind:         "fallback",
+				Kernel:       "QVectorGatherReduce",
+				Shape:        "gather/vector-reduce",
+				Route:        "lowering",
+				Outcome:      "fallback",
+				ReasonFamily: "lowering",
+				ReasonCode:   "shared_gather",
+				Count:        3,
+			},
+		}
+	})
+	defer restoreB()
+
+	restoreA()
+	row := qTestCacheStatsRowTable(t, qCacheStatsTable(), "q_runtime_kernel_lowering")
+	if got := row.RawGetString("lowerings"); !got.IsInt() || got.Int() != 5 {
+		t.Fatalf("q_runtime_kernel_lowering lowerings after stale restore = %v, want provider B total 5", got)
+	}
+	if got := row.RawGetString("fallbacks"); !got.IsInt() || got.Int() != 5 {
+		t.Fatalf("q_runtime_kernel_lowering fallbacks after stale restore = %v, want provider B total 5", got)
+	}
+	routes := row.RawGetString("routes").Table()
+	if routes == nil || routes.Length() != 1 {
+		t.Fatalf("q_runtime_kernel_lowering routes after stale restore = %v, want one aggregated route", routes)
+	}
+	route := routes.RawGetInt(1).Table()
+	if route == nil {
+		t.Fatal("q_runtime_kernel_lowering routes[1] is nil")
+	}
+	if got := route.RawGetString("count"); !got.IsInt() || got.Int() != 5 {
+		t.Fatalf("q_runtime_kernel_lowering routes[1].count = %v, want duplicate provider rows aggregated to 5", got)
+	}
+
+	qClearCaches()
+	cleared := qTestCacheStatsRowTable(t, qCacheStatsTable(), "q_runtime_kernel_lowering")
+	if got := cleared.RawGetString("fallbacks"); !got.IsInt() || got.Int() != 5 {
+		t.Fatalf("q_runtime_kernel_lowering fallbacks after q.cache_clear-equivalent = %v, want provider stats retained", got)
+	}
+
+	restoreB()
+	empty := qTestCacheStatsRowTable(t, qCacheStatsTable(), "q_runtime_kernel_lowering")
+	if got := empty.RawGetString("lowerings"); !got.IsInt() || got.Int() != 0 {
+		t.Fatalf("q_runtime_kernel_lowering lowerings after current restore = %v, want 0", got)
 	}
 }
 

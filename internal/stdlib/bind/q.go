@@ -198,6 +198,15 @@ type qRuntimeKernelLoweringReasonStat struct {
 	Count        uint64
 }
 
+type qRuntimeKernelLoweringRouteStat struct {
+	Source  string
+	Kind    string
+	Kernel  string
+	Route   string
+	Outcome string
+	Count   uint64
+}
+
 type qRuntimeKernelExecutionShapeSummary struct {
 	Executions uint64
 	Successes  uint64
@@ -3307,9 +3316,15 @@ func qRuntimeKernelExecutionStatsSnapshot() []QRuntimeKernelExecutionStat {
 
 func qRuntimeKernelLoweringStatsRow() *Table {
 	stats := qRuntimeKernelLoweringStatsSnapshot()
+	lowerings := uint64(0)
+	supported := uint64(0)
 	fallbacks := uint64(0)
 	for _, stat := range stats {
-		if stat.Outcome == "fallback" {
+		lowerings += stat.Count
+		switch stat.Outcome {
+		case "supported":
+			supported += stat.Count
+		case "fallback":
 			fallbacks += stat.Count
 		}
 	}
@@ -3317,11 +3332,14 @@ func qRuntimeKernelLoweringStatsRow() *Table {
 	row.RawSetString("stats_domain", StringValue(qStatsDomainJITLowering))
 	row.RawSetString("stats_source", StringValue(qStatsSourceMethodJIT))
 	row.RawSetString("cache_backed", BoolValue(false))
+	row.RawSetString("lowerings", qUint64IntValue(lowerings))
+	row.RawSetString("supported", qUint64IntValue(supported))
 	row.RawSetString("fallbacks", qUint64IntValue(fallbacks))
 	row.RawSetString("stats", TableValue(qRuntimeKernelLoweringStatsTable(stats)))
 	row.RawSetString("shapes", TableValue(qRuntimeKernelLoweringShapeStatsTable(qRuntimeKernelLoweringShapeStats(stats))))
 	row.RawSetString("kernels", TableValue(qRuntimeKernelLoweringKernelStatsTable(qRuntimeKernelLoweringKernelStats(stats))))
 	row.RawSetString("reasons", TableValue(qRuntimeKernelLoweringReasonStatsTable(qRuntimeKernelLoweringReasonStats(stats))))
+	row.RawSetString("routes", TableValue(qRuntimeKernelLoweringRouteStatsTable(qRuntimeKernelLoweringRouteStats(stats))))
 	return row
 }
 
@@ -3785,6 +3803,9 @@ func qRuntimeKernelLoweringReasonStats(stats []QRuntimeKernelLoweringStat) []qRu
 	}
 	counts := make(map[reasonKey]uint64, len(stats))
 	for _, stat := range stats {
+		if stat.Outcome != "fallback" {
+			continue
+		}
 		key := reasonKey{
 			source:       stat.Source,
 			kind:         stat.Kind,
@@ -3830,6 +3851,73 @@ func qRuntimeKernelLoweringReasonStatsTable(stats []qRuntimeKernelLoweringReason
 		row.RawSetString("kind", StringValue(stat.Kind))
 		row.RawSetString("reason_family", StringValue(stat.ReasonFamily))
 		row.RawSetString("reason_code", StringValue(stat.ReasonCode))
+		row.RawSetString("count", qUint64IntValue(stat.Count))
+		rows.RawSetInt(int64(i+1), TableValue(row))
+	}
+	return rows
+}
+
+func qRuntimeKernelLoweringRouteStats(stats []QRuntimeKernelLoweringStat) []qRuntimeKernelLoweringRouteStat {
+	type routeKey struct {
+		source  string
+		kind    string
+		kernel  string
+		route   string
+		outcome string
+	}
+	counts := make(map[routeKey]uint64, len(stats))
+	for _, stat := range stats {
+		key := routeKey{
+			source:  stat.Source,
+			kind:    stat.Kind,
+			kernel:  stat.Kernel,
+			route:   stat.Route,
+			outcome: stat.Outcome,
+		}
+		counts[key] += stat.Count
+	}
+	out := make([]qRuntimeKernelLoweringRouteStat, 0, len(counts))
+	for key, count := range counts {
+		out = append(out, qRuntimeKernelLoweringRouteStat{
+			Source:  key.source,
+			Kind:    key.kind,
+			Kernel:  key.kernel,
+			Route:   key.route,
+			Outcome: key.outcome,
+			Count:   count,
+		})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		a, b := out[i], out[j]
+		if a.Count != b.Count {
+			return a.Count > b.Count
+		}
+		if a.Source != b.Source {
+			return a.Source < b.Source
+		}
+		if a.Kind != b.Kind {
+			return a.Kind < b.Kind
+		}
+		if a.Kernel != b.Kernel {
+			return a.Kernel < b.Kernel
+		}
+		if a.Route != b.Route {
+			return a.Route < b.Route
+		}
+		return a.Outcome < b.Outcome
+	})
+	return out
+}
+
+func qRuntimeKernelLoweringRouteStatsTable(stats []qRuntimeKernelLoweringRouteStat) *Table {
+	rows := NewAppendArrayTable(len(stats))
+	for i, stat := range stats {
+		row := NewTable()
+		row.RawSetString("source", StringValue(stat.Source))
+		row.RawSetString("kind", StringValue(stat.Kind))
+		row.RawSetString("kernel", StringValue(stat.Kernel))
+		row.RawSetString("route", StringValue(stat.Route))
+		row.RawSetString("outcome", StringValue(stat.Outcome))
 		row.RawSetString("count", qUint64IntValue(stat.Count))
 		rows.RawSetInt(int64(i+1), TableValue(row))
 	}

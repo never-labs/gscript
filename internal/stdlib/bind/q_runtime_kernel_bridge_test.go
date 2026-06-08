@@ -181,17 +181,32 @@ func TestMappedQRuntimeKernelLoweringStatsProviderFeedsCacheStats(t *testing.T) 
 				ReasonCode:   "shared_gather",
 				Count:        3,
 			},
+			{
+				Source:  "methodjit_q_vector_runtime",
+				Kind:    "runtime_kernel",
+				Kernel:  "QVectorGatherReduce",
+				Shape:   "gather/vector-reduce",
+				Route:   "typed_runtime_op_exit",
+				Outcome: "supported",
+				Count:   4,
+			},
 		}
 	}, qRuntimeKernelLoweringExternalStatToBindForTest)
 	defer restore()
 
 	row := qTestCacheStatsRowTable(t, qCacheStatsTable(), "q_runtime_kernel_lowering")
+	if got := row.RawGetString("lowerings"); !got.IsInt() || got.Int() != 9 {
+		t.Fatalf("q_runtime_kernel_lowering lowerings = %v, want 9", got)
+	}
+	if got := row.RawGetString("supported"); !got.IsInt() || got.Int() != 4 {
+		t.Fatalf("q_runtime_kernel_lowering supported = %v, want 4", got)
+	}
 	if got := row.RawGetString("fallbacks"); !got.IsInt() || got.Int() != 5 {
 		t.Fatalf("q_runtime_kernel_lowering fallbacks = %v, want 5", got)
 	}
 	stats := row.RawGetString("stats").Table()
-	if stats == nil || stats.Length() != 1 {
-		t.Fatalf("q_runtime_kernel_lowering stats table = %v, want one aggregated row", stats)
+	if stats == nil || stats.Length() != 2 {
+		t.Fatalf("q_runtime_kernel_lowering stats table = %v, want two aggregated rows", stats)
 	}
 	stat := stats.RawGetInt(1).Table()
 	if stat == nil {
@@ -231,4 +246,55 @@ func TestMappedQRuntimeKernelLoweringStatsProviderFeedsCacheStats(t *testing.T) 
 	if got := reason.RawGetString("count"); !got.IsInt() || got.Int() != 5 {
 		t.Fatalf("q_runtime_kernel_lowering reasons[1].count = %v, want 5", got)
 	}
+	routes := row.RawGetString("routes").Table()
+	if routes == nil || routes.Length() != 2 {
+		t.Fatalf("q_runtime_kernel_lowering routes table = %v, want two rows", routes)
+	}
+	route := qTestNestedRowByFields(t, row, "routes", map[string]string{
+		"source":  "methodjit_q_vector_lowering",
+		"kind":    "fallback",
+		"kernel":  "QVectorGatherReduce",
+		"route":   "lowering",
+		"outcome": "fallback",
+	})
+	if got := route.RawGetString("count"); !got.IsInt() || got.Int() != 5 {
+		t.Fatalf("q_runtime_kernel_lowering fallback route count = %v, want 5", got)
+	}
+	route = qTestNestedRowByFields(t, row, "routes", map[string]string{
+		"source":  "methodjit_q_vector_runtime",
+		"kind":    "runtime_kernel",
+		"kernel":  "QVectorGatherReduce",
+		"route":   "typed_runtime_op_exit",
+		"outcome": "supported",
+	})
+	if got := route.RawGetString("count"); !got.IsInt() || got.Int() != 4 {
+		t.Fatalf("q_runtime_kernel_lowering supported route count = %v, want 4", got)
+	}
+}
+
+func qTestNestedRowByFields(t *testing.T, row *Table, field string, want map[string]string) *Table {
+	t.Helper()
+	nested := row.RawGetString(field).Table()
+	if nested == nil {
+		t.Fatalf("%s nested table is nil", field)
+	}
+	for i := int64(1); i <= int64(nested.Length()); i++ {
+		item := nested.RawGetInt(i).Table()
+		if item == nil {
+			continue
+		}
+		matches := true
+		for name, value := range want {
+			got := item.RawGetString(name)
+			if !got.IsString() || got.Str() != value {
+				matches = false
+				break
+			}
+		}
+		if matches {
+			return item
+		}
+	}
+	t.Fatalf("%s row matching %+v not found", field, want)
+	return nil
 }

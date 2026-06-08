@@ -151,6 +151,8 @@ func TestQRuntimeKernelLoweringStatsProviderMapsMethodJITFallbacks(t *testing.T)
 	defer restore()
 
 	row := qCacheStatsRow(t, qCacheStats(t), "q_runtime_kernel_lowering")
+	assertIntField(t, row, "lowerings", 1)
+	assertIntField(t, row, "supported", 0)
 	assertIntField(t, row, "fallbacks", 1)
 
 	stat := nestedRowByFields(t, row, "stats", map[string]string{
@@ -172,6 +174,15 @@ func TestQRuntimeKernelLoweringStatsProviderMapsMethodJITFallbacks(t *testing.T)
 		"reason_code":   "shared_gather",
 	})
 	assertIntField(t, reason, "count", 1)
+
+	route := nestedRowByFields(t, row, "routes", map[string]string{
+		"source":  "methodjit_q_vector_lowering",
+		"kind":    "fallback",
+		"kernel":  "QVectorGatherReduce",
+		"route":   "lowering",
+		"outcome": "fallback",
+	})
+	assertIntField(t, route, "count", 1)
 }
 
 func qMethodJITBridgeFrame(t *testing.T) *runtime.Table {
