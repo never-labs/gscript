@@ -2702,6 +2702,31 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 				fb.Result.Observe(out.Type())
 			}
 
+		case OP_VECTOR_WHERE_REDUCE:
+			a := DecodeA(inst)
+			b := DecodeB(inst)
+			op := runtime.DenseArrayReduceOp(DecodeC(inst))
+			if b+1 >= frame.closure.Proto.MaxStack {
+				return nil, wrapLineErr(frame, fmt.Errorf("VECTOR_WHERE_REDUCE true/false operand pair out of range"))
+			}
+			maskVal := vm.regs[base+a]
+			trueVal := vm.regs[base+b]
+			falseVal := vm.regs[base+b+1]
+			if !maskVal.IsDenseArray() {
+				return nil, wrapLineErr(frame, fmt.Errorf("VECTOR_WHERE_REDUCE mask must be dense array (got %s)", maskVal.TypeName()))
+			}
+			out, err := runtime.DenseArrayWhereReduce(op, maskVal.DenseArray(), trueVal, falseVal)
+			if err != nil {
+				return nil, wrapLineErr(frame, err)
+			}
+			vm.regs[base+a] = out
+			if frame.closure.Proto.Feedback != nil {
+				fb := &frame.closure.Proto.Feedback[frame.pc-1]
+				fb.Left.Observe(maskVal.Type())
+				fb.Right.Observe(trueVal.Type())
+				fb.Result.Observe(out.Type())
+			}
+
 		case OP_VECTOR_SCAN:
 			a := DecodeA(inst)
 			vectorVal := vm.regs[base+a]

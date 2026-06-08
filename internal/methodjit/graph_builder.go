@@ -1079,6 +1079,16 @@ func (b *graphBuilder) emitBlocks() {
 				instr := b.emit(block, OpVectorReduce, TypeAny, []*Value{vector}, int64(c), 0)
 				b.writeVariable(a, block, instr.Value())
 
+			case vm.OP_VECTOR_WHERE_REDUCE:
+				a := vm.DecodeA(inst)
+				bOp := vm.DecodeB(inst)
+				c := vm.DecodeC(inst)
+				mask := b.readVariable(a, block)
+				trueValue := b.readVariable(bOp, block)
+				falseValue := b.readVariable(bOp+1, block)
+				instr := b.emit(block, OpQVectorWhereReduce, TypeAny, []*Value{mask, trueValue, falseValue}, int64(c), 0)
+				b.writeVariable(a, block, instr.Value())
+
 			case vm.OP_VECTOR_SCAN:
 				a := vm.DecodeA(inst)
 				vector := b.readVariable(a, block)

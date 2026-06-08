@@ -174,6 +174,40 @@ func TestVectorReduceBytecodeBuildsMethodJITIR(t *testing.T) {
 	}
 }
 
+func TestVectorWhereReduceBytecodeBuildsMethodJITIR(t *testing.T) {
+	proto := &vm.FuncProto{
+		Name:     "vector_where_reduce",
+		MaxStack: 3,
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_VECTOR_WHERE_REDUCE, 0, 1, int(runtime.DenseArrayReduceMean)),
+			vm.EncodeABC(vm.OP_RETURN, 0, 2, 0),
+		},
+	}
+
+	fn := BuildGraph(proto)
+	var reduce *Instr
+	for _, block := range fn.Blocks {
+		for _, instr := range block.Instrs {
+			if instr.Op == OpQVectorWhereReduce {
+				reduce = instr
+				break
+			}
+		}
+	}
+	if reduce == nil {
+		t.Fatalf("BuildGraph did not emit OpQVectorWhereReduce:\n%s", Print(fn))
+	}
+	if len(reduce.Args) != 3 {
+		t.Fatalf("OpQVectorWhereReduce arg count = %d, want 3", len(reduce.Args))
+	}
+	if reduce.Type != TypeAny {
+		t.Fatalf("OpQVectorWhereReduce type = %s, want Any", reduce.Type)
+	}
+	if reduce.Aux != int64(runtime.DenseArrayReduceMean) {
+		t.Fatalf("OpQVectorWhereReduce Aux = %d, want %d", reduce.Aux, runtime.DenseArrayReduceMean)
+	}
+}
+
 func TestVectorScanBytecodeBuildsMethodJITIR(t *testing.T) {
 	proto := &vm.FuncProto{
 		Name:     "vector_scan",
@@ -2165,6 +2199,22 @@ func TestTier2GateAllowsVectorReduceThroughOpExit(t *testing.T) {
 	gate := firstUnsupportedTier2BytecodeGate(proto)
 	if !gate.Allowed {
 		t.Fatalf("OP_VECTOR_REDUCE should be Tier2-eligible via op-exit, got %q", gate.Reason)
+	}
+}
+
+func TestTier2GateAllowsVectorWhereReduceThroughOpExit(t *testing.T) {
+	proto := &vm.FuncProto{
+		Name:     "vector_where_reduce",
+		MaxStack: 3,
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_VECTOR_WHERE_REDUCE, 0, 1, int(runtime.DenseArrayReduceSum)),
+			vm.EncodeABC(vm.OP_RETURN, 0, 2, 0),
+		},
+	}
+
+	gate := firstUnsupportedTier2BytecodeGate(proto)
+	if !gate.Allowed {
+		t.Fatalf("OP_VECTOR_WHERE_REDUCE should be Tier2-eligible via op-exit, got %q", gate.Reason)
 	}
 }
 
