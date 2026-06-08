@@ -520,6 +520,19 @@ func (s *SoA) MaskOp(columnName string, op DenseArrayBinaryOp, rhs Value) (*Dens
 	return denseArrayCompareMask(left, op, right)
 }
 
+// MaskLiteralOp builds a boolean mask against a scalar literal RHS. Unlike
+// MaskOp, string RHS values are treated as literal strings, not column names.
+func (s *SoA) MaskLiteralOp(columnName string, op DenseArrayBinaryOp, rhs Value) (*DenseArray, error) {
+	if s == nil {
+		return nil, fmt.Errorf("soa is nil")
+	}
+	left, ok := s.Column(columnName)
+	if !ok {
+		return nil, fmt.Errorf("soa column %q not found", columnName)
+	}
+	return denseArrayCompareMask(left, op, rhs)
+}
+
 func denseArrayCompareOp(op string) (DenseArrayBinaryOp, error) {
 	switch op {
 	case "==", "eq":

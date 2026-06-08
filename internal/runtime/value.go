@@ -742,6 +742,27 @@ func (v Value) NativeFrameMaskOp(name string, op DenseArrayBinaryOp, rhs Value) 
 	return DenseArrayValue(mask), true, nil
 }
 
+// NativeFrameMaskLiteralOp computes a frame mask against a scalar literal RHS.
+// String RHS values remain string literals instead of being resolved as column
+// references.
+func (v Value) NativeFrameMaskLiteralOp(name string, op DenseArrayBinaryOp, rhs Value) (Value, bool, error) {
+	if name == "" {
+		return NilValue(), true, fmt.Errorf("FRAME_MASK column name must not be empty")
+	}
+	if !isComparisonOp(op) {
+		return NilValue(), true, fmt.Errorf("FRAME_MASK op %d is not a comparison", op)
+	}
+	frame, _, handled, err := v.nativeFrameSoA("FRAME_MASK")
+	if err != nil || !handled {
+		return NilValue(), handled, err
+	}
+	mask, err := frame.MaskLiteralOp(name, op, rhs)
+	if err != nil {
+		return NilValue(), true, err
+	}
+	return DenseArrayValue(mask), true, nil
+}
+
 // NativeFrameProject returns a new runtime frame facade that carries a projected
 // subset of a runtime-owned native frame payload.
 func (v Value) NativeFrameProject(names []string) (Value, bool, error) {

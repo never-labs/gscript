@@ -1123,9 +1123,10 @@ type qSimpleGroupAggregateQuery struct {
 }
 
 type qSimpleFramePredicate struct {
-	Column string
-	Op     string
-	Value  runtime.Value
+	Column    string
+	Op        string
+	Value     runtime.Value
+	ValueKind string
 }
 
 type qQueryToken struct {
@@ -1365,34 +1366,42 @@ func qParseSimpleFramePredicate(text string) (qSimpleFramePredicate, bool) {
 		} else if op == "<>" {
 			op = "!="
 		}
-		value, ok := qParseSimpleFramePredicateValue(rhsText)
+		value, valueKind, ok := qParseSimpleFramePredicateValue(rhsText)
 		if !ok {
 			return qSimpleFramePredicate{}, false
 		}
-		return qSimpleFramePredicate{Column: column, Op: op, Value: value}, true
+		return qSimpleFramePredicate{Column: column, Op: op, Value: value, ValueKind: valueKind}, true
 	}
 	return qSimpleFramePredicate{}, false
 }
 
-func qParseSimpleFramePredicateValue(text string) (runtime.Value, bool) {
-	switch strings.ToLower(strings.TrimSpace(text)) {
+func qParseSimpleFramePredicateValue(text string) (runtime.Value, string, bool) {
+	text = strings.TrimSpace(text)
+	if len(text) >= 2 && text[0] == '"' && text[len(text)-1] == '"' {
+		unquoted, err := strconv.Unquote(text)
+		if err != nil {
+			return runtime.NilValue(), "", false
+		}
+		return runtime.StringValue(unquoted), "literal", true
+	}
+	switch strings.ToLower(text) {
 	case "true":
-		return runtime.BoolValue(true), true
+		return runtime.BoolValue(true), "", true
 	case "false":
-		return runtime.BoolValue(false), true
+		return runtime.BoolValue(false), "", true
 	}
 	if strings.ContainsAny(text, ".eE") {
 		value, err := strconv.ParseFloat(text, 64)
 		if err != nil {
-			return runtime.NilValue(), false
+			return runtime.NilValue(), "", false
 		}
-		return runtime.FloatValue(value), true
+		return runtime.FloatValue(value), "", true
 	}
 	value, err := strconv.ParseInt(text, 10, 64)
 	if err != nil {
-		return runtime.NilValue(), false
+		return runtime.NilValue(), "", false
 	}
-	return runtime.IntValue(value), true
+	return runtime.IntValue(value), "", true
 }
 
 func qLexQueryTokens(query string) []qQueryToken {
@@ -1443,6 +1452,9 @@ func qFrameMaskSpecValue(predicate qSimpleFramePredicate) runtime.Value {
 	tbl.RawSetString("column", runtime.StringValue(predicate.Column))
 	tbl.RawSetString("op", runtime.StringValue(predicate.Op))
 	tbl.RawSetString("value", predicate.Value)
+	if predicate.ValueKind != "" {
+		tbl.RawSetString("value_kind", runtime.StringValue(predicate.ValueKind))
+	}
 	return runtime.TableValue(tbl)
 }
 

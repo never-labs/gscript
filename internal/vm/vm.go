@@ -2389,11 +2389,21 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 			if c >= len(constants) {
 				return nil, wrapLineErr(frame, fmt.Errorf("FRAME_MASK spec constant is out of range"))
 			}
-			name, op, rhs, err := frameMaskSpec(constants[c])
+			spec, err := frameMaskSpec(constants[c])
 			if err != nil {
 				return nil, wrapLineErr(frame, err)
 			}
-			out, handled, err := frameVal.NativeFrameMask(name, op, rhs)
+			denseOp, err := runtime.DenseArrayCompareOp(spec.Op)
+			if err != nil {
+				return nil, wrapLineErr(frame, err)
+			}
+			var out runtime.Value
+			var handled bool
+			if spec.RHSLiteral {
+				out, handled, err = frameVal.NativeFrameMaskLiteralOp(spec.Name, denseOp, spec.RHS)
+			} else {
+				out, handled, err = frameVal.NativeFrameMaskOp(spec.Name, denseOp, spec.RHS)
+			}
 			if err != nil {
 				return nil, wrapLineErr(frame, err)
 			}
@@ -4281,9 +4291,16 @@ func frameProjectColumnSpec(v runtime.Value) ([]string, string, error) {
 	return names, result.Str(), nil
 }
 
-func frameMaskSpec(v runtime.Value) (string, string, runtime.Value, error) {
+type frameMaskSpecData struct {
+	Name       string
+	Op         string
+	RHS        runtime.Value
+	RHSLiteral bool
+}
+
+func frameMaskSpec(v runtime.Value) (frameMaskSpecData, error) {
 	if !v.IsTable() {
-		return "", "", runtime.NilValue(), fmt.Errorf("FRAME_MASK spec must be a table")
+		return frameMaskSpecData{}, fmt.Errorf("FRAME_MASK spec must be a table")
 	}
 	tbl := v.Table()
 	column := tbl.RawGetString("column")
@@ -4299,9 +4316,15 @@ func frameMaskSpec(v runtime.Value) (string, string, runtime.Value, error) {
 		rhs = tbl.RawGetInt(3)
 	}
 	if !column.IsString() || !op.IsString() {
-		return "", "", runtime.NilValue(), fmt.Errorf("FRAME_MASK spec must provide column and op")
+		return frameMaskSpecData{}, fmt.Errorf("FRAME_MASK spec must provide column and op")
 	}
-	return column.Str(), op.Str(), rhs, nil
+	valueKind := tbl.RawGetString("value_kind")
+	return frameMaskSpecData{
+		Name:       column.Str(),
+		Op:         op.Str(),
+		RHS:        rhs,
+		RHSLiteral: valueKind.IsString() && valueKind.Str() == "literal",
+	}, nil
 }
 
 func frameOrderSpec(v runtime.Value) ([]string, []bool, int, error) {

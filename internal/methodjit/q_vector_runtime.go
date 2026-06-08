@@ -32,15 +32,15 @@ func executeFrameColumnValue(frameVal runtime.Value, name string) (runtime.Value
 }
 
 func executeFrameMaskValue(frameVal runtime.Value, spec runtime.Value) (runtime.Value, error) {
-	name, op, rhs, err := frameMaskSpec(spec)
+	maskSpec, err := frameMaskSpecDetails(spec)
 	if err != nil {
 		return runtime.NilValue(), err
 	}
-	denseOp, err := runtime.DenseArrayCompareOp(op)
+	denseOp, err := runtime.DenseArrayCompareOp(maskSpec.Op)
 	if err != nil {
 		return runtime.NilValue(), err
 	}
-	out, handled, err := frameVal.NativeFrameMaskOp(name, denseOp, rhs)
+	out, handled, err := executeNativeFrameMaskOp(frameVal, maskSpec, denseOp)
 	if err != nil {
 		return runtime.NilValue(), err
 	}
@@ -48,6 +48,13 @@ func executeFrameMaskValue(frameVal runtime.Value, spec runtime.Value) (runtime.
 		return runtime.NilValue(), fmt.Errorf("FrameMask operand must be native frame (got %s)", frameVal.TypeName())
 	}
 	return out, nil
+}
+
+func executeNativeFrameMaskOp(frameVal runtime.Value, spec frameMaskSpecData, denseOp runtime.DenseArrayBinaryOp) (runtime.Value, bool, error) {
+	if spec.RHSLiteral {
+		return frameVal.NativeFrameMaskLiteralOp(spec.Name, denseOp, spec.RHS)
+	}
+	return frameVal.NativeFrameMaskOp(spec.Name, denseOp, spec.RHS)
 }
 
 func executeFrameProjectValue(frameVal runtime.Value, names []string) (runtime.Value, error) {
@@ -280,15 +287,18 @@ func executeQFrameSelectColumnCompareFilterProject(constants []runtime.Value, sp
 		if spec.MaskSpecConst >= len(constants) {
 			return runtime.NilValue(), true, fmt.Errorf("QFrameSelectColumn mask spec constant is out of range")
 		}
-		name, op, rhs, err := frameMaskSpec(constants[spec.MaskSpecConst])
+		maskSpec, err := frameMaskSpecDetails(constants[spec.MaskSpecConst])
 		if err != nil {
 			return runtime.NilValue(), true, err
 		}
-		denseOp, err := runtime.DenseArrayCompareOp(op)
+		if maskSpec.RHSLiteral {
+			return runtime.NilValue(), false, nil
+		}
+		denseOp, err := runtime.DenseArrayCompareOp(maskSpec.Op)
 		if err != nil {
 			return runtime.NilValue(), true, err
 		}
-		out, err := executeFrameCompareFilterProjectColumnValue(frameVal, name, denseOp, rhs, names, resultName)
+		out, err := executeFrameCompareFilterProjectColumnValue(frameVal, maskSpec.Name, denseOp, maskSpec.RHS, names, resultName)
 		return out, true, err
 	}
 	if spec.SourceColumnConst < 0 {
@@ -320,15 +330,15 @@ func executeQFrameSelectColumnMask(constants []runtime.Value, spec QFrameSelectC
 		if spec.MaskSpecConst >= len(constants) {
 			return runtime.NilValue(), fmt.Errorf("QFrameSelectColumn mask spec constant is out of range")
 		}
-		name, op, rhs, err := frameMaskSpec(constants[spec.MaskSpecConst])
+		maskSpec, err := frameMaskSpecDetails(constants[spec.MaskSpecConst])
 		if err != nil {
 			return runtime.NilValue(), err
 		}
-		denseOp, err := runtime.DenseArrayCompareOp(op)
+		denseOp, err := runtime.DenseArrayCompareOp(maskSpec.Op)
 		if err != nil {
 			return runtime.NilValue(), err
 		}
-		out, handled, err := frameVal.NativeFrameMaskOp(name, denseOp, rhs)
+		out, handled, err := executeNativeFrameMaskOp(frameVal, maskSpec, denseOp)
 		if err != nil {
 			return runtime.NilValue(), err
 		}
@@ -384,15 +394,15 @@ func executeQFrameMaskTerm(constants []runtime.Value, spec QFrameSelectColumnSpe
 		if term.MaskSpecConst < 0 || term.MaskSpecConst >= len(constants) {
 			return runtime.NilValue(), fmt.Errorf("QFrameSelectColumn mask term spec constant is out of range")
 		}
-		name, op, rhs, err := frameMaskSpec(constants[term.MaskSpecConst])
+		maskSpec, err := frameMaskSpecDetails(constants[term.MaskSpecConst])
 		if err != nil {
 			return runtime.NilValue(), err
 		}
-		denseOp, err := runtime.DenseArrayCompareOp(op)
+		denseOp, err := runtime.DenseArrayCompareOp(maskSpec.Op)
 		if err != nil {
 			return runtime.NilValue(), err
 		}
-		out, handled, err := frameVal.NativeFrameMaskOp(name, denseOp, rhs)
+		out, handled, err := executeNativeFrameMaskOp(frameVal, maskSpec, denseOp)
 		if err != nil {
 			return runtime.NilValue(), err
 		}
@@ -522,9 +532,24 @@ func frameProjectColumnSpec(v runtime.Value) ([]string, string, error) {
 	return names, result.Str(), nil
 }
 
+type frameMaskSpecData struct {
+	Name       string
+	Op         string
+	RHS        runtime.Value
+	RHSLiteral bool
+}
+
 func frameMaskSpec(v runtime.Value) (string, string, runtime.Value, error) {
+	spec, err := frameMaskSpecDetails(v)
+	if err != nil {
+		return "", "", runtime.NilValue(), err
+	}
+	return spec.Name, spec.Op, spec.RHS, nil
+}
+
+func frameMaskSpecDetails(v runtime.Value) (frameMaskSpecData, error) {
 	if !v.IsTable() {
-		return "", "", runtime.NilValue(), fmt.Errorf("FrameMask spec must be a table")
+		return frameMaskSpecData{}, fmt.Errorf("FrameMask spec must be a table")
 	}
 	tbl := v.Table()
 	column := tbl.RawGetString("column")
@@ -540,9 +565,15 @@ func frameMaskSpec(v runtime.Value) (string, string, runtime.Value, error) {
 		rhs = tbl.RawGetInt(3)
 	}
 	if !column.IsString() || !op.IsString() {
-		return "", "", runtime.NilValue(), fmt.Errorf("FrameMask spec must provide column and op")
+		return frameMaskSpecData{}, fmt.Errorf("FrameMask spec must provide column and op")
 	}
-	return column.Str(), op.Str(), rhs, nil
+	valueKind := tbl.RawGetString("value_kind")
+	return frameMaskSpecData{
+		Name:       column.Str(),
+		Op:         op.Str(),
+		RHS:        rhs,
+		RHSLiteral: valueKind.IsString() && valueKind.Str() == "literal",
+	}, nil
 }
 
 func frameOrderSpec(v runtime.Value) ([]string, []bool, int, error) {

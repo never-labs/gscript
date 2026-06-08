@@ -142,6 +142,7 @@ func TestNativeFrameMaskOpUsesTypedComparison(t *testing.T) {
 	soa, err := NewSoA(map[string]*DenseArray{
 		"price": NewDenseArrayF64([]float64{10, 12, 8}),
 		"limit": NewDenseArrayF64([]float64{9, 12, 9}),
+		"sym":   NewDenseArrayString([]string{"AAPL", "MSFT", "AAPL"}),
 	})
 	if err != nil {
 		t.Fatalf("NewSoA: %v", err)
@@ -168,6 +169,18 @@ func TestNativeFrameMaskOpUsesTypedComparison(t *testing.T) {
 
 	if _, handled, err := TableValue(frame).NativeFrameMaskOp("price", DenseArrayAdd, FloatValue(10)); !handled || err == nil {
 		t.Fatalf("NativeFrameMaskOp arithmetic op handled=%v err=%v, want handled error", handled, err)
+	}
+
+	stringMask, handled, err := TableValue(frame).NativeFrameMaskLiteralOp("sym", DenseArrayEQ, StringValue("AAPL"))
+	if err != nil {
+		t.Fatalf("NativeFrameMaskLiteralOp string: %v", err)
+	}
+	if !handled || !stringMask.IsDenseArray() {
+		t.Fatalf("NativeFrameMaskLiteralOp string = %v handled=%v, want dense array", stringMask, handled)
+	}
+	stringGot, ok := stringMask.DenseArray().Bool()
+	if !ok || len(stringGot) != 3 || !stringGot[0] || stringGot[1] || !stringGot[2] {
+		t.Fatalf("string literal mask = %#v, want [true false true]", stringGot)
 	}
 }
 

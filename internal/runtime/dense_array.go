@@ -2044,6 +2044,12 @@ func denseArrayCompareMaskArray(left *DenseArray, op DenseArrayBinaryOp, right *
 		}
 		return &DenseArray{dtype: DenseArrayBool, bools: out}, nil
 	}
+	if (op == DenseArrayEQ || op == DenseArrayNE) && left.dtype == DenseArrayString && right.dtype == DenseArrayString {
+		for i := range out {
+			out[i] = compareStrings(op, left.strings[i], right.strings[i])
+		}
+		return &DenseArray{dtype: DenseArrayBool, bools: out}, nil
+	}
 	if left.dtype == DenseArrayBool || right.dtype == DenseArrayBool {
 		return nil, ErrDenseArrayDType
 	}
@@ -2068,6 +2074,13 @@ func denseArrayCompareMaskScalar(left *DenseArray, op DenseArrayBinaryOp, right 
 		r := right.Bool()
 		for i := range out {
 			out[i] = compareBools(op, left.bools[i], r)
+		}
+		return &DenseArray{dtype: DenseArrayBool, bools: out}, nil
+	}
+	if (op == DenseArrayEQ || op == DenseArrayNE) && left.dtype == DenseArrayString && right.IsString() {
+		r := right.Str()
+		for i := range out {
+			out[i] = compareStrings(op, left.strings[i], r)
 		}
 		return &DenseArray{dtype: DenseArrayBool, bools: out}, nil
 	}
@@ -2761,5 +2774,16 @@ func compareBools(op DenseArrayBinaryOp, left, right bool) bool {
 		return left != right
 	default:
 		panic(fmt.Sprintf("unsupported bool comparison op %d", op))
+	}
+}
+
+func compareStrings(op DenseArrayBinaryOp, left, right string) bool {
+	switch op {
+	case DenseArrayEQ:
+		return left == right
+	case DenseArrayNE:
+		return left != right
+	default:
+		panic(fmt.Sprintf("unsupported string comparison op %d", op))
 	}
 }
