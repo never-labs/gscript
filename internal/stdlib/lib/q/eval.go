@@ -196,6 +196,8 @@ func qRuntimeKernelPipelineShape(kernel, shape string) string {
 	switch {
 	case strings.HasPrefix(shape, "gather-reduce/"):
 		return "where_gather_reduce"
+	case strings.HasPrefix(shape, "script-pipeline/"):
+		return "script_pipeline"
 	case strings.HasPrefix(shape, "where-reduce/"), strings.HasPrefix(shape, "where-index-reduce/"):
 		return "mask_reduce"
 	case strings.HasPrefix(shape, "compare-to-index-count-sum-stats/"), strings.HasPrefix(shape, "compare-to-index-count-stats/"), strings.HasPrefix(shape, "compare-to-index-sum-stats/"):
@@ -353,6 +355,9 @@ func (s *EvalState) Eval(src string) (any, error) {
 
 func (s *EvalState) evalScript(src string) (any, error) {
 	plan := s.qScriptPlan(src)
+	if plan.scriptPipeline != nil {
+		recordRuntimeKernelProbe("QScriptPipelinePlan", plan.scriptPipeline.shape(), true, nil)
+	}
 	previousDeferredScans := s.deferScanAssignments
 	if len(plan.statements) > 1 && plan.deferScanCandidates {
 		s.deferScanAssignments = deferredScanAssignments(plan.statements, s)
@@ -392,6 +397,7 @@ func (s *EvalState) evalScript(src string) (any, error) {
 type qScriptPlan struct {
 	statements          []qScriptStatement
 	deferScanCandidates bool
+	scriptPipeline      *qScriptPipelineDescriptor
 }
 
 type qScriptStatement struct {
@@ -439,7 +445,8 @@ func buildQScriptPlan(src string) qScriptPlan {
 		}
 		statements = append(statements, stmt)
 	}
-	return qScriptPlan{statements: statements, deferScanCandidates: deferScanCandidates}
+	pipeline, _ := buildQScriptPipelineDescriptor(statements)
+	return qScriptPlan{statements: statements, deferScanCandidates: deferScanCandidates, scriptPipeline: pipeline}
 }
 
 func parseCachedValueExpr(src string) Expr {

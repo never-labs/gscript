@@ -107,6 +107,95 @@ func TestRuntimeKernelExecutionStatsMapPipelineShapes(t *testing.T) {
 	}
 }
 
+func TestQScriptPipelinePlannerDescribesAssignmentTerminalWhereIndexReduce(t *testing.T) {
+	plan := buildQScriptPlan("x:til 64;y:(x*3)+7;lo:8;hi:32;idx:where (x>=lo) and x<hi;+/y[idx]")
+	if plan.scriptPipeline == nil {
+		t.Fatalf("script pipeline descriptor missing")
+	}
+	d := plan.scriptPipeline
+	if d.kind != qScriptPipelineWhereIndexReduceSum {
+		t.Fatalf("pipeline kind = %q, want %q", d.kind, qScriptPipelineWhereIndexReduceSum)
+	}
+	if got, want := len(d.assignments), 5; got != want {
+		t.Fatalf("assignment count = %d, want %d", got, want)
+	}
+	if d.valueExpr != "y" || d.valueBinding != "(x*3)+7" {
+		t.Fatalf("value descriptor = expr %q binding %q, want y/(x*3)+7", d.valueExpr, d.valueBinding)
+	}
+	if d.indexExpr != "idx" || d.indexBinding != "where (x>=lo) and x<hi" {
+		t.Fatalf("index descriptor = expr %q binding %q, want idx/where mask", d.indexExpr, d.indexBinding)
+	}
+	if d.maskExpr != "(x>=lo) and x<hi" {
+		t.Fatalf("mask expr = %q, want compound mask", d.maskExpr)
+	}
+	if got, want := d.shape(), "script-pipeline/where-index-reduce/sum/assignments"; got != want {
+		t.Fatalf("shape = %q, want %q", got, want)
+	}
+}
+
+func TestQScriptPipelinePlannerDescribesTerminalWhereReduce(t *testing.T) {
+	plan := buildQScriptPlan("x:til 64;y:x*2;lo:4;hi:12;+/y where (x>=lo) and x<hi")
+	if plan.scriptPipeline == nil {
+		t.Fatalf("script pipeline descriptor missing")
+	}
+	d := plan.scriptPipeline
+	if d.kind != qScriptPipelineWhereReduceSum {
+		t.Fatalf("pipeline kind = %q, want %q", d.kind, qScriptPipelineWhereReduceSum)
+	}
+	if !d.terminalUsesWhere {
+		t.Fatalf("terminalUsesWhere = false, want true")
+	}
+	if d.valueExpr != "y" || d.valueBinding != "x*2" {
+		t.Fatalf("value descriptor = expr %q binding %q, want y/x*2", d.valueExpr, d.valueBinding)
+	}
+	if d.maskExpr != "(x>=lo) and x<hi" {
+		t.Fatalf("mask expr = %q, want compound mask", d.maskExpr)
+	}
+}
+
+func TestQScriptPipelinePlannerDescribesTerminalGatherReduce(t *testing.T) {
+	plan := buildQScriptPlan("x:til 64;y:x*2;idx:4 5 6;+/y[idx]")
+	if plan.scriptPipeline == nil {
+		t.Fatalf("script pipeline descriptor missing")
+	}
+	d := plan.scriptPipeline
+	if d.kind != qScriptPipelineGatherReduceSum {
+		t.Fatalf("pipeline kind = %q, want %q", d.kind, qScriptPipelineGatherReduceSum)
+	}
+	if d.valueExpr != "y" || d.valueBinding != "x*2" {
+		t.Fatalf("value descriptor = expr %q binding %q, want y/x*2", d.valueExpr, d.valueBinding)
+	}
+	if d.indexExpr != "idx" || d.indexBinding != "4 5 6" {
+		t.Fatalf("index descriptor = expr %q binding %q, want idx/4 5 6", d.indexExpr, d.indexBinding)
+	}
+	if d.maskExpr != "" || d.maskBinding != "" {
+		t.Fatalf("mask descriptor = expr %q binding %q, want empty", d.maskExpr, d.maskBinding)
+	}
+	if got, want := d.shape(), "script-pipeline/gather-reduce/sum/assignments"; got != want {
+		t.Fatalf("shape = %q, want %q", got, want)
+	}
+}
+
+func TestQScriptPipelinePlannerRecordsRuntimeStats(t *testing.T) {
+	ClearRuntimeKernelExecutionStats()
+	t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+	assertEvalValue(t, "x:til 32;y:x*2;+/y[where (x>=4) and x<12]", int64(120))
+	seen := false
+	for _, stat := range RuntimeKernelExecutionStats() {
+		if stat.Kernel == "QScriptPipelinePlan" &&
+			stat.Shape == "script-pipeline/where-index-reduce/sum/assignments" &&
+			stat.PipelineShape == "script_pipeline" &&
+			stat.Outcome == "hit" &&
+			stat.Count > 0 {
+			seen = true
+		}
+	}
+	if !seen {
+		t.Fatalf("missing script pipeline runtime stat: %#v", RuntimeKernelExecutionStats())
+	}
+}
+
 func TestEvalNumericReductionBundleRecordsTypedRuntimeKernel(t *testing.T) {
 	ClearRuntimeKernelExecutionStats()
 	t.Cleanup(ClearRuntimeKernelExecutionStats)
