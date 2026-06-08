@@ -6008,6 +6008,16 @@ func applyVectorDyadic(op byte, left, right any, la, ra data.Array) (data.Array,
 	case ra != nil:
 		n = ra.Len()
 	}
+	if dataOp, ok := qDataComparisonOp(op); ok && qVectorDyadicCanUseTypedCompare(left, right, la, ra) {
+		if out, handled, err := data.TryTypedDyadic(dataOp, left, right); err != nil || handled {
+			if err != nil {
+				return nil, err
+			}
+			if array, ok := out.(data.Array); ok {
+				return array, nil
+			}
+		}
+	}
 	out := make([]any, n)
 	hasFloat := op == '%'
 	hasNull := false
@@ -6090,6 +6100,47 @@ func applyVectorDyadic(op byte, left, right any, la, ra data.Array) (data.Array,
 		xs[i] = x
 	}
 	return data.NewI64(xs), nil
+}
+
+func qDataComparisonOp(op byte) (data.Op, bool) {
+	switch op {
+	case '=':
+		return data.OpEQ, true
+	case '<':
+		return data.OpLT, true
+	case '>':
+		return data.OpGT, true
+	default:
+		return "", false
+	}
+}
+
+func qVectorDyadicCanUseTypedCompare(left, right any, la, ra data.Array) bool {
+	if la != nil && ra != nil && la.Len() != ra.Len() {
+		return false
+	}
+	return qTypedCompareOperandOK(left, la) && qTypedCompareOperandOK(right, ra)
+}
+
+func qTypedCompareOperandOK(value any, array data.Array) bool {
+	if array != nil {
+		return qTypedCompareKindOK(array.Kind())
+	}
+	return qTypedCompareKindOK(qKindOfValue(value))
+}
+
+func qTypedCompareKindOK(kind data.Kind) bool {
+	switch kind {
+	case data.KindBool,
+		data.KindI8, data.KindI16, data.KindI32, data.KindI64,
+		data.KindU8, data.KindU16, data.KindU32, data.KindU64,
+		data.KindF32, data.KindF64,
+		data.KindMonth, data.KindDate, data.KindDateTime,
+		data.KindTimespan, data.KindMinute, data.KindSecond, data.KindTime, data.KindTimestamp:
+		return true
+	default:
+		return false
+	}
 }
 
 func vectorIndex(i, length int) int {

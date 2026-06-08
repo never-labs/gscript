@@ -1951,6 +1951,20 @@ func TestTypedDyadicBroadcastPromotionAndNullPropagation(t *testing.T) {
 }
 
 func TestTypedDyadicSymbolAndTemporalComparisons(t *testing.T) {
+	applied, handled, err := TryTypedDyadic(OpLT, NewI64([]int64{1, 2, 3}), NewI64([]int64{2, 2, 2}))
+	if err != nil {
+		t.Fatalf("TryTypedDyadic returned error: %v", err)
+	}
+	if !handled {
+		t.Fatal("TryTypedDyadic did not handle typed comparison")
+	}
+	if got, want := applied.(Array).Values(), []any{true, false, false}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("TryTypedDyadic values = %v, want %v", got, want)
+	}
+	if _, handled, err := TryTypedDyadic(OpLT, NewI64([]int64{1, 2}), NewI64([]int64{1})); err == nil || !handled {
+		t.Fatalf("TryTypedDyadic mismatch err = %v handled = %v, want handled mismatch error", err, handled)
+	}
+
 	symEq, ok, err := typedKernels.Dyadic(OpEQ, NewSymbols([]string{"a", "b", "c"}), Symbol("b"))
 	if err != nil {
 		t.Fatalf("symbol Dyadic returned error: %v", err)

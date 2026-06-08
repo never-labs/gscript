@@ -1492,9 +1492,26 @@ func TestEvalDyadicConformAndPromotion(t *testing.T) {
 	assertEvalArray(t, "1.5e 0Ne 3.5e+1", data.KindF64, []any{2.5, data.NullValue, 4.5})
 	assertEvalArray(t, "1 0N 3*2.5 10 0N", data.KindF64, []any{2.5, data.NullValue, data.NullValue})
 	assertEvalArray(t, "0N 1=0N 1", data.KindBool, []any{true, true})
+	assertEvalArray(t, "1 2 3<2 2 2", data.KindBool, []any{true, false, false})
 
 	assertEvalErrorContains(t, "1 2+10 20 30", "vector length mismatch")
 
+	if got, err := applyDyadic('<', data.NewI64([]int64{1, 2, 3}), data.NewI64([]int64{2, 2, 2})); err != nil {
+		t.Fatalf("typed vector compare returned error: %v", err)
+	} else {
+		array, ok := got.(data.Array)
+		if !ok || array.Kind() != data.KindBool || !reflect.DeepEqual(array.Values(), []any{true, false, false}) {
+			t.Fatalf("typed vector compare = %#v", got)
+		}
+	}
+	if got, err := applyDyadic('=', data.NewSymbols([]string{"AAPL", "MSFT"}), "AAPL"); err != nil {
+		t.Fatalf("symbol/string vector compare returned error: %v", err)
+	} else {
+		array, ok := got.(data.Array)
+		if !ok || array.Kind() != data.KindBool || !reflect.DeepEqual(array.Values(), []any{true, false}) {
+			t.Fatalf("symbol/string vector compare = %#v", got)
+		}
+	}
 	if got, err := applyDyadic('+', data.NewI64([]int64{10}), data.NewI64([]int64{1, 2, 3})); err != nil {
 		t.Fatalf("singleton-vector left conform returned error: %v", err)
 	} else {

@@ -3150,6 +3150,13 @@ func ApplyBinary(op Op, left, right any) (any, error) {
 	}
 }
 
+// TryTypedDyadic attempts the shared typed binary kernel without falling
+// back to scalar row evaluation. Callers with language-specific broadcasting or
+// result-kind rules can probe this first and keep their existing fallback.
+func TryTypedDyadic(op Op, left, right any) (any, bool, error) {
+	return typedKernels.Dyadic(op, left, right)
+}
+
 func promotedNullForBinary(left, right any) any {
 	if !hasTypedNullKind(left) && !hasTypedNullKind(right) {
 		return NullValue
