@@ -123,7 +123,8 @@ func executeQFrameSelectColumnValue(constants []runtime.Value, specs []QFrameSel
 		return runtime.NilValue(), fmt.Errorf("QFrameSelectColumn spec index %d is out of range", specIdx)
 	}
 	spec := specs[specIdx]
-	mask, err := executeQFrameSelectColumnMask(constants, spec, frameVal, argVal, hasArg)
+	rhs, hasRHS := qFrameSelectColumnCompareRHS(spec, argVal, hasArg)
+	mask, err := executeQFrameSelectColumnMask(constants, spec, frameVal, rhs, hasRHS)
 	if err != nil {
 		return runtime.NilValue(), err
 	}
@@ -131,7 +132,8 @@ func executeQFrameSelectColumnValue(constants []runtime.Value, specs []QFrameSel
 	if err != nil {
 		return runtime.NilValue(), err
 	}
-	rows, err = executeQFrameSelectColumnRows(constants, spec, rows, argVal, hasArg)
+	rowArg, hasRowArg := qFrameSelectColumnRowArg(spec, argVal, hasArg)
+	rows, err = executeQFrameSelectColumnRows(constants, spec, rows, rowArg, hasRowArg)
 	if err != nil {
 		return runtime.NilValue(), err
 	}
@@ -152,7 +154,7 @@ func executeQFrameSelectColumnValue(constants []runtime.Value, specs []QFrameSel
 	return executeFrameColumnValue(projected, constants[spec.ResultColumnConst].Str())
 }
 
-func executeQFrameSelectColumnMask(constants []runtime.Value, spec QFrameSelectColumnSpec, frameVal runtime.Value, argVal runtime.Value, hasArg bool) (runtime.Value, error) {
+func executeQFrameSelectColumnMask(constants []runtime.Value, spec QFrameSelectColumnSpec, frameVal runtime.Value, rhsVal runtime.Value, hasRHS bool) (runtime.Value, error) {
 	if spec.MaskSpecConst >= 0 {
 		if spec.MaskSpecConst >= len(constants) {
 			return runtime.NilValue(), fmt.Errorf("QFrameSelectColumn mask spec constant is out of range")
@@ -174,10 +176,7 @@ func executeQFrameSelectColumnMask(constants []runtime.Value, spec QFrameSelectC
 		}
 		return out, nil
 	}
-	rhsVal := argVal
-	if spec.HasCompareRHSConst {
-		rhsVal = spec.CompareRHSConst
-	} else if !hasArg {
+	if !hasRHS {
 		return runtime.NilValue(), fmt.Errorf("QFrameSelectColumn compare path requires rhs")
 	}
 	if spec.SourceColumnConst < 0 || spec.SourceColumnConst >= len(constants) || !constants[spec.SourceColumnConst].IsString() {
@@ -193,20 +192,40 @@ func executeQFrameSelectColumnMask(constants []runtime.Value, spec QFrameSelectC
 	return out, nil
 }
 
-func executeQFrameSelectColumnRows(constants []runtime.Value, spec QFrameSelectColumnSpec, rows runtime.Value, argVal runtime.Value, hasArg bool) (runtime.Value, error) {
+func qFrameSelectColumnCompareRHS(spec QFrameSelectColumnSpec, argVal runtime.Value, hasArg bool) (runtime.Value, bool) {
+	if spec.MaskSpecConst >= 0 {
+		return runtime.NilValue(), false
+	}
+	if spec.HasCompareRHSConst {
+		return spec.CompareRHSConst, true
+	}
+	if spec.DynamicArgRole == QFrameSelectColumnArgCompareRHS && hasArg {
+		return argVal, true
+	}
+	return runtime.NilValue(), false
+}
+
+func qFrameSelectColumnRowArg(spec QFrameSelectColumnSpec, argVal runtime.Value, hasArg bool) (runtime.Value, bool) {
+	if spec.DynamicArgRole == QFrameSelectColumnArgRowValue && hasArg {
+		return argVal, true
+	}
+	return runtime.NilValue(), false
+}
+
+func executeQFrameSelectColumnRows(constants []runtime.Value, spec QFrameSelectColumnSpec, rows runtime.Value, rowArg runtime.Value, hasRowArg bool) (runtime.Value, error) {
 	switch spec.RowMode {
 	case QFrameSelectColumnRowsNone:
 		return rows, nil
 	case QFrameSelectColumnRowsGather:
-		if !hasArg {
+		if !hasRowArg {
 			return runtime.NilValue(), fmt.Errorf("QFrameSelectColumn gather path requires indexes")
 		}
-		return executeFrameGatherValue(rows, argVal)
+		return executeFrameGatherValue(rows, rowArg)
 	case QFrameSelectColumnRowsSlice:
-		if !hasArg {
+		if !hasRowArg {
 			return runtime.NilValue(), fmt.Errorf("QFrameSelectColumn slice path requires end")
 		}
-		return executeFrameSliceValue(rows, argVal)
+		return executeFrameSliceValue(rows, rowArg)
 	case QFrameSelectColumnRowsOrderGather:
 		if spec.RowOrderConst < 0 || spec.RowOrderConst >= len(constants) {
 			return runtime.NilValue(), fmt.Errorf("QFrameSelectColumn order spec constant is out of range")

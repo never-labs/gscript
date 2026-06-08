@@ -250,6 +250,7 @@ func qQueryFrameSelectColumnSpec(fn *Function, path QQueryHotPath) (QFrameSelect
 		MaskSpecConst:     -1,
 		RowMode:           QFrameSelectColumnRowsNone,
 		RowOrderConst:     -1,
+		DynamicArgRole:    QFrameSelectColumnArgNone,
 		ProjectConst:      int(path.Project.Aux),
 		ResultColumnConst: int(path.ResultColumn.Aux),
 	}
@@ -269,6 +270,7 @@ func qQueryFrameSelectColumnSpec(fn *Function, path QQueryHotPath) (QFrameSelect
 			spec.CompareRHSConst = rhsConst
 			spec.HasCompareRHSConst = true
 		} else if path.RowGather == nil && path.RowSlice == nil && path.RowOrder == nil {
+			spec.DynamicArgRole = QFrameSelectColumnArgCompareRHS
 			args = append(args, rhs)
 		} else {
 			return QFrameSelectColumnSpec{}, nil, false
@@ -296,6 +298,7 @@ func qQueryFrameSelectColumnSpec(fn *Function, path QQueryHotPath) (QFrameSelect
 		if qQueryOpaqueConst(path.RowGather.Args[1]) {
 			return QFrameSelectColumnSpec{}, nil, false
 		}
+		spec.DynamicArgRole = QFrameSelectColumnArgRowValue
 		args = append(args, path.RowGather.Args[1])
 	case path.RowSlice != nil:
 		spec.RowMode = QFrameSelectColumnRowsSlice
@@ -305,6 +308,7 @@ func qQueryFrameSelectColumnSpec(fn *Function, path QQueryHotPath) (QFrameSelect
 		if qQueryOpaqueConst(path.RowSlice.Args[1]) {
 			return QFrameSelectColumnSpec{}, nil, false
 		}
+		spec.DynamicArgRole = QFrameSelectColumnArgRowValue
 		args = append(args, path.RowSlice.Args[1])
 	}
 	return spec, args, true

@@ -65,6 +65,7 @@ type QFrameSelectColumnSpec struct {
 	MaskSpecConst      int
 	RowMode            QFrameSelectColumnRowMode
 	RowOrderConst      int
+	DynamicArgRole     QFrameSelectColumnDynamicArgRole
 	ProjectConst       int
 	ResultColumnConst  int
 	CompareOp          runtime.DenseArrayBinaryOp
@@ -79,6 +80,14 @@ const (
 	QFrameSelectColumnRowsGather
 	QFrameSelectColumnRowsSlice
 	QFrameSelectColumnRowsOrderGather
+)
+
+type QFrameSelectColumnDynamicArgRole uint8
+
+const (
+	QFrameSelectColumnArgNone QFrameSelectColumnDynamicArgRole = iota
+	QFrameSelectColumnArgCompareRHS
+	QFrameSelectColumnArgRowValue
 )
 
 type RecordArraySpecializationSourceKind uint8
