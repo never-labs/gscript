@@ -931,6 +931,36 @@ func TryTypedQNumericUnarySum(op string, array Array) (any, bool, error) {
 	return qNumericUnarySumIntegerArray(op, array)
 }
 
+func TryTypedQNumericUnaryDyadicSum(unaryOp string, dyadicOp Op, left, right any) (any, bool, error) {
+	if !isArithmeticOp(dyadicOp) {
+		return nil, false, nil
+	}
+	leftArray, leftIsArray := left.(Array)
+	rightArray, rightIsArray := right.(Array)
+	if !leftIsArray && !rightIsArray {
+		return nil, false, nil
+	}
+	length := 0
+	switch {
+	case leftIsArray && rightIsArray:
+		if leftArray.Len() != rightArray.Len() {
+			return nil, true, fmt.Errorf("typed unary dyadic sum length mismatch: %d != %d", leftArray.Len(), rightArray.Len())
+		}
+		length = leftArray.Len()
+	case leftIsArray:
+		length = leftArray.Len()
+	case rightIsArray:
+		length = rightArray.Len()
+	}
+	if !typedNumericOperand(left) || !typedNumericOperand(right) {
+		return nil, false, nil
+	}
+	if out, ok, err := qNumericUnaryDyadicSumRangeScalar(unaryOp, dyadicOp, left, right); ok || err != nil {
+		return out, ok, err
+	}
+	return qNumericUnaryDyadicSum(unaryOp, dyadicOp, left, right, length)
+}
+
 func TryTypedCast(kind Kind, array Array) (Array, bool, error) {
 	if array == nil {
 		return nil, true, fmt.Errorf("typed cast array is nil")
@@ -3139,6 +3169,187 @@ func qNumericUnarySumFloatSlice[T floatScalar](op string, values []T) (any, bool
 	default:
 		return nil, false, nil
 	}
+}
+
+func qNumericUnaryDyadicSum(unaryOp string, dyadicOp Op, left, right any, length int) (any, bool, error) {
+	switch unaryOp {
+	case NumericUnaryNeg, NumericUnaryAbs, NumericUnaryExp, NumericUnaryRecip:
+		var sum float64
+		for row := 0; row < length; row++ {
+			value, ok, err := numericDyadicValueAt(dyadicOp, left, right, row)
+			if err != nil {
+				return nil, true, err
+			}
+			if !ok {
+				continue
+			}
+			switch unaryOp {
+			case NumericUnaryNeg:
+				sum -= value
+			case NumericUnaryAbs:
+				sum += math.Abs(value)
+			case NumericUnaryExp:
+				sum += math.Exp(value)
+			case NumericUnaryRecip:
+				sum += 1 / value
+			}
+		}
+		return sum, true, nil
+	case NumericUnaryFloor, NumericUnaryCeiling:
+		var sum int64
+		for row := 0; row < length; row++ {
+			value, ok, err := numericDyadicValueAt(dyadicOp, left, right, row)
+			if err != nil {
+				return nil, true, err
+			}
+			if !ok {
+				continue
+			}
+			if unaryOp == NumericUnaryFloor {
+				sum += int64(math.Floor(value))
+			} else {
+				sum += int64(math.Ceil(value))
+			}
+		}
+		return sum, true, nil
+	case NumericUnarySignum:
+		var sum int64
+		for row := 0; row < length; row++ {
+			value, ok, err := numericDyadicValueAt(dyadicOp, left, right, row)
+			if err != nil {
+				return nil, true, err
+			}
+			if !ok {
+				continue
+			}
+			switch {
+			case value < 0:
+				sum--
+			case value > 0:
+				sum++
+			}
+		}
+		return sum, true, nil
+	default:
+		return nil, false, nil
+	}
+}
+
+func qNumericUnaryDyadicSumRangeScalar(unaryOp string, dyadicOp Op, left, right any) (any, bool, error) {
+	if leftRange, ok := asI64RangeArray(left); ok {
+		if scalar, ok := numericScalarValue(right); ok {
+			return qNumericUnaryDyadicSumI64RangeScalar(unaryOp, dyadicOp, leftRange, scalar, false)
+		}
+	}
+	if rightRange, ok := asI64RangeArray(right); ok {
+		if scalar, ok := numericScalarValue(left); ok {
+			return qNumericUnaryDyadicSumI64RangeScalar(unaryOp, dyadicOp, rightRange, scalar, true)
+		}
+	}
+	return nil, false, nil
+}
+
+func qNumericUnaryDyadicSumI64RangeScalar(unaryOp string, dyadicOp Op, values i64RangeArray, scalar float64, scalarLeft bool) (any, bool, error) {
+	switch unaryOp {
+	case NumericUnaryNeg, NumericUnaryAbs, NumericUnaryExp, NumericUnaryRecip:
+		var sum float64
+		for i := 0; i < values.len; i++ {
+			value, err := numericRangeScalarValueAt(dyadicOp, values, scalar, scalarLeft, i)
+			if err != nil {
+				return nil, true, err
+			}
+			switch unaryOp {
+			case NumericUnaryNeg:
+				sum -= value
+			case NumericUnaryAbs:
+				sum += math.Abs(value)
+			case NumericUnaryExp:
+				sum += math.Exp(value)
+			case NumericUnaryRecip:
+				sum += 1 / value
+			}
+		}
+		return sum, true, nil
+	case NumericUnaryFloor, NumericUnaryCeiling:
+		var sum int64
+		for i := 0; i < values.len; i++ {
+			value, err := numericRangeScalarValueAt(dyadicOp, values, scalar, scalarLeft, i)
+			if err != nil {
+				return nil, true, err
+			}
+			if unaryOp == NumericUnaryFloor {
+				sum += int64(math.Floor(value))
+			} else {
+				sum += int64(math.Ceil(value))
+			}
+		}
+		return sum, true, nil
+	case NumericUnarySignum:
+		var sum int64
+		for i := 0; i < values.len; i++ {
+			value, err := numericRangeScalarValueAt(dyadicOp, values, scalar, scalarLeft, i)
+			if err != nil {
+				return nil, true, err
+			}
+			switch {
+			case value < 0:
+				sum--
+			case value > 0:
+				sum++
+			}
+		}
+		return sum, true, nil
+	default:
+		return nil, false, nil
+	}
+}
+
+func numericRangeScalarValueAt(op Op, values i64RangeArray, scalar float64, scalarLeft bool, row int) (float64, error) {
+	value := float64(values.start + int64(row)*values.step)
+	switch op {
+	case OpAdd:
+		return value + scalar, nil
+	case OpSub:
+		if scalarLeft {
+			return scalar - value, nil
+		}
+		return value - scalar, nil
+	case OpMul:
+		return value * scalar, nil
+	case OpDiv:
+		if scalarLeft {
+			return scalar / value, nil
+		}
+		return value / scalar, nil
+	default:
+		return 0, fmt.Errorf("unsupported numeric dyadic kernel %s", op)
+	}
+}
+
+func numericScalarValue(value any) (float64, bool) {
+	if _, ok := value.(Array); ok {
+		return 0, false
+	}
+	if IsNull(value) {
+		return 0, false
+	}
+	return numeric(value)
+}
+
+func numericDyadicValueAt(op Op, left, right any, row int) (float64, bool, error) {
+	lv, ok, err := numericOperandAt(left, row)
+	if err != nil || !ok {
+		return 0, ok, err
+	}
+	rv, ok, err := numericOperandAt(right, row)
+	if err != nil || !ok {
+		return 0, ok, err
+	}
+	out, err := applyNumericBinaryFloat(op, lv, rv)
+	if err != nil {
+		return 0, true, err
+	}
+	return out, true, nil
 }
 
 func applyNumericUnaryFloat(op string, value float64) (float64, error) {

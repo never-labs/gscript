@@ -2938,6 +2938,9 @@ func (s *EvalState) tryEvalTypedUnarySum(src string) (any, bool, error) {
 	if !ok {
 		return nil, false, nil
 	}
+	if out, handled, err := s.tryEvalTypedUnaryDyadicSum(op, arg); err != nil || handled {
+		return out, handled, err
+	}
 	value, err := s.eval(arg)
 	if err != nil {
 		return nil, true, err
@@ -2963,6 +2966,47 @@ func (s *EvalState) tryEvalTypedUnarySum(src string) (any, bool, error) {
 	}
 	out, err := sum(unary)
 	return out, true, err
+}
+
+func (s *EvalState) tryEvalTypedUnaryDyadicSum(unaryOp, src string) (any, bool, error) {
+	leftExpr, dyadicOp, rightExpr, ok := splitTopLevelArithmeticOperator(src)
+	if !ok {
+		return nil, false, nil
+	}
+	left, err := s.eval(leftExpr)
+	if err != nil {
+		return nil, true, err
+	}
+	right, err := s.eval(rightExpr)
+	if err != nil {
+		return nil, true, err
+	}
+	if out, handled, err := data.TryTypedQNumericUnaryDyadicSum(unaryOp, data.Op(string(dyadicOp)), left, right); err != nil || handled {
+		shape := "vector-reduce/sum-" + unaryOp + "-dyadic-" + string(dyadicOp)
+		if array, ok := left.(data.Array); ok {
+			shape += "/left-" + string(array.Kind())
+		}
+		if array, ok := right.(data.Array); ok {
+			shape += "/right-" + string(array.Kind())
+		}
+		recordRuntimeKernelProbe("ArrayNumericUnaryDyadicSum", shape, handled, err)
+		if err != nil {
+			return nil, true, fmt.Errorf("sum %s %s: %w", unaryOp, string(dyadicOp), err)
+		}
+		return out, true, nil
+	} else {
+		recordRuntimeKernelProbe("ArrayNumericUnaryDyadicSum", "vector-reduce/sum-"+unaryOp+"-dyadic-"+string(dyadicOp), handled, err)
+	}
+	return nil, false, nil
+}
+
+func splitTopLevelArithmeticOperator(src string) (string, byte, string, bool) {
+	for _, op := range []string{"+", "-", "*", "%"} {
+		if left, right, ok := splitTopLevelOperator(src, op); ok {
+			return left, op[0], right, true
+		}
+	}
+	return "", 0, "", false
 }
 
 func splitLeadingNumericUnary(src string) (string, string, bool) {

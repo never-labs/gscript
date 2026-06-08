@@ -1995,6 +1995,30 @@ func TestTypedNumericUnaryBinaryAndAggregates(t *testing.T) {
 		t.Fatalf("TryTypedQNumericUnarySum floor = %v, %v; want 2, true", value, ok)
 	}
 
+	value, ok, err = TryTypedQNumericUnaryDyadicSum(NumericUnaryAbs, OpMul, int64(-1), NewI64([]int64{1, 2, 3}))
+	if err != nil {
+		t.Fatalf("TryTypedQNumericUnaryDyadicSum abs scalar*array returned error: %v", err)
+	}
+	if !ok || value != float64(6) {
+		t.Fatalf("TryTypedQNumericUnaryDyadicSum abs scalar*array = %v, %v; want 6, true", value, ok)
+	}
+
+	value, ok, err = TryTypedQNumericUnaryDyadicSum(NumericUnaryFloor, OpMul, NewI64([]int64{0, 1, 2, 3}), float64(1.5))
+	if err != nil {
+		t.Fatalf("TryTypedQNumericUnaryDyadicSum floor array*scalar returned error: %v", err)
+	}
+	if !ok || value != int64(8) {
+		t.Fatalf("TryTypedQNumericUnaryDyadicSum floor array*scalar = %v, %v; want 8, true", value, ok)
+	}
+
+	value, ok, err = TryTypedQNumericUnaryDyadicSum(NumericUnaryCeiling, OpMul, NewI64Range(0, 1, 4), float64(1.5))
+	if err != nil {
+		t.Fatalf("TryTypedQNumericUnaryDyadicSum ceiling range*scalar returned error: %v", err)
+	}
+	if !ok || value != int64(10) {
+		t.Fatalf("TryTypedQNumericUnaryDyadicSum ceiling range*scalar = %v, %v; want 10, true", value, ok)
+	}
+
 	sum, ok, err := typedKernels.NumericBinary(OpAdd, NewI32([]int32{1, 2, 3}), NewF64([]float64{0.5, 1.5, 2.5}))
 	if err != nil {
 		t.Fatalf("NumericBinary returned error: %v", err)
