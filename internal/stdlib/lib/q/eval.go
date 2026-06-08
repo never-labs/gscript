@@ -2104,7 +2104,10 @@ func findPostfixIndex(src string) (string, string, bool) {
 			if i == len(src)-1 && parenDepth == 0 && bracketDepth == 0 && braceDepth == 0 && candidate >= 0 {
 				collection := strings.TrimSpace(src[:candidate])
 				index := strings.TrimSpace(src[candidate+1 : len(src)-1])
-				return collection, index, collection != "" && (index != "" || strings.Contains(src[candidate+1:len(src)-1], ";"))
+				if collection == "" || !qCanReceivePostfixIndex(collection) {
+					return "", "", false
+				}
+				return collection, index, index != "" || strings.Contains(src[candidate+1:len(src)-1], ";")
 			}
 		case '{':
 			braceDepth++
@@ -2113,6 +2116,63 @@ func findPostfixIndex(src string) (string, string, bool) {
 		}
 	}
 	return "", "", false
+}
+
+func qCanReceivePostfixIndex(collection string) bool {
+	collection = strings.TrimSpace(collection)
+	if collection == "" {
+		return false
+	}
+	if _, _, ok := findDyadic(collection); ok {
+		return false
+	}
+	if isQAssignmentName(collection) {
+		return true
+	}
+	if _, ok := lookupUnaryVerb(collection); ok {
+		return true
+	}
+	if _, ok := lookupDyadicVerbFunc(collection); ok {
+		return true
+	}
+	if _, ok := parseDyadicAdverbFunction(collection); ok {
+		return true
+	}
+	if qCanReceivePostfixCallableAdverbIndex(collection) {
+		return true
+	}
+	if strings.HasPrefix(collection, "{") && strings.HasSuffix(collection, "}") {
+		return true
+	}
+	return strings.HasSuffix(collection, ")") || strings.HasSuffix(collection, "]")
+}
+
+func qCanReceivePostfixCallableAdverbIndex(collection string) bool {
+	for _, adverb := range []string{"\\:", "/:", "':", "'", "/", "\\"} {
+		if !strings.HasSuffix(collection, adverb) {
+			continue
+		}
+		base := strings.TrimSpace(collection[:len(collection)-len(adverb)])
+		if base == "" {
+			continue
+		}
+		if strings.HasPrefix(base, "{") && strings.HasSuffix(base, "}") {
+			return true
+		}
+		if isQAssignmentName(base) {
+			return true
+		}
+		if strings.HasSuffix(base, ")") || strings.HasSuffix(base, "]") {
+			return true
+		}
+		if _, ok := lookupDyadicVerbFunc(base); ok {
+			return true
+		}
+		if _, ok := lookupUnaryVerb(base); ok {
+			return true
+		}
+	}
+	return false
 }
 
 func findMatchingDelimiter(src string, start int, open, close byte) int {

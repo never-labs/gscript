@@ -573,6 +573,8 @@ func TestEvalLambdaCallProjectionAndAdverbs(t *testing.T) {
 	assertEvalValue(t, "first[10 20 30]", int64(10))
 	assertEvalValue(t, "(first reverse)[10 20 30]", int64(30))
 	assertEvalValue(t, "(count distinct)[10 20 10 30]", int64(3))
+	assertEvalValue(t, "(count distinct)[10 20 10 30]+(first reverse)[1 2 3]", int64(6))
+	assertEvalValue(t, "a:(count distinct)[10 20 10 30];b:(first reverse)[1 2 3];a+b", int64(6))
 	assertEvalValue(t, "{x+y}[1;][2]", int64(3))
 	assertEvalValue(t, "{x+y}[;2][1]", int64(3))
 	assertEvalValue(t, "{x+y+z}[1;;3][2]", int64(6))
