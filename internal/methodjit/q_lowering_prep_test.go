@@ -3093,6 +3093,80 @@ func TestDiagnoseReportsQQueryFallbackReasons(t *testing.T) {
 	}
 }
 
+func TestDiagnoseReportsQGroupAggregateFallbackDescriptor(t *testing.T) {
+	const query = "select notional:sum price*size, fills:count i by sym from trades where price>100 order by sym asc"
+	proto := &vm.FuncProto{
+		Name:      "q_group_aggregate_fallback_diag",
+		NumParams: 1,
+		MaxStack:  4,
+		Constants: []runtime.Value{
+			runtime.StringValue("q"),
+			runtime.StringValue("sql"),
+			runtime.StringValue(query),
+		},
+		Code: []uint32{
+			vm.EncodeABx(vm.OP_GETGLOBAL, 1, 0),
+			vm.EncodeABC(vm.OP_GETFIELD, 1, 1, 1),
+			vm.EncodeABC(vm.OP_MOVE, 2, 0, 0),
+			vm.EncodeABx(vm.OP_LOADK, 3, 2),
+			vm.EncodeABC(vm.OP_CALL, 1, 3, 2),
+			vm.EncodeABC(vm.OP_RETURN, 1, 2, 0),
+		},
+	}
+
+	report := Diagnose(proto, []runtime.Value{runtime.TableValue(qHotPathTestFrame(t))})
+	if report.QQueryFallbacks[qQueryLoweringFallbackGroupAggregateCall] != 1 {
+		t.Fatalf("Diagnose QQueryFallbacks = %+v, want group_aggregate_call=1\n%s", report.QQueryFallbacks, report.String())
+	}
+	assertQKernelDescriptor(t, report.QKernelDescriptors, "methodjit_q_query_lowering", "fallback", "QGroupAggregate", "select/where/group/aggregate/order", "lowering", "fallback", qQueryLoweringFallbackGroupAggregateCall)
+	assertQKernelShapeSummary(t, report.QKernelShapeSummary, "methodjit_q_query_lowering", "fallback", "select/where/group/aggregate/order", "fallback", qQueryLoweringFallbackGroupAggregateCall, 1)
+	if len(report.QKernelExecutionStats) != 0 || len(report.QKernelExecutionRoutes) != 0 {
+		t.Fatalf("Diagnose group fallback execution stats/routes = %+v/%+v, want none\n%s", report.QKernelExecutionStats, report.QKernelExecutionRoutes, report.String())
+	}
+	if !strings.Contains(report.String(), "kernel=QGroupAggregate") ||
+		!strings.Contains(report.String(), "reason_code=group_aggregate_call") ||
+		!strings.Contains(report.String(), "shape=select/where/group/aggregate/order") {
+		t.Fatalf("diagnostic report missing group fallback descriptor:\n%s", report.String())
+	}
+}
+
+func TestDiagnoseReportsQJoinFallbackDescriptor(t *testing.T) {
+	const query = "select id,value,qty from accounts left join fills on id=account_id,venue=exchange where value>0 order by qty desc"
+	proto := &vm.FuncProto{
+		Name:      "q_join_fallback_diag",
+		NumParams: 1,
+		MaxStack:  4,
+		Constants: []runtime.Value{
+			runtime.StringValue("q"),
+			runtime.StringValue("sql"),
+			runtime.StringValue(query),
+		},
+		Code: []uint32{
+			vm.EncodeABx(vm.OP_GETGLOBAL, 1, 0),
+			vm.EncodeABC(vm.OP_GETFIELD, 1, 1, 1),
+			vm.EncodeABC(vm.OP_MOVE, 2, 0, 0),
+			vm.EncodeABx(vm.OP_LOADK, 3, 2),
+			vm.EncodeABC(vm.OP_CALL, 1, 3, 2),
+			vm.EncodeABC(vm.OP_RETURN, 1, 2, 0),
+		},
+	}
+
+	report := Diagnose(proto, []runtime.Value{runtime.TableValue(qHotPathTestFrame(t))})
+	if report.QQueryFallbacks[qQueryLoweringFallbackJoinCall] != 1 {
+		t.Fatalf("Diagnose QQueryFallbacks = %+v, want join_call=1\n%s", report.QQueryFallbacks, report.String())
+	}
+	assertQKernelDescriptor(t, report.QKernelDescriptors, "methodjit_q_query_lowering", "fallback", "QJoin", "where/join/left/order", "lowering", "fallback", qQueryLoweringFallbackJoinCall)
+	assertQKernelShapeSummary(t, report.QKernelShapeSummary, "methodjit_q_query_lowering", "fallback", "where/join/left/order", "fallback", qQueryLoweringFallbackJoinCall, 1)
+	if len(report.QKernelExecutionStats) != 0 || len(report.QKernelExecutionRoutes) != 0 {
+		t.Fatalf("Diagnose join fallback execution stats/routes = %+v/%+v, want none\n%s", report.QKernelExecutionStats, report.QKernelExecutionRoutes, report.String())
+	}
+	if !strings.Contains(report.String(), "kernel=QJoin") ||
+		!strings.Contains(report.String(), "reason_code=join_call") ||
+		!strings.Contains(report.String(), "shape=where/join/left/order") {
+		t.Fatalf("diagnostic report missing join fallback descriptor:\n%s", report.String())
+	}
+}
+
 func TestFrameLenBytecodeBuildsMethodJITIR(t *testing.T) {
 	proto := &vm.FuncProto{
 		Name:      "frame_len",
