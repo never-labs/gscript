@@ -84,13 +84,14 @@ type qScanView struct {
 // The shape matches bind's q.cache_stats runtime-kernel rows without importing
 // bind into the q evaluator.
 type RuntimeKernelExecutionStat struct {
-	Source     string
-	Kernel     string
-	Shape      string
-	Route      string
-	Outcome    string
-	ReasonCode string
-	Count      uint64
+	Source        string
+	Kernel        string
+	Shape         string
+	PipelineShape string
+	Route         string
+	Outcome       string
+	ReasonCode    string
+	Count         uint64
 }
 
 type runtimeKernelExecutionKey struct {
@@ -159,13 +160,14 @@ func RuntimeKernelExecutionStats() []RuntimeKernelExecutionStat {
 	out := make([]RuntimeKernelExecutionStat, 0, len(runtimeKernelStats))
 	for key, count := range runtimeKernelStats {
 		out = append(out, RuntimeKernelExecutionStat{
-			Source:     key.source,
-			Kernel:     key.kernel,
-			Shape:      key.shape,
-			Route:      key.route,
-			Outcome:    key.outcome,
-			ReasonCode: key.reasonCode,
-			Count:      count,
+			Source:        key.source,
+			Kernel:        key.kernel,
+			Shape:         key.shape,
+			PipelineShape: qRuntimeKernelPipelineShape(key.kernel, key.shape),
+			Route:         key.route,
+			Outcome:       key.outcome,
+			ReasonCode:    key.reasonCode,
+			Count:         count,
 		})
 	}
 	sort.Slice(out, func(i, j int) bool {
@@ -188,6 +190,49 @@ func RuntimeKernelExecutionStats() []RuntimeKernelExecutionStat {
 		return a.ReasonCode < b.ReasonCode
 	})
 	return out
+}
+
+func qRuntimeKernelPipelineShape(kernel, shape string) string {
+	switch {
+	case strings.HasPrefix(shape, "gather-reduce/"):
+		return "where_gather_reduce"
+	case strings.HasPrefix(shape, "where-reduce/"), strings.HasPrefix(shape, "where-index-reduce/"):
+		return "mask_reduce"
+	case strings.HasPrefix(shape, "compare-to-index-count-sum-stats/"), strings.HasPrefix(shape, "compare-to-index-count-stats/"), strings.HasPrefix(shape, "compare-to-index-sum-stats/"):
+		return "compare_index_stats"
+	case strings.HasPrefix(shape, "compare-to-index/"):
+		return "compare_index"
+	case strings.HasPrefix(shape, "mask-to-index/"):
+		return "mask_to_index"
+	case strings.HasPrefix(shape, "vector-dyadic/"), strings.HasPrefix(shape, "composite-dyadic/"):
+		return "vector_map"
+	case strings.HasPrefix(shape, "vector-reduce/"):
+		return "vector_reduce"
+	case strings.HasPrefix(shape, "vector-count/"):
+		return "vector_scan"
+	case strings.HasPrefix(shape, "gather/"):
+		return "gather"
+	case strings.HasPrefix(shape, "and/"), strings.HasPrefix(shape, "or/"):
+		return "mask_combine"
+	case strings.HasPrefix(shape, "sort-index/"):
+		return "sort_index"
+	case strings.HasPrefix(shape, "fby-"), strings.Contains(shape, "/fby-"):
+		return "group_aggregate"
+	case strings.HasPrefix(shape, "like-count/"), strings.HasPrefix(shape, "in-count/"):
+		return "predicate_count"
+	case strings.HasPrefix(shape, "last-scan/"), strings.HasPrefix(shape, "vector-last/"):
+		return "terminal_scan"
+	case strings.HasPrefix(shape, "amend-indexes/"):
+		return "indexed_amend"
+	case strings.HasPrefix(shape, "scalar-fill/"), strings.HasPrefix(shape, "null-count/"), strings.HasPrefix(shape, "true-count/"):
+		return "null_mask"
+	case strings.HasPrefix(shape, "count-reverse/"):
+		return "reverse_count"
+	case kernel != "":
+		return "kernel/" + kernel
+	default:
+		return "unknown"
+	}
 }
 
 // ClearRuntimeKernelExecutionStats resets q.eval runtime-kernel counters.

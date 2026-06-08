@@ -12,7 +12,7 @@ BenchmarkQSQLBindRunSQLColdCacheSelectWhereProject-16    100  4000 ns/op  8192 i
 BenchmarkQSQLNativeGoSelectWhereProject-16               100  2000 ns/op  8192 input_rows/s  100 B/op  1 allocs/op
 BenchmarkQEvalVectorResultCacheWarm/MaskWhere-16         100  500 ns/op  64 B/op  2 allocs/op
 BenchmarkQEvalVectorCold/MaskWhere-16                    100  2500 ns/op  512 B/op  12 allocs/op
-BenchmarkQSessionEvalVectorWarmExecution/MaskWhere-16    100  2000 ns/op  256 B/op  8 allocs/op  100.0 typed_kernel_hit_pct  1 typed_kernel_attempts/op  1 typed_kernel_hits/op  0 typed_kernel_fallbacks/op  0 typed_kernel_errors/op
+BenchmarkQSessionEvalVectorWarmExecution/MaskWhere-16    100  2000 ns/op  256 B/op  8 allocs/op  100.0 typed_kernel_hit_pct  1 typed_kernel_attempts/op  1 typed_kernel_hits/op  0 typed_kernel_fallbacks/op  0 typed_kernel_errors/op  2 typed_pipeline_shapes  0 typed_pipeline_fallback_shapes
 BenchmarkQEvalVectorGoBaseline/MaskWhere-16              100  1000 ns/op  0 B/op  0 allocs/op
 """
 
@@ -88,6 +88,8 @@ class QPerfReportTest(unittest.TestCase):
         self.assertEqual(qeval.typed_kernel_hit_pct, 100)
         self.assertEqual(qeval.typed_kernel_attempts_op, 1)
         self.assertEqual(qeval.typed_kernel_fallbacks_op, 0)
+        self.assertEqual(qeval.typed_pipeline_shapes, 2)
+        self.assertEqual(qeval.typed_pipeline_fallback_shapes, 0)
 
     def test_qsql_benchmark_coverage_reports_missing_expected_rows(self):
         rows = report.parse_go_benchmarks(SAMPLE)

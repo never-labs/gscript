@@ -103,6 +103,8 @@ class RuntimeMetricRow:
     typed_kernel_hits_op: float | None
     typed_kernel_fallbacks_op: float | None
     typed_kernel_errors_op: float | None
+    typed_pipeline_shapes: float | None
+    typed_pipeline_fallback_shapes: float | None
 
 
 @dataclass
@@ -311,6 +313,8 @@ def build_runtime_metric_rows(rows: dict[str, BenchRow]) -> list[RuntimeMetricRo
                 typed_kernel_hits_op=metrics.get("typed_kernel_hits/op"),
                 typed_kernel_fallbacks_op=metrics.get("typed_kernel_fallbacks/op"),
                 typed_kernel_errors_op=metrics.get("typed_kernel_errors/op"),
+                typed_pipeline_shapes=metrics.get("typed_pipeline_shapes"),
+                typed_pipeline_fallback_shapes=metrics.get("typed_pipeline_fallback_shapes"),
             )
         )
     return out
@@ -631,8 +635,8 @@ def markdown_report(rows: dict[str, BenchRow], commands: list[CommandResult], cu
             "",
             "## Runtime Metrics",
             "",
-            "| Benchmark | ns/op | B/op | allocs/op | kernel_hit_pct | fallbacks/op | typed_kernel_hit_pct | typed_kernel_attempts/op | typed_kernel_fallbacks/op | typed_kernel_errors/op |",
-            "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
+            "| Benchmark | ns/op | B/op | allocs/op | kernel_hit_pct | fallbacks/op | typed_kernel_hit_pct | typed_kernel_attempts/op | typed_kernel_fallbacks/op | typed_kernel_errors/op | typed_pipeline_shapes | typed_pipeline_fallback_shapes |",
+            "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
         ]
     )
     for item in runtime_metrics:
@@ -645,15 +649,17 @@ def markdown_report(rows: dict[str, BenchRow], commands: list[CommandResult], cu
             f"{format_metric(item.typed_kernel_hit_pct, 1)} | "
             f"{format_metric(item.typed_kernel_attempts_op, 3)} | "
             f"{format_metric(item.typed_kernel_fallbacks_op, 3)} | "
-            f"{format_metric(item.typed_kernel_errors_op, 3)} |"
+            f"{format_metric(item.typed_kernel_errors_op, 3)} | "
+            f"{format_metric(item.typed_pipeline_shapes, 0)} | "
+            f"{format_metric(item.typed_pipeline_fallback_shapes, 0)} |"
         )
     lines.extend(
         [
             "",
             "## Raw Benchmarks",
             "",
-            "| Benchmark | ns/op | B/op | allocs/op | kernel_hit_pct | fallbacks/op | typed_kernel_hit_pct | typed_kernel_fallbacks/op |",
-            "|---|---:|---:|---:|---:|---:|---:|---:|",
+            "| Benchmark | ns/op | B/op | allocs/op | kernel_hit_pct | fallbacks/op | typed_kernel_hit_pct | typed_kernel_fallbacks/op | typed_pipeline_shapes | typed_pipeline_fallback_shapes |",
+            "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
         ]
     )
     for name in sorted(rows):
@@ -665,7 +671,9 @@ def markdown_report(rows: dict[str, BenchRow], commands: list[CommandResult], cu
             f"{row.metrics.get('kernel_hit_pct', 0):.1f} | "
             f"{row.metrics.get('fallbacks/op', 0):.3f} | "
             f"{row.metrics.get('typed_kernel_hit_pct', 0):.1f} | "
-            f"{row.metrics.get('typed_kernel_fallbacks/op', 0):.3f} |"
+            f"{row.metrics.get('typed_kernel_fallbacks/op', 0):.3f} | "
+            f"{row.metrics.get('typed_pipeline_shapes', 0):.0f} | "
+            f"{row.metrics.get('typed_pipeline_fallback_shapes', 0):.0f} |"
         )
     lines.extend(
         [

@@ -87,6 +87,26 @@ func TestRuntimeKernelExecutionStatsReportHitAndFallbackOutcomes(t *testing.T) {
 	}
 }
 
+func TestRuntimeKernelExecutionStatsMapPipelineShapes(t *testing.T) {
+	ClearRuntimeKernelExecutionStats()
+	t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+	assertEvalValue(t, "x:til 32;y:x*2;+/y[where (x>=4) and x<12]", int64(120))
+	assertEvalValue(t, "+/deltas til 16", int64(15))
+
+	seen := map[string]bool{}
+	for _, stat := range RuntimeKernelExecutionStats() {
+		if stat.Outcome == "hit" && stat.ReasonCode == "typed_kernel" {
+			seen[stat.PipelineShape] = true
+		}
+	}
+	for _, shape := range []string{"vector_map", "mask_combine", "mask_reduce", "vector_reduce"} {
+		if !seen[shape] {
+			t.Fatalf("missing pipeline shape %q in runtime stats: %#v", shape, RuntimeKernelExecutionStats())
+		}
+	}
+}
+
 func TestEvalNumericReductionBundleRecordsTypedRuntimeKernel(t *testing.T) {
 	ClearRuntimeKernelExecutionStats()
 	t.Cleanup(ClearRuntimeKernelExecutionStats)

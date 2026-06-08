@@ -1450,16 +1450,27 @@ func qEvalVectorRun(tb testing.TB, eval *bind.GoFunction, src string) int64 {
 func qEvalVectorReportRuntimeKernelStats(b *testing.B) {
 	b.Helper()
 	var attempts, hits, fallbacks, errors uint64
+	pipelineShapes := map[string]struct{}{}
+	fallbackPipelineShapes := map[string]struct{}{}
 	for _, stat := range stdq.RuntimeKernelExecutionStats() {
 		switch stat.Outcome {
 		case "attempt":
 			attempts += stat.Count
+			if stat.PipelineShape != "" {
+				pipelineShapes[stat.PipelineShape] = struct{}{}
+			}
 		case "hit", "success":
 			hits += stat.Count
 		case "fallback":
 			fallbacks += stat.Count
+			if stat.PipelineShape != "" {
+				fallbackPipelineShapes[stat.PipelineShape] = struct{}{}
+			}
 		case "error":
 			errors += stat.Count
+			if stat.PipelineShape != "" {
+				fallbackPipelineShapes[stat.PipelineShape] = struct{}{}
+			}
 		}
 	}
 	if attempts > 0 {
@@ -1470,6 +1481,8 @@ func qEvalVectorReportRuntimeKernelStats(b *testing.B) {
 		b.ReportMetric(float64(hits)/float64(b.N), "typed_kernel_hits/op")
 		b.ReportMetric(float64(fallbacks)/float64(b.N), "typed_kernel_fallbacks/op")
 		b.ReportMetric(float64(errors)/float64(b.N), "typed_kernel_errors/op")
+		b.ReportMetric(float64(len(pipelineShapes)), "typed_pipeline_shapes")
+		b.ReportMetric(float64(len(fallbackPipelineShapes)), "typed_pipeline_fallback_shapes")
 	}
 }
 
