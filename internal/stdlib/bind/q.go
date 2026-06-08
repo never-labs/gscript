@@ -290,6 +290,7 @@ type qFallbackStats struct {
 	QueryKernel       int
 	ByReasonCode      map[qFallbackReasonCodeKey]int
 	ByReason          map[qFallbackReasonKey]int
+	ByAttribution     map[qFallbackAttributionKey]int
 }
 
 type qFallbackReasonCodeKey struct {
@@ -300,6 +301,15 @@ type qFallbackReasonCodeKey struct {
 type qFallbackReasonKey struct {
 	Code   string
 	Reason string
+}
+
+type qFallbackAttributionKey struct {
+	Code         string
+	ReasonCode   string
+	ReasonFamily string
+	Source       string
+	SchemaHash   string
+	Shape        string
 }
 
 type qQueryKernelSupportShapeKey struct {
@@ -1454,7 +1464,14 @@ func qRunQuery(s *SoA, spec *Table) (*Table, error) {
 					Reason:     nativeReason,
 				})
 			}
-			qRecordFallbackReason(qFallbackQueryKernel, nativeReasonCode, nativeReason)
+			qRecordFallbackReasonAttribution(
+				qFallbackQueryKernel,
+				nativeReasonCode,
+				nativeReason,
+				"q.query",
+				qQueryKernelSchemaHashFromCacheKey(nativeCacheKey),
+				qQueryKernelShapeFromCacheKey(nativeCacheKey),
+			)
 		}
 		qAttachRowsNativeFramePayload(rows)
 	}
@@ -1661,7 +1678,16 @@ func qRunSQLPlan(src string, plan data.QueryPlan, frame data.Frame) (data.Frame,
 		return data.Frame{}, err
 	}
 	if !ok {
-		qRecordFallbackReason(qFallbackKernelUnsupported, stdq.KernelFallbackReasonCode(reason), reason)
+		reasonCode := stdq.KernelFallbackReasonCode(reason)
+		info := qSQLKernelCacheKeyInfo(data.QueryKernelCacheKey(src, frame, plan))
+		qRecordFallbackReasonAttribution(
+			qFallbackKernelUnsupported,
+			reasonCode,
+			reason,
+			info.Namespace,
+			info.SchemaHash,
+			data.QueryKernelPlanShape(plan),
+		)
 		kernel = nil
 	}
 	return data.ExecQueryKernelOrPlan(kernel, plan, frame)
@@ -3808,12 +3834,19 @@ func qRecordQueryKernelHit() {
 }
 
 func qRecordFallbackReason(code, reasonCode, reason string) {
+	qRecordFallbackReasonAttribution(code, reasonCode, reason, "", "", "")
+}
+
+func qRecordFallbackReasonAttribution(code, reasonCode, reason, source, schemaHash, shape string) {
 	qFallbackStatsMu.Lock()
 	if qFallbackCounters.ByReasonCode == nil {
 		qFallbackCounters.ByReasonCode = make(map[qFallbackReasonCodeKey]int)
 	}
 	if qFallbackCounters.ByReason == nil {
 		qFallbackCounters.ByReason = make(map[qFallbackReasonKey]int)
+	}
+	if qFallbackCounters.ByAttribution == nil {
+		qFallbackCounters.ByAttribution = make(map[qFallbackAttributionKey]int)
 	}
 	switch code {
 	case qFallbackKernelUnsupported:
@@ -3836,6 +3869,17 @@ func qRecordFallbackReason(code, reasonCode, reason string) {
 	}
 	if reason != "" {
 		qFallbackCounters.ByReason[qFallbackReasonKey{Code: code, Reason: reason}]++
+	}
+	if source != "" || schemaHash != "" || shape != "" {
+		family := qFallbackReasonFamilyForDetail(code, reasonCode, reason)
+		qFallbackCounters.ByAttribution[qFallbackAttributionKey{
+			Code:         code,
+			ReasonCode:   reasonCode,
+			ReasonFamily: family,
+			Source:       source,
+			SchemaHash:   schemaHash,
+			Shape:        shape,
+		}]++
 	}
 	qFallbackStatsMu.Unlock()
 }
@@ -3893,7 +3937,8 @@ func qFallbackStatsTable() *Table {
 
 	familyRows := qFallbackFamilyRows(stats)
 	detailRows := qFallbackTopRows(stats, 10)
-	rows := NewAppendArrayTable(7 + len(familyRows) + len(detailRows))
+	attributionRows := qFallbackAttributionRows(stats, 10)
+	rows := NewAppendArrayTable(7 + len(familyRows) + len(detailRows) + len(attributionRows))
 	rows.RawSetInt(1, TableValue(qFallbackStatsRow(qFallbackKernelUnsupported, stats.KernelUnsupported)))
 	rows.RawSetInt(2, TableValue(qFallbackStatsRow(qFallbackKernelCompileErr, stats.KernelCompileErr)))
 	rows.RawSetInt(3, TableValue(qFallbackStatsRow(qFallbackSourceErr, stats.SourceErr)))
@@ -3910,6 +3955,10 @@ func qFallbackStatsTable() *Table {
 		rows.RawSetInt(next, TableValue(row))
 		next++
 	}
+	for _, row := range attributionRows {
+		rows.RawSetInt(next, TableValue(row))
+		next++
+	}
 	return rows
 }
 
@@ -3920,6 +3969,9 @@ func qFallbackStatsRow(code string, count int) *Table {
 	row.RawSetString("reason_family", StringValue(qFallbackReasonFamily(code, "")))
 	row.RawSetString("reason_code", StringValue(""))
 	row.RawSetString("reason", StringValue(""))
+	row.RawSetString("source", StringValue(""))
+	row.RawSetString("schema_hash", StringValue(""))
+	row.RawSetString("shape", StringValue(""))
 	row.RawSetString("count", IntValue(int64(count)))
 	return row
 }
@@ -3936,6 +3988,12 @@ func qCloneFallbackStatsLocked() qFallbackStats {
 		stats.ByReason = make(map[qFallbackReasonKey]int, len(qFallbackCounters.ByReason))
 		for key, count := range qFallbackCounters.ByReason {
 			stats.ByReason[key] = count
+		}
+	}
+	if len(qFallbackCounters.ByAttribution) > 0 {
+		stats.ByAttribution = make(map[qFallbackAttributionKey]int, len(qFallbackCounters.ByAttribution))
+		for key, count := range qFallbackCounters.ByAttribution {
+			stats.ByAttribution[key] = count
 		}
 	}
 	return stats
@@ -3980,6 +4038,9 @@ func qFallbackFamilyStatsRow(family string, count int) *Table {
 	row.RawSetString("reason_family", StringValue(family))
 	row.RawSetString("reason_code", StringValue(""))
 	row.RawSetString("reason", StringValue(""))
+	row.RawSetString("source", StringValue(""))
+	row.RawSetString("schema_hash", StringValue(""))
+	row.RawSetString("shape", StringValue(""))
 	row.RawSetString("count", IntValue(int64(count)))
 	return row
 }
@@ -4030,6 +4091,48 @@ func qFallbackTopRows(stats qFallbackStats, limit int) []*Table {
 	return rows
 }
 
+func qFallbackAttributionRows(stats qFallbackStats, limit int) []*Table {
+	rows := make([]qFallbackAttributionRow, 0, len(stats.ByAttribution))
+	for key, count := range stats.ByAttribution {
+		rows = append(rows, qFallbackAttributionRow{Key: key, Count: count})
+	}
+	sort.Slice(rows, func(i, j int) bool {
+		a, b := rows[i], rows[j]
+		if a.Count != b.Count {
+			return a.Count > b.Count
+		}
+		if a.Key.Code != b.Key.Code {
+			return a.Key.Code < b.Key.Code
+		}
+		if a.Key.ReasonFamily != b.Key.ReasonFamily {
+			return a.Key.ReasonFamily < b.Key.ReasonFamily
+		}
+		if a.Key.ReasonCode != b.Key.ReasonCode {
+			return a.Key.ReasonCode < b.Key.ReasonCode
+		}
+		if a.Key.Source != b.Key.Source {
+			return a.Key.Source < b.Key.Source
+		}
+		if a.Key.SchemaHash != b.Key.SchemaHash {
+			return a.Key.SchemaHash < b.Key.SchemaHash
+		}
+		return a.Key.Shape < b.Key.Shape
+	})
+	out := make([]*Table, 0, len(rows))
+	for i, item := range rows {
+		if i >= limit {
+			break
+		}
+		out = append(out, qFallbackAttributionStatsRow(item.Key, item.Count))
+	}
+	return out
+}
+
+type qFallbackAttributionRow struct {
+	Key   qFallbackAttributionKey
+	Count int
+}
+
 type qFallbackReasonCodeRow struct {
 	Key   qFallbackReasonCodeKey
 	Count int
@@ -4047,6 +4150,23 @@ func qFallbackDetailStatsRow(kind, code, reasonCode, reason string, count int) *
 	row.RawSetString("reason_family", StringValue(qFallbackReasonFamilyForDetail(code, reasonCode, reason)))
 	row.RawSetString("reason_code", StringValue(reasonCode))
 	row.RawSetString("reason", StringValue(reason))
+	row.RawSetString("source", StringValue(""))
+	row.RawSetString("schema_hash", StringValue(""))
+	row.RawSetString("shape", StringValue(""))
+	row.RawSetString("count", IntValue(int64(count)))
+	return row
+}
+
+func qFallbackAttributionStatsRow(key qFallbackAttributionKey, count int) *Table {
+	row := NewTable()
+	row.RawSetString("kind", StringValue("reason_shape"))
+	row.RawSetString("code", StringValue(key.Code))
+	row.RawSetString("reason_family", StringValue(key.ReasonFamily))
+	row.RawSetString("reason_code", StringValue(key.ReasonCode))
+	row.RawSetString("reason", StringValue(""))
+	row.RawSetString("source", StringValue(key.Source))
+	row.RawSetString("schema_hash", StringValue(key.SchemaHash))
+	row.RawSetString("shape", StringValue(key.Shape))
 	row.RawSetString("count", IntValue(int64(count)))
 	return row
 }

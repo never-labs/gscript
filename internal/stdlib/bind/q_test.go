@@ -3352,6 +3352,9 @@ again := q.query(trades, {select: {price: "price"}, order_by: "missing"})
 	if got := qTestQueryKernelShapeCount(shapeRows, false, qFallbackFamilyOrder, qQueryKernelReasonOrder, shapeRows[0].SchemaHash); got != 1 {
 		t.Fatalf("q_query_kernel order shape count = %d, want 1", got)
 	}
+	if got := qTestFallbackAttributionCount(details, qFallbackQueryKernel, qQueryKernelReasonOrder, "q.query", shapeRows[0].SchemaHash, shapeRows[0].Shape); got != 2 {
+		t.Fatalf("q_query_kernel fallback attribution count = %d, want 2 for schema/shape", got)
+	}
 }
 
 func TestQFallbackStatsTrackQueryKernelHits(t *testing.T) {
@@ -4709,6 +4712,10 @@ func TestQSQLKernelUnsupportedDecisionCacheIsSchemaStable(t *testing.T) {
 	shapeRows := qTestKernelDecisionShapeRows(t, decisionRow.RawGetString("shapes").Table())
 	if got := qTestKernelDecisionShapeCount(shapeRows, qFallbackFamilySelect, stdq.KernelFallbackSelectExpression, keyRows[0].SchemaHash, keyRows[0].Shape); got != 1 {
 		t.Fatalf("qsql_kernel_decision select shape aggregate = %d, want 1", got)
+	}
+	fallbackRows := qTestFallbackStatsDetailRows(t, qFallbackStatsTable())
+	if got := qTestFallbackAttributionCount(fallbackRows, qFallbackKernelUnsupported, stdq.KernelFallbackSelectExpression, src, keyRows[0].SchemaHash, keyRows[0].Shape); got != 2 {
+		t.Fatalf("qsql_kernel_decision fallback attribution count = %d, want 2 executions for schema/shape", got)
 	}
 }
 
@@ -6237,6 +6244,9 @@ type qFallbackStatsDetailRow struct {
 	ReasonFamily string
 	ReasonCode   string
 	Reason       string
+	Source       string
+	SchemaHash   string
+	Shape        string
 	Count        int64
 }
 
@@ -6259,8 +6269,11 @@ func qTestFallbackStatsDetailRows(t *testing.T, tbl *Table) []qFallbackStatsDeta
 		reasonFamily := row.RawGetString("reason_family")
 		reasonCode := row.RawGetString("reason_code")
 		reason := row.RawGetString("reason")
+		source := row.RawGetString("source")
+		schemaHash := row.RawGetString("schema_hash")
+		shape := row.RawGetString("shape")
 		count := row.RawGetString("count")
-		if !code.IsString() || !reasonFamily.IsString() || !reasonCode.IsString() || !reason.IsString() || !count.IsInt() {
+		if !code.IsString() || !reasonFamily.IsString() || !reasonCode.IsString() || !reason.IsString() || !source.IsString() || !schemaHash.IsString() || !shape.IsString() || !count.IsInt() {
 			t.Fatalf("fallback stats detail row %d malformed: %#v", i, row)
 		}
 		out = append(out, qFallbackStatsDetailRow{
@@ -6269,6 +6282,9 @@ func qTestFallbackStatsDetailRows(t *testing.T, tbl *Table) []qFallbackStatsDeta
 			ReasonFamily: reasonFamily.Str(),
 			ReasonCode:   reasonCode.Str(),
 			Reason:       reason.Str(),
+			Source:       source.Str(),
+			SchemaHash:   schemaHash.Str(),
+			Shape:        shape.Str(),
 			Count:        count.Int(),
 		})
 	}
@@ -6296,6 +6312,15 @@ func qTestFallbackDetailFamily(rows []qFallbackStatsDetailRow, kind, code, reaso
 func qTestFallbackFamilyCount(rows []qFallbackStatsDetailRow, family string) int64 {
 	for _, row := range rows {
 		if row.Kind == "reason_family" && row.ReasonFamily == family {
+			return row.Count
+		}
+	}
+	return 0
+}
+
+func qTestFallbackAttributionCount(rows []qFallbackStatsDetailRow, code, reasonCode, source, schemaHash, shape string) int64 {
+	for _, row := range rows {
+		if row.Kind == "reason_shape" && row.Code == code && row.ReasonCode == reasonCode && row.Source == source && row.SchemaHash == schemaHash && row.Shape == shape {
 			return row.Count
 		}
 	}
