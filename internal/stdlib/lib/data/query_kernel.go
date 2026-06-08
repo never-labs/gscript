@@ -947,7 +947,7 @@ func queryKernelFrameReason(frame Frame, plan QueryPlan) string {
 	if len(plan.By)+len(plan.ByExprs) > 0 && len(plan.Aggregates) > 0 {
 		byInputs, err := bindGroupInputs(frame, groupByItems(plan))
 		if err == nil {
-			if _, ok, err := groupIndexForSingleColumn(byInputs); err == nil && ok && queryPlanAggregatesAreIndexedMixedFastPath(plan) {
+			if _, ok, err := groupIndexForSingleColumn(frame, byInputs); err == nil && ok && queryPlanAggregatesAreIndexedMixedFastPath(plan) {
 				return "data query kernel supported: indexed single-column grouped mixed aggregate fast path"
 			}
 		}
@@ -1635,8 +1635,19 @@ func (k *QueryKernel) Exec(frame Frame) (Frame, error) {
 	if err != nil {
 		return Frame{}, err
 	}
+	projectedOrderBy, projectOrderBeforeProjection := projectedSourceOrderSpecs(plan)
 	if len(plan.OrderBy) > 0 && plan.PreProjectOrder {
-		indexes, err = orderIndexes(frame, indexes, plan.OrderBy)
+		if canLimitBeforeProjection(plan) {
+			indexes, err = orderIndexesLimit(frame, indexes, plan.OrderBy, plan.LimitN)
+		} else {
+			indexes, err = orderIndexes(frame, indexes, plan.OrderBy)
+		}
+		if err != nil {
+			return Frame{}, err
+		}
+	}
+	if len(projectedOrderBy) > 0 && projectOrderBeforeProjection {
+		indexes, err = orderIndexesLimit(frame, indexes, projectedOrderBy, plan.LimitN)
 		if err != nil {
 			return Frame{}, err
 		}
@@ -1659,8 +1670,8 @@ func (k *QueryKernel) Exec(frame Frame) (Frame, error) {
 			return Frame{}, err
 		}
 	}
-	if len(plan.OrderBy) > 0 && !plan.PreProjectOrder {
-		out, err = orderFrame(out, plan.OrderBy)
+	if len(plan.OrderBy) > 0 && !plan.PreProjectOrder && !projectOrderBeforeProjection {
+		out, err = orderFrameLimit(out, plan.OrderBy, plan.LimitN)
 		if err != nil {
 			return Frame{}, err
 		}

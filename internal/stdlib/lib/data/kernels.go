@@ -648,7 +648,6 @@ func (typedKernelRegistry) FilteredGroupAggregateStates(index ArrayIndex, indexe
 	if err != nil {
 		return nil, nil, true, err
 	}
-	rowsByGroup := make([][]int, len(index.Rows))
 	for _, row := range indexes {
 		if row < 0 || row >= len(rowToGroup) {
 			return nil, nil, true, fmt.Errorf("filter row %d out of range for grouped index", row)
@@ -657,14 +656,8 @@ func (typedKernelRegistry) FilteredGroupAggregateStates(index ArrayIndex, indexe
 		if group < 0 {
 			return nil, nil, true, fmt.Errorf("filter row %d is missing from grouped index", row)
 		}
-		rowsByGroup[group] = append(rowsByGroup[group], row)
-	}
-	for group, rows := range rowsByGroup {
-		if len(rows) == 0 {
-			continue
-		}
 		for i, agg := range aggs {
-			if err := accumulateIndexedAggregate(&states[group].aggs[i], agg, rows); err != nil {
+			if err := accumulateIndexedAggregateRow(&states[group].aggs[i], agg, row); err != nil {
 				return nil, nil, true, err
 			}
 		}
@@ -683,7 +676,13 @@ func groupAggregatesSupportedByTypedIndex(aggs []aggregateInput) bool {
 		switch agg.Func {
 		case "count":
 		case "sum", "avg":
-			if agg.column == nil || !isNumericArray(agg.column) {
+			if agg.column != nil && isNumericArray(agg.column) {
+				continue
+			}
+			if agg.leftColumn != nil && agg.rightColumn != nil && isNumericArray(agg.leftColumn) && isNumericArray(agg.rightColumn) {
+				continue
+			}
+			{
 				return false
 			}
 		case "min", "max":
@@ -722,7 +721,15 @@ func accumulateIndexedAggregate(state *aggregateState, agg aggregateInput, rows 
 		state.count = int64(len(rows))
 		return nil
 	case "sum", "avg":
-		sum, count, ok, err := typedKernels.NumericSumRows(agg.column, rows)
+		var sum float64
+		var count int64
+		var ok bool
+		var err error
+		if agg.leftColumn != nil && agg.rightColumn != nil {
+			sum, count, ok, err = typedKernels.NumericBinarySumRows(agg.leftColumn, agg.binaryOp, agg.rightColumn, rows)
+		} else {
+			sum, count, ok, err = typedKernels.NumericSumRows(agg.column, rows)
+		}
 		if err != nil || ok {
 			state.sum = sum
 			state.count = count
@@ -744,12 +751,9 @@ func accumulateIndexedAggregateRow(state *aggregateState, agg aggregateInput, ro
 	case "count":
 		state.count++
 	case "sum", "avg":
-		n, ok, err := typedKernels.NumericAt(agg.column, row)
-		if err != nil {
+		n, ok, err := aggregateIndexedNumericValue(agg, row)
+		if err != nil || !ok {
 			return err
-		}
-		if !ok {
-			return nil
 		}
 		state.sum += n
 		state.count++
@@ -911,6 +915,13 @@ func (typedKernelRegistry) NumericUnary(op string, array Array) (Array, bool, er
 	}
 }
 
+func aggregateIndexedNumericValue(agg aggregateInput, row int) (float64, bool, error) {
+	if agg.leftColumn != nil && agg.rightColumn != nil {
+		return aggregateBinaryNumericValue(agg, row)
+	}
+	return typedKernels.NumericAt(agg.column, row)
+}
+
 func (typedKernelRegistry) NumericBinary(op Op, left, right Array) (Array, bool, error) {
 	out, ok, err := typedKernels.Dyadic(op, left, right)
 	if err != nil || !ok {
@@ -1043,6 +1054,47 @@ func (typedKernelRegistry) NumericSumRows(array Array, rows []int) (float64, int
 	default:
 		return 0, 0, false, nil
 	}
+}
+
+func (typedKernelRegistry) NumericBinarySumRows(left Array, op Op, right Array, rows []int) (float64, int64, bool, error) {
+	if !isNumericBinaryAggregateOp(op) {
+		return 0, 0, false, nil
+	}
+	var sum float64
+	var count int64
+	for _, row := range rows {
+		leftValue, leftOK, err := typedKernels.NumericAt(left, row)
+		if err != nil {
+			return 0, 0, true, err
+		}
+		if !leftOK {
+			continue
+		}
+		rightValue, rightOK, err := typedKernels.NumericAt(right, row)
+		if err != nil {
+			return 0, 0, true, err
+		}
+		if !rightOK {
+			continue
+		}
+		switch op {
+		case OpAdd:
+			sum += leftValue + rightValue
+		case OpSub:
+			sum += leftValue - rightValue
+		case OpMul:
+			sum += leftValue * rightValue
+		case OpDiv:
+			if rightValue == 0 {
+				continue
+			}
+			sum += leftValue / rightValue
+		default:
+			return 0, 0, false, nil
+		}
+		count++
+	}
+	return sum, count, true, nil
 }
 
 func (typedKernelRegistry) Min(array Array) (any, bool, bool, error) {

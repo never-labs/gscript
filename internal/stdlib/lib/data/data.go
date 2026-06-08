@@ -2,6 +2,7 @@
 package data
 
 import (
+	"container/heap"
 	"fmt"
 	"hash/fnv"
 	"math"
@@ -3634,8 +3635,19 @@ func Exec(frame Frame, plan QueryPlan) (Frame, error) {
 	if err != nil {
 		return Frame{}, err
 	}
+	projectedOrderBy, projectOrderBeforeProjection := projectedSourceOrderSpecs(plan)
 	if len(plan.OrderBy) > 0 && plan.PreProjectOrder {
-		indexes, err = orderIndexes(frame, indexes, plan.OrderBy)
+		if canLimitBeforeProjection(plan) {
+			indexes, err = orderIndexesLimit(frame, indexes, plan.OrderBy, plan.LimitN)
+		} else {
+			indexes, err = orderIndexes(frame, indexes, plan.OrderBy)
+		}
+		if err != nil {
+			return Frame{}, err
+		}
+	}
+	if len(projectedOrderBy) > 0 && projectOrderBeforeProjection {
+		indexes, err = orderIndexesLimit(frame, indexes, projectedOrderBy, plan.LimitN)
 		if err != nil {
 			return Frame{}, err
 		}
@@ -3658,8 +3670,8 @@ func Exec(frame Frame, plan QueryPlan) (Frame, error) {
 			return Frame{}, err
 		}
 	}
-	if len(plan.OrderBy) > 0 && !plan.PreProjectOrder {
-		out, err = orderFrame(out, plan.OrderBy)
+	if len(plan.OrderBy) > 0 && !plan.PreProjectOrder && !projectOrderBeforeProjection {
+		out, err = orderFrameLimit(out, plan.OrderBy, plan.LimitN)
 		if err != nil {
 			return Frame{}, err
 		}
@@ -3671,6 +3683,13 @@ func Exec(frame Frame, plan QueryPlan) (Frame, error) {
 }
 
 func canLimitBeforeProjection(plan QueryPlan) bool {
+	if !canLimitRowsBeforeProjection(plan) {
+		return false
+	}
+	return len(plan.OrderBy) == 0 || plan.PreProjectOrder
+}
+
+func canLimitRowsBeforeProjection(plan QueryPlan) bool {
 	if plan.LimitN < 0 || plan.Distinct || len(plan.By) > 0 || len(plan.ByExprs) > 0 || len(plan.Aggregates) > 0 {
 		return false
 	}
@@ -3679,7 +3698,7 @@ func canLimitBeforeProjection(plan QueryPlan) bool {
 			return false
 		}
 	}
-	return len(plan.OrderBy) == 0 || plan.PreProjectOrder
+	return true
 }
 
 func exprNeedsFullProjectionRows(expr Expr) bool {
@@ -3707,6 +3726,30 @@ func exprNeedsFullProjectionRows(expr Expr) bool {
 	default:
 		return false
 	}
+}
+
+func projectedSourceOrderSpecs(plan QueryPlan) ([]OrderSpec, bool) {
+	if plan.PreProjectOrder || len(plan.OrderBy) == 0 || !canLimitRowsBeforeProjection(plan) {
+		return nil, false
+	}
+	if len(plan.Select) == 0 {
+		return append([]OrderSpec(nil), plan.OrderBy...), true
+	}
+	byOutput := make(map[Symbol]ColumnRef, len(plan.Select))
+	for _, item := range plan.Select {
+		if ref, ok := item.Expr.(ColumnRef); ok {
+			byOutput[item.Name] = ref
+		}
+	}
+	out := make([]OrderSpec, 0, len(plan.OrderBy))
+	for _, spec := range plan.OrderBy {
+		ref, ok := byOutput[spec.Column]
+		if !ok {
+			return nil, false
+		}
+		out = append(out, OrderSpec{Column: ref.Name, Desc: spec.Desc})
+	}
+	return out, true
 }
 
 func filterIndexes(frame Frame, where Expr) ([]int, error) {
@@ -3772,6 +3815,23 @@ func fastFilterIndexes(frame Frame, where Expr) ([]int, bool, error) {
 			return indexes, true, err
 		}
 		return nil, false, nil
+	case Logical:
+		left, lok, err := fastFilterIndexes(frame, expr.Left)
+		if err != nil || !lok {
+			return nil, lok, err
+		}
+		right, rok, err := fastFilterIndexes(frame, expr.Right)
+		if err != nil || !rok {
+			return nil, rok, err
+		}
+		switch expr.Op {
+		case "and":
+			return intersectSortedIndexes(left, right), true, nil
+		case "or":
+			return unionSortedIndexes(left, right), true, nil
+		default:
+			return nil, false, nil
+		}
 	case Within:
 		ref, ok := expr.Expr.(ColumnRef)
 		if !ok {
@@ -3828,6 +3888,46 @@ func fastFilterIndexes(frame Frame, where Expr) ([]int, bool, error) {
 	default:
 		return nil, false, nil
 	}
+}
+
+func intersectSortedIndexes(left, right []int) []int {
+	out := make([]int, 0, min(len(left), len(right)))
+	i, j := 0, 0
+	for i < len(left) && j < len(right) {
+		switch {
+		case left[i] == right[j]:
+			out = append(out, left[i])
+			i++
+			j++
+		case left[i] < right[j]:
+			i++
+		default:
+			j++
+		}
+	}
+	return out
+}
+
+func unionSortedIndexes(left, right []int) []int {
+	out := make([]int, 0, len(left)+len(right))
+	i, j := 0, 0
+	for i < len(left) && j < len(right) {
+		switch {
+		case left[i] == right[j]:
+			out = append(out, left[i])
+			i++
+			j++
+		case left[i] < right[j]:
+			out = append(out, left[i])
+			i++
+		default:
+			out = append(out, right[j])
+			j++
+		}
+	}
+	out = append(out, left[i:]...)
+	out = append(out, right[j:]...)
+	return out
 }
 
 func filterIndexScratch(length int) []int {
@@ -4058,6 +4158,9 @@ type aggregateInput struct {
 	Aggregate
 	column       Array
 	weightColumn Array
+	binaryOp     Op
+	leftColumn   Array
+	rightColumn  Array
 }
 
 type groupInput struct {
@@ -4090,6 +4193,23 @@ func execGrouped(frame Frame, indexes []int, plan QueryPlan) (Frame, error) {
 			}
 			aggs[i].column = col
 		}
+		if bin, ok := agg.Expr.(Binary); ok {
+			leftRef, leftOK := bin.Left.(ColumnRef)
+			rightRef, rightOK := bin.Right.(ColumnRef)
+			if leftOK && rightOK && isNumericBinaryAggregateOp(bin.Op) {
+				leftCol, ok := frame.Column(leftRef.Name)
+				if !ok {
+					return Frame{}, fmt.Errorf("unknown column %q", leftRef.Name)
+				}
+				rightCol, ok := frame.Column(rightRef.Name)
+				if !ok {
+					return Frame{}, fmt.Errorf("unknown column %q", rightRef.Name)
+				}
+				aggs[i].binaryOp = bin.Op
+				aggs[i].leftColumn = leftCol
+				aggs[i].rightColumn = rightCol
+			}
+		}
 		if ref, ok := agg.Weight.(ColumnRef); ok {
 			col, ok := frame.Column(ref.Name)
 			if !ok {
@@ -4098,7 +4218,7 @@ func execGrouped(frame Frame, indexes []int, plan QueryPlan) (Frame, error) {
 			aggs[i].weightColumn = col
 		}
 	}
-	if index, ok, err := groupIndexForSingleColumn(byInputs); err != nil {
+	if index, ok, err := groupIndexForSingleColumn(frame, byInputs); err != nil {
 		return Frame{}, err
 	} else if ok {
 		if indexesCoverAllRows(indexes, byInputs[0].column.Len()) {
@@ -4256,7 +4376,7 @@ func execGroupedProjection(frame Frame, indexes []int, plan QueryPlan, byItems [
 	return NewFrame(cols...)
 }
 
-func groupIndexForSingleColumn(byInputs []groupInput) (ArrayIndex, bool, error) {
+func groupIndexForSingleColumn(frame Frame, byInputs []groupInput) (ArrayIndex, bool, error) {
 	if len(byInputs) != 1 {
 		return ArrayIndex{}, false, nil
 	}
@@ -4269,6 +4389,14 @@ func groupIndexForSingleColumn(byInputs []groupInput) (ArrayIndex, bool, error) 
 	}
 	if index, ok := ArrayIndexFor(column, ArrayAttributeGrouped); ok {
 		return index, true, nil
+	}
+	if ref, ok := byInputs[0].Expr.(ColumnRef); ok {
+		indexed := WithArrayAttribute(column, ArrayAttributeGrouped)
+		if index, ok := ArrayIndexFor(indexed, ArrayAttributeGrouped); ok {
+			frame.columns[ref.Name] = indexed
+			byInputs[0].column = indexed
+			return index, true, nil
+		}
 	}
 	index, err := BuildArrayIndex(column, ArrayAttributeGrouped)
 	if err != nil {
@@ -4459,6 +4587,9 @@ func aggregateNumericValue(agg aggregateInput, frame Frame, row int) (float64, b
 	if agg.column != nil {
 		return numericAt(agg.column, row)
 	}
+	if agg.leftColumn != nil && agg.rightColumn != nil {
+		return aggregateBinaryNumericValue(agg, row)
+	}
 	v, err := agg.value(frame, row)
 	if err != nil {
 		return 0, false, err
@@ -4471,6 +4602,91 @@ func aggregateNumericValue(agg aggregateInput, frame Frame, row int) (float64, b
 		return 0, false, fmt.Errorf("aggregate %s expects numeric expression, got %T (%v)", agg.Func, v, v)
 	}
 	return n, true, nil
+}
+
+func aggregateBinaryNumericValue(agg aggregateInput, row int) (float64, bool, error) {
+	if value, ok, handled, err := aggregateBinaryNumericValueFast(agg.leftColumn, agg.binaryOp, agg.rightColumn, row); handled || err != nil {
+		return value, ok, err
+	}
+	left, lok, err := typedKernels.NumericAt(agg.leftColumn, row)
+	if err != nil || !lok {
+		return 0, lok, err
+	}
+	right, rok, err := typedKernels.NumericAt(agg.rightColumn, row)
+	if err != nil || !rok {
+		return 0, rok, err
+	}
+	switch agg.binaryOp {
+	case OpAdd:
+		return left + right, true, nil
+	case OpSub:
+		return left - right, true, nil
+	case OpMul:
+		return left * right, true, nil
+	case OpDiv:
+		if right == 0 {
+			return 0, false, nil
+		}
+		return left / right, true, nil
+	default:
+		return 0, false, fmt.Errorf("unsupported aggregate binary op %q", agg.binaryOp)
+	}
+}
+
+func aggregateBinaryNumericValueFast(left Array, op Op, right Array, row int) (float64, bool, bool, error) {
+	if leftAttr, ok := left.(attributedArray); ok {
+		return aggregateBinaryNumericValueFast(leftAttr.array, op, right, row)
+	}
+	if rightAttr, ok := right.(attributedArray); ok {
+		return aggregateBinaryNumericValueFast(left, op, rightAttr.array, row)
+	}
+	if op != OpMul {
+		return 0, false, false, nil
+	}
+	switch l := left.(type) {
+	case columnArray[float64]:
+		if row < 0 || row >= len(l.data) {
+			return 0, false, true, fmt.Errorf("left aggregate row %d out of range", row)
+		}
+		switch r := right.(type) {
+		case columnArray[int64]:
+			if row < 0 || row >= len(r.data) {
+				return 0, false, true, fmt.Errorf("right aggregate row %d out of range", row)
+			}
+			return l.data[row] * float64(r.data[row]), true, true, nil
+		case columnArray[float64]:
+			if row < 0 || row >= len(r.data) {
+				return 0, false, true, fmt.Errorf("right aggregate row %d out of range", row)
+			}
+			return l.data[row] * r.data[row], true, true, nil
+		}
+	case columnArray[int64]:
+		if row < 0 || row >= len(l.data) {
+			return 0, false, true, fmt.Errorf("left aggregate row %d out of range", row)
+		}
+		switch r := right.(type) {
+		case columnArray[float64]:
+			if row < 0 || row >= len(r.data) {
+				return 0, false, true, fmt.Errorf("right aggregate row %d out of range", row)
+			}
+			return float64(l.data[row]) * r.data[row], true, true, nil
+		case columnArray[int64]:
+			if row < 0 || row >= len(r.data) {
+				return 0, false, true, fmt.Errorf("right aggregate row %d out of range", row)
+			}
+			return float64(l.data[row] * r.data[row]), true, true, nil
+		}
+	}
+	return 0, false, false, nil
+}
+
+func isNumericBinaryAggregateOp(op Op) bool {
+	switch op {
+	case OpAdd, OpSub, OpMul, OpDiv:
+		return true
+	default:
+		return false
+	}
 }
 
 func aggregateWeightValue(agg aggregateInput, frame Frame, row int) (float64, bool, error) {
@@ -4668,6 +4884,14 @@ func orderFrame(frame Frame, specs []OrderSpec) (Frame, error) {
 	return frame.Gather(indexes)
 }
 
+func orderFrameLimit(frame Frame, specs []OrderSpec, limit int) (Frame, error) {
+	indexes, err := orderIndexesLimit(frame, allIndexes(frame.Len()), specs, limit)
+	if err != nil {
+		return Frame{}, err
+	}
+	return frame.Gather(indexes)
+}
+
 func orderIndexes(frame Frame, indexes []int, specs []OrderSpec) ([]int, error) {
 	bound := make([]boundOrderSpec, len(specs))
 	for i, spec := range specs {
@@ -4698,6 +4922,34 @@ func orderIndexes(frame Frame, indexes []int, specs []OrderSpec) ([]int, error) 
 	return out, nil
 }
 
+func orderIndexesLimit(frame Frame, indexes []int, specs []OrderSpec, limit int) ([]int, error) {
+	if limit < 0 || limit >= len(indexes) {
+		return orderIndexes(frame, indexes, specs)
+	}
+	if limit == 0 {
+		return []int{}, nil
+	}
+	bound := make([]boundOrderSpec, len(specs))
+	for i, spec := range specs {
+		col, ok := frame.Column(spec.Column)
+		if !ok {
+			return nil, fmt.Errorf("order column %q does not exist", spec.Column)
+		}
+		bound[i] = boundOrderSpec{spec: spec, column: col}
+	}
+	if out, ok := orderIndexesBySortedAttribute(indexes, bound); ok {
+		return out[:limit], nil
+	}
+	if len(bound) != 1 {
+		out, err := orderIndexes(frame, indexes, specs)
+		if err != nil {
+			return nil, err
+		}
+		return out[:limit], nil
+	}
+	return topKOrderIndexes(indexes, bound[0], limit), nil
+}
+
 func orderIndexesBySortedAttribute(indexes []int, bound []boundOrderSpec) ([]int, bool) {
 	if len(bound) != 1 {
 		return nil, false
@@ -4718,6 +4970,71 @@ func orderIndexesBySortedAttribute(indexes []int, bound []boundOrderSpec) ([]int
 type boundOrderSpec struct {
 	spec   OrderSpec
 	column Array
+}
+
+type orderTopKItem struct {
+	row int
+	seq int
+}
+
+type orderTopKHeap struct {
+	items []orderTopKItem
+	spec  boundOrderSpec
+}
+
+func (h orderTopKHeap) Len() int { return len(h.items) }
+
+func (h orderTopKHeap) Less(i, j int) bool {
+	return orderTopKBefore(h.spec, h.items[j], h.items[i])
+}
+
+func (h orderTopKHeap) Swap(i, j int) { h.items[i], h.items[j] = h.items[j], h.items[i] }
+
+func (h *orderTopKHeap) Push(x any) {
+	h.items = append(h.items, x.(orderTopKItem))
+}
+
+func (h *orderTopKHeap) Pop() any {
+	old := h.items
+	n := len(old)
+	item := old[n-1]
+	h.items = old[:n-1]
+	return item
+}
+
+func topKOrderIndexes(indexes []int, spec boundOrderSpec, limit int) []int {
+	h := &orderTopKHeap{items: make([]orderTopKItem, 0, limit), spec: spec}
+	for seq, row := range indexes {
+		item := orderTopKItem{row: row, seq: seq}
+		if h.Len() < limit {
+			heap.Push(h, item)
+			continue
+		}
+		if orderTopKBefore(spec, item, h.items[0]) {
+			h.items[0] = item
+			heap.Fix(h, 0)
+		}
+	}
+	outItems := append([]orderTopKItem(nil), h.items...)
+	sort.SliceStable(outItems, func(i, j int) bool {
+		return orderTopKBefore(spec, outItems[i], outItems[j])
+	})
+	out := make([]int, len(outItems))
+	for i, item := range outItems {
+		out[i] = item.row
+	}
+	return out
+}
+
+func orderTopKBefore(spec boundOrderSpec, left, right orderTopKItem) bool {
+	cmp := compareArrayRows(spec.column, left.row, right.row)
+	if cmp != 0 {
+		if spec.spec.Desc {
+			return cmp > 0
+		}
+		return cmp < 0
+	}
+	return left.seq < right.seq
 }
 
 func compareArrayRows(array Array, leftRow, rightRow int) int {
@@ -6694,6 +7011,12 @@ func rightRowsByJoinKey(right Frame, keys []JoinKey) (map[string][]int, []Symbol
 	rightKeyCols := make([]Symbol, len(keys))
 	for i, key := range keys {
 		rightKeyCols[i] = key.Right
+	}
+	if len(rightKeyCols) == 1 {
+		name := rightKeyCols[0]
+		if col, ok := right.Column(name); ok && !ArrayHasAttribute(col, ArrayAttributeUnique) && !ArrayHasAttribute(col, ArrayAttributeGrouped) {
+			right.columns[name] = WithArrayAttribute(col, ArrayAttributeGrouped)
+		}
 	}
 	rowsByKey, err := typedKernels.RowsByKey(right, rightKeyCols)
 	if err != nil {

@@ -321,6 +321,37 @@ func TestFilterIndexesUsesTypedInKernelWithoutAttributeIndex(t *testing.T) {
 	assertColumnValues(t, got, "qty", []any{int32(10), int32(20), int32(40)})
 }
 
+func TestFilterIndexesFusesLogicalTypedIndexes(t *testing.T) {
+	frame := mustFrame(t,
+		Column{Name: "active", Data: NewBool([]bool{true, false, true, true, false})},
+		Column{Name: "price", Data: NewF64([]float64{99, 101, 102, 88, 120})},
+	)
+
+	indexes, err := filterIndexes(frame, Logical{
+		Op:    "and",
+		Left:  Binary{Op: OpEQ, Left: ColumnRef{Name: "active"}, Right: Literal{Value: true}},
+		Right: Binary{Op: OpGE, Left: ColumnRef{Name: "price"}, Right: Literal{Value: 100.0}},
+	})
+	if err != nil {
+		t.Fatalf("filterIndexes and returned error: %v", err)
+	}
+	if want := []int{2}; !reflect.DeepEqual(indexes, want) {
+		t.Fatalf("and filter indexes = %v, want %v", indexes, want)
+	}
+
+	indexes, err = filterIndexes(frame, Logical{
+		Op:    "or",
+		Left:  Binary{Op: OpEQ, Left: ColumnRef{Name: "active"}, Right: Literal{Value: true}},
+		Right: Binary{Op: OpGE, Left: ColumnRef{Name: "price"}, Right: Literal{Value: 100.0}},
+	})
+	if err != nil {
+		t.Fatalf("filterIndexes or returned error: %v", err)
+	}
+	if want := []int{0, 1, 2, 3, 4}; !reflect.DeepEqual(indexes, want) {
+		t.Fatalf("or filter indexes = %v, want %v", indexes, want)
+	}
+}
+
 func TestExecFilteredGroupedCountUsesAttributeIndexOrder(t *testing.T) {
 	frame := mustFrame(t,
 		Column{Name: "sym", Data: WithArrayAttribute(NewSymbols([]string{"AAPL", "MSFT", "AAPL", "NVDA", "MSFT"}), ArrayAttributeGrouped)},
@@ -1972,6 +2003,33 @@ func TestQueryGroupByUsesSingleColumnAttributeIndexForKeys(t *testing.T) {
 	assertColumnValues(t, got, "n", []any{int64(3), int64(2)})
 }
 
+func TestQueryGroupByCachesSingleColumnGroupedIndex(t *testing.T) {
+	frame := mustFrame(t,
+		Column{Name: "sym", Data: NewSymbols([]string{"AAPL", "MSFT", "AAPL", "NVDA", "MSFT"})},
+		Column{Name: "qty", Data: NewI64([]int64{10, 20, 30, 40, 50})},
+	)
+	if sym, _ := frame.Column("sym"); ArrayHasAttribute(sym, ArrayAttributeGrouped) {
+		t.Fatal("sym unexpectedly starts with grouped attribute")
+	}
+
+	_, err := Exec(frame, QueryPlan{
+		Source: frame,
+		By:     []Symbol{"sym"},
+		Aggregates: []Aggregate{
+			{Name: "qty", Func: "sum", Expr: ColumnRef{Name: "qty"}},
+		},
+		LimitN: -1,
+	})
+	if err != nil {
+		t.Fatalf("Exec returned error: %v", err)
+	}
+
+	sym, _ := frame.Column("sym")
+	if _, ok := ArrayIndexFor(sym, ArrayAttributeGrouped); !ok {
+		t.Fatal("sym grouped index was not cached on frame column")
+	}
+}
+
 func TestQueryGroupByBucket(t *testing.T) {
 	raw := NewColumn("ts", []any{
 		TimestampFromUnixNanos(100),
@@ -2049,6 +2107,24 @@ func TestQueryOrderLimit(t *testing.T) {
 	assertColumnValues(t, got, "qty", []any{int64(5), int64(3)})
 }
 
+func TestQuerySingleColumnOrderLimitUsesStableTopK(t *testing.T) {
+	frame := mustFrame(t,
+		NewColumn("sym", []any{"a", "b", "c", "d", "e", "f"}),
+		NewColumn("qty", []any{5, 7, 7, 4, 7, 1}),
+	)
+
+	got, err := From(frame).
+		OrderByColumn("qty", Desc).
+		Limit(3).
+		Exec()
+	if err != nil {
+		t.Fatalf("Exec returned error: %v", err)
+	}
+
+	assertColumnValues(t, got, "sym", []any{"b", "c", "e"})
+	assertColumnValues(t, got, "qty", []any{int64(7), int64(7), int64(7)})
+}
+
 func TestQueryLimitBeforeProjectionAvoidsExtraEval(t *testing.T) {
 	frame := mustFrame(t,
 		NewColumn("id", []any{1, 2, 3, 4, 5}),
@@ -2076,6 +2152,34 @@ func TestQueryLimitBeforeProjectionAvoidsExtraEval(t *testing.T) {
 		t.Fatalf("computed projection calls = %d, want 2", notional.calls)
 	}
 	assertColumnValues(t, got, "notional", []any{20.0, 33.0})
+}
+
+func TestQueryOrderLimitOnDirectProjectionAvoidsExtraEval(t *testing.T) {
+	frame := mustFrame(t,
+		NewColumn("id", []any{1, 2, 3, 4, 5}),
+		NewColumn("price", []any{10.0, 14.0, 12.0, 13.0, 11.0}),
+		NewColumn("size", []any{2, 3, 4, 5, 6}),
+	)
+	notional := &countingExpr{expr: Binary{Op: OpMul, Left: ColumnRef{Name: "price"}, Right: ColumnRef{Name: "size"}}}
+
+	got, err := Exec(frame, QueryPlan{
+		Source: frame,
+		Select: []SelectItem{
+			{Name: "price", Expr: ColumnRef{Name: "price"}},
+			{Name: "notional", Expr: notional},
+		},
+		OrderBy: []OrderSpec{{Column: "price", Desc: true}},
+		LimitN:  2,
+	})
+	if err != nil {
+		t.Fatalf("Exec returned error: %v", err)
+	}
+
+	if notional.calls != 2 {
+		t.Fatalf("computed projection calls = %d, want 2", notional.calls)
+	}
+	assertColumnValues(t, got, "price", []any{14.0, 13.0})
+	assertColumnValues(t, got, "notional", []any{42.0, 65.0})
 }
 
 func TestQueryLimitZeroAfterPreProjectOrderPreservesSchema(t *testing.T) {
@@ -4118,6 +4222,29 @@ func TestInnerJoinRejectsInvalidKeys(t *testing.T) {
 	}
 	if _, err := InnerJoinOn(left, right, JoinKey{Left: "id", Right: "id"}, JoinKey{Left: "id", Right: "id"}); err == nil {
 		t.Fatal("InnerJoinOn accepted duplicate key pair")
+	}
+}
+
+func TestJoinCachesRightSingleColumnGroupedIndex(t *testing.T) {
+	left := mustFrame(t,
+		Column{Name: "sym", Data: NewSymbols([]string{"AAPL", "MSFT", "TSLA"})},
+		Column{Name: "qty", Data: NewI64([]int64{10, 20, 30})},
+	)
+	right := mustFrame(t,
+		Column{Name: "sym", Data: NewSymbols([]string{"AAPL", "AAPL", "MSFT"})},
+		Column{Name: "bid", Data: NewF64([]float64{100.0, 101.0, 80.0})},
+	)
+	if sym, _ := right.Column("sym"); ArrayHasAttribute(sym, ArrayAttributeGrouped) {
+		t.Fatal("right sym unexpectedly starts with grouped attribute")
+	}
+
+	if _, err := InnerJoin(left, right, "sym"); err != nil {
+		t.Fatalf("InnerJoin returned error: %v", err)
+	}
+
+	sym, _ := right.Column("sym")
+	if _, ok := ArrayIndexFor(sym, ArrayAttributeGrouped); !ok {
+		t.Fatal("right sym grouped index was not cached on frame column")
 	}
 }
 
