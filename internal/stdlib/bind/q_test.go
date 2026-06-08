@@ -3296,6 +3296,37 @@ func TestQCacheStatsAndClearPublicAPI(t *testing.T) {
 	}
 }
 
+func TestQEvalVectorTypedRuntimeKernelStats(t *testing.T) {
+	qClearCaches()
+
+	interp := runtime.NewCore()
+	installTestModule(interp, "q", runtime.TableValue(BuildQ()))
+	execOnInterp(t, interp, `
+value := q.eval("x:1+til 16;(+/x)+last sums x")
+stats := q.cache_stats()
+cleared := q.cache_clear()
+after := q.cache_stats()
+`)
+	if got := interp.GetGlobal("value"); !got.IsInt() || got.Int() != 272 {
+		t.Fatalf("q.eval vector value = %v, want 272", got)
+	}
+	row := qTestCacheStatsRowTable(t, interp.GetGlobal("stats").Table(), "q_runtime_kernel_execution")
+	if got := row.RawGetString("executions"); !got.IsInt() || got.Int() != 2 {
+		t.Fatalf("q_runtime_kernel_execution executions = %v, want 2", got)
+	}
+	stats := row.RawGetString("stats").Table()
+	if stats == nil {
+		t.Fatal("q_runtime_kernel_execution stats table is nil")
+	}
+	assertQEvalRuntimeKernelStat(t, stats, "ArraySum", "vector-reduce/sum", 1)
+	assertQEvalRuntimeKernelStat(t, stats, "ArraySums", "vector-scan/sum", 1)
+
+	afterRow := qTestCacheStatsRowTable(t, interp.GetGlobal("after").Table(), "q_runtime_kernel_execution")
+	if got := afterRow.RawGetString("executions"); !got.IsInt() || got.Int() != 0 {
+		t.Fatalf("q_runtime_kernel_execution after clear executions = %v, want 0", got)
+	}
+}
+
 func TestQRuntimeKernelExecutionStatsProviderFeedsCacheStats(t *testing.T) {
 	qClearCaches()
 	restore := SetQRuntimeKernelExecutionStatsProvider(func() []QRuntimeKernelExecutionStat {
@@ -6660,6 +6691,36 @@ func qTestCacheStatsRowTable(t *testing.T, tbl *Table, cache string) *Table {
 	}
 	t.Fatalf("cache stats missing row %q", cache)
 	return nil
+}
+
+func assertQEvalRuntimeKernelStat(t *testing.T, tbl *Table, kernel, shape string, count int64) {
+	t.Helper()
+	for i := 1; i <= tbl.Length(); i++ {
+		row := tbl.RawGetInt(int64(i)).Table()
+		if row == nil {
+			t.Fatalf("runtime kernel stats row %d is nil", i)
+		}
+		if got := row.RawGetString("source"); !got.IsString() || got.Str() != "q_eval_vector_runtime" {
+			continue
+		}
+		if got := row.RawGetString("kernel"); !got.IsString() || got.Str() != kernel {
+			continue
+		}
+		if got := row.RawGetString("shape"); !got.IsString() || got.Str() != shape {
+			continue
+		}
+		if got := row.RawGetString("route"); !got.IsString() || got.Str() != "typed_data_kernel" {
+			t.Fatalf("runtime kernel %s route = %v, want typed_data_kernel", kernel, got)
+		}
+		if got := row.RawGetString("outcome"); !got.IsString() || got.Str() != "success" {
+			t.Fatalf("runtime kernel %s outcome = %v, want success", kernel, got)
+		}
+		if got := row.RawGetString("count"); !got.IsInt() || got.Int() != count {
+			t.Fatalf("runtime kernel %s count = %v, want %d", kernel, got, count)
+		}
+		return
+	}
+	t.Fatalf("runtime kernel stat %s/%s not found in %+v", kernel, shape, tbl)
 }
 
 type qQueryKernelShapeRow struct {

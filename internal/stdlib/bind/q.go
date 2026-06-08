@@ -3718,10 +3718,14 @@ func qRuntimeKernelExecutionStatsSnapshot() []QRuntimeKernelExecutionStat {
 		provider = state.provider
 	}
 	qRuntimeKernelExecutionStatsProviderMu.Unlock()
+	stats := qEvalRuntimeKernelExecutionStats()
 	if provider == nil {
-		return nil
+		if len(stats) == 0 {
+			return nil
+		}
+	} else {
+		stats = append(stats, provider()...)
 	}
-	stats := provider()
 	if len(stats) == 0 {
 		return nil
 	}
@@ -5892,6 +5896,27 @@ func qClearCaches() {
 	qFallbackStatsMu.Lock()
 	qFallbackCounters = qFallbackStats{}
 	qFallbackStatsMu.Unlock()
+
+	stdq.ClearRuntimeKernelExecutionStats()
+}
+
+func qEvalRuntimeKernelExecutionStats() []QRuntimeKernelExecutionStat {
+	stats := stdq.RuntimeKernelExecutionStats()
+	if len(stats) == 0 {
+		return nil
+	}
+	out := make([]QRuntimeKernelExecutionStat, 0, len(stats))
+	for _, stat := range stats {
+		out = append(out, QRuntimeKernelExecutionStat{
+			Source:  stat.Source,
+			Kernel:  stat.Kernel,
+			Shape:   stat.Shape,
+			Route:   stat.Route,
+			Outcome: stat.Outcome,
+			Count:   stat.Count,
+		})
+	}
+	return out
 }
 
 func qCloneDataQueryPlan(plan data.QueryPlan) data.QueryPlan {

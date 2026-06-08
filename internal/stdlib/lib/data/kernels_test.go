@@ -1895,6 +1895,52 @@ func TestTypedNumericUnaryBinaryAndAggregates(t *testing.T) {
 		t.Fatal("NumericSumRows accepted row past end")
 	}
 
+	value, ok, err := TryTypedNumericSum(NewI32([]int32{1, 2, 3}))
+	if err != nil {
+		t.Fatalf("TryTypedNumericSum i32 returned error: %v", err)
+	}
+	if !ok || value != int64(6) {
+		t.Fatalf("TryTypedNumericSum i32 = %v, %v; want 6, true", value, ok)
+	}
+
+	value, ok, err = TryTypedNumericSum(NewF32([]float32{1.5, 2.5}))
+	if err != nil {
+		t.Fatalf("TryTypedNumericSum f32 returned error: %v", err)
+	}
+	if !ok || value != float64(4) {
+		t.Fatalf("TryTypedNumericSum f32 = %v, %v; want 4.0, true", value, ok)
+	}
+
+	value, ok, err = TryTypedNumericSum(NewColumn("x", []any{int64(1), nil, float64(2.5)}).Data)
+	if err != nil {
+		t.Fatalf("TryTypedNumericSum nullable returned error: %v", err)
+	}
+	if !ok || value != float64(3.5) {
+		t.Fatalf("TryTypedNumericSum nullable = %v, %v; want 3.5, true", value, ok)
+	}
+
+	scan, ok, err := TryTypedNumericSums(NewI64([]int64{1, 2, 3}))
+	if err != nil {
+		t.Fatalf("TryTypedNumericSums i64 returned error: %v", err)
+	}
+	if !ok || scan.Kind() != KindI64 {
+		t.Fatalf("TryTypedNumericSums i64 kind = %s, %v; want i64, true", scan.Kind(), ok)
+	}
+	if got, want := scan.Values(), []any{int64(1), int64(3), int64(6)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("TryTypedNumericSums i64 values = %v, want %v", got, want)
+	}
+
+	scan, ok, err = TryTypedNumericSums(NewColumn("x", []any{int64(1), nil, float64(2.5)}).Data)
+	if err != nil {
+		t.Fatalf("TryTypedNumericSums nullable returned error: %v", err)
+	}
+	if !ok || scan.Kind() != KindF64 {
+		t.Fatalf("TryTypedNumericSums nullable kind = %s, %v; want f64, true", scan.Kind(), ok)
+	}
+	if got, want := scan.Values(), []any{float64(1), float64(1), float64(3.5)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("TryTypedNumericSums nullable values = %v, want %v", got, want)
+	}
+
 	min, has, ok, err := typedKernels.Min(NewTimestamp([]Timestamp{30, 10, 20}))
 	if err != nil {
 		t.Fatalf("Min returned error: %v", err)

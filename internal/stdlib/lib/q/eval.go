@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/never-labs/leia/internal/stdlib/lib/data"
@@ -72,6 +73,101 @@ type qUnaryFunction struct {
 
 type qComposition struct {
 	funcs []qUnaryFunction
+}
+
+// RuntimeKernelExecutionStat reports q.eval typed-runtime primitive execution.
+// The shape matches bind's q.cache_stats runtime-kernel rows without importing
+// bind into the q evaluator.
+type RuntimeKernelExecutionStat struct {
+	Source  string
+	Kernel  string
+	Shape   string
+	Route   string
+	Outcome string
+	Count   uint64
+}
+
+type runtimeKernelExecutionKey struct {
+	source  string
+	kernel  string
+	shape   string
+	route   string
+	outcome string
+}
+
+var (
+	runtimeKernelStatsMu sync.Mutex
+	runtimeKernelStats   map[runtimeKernelExecutionKey]uint64
+)
+
+func recordRuntimeKernelExecution(kernel, shape, outcome string) {
+	if kernel == "" {
+		kernel = "unknown"
+	}
+	if shape == "" {
+		shape = "unknown"
+	}
+	if outcome == "" {
+		outcome = "unknown"
+	}
+	key := runtimeKernelExecutionKey{
+		source:  "q_eval_vector_runtime",
+		kernel:  kernel,
+		shape:   shape,
+		route:   "typed_data_kernel",
+		outcome: outcome,
+	}
+	runtimeKernelStatsMu.Lock()
+	if runtimeKernelStats == nil {
+		runtimeKernelStats = make(map[runtimeKernelExecutionKey]uint64)
+	}
+	runtimeKernelStats[key]++
+	runtimeKernelStatsMu.Unlock()
+}
+
+// RuntimeKernelExecutionStats returns a stable snapshot of q.eval typed
+// primitive executions for q.cache_stats.
+func RuntimeKernelExecutionStats() []RuntimeKernelExecutionStat {
+	runtimeKernelStatsMu.Lock()
+	defer runtimeKernelStatsMu.Unlock()
+	if len(runtimeKernelStats) == 0 {
+		return nil
+	}
+	out := make([]RuntimeKernelExecutionStat, 0, len(runtimeKernelStats))
+	for key, count := range runtimeKernelStats {
+		out = append(out, RuntimeKernelExecutionStat{
+			Source:  key.source,
+			Kernel:  key.kernel,
+			Shape:   key.shape,
+			Route:   key.route,
+			Outcome: key.outcome,
+			Count:   count,
+		})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		a, b := out[i], out[j]
+		if a.Source != b.Source {
+			return a.Source < b.Source
+		}
+		if a.Kernel != b.Kernel {
+			return a.Kernel < b.Kernel
+		}
+		if a.Shape != b.Shape {
+			return a.Shape < b.Shape
+		}
+		if a.Route != b.Route {
+			return a.Route < b.Route
+		}
+		return a.Outcome < b.Outcome
+	})
+	return out
+}
+
+// ClearRuntimeKernelExecutionStats resets q.eval runtime-kernel counters.
+func ClearRuntimeKernelExecutionStats() {
+	runtimeKernelStatsMu.Lock()
+	runtimeKernelStats = nil
+	runtimeKernelStatsMu.Unlock()
 }
 
 type projectionArg struct {
@@ -6538,6 +6634,14 @@ func sum(v any) (any, error) {
 	if array.Len() == 0 {
 		return data.NullValue, nil
 	}
+	if out, handled, err := data.TryTypedNumericSum(array); err != nil || handled {
+		if err != nil {
+			recordRuntimeKernelExecution("ArraySum", "vector-reduce/sum", "error")
+			return nil, err
+		}
+		recordRuntimeKernelExecution("ArraySum", "vector-reduce/sum", "success")
+		return out, nil
+	}
 	totalI := int64(0)
 	totalF := float64(0)
 	hasFloat := false
@@ -6809,6 +6913,14 @@ func sums(v any) (any, error) {
 	array, ok := v.(data.Array)
 	if !ok {
 		return nil, fmt.Errorf("sums expects a numeric vector")
+	}
+	if out, handled, err := data.TryTypedNumericSums(array); err != nil || handled {
+		if err != nil {
+			recordRuntimeKernelExecution("ArraySums", "vector-scan/sum", "error")
+			return nil, err
+		}
+		recordRuntimeKernelExecution("ArraySums", "vector-scan/sum", "success")
+		return out, nil
 	}
 	out := make([]any, array.Len())
 	totalI := int64(0)

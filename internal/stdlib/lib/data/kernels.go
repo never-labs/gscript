@@ -988,6 +988,144 @@ func (typedKernelRegistry) NumericSum(array Array) (float64, int64, bool, error)
 	}
 }
 
+// TryTypedNumericSum applies the shared typed numeric reduction kernel and
+// returns the q-style scalar result: integer vectors keep an integer sum, while
+// float or mixed nullable vectors produce a float sum.
+func TryTypedNumericSum(array Array) (any, bool, error) {
+	return typedKernels.NumericSumValue(array)
+}
+
+func (k typedKernelRegistry) NumericSumValue(array Array) (any, bool, error) {
+	switch a := array.(type) {
+	case attributedArray:
+		return k.NumericSumValue(a.array)
+	case columnArray[int8]:
+		return numericSumIntegerValue(a.data), true, nil
+	case columnArray[int16]:
+		return numericSumIntegerValue(a.data), true, nil
+	case columnArray[int32]:
+		return numericSumIntegerValue(a.data), true, nil
+	case columnArray[int64]:
+		return numericSumIntegerValue(a.data), true, nil
+	case columnArray[uint8]:
+		return numericSumUnsignedValue(a.data), true, nil
+	case columnArray[uint16]:
+		return numericSumUnsignedValue(a.data), true, nil
+	case columnArray[uint32]:
+		return numericSumUnsignedValue(a.data), true, nil
+	case columnArray[uint64]:
+		return numericSumUnsignedValue(a.data), true, nil
+	case columnArray[float32]:
+		return numericSumFloatValue(a.data), true, nil
+	case columnArray[float64]:
+		return numericSumFloatValue(a.data), true, nil
+	case nullableArray:
+		var sumI int64
+		var sumF float64
+		hasFloat := false
+		for _, v := range a.data {
+			if IsNull(v) {
+				continue
+			}
+			if n, ok := coerceInt64Exact(v); ok {
+				sumI += n
+				sumF += float64(n)
+				continue
+			}
+			n, ok := numeric(v)
+			if !ok {
+				return nil, true, fmt.Errorf("sum expects numeric values, got %T (%v)", v, v)
+			}
+			hasFloat = true
+			sumF += n
+		}
+		if hasFloat {
+			return sumF, true, nil
+		}
+		return sumI, true, nil
+	default:
+		return nil, false, nil
+	}
+}
+
+// TryTypedNumericSums applies the shared typed numeric scan kernel for q sums
+// and +\ without materializing []any intermediates.
+func TryTypedNumericSums(array Array) (Array, bool, error) {
+	return typedKernels.NumericSums(array)
+}
+
+func (k typedKernelRegistry) NumericSums(array Array) (Array, bool, error) {
+	switch a := array.(type) {
+	case attributedArray:
+		return k.NumericSums(a.array)
+	case columnArray[int8]:
+		return numericSumsInteger(a.data), true, nil
+	case columnArray[int16]:
+		return numericSumsInteger(a.data), true, nil
+	case columnArray[int32]:
+		return numericSumsInteger(a.data), true, nil
+	case columnArray[int64]:
+		return numericSumsInteger(a.data), true, nil
+	case columnArray[uint8]:
+		return numericSumsUnsigned(a.data), true, nil
+	case columnArray[uint16]:
+		return numericSumsUnsigned(a.data), true, nil
+	case columnArray[uint32]:
+		return numericSumsUnsigned(a.data), true, nil
+	case columnArray[uint64]:
+		return numericSumsUnsigned(a.data), true, nil
+	case columnArray[float32]:
+		return numericSumsFloat(a.data), true, nil
+	case columnArray[float64]:
+		return numericSumsFloat(a.data), true, nil
+	case nullableArray:
+		outI := make([]int64, len(a.data))
+		var outF []float64
+		var sumI int64
+		var sumF float64
+		hasFloat := false
+		for i, v := range a.data {
+			if IsNull(v) {
+				if hasFloat {
+					outF[i] = sumF
+				} else {
+					outI[i] = sumI
+				}
+				continue
+			}
+			if n, ok := coerceInt64Exact(v); ok {
+				sumI += n
+				sumF += float64(n)
+				if hasFloat {
+					outF[i] = sumF
+				} else {
+					outI[i] = sumI
+				}
+				continue
+			}
+			n, ok := numeric(v)
+			if !ok {
+				return nil, true, fmt.Errorf("sums expects numeric values, got %T (%v)", v, v)
+			}
+			if !hasFloat {
+				outF = make([]float64, len(a.data))
+				for j := 0; j < i; j++ {
+					outF[j] = float64(outI[j])
+				}
+				hasFloat = true
+			}
+			sumF += n
+			outF[i] = sumF
+		}
+		if hasFloat {
+			return NewF64(outF), true, nil
+		}
+		return NewI64(outI), true, nil
+	default:
+		return nil, false, nil
+	}
+}
+
 func (typedKernelRegistry) NumericSumRows(array Array, rows []int) (float64, int64, bool, error) {
 	switch a := array.(type) {
 	case attributedArray:
@@ -2157,6 +2295,60 @@ func numericSumSlice[T signedScalar | unsignedScalar | floatScalar](values []T) 
 		sum += float64(v)
 	}
 	return sum, int64(len(values)), true, nil
+}
+
+func numericSumIntegerValue[T signedScalar](values []T) int64 {
+	var sum int64
+	for _, v := range values {
+		sum += int64(v)
+	}
+	return sum
+}
+
+func numericSumUnsignedValue[T unsignedScalar](values []T) int64 {
+	var sum int64
+	for _, v := range values {
+		sum += int64(v)
+	}
+	return sum
+}
+
+func numericSumFloatValue[T floatScalar](values []T) float64 {
+	var sum float64
+	for _, v := range values {
+		sum += float64(v)
+	}
+	return sum
+}
+
+func numericSumsInteger[T signedScalar](values []T) Array {
+	out := make([]int64, len(values))
+	var sum int64
+	for i, v := range values {
+		sum += int64(v)
+		out[i] = sum
+	}
+	return NewI64(out)
+}
+
+func numericSumsUnsigned[T unsignedScalar](values []T) Array {
+	out := make([]int64, len(values))
+	var sum int64
+	for i, v := range values {
+		sum += int64(v)
+		out[i] = sum
+	}
+	return NewI64(out)
+}
+
+func numericSumsFloat[T floatScalar](values []T) Array {
+	out := make([]float64, len(values))
+	var sum float64
+	for i, v := range values {
+		sum += float64(v)
+		out[i] = sum
+	}
+	return NewF64(out)
 }
 
 func numericSumRowsSlice[T signedScalar | unsignedScalar | floatScalar](values []T, rows []int) (float64, int64, bool, error) {
