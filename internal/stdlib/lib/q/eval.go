@@ -200,9 +200,10 @@ type projectionArg struct {
 // EvalState carries q script bindings through recursive evaluation without
 // relying on package-global state.
 type EvalState struct {
-	env       map[string]any
-	port      int64
-	namespace string
+	env         map[string]any
+	port        int64
+	namespace   string
+	scriptCache map[string]qScriptPlan
 }
 
 func NewEvalState(env map[string]any) *EvalState {
@@ -298,34 +299,16 @@ func (s *EvalState) Eval(src string) (any, error) {
 }
 
 func (s *EvalState) evalScript(src string) (any, error) {
-	parts := splitTopLevelDelim(src, ';')
-	if len(parts) <= 1 {
-		if name, rhs, ok := splitTopLevelAssignment(src); ok {
-			v, err := s.eval(rhs)
-			if err != nil {
-				return nil, err
-			}
-			s.env[s.resolveAssignmentName(name)] = v
-			return v, nil
-		}
-		return s.eval(src)
+	plan := s.qScriptPlan(src)
+	if len(plan.statements) == 1 {
+		return s.evalScriptStatement(plan.statements[0])
 	}
 	var last any
-	for _, part := range parts {
-		part = strings.TrimSpace(part)
-		if part == "" {
+	for _, stmt := range plan.statements {
+		if stmt.src == "" {
 			continue
 		}
-		if name, rhs, ok := splitTopLevelAssignment(part); ok {
-			v, err := s.eval(rhs)
-			if err != nil {
-				return nil, err
-			}
-			s.env[s.resolveAssignmentName(name)] = v
-			last = v
-			continue
-		}
-		v, err := s.eval(part)
+		v, err := s.evalScriptStatement(stmt)
 		if err != nil {
 			return nil, err
 		}
@@ -335,6 +318,178 @@ func (s *EvalState) evalScript(src string) (any, error) {
 		return nil, fmt.Errorf("empty q script")
 	}
 	return last, nil
+}
+
+type qScriptPlan struct {
+	statements []qScriptStatement
+}
+
+type qScriptStatement struct {
+	src       string
+	assign    string
+	rhs       string
+	valueExpr Expr
+}
+
+func (s *EvalState) qScriptPlan(src string) qScriptPlan {
+	if s.scriptCache != nil {
+		if plan, ok := s.scriptCache[src]; ok {
+			return plan
+		}
+	}
+	plan := buildQScriptPlan(src)
+	if s.scriptCache == nil {
+		s.scriptCache = make(map[string]qScriptPlan, 16)
+	} else if len(s.scriptCache) >= 256 {
+		s.scriptCache = make(map[string]qScriptPlan, 16)
+	}
+	s.scriptCache[src] = plan
+	return plan
+}
+
+func buildQScriptPlan(src string) qScriptPlan {
+	parts := splitTopLevelDelim(src, ';')
+	if len(parts) == 0 {
+		parts = []string{strings.TrimSpace(src)}
+	}
+	statements := make([]qScriptStatement, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		stmt := qScriptStatement{src: part}
+		if name, rhs, ok := splitTopLevelAssignment(part); ok {
+			stmt.assign = name
+			stmt.rhs = rhs
+			stmt.valueExpr = parseCachedValueExpr(rhs)
+		} else {
+			stmt.valueExpr = parseCachedValueExpr(part)
+		}
+		statements = append(statements, stmt)
+	}
+	return qScriptPlan{statements: statements}
+}
+
+func parseCachedValueExpr(src string) Expr {
+	if !cachedValueExprTextEligible(src) {
+		return nil
+	}
+	expr, ok, err := parseValueExpr(src)
+	if err != nil || !ok {
+		return nil
+	}
+	if !cachedValueExprEligible(expr) {
+		return nil
+	}
+	return expr
+}
+
+func cachedValueExprTextEligible(src string) bool {
+	src = strings.TrimSpace(src)
+	if src == "" {
+		return true
+	}
+	if strings.ContainsAny(src, "`'\\/#$\"") {
+		return false
+	}
+	if strings.Contains(src, "0W") || strings.Contains(src, "0w") {
+		return false
+	}
+	if !isQArithmeticText(src) {
+		return false
+	}
+	if !isQIdentStart(src[0]) {
+		return true
+	}
+	end := 1
+	for end < len(src) && isQIdentRest(src[end]) {
+		end++
+	}
+	if end >= len(src) || !isQWhitespace(src[end]) {
+		return true
+	}
+	next := end
+	for next < len(src) && isQWhitespace(src[next]) {
+		next++
+	}
+	if next >= len(src) {
+		return true
+	}
+	switch src[next] {
+	case '+', '-', '*', '%', ')', ']', '<', '>', '=':
+		return true
+	}
+	return false
+}
+
+func isQArithmeticText(src string) bool {
+	for i := 0; i < len(src); i++ {
+		switch src[i] {
+		case '+', '-', '*', '%':
+			return true
+		}
+	}
+	return false
+}
+
+func cachedValueExprEligible(expr Expr) bool {
+	switch x := expr.(type) {
+	case Binary:
+		switch strings.ToLower(x.Op) {
+		case "and", "or", "in", "within", "=", "<", ">", "<=", ">=", "<>", "~":
+			return false
+		}
+		return cachedValueExprEligible(x.Left) && cachedValueExprEligible(x.Right)
+	case Call:
+		switch strings.ToLower(x.Func) {
+		case "where", "null", "not", "like":
+			return false
+		}
+		return cachedValueExprEligible(x.Arg)
+	case Vector:
+		return false
+	case DictExpr:
+		return cachedValueExprEligible(x.Keys) && cachedValueExprEligible(x.Values)
+	case IndexExpr:
+		return cachedValueExprEligible(x.Expr) && cachedValueExprEligible(x.Index)
+	case Flip:
+		for _, column := range x.Keys {
+			if !cachedValueExprEligible(column.Expr) {
+				return false
+			}
+		}
+		for _, column := range x.Columns {
+			if !cachedValueExprEligible(column.Expr) {
+				return false
+			}
+		}
+		return true
+	default:
+		return true
+	}
+}
+
+func (s *EvalState) evalScriptStatement(stmt qScriptStatement) (any, error) {
+	target := stmt.src
+	if stmt.assign != "" {
+		target = stmt.rhs
+	}
+	v, err := s.evalCachedOrString(target, stmt.valueExpr)
+	if err != nil {
+		return nil, err
+	}
+	if stmt.assign != "" {
+		s.env[s.resolveAssignmentName(stmt.assign)] = v
+	}
+	return v, nil
+}
+
+func (s *EvalState) evalCachedOrString(src string, expr Expr) (any, error) {
+	if expr != nil {
+		value, err := s.evalValueExpr(expr)
+		if err == nil {
+			return value, nil
+		}
+	}
+	return s.eval(src)
 }
 
 func cloneEnv(env map[string]any) map[string]any {

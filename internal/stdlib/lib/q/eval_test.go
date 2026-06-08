@@ -428,6 +428,22 @@ func TestEvalCacheabilityClassification(t *testing.T) {
 	}
 }
 
+func TestEvalStateScriptPlanCachePreservesEnvironmentSemantics(t *testing.T) {
+	state := NewEvalState(nil)
+	if got, err := state.Eval("x:1;y:x+2;y"); err != nil || got != int64(3) {
+		t.Fatalf("first Eval returned %#v, %v; want 3,nil", got, err)
+	}
+	if got, err := state.Eval("x:10;y:x+2;y"); err != nil || got != int64(12) {
+		t.Fatalf("second Eval returned %#v, %v; want 12,nil", got, err)
+	}
+	if len(state.scriptCache) == 0 {
+		t.Fatal("EvalState script plan cache was not populated")
+	}
+	if got, err := state.Eval("x:20;y:x+2;y"); err != nil || got != int64(22) {
+		t.Fatalf("third Eval returned %#v, %v; want 22,nil", got, err)
+	}
+}
+
 func TestEvalIPCLoopbackHandle(t *testing.T) {
 	state := NewEvalState(map[string]any{"x": int64(100)})
 	assertStateEvalValue(t, state, `h:hopen "loopback";h["1+2"]`, int64(3))
