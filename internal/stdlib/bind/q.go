@@ -239,6 +239,7 @@ type qQueryKernelSupportShapeKey struct {
 	Supported    bool
 	ReasonFamily string
 	ReasonCode   string
+	SchemaHash   string
 	Shape        string
 }
 
@@ -782,6 +783,9 @@ func qQueryKernelSupportCacheStore(key string, entry qQueryKernelSupportCacheEnt
 	if key == "" {
 		return
 	}
+	if schemaHash := qQueryKernelSchemaHashFromCacheKey(key); schemaHash != "" {
+		entry.SchemaHash = schemaHash
+	}
 	if entry.Shape == "" {
 		entry.Shape = qQueryKernelShapeFromCacheKey(key)
 	}
@@ -860,6 +864,15 @@ func qQueryKernelShapeFromCacheKey(key string) string {
 		selectShapes = append(selectShapes, "none")
 	}
 	return fmt.Sprintf("select=%s|order=%d|limit=%s", strings.Join(selectShapes, ","), orderCount, limit)
+}
+
+func qQueryKernelSchemaHashFromCacheKey(key string) string {
+	for _, part := range strings.Split(key, "|") {
+		if strings.HasPrefix(part, "source=") {
+			return strings.TrimPrefix(part, "source=")
+		}
+	}
+	return ""
 }
 
 func qQueryKernelExprShape(sig string) string {
@@ -3206,6 +3219,7 @@ func qQueryKernelSupportCacheShapeStatsLocked() []qQueryKernelSupportShapeStat {
 			Supported:    entry.Supported,
 			ReasonFamily: family,
 			ReasonCode:   reasonCode,
+			SchemaHash:   entry.SchemaHash,
 			Shape:        shape,
 		}]++
 	}
@@ -3227,6 +3241,9 @@ func qQueryKernelSupportCacheShapeStatsLocked() []qQueryKernelSupportShapeStat {
 		if a.Key.ReasonCode != b.Key.ReasonCode {
 			return a.Key.ReasonCode < b.Key.ReasonCode
 		}
+		if a.Key.SchemaHash != b.Key.SchemaHash {
+			return a.Key.SchemaHash < b.Key.SchemaHash
+		}
 		return a.Key.Shape < b.Key.Shape
 	})
 	return stats
@@ -3239,6 +3256,7 @@ func qQueryKernelSupportShapeStatsTable(stats []qQueryKernelSupportShapeStat) *T
 		row.RawSetString("supported", BoolValue(stat.Key.Supported))
 		row.RawSetString("reason_family", StringValue(stat.Key.ReasonFamily))
 		row.RawSetString("reason_code", StringValue(stat.Key.ReasonCode))
+		row.RawSetString("schema_hash", StringValue(stat.Key.SchemaHash))
 		row.RawSetString("shape", StringValue(stat.Key.Shape))
 		row.RawSetString("count", IntValue(int64(stat.Count)))
 		rows.RawSetInt(int64(i+1), TableValue(row))

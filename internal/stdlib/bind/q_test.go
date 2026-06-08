@@ -3294,7 +3294,10 @@ again := q.query(trades, {select: {price: "price"}, order_by: "missing"})
 	}
 	queryKernelRow := qTestCacheStatsRowTable(t, qCacheStatsTable(), "q_query_kernel")
 	shapeRows := qTestQueryKernelShapeRows(t, queryKernelRow.RawGetString("shapes").Table())
-	if got := qTestQueryKernelShapeCount(shapeRows, false, qFallbackFamilyOrder, qQueryKernelReasonOrder); got != 1 {
+	if len(shapeRows) != 1 {
+		t.Fatalf("q_query_kernel order shapes = %+v, want one row", shapeRows)
+	}
+	if got := qTestQueryKernelShapeCount(shapeRows, false, qFallbackFamilyOrder, qQueryKernelReasonOrder, shapeRows[0].SchemaHash); got != 1 {
 		t.Fatalf("q_query_kernel order shape count = %d, want 1", got)
 	}
 }
@@ -3411,15 +3414,78 @@ explained := q.explain_query(trades, {select: {large: {">=", "size", 15}, notion
 	}
 	queryKernelRow := qTestCacheStatsRowTable(t, qCacheStatsTable(), "q_query_kernel")
 	shapeRows := qTestQueryKernelShapeRows(t, queryKernelRow.RawGetString("shapes").Table())
-	if got := qTestQueryKernelShapeCount(shapeRows, true, qFallbackFamilySupported, qKernelReasonSupported); got != 1 {
+	if len(shapeRows) != 1 {
+		t.Fatalf("q_query_kernel supported shapes = %+v, want one row", shapeRows)
+	}
+	if got := qTestQueryKernelShapeCount(shapeRows, true, qFallbackFamilySupported, qKernelReasonSupported, shapeRows[0].SchemaHash); got != 1 {
 		t.Fatalf("q_query_kernel supported shape count = %d, want 1", got)
 	}
 	if shapeRows[0].Shape == "" || !strings.Contains(shapeRows[0].Shape, "select=") {
 		t.Fatalf("q_query_kernel supported shape = %q, want select shape", shapeRows[0].Shape)
 	}
+	if !strings.HasPrefix(shapeRows[0].SchemaHash, "q.query.kernel:") {
+		t.Fatalf("q_query_kernel supported schema_hash = %q, want q.query kernel hash", shapeRows[0].SchemaHash)
+	}
 	fallback := qTestFallbackStatsRows(t, qFallbackStatsTable())
 	if got := fallback[qQueryKernelSupported]; got != 2 {
 		t.Fatalf("query kernel hit count = %d, want 2", got)
+	}
+}
+
+func TestQQueryKernelShapeStatsSplitBySchemaHash(t *testing.T) {
+	qClearCaches()
+	defer qClearCaches()
+
+	trades, err := NewSoA(map[string]*DenseArray{
+		"price": NewDenseArrayF64([]float64{100, 101}),
+		"size":  NewDenseArrayF64([]float64{10, 20}),
+	})
+	if err != nil {
+		t.Fatalf("NewSoA trades: %v", err)
+	}
+	quotes, err := NewSoA(map[string]*DenseArray{
+		"price": NewDenseArrayF64([]float64{80, 90}),
+		"qty":   NewDenseArrayF64([]float64{1, 2}),
+	})
+	if err != nil {
+		t.Fatalf("NewSoA quotes: %v", err)
+	}
+	spec := NewTable()
+	selects := NewTable()
+	selects.RawSetString("price", StringValue("price"))
+	spec.RawSetString("select", TableValue(selects))
+
+	for label, soa := range map[string]*SoA{"trades": trades, "quotes": quotes} {
+		if _, err := qRunQuery(soa, spec); err != nil {
+			t.Fatalf("qRunQuery %s: %v", label, err)
+		}
+	}
+
+	queryKernelRow := qTestCacheStatsRowTable(t, qCacheStatsTable(), "q_query_kernel")
+	shapeRows := qTestQueryKernelShapeRows(t, queryKernelRow.RawGetString("shapes").Table())
+	if len(shapeRows) != 2 {
+		t.Fatalf("q_query_kernel shapes = %+v, want one row per schema", shapeRows)
+	}
+	wantSchemas := map[string]bool{
+		qQueryNativeSoASchemaHash(trades): false,
+		qQueryNativeSoASchemaHash(quotes): false,
+	}
+	for _, row := range shapeRows {
+		if !row.Supported || row.ReasonFamily != qFallbackFamilySupported || row.ReasonCode != qKernelReasonSupported || row.Count != 1 {
+			t.Fatalf("q_query_kernel shape row = %+v, want supported count=1", row)
+		}
+		if row.Shape != "select=column|order=0|limit=none" {
+			t.Fatalf("q_query_kernel shape = %q, want column select shape", row.Shape)
+		}
+		if _, ok := wantSchemas[row.SchemaHash]; !ok {
+			t.Fatalf("q_query_kernel shape schema_hash = %q, want one of %#v", row.SchemaHash, wantSchemas)
+		}
+		wantSchemas[row.SchemaHash] = true
+	}
+	for schemaHash, seen := range wantSchemas {
+		if !seen {
+			t.Fatalf("q_query_kernel shape schema_hash %q was not reported; rows=%+v", schemaHash, shapeRows)
+		}
 	}
 }
 
@@ -5712,6 +5778,7 @@ type qQueryKernelShapeRow struct {
 	Supported    bool
 	ReasonFamily string
 	ReasonCode   string
+	SchemaHash   string
 	Shape        string
 	Count        int64
 }
@@ -5730,15 +5797,17 @@ func qTestQueryKernelShapeRows(t *testing.T, tbl *Table) []qQueryKernelShapeRow 
 		supported := row.RawGetString("supported")
 		reasonFamily := row.RawGetString("reason_family")
 		reasonCode := row.RawGetString("reason_code")
+		schemaHash := row.RawGetString("schema_hash")
 		shape := row.RawGetString("shape")
 		count := row.RawGetString("count")
-		if !supported.IsBool() || !reasonFamily.IsString() || !reasonCode.IsString() || !shape.IsString() || !count.IsInt() {
+		if !supported.IsBool() || !reasonFamily.IsString() || !reasonCode.IsString() || !schemaHash.IsString() || !shape.IsString() || !count.IsInt() {
 			t.Fatalf("q_query_kernel shape row %d malformed: %#v", i, row)
 		}
 		rows = append(rows, qQueryKernelShapeRow{
 			Supported:    supported.Bool(),
 			ReasonFamily: reasonFamily.Str(),
 			ReasonCode:   reasonCode.Str(),
+			SchemaHash:   schemaHash.Str(),
 			Shape:        shape.Str(),
 			Count:        count.Int(),
 		})
@@ -5746,9 +5815,9 @@ func qTestQueryKernelShapeRows(t *testing.T, tbl *Table) []qQueryKernelShapeRow 
 	return rows
 }
 
-func qTestQueryKernelShapeCount(rows []qQueryKernelShapeRow, supported bool, reasonFamily, reasonCode string) int64 {
+func qTestQueryKernelShapeCount(rows []qQueryKernelShapeRow, supported bool, reasonFamily, reasonCode, schemaHash string) int64 {
 	for _, row := range rows {
-		if row.Supported == supported && row.ReasonFamily == reasonFamily && row.ReasonCode == reasonCode {
+		if row.Supported == supported && row.ReasonFamily == reasonFamily && row.ReasonCode == reasonCode && row.SchemaHash == schemaHash {
 			return row.Count
 		}
 	}
