@@ -3099,6 +3099,22 @@ func TestTryTypedStringLikeCount(t *testing.T) {
 	}
 }
 
+func TestTryTypedInCount(t *testing.T) {
+	if count, ok, err := TryTypedInCount(NewI32([]int32{10, 20, 30, 20, 40}), []any{int64(20), int32(40)}); err != nil || !ok || count != 3 {
+		t.Fatalf("i32 in count = %d,%v,%v; want 3,true,nil", count, ok, err)
+	}
+	if count, ok, err := TryTypedInCount(NewSymbols([]string{"AAPL", "MSFT", "NVDA", "AAPL"}), []any{"NVDA", Symbol("AAPL")}); err != nil || !ok || count != 3 {
+		t.Fatalf("symbol in count = %d,%v,%v; want 3,true,nil", count, ok, err)
+	}
+	repeated := takeRepeatMust(t, NewSymbols([]string{"AAPL", "MSFT", "NVDA", "TSLA"}), 10)
+	if count, ok, err := TryTypedInCount(repeated, []any{Symbol("AAPL"), "MSFT"}); err != nil || !ok || count != 6 {
+		t.Fatalf("tiled symbol in count = %d,%v,%v; want 6,true,nil", count, ok, err)
+	}
+	if count, ok, err := TryTypedInCount(NewColumn("x", []any{"AAPL", NullValue, Symbol("AAPL")}).Data, []any{"AAPL"}); err != nil || ok || count != 0 {
+		t.Fatalf("nullable in count = %d,%v,%v; want 0,false,nil", count, ok, err)
+	}
+}
+
 func TestTryTypedStringCastAndCasePreserveTiledArrays(t *testing.T) {
 	repeated := takeRepeatMust(t, NewSymbols([]string{"aapl", "msft", "amd", "ask"}), 10)
 	cast, handled, err := TryTypedStringCast(repeated)

@@ -1045,6 +1045,146 @@ func TryTypedStringLikeCount(array Array, pattern string) (int64, bool, error) {
 	return typedStringLikeCount(array, matcher)
 }
 
+// TryTypedInCount counts rows whose values are members of values without
+// materializing a boolean mask or row-index vector.
+func TryTypedInCount(array Array, values []any) (int64, bool, error) {
+	if array == nil {
+		return 0, true, fmt.Errorf("in count array is nil")
+	}
+	return typedInCount(array, values)
+}
+
+func typedInCount(array Array, values []any) (int64, bool, error) {
+	switch a := array.(type) {
+	case attributedArray:
+		return typedInCount(a.array, values)
+	case encodedArray:
+		codes := make(map[int32]struct{}, len(values))
+		for _, value := range values {
+			code, ok := encodedComparableCode(a, value)
+			if !ok {
+				return 0, false, nil
+			}
+			codes[code] = struct{}{}
+		}
+		var count int64
+		for _, code := range a.codes {
+			if _, matched := codes[code]; matched {
+				count++
+			}
+		}
+		return count, true, nil
+	case tiledArray:
+		sourceLen := a.source.Len()
+		if sourceLen == 0 || a.len == 0 {
+			return 0, true, nil
+		}
+		sourceCount, handled, err := typedInCount(a.source, values)
+		if err != nil || !handled {
+			return 0, handled, err
+		}
+		fullCycles := a.len / sourceLen
+		remainder := a.len % sourceLen
+		count := sourceCount * int64(fullCycles)
+		matches, ok := typedInPredicate(a.source.Kind(), values)
+		if !ok {
+			return 0, false, nil
+		}
+		for row := 0; row < remainder; row++ {
+			value, ok := a.source.At((a.start + row) % sourceLen)
+			if !ok {
+				return 0, true, fmt.Errorf("tiled in count source row %d out of range", row)
+			}
+			matched, ok := matches(value)
+			if !ok {
+				return 0, false, nil
+			}
+			if matched {
+				count++
+			}
+		}
+		return count, true, nil
+	case columnArray[bool]:
+		values = normalizeMembershipValues(array.Kind(), values)
+		set, ok := boolMembership(values)
+		return countMembershipBool(a.data, set, ok), ok, nil
+	case columnArray[int8]:
+		values = normalizeMembershipValues(array.Kind(), values)
+		set, ok := signedMembership[int8](values)
+		return countMembershipSigned(a.data, set, ok), ok, nil
+	case columnArray[int16]:
+		values = normalizeMembershipValues(array.Kind(), values)
+		set, ok := signedMembership[int16](values)
+		return countMembershipSigned(a.data, set, ok), ok, nil
+	case columnArray[int32]:
+		values = normalizeMembershipValues(array.Kind(), values)
+		set, ok := signedMembership[int32](values)
+		return countMembershipSigned(a.data, set, ok), ok, nil
+	case columnArray[int64]:
+		values = normalizeMembershipValues(array.Kind(), values)
+		set, ok := int64Membership(values)
+		return countMembershipSigned(a.data, set, ok), ok, nil
+	case columnArray[uint8]:
+		values = normalizeMembershipValues(array.Kind(), values)
+		set, ok := unsignedMembership[uint8](values)
+		return countMembershipUnsigned(a.data, set, ok), ok, nil
+	case columnArray[uint16]:
+		values = normalizeMembershipValues(array.Kind(), values)
+		set, ok := unsignedMembership[uint16](values)
+		return countMembershipUnsigned(a.data, set, ok), ok, nil
+	case columnArray[uint32]:
+		values = normalizeMembershipValues(array.Kind(), values)
+		set, ok := unsignedMembership[uint32](values)
+		return countMembershipUnsigned(a.data, set, ok), ok, nil
+	case columnArray[uint64]:
+		values = normalizeMembershipValues(array.Kind(), values)
+		set, ok := unsignedMembership[uint64](values)
+		return countMembershipUnsigned(a.data, set, ok), ok, nil
+	case columnArray[string]:
+		values = normalizeMembershipValues(array.Kind(), values)
+		set, ok := stringMembership(values)
+		return countMembershipString(a.data, set, ok), ok, nil
+	case columnArray[Symbol]:
+		values = normalizeMembershipValues(array.Kind(), values)
+		set, ok := symbolMembership(values)
+		return countMembershipSymbol(a.data, set, ok), ok, nil
+	case columnArray[Month]:
+		values = normalizeMembershipValues(array.Kind(), values)
+		set, ok := exactMembership[Month](values)
+		return countMembershipSigned(a.data, set, ok), ok, nil
+	case columnArray[Date]:
+		values = normalizeMembershipValues(array.Kind(), values)
+		set, ok := exactMembership[Date](values)
+		return countMembershipSigned(a.data, set, ok), ok, nil
+	case columnArray[DateTime]:
+		values = normalizeMembershipValues(array.Kind(), values)
+		set, ok := exactMembership[DateTime](values)
+		return countMembershipSigned(a.data, set, ok), ok, nil
+	case columnArray[Timespan]:
+		values = normalizeMembershipValues(array.Kind(), values)
+		set, ok := exactMembership[Timespan](values)
+		return countMembershipSigned(a.data, set, ok), ok, nil
+	case columnArray[Minute]:
+		values = normalizeMembershipValues(array.Kind(), values)
+		set, ok := exactMembership[Minute](values)
+		return countMembershipSigned(a.data, set, ok), ok, nil
+	case columnArray[Second]:
+		values = normalizeMembershipValues(array.Kind(), values)
+		set, ok := exactMembership[Second](values)
+		return countMembershipSigned(a.data, set, ok), ok, nil
+	case columnArray[Time]:
+		values = normalizeMembershipValues(array.Kind(), values)
+		set, ok := exactMembership[Time](values)
+		return countMembershipSigned(a.data, set, ok), ok, nil
+	case columnArray[Timestamp]:
+		values = normalizeMembershipValues(array.Kind(), values)
+		set, ok := exactMembership[Timestamp](values)
+		return countMembershipSigned(a.data, set, ok), ok, nil
+	default:
+		return 0, false, nil
+	}
+}
+
 func typedStringLikeCount(array Array, matcher stringLikeMatcher) (int64, bool, error) {
 	switch a := array.(type) {
 	case attributedArray:
@@ -5105,6 +5245,186 @@ func symbolMembership(values []any) (map[Symbol]struct{}, bool) {
 		set[v] = struct{}{}
 	}
 	return set, true
+}
+
+func typedInPredicate(kind Kind, values []any) (func(any) (bool, bool), bool) {
+	values = normalizeMembershipValues(kind, values)
+	switch kind {
+	case KindBool:
+		set, ok := boolMembership(values)
+		return func(value any) (bool, bool) {
+			v, ok := value.(bool)
+			if !ok {
+				return false, false
+			}
+			_, matched := set[v]
+			return matched, true
+		}, ok
+	case KindI8:
+		set, ok := signedMembership[int8](values)
+		return typedInSignedPredicate[int8](set), ok
+	case KindI16:
+		set, ok := signedMembership[int16](values)
+		return typedInSignedPredicate[int16](set), ok
+	case KindI32:
+		set, ok := signedMembership[int32](values)
+		return typedInSignedPredicate[int32](set), ok
+	case KindI64:
+		set, ok := int64Membership(values)
+		return func(value any) (bool, bool) {
+			v, ok := coerceInt64Exact(value)
+			if !ok {
+				return false, false
+			}
+			_, matched := set[v]
+			return matched, true
+		}, ok
+	case KindU8:
+		set, ok := unsignedMembership[uint8](values)
+		return typedInUnsignedPredicate[uint8](set), ok
+	case KindU16:
+		set, ok := unsignedMembership[uint16](values)
+		return typedInUnsignedPredicate[uint16](set), ok
+	case KindU32:
+		set, ok := unsignedMembership[uint32](values)
+		return typedInUnsignedPredicate[uint32](set), ok
+	case KindU64:
+		set, ok := unsignedMembership[uint64](values)
+		return typedInUnsignedPredicate[uint64](set), ok
+	case KindString:
+		set, ok := stringMembership(values)
+		return func(value any) (bool, bool) {
+			v, ok := coerceComparableString(value)
+			if !ok {
+				return false, false
+			}
+			_, matched := set[v]
+			return matched, true
+		}, ok
+	case KindSymbol:
+		set, ok := symbolMembership(values)
+		return func(value any) (bool, bool) {
+			v, ok := coerceComparableSymbol(value)
+			if !ok {
+				return false, false
+			}
+			_, matched := set[v]
+			return matched, true
+		}, ok
+	case KindMonth:
+		set, ok := exactMembership[Month](values)
+		return typedInSignedPredicate[Month](set), ok
+	case KindDate:
+		set, ok := exactMembership[Date](values)
+		return typedInSignedPredicate[Date](set), ok
+	case KindDateTime:
+		set, ok := exactMembership[DateTime](values)
+		return typedInSignedPredicate[DateTime](set), ok
+	case KindTimespan:
+		set, ok := exactMembership[Timespan](values)
+		return typedInSignedPredicate[Timespan](set), ok
+	case KindMinute:
+		set, ok := exactMembership[Minute](values)
+		return typedInSignedPredicate[Minute](set), ok
+	case KindSecond:
+		set, ok := exactMembership[Second](values)
+		return typedInSignedPredicate[Second](set), ok
+	case KindTime:
+		set, ok := exactMembership[Time](values)
+		return typedInSignedPredicate[Time](set), ok
+	case KindTimestamp:
+		set, ok := exactMembership[Timestamp](values)
+		return typedInSignedPredicate[Timestamp](set), ok
+	default:
+		return nil, false
+	}
+}
+
+func typedInSignedPredicate[T signedScalar](set map[T]struct{}) func(any) (bool, bool) {
+	return func(value any) (bool, bool) {
+		v, ok := value.(T)
+		if !ok {
+			return false, false
+		}
+		_, matched := set[v]
+		return matched, true
+	}
+}
+
+func typedInUnsignedPredicate[T unsignedScalar](set map[T]struct{}) func(any) (bool, bool) {
+	return func(value any) (bool, bool) {
+		v, ok := value.(T)
+		if !ok {
+			return false, false
+		}
+		_, matched := set[v]
+		return matched, true
+	}
+}
+
+func countMembershipBool(values []bool, set map[bool]struct{}, ok bool) int64 {
+	if !ok {
+		return 0
+	}
+	var count int64
+	for _, value := range values {
+		if _, matched := set[value]; matched {
+			count++
+		}
+	}
+	return count
+}
+
+func countMembershipSigned[T signedScalar](values []T, set map[T]struct{}, ok bool) int64 {
+	if !ok {
+		return 0
+	}
+	var count int64
+	for _, value := range values {
+		if _, matched := set[value]; matched {
+			count++
+		}
+	}
+	return count
+}
+
+func countMembershipUnsigned[T unsignedScalar](values []T, set map[T]struct{}, ok bool) int64 {
+	if !ok {
+		return 0
+	}
+	var count int64
+	for _, value := range values {
+		if _, matched := set[value]; matched {
+			count++
+		}
+	}
+	return count
+}
+
+func countMembershipString(values []string, set map[string]struct{}, ok bool) int64 {
+	if !ok {
+		return 0
+	}
+	var count int64
+	for _, value := range values {
+		if _, matched := set[value]; matched {
+			count++
+		}
+	}
+	return count
+}
+
+func countMembershipSymbol(values []Symbol, set map[Symbol]struct{}, ok bool) int64 {
+	if !ok {
+		return 0
+	}
+	var count int64
+	for _, value := range values {
+		if _, matched := set[value]; matched {
+			count++
+		}
+	}
+	return count
 }
 
 func membershipBoolIndexes(values []bool, set map[bool]struct{}, ok bool, out []int) ([]int, bool) {

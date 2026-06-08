@@ -642,6 +642,9 @@ func (s *EvalState) eval(src string) (any, error) {
 		if out, handled, err := s.tryEvalCountWhereLike(strings.TrimSpace(src[len("count "):])); err != nil || handled {
 			return out, err
 		}
+		if out, handled, err := s.tryEvalCountWhereIn(strings.TrimSpace(src[len("count "):])); err != nil || handled {
+			return out, err
+		}
 		if out, handled, err := s.tryEvalCountWhereNull(strings.TrimSpace(src[len("count "):])); err != nil || handled {
 			return out, err
 		}
@@ -3406,6 +3409,43 @@ func (s *EvalState) tryEvalCountWhereLike(src string) (any, bool, error) {
 	out, handled, err := data.TryTypedStringLikeCount(array, pattern)
 	shape := "like-count/" + string(array.Kind()) + "/" + string(qRuntimeKernelOperandKind(right, nil))
 	recordRuntimeKernelProbe("ArrayStringLikeCount", shape, handled, err)
+	if err != nil {
+		return nil, true, err
+	}
+	if !handled {
+		return nil, false, nil
+	}
+	return out, true, nil
+}
+
+func (s *EvalState) tryEvalCountWhereIn(src string) (any, bool, error) {
+	if !strings.HasPrefix(src, "where ") {
+		return nil, false, nil
+	}
+	arg := strings.TrimSpace(src[len("where "):])
+	leftExpr, rightExpr, ok := splitTopLevelWord(arg, "in")
+	if !ok {
+		return nil, false, nil
+	}
+	left, err := s.eval(leftExpr)
+	if err != nil {
+		return nil, true, err
+	}
+	array, ok := left.(data.Array)
+	if !ok {
+		return nil, false, nil
+	}
+	right, err := s.eval(rightExpr)
+	if err != nil {
+		return nil, true, err
+	}
+	values, err := setItems(right)
+	if err != nil {
+		return nil, true, err
+	}
+	out, handled, err := data.TryTypedInCount(array, values)
+	shape := "in-count/" + string(array.Kind()) + "/" + string(qRuntimeKernelOperandKind(right, nil))
+	recordRuntimeKernelProbe("ArrayInCount", shape, handled, err)
 	if err != nil {
 		return nil, true, err
 	}
