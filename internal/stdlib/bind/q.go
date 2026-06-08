@@ -241,6 +241,20 @@ type qQueryKernelSupportCacheEntry struct {
 	Shape      string
 }
 
+type qQueryKernelSupportCacheKeyStat struct {
+	Key          string
+	Namespace    string
+	Kind         string
+	Supported    bool
+	ReasonFamily string
+	ReasonCode   string
+	SchemaHash   string
+	Shape        string
+	Hits         int
+	Misses       int
+	Evictions    int
+}
+
 type qFallbackStats struct {
 	KernelUnsupported int
 	KernelCompileErr  int
@@ -311,6 +325,7 @@ var (
 	qQueryKernelSupportCache      = make(map[string]qQueryKernelSupportCacheEntry)
 	qQueryKernelSupportCacheOrder []string
 	qQueryKernelSupportStats      qQueryKernelSupportCacheStats
+	qQueryKernelSupportStatsByKey = make(map[string]*qQueryKernelSupportCacheKeyStat)
 
 	qFallbackStatsMu  sync.Mutex
 	qFallbackCounters qFallbackStats
@@ -793,8 +808,10 @@ func qQueryKernelSupportCacheProbe(key string) (qQueryKernelSupportCacheEntry, b
 	entry, ok := qQueryKernelSupportCache[key]
 	if ok {
 		qQueryKernelSupportStats.Hits++
+		qQueryKernelSupportStatsForKeyLocked(key).Hits++
 	} else {
 		qQueryKernelSupportStats.Misses++
+		qQueryKernelSupportStatsForKeyLocked(key).Misses++
 	}
 	qQueryKernelSupportCacheMu.Unlock()
 	return entry, ok
@@ -822,10 +839,12 @@ func qQueryKernelSupportCacheStore(key string, entry qQueryKernelSupportCacheEnt
 		qQueryKernelSupportCacheOrder = append(qQueryKernelSupportCacheOrder, key)
 	}
 	qQueryKernelSupportCache[key] = entry
+	qQueryKernelSupportStatsForKeyLocked(key).setEntry(entry)
 	for len(qQueryKernelSupportCacheOrder) > qQueryKernelSupportCacheLimit {
 		evict := qQueryKernelSupportCacheOrder[0]
 		qQueryKernelSupportCacheOrder = qQueryKernelSupportCacheOrder[1:]
 		delete(qQueryKernelSupportCache, evict)
+		delete(qQueryKernelSupportStatsByKey, evict)
 		qQueryKernelSupportStats.Evictions++
 	}
 	qQueryKernelSupportCacheMu.Unlock()
@@ -2919,6 +2938,7 @@ func qCacheStatsTable() *Table {
 	qQueryKernelSupportCacheMu.Lock()
 	queryKernelEntries := len(qQueryKernelSupportCache)
 	queryKernelStats := qQueryKernelSupportStats
+	queryKernelKeyStats := qQueryKernelSupportKeyStatsSnapshotLocked()
 	queryKernelShapeStats := qQueryKernelSupportCacheShapeStatsLocked()
 	qQueryKernelSupportCacheMu.Unlock()
 
@@ -2970,6 +2990,7 @@ func qCacheStatsTable() *Table {
 		queryKernelStats.Evictions,
 		qQueryKernelSupportCacheLimit,
 	)
+	queryKernelStatsRow.RawSetString("keys", TableValue(qQueryKernelSupportKeyStatsTable(queryKernelKeyStats)))
 	queryKernelStatsRow.RawSetString("shapes", TableValue(qQueryKernelSupportShapeStatsTable(queryKernelShapeStats)))
 	rows.RawSetInt(5, TableValue(queryKernelStatsRow))
 	rows.RawSetInt(6, TableValue(qRuntimeKernelExecutionStatsRow()))
@@ -3287,6 +3308,101 @@ func qQueryKernelSupportShapeStatsTable(stats []qQueryKernelSupportShapeStat) *T
 		row.RawSetString("schema_hash", StringValue(stat.Key.SchemaHash))
 		row.RawSetString("shape", StringValue(stat.Key.Shape))
 		row.RawSetString("count", IntValue(int64(stat.Count)))
+		rows.RawSetInt(int64(i+1), TableValue(row))
+	}
+	return rows
+}
+
+func qQueryKernelSupportStatsForKeyLocked(key string) *qQueryKernelSupportCacheKeyStat {
+	stats := qQueryKernelSupportStatsByKey[key]
+	if stats == nil {
+		stats = &qQueryKernelSupportCacheKeyStat{
+			Key:        key,
+			Namespace:  "q.query",
+			Kind:       "query_kernel",
+			SchemaHash: qQueryKernelSchemaHashFromCacheKey(key),
+			Shape:      qQueryKernelShapeFromCacheKey(key),
+		}
+		qQueryKernelSupportStatsByKey[key] = stats
+	}
+	return stats
+}
+
+func (stat *qQueryKernelSupportCacheKeyStat) setEntry(entry qQueryKernelSupportCacheEntry) {
+	if stat == nil {
+		return
+	}
+	stat.Supported = entry.Supported
+	reasonCode := entry.ReasonCode
+	if reasonCode == "" {
+		reasonCode = qNormalizeQueryKernelFallbackReasonCode(entry.Reason)
+	}
+	if reasonCode == "" && entry.Supported {
+		reasonCode = qKernelReasonSupported
+	}
+	stat.ReasonCode = reasonCode
+	stat.ReasonFamily = qFallbackReasonFamilyForDetail(qFallbackQueryKernel, reasonCode, entry.Reason)
+	if entry.Supported {
+		stat.ReasonFamily = qFallbackFamilySupported
+	}
+	if entry.SchemaHash != "" {
+		stat.SchemaHash = entry.SchemaHash
+	}
+	if entry.Shape != "" {
+		stat.Shape = entry.Shape
+	}
+}
+
+func qQueryKernelSupportKeyStatsSnapshotLocked() []qQueryKernelSupportCacheKeyStat {
+	out := make([]qQueryKernelSupportCacheKeyStat, 0, len(qQueryKernelSupportStatsByKey))
+	for key, stat := range qQueryKernelSupportStatsByKey {
+		if _, ok := qQueryKernelSupportCache[key]; !ok {
+			continue
+		}
+		if stat == nil {
+			continue
+		}
+		row := *stat
+		if row.SchemaHash == "" {
+			row.SchemaHash = qQueryKernelSchemaHashFromCacheKey(row.Key)
+		}
+		if row.Shape == "" {
+			row.Shape = qQueryKernelShapeFromCacheKey(row.Key)
+		}
+		out = append(out, row)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		a, b := out[i], out[j]
+		if a.Supported != b.Supported {
+			return a.Supported
+		}
+		if a.SchemaHash != b.SchemaHash {
+			return a.SchemaHash < b.SchemaHash
+		}
+		if a.Shape != b.Shape {
+			return a.Shape < b.Shape
+		}
+		return a.Key < b.Key
+	})
+	return out
+}
+
+func qQueryKernelSupportKeyStatsTable(stats []qQueryKernelSupportCacheKeyStat) *Table {
+	rows := NewAppendArrayTable(len(stats))
+	for i, stat := range stats {
+		row := NewTable()
+		row.RawSetString("key", StringValue(stat.Key))
+		row.RawSetString("namespace", StringValue(stat.Namespace))
+		row.RawSetString("kind", StringValue(stat.Kind))
+		row.RawSetString("plan_fingerprint", StringValue(""))
+		row.RawSetString("supported", BoolValue(stat.Supported))
+		row.RawSetString("reason_family", StringValue(stat.ReasonFamily))
+		row.RawSetString("reason_code", StringValue(stat.ReasonCode))
+		row.RawSetString("schema_hash", StringValue(stat.SchemaHash))
+		row.RawSetString("shape", StringValue(stat.Shape))
+		row.RawSetString("hits", IntValue(int64(stat.Hits)))
+		row.RawSetString("misses", IntValue(int64(stat.Misses)))
+		row.RawSetString("evictions", IntValue(int64(stat.Evictions)))
 		rows.RawSetInt(int64(i+1), TableValue(row))
 	}
 	return rows
@@ -3945,6 +4061,7 @@ func qClearCaches() {
 	qQueryKernelSupportCache = make(map[string]qQueryKernelSupportCacheEntry)
 	qQueryKernelSupportCacheOrder = nil
 	qQueryKernelSupportStats = qQueryKernelSupportCacheStats{}
+	qQueryKernelSupportStatsByKey = make(map[string]*qQueryKernelSupportCacheKeyStat)
 	qQueryKernelSupportCacheMu.Unlock()
 
 	qFallbackStatsMu.Lock()

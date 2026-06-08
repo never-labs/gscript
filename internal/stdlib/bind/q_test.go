@@ -3294,6 +3294,13 @@ again := q.query(trades, {select: {price: "price"}, order_by: "missing"})
 		t.Fatalf("q_query_kernel unsupported stats = %#v, want 1 entry, 1 hit, 1 miss, 0 evictions", cache)
 	}
 	queryKernelRow := qTestCacheStatsRowTable(t, qCacheStatsTable(), "q_query_kernel")
+	keyRows := qTestQueryKernelKeyRows(t, queryKernelRow.RawGetString("keys").Table())
+	if len(keyRows) != 1 {
+		t.Fatalf("q_query_kernel order keys = %+v, want one row", keyRows)
+	}
+	if got := keyRows[0]; got.Namespace != "q.query" || got.Kind != "query_kernel" || got.PlanFingerprint != "" || got.Supported || got.ReasonFamily != qFallbackFamilyOrder || got.ReasonCode != qQueryKernelReasonOrder || got.Hits != 1 || got.Misses != 1 || got.Evictions != 0 {
+		t.Fatalf("q_query_kernel order key row = %+v, want unsupported order hit=1 miss=1", got)
+	}
 	shapeRows := qTestQueryKernelShapeRows(t, queryKernelRow.RawGetString("shapes").Table())
 	if len(shapeRows) != 1 {
 		t.Fatalf("q_query_kernel order shapes = %+v, want one row", shapeRows)
@@ -3414,6 +3421,13 @@ explained := q.explain_query(trades, {select: {large: {">=", "size", 15}, notion
 		t.Fatalf("q_query_kernel stats = %#v, want 1 entry, 1 hit, 1 miss, 0 evictions", got)
 	}
 	queryKernelRow := qTestCacheStatsRowTable(t, qCacheStatsTable(), "q_query_kernel")
+	keyRows := qTestQueryKernelKeyRows(t, queryKernelRow.RawGetString("keys").Table())
+	if len(keyRows) != 1 {
+		t.Fatalf("q_query_kernel supported keys = %+v, want one row", keyRows)
+	}
+	if got := keyRows[0]; got.Namespace != "q.query" || got.Kind != "query_kernel" || got.PlanFingerprint != "" || !got.Supported || got.ReasonFamily != qFallbackFamilySupported || got.ReasonCode != qKernelReasonSupported || got.Hits != 1 || got.Misses != 1 || got.Evictions != 0 {
+		t.Fatalf("q_query_kernel supported key row = %+v, want supported hit=1 miss=1", got)
+	}
 	shapeRows := qTestQueryKernelShapeRows(t, queryKernelRow.RawGetString("shapes").Table())
 	if len(shapeRows) != 1 {
 		t.Fatalf("q_query_kernel supported shapes = %+v, want one row", shapeRows)
@@ -3463,6 +3477,10 @@ func TestQQueryKernelShapeStatsSplitBySchemaHash(t *testing.T) {
 	}
 
 	queryKernelRow := qTestCacheStatsRowTable(t, qCacheStatsTable(), "q_query_kernel")
+	keyRows := qTestQueryKernelKeyRows(t, queryKernelRow.RawGetString("keys").Table())
+	if len(keyRows) != 2 {
+		t.Fatalf("q_query_kernel keys = %+v, want one row per schema", keyRows)
+	}
 	shapeRows := qTestQueryKernelShapeRows(t, queryKernelRow.RawGetString("shapes").Table())
 	if len(shapeRows) != 2 {
 		t.Fatalf("q_query_kernel shapes = %+v, want one row per schema", shapeRows)
@@ -3482,6 +3500,14 @@ func TestQQueryKernelShapeStatsSplitBySchemaHash(t *testing.T) {
 			t.Fatalf("q_query_kernel shape schema_hash = %q, want one of %#v", row.SchemaHash, wantSchemas)
 		}
 		wantSchemas[row.SchemaHash] = true
+	}
+	for _, row := range keyRows {
+		if row.Namespace != "q.query" || row.Kind != "query_kernel" || row.PlanFingerprint != "" || !row.Supported || row.ReasonFamily != qFallbackFamilySupported || row.ReasonCode != qKernelReasonSupported || row.Hits != 0 || row.Misses != 1 || row.Evictions != 0 {
+			t.Fatalf("q_query_kernel key row = %+v, want supported miss=1", row)
+		}
+		if _, ok := wantSchemas[row.SchemaHash]; !ok {
+			t.Fatalf("q_query_kernel key schema_hash = %q, want one of %#v", row.SchemaHash, wantSchemas)
+		}
 	}
 	for schemaHash, seen := range wantSchemas {
 		if !seen {
@@ -5813,6 +5839,65 @@ type qQueryKernelShapeRow struct {
 	SchemaHash   string
 	Shape        string
 	Count        int64
+}
+
+type qQueryKernelKeyRow struct {
+	Key             string
+	Namespace       string
+	Kind            string
+	PlanFingerprint string
+	Supported       bool
+	ReasonFamily    string
+	ReasonCode      string
+	SchemaHash      string
+	Shape           string
+	Hits            int64
+	Misses          int64
+	Evictions       int64
+}
+
+func qTestQueryKernelKeyRows(t *testing.T, tbl *Table) []qQueryKernelKeyRow {
+	t.Helper()
+	if tbl == nil {
+		t.Fatal("q_query_kernel keys table is nil")
+	}
+	rows := make([]qQueryKernelKeyRow, 0, tbl.Length())
+	for i := 1; i <= tbl.Length(); i++ {
+		row := tbl.RawGetInt(int64(i)).Table()
+		if row == nil {
+			t.Fatalf("q_query_kernel key row %d is nil", i)
+		}
+		key := row.RawGetString("key")
+		namespace := row.RawGetString("namespace")
+		kind := row.RawGetString("kind")
+		planFingerprint := row.RawGetString("plan_fingerprint")
+		supported := row.RawGetString("supported")
+		reasonFamily := row.RawGetString("reason_family")
+		reasonCode := row.RawGetString("reason_code")
+		schemaHash := row.RawGetString("schema_hash")
+		shape := row.RawGetString("shape")
+		hits := row.RawGetString("hits")
+		misses := row.RawGetString("misses")
+		evictions := row.RawGetString("evictions")
+		if !key.IsString() || !namespace.IsString() || !kind.IsString() || !planFingerprint.IsString() || !supported.IsBool() || !reasonFamily.IsString() || !reasonCode.IsString() || !schemaHash.IsString() || !shape.IsString() || !hits.IsInt() || !misses.IsInt() || !evictions.IsInt() {
+			t.Fatalf("q_query_kernel key row %d malformed: %#v", i, row)
+		}
+		rows = append(rows, qQueryKernelKeyRow{
+			Key:             key.Str(),
+			Namespace:       namespace.Str(),
+			Kind:            kind.Str(),
+			PlanFingerprint: planFingerprint.Str(),
+			Supported:       supported.Bool(),
+			ReasonFamily:    reasonFamily.Str(),
+			ReasonCode:      reasonCode.Str(),
+			SchemaHash:      schemaHash.Str(),
+			Shape:           shape.Str(),
+			Hits:            hits.Int(),
+			Misses:          misses.Int(),
+			Evictions:       evictions.Int(),
+		})
+	}
+	return rows
 }
 
 func qTestQueryKernelShapeRows(t *testing.T, tbl *Table) []qQueryKernelShapeRow {
