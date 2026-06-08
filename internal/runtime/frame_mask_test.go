@@ -235,6 +235,30 @@ func TestNativeFrameFilterProjectColumnFiltersSingleProjectedColumn(t *testing.T
 	}
 }
 
+func TestNativeFrameProjectedColumnValidationKeepsPrimitiveNames(t *testing.T) {
+	soa, err := NewSoA(map[string]*DenseArray{
+		"price": NewDenseArrayF64([]float64{10, 12, 8}),
+		"size":  NewDenseArrayI64([]int64{100, 200, 300}),
+	})
+	if err != nil {
+		t.Fatalf("NewSoA: %v", err)
+	}
+	frame := NewTable()
+	frame.SetNativePayloadWithInfo(soa, NativePayloadInfo{
+		Kind:       NativePayloadDataFrame,
+		Rows:       soa.Len(),
+		Columns:    2,
+		SchemaHash: "projected-column-validation-test",
+	})
+
+	if _, handled, err := TableValue(frame).NativeFrameProjectColumn([]string{"price"}, "size"); !handled || err == nil || err.Error() != `FRAME_PROJECT_COLUMN result column "size" is not projected` {
+		t.Fatalf("NativeFrameProjectColumn validation handled=%v err=%v, want project-column prefix", handled, err)
+	}
+	if _, handled, err := TableValue(frame).NativeFrameFilterProjectColumn(NewDenseArrayBool([]bool{true, false, true}), []string{"price"}, "size"); !handled || err == nil || err.Error() != `FRAME_FILTER_PROJECT_COLUMN result column "size" is not projected` {
+		t.Fatalf("NativeFrameFilterProjectColumn validation handled=%v err=%v, want filter-project-column prefix", handled, err)
+	}
+}
+
 func TestNativeFrameFilterProjectFiltersProjectedFrame(t *testing.T) {
 	soa, err := NewSoA(map[string]*DenseArray{
 		"price": NewDenseArrayF64([]float64{10, 12, 8}),
