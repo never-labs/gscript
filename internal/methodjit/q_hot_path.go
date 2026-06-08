@@ -9,6 +9,21 @@ import (
 	"github.com/never-labs/leia/internal/runtime"
 )
 
+const (
+	qQueryLoweringFallbackUnsupportedSpec         = "unsupported_spec"
+	qQueryLoweringFallbackMultiUse                = "multi_use"
+	qQueryLoweringFallbackMissingProto            = "missing_proto"
+	qQueryLoweringFallbackBadProjectOrResultConst = "bad_project_or_result_const"
+	qQueryLoweringFallbackBadSourceColumnConst    = "bad_source_column_const"
+	qQueryLoweringFallbackMissingCompareRHS       = "missing_compare_rhs"
+	qQueryLoweringFallbackTooManyDynamicArgs      = "too_many_dynamic_args"
+	qQueryLoweringFallbackBadMaskSpecConst        = "bad_mask_spec_const"
+	qQueryLoweringFallbackMissingPredicate        = "missing_predicate"
+	qQueryLoweringFallbackBadOrderConst           = "bad_order_const"
+	qQueryLoweringFallbackMissingRowValue         = "missing_row_value"
+	qQueryLoweringFallbackOpaqueRowConst          = "opaque_row_const"
+)
+
 // QQueryHotPath describes an IR pattern for the q query primitive pipeline:
 // column load -> typed compare mask -> frame filter -> optional row reorder or
 // prefix slice -> frame projection -> projected column load.
@@ -50,6 +65,50 @@ func CountQQueryHotPathShapes(paths []QQueryHotPath) map[string]int {
 		counts[path.Shape()]++
 	}
 	return counts
+}
+
+func CountQFrameSelectColumnSpecShapes(specs []QFrameSelectColumnSpec) map[string]int {
+	if len(specs) == 0 {
+		return nil
+	}
+	counts := make(map[string]int)
+	for _, spec := range specs {
+		shape := spec.Shape
+		if shape == "" {
+			shape = "unknown"
+		}
+		counts[shape]++
+	}
+	return counts
+}
+
+func CountQQueryLoweringFallbackReasons(remarks []OptimizationRemark) map[string]int {
+	counts := make(map[string]int)
+	for _, remark := range remarks {
+		if remark.Pass != "QQueryNativeLowering" || remark.Kind != "missed" {
+			continue
+		}
+		reason, ok := qQueryLoweringFallbackReasonFromRemark(remark.Reason)
+		if !ok {
+			continue
+		}
+		counts[reason]++
+	}
+	if len(counts) == 0 {
+		return nil
+	}
+	return counts
+}
+
+func qQueryLoweringFallbackReasonFromRemark(reason string) (string, bool) {
+	const prefix = "reason_code="
+	for _, field := range strings.Fields(reason) {
+		if strings.HasPrefix(field, prefix) {
+			code := strings.TrimRight(strings.TrimPrefix(field, prefix), ",;")
+			return code, code != ""
+		}
+	}
+	return "", false
 }
 
 // DetectQQueryHotPaths returns q query primitive pipelines visible in Method
@@ -170,10 +229,12 @@ func QQueryNativeLoweringPass(fn *Function) (*Function, error) {
 	uses := qQueryValueUseCounts(fn)
 	for _, path := range DetectQQueryHotPaths(fn) {
 		if !qQueryHotPathSingleUse(path, uses) {
+			qQueryLoweringFallbackRemark(fn, path, qQueryLoweringFallbackMultiUse)
 			continue
 		}
-		spec, args, ok := qQueryFrameSelectColumnSpec(fn, path)
+		spec, args, reason, ok := qQueryFrameSelectColumnSpec(fn, path)
 		if !ok {
+			qQueryLoweringFallbackRemark(fn, path, reason)
 			continue
 		}
 		specIdx := len(fn.QFrameSelectColumnSpecs)
@@ -198,6 +259,22 @@ func QQueryNativeLoweringPass(fn *Function) (*Function, error) {
 		}
 	}
 	return fn, nil
+}
+
+func qQueryLoweringFallbackRemark(fn *Function, path QQueryHotPath, reason string) {
+	if reason == "" {
+		reason = qQueryLoweringFallbackUnsupportedSpec
+	}
+	blockID, valueID := 0, 0
+	if path.ResultColumn != nil {
+		valueID = path.ResultColumn.ID
+		if path.ResultColumn.Block != nil {
+			blockID = path.ResultColumn.Block.ID
+		}
+	}
+	functionRemarks(fn).Add("QQueryNativeLowering", "missed", blockID, valueID, OpFrameColumn,
+		fmt.Sprintf("reason_code=%s shape=%s compare=%s; q query hot path remains on primitive fallback",
+			reason, path.Shape(), qQueryHotPathCompareOpName(path.Compare)))
 }
 
 func qQueryValueUseCounts(fn *Function) map[int]int {
@@ -236,13 +313,13 @@ func qQueryHotPathSingleUse(path QQueryHotPath, uses map[int]int) bool {
 	return true
 }
 
-func qQueryFrameSelectColumnSpec(fn *Function, path QQueryHotPath) (QFrameSelectColumnSpec, []*Value, bool) {
+func qQueryFrameSelectColumnSpec(fn *Function, path QQueryHotPath) (QFrameSelectColumnSpec, []*Value, string, bool) {
 	if fn == nil || fn.Proto == nil || path.Filter == nil || path.Project == nil || path.ResultColumn == nil {
-		return QFrameSelectColumnSpec{}, nil, false
+		return QFrameSelectColumnSpec{}, nil, qQueryLoweringFallbackMissingProto, false
 	}
 	if path.ResultColumn.Aux < 0 || path.ResultColumn.Aux >= int64(len(fn.Proto.Constants)) ||
 		path.Project.Aux < 0 || path.Project.Aux >= int64(len(fn.Proto.Constants)) {
-		return QFrameSelectColumnSpec{}, nil, false
+		return QFrameSelectColumnSpec{}, nil, qQueryLoweringFallbackBadProjectOrResultConst, false
 	}
 	spec := QFrameSelectColumnSpec{
 		Shape:             path.Shape(),
@@ -258,60 +335,74 @@ func qQueryFrameSelectColumnSpec(fn *Function, path QQueryHotPath) (QFrameSelect
 	args := []*Value{frameArg}
 	if path.Compare != nil {
 		if path.SourceColumn == nil || path.SourceColumn.Aux < 0 || path.SourceColumn.Aux >= int64(len(fn.Proto.Constants)) {
-			return QFrameSelectColumnSpec{}, nil, false
+			return QFrameSelectColumnSpec{}, nil, qQueryLoweringFallbackBadSourceColumnConst, false
 		}
 		rhs := qQueryCompareRHS(path.Compare, path.SourceColumn)
 		if rhs == nil {
-			return QFrameSelectColumnSpec{}, nil, false
+			return QFrameSelectColumnSpec{}, nil, qQueryLoweringFallbackMissingCompareRHS, false
 		}
 		spec.SourceColumnConst = int(path.SourceColumn.Aux)
 		spec.CompareOp = runtime.DenseArrayBinaryOp(path.Compare.Aux)
 		if rhsConst, ok := qQueryConstRuntimeValue(rhs); ok {
 			spec.CompareRHSConst = rhsConst
 			spec.HasCompareRHSConst = true
-		} else if path.RowGather == nil && path.RowSlice == nil && path.RowOrder == nil {
+		} else if spec.DynamicArgRole == QFrameSelectColumnArgNone {
 			spec.DynamicArgRole = QFrameSelectColumnArgCompareRHS
 			args = append(args, rhs)
 		} else {
-			return QFrameSelectColumnSpec{}, nil, false
+			return QFrameSelectColumnSpec{}, nil, qQueryLoweringFallbackTooManyDynamicArgs, false
 		}
 	} else if path.Mask != nil {
 		if path.Mask.Aux < 0 || path.Mask.Aux >= int64(len(fn.Proto.Constants)) {
-			return QFrameSelectColumnSpec{}, nil, false
+			return QFrameSelectColumnSpec{}, nil, qQueryLoweringFallbackBadMaskSpecConst, false
 		}
 		spec.MaskSpecConst = int(path.Mask.Aux)
 	} else {
-		return QFrameSelectColumnSpec{}, nil, false
+		return QFrameSelectColumnSpec{}, nil, qQueryLoweringFallbackMissingPredicate, false
 	}
 	switch {
 	case path.RowOrder != nil && path.RowGather != nil:
 		if path.RowOrder.Aux < 0 || path.RowOrder.Aux >= int64(len(fn.Proto.Constants)) {
-			return QFrameSelectColumnSpec{}, nil, false
+			return QFrameSelectColumnSpec{}, nil, qQueryLoweringFallbackBadOrderConst, false
 		}
 		spec.RowMode = QFrameSelectColumnRowsOrderGather
 		spec.RowOrderConst = int(path.RowOrder.Aux)
 	case path.RowGather != nil:
 		spec.RowMode = QFrameSelectColumnRowsGather
 		if len(path.RowGather.Args) != 2 || path.RowGather.Args[1] == nil {
-			return QFrameSelectColumnSpec{}, nil, false
+			return QFrameSelectColumnSpec{}, nil, qQueryLoweringFallbackMissingRowValue, false
 		}
 		if qQueryOpaqueConst(path.RowGather.Args[1]) {
-			return QFrameSelectColumnSpec{}, nil, false
+			return QFrameSelectColumnSpec{}, nil, qQueryLoweringFallbackOpaqueRowConst, false
 		}
-		spec.DynamicArgRole = QFrameSelectColumnArgRowValue
-		args = append(args, path.RowGather.Args[1])
+		if rowConst, ok := qQueryConstRuntimeValue(path.RowGather.Args[1]); ok {
+			spec.RowValueConst = rowConst
+			spec.HasRowValueConst = true
+		} else if spec.DynamicArgRole == QFrameSelectColumnArgNone {
+			spec.DynamicArgRole = QFrameSelectColumnArgRowValue
+			args = append(args, path.RowGather.Args[1])
+		} else {
+			return QFrameSelectColumnSpec{}, nil, qQueryLoweringFallbackTooManyDynamicArgs, false
+		}
 	case path.RowSlice != nil:
 		spec.RowMode = QFrameSelectColumnRowsSlice
 		if len(path.RowSlice.Args) != 2 || path.RowSlice.Args[1] == nil {
-			return QFrameSelectColumnSpec{}, nil, false
+			return QFrameSelectColumnSpec{}, nil, qQueryLoweringFallbackMissingRowValue, false
 		}
 		if qQueryOpaqueConst(path.RowSlice.Args[1]) {
-			return QFrameSelectColumnSpec{}, nil, false
+			return QFrameSelectColumnSpec{}, nil, qQueryLoweringFallbackOpaqueRowConst, false
 		}
-		spec.DynamicArgRole = QFrameSelectColumnArgRowValue
-		args = append(args, path.RowSlice.Args[1])
+		if rowConst, ok := qQueryConstRuntimeValue(path.RowSlice.Args[1]); ok {
+			spec.RowValueConst = rowConst
+			spec.HasRowValueConst = true
+		} else if spec.DynamicArgRole == QFrameSelectColumnArgNone {
+			spec.DynamicArgRole = QFrameSelectColumnArgRowValue
+			args = append(args, path.RowSlice.Args[1])
+		} else {
+			return QFrameSelectColumnSpec{}, nil, qQueryLoweringFallbackTooManyDynamicArgs, false
+		}
 	}
-	return spec, args, true
+	return spec, args, "", true
 }
 
 func qQueryOpaqueConst(value *Value) bool {
@@ -402,11 +493,59 @@ func formatQQueryHotPathShapeCounts(counts map[string]int) string {
 	return strings.Join(parts, ", ")
 }
 
-func qQueryHotPathCompareOpName(compare *Instr) string {
-	if compare == nil {
-		return "frame-mask"
+func formatQQueryLoweringFallbackReasons(counts map[string]int) string {
+	if len(counts) == 0 {
+		return "0 fallback reason(s)\n"
 	}
-	switch runtime.DenseArrayBinaryOp(compare.Aux) {
+	return fmt.Sprintf("%d fallback reason(s): %s\n", len(counts), formatQQueryHotPathShapeCounts(counts))
+}
+
+func formatQFrameSelectColumnSpecs(specs []QFrameSelectColumnSpec) string {
+	if len(specs) == 0 {
+		return "0 typed runtime kernel(s)\n"
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "%d typed runtime kernel(s)\n", len(specs))
+	if counts := CountQFrameSelectColumnSpecShapes(specs); len(counts) > 0 {
+		fmt.Fprintf(&b, "  shapes: %s\n", formatQQueryHotPathShapeCounts(counts))
+	}
+	for i, spec := range specs {
+		fmt.Fprintf(&b, "  [%d] shape=%s mask=%s rows=%s dynamic_arg=%s project_const=%d result_const=%d",
+			i,
+			qFrameSelectColumnSpecShape(spec),
+			qFrameSelectColumnSpecMaskKind(spec),
+			qFrameSelectColumnRowModeName(spec.RowMode),
+			qFrameSelectColumnDynamicArgRoleName(spec.DynamicArgRole),
+			spec.ProjectConst,
+			spec.ResultColumnConst,
+		)
+		if spec.RowOrderConst >= 0 {
+			fmt.Fprintf(&b, " order_const=%d", spec.RowOrderConst)
+		}
+		b.WriteByte('\n')
+	}
+	return b.String()
+}
+
+func qFrameSelectColumnSpecShape(spec QFrameSelectColumnSpec) string {
+	if spec.Shape == "" {
+		return "unknown"
+	}
+	return spec.Shape
+}
+
+func qFrameSelectColumnSpecMaskKind(spec QFrameSelectColumnSpec) string {
+	if spec.MaskSpecConst >= 0 {
+		return fmt.Sprintf("frame-mask:%d", spec.MaskSpecConst)
+	}
+	if spec.SourceColumnConst >= 0 {
+		return fmt.Sprintf("compare:%s:%d", qDenseArrayCompareOpName(spec.CompareOp), spec.SourceColumnConst)
+	}
+	return "unknown"
+}
+
+func qDenseArrayCompareOpName(op runtime.DenseArrayBinaryOp) string {
+	switch op {
 	case runtime.DenseArrayEQ:
 		return "=="
 	case runtime.DenseArrayNE:
@@ -420,8 +559,43 @@ func qQueryHotPathCompareOpName(compare *Instr) string {
 	case runtime.DenseArrayGE:
 		return ">="
 	default:
-		return fmt.Sprintf("op(%d)", compare.Aux)
+		return fmt.Sprintf("op(%d)", op)
 	}
+}
+
+func qFrameSelectColumnRowModeName(mode QFrameSelectColumnRowMode) string {
+	switch mode {
+	case QFrameSelectColumnRowsNone:
+		return "none"
+	case QFrameSelectColumnRowsGather:
+		return "gather"
+	case QFrameSelectColumnRowsSlice:
+		return "slice"
+	case QFrameSelectColumnRowsOrderGather:
+		return "order/gather"
+	default:
+		return fmt.Sprintf("unknown(%d)", mode)
+	}
+}
+
+func qFrameSelectColumnDynamicArgRoleName(role QFrameSelectColumnDynamicArgRole) string {
+	switch role {
+	case QFrameSelectColumnArgNone:
+		return "none"
+	case QFrameSelectColumnArgCompareRHS:
+		return "compare_rhs"
+	case QFrameSelectColumnArgRowValue:
+		return "row_value"
+	default:
+		return fmt.Sprintf("unknown(%d)", role)
+	}
+}
+
+func qQueryHotPathCompareOpName(compare *Instr) string {
+	if compare == nil {
+		return "frame-mask"
+	}
+	return qDenseArrayCompareOpName(runtime.DenseArrayBinaryOp(compare.Aux))
 }
 
 func qQueryCompareColumn(compare *Instr) *Instr {

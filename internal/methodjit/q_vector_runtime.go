@@ -231,6 +231,9 @@ func qFrameSelectColumnCompareRHS(spec QFrameSelectColumnSpec, argVal runtime.Va
 }
 
 func qFrameSelectColumnRowArg(spec QFrameSelectColumnSpec, argVal runtime.Value, hasArg bool) (runtime.Value, bool) {
+	if spec.HasRowValueConst {
+		return spec.RowValueConst, true
+	}
 	if spec.DynamicArgRole == QFrameSelectColumnArgRowValue && hasArg {
 		return argVal, true
 	}
@@ -282,6 +285,39 @@ func frameProjectColumnNames(v runtime.Value) ([]string, error) {
 		names = append(names, item.Str())
 	}
 	return names, nil
+}
+
+func frameProjectColumnSpec(v runtime.Value) ([]string, string, error) {
+	if v.IsString() {
+		name := v.Str()
+		if name == "" {
+			return nil, "", fmt.Errorf("FrameProjectColumn result column name must not be empty")
+		}
+		return []string{name}, name, nil
+	}
+	if !v.IsTable() {
+		return nil, "", fmt.Errorf("FrameProjectColumn spec must be a string or table")
+	}
+	tbl := v.Table()
+	project := tbl.RawGetString("project")
+	if project.IsNil() {
+		project = tbl.RawGetInt(1)
+	}
+	names, err := frameProjectColumnNames(project)
+	if err != nil {
+		return nil, "", err
+	}
+	result := tbl.RawGetString("column")
+	if result.IsNil() {
+		result = tbl.RawGetString("result")
+	}
+	if result.IsNil() {
+		result = tbl.RawGetInt(2)
+	}
+	if !result.IsString() {
+		return nil, "", fmt.Errorf("FrameProjectColumn spec must provide result column")
+	}
+	return names, result.Str(), nil
 }
 
 func frameMaskSpec(v runtime.Value) (string, string, runtime.Value, error) {

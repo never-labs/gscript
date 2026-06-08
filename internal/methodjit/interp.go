@@ -1125,6 +1125,36 @@ func (s *interpState) execInstr(instr *Instr, block *Block) ([]runtime.Value, bo
 		}
 		s.values[instr.ID] = out
 
+	case OpFrameProjectColumn:
+		idx := int(instr.Aux)
+		if idx < 0 || idx >= len(s.fn.Proto.Constants) {
+			return nil, false, fmt.Errorf("FrameProjectColumn spec constant is out of range")
+		}
+		names, resultName, err := frameProjectColumnSpec(s.fn.Proto.Constants[idx])
+		if err != nil {
+			return nil, false, err
+		}
+		out, err := executeFrameProjectColumnValue(s.val(instr.Args[0]), names, resultName)
+		if err != nil {
+			return nil, false, err
+		}
+		s.values[instr.ID] = out
+
+	case OpFrameFilterProjectColumn:
+		idx := int(instr.Aux)
+		if idx < 0 || idx >= len(s.fn.Proto.Constants) {
+			return nil, false, fmt.Errorf("FrameFilterProjectColumn spec constant is out of range")
+		}
+		names, resultName, err := frameProjectColumnSpec(s.fn.Proto.Constants[idx])
+		if err != nil {
+			return nil, false, err
+		}
+		out, err := executeFrameFilterProjectColumnValue(s.val(instr.Args[0]), s.val(instr.Args[1]), names, resultName)
+		if err != nil {
+			return nil, false, err
+		}
+		s.values[instr.ID] = out
+
 	case OpQFrameSelectColumn:
 		if len(instr.Args) < 1 || len(instr.Args) > 2 {
 			return nil, false, fmt.Errorf("QFrameSelectColumn arg count = %d, want 1 or 2", len(instr.Args))

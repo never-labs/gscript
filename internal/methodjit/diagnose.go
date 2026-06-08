@@ -167,27 +167,30 @@ func (sc *snapshotCollector) latestSnapshotIR() string {
 
 // DiagReport is the complete diagnostic output for one function invocation.
 type DiagReport struct {
-	FuncName            string
-	NumArgs             int
-	Args                []runtime.Value
-	IRBefore            string   // IR after BuildGraph (before passes)
-	IRAfter             string   // IR after all passes
-	PassDiffs           []string // diff for each pass that changed the IR
-	PipelineStages      []PipelineStageTiming
-	ModuleContracts     []Tier2ModuleContract
-	ModuleReasons       []Tier2ModuleReason
-	ModuleFactDiffs     []Tier2ModuleFactDiff
-	OptimizationRemarks []OptimizationRemark // structured pass/gate diagnostics
-	QQueryHotPaths      []QQueryHotPath      // q query primitive pipelines visible in final IR
-	QQueryHotPathShapes map[string]int       // q query primitive pipeline count by shape
-	ValidateErrors      []error              // structural invariant violations
-	RegAllocMap         string               // human-readable register assignments
-	InterpResult        []runtime.Value      // IR interpreter output on UNOPTIMIZED IR
-	InterpError         error
-	OptInterpResult     []runtime.Value // IR interpreter output on OPTIMIZED IR
-	OptInterpError      error
-	NativeResult        []runtime.Value // compiled ARM64 output (OPTIMIZED IR)
-	NativeError         error
+	FuncName                  string
+	NumArgs                   int
+	Args                      []runtime.Value
+	IRBefore                  string   // IR after BuildGraph (before passes)
+	IRAfter                   string   // IR after all passes
+	PassDiffs                 []string // diff for each pass that changed the IR
+	PipelineStages            []PipelineStageTiming
+	ModuleContracts           []Tier2ModuleContract
+	ModuleReasons             []Tier2ModuleReason
+	ModuleFactDiffs           []Tier2ModuleFactDiff
+	OptimizationRemarks       []OptimizationRemark     // structured pass/gate diagnostics
+	QQueryHotPaths            []QQueryHotPath          // q query primitive pipelines visible in final IR
+	QQueryHotPathShapes       map[string]int           // q query primitive pipeline count by shape
+	QTypedRuntimeKernels      []QFrameSelectColumnSpec // q query primitive pipelines lowered to typed runtime-kernel op-exits
+	QTypedRuntimeKernelShapes map[string]int           // lowered q typed runtime-kernel count by shape
+	QQueryFallbacks           map[string]int           // q native lowering fallback count by reason code
+	ValidateErrors            []error                  // structural invariant violations
+	RegAllocMap               string                   // human-readable register assignments
+	InterpResult              []runtime.Value          // IR interpreter output on UNOPTIMIZED IR
+	InterpError               error
+	OptInterpResult           []runtime.Value // IR interpreter output on OPTIMIZED IR
+	OptInterpError            error
+	NativeResult              []runtime.Value // compiled ARM64 output (OPTIMIZED IR)
+	NativeError               error
 
 	// Three-way verdicts. The oracle interprets the unoptimized IR, interprets
 	// the optimized IR, and executes the optimized IR as native code. Comparing
@@ -259,6 +262,9 @@ func Diagnose(proto *vm.FuncProto, args []runtime.Value) *DiagReport {
 		r.OptimizationRemarks = remarks.List()
 		r.QQueryHotPaths = DetectQQueryHotPaths(fn)
 		r.QQueryHotPathShapes = CountQQueryHotPathShapes(r.QQueryHotPaths)
+		r.QTypedRuntimeKernels = append([]QFrameSelectColumnSpec(nil), fn.QFrameSelectColumnSpecs...)
+		r.QTypedRuntimeKernelShapes = CountQFrameSelectColumnSpecShapes(r.QTypedRuntimeKernels)
+		r.QQueryFallbacks = CountQQueryLoweringFallbackReasons(r.OptimizationRemarks)
 		r.NativeError = fmt.Errorf("pipeline error: %w", pipeErr)
 		r.compareResults()
 		return r
@@ -268,6 +274,9 @@ func Diagnose(proto *vm.FuncProto, args []runtime.Value) *DiagReport {
 	r.OptimizationRemarks = remarks.List()
 	r.QQueryHotPaths = DetectQQueryHotPaths(optimized)
 	r.QQueryHotPathShapes = CountQQueryHotPathShapes(r.QQueryHotPaths)
+	r.QTypedRuntimeKernels = append([]QFrameSelectColumnSpec(nil), optimized.QFrameSelectColumnSpecs...)
+	r.QTypedRuntimeKernelShapes = CountQFrameSelectColumnSpecShapes(r.QTypedRuntimeKernels)
+	r.QQueryFallbacks = CountQQueryLoweringFallbackReasons(r.OptimizationRemarks)
 	r.PipelineStages = collector.timings
 
 	// 4b. Interpret the OPTIMIZED IR. This is the middle of the three-way
@@ -511,6 +520,8 @@ func (r *DiagReport) String() string {
 	}
 	w("\n--- Optimization remarks ---\n%s", formatOptimizationRemarks(r.OptimizationRemarks))
 	w("\n--- Q query hot paths ---\n%s", formatQQueryHotPaths(r.QQueryHotPaths))
+	w("\n--- Q typed runtime kernels ---\n%s", formatQFrameSelectColumnSpecs(r.QTypedRuntimeKernels))
+	w("\n--- Q query fallback reasons ---\n%s", formatQQueryLoweringFallbackReasons(r.QQueryFallbacks))
 	w("\n--- IR (after passes) ---\n%s", r.IRAfter)
 	w("\n--- Register Allocation ---\n%s\n", r.RegAllocMap)
 	w("\n--- Validation ---\n")

@@ -197,6 +197,13 @@ const (
 	// q/frame runtime primitive. Args = [frame], Aux = constant pool index for
 	// an order spec; mirrors OP_FRAME_ORDER and returns sorted i64 row indexes.
 	OpFrameOrder
+	// q/frame runtime primitive. Args = [frame], Aux = constant pool index for
+	// a project-column spec; mirrors OP_FRAME_PROJECT_COLUMN and returns a
+	// dense-array column without materializing a projected frame facade.
+	OpFrameProjectColumn
+	// q/frame runtime primitive. Args = [frame, mask], Aux = constant pool
+	// index for a project-column spec; mirrors OP_FRAME_FILTER_PROJECT_COLUMN.
+	OpFrameFilterProjectColumn
 	// q/vector runtime primitive. Args = [vector, indexes]; mirrors
 	// OP_VECTOR_GATHER and returns a gathered dense-array value.
 	OpVectorGather

@@ -2531,6 +2531,64 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 				fb.Result.Observe(out.Type())
 			}
 
+		case OP_FRAME_PROJECT_COLUMN:
+			a := DecodeA(inst)
+			b := DecodeB(inst)
+			c := DecodeC(inst)
+			frameVal := vm.regs[base+b]
+			if c >= len(constants) {
+				return nil, wrapLineErr(frame, fmt.Errorf("FRAME_PROJECT_COLUMN spec constant is out of range"))
+			}
+			names, resultName, err := frameProjectColumnSpec(constants[c])
+			if err != nil {
+				return nil, wrapLineErr(frame, err)
+			}
+			out, handled, err := frameVal.NativeFrameProjectColumn(names, resultName)
+			if err != nil {
+				return nil, wrapLineErr(frame, err)
+			}
+			if !handled {
+				return nil, wrapLineErr(frame, fmt.Errorf("FRAME_PROJECT_COLUMN operand must be native frame (got %s)", frameVal.TypeName()))
+			}
+			vm.regs[base+a] = out
+			if frame.closure.Proto.Feedback != nil {
+				fb := &frame.closure.Proto.Feedback[frame.pc-1]
+				fb.Left.Observe(frameVal.Type())
+				fb.Right.Observe(constants[c].Type())
+				fb.Result.Observe(out.Type())
+			}
+
+		case OP_FRAME_FILTER_PROJECT_COLUMN:
+			a := DecodeA(inst)
+			b := DecodeB(inst)
+			c := DecodeC(inst)
+			maskVal := vm.regs[base+a]
+			frameVal := vm.regs[base+b]
+			if !maskVal.IsDenseArray() {
+				return nil, wrapLineErr(frame, fmt.Errorf("FRAME_FILTER_PROJECT_COLUMN mask must be dense array (got %s)", maskVal.TypeName()))
+			}
+			if c >= len(constants) {
+				return nil, wrapLineErr(frame, fmt.Errorf("FRAME_FILTER_PROJECT_COLUMN spec constant is out of range"))
+			}
+			names, resultName, err := frameProjectColumnSpec(constants[c])
+			if err != nil {
+				return nil, wrapLineErr(frame, err)
+			}
+			out, handled, err := frameVal.NativeFrameFilterProjectColumn(maskVal.DenseArray(), names, resultName)
+			if err != nil {
+				return nil, wrapLineErr(frame, err)
+			}
+			if !handled {
+				return nil, wrapLineErr(frame, fmt.Errorf("FRAME_FILTER_PROJECT_COLUMN operand must be native frame (got %s)", frameVal.TypeName()))
+			}
+			vm.regs[base+a] = out
+			if frame.closure.Proto.Feedback != nil {
+				fb := &frame.closure.Proto.Feedback[frame.pc-1]
+				fb.Left.Observe(frameVal.Type())
+				fb.Right.Observe(maskVal.Type())
+				fb.Result.Observe(out.Type())
+			}
+
 		case OP_VECTOR_COMPARE:
 			a := DecodeA(inst)
 			b := DecodeB(inst)
@@ -3992,6 +4050,39 @@ func frameProjectColumnNames(v runtime.Value) ([]string, error) {
 		names = append(names, item.Str())
 	}
 	return names, nil
+}
+
+func frameProjectColumnSpec(v runtime.Value) ([]string, string, error) {
+	if v.IsString() {
+		name := v.Str()
+		if name == "" {
+			return nil, "", fmt.Errorf("FRAME_PROJECT_COLUMN result column name must not be empty")
+		}
+		return []string{name}, name, nil
+	}
+	if !v.IsTable() {
+		return nil, "", fmt.Errorf("FRAME_PROJECT_COLUMN spec must be a string or table")
+	}
+	tbl := v.Table()
+	project := tbl.RawGetString("project")
+	if project.IsNil() {
+		project = tbl.RawGetInt(1)
+	}
+	names, err := frameProjectColumnNames(project)
+	if err != nil {
+		return nil, "", err
+	}
+	result := tbl.RawGetString("column")
+	if result.IsNil() {
+		result = tbl.RawGetString("result")
+	}
+	if result.IsNil() {
+		result = tbl.RawGetInt(2)
+	}
+	if !result.IsString() {
+		return nil, "", fmt.Errorf("FRAME_PROJECT_COLUMN spec must provide result column")
+	}
+	return names, result.Str(), nil
 }
 
 func frameMaskSpec(v runtime.Value) (string, string, runtime.Value, error) {

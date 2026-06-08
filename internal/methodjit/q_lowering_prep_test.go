@@ -195,6 +195,47 @@ func TestFrameProjectBytecodeBuildsMethodJITIR(t *testing.T) {
 	}
 }
 
+func TestFrameProjectColumnBytecodeBuildsMethodJITIR(t *testing.T) {
+	spec := runtime.NewTable()
+	spec.RawSetString("project", runtime.StringValue("price"))
+	spec.RawSetString("column", runtime.StringValue("price"))
+	proto := &vm.FuncProto{
+		Name:      "frame_project_column",
+		NumParams: 1,
+		MaxStack:  1,
+		Constants: []runtime.Value{
+			runtime.TableValue(spec),
+		},
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_FRAME_PROJECT_COLUMN, 0, 0, 0),
+			vm.EncodeABC(vm.OP_RETURN, 0, 2, 0),
+		},
+	}
+
+	fn := BuildGraph(proto)
+	var projectColumn *Instr
+	for _, block := range fn.Blocks {
+		for _, instr := range block.Instrs {
+			if instr.Op == OpFrameProjectColumn {
+				projectColumn = instr
+				break
+			}
+		}
+	}
+	if projectColumn == nil {
+		t.Fatalf("BuildGraph did not emit OpFrameProjectColumn:\n%s", Print(fn))
+	}
+	if len(projectColumn.Args) != 1 {
+		t.Fatalf("OpFrameProjectColumn arg count = %d, want 1", len(projectColumn.Args))
+	}
+	if projectColumn.Type != TypeAny {
+		t.Fatalf("OpFrameProjectColumn type = %s, want Any", projectColumn.Type)
+	}
+	if projectColumn.Aux != 0 {
+		t.Fatalf("OpFrameProjectColumn Aux = %d, want const index 0", projectColumn.Aux)
+	}
+}
+
 func TestFrameFilterBytecodeBuildsMethodJITIR(t *testing.T) {
 	proto := &vm.FuncProto{
 		Name:      "frame_filter",
@@ -224,6 +265,47 @@ func TestFrameFilterBytecodeBuildsMethodJITIR(t *testing.T) {
 	}
 	if filter.Type != TypeAny {
 		t.Fatalf("OpFrameFilter type = %s, want Any", filter.Type)
+	}
+}
+
+func TestFrameFilterProjectColumnBytecodeBuildsMethodJITIR(t *testing.T) {
+	spec := runtime.NewTable()
+	spec.RawSetString("project", runtime.StringValue("price"))
+	spec.RawSetString("column", runtime.StringValue("price"))
+	proto := &vm.FuncProto{
+		Name:      "frame_filter_project_column",
+		NumParams: 2,
+		MaxStack:  2,
+		Constants: []runtime.Value{
+			runtime.TableValue(spec),
+		},
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_FRAME_FILTER_PROJECT_COLUMN, 1, 0, 0),
+			vm.EncodeABC(vm.OP_RETURN, 1, 2, 0),
+		},
+	}
+
+	fn := BuildGraph(proto)
+	var filterProjectColumn *Instr
+	for _, block := range fn.Blocks {
+		for _, instr := range block.Instrs {
+			if instr.Op == OpFrameFilterProjectColumn {
+				filterProjectColumn = instr
+				break
+			}
+		}
+	}
+	if filterProjectColumn == nil {
+		t.Fatalf("BuildGraph did not emit OpFrameFilterProjectColumn:\n%s", Print(fn))
+	}
+	if len(filterProjectColumn.Args) != 2 {
+		t.Fatalf("OpFrameFilterProjectColumn arg count = %d, want 2", len(filterProjectColumn.Args))
+	}
+	if filterProjectColumn.Type != TypeAny {
+		t.Fatalf("OpFrameFilterProjectColumn type = %s, want Any", filterProjectColumn.Type)
+	}
+	if filterProjectColumn.Aux != 0 {
+		t.Fatalf("OpFrameFilterProjectColumn Aux = %d, want const index 0", filterProjectColumn.Aux)
 	}
 }
 
@@ -442,6 +524,54 @@ func TestQFramePrimitiveHotPathLowersToTypedRuntimeKernel(t *testing.T) {
 	}
 }
 
+func TestQFramePrimitiveHotPathLoweringReportsFallbackReason(t *testing.T) {
+	proto := &vm.FuncProto{
+		Name:      "q_frame_pipeline_lowering_fallback",
+		NumParams: 3,
+		MaxStack:  4,
+		Constants: []runtime.Value{
+			runtime.StringValue("price"),
+			qHotPathNamesValue("size"),
+			runtime.StringValue("size"),
+		},
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_FRAME_COLUMN, 3, 0, 0),
+			vm.EncodeABC(vm.OP_VECTOR_COMPARE, 3, 2, int(runtime.DenseArrayGE)),
+			vm.EncodeABC(vm.OP_FRAME_FILTER, 0, 0, 3),
+			vm.EncodeABC(vm.OP_FRAME_GATHER, 0, 0, 1),
+			vm.EncodeABC(vm.OP_FRAME_PROJECT, 0, 0, 1),
+			vm.EncodeABC(vm.OP_FRAME_COLUMN, 0, 0, 2),
+			vm.EncodeABC(vm.OP_RETURN, 0, 2, 0),
+		},
+	}
+
+	fn := BuildGraph(proto)
+	fn.Remarks = &OptimizationRemarks{}
+	lowered, err := QQueryNativeLoweringPass(fn)
+	if err != nil {
+		t.Fatalf("QQueryNativeLoweringPass: %v", err)
+	}
+	counts := map[Op]int{}
+	for _, block := range lowered.Blocks {
+		for _, instr := range block.Instrs {
+			counts[instr.Op]++
+		}
+	}
+	if counts[OpQFrameSelectColumn] != 0 {
+		t.Fatalf("OpQFrameSelectColumn count = %d, want 0 for unsupported dynamic rhs+row path\n%s", counts[OpQFrameSelectColumn], Print(lowered))
+	}
+	fallbacks := CountQQueryLoweringFallbackReasons(fn.Remarks.List())
+	if fallbacks[qQueryLoweringFallbackTooManyDynamicArgs] != 1 {
+		t.Fatalf("q lowering fallback counts = %+v, want %s=1", fallbacks, qQueryLoweringFallbackTooManyDynamicArgs)
+	}
+	got := formatOptimizationRemarks(fn.Remarks.List())
+	if !strings.Contains(got, "QQueryNativeLowering") ||
+		!strings.Contains(got, "reason_code=too_many_dynamic_args") ||
+		!strings.Contains(got, "shape=compare/filter/gather/project/column") {
+		t.Fatalf("q lowering fallback remark = %q, want structured reason and shape", got)
+	}
+}
+
 func TestQFramePrimitiveRowHotPathsLowerToTypedRuntimeKernel(t *testing.T) {
 	for _, tc := range []struct {
 		name      string
@@ -572,6 +702,66 @@ func TestQFramePrimitiveRowHotPathsLowerToTypedRuntimeKernel(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestQFramePrimitiveDynamicCompareConstRowLowersToTypedRuntimeKernel(t *testing.T) {
+	proto := &vm.FuncProto{
+		Name:      "q_frame_dynamic_compare_const_row_lowered",
+		NumParams: 2,
+		MaxStack:  4,
+		Constants: []runtime.Value{
+			runtime.StringValue("price"),
+			runtime.IntValue(1),
+			qHotPathNamesValue("size"),
+			runtime.StringValue("size"),
+		},
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_FRAME_COLUMN, 2, 0, 0),
+			vm.EncodeABC(vm.OP_VECTOR_COMPARE, 2, 1, int(runtime.DenseArrayGE)),
+			vm.EncodeABC(vm.OP_FRAME_FILTER, 0, 0, 2),
+			vm.EncodeABx(vm.OP_LOADK, 3, 1),
+			vm.EncodeABC(vm.OP_FRAME_SLICE, 0, 0, 3),
+			vm.EncodeABC(vm.OP_FRAME_PROJECT, 0, 0, 2),
+			vm.EncodeABC(vm.OP_FRAME_COLUMN, 0, 0, 3),
+			vm.EncodeABC(vm.OP_RETURN, 0, 2, 0),
+		},
+	}
+	fn := BuildGraph(proto)
+	lowered, err := QQueryNativeLoweringPass(fn)
+	if err != nil {
+		t.Fatalf("QQueryNativeLoweringPass: %v", err)
+	}
+	counts := map[Op]int{}
+	for _, block := range lowered.Blocks {
+		for _, instr := range block.Instrs {
+			counts[instr.Op]++
+		}
+	}
+	if counts[OpQFrameSelectColumn] != 1 {
+		t.Fatalf("OpQFrameSelectColumn count = %d, want 1\n%s", counts[OpQFrameSelectColumn], Print(lowered))
+	}
+	if len(lowered.QFrameSelectColumnSpecs) != 1 {
+		t.Fatalf("QFrameSelectColumnSpecs count = %d, want 1", len(lowered.QFrameSelectColumnSpecs))
+	}
+	spec := lowered.QFrameSelectColumnSpecs[0]
+	if spec.Shape != "compare/filter/slice/project/column" ||
+		spec.DynamicArgRole != QFrameSelectColumnArgCompareRHS ||
+		!spec.HasRowValueConst ||
+		!spec.RowValueConst.IsInt() ||
+		spec.RowValueConst.Int() != 1 {
+		t.Fatalf("lowered q spec = %+v, want dynamic compare rhs with const slice row", spec)
+	}
+	result, err := Interpret(lowered, []runtime.Value{
+		runtime.TableValue(qHotPathTestFrame(t)),
+		runtime.FloatValue(100),
+	})
+	if err != nil {
+		t.Fatalf("Interpret lowered q hot path: %v", err)
+	}
+	got, ok := result[0].DenseArray().I64()
+	if !ok || len(got) != 1 || got[0] != 10 {
+		t.Fatalf("lowered result values = %#v, want [10]", got)
 	}
 }
 
@@ -924,8 +1114,24 @@ func TestDiagnoseReportsQQueryHotPath(t *testing.T) {
 	if len(report.QQueryHotPathShapes) != 0 {
 		t.Fatalf("Diagnose QQueryHotPathShapes = %+v, want empty after native lowering", report.QQueryHotPathShapes)
 	}
+	if len(report.QTypedRuntimeKernels) != 1 {
+		t.Fatalf("Diagnose QTypedRuntimeKernels = %d, want 1\n%s", len(report.QTypedRuntimeKernels), report.String())
+	}
+	if report.QTypedRuntimeKernels[0].Shape != "compare/filter/project/column" {
+		t.Fatalf("Diagnose QTypedRuntimeKernels[0].Shape = %q, want compare/filter/project/column", report.QTypedRuntimeKernels[0].Shape)
+	}
+	if report.QTypedRuntimeKernelShapes["compare/filter/project/column"] != 1 {
+		t.Fatalf("Diagnose QTypedRuntimeKernelShapes = %+v, want compare/filter/project/column count 1", report.QTypedRuntimeKernelShapes)
+	}
 	if !strings.Contains(report.String(), "Q query hot paths") {
 		t.Fatalf("diagnostic report missing q hot path section:\n%s", report.String())
+	}
+	if !strings.Contains(report.String(), "Q typed runtime kernels") ||
+		!strings.Contains(report.String(), "1 typed runtime kernel(s)") ||
+		!strings.Contains(report.String(), "shapes: compare/filter/project/column=1") ||
+		!strings.Contains(report.String(), "mask=compare:>=:0") ||
+		!strings.Contains(report.String(), "rows=none") {
+		t.Fatalf("diagnostic report missing q typed runtime kernel section:\n%s", report.String())
 	}
 	if !strings.Contains(report.String(), "QFrameSelectColumn") {
 		t.Fatalf("diagnostic report missing lowered q kernel op:\n%s", report.String())
@@ -937,6 +1143,48 @@ func TestDiagnoseReportsQQueryHotPath(t *testing.T) {
 		!strings.Contains(formatOptimizationRemarks(report.OptimizationRemarks), "QQueryNativeLowering") ||
 		!strings.Contains(formatOptimizationRemarks(report.OptimizationRemarks), "typed runtime kernel op-exit") {
 		t.Fatalf("diagnostic remarks missing q hot path lowering handoff:\n%s", formatOptimizationRemarks(report.OptimizationRemarks))
+	}
+}
+
+func TestDiagnoseReportsQQueryFallbackReasons(t *testing.T) {
+	proto := &vm.FuncProto{
+		Name:      "q_frame_pipeline_fallback_diag",
+		NumParams: 3,
+		MaxStack:  4,
+		Constants: []runtime.Value{
+			runtime.StringValue("price"),
+			qHotPathNamesValue("size"),
+			runtime.StringValue("size"),
+		},
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_FRAME_COLUMN, 3, 0, 0),
+			vm.EncodeABC(vm.OP_VECTOR_COMPARE, 3, 2, int(runtime.DenseArrayGE)),
+			vm.EncodeABC(vm.OP_FRAME_FILTER, 0, 0, 3),
+			vm.EncodeABC(vm.OP_FRAME_GATHER, 0, 0, 1),
+			vm.EncodeABC(vm.OP_FRAME_PROJECT, 0, 0, 1),
+			vm.EncodeABC(vm.OP_FRAME_COLUMN, 0, 0, 2),
+			vm.EncodeABC(vm.OP_RETURN, 0, 2, 0),
+		},
+	}
+
+	report := Diagnose(proto, []runtime.Value{
+		runtime.TableValue(qHotPathTestFrame(t)),
+		runtime.DenseArrayValue(runtime.NewDenseArrayI64([]int64{2, 1})),
+		runtime.FloatValue(100),
+	})
+	if report.QQueryFallbacks[qQueryLoweringFallbackTooManyDynamicArgs] != 1 {
+		t.Fatalf("Diagnose QQueryFallbacks = %+v, want %s count 1\n%s", report.QQueryFallbacks, qQueryLoweringFallbackTooManyDynamicArgs, report.String())
+	}
+	if len(report.QTypedRuntimeKernels) != 0 {
+		t.Fatalf("Diagnose QTypedRuntimeKernels = %d, want 0 for fallback path\n%s", len(report.QTypedRuntimeKernels), report.String())
+	}
+	if len(report.QQueryHotPaths) != 1 {
+		t.Fatalf("Diagnose QQueryHotPaths = %d, want 1 remaining fallback hot path\n%s", len(report.QQueryHotPaths), report.String())
+	}
+	if !strings.Contains(report.String(), "Q query fallback reasons") ||
+		!strings.Contains(report.String(), "too_many_dynamic_args=1") ||
+		!strings.Contains(formatOptimizationRemarks(report.OptimizationRemarks), "reason_code=too_many_dynamic_args") {
+		t.Fatalf("diagnostic report missing q fallback reason:\n%s", report.String())
 	}
 }
 
@@ -1125,6 +1373,52 @@ func TestTier2GateAllowsFrameOrderThroughOpExit(t *testing.T) {
 	gate := firstUnsupportedTier2BytecodeGate(proto)
 	if !gate.Allowed {
 		t.Fatalf("OP_FRAME_ORDER should be Tier2-eligible via op-exit, got %q", gate.Reason)
+	}
+}
+
+func TestTier2GateAllowsFrameProjectColumnThroughOpExit(t *testing.T) {
+	spec := runtime.NewTable()
+	spec.RawSetString("project", runtime.StringValue("price"))
+	spec.RawSetString("column", runtime.StringValue("price"))
+	proto := &vm.FuncProto{
+		Name:      "frame_project_column",
+		NumParams: 1,
+		MaxStack:  1,
+		Constants: []runtime.Value{
+			runtime.TableValue(spec),
+		},
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_FRAME_PROJECT_COLUMN, 0, 0, 0),
+			vm.EncodeABC(vm.OP_RETURN, 0, 2, 0),
+		},
+	}
+
+	gate := firstUnsupportedTier2BytecodeGate(proto)
+	if !gate.Allowed {
+		t.Fatalf("OP_FRAME_PROJECT_COLUMN should be Tier2-eligible via op-exit, got %q", gate.Reason)
+	}
+}
+
+func TestTier2GateAllowsFrameFilterProjectColumnThroughOpExit(t *testing.T) {
+	spec := runtime.NewTable()
+	spec.RawSetString("project", runtime.StringValue("price"))
+	spec.RawSetString("column", runtime.StringValue("price"))
+	proto := &vm.FuncProto{
+		Name:      "frame_filter_project_column",
+		NumParams: 2,
+		MaxStack:  2,
+		Constants: []runtime.Value{
+			runtime.TableValue(spec),
+		},
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_FRAME_FILTER_PROJECT_COLUMN, 1, 0, 0),
+			vm.EncodeABC(vm.OP_RETURN, 1, 2, 0),
+		},
+	}
+
+	gate := firstUnsupportedTier2BytecodeGate(proto)
+	if !gate.Allowed {
+		t.Fatalf("OP_FRAME_FILTER_PROJECT_COLUMN should be Tier2-eligible via op-exit, got %q", gate.Reason)
 	}
 }
 

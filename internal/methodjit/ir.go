@@ -71,6 +71,8 @@ type QFrameSelectColumnSpec struct {
 	CompareOp          runtime.DenseArrayBinaryOp
 	CompareRHSConst    runtime.Value
 	HasCompareRHSConst bool
+	RowValueConst      runtime.Value
+	HasRowValueConst   bool
 }
 
 type QFrameSelectColumnRowMode uint8

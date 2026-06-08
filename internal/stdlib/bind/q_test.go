@@ -3481,12 +3481,54 @@ func TestQExplainReportsQueryKernelVisibility(t *testing.T) {
 	if got := beforeTable.RawGetString("source_schema_hash"); !got.IsString() || got.Str() != frame.SchemaFingerprint() {
 		t.Fatalf("source_schema_hash before = %v, want %s", got, frame.SchemaFingerprint())
 	}
+	cacheKey := beforeTable.RawGetString("kernel_cache_key")
+	if !cacheKey.IsString() || cacheKey.Str() == "" {
+		t.Fatalf("kernel_cache_key before = %v, want stable non-empty key", cacheKey)
+	}
 	schema := beforeTable.RawGetString("source_schema").Table()
 	if schema == nil || schema.Length() != 3 {
 		t.Fatalf("source_schema len = %v, want 3", schema)
 	}
 	if got := schema.RawGetInt(1).Table().RawGetString("name"); !got.IsString() || got.Str() != "sym" {
 		t.Fatalf("source_schema[1].name = %v, want sym", got)
+	}
+	sameSchema, err := data.NewFrame(
+		data.Column{Name: "sym", Data: data.NewSymbols([]string{"IBM"})},
+		data.Column{Name: "price", Data: data.NewF64([]float64{99})},
+		data.Column{Name: "size", Data: data.NewI64([]int64{1})},
+	)
+	if err != nil {
+		t.Fatalf("same schema frame: %v", err)
+	}
+	sameSchemaValue, err := qDataFrameValue(sameSchema)
+	if err != nil {
+		t.Fatalf("same schema frame value: %v", err)
+	}
+	sameSchemaExplain, err := qExplainSQL(qSQLArgsResult{frameValue: sameSchemaValue, source: query})
+	if err != nil {
+		t.Fatalf("same schema explain: %v", err)
+	}
+	if got := sameSchemaExplain.Table().RawGetString("kernel_cache_key"); !got.IsString() || got.Str() != cacheKey.Str() {
+		t.Fatalf("same schema kernel_cache_key = %v, want %s", got, cacheKey.Str())
+	}
+	differentSchema, err := data.NewFrame(
+		data.Column{Name: "sym", Data: data.NewSymbols([]string{"IBM"})},
+		data.Column{Name: "size", Data: data.NewI64([]int64{1})},
+		data.Column{Name: "price", Data: data.NewF64([]float64{99})},
+	)
+	if err != nil {
+		t.Fatalf("different schema frame: %v", err)
+	}
+	differentSchemaValue, err := qDataFrameValue(differentSchema)
+	if err != nil {
+		t.Fatalf("different schema frame value: %v", err)
+	}
+	differentSchemaExplain, err := qExplainSQL(qSQLArgsResult{frameValue: differentSchemaValue, source: query})
+	if err != nil {
+		t.Fatalf("different schema explain: %v", err)
+	}
+	if got := differentSchemaExplain.Table().RawGetString("kernel_cache_key"); !got.IsString() || got.Str() == cacheKey.Str() {
+		t.Fatalf("different schema kernel_cache_key = %v, want it to differ from %s", got, cacheKey.Str())
 	}
 
 	if _, err := qRunSQL("q.sql", qSQLArgsResult{frameValue: frameValue, source: query}); err != nil {
@@ -3505,6 +3547,9 @@ func TestQExplainReportsQueryKernelVisibility(t *testing.T) {
 	}
 	if got := afterTable.RawGetString("kernel_cached"); !got.IsBool() || !got.Bool() {
 		t.Fatalf("kernel_cached after = %v, want true", got)
+	}
+	if got := afterTable.RawGetString("kernel_cache_key"); !got.IsString() || got.Str() != cacheKey.Str() {
+		t.Fatalf("kernel_cache_key after = %v, want %s", got, cacheKey.Str())
 	}
 
 	stats := qSQLPlanCacheStatsSnapshot()

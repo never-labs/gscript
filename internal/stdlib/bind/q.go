@@ -1453,6 +1453,7 @@ func qExplainSQL(args qSQLArgsResult) (Value, error) {
 	out.RawSetString("source_schema_hash", StringValue(qExplainKernelSchemaHash(kernelInfo)))
 	out.RawSetString("kernel_supported", BoolValue(kernelInfo.supported))
 	out.RawSetString("kernel_cached", BoolValue(kernelInfo.cached))
+	out.RawSetString("kernel_cache_key", StringValue(kernelInfo.cacheKey))
 	out.RawSetString("kernel_reason_code", StringValue(kernelInfo.reasonCode))
 	out.RawSetString("kernel_reason", StringValue(kernelInfo.reason))
 	return TableValue(out), nil
@@ -1461,6 +1462,7 @@ func qExplainSQL(args qSQLArgsResult) (Value, error) {
 type qExplainKernelResult struct {
 	schema     data.Schema
 	schemaHash string
+	cacheKey   string
 	supported  bool
 	cached     bool
 	reasonCode string
@@ -1848,12 +1850,12 @@ func qExplainKernelInfo(args qSQLArgsResult, tmpl qSQLPlanTemplate) qExplainKern
 	}
 	supported, reason, err := data.QueryKernelCompileReason(frame, plan)
 	if err != nil {
-		return qExplainKernelResult{schema: frame.Schema(), schemaHash: schemaHash, cached: cached, reasonCode: qKernelReasonCompileError, reason: err.Error()}
+		return qExplainKernelResult{schema: frame.Schema(), schemaHash: schemaHash, cacheKey: kernelKey, cached: cached, reasonCode: qKernelReasonCompileError, reason: err.Error()}
 	}
 	if !supported {
-		return qExplainKernelResult{schema: frame.Schema(), schemaHash: schemaHash, cached: cached, reasonCode: stdq.KernelFallbackReasonCode(reason), reason: reason}
+		return qExplainKernelResult{schema: frame.Schema(), schemaHash: schemaHash, cacheKey: kernelKey, cached: cached, reasonCode: stdq.KernelFallbackReasonCode(reason), reason: reason}
 	}
-	return qExplainKernelResult{schema: frame.Schema(), schemaHash: schemaHash, supported: true, cached: cached, reasonCode: qKernelReasonSupported, reason: reason}
+	return qExplainKernelResult{schema: frame.Schema(), schemaHash: schemaHash, cacheKey: kernelKey, supported: true, cached: cached, reasonCode: qKernelReasonSupported, reason: reason}
 }
 
 func qExplainKernelSchemaHash(info qExplainKernelResult) string {

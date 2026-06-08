@@ -1067,6 +1067,40 @@ func (cf *CompiledFunction) executeOpExit(ctx *ExecContext, regs []runtime.Value
 		}
 		regs[slot] = out
 
+	case OpFrameProjectColumn:
+		if arg1 >= len(regs) || slot >= len(regs) {
+			return fmt.Errorf("FrameProjectColumn op-exit out of register range")
+		}
+		if aux < 0 || cf.Proto == nil || aux >= len(cf.Proto.Constants) {
+			return fmt.Errorf("FrameProjectColumn spec constant is out of range")
+		}
+		names, resultName, err := frameProjectColumnSpec(cf.Proto.Constants[aux])
+		if err != nil {
+			return err
+		}
+		out, err := executeFrameProjectColumnValue(regs[arg1], names, resultName)
+		if err != nil {
+			return err
+		}
+		regs[slot] = out
+
+	case OpFrameFilterProjectColumn:
+		if arg1 >= len(regs) || arg2 >= len(regs) || slot >= len(regs) {
+			return fmt.Errorf("FrameFilterProjectColumn op-exit out of register range")
+		}
+		if aux < 0 || cf.Proto == nil || aux >= len(cf.Proto.Constants) {
+			return fmt.Errorf("FrameFilterProjectColumn spec constant is out of range")
+		}
+		names, resultName, err := frameProjectColumnSpec(cf.Proto.Constants[aux])
+		if err != nil {
+			return err
+		}
+		out, err := executeFrameFilterProjectColumnValue(regs[arg1], regs[arg2], names, resultName)
+		if err != nil {
+			return err
+		}
+		regs[slot] = out
+
 	case OpQFrameSelectColumn:
 		if arg1 >= len(regs) || slot >= len(regs) {
 			return fmt.Errorf("QFrameSelectColumn op-exit out of register range")

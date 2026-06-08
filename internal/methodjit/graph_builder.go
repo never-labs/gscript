@@ -1010,6 +1010,23 @@ func (b *graphBuilder) emitBlocks() {
 				instr := b.emit(block, OpFrameOrder, TypeAny, []*Value{frame}, int64(c), 0)
 				b.writeVariable(a, block, instr.Value())
 
+			case vm.OP_FRAME_PROJECT_COLUMN:
+				a := vm.DecodeA(inst)
+				bOp := vm.DecodeB(inst)
+				c := vm.DecodeC(inst)
+				frame := b.readVariable(bOp, block)
+				instr := b.emit(block, OpFrameProjectColumn, TypeAny, []*Value{frame}, int64(c), 0)
+				b.writeVariable(a, block, instr.Value())
+
+			case vm.OP_FRAME_FILTER_PROJECT_COLUMN:
+				a := vm.DecodeA(inst)
+				bOp := vm.DecodeB(inst)
+				c := vm.DecodeC(inst)
+				frame := b.readVariable(bOp, block)
+				mask := b.readVariable(a, block)
+				instr := b.emit(block, OpFrameFilterProjectColumn, TypeAny, []*Value{frame, mask}, int64(c), 0)
+				b.writeVariable(a, block, instr.Value())
+
 			case vm.OP_VECTOR_GATHER:
 				a := vm.DecodeA(inst)
 				bOp := vm.DecodeB(inst)

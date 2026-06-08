@@ -91,6 +91,8 @@ var opSpecs = [...]OpSpec{
 	OpFrameGather:                   opSpecArgCount(opSpec("FrameGather", OpEmitterTable, OpArgFixed, OpSideEffectRead, true), OpFixedCount(2)),
 	OpFrameSlice:                    opSpecArgCount(opSpec("FrameSlice", OpEmitterTable, OpArgFixed, OpSideEffectRead, true), OpFixedCount(2)),
 	OpFrameOrder:                    opSpecArgCount(opSpec("FrameOrder", OpEmitterTable, OpArgFixedAux, OpSideEffectRead, true), OpFixedCount(1)),
+	OpFrameProjectColumn:            opSpecArgCount(opSpec("FrameProjectColumn", OpEmitterTable, OpArgFixedAux, OpSideEffectRead, true), OpFixedCount(1)),
+	OpFrameFilterProjectColumn:      opSpecArgCount(opSpec("FrameFilterProjectColumn", OpEmitterTable, OpArgFixedAux, OpSideEffectRead, true), OpFixedCount(2)),
 	OpVectorGather:                  opSpecArgCount(opSpec("VectorGather", OpEmitterTable, OpArgFixed, OpSideEffectRead, true), OpFixedCount(2)),
 	OpVectorCompare:                 opSpecArgCount(opSpec("VectorCompare", OpEmitterTable, OpArgFixedAux, OpSideEffectRead, true), OpFixedCount(2)),
 	OpQFrameSelectColumn:            opSpec("QFrameSelectColumn", OpEmitterTable, OpArgVariadicAux, OpSideEffectRead, true),
