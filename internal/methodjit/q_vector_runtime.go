@@ -106,6 +106,17 @@ func executeFrameFilterProjectColumnValue(frameVal, maskVal runtime.Value, names
 	return out, nil
 }
 
+func executeFrameBoolMaskFilterProjectColumnValue(frameVal runtime.Value, maskName string, names []string, resultName string) (runtime.Value, error) {
+	maskVal, handled, err := frameVal.NativeFrameBoolMask(maskName)
+	if err != nil {
+		return runtime.NilValue(), err
+	}
+	if !handled {
+		return runtime.NilValue(), fmt.Errorf("FrameBoolMaskFilterProjectColumn operand must be native frame (got %s)", frameVal.TypeName())
+	}
+	return executeFrameFilterProjectColumnValue(frameVal, maskVal, names, resultName)
+}
+
 func executeFrameGroupAggregateValue(frameVal, maskVal, specVal runtime.Value) (runtime.Value, error) {
 	spec, err := runtime.DecodeFrameGroupAggregateSpec(specVal)
 	if err != nil {
@@ -304,7 +315,11 @@ func executeQFrameSelectColumnCompareFilterProject(constants []runtime.Value, sp
 		if err != nil {
 			return runtime.NilValue(), true, err
 		}
-		if maskSpec.Mode == "bool_column" || maskSpec.RHSLiteral {
+		if maskSpec.Mode == "bool_column" {
+			out, err := executeFrameBoolMaskFilterProjectColumnValue(frameVal, maskSpec.Name, names, resultName)
+			return out, true, err
+		}
+		if maskSpec.RHSLiteral {
 			return runtime.NilValue(), false, nil
 		}
 		denseOp, err := runtime.DenseArrayCompareOp(maskSpec.Op)
