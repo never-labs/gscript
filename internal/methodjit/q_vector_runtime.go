@@ -140,6 +140,24 @@ func executeFrameFilterSliceProjectColumnValue(frameVal, maskVal, endVal runtime
 	return out, nil
 }
 
+func executeFrameFilterOrderGatherProjectColumnValue(frameVal, maskVal, orderSpec runtime.Value, names []string, resultName string) (runtime.Value, error) {
+	if !maskVal.IsDenseArray() {
+		return runtime.NilValue(), fmt.Errorf("FrameFilterOrderGatherProjectColumn mask must be dense array (got %s)", maskVal.TypeName())
+	}
+	orderNames, desc, limit, err := frameOrderSpec(orderSpec)
+	if err != nil {
+		return runtime.NilValue(), err
+	}
+	out, handled, err := frameVal.NativeFrameFilterOrderGatherProjectColumn(maskVal.DenseArray(), orderNames, desc, limit, names, resultName)
+	if err != nil {
+		return runtime.NilValue(), err
+	}
+	if !handled {
+		return runtime.NilValue(), fmt.Errorf("FrameFilterOrderGatherProjectColumn operand must be native frame (got %s)", frameVal.TypeName())
+	}
+	return out, nil
+}
+
 func executeFrameBoolMaskFilterProjectColumnValue(frameVal runtime.Value, maskName string, names []string, resultName string) (runtime.Value, error) {
 	maskVal, handled, err := frameVal.NativeFrameBoolMask(maskName)
 	if err != nil {
@@ -348,6 +366,11 @@ func executeQFrameSelectColumnValue(constants []runtime.Value, specs []QFrameSel
 			return runtime.NilValue(), fmt.Errorf("QFrameSelectColumn slice path requires end")
 		}
 		return executeFrameFilterSliceProjectColumnValue(frameVal, mask, rowArg, names, resultName)
+	case QFrameSelectColumnRowsOrderGather:
+		if spec.RowOrderConst < 0 || spec.RowOrderConst >= len(constants) {
+			return runtime.NilValue(), fmt.Errorf("QFrameSelectColumn order spec constant is out of range")
+		}
+		return executeFrameFilterOrderGatherProjectColumnValue(frameVal, mask, constants[spec.RowOrderConst], names, resultName)
 	}
 	rows, err := executeFrameFilterValue(frameVal, mask)
 	if err != nil {

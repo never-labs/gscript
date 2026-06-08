@@ -4687,6 +4687,47 @@ func TestFrameFilterRowsProjectColumnRuntimeHelpersUseRuntimePrimitive(t *testin
 	}
 }
 
+func TestFrameFilterOrderGatherProjectColumnRuntimeHelperUsesRuntimePrimitive(t *testing.T) {
+	soa, err := runtime.NewSoA(map[string]*runtime.DenseArray{
+		"price": runtime.NewDenseArrayF64([]float64{10.5, 20.25, 30.75}),
+		"size":  runtime.NewDenseArrayI64([]int64{100, 200, 300}),
+	})
+	if err != nil {
+		t.Fatalf("NewSoA: %v", err)
+	}
+	frame := runtime.NewTable()
+	frame.SetNativePayloadWithInfo(soa, runtime.NativePayloadInfo{
+		Kind:    runtime.NativePayloadDataFrame,
+		Rows:    soa.Len(),
+		Columns: 2,
+	})
+	order := qHotPathOrderValue("price", true)
+
+	result, err := executeFrameFilterOrderGatherProjectColumnValue(
+		runtime.TableValue(frame),
+		runtime.DenseArrayValue(runtime.NewDenseArrayBool([]bool{true, false, true})),
+		order,
+		[]string{"size"},
+		"size",
+	)
+	if err != nil {
+		t.Fatalf("execute frame filter order gather project column: %v", err)
+	}
+	got, ok := result.DenseArray().I64()
+	if !ok || len(got) != 2 || got[0] != 300 || got[1] != 100 {
+		t.Fatalf("filter order gather project column values = %#v, want [300 100]", got)
+	}
+	if _, err := executeFrameFilterOrderGatherProjectColumnValue(
+		runtime.TableValue(frame),
+		runtime.DenseArrayValue(runtime.NewDenseArrayBool([]bool{true, false, true})),
+		runtime.StringValue("missing"),
+		[]string{"size"},
+		"size",
+	); err == nil {
+		t.Fatalf("execute frame filter order gather project column accepted missing order column")
+	}
+}
+
 func TestFrameCompareFilterProjectColumnRuntimeHelperUsesRuntimePrimitive(t *testing.T) {
 	soa, err := runtime.NewSoA(map[string]*runtime.DenseArray{
 		"price": runtime.NewDenseArrayF64([]float64{10.5, 20.25, 30.75}),

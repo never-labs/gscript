@@ -890,6 +890,17 @@ func (v Value) NativeFrameFilterSliceProjectColumn(mask *DenseArray, start, end 
 	return DenseArrayValue(out), true, nil
 }
 
+// NativeFrameFilterOrderGatherProjectColumn filters a native frame, orders the
+// selected rows, and returns one projected result column without materializing
+// intermediate frame facades.
+func (v Value) NativeFrameFilterOrderGatherProjectColumn(mask *DenseArray, orderNames []string, desc []bool, limit int, names []string, resultName string) (Value, bool, error) {
+	indexes, handled, err := v.nativeFrameFilteredOrderIndexes("FRAME_FILTER_ORDER_GATHER_PROJECT_COLUMN", mask, orderNames, desc, limit)
+	if err != nil || !handled {
+		return NilValue(), handled, err
+	}
+	return v.NativeFrameFilterGatherProjectColumn(mask, indexes, names, resultName)
+}
+
 // NativeFrameCompareFilterProjectColumn computes a typed frame-column comparison
 // and returns one filtered projected column without materializing an
 // intermediate mask or frame facade for VM/JIT q hot paths.
@@ -1716,6 +1727,79 @@ func (v Value) nativeFrameOrderIndexes(op string, names []string, desc []bool, l
 		indices = indices[:limit]
 	}
 	return frame, info, NewDenseArrayI64(indices), true, nil
+}
+
+func (v Value) nativeFrameFilteredOrderIndexes(op string, mask *DenseArray, names []string, desc []bool, limit int) (*DenseArray, bool, error) {
+	if mask == nil {
+		return nil, true, fmt.Errorf("%s mask must be a bool dense array", op)
+	}
+	if mask.dtype != DenseArrayBool {
+		return nil, true, fmt.Errorf("%s mask must be a bool dense array", op)
+	}
+	if len(names) == 0 {
+		return nil, true, fmt.Errorf("%s requires at least one order column", op)
+	}
+	if len(desc) != 0 && len(desc) != len(names) {
+		return nil, true, fmt.Errorf("%s desc flags must match order column count", op)
+	}
+	frame, _, handled, err := v.nativeFrameSoA(op)
+	if err != nil || !handled {
+		return nil, handled, err
+	}
+	if frame.Len() != mask.Len() {
+		return nil, true, ErrDenseArrayLength
+	}
+	comparers := make([]nativeFrameOrderComparer, len(names))
+	for i, name := range names {
+		if name == "" {
+			return nil, true, fmt.Errorf("%s order column name must not be empty", op)
+		}
+		col, ok := frame.Column(name)
+		if !ok {
+			return nil, true, fmt.Errorf("%s unknown order column %q", op, name)
+		}
+		comparer, err := nativeFrameOrderComparerFor(col)
+		if err != nil {
+			return nil, true, err
+		}
+		comparers[i] = comparer
+	}
+	type filteredOrderRow struct {
+		original int
+		position int64
+	}
+	rows := make([]filteredOrderRow, 0, denseArrayBoolCount(mask.bools))
+	var position int64
+	for original, keep := range mask.bools {
+		if !keep {
+			continue
+		}
+		position++
+		rows = append(rows, filteredOrderRow{original: original, position: position})
+	}
+	sort.SliceStable(rows, func(i, j int) bool {
+		leftIdx := rows[i].original
+		rightIdx := rows[j].original
+		for k, comparer := range comparers {
+			cmp := comparer(leftIdx, rightIdx)
+			if cmp == 0 {
+				continue
+			}
+			if len(desc) > 0 && desc[k] {
+				return cmp > 0
+			}
+			return cmp < 0
+		}
+		return false
+	})
+	if limit >= 0 && limit < len(rows) {
+		rows = rows[:limit]
+	}
+	indices := make([]int64, len(rows))
+	for i, row := range rows {
+		indices[i] = row.position
+	}
+	return NewDenseArrayI64(indices), true, nil
 }
 
 type nativeFrameOrderComparer func(left, right int) int

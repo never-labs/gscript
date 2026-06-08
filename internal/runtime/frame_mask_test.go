@@ -307,6 +307,61 @@ func TestNativeFrameFilterRowsProjectColumnFusesTypedRuntimePath(t *testing.T) {
 	}
 }
 
+func TestNativeFrameFilterOrderGatherProjectColumnFusesTypedRuntimePath(t *testing.T) {
+	soa, err := NewSoA(map[string]*DenseArray{
+		"price": NewDenseArrayF64([]float64{10, 12, 8}),
+		"size":  NewDenseArrayI64([]int64{100, 200, 300}),
+	})
+	if err != nil {
+		t.Fatalf("NewSoA: %v", err)
+	}
+	frame := NewTable()
+	frame.SetNativePayloadWithInfo(soa, NativePayloadInfo{
+		Kind:       NativePayloadDataFrame,
+		Rows:       soa.Len(),
+		Columns:    2,
+		SchemaHash: "filter-order-gather-project-column-test",
+	})
+
+	col, handled, err := TableValue(frame).NativeFrameFilterOrderGatherProjectColumn(
+		NewDenseArrayBool([]bool{true, false, true}),
+		[]string{"price"},
+		[]bool{false},
+		-1,
+		[]string{"size"},
+		"size",
+	)
+	if err != nil {
+		t.Fatalf("NativeFrameFilterOrderGatherProjectColumn: %v", err)
+	}
+	if !handled || !col.IsDenseArray() {
+		t.Fatalf("NativeFrameFilterOrderGatherProjectColumn = %v handled=%v, want dense array", col, handled)
+	}
+	got, ok := col.DenseArray().I64()
+	if !ok || len(got) != 2 || got[0] != 300 || got[1] != 100 {
+		t.Fatalf("filter order gather project column values = %#v, want [300 100]", got)
+	}
+
+	limited, handled, err := TableValue(frame).NativeFrameFilterOrderGatherProjectColumn(
+		NewDenseArrayBool([]bool{true, true, true}),
+		[]string{"price"},
+		[]bool{true},
+		1,
+		[]string{"size"},
+		"size",
+	)
+	if err != nil {
+		t.Fatalf("NativeFrameFilterOrderGatherProjectColumn limit: %v", err)
+	}
+	if !handled || !limited.IsDenseArray() {
+		t.Fatalf("NativeFrameFilterOrderGatherProjectColumn limit = %v handled=%v, want dense array", limited, handled)
+	}
+	limitedVals, ok := limited.DenseArray().I64()
+	if !ok || len(limitedVals) != 1 || limitedVals[0] != 200 {
+		t.Fatalf("filter order gather project column limit values = %#v, want [200]", limitedVals)
+	}
+}
+
 func TestNativeFrameCompareFilterProjectColumnFusesTypedRuntimePath(t *testing.T) {
 	soa, err := NewSoA(map[string]*DenseArray{
 		"price": NewDenseArrayF64([]float64{10, 12, 8}),
