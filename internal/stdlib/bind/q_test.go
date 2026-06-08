@@ -3691,6 +3691,13 @@ func TestQExplainReportsQueryKernelVisibility(t *testing.T) {
 			t.Fatalf("qsql_kernel keys[1].%s = %v, want %d", field, got, want)
 		}
 	}
+	shapeRows := qTestKernelShapeRows(t, kernelRow.RawGetString("shapes").Table())
+	if len(shapeRows) != 1 {
+		t.Fatalf("qsql_kernel shapes = %+v, want one shape row", shapeRows)
+	}
+	if got := shapeRows[0]; got.Shape != kernelShape.Str() || got.Count != 1 || got.Hits != 1 || got.Misses != 1 || got.Evictions != 0 {
+		t.Fatalf("qsql_kernel shape aggregate = %+v, want shape %q count=1 hits=1 misses=1 evictions=0", got, kernelShape.Str())
+	}
 }
 
 func TestQExplainReportsVectorTransformKernelVisibility(t *testing.T) {
@@ -4121,6 +4128,20 @@ func TestQSQLQueryKernelCacheSplitsBoundScalarValues(t *testing.T) {
 	}
 	if stats.KernelMisses != 2 || stats.KernelHits != 0 {
 		t.Fatalf("kernel cache stats = %+v, want bound scalar values to split kernels", stats)
+	}
+	if len(stats.KernelKeys) != 2 {
+		t.Fatalf("kernel key stats rows = %d, want 2 split kernel keys", len(stats.KernelKeys))
+	}
+	if stats.KernelKeys[0].Shape == "" || stats.KernelKeys[1].Shape == "" || stats.KernelKeys[0].Shape != stats.KernelKeys[1].Shape {
+		t.Fatalf("split kernel key shapes = %+v, want same non-empty shape", stats.KernelKeys)
+	}
+	kernelRow := qTestCacheStatsRowTable(t, qCacheStatsTable(), "qsql_kernel")
+	shapeRows := qTestKernelShapeRows(t, kernelRow.RawGetString("shapes").Table())
+	if len(shapeRows) != 1 {
+		t.Fatalf("qsql_kernel shapes = %+v, want one aggregated shape", shapeRows)
+	}
+	if got := shapeRows[0]; got.Shape != stats.KernelKeys[0].Shape || got.Count != 2 || got.Hits != 0 || got.Misses != 2 || got.Evictions != 0 {
+		t.Fatalf("qsql_kernel shape aggregate = %+v, want shape %q count=2 hits=0 misses=2 evictions=0", got, stats.KernelKeys[0].Shape)
 	}
 }
 
@@ -5353,6 +5374,44 @@ func qTestQueryKernelShapeCount(rows []qQueryKernelShapeRow, supported bool, rea
 	return 0
 }
 
+type qKernelShapeRow struct {
+	Shape     string
+	Count     int64
+	Hits      int64
+	Misses    int64
+	Evictions int64
+}
+
+func qTestKernelShapeRows(t *testing.T, tbl *Table) []qKernelShapeRow {
+	t.Helper()
+	if tbl == nil {
+		t.Fatal("qsql_kernel shapes table is nil")
+	}
+	rows := make([]qKernelShapeRow, 0, tbl.Length())
+	for i := 1; i <= tbl.Length(); i++ {
+		row := tbl.RawGetInt(int64(i)).Table()
+		if row == nil {
+			t.Fatalf("qsql_kernel shape row %d is nil", i)
+		}
+		shape := row.RawGetString("shape")
+		count := row.RawGetString("count")
+		hits := row.RawGetString("hits")
+		misses := row.RawGetString("misses")
+		evictions := row.RawGetString("evictions")
+		if !shape.IsString() || !count.IsInt() || !hits.IsInt() || !misses.IsInt() || !evictions.IsInt() {
+			t.Fatalf("qsql_kernel shape row %d malformed: %#v", i, row)
+		}
+		rows = append(rows, qKernelShapeRow{
+			Shape:     shape.Str(),
+			Count:     count.Int(),
+			Hits:      hits.Int(),
+			Misses:    misses.Int(),
+			Evictions: evictions.Int(),
+		})
+	}
+	return rows
+}
+
 type qKernelDecisionKeyRow struct {
 	Key             string
 	Namespace       string
@@ -6087,6 +6146,10 @@ func TestQSQLKernelCacheEvictionPrunesPerKeyStats(t *testing.T) {
 	keys := row.RawGetString("keys").Table()
 	if keys == nil || keys.Length() != qSQLPlanCacheLimit {
 		t.Fatalf("qsql_kernel keys rows = %v, want %d active keys", keys, qSQLPlanCacheLimit)
+	}
+	shapes := qTestKernelShapeRows(t, row.RawGetString("shapes").Table())
+	if len(shapes) != 1 || shapes[0].Shape != "unknown" || shapes[0].Count != int64(qSQLPlanCacheLimit) {
+		t.Fatalf("qsql_kernel shapes = %+v, want one unknown shape for active keys only", shapes)
 	}
 	if got := qTestKernelCacheKeyStats(t, stats.KernelKeys, lastKey); got.Misses != 1 {
 		t.Fatalf("newest kernel key stats = %+v, want one miss", got)

@@ -91,6 +91,14 @@ type qSQLKernelCacheKeyStats struct {
 	Evictions int
 }
 
+type qSQLKernelShapeStat struct {
+	Shape     string
+	Count     int
+	Hits      int
+	Misses    int
+	Evictions int
+}
+
 type qSQLKernelDecisionKeyStat struct {
 	Key          string
 	ReasonCode   string
@@ -2767,6 +2775,7 @@ func qCacheStatsTable() *Table {
 	kernelDecisionEntries := len(qSQLKernelUnsupported)
 	alignedStats := qSQLAlignedStats
 	kernelStatsByKey := qSQLKernelStatsByKeySnapshotLocked()
+	kernelShapeStats := qSQLKernelShapeStats(kernelStatsByKey)
 	kernelDecisionKeyStats := qSQLKernelDecisionKeyStatsSnapshotLocked()
 	kernelDecisionReasonStats := qSQLKernelDecisionReasonStatsLocked(kernelDecisionKeyStats)
 	qSQLAlignedPlanCacheMu.Unlock()
@@ -2808,6 +2817,7 @@ func qCacheStatsTable() *Table {
 		qSQLPlanCacheLimit,
 	)
 	kernelStatsRow.RawSetString("keys", TableValue(qKernelCacheKeyStatsTable(kernelStatsByKey)))
+	kernelStatsRow.RawSetString("shapes", TableValue(qKernelShapeStatsTable(kernelShapeStats)))
 	rows.RawSetInt(3, TableValue(kernelStatsRow))
 	kernelDecisionStatsRow := qCacheStatsRow(
 		"qsql_kernel_decision",
@@ -2909,6 +2919,60 @@ func qQueryKernelSupportShapeStatsTable(stats []qQueryKernelSupportShapeStat) *T
 		row.RawSetString("reason_code", StringValue(stat.Key.ReasonCode))
 		row.RawSetString("shape", StringValue(stat.Key.Shape))
 		row.RawSetString("count", IntValue(int64(stat.Count)))
+		rows.RawSetInt(int64(i+1), TableValue(row))
+	}
+	return rows
+}
+
+func qSQLKernelShapeStats(stats []qSQLKernelCacheKeyStats) []qSQLKernelShapeStat {
+	if len(stats) == 0 {
+		return nil
+	}
+	counts := make(map[string]*qSQLKernelShapeStat)
+	for _, stat := range stats {
+		shape := stat.Shape
+		if shape == "" {
+			shape = "unknown"
+		}
+		shapeStat := counts[shape]
+		if shapeStat == nil {
+			shapeStat = &qSQLKernelShapeStat{Shape: shape}
+			counts[shape] = shapeStat
+		}
+		shapeStat.Count++
+		shapeStat.Hits += stat.Hits
+		shapeStat.Misses += stat.Misses
+		shapeStat.Evictions += stat.Evictions
+	}
+	out := make([]qSQLKernelShapeStat, 0, len(counts))
+	for _, stat := range counts {
+		out = append(out, *stat)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		a, b := out[i], out[j]
+		if a.Count != b.Count {
+			return a.Count > b.Count
+		}
+		if a.Hits != b.Hits {
+			return a.Hits > b.Hits
+		}
+		if a.Misses != b.Misses {
+			return a.Misses > b.Misses
+		}
+		return a.Shape < b.Shape
+	})
+	return out
+}
+
+func qKernelShapeStatsTable(stats []qSQLKernelShapeStat) *Table {
+	rows := NewAppendArrayTable(len(stats))
+	for i, stat := range stats {
+		row := NewTable()
+		row.RawSetString("shape", StringValue(stat.Shape))
+		row.RawSetString("count", IntValue(int64(stat.Count)))
+		row.RawSetString("hits", IntValue(int64(stat.Hits)))
+		row.RawSetString("misses", IntValue(int64(stat.Misses)))
+		row.RawSetString("evictions", IntValue(int64(stat.Evictions)))
 		rows.RawSetInt(int64(i+1), TableValue(row))
 	}
 	return rows
