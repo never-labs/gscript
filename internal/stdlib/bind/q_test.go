@@ -3,6 +3,7 @@ package bind
 import (
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -618,6 +619,66 @@ func TestQSQLJoinRightSourceUsesNativeCarrierBeforeWrapperFallback(t *testing.T)
 	}
 	if got := rows.RawGetInt(3).Table().RawGetString("seq"); !got.IsNil() {
 		t.Fatalf("join rows[3].seq = %v, want nil unmatched native keyed source", got)
+	}
+}
+
+func TestQSQLJoinPrunesUnreferencedColumnsBeforePlan(t *testing.T) {
+	trades, err := data.NewFrame(
+		data.Column{Name: "sym", Data: data.NewSymbols([]string{"AAPL", "MSFT", "AAPL"})},
+		data.Column{Name: "price", Data: data.NewF64([]float64{100, 80, 101})},
+		data.Column{Name: "size", Data: data.NewI64([]int64{10, 20, 30})},
+		data.Column{Name: "active", Data: data.NewBool([]bool{true, true, false})},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	quotes, err := data.NewFrame(
+		data.Column{Name: "sym", Data: data.NewSymbols([]string{"AAPL", "MSFT"})},
+		data.Column{Name: "bid", Data: data.NewF64([]float64{99.5, 79.5})},
+		data.Column{Name: "ask", Data: data.NewF64([]float64{100.5, 80.5})},
+		data.Column{Name: "venue", Data: data.NewSymbols([]string{"XNAS", "XNYS"})},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tradesValue, err := qDataFrameValue(trades)
+	if err != nil {
+		t.Fatal(err)
+	}
+	quotesValue, err := qDataFrameValue(quotes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	env := NewTable()
+	env.RawSetString("trades", tradesValue)
+	env.RawSetString("quotes", quotesValue)
+	out, err := qRunSQL("q.sql", qSQLArgsResult{
+		frameValue:    TableValue(env),
+		source:        "select sym,price,bid,ask from trades join quotes on sym order by price desc take 2",
+		resolveSource: true,
+		envValue:      TableValue(env),
+	})
+	if err != nil {
+		t.Fatalf("q.sql join: %v", err)
+	}
+	frame, err := qDataFrameFromValue(out, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := frame.Schema().Names(); !reflect.DeepEqual(got, []data.Symbol{"sym", "price", "bid", "ask"}) {
+		t.Fatalf("result columns = %v, want [sym price bid ask]", got)
+	}
+	if got, _ := frame.Column("sym"); !reflect.DeepEqual(got.Values(), []any{data.Symbol("AAPL"), data.Symbol("AAPL")}) {
+		t.Fatalf("sym values = %v, want [AAPL AAPL]", got.Values())
+	}
+	if got, _ := frame.Column("price"); !reflect.DeepEqual(got.Values(), []any{101.0, 100.0}) {
+		t.Fatalf("price values = %v, want [101 100]", got.Values())
+	}
+	if _, ok := frame.Column("size"); ok {
+		t.Fatal("qSQL join result included unreferenced left column size")
+	}
+	if _, ok := frame.Column("venue"); ok {
+		t.Fatal("qSQL join result included unreferenced right column venue")
 	}
 }
 

@@ -1875,15 +1875,16 @@ func qRunSQL(name string, args qSQLArgsResult) (Value, error) {
 		}
 		return qDataFrameValue(out)
 	}
-	if len(qSQLTemplateJoins(tmpl)) > 0 {
+	joins := qSQLTemplateJoins(tmpl)
+	if len(joins) > 0 {
 		if !args.resolveSource {
 			err := fmt.Errorf("join queries require a source table map")
 			qRecordFallbackReason(qFallbackJoinErr, qKernelReasonJoinUnavailable, err.Error())
 			return NilValue(), fmt.Errorf("%s: %w", name, err)
 		}
-		for _, join := range qSQLTemplateJoins(tmpl) {
+		for _, join := range joins {
 			var err error
-			frame, err = qApplySQLJoin(args.frameValue, frame, join)
+			frame, err = qApplySQLJoinForPlan(args.frameValue, frame, join, tmpl.plan, len(joins) == 1)
 			if err != nil {
 				qRecordFallbackReason(qFallbackJoinErr, qKernelReasonJoinUnavailable, err.Error())
 				return NilValue(), fmt.Errorf("%s: join: %w", name, err)
@@ -1941,6 +1942,10 @@ func qSQLTemplateJoins(tmpl qSQLPlanTemplate) []*stdq.JoinPlan {
 }
 
 func qApplySQLJoin(sources Value, left data.Frame, join *stdq.JoinPlan) (data.Frame, error) {
+	return qApplySQLJoinForPlan(sources, left, join, data.QueryPlan{}, false)
+}
+
+func qApplySQLJoinForPlan(sources Value, left data.Frame, join *stdq.JoinPlan, plan data.QueryPlan, allowPrune bool) (data.Frame, error) {
 	if join == nil {
 		return left, nil
 	}
@@ -1953,10 +1958,16 @@ func qApplySQLJoin(sources Value, left data.Frame, join *stdq.JoinPlan) (data.Fr
 		if right.hasKeyed {
 			return data.InnerJoinKeyedOn(left, right.keyed, join.Keys...)
 		}
+		if opts, ok := qJoinPruneOptions(left, right.frame, join, plan, allowPrune); ok {
+			return data.InnerJoinOnWithOptions(left, right.frame, opts, join.Keys...)
+		}
 		return data.InnerJoinOn(left, right.frame, join.Keys...)
 	case "left":
 		if right.hasKeyed {
 			return data.LeftJoinKeyedOn(left, right.keyed, join.Keys...)
+		}
+		if opts, ok := qJoinPruneOptions(left, right.frame, join, plan, allowPrune); ok {
+			return data.LeftJoinOnWithOptions(left, right.frame, opts, join.Keys...)
 		}
 		return data.LeftJoinOn(left, right.frame, join.Keys...)
 	case "union":
@@ -1993,6 +2004,104 @@ func qApplySQLJoin(sources Value, left data.Frame, join *stdq.JoinPlan) (data.Fr
 		return data.WindowJoinOn(left, right.frame, timeKey, partitionKeys...)
 	default:
 		return data.Frame{}, fmt.Errorf("q join kind %q is not supported", join.Kind)
+	}
+}
+
+func qJoinPruneOptions(left data.Frame, right data.Frame, join *stdq.JoinPlan, plan data.QueryPlan, allowPrune bool) (data.JoinOptions, bool) {
+	if !allowPrune || join == nil || len(join.Keys) == 0 || plan.Distinct || len(plan.By) > 0 || len(plan.ByExprs) > 0 || len(plan.Aggregates) > 0 {
+		return data.JoinOptions{}, false
+	}
+	refs, ok := qQueryPlanColumnRefs(plan)
+	if !ok || len(refs) == 0 {
+		return data.JoinOptions{}, false
+	}
+	leftSchema := left.Schema()
+	rightSchema := right.Schema()
+	leftNeeded := make(map[data.Symbol]struct{}, len(refs)+len(join.Keys))
+	rightNeeded := make(map[data.Symbol]struct{}, len(refs)+len(join.Keys))
+	for _, key := range join.Keys {
+		leftNeeded[key.Left] = struct{}{}
+		rightNeeded[key.Right] = struct{}{}
+	}
+	for ref := range refs {
+		_, leftOK := leftSchema.Kind(ref)
+		_, rightOK := rightSchema.Kind(ref)
+		if leftOK {
+			leftNeeded[ref] = struct{}{}
+			continue
+		}
+		if rightOK {
+			rightNeeded[ref] = struct{}{}
+			continue
+		}
+		return data.JoinOptions{}, false
+	}
+	return data.JoinOptions{
+		LeftColumns:  qSymbolsInSchemaOrder(leftSchema, leftNeeded),
+		RightColumns: qSymbolsInSchemaOrder(rightSchema, rightNeeded),
+	}, true
+}
+
+func qSymbolsInSchemaOrder(schema data.Schema, keep map[data.Symbol]struct{}) []data.Symbol {
+	out := make([]data.Symbol, 0, len(keep))
+	for _, name := range schema.Names() {
+		if _, ok := keep[name]; ok {
+			out = append(out, name)
+		}
+	}
+	return out
+}
+
+func qQueryPlanColumnRefs(plan data.QueryPlan) (map[data.Symbol]struct{}, bool) {
+	refs := make(map[data.Symbol]struct{})
+	ok := true
+	ok = qCollectDataExprColumnRefs(plan.Where, refs) && ok
+	for _, item := range plan.Select {
+		ok = qCollectDataExprColumnRefs(item.Expr, refs) && ok
+	}
+	for _, item := range plan.ByExprs {
+		ok = qCollectDataExprColumnRefs(item.Expr, refs) && ok
+	}
+	for _, agg := range plan.Aggregates {
+		ok = qCollectDataExprColumnRefs(agg.Expr, refs) && ok
+		ok = qCollectDataExprColumnRefs(agg.Weight, refs) && ok
+	}
+	for _, name := range plan.By {
+		refs[name] = struct{}{}
+	}
+	for _, spec := range plan.OrderBy {
+		refs[spec.Column] = struct{}{}
+	}
+	return refs, ok
+}
+
+func qCollectDataExprColumnRefs(expr data.Expr, refs map[data.Symbol]struct{}) bool {
+	switch e := expr.(type) {
+	case nil, data.Literal:
+		return true
+	case data.ColumnRef:
+		refs[e.Name] = struct{}{}
+		return true
+	case data.Binary:
+		return qCollectDataExprColumnRefs(e.Left, refs) && qCollectDataExprColumnRefs(e.Right, refs)
+	case data.Logical:
+		return qCollectDataExprColumnRefs(e.Left, refs) && qCollectDataExprColumnRefs(e.Right, refs)
+	case data.Not:
+		return qCollectDataExprColumnRefs(e.Expr, refs)
+	case data.Conditional:
+		return qCollectDataExprColumnRefs(e.Cond, refs) && qCollectDataExprColumnRefs(e.Then, refs) && qCollectDataExprColumnRefs(e.Else, refs)
+	case data.In:
+		return qCollectDataExprColumnRefs(e.Expr, refs)
+	case data.Within:
+		return qCollectDataExprColumnRefs(e.Expr, refs)
+	case data.BucketFloorExpr:
+		return qCollectDataExprColumnRefs(e.Expr, refs)
+	case data.ListAggregateExpr:
+		return qCollectDataExprColumnRefs(e.Expr, refs)
+	case data.VectorTransformExpr:
+		return qCollectDataExprColumnRefs(e.Expr, refs) && qCollectDataExprColumnRefs(e.Arg, refs)
+	default:
+		return false
 	}
 }
 

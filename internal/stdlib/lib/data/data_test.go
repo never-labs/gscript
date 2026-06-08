@@ -4117,6 +4117,63 @@ func TestInnerJoinOnSpecifiedKeyColumns(t *testing.T) {
 	}
 }
 
+func TestInnerJoinOnWithOptionsPrunesOutputColumns(t *testing.T) {
+	left := mustFrame(t,
+		NewColumn("sym", []any{Symbol("AAPL"), Symbol("MSFT"), Symbol("AAPL")}),
+		NewColumn("price", []any{100.0, 80.0, 101.0}),
+		NewColumn("size", []any{10, 20, 30}),
+	)
+	right := mustFrame(t,
+		NewColumn("sym", []any{Symbol("AAPL"), Symbol("MSFT")}),
+		NewColumn("bid", []any{99.5, 79.5}),
+		NewColumn("ask", []any{100.5, 80.5}),
+		NewColumn("venue", []any{Symbol("XNAS"), Symbol("XNYS")}),
+	)
+
+	got, err := InnerJoinOnWithOptions(left, right, JoinOptions{
+		LeftColumns:  []Symbol{"sym", "price"},
+		RightColumns: []Symbol{"sym", "bid", "ask"},
+	}, JoinKey{Left: "sym", Right: "sym"})
+	if err != nil {
+		t.Fatalf("InnerJoinOnWithOptions returned error: %v", err)
+	}
+
+	assertColumnNames(t, got, []Symbol{"sym", "price", "bid", "ask"})
+	assertColumnValues(t, got, "sym", []any{Symbol("AAPL"), Symbol("MSFT"), Symbol("AAPL")})
+	assertColumnValues(t, got, "price", []any{100.0, 80.0, 101.0})
+	assertColumnValues(t, got, "bid", []any{99.5, 79.5, 99.5})
+	if _, ok := got.Column("size"); ok {
+		t.Fatal("pruned join output included unrequested left column size")
+	}
+	if _, ok := got.Column("venue"); ok {
+		t.Fatal("pruned join output included unrequested right column venue")
+	}
+}
+
+func TestInnerJoinOnWithOptionsPreservesRightCollisionNames(t *testing.T) {
+	left := mustFrame(t,
+		NewColumn("sym", []any{Symbol("AAPL")}),
+		NewColumn("bid", []any{100.0}),
+		NewColumn("bid_right", []any{101.0}),
+	)
+	right := mustFrame(t,
+		NewColumn("sym", []any{Symbol("AAPL")}),
+		NewColumn("bid", []any{99.5}),
+		NewColumn("ask", []any{100.5}),
+	)
+
+	got, err := InnerJoinOnWithOptions(left, right, JoinOptions{
+		LeftColumns:  []Symbol{"sym"},
+		RightColumns: []Symbol{"bid", "ask"},
+	}, JoinKey{Left: "sym", Right: "sym"})
+	if err != nil {
+		t.Fatalf("InnerJoinOnWithOptions returned error: %v", err)
+	}
+
+	assertColumnNames(t, got, []Symbol{"sym", "bid_right2", "ask"})
+	assertColumnValues(t, got, "bid_right2", []any{99.5})
+}
+
 func TestJoinAsofWindowReuseIndexedRightAttributes(t *testing.T) {
 	left := mustFrame(t,
 		NewColumn("sym", []any{Symbol("AAPL"), Symbol("MSFT"), Symbol("AAPL")}),

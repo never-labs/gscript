@@ -2103,6 +2103,11 @@ type JoinKey struct {
 	Right Symbol
 }
 
+type JoinOptions struct {
+	LeftColumns  []Symbol
+	RightColumns []Symbol
+}
+
 func InnerJoin(left, right Frame, keys ...Symbol) (Frame, error) {
 	joinKeys := make([]JoinKey, len(keys))
 	for i, key := range keys {
@@ -2120,11 +2125,19 @@ func LeftJoin(left, right Frame, keys ...Symbol) (Frame, error) {
 }
 
 func LeftJoinOn(left, right Frame, keys ...JoinKey) (Frame, error) {
-	return joinOn(left, right, true, keys...)
+	return joinOnWithOptions(left, right, true, JoinOptions{}, keys...)
 }
 
 func InnerJoinOn(left, right Frame, keys ...JoinKey) (Frame, error) {
-	return joinOn(left, right, false, keys...)
+	return joinOnWithOptions(left, right, false, JoinOptions{}, keys...)
+}
+
+func LeftJoinOnWithOptions(left, right Frame, opts JoinOptions, keys ...JoinKey) (Frame, error) {
+	return joinOnWithOptions(left, right, true, opts, keys...)
+}
+
+func InnerJoinOnWithOptions(left, right Frame, opts JoinOptions, keys ...JoinKey) (Frame, error) {
+	return joinOnWithOptions(left, right, false, opts, keys...)
 }
 
 func LeftJoinKeyed(left Frame, right KeyedFrame) (Frame, error) {
@@ -2377,7 +2390,7 @@ func UnionJoin(left, right Frame) (Frame, error) {
 	return NewFrame(cols...)
 }
 
-func joinOn(left, right Frame, keepUnmatchedLeft bool, keys ...JoinKey) (Frame, error) {
+func joinOnWithOptions(left, right Frame, keepUnmatchedLeft bool, opts JoinOptions, keys ...JoinKey) (Frame, error) {
 	if len(keys) == 0 {
 		return Frame{}, fmt.Errorf("join requires at least one key")
 	}
@@ -2390,18 +2403,22 @@ func joinOn(left, right Frame, keepUnmatchedLeft bool, keys ...JoinKey) (Frame, 
 		return Frame{}, err
 	}
 
-	cols := make([]Column, 0, len(left.schema.names)+len(right.schema.names))
+	leftNames := joinOutputLeftColumns(left, opts.LeftColumns)
+	rightNames := joinOutputRightColumns(right, opts.RightColumns)
+	cols := make([]Column, 0, len(leftNames)+len(rightNames))
 	usedNames := make(map[Symbol]struct{}, len(left.schema.names)+len(right.schema.names))
 	for _, name := range left.schema.names {
-		cols = append(cols, Column{Name: name, Data: left.columns[name].Gather(leftIndexes)})
 		usedNames[name] = struct{}{}
+	}
+	for _, name := range leftNames {
+		cols = append(cols, Column{Name: name, Data: left.columns[name].Gather(leftIndexes)})
 	}
 
 	rightKeys := make(map[Symbol]struct{}, len(keys))
 	for _, key := range keys {
 		rightKeys[key.Right] = struct{}{}
 	}
-	for _, name := range right.schema.names {
+	for _, name := range rightNames {
 		if _, isJoinKey := rightKeys[name]; isJoinKey {
 			continue
 		}
@@ -2414,6 +2431,50 @@ func joinOn(left, right Frame, keepUnmatchedLeft bool, keys ...JoinKey) (Frame, 
 		usedNames[outName] = struct{}{}
 	}
 	return newFrameTrusted(cols...)
+}
+
+func joinOutputLeftColumns(frame Frame, requested []Symbol) []Symbol {
+	if len(requested) == 0 {
+		return append([]Symbol(nil), frame.schema.names...)
+	}
+	out := make([]Symbol, 0, len(requested))
+	seen := make(map[Symbol]struct{}, len(requested))
+	for _, name := range requested {
+		if name == "" {
+			continue
+		}
+		if _, ok := seen[name]; ok {
+			continue
+		}
+		if _, ok := frame.columns[name]; !ok {
+			continue
+		}
+		seen[name] = struct{}{}
+		out = append(out, name)
+	}
+	return out
+}
+
+func joinOutputRightColumns(frame Frame, requested []Symbol) []Symbol {
+	if len(requested) == 0 {
+		return append([]Symbol(nil), frame.schema.names...)
+	}
+	out := make([]Symbol, 0, len(requested))
+	seen := make(map[Symbol]struct{}, len(requested))
+	for _, name := range requested {
+		if name == "" {
+			continue
+		}
+		if _, ok := seen[name]; ok {
+			continue
+		}
+		if _, ok := frame.columns[name]; !ok {
+			continue
+		}
+		seen[name] = struct{}{}
+		out = append(out, name)
+	}
+	return out
 }
 
 func joinKeyedOn(left Frame, right KeyedFrame, keepUnmatchedLeft bool, keys ...JoinKey) (Frame, error) {
@@ -2438,7 +2499,7 @@ func joinKeyedOn(left Frame, right KeyedFrame, keepUnmatchedLeft bool, keys ...J
 	if err != nil {
 		return Frame{}, err
 	}
-	return joinOn(left, rightFrame, keepUnmatchedLeft, keys...)
+	return joinOnWithOptions(left, rightFrame, keepUnmatchedLeft, JoinOptions{}, keys...)
 }
 
 func AsofJoin(left, right Frame, timeKey Symbol, partitionKeys ...Symbol) (Frame, error) {
