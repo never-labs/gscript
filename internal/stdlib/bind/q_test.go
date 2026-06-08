@@ -2921,6 +2921,12 @@ func TestQCacheStatsAndClearPublicAPI(t *testing.T) {
 	if got := runtimeRow.RawGetString("executions"); !got.IsInt() || got.Int() != 0 {
 		t.Fatalf("q_runtime_kernel_execution executions = %v, want 0", got)
 	}
+	if got := runtimeRow.RawGetString("successes"); !got.IsInt() || got.Int() != 0 {
+		t.Fatalf("q_runtime_kernel_execution successes = %v, want 0", got)
+	}
+	if got := runtimeRow.RawGetString("errors"); !got.IsInt() || got.Int() != 0 {
+		t.Fatalf("q_runtime_kernel_execution errors = %v, want 0", got)
+	}
 	if stats := runtimeRow.RawGetString("stats").Table(); stats == nil || stats.Length() != 0 {
 		t.Fatalf("q_runtime_kernel_execution stats = %v, want empty table until MethodJIT diagnostics are attached", stats)
 	}
@@ -2970,7 +2976,15 @@ func TestQRuntimeKernelExecutionStatsProviderFeedsCacheStats(t *testing.T) {
 				Kernel:  "QFrameSelectColumn",
 				Shape:   "compare/filter/project/column",
 				Route:   "typed_runtime_op_exit",
-				Outcome: "fallback",
+				Outcome: "success",
+				Count:   3,
+			},
+			{
+				Source:  "methodjit_q_frame_runtime",
+				Kernel:  "QFrameSelectColumn",
+				Shape:   "compare/filter/project/column",
+				Route:   "typed_runtime_op_exit",
+				Outcome: "error",
 				Count:   1,
 			},
 			{
@@ -2999,8 +3013,14 @@ func TestQRuntimeKernelExecutionStatsProviderFeedsCacheStats(t *testing.T) {
 	if got := row.RawGetString("cache_backed"); !got.IsBool() || got.Bool() {
 		t.Fatalf("q_runtime_kernel_execution cache_backed = %v, want false", got)
 	}
-	if got := row.RawGetString("executions"); !got.IsInt() || got.Int() != 3 {
-		t.Fatalf("q_runtime_kernel_execution executions = %v, want 3", got)
+	if got := row.RawGetString("executions"); !got.IsInt() || got.Int() != 6 {
+		t.Fatalf("q_runtime_kernel_execution executions = %v, want 6", got)
+	}
+	if got := row.RawGetString("successes"); !got.IsInt() || got.Int() != 5 {
+		t.Fatalf("q_runtime_kernel_execution successes = %v, want 5", got)
+	}
+	if got := row.RawGetString("errors"); !got.IsInt() || got.Int() != 1 {
+		t.Fatalf("q_runtime_kernel_execution errors = %v, want 1", got)
 	}
 
 	stats := row.RawGetString("stats").Table()
@@ -3016,7 +3036,7 @@ func TestQRuntimeKernelExecutionStatsProviderFeedsCacheStats(t *testing.T) {
 		"kernel":  "QFrameSelectColumn",
 		"shape":   "compare/filter/project/column",
 		"route":   "typed_runtime_op_exit",
-		"outcome": "fallback",
+		"outcome": "error",
 	} {
 		if got := first.RawGetString(field); !got.IsString() || got.Str() != want {
 			t.Fatalf("q_runtime_kernel_execution stats[1].%s = %v, want %q", field, got, want)
@@ -3043,8 +3063,72 @@ func TestQRuntimeKernelExecutionStatsProviderFeedsCacheStats(t *testing.T) {
 	if got := top.RawGetString("outcome"); !got.IsString() || got.Str() != "success" {
 		t.Fatalf("q_runtime_kernel_execution shapes[1].outcome = %v, want success", got)
 	}
-	if got := top.RawGetString("count"); !got.IsInt() || got.Int() != 2 {
-		t.Fatalf("q_runtime_kernel_execution shapes[1].count = %v, want 2", got)
+	if got := top.RawGetString("count"); !got.IsInt() || got.Int() != 5 {
+		t.Fatalf("q_runtime_kernel_execution shapes[1].count = %v, want 5", got)
+	}
+}
+
+func TestQRuntimeKernelExecutionStatsProviderCleanupIsGenerationGuarded(t *testing.T) {
+	qClearCaches()
+	restoreA := SetQRuntimeKernelExecutionStatsProvider(func() []QRuntimeKernelExecutionStat {
+		return []QRuntimeKernelExecutionStat{{
+			Source:  "methodjit_q_frame_runtime",
+			Kernel:  "QFrameSelectColumn",
+			Shape:   "compare/filter/project/column",
+			Route:   "typed_runtime_op_exit",
+			Outcome: "success",
+			Count:   1,
+		}}
+	})
+	restoreB := SetQRuntimeKernelExecutionStatsProvider(func() []QRuntimeKernelExecutionStat {
+		return []QRuntimeKernelExecutionStat{
+			{
+				Source:  "methodjit_q_frame_runtime",
+				Kernel:  "QFrameSelectColumn",
+				Shape:   "compare/filter/project/column",
+				Route:   "typed_runtime_op_exit",
+				Outcome: "success",
+				Count:   2,
+			},
+			{
+				Source:  "methodjit_q_frame_runtime",
+				Kernel:  "QFrameSelectColumn",
+				Shape:   "compare/filter/project/column",
+				Route:   "typed_runtime_op_exit",
+				Outcome: "success",
+				Count:   3,
+			},
+		}
+	})
+	defer restoreB()
+
+	restoreA()
+	row := qTestCacheStatsRowTable(t, qCacheStatsTable(), "q_runtime_kernel_execution")
+	if got := row.RawGetString("executions"); !got.IsInt() || got.Int() != 5 {
+		t.Fatalf("q_runtime_kernel_execution executions after stale restore = %v, want provider B total 5", got)
+	}
+	shapes := row.RawGetString("shapes").Table()
+	if shapes == nil || shapes.Length() != 1 {
+		t.Fatalf("q_runtime_kernel_execution shapes after stale restore = %v, want one aggregated shape", shapes)
+	}
+	shape := shapes.RawGetInt(1).Table()
+	if shape == nil {
+		t.Fatal("q_runtime_kernel_execution shapes[1] is nil")
+	}
+	if got := shape.RawGetString("count"); !got.IsInt() || got.Int() != 5 {
+		t.Fatalf("q_runtime_kernel_execution shapes[1].count = %v, want duplicate provider rows aggregated to 5", got)
+	}
+
+	qClearCaches()
+	cleared := qTestCacheStatsRowTable(t, qCacheStatsTable(), "q_runtime_kernel_execution")
+	if got := cleared.RawGetString("executions"); !got.IsInt() || got.Int() != 5 {
+		t.Fatalf("q_runtime_kernel_execution executions after q.cache_clear-equivalent = %v, want provider stats retained", got)
+	}
+
+	restoreB()
+	empty := qTestCacheStatsRowTable(t, qCacheStatsTable(), "q_runtime_kernel_execution")
+	if got := empty.RawGetString("executions"); !got.IsInt() || got.Int() != 0 {
+		t.Fatalf("q_runtime_kernel_execution executions after current restore = %v, want 0", got)
 	}
 }
 

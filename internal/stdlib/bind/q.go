@@ -134,20 +134,42 @@ type qSQLKernelDecisionKeyStat struct {
 }
 
 var (
-	qRuntimeKernelExecutionStatsProviderMu sync.Mutex
-	qRuntimeKernelExecutionStatsProvider   func() []QRuntimeKernelExecutionStat
+	qRuntimeKernelExecutionStatsProviderMu      sync.Mutex
+	qRuntimeKernelExecutionStatsProviderCurrent *qRuntimeKernelExecutionStatsProviderState
 )
+
+type qRuntimeKernelExecutionStatsProviderState struct {
+	provider func() []QRuntimeKernelExecutionStat
+	previous *qRuntimeKernelExecutionStatsProviderState
+	active   bool
+}
 
 func SetQRuntimeKernelExecutionStatsProvider(provider func() []QRuntimeKernelExecutionStat) func() {
 	qRuntimeKernelExecutionStatsProviderMu.Lock()
-	previous := qRuntimeKernelExecutionStatsProvider
-	qRuntimeKernelExecutionStatsProvider = provider
+	state := &qRuntimeKernelExecutionStatsProviderState{
+		provider: provider,
+		previous: qRuntimeKernelExecutionStatsProviderCurrent,
+		active:   true,
+	}
+	qRuntimeKernelExecutionStatsProviderCurrent = state
 	qRuntimeKernelExecutionStatsProviderMu.Unlock()
 	return func() {
 		qRuntimeKernelExecutionStatsProviderMu.Lock()
-		qRuntimeKernelExecutionStatsProvider = previous
+		if state.active {
+			state.active = false
+			if qRuntimeKernelExecutionStatsProviderCurrent == state {
+				qRuntimeKernelExecutionStatsProviderCurrent = qRuntimeKernelExecutionStatsNextActiveProvider(state.previous)
+			}
+		}
 		qRuntimeKernelExecutionStatsProviderMu.Unlock()
 	}
+}
+
+func qRuntimeKernelExecutionStatsNextActiveProvider(state *qRuntimeKernelExecutionStatsProviderState) *qRuntimeKernelExecutionStatsProviderState {
+	for state != nil && !state.active {
+		state = state.previous
+	}
+	return state
 }
 
 type qSQLKernelDecisionReasonStat struct {
@@ -2932,14 +2954,24 @@ func qCacheStatsRow(name string, entries, hits, misses, evictions, limit int) *T
 func qRuntimeKernelExecutionStatsRow() *Table {
 	stats := qRuntimeKernelExecutionStatsSnapshot()
 	executions := uint64(0)
+	successes := uint64(0)
+	errors := uint64(0)
 	for _, stat := range stats {
 		executions += stat.Count
+		switch stat.Outcome {
+		case "success":
+			successes += stat.Count
+		case "error":
+			errors += stat.Count
+		}
 	}
 	row := qCacheStatsRow("q_runtime_kernel_execution", len(stats), 0, 0, 0, 0)
 	row.RawSetString("stats_domain", StringValue(qStatsDomainJITExecution))
 	row.RawSetString("stats_source", StringValue(qStatsSourceMethodJIT))
 	row.RawSetString("cache_backed", BoolValue(false))
 	row.RawSetString("executions", qUint64IntValue(executions))
+	row.RawSetString("successes", qUint64IntValue(successes))
+	row.RawSetString("errors", qUint64IntValue(errors))
 	row.RawSetString("stats", TableValue(qRuntimeKernelExecutionStatsTable(stats)))
 	row.RawSetString("shapes", TableValue(qRuntimeKernelExecutionShapeStatsTable(qRuntimeKernelExecutionShapeStats(stats))))
 	return row
@@ -2947,7 +2979,12 @@ func qRuntimeKernelExecutionStatsRow() *Table {
 
 func qRuntimeKernelExecutionStatsSnapshot() []QRuntimeKernelExecutionStat {
 	qRuntimeKernelExecutionStatsProviderMu.Lock()
-	provider := qRuntimeKernelExecutionStatsProvider
+	state := qRuntimeKernelExecutionStatsNextActiveProvider(qRuntimeKernelExecutionStatsProviderCurrent)
+	qRuntimeKernelExecutionStatsProviderCurrent = state
+	var provider func() []QRuntimeKernelExecutionStat
+	if state != nil {
+		provider = state.provider
+	}
 	qRuntimeKernelExecutionStatsProviderMu.Unlock()
 	if provider == nil {
 		return nil
@@ -2956,18 +2993,39 @@ func qRuntimeKernelExecutionStatsSnapshot() []QRuntimeKernelExecutionStat {
 	if len(stats) == 0 {
 		return nil
 	}
-	out := make([]QRuntimeKernelExecutionStat, 0, len(stats))
+	type statKey struct {
+		source  string
+		kernel  string
+		shape   string
+		route   string
+		outcome string
+	}
+	counts := make(map[statKey]uint64, len(stats))
 	for _, stat := range stats {
 		if stat.Count == 0 {
 			continue
 		}
+		key := statKey{
+			source:  qNormalizeRuntimeKernelStatPart(stat.Source),
+			kernel:  qNormalizeRuntimeKernelStatPart(stat.Kernel),
+			shape:   qNormalizeRuntimeKernelStatPart(stat.Shape),
+			route:   qNormalizeRuntimeKernelStatPart(stat.Route),
+			outcome: qNormalizeRuntimeKernelStatPart(stat.Outcome),
+		}
+		counts[key] += stat.Count
+	}
+	if len(counts) == 0 {
+		return nil
+	}
+	out := make([]QRuntimeKernelExecutionStat, 0, len(counts))
+	for key, count := range counts {
 		out = append(out, QRuntimeKernelExecutionStat{
-			Source:  qNormalizeRuntimeKernelStatPart(stat.Source),
-			Kernel:  qNormalizeRuntimeKernelStatPart(stat.Kernel),
-			Shape:   qNormalizeRuntimeKernelStatPart(stat.Shape),
-			Route:   qNormalizeRuntimeKernelStatPart(stat.Route),
-			Outcome: qNormalizeRuntimeKernelStatPart(stat.Outcome),
-			Count:   stat.Count,
+			Source:  key.source,
+			Kernel:  key.kernel,
+			Shape:   key.shape,
+			Route:   key.route,
+			Outcome: key.outcome,
+			Count:   count,
 		})
 	}
 	sort.Slice(out, func(i, j int) bool {
