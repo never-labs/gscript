@@ -24,6 +24,17 @@ QSQL_BENCH = (
     "BindFastArg2WarmCacheSelectWhereProject|"
     "BindRunSQLWarmCacheGroupByAggregate|"
     "BindRunSQLWarmCacheJoin|"
+    "BindRunSQLColdCacheJoin|"
+    "BindRunSQLWarmCacheLeftJoin|"
+    "BindRunSQLWarmCacheChainedJoin|"
+    "BindRunSQLWarmCacheAsofJoin|"
+    "BindRunSQLWarmCacheWindowJoin|"
+    "BindRunSQLWarmCacheUnionJoin|"
+    "BindRunSQLWarmCachePlusJoin|"
+    "BindRunSQLWarmCacheDistinctOrderTake|"
+    "BindRunSQLWarmCacheGroupByXbarAggregate|"
+    "BindRunSQLWarmCacheUpdateWhere|"
+    "BindRunSQLWarmCacheDeleteWhere|"
     "NativeGoSelectWhereProject|"
     "NativeGoGroupByAggregate|"
     "NativeGoJoin|"
@@ -68,6 +79,31 @@ class RatioRow:
 
 
 @dataclass
+class CurrentVsOldRow:
+    benchmark: str
+    mode: str
+    current_seconds: float | None
+    old_seconds: float | None
+    ratio: float | None
+    source: str = ""
+
+
+@dataclass
+class RuntimeMetricRow:
+    benchmark: str
+    ns_op: float
+    bytes_op: float | None
+    allocs_op: float | None
+    kernel_hit_pct: float | None
+    fallbacks_op: float | None
+    typed_kernel_hit_pct: float | None
+    typed_kernel_attempts_op: float | None
+    typed_kernel_hits_op: float | None
+    typed_kernel_fallbacks_op: float | None
+    typed_kernel_errors_op: float | None
+
+
+@dataclass
 class QEvalComputeCoverage:
     session_case_count: int
     go_baseline_case_count: int
@@ -98,6 +134,17 @@ QSQL_EXPECTED_BENCHMARKS = {
     "BenchmarkQSQLBindFastArg2WarmCacheSelectWhereProject",
     "BenchmarkQSQLBindRunSQLWarmCacheGroupByAggregate",
     "BenchmarkQSQLBindRunSQLWarmCacheJoin",
+    "BenchmarkQSQLBindRunSQLColdCacheJoin",
+    "BenchmarkQSQLBindRunSQLWarmCacheLeftJoin",
+    "BenchmarkQSQLBindRunSQLWarmCacheChainedJoin",
+    "BenchmarkQSQLBindRunSQLWarmCacheAsofJoin",
+    "BenchmarkQSQLBindRunSQLWarmCacheWindowJoin",
+    "BenchmarkQSQLBindRunSQLWarmCacheUnionJoin",
+    "BenchmarkQSQLBindRunSQLWarmCachePlusJoin",
+    "BenchmarkQSQLBindRunSQLWarmCacheDistinctOrderTake",
+    "BenchmarkQSQLBindRunSQLWarmCacheGroupByXbarAggregate",
+    "BenchmarkQSQLBindRunSQLWarmCacheUpdateWhere",
+    "BenchmarkQSQLBindRunSQLWarmCacheDeleteWhere",
     "BenchmarkQSQLNativeGoSelectWhereProject",
     "BenchmarkQSQLNativeGoGroupByAggregate",
     "BenchmarkQSQLNativeGoJoin",
@@ -162,6 +209,80 @@ def ratio(rows: dict[str, BenchRow], numerator: str, denominator: str) -> float 
     if left is None or right is None or right.ns_op == 0:
         return None
     return left.ns_op / right.ns_op
+
+
+def subject_seconds(subject: dict | None) -> float | None:
+    if not isinstance(subject, dict):
+        return None
+    stats = subject.get("stats")
+    if isinstance(stats, dict) and stats.get("median") is not None:
+        return float(stats["median"])
+    if subject.get("seconds") is not None:
+        return float(subject["seconds"])
+    return None
+
+
+def subject_source(subject: dict | None) -> str:
+    if not isinstance(subject, dict):
+        return ""
+    return str(subject.get("source") or "")
+
+
+def parse_timing_compare_payload(payload: dict) -> list[CurrentVsOldRow]:
+    rows: list[CurrentVsOldRow] = []
+    for result in payload.get("results", []):
+        if not isinstance(result, dict):
+            continue
+        benchmark = str(result.get("benchmark") or "")
+        group = str(result.get("group") or "")
+        name = f"{group}/{benchmark}" if group and benchmark else benchmark or group
+        modes = result.get("modes") or {}
+        if not isinstance(modes, dict):
+            continue
+        for mode, subjects in modes.items():
+            if not isinstance(subjects, dict):
+                continue
+            current = subjects.get("current")
+            old = subjects.get("head")
+            cur_s = subject_seconds(current)
+            old_s = subject_seconds(old)
+            rows.append(
+                CurrentVsOldRow(
+                    benchmark=name,
+                    mode=str(mode),
+                    current_seconds=cur_s,
+                    old_seconds=old_s,
+                    ratio=(cur_s / old_s) if cur_s is not None and old_s not in (None, 0) else None,
+                    source="/".join(part for part in (subject_source(current), subject_source(old)) if part),
+                )
+            )
+    return rows
+
+
+def parse_timing_compare_json(path: Path) -> list[CurrentVsOldRow]:
+    return parse_timing_compare_payload(json.loads(path.read_text()))
+
+
+def build_runtime_metric_rows(rows: dict[str, BenchRow]) -> list[RuntimeMetricRow]:
+    out: list[RuntimeMetricRow] = []
+    for name, row in sorted(rows.items()):
+        metrics = row.metrics
+        out.append(
+            RuntimeMetricRow(
+                benchmark=name,
+                ns_op=row.ns_op,
+                bytes_op=metrics.get("B/op"),
+                allocs_op=metrics.get("allocs/op"),
+                kernel_hit_pct=metrics.get("kernel_hit_pct"),
+                fallbacks_op=metrics.get("fallbacks/op"),
+                typed_kernel_hit_pct=metrics.get("typed_kernel_hit_pct"),
+                typed_kernel_attempts_op=metrics.get("typed_kernel_attempts/op"),
+                typed_kernel_hits_op=metrics.get("typed_kernel_hits/op"),
+                typed_kernel_fallbacks_op=metrics.get("typed_kernel_fallbacks/op"),
+                typed_kernel_errors_op=metrics.get("typed_kernel_errors/op"),
+            )
+        )
+    return out
 
 
 def qeval_cases(rows: dict[str, BenchRow], prefix: str) -> set[str]:
@@ -288,15 +409,18 @@ def metric_present(rows: dict[str, BenchRow], names: list[str], metric: str) -> 
     return any(metric in rows.get(name, BenchRow(name, 0, 0)).metrics for name in names)
 
 
-def build_coverage(rows: dict[str, BenchRow]) -> list[dict[str, str]]:
+def build_coverage(rows: dict[str, BenchRow], current_vs_old: list[CurrentVsOldRow] | None = None) -> list[dict[str, str]]:
+    current_vs_old = current_vs_old or []
     qsql_names = [name for name in rows if name.startswith("BenchmarkQSQL")]
     qeval_names = [name for name in rows if name.startswith("BenchmarkQEval") or name.startswith("BenchmarkQSessionEval")]
+    qeval_has_kernel_metrics = metric_present(rows, qeval_names, "typed_kernel_hit_pct") or metric_present(rows, qeval_names, "kernel_hit_pct")
+    qeval_has_fallback_metrics = metric_present(rows, qeval_names, "typed_kernel_fallbacks/op") or metric_present(rows, qeval_names, "fallbacks/op")
     return [
         {
             "signal": "current Leia vs old Leia",
-            "qSQL": "covered by q_columnar_suite current-vs-HEAD, not this Go bench report",
-            "q.eval": "covered by q_columnar_suite for data/q_columnar_eval_primitives, not this Go bench report",
-            "gap": "run q_columnar_suite alongside this report for old-Leia ratios",
+            "qSQL": "covered" if current_vs_old else "missing",
+            "q.eval": "covered" if current_vs_old else "missing",
+            "gap": "" if current_vs_old else "provide --timing-json from benchmarks/timing_compare.py or q_columnar_suite JSON output",
         },
         {
             "signal": "current Leia vs hand-written Go",
@@ -313,14 +437,14 @@ def build_coverage(rows: dict[str, BenchRow]) -> list[dict[str, str]]:
         {
             "signal": "typed kernel hit rate",
             "qSQL": "covered" if metric_present(rows, qsql_names, "kernel_hit_pct") else "missing",
-            "q.eval": "missing",
-            "gap": "q.eval exposes eval-cache stats, but no per-shape typed-kernel hit/fallback metric is benchmark-readable from benchmarks/",
+            "q.eval": "covered" if qeval_has_kernel_metrics else "missing",
+            "gap": "" if qeval_has_kernel_metrics else "q.eval typed kernel execution is visible through q.cache_stats, but q.eval benchmarks do not yet emit per-op typed kernel metrics",
         },
         {
             "signal": "fallback rate",
             "qSQL": "covered" if metric_present(rows, qsql_names, "fallbacks/op") else "missing",
-            "q.eval": "missing",
-            "gap": "q.eval fallback stats need a public/cache_stats shape tied to vector/list kernels",
+            "q.eval": "covered" if qeval_has_fallback_metrics else "missing",
+            "gap": "" if qeval_has_fallback_metrics else "q.eval benchmarks do not yet emit per-op fallbacks/op; q.cache_stats has execution counters only",
         },
         {
             "signal": "allocs/op",
@@ -337,11 +461,25 @@ def format_float(value: float | None) -> str:
     return f"{value:.3f}x"
 
 
-def markdown_report(rows: dict[str, BenchRow], commands: list[CommandResult]) -> str:
-    coverage = build_coverage(rows)
+def format_seconds(value: float | None) -> str:
+    if value is None:
+        return "missing"
+    return f"{value:.6f}s"
+
+
+def format_metric(value: float | None, digits: int) -> str:
+    if value is None:
+        return "missing"
+    return f"{value:.{digits}f}"
+
+
+def markdown_report(rows: dict[str, BenchRow], commands: list[CommandResult], current_vs_old: list[CurrentVsOldRow] | None = None) -> str:
+    current_vs_old = current_vs_old or []
+    coverage = build_coverage(rows, current_vs_old)
     qsql_coverage = build_qsql_benchmark_coverage(rows)
     qeval_compute = build_qeval_compute_coverage(rows)
     ratios = build_ratios(rows)
+    runtime_metrics = build_runtime_metric_rows(rows)
     lines = [
         "# q Performance Completeness Report",
         "",
@@ -362,6 +500,23 @@ def markdown_report(rows: dict[str, BenchRow], commands: list[CommandResult]) ->
     )
     for item in coverage:
         lines.append(f"| {item['signal']} | {item['qSQL']} | {item['q.eval']} | {item['gap']} |")
+    lines.extend(
+        [
+            "",
+            "## Current vs Old Leia",
+            "",
+            "| Benchmark | Mode | Current | Old | Current/Old | Source |",
+            "|---|---|---:|---:|---:|---|",
+        ]
+    )
+    if current_vs_old:
+        for item in current_vs_old:
+            lines.append(
+                f"| {item.benchmark} | {item.mode} | {format_seconds(item.current_seconds)} | "
+                f"{format_seconds(item.old_seconds)} | {format_float(item.ratio)} | {item.source} |"
+            )
+    else:
+        lines.append("| missing | missing | missing | missing | missing | provide `--timing-json` |")
     lines.extend(
         [
             "",
@@ -430,10 +585,31 @@ def markdown_report(rows: dict[str, BenchRow], commands: list[CommandResult]) ->
     lines.extend(
         [
             "",
+            "## Runtime Metrics",
+            "",
+            "| Benchmark | ns/op | B/op | allocs/op | kernel_hit_pct | fallbacks/op | typed_kernel_hit_pct | typed_kernel_attempts/op | typed_kernel_fallbacks/op | typed_kernel_errors/op |",
+            "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
+        ]
+    )
+    for item in runtime_metrics:
+        lines.append(
+            f"| {item.benchmark} | {item.ns_op:.0f} | "
+            f"{format_metric(item.bytes_op, 0)} | "
+            f"{format_metric(item.allocs_op, 0)} | "
+            f"{format_metric(item.kernel_hit_pct, 1)} | "
+            f"{format_metric(item.fallbacks_op, 3)} | "
+            f"{format_metric(item.typed_kernel_hit_pct, 1)} | "
+            f"{format_metric(item.typed_kernel_attempts_op, 3)} | "
+            f"{format_metric(item.typed_kernel_fallbacks_op, 3)} | "
+            f"{format_metric(item.typed_kernel_errors_op, 3)} |"
+        )
+    lines.extend(
+        [
+            "",
             "## Raw Benchmarks",
             "",
-            "| Benchmark | ns/op | B/op | allocs/op | kernel_hit_pct | fallbacks/op |",
-            "|---|---:|---:|---:|---:|---:|",
+            "| Benchmark | ns/op | B/op | allocs/op | kernel_hit_pct | fallbacks/op | typed_kernel_hit_pct | typed_kernel_fallbacks/op |",
+            "|---|---:|---:|---:|---:|---:|---:|---:|",
         ]
     )
     for name in sorted(rows):
@@ -443,17 +619,18 @@ def markdown_report(rows: dict[str, BenchRow], commands: list[CommandResult]) ->
             f"{row.metrics.get('B/op', 0):.0f} | "
             f"{row.metrics.get('allocs/op', 0):.0f} | "
             f"{row.metrics.get('kernel_hit_pct', 0):.1f} | "
-            f"{row.metrics.get('fallbacks/op', 0):.3f} |"
+            f"{row.metrics.get('fallbacks/op', 0):.3f} | "
+            f"{row.metrics.get('typed_kernel_hit_pct', 0):.1f} | "
+            f"{row.metrics.get('typed_kernel_fallbacks/op', 0):.3f} |"
         )
     lines.extend(
         [
             "",
             "## Required Follow-up Gaps",
             "",
-            "- Add q.eval/vector-runtime typed kernel hit and fallback counters that are visible through `q.cache_stats()` or a benchmark-safe public API.",
             "- Add stable q.eval math-map coverage once unary/vector math expressions such as exp/log/sqrt have complete parser/eval support.",
             "- Add qSQL cold-cache counterparts for group and join if those paths are used to judge schema-stable cache value.",
-            "- Add current-vs-old Go benchmark comparison for q.eval/qSQL, or always pair this report with `bash benchmarks/q_columnar_suite.sh` for current-vs-HEAD timing.",
+            "- Pass `--timing-json` from `benchmarks/timing_compare.py` / `q_columnar_suite.sh --json ...` when this report is used for current-vs-old decisions.",
         ]
     )
     return "\n".join(lines) + "\n"
@@ -465,10 +642,12 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--json", type=Path, default=Path("benchmarks/data/q_perf_report_latest.json"))
     parser.add_argument("--markdown", type=Path, default=Path("benchmarks/data/q_perf_report_latest.md"))
     parser.add_argument("--from-output", type=Path, action="append", default=[], help="Parse existing go test output instead of running commands.")
+    parser.add_argument("--timing-json", type=Path, action="append", default=[], help="Include current-vs-old rows from timing_compare.py JSON output.")
     args = parser.parse_args(argv)
 
     commands: list[CommandResult] = []
     rows: dict[str, BenchRow] = {}
+    current_vs_old: list[CurrentVsOldRow] = []
 
     if args.from_output:
         for path in args.from_output:
@@ -503,10 +682,15 @@ def main(argv: list[str]) -> int:
         commands.append(qeval)
         rows.update(qeval_rows)
 
+    for path in args.timing_json:
+        current_vs_old.extend(parse_timing_compare_json(path))
+
     payload = {
         "commands": [asdict(command) for command in commands],
         "benchmarks": {name: asdict(row) for name, row in sorted(rows.items())},
-        "coverage": build_coverage(rows),
+        "coverage": build_coverage(rows, current_vs_old),
+        "current_vs_old": [asdict(row) for row in current_vs_old],
+        "runtime_metrics": [asdict(row) for row in build_runtime_metric_rows(rows)],
         "qsql_benchmark_coverage": asdict(build_qsql_benchmark_coverage(rows)),
         "q_eval_compute_coverage": asdict(build_qeval_compute_coverage(rows)),
         "ratios": [asdict(row) for row in build_ratios(rows)],
@@ -515,7 +699,7 @@ def main(argv: list[str]) -> int:
     args.json.parent.mkdir(parents=True, exist_ok=True)
     args.markdown.parent.mkdir(parents=True, exist_ok=True)
     args.json.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
-    args.markdown.write_text(markdown_report(rows, commands))
+    args.markdown.write_text(markdown_report(rows, commands, current_vs_old))
 
     for command in commands:
         if command.exit_code != 0:
