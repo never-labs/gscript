@@ -1010,12 +1010,11 @@ func DetectQFrameRuntimeKernels(fn *Function) []QFrameRuntimeKernel {
 			if instr == nil {
 				continue
 			}
-			switch instr.Op {
-			case OpFrameProjectColumn:
-				out = append(out, QFrameRuntimeKernel{Instr: instr, Kernel: "FrameProjectColumn", ShapeName: "project/column"})
-			case OpFrameFilterProjectColumn:
-				out = append(out, QFrameRuntimeKernel{Instr: instr, Kernel: "FrameFilterProjectColumn", ShapeName: "filter/project/column"})
+			source, kernel, shape, _, ok := qRuntimePrimitiveExecutionMetadata(instr.Op)
+			if !ok || source != "methodjit_q_frame_runtime" {
+				continue
 			}
+			out = append(out, QFrameRuntimeKernel{Instr: instr, Kernel: kernel, ShapeName: shape})
 		}
 	}
 	return out

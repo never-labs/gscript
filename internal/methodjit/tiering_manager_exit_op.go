@@ -332,8 +332,10 @@ func (tm *TieringManager) executeOpExit(ctx *ExecContext, regs []runtime.Value, 
 		}
 		out, err := executeFrameLenValue(regs[absArg1])
 		if err != nil {
+			tm.recordQRuntimePrimitiveExecution(proto, OpFrameLen, "error")
 			return err
 		}
+		tm.recordQRuntimePrimitiveExecution(proto, OpFrameLen, "success")
 		regs[absSlot] = out
 
 	case OpFrameColumn:
@@ -345,8 +347,10 @@ func (tm *TieringManager) executeOpExit(ctx *ExecContext, regs []runtime.Value, 
 		}
 		out, err := executeFrameColumnValue(regs[absArg1], proto.Constants[aux].Str())
 		if err != nil {
+			tm.recordQRuntimePrimitiveExecution(proto, OpFrameColumn, "error")
 			return err
 		}
+		tm.recordQRuntimePrimitiveExecution(proto, OpFrameColumn, "success")
 		regs[absSlot] = out
 
 	case OpFrameMask:
@@ -358,8 +362,10 @@ func (tm *TieringManager) executeOpExit(ctx *ExecContext, regs []runtime.Value, 
 		}
 		out, err := executeFrameMaskValue(regs[absArg1], proto.Constants[aux])
 		if err != nil {
+			tm.recordQRuntimePrimitiveExecution(proto, OpFrameMask, "error")
 			return err
 		}
+		tm.recordQRuntimePrimitiveExecution(proto, OpFrameMask, "success")
 		regs[absSlot] = out
 
 	case OpFrameProject:
@@ -375,8 +381,10 @@ func (tm *TieringManager) executeOpExit(ctx *ExecContext, regs []runtime.Value, 
 		}
 		out, err := executeFrameProjectValue(regs[absArg1], names)
 		if err != nil {
+			tm.recordQRuntimePrimitiveExecution(proto, OpFrameProject, "error")
 			return err
 		}
+		tm.recordQRuntimePrimitiveExecution(proto, OpFrameProject, "success")
 		regs[absSlot] = out
 
 	case OpFrameFilter:
@@ -385,8 +393,10 @@ func (tm *TieringManager) executeOpExit(ctx *ExecContext, regs []runtime.Value, 
 		}
 		out, err := executeFrameFilterValue(regs[absArg1], regs[absArg2])
 		if err != nil {
+			tm.recordQRuntimePrimitiveExecution(proto, OpFrameFilter, "error")
 			return err
 		}
+		tm.recordQRuntimePrimitiveExecution(proto, OpFrameFilter, "success")
 		regs[absSlot] = out
 
 	case OpFrameFilterProject:
@@ -402,8 +412,10 @@ func (tm *TieringManager) executeOpExit(ctx *ExecContext, regs []runtime.Value, 
 		}
 		out, err := executeFrameFilterProjectValue(regs[absArg1], regs[absArg2], names)
 		if err != nil {
+			tm.recordQRuntimePrimitiveExecution(proto, OpFrameFilterProject, "error")
 			return err
 		}
+		tm.recordQRuntimePrimitiveExecution(proto, OpFrameFilterProject, "success")
 		regs[absSlot] = out
 
 	case OpFrameGather:
@@ -412,8 +424,10 @@ func (tm *TieringManager) executeOpExit(ctx *ExecContext, regs []runtime.Value, 
 		}
 		out, err := executeFrameGatherValue(regs[absArg1], regs[absArg2])
 		if err != nil {
+			tm.recordQRuntimePrimitiveExecution(proto, OpFrameGather, "error")
 			return err
 		}
+		tm.recordQRuntimePrimitiveExecution(proto, OpFrameGather, "success")
 		regs[absSlot] = out
 
 	case OpFrameSlice:
@@ -422,8 +436,10 @@ func (tm *TieringManager) executeOpExit(ctx *ExecContext, regs []runtime.Value, 
 		}
 		out, err := executeFrameSliceValue(regs[absArg1], regs[absArg2])
 		if err != nil {
+			tm.recordQRuntimePrimitiveExecution(proto, OpFrameSlice, "error")
 			return err
 		}
+		tm.recordQRuntimePrimitiveExecution(proto, OpFrameSlice, "success")
 		regs[absSlot] = out
 
 	case OpFrameOrder:
@@ -435,8 +451,10 @@ func (tm *TieringManager) executeOpExit(ctx *ExecContext, regs []runtime.Value, 
 		}
 		out, err := executeFrameOrderValue(regs[absArg1], proto.Constants[aux])
 		if err != nil {
+			tm.recordQRuntimePrimitiveExecution(proto, OpFrameOrder, "error")
 			return err
 		}
+		tm.recordQRuntimePrimitiveExecution(proto, OpFrameOrder, "success")
 		regs[absSlot] = out
 
 	case OpFrameOrderGather:
@@ -448,8 +466,10 @@ func (tm *TieringManager) executeOpExit(ctx *ExecContext, regs []runtime.Value, 
 		}
 		out, err := executeFrameOrderGatherValue(regs[absArg1], proto.Constants[aux])
 		if err != nil {
+			tm.recordQRuntimePrimitiveExecution(proto, OpFrameOrderGather, "error")
 			return err
 		}
+		tm.recordQRuntimePrimitiveExecution(proto, OpFrameOrderGather, "success")
 		regs[absSlot] = out
 
 	case OpFrameProjectColumn:
@@ -465,8 +485,10 @@ func (tm *TieringManager) executeOpExit(ctx *ExecContext, regs []runtime.Value, 
 		}
 		out, err := executeFrameProjectColumnValue(regs[absArg1], names, resultName)
 		if err != nil {
+			tm.recordQRuntimePrimitiveExecution(proto, OpFrameProjectColumn, "error")
 			return err
 		}
+		tm.recordQRuntimePrimitiveExecution(proto, OpFrameProjectColumn, "success")
 		regs[absSlot] = out
 
 	case OpFrameFilterProjectColumn:
@@ -482,8 +504,10 @@ func (tm *TieringManager) executeOpExit(ctx *ExecContext, regs []runtime.Value, 
 		}
 		out, err := executeFrameFilterProjectColumnValue(regs[absArg1], regs[absArg2], names, resultName)
 		if err != nil {
+			tm.recordQRuntimePrimitiveExecution(proto, OpFrameFilterProjectColumn, "error")
 			return err
 		}
+		tm.recordQRuntimePrimitiveExecution(proto, OpFrameFilterProjectColumn, "success")
 		regs[absSlot] = out
 
 	case OpQFrameSelectColumn:
@@ -518,8 +542,10 @@ func (tm *TieringManager) executeOpExit(ctx *ExecContext, regs []runtime.Value, 
 		}
 		out, err := executeVectorGatherValue(regs[absArg1], regs[absArg2])
 		if err != nil {
+			tm.recordQRuntimePrimitiveExecution(proto, OpVectorGather, "error")
 			return err
 		}
+		tm.recordQRuntimePrimitiveExecution(proto, OpVectorGather, "success")
 		regs[absSlot] = out
 
 	case OpVectorCompare:
@@ -528,8 +554,10 @@ func (tm *TieringManager) executeOpExit(ctx *ExecContext, regs []runtime.Value, 
 		}
 		out, err := executeVectorCompareValue(aux, regs[absArg1], regs[absArg2])
 		if err != nil {
+			tm.recordQRuntimePrimitiveExecution(proto, OpVectorCompare, "error")
 			return err
 		}
+		tm.recordQRuntimePrimitiveExecution(proto, OpVectorCompare, "success")
 		regs[absSlot] = out
 
 	case OpVectorMask:
@@ -538,8 +566,10 @@ func (tm *TieringManager) executeOpExit(ctx *ExecContext, regs []runtime.Value, 
 		}
 		out, err := executeVectorMaskValue(aux, regs[absArg1], regs[absArg2])
 		if err != nil {
+			tm.recordQRuntimePrimitiveExecution(proto, OpVectorMask, "error")
 			return err
 		}
+		tm.recordQRuntimePrimitiveExecution(proto, OpVectorMask, "success")
 		regs[absSlot] = out
 
 	case OpVectorWhere:
@@ -550,8 +580,10 @@ func (tm *TieringManager) executeOpExit(ctx *ExecContext, regs []runtime.Value, 
 		}
 		out, err := executeVectorWhereValue(regs[tempBase], regs[tempBase+1], regs[tempBase+2])
 		if err != nil {
+			tm.recordQRuntimePrimitiveExecution(proto, OpVectorWhere, "error")
 			return err
 		}
+		tm.recordQRuntimePrimitiveExecution(proto, OpVectorWhere, "success")
 		regs[absSlot] = out
 
 	case OpVectorReduce:
@@ -560,8 +592,10 @@ func (tm *TieringManager) executeOpExit(ctx *ExecContext, regs []runtime.Value, 
 		}
 		out, err := executeVectorReduceValue(aux, regs[absArg1])
 		if err != nil {
+			tm.recordQRuntimePrimitiveExecution(proto, OpVectorReduce, "error")
 			return err
 		}
+		tm.recordQRuntimePrimitiveExecution(proto, OpVectorReduce, "success")
 		regs[absSlot] = out
 
 	case OpQVectorWhereReduce:
@@ -589,8 +623,10 @@ func (tm *TieringManager) executeOpExit(ctx *ExecContext, regs []runtime.Value, 
 		}
 		out, err := executeVectorScanValue(regs[absArg1])
 		if err != nil {
+			tm.recordQRuntimePrimitiveExecution(proto, OpVectorScan, "error")
 			return err
 		}
+		tm.recordQRuntimePrimitiveExecution(proto, OpVectorScan, "success")
 		regs[absSlot] = out
 
 	case OpEq:

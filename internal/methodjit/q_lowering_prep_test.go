@@ -473,9 +473,13 @@ func TestFrameProjectColumnBytecodeBuildsMethodJITIR(t *testing.T) {
 	}
 	assertQKernelDescriptor(t, report.QKernelDescriptors, "methodjit_q_frame_runtime", "runtime_kernel", "FrameProjectColumn", "project/column", "typed_runtime_op_exit", "supported", "")
 	assertQKernelShapeSummary(t, report.QKernelShapeSummary, "methodjit_q_frame_runtime", "runtime_kernel", "project/column", "supported", "", 1)
+	assertQKernelShapeSummaryExecution(t, report.QKernelShapeSummary, "methodjit_q_frame_runtime", "runtime_kernel", "project/column", "supported", 1, 1, 0)
+	assertQKernelExecutionStat(t, report.QKernelExecutionStats, "methodjit_q_frame_runtime", "FrameProjectColumn", "project/column", "typed_runtime_op_exit", "success", 1)
+	assertQKernelExecutionRouteSummary(t, report.QKernelExecutionRoutes, "methodjit_q_frame_runtime", "FrameProjectColumn", "typed_runtime_op_exit", "success", 1)
 	if !strings.Contains(report.String(), "Q frame runtime kernels") ||
 		!strings.Contains(report.String(), "kernel=FrameProjectColumn") ||
-		!strings.Contains(report.String(), "source=methodjit_q_frame_runtime kind=runtime_kernel kernel=FrameProjectColumn shape=project/column route=typed_runtime_op_exit outcome=supported") {
+		!strings.Contains(report.String(), "source=methodjit_q_frame_runtime kind=runtime_kernel kernel=FrameProjectColumn shape=project/column route=typed_runtime_op_exit outcome=supported") ||
+		!strings.Contains(report.String(), "source=methodjit_q_frame_runtime kernel=FrameProjectColumn shape=project/column route=typed_runtime_op_exit outcome=success count=1") {
 		t.Fatalf("diagnostic report missing frame project-column runtime kernel descriptor:\n%s", report.String())
 	}
 }
@@ -2499,9 +2503,15 @@ func TestQVectorRuntimeKernelsDiagnosePrimitiveShapes(t *testing.T) {
 			t.Fatalf("Diagnose QVectorRuntimeKernelShapes = %+v, want %s count 1", report.QVectorRuntimeKernelShapes, shape)
 		}
 	}
+	assertQKernelExecutionStat(t, report.QKernelExecutionStats, "methodjit_q_vector_runtime", "VectorGather", "vector-gather", "typed_runtime_op_exit", "success", 1)
+	assertQKernelExecutionStat(t, report.QKernelExecutionStats, "methodjit_q_vector_runtime", "VectorCompare", "vector-compare", "typed_runtime_op_exit", "success", 1)
+	assertQKernelExecutionStat(t, report.QKernelExecutionStats, "methodjit_q_vector_runtime", "VectorMask", "vector-mask", "typed_runtime_op_exit", "success", 1)
+	assertQKernelExecutionRouteSummary(t, report.QKernelExecutionRoutes, "methodjit_q_vector_runtime", "VectorGather", "typed_runtime_op_exit", "success", 1)
+	assertQKernelShapeSummaryExecution(t, report.QKernelShapeSummary, "methodjit_q_vector_runtime", "runtime_kernel", "vector-gather", "supported", 1, 1, 0)
 	if !strings.Contains(report.String(), "kernel=VectorGather") ||
 		!strings.Contains(report.String(), "kernel=VectorCompare op=>=") ||
-		!strings.Contains(report.String(), "kernel=VectorMask op=and") {
+		!strings.Contains(report.String(), "kernel=VectorMask op=and") ||
+		!strings.Contains(report.String(), "source=methodjit_q_vector_runtime kernel=VectorGather shape=vector-gather route=typed_runtime_op_exit outcome=success count=1") {
 		t.Fatalf("diagnostic report missing vector runtime kernel details:\n%s", report.String())
 	}
 }

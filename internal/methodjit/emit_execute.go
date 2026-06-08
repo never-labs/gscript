@@ -977,8 +977,10 @@ func (cf *CompiledFunction) executeOpExit(ctx *ExecContext, regs []runtime.Value
 		}
 		out, err := executeFrameLenValue(regs[arg1])
 		if err != nil {
+			cf.recordQRuntimePrimitiveExecution(OpFrameLen, "error")
 			return err
 		}
+		cf.recordQRuntimePrimitiveExecution(OpFrameLen, "success")
 		regs[slot] = out
 
 	case OpFrameColumn:
@@ -990,8 +992,10 @@ func (cf *CompiledFunction) executeOpExit(ctx *ExecContext, regs []runtime.Value
 		}
 		out, err := executeFrameColumnValue(regs[arg1], cf.Proto.Constants[aux].Str())
 		if err != nil {
+			cf.recordQRuntimePrimitiveExecution(OpFrameColumn, "error")
 			return err
 		}
+		cf.recordQRuntimePrimitiveExecution(OpFrameColumn, "success")
 		regs[slot] = out
 
 	case OpFrameMask:
@@ -1003,8 +1007,10 @@ func (cf *CompiledFunction) executeOpExit(ctx *ExecContext, regs []runtime.Value
 		}
 		out, err := executeFrameMaskValue(regs[arg1], cf.Proto.Constants[aux])
 		if err != nil {
+			cf.recordQRuntimePrimitiveExecution(OpFrameMask, "error")
 			return err
 		}
+		cf.recordQRuntimePrimitiveExecution(OpFrameMask, "success")
 		regs[slot] = out
 
 	case OpFrameProject:
@@ -1020,8 +1026,10 @@ func (cf *CompiledFunction) executeOpExit(ctx *ExecContext, regs []runtime.Value
 		}
 		out, err := executeFrameProjectValue(regs[arg1], names)
 		if err != nil {
+			cf.recordQRuntimePrimitiveExecution(OpFrameProject, "error")
 			return err
 		}
+		cf.recordQRuntimePrimitiveExecution(OpFrameProject, "success")
 		regs[slot] = out
 
 	case OpFrameFilter:
@@ -1030,8 +1038,10 @@ func (cf *CompiledFunction) executeOpExit(ctx *ExecContext, regs []runtime.Value
 		}
 		out, err := executeFrameFilterValue(regs[arg1], regs[arg2])
 		if err != nil {
+			cf.recordQRuntimePrimitiveExecution(OpFrameFilter, "error")
 			return err
 		}
+		cf.recordQRuntimePrimitiveExecution(OpFrameFilter, "success")
 		regs[slot] = out
 
 	case OpFrameFilterProject:
@@ -1047,8 +1057,10 @@ func (cf *CompiledFunction) executeOpExit(ctx *ExecContext, regs []runtime.Value
 		}
 		out, err := executeFrameFilterProjectValue(regs[arg1], regs[arg2], names)
 		if err != nil {
+			cf.recordQRuntimePrimitiveExecution(OpFrameFilterProject, "error")
 			return err
 		}
+		cf.recordQRuntimePrimitiveExecution(OpFrameFilterProject, "success")
 		regs[slot] = out
 
 	case OpFrameGather:
@@ -1057,8 +1069,10 @@ func (cf *CompiledFunction) executeOpExit(ctx *ExecContext, regs []runtime.Value
 		}
 		out, err := executeFrameGatherValue(regs[arg1], regs[arg2])
 		if err != nil {
+			cf.recordQRuntimePrimitiveExecution(OpFrameGather, "error")
 			return err
 		}
+		cf.recordQRuntimePrimitiveExecution(OpFrameGather, "success")
 		regs[slot] = out
 
 	case OpFrameSlice:
@@ -1067,8 +1081,10 @@ func (cf *CompiledFunction) executeOpExit(ctx *ExecContext, regs []runtime.Value
 		}
 		out, err := executeFrameSliceValue(regs[arg1], regs[arg2])
 		if err != nil {
+			cf.recordQRuntimePrimitiveExecution(OpFrameSlice, "error")
 			return err
 		}
+		cf.recordQRuntimePrimitiveExecution(OpFrameSlice, "success")
 		regs[slot] = out
 
 	case OpFrameOrder:
@@ -1080,8 +1096,10 @@ func (cf *CompiledFunction) executeOpExit(ctx *ExecContext, regs []runtime.Value
 		}
 		out, err := executeFrameOrderValue(regs[arg1], cf.Proto.Constants[aux])
 		if err != nil {
+			cf.recordQRuntimePrimitiveExecution(OpFrameOrder, "error")
 			return err
 		}
+		cf.recordQRuntimePrimitiveExecution(OpFrameOrder, "success")
 		regs[slot] = out
 
 	case OpFrameOrderGather:
@@ -1093,8 +1111,10 @@ func (cf *CompiledFunction) executeOpExit(ctx *ExecContext, regs []runtime.Value
 		}
 		out, err := executeFrameOrderGatherValue(regs[arg1], cf.Proto.Constants[aux])
 		if err != nil {
+			cf.recordQRuntimePrimitiveExecution(OpFrameOrderGather, "error")
 			return err
 		}
+		cf.recordQRuntimePrimitiveExecution(OpFrameOrderGather, "success")
 		regs[slot] = out
 
 	case OpFrameProjectColumn:
@@ -1110,8 +1130,10 @@ func (cf *CompiledFunction) executeOpExit(ctx *ExecContext, regs []runtime.Value
 		}
 		out, err := executeFrameProjectColumnValue(regs[arg1], names, resultName)
 		if err != nil {
+			cf.recordQRuntimePrimitiveExecution(OpFrameProjectColumn, "error")
 			return err
 		}
+		cf.recordQRuntimePrimitiveExecution(OpFrameProjectColumn, "success")
 		regs[slot] = out
 
 	case OpFrameFilterProjectColumn:
@@ -1127,8 +1149,10 @@ func (cf *CompiledFunction) executeOpExit(ctx *ExecContext, regs []runtime.Value
 		}
 		out, err := executeFrameFilterProjectColumnValue(regs[arg1], regs[arg2], names, resultName)
 		if err != nil {
+			cf.recordQRuntimePrimitiveExecution(OpFrameFilterProjectColumn, "error")
 			return err
 		}
+		cf.recordQRuntimePrimitiveExecution(OpFrameFilterProjectColumn, "success")
 		regs[slot] = out
 
 	case OpQFrameSelectColumn:
@@ -1162,8 +1186,10 @@ func (cf *CompiledFunction) executeOpExit(ctx *ExecContext, regs []runtime.Value
 		}
 		out, err := executeVectorGatherValue(regs[arg1], regs[arg2])
 		if err != nil {
+			cf.recordQRuntimePrimitiveExecution(OpVectorGather, "error")
 			return err
 		}
+		cf.recordQRuntimePrimitiveExecution(OpVectorGather, "success")
 		regs[slot] = out
 
 	case OpVectorCompare:
@@ -1172,8 +1198,10 @@ func (cf *CompiledFunction) executeOpExit(ctx *ExecContext, regs []runtime.Value
 		}
 		out, err := executeVectorCompareValue(aux, regs[arg1], regs[arg2])
 		if err != nil {
+			cf.recordQRuntimePrimitiveExecution(OpVectorCompare, "error")
 			return err
 		}
+		cf.recordQRuntimePrimitiveExecution(OpVectorCompare, "success")
 		regs[slot] = out
 
 	case OpVectorMask:
@@ -1182,8 +1210,10 @@ func (cf *CompiledFunction) executeOpExit(ctx *ExecContext, regs []runtime.Value
 		}
 		out, err := executeVectorMaskValue(aux, regs[arg1], regs[arg2])
 		if err != nil {
+			cf.recordQRuntimePrimitiveExecution(OpVectorMask, "error")
 			return err
 		}
+		cf.recordQRuntimePrimitiveExecution(OpVectorMask, "success")
 		regs[slot] = out
 
 	case OpVectorWhere:
@@ -1194,8 +1224,10 @@ func (cf *CompiledFunction) executeOpExit(ctx *ExecContext, regs []runtime.Value
 		}
 		out, err := executeVectorWhereValue(regs[tempBase], regs[tempBase+1], regs[tempBase+2])
 		if err != nil {
+			cf.recordQRuntimePrimitiveExecution(OpVectorWhere, "error")
 			return err
 		}
+		cf.recordQRuntimePrimitiveExecution(OpVectorWhere, "success")
 		regs[slot] = out
 
 	case OpVectorReduce:
@@ -1204,8 +1236,10 @@ func (cf *CompiledFunction) executeOpExit(ctx *ExecContext, regs []runtime.Value
 		}
 		out, err := executeVectorReduceValue(aux, regs[arg1])
 		if err != nil {
+			cf.recordQRuntimePrimitiveExecution(OpVectorReduce, "error")
 			return err
 		}
+		cf.recordQRuntimePrimitiveExecution(OpVectorReduce, "success")
 		regs[slot] = out
 
 	case OpQVectorWhereReduce:
@@ -1228,8 +1262,10 @@ func (cf *CompiledFunction) executeOpExit(ctx *ExecContext, regs []runtime.Value
 		}
 		out, err := executeVectorScanValue(regs[arg1])
 		if err != nil {
+			cf.recordQRuntimePrimitiveExecution(OpVectorScan, "error")
 			return err
 		}
+		cf.recordQRuntimePrimitiveExecution(OpVectorScan, "success")
 		regs[slot] = out
 
 	case OpEq:

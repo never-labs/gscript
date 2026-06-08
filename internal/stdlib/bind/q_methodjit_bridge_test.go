@@ -56,28 +56,51 @@ func TestQRuntimeKernelExecutionStatsProviderAggregatesMethodJITDiagnoseRoutesAn
 	defer restore()
 
 	row := qCacheStatsRow(t, qCacheStats(t), "q_runtime_kernel_execution")
-	assertIntField(t, row, "executions", 2)
-	assertIntField(t, row, "successes", 2)
+	assertIntField(t, row, "executions", 4)
+	assertIntField(t, row, "successes", 4)
 	assertIntField(t, row, "errors", 0)
 
-	stat := onlyNestedRow(t, row, "stats")
-	assertStringField(t, stat, "source", "methodjit_q_vector_runtime")
-	assertStringField(t, stat, "kernel", "QVectorWhereReduce")
-	assertStringField(t, stat, "shape", "compare/vector-where/vector-reduce")
-	assertStringField(t, stat, "route", "typed_runtime_op_exit")
-	assertStringField(t, stat, "outcome", "success")
+	stat := nestedRowByFields(t, row, "stats", map[string]string{
+		"source":  "methodjit_q_vector_runtime",
+		"kernel":  "QVectorWhereReduce",
+		"shape":   "compare/vector-where/vector-reduce",
+		"route":   "typed_runtime_op_exit",
+		"outcome": "success",
+	})
+	assertIntField(t, stat, "count", 2)
+	stat = nestedRowByFields(t, row, "stats", map[string]string{
+		"source":  "methodjit_q_vector_runtime",
+		"kernel":  "VectorCompare",
+		"shape":   "vector-compare",
+		"route":   "typed_runtime_op_exit",
+		"outcome": "success",
+	})
 	assertIntField(t, stat, "count", 2)
 
-	kernel := onlyNestedRow(t, row, "kernels")
-	assertStringField(t, kernel, "source", "methodjit_q_vector_runtime")
-	assertStringField(t, kernel, "kernel", "QVectorWhereReduce")
-	assertStringField(t, kernel, "outcome", "success")
+	kernel := nestedRowByFields(t, row, "kernels", map[string]string{
+		"source":  "methodjit_q_vector_runtime",
+		"kernel":  "QVectorWhereReduce",
+		"outcome": "success",
+	})
+	assertIntField(t, kernel, "count", 2)
+	kernel = nestedRowByFields(t, row, "kernels", map[string]string{
+		"source":  "methodjit_q_vector_runtime",
+		"kernel":  "VectorCompare",
+		"outcome": "success",
+	})
 	assertIntField(t, kernel, "count", 2)
 
-	shape := onlyNestedRow(t, row, "shapes")
-	assertStringField(t, shape, "source", "methodjit_q_vector_runtime")
-	assertStringField(t, shape, "shape", "compare/vector-where/vector-reduce")
-	assertStringField(t, shape, "outcome", "success")
+	shape := nestedRowByFields(t, row, "shapes", map[string]string{
+		"source":  "methodjit_q_vector_runtime",
+		"shape":   "compare/vector-where/vector-reduce",
+		"outcome": "success",
+	})
+	assertIntField(t, shape, "count", 2)
+	shape = nestedRowByFields(t, row, "shapes", map[string]string{
+		"source":  "methodjit_q_vector_runtime",
+		"shape":   "vector-compare",
+		"outcome": "success",
+	})
 	assertIntField(t, shape, "count", 2)
 }
 
@@ -113,24 +136,31 @@ func qCacheStatsRow(t *testing.T, tbl *runtime.Table, cache string) *runtime.Tab
 	return nil
 }
 
-func onlyNestedRow(t *testing.T, row *runtime.Table, field string) *runtime.Table {
+func nestedRowByFields(t *testing.T, row *runtime.Table, field string, want map[string]string) *runtime.Table {
 	t.Helper()
 	nested := row.RawGetString(field).Table()
-	if nested == nil || nested.Length() != 1 {
-		t.Fatalf("%s nested table = %v, want one row", field, nested)
+	if nested == nil {
+		t.Fatalf("%s nested table is nil", field)
 	}
-	item := nested.RawGetInt(1).Table()
-	if item == nil {
-		t.Fatalf("%s[1] is nil", field)
+	for i := int64(1); i <= int64(nested.Length()); i++ {
+		item := nested.RawGetInt(i).Table()
+		if item == nil {
+			continue
+		}
+		matches := true
+		for name, value := range want {
+			got := item.RawGetString(name)
+			if !got.IsString() || got.Str() != value {
+				matches = false
+				break
+			}
+		}
+		if matches {
+			return item
+		}
 	}
-	return item
-}
-
-func assertStringField(t *testing.T, row *runtime.Table, field, want string) {
-	t.Helper()
-	if got := row.RawGetString(field); !got.IsString() || got.Str() != want {
-		t.Fatalf("%s = %v, want %q", field, got, want)
-	}
+	t.Fatalf("%s row matching %+v not found", field, want)
+	return nil
 }
 
 func assertIntField(t *testing.T, row *runtime.Table, field string, want int64) {

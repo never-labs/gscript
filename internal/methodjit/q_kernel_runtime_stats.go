@@ -2,7 +2,33 @@
 
 package methodjit
 
-import "sort"
+import (
+	"sort"
+
+	"github.com/never-labs/leia/internal/vm"
+)
+
+func (tm *TieringManager) recordQRuntimePrimitiveExecution(proto *vm.FuncProto, op Op, outcome string) {
+	if tm == nil || proto == nil {
+		return
+	}
+	cf, _ := tm.tier2CompiledFor(proto)
+	if cf == nil {
+		return
+	}
+	cf.recordQRuntimePrimitiveExecution(op, outcome)
+}
+
+func (cf *CompiledFunction) recordQRuntimePrimitiveExecution(op Op, outcome string) {
+	if cf == nil {
+		return
+	}
+	source, kernel, shape, route, ok := qRuntimePrimitiveExecutionMetadata(op)
+	if !ok {
+		return
+	}
+	cf.recordQKernelExecution(source, kernel, shape, route, outcome)
+}
 
 func (cf *CompiledFunction) recordQKernelExecution(source, kernel, shape, route, outcome string) {
 	if cf == nil {
