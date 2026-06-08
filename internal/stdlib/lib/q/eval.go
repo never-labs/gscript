@@ -306,14 +306,16 @@ func (s *EvalState) Eval(src string) (any, error) {
 
 func (s *EvalState) evalScript(src string) (any, error) {
 	plan := s.qScriptPlan(src)
-	if len(plan.statements) == 1 {
-		return s.evalScriptStatement(plan.statements[0])
-	}
 	previousDeferredScans := s.deferScanAssignments
-	s.deferScanAssignments = deferredScanAssignments(plan.statements, s)
+	if len(plan.statements) > 1 {
+		s.deferScanAssignments = deferredScanAssignments(plan.statements, s)
+	}
 	defer func() {
 		s.deferScanAssignments = previousDeferredScans
 	}()
+	if len(plan.statements) == 1 {
+		return s.evalScriptStatement(plan.statements[0])
+	}
 	var last any
 	for i := 0; i < len(plan.statements); i++ {
 		stmt := plan.statements[i]
@@ -1168,6 +1170,9 @@ func (s *EvalState) eval(src string) (any, error) {
 		right := strings.TrimSpace(src[2:])
 		if right == "" {
 			return qAdverbFunction{verb: "+", adverb: "/"}, nil
+		}
+		if out, handled, err := s.tryEvalSumWhereGatherReduce(right); err != nil || handled {
+			return out, err
 		}
 		if out, handled, err := s.tryEvalSumWhereCompare(right); err != nil || handled {
 			return out, err
@@ -4133,6 +4138,84 @@ func (s *EvalState) tryEvalSumDeltas(src string) (any, bool, error) {
 		recordRuntimeKernelProbe("ArrayDeltasSum", shape, handled, err)
 	}
 	return nil, false, nil
+}
+
+func (s *EvalState) tryEvalSumWhereGatherReduce(src string) (any, bool, error) {
+	if valueExpr, maskExpr, ok := splitTopLevelWord(src, "where"); ok {
+		value, err := s.eval(valueExpr)
+		if err != nil {
+			return nil, true, err
+		}
+		array, ok := value.(data.Array)
+		if !ok {
+			return nil, false, nil
+		}
+		maskValue, err := s.eval(maskExpr)
+		if err != nil {
+			return nil, true, err
+		}
+		mask, ok := maskValue.(data.Array)
+		if !ok {
+			return nil, false, nil
+		}
+		out, handled, err := data.TryTypedNumericSumWhereMask(array, mask)
+		shape := "where-reduce/" + string(array.Kind()) + "/" + string(mask.Kind())
+		recordRuntimeKernelProbe("ArrayWhereReduceSum", shape, handled, err)
+		if err != nil || !handled {
+			return nil, handled, err
+		}
+		return out, true, nil
+	}
+	collectionExpr, indexExpr, ok := findPostfixIndex(src)
+	if !ok {
+		return nil, false, nil
+	}
+	value, err := s.eval(collectionExpr)
+	if err != nil {
+		return nil, true, err
+	}
+	array, ok := value.(data.Array)
+	if !ok {
+		return nil, false, nil
+	}
+	if maskExpr, ok := directWhereMaskExpr(indexExpr); ok {
+		maskValue, err := s.eval(maskExpr)
+		if err != nil {
+			return nil, true, err
+		}
+		mask, ok := maskValue.(data.Array)
+		if ok {
+			out, handled, err := data.TryTypedNumericSumWhereMask(array, mask)
+			shape := "where-index-reduce/" + string(array.Kind()) + "/" + string(mask.Kind())
+			recordRuntimeKernelProbe("ArrayWhereReduceSum", shape, handled, err)
+			if err != nil || handled {
+				return out, handled, err
+			}
+		}
+	}
+	indexValue, err := s.eval(indexExpr)
+	if err != nil {
+		return nil, true, err
+	}
+	indexes, ok := indexValue.(data.Array)
+	if !ok {
+		return nil, false, nil
+	}
+	out, handled, err := data.TryTypedNumericSumByI64Indexes(array, indexes)
+	shape := "gather-reduce/" + string(array.Kind()) + "/" + string(indexes.Kind())
+	recordRuntimeKernelProbe("ArrayGatherReduceSum", shape, handled, err)
+	if err != nil || !handled {
+		return nil, handled, err
+	}
+	return out, true, nil
+}
+
+func directWhereMaskExpr(indexExpr string) (string, bool) {
+	indexExpr = strings.TrimSpace(indexExpr)
+	if strings.HasPrefix(indexExpr, "where ") {
+		return strings.TrimSpace(indexExpr[len("where "):]), true
+	}
+	return "", false
 }
 
 func (s *EvalState) tryEvalWhereCompareCountSum(src string) (any, bool, error) {

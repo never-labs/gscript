@@ -1928,6 +1928,11 @@ func TestEvalWhereRecordsTypedRuntimeKernel(t *testing.T) {
 	assertEvalValue(t, `count reverse "AAPL" "MSFT" "AMD"`, int64(3))
 	assertEvalArray(t, "x:til 8;x[where x>=4]", data.KindI64, []any{int64(4), int64(5), int64(6), int64(7)})
 	assertEvalValue(t, "x:til 8;(count where x>=4)+(+/where x>=4)", int64(26))
+	assertEvalValue(t, "x:til 8;y:(x*3)+7;idx:where x>=4;+/y[idx]", int64(94))
+	assertEvalValue(t, "x:til 8;y:(x*3)+7;+/y[where x>=4]", int64(94))
+	assertEvalValue(t, "x:til 8;y:(x*3)+7;+/y where x>=4", int64(94))
+	assertEvalValue(t, "x:til 8;y:(x*3)+7;lo:0;hi:4;idx:where (x>=lo) and x<hi;+/y[idx]", int64(46))
+	assertEvalValue(t, "x:reverse til 8;idx:iasc x;+/x[idx]", int64(28))
 	assertEvalArray(t, "sum 1 2 3 4 fby `a`a`b`b", data.KindI64, []any{int64(3), int64(3), int64(7), int64(7)})
 	assertEvalValue(t, "count (sum 1 2 3 4 fby `a`a`b`b)", int64(4))
 	assertEvalValue(t, "last ({x+y}\\[10;1 2 3])", int64(16))
@@ -1959,6 +1964,8 @@ func TestEvalWhereRecordsTypedRuntimeKernel(t *testing.T) {
 	seenCountMaxs := false
 	seenCountAvgs := false
 	seenCountFby := false
+	seenGatherReduce := false
+	seenWhereReduce := false
 	for _, stat := range RuntimeKernelExecutionStats() {
 		if stat.Kernel == "ArrayWhereCompare" && stat.Shape == "compare-to-index/>=/i64/i64" && stat.Outcome == "hit" && stat.ReasonCode == "typed_kernel" && stat.Count > 0 {
 			seenWhereCompare = true
@@ -2023,9 +2030,15 @@ func TestEvalWhereRecordsTypedRuntimeKernel(t *testing.T) {
 		if stat.Kernel == "ArrayCountFby" && stat.Shape == "vector-count/fby-sum/i64/symbol" && stat.Outcome == "hit" && stat.ReasonCode == "typed_kernel" && stat.Count > 0 {
 			seenCountFby = true
 		}
+		if stat.Kernel == "ArrayGatherReduceSum" && stat.Shape == "gather-reduce/i64/i64" && stat.Outcome == "hit" && stat.ReasonCode == "typed_kernel" && stat.Count > 0 {
+			seenGatherReduce = true
+		}
+		if stat.Kernel == "ArrayWhereReduceSum" && strings.HasPrefix(stat.Shape, "where") && stat.Outcome == "hit" && stat.ReasonCode == "typed_kernel" && stat.Count > 0 {
+			seenWhereReduce = true
+		}
 	}
-	if !seenWhereCompare || !seenWhereMask || !seenLikeCount || !seenInCount || !seenBoolLogical || !seenTrueCount || !seenScalarFill || !seenSortIndexes || !seenCountReverse || !seenGather || !seenFbySum || !seenLastCallableScan || !seenAmend || !seenEachCountDistinct || !seenWhereCompareStats || !seenWhereCompareCountSum || !seenCountSums || !seenCountMins || !seenCountMaxs || !seenCountAvgs || !seenCountFby {
-		t.Fatalf("missing where typed runtime stats: compare=%v mask=%v like=%v in=%v logical=%v trueCount=%v scalarFill=%v sortIndexes=%v reverse=%v gather=%v fbySum=%v lastScan=%v amend=%v eachDistinct=%v compareStats=%v compareCountSum=%v countSums=%v countMins=%v countMaxs=%v countAvgs=%v countFby=%v stats=%#v", seenWhereCompare, seenWhereMask, seenLikeCount, seenInCount, seenBoolLogical, seenTrueCount, seenScalarFill, seenSortIndexes, seenCountReverse, seenGather, seenFbySum, seenLastCallableScan, seenAmend, seenEachCountDistinct, seenWhereCompareStats, seenWhereCompareCountSum, seenCountSums, seenCountMins, seenCountMaxs, seenCountAvgs, seenCountFby, RuntimeKernelExecutionStats())
+	if !seenWhereCompare || !seenWhereMask || !seenLikeCount || !seenInCount || !seenBoolLogical || !seenTrueCount || !seenScalarFill || !seenSortIndexes || !seenCountReverse || !seenGather || !seenFbySum || !seenLastCallableScan || !seenAmend || !seenEachCountDistinct || !seenWhereCompareStats || !seenWhereCompareCountSum || !seenCountSums || !seenCountMins || !seenCountMaxs || !seenCountAvgs || !seenCountFby || !seenGatherReduce || !seenWhereReduce {
+		t.Fatalf("missing where typed runtime stats: compare=%v mask=%v like=%v in=%v logical=%v trueCount=%v scalarFill=%v sortIndexes=%v reverse=%v gather=%v fbySum=%v lastScan=%v amend=%v eachDistinct=%v compareStats=%v compareCountSum=%v countSums=%v countMins=%v countMaxs=%v countAvgs=%v countFby=%v gatherReduce=%v whereReduce=%v stats=%#v", seenWhereCompare, seenWhereMask, seenLikeCount, seenInCount, seenBoolLogical, seenTrueCount, seenScalarFill, seenSortIndexes, seenCountReverse, seenGather, seenFbySum, seenLastCallableScan, seenAmend, seenEachCountDistinct, seenWhereCompareStats, seenWhereCompareCountSum, seenCountSums, seenCountMins, seenCountMaxs, seenCountAvgs, seenCountFby, seenGatherReduce, seenWhereReduce, RuntimeKernelExecutionStats())
 	}
 }
 
@@ -2042,6 +2055,16 @@ func TestEvalVectorArithmeticRecordsTypedRuntimeKernel(t *testing.T) {
 	}
 	if counts["ArrayDyadicArithmetic"] != 2 {
 		t.Fatalf("ArrayDyadicArithmetic hits = %d, want 2; stats=%#v", counts["ArrayDyadicArithmetic"], RuntimeKernelExecutionStats())
+	}
+}
+
+func TestEvalWhereGatherReduceCompositeMaskStats(t *testing.T) {
+	ClearRuntimeKernelExecutionStats()
+	t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+	assertEvalValue(t, "x:til 8192;y:(x*3)+7;lo:0;hi:4096;idx:where (x>=lo) and x<hi;+/y[idx]", int64(25188352))
+	for _, stat := range RuntimeKernelExecutionStats() {
+		t.Logf("%s %s %s %s %d", stat.Kernel, stat.Shape, stat.Outcome, stat.ReasonCode, stat.Count)
 	}
 }
 

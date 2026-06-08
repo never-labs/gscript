@@ -2467,6 +2467,35 @@ func TestTypedNumericUnaryBinaryAndAggregates(t *testing.T) {
 		t.Fatalf("TryTypedNumericSum range = %v, %v; want %d, true", value, ok, want)
 	}
 
+	value, ok, err = TryTypedNumericSumByI64Indexes(NewI64Range(0, 1, 8), NewI64([]int64{2, 4, 6}))
+	if err != nil {
+		t.Fatalf("TryTypedNumericSumByI64Indexes returned error: %v", err)
+	}
+	if !ok || value != int64(12) {
+		t.Fatalf("TryTypedNumericSumByI64Indexes = %v, %v; want 12, true", value, ok)
+	}
+	value, ok, err = TryTypedNumericSumWhereMask(NewI64Range(0, 1, 8), NewBool([]bool{false, true, false, true, false, true, false, false}))
+	if err != nil {
+		t.Fatalf("TryTypedNumericSumWhereMask returned error: %v", err)
+	}
+	if !ok || value != int64(9) {
+		t.Fatalf("TryTypedNumericSumWhereMask = %v, %v; want 9, true", value, ok)
+	}
+	value, ok, err = TryTypedNumericSumWhereMask(NewF64([]float64{1.5, 2.5, 3.5}), NewBool([]bool{true, false, true}))
+	if err != nil {
+		t.Fatalf("TryTypedNumericSumWhereMask f64 returned error: %v", err)
+	}
+	if !ok || value != float64(5) {
+		t.Fatalf("TryTypedNumericSumWhereMask f64 = %v, %v; want 5, true", value, ok)
+	}
+	value, ok, err = TryTypedNumericSumWhereMask(NewI64Range(0, 1, 3), NewBool([]bool{false, false, false}))
+	if err != nil {
+		t.Fatalf("TryTypedNumericSumWhereMask empty selection returned error: %v", err)
+	}
+	if !ok || value != NullValue {
+		t.Fatalf("TryTypedNumericSumWhereMask empty selection = %v, %v; want null, true", value, ok)
+	}
+
 	value, ok, err = TryTypedNumericAvg(NewI64Range(0, 1, 4))
 	if err != nil {
 		t.Fatalf("TryTypedNumericAvg range returned error: %v", err)

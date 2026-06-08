@@ -1954,6 +1954,247 @@ func TryTypedNumericSum(array Array) (any, bool, error) {
 	return typedKernels.NumericSumValue(array)
 }
 
+// TryTypedNumericSumByI64Indexes reduces array rows selected by a typed i64
+// index vector without materializing the gathered vector.
+func TryTypedNumericSumByI64Indexes(array, indexes Array) (any, bool, error) {
+	if array == nil || indexes == nil {
+		return nil, true, fmt.Errorf("sum gather array and indexes must be non-nil")
+	}
+	if indexes.Kind() != KindI64 {
+		return nil, true, fmt.Errorf("index vector kind is %s, want %s", indexes.Kind(), KindI64)
+	}
+	if indexes.Len() == 0 {
+		return NullValue, true, nil
+	}
+	if isDenseIntegerArray(array) {
+		return typedIntegerSumByI64Indexes(array, indexes)
+	}
+	if !isNumericArray(array) {
+		return nil, false, nil
+	}
+	var total float64
+	if err := forEachTypedI64Index(indexes, array.Len(), func(row int) error {
+		value, ok, err := typedKernels.NumericAt(array, row)
+		if err != nil {
+			return err
+		}
+		if ok {
+			total += value
+		}
+		return nil
+	}); err != nil {
+		return nil, true, err
+	}
+	return total, true, nil
+}
+
+// TryTypedNumericSumWhereMask reduces rows whose typed boolean mask is true
+// without materializing where indexes or a gathered value vector.
+func TryTypedNumericSumWhereMask(array, mask Array) (any, bool, error) {
+	if array == nil || mask == nil {
+		return nil, true, fmt.Errorf("sum where array and mask must be non-nil")
+	}
+	if mask.Kind() != KindBool {
+		return nil, true, fmt.Errorf("where mask kind is %s, want %s", mask.Kind(), KindBool)
+	}
+	if array.Len() != mask.Len() {
+		return nil, true, fmt.Errorf("sum where length mismatch: values=%d mask=%d", array.Len(), mask.Len())
+	}
+	if isDenseIntegerArray(array) {
+		return typedIntegerSumWhereMask(array, mask)
+	}
+	if !isNumericArray(array) {
+		return nil, false, nil
+	}
+	var total float64
+	selected := 0
+	if err := forEachTypedBoolMask(mask, func(row int) error {
+		selected++
+		value, ok, err := typedKernels.NumericAt(array, row)
+		if err != nil {
+			return err
+		}
+		if ok {
+			total += value
+		}
+		return nil
+	}); err != nil {
+		return nil, true, err
+	}
+	if selected == 0 {
+		return NullValue, true, nil
+	}
+	return total, true, nil
+}
+
+func typedIntegerSumByI64Indexes(array, indexes Array) (any, bool, error) {
+	var total int64
+	if err := forEachTypedI64Index(indexes, array.Len(), func(row int) error {
+		value, ok, err := integerArrayAt(array, row)
+		if err != nil {
+			return err
+		}
+		if ok {
+			total += value
+		}
+		return nil
+	}); err != nil {
+		return nil, true, err
+	}
+	return total, true, nil
+}
+
+func typedIntegerSumWhereMask(array, mask Array) (any, bool, error) {
+	var total int64
+	count := 0
+	if err := forEachTypedBoolMask(mask, func(row int) error {
+		value, ok, err := integerArrayAt(array, row)
+		if err != nil {
+			return err
+		}
+		if ok {
+			total += value
+			count++
+		}
+		return nil
+	}); err != nil {
+		return nil, true, err
+	}
+	if count == 0 {
+		return NullValue, true, nil
+	}
+	return total, true, nil
+}
+
+func forEachTypedI64Index(indexes Array, limit int, fn func(row int) error) error {
+	switch idx := indexes.(type) {
+	case attributedArray:
+		return forEachTypedI64Index(idx.array, limit, fn)
+	case i64RangeArray:
+		for i := 0; i < idx.len; i++ {
+			row, err := checkedI64Index(idx.start + int64(i)*idx.step)
+			if err != nil {
+				return err
+			}
+			if row >= limit {
+				return fmt.Errorf("index %d out of bounds for length %d", row, limit)
+			}
+			if err := fn(row); err != nil {
+				return err
+			}
+		}
+		return nil
+	case i64SegmentArray:
+		for _, segment := range idx.segments {
+			if err := forEachTypedI64Index(segment, limit, fn); err != nil {
+				return err
+			}
+		}
+		return nil
+	case columnArray[int64]:
+		for _, value := range idx.data {
+			row, err := checkedI64Index(value)
+			if err != nil {
+				return err
+			}
+			if row >= limit {
+				return fmt.Errorf("index %d out of bounds for length %d", row, limit)
+			}
+			if err := fn(row); err != nil {
+				return err
+			}
+		}
+		return nil
+	case nullableArray:
+		for i, value := range idx.data {
+			n64, ok := value.(int64)
+			if !ok {
+				return fmt.Errorf("index vector row %d is %T, want i64", i, value)
+			}
+			row, err := checkedI64Index(n64)
+			if err != nil {
+				return err
+			}
+			if row >= limit {
+				return fmt.Errorf("index %d out of bounds for length %d", row, limit)
+			}
+			if err := fn(row); err != nil {
+				return err
+			}
+		}
+		return nil
+	default:
+		rows, handled, err := TryTypedI64Indexes(indexes)
+		if err != nil {
+			return err
+		}
+		if !handled {
+			return fmt.Errorf("unsupported i64 index array %T", indexes)
+		}
+		for _, row := range rows {
+			if row >= limit {
+				return fmt.Errorf("index %d out of bounds for length %d", row, limit)
+			}
+			if err := fn(row); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+}
+
+func forEachTypedBoolMask(mask Array, fn func(row int) error) error {
+	switch m := mask.(type) {
+	case attributedArray:
+		return forEachTypedBoolMask(m.array, fn)
+	case columnArray[bool]:
+		for row, keep := range m.data {
+			if keep {
+				if err := fn(row); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	case nullableArray:
+		for row, value := range m.data {
+			if IsNull(value) {
+				continue
+			}
+			keep, ok := value.(bool)
+			if !ok {
+				return fmt.Errorf("where mask row %d is %T, want bool", row, value)
+			}
+			if keep {
+				if err := fn(row); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	default:
+		for row := 0; row < mask.Len(); row++ {
+			value, ok := mask.At(row)
+			if !ok {
+				return fmt.Errorf("where mask row %d out of range", row)
+			}
+			if IsNull(value) {
+				continue
+			}
+			keep, ok := value.(bool)
+			if !ok {
+				return fmt.Errorf("where mask row %d is %T, want bool", row, value)
+			}
+			if keep {
+				if err := fn(row); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	}
+}
+
 type NumericStats struct {
 	Sum      any
 	Min      any
@@ -7361,11 +7602,10 @@ func boolArrayAt(array Array, row int) (bool, bool, error) {
 	case attributedArray:
 		return boolArrayAt(a.array, row)
 	case i64RangeCompareMask:
-		value, ok := a.At(row)
-		if !ok {
+		if row < 0 || row >= a.Len() {
 			return false, true, fmt.Errorf("logical row %d out of range", row)
 		}
-		return value.(bool), true, nil
+		return a.valueAt(row), true, nil
 	case boolLogicalMask:
 		return a.valueAt(row)
 	case notMask:

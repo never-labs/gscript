@@ -1588,6 +1588,9 @@ func TryTypedWhereMaskI64(mask Array) (Array, bool, error) {
 	if mask.Kind() != KindBool {
 		return nil, true, fmt.Errorf("where mask kind is %s, want %s", mask.Kind(), KindBool)
 	}
+	if out, handled, err := typedWhereMaskIndexArray(mask); handled || err != nil {
+		return out, handled, err
+	}
 	indexes, handled, err := typedWhereMaskIndexes(mask)
 	if err != nil {
 		return nil, true, err
@@ -1600,6 +1603,69 @@ func TryTypedWhereMaskI64(mask Array) (Array, bool, error) {
 		out[i] = int64(index)
 	}
 	return newI64Trusted(out), true, nil
+}
+
+func typedWhereMaskIndexArray(mask Array) (Array, bool, error) {
+	switch a := mask.(type) {
+	case attributedArray:
+		return typedWhereMaskIndexArray(a.array)
+	case i64RangeCompareMask:
+		return i64RangeCompareMaskIndexArray(a)
+	case boolLogicalMask:
+		return boolLogicalMaskIndexArray(a)
+	default:
+		return nil, false, nil
+	}
+}
+
+func boolLogicalMaskIndexArray(mask boolLogicalMask) (Array, bool, error) {
+	if mask.op != "and" || mask.leftIsScalar || mask.rightIsScalar {
+		return nil, false, nil
+	}
+	left, leftOK := mask.left.(i64RangeCompareMask)
+	right, rightOK := mask.right.(i64RangeCompareMask)
+	if !leftOK || !rightOK || !sameI64Range(left.values, right.values) || left.values.step != 1 {
+		return nil, false, nil
+	}
+	leftLow, leftHigh, ok := compareMaskValueInterval(left)
+	if !ok {
+		return nil, false, nil
+	}
+	rightLow, rightHigh, ok := compareMaskValueInterval(right)
+	if !ok {
+		return nil, false, nil
+	}
+	return i64RangeIntervalIndexArray(left.values, maxInt64Value(leftLow, rightLow), minInt64Value(leftHigh, rightHigh)), true, nil
+}
+
+func i64RangeCompareMaskIndexArray(mask i64RangeCompareMask) (Array, bool, error) {
+	if mask.values.step != 1 {
+		return nil, false, nil
+	}
+	low, high, ok := compareMaskValueInterval(mask)
+	if !ok {
+		return nil, false, nil
+	}
+	return i64RangeIntervalIndexArray(mask.values, low, high), true, nil
+}
+
+func i64RangeIntervalIndexArray(values i64RangeArray, low, high int64) Array {
+	if values.len == 0 || high < low {
+		return i64RangeArray{len: 0}
+	}
+	startRow := low - values.start
+	if startRow < 0 {
+		startRow = 0
+	}
+	endRow := high - values.start
+	lastRow := int64(values.len - 1)
+	if endRow > lastRow {
+		endRow = lastRow
+	}
+	if endRow < startRow {
+		return i64RangeArray{len: 0}
+	}
+	return i64RangeArray{start: startRow, step: 1, len: int(endRow-startRow) + 1}
 }
 
 func typedWhereMaskIndexes(mask Array) ([]int, bool, error) {
@@ -1638,7 +1704,29 @@ func typedWhereMaskIndexes(mask Array) ([]int, bool, error) {
 		}
 		return out, true, nil
 	default:
-		return nil, false, nil
+		if mask.Kind() != KindBool {
+			return nil, false, nil
+		}
+		capacity := mask.Len()
+		if count, handled, err := TryTypedTrueCount(mask); err != nil {
+			return nil, true, err
+		} else if handled && count >= 0 && int64(int(count)) == count {
+			capacity = int(count)
+		}
+		out := make([]int, 0, capacity)
+		for row := 0; row < mask.Len(); row++ {
+			keep, ok, err := boolArrayAt(mask, row)
+			if err != nil {
+				return nil, true, err
+			}
+			if !ok {
+				return nil, false, nil
+			}
+			if keep {
+				out = append(out, row)
+			}
+		}
+		return out, true, nil
 	}
 }
 
