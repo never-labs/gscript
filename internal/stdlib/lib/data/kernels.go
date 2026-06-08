@@ -827,6 +827,70 @@ func (typedKernelRegistry) Count(array Array) (int64, bool) {
 	return int64(array.Len()), true
 }
 
+func TryTypedTrueCount(mask Array) (int64, bool, error) {
+	if mask == nil {
+		return 0, true, fmt.Errorf("true count mask is nil")
+	}
+	if mask.Kind() != KindBool {
+		return 0, true, fmt.Errorf("true count mask kind is %s, want %s", mask.Kind(), KindBool)
+	}
+	switch a := mask.(type) {
+	case attributedArray:
+		return TryTypedTrueCount(a.array)
+	case i64RangeCompareMask:
+		return a.trueCount(), true, nil
+	case boolLogicalMask:
+		return a.trueCount()
+	case tiledArray:
+		sourceLen := a.source.Len()
+		if sourceLen == 0 || a.len == 0 {
+			return 0, true, nil
+		}
+		sourceCount, handled, err := TryTypedTrueCount(a.source)
+		if err != nil || !handled {
+			return 0, handled, err
+		}
+		fullCycles := a.len / sourceLen
+		remainder := a.len % sourceLen
+		count := sourceCount * int64(fullCycles)
+		for row := 0; row < remainder; row++ {
+			value, ok, err := boolArrayAt(a.source, (a.start+row)%sourceLen)
+			if err != nil || !ok {
+				return 0, ok, err
+			}
+			if value {
+				count++
+			}
+		}
+		return count, true, nil
+	case columnArray[bool]:
+		var count int64
+		for _, keep := range a.data {
+			if keep {
+				count++
+			}
+		}
+		return count, true, nil
+	case nullableArray:
+		var count int64
+		for row, value := range a.data {
+			if IsNull(value) {
+				continue
+			}
+			keep, ok := value.(bool)
+			if !ok {
+				return 0, true, fmt.Errorf("true count mask row %d is %T, want bool", row, value)
+			}
+			if keep {
+				count++
+			}
+		}
+		return count, true, nil
+	default:
+		return 0, false, nil
+	}
+}
+
 func (typedKernelRegistry) ComplementSortedIndexes(length int, exclude []int) ([]int, bool, error) {
 	if len(exclude) == 0 {
 		return allIndexes(length), true, nil
@@ -1052,6 +1116,58 @@ func TryTypedInCount(array Array, values []any) (int64, bool, error) {
 		return 0, true, fmt.Errorf("in count array is nil")
 	}
 	return typedInCount(array, values)
+}
+
+// TryTypedBoolLogical composes boolean masks without routing each row through
+// Array.At or []any boxing. Scalars are broadcast using q vector rules.
+func TryTypedBoolLogical(op string, left, right any) (Array, bool, error) {
+	leftArray, leftIsArray := left.(Array)
+	rightArray, rightIsArray := right.(Array)
+	if !leftIsArray && !rightIsArray {
+		return nil, false, nil
+	}
+	length := 0
+	switch {
+	case leftIsArray && rightIsArray:
+		if leftArray.Kind() != KindBool || rightArray.Kind() != KindBool {
+			return nil, false, nil
+		}
+		if leftArray.Len() != rightArray.Len() && leftArray.Len() != 1 && rightArray.Len() != 1 {
+			return nil, true, fmt.Errorf("logical length mismatch")
+		}
+		length = leftArray.Len()
+		if rightArray.Len() > length {
+			length = rightArray.Len()
+		}
+	case leftIsArray:
+		if leftArray.Kind() != KindBool {
+			return nil, false, nil
+		}
+		if _, ok := left.(Array); ok && right == nil {
+			return nil, false, nil
+		}
+		length = leftArray.Len()
+	case rightIsArray:
+		if rightArray.Kind() != KindBool {
+			return nil, false, nil
+		}
+		length = rightArray.Len()
+	}
+	if leftIsArray && rightIsArray {
+		return boolLogicalMask{op: op, left: leftArray, right: rightArray, len: length}, true, nil
+	}
+	if leftIsArray {
+		rv, ok := boolScalarValue(right)
+		if !ok {
+			return nil, false, nil
+		}
+		return boolLogicalMask{op: op, left: leftArray, rightScalar: rv, rightIsScalar: true, len: length}, true, nil
+	}
+	lv, ok := boolScalarValue(left)
+	if !ok {
+		return nil, false, nil
+	}
+	return boolLogicalMask{op: op, leftScalar: lv, leftIsScalar: true, right: rightArray, len: length}, true, nil
 }
 
 func typedInCount(array Array, values []any) (int64, bool, error) {
@@ -4010,6 +4126,9 @@ func integerScalarValue(value any) (int64, bool) {
 }
 
 func compareDyadic(op Op, left, right any, length int) (Array, bool, error) {
+	if out, ok := compareI64RangeScalarDyadic(op, left, right, length); ok {
+		return out, true, nil
+	}
 	out := make([]bool, length)
 	for i := 0; i < length; i++ {
 		lv, ok, err := operandAt(left, i)
@@ -4041,6 +4160,82 @@ func compareDyadic(op Op, left, right any, length int) (Array, bool, error) {
 		out[i] = keep
 	}
 	return newBoolTrusted(out), true, nil
+}
+
+type i64RangeCompareMask struct {
+	values     i64RangeArray
+	op         Op
+	scalar     int64
+	scalarLeft bool
+}
+
+func (a i64RangeCompareMask) Kind() Kind { return KindBool }
+
+func (a i64RangeCompareMask) Len() int { return a.values.len }
+
+func (a i64RangeCompareMask) At(row int) (any, bool) {
+	if row < 0 || row >= a.values.len {
+		return nil, false
+	}
+	return a.valueAt(row), true
+}
+
+func (a i64RangeCompareMask) Values() []any {
+	out := make([]any, a.values.len)
+	for row := range out {
+		out[row] = a.valueAt(row)
+	}
+	return out
+}
+
+func (a i64RangeCompareMask) Gather(indexes []int) Array {
+	out := make([]bool, len(indexes))
+	for i, row := range indexes {
+		if row < 0 || row >= a.values.len {
+			panic(fmt.Sprintf("data range compare gather index %d out of range", row))
+		}
+		out[i] = a.valueAt(row)
+	}
+	return newBoolTrusted(out)
+}
+
+func (a i64RangeCompareMask) valueAt(row int) bool {
+	value := a.values.start + int64(row)*a.values.step
+	if a.scalarLeft {
+		return boolCompare(a.op, a.scalar == value, compareInt64(a.scalar, value))
+	}
+	return boolCompare(a.op, value == a.scalar, compareInt64(value, a.scalar))
+}
+
+func (a i64RangeCompareMask) trueCount() int64 {
+	var count int64
+	for row := 0; row < a.values.len; row++ {
+		if a.valueAt(row) {
+			count++
+		}
+	}
+	return count
+}
+
+func compareI64RangeScalarDyadic(op Op, left, right any, length int) (Array, bool) {
+	leftRange, leftRangeOK := asI64RangeArray(left)
+	rightRange, rightRangeOK := asI64RangeArray(right)
+	leftScalar, leftScalarOK := integerScalarValue(left)
+	rightScalar, rightScalarOK := integerScalarValue(right)
+	switch {
+	case leftRangeOK && rightScalarOK:
+		if leftRange.len != length {
+			return nil, false
+		}
+		return i64RangeCompareMask{values: leftRange, op: op, scalar: rightScalar}, true
+	case leftScalarOK && rightRangeOK:
+		if rightRange.len != length {
+			return nil, false
+		}
+		return i64RangeCompareMask{values: rightRange, op: op, scalar: leftScalar, scalarLeft: true}, true
+	default:
+		return nil, false
+	}
 }
 
 func compareSymbolStringScalar(op Op, left, right any) (bool, bool) {
@@ -5677,6 +5872,186 @@ func typedInUnsignedPredicate[T unsignedScalar](set map[T]struct{}) func(any) (b
 		_, matched := set[v]
 		return matched, true
 	}
+}
+
+type boolLogicalMask struct {
+	op            string
+	left          Array
+	leftScalar    bool
+	leftIsScalar  bool
+	right         Array
+	rightScalar   bool
+	rightIsScalar bool
+	len           int
+}
+
+func (a boolLogicalMask) Kind() Kind { return KindBool }
+
+func (a boolLogicalMask) Len() int { return a.len }
+
+func (a boolLogicalMask) At(row int) (any, bool) {
+	if row < 0 || row >= a.len {
+		return nil, false
+	}
+	value, ok, err := a.valueAt(row)
+	if err != nil || !ok {
+		return nil, false
+	}
+	return value, true
+}
+
+func (a boolLogicalMask) Values() []any {
+	out := make([]any, a.len)
+	for row := range out {
+		value, ok, err := a.valueAt(row)
+		if err != nil || !ok {
+			panic(fmt.Sprintf("data logical mask row %d out of range", row))
+		}
+		out[row] = value
+	}
+	return out
+}
+
+func (a boolLogicalMask) Gather(indexes []int) Array {
+	out := make([]bool, len(indexes))
+	for i, row := range indexes {
+		if row < 0 || row >= a.len {
+			panic(fmt.Sprintf("data logical mask gather index %d out of range", row))
+		}
+		value, ok, err := a.valueAt(row)
+		if err != nil || !ok {
+			panic(fmt.Sprintf("data logical mask row %d out of range", row))
+		}
+		out[i] = value
+	}
+	return newBoolTrusted(out)
+}
+
+func (a boolLogicalMask) valueAt(row int) (bool, bool, error) {
+	left := a.leftScalar
+	if !a.leftIsScalar {
+		value, ok, err := boolArrayAt(a.left, row%a.left.Len())
+		if err != nil || !ok {
+			return false, ok, err
+		}
+		left = value
+	}
+	right := a.rightScalar
+	if !a.rightIsScalar {
+		value, ok, err := boolArrayAt(a.right, row%a.right.Len())
+		if err != nil || !ok {
+			return false, ok, err
+		}
+		right = value
+	}
+	return applyBoolLogical(a.op, left, right), true, nil
+}
+
+func (a boolLogicalMask) trueCount() (int64, bool, error) {
+	var count int64
+	for row := 0; row < a.len; row++ {
+		value, ok, err := a.valueAt(row)
+		if err != nil || !ok {
+			return 0, ok, err
+		}
+		if value {
+			count++
+		}
+	}
+	return count, true, nil
+}
+
+func boolLogicalArrayArray(op string, left, right Array, out []bool) (Array, bool, error) {
+	for row := range out {
+		lv, ok, err := boolArrayAt(left, row%left.Len())
+		if err != nil || !ok {
+			return nil, ok, err
+		}
+		rv, ok, err := boolArrayAt(right, row%right.Len())
+		if err != nil || !ok {
+			return nil, ok, err
+		}
+		out[row] = applyBoolLogical(op, lv, rv)
+	}
+	return newBoolTrusted(out), true, nil
+}
+
+func boolLogicalArrayScalar(op string, left Array, right bool, out []bool) (Array, bool, error) {
+	for row := range out {
+		leftValue, ok, err := boolArrayAt(left, row)
+		if err != nil || !ok {
+			return nil, ok, err
+		}
+		out[row] = applyBoolLogical(op, leftValue, right)
+	}
+	return newBoolTrusted(out), true, nil
+}
+
+func boolLogicalScalarArray(op string, left bool, right Array, out []bool) (Array, bool, error) {
+	for row := range out {
+		rightValue, ok, err := boolArrayAt(right, row)
+		if err != nil || !ok {
+			return nil, ok, err
+		}
+		out[row] = applyBoolLogical(op, left, rightValue)
+	}
+	return newBoolTrusted(out), true, nil
+}
+
+func boolArrayAt(array Array, row int) (bool, bool, error) {
+	switch a := array.(type) {
+	case attributedArray:
+		return boolArrayAt(a.array, row)
+	case i64RangeCompareMask:
+		value, ok := a.At(row)
+		if !ok {
+			return false, true, fmt.Errorf("logical row %d out of range", row)
+		}
+		return value.(bool), true, nil
+	case boolLogicalMask:
+		return a.valueAt(row)
+	case tiledArray:
+		sourceLen := a.source.Len()
+		if row < 0 || row >= a.len || sourceLen == 0 {
+			return false, true, fmt.Errorf("logical row %d out of range", row)
+		}
+		return boolArrayAt(a.source, (a.start+row)%sourceLen)
+	case columnArray[bool]:
+		if row < 0 || row >= len(a.data) {
+			return false, true, fmt.Errorf("logical row %d out of range", row)
+		}
+		return a.data[row], true, nil
+	case nullableArray:
+		if row < 0 || row >= len(a.data) {
+			return false, true, fmt.Errorf("logical row %d out of range", row)
+		}
+		value := a.data[row]
+		if IsNull(value) {
+			return false, true, nil
+		}
+		out, ok := value.(bool)
+		if !ok {
+			return false, true, fmt.Errorf("logical row %d is %T, want bool", row, value)
+		}
+		return out, true, nil
+	default:
+		return false, false, nil
+	}
+}
+
+func boolScalarValue(value any) (bool, bool) {
+	if IsNull(value) {
+		return false, true
+	}
+	out, ok := value.(bool)
+	return out, ok
+}
+
+func applyBoolLogical(op string, left, right bool) bool {
+	if op == "or" {
+		return left || right
+	}
+	return left && right
 }
 
 func countMembershipBool(values []bool, set map[bool]struct{}, ok bool) int64 {

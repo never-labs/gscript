@@ -648,6 +648,9 @@ func (s *EvalState) eval(src string) (any, error) {
 		if out, handled, err := s.tryEvalCountWhereNull(strings.TrimSpace(src[len("count "):])); err != nil || handled {
 			return out, err
 		}
+		if out, handled, err := s.tryEvalCountWhereMask(strings.TrimSpace(src[len("count "):])); err != nil || handled {
+			return out, err
+		}
 		if out, handled, err := s.tryEvalCountReverse(strings.TrimSpace(src[len("count "):])); err != nil || handled {
 			return out, err
 		}
@@ -3553,6 +3556,29 @@ func (s *EvalState) tryEvalCountWhereNull(src string) (any, bool, error) {
 	}
 	out, err := count(indexes)
 	return out, true, err
+}
+
+func (s *EvalState) tryEvalCountWhereMask(src string) (any, bool, error) {
+	if !strings.HasPrefix(src, "where ") {
+		return nil, false, nil
+	}
+	value, err := s.eval(strings.TrimSpace(src[len("where "):]))
+	if err != nil {
+		return nil, true, err
+	}
+	array, ok := value.(data.Array)
+	if !ok || array.Kind() != data.KindBool {
+		return nil, false, nil
+	}
+	out, handled, err := data.TryTypedTrueCount(array)
+	recordRuntimeKernelProbe("ArrayTrueCount", "true-count/"+string(array.Kind()), handled, err)
+	if err != nil {
+		return nil, true, err
+	}
+	if !handled {
+		return nil, false, nil
+	}
+	return out, true, nil
 }
 
 func (s *EvalState) tryEvalCountPrds(src string) (any, bool, error) {
@@ -9285,11 +9311,36 @@ func nullValue(v any) (any, error) {
 }
 
 func logicalAnd(left, right any) (any, error) {
+	if out, handled, err := data.TryTypedBoolLogical("and", left, right); err != nil || handled {
+		recordRuntimeKernelProbe("ArrayBoolLogical", "and/"+logicalShape(left)+"/"+logicalShape(right), handled, err)
+		if err != nil {
+			return nil, err
+		}
+		return out, nil
+	} else {
+		recordRuntimeKernelProbe("ArrayBoolLogical", "and/"+logicalShape(left)+"/"+logicalShape(right), handled, err)
+	}
 	return applyLogical(left, right, func(a, b bool) bool { return a && b })
 }
 
 func logicalOr(left, right any) (any, error) {
+	if out, handled, err := data.TryTypedBoolLogical("or", left, right); err != nil || handled {
+		recordRuntimeKernelProbe("ArrayBoolLogical", "or/"+logicalShape(left)+"/"+logicalShape(right), handled, err)
+		if err != nil {
+			return nil, err
+		}
+		return out, nil
+	} else {
+		recordRuntimeKernelProbe("ArrayBoolLogical", "or/"+logicalShape(left)+"/"+logicalShape(right), handled, err)
+	}
 	return applyLogical(left, right, func(a, b bool) bool { return a || b })
+}
+
+func logicalShape(value any) string {
+	if array, ok := value.(data.Array); ok {
+		return string(array.Kind())
+	}
+	return string(qRuntimeKernelOperandKind(value, nil))
 }
 
 func applyLogical(left, right any, fn func(bool, bool) bool) (any, error) {

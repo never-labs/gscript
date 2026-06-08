@@ -3133,6 +3133,37 @@ func TestTryTypedFbySum(t *testing.T) {
 	}
 }
 
+func TestTryTypedBoolLogical(t *testing.T) {
+	out, ok, err := TryTypedBoolLogical("and", NewBool([]bool{true, false, true}), NewBool([]bool{true, true, false}))
+	if err != nil || !ok {
+		t.Fatalf("TryTypedBoolLogical handled=%v err=%v; want true,nil", ok, err)
+	}
+	if got, want := out.Values(), []any{true, false, false}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("bool logical and values = %#v, want %#v", got, want)
+	}
+	out, ok, err = TryTypedBoolLogical("or", NewBool([]bool{true, false, false}), true)
+	if err != nil || !ok {
+		t.Fatalf("TryTypedBoolLogical scalar handled=%v err=%v; want true,nil", ok, err)
+	}
+	if got, want := out.Values(), []any{true, true, true}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("bool logical or scalar values = %#v, want %#v", got, want)
+	}
+	if count, ok, err := TryTypedTrueCount(out); err != nil || !ok || count != 3 {
+		t.Fatalf("true count = %d,%v,%v; want 3,true,nil", count, ok, err)
+	}
+
+	cmp, ok, err := TryTypedDyadic(OpGE, NewI64Range(0, 1, 5), int64(2))
+	if err != nil || !ok {
+		t.Fatalf("range compare handled=%v err=%v; want true,nil", ok, err)
+	}
+	if got, want := cmp.(Array).Values(), []any{false, false, true, true, true}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("range compare values = %#v, want %#v", got, want)
+	}
+	if count, ok, err := TryTypedTrueCount(cmp.(Array)); err != nil || !ok || count != 3 {
+		t.Fatalf("range compare true count = %d,%v,%v; want 3,true,nil", count, ok, err)
+	}
+}
+
 func TestTryTypedStringCastAndCasePreserveTiledArrays(t *testing.T) {
 	repeated := takeRepeatMust(t, NewSymbols([]string{"aapl", "msft", "amd", "ask"}), 10)
 	cast, handled, err := TryTypedStringCast(repeated)
