@@ -179,6 +179,9 @@ const (
 	// the column name; mirrors OP_FRAME_COLUMN and returns a dense-array column.
 	OpFrameColumn
 	// q/frame runtime primitive. Args = [frame], Aux = constant pool index for
+	// a mask spec; mirrors OP_FRAME_MASK and returns a bool dense-array mask.
+	OpFrameMask
+	// q/frame runtime primitive. Args = [frame], Aux = constant pool index for
 	// a string or string-array projection; mirrors OP_FRAME_PROJECT and returns
 	// a projected native frame facade.
 	OpFrameProject

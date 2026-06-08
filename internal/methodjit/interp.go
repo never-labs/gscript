@@ -1067,6 +1067,17 @@ func (s *interpState) execInstr(instr *Instr, block *Block) ([]runtime.Value, bo
 		}
 		s.values[instr.ID] = out
 
+	case OpFrameMask:
+		idx := int(instr.Aux)
+		if idx < 0 || idx >= len(s.fn.Proto.Constants) {
+			return nil, false, fmt.Errorf("FrameMask spec constant is out of range")
+		}
+		out, err := executeFrameMaskValue(s.val(instr.Args[0]), s.fn.Proto.Constants[idx])
+		if err != nil {
+			return nil, false, err
+		}
+		s.values[instr.ID] = out
+
 	case OpFrameProject:
 		idx := int(instr.Aux)
 		if idx < 0 || idx >= len(s.fn.Proto.Constants) {

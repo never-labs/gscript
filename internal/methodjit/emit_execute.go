@@ -994,6 +994,19 @@ func (cf *CompiledFunction) executeOpExit(ctx *ExecContext, regs []runtime.Value
 		}
 		regs[slot] = out
 
+	case OpFrameMask:
+		if arg1 >= len(regs) || slot >= len(regs) {
+			return fmt.Errorf("FrameMask op-exit out of register range")
+		}
+		if aux < 0 || cf.Proto == nil || aux >= len(cf.Proto.Constants) {
+			return fmt.Errorf("FrameMask spec constant is out of range")
+		}
+		out, err := executeFrameMaskValue(regs[arg1], cf.Proto.Constants[aux])
+		if err != nil {
+			return err
+		}
+		regs[slot] = out
+
 	case OpFrameProject:
 		if arg1 >= len(regs) || slot >= len(regs) {
 			return fmt.Errorf("FrameProject op-exit out of register range")

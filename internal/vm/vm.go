@@ -2378,6 +2378,33 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 				fb.Result.Observe(out.Type())
 			}
 
+		case OP_FRAME_MASK:
+			a := DecodeA(inst)
+			b := DecodeB(inst)
+			c := DecodeC(inst)
+			frameVal := vm.regs[base+b]
+			if c >= len(constants) {
+				return nil, wrapLineErr(frame, fmt.Errorf("FRAME_MASK spec constant is out of range"))
+			}
+			name, op, rhs, err := frameMaskSpec(constants[c])
+			if err != nil {
+				return nil, wrapLineErr(frame, err)
+			}
+			out, handled, err := frameVal.NativeFrameMask(name, op, rhs)
+			if err != nil {
+				return nil, wrapLineErr(frame, err)
+			}
+			if !handled {
+				return nil, wrapLineErr(frame, fmt.Errorf("FRAME_MASK operand must be native frame (got %s)", frameVal.TypeName()))
+			}
+			vm.regs[base+a] = out
+			if frame.closure.Proto.Feedback != nil {
+				fb := &frame.closure.Proto.Feedback[frame.pc-1]
+				fb.Left.Observe(frameVal.Type())
+				fb.Right.Observe(constants[c].Type())
+				fb.Result.Observe(out.Type())
+			}
+
 		case OP_FRAME_PROJECT:
 			a := DecodeA(inst)
 			b := DecodeB(inst)
@@ -3965,6 +3992,29 @@ func frameProjectColumnNames(v runtime.Value) ([]string, error) {
 		names = append(names, item.Str())
 	}
 	return names, nil
+}
+
+func frameMaskSpec(v runtime.Value) (string, string, runtime.Value, error) {
+	if !v.IsTable() {
+		return "", "", runtime.NilValue(), fmt.Errorf("FRAME_MASK spec must be a table")
+	}
+	tbl := v.Table()
+	column := tbl.RawGetString("column")
+	if column.IsNil() {
+		column = tbl.RawGetInt(1)
+	}
+	op := tbl.RawGetString("op")
+	if op.IsNil() {
+		op = tbl.RawGetInt(2)
+	}
+	rhs := tbl.RawGetString("value")
+	if rhs.IsNil() {
+		rhs = tbl.RawGetInt(3)
+	}
+	if !column.IsString() || !op.IsString() {
+		return "", "", runtime.NilValue(), fmt.Errorf("FRAME_MASK spec must provide column and op")
+	}
+	return column.Str(), op.Str(), rhs, nil
 }
 
 func frameOrderSpec(v runtime.Value) ([]string, []bool, int, error) {

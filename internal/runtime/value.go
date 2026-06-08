@@ -684,6 +684,38 @@ func (v Value) NativeFrameColumn(name string) (Value, bool, error) {
 	}
 }
 
+// NativeFrameMask returns a bool dense-array mask computed from a runtime-owned
+// native frame column comparison.
+func (v Value) NativeFrameMask(name, op string, rhs Value) (Value, bool, error) {
+	if name == "" {
+		return NilValue(), true, fmt.Errorf("FRAME_MASK column name must not be empty")
+	}
+	if op == "" {
+		return NilValue(), true, fmt.Errorf("FRAME_MASK op must not be empty")
+	}
+	if !v.IsTable() {
+		return NilValue(), false, nil
+	}
+	tbl := v.Table()
+	if tbl == nil {
+		return NilValue(), false, nil
+	}
+	payload, _, ok := tbl.NativeFramePayload()
+	if !ok {
+		return NilValue(), false, nil
+	}
+	switch frame := payload.(type) {
+	case *SoA:
+		mask, err := frame.Mask(name, op, rhs)
+		if err != nil {
+			return NilValue(), true, err
+		}
+		return DenseArrayValue(mask), true, nil
+	default:
+		return NilValue(), true, fmt.Errorf("FRAME_MASK unsupported native frame payload %T", payload)
+	}
+}
+
 // NativeFrameProject returns a new runtime frame facade that carries a projected
 // subset of a runtime-owned native frame payload.
 func (v Value) NativeFrameProject(names []string) (Value, bool, error) {

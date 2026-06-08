@@ -349,6 +349,19 @@ func (tm *TieringManager) executeOpExit(ctx *ExecContext, regs []runtime.Value, 
 		}
 		regs[absSlot] = out
 
+	case OpFrameMask:
+		if absArg1 >= len(regs) || absSlot >= len(regs) {
+			return fmt.Errorf("FrameMask op-exit out of register range")
+		}
+		if aux < 0 || proto == nil || aux >= len(proto.Constants) {
+			return fmt.Errorf("FrameMask spec constant is out of range")
+		}
+		out, err := executeFrameMaskValue(regs[absArg1], proto.Constants[aux])
+		if err != nil {
+			return err
+		}
+		regs[absSlot] = out
+
 	case OpFrameProject:
 		if absArg1 >= len(regs) || absSlot >= len(regs) {
 			return fmt.Errorf("FrameProject op-exit out of register range")

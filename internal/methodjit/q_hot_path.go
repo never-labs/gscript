@@ -14,6 +14,7 @@ import (
 type QQueryHotPath struct {
 	SourceColumn *Instr
 	Compare      *Instr
+	Mask         *Instr
 	Filter       *Instr
 	RowGather    *Instr
 	RowSlice     *Instr
@@ -90,19 +91,30 @@ func DetectQQueryHotPaths(fn *Function) []QQueryHotPath {
 				continue
 			}
 			compare := valueDef(filter.Args[1], OpVectorCompare)
-			if compare == nil || len(compare.Args) != 2 {
-				continue
-			}
-			sourceColumn := qQueryCompareColumn(compare)
-			if sourceColumn == nil || len(sourceColumn.Args) != 1 {
-				continue
-			}
-			if filter.Args[0] == nil || sourceColumn.Args[0] == nil || filter.Args[0].ID != sourceColumn.Args[0].ID {
+			mask := valueDef(filter.Args[1], OpFrameMask)
+			var sourceColumn *Instr
+			if compare != nil {
+				if len(compare.Args) != 2 {
+					continue
+				}
+				sourceColumn = qQueryCompareColumn(compare)
+				if sourceColumn == nil || len(sourceColumn.Args) != 1 {
+					continue
+				}
+				if filter.Args[0] == nil || sourceColumn.Args[0] == nil || filter.Args[0].ID != sourceColumn.Args[0].ID {
+					continue
+				}
+			} else if mask != nil {
+				if len(mask.Args) != 1 || filter.Args[0] == nil || mask.Args[0] == nil || filter.Args[0].ID != mask.Args[0].ID {
+					continue
+				}
+			} else {
 				continue
 			}
 			out = append(out, QQueryHotPath{
 				SourceColumn: sourceColumn,
 				Compare:      compare,
+				Mask:         mask,
 				Filter:       filter,
 				RowGather:    rowGather,
 				RowSlice:     rowSlice,
@@ -154,6 +166,9 @@ func formatQQueryHotPaths(paths []QQueryHotPath) string {
 	}
 	for i, path := range paths {
 		fmt.Fprintf(&b, "  [%d] shape=%s compare=%s", i, path.Shape(), qQueryHotPathCompareOpName(path.Compare))
+		if path.Mask != nil {
+			fmt.Fprintf(&b, " mask_aux=%d", path.Mask.Aux)
+		}
 		if path.RowOrder != nil {
 			fmt.Fprintf(&b, " order_aux=%d", path.RowOrder.Aux)
 		}
@@ -186,7 +201,7 @@ func formatQQueryHotPathShapeCounts(counts map[string]int) string {
 
 func qQueryHotPathCompareOpName(compare *Instr) string {
 	if compare == nil {
-		return "unknown"
+		return "frame-mask"
 	}
 	switch runtime.DenseArrayBinaryOp(compare.Aux) {
 	case runtime.DenseArrayEQ:

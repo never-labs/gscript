@@ -4998,7 +4998,14 @@ func qQueryMask(s *SoA, where Value) (*DenseArray, error) {
 	if !column.IsString() || !op.IsString() {
 		return nil, fmt.Errorf("q.query where condition must provide column and op")
 	}
-	return s.Mask(column.Str(), op.Str(), value)
+	mask, handled, err := qNativeRowsFrameCarrier(s).NativeFrameMask(column.Str(), op.Str(), value)
+	if err != nil {
+		return nil, err
+	}
+	if !handled || !mask.IsDenseArray() {
+		return nil, fmt.Errorf("q.query where condition requires native frame mask support")
+	}
+	return mask.DenseArray(), nil
 }
 
 type qSelect struct {

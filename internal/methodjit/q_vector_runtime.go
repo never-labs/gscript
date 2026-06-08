@@ -31,6 +31,21 @@ func executeFrameColumnValue(frameVal runtime.Value, name string) (runtime.Value
 	return out, nil
 }
 
+func executeFrameMaskValue(frameVal runtime.Value, spec runtime.Value) (runtime.Value, error) {
+	name, op, rhs, err := frameMaskSpec(spec)
+	if err != nil {
+		return runtime.NilValue(), err
+	}
+	out, handled, err := frameVal.NativeFrameMask(name, op, rhs)
+	if err != nil {
+		return runtime.NilValue(), err
+	}
+	if !handled {
+		return runtime.NilValue(), fmt.Errorf("FrameMask operand must be native frame (got %s)", frameVal.TypeName())
+	}
+	return out, nil
+}
+
 func executeFrameProjectValue(frameVal runtime.Value, names []string) (runtime.Value, error) {
 	out, handled, err := frameVal.NativeFrameProject(names)
 	if err != nil {
@@ -116,6 +131,29 @@ func frameProjectColumnNames(v runtime.Value) ([]string, error) {
 		names = append(names, item.Str())
 	}
 	return names, nil
+}
+
+func frameMaskSpec(v runtime.Value) (string, string, runtime.Value, error) {
+	if !v.IsTable() {
+		return "", "", runtime.NilValue(), fmt.Errorf("FrameMask spec must be a table")
+	}
+	tbl := v.Table()
+	column := tbl.RawGetString("column")
+	if column.IsNil() {
+		column = tbl.RawGetInt(1)
+	}
+	op := tbl.RawGetString("op")
+	if op.IsNil() {
+		op = tbl.RawGetInt(2)
+	}
+	rhs := tbl.RawGetString("value")
+	if rhs.IsNil() {
+		rhs = tbl.RawGetInt(3)
+	}
+	if !column.IsString() || !op.IsString() {
+		return "", "", runtime.NilValue(), fmt.Errorf("FrameMask spec must provide column and op")
+	}
+	return column.Str(), op.Str(), rhs, nil
 }
 
 func frameOrderSpec(v runtime.Value) ([]string, []bool, int, error) {

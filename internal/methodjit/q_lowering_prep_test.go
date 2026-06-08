@@ -113,6 +113,48 @@ func TestFrameColumnBytecodeBuildsMethodJITIR(t *testing.T) {
 	}
 }
 
+func TestFrameMaskBytecodeBuildsMethodJITIR(t *testing.T) {
+	spec := runtime.NewTable()
+	spec.RawSetString("column", runtime.StringValue("price"))
+	spec.RawSetString("op", runtime.StringValue(">="))
+	spec.RawSetString("value", runtime.FloatValue(100))
+	proto := &vm.FuncProto{
+		Name:      "frame_mask",
+		NumParams: 1,
+		MaxStack:  2,
+		Constants: []runtime.Value{
+			runtime.TableValue(spec),
+		},
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_FRAME_MASK, 1, 0, 0),
+			vm.EncodeABC(vm.OP_RETURN, 1, 2, 0),
+		},
+	}
+
+	fn := BuildGraph(proto)
+	var mask *Instr
+	for _, block := range fn.Blocks {
+		for _, instr := range block.Instrs {
+			if instr.Op == OpFrameMask {
+				mask = instr
+				break
+			}
+		}
+	}
+	if mask == nil {
+		t.Fatalf("BuildGraph did not emit OpFrameMask:\n%s", Print(fn))
+	}
+	if len(mask.Args) != 1 {
+		t.Fatalf("OpFrameMask arg count = %d, want 1", len(mask.Args))
+	}
+	if mask.Type != TypeAny {
+		t.Fatalf("OpFrameMask type = %s, want Any", mask.Type)
+	}
+	if mask.Aux != 0 {
+		t.Fatalf("OpFrameMask Aux = %d, want const index 0", mask.Aux)
+	}
+}
+
 func TestFrameProjectBytecodeBuildsMethodJITIR(t *testing.T) {
 	names := runtime.NewTable()
 	names.RawSetInt(1, runtime.StringValue("price"))
@@ -334,6 +376,44 @@ func TestQFramePrimitivePipelineBuildsMethodJITIR(t *testing.T) {
 	}
 	if paths[0].Compare.Aux != int64(runtime.DenseArrayGE) {
 		t.Fatalf("q hot path compare Aux = %d, want %d", paths[0].Compare.Aux, runtime.DenseArrayGE)
+	}
+}
+
+func TestQFramePrimitiveHotPathDetectsFrameMask(t *testing.T) {
+	names := runtime.NewTable()
+	names.RawSetInt(1, runtime.StringValue("size"))
+	mask := runtime.NewTable()
+	mask.RawSetString("column", runtime.StringValue("price"))
+	mask.RawSetString("op", runtime.StringValue(">="))
+	mask.RawSetString("value", runtime.FloatValue(100))
+	proto := &vm.FuncProto{
+		Name:      "q_frame_mask_pipeline",
+		NumParams: 1,
+		MaxStack:  2,
+		Constants: []runtime.Value{
+			runtime.TableValue(mask),
+			runtime.TableValue(names),
+			runtime.StringValue("size"),
+		},
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_FRAME_MASK, 1, 0, 0),
+			vm.EncodeABC(vm.OP_FRAME_FILTER, 0, 0, 1),
+			vm.EncodeABC(vm.OP_FRAME_PROJECT, 0, 0, 1),
+			vm.EncodeABC(vm.OP_FRAME_COLUMN, 0, 0, 2),
+			vm.EncodeABC(vm.OP_RETURN, 0, 2, 0),
+		},
+	}
+
+	fn := BuildGraph(proto)
+	paths := DetectQQueryHotPaths(fn)
+	if len(paths) != 1 {
+		t.Fatalf("DetectQQueryHotPaths count = %d, want 1\n%s", len(paths), Print(fn))
+	}
+	if paths[0].Mask == nil || paths[0].Compare != nil {
+		t.Fatalf("DetectQQueryHotPaths Mask=%v Compare=%v, want mask-only path\n%s", paths[0].Mask, paths[0].Compare, Print(fn))
+	}
+	if got := formatQQueryHotPaths(paths); !strings.Contains(got, "compare=frame-mask") || !strings.Contains(got, "mask_aux=0") {
+		t.Fatalf("frame mask hot path format = %q, want frame-mask and mask aux", got)
 	}
 }
 
@@ -608,6 +688,30 @@ func TestTier2GateAllowsFrameColumnThroughOpExit(t *testing.T) {
 	}
 }
 
+func TestTier2GateAllowsFrameMaskThroughOpExit(t *testing.T) {
+	spec := runtime.NewTable()
+	spec.RawSetString("column", runtime.StringValue("price"))
+	spec.RawSetString("op", runtime.StringValue(">="))
+	spec.RawSetString("value", runtime.FloatValue(100))
+	proto := &vm.FuncProto{
+		Name:      "frame_mask",
+		NumParams: 1,
+		MaxStack:  2,
+		Constants: []runtime.Value{
+			runtime.TableValue(spec),
+		},
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_FRAME_MASK, 1, 0, 0),
+			vm.EncodeABC(vm.OP_RETURN, 1, 2, 0),
+		},
+	}
+
+	gate := firstUnsupportedTier2BytecodeGate(proto)
+	if !gate.Allowed {
+		t.Fatalf("OP_FRAME_MASK should be Tier2-eligible via op-exit, got %q", gate.Reason)
+	}
+}
+
 func TestTier2GateAllowsFrameProjectThroughOpExit(t *testing.T) {
 	names := runtime.NewTable()
 	names.RawSetInt(1, runtime.StringValue("price"))
@@ -776,6 +880,37 @@ func TestFrameColumnRuntimeHelperUsesRuntimePrimitive(t *testing.T) {
 	got, ok := result.DenseArray().F64()
 	if !ok || len(got) != 2 || got[0] != 10.5 || got[1] != 20.25 {
 		t.Fatalf("frame column values = %#v, want [10.5 20.25]", got)
+	}
+}
+
+func TestFrameMaskRuntimeHelperUsesRuntimePrimitive(t *testing.T) {
+	soa, err := runtime.NewSoA(map[string]*runtime.DenseArray{
+		"price": runtime.NewDenseArrayF64([]float64{10.5, 20.25, 30.75}),
+	})
+	if err != nil {
+		t.Fatalf("NewSoA: %v", err)
+	}
+	frame := runtime.NewTable()
+	frame.SetNativePayloadWithInfo(soa, runtime.NativePayloadInfo{
+		Kind:    runtime.NativePayloadDataFrame,
+		Rows:    soa.Len(),
+		Columns: 1,
+	})
+	spec := runtime.NewTable()
+	spec.RawSetString("column", runtime.StringValue("price"))
+	spec.RawSetString("op", runtime.StringValue(">="))
+	spec.RawSetString("value", runtime.FloatValue(20))
+
+	result, err := executeFrameMaskValue(runtime.TableValue(frame), runtime.TableValue(spec))
+	if err != nil {
+		t.Fatalf("execute frame mask: %v", err)
+	}
+	if !result.IsDenseArray() {
+		t.Fatalf("frame mask result = %#v, want dense array", result)
+	}
+	got, ok := result.DenseArray().Bool()
+	if !ok || len(got) != 3 || got[0] || !got[1] || !got[2] {
+		t.Fatalf("frame mask values = %#v, want [false true true]", got)
 	}
 }
 
