@@ -52,6 +52,32 @@ func TestTryTypedWhereMaskI64(t *testing.T) {
 	}
 }
 
+func TestNewI64RangeArraySemantics(t *testing.T) {
+	values := NewI64Range(10, 2, 5)
+	if values.Kind() != KindI64 {
+		t.Fatalf("range kind = %s, want %s", values.Kind(), KindI64)
+	}
+	if values.Len() != 5 {
+		t.Fatalf("range len = %d, want 5", values.Len())
+	}
+	for row, want := range []any{int64(10), int64(12), int64(14), int64(16), int64(18)} {
+		got, ok := values.At(row)
+		if !ok || got != want {
+			t.Fatalf("range At(%d) = %v, %v; want %v, true", row, got, ok, want)
+		}
+	}
+	if got, ok := values.At(5); ok || got != nil {
+		t.Fatalf("range At(out of bounds) = %v, %v; want nil, false", got, ok)
+	}
+	if got, want := values.Values(), []any{int64(10), int64(12), int64(14), int64(16), int64(18)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("range Values = %#v, want %#v", got, want)
+	}
+	gathered := values.Gather([]int{4, 1, 0})
+	if got, want := gathered.Values(), []any{int64(18), int64(12), int64(10)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("range Gather values = %#v, want %#v", got, want)
+	}
+}
+
 func TestNewFramePreservesColumnOrderAndKinds(t *testing.T) {
 	frame, err := NewFrame(
 		NewColumn("z", []any{int64(3)}),

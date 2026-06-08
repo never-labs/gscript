@@ -1820,6 +1820,8 @@ func TestEvalCountSumSumsTakeWhereAndPlusAdverbs(t *testing.T) {
 	assertEvalArray(t, "til 4", data.KindI64, []any{int64(0), int64(1), int64(2), int64(3)})
 	assertEvalArray(t, "til 0", data.KindI64, []any{})
 	assertEvalErrorContains(t, "til 1.5", "til expects an integer")
+	assertEvalValue(t, "+/til 5", int64(10))
+	assertEvalArray(t, "where (til 5)>=3", data.KindI64, []any{int64(3), int64(4)})
 	assertEvalArray(t, "where true false true", data.KindI64, []any{int64(0), int64(2)})
 	assertEvalArray(t, "where 2 0 3", data.KindI64, []any{int64(0), int64(0), int64(2), int64(2), int64(2)})
 	assertEvalArray(t, "where 0N 1 0", data.KindI64, []any{int64(1)})
@@ -1850,6 +1852,22 @@ func TestEvalWhereRecordsTypedRuntimeKernel(t *testing.T) {
 		}
 	}
 	t.Fatalf("missing ArrayWhere typed runtime stat: %#v", RuntimeKernelExecutionStats())
+}
+
+func TestEvalVectorArithmeticRecordsTypedRuntimeKernel(t *testing.T) {
+	ClearRuntimeKernelExecutionStats()
+	t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+	assertEvalValue(t, "x:til 8;y:(x*3)+7;+/y", int64(140))
+	counts := map[string]uint64{}
+	for _, stat := range RuntimeKernelExecutionStats() {
+		if stat.Kernel == "ArrayDyadicArithmetic" && stat.Outcome == "hit" {
+			counts[stat.Kernel] += stat.Count
+		}
+	}
+	if counts["ArrayDyadicArithmetic"] != 2 {
+		t.Fatalf("ArrayDyadicArithmetic hits = %d, want 2; stats=%#v", counts["ArrayDyadicArithmetic"], RuntimeKernelExecutionStats())
+	}
 }
 
 func TestEvalGenericOverAndScanAdverbs(t *testing.T) {

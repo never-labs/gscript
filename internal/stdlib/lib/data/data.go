@@ -462,6 +462,12 @@ type columnArray[T any] struct {
 	data []T
 }
 
+type i64RangeArray struct {
+	start int64
+	step  int64
+	len   int
+}
+
 type nullableArray struct {
 	kind Kind
 	data []any
@@ -499,6 +505,13 @@ func NewI32(values []int32) Array {
 
 func NewI64(values []int64) Array {
 	return columnArray[int64]{kind: KindI64, data: append([]int64(nil), values...)}
+}
+
+func NewI64Range(start, step int64, length int) Array {
+	if length < 0 {
+		panic(fmt.Sprintf("negative i64 range length %d", length))
+	}
+	return i64RangeArray{start: start, step: step, len: length}
 }
 
 func NewU8(values []uint8) Array {
@@ -647,6 +660,36 @@ func (a columnArray[T]) Gather(indexes []int) Array {
 		out[i] = a.data[row]
 	}
 	return columnArray[T]{kind: a.kind, data: out}
+}
+
+func (a i64RangeArray) Kind() Kind { return KindI64 }
+
+func (a i64RangeArray) Len() int { return a.len }
+
+func (a i64RangeArray) At(row int) (any, bool) {
+	if row < 0 || row >= a.len {
+		return nil, false
+	}
+	return a.start + int64(row)*a.step, true
+}
+
+func (a i64RangeArray) Values() []any {
+	out := make([]any, a.len)
+	for i := range out {
+		out[i] = a.start + int64(i)*a.step
+	}
+	return out
+}
+
+func (a i64RangeArray) Gather(indexes []int) Array {
+	out := make([]int64, len(indexes))
+	for i, row := range indexes {
+		if row < 0 || row >= a.len {
+			panic(fmt.Sprintf("data range gather index %d out of range", row))
+		}
+		out[i] = a.start + int64(row)*a.step
+	}
+	return columnArray[int64]{kind: KindI64, data: out}
 }
 
 func (a nullableArray) Kind() Kind { return a.kind }
@@ -3763,6 +3806,13 @@ func ApplyBinary(op Op, left, right any) (any, error) {
 // result-kind rules can probe this first and keep their existing fallback.
 func TryTypedDyadic(op Op, left, right any) (any, bool, error) {
 	return typedKernels.Dyadic(op, left, right)
+}
+
+// TryTypedIntegerDyadic attempts the integer-preserving typed binary kernel.
+// It is intended for language surfaces, such as q.eval, whose arithmetic rules
+// keep integer vector +,-,* results as integer vectors.
+func TryTypedIntegerDyadic(op Op, left, right any) (any, bool, error) {
+	return typedKernels.IntegerDyadic(op, left, right)
 }
 
 func promotedNullForBinary(left, right any) any {

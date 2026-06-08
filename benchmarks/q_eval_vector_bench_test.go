@@ -340,7 +340,16 @@ func buildQEvalVectorCases() []qEvalVectorCase {
 				return "d:(count distinct)'`a`b`c!(1 1 2;3 3 3;9 8 9 7);a:d`a;b:d`b;c:d`c;a+b+c"
 			},
 			goFn: func(rows int) int64 {
-				return 2 + 1 + 3
+				countDistinct := func(values []int64) int64 {
+					seen := make(map[int64]struct{}, len(values))
+					for _, value := range values {
+						seen[value] = struct{}{}
+					}
+					return int64(len(seen))
+				}
+				return countDistinct([]int64{1, 1, 2}) +
+					countDistinct([]int64{3, 3, 3}) +
+					countDistinct([]int64{9, 8, 9, 7})
 			},
 		},
 	)

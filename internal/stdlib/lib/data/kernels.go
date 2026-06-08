@@ -91,6 +91,9 @@ func (typedKernelRegistry) CompareMask(array Array, op Op, value any, out []bool
 	case columnArray[int64]:
 		v, ok := coerceInt64Exact(value)
 		return compareSignedSlice(a.data, v, ok, op, out)
+	case i64RangeArray:
+		v, ok := coerceInt64Exact(value)
+		return compareI64RangeMask(a, v, ok, op, out)
 	case columnArray[uint8]:
 		v, ok := value.(uint8)
 		return compareUnsignedSlice(a.data, v, ok, op, out)
@@ -165,6 +168,9 @@ func (k typedKernelRegistry) CompareIndexes(array Array, op Op, value any, out [
 	case columnArray[int64]:
 		v, ok := coerceInt64Exact(value)
 		return compareSignedIndexes(a.data, v, ok, op, out)
+	case i64RangeArray:
+		v, ok := coerceInt64Exact(value)
+		return compareI64RangeIndexes(a, v, ok, op, out)
 	case columnArray[uint8]:
 		v, ok := value.(uint8)
 		return compareUnsignedIndexes(a.data, v, ok, op, out)
@@ -944,6 +950,33 @@ func (typedKernelRegistry) Dyadic(op Op, left, right any) (any, bool, error) {
 	return nil, false, nil
 }
 
+func (typedKernelRegistry) IntegerDyadic(op Op, left, right any) (any, bool, error) {
+	if op == OpDiv {
+		return nil, false, nil
+	}
+	leftArray, leftIsArray := left.(Array)
+	rightArray, rightIsArray := right.(Array)
+	if !leftIsArray && !rightIsArray {
+		return nil, false, nil
+	}
+	length := 0
+	switch {
+	case leftIsArray && rightIsArray:
+		if leftArray.Len() != rightArray.Len() {
+			return nil, true, fmt.Errorf("typed integer dyadic kernel length mismatch: %d != %d", leftArray.Len(), rightArray.Len())
+		}
+		length = leftArray.Len()
+	case leftIsArray:
+		length = leftArray.Len()
+	case rightIsArray:
+		length = rightArray.Len()
+	}
+	if !typedIntegerOperand(left) || !typedIntegerOperand(right) {
+		return nil, false, nil
+	}
+	return numericIntegerDyadic(op, left, right, length)
+}
+
 func (typedKernelRegistry) NumericSum(array Array) (float64, int64, bool, error) {
 	switch a := array.(type) {
 	case attributedArray:
@@ -956,6 +989,9 @@ func (typedKernelRegistry) NumericSum(array Array) (float64, int64, bool, error)
 		return numericSumSlice(a.data)
 	case columnArray[int64]:
 		return numericSumSlice(a.data)
+	case i64RangeArray:
+		sum := i64RangeSum(a)
+		return float64(sum), int64(a.len), true, nil
 	case columnArray[uint8]:
 		return numericSumSlice(a.data)
 	case columnArray[uint16]:
@@ -1007,6 +1043,8 @@ func (k typedKernelRegistry) NumericSumValue(array Array) (any, bool, error) {
 		return numericSumIntegerValue(a.data), true, nil
 	case columnArray[int64]:
 		return numericSumIntegerValue(a.data), true, nil
+	case i64RangeArray:
+		return i64RangeSum(a), true, nil
 	case columnArray[uint8]:
 		return numericSumUnsignedValue(a.data), true, nil
 	case columnArray[uint16]:
@@ -1066,6 +1104,8 @@ func (k typedKernelRegistry) NumericSums(array Array) (Array, bool, error) {
 		return numericSumsInteger(a.data), true, nil
 	case columnArray[int64]:
 		return numericSumsInteger(a.data), true, nil
+	case i64RangeArray:
+		return numericSumsI64Range(a), true, nil
 	case columnArray[uint8]:
 		return numericSumsUnsigned(a.data), true, nil
 	case columnArray[uint16]:
@@ -1138,6 +1178,8 @@ func (typedKernelRegistry) NumericSumRows(array Array, rows []int) (float64, int
 		return numericSumRowsSlice(a.data, rows)
 	case columnArray[int64]:
 		return numericSumRowsSlice(a.data, rows)
+	case i64RangeArray:
+		return numericSumRowsI64Range(a, rows)
 	case columnArray[uint8]:
 		return numericSumRowsSlice(a.data, rows)
 	case columnArray[uint16]:
@@ -2003,6 +2045,8 @@ func (typedKernelRegistry) NumericAt(array Array, row int) (float64, bool, error
 		return numericColumnAt(a.data, row)
 	case columnArray[int64]:
 		return numericColumnAt(a.data, row)
+	case i64RangeArray:
+		return numericI64RangeAt(a, row)
 	case columnArray[uint8]:
 		return numericColumnAt(a.data, row)
 	case columnArray[uint16]:
@@ -2038,6 +2082,13 @@ func numericColumnAt[T signedScalar | unsignedScalar | floatScalar](values []T, 
 	return float64(values[row]), true, nil
 }
 
+func numericI64RangeAt(values i64RangeArray, row int) (float64, bool, error) {
+	if row < 0 || row >= values.len {
+		return 0, false, fmt.Errorf("array row %d out of range", row)
+	}
+	return float64(values.start + int64(row)*values.step), true, nil
+}
+
 func numericValueAt(array Array, row int) (float64, bool) {
 	v, ok := array.At(row)
 	if !ok || IsNull(v) {
@@ -2064,7 +2115,7 @@ func isNumericArray(array Array) bool {
 		return isNumericArray(a.array)
 	case columnArray[int8], columnArray[int16], columnArray[int32], columnArray[int64],
 		columnArray[uint8], columnArray[uint16], columnArray[uint32], columnArray[uint64],
-		columnArray[float32], columnArray[float64]:
+		columnArray[float32], columnArray[float64], i64RangeArray:
 		return true
 	case nullableArray:
 		for i := 0; i < array.Len(); i++ {
@@ -2086,16 +2137,18 @@ func isNumericArray(array Array) bool {
 }
 
 func numericDyadic(op Op, left, right any, length int) (Array, bool, error) {
-	values := make([]any, length)
-	hasNull := false
+	values := make([]float64, length)
+	var nullable []any
 	for i := 0; i < length; i++ {
 		lv, ok, err := numericOperandAt(left, i)
 		if err != nil {
 			return nil, true, err
 		}
 		if !ok {
-			values[i] = NullValue
-			hasNull = true
+			if nullable == nil {
+				nullable = numericDyadicNullablePrefix(values, i)
+			}
+			nullable[i] = NullValue
 			continue
 		}
 		rv, ok, err := numericOperandAt(right, i)
@@ -2103,24 +2156,219 @@ func numericDyadic(op Op, left, right any, length int) (Array, bool, error) {
 			return nil, true, err
 		}
 		if !ok {
-			values[i] = NullValue
-			hasNull = true
+			if nullable == nil {
+				nullable = numericDyadicNullablePrefix(values, i)
+			}
+			nullable[i] = NullValue
 			continue
 		}
 		out, err := applyNumericBinaryFloat(op, lv, rv)
 		if err != nil {
 			return nil, true, err
 		}
+		if nullable != nil {
+			nullable[i] = out
+			continue
+		}
 		values[i] = out
 	}
-	if hasNull {
-		return newNullableArray(KindF64, values), true, nil
+	if nullable != nil {
+		return newNullableArray(KindF64, nullable), true, nil
 	}
-	out := make([]float64, len(values))
-	for i, v := range values {
-		out[i] = v.(float64)
+	return columnArray[float64]{kind: KindF64, data: values}, true, nil
+}
+
+func numericIntegerDyadic(op Op, left, right any, length int) (Array, bool, error) {
+	values := make([]int64, length)
+	var nullable []any
+	for i := 0; i < length; i++ {
+		lv, ok, err := integerOperandAt(left, i)
+		if err != nil {
+			return nil, true, err
+		}
+		if !ok {
+			if nullable == nil {
+				nullable = numericIntegerDyadicNullablePrefix(values, i)
+			}
+			nullable[i] = NullValue
+			continue
+		}
+		rv, ok, err := integerOperandAt(right, i)
+		if err != nil {
+			return nil, true, err
+		}
+		if !ok {
+			if nullable == nil {
+				nullable = numericIntegerDyadicNullablePrefix(values, i)
+			}
+			nullable[i] = NullValue
+			continue
+		}
+		var out int64
+		switch op {
+		case OpAdd:
+			out = lv + rv
+		case OpSub:
+			out = lv - rv
+		case OpMul:
+			out = lv * rv
+		default:
+			return nil, false, nil
+		}
+		if nullable != nil {
+			nullable[i] = out
+			continue
+		}
+		values[i] = out
 	}
-	return NewF64(out), true, nil
+	if nullable != nil {
+		return newNullableArray(KindI64, nullable), true, nil
+	}
+	return columnArray[int64]{kind: KindI64, data: values}, true, nil
+}
+
+func numericDyadicNullablePrefix(values []float64, upto int) []any {
+	out := make([]any, len(values))
+	for i := 0; i < upto; i++ {
+		out[i] = values[i]
+	}
+	return out
+}
+
+func numericIntegerDyadicNullablePrefix(values []int64, upto int) []any {
+	out := make([]any, len(values))
+	for i := 0; i < upto; i++ {
+		out[i] = values[i]
+	}
+	return out
+}
+
+func typedIntegerOperand(value any) bool {
+	if array, ok := value.(Array); ok {
+		return isIntegerArray(array)
+	}
+	if IsNull(value) {
+		return true
+	}
+	_, ok := integerScalarValue(value)
+	return ok
+}
+
+func isIntegerArray(array Array) bool {
+	switch a := array.(type) {
+	case attributedArray:
+		return isIntegerArray(a.array)
+	case columnArray[int8], columnArray[int16], columnArray[int32], columnArray[int64],
+		columnArray[uint8], columnArray[uint16], columnArray[uint32], columnArray[uint64],
+		i64RangeArray:
+		return true
+	case nullableArray:
+		for i := 0; i < array.Len(); i++ {
+			v, ok := array.At(i)
+			if !ok {
+				return false
+			}
+			if IsNull(v) {
+				continue
+			}
+			if _, ok := integerScalarValue(v); !ok {
+				return false
+			}
+		}
+		return true
+	default:
+		return false
+	}
+}
+
+func integerOperandAt(value any, row int) (int64, bool, error) {
+	if array, ok := value.(Array); ok {
+		return integerArrayAt(array, row)
+	}
+	if IsNull(value) {
+		return 0, false, nil
+	}
+	n, ok := integerScalarValue(value)
+	if !ok {
+		return 0, false, fmt.Errorf("typed integer operand row %d is %T, want integer", row, value)
+	}
+	return n, true, nil
+}
+
+func integerArrayAt(array Array, row int) (int64, bool, error) {
+	switch a := array.(type) {
+	case attributedArray:
+		return integerArrayAt(a.array, row)
+	case columnArray[int8]:
+		return integerColumnAt(a.data, row)
+	case columnArray[int16]:
+		return integerColumnAt(a.data, row)
+	case columnArray[int32]:
+		return integerColumnAt(a.data, row)
+	case columnArray[int64]:
+		return integerColumnAt(a.data, row)
+	case i64RangeArray:
+		if row < 0 || row >= a.len {
+			return 0, false, fmt.Errorf("array row %d out of range", row)
+		}
+		return a.start + int64(row)*a.step, true, nil
+	case columnArray[uint8]:
+		return integerColumnAt(a.data, row)
+	case columnArray[uint16]:
+		return integerColumnAt(a.data, row)
+	case columnArray[uint32]:
+		return integerColumnAt(a.data, row)
+	case columnArray[uint64]:
+		return integerColumnAt(a.data, row)
+	default:
+		v, ok := array.At(row)
+		if !ok {
+			return 0, false, fmt.Errorf("array row %d out of range", row)
+		}
+		if IsNull(v) {
+			return 0, false, nil
+		}
+		n, ok := integerScalarValue(v)
+		if !ok {
+			return 0, false, fmt.Errorf("typed integer operand row %d is %T, want integer", row, v)
+		}
+		return n, true, nil
+	}
+}
+
+func integerColumnAt[T signedScalar | unsignedScalar](values []T, row int) (int64, bool, error) {
+	if row < 0 || row >= len(values) {
+		return 0, false, fmt.Errorf("array row %d out of range", row)
+	}
+	return int64(values[row]), true, nil
+}
+
+func integerScalarValue(value any) (int64, bool) {
+	switch n := value.(type) {
+	case int:
+		return int64(n), true
+	case int8:
+		return int64(n), true
+	case int16:
+		return int64(n), true
+	case int32:
+		return int64(n), true
+	case int64:
+		return n, true
+	case uint8:
+		return int64(n), true
+	case uint16:
+		return int64(n), true
+	case uint32:
+		return int64(n), true
+	case uint64:
+		if n > math.MaxInt64 {
+			return 0, false
+		}
+		return int64(n), true
+	default:
+		return 0, false
+	}
 }
 
 func compareDyadic(op Op, left, right any, length int) (Array, bool, error) {
@@ -2179,6 +2427,9 @@ func compareSymbolStringScalar(op Op, left, right any) (bool, bool) {
 }
 
 func numericOperandAt(value any, row int) (float64, bool, error) {
+	if array, ok := value.(Array); ok {
+		return typedKernels.NumericAt(array, row)
+	}
 	v, ok, err := operandAt(value, row)
 	if err != nil || !ok || IsNull(v) {
 		return 0, false, err
@@ -2321,6 +2572,19 @@ func numericSumFloatValue[T floatScalar](values []T) float64 {
 	return sum
 }
 
+func i64RangeSum(values i64RangeArray) int64 {
+	if values.len == 0 {
+		return 0
+	}
+	n := int64(values.len)
+	last := values.start + int64(values.len-1)*values.step
+	endpoints := values.start + last
+	if n%2 == 0 {
+		return (n / 2) * endpoints
+	}
+	return n * (endpoints / 2)
+}
+
 func numericSumsInteger[T signedScalar](values []T) Array {
 	out := make([]int64, len(values))
 	var sum int64
@@ -2351,6 +2615,16 @@ func numericSumsFloat[T floatScalar](values []T) Array {
 	return NewF64(out)
 }
 
+func numericSumsI64Range(values i64RangeArray) Array {
+	out := make([]int64, values.len)
+	var sum int64
+	for i := range out {
+		sum += values.start + int64(i)*values.step
+		out[i] = sum
+	}
+	return columnArray[int64]{kind: KindI64, data: out}
+}
+
 func numericSumRowsSlice[T signedScalar | unsignedScalar | floatScalar](values []T, rows []int) (float64, int64, bool, error) {
 	var sum float64
 	for _, row := range rows {
@@ -2360,6 +2634,17 @@ func numericSumRowsSlice[T signedScalar | unsignedScalar | floatScalar](values [
 		sum += float64(values[row])
 	}
 	return sum, int64(len(rows)), true, nil
+}
+
+func numericSumRowsI64Range(values i64RangeArray, rows []int) (float64, int64, bool, error) {
+	var sum int64
+	for _, row := range rows {
+		if row < 0 || row >= values.len {
+			return 0, 0, true, fmt.Errorf("sum row %d out of range", row)
+		}
+		sum += values.start + int64(row)*values.step
+	}
+	return float64(sum), int64(len(rows)), true, nil
 }
 
 func minMax(array Array, mode string) (any, bool, bool, error) {
@@ -2456,6 +2741,17 @@ func compareSignedSlice[T signedScalar](values []T, target T, ok bool, op Op, ou
 	}
 	for i, v := range values {
 		out[i] = boolCompare(op, int64(v) == int64(target), compareInt64(int64(v), int64(target)))
+	}
+	return true
+}
+
+func compareI64RangeMask(values i64RangeArray, target int64, ok bool, op Op, out []bool) bool {
+	if !ok || len(out) < values.len {
+		return false
+	}
+	for i := 0; i < values.len; i++ {
+		v := values.start + int64(i)*values.step
+		out[i] = boolCompare(op, v == target, compareInt64(v, target))
 	}
 	return true
 }
@@ -2557,6 +2853,20 @@ func compareSignedIndexes[T signedScalar](values []T, target T, ok bool, op Op, 
 	out = out[:0]
 	for i, v := range values {
 		if boolCompare(op, int64(v) == int64(target), compareInt64(int64(v), int64(target))) {
+			out = append(out, i)
+		}
+	}
+	return out, true
+}
+
+func compareI64RangeIndexes(values i64RangeArray, target int64, ok bool, op Op, out []int) ([]int, bool) {
+	if !ok {
+		return nil, false
+	}
+	out = out[:0]
+	for i := 0; i < values.len; i++ {
+		v := values.start + int64(i)*values.step
+		if boolCompare(op, v == target, compareInt64(v, target)) {
 			out = append(out, i)
 		}
 	}

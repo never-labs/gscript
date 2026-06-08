@@ -1406,6 +1406,21 @@ func TestTypedCompareIndexesAndNullMasks(t *testing.T) {
 		t.Fatalf("typed compare indexes = %v, want %v", indexes, want)
 	}
 
+	indexes, ok = typedKernels.CompareIndexes(NewI64Range(0, 1, 6), OpGE, int64(3), indexes)
+	if !ok {
+		t.Fatal("typed compare indexes did not match i64 range")
+	}
+	if want := []int{3, 4, 5}; !reflect.DeepEqual(indexes, want) {
+		t.Fatalf("range compare indexes = %v, want %v", indexes, want)
+	}
+	rangeMask := make([]bool, 6)
+	if ok := typedKernels.CompareMask(NewI64Range(0, 1, 6), OpLT, int64(3), rangeMask); !ok {
+		t.Fatal("typed compare mask did not match i64 range")
+	}
+	if want := []bool{true, true, true, false, false, false}; !reflect.DeepEqual(rangeMask, want) {
+		t.Fatalf("range compare mask = %v, want %v", rangeMask, want)
+	}
+
 	indexes = []int{99}
 	indexes, ok = typedKernels.CompareIndexes(NewString([]string{"a", "b", "c"}), OpGE, "b", indexes)
 	if !ok {
@@ -1919,6 +1934,14 @@ func TestTypedNumericUnaryBinaryAndAggregates(t *testing.T) {
 		t.Fatalf("TryTypedNumericSum nullable = %v, %v; want 3.5, true", value, ok)
 	}
 
+	value, ok, err = TryTypedNumericSum(NewI64Range(0, 1, 8192))
+	if err != nil {
+		t.Fatalf("TryTypedNumericSum range returned error: %v", err)
+	}
+	if want := int64(8192 * 8191 / 2); !ok || value != want {
+		t.Fatalf("TryTypedNumericSum range = %v, %v; want %d, true", value, ok, want)
+	}
+
 	scan, ok, err := TryTypedNumericSums(NewI64([]int64{1, 2, 3}))
 	if err != nil {
 		t.Fatalf("TryTypedNumericSums i64 returned error: %v", err)
@@ -1928,6 +1951,25 @@ func TestTypedNumericUnaryBinaryAndAggregates(t *testing.T) {
 	}
 	if got, want := scan.Values(), []any{int64(1), int64(3), int64(6)}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("TryTypedNumericSums i64 values = %v, want %v", got, want)
+	}
+
+	scan, ok, err = TryTypedNumericSums(NewI64Range(0, 1, 4))
+	if err != nil {
+		t.Fatalf("TryTypedNumericSums range returned error: %v", err)
+	}
+	if !ok || scan.Kind() != KindI64 {
+		t.Fatalf("TryTypedNumericSums range kind = %s, %v; want i64, true", scan.Kind(), ok)
+	}
+	if got, want := scan.Values(), []any{int64(0), int64(1), int64(3), int64(6)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("TryTypedNumericSums range values = %v, want %v", got, want)
+	}
+
+	total, count, ok, err = typedKernels.NumericSumRows(NewI64Range(10, 2, 5), []int{4, 0, 2})
+	if err != nil {
+		t.Fatalf("range NumericSumRows returned error: %v", err)
+	}
+	if !ok || total != 42 || count != 3 {
+		t.Fatalf("range NumericSumRows = %v, %d, %v; want 42, 3, true", total, count, ok)
 	}
 
 	scan, ok, err = TryTypedNumericSums(NewColumn("x", []any{int64(1), nil, float64(2.5)}).Data)
@@ -1967,6 +2009,28 @@ func TestTypedDyadicBroadcastPromotionAndNullPropagation(t *testing.T) {
 	}
 	if got, want := scalarRight.(Array).Values(), []any{11.0, 12.0, 13.0}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("Dyadic scalar right values = %v, want %v", got, want)
+	}
+
+	rangeRight, ok, err := typedKernels.Dyadic(OpMul, NewI64Range(0, 2, 4), int64(3))
+	if err != nil {
+		t.Fatalf("Dyadic range scalar returned error: %v", err)
+	}
+	if !ok {
+		t.Fatal("Dyadic range scalar did not match numeric range")
+	}
+	if got, want := rangeRight.(Array).Values(), []any{0.0, 6.0, 12.0, 18.0}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("Dyadic range scalar values = %v, want %v", got, want)
+	}
+
+	integerRangeRight, ok, err := TryTypedIntegerDyadic(OpMul, NewI64Range(0, 2, 4), int64(3))
+	if err != nil {
+		t.Fatalf("TryTypedIntegerDyadic range scalar returned error: %v", err)
+	}
+	if !ok {
+		t.Fatal("TryTypedIntegerDyadic range scalar did not match numeric range")
+	}
+	if got, want := integerRangeRight.(Array).Values(), []any{int64(0), int64(6), int64(12), int64(18)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("TryTypedIntegerDyadic range scalar values = %v, want %v", got, want)
 	}
 
 	scalarLeft, ok, err := typedKernels.Dyadic(OpSub, float64(10), NewI64([]int64{1, 2, 3}))

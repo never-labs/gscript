@@ -4815,11 +4815,10 @@ func (s *EvalState) evalTil(src string) (any, error) {
 	if n < 0 {
 		return nil, fmt.Errorf("til expects a non-negative integer")
 	}
-	out := make([]int64, n)
-	for i := range out {
-		out[i] = int64(i)
+	if int64(int(n)) != n {
+		return nil, fmt.Errorf("til count is too large")
 	}
-	return data.NewI64(out), nil
+	return data.NewI64Range(0, 1, int(n)), nil
 }
 
 func (s *EvalState) evalLookup(src string) (any, error) {
@@ -6186,6 +6185,28 @@ func applyVectorDyadic(op byte, left, right any, la, ra data.Array) (data.Array,
 	case ra != nil:
 		n = ra.Len()
 	}
+	if dataOp, ok := qDataArithmeticOp(op); ok {
+		shape := qRuntimeKernelVectorDyadicShape(op, left, right, la, ra)
+		typedLeft, typedRight, canUse, err := qVectorDyadicTypedOperands(left, right, la, ra)
+		if err != nil {
+			recordRuntimeKernelExecution("ArrayDyadicArithmetic", shape, "error", "runtime_error")
+			return nil, err
+		}
+		if !canUse || !qVectorDyadicCanUseTypedArithmetic(typedLeft, typedRight) {
+			recordRuntimeKernelExecution("ArrayDyadicArithmetic", shape, "attempt", "attempt")
+			recordRuntimeKernelExecution("ArrayDyadicArithmetic", shape, "fallback", "unsupported_shape")
+		} else if out, handled, err := qTryTypedArithmeticDyadic(dataOp, typedLeft, typedRight); err != nil || handled {
+			recordRuntimeKernelProbe("ArrayDyadicArithmetic", shape, handled, err)
+			if err != nil {
+				return nil, err
+			}
+			if array, ok := out.(data.Array); ok {
+				return array, nil
+			}
+		} else {
+			recordRuntimeKernelProbe("ArrayDyadicArithmetic", shape, handled, err)
+		}
+	}
 	if dataOp, ok := qDataComparisonOp(op); ok {
 		shape := qRuntimeKernelVectorDyadicShape(op, left, right, la, ra)
 		if !qVectorDyadicCanUseTypedCompare(left, right, la, ra) {
@@ -6287,6 +6308,28 @@ func applyVectorDyadic(op byte, left, right any, la, ra data.Array) (data.Array,
 	return data.NewI64(xs), nil
 }
 
+func qDataArithmeticOp(op byte) (data.Op, bool) {
+	switch op {
+	case '+':
+		return data.OpAdd, true
+	case '-':
+		return data.OpSub, true
+	case '*':
+		return data.OpMul, true
+	case '%':
+		return data.OpDiv, true
+	default:
+		return "", false
+	}
+}
+
+func qTryTypedArithmeticDyadic(op data.Op, left, right any) (any, bool, error) {
+	if op != data.OpDiv && qTypedIntegerOperandOK(left) && qTypedIntegerOperandOK(right) {
+		return data.TryTypedIntegerDyadic(op, left, right)
+	}
+	return data.TryTypedDyadic(op, left, right)
+}
+
 func qDataComparisonOp(op byte) (data.Op, bool) {
 	switch op {
 	case '=':
@@ -6306,6 +6349,31 @@ func qRuntimeKernelVectorDyadicShape(op byte, left, right any, la, ra data.Array
 	return "vector-dyadic/" + string(op) + "/" + string(leftKind) + "/" + string(rightKind)
 }
 
+func qVectorDyadicTypedOperands(left, right any, la, ra data.Array) (any, any, bool, error) {
+	typedLeft := left
+	typedRight := right
+	if la != nil && ra != nil {
+		switch {
+		case la.Len() == ra.Len():
+		case la.Len() == 1:
+			value, ok := la.At(0)
+			if !ok {
+				return nil, nil, false, fmt.Errorf("left vector row 0 out of range")
+			}
+			typedLeft = value
+		case ra.Len() == 1:
+			value, ok := ra.At(0)
+			if !ok {
+				return nil, nil, false, fmt.Errorf("right vector row 0 out of range")
+			}
+			typedRight = value
+		default:
+			return nil, nil, false, nil
+		}
+	}
+	return typedLeft, typedRight, true, nil
+}
+
 func qRuntimeKernelOperandKind(value any, array data.Array) data.Kind {
 	if array != nil {
 		return array.Kind()
@@ -6315,6 +6383,30 @@ func qRuntimeKernelOperandKind(value any, array data.Array) data.Kind {
 		return data.KindAny
 	}
 	return kind
+}
+
+func qVectorDyadicCanUseTypedArithmetic(left, right any) bool {
+	return qTypedArithmeticOperandOK(left) && qTypedArithmeticOperandOK(right)
+}
+
+func qTypedArithmeticOperandOK(value any) bool {
+	if array, ok := value.(data.Array); ok {
+		return qKindIsNumeric(array.Kind())
+	}
+	if data.IsNull(value) {
+		return true
+	}
+	return qKindIsNumeric(qKindOfValue(value))
+}
+
+func qTypedIntegerOperandOK(value any) bool {
+	if array, ok := value.(data.Array); ok {
+		return qKindIsInteger(array.Kind())
+	}
+	if kind, ok := data.NullKind(value); ok {
+		return qKindIsInteger(kind)
+	}
+	return qKindIsInteger(qKindOfValue(value))
 }
 
 func qVectorDyadicCanUseTypedCompare(left, right any, la, ra data.Array) bool {
@@ -6524,6 +6616,15 @@ func mergeQResultKinds(left, right data.Kind) (data.Kind, bool) {
 func qKindIsNumeric(kind data.Kind) bool {
 	switch kind {
 	case data.KindI8, data.KindI16, data.KindI32, data.KindI64, data.KindF32, data.KindF64:
+		return true
+	default:
+		return false
+	}
+}
+
+func qKindIsInteger(kind data.Kind) bool {
+	switch kind {
+	case data.KindI8, data.KindI16, data.KindI32, data.KindI64:
 		return true
 	default:
 		return false
