@@ -1,0 +1,67 @@
+// qSQL columnar filter/project benchmark over an in-memory data.frame. This
+// isolates schema-stable where mask plus computed projection.
+
+N := 8192
+REPS := 760
+MOD := 1000000007
+
+func make_i64(n, mod, offset) {
+    t := {}
+    for i := 1; i <= n; i++ {
+        t[i] = offset + (i % mod)
+    }
+    return data.i64(t)
+}
+
+func make_f64(n, mod, offset) {
+    t := {}
+    for i := 1; i <= n; i++ {
+        t[i] = offset + (i % mod) * 0.25
+    }
+    return data.f64(t)
+}
+
+func make_symbols(n, mod, prefix) {
+    t := {}
+    for i := 1; i <= n; i++ {
+        t[i] = string.format("%s%d", prefix, i % mod)
+    }
+    return data.symbols(t)
+}
+
+func mix(sum, v) {
+    return (sum * 131 + v) % MOD
+}
+
+trades := data.frame({
+    id: make_i64(N, N, 1),
+    sym: make_symbols(N, 128, "S"),
+    price: make_f64(N, 320, 85.0),
+    size: make_i64(N, 100, 1),
+    venue_id: make_i64(N, 16, 1),
+})
+
+query := "select id,sym,price,size,notional:price*size,spread:price-100 from trades where price>=100,size>=50 order by notional desc take 32"
+
+func run_hot(trades, query, reps) {
+    checksum := 0
+    for r := 1; r <= reps; r++ {
+        rows := q.sql(trades, query)
+        assert(#rows == 32)
+        top := rows[1]
+        tail := rows[#rows]
+        checksum = mix(checksum, #rows + top.id + tail.id)
+        checksum = mix(checksum, math.floor(top.notional) + math.floor(tail.spread * 100))
+    }
+    return checksum
+}
+
+warm := run_hot(trades, query, 2)
+collectgarbage("collect")
+t0 := time.now()
+checksum := run_hot(trades, query, REPS)
+elapsed := time.since(t0)
+
+print(string.format("q_columnar_qsql_filter_project_hot n=%d reps=%d", N, REPS))
+print(string.format("checksum: %d", mix(checksum, warm)))
+print(string.format("Time: %.3fs", elapsed))

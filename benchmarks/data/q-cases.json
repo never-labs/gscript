@@ -362,6 +362,68 @@
       ]
     },
     {
+      "id": "data/q_columnar_eval_primitives",
+      "path": "benchmarks/data/q_columnar_eval_primitives.leia",
+      "types": [
+        "perf"
+      ],
+      "features": [
+        "operators",
+        "adverbs",
+        "xbar",
+        "analytics",
+        "runtime-kernel"
+      ]
+    },
+    {
+      "id": "data/q_columnar_qsql_asof_join",
+      "path": "benchmarks/data/q_columnar_qsql_asof_join.leia",
+      "types": [
+        "perf"
+      ],
+      "features": [
+        "qsql",
+        "join",
+        "asof",
+        "temporal",
+        "projection",
+        "order",
+        "analytics",
+        "runtime-kernel"
+      ]
+    },
+    {
+      "id": "data/q_columnar_qsql_filter_project",
+      "path": "benchmarks/data/q_columnar_qsql_filter_project.leia",
+      "types": [
+        "perf"
+      ],
+      "features": [
+        "qsql",
+        "projection",
+        "limit",
+        "order",
+        "analytics",
+        "runtime-kernel"
+      ]
+    },
+    {
+      "id": "data/q_columnar_qsql_group_xbar",
+      "path": "benchmarks/data/q_columnar_qsql_group_xbar.leia",
+      "types": [
+        "perf"
+      ],
+      "features": [
+        "qsql",
+        "xbar",
+        "temporal",
+        "rollup",
+        "order",
+        "analytics",
+        "runtime-kernel"
+      ]
+    },
+    {
       "id": "data/q_kdb_market_tape_complex_project",
       "path": "benchmarks/data/q_kdb_market_tape_complex_project.leia",
       "types": [

@@ -1,0 +1,35 @@
+// q.eval vector primitive benchmark. This isolates q expression parsing plus
+// vector compare/mask/xbar/adverb execution without qSQL planning.
+
+N := 4096
+REPS := 9000
+MOD := 1000000007
+
+func mix(sum, v) {
+    return (sum * 131 + v) % MOD
+}
+
+script := string.format(
+    "x:til %d;price:95.0+x*0.25;size:1+x mod 100;ts:60*x;mask:and[price>=100;size>=50];idx:where mask;buckets:60 xbar ts;(+/size;+/(price*size);count idx;first buckets;last buckets)",
+    N
+)
+
+func run_hot(script, reps) {
+    checksum := 0
+    for r := 1; r <= reps; r++ {
+        out := q.eval(script)
+        checksum = mix(checksum, out[1] + out[3])
+        checksum = mix(checksum, math.floor(out[2]) + out[4] + out[5])
+    }
+    return checksum
+}
+
+warm := run_hot(script, 2)
+collectgarbage("collect")
+t0 := time.now()
+checksum := run_hot(script, REPS)
+elapsed := time.since(t0)
+
+print(string.format("q_columnar_eval_primitives_hot n=%d reps=%d", N, REPS))
+print(string.format("checksum: %d", mix(checksum, warm)))
+print(string.format("Time: %.3fs", elapsed))

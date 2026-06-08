@@ -1,0 +1,74 @@
+// qSQL columnar asof join benchmark over in-memory trade/quote frames. This
+// isolates partitioned temporal matching plus projection/order.
+
+N := 4096
+REPS := 240
+MOD := 1000000007
+
+func make_i64(n, mod, offset) {
+    t := {}
+    for i := 1; i <= n; i++ {
+        t[i] = offset + (i % mod)
+    }
+    return data.i64(t)
+}
+
+func make_symbols(n, mod, prefix) {
+    t := {}
+    for i := 1; i <= n; i++ {
+        t[i] = string.format("%s%d", prefix, i % mod)
+    }
+    return data.symbols(t)
+}
+
+func make_price(n, base) {
+    t := {}
+    for i := 1; i <= n; i++ {
+        t[i] = base + (i % 251) * 0.35
+    }
+    return data.f64(t)
+}
+
+func mix(sum, v) {
+    return (sum * 131 + v) % MOD
+}
+
+trades := data.frame({
+    trade_id: make_i64(N, N, 1),
+    sym: make_symbols(N, 64, "S"),
+    ts: make_i64(N, N, 600),
+    price: make_price(N, 90.0),
+    size: make_i64(N, 97, 10),
+})
+
+quotes := data.frame({
+    sym: make_symbols(N, 64, "S"),
+    ts: make_i64(N, N, 540),
+    bid: make_price(N, 89.75),
+    ask: make_price(N, 90.25),
+})
+
+query := "select trade_id,sym,ts,price,size,bid,ask,spread:ask-bid from trades asof join quotes on sym,ts where price>=100 order by trade_id asc take 128"
+
+func run_hot(trades, quotes, query, reps) {
+    checksum := 0
+    for r := 1; r <= reps; r++ {
+        rows := q.sql(query, {trades: trades, quotes: quotes})
+        assert(#rows == 128)
+        first := rows[1]
+        last := rows[#rows]
+        checksum = mix(checksum, #rows + first.trade_id + last.trade_id + first.size)
+        checksum = mix(checksum, math.floor(first.spread * 1000) + math.floor(last.bid * 100))
+    }
+    return checksum
+}
+
+warm := run_hot(trades, quotes, query, 2)
+collectgarbage("collect")
+t0 := time.now()
+checksum := run_hot(trades, quotes, query, REPS)
+elapsed := time.since(t0)
+
+print(string.format("q_columnar_qsql_asof_join_hot trades=%d quotes=%d reps=%d", N, N, REPS))
+print(string.format("checksum: %d", mix(checksum, warm)))
+print(string.format("Time: %.3fs", elapsed))

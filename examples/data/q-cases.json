@@ -49,7 +49,8 @@
           "benchmarks/data/q_kdb_market_tape_complex_project.leia",
           "benchmarks/data/q_intraday_tca_order_book_project.leia",
           "benchmarks/data/q_portfolio_risk_factor_project.leia",
-          "benchmarks/data/q_iot_sensor_telemetry_project.leia"
+          "benchmarks/data/q_iot_sensor_telemetry_project.leia",
+          "benchmarks/data/q_columnar_eval_primitives.leia"
         ]
       }
     },
@@ -93,7 +94,11 @@
           "benchmarks/data/q_kdb_market_tape_complex_project.leia",
           "benchmarks/data/q_intraday_tca_order_book_project.leia",
           "benchmarks/data/q_portfolio_risk_factor_project.leia",
-          "benchmarks/data/q_iot_sensor_telemetry_project.leia"
+          "benchmarks/data/q_iot_sensor_telemetry_project.leia",
+          "benchmarks/data/q_columnar_eval_primitives.leia",
+          "benchmarks/data/q_columnar_qsql_filter_project.leia",
+          "benchmarks/data/q_columnar_qsql_group_xbar.leia",
+          "benchmarks/data/q_columnar_qsql_asof_join.leia"
         ]
       }
     },
@@ -213,7 +218,10 @@
           "benchmarks/data/q_kdb_market_tape_complex_project.leia",
           "benchmarks/data/q_intraday_tca_order_book_project.leia",
           "benchmarks/data/q_portfolio_risk_factor_project.leia",
-          "benchmarks/data/q_iot_sensor_telemetry_project.leia"
+          "benchmarks/data/q_iot_sensor_telemetry_project.leia",
+          "benchmarks/data/q_columnar_qsql_filter_project.leia",
+          "benchmarks/data/q_columnar_qsql_group_xbar.leia",
+          "benchmarks/data/q_columnar_qsql_asof_join.leia"
         ]
       }
     },
@@ -263,7 +271,8 @@
           "benchmarks/data/q_conformance_golden_project.leia",
           "benchmarks/data/q_intraday_tca_order_book_project.leia",
           "benchmarks/data/q_portfolio_risk_factor_project.leia",
-          "benchmarks/data/q_iot_sensor_telemetry_project.leia"
+          "benchmarks/data/q_iot_sensor_telemetry_project.leia",
+          "benchmarks/data/q_columnar_qsql_asof_join.leia"
         ]
       }
     },
@@ -316,7 +325,8 @@
           "benchmarks/data/q_kdb_market_tape_complex_project.leia",
           "benchmarks/data/q_intraday_tca_order_book_project.leia",
           "benchmarks/data/q_portfolio_risk_factor_project.leia",
-          "benchmarks/data/q_iot_sensor_telemetry_project.leia"
+          "benchmarks/data/q_iot_sensor_telemetry_project.leia",
+          "benchmarks/data/q_columnar_qsql_asof_join.leia"
         ]
       }
     },
@@ -367,7 +377,9 @@
           "benchmarks/data/q_conformance_golden_project.leia",
           "benchmarks/data/q_kdb_market_tape_complex_project.leia",
           "benchmarks/data/q_intraday_tca_order_book_project.leia",
-          "benchmarks/data/q_iot_sensor_telemetry_project.leia"
+          "benchmarks/data/q_iot_sensor_telemetry_project.leia",
+          "benchmarks/data/q_columnar_eval_primitives.leia",
+          "benchmarks/data/q_columnar_qsql_group_xbar.leia"
         ]
       }
     },
@@ -420,7 +432,9 @@
           "benchmarks/data/q_kdb_market_tape_complex_project.leia",
           "benchmarks/data/q_intraday_tca_order_book_project.leia",
           "benchmarks/data/q_portfolio_risk_factor_project.leia",
-          "benchmarks/data/q_iot_sensor_telemetry_project.leia"
+          "benchmarks/data/q_iot_sensor_telemetry_project.leia",
+          "benchmarks/data/q_columnar_qsql_group_xbar.leia",
+          "benchmarks/data/q_columnar_qsql_asof_join.leia"
         ]
       }
     },
@@ -495,7 +509,8 @@
           "benchmarks/data/q_kdb_market_tape_complex_project.leia",
           "benchmarks/data/q_intraday_tca_order_book_project.leia",
           "benchmarks/data/q_portfolio_risk_factor_project.leia",
-          "benchmarks/data/q_iot_sensor_telemetry_project.leia"
+          "benchmarks/data/q_iot_sensor_telemetry_project.leia",
+          "benchmarks/data/q_columnar_qsql_group_xbar.leia"
         ]
       }
     },
@@ -612,7 +627,11 @@
           "benchmarks/data/q_kdb_market_tape_complex_project.leia",
           "benchmarks/data/q_intraday_tca_order_book_project.leia",
           "benchmarks/data/q_portfolio_risk_factor_project.leia",
-          "benchmarks/data/q_iot_sensor_telemetry_project.leia"
+          "benchmarks/data/q_iot_sensor_telemetry_project.leia",
+          "benchmarks/data/q_columnar_eval_primitives.leia",
+          "benchmarks/data/q_columnar_qsql_filter_project.leia",
+          "benchmarks/data/q_columnar_qsql_group_xbar.leia",
+          "benchmarks/data/q_columnar_qsql_asof_join.leia"
         ]
       }
     },
@@ -905,7 +924,8 @@
         ],
         "benchmarks": [
           "benchmarks/data/q_operator_pipeline.leia",
-          "benchmarks/data/q_kdb_complex_event_replay_project.leia"
+          "benchmarks/data/q_kdb_complex_event_replay_project.leia",
+          "benchmarks/data/q_columnar_eval_primitives.leia"
         ]
       }
     },
@@ -1091,7 +1111,9 @@
         "benchmarks": [
           "benchmarks/data/q_projection_limit_cache.leia",
           "benchmarks/data/q_kdb_delta_golden.leia",
-          "benchmarks/data/frame_qsql_distinct_take.leia"
+          "benchmarks/data/frame_qsql_distinct_take.leia",
+          "benchmarks/data/q_columnar_qsql_filter_project.leia",
+          "benchmarks/data/q_columnar_qsql_asof_join.leia"
         ]
       }
     },
@@ -1110,7 +1132,8 @@
         ],
         "benchmarks": [
           "benchmarks/data/q_projection_limit_cache.leia",
-          "benchmarks/data/frame_qsql_distinct_take.leia"
+          "benchmarks/data/frame_qsql_distinct_take.leia",
+          "benchmarks/data/q_columnar_qsql_filter_project.leia"
         ]
       }
     },
@@ -1154,7 +1177,10 @@
           "benchmarks/data/q_select_star_order_project.leia",
           "benchmarks/data/q_kdb_market_tape_complex_project.leia",
           "benchmarks/data/q_portfolio_risk_factor_project.leia",
-          "benchmarks/data/q_iot_sensor_telemetry_project.leia"
+          "benchmarks/data/q_iot_sensor_telemetry_project.leia",
+          "benchmarks/data/q_columnar_qsql_filter_project.leia",
+          "benchmarks/data/q_columnar_qsql_group_xbar.leia",
+          "benchmarks/data/q_columnar_qsql_asof_join.leia"
         ]
       }
     },
@@ -1231,7 +1257,11 @@
           "benchmarks/data/q_kdb_market_tape_complex_project.leia",
           "benchmarks/data/q_intraday_tca_order_book_project.leia",
           "benchmarks/data/q_portfolio_risk_factor_project.leia",
-          "benchmarks/data/q_iot_sensor_telemetry_project.leia"
+          "benchmarks/data/q_iot_sensor_telemetry_project.leia",
+          "benchmarks/data/q_columnar_eval_primitives.leia",
+          "benchmarks/data/q_columnar_qsql_filter_project.leia",
+          "benchmarks/data/q_columnar_qsql_group_xbar.leia",
+          "benchmarks/data/q_columnar_qsql_asof_join.leia"
         ]
       }
     },
@@ -1288,7 +1318,11 @@
         ],
         "benchmarks": [
           "benchmarks/data/q_conformance_golden_project.leia",
-          "benchmarks/data/q_kdb_market_tape_complex_project.leia"
+          "benchmarks/data/q_kdb_market_tape_complex_project.leia",
+          "benchmarks/data/q_columnar_eval_primitives.leia",
+          "benchmarks/data/q_columnar_qsql_filter_project.leia",
+          "benchmarks/data/q_columnar_qsql_group_xbar.leia",
+          "benchmarks/data/q_columnar_qsql_asof_join.leia"
         ]
       }
     },

@@ -1,6 +1,6 @@
 {
   "schema_version": 3,
-  "case_count": 98,
+  "case_count": 102,
   "cases": [
     {
       "id": "app/actors_dispatch_mutation",
@@ -380,6 +380,54 @@
     {
       "id": "data/frame_qsql_rollup",
       "path": "benchmarks/data/frame_qsql_rollup.leia",
+      "domain": "data",
+      "kind": "benchmark",
+      "reference": null,
+      "status": "active",
+      "tags": [
+        "data",
+        "benchmark"
+      ]
+    },
+    {
+      "id": "data/q_columnar_eval_primitives",
+      "path": "benchmarks/data/q_columnar_eval_primitives.leia",
+      "domain": "data",
+      "kind": "benchmark",
+      "reference": null,
+      "status": "active",
+      "tags": [
+        "data",
+        "benchmark"
+      ]
+    },
+    {
+      "id": "data/q_columnar_qsql_asof_join",
+      "path": "benchmarks/data/q_columnar_qsql_asof_join.leia",
+      "domain": "data",
+      "kind": "benchmark",
+      "reference": null,
+      "status": "active",
+      "tags": [
+        "data",
+        "benchmark"
+      ]
+    },
+    {
+      "id": "data/q_columnar_qsql_filter_project",
+      "path": "benchmarks/data/q_columnar_qsql_filter_project.leia",
+      "domain": "data",
+      "kind": "benchmark",
+      "reference": null,
+      "status": "active",
+      "tags": [
+        "data",
+        "benchmark"
+      ]
+    },
+    {
+      "id": "data/q_columnar_qsql_group_xbar",
+      "path": "benchmarks/data/q_columnar_qsql_group_xbar.leia",
       "domain": "data",
       "kind": "benchmark",
       "reference": null,
@@ -3018,6 +3066,66 @@
       "domain": "data",
       "name": "q_iot_sensor_telemetry_project",
       "script": "benchmarks/data/q_iot_sensor_telemetry_project.leia",
+      "comparison_reference": null,
+      "params": {},
+      "recommended_scale": {
+        "hot": {}
+      },
+      "time_source_hint": "script_time_line",
+      "tags": [
+        "data"
+      ]
+    },
+    {
+      "id": "data/q_columnar_eval_primitives",
+      "domain": "data",
+      "name": "q_columnar_eval_primitives",
+      "script": "benchmarks/data/q_columnar_eval_primitives.leia",
+      "comparison_reference": null,
+      "params": {},
+      "recommended_scale": {
+        "hot": {}
+      },
+      "time_source_hint": "script_time_line",
+      "tags": [
+        "data"
+      ]
+    },
+    {
+      "id": "data/q_columnar_qsql_asof_join",
+      "domain": "data",
+      "name": "q_columnar_qsql_asof_join",
+      "script": "benchmarks/data/q_columnar_qsql_asof_join.leia",
+      "comparison_reference": null,
+      "params": {},
+      "recommended_scale": {
+        "hot": {}
+      },
+      "time_source_hint": "script_time_line",
+      "tags": [
+        "data"
+      ]
+    },
+    {
+      "id": "data/q_columnar_qsql_filter_project",
+      "domain": "data",
+      "name": "q_columnar_qsql_filter_project",
+      "script": "benchmarks/data/q_columnar_qsql_filter_project.leia",
+      "comparison_reference": null,
+      "params": {},
+      "recommended_scale": {
+        "hot": {}
+      },
+      "time_source_hint": "script_time_line",
+      "tags": [
+        "data"
+      ]
+    },
+    {
+      "id": "data/q_columnar_qsql_group_xbar",
+      "domain": "data",
+      "name": "q_columnar_qsql_group_xbar",
+      "script": "benchmarks/data/q_columnar_qsql_group_xbar.leia",
       "comparison_reference": null,
       "params": {},
       "recommended_scale": {
