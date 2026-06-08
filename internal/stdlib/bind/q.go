@@ -125,6 +125,13 @@ type qRuntimeKernelExecutionShapeStat struct {
 	Count   uint64
 }
 
+type qRuntimeKernelExecutionKernelStat struct {
+	Source  string
+	Kernel  string
+	Outcome string
+	Count   uint64
+}
+
 type qSQLKernelDecisionKeyStat struct {
 	Key          string
 	Shape        string
@@ -2974,6 +2981,7 @@ func qRuntimeKernelExecutionStatsRow() *Table {
 	row.RawSetString("errors", qUint64IntValue(errors))
 	row.RawSetString("stats", TableValue(qRuntimeKernelExecutionStatsTable(stats)))
 	row.RawSetString("shapes", TableValue(qRuntimeKernelExecutionShapeStatsTable(qRuntimeKernelExecutionShapeStats(stats))))
+	row.RawSetString("kernels", TableValue(qRuntimeKernelExecutionKernelStatsTable(qRuntimeKernelExecutionKernelStats(stats))))
 	return row
 }
 
@@ -3104,6 +3112,55 @@ func qRuntimeKernelExecutionShapeStatsTable(stats []qRuntimeKernelExecutionShape
 		row := NewTable()
 		row.RawSetString("source", StringValue(stat.Source))
 		row.RawSetString("shape", StringValue(stat.Shape))
+		row.RawSetString("outcome", StringValue(stat.Outcome))
+		row.RawSetString("count", qUint64IntValue(stat.Count))
+		rows.RawSetInt(int64(i+1), TableValue(row))
+	}
+	return rows
+}
+
+func qRuntimeKernelExecutionKernelStats(stats []QRuntimeKernelExecutionStat) []qRuntimeKernelExecutionKernelStat {
+	type kernelKey struct {
+		source  string
+		kernel  string
+		outcome string
+	}
+	counts := make(map[kernelKey]uint64, len(stats))
+	for _, stat := range stats {
+		key := kernelKey{source: stat.Source, kernel: stat.Kernel, outcome: stat.Outcome}
+		counts[key] += stat.Count
+	}
+	out := make([]qRuntimeKernelExecutionKernelStat, 0, len(counts))
+	for key, count := range counts {
+		out = append(out, qRuntimeKernelExecutionKernelStat{
+			Source:  key.source,
+			Kernel:  key.kernel,
+			Outcome: key.outcome,
+			Count:   count,
+		})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		a, b := out[i], out[j]
+		if a.Count != b.Count {
+			return a.Count > b.Count
+		}
+		if a.Source != b.Source {
+			return a.Source < b.Source
+		}
+		if a.Kernel != b.Kernel {
+			return a.Kernel < b.Kernel
+		}
+		return a.Outcome < b.Outcome
+	})
+	return out
+}
+
+func qRuntimeKernelExecutionKernelStatsTable(stats []qRuntimeKernelExecutionKernelStat) *Table {
+	rows := NewAppendArrayTable(len(stats))
+	for i, stat := range stats {
+		row := NewTable()
+		row.RawSetString("source", StringValue(stat.Source))
+		row.RawSetString("kernel", StringValue(stat.Kernel))
 		row.RawSetString("outcome", StringValue(stat.Outcome))
 		row.RawSetString("count", qUint64IntValue(stat.Count))
 		rows.RawSetInt(int64(i+1), TableValue(row))
