@@ -3,6 +3,7 @@ package data
 import (
 	"fmt"
 	"math"
+	"path"
 	"sort"
 	"strings"
 )
@@ -1029,6 +1030,256 @@ func distinctCountRows(array Array, rows int) (int64, bool, error) {
 		seen[arrayValueKey(array.Kind(), value)] = struct{}{}
 	}
 	return int64(len(seen)), true, nil
+}
+
+// TryTypedStringLikeCount counts string/symbol rows matching a q-like glob
+// pattern without materializing a boolean mask or where index vector.
+func TryTypedStringLikeCount(array Array, pattern string) (int64, bool, error) {
+	if array == nil {
+		return 0, true, fmt.Errorf("like count array is nil")
+	}
+	matcher, err := newStringLikeMatcher(pattern)
+	if err != nil {
+		return 0, true, err
+	}
+	return typedStringLikeCount(array, matcher)
+}
+
+func typedStringLikeCount(array Array, matcher stringLikeMatcher) (int64, bool, error) {
+	switch a := array.(type) {
+	case attributedArray:
+		return typedStringLikeCount(a.array, matcher)
+	case tiledArray:
+		sourceLen := a.source.Len()
+		if sourceLen == 0 || a.len == 0 {
+			return 0, true, nil
+		}
+		sourceCount, handled, err := typedStringLikeCount(a.source, matcher)
+		if err != nil || !handled {
+			return 0, handled, err
+		}
+		fullCycles := a.len / sourceLen
+		remainder := a.len % sourceLen
+		count := sourceCount * int64(fullCycles)
+		for row := 0; row < remainder; row++ {
+			value, ok := a.source.At((a.start + row) % sourceLen)
+			if !ok {
+				return 0, true, fmt.Errorf("tiled like count source row %d out of range", row)
+			}
+			matched, ok, err := matcher.matchValue(value)
+			if err != nil || !ok {
+				return 0, ok, err
+			}
+			if matched {
+				count++
+			}
+		}
+		return count, true, nil
+	case columnArray[string]:
+		return matcher.countStrings(a.data)
+	case columnArray[Symbol]:
+		return matcher.countSymbols(a.data)
+	case nullableArray:
+		var count int64
+		for _, value := range a.data {
+			if IsNull(value) {
+				continue
+			}
+			matched, ok, err := matcher.matchValue(value)
+			if err != nil || !ok {
+				return 0, ok, err
+			}
+			if matched {
+				count++
+			}
+		}
+		return count, true, nil
+	default:
+		return 0, false, nil
+	}
+}
+
+type stringLikeMatcher struct {
+	pattern string
+	prefix  string
+	fast    bool
+}
+
+func newStringLikeMatcher(pattern string) (stringLikeMatcher, error) {
+	if _, err := path.Match(pattern, ""); err != nil {
+		return stringLikeMatcher{}, fmt.Errorf("like pattern %q: %w", pattern, err)
+	}
+	prefix, fast := simpleTrailingStarPattern(pattern)
+	return stringLikeMatcher{pattern: pattern, prefix: prefix, fast: fast}, nil
+}
+
+func simpleTrailingStarPattern(pattern string) (string, bool) {
+	if !strings.HasSuffix(pattern, "*") {
+		return "", false
+	}
+	prefix := strings.TrimSuffix(pattern, "*")
+	if strings.ContainsAny(prefix, "*?[\\") {
+		return "", false
+	}
+	return prefix, true
+}
+
+func (m stringLikeMatcher) countStrings(values []string) (int64, bool, error) {
+	var count int64
+	for _, value := range values {
+		matched, err := m.matchString(value)
+		if err != nil {
+			return 0, true, err
+		}
+		if matched {
+			count++
+		}
+	}
+	return count, true, nil
+}
+
+func (m stringLikeMatcher) countSymbols(values []Symbol) (int64, bool, error) {
+	var count int64
+	for _, value := range values {
+		matched, err := m.matchString(string(value))
+		if err != nil {
+			return 0, true, err
+		}
+		if matched {
+			count++
+		}
+	}
+	return count, true, nil
+}
+
+func (m stringLikeMatcher) matchValue(value any) (bool, bool, error) {
+	switch x := value.(type) {
+	case string:
+		matched, err := m.matchString(x)
+		return matched, true, err
+	case Symbol:
+		matched, err := m.matchString(string(x))
+		return matched, true, err
+	default:
+		return false, false, nil
+	}
+}
+
+func (m stringLikeMatcher) matchString(value string) (bool, error) {
+	if m.fast {
+		return strings.HasPrefix(value, m.prefix), nil
+	}
+	matched, err := path.Match(m.pattern, value)
+	if err != nil {
+		return false, fmt.Errorf("like pattern %q: %w", m.pattern, err)
+	}
+	return matched, nil
+}
+
+// TryTypedStringCast converts string/symbol arrays to string arrays while
+// preserving lazy tiled storage when possible.
+func TryTypedStringCast(array Array) (Array, bool, error) {
+	if array == nil {
+		return nil, true, fmt.Errorf("string cast array is nil")
+	}
+	switch a := array.(type) {
+	case attributedArray:
+		out, handled, err := TryTypedStringCast(a.array)
+		if err != nil || !handled {
+			return out, handled, err
+		}
+		return attributedArray{array: out, metadata: a.metadata.cloneWithRebuiltIndexes(out)}, true, nil
+	case tiledArray:
+		source, handled, err := TryTypedStringCast(a.source)
+		if err != nil || !handled {
+			return source, handled, err
+		}
+		return tiledArray{source: source, start: a.start, len: a.len}, true, nil
+	case columnArray[string]:
+		return a, true, nil
+	case columnArray[Symbol]:
+		out := make([]string, len(a.data))
+		for i, value := range a.data {
+			out[i] = string(value)
+		}
+		return columnArray[string]{kind: KindString, data: out}, true, nil
+	case nullableArray:
+		out := make([]any, len(a.data))
+		for i, value := range a.data {
+			if IsNull(value) {
+				out[i] = NullValue
+				continue
+			}
+			switch x := value.(type) {
+			case string:
+				out[i] = x
+			case Symbol:
+				out[i] = string(x)
+			default:
+				return nil, false, nil
+			}
+		}
+		return nullableArray{kind: KindString, data: out}, true, nil
+	default:
+		return nil, false, nil
+	}
+}
+
+// TryTypedStringCase applies lower/upper to string/symbol arrays while
+// preserving lazy tiled storage when possible.
+func TryTypedStringCase(array Array, upper bool) (Array, bool, error) {
+	if array == nil {
+		return nil, true, fmt.Errorf("string case array is nil")
+	}
+	fn := strings.ToLower
+	if upper {
+		fn = strings.ToUpper
+	}
+	switch a := array.(type) {
+	case attributedArray:
+		out, handled, err := TryTypedStringCase(a.array, upper)
+		if err != nil || !handled {
+			return out, handled, err
+		}
+		return attributedArray{array: out, metadata: a.metadata.cloneWithRebuiltIndexes(out)}, true, nil
+	case tiledArray:
+		source, handled, err := TryTypedStringCase(a.source, upper)
+		if err != nil || !handled {
+			return source, handled, err
+		}
+		return tiledArray{source: source, start: a.start, len: a.len}, true, nil
+	case columnArray[string]:
+		out := make([]string, len(a.data))
+		for i, value := range a.data {
+			out[i] = fn(value)
+		}
+		return columnArray[string]{kind: KindString, data: out}, true, nil
+	case columnArray[Symbol]:
+		out := make([]string, len(a.data))
+		for i, value := range a.data {
+			out[i] = fn(string(value))
+		}
+		return columnArray[string]{kind: KindString, data: out}, true, nil
+	case nullableArray:
+		out := make([]any, len(a.data))
+		for i, value := range a.data {
+			if IsNull(value) {
+				out[i] = NullValue
+				continue
+			}
+			switch x := value.(type) {
+			case string:
+				out[i] = fn(x)
+			case Symbol:
+				out[i] = fn(string(x))
+			default:
+				return nil, false, nil
+			}
+		}
+		return nullableArray{kind: KindString, data: out}, true, nil
+	default:
+		return nil, false, nil
+	}
 }
 
 func (typedKernelRegistry) NumericUnary(op string, array Array) (Array, bool, error) {

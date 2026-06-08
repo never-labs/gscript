@@ -3035,6 +3035,9 @@ func TestGatherAndTakeOperators(t *testing.T) {
 	if count, ok, err := TryTypedDistinctCount(repeated); err != nil || !ok || count != 3 {
 		t.Fatalf("TakeRepeat distinct count = %d,%v,%v; want 3,true,nil", count, ok, err)
 	}
+	if count, ok, err := TryTypedStringLikeCount(takeRepeatMust(t, NewSymbols([]string{"AAPL", "MSFT", "AMD", "ASK"}), 10), "A*"); err != nil || !ok || count != 7 {
+		t.Fatalf("TakeRepeat symbol like count = %d,%v,%v; want 7,true,nil", count, ok, err)
+	}
 
 	repeatedTail, err := TakeRepeat(NewI64([]int64{10, 20, 30}), -5)
 	if err != nil {
@@ -3069,6 +3072,74 @@ func TestGatherAndTakeOperators(t *testing.T) {
 	}
 	if count, ok, err := TryTypedDistinctCount(rotated); err != nil || !ok || count != 3 {
 		t.Fatalf("TryTypedRotate symbols distinct count = %d,%v,%v; want 3,true,nil", count, ok, err)
+	}
+}
+
+func takeRepeatMust(t *testing.T, array Array, n int) Array {
+	t.Helper()
+	out, err := TakeRepeat(array, n)
+	if err != nil {
+		t.Fatalf("TakeRepeat returned error: %v", err)
+	}
+	return out
+}
+
+func TestTryTypedStringLikeCount(t *testing.T) {
+	if count, ok, err := TryTypedStringLikeCount(NewString([]string{"AAPL", "MSFT", "AMD", "ASK"}), "A*"); err != nil || !ok || count != 3 {
+		t.Fatalf("string like prefix count = %d,%v,%v; want 3,true,nil", count, ok, err)
+	}
+	if count, ok, err := TryTypedStringLikeCount(NewSymbols([]string{"AAPL", "MSFT", "AMD", "ASK"}), "A?D"); err != nil || !ok || count != 1 {
+		t.Fatalf("symbol like glob count = %d,%v,%v; want 1,true,nil", count, ok, err)
+	}
+	if count, ok, err := TryTypedStringLikeCount(NewColumn("x", []any{"AAPL", NullValue, Symbol("ASK"), int64(1)}).Data, "A*"); err != nil || ok || count != 0 {
+		t.Fatalf("mixed nullable like count = %d,%v,%v; want 0,false,nil", count, ok, err)
+	}
+	if _, ok, err := TryTypedStringLikeCount(NewI64([]int64{1, 2, 3}), "A*"); err != nil || ok {
+		t.Fatalf("integer like count handled=%v err=%v; want false,nil", ok, err)
+	}
+}
+
+func TestTryTypedStringCastAndCasePreserveTiledArrays(t *testing.T) {
+	repeated := takeRepeatMust(t, NewSymbols([]string{"aapl", "msft", "amd", "ask"}), 10)
+	cast, handled, err := TryTypedStringCast(repeated)
+	if err != nil || !handled {
+		t.Fatalf("TryTypedStringCast handled=%v err=%v; want true,nil", handled, err)
+	}
+	if _, ok := cast.(tiledArray); !ok {
+		t.Fatalf("TryTypedStringCast returned %T, want tiledArray", cast)
+	}
+	upper, handled, err := TryTypedStringCase(cast, true)
+	if err != nil || !handled {
+		t.Fatalf("TryTypedStringCase handled=%v err=%v; want true,nil", handled, err)
+	}
+	if _, ok := upper.(tiledArray); !ok {
+		t.Fatalf("TryTypedStringCase returned %T, want tiledArray", upper)
+	}
+	if got, want := upper.Values(), []any{"AAPL", "MSFT", "AMD", "ASK", "AAPL", "MSFT", "AMD", "ASK", "AAPL", "MSFT"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("upper tiled values = %#v, want %#v", got, want)
+	}
+	if count, ok, err := TryTypedStringLikeCount(upper, "A*"); err != nil || !ok || count != 7 {
+		t.Fatalf("upper tiled like count = %d,%v,%v; want 7,true,nil", count, ok, err)
+	}
+}
+
+func TestTryGatherByI64IndexArrayPreservesRanges(t *testing.T) {
+	values := NewI64Range(0, 1, 10)
+	indexes := NewI64Range(4, 1, 3)
+	gathered, handled, err := TryGatherByI64IndexArray(values, indexes)
+	if err != nil || !handled {
+		t.Fatalf("TryGatherByI64IndexArray handled=%v err=%v; want true,nil", handled, err)
+	}
+	if _, ok := gathered.(i64RangeArray); !ok {
+		t.Fatalf("TryGatherByI64IndexArray returned %T, want i64RangeArray", gathered)
+	}
+	if got, want := gathered.Values(), []any{int64(4), int64(5), int64(6)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("range gather values = %#v, want %#v", got, want)
+	}
+
+	rows, handled, err := TryTypedI64Indexes(indexes)
+	if err != nil || !handled || !reflect.DeepEqual(rows, []int{4, 5, 6}) {
+		t.Fatalf("TryTypedI64Indexes = %#v,%v,%v; want [4 5 6],true,nil", rows, handled, err)
 	}
 }
 

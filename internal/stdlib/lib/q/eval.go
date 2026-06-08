@@ -639,7 +639,13 @@ func (s *EvalState) eval(src string) (any, error) {
 		if out, handled, err := s.tryEvalCountWhereCompare(strings.TrimSpace(src[len("count "):])); err != nil || handled {
 			return out, err
 		}
+		if out, handled, err := s.tryEvalCountWhereLike(strings.TrimSpace(src[len("count "):])); err != nil || handled {
+			return out, err
+		}
 		if out, handled, err := s.tryEvalCountWhereNull(strings.TrimSpace(src[len("count "):])); err != nil || handled {
+			return out, err
+		}
+		if out, handled, err := s.tryEvalCountReverse(strings.TrimSpace(src[len("count "):])); err != nil || handled {
 			return out, err
 		}
 		if out, handled, err := s.tryEvalCountPrds(strings.TrimSpace(src[len("count "):])); err != nil || handled {
@@ -3369,6 +3375,59 @@ func (s *EvalState) tryEvalCountWhereCompare(src string) (any, bool, error) {
 	return int64(indexes.Len()), true, nil
 }
 
+func (s *EvalState) tryEvalCountWhereLike(src string) (any, bool, error) {
+	if !strings.HasPrefix(src, "where ") {
+		return nil, false, nil
+	}
+	arg := strings.TrimSpace(src[len("where "):])
+	leftExpr, rightExpr, ok := splitTopLevelWord(arg, "like")
+	if !ok {
+		return nil, false, nil
+	}
+	left, err := s.eval(leftExpr)
+	if err != nil {
+		return nil, true, err
+	}
+	array, ok := left.(data.Array)
+	if !ok {
+		return nil, false, nil
+	}
+	right, err := s.eval(rightExpr)
+	if err != nil {
+		return nil, true, err
+	}
+	pattern, ok := qLikeText(right)
+	if !ok {
+		return nil, false, nil
+	}
+	out, handled, err := data.TryTypedStringLikeCount(array, pattern)
+	shape := "like-count/" + string(array.Kind()) + "/" + string(qRuntimeKernelOperandKind(right, nil))
+	recordRuntimeKernelProbe("ArrayStringLikeCount", shape, handled, err)
+	if err != nil {
+		return nil, true, err
+	}
+	if !handled {
+		return nil, false, nil
+	}
+	return out, true, nil
+}
+
+func (s *EvalState) tryEvalCountReverse(src string) (any, bool, error) {
+	if !strings.HasPrefix(src, "reverse ") {
+		return nil, false, nil
+	}
+	value, err := s.eval(strings.TrimSpace(src[len("reverse "):]))
+	if err != nil {
+		return nil, true, err
+	}
+	out, err := count(value)
+	if err != nil {
+		return nil, true, err
+	}
+	recordRuntimeKernelProbe("ArrayCountReverse", "count-reverse/"+string(qRuntimeKernelOperandKind(value, nil)), true, nil)
+	return out, true, nil
+}
+
 func (s *EvalState) tryEvalSumWhereCompare(src string) (any, bool, error) {
 	indexes, handled, err := s.tryEvalWhereCompareIndexes(src, "compare-to-index-sum")
 	if err != nil || !handled {
@@ -5734,6 +5793,18 @@ func indexValue(v any, index any) (any, error) {
 		}
 		return keyedTableLookup(keyed, index)
 	}
+	if array, ok := v.(data.Array); ok {
+		if indexArray, ok := index.(data.Array); ok && indexArray.Len() != 1 {
+			out, handled, err := data.TryGatherByI64IndexArray(array, indexArray)
+			recordRuntimeKernelProbe("ArrayGatherI64Indexes", "gather/"+string(array.Kind())+"/"+string(indexArray.Kind()), handled, err)
+			if err != nil {
+				return nil, err
+			}
+			if handled {
+				return out, nil
+			}
+		}
+	}
 	indexes, scalar, err := indexInts(index)
 	if err != nil {
 		return nil, err
@@ -5873,6 +5944,9 @@ func indexInts(v any) ([]int, bool, error) {
 	case data.Array:
 		if x.Kind() != data.KindI64 {
 			return nil, false, fmt.Errorf("index vector must contain integers")
+		}
+		if indexes, handled, err := data.TryTypedI64Indexes(x); err != nil || handled {
+			return indexes, len(indexes) == 1, err
 		}
 		values := x.Values()
 		indexes := make([]int, len(values))
@@ -7462,6 +7536,12 @@ func qTypeCode(kind data.Kind, atom bool) int {
 
 func stringValue(v any) (any, error) {
 	if array, ok := v.(data.Array); ok {
+		if typed, handled, err := data.TryTypedStringCast(array); err != nil || handled {
+			recordRuntimeKernelProbe("ArrayStringCast", "string-cast/"+string(array.Kind()), handled, err)
+			return typed, err
+		} else {
+			recordRuntimeKernelProbe("ArrayStringCast", "string-cast/"+string(array.Kind()), handled, err)
+		}
 		out := make([]string, array.Len())
 		for i := 0; i < array.Len(); i++ {
 			item, ok := array.At(i)
@@ -7499,6 +7579,13 @@ func upperValue(v any) (any, error) {
 
 func mapStringValue(name string, v any, fn func(string) string) (any, error) {
 	if array, ok := v.(data.Array); ok {
+		if name == "upper" || name == "lower" {
+			typed, handled, err := data.TryTypedStringCase(array, name == "upper")
+			recordRuntimeKernelProbe("ArrayStringCase", name+"/"+string(array.Kind()), handled, err)
+			if err != nil || handled {
+				return typed, err
+			}
+		}
 		out := make([]string, array.Len())
 		for i := 0; i < array.Len(); i++ {
 			item, ok := array.At(i)

@@ -1656,6 +1656,157 @@ func TryTypedCompareIndexesI64(array Array, op Op, value any) (Array, bool, erro
 	return newI64Trusted(out), true, nil
 }
 
+// TryGatherByI64IndexArray gathers array rows using a typed i64 index vector
+// without boxing the index array through Values().
+func TryGatherByI64IndexArray(array Array, indexes Array) (Array, bool, error) {
+	if array == nil || indexes == nil {
+		return nil, true, fmt.Errorf("gather array and indexes must be non-nil")
+	}
+	if indexes.Kind() != KindI64 {
+		return nil, true, fmt.Errorf("index vector kind is %s, want %s", indexes.Kind(), KindI64)
+	}
+	if out, ok, err := tryGatherRangeByI64IndexArray(array, indexes); ok || err != nil {
+		return out, ok, err
+	}
+	rows, handled, err := TryTypedI64Indexes(indexes)
+	if err != nil || !handled {
+		return nil, handled, err
+	}
+	out, err := Gather(array, rows)
+	return out, true, err
+}
+
+func tryGatherRangeByI64IndexArray(array Array, indexes Array) (Array, bool, error) {
+	switch a := array.(type) {
+	case attributedArray:
+		out, handled, err := tryGatherRangeByI64IndexArray(a.array, indexes)
+		if err != nil || !handled {
+			return out, handled, err
+		}
+		return attributedArray{array: out, metadata: a.metadata.cloneWithRebuiltIndexes(out)}, true, nil
+	case i64RangeArray:
+		switch idx := indexes.(type) {
+		case attributedArray:
+			return tryGatherRangeByI64IndexArray(array, idx.array)
+		case i64RangeArray:
+			if err := validateI64IndexRange(idx, a.len); err != nil {
+				return nil, true, err
+			}
+			return i64RangeArray{
+				start: a.start + idx.start*a.step,
+				step:  idx.step * a.step,
+				len:   idx.len,
+			}, true, nil
+		case i64SegmentArray:
+			out := make([]i64RangeArray, len(idx.segments))
+			for i, segment := range idx.segments {
+				if err := validateI64IndexRange(segment, a.len); err != nil {
+					return nil, true, err
+				}
+				out[i] = i64RangeArray{
+					start: a.start + segment.start*a.step,
+					step:  segment.step * a.step,
+					len:   segment.len,
+				}
+			}
+			return newI64SegmentArray(out...), true, nil
+		default:
+			return nil, false, nil
+		}
+	default:
+		return nil, false, nil
+	}
+}
+
+func validateI64IndexRange(indexes i64RangeArray, length int) error {
+	if indexes.len == 0 {
+		return nil
+	}
+	first := indexes.start
+	last := indexes.start + int64(indexes.len-1)*indexes.step
+	lo, hi := first, last
+	if lo > hi {
+		lo, hi = hi, lo
+	}
+	if lo < 0 || hi >= int64(length) {
+		return fmt.Errorf("index range %d..%d out of bounds for length %d", lo, hi, length)
+	}
+	return nil
+}
+
+// TryTypedI64Indexes converts typed i64 index arrays to []int without boxing.
+func TryTypedI64Indexes(indexes Array) ([]int, bool, error) {
+	if indexes == nil {
+		return nil, true, fmt.Errorf("index vector is nil")
+	}
+	if indexes.Kind() != KindI64 {
+		return nil, true, fmt.Errorf("index vector kind is %s, want %s", indexes.Kind(), KindI64)
+	}
+	switch idx := indexes.(type) {
+	case attributedArray:
+		return TryTypedI64Indexes(idx.array)
+	case i64RangeArray:
+		out := make([]int, idx.len)
+		for i := range out {
+			value := idx.start + int64(i)*idx.step
+			n, err := checkedI64Index(value)
+			if err != nil {
+				return nil, true, err
+			}
+			out[i] = n
+		}
+		return out, true, nil
+	case i64SegmentArray:
+		out := make([]int, idx.len)
+		next := 0
+		for _, segment := range idx.segments {
+			for i := 0; i < segment.len; i++ {
+				value := segment.start + int64(i)*segment.step
+				n, err := checkedI64Index(value)
+				if err != nil {
+					return nil, true, err
+				}
+				out[next] = n
+				next++
+			}
+		}
+		return out, true, nil
+	case columnArray[int64]:
+		out := make([]int, len(idx.data))
+		for i, value := range idx.data {
+			n, err := checkedI64Index(value)
+			if err != nil {
+				return nil, true, err
+			}
+			out[i] = n
+		}
+		return out, true, nil
+	case nullableArray:
+		out := make([]int, len(idx.data))
+		for i, value := range idx.data {
+			n64, ok := value.(int64)
+			if !ok {
+				return nil, true, fmt.Errorf("index vector row %d is %T, want i64", i, value)
+			}
+			n, err := checkedI64Index(n64)
+			if err != nil {
+				return nil, true, err
+			}
+			out[i] = n
+		}
+		return out, true, nil
+	default:
+		return nil, false, nil
+	}
+}
+
+func checkedI64Index(value int64) (int, error) {
+	if value < 0 || int64(int(value)) != value {
+		return 0, fmt.Errorf("index vector must contain non-negative integers")
+	}
+	return int(value), nil
+}
+
 func typedCompareIndexRangeI64(array Array, op Op, value any) (Array, bool) {
 	switch a := array.(type) {
 	case attributedArray:
