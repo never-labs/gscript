@@ -79,20 +79,22 @@ type qComposition struct {
 // The shape matches bind's q.cache_stats runtime-kernel rows without importing
 // bind into the q evaluator.
 type RuntimeKernelExecutionStat struct {
-	Source  string
-	Kernel  string
-	Shape   string
-	Route   string
-	Outcome string
-	Count   uint64
+	Source     string
+	Kernel     string
+	Shape      string
+	Route      string
+	Outcome    string
+	ReasonCode string
+	Count      uint64
 }
 
 type runtimeKernelExecutionKey struct {
-	source  string
-	kernel  string
-	shape   string
-	route   string
-	outcome string
+	source     string
+	kernel     string
+	shape      string
+	route      string
+	outcome    string
+	reasonCode string
 }
 
 var (
@@ -100,7 +102,7 @@ var (
 	runtimeKernelStats   map[runtimeKernelExecutionKey]uint64
 )
 
-func recordRuntimeKernelExecution(kernel, shape, outcome string) {
+func recordRuntimeKernelExecution(kernel, shape, outcome, reasonCode string) {
 	if kernel == "" {
 		kernel = "unknown"
 	}
@@ -110,12 +112,16 @@ func recordRuntimeKernelExecution(kernel, shape, outcome string) {
 	if outcome == "" {
 		outcome = "unknown"
 	}
+	if reasonCode == "" {
+		reasonCode = outcome
+	}
 	key := runtimeKernelExecutionKey{
-		source:  "q_eval_vector_runtime",
-		kernel:  kernel,
-		shape:   shape,
-		route:   "typed_data_kernel",
-		outcome: outcome,
+		source:     "q_eval_vector_runtime",
+		kernel:     kernel,
+		shape:      shape,
+		route:      "typed_data_kernel",
+		outcome:    outcome,
+		reasonCode: reasonCode,
 	}
 	runtimeKernelStatsMu.Lock()
 	if runtimeKernelStats == nil {
@@ -123,6 +129,18 @@ func recordRuntimeKernelExecution(kernel, shape, outcome string) {
 	}
 	runtimeKernelStats[key]++
 	runtimeKernelStatsMu.Unlock()
+}
+
+func recordRuntimeKernelProbe(kernel, shape string, handled bool, err error) {
+	recordRuntimeKernelExecution(kernel, shape, "attempt", "attempt")
+	switch {
+	case err != nil:
+		recordRuntimeKernelExecution(kernel, shape, "error", "runtime_error")
+	case handled:
+		recordRuntimeKernelExecution(kernel, shape, "hit", "typed_kernel")
+	default:
+		recordRuntimeKernelExecution(kernel, shape, "fallback", "unsupported_shape")
+	}
 }
 
 // RuntimeKernelExecutionStats returns a stable snapshot of q.eval typed
@@ -136,12 +154,13 @@ func RuntimeKernelExecutionStats() []RuntimeKernelExecutionStat {
 	out := make([]RuntimeKernelExecutionStat, 0, len(runtimeKernelStats))
 	for key, count := range runtimeKernelStats {
 		out = append(out, RuntimeKernelExecutionStat{
-			Source:  key.source,
-			Kernel:  key.kernel,
-			Shape:   key.shape,
-			Route:   key.route,
-			Outcome: key.outcome,
-			Count:   count,
+			Source:     key.source,
+			Kernel:     key.kernel,
+			Shape:      key.shape,
+			Route:      key.route,
+			Outcome:    key.outcome,
+			ReasonCode: key.reasonCode,
+			Count:      count,
 		})
 	}
 	sort.Slice(out, func(i, j int) bool {
@@ -158,7 +177,10 @@ func RuntimeKernelExecutionStats() []RuntimeKernelExecutionStat {
 		if a.Route != b.Route {
 			return a.Route < b.Route
 		}
-		return a.Outcome < b.Outcome
+		if a.Outcome != b.Outcome {
+			return a.Outcome < b.Outcome
+		}
+		return a.ReasonCode < b.ReasonCode
 	})
 	return out
 }
@@ -868,7 +890,7 @@ func (s *EvalState) eval(src string) (any, error) {
 		}
 		return dictLookup(left, right)
 	}
-	if parts := splitTopLevel(src, ';'); len(parts) > 1 {
+	if parts := splitTopLevelDelim(src, ';'); len(parts) > 1 {
 		out := make([]any, len(parts))
 		for i, part := range parts {
 			v, err := s.eval(part)
@@ -6164,14 +6186,21 @@ func applyVectorDyadic(op byte, left, right any, la, ra data.Array) (data.Array,
 	case ra != nil:
 		n = ra.Len()
 	}
-	if dataOp, ok := qDataComparisonOp(op); ok && qVectorDyadicCanUseTypedCompare(left, right, la, ra) {
-		if out, handled, err := data.TryTypedDyadic(dataOp, left, right); err != nil || handled {
+	if dataOp, ok := qDataComparisonOp(op); ok {
+		shape := qRuntimeKernelVectorDyadicShape(op, left, right, la, ra)
+		if !qVectorDyadicCanUseTypedCompare(left, right, la, ra) {
+			recordRuntimeKernelExecution("ArrayDyadicCompare", shape, "attempt", "attempt")
+			recordRuntimeKernelExecution("ArrayDyadicCompare", shape, "fallback", "unsupported_shape")
+		} else if out, handled, err := data.TryTypedDyadic(dataOp, left, right); err != nil || handled {
+			recordRuntimeKernelProbe("ArrayDyadicCompare", shape, handled, err)
 			if err != nil {
 				return nil, err
 			}
 			if array, ok := out.(data.Array); ok {
 				return array, nil
 			}
+		} else {
+			recordRuntimeKernelProbe("ArrayDyadicCompare", shape, handled, err)
 		}
 	}
 	out := make([]any, n)
@@ -6269,6 +6298,23 @@ func qDataComparisonOp(op byte) (data.Op, bool) {
 	default:
 		return "", false
 	}
+}
+
+func qRuntimeKernelVectorDyadicShape(op byte, left, right any, la, ra data.Array) string {
+	leftKind := qRuntimeKernelOperandKind(left, la)
+	rightKind := qRuntimeKernelOperandKind(right, ra)
+	return "vector-dyadic/" + string(op) + "/" + string(leftKind) + "/" + string(rightKind)
+}
+
+func qRuntimeKernelOperandKind(value any, array data.Array) data.Kind {
+	if array != nil {
+		return array.Kind()
+	}
+	kind := qKindOfValue(value)
+	if kind == "" {
+		return data.KindAny
+	}
+	return kind
 }
 
 func qVectorDyadicCanUseTypedCompare(left, right any, la, ra data.Array) bool {
@@ -6695,12 +6741,13 @@ func sum(v any) (any, error) {
 		return data.NullValue, nil
 	}
 	if out, handled, err := data.TryTypedNumericSum(array); err != nil || handled {
+		recordRuntimeKernelProbe("ArraySum", "vector-reduce/sum/"+string(array.Kind()), handled, err)
 		if err != nil {
-			recordRuntimeKernelExecution("ArraySum", "vector-reduce/sum", "error")
 			return nil, err
 		}
-		recordRuntimeKernelExecution("ArraySum", "vector-reduce/sum", "success")
 		return out, nil
+	} else {
+		recordRuntimeKernelProbe("ArraySum", "vector-reduce/sum/"+string(array.Kind()), handled, err)
 	}
 	totalI := int64(0)
 	totalF := float64(0)
@@ -6975,12 +7022,13 @@ func sums(v any) (any, error) {
 		return nil, fmt.Errorf("sums expects a numeric vector")
 	}
 	if out, handled, err := data.TryTypedNumericSums(array); err != nil || handled {
+		recordRuntimeKernelProbe("ArraySums", "vector-scan/sum/"+string(array.Kind()), handled, err)
 		if err != nil {
-			recordRuntimeKernelExecution("ArraySums", "vector-scan/sum", "error")
 			return nil, err
 		}
-		recordRuntimeKernelExecution("ArraySums", "vector-scan/sum", "success")
 		return out, nil
+	} else {
+		recordRuntimeKernelProbe("ArraySums", "vector-scan/sum/"+string(array.Kind()), handled, err)
 	}
 	out := make([]any, array.Len())
 	totalI := int64(0)
@@ -7930,6 +7978,14 @@ func where(v any) (any, error) {
 		return data.NewI64(make([]int64, n)), nil
 	}
 	if array.Kind() == data.KindBool {
+		typedOut, handled, err := data.TryTypedWhereMaskI64(array)
+		recordRuntimeKernelProbe("ArrayWhere", "mask-to-index/i64", handled, err)
+		if err != nil {
+			return nil, err
+		}
+		if handled {
+			return typedOut, nil
+		}
 		indexes, err := data.WhereMask(array)
 		if err != nil {
 			return nil, err

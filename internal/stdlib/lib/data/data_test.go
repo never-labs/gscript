@@ -20,6 +20,38 @@ func TestNewFrameRejectsUnequalColumnLengths(t *testing.T) {
 	}
 }
 
+func TestTryTypedWhereMaskI64(t *testing.T) {
+	got, handled, err := TryTypedWhereMaskI64(NewBool([]bool{true, false, true, true, false}))
+	if err != nil {
+		t.Fatalf("TryTypedWhereMaskI64 bool returned error: %v", err)
+	}
+	if !handled {
+		t.Fatal("TryTypedWhereMaskI64 bool did not handle typed bool array")
+	}
+	if got.Kind() != KindI64 {
+		t.Fatalf("TryTypedWhereMaskI64 kind = %s, want %s", got.Kind(), KindI64)
+	}
+	if values := got.Values(); !reflect.DeepEqual(values, []any{int64(0), int64(2), int64(3)}) {
+		t.Fatalf("TryTypedWhereMaskI64 bool values = %#v", values)
+	}
+
+	nullableColumn, err := NewColumnWithKind("_", KindBool, []any{true, NullValue, false, true})
+	if err != nil {
+		t.Fatalf("NewColumnWithKind nullable bool returned error: %v", err)
+	}
+	nullable := nullableColumn.Data
+	got, handled, err = TryTypedWhereMaskI64(nullable)
+	if err != nil {
+		t.Fatalf("TryTypedWhereMaskI64 nullable returned error: %v", err)
+	}
+	if !handled {
+		t.Fatal("TryTypedWhereMaskI64 nullable did not handle bool nullable array")
+	}
+	if values := got.Values(); !reflect.DeepEqual(values, []any{int64(0), int64(3)}) {
+		t.Fatalf("TryTypedWhereMaskI64 nullable values = %#v", values)
+	}
+}
+
 func TestNewFramePreservesColumnOrderAndKinds(t *testing.T) {
 	frame, err := NewFrame(
 		NewColumn("z", []any{int64(3)}),

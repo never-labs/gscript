@@ -981,6 +981,54 @@ func WhereMask(mask Array) ([]int, error) {
 	return indexes, nil
 }
 
+// TryTypedWhereMaskI64 converts a boolean mask into q's where index vector
+// without routing every row through Array.At and []any boxing.
+func TryTypedWhereMaskI64(mask Array) (Array, bool, error) {
+	if mask == nil {
+		return nil, true, fmt.Errorf("where mask is nil")
+	}
+	if mask.Kind() != KindBool {
+		return nil, true, fmt.Errorf("where mask kind is %s, want %s", mask.Kind(), KindBool)
+	}
+	switch a := mask.(type) {
+	case attributedArray:
+		return TryTypedWhereMaskI64(a.array)
+	case columnArray[bool]:
+		count := 0
+		for _, keep := range a.data {
+			if keep {
+				count++
+			}
+		}
+		out := make([]int64, count)
+		next := 0
+		for row, keep := range a.data {
+			if keep {
+				out[next] = int64(row)
+				next++
+			}
+		}
+		return columnArray[int64]{kind: KindI64, data: out}, true, nil
+	case nullableArray:
+		out := make([]int64, 0, len(a.data))
+		for row, value := range a.data {
+			if IsNull(value) {
+				continue
+			}
+			keep, ok := value.(bool)
+			if !ok {
+				return nil, true, fmt.Errorf("where mask row %d is %T, want bool", row, value)
+			}
+			if keep {
+				out = append(out, int64(row))
+			}
+		}
+		return columnArray[int64]{kind: KindI64, data: out}, true, nil
+	default:
+		return nil, false, nil
+	}
+}
+
 func EqualMask(array Array, value any) (Array, error) {
 	return compareMask(array, OpEQ, value)
 }

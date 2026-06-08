@@ -3311,15 +3311,23 @@ after := q.cache_stats()
 		t.Fatalf("q.eval vector value = %v, want 272", got)
 	}
 	row := qTestCacheStatsRowTable(t, interp.GetGlobal("stats").Table(), "q_runtime_kernel_execution")
-	if got := row.RawGetString("executions"); !got.IsInt() || got.Int() != 2 {
-		t.Fatalf("q_runtime_kernel_execution executions = %v, want 2", got)
+	if got := row.RawGetString("executions"); !got.IsInt() || got.Int() != 4 {
+		t.Fatalf("q_runtime_kernel_execution executions = %v, want 4", got)
+	}
+	if got := row.RawGetString("attempts"); !got.IsInt() || got.Int() != 2 {
+		t.Fatalf("q_runtime_kernel_execution attempts = %v, want 2", got)
+	}
+	if got := row.RawGetString("hits"); !got.IsInt() || got.Int() != 2 {
+		t.Fatalf("q_runtime_kernel_execution hits = %v, want 2", got)
 	}
 	stats := row.RawGetString("stats").Table()
 	if stats == nil {
 		t.Fatal("q_runtime_kernel_execution stats table is nil")
 	}
-	assertQEvalRuntimeKernelStat(t, stats, "ArraySum", "vector-reduce/sum", 1)
-	assertQEvalRuntimeKernelStat(t, stats, "ArraySums", "vector-scan/sum", 1)
+	assertQEvalRuntimeKernelStat(t, stats, "ArraySum", "vector-reduce/sum/i64", "attempt", 1)
+	assertQEvalRuntimeKernelStat(t, stats, "ArraySum", "vector-reduce/sum/i64", "hit", 1)
+	assertQEvalRuntimeKernelStat(t, stats, "ArraySums", "vector-scan/sum/i64", "attempt", 1)
+	assertQEvalRuntimeKernelStat(t, stats, "ArraySums", "vector-scan/sum/i64", "hit", 1)
 
 	afterRow := qTestCacheStatsRowTable(t, interp.GetGlobal("after").Table(), "q_runtime_kernel_execution")
 	if got := afterRow.RawGetString("executions"); !got.IsInt() || got.Int() != 0 {
@@ -3378,7 +3386,7 @@ func TestQRuntimeKernelExecutionStatsProviderFeedsCacheStats(t *testing.T) {
 	if got := rows["qsql_kernel"]; got["entries"] != 0 || got["hits"] != 0 || got["misses"] != 0 || got["evictions"] != 0 {
 		t.Fatalf("qsql_kernel stats = %#v, want semantic cache untouched by runtime execution stats", got)
 	}
-	if got := rows["q_runtime_kernel_execution"]; got["entries"] != 3 || got["hits"] != 0 || got["misses"] != 0 || got["evictions"] != 0 || got["limit"] != 0 {
+	if got := rows["q_runtime_kernel_execution"]; got["entries"] != 3 || got["hits"] != 9 || got["misses"] != 0 || got["evictions"] != 0 || got["limit"] != 0 {
 		t.Fatalf("q_runtime_kernel_execution stats = %#v, want three non-cache execution rows", got)
 	}
 
@@ -6693,7 +6701,7 @@ func qTestCacheStatsRowTable(t *testing.T, tbl *Table, cache string) *Table {
 	return nil
 }
 
-func assertQEvalRuntimeKernelStat(t *testing.T, tbl *Table, kernel, shape string, count int64) {
+func assertQEvalRuntimeKernelStat(t *testing.T, tbl *Table, kernel, shape, outcome string, count int64) {
 	t.Helper()
 	for i := 1; i <= tbl.Length(); i++ {
 		row := tbl.RawGetInt(int64(i)).Table()
@@ -6712,15 +6720,15 @@ func assertQEvalRuntimeKernelStat(t *testing.T, tbl *Table, kernel, shape string
 		if got := row.RawGetString("route"); !got.IsString() || got.Str() != "typed_data_kernel" {
 			t.Fatalf("runtime kernel %s route = %v, want typed_data_kernel", kernel, got)
 		}
-		if got := row.RawGetString("outcome"); !got.IsString() || got.Str() != "success" {
-			t.Fatalf("runtime kernel %s outcome = %v, want success", kernel, got)
+		if got := row.RawGetString("outcome"); !got.IsString() || got.Str() != outcome {
+			continue
 		}
 		if got := row.RawGetString("count"); !got.IsInt() || got.Int() != count {
 			t.Fatalf("runtime kernel %s count = %v, want %d", kernel, got, count)
 		}
 		return
 	}
-	t.Fatalf("runtime kernel stat %s/%s not found in %+v", kernel, shape, tbl)
+	t.Fatalf("runtime kernel stat %s/%s/%s not found in %+v", kernel, shape, outcome, tbl)
 }
 
 type qQueryKernelShapeRow struct {

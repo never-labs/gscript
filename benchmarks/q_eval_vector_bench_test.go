@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/never-labs/leia/internal/stdlib/bind"
+	stdq "github.com/never-labs/leia/internal/stdlib/lib/q"
 )
 
 const qEvalVectorRows = 8192
@@ -44,6 +45,8 @@ var qEvalRequiredCoverageTags = []string{
 	"sums",
 	"min-max",
 	"avg-var-dev-med",
+	"running-aggregate",
+	"product",
 	"moving-window",
 	"adverb-each",
 	"adverb-each-prior",
@@ -69,6 +72,13 @@ var qEvalRequiredCoverageTags = []string{
 	"table-sort",
 	"table-group-ungroup",
 	"fby",
+	"membership",
+	"find-bin",
+	"weighted-aggregate",
+	"fill",
+	"match",
+	"attrs",
+	"keys-value",
 	"match-like",
 	"null-verb",
 	"safe-system",
@@ -92,10 +102,15 @@ var qEvalRequiredMatrixCoverage = []string{
 	"adverb:over-scan:projection",
 	"list:cut-raze-enlist:nested",
 	"list:prev-next-deltas-fills:typed-null",
+	"aggregate:running-prd-min-max-avg:vector",
+	"membership:in-differ-ratios:vector",
 	"sort:int-vector:index-rank",
 	"sort:symbol-vector:index-rank",
 	"sort:temporal-vector:index-rank",
+	"search:bin-binr-find:vector",
+	"aggregate:wavg-xprev:vector",
 	"dict:lookup-amend-upsert:symbol-key",
+	"dict:keys-value-attrs:meta",
 	"table:literal-meta-cols:frame",
 	"table:xcols-xasc-xdesc:frame",
 	"table:xkey-xgroup-ungroup:keyed-frame",
@@ -500,6 +515,28 @@ func appendQEvalSemanticCoverageCases(cases []qEvalVectorCase) []qEvalVectorCase
 			},
 		},
 		{
+			name:   "RunningAggregateProductMatrix",
+			tags:   []string{"running-aggregate", "product", "avg-var-dev-med", "min-max"},
+			matrix: []string{"aggregate:running-prd-min-max-avg:vector"},
+			expr: func(rows int) string {
+				return "(prd 1 2 3 4)+(last prds 1 2 3 4)+(last mins 4 3 5 2)+(last maxs 4 3 5 2)+(last avgs 2 4 6 8)"
+			},
+			goFn: func(rows int) int64 {
+				return 24 + 24 + 2 + 5 + 5
+			},
+		},
+		{
+			name:   "MembershipDifferRatiosTruthMatrix",
+			tags:   []string{"membership", "boolean-logical", "numeric-vector"},
+			matrix: []string{"membership:in-differ-ratios:vector"},
+			expr: func(rows int) string {
+				return "(count where differ `a`a`b`b`c)+(count ratios 2 4 8 16)+(count where all 1 1 1)+(count where any 0 0 1)+(count where (1 0 1) in 1 2)"
+			},
+			goFn: func(rows int) int64 {
+				return 3 + 4 + 1 + 1 + 2
+			},
+		},
+		{
 			name: "AdverbMatrix",
 			tags: []string{"adverb-each", "adverb-each-prior", "adverb-each-left-right", "adverb-over-scan", "projection"},
 			matrix: []string{
@@ -524,6 +561,17 @@ func appendQEvalSemanticCoverageCases(cases []qEvalVectorCase) []qEvalVectorCase
 			},
 			goFn: func(rows int) int64 {
 				return 2 + 2 + 3 + 4 + 2 + 2
+			},
+		},
+		{
+			name:   "SearchBinrWavgXprevMatrix",
+			tags:   []string{"find-bin", "weighted-aggregate"},
+			matrix: []string{"search:bin-binr-find:vector", "aggregate:wavg-xprev:vector"},
+			expr: func(rows int) string {
+				return "(+/10 20 30 binr 5 10 29 30 31)+(+/`AAPL`MSFT`NVDA?`MSFT`TSLA)+(wavg[1 2 3;10 20 30])+(+/2 xprev 10 20 30 40)"
+			},
+			goFn: func(rows int) int64 {
+				return 6 + 4 + 23 + 31
 			},
 		},
 		{
@@ -557,10 +605,10 @@ func appendQEvalSemanticCoverageCases(cases []qEvalVectorCase) []qEvalVectorCase
 				"sort:temporal-vector:index-rank",
 			},
 			expr: func(rows int) string {
-				return "(+/iasc 3 1 2 1)+(+/rank 2 7 3 2 5)+(+/iasc `MSFT`AAPL`AAPL)+(+/rank `x`a`b`z`c)+(+/iasc 2026.06.07 0Nd 2026.06.06)+(+/rank 2026.06.07 0Nd 2026.06.06)"
+				return "(+/iasc 3 1 2 1)+(+/idesc 3 1 2 1)+(+/rank 2 7 3 2 5)+(first asc 3 1 2)+(first desc 3 1 2)+(+/iasc `MSFT`AAPL`AAPL)+(+/rank `x`a`b`z`c)+(+/iasc 2026.06.07 0Nd 2026.06.06)+(+/rank 2026.06.07 0Nd 2026.06.06)"
 			},
 			goFn: func(rows int) int64 {
-				return 6 + 10 + 3 + 10 + 3 + 3
+				return 6 + 6 + 10 + 1 + 3 + 3 + 10 + 3 + 3
 			},
 		},
 		{
@@ -572,6 +620,17 @@ func appendQEvalSemanticCoverageCases(cases []qEvalVectorCase) []qEvalVectorCase
 			},
 			goFn: func(rows int) int64 {
 				return 10 + 20 + 99 + 30
+			},
+		},
+		{
+			name:   "DictKeysValueAttrFillMatch",
+			tags:   []string{"dict", "keys-value", "attrs", "fill", "match"},
+			matrix: []string{"dict:keys-value-attrs:meta"},
+			expr: func(rows int) string {
+				return "(count keys `bid`ask!99 101)+(count value `bid`ask!99 101)+(type attr `p#`AAPL`AAPL`MSFT)+(count 0^0N 1 0N)+(count where (1 2 3~1 2 3;1 2~2 1))"
+			},
+			goFn: func(rows int) int64 {
+				return 2 + 2 + -11 + 3 + 1
 			},
 		},
 		{
@@ -627,6 +686,66 @@ func appendQEvalSemanticCoverageCases(cases []qEvalVectorCase) []qEvalVectorCase
 			},
 			goFn: func(rows int) int64 {
 				return 5
+			},
+		},
+		{
+			name: "ProjectionEachDictNumericTableCombo",
+			tags: []string{"projection", "adverb-each", "dict", "table-literal", "typed-null"},
+			matrix: []string{
+				"adverb:dyadic-each:vector",
+				"dict:lookup-amend-upsert:symbol-key",
+				"table:literal-meta-cols:frame",
+			},
+			expr: func(rows int) string {
+				return "d:`px`qty!(100 101 102;10 20 0N);t:flip `sym`px`qty!(`AAPL`MSFT`NVDA;d`px;d`qty);(+/(d`px)+10)+(+/fills d`qty)+(count meta t)"
+			},
+			goFn: func(rows int) int64 {
+				return (110 + 111 + 112) + (10 + 20 + 20) + 3
+			},
+		},
+		{
+			name: "TemporalStringSymbolProjectionCombo",
+			tags: []string{"projection", "composition", "temporal", "string", "symbol", "match-like", "xbar"},
+			matrix: []string{
+				"compare:symbol-vector:where",
+				"compare:string-vector:where",
+				"compare:temporal-vector:where",
+				"temporal:xbar:bucket",
+			},
+			expr: func(rows int) string {
+				return "syms:`AAPL`MSFT`AMD`AAPL;names:upper string syms;(count where syms=`AAPL)+(count where names like \"A*\")+(count xbar[00:01;09:30 09:30:59 09:31:01])+(count where 2026.06.06 2026.06.07>=2026.06.07)"
+			},
+			goFn: func(rows int) int64 {
+				return 2 + 3 + 3 + 1
+			},
+		},
+		{
+			name: "NestedDictProjectionAmendCombo",
+			tags: []string{"projection", "dict", "dict-amend-upsert", "adverb-over-scan", "typed-null"},
+			matrix: []string{
+				"adverb:over-scan:projection",
+				"dict:lookup-amend-upsert:symbol-key",
+			},
+			expr: func(rows int) string {
+				return "sum2:{x+y}/;d:`a`b!(1 2 0Ni;10 20 30);u:@[d;`a;:;fills d`a];(+/u`a)+sum2[d`b]+((@[d;`c;:;40])`c)"
+			},
+			goFn: func(rows int) int64 {
+				return (1 + 2 + 2) + (10 + 20 + 30) + 40
+			},
+		},
+		{
+			name: "KeyedTableTemporalStringMetaCombo",
+			tags: []string{"keyed-table", "table-reorder", "table-sort", "metadata", "temporal", "string", "symbol"},
+			matrix: []string{
+				"table:xcols-xasc-xdesc:frame",
+				"table:xkey-xgroup-ungroup:keyed-frame",
+				"sort:temporal-vector:index-rank",
+			},
+			expr: func(rows int) string {
+				return "t:`time xasc flip `sym`time`venue!(`MSFT`AAPL`AAPL;09:31 09:30 09:32;`xnys`xnas`bats);k:`sym xkey (`venue`time`sym xcols t);(count key k)+(count meta k)+(count cols k)+(+/iasc t`time)+(count upper string t`sym)"
+			},
+			goFn: func(rows int) int64 {
+				return 1 + 3 + 3 + 3 + 3
 			},
 		},
 	}
@@ -701,12 +820,15 @@ func BenchmarkQSessionEvalVectorWarmExecution(b *testing.B) {
 			eval := qSessionEvalVectorEval(b)
 			src := tc.expr(qEvalVectorRows)
 			qEvalVectorBenchSink = qEvalVectorRun(b, eval, src)
+			stdq.ClearRuntimeKernelExecutionStats()
 
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
 				qEvalVectorBenchSink = qEvalVectorRun(b, eval, src)
 			}
+			b.StopTimer()
+			qEvalVectorReportRuntimeKernelStats(b)
 		})
 	}
 }
@@ -779,6 +901,32 @@ func qEvalVectorRun(tb testing.TB, eval *bind.GoFunction, src string) int64 {
 		tb.Fatalf("q.eval(%q) returned %d values, want 1", src, len(out))
 	}
 	return qEvalVectorInt64(tb, out[0])
+}
+
+func qEvalVectorReportRuntimeKernelStats(b *testing.B) {
+	b.Helper()
+	var attempts, hits, fallbacks, errors uint64
+	for _, stat := range stdq.RuntimeKernelExecutionStats() {
+		switch stat.Outcome {
+		case "attempt":
+			attempts += stat.Count
+		case "hit", "success":
+			hits += stat.Count
+		case "fallback":
+			fallbacks += stat.Count
+		case "error":
+			errors += stat.Count
+		}
+	}
+	if attempts > 0 {
+		b.ReportMetric(100*float64(hits)/float64(attempts), "typed_kernel_hit_pct")
+	}
+	if b.N > 0 {
+		b.ReportMetric(float64(attempts)/float64(b.N), "typed_kernel_attempts/op")
+		b.ReportMetric(float64(hits)/float64(b.N), "typed_kernel_hits/op")
+		b.ReportMetric(float64(fallbacks)/float64(b.N), "typed_kernel_fallbacks/op")
+		b.ReportMetric(float64(errors)/float64(b.N), "typed_kernel_errors/op")
+	}
 }
 
 func qEvalVectorInt64(tb testing.TB, v bind.Value) int64 {

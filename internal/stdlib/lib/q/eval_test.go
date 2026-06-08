@@ -62,6 +62,31 @@ func TestEvalTypedNumericSuffixLiterals(t *testing.T) {
 	assertEvalArray(t, "1i 2i 3i<3i", data.KindBool, []any{true, true, false})
 }
 
+func TestRuntimeKernelExecutionStatsReportHitAndFallbackOutcomes(t *testing.T) {
+	ClearRuntimeKernelExecutionStats()
+	t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+	assertEvalValue(t, "+/1 2 3", int64(6))
+	if _, err := Eval("+/`a`b"); err == nil {
+		t.Fatalf("Eval(+/`a`b) succeeded, want numeric error")
+	}
+	stats := RuntimeKernelExecutionStats()
+	counts := map[string]uint64{}
+	for _, stat := range stats {
+		key := stat.Kernel + "/" + stat.Outcome + "/" + stat.ReasonCode
+		counts[key] += stat.Count
+	}
+	if counts["ArraySum/attempt/attempt"] != 2 {
+		t.Fatalf("ArraySum attempts = %d, want 2; stats=%#v", counts["ArraySum/attempt/attempt"], stats)
+	}
+	if counts["ArraySum/hit/typed_kernel"] != 1 {
+		t.Fatalf("ArraySum hits = %d, want 1; stats=%#v", counts["ArraySum/hit/typed_kernel"], stats)
+	}
+	if counts["ArraySum/fallback/unsupported_shape"] != 1 {
+		t.Fatalf("ArraySum fallbacks = %d, want 1; stats=%#v", counts["ArraySum/fallback/unsupported_shape"], stats)
+	}
+}
+
 func TestEvalSymbolVectorAndDictionary(t *testing.T) {
 	assertEvalValue(t, "`AAPL", data.Symbol("AAPL"))
 	assertEvalArray(t, "`AAPL`MSFT`NVDA", data.KindSymbol, []any{
@@ -1811,6 +1836,20 @@ func TestEvalCountSumSumsTakeWhereAndPlusAdverbs(t *testing.T) {
 	assertEvalArray(t, "+\\1 2 3", data.KindI64, []any{int64(1), int64(3), int64(6)})
 	assertEvalErrorContains(t, "til -1", "non-negative")
 	assertEvalErrorContains(t, "where -1 2", "non-negative")
+}
+
+func TestEvalWhereRecordsTypedRuntimeKernel(t *testing.T) {
+	ClearRuntimeKernelExecutionStats()
+	t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+	assertEvalArray(t, "where 10 20 30>=20", data.KindI64, []any{int64(1), int64(2)})
+
+	for _, stat := range RuntimeKernelExecutionStats() {
+		if stat.Kernel == "ArrayWhere" && stat.Shape == "mask-to-index/i64" && stat.Outcome == "hit" && stat.ReasonCode == "typed_kernel" && stat.Count > 0 {
+			return
+		}
+	}
+	t.Fatalf("missing ArrayWhere typed runtime stat: %#v", RuntimeKernelExecutionStats())
 }
 
 func TestEvalGenericOverAndScanAdverbs(t *testing.T) {
