@@ -3546,6 +3546,9 @@ func TestQExplainReportsQueryKernelVisibility(t *testing.T) {
 	if got := beforeTable.RawGetString("kernel_cache_schema_hash"); !got.IsString() || got.Str() != frame.SchemaFingerprint() {
 		t.Fatalf("kernel_cache_schema_hash before = %v, want %s", got, frame.SchemaFingerprint())
 	}
+	if got := beforeTable.RawGetString("kernel_cache_schema_match"); !got.IsBool() || !got.Bool() {
+		t.Fatalf("kernel_cache_schema_match before = %v, want true", got)
+	}
 	planFingerprint := beforeTable.RawGetString("kernel_plan_fingerprint")
 	if !planFingerprint.IsString() || planFingerprint.Str() == "" {
 		t.Fatalf("kernel_plan_fingerprint before = %v, want stable non-empty fingerprint", planFingerprint)
@@ -3576,6 +3579,9 @@ func TestQExplainReportsQueryKernelVisibility(t *testing.T) {
 	if got := sameSchemaExplain.Table().RawGetString("kernel_cache_key"); !got.IsString() || got.Str() != cacheKey.Str() {
 		t.Fatalf("same schema kernel_cache_key = %v, want %s", got, cacheKey.Str())
 	}
+	if got := sameSchemaExplain.Table().RawGetString("kernel_cache_schema_match"); !got.IsBool() || !got.Bool() {
+		t.Fatalf("same schema kernel_cache_schema_match = %v, want true", got)
+	}
 	differentSchema, err := data.NewFrame(
 		data.Column{Name: "sym", Data: data.NewSymbols([]string{"IBM"})},
 		data.Column{Name: "size", Data: data.NewI64([]int64{1})},
@@ -3594,6 +3600,9 @@ func TestQExplainReportsQueryKernelVisibility(t *testing.T) {
 	}
 	if got := differentSchemaExplain.Table().RawGetString("kernel_cache_key"); !got.IsString() || got.Str() == cacheKey.Str() {
 		t.Fatalf("different schema kernel_cache_key = %v, want it to differ from %s", got, cacheKey.Str())
+	}
+	if got := differentSchemaExplain.Table().RawGetString("kernel_cache_schema_match"); !got.IsBool() || !got.Bool() {
+		t.Fatalf("different schema kernel_cache_schema_match = %v, want true for its own cache key", got)
 	}
 
 	if _, err := qRunSQL("q.sql", qSQLArgsResult{frameValue: frameValue, source: query}); err != nil {
@@ -4135,6 +4144,21 @@ func TestQSQLKernelUnsupportedDecisionCacheIsSchemaStable(t *testing.T) {
 	cacheStats := qTestCacheStatsRows(t, qCacheStatsTable())
 	if got := cacheStats["qsql_kernel_decision"]; got["entries"] != 1 || got["hits"] != 1 || got["misses"] != 1 || got["evictions"] != 0 {
 		t.Fatalf("qsql_kernel_decision cache stats = %#v, want 1 entry, 1 hit, 1 miss, 0 evictions", got)
+	}
+	decisionRow := qTestCacheStatsRowTable(t, qCacheStatsTable(), "qsql_kernel_decision")
+	keyRows := qTestKernelDecisionKeyRows(t, decisionRow.RawGetString("keys").Table())
+	if len(keyRows) != 1 {
+		t.Fatalf("qsql_kernel_decision keys = %#v, want one row", keyRows)
+	}
+	if keyRows[0].Namespace != src || keyRows[0].Kind != "kernel" || keyRows[0].SchemaHash != frame.SchemaFingerprint() {
+		t.Fatalf("qsql_kernel_decision key row = %+v, want source/schema key metadata", keyRows[0])
+	}
+	if keyRows[0].ReasonFamily != qFallbackFamilySelect || keyRows[0].ReasonCode != stdq.KernelFallbackSelectExpression || keyRows[0].Count != 1 {
+		t.Fatalf("qsql_kernel_decision key reason = %+v, want select reason count 1", keyRows[0])
+	}
+	reasonRows := qTestKernelDecisionReasonRows(t, decisionRow.RawGetString("reasons").Table())
+	if got := qTestKernelDecisionReasonCount(reasonRows, qFallbackFamilySelect, stdq.KernelFallbackSelectExpression); got != 1 {
+		t.Fatalf("qsql_kernel_decision select reason aggregate = %d, want 1", got)
 	}
 }
 
@@ -5300,6 +5324,94 @@ func qTestQueryKernelShapeRows(t *testing.T, tbl *Table) []qQueryKernelShapeRow 
 func qTestQueryKernelShapeCount(rows []qQueryKernelShapeRow, supported bool, reasonFamily, reasonCode string) int64 {
 	for _, row := range rows {
 		if row.Supported == supported && row.ReasonFamily == reasonFamily && row.ReasonCode == reasonCode {
+			return row.Count
+		}
+	}
+	return 0
+}
+
+type qKernelDecisionKeyRow struct {
+	Key             string
+	Namespace       string
+	Kind            string
+	SchemaHash      string
+	PlanFingerprint string
+	ReasonFamily    string
+	ReasonCode      string
+	Count           int64
+}
+
+func qTestKernelDecisionKeyRows(t *testing.T, tbl *Table) []qKernelDecisionKeyRow {
+	t.Helper()
+	if tbl == nil {
+		t.Fatal("qsql_kernel_decision keys table is nil")
+	}
+	rows := make([]qKernelDecisionKeyRow, 0, tbl.Length())
+	for i := 1; i <= tbl.Length(); i++ {
+		row := tbl.RawGetInt(int64(i)).Table()
+		if row == nil {
+			t.Fatalf("qsql_kernel_decision key row %d is nil", i)
+		}
+		key := row.RawGetString("key")
+		namespace := row.RawGetString("namespace")
+		kind := row.RawGetString("kind")
+		schemaHash := row.RawGetString("schema_hash")
+		planFingerprint := row.RawGetString("plan_fingerprint")
+		reasonFamily := row.RawGetString("reason_family")
+		reasonCode := row.RawGetString("reason_code")
+		count := row.RawGetString("count")
+		if !key.IsString() || !namespace.IsString() || !kind.IsString() || !schemaHash.IsString() || !planFingerprint.IsString() || !reasonFamily.IsString() || !reasonCode.IsString() || !count.IsInt() {
+			t.Fatalf("qsql_kernel_decision key row %d malformed: %#v", i, row)
+		}
+		rows = append(rows, qKernelDecisionKeyRow{
+			Key:             key.Str(),
+			Namespace:       namespace.Str(),
+			Kind:            kind.Str(),
+			SchemaHash:      schemaHash.Str(),
+			PlanFingerprint: planFingerprint.Str(),
+			ReasonFamily:    reasonFamily.Str(),
+			ReasonCode:      reasonCode.Str(),
+			Count:           count.Int(),
+		})
+	}
+	return rows
+}
+
+type qKernelDecisionReasonRow struct {
+	ReasonFamily string
+	ReasonCode   string
+	Count        int64
+}
+
+func qTestKernelDecisionReasonRows(t *testing.T, tbl *Table) []qKernelDecisionReasonRow {
+	t.Helper()
+	if tbl == nil {
+		t.Fatal("qsql_kernel_decision reasons table is nil")
+	}
+	rows := make([]qKernelDecisionReasonRow, 0, tbl.Length())
+	for i := 1; i <= tbl.Length(); i++ {
+		row := tbl.RawGetInt(int64(i)).Table()
+		if row == nil {
+			t.Fatalf("qsql_kernel_decision reason row %d is nil", i)
+		}
+		reasonFamily := row.RawGetString("reason_family")
+		reasonCode := row.RawGetString("reason_code")
+		count := row.RawGetString("count")
+		if !reasonFamily.IsString() || !reasonCode.IsString() || !count.IsInt() {
+			t.Fatalf("qsql_kernel_decision reason row %d malformed: %#v", i, row)
+		}
+		rows = append(rows, qKernelDecisionReasonRow{
+			ReasonFamily: reasonFamily.Str(),
+			ReasonCode:   reasonCode.Str(),
+			Count:        count.Int(),
+		})
+	}
+	return rows
+}
+
+func qTestKernelDecisionReasonCount(rows []qKernelDecisionReasonRow, reasonFamily, reasonCode string) int64 {
+	for _, row := range rows {
+		if row.ReasonFamily == reasonFamily && row.ReasonCode == reasonCode {
 			return row.Count
 		}
 	}
