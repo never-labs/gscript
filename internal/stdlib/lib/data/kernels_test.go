@@ -1845,6 +1845,46 @@ func TestTypedJoinRowsByKeyUsesRebuiltSingleColumnAttributeIndex(t *testing.T) {
 	}
 }
 
+func TestTypedJoinRowsByKeyUsesSingleColumnTypedKeys(t *testing.T) {
+	tests := []struct {
+		name   string
+		column Column
+		want   []int
+	}{
+		{
+			name:   "u32",
+			column: Column{Name: "k", Data: NewU32([]uint32{7, 9, 7, 11})},
+			want:   []int{0, 2},
+		},
+		{
+			name:   "date",
+			column: Column{Name: "k", Data: NewDate([]Date{DateFromDays(1), DateFromDays(2), DateFromDays(1)})},
+			want:   []int{0, 2},
+		},
+		{
+			name:   "encoded symbol",
+			column: Column{Name: "k", Data: NewEncodedSymbols([]Symbol{"AAPL", "MSFT", "AAPL"})},
+			want:   []int{0, 2},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			frame := mustFrame(t, tt.column)
+			rowsByKey, err := typedKernels.RowsByKey(frame, []Symbol{"k"})
+			if err != nil {
+				t.Fatalf("RowsByKey returned error: %v", err)
+			}
+			key, err := rowKey(frame, 0, []Symbol{"k"})
+			if err != nil {
+				t.Fatalf("rowKey returned error: %v", err)
+			}
+			if got := rowsByKey[key]; !reflect.DeepEqual(got, tt.want) {
+				t.Fatalf("RowsByKey[%q] = %v, want %v", key, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestTypedAsofAndWindowMatchIndexesBoundaries(t *testing.T) {
 	left := mustFrame(t,
 		NewColumn("sym", []any{Symbol("a"), Symbol("a"), Symbol("a"), Symbol("b")}),

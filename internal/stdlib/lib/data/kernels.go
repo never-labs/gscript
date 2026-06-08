@@ -1440,49 +1440,95 @@ func singleColumnKeyFunc(col keyColumn) func(row int) (string, error) {
 	case attributedArray:
 		return singleColumnKeyFunc(keyColumn{name: col.name, kind: col.kind, array: a.array})
 	case columnArray[bool]:
-		return func(row int) (string, error) {
-			if row < 0 || row >= len(a.data) {
-				return "", fmt.Errorf("key column %q row %d out of range", col.name, row)
-			}
-			return arrayValueKey(col.kind, a.data[row]), nil
-		}
+		return typedColumnKeyFunc(col, a.data)
+	case columnArray[int8]:
+		return typedColumnKeyFunc(col, a.data)
+	case columnArray[int16]:
+		return typedColumnKeyFunc(col, a.data)
 	case columnArray[int32]:
-		return func(row int) (string, error) {
-			if row < 0 || row >= len(a.data) {
-				return "", fmt.Errorf("key column %q row %d out of range", col.name, row)
-			}
-			return arrayValueKey(col.kind, a.data[row]), nil
-		}
+		return typedColumnKeyFunc(col, a.data)
 	case columnArray[int64]:
-		return func(row int) (string, error) {
-			if row < 0 || row >= len(a.data) {
-				return "", fmt.Errorf("key column %q row %d out of range", col.name, row)
-			}
-			return arrayValueKey(col.kind, a.data[row]), nil
-		}
+		return typedColumnKeyFunc(col, a.data)
+	case columnArray[uint8]:
+		return typedColumnKeyFunc(col, a.data)
+	case columnArray[uint16]:
+		return typedColumnKeyFunc(col, a.data)
+	case columnArray[uint32]:
+		return typedColumnKeyFunc(col, a.data)
+	case columnArray[uint64]:
+		return typedColumnKeyFunc(col, a.data)
+	case columnArray[float32]:
+		return typedColumnKeyFunc(col, a.data)
 	case columnArray[float64]:
-		return func(row int) (string, error) {
-			if row < 0 || row >= len(a.data) {
-				return "", fmt.Errorf("key column %q row %d out of range", col.name, row)
-			}
-			return arrayValueKey(col.kind, a.data[row]), nil
-		}
+		return typedColumnKeyFunc(col, a.data)
 	case columnArray[string]:
-		return func(row int) (string, error) {
-			if row < 0 || row >= len(a.data) {
-				return "", fmt.Errorf("key column %q row %d out of range", col.name, row)
-			}
-			return arrayValueKey(col.kind, a.data[row]), nil
-		}
+		return typedColumnKeyFunc(col, a.data)
 	case columnArray[Symbol]:
-		return func(row int) (string, error) {
-			if row < 0 || row >= len(a.data) {
-				return "", fmt.Errorf("key column %q row %d out of range", col.name, row)
-			}
-			return arrayValueKey(col.kind, a.data[row]), nil
-		}
+		return typedColumnKeyFunc(col, a.data)
+	case columnArray[Month]:
+		return typedColumnKeyFunc(col, a.data)
+	case columnArray[Date]:
+		return typedColumnKeyFunc(col, a.data)
+	case columnArray[DateTime]:
+		return typedColumnKeyFunc(col, a.data)
+	case columnArray[Timespan]:
+		return typedColumnKeyFunc(col, a.data)
+	case columnArray[Minute]:
+		return typedColumnKeyFunc(col, a.data)
+	case columnArray[Second]:
+		return typedColumnKeyFunc(col, a.data)
+	case columnArray[Time]:
+		return typedColumnKeyFunc(col, a.data)
+	case columnArray[Timestamp]:
+		return typedColumnKeyFunc(col, a.data)
+	case nullableArray:
+		return nullableColumnKeyFunc(col, a.data)
+	case encodedArray:
+		return encodedColumnKeyFunc(col, a)
 	default:
 		return nil
+	}
+}
+
+func typedColumnKeyFunc[T any](col keyColumn, values []T) func(row int) (string, error) {
+	return func(row int) (string, error) {
+		if row < 0 || row >= len(values) {
+			return "", fmt.Errorf("key column %q row %d out of range", col.name, row)
+		}
+		return arrayValueKey(col.kind, values[row]), nil
+	}
+}
+
+func nullableColumnKeyFunc(col keyColumn, values []any) func(row int) (string, error) {
+	return func(row int) (string, error) {
+		if row < 0 || row >= len(values) {
+			return "", fmt.Errorf("key column %q row %d out of range", col.name, row)
+		}
+		value, err := normalizeKeyValue(col.kind, values[row])
+		if err != nil {
+			return "", fmt.Errorf("key column %q: %w", col.name, err)
+		}
+		return arrayValueKey(col.kind, value), nil
+	}
+}
+
+func encodedColumnKeyFunc(col keyColumn, array encodedArray) func(row int) (string, error) {
+	return func(row int) (string, error) {
+		if row < 0 || row >= len(array.codes) {
+			return "", fmt.Errorf("key column %q row %d out of range", col.name, row)
+		}
+		code := array.codes[row]
+		if code < 0 {
+			return arrayValueKey(col.kind, NullValue), nil
+		}
+		if int(code) >= len(array.domain) {
+			return "", fmt.Errorf("encoded key column %q code %d at row %d outside domain length %d", col.name, code, row, len(array.domain))
+		}
+		value, err := normalizeKeyValue(col.kind, array.domain[code])
+		if err != nil {
+			return "", fmt.Errorf("key column %q: %w", col.name, err)
+		}
+		return arrayValueKey(col.kind, value), nil
 	}
 }
 

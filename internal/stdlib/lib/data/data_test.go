@@ -3968,6 +3968,26 @@ func TestLeftJoinOnDuplicateRightKeysExpandsInRightOrder(t *testing.T) {
 	assertColumnValues(t, got, "bid", []any{99.0, 100.0, 79.0, NullValue})
 }
 
+func TestLeftJoinUsesTypedSingleColumnKeyKernel(t *testing.T) {
+	left := mustFrame(t,
+		Column{Name: "id", Data: NewU32([]uint32{7, 9, 11})},
+		NewColumn("qty", []any{10, 20, 30}),
+	)
+	right := mustFrame(t,
+		Column{Name: "id", Data: NewU32([]uint32{7, 7, 9})},
+		NewColumn("tag", []any{"a", "b", "c"}),
+	)
+
+	got, err := LeftJoin(left, right, "id")
+	if err != nil {
+		t.Fatalf("LeftJoin returned error: %v", err)
+	}
+
+	assertColumnValues(t, got, "id", []any{uint32(7), uint32(7), uint32(9), uint32(11)})
+	assertColumnValues(t, got, "qty", []any{int64(10), int64(10), int64(20), int64(30)})
+	assertColumnValues(t, got, "tag", []any{"a", "b", "c", NullValue})
+}
+
 func TestLeftJoinUsesRightSingleColumnAttributeIndex(t *testing.T) {
 	left := mustFrame(t,
 		NewColumn("sym", []any{Symbol("AAPL"), Symbol("MSFT"), Symbol("TSLA")}),
