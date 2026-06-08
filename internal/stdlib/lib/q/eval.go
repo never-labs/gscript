@@ -6022,9 +6022,9 @@ func (s *EvalState) vectorAmendFunction(array data.Array, key any, fn any, value
 	if err != nil {
 		return nil, err
 	}
-	out := array
+	nextValues := make([]any, len(indexes))
 	for i, index := range indexes {
-		old, ok := out.At(index)
+		old, ok := array.At(index)
 		if !ok {
 			return nil, fmt.Errorf("amend index %d out of range", index)
 		}
@@ -6032,13 +6032,9 @@ func (s *EvalState) vectorAmendFunction(array data.Array, key any, fn any, value
 		if err != nil {
 			return nil, err
 		}
-		amended, err := vectorAmend(out, int64(index), next)
-		if err != nil {
-			return nil, err
-		}
-		out = amended
+		nextValues[i] = next
 	}
-	return out, nil
+	return vectorAmendIndexes(array, indexes, nextValues)
 }
 
 func (s *EvalState) frameAmendFunction(frame data.Frame, key any, fn any, value any) (data.Frame, error) {
@@ -6216,6 +6212,13 @@ func vectorAmend(array data.Array, key any, value any) (data.Array, error) {
 			return nil, fmt.Errorf("amend value length mismatch")
 		}
 		copy(values, items)
+	}
+	return vectorAmendIndexes(array, indexes, values)
+}
+
+func vectorAmendIndexes(array data.Array, indexes []int, values []any) (data.Array, error) {
+	if len(indexes) != len(values) {
+		return nil, fmt.Errorf("amend value length mismatch")
 	}
 	out := array.Values()
 	for i, index := range indexes {
