@@ -1891,6 +1891,32 @@ func TryTypedScalarFill(fill any, array Array) (Array, bool, error) {
 	return nil, false, nil
 }
 
+// TryTypedSortIndexesI64 returns stable row indexes for typed arrays when the
+// ordering can be described without materializing and sorting an index slice.
+func TryTypedSortIndexesI64(array Array, descending bool) (Array, bool, error) {
+	if array == nil {
+		return nil, true, fmt.Errorf("sort index array is nil")
+	}
+	switch a := array.(type) {
+	case attributedArray:
+		return TryTypedSortIndexesI64(a.array, descending)
+	case i64RangeArray:
+		if a.len == 0 {
+			return NewI64Range(0, 1, 0), true, nil
+		}
+		if a.step == 0 {
+			return NewI64Range(0, 1, a.len), true, nil
+		}
+		ascendingData := a.step > 0
+		if descending == ascendingData {
+			return NewI64Range(int64(a.len-1), -1, a.len), true, nil
+		}
+		return NewI64Range(0, 1, a.len), true, nil
+	default:
+		return nil, false, nil
+	}
+}
+
 // TryTypedFbySum broadcasts per-group sums back to the original row shape.
 // It avoids group row slices, gather materialization, and boxed []any output.
 func TryTypedFbySum(values, groups Array) (Array, bool, error) {

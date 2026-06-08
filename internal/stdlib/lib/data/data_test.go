@@ -3182,6 +3182,23 @@ func TestTryTypedScalarFill(t *testing.T) {
 	}
 }
 
+func TestTryTypedSortIndexesI64(t *testing.T) {
+	indexes, ok, err := TryTypedSortIndexesI64(NewI64Range(4, -1, 5), false)
+	if err != nil || !ok {
+		t.Fatalf("TryTypedSortIndexesI64 handled=%v err=%v; want true,nil", ok, err)
+	}
+	if got, want := indexes.Values(), []any{int64(4), int64(3), int64(2), int64(1), int64(0)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("sort indexes = %#v, want %#v", got, want)
+	}
+	gathered, ok, err := TryGatherByI64IndexArray(NewI64Range(4, -1, 5), indexes)
+	if err != nil || !ok {
+		t.Fatalf("TryGatherByI64IndexArray handled=%v err=%v; want true,nil", ok, err)
+	}
+	if got, want := gathered.Values(), []any{int64(0), int64(1), int64(2), int64(3), int64(4)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("gathered sorted range = %#v, want %#v", got, want)
+	}
+}
+
 func TestTryTypedStringCastAndCasePreserveTiledArrays(t *testing.T) {
 	repeated := takeRepeatMust(t, NewSymbols([]string{"aapl", "msft", "amd", "ask"}), 10)
 	cast, handled, err := TryTypedStringCast(repeated)

@@ -9815,6 +9815,27 @@ func sortIndex(v any, descending bool) (any, error) {
 	if !ok {
 		return data.NewI64([]int64{0}), nil
 	}
+	if out, handled, err := data.TryTypedSortIndexesI64(array, descending); err != nil || handled {
+		shape := "sort-index/" + string(array.Kind())
+		if descending {
+			shape += "/desc"
+		} else {
+			shape += "/asc"
+		}
+		recordRuntimeKernelProbe("ArraySortIndexes", shape, handled, err)
+		if err != nil {
+			return nil, err
+		}
+		return out, nil
+	} else {
+		shape := "sort-index/" + string(array.Kind())
+		if descending {
+			shape += "/desc"
+		} else {
+			shape += "/asc"
+		}
+		recordRuntimeKernelProbe("ArraySortIndexes", shape, handled, err)
+	}
 	indexes, err := sortedIndexes(array, descending)
 	if err != nil {
 		return nil, err
