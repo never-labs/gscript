@@ -43,6 +43,12 @@ python3 benchmarks/strict_guard.py --runs=3 --warmup=0 --max-repeat=8 \
   --bench=numeric/matmul --bench=numeric/matmul_row \
   --bench=table/json_table_walk
 
+# q in-memory columnar analytics suite.
+bash benchmarks/q_columnar_suite.sh --runs=3 --warmup=1 \
+  --time-source=auto --min-sample-seconds=0.100 --max-repeat=128 \
+  --json /tmp/leia_q_columnar_timing.json \
+  --markdown /tmp/leia_q_columnar_timing.md
+
 # Hot-loop scaling profile for low-resolution workloads.
 python3 benchmarks/timing_compare.py --runs=5 --warmup=1 \
   --scale-profile=hot --sort=luajit-gap \
@@ -89,3 +95,24 @@ wall-time workloads rather than comparable hot loops.
 Benchmark selectors are domain IDs such as `numeric/matmul` or
 `table/json_table_walk`. Historical selector families are intentionally not
 accepted by the harness.
+
+## q Columnar Analytics
+
+`benchmarks/q_columnar_suite.sh` runs the focused q analytics baseline for
+runtime and JIT work. The suite is Leia-only and compares the current worktree
+against a clean HEAD build over these stable shapes:
+
+| Benchmark | Focus |
+|---|---|
+| `data/q_columnar_eval_primitives` | q vector arithmetic, compare masks, `where`, `xbar`, and adverb reducers |
+| `data/q_columnar_qsql_filter_project` | qSQL typed filter, computed projection, order, and take |
+| `data/q_columnar_qsql_group_xbar` | qSQL grouped aggregation over symbol and temporal bucket keys |
+| `data/q_columnar_qsql_asof_join` | qSQL partitioned temporal asof join with projection and filter |
+
+Use the wrapper after q runtime, frame/vector, schema-cache, or JIT path changes
+to keep measurements comparable:
+
+```bash
+bash benchmarks/q_columnar_suite.sh --runs=5 --warmup=1 \
+  --time-source=auto --min-sample-seconds=0.100 --max-repeat=128
+```

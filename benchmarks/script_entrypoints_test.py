@@ -38,6 +38,19 @@ class ScriptEntrypointConsistencyTest(unittest.TestCase):
                 wrapper = (ROOT / "benchmarks" / f"{stem}.sh").read_text()
                 self.assertIn(f'exec python3 benchmarks/{stem}.py "$@"', wrapper)
 
+    def test_q_columnar_suite_wraps_timing_compare(self):
+        wrapper = (ROOT / "benchmarks" / "q_columnar_suite.sh").read_text()
+        self.assertIn("python3 benchmarks/timing_compare.py", wrapper)
+        self.assertIn("--no-luajit", wrapper)
+        for bench in (
+            "data/q_columnar_eval_primitives",
+            "data/q_columnar_qsql_filter_project",
+            "data/q_columnar_qsql_group_xbar",
+            "data/q_columnar_qsql_asof_join",
+        ):
+            with self.subTest(bench=bench):
+                self.assertIn(f"--bench={bench}", wrapper)
+
     def test_scripts_performance_gate_wraps_benchmark_python_tools(self):
         gate = (ROOT / "scripts" / "performance_gate.sh").read_text()
         self.assertIn("python3 benchmarks/timing_compare.py", gate)
