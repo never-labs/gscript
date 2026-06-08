@@ -1882,6 +1882,12 @@ func qRunSQL(name string, args qSQLArgsResult) (Value, error) {
 			qRecordFallbackReason(qFallbackJoinErr, qKernelReasonJoinUnavailable, err.Error())
 			return NilValue(), fmt.Errorf("%s: %w", name, err)
 		}
+		if out, ok, err := qTryRunSQLJoinFastPath(args.frameValue, frame, tmpl, joins); err != nil {
+			qRecordFallbackReason(qFallbackJoinErr, qKernelReasonJoinUnavailable, err.Error())
+			return NilValue(), fmt.Errorf("%s: join: %w", name, err)
+		} else if ok {
+			return qDataFrameValue(out)
+		}
 		for _, join := range joins {
 			var err error
 			frame, err = qApplySQLJoinForPlan(args.frameValue, frame, join, tmpl.plan, len(joins) == 1)
@@ -1907,6 +1913,45 @@ func qRunSQL(name string, args qSQLArgsResult) (Value, error) {
 		return qExecResultValue(out)
 	}
 	return qDataFrameValue(out)
+}
+
+func qTryRunSQLJoinFastPath(sources Value, left data.Frame, tmpl qSQLPlanTemplate, joins []*stdq.JoinPlan) (data.Frame, bool, error) {
+	if tmpl.op != stdq.SelectQuery || len(joins) != 1 || len(tmpl.hiddenCols) > 0 {
+		return data.Frame{}, false, nil
+	}
+	plan := tmpl.plan
+	if plan.Where != nil || plan.Distinct || len(plan.By) > 0 || len(plan.ByExprs) > 0 || len(plan.Aggregates) > 0 || len(plan.Select) == 0 || plan.LimitN <= 0 || len(plan.OrderBy) != 1 {
+		return data.Frame{}, false, nil
+	}
+	for _, item := range plan.Select {
+		if _, ok := item.Expr.(data.ColumnRef); !ok {
+			return data.Frame{}, false, nil
+		}
+	}
+	join := joins[0]
+	if join == nil || (join.Kind != "inner" && join.Kind != "left") {
+		return data.Frame{}, false, nil
+	}
+	right, err := qSQLSourceCarrierFromValue(sources, join.Right)
+	if err != nil {
+		return data.Frame{}, false, err
+	}
+	if right.hasKeyed {
+		return data.Frame{}, false, nil
+	}
+	opts, ok := qJoinPruneOptions(left, right.frame, join, plan, true)
+	if !ok {
+		return data.Frame{}, false, nil
+	}
+	if !qJoinOutputMatchesSelect(left, right.frame, join, opts, plan.Select) {
+		return data.Frame{}, false, nil
+	}
+	if join.Kind == "left" {
+		out, err := data.LeftJoinOnWithOptions(left, right.frame, opts, join.Keys...)
+		return out, true, err
+	}
+	out, err := data.InnerJoinOnWithOptions(left, right.frame, opts, join.Keys...)
+	return out, true, err
 }
 
 func qRunSQLPlan(src string, plan data.QueryPlan, frame data.Frame) (data.Frame, error) {
@@ -2039,7 +2084,96 @@ func qJoinPruneOptions(left data.Frame, right data.Frame, join *stdq.JoinPlan, p
 	return data.JoinOptions{
 		LeftColumns:  qSymbolsInSchemaOrder(leftSchema, leftNeeded),
 		RightColumns: qSymbolsInSchemaOrder(rightSchema, rightNeeded),
+		OrderBy:      qJoinPruneOrder(leftSchema, rightSchema, plan),
+		LimitN:       plan.LimitN,
 	}, true
+}
+
+func qJoinPruneOrder(leftSchema, rightSchema data.Schema, plan data.QueryPlan) []data.JoinOrderSpec {
+	if plan.LimitN < 0 || len(plan.OrderBy) != 1 {
+		return nil
+	}
+	spec := plan.OrderBy[0]
+	_, leftOK := leftSchema.Kind(spec.Column)
+	_, rightOK := rightSchema.Kind(spec.Column)
+	switch {
+	case leftOK:
+		return []data.JoinOrderSpec{{Column: spec.Column, Desc: spec.Desc}}
+	case rightOK:
+		return []data.JoinOrderSpec{{Column: spec.Column, Right: true, Desc: spec.Desc}}
+	default:
+		return nil
+	}
+}
+
+func qJoinOutputMatchesSelect(left data.Frame, right data.Frame, join *stdq.JoinPlan, opts data.JoinOptions, selectItems []data.SelectItem) bool {
+	names := qJoinOutputColumnNames(left, right, join, opts)
+	if len(names) != len(selectItems) {
+		return false
+	}
+	for i, item := range selectItems {
+		if item.Name != names[i] {
+			return false
+		}
+		ref, ok := item.Expr.(data.ColumnRef)
+		if !ok || ref.Name != names[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func qJoinOutputColumnNames(left data.Frame, right data.Frame, join *stdq.JoinPlan, opts data.JoinOptions) []data.Symbol {
+	leftSchema := left.Schema()
+	rightSchema := right.Schema()
+	leftNames := qJoinOutputSchemaColumns(leftSchema, opts.LeftColumns)
+	rightNames := qJoinOutputSchemaColumns(rightSchema, opts.RightColumns)
+	out := make([]data.Symbol, 0, len(leftNames)+len(rightNames))
+	used := make(map[data.Symbol]struct{}, len(leftSchema.Names())+len(rightSchema.Names()))
+	for _, name := range leftSchema.Names() {
+		used[name] = struct{}{}
+	}
+	out = append(out, leftNames...)
+	rightKeys := make(map[data.Symbol]struct{}, len(join.Keys))
+	for _, key := range join.Keys {
+		rightKeys[key.Right] = struct{}{}
+	}
+	for _, name := range rightNames {
+		if _, ok := rightKeys[name]; ok {
+			continue
+		}
+		outName := qRightJoinColumnName(name, used)
+		out = append(out, outName)
+		used[outName] = struct{}{}
+	}
+	return out
+}
+
+func qJoinOutputSchemaColumns(schema data.Schema, requested []data.Symbol) []data.Symbol {
+	if len(requested) == 0 {
+		return schema.Names()
+	}
+	keep := make(map[data.Symbol]struct{}, len(requested))
+	for _, name := range requested {
+		keep[name] = struct{}{}
+	}
+	return qSymbolsInSchemaOrder(schema, keep)
+}
+
+func qRightJoinColumnName(name data.Symbol, used map[data.Symbol]struct{}) data.Symbol {
+	if _, ok := used[name]; !ok {
+		return name
+	}
+	base := data.Symbol(string(name) + "_right")
+	if _, ok := used[base]; !ok {
+		return base
+	}
+	for i := 2; ; i++ {
+		candidate := data.Symbol(fmt.Sprintf("%s%d", base, i))
+		if _, ok := used[candidate]; !ok {
+			return candidate
+		}
+	}
 }
 
 func qSymbolsInSchemaOrder(schema data.Schema, keep map[data.Symbol]struct{}) []data.Symbol {

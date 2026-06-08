@@ -4174,6 +4174,107 @@ func TestInnerJoinOnWithOptionsPreservesRightCollisionNames(t *testing.T) {
 	assertColumnValues(t, got, "bid_right2", []any{99.5})
 }
 
+func TestInnerJoinOnWithOptionsOrderLimitLeftColumnDesc(t *testing.T) {
+	left := mustFrame(t,
+		NewColumn("sym", []any{Symbol("AAPL"), Symbol("MSFT"), Symbol("AAPL"), Symbol("TSLA")}),
+		NewColumn("price", []any{100.0, 80.0, 101.0, 120.0}),
+		NewColumn("seq", []any{1, 2, 3, 4}),
+	)
+	right := mustFrame(t,
+		NewColumn("sym", []any{Symbol("AAPL"), Symbol("MSFT"), Symbol("AAPL")}),
+		NewColumn("bid", []any{99.5, 79.5, 99.7}),
+	)
+
+	got, err := InnerJoinOnWithOptions(left, right, JoinOptions{
+		LeftColumns:  []Symbol{"sym", "price"},
+		RightColumns: []Symbol{"bid"},
+		OrderBy:      []JoinOrderSpec{{Column: "price", Desc: true}},
+		LimitN:       2,
+	}, JoinKey{Left: "sym", Right: "sym"})
+	if err != nil {
+		t.Fatalf("InnerJoinOnWithOptions returned error: %v", err)
+	}
+
+	assertColumnValues(t, got, "sym", []any{Symbol("AAPL"), Symbol("AAPL")})
+	assertColumnValues(t, got, "price", []any{101.0, 101.0})
+	assertColumnValues(t, got, "bid", []any{99.5, 99.7})
+}
+
+func TestInnerJoinOnWithOptionsOrderLimitRightColumnDesc(t *testing.T) {
+	left := mustFrame(t,
+		NewColumn("sym", []any{Symbol("AAPL"), Symbol("MSFT"), Symbol("TSLA")}),
+		NewColumn("price", []any{100.0, 80.0, 120.0}),
+	)
+	right := mustFrame(t,
+		NewColumn("sym", []any{Symbol("AAPL"), Symbol("MSFT"), Symbol("AAPL")}),
+		NewColumn("bid", []any{99.5, 79.5, 100.2}),
+		NewColumn("quote_seq", []any{1, 2, 3}),
+	)
+
+	got, err := InnerJoinOnWithOptions(left, right, JoinOptions{
+		LeftColumns:  []Symbol{"sym", "price"},
+		RightColumns: []Symbol{"bid", "quote_seq"},
+		OrderBy:      []JoinOrderSpec{{Column: "bid", Right: true, Desc: true}},
+		LimitN:       2,
+	}, JoinKey{Left: "sym", Right: "sym"})
+	if err != nil {
+		t.Fatalf("InnerJoinOnWithOptions returned error: %v", err)
+	}
+
+	assertColumnValues(t, got, "sym", []any{Symbol("AAPL"), Symbol("AAPL")})
+	assertColumnValues(t, got, "bid", []any{100.2, 99.5})
+	assertColumnValues(t, got, "quote_seq", []any{int64(3), int64(1)})
+}
+
+func TestInnerJoinOnWithOptionsOrderLimitDuplicateRightRowsStable(t *testing.T) {
+	left := mustFrame(t,
+		NewColumn("sym", []any{Symbol("AAPL")}),
+		NewColumn("price", []any{100.0}),
+	)
+	right := mustFrame(t,
+		NewColumn("sym", []any{Symbol("AAPL"), Symbol("AAPL")}),
+		NewColumn("bid", []any{99.5, 99.5}),
+		NewColumn("quote_seq", []any{1, 2}),
+	)
+
+	got, err := InnerJoinOnWithOptions(left, right, JoinOptions{
+		LeftColumns:  []Symbol{"sym", "price"},
+		RightColumns: []Symbol{"bid", "quote_seq"},
+		OrderBy:      []JoinOrderSpec{{Column: "bid", Right: true, Desc: true}},
+		LimitN:       2,
+	}, JoinKey{Left: "sym", Right: "sym"})
+	if err != nil {
+		t.Fatalf("InnerJoinOnWithOptions returned error: %v", err)
+	}
+
+	assertColumnValues(t, got, "quote_seq", []any{int64(1), int64(2)})
+}
+
+func TestLeftJoinOnWithOptionsOrderLimitKeepsUnmatchedRows(t *testing.T) {
+	left := mustFrame(t,
+		NewColumn("sym", []any{Symbol("AAPL"), Symbol("TSLA"), Symbol("MSFT")}),
+		NewColumn("price", []any{100.0, 120.0, 80.0}),
+	)
+	right := mustFrame(t,
+		NewColumn("sym", []any{Symbol("AAPL"), Symbol("MSFT")}),
+		NewColumn("bid", []any{99.5, 79.5}),
+	)
+
+	got, err := LeftJoinOnWithOptions(left, right, JoinOptions{
+		LeftColumns:  []Symbol{"sym", "price"},
+		RightColumns: []Symbol{"bid"},
+		OrderBy:      []JoinOrderSpec{{Column: "price", Desc: true}},
+		LimitN:       2,
+	}, JoinKey{Left: "sym", Right: "sym"})
+	if err != nil {
+		t.Fatalf("LeftJoinOnWithOptions returned error: %v", err)
+	}
+
+	assertColumnValues(t, got, "sym", []any{Symbol("TSLA"), Symbol("AAPL")})
+	assertColumnValues(t, got, "price", []any{120.0, 100.0})
+	assertColumnValues(t, got, "bid", []any{NullValue, 99.5})
+}
+
 func TestJoinAsofWindowReuseIndexedRightAttributes(t *testing.T) {
 	left := mustFrame(t,
 		NewColumn("sym", []any{Symbol("AAPL"), Symbol("MSFT"), Symbol("AAPL")}),

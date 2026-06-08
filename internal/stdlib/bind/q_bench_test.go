@@ -1,6 +1,7 @@
 package bind
 
 import (
+	"container/heap"
 	"sort"
 	"testing"
 	"time"
@@ -10,6 +11,8 @@ import (
 
 var qSQLBindBenchSink Value
 var qSQLNativeBenchSink int64
+var qSQLDataFrameBenchSink data.Frame
+var qSQLNativeJoinRowsBenchSink qSQLNativeJoinRows
 
 func BenchmarkQSQLBindRunSQLWarmCacheSelectWhereProject(b *testing.B) {
 	qClearCaches()
@@ -208,6 +211,65 @@ func BenchmarkQSQLNativeGoJoin(b *testing.B) {
 	qSQLBindBenchReportRows(b, rows, start)
 }
 
+func BenchmarkQSQLNativeGoJoinTopK(b *testing.B) {
+	const rows = 8192
+	trades := qSQLNativeBenchTrades(rows)
+	quotes := qSQLNativeBenchQuotes()
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	start := time.Now()
+	for i := 0; i < b.N; i++ {
+		qSQLNativeBenchSink = qSQLNativeJoinTopK(trades, quotes)
+	}
+	b.StopTimer()
+	qSQLBindBenchReportRows(b, rows, start)
+}
+
+func BenchmarkQSQLNativeGoJoinTopKMaterialized(b *testing.B) {
+	const rows = 8192
+	trades := qSQLNativeBenchTrades(rows)
+	quotes := qSQLNativeBenchQuotes()
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	start := time.Now()
+	for i := 0; i < b.N; i++ {
+		qSQLNativeJoinRowsBenchSink = qSQLNativeJoinTopKMaterialized(trades, quotes)
+	}
+	b.StopTimer()
+	qSQLBindBenchReportRows(b, rows, start)
+}
+
+func BenchmarkQSQLDataRuntimeJoinTopK(b *testing.B) {
+	const rows = 8192
+	trades := qSQLBindBenchTradesFrame(b, rows)
+	quotes := qSQLBindBenchQuotesFrame(b)
+	opts := data.JoinOptions{
+		LeftColumns:  []data.Symbol{"sym", "price"},
+		RightColumns: []data.Symbol{"sym", "bid", "ask"},
+		OrderBy:      []data.JoinOrderSpec{{Column: "price", Desc: true}},
+		LimitN:       128,
+	}
+	keys := []data.JoinKey{{Left: "sym", Right: "sym"}}
+	if _, err := data.InnerJoinOnWithOptions(trades, quotes, opts, keys...); err != nil {
+		b.Fatalf("warm data join: %v", err)
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	start := time.Now()
+	for i := 0; i < b.N; i++ {
+		out, err := data.InnerJoinOnWithOptions(trades, quotes, opts, keys...)
+		if err != nil {
+			b.Fatalf("data join: %v", err)
+		}
+		qSQLDataFrameBenchSink = out
+	}
+	b.StopTimer()
+	qSQLBindBenchReportRows(b, rows, start)
+}
+
 func qSQLBindBenchTradesFrame(b *testing.B, rows int) data.Frame {
 	b.Helper()
 	trades := qSQLNativeBenchTrades(rows)
@@ -398,4 +460,118 @@ func qSQLNativeJoin(trades qSQLNativeTrades, quotes qSQLNativeQuotes) int64 {
 		checksum += int64(trades.price[row]*100) + int64(quotes.bid[sym]*100) + int64(quotes.ask[sym]*100)
 	}
 	return checksum
+}
+
+type qSQLNativeTopKRow struct {
+	row int
+	seq int
+}
+
+type qSQLNativeJoinTopKHeap struct {
+	items  []qSQLNativeTopKRow
+	trades qSQLNativeTrades
+}
+
+func (h qSQLNativeJoinTopKHeap) Len() int { return len(h.items) }
+
+func (h qSQLNativeJoinTopKHeap) Less(i, j int) bool {
+	return qSQLNativeJoinTopKBefore(h.trades, h.items[j], h.items[i])
+}
+
+func (h qSQLNativeJoinTopKHeap) Swap(i, j int) { h.items[i], h.items[j] = h.items[j], h.items[i] }
+
+func (h *qSQLNativeJoinTopKHeap) Push(x any) {
+	h.items = append(h.items, x.(qSQLNativeTopKRow))
+}
+
+func (h *qSQLNativeJoinTopKHeap) Pop() any {
+	old := h.items
+	n := len(old)
+	item := old[n-1]
+	h.items = old[:n-1]
+	return item
+}
+
+func qSQLNativeJoinTopKBefore(trades qSQLNativeTrades, left, right qSQLNativeTopKRow) bool {
+	if trades.price[left.row] != trades.price[right.row] {
+		return trades.price[left.row] > trades.price[right.row]
+	}
+	return left.seq < right.seq
+}
+
+func qSQLNativeJoinTopK(trades qSQLNativeTrades, quotes qSQLNativeQuotes) int64 {
+	const limit = 128
+	h := &qSQLNativeJoinTopKHeap{items: make([]qSQLNativeTopKRow, 0, limit), trades: trades}
+	seq := 0
+	for row, sym := range trades.sym {
+		if _, ok := quotes.bid[sym]; !ok {
+			continue
+		}
+		item := qSQLNativeTopKRow{row: row, seq: seq}
+		seq++
+		if h.Len() < limit {
+			heap.Push(h, item)
+			continue
+		}
+		if qSQLNativeJoinTopKBefore(trades, item, h.items[0]) {
+			h.items[0] = item
+			heap.Fix(h, 0)
+		}
+	}
+	out := append([]qSQLNativeTopKRow(nil), h.items...)
+	sort.SliceStable(out, func(i, j int) bool {
+		return qSQLNativeJoinTopKBefore(trades, out[i], out[j])
+	})
+	var checksum int64
+	for _, item := range out {
+		sym := trades.sym[item.row]
+		checksum += int64(trades.price[item.row]*100) + int64(quotes.bid[sym]*100) + int64(quotes.ask[sym]*100)
+	}
+	return checksum
+}
+
+type qSQLNativeJoinRows struct {
+	sym   []string
+	price []float64
+	bid   []float64
+	ask   []float64
+}
+
+func qSQLNativeJoinTopKMaterialized(trades qSQLNativeTrades, quotes qSQLNativeQuotes) qSQLNativeJoinRows {
+	const limit = 128
+	h := &qSQLNativeJoinTopKHeap{items: make([]qSQLNativeTopKRow, 0, limit), trades: trades}
+	seq := 0
+	for row, sym := range trades.sym {
+		if _, ok := quotes.bid[sym]; !ok {
+			continue
+		}
+		item := qSQLNativeTopKRow{row: row, seq: seq}
+		seq++
+		if h.Len() < limit {
+			heap.Push(h, item)
+			continue
+		}
+		if qSQLNativeJoinTopKBefore(trades, item, h.items[0]) {
+			h.items[0] = item
+			heap.Fix(h, 0)
+		}
+	}
+	out := append([]qSQLNativeTopKRow(nil), h.items...)
+	sort.SliceStable(out, func(i, j int) bool {
+		return qSQLNativeJoinTopKBefore(trades, out[i], out[j])
+	})
+	rows := qSQLNativeJoinRows{
+		sym:   make([]string, len(out)),
+		price: make([]float64, len(out)),
+		bid:   make([]float64, len(out)),
+		ask:   make([]float64, len(out)),
+	}
+	for i, item := range out {
+		sym := trades.sym[item.row]
+		rows.sym[i] = sym
+		rows.price[i] = trades.price[item.row]
+		rows.bid[i] = quotes.bid[sym]
+		rows.ask[i] = quotes.ask[sym]
+	}
+	return rows
 }

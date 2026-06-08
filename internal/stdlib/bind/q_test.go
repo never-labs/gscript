@@ -682,6 +682,82 @@ func TestQSQLJoinPrunesUnreferencedColumnsBeforePlan(t *testing.T) {
 	}
 }
 
+func TestQSQLJoinTopKRightOrderColumn(t *testing.T) {
+	trades := mustQTestFrame(t,
+		data.Column{Name: "sym", Data: data.NewSymbols([]string{"AAPL", "MSFT", "TSLA"})},
+		data.Column{Name: "price", Data: data.NewF64([]float64{100, 80, 120})},
+	)
+	quotes := mustQTestFrame(t,
+		data.Column{Name: "sym", Data: data.NewSymbols([]string{"AAPL", "MSFT", "AAPL"})},
+		data.Column{Name: "bid", Data: data.NewF64([]float64{99.5, 79.5, 100.2})},
+		data.Column{Name: "ask", Data: data.NewF64([]float64{100.5, 80.5, 100.8})},
+	)
+	out := mustQSQLJoinResult(t, trades, quotes, "select sym,price,bid,ask from trades join quotes on sym order by bid desc take 2")
+	frame, err := qDataFrameFromValue(out, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := frame.Column("bid"); !reflect.DeepEqual(got.Values(), []any{100.2, 99.5}) {
+		t.Fatalf("bid values = %v, want [100.2 99.5]", got.Values())
+	}
+}
+
+func TestQSQLLeftJoinTopKKeepsUnmatchedRows(t *testing.T) {
+	trades := mustQTestFrame(t,
+		data.Column{Name: "sym", Data: data.NewSymbols([]string{"AAPL", "TSLA", "MSFT"})},
+		data.Column{Name: "price", Data: data.NewF64([]float64{100, 120, 80})},
+	)
+	quotes := mustQTestFrame(t,
+		data.Column{Name: "sym", Data: data.NewSymbols([]string{"AAPL", "MSFT"})},
+		data.Column{Name: "bid", Data: data.NewF64([]float64{99.5, 79.5})},
+	)
+	out := mustQSQLJoinResult(t, trades, quotes, "select sym,price,bid from trades left join quotes on sym order by price desc take 2")
+	frame, err := qDataFrameFromValue(out, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := frame.Column("sym"); !reflect.DeepEqual(got.Values(), []any{data.Symbol("TSLA"), data.Symbol("AAPL")}) {
+		t.Fatalf("sym values = %v, want [TSLA AAPL]", got.Values())
+	}
+	if got, _ := frame.Column("bid"); !reflect.DeepEqual(got.Values(), []any{data.NullValue, 99.5}) {
+		t.Fatalf("bid values = %v, want [null 99.5]", got.Values())
+	}
+}
+
+func mustQTestFrame(t *testing.T, cols ...data.Column) data.Frame {
+	t.Helper()
+	frame, err := data.NewFrame(cols...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return frame
+}
+
+func mustQSQLJoinResult(t *testing.T, trades, quotes data.Frame, query string) Value {
+	t.Helper()
+	tradesValue, err := qDataFrameValue(trades)
+	if err != nil {
+		t.Fatal(err)
+	}
+	quotesValue, err := qDataFrameValue(quotes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	env := NewTable()
+	env.RawSetString("trades", tradesValue)
+	env.RawSetString("quotes", quotesValue)
+	out, err := qRunSQL("q.sql", qSQLArgsResult{
+		frameValue:    TableValue(env),
+		source:        query,
+		resolveSource: true,
+		envValue:      TableValue(env),
+	})
+	if err != nil {
+		t.Fatalf("q.sql join: %v", err)
+	}
+	return out
+}
+
 func TestQSQLResultKeepsNativeFrameFacade(t *testing.T) {
 	frame, err := data.NewFrame(
 		data.Column{Name: "sym", Data: data.NewSymbols([]string{"AAPL", "MSFT", "NVDA"})},

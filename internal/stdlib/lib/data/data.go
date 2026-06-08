@@ -219,10 +219,11 @@ type arrayMetadataProvider interface {
 // ArrayIndex is a reusable value-to-rows sidecar for planner attributes such as
 // q's `g#` and `u#`. Keys and row lists preserve first-seen order.
 type ArrayIndex struct {
-	Attribute Symbol
-	Keys      []any
-	Rows      [][]int
-	RowsByKey map[string][]int
+	Attribute      Symbol
+	Keys           []any
+	Rows           [][]int
+	RowsByKey      map[string][]int
+	typedRowsByKey any
 }
 
 func (idx ArrayIndex) clone() ArrayIndex {
@@ -357,7 +358,67 @@ func BuildArrayIndex(array Array, attr Symbol) (ArrayIndex, error) {
 		index.Rows = append(index.Rows, []int{row})
 		index.RowsByKey[key] = []int{row}
 	}
+	index.typedRowsByKey = typedRowsByKey(array)
 	return index, nil
+}
+
+func typedRowsByKey(array Array) any {
+	switch a := array.(type) {
+	case attributedArray:
+		return typedRowsByKey(a.array)
+	case columnArray[bool]:
+		return typedRowsByKeyFor(a.data)
+	case columnArray[int8]:
+		return typedRowsByKeyFor(a.data)
+	case columnArray[int16]:
+		return typedRowsByKeyFor(a.data)
+	case columnArray[int32]:
+		return typedRowsByKeyFor(a.data)
+	case columnArray[int64]:
+		return typedRowsByKeyFor(a.data)
+	case columnArray[uint8]:
+		return typedRowsByKeyFor(a.data)
+	case columnArray[uint16]:
+		return typedRowsByKeyFor(a.data)
+	case columnArray[uint32]:
+		return typedRowsByKeyFor(a.data)
+	case columnArray[uint64]:
+		return typedRowsByKeyFor(a.data)
+	case columnArray[float32]:
+		return typedRowsByKeyFor(a.data)
+	case columnArray[float64]:
+		return typedRowsByKeyFor(a.data)
+	case columnArray[string]:
+		return typedRowsByKeyFor(a.data)
+	case columnArray[Symbol]:
+		return typedRowsByKeyFor(a.data)
+	case columnArray[Month]:
+		return typedRowsByKeyFor(a.data)
+	case columnArray[Date]:
+		return typedRowsByKeyFor(a.data)
+	case columnArray[DateTime]:
+		return typedRowsByKeyFor(a.data)
+	case columnArray[Timespan]:
+		return typedRowsByKeyFor(a.data)
+	case columnArray[Minute]:
+		return typedRowsByKeyFor(a.data)
+	case columnArray[Second]:
+		return typedRowsByKeyFor(a.data)
+	case columnArray[Time]:
+		return typedRowsByKeyFor(a.data)
+	case columnArray[Timestamp]:
+		return typedRowsByKeyFor(a.data)
+	default:
+		return nil
+	}
+}
+
+func typedRowsByKeyFor[T comparable](values []T) map[T][]int {
+	rowsByKey := make(map[T][]int, len(values))
+	for row, value := range values {
+		rowsByKey[value] = append(rowsByKey[value], row)
+	}
+	return rowsByKey
 }
 
 func ArrayIndexFor(array Array, attr Symbol) (ArrayIndex, bool) {
@@ -2106,6 +2167,14 @@ type JoinKey struct {
 type JoinOptions struct {
 	LeftColumns  []Symbol
 	RightColumns []Symbol
+	OrderBy      []JoinOrderSpec
+	LimitN       int
+}
+
+type JoinOrderSpec struct {
+	Column Symbol
+	Right  bool
+	Desc   bool
 }
 
 func InnerJoin(left, right Frame, keys ...Symbol) (Frame, error) {
@@ -2398,9 +2467,19 @@ func joinOnWithOptions(left, right Frame, keepUnmatchedLeft bool, opts JoinOptio
 		return Frame{}, err
 	}
 
-	leftIndexes, rightIndexes, err := typedKernels.JoinIndexes(left, right, keepUnmatchedLeft, keys)
+	leftIndexes, rightIndexes, ok, err := joinIndexesWithOptions(left, right, keepUnmatchedLeft, opts, keys)
 	if err != nil {
 		return Frame{}, err
+	}
+	if !ok {
+		leftIndexes, rightIndexes, err = typedKernels.JoinIndexes(left, right, keepUnmatchedLeft, keys)
+		if err != nil {
+			return Frame{}, err
+		}
+		leftIndexes, rightIndexes, err = limitJoinIndexesByOrder(left, right, leftIndexes, rightIndexes, opts)
+		if err != nil {
+			return Frame{}, err
+		}
 	}
 
 	leftNames := joinOutputLeftColumns(left, opts.LeftColumns)
@@ -2431,6 +2510,363 @@ func joinOnWithOptions(left, right Frame, keepUnmatchedLeft bool, opts JoinOptio
 		usedNames[outName] = struct{}{}
 	}
 	return newFrameTrusted(cols...)
+}
+
+func joinIndexesWithOptions(left, right Frame, keepUnmatchedLeft bool, opts JoinOptions, keys []JoinKey) ([]int, []int, bool, error) {
+	if keepUnmatchedLeft || opts.LimitN <= 0 || len(opts.OrderBy) != 1 || len(keys) != 1 {
+		return nil, nil, false, nil
+	}
+	leftKey, ok := left.Column(keys[0].Left)
+	if !ok {
+		return nil, nil, true, fmt.Errorf("join left key column %q does not exist", keys[0].Left)
+	}
+	rightKey, ok := right.Column(keys[0].Right)
+	if !ok {
+		return nil, nil, true, fmt.Errorf("join right key column %q does not exist", keys[0].Right)
+	}
+	if leftKey.Kind() != rightKey.Kind() {
+		return nil, nil, false, nil
+	}
+	if _, ok := arrayIndexForBorrowed(rightKey, ArrayAttributeUnique); !ok {
+		if _, ok := arrayIndexForBorrowed(rightKey, ArrayAttributeGrouped); !ok {
+			rightKey = WithArrayAttribute(rightKey, ArrayAttributeGrouped)
+			right.columns[keys[0].Right] = rightKey
+		}
+	}
+	orderSpec := opts.OrderBy[0]
+	orderFrame := left
+	if orderSpec.Right {
+		orderFrame = right
+	}
+	orderColumn, ok := orderFrame.Column(orderSpec.Column)
+	if !ok {
+		return nil, nil, true, fmt.Errorf("join order column %q does not exist", orderSpec.Column)
+	}
+	return singleColumnTypedJoinTopKIndexes(leftKey, rightKey, orderColumn, orderSpec.Right, orderSpec.Desc, opts.LimitN)
+}
+
+func singleColumnTypedJoinTopKIndexes(leftKey, rightKey, orderColumn Array, orderRight bool, desc bool, limit int) ([]int, []int, bool, error) {
+	switch left := leftKey.(type) {
+	case attributedArray:
+		return singleColumnTypedJoinTopKIndexes(left.array, rightKey, orderColumn, orderRight, desc, limit)
+	case columnArray[bool]:
+		return singleColumnTypedJoinTopKIndexesFor(left, rightKey, orderColumn, orderRight, desc, limit)
+	case columnArray[int8]:
+		return singleColumnTypedJoinTopKIndexesFor(left, rightKey, orderColumn, orderRight, desc, limit)
+	case columnArray[int16]:
+		return singleColumnTypedJoinTopKIndexesFor(left, rightKey, orderColumn, orderRight, desc, limit)
+	case columnArray[int32]:
+		return singleColumnTypedJoinTopKIndexesFor(left, rightKey, orderColumn, orderRight, desc, limit)
+	case columnArray[int64]:
+		return singleColumnTypedJoinTopKIndexesFor(left, rightKey, orderColumn, orderRight, desc, limit)
+	case columnArray[uint8]:
+		return singleColumnTypedJoinTopKIndexesFor(left, rightKey, orderColumn, orderRight, desc, limit)
+	case columnArray[uint16]:
+		return singleColumnTypedJoinTopKIndexesFor(left, rightKey, orderColumn, orderRight, desc, limit)
+	case columnArray[uint32]:
+		return singleColumnTypedJoinTopKIndexesFor(left, rightKey, orderColumn, orderRight, desc, limit)
+	case columnArray[uint64]:
+		return singleColumnTypedJoinTopKIndexesFor(left, rightKey, orderColumn, orderRight, desc, limit)
+	case columnArray[float32]:
+		return singleColumnTypedJoinTopKIndexesFor(left, rightKey, orderColumn, orderRight, desc, limit)
+	case columnArray[float64]:
+		return singleColumnTypedJoinTopKIndexesFor(left, rightKey, orderColumn, orderRight, desc, limit)
+	case columnArray[string]:
+		return singleColumnTypedJoinTopKIndexesFor(left, rightKey, orderColumn, orderRight, desc, limit)
+	case columnArray[Symbol]:
+		return singleColumnTypedJoinTopKIndexesFor(left, rightKey, orderColumn, orderRight, desc, limit)
+	case columnArray[Month]:
+		return singleColumnTypedJoinTopKIndexesFor(left, rightKey, orderColumn, orderRight, desc, limit)
+	case columnArray[Date]:
+		return singleColumnTypedJoinTopKIndexesFor(left, rightKey, orderColumn, orderRight, desc, limit)
+	case columnArray[DateTime]:
+		return singleColumnTypedJoinTopKIndexesFor(left, rightKey, orderColumn, orderRight, desc, limit)
+	case columnArray[Timespan]:
+		return singleColumnTypedJoinTopKIndexesFor(left, rightKey, orderColumn, orderRight, desc, limit)
+	case columnArray[Minute]:
+		return singleColumnTypedJoinTopKIndexesFor(left, rightKey, orderColumn, orderRight, desc, limit)
+	case columnArray[Second]:
+		return singleColumnTypedJoinTopKIndexesFor(left, rightKey, orderColumn, orderRight, desc, limit)
+	case columnArray[Time]:
+		return singleColumnTypedJoinTopKIndexesFor(left, rightKey, orderColumn, orderRight, desc, limit)
+	case columnArray[Timestamp]:
+		return singleColumnTypedJoinTopKIndexesFor(left, rightKey, orderColumn, orderRight, desc, limit)
+	default:
+		return nil, nil, false, nil
+	}
+}
+
+func singleColumnTypedJoinTopKIndexesFor[T comparable](leftKey columnArray[T], rightKey Array, orderColumn Array, orderRight bool, desc bool, limit int) ([]int, []int, bool, error) {
+	rightKey = unwrapAttributedArray(rightKey)
+	right, ok := rightKey.(columnArray[T])
+	if !ok {
+		return nil, nil, false, nil
+	}
+	rowsByKey, ok := typedRowsByKeyForArray[T](rightKey)
+	if !ok {
+		rowsByKey = typedRowsByKeyFor(right.data)
+	}
+	spec := boundOrderSpec{spec: OrderSpec{Desc: desc}, column: orderColumn}
+	before := makeJoinTopKBefore(spec)
+	h := &joinTopKHeap{items: make([]joinTopKPair, 0, limit), spec: spec, before: before}
+	seq := 0
+	for leftRow, value := range leftKey.data {
+		for _, rightRow := range rowsByKey[value] {
+			orderRow := leftRow
+			if orderRight {
+				orderRow = rightRow
+			}
+			pair := joinTopKPair{left: leftRow, right: rightRow, orderRow: orderRow, seq: seq}
+			seq++
+			if h.Len() < limit {
+				heap.Push(h, pair)
+				continue
+			}
+			if before(pair, h.items[0]) {
+				h.items[0] = pair
+				heap.Fix(h, 0)
+			}
+		}
+	}
+	out := append([]joinTopKPair(nil), h.items...)
+	sort.SliceStable(out, func(i, j int) bool {
+		return before(out[i], out[j])
+	})
+	leftIndexes := make([]int, len(out))
+	rightIndexes := make([]int, len(out))
+	for i, pair := range out {
+		leftIndexes[i] = pair.left
+		rightIndexes[i] = pair.right
+	}
+	return leftIndexes, rightIndexes, true, nil
+}
+
+func typedRowsByKeyForArray[T comparable](array Array) (map[T][]int, bool) {
+	if index, ok := arrayIndexForBorrowed(array, ArrayAttributeUnique); ok {
+		if rowsByKey, ok := index.typedRowsByKey.(map[T][]int); ok {
+			return rowsByKey, true
+		}
+	}
+	if index, ok := arrayIndexForBorrowed(array, ArrayAttributeGrouped); ok {
+		if rowsByKey, ok := index.typedRowsByKey.(map[T][]int); ok {
+			return rowsByKey, true
+		}
+	}
+	return nil, false
+}
+
+func limitJoinIndexesByOrder(left, right Frame, leftIndexes, rightIndexes []int, opts JoinOptions) ([]int, []int, error) {
+	if opts.LimitN <= 0 || opts.LimitN >= len(leftIndexes) {
+		return leftIndexes, rightIndexes, nil
+	}
+	if opts.LimitN == 0 {
+		return []int{}, []int{}, nil
+	}
+	if len(opts.OrderBy) != 1 {
+		return leftIndexes, rightIndexes, nil
+	}
+	spec := opts.OrderBy[0]
+	frame := left
+	indexes := leftIndexes
+	if spec.Right {
+		frame = right
+		indexes = rightIndexes
+		for _, row := range rightIndexes {
+			if row < 0 {
+				return leftIndexes, rightIndexes, nil
+			}
+		}
+	}
+	column, ok := frame.Column(spec.Column)
+	if !ok {
+		return nil, nil, fmt.Errorf("join order column %q does not exist", spec.Column)
+	}
+	pairs := topKJoinPairs(leftIndexes, rightIndexes, indexes, boundOrderSpec{
+		spec:   OrderSpec{Column: spec.Column, Desc: spec.Desc},
+		column: column,
+	}, opts.LimitN)
+	outLeft := make([]int, len(pairs))
+	outRight := make([]int, len(pairs))
+	for i, pair := range pairs {
+		outLeft[i] = pair.left
+		outRight[i] = pair.right
+	}
+	return outLeft, outRight, nil
+}
+
+type joinTopKPair struct {
+	left     int
+	right    int
+	orderRow int
+	seq      int
+}
+
+type joinTopKHeap struct {
+	items  []joinTopKPair
+	spec   boundOrderSpec
+	before func(left, right joinTopKPair) bool
+}
+
+func (h joinTopKHeap) Len() int { return len(h.items) }
+
+func (h joinTopKHeap) Less(i, j int) bool {
+	if h.before != nil {
+		return h.before(h.items[j], h.items[i])
+	}
+	return joinTopKBefore(h.spec, h.items[j], h.items[i])
+}
+
+func (h joinTopKHeap) Swap(i, j int) { h.items[i], h.items[j] = h.items[j], h.items[i] }
+
+func (h *joinTopKHeap) Push(x any) {
+	h.items = append(h.items, x.(joinTopKPair))
+}
+
+func (h *joinTopKHeap) Pop() any {
+	old := h.items
+	n := len(old)
+	item := old[n-1]
+	h.items = old[:n-1]
+	return item
+}
+
+func topKJoinPairs(leftIndexes, rightIndexes, orderRows []int, spec boundOrderSpec, limit int) []joinTopKPair {
+	before := makeJoinTopKBefore(spec)
+	h := &joinTopKHeap{items: make([]joinTopKPair, 0, limit), spec: spec, before: before}
+	for seq, orderRow := range orderRows {
+		pair := joinTopKPair{left: leftIndexes[seq], right: rightIndexes[seq], orderRow: orderRow, seq: seq}
+		if h.Len() < limit {
+			heap.Push(h, pair)
+			continue
+		}
+		if before(pair, h.items[0]) {
+			h.items[0] = pair
+			heap.Fix(h, 0)
+		}
+	}
+	out := append([]joinTopKPair(nil), h.items...)
+	sort.SliceStable(out, func(i, j int) bool {
+		return before(out[i], out[j])
+	})
+	return out
+}
+
+func joinTopKBefore(spec boundOrderSpec, left, right joinTopKPair) bool {
+	cmp := compareArrayRows(spec.column, left.orderRow, right.orderRow)
+	if cmp != 0 {
+		if spec.spec.Desc {
+			return cmp > 0
+		}
+		return cmp < 0
+	}
+	return left.seq < right.seq
+}
+
+func makeJoinTopKBefore(spec boundOrderSpec) func(left, right joinTopKPair) bool {
+	switch a := spec.column.(type) {
+	case attributedArray:
+		return makeJoinTopKBefore(boundOrderSpec{spec: spec.spec, column: a.array})
+	case columnArray[bool]:
+		return makeJoinTopKBeforeBy(a.data, spec.spec.Desc, compareBool)
+	case columnArray[int8]:
+		return makeJoinTopKBeforeSigned(a.data, spec.spec.Desc)
+	case columnArray[int16]:
+		return makeJoinTopKBeforeSigned(a.data, spec.spec.Desc)
+	case columnArray[int32]:
+		return makeJoinTopKBeforeSigned(a.data, spec.spec.Desc)
+	case columnArray[int64]:
+		return makeJoinTopKBeforeSigned(a.data, spec.spec.Desc)
+	case columnArray[uint8]:
+		return makeJoinTopKBeforeUnsigned(a.data, spec.spec.Desc)
+	case columnArray[uint16]:
+		return makeJoinTopKBeforeUnsigned(a.data, spec.spec.Desc)
+	case columnArray[uint32]:
+		return makeJoinTopKBeforeUnsigned(a.data, spec.spec.Desc)
+	case columnArray[uint64]:
+		return makeJoinTopKBeforeUnsigned(a.data, spec.spec.Desc)
+	case columnArray[float32]:
+		return makeJoinTopKBeforeFloat(a.data, spec.spec.Desc)
+	case columnArray[float64]:
+		return makeJoinTopKBeforeFloat(a.data, spec.spec.Desc)
+	case columnArray[string]:
+		return makeJoinTopKBeforeBy(a.data, spec.spec.Desc, compareString)
+	case columnArray[Symbol]:
+		return makeJoinTopKBeforeBy(a.data, spec.spec.Desc, func(left, right Symbol) int {
+			return compareString(string(left), string(right))
+		})
+	case columnArray[Month]:
+		return makeJoinTopKBeforeSigned(a.data, spec.spec.Desc)
+	case columnArray[Date]:
+		return makeJoinTopKBeforeSigned(a.data, spec.spec.Desc)
+	case columnArray[DateTime]:
+		return makeJoinTopKBeforeSigned(a.data, spec.spec.Desc)
+	case columnArray[Timespan]:
+		return makeJoinTopKBeforeSigned(a.data, spec.spec.Desc)
+	case columnArray[Minute]:
+		return makeJoinTopKBeforeSigned(a.data, spec.spec.Desc)
+	case columnArray[Second]:
+		return makeJoinTopKBeforeSigned(a.data, spec.spec.Desc)
+	case columnArray[Time]:
+		return makeJoinTopKBeforeSigned(a.data, spec.spec.Desc)
+	case columnArray[Timestamp]:
+		return makeJoinTopKBeforeSigned(a.data, spec.spec.Desc)
+	default:
+		return func(left, right joinTopKPair) bool {
+			return joinTopKBefore(spec, left, right)
+		}
+	}
+}
+
+func makeJoinTopKBeforeBy[T any](values []T, desc bool, compare func(T, T) int) func(left, right joinTopKPair) bool {
+	return func(left, right joinTopKPair) bool {
+		cmp := compare(values[left.orderRow], values[right.orderRow])
+		if cmp != 0 {
+			if desc {
+				return cmp > 0
+			}
+			return cmp < 0
+		}
+		return left.seq < right.seq
+	}
+}
+
+func makeJoinTopKBeforeSigned[T signedScalar](values []T, desc bool) func(left, right joinTopKPair) bool {
+	return func(left, right joinTopKPair) bool {
+		cmp := compareInt64(int64(values[left.orderRow]), int64(values[right.orderRow]))
+		if cmp != 0 {
+			if desc {
+				return cmp > 0
+			}
+			return cmp < 0
+		}
+		return left.seq < right.seq
+	}
+}
+
+func makeJoinTopKBeforeUnsigned[T unsignedScalar](values []T, desc bool) func(left, right joinTopKPair) bool {
+	return func(left, right joinTopKPair) bool {
+		cmp := compareUint64(uint64(values[left.orderRow]), uint64(values[right.orderRow]))
+		if cmp != 0 {
+			if desc {
+				return cmp > 0
+			}
+			return cmp < 0
+		}
+		return left.seq < right.seq
+	}
+}
+
+func makeJoinTopKBeforeFloat[T floatScalar](values []T, desc bool) func(left, right joinTopKPair) bool {
+	return func(left, right joinTopKPair) bool {
+		cmp := compareFloat64(float64(values[left.orderRow]), float64(values[right.orderRow]))
+		if cmp != 0 {
+			if desc {
+				return cmp > 0
+			}
+			return cmp < 0
+		}
+		return left.seq < right.seq
+	}
 }
 
 func joinOutputLeftColumns(frame Frame, requested []Symbol) []Symbol {
