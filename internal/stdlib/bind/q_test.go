@@ -1413,6 +1413,15 @@ unsupported := q.explain_query(trades, {
 	if got := supported.RawGetString("kernel_execution_stats_cache_backed"); !got.IsBool() || got.Bool() {
 		t.Fatalf("supported kernel_execution_stats_cache_backed = %v, want false", got)
 	}
+	if got := supported.RawGetString("kernel_execution_count"); !got.IsInt() || got.Int() != 0 {
+		t.Fatalf("supported kernel_execution_count = %v, want 0 without provider stats", got)
+	}
+	if got := supported.RawGetString("kernel_execution_success_count"); !got.IsInt() || got.Int() != 0 {
+		t.Fatalf("supported kernel_execution_success_count = %v, want 0 without provider stats", got)
+	}
+	if got := supported.RawGetString("kernel_execution_error_count"); !got.IsInt() || got.Int() != 0 {
+		t.Fatalf("supported kernel_execution_error_count = %v, want 0 without provider stats", got)
+	}
 	if got := supported.RawGetString("kernel_rows"); !got.IsInt() || got.Int() != 2 {
 		t.Fatalf("supported kernel_rows = %v, want 2", got)
 	}
@@ -1473,6 +1482,15 @@ unsupported := q.explain_query(trades, {
 	}
 	if got := unsupported.RawGetString("kernel_execution_stats_cache_backed"); !got.IsBool() || got.Bool() {
 		t.Fatalf("unsupported kernel_execution_stats_cache_backed = %v, want false", got)
+	}
+	if got := unsupported.RawGetString("kernel_execution_count"); !got.IsInt() || got.Int() != 0 {
+		t.Fatalf("unsupported kernel_execution_count = %v, want 0 without provider stats", got)
+	}
+	if got := unsupported.RawGetString("kernel_execution_success_count"); !got.IsInt() || got.Int() != 0 {
+		t.Fatalf("unsupported kernel_execution_success_count = %v, want 0 without provider stats", got)
+	}
+	if got := unsupported.RawGetString("kernel_execution_error_count"); !got.IsInt() || got.Int() != 0 {
+		t.Fatalf("unsupported kernel_execution_error_count = %v, want 0 without provider stats", got)
 	}
 	if schema := unsupported.RawGetString("kernel_schema").Table(); schema == nil || schema.Length() != 0 {
 		t.Fatalf("unsupported kernel_schema = %v, want empty table", schema)
@@ -4015,6 +4033,15 @@ func TestQExplainReportsQueryKernelVisibility(t *testing.T) {
 	if got := beforeTable.RawGetString("kernel_execution_stats_cache_backed"); !got.IsBool() || got.Bool() {
 		t.Fatalf("kernel_execution_stats_cache_backed before = %v, want false", got)
 	}
+	if got := beforeTable.RawGetString("kernel_execution_count"); !got.IsInt() || got.Int() != 0 {
+		t.Fatalf("kernel_execution_count before = %v, want 0 without provider stats", got)
+	}
+	if got := beforeTable.RawGetString("kernel_execution_success_count"); !got.IsInt() || got.Int() != 0 {
+		t.Fatalf("kernel_execution_success_count before = %v, want 0 without provider stats", got)
+	}
+	if got := beforeTable.RawGetString("kernel_execution_error_count"); !got.IsInt() || got.Int() != 0 {
+		t.Fatalf("kernel_execution_error_count before = %v, want 0 without provider stats", got)
+	}
 	cacheKey := beforeTable.RawGetString("kernel_cache_key")
 	if !cacheKey.IsString() || cacheKey.Str() == "" {
 		t.Fatalf("kernel_cache_key before = %v, want stable non-empty key", cacheKey)
@@ -4112,6 +4139,49 @@ func TestQExplainReportsQueryKernelVisibility(t *testing.T) {
 	}
 	if got := afterTable.RawGetString("kernel_shape"); !got.IsString() || got.Str() != kernelShape.Str() {
 		t.Fatalf("kernel_shape after = %v, want cached shape %q", got, kernelShape.Str())
+	}
+	restoreStats := SetQRuntimeKernelExecutionStatsProvider(func() []QRuntimeKernelExecutionStat {
+		return []QRuntimeKernelExecutionStat{
+			{
+				Source:  "methodjit_q_frame_runtime",
+				Kernel:  "QFrameSelectColumn",
+				Shape:   kernelShape.Str(),
+				Route:   "typed_runtime_op_exit",
+				Outcome: "success",
+				Count:   2,
+			},
+			{
+				Source:  "methodjit_q_frame_runtime",
+				Kernel:  "QFrameSelectColumn",
+				Shape:   kernelShape.Str(),
+				Route:   "typed_runtime_op_exit",
+				Outcome: "error",
+				Count:   1,
+			},
+			{
+				Source:  "methodjit_q_vector_runtime",
+				Kernel:  "QVectorGatherReduce",
+				Shape:   "gather/vector-reduce",
+				Route:   "typed_runtime_op_exit",
+				Outcome: "success",
+				Count:   9,
+			},
+		}
+	})
+	withExecution, err := qExplainSQL(qSQLArgsResult{frameValue: frameValue, source: query})
+	restoreStats()
+	if err != nil {
+		t.Fatalf("explain with runtime execution stats: %v", err)
+	}
+	withExecutionTable := withExecution.Table()
+	if got := withExecutionTable.RawGetString("kernel_execution_count"); !got.IsInt() || got.Int() != 3 {
+		t.Fatalf("kernel_execution_count with stats = %v, want 3 for current shape", got)
+	}
+	if got := withExecutionTable.RawGetString("kernel_execution_success_count"); !got.IsInt() || got.Int() != 2 {
+		t.Fatalf("kernel_execution_success_count with stats = %v, want 2 for current shape", got)
+	}
+	if got := withExecutionTable.RawGetString("kernel_execution_error_count"); !got.IsInt() || got.Int() != 1 {
+		t.Fatalf("kernel_execution_error_count with stats = %v, want 1 for current shape", got)
 	}
 	if got := afterTable.RawGetString("kernel_cache_key"); !got.IsString() || got.Str() != cacheKey.Str() {
 		t.Fatalf("kernel_cache_key after = %v, want %s", got, cacheKey.Str())

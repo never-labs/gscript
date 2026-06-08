@@ -154,6 +154,12 @@ type qRuntimeKernelExecutionRouteStat struct {
 	Count   uint64
 }
 
+type qRuntimeKernelExecutionShapeSummary struct {
+	Executions uint64
+	Successes  uint64
+	Errors     uint64
+}
+
 // QQueryKernelSupportKeyStatJSONRow is the stable external row shape for
 // q.query native-kernel support cache key statistics.
 type QQueryKernelSupportKeyStatJSONRow struct {
@@ -1568,6 +1574,7 @@ func qExplainQuery(s *SoA, spec *Table) (*Table, error) {
 	}
 	out.RawSetString("kernel_cached", BoolValue(kernelCached))
 	out.RawSetString("kernel_shape", StringValue(kernelShape))
+	qExplainAttachRuntimeKernelExecutionSummary(out, kernelShape)
 	if len(aggs) != 0 {
 		reason := "query native kernel supports non-aggregate selects only"
 		out.RawSetString("kernel_supported", BoolValue(false))
@@ -1858,6 +1865,7 @@ func qExplainSQL(args qSQLArgsResult) (Value, error) {
 	out.RawSetString("kernel_execution_stats_domain", StringValue(qStatsDomainJITExecution))
 	out.RawSetString("kernel_execution_stats_source", StringValue(qStatsSourceMethodJIT))
 	out.RawSetString("kernel_execution_stats_cache_backed", BoolValue(false))
+	qExplainAttachRuntimeKernelExecutionSummary(out, kernelInfo.shape)
 	qExplainAttachFallbackStats(out, qSQLKernelFallbackStatsCode(kernelInfo), kernelInfo.reasonCode, kernelInfo.reason)
 	return TableValue(out), nil
 }
@@ -3229,6 +3237,35 @@ func qRuntimeKernelExecutionStatsTable(stats []QRuntimeKernelExecutionStat) *Tab
 		rows.RawSetInt(int64(i+1), TableValue(row))
 	}
 	return rows
+}
+
+func qRuntimeKernelExecutionSummaryForShape(shape string) qRuntimeKernelExecutionShapeSummary {
+	shape = qNormalizeRuntimeKernelStatPart(shape)
+	if shape == "" {
+		return qRuntimeKernelExecutionShapeSummary{}
+	}
+	stats := qRuntimeKernelExecutionStatsSnapshot()
+	var out qRuntimeKernelExecutionShapeSummary
+	for _, stat := range stats {
+		if stat.Shape != shape {
+			continue
+		}
+		out.Executions += stat.Count
+		switch stat.Outcome {
+		case "success":
+			out.Successes += stat.Count
+		case "error":
+			out.Errors += stat.Count
+		}
+	}
+	return out
+}
+
+func qExplainAttachRuntimeKernelExecutionSummary(out *Table, shape string) {
+	summary := qRuntimeKernelExecutionSummaryForShape(shape)
+	out.RawSetString("kernel_execution_count", qUint64IntValue(summary.Executions))
+	out.RawSetString("kernel_execution_success_count", qUint64IntValue(summary.Successes))
+	out.RawSetString("kernel_execution_error_count", qUint64IntValue(summary.Errors))
 }
 
 func qRuntimeKernelExecutionShapeStats(stats []QRuntimeKernelExecutionStat) []qRuntimeKernelExecutionShapeStat {
