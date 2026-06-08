@@ -792,10 +792,21 @@ func dataNativeFramePayload(frame *Table) (stddata.Frame, bool, error) {
 		}
 		return stddata.Frame{}, false, fmt.Errorf("native data frame payload is invalid")
 	}
-	if native, ok := frame.NativePayload().(stddata.Frame); ok {
+	if native, ok := dataLegacyNativeFramePayload(frame); ok {
 		return native, true, nil
 	}
 	return stddata.Frame{}, false, nil
+}
+
+func dataLegacyNativeFramePayload(frame *Table) (stddata.Frame, bool) {
+	if frame == nil {
+		return stddata.Frame{}, false
+	}
+	if _, hasInfo := frame.NativePayloadInfo(); hasInfo {
+		return stddata.Frame{}, false
+	}
+	native, ok := frame.NativePayload().(stddata.Frame)
+	return native, ok
 }
 
 func dataFrameValueFromLib(frame stddata.Frame) (Value, error) {
