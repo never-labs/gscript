@@ -122,6 +122,11 @@ runs the focused q analytics script suite and then runs Go benchmarks for qSQL
 and ordinary q session expressions against hand-written Go baselines with
 `ns/op`, `B/op`, and `allocs/op`.
 
+See [q_benchmark_coverage.md](q_benchmark_coverage.md) for the q language
+benchmark coverage audit. That document maps semantic q coverage from
+`eval_test.go`, `parser_test.go`, and `bind/q_test.go` to the benchmark
+dimensions that still need performance rows.
+
 `benchmarks/q_columnar_suite.sh` runs the focused q analytics baseline for
 runtime and JIT work. The script suite is Leia-only and compares the current
 worktree against a clean HEAD build over these stable shapes:
@@ -203,9 +208,11 @@ Read the q performance baseline through these ratios:
 ## q.eval Vector/List Compute
 
 `benchmarks/q_eval_vector_bench_test.go` covers ordinary q expressions outside
-qSQL: vector arithmetic, compare mask to `where` indexes, `take`/`drop`/
-`reverse`/`rotate`, adverb scans/reductions, named list reductions, and math map
-expressions. Each shape has four benchmark rows:
+qSQL. This suite should be the main non-qSQL q performance matrix: numeric
+vector arithmetic, typed numeric and null behavior, compare masks to `where`
+indexes, selectivity changes, `take`/`drop`/`reverse`/`rotate`, adverb
+scans/reductions, list/set verbs, dictionaries, symbols, temporal values, and
+table-like transforms. Each shape has four benchmark rows:
 
 | Row | Signal |
 |---|---|
@@ -223,3 +230,8 @@ bridge, allocation, and dynamic dispatch overhead.
 q compute suite. It keeps the benchmarks under `benchmarks/` while still
 exercising q result-cache warm, session warm execution, cold parse/lower, and
 hand-written Go baseline rows in one command.
+
+The coverage target for q work is at least 50 ordinary `q.eval` cases, 25 qSQL
+Go benchmark rows, and 40 script-level q columnar cases. Keep new benchmark
+cases tied to real q language shapes from the semantic tests rather than to
+individual optimizer implementation details.
