@@ -2,7 +2,8 @@ package bind
 
 // QRuntimeKernelExecutionStatsFrom maps external q runtime-kernel execution
 // observations into the q.cache_stats-facing bind shape without coupling bind
-// to the producer package.
+// to the producer package. Use the filtered variant when a producer needs to
+// skip rows; this mapper preserves every converted row.
 func QRuntimeKernelExecutionStatsFrom[T any](stats []T, convert func(T) QRuntimeKernelExecutionStat) []QRuntimeKernelExecutionStat {
 	if len(stats) == 0 || convert == nil {
 		return nil
@@ -10,6 +11,24 @@ func QRuntimeKernelExecutionStatsFrom[T any](stats []T, convert func(T) QRuntime
 	out := make([]QRuntimeKernelExecutionStat, 0, len(stats))
 	for _, stat := range stats {
 		out = append(out, convert(stat))
+	}
+	return out
+}
+
+// QRuntimeKernelExecutionStatsFromFiltered maps external execution
+// observations and lets the producer explicitly skip rows that do not belong
+// in the bind execution stats table.
+func QRuntimeKernelExecutionStatsFromFiltered[T any](stats []T, convert func(T) (QRuntimeKernelExecutionStat, bool)) []QRuntimeKernelExecutionStat {
+	if len(stats) == 0 || convert == nil {
+		return nil
+	}
+	out := make([]QRuntimeKernelExecutionStat, 0, len(stats))
+	for _, stat := range stats {
+		row, ok := convert(stat)
+		if !ok {
+			continue
+		}
+		out = append(out, row)
 	}
 	return out
 }
@@ -26,9 +45,21 @@ func SetMappedQRuntimeKernelExecutionStatsProvider[T any](provider func() []T, c
 	})
 }
 
+// SetMappedQRuntimeKernelExecutionStatsProviderFiltered adapts producer-owned
+// execution stats while making row filtering explicit at the bridge boundary.
+func SetMappedQRuntimeKernelExecutionStatsProviderFiltered[T any](provider func() []T, convert func(T) (QRuntimeKernelExecutionStat, bool)) func() {
+	if provider == nil || convert == nil {
+		return SetQRuntimeKernelExecutionStatsProvider(nil)
+	}
+	return SetQRuntimeKernelExecutionStatsProvider(func() []QRuntimeKernelExecutionStat {
+		return QRuntimeKernelExecutionStatsFromFiltered(provider(), convert)
+	})
+}
+
 // QRuntimeKernelLoweringStatsFrom maps external q runtime-kernel lowering
-// fallback observations into the q.cache_stats-facing bind shape without
-// coupling bind to the producer package.
+// decision observations into the q.cache_stats-facing bind shape without
+// coupling bind to the producer package. Use the filtered variant when a
+// producer needs to skip rows; this mapper preserves every converted row.
 func QRuntimeKernelLoweringStatsFrom[T any](stats []T, convert func(T) QRuntimeKernelLoweringStat) []QRuntimeKernelLoweringStat {
 	if len(stats) == 0 || convert == nil {
 		return nil

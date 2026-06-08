@@ -1365,19 +1365,16 @@ trades := soa.zip({
     size: []f64{100, 50, 200},
 })
 
-primed := q.query(trades, {
+supported_spec := {
     where: {column: "size", op: ">=", value: 50},
     select: {notional: {"*", "price", "size"}},
     order_by: {column: "notional", desc: true},
     limit: 2,
-})
+}
 
-supported := q.explain_query(trades, {
-    where: {column: "size", op: ">=", value: 50},
-    select: {notional: {"*", "price", "size"}},
-    order_by: {column: "notional", desc: true},
-    limit: 2,
-})
+primed := q.query(trades, supported_spec)
+
+supported := q.explain_query(trades, supported_spec)
 
 unsupported := q.explain_query(trades, {
     select: {price: "price", marker: {"negate", "price"}},
@@ -1404,6 +1401,7 @@ unsupported := q.explain_query(trades, {
 	if got := supported.RawGetString("kernel_shape"); !got.IsString() || !strings.Contains(got.Str(), "select=") {
 		t.Fatalf("supported kernel_shape = %v, want stable q.query select shape", got)
 	}
+	supportedShape := supported.RawGetString("kernel_shape").Str()
 	if got := supported.RawGetString("kernel_execution_stats_domain"); !got.IsString() || got.Str() != qStatsDomainJITExecution {
 		t.Fatalf("supported kernel_execution_stats_domain = %v, want %s", got, qStatsDomainJITExecution)
 	}
@@ -1451,6 +1449,43 @@ unsupported := q.explain_query(trades, {
 	}
 	if routes := supported.RawGetString("kernel_lowering_routes").Table(); routes == nil || routes.Length() != 0 {
 		t.Fatalf("supported kernel_lowering_routes = %v, want empty table without provider stats", routes)
+	}
+	restoreExecutionStats := SetQRuntimeKernelExecutionStatsProvider(func() []QRuntimeKernelExecutionStat {
+		return []QRuntimeKernelExecutionStat{
+			{
+				Source:  "methodjit_q_frame_runtime",
+				Kernel:  "QFrameSelectColumn",
+				Shape:   supportedShape,
+				Route:   "typed_runtime_op_exit",
+				Outcome: "success",
+				Count:   7,
+			},
+		}
+	})
+	restoreLoweringStats := SetQRuntimeKernelLoweringStatsProvider(func() []QRuntimeKernelLoweringStat {
+		return []QRuntimeKernelLoweringStat{
+			{
+				Source:  "methodjit_q_frame_runtime",
+				Kind:    "runtime_kernel",
+				Kernel:  "QFrameSelectColumn",
+				Shape:   supportedShape,
+				Route:   "typed_runtime_op_exit",
+				Outcome: "supported",
+				Count:   11,
+			},
+		}
+	})
+	explainedWithStats, err := qExplainQuery(interp.GetGlobal("trades").SoA(), interp.GetGlobal("supported_spec").Table())
+	restoreLoweringStats()
+	restoreExecutionStats()
+	if err != nil {
+		t.Fatalf("qExplainQuery with same-shape runtime stats: %v", err)
+	}
+	if got := explainedWithStats.RawGetString("kernel_execution_count"); !got.IsInt() || got.Int() != 0 {
+		t.Fatalf("same-shape q.explain_query kernel_execution_count = %v, want 0 for non-runtime q.query shape", got)
+	}
+	if got := explainedWithStats.RawGetString("kernel_lowering_count"); !got.IsInt() || got.Int() != 0 {
+		t.Fatalf("same-shape q.explain_query kernel_lowering_count = %v, want 0 for non-runtime q.query shape", got)
 	}
 	if got := supported.RawGetString("kernel_rows"); !got.IsInt() || got.Int() != 2 {
 		t.Fatalf("supported kernel_rows = %v, want 2", got)

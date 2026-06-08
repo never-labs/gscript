@@ -71,6 +71,47 @@ func TestQRuntimeKernelExecutionStatsFromMapsExternalRows(t *testing.T) {
 	if got := QRuntimeKernelExecutionStatsFrom([]qRuntimeKernelExecutionExternalStatForTest{{Count: 1}}, nil); got != nil {
 		t.Fatalf("nil converter mapped stats = %#v, want nil", got)
 	}
+	zeroRows := QRuntimeKernelExecutionStatsFrom([]qRuntimeKernelExecutionExternalStatForTest{{Count: 1}}, func(qRuntimeKernelExecutionExternalStatForTest) QRuntimeKernelExecutionStat {
+		return QRuntimeKernelExecutionStat{}
+	})
+	if len(zeroRows) != 1 {
+		t.Fatalf("zero execution row mapping length = %d, want 1; use filtered mapper to skip rows", len(zeroRows))
+	}
+}
+
+func TestQRuntimeKernelExecutionStatsFromFilteredSkipsExternalRows(t *testing.T) {
+	stats := QRuntimeKernelExecutionStatsFromFiltered([]qRuntimeKernelExecutionExternalStatForTest{
+		{
+			Source:  "methodjit_q_frame_runtime",
+			Kernel:  "QFrameSelectColumn",
+			Shape:   "compare/filter/project/column",
+			Route:   "typed_runtime_op_exit",
+			Outcome: "success",
+			Count:   4,
+		},
+		{
+			Source:  "methodjit_q_vector_runtime",
+			Kernel:  "QVectorGatherReduce",
+			Shape:   "gather/vector-reduce",
+			Route:   "typed_runtime_op_exit",
+			Outcome: "success",
+			Count:   7,
+		},
+	}, func(stat qRuntimeKernelExecutionExternalStatForTest) (QRuntimeKernelExecutionStat, bool) {
+		if stat.Kernel != "QVectorGatherReduce" {
+			return QRuntimeKernelExecutionStat{}, false
+		}
+		return qRuntimeKernelExecutionExternalStatToBindForTest(stat), true
+	})
+	if len(stats) != 1 {
+		t.Fatalf("filtered execution stats length = %d, want 1", len(stats))
+	}
+	if stats[0].Kernel != "QVectorGatherReduce" || stats[0].Count != 7 {
+		t.Fatalf("filtered execution stat = %#v, want vector row", stats[0])
+	}
+	if got := QRuntimeKernelExecutionStatsFromFiltered([]qRuntimeKernelExecutionExternalStatForTest{{Count: 1}}, nil); got != nil {
+		t.Fatalf("nil filtered converter mapped execution stats = %#v, want nil", got)
+	}
 }
 
 func TestQRuntimeKernelLoweringStatsFromMapsExternalRows(t *testing.T) {
@@ -100,6 +141,12 @@ func TestQRuntimeKernelLoweringStatsFromMapsExternalRows(t *testing.T) {
 	}
 	if got := QRuntimeKernelLoweringStatsFrom([]qRuntimeKernelLoweringExternalStatForTest{{Count: 1}}, nil); got != nil {
 		t.Fatalf("nil converter mapped lowering stats = %#v, want nil", got)
+	}
+	zeroRows := QRuntimeKernelLoweringStatsFrom([]qRuntimeKernelLoweringExternalStatForTest{{Count: 1}}, func(qRuntimeKernelLoweringExternalStatForTest) QRuntimeKernelLoweringStat {
+		return QRuntimeKernelLoweringStat{}
+	})
+	if len(zeroRows) != 1 {
+		t.Fatalf("zero lowering row mapping length = %d, want 1; use filtered mapper to skip rows", len(zeroRows))
 	}
 }
 
@@ -187,6 +234,51 @@ func TestMappedQRuntimeKernelExecutionStatsProviderFeedsCacheStats(t *testing.T)
 	}
 	if got := stat.RawGetString("count"); !got.IsInt() || got.Int() != 5 {
 		t.Fatalf("q_runtime_kernel_execution stats[1].count = %v, want 5", got)
+	}
+}
+
+func TestMappedQRuntimeKernelExecutionStatsProviderFilteredFeedsCacheStats(t *testing.T) {
+	qClearCaches()
+	restore := SetMappedQRuntimeKernelExecutionStatsProviderFiltered(func() []qRuntimeKernelExecutionExternalStatForTest {
+		return []qRuntimeKernelExecutionExternalStatForTest{
+			{
+				Source:  "methodjit_q_frame_runtime",
+				Kernel:  "QFrameSelectColumn",
+				Shape:   "compare/filter/project/column",
+				Route:   "typed_runtime_op_exit",
+				Outcome: "success",
+				Count:   2,
+			},
+			{
+				Source:  "methodjit_q_vector_runtime",
+				Kernel:  "QVectorGatherReduce",
+				Shape:   "gather/vector-reduce",
+				Route:   "typed_runtime_op_exit",
+				Outcome: "success",
+				Count:   5,
+			},
+		}
+	}, func(stat qRuntimeKernelExecutionExternalStatForTest) (QRuntimeKernelExecutionStat, bool) {
+		if stat.Kernel != "QVectorGatherReduce" {
+			return QRuntimeKernelExecutionStat{}, false
+		}
+		return qRuntimeKernelExecutionExternalStatToBindForTest(stat), true
+	})
+	defer restore()
+
+	row := qTestCacheStatsRowTable(t, qCacheStatsTable(), "q_runtime_kernel_execution")
+	if got := row.RawGetString("executions"); !got.IsInt() || got.Int() != 5 {
+		t.Fatalf("q_runtime_kernel_execution executions = %v, want filtered count 5", got)
+	}
+	stat := qTestNestedRowByFields(t, row, "stats", map[string]string{
+		"source":  "methodjit_q_vector_runtime",
+		"kernel":  "QVectorGatherReduce",
+		"shape":   "gather/vector-reduce",
+		"route":   "typed_runtime_op_exit",
+		"outcome": "success",
+	})
+	if got := stat.RawGetString("count"); !got.IsInt() || got.Int() != 5 {
+		t.Fatalf("q_runtime_kernel_execution filtered stat count = %v, want 5", got)
 	}
 }
 

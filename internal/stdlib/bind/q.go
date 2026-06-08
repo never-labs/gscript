@@ -1688,8 +1688,9 @@ func qExplainQuery(s *SoA, spec *Table) (*Table, error) {
 	}
 	out.RawSetString("kernel_cached", BoolValue(kernelCached))
 	out.RawSetString("kernel_shape", StringValue(kernelShape))
-	qExplainAttachRuntimeKernelExecutionSummary(out, qRuntimeKernelExplainFilter{Shape: kernelShape})
-	qExplainAttachRuntimeKernelLoweringSummary(out, qRuntimeKernelExplainFilter{Shape: kernelShape})
+	runtimeKernelFilter := qQueryRuntimeKernelExplainFilter(kernelShape)
+	qExplainAttachRuntimeKernelExecutionSummary(out, runtimeKernelFilter)
+	qExplainAttachRuntimeKernelLoweringSummary(out, runtimeKernelFilter)
 	if len(aggs) != 0 {
 		reason := "query native kernel supports non-aggregate selects only"
 		out.RawSetString("kernel_supported", BoolValue(false))
@@ -3566,6 +3567,11 @@ type qRuntimeKernelExplainFilter struct {
 	ExecutionKernels map[string]bool
 	LoweringSources  map[string]bool
 	LoweringKernels  map[string]bool
+	RejectAll        bool
+}
+
+func qQueryRuntimeKernelExplainFilter(shape string) qRuntimeKernelExplainFilter {
+	return qRuntimeKernelExplainFilter{Shape: shape, RejectAll: true}
 }
 
 func qSQLRuntimeKernelExplainFilter(shape string) qRuntimeKernelExplainFilter {
@@ -3619,6 +3625,9 @@ func (filter qRuntimeKernelExplainFilter) normalizedShape() string {
 }
 
 func (filter qRuntimeKernelExplainFilter) matchesExecution(stat QRuntimeKernelExecutionStat) bool {
+	if filter.RejectAll {
+		return false
+	}
 	shape := filter.normalizedShape()
 	if shape != "" && stat.Shape != shape {
 		return false
@@ -3633,6 +3642,9 @@ func (filter qRuntimeKernelExplainFilter) matchesExecution(stat QRuntimeKernelEx
 }
 
 func (filter qRuntimeKernelExplainFilter) matchesLowering(stat QRuntimeKernelLoweringStat) bool {
+	if filter.RejectAll {
+		return false
+	}
 	shape := filter.normalizedShape()
 	if shape != "" && stat.Shape != shape {
 		return false
