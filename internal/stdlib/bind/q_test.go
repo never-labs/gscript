@@ -1404,6 +1404,15 @@ unsupported := q.explain_query(trades, {
 	if got := supported.RawGetString("kernel_shape"); !got.IsString() || !strings.Contains(got.Str(), "select=") {
 		t.Fatalf("supported kernel_shape = %v, want stable q.query select shape", got)
 	}
+	if got := supported.RawGetString("kernel_execution_stats_domain"); !got.IsString() || got.Str() != qStatsDomainJITExecution {
+		t.Fatalf("supported kernel_execution_stats_domain = %v, want %s", got, qStatsDomainJITExecution)
+	}
+	if got := supported.RawGetString("kernel_execution_stats_source"); !got.IsString() || got.Str() != qStatsSourceMethodJIT {
+		t.Fatalf("supported kernel_execution_stats_source = %v, want %s", got, qStatsSourceMethodJIT)
+	}
+	if got := supported.RawGetString("kernel_execution_stats_cache_backed"); !got.IsBool() || got.Bool() {
+		t.Fatalf("supported kernel_execution_stats_cache_backed = %v, want false", got)
+	}
 	if got := supported.RawGetString("kernel_rows"); !got.IsInt() || got.Int() != 2 {
 		t.Fatalf("supported kernel_rows = %v, want 2", got)
 	}
@@ -1455,6 +1464,15 @@ unsupported := q.explain_query(trades, {
 	}
 	if got := unsupported.RawGetString("kernel_shape"); !got.IsString() || !strings.Contains(got.Str(), "select=") {
 		t.Fatalf("unsupported kernel_shape = %v, want stable fallback select shape", got)
+	}
+	if got := unsupported.RawGetString("kernel_execution_stats_domain"); !got.IsString() || got.Str() != qStatsDomainJITExecution {
+		t.Fatalf("unsupported kernel_execution_stats_domain = %v, want %s", got, qStatsDomainJITExecution)
+	}
+	if got := unsupported.RawGetString("kernel_execution_stats_source"); !got.IsString() || got.Str() != qStatsSourceMethodJIT {
+		t.Fatalf("unsupported kernel_execution_stats_source = %v, want %s", got, qStatsSourceMethodJIT)
+	}
+	if got := unsupported.RawGetString("kernel_execution_stats_cache_backed"); !got.IsBool() || got.Bool() {
+		t.Fatalf("unsupported kernel_execution_stats_cache_backed = %v, want false", got)
 	}
 	if schema := unsupported.RawGetString("kernel_schema").Table(); schema == nil || schema.Length() != 0 {
 		t.Fatalf("unsupported kernel_schema = %v, want empty table", schema)

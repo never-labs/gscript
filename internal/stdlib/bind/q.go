@@ -1550,6 +1550,9 @@ func qExplainQuery(s *SoA, spec *Table) (*Table, error) {
 	out.RawSetString("select_count", IntValue(int64(len(selects))))
 	out.RawSetString("by_count", IntValue(int64(len(by))))
 	out.RawSetString("aggregate_count", IntValue(int64(len(aggs))))
+	out.RawSetString("kernel_execution_stats_domain", StringValue(qStatsDomainJITExecution))
+	out.RawSetString("kernel_execution_stats_source", StringValue(qStatsSourceMethodJIT))
+	out.RawSetString("kernel_execution_stats_cache_backed", BoolValue(false))
 	kernelCached := false
 	kernelShape := ""
 	if len(aggs) == 0 {
