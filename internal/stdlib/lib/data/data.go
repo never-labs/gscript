@@ -4379,7 +4379,7 @@ func TryTypedRotate(array Array, n int) (Array, bool, error) {
 		if err != nil || !ok {
 			return rotated, ok, err
 		}
-		return attributedArray{array: rotated, metadata: a.metadata}, true, nil
+		return attributedArray{array: rotated, metadata: a.metadata.cloneWithRebuiltIndexes(rotated)}, true, nil
 	case i64RangeArray:
 		if a.len == 0 {
 			return a, true, nil
@@ -4403,7 +4403,22 @@ func TryTypedRotate(array Array, n int) (Array, bool, error) {
 		}
 		return newI64SegmentArray(first, second), true, nil
 	default:
-		return nil, false, nil
+		length := array.Len()
+		if length == 0 {
+			return array, true, nil
+		}
+		shift := n % length
+		if shift < 0 {
+			shift += length
+		}
+		if shift == 0 {
+			return array, true, nil
+		}
+		rotated := tiledArray{source: array, start: shift, len: length}
+		if metadata := ArrayMetadataOf(array); len(metadata.Attributes) > 0 {
+			return attributedArray{array: rotated, metadata: metadata.cloneWithRebuiltIndexes(rotated)}, true, nil
+		}
+		return rotated, true, nil
 	}
 }
 

@@ -2992,6 +2992,9 @@ func TestGatherAndTakeOperators(t *testing.T) {
 	if count, ok, err := TryTypedNullCount(repeated); err != nil || !ok || count != 3 {
 		t.Fatalf("TakeRepeat null count = %d,%v,%v; want 3,true,nil", count, ok, err)
 	}
+	if count, ok, err := TryTypedDistinctCount(repeated); err != nil || !ok || count != 3 {
+		t.Fatalf("TakeRepeat distinct count = %d,%v,%v; want 3,true,nil", count, ok, err)
+	}
 
 	repeatedTail, err := TakeRepeat(NewI64([]int64{10, 20, 30}), -5)
 	if err != nil {
@@ -2999,6 +3002,33 @@ func TestGatherAndTakeOperators(t *testing.T) {
 	}
 	if got, want := repeatedTail.Values(), []any{int64(20), int64(30), int64(10), int64(20), int64(30)}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("TakeRepeat negative values = %#v, want %#v", got, want)
+	}
+	if count, ok, err := TryTypedDistinctCount(repeatedTail); err != nil || !ok || count != 3 {
+		t.Fatalf("TakeRepeat negative distinct count = %d,%v,%v; want 3,true,nil", count, ok, err)
+	}
+	shortRepeat, err := TakeRepeat(NewI64([]int64{10, 20, 10, 30}), 2)
+	if err != nil {
+		t.Fatalf("TakeRepeat short returned error: %v", err)
+	}
+	if count, ok, err := TryTypedDistinctCount(shortRepeat); err != nil || !ok || count != 2 {
+		t.Fatalf("TakeRepeat short distinct count = %d,%v,%v; want 2,true,nil", count, ok, err)
+	}
+
+	rotated, handled, err := TryTypedRotate(NewSymbols([]string{"AAPL", "MSFT", "NVDA", "AAPL"}), -1)
+	if err != nil {
+		t.Fatalf("TryTypedRotate symbols returned error: %v", err)
+	}
+	if !handled {
+		t.Fatal("TryTypedRotate symbols did not handle typed array")
+	}
+	if _, ok := rotated.(tiledArray); !ok {
+		t.Fatalf("TryTypedRotate symbols returned %T, want lazy tiledArray", rotated)
+	}
+	if got, want := rotated.Values(), []any{Symbol("AAPL"), Symbol("AAPL"), Symbol("MSFT"), Symbol("NVDA")}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("TryTypedRotate symbols values = %#v, want %#v", got, want)
+	}
+	if count, ok, err := TryTypedDistinctCount(rotated); err != nil || !ok || count != 3 {
+		t.Fatalf("TryTypedRotate symbols distinct count = %d,%v,%v; want 3,true,nil", count, ok, err)
 	}
 }
 

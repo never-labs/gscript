@@ -630,6 +630,9 @@ func (s *EvalState) eval(src string) (any, error) {
 		return s.evalDrop(strings.TrimSpace(src[len("drop "):]))
 	}
 	if strings.HasPrefix(src, "count ") {
+		if out, handled, err := s.tryEvalCountDistinct(strings.TrimSpace(src[len("count "):])); err != nil || handled {
+			return out, err
+		}
 		if out, handled, err := s.tryEvalCountWhereNull(strings.TrimSpace(src[len("count "):])); err != nil || handled {
 			return out, err
 		}
@@ -3340,6 +3343,18 @@ func firstLastDyadicOperandValue(value any, array data.Array, isArray bool, row 
 	return item, nil
 }
 
+func (s *EvalState) tryEvalCountDistinct(src string) (any, bool, error) {
+	if !strings.HasPrefix(src, "distinct ") {
+		return nil, false, nil
+	}
+	out, err := s.eval(strings.TrimSpace(src[len("distinct "):]))
+	if err != nil {
+		return nil, true, err
+	}
+	value, err := countDistinct(out)
+	return value, true, err
+}
+
 func (s *EvalState) tryEvalCountWhereNull(src string) (any, bool, error) {
 	if !strings.HasPrefix(src, "where ") {
 		return nil, false, nil
@@ -4122,6 +4137,9 @@ func applyComposition(fn qComposition, args []any) (any, error) {
 	if len(args) != 1 {
 		return nil, fmt.Errorf("composition expected 1 argument, got %d", len(args))
 	}
+	if isCountDistinctComposition(fn) {
+		return countDistinct(args[0])
+	}
 	value := args[0]
 	for i := len(fn.funcs) - 1; i >= 0; i-- {
 		next, err := fn.funcs[i].fn(value)
@@ -4131,6 +4149,10 @@ func applyComposition(fn qComposition, args []any) (any, error) {
 		value = next
 	}
 	return value, nil
+}
+
+func isCountDistinctComposition(fn qComposition) bool {
+	return len(fn.funcs) == 2 && fn.funcs[0].name == "count" && fn.funcs[1].name == "distinct"
 }
 
 func applyDyadicFunction(fn qDyadicFunction, args []any) (any, error) {
@@ -9414,6 +9436,41 @@ func distinct(v any) (any, error) {
 		}
 	}
 	return array.Gather(indexes), nil
+}
+
+func countDistinct(v any) (any, error) {
+	array, ok := v.(data.Array)
+	if !ok {
+		return count(v)
+	}
+	if value, handled, err := data.TryTypedDistinctCount(array); err != nil || handled {
+		recordRuntimeKernelProbe("ArrayDistinctCount", "distinct-count/"+string(array.Kind()), handled, err)
+		return value, err
+	} else {
+		recordRuntimeKernelProbe("ArrayDistinctCount", "distinct-count/"+string(array.Kind()), handled, err)
+	}
+	indexes := make([]int, 0, array.Len())
+	for i := 0; i < array.Len(); i++ {
+		value, ok := array.At(i)
+		if !ok {
+			return nil, fmt.Errorf("distinct row %d out of range", i)
+		}
+		seen := false
+		for _, index := range indexes {
+			existing, ok := array.At(index)
+			if !ok {
+				return nil, fmt.Errorf("distinct row %d out of range", index)
+			}
+			if equalValue(existing, value) {
+				seen = true
+				break
+			}
+		}
+		if !seen {
+			indexes = append(indexes, i)
+		}
+	}
+	return int64(len(indexes)), nil
 }
 
 func reverse(v any) (any, error) {

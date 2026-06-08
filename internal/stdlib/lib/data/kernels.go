@@ -910,6 +910,127 @@ func TryTypedNullCount(array Array) (int64, bool, error) {
 	}
 }
 
+func TryTypedDistinctCount(array Array) (int64, bool, error) {
+	if array == nil {
+		return 0, true, fmt.Errorf("distinct count array is nil")
+	}
+	switch a := array.(type) {
+	case attributedArray:
+		return TryTypedDistinctCount(a.array)
+	case tiledArray:
+		sourceLen := a.source.Len()
+		if sourceLen == 0 || a.len == 0 {
+			return 0, true, nil
+		}
+		if a.len >= sourceLen {
+			return TryTypedDistinctCount(a.source)
+		}
+		return distinctCountRows(a, a.len)
+	case i64RangeArray:
+		if a.len == 0 {
+			return 0, true, nil
+		}
+		if a.step == 0 {
+			return 1, true, nil
+		}
+		return int64(a.len), true, nil
+	case f64RangeArray:
+		if a.len == 0 {
+			return 0, true, nil
+		}
+		if a.step == 0 {
+			return 1, true, nil
+		}
+		return int64(a.len), true, nil
+	case columnArray[bool]:
+		return distinctCountComparable(a.data), true, nil
+	case columnArray[int8]:
+		return distinctCountComparable(a.data), true, nil
+	case columnArray[int16]:
+		return distinctCountComparable(a.data), true, nil
+	case columnArray[int32]:
+		return distinctCountComparable(a.data), true, nil
+	case columnArray[int64]:
+		return distinctCountComparable(a.data), true, nil
+	case columnArray[uint8]:
+		return distinctCountComparable(a.data), true, nil
+	case columnArray[uint16]:
+		return distinctCountComparable(a.data), true, nil
+	case columnArray[uint32]:
+		return distinctCountComparable(a.data), true, nil
+	case columnArray[uint64]:
+		return distinctCountComparable(a.data), true, nil
+	case columnArray[float32]:
+		return distinctCountComparable(a.data), true, nil
+	case columnArray[float64]:
+		return distinctCountComparable(a.data), true, nil
+	case columnArray[string]:
+		return distinctCountComparable(a.data), true, nil
+	case columnArray[Symbol]:
+		return distinctCountComparable(a.data), true, nil
+	case columnArray[Month]:
+		return distinctCountComparable(a.data), true, nil
+	case columnArray[Date]:
+		return distinctCountComparable(a.data), true, nil
+	case columnArray[DateTime]:
+		return distinctCountComparable(a.data), true, nil
+	case columnArray[Timespan]:
+		return distinctCountComparable(a.data), true, nil
+	case columnArray[Minute]:
+		return distinctCountComparable(a.data), true, nil
+	case columnArray[Second]:
+		return distinctCountComparable(a.data), true, nil
+	case columnArray[Time]:
+		return distinctCountComparable(a.data), true, nil
+	case columnArray[Timestamp]:
+		return distinctCountComparable(a.data), true, nil
+	default:
+		return distinctCountRows(array, array.Len())
+	}
+}
+
+func distinctCountComparable[T comparable](values []T) int64 {
+	if len(values) == 0 {
+		return 0
+	}
+	if len(values) <= 16 {
+		seen := make([]T, 0, len(values))
+		for _, value := range values {
+			found := false
+			for _, existing := range seen {
+				if existing == value {
+					found = true
+					break
+				}
+			}
+			if !found {
+				seen = append(seen, value)
+			}
+		}
+		return int64(len(seen))
+	}
+	seen := make(map[T]struct{}, len(values))
+	for _, value := range values {
+		seen[value] = struct{}{}
+	}
+	return int64(len(seen))
+}
+
+func distinctCountRows(array Array, rows int) (int64, bool, error) {
+	if rows <= 0 {
+		return 0, true, nil
+	}
+	seen := make(map[string]struct{}, min(rows, 64))
+	for row := 0; row < rows; row++ {
+		value, ok := array.At(row)
+		if !ok {
+			return 0, true, fmt.Errorf("distinct count row %d out of range", row)
+		}
+		seen[arrayValueKey(array.Kind(), value)] = struct{}{}
+	}
+	return int64(len(seen)), true, nil
+}
+
 func (typedKernelRegistry) NumericUnary(op string, array Array) (Array, bool, error) {
 	switch a := array.(type) {
 	case columnArray[int8]:
