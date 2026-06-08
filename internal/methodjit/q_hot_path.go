@@ -73,6 +73,15 @@ type QVectorRuntimeKernel struct {
 	Detail    string
 }
 
+// QFrameRuntimeKernel records frame/select projection primitives that already
+// execute through typed runtime helpers/op-exits outside QFrameSelectColumn.
+type QFrameRuntimeKernel struct {
+	Instr     *Instr
+	Kernel    string
+	ShapeName string
+	Detail    string
+}
+
 // QKernelDescriptor is the normalized MethodJIT q kernel observation. Summary
 // rows are derived from descriptors so new runtime routes do not fork taxonomy.
 type QKernelDescriptor struct {
@@ -93,6 +102,17 @@ type QKernelExecutionStat struct {
 	Source  string
 	Kernel  string
 	Shape   string
+	Route   string
+	Outcome string
+	Count   uint64
+}
+
+// QKernelExecutionRouteSummary aggregates q typed-runtime execution outcomes
+// without shape cardinality. It complements QKernelShapeSummary for route-level
+// diagnostics and perf triage.
+type QKernelExecutionRouteSummary struct {
+	Source  string
+	Kernel  string
 	Route   string
 	Outcome string
 	Count   uint64
@@ -183,6 +203,13 @@ func (k QVectorRuntimeKernel) Shape() string {
 	return k.ShapeName
 }
 
+func (k QFrameRuntimeKernel) Shape() string {
+	if k.ShapeName == "" {
+		return "unknown"
+	}
+	return k.ShapeName
+}
+
 func CountQQueryHotPathShapes(paths []QQueryHotPath) map[string]int {
 	if len(paths) == 0 {
 		return nil
@@ -217,6 +244,17 @@ func CountQVectorReduceHotPathShapes(paths []QVectorReduceHotPath) map[string]in
 }
 
 func CountQVectorRuntimeKernelShapes(kernels []QVectorRuntimeKernel) map[string]int {
+	if len(kernels) == 0 {
+		return nil
+	}
+	counts := make(map[string]int)
+	for _, kernel := range kernels {
+		counts[kernel.Shape()]++
+	}
+	return counts
+}
+
+func CountQFrameRuntimeKernelShapes(kernels []QFrameRuntimeKernel) map[string]int {
 	if len(kernels) == 0 {
 		return nil
 	}
@@ -301,7 +339,7 @@ func CountQVectorLoweringFallbackReasons(remarks []OptimizationRemark) map[strin
 	return counts
 }
 
-func BuildQKernelDescriptors(vectorKernels []QVectorRuntimeKernel, frameKernels []QFrameSelectColumnSpec, remarks []OptimizationRemark) []QKernelDescriptor {
+func BuildQKernelDescriptors(vectorKernels []QVectorRuntimeKernel, framePrimitiveKernels []QFrameRuntimeKernel, frameKernels []QFrameSelectColumnSpec, remarks []OptimizationRemark) []QKernelDescriptor {
 	var out []QKernelDescriptor
 	for _, kernel := range vectorKernels {
 		shape := kernel.Shape()
@@ -310,6 +348,20 @@ func BuildQKernelDescriptors(vectorKernels []QVectorRuntimeKernel, frameKernels 
 		}
 		out = append(out, QKernelDescriptor{
 			Source:  "methodjit_q_vector_runtime",
+			Kind:    "runtime_kernel",
+			Kernel:  kernel.Kernel,
+			Shape:   shape,
+			Route:   "typed_runtime_op_exit",
+			Outcome: "supported",
+		})
+	}
+	for _, kernel := range framePrimitiveKernels {
+		shape := kernel.Shape()
+		if shape == "" {
+			shape = "unknown"
+		}
+		out = append(out, QKernelDescriptor{
+			Source:  "methodjit_q_frame_runtime",
 			Kind:    "runtime_kernel",
 			Kernel:  kernel.Kernel,
 			Shape:   shape,
@@ -472,8 +524,50 @@ func BuildQKernelShapeSummaryFromDescriptorsAndExecutionStats(descriptors []QKer
 	return out
 }
 
-func BuildQKernelShapeSummary(vectorKernels []QVectorRuntimeKernel, frameKernels []QFrameSelectColumnSpec, remarks []OptimizationRemark) []QKernelShapeSummary {
-	return BuildQKernelShapeSummaryFromDescriptors(BuildQKernelDescriptors(vectorKernels, frameKernels, remarks))
+func BuildQKernelShapeSummary(vectorKernels []QVectorRuntimeKernel, framePrimitiveKernels []QFrameRuntimeKernel, frameKernels []QFrameSelectColumnSpec, remarks []OptimizationRemark) []QKernelShapeSummary {
+	return BuildQKernelShapeSummaryFromDescriptors(BuildQKernelDescriptors(vectorKernels, framePrimitiveKernels, frameKernels, remarks))
+}
+
+func BuildQKernelExecutionRouteSummary(rows []QKernelExecutionStat) []QKernelExecutionRouteSummary {
+	counts := make(map[qKernelExecutionRouteSummaryKey]uint64)
+	for _, row := range rows {
+		counts[qKernelExecutionRouteSummaryKey{
+			source:  qKernelExecutionSummarySource(row.Source),
+			kernel:  qKernelExecutionSummaryKernel(row.Kernel),
+			route:   qKernelExecutionSummaryRoute(row.Route),
+			outcome: qKernelExecutionSummaryOutcome(row.Outcome),
+		}] += row.Count
+	}
+	if len(counts) == 0 {
+		return nil
+	}
+	keys := make([]qKernelExecutionRouteSummaryKey, 0, len(counts))
+	for key := range counts {
+		keys = append(keys, key)
+	}
+	sort.Slice(keys, func(i, j int) bool {
+		if keys[i].source != keys[j].source {
+			return keys[i].source < keys[j].source
+		}
+		if keys[i].kernel != keys[j].kernel {
+			return keys[i].kernel < keys[j].kernel
+		}
+		if keys[i].route != keys[j].route {
+			return keys[i].route < keys[j].route
+		}
+		return keys[i].outcome < keys[j].outcome
+	})
+	out := make([]QKernelExecutionRouteSummary, 0, len(keys))
+	for _, key := range keys {
+		out = append(out, QKernelExecutionRouteSummary{
+			Source:  key.source,
+			Kernel:  key.kernel,
+			Route:   key.route,
+			Outcome: key.outcome,
+			Count:   counts[key],
+		})
+	}
+	return out
 }
 
 func qKernelExecutionSummarySource(source string) string {
@@ -483,11 +577,32 @@ func qKernelExecutionSummarySource(source string) string {
 	return source
 }
 
+func qKernelExecutionSummaryKernel(kernel string) string {
+	if kernel == "" {
+		return "unknown"
+	}
+	return kernel
+}
+
 func qKernelExecutionSummaryShape(shape string) string {
 	if shape == "" {
 		return "unknown"
 	}
 	return shape
+}
+
+func qKernelExecutionSummaryRoute(route string) string {
+	if route == "" {
+		return "unknown"
+	}
+	return route
+}
+
+func qKernelExecutionSummaryOutcome(outcome string) string {
+	if outcome == "" {
+		return "unknown"
+	}
+	return outcome
 }
 
 type qKernelExecutionCounters struct {
@@ -503,6 +618,13 @@ type qKernelShapeSummaryKey struct {
 	outcome      string
 	reasonFamily string
 	reasonCode   string
+}
+
+type qKernelExecutionRouteSummaryKey struct {
+	source  string
+	kernel  string
+	route   string
+	outcome string
 }
 
 // DetectQQueryHotPaths returns q query primitive pipelines visible in Method
@@ -530,7 +652,14 @@ func DetectQQueryHotPaths(fn *Function) []QQueryHotPath {
 			var rowGather *Instr
 			var rowSlice *Instr
 			var rowOrder *Instr
-			if gather := valueDef(filterInput, OpFrameGather); gather != nil {
+			if orderGather := valueDef(filterInput, OpFrameOrderGather); orderGather != nil {
+				if len(orderGather.Args) != 1 {
+					continue
+				}
+				rowGather = orderGather
+				rowOrder = orderGather
+				filterInput = orderGather.Args[0]
+			} else if gather := valueDef(filterInput, OpFrameGather); gather != nil {
 				if len(gather.Args) != 2 {
 					continue
 				}
@@ -727,6 +856,33 @@ func DetectQVectorRuntimeKernels(fn *Function) []QVectorRuntimeKernel {
 	return out
 }
 
+// DetectQFrameRuntimeKernels returns frame/select projection primitives that
+// are carried as typed runtime op-exits but are not produced by
+// QQueryNativeLoweringPass.
+func DetectQFrameRuntimeKernels(fn *Function) []QFrameRuntimeKernel {
+	if fn == nil {
+		return nil
+	}
+	var out []QFrameRuntimeKernel
+	for _, block := range fn.Blocks {
+		if block == nil {
+			continue
+		}
+		for _, instr := range block.Instrs {
+			if instr == nil {
+				continue
+			}
+			switch instr.Op {
+			case OpFrameProjectColumn:
+				out = append(out, QFrameRuntimeKernel{Instr: instr, Kernel: "FrameProjectColumn", ShapeName: "project/column"})
+			case OpFrameFilterProjectColumn:
+				out = append(out, QFrameRuntimeKernel{Instr: instr, Kernel: "FrameFilterProjectColumn", ShapeName: "filter/project/column"})
+			}
+		}
+	}
+	return out
+}
+
 // QQueryHotPathRemarkPass records visible q query primitive hot paths in the
 // structured optimization remark stream. It does not mutate IR; the remark is a
 // handoff point for diagnostics and future native lowering policy.
@@ -902,7 +1058,7 @@ func qQueryHotPathSingleUse(path QQueryHotPath, uses map[int]int) bool {
 		}
 	}
 	filterUses := 1
-	if path.RowOrder != nil && path.RowGather != nil {
+	if path.RowOrder != nil && path.RowGather != nil && path.RowOrder.ID != path.RowGather.ID {
 		filterUses = 2
 	}
 	if path.Filter != nil && uses[path.Filter.ID] != filterUses {
@@ -1424,6 +1580,19 @@ func formatQKernelExecutionStats(rows []QKernelExecutionStat) string {
 	return b.String()
 }
 
+func formatQKernelExecutionRouteSummary(rows []QKernelExecutionRouteSummary) string {
+	if len(rows) == 0 {
+		return "0 route summary row(s)\n"
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "%d route summary row(s)\n", len(rows))
+	for i, row := range rows {
+		fmt.Fprintf(&b, "  [%d] source=%s kernel=%s route=%s outcome=%s count=%d\n",
+			i, row.Source, row.Kernel, row.Route, row.Outcome, row.Count)
+	}
+	return b.String()
+}
+
 func formatQKernelShapeSummary(rows []QKernelShapeSummary) string {
 	if len(rows) == 0 {
 		return "0 summary row(s)\n"
@@ -1474,6 +1643,25 @@ func formatQFrameSelectColumnSpecs(specs []QFrameSelectColumnSpec) string {
 		)
 		if spec.RowOrderConst >= 0 {
 			fmt.Fprintf(&b, " order_const=%d", spec.RowOrderConst)
+		}
+		b.WriteByte('\n')
+	}
+	return b.String()
+}
+
+func formatQFrameRuntimeKernelReport(kernels []QFrameRuntimeKernel) string {
+	if len(kernels) == 0 {
+		return "0 frame runtime kernel(s)\n"
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "%d frame runtime kernel(s)\n", len(kernels))
+	if counts := CountQFrameRuntimeKernelShapes(kernels); len(counts) > 0 {
+		fmt.Fprintf(&b, "  shapes: %s\n", formatQQueryHotPathShapeCounts(counts))
+	}
+	for i, kernel := range kernels {
+		fmt.Fprintf(&b, "  [%d] shape=%s kernel=%s", i, kernel.Shape(), kernel.Kernel)
+		if kernel.Detail != "" {
+			fmt.Fprintf(&b, " %s", kernel.Detail)
 		}
 		b.WriteByte('\n')
 	}

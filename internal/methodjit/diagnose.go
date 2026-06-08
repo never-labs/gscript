@@ -186,16 +186,19 @@ type DiagReport struct {
 	QVectorReduceHotPathShapes map[string]int           // q vector aggregate count by shape
 	QVectorRuntimeKernels      []QVectorRuntimeKernel   // q vector primitives carried by typed runtime op-exits
 	QVectorRuntimeKernelShapes map[string]int           // q vector typed runtime-kernel count by shape
+	QFrameRuntimeKernels       []QFrameRuntimeKernel    // q frame/select projection primitives carried by typed runtime op-exits
+	QFrameRuntimeKernelShapes  map[string]int           // q frame typed runtime-kernel count by shape
 	QTypedRuntimeKernels       []QFrameSelectColumnSpec // q query primitive pipelines lowered to typed runtime-kernel op-exits
 	QTypedRuntimeKernelShapes  map[string]int           // lowered q typed runtime-kernel count by shape
 	QQueryFallbacks            map[string]int           // q native lowering fallback count by reason code
 	QVectorLoweringFallbacks   map[string]int           // q vector native lowering fallback count by reason code
 	QKernelDescriptors         []QKernelDescriptor      // normalized q kernel runtime/fallback observations
 	QKernelExecutionStats      []QKernelExecutionStat   // observed q typed-runtime kernel execution outcomes
-	QKernelShapeSummary        []QKernelShapeSummary    // source-stable q kernel shape/fallback summary
-	ValidateErrors             []error                  // structural invariant violations
-	RegAllocMap                string                   // human-readable register assignments
-	InterpResult               []runtime.Value          // IR interpreter output on UNOPTIMIZED IR
+	QKernelExecutionRoutes     []QKernelExecutionRouteSummary
+	QKernelShapeSummary        []QKernelShapeSummary // source-stable q kernel shape/fallback summary
+	ValidateErrors             []error               // structural invariant violations
+	RegAllocMap                string                // human-readable register assignments
+	InterpResult               []runtime.Value       // IR interpreter output on UNOPTIMIZED IR
 	InterpError                error
 	OptInterpResult            []runtime.Value // IR interpreter output on OPTIMIZED IR
 	OptInterpError             error
@@ -278,11 +281,13 @@ func Diagnose(proto *vm.FuncProto, args []runtime.Value) *DiagReport {
 		r.QVectorReduceHotPathShapes = CountQVectorReduceHotPathShapes(r.QVectorReduceHotPaths)
 		r.QVectorRuntimeKernels = DetectQVectorRuntimeKernels(fn)
 		r.QVectorRuntimeKernelShapes = CountQVectorRuntimeKernelShapes(r.QVectorRuntimeKernels)
+		r.QFrameRuntimeKernels = DetectQFrameRuntimeKernels(fn)
+		r.QFrameRuntimeKernelShapes = CountQFrameRuntimeKernelShapes(r.QFrameRuntimeKernels)
 		r.QTypedRuntimeKernels = append([]QFrameSelectColumnSpec(nil), fn.QFrameSelectColumnSpecs...)
 		r.QTypedRuntimeKernelShapes = CountQFrameSelectColumnSpecShapes(r.QTypedRuntimeKernels)
 		r.QQueryFallbacks = CountQQueryLoweringFallbackReasons(r.OptimizationRemarks)
 		r.QVectorLoweringFallbacks = CountQVectorLoweringFallbackReasons(r.OptimizationRemarks)
-		r.QKernelDescriptors = BuildQKernelDescriptors(r.QVectorRuntimeKernels, r.QTypedRuntimeKernels, r.OptimizationRemarks)
+		r.QKernelDescriptors = BuildQKernelDescriptors(r.QVectorRuntimeKernels, r.QFrameRuntimeKernels, r.QTypedRuntimeKernels, r.OptimizationRemarks)
 		r.QKernelShapeSummary = BuildQKernelShapeSummaryFromDescriptors(r.QKernelDescriptors)
 		r.NativeError = fmt.Errorf("pipeline error: %w", pipeErr)
 		r.compareResults()
@@ -299,11 +304,13 @@ func Diagnose(proto *vm.FuncProto, args []runtime.Value) *DiagReport {
 	r.QVectorReduceHotPathShapes = CountQVectorReduceHotPathShapes(r.QVectorReduceHotPaths)
 	r.QVectorRuntimeKernels = DetectQVectorRuntimeKernels(optimized)
 	r.QVectorRuntimeKernelShapes = CountQVectorRuntimeKernelShapes(r.QVectorRuntimeKernels)
+	r.QFrameRuntimeKernels = DetectQFrameRuntimeKernels(optimized)
+	r.QFrameRuntimeKernelShapes = CountQFrameRuntimeKernelShapes(r.QFrameRuntimeKernels)
 	r.QTypedRuntimeKernels = append([]QFrameSelectColumnSpec(nil), optimized.QFrameSelectColumnSpecs...)
 	r.QTypedRuntimeKernelShapes = CountQFrameSelectColumnSpecShapes(r.QTypedRuntimeKernels)
 	r.QQueryFallbacks = CountQQueryLoweringFallbackReasons(r.OptimizationRemarks)
 	r.QVectorLoweringFallbacks = CountQVectorLoweringFallbackReasons(r.OptimizationRemarks)
-	r.QKernelDescriptors = BuildQKernelDescriptors(r.QVectorRuntimeKernels, r.QTypedRuntimeKernels, r.OptimizationRemarks)
+	r.QKernelDescriptors = BuildQKernelDescriptors(r.QVectorRuntimeKernels, r.QFrameRuntimeKernels, r.QTypedRuntimeKernels, r.OptimizationRemarks)
 	r.QKernelShapeSummary = BuildQKernelShapeSummaryFromDescriptors(r.QKernelDescriptors)
 	r.PipelineStages = collector.timings
 
@@ -340,6 +347,7 @@ func Diagnose(proto *vm.FuncProto, args []runtime.Value) *DiagReport {
 	r.NativeResult = nativeResult
 	r.NativeError = nativeErr
 	r.QKernelExecutionStats = cf.QKernelExecutionStats()
+	r.QKernelExecutionRoutes = BuildQKernelExecutionRouteSummary(r.QKernelExecutionStats)
 	r.QKernelShapeSummary = BuildQKernelShapeSummaryFromDescriptorsAndExecutionStats(r.QKernelDescriptors, r.QKernelExecutionStats)
 	r.compareResults()
 	return r
@@ -552,11 +560,13 @@ func (r *DiagReport) String() string {
 	w("\n--- Q query hot paths ---\n%s", formatQQueryHotPaths(r.QQueryHotPaths))
 	w("\n--- Q vector conditional hot paths ---\n%s", formatQVectorWhereHotPaths(r.QVectorWhereHotPaths))
 	w("\n--- Q typed runtime kernels ---\n%s", formatQFrameSelectColumnSpecs(r.QTypedRuntimeKernels))
+	w("\n--- Q frame runtime kernels ---\n%s", formatQFrameRuntimeKernelReport(r.QFrameRuntimeKernels))
 	w("\n--- Q typed vector runtime kernels ---\n%s", formatQTypedVectorRuntimeKernelReport(r.QVectorRuntimeKernels))
 	w("\n--- Q query fallback reasons ---\n%s", formatQQueryLoweringFallbackReasons(r.QQueryFallbacks))
 	w("\n--- Q vector fallback reasons ---\n%s", formatQVectorLoweringFallbackReasons(r.QVectorLoweringFallbacks))
 	w("\n--- Q kernel descriptors ---\n%s", formatQKernelDescriptors(r.QKernelDescriptors))
 	w("\n--- Q kernel execution stats ---\n%s", formatQKernelExecutionStats(r.QKernelExecutionStats))
+	w("\n--- Q kernel execution route summary ---\n%s", formatQKernelExecutionRouteSummary(r.QKernelExecutionRoutes))
 	w("\n--- Q kernel shape summary ---\n%s", formatQKernelShapeSummary(r.QKernelShapeSummary))
 	w("\n--- IR (after passes) ---\n%s", r.IRAfter)
 	w("\n--- Register Allocation ---\n%s\n", r.RegAllocMap)

@@ -255,11 +255,14 @@ func TestVectorWhereReduceBytecodeDiagnosesTypedRuntimeKernel(t *testing.T) {
 	assertQKernelShapeSummary(t, report.QKernelShapeSummary, "methodjit_q_vector_runtime", "runtime_kernel", "compare/vector-where/vector-reduce", "supported", "", 1)
 	assertQKernelShapeSummaryExecution(t, report.QKernelShapeSummary, "methodjit_q_vector_runtime", "runtime_kernel", "compare/vector-where/vector-reduce", "supported", 1, 1, 0)
 	assertQKernelExecutionStat(t, report.QKernelExecutionStats, "methodjit_q_vector_runtime", "QVectorWhereReduce", "compare/vector-where/vector-reduce", "typed_runtime_op_exit", "success", 1)
+	assertQKernelExecutionRouteSummary(t, report.QKernelExecutionRoutes, "methodjit_q_vector_runtime", "QVectorWhereReduce", "typed_runtime_op_exit", "success", 1)
 	if len(report.InterpResult) != 1 || !report.InterpResult[0].IsInt() || report.InterpResult[0].Int() != 57 {
 		t.Fatalf("Diagnose vector where-reduce primitive result = %#v, want int 57", report.InterpResult)
 	}
 	if !strings.Contains(report.String(), "kernel=QVectorWhereReduce") ||
-		!strings.Contains(report.String(), "source=methodjit_q_vector_runtime kernel=QVectorWhereReduce shape=compare/vector-where/vector-reduce route=typed_runtime_op_exit outcome=success count=1") {
+		!strings.Contains(report.String(), "source=methodjit_q_vector_runtime kernel=QVectorWhereReduce shape=compare/vector-where/vector-reduce route=typed_runtime_op_exit outcome=success count=1") ||
+		!strings.Contains(report.String(), "Q kernel execution route summary") ||
+		!strings.Contains(report.String(), "source=methodjit_q_vector_runtime kernel=QVectorWhereReduce route=typed_runtime_op_exit outcome=success count=1") {
 		t.Fatalf("diagnostic report missing VM fused primitive typed-kernel evidence:\n%s", report.String())
 	}
 }
@@ -417,8 +420,8 @@ func TestFrameProjectBytecodeBuildsMethodJITIR(t *testing.T) {
 
 func TestFrameProjectColumnBytecodeBuildsMethodJITIR(t *testing.T) {
 	spec := runtime.NewTable()
-	spec.RawSetString("project", runtime.StringValue("price"))
-	spec.RawSetString("column", runtime.StringValue("price"))
+	spec.RawSetString("project", runtime.StringValue("size"))
+	spec.RawSetString("column", runtime.StringValue("size"))
 	proto := &vm.FuncProto{
 		Name:      "frame_project_column",
 		NumParams: 1,
@@ -453,6 +456,25 @@ func TestFrameProjectColumnBytecodeBuildsMethodJITIR(t *testing.T) {
 	}
 	if projectColumn.Aux != 0 {
 		t.Fatalf("OpFrameProjectColumn Aux = %d, want const index 0", projectColumn.Aux)
+	}
+
+	kernels := DetectQFrameRuntimeKernels(fn)
+	if got := CountQFrameRuntimeKernelShapes(kernels)["project/column"]; got != 1 {
+		t.Fatalf("QFrameRuntimeKernelShapes = %+v, want project/column count 1", CountQFrameRuntimeKernelShapes(kernels))
+	}
+	descriptors := BuildQKernelDescriptors(nil, kernels, nil, nil)
+	assertQKernelDescriptor(t, descriptors, "methodjit_q_frame_runtime", "runtime_kernel", "FrameProjectColumn", "project/column", "typed_runtime_op_exit", "supported", "")
+
+	report := Diagnose(proto, []runtime.Value{runtime.TableValue(qHotPathTestFrame(t))})
+	if report.QFrameRuntimeKernelShapes["project/column"] != 1 {
+		t.Fatalf("Diagnose QFrameRuntimeKernelShapes = %+v, want project/column count 1\n%s", report.QFrameRuntimeKernelShapes, report.String())
+	}
+	assertQKernelDescriptor(t, report.QKernelDescriptors, "methodjit_q_frame_runtime", "runtime_kernel", "FrameProjectColumn", "project/column", "typed_runtime_op_exit", "supported", "")
+	assertQKernelShapeSummary(t, report.QKernelShapeSummary, "methodjit_q_frame_runtime", "runtime_kernel", "project/column", "supported", "", 1)
+	if !strings.Contains(report.String(), "Q frame runtime kernels") ||
+		!strings.Contains(report.String(), "kernel=FrameProjectColumn") ||
+		!strings.Contains(report.String(), "source=methodjit_q_frame_runtime kind=runtime_kernel kernel=FrameProjectColumn shape=project/column route=typed_runtime_op_exit outcome=supported") {
+		t.Fatalf("diagnostic report missing frame project-column runtime kernel descriptor:\n%s", report.String())
 	}
 }
 
@@ -1479,6 +1501,125 @@ func TestQFramePrimitiveHotPathDetectsOrderedRows(t *testing.T) {
 	}
 }
 
+func TestQFramePrimitiveHotPathLowersFrameOrderGatherRows(t *testing.T) {
+	names := runtime.NewTable()
+	names.RawSetInt(1, runtime.StringValue("size"))
+	order := runtime.NewTable()
+	order.RawSetString("column", runtime.StringValue("price"))
+	order.RawSetString("desc", runtime.BoolValue(true))
+	order.RawSetString("limit", runtime.IntValue(2))
+	proto := &vm.FuncProto{
+		Name:      "q_frame_order_gather_pipeline",
+		NumParams: 1,
+		MaxStack:  4,
+		Constants: []runtime.Value{
+			runtime.StringValue("price"),
+			runtime.FloatValue(100),
+			runtime.TableValue(order),
+			runtime.TableValue(names),
+			runtime.StringValue("size"),
+		},
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_FRAME_COLUMN, 1, 0, 0),
+			vm.EncodeABx(vm.OP_LOADK, 2, 1),
+			vm.EncodeABC(vm.OP_VECTOR_COMPARE, 1, 2, int(runtime.DenseArrayGE)),
+			vm.EncodeABC(vm.OP_FRAME_FILTER, 0, 0, 1),
+			vm.EncodeABC(vm.OP_FRAME_ORDER_GATHER, 0, 0, 2),
+			vm.EncodeABC(vm.OP_FRAME_PROJECT, 0, 0, 3),
+			vm.EncodeABC(vm.OP_FRAME_COLUMN, 0, 0, 4),
+			vm.EncodeABC(vm.OP_RETURN, 0, 2, 0),
+		},
+	}
+
+	fn := BuildGraph(proto)
+	paths := DetectQQueryHotPaths(fn)
+	if len(paths) != 1 {
+		t.Fatalf("DetectQQueryHotPaths count = %d, want 1\n%s", len(paths), Print(fn))
+	}
+	if paths[0].RowGather == nil || paths[0].RowOrder == nil || paths[0].RowGather.ID != paths[0].RowOrder.ID {
+		t.Fatalf("DetectQQueryHotPaths RowGather=%v RowOrder=%v, want fused OpFrameOrderGather\n%s", paths[0].RowGather, paths[0].RowOrder, Print(fn))
+	}
+	if got := paths[0].Shape(); got != "compare/filter/order/gather/project/column" {
+		t.Fatalf("fused ordered hot path shape = %q, want compare/filter/order/gather/project/column", got)
+	}
+
+	fn.Remarks = &OptimizationRemarks{}
+	lowered, err := QQueryNativeLoweringPass(fn)
+	if err != nil {
+		t.Fatalf("QQueryNativeLoweringPass: %v", err)
+	}
+	if counts := countOps(lowered); counts[OpQFrameSelectColumn] != 1 || counts[OpFrameOrderGather] != 0 {
+		t.Fatalf("lowered op counts QFrameSelectColumn=%d FrameOrderGather=%d, want 1/0\n%s", counts[OpQFrameSelectColumn], counts[OpFrameOrderGather], Print(lowered))
+	}
+	if len(lowered.QFrameSelectColumnSpecs) != 1 {
+		t.Fatalf("QFrameSelectColumnSpecs = %d, want 1\n%s", len(lowered.QFrameSelectColumnSpecs), Print(lowered))
+	}
+	spec := lowered.QFrameSelectColumnSpecs[0]
+	if spec.RowMode != QFrameSelectColumnRowsOrderGather || spec.RowOrderConst != 2 || spec.Shape != "compare/filter/order/gather/project/column" {
+		t.Fatalf("lowered spec row mode/order/shape = %s/%d/%q, want order-gather/2/shape",
+			qFrameSelectColumnRowModeName(spec.RowMode), spec.RowOrderConst, spec.Shape)
+	}
+	descriptors := BuildQKernelDescriptors(DetectQVectorRuntimeKernels(lowered), DetectQFrameRuntimeKernels(lowered), lowered.QFrameSelectColumnSpecs, fn.Remarks.List())
+	assertQKernelDescriptor(t, descriptors, "methodjit_q_frame_runtime", "runtime_kernel", "QFrameSelectColumn", "compare/filter/order/gather/project/column", "typed_runtime_op_exit", "supported", "")
+	summary := BuildQKernelShapeSummaryFromDescriptors(descriptors)
+	assertQKernelShapeSummary(t, summary, "methodjit_q_frame_runtime", "runtime_kernel", "compare/filter/order/gather/project/column", "supported", "", 1)
+}
+
+func TestQFrameSelectColumnOrderGatherDiagnoseReportsNativeExecutionStats(t *testing.T) {
+	proto := &vm.FuncProto{
+		Name:      "q_frame_order_gather_select_column_execution_stats",
+		NumParams: 1,
+		MaxStack:  4,
+		Constants: []runtime.Value{
+			runtime.StringValue("price"),
+			runtime.FloatValue(100),
+			qHotPathOrderValue("price", true),
+			qHotPathNamesValue("size"),
+			runtime.StringValue("size"),
+		},
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_FRAME_COLUMN, 1, 0, 0),
+			vm.EncodeABx(vm.OP_LOADK, 2, 1),
+			vm.EncodeABC(vm.OP_VECTOR_COMPARE, 1, 2, int(runtime.DenseArrayGE)),
+			vm.EncodeABC(vm.OP_FRAME_FILTER, 0, 0, 1),
+			vm.EncodeABC(vm.OP_FRAME_ORDER, 3, 0, 2),
+			vm.EncodeABC(vm.OP_FRAME_GATHER, 0, 0, 3),
+			vm.EncodeABC(vm.OP_FRAME_PROJECT, 0, 0, 3),
+			vm.EncodeABC(vm.OP_FRAME_COLUMN, 0, 0, 4),
+			vm.EncodeABC(vm.OP_RETURN, 0, 2, 0),
+		},
+	}
+
+	report := Diagnose(proto, []runtime.Value{runtime.TableValue(qHotPathTestFrame(t))})
+	if report.InterpError != nil || report.OptInterpError != nil || report.NativeError != nil {
+		t.Fatalf("Diagnose ordered q frame select errors: unopt=%v opt=%v native=%v\n%s",
+			report.InterpError, report.OptInterpError, report.NativeError, report.String())
+	}
+	if len(report.QTypedRuntimeKernels) != 1 {
+		t.Fatalf("Diagnose QTypedRuntimeKernels = %d, want 1\n%s", len(report.QTypedRuntimeKernels), report.String())
+	}
+	const shape = "compare/filter/order/gather/project/column"
+	if report.QTypedRuntimeKernels[0].Shape != shape {
+		t.Fatalf("Diagnose QTypedRuntimeKernels[0].Shape = %q, want %s", report.QTypedRuntimeKernels[0].Shape, shape)
+	}
+	if len(report.NativeResult) != 1 || !report.NativeResult[0].IsDenseArray() {
+		t.Fatalf("ordered q frame native result = %#v, want dense array", report.NativeResult)
+	}
+	got, ok := report.NativeResult[0].DenseArray().I64()
+	if !ok || len(got) != 2 || got[0] != 20 || got[1] != 10 {
+		t.Fatalf("ordered q frame native values = %#v, want [20 10]", got)
+	}
+
+	assertQKernelDescriptor(t, report.QKernelDescriptors, "methodjit_q_frame_runtime", "runtime_kernel", "QFrameSelectColumn", shape, "typed_runtime_op_exit", "supported", "")
+	assertQKernelExecutionStat(t, report.QKernelExecutionStats, "methodjit_q_frame_runtime", "QFrameSelectColumn", shape, "typed_runtime_op_exit", "success", 1)
+	assertQKernelShapeSummary(t, report.QKernelShapeSummary, "methodjit_q_frame_runtime", "runtime_kernel", shape, "supported", "", 1)
+	assertQKernelShapeSummaryExecution(t, report.QKernelShapeSummary, "methodjit_q_frame_runtime", "runtime_kernel", shape, "supported", 1, 1, 0)
+	if !strings.Contains(report.String(), "source=methodjit_q_frame_runtime kernel=QFrameSelectColumn shape="+shape+" route=typed_runtime_op_exit outcome=success count=1") ||
+		!strings.Contains(report.String(), "executions=1 successes=1 errors=0") {
+		t.Fatalf("diagnostic report missing ordered QFrameSelectColumn execution stats:\n%s", report.String())
+	}
+}
+
 func TestQFramePrimitiveHotPathKeepsCrossFrameOrderGatherAsGather(t *testing.T) {
 	names := runtime.NewTable()
 	names.RawSetInt(1, runtime.StringValue("size"))
@@ -1535,7 +1676,7 @@ func TestQFramePrimitiveHotPathKeepsCrossFrameOrderGatherAsGather(t *testing.T) 
 	if got := lowered.QFrameSelectColumnSpecs[0].Shape; got != "compare/filter/gather/project/column" {
 		t.Fatalf("lowered cross-frame order-gather shape = %q, want compare/filter/gather/project/column", got)
 	}
-	descriptors := BuildQKernelDescriptors(DetectQVectorRuntimeKernels(lowered), lowered.QFrameSelectColumnSpecs, fn.Remarks.List())
+	descriptors := BuildQKernelDescriptors(DetectQVectorRuntimeKernels(lowered), DetectQFrameRuntimeKernels(lowered), lowered.QFrameSelectColumnSpecs, fn.Remarks.List())
 	assertQKernelDescriptor(t, descriptors, "methodjit_q_frame_runtime", "runtime_kernel", "QFrameSelectColumn", "compare/filter/gather/project/column", "typed_runtime_op_exit", "supported", "")
 }
 
@@ -2233,6 +2374,7 @@ func TestDiagnoseReportsQQueryHotPath(t *testing.T) {
 	assertQKernelShapeSummary(t, report.QKernelShapeSummary, "methodjit_q_frame_runtime", "runtime_kernel", "compare/filter/project/column", "supported", "", 1)
 	assertQKernelShapeSummaryExecution(t, report.QKernelShapeSummary, "methodjit_q_frame_runtime", "runtime_kernel", "compare/filter/project/column", "supported", 1, 1, 0)
 	assertQKernelExecutionStat(t, report.QKernelExecutionStats, "methodjit_q_frame_runtime", "QFrameSelectColumn", "compare/filter/project/column", "typed_runtime_op_exit", "success", 1)
+	assertQKernelExecutionRouteSummary(t, report.QKernelExecutionRoutes, "methodjit_q_frame_runtime", "QFrameSelectColumn", "typed_runtime_op_exit", "success", 1)
 	if !strings.Contains(report.String(), "Q query hot paths") {
 		t.Fatalf("diagnostic report missing q hot path section:\n%s", report.String())
 	}
@@ -3293,6 +3435,21 @@ func assertQKernelExecutionStat(t *testing.T, rows []QKernelExecutionStat, sourc
 	}
 	t.Fatalf("QKernelExecutionStat missing source=%s kernel=%s shape=%s route=%s outcome=%s; rows=%+v",
 		source, kernel, shape, route, outcome, rows)
+}
+
+func assertQKernelExecutionRouteSummary(t *testing.T, rows []QKernelExecutionRouteSummary, source, kernel, route, outcome string, count uint64) {
+	t.Helper()
+	for _, row := range rows {
+		if row.Source == source && row.Kernel == kernel && row.Route == route && row.Outcome == outcome {
+			if row.Count != count {
+				t.Fatalf("QKernelExecutionRouteSummary %s/%s/%s/%s count = %d, want %d; rows=%+v",
+					source, kernel, route, outcome, row.Count, count, rows)
+			}
+			return
+		}
+	}
+	t.Fatalf("QKernelExecutionRouteSummary missing source=%s kernel=%s route=%s outcome=%s; rows=%+v",
+		source, kernel, route, outcome, rows)
 }
 
 func qHotPathNamesValue(names ...string) runtime.Value {
