@@ -101,12 +101,20 @@ type qSQLKernelShapeStat struct {
 
 type qSQLKernelDecisionKeyStat struct {
 	Key          string
+	Shape        string
 	ReasonCode   string
 	ReasonFamily string
 	Count        int
 }
 
 type qSQLKernelDecisionReasonStat struct {
+	ReasonCode   string
+	ReasonFamily string
+	Count        int
+}
+
+type qSQLKernelDecisionShapeStat struct {
+	Shape        string
 	ReasonCode   string
 	ReasonFamily string
 	Count        int
@@ -187,6 +195,7 @@ var (
 	qSQLKernelCache            = make(map[string]*data.QueryKernel)
 	qSQLKernelOrder            []string
 	qSQLKernelUnsupported      = make(map[string]string)
+	qSQLKernelUnsupportedShape = make(map[string]string)
 	qSQLKernelUnsupportedOrder []string
 	qSQLKernelStatsByKey       = make(map[string]*qSQLKernelCacheKeyStats)
 	qSQLAlignedStats           qSQLPlanCacheStats
@@ -2019,6 +2028,7 @@ func qExplainKernelInfo(args qSQLArgsResult, tmpl qSQLPlanTemplate) qExplainKern
 	qSQLAlignedPlanCacheMu.Lock()
 	cachedKernel, cached := qSQLKernelCache[kernelKey]
 	unsupportedReason, unsupportedCached := qSQLKernelUnsupported[kernelKey]
+	unsupportedShape := qSQLKernelUnsupportedShape[kernelKey]
 	qSQLAlignedPlanCacheMu.Unlock()
 	if cached {
 		reason := cachedKernel.Reason()
@@ -2032,14 +2042,14 @@ func qExplainKernelInfo(args qSQLArgsResult, tmpl qSQLPlanTemplate) qExplainKern
 		return qExplainKernelResult{schema: frame.Schema(), schemaHash: schemaHash, cacheKey: kernelKey, cacheNamespace: kernelKeyInfo.Namespace, cacheKind: kernelKeyInfo.Kind, cacheSchemaHash: kernelKeyInfo.SchemaHash, planFingerprint: planFingerprint, shape: shape, supported: true, cached: true, decisionCached: true, reasonCode: qKernelReasonSupported, reason: reason}
 	}
 	if unsupportedCached {
-		return qExplainKernelResult{schema: frame.Schema(), schemaHash: schemaHash, cacheKey: kernelKey, cacheNamespace: kernelKeyInfo.Namespace, cacheKind: kernelKeyInfo.Kind, cacheSchemaHash: kernelKeyInfo.SchemaHash, planFingerprint: planFingerprint, cached: false, decisionCached: true, reasonCode: stdq.KernelFallbackReasonCode(unsupportedReason), reason: unsupportedReason}
+		return qExplainKernelResult{schema: frame.Schema(), schemaHash: schemaHash, cacheKey: kernelKey, cacheNamespace: kernelKeyInfo.Namespace, cacheKind: kernelKeyInfo.Kind, cacheSchemaHash: kernelKeyInfo.SchemaHash, planFingerprint: planFingerprint, shape: unsupportedShape, cached: false, decisionCached: true, reasonCode: stdq.KernelFallbackReasonCode(unsupportedReason), reason: unsupportedReason}
 	}
 	supported, reason, err := data.QueryKernelCompileReason(frame, plan)
 	if err != nil {
 		return qExplainKernelResult{schema: frame.Schema(), schemaHash: schemaHash, cacheKey: kernelKey, cacheNamespace: kernelKeyInfo.Namespace, cacheKind: kernelKeyInfo.Kind, cacheSchemaHash: kernelKeyInfo.SchemaHash, planFingerprint: planFingerprint, cached: cached, decisionCached: cached, reasonCode: qKernelReasonCompileError, reason: err.Error()}
 	}
 	if !supported {
-		return qExplainKernelResult{schema: frame.Schema(), schemaHash: schemaHash, cacheKey: kernelKey, cacheNamespace: kernelKeyInfo.Namespace, cacheKind: kernelKeyInfo.Kind, cacheSchemaHash: kernelKeyInfo.SchemaHash, planFingerprint: planFingerprint, cached: cached, decisionCached: cached, reasonCode: stdq.KernelFallbackReasonCode(reason), reason: reason}
+		return qExplainKernelResult{schema: frame.Schema(), schemaHash: schemaHash, cacheKey: kernelKey, cacheNamespace: kernelKeyInfo.Namespace, cacheKind: kernelKeyInfo.Kind, cacheSchemaHash: kernelKeyInfo.SchemaHash, planFingerprint: planFingerprint, shape: data.QueryKernelPlanShape(plan), cached: cached, decisionCached: cached, reasonCode: stdq.KernelFallbackReasonCode(reason), reason: reason}
 	}
 	return qExplainKernelResult{schema: frame.Schema(), schemaHash: schemaHash, cacheKey: kernelKey, cacheNamespace: kernelKeyInfo.Namespace, cacheKind: kernelKeyInfo.Kind, cacheSchemaHash: kernelKeyInfo.SchemaHash, planFingerprint: planFingerprint, shape: data.QueryKernelPlanShape(plan), supported: true, cached: cached, decisionCached: cached, reasonCode: qKernelReasonSupported, reason: reason}
 }
@@ -2498,7 +2508,7 @@ func qSQLKernelForFrame(src string, plan data.QueryPlan, frame data.Frame) (*dat
 			_, reason = data.QueryKernelSupportReason(plan)
 			qSQLAlignedPlanCacheMu.Lock()
 			qSQLAlignedStats.KernelDecisionMisses++
-			qSQLKernelUnsupportedStoreLocked(key, reason)
+			qSQLKernelUnsupportedStoreLocked(key, reason, data.QueryKernelPlanShape(plan))
 			qSQLAlignedPlanCacheMu.Unlock()
 		}
 		return nil, ok, reason, err
@@ -2703,7 +2713,7 @@ func qSQLKernelCacheStoreLocked(key string, kernel *data.QueryKernel) {
 	}
 }
 
-func qSQLKernelUnsupportedStoreLocked(key, reason string) {
+func qSQLKernelUnsupportedStoreLocked(key, reason, shape string) {
 	if key == "" || reason == "" {
 		return
 	}
@@ -2711,10 +2721,12 @@ func qSQLKernelUnsupportedStoreLocked(key, reason string) {
 		qSQLKernelUnsupportedOrder = append(qSQLKernelUnsupportedOrder, key)
 	}
 	qSQLKernelUnsupported[key] = reason
+	qSQLKernelUnsupportedShape[key] = shape
 	for len(qSQLKernelUnsupportedOrder) > qSQLPlanCacheLimit {
 		evict := qSQLKernelUnsupportedOrder[0]
 		qSQLKernelUnsupportedOrder = qSQLKernelUnsupportedOrder[1:]
 		delete(qSQLKernelUnsupported, evict)
+		delete(qSQLKernelUnsupportedShape, evict)
 		qSQLAlignedStats.KernelDecisionEvictions++
 	}
 }
@@ -2778,6 +2790,7 @@ func qCacheStatsTable() *Table {
 	kernelShapeStats := qSQLKernelShapeStats(kernelStatsByKey)
 	kernelDecisionKeyStats := qSQLKernelDecisionKeyStatsSnapshotLocked()
 	kernelDecisionReasonStats := qSQLKernelDecisionReasonStatsLocked(kernelDecisionKeyStats)
+	kernelDecisionShapeStats := qSQLKernelDecisionShapeStatsLocked(kernelDecisionKeyStats)
 	qSQLAlignedPlanCacheMu.Unlock()
 
 	qEvalCacheMu.Lock()
@@ -2829,6 +2842,7 @@ func qCacheStatsTable() *Table {
 	)
 	kernelDecisionStatsRow.RawSetString("keys", TableValue(qKernelDecisionKeyStatsTable(kernelDecisionKeyStats)))
 	kernelDecisionStatsRow.RawSetString("reasons", TableValue(qKernelDecisionReasonStatsTable(kernelDecisionReasonStats)))
+	kernelDecisionStatsRow.RawSetString("shapes", TableValue(qKernelDecisionShapeStatsTable(kernelDecisionShapeStats)))
 	rows.RawSetInt(4, TableValue(kernelDecisionStatsRow))
 	queryKernelStatsRow := qCacheStatsRow(
 		"q_query_kernel",
@@ -3005,8 +3019,13 @@ func qSQLKernelDecisionKeyStatsSnapshotLocked() []qSQLKernelDecisionKeyStat {
 	out := make([]qSQLKernelDecisionKeyStat, 0, len(qSQLKernelUnsupported))
 	for key, reason := range qSQLKernelUnsupported {
 		reasonCode := stdq.KernelFallbackReasonCode(reason)
+		shape := qSQLKernelUnsupportedShape[key]
+		if shape == "" {
+			shape = "unknown"
+		}
 		out = append(out, qSQLKernelDecisionKeyStat{
 			Key:          key,
+			Shape:        shape,
 			ReasonCode:   reasonCode,
 			ReasonFamily: qFallbackReasonFamilyForDetail(qFallbackKernelUnsupported, reasonCode, reason),
 			Count:        1,
@@ -3021,6 +3040,40 @@ func qSQLKernelDecisionKeyStatsSnapshotLocked() []qSQLKernelDecisionKeyStat {
 			return a.ReasonCode < b.ReasonCode
 		}
 		return a.Key < b.Key
+	})
+	return out
+}
+
+func qSQLKernelDecisionShapeStatsLocked(keys []qSQLKernelDecisionKeyStat) []qSQLKernelDecisionShapeStat {
+	counts := make(map[qSQLKernelDecisionShapeStat]int, len(keys))
+	for _, key := range keys {
+		shape := key.Shape
+		if shape == "" {
+			shape = "unknown"
+		}
+		counts[qSQLKernelDecisionShapeStat{
+			Shape:        shape,
+			ReasonCode:   key.ReasonCode,
+			ReasonFamily: key.ReasonFamily,
+		}] += key.Count
+	}
+	out := make([]qSQLKernelDecisionShapeStat, 0, len(counts))
+	for stat, count := range counts {
+		stat.Count = count
+		out = append(out, stat)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		a, b := out[i], out[j]
+		if a.Count != b.Count {
+			return a.Count > b.Count
+		}
+		if a.ReasonFamily != b.ReasonFamily {
+			return a.ReasonFamily < b.ReasonFamily
+		}
+		if a.ReasonCode != b.ReasonCode {
+			return a.ReasonCode < b.ReasonCode
+		}
+		return a.Shape < b.Shape
 	})
 	return out
 }
@@ -3065,6 +3118,7 @@ func qKernelDecisionKeyStatsTable(stats []qSQLKernelDecisionKeyStat) *Table {
 			planFingerprint = info.Extra[0]
 		}
 		row.RawSetString("plan_fingerprint", StringValue(planFingerprint))
+		row.RawSetString("shape", StringValue(stat.Shape))
 		row.RawSetString("reason_family", StringValue(stat.ReasonFamily))
 		row.RawSetString("reason_code", StringValue(stat.ReasonCode))
 		row.RawSetString("count", IntValue(int64(stat.Count)))
@@ -3079,6 +3133,19 @@ func qKernelDecisionReasonStatsTable(stats []qSQLKernelDecisionReasonStat) *Tabl
 		row := NewTable()
 		row.RawSetString("reason_family", StringValue(stat.ReasonFamily))
 		row.RawSetString("reason_code", StringValue(stat.ReasonCode))
+		row.RawSetString("count", IntValue(int64(stat.Count)))
+		rows.RawSetInt(int64(i+1), TableValue(row))
+	}
+	return rows
+}
+
+func qKernelDecisionShapeStatsTable(stats []qSQLKernelDecisionShapeStat) *Table {
+	rows := NewAppendArrayTable(len(stats))
+	for i, stat := range stats {
+		row := NewTable()
+		row.RawSetString("reason_family", StringValue(stat.ReasonFamily))
+		row.RawSetString("reason_code", StringValue(stat.ReasonCode))
+		row.RawSetString("shape", StringValue(stat.Shape))
 		row.RawSetString("count", IntValue(int64(stat.Count)))
 		rows.RawSetInt(int64(i+1), TableValue(row))
 	}
@@ -3441,6 +3508,7 @@ func qClearCaches() {
 	qSQLKernelCache = make(map[string]*data.QueryKernel)
 	qSQLKernelOrder = nil
 	qSQLKernelUnsupported = make(map[string]string)
+	qSQLKernelUnsupportedShape = make(map[string]string)
 	qSQLKernelUnsupportedOrder = nil
 	qSQLKernelStatsByKey = make(map[string]*qSQLKernelCacheKeyStats)
 	qSQLAlignedStats = qSQLPlanCacheStats{}

@@ -4197,12 +4197,19 @@ func TestQSQLKernelUnsupportedDecisionCacheIsSchemaStable(t *testing.T) {
 	if keyRows[0].Namespace != src || keyRows[0].Kind != "kernel" || keyRows[0].SchemaHash != frame.SchemaFingerprint() {
 		t.Fatalf("qsql_kernel_decision key row = %+v, want source/schema key metadata", keyRows[0])
 	}
+	if keyRows[0].Shape != "projection|projection=computed" {
+		t.Fatalf("qsql_kernel_decision key shape = %+v, want computed projection shape", keyRows[0])
+	}
 	if keyRows[0].ReasonFamily != qFallbackFamilySelect || keyRows[0].ReasonCode != stdq.KernelFallbackSelectExpression || keyRows[0].Count != 1 {
 		t.Fatalf("qsql_kernel_decision key reason = %+v, want select reason count 1", keyRows[0])
 	}
 	reasonRows := qTestKernelDecisionReasonRows(t, decisionRow.RawGetString("reasons").Table())
 	if got := qTestKernelDecisionReasonCount(reasonRows, qFallbackFamilySelect, stdq.KernelFallbackSelectExpression); got != 1 {
 		t.Fatalf("qsql_kernel_decision select reason aggregate = %d, want 1", got)
+	}
+	shapeRows := qTestKernelDecisionShapeRows(t, decisionRow.RawGetString("shapes").Table())
+	if got := qTestKernelDecisionShapeCount(shapeRows, qFallbackFamilySelect, stdq.KernelFallbackSelectExpression, keyRows[0].Shape); got != 1 {
+		t.Fatalf("qsql_kernel_decision select shape aggregate = %d, want 1", got)
 	}
 }
 
@@ -5418,6 +5425,7 @@ type qKernelDecisionKeyRow struct {
 	Kind            string
 	SchemaHash      string
 	PlanFingerprint string
+	Shape           string
 	ReasonFamily    string
 	ReasonCode      string
 	Count           int64
@@ -5439,10 +5447,11 @@ func qTestKernelDecisionKeyRows(t *testing.T, tbl *Table) []qKernelDecisionKeyRo
 		kind := row.RawGetString("kind")
 		schemaHash := row.RawGetString("schema_hash")
 		planFingerprint := row.RawGetString("plan_fingerprint")
+		shape := row.RawGetString("shape")
 		reasonFamily := row.RawGetString("reason_family")
 		reasonCode := row.RawGetString("reason_code")
 		count := row.RawGetString("count")
-		if !key.IsString() || !namespace.IsString() || !kind.IsString() || !schemaHash.IsString() || !planFingerprint.IsString() || !reasonFamily.IsString() || !reasonCode.IsString() || !count.IsInt() {
+		if !key.IsString() || !namespace.IsString() || !kind.IsString() || !schemaHash.IsString() || !planFingerprint.IsString() || !shape.IsString() || !reasonFamily.IsString() || !reasonCode.IsString() || !count.IsInt() {
 			t.Fatalf("qsql_kernel_decision key row %d malformed: %#v", i, row)
 		}
 		rows = append(rows, qKernelDecisionKeyRow{
@@ -5451,12 +5460,57 @@ func qTestKernelDecisionKeyRows(t *testing.T, tbl *Table) []qKernelDecisionKeyRo
 			Kind:            kind.Str(),
 			SchemaHash:      schemaHash.Str(),
 			PlanFingerprint: planFingerprint.Str(),
+			Shape:           shape.Str(),
 			ReasonFamily:    reasonFamily.Str(),
 			ReasonCode:      reasonCode.Str(),
 			Count:           count.Int(),
 		})
 	}
 	return rows
+}
+
+type qKernelDecisionShapeRow struct {
+	ReasonFamily string
+	ReasonCode   string
+	Shape        string
+	Count        int64
+}
+
+func qTestKernelDecisionShapeRows(t *testing.T, tbl *Table) []qKernelDecisionShapeRow {
+	t.Helper()
+	if tbl == nil {
+		t.Fatal("qsql_kernel_decision shapes table is nil")
+	}
+	rows := make([]qKernelDecisionShapeRow, 0, tbl.Length())
+	for i := 1; i <= tbl.Length(); i++ {
+		row := tbl.RawGetInt(int64(i)).Table()
+		if row == nil {
+			t.Fatalf("qsql_kernel_decision shape row %d is nil", i)
+		}
+		reasonFamily := row.RawGetString("reason_family")
+		reasonCode := row.RawGetString("reason_code")
+		shape := row.RawGetString("shape")
+		count := row.RawGetString("count")
+		if !reasonFamily.IsString() || !reasonCode.IsString() || !shape.IsString() || !count.IsInt() {
+			t.Fatalf("qsql_kernel_decision shape row %d malformed: %#v", i, row)
+		}
+		rows = append(rows, qKernelDecisionShapeRow{
+			ReasonFamily: reasonFamily.Str(),
+			ReasonCode:   reasonCode.Str(),
+			Shape:        shape.Str(),
+			Count:        count.Int(),
+		})
+	}
+	return rows
+}
+
+func qTestKernelDecisionShapeCount(rows []qKernelDecisionShapeRow, reasonFamily, reasonCode, shape string) int64 {
+	for _, row := range rows {
+		if row.ReasonFamily == reasonFamily && row.ReasonCode == reasonCode && row.Shape == shape {
+			return row.Count
+		}
+	}
+	return 0
 }
 
 type qKernelDecisionReasonRow struct {
