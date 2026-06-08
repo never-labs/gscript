@@ -22,9 +22,3 @@ go test ./benchmarks -run '^TestQEvalVectorBenchmarkExpressions$' \
   -benchmem \
   -benchtime="${LEIA_GO_BENCHTIME}" \
   -count="${LEIA_GO_BENCHCOUNT}"
-
-go test ./internal/stdlib/bind -run '^$' \
-  -bench 'BenchmarkQEval(Session|NativeGo)(Adverb|Where|Math|Symbol)' \
-  -benchmem \
-  -benchtime="${LEIA_GO_BENCHTIME}" \
-  -count="${LEIA_GO_BENCHCOUNT}"
