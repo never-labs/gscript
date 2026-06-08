@@ -31,6 +31,11 @@ func (t *Table) RawGetString(key string) Value {
 			return v
 		}
 	}
+	if t.lazyStringGetter != nil {
+		if v, ok := t.lazyStringGetter(key); ok {
+			return v
+		}
+	}
 	return NilValue()
 }
 
@@ -55,6 +60,11 @@ func (t *Table) RawGetStringNoCache(key string) Value {
 	}
 	if t.smap != nil {
 		if v, ok := t.smap[key]; ok {
+			return v
+		}
+	}
+	if t.lazyStringGetter != nil {
+		if v, ok := t.lazyStringGetter(key); ok {
 			return v
 		}
 	}
@@ -96,6 +106,11 @@ func (t *Table) RawGetStringCached(key string, cache *FieldCacheEntry) Value {
 			return v
 		}
 	}
+	if t.lazyStringGetter != nil {
+		if v, ok := t.lazyStringGetter(key); ok {
+			return v
+		}
+	}
 	return NilValue()
 }
 
@@ -133,6 +148,11 @@ func (t *Table) RawGetStringCachedPoly(key string, cache *FieldCacheEntry, poly 
 			return v
 		}
 	}
+	if t.lazyStringGetter != nil {
+		if v, ok := t.lazyStringGetter(key); ok {
+			return v
+		}
+	}
 	return NilValue()
 }
 
@@ -167,6 +187,12 @@ func (t *Table) RawGetStringDynamicCached(key string, cache []TableStringKeyCach
 		if v, ok := t.smap[key]; ok {
 			t.rememberStringMapValueCacheLocked(key, data, keyLen, v)
 			RecordRuntimePathTableStringGetMapHit()
+			return v
+		}
+	}
+	if t.lazyStringGetter != nil {
+		if v, ok := t.lazyStringGetter(key); ok {
+			RecordRuntimePathTableStringGetScanHit()
 			return v
 		}
 	}

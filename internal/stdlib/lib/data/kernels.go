@@ -792,6 +792,9 @@ func accumulateIndexedAggregateRow(state *aggregateState, agg aggregateInput, ro
 }
 
 func rowToGroupFromIndex(index ArrayIndex) ([]int, error) {
+	if len(index.RowToGroup) > 0 {
+		return index.RowToGroup, nil
+	}
 	maxRow := -1
 	for _, rows := range index.Rows {
 		for _, row := range rows {

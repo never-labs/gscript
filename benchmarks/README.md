@@ -49,6 +49,25 @@ bash benchmarks/q_columnar_suite.sh --runs=3 --warmup=1 \
   --json /tmp/leia_q_columnar_timing.json \
   --markdown /tmp/leia_q_columnar_timing.md
 
+# Full q performance suite: q columnar scripts plus Go-level qSQL/q.eval
+# comparisons against hand-written Go with allocation metrics.
+LEIA_GO_BENCHTIME=100x bash benchmarks/q_performance_suite.sh --runs=3 --warmup=1 \
+  --time-source=auto --min-sample-seconds=0.100 --max-repeat=128
+
+# q performance completeness report: qSQL plus ordinary q.eval/list/vector
+# workloads against hand-written Go, with warm/cold, cache/fallback, and allocs.
+python3 benchmarks/q_perf_report.py --benchtime=100x \
+  --json benchmarks/data/q_perf_report_latest.json \
+  --markdown benchmarks/data/q_perf_report_latest.md
+
+# q stateful eval ordinary compute vs hand-written Go with reusable buffers.
+BENCHTIME=100x bash benchmarks/q_general_compute_suite.sh
+
+# q.eval vector/list compute microbenchmarks with Go baselines and allocs/op.
+go test ./benchmarks -run '^TestQEvalVectorBenchmarkExpressions$' \
+  -bench 'Benchmark(QEvalVector(ResultCacheWarm|Cold|GoBaseline)|QSessionEvalVectorWarmExecution)' \
+  -benchmem
+
 # Hot-loop scaling profile for low-resolution workloads.
 python3 benchmarks/timing_compare.py --runs=5 --warmup=1 \
   --scale-profile=hot --sort=luajit-gap \
@@ -98,9 +117,14 @@ accepted by the harness.
 
 ## q Columnar Analytics
 
+`benchmarks/q_performance_suite.sh` is the broad q performance entrypoint. It
+runs the focused q analytics script suite and then runs Go benchmarks for qSQL
+and ordinary q session expressions against hand-written Go baselines with
+`ns/op`, `B/op`, and `allocs/op`.
+
 `benchmarks/q_columnar_suite.sh` runs the focused q analytics baseline for
-runtime and JIT work. The suite is Leia-only and compares the current worktree
-against a clean HEAD build over these stable shapes:
+runtime and JIT work. The script suite is Leia-only and compares the current
+worktree against a clean HEAD build over these stable shapes:
 
 | Benchmark | Focus |
 |---|---|
@@ -109,27 +133,96 @@ against a clean HEAD build over these stable shapes:
 | `data/q_columnar_qsql_group_xbar` | qSQL grouped aggregation over symbol and temporal bucket keys |
 | `data/q_columnar_qsql_asof_join` | qSQL partitioned temporal asof join with projection and filter |
 
-Use the wrapper after q runtime, frame/vector, schema-cache, or JIT path changes
-to keep measurements comparable:
+The Go-level q benchmarks add these direct comparison families:
+
+| Benchmark family | Focus |
+|---|---|
+| `BenchmarkQSQLBind...` | user-facing qSQL warm/cold/cache paths |
+| `BenchmarkQSQLDataRuntime...` | direct Frame/runtime primitive paths |
+| `BenchmarkQSQLNativeGo...` | simple and optimized hand-written Go qSQL baselines |
+| `BenchmarkQEvalSession...` | ordinary q vector/list/math/adverb session expressions |
+| `BenchmarkQEvalNativeGo...` | hand-written Go baselines for the same ordinary q shapes |
+
+Use the full wrapper after q runtime, frame/vector, schema-cache, or JIT path
+changes to keep measurements comparable:
 
 ```bash
-bash benchmarks/q_columnar_suite.sh --runs=5 --warmup=1 \
+LEIA_GO_BENCHTIME=100x bash benchmarks/q_performance_suite.sh --runs=5 --warmup=1 \
   --time-source=auto --min-sample-seconds=0.100 --max-repeat=128
 ```
 
-For runtime-level qSQL work, also run the bind/native comparison benchmarks:
+To run only the Go-level qSQL and q.eval comparison benchmarks:
 
 ```bash
 go test ./internal/stdlib/bind -run '^$' \
-  -bench 'BenchmarkQSQL(Bind|Native)' -benchmem -benchtime=100x
+  -bench 'BenchmarkQ(SQL(Bind|DataRuntime|NativeGo)|Eval(Session|NativeGo))' \
+  -benchmem -benchtime=100x
 ```
+
+For the fuller q performance report, prefer:
+
+```bash
+python3 benchmarks/q_perf_report.py --benchtime=100x \
+  --json benchmarks/data/q_perf_report_latest.json \
+  --markdown benchmarks/data/q_perf_report_latest.md
+```
+
+That report runs:
+
+```bash
+go test ./internal/stdlib/bind -run '^$' \
+  -bench 'BenchmarkQSQL(...)' -benchmem -benchtime=100x
+
+go test ./benchmarks -run '^$' \
+  -bench 'Benchmark(QEval|NativeGoQEval)(...)' -benchmem -benchtime=100x
+```
+
+It intentionally separates qSQL from ordinary `q.eval` list/vector/math/adverb
+workloads. `q.eval` now has hand-written Go baselines and warm/cold cache
+measurements for vector arithmetic/reduce, compare/where, list slice/reduce, and
+math map shapes. The remaining known gap is not timing collection but
+instrumentation:
+qSQL bind benchmarks expose `kernel_hit_pct` and `fallbacks/op`, while ordinary
+`q.eval` currently exposes eval-cache behavior but not per-shape typed runtime
+kernel hit/fallback counters through a benchmark-safe public API.
 
 Read the q performance baseline through these ratios:
 
 | Signal | How to read it |
 |---|---|
 | Current Leia vs old Leia | `benchmarks/q_columnar_suite.sh` reports current worktree vs clean `HEAD`; compare `Current`, `HEAD`, and `HEAD delta` |
-| Current Leia vs hand-written Go | compare `BenchmarkQSQLBind...` rows with `BenchmarkQSQLNativeGo...` rows for the same shape |
+| Current Leia vs hand-written Go | compare `BenchmarkQSQLBind...` rows with `BenchmarkQSQLNativeGo...` rows for qSQL; compare `BenchmarkQEval...`/`BenchmarkNativeGoQEval...` or `BenchmarkQEvalSession...`/`BenchmarkQEvalNativeGo...` rows for ordinary q compute |
 | Warm vs cold | compare `BenchmarkQSQLBindRunSQLWarmCache...` with `BenchmarkQSQLBindRunSQLColdCache...` |
 | Typed kernel hit/fallback rate | use `kernel_hit_pct`, `template_hit_pct`, `aligned_hit_pct`, and `fallbacks/op` in the bind benchmark output |
 | Allocation pressure | use `B/op` and `allocs/op`; q columnar hot paths should trend toward low per-row allocation |
+
+## q.eval Vector/List Compute
+
+`benchmarks/q_eval_vector_bench_test.go` covers ordinary q expressions outside
+qSQL: vector arithmetic, compare mask to `where` indexes, `take`/`drop`/
+`reverse`/`rotate`, adverb scans/reductions, and named list reductions. Each
+shape has three benchmark rows:
+
+| Row | Signal |
+|---|---|
+| `BenchmarkQEvalVectorResultCacheWarm/...` | repeated `q.eval` of one cacheable expression after the current result cache is warm |
+| `BenchmarkQEvalVectorCold/...` | equivalent `q.eval` expressions with distinct cache keys, exercising parse/lower and execution cost |
+| `BenchmarkQSessionEvalVectorWarmExecution/...` | repeated execution through `q.session.eval`, bypassing the global q.eval result cache |
+| `BenchmarkQEvalVectorGoBaseline/...` | hand-written Go loop for the same checksum |
+
+Use `-benchmem` to compare `B/op` and `allocs/op`; use result-cache warm vs
+cold ratios to judge q.eval cache value; use `QSessionEvalVectorWarmExecution`
+vs Go baseline to see how much ordinary vector/list execution still pays in
+bridge, allocation, and dynamic dispatch overhead.
+
+`benchmarks/q_general_compute_suite.sh` runs lower-level stateful q eval
+benchmarks from `internal/stdlib/bind/q_bench_test.go`. These keep source
+vectors in a q eval state so stateless result caching does not hide compute
+cost, then compare against hand-written Go loops with reused output buffers:
+
+| Benchmark pair | Focus |
+|---|---|
+| `BenchmarkQEvalSessionAdverbReduceScanDeltas` / `BenchmarkQEvalNativeGoAdverbReduceScanDeltas` | `+/`, `+\`, and `-':` over numeric vectors |
+| `BenchmarkQEvalSessionWhereTakeDrop` / `BenchmarkQEvalNativeGoWhereTakeDrop` | compare mask to `where`, then `take`/`drop` over indexes |
+| `BenchmarkQEvalSessionMathExpReciprocal` / `BenchmarkQEvalNativeGoMathExpReciprocal` | unary math vector map |
+| `BenchmarkQEvalSessionSymbolSetListOps` / `BenchmarkQEvalNativeGoSymbolSetListOps` | symbol list `except`, `inter`, `union`, and `distinct` |

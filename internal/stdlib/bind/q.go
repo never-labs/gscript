@@ -1939,7 +1939,10 @@ func qTryRunSQLJoinFastPath(sources Value, left data.Frame, tmpl qSQLPlanTemplat
 	if right.hasKeyed {
 		return data.Frame{}, false, nil
 	}
-	opts, ok := qJoinPruneOptions(left, right.frame, join, plan, true)
+	opts, ok := qJoinDirectSelectPruneOptions(left, right.frame, join, plan)
+	if !ok {
+		opts, ok = qJoinPruneOptions(left, right.frame, join, plan, true)
+	}
 	if !ok {
 		return data.Frame{}, false, nil
 	}
@@ -2087,6 +2090,105 @@ func qJoinPruneOptions(left data.Frame, right data.Frame, join *stdq.JoinPlan, p
 		OrderBy:      qJoinPruneOrder(leftSchema, rightSchema, plan),
 		LimitN:       plan.LimitN,
 	}, true
+}
+
+func qJoinDirectSelectPruneOptions(left data.Frame, right data.Frame, join *stdq.JoinPlan, plan data.QueryPlan) (data.JoinOptions, bool) {
+	if join == nil || len(join.Keys) == 0 || plan.Distinct || len(plan.By) > 0 || len(plan.ByExprs) > 0 || len(plan.Aggregates) > 0 || len(plan.Select) == 0 {
+		return data.JoinOptions{}, false
+	}
+	leftSchema := left.Schema()
+	rightSchema := right.Schema()
+	leftNeeded := make([]data.Symbol, 0, len(plan.Select)+len(join.Keys))
+	rightNeeded := make([]data.Symbol, 0, len(plan.Select)+len(join.Keys))
+	for _, key := range join.Keys {
+		leftNeeded = appendSymbolUnique(leftNeeded, key.Left)
+		rightNeeded = appendSymbolUnique(rightNeeded, key.Right)
+	}
+	for _, item := range plan.Select {
+		ref, ok := item.Expr.(data.ColumnRef)
+		if !ok || item.Name != ref.Name {
+			return data.JoinOptions{}, false
+		}
+		if _, ok := leftSchema.Kind(ref.Name); ok {
+			leftNeeded = appendSymbolUnique(leftNeeded, ref.Name)
+			continue
+		}
+		if _, ok := rightSchema.Kind(ref.Name); ok {
+			rightNeeded = appendSymbolUnique(rightNeeded, ref.Name)
+			continue
+		}
+		return data.JoinOptions{}, false
+	}
+	opts := data.JoinOptions{
+		LeftColumns:  qSymbolsInSchemaOrderList(leftSchema, leftNeeded),
+		RightColumns: qSymbolsInSchemaOrderList(rightSchema, rightNeeded),
+		OrderBy:      qJoinPruneOrder(leftSchema, rightSchema, plan),
+		LimitN:       plan.LimitN,
+	}
+	if !qJoinOutputMatchesSelectNoCollision(leftSchema, rightSchema, join, opts, plan.Select) {
+		return data.JoinOptions{}, false
+	}
+	return opts, true
+}
+
+func appendSymbolUnique(symbols []data.Symbol, symbol data.Symbol) []data.Symbol {
+	for _, existing := range symbols {
+		if existing == symbol {
+			return symbols
+		}
+	}
+	return append(symbols, symbol)
+}
+
+func qSymbolsInSchemaOrderList(schema data.Schema, needed []data.Symbol) []data.Symbol {
+	names := schema.Names()
+	out := make([]data.Symbol, 0, len(needed))
+	for _, name := range names {
+		for _, want := range needed {
+			if name == want {
+				out = append(out, name)
+				break
+			}
+		}
+	}
+	return out
+}
+
+func qJoinOutputMatchesSelectNoCollision(leftSchema data.Schema, rightSchema data.Schema, join *stdq.JoinPlan, opts data.JoinOptions, selectItems []data.SelectItem) bool {
+	out := make([]data.Symbol, 0, len(opts.LeftColumns)+len(opts.RightColumns))
+	out = append(out, qJoinOutputSchemaColumns(leftSchema, opts.LeftColumns)...)
+	rightKeys := make([]data.Symbol, 0, len(join.Keys))
+	for _, key := range join.Keys {
+		rightKeys = append(rightKeys, key.Right)
+	}
+	for _, name := range qJoinOutputSchemaColumns(rightSchema, opts.RightColumns) {
+		if containsSymbol(rightKeys, name) {
+			continue
+		}
+		if _, collides := leftSchema.Kind(name); collides {
+			return false
+		}
+		out = append(out, name)
+	}
+	if len(out) != len(selectItems) {
+		return false
+	}
+	for i, item := range selectItems {
+		ref, ok := item.Expr.(data.ColumnRef)
+		if !ok || item.Name != out[i] || ref.Name != out[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func containsSymbol(symbols []data.Symbol, symbol data.Symbol) bool {
+	for _, existing := range symbols {
+		if existing == symbol {
+			return true
+		}
+	}
+	return false
 }
 
 func qJoinPruneOrder(leftSchema, rightSchema data.Schema, plan data.QueryPlan) []data.JoinOrderSpec {
@@ -7731,6 +7833,10 @@ func qDataFrameValue(frame data.Frame) (Value, error) {
 	return qDataFrameFacadeValue(frame)
 }
 
+func qDataFrameResultValue(frame data.Frame) (Value, error) {
+	return qDataFrameLazyFacadeValue(frame)
+}
+
 func qExecDictResultValue(frame data.Frame, plan *stdq.ExecDictPlan) (Value, error) {
 	if plan == nil {
 		return qExecResultValue(frame)
@@ -7791,7 +7897,12 @@ func qRowsFromDataFrame(frame data.Frame) (*Table, error) {
 }
 
 func qDataFrameFacadeValue(frame data.Frame) (Value, error) {
-	names := frame.Schema().Names()
+	return qDataFrameFacadeValueWithNative(frame, true)
+}
+
+func qDataFrameFacadeValueWithNative(frame data.Frame, soaNative bool) (Value, error) {
+	schema := frame.Schema()
+	names := schema.Names()
 	cols := NewTable()
 	kindNames := make([]string, 0, len(names))
 	kindMap := make(map[string]string, len(names))
@@ -7800,7 +7911,7 @@ func qDataFrameFacadeValue(frame data.Frame) (Value, error) {
 		if !ok {
 			return NilValue(), fmt.Errorf("column %q not found", name)
 		}
-		kind, _ := frame.Schema().Kind(name)
+		kind, _ := schema.Kind(name)
 		cols.RawSetString(string(name), dataColumnValue(kind, dataArrayFacadeValue(col, qAnyToColumnValue)))
 		kindNames = append(kindNames, string(name))
 		kindMap[string(name)] = string(kind)
@@ -7819,7 +7930,118 @@ func qDataFrameFacadeValue(frame data.Frame) (Value, error) {
 	}
 	dataDecorateFrameTable(out, nil)
 	qInstallLazyDataFrameRows(out, frame)
-	setDataFrameNativePayload(out, frame)
+	if soaNative {
+		setDataFrameNativePayload(out, frame)
+	} else {
+		setDataFrameNativeFramePayload(out, frame)
+	}
+	return TableValue(out), nil
+}
+
+func qDataFrameLazyFacadeValue(frame data.Frame) (Value, error) {
+	schema := frame.Schema()
+	names := schema.Names()
+	kindNames := make([]string, len(names))
+	kindValues := make([]string, len(names))
+	for i, name := range names {
+		if _, ok := frame.Column(name); !ok {
+			return NilValue(), fmt.Errorf("column %q not found", name)
+		}
+		kind, _ := schema.Kind(name)
+		kindNames[i] = string(name)
+		kindValues[i] = string(kind)
+	}
+	out := NewTable()
+	out.RawSetString(dataFrameMarker, BoolValue(true))
+	out.RawSetString("len", IntValue(int64(frame.Len())))
+	out.RawSetString("kind", StringValue("data_frame"))
+	out.RawSetString("type", StringValue("data_frame"))
+	out.RawSetString("nrows", IntValue(int64(frame.Len())))
+	out.RawSetString("ncols", IntValue(int64(len(names))))
+	kindMap := make(map[string]string, len(kindNames))
+	for i, name := range kindNames {
+		kindMap[name] = kindValues[i]
+	}
+	out.RawSetString("column_names", TableValue(dataColumnNamesTable(kindNames)))
+	out.RawSetString("column_kinds", TableValue(dataColumnKindsTable(kindNames, kindMap)))
+	out.RawSetString("schema", TableValue(dataSchemaTable(kindNames, kindMap)))
+	rowGetter := qLazyDataFrameRowGetter(frame)
+	if rowGetter != nil {
+		out.SetLazyIntGetter(frame.Len(), rowGetter)
+	}
+
+	var columns Value
+	var shape Value
+	var rowFn Value
+	var gatherFn Value
+	var rowsValue Value
+	var columnValues map[string]Value
+	out.SetLazyStringGetter(func(key string) (Value, bool) {
+		switch key {
+		case "columns", "data":
+			if columns.IsNil() {
+				cols := NewTable()
+				for _, name := range names {
+					col, ok := frame.Column(name)
+					if !ok {
+						return NilValue(), false
+					}
+					kind, _ := schema.Kind(name)
+					cols.RawSetString(string(name), dataColumnValue(kind, dataArrayFacadeValue(col, qAnyToColumnValue)))
+				}
+				columns = TableValue(cols)
+			}
+			return columns, true
+		case "shape":
+			if shape.IsNil() {
+				t := NewTable()
+				t.RawSetString("rows", IntValue(int64(frame.Len())))
+				t.RawSetString("columns", IntValue(int64(len(names))))
+				shape = TableValue(t)
+			}
+			return shape, true
+		case "row":
+			if rowFn.IsNil() {
+				rowFn = FunctionValue(&GoFunction{Name: "data.frame.row", Fn: dataFrameRowMethod(out)})
+			}
+			return rowFn, true
+		case "gather":
+			if gatherFn.IsNil() {
+				gatherFn = FunctionValue(&GoFunction{Name: "data.frame.gather", Fn: dataFrameGatherMethod(out)})
+			}
+			return gatherFn, true
+		case "rows":
+			if rowsValue.IsNil() {
+				rows := NewTable()
+				rows.RawSetString("len", IntValue(int64(frame.Len())))
+				if rowGetter != nil {
+					rows.SetLazyIntGetter(frame.Len(), rowGetter)
+				}
+				rowsValue = TableValue(rows)
+			}
+			return rowsValue, true
+		}
+		for _, name := range names {
+			if key != string(name) {
+				continue
+			}
+			if value, ok := columnValues[key]; ok {
+				return value, true
+			}
+			col, ok := frame.Column(name)
+			if !ok {
+				return NilValue(), false
+			}
+			value := dataArrayFacadeValue(col, qAnyToColumnValue)
+			if columnValues == nil {
+				columnValues = make(map[string]Value, len(names))
+			}
+			columnValues[key] = value
+			return value, true
+		}
+		return NilValue(), false
+	})
+	setDataFrameNativeFramePayload(out, frame)
 	return TableValue(out), nil
 }
 
@@ -7827,14 +8049,31 @@ func qInstallLazyDataFrameRows(out *Table, frame data.Frame) {
 	if out == nil || frame.Len() <= 0 {
 		return
 	}
+	getRow := qLazyDataFrameRowGetter(frame)
+	if getRow == nil {
+		return
+	}
+	rows := NewTable()
+	rows.RawSetString("len", IntValue(int64(frame.Len())))
+	rows.SetLazyIntGetter(frame.Len(), getRow)
+	out.RawSetString("rows", TableValue(rows))
+	out.SetLazyIntGetter(frame.Len(), getRow)
+}
+
+func qLazyDataFrameRowGetter(frame data.Frame) func(int64) (Value, bool) {
+	if frame.Len() <= 0 {
+		return nil
+	}
 	names := frame.Schema().Names()
-	cache := make(map[int64]Value)
-	getRow := func(key int64) (Value, bool) {
+	var cache map[int64]Value
+	return func(key int64) (Value, bool) {
 		if key < 1 || key > int64(frame.Len()) {
 			return NilValue(), false
 		}
-		if row, ok := cache[key]; ok {
-			return row, true
+		if cache != nil {
+			if row, ok := cache[key]; ok {
+				return row, true
+			}
 		}
 		row := NewTable()
 		rowIndex := int(key - 1)
@@ -7850,14 +8089,12 @@ func qInstallLazyDataFrameRows(out *Table, frame data.Frame) {
 			row.RawSetString(string(name), qAnyToRowValue(v))
 		}
 		value := TableValue(row)
+		if cache == nil {
+			cache = make(map[int64]Value)
+		}
 		cache[key] = value
 		return value, true
 	}
-	rows := NewTable()
-	rows.RawSetString("len", IntValue(int64(frame.Len())))
-	rows.SetLazyIntGetter(frame.Len(), getRow)
-	out.RawSetString("rows", TableValue(rows))
-	out.SetLazyIntGetter(frame.Len(), getRow)
 }
 
 func qAnyToRowValue(v any) Value {

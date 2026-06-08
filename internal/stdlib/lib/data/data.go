@@ -223,14 +223,17 @@ type ArrayIndex struct {
 	Keys           []any
 	Rows           [][]int
 	RowsByKey      map[string][]int
+	RowToGroup     []int
 	typedRowsByKey any
 }
 
 func (idx ArrayIndex) clone() ArrayIndex {
 	out := ArrayIndex{
-		Attribute: idx.Attribute,
-		Keys:      append([]any(nil), idx.Keys...),
-		Rows:      make([][]int, len(idx.Rows)),
+		Attribute:      idx.Attribute,
+		Keys:           append([]any(nil), idx.Keys...),
+		Rows:           make([][]int, len(idx.Rows)),
+		RowToGroup:     append([]int(nil), idx.RowToGroup...),
+		typedRowsByKey: idx.typedRowsByKey,
 	}
 	if idx.RowsByKey != nil {
 		out.RowsByKey = make(map[string][]int, len(idx.RowsByKey))
@@ -336,10 +339,11 @@ func BuildArrayIndex(array Array, attr Symbol) (ArrayIndex, error) {
 		return ArrayIndex{}, fmt.Errorf("array index source is nil")
 	}
 	index := ArrayIndex{
-		Attribute: attr,
-		Keys:      make([]any, 0),
-		Rows:      make([][]int, 0),
-		RowsByKey: make(map[string][]int),
+		Attribute:  attr,
+		Keys:       make([]any, 0),
+		Rows:       make([][]int, 0),
+		RowsByKey:  make(map[string][]int),
+		RowToGroup: make([]int, array.Len()),
 	}
 	positionByKey := make(map[string]int)
 	for row := 0; row < array.Len(); row++ {
@@ -349,11 +353,13 @@ func BuildArrayIndex(array Array, attr Symbol) (ArrayIndex, error) {
 		}
 		key := arrayValueKey(array.Kind(), value)
 		if position, ok := positionByKey[key]; ok {
+			index.RowToGroup[row] = position
 			index.Rows[position] = append(index.Rows[position], row)
 			index.RowsByKey[key] = append(index.RowsByKey[key], row)
 			continue
 		}
 		positionByKey[key] = len(index.Keys)
+		index.RowToGroup[row] = len(index.Keys)
 		index.Keys = append(index.Keys, value)
 		index.Rows = append(index.Rows, []int{row})
 		index.RowsByKey[key] = []int{row}
@@ -4184,6 +4190,27 @@ func Exec(frame Frame, plan QueryPlan) (Frame, error) {
 	if frame.Len() < 0 {
 		return Frame{}, fmt.Errorf("query frame is empty")
 	}
+	if out, ok, err := execGroupedFilteredWhere(frame, plan); ok || err != nil {
+		if err != nil {
+			return Frame{}, err
+		}
+		if plan.Distinct {
+			out, err = Distinct(out)
+			if err != nil {
+				return Frame{}, err
+			}
+		}
+		if len(plan.OrderBy) > 0 && !plan.PreProjectOrder {
+			out, err = orderFrameLimit(out, plan.OrderBy, plan.LimitN)
+			if err != nil {
+				return Frame{}, err
+			}
+		}
+		if plan.LimitN >= 0 && plan.LimitN < out.Len() {
+			return out.Gather(allIndexes(plan.LimitN))
+		}
+		return out, nil
+	}
 	indexes, err := filterIndexes(frame, plan.Where)
 	if err != nil {
 		return Frame{}, err
@@ -4451,21 +4478,47 @@ func fastFilterIndexes(frame Frame, where Expr) ([]int, bool, error) {
 type rowPredicate func(row int) bool
 
 func fastLogicalAndFilterIndexes(frame Frame, expr Logical) ([]int, bool, error) {
-	left, lok, err := comparisonRowPredicate(frame, expr.Left)
-	if err != nil || !lok {
-		return nil, lok, err
-	}
-	right, rok, err := comparisonRowPredicate(frame, expr.Right)
-	if err != nil || !rok {
-		return nil, rok, err
+	predicate, ok, err := filterRowPredicate(frame, expr)
+	if err != nil || !ok {
+		return nil, ok, err
 	}
 	out := filterIndexScratch(frame.Len())
 	for row := 0; row < frame.Len(); row++ {
-		if left(row) && right(row) {
+		if predicate(row) {
 			out = append(out, row)
 		}
 	}
 	return out, true, nil
+}
+
+func filterRowPredicate(frame Frame, expr Expr) (rowPredicate, bool, error) {
+	switch e := expr.(type) {
+	case Binary:
+		return comparisonRowPredicate(frame, e)
+	case Logical:
+		left, lok, err := filterRowPredicate(frame, e.Left)
+		if err != nil || !lok {
+			return nil, lok, err
+		}
+		right, rok, err := filterRowPredicate(frame, e.Right)
+		if err != nil || !rok {
+			return nil, rok, err
+		}
+		switch e.Op {
+		case "and":
+			return func(row int) bool {
+				return left(row) && right(row)
+			}, true, nil
+		case "or":
+			return func(row int) bool {
+				return left(row) || right(row)
+			}, true, nil
+		default:
+			return nil, false, nil
+		}
+	default:
+		return nil, false, nil
+	}
 }
 
 func comparisonRowPredicate(frame Frame, expr Expr) (rowPredicate, bool, error) {
@@ -5011,6 +5064,73 @@ func execGrouped(frame Frame, indexes []int, plan QueryPlan) (Frame, error) {
 	return NewFrame(cols...)
 }
 
+func execGroupedFilteredWhere(frame Frame, plan QueryPlan) (Frame, bool, error) {
+	if plan.Where == nil || plan.PreProjectOrder || len(plan.Aggregates) == 0 {
+		return Frame{}, false, nil
+	}
+	byItems := groupByItems(plan)
+	if len(byItems) == 0 {
+		return Frame{}, false, nil
+	}
+	predicate, ok, err := filterRowPredicate(frame, plan.Where)
+	if err != nil || !ok {
+		return Frame{}, ok, err
+	}
+	byInputs, err := bindGroupInputs(frame, byItems)
+	if err != nil {
+		return Frame{}, true, err
+	}
+	aggs, err := bindAggregateInputs(frame, plan.Aggregates)
+	if err != nil {
+		return Frame{}, true, err
+	}
+	index, ok, err := groupIndexForSingleColumn(frame, byInputs)
+	if err != nil || !ok {
+		return Frame{}, ok, err
+	}
+	out, ok, err := execGroupedFromFilteredPredicateIndex(frame, byInputs, aggs, index, predicate)
+	return out, ok, err
+}
+
+func bindAggregateInputs(frame Frame, aggregates []Aggregate) ([]aggregateInput, error) {
+	aggs := make([]aggregateInput, len(aggregates))
+	for i, agg := range aggregates {
+		aggs[i].Aggregate = agg
+		if ref, ok := agg.Expr.(ColumnRef); ok {
+			col, ok := frame.Column(ref.Name)
+			if !ok {
+				return nil, fmt.Errorf("unknown column %q", ref.Name)
+			}
+			aggs[i].column = col
+		}
+		if bin, ok := agg.Expr.(Binary); ok {
+			leftRef, leftOK := bin.Left.(ColumnRef)
+			rightRef, rightOK := bin.Right.(ColumnRef)
+			if leftOK && rightOK && isNumericBinaryAggregateOp(bin.Op) {
+				leftCol, ok := frame.Column(leftRef.Name)
+				if !ok {
+					return nil, fmt.Errorf("unknown column %q", leftRef.Name)
+				}
+				rightCol, ok := frame.Column(rightRef.Name)
+				if !ok {
+					return nil, fmt.Errorf("unknown column %q", rightRef.Name)
+				}
+				aggs[i].binaryOp = bin.Op
+				aggs[i].leftColumn = leftCol
+				aggs[i].rightColumn = rightCol
+			}
+		}
+		if ref, ok := agg.Weight.(ColumnRef); ok {
+			col, ok := frame.Column(ref.Name)
+			if !ok {
+				return nil, fmt.Errorf("unknown column %q", ref.Name)
+			}
+			aggs[i].weightColumn = col
+		}
+	}
+	return aggs, nil
+}
+
 type projectionGroup struct {
 	rows      []int
 	positions []int
@@ -5233,6 +5353,51 @@ func execGroupedFromFilteredArrayIndex(frame Frame, byInputs []groupInput, aggs 
 		cols = append(cols, NewColumn(agg.Name, values))
 	}
 	out, err := newFrameTrusted(cols...)
+	return out, true, err
+}
+
+func execGroupedFromFilteredPredicateIndex(frame Frame, byInputs []groupInput, aggs []aggregateInput, index ArrayIndex, predicate rowPredicate) (Frame, bool, error) {
+	if predicate == nil || !groupAggregatesSupportedByTypedIndex(aggs) {
+		return Frame{}, false, nil
+	}
+	states := make([]groupState, len(index.Rows))
+	for group := range index.Rows {
+		states[group] = groupState{
+			keys: []any{index.Keys[group]},
+			aggs: make([]aggregateState, len(aggs)),
+		}
+		for i, agg := range aggs {
+			states[group].aggs[i].fn = agg.Func
+		}
+	}
+	rowToGroup, err := rowToGroupFromIndex(index)
+	if err != nil {
+		return Frame{}, true, err
+	}
+	seen := make([]bool, len(index.Rows))
+	groupOrder := make([]int, 0, len(index.Rows))
+	for row := 0; row < frame.Len(); row++ {
+		if !predicate(row) {
+			continue
+		}
+		if row >= len(rowToGroup) {
+			return Frame{}, true, fmt.Errorf("filter row %d out of range for grouped index", row)
+		}
+		group := rowToGroup[row]
+		if group < 0 {
+			return Frame{}, true, fmt.Errorf("filter row %d is missing from grouped index", row)
+		}
+		if !seen[group] {
+			seen[group] = true
+			groupOrder = append(groupOrder, group)
+		}
+		for i, agg := range aggs {
+			if err := accumulateIndexedAggregateRow(&states[group].aggs[i], agg, row); err != nil {
+				return Frame{}, true, err
+			}
+		}
+	}
+	out, err := buildGroupedAggregateFrame(frame, byInputs, aggs, states, groupOrder)
 	return out, true, err
 }
 

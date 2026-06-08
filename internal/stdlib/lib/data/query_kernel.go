@@ -946,10 +946,8 @@ func (k *QueryKernel) Shape() string {
 func queryKernelFrameReason(frame Frame, plan QueryPlan) string {
 	if len(plan.By)+len(plan.ByExprs) > 0 && len(plan.Aggregates) > 0 {
 		byInputs, err := bindGroupInputs(frame, groupByItems(plan))
-		if err == nil {
-			if _, ok, err := groupIndexForSingleColumn(frame, byInputs); err == nil && ok && queryPlanAggregatesAreIndexedMixedFastPath(plan) {
-				return "data query kernel supported: indexed single-column grouped mixed aggregate fast path"
-			}
+		if err == nil && len(byInputs) == 1 && byInputs[0].column != nil && queryPlanAggregatesAreIndexedMixedFastPath(plan) {
+			return "data query kernel supported: indexed single-column grouped mixed aggregate fast path"
 		}
 	}
 	return ""
@@ -1631,6 +1629,27 @@ func (k *QueryKernel) Exec(frame Frame) (Frame, error) {
 	}
 	plan := k.plan
 	plan.Source = frame
+	if out, ok, err := execGroupedFilteredWhere(frame, plan); ok || err != nil {
+		if err != nil {
+			return Frame{}, err
+		}
+		if plan.Distinct {
+			out, err = Distinct(out)
+			if err != nil {
+				return Frame{}, err
+			}
+		}
+		if len(plan.OrderBy) > 0 && !plan.PreProjectOrder {
+			out, err = orderFrameLimit(out, plan.OrderBy, plan.LimitN)
+			if err != nil {
+				return Frame{}, err
+			}
+		}
+		if plan.LimitN >= 0 && plan.LimitN < out.Len() {
+			return out.Gather(allIndexes(plan.LimitN))
+		}
+		return out, nil
+	}
 	indexes, err := filterIndexes(frame, plan.Where)
 	if err != nil {
 		return Frame{}, err

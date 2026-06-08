@@ -146,6 +146,10 @@ type Table struct {
 	// similar payloads without introducing import cycles.
 	nativePayload     any
 	nativePayloadInfo *NativePayloadInfo
+
+	// lazyStringGetter exposes deferred string fields for native facades whose
+	// script-visible wrappers are expensive and often never inspected.
+	lazyStringGetter func(string) (Value, bool)
 }
 
 // NativePayloadInfo is a small runtime-facing description of an opaque native
@@ -440,6 +444,20 @@ func (t *Table) SetLazyIntGetter(length int, getter func(int64) (Value, bool)) {
 	t.lazyIntLength = length
 }
 
+// SetLazyStringGetter installs a deferred string-keyed view. Concrete string
+// fields keep priority over the getter. Any later write clears the getter along
+// with the native payload to avoid stale derived fields.
+func (t *Table) SetLazyStringGetter(getter func(string) (Value, bool)) {
+	if t == nil {
+		return
+	}
+	if t.mu != nil {
+		t.mu.Lock()
+		defer t.mu.Unlock()
+	}
+	t.lazyStringGetter = getter
+}
+
 // SetNativePayload attaches an opaque host payload to the table. The payload is
 // invalidated by raw table writes, so callers should install it after finishing
 // visible table decoration.
@@ -582,6 +600,7 @@ func (t *Table) clearNativePayloadLocked() {
 	t.nativePayloadInfo = nil
 	t.lazyIntGetter = nil
 	t.lazyIntLength = 0
+	t.lazyStringGetter = nil
 }
 
 // FieldIndex returns the index of a string key in the skeys slice, or -1 if not found.

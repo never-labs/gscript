@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	stddata "github.com/never-labs/leia/internal/stdlib/lib/data"
+	stdq "github.com/never-labs/leia/internal/stdlib/lib/q"
 )
 
 const dataFrameMarker = "__data_frame"
@@ -780,11 +781,18 @@ func dataNativeFramePayload(frame *Table) (stddata.Frame, bool, error) {
 		if info.Kind != NativePayloadDataFrame {
 			return stddata.Frame{}, false, fmt.Errorf("argument 1 must be a data frame")
 		}
-		native, hasPayload := payload.(stddata.Frame)
-		if !hasPayload {
+		switch native := payload.(type) {
+		case stddata.Frame:
+			return native, true, nil
+		case *SoA:
+			out, err := qDataFrameFromSoA(native)
+			if err != nil {
+				return stddata.Frame{}, false, err
+			}
+			return out, true, nil
+		default:
 			return stddata.Frame{}, false, fmt.Errorf("native data frame payload is invalid")
 		}
-		return native, true, nil
 	}
 	if kind, ok := frame.NativePayloadKind(); ok {
 		if kind != NativePayloadDataFrame {
@@ -894,6 +902,18 @@ func setDataFrameNativePayload(table *Table, frame stddata.Frame) {
 	})
 }
 
+func setDataFrameNativeFramePayload(table *Table, frame stddata.Frame) {
+	if table == nil {
+		return
+	}
+	table.SetNativePayloadWithInfo(any(frame), NativePayloadInfo{
+		Kind:       NativePayloadDataFrame,
+		Rows:       frame.Len(),
+		Columns:    len(frame.Schema().Names()),
+		SchemaHash: frame.SchemaFingerprint(),
+	})
+}
+
 func dataFrameRuntimeSoA(frame stddata.Frame) (*SoA, bool) {
 	names := frame.Schema().Names()
 	if len(names) == 0 {
@@ -919,11 +939,14 @@ func dataFrameRuntimeSoA(frame stddata.Frame) (*SoA, bool) {
 }
 
 func dataArrayRuntimeDense(array stddata.Array) (*DenseArray, bool) {
-	if array == nil || dataArrayHasNull(array) {
+	if array == nil {
 		return nil, false
 	}
 	switch array.Kind() {
 	case stddata.KindI64:
+		if dataArrayHasNull(array) {
+			return nil, false
+		}
 		xs := make([]int64, array.Len())
 		for i := range xs {
 			v, ok := array.At(i)
@@ -939,6 +962,9 @@ func dataArrayRuntimeDense(array stddata.Array) (*DenseArray, bool) {
 		}
 		return NewDenseArrayI64(xs), true
 	case stddata.KindF64:
+		if dataArrayHasNull(array) {
+			return nil, false
+		}
 		xs := make([]float64, array.Len())
 		for i := range xs {
 			v, ok := array.At(i)
@@ -954,6 +980,9 @@ func dataArrayRuntimeDense(array stddata.Array) (*DenseArray, bool) {
 		}
 		return NewDenseArrayF64(xs), true
 	case stddata.KindBool:
+		if dataArrayHasNull(array) {
+			return nil, false
+		}
 		out, err := NewDenseArrayOfLen(DenseArrayBool, array.Len())
 		if err != nil {
 			return nil, false
@@ -1300,6 +1329,18 @@ func dataColumnKind(v Value) stddata.Kind {
 }
 
 func dataFrameRows(frame *Table) (*Table, error) {
+	if payload, info, ok := frame.NativeFramePayload(); ok && info.Kind == NativePayloadDataFrame {
+		switch native := payload.(type) {
+		case stddata.Frame:
+			return dataRowsFromNativeFrame(native)
+		case *SoA:
+			libFrame, err := qDataFrameFromSoA(native)
+			if err != nil {
+				return nil, err
+			}
+			return dataRowsFromNativeFrame(libFrame)
+		}
+	}
 	nv := frame.RawGetString("len")
 	if !nv.IsInt() {
 		return nil, fmt.Errorf("data.rows: frame len is invalid")
@@ -1310,6 +1351,7 @@ func dataFrameRows(frame *Table) (*Table, error) {
 		return nil, fmt.Errorf("data.rows: frame columns are invalid")
 	}
 	names := dataColumnNames(frame)
+	kinds := dataColumnKinds(frame)
 	out := NewAppendArrayTable(n)
 	for i := 0; i < n; i++ {
 		row := NewTable()
@@ -1318,11 +1360,57 @@ func dataFrameRows(frame *Table) (*Table, error) {
 			if err != nil {
 				return nil, fmt.Errorf("data.rows column %q: %w", name, err)
 			}
-			row.RawSetString(name, v)
+			kind := stddata.Kind(kinds[name])
+			row.RawSetString(name, dataNativeRowValue(kind, dataValueAnyForKind(v, kind)))
 		}
 		out.RawSetInt(int64(i+1), TableValue(row))
 	}
 	return out, nil
+}
+
+func dataRowsFromNativeFrame(frame stddata.Frame) (*Table, error) {
+	names := frame.Schema().Names()
+	out := NewAppendArrayTable(frame.Len())
+	for rowIdx := 0; rowIdx < frame.Len(); rowIdx++ {
+		row := NewTable()
+		for _, name := range names {
+			col, ok := frame.Column(name)
+			if !ok {
+				return nil, fmt.Errorf("data.rows column %q: missing native column", name)
+			}
+			v, ok := col.At(rowIdx)
+			if !ok {
+				return nil, fmt.Errorf("data.rows column %q row %d out of range", name, rowIdx+1)
+			}
+			row.RawSetString(string(name), dataNativeRowValue(col.Kind(), v))
+		}
+		out.RawSetInt(int64(rowIdx+1), TableValue(row))
+	}
+	return out, nil
+}
+
+func dataNativeRowValue(kind stddata.Kind, v any) Value {
+	if stddata.IsNull(v) {
+		switch kind {
+		case stddata.KindI8, stddata.KindI16, stddata.KindI32, stddata.KindI64,
+			stddata.KindU8, stddata.KindU16, stddata.KindU32, stddata.KindU64,
+			stddata.KindF32, stddata.KindF64, stddata.KindString, stddata.KindSymbol:
+			return dataTypedNullValue(kind)
+		case stddata.KindMonth, stddata.KindDate, stddata.KindDateTime, stddata.KindTimespan,
+			stddata.KindMinute, stddata.KindSecond, stddata.KindTime, stddata.KindTimestamp:
+			return dataTypedNullValue(kind)
+		default:
+			return NilValue()
+		}
+	}
+	switch kind {
+	case stddata.KindMonth, stddata.KindDate, stddata.KindTime, stddata.KindDateTime, stddata.KindTimespan,
+		stddata.KindMinute, stddata.KindSecond, stddata.KindTimestamp:
+		if text, ok := stdq.FormatTemporal(v); ok {
+			return StringValue(text)
+		}
+	}
+	return dataValueFromAny(v)
 }
 
 func dataColumnKinds(frame *Table) map[string]string {
