@@ -724,6 +724,34 @@ func TestFrameGroupAggregatePrimitiveSingleKeyAndMask(t *testing.T) {
 	}
 }
 
+func TestFrameGroupAggregatePrimitiveMultiKey(t *testing.T) {
+	frame := frameGroupAggregateTestFrame(t)
+	spec := frameGroupAggregateSpecMulti([]string{"acct", "flag"}, []runtime.FrameAggregateSpec{
+		{Name: "n", Op: "count"},
+		{Name: "total", Op: "sum", Column: "qty"},
+	})
+	proto := &FuncProto{
+		MaxStack: 2,
+		Code: []uint32{
+			EncodeABx(OP_LOADK, 0, 0),
+			EncodeABC(OP_LOADNIL, 1, 0, 0),
+			EncodeABC(OP_FRAME_GROUP_AGGREGATE, 1, 0, 1),
+			EncodeABC(OP_RETURN, 1, 2, 0),
+		},
+		Constants: []runtime.Value{runtime.TableValue(frame), runtime.TableValue(spec)},
+	}
+
+	results, err := New(map[string]runtime.Value{}).Execute(proto)
+	if err != nil {
+		t.Fatalf("Execute FRAME_GROUP_AGGREGATE multi-key: %v", err)
+	}
+	out := frameGroupAggregateResultSoA(t, results)
+	assertI64Column(t, out, "acct", []int64{1, 1, 2})
+	assertBoolColumn(t, out, "flag", []bool{true, false, true})
+	assertI64Column(t, out, "n", []int64{2, 1, 1})
+	assertI64Column(t, out, "total", []int64{17, 5, 3})
+}
+
 func TestFrameGroupAggregatePrimitiveRejectsUnsupportedSumColumn(t *testing.T) {
 	frame := frameGroupAggregateTestFrame(t)
 	spec := frameGroupAggregateSpec("", []runtime.FrameAggregateSpec{
@@ -856,6 +884,24 @@ func frameGroupAggregateSpec(by string, aggs []runtime.FrameAggregateSpec) *runt
 	if by != "" {
 		spec.RawSetString("by", runtime.StringValue(by))
 	}
+	frameGroupAggregateSetAggs(spec, aggs)
+	return spec
+}
+
+func frameGroupAggregateSpecMulti(by []string, aggs []runtime.FrameAggregateSpec) *runtime.Table {
+	spec := runtime.NewTable()
+	if len(by) > 0 {
+		byTable := runtime.NewAppendArrayTable(len(by))
+		for i, name := range by {
+			byTable.RawSetInt(int64(i+1), runtime.StringValue(name))
+		}
+		spec.RawSetString("by", runtime.TableValue(byTable))
+	}
+	frameGroupAggregateSetAggs(spec, aggs)
+	return spec
+}
+
+func frameGroupAggregateSetAggs(spec *runtime.Table, aggs []runtime.FrameAggregateSpec) {
 	aggRows := runtime.NewAppendArrayTable(len(aggs))
 	for i, agg := range aggs {
 		row := runtime.NewTable()
@@ -867,7 +913,6 @@ func frameGroupAggregateSpec(by string, aggs []runtime.FrameAggregateSpec) *runt
 		aggRows.RawSetInt(int64(i+1), runtime.TableValue(row))
 	}
 	spec.RawSetString("aggregates", runtime.TableValue(aggRows))
-	return spec
 }
 
 func frameGroupAggregateResultSoA(t *testing.T, results []runtime.Value) *runtime.SoA {
@@ -915,6 +960,26 @@ func assertF64Column(t *testing.T, soa *runtime.SoA, name string, want []float64
 	got, ok := col.F64()
 	if !ok {
 		t.Fatalf("column %q dtype = %s, want f64", name, col.DType())
+	}
+	if len(got) != len(want) {
+		t.Fatalf("column %q len = %d, want %d", name, len(got), len(want))
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("column %q[%d] = %v, want %v", name, i, got[i], want[i])
+		}
+	}
+}
+
+func assertBoolColumn(t *testing.T, soa *runtime.SoA, name string, want []bool) {
+	t.Helper()
+	col, ok := soa.Column(name)
+	if !ok {
+		t.Fatalf("missing bool column %q", name)
+	}
+	got, ok := col.Bool()
+	if !ok {
+		t.Fatalf("column %q dtype = %s, want bool", name, col.DType())
 	}
 	if len(got) != len(want) {
 		t.Fatalf("column %q len = %d, want %d", name, len(got), len(want))

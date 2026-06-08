@@ -918,6 +918,7 @@ type FrameAggregateSpec struct {
 
 type FrameGroupAggregateSpec struct {
 	By         string
+	ByColumns  []string
 	Aggregates []FrameAggregateSpec
 }
 
@@ -932,10 +933,14 @@ func DecodeFrameGroupAggregateSpec(v Value) (FrameGroupAggregateSpec, error) {
 		by = tbl.RawGetInt(1)
 	}
 	if !by.IsNil() {
-		if !by.IsString() {
-			return FrameGroupAggregateSpec{}, fmt.Errorf("FRAME_GROUP_AGGREGATE by must be a string")
+		byColumns, err := decodeFrameGroupAggregateByColumns(by)
+		if err != nil {
+			return FrameGroupAggregateSpec{}, err
 		}
-		spec.By = by.Str()
+		spec.ByColumns = byColumns
+		if len(byColumns) == 1 {
+			spec.By = byColumns[0]
+		}
 	}
 	aggs := tbl.RawGetString("aggregates")
 	if aggs.IsNil() {
@@ -970,9 +975,16 @@ func validateFrameGroupAggregateSpec(spec FrameGroupAggregateSpec) error {
 	if len(spec.Aggregates) == 0 {
 		return fmt.Errorf("FRAME_GROUP_AGGREGATE requires at least one aggregate")
 	}
+	byColumns := frameGroupAggregateByColumns(spec)
 	seenOutputs := make(map[string]struct{}, len(spec.Aggregates)+1)
-	if spec.By != "" {
-		seenOutputs[spec.By] = struct{}{}
+	for _, by := range byColumns {
+		if by == "" {
+			return fmt.Errorf("FRAME_GROUP_AGGREGATE by column must be non-empty")
+		}
+		if _, ok := seenOutputs[by]; ok {
+			return fmt.Errorf("FRAME_GROUP_AGGREGATE duplicate by column %q", by)
+		}
+		seenOutputs[by] = struct{}{}
 	}
 	for _, agg := range spec.Aggregates {
 		if agg.Name == "" {
@@ -990,6 +1002,40 @@ func validateFrameGroupAggregateSpec(spec FrameGroupAggregateSpec) error {
 		}
 	}
 	return nil
+}
+
+func decodeFrameGroupAggregateByColumns(v Value) ([]string, error) {
+	if v.IsString() {
+		if v.Str() == "" {
+			return nil, fmt.Errorf("FRAME_GROUP_AGGREGATE by column must be non-empty")
+		}
+		return []string{v.Str()}, nil
+	}
+	if !v.IsTable() {
+		return nil, fmt.Errorf("FRAME_GROUP_AGGREGATE by must be a string or table of strings")
+	}
+	tbl := v.Table()
+	out := make([]string, 0, tbl.Length())
+	for i := int64(1); i <= int64(tbl.Length()); i++ {
+		item := tbl.RawGetInt(i)
+		if !item.IsString() || item.Str() == "" {
+			return nil, fmt.Errorf("FRAME_GROUP_AGGREGATE by column %d must be a string", i)
+		}
+		out = append(out, item.Str())
+	}
+	return out, nil
+}
+
+func frameGroupAggregateByColumns(spec FrameGroupAggregateSpec) []string {
+	if len(spec.ByColumns) > 0 {
+		out := make([]string, len(spec.ByColumns))
+		copy(out, spec.ByColumns)
+		return out
+	}
+	if spec.By == "" {
+		return nil
+	}
+	return []string{spec.By}
 }
 
 func decodeFrameAggregateSpec(tbl *Table, index int) (FrameAggregateSpec, error) {
@@ -1051,7 +1097,7 @@ func (v Value) NativeFrameGroupAggregate(mask *DenseArray, spec FrameGroupAggreg
 
 func frameGroupAggregateSchemaSignature(spec FrameGroupAggregateSpec) []string {
 	out := make([]string, 0, len(spec.Aggregates)+1)
-	out = append(out, "by="+spec.By)
+	out = append(out, "by="+strings.Join(frameGroupAggregateByColumns(spec), "+"))
 	for _, agg := range spec.Aggregates {
 		out = append(out, "agg="+agg.Name+":"+strings.ToLower(agg.Op)+":"+agg.Column)
 	}
@@ -1059,12 +1105,17 @@ func frameGroupAggregateSchemaSignature(spec FrameGroupAggregateSpec) []string {
 }
 
 func nativeFrameGroupAggregate(frame *SoA, mask *DenseArray, spec FrameGroupAggregateSpec) (*SoA, error) {
-	if spec.By == "" {
+	byColumns := frameGroupAggregateByColumns(spec)
+	if len(byColumns) == 0 {
 		return nativeFrameNoKeyAggregate(frame, mask, spec.Aggregates)
 	}
-	keyCol, ok := frame.Column(spec.By)
-	if !ok {
-		return nil, fmt.Errorf("FRAME_GROUP_AGGREGATE unknown by column %q", spec.By)
+	keyCols := make([]*DenseArray, len(byColumns))
+	for i, name := range byColumns {
+		col, ok := frame.Column(name)
+		if !ok {
+			return nil, fmt.Errorf("FRAME_GROUP_AGGREGATE unknown by column %q", name)
+		}
+		keyCols[i] = col
 	}
 	groups := make(map[string]int)
 	order := make([]int, 0)
@@ -1074,7 +1125,7 @@ func nativeFrameGroupAggregate(frame *SoA, mask *DenseArray, spec FrameGroupAggr
 		if mask != nil && !mask.bools[i] {
 			continue
 		}
-		key := nativeFrameGroupKey(keyCol, i)
+		key := nativeFrameCompositeGroupKey(keyCols, i)
 		group, ok := groups[key]
 		if !ok {
 			group = len(order)
@@ -1083,12 +1134,14 @@ func nativeFrameGroupAggregate(frame *SoA, mask *DenseArray, spec FrameGroupAggr
 		}
 		rowGroups[i] = group
 	}
-	cols := make(map[string]*DenseArray, len(spec.Aggregates)+1)
-	keyOut, err := nativeFrameGroupKeyColumn(keyCol, order)
-	if err != nil {
-		return nil, err
+	cols := make(map[string]*DenseArray, len(spec.Aggregates)+len(byColumns))
+	for i, name := range byColumns {
+		keyOut, err := nativeFrameGroupKeyColumn(keyCols[i], order)
+		if err != nil {
+			return nil, err
+		}
+		cols[name] = keyOut
 	}
-	cols[spec.By] = keyOut
 	for _, agg := range spec.Aggregates {
 		col, err := nativeFrameGroupedAggregateColumn(frame, rowGroups, len(order), agg)
 		if err != nil {
@@ -1122,6 +1175,20 @@ func nativeFrameGroupKey(col *DenseArray, row int) string {
 	default:
 		return "unknown"
 	}
+}
+
+func nativeFrameCompositeGroupKey(cols []*DenseArray, row int) string {
+	if len(cols) == 1 {
+		return nativeFrameGroupKey(cols[0], row)
+	}
+	var b strings.Builder
+	for i, col := range cols {
+		if i > 0 {
+			b.WriteByte('|')
+		}
+		b.WriteString(nativeFrameGroupKey(col, row))
+	}
+	return b.String()
 }
 
 func nativeFrameGroupKeyColumn(col *DenseArray, rows []int) (*DenseArray, error) {
