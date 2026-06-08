@@ -2628,6 +2628,28 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 				fb.Result.Observe(vm.regs[base+a].Type())
 			}
 
+		case OP_VECTOR_WHERE:
+			a := DecodeA(inst)
+			b := DecodeB(inst)
+			c := DecodeC(inst)
+			maskVal := vm.regs[base+a]
+			trueVal := vm.regs[base+b]
+			falseVal := vm.regs[base+c]
+			if !maskVal.IsDenseArray() {
+				return nil, wrapLineErr(frame, fmt.Errorf("VECTOR_WHERE mask must be dense array (got %s)", maskVal.TypeName()))
+			}
+			out, err := runtime.DenseArrayWhere(maskVal.DenseArray(), trueVal, falseVal)
+			if err != nil {
+				return nil, wrapLineErr(frame, err)
+			}
+			vm.regs[base+a] = runtime.DenseArrayValue(out)
+			if frame.closure.Proto.Feedback != nil {
+				fb := &frame.closure.Proto.Feedback[frame.pc-1]
+				fb.Left.Observe(maskVal.Type())
+				fb.Right.Observe(trueVal.Type())
+				fb.Result.Observe(vm.regs[base+a].Type())
+			}
+
 		case OP_VECTOR_GATHER:
 			a := DecodeA(inst)
 			b := DecodeB(inst)
