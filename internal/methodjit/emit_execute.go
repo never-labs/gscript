@@ -1188,7 +1188,12 @@ func (cf *CompiledFunction) executeOpExit(ctx *ExecContext, regs []runtime.Value
 			hasRHS = true
 		}
 		shape := qFrameSelectColumnExecutionShape(cf.QFrameSelectColumnSpecs, int(aux))
-		out, err := executeQFrameSelectColumnValue(cf.Proto.Constants, cf.QFrameSelectColumnSpecs, int(aux), regs[arg1], rhs, hasRHS)
+		plan, err := cf.qFrameSelectColumnRuntimePlan(cf.Proto.Constants, int(aux), regs[arg1])
+		if err != nil {
+			cf.recordQKernelExecutionForFrame("methodjit_q_frame_runtime", "QFrameSelectColumn", shape, "typed_runtime_op_exit", "error", regs[arg1])
+			return err
+		}
+		out, err := executeQFrameSelectColumnPlannedValue(cf.Proto.Constants, cf.QFrameSelectColumnSpecs, int(aux), plan, regs[arg1], rhs, hasRHS)
 		if err != nil {
 			cf.recordQKernelExecutionForFrame("methodjit_q_frame_runtime", "QFrameSelectColumn", shape, "typed_runtime_op_exit", "error", regs[arg1])
 			return err

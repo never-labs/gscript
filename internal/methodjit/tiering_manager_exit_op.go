@@ -549,7 +549,12 @@ func (tm *TieringManager) executeOpExit(ctx *ExecContext, regs []runtime.Value, 
 			hasRHS = true
 		}
 		shape := qFrameSelectColumnExecutionShape(cf.QFrameSelectColumnSpecs, int(aux))
-		out, err := executeQFrameSelectColumnValue(proto.Constants, cf.QFrameSelectColumnSpecs, int(aux), regs[absArg1], rhs, hasRHS)
+		plan, err := cf.qFrameSelectColumnRuntimePlan(proto.Constants, int(aux), regs[absArg1])
+		if err != nil {
+			cf.recordQKernelExecutionForFrame("methodjit_q_frame_runtime", "QFrameSelectColumn", shape, "typed_runtime_op_exit", "error", regs[absArg1])
+			return err
+		}
+		out, err := executeQFrameSelectColumnPlannedValue(proto.Constants, cf.QFrameSelectColumnSpecs, int(aux), plan, regs[absArg1], rhs, hasRHS)
 		if err != nil {
 			cf.recordQKernelExecutionForFrame("methodjit_q_frame_runtime", "QFrameSelectColumn", shape, "typed_runtime_op_exit", "error", regs[absArg1])
 			return err

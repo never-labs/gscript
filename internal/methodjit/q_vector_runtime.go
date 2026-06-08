@@ -167,6 +167,10 @@ func executeFrameFilterOrderGatherProjectColumnDenseValue(frameVal runtime.Value
 	if err != nil {
 		return runtime.NilValue(), err
 	}
+	return executeFrameFilterOrderGatherProjectColumnDenseParsedValue(frameVal, mask, orderNames, desc, limit, names, resultName)
+}
+
+func executeFrameFilterOrderGatherProjectColumnDenseParsedValue(frameVal runtime.Value, mask *runtime.DenseArray, orderNames []string, desc []bool, limit int, names []string, resultName string) (runtime.Value, error) {
 	out, handled, err := frameVal.NativeFrameFilterOrderGatherProjectColumn(mask, orderNames, desc, limit, names, resultName)
 	if err != nil {
 		return runtime.NilValue(), err
@@ -405,6 +409,201 @@ func executeQFrameSelectColumnValue(constants []runtime.Value, specs []QFrameSel
 	return executeFrameProjectColumnValue(rows, names, resultName)
 }
 
+type qFrameSelectColumnRuntimePlan struct {
+	names      []string
+	resultName string
+
+	sourceColumnName    string
+	hasSourceColumnName bool
+
+	maskSpec    frameMaskSpecData
+	hasMaskSpec bool
+
+	termSourceColumnNames []string
+	termHasSourceColumn   []bool
+	termMaskSpecs         []frameMaskSpecData
+	termHasMaskSpec       []bool
+
+	orderNames []string
+	orderDesc  []bool
+	orderLimit int
+	hasOrder   bool
+}
+
+func buildQFrameSelectColumnRuntimePlan(constants []runtime.Value, specs []QFrameSelectColumnSpec, specIdx int) (qFrameSelectColumnRuntimePlan, error) {
+	if specIdx < 0 || specIdx >= len(specs) {
+		return qFrameSelectColumnRuntimePlan{}, fmt.Errorf("QFrameSelectColumn spec index %d is out of range", specIdx)
+	}
+	spec := specs[specIdx]
+	if spec.ProjectConst < 0 || spec.ProjectConst >= len(constants) {
+		return qFrameSelectColumnRuntimePlan{}, fmt.Errorf("QFrameSelectColumn project constant is out of range")
+	}
+	names, err := frameProjectColumnNames(constants[spec.ProjectConst])
+	if err != nil {
+		return qFrameSelectColumnRuntimePlan{}, err
+	}
+	if spec.ResultColumnConst < 0 || spec.ResultColumnConst >= len(constants) || !constants[spec.ResultColumnConst].IsString() {
+		return qFrameSelectColumnRuntimePlan{}, fmt.Errorf("QFrameSelectColumn result column must be a string constant")
+	}
+	plan := qFrameSelectColumnRuntimePlan{
+		names:      append([]string(nil), names...),
+		resultName: constants[spec.ResultColumnConst].Str(),
+		orderLimit: -1,
+	}
+	if len(spec.MaskTerms) == 0 && spec.MaskSpecConst < 0 && spec.SourceColumnConst >= 0 {
+		if spec.SourceColumnConst >= len(constants) || !constants[spec.SourceColumnConst].IsString() {
+			return qFrameSelectColumnRuntimePlan{}, fmt.Errorf("QFrameSelectColumn source column must be a string constant")
+		}
+		plan.sourceColumnName = constants[spec.SourceColumnConst].Str()
+		plan.hasSourceColumnName = true
+	}
+	if len(spec.MaskTerms) == 0 && spec.MaskSpecConst >= 0 {
+		if spec.MaskSpecConst >= len(constants) {
+			return qFrameSelectColumnRuntimePlan{}, fmt.Errorf("QFrameSelectColumn mask spec constant is out of range")
+		}
+		maskSpec, err := frameMaskSpecDetails(constants[spec.MaskSpecConst])
+		if err != nil {
+			return qFrameSelectColumnRuntimePlan{}, err
+		}
+		plan.maskSpec = maskSpec
+		plan.hasMaskSpec = true
+	}
+	if len(spec.MaskTerms) > 0 {
+		plan.termSourceColumnNames = make([]string, len(spec.MaskTerms))
+		plan.termHasSourceColumn = make([]bool, len(spec.MaskTerms))
+		plan.termMaskSpecs = make([]frameMaskSpecData, len(spec.MaskTerms))
+		plan.termHasMaskSpec = make([]bool, len(spec.MaskTerms))
+		visiting := make([]bool, len(spec.MaskTerms))
+		if err := populateQFrameSelectColumnMaskTermPlan(constants, spec, &plan, spec.MaskRoot, visiting); err != nil {
+			return qFrameSelectColumnRuntimePlan{}, err
+		}
+	}
+	if spec.RowMode == QFrameSelectColumnRowsOrderGather {
+		if spec.RowOrderConst < 0 || spec.RowOrderConst >= len(constants) {
+			return qFrameSelectColumnRuntimePlan{}, fmt.Errorf("QFrameSelectColumn order spec constant is out of range")
+		}
+		orderNames, desc, limit, err := frameOrderSpec(constants[spec.RowOrderConst])
+		if err != nil {
+			return qFrameSelectColumnRuntimePlan{}, err
+		}
+		plan.orderNames = append([]string(nil), orderNames...)
+		plan.orderDesc = append([]bool(nil), desc...)
+		plan.orderLimit = limit
+		plan.hasOrder = true
+	}
+	return plan, nil
+}
+
+func populateQFrameSelectColumnMaskTermPlan(constants []runtime.Value, spec QFrameSelectColumnSpec, plan *qFrameSelectColumnRuntimePlan, termIdx int, visiting []bool) error {
+	if termIdx < 0 || termIdx >= len(spec.MaskTerms) {
+		return fmt.Errorf("QFrameSelectColumn mask term is out of range")
+	}
+	if visiting[termIdx] {
+		return fmt.Errorf("QFrameSelectColumn mask term contains a cycle")
+	}
+	term := spec.MaskTerms[termIdx]
+	switch term.Kind {
+	case QFrameMaskTermCompare:
+		if plan.termHasSourceColumn[termIdx] {
+			return nil
+		}
+		if term.SourceColumnConst < 0 || term.SourceColumnConst >= len(constants) || !constants[term.SourceColumnConst].IsString() {
+			return fmt.Errorf("QFrameSelectColumn mask term source column must be a string constant")
+		}
+		plan.termSourceColumnNames[termIdx] = constants[term.SourceColumnConst].Str()
+		plan.termHasSourceColumn[termIdx] = true
+	case QFrameMaskTermFrameMask:
+		if plan.termHasMaskSpec[termIdx] {
+			return nil
+		}
+		if term.MaskSpecConst < 0 || term.MaskSpecConst >= len(constants) {
+			return fmt.Errorf("QFrameSelectColumn mask term spec constant is out of range")
+		}
+		maskSpec, err := frameMaskSpecDetails(constants[term.MaskSpecConst])
+		if err != nil {
+			return err
+		}
+		plan.termMaskSpecs[termIdx] = maskSpec
+		plan.termHasMaskSpec[termIdx] = true
+	case QFrameMaskTermCombine:
+		visiting[termIdx] = true
+		if err := populateQFrameSelectColumnMaskTermPlan(constants, spec, plan, term.LeftTerm, visiting); err != nil {
+			visiting[termIdx] = false
+			return err
+		}
+		if err := populateQFrameSelectColumnMaskTermPlan(constants, spec, plan, term.RightTerm, visiting); err != nil {
+			visiting[termIdx] = false
+			return err
+		}
+		visiting[termIdx] = false
+	default:
+		return fmt.Errorf("QFrameSelectColumn unknown mask term kind %d", term.Kind)
+	}
+	return nil
+}
+
+func executeQFrameSelectColumnPlannedValue(constants []runtime.Value, specs []QFrameSelectColumnSpec, specIdx int, plan qFrameSelectColumnRuntimePlan, frameVal runtime.Value, argVal runtime.Value, hasArg bool) (runtime.Value, error) {
+	if specIdx < 0 || specIdx >= len(specs) {
+		return runtime.NilValue(), fmt.Errorf("QFrameSelectColumn spec index %d is out of range", specIdx)
+	}
+	spec := specs[specIdx]
+	if spec.RowMode == QFrameSelectColumnRowsNone {
+		if out, ok, err := executeQFrameSelectColumnCompareFilterProjectPlanned(constants, spec, plan, frameVal, argVal, hasArg); ok || err != nil {
+			return out, err
+		}
+	}
+	if !qFrameSelectColumnHasPredicate(spec) {
+		rows := frameVal
+		if spec.RowMode != QFrameSelectColumnRowsNone {
+			rowArg, hasRowArg := qFrameSelectColumnRowArg(spec, argVal, hasArg)
+			var err error
+			rows, err = executeQFrameSelectColumnRows(constants, spec, rows, rowArg, hasRowArg)
+			if err != nil {
+				return runtime.NilValue(), err
+			}
+		}
+		return executeFrameProjectColumnValue(rows, plan.names, plan.resultName)
+	}
+	rhs, hasRHS := qFrameSelectColumnCompareRHS(spec, argVal, hasArg)
+	mask, err := executeQFrameSelectColumnDenseMaskPlanned(constants, spec, plan, frameVal, rhs, hasRHS)
+	if err != nil {
+		return runtime.NilValue(), err
+	}
+	if spec.RowMode == QFrameSelectColumnRowsNone {
+		return executeFrameFilterProjectColumnDenseValue(frameVal, mask, plan.names, plan.resultName)
+	}
+	rowArg, hasRowArg := qFrameSelectColumnRowArg(spec, argVal, hasArg)
+	switch spec.RowMode {
+	case QFrameSelectColumnRowsGather:
+		if !hasRowArg {
+			return runtime.NilValue(), fmt.Errorf("QFrameSelectColumn gather path requires indexes")
+		}
+		if !rowArg.IsDenseArray() {
+			return runtime.NilValue(), fmt.Errorf("FrameFilterGatherProjectColumn indexes must be dense array (got %s)", rowArg.TypeName())
+		}
+		return executeFrameFilterGatherProjectColumnDenseValue(frameVal, mask, rowArg.DenseArray(), plan.names, plan.resultName)
+	case QFrameSelectColumnRowsSlice:
+		if !hasRowArg {
+			return runtime.NilValue(), fmt.Errorf("QFrameSelectColumn slice path requires end")
+		}
+		return executeFrameFilterSliceProjectColumnDenseValue(frameVal, mask, rowArg, plan.names, plan.resultName)
+	case QFrameSelectColumnRowsOrderGather:
+		if !plan.hasOrder {
+			return runtime.NilValue(), fmt.Errorf("QFrameSelectColumn order plan is missing")
+		}
+		return executeFrameFilterOrderGatherProjectColumnDenseParsedValue(frameVal, mask, plan.orderNames, plan.orderDesc, plan.orderLimit, plan.names, plan.resultName)
+	}
+	rows, err := executeFrameFilterValue(frameVal, runtime.DenseArrayValue(mask))
+	if err != nil {
+		return runtime.NilValue(), err
+	}
+	rows, err = executeQFrameSelectColumnRows(constants, spec, rows, rowArg, hasRowArg)
+	if err != nil {
+		return runtime.NilValue(), err
+	}
+	return executeFrameProjectColumnValue(rows, plan.names, plan.resultName)
+}
+
 func executeQFrameSelectColumnCompareFilterProject(constants []runtime.Value, spec QFrameSelectColumnSpec, frameVal runtime.Value, argVal runtime.Value, hasArg bool, names []string, resultName string) (runtime.Value, bool, error) {
 	if len(spec.MaskTerms) > 0 {
 		return runtime.NilValue(), false, nil
@@ -443,6 +642,44 @@ func executeQFrameSelectColumnCompareFilterProject(constants []runtime.Value, sp
 		return runtime.NilValue(), true, fmt.Errorf("QFrameSelectColumn compare path requires rhs")
 	}
 	out, err := executeFrameCompareFilterProjectColumnValue(frameVal, constants[spec.SourceColumnConst].Str(), spec.CompareOp, rhs, names, resultName)
+	return out, true, err
+}
+
+func executeQFrameSelectColumnCompareFilterProjectPlanned(constants []runtime.Value, spec QFrameSelectColumnSpec, plan qFrameSelectColumnRuntimePlan, frameVal runtime.Value, argVal runtime.Value, hasArg bool) (runtime.Value, bool, error) {
+	if len(spec.MaskTerms) > 0 {
+		return runtime.NilValue(), false, nil
+	}
+	if spec.MaskSpecConst >= 0 {
+		if !plan.hasMaskSpec {
+			return runtime.NilValue(), true, fmt.Errorf("QFrameSelectColumn mask plan is missing")
+		}
+		maskSpec := plan.maskSpec
+		if maskSpec.Mode == "bool_column" {
+			out, err := executeFrameBoolMaskFilterProjectColumnValue(frameVal, maskSpec.Name, plan.names, plan.resultName)
+			return out, true, err
+		}
+		denseOp, err := runtime.DenseArrayCompareOp(maskSpec.Op)
+		if err != nil {
+			return runtime.NilValue(), true, err
+		}
+		if maskSpec.RHSLiteral {
+			out, err := executeFrameCompareLiteralFilterProjectColumnValue(frameVal, maskSpec.Name, denseOp, maskSpec.RHS, plan.names, plan.resultName)
+			return out, true, err
+		}
+		out, err := executeFrameCompareFilterProjectColumnValue(frameVal, maskSpec.Name, denseOp, maskSpec.RHS, plan.names, plan.resultName)
+		return out, true, err
+	}
+	if spec.SourceColumnConst < 0 {
+		return runtime.NilValue(), false, nil
+	}
+	if !plan.hasSourceColumnName {
+		return runtime.NilValue(), true, fmt.Errorf("QFrameSelectColumn source column plan is missing")
+	}
+	rhs, hasRHS := qFrameSelectColumnCompareRHS(spec, argVal, hasArg)
+	if !hasRHS {
+		return runtime.NilValue(), true, fmt.Errorf("QFrameSelectColumn compare path requires rhs")
+	}
+	out, err := executeFrameCompareFilterProjectColumnValue(frameVal, plan.sourceColumnName, spec.CompareOp, rhs, plan.names, plan.resultName)
 	return out, true, err
 }
 
@@ -489,6 +726,42 @@ func executeQFrameSelectColumnDenseMask(constants []runtime.Value, spec QFrameSe
 		return nil, fmt.Errorf("QFrameSelectColumn source column must be a string constant")
 	}
 	out, handled, err := frameVal.NativeFrameMaskOp(constants[spec.SourceColumnConst].Str(), spec.CompareOp, rhsVal)
+	if err != nil {
+		return nil, err
+	}
+	if !handled {
+		return nil, fmt.Errorf("QFrameSelectColumn operand must be native frame (got %s)", frameVal.TypeName())
+	}
+	return qFrameDenseMaskFromValue(out, "QFrameSelectColumn mask")
+}
+
+func executeQFrameSelectColumnDenseMaskPlanned(constants []runtime.Value, spec QFrameSelectColumnSpec, plan qFrameSelectColumnRuntimePlan, frameVal runtime.Value, rhsVal runtime.Value, hasRHS bool) (*runtime.DenseArray, error) {
+	if len(spec.MaskTerms) > 0 {
+		if spec.MaskRoot < 0 || spec.MaskRoot >= len(spec.MaskTerms) {
+			return nil, fmt.Errorf("QFrameSelectColumn mask root is out of range")
+		}
+		return executeQFrameMaskTermDensePlanned(constants, spec, plan, spec.MaskRoot, frameVal, rhsVal, hasRHS)
+	}
+	if spec.MaskSpecConst >= 0 {
+		if !plan.hasMaskSpec {
+			return nil, fmt.Errorf("QFrameSelectColumn mask plan is missing")
+		}
+		out, handled, err := executeNativeFrameMaskDense(frameVal, plan.maskSpec)
+		if err != nil {
+			return nil, err
+		}
+		if !handled {
+			return nil, fmt.Errorf("QFrameSelectColumn operand must be native frame (got %s)", frameVal.TypeName())
+		}
+		return out, nil
+	}
+	if !hasRHS {
+		return nil, fmt.Errorf("QFrameSelectColumn compare path requires rhs")
+	}
+	if !plan.hasSourceColumnName {
+		return nil, fmt.Errorf("QFrameSelectColumn source column plan is missing")
+	}
+	out, handled, err := frameVal.NativeFrameMaskOp(plan.sourceColumnName, spec.CompareOp, rhsVal)
 	if err != nil {
 		return nil, err
 	}
@@ -555,6 +828,60 @@ func executeQFrameMaskTermDense(constants []runtime.Value, spec QFrameSelectColu
 			return nil, err
 		}
 		right, err := executeQFrameMaskTermDense(constants, spec, term.RightTerm, frameVal, rhsVal, hasRHS)
+		if err != nil {
+			return nil, err
+		}
+		return runtime.DenseArrayMaskCombineArrays(term.CombineOp, left, right)
+	default:
+		return nil, fmt.Errorf("QFrameSelectColumn unknown mask term kind %d", term.Kind)
+	}
+}
+
+func executeQFrameMaskTermDensePlanned(constants []runtime.Value, spec QFrameSelectColumnSpec, plan qFrameSelectColumnRuntimePlan, termIdx int, frameVal runtime.Value, rhsVal runtime.Value, hasRHS bool) (*runtime.DenseArray, error) {
+	if termIdx < 0 || termIdx >= len(spec.MaskTerms) {
+		return nil, fmt.Errorf("QFrameSelectColumn mask term is out of range")
+	}
+	term := spec.MaskTerms[termIdx]
+	switch term.Kind {
+	case QFrameMaskTermCompare:
+		if termIdx >= len(plan.termHasSourceColumn) || !plan.termHasSourceColumn[termIdx] {
+			return nil, fmt.Errorf("QFrameSelectColumn mask term source column plan is missing")
+		}
+		rhs := term.CompareRHSConst
+		if term.DynamicCompareRHS {
+			if !hasRHS {
+				return nil, fmt.Errorf("QFrameSelectColumn mask term compare path requires rhs")
+			}
+			rhs = rhsVal
+		} else if !term.HasCompareRHSConst {
+			return nil, fmt.Errorf("QFrameSelectColumn mask term compare path requires rhs")
+		}
+		out, handled, err := frameVal.NativeFrameMaskOp(plan.termSourceColumnNames[termIdx], term.CompareOp, rhs)
+		if err != nil {
+			return nil, err
+		}
+		if !handled {
+			return nil, fmt.Errorf("QFrameSelectColumn operand must be native frame (got %s)", frameVal.TypeName())
+		}
+		return qFrameDenseMaskFromValue(out, "QFrameSelectColumn mask term")
+	case QFrameMaskTermFrameMask:
+		if termIdx >= len(plan.termHasMaskSpec) || !plan.termHasMaskSpec[termIdx] {
+			return nil, fmt.Errorf("QFrameSelectColumn mask term plan is missing")
+		}
+		out, handled, err := executeNativeFrameMaskDense(frameVal, plan.termMaskSpecs[termIdx])
+		if err != nil {
+			return nil, err
+		}
+		if !handled {
+			return nil, fmt.Errorf("QFrameSelectColumn operand must be native frame (got %s)", frameVal.TypeName())
+		}
+		return out, nil
+	case QFrameMaskTermCombine:
+		left, err := executeQFrameMaskTermDensePlanned(constants, spec, plan, term.LeftTerm, frameVal, rhsVal, hasRHS)
+		if err != nil {
+			return nil, err
+		}
+		right, err := executeQFrameMaskTermDensePlanned(constants, spec, plan, term.RightTerm, frameVal, rhsVal, hasRHS)
 		if err != nil {
 			return nil, err
 		}

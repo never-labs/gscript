@@ -4885,6 +4885,192 @@ func TestQFrameMaskTermDenseRuntimeHelperSupportsBoolColumnCombine(t *testing.T)
 	}
 }
 
+func TestQFrameSelectColumnRuntimePlanCachesBySchema(t *testing.T) {
+	constants := []runtime.Value{
+		runtime.StringValue("price"),
+		runtime.FloatValue(100),
+		qHotPathNamesValue("size"),
+		runtime.StringValue("size"),
+	}
+	spec := QFrameSelectColumnSpec{
+		Shape:              "compare/filter/project/column",
+		SourceColumnConst:  0,
+		ProjectConst:       2,
+		ResultColumnConst:  3,
+		CompareOp:          runtime.DenseArrayGE,
+		DynamicArgRole:     QFrameSelectColumnArgNone,
+		CompareRHSConst:    constants[1],
+		HasCompareRHSConst: true,
+		MaskSpecConst:      -1,
+		RowOrderConst:      -1,
+		MaskRoot:           -1,
+		HasRowValueConst:   false,
+	}
+	cf := &CompiledFunction{QFrameSelectColumnSpecs: []QFrameSelectColumnSpec{spec}}
+	frame := runtime.TableValue(qHotPathTestFrame(t))
+	plan, err := cf.qFrameSelectColumnRuntimePlan(constants, 0, frame)
+	if err != nil {
+		t.Fatalf("build first plan: %v", err)
+	}
+	if len(plan.names) != 1 || plan.names[0] != "size" || plan.resultName != "size" || !plan.hasSourceColumnName || plan.sourceColumnName != "price" {
+		t.Fatalf("first plan = %+v, want size projection from price", plan)
+	}
+	if _, err := cf.qFrameSelectColumnRuntimePlan(constants, 0, frame); err != nil {
+		t.Fatalf("reuse first plan: %v", err)
+	}
+	otherFrame := runtime.TableValue(qHotPathStringTestFrame(t))
+	if _, err := cf.qFrameSelectColumnRuntimePlan(constants, 0, otherFrame); err != nil {
+		t.Fatalf("build second schema plan: %v", err)
+	}
+	stats := cf.qFrameSelectColumnPlanStatsSnapshot()
+	first := stats[qFrameSelectColumnPlanKey{specIdx: 0, schemaHash: "q-hot-path-test"}]
+	if first.misses != 1 || first.hits != 1 {
+		t.Fatalf("first schema plan stats = %+v, want 1 miss/1 hit", first)
+	}
+	second := stats[qFrameSelectColumnPlanKey{specIdx: 0, schemaHash: "q-hot-path-string-test"}]
+	if second.misses != 1 || second.hits != 0 {
+		t.Fatalf("second schema plan stats = %+v, want 1 miss/0 hits", second)
+	}
+}
+
+func TestQFrameSelectColumnPlannedRuntimeExecutesBoolColumnCombine(t *testing.T) {
+	boolMask := runtime.NewTable()
+	boolMask.RawSetString("column", runtime.StringValue("active"))
+	boolMask.RawSetString("mode", runtime.StringValue("bool_column"))
+	constants := []runtime.Value{
+		runtime.StringValue("price"),
+		runtime.FloatValue(100),
+		runtime.TableValue(boolMask),
+		qHotPathNamesValue("price"),
+		runtime.StringValue("price"),
+	}
+	spec := QFrameSelectColumnSpec{
+		Shape:             "mask-combine/filter/project/column",
+		ProjectConst:      3,
+		ResultColumnConst: 4,
+		SourceColumnConst: -1,
+		MaskRoot:          2,
+		MaskSpecConst:     -1,
+		RowOrderConst:     -1,
+		MaskTerms: []QFrameMaskTermSpec{
+			{
+				Kind:               QFrameMaskTermCompare,
+				SourceColumnConst:  0,
+				CompareOp:          runtime.DenseArrayGE,
+				CompareRHSConst:    constants[1],
+				HasCompareRHSConst: true,
+				LeftTerm:           -1,
+				RightTerm:          -1,
+			},
+			{
+				Kind:              QFrameMaskTermFrameMask,
+				MaskSpecConst:     2,
+				SourceColumnConst: -1,
+				LeftTerm:          -1,
+				RightTerm:         -1,
+			},
+			{
+				Kind:              QFrameMaskTermCombine,
+				CombineOp:         runtime.DenseArrayMaskAnd,
+				SourceColumnConst: -1,
+				MaskSpecConst:     -1,
+				LeftTerm:          0,
+				RightTerm:         1,
+			},
+		},
+	}
+	plan, err := buildQFrameSelectColumnRuntimePlan(constants, []QFrameSelectColumnSpec{spec}, 0)
+	if err != nil {
+		t.Fatalf("build planned q frame select-column: %v", err)
+	}
+	result, err := executeQFrameSelectColumnPlannedValue(constants, []QFrameSelectColumnSpec{spec}, 0, plan, runtime.TableValue(qHotPathBoolTestFrame(t)), runtime.NilValue(), false)
+	if err != nil {
+		t.Fatalf("execute planned q frame select-column: %v", err)
+	}
+	got, ok := result.DenseArray().F64()
+	if !ok || len(got) != 1 || got[0] != 101.25 {
+		t.Fatalf("planned bool-column mask-combine selected values = %#v, want [101.25]", got)
+	}
+}
+
+func TestQFrameSelectColumnRuntimePlanExecutesMaskTermOrderGather(t *testing.T) {
+	boolMask := runtime.NewTable()
+	boolMask.RawSetString("column", runtime.StringValue("active"))
+	boolMask.RawSetString("mode", runtime.StringValue("bool_column"))
+	constants := []runtime.Value{
+		runtime.StringValue("price"),
+		runtime.FloatValue(100),
+		runtime.TableValue(boolMask),
+		qHotPathOrderValue("price", true),
+		qHotPathNamesValue("price"),
+		runtime.StringValue("price"),
+	}
+	spec := QFrameSelectColumnSpec{
+		Shape:             "mask-combine/filter/order/gather/project/column",
+		ProjectConst:      4,
+		ResultColumnConst: 5,
+		SourceColumnConst: -1,
+		RowMode:           QFrameSelectColumnRowsOrderGather,
+		RowOrderConst:     3,
+		MaskRoot:          2,
+		MaskSpecConst:     -1,
+		MaskTerms: []QFrameMaskTermSpec{
+			{
+				Kind:               QFrameMaskTermCompare,
+				SourceColumnConst:  0,
+				CompareOp:          runtime.DenseArrayGE,
+				CompareRHSConst:    constants[1],
+				HasCompareRHSConst: true,
+				LeftTerm:           -1,
+				RightTerm:          -1,
+			},
+			{
+				Kind:              QFrameMaskTermFrameMask,
+				MaskSpecConst:     2,
+				SourceColumnConst: -1,
+				LeftTerm:          -1,
+				RightTerm:         -1,
+			},
+			{
+				Kind:              QFrameMaskTermCombine,
+				CombineOp:         runtime.DenseArrayMaskAnd,
+				SourceColumnConst: -1,
+				MaskSpecConst:     -1,
+				LeftTerm:          0,
+				RightTerm:         1,
+			},
+		},
+	}
+	cf := &CompiledFunction{QFrameSelectColumnSpecs: []QFrameSelectColumnSpec{spec}}
+	frame := runtime.TableValue(qHotPathBoolTestFrame(t))
+	plan, err := cf.qFrameSelectColumnRuntimePlan(constants, 0, frame)
+	if err != nil {
+		t.Fatalf("build q frame select-column mask/order plan: %v", err)
+	}
+	if !plan.hasOrder || len(plan.orderNames) != 1 || plan.orderNames[0] != "price" || len(plan.orderDesc) != 1 || !plan.orderDesc[0] {
+		t.Fatalf("order plan = %+v, want price desc", plan)
+	}
+	if len(plan.termHasMaskSpec) <= 1 || !plan.termHasMaskSpec[1] || plan.termMaskSpecs[1].Mode != "bool_column" || plan.termMaskSpecs[1].Name != "active" {
+		t.Fatalf("mask term plan = %+v, want bool-column active term", plan)
+	}
+	result, err := executeQFrameSelectColumnPlannedValue(constants, cf.QFrameSelectColumnSpecs, 0, plan, frame, runtime.NilValue(), false)
+	if err != nil {
+		t.Fatalf("execute planned q frame select-column mask/order: %v", err)
+	}
+	got, ok := result.DenseArray().F64()
+	if !ok || len(got) != 1 || got[0] != 101.25 {
+		t.Fatalf("planned mask/order selected values = %#v, want [101.25]", got)
+	}
+	if _, err := cf.qFrameSelectColumnRuntimePlan(constants, 0, frame); err != nil {
+		t.Fatalf("reuse q frame select-column mask/order plan: %v", err)
+	}
+	stats := cf.qFrameSelectColumnPlanStatsSnapshot()
+	counters := stats[qFrameSelectColumnPlanKey{specIdx: 0, schemaHash: "q-hot-path-bool-test"}]
+	if counters.misses != 1 || counters.hits != 1 {
+		t.Fatalf("mask/order plan stats = %+v, want 1 miss/1 hit", counters)
+	}
+}
+
 func TestFrameCompareFilterProjectColumnRuntimeHelperUsesRuntimePrimitive(t *testing.T) {
 	soa, err := runtime.NewSoA(map[string]*runtime.DenseArray{
 		"price": runtime.NewDenseArrayF64([]float64{10.5, 20.25, 30.75}),
@@ -4968,6 +5154,257 @@ func TestQFrameSelectColumnLiteralMaskUsesFusedHelper(t *testing.T) {
 	got, gotOK := out.DenseArray().F64()
 	if !gotOK || len(got) != 2 || got[0] != 99 || got[1] != 101.25 {
 		t.Fatalf("literal mask fused values = %#v, want [99 101.25]", got)
+	}
+}
+
+func TestQFrameSelectColumnRuntimePlanCachesBySchema(t *testing.T) {
+	constants := []runtime.Value{
+		runtime.StringValue("price"),
+		runtime.FloatValue(100),
+		qHotPathNamesValue("price"),
+		runtime.StringValue("price"),
+	}
+	spec := QFrameSelectColumnSpec{
+		Shape:             "compare/filter/project/column",
+		SourceColumnConst: 0,
+		MaskSpecConst:     -1,
+		ProjectConst:      2,
+		ResultColumnConst: 3,
+		CompareOp:         runtime.DenseArrayGE,
+		RowMode:           QFrameSelectColumnRowsNone,
+	}
+	cf := &CompiledFunction{QFrameSelectColumnSpecs: []QFrameSelectColumnSpec{spec}}
+	frame := runtime.TableValue(qHotPathTestFrame(t))
+	if _, err := cf.qFrameSelectColumnRuntimePlan(constants, 0, frame); err != nil {
+		t.Fatalf("build q frame select-column plan: %v", err)
+	}
+	if _, err := cf.qFrameSelectColumnRuntimePlan(constants, 0, frame); err != nil {
+		t.Fatalf("reuse q frame select-column plan: %v", err)
+	}
+	if _, err := cf.qFrameSelectColumnRuntimePlan(constants, 0, runtime.TableValue(qHotPathStringTestFrame(t))); err != nil {
+		t.Fatalf("build q frame select-column plan for second schema: %v", err)
+	}
+
+	stats := cf.qFrameSelectColumnPlanStatsSnapshot()
+	first := stats[qFrameSelectColumnPlanKey{specIdx: 0, schemaHash: "q-hot-path-test"}]
+	if first.misses != 1 || first.hits != 1 {
+		t.Fatalf("q frame select-column plan stats for first schema = %+v, want hits=1 misses=1", first)
+	}
+	second := stats[qFrameSelectColumnPlanKey{specIdx: 0, schemaHash: "q-hot-path-string-test"}]
+	if second.misses != 1 || second.hits != 0 {
+		t.Fatalf("q frame select-column plan stats for second schema = %+v, want hits=0 misses=1", second)
+	}
+}
+
+func TestQFrameSelectColumnRuntimePlanMatchesLegacyPaths(t *testing.T) {
+	boolMask := runtime.NewTable()
+	boolMask.RawSetString("column", runtime.StringValue("active"))
+	boolMask.RawSetString("mode", runtime.StringValue("bool_column"))
+	literalMask := runtime.NewTable()
+	literalMask.RawSetString("column", runtime.StringValue("sym"))
+	literalMask.RawSetString("op", runtime.StringValue("=="))
+	literalMask.RawSetString("value", runtime.StringValue("AAPL"))
+	literalMask.RawSetString("value_kind", runtime.StringValue("literal"))
+
+	tests := []struct {
+		name      string
+		constants []runtime.Value
+		spec      QFrameSelectColumnSpec
+		frame     runtime.Value
+		arg       runtime.Value
+		hasArg    bool
+	}{
+		{
+			name: "literal_mask",
+			constants: []runtime.Value{
+				runtime.TableValue(literalMask),
+				qHotPathNamesValue("price"),
+				runtime.StringValue("price"),
+			},
+			spec: QFrameSelectColumnSpec{
+				Shape:             "mask/filter/project/column",
+				MaskSpecConst:     0,
+				SourceColumnConst: -1,
+				ProjectConst:      1,
+				ResultColumnConst: 2,
+				RowMode:           QFrameSelectColumnRowsNone,
+			},
+			frame: runtime.TableValue(qHotPathStringTestFrame(t)),
+		},
+		{
+			name: "mask_terms_bool_column_combine",
+			constants: []runtime.Value{
+				runtime.StringValue("price"),
+				runtime.FloatValue(100),
+				runtime.TableValue(boolMask),
+				qHotPathNamesValue("price"),
+				runtime.StringValue("price"),
+			},
+			spec: QFrameSelectColumnSpec{
+				Shape:             "mask-combine/filter/project/column",
+				ProjectConst:      3,
+				ResultColumnConst: 4,
+				SourceColumnConst: -1,
+				MaskRoot:          2,
+				MaskTerms: []QFrameMaskTermSpec{
+					{
+						Kind:               QFrameMaskTermCompare,
+						SourceColumnConst:  0,
+						CompareOp:          runtime.DenseArrayGE,
+						CompareRHSConst:    runtime.FloatValue(100),
+						HasCompareRHSConst: true,
+						LeftTerm:           -1,
+						RightTerm:          -1,
+					},
+					{
+						Kind:              QFrameMaskTermFrameMask,
+						MaskSpecConst:     2,
+						SourceColumnConst: -1,
+						LeftTerm:          -1,
+						RightTerm:         -1,
+					},
+					{
+						Kind:              QFrameMaskTermCombine,
+						CombineOp:         runtime.DenseArrayMaskAnd,
+						SourceColumnConst: -1,
+						MaskSpecConst:     -1,
+						LeftTerm:          0,
+						RightTerm:         1,
+					},
+				},
+			},
+			frame: runtime.TableValue(qHotPathBoolTestFrame(t)),
+		},
+		{
+			name: "gather",
+			constants: []runtime.Value{
+				runtime.StringValue("price"),
+				qHotPathNamesValue("size"),
+				runtime.StringValue("size"),
+			},
+			spec: QFrameSelectColumnSpec{
+				Shape:             "compare/filter/gather/project/column",
+				SourceColumnConst: 0,
+				MaskSpecConst:     -1,
+				ProjectConst:      1,
+				ResultColumnConst: 2,
+				CompareOp:         runtime.DenseArrayGE,
+				CompareRHSConst:   runtime.FloatValue(100),
+				HasCompareRHSConst: true,
+				RowMode:           QFrameSelectColumnRowsGather,
+				RowValueConst:      runtime.DenseArrayValue(runtime.NewDenseArrayI64([]int64{2, 1})),
+				HasRowValueConst:   true,
+			},
+			frame: runtime.TableValue(qHotPathTestFrame(t)),
+		},
+		{
+			name: "slice",
+			constants: []runtime.Value{
+				runtime.StringValue("price"),
+				qHotPathNamesValue("size"),
+				runtime.StringValue("size"),
+			},
+			spec: QFrameSelectColumnSpec{
+				Shape:              "compare/filter/slice/project/column",
+				SourceColumnConst:  0,
+				MaskSpecConst:      -1,
+				ProjectConst:       1,
+				ResultColumnConst:  2,
+				CompareOp:          runtime.DenseArrayGE,
+				CompareRHSConst:    runtime.FloatValue(100),
+				HasCompareRHSConst: true,
+				RowMode:            QFrameSelectColumnRowsSlice,
+				RowValueConst:      runtime.IntValue(1),
+				HasRowValueConst:   true,
+			},
+			frame: runtime.TableValue(qHotPathTestFrame(t)),
+		},
+		{
+			name: "order_gather",
+			constants: []runtime.Value{
+				runtime.StringValue("price"),
+				qHotPathOrderValue("price", true),
+				qHotPathNamesValue("size"),
+				runtime.StringValue("size"),
+			},
+			spec: QFrameSelectColumnSpec{
+				Shape:              "compare/filter/order/gather/project/column",
+				SourceColumnConst:  0,
+				MaskSpecConst:      -1,
+				ProjectConst:       2,
+				ResultColumnConst:  3,
+				CompareOp:          runtime.DenseArrayGE,
+				CompareRHSConst:    runtime.FloatValue(99),
+				HasCompareRHSConst: true,
+				RowMode:            QFrameSelectColumnRowsOrderGather,
+				RowOrderConst:      1,
+			},
+			frame: runtime.TableValue(qHotPathTestFrame(t)),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assertQFrameSelectColumnPlannedMatchesLegacy(t, tt.constants, tt.spec, tt.frame, tt.arg, tt.hasArg)
+		})
+	}
+}
+
+func assertQFrameSelectColumnPlannedMatchesLegacy(t *testing.T, constants []runtime.Value, spec QFrameSelectColumnSpec, frame runtime.Value, arg runtime.Value, hasArg bool) {
+	t.Helper()
+	legacy, err := executeQFrameSelectColumnValue(constants, []QFrameSelectColumnSpec{spec}, 0, frame, arg, hasArg)
+	if err != nil {
+		t.Fatalf("execute legacy q frame select-column: %v", err)
+	}
+	plan, err := buildQFrameSelectColumnRuntimePlan(constants, []QFrameSelectColumnSpec{spec}, 0)
+	if err != nil {
+		t.Fatalf("build q frame select-column runtime plan: %v", err)
+	}
+	planned, err := executeQFrameSelectColumnPlannedValue(constants, []QFrameSelectColumnSpec{spec}, 0, plan, frame, arg, hasArg)
+	if err != nil {
+		t.Fatalf("execute planned q frame select-column: %v", err)
+	}
+	if legacy.TypeName() != planned.TypeName() {
+		t.Fatalf("planned result type = %s, want %s", planned.TypeName(), legacy.TypeName())
+	}
+	if !legacy.IsDenseArray() || !planned.IsDenseArray() {
+		if legacy.String() != planned.String() {
+			t.Fatalf("planned result = %s, want %s", planned.String(), legacy.String())
+		}
+		return
+	}
+	legacyDense := legacy.DenseArray()
+	plannedDense := planned.DenseArray()
+	if legacyDense.DType() != plannedDense.DType() || legacyDense.Len() != plannedDense.Len() {
+		t.Fatalf("planned dense result dtype/len = %s/%d, want %s/%d", plannedDense.DType(), plannedDense.Len(), legacyDense.DType(), legacyDense.Len())
+	}
+	switch legacyDense.DType() {
+	case runtime.DenseArrayFloat64:
+		want, _ := legacyDense.F64()
+		got, _ := plannedDense.F64()
+		if !reflect.DeepEqual(got, want) {
+			t.Fatalf("planned f64 result = %#v, want %#v", got, want)
+		}
+	case runtime.DenseArrayInt64:
+		want, _ := legacyDense.I64()
+		got, _ := plannedDense.I64()
+		if !reflect.DeepEqual(got, want) {
+			t.Fatalf("planned i64 result = %#v, want %#v", got, want)
+		}
+	case runtime.DenseArrayBool:
+		want, _ := legacyDense.Bool()
+		got, _ := plannedDense.Bool()
+		if !reflect.DeepEqual(got, want) {
+			t.Fatalf("planned bool result = %#v, want %#v", got, want)
+		}
+	case runtime.DenseArrayString:
+		want, _ := legacyDense.StringValues()
+		got, _ := plannedDense.StringValues()
+		if !reflect.DeepEqual(got, want) {
+			t.Fatalf("planned string result = %#v, want %#v", got, want)
+		}
+	default:
+		t.Fatalf("unexpected dense dtype %s", legacyDense.DType())
 	}
 }
 
