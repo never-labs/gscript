@@ -1718,6 +1718,26 @@ func TestTypedCompareIndexesAndNullMasks(t *testing.T) {
 	}
 }
 
+func TestTypedNumericSumByI64IndexesConsumesLazyIntegerViews(t *testing.T) {
+	base := NewI64Range(0, 1, 16)
+	scaled, handled, err := TryTypedIntegerDyadic(OpMul, base, int64(3))
+	if err != nil || !handled {
+		t.Fatalf("typed multiply handled=%v err=%v", handled, err)
+	}
+	affine, handled, err := TryTypedIntegerDyadic(OpAdd, scaled, int64(7))
+	if err != nil || !handled {
+		t.Fatalf("typed add handled=%v err=%v", handled, err)
+	}
+
+	got, handled, err := TryTypedNumericSumByI64Indexes(affine.(Array), NewI64Range(2, 1, 5))
+	if err != nil || !handled {
+		t.Fatalf("typed indexed sum handled=%v err=%v", handled, err)
+	}
+	if got != int64(95) {
+		t.Fatalf("typed indexed sum = %v, want 95", got)
+	}
+}
+
 func TestTypedInIndexesScansNonIndexedColumns(t *testing.T) {
 	indexes, ok := typedKernels.InIndexes(NewI32([]int32{10, 20, 30, 20, 40}), []any{int64(20), int32(40)}, nil)
 	if !ok {

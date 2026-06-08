@@ -2063,14 +2063,21 @@ func TestEvalWhereGatherReduceCompositeMaskStats(t *testing.T) {
 	t.Cleanup(ClearRuntimeKernelExecutionStats)
 
 	assertEvalValue(t, "x:til 8192;y:(x*3)+7;lo:0;hi:4096;idx:where (x>=lo) and x<hi;+/y[idx]", int64(25188352))
+	seenPipelinePlan := false
 	seenGatherReduce := false
 	for _, stat := range RuntimeKernelExecutionStats() {
 		if stat.Outcome == "fallback" || stat.Outcome == "error" {
 			t.Fatalf("unexpected runtime fallback/error for composite where gather reduce: %#v stats=%#v", stat, RuntimeKernelExecutionStats())
 		}
+		if stat.Kernel == "QPipelinePlan" && stat.Shape == "gather-reduce/sum/i64/i64" && stat.Outcome == "hit" && stat.Count > 0 {
+			seenPipelinePlan = true
+		}
 		if stat.Kernel == "ArrayGatherReduceSum" && stat.Shape == "gather-reduce/i64/i64" && stat.Outcome == "hit" && stat.Count > 0 {
 			seenGatherReduce = true
 		}
+	}
+	if !seenPipelinePlan {
+		t.Fatalf("missing q pipeline plan typed hit for composite where gather reduce: %#v", RuntimeKernelExecutionStats())
 	}
 	if !seenGatherReduce {
 		t.Fatalf("missing gather reduce typed hit for composite where gather reduce: %#v", RuntimeKernelExecutionStats())

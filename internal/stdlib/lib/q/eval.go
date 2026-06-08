@@ -4141,69 +4141,14 @@ func (s *EvalState) tryEvalSumDeltas(src string) (any, bool, error) {
 }
 
 func (s *EvalState) tryEvalSumWhereGatherReduce(src string) (any, bool, error) {
-	if valueExpr, maskExpr, ok := splitTopLevelWord(src, "where"); ok {
-		value, err := s.eval(valueExpr)
-		if err != nil {
-			return nil, true, err
-		}
-		array, ok := value.(data.Array)
-		if !ok {
-			return nil, false, nil
-		}
-		maskValue, err := s.eval(maskExpr)
-		if err != nil {
-			return nil, true, err
-		}
-		mask, ok := maskValue.(data.Array)
-		if !ok {
-			return nil, false, nil
-		}
-		out, handled, err := data.TryTypedNumericSumWhereMask(array, mask)
-		shape := "where-reduce/" + string(array.Kind()) + "/" + string(mask.Kind())
-		recordRuntimeKernelProbe("ArrayWhereReduceSum", shape, handled, err)
-		if err != nil || !handled {
-			return nil, handled, err
-		}
-		return out, true, nil
-	}
-	collectionExpr, indexExpr, ok := findPostfixIndex(src)
-	if !ok {
-		return nil, false, nil
-	}
-	value, err := s.eval(collectionExpr)
+	plan, ok, err := s.buildQPipelineSumPlan(src)
 	if err != nil {
 		return nil, true, err
 	}
-	array, ok := value.(data.Array)
 	if !ok {
 		return nil, false, nil
 	}
-	if maskExpr, ok := directWhereMaskExpr(indexExpr); ok {
-		maskValue, err := s.eval(maskExpr)
-		if err != nil {
-			return nil, true, err
-		}
-		mask, ok := maskValue.(data.Array)
-		if ok {
-			out, handled, err := data.TryTypedNumericSumWhereMask(array, mask)
-			shape := "where-index-reduce/" + string(array.Kind()) + "/" + string(mask.Kind())
-			recordRuntimeKernelProbe("ArrayWhereReduceSum", shape, handled, err)
-			if err != nil || handled {
-				return out, handled, err
-			}
-		}
-	}
-	indexValue, err := s.eval(indexExpr)
-	if err != nil {
-		return nil, true, err
-	}
-	indexes, ok := indexValue.(data.Array)
-	if !ok {
-		return nil, false, nil
-	}
-	out, handled, err := data.TryTypedNumericSumByI64Indexes(array, indexes)
-	shape := "gather-reduce/" + string(array.Kind()) + "/" + string(indexes.Kind())
-	recordRuntimeKernelProbe("ArrayGatherReduceSum", shape, handled, err)
+	out, handled, err := executeQPipelinePlan(plan)
 	if err != nil || !handled {
 		return nil, handled, err
 	}

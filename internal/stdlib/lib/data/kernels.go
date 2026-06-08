@@ -2028,6 +2028,9 @@ func TryTypedNumericSumWhereMask(array, mask Array) (any, bool, error) {
 }
 
 func typedIntegerSumByI64Indexes(array, indexes Array) (any, bool, error) {
+	if sum, handled, err := typedIntegerSumByI64IndexView(array, indexes); handled || err != nil {
+		return sum, handled, err
+	}
 	var total int64
 	if err := forEachTypedI64Index(indexes, array.Len(), func(row int) error {
 		value, ok, err := integerArrayAt(array, row)
@@ -2042,6 +2045,49 @@ func typedIntegerSumByI64Indexes(array, indexes Array) (any, bool, error) {
 		return nil, true, err
 	}
 	return total, true, nil
+}
+
+func typedIntegerSumByI64IndexView(array, indexes Array) (any, bool, error) {
+	switch idx := indexes.(type) {
+	case attributedArray:
+		return typedIntegerSumByI64IndexView(array, idx.array)
+	case i64RangeArray:
+		return typedIntegerSumContiguousRange(array, idx)
+	default:
+		return nil, false, nil
+	}
+}
+
+func typedIntegerSumContiguousRange(array Array, rows i64RangeArray) (any, bool, error) {
+	if rows.len == 0 {
+		return NullValue, true, nil
+	}
+	if rows.step != 1 {
+		return nil, false, nil
+	}
+	start, err := checkedI64Index(rows.start)
+	if err != nil {
+		return nil, true, err
+	}
+	last, err := checkedI64Index(rows.start + int64(rows.len-1))
+	if err != nil {
+		return nil, true, err
+	}
+	if start < 0 || last >= array.Len() {
+		return nil, true, fmt.Errorf("index %d out of bounds for length %d", last, array.Len())
+	}
+	switch a := array.(type) {
+	case attributedArray:
+		return typedIntegerSumContiguousRange(a.array, rows)
+	case i64RangeArray:
+		return i64RangeSum(i64RangeArray{start: a.start + int64(start)*a.step, step: a.step, len: rows.len}), true, nil
+	case i64ScalarDyadicArray:
+		return i64ScalarDyadicRangeSum(a, start, rows.len)
+	case tiledArray:
+		return nil, false, nil
+	default:
+		return nil, false, nil
+	}
 }
 
 func typedIntegerSumWhereMask(array, mask Array) (any, bool, error) {
@@ -7297,6 +7343,38 @@ func (a i64ScalarDyadicArray) i64At(row int) (int64, bool, error) {
 		return 0, ok, err
 	}
 	return applyI64ScalarDyadicValue(a.op, value, a.scalar, a.scalarLeft)
+}
+
+func i64ScalarDyadicRangeSum(array i64ScalarDyadicArray, start, length int) (any, bool, error) {
+	if length == 0 {
+		return NullValue, true, nil
+	}
+	sourceRows := i64RangeArray{start: int64(start), step: 1, len: length}
+	sourceSumValue, handled, err := typedIntegerSumContiguousRange(array.source, sourceRows)
+	if err != nil || !handled {
+		return nil, handled, err
+	}
+	sourceSum, ok := sourceSumValue.(int64)
+	if !ok {
+		return nil, false, nil
+	}
+	n := int64(length)
+	switch array.op {
+	case OpAdd:
+		if array.scalarLeft {
+			return array.scalar*n + sourceSum, true, nil
+		}
+		return sourceSum + array.scalar*n, true, nil
+	case OpSub:
+		if array.scalarLeft {
+			return array.scalar*n - sourceSum, true, nil
+		}
+		return sourceSum - array.scalar*n, true, nil
+	case OpMul:
+		return sourceSum * array.scalar, true, nil
+	default:
+		return nil, false, nil
+	}
 }
 
 func (a notMask) Kind() Kind { return KindBool }
