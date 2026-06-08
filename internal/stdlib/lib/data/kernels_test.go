@@ -2107,6 +2107,25 @@ func TestTypedNumericUnaryBinaryAndAggregates(t *testing.T) {
 		t.Fatalf("TryTypedNumericAvg range = %v, %v; want 1.5, true", value, ok)
 	}
 
+	value, ok, err = TryTypedNumericProduct(NewI64([]int64{2, 3, 4}))
+	if err != nil {
+		t.Fatalf("TryTypedNumericProduct i64 returned error: %v", err)
+	}
+	if !ok || value != int64(24) {
+		t.Fatalf("TryTypedNumericProduct i64 = %v, %v; want 24, true", value, ok)
+	}
+
+	productScan, ok, err := TryTypedNumericProducts(NewI64Range(1, 1, 4))
+	if err != nil {
+		t.Fatalf("TryTypedNumericProducts range returned error: %v", err)
+	}
+	if !ok || productScan.Kind() != KindI64 {
+		t.Fatalf("TryTypedNumericProducts range kind = %s, %v; want i64, true", productScan.Kind(), ok)
+	}
+	if got, want := productScan.Values(), []any{int64(1), int64(2), int64(6), int64(24)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("TryTypedNumericProducts range values = %v, want %v", got, want)
+	}
+
 	scan, ok, err := TryTypedNumericSums(NewI64([]int64{1, 2, 3}))
 	if err != nil {
 		t.Fatalf("TryTypedNumericSums i64 returned error: %v", err)

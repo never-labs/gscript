@@ -626,6 +626,16 @@ func (s *EvalState) eval(src string) (any, error) {
 	if strings.HasPrefix(src, "drop ") {
 		return s.evalDrop(strings.TrimSpace(src[len("drop "):]))
 	}
+	if strings.HasPrefix(src, "count ") {
+		if out, handled, err := s.tryEvalCountPrds(strings.TrimSpace(src[len("count "):])); err != nil || handled {
+			return out, err
+		}
+	}
+	if strings.HasPrefix(src, "last ") {
+		if out, handled, err := s.tryEvalLastScan(strings.TrimSpace(src[len("last "):])); err != nil || handled {
+			return out, err
+		}
+	}
 	for _, prefix := range []struct {
 		word string
 		fn   func(any) (any, error)
@@ -2996,6 +3006,61 @@ func (s *EvalState) tryEvalTypedUnaryDyadicSum(unaryOp, src string) (any, bool, 
 		return out, true, nil
 	} else {
 		recordRuntimeKernelProbe("ArrayNumericUnaryDyadicSum", "vector-reduce/sum-"+unaryOp+"-dyadic-"+string(dyadicOp), handled, err)
+	}
+	return nil, false, nil
+}
+
+func (s *EvalState) tryEvalCountPrds(src string) (any, bool, error) {
+	if !strings.HasPrefix(src, "prds ") {
+		return nil, false, nil
+	}
+	value, err := s.eval(strings.TrimSpace(src[len("prds "):]))
+	if err != nil {
+		return nil, true, err
+	}
+	array, ok := value.(data.Array)
+	if !ok {
+		product, err := prds(value)
+		if err != nil {
+			return nil, true, err
+		}
+		out, err := count(product)
+		return out, true, err
+	}
+	if out, handled := data.TryTypedNumericArrayLen(array); handled {
+		recordRuntimeKernelProbe("ArrayCountProducts", "vector-count/prds/"+string(array.Kind()), true, nil)
+		return out, true, nil
+	}
+	recordRuntimeKernelProbe("ArrayCountProducts", "vector-count/prds/"+string(array.Kind()), false, nil)
+	return nil, false, nil
+}
+
+func (s *EvalState) tryEvalLastScan(src string) (any, bool, error) {
+	for _, scan := range []struct {
+		word string
+		fn   func(any) (any, error)
+	}{
+		{"sums ", sum},
+		{"prds ", prd},
+		{"mins ", minValue},
+		{"maxs ", maxValue},
+		{"avgs ", avg},
+	} {
+		if !strings.HasPrefix(src, scan.word) {
+			continue
+		}
+		value, err := s.eval(strings.TrimSpace(src[len(scan.word):]))
+		if err != nil {
+			return nil, true, err
+		}
+		if array, ok := value.(data.Array); ok {
+			if array.Len() == 0 {
+				return nil, false, nil
+			}
+			recordRuntimeKernelProbe("ArrayLastScan", "vector-last/"+strings.TrimSpace(scan.word)+"/"+string(array.Kind()), true, nil)
+		}
+		out, err := scan.fn(value)
+		return out, true, err
 	}
 	return nil, false, nil
 }
@@ -7203,6 +7268,15 @@ func prd(v any) (any, error) {
 	if array.Len() == 0 {
 		return data.NullValue, nil
 	}
+	if out, handled, err := data.TryTypedNumericProduct(array); err != nil || handled {
+		recordRuntimeKernelProbe("ArrayProduct", "vector-reduce/product/"+string(array.Kind()), handled, err)
+		if err != nil {
+			return nil, err
+		}
+		return out, nil
+	} else {
+		recordRuntimeKernelProbe("ArrayProduct", "vector-reduce/product/"+string(array.Kind()), handled, err)
+	}
 	totalI := int64(1)
 	totalF := float64(1)
 	hasFloat := false
@@ -7319,6 +7393,15 @@ func prds(v any) (any, error) {
 	array, ok := v.(data.Array)
 	if !ok {
 		return nil, fmt.Errorf("prds expects a numeric vector")
+	}
+	if out, handled, err := data.TryTypedNumericProducts(array); err != nil || handled {
+		recordRuntimeKernelProbe("ArrayProducts", "vector-scan/product/"+string(array.Kind()), handled, err)
+		if err != nil {
+			return nil, err
+		}
+		return out, nil
+	} else {
+		recordRuntimeKernelProbe("ArrayProducts", "vector-scan/product/"+string(array.Kind()), handled, err)
 	}
 	out := make([]any, array.Len())
 	totalI := int64(1)

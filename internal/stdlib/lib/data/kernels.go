@@ -1183,6 +1183,83 @@ func TryTypedNumericAvg(array Array) (any, bool, error) {
 	return sum / float64(count), true, nil
 }
 
+func TryTypedNumericProduct(array Array) (any, bool, error) {
+	switch a := array.(type) {
+	case attributedArray:
+		return TryTypedNumericProduct(a.array)
+	case columnArray[int8]:
+		return numericProductIntegerValue(a.data), true, nil
+	case columnArray[int16]:
+		return numericProductIntegerValue(a.data), true, nil
+	case columnArray[int32]:
+		return numericProductIntegerValue(a.data), true, nil
+	case columnArray[int64]:
+		return numericProductIntegerValue(a.data), true, nil
+	case i64RangeArray:
+		return numericProductIntegerArray(a), true, nil
+	case i64SegmentArray:
+		return numericProductIntegerArray(a), true, nil
+	case i64ProductArray:
+		return numericProductIntegerArray(a), true, nil
+	case columnArray[uint8]:
+		return numericProductUnsignedValue(a.data), true, nil
+	case columnArray[uint16]:
+		return numericProductUnsignedValue(a.data), true, nil
+	case columnArray[uint32]:
+		return numericProductUnsignedValue(a.data), true, nil
+	case columnArray[uint64]:
+		return numericProductUnsignedValue(a.data), true, nil
+	case columnArray[float32]:
+		return numericProductFloatValue(a.data), true, nil
+	case columnArray[float64]:
+		return numericProductFloatValue(a.data), true, nil
+	default:
+		return nil, false, nil
+	}
+}
+
+func TryTypedNumericProducts(array Array) (Array, bool, error) {
+	switch a := array.(type) {
+	case attributedArray:
+		return TryTypedNumericProducts(a.array)
+	case columnArray[int8]:
+		return numericProductsInteger(a.data), true, nil
+	case columnArray[int16]:
+		return numericProductsInteger(a.data), true, nil
+	case columnArray[int32]:
+		return numericProductsInteger(a.data), true, nil
+	case columnArray[int64]:
+		return numericProductsInteger(a.data), true, nil
+	case i64RangeArray:
+		return numericProductsIntegerArray(a), true, nil
+	case i64SegmentArray:
+		return numericProductsIntegerArray(a), true, nil
+	case i64ProductArray:
+		return numericProductsIntegerArray(a), true, nil
+	case columnArray[uint8]:
+		return numericProductsUnsigned(a.data), true, nil
+	case columnArray[uint16]:
+		return numericProductsUnsigned(a.data), true, nil
+	case columnArray[uint32]:
+		return numericProductsUnsigned(a.data), true, nil
+	case columnArray[uint64]:
+		return numericProductsUnsigned(a.data), true, nil
+	case columnArray[float32]:
+		return numericProductsFloat(a.data), true, nil
+	case columnArray[float64]:
+		return numericProductsFloat(a.data), true, nil
+	default:
+		return nil, false, nil
+	}
+}
+
+func TryTypedNumericArrayLen(array Array) (int64, bool) {
+	if !isNumericArray(array) {
+		return 0, false
+	}
+	return int64(array.Len()), true
+}
+
 func (k typedKernelRegistry) NumericSumValue(array Array) (any, bool, error) {
 	switch a := array.(type) {
 	case attributedArray:
@@ -3431,6 +3508,42 @@ func numericSumFloatValue[T floatScalar](values []T) float64 {
 	return sum
 }
 
+func numericProductIntegerValue[T signedScalar](values []T) int64 {
+	var product int64 = 1
+	for _, v := range values {
+		product *= int64(v)
+	}
+	return product
+}
+
+func numericProductUnsignedValue[T unsignedScalar](values []T) int64 {
+	var product int64 = 1
+	for _, v := range values {
+		product *= int64(v)
+	}
+	return product
+}
+
+func numericProductFloatValue[T floatScalar](values []T) float64 {
+	product := float64(1)
+	for _, v := range values {
+		product *= float64(v)
+	}
+	return product
+}
+
+func numericProductIntegerArray(array Array) int64 {
+	var product int64 = 1
+	for i := 0; i < array.Len(); i++ {
+		value, ok, err := integerArrayAt(array, i)
+		if err != nil || !ok {
+			return 0
+		}
+		product *= value
+	}
+	return product
+}
+
 func i64RangeSum(values i64RangeArray) int64 {
 	if values.len == 0 {
 		return 0
@@ -3499,6 +3612,50 @@ func numericSumsI64Range(values i64RangeArray) Array {
 		out[i] = sum
 	}
 	return columnArray[int64]{kind: KindI64, data: out}
+}
+
+func numericProductsInteger[T signedScalar](values []T) Array {
+	out := make([]int64, len(values))
+	var product int64 = 1
+	for i, value := range values {
+		product *= int64(value)
+		out[i] = product
+	}
+	return newI64Trusted(out)
+}
+
+func numericProductsUnsigned[T unsignedScalar](values []T) Array {
+	out := make([]int64, len(values))
+	var product int64 = 1
+	for i, value := range values {
+		product *= int64(value)
+		out[i] = product
+	}
+	return newI64Trusted(out)
+}
+
+func numericProductsFloat[T floatScalar](values []T) Array {
+	out := make([]float64, len(values))
+	product := float64(1)
+	for i, value := range values {
+		product *= float64(value)
+		out[i] = product
+	}
+	return newF64Trusted(out)
+}
+
+func numericProductsIntegerArray(array Array) Array {
+	out := make([]int64, array.Len())
+	var product int64 = 1
+	for i := range out {
+		value, ok, err := integerArrayAt(array, i)
+		if err != nil || !ok {
+			return nil
+		}
+		product *= value
+		out[i] = product
+	}
+	return newI64Trusted(out)
 }
 
 func deltasI64Slice(values []int64) Array {
