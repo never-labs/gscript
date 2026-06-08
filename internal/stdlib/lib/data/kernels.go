@@ -2554,6 +2554,9 @@ func (a i64FillArray) valueAt(row int) (int64, bool, error) {
 }
 
 func (a i64FillArray) sum() int64 {
+	if total, ok := i64FilledSum(a.source, a.fill); ok {
+		return total
+	}
 	var total int64
 	for row := 0; row < a.Len(); row++ {
 		value, ok, err := a.valueAt(row)
@@ -2563,6 +2566,71 @@ func (a i64FillArray) sum() int64 {
 		total += value
 	}
 	return total
+}
+
+func i64FilledSum(array Array, fill int64) (int64, bool) {
+	switch a := array.(type) {
+	case attributedArray:
+		return i64FilledSum(a.array, fill)
+	case tiledArray:
+		sourceLen := a.source.Len()
+		if sourceLen == 0 || a.len == 0 {
+			return 0, true
+		}
+		sourceTotal, ok := i64FilledSum(a.source, fill)
+		if !ok {
+			return 0, false
+		}
+		fullCycles := a.len / sourceLen
+		remainder := a.len % sourceLen
+		total := sourceTotal * int64(fullCycles)
+		for row := 0; row < remainder; row++ {
+			value, ok := i64FilledValueAt(a.source, (a.start+row)%sourceLen, fill)
+			if !ok {
+				return 0, false
+			}
+			total += value
+		}
+		return total, true
+	case nullableArray:
+		var total int64
+		for _, value := range a.data {
+			if IsNull(value) {
+				total += fill
+				continue
+			}
+			n, ok := coerceInt64Exact(value)
+			if !ok {
+				return 0, false
+			}
+			total += n
+		}
+		return total, true
+	case columnArray[int8]:
+		return numericSumIntegerValue(a.data), true
+	case columnArray[int16]:
+		return numericSumIntegerValue(a.data), true
+	case columnArray[int32]:
+		return numericSumIntegerValue(a.data), true
+	case columnArray[int64]:
+		return numericSumIntegerValue(a.data), true
+	case i64RangeArray:
+		return i64RangeSum(a), true
+	default:
+		return 0, false
+	}
+}
+
+func i64FilledValueAt(array Array, row int, fill int64) (int64, bool) {
+	value, ok := array.At(row)
+	if !ok {
+		return 0, false
+	}
+	if IsNull(value) {
+		return fill, true
+	}
+	n, ok := coerceInt64Exact(value)
+	return n, ok
 }
 
 type f64FillArray struct {

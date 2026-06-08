@@ -3202,6 +3202,17 @@ func TestTryTypedScalarFill(t *testing.T) {
 	if sum, ok, err := TryTypedNumericSum(out); err != nil || !ok || sum != int64(8) {
 		t.Fatalf("scalar fill sum = %#v,%v,%v; want 8,true,nil", sum, ok, err)
 	}
+	repeated, err := TakeRepeat(column.Data, 10)
+	if err != nil {
+		t.Fatalf("TakeRepeat scalar fill source returned error: %v", err)
+	}
+	out, ok, err = TryTypedScalarFill(int64(5), repeated)
+	if err != nil || !ok {
+		t.Fatalf("TryTypedScalarFill repeated handled=%v err=%v; want true,nil", ok, err)
+	}
+	if sum, ok, err := TryTypedNumericSum(out); err != nil || !ok || sum != int64(34) {
+		t.Fatalf("repeated scalar fill sum = %#v,%v,%v; want 34,true,nil", sum, ok, err)
+	}
 }
 
 func TestTryTypedSortIndexesI64(t *testing.T) {
