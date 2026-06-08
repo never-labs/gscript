@@ -1443,7 +1443,7 @@ func newRowKeyEncoderWithKinds(frame Frame, columns []Symbol, targetKinds []Kind
 		}
 		encoder.columns[i] = keyColumn{name: name, kind: kind, array: col}
 	}
-	if len(encoder.columns) == 1 && len(targetKinds) == 0 {
+	if len(encoder.columns) == 1 && (len(targetKinds) == 0 || encoder.columns[0].kind == frame.columns[columns[0]].Kind()) {
 		encoder.single = singleColumnKeyFunc(encoder.columns[0])
 	}
 	return encoder, nil

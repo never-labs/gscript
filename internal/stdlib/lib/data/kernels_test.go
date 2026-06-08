@@ -2093,6 +2093,36 @@ func TestTypedJoinRowsByKeyUsesSingleColumnTypedKeys(t *testing.T) {
 	}
 }
 
+func TestSingleColumnJoinEncoderUsesTypedKeyWhenTargetKindMatches(t *testing.T) {
+	frame := mustFrame(t, NewColumn("sym", []any{Symbol("AAPL"), Symbol("MSFT")}))
+	encoder, err := newRowKeyEncoderWithKinds(frame, []Symbol{"sym"}, []Kind{KindSymbol})
+	if err != nil {
+		t.Fatalf("newRowKeyEncoderWithKinds matching kind returned error: %v", err)
+	}
+	if encoder.single == nil {
+		t.Fatal("matching single-column join encoder did not use typed key fast path")
+	}
+	got, ok, err := encoder.lookupKeyWithBuilder(0, &strings.Builder{})
+	if err != nil || !ok {
+		t.Fatalf("matching single-column lookup key = %q ok=%v err=%v, want key without error", got, ok, err)
+	}
+	want, err := rowKey(frame, 0, []Symbol{"sym"})
+	if err != nil {
+		t.Fatalf("rowKey returned error: %v", err)
+	}
+	if got != want {
+		t.Fatalf("matching single-column lookup key = %q, want %q", got, want)
+	}
+
+	coerced, err := newRowKeyEncoderWithKinds(frame, []Symbol{"sym"}, []Kind{KindString})
+	if err != nil {
+		t.Fatalf("newRowKeyEncoderWithKinds coercing kind returned error: %v", err)
+	}
+	if coerced.single != nil {
+		t.Fatal("coercing single-column join encoder used typed key fast path; want normalization path")
+	}
+}
+
 func TestTypedAsofAndWindowMatchIndexesBoundaries(t *testing.T) {
 	left := mustFrame(t,
 		NewColumn("sym", []any{Symbol("a"), Symbol("a"), Symbol("a"), Symbol("b")}),

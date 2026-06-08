@@ -1462,6 +1462,7 @@ func qRunQuery(s *SoA, spec *Table) (*Table, error) {
 }
 
 func qExplainQuery(s *SoA, spec *Table) (*Table, error) {
+	sourceSchemaHash := qQueryNativeSoASchemaHash(s)
 	mask, err := qQueryMask(s, spec.RawGetString("where"))
 	if err != nil {
 		return nil, err
@@ -1511,7 +1512,7 @@ func qExplainQuery(s *SoA, spec *Table) (*Table, error) {
 		out.RawSetString("kernel_reason_code", StringValue(qQueryKernelReasonUnsupported))
 		out.RawSetString("kernel_reason", StringValue(reason))
 		qExplainAttachFallbackStats(out, qFallbackQueryKernel, qQueryKernelReasonUnsupported, reason)
-		out.RawSetString("source_schema_hash", StringValue(""))
+		out.RawSetString("source_schema_hash", StringValue(sourceSchemaHash))
 		out.RawSetString("kernel_schema_hash", StringValue(""))
 		out.RawSetString("kernel_schema", TableValue(NewAppendArrayTable(0)))
 		out.RawSetString("kernel_rows", IntValue(0))
@@ -1533,20 +1534,20 @@ func qExplainQuery(s *SoA, spec *Table) (*Table, error) {
 		out.RawSetString("kernel_reason_code", StringValue(reasonCode))
 		out.RawSetString("kernel_reason", StringValue(reason))
 		qExplainAttachFallbackStats(out, qFallbackQueryKernel, reasonCode, reason)
-		out.RawSetString("source_schema_hash", StringValue(""))
+		out.RawSetString("source_schema_hash", StringValue(sourceSchemaHash))
 		out.RawSetString("kernel_schema_hash", StringValue(""))
 		out.RawSetString("kernel_schema", TableValue(NewAppendArrayTable(0)))
 		out.RawSetString("kernel_rows", IntValue(0))
 		out.RawSetString("kernel_columns", IntValue(0))
 		return out, nil
 	}
-	schemaHash := qQueryNativeSoASchemaHash(nativeRows)
+	kernelSchemaHash := qQueryNativeSoASchemaHash(nativeRows)
 	out.RawSetString("kernel_supported", BoolValue(true))
 	out.RawSetString("kernel_reason_code", StringValue(qKernelReasonSupported))
 	out.RawSetString("kernel_reason", StringValue(qKernelReasonSupported))
 	qExplainAttachFallbackStats(out, "", qKernelReasonSupported, qKernelReasonSupported)
-	out.RawSetString("source_schema_hash", StringValue(schemaHash))
-	out.RawSetString("kernel_schema_hash", StringValue(schemaHash))
+	out.RawSetString("source_schema_hash", StringValue(sourceSchemaHash))
+	out.RawSetString("kernel_schema_hash", StringValue(kernelSchemaHash))
 	out.RawSetString("kernel_schema", qExplainSoASchemaValue(nativeRows))
 	out.RawSetString("kernel_rows", IntValue(int64(nativeRows.Len())))
 	out.RawSetString("kernel_columns", IntValue(int64(len(nativeRows.ColumnNames()))))

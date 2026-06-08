@@ -1413,8 +1413,8 @@ unsupported := q.explain_query(trades, {
 	if got := supported.RawGetString("source_schema_hash"); !got.IsString() || !strings.HasPrefix(got.Str(), "q.query.kernel:") {
 		t.Fatalf("supported schema hash = %v, want q.query kernel hash", got)
 	}
-	if got := supported.RawGetString("kernel_schema_hash"); !got.IsString() || got.Str() != supported.RawGetString("source_schema_hash").Str() {
-		t.Fatalf("supported kernel_schema_hash = %v, want source_schema_hash alias", got)
+	if got := supported.RawGetString("kernel_schema_hash"); !got.IsString() || !strings.HasPrefix(got.Str(), "q.query.kernel:") || got.Str() == supported.RawGetString("source_schema_hash").Str() {
+		t.Fatalf("supported kernel_schema_hash = %v, want distinct projected kernel schema hash", got)
 	}
 	kernelSchema := supported.RawGetString("kernel_schema").Table()
 	if kernelSchema == nil || kernelSchema.Length() != 1 {
@@ -1443,6 +1443,12 @@ unsupported := q.explain_query(trades, {
 	}
 	if got := unsupported.RawGetString("kernel_reason_code"); !got.IsString() || got.Str() != qQueryKernelReasonSelect {
 		t.Fatalf("unsupported kernel_reason_code = %v, want %s", got, qQueryKernelReasonSelect)
+	}
+	if got := unsupported.RawGetString("source_schema_hash"); !got.IsString() || !strings.HasPrefix(got.Str(), "q.query.kernel:") {
+		t.Fatalf("unsupported source_schema_hash = %v, want q.query source schema hash", got)
+	}
+	if got := unsupported.RawGetString("source_schema_hash"); got.Str() != supported.RawGetString("source_schema_hash").Str() {
+		t.Fatalf("unsupported source_schema_hash = %v, want same input schema as supported explain", got)
 	}
 	if got := unsupported.RawGetString("kernel_schema_hash"); !got.IsString() || got.Str() != "" {
 		t.Fatalf("unsupported kernel_schema_hash = %v, want empty string", got)
