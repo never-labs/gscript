@@ -3,6 +3,7 @@ package benchmarks
 import (
 	"fmt"
 	"math"
+	"sort"
 	"strings"
 	"testing"
 
@@ -127,6 +128,12 @@ var qEvalRequiredSemanticShapes = []string{
 	"where:compare-count-sum:row-scaled",
 	"amend:functional-vector-where:row-scaled",
 	"string:symbol-string-like:row-scaled",
+	"logical:mask-composition:row-scaled",
+	"membership:symbol-filter:row-scaled",
+	"sort:index-gather:row-scaled",
+	"group:fby-aggregate:row-scaled",
+	"moving:sum-avg:row-scaled",
+	"null:fill-arithmetic-where:row-scaled",
 }
 
 func buildQEvalVectorCases() []qEvalVectorCase {
@@ -675,6 +682,139 @@ func buildQEvalVectorCases() []qEvalVectorCase {
 					}
 				}
 				return aCount + int64(rows)
+			},
+		},
+		qEvalVectorCase{
+			name:   "LogicalMaskFilterRowScaled",
+			tags:   []string{"boolean-logical", "composite-compare", "where", "numeric-vector"},
+			matrix: []string{"compare:int-vector:where"},
+			shapes: []string{"logical:mask-composition:row-scaled"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("x:til %d;lo:%d;hi:%d;m:(x>=lo) and x<hi;count where m", rows, rows/4, rows*3/4)
+			},
+			goFn: func(rows int) int64 {
+				lo := rows / 4
+				hi := rows * 3 / 4
+				var count int64
+				for i := 0; i < rows; i++ {
+					if i >= lo && i < hi {
+						count++
+					}
+				}
+				return count
+			},
+		},
+		qEvalVectorCase{
+			name:   "MembershipSymbolFilterRowScaled",
+			tags:   []string{"membership", "symbol", "where"},
+			matrix: []string{"membership:in-differ-ratios:vector", "compare:symbol-vector:where"},
+			shapes: []string{"membership:symbol-filter:row-scaled"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("syms:%d#`AAPL`MSFT`NVDA`TSLA;count where syms in `AAPL`MSFT", rows)
+			},
+			goFn: func(rows int) int64 {
+				var count int64
+				for i := 0; i < rows; i++ {
+					if i%4 == 0 || i%4 == 1 {
+						count++
+					}
+				}
+				return count
+			},
+		},
+		qEvalVectorCase{
+			name:   "SortIndexGatherRowScaled",
+			tags:   []string{"table-sort", "projection", "sum"},
+			matrix: []string{"sort:int-vector:index-rank"},
+			shapes: []string{"sort:index-gather:row-scaled"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("x:reverse til %d;idx:iasc x;y:x[idx];f:first y;l:last y;f+l+count y", rows)
+			},
+			goFn: func(rows int) int64 {
+				x := make([]int64, rows)
+				idx := make([]int, rows)
+				for i := 0; i < rows; i++ {
+					x[i] = int64(rows - 1 - i)
+					idx[i] = i
+				}
+				sort.Slice(idx, func(i, j int) bool {
+					return x[idx[i]] < x[idx[j]]
+				})
+				first := x[idx[0]]
+				last := x[idx[len(idx)-1]]
+				return first + last + int64(len(idx))
+			},
+		},
+		qEvalVectorCase{
+			name:   "FbyGroupedAggregateRowScaled",
+			tags:   []string{"fby", "group", "sum", "symbol"},
+			matrix: []string{"aggregate:running-prd-min-max-avg:vector"},
+			shapes: []string{"group:fby-aggregate:row-scaled"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("v:til %d;g:%d#`a`b`c`d;s:sum v fby g;+/s", rows, rows)
+			},
+			goFn: func(rows int) int64 {
+				groupSums := [4]int64{}
+				groupCounts := [4]int64{}
+				for i := 0; i < rows; i++ {
+					group := i % 4
+					groupSums[group] += int64(i)
+					groupCounts[group]++
+				}
+				var total int64
+				for group := 0; group < 4; group++ {
+					total += groupSums[group] * groupCounts[group]
+				}
+				return total
+			},
+		},
+		qEvalVectorCase{
+			name:   "MovingSumAvgRowScaled",
+			tags:   []string{"moving-window", "sum", "avg-var-dev-med"},
+			matrix: []string{"aggregate:running-prd-min-max-avg:vector"},
+			shapes: []string{"moving:sum-avg:row-scaled"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("x:1+til %d;(+/20 msum x)+(+/20 mavg x)", rows)
+			},
+			goFn: func(rows int) int64 {
+				var sumWindow int64
+				var avgWindow float64
+				for i := 0; i < rows; i++ {
+					start := i - 19
+					if start < 0 {
+						start = 0
+					}
+					var window int64
+					for row := start; row <= i; row++ {
+						window += int64(row + 1)
+					}
+					sumWindow += window
+					avgWindow += float64(window) / float64(i-start+1)
+				}
+				return sumWindow + int64(avgWindow)
+			},
+		},
+		qEvalVectorCase{
+			name:   "TypedNullFillWhereRowScaled",
+			tags:   []string{"typed-null", "fill", "null-verb", "where", "sum"},
+			matrix: []string{"numeric-arithmetic:typed-null:hot", "list:prev-next-deltas-fills:typed-null"},
+			shapes: []string{"null:fill-arithmetic-where:row-scaled"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("x:%d#1 0Ni 3 0Ni;y:0^x;(+/y)+count where null x", rows)
+			},
+			goFn: func(rows int) int64 {
+				var sum, nullCount int64
+				for i := 0; i < rows; i++ {
+					switch i % 4 {
+					case 0:
+						sum += 1
+					case 1, 3:
+						nullCount++
+					case 2:
+						sum += 3
+					}
+				}
+				return sum + nullCount
 			},
 		},
 	)
