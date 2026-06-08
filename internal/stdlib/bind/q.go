@@ -1688,8 +1688,8 @@ func qExplainQuery(s *SoA, spec *Table) (*Table, error) {
 	}
 	out.RawSetString("kernel_cached", BoolValue(kernelCached))
 	out.RawSetString("kernel_shape", StringValue(kernelShape))
-	qExplainAttachRuntimeKernelExecutionSummary(out, kernelShape)
-	qExplainAttachRuntimeKernelLoweringSummary(out, kernelShape)
+	qExplainAttachRuntimeKernelExecutionSummary(out, qRuntimeKernelExplainFilter{Shape: kernelShape})
+	qExplainAttachRuntimeKernelLoweringSummary(out, qRuntimeKernelExplainFilter{Shape: kernelShape})
 	if len(aggs) != 0 {
 		reason := "query native kernel supports non-aggregate selects only"
 		out.RawSetString("kernel_supported", BoolValue(false))
@@ -1983,8 +1983,9 @@ func qExplainSQL(args qSQLArgsResult) (Value, error) {
 	out.RawSetString("kernel_lowering_stats_domain", StringValue(qStatsDomainJITLowering))
 	out.RawSetString("kernel_lowering_stats_source", StringValue(qStatsSourceMethodJIT))
 	out.RawSetString("kernel_lowering_stats_cache_backed", BoolValue(false))
-	qExplainAttachRuntimeKernelExecutionSummary(out, kernelInfo.shape)
-	qExplainAttachRuntimeKernelLoweringSummary(out, kernelInfo.shape)
+	runtimeKernelFilter := qSQLRuntimeKernelExplainFilter(kernelInfo.shape)
+	qExplainAttachRuntimeKernelExecutionSummary(out, runtimeKernelFilter)
+	qExplainAttachRuntimeKernelLoweringSummary(out, runtimeKernelFilter)
 	qExplainAttachFallbackStats(out, qSQLKernelFallbackStatsCode(kernelInfo), kernelInfo.reasonCode, kernelInfo.reason)
 	return TableValue(out), nil
 }
@@ -3559,15 +3560,100 @@ func qRuntimeKernelLoweringStatsTable(stats []QRuntimeKernelLoweringStat) *Table
 	return rows
 }
 
-func qRuntimeKernelExecutionSummaryForShape(shape string) qRuntimeKernelExecutionShapeSummary {
-	shape = qNormalizeRuntimeKernelStatPart(shape)
-	if shape == "" {
+type qRuntimeKernelExplainFilter struct {
+	Shape            string
+	ExecutionSources map[string]bool
+	ExecutionKernels map[string]bool
+	LoweringSources  map[string]bool
+	LoweringKernels  map[string]bool
+}
+
+func qSQLRuntimeKernelExplainFilter(shape string) qRuntimeKernelExplainFilter {
+	if qRuntimeKernelExplainShapeIsVector(shape) {
+		return qRuntimeKernelExplainFilter{
+			Shape: shape,
+			ExecutionSources: map[string]bool{
+				"methodjit_q_vector_runtime": true,
+			},
+			ExecutionKernels: map[string]bool{
+				"QVectorGatherReduce": true,
+				"QVectorWhereReduce":  true,
+			},
+			LoweringSources: map[string]bool{
+				"methodjit_q_vector_runtime":  true,
+				"methodjit_q_vector_lowering": true,
+			},
+			LoweringKernels: map[string]bool{
+				"QVectorGatherReduce": true,
+				"QVectorWhereReduce":  true,
+			},
+		}
+	}
+	return qRuntimeKernelExplainFilter{
+		Shape: shape,
+		ExecutionSources: map[string]bool{
+			"methodjit_q_frame_runtime": true,
+		},
+		ExecutionKernels: map[string]bool{
+			"QFrameSelectColumn": true,
+		},
+		LoweringSources: map[string]bool{
+			"methodjit_q_frame_runtime":  true,
+			"methodjit_q_frame_lowering": true,
+		},
+		LoweringKernels: map[string]bool{
+			"QFrameSelectColumn": true,
+		},
+	}
+}
+
+func qRuntimeKernelExplainShapeIsVector(shape string) bool {
+	return strings.Contains(shape, "vector-")
+}
+
+func (filter qRuntimeKernelExplainFilter) normalizedShape() string {
+	if filter.Shape == "" {
+		return ""
+	}
+	return qNormalizeRuntimeKernelStatPart(filter.Shape)
+}
+
+func (filter qRuntimeKernelExplainFilter) matchesExecution(stat QRuntimeKernelExecutionStat) bool {
+	shape := filter.normalizedShape()
+	if shape != "" && stat.Shape != shape {
+		return false
+	}
+	if len(filter.ExecutionSources) != 0 && !filter.ExecutionSources[stat.Source] {
+		return false
+	}
+	if len(filter.ExecutionKernels) != 0 && !filter.ExecutionKernels[stat.Kernel] {
+		return false
+	}
+	return true
+}
+
+func (filter qRuntimeKernelExplainFilter) matchesLowering(stat QRuntimeKernelLoweringStat) bool {
+	shape := filter.normalizedShape()
+	if shape != "" && stat.Shape != shape {
+		return false
+	}
+	if len(filter.LoweringSources) != 0 && !filter.LoweringSources[stat.Source] {
+		return false
+	}
+	if len(filter.LoweringKernels) != 0 && !filter.LoweringKernels[stat.Kernel] {
+		return false
+	}
+	return true
+}
+
+func qRuntimeKernelExecutionSummaryForExplainFilter(filter qRuntimeKernelExplainFilter) qRuntimeKernelExecutionShapeSummary {
+	if filter.normalizedShape() == "" {
 		return qRuntimeKernelExecutionShapeSummary{}
 	}
 	stats := qRuntimeKernelExecutionStatsSnapshot()
 	var out qRuntimeKernelExecutionShapeSummary
 	for _, stat := range stats {
-		if stat.Shape != shape {
+		if !filter.matchesExecution(stat) {
 			continue
 		}
 		out.Executions += stat.Count
@@ -3578,27 +3664,30 @@ func qRuntimeKernelExecutionSummaryForShape(shape string) qRuntimeKernelExecutio
 			out.Errors += stat.Count
 		}
 	}
-	out.Routes = qRuntimeKernelExecutionRouteStatsForShape(stats, shape)
+	out.Routes = qRuntimeKernelExecutionRouteStatsForExplainFilter(stats, filter)
 	return out
 }
 
-func qExplainAttachRuntimeKernelExecutionSummary(out *Table, shape string) {
-	summary := qRuntimeKernelExecutionSummaryForShape(shape)
+func qRuntimeKernelExecutionSummaryForShape(shape string) qRuntimeKernelExecutionShapeSummary {
+	return qRuntimeKernelExecutionSummaryForExplainFilter(qRuntimeKernelExplainFilter{Shape: shape})
+}
+
+func qExplainAttachRuntimeKernelExecutionSummary(out *Table, filter qRuntimeKernelExplainFilter) {
+	summary := qRuntimeKernelExecutionSummaryForExplainFilter(filter)
 	out.RawSetString("kernel_execution_count", qUint64IntValue(summary.Executions))
 	out.RawSetString("kernel_execution_success_count", qUint64IntValue(summary.Successes))
 	out.RawSetString("kernel_execution_error_count", qUint64IntValue(summary.Errors))
 	out.RawSetString("kernel_execution_routes", TableValue(qRuntimeKernelExecutionRouteStatsTable(summary.Routes)))
 }
 
-func qRuntimeKernelLoweringSummaryForShape(shape string) qRuntimeKernelLoweringShapeSummary {
-	if shape == "" {
+func qRuntimeKernelLoweringSummaryForExplainFilter(filter qRuntimeKernelExplainFilter) qRuntimeKernelLoweringShapeSummary {
+	if filter.normalizedShape() == "" {
 		return qRuntimeKernelLoweringShapeSummary{}
 	}
-	shape = qNormalizeRuntimeKernelStatPart(shape)
 	stats := qRuntimeKernelLoweringStatsSnapshot()
 	var out qRuntimeKernelLoweringShapeSummary
 	for _, stat := range stats {
-		if stat.Shape != shape {
+		if !filter.matchesLowering(stat) {
 			continue
 		}
 		out.Lowerings += stat.Count
@@ -3609,14 +3698,18 @@ func qRuntimeKernelLoweringSummaryForShape(shape string) qRuntimeKernelLoweringS
 			out.Fallbacks += stat.Count
 		}
 	}
-	out.Reasons = qRuntimeKernelLoweringReasonStatsForShape(stats, shape)
-	out.ReasonShapes = qRuntimeKernelLoweringReasonShapeStatsForShape(stats, shape)
-	out.Routes = qRuntimeKernelLoweringRouteStatsForShape(stats, shape)
+	out.Reasons = qRuntimeKernelLoweringReasonStatsForExplainFilter(stats, filter)
+	out.ReasonShapes = qRuntimeKernelLoweringReasonShapeStatsForExplainFilter(stats, filter)
+	out.Routes = qRuntimeKernelLoweringRouteStatsForExplainFilter(stats, filter)
 	return out
 }
 
-func qExplainAttachRuntimeKernelLoweringSummary(out *Table, shape string) {
-	summary := qRuntimeKernelLoweringSummaryForShape(shape)
+func qRuntimeKernelLoweringSummaryForShape(shape string) qRuntimeKernelLoweringShapeSummary {
+	return qRuntimeKernelLoweringSummaryForExplainFilter(qRuntimeKernelExplainFilter{Shape: shape})
+}
+
+func qExplainAttachRuntimeKernelLoweringSummary(out *Table, filter qRuntimeKernelExplainFilter) {
+	summary := qRuntimeKernelLoweringSummaryForExplainFilter(filter)
 	out.RawSetString("kernel_lowering_count", qUint64IntValue(summary.Lowerings))
 	out.RawSetString("kernel_lowering_supported_count", qUint64IntValue(summary.Supported))
 	out.RawSetString("kernel_lowering_fallback_count", qUint64IntValue(summary.Fallbacks))
@@ -3728,6 +3821,10 @@ func qRuntimeKernelExecutionRouteStats(stats []QRuntimeKernelExecutionStat) []qR
 }
 
 func qRuntimeKernelExecutionRouteStatsForShape(stats []QRuntimeKernelExecutionStat, shape string) []qRuntimeKernelExecutionRouteStat {
+	return qRuntimeKernelExecutionRouteStatsForExplainFilter(stats, qRuntimeKernelExplainFilter{Shape: shape})
+}
+
+func qRuntimeKernelExecutionRouteStatsForExplainFilter(stats []QRuntimeKernelExecutionStat, filter qRuntimeKernelExplainFilter) []qRuntimeKernelExecutionRouteStat {
 	type routeKey struct {
 		source  string
 		kernel  string
@@ -3736,7 +3833,7 @@ func qRuntimeKernelExecutionRouteStatsForShape(stats []QRuntimeKernelExecutionSt
 	}
 	counts := make(map[routeKey]uint64, len(stats))
 	for _, stat := range stats {
-		if shape != "" && stat.Shape != shape {
+		if !filter.matchesExecution(stat) {
 			continue
 		}
 		key := routeKey{source: stat.Source, kernel: stat.Kernel, route: stat.Route, outcome: stat.Outcome}
@@ -3938,6 +4035,10 @@ func qRuntimeKernelLoweringReasonStats(stats []QRuntimeKernelLoweringStat) []qRu
 }
 
 func qRuntimeKernelLoweringReasonStatsForShape(stats []QRuntimeKernelLoweringStat, shape string) []qRuntimeKernelLoweringReasonStat {
+	return qRuntimeKernelLoweringReasonStatsForExplainFilter(stats, qRuntimeKernelExplainFilter{Shape: shape})
+}
+
+func qRuntimeKernelLoweringReasonStatsForExplainFilter(stats []QRuntimeKernelLoweringStat, filter qRuntimeKernelExplainFilter) []qRuntimeKernelLoweringReasonStat {
 	type reasonKey struct {
 		source       string
 		kind         string
@@ -3946,7 +4047,7 @@ func qRuntimeKernelLoweringReasonStatsForShape(stats []QRuntimeKernelLoweringSta
 	}
 	counts := make(map[reasonKey]uint64, len(stats))
 	for _, stat := range stats {
-		if shape != "" && stat.Shape != shape {
+		if !filter.matchesLowering(stat) {
 			continue
 		}
 		if stat.Outcome != "fallback" {
@@ -4008,6 +4109,10 @@ func qRuntimeKernelLoweringReasonShapeStats(stats []QRuntimeKernelLoweringStat) 
 }
 
 func qRuntimeKernelLoweringReasonShapeStatsForShape(stats []QRuntimeKernelLoweringStat, shape string) []qRuntimeKernelLoweringReasonShapeStat {
+	return qRuntimeKernelLoweringReasonShapeStatsForExplainFilter(stats, qRuntimeKernelExplainFilter{Shape: shape})
+}
+
+func qRuntimeKernelLoweringReasonShapeStatsForExplainFilter(stats []QRuntimeKernelLoweringStat, filter qRuntimeKernelExplainFilter) []qRuntimeKernelLoweringReasonShapeStat {
 	type reasonShapeKey struct {
 		source       string
 		kind         string
@@ -4020,7 +4125,7 @@ func qRuntimeKernelLoweringReasonShapeStatsForShape(stats []QRuntimeKernelLoweri
 	}
 	counts := make(map[reasonShapeKey]uint64, len(stats))
 	for _, stat := range stats {
-		if shape != "" && stat.Shape != shape {
+		if !filter.matchesLowering(stat) {
 			continue
 		}
 		if stat.Outcome != "fallback" {
@@ -4106,6 +4211,10 @@ func qRuntimeKernelLoweringRouteStats(stats []QRuntimeKernelLoweringStat) []qRun
 }
 
 func qRuntimeKernelLoweringRouteStatsForShape(stats []QRuntimeKernelLoweringStat, shape string) []qRuntimeKernelLoweringRouteStat {
+	return qRuntimeKernelLoweringRouteStatsForExplainFilter(stats, qRuntimeKernelExplainFilter{Shape: shape})
+}
+
+func qRuntimeKernelLoweringRouteStatsForExplainFilter(stats []QRuntimeKernelLoweringStat, filter qRuntimeKernelExplainFilter) []qRuntimeKernelLoweringRouteStat {
 	type routeKey struct {
 		source  string
 		kind    string
@@ -4115,7 +4224,7 @@ func qRuntimeKernelLoweringRouteStatsForShape(stats []QRuntimeKernelLoweringStat
 	}
 	counts := make(map[routeKey]uint64, len(stats))
 	for _, stat := range stats {
-		if shape != "" && stat.Shape != shape {
+		if !filter.matchesLowering(stat) {
 			continue
 		}
 		key := routeKey{

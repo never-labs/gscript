@@ -4369,6 +4369,14 @@ func TestQExplainReportsQueryKernelVisibility(t *testing.T) {
 				Outcome: "success",
 				Count:   9,
 			},
+			{
+				Source:  "methodjit_q_vector_runtime",
+				Kernel:  "QVectorGatherReduce",
+				Shape:   kernelShape.Str(),
+				Route:   "typed_runtime_op_exit",
+				Outcome: "success",
+				Count:   11,
+			},
 		}
 	})
 	withExecution, err := qExplainSQL(qSQLArgsResult{frameValue: frameValue, source: query})
@@ -4440,6 +4448,17 @@ func TestQExplainReportsQueryKernelVisibility(t *testing.T) {
 				ReasonFamily: "lowering",
 				ReasonCode:   "shared_gather",
 				Count:        9,
+			},
+			{
+				Source:       "methodjit_q_vector_lowering",
+				Kind:         "fallback",
+				Kernel:       "QVectorGatherReduce",
+				Shape:        kernelShape.Str(),
+				Route:        "lowering",
+				Outcome:      "fallback",
+				ReasonFamily: "lowering",
+				ReasonCode:   "same_shape_vector",
+				Count:        11,
 			},
 		}
 	})
