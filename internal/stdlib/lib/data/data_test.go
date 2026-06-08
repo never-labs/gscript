@@ -2981,6 +2981,46 @@ func TestGatherAndTakeOperators(t *testing.T) {
 	if _, err := Take(array, -1); err == nil {
 		t.Fatal("Take accepted negative count")
 	}
+	head, err := TakeRepeat(NewI64Range(10, 2, 5), 3)
+	if err != nil {
+		t.Fatalf("TakeRepeat range head returned error: %v", err)
+	}
+	if _, ok := head.(i64RangeArray); !ok {
+		t.Fatalf("TakeRepeat range head returned %T, want i64RangeArray", head)
+	}
+	if got, want := head.Values(), []any{int64(10), int64(12), int64(14)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("TakeRepeat range head values = %#v, want %#v", got, want)
+	}
+	tail, err := TakeRepeat(NewI64Range(10, 2, 5), -2)
+	if err != nil {
+		t.Fatalf("TakeRepeat range tail returned error: %v", err)
+	}
+	if _, ok := tail.(i64RangeArray); !ok {
+		t.Fatalf("TakeRepeat range tail returned %T, want i64RangeArray", tail)
+	}
+	if got, want := tail.Values(), []any{int64(16), int64(18)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("TakeRepeat range tail values = %#v, want %#v", got, want)
+	}
+	sliced, err := Slice(NewSymbols([]string{"AAPL", "MSFT", "NVDA", "TSLA"}), 1, 2)
+	if err != nil {
+		t.Fatalf("Slice symbols returned error: %v", err)
+	}
+	if got, want := sliced.Values(), []any{Symbol("MSFT"), Symbol("NVDA")}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("Slice symbols values = %#v, want %#v", got, want)
+	}
+	reversedRange, handled, err := Reverse(NewI64Range(10, 2, 4))
+	if err != nil {
+		t.Fatalf("Reverse range returned error: %v", err)
+	}
+	if !handled {
+		t.Fatal("Reverse range did not handle typed array")
+	}
+	if _, ok := reversedRange.(i64RangeArray); !ok {
+		t.Fatalf("Reverse range returned %T, want i64RangeArray", reversedRange)
+	}
+	if got, want := reversedRange.Values(), []any{int64(16), int64(14), int64(12), int64(10)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("Reverse range values = %#v, want %#v", got, want)
+	}
 
 	repeated, err := TakeRepeat(NewAny([]any{int64(1), NullValue, int64(2)}), 8)
 	if err != nil {

@@ -1331,6 +1331,126 @@ func Gather(array Array, indexes []int) (Array, error) {
 	return array.Gather(indexes), nil
 }
 
+func Slice(array Array, start, count int) (Array, error) {
+	if array == nil {
+		return nil, fmt.Errorf("slice array is nil")
+	}
+	if start < 0 || count < 0 || start > array.Len() || start+count > array.Len() {
+		return nil, fmt.Errorf("slice range start=%d count=%d outside length %d", start, count, array.Len())
+	}
+	if count == 0 {
+		return array.Gather(nil), nil
+	}
+	switch a := array.(type) {
+	case attributedArray:
+		sliced, err := Slice(a.array, start, count)
+		if err != nil {
+			return nil, err
+		}
+		return attributedArray{array: sliced, metadata: a.metadata.cloneWithRebuiltIndexes(sliced)}, nil
+	case tiledArray:
+		if a.source.Len() == 0 {
+			return array.Gather(nil), nil
+		}
+		return tiledArray{source: a.source, start: (a.start + start) % a.source.Len(), len: count}, nil
+	case i64RangeArray:
+		return i64RangeArray{start: a.start + int64(start)*a.step, step: a.step, len: count}, nil
+	case f64RangeArray:
+		return f64RangeArray{start: a.start + float64(start)*a.step, step: a.step, len: count}, nil
+	case columnArray[bool]:
+		return columnArray[bool]{kind: a.kind, data: a.data[start : start+count]}, nil
+	case columnArray[int8]:
+		return columnArray[int8]{kind: a.kind, data: a.data[start : start+count]}, nil
+	case columnArray[int16]:
+		return columnArray[int16]{kind: a.kind, data: a.data[start : start+count]}, nil
+	case columnArray[int32]:
+		return columnArray[int32]{kind: a.kind, data: a.data[start : start+count]}, nil
+	case columnArray[int64]:
+		return columnArray[int64]{kind: a.kind, data: a.data[start : start+count]}, nil
+	case columnArray[uint8]:
+		return columnArray[uint8]{kind: a.kind, data: a.data[start : start+count]}, nil
+	case columnArray[uint16]:
+		return columnArray[uint16]{kind: a.kind, data: a.data[start : start+count]}, nil
+	case columnArray[uint32]:
+		return columnArray[uint32]{kind: a.kind, data: a.data[start : start+count]}, nil
+	case columnArray[uint64]:
+		return columnArray[uint64]{kind: a.kind, data: a.data[start : start+count]}, nil
+	case columnArray[float32]:
+		return columnArray[float32]{kind: a.kind, data: a.data[start : start+count]}, nil
+	case columnArray[float64]:
+		return columnArray[float64]{kind: a.kind, data: a.data[start : start+count]}, nil
+	case columnArray[string]:
+		return columnArray[string]{kind: a.kind, data: a.data[start : start+count]}, nil
+	case columnArray[Symbol]:
+		return columnArray[Symbol]{kind: a.kind, data: a.data[start : start+count]}, nil
+	case columnArray[Month]:
+		return columnArray[Month]{kind: a.kind, data: a.data[start : start+count]}, nil
+	case columnArray[Date]:
+		return columnArray[Date]{kind: a.kind, data: a.data[start : start+count]}, nil
+	case columnArray[DateTime]:
+		return columnArray[DateTime]{kind: a.kind, data: a.data[start : start+count]}, nil
+	case columnArray[Timespan]:
+		return columnArray[Timespan]{kind: a.kind, data: a.data[start : start+count]}, nil
+	case columnArray[Minute]:
+		return columnArray[Minute]{kind: a.kind, data: a.data[start : start+count]}, nil
+	case columnArray[Second]:
+		return columnArray[Second]{kind: a.kind, data: a.data[start : start+count]}, nil
+	case columnArray[Time]:
+		return columnArray[Time]{kind: a.kind, data: a.data[start : start+count]}, nil
+	case columnArray[Timestamp]:
+		return columnArray[Timestamp]{kind: a.kind, data: a.data[start : start+count]}, nil
+	case nullableArray:
+		return nullableArray{kind: a.kind, data: a.data[start : start+count]}, nil
+	case encodedArray:
+		return encodedArray{kind: a.kind, domain: a.domain, codes: a.codes[start : start+count]}, nil
+	default:
+		return Gather(array, contiguousIndexes(start, count))
+	}
+}
+
+func Reverse(array Array) (Array, bool, error) {
+	if array == nil {
+		return nil, true, fmt.Errorf("reverse array is nil")
+	}
+	switch a := array.(type) {
+	case attributedArray:
+		reversed, handled, err := Reverse(a.array)
+		if err != nil || !handled {
+			return reversed, handled, err
+		}
+		return attributedArray{array: reversed, metadata: a.metadata.cloneWithRebuiltIndexes(reversed)}, true, nil
+	case i64RangeArray:
+		if a.len == 0 {
+			return a, true, nil
+		}
+		return i64RangeArray{start: a.start + int64(a.len-1)*a.step, step: -a.step, len: a.len}, true, nil
+	case f64RangeArray:
+		if a.len == 0 {
+			return a, true, nil
+		}
+		return f64RangeArray{start: a.start + float64(a.len-1)*a.step, step: -a.step, len: a.len}, true, nil
+	case i64SegmentArray:
+		if a.len == 0 {
+			return i64RangeArray{len: 0}, true, nil
+		}
+		segments := make([]i64RangeArray, 0, len(a.segments))
+		for i := len(a.segments) - 1; i >= 0; i-- {
+			segment := a.segments[i]
+			if segment.len <= 0 {
+				continue
+			}
+			segments = append(segments, i64RangeArray{
+				start: segment.start + int64(segment.len-1)*segment.step,
+				step:  -segment.step,
+				len:   segment.len,
+			})
+		}
+		return newI64SegmentArray(segments...), true, nil
+	default:
+		return nil, false, nil
+	}
+}
+
 func TakeRepeat(array Array, n int) (Array, error) {
 	if array == nil {
 		return nil, fmt.Errorf("take array is nil")
@@ -1356,14 +1476,10 @@ func TakeRepeat(array Array, n int) (Array, error) {
 		}
 		return tiledArray{source: array, start: start, len: count}, nil
 	}
-	indexes := allIndexes(count)
 	if n < 0 {
-		offset := length - count
-		for i := range indexes {
-			indexes[i] += offset
-		}
+		return Slice(array, length-count, count)
 	}
-	return Gather(array, indexes)
+	return Slice(array, 0, count)
 }
 
 func GatherFrame(frame Frame, indexes []int) (Frame, error) {
@@ -8523,6 +8639,14 @@ func allIndexes(n int) []int {
 	out := make([]int, n)
 	for i := range out {
 		out[i] = i
+	}
+	return out
+}
+
+func contiguousIndexes(start, count int) []int {
+	out := make([]int, count)
+	for i := range out {
+		out[i] = start + i
 	}
 	return out
 }

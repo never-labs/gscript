@@ -9485,6 +9485,12 @@ func reverse(v any) (any, error) {
 		}
 		return v, nil
 	}
+	if reversed, handled, err := data.Reverse(array); err != nil || handled {
+		if err != nil {
+			return nil, err
+		}
+		return reversed, nil
+	}
 	indexes := make([]int, array.Len())
 	for i := range indexes {
 		indexes[i] = array.Len() - 1 - i
@@ -10231,8 +10237,22 @@ func segmentIndexes(length, start, end int) []int {
 }
 
 func dropArray(array data.Array, n int) (data.Array, error) {
-	indexes := dropIndexes(array.Len(), n)
-	return data.Gather(array, indexes)
+	start := 0
+	count := array.Len()
+	if n >= 0 {
+		if n > count {
+			n = count
+		}
+		start = n
+		count -= n
+	} else {
+		n = -n
+		if n > count {
+			n = count
+		}
+		count -= n
+	}
+	return data.Slice(array, start, count)
 }
 
 func dropFrame(frame data.Frame, n int) (data.Frame, error) {
@@ -10297,11 +10317,7 @@ func takeArrayTail(array data.Array, n int) (data.Array, error) {
 		n = array.Len()
 	}
 	start := array.Len() - n
-	indexes := make([]int, n)
-	for i := range indexes {
-		indexes[i] = start + i
-	}
-	return data.Gather(array, indexes)
+	return data.Slice(array, start, n)
 }
 
 func takeFrameTail(frame data.Frame, n int) (data.Frame, error) {
