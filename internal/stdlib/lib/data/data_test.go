@@ -3162,6 +3162,28 @@ func TestTryTypedBoolLogical(t *testing.T) {
 	if count, ok, err := TryTypedTrueCount(cmp.(Array)); err != nil || !ok || count != 3 {
 		t.Fatalf("range compare true count = %d,%v,%v; want 3,true,nil", count, ok, err)
 	}
+	lower, ok, err := TryTypedDyadic(OpGE, NewI64Range(0, 1, 8), int64(2))
+	if err != nil || !ok {
+		t.Fatalf("lower range compare handled=%v err=%v; want true,nil", ok, err)
+	}
+	upper, ok, err := TryTypedDyadic(OpLT, NewI64Range(0, 1, 8), int64(6))
+	if err != nil || !ok {
+		t.Fatalf("upper range compare handled=%v err=%v; want true,nil", ok, err)
+	}
+	between, ok, err := TryTypedBoolLogical("and", lower, upper)
+	if err != nil || !ok {
+		t.Fatalf("range logical and handled=%v err=%v; want true,nil", ok, err)
+	}
+	if count, ok, err := TryTypedTrueCount(between); err != nil || !ok || count != 4 {
+		t.Fatalf("range logical and true count = %d,%v,%v; want 4,true,nil", count, ok, err)
+	}
+	outside, ok, err := TryTypedBoolLogical("or", lower, upper)
+	if err != nil || !ok {
+		t.Fatalf("range logical or handled=%v err=%v; want true,nil", ok, err)
+	}
+	if count, ok, err := TryTypedTrueCount(outside); err != nil || !ok || count != 8 {
+		t.Fatalf("range logical or true count = %d,%v,%v; want 8,true,nil", count, ok, err)
+	}
 }
 
 func TestTryTypedScalarFill(t *testing.T) {

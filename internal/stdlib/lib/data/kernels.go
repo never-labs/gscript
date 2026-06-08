@@ -5373,12 +5373,131 @@ func i64SegmentSum(values i64SegmentArray) int64 {
 }
 
 func i64ProductSum(values i64ProductArray) int64 {
+	if sum, ok := i64ProductRangeSum(values); ok {
+		return sum
+	}
 	var sum int64
 	for i := 0; i < values.Len(); i++ {
 		value, _ := values.i64At(i)
 		sum += value
 	}
 	return sum
+}
+
+func i64ProductRangeSum(values i64ProductArray) (int64, bool) {
+	n := int64(values.Len())
+	if n == 0 {
+		return 0, true
+	}
+	sumI, ok := i64IndexSumChecked(n)
+	if !ok {
+		return 0, false
+	}
+	sumI2, ok := i64IndexSquareSumChecked(n)
+	if !ok {
+		return 0, false
+	}
+	constant, ok := i64MulChecked(values.left.start, values.right.start)
+	if !ok {
+		return 0, false
+	}
+	constant, ok = i64MulChecked(constant, n)
+	if !ok {
+		return 0, false
+	}
+	leftLinear, ok := i64MulChecked(values.left.start, values.right.step)
+	if !ok {
+		return 0, false
+	}
+	rightLinear, ok := i64MulChecked(values.right.start, values.left.step)
+	if !ok {
+		return 0, false
+	}
+	linear, ok := i64AddChecked(leftLinear, rightLinear)
+	if !ok {
+		return 0, false
+	}
+	linear, ok = i64MulChecked(linear, sumI)
+	if !ok {
+		return 0, false
+	}
+	quadratic, ok := i64MulChecked(values.left.step, values.right.step)
+	if !ok {
+		return 0, false
+	}
+	quadratic, ok = i64MulChecked(quadratic, sumI2)
+	if !ok {
+		return 0, false
+	}
+	total, ok := i64AddChecked(constant, linear)
+	if !ok {
+		return 0, false
+	}
+	total, ok = i64AddChecked(total, quadratic)
+	if !ok {
+		return 0, false
+	}
+	return total, true
+}
+
+func i64IndexSumChecked(n int64) (int64, bool) {
+	if n <= 0 {
+		return 0, true
+	}
+	if n%2 == 0 {
+		return i64MulChecked(n/2, n-1)
+	}
+	return i64MulChecked(n, (n-1)/2)
+}
+
+func i64IndexSquareSumChecked(n int64) (int64, bool) {
+	if n <= 0 {
+		return 0, true
+	}
+	if n > int64(^uint64(0)>>1)/2+1 {
+		return 0, false
+	}
+	factors := [3]int64{n, n - 1, 2*n - 1}
+	divideFactor := func(divisor int64) bool {
+		for i := range factors {
+			if factors[i]%divisor == 0 {
+				factors[i] /= divisor
+				return true
+			}
+		}
+		return false
+	}
+	if !divideFactor(2) || !divideFactor(3) {
+		return 0, false
+	}
+	product, ok := i64MulChecked(factors[0], factors[1])
+	if !ok {
+		return 0, false
+	}
+	return i64MulChecked(product, factors[2])
+}
+
+func i64AddChecked(left, right int64) (int64, bool) {
+	out := left + right
+	if (right > 0 && out < left) || (right < 0 && out > left) {
+		return 0, false
+	}
+	return out, true
+}
+
+func i64MulChecked(left, right int64) (int64, bool) {
+	if left == 0 || right == 0 {
+		return 0, true
+	}
+	minInt := -int64(^uint64(0)>>1) - 1
+	if (left == minInt && right == -1) || (right == minInt && left == -1) {
+		return 0, false
+	}
+	out := left * right
+	if out/right != left {
+		return 0, false
+	}
+	return out, true
 }
 
 func numericSumsInteger[T signedScalar](values []T) Array {
@@ -6136,6 +6255,9 @@ func (a boolLogicalMask) valueAt(row int) (bool, bool, error) {
 }
 
 func (a boolLogicalMask) trueCount() (int64, bool, error) {
+	if count, ok := a.rangeCompareTrueCount(); ok {
+		return count, true, nil
+	}
 	var count int64
 	for row := 0; row < a.len; row++ {
 		value, ok, err := a.valueAt(row)
@@ -6147,6 +6269,114 @@ func (a boolLogicalMask) trueCount() (int64, bool, error) {
 		}
 	}
 	return count, true, nil
+}
+
+func (a boolLogicalMask) rangeCompareTrueCount() (int64, bool) {
+	if a.leftIsScalar || a.rightIsScalar {
+		return 0, false
+	}
+	left, leftOK := a.left.(i64RangeCompareMask)
+	right, rightOK := a.right.(i64RangeCompareMask)
+	if !leftOK || !rightOK || !sameI64Range(left.values, right.values) || left.values.step != 1 {
+		return 0, false
+	}
+	leftLow, leftHigh, ok := compareMaskValueInterval(left)
+	if !ok {
+		return 0, false
+	}
+	rightLow, rightHigh, ok := compareMaskValueInterval(right)
+	if !ok {
+		return 0, false
+	}
+	intersect := i64RangeIntervalCount(left.values, maxInt64Value(leftLow, rightLow), minInt64Value(leftHigh, rightHigh))
+	if a.op == "and" {
+		return intersect, true
+	}
+	if a.op == "or" {
+		leftCount := i64RangeIntervalCount(left.values, leftLow, leftHigh)
+		rightCount := i64RangeIntervalCount(right.values, rightLow, rightHigh)
+		return leftCount + rightCount - intersect, true
+	}
+	return 0, false
+}
+
+func sameI64Range(left, right i64RangeArray) bool {
+	return left.start == right.start && left.step == right.step && left.len == right.len
+}
+
+func compareMaskValueInterval(mask i64RangeCompareMask) (int64, int64, bool) {
+	op := mask.op
+	if mask.scalarLeft {
+		switch op {
+		case OpLT:
+			op = OpGT
+		case OpLE:
+			op = OpGE
+		case OpGT:
+			op = OpLT
+		case OpGE:
+			op = OpLE
+		}
+	}
+	minInt := -int64(^uint64(0)>>1) - 1
+	maxInt := int64(^uint64(0) >> 1)
+	switch op {
+	case OpEQ:
+		return mask.scalar, mask.scalar, true
+	case OpGT:
+		if mask.scalar == maxInt {
+			return 1, 0, true
+		}
+		return mask.scalar + 1, maxInt, true
+	case OpGE:
+		return mask.scalar, maxInt, true
+	case OpLT:
+		if mask.scalar == minInt {
+			return 1, 0, true
+		}
+		return minInt, mask.scalar - 1, true
+	case OpLE:
+		return minInt, mask.scalar, true
+	default:
+		return 0, 0, false
+	}
+}
+
+func i64RangeIntervalCount(values i64RangeArray, low, high int64) int64 {
+	if values.len <= 0 || low > high {
+		return 0
+	}
+	start := values.start
+	last := values.start + int64(values.len-1)
+	if high < start || low > last {
+		return 0
+	}
+	firstRow := int64(0)
+	if low > start {
+		firstRow = low - start
+	}
+	lastRow := int64(values.len - 1)
+	if high < last {
+		lastRow = high - start
+	}
+	if lastRow < firstRow {
+		return 0
+	}
+	return lastRow - firstRow + 1
+}
+
+func maxInt64Value(left, right int64) int64 {
+	if left > right {
+		return left
+	}
+	return right
+}
+
+func minInt64Value(left, right int64) int64 {
+	if left < right {
+		return left
+	}
+	return right
 }
 
 func boolLogicalArrayArray(op string, left, right Array, out []bool) (Array, bool, error) {

@@ -2464,6 +2464,34 @@ func TestTypedDyadicBroadcastPromotionAndNullPropagation(t *testing.T) {
 	if !handled || productSum != int64(300) {
 		t.Fatalf("TryTypedNumericSum range product = %v, %v; want 300, true", productSum, handled)
 	}
+	descProduct, ok, err := TryTypedIntegerDyadic(OpMul, NewI64Range(10, -2, 5), NewI64Range(-3, 4, 5))
+	if err != nil {
+		t.Fatalf("TryTypedIntegerDyadic descending range product returned error: %v", err)
+	}
+	if !ok {
+		t.Fatal("TryTypedIntegerDyadic descending range product did not match numeric ranges")
+	}
+	descSum, handled, err := TryTypedNumericSum(descProduct.(Array))
+	if err != nil {
+		t.Fatalf("TryTypedNumericSum descending range product returned error: %v", err)
+	}
+	if !handled || descSum != int64(70) {
+		t.Fatalf("TryTypedNumericSum descending range product = %v, %v; want 70, true", descSum, handled)
+	}
+	emptyProduct, ok, err := TryTypedIntegerDyadic(OpMul, NewI64Range(1, 1, 0), NewI64Range(10, 10, 0))
+	if err != nil {
+		t.Fatalf("TryTypedIntegerDyadic empty range product returned error: %v", err)
+	}
+	if !ok {
+		t.Fatal("TryTypedIntegerDyadic empty range product did not match numeric ranges")
+	}
+	emptySum, handled, err := TryTypedNumericSum(emptyProduct.(Array))
+	if err != nil {
+		t.Fatalf("TryTypedNumericSum empty range product returned error: %v", err)
+	}
+	if !handled || emptySum != int64(0) {
+		t.Fatalf("TryTypedNumericSum empty range product = %v, %v; want 0, true", emptySum, handled)
+	}
 
 	scalarLeft, ok, err := typedKernels.Dyadic(OpSub, float64(10), NewI64([]int64{1, 2, 3}))
 	if err != nil {
