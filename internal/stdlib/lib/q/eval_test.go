@@ -509,6 +509,35 @@ func TestEvalStateScriptPlanCachePreservesEnvironmentSemantics(t *testing.T) {
 	}
 }
 
+func TestEvalStatePipelinePlanCachePreservesEnvironmentSemantics(t *testing.T) {
+	ClearRuntimeKernelExecutionStats()
+	t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+	state := NewEvalState(nil)
+	if got, err := state.Eval("x:til 8;y:x*2;idx:where x<4;+/y[idx]"); err != nil || got != int64(12) {
+		t.Fatalf("first Eval returned %#v, %v; want 12,nil", got, err)
+	}
+	if got, err := state.Eval("x:til 8;y:x*2;idx:where x<6;+/y[idx]"); err != nil || got != int64(30) {
+		t.Fatalf("second Eval returned %#v, %v; want 30,nil", got, err)
+	}
+	if len(state.pipelineCache) == 0 {
+		t.Fatal("EvalState pipeline plan cache was not populated")
+	}
+	if plan := state.pipelineCache["+/y[idx]"]; plan.kind != qPipelineSumGatherIndexes {
+		t.Fatalf("cached +/y[idx] plan kind = %v, want qPipelineSumGatherIndexes", plan.kind)
+	}
+	seenPlanHit := false
+	for _, stat := range RuntimeKernelExecutionStats() {
+		if stat.Kernel == "QPipelinePlan" && stat.Outcome == "hit" && stat.Count > 0 {
+			seenPlanHit = true
+			break
+		}
+	}
+	if !seenPlanHit {
+		t.Fatalf("missing QPipelinePlan hit stat: %#v", RuntimeKernelExecutionStats())
+	}
+}
+
 func TestEvalIPCLoopbackHandle(t *testing.T) {
 	state := NewEvalState(map[string]any{"x": int64(100)})
 	assertStateEvalValue(t, state, `h:hopen "loopback";h["1+2"]`, int64(3))
@@ -2089,7 +2118,7 @@ func TestEvalWhereGatherReduceCompositeMaskStats(t *testing.T) {
 		if stat.Outcome == "fallback" || stat.Outcome == "error" {
 			t.Fatalf("unexpected runtime fallback/error for composite where gather reduce: %#v stats=%#v", stat, RuntimeKernelExecutionStats())
 		}
-		if stat.Kernel == "QPipelinePlan" && stat.Shape == "gather-reduce/sum/i64/i64" && stat.Outcome == "hit" && stat.Count > 0 {
+		if stat.Kernel == "QPipelinePlan" && stat.Shape == "gather-reduce/sum" && stat.Outcome == "hit" && stat.Count > 0 {
 			seenPipelinePlan = true
 		}
 		if stat.Kernel == "ArrayGatherReduceSum" && stat.Shape == "gather-reduce/i64/i64" && stat.Outcome == "hit" && stat.Count > 0 {

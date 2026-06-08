@@ -255,6 +255,7 @@ type EvalState struct {
 	namespace            string
 	scriptCache          map[string]qScriptPlan
 	valueExprCache       map[string]Expr
+	pipelineCache        map[string]qPipelinePlan
 	deferScanAssignments map[string]bool
 }
 
@@ -1050,6 +1051,11 @@ func (s *EvalState) eval(src string) (any, error) {
 	src = strings.TrimSpace(src)
 	if src == "" {
 		return nil, fmt.Errorf("empty q expression")
+	}
+	if plan := s.qPipelinePlan(src); plan.kind != qPipelineInvalid {
+		if out, handled, err := s.evalQPipelinePlan(plan); err != nil || handled {
+			return out, err
+		}
 	}
 	if value, ok, err := s.evalSystemCommand(src); ok {
 		return value, err
@@ -4211,14 +4217,11 @@ func (s *EvalState) tryEvalSumDeltas(src string) (any, bool, error) {
 }
 
 func (s *EvalState) tryEvalSumWhereGatherReduce(src string) (any, bool, error) {
-	plan, ok, err := s.buildQPipelineSumPlan(src)
-	if err != nil {
-		return nil, true, err
-	}
+	plan, ok := buildQPipelineSumGatherPlan(src)
 	if !ok {
 		return nil, false, nil
 	}
-	out, handled, err := executeQPipelinePlan(plan)
+	out, handled, err := s.evalQPipelinePlan(plan)
 	if err != nil || !handled {
 		return nil, handled, err
 	}
