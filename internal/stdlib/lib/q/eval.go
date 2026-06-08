@@ -254,6 +254,7 @@ type EvalState struct {
 	port                 int64
 	namespace            string
 	scriptCache          map[string]qScriptPlan
+	valueExprCache       map[string]Expr
 	deferScanAssignments map[string]bool
 }
 
@@ -352,7 +353,7 @@ func (s *EvalState) Eval(src string) (any, error) {
 func (s *EvalState) evalScript(src string) (any, error) {
 	plan := s.qScriptPlan(src)
 	previousDeferredScans := s.deferScanAssignments
-	if len(plan.statements) > 1 {
+	if len(plan.statements) > 1 && plan.deferScanCandidates {
 		s.deferScanAssignments = deferredScanAssignments(plan.statements, s)
 	}
 	defer func() {
@@ -388,7 +389,8 @@ func (s *EvalState) evalScript(src string) (any, error) {
 }
 
 type qScriptPlan struct {
-	statements []qScriptStatement
+	statements          []qScriptStatement
+	deferScanCandidates bool
 }
 
 type qScriptStatement struct {
@@ -420,6 +422,7 @@ func buildQScriptPlan(src string) qScriptPlan {
 		parts = []string{strings.TrimSpace(src)}
 	}
 	statements := make([]qScriptStatement, 0, len(parts))
+	deferScanCandidates := false
 	for _, part := range parts {
 		part = strings.TrimSpace(part)
 		stmt := qScriptStatement{src: part}
@@ -427,12 +430,15 @@ func buildQScriptPlan(src string) qScriptPlan {
 			stmt.assign = name
 			stmt.rhs = rhs
 			stmt.valueExpr = parseCachedValueExpr(rhs)
+			if _, _, ok := parseDeferredScan(rhs); ok {
+				deferScanCandidates = true
+			}
 		} else {
 			stmt.valueExpr = parseCachedValueExpr(part)
 		}
 		statements = append(statements, stmt)
 	}
-	return qScriptPlan{statements: statements}
+	return qScriptPlan{statements: statements, deferScanCandidates: deferScanCandidates}
 }
 
 func parseCachedValueExpr(src string) Expr {
@@ -542,7 +548,7 @@ func (s *EvalState) evalScriptStatement(stmt qScriptStatement) (any, error) {
 	var v any
 	var err error
 	handled := false
-	if stmt.assign != "" && s.deferScanAssignments[s.resolveAssignmentName(stmt.assign)] {
+	if stmt.assign != "" && s.deferScanAssignments != nil && s.deferScanAssignments[s.resolveAssignmentName(stmt.assign)] {
 		v, handled, err = s.tryEvalDeferredScanAssignment(target)
 		if err != nil {
 			return nil, err
@@ -1678,7 +1684,7 @@ func (s *EvalState) evalNameVector(src string) (any, bool, error) {
 }
 
 func (s *EvalState) evalParsedValueExpr(src string) (any, bool, error) {
-	expr, ok, err := parseValueExpr(src)
+	expr, ok, err := s.cachedValueExpr(src)
 	if err != nil || !ok {
 		return nil, false, nil
 	}
@@ -1690,6 +1696,25 @@ func (s *EvalState) evalParsedValueExpr(src string) (any, bool, error) {
 		return nil, true, err
 	}
 	return value, true, nil
+}
+
+func (s *EvalState) cachedValueExpr(src string) (Expr, bool, error) {
+	if s.valueExprCache != nil {
+		if expr, ok := s.valueExprCache[src]; ok {
+			return expr, true, nil
+		}
+	}
+	expr, ok, err := parseValueExpr(src)
+	if err != nil || !ok {
+		return nil, ok, err
+	}
+	if s.valueExprCache == nil {
+		s.valueExprCache = make(map[string]Expr, 32)
+	} else if len(s.valueExprCache) >= 512 {
+		s.valueExprCache = make(map[string]Expr, 32)
+	}
+	s.valueExprCache[src] = expr
+	return expr, true, nil
 }
 
 type unsupportedEvalValueExpr struct {
