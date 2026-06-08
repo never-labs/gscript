@@ -258,6 +258,7 @@ func QQueryNativeLoweringPass(fn *Function) (*Function, error) {
 		qQueryNop(path.SourceColumn)
 		qQueryNop(path.Compare)
 		qQueryNop(path.Mask)
+		qQueryNopMaskTree(path.MaskCombine)
 		qQueryNop(path.Filter)
 		qQueryNop(path.RowOrder)
 		qQueryNop(path.RowGather)
@@ -313,12 +314,46 @@ func qQueryHotPathSingleUse(path QQueryHotPath, uses map[int]int) bool {
 			return false
 		}
 	}
+	if path.MaskCombine != nil && !qQueryMaskTreeSingleUse(path.MaskCombine, uses) {
+		return false
+	}
 	filterUses := 1
 	if path.RowOrder != nil && path.RowGather != nil {
 		filterUses = 2
 	}
 	if path.Filter != nil && uses[path.Filter.ID] != filterUses {
 		return false
+	}
+	return true
+}
+
+func qQueryMaskTreeSingleUse(instr *Instr, uses map[int]int) bool {
+	if instr == nil {
+		return true
+	}
+	for _, arg := range instr.Args {
+		child := valueDef(arg, OpFrameMask)
+		if child == nil {
+			child = valueDef(arg, OpVectorCompare)
+		}
+		if child == nil {
+			child = valueDef(arg, OpVectorMask)
+		}
+		if child == nil {
+			continue
+		}
+		if uses[child.ID] != 1 {
+			return false
+		}
+		if child.Op == OpVectorCompare {
+			sourceColumn := qQueryCompareColumn(child)
+			if sourceColumn != nil && uses[sourceColumn.ID] != 1 {
+				return false
+			}
+		}
+		if child.Op == OpVectorMask && !qQueryMaskTreeSingleUse(child, uses) {
+			return false
+		}
 	}
 	return true
 }
@@ -335,6 +370,7 @@ func qQueryFrameSelectColumnSpec(fn *Function, path QQueryHotPath) (QFrameSelect
 		Shape:             path.Shape(),
 		SourceColumnConst: -1,
 		MaskSpecConst:     -1,
+		MaskRoot:          -1,
 		RowMode:           QFrameSelectColumnRowsNone,
 		RowOrderConst:     -1,
 		DynamicArgRole:    QFrameSelectColumnArgNone,
@@ -368,7 +404,11 @@ func qQueryFrameSelectColumnSpec(fn *Function, path QQueryHotPath) (QFrameSelect
 		}
 		spec.MaskSpecConst = int(path.Mask.Aux)
 	} else if path.MaskCombine != nil {
-		return QFrameSelectColumnSpec{}, nil, qQueryLoweringFallbackMaskCombineUnsupported, false
+		root, reason, ok := qQueryFrameMaskTermSpec(fn, &spec, path.MaskCombine.Value(), &args)
+		if !ok {
+			return QFrameSelectColumnSpec{}, nil, reason, false
+		}
+		spec.MaskRoot = root
 	} else {
 		return QFrameSelectColumnSpec{}, nil, qQueryLoweringFallbackMissingPredicate, false
 	}
@@ -419,6 +459,80 @@ func qQueryFrameSelectColumnSpec(fn *Function, path QQueryHotPath) (QFrameSelect
 
 func qQueryOpaqueConst(value *Value) bool {
 	return value != nil && value.Def != nil && value.Def.Op == OpConstNil && value.Def.Type == TypeAny
+}
+
+func qQueryFrameMaskTermSpec(fn *Function, spec *QFrameSelectColumnSpec, value *Value, args *[]*Value) (int, string, bool) {
+	if fn == nil || fn.Proto == nil || spec == nil || value == nil || args == nil {
+		return -1, qQueryLoweringFallbackMissingPredicate, false
+	}
+	if mask := valueDef(value, OpFrameMask); mask != nil {
+		if mask.Aux < 0 || mask.Aux >= int64(len(fn.Proto.Constants)) {
+			return -1, qQueryLoweringFallbackBadMaskSpecConst, false
+		}
+		return qFrameMaskAppendTerm(spec, QFrameMaskTermSpec{
+			Kind:              QFrameMaskTermFrameMask,
+			MaskSpecConst:     int(mask.Aux),
+			SourceColumnConst: -1,
+			LeftTerm:          -1,
+			RightTerm:         -1,
+		}), "", true
+	}
+	if compare := valueDef(value, OpVectorCompare); compare != nil {
+		sourceColumn := qQueryCompareColumn(compare)
+		if sourceColumn == nil || sourceColumn.Aux < 0 || sourceColumn.Aux >= int64(len(fn.Proto.Constants)) {
+			return -1, qQueryLoweringFallbackBadSourceColumnConst, false
+		}
+		rhs := qQueryCompareRHS(compare, sourceColumn)
+		if rhs == nil {
+			return -1, qQueryLoweringFallbackMissingCompareRHS, false
+		}
+		term := QFrameMaskTermSpec{
+			Kind:              QFrameMaskTermCompare,
+			SourceColumnConst: int(sourceColumn.Aux),
+			MaskSpecConst:     -1,
+			CompareOp:         runtime.DenseArrayBinaryOp(compare.Aux),
+			LeftTerm:          -1,
+			RightTerm:         -1,
+		}
+		if rhsConst, ok := qQueryConstRuntimeValue(rhs); ok {
+			term.CompareRHSConst = rhsConst
+			term.HasCompareRHSConst = true
+		} else if spec.DynamicArgRole == QFrameSelectColumnArgNone {
+			term.DynamicCompareRHS = true
+			spec.DynamicArgRole = QFrameSelectColumnArgCompareRHS
+			*args = append(*args, rhs)
+		} else {
+			return -1, qQueryLoweringFallbackTooManyDynamicArgs, false
+		}
+		return qFrameMaskAppendTerm(spec, term), "", true
+	}
+	if combine := valueDef(value, OpVectorMask); combine != nil {
+		if len(combine.Args) != 2 {
+			return -1, qQueryLoweringFallbackMissingPredicate, false
+		}
+		left, reason, ok := qQueryFrameMaskTermSpec(fn, spec, combine.Args[0], args)
+		if !ok {
+			return -1, reason, false
+		}
+		right, reason, ok := qQueryFrameMaskTermSpec(fn, spec, combine.Args[1], args)
+		if !ok {
+			return -1, reason, false
+		}
+		return qFrameMaskAppendTerm(spec, QFrameMaskTermSpec{
+			Kind:              QFrameMaskTermCombine,
+			SourceColumnConst: -1,
+			MaskSpecConst:     -1,
+			CombineOp:         runtime.DenseArrayMaskOp(combine.Aux),
+			LeftTerm:          left,
+			RightTerm:         right,
+		}), "", true
+	}
+	return -1, qQueryLoweringFallbackMissingPredicate, false
+}
+
+func qFrameMaskAppendTerm(spec *QFrameSelectColumnSpec, term QFrameMaskTermSpec) int {
+	spec.MaskTerms = append(spec.MaskTerms, term)
+	return len(spec.MaskTerms) - 1
 }
 
 func qQueryMaskCombineUsesFrame(frame *Value, mask *Instr) bool {
@@ -491,6 +605,27 @@ func qQueryNop(instr *Instr) {
 	instr.Args = nil
 	instr.Aux = 0
 	instr.Aux2 = 0
+}
+
+func qQueryNopMaskTree(instr *Instr) {
+	if instr == nil {
+		return
+	}
+	for _, arg := range instr.Args {
+		if child := valueDef(arg, OpVectorMask); child != nil {
+			qQueryNopMaskTree(child)
+			continue
+		}
+		if child := valueDef(arg, OpVectorCompare); child != nil {
+			qQueryNop(qQueryCompareColumn(child))
+			qQueryNop(child)
+			continue
+		}
+		if child := valueDef(arg, OpFrameMask); child != nil {
+			qQueryNop(child)
+		}
+	}
+	qQueryNop(instr)
 }
 
 func formatQQueryHotPaths(paths []QQueryHotPath) string {
@@ -579,6 +714,9 @@ func qFrameSelectColumnSpecShape(spec QFrameSelectColumnSpec) string {
 }
 
 func qFrameSelectColumnSpecMaskKind(spec QFrameSelectColumnSpec) string {
+	if len(spec.MaskTerms) > 0 {
+		return fmt.Sprintf("mask-terms:%d root=%d", len(spec.MaskTerms), spec.MaskRoot)
+	}
 	if spec.MaskSpecConst >= 0 {
 		return fmt.Sprintf("frame-mask:%d", spec.MaskSpecConst)
 	}

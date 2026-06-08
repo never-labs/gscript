@@ -1160,11 +1160,23 @@ func TestQFramePrimitiveHotPathDetectsVectorMaskPredicate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("QQueryNativeLoweringPass: %v", err)
 	}
-	if len(lowered.QFrameSelectColumnSpecs) != 0 {
-		t.Fatalf("QFrameSelectColumnSpecs = %+v, want no fused lowering for mask combine", lowered.QFrameSelectColumnSpecs)
+	if len(lowered.QFrameSelectColumnSpecs) != 1 {
+		t.Fatalf("QFrameSelectColumnSpecs = %+v, want one fused lowering for mask combine", lowered.QFrameSelectColumnSpecs)
 	}
-	if got := CountQQueryLoweringFallbackReasons(remarks.List()); got[qQueryLoweringFallbackMaskCombineUnsupported] != 1 {
-		t.Fatalf("fallback reasons = %+v, want %s=1", got, qQueryLoweringFallbackMaskCombineUnsupported)
+	spec := lowered.QFrameSelectColumnSpecs[0]
+	if spec.Shape != "mask-combine/filter/project/column" || len(spec.MaskTerms) != 3 || spec.MaskRoot != 2 {
+		t.Fatalf("lowered mask-combine spec = %+v, want three mask terms with root 2", spec)
+	}
+	if got := CountQQueryLoweringFallbackReasons(remarks.List()); len(got) != 0 {
+		t.Fatalf("fallback reasons = %+v, want none after mask-combine lowering", got)
+	}
+	result, err := Interpret(lowered, []runtime.Value{runtime.TableValue(qHotPathTestFrame(t))})
+	if err != nil {
+		t.Fatalf("Interpret lowered vector mask q hot path: %v", err)
+	}
+	got, ok := result[0].DenseArray().I64()
+	if !ok || len(got) != 2 || got[0] != 10 || got[1] != 20 {
+		t.Fatalf("lowered vector mask result values = %#v, want [10 20]", got)
 	}
 }
 

@@ -180,6 +180,12 @@ func executeQFrameSelectColumnValue(constants []runtime.Value, specs []QFrameSel
 }
 
 func executeQFrameSelectColumnMask(constants []runtime.Value, spec QFrameSelectColumnSpec, frameVal runtime.Value, rhsVal runtime.Value, hasRHS bool) (runtime.Value, error) {
+	if len(spec.MaskTerms) > 0 {
+		if spec.MaskRoot < 0 || spec.MaskRoot >= len(spec.MaskTerms) {
+			return runtime.NilValue(), fmt.Errorf("QFrameSelectColumn mask root is out of range")
+		}
+		return executeQFrameMaskTerm(constants, spec, spec.MaskRoot, frameVal, rhsVal, hasRHS)
+	}
 	if spec.MaskSpecConst >= 0 {
 		if spec.MaskSpecConst >= len(constants) {
 			return runtime.NilValue(), fmt.Errorf("QFrameSelectColumn mask spec constant is out of range")
@@ -217,7 +223,77 @@ func executeQFrameSelectColumnMask(constants []runtime.Value, spec QFrameSelectC
 	return out, nil
 }
 
+func executeQFrameMaskTerm(constants []runtime.Value, spec QFrameSelectColumnSpec, termIdx int, frameVal runtime.Value, rhsVal runtime.Value, hasRHS bool) (runtime.Value, error) {
+	if termIdx < 0 || termIdx >= len(spec.MaskTerms) {
+		return runtime.NilValue(), fmt.Errorf("QFrameSelectColumn mask term is out of range")
+	}
+	term := spec.MaskTerms[termIdx]
+	switch term.Kind {
+	case QFrameMaskTermCompare:
+		if term.SourceColumnConst < 0 || term.SourceColumnConst >= len(constants) || !constants[term.SourceColumnConst].IsString() {
+			return runtime.NilValue(), fmt.Errorf("QFrameSelectColumn mask term source column must be a string constant")
+		}
+		rhs := term.CompareRHSConst
+		if term.DynamicCompareRHS {
+			if !hasRHS {
+				return runtime.NilValue(), fmt.Errorf("QFrameSelectColumn mask term compare path requires rhs")
+			}
+			rhs = rhsVal
+		} else if !term.HasCompareRHSConst {
+			return runtime.NilValue(), fmt.Errorf("QFrameSelectColumn mask term compare path requires rhs")
+		}
+		out, handled, err := frameVal.NativeFrameMaskOp(constants[term.SourceColumnConst].Str(), term.CompareOp, rhs)
+		if err != nil {
+			return runtime.NilValue(), err
+		}
+		if !handled {
+			return runtime.NilValue(), fmt.Errorf("QFrameSelectColumn operand must be native frame (got %s)", frameVal.TypeName())
+		}
+		return out, nil
+	case QFrameMaskTermFrameMask:
+		if term.MaskSpecConst < 0 || term.MaskSpecConst >= len(constants) {
+			return runtime.NilValue(), fmt.Errorf("QFrameSelectColumn mask term spec constant is out of range")
+		}
+		name, op, rhs, err := frameMaskSpec(constants[term.MaskSpecConst])
+		if err != nil {
+			return runtime.NilValue(), err
+		}
+		denseOp, err := runtime.DenseArrayCompareOp(op)
+		if err != nil {
+			return runtime.NilValue(), err
+		}
+		out, handled, err := frameVal.NativeFrameMaskOp(name, denseOp, rhs)
+		if err != nil {
+			return runtime.NilValue(), err
+		}
+		if !handled {
+			return runtime.NilValue(), fmt.Errorf("QFrameSelectColumn operand must be native frame (got %s)", frameVal.TypeName())
+		}
+		return out, nil
+	case QFrameMaskTermCombine:
+		left, err := executeQFrameMaskTerm(constants, spec, term.LeftTerm, frameVal, rhsVal, hasRHS)
+		if err != nil {
+			return runtime.NilValue(), err
+		}
+		right, err := executeQFrameMaskTerm(constants, spec, term.RightTerm, frameVal, rhsVal, hasRHS)
+		if err != nil {
+			return runtime.NilValue(), err
+		}
+		return executeVectorMaskValue(int(term.CombineOp), left, right)
+	default:
+		return runtime.NilValue(), fmt.Errorf("QFrameSelectColumn unknown mask term kind %d", term.Kind)
+	}
+}
+
 func qFrameSelectColumnCompareRHS(spec QFrameSelectColumnSpec, argVal runtime.Value, hasArg bool) (runtime.Value, bool) {
+	if len(spec.MaskTerms) > 0 {
+		for _, term := range spec.MaskTerms {
+			if term.DynamicCompareRHS && hasArg {
+				return argVal, true
+			}
+		}
+		return runtime.NilValue(), false
+	}
 	if spec.MaskSpecConst >= 0 {
 		return runtime.NilValue(), false
 	}

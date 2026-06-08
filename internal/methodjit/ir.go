@@ -63,6 +63,8 @@ type QFrameSelectColumnSpec struct {
 	Shape              string
 	SourceColumnConst  int
 	MaskSpecConst      int
+	MaskTerms          []QFrameMaskTermSpec
+	MaskRoot           int
 	RowMode            QFrameSelectColumnRowMode
 	RowOrderConst      int
 	DynamicArgRole     QFrameSelectColumnDynamicArgRole
@@ -74,6 +76,27 @@ type QFrameSelectColumnSpec struct {
 	RowValueConst      runtime.Value
 	HasRowValueConst   bool
 }
+
+type QFrameMaskTermSpec struct {
+	Kind               QFrameMaskTermKind
+	SourceColumnConst  int
+	MaskSpecConst      int
+	CompareOp          runtime.DenseArrayBinaryOp
+	CompareRHSConst    runtime.Value
+	HasCompareRHSConst bool
+	DynamicCompareRHS  bool
+	CombineOp          runtime.DenseArrayMaskOp
+	LeftTerm           int
+	RightTerm          int
+}
+
+type QFrameMaskTermKind uint8
+
+const (
+	QFrameMaskTermCompare QFrameMaskTermKind = iota
+	QFrameMaskTermFrameMask
+	QFrameMaskTermCombine
+)
 
 type QFrameSelectColumnRowMode uint8
 
