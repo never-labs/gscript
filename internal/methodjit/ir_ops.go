@@ -236,6 +236,9 @@ const (
 	// Fused q/vector typed runtime-kernel primitive. Args = [mask, trueValue,
 	// falseValue], Aux = runtime DenseArrayReduceOp; computes where then reduce.
 	OpQVectorWhereReduce
+	// Fused q/vector typed runtime-kernel primitive. Args = [vector, indexes],
+	// Aux = runtime DenseArrayReduceOp; computes gather then reduce.
+	OpQVectorGatherReduce
 	OpGetField // Args[0].field; Aux = constant pool index for field name
 	// OpGetFieldNumToFloat fuses Args[0].field with numeric widening.
 	// It preserves NumToFloat semantics: int and float fields become raw

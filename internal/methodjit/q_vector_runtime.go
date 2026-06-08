@@ -611,6 +611,14 @@ func executeQVectorWhereReduceValue(opCode int, maskVal, trueVal, falseVal runti
 	return runtime.DenseArrayWhereReduce(runtime.DenseArrayReduceOp(opCode), maskVal.DenseArray(), trueVal, falseVal)
 }
 
+func executeQVectorGatherReduceValue(opCode int, vectorVal, indexVal runtime.Value) (runtime.Value, error) {
+	gathered, err := executeVectorGatherValue(vectorVal, indexVal)
+	if err != nil {
+		return runtime.NilValue(), err
+	}
+	return executeVectorReduceValue(opCode, gathered)
+}
+
 func executeVectorScanValue(vectorVal runtime.Value) (runtime.Value, error) {
 	if !vectorVal.IsDenseArray() {
 		return runtime.NilValue(), fmt.Errorf("VectorScan operand must be dense array (got %s)", vectorVal.TypeName())

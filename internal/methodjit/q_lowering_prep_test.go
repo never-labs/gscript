@@ -2085,6 +2085,125 @@ func TestQVectorWhereReduceLowersMaskCombineToFusedTypedRuntimeKernel(t *testing
 	}
 }
 
+func TestQVectorGatherReduceLowersToFusedTypedRuntimeKernel(t *testing.T) {
+	proto := &vm.FuncProto{
+		Name:      "q_vector_gather_reduce",
+		NumParams: 2,
+		MaxStack:  3,
+		Constants: []runtime.Value{
+			runtime.StringValue("price"),
+		},
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_FRAME_COLUMN, 2, 0, 0),
+			vm.EncodeABC(vm.OP_VECTOR_GATHER, 2, 1, 0),
+			vm.EncodeABC(vm.OP_VECTOR_REDUCE, 2, 2, int(runtime.DenseArrayReduceSum)),
+			vm.EncodeABC(vm.OP_RETURN, 2, 2, 0),
+		},
+	}
+
+	fn := BuildGraph(proto)
+	fn.Remarks = &OptimizationRemarks{}
+	lowered, err := QQueryNativeLoweringPass(fn)
+	if err != nil {
+		t.Fatalf("QQueryNativeLoweringPass: %v", err)
+	}
+	counts := countOps(lowered)
+	if counts[OpQVectorGatherReduce] != 1 {
+		t.Fatalf("OpQVectorGatherReduce count = %d, want 1\n%s", counts[OpQVectorGatherReduce], Print(lowered))
+	}
+	if counts[OpVectorGather] != 0 || counts[OpVectorReduce] != 0 {
+		t.Fatalf("vector gather/reduce counts = %d/%d, want 0/0 after fusion\n%s", counts[OpVectorGather], counts[OpVectorReduce], Print(lowered))
+	}
+	if fallbacks := CountQVectorLoweringFallbackReasons(fn.Remarks.List()); len(fallbacks) != 0 {
+		t.Fatalf("q vector lowering fallback counts = %+v, want none for gather-reduce fusion", fallbacks)
+	}
+
+	kernels := DetectQVectorRuntimeKernels(lowered)
+	if got := CountQVectorRuntimeKernelShapes(kernels)["gather/vector-reduce"]; got != 1 {
+		t.Fatalf("QVectorRuntimeKernelShapes = %+v, want fused gather/vector-reduce", CountQVectorRuntimeKernelShapes(kernels))
+	}
+	if got := formatQTypedVectorRuntimeKernelReport(kernels); !strings.Contains(got, "kernel=QVectorGatherReduce") ||
+		!strings.Contains(got, "shape=gather/vector-reduce") ||
+		!strings.Contains(got, "op=sum") {
+		t.Fatalf("formatted vector runtime kernels missing fused gather-reduce:\n%s", got)
+	}
+
+	args := []runtime.Value{
+		runtime.TableValue(qHotPathTestFrame(t)),
+		runtime.DenseArrayValue(runtime.NewDenseArrayI64([]int64{3, 1})),
+	}
+	report := Diagnose(proto, args)
+	if report.QVectorRuntimeKernelShapes["gather/vector-reduce"] != 1 {
+		t.Fatalf("Diagnose QVectorRuntimeKernelShapes = %+v, want fused gather/vector-reduce", report.QVectorRuntimeKernelShapes)
+	}
+	assertQKernelDescriptor(t, report.QKernelDescriptors, "methodjit_q_vector_runtime", "runtime_kernel", "QVectorGatherReduce", "gather/vector-reduce", "typed_runtime_op_exit", "supported", "")
+	assertQKernelShapeSummary(t, report.QKernelShapeSummary, "methodjit_q_vector_runtime", "runtime_kernel", "gather/vector-reduce", "supported", "", 1)
+	assertQKernelExecutionStat(t, report.QKernelExecutionStats, "methodjit_q_vector_runtime", "QVectorGatherReduce", "gather/vector-reduce", "typed_runtime_op_exit", "success", 1)
+	assertQKernelExecutionRouteSummary(t, report.QKernelExecutionRoutes, "methodjit_q_vector_runtime", "QVectorGatherReduce", "typed_runtime_op_exit", "success", 1)
+
+	result, err := Interpret(lowered, args)
+	if err != nil {
+		t.Fatalf("Interpret lowered q vector gather-reduce: %v", err)
+	}
+	if len(result) != 1 || !result[0].IsFloat() || result[0].Float() != 200.25 {
+		t.Fatalf("lowered gather-reduce result = %#v, want float 200.25", result)
+	}
+}
+
+func TestQVectorGatherReduceSharedGatherDoesNotLower(t *testing.T) {
+	proto := &vm.FuncProto{
+		Name:      "q_vector_gather_reduce_shared",
+		NumParams: 2,
+		MaxStack:  4,
+		Constants: []runtime.Value{
+			runtime.StringValue("price"),
+		},
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_FRAME_COLUMN, 2, 0, 0),
+			vm.EncodeABC(vm.OP_VECTOR_GATHER, 2, 1, 0),
+			vm.EncodeABC(vm.OP_MOVE, 3, 2, 0),
+			vm.EncodeABC(vm.OP_VECTOR_REDUCE, 2, 2, int(runtime.DenseArrayReduceSum)),
+			vm.EncodeABC(vm.OP_VECTOR_SCAN, 3, 3, 0),
+			vm.EncodeABC(vm.OP_RETURN, 2, 3, 0),
+		},
+	}
+
+	fn := BuildGraph(proto)
+	fn.Remarks = &OptimizationRemarks{}
+	lowered, err := QQueryNativeLoweringPass(fn)
+	if err != nil {
+		t.Fatalf("QQueryNativeLoweringPass: %v", err)
+	}
+	counts := countOps(lowered)
+	if counts[OpQVectorGatherReduce] != 0 {
+		t.Fatalf("OpQVectorGatherReduce count = %d, want 0 for shared gather\n%s", counts[OpQVectorGatherReduce], Print(lowered))
+	}
+	if counts[OpVectorGather] != 1 || counts[OpVectorReduce] != 1 || counts[OpVectorScan] != 1 {
+		t.Fatalf("shared vector primitive counts gather/reduce/scan = %d/%d/%d, want 1/1/1\n%s",
+			counts[OpVectorGather], counts[OpVectorReduce], counts[OpVectorScan], Print(lowered))
+	}
+	vectorFallbacks := CountQVectorLoweringFallbackReasons(fn.Remarks.List())
+	if vectorFallbacks[qVectorGatherReduceFallbackSharedGather] != 1 {
+		t.Fatalf("q vector lowering fallback counts = %+v, want shared_gather=1", vectorFallbacks)
+	}
+	formatted := formatOptimizationRemarks(fn.Remarks.List())
+	if !strings.Contains(formatted, "kernel=QVectorGatherReduce") ||
+		!strings.Contains(formatted, "reason_code=shared_gather") ||
+		!strings.Contains(formatted, "shape=gather/vector-reduce") {
+		t.Fatalf("q vector gather-reduce fallback remark missing stable kernel/reason/shape:\n%s", formatted)
+	}
+
+	report := Diagnose(proto, []runtime.Value{
+		runtime.TableValue(qHotPathTestFrame(t)),
+		runtime.DenseArrayValue(runtime.NewDenseArrayI64([]int64{3, 1})),
+	})
+	if report.QVectorLoweringFallbacks[qVectorGatherReduceFallbackSharedGather] != 1 {
+		t.Fatalf("Diagnose QVectorLoweringFallbacks = %+v, want shared_gather=1\n%s", report.QVectorLoweringFallbacks, report.String())
+	}
+	assertQKernelDescriptor(t, report.QKernelDescriptors, "methodjit_q_vector_lowering", "fallback", "QVectorGatherReduce", "gather/vector-reduce", "lowering", "fallback", qVectorGatherReduceFallbackSharedGather)
+	assertQKernelShapeSummary(t, report.QKernelShapeSummary, "methodjit_q_vector_lowering", "fallback", "gather/vector-reduce", "fallback", qVectorGatherReduceFallbackSharedGather, 1)
+}
+
 func TestQVectorWhereReduceSharedWhereDoesNotLower(t *testing.T) {
 	proto := &vm.FuncProto{
 		Name:      "q_vector_where_reduce_shared",
@@ -3564,6 +3683,20 @@ func TestQVectorWhereReduceRuntimeHelperUsesRuntimePrimitives(t *testing.T) {
 	}
 	if !result.IsInt() || result.Int() != 47 {
 		t.Fatalf("q vector where-reduce result = %#v, want int 47", result)
+	}
+}
+
+func TestQVectorGatherReduceRuntimeHelperUsesRuntimePrimitives(t *testing.T) {
+	result, err := executeQVectorGatherReduceValue(
+		int(runtime.DenseArrayReduceSum),
+		runtime.DenseArrayValue(runtime.NewDenseArrayF64([]float64{10, 20.25, 30})),
+		runtime.DenseArrayValue(runtime.NewDenseArrayI64([]int64{3, 1})),
+	)
+	if err != nil {
+		t.Fatalf("execute q vector gather-reduce: %v", err)
+	}
+	if !result.IsFloat() || result.Float() != 40 {
+		t.Fatalf("q vector gather-reduce result = %#v, want float 40", result)
 	}
 }
 

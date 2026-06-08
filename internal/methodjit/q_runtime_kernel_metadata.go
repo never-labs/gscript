@@ -37,6 +37,8 @@ func qRuntimePrimitiveExecutionMetadata(op Op) (source, kernel, shape, route str
 		return "methodjit_q_vector_runtime", "VectorWhere", "vector-where", route, true
 	case OpVectorReduce:
 		return "methodjit_q_vector_runtime", "VectorReduce", "vector/vector-reduce", route, true
+	case OpQVectorGatherReduce:
+		return "methodjit_q_vector_runtime", "QVectorGatherReduce", "gather/vector-reduce", route, true
 	case OpVectorScan:
 		return "methodjit_q_vector_runtime", "VectorScan", "vector-scan", route, true
 	default:

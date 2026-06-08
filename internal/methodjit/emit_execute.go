@@ -1256,6 +1256,18 @@ func (cf *CompiledFunction) executeOpExit(ctx *ExecContext, regs []runtime.Value
 		cf.recordQKernelExecution("methodjit_q_vector_runtime", "QVectorWhereReduce", "compare/vector-where/vector-reduce", "typed_runtime_op_exit", "success")
 		regs[slot] = out
 
+	case OpQVectorGatherReduce:
+		if arg1 >= len(regs) || arg2 >= len(regs) || slot >= len(regs) {
+			return fmt.Errorf("QVectorGatherReduce op-exit out of register range")
+		}
+		out, err := executeQVectorGatherReduceValue(aux, regs[arg1], regs[arg2])
+		if err != nil {
+			cf.recordQKernelExecution("methodjit_q_vector_runtime", "QVectorGatherReduce", "gather/vector-reduce", "typed_runtime_op_exit", "error")
+			return err
+		}
+		cf.recordQKernelExecution("methodjit_q_vector_runtime", "QVectorGatherReduce", "gather/vector-reduce", "typed_runtime_op_exit", "success")
+		regs[slot] = out
+
 	case OpVectorScan:
 		if arg1 >= len(regs) || slot >= len(regs) {
 			return fmt.Errorf("VectorScan op-exit out of register range")

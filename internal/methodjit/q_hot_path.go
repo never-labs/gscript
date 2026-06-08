@@ -195,6 +195,7 @@ const (
 	qVectorWhereReduceFallbackSharedWhere      = "shared_where"
 	qVectorWhereReduceFallbackBadWhereArgCount = "bad_where_arg_count"
 	qVectorWhereReduceFallbackUnsupportedInput = "unsupported_input_shape"
+	qVectorGatherReduceFallbackSharedGather    = "shared_gather"
 )
 
 func (p QQueryHotPath) Shape() string {
@@ -986,6 +987,9 @@ func DetectQVectorRuntimeKernels(fn *Function) []QVectorRuntimeKernel {
 					detail += " predicate=" + qVectorWherePredicateValueDetail(instr.Args[0])
 				}
 				out = append(out, QVectorRuntimeKernel{Instr: instr, Kernel: "QVectorWhereReduce", ShapeName: qVectorWhereReduceShape(instr), Detail: detail})
+			case OpQVectorGatherReduce:
+				detail := "op=" + qDenseArrayReduceOpName(runtime.DenseArrayReduceOp(instr.Aux))
+				out = append(out, QVectorRuntimeKernel{Instr: instr, Kernel: "QVectorGatherReduce", ShapeName: "gather/vector-reduce", Detail: detail})
 			case OpVectorScan:
 				out = append(out, QVectorRuntimeKernel{Instr: instr, Kernel: "VectorScan", ShapeName: "vector-scan"})
 			}
@@ -1099,6 +1103,28 @@ func qVectorWhereReduceLoweringPass(fn *Function, uses map[int]int) {
 		if path.Reduce == nil {
 			continue
 		}
+		if path.Gather != nil {
+			if len(path.Gather.Args) != 2 {
+				qVectorGatherReduceLoweringFallbackRemark(fn, path, qVectorWhereReduceFallbackUnsupportedInput)
+				continue
+			}
+			if uses[path.Gather.ID] != 1 {
+				qVectorGatherReduceLoweringFallbackRemark(fn, path, qVectorGatherReduceFallbackSharedGather)
+				continue
+			}
+			reduce := path.Reduce
+			gather := path.Gather
+			reduce.Op = OpQVectorGatherReduce
+			reduce.Type = TypeAny
+			reduce.Args = append([]*Value(nil), gather.Args...)
+			reduce.Aux2 = 0
+			qQueryNop(gather)
+			if reduce.Block != nil {
+				functionRemarks(fn).Add("QQueryNativeLowering", "changed", reduce.Block.ID, reduce.ID, OpQVectorGatherReduce,
+					"lowered q vector hot path shape gather/vector-reduce to fused typed runtime kernel op-exit")
+			}
+			continue
+		}
 		if path.Where == nil {
 			qVectorWhereReduceLoweringFallbackRemark(fn, path, qVectorWhereReduceFallbackUnsupportedInput)
 			continue
@@ -1123,6 +1149,24 @@ func qVectorWhereReduceLoweringPass(fn *Function, uses map[int]int) {
 				fmt.Sprintf("lowered q vector hot path shape %s to fused typed runtime kernel op-exit", qVectorWhereReduceShape(reduce)))
 		}
 	}
+}
+
+func qVectorGatherReduceLoweringFallbackRemark(fn *Function, path QVectorReduceHotPath, reason string) {
+	if reason == "" {
+		reason = "unsupported_shape"
+	}
+	blockID, valueID := 0, 0
+	op := OpVectorReduce
+	if path.Reduce != nil {
+		valueID = path.Reduce.ID
+		op = path.Reduce.Op
+		if path.Reduce.Block != nil {
+			blockID = path.Reduce.Block.ID
+		}
+	}
+	functionRemarks(fn).Add("QVectorNativeLowering", "missed", blockID, valueID, op,
+		fmt.Sprintf("kernel=QVectorGatherReduce reason_code=%s shape=%s; q vector gather-reduce remains on primitive runtime fallback",
+			reason, path.Shape()))
 }
 
 func qVectorWhereReduceLoweringFallbackRemark(fn *Function, path QVectorReduceHotPath, reason string) {

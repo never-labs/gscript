@@ -617,6 +617,23 @@ func (tm *TieringManager) executeOpExit(ctx *ExecContext, regs []runtime.Value, 
 		}
 		regs[absSlot] = out
 
+	case OpQVectorGatherReduce:
+		if absArg1 >= len(regs) || absArg2 >= len(regs) || absSlot >= len(regs) {
+			return fmt.Errorf("QVectorGatherReduce op-exit out of register range")
+		}
+		cf, _ := tm.tier2CompiledFor(proto)
+		out, err := executeQVectorGatherReduceValue(aux, regs[absArg1], regs[absArg2])
+		if err != nil {
+			if cf != nil {
+				cf.recordQKernelExecution("methodjit_q_vector_runtime", "QVectorGatherReduce", "gather/vector-reduce", "typed_runtime_op_exit", "error")
+			}
+			return err
+		}
+		if cf != nil {
+			cf.recordQKernelExecution("methodjit_q_vector_runtime", "QVectorGatherReduce", "gather/vector-reduce", "typed_runtime_op_exit", "success")
+		}
+		regs[absSlot] = out
+
 	case OpVectorScan:
 		if absArg1 >= len(regs) || absSlot >= len(regs) {
 			return fmt.Errorf("VectorScan op-exit out of register range")
