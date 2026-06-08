@@ -158,11 +158,18 @@ func executeFrameOrderValue(frameVal runtime.Value, spec runtime.Value) (runtime
 }
 
 func executeFrameOrderGatherValue(frameVal runtime.Value, spec runtime.Value) (runtime.Value, error) {
-	indexes, err := executeFrameOrderValue(frameVal, spec)
+	names, desc, limit, err := frameOrderSpec(spec)
 	if err != nil {
 		return runtime.NilValue(), err
 	}
-	return executeFrameGatherValue(frameVal, indexes)
+	out, handled, err := frameVal.NativeFrameOrderGather(names, desc, limit)
+	if err != nil {
+		return runtime.NilValue(), err
+	}
+	if !handled {
+		return runtime.NilValue(), fmt.Errorf("FrameOrderGather operand must be native frame (got %s)", frameVal.TypeName())
+	}
+	return out, nil
 }
 
 func executeQFrameSelectColumnValue(constants []runtime.Value, specs []QFrameSelectColumnSpec, specIdx int, frameVal runtime.Value, argVal runtime.Value, hasArg bool) (runtime.Value, error) {
@@ -372,11 +379,7 @@ func executeQFrameSelectColumnRows(constants []runtime.Value, spec QFrameSelectC
 		if spec.RowOrderConst < 0 || spec.RowOrderConst >= len(constants) {
 			return runtime.NilValue(), fmt.Errorf("QFrameSelectColumn order spec constant is out of range")
 		}
-		indexes, err := executeFrameOrderValue(rows, constants[spec.RowOrderConst])
-		if err != nil {
-			return runtime.NilValue(), err
-		}
-		return executeFrameGatherValue(rows, indexes)
+		return executeFrameOrderGatherValue(rows, constants[spec.RowOrderConst])
 	default:
 		return runtime.NilValue(), fmt.Errorf("QFrameSelectColumn unknown row mode %d", spec.RowMode)
 	}

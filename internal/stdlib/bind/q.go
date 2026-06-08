@@ -146,6 +146,31 @@ type qRuntimeKernelExecutionKernelStat struct {
 	Count   uint64
 }
 
+type qRuntimeKernelExecutionRouteStat struct {
+	Source  string
+	Kernel  string
+	Route   string
+	Outcome string
+	Count   uint64
+}
+
+// QQueryKernelSupportKeyStatJSONRow is the stable external row shape for
+// q.query native-kernel support cache key statistics.
+type QQueryKernelSupportKeyStatJSONRow struct {
+	Key             string `json:"key"`
+	Namespace       string `json:"namespace"`
+	Kind            string `json:"kind"`
+	PlanFingerprint string `json:"plan_fingerprint"`
+	Supported       bool   `json:"supported"`
+	ReasonFamily    string `json:"reason_family"`
+	ReasonCode      string `json:"reason_code"`
+	SchemaHash      string `json:"schema_hash"`
+	Shape           string `json:"shape"`
+	Hits            int    `json:"hits"`
+	Misses          int    `json:"misses"`
+	Evictions       int    `json:"evictions"`
+}
+
 type qSQLKernelDecisionKeyStat struct {
 	Key          string
 	Shape        string
@@ -3045,6 +3070,7 @@ func qRuntimeKernelExecutionStatsRow() *Table {
 	row.RawSetString("stats", TableValue(qRuntimeKernelExecutionStatsTable(stats)))
 	row.RawSetString("shapes", TableValue(qRuntimeKernelExecutionShapeStatsTable(qRuntimeKernelExecutionShapeStats(stats))))
 	row.RawSetString("kernels", TableValue(qRuntimeKernelExecutionKernelStatsTable(qRuntimeKernelExecutionKernelStats(stats))))
+	row.RawSetString("routes", TableValue(qRuntimeKernelExecutionRouteStatsTable(qRuntimeKernelExecutionRouteStats(stats))))
 	return row
 }
 
@@ -3231,6 +3257,61 @@ func qRuntimeKernelExecutionKernelStatsTable(stats []qRuntimeKernelExecutionKern
 	return rows
 }
 
+func qRuntimeKernelExecutionRouteStats(stats []QRuntimeKernelExecutionStat) []qRuntimeKernelExecutionRouteStat {
+	type routeKey struct {
+		source  string
+		kernel  string
+		route   string
+		outcome string
+	}
+	counts := make(map[routeKey]uint64, len(stats))
+	for _, stat := range stats {
+		key := routeKey{source: stat.Source, kernel: stat.Kernel, route: stat.Route, outcome: stat.Outcome}
+		counts[key] += stat.Count
+	}
+	out := make([]qRuntimeKernelExecutionRouteStat, 0, len(counts))
+	for key, count := range counts {
+		out = append(out, qRuntimeKernelExecutionRouteStat{
+			Source:  key.source,
+			Kernel:  key.kernel,
+			Route:   key.route,
+			Outcome: key.outcome,
+			Count:   count,
+		})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		a, b := out[i], out[j]
+		if a.Count != b.Count {
+			return a.Count > b.Count
+		}
+		if a.Source != b.Source {
+			return a.Source < b.Source
+		}
+		if a.Kernel != b.Kernel {
+			return a.Kernel < b.Kernel
+		}
+		if a.Route != b.Route {
+			return a.Route < b.Route
+		}
+		return a.Outcome < b.Outcome
+	})
+	return out
+}
+
+func qRuntimeKernelExecutionRouteStatsTable(stats []qRuntimeKernelExecutionRouteStat) *Table {
+	rows := NewAppendArrayTable(len(stats))
+	for i, stat := range stats {
+		row := NewTable()
+		row.RawSetString("source", StringValue(stat.Source))
+		row.RawSetString("kernel", StringValue(stat.Kernel))
+		row.RawSetString("route", StringValue(stat.Route))
+		row.RawSetString("outcome", StringValue(stat.Outcome))
+		row.RawSetString("count", qUint64IntValue(stat.Count))
+		rows.RawSetInt(int64(i+1), TableValue(row))
+	}
+	return rows
+}
+
 func qNormalizeRuntimeKernelStatPart(part string) string {
 	if part == "" {
 		return "unknown"
@@ -3384,6 +3465,32 @@ func qQueryKernelSupportKeyStatsSnapshotLocked() []qQueryKernelSupportCacheKeySt
 		}
 		return a.Key < b.Key
 	})
+	return out
+}
+
+// QQueryKernelSupportKeyStatJSONRows converts q.query native-kernel support
+// cache key stats to a schema-stable JSON row shape.
+func QQueryKernelSupportKeyStatJSONRows(stats []qQueryKernelSupportCacheKeyStat) []QQueryKernelSupportKeyStatJSONRow {
+	if len(stats) == 0 {
+		return nil
+	}
+	out := make([]QQueryKernelSupportKeyStatJSONRow, 0, len(stats))
+	for _, stat := range stats {
+		out = append(out, QQueryKernelSupportKeyStatJSONRow{
+			Key:             stat.Key,
+			Namespace:       stat.Namespace,
+			Kind:            stat.Kind,
+			PlanFingerprint: "",
+			Supported:       stat.Supported,
+			ReasonFamily:    stat.ReasonFamily,
+			ReasonCode:      stat.ReasonCode,
+			SchemaHash:      stat.SchemaHash,
+			Shape:           stat.Shape,
+			Hits:            stat.Hits,
+			Misses:          stat.Misses,
+			Evictions:       stat.Evictions,
+		})
+	}
 	return out
 }
 

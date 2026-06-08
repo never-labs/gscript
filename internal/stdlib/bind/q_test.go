@@ -2937,6 +2937,9 @@ func TestQCacheStatsAndClearPublicAPI(t *testing.T) {
 	if kernels := runtimeRow.RawGetString("kernels").Table(); kernels == nil || kernels.Length() != 0 {
 		t.Fatalf("q_runtime_kernel_execution kernels = %v, want empty table until MethodJIT diagnostics are attached", kernels)
 	}
+	if routes := runtimeRow.RawGetString("routes").Table(); routes == nil || routes.Length() != 0 {
+		t.Fatalf("q_runtime_kernel_execution routes = %v, want empty table until MethodJIT diagnostics are attached", routes)
+	}
 	kernelRow := qTestCacheStatsRowTable(t, interp.GetGlobal("stats").Table(), "qsql_kernel")
 	if got := kernelRow.RawGetString("stats_domain"); !got.IsString() || got.Str() != qStatsDomainSemanticCache {
 		t.Fatalf("qsql_kernel stats_domain = %v, want %s", got, qStatsDomainSemanticCache)
@@ -3097,6 +3100,27 @@ func TestQRuntimeKernelExecutionStatsProviderFeedsCacheStats(t *testing.T) {
 	}
 	if got := kernel.RawGetString("count"); !got.IsInt() || got.Int() != 5 {
 		t.Fatalf("q_runtime_kernel_execution kernels[1].count = %v, want 5", got)
+	}
+	routes := row.RawGetString("routes").Table()
+	if routes == nil || routes.Length() != 3 {
+		t.Fatalf("q_runtime_kernel_execution routes table = %v, want three rows", routes)
+	}
+	route := routes.RawGetInt(1).Table()
+	if route == nil {
+		t.Fatal("q_runtime_kernel_execution routes[1] is nil")
+	}
+	for field, want := range map[string]string{
+		"source":  "methodjit_q_frame_runtime",
+		"kernel":  "QFrameSelectColumn",
+		"route":   "typed_runtime_op_exit",
+		"outcome": "success",
+	} {
+		if got := route.RawGetString(field); !got.IsString() || got.Str() != want {
+			t.Fatalf("q_runtime_kernel_execution routes[1].%s = %v, want %q", field, got, want)
+		}
+	}
+	if got := route.RawGetString("count"); !got.IsInt() || got.Int() != 5 {
+		t.Fatalf("q_runtime_kernel_execution routes[1].count = %v, want 5", got)
 	}
 }
 
@@ -3301,6 +3325,20 @@ again := q.query(trades, {select: {price: "price"}, order_by: "missing"})
 	if got := keyRows[0]; got.Namespace != "q.query" || got.Kind != "query_kernel" || got.PlanFingerprint != "" || got.Supported || got.ReasonFamily != qFallbackFamilyOrder || got.ReasonCode != qQueryKernelReasonOrder || got.Hits != 1 || got.Misses != 1 || got.Evictions != 0 {
 		t.Fatalf("q_query_kernel order key row = %+v, want unsupported order hit=1 miss=1", got)
 	}
+	keyJSONRows := qTestQueryKernelSupportKeyJSONRows(t)
+	if len(keyJSONRows) != 1 {
+		t.Fatalf("QQueryKernelSupportKeyStatJSONRows = %+v, want one unsupported row", keyJSONRows)
+	}
+	if got := keyJSONRows[0]; got.Key != keyRows[0].Key || got.Namespace != "q.query" || got.Kind != "query_kernel" || got.PlanFingerprint != "" || got.Supported || got.ReasonFamily != qFallbackFamilyOrder || got.ReasonCode != qQueryKernelReasonOrder || got.SchemaHash != keyRows[0].SchemaHash || got.Shape != keyRows[0].Shape || got.Hits != 1 || got.Misses != 1 || got.Evictions != 0 {
+		t.Fatalf("QQueryKernelSupportKeyStatJSONRows[0] = %+v, want stable unsupported q.query key row", got)
+	}
+	keyJSON, err := json.Marshal(keyJSONRows)
+	if err != nil {
+		t.Fatalf("marshal QQueryKernelSupportKeyStatJSONRows: %v", err)
+	}
+	if !strings.Contains(string(keyJSON), `"reason_family"`) || !strings.Contains(string(keyJSON), `"schema_hash"`) || !strings.Contains(string(keyJSON), `"plan_fingerprint"`) || strings.Contains(string(keyJSON), "ReasonFamily") || strings.Contains(string(keyJSON), "SchemaHash") || strings.Contains(string(keyJSON), "PlanFingerprint") {
+		t.Fatalf("QQueryKernelSupportKeyStatJSONRows JSON = %s, want snake_case stable fields", keyJSON)
+	}
 	shapeRows := qTestQueryKernelShapeRows(t, queryKernelRow.RawGetString("shapes").Table())
 	if len(shapeRows) != 1 {
 		t.Fatalf("q_query_kernel order shapes = %+v, want one row", shapeRows)
@@ -3427,6 +3465,13 @@ explained := q.explain_query(trades, {select: {large: {">=", "size", 15}, notion
 	}
 	if got := keyRows[0]; got.Namespace != "q.query" || got.Kind != "query_kernel" || got.PlanFingerprint != "" || !got.Supported || got.ReasonFamily != qFallbackFamilySupported || got.ReasonCode != qKernelReasonSupported || got.Hits != 1 || got.Misses != 1 || got.Evictions != 0 {
 		t.Fatalf("q_query_kernel supported key row = %+v, want supported hit=1 miss=1", got)
+	}
+	keyJSONRows := qTestQueryKernelSupportKeyJSONRows(t)
+	if len(keyJSONRows) != 1 {
+		t.Fatalf("QQueryKernelSupportKeyStatJSONRows = %+v, want one supported row", keyJSONRows)
+	}
+	if got := keyJSONRows[0]; got.Key != keyRows[0].Key || got.Namespace != "q.query" || got.Kind != "query_kernel" || got.PlanFingerprint != "" || !got.Supported || got.ReasonFamily != qFallbackFamilySupported || got.ReasonCode != qKernelReasonSupported || got.SchemaHash != keyRows[0].SchemaHash || got.Shape != keyRows[0].Shape || got.Hits != 1 || got.Misses != 1 || got.Evictions != 0 {
+		t.Fatalf("QQueryKernelSupportKeyStatJSONRows[0] = %+v, want stable supported q.query key row", got)
 	}
 	shapeRows := qTestQueryKernelShapeRows(t, queryKernelRow.RawGetString("shapes").Table())
 	if len(shapeRows) != 1 {
@@ -5898,6 +5943,14 @@ func qTestQueryKernelKeyRows(t *testing.T, tbl *Table) []qQueryKernelKeyRow {
 		})
 	}
 	return rows
+}
+
+func qTestQueryKernelSupportKeyJSONRows(t *testing.T) []QQueryKernelSupportKeyStatJSONRow {
+	t.Helper()
+	qQueryKernelSupportCacheMu.Lock()
+	rows := qQueryKernelSupportKeyStatsSnapshotLocked()
+	qQueryKernelSupportCacheMu.Unlock()
+	return QQueryKernelSupportKeyStatJSONRows(rows)
 }
 
 func qTestQueryKernelShapeRows(t *testing.T, tbl *Table) []qQueryKernelShapeRow {
