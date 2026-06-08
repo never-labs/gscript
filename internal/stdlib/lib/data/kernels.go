@@ -1191,9 +1191,9 @@ func (k typedKernelRegistry) NumericSums(array Array) (Array, bool, error) {
 			outF[i] = sumF
 		}
 		if hasFloat {
-			return NewF64(outF), true, nil
+			return newF64Trusted(outF), true, nil
 		}
-		return NewI64(outI), true, nil
+		return newI64Trusted(outI), true, nil
 	default:
 		return nil, false, nil
 	}
@@ -2536,7 +2536,7 @@ func compareDyadic(op Op, left, right any, length int) (Array, bool, error) {
 		}
 		out[i] = keep
 	}
-	return NewBool(out), true, nil
+	return newBoolTrusted(out), true, nil
 }
 
 func compareSymbolStringScalar(op Op, left, right any) (bool, bool) {
@@ -2604,7 +2604,7 @@ func numericUnarySlice[T signedScalar | unsignedScalar | floatScalar](op string,
 		}
 		out[i] = n
 	}
-	return NewF64(out), true, nil
+	return newF64Trusted(out), true, nil
 }
 
 func numericUnaryNullable(op string, values []any) (Array, bool, error) {
@@ -2743,7 +2743,7 @@ func numericSumsInteger[T signedScalar](values []T) Array {
 		sum += int64(v)
 		out[i] = sum
 	}
-	return NewI64(out)
+	return newI64Trusted(out)
 }
 
 func numericSumsUnsigned[T unsignedScalar](values []T) Array {
@@ -2753,7 +2753,7 @@ func numericSumsUnsigned[T unsignedScalar](values []T) Array {
 		sum += int64(v)
 		out[i] = sum
 	}
-	return NewI64(out)
+	return newI64Trusted(out)
 }
 
 func numericSumsFloat[T floatScalar](values []T) Array {
@@ -2763,7 +2763,7 @@ func numericSumsFloat[T floatScalar](values []T) Array {
 		sum += float64(v)
 		out[i] = sum
 	}
-	return NewF64(out)
+	return newF64Trusted(out)
 }
 
 func numericSumsI64Range(values i64RangeArray) Array {

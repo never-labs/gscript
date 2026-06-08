@@ -501,6 +501,10 @@ func NewBool(values []bool) Array {
 	return columnArray[bool]{kind: KindBool, data: append([]bool(nil), values...)}
 }
 
+func newBoolTrusted(values []bool) Array {
+	return columnArray[bool]{kind: KindBool, data: values}
+}
+
 func NewI8(values []int8) Array {
 	return columnArray[int8]{kind: KindI8, data: append([]int8(nil), values...)}
 }
@@ -515,6 +519,10 @@ func NewI32(values []int32) Array {
 
 func NewI64(values []int64) Array {
 	return columnArray[int64]{kind: KindI64, data: append([]int64(nil), values...)}
+}
+
+func newI64Trusted(values []int64) Array {
+	return columnArray[int64]{kind: KindI64, data: values}
 }
 
 func NewI64Range(start, step int64, length int) Array {
@@ -546,6 +554,10 @@ func NewF32(values []float32) Array {
 
 func NewF64(values []float64) Array {
 	return columnArray[float64]{kind: KindF64, data: append([]float64(nil), values...)}
+}
+
+func newF64Trusted(values []float64) Array {
+	return columnArray[float64]{kind: KindF64, data: values}
 }
 
 func NewString(values []string) Array {
@@ -1253,6 +1265,9 @@ func TryTypedCompareIndexesI64(array Array, op Op, value any) (Array, bool, erro
 	if array == nil {
 		return nil, true, fmt.Errorf("compare array is nil")
 	}
+	if out, ok := typedCompareIndexRangeI64(array, op, value); ok {
+		return out, true, nil
+	}
 	indexes, ok := typedKernels.CompareIndexes(array, op, value, nil)
 	if !ok {
 		return nil, false, nil
@@ -1261,7 +1276,55 @@ func TryTypedCompareIndexesI64(array Array, op Op, value any) (Array, bool, erro
 	for i, index := range indexes {
 		out[i] = int64(index)
 	}
-	return columnArray[int64]{kind: KindI64, data: out}, true, nil
+	return newI64Trusted(out), true, nil
+}
+
+func typedCompareIndexRangeI64(array Array, op Op, value any) (Array, bool) {
+	switch a := array.(type) {
+	case attributedArray:
+		return typedCompareIndexRangeI64(a.array, op, value)
+	case i64RangeArray:
+		target, ok := coerceInt64Exact(value)
+		if !ok {
+			return nil, false
+		}
+		return compareI64RangeIndexArray(a, op, target)
+	default:
+		return nil, false
+	}
+}
+
+func compareI64RangeIndexArray(values i64RangeArray, op Op, target int64) (Array, bool) {
+	if values.len == 0 {
+		return i64RangeArray{len: 0}, true
+	}
+	if values.step == 0 {
+		keep := boolCompare(op, values.start == target, compareInt64(values.start, target))
+		if keep {
+			return i64RangeArray{start: 0, step: 1, len: values.len}, true
+		}
+		return i64RangeArray{len: 0}, true
+	}
+	start := -1
+	end := -1
+	for row := 0; row < values.len; row++ {
+		v := values.start + int64(row)*values.step
+		if boolCompare(op, v == target, compareInt64(v, target)) {
+			if start < 0 {
+				start = row
+			}
+			end = row
+		} else if start >= 0 {
+			break
+		}
+	}
+	if start < 0 {
+		return i64RangeArray{len: 0}, true
+	}
+	if op == OpNE && end-start+1 != values.len {
+		return nil, false
+	}
+	return i64RangeArray{start: int64(start), step: 1, len: end - start + 1}, true
 }
 
 func EqualMask(array Array, value any) (Array, error) {
@@ -1283,12 +1346,12 @@ func WithinMask(array Array, low, high any, highClosed bool) (Array, error) {
 	}
 	out := make([]bool, array.Len())
 	if IsNull(low) || IsNull(high) {
-		return NewBool(out), nil
+		return newBoolTrusted(out), nil
 	}
 	low = normalizeScalar(array.Kind(), low)
 	high = normalizeScalar(array.Kind(), high)
 	if ok := withinMaskTyped(array, low, high, highClosed, out); ok {
-		return NewBool(out), nil
+		return newBoolTrusted(out), nil
 	}
 	for row := 0; row < array.Len(); row++ {
 		v, ok := array.At(row)
@@ -1307,7 +1370,7 @@ func WithinMask(array Array, low, high any, highClosed bool) (Array, error) {
 			out[row] = compare(v, high) < 0
 		}
 	}
-	return NewBool(out), nil
+	return newBoolTrusted(out), nil
 }
 
 func compareMask(array Array, op Op, value any) (Array, error) {
@@ -1331,11 +1394,11 @@ func compareMask(array Array, op Op, value any) (Array, error) {
 				out[row] = false
 			}
 		}
-		return NewBool(out), nil
+		return newBoolTrusted(out), nil
 	}
 	value = normalizeScalar(array.Kind(), value)
 	if ok := compareMaskTyped(array, op, value, out); ok {
-		return NewBool(out), nil
+		return newBoolTrusted(out), nil
 	}
 	for row := 0; row < array.Len(); row++ {
 		v, ok := array.At(row)
@@ -1356,7 +1419,7 @@ func compareMask(array Array, op Op, value any) (Array, error) {
 		}
 		out[row] = keep
 	}
-	return NewBool(out), nil
+	return newBoolTrusted(out), nil
 }
 
 func FilterMask(frame Frame, mask Array) (Frame, error) {

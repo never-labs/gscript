@@ -63,8 +63,39 @@ func TestTryTypedCompareIndexesI64(t *testing.T) {
 	if got.Kind() != KindI64 {
 		t.Fatalf("TryTypedCompareIndexesI64 kind = %s, want %s", got.Kind(), KindI64)
 	}
+	if _, ok := got.(i64RangeArray); !ok {
+		t.Fatalf("TryTypedCompareIndexesI64 range returned %T, want lazy i64RangeArray", got)
+	}
 	if values := got.Values(); !reflect.DeepEqual(values, []any{int64(3), int64(4), int64(5)}) {
 		t.Fatalf("TryTypedCompareIndexesI64 range values = %#v", values)
+	}
+
+	got, handled, err = TryTypedCompareIndexesI64(NewI64Range(10, -2, 6), OpGT, int64(4))
+	if err != nil {
+		t.Fatalf("TryTypedCompareIndexesI64 descending range returned error: %v", err)
+	}
+	if !handled {
+		t.Fatal("TryTypedCompareIndexesI64 descending range did not handle typed compare")
+	}
+	if _, ok := got.(i64RangeArray); !ok {
+		t.Fatalf("TryTypedCompareIndexesI64 descending range returned %T, want lazy i64RangeArray", got)
+	}
+	if values := got.Values(); !reflect.DeepEqual(values, []any{int64(0), int64(1), int64(2)}) {
+		t.Fatalf("TryTypedCompareIndexesI64 descending range values = %#v", values)
+	}
+
+	got, handled, err = TryTypedCompareIndexesI64(NewI64Range(0, 1, 6), OpNE, int64(3))
+	if err != nil {
+		t.Fatalf("TryTypedCompareIndexesI64 non-contiguous range returned error: %v", err)
+	}
+	if !handled {
+		t.Fatal("TryTypedCompareIndexesI64 non-contiguous range did not handle typed compare")
+	}
+	if _, ok := got.(i64RangeArray); ok {
+		t.Fatalf("TryTypedCompareIndexesI64 non-contiguous range returned lazy range, want materialized indexes")
+	}
+	if values := got.Values(); !reflect.DeepEqual(values, []any{int64(0), int64(1), int64(2), int64(4), int64(5)}) {
+		t.Fatalf("TryTypedCompareIndexesI64 non-contiguous range values = %#v", values)
 	}
 
 	got, handled, err = TryTypedCompareIndexesI64(NewSymbols([]string{"AAPL", "MSFT", "NVDA"}), OpLT, "NVDA")

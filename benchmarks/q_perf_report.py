@@ -15,7 +15,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 BENCH_RE = re.compile(r"^(Benchmark[^\s]+)\s+(\d+)\s+([0-9.]+)\s+ns/op(?:\s+(.*))?$")
+BENCH_NO_NS_RE = re.compile(r"^(Benchmark[^\s]+)\s+(\d+)\s+(.*)$")
 BENCH_CPU_SUFFIX_RE = re.compile(r"-\d+$")
+MIN_TRUSTED_GO_BASELINE_NS = 100.0
 
 QSQL_BENCH = (
     "BenchmarkQSQL("
@@ -169,15 +171,29 @@ def run_command(label: str, cmd: list[str]) -> CommandResult:
 def parse_go_benchmarks(output: str) -> dict[str, BenchRow]:
     rows: dict[str, BenchRow] = {}
     for line in output.splitlines():
-        match = BENCH_RE.match(line.strip())
+        stripped = line.strip()
+        match = BENCH_RE.match(stripped)
+        if match:
+            raw_name, iterations, ns_op, rest = match.groups()
+            name = normalize_benchmark_name(raw_name)
+            rows[name] = BenchRow(
+                name=name,
+                iterations=int(iterations),
+                ns_op=float(ns_op),
+                metrics=parse_metric_pairs(rest or ""),
+            )
+            continue
+        match = BENCH_NO_NS_RE.match(stripped)
         if not match:
             continue
-        raw_name, iterations, ns_op, rest = match.groups()
+        raw_name, iterations, rest = match.groups()
+        if not raw_name.startswith("Benchmark"):
+            continue
         name = normalize_benchmark_name(raw_name)
         rows[name] = BenchRow(
             name=name,
             iterations=int(iterations),
-            ns_op=float(ns_op),
+            ns_op=0.0,
             metrics=parse_metric_pairs(rest or ""),
         )
     return rows
@@ -209,6 +225,18 @@ def ratio(rows: dict[str, BenchRow], numerator: str, denominator: str) -> float 
     if left is None or right is None or right.ns_op == 0:
         return None
     return left.ns_op / right.ns_op
+
+
+def trusted_qeval_go_ratio(rows: dict[str, BenchRow], session: str, go: str) -> tuple[float | None, str]:
+    go_row = rows.get(go)
+    if go_row is None:
+        return None, "missing Go baseline"
+    if go_row.ns_op < MIN_TRUSTED_GO_BASELINE_NS:
+        return None, (
+            f"Go baseline is {go_row.ns_op:g} ns/op, below {MIN_TRUSTED_GO_BASELINE_NS:g} ns/op; "
+            "treat as correctness oracle or constant-folded baseline, not a performance denominator"
+        )
+    return ratio(rows, session, go), "session eval bypasses q.eval result cache and measures repeated execution"
 
 
 def subject_seconds(subject: dict | None) -> float | None:
@@ -378,14 +406,15 @@ def build_ratios(rows: dict[str, BenchRow]) -> list[RatioRow]:
         go = f"BenchmarkQEvalVectorGoBaseline/{case}"
         warm = f"BenchmarkQEvalVectorResultCacheWarm/{case}"
         cold = f"BenchmarkQEvalVectorCold/{case}"
+        go_ratio, go_note = trusted_qeval_go_ratio(rows, session, go)
         ratios.extend(
             [
                 RatioRow(
                     f"q.eval {case} session execution vs Go",
                     session,
                     go,
-                    ratio(rows, session, go),
-                    "session eval bypasses q.eval result cache and measures repeated execution",
+                    go_ratio,
+                    go_note,
                 ),
                 RatioRow(
                     f"q.eval {case} result-cache warm vs session execution",
