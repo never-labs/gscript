@@ -86,6 +86,28 @@ func qPipelineShapeSpecForPlan(kind qPipelineKind, variant string) (qPipelineSha
 			Transform:     "dyadic-float-" + variant,
 			PipelineShape: "vector_reduce",
 		}, true
+	case qPipelineSumUnaryPrimitive:
+		if variant == "" {
+			return qPipelineShapeSpec{}, false
+		}
+		return qPipelineShapeSpec{
+			ID:            "vector-reduce/sum-unary-" + variant,
+			Family:        qPipelineShapeFamilyVector,
+			Reducer:       "sum",
+			Transform:     variant,
+			PipelineShape: "vector_reduce",
+		}, true
+	case qPipelineWhereUnaryCompareIndexes:
+		if variant == "" {
+			return qPipelineShapeSpec{}, false
+		}
+		return qPipelineShapeSpec{
+			ID:            "numeric-unary-compare-to-index/" + variant,
+			Family:        qPipelineShapeFamilyWhere,
+			Selector:      "index",
+			Transform:     variant,
+			PipelineShape: "compare_index",
+		}, true
 	case qPipelineSumSequenceTransform:
 		if variant == "" {
 			return qPipelineShapeSpec{}, false
@@ -265,12 +287,21 @@ func qPipelinePlanShapeSpec(plan qPipelinePlan) qPipelineShapeSpec {
 	if plan.shapeSpec.valid() {
 		return plan.shapeSpec
 	}
-	if spec, ok := qPipelineShapeSpecForPlan(plan.kind, plan.compareOp); ok && (plan.shape == "" || spec.ID == plan.shape) {
+	if spec, ok := qPipelineShapeSpecForPlan(plan.kind, plan.shapeVariant()); ok && (plan.shape == "" || spec.ID == plan.shape) {
 		return spec
 	}
 	return qPipelineShapeSpec{
 		ID:            plan.shape,
 		PipelineShape: qRuntimeKernelPipelineShape("QPipelinePlan", plan.shape),
+	}
+}
+
+func (plan qPipelinePlan) shapeVariant() string {
+	switch plan.kind {
+	case qPipelineSumUnaryPrimitive, qPipelineWhereUnaryCompareIndexes:
+		return plan.unaryOp
+	default:
+		return plan.compareOp
 	}
 }
 

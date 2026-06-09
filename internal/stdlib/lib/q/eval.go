@@ -576,6 +576,10 @@ func qRuntimeKernelQPipelinePlanShape(shape string) string {
 		return "cast"
 	default:
 		switch {
+		case strings.HasPrefix(shape, "numeric-unary-compare-to-index/"):
+			return "compare_index"
+		case strings.HasPrefix(shape, "vector-reduce/sum-unary-"):
+			return "vector_reduce"
 		case strings.HasPrefix(shape, "runtime-unary/"):
 			return qRuntimePrimitivePipelineShape(strings.TrimPrefix(shape, "runtime-unary/"))
 		case strings.HasPrefix(shape, "runtime-dyadic/"):
@@ -7272,7 +7276,15 @@ func splitLeadingNumericUnary(src string) (string, string, bool) {
 		data.NumericUnaryRecip,
 		data.NumericUnaryCeiling,
 		data.NumericUnarySignum,
+		data.NumericUnarySqrt,
+		data.NumericUnaryLog,
 		data.NumericUnaryFloor,
+		data.NumericUnarySin,
+		data.NumericUnaryCos,
+		data.NumericUnaryTan,
+		data.NumericUnaryAsin,
+		data.NumericUnaryAcos,
+		data.NumericUnaryAtan,
 		data.NumericUnaryAbs,
 		data.NumericUnaryExp,
 		data.NumericUnaryNeg,

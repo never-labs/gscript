@@ -3379,6 +3379,14 @@ func TryTypedQNumericUnarySum(op string, array Array) (any, bool, error) {
 	return qNumericUnarySumIntegerArray(op, array)
 }
 
+func TryTypedQNumericUnaryCompareIndexes(op string, array Array, compareOp Op, scalar any) (Array, bool, error) {
+	transformed, handled, err := TryTypedQNumericUnary(op, array)
+	if err != nil || !handled {
+		return nil, handled, err
+	}
+	return TryTypedCompareIndexesI64(transformed, compareOp, scalar)
+}
+
 func qNumericUnarySumTiled(op string, array tiledArray) (any, bool, error) {
 	sourceLen := array.source.Len()
 	if array.len == 0 {
@@ -10102,7 +10110,7 @@ func qNumericUnarySumIntegerArray(op string, array Array) (any, bool, error) {
 			}
 		}
 		return sum, true, nil
-	case NumericUnaryExp:
+	case NumericUnarySqrt, NumericUnaryLog, NumericUnaryExp, NumericUnarySin, NumericUnaryCos, NumericUnaryTan, NumericUnaryAsin, NumericUnaryAcos, NumericUnaryAtan, NumericUnaryRecip:
 		var sum float64
 		for i := 0; i < array.Len(); i++ {
 			value, ok, err := integerArrayAt(array, i)
@@ -10112,20 +10120,11 @@ func qNumericUnarySumIntegerArray(op string, array Array) (any, bool, error) {
 			if !ok {
 				return nil, false, nil
 			}
-			sum += math.Exp(float64(value))
-		}
-		return sum, true, nil
-	case NumericUnaryRecip:
-		var sum float64
-		for i := 0; i < array.Len(); i++ {
-			value, ok, err := integerArrayAt(array, i)
+			out, err := applyNumericUnaryFloat(op, float64(value))
 			if err != nil {
 				return nil, true, err
 			}
-			if !ok {
-				return nil, false, nil
-			}
-			sum += 1 / float64(value)
+			sum += out
 		}
 		return sum, true, nil
 	default:

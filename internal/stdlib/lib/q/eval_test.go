@@ -509,6 +509,85 @@ func TestQPipelineExecutablePlanCoversRuntimeDyadicWhere(t *testing.T) {
 	}
 }
 
+func TestQPipelinePlanRecognizesNumericUnaryComposedShapes(t *testing.T) {
+	tests := []struct {
+		name          string
+		src           string
+		shape         string
+		pipelineShape string
+		transform     string
+		want          any
+	}{
+		{
+			name:          "sum unary",
+			src:           "+/sqrt 1 4 9 16",
+			shape:         "vector-reduce/sum-unary-sqrt",
+			pipelineShape: "vector_reduce",
+			transform:     "sqrt",
+			want:          float64(10),
+		},
+		{
+			name:          "where unary compare",
+			src:           "where sqrt 1 4 9 16>2",
+			shape:         "numeric-unary-compare-to-index/sqrt",
+			pipelineShape: "compare_index",
+			transform:     "sqrt",
+			want:          data.NewI64([]int64{2, 3}),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ClearRuntimeKernelExecutionStats()
+			t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+			descriptor, ok := DescribeEvalPipeline(tt.src)
+			if !ok {
+				t.Fatalf("DescribeEvalPipeline(%q) did not recognize numeric unary composed shape", tt.src)
+			}
+			if descriptor.Shape != tt.shape ||
+				descriptor.PipelineShape != tt.pipelineShape ||
+				descriptor.ShapeFamily == "" ||
+				descriptor.ShapeTransform != tt.transform ||
+				descriptor.UnaryOp != tt.transform {
+				t.Fatalf("descriptor = %#v, want shape=%q pipeline=%q transform=%q", descriptor, tt.shape, tt.pipelineShape, tt.transform)
+			}
+
+			backend, ok := DescribeEvalPipelineBackendPlan(tt.src)
+			if !ok {
+				t.Fatalf("DescribeEvalPipelineBackendPlan(%q) failed", tt.src)
+			}
+			executable, ok := CompileEvalPipelineBackendPlan(backend)
+			if !ok {
+				t.Fatalf("CompileEvalPipelineBackendPlan(%q) failed", tt.src)
+			}
+			out, handled, err := NewEvalState(nil).ExecuteEvalPipelineExecutablePlan(executable)
+			if err != nil || !handled {
+				t.Fatalf("ExecuteEvalPipelineExecutablePlan = %#v,%v,%v", out, handled, err)
+			}
+			if !qEvalPipelineTestValueEqual(out, tt.want) {
+				t.Fatalf("ExecuteEvalPipelineExecutablePlan output = %#v, want %#v", out, tt.want)
+			}
+
+			seenPipeline := false
+			seenTyped := false
+			for _, stat := range RuntimeKernelExecutionStats() {
+				if stat.Outcome == "fallback" || stat.Outcome == "error" {
+					t.Fatalf("unexpected runtime fallback/error: %#v all=%#v", stat, RuntimeKernelExecutionStats())
+				}
+				if stat.Kernel == "QPipelinePlan" && stat.Shape == tt.shape && stat.Outcome == "hit" {
+					seenPipeline = true
+				}
+				if (stat.Kernel == "ArrayNumericUnarySum" || stat.Kernel == "ArrayNumericUnaryCompareIndexes") && stat.Outcome == "hit" {
+					seenTyped = true
+				}
+			}
+			if !seenPipeline || !seenTyped {
+				t.Fatalf("missing numeric unary composed stats: pipeline=%v typed=%v all=%#v", seenPipeline, seenTyped, RuntimeKernelExecutionStats())
+			}
+		})
+	}
+}
+
 func TestQPipelinePlanRecognizesCastEnvelope(t *testing.T) {
 	src := "(`long$3.7)+(\"J\"$\"42\")+(\"I\"$\"17\")+(count `$\"AAPL\")+(count string `$\"MSFT\")"
 	ClearRuntimeKernelExecutionStats()

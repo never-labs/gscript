@@ -225,6 +225,28 @@ func TestTypedWithinMaskOpenClosedAndNullBounds(t *testing.T) {
 	}
 }
 
+func TestTryTypedQNumericUnaryCompareIndexes(t *testing.T) {
+	sum, handled, err := TryTypedQNumericUnarySum(NumericUnarySqrt, NewI64([]int64{1, 4, 9, 16}))
+	if err != nil || !handled || sum != float64(10) {
+		t.Fatalf("TryTypedQNumericUnarySum sqrt = %#v,%v,%v; want 10,true,nil", sum, handled, err)
+	}
+
+	indexes, handled, err := TryTypedQNumericUnaryCompareIndexes(NumericUnarySqrt, NewI64([]int64{1, 4, 9, 16}), OpGT, float64(2))
+	if err != nil {
+		t.Fatalf("TryTypedQNumericUnaryCompareIndexes returned error: %v", err)
+	}
+	if !handled {
+		t.Fatal("TryTypedQNumericUnaryCompareIndexes did not handle typed numeric input")
+	}
+	if got, want := indexes.Values(), []any{int64(2), int64(3)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("TryTypedQNumericUnaryCompareIndexes = %v, want %v", got, want)
+	}
+
+	if _, handled, err := TryTypedQNumericUnaryCompareIndexes(NumericUnarySqrt, NewString([]string{"a"}), OpGT, float64(2)); err != nil || handled {
+		t.Fatalf("TryTypedQNumericUnaryCompareIndexes string = handled %v err %v; want false,nil", handled, err)
+	}
+}
+
 func TestTryTypedWithinIndexesAndStatsTiledTime(t *testing.T) {
 	times, err := TakeRepeat(NewTime([]Time{1, 2, 3, 4}), 10)
 	if err != nil {

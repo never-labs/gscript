@@ -69,6 +69,7 @@ type EvalPipelineDescriptor struct {
 
 	LeftExpr       string
 	RightExpr      string
+	UnaryOp        string
 	CompareOp      string
 	ComparePrefix  string
 	ModExpr        string
@@ -383,6 +384,7 @@ func evalExpressionPipelineDescriptor(source string, plan qPipelinePlan) EvalPip
 		MaskExpr:       strings.TrimSpace(plan.maskExpr),
 		LeftExpr:       strings.TrimSpace(plan.leftExpr),
 		RightExpr:      strings.TrimSpace(plan.rightExpr),
+		UnaryOp:        strings.TrimSpace(plan.unaryOp),
 		CompareOp:      plan.compareOp,
 		ComparePrefix:  plan.comparePrefix,
 		ModExpr:        strings.TrimSpace(plan.modExpr),
@@ -417,6 +419,7 @@ func qPipelinePlanFromEvalDescriptor(descriptor EvalPipelineDescriptor) (qPipeli
 		maskExpr:       strings.TrimSpace(descriptor.MaskExpr),
 		leftExpr:       strings.TrimSpace(descriptor.LeftExpr),
 		rightExpr:      strings.TrimSpace(descriptor.RightExpr),
+		unaryOp:        strings.TrimSpace(descriptor.UnaryOp),
 		compareOp:      descriptor.CompareOp,
 		comparePrefix:  descriptor.ComparePrefix,
 		modExpr:        strings.TrimSpace(descriptor.ModExpr),
@@ -521,6 +524,19 @@ func qPipelinePlanFromEvalDescriptor(descriptor EvalPipelineDescriptor) (qPipeli
 		}
 	default:
 		switch {
+		case strings.HasPrefix(shape, "vector-reduce/sum-unary-"):
+			plan.kind = qPipelineSumUnaryPrimitive
+			if plan.unaryOp == "" {
+				plan.unaryOp = strings.TrimPrefix(shape, "vector-reduce/sum-unary-")
+			}
+		case strings.HasPrefix(shape, "numeric-unary-compare-to-index/"):
+			plan.kind = qPipelineWhereUnaryCompareIndexes
+			if plan.unaryOp == "" {
+				plan.unaryOp = strings.TrimPrefix(shape, "numeric-unary-compare-to-index/")
+			}
+			if plan.comparePrefix == "" {
+				plan.comparePrefix = "numeric-unary-compare-to-index"
+			}
 		case strings.HasPrefix(shape, "runtime-unary/"):
 			plan.kind = qPipelineUnaryPrimitive
 			if plan.compareOp == "" {

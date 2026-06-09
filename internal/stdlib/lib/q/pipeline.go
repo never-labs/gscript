@@ -26,6 +26,8 @@ const (
 	qPipelineSumVectorExpr
 	qPipelineSumDyadicMinMax
 	qPipelineSumDyadicFloatMath
+	qPipelineSumUnaryPrimitive
+	qPipelineWhereUnaryCompareIndexes
 	qPipelineSumSequenceTransform
 	qPipelineCountVectorExpr
 	qPipelineCountDistinct
@@ -60,6 +62,7 @@ type qPipelinePlan struct {
 	rightPlan      qScriptBindingPlan
 	compareOp      string
 	comparePrefix  string
+	unaryOp        string
 	modExpr        string
 	modPlan        qScriptBindingPlan
 	modulusExpr    string
@@ -316,6 +319,9 @@ func buildQPipelinePlan(src string) qPipelinePlan {
 		if plan, ok := buildQPipelineSumDyadicFloatMathPlan(right); ok {
 			return qPipelinePlanWithBindingPlans(withSource(plan))
 		}
+		if plan, ok := buildQPipelineSumUnaryPrimitivePlan(right); ok {
+			return qPipelinePlanWithBindingPlans(withSource(plan))
+		}
 		if plan, ok := buildQPipelineSumSequenceTransformPlan(right); ok {
 			return qPipelinePlanWithBindingPlans(withSource(plan))
 		}
@@ -340,6 +346,9 @@ func buildQPipelinePlan(src string) qPipelinePlan {
 			return qPipelinePlanWithBindingPlans(withSource(plan))
 		}
 		if plan, ok := buildQPipelineSumDyadicFloatMathPlan(inputExpr); ok {
+			return qPipelinePlanWithBindingPlans(withSource(plan))
+		}
+		if plan, ok := buildQPipelineSumUnaryPrimitivePlan(inputExpr); ok {
 			return qPipelinePlanWithBindingPlans(withSource(plan))
 		}
 		if plan, ok := buildQPipelineSumSequenceTransformPlan(inputExpr); ok {
@@ -407,6 +416,9 @@ func buildQPipelinePlan(src string) qPipelinePlan {
 		return qPipelinePlan{}
 	}
 	if strings.HasPrefix(src, "where ") && wordBoundary(src, 0, len("where")) {
+		if plan, ok := buildQPipelineWhereUnaryComparePlan(src); ok {
+			return qPipelinePlanWithBindingPlans(withSource(plan))
+		}
 		if plan, ok := buildQPipelineWhereComparePlan(src, qPipelineWhereCompareIndexes, "compare-to-index"); ok {
 			return qPipelinePlanWithBindingPlans(withSource(plan))
 		}
@@ -911,6 +923,58 @@ func buildQPipelineSumDyadicFloatMathPlan(src string) (qPipelinePlan, bool) {
 	return qPipelinePlan{}, false
 }
 
+func buildQPipelineSumUnaryPrimitivePlan(src string) (qPipelinePlan, bool) {
+	op, arg, ok := splitLeadingNumericUnary(stripEnclosingParens(strings.TrimSpace(src)))
+	if !ok || arg == "" {
+		return qPipelinePlan{}, false
+	}
+	plan := qPipelineShapePlan(qPipelineSumUnaryPrimitive, op)
+	plan.unaryOp = op
+	plan.reductionInput = arg
+	return plan, true
+}
+
+func buildQPipelineWhereUnaryComparePlan(src string) (qPipelinePlan, bool) {
+	src = strings.TrimSpace(src)
+	if !strings.HasPrefix(src, "where ") || !wordBoundary(src, 0, len("where")) {
+		return qPipelinePlan{}, false
+	}
+	arg := strings.TrimSpace(src[len("where "):])
+	leftExpr, rightExpr, op, ok := splitWhereCompareExpr(arg)
+	if !ok {
+		return qPipelinePlan{}, false
+	}
+	dataOp, ok := qDataCompareOpString(op)
+	if !ok {
+		return qPipelinePlan{}, false
+	}
+	unaryOp, valueExpr, ok := splitLeadingNumericUnary(leftExpr)
+	if ok && valueExpr != "" {
+		plan := qPipelineShapePlan(qPipelineWhereUnaryCompareIndexes, unaryOp)
+		plan.unaryOp = unaryOp
+		plan.compareOp = op
+		plan.leftExpr = strings.TrimSpace(valueExpr)
+		plan.rightExpr = strings.TrimSpace(rightExpr)
+		plan.comparePrefix = "numeric-unary-compare-to-index"
+		return plan, dataOp != ""
+	}
+	unaryOp, valueExpr, ok = splitLeadingNumericUnary(rightExpr)
+	if !ok || valueExpr == "" {
+		return qPipelinePlan{}, false
+	}
+	reversed := qReverseCompareOpString(op)
+	if reversed == "" {
+		return qPipelinePlan{}, false
+	}
+	plan := qPipelineShapePlan(qPipelineWhereUnaryCompareIndexes, unaryOp)
+	plan.unaryOp = unaryOp
+	plan.compareOp = reversed
+	plan.leftExpr = strings.TrimSpace(valueExpr)
+	plan.rightExpr = strings.TrimSpace(leftExpr)
+	plan.comparePrefix = "numeric-unary-compare-to-index"
+	return plan, true
+}
+
 func qPipelineRunningScanInput(src string) (scan, arg string, ok bool) {
 	src = stripEnclosingParens(strings.TrimSpace(src))
 	for _, spec := range []struct {
@@ -938,7 +1002,7 @@ func qPipelineRunningScanInput(src string) (scan, arg string, ok bool) {
 
 func qPipelinePlanWithBindingPlans(plan qPipelinePlan) qPipelinePlan {
 	if !plan.shapeSpec.valid() {
-		if spec, ok := qPipelineShapeSpecForPlan(plan.kind, plan.compareOp); ok && (plan.shape == "" || plan.shape == spec.ID) {
+		if spec, ok := qPipelineShapeSpecForPlan(plan.kind, plan.shapeVariant()); ok && (plan.shape == "" || plan.shape == spec.ID) {
 			plan.shapeSpec = spec
 			plan.shape = spec.ID
 		}
@@ -1328,6 +1392,10 @@ func (s *EvalState) evalQPipelinePlan(plan *qPipelinePlan) (any, bool, error) {
 		out, handled, err = s.evalQPipelineSumDyadicMinMax(plan)
 	case qPipelineSumDyadicFloatMath:
 		out, handled, err = s.evalQPipelineSumDyadicFloatMath(plan)
+	case qPipelineSumUnaryPrimitive:
+		out, handled, err = s.evalQPipelineSumUnaryPrimitive(plan)
+	case qPipelineWhereUnaryCompareIndexes:
+		out, handled, err = s.evalQPipelineWhereUnaryCompareIndexes(plan)
 	case qPipelineSumSequenceTransform:
 		out, handled, err = s.evalQPipelineSumSequenceTransform(plan)
 	case qPipelineCountVectorExpr:
@@ -1539,6 +1607,62 @@ func evalQPipelineSumSequenceTransformBound(plan *qPipelinePlan, bound qPipeline
 		fallbackReason: bound.fallbackReason,
 		call: func() (any, bool, error) {
 			return data.TryTypedSequenceTransformNumericSum(plan.compareOp, args, value)
+		},
+	})
+}
+
+func (s *EvalState) evalQPipelineSumUnaryPrimitive(plan *qPipelinePlan) (any, bool, error) {
+	op := strings.TrimSpace(plan.unaryOp)
+	if op == "" {
+		op = strings.TrimPrefix(plan.stableShape(), "vector-reduce/sum-unary-")
+	}
+	value, err := s.evalQPipelinePlannedExpr(plan.reductionInput, &plan.reductionPlan)
+	if err != nil {
+		return nil, true, err
+	}
+	array, ok := value.(data.Array)
+	if !ok {
+		return nil, false, nil
+	}
+	shape := "vector-reduce/sum-unary-" + op + "/" + string(array.Kind())
+	return evalQTypedRuntimeKernel(qTypedRuntimeKernel[any]{
+		kernel:         "ArrayNumericUnarySum",
+		shape:          shape,
+		fallbackReason: RuntimeFallbackUnsupportedType,
+		call: func() (any, bool, error) {
+			return data.TryTypedQNumericUnarySum(op, array)
+		},
+	})
+}
+
+func (s *EvalState) evalQPipelineWhereUnaryCompareIndexes(plan *qPipelinePlan) (any, bool, error) {
+	op := strings.TrimSpace(plan.unaryOp)
+	if op == "" {
+		op = strings.TrimPrefix(plan.stableShape(), "numeric-unary-compare-to-index/")
+	}
+	dataOp, ok := qDataCompareOpString(plan.compareOp)
+	if !ok {
+		return nil, false, nil
+	}
+	value, err := s.evalQPipelinePlannedExpr(plan.leftExpr, &plan.leftPlan)
+	if err != nil {
+		return nil, true, err
+	}
+	array, ok := value.(data.Array)
+	if !ok {
+		return nil, false, nil
+	}
+	scalar, err := s.evalQPipelinePlannedExpr(plan.rightExpr, &plan.rightPlan)
+	if err != nil {
+		return nil, true, err
+	}
+	shape := "numeric-unary-compare-to-index/" + op + "/" + plan.compareOp + "/" + string(array.Kind()) + "/" + string(qRuntimeKernelOperandKind(scalar, nil))
+	return evalQTypedRuntimeKernel(qTypedRuntimeKernel[any]{
+		kernel:         "ArrayNumericUnaryCompareIndexes",
+		shape:          shape,
+		fallbackReason: RuntimeFallbackUnsupportedType,
+		call: func() (any, bool, error) {
+			return data.TryTypedQNumericUnaryCompareIndexes(op, array, dataOp, scalar)
 		},
 	})
 }
