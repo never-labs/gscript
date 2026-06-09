@@ -23,13 +23,19 @@ type qPipelinePlan struct {
 	kind           qPipelineKind
 	shape          string
 	valueExpr      string
+	valuePlan      qScriptBindingPlan
 	indexExpr      string
+	indexPlan      qScriptBindingPlan
 	maskExpr       string
+	maskPlan       qScriptBindingPlan
 	leftExpr       string
+	leftPlan       qScriptBindingPlan
 	rightExpr      string
+	rightPlan      qScriptBindingPlan
 	compareOp      string
 	comparePrefix  string
 	reductionInput string
+	reductionPlan  qScriptBindingPlan
 }
 
 func (s *EvalState) qPipelinePlan(src string) qPipelinePlan {
@@ -97,34 +103,56 @@ func buildQPipelinePlan(src string) qPipelinePlan {
 			return qPipelinePlan{}
 		}
 		if plan, ok := buildQPipelineSumGatherPlan(right); ok {
-			return plan
+			return qPipelinePlanWithBindingPlans(plan)
 		}
 		if plan, ok := buildQPipelineWhereComparePlan(right, qPipelineSumWhereCompare, "compare-to-index-sum"); ok {
-			return plan
+			return qPipelinePlanWithBindingPlans(plan)
 		}
 		if input, ok := qPipelineDeltasInput(right); ok {
-			return qPipelinePlan{kind: qPipelineSumDeltas, shape: "vector-reduce/sum-deltas", reductionInput: input}
+			return qPipelinePlanWithBindingPlans(qPipelinePlan{kind: qPipelineSumDeltas, shape: "vector-reduce/sum-deltas", reductionInput: input})
 		}
 		return qPipelinePlan{}
 	}
 	if strings.HasPrefix(src, "sum ") && wordBoundary(src, 0, len("sum")) {
 		if input, ok := qPipelineDeltasInput(strings.TrimSpace(src[len("sum "):])); ok {
-			return qPipelinePlan{kind: qPipelineSumDeltas, shape: "vector-reduce/sum-deltas", reductionInput: input}
+			return qPipelinePlanWithBindingPlans(qPipelinePlan{kind: qPipelineSumDeltas, shape: "vector-reduce/sum-deltas", reductionInput: input})
 		}
 		return qPipelinePlan{}
 	}
 	if strings.HasPrefix(src, "count ") && wordBoundary(src, 0, len("count")) {
 		if plan, ok := buildQPipelineWhereComparePlan(strings.TrimSpace(src[len("count "):]), qPipelineCountWhereCompare, "compare-to-index-count"); ok {
-			return plan
+			return qPipelinePlanWithBindingPlans(plan)
 		}
 		return qPipelinePlan{}
 	}
 	if strings.HasPrefix(src, "where ") && wordBoundary(src, 0, len("where")) {
 		if plan, ok := buildQPipelineWhereComparePlan(src, qPipelineWhereCompareIndexes, "compare-to-index"); ok {
-			return plan
+			return qPipelinePlanWithBindingPlans(plan)
 		}
 	}
 	return qPipelinePlan{}
+}
+
+func qPipelinePlanWithBindingPlans(plan qPipelinePlan) qPipelinePlan {
+	if plan.valueExpr != "" {
+		plan.valuePlan = buildQScriptBindingPlanForRHS(plan.valueExpr, nil)
+	}
+	if plan.indexExpr != "" {
+		plan.indexPlan = buildQScriptBindingPlanForRHS(plan.indexExpr, nil)
+	}
+	if plan.maskExpr != "" {
+		plan.maskPlan = buildQScriptBindingPlanForRHS(plan.maskExpr, nil)
+	}
+	if plan.leftExpr != "" {
+		plan.leftPlan = buildQScriptBindingPlanForRHS(plan.leftExpr, nil)
+	}
+	if plan.rightExpr != "" {
+		plan.rightPlan = buildQScriptBindingPlanForRHS(plan.rightExpr, nil)
+	}
+	if plan.reductionInput != "" {
+		plan.reductionPlan = buildQScriptBindingPlanForRHS(plan.reductionInput, nil)
+	}
+	return plan
 }
 
 func buildQPipelineSumGatherPlan(src string) (qPipelinePlan, bool) {
@@ -229,7 +257,7 @@ func (s *EvalState) evalQPipelinePlan(plan qPipelinePlan) (any, bool, error) {
 }
 
 func (s *EvalState) evalQPipelineSumWhereMask(plan qPipelinePlan) (any, bool, error) {
-	value, err := s.eval(plan.valueExpr)
+	value, err := s.evalQPipelinePlannedExpr(plan.valueExpr, &plan.valuePlan)
 	if err != nil {
 		return nil, true, err
 	}
@@ -237,7 +265,7 @@ func (s *EvalState) evalQPipelineSumWhereMask(plan qPipelinePlan) (any, bool, er
 	if !ok {
 		return nil, false, nil
 	}
-	maskValue, err := s.eval(plan.maskExpr)
+	maskValue, err := s.evalQPipelinePlannedExpr(plan.maskExpr, &plan.maskPlan)
 	if err != nil {
 		return nil, true, err
 	}
@@ -252,7 +280,7 @@ func (s *EvalState) evalQPipelineSumWhereMask(plan qPipelinePlan) (any, bool, er
 }
 
 func (s *EvalState) evalQPipelineSumWhereIndex(plan qPipelinePlan) (any, bool, error) {
-	value, err := s.eval(plan.valueExpr)
+	value, err := s.evalQPipelinePlannedExpr(plan.valueExpr, &plan.valuePlan)
 	if err != nil {
 		return nil, true, err
 	}
@@ -260,7 +288,7 @@ func (s *EvalState) evalQPipelineSumWhereIndex(plan qPipelinePlan) (any, bool, e
 	if !ok {
 		return nil, false, nil
 	}
-	maskValue, err := s.eval(plan.maskExpr)
+	maskValue, err := s.evalQPipelinePlannedExpr(plan.maskExpr, &plan.maskPlan)
 	if err != nil {
 		return nil, true, err
 	}
@@ -273,7 +301,7 @@ func (s *EvalState) evalQPipelineSumWhereIndex(plan qPipelinePlan) (any, bool, e
 			return out, handled, err
 		}
 	}
-	indexValue, err := s.eval(plan.indexExpr)
+	indexValue, err := s.evalQPipelinePlannedExpr(plan.indexExpr, &plan.indexPlan)
 	if err != nil {
 		return nil, true, err
 	}
@@ -285,7 +313,7 @@ func (s *EvalState) evalQPipelineSumWhereIndex(plan qPipelinePlan) (any, bool, e
 }
 
 func (s *EvalState) evalQPipelineSumGatherIndexes(plan qPipelinePlan) (any, bool, error) {
-	value, err := s.eval(plan.valueExpr)
+	value, err := s.evalQPipelinePlannedExpr(plan.valueExpr, &plan.valuePlan)
 	if err != nil {
 		return nil, true, err
 	}
@@ -293,7 +321,7 @@ func (s *EvalState) evalQPipelineSumGatherIndexes(plan qPipelinePlan) (any, bool
 	if !ok {
 		return nil, false, nil
 	}
-	indexValue, err := s.eval(plan.indexExpr)
+	indexValue, err := s.evalQPipelinePlannedExpr(plan.indexExpr, &plan.indexPlan)
 	if err != nil {
 		return nil, true, err
 	}
@@ -411,11 +439,11 @@ func (s *EvalState) evalQPipelineWhereCompareIndexesArray(plan qPipelinePlan) (d
 }
 
 func (s *EvalState) evalQPipelineCompareOperands(plan qPipelinePlan) (any, any, error) {
-	left, err := s.eval(plan.leftExpr)
+	left, err := s.evalQPipelinePlannedExpr(plan.leftExpr, &plan.leftPlan)
 	if err != nil {
 		return nil, nil, err
 	}
-	right, err := s.eval(plan.rightExpr)
+	right, err := s.evalQPipelinePlannedExpr(plan.rightExpr, &plan.rightPlan)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -423,7 +451,7 @@ func (s *EvalState) evalQPipelineCompareOperands(plan qPipelinePlan) (any, any, 
 }
 
 func (s *EvalState) evalQPipelineSumDeltas(plan qPipelinePlan) (any, bool, error) {
-	value, err := s.eval(plan.reductionInput)
+	value, err := s.evalQPipelinePlannedExpr(plan.reductionInput, &plan.reductionPlan)
 	if err != nil {
 		return nil, true, err
 	}
@@ -444,4 +472,13 @@ func (s *EvalState) evalQPipelineSumDeltas(plan qPipelinePlan) (any, bool, error
 		recordRuntimeKernelProbe("ArrayDeltasSum", shape, handled, err)
 	}
 	return nil, false, nil
+}
+
+func (s *EvalState) evalQPipelinePlannedExpr(src string, plan *qScriptBindingPlan) (any, error) {
+	if plan != nil && plan.kind != qScriptBindingInvalid {
+		if value, handled, err := s.evalQScriptBindingPlan(plan); err != nil || handled {
+			return value, err
+		}
+	}
+	return s.eval(src)
 }
