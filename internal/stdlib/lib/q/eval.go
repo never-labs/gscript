@@ -113,8 +113,9 @@ type runtimeKernelExecutionKey struct {
 }
 
 type runtimeKernelExecutionCounter struct {
-	key   runtimeKernelExecutionKey
-	count atomic.Uint64
+	key           runtimeKernelExecutionKey
+	pipelineShape string
+	count         atomic.Uint64
 }
 
 type runtimeKernelProbeKey struct {
@@ -141,6 +142,7 @@ var (
 	runtimeKernelLastProbe    atomic.Pointer[runtimeKernelProbeCounters]
 	runtimeKernelCounterCache [runtimeKernelCounterCacheSize]atomic.Pointer[runtimeKernelExecutionCounter]
 	runtimeKernelProbeCache   [runtimeKernelCounterCacheSize]atomic.Pointer[runtimeKernelProbeCounters]
+	qRuntimeShapeCache        sync.Map
 )
 
 func recordRuntimeKernelExecution(kernel, shape, outcome, reasonCode string) {
@@ -236,7 +238,7 @@ func RuntimeKernelExecutionStats() []RuntimeKernelExecutionStat {
 			Source:        key.source,
 			Kernel:        key.kernel,
 			Shape:         key.shape,
-			PipelineShape: qRuntimeKernelPipelineShape(key.kernel, key.shape),
+			PipelineShape: counter.pipelineShape,
 			Route:         key.route,
 			Outcome:       key.outcome,
 			ReasonCode:    key.reasonCode,
@@ -374,7 +376,10 @@ func registerRuntimeKernelCounterLocked(key runtimeKernelExecutionKey) *runtimeK
 	if counter := runtimeKernelStats[key]; counter != nil {
 		return counter
 	}
-	counter := &runtimeKernelExecutionCounter{key: key}
+	counter := &runtimeKernelExecutionCounter{
+		key:           key,
+		pipelineShape: qRuntimeKernelPipelineShape(key.kernel, key.shape),
+	}
 	runtimeKernelStats[key] = counter
 	runtimeKernelStatCounters = append(runtimeKernelStatCounters, counter)
 	return counter
@@ -502,6 +507,47 @@ func qRuntimeKernelPipelineShape(kernel, shape string) string {
 	default:
 		return "unknown"
 	}
+}
+
+type qRuntimeShapeKey struct {
+	family string
+	op     string
+	left   data.Kind
+	right  data.Kind
+	args   int
+}
+
+func qRuntimeKernelDyadicFloatSumShape(op string, leftKind, rightKind data.Kind) string {
+	key := qRuntimeShapeKey{
+		family: "vector-reduce/sum-dyadic-float",
+		op:     op,
+		left:   leftKind,
+		right:  rightKind,
+	}
+	if value, ok := qRuntimeShapeCache.Load(key); ok {
+		return value.(string)
+	}
+	shape := "vector-reduce/sum-dyadic-float-" + op + "/" + string(leftKind) + "/" + string(rightKind)
+	value, _ := qRuntimeShapeCache.LoadOrStore(key, shape)
+	return value.(string)
+}
+
+func qRuntimeKernelSequenceTransformSumShape(transform string, valueKind data.Kind, argCount int) string {
+	key := qRuntimeShapeKey{
+		family: "vector-reduce/sum-sequence-transform",
+		op:     transform,
+		left:   valueKind,
+		args:   argCount,
+	}
+	if value, ok := qRuntimeShapeCache.Load(key); ok {
+		return value.(string)
+	}
+	shape := "vector-reduce/sum-" + transform + "/" + string(valueKind)
+	if argCount > 0 {
+		shape += "/args-" + strconv.Itoa(argCount)
+	}
+	value, _ := qRuntimeShapeCache.LoadOrStore(key, shape)
+	return value.(string)
 }
 
 func qFrameGatherShape(op string, frame data.Frame, indexes []int) string {
@@ -4647,7 +4693,7 @@ func (s *EvalState) tryEvalTypedDyadicFloatSum(src string) (any, bool, error) {
 			return nil, true, err
 		}
 		out, handled, err := data.TryTypedQNumericDyadicFloatSum(op, left, right)
-		shape := "vector-reduce/sum-dyadic-float-" + op + "/" + string(qRuntimeKernelOperandKind(left, nil)) + "/" + string(qRuntimeKernelOperandKind(right, nil))
+		shape := qRuntimeKernelDyadicFloatSumShape(op, qRuntimeKernelOperandKind(left, nil), qRuntimeKernelOperandKind(right, nil))
 		out, handled, err = qTypedRuntimeResult("ArrayNumericDyadicFloatSum", shape, out, handled, err)
 		if err != nil {
 			return nil, true, fmt.Errorf("sum %s: %w", op, err)
@@ -4667,10 +4713,7 @@ func (s *EvalState) tryEvalSequenceTransformSum(src string) (any, bool, error) {
 		return nil, true, err
 	}
 	out, handled, err := data.TryTypedSequenceTransformNumericSum(transform, args, value)
-	shape := "vector-reduce/sum-" + transform + "/" + string(qRuntimeKernelOperandKind(value, nil))
-	if len(args) > 0 {
-		shape += "/args-" + strconv.Itoa(len(args))
-	}
+	shape := qRuntimeKernelSequenceTransformSumShape(transform, qRuntimeKernelOperandKind(value, nil), len(args))
 	out, handled, err = qTypedRuntimeResultReason("SequenceTransformSum", shape, RuntimeFallbackUnsupportedType, out, handled, err)
 	if err != nil {
 		return nil, true, err
@@ -10262,7 +10305,18 @@ func qRuntimeKernelVectorDyadicShape(op byte, left, right any, la, ra data.Array
 			return "vector-dyadic/=/i64/i64"
 		}
 	}
-	return "vector-dyadic/" + string(op) + "/" + string(leftKind) + "/" + string(rightKind)
+	key := qRuntimeShapeKey{
+		family: "vector-dyadic",
+		op:     string(op),
+		left:   leftKind,
+		right:  rightKind,
+	}
+	if value, ok := qRuntimeShapeCache.Load(key); ok {
+		return value.(string)
+	}
+	shape := "vector-dyadic/" + string(op) + "/" + string(leftKind) + "/" + string(rightKind)
+	value, _ := qRuntimeShapeCache.LoadOrStore(key, shape)
+	return value.(string)
 }
 
 func qRuntimeKernelCompositeVectorDyadicShape(op string, left, right any, la, ra data.Array) string {
@@ -10284,7 +10338,18 @@ func qRuntimeKernelCompositeVectorDyadicShape(op string, left, right any, la, ra
 			return "vector-dyadic/<>/i64/i64"
 		}
 	}
-	return "vector-dyadic/" + op + "/" + string(leftKind) + "/" + string(rightKind)
+	key := qRuntimeShapeKey{
+		family: "vector-dyadic",
+		op:     op,
+		left:   leftKind,
+		right:  rightKind,
+	}
+	if value, ok := qRuntimeShapeCache.Load(key); ok {
+		return value.(string)
+	}
+	shape := "vector-dyadic/" + op + "/" + string(leftKind) + "/" + string(rightKind)
+	value, _ := qRuntimeShapeCache.LoadOrStore(key, shape)
+	return value.(string)
 }
 
 func qVectorDyadicTypedOperands(left, right any, la, ra data.Array) (any, any, bool, error) {

@@ -2,7 +2,6 @@ package q
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/never-labs/leia/internal/stdlib/lib/data"
@@ -1180,10 +1179,7 @@ func (s *EvalState) evalQPipelineSumSequenceTransform(plan qPipelinePlan) (any, 
 	if err != nil {
 		return nil, true, err
 	}
-	shape := "vector-reduce/sum-" + plan.compareOp + "/" + string(qRuntimeKernelOperandKind(value, nil))
-	if len(args) > 0 {
-		shape += "/args-" + strconv.Itoa(len(args))
-	}
+	shape := qRuntimeKernelSequenceTransformSumShape(plan.compareOp, qRuntimeKernelOperandKind(value, nil), len(args))
 	operands := []qPipelineOperandFingerprint{
 		qPipelineOperandFingerprintForValue(qPipelineOperandReduction, value),
 	}
@@ -2090,7 +2086,7 @@ func (s *EvalState) evalQPipelineSumDyadicFloatMath(plan qPipelinePlan) (any, bo
 	if err != nil {
 		return nil, true, err
 	}
-	shape := "vector-reduce/sum-dyadic-float-" + plan.compareOp + "/" + string(qRuntimeKernelOperandKind(left, nil)) + "/" + string(qRuntimeKernelOperandKind(right, nil))
+	shape := qRuntimeKernelDyadicFloatSumShape(plan.compareOp, qRuntimeKernelOperandKind(left, nil), qRuntimeKernelOperandKind(right, nil))
 	out, handled, err := data.TryTypedQNumericDyadicFloatSum(plan.compareOp, left, right)
 	return qTypedRuntimeResult("ArrayNumericDyadicFloatSum", shape, out, handled, err)
 }
