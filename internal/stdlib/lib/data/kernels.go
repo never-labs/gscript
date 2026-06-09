@@ -1724,6 +1724,9 @@ func ApplyNumericDyadicFloat(op string, left, right any) (any, bool, error) {
 	if !leftIsArray && !rightIsArray {
 		return applyNumericDyadicFloatValue(op, left, right)
 	}
+	if out, handled, err := TryTypedQNumericDyadicFloat(op, left, right); err != nil || handled {
+		return out, handled, err
+	}
 	n, err := numericDyadicLength(op, leftArray, rightArray)
 	if err != nil {
 		return nil, true, err
@@ -1772,6 +1775,113 @@ func ApplyNumericDyadicFloat(op string, left, right any) (any, bool, error) {
 	return newF64Trusted(out), true, nil
 }
 
+func TryTypedQNumericDyadicFloat(op string, left, right any) (Array, bool, error) {
+	leftArray, leftIsArray := left.(Array)
+	rightArray, rightIsArray := right.(Array)
+	if !leftIsArray && !rightIsArray {
+		return nil, false, nil
+	}
+	if !typedNumericOperand(left) || !typedNumericOperand(right) {
+		return nil, false, nil
+	}
+	length, err := numericDyadicLength(op, leftArray, rightArray)
+	if err != nil {
+		return nil, true, err
+	}
+	out := make([]float64, length)
+	var nulls []any
+	for row := 0; row < length; row++ {
+		leftValue, leftOK, err := numericDyadicFloatOperandAt(left, leftArray, leftIsArray, row, length)
+		if err != nil {
+			return nil, true, err
+		}
+		rightValue, rightOK, err := numericDyadicFloatOperandAt(right, rightArray, rightIsArray, row, length)
+		if err != nil {
+			return nil, true, err
+		}
+		if !leftOK || !rightOK {
+			if nulls == nil {
+				nulls = make([]any, length)
+				for i := 0; i < row; i++ {
+					nulls[i] = out[i]
+				}
+			}
+			nulls[row] = NullValue
+			continue
+		}
+		value, err := applyNumericDyadicFloatNumbers(op, leftValue, rightValue)
+		if err != nil {
+			return nil, true, err
+		}
+		out[row] = value
+		if nulls != nil {
+			nulls[row] = value
+		}
+	}
+	if nulls != nil {
+		return newNullableArray(KindF64, nulls), true, nil
+	}
+	return newF64Trusted(out), true, nil
+}
+
+func TryTypedQNumericDyadicFloatSum(op string, left, right any) (any, bool, error) {
+	leftArray, leftIsArray := left.(Array)
+	rightArray, rightIsArray := right.(Array)
+	if !leftIsArray && !rightIsArray {
+		return nil, false, nil
+	}
+	if !typedNumericOperand(left) || !typedNumericOperand(right) {
+		return nil, false, nil
+	}
+	length, err := numericDyadicLength(op, leftArray, rightArray)
+	if err != nil {
+		return nil, true, err
+	}
+	var sum float64
+	for row := 0; row < length; row++ {
+		leftValue, leftOK, err := numericDyadicFloatOperandAt(left, leftArray, leftIsArray, row, length)
+		if err != nil {
+			return nil, true, err
+		}
+		if !leftOK {
+			continue
+		}
+		rightValue, rightOK, err := numericDyadicFloatOperandAt(right, rightArray, rightIsArray, row, length)
+		if err != nil {
+			return nil, true, err
+		}
+		if !rightOK {
+			continue
+		}
+		value, err := applyNumericDyadicFloatNumbers(op, leftValue, rightValue)
+		if err != nil {
+			return nil, true, err
+		}
+		sum += value
+	}
+	return sum, true, nil
+}
+
+func numericDyadicFloatOperandAt(value any, array Array, isArray bool, row, length int) (float64, bool, error) {
+	if isArray {
+		if array == nil {
+			return 0, false, nil
+		}
+		if array.Len() == 1 && length != 1 {
+			row = 0
+		}
+		return typedKernels.NumericAt(array, row)
+	}
+	if IsNull(value) {
+		return 0, false, nil
+	}
+	n, ok := numeric(value)
+	if !ok {
+		return 0, false, fmt.Errorf("typed numeric dyadic float operand row %d is %T, want numeric", row, value)
+	}
+	return n, true, nil
+}
+
 func numericDyadicLength(name string, left, right Array) (int, error) {
 	switch {
 	case left != nil && right != nil:
@@ -1810,13 +1920,21 @@ func applyNumericDyadicFloatValue(op string, left, right any) (any, bool, error)
 	if !lok || !rok {
 		return nil, false, nil
 	}
+	out, err := applyNumericDyadicFloatNumbers(op, ln, rn)
+	if err != nil {
+		return nil, true, err
+	}
+	return out, true, nil
+}
+
+func applyNumericDyadicFloatNumbers(op string, left, right float64) (float64, error) {
 	switch op {
 	case NumericDyadicXExp:
-		return math.Pow(ln, rn), true, nil
+		return math.Pow(left, right), nil
 	case NumericDyadicXLog:
-		return math.Log(rn) / math.Log(ln), true, nil
+		return math.Log(right) / math.Log(left), nil
 	default:
-		return nil, true, fmt.Errorf("unsupported numeric dyadic float kernel %q", op)
+		return 0, fmt.Errorf("unsupported numeric dyadic float kernel %q", op)
 	}
 }
 
@@ -3690,6 +3808,10 @@ func (k typedKernelRegistry) NumericSumValue(array Array) (any, bool, error) {
 		return i64PeriodicIndexSum(a), true, nil
 	case i64ProductArray:
 		return i64ProductSum(a), true, nil
+	case matrixRowArray:
+		return numericSumMatrixRowValue(a)
+	case transposedMatrixRowArray:
+		return numericSumRowArrayValue(a)
 	case columnArray[uint8]:
 		return numericSumUnsignedValue(a.data), true, nil
 	case columnArray[uint16]:
@@ -7177,6 +7299,15 @@ func isIntegerArray(array Array) bool {
 		columnArray[uint8], columnArray[uint16], columnArray[uint32], columnArray[uint64],
 		i64RangeArray, i64RunningSumArray, i64SegmentArray, i64PeriodicIndexArray, i64ProductArray, i64BucketArray, i64XrankArray:
 		return true
+	case matrixRowArray:
+		return isIntegerArray(a.matrix.data)
+	case transposedMatrixRowArray:
+		shape := a.matrix.source.Shape()
+		if len(shape) != 2 || shape[0] == 0 {
+			return false
+		}
+		row, ok := a.matrix.source.RowArray(0)
+		return ok && isIntegerArray(row)
 	case nullableArray:
 		for i := 0; i < array.Len(); i++ {
 			v, ok := array.At(i)
@@ -7212,6 +7343,15 @@ func isDenseIntegerArray(array Array) bool {
 		columnArray[uint8], columnArray[uint16], columnArray[uint32], columnArray[uint64],
 		i64RangeArray, i64RunningSumArray, i64SegmentArray, i64PeriodicIndexArray, i64ProductArray, i64BucketArray, i64XrankArray:
 		return true
+	case matrixRowArray:
+		return isDenseIntegerArray(a.matrix.data)
+	case transposedMatrixRowArray:
+		shape := a.matrix.source.Shape()
+		if len(shape) != 2 || shape[0] == 0 {
+			return false
+		}
+		row, ok := a.matrix.source.RowArray(0)
+		return ok && isDenseIntegerArray(row)
 	default:
 		return false
 	}
@@ -8885,6 +9025,75 @@ func numericSumIntegerValue[T signedScalar](values []T) int64 {
 		sum += int64(v)
 	}
 	return sum
+}
+
+func numericSumMatrixRowValue(row matrixRowArray) (any, bool, error) {
+	if len(row.matrix.shape) != 2 || row.row < 0 || row.row >= row.matrix.shape[0] {
+		return nil, true, fmt.Errorf("matrix row index %d out of range", row.row)
+	}
+	cols := row.matrix.shape[1]
+	start := row.row * cols
+	end := start + cols
+	switch source := row.matrix.data.(type) {
+	case attributedArray:
+		return numericSumMatrixRowValue(matrixRowArray{matrix: matrixArray{shape: row.matrix.shape, data: source.array}, row: row.row})
+	case columnArray[int8]:
+		return numericSumIntegerValue(source.data[start:end]), true, nil
+	case columnArray[int16]:
+		return numericSumIntegerValue(source.data[start:end]), true, nil
+	case columnArray[int32]:
+		return numericSumIntegerValue(source.data[start:end]), true, nil
+	case columnArray[int64]:
+		return numericSumIntegerValue(source.data[start:end]), true, nil
+	case i64RangeArray:
+		return i64RangeSum(i64RangeArray{start: source.start + int64(start)*source.step, step: source.step, len: cols}), true, nil
+	case columnArray[uint8]:
+		return numericSumUnsignedValue(source.data[start:end]), true, nil
+	case columnArray[uint16]:
+		return numericSumUnsignedValue(source.data[start:end]), true, nil
+	case columnArray[uint32]:
+		return numericSumUnsignedValue(source.data[start:end]), true, nil
+	case columnArray[uint64]:
+		return numericSumUnsignedValue(source.data[start:end]), true, nil
+	case columnArray[float32]:
+		return numericSumFloatValue(source.data[start:end]), true, nil
+	case columnArray[float64]:
+		return numericSumFloatValue(source.data[start:end]), true, nil
+	default:
+		return numericSumRowArrayValue(row)
+	}
+}
+
+func numericSumRowArrayValue(array Array) (any, bool, error) {
+	if array == nil {
+		return nil, false, nil
+	}
+	if isIntegerArray(array) {
+		var sum int64
+		for row := 0; row < array.Len(); row++ {
+			value, ok, err := integerArrayAt(array, row)
+			if err != nil {
+				return nil, true, err
+			}
+			if !ok {
+				return nil, false, nil
+			}
+			sum += value
+		}
+		return sum, true, nil
+	}
+	var sum float64
+	for row := 0; row < array.Len(); row++ {
+		value, ok, err := typedKernels.NumericAt(array, row)
+		if err != nil {
+			return nil, true, err
+		}
+		if !ok {
+			continue
+		}
+		sum += value
+	}
+	return sum, true, nil
 }
 
 func numericSumIntegerArray(array Array) int64 {

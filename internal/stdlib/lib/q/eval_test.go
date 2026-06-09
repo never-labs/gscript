@@ -274,6 +274,60 @@ func TestQPipelinePlanRecognizesSequenceStringCounts(t *testing.T) {
 	}
 }
 
+func TestQPipelinePlanRecognizesRazeSumAndCounts(t *testing.T) {
+	tests := []struct {
+		expr          string
+		shape         string
+		pipelineShape string
+		transform     string
+		want          any
+		kernel        string
+	}{
+		{expr: "+/raze 2 3#til 6", shape: "vector-reduce/sum-raze", pipelineShape: "vector_reduce", transform: "raze", want: int64(15), kernel: "ArrayNestedRazeSum"},
+		{expr: "+/raze[(til 6;reverse til 6;3#til 6)]", shape: "vector-reduce/sum-raze", pipelineShape: "vector_reduce", transform: "raze", want: int64(33), kernel: "ArrayNestedRazeSum"},
+		{expr: "count raze 2 3#til 6", shape: "sequence-count/raze", pipelineShape: "sequence_count", transform: "raze", want: int64(6), kernel: "SequenceRazeCount"},
+		{expr: "count 2 3#til 6", shape: "sequence-count/value", pipelineShape: "sequence_count", transform: "value", want: int64(2), kernel: "SequenceValueCount"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.expr, func(t *testing.T) {
+			ClearRuntimeKernelExecutionStats()
+			t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+			descriptor, ok := DescribeEvalPipeline(tt.expr)
+			if !ok {
+				t.Fatalf("DescribeEvalPipeline(%q) did not recognize raze/count pipeline", tt.expr)
+			}
+			if descriptor.Shape != tt.shape ||
+				descriptor.PipelineShape != tt.pipelineShape ||
+				descriptor.ShapeTransform != tt.transform {
+				t.Fatalf("descriptor = %#v, want shape=%q pipeline=%q transform=%q", descriptor, tt.shape, tt.pipelineShape, tt.transform)
+			}
+			out, handled, err := ExecuteEvalPipelineDescriptor(descriptor)
+			if err != nil || !handled || !reflect.DeepEqual(out, tt.want) {
+				t.Fatalf("ExecuteEvalPipelineDescriptor = %#v,%v,%v; want %#v,true,nil", out, handled, err, tt.want)
+			}
+			assertEvalValue(t, tt.expr, tt.want)
+
+			seenPipeline := false
+			seenKernel := false
+			for _, stat := range RuntimeKernelExecutionStats() {
+				if stat.Outcome == "fallback" || stat.Outcome == "error" {
+					t.Fatalf("unexpected raze pipeline fallback/error: %#v all=%#v", stat, RuntimeKernelExecutionStats())
+				}
+				if stat.Kernel == "QPipelinePlan" && stat.Shape == tt.shape && stat.Outcome == "hit" {
+					seenPipeline = true
+				}
+				if stat.Kernel == tt.kernel && stat.Outcome == "hit" {
+					seenKernel = true
+				}
+			}
+			if !seenPipeline || !seenKernel {
+				t.Fatalf("missing raze pipeline/kernel stats: pipeline=%v kernel=%v all=%#v", seenPipeline, seenKernel, RuntimeKernelExecutionStats())
+			}
+		})
+	}
+}
+
 func TestQPipelinePlanRecognizesRuntimePrimitiveStatsAndWindows(t *testing.T) {
 	tests := []struct {
 		expr          string
@@ -2876,6 +2930,8 @@ func TestEvalCountSumSumsTakeWhereAndPlusAdverbs(t *testing.T) {
 		data.NewI64([]int64{2, 5}),
 		data.NewI64([]int64{3, 6}),
 	})
+	assertEvalArray(t, "(2 3#1 2 3 4 5 6) . 1", data.KindI64, []any{int64(4), int64(5), int64(6)})
+	assertEvalValue(t, "(2 3#1 2 3 4 5 6) . 1 2", int64(6))
 	assertEvalArray(t, "(2 3#1 2 3 4 5 6) mmu 3 2#10 20 30 40 50 60", data.KindAny, []any{
 		data.NewF64([]float64{220, 280}),
 		data.NewF64([]float64{490, 640}),
@@ -3248,6 +3304,98 @@ func TestEvalDyadicMinMaxReduceUsesTypedPipeline(t *testing.T) {
 	}
 	if !seenKernel["vector-reduce/sum-dyadic-min/i64/i64"] || !seenKernel["vector-reduce/sum-dyadic-max/i64/i64"] {
 		t.Fatalf("missing dyadic min/max reduce typed kernels: %#v", RuntimeKernelExecutionStats())
+	}
+}
+
+func TestEvalDyadicFloatReduceUsesTypedPipeline(t *testing.T) {
+	ClearRuntimeKernelExecutionStats()
+	t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+	assertEvalValue(t, "+/2 xexp 0 1 2 3", 15.0)
+	assertEvalValue(t, "+/2 xlog 2 4 8 0N", 6.0)
+
+	seenKernel := map[string]bool{}
+	for _, stat := range RuntimeKernelExecutionStats() {
+		if stat.Outcome == "fallback" || stat.Outcome == "error" {
+			t.Fatalf("unexpected dyadic float reduce fallback/error: %#v stats=%#v", stat, RuntimeKernelExecutionStats())
+		}
+		if stat.Kernel == "ArrayNumericDyadicFloatSum" && stat.Outcome == "hit" && stat.ReasonCode == "typed_kernel" {
+			seenKernel[stat.Shape] = true
+		}
+	}
+	if !seenKernel["vector-reduce/sum-dyadic-float-xexp/i64/i64"] || !seenKernel["vector-reduce/sum-dyadic-float-xlog/i64/i64"] {
+		t.Fatalf("missing dyadic float reduce typed kernels: %#v", RuntimeKernelExecutionStats())
+	}
+}
+
+func TestEvalFusesDyadicFloatMathSumDescriptor(t *testing.T) {
+	tests := []struct {
+		expr  string
+		shape string
+		want  float64
+	}{
+		{expr: "+/2 xexp 0 1 2 3", shape: "vector-reduce/sum-dyadic-float-xexp", want: 15},
+		{expr: "+/2 xlog 2 4 8", shape: "vector-reduce/sum-dyadic-float-xlog", want: 6},
+		{expr: "+/2 3 4 xexp 2", shape: "vector-reduce/sum-dyadic-float-xexp", want: 29},
+	}
+	for _, tt := range tests {
+		t.Run(tt.expr, func(t *testing.T) {
+			ClearRuntimeKernelExecutionStats()
+			t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+			descriptor, ok := DescribeEvalPipeline(tt.expr)
+			if !ok {
+				t.Fatalf("DescribeEvalPipeline(%q) did not recognize dyadic float sum", tt.expr)
+			}
+			if descriptor.Shape != tt.shape || descriptor.PipelineShape != "vector_reduce" || descriptor.ShapeTransform != strings.TrimPrefix(tt.shape, "vector-reduce/sum-") {
+				t.Fatalf("descriptor = %#v, want shape=%q vector_reduce", descriptor, tt.shape)
+			}
+			out, handled, err := ExecuteEvalPipelineDescriptor(descriptor)
+			if err != nil || !handled {
+				t.Fatalf("ExecuteEvalPipelineDescriptor = %#v,%v,%v", out, handled, err)
+			}
+			got, ok := out.(float64)
+			if !ok || math.Abs(got-tt.want) > 1e-12 {
+				t.Fatalf("ExecuteEvalPipelineDescriptor = %#v (%T), want %.17g", out, out, tt.want)
+			}
+
+			seen := false
+			for _, stat := range RuntimeKernelExecutionStats() {
+				if stat.Kernel == "ArrayNumericDyadicFloatSum" && stat.Outcome == "hit" {
+					seen = true
+				}
+				if stat.Outcome == "fallback" || stat.Outcome == "error" {
+					t.Fatalf("unexpected runtime fallback/error: %#v all=%#v", stat, RuntimeKernelExecutionStats())
+				}
+			}
+			if !seen {
+				t.Fatalf("missing ArrayNumericDyadicFloatSum hit: %#v", RuntimeKernelExecutionStats())
+			}
+		})
+	}
+}
+
+func TestEvalMatrixDotIndexRecordsTypedPrimitive(t *testing.T) {
+	ClearRuntimeKernelExecutionStats()
+	t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+	assertEvalValue(t, "m:2 4#til 8;row:m . 1;(+/row)+(m . 1 2)", int64(28))
+
+	seenRow := false
+	seenCell := false
+	for _, stat := range RuntimeKernelExecutionStats() {
+		if stat.Kernel != "MatrixIndex" || stat.Outcome != "hit" || stat.ReasonCode != "typed_kernel" {
+			continue
+		}
+		if strings.HasSuffix(stat.Shape, "/1-indexes") {
+			seenRow = true
+		}
+		if strings.HasSuffix(stat.Shape, "/2-indexes") {
+			seenCell = true
+		}
+	}
+	if !seenRow || !seenCell {
+		t.Fatalf("missing matrix index typed primitive stats: row=%v cell=%v stats=%#v", seenRow, seenCell, RuntimeKernelExecutionStats())
 	}
 }
 

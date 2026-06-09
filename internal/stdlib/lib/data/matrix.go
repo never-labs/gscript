@@ -118,6 +118,37 @@ func MatrixFromRows(value Array) (Matrix, bool, error) {
 	return matrix, true, nil
 }
 
+// TryRowArrayIndex returns a row view for matrix and list-of-lists values.
+// It is narrower than general indexing so callers can probe it before scalar
+// Array.At and preserve typed row views without materializing nested Values.
+func TryRowArrayIndex(value Array, row int) (Array, bool, error) {
+	if value == nil {
+		return nil, false, nil
+	}
+	if row < 0 {
+		return nil, true, fmt.Errorf("matrix row index must be non-negative")
+	}
+	if matrix, ok := value.(Matrix); ok {
+		rowArray, ok := matrix.RowArray(row)
+		if !ok {
+			return nil, true, fmt.Errorf("matrix row index %d out of range", row)
+		}
+		return rowArray, true, nil
+	}
+	if row >= value.Len() {
+		return nil, false, nil
+	}
+	item, ok := value.At(row)
+	if !ok {
+		return nil, true, fmt.Errorf("matrix row index %d out of range", row)
+	}
+	rowArray, ok := item.(Array)
+	if !ok {
+		return nil, false, nil
+	}
+	return rowArray, true, nil
+}
+
 // MatrixMultiplyNumeric multiplies two numeric two-dimensional matrices. The
 // f64 result keeps the semantic layer simple while leaving a single replacement
 // point for future typed BLAS-style kernels.
@@ -310,15 +341,15 @@ func (r matrixRowArray) Values() []any {
 }
 
 func (r matrixRowArray) Gather(indexes []int) Array {
-	out := make([]any, len(indexes))
+	out := make([]int, len(indexes))
+	base := r.row * r.matrix.shape[1]
 	for i, col := range indexes {
-		value, ok := r.At(col)
-		if !ok {
+		if col < 0 || col >= r.Len() {
 			panic(fmt.Sprintf("data matrix row gather col %d out of range", col))
 		}
-		out[i] = value
+		out[i] = base + col
 	}
-	return InferArray(out)
+	return r.matrix.data.Gather(out)
 }
 
 func (m transposedMatrixArray) Kind() Kind { return KindAny }
@@ -400,6 +431,17 @@ func (r transposedMatrixRowArray) Values() []any {
 }
 
 func (r transposedMatrixRowArray) Gather(indexes []int) Array {
+	sourceShape := r.matrix.source.Shape()
+	if source, ok := r.matrix.source.(matrixArray); ok && len(sourceShape) == 2 {
+		out := make([]int, len(indexes))
+		for i, col := range indexes {
+			if col < 0 || col >= r.Len() {
+				panic(fmt.Sprintf("data transpose row gather col %d out of range", col))
+			}
+			out[i] = col*sourceShape[1] + r.row
+		}
+		return source.data.Gather(out)
+	}
 	out := make([]any, len(indexes))
 	for i, col := range indexes {
 		value, ok := r.At(col)

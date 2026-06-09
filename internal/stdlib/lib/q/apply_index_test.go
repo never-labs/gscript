@@ -1,6 +1,7 @@
 package q
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/never-labs/leia/internal/stdlib/lib/data"
@@ -35,4 +36,29 @@ func TestQApplyIndexCoreSemantics(t *testing.T) {
 		assertEvalDict(t, ".[(`a`b!10 20);`b;:;25]", []data.Symbol{"a", "b"}, []any{int64(10), int64(25)})
 		assertEvalArray(t, "@[(10 20 30);1;+;5]", data.KindI64, []any{int64(10), int64(25), int64(30)})
 	})
+}
+
+func TestQMatrixRowIndexRecordsTypedRuntimeKernel(t *testing.T) {
+	ClearRuntimeKernelExecutionStats()
+	t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+	assertEvalValue(t, "m:2 4#til 8;row:m@1;(+/row)+count row", int64(26))
+	assertEvalValue(t, "m:2 4#til 8;row:m . 1;(+/row)+count row", int64(26))
+
+	seenRowIndex := false
+	seenRowSum := false
+	for _, stat := range RuntimeKernelExecutionStats() {
+		if stat.Outcome == "fallback" || stat.Outcome == "error" {
+			t.Fatalf("unexpected matrix row runtime fallback/error: %#v stats=%#v", stat, RuntimeKernelExecutionStats())
+		}
+		if stat.Kernel == "ArrayMatrixRowIndex" && stat.Outcome == "hit" && stat.ReasonCode == "typed_kernel" && strings.HasPrefix(stat.Shape, "matrix-row/") {
+			seenRowIndex = true
+		}
+		if stat.Kernel == "ArraySum" && stat.Outcome == "hit" && stat.ReasonCode == "typed_kernel" && strings.HasPrefix(stat.Shape, "vector-reduce/sum/i64") {
+			seenRowSum = true
+		}
+	}
+	if !seenRowIndex || !seenRowSum {
+		t.Fatalf("missing matrix row typed runtime stats: rowIndex=%v rowSum=%v stats=%#v", seenRowIndex, seenRowSum, RuntimeKernelExecutionStats())
+	}
 }

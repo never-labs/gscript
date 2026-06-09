@@ -96,6 +96,46 @@ func qApplyArgs(arg any) []any {
 }
 
 func dotIndexValue(target any, path any) (any, error) {
+	if matrix, ok := target.(data.Matrix); ok {
+		indexes, scalar, err := indexInts(path)
+		if err != nil {
+			recordRuntimeKernelProbe("MatrixIndex", "matrix-dot/path-error", false, err)
+			return nil, err
+		}
+		shape := fmt.Sprintf("matrix-dot/%dx%d/%d-indexes", qMatrixRows(matrix), qMatrixCols(matrix), len(indexes))
+		switch {
+		case scalar:
+			row, ok := matrix.RowArray(indexes[0])
+			if !ok {
+				err := fmt.Errorf("index %d out of range", indexes[0])
+				recordRuntimeKernelProbe("MatrixIndex", shape, true, err)
+				return nil, err
+			}
+			out, handled, err := qTypedRuntimeResult("MatrixIndex", shape, row, true, nil)
+			if err != nil {
+				return nil, err
+			}
+			if handled {
+				return out, nil
+			}
+			return row, nil
+		case len(indexes) == 2:
+			cell, ok := matrix.Cell(indexes[0], indexes[1])
+			if !ok {
+				err := fmt.Errorf("index %d %d out of range", indexes[0], indexes[1])
+				recordRuntimeKernelProbe("MatrixIndex", shape, true, err)
+				return nil, err
+			}
+			out, handled, err := qTypedRuntimeResult("MatrixIndex", shape, cell, true, nil)
+			if err != nil {
+				return nil, err
+			}
+			if handled {
+				return out, nil
+			}
+			return cell, nil
+		}
+	}
 	if array, ok := path.(data.Array); ok {
 		current := target
 		for _, item := range array.Values() {
@@ -108,6 +148,22 @@ func dotIndexValue(target any, path any) (any, error) {
 		return current, nil
 	}
 	return indexValue(target, path)
+}
+
+func qMatrixRows(matrix data.Matrix) int {
+	shape := matrix.Shape()
+	if len(shape) == 0 {
+		return 0
+	}
+	return shape[0]
+}
+
+func qMatrixCols(matrix data.Matrix) int {
+	shape := matrix.Shape()
+	if len(shape) < 2 {
+		return 0
+	}
+	return shape[1]
 }
 
 func splitTopLevelDotApply(src string) (string, string, bool) {

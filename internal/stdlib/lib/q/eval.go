@@ -451,6 +451,8 @@ func qRuntimeKernelPipelineShape(kernel, shape string) string {
 		return "vector_scan"
 	case strings.HasPrefix(shape, "gather/"):
 		return "gather"
+	case strings.HasPrefix(shape, "matrix-row/"):
+		return "matrix_row_index"
 	case strings.HasPrefix(shape, "and/"), strings.HasPrefix(shape, "or/"):
 		return "mask_combine"
 	case strings.HasPrefix(shape, "sort-index/"):
@@ -2127,6 +2129,9 @@ func (s *EvalState) eval(src string) (any, error) {
 			return out, err
 		}
 		if out, handled, err := s.tryEvalSumDeltas(right); err != nil || handled {
+			return out, err
+		}
+		if out, handled, err := s.tryEvalTypedDyadicFloatSum(right); err != nil || handled {
 			return out, err
 		}
 		if out, handled, err := s.tryEvalTypedUnarySum(right); err != nil || handled {
@@ -4397,6 +4402,9 @@ func (s *EvalState) evalAdverb(expr adverbExpr) (any, error) {
 		if out, handled, err := s.tryEvalSumDeltas(expr.right); err != nil || handled {
 			return out, err
 		}
+		if out, handled, err := s.tryEvalTypedDyadicFloatSum(expr.right); err != nil || handled {
+			return out, err
+		}
 		if out, handled, err := s.tryEvalTypedUnarySum(expr.right); err != nil || handled {
 			return out, err
 		}
@@ -4472,6 +4480,31 @@ func (s *EvalState) evalAdverb(expr adverbExpr) (any, error) {
 	default:
 		return nil, fmt.Errorf("adverb %q is not supported", expr.adverb)
 	}
+}
+
+func (s *EvalState) tryEvalTypedDyadicFloatSum(src string) (any, bool, error) {
+	for _, op := range []string{data.NumericDyadicXExp, data.NumericDyadicXLog} {
+		leftExpr, rightExpr, ok := splitTopLevelWord(src, op)
+		if !ok {
+			continue
+		}
+		left, err := s.eval(leftExpr)
+		if err != nil {
+			return nil, true, err
+		}
+		right, err := s.eval(rightExpr)
+		if err != nil {
+			return nil, true, err
+		}
+		out, handled, err := data.TryTypedQNumericDyadicFloatSum(op, left, right)
+		shape := "vector-reduce/sum-dyadic-float-" + op + "/" + string(qRuntimeKernelOperandKind(left, nil)) + "/" + string(qRuntimeKernelOperandKind(right, nil))
+		out, handled, err = qTypedRuntimeResult("ArrayNumericDyadicFloatSum", shape, out, handled, err)
+		if err != nil {
+			return nil, true, fmt.Errorf("sum %s: %w", op, err)
+		}
+		return out, handled, nil
+	}
+	return nil, false, nil
 }
 
 func (s *EvalState) tryEvalTypedUnarySum(src string) (any, bool, error) {
@@ -8278,6 +8311,14 @@ func indexValue(v any, index any) (any, error) {
 	switch x := v.(type) {
 	case data.Array:
 		if scalar {
+			if row, handled, err := data.TryRowArrayIndex(x, indexes[0]); err != nil || handled {
+				shape := "matrix-row/" + string(x.Kind()) + "/" + qRuntimeCardinalityShape(rowArrayLen(row))
+				recordRuntimeKernelProbe("ArrayMatrixRowIndex", shape, handled, err)
+				if err != nil {
+					return nil, err
+				}
+				return row, nil
+			}
 			item, ok := x.At(indexes[0])
 			if !ok {
 				return nil, fmt.Errorf("index %d out of range", indexes[0])
@@ -8304,6 +8345,13 @@ func indexValue(v any, index any) (any, error) {
 	default:
 		return nil, fmt.Errorf("index expects a vector, string, or dictionary")
 	}
+}
+
+func rowArrayLen(row data.Array) int {
+	if row == nil {
+		return 0
+	}
+	return row.Len()
 }
 
 func frameColumnLookup(frame data.Frame, key any) (any, error) {
@@ -12800,6 +12848,15 @@ func fills(v any) (any, error) {
 }
 
 func raze(v any) (any, error) {
+	if flattened, handled, err := data.FlattenNestedArray(v); err != nil || handled {
+		if err != nil {
+			return nil, err
+		}
+		if flattened.Len() == 0 {
+			return data.InferArray(nil), nil
+		}
+		return flattened, nil
+	}
 	items, err := vectorValues(v)
 	if err != nil {
 		return v, nil

@@ -27,6 +27,73 @@ func SequenceCount(value any) int64 {
 	}
 }
 
+// RazeCount returns count raze value without building the flattened sequence.
+// Array rows contribute their row length; scalar rows contribute one item.
+func RazeCount(value any) (int64, bool, error) {
+	switch x := value.(type) {
+	case Matrix:
+		shape := x.Shape()
+		if len(shape) != 2 {
+			return 0, true, fmt.Errorf("raze count expects a two-dimensional matrix")
+		}
+		return int64(shape[0] * shape[1]), true, nil
+	case Array:
+		var count int64
+		for row := 0; row < x.Len(); row++ {
+			item, ok := x.At(row)
+			if !ok {
+				return 0, true, fmt.Errorf("raze count row %d out of range", row)
+			}
+			if array, ok := item.(Array); ok {
+				count += int64(array.Len())
+			} else {
+				count++
+			}
+		}
+		return count, true, nil
+	default:
+		return 0, false, nil
+	}
+}
+
+// FlattenNestedArray returns a lazy raze view for matrices and nested arrays.
+// The view preserves list semantics while avoiding flat []any allocation on hot
+// reduce/count paths.
+func FlattenNestedArray(value any) (Array, bool, error) {
+	switch x := value.(type) {
+	case Matrix:
+		if m, ok := x.(matrixArray); ok {
+			return m.data, true, nil
+		}
+		count, _, err := RazeCount(x)
+		if err != nil {
+			return nil, true, err
+		}
+		return flattenArray{source: x, len: int(count), kind: matrixElementKind(x)}, true, nil
+	case Array:
+		count, ok, err := RazeCount(x)
+		if err != nil || !ok {
+			return nil, ok, err
+		}
+		return flattenArray{source: x, len: int(count), kind: nestedElementKind(x)}, true, nil
+	default:
+		return nil, false, nil
+	}
+}
+
+// TryTypedNestedNumericSum reduces raze value directly. It recognizes matrix
+// views and lists of numeric arrays without materializing the flattened array.
+func TryTypedNestedNumericSum(value any) (any, bool, error) {
+	sum, handled, err := nestedNumericSum(value)
+	if err != nil || !handled {
+		return nil, handled, err
+	}
+	if sum.hasFloat {
+		return sum.float, true, nil
+	}
+	return sum.integer, true, nil
+}
+
 // Cross returns the Cartesian product of two scalar-or-array values. The
 // product rows are two-item arrays so callers can preserve tuple-like shape.
 func Cross(left, right any) Array {
@@ -192,4 +259,267 @@ func sequenceItemsCount(value any) int64 {
 		return int64(array.Len())
 	}
 	return 1
+}
+
+type flattenArray struct {
+	source Array
+	len    int
+	kind   Kind
+}
+
+type nestedSum struct {
+	integer  int64
+	float    float64
+	hasFloat bool
+}
+
+func (a flattenArray) Kind() Kind { return a.kind }
+
+func (a flattenArray) Len() int { return a.len }
+
+func (a flattenArray) At(index int) (any, bool) {
+	if index < 0 || index >= a.len {
+		return nil, false
+	}
+	if matrix, ok := a.source.(Matrix); ok {
+		shape := matrix.Shape()
+		if len(shape) != 2 || shape[1] == 0 {
+			return nil, false
+		}
+		return matrix.Cell(index/shape[1], index%shape[1])
+	}
+	offset := 0
+	for row := 0; row < a.source.Len(); row++ {
+		item, ok := a.source.At(row)
+		if !ok {
+			return nil, false
+		}
+		if array, ok := item.(Array); ok {
+			next := offset + array.Len()
+			if index < next {
+				return array.At(index - offset)
+			}
+			offset = next
+			continue
+		}
+		if index == offset {
+			return item, true
+		}
+		offset++
+	}
+	return nil, false
+}
+
+func (a flattenArray) Values() []any {
+	out := make([]any, a.len)
+	for row := range out {
+		value, ok := a.At(row)
+		if !ok {
+			panic(fmt.Sprintf("data flatten row %d out of range", row))
+		}
+		out[row] = value
+	}
+	return out
+}
+
+func (a flattenArray) Gather(indexes []int) Array {
+	out := make([]any, len(indexes))
+	for i, index := range indexes {
+		value, ok := a.At(index)
+		if !ok {
+			panic(fmt.Sprintf("data flatten gather row %d out of range", index))
+		}
+		out[i] = value
+	}
+	return InferArray(out)
+}
+
+func nestedElementKind(array Array) Kind {
+	kind := KindNull
+	for row := 0; row < array.Len(); row++ {
+		item, ok := array.At(row)
+		if !ok {
+			return KindAny
+		}
+		itemKind := KindAny
+		if child, ok := item.(Array); ok {
+			itemKind = child.Kind()
+		} else {
+			itemKind = scalarSequenceKind(item)
+		}
+		if itemKind == KindNull {
+			continue
+		}
+		if kind == KindNull {
+			kind = itemKind
+			continue
+		}
+		if kind != itemKind {
+			return KindAny
+		}
+	}
+	if kind == KindNull {
+		return KindAny
+	}
+	return kind
+}
+
+func scalarSequenceKind(value any) Kind {
+	switch value.(type) {
+	case bool:
+		return KindBool
+	case int8:
+		return KindI8
+	case int16:
+		return KindI16
+	case int32:
+		return KindI32
+	case int, int64:
+		return KindI64
+	case uint8:
+		return KindU8
+	case uint16:
+		return KindU16
+	case uint32:
+		return KindU32
+	case uint, uint64:
+		return KindU64
+	case float32:
+		return KindF32
+	case float64:
+		return KindF64
+	case string:
+		return KindString
+	case Symbol:
+		return KindSymbol
+	case Month:
+		return KindMonth
+	case Date:
+		return KindDate
+	case DateTime:
+		return KindDateTime
+	case Timestamp:
+		return KindTimestamp
+	case Timespan:
+		return KindTimespan
+	case Minute:
+		return KindMinute
+	case Second:
+		return KindSecond
+	case Time:
+		return KindTime
+	default:
+		if IsNull(value) {
+			return KindNull
+		}
+		return KindAny
+	}
+}
+
+func matrixElementKind(matrix Matrix) Kind {
+	if row, ok := matrix.RowArray(0); ok {
+		return row.Kind()
+	}
+	return KindAny
+}
+
+func nestedNumericSum(value any) (nestedSum, bool, error) {
+	switch x := value.(type) {
+	case Matrix:
+		if m, ok := x.(matrixArray); ok {
+			return nestedNumericArraySum(m.data)
+		}
+		return nestedNumericMatrixSum(x)
+	case Array:
+		if x.Kind() != KindAny && x.Kind() != KindNull {
+			return nestedNumericArraySum(x)
+		}
+		var total nestedSum
+		for row := 0; row < x.Len(); row++ {
+			item, ok := x.At(row)
+			if !ok {
+				return nestedSum{}, true, fmt.Errorf("nested sum row %d out of range", row)
+			}
+			part, handled, err := nestedNumericSum(item)
+			if err != nil || !handled {
+				return nestedSum{}, handled, err
+			}
+			total.add(part)
+		}
+		return total, true, nil
+	default:
+		if IsNull(value) {
+			return nestedSum{}, true, nil
+		}
+		if n, ok := integerValue(value); ok {
+			return nestedSum{integer: n, float: float64(n)}, true, nil
+		}
+		if n, ok := numeric(value); ok {
+			return nestedSum{float: n, hasFloat: true}, true, nil
+		}
+		return nestedSum{}, false, nil
+	}
+}
+
+func nestedNumericArraySum(array Array) (nestedSum, bool, error) {
+	out, handled, err := TryTypedNumericSum(array)
+	if err != nil || !handled {
+		return nestedSum{}, handled, err
+	}
+	switch value := out.(type) {
+	case int64:
+		return nestedSum{integer: value, float: float64(value)}, true, nil
+	case int32:
+		n := int64(value)
+		return nestedSum{integer: n, float: float64(n)}, true, nil
+	case int16:
+		n := int64(value)
+		return nestedSum{integer: n, float: float64(n)}, true, nil
+	case int8:
+		n := int64(value)
+		return nestedSum{integer: n, float: float64(n)}, true, nil
+	case float32:
+		return nestedSum{float: float64(value), hasFloat: true}, true, nil
+	case float64:
+		return nestedSum{float: value, hasFloat: true}, true, nil
+	default:
+		if IsNull(value) {
+			return nestedSum{}, true, nil
+		}
+		if n, ok := integerValue(value); ok {
+			return nestedSum{integer: n, float: float64(n)}, true, nil
+		}
+		if n, ok := numeric(value); ok {
+			return nestedSum{float: n, hasFloat: true}, true, nil
+		}
+		return nestedSum{}, false, nil
+	}
+}
+
+func nestedNumericMatrixSum(matrix Matrix) (nestedSum, bool, error) {
+	shape := matrix.Shape()
+	if len(shape) != 2 {
+		return nestedSum{}, true, fmt.Errorf("nested sum expects a two-dimensional matrix")
+	}
+	var total nestedSum
+	for row := 0; row < shape[0]; row++ {
+		for col := 0; col < shape[1]; col++ {
+			value, ok := matrix.Cell(row, col)
+			if !ok {
+				return nestedSum{}, true, fmt.Errorf("matrix cell %d,%d out of range", row, col)
+			}
+			part, handled, err := nestedNumericSum(value)
+			if err != nil || !handled {
+				return nestedSum{}, handled, err
+			}
+			total.add(part)
+		}
+	}
+	return total, true, nil
+}
+
+func (s *nestedSum) add(other nestedSum) {
+	s.integer += other.integer
+	s.float += other.float
+	s.hasFloat = s.hasFloat || other.hasFloat
 }

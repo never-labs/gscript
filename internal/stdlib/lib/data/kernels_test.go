@@ -2361,6 +2361,46 @@ func TestTypedNumericUnaryBinaryAndAggregates(t *testing.T) {
 	if got, want := xlog.(Array).Values(), []any{3.0, NullValue}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("ApplyNumericDyadicFloat xlog values = %v, want %v", got, want)
 	}
+
+	typedXexp, ok, err := TryTypedQNumericDyadicFloat(NumericDyadicXExp, NewI64([]int64{2, 3}), NewI64([]int64{3, 2}))
+	if err != nil || !ok {
+		t.Fatalf("TryTypedQNumericDyadicFloat xexp array-array = %#v,%v,%v; want handled nil error", typedXexp, ok, err)
+	}
+	if got, want := typedXexp.Values(), []any{8.0, 9.0}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("TryTypedQNumericDyadicFloat xexp values = %v, want %v", got, want)
+	}
+
+	typedNullable, ok, err := TryTypedQNumericDyadicFloat(NumericDyadicXLog, int64(2), NewColumn("x", []any{8, NullValue, 16}).Data)
+	if err != nil || !ok {
+		t.Fatalf("TryTypedQNumericDyadicFloat xlog nullable = %#v,%v,%v; want handled nil error", typedNullable, ok, err)
+	}
+	if got, want := typedNullable.Values(), []any{3.0, NullValue, 4.0}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("TryTypedQNumericDyadicFloat xlog nullable values = %v, want %v", got, want)
+	}
+
+	xexpSum, ok, err := TryTypedQNumericDyadicFloatSum(NumericDyadicXExp, int64(2), NewI64([]int64{0, 1, 2, 3}))
+	if err != nil || !ok {
+		t.Fatalf("TryTypedQNumericDyadicFloatSum xexp = %#v,%v,%v; want handled nil error", xexpSum, ok, err)
+	}
+	if got, want := xexpSum.(float64), 15.0; got != want {
+		t.Fatalf("TryTypedQNumericDyadicFloatSum xexp = %v, want %v", got, want)
+	}
+
+	xlogSum, ok, err := TryTypedQNumericDyadicFloatSum(NumericDyadicXLog, int64(2), NewColumn("x", []any{2, 4, 8, NullValue}).Data)
+	if err != nil || !ok {
+		t.Fatalf("TryTypedQNumericDyadicFloatSum xlog = %#v,%v,%v; want handled nil error", xlogSum, ok, err)
+	}
+	if got, want := xlogSum.(float64), 6.0; got != want {
+		t.Fatalf("TryTypedQNumericDyadicFloatSum xlog = %v, want %v", got, want)
+	}
+
+	broadcastSum, ok, err := TryTypedQNumericDyadicFloatSum(NumericDyadicXExp, NewI64([]int64{2}), NewI64([]int64{1, 2, 3}))
+	if err != nil || !ok {
+		t.Fatalf("TryTypedQNumericDyadicFloatSum xexp singleton-array = %#v,%v,%v; want handled nil error", broadcastSum, ok, err)
+	}
+	if got, want := broadcastSum.(float64), 14.0; got != want {
+		t.Fatalf("TryTypedQNumericDyadicFloatSum xexp singleton-array = %v, want %v", got, want)
+	}
 	gotExp := exponent.Values()
 	if len(gotExp) != 2 || gotExp[0].(float64) != 1 || math.Abs(gotExp[1].(float64)-math.E) > 1e-12 {
 		t.Fatalf("exp NumericUnary values = %v, want [1 e]", gotExp)

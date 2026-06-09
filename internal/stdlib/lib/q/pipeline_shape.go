@@ -73,6 +73,25 @@ func qPipelineShapeSpecForPlan(kind qPipelineKind, variant string) (qPipelineSha
 			Transform:     "dyadic-" + variant,
 			PipelineShape: "vector_reduce",
 		}, true
+	case qPipelineSumDyadicFloatMath:
+		if variant == "" {
+			return qPipelineShapeSpec{}, false
+		}
+		return qPipelineShapeSpec{
+			ID:            "vector-reduce/sum-dyadic-float-" + variant,
+			Family:        qPipelineShapeFamilyVector,
+			Reducer:       "sum",
+			Transform:     "dyadic-float-" + variant,
+			PipelineShape: "vector_reduce",
+		}, true
+	case qPipelineSumRaze:
+		return qPipelineShapeSpec{
+			ID:            "vector-reduce/sum-raze",
+			Family:        qPipelineShapeFamilyVector,
+			Reducer:       "sum",
+			Transform:     "raze",
+			PipelineShape: "vector_reduce",
+		}, true
 	case qPipelineCountVectorExpr:
 		return qPipelineShapeSpec{
 			ID:            "vector-count/expr",

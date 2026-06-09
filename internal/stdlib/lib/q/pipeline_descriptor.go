@@ -1,6 +1,10 @@
 package q
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/never-labs/leia/internal/stdlib/lib/data"
+)
 
 const EvalPipelineTypedRuntimeBackend = "q_pipeline_typed_runtime"
 
@@ -373,6 +377,14 @@ func qPipelinePlanFromEvalDescriptor(descriptor EvalPipelineDescriptor) (qPipeli
 	case "vector-reduce/sum-dyadic-max":
 		plan.kind = qPipelineSumDyadicMinMax
 		plan.compareOp = "max"
+	case "vector-reduce/sum-dyadic-float-xexp":
+		plan.kind = qPipelineSumDyadicFloatMath
+		plan.compareOp = data.NumericDyadicXExp
+	case "vector-reduce/sum-dyadic-float-xlog":
+		plan.kind = qPipelineSumDyadicFloatMath
+		plan.compareOp = data.NumericDyadicXLog
+	case "vector-reduce/sum-raze":
+		plan.kind = qPipelineSumRaze
 	case "vector-count/expr":
 		plan.kind = qPipelineCountVectorExpr
 	case "vector-reduce/sum-msum", "vector-reduce/sum-mavg", "vector-reduce/sum-mcount", "vector-reduce/sum-mmin", "vector-reduce/sum-mmax":
@@ -382,7 +394,8 @@ func qPipelinePlanFromEvalDescriptor(descriptor EvalPipelineDescriptor) (qPipeli
 	case "vector-last/sums", "vector-last/prds", "vector-last/mins", "vector-last/maxs", "vector-last/avgs":
 		plan.kind = qPipelineLastRunningScan
 	case "sequence-count/trim", "sequence-count/ltrim", "sequence-count/rtrim",
-		"sequence-count/cross", "sequence-count/cut", "sequence-count/sublist":
+		"sequence-count/cross", "sequence-count/cut", "sequence-count/sublist",
+		"sequence-count/raze", "sequence-count/value":
 		plan.kind = qPipelineCountSequencePrimitive
 		plan.compareOp = strings.TrimPrefix(shape, "sequence-count/")
 	default:

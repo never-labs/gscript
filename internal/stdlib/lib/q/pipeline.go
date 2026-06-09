@@ -24,6 +24,7 @@ const (
 	qPipelineSumBin
 	qPipelineSumVectorExpr
 	qPipelineSumDyadicMinMax
+	qPipelineSumDyadicFloatMath
 	qPipelineCountVectorExpr
 	qPipelineCountDistinct
 	qPipelineCountWhereIn
@@ -31,6 +32,7 @@ const (
 	qPipelineCountRunningScan
 	qPipelineLastRunningScan
 	qPipelineCountSequencePrimitive
+	qPipelineSumRaze
 	qPipelineUnaryPrimitive
 	qPipelineDyadicPrimitive
 )
@@ -230,6 +232,11 @@ func buildQPipelinePlan(src string) qPipelinePlan {
 		if right == "" {
 			return qPipelinePlan{}
 		}
+		if input, ok := qPipelineRazeInput(right); ok {
+			plan := qPipelineShapePlan(qPipelineSumRaze, "")
+			plan.reductionInput = input
+			return qPipelinePlanWithBindingPlans(withSource(plan))
+		}
 		if plan, ok := buildQPipelineSumGatherPlan(right); ok {
 			return qPipelinePlanWithBindingPlans(withSource(plan))
 		}
@@ -250,6 +257,9 @@ func buildQPipelinePlan(src string) qPipelinePlan {
 		if plan, ok := buildQPipelineSumDyadicMinMaxPlan(right); ok {
 			return qPipelinePlanWithBindingPlans(withSource(plan))
 		}
+		if plan, ok := buildQPipelineSumDyadicFloatMathPlan(right); ok {
+			return qPipelinePlanWithBindingPlans(withSource(plan))
+		}
 		if qPipelineVectorTransformExprCandidate(right) {
 			plan := qPipelineShapePlan(qPipelineSumVectorExpr, "")
 			plan.reductionInput = right
@@ -268,6 +278,14 @@ func buildQPipelinePlan(src string) qPipelinePlan {
 			return qPipelinePlanWithBindingPlans(withSource(plan))
 		}
 		if plan, ok := buildQPipelineSumDyadicMinMaxPlan(inputExpr); ok {
+			return qPipelinePlanWithBindingPlans(withSource(plan))
+		}
+		if plan, ok := buildQPipelineSumDyadicFloatMathPlan(inputExpr); ok {
+			return qPipelinePlanWithBindingPlans(withSource(plan))
+		}
+		if input, ok := qPipelineRazeInput(inputExpr); ok {
+			plan := qPipelineShapePlan(qPipelineSumRaze, "")
+			plan.reductionInput = input
 			return qPipelinePlanWithBindingPlans(withSource(plan))
 		}
 		if qPipelineVectorTransformExprCandidate(inputExpr) {
@@ -296,6 +314,12 @@ func buildQPipelinePlan(src string) qPipelinePlan {
 		}
 		if plan, ok := buildQPipelineCountSequencePlan(inputExpr); ok {
 			return qPipelinePlanWithBindingPlans(withSource(plan))
+		}
+		if input, ok := qPipelineRazeInput(inputExpr); ok {
+			return qPipelinePlanWithBindingPlans(withSource(qPipelinePlan{kind: qPipelineCountSequencePrimitive, shape: "sequence-count/raze", compareOp: "raze", reductionInput: input}))
+		}
+		if qPipelineMatrixReshapeExprCandidate(inputExpr) {
+			return qPipelinePlanWithBindingPlans(withSource(qPipelinePlan{kind: qPipelineCountSequencePrimitive, shape: "sequence-count/value", compareOp: "value", reductionInput: inputExpr}))
 		}
 		if strings.HasPrefix(inputExpr, "where ") && wordBoundary(inputExpr, 0, len("where")) {
 			return qPipelinePlan{}
@@ -394,6 +418,42 @@ func buildQPipelineCountSequencePlan(src string) (qPipelinePlan, bool) {
 		}, true
 	}
 	return qPipelinePlan{}, false
+}
+
+func qPipelineRazeInput(src string) (string, bool) {
+	src = stripEnclosingParens(strings.TrimSpace(src))
+	if strings.HasPrefix(src, "raze ") && wordBoundary(src, 0, len("raze")) {
+		input := strings.TrimSpace(src[len("raze "):])
+		return input, input != ""
+	}
+	args, ok := qFunctionCallArgs(src)
+	if !ok || strings.TrimSpace(src[:strings.Index(src, "[")]) != "raze" || len(args) != 1 {
+		if !strings.HasPrefix(src, "raze[") || !strings.HasSuffix(src, "]") || !enclosed(src[len("raze"):], '[', ']') {
+			return "", false
+		}
+		input := strings.TrimSpace(src[len("raze[") : len(src)-1])
+		return input, input != ""
+	}
+	input := strings.TrimSpace(args[0])
+	return input, input != ""
+}
+
+func qPipelineMatrixReshapeExprCandidate(src string) bool {
+	parts := splitTopLevel(strings.TrimSpace(src), '#')
+	if len(parts) != 2 {
+		return false
+	}
+	left := strings.TrimSpace(parts[0])
+	if left == "" {
+		return false
+	}
+	if strings.Contains(left, " ") {
+		return true
+	}
+	if strings.HasPrefix(left, "(") && strings.HasSuffix(left, ")") {
+		return true
+	}
+	return false
 }
 
 func qPipelineRuntimePrimitiveCandidate(src string) bool {
@@ -618,6 +678,27 @@ func buildQPipelineSumDyadicMinMaxPlan(src string) (qPipelinePlan, bool) {
 			return qPipelinePlan{}, false
 		}
 		plan := qPipelineShapePlan(qPipelineSumDyadicMinMax, word)
+		plan.compareOp = word
+		plan.leftExpr = left
+		plan.rightExpr = right
+		return plan, true
+	}
+	return qPipelinePlan{}, false
+}
+
+func buildQPipelineSumDyadicFloatMathPlan(src string) (qPipelinePlan, bool) {
+	src = stripEnclosingParens(strings.TrimSpace(src))
+	for _, word := range []string{data.NumericDyadicXExp, data.NumericDyadicXLog} {
+		left, right, ok := splitTopLevelWord(src, word)
+		if !ok {
+			continue
+		}
+		left = strings.TrimSpace(left)
+		right = strings.TrimSpace(right)
+		if left == "" || right == "" {
+			return qPipelinePlan{}, false
+		}
+		plan := qPipelineShapePlan(qPipelineSumDyadicFloatMath, word)
 		plan.compareOp = word
 		plan.leftExpr = left
 		plan.rightExpr = right
@@ -932,6 +1013,8 @@ func (s *EvalState) evalQPipelinePlan(plan qPipelinePlan) (any, bool, error) {
 		out, handled, err = s.evalQPipelineSumVectorExpr(plan)
 	case qPipelineSumDyadicMinMax:
 		out, handled, err = s.evalQPipelineSumDyadicMinMax(plan)
+	case qPipelineSumDyadicFloatMath:
+		out, handled, err = s.evalQPipelineSumDyadicFloatMath(plan)
 	case qPipelineCountVectorExpr:
 		out, handled, err = s.evalQPipelineCountVectorExpr(plan)
 	case qPipelineCountDistinct:
@@ -946,6 +1029,8 @@ func (s *EvalState) evalQPipelinePlan(plan qPipelinePlan) (any, bool, error) {
 		out, handled, err = s.evalQPipelineLastRunningScan(plan)
 	case qPipelineCountSequencePrimitive:
 		out, handled, err = s.evalQPipelineCountSequencePrimitive(plan)
+	case qPipelineSumRaze:
+		out, handled, err = s.evalQPipelineSumRaze(plan)
 	case qPipelineUnaryPrimitive, qPipelineDyadicPrimitive:
 		out, handled, err = s.evalQPipelineRuntimePrimitive(plan)
 	default:
@@ -961,6 +1046,22 @@ func (s *EvalState) evalQPipelinePlan(plan qPipelinePlan) (any, bool, error) {
 		recordRuntimeKernelExecution("QPipelinePlan", shape, "fallback", "unsupported_runtime_shape")
 	}
 	return out, handled, err
+}
+
+func (s *EvalState) evalQPipelineSumRaze(plan qPipelinePlan) (any, bool, error) {
+	value, err := s.evalQPipelinePlannedExpr(plan.reductionInput, &plan.reductionPlan)
+	if err != nil {
+		return nil, true, err
+	}
+	shape := "vector-reduce/sum-raze/" + string(qRuntimeKernelOperandKind(value, nil))
+	return evalQTypedRuntimeKernel(qTypedRuntimeKernel[any]{
+		kernel:         "ArrayNestedRazeSum",
+		shape:          shape,
+		fallbackReason: RuntimeFallbackUnsupportedType,
+		call: func() (any, bool, error) {
+			return data.TryTypedNestedNumericSum(value)
+		},
+	})
 }
 
 func (s *EvalState) evalQPipelineSumWhereMask(plan qPipelinePlan) (any, bool, error) {
@@ -1787,6 +1888,20 @@ func (s *EvalState) evalQPipelineSumDyadicMinMax(plan qPipelinePlan) (any, bool,
 	return qTypedRuntimeResult("ArrayDyadicMinMaxSum", shape, out, handled, err)
 }
 
+func (s *EvalState) evalQPipelineSumDyadicFloatMath(plan qPipelinePlan) (any, bool, error) {
+	left, err := s.evalQPipelinePlannedExpr(plan.leftExpr, &plan.leftPlan)
+	if err != nil {
+		return nil, true, err
+	}
+	right, err := s.evalQPipelinePlannedExpr(plan.rightExpr, &plan.rightPlan)
+	if err != nil {
+		return nil, true, err
+	}
+	shape := "vector-reduce/sum-dyadic-float-" + plan.compareOp + "/" + string(qRuntimeKernelOperandKind(left, nil)) + "/" + string(qRuntimeKernelOperandKind(right, nil))
+	out, handled, err := data.TryTypedQNumericDyadicFloatSum(plan.compareOp, left, right)
+	return qTypedRuntimeResult("ArrayNumericDyadicFloatSum", shape, out, handled, err)
+}
+
 func (s *EvalState) evalQPipelineCountRunningScan(plan qPipelinePlan) (any, bool, error) {
 	value, err := s.evalQPipelinePlannedExpr(plan.reductionInput, &plan.reductionPlan)
 	if err != nil {
@@ -1923,6 +2038,26 @@ func evalQPipelineCountVectorExprBound(bound qPipelineBoundPlan, array data.Arra
 
 func (s *EvalState) evalQPipelineCountSequencePrimitive(plan qPipelinePlan) (any, bool, error) {
 	switch plan.compareOp {
+	case "value":
+		value, err := s.evalQPipelinePlannedExpr(plan.reductionInput, &plan.reductionPlan)
+		if err != nil {
+			return nil, true, err
+		}
+		shape := "value-count/" + string(qRuntimeKernelOperandKind(value, nil))
+		recordRuntimeKernelProbe("SequenceValueCount", shape, true, nil)
+		return data.SequenceCount(value), true, nil
+	case "raze":
+		value, err := s.evalQPipelinePlannedExpr(plan.reductionInput, &plan.reductionPlan)
+		if err != nil {
+			return nil, true, err
+		}
+		out, handled, err := data.RazeCount(value)
+		shape := "raze-count/" + string(qRuntimeKernelOperandKind(value, nil))
+		recordRuntimeKernelProbe("SequenceRazeCount", shape, handled && err == nil, err)
+		if err != nil || handled {
+			return out, handled, err
+		}
+		return nil, false, nil
 	case "trim", "ltrim", "rtrim":
 		out, handled, err := s.tryEvalCountStringTransform(plan.compareOp + " " + plan.reductionInput)
 		return out, handled, err

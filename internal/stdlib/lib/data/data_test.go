@@ -7144,6 +7144,13 @@ func TestMatrixReshapeTransposeAndMultiply(t *testing.T) {
 	if !ok || !reflect.DeepEqual(row.Values(), []any{int64(1), int64(2), int64(3)}) {
 		t.Fatalf("matrix row 0 = %#v ok %v", row, ok)
 	}
+	gatheredRow := row.Gather([]int{2, 0})
+	if got, want := gatheredRow.Kind(), KindI64; got != want {
+		t.Fatalf("matrix row gather kind = %s, want %s", got, want)
+	}
+	if got, want := gatheredRow.Values(), []any{int64(3), int64(1)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("matrix row gather values = %#v, want %#v", got, want)
+	}
 
 	transposed, err := TransposeMatrix(matrix)
 	if err != nil {
@@ -7155,6 +7162,17 @@ func TestMatrixReshapeTransposeAndMultiply(t *testing.T) {
 	}
 	if got, ok := tm.Cell(2, 1); !ok || got != int64(6) {
 		t.Fatalf("transpose cell 2,1 = %#v ok %v, want 6", got, ok)
+	}
+	transposedRow, ok := tm.RowArray(2)
+	if !ok {
+		t.Fatal("transpose row 2 missing")
+	}
+	gatheredTransposedRow := transposedRow.Gather([]int{1, 0})
+	if got, want := gatheredTransposedRow.Kind(), KindI64; got != want {
+		t.Fatalf("transpose row gather kind = %s, want %s", got, want)
+	}
+	if got, want := gatheredTransposedRow.Values(), []any{int64(6), int64(3)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("transpose row gather values = %#v, want %#v", got, want)
 	}
 
 	fromRows, ok, err := MatrixFromRows(NewAny([]any{
