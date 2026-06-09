@@ -38,6 +38,7 @@ const (
 	qPipelineUnaryPrimitive
 	qPipelineDyadicPrimitive
 	qPipelineApplyScalarIndex
+	qPipelineApplyGatherIndex
 	qPipelineCastEnvelopeSum
 )
 
@@ -246,6 +247,9 @@ func qPipelinePlanCandidate(src string) bool {
 	if qPipelineApplyScalarIndexCandidate(src) {
 		return true
 	}
+	if qPipelineApplyGatherIndexCandidate(src) {
+		return true
+	}
 	if qPipelineApplyPathIndexCandidate(src) {
 		return true
 	}
@@ -268,6 +272,9 @@ func buildQPipelinePlan(src string) qPipelinePlan {
 		return qPipelinePlanWithBindingPlans(withSource(plan))
 	}
 	if plan, ok := buildQPipelineApplyScalarIndexPlan(src); ok {
+		return qPipelinePlanWithBindingPlans(withSource(plan))
+	}
+	if plan, ok := buildQPipelineApplyGatherIndexPlan(src); ok {
 		return qPipelinePlanWithBindingPlans(withSource(plan))
 	}
 	if plan, ok := buildQPipelineApplyPathIndexPlan(src); ok {
@@ -417,6 +424,11 @@ func qPipelineApplyPathIndexCandidate(src string) bool {
 	return ok
 }
 
+func qPipelineApplyGatherIndexCandidate(src string) bool {
+	_, ok := buildQPipelineApplyGatherIndexPlan(src)
+	return ok
+}
+
 func buildQPipelineApplyScalarIndexPlan(src string) (qPipelinePlan, bool) {
 	apply, ok := buildScalarApplyIndexPlan(src)
 	if !ok {
@@ -435,6 +447,24 @@ func buildQPipelineApplyScalarIndexPlan(src string) (qPipelinePlan, bool) {
 		compareOp: op,
 		valueExpr: apply.target,
 		indexExpr: fmt.Sprintf("%d", apply.index),
+	}, true
+}
+
+func buildQPipelineApplyGatherIndexPlan(src string) (qPipelinePlan, bool) {
+	apply, ok := buildScalarApplyIndexPlan(src)
+	if !ok || apply.mode != qApplyIndexAt || apply.scalar || len(apply.indexes) == 0 {
+		return qPipelinePlan{}, false
+	}
+	indexExpr := make([]string, 0, len(apply.indexes))
+	for _, index := range apply.indexes {
+		indexExpr = append(indexExpr, fmt.Sprintf("%d", index))
+	}
+	return qPipelinePlan{
+		kind:      qPipelineApplyGatherIndex,
+		shape:     "apply-index/gather-at",
+		compareOp: "at",
+		valueExpr: apply.target,
+		indexExpr: strings.Join(indexExpr, " "),
 	}, true
 }
 
@@ -1320,6 +1350,8 @@ func (s *EvalState) evalQPipelinePlan(plan *qPipelinePlan) (any, bool, error) {
 		out, handled, err = s.evalQPipelineRuntimePrimitive(*plan)
 	case qPipelineApplyScalarIndex:
 		out, handled, err = s.evalQPipelineApplyScalarIndex(plan)
+	case qPipelineApplyGatherIndex:
+		out, handled, err = s.evalQPipelineApplyGatherIndex(plan)
 	case qPipelineCastEnvelopeSum:
 		out, handled, err = s.evalQPipelineCastEnvelopeSum(plan)
 	default:
@@ -1377,6 +1409,36 @@ func (s *EvalState) evalQPipelineCastEnvelopeSum(plan *qPipelinePlan) (any, bool
 		total += n
 	}
 	return total, true, nil
+}
+
+func (s *EvalState) evalQPipelineApplyGatherIndex(plan *qPipelinePlan) (any, bool, error) {
+	target, err := s.evalQPipelinePlannedExpr(plan.valueExpr, &plan.valuePlan)
+	if err != nil {
+		return nil, true, err
+	}
+	indexValue, err := s.evalQPipelinePlannedExpr(plan.indexExpr, &plan.indexPlan)
+	if err != nil {
+		return nil, true, err
+	}
+	indexes, scalar, err := indexInts(indexValue)
+	if err != nil {
+		return nil, true, err
+	}
+	if scalar || len(indexes) == 0 {
+		return nil, false, nil
+	}
+	if array, ok := target.(data.Array); ok {
+		shape := "gather-at/" + string(array.Kind()) + "/" + qRuntimeCardinalityShape(len(indexes))
+		recordRuntimeKernelExecution("ArrayGatherIndex", shape, "attempt", "attempt")
+		out := array.Gather(indexes)
+		recordRuntimeKernelExecution("ArrayGatherIndex", shape, "hit", "typed_gather_index")
+		return out, true, nil
+	}
+	out, err := s.applyOrIndexValue(qApplyIndexAt, target, indexValue)
+	if err != nil {
+		return nil, true, err
+	}
+	return out, true, nil
 }
 
 func (s *EvalState) evalQPipelineApplyScalarIndex(plan *qPipelinePlan) (any, bool, error) {

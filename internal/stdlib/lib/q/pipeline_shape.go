@@ -175,6 +175,14 @@ func qPipelineShapeSpecForPlan(kind qPipelineKind, variant string) (qPipelineSha
 			return qPipelineShapeSpec{}, false
 		}
 		return qPipelineRuntimePrimitiveShapeSpec("runtime-dyadic", variant), true
+	case qPipelineApplyGatherIndex:
+		return qPipelineShapeSpec{
+			ID:            "apply-index/gather-at",
+			Family:        qPipelineShapeFamilyApply,
+			Selector:      "gather",
+			Transform:     "at",
+			PipelineShape: "apply_index",
+		}, true
 	case qPipelineApplyScalarIndex:
 		if variant == "" {
 			return qPipelineShapeSpec{}, false

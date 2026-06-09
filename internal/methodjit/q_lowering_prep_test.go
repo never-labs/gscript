@@ -6115,6 +6115,13 @@ func TestQEvalPipelineRuntimeBackendCoversRecentExecutableShapes(t *testing.T) {
 			wantArray: true,
 		},
 		{
+			name:      "gather_at_index",
+			src:       "x:10 20 30 40;x@2 0",
+			shape:     "script-pipeline/apply-index/gather-at/assignments",
+			wantI64:   []int64{30, 10},
+			wantArray: true,
+		},
+		{
 			name:    "nd_reshape_dot_path",
 			src:     "t:2 3 4#til 24;t . 1 2 3",
 			shape:   "script-pipeline/apply-index/path-dot/assignments",

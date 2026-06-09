@@ -491,6 +491,9 @@ func qPipelinePlanFromEvalDescriptor(descriptor EvalPipelineDescriptor) (qPipeli
 	case "apply-index/scalar-at":
 		plan.kind = qPipelineApplyScalarIndex
 		plan.compareOp = "at"
+	case "apply-index/gather-at":
+		plan.kind = qPipelineApplyGatherIndex
+		plan.compareOp = "at"
 	case "apply-index/scalar-dot":
 		plan.kind = qPipelineApplyScalarIndex
 		plan.compareOp = "dot"
@@ -608,6 +611,15 @@ func qScriptPipelineDescriptorFromEvalDescriptor(descriptor EvalPipelineDescript
 		out.terminalPlan = qPipelinePlanWithBindingPlans(qPipelinePlan{
 			kind:      qPipelineApplyScalarIndex,
 			shape:     "apply-index/scalar-at",
+			compareOp: "at",
+			valueExpr: out.valueExpr,
+			indexExpr: out.indexExpr,
+		})
+	case strings.Contains(shape, "apply-index/gather-at"):
+		out.kind = qScriptPipelineApplyGatherAt
+		out.terminalPlan = qPipelinePlanWithBindingPlans(qPipelinePlan{
+			kind:      qPipelineApplyGatherIndex,
+			shape:     "apply-index/gather-at",
 			compareOp: "at",
 			valueExpr: out.valueExpr,
 			indexExpr: out.indexExpr,

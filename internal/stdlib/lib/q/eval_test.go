@@ -336,6 +336,12 @@ func TestQPipelinePlanRecognizesScalarApplyIndex(t *testing.T) {
 		plan.indexExpr != "1 2" {
 		t.Fatalf("buildQPipelineApplyPathIndexPlan = %#v,%v; want path-dot m 1 2", plan, ok)
 	}
+	if plan, ok := buildQPipelineApplyGatherIndexPlan("x@2 0"); !ok ||
+		plan.shape != "apply-index/gather-at" ||
+		plan.valueExpr != "x" ||
+		plan.indexExpr != "2 0" {
+		t.Fatalf("buildQPipelineApplyGatherIndexPlan = %#v,%v; want gather-at x 2 0", plan, ok)
+	}
 	tests := []struct {
 		expr          string
 		shape         string
@@ -345,6 +351,7 @@ func TestQPipelinePlanRecognizesScalarApplyIndex(t *testing.T) {
 		pipelineShape string
 	}{
 		{expr: "x:10 20 30;x@1", shape: "script-pipeline/apply-index/scalar-at/assignments", valueExpr: "x", indexExpr: "1", want: int64(20), pipelineShape: "script_pipeline"},
+		{expr: "x:10 20 30 40;x@2 0", shape: "script-pipeline/apply-index/gather-at/assignments", valueExpr: "x", indexExpr: "2 0", want: data.NewI64([]int64{30, 10}), pipelineShape: "script_pipeline"},
 		{expr: "x:10 20 30;x . 2", shape: "script-pipeline/apply-index/scalar-dot/assignments", valueExpr: "x", indexExpr: "2", want: int64(30), pipelineShape: "script_pipeline"},
 		{expr: "m:2 3#til 6;m . 1", shape: "script-pipeline/apply-index/scalar-dot/assignments", valueExpr: "m", indexExpr: "1", want: data.NewI64([]int64{3, 4, 5}), pipelineShape: "script_pipeline"},
 		{expr: "m:2 3#til 6;m . 1 2", shape: "script-pipeline/apply-index/path-dot/assignments", valueExpr: "m", indexExpr: "1 2", want: int64(5), pipelineShape: "script_pipeline"},
@@ -382,7 +389,7 @@ func TestQPipelinePlanRecognizesScalarApplyIndex(t *testing.T) {
 				if stat.Kernel == "QScriptPipelinePlan" && stat.Shape == tt.shape && stat.Outcome == "hit" {
 					seenPipeline = true
 				}
-				if (stat.Kernel == "ArrayScalarIndex" || stat.Kernel == "ArrayMatrixRowIndex" || stat.Kernel == "MatrixIndex") && stat.Outcome == "hit" {
+				if (stat.Kernel == "ArrayScalarIndex" || stat.Kernel == "ArrayGatherIndex" || stat.Kernel == "ArrayMatrixRowIndex" || stat.Kernel == "MatrixIndex") && stat.Outcome == "hit" {
 					seenApplyKernel = true
 				}
 			}

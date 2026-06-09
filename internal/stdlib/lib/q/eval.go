@@ -570,7 +570,7 @@ func qRuntimeKernelQPipelinePlanShape(shape string) string {
 		return "sequence_count"
 	case "bin-reduce/sum":
 		return "search_index_reduce"
-	case "apply-index/scalar-at", "apply-index/scalar-dot", "apply-index/path-dot":
+	case "apply-index/scalar-at", "apply-index/gather-at", "apply-index/scalar-dot", "apply-index/path-dot":
 		return "apply_index"
 	case "cast-envelope/sum":
 		return "cast"

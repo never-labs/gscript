@@ -27,6 +27,7 @@ const (
 	qScriptPipelineCallableOverScanSum  qScriptPipelineKind = "callable-over/scan-sum-count"
 	qScriptPipelineStringJoinCounts     qScriptPipelineKind = "string-join/counts"
 	qScriptPipelineApplyScalarAt        qScriptPipelineKind = "apply-index/scalar-at"
+	qScriptPipelineApplyGatherAt        qScriptPipelineKind = "apply-index/gather-at"
 	qScriptPipelineApplyScalarDot       qScriptPipelineKind = "apply-index/scalar-dot"
 	qScriptPipelineApplyPathDot         qScriptPipelineKind = "apply-index/path-dot"
 	qScriptPipelineUnsupported          qScriptPipelineKind = ""
@@ -158,6 +159,15 @@ func describeQScriptPipelineTerminal(src string, bindings map[string]string) (qS
 		}
 		return qScriptPipelineDescriptor{
 			kind:         kind,
+			valueExpr:    plan.valueExpr,
+			valueBinding: qScriptPipelineBinding(plan.valueExpr, bindings),
+			indexExpr:    plan.indexExpr,
+			indexBinding: qScriptPipelineBinding(plan.indexExpr, bindings),
+		}, true
+	}
+	if plan, ok := buildQPipelineApplyGatherIndexPlan(src); ok {
+		return qScriptPipelineDescriptor{
+			kind:         qScriptPipelineApplyGatherAt,
 			valueExpr:    plan.valueExpr,
 			valueBinding: qScriptPipelineBinding(plan.valueExpr, bindings),
 			indexExpr:    plan.indexExpr,
@@ -2577,7 +2587,7 @@ func decodeQScriptPipelineNames(text string) []string {
 
 func (s *EvalState) evalQScriptTerminalPipeline(descriptor *qScriptPipelineDescriptor, terminal *qPipelinePlan) (any, bool, error) {
 	switch terminal.kind {
-	case qPipelineApplyScalarIndex:
+	case qPipelineApplyScalarIndex, qPipelineApplyGatherIndex:
 		return s.evalQPipelinePlan(terminal)
 	case qPipelineSumWhereIndex:
 		value, handled, err := s.evalQScriptBindingPlan(&descriptor.valuePlan)
