@@ -2635,6 +2635,7 @@ func TestEvalTemporalCompareRecordsTypedRuntimeKernel(t *testing.T) {
 	assertEvalValue(t, "times:8#09:30 09:31 09:32 09:33;count where times within 09:31 09:32", int64(4))
 
 	seenCompareCount := false
+	seenWithinCount := false
 	seenPipeline := false
 	seenDateFallback := false
 	for _, stat := range RuntimeKernelExecutionStats() {
@@ -2650,9 +2651,12 @@ func TestEvalTemporalCompareRecordsTypedRuntimeKernel(t *testing.T) {
 		if stat.Kernel == "ArrayWhereCompareCount" && stat.Shape == "compare-count/>=/date/date" && stat.PipelineShape == "compare_count" {
 			seenCompareCount = true
 		}
+		if stat.Kernel == "ArrayWhereWithinCount" && stat.PipelineShape == "within_count" {
+			seenWithinCount = true
+		}
 	}
-	if !seenCompareCount || !seenPipeline || seenDateFallback {
-		t.Fatalf("missing temporal compare typed runtime stats: count=%v pipeline=%v dateFallback=%v allStats=%#v", seenCompareCount, seenPipeline, seenDateFallback, RuntimeKernelExecutionStats())
+	if !seenCompareCount || !seenWithinCount || !seenPipeline || seenDateFallback {
+		t.Fatalf("missing temporal compare typed runtime stats: count=%v within=%v pipeline=%v dateFallback=%v allStats=%#v", seenCompareCount, seenWithinCount, seenPipeline, seenDateFallback, RuntimeKernelExecutionStats())
 	}
 }
 

@@ -423,10 +423,16 @@ func qRuntimeKernelPipelineShape(kernel, shape string) string {
 		return "mask_reduce"
 	case strings.HasPrefix(shape, "compare-count/"):
 		return "compare_count"
+	case strings.HasPrefix(shape, "within-count/"):
+		return "within_count"
 	case strings.HasPrefix(shape, "compare-to-index-count-sum-stats/"), strings.HasPrefix(shape, "compare-to-index-count-stats/"), strings.HasPrefix(shape, "compare-to-index-sum-stats/"):
 		return "compare_index_stats"
+	case strings.HasPrefix(shape, "within-to-index-count-sum-stats/"), strings.HasPrefix(shape, "within-to-index-count-stats/"), strings.HasPrefix(shape, "within-to-index-sum-stats/"):
+		return "within_index_stats"
 	case strings.HasPrefix(shape, "compare-to-index/"):
 		return "compare_index"
+	case strings.HasPrefix(shape, "within-to-index/"):
+		return "within_index"
 	case strings.HasPrefix(shape, "mask-to-index/"):
 		return "mask_to_index"
 	case strings.HasPrefix(shape, "vector-dyadic/"), strings.HasPrefix(shape, "composite-dyadic/"):
@@ -10861,6 +10867,9 @@ func splitWhereCompareExpr(src string) (string, string, string, bool) {
 			return left, right, op, true
 		}
 	}
+	if left, right, ok := splitTopLevelWord(src, "within"); ok {
+		return left, right, "within", true
+	}
 	return "", "", "", false
 }
 
@@ -10897,6 +10906,18 @@ func qDataCompareOpString(op string) (data.Op, bool) {
 	default:
 		return "", false
 	}
+}
+
+func qWithinOperands(left, right any) (data.Array, any, any, bool, error) {
+	array, ok := left.(data.Array)
+	if !ok {
+		return nil, nil, nil, false, nil
+	}
+	bounds, err := vectorValues(right)
+	if err != nil || len(bounds) != 2 {
+		return nil, nil, nil, true, fmt.Errorf("within expects a two-item bounds vector")
+	}
+	return array, bounds[0], bounds[1], true, nil
 }
 
 func qReverseCompareOpString(op string) string {
@@ -11268,6 +11289,10 @@ func within(left, right any) (any, error) {
 		return nil, fmt.Errorf("within expects a two-item bounds vector")
 	}
 	if leftArray, ok := left.(data.Array); ok {
+		mask, err := data.WithinMask(leftArray, bounds[0], bounds[1], true)
+		if err == nil {
+			return mask, nil
+		}
 		out := make([]bool, leftArray.Len())
 		for i := 0; i < leftArray.Len(); i++ {
 			value, ok := leftArray.At(i)

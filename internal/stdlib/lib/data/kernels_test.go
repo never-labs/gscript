@@ -1768,6 +1768,17 @@ func TestTypedCompareIndexesAndNullMasks(t *testing.T) {
 	if want := []int{1, 2}; !reflect.DeepEqual(indexes, want) {
 		t.Fatalf("timestamp within indexes = %v, want %v", indexes, want)
 	}
+	indexArray, handled, err := TryTypedWithinIndexesI64(NewI64Range(0, 1, 10), int64(3), int64(6), true)
+	if err != nil || !handled {
+		t.Fatalf("TryTypedWithinIndexesI64 range = %T,%v,%v; want handled", indexArray, handled, err)
+	}
+	if got, want := indexArray.Values(), []any{int64(3), int64(4), int64(5), int64(6)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("TryTypedWithinIndexesI64 range values = %v, want %v", got, want)
+	}
+	count, sum, handled, err := TryTypedWithinIndexStatsI64(NewI64Range(0, 1, 10), int64(3), int64(6), true)
+	if err != nil || !handled || count != 4 || sum != 18 {
+		t.Fatalf("TryTypedWithinIndexStatsI64 range = count %d sum %d handled %v err %v; want 4,18,true,nil", count, sum, handled, err)
+	}
 
 	encoded := NewEncodedSymbols([]Symbol{"AAPL", "MSFT", "AAPL", "NVDA"})
 	indexes, ok = typedKernels.CompareIndexes(encoded, OpEQ, "AAPL", nil)

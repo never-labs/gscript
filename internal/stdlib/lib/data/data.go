@@ -2065,6 +2065,91 @@ func TryTypedCompareCount(array Array, op Op, value any) (count int64, handled b
 	}
 }
 
+// TryTypedWithinIndexesI64 returns q-style row indexes selected by a typed
+// within comparison without materializing a boolean mask.
+func TryTypedWithinIndexesI64(array Array, low, high any, highClosed bool) (Array, bool, error) {
+	if array == nil {
+		return nil, true, fmt.Errorf("within array is nil")
+	}
+	if IsNull(low) || IsNull(high) {
+		return i64RangeArray{len: 0}, true, nil
+	}
+	low = normalizeScalar(array.Kind(), low)
+	high = normalizeScalar(array.Kind(), high)
+	switch a := array.(type) {
+	case attributedArray:
+		return TryTypedWithinIndexesI64(a.array, low, high, highClosed)
+	case i64RangeArray:
+		lowI, lowOK := coerceInt64Exact(low)
+		highI, highOK := coerceInt64Exact(high)
+		if !lowOK || !highOK {
+			return nil, false, nil
+		}
+		out := make([]int64, 0)
+		for row := 0; row < a.len; row++ {
+			value := a.start + int64(row)*a.step
+			if value < lowI || value > highI || (!highClosed && value == highI) {
+				continue
+			}
+			out = append(out, int64(row))
+		}
+		return newI64Trusted(out), true, nil
+	case tiledArray:
+		residues, handled, err := typedWithinTiledResidues(a, low, high, highClosed)
+		if err != nil || !handled {
+			return nil, handled, err
+		}
+		return newI64PeriodicIndexArray(int64(a.source.Len()), residues, a.len), true, nil
+	default:
+		indexes, ok := typedKernels.WithinIndexes(a, low, high, highClosed, nil)
+		if !ok {
+			return nil, false, nil
+		}
+		out := make([]int64, len(indexes))
+		for i, index := range indexes {
+			out[i] = int64(index)
+		}
+		return newI64Trusted(out), true, nil
+	}
+}
+
+// TryTypedWithinIndexStatsI64 returns count and sum of q-style row indexes
+// selected by a typed within comparison without materializing indexes.
+func TryTypedWithinIndexStatsI64(array Array, low, high any, highClosed bool) (count, sum int64, handled bool, err error) {
+	if array == nil {
+		return 0, 0, true, fmt.Errorf("within array is nil")
+	}
+	if IsNull(low) || IsNull(high) {
+		return 0, 0, true, nil
+	}
+	low = normalizeScalar(array.Kind(), low)
+	high = normalizeScalar(array.Kind(), high)
+	switch a := array.(type) {
+	case attributedArray:
+		return TryTypedWithinIndexStatsI64(a.array, low, high, highClosed)
+	case tiledArray:
+		residues, handled, err := typedWithinTiledResidues(a, low, high, highClosed)
+		if err != nil || !handled {
+			return 0, 0, handled, err
+		}
+		indexes := newI64PeriodicIndexArray(int64(a.source.Len()), residues, a.len)
+		return int64(indexes.Len()), i64IndexArraySum(indexes), true, nil
+	default:
+		indexes, handled, err := TryTypedWithinIndexesI64(a, low, high, highClosed)
+		if err != nil || !handled {
+			return 0, 0, handled, err
+		}
+		return int64(indexes.Len()), i64IndexArraySum(indexes), true, nil
+	}
+}
+
+// TryTypedWithinCount returns the number of rows selected by a typed within
+// comparison without materializing a mask or index vector.
+func TryTypedWithinCount(array Array, low, high any, highClosed bool) (count int64, handled bool, err error) {
+	count, _, handled, err = TryTypedWithinIndexStatsI64(array, low, high, highClosed)
+	return count, handled, err
+}
+
 func typedCompareScalarDyadicIndexesI64(array Array, op Op, value any) (Array, bool, error) {
 	values, ok := array.(i64ScalarDyadicArray)
 	if !ok {
@@ -2088,6 +2173,26 @@ func typedCompareScalarDyadicIndexesI64(array Array, op Op, value any) (Array, b
 		}
 	}
 	return newI64Trusted(out), true, nil
+}
+
+func typedWithinTiledResidues(array tiledArray, low, high any, highClosed bool) ([]int64, bool, error) {
+	period := array.source.Len()
+	if period == 0 || array.len == 0 {
+		return nil, true, nil
+	}
+	sourceMask := make([]bool, period)
+	low = normalizeScalar(array.source.Kind(), low)
+	high = normalizeScalar(array.source.Kind(), high)
+	if ok := typedKernels.WithinMask(array.source, low, high, highClosed, sourceMask); !ok {
+		return nil, false, nil
+	}
+	residues := make([]int64, 0)
+	for sourceRow, keep := range sourceMask {
+		if keep {
+			residues = append(residues, int64(positiveModInt(sourceRow-array.start, period)))
+		}
+	}
+	return residues, true, nil
 }
 
 func compareScalarDyadicIndexStats(array i64ScalarDyadicArray, op Op, value any) (count, sum int64, handled bool, err error) {

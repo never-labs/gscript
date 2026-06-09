@@ -328,7 +328,12 @@ func buildQPipelineWhereComparePlan(src string, kind qPipelineKind, prefix strin
 	if !ok {
 		return qPipelinePlan{}, false
 	}
-	if _, ok := qDataCompareOpString(op); !ok {
+	if op != "within" {
+		if _, ok := qDataCompareOpString(op); !ok {
+			return qPipelinePlan{}, false
+		}
+	}
+	if op == "within" && (strings.TrimSpace(leftExpr) == "" || strings.TrimSpace(rightExpr) == "") {
 		return qPipelinePlan{}, false
 	}
 	if plan, ok := buildQPipelineWhereModuloComparePlan(leftExpr, rightExpr, op, kind, prefix); ok {
@@ -727,6 +732,19 @@ func (s *EvalState) evalQPipelineWhereCompareIndexStats(plan qPipelinePlan) (cou
 	if err != nil {
 		return 0, 0, true, err
 	}
+	if plan.compareOp == "within" {
+		array, low, high, ok, err := qWithinOperands(left, right)
+		if err != nil || !ok {
+			return 0, 0, ok, err
+		}
+		shape := "within-to-index-" + strings.TrimPrefix(plan.comparePrefix, "compare-to-index-") + "-stats/" + string(array.Kind()) + "/" + string(qRuntimeKernelOperandKind(low, nil)) + "/" + string(qRuntimeKernelOperandKind(high, nil))
+		count, sum, handled, err = data.TryTypedWithinIndexStatsI64(array, low, high, true)
+		recordRuntimeKernelProbe("ArrayWhereWithinStats", shape, handled, err)
+		if err != nil || !handled {
+			return 0, 0, handled, err
+		}
+		return count, sum, true, nil
+	}
 	array, scalar, dataOp, ok := qWhereCompareOperands(left, right, plan.compareOp)
 	if !ok {
 		return 0, 0, false, nil
@@ -745,6 +763,19 @@ func (s *EvalState) evalQPipelineWhereCompareCount(plan qPipelinePlan) (count in
 	if err != nil {
 		return 0, true, err
 	}
+	if plan.compareOp == "within" {
+		array, low, high, ok, err := qWithinOperands(left, right)
+		if err != nil || !ok {
+			return 0, ok, err
+		}
+		shape := "within-count/" + string(array.Kind()) + "/" + string(qRuntimeKernelOperandKind(low, nil)) + "/" + string(qRuntimeKernelOperandKind(high, nil))
+		count, handled, err = data.TryTypedWithinCount(array, low, high, true)
+		recordRuntimeKernelProbe("ArrayWhereWithinCount", shape, handled, err)
+		if err != nil || !handled {
+			return 0, handled, err
+		}
+		return count, true, nil
+	}
 	array, scalar, dataOp, ok := qWhereCompareOperands(left, right, plan.compareOp)
 	if !ok {
 		return 0, false, nil
@@ -762,6 +793,19 @@ func (s *EvalState) evalQPipelineWhereCompareIndexesArray(plan qPipelinePlan) (d
 	left, right, err := s.evalQPipelineCompareOperands(plan)
 	if err != nil {
 		return nil, true, err
+	}
+	if plan.compareOp == "within" {
+		array, low, high, ok, err := qWithinOperands(left, right)
+		if err != nil || !ok {
+			return nil, ok, err
+		}
+		shape := "within-to-index/" + string(array.Kind()) + "/" + string(qRuntimeKernelOperandKind(low, nil)) + "/" + string(qRuntimeKernelOperandKind(high, nil))
+		out, handled, err := data.TryTypedWithinIndexesI64(array, low, high, true)
+		recordRuntimeKernelProbe("ArrayWhereWithin", shape, handled, err)
+		if err != nil || !handled {
+			return nil, handled, err
+		}
+		return out, true, nil
 	}
 	array, scalar, dataOp, ok := qWhereCompareOperands(left, right, plan.compareOp)
 	if !ok {
