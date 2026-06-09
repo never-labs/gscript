@@ -5462,6 +5462,9 @@ func (s *EvalState) evalScalarAddChainTerm(src string) (any, error) {
 	if src == "" {
 		return nil, fmt.Errorf("empty q expression")
 	}
+	if value, handled, err := s.tryEvalCallableOverScalar(src); err != nil || handled {
+		return value, err
+	}
 	if qScalarAddChainTermMayBeNumber(src) {
 		if value, _, err := parseNumberOrBool(src); err == nil {
 			return value, nil
@@ -5484,6 +5487,36 @@ func (s *EvalState) evalScalarAddChainTerm(src string) (any, error) {
 		}
 	}
 	return s.eval(src)
+}
+
+func (s *EvalState) tryEvalCallableOverScalar(src string) (any, bool, error) {
+	fnSrc, initialSrc, valueSrc, ok := parseCallableOverApplication(src)
+	if !ok {
+		return nil, false, nil
+	}
+	fn, err := s.eval(fnSrc)
+	if err != nil {
+		return nil, true, err
+	}
+	if !isCallable(fn) {
+		return nil, false, nil
+	}
+	var initial any
+	if initialSrc != "" {
+		initial, err = s.eval(initialSrc)
+		if err != nil {
+			return nil, true, err
+		}
+	}
+	value, err := s.eval(valueSrc)
+	if err != nil {
+		return nil, true, err
+	}
+	out, err := s.applyOverCallable(fn, initial, value)
+	if isCallableAdd(fn) {
+		recordRuntimeKernelProbe("CallableOverScalar", "over-scalar/add/"+string(qRuntimeKernelOperandKind(value, nil)), err == nil, err)
+	}
+	return out, true, err
 }
 
 func qScalarAddChainTermMayBeNumber(src string) bool {
@@ -5601,6 +5634,9 @@ func isScalarAddChainTerm(src string) bool {
 	if strings.HasPrefix(src, "+/") {
 		return true
 	}
+	if _, _, _, ok := parseCallableOverApplication(src); ok {
+		return true
+	}
 	if _, ok := buildScalarApplyIndexPlan(src); ok {
 		return true
 	}
@@ -5613,6 +5649,39 @@ func isScalarAddChainTerm(src string) bool {
 		return true
 	}
 	return false
+}
+
+func parseCallableOverApplication(src string) (fnSrc, initialSrc, valueSrc string, ok bool) {
+	src = stripEnclosingParens(strings.TrimSpace(src))
+	if !strings.HasSuffix(src, "]") {
+		return "", "", "", false
+	}
+	open := findMatchingCallOpen(src)
+	if open < 0 {
+		return "", "", "", false
+	}
+	head := strings.TrimSpace(src[:open])
+	if !strings.HasSuffix(head, "/") || strings.HasSuffix(head, "+/") {
+		return "", "", "", false
+	}
+	fnSrc = strings.TrimSpace(head[:len(head)-1])
+	if fnSrc == "" {
+		return "", "", "", false
+	}
+	args := splitTopLevel(src[open+1:len(src)-1], ';')
+	switch len(args) {
+	case 1:
+		valueSrc = strings.TrimSpace(args[0])
+	case 2:
+		initialSrc = strings.TrimSpace(args[0])
+		valueSrc = strings.TrimSpace(args[1])
+	default:
+		return "", "", "", false
+	}
+	if valueSrc == "" {
+		return "", "", "", false
+	}
+	return fnSrc, initialSrc, valueSrc, true
 }
 
 func stripEnclosingParens(src string) string {

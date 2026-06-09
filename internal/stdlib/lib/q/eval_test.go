@@ -506,6 +506,22 @@ func TestEvalAdverbArithmeticUsesTypedRuntime(t *testing.T) {
 	}
 }
 
+func TestEvalCallableOverScalarTermUsesTypedRuntime(t *testing.T) {
+	ClearRuntimeKernelExecutionStats()
+	t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+	assertEvalValue(t, "({x+y}/[10;1 2 3])+4", int64(20))
+	seen := false
+	for _, stat := range RuntimeKernelExecutionStats() {
+		if stat.Kernel == "CallableOverScalar" && stat.Outcome == "hit" && stat.Count > 0 {
+			seen = true
+		}
+	}
+	if !seen {
+		t.Fatalf("missing CallableOverScalar hit: %#v", RuntimeKernelExecutionStats())
+	}
+}
+
 func TestEvalLastDyadicTerminalUsesTypedRuntime(t *testing.T) {
 	ClearRuntimeKernelExecutionStats()
 	t.Cleanup(ClearRuntimeKernelExecutionStats)
