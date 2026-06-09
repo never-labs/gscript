@@ -109,19 +109,58 @@ var (
 )
 
 func recordRuntimeKernelExecution(kernel, shape, outcome, reasonCode string) {
+	key := runtimeKernelExecutionKey{
+		source:     "q_eval_vector_runtime",
+		kernel:     normalizeRuntimeStatField(kernel, "unknown"),
+		shape:      normalizeRuntimeStatField(shape, "unknown"),
+		route:      "typed_data_kernel",
+		outcome:    normalizeRuntimeStatField(outcome, "unknown"),
+		reasonCode: normalizeRuntimeStatField(reasonCode, outcome),
+	}
+	if key.reasonCode == "" {
+		key.reasonCode = key.outcome
+	}
+	runtimeKernelStatsMu.Lock()
+	if runtimeKernelStats == nil {
+		runtimeKernelStats = make(map[runtimeKernelExecutionKey]uint64)
+	}
+	runtimeKernelStats[key]++
+	runtimeKernelStatsMu.Unlock()
+}
+
+func normalizeRuntimeStatField(value, fallback string) string {
+	if value != "" {
+		return value
+	}
+	return fallback
+}
+
+func recordRuntimeKernelProbe(kernel, shape string, handled bool, err error) {
 	if kernel == "" {
 		kernel = "unknown"
 	}
 	if shape == "" {
 		shape = "unknown"
 	}
-	if outcome == "" {
-		outcome = "unknown"
+	outcome := "fallback"
+	reasonCode := "unsupported_shape"
+	switch {
+	case err != nil:
+		outcome = "error"
+		reasonCode = "runtime_error"
+	case handled:
+		outcome = "hit"
+		reasonCode = "typed_kernel"
 	}
-	if reasonCode == "" {
-		reasonCode = outcome
+	attemptKey := runtimeKernelExecutionKey{
+		source:     "q_eval_vector_runtime",
+		kernel:     kernel,
+		shape:      shape,
+		route:      "typed_data_kernel",
+		outcome:    "attempt",
+		reasonCode: "attempt",
 	}
-	key := runtimeKernelExecutionKey{
+	outcomeKey := runtimeKernelExecutionKey{
 		source:     "q_eval_vector_runtime",
 		kernel:     kernel,
 		shape:      shape,
@@ -133,20 +172,9 @@ func recordRuntimeKernelExecution(kernel, shape, outcome, reasonCode string) {
 	if runtimeKernelStats == nil {
 		runtimeKernelStats = make(map[runtimeKernelExecutionKey]uint64)
 	}
-	runtimeKernelStats[key]++
+	runtimeKernelStats[attemptKey]++
+	runtimeKernelStats[outcomeKey]++
 	runtimeKernelStatsMu.Unlock()
-}
-
-func recordRuntimeKernelProbe(kernel, shape string, handled bool, err error) {
-	recordRuntimeKernelExecution(kernel, shape, "attempt", "attempt")
-	switch {
-	case err != nil:
-		recordRuntimeKernelExecution(kernel, shape, "error", "runtime_error")
-	case handled:
-		recordRuntimeKernelExecution(kernel, shape, "hit", "typed_kernel")
-	default:
-		recordRuntimeKernelExecution(kernel, shape, "fallback", "unsupported_shape")
-	}
 }
 
 // RuntimeKernelExecutionStats returns a stable snapshot of q.eval typed
