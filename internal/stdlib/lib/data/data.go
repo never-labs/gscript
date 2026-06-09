@@ -2480,6 +2480,9 @@ func TryTypedCompareIndexesI64(array Array, op Op, value any) (Array, bool, erro
 	if out, ok, err := typedCompareTiledIndexesI64(array, op, value); ok || err != nil {
 		return out, ok, err
 	}
+	if out, ok, err := typedCompareCarrierIndexesI64(array, op, value); ok || err != nil {
+		return out, ok, err
+	}
 	indexes, ok := typedKernels.CompareIndexes(array, op, value, nil)
 	if !ok {
 		return nil, false, nil
@@ -2520,6 +2523,8 @@ func TryTypedCompareIndexStatsI64(array Array, op Op, value any) (count, sum int
 		return compareTiledIndexStats(a, op, value)
 	case i64ScalarDyadicArray:
 		return compareScalarDyadicIndexStats(a, op, value)
+	case indexedArray, nullableArray:
+		return typedCompareCarrierIndexStatsI64(a, op, value)
 	default:
 		return typedCompareIndexStatsI64(a, op, value)
 	}
@@ -2831,6 +2836,115 @@ func typedWithinNullableIndexesI64(array nullableArray, low, high any, highClose
 		}
 	}
 	return newI64Trusted(out), true, nil
+}
+
+func typedCompareCarrierIndexesI64(array Array, op Op, value any) (Array, bool, error) {
+	if !typedCompareCarrierCanHandle(array) {
+		return nil, false, nil
+	}
+	target := normalizeScalar(array.Kind(), value)
+	if !typedCompareCarrierTargetCompatible(array.Kind(), target) {
+		return nil, false, nil
+	}
+	out := make([]int64, 0)
+	for row := 0; row < array.Len(); row++ {
+		keep, handled, err := typedCompareCarrierRow(array, row, op, target)
+		if err != nil || !handled {
+			return nil, handled, err
+		}
+		if keep {
+			out = append(out, int64(row))
+		}
+	}
+	return newI64Trusted(out), true, nil
+}
+
+func typedCompareCarrierIndexStatsI64(array Array, op Op, value any) (count, sum int64, handled bool, err error) {
+	if !typedCompareCarrierCanHandle(array) {
+		return 0, 0, false, nil
+	}
+	target := normalizeScalar(array.Kind(), value)
+	if !typedCompareCarrierTargetCompatible(array.Kind(), target) {
+		return 0, 0, false, nil
+	}
+	for row := 0; row < array.Len(); row++ {
+		keep, handled, err := typedCompareCarrierRow(array, row, op, target)
+		if err != nil || !handled {
+			return 0, 0, handled, err
+		}
+		if keep {
+			count++
+			sum += int64(row)
+		}
+	}
+	return count, sum, true, nil
+}
+
+func typedCompareCarrierCanHandle(array Array) bool {
+	switch a := array.(type) {
+	case attributedArray:
+		return typedCompareCarrierCanHandle(a.array)
+	case indexedArray, nullableArray:
+		return typedCompareKindCanHandle(array.Kind())
+	default:
+		return false
+	}
+}
+
+func typedCompareKindCanHandle(kind Kind) bool {
+	switch kind {
+	case KindBool,
+		KindI8, KindI16, KindI32, KindI64,
+		KindU8, KindU16, KindU32, KindU64,
+		KindF32, KindF64,
+		KindString, KindSymbol,
+		KindMonth, KindDate, KindDateTime, KindTimespan,
+		KindMinute, KindSecond, KindTime, KindTimestamp:
+		return true
+	default:
+		return false
+	}
+}
+
+func typedCompareCarrierTargetCompatible(kind Kind, value any) bool {
+	if IsNull(value) {
+		return true
+	}
+	switch kind {
+	case KindF64:
+		_, ok := numeric(value)
+		return ok
+	case KindString:
+		_, ok := coerceComparableString(value)
+		return ok
+	case KindSymbol:
+		_, ok := coerceComparableSymbol(value)
+		return ok
+	default:
+		_, err := NormalizeValueForKind(kind, value)
+		return err == nil
+	}
+}
+
+func typedCompareCarrierRow(array Array, row int, op Op, target any) (bool, bool, error) {
+	value, ok := array.At(row)
+	if !ok {
+		return false, true, fmt.Errorf("compare row %d out of range", row)
+	}
+	if IsNull(value) || IsNull(target) {
+		equal := IsNull(value) && IsNull(target)
+		switch op {
+		case OpEQ, OpNE:
+			return boolCompare(op, equal, 0), true, nil
+		default:
+			return false, true, nil
+		}
+	}
+	cmp, ok := compareSameKind(value, target)
+	if !ok {
+		return false, false, nil
+	}
+	return boolCompare(op, cmp == 0, cmp), true, nil
 }
 
 func compareScalarDyadicIndexStats(array i64ScalarDyadicArray, op Op, value any) (count, sum int64, handled bool, err error) {

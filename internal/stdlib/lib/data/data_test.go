@@ -638,6 +638,91 @@ func TestTryTypedCompareIndexStatsI64(t *testing.T) {
 	}
 }
 
+func TestTryTypedCompareNullableTemporalCarrier(t *testing.T) {
+	column, err := NewColumnWithKind("_", KindDate, []any{
+		DateFromDays(20610),
+		NullValue,
+		DateFromDays(20612),
+		DateFromDays(20611),
+	})
+	if err != nil {
+		t.Fatalf("NewColumnWithKind nullable date returned error: %v", err)
+	}
+
+	indexes, handled, err := TryTypedCompareIndexesI64(column.Data, OpGE, DateFromDays(20611))
+	if err != nil {
+		t.Fatalf("TryTypedCompareIndexesI64 nullable date returned error: %v", err)
+	}
+	if !handled {
+		t.Fatal("TryTypedCompareIndexesI64 nullable date did not handle")
+	}
+	if got, want := indexes.Values(), []any{int64(2), int64(3)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("TryTypedCompareIndexesI64 nullable date = %#v, want %#v", got, want)
+	}
+
+	count, sum, handled, err := TryTypedCompareIndexStatsI64(column.Data, OpGE, DateFromDays(20611))
+	if err != nil {
+		t.Fatalf("TryTypedCompareIndexStatsI64 nullable date returned error: %v", err)
+	}
+	if !handled {
+		t.Fatal("TryTypedCompareIndexStatsI64 nullable date did not handle")
+	}
+	if count != 2 || sum != 5 {
+		t.Fatalf("TryTypedCompareIndexStatsI64 nullable date = count %d sum %d; want 2, 5", count, sum)
+	}
+}
+
+func TestTryTypedCompareIndexedNullableTemporalCarrier(t *testing.T) {
+	column, err := NewColumnWithKind("_", KindDate, []any{
+		DateFromDays(20610),
+		NullValue,
+		DateFromDays(20612),
+		DateFromDays(20611),
+		DateFromDays(20613),
+	})
+	if err != nil {
+		t.Fatalf("NewColumnWithKind nullable date returned error: %v", err)
+	}
+	reversed := indexedArray{
+		source:  column.Data,
+		indexes: NewI64([]int64{4, 3, 2, 1, 0}),
+		len:     column.Data.Len(),
+	}
+
+	indexes, handled, err := TryTypedCompareIndexesI64(reversed, OpLT, DateFromDays(20612))
+	if err != nil {
+		t.Fatalf("TryTypedCompareIndexesI64 indexed nullable date returned error: %v", err)
+	}
+	if !handled {
+		t.Fatal("TryTypedCompareIndexesI64 indexed nullable date did not handle")
+	}
+	if got, want := indexes.Values(), []any{int64(1), int64(4)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("TryTypedCompareIndexesI64 indexed nullable date = %#v, want %#v", got, want)
+	}
+
+	count, sum, handled, err := TryTypedCompareIndexStatsI64(reversed, OpLT, DateFromDays(20612))
+	if err != nil {
+		t.Fatalf("TryTypedCompareIndexStatsI64 indexed nullable date returned error: %v", err)
+	}
+	if !handled {
+		t.Fatal("TryTypedCompareIndexStatsI64 indexed nullable date did not handle")
+	}
+	if count != 2 || sum != 5 {
+		t.Fatalf("TryTypedCompareIndexStatsI64 indexed nullable date = count %d sum %d; want 2, 5", count, sum)
+	}
+
+	count, handled, err = TryTypedCompareCount(reversed, OpLT, DateFromDays(20612))
+	if err != nil {
+		t.Fatalf("TryTypedCompareCount indexed nullable date returned error: %v", err)
+	}
+	if !handled {
+		t.Fatal("TryTypedCompareCount indexed nullable date did not handle")
+	}
+	if count != 2 {
+		t.Fatalf("TryTypedCompareCount indexed nullable date = %d; want 2", count)
+	}
+}
+
 func TestNewI64RangeArraySemantics(t *testing.T) {
 	values := NewI64Range(10, 2, 5)
 	if values.Kind() != KindI64 {
