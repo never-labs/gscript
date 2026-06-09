@@ -24,6 +24,17 @@ func TestQGapValidationConditionalsApplyIndexAndCasts(t *testing.T) {
 	assertEvalValue(t, "\"I\"$\"42\"", int32(42))
 	assertEvalValue(t, "`long$\"42\"", int64(42))
 	assertEvalValue(t, "`int$\"42\"", int32(42))
+	assertEvalValue(t, "`long$3.7", int64(3))
+	assertEvalValue(t, "`int$-3.7", int32(-3))
+	assertEvalArray(t, "`long$1.2 2.8 -3.7", data.KindI64, []any{int64(1), int64(2), int64(-3)})
+}
+
+func TestQGapValidationBooleanVectorLiterals(t *testing.T) {
+	assertEvalValue(t, "1b", true)
+	assertEvalArray(t, "101b", data.KindBool, []any{true, false, true})
+	assertEvalArray(t, "0 1b", data.KindBool, []any{false, true})
+	assertEvalArray(t, "1 0 1b", data.KindBool, []any{true, false, true})
+	assertEvalArray(t, "where 101b", data.KindI64, []any{int64(0), int64(2)})
 }
 
 func TestQGapValidationReshapeMatrixAndFlip(t *testing.T) {

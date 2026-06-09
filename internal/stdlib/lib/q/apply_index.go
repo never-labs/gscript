@@ -57,13 +57,7 @@ func (s *EvalState) evalDotApplyArgs(src string) ([]any, error) {
 	if err != nil {
 		return nil, err
 	}
-	if array, ok := value.(data.Array); ok {
-		items := array.Values()
-		out := make([]any, len(items))
-		copy(out, items)
-		return out, nil
-	}
-	return []any{value}, nil
+	return qApplyArgs(value), nil
 }
 
 func (s *EvalState) evalApplyIndex(mode qApplyIndexMode, leftExpr, rightExpr string) (any, error) {

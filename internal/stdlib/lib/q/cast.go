@@ -2,6 +2,7 @@ package q
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 
@@ -166,7 +167,109 @@ func castScalarValue(kind data.Kind, value any) (any, error) {
 			}
 		}
 	}
+	if converted, ok, err := castScalarNumericIntegerValue(kind, value); ok || err != nil {
+		return converted, err
+	}
 	return data.NormalizeValueForKind(kind, value)
+}
+
+func castScalarNumericIntegerValue(kind data.Kind, value any) (any, bool, error) {
+	min, max, signed, ok := qCastIntegerBounds(kind)
+	if !ok {
+		return nil, false, nil
+	}
+	n, ok := qCastTruncatedInteger(value)
+	if !ok {
+		return nil, false, nil
+	}
+	if !signed && n < 0 {
+		return nil, true, fmt.Errorf("value must be non-negative for %s", kind)
+	}
+	if n < min || n > max {
+		return nil, true, fmt.Errorf("value %d out of range for %s", n, kind)
+	}
+	switch kind {
+	case data.KindI8:
+		return int8(n), true, nil
+	case data.KindI16:
+		return int16(n), true, nil
+	case data.KindI32:
+		return int32(n), true, nil
+	case data.KindI64:
+		return n, true, nil
+	case data.KindU8:
+		return uint8(n), true, nil
+	case data.KindU16:
+		return uint16(n), true, nil
+	case data.KindU32:
+		return uint32(n), true, nil
+	case data.KindU64:
+		return uint64(n), true, nil
+	default:
+		return nil, false, nil
+	}
+}
+
+func qCastIntegerBounds(kind data.Kind) (min, max int64, signed, ok bool) {
+	switch kind {
+	case data.KindI8:
+		return -128, 127, true, true
+	case data.KindI16:
+		return -32768, 32767, true, true
+	case data.KindI32:
+		return -2147483648, 2147483647, true, true
+	case data.KindI64:
+		return -9223372036854775808, 9223372036854775807, true, true
+	case data.KindU8:
+		return 0, 255, false, true
+	case data.KindU16:
+		return 0, 65535, false, true
+	case data.KindU32:
+		return 0, 4294967295, false, true
+	case data.KindU64:
+		return 0, 9223372036854775807, false, true
+	default:
+		return 0, 0, false, false
+	}
+}
+
+func qCastTruncatedInteger(value any) (int64, bool) {
+	switch x := value.(type) {
+	case int:
+		return int64(x), true
+	case int8:
+		return int64(x), true
+	case int16:
+		return int64(x), true
+	case int32:
+		return int64(x), true
+	case int64:
+		return x, true
+	case uint8:
+		return int64(x), true
+	case uint16:
+		return int64(x), true
+	case uint32:
+		return int64(x), true
+	case uint64:
+		if x <= 9223372036854775807 {
+			return int64(x), true
+		}
+		return 0, false
+	case float32:
+		return qCastTruncatedFloatInteger(float64(x))
+	case float64:
+		return qCastTruncatedFloatInteger(x)
+	default:
+		return 0, false
+	}
+}
+
+func qCastTruncatedFloatInteger(value float64) (int64, bool) {
+	if math.IsNaN(value) || math.IsInf(value, 0) || value < -9223372036854775808.0 || value >= 9223372036854775808.0 {
+		return 0, false
+	}
+	return int64(value), true
 }
 
 func castScalarStringValue(kind data.Kind, text string) (any, bool, error) {
