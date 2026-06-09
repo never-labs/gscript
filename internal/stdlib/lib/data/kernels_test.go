@@ -2737,6 +2737,32 @@ func TestTypedNumericUnaryBinaryAndAggregates(t *testing.T) {
 		t.Fatalf("TryTypedSequenceTransformChainNumericSumCount drop/take/sublist = %#v, want %#v", got, want)
 	}
 
+	repeatTakeSteps := []SequenceTransformStep{
+		{Transform: SequenceTransformRotate, Args: [2]int{997}, ArgCount: 1},
+		{Transform: SequenceTransformDrop, Args: [2]int{1024}, ArgCount: 1},
+		{Transform: SequenceTransformSublist, Args: [2]int{9000}, ArgCount: 1},
+	}
+	repeatTakeSource := NewI64Range(0, 1, 8192)
+	repeatTakeEdge, ok, err := TryTypedSequenceTransformChainNumericSumFirstLast(repeatTakeSteps, repeatTakeSource)
+	if err != nil || !ok {
+		t.Fatalf("TryTypedSequenceTransformChainNumericSumFirstLast repeat take = %#v,%v,%v", repeatTakeEdge, ok, err)
+	}
+	repeatTakeSumCount, ok, err := TryTypedSequenceTransformChainNumericSumCount(repeatTakeSteps, repeatTakeSource)
+	if err != nil || !ok {
+		t.Fatalf("TryTypedSequenceTransformChainNumericSumCount repeat take = %#v,%v,%v", repeatTakeSumCount, ok, err)
+	}
+	var repeatSum int64
+	period := 8192 - 1024
+	for i := 0; i < 9000; i++ {
+		repeatSum += int64((997 + 1024 + (i % period)) % 8192)
+	}
+	if got, want := repeatTakeEdge, repeatSum+2021+int64((997+1024+((9000-1)%period))%8192); got != want {
+		t.Fatalf("TryTypedSequenceTransformChainNumericSumFirstLast repeat take = %#v, want %#v", got, want)
+	}
+	if got, want := repeatTakeSumCount, repeatSum+9000; got != want {
+		t.Fatalf("TryTypedSequenceTransformChainNumericSumCount repeat take = %#v, want %#v", got, want)
+	}
+
 	tiledFloats, err := TakeRepeat(NewF64([]float64{0, 1.5}), 7)
 	if err != nil {
 		t.Fatalf("Take tiled floats returned error: %v", err)
