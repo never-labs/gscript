@@ -612,7 +612,8 @@ func qPipelineRuntimePrimitiveCandidate(src string) bool {
 		return qPipelineRuntimePrimitiveCallArity(name, len(args))
 	}
 	for _, word := range qPipelineRuntimeDyadicPrimitiveVerbs() {
-		if _, _, ok := splitTopLevelWord(src, word); ok {
+		left, right, ok := splitTopLevelWord(src, word)
+		if ok && qPipelineRuntimeDyadicPrimitiveOperands(word, left, right) {
 			return true
 		}
 	}
@@ -655,6 +656,9 @@ func buildQPipelineRuntimePrimitivePlan(src string) (qPipelinePlan, bool) {
 		left = strings.TrimSpace(left)
 		right = strings.TrimSpace(right)
 		if left == "" || right == "" {
+			return qPipelinePlan{}, false
+		}
+		if !qPipelineRuntimeDyadicPrimitiveOperands(word, left, right) {
 			return qPipelinePlan{}, false
 		}
 		plan := qPipelineShapePlan(qPipelineDyadicPrimitive, word)
@@ -754,7 +758,7 @@ func qPipelineRuntimePrimitiveCallArity(name string, n int) bool {
 	case "sqrt", "log", "exp", "sin", "cos", "tan", "asin", "acos", "atan", "reciprocal", "signum", "floor", "ceiling",
 		"svar", "sdev":
 		return n == 1
-	case "xexp", "xlog", "mdev", "ema", "cov", "scov", "cor":
+	case "xexp", "xlog", "mdev", "ema", "cov", "scov", "cor", "where":
 		return n == 2
 	case "wsum":
 		return n == 1 || n == 2
@@ -771,7 +775,32 @@ func qPipelineRuntimeUnaryPrimitiveVerbs() []string {
 }
 
 func qPipelineRuntimeDyadicPrimitiveVerbs() []string {
-	return []string{"xexp", "xlog", "mdev", "ema", "wsum", "cov", "scov", "cor"}
+	return []string{"xexp", "xlog", "mdev", "ema", "wsum", "cov", "scov", "cor", "where"}
+}
+
+func qPipelineRuntimeDyadicPrimitiveOperands(word, left, right string) bool {
+	left = strings.TrimSpace(left)
+	right = strings.TrimSpace(right)
+	if left == "" || right == "" {
+		return false
+	}
+	if word != "where" {
+		return true
+	}
+	if findTopLevel(left, "+-*%") >= 0 {
+		return false
+	}
+	for _, prefix := range []string{"count ", "sum ", "last ", "+/", "where "} {
+		if strings.HasPrefix(left, prefix) {
+			return false
+		}
+	}
+	switch left {
+	case "count", "sum", "last", "where":
+		return false
+	default:
+		return true
+	}
 }
 
 func qPipelineRuntimePrimitiveVerb(name string) bool {
@@ -1369,7 +1398,11 @@ func (s *EvalState) evalQPipelineApplyScalarIndex(plan *qPipelinePlan) (any, boo
 		if out, handled, err := scalarApplyIndexPlanValue(indexPlan, target); err != nil || handled {
 			return out, handled, err
 		}
-		return nil, false, nil
+		out, err := s.applyOrIndexValue(mode, target, indexValue)
+		if err != nil {
+			return nil, true, err
+		}
+		return out, true, nil
 	}
 	if out, handled, err := scalarIndexValue(mode, target, indexes[0]); err != nil || handled {
 		return out, handled, err

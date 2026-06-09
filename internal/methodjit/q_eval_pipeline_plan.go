@@ -5,6 +5,7 @@ import (
 	"sync/atomic"
 
 	"github.com/never-labs/leia/internal/runtime"
+	"github.com/never-labs/leia/internal/stdlib/lib/data"
 )
 
 // QEvalPipelineBackend is the stable handoff point between MethodJIT q.eval
@@ -465,7 +466,90 @@ func qEvalPipelineRuntimeValue(v any) (runtime.Value, error) {
 		return runtime.FloatValue(x), nil
 	case string:
 		return runtime.StringValue(x), nil
+	case data.Array:
+		return qEvalPipelineArrayRuntimeValue(x)
 	default:
 		return runtime.NilValue(), fmt.Errorf("methodjit: q eval pipeline result type %T is not runtime-value supported", v)
+	}
+}
+
+func qEvalPipelineArrayRuntimeValue(array data.Array) (runtime.Value, error) {
+	switch array.Kind() {
+	case data.KindBool:
+		out := make([]bool, array.Len())
+		for i := range out {
+			v, ok := array.At(i)
+			if !ok {
+				return runtime.NilValue(), fmt.Errorf("methodjit: q eval bool array row %d out of range", i)
+			}
+			b, ok := v.(bool)
+			if !ok {
+				return runtime.NilValue(), fmt.Errorf("methodjit: q eval bool array row %d has %T", i, v)
+			}
+			out[i] = b
+		}
+		return runtime.DenseArrayValue(runtime.NewDenseArrayBool(out)), nil
+	case data.KindI64:
+		out := make([]int64, array.Len())
+		for i := range out {
+			v, ok := array.At(i)
+			if !ok {
+				return runtime.NilValue(), fmt.Errorf("methodjit: q eval i64 array row %d out of range", i)
+			}
+			n, ok := v.(int64)
+			if !ok {
+				return runtime.NilValue(), fmt.Errorf("methodjit: q eval i64 array row %d has %T", i, v)
+			}
+			out[i] = n
+		}
+		return runtime.DenseArrayValue(runtime.NewDenseArrayI64(out)), nil
+	case data.KindF64:
+		out := make([]float64, array.Len())
+		for i := range out {
+			v, ok := array.At(i)
+			if !ok {
+				return runtime.NilValue(), fmt.Errorf("methodjit: q eval f64 array row %d out of range", i)
+			}
+			switch n := v.(type) {
+			case float64:
+				out[i] = n
+			case int64:
+				out[i] = float64(n)
+			default:
+				return runtime.NilValue(), fmt.Errorf("methodjit: q eval f64 array row %d has %T", i, v)
+			}
+		}
+		return runtime.DenseArrayValue(runtime.NewDenseArrayF64(out)), nil
+	case data.KindString, data.KindSymbol:
+		out := make([]string, array.Len())
+		for i := range out {
+			v, ok := array.At(i)
+			if !ok {
+				return runtime.NilValue(), fmt.Errorf("methodjit: q eval string array row %d out of range", i)
+			}
+			switch s := v.(type) {
+			case string:
+				out[i] = s
+			case data.Symbol:
+				out[i] = string(s)
+			default:
+				return runtime.NilValue(), fmt.Errorf("methodjit: q eval string array row %d has %T", i, v)
+			}
+		}
+		return runtime.DenseArrayValue(runtime.NewDenseArrayString(out)), nil
+	default:
+		out := runtime.NewAppendArrayTable(array.Len())
+		for i := 0; i < array.Len(); i++ {
+			v, ok := array.At(i)
+			if !ok {
+				return runtime.NilValue(), fmt.Errorf("methodjit: q eval generic array row %d out of range", i)
+			}
+			item, err := qEvalPipelineRuntimeValue(v)
+			if err != nil {
+				return runtime.NilValue(), err
+			}
+			out.RawSetInt(int64(i+1), item)
+		}
+		return runtime.TableValue(out), nil
 	}
 }

@@ -6092,6 +6092,73 @@ func TestQEvalPipelineRuntimeBackendExecutesDescriptorPlanRef(t *testing.T) {
 	}
 }
 
+func TestQEvalPipelineRuntimeBackendCoversRecentExecutableShapes(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		src       string
+		shape     string
+		wantInt   int64
+		wantI64   []int64
+		wantArray bool
+	}{
+		{
+			name:    "callable_over_scan_summary",
+			src:     "x:1+til 8;s:+\\x;({x+y}/[10;x])+last s+count s",
+			shape:   "script-pipeline/callable-over/scan-sum-count/assignments",
+			wantInt: int64(90),
+		},
+		{
+			name:      "dyadic_where_filter",
+			src:       "10 20 30 40 where 1010b",
+			shape:     "runtime-dyadic/where",
+			wantI64:   []int64{10, 30},
+			wantArray: true,
+		},
+		{
+			name:    "nd_reshape_dot_path",
+			src:     "t:2 3 4#til 24;t . 1 2 3",
+			shape:   "script-pipeline/apply-index/path-dot/assignments",
+			wantInt: int64(23),
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			plan, ok := qEvalRuntimePipelinePlan(tc.src)
+			if !ok {
+				t.Fatalf("qEvalRuntimePipelinePlan(%q) did not recognize pipeline", tc.src)
+			}
+			if plan.Shape != tc.shape {
+				t.Fatalf("plan shape = %q, want %q; plan=%+v", plan.Shape, tc.shape, plan)
+			}
+			fn := &Function{}
+			ref := fn.addQEvalPipelinePlan("not a q pipeline", plan)
+			backend := newQRuntimeEvalPipelineBackend(fn.QEvalPipelinePlans)
+			if _, ok := backend.lookupExecutablePlan(ref); !ok {
+				t.Fatalf("lookupExecutablePlan(%+v) missed; descriptor=%+v", ref, plan)
+			}
+			value, handled, err := executeQEvalPipelinePlanValue(backend, ref)
+			if err != nil {
+				t.Fatalf("executeQEvalPipelinePlanValue: %v", err)
+			}
+			if !handled {
+				t.Fatalf("executeQEvalPipelinePlanValue handled=false")
+			}
+			if tc.wantArray {
+				if !value.IsDenseArray() {
+					t.Fatalf("executeQEvalPipelinePlanValue = %v, want dense i64 array", value)
+				}
+				got, ok := value.DenseArray().I64()
+				if !ok || !reflect.DeepEqual(got, tc.wantI64) {
+					t.Fatalf("executeQEvalPipelinePlanValue array = %#v/%v, want %#v", got, ok, tc.wantI64)
+				}
+				return
+			}
+			if !value.IsInt() || value.Int() != tc.wantInt {
+				t.Fatalf("executeQEvalPipelinePlanValue = %v, want int %d", value, tc.wantInt)
+			}
+		})
+	}
+}
+
 func TestQEvalPipelinePlanRefsCopyToCompiledFunction(t *testing.T) {
 	fn := &Function{
 		QEvalPipelinePlans: []QEvalPipelinePlanRef{{

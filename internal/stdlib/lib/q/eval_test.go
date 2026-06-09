@@ -429,6 +429,7 @@ func TestQPipelinePlanRecognizesRuntimePrimitiveStatsAndWindows(t *testing.T) {
 		{expr: "1 2 3 cor 1 2 3", shape: "runtime-dyadic/cor", pipelineShape: "numeric_stats", transform: "cor", want: 1.0},
 		{expr: "2 mdev 1 2 3", shape: "runtime-dyadic/mdev", pipelineShape: "window_scan", transform: "mdev", want: data.NewF64([]float64{0, 0.5, 0.5})},
 		{expr: "0.5 ema 1 2 3", shape: "runtime-dyadic/ema", pipelineShape: "window_scan", transform: "ema", want: data.NewF64([]float64{1, 1.5, 2.25})},
+		{expr: "10 20 30 40 where 1010b", shape: "runtime-dyadic/where", pipelineShape: "runtime_primitive", transform: "where", want: data.NewI64([]int64{10, 30})},
 	}
 	for _, tt := range tests {
 		t.Run(tt.shape, func(t *testing.T) {
@@ -473,6 +474,31 @@ func TestQPipelinePlanRecognizesRuntimePrimitiveStatsAndWindows(t *testing.T) {
 
 	if descriptor, ok := DescribeEvalPipeline("floor 1.9 -1.2 0N"); ok {
 		t.Fatalf("compound prefix expression unexpectedly recognized as runtime primitive: %#v", descriptor)
+	}
+}
+
+func TestQPipelineExecutablePlanCoversRuntimeDyadicWhere(t *testing.T) {
+	src := "10 20 30 40 where 1010b"
+	backend, ok := DescribeEvalPipelineBackendPlan(src)
+	if !ok {
+		t.Fatalf("DescribeEvalPipelineBackendPlan(%q) did not recognize dyadic where", src)
+	}
+	if backend.Descriptor.Kind != "expression" ||
+		backend.Descriptor.Shape != "runtime-dyadic/where" ||
+		backend.Descriptor.LeftExpr != "10 20 30 40" ||
+		backend.Descriptor.RightExpr != "1010b" {
+		t.Fatalf("descriptor = %#v, want runtime-dyadic where expression fields", backend.Descriptor)
+	}
+	executable, ok := CompileEvalPipelineBackendPlan(backend)
+	if !ok {
+		t.Fatalf("CompileEvalPipelineBackendPlan(%q) failed", src)
+	}
+	out, handled, err := NewEvalState(nil).ExecuteEvalPipelineExecutablePlan(executable)
+	if err != nil || !handled {
+		t.Fatalf("ExecuteEvalPipelineExecutablePlan = %#v,%v,%v", out, handled, err)
+	}
+	if !qEvalPipelineTestValueEqual(out, data.NewI64([]int64{10, 30})) {
+		t.Fatalf("ExecuteEvalPipelineExecutablePlan output = %#v, want 10 30", out)
 	}
 }
 
@@ -1125,6 +1151,34 @@ func TestQScriptPipelinePlannerDescribesCallableOverScanSum(t *testing.T) {
 		t.Fatalf("ExecuteEvalPipelineExecutablePlan callable-over scan = %#v,%v,%v; want 90,true,nil", out, handled, err)
 	}
 	assertEvalValue(t, src, int64(90))
+}
+
+func TestQScriptPipelineExecutablePlanCoversNDReshapeDotPath(t *testing.T) {
+	src := "t:2 3 4#til 24;t . 1 2 3"
+	descriptor, ok := DescribeEvalPipeline(src)
+	if !ok {
+		t.Fatalf("DescribeEvalPipeline(%q) did not recognize N-D reshape dot path", src)
+	}
+	if descriptor.Kind != "script" ||
+		descriptor.Shape != "script-pipeline/apply-index/path-dot/assignments" ||
+		descriptor.ValueExpr != "t" ||
+		descriptor.ValueBinding != "2 3 4#til 24" ||
+		descriptor.IndexExpr != "1 2 3" {
+		t.Fatalf("descriptor = %#v, want script apply path over N-D reshape", descriptor)
+	}
+	backend := EvalPipelineBackendPlan{
+		Backend:    EvalPipelineTypedRuntimeBackend,
+		Detail:     "kind=" + descriptor.Kind,
+		Descriptor: descriptor,
+	}
+	executable, ok := CompileEvalPipelineBackendPlan(backend)
+	if !ok {
+		t.Fatalf("CompileEvalPipelineBackendPlan failed for N-D reshape dot path")
+	}
+	out, handled, err := NewEvalState(nil).ExecuteEvalPipelineExecutablePlan(executable)
+	if err != nil || !handled || out != int64(23) {
+		t.Fatalf("ExecuteEvalPipelineExecutablePlan N-D reshape dot path = %#v,%v,%v; want 23,true,nil", out, handled, err)
+	}
 }
 
 func TestQScriptPipelinePlannerDescribesStringJoinCounts(t *testing.T) {

@@ -7594,6 +7594,8 @@ func lookupDyadicVerbFunc(verb string) (func(any, any) (any, error), bool) {
 		return corValue, true
 	case "within":
 		return within, true
+	case "where":
+		return whereFilterValue, true
 	case "like":
 		return likeValue, true
 	case "in":
