@@ -461,10 +461,15 @@ func qRuntimeKernelPipelineShape(kernel, shape string) string {
 		return "compare_index_stats"
 	case strings.HasPrefix(shape, "within-to-index-count-sum-stats/"), strings.HasPrefix(shape, "within-to-index-count-stats/"), strings.HasPrefix(shape, "within-to-index-sum-stats/"):
 		return "within_index_stats"
+	case strings.HasPrefix(shape, "in-to-index-count-sum-stats/"), strings.HasPrefix(shape, "in-to-index-count-stats/"), strings.HasPrefix(shape, "in-to-index-sum-stats/"),
+		strings.HasPrefix(shape, "in-to-index-count-sum/"), strings.HasPrefix(shape, "in-to-index-count/"), strings.HasPrefix(shape, "in-to-index-sum/"):
+		return "membership_index_stats"
 	case strings.HasPrefix(shape, "compare-to-index/"):
 		return "compare_index"
 	case strings.HasPrefix(shape, "within-to-index/"):
 		return "within_index"
+	case strings.HasPrefix(shape, "in-to-index/"):
+		return "membership_index"
 	case strings.HasPrefix(shape, "mask-to-index/"):
 		return "mask_to_index"
 	case strings.HasPrefix(shape, "vector-dyadic/"), strings.HasPrefix(shape, "composite-dyadic/"):
@@ -2508,10 +2513,14 @@ func (s *EvalState) eval(src string) (any, error) {
 		}
 	}
 	if strings.HasPrefix(src, "last ") {
-		if out, handled, err := s.tryEvalLastScan(strings.TrimSpace(src[len("last "):])); err != nil || handled {
+		lastInput := strings.TrimSpace(src[len("last "):])
+		if out, handled, err := s.tryEvalLastDyadicTerminal(lastInput); err != nil || handled {
 			return out, err
 		}
-		if out, handled, err := s.tryEvalLastCallableScan(strings.TrimSpace(src[len("last "):])); err != nil || handled {
+		if out, handled, err := s.tryEvalLastScan(lastInput); err != nil || handled {
+			return out, err
+		}
+		if out, handled, err := s.tryEvalLastCallableScan(lastInput); err != nil || handled {
 			return out, err
 		}
 	}
@@ -2597,6 +2606,9 @@ func (s *EvalState) eval(src string) (any, error) {
 			arg := strings.TrimSpace(src[len(prefix.word):])
 			if prefix.word == "where " {
 				if out, ok, err := s.evalWhereCompare(arg); ok || err != nil {
+					return out, err
+				}
+				if out, ok, err := s.evalWhereIn(arg); ok || err != nil {
 					return out, err
 				}
 			}
@@ -4727,28 +4739,36 @@ func (s *EvalState) evalAdverb(expr adverbExpr) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	fn, ok := lookupDyadicVerbFunc(expr.verb)
-	if !ok {
+	op, _, hasDyadicOp := lookupDyadicVerb(expr.verb)
+	fn, hasDyadicFunc := lookupDyadicVerbFunc(expr.verb)
+	if !hasDyadicFunc {
 		return nil, fmt.Errorf("%s cannot be used as a dyadic verb", expr.verb)
 	}
 	switch expr.adverb {
 	case "'":
+		if hasDyadicOp {
+			return applyEachDyadic(op, left, right)
+		}
 		return applyEachDyadicFunc(fn, left, right)
 	case "':":
 		return applyEachPriorFunc(fn, left, right)
 	case "\\:":
+		if hasDyadicOp {
+			return applyEachLeft(op, left, right)
+		}
 		return applyEachLeftFunc(fn, left, right)
 	case "/:":
+		if hasDyadicOp {
+			return applyEachRight(op, left, right)
+		}
 		return applyEachRightFunc(fn, left, right)
 	case "/":
-		op, _, ok := lookupDyadicVerb(expr.verb)
-		if !ok {
+		if !hasDyadicOp {
 			return nil, fmt.Errorf("%s cannot be used with over", expr.verb)
 		}
 		return applyOver(op, left, right)
 	case "\\":
-		op, _, ok := lookupDyadicVerb(expr.verb)
-		if !ok {
+		if !hasDyadicOp {
 			return nil, fmt.Errorf("%s cannot be used with scan", expr.verb)
 		}
 		return applyScan(op, left, right)
@@ -5605,6 +5625,84 @@ func (s *EvalState) tryEvalCountWhereIn(src string) (any, bool, error) {
 	return out, true, nil
 }
 
+func (s *EvalState) tryEvalWhereInIndexes(src, shapePrefix string) (data.Array, bool, error) {
+	if !strings.HasPrefix(src, "where ") {
+		return nil, false, nil
+	}
+	arg := strings.TrimSpace(src[len("where "):])
+	leftExpr, rightExpr, ok := splitTopLevelWord(arg, "in")
+	if !ok {
+		return nil, false, nil
+	}
+	left, err := s.eval(leftExpr)
+	if err != nil {
+		return nil, true, err
+	}
+	array, ok := left.(data.Array)
+	if !ok {
+		return nil, false, nil
+	}
+	right, err := s.eval(rightExpr)
+	if err != nil {
+		return nil, true, err
+	}
+	values, err := setItems(right)
+	if err != nil {
+		return nil, true, err
+	}
+	shape := shapePrefix + "/" + string(array.Kind()) + "/" + string(qRuntimeKernelOperandKind(right, nil))
+	out, handled, err := evalQTypedRuntimeKernel(qTypedRuntimeKernel[data.Array]{
+		kernel: "ArrayWhereIn",
+		shape:  shape,
+		call: func() (data.Array, bool, error) {
+			return data.TryTypedInIndexesI64(array, values)
+		},
+	})
+	if err != nil || !handled {
+		return nil, handled, err
+	}
+	return out, true, nil
+}
+
+func (s *EvalState) tryEvalWhereInIndexStats(src, shapePrefix string) (count, sum int64, handled bool, err error) {
+	if !strings.HasPrefix(src, "where ") {
+		return 0, 0, false, nil
+	}
+	arg := strings.TrimSpace(src[len("where "):])
+	leftExpr, rightExpr, ok := splitTopLevelWord(arg, "in")
+	if !ok {
+		return 0, 0, false, nil
+	}
+	left, err := s.eval(leftExpr)
+	if err != nil {
+		return 0, 0, true, err
+	}
+	array, ok := left.(data.Array)
+	if !ok {
+		return 0, 0, false, nil
+	}
+	right, err := s.eval(rightExpr)
+	if err != nil {
+		return 0, 0, true, err
+	}
+	values, err := setItems(right)
+	if err != nil {
+		return 0, 0, true, err
+	}
+	shape := shapePrefix + "/" + string(array.Kind()) + "/" + string(qRuntimeKernelOperandKind(right, nil))
+	count, sum, handled, err = evalQTypedRuntimeKernel2(qTypedRuntimeKernel2[int64, int64]{
+		kernel: "ArrayWhereInStats",
+		shape:  shape,
+		call: func() (int64, int64, bool, error) {
+			return data.TryTypedInIndexStatsI64(array, values)
+		},
+	})
+	if err != nil || !handled {
+		return 0, 0, handled, err
+	}
+	return count, sum, true, nil
+}
+
 func (s *EvalState) tryEvalCountReverse(src string) (any, bool, error) {
 	if !strings.HasPrefix(src, "reverse ") {
 		return nil, false, nil
@@ -5867,9 +5965,16 @@ func (s *EvalState) tryEvalSumWhereCompare(src string) (any, bool, error) {
 	if err != nil || handled {
 		return sum, handled, err
 	}
+	_, sum, handled, err = s.tryEvalWhereInIndexStats(src, "in-to-index-sum")
+	if err != nil || handled {
+		return sum, handled, err
+	}
 	indexes, handled, err := s.tryEvalWhereCompareIndexes(src, "compare-to-index-sum")
 	if err != nil || !handled {
-		return nil, handled, err
+		indexes, handled, err = s.tryEvalWhereInIndexes(src, "in-to-index-sum")
+		if err != nil || !handled {
+			return nil, handled, err
+		}
 	}
 	shape := "index-sum/" + string(indexes.Kind())
 	out, handled, err := data.TryTypedNumericSum(indexes)
@@ -6359,6 +6464,67 @@ func (s *EvalState) tryEvalCountRunningScan(src string) (any, bool, error) {
 		return int64(array.Len()), true, nil
 	}
 	return nil, false, nil
+}
+
+func (s *EvalState) tryEvalLastDyadicTerminal(src string) (any, bool, error) {
+	src = stripEnclosingParens(strings.TrimSpace(src))
+	for _, candidate := range []struct {
+		token string
+		op    byte
+		word  bool
+	}{
+		{token: "+", op: '+'},
+		{token: "-", op: '-'},
+		{token: "*", op: '*'},
+		{token: "%", op: '%'},
+		{token: "mod", op: 'r', word: true},
+		{token: "div", op: 'd', word: true},
+		{token: "<", op: '<'},
+		{token: ">", op: '>'},
+		{token: "=", op: '='},
+	} {
+		var leftExpr, rightExpr string
+		var ok bool
+		if candidate.word {
+			leftExpr, rightExpr, ok = splitTopLevelWord(src, candidate.token)
+		} else {
+			leftExpr, rightExpr, ok = splitTopLevelOperator(src, candidate.token)
+		}
+		if !ok {
+			continue
+		}
+		left, err := s.evalQLastTerminalOperand(leftExpr)
+		if err != nil {
+			return nil, true, err
+		}
+		right, err := s.evalQLastTerminalOperand(rightExpr)
+		if err != nil {
+			return nil, true, err
+		}
+		out, err := applyDyadic(candidate.op, left, right)
+		shape := "last-dyadic/" + qAdverbOperatorShapeToken(candidate.token, candidate.op) + "/" + string(qKindOfValue(left)) + "/" + string(qKindOfValue(right))
+		recordQTypedRuntimeKernelReason("QTerminalLastDyadic", shape, err == nil, err, RuntimeFallbackRuntimeError)
+		return out, true, err
+	}
+	return nil, false, nil
+}
+
+func (s *EvalState) evalQLastTerminalOperand(src string) (any, error) {
+	value, err := s.eval(src)
+	if err != nil {
+		return nil, err
+	}
+	if _, ok := value.(data.Array); ok {
+		return last(value)
+	}
+	return value, nil
+}
+
+func qAdverbOperatorShapeToken(token string, op byte) string {
+	if token != "" {
+		return token
+	}
+	return string(op)
 }
 
 func (s *EvalState) tryEvalCountFby(src string) (any, bool, error) {
@@ -7405,6 +7571,7 @@ func applyAdverbFunction(fn qAdverbFunction, args []any) (any, error) {
 	if !ok {
 		return nil, fmt.Errorf("%s cannot be used as a dyadic verb", fn.verb)
 	}
+	op, _, hasDyadicOp := lookupDyadicVerb(fn.verb)
 	switch len(args) {
 	case 1:
 		switch fn.adverb {
@@ -7432,24 +7599,31 @@ func applyAdverbFunction(fn qAdverbFunction, args []any) (any, error) {
 	case 2:
 		switch fn.adverb {
 		case "'":
+			if hasDyadicOp {
+				return applyEachDyadic(op, args[0], args[1])
+			}
 			return applyEachDyadicFunc(dyad, args[0], args[1])
 		case "/":
-			op, _, ok := lookupDyadicVerb(fn.verb)
-			if !ok {
+			if !hasDyadicOp {
 				return nil, fmt.Errorf("%s cannot be used with over", fn.verb)
 			}
 			return applyOver(op, args[0], args[1])
 		case "\\":
-			op, _, ok := lookupDyadicVerb(fn.verb)
-			if !ok {
+			if !hasDyadicOp {
 				return nil, fmt.Errorf("%s cannot be used with scan", fn.verb)
 			}
 			return applyScan(op, args[0], args[1])
 		case "':":
 			return applyEachPriorFunc(dyad, args[0], args[1])
 		case "\\:":
+			if hasDyadicOp {
+				return applyEachLeft(op, args[0], args[1])
+			}
 			return applyEachLeftFunc(dyad, args[0], args[1])
 		case "/:":
+			if hasDyadicOp {
+				return applyEachRight(op, args[0], args[1])
+			}
 			return applyEachRightFunc(dyad, args[0], args[1])
 		default:
 			return nil, fmt.Errorf("adverb %q is not supported as a function", fn.adverb)
@@ -8113,15 +8287,8 @@ func isCallableAdd(fn any) bool {
 	case qDyadicFunction:
 		return f.name == "+"
 	case qLambda:
-		params, body, err := lambdaSignature(f.body)
-		if err != nil || len(params) < 2 {
-			return false
-		}
-		left, right, ok := splitTopLevelOperator(body, "+")
-		if !ok {
-			return false
-		}
-		return strings.TrimSpace(left) == params[0] && strings.TrimSpace(right) == params[1]
+		plan, ok := qLambdaFastPlanFor(f.body)
+		return ok && plan.kind == qLambdaFastDyadic && plan.op == '+'
 	default:
 		return false
 	}
@@ -8190,7 +8357,61 @@ func applyEachUnary(verb string, v any) (any, error) {
 }
 
 func applyEachDyadic(op byte, left, right any) (any, error) {
+	if out, handled, err := tryApplyTypedAdverbDyadic(op, "'", left, right); err != nil || handled {
+		return out, err
+	}
 	return applyEachDyadicFunc(dyadicVerbFunc(op), left, right)
+}
+
+func tryApplyTypedAdverbDyadic(op byte, adverb string, left, right any) (any, bool, error) {
+	if _, ok := qDataArithmeticOp(op); !ok {
+		return nil, false, nil
+	}
+	la, lok := left.(data.Array)
+	ra, rok := right.(data.Array)
+	if !lok && !rok {
+		return nil, false, nil
+	}
+	shape := qAdverbArithmeticShape(adverb, op, left, right, la, ra)
+	if adverb == "'" && lok && rok && la.Len() != ra.Len() {
+		err := fmt.Errorf("each length mismatch")
+		recordQTypedRuntimeKernelReason("QAdverbArithmetic", shape, false, err, RuntimeFallbackSemanticGuard)
+		return nil, true, err
+	}
+	out, err := applyDyadic(op, left, right)
+	if err != nil {
+		recordQTypedRuntimeKernelReason("QAdverbArithmetic", shape, false, err, RuntimeFallbackRuntimeError)
+		return nil, true, err
+	}
+	if _, ok := out.(data.Array); !ok {
+		recordQTypedRuntimeKernelReason("QAdverbArithmetic", shape, false, nil, RuntimeFallbackUnsupportedType)
+		return nil, false, nil
+	}
+	recordQTypedRuntimeKernel("QAdverbArithmetic", shape, true, nil)
+	return out, true, nil
+}
+
+func qAdverbArithmeticShape(adverb string, op byte, left, right any, la, ra data.Array) string {
+	return "adverb-dyadic/" + qAdverbShapeName(adverb) + "/" + string(op) + "/" + string(qRuntimeKernelOperandKind(left, la)) + "/" + string(qRuntimeKernelOperandKind(right, ra))
+}
+
+func qAdverbShapeName(adverb string) string {
+	switch adverb {
+	case "'":
+		return "each"
+	case "\\:":
+		return "each-left"
+	case "/:":
+		return "each-right"
+	case "':":
+		return "each-prior"
+	case "/":
+		return "over"
+	case "\\":
+		return "scan"
+	default:
+		return "adverb"
+	}
 }
 
 func applyEachDyadicFunc(fn func(any, any) (any, error), left, right any) (any, error) {
@@ -8272,6 +8493,9 @@ func applyEachPriorFunc(fn func(any, any) (any, error), initial any, v any) (any
 }
 
 func applyEachLeft(op byte, left, right any) (any, error) {
+	if out, handled, err := tryApplyTypedAdverbDyadic(op, "\\:", left, right); err != nil || handled {
+		return out, err
+	}
 	return applyEachLeftFunc(dyadicVerbFunc(op), left, right)
 }
 
@@ -8295,6 +8519,9 @@ func applyEachLeftFunc(fn func(any, any) (any, error), left, right any) (any, er
 }
 
 func applyEachRight(op byte, left, right any) (any, error) {
+	if out, handled, err := tryApplyTypedAdverbDyadic(op, "/:", left, right); err != nil || handled {
+		return out, err
+	}
 	return applyEachRightFunc(dyadicVerbFunc(op), left, right)
 }
 
@@ -12643,6 +12870,10 @@ func (s *EvalState) evalWhereCompare(src string) (any, bool, error) {
 		return nil, false, nil
 	}
 	return out, true, nil
+}
+
+func (s *EvalState) evalWhereIn(src string) (any, bool, error) {
+	return s.tryEvalWhereInIndexes("where "+src, "in-to-index")
 }
 
 func splitWhereCompareExpr(src string) (string, string, string, bool) {

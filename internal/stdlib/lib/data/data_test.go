@@ -3888,6 +3888,27 @@ func TestTryTypedInCount(t *testing.T) {
 	if count, ok, err := TryTypedInCount(NewColumn("x", []any{"AAPL", NullValue, Symbol("AAPL")}).Data, []any{"AAPL"}); err != nil || ok || count != 0 {
 		t.Fatalf("nullable in count = %d,%v,%v; want 0,false,nil", count, ok, err)
 	}
+
+	indexes, ok, err := TryTypedInIndexesI64(NewSymbols([]string{"AAPL", "MSFT", "NVDA", "AAPL"}), []any{"NVDA", Symbol("AAPL")})
+	if err != nil || !ok {
+		t.Fatalf("symbol in indexes handled=%v err=%v; want true,nil", ok, err)
+	}
+	if got, want := indexes.Values(), []any{int64(0), int64(2), int64(3)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("symbol in indexes = %v, want %v", got, want)
+	}
+	repeatedIndexes, ok, err := TryTypedInIndexesI64(repeated, []any{Symbol("AAPL"), "MSFT"})
+	if err != nil || !ok {
+		t.Fatalf("tiled symbol in indexes handled=%v err=%v; want true,nil", ok, err)
+	}
+	if _, ok := repeatedIndexes.(i64PeriodicIndexArray); !ok {
+		t.Fatalf("tiled symbol in indexes returned %T, want i64PeriodicIndexArray", repeatedIndexes)
+	}
+	if got, want := repeatedIndexes.Values(), []any{int64(0), int64(1), int64(4), int64(5), int64(8), int64(9)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("tiled symbol in indexes = %v, want %v", got, want)
+	}
+	if count, sum, ok, err := TryTypedInIndexStatsI64(repeated, []any{Symbol("AAPL"), "MSFT"}); err != nil || !ok || count != 6 || sum != 27 {
+		t.Fatalf("tiled symbol in stats = %d,%d,%v,%v; want 6,27,true,nil", count, sum, ok, err)
+	}
 }
 
 func TestTryTypedFbySum(t *testing.T) {

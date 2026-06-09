@@ -1186,6 +1186,70 @@ func TryTypedInCount(array Array, values []any) (int64, bool, error) {
 	return typedInCount(array, values)
 }
 
+// TryTypedInIndexesI64 returns q-style row indexes selected by a typed
+// membership predicate without materializing a boolean mask.
+func TryTypedInIndexesI64(array Array, values []any) (Array, bool, error) {
+	if array == nil {
+		return nil, true, fmt.Errorf("in indexes array is nil")
+	}
+	switch a := array.(type) {
+	case attributedArray:
+		if rows, ok := typedKernels.IndexedInRows(a, values); ok {
+			return intIndexesToI64Array(rows), true, nil
+		}
+		return TryTypedInIndexesI64(a.array, values)
+	case tiledArray:
+		sourceLen := a.source.Len()
+		if sourceLen == 0 || a.len == 0 {
+			return i64RangeArray{len: 0}, true, nil
+		}
+		sourceRows, handled, err := TryTypedInIndexesI64(a.source, values)
+		if err != nil || !handled {
+			return nil, handled, err
+		}
+		rows, handled, err := TryTypedI64Indexes(sourceRows)
+		if err != nil || !handled {
+			return nil, handled, err
+		}
+		residues := make([]int64, 0, len(rows))
+		for _, sourceRow := range rows {
+			residue := (sourceRow - a.start) % sourceLen
+			if residue < 0 {
+				residue += sourceLen
+			}
+			residues = append(residues, int64(residue))
+		}
+		return newI64PeriodicIndexArray(int64(sourceLen), residues, a.len), true, nil
+	default:
+		indexes, ok := typedKernels.InIndexes(a, values, nil)
+		if !ok {
+			return nil, false, nil
+		}
+		return intIndexesToI64Array(indexes), true, nil
+	}
+}
+
+// TryTypedInIndexStatsI64 returns the selected row count and row-index sum for
+// a typed membership predicate without materializing a boolean mask.
+func TryTypedInIndexStatsI64(array Array, values []any) (count, sum int64, handled bool, err error) {
+	indexes, handled, err := TryTypedInIndexesI64(array, values)
+	if err != nil || !handled {
+		return 0, 0, handled, err
+	}
+	return int64(indexes.Len()), i64IndexArraySum(indexes), true, nil
+}
+
+func intIndexesToI64Array(indexes []int) Array {
+	if out, ok := i64RangeIndexArrayFromInts(indexes); ok {
+		return out
+	}
+	out := make([]int64, len(indexes))
+	for i, index := range indexes {
+		out[i] = int64(index)
+	}
+	return newI64Trusted(out)
+}
+
 // TryTypedBoolLogical composes boolean masks without routing each row through
 // Array.At or []any boxing. Scalars are broadcast using q vector rules.
 func TryTypedBoolLogical(op string, left, right any) (Array, bool, error) {
@@ -4116,6 +4180,159 @@ func TryTypedNumericSumWhereMask(array, mask Array) (any, bool, error) {
 		return NullValue, true, nil
 	}
 	return total, true, nil
+}
+
+// TryTypedNumericSumCountWhereCompare reduces a numeric value array over rows
+// selected by a typed comparison predicate without materializing a mask, index
+// vector, or gathered value vector.
+func TryTypedNumericSumCountWhereCompare(values, predicate Array, op Op, scalar any) (any, int64, bool, error) {
+	if values == nil || predicate == nil {
+		return nil, 0, true, fmt.Errorf("sum count where compare arrays must be non-nil")
+	}
+	if values.Len() != predicate.Len() {
+		return nil, 0, true, fmt.Errorf("sum count where compare length mismatch: values=%d predicate=%d", values.Len(), predicate.Len())
+	}
+	scalar = normalizeScalar(predicate.Kind(), scalar)
+	pred, handled, err := typedCompareRowPredicate(predicate, op, scalar)
+	if err != nil || !handled {
+		return nil, 0, handled, err
+	}
+	sum, count, err := typedNumericSumCountWherePredicate(values, pred)
+	if err == errUnsupportedNumericSumCountWhereValues {
+		return nil, 0, false, nil
+	}
+	return sum, count, true, err
+}
+
+// TryTypedNumericSumCountWhereWithin reduces a numeric value array over rows
+// selected by a typed within predicate without materializing a mask, index
+// vector, or gathered value vector.
+func TryTypedNumericSumCountWhereWithin(values, predicate Array, low, high any, highClosed bool) (any, int64, bool, error) {
+	if values == nil || predicate == nil {
+		return nil, 0, true, fmt.Errorf("sum count where within arrays must be non-nil")
+	}
+	if values.Len() != predicate.Len() {
+		return nil, 0, true, fmt.Errorf("sum count where within length mismatch: values=%d predicate=%d", values.Len(), predicate.Len())
+	}
+	pred, handled, err := typedWithinRowPredicate(predicate, low, high, highClosed)
+	if err != nil || !handled {
+		return nil, 0, handled, err
+	}
+	sum, count, err := typedNumericSumCountWherePredicate(values, pred)
+	if err == errUnsupportedNumericSumCountWhereValues {
+		return nil, 0, false, nil
+	}
+	return sum, count, true, err
+}
+
+func typedNumericSumCountWherePredicate(values Array, pred rowPredicate) (any, int64, error) {
+	var count int64
+	if isDenseIntegerArray(values) {
+		var total int64
+		for row := 0; row < values.Len(); row++ {
+			if !pred(row) {
+				continue
+			}
+			count++
+			value, ok, err := integerArrayAt(values, row)
+			if err != nil {
+				return nil, 0, err
+			}
+			if ok {
+				total += value
+			}
+		}
+		if count == 0 {
+			return NullValue, 0, nil
+		}
+		return total, count, nil
+	}
+	if !isNumericArray(values) {
+		return nil, 0, errUnsupportedNumericSumCountWhereValues
+	}
+	var total float64
+	for row := 0; row < values.Len(); row++ {
+		if !pred(row) {
+			continue
+		}
+		count++
+		value, ok, err := typedKernels.NumericAt(values, row)
+		if err != nil {
+			return nil, 0, err
+		}
+		if ok {
+			total += value
+		}
+	}
+	if count == 0 {
+		return NullValue, 0, nil
+	}
+	return total, count, nil
+}
+
+var errUnsupportedNumericSumCountWhereValues = fmt.Errorf("unsupported sum count where values")
+
+func typedWithinRowPredicate(array Array, low, high any, highClosed bool) (rowPredicate, bool, error) {
+	switch a := array.(type) {
+	case attributedArray:
+		return typedWithinRowPredicate(a.array, low, high, highClosed)
+	case tiledArray:
+		if a.source.Len() == 0 {
+			return nil, false, nil
+		}
+		low = normalizeScalar(a.source.Kind(), low)
+		high = normalizeScalar(a.source.Kind(), high)
+		return func(row int) bool {
+			if row < 0 || row >= a.len {
+				return false
+			}
+			value, ok := a.source.At((a.start + row) % a.source.Len())
+			if !ok {
+				return false
+			}
+			if compare(value, low) < 0 {
+				return false
+			}
+			if highClosed {
+				return compare(value, high) <= 0
+			}
+			return compare(value, high) < 0
+		}, true, nil
+	default:
+		low = normalizeScalar(array.Kind(), low)
+		high = normalizeScalar(array.Kind(), high)
+		if !qTypedWithinPredicateKind(array.Kind()) {
+			return nil, false, nil
+		}
+		return func(row int) bool {
+			value, ok := array.At(row)
+			if !ok {
+				return false
+			}
+			if compare(value, low) < 0 {
+				return false
+			}
+			if highClosed {
+				return compare(value, high) <= 0
+			}
+			return compare(value, high) < 0
+		}, true, nil
+	}
+}
+
+func qTypedWithinPredicateKind(kind Kind) bool {
+	switch kind {
+	case KindBool,
+		KindI8, KindI16, KindI32, KindI64,
+		KindU8, KindU16, KindU32, KindU64,
+		KindF32, KindF64,
+		KindString, KindSymbol,
+		KindMonth, KindDate, KindDateTime,
+		KindTimespan, KindMinute, KindSecond, KindTime, KindTimestamp:
+		return true
+	default:
+		return false
+	}
 }
 
 // TryTypedModuloCompareIndexStatsI64 computes count and q-index sum for

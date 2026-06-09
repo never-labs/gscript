@@ -513,9 +513,6 @@ func qScriptPipelineGatherSumCountDescriptor(src string, bindings map[string]str
 	if valueExpr == "" || indexExpr == "" || countExpr == "" || strings.TrimSpace(countExpr) != strings.TrimSpace(indexExpr) {
 		return qScriptPipelineDescriptor{}, false
 	}
-	if _, ok := qScriptPipelineIndexMaskExpr(indexExpr, bindings); ok {
-		return qScriptPipelineDescriptor{}, false
-	}
 	return qScriptPipelineDescriptor{
 		kind:         qScriptPipelineGatherReduceSumCount,
 		valueExpr:    valueExpr,
@@ -1432,6 +1429,9 @@ func (s *EvalState) evalQScriptGatherSumCountPipeline(descriptor *qScriptPipelin
 	if !ok {
 		return nil, false, nil
 	}
+	if out, handled, err := s.evalQScriptGatherSumCountWhereIndexPipeline(descriptor, array); err != nil || handled {
+		return out, handled, err
+	}
 	index, handled, err := s.evalQScriptBindingPlan(&descriptor.indexPlan)
 	if err != nil {
 		return nil, true, err
@@ -1459,6 +1459,84 @@ func (s *EvalState) evalQScriptGatherSumCountPipeline(descriptor *qScriptPipelin
 	if !ok {
 		return nil, false, nil
 	}
+	return out, true, nil
+}
+
+func (s *EvalState) evalQScriptGatherSumCountWhereIndexPipeline(descriptor *qScriptPipelineDescriptor, array data.Array) (any, bool, error) {
+	whereExpr := strings.TrimSpace(descriptor.indexBinding)
+	if whereExpr == "" {
+		if maskExpr, ok := directWhereMaskExpr(descriptor.indexExpr); ok {
+			whereExpr = "where " + maskExpr
+		}
+	}
+	if whereExpr == "" {
+		return nil, false, nil
+	}
+	plan, ok := buildQPipelineWhereComparePlan(whereExpr, qPipelineWhereCompareIndexes, "compare-to-index-count-sum")
+	if !ok {
+		return nil, false, nil
+	}
+	if plan.kind != qPipelineWhereCompareIndexes {
+		return nil, false, nil
+	}
+	plan = qPipelinePlanWithBindingPlans(plan)
+	if isIdentityI64RangeArray(array) {
+		count, sum, handled, err := s.evalQPipelineWhereCompareIndexStats(&plan)
+		if err != nil || !handled {
+			return nil, handled, err
+		}
+		out, ok := dataNumericAddCount(sum, int(count))
+		if !ok {
+			return nil, false, nil
+		}
+		recordRuntimeKernelExecution("QScriptPipelinePlan", descriptor.shape(), "hit", "typed_pipeline")
+		return out, true, nil
+	}
+	left, right, err := s.evalQPipelineCompareOperands(&plan)
+	if err != nil {
+		return nil, true, err
+	}
+	shape := "where-index-reduce/sum-count/" + string(array.Kind())
+	var sum any
+	var count int64
+	var handled bool
+	if plan.compareOp == "within" {
+		predicate, low, high, ok, err := qWithinOperands(left, right)
+		if err != nil || !ok {
+			return nil, ok, err
+		}
+		shape += "/within/" + string(predicate.Kind()) + "/" + string(qRuntimeKernelOperandKind(low, nil)) + "/" + string(qRuntimeKernelOperandKind(high, nil))
+		sum, count, handled, err = evalQTypedRuntimeKernel2(qTypedRuntimeKernel2[any, int64]{
+			kernel:         "ArrayWhereGatherSumCount",
+			shape:          shape,
+			fallbackReason: RuntimeFallbackUnsupportedType,
+			call: func() (any, int64, bool, error) {
+				return data.TryTypedNumericSumCountWhereWithin(array, predicate, low, high, true)
+			},
+		})
+	} else {
+		predicate, scalar, dataOp, ok := qWhereCompareOperands(left, right, plan.compareOp)
+		if !ok {
+			return nil, false, nil
+		}
+		shape += "/" + plan.compareOp + "/" + string(predicate.Kind()) + "/" + string(qRuntimeKernelOperandKind(scalar, nil))
+		sum, count, handled, err = evalQTypedRuntimeKernel2(qTypedRuntimeKernel2[any, int64]{
+			kernel:         "ArrayWhereGatherSumCount",
+			shape:          shape,
+			fallbackReason: RuntimeFallbackUnsupportedType,
+			call: func() (any, int64, bool, error) {
+				return data.TryTypedNumericSumCountWhereCompare(array, predicate, dataOp, scalar)
+			},
+		})
+	}
+	if err != nil || !handled {
+		return nil, handled, err
+	}
+	out, ok := dataNumericAddCount(sum, int(count))
+	if !ok {
+		return nil, false, nil
+	}
+	recordRuntimeKernelExecution("QScriptPipelinePlan", descriptor.shape(), "hit", "typed_pipeline")
 	return out, true, nil
 }
 

@@ -476,6 +476,52 @@ func TestQPipelinePlanRecognizesRuntimePrimitiveStatsAndWindows(t *testing.T) {
 	}
 }
 
+func TestEvalAdverbArithmeticUsesTypedRuntime(t *testing.T) {
+	tests := []struct {
+		expr string
+		want any
+	}{
+		{"x:til 8;(+/100-\\:x)+(+/x-/:100)", int64(0)},
+		{"x:til 8;y:(x*2)+1;+/x+'y", int64(92)},
+	}
+	for _, tt := range tests {
+		t.Run(tt.expr, func(t *testing.T) {
+			ClearRuntimeKernelExecutionStats()
+			t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+			assertEvalValue(t, tt.expr, tt.want)
+			seenAdverb := false
+			for _, stat := range RuntimeKernelExecutionStats() {
+				if stat.Kernel == "QAdverbArithmetic" && stat.Outcome == "hit" && stat.Count > 0 {
+					seenAdverb = true
+				}
+				if stat.Kernel == "QAdverbArithmetic" && (stat.Outcome == "fallback" || stat.Outcome == "error") {
+					t.Fatalf("unexpected adverb arithmetic fallback/error: %#v all=%#v", stat, RuntimeKernelExecutionStats())
+				}
+			}
+			if !seenAdverb {
+				t.Fatalf("missing QAdverbArithmetic hit: %#v", RuntimeKernelExecutionStats())
+			}
+		})
+	}
+}
+
+func TestEvalLastDyadicTerminalUsesTypedRuntime(t *testing.T) {
+	ClearRuntimeKernelExecutionStats()
+	t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+	assertEvalValue(t, "x:1+til 8;s:+\\x;last (s+count s)", int64(44))
+	seen := false
+	for _, stat := range RuntimeKernelExecutionStats() {
+		if stat.Kernel == "QTerminalLastDyadic" && stat.Outcome == "hit" && stat.Count > 0 {
+			seen = true
+		}
+	}
+	if !seen {
+		t.Fatalf("missing QTerminalLastDyadic hit: %#v", RuntimeKernelExecutionStats())
+	}
+}
+
 func TestQPipelineShapeRegistryStabilizesExpressionPlans(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -3402,13 +3448,16 @@ func TestEvalWhereRecordsTypedRuntimeKernel(t *testing.T) {
 	assertEvalValue(t, "count (sum 1 2 3 4 fby `a`a`b`b)", int64(4))
 	assertEvalValue(t, `count where "AAPL" "MSFT" "AMD" "ASK" like "A*"`, int64(3))
 	assertEvalValue(t, "count where 8#`AAPL`MSFT`NVDA`TSLA in `AAPL`MSFT", int64(4))
+	assertEvalArray(t, "where 8#`AAPL`MSFT`NVDA`TSLA in `AAPL`MSFT", data.KindI64, []any{int64(0), int64(1), int64(4), int64(5)})
 	assertEvalValue(t, `count reverse "AAPL" "MSFT" "AMD"`, int64(3))
 	assertEvalArray(t, "x:til 8;x[where x>=4]", data.KindI64, []any{int64(4), int64(5), int64(6), int64(7)})
 	assertEvalValue(t, "x:til 8;(count where x>=4)+(+/where x>=4)", int64(26))
+	assertEvalValue(t, "syms:8#`AAPL`MSFT`NVDA`TSLA;(+/where syms in `AAPL`MSFT)+count where syms in `AAPL`MSFT", int64(14))
 	assertEvalValue(t, "x:til 8;y:(x*3)+7;idx:where x>=4;+/y[idx]", int64(94))
 	assertEvalValue(t, "x:til 8;y:(x*3)+7;+/y[where x>=4]", int64(94))
 	assertEvalValue(t, "x:til 8;y:(x*3)+7;+/y where x>=4", int64(94))
 	assertEvalValue(t, "syms:8#`AAPL`MSFT`NVDA`AAPL;px:til 8;idx:where syms=`AAPL;(+/px[idx])+count idx", int64(18))
+	assertEvalValue(t, "syms:16#`aapl`amd`xnys`bats`buy`msft;v:til 16;idx:where syms in `aapl`amd`buy;(+/v[idx])+count idx", int64(61))
 	assertEvalValue(t, "count distinct 8#`AAPL`MSFT`AAPL`NVDA", int64(3))
 	assertEvalValue(t, "x:til 8;y:(x*3)+7;lo:0;hi:4;idx:where (x>=lo) and x<hi;+/y[idx]", int64(46))
 	assertEvalValue(t, "x:reverse til 8;idx:iasc x;+/x[idx]", int64(28))
@@ -3448,6 +3497,8 @@ func TestEvalWhereRecordsTypedRuntimeKernel(t *testing.T) {
 	seenCompareIndexView := false
 	seenCompareIndexViewReduce := false
 	seenDistinctCount := false
+	seenWhereIn := false
+	seenWhereInStats := false
 	for _, stat := range RuntimeKernelExecutionStats() {
 		if stat.Kernel == "ArrayWhereCompare" && stat.Shape == "compare-to-index/>=/i64/i64" && stat.Outcome == "hit" && stat.ReasonCode == "typed_kernel" && stat.Count > 0 {
 			seenWhereCompare = true
@@ -3521,15 +3572,27 @@ func TestEvalWhereRecordsTypedRuntimeKernel(t *testing.T) {
 		if stat.Kernel == "ArrayWhereCompareIndexView" && strings.HasPrefix(stat.Shape, "compare-to-index-view/=/symbol/symbol") && stat.Outcome == "hit" && stat.ReasonCode == "typed_kernel" && stat.Count > 0 {
 			seenCompareIndexView = true
 		}
+		if stat.Kernel == "ArrayWhereCompareStats" && strings.HasPrefix(stat.Shape, "compare-to-index-count-sum-stats/=/symbol/symbol") && stat.Outcome == "hit" && stat.ReasonCode == "typed_kernel" && stat.Count > 0 {
+			seenCompareIndexView = true
+		}
 		if stat.Kernel == "ArrayGatherReduceSum" && stat.Shape == "gather-reduce/i64-range/compare-index-view" && stat.Outcome == "hit" && stat.ReasonCode == "typed_kernel" && stat.Count > 0 {
+			seenCompareIndexViewReduce = true
+		}
+		if stat.Kernel == "QScriptPipelinePlan" && stat.Shape == "script-pipeline/gather-reduce/sum-count/assignments" && stat.Outcome == "hit" && stat.Count > 0 {
 			seenCompareIndexViewReduce = true
 		}
 		if stat.Kernel == "ArrayDistinctCount" && stat.Shape == "distinct-count/symbol" && stat.Outcome == "hit" && stat.ReasonCode == "typed_kernel" && stat.Count > 0 {
 			seenDistinctCount = true
 		}
+		if stat.Kernel == "ArrayWhereIn" && strings.HasPrefix(stat.Shape, "in-to-index/symbol/symbol") && stat.Outcome == "hit" && stat.ReasonCode == "typed_kernel" && stat.PipelineShape == "membership_index" && stat.Count > 0 {
+			seenWhereIn = true
+		}
+		if stat.Kernel == "ArrayWhereInStats" && strings.HasPrefix(stat.Shape, "in-to-index-sum/symbol/symbol") && stat.Outcome == "hit" && stat.ReasonCode == "typed_kernel" && stat.PipelineShape == "membership_index_stats" && stat.Count > 0 {
+			seenWhereInStats = true
+		}
 	}
-	if !seenWhereCompare || !seenWhereMask || !seenLikeCount || !seenInCount || !seenBoolLogical || !seenTrueCount || !seenScalarFill || !seenSortIndexes || !seenCountReverse || !seenGather || !seenFbySum || !seenLastCallableScan || !seenAmend || !seenEachCountDistinct || !seenWhereCompareStats || !seenWhereCompareCountSum || !seenCountSums || !seenCountMins || !seenCountMaxs || !seenCountAvgs || !seenCountFby || !seenGatherReduce || !seenWhereReduce || !seenCompareIndexView || !seenCompareIndexViewReduce || !seenDistinctCount {
-		t.Fatalf("missing where typed runtime stats: compare=%v mask=%v like=%v in=%v logical=%v trueCount=%v scalarFill=%v sortIndexes=%v reverse=%v gather=%v fbySum=%v lastScan=%v amend=%v eachDistinct=%v compareStats=%v compareCountSum=%v countSums=%v countMins=%v countMaxs=%v countAvgs=%v countFby=%v gatherReduce=%v whereReduce=%v compareIndexView=%v compareIndexViewReduce=%v distinctCount=%v stats=%#v", seenWhereCompare, seenWhereMask, seenLikeCount, seenInCount, seenBoolLogical, seenTrueCount, seenScalarFill, seenSortIndexes, seenCountReverse, seenGather, seenFbySum, seenLastCallableScan, seenAmend, seenEachCountDistinct, seenWhereCompareStats, seenWhereCompareCountSum, seenCountSums, seenCountMins, seenCountMaxs, seenCountAvgs, seenCountFby, seenGatherReduce, seenWhereReduce, seenCompareIndexView, seenCompareIndexViewReduce, seenDistinctCount, RuntimeKernelExecutionStats())
+	if !seenWhereCompare || !seenWhereMask || !seenLikeCount || !seenInCount || !seenBoolLogical || !seenTrueCount || !seenScalarFill || !seenSortIndexes || !seenCountReverse || !seenGather || !seenFbySum || !seenLastCallableScan || !seenAmend || !seenEachCountDistinct || !seenWhereCompareStats || !seenWhereCompareCountSum || !seenCountSums || !seenCountMins || !seenCountMaxs || !seenCountAvgs || !seenCountFby || !seenGatherReduce || !seenWhereReduce || !seenCompareIndexView || !seenCompareIndexViewReduce || !seenDistinctCount || !seenWhereIn || !seenWhereInStats {
+		t.Fatalf("missing where typed runtime stats: compare=%v mask=%v like=%v in=%v whereIn=%v whereInStats=%v logical=%v trueCount=%v scalarFill=%v sortIndexes=%v reverse=%v gather=%v fbySum=%v lastScan=%v amend=%v eachDistinct=%v compareStats=%v compareCountSum=%v countSums=%v countMins=%v countMaxs=%v countAvgs=%v countFby=%v gatherReduce=%v whereReduce=%v compareIndexView=%v compareIndexViewReduce=%v distinctCount=%v stats=%#v", seenWhereCompare, seenWhereMask, seenLikeCount, seenInCount, seenWhereIn, seenWhereInStats, seenBoolLogical, seenTrueCount, seenScalarFill, seenSortIndexes, seenCountReverse, seenGather, seenFbySum, seenLastCallableScan, seenAmend, seenEachCountDistinct, seenWhereCompareStats, seenWhereCompareCountSum, seenCountSums, seenCountMins, seenCountMaxs, seenCountAvgs, seenCountFby, seenGatherReduce, seenWhereReduce, seenCompareIndexView, seenCompareIndexViewReduce, seenDistinctCount, RuntimeKernelExecutionStats())
 	}
 }
 
@@ -3665,6 +3728,9 @@ func TestEvalTemporalCompareRecordsTypedRuntimeKernel(t *testing.T) {
 			seenWithinCount = true
 		}
 		if stat.Kernel == "ArrayWhereWithin" && strings.HasPrefix(stat.Shape, "within-to-index/minute/minute/minute") && stat.PipelineShape == "within_index" {
+			seenWithinIndex = true
+		}
+		if stat.Kernel == "ArrayWhereWithinStats" && strings.HasPrefix(stat.Shape, "within-to-index-count-sum-stats/minute/minute/minute") && stat.PipelineShape == "within_index_stats" {
 			seenWithinIndex = true
 		}
 	}
