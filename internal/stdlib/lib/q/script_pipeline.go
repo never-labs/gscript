@@ -178,7 +178,7 @@ func (s *EvalState) tryEvalQScriptPipeline(descriptor *qScriptPipelineDescriptor
 			return nil, true, err
 		}
 		if !handled {
-			value, err = s.evalCachedOrString(assignment.rhs, assignment.valueExpr, &assignment.binding)
+			value, err = s.evalCachedOrString(assignment.rhs, assignment.valueExpr, &assignment.binding, nil)
 			if err != nil {
 				recordRuntimeKernelExecution("QScriptPipelinePlan", shape, "error", "runtime_error")
 				return nil, true, err
@@ -357,7 +357,7 @@ func (s *EvalState) evalQScriptPipelineDeferredAssignment(descriptor *qScriptPip
 			return err
 		}
 		if !handled {
-			value, err = s.evalCachedOrString(assignment.rhs, assignment.valueExpr, &assignment.binding)
+			value, err = s.evalCachedOrString(assignment.rhs, assignment.valueExpr, &assignment.binding, nil)
 			if err != nil {
 				return err
 			}
