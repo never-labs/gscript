@@ -5202,6 +5202,25 @@ func TestEvalSortAndSortIndexes(t *testing.T) {
 	assertEvalArray(t, "rank 2026.06.07 0Nd 2026.06.06", data.KindI64, []any{int64(2), int64(0), int64(1)})
 }
 
+func TestEvalXPrevSumUsesTypedRuntime(t *testing.T) {
+	ClearRuntimeKernelExecutionStats()
+	t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+	assertEvalValue(t, "+/2 xprev 10 20 30 40", int64(30))
+	seenSum := false
+	for _, stat := range RuntimeKernelExecutionStats() {
+		if stat.Kernel == "ArraySum" && stat.Outcome == "hit" && stat.ReasonCode == "typed_kernel" {
+			seenSum = true
+		}
+		if stat.Kernel == "ArraySum" && (stat.Outcome == "fallback" || stat.Outcome == "error") {
+			t.Fatalf("unexpected ArraySum fallback/error: %#v all=%#v", stat, RuntimeKernelExecutionStats())
+		}
+	}
+	if !seenSum {
+		t.Fatalf("missing typed ArraySum hit: %#v", RuntimeKernelExecutionStats())
+	}
+}
+
 func TestEvalSortRankReducerBundleRecordsTypedRuntimeKernel(t *testing.T) {
 	ClearRuntimeKernelExecutionStats()
 	t.Cleanup(ClearRuntimeKernelExecutionStats)
@@ -5587,6 +5606,7 @@ func TestEvalSequenceTransformSumAndCountRecordsRuntimeKernel(t *testing.T) {
 		{name: "ratios_sum", expr: "+/ratios 2 4 8 16", want: float64(8)},
 		{name: "reverse_count", expr: "count reverse til 8", want: int64(8)},
 		{name: "ratios_count", expr: "count ratios 2 4 8 16", want: int64(4)},
+		{name: "deltas_count_after_fills", expr: "count deltas fills 1 0N 3", want: int64(3)},
 	}
 
 	for _, tc := range cases {

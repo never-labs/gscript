@@ -3416,6 +3416,14 @@ func TestTypedNumericUnaryBinaryAndAggregates(t *testing.T) {
 		t.Fatalf("TryTypedNumericSum nullable = %v, %v; want 3.5, true", value, ok)
 	}
 
+	value, ok, err = TryTypedNumericSum(shiftedArray{source: NewI64([]int64{10, 20, 30, 40}), offset: -2})
+	if err != nil {
+		t.Fatalf("TryTypedNumericSum shifted integer returned error: %v", err)
+	}
+	if !ok || value != int64(30) {
+		t.Fatalf("TryTypedNumericSum shifted integer = %v, %v; want 30, true", value, ok)
+	}
+
 	value, ok, err = TryTypedNumericSum(NewI64Range(0, 1, 8192))
 	if err != nil {
 		t.Fatalf("TryTypedNumericSum range returned error: %v", err)

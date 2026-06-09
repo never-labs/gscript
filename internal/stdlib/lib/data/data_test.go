@@ -7800,6 +7800,14 @@ func TestSequenceTransformRuntimeHelpers(t *testing.T) {
 	if err != nil || !handled || count != 8 {
 		t.Fatalf("SequenceTransformCount reverse = %d,%v,%v; want 8,true,nil", count, handled, err)
 	}
+	filled, handled, err := TryTypedFills(NewColumn("x", []any{int64(1), NullValue, int64(3)}).Data)
+	if err != nil || !handled {
+		t.Fatalf("TryTypedFills = %T,%v,%v; want handled nil error", filled, handled, err)
+	}
+	count, handled, err = SequenceTransformCount(SequenceTransformDeltas, nil, filled)
+	if err != nil || !handled || count != 3 {
+		t.Fatalf("SequenceTransformCount deltas filled = %d,%v,%v; want 3,true,nil", count, handled, err)
+	}
 
 	sum, handled, err := TryTypedSequenceTransformNumericSum(SequenceTransformReverse, nil, values)
 	if err != nil || !handled || sum != int64(36) {

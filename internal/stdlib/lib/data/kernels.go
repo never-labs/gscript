@@ -9231,6 +9231,15 @@ func (typedKernelRegistry) NumericAt(array Array, row int) (float64, bool, error
 			return 0, ok, err
 		}
 		return typedKernels.NumericAt(a.source, index)
+	case shiftedArray:
+		sourceRow := row + a.offset
+		if row < 0 || row >= a.Len() {
+			return 0, false, fmt.Errorf("array row %d out of range", row)
+		}
+		if sourceRow < 0 || sourceRow >= a.source.Len() {
+			return 0, false, nil
+		}
+		return typedKernels.NumericAt(a.source, sourceRow)
 	case i64SparseAmendArray:
 		value, ok, err := a.i64At(row)
 		if err != nil || !ok {
@@ -9414,6 +9423,10 @@ func isNumericArray(array Array) bool {
 	case tiledArray:
 		return isNumericArray(a.source)
 	case indexedArray:
+		return isNumericArray(a.source)
+	case filledArray:
+		return isNumericArray(a.source)
+	case shiftedArray:
 		return isNumericArray(a.source)
 	case columnArray[int8], columnArray[int16], columnArray[int32], columnArray[int64],
 		columnArray[uint8], columnArray[uint16], columnArray[uint32], columnArray[uint64],
@@ -9881,6 +9894,8 @@ func isIntegerArray(array Array) bool {
 		return isIntegerArray(a.source)
 	case indexedArray:
 		return isIntegerArray(a.source)
+	case shiftedArray:
+		return isIntegerArray(a.source)
 	case i64SparseAmendArray:
 		return true
 	case i64ScalarDyadicArray:
@@ -9977,6 +9992,15 @@ func integerArrayAt(array Array, row int) (int64, bool, error) {
 			return 0, ok, err
 		}
 		return integerArrayAt(a.source, index)
+	case shiftedArray:
+		sourceRow := row + a.offset
+		if row < 0 || row >= a.Len() {
+			return 0, false, fmt.Errorf("array row %d out of range", row)
+		}
+		if sourceRow < 0 || sourceRow >= a.source.Len() {
+			return 0, false, nil
+		}
+		return integerArrayAt(a.source, sourceRow)
 	case i64SparseAmendArray:
 		return a.i64At(row)
 	case fbyI64BroadcastArray:
