@@ -60,6 +60,7 @@ type qScriptPipelineDescriptor struct {
 	sequenceValuePlan qScriptBindingPlan
 	sequenceSteps     []data.SequenceTransformStep
 	sequenceBindings  []string
+	sequenceShapeName string
 	terminalUsesWhere bool
 	terminalPlan      qPipelinePlan
 	moduloMaskPlan    *qPipelinePlan
@@ -132,6 +133,7 @@ func buildQScriptPipelineDescriptor(statements []qScriptStatement) (*qScriptPipe
 	descriptor.colIndexPlan = buildQScriptBindingPlanForRHS(descriptor.colIndexExpr, nil)
 	descriptor.scalarPlan = buildQScriptBindingPlanForRHS(descriptor.scalarExpr, nil)
 	descriptor.sequenceValuePlan = buildQScriptBindingPlanForRHS(descriptor.sequenceValueExpr, nil)
+	descriptor.sequenceShapeName = qScriptPipelineSequenceTransformName(descriptor.sequenceSteps)
 	descriptor.moduloMaskPlan = qScriptPipelineModuloMaskPlan(descriptor.maskExpr)
 	descriptor.shapeText = descriptor.shape()
 	return &descriptor, true
@@ -913,12 +915,12 @@ func (s *EvalState) tryEvalQScriptPipeline(descriptor *qScriptPipelineDescriptor
 		recordQScriptPipelineResult(shape, handled, err)
 		return out, handled, err
 	}
-	terminal := descriptor.terminalPlan
+	terminal := &descriptor.terminalPlan
 	if terminal.kind == qPipelineInvalid {
 		recordRuntimeKernelExecution("QScriptPipelinePlan", shape, "fallback", RuntimeFallbackPlannerUnhandled)
 		return nil, false, nil
 	}
-	s.rememberQPipelinePlan(descriptor.terminal, terminal)
+	s.rememberQPipelinePlanKnownSource(descriptor.terminal, *terminal)
 	for _, assignment := range descriptor.assignments {
 		if qScriptPipelineCanDeferAssignment(descriptor, assignment) {
 			continue
@@ -1362,7 +1364,7 @@ func (s *EvalState) evalQScriptSequenceTransformChainEdgeSumPipeline(descriptor 
 	if !handled {
 		return nil, false, nil
 	}
-	shape := "vector-transform-chain/sum-first-last/" + qScriptPipelineSequenceTransformName(descriptor.sequenceSteps) + "/" + string(qRuntimeKernelOperandKind(value, nil))
+	shape := "vector-transform-chain/sum-first-last/" + descriptor.sequenceShapeName + "/" + string(qRuntimeKernelOperandKind(value, nil))
 	out, handled, err := data.TryTypedSequenceTransformChainNumericSumFirstLast(descriptor.sequenceSteps, value)
 	out, handled, err = qTypedRuntimeResultReason("SequenceTransformChainEdgeReduce", shape, RuntimeFallbackUnsupportedType, out, handled, err)
 	return out, handled, err
@@ -1389,7 +1391,7 @@ func (s *EvalState) evalQScriptSequenceTransformChainSumCountPipeline(descriptor
 	if err != nil || !handled {
 		return nil, handled, err
 	}
-	shape := "vector-transform-chain/sum-count/" + qScriptPipelineSequenceTransformName(descriptor.sequenceSteps) + "/" + string(qRuntimeKernelOperandKind(value, nil))
+	shape := "vector-transform-chain/sum-count/" + descriptor.sequenceShapeName + "/" + string(qRuntimeKernelOperandKind(value, nil))
 	out, handled, err := data.TryTypedSequenceTransformChainNumericSumCount(descriptor.sequenceSteps, value)
 	out, handled, err = qTypedRuntimeResultReason("SequenceTransformChainSumCount", shape, RuntimeFallbackUnsupportedType, out, handled, err)
 	return out, handled, err
@@ -1634,7 +1636,7 @@ func decodeQScriptPipelineNames(text string) []string {
 	return out
 }
 
-func (s *EvalState) evalQScriptTerminalPipeline(descriptor *qScriptPipelineDescriptor, terminal qPipelinePlan) (any, bool, error) {
+func (s *EvalState) evalQScriptTerminalPipeline(descriptor *qScriptPipelineDescriptor, terminal *qPipelinePlan) (any, bool, error) {
 	switch terminal.kind {
 	case qPipelineApplyScalarIndex:
 		return s.evalQPipelinePlan(terminal)
@@ -1651,7 +1653,7 @@ func (s *EvalState) evalQScriptTerminalPipeline(descriptor *qScriptPipelineDescr
 			return nil, false, nil
 		}
 		if descriptor.moduloMaskPlan != nil {
-			if out, handled, err := s.evalQPipelineModuloCompareValueSum(*descriptor.moduloMaskPlan, array); err != nil || handled {
+			if out, handled, err := s.evalQPipelineModuloCompareValueSum(descriptor.moduloMaskPlan, array); err != nil || handled {
 				return out, handled, err
 			}
 		}
@@ -1702,7 +1704,7 @@ func (s *EvalState) evalQScriptTerminalPipeline(descriptor *qScriptPipelineDescr
 		}
 		if descriptor.kind == qScriptPipelineWhereIndexReduceSum {
 			if descriptor.moduloMaskPlan != nil {
-				if out, handled, err := s.evalQPipelineModuloCompareValueSum(*descriptor.moduloMaskPlan, array); err != nil || handled {
+				if out, handled, err := s.evalQPipelineModuloCompareValueSum(descriptor.moduloMaskPlan, array); err != nil || handled {
 					return out, handled, err
 				}
 			}

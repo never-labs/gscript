@@ -1400,7 +1400,7 @@ func (s *EvalState) tryEvalCompareIndexStatsAssignment(src string) (any, bool, e
 		return nil, false, nil
 	}
 	plan = qPipelinePlanWithBindingPlans(plan)
-	left, right, err := s.evalQPipelineCompareOperands(plan)
+	left, right, err := s.evalQPipelineCompareOperands(&plan)
 	if err != nil {
 		return nil, true, err
 	}
@@ -1608,7 +1608,7 @@ func (s *EvalState) evalQFastPlan(plan *qEvalFastPlan) (any, bool, error) {
 		if plan.pipeline.kind == qPipelineInvalid {
 			return nil, false, nil
 		}
-		return s.evalQPipelinePlan(plan.pipeline)
+		return s.evalQPipelinePlan(&plan.pipeline)
 	case qEvalFastScalarApplyIndex:
 		target, ok := s.lookupName(plan.scalarIndex.target)
 		if !ok || isCallable(target) {
@@ -1634,7 +1634,7 @@ func (s *EvalState) evalCachedOrString(src string, expr Expr, bindingPlan *qScri
 		return out, err
 	}
 	if plan := s.qPipelinePlan(src); plan.kind != qPipelineInvalid {
-		if out, handled, err := s.evalQPipelinePlan(plan); err != nil || handled {
+		if out, handled, err := s.evalQPipelinePlan(&plan); err != nil || handled {
 			return out, err
 		}
 	}
@@ -2204,7 +2204,7 @@ func (s *EvalState) eval(src string) (any, error) {
 		return out, err
 	}
 	if plan := s.qPipelinePlan(src); plan.kind != qPipelineInvalid {
-		if out, handled, err := s.evalQPipelinePlan(plan); err != nil || handled {
+		if out, handled, err := s.evalQPipelinePlan(&plan); err != nil || handled {
 			return out, err
 		}
 	}
@@ -5913,7 +5913,7 @@ func (s *EvalState) tryEvalSumWhereGatherReduce(src string) (any, bool, error) {
 	if !ok {
 		return nil, false, nil
 	}
-	out, handled, err := s.evalQPipelinePlan(plan)
+	out, handled, err := s.evalQPipelinePlan(&plan)
 	if err != nil || !handled {
 		return nil, handled, err
 	}

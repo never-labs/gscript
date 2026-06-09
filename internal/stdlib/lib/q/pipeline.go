@@ -195,6 +195,23 @@ func (s *EvalState) rememberQPipelinePlan(src string, plan qPipelinePlan) {
 	s.pipelineCache[src] = plan
 }
 
+func (s *EvalState) rememberQPipelinePlanKnownSource(src string, plan qPipelinePlan) {
+	if src == "" || plan.kind == qPipelineInvalid {
+		return
+	}
+	if s.pipelineCache != nil {
+		if _, ok := s.pipelineCache[src]; ok {
+			return
+		}
+	}
+	if s.pipelineCache == nil {
+		s.pipelineCache = make(map[string]qPipelinePlan, 32)
+	} else if len(s.pipelineCache) >= 512 {
+		s.pipelineCache = make(map[string]qPipelinePlan, 32)
+	}
+	s.pipelineCache[src] = plan
+}
+
 func qPipelinePlanCandidate(src string) bool {
 	if strings.HasPrefix(src, "+/") {
 		return true
@@ -1085,7 +1102,7 @@ func qPipelineDeltasInput(src string) (string, bool) {
 	return input, true
 }
 
-func (s *EvalState) evalQPipelinePlan(plan qPipelinePlan) (any, bool, error) {
+func (s *EvalState) evalQPipelinePlan(plan *qPipelinePlan) (any, bool, error) {
 	if plan.kind == qPipelineInvalid {
 		return nil, false, nil
 	}
@@ -1144,7 +1161,7 @@ func (s *EvalState) evalQPipelinePlan(plan qPipelinePlan) (any, bool, error) {
 	case qPipelineSumRaze:
 		out, handled, err = s.evalQPipelineSumRaze(plan)
 	case qPipelineUnaryPrimitive, qPipelineDyadicPrimitive:
-		out, handled, err = s.evalQPipelineRuntimePrimitive(plan)
+		out, handled, err = s.evalQPipelineRuntimePrimitive(*plan)
 	case qPipelineApplyScalarIndex:
 		out, handled, err = s.evalQPipelineApplyScalarIndex(plan)
 	default:
@@ -1162,7 +1179,7 @@ func (s *EvalState) evalQPipelinePlan(plan qPipelinePlan) (any, bool, error) {
 	return out, handled, err
 }
 
-func (s *EvalState) evalQPipelineApplyScalarIndex(plan qPipelinePlan) (any, bool, error) {
+func (s *EvalState) evalQPipelineApplyScalarIndex(plan *qPipelinePlan) (any, bool, error) {
 	target, err := s.evalQPipelinePlannedExpr(plan.valueExpr, &plan.valuePlan)
 	if err != nil {
 		return nil, true, err
@@ -1204,7 +1221,7 @@ func (s *EvalState) evalQPipelineApplyScalarIndex(plan qPipelinePlan) (any, bool
 	return out, true, nil
 }
 
-func (s *EvalState) evalQPipelineSumSequenceTransform(plan qPipelinePlan) (any, bool, error) {
+func (s *EvalState) evalQPipelineSumSequenceTransform(plan *qPipelinePlan) (any, bool, error) {
 	var left any
 	var leftOK bool
 	if plan.leftExpr != "" {
@@ -1246,7 +1263,7 @@ func (s *EvalState) evalQPipelineSumSequenceTransform(plan qPipelinePlan) (any, 
 	return evalQPipelineSumSequenceTransformBound(plan, bound, args, value)
 }
 
-func evalQPipelineSumSequenceTransformBound(plan qPipelinePlan, bound qPipelineBoundPlan, args []int, value any) (any, bool, error) {
+func evalQPipelineSumSequenceTransformBound(plan *qPipelinePlan, bound qPipelineBoundPlan, args []int, value any) (any, bool, error) {
 	if qRuntimeKernelOperandKind(value, nil) != bound.resultKind {
 		return nil, false, nil
 	}
@@ -1260,7 +1277,7 @@ func evalQPipelineSumSequenceTransformBound(plan qPipelinePlan, bound qPipelineB
 	})
 }
 
-func (s *EvalState) evalQPipelineSequenceTransformArgs(plan qPipelinePlan, left any, leftOK bool) ([]int, error) {
+func (s *EvalState) evalQPipelineSequenceTransformArgs(plan *qPipelinePlan, left any, leftOK bool) ([]int, error) {
 	switch plan.compareOp {
 	case data.SequenceTransformRotate:
 		if !leftOK {
@@ -1281,7 +1298,7 @@ func (s *EvalState) evalQPipelineSequenceTransformArgs(plan qPipelinePlan, left 
 	}
 }
 
-func (s *EvalState) evalQPipelineSumRaze(plan qPipelinePlan) (any, bool, error) {
+func (s *EvalState) evalQPipelineSumRaze(plan *qPipelinePlan) (any, bool, error) {
 	value, err := s.evalQPipelinePlannedExpr(plan.reductionInput, &plan.reductionPlan)
 	if err != nil {
 		return nil, true, err
@@ -1297,7 +1314,7 @@ func (s *EvalState) evalQPipelineSumRaze(plan qPipelinePlan) (any, bool, error) 
 	})
 }
 
-func (s *EvalState) evalQPipelineSumWhereMask(plan qPipelinePlan) (any, bool, error) {
+func (s *EvalState) evalQPipelineSumWhereMask(plan *qPipelinePlan) (any, bool, error) {
 	value, err := s.evalQPipelinePlannedExpr(plan.valueExpr, &plan.valuePlan)
 	if err != nil {
 		return nil, true, err
@@ -1319,7 +1336,7 @@ func (s *EvalState) evalQPipelineSumWhereMask(plan qPipelinePlan) (any, bool, er
 	return qTypedRuntimeResult("ArrayWhereReduceSum", shape, out, handled, err)
 }
 
-func (s *EvalState) evalQPipelineSumWhereIndex(plan qPipelinePlan) (any, bool, error) {
+func (s *EvalState) evalQPipelineSumWhereIndex(plan *qPipelinePlan) (any, bool, error) {
 	value, err := s.evalQPipelinePlannedExpr(plan.valueExpr, &plan.valuePlan)
 	if err != nil {
 		return nil, true, err
@@ -1329,7 +1346,7 @@ func (s *EvalState) evalQPipelineSumWhereIndex(plan qPipelinePlan) (any, bool, e
 		return nil, false, nil
 	}
 	if plan.moduloMaskPlan != nil {
-		if out, handled, err := s.evalQPipelineModuloCompareValueSum(*plan.moduloMaskPlan, array); err != nil || handled {
+		if out, handled, err := s.evalQPipelineModuloCompareValueSum(plan.moduloMaskPlan, array); err != nil || handled {
 			return out, handled, err
 		}
 	}
@@ -1417,7 +1434,7 @@ func isIdentityI64RangeArray(array data.Array) bool {
 	return ok && lastI == int64(array.Len()-1)
 }
 
-func (s *EvalState) evalQPipelineSumGatherIndexes(plan qPipelinePlan) (any, bool, error) {
+func (s *EvalState) evalQPipelineSumGatherIndexes(plan *qPipelinePlan) (any, bool, error) {
 	value, err := s.evalQPipelinePlannedExpr(plan.valueExpr, &plan.valuePlan)
 	if err != nil {
 		return nil, true, err
@@ -1454,14 +1471,14 @@ func qPipelineGatherReduceSum(array, indexes data.Array) (any, bool, error) {
 	return qTypedRuntimeResult("ArrayGatherReduceSum", shape, out, handled, err)
 }
 
-func qPipelineGatherReduceSumWithPlanStats(plan qPipelinePlan, array, indexes data.Array) (any, bool, error) {
+func qPipelineGatherReduceSumWithPlanStats(plan *qPipelinePlan, array, indexes data.Array) (any, bool, error) {
 	recordRuntimeKernelExecution("QPipelinePlan", plan.stableShape(), "attempt", "attempt")
 	out, handled, err := qPipelineGatherReduceSum(array, indexes)
 	recordQPipelinePlanOutcome(plan, handled, err)
 	return out, handled, err
 }
 
-func qPipelineWhereReduceSumWithPlanStats(plan qPipelinePlan, array, mask data.Array) (any, bool, error) {
+func qPipelineWhereReduceSumWithPlanStats(plan *qPipelinePlan, array, mask data.Array) (any, bool, error) {
 	recordRuntimeKernelExecution("QPipelinePlan", plan.stableShape(), "attempt", "attempt")
 	shape := ""
 	if array.Kind() == data.KindI64 && mask.Kind() == data.KindBool {
@@ -1475,7 +1492,7 @@ func qPipelineWhereReduceSumWithPlanStats(plan qPipelinePlan, array, mask data.A
 	return out, handled, err
 }
 
-func recordQPipelinePlanOutcome(plan qPipelinePlan, handled bool, err error) {
+func recordQPipelinePlanOutcome(plan *qPipelinePlan, handled bool, err error) {
 	shape := plan.stableShape()
 	switch {
 	case err != nil:
@@ -1487,7 +1504,7 @@ func recordQPipelinePlanOutcome(plan qPipelinePlan, handled bool, err error) {
 	}
 }
 
-func (s *EvalState) evalQPipelineSumWhereCompare(plan qPipelinePlan) (any, bool, error) {
+func (s *EvalState) evalQPipelineSumWhereCompare(plan *qPipelinePlan) (any, bool, error) {
 	left, right, err := s.evalQPipelineCompareOperands(plan)
 	if err != nil {
 		return nil, true, err
@@ -1527,7 +1544,7 @@ func (s *EvalState) evalQPipelineSumWhereCompare(plan qPipelinePlan) (any, bool,
 	return qPipelineWhereCompareIndexesSum(indexes)
 }
 
-func (s *EvalState) evalQPipelineCountWhereCompare(plan qPipelinePlan) (any, bool, error) {
+func (s *EvalState) evalQPipelineCountWhereCompare(plan *qPipelinePlan) (any, bool, error) {
 	left, right, err := s.evalQPipelineCompareOperands(plan)
 	if err != nil {
 		return nil, true, err
@@ -1579,7 +1596,7 @@ func (s *EvalState) evalQPipelineCountWhereCompare(plan qPipelinePlan) (any, boo
 	return int64(indexes.Len()), true, nil
 }
 
-func (s *EvalState) evalQPipelineSumWhereCompareBound(plan qPipelinePlan, bound qPipelineBoundPlan, left, right any) (any, bool, error) {
+func (s *EvalState) evalQPipelineSumWhereCompareBound(plan *qPipelinePlan, bound qPipelineBoundPlan, left, right any) (any, bool, error) {
 	switch bound.resultClass {
 	case "compare_stats_sum":
 		_, sum, handled, err := s.evalQPipelineWhereCompareIndexStatsForOperands(plan, left, right)
@@ -1598,7 +1615,7 @@ func (s *EvalState) evalQPipelineSumWhereCompareBound(plan qPipelinePlan, bound 
 	}
 }
 
-func (s *EvalState) evalQPipelineCountWhereCompareBound(plan qPipelinePlan, bound qPipelineBoundPlan, left, right any) (any, bool, error) {
+func (s *EvalState) evalQPipelineCountWhereCompareBound(plan *qPipelinePlan, bound qPipelineBoundPlan, left, right any) (any, bool, error) {
 	switch bound.resultClass {
 	case "compare_count":
 		count, handled, err := s.evalQPipelineWhereCompareCountForOperands(plan, left, right)
@@ -1630,11 +1647,11 @@ func qPipelineWhereCompareIndexesSum(indexes data.Array) (any, bool, error) {
 	})
 }
 
-func (s *EvalState) evalQPipelineWhereCompareIndexes(plan qPipelinePlan) (any, bool, error) {
+func (s *EvalState) evalQPipelineWhereCompareIndexes(plan *qPipelinePlan) (any, bool, error) {
 	return s.evalQPipelineWhereCompareIndexesArray(plan)
 }
 
-func (s *EvalState) evalQPipelineSumWhereModuloCompare(plan qPipelinePlan) (any, bool, error) {
+func (s *EvalState) evalQPipelineSumWhereModuloCompare(plan *qPipelinePlan) (any, bool, error) {
 	_, sum, handled, err := s.evalQPipelineWhereModuloCompareIndexStats(plan)
 	if err != nil || handled {
 		return sum, handled, err
@@ -1642,7 +1659,7 @@ func (s *EvalState) evalQPipelineSumWhereModuloCompare(plan qPipelinePlan) (any,
 	return nil, false, nil
 }
 
-func (s *EvalState) evalQPipelineCountWhereModuloCompare(plan qPipelinePlan) (any, bool, error) {
+func (s *EvalState) evalQPipelineCountWhereModuloCompare(plan *qPipelinePlan) (any, bool, error) {
 	count, _, handled, err := s.evalQPipelineWhereModuloCompareIndexStats(plan)
 	if err != nil || handled {
 		return count, handled, err
@@ -1650,7 +1667,7 @@ func (s *EvalState) evalQPipelineCountWhereModuloCompare(plan qPipelinePlan) (an
 	return nil, false, nil
 }
 
-func (s *EvalState) evalQPipelineWhereModuloCompareIndexes(plan qPipelinePlan) (any, bool, error) {
+func (s *EvalState) evalQPipelineWhereModuloCompareIndexes(plan *qPipelinePlan) (any, bool, error) {
 	array, modulus, target, dataOp, handled, err := s.evalQPipelineModuloCompareOperands(plan)
 	if err != nil || !handled {
 		return nil, handled, err
@@ -1669,7 +1686,7 @@ func (s *EvalState) evalQPipelineWhereModuloCompareIndexes(plan qPipelinePlan) (
 	return out, true, nil
 }
 
-func (s *EvalState) evalQPipelineWhereModuloCompareIndexStats(plan qPipelinePlan) (count, sum int64, handled bool, err error) {
+func (s *EvalState) evalQPipelineWhereModuloCompareIndexStats(plan *qPipelinePlan) (count, sum int64, handled bool, err error) {
 	array, modulus, target, dataOp, handled, err := s.evalQPipelineModuloCompareOperands(plan)
 	if err != nil || !handled {
 		return 0, 0, handled, err
@@ -1683,7 +1700,7 @@ func (s *EvalState) evalQPipelineWhereModuloCompareIndexStats(plan qPipelinePlan
 	return count, sum, true, nil
 }
 
-func (s *EvalState) evalQPipelineModuloCompareValueSum(plan qPipelinePlan, values data.Array) (any, bool, error) {
+func (s *EvalState) evalQPipelineModuloCompareValueSum(plan *qPipelinePlan, values data.Array) (any, bool, error) {
 	array, modulus, target, dataOp, handled, err := s.evalQPipelineModuloCompareOperands(plan)
 	if err != nil || !handled {
 		return nil, handled, err
@@ -1702,7 +1719,7 @@ func (s *EvalState) evalQPipelineModuloCompareValueSum(plan qPipelinePlan, value
 	return out, true, nil
 }
 
-func (s *EvalState) evalQPipelineModuloCompareOperands(plan qPipelinePlan) (data.Array, any, any, data.Op, bool, error) {
+func (s *EvalState) evalQPipelineModuloCompareOperands(plan *qPipelinePlan) (data.Array, any, any, data.Op, bool, error) {
 	source, err := s.evalQPipelinePlannedExpr(plan.modExpr, &plan.modPlan)
 	if err != nil {
 		return nil, nil, nil, "", true, err
@@ -1747,7 +1764,7 @@ func buildQPipelineWhereModuloComparePlanFromWhere(src string, kind qPipelineKin
 	return buildQPipelineWhereModuloComparePlan(leftExpr, rightExpr, op, kind, prefix)
 }
 
-func (s *EvalState) evalQPipelineWhereCompareIndexStats(plan qPipelinePlan) (count, sum int64, handled bool, err error) {
+func (s *EvalState) evalQPipelineWhereCompareIndexStats(plan *qPipelinePlan) (count, sum int64, handled bool, err error) {
 	left, right, err := s.evalQPipelineCompareOperands(plan)
 	if err != nil {
 		return 0, 0, true, err
@@ -1755,7 +1772,7 @@ func (s *EvalState) evalQPipelineWhereCompareIndexStats(plan qPipelinePlan) (cou
 	return s.evalQPipelineWhereCompareIndexStatsForOperands(plan, left, right)
 }
 
-func (s *EvalState) evalQPipelineWhereCompareIndexStatsForOperands(plan qPipelinePlan, left, right any) (count, sum int64, handled bool, err error) {
+func (s *EvalState) evalQPipelineWhereCompareIndexStatsForOperands(plan *qPipelinePlan, left, right any) (count, sum int64, handled bool, err error) {
 	if plan.compareOp == "within" {
 		array, low, high, ok, err := qWithinOperands(left, right)
 		if err != nil || !ok {
@@ -1792,7 +1809,7 @@ func (s *EvalState) evalQPipelineWhereCompareIndexStatsForOperands(plan qPipelin
 	return count, sum, true, nil
 }
 
-func (s *EvalState) evalQPipelineWhereCompareCount(plan qPipelinePlan) (count int64, handled bool, err error) {
+func (s *EvalState) evalQPipelineWhereCompareCount(plan *qPipelinePlan) (count int64, handled bool, err error) {
 	left, right, err := s.evalQPipelineCompareOperands(plan)
 	if err != nil {
 		return 0, true, err
@@ -1800,7 +1817,7 @@ func (s *EvalState) evalQPipelineWhereCompareCount(plan qPipelinePlan) (count in
 	return s.evalQPipelineWhereCompareCountForOperands(plan, left, right)
 }
 
-func (s *EvalState) evalQPipelineWhereCompareCountForOperands(plan qPipelinePlan, left, right any) (count int64, handled bool, err error) {
+func (s *EvalState) evalQPipelineWhereCompareCountForOperands(plan *qPipelinePlan, left, right any) (count int64, handled bool, err error) {
 	if plan.compareOp == "within" {
 		array, low, high, ok, err := qWithinOperands(left, right)
 		if err != nil || !ok {
@@ -1837,7 +1854,7 @@ func (s *EvalState) evalQPipelineWhereCompareCountForOperands(plan qPipelinePlan
 	return count, true, nil
 }
 
-func (s *EvalState) evalQPipelineWhereCompareIndexesArray(plan qPipelinePlan) (data.Array, bool, error) {
+func (s *EvalState) evalQPipelineWhereCompareIndexesArray(plan *qPipelinePlan) (data.Array, bool, error) {
 	left, right, err := s.evalQPipelineCompareOperands(plan)
 	if err != nil {
 		return nil, true, err
@@ -1845,7 +1862,7 @@ func (s *EvalState) evalQPipelineWhereCompareIndexesArray(plan qPipelinePlan) (d
 	return s.evalQPipelineWhereCompareIndexesArrayForOperands(plan, left, right)
 }
 
-func (s *EvalState) evalQPipelineWhereCompareIndexesArrayForOperands(plan qPipelinePlan, left, right any) (data.Array, bool, error) {
+func (s *EvalState) evalQPipelineWhereCompareIndexesArrayForOperands(plan *qPipelinePlan, left, right any) (data.Array, bool, error) {
 	if plan.compareOp == "within" {
 		array, low, high, ok, err := qWithinOperands(left, right)
 		if err != nil || !ok {
@@ -1882,7 +1899,7 @@ func (s *EvalState) evalQPipelineWhereCompareIndexesArrayForOperands(plan qPipel
 	return out, true, nil
 }
 
-func qPipelineWhereCompareStatsShape(plan qPipelinePlan, left, right any) string {
+func qPipelineWhereCompareStatsShape(plan *qPipelinePlan, left, right any) string {
 	if plan.compareOp == "within" {
 		array, low, high, ok, err := qWithinOperands(left, right)
 		if err != nil || !ok {
@@ -1897,7 +1914,7 @@ func qPipelineWhereCompareStatsShape(plan qPipelinePlan, left, right any) string
 	return plan.comparePrefix + "-stats/" + plan.compareOp + "/" + string(array.Kind()) + "/" + string(qRuntimeKernelOperandKind(scalar, nil))
 }
 
-func qPipelineWhereCompareCountShape(plan qPipelinePlan, left, right any) string {
+func qPipelineWhereCompareCountShape(plan *qPipelinePlan, left, right any) string {
 	if plan.compareOp == "within" {
 		array, low, high, ok, err := qWithinOperands(left, right)
 		if err != nil || !ok {
@@ -1912,7 +1929,7 @@ func qPipelineWhereCompareCountShape(plan qPipelinePlan, left, right any) string
 	return "compare-count/" + plan.compareOp + "/" + string(array.Kind()) + "/" + string(qRuntimeKernelOperandKind(scalar, nil))
 }
 
-func qPipelineWhereCompareIndexShape(plan qPipelinePlan, left, right any) string {
+func qPipelineWhereCompareIndexShape(plan *qPipelinePlan, left, right any) string {
 	if plan.compareOp == "within" {
 		array, low, high, ok, err := qWithinOperands(left, right)
 		if err != nil || !ok {
@@ -1927,7 +1944,7 @@ func qPipelineWhereCompareIndexShape(plan qPipelinePlan, left, right any) string
 	return plan.comparePrefix + "/" + plan.compareOp + "/" + string(array.Kind()) + "/" + string(qRuntimeKernelOperandKind(scalar, nil))
 }
 
-func (s *EvalState) evalQPipelineCompareOperands(plan qPipelinePlan) (any, any, error) {
+func (s *EvalState) evalQPipelineCompareOperands(plan *qPipelinePlan) (any, any, error) {
 	left, err := s.evalQPipelinePlannedExpr(plan.leftExpr, &plan.leftPlan)
 	if err != nil {
 		return nil, nil, err
@@ -1939,7 +1956,7 @@ func (s *EvalState) evalQPipelineCompareOperands(plan qPipelinePlan) (any, any, 
 	return left, right, nil
 }
 
-func (s *EvalState) evalQPipelineSumDeltas(plan qPipelinePlan) (any, bool, error) {
+func (s *EvalState) evalQPipelineSumDeltas(plan *qPipelinePlan) (any, bool, error) {
 	value, err := s.evalQPipelinePlannedExpr(plan.reductionInput, &plan.reductionPlan)
 	if err != nil {
 		return nil, true, err
@@ -1963,7 +1980,7 @@ func (s *EvalState) evalQPipelineSumDeltas(plan qPipelinePlan) (any, bool, error
 	})
 }
 
-func (s *EvalState) evalQPipelineSumBin(plan qPipelinePlan) (any, bool, error) {
+func (s *EvalState) evalQPipelineSumBin(plan *qPipelinePlan) (any, bool, error) {
 	left, err := s.evalQPipelinePlannedExpr(plan.leftExpr, &plan.leftPlan)
 	if err != nil {
 		return nil, true, err
@@ -1986,7 +2003,7 @@ func (s *EvalState) evalQPipelineSumBin(plan qPipelinePlan) (any, bool, error) {
 	})
 }
 
-func (s *EvalState) evalQPipelineSumVectorExpr(plan qPipelinePlan) (any, bool, error) {
+func (s *EvalState) evalQPipelineSumVectorExpr(plan *qPipelinePlan) (any, bool, error) {
 	value, err := s.evalQPipelinePlannedExpr(plan.reductionInput, &plan.reductionPlan)
 	if err != nil {
 		return nil, true, err
@@ -2043,7 +2060,7 @@ func (s *EvalState) evalQPipelineSumVectorExprBound(bound qPipelineBoundPlan, va
 	})
 }
 
-func (s *EvalState) evalQPipelineSumMovingWindow(plan qPipelinePlan) (any, bool, error) {
+func (s *EvalState) evalQPipelineSumMovingWindow(plan *qPipelinePlan) (any, bool, error) {
 	widthValue, err := s.evalQPipelinePlannedExpr(plan.leftExpr, &plan.leftPlan)
 	if err != nil {
 		return nil, true, err
@@ -2071,7 +2088,7 @@ func (s *EvalState) evalQPipelineSumMovingWindow(plan qPipelinePlan) (any, bool,
 	return evalQPipelineSumMovingWindowBound(plan, bound, array, int(width))
 }
 
-func evalQPipelineSumMovingWindowBound(plan qPipelinePlan, bound qPipelineBoundPlan, array data.Array, width int) (any, bool, error) {
+func evalQPipelineSumMovingWindowBound(plan *qPipelinePlan, bound qPipelineBoundPlan, array data.Array, width int) (any, bool, error) {
 	if bound.resultClass != "moving_sum" || array.Kind() != bound.resultKind {
 		return nil, false, nil
 	}
@@ -2106,7 +2123,7 @@ func errMovingWindowWidth(name string) error {
 	return fmt.Errorf("%s width must be a positive integer", name)
 }
 
-func (s *EvalState) evalQPipelineSumDyadicMinMax(plan qPipelinePlan) (any, bool, error) {
+func (s *EvalState) evalQPipelineSumDyadicMinMax(plan *qPipelinePlan) (any, bool, error) {
 	left, err := s.evalQPipelinePlannedExpr(plan.leftExpr, &plan.leftPlan)
 	if err != nil {
 		return nil, true, err
@@ -2121,7 +2138,7 @@ func (s *EvalState) evalQPipelineSumDyadicMinMax(plan qPipelinePlan) (any, bool,
 	return qTypedRuntimeResult("ArrayDyadicMinMaxSum", shape, out, handled, err)
 }
 
-func (s *EvalState) evalQPipelineSumDyadicFloatMath(plan qPipelinePlan) (any, bool, error) {
+func (s *EvalState) evalQPipelineSumDyadicFloatMath(plan *qPipelinePlan) (any, bool, error) {
 	left, err := s.evalQPipelinePlannedExpr(plan.leftExpr, &plan.leftPlan)
 	if err != nil {
 		return nil, true, err
@@ -2135,7 +2152,7 @@ func (s *EvalState) evalQPipelineSumDyadicFloatMath(plan qPipelinePlan) (any, bo
 	return qTypedRuntimeResult("ArrayNumericDyadicFloatSum", shape, out, handled, err)
 }
 
-func (s *EvalState) evalQPipelineCountRunningScan(plan qPipelinePlan) (any, bool, error) {
+func (s *EvalState) evalQPipelineCountRunningScan(plan *qPipelinePlan) (any, bool, error) {
 	value, err := s.evalQPipelinePlannedExpr(plan.reductionInput, &plan.reductionPlan)
 	if err != nil {
 		return nil, true, err
@@ -2178,7 +2195,7 @@ func (s *EvalState) evalQPipelineCountRunningScan(plan qPipelinePlan) (any, bool
 	return int64(array.Len()), true, nil
 }
 
-func (s *EvalState) evalQPipelineLastRunningScan(plan qPipelinePlan) (any, bool, error) {
+func (s *EvalState) evalQPipelineLastRunningScan(plan *qPipelinePlan) (any, bool, error) {
 	value, err := s.evalQPipelinePlannedExpr(plan.reductionInput, &plan.reductionPlan)
 	if err != nil {
 		return nil, true, err
@@ -2231,7 +2248,7 @@ func qLastRunningScanValue(scan string, value any) (any, error) {
 	}
 }
 
-func (s *EvalState) evalQPipelineCountVectorExpr(plan qPipelinePlan) (any, bool, error) {
+func (s *EvalState) evalQPipelineCountVectorExpr(plan *qPipelinePlan) (any, bool, error) {
 	value, err := s.evalQPipelinePlannedExpr(plan.reductionInput, &plan.reductionPlan)
 	if err != nil {
 		return nil, true, err
@@ -2269,7 +2286,7 @@ func evalQPipelineCountVectorExprBound(bound qPipelineBoundPlan, array data.Arra
 	return int64(array.Len()), true, nil
 }
 
-func (s *EvalState) evalQPipelineCountSequencePrimitive(plan qPipelinePlan) (any, bool, error) {
+func (s *EvalState) evalQPipelineCountSequencePrimitive(plan *qPipelinePlan) (any, bool, error) {
 	switch plan.compareOp {
 	case "value":
 		value, err := s.evalQPipelinePlannedExpr(plan.reductionInput, &plan.reductionPlan)
@@ -2360,7 +2377,7 @@ func (s *EvalState) evalQPipelineCountSequencePrimitive(plan qPipelinePlan) (any
 	}
 }
 
-func (s *EvalState) evalQPipelineCountDistinct(plan qPipelinePlan) (any, bool, error) {
+func (s *EvalState) evalQPipelineCountDistinct(plan *qPipelinePlan) (any, bool, error) {
 	value, err := s.evalQPipelinePlannedExpr(plan.reductionInput, &plan.reductionPlan)
 	if err != nil {
 		return nil, true, err
@@ -2380,7 +2397,7 @@ func (s *EvalState) evalQPipelineCountDistinct(plan qPipelinePlan) (any, bool, e
 	})
 }
 
-func (s *EvalState) evalQPipelineCountWhereIn(plan qPipelinePlan) (any, bool, error) {
+func (s *EvalState) evalQPipelineCountWhereIn(plan *qPipelinePlan) (any, bool, error) {
 	left, err := s.evalQPipelinePlannedExpr(plan.leftExpr, &plan.leftPlan)
 	if err != nil {
 		return nil, true, err
@@ -2432,7 +2449,10 @@ func qPipelineOperandFingerprintForValue(role qPipelineOperandRole, value any) q
 	return qPipelineOperandFingerprint{role: role, kind: qRuntimeKernelOperandKind(value, nil), class: "value"}
 }
 
-func qPipelineBindingKey(plan qPipelinePlan, operands []qPipelineOperandFingerprint) qPipelineBindingCacheKey {
+func qPipelineBindingKey(plan *qPipelinePlan, operands []qPipelineOperandFingerprint) qPipelineBindingCacheKey {
+	if plan == nil {
+		return qPipelineBindingCacheKey{}
+	}
 	source := plan.source
 	if source == "" {
 		source = plan.shape

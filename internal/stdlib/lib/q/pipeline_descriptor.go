@@ -252,7 +252,7 @@ func (s *EvalState) ExecuteEvalPipelineExecutablePlan(plan EvalPipelineExecutabl
 	}
 	switch plan.kind {
 	case "expression":
-		return s.evalQPipelinePlan(plan.expression)
+		return s.evalQPipelinePlan(&plan.expression)
 	case "script":
 		return s.tryEvalQScriptPipeline(plan.script)
 	default:
@@ -268,7 +268,7 @@ func (s *EvalState) executeEvalPipeline(source string) (any, bool, error) {
 		return s.tryEvalQScriptPipeline(plan.scriptPipeline)
 	}
 	if plan := s.qPipelinePlan(source); plan.kind != qPipelineInvalid {
-		return s.evalQPipelinePlan(plan)
+		return s.evalQPipelinePlan(&plan)
 	}
 	return nil, false, nil
 }
@@ -280,7 +280,7 @@ func (s *EvalState) executeEvalPipelineDescriptor(descriptor EvalPipelineDescrip
 		if !ok {
 			return nil, false, nil
 		}
-		return s.evalQPipelinePlan(plan)
+		return s.evalQPipelinePlan(&plan)
 	case "script":
 		plan, ok := qScriptPipelineDescriptorFromEvalDescriptor(descriptor)
 		if !ok {
@@ -517,6 +517,7 @@ func qScriptPipelineDescriptorFromEvalDescriptor(descriptor EvalPipelineDescript
 	}
 	if steps, ok := decodeQScriptPipelineSequenceTransformSteps(descriptor.SequenceTransformChain); ok {
 		out.sequenceSteps = steps
+		out.sequenceShapeName = qScriptPipelineSequenceTransformName(steps)
 	} else {
 		return qScriptPipelineDescriptor{}, false
 	}
