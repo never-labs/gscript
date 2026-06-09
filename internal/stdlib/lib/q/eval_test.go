@@ -390,6 +390,35 @@ func TestDescribeEvalPipelineExposesReadOnlyRuntimeDescriptor(t *testing.T) {
 	if got, handled, err := ExecuteEvalPipelineDescriptor(descriptor); err != nil || !handled || got != int64(8) {
 		t.Fatalf("ExecuteEvalPipelineDescriptor generic count = %#v,%v,%v; want 8,true,nil", got, handled, err)
 	}
+
+	descriptor, ok = DescribeEvalPipeline("+/3 msum 1+til 5")
+	if !ok {
+		t.Fatalf("DescribeEvalPipeline did not recognize moving window sum pipeline")
+	}
+	if descriptor.Shape != "vector-reduce/sum-msum" ||
+		descriptor.PipelineShape != "vector_reduce" ||
+		descriptor.LeftExpr != "3" ||
+		descriptor.RightExpr != "1+til 5" ||
+		descriptor.CompareOp != "msum" {
+		t.Fatalf("moving sum descriptor = %#v", descriptor)
+	}
+	if got, handled, err := ExecuteEvalPipelineDescriptor(descriptor); err != nil || !handled || got != int64(31) {
+		t.Fatalf("ExecuteEvalPipelineDescriptor moving sum = %#v,%v,%v; want 31,true,nil", got, handled, err)
+	}
+
+	descriptor, ok = DescribeEvalPipeline("count sums 8#til 4")
+	if !ok {
+		t.Fatalf("DescribeEvalPipeline did not recognize count running scan pipeline")
+	}
+	if descriptor.Shape != "vector-count/sums" ||
+		descriptor.PipelineShape != "vector_scan" ||
+		descriptor.ReductionInput != "8#til 4" ||
+		descriptor.CompareOp != "sums" {
+		t.Fatalf("count running scan descriptor = %#v", descriptor)
+	}
+	if got, handled, err := ExecuteEvalPipelineDescriptor(descriptor); err != nil || !handled || got != int64(8) {
+		t.Fatalf("ExecuteEvalPipelineDescriptor count running scan = %#v,%v,%v; want 8,true,nil", got, handled, err)
+	}
 }
 
 func TestExecuteEvalPipelineRunsOnlyRecognizedRuntimePlans(t *testing.T) {

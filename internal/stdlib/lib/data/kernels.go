@@ -3444,6 +3444,12 @@ func TryTypedMovingNumericSumSum(array Array, width int, average bool) (any, boo
 	if !isNumericArray(array) {
 		return nil, false, nil
 	}
+	if values, ok := asI64RangeArray(array); ok {
+		if average {
+			return movingAvgSumI64Range(values, width), true, nil
+		}
+		return movingSumSumI64Range(values, width), true, nil
+	}
 	if isDenseIntegerArray(array) {
 		var window int64
 		var totalI int64
@@ -3514,6 +3520,54 @@ func TryTypedMovingNumericSumSum(array Array, width int, average bool) (any, boo
 		}
 	}
 	return total, true, nil
+}
+
+func movingSumSumI64Range(values i64RangeArray, width int) int64 {
+	n := values.len
+	if n == 0 {
+		return 0
+	}
+	if width >= n {
+		var total int64
+		for row := 0; row < n; row++ {
+			value := values.start + int64(row)*values.step
+			total += value * int64(n-row)
+		}
+		return total
+	}
+	stableLen := n - width + 1
+	total := int64(width) * i64RangeSum(i64RangeArray{
+		start: values.start,
+		step:  values.step,
+		len:   stableLen,
+	})
+	for row := stableLen; row < n; row++ {
+		value := values.start + int64(row)*values.step
+		total += value * int64(n-row)
+	}
+	return total
+}
+
+func movingAvgSumI64Range(values i64RangeArray, width int) float64 {
+	n := values.len
+	if n == 0 {
+		return 0
+	}
+	prefixLen := width - 1
+	if prefixLen > n {
+		prefixLen = n
+	}
+	total := 0.0
+	for row := 0; row < prefixLen; row++ {
+		total += float64(values.start) + float64(values.step)*float64(row)/2
+	}
+	if width > n {
+		return total
+	}
+	stableLen := n - width + 1
+	firstStable := float64(values.start) + float64(values.step)*float64(width-1)/2
+	lastStable := firstStable + float64(stableLen-1)*float64(values.step)
+	return total + float64(stableLen)*(firstStable+lastStable)/2
 }
 
 // TryTypedDeltas applies q-style deltas for dense typed numeric arrays.

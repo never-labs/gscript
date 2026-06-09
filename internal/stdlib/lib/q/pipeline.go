@@ -1,6 +1,7 @@
 package q
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/never-labs/leia/internal/stdlib/lib/data"
@@ -25,6 +26,8 @@ const (
 	qPipelineCountVectorExpr
 	qPipelineCountDistinct
 	qPipelineCountWhereIn
+	qPipelineSumMovingWindow
+	qPipelineCountRunningScan
 )
 
 type qPipelinePlan struct {
@@ -176,6 +179,9 @@ func buildQPipelinePlan(src string) qPipelinePlan {
 		if input, ok := qPipelineDeltasInput(right); ok {
 			return qPipelinePlanWithBindingPlans(qPipelinePlan{kind: qPipelineSumDeltas, shape: "vector-reduce/sum-deltas", reductionInput: input})
 		}
+		if plan, ok := buildQPipelineSumMovingWindowPlan(right); ok {
+			return qPipelinePlanWithBindingPlans(plan)
+		}
 		if qPipelineVectorTransformExprCandidate(right) {
 			return qPipelinePlanWithBindingPlans(qPipelinePlan{kind: qPipelineSumVectorExpr, shape: "vector-reduce/sum-expr", reductionInput: right})
 		}
@@ -185,6 +191,9 @@ func buildQPipelinePlan(src string) qPipelinePlan {
 		inputExpr := strings.TrimSpace(src[len("sum "):])
 		if input, ok := qPipelineDeltasInput(inputExpr); ok {
 			return qPipelinePlanWithBindingPlans(qPipelinePlan{kind: qPipelineSumDeltas, shape: "vector-reduce/sum-deltas", reductionInput: input})
+		}
+		if plan, ok := buildQPipelineSumMovingWindowPlan(inputExpr); ok {
+			return qPipelinePlanWithBindingPlans(plan)
 		}
 		if qPipelineVectorTransformExprCandidate(inputExpr) {
 			return qPipelinePlanWithBindingPlans(qPipelinePlan{kind: qPipelineSumVectorExpr, shape: "vector-reduce/sum-expr", reductionInput: inputExpr})
@@ -205,6 +214,9 @@ func buildQPipelinePlan(src string) qPipelinePlan {
 				return qPipelinePlanWithBindingPlans(qPipelinePlan{kind: qPipelineCountDistinct, shape: "distinct-count", reductionInput: arg})
 			}
 		}
+		if scan, arg, ok := qPipelineRunningScanInput(inputExpr); ok {
+			return qPipelinePlanWithBindingPlans(qPipelinePlan{kind: qPipelineCountRunningScan, shape: "vector-count/" + scan, compareOp: scan, reductionInput: arg})
+		}
 		if strings.HasPrefix(inputExpr, "where ") && wordBoundary(inputExpr, 0, len("where")) {
 			return qPipelinePlan{}
 		}
@@ -222,6 +234,54 @@ func buildQPipelinePlan(src string) qPipelinePlan {
 		}
 	}
 	return qPipelinePlan{}
+}
+
+func buildQPipelineSumMovingWindowPlan(src string) (qPipelinePlan, bool) {
+	src = stripEnclosingParens(strings.TrimSpace(src))
+	for _, word := range []string{"msum", "mavg", "mcount", "mmin", "mmax"} {
+		left, right, ok := splitTopLevelWord(src, word)
+		if !ok {
+			continue
+		}
+		left = strings.TrimSpace(left)
+		right = strings.TrimSpace(right)
+		if left == "" || right == "" {
+			return qPipelinePlan{}, false
+		}
+		return qPipelinePlan{
+			kind:      qPipelineSumMovingWindow,
+			shape:     "vector-reduce/sum-" + word,
+			compareOp: word,
+			leftExpr:  left,
+			rightExpr: right,
+		}, true
+	}
+	return qPipelinePlan{}, false
+}
+
+func qPipelineRunningScanInput(src string) (scan, arg string, ok bool) {
+	src = stripEnclosingParens(strings.TrimSpace(src))
+	for _, spec := range []struct {
+		prefix string
+		scan   string
+	}{
+		{"+\\", "sums"},
+		{"sums ", "sums"},
+		{"prds ", "prds"},
+		{"mins ", "mins"},
+		{"maxs ", "maxs"},
+		{"avgs ", "avgs"},
+	} {
+		if !strings.HasPrefix(src, spec.prefix) {
+			continue
+		}
+		arg = strings.TrimSpace(src[len(spec.prefix):])
+		if arg == "" || (spec.prefix == "+\\" && strings.HasPrefix(arg, "[")) {
+			return "", "", false
+		}
+		return spec.scan, arg, true
+	}
+	return "", "", false
 }
 
 func qPipelinePlanWithBindingPlans(plan qPipelinePlan) qPipelinePlan {
@@ -497,6 +557,10 @@ func (s *EvalState) evalQPipelinePlan(plan qPipelinePlan) (any, bool, error) {
 		out, handled, err = s.evalQPipelineCountDistinct(plan)
 	case qPipelineCountWhereIn:
 		out, handled, err = s.evalQPipelineCountWhereIn(plan)
+	case qPipelineSumMovingWindow:
+		out, handled, err = s.evalQPipelineSumMovingWindow(plan)
+	case qPipelineCountRunningScan:
+		out, handled, err = s.evalQPipelineCountRunningScan(plan)
 	default:
 		recordRuntimeKernelExecution("QPipelinePlan", plan.shape, "fallback", RuntimeFallbackPlannerUnhandled)
 		return nil, false, nil
@@ -1004,6 +1068,93 @@ func (s *EvalState) evalQPipelineSumVectorExpr(plan qPipelinePlan) (any, bool, e
 	shape := "vector-reduce/sum-expr/" + string(array.Kind())
 	recordRuntimeKernelProbe("ArraySumExpr", shape, handled, err)
 	return out, handled, err
+}
+
+func (s *EvalState) evalQPipelineSumMovingWindow(plan qPipelinePlan) (any, bool, error) {
+	widthValue, err := s.evalQPipelinePlannedExpr(plan.leftExpr, &plan.leftPlan)
+	if err != nil {
+		return nil, true, err
+	}
+	width, ok := integerValue(widthValue)
+	if !ok || width <= 0 || int64(int(width)) != width {
+		return nil, true, errMovingWindowWidth(plan.compareOp)
+	}
+	value, err := s.evalQPipelinePlannedExpr(plan.rightExpr, &plan.rightPlan)
+	if err != nil {
+		return nil, true, err
+	}
+	array, ok := value.(data.Array)
+	if !ok {
+		return nil, false, nil
+	}
+	var (
+		out     any
+		handled bool
+	)
+	switch plan.compareOp {
+	case "mcount":
+		out, handled, err = data.TryTypedMCountSum(array, int(width))
+	case "msum":
+		out, handled, err = data.TryTypedMovingNumericSumSum(array, int(width), false)
+	case "mavg":
+		out, handled, err = data.TryTypedMovingNumericSumSum(array, int(width), true)
+	case "mmin":
+		out, handled, err = data.TryTypedMovingMinMaxSum(array, int(width), false)
+	case "mmax":
+		out, handled, err = data.TryTypedMovingMinMaxSum(array, int(width), true)
+	default:
+		return nil, false, nil
+	}
+	shape := "vector-reduce/sum-" + plan.compareOp + "/" + string(array.Kind())
+	recordRuntimeKernelProbe("ArrayMovingWindowSum", shape, handled, err)
+	return out, handled, err
+}
+
+func errMovingWindowWidth(name string) error {
+	return fmt.Errorf("%s width must be a positive integer", name)
+}
+
+func (s *EvalState) evalQPipelineCountRunningScan(plan qPipelinePlan) (any, bool, error) {
+	value, err := s.evalQPipelinePlannedExpr(plan.reductionInput, &plan.reductionPlan)
+	if err != nil {
+		return nil, true, err
+	}
+	array, ok := value.(data.Array)
+	if !ok {
+		return nil, false, nil
+	}
+	shape := "vector-count/" + plan.compareOp + "/" + string(array.Kind())
+	kernel := "ArrayCountRunningScan"
+	switch plan.compareOp {
+	case "sums", "prds", "avgs":
+		if !qKindIsNumeric(array.Kind()) {
+			err := fmt.Errorf("%s expects a numeric vector", plan.compareOp)
+			recordRuntimeKernelProbe(kernel, shape, false, err)
+			return nil, true, err
+		}
+	case "mins", "maxs":
+		if !qTypedCompareKindOK(array.Kind()) {
+			err := fmt.Errorf("%s expects an ordered vector", plan.compareOp)
+			recordRuntimeKernelProbe(kernel, shape, false, err)
+			return nil, true, err
+		}
+	default:
+		return nil, false, nil
+	}
+	switch plan.compareOp {
+	case "sums":
+		kernel = "ArrayCountSums"
+	case "prds":
+		kernel = "ArrayCountProducts"
+	case "mins":
+		kernel = "ArrayCountMins"
+	case "maxs":
+		kernel = "ArrayCountMaxs"
+	case "avgs":
+		kernel = "ArrayCountAvgs"
+	}
+	recordRuntimeKernelProbe(kernel, shape, true, nil)
+	return int64(array.Len()), true, nil
 }
 
 func (s *EvalState) evalQPipelineCountVectorExpr(plan qPipelinePlan) (any, bool, error) {

@@ -1324,6 +1324,17 @@ func (s *EvalState) evalCachedOrString(src string, expr Expr, bindingPlan *qScri
 			return value, nil
 		}
 	}
+	if plan := s.qPipelinePlan(src); plan.kind != qPipelineInvalid {
+		if out, handled, err := s.evalQPipelinePlan(plan); err != nil || handled {
+			return out, err
+		}
+	}
+	if out, handled, err := s.tryEvalWhereCompareCountSum(src); err != nil || handled {
+		return out, err
+	}
+	if out, handled, err := s.tryEvalScalarAddChain(src); err != nil || handled {
+		return out, err
+	}
 	if expr != nil {
 		value, err := s.evalValueExpr(expr)
 		if err == nil {
@@ -2341,10 +2352,10 @@ func (s *EvalState) eval(src string) (any, error) {
 	if looksLikeLiteralVector(src) {
 		return parseAtomOrVector(src)
 	}
-	if out, handled, err := s.tryEvalScalarAddChain(src); err != nil || handled {
+	if out, handled, err := s.tryEvalWhereCompareCountSum(src); err != nil || handled {
 		return out, err
 	}
-	if out, handled, err := s.tryEvalWhereCompareCountSum(src); err != nil || handled {
+	if out, handled, err := s.tryEvalScalarAddChain(src); err != nil || handled {
 		return out, err
 	}
 	if out, handled, err := s.tryEvalFirstLastDyadic(src); err != nil || handled {
@@ -4565,7 +4576,7 @@ func (s *EvalState) tryEvalTypedMovingWindowSum(src string) (any, bool, error) {
 
 func (s *EvalState) tryEvalScalarAddChain(src string) (any, bool, error) {
 	terms := splitTopLevelPlusChain(src)
-	if len(terms) < 3 {
+	if len(terms) < 2 {
 		return nil, false, nil
 	}
 	for _, term := range terms {

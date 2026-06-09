@@ -374,6 +374,28 @@ func TestTypedRunningAndMovingIntegerKernels(t *testing.T) {
 		t.Fatalf("mavg sum = %#v, want %.1f", movingAvg, want)
 	}
 
+	rangeMovingSum, handled, err := TryTypedMovingNumericSumSum(NewI64Range(1, 1, 5), 3, false)
+	if err != nil {
+		t.Fatalf("TryTypedMovingNumericSumSum range msum returned error: %v", err)
+	}
+	if !handled || rangeMovingSum != int64(31) {
+		t.Fatalf("range msum sum = %#v, %v; want 31, true", rangeMovingSum, handled)
+	}
+	rangeMovingAvg, handled, err := TryTypedMovingNumericSumSum(NewI64Range(1, 1, 5), 3, true)
+	if err != nil {
+		t.Fatalf("TryTypedMovingNumericSumSum range mavg returned error: %v", err)
+	}
+	if !handled || rangeMovingAvg != 11.5 {
+		t.Fatalf("range mavg sum = %#v, %v; want 11.5, true", rangeMovingAvg, handled)
+	}
+	descRangeMovingAvg, handled, err := TryTypedMovingNumericSumSum(NewI64Range(5, -1, 5), 8, true)
+	if err != nil {
+		t.Fatalf("TryTypedMovingNumericSumSum descending wide range mavg returned error: %v", err)
+	}
+	if !handled || descRangeMovingAvg != 20.0 {
+		t.Fatalf("descending wide range mavg sum = %#v, %v; want 20.0, true", descRangeMovingAvg, handled)
+	}
+
 	floatMovingSum, handled, err := TryTypedMovingNumericSumSum(NewF64([]float64{1.5, 2.5, 3.5}), 2, false)
 	if err != nil {
 		t.Fatalf("TryTypedMovingNumericSumSum float returned error: %v", err)
