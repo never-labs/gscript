@@ -1149,36 +1149,40 @@ func TestEvalGlobalPipelineBindingCacheKeysByOperandKind(t *testing.T) {
 
 func TestEvalGlobalPipelineBindingCacheMoreShapes(t *testing.T) {
 	cases := []struct {
-		name string
-		src  string
-		i64  any
-		f64  any
-		envI map[string]any
-		envF map[string]any
+		name  string
+		src   string
+		i64   any
+		f64   any
+		envI  map[string]any
+		envF  map[string]any
+		cache bool
 	}{
 		{
-			name: "count vector expr",
-			src:  "count 4#v",
-			i64:  int64(4),
-			f64:  int64(4),
-			envI: map[string]any{"v": data.NewI64([]int64{1, 2, 3})},
-			envF: map[string]any{"v": data.NewF64([]float64{1.5, 2.5, 3.5})},
+			name:  "count vector expr",
+			src:   "count 4#v",
+			i64:   int64(4),
+			f64:   int64(4),
+			envI:  map[string]any{"v": data.NewI64([]int64{1, 2, 3})},
+			envF:  map[string]any{"v": data.NewF64([]float64{1.5, 2.5, 3.5})},
+			cache: true,
 		},
 		{
-			name: "count where compare",
-			src:  "count where v>threshold",
-			i64:  int64(2),
-			f64:  int64(2),
-			envI: map[string]any{"v": data.NewI64([]int64{1, 2, 3, 4}), "threshold": int64(2)},
-			envF: map[string]any{"v": data.NewF64([]float64{1.5, 2.5, 3.5, 4.5}), "threshold": 2.5},
+			name:  "count where compare",
+			src:   "count where v>threshold",
+			i64:   int64(2),
+			f64:   int64(2),
+			envI:  map[string]any{"v": data.NewI64([]int64{1, 2, 3, 4}), "threshold": int64(2)},
+			envF:  map[string]any{"v": data.NewF64([]float64{1.5, 2.5, 3.5, 4.5}), "threshold": 2.5},
+			cache: true,
 		},
 		{
-			name: "sum where compare",
-			src:  "+/where v>threshold",
-			i64:  int64(5),
-			f64:  int64(5),
-			envI: map[string]any{"v": data.NewI64([]int64{1, 2, 3, 4}), "threshold": int64(2)},
-			envF: map[string]any{"v": data.NewF64([]float64{1.5, 2.5, 3.5, 4.5}), "threshold": 2.5},
+			name:  "sum where compare",
+			src:   "+/where v>threshold",
+			i64:   int64(5),
+			f64:   int64(5),
+			envI:  map[string]any{"v": data.NewI64([]int64{1, 2, 3, 4}), "threshold": int64(2)},
+			envF:  map[string]any{"v": data.NewF64([]float64{1.5, 2.5, 3.5, 4.5}), "threshold": 2.5},
+			cache: true,
 		},
 		{
 			name: "sum moving window",
@@ -1198,6 +1202,19 @@ func TestEvalGlobalPipelineBindingCacheMoreShapes(t *testing.T) {
 				t.Fatalf("cold i64 EvalWithEnv returned %#v, %v; want %#v,nil", got, err, tc.i64)
 			}
 			afterI64 := EvalPlanCacheStatsSnapshot()
+			if !tc.cache {
+				if got, err := EvalWithEnv(tc.src, tc.envF); err != nil || !reflect.DeepEqual(got, tc.f64) {
+					t.Fatalf("cold f64 EvalWithEnv returned %#v, %v; want %#v,nil", got, err, tc.f64)
+				}
+				if got, err := EvalWithEnv(tc.src, tc.envI); err != nil || !reflect.DeepEqual(got, tc.i64) {
+					t.Fatalf("warm i64 EvalWithEnv returned %#v, %v; want %#v,nil", got, err, tc.i64)
+				}
+				afterWarmI64 := EvalPlanCacheStatsSnapshot()
+				if afterWarmI64.PipelineBindingEntries != afterI64.PipelineBindingEntries {
+					t.Fatalf("non-cached shape changed binding cache entries: before=%#v after=%#v", afterI64, afterWarmI64)
+				}
+				return
+			}
 			if afterI64.PipelineBindingMisses == 0 || afterI64.PipelineBindingStores == 0 || afterI64.PipelineBindingEntries != 1 {
 				t.Fatalf("cold i64 eval did not populate typed pipeline binding cache: %#v", afterI64)
 			}

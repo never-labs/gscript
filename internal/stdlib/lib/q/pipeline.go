@@ -1424,27 +1424,15 @@ func (s *EvalState) evalQPipelineSumMovingWindow(plan qPipelinePlan) (any, bool,
 	if !ok {
 		return nil, false, nil
 	}
-	bindingKey := qPipelineBindingKey(plan, []qPipelineOperandFingerprint{
-		qPipelineOperandFingerprintForValue(qPipelineOperandLeft, widthValue),
-		qPipelineOperandFingerprintForValue(qPipelineOperandRight, value),
-	})
-	if bound, ok := qGlobalPipelineBindingCacheProbe(bindingKey); ok {
-		return evalQPipelineSumMovingWindowBound(plan, bound, array, int(width))
-	}
 	shape := "vector-reduce/sum-" + plan.compareOp + "/" + string(array.Kind())
 	bound := qPipelineBoundPlan{
-		key:            bindingKey,
 		resultClass:    "moving_sum",
 		resultKind:     array.Kind(),
 		kernel:         "ArrayMovingWindowSum",
 		kernelShape:    shape,
 		fallbackReason: RuntimeFallbackUnsupportedType,
 	}
-	out, handled, err := evalQPipelineSumMovingWindowBound(plan, bound, array, int(width))
-	if handled {
-		qGlobalPipelineBindingCacheStore(bound)
-	}
-	return out, handled, err
+	return evalQPipelineSumMovingWindowBound(plan, bound, array, int(width))
 }
 
 func evalQPipelineSumMovingWindowBound(plan qPipelinePlan, bound qPipelineBoundPlan, array data.Array, width int) (any, bool, error) {
