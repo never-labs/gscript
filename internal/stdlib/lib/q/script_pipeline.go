@@ -167,6 +167,9 @@ func (s *EvalState) tryEvalQScriptPipeline(descriptor *qScriptPipelineDescriptor
 	}
 	s.rememberQPipelinePlan(descriptor.terminal, terminal)
 	for _, assignment := range descriptor.assignments {
+		if qScriptPipelineCanDeferAssignment(descriptor, assignment) {
+			continue
+		}
 		value, handled, err := s.evalQScriptBindingPlan(&assignment.binding)
 		if err != nil {
 			recordRuntimeKernelExecution("QScriptPipelinePlan", shape, "error", "runtime_error")
@@ -207,6 +210,12 @@ func (s *EvalState) evalQScriptTerminalPipeline(descriptor *qScriptPipelineDescr
 		if !ok {
 			return nil, false, nil
 		}
+		if modPlan, ok := qPipelineModuloComparePlanFromMask(descriptor.maskExpr); ok {
+			qPipelinePlanWithBindingPlansInPlace(&modPlan)
+			if out, handled, err := s.evalQPipelineModuloCompareValueSum(modPlan, array); err != nil || handled {
+				return out, handled, err
+			}
+		}
 		mask, handled, err := s.evalQScriptBindingPlan(&descriptor.maskPlan)
 		if err != nil {
 			return nil, true, err
@@ -222,6 +231,15 @@ func (s *EvalState) evalQScriptTerminalPipeline(descriptor *qScriptPipelineDescr
 		index, handled, err := s.evalQScriptBindingPlan(&descriptor.indexPlan)
 		if err != nil {
 			return nil, true, err
+		}
+		if !handled {
+			if err := s.evalQScriptPipelineDeferredAssignment(descriptor, descriptor.indexExpr); err != nil {
+				return nil, true, err
+			}
+			index, handled, err = s.evalQScriptBindingPlan(&descriptor.indexPlan)
+			if err != nil {
+				return nil, true, err
+			}
 		}
 		if !handled {
 			return s.evalQPipelinePlan(terminal)
@@ -243,9 +261,26 @@ func (s *EvalState) evalQScriptTerminalPipeline(descriptor *qScriptPipelineDescr
 		if !ok {
 			return nil, false, nil
 		}
+		if descriptor.kind == qScriptPipelineWhereIndexReduceSum {
+			if modPlan, ok := qPipelineModuloComparePlanFromMask(descriptor.maskExpr); ok {
+				qPipelinePlanWithBindingPlansInPlace(&modPlan)
+				if out, handled, err := s.evalQPipelineModuloCompareValueSum(modPlan, array); err != nil || handled {
+					return out, handled, err
+				}
+			}
+		}
 		index, handled, err := s.evalQScriptBindingPlan(&descriptor.indexPlan)
 		if err != nil {
 			return nil, true, err
+		}
+		if !handled {
+			if err := s.evalQScriptPipelineDeferredAssignment(descriptor, descriptor.indexExpr); err != nil {
+				return nil, true, err
+			}
+			index, handled, err = s.evalQScriptBindingPlan(&descriptor.indexPlan)
+			if err != nil {
+				return nil, true, err
+			}
 		}
 		if !handled {
 			return s.evalQPipelinePlan(terminal)
@@ -282,4 +317,43 @@ func (s *EvalState) evalQScriptTerminalPipeline(descriptor *qScriptPipelineDescr
 	default:
 		return s.evalQPipelinePlan(terminal)
 	}
+}
+
+func qScriptPipelineCanDeferAssignment(descriptor *qScriptPipelineDescriptor, assignment qScriptPipelineAssignment) bool {
+	if descriptor == nil || descriptor.kind != qScriptPipelineWhereIndexReduceSum {
+		return false
+	}
+	if strings.TrimSpace(descriptor.indexExpr) != assignment.name {
+		return false
+	}
+	_, ok := qPipelineModuloComparePlanFromMask(descriptor.maskExpr)
+	return ok
+}
+
+func (s *EvalState) evalQScriptPipelineDeferredAssignment(descriptor *qScriptPipelineDescriptor, name string) error {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return nil
+	}
+	if _, ok := s.lookupName(name); ok {
+		return nil
+	}
+	for _, assignment := range descriptor.assignments {
+		if assignment.name != name {
+			continue
+		}
+		value, handled, err := s.evalQScriptBindingPlan(&assignment.binding)
+		if err != nil {
+			return err
+		}
+		if !handled {
+			value, err = s.evalCachedOrString(assignment.rhs, assignment.valueExpr)
+			if err != nil {
+				return err
+			}
+		}
+		s.env[s.resolveAssignmentName(assignment.name)] = value
+		return nil
+	}
+	return nil
 }

@@ -16,6 +16,9 @@ const (
 	qPipelineSumWhereCompare
 	qPipelineCountWhereCompare
 	qPipelineWhereCompareIndexes
+	qPipelineSumWhereModuloCompare
+	qPipelineCountWhereModuloCompare
+	qPipelineWhereModuloCompareIndexes
 	qPipelineSumDeltas
 	qPipelineSumBin
 )
@@ -35,6 +38,12 @@ type qPipelinePlan struct {
 	rightPlan      qScriptBindingPlan
 	compareOp      string
 	comparePrefix  string
+	modExpr        string
+	modPlan        qScriptBindingPlan
+	modulusExpr    string
+	modulusPlan    qScriptBindingPlan
+	modTargetExpr  string
+	modTargetPlan  qScriptBindingPlan
 	reductionInput string
 	reductionPlan  qScriptBindingPlan
 }
@@ -153,6 +162,15 @@ func qPipelinePlanWithBindingPlans(plan qPipelinePlan) qPipelinePlan {
 	if plan.rightExpr != "" {
 		plan.rightPlan = buildQScriptBindingPlanForRHS(plan.rightExpr, nil)
 	}
+	if plan.modExpr != "" {
+		plan.modPlan = buildQScriptBindingPlanForRHS(plan.modExpr, nil)
+	}
+	if plan.modulusExpr != "" {
+		plan.modulusPlan = buildQScriptBindingPlanForRHS(plan.modulusExpr, nil)
+	}
+	if plan.modTargetExpr != "" {
+		plan.modTargetPlan = buildQScriptBindingPlanForRHS(plan.modTargetExpr, nil)
+	}
 	if plan.reductionInput != "" {
 		plan.reductionPlan = buildQScriptBindingPlanForRHS(plan.reductionInput, nil)
 	}
@@ -212,6 +230,9 @@ func buildQPipelineWhereComparePlan(src string, kind qPipelineKind, prefix strin
 	if _, ok := qDataCompareOpString(op); !ok {
 		return qPipelinePlan{}, false
 	}
+	if plan, ok := buildQPipelineWhereModuloComparePlan(leftExpr, rightExpr, op, kind, prefix); ok {
+		return plan, true
+	}
 	return qPipelinePlan{
 		kind:          kind,
 		shape:         prefix,
@@ -220,6 +241,58 @@ func buildQPipelineWhereComparePlan(src string, kind qPipelineKind, prefix strin
 		compareOp:     op,
 		comparePrefix: prefix,
 	}, true
+}
+
+func buildQPipelineWhereModuloComparePlan(leftExpr, rightExpr, op string, kind qPipelineKind, prefix string) (qPipelinePlan, bool) {
+	dataOp, ok := qDataCompareOpString(op)
+	if !ok || (dataOp != data.OpEQ && dataOp != data.OpNE) {
+		return qPipelinePlan{}, false
+	}
+	modExpr, modulusExpr, ok := splitQPipelineModExpr(leftExpr)
+	targetExpr := strings.TrimSpace(rightExpr)
+	compareOp := op
+	if !ok {
+		modExpr, modulusExpr, ok = splitQPipelineModExpr(rightExpr)
+		if !ok {
+			return qPipelinePlan{}, false
+		}
+		targetExpr = strings.TrimSpace(leftExpr)
+		compareOp = qReverseCompareOpString(op)
+	}
+	modKind := qPipelineWhereModuloCompareIndexes
+	switch kind {
+	case qPipelineCountWhereCompare:
+		modKind = qPipelineCountWhereModuloCompare
+	case qPipelineSumWhereCompare:
+		modKind = qPipelineSumWhereModuloCompare
+	case qPipelineWhereCompareIndexes:
+		modKind = qPipelineWhereModuloCompareIndexes
+	default:
+		return qPipelinePlan{}, false
+	}
+	return qPipelinePlan{
+		kind:          modKind,
+		shape:         prefix + "-mod",
+		compareOp:     compareOp,
+		comparePrefix: prefix + "-mod",
+		modExpr:       modExpr,
+		modulusExpr:   modulusExpr,
+		modTargetExpr: targetExpr,
+	}, true
+}
+
+func splitQPipelineModExpr(src string) (string, string, bool) {
+	src = stripEnclosedParens(strings.TrimSpace(src))
+	left, right, ok := splitTopLevelWord(src, "mod")
+	if !ok {
+		return "", "", false
+	}
+	left = strings.TrimSpace(left)
+	right = strings.TrimSpace(right)
+	if left == "" || right == "" {
+		return "", "", false
+	}
+	return left, right, true
 }
 
 func qPipelineDeltasInput(src string) (string, bool) {
@@ -257,6 +330,12 @@ func (s *EvalState) evalQPipelinePlan(plan qPipelinePlan) (any, bool, error) {
 		out, handled, err = s.evalQPipelineCountWhereCompare(plan)
 	case qPipelineWhereCompareIndexes:
 		out, handled, err = s.evalQPipelineWhereCompareIndexes(plan)
+	case qPipelineSumWhereModuloCompare:
+		out, handled, err = s.evalQPipelineSumWhereModuloCompare(plan)
+	case qPipelineCountWhereModuloCompare:
+		out, handled, err = s.evalQPipelineCountWhereModuloCompare(plan)
+	case qPipelineWhereModuloCompareIndexes:
+		out, handled, err = s.evalQPipelineWhereModuloCompareIndexes(plan)
 	case qPipelineSumDeltas:
 		out, handled, err = s.evalQPipelineSumDeltas(plan)
 	case qPipelineSumBin:
@@ -306,6 +385,12 @@ func (s *EvalState) evalQPipelineSumWhereIndex(plan qPipelinePlan) (any, bool, e
 	array, ok := value.(data.Array)
 	if !ok {
 		return nil, false, nil
+	}
+	if modPlan, ok := qPipelineModuloComparePlanFromMask(plan.maskExpr); ok {
+		qPipelinePlanWithBindingPlansInPlace(&modPlan)
+		if out, handled, err := s.evalQPipelineModuloCompareValueSum(modPlan, array); err != nil || handled {
+			return out, handled, err
+		}
 	}
 	maskValue, err := s.evalQPipelinePlannedExpr(plan.maskExpr, &plan.maskPlan)
 	if err != nil {
@@ -421,6 +506,105 @@ func (s *EvalState) evalQPipelineWhereCompareIndexes(plan qPipelinePlan) (any, b
 	return s.evalQPipelineWhereCompareIndexesArray(plan)
 }
 
+func (s *EvalState) evalQPipelineSumWhereModuloCompare(plan qPipelinePlan) (any, bool, error) {
+	_, sum, handled, err := s.evalQPipelineWhereModuloCompareIndexStats(plan)
+	if err != nil || handled {
+		return sum, handled, err
+	}
+	return nil, false, nil
+}
+
+func (s *EvalState) evalQPipelineCountWhereModuloCompare(plan qPipelinePlan) (any, bool, error) {
+	count, _, handled, err := s.evalQPipelineWhereModuloCompareIndexStats(plan)
+	if err != nil || handled {
+		return count, handled, err
+	}
+	return nil, false, nil
+}
+
+func (s *EvalState) evalQPipelineWhereModuloCompareIndexes(plan qPipelinePlan) (any, bool, error) {
+	array, modulus, target, dataOp, handled, err := s.evalQPipelineModuloCompareOperands(plan)
+	if err != nil || !handled {
+		return nil, handled, err
+	}
+	out, handled, err := data.TryTypedModuloCompareIndexesI64(array, modulus, dataOp, target)
+	shape := plan.comparePrefix + "/" + plan.compareOp + "/" + string(array.Kind()) + "/" + string(qRuntimeKernelOperandKind(modulus, nil)) + "/" + string(qRuntimeKernelOperandKind(target, nil))
+	recordRuntimeKernelProbe("ArrayModuloCompare", shape, handled, err)
+	if err != nil || !handled {
+		return nil, handled, err
+	}
+	return out, true, nil
+}
+
+func (s *EvalState) evalQPipelineWhereModuloCompareIndexStats(plan qPipelinePlan) (count, sum int64, handled bool, err error) {
+	array, modulus, target, dataOp, handled, err := s.evalQPipelineModuloCompareOperands(plan)
+	if err != nil || !handled {
+		return 0, 0, handled, err
+	}
+	count, sum, handled, err = data.TryTypedModuloCompareIndexStatsI64(array, modulus, dataOp, target)
+	shape := plan.comparePrefix + "-stats/" + plan.compareOp + "/" + string(array.Kind()) + "/" + string(qRuntimeKernelOperandKind(modulus, nil)) + "/" + string(qRuntimeKernelOperandKind(target, nil))
+	recordRuntimeKernelProbe("ArrayModuloCompareStats", shape, handled, err)
+	if err != nil || !handled {
+		return 0, 0, handled, err
+	}
+	return count, sum, true, nil
+}
+
+func (s *EvalState) evalQPipelineModuloCompareValueSum(plan qPipelinePlan, values data.Array) (any, bool, error) {
+	array, modulus, target, dataOp, handled, err := s.evalQPipelineModuloCompareOperands(plan)
+	if err != nil || !handled {
+		return nil, handled, err
+	}
+	out, handled, err := data.TryTypedNumericSumWhereModuloCompare(values, array, modulus, dataOp, target)
+	shape := "where-mod-reduce/" + string(values.Kind()) + "/" + string(array.Kind()) + "/" + string(qRuntimeKernelOperandKind(modulus, nil)) + "/" + string(qRuntimeKernelOperandKind(target, nil))
+	recordRuntimeKernelProbe("ArrayModuloCompareReduceSum", shape, handled, err)
+	if err != nil || !handled {
+		return nil, handled, err
+	}
+	return out, true, nil
+}
+
+func (s *EvalState) evalQPipelineModuloCompareOperands(plan qPipelinePlan) (data.Array, any, any, data.Op, bool, error) {
+	source, err := s.evalQPipelinePlannedExpr(plan.modExpr, &plan.modPlan)
+	if err != nil {
+		return nil, nil, nil, "", true, err
+	}
+	array, ok := source.(data.Array)
+	if !ok {
+		return nil, nil, nil, "", false, nil
+	}
+	modulus, err := s.evalQPipelinePlannedExpr(plan.modulusExpr, &plan.modulusPlan)
+	if err != nil {
+		return nil, nil, nil, "", true, err
+	}
+	target, err := s.evalQPipelinePlannedExpr(plan.modTargetExpr, &plan.modTargetPlan)
+	if err != nil {
+		return nil, nil, nil, "", true, err
+	}
+	dataOp, ok := qDataCompareOpString(plan.compareOp)
+	if !ok {
+		return nil, nil, nil, "", false, nil
+	}
+	return array, modulus, target, dataOp, true, nil
+}
+
+func qPipelineModuloComparePlanFromMask(maskExpr string) (qPipelinePlan, bool) {
+	src := "where " + strings.TrimSpace(maskExpr)
+	return buildQPipelineWhereModuloComparePlanFromWhere(src, qPipelineWhereCompareIndexes, "compare-to-index")
+}
+
+func buildQPipelineWhereModuloComparePlanFromWhere(src string, kind qPipelineKind, prefix string) (qPipelinePlan, bool) {
+	src = strings.TrimSpace(src)
+	if !strings.HasPrefix(src, "where ") || !wordBoundary(src, 0, len("where")) {
+		return qPipelinePlan{}, false
+	}
+	leftExpr, rightExpr, op, ok := splitWhereCompareExpr(strings.TrimSpace(src[len("where "):]))
+	if !ok {
+		return qPipelinePlan{}, false
+	}
+	return buildQPipelineWhereModuloComparePlan(leftExpr, rightExpr, op, kind, prefix)
+}
+
 func (s *EvalState) evalQPipelineWhereCompareIndexStats(plan qPipelinePlan) (count, sum int64, handled bool, err error) {
 	left, right, err := s.evalQPipelineCompareOperands(plan)
 	if err != nil {
@@ -467,6 +651,10 @@ func (s *EvalState) evalQPipelineCompareOperands(plan qPipelinePlan) (any, any, 
 		return nil, nil, err
 	}
 	return left, right, nil
+}
+
+func qPipelinePlanWithBindingPlansInPlace(plan *qPipelinePlan) {
+	*plan = qPipelinePlanWithBindingPlans(*plan)
 }
 
 func (s *EvalState) evalQPipelineSumDeltas(plan qPipelinePlan) (any, bool, error) {

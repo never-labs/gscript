@@ -141,6 +141,16 @@ func TestQScriptPipelinePlannerDescribesAssignmentTerminalWhereIndexReduce(t *te
 	}
 }
 
+func TestQPipelineModuloComparePlanFromMask(t *testing.T) {
+	plan, ok := qPipelineModuloComparePlanFromMask("(x mod 3)=0")
+	if !ok {
+		t.Fatal("modulo compare mask was not recognized")
+	}
+	if plan.kind != qPipelineWhereModuloCompareIndexes || plan.modExpr != "x" || plan.modulusExpr != "3" || plan.modTargetExpr != "0" || plan.compareOp != "=" {
+		t.Fatalf("modulo compare plan = %#v", plan)
+	}
+}
+
 func TestQScriptPipelinePlannerDescribesTerminalWhereReduce(t *testing.T) {
 	plan := buildQScriptPlan("x:til 64;y:x*2;lo:4;hi:12;+/y where (x>=lo) and x<hi")
 	if plan.scriptPipeline == nil {
@@ -2443,6 +2453,32 @@ func TestEvalWhereGatherReduceCompositeMaskStats(t *testing.T) {
 	}
 	if !seenGatherReduce {
 		t.Fatalf("missing gather reduce typed hit for composite where gather reduce: %#v", RuntimeKernelExecutionStats())
+	}
+}
+
+func TestEvalModuloWherePipelinesUseFusedTypedKernel(t *testing.T) {
+	ClearRuntimeKernelExecutionStats()
+	t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+	assertEvalValue(t, "x:til 64;count where (x mod 4)=2", int64(16))
+	assertEvalValue(t, "x:til 64;count where (x mod 5)<>3", int64(51))
+	assertEvalValue(t, "x:til 64;y:(x*2)+1;idx:where (x mod 3)=0;+/y[idx]", int64(1408))
+
+	seenStats := false
+	seenReduce := false
+	for _, stat := range RuntimeKernelExecutionStats() {
+		if stat.Outcome == "fallback" || stat.Outcome == "error" {
+			t.Fatalf("unexpected modulo pipeline fallback/error: %#v stats=%#v", stat, RuntimeKernelExecutionStats())
+		}
+		if stat.Kernel == "ArrayModuloCompareStats" && stat.Outcome == "hit" && stat.Count > 0 {
+			seenStats = true
+		}
+		if stat.Kernel == "ArrayModuloCompareReduceSum" && stat.Outcome == "hit" && stat.Count > 0 {
+			seenReduce = true
+		}
+	}
+	if !seenStats || !seenReduce {
+		t.Fatalf("missing modulo fused kernel stats: stats=%v reduce=%v all=%#v", seenStats, seenReduce, RuntimeKernelExecutionStats())
 	}
 }
 

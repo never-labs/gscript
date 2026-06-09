@@ -2397,6 +2397,25 @@ func TestTypedNumericUnaryBinaryAndAggregates(t *testing.T) {
 			t.Fatalf("%s sum = %v,%v; want %d,true", tt.name, sum, ok, tt.want)
 		}
 	}
+	count, indexSum, ok, err := TryTypedModuloCompareIndexStatsI64(NewI64Range(0, 1, 12), int64(4), OpEQ, int64(2))
+	if err != nil || !ok || count != 3 || indexSum != 18 {
+		t.Fatalf("TryTypedModuloCompareIndexStatsI64 eq = %d,%d,%v,%v; want 3,18,true,nil", count, indexSum, ok, err)
+	}
+	count, indexSum, ok, err = TryTypedModuloCompareIndexStatsI64(NewI64Range(0, 1, 10), int64(5), OpNE, int64(3))
+	if err != nil || !ok || count != 8 || indexSum != 34 {
+		t.Fatalf("TryTypedModuloCompareIndexStatsI64 ne = %d,%d,%v,%v; want 8,34,true,nil", count, indexSum, ok, err)
+	}
+	indexes, ok, err := TryTypedModuloCompareIndexesI64(NewI64Range(0, 1, 10), int64(3), OpEQ, int64(0))
+	if err != nil || !ok {
+		t.Fatalf("TryTypedModuloCompareIndexesI64 = %v,%v; want handled nil", ok, err)
+	}
+	if got, want := indexes.Values(), []any{int64(0), int64(3), int64(6), int64(9)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("TryTypedModuloCompareIndexesI64 values = %v, want %v", got, want)
+	}
+	valueSum, ok, err := TryTypedNumericSumWhereModuloCompare(NewI64Range(1, 2, 10), NewI64Range(0, 1, 10), int64(3), OpEQ, int64(0))
+	if err != nil || !ok || valueSum != int64(40) {
+		t.Fatalf("TryTypedNumericSumWhereModuloCompare = %v,%v,%v; want 40,true,nil", valueSum, ok, err)
+	}
 	attributedNot, ok, err := TryTypedNot(WithArrayAttribute(NewI64([]int64{0, 1}), ArrayAttributeSorted))
 	if err != nil {
 		t.Fatalf("TryTypedNot attributed returned error: %v", err)

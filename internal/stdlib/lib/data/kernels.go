@@ -2060,6 +2060,159 @@ func TryTypedNumericSumWhereMask(array, mask Array) (any, bool, error) {
 	return total, true, nil
 }
 
+// TryTypedModuloCompareIndexStatsI64 computes count and q-index sum for
+// where (array mod modulus) op target without materializing the modulo vector,
+// boolean mask, or where index vector.
+func TryTypedModuloCompareIndexStatsI64(array Array, modulus any, op Op, target any) (count, sum int64, handled bool, err error) {
+	modulusI64, targetI64, ok := moduloCompareOperands(modulus, op, target)
+	if !ok {
+		return 0, 0, false, nil
+	}
+	if array == nil {
+		return 0, 0, true, fmt.Errorf("modulo compare array is nil")
+	}
+	if !isDenseIntegerArray(array) {
+		return 0, 0, false, nil
+	}
+	for row := 0; row < array.Len(); row++ {
+		selected, err := integerModuloCompareAt(array, row, modulusI64, op, targetI64)
+		if err != nil {
+			return 0, 0, true, err
+		}
+		if selected {
+			count++
+			sum += int64(row)
+		}
+	}
+	return count, sum, true, nil
+}
+
+// TryTypedModuloCompareIndexesI64 returns q where indexes for modulo compare
+// shapes without first building a modulo vector and compare mask.
+func TryTypedModuloCompareIndexesI64(array Array, modulus any, op Op, target any) (Array, bool, error) {
+	modulusI64, targetI64, ok := moduloCompareOperands(modulus, op, target)
+	if !ok {
+		return nil, false, nil
+	}
+	if array == nil {
+		return nil, true, fmt.Errorf("modulo compare array is nil")
+	}
+	if !isDenseIntegerArray(array) {
+		return nil, false, nil
+	}
+	indexes := make([]int64, 0, array.Len()/2)
+	for row := 0; row < array.Len(); row++ {
+		selected, err := integerModuloCompareAt(array, row, modulusI64, op, targetI64)
+		if err != nil {
+			return nil, true, err
+		}
+		if selected {
+			indexes = append(indexes, int64(row))
+		}
+	}
+	return newI64Trusted(indexes), true, nil
+}
+
+// TryTypedNumericSumWhereModuloCompare reduces values selected by a modulo
+// compare over a second integer array in one pass.
+func TryTypedNumericSumWhereModuloCompare(values, modSource Array, modulus any, op Op, target any) (any, bool, error) {
+	modulusI64, targetI64, ok := moduloCompareOperands(modulus, op, target)
+	if !ok {
+		return nil, false, nil
+	}
+	if values == nil || modSource == nil {
+		return nil, true, fmt.Errorf("modulo compare sum arrays must be non-nil")
+	}
+	if values.Len() != modSource.Len() {
+		return nil, true, fmt.Errorf("modulo compare sum length mismatch: values=%d source=%d", values.Len(), modSource.Len())
+	}
+	if !isDenseIntegerArray(modSource) || !isNumericArray(values) {
+		return nil, false, nil
+	}
+	if isDenseIntegerArray(values) {
+		var total int64
+		selected := 0
+		for row := 0; row < modSource.Len(); row++ {
+			match, err := integerModuloCompareAt(modSource, row, modulusI64, op, targetI64)
+			if err != nil {
+				return nil, true, err
+			}
+			if !match {
+				continue
+			}
+			value, ok, err := integerArrayAt(values, row)
+			if err != nil {
+				return nil, true, err
+			}
+			if ok {
+				total += value
+			}
+			selected++
+		}
+		if selected == 0 {
+			return NullValue, true, nil
+		}
+		return total, true, nil
+	}
+	var total float64
+	selected := 0
+	for row := 0; row < modSource.Len(); row++ {
+		match, err := integerModuloCompareAt(modSource, row, modulusI64, op, targetI64)
+		if err != nil {
+			return nil, true, err
+		}
+		if !match {
+			continue
+		}
+		value, ok, err := typedKernels.NumericAt(values, row)
+		if err != nil {
+			return nil, true, err
+		}
+		if ok {
+			total += value
+		}
+		selected++
+	}
+	if selected == 0 {
+		return NullValue, true, nil
+	}
+	return total, true, nil
+}
+
+func moduloCompareOperands(modulus any, op Op, target any) (int64, int64, bool) {
+	if op != OpEQ && op != OpNE {
+		return 0, 0, false
+	}
+	modulusI64, ok := coerceInt64Exact(modulus)
+	if !ok || modulusI64 == 0 {
+		return 0, 0, false
+	}
+	targetI64, ok := coerceInt64Exact(target)
+	if !ok {
+		return 0, 0, false
+	}
+	return modulusI64, targetI64, true
+}
+
+func integerModuloCompareAt(array Array, row int, modulus int64, op Op, target int64) (bool, error) {
+	value, ok, err := integerArrayAt(array, row)
+	if err != nil {
+		return false, err
+	}
+	if !ok {
+		return op == OpNE, nil
+	}
+	mod := qModInt64(value, modulus)
+	switch op {
+	case OpEQ:
+		return mod == target, nil
+	case OpNE:
+		return mod != target, nil
+	default:
+		return false, nil
+	}
+}
+
 func typedIntegerSumByI64Indexes(array, indexes Array) (any, bool, error) {
 	if sum, handled, err := typedIntegerSumByI64IndexView(array, indexes); handled || err != nil {
 		return sum, handled, err
