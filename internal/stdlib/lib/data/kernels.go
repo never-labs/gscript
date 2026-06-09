@@ -13161,10 +13161,13 @@ func i64ScalarDyadicWholeRangeSum(array i64ScalarDyadicArray) (int64, bool) {
 		return 0, false
 	}
 	rangeSource, ok := array.source.(i64RangeArray)
-	if !ok || rangeSource.step != 1 {
+	if !ok {
 		return 0, false
 	}
-	return i64RangePositiveModSum(rangeSource.start, array.len, array.scalar), true
+	if rangeSource.step == 1 {
+		return i64RangePositiveModSum(rangeSource.start, array.len, array.scalar), true
+	}
+	return i64RangePositiveModStepSum(rangeSource.start, rangeSource.step, array.len, array.scalar)
 }
 
 func i64ScalarDyadicModuloRangeSum(array i64ScalarDyadicArray, start, length int) (int64, bool) {
@@ -13172,10 +13175,14 @@ func i64ScalarDyadicModuloRangeSum(array i64ScalarDyadicArray, start, length int
 		return 0, false
 	}
 	rangeSource, ok := array.source.(i64RangeArray)
-	if !ok || rangeSource.step != 1 {
+	if !ok {
 		return 0, false
 	}
-	return i64RangePositiveModSum(rangeSource.start+int64(start), length, array.scalar), true
+	startValue := rangeSource.start + int64(start)*rangeSource.step
+	if rangeSource.step == 1 {
+		return i64RangePositiveModSum(startValue, length, array.scalar), true
+	}
+	return i64RangePositiveModStepSum(startValue, rangeSource.step, length, array.scalar)
 }
 
 func i64RangePositiveModSum(start int64, length int, modulus int64) int64 {
@@ -13203,6 +13210,36 @@ func i64RangePositiveModSum(start int64, length int, modulus int64) int64 {
 	full := remaining / period
 	rem := remaining % period
 	return sum + full*periodSum + rem*(rem-1)/2
+}
+
+func i64RangePositiveModStepSum(start, step int64, length int, modulus int64) (int64, bool) {
+	if length <= 0 {
+		return 0, true
+	}
+	if modulus <= 0 {
+		return 0, false
+	}
+	period := modulus / gcdInt64(step, modulus)
+	if period <= 0 || period > 1<<20 {
+		return 0, false
+	}
+	var periodSum int64
+	value := qPositiveMod(start, modulus)
+	step = qPositiveMod(step, modulus)
+	for i := int64(0); i < period; i++ {
+		periodSum += value
+		value = (value + step) % modulus
+	}
+	n := int64(length)
+	full := n / period
+	rem := n % period
+	sum := full * periodSum
+	value = qPositiveMod(start, modulus)
+	for i := int64(0); i < rem; i++ {
+		sum += value
+		value = (value + step) % modulus
+	}
+	return sum, true
 }
 
 func qPositiveMod(value, modulus int64) int64 {

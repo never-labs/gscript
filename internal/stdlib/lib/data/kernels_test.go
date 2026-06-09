@@ -2936,6 +2936,7 @@ func TestTypedNumericUnaryBinaryAndAggregates(t *testing.T) {
 		{name: "til", source: NewI64Range(0, 1, 40), modulus: 17, want: 287},
 		{name: "offset", source: NewI64Range(5, 1, 20), modulus: 7, want: 59},
 		{name: "negative start", source: NewI64Range(-5, 1, 12), modulus: 4, want: 18},
+		{name: "stepped", source: NewI64Range(7, 3, 12), modulus: 5, want: 22},
 	} {
 		mod, ok, err := TryTypedIntegerDyadic(OpMod, tt.source, tt.modulus)
 		if err != nil {
