@@ -7784,6 +7784,13 @@ func TestMatrixReshapeTransposeAndMultiply(t *testing.T) {
 			t.Fatalf("inverse cell %d = %v, want %v", i, got, expected)
 		}
 	}
+	inverseSum, handled, err := MatrixInverseNumericSum(matrixArray{
+		shape: []int{2, 2},
+		data:  NewF64([]float64{4, 7, 2, 6}),
+	})
+	if err != nil || !handled || math.Abs(inverseSum-0.1) > 1e-12 {
+		t.Fatalf("MatrixInverseNumericSum = %#v,%v,%v; want 0.1,true,nil", inverseSum, handled, err)
+	}
 }
 
 func TestSequenceTransformRuntimeHelpers(t *testing.T) {

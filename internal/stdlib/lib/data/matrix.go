@@ -806,6 +806,15 @@ func MatrixInverseNumeric(matrix Matrix) (Array, error) {
 	if n == 0 {
 		return matrixArray{shape: []int{0, 0}, data: NewF64(nil)}, nil
 	}
+	if n == 2 {
+		out, handled, err := matrixInverse2x2(matrix)
+		if err != nil {
+			return nil, err
+		}
+		if handled {
+			return matrixArray{shape: []int{2, 2}, data: NewF64(out)}, nil
+		}
+	}
 	aug := make([]float64, n*2*n)
 	for row := 0; row < n; row++ {
 		for col := 0; col < n; col++ {
@@ -863,6 +872,31 @@ func MatrixInverseNumeric(matrix Matrix) (Array, error) {
 	return matrixArray{shape: []int{n, n}, data: NewF64(out)}, nil
 }
 
+func matrixInverse2x2(matrix Matrix) ([]float64, bool, error) {
+	a, ok, err := matrixCellNumeric(matrix, 0, 0)
+	if err != nil || !ok {
+		return nil, ok, err
+	}
+	b, ok, err := matrixCellNumeric(matrix, 0, 1)
+	if err != nil || !ok {
+		return nil, ok, err
+	}
+	c, ok, err := matrixCellNumeric(matrix, 1, 0)
+	if err != nil || !ok {
+		return nil, ok, err
+	}
+	d, ok, err := matrixCellNumeric(matrix, 1, 1)
+	if err != nil || !ok {
+		return nil, ok, err
+	}
+	det := a*d - b*c
+	if det == 0 {
+		return nil, true, fmt.Errorf("matrix inverse expects a non-singular matrix")
+	}
+	invDet := 1 / det
+	return []float64{d * invDet, -b * invDet, -c * invDet, a * invDet}, true, nil
+}
+
 // MatrixInverseNumericSum computes sum(raze inv matrix). It keeps the
 // elimination work buffer but avoids allocating the final matrix value.
 func MatrixInverseNumericSum(matrix Matrix) (float64, bool, error) {
@@ -879,6 +913,13 @@ func MatrixInverseNumericSum(matrix Matrix) (float64, bool, error) {
 	}
 	if n == 0 {
 		return 0, true, nil
+	}
+	if n == 2 {
+		inverse, handled, err := matrixInverse2x2(matrix)
+		if err != nil || !handled {
+			return 0, handled, err
+		}
+		return inverse[0] + inverse[1] + inverse[2] + inverse[3], true, nil
 	}
 	aug := make([]float64, n*2*n)
 	for row := 0; row < n; row++ {
