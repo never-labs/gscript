@@ -2777,6 +2777,7 @@ func (s *EvalState) eval(src string) (any, error) {
 		{"left", dyadicVerbFunc('L')},
 		{"right", dyadicVerbFunc('R')},
 		{"within", within},
+		{"where", whereFilterValue},
 		{"in", membership},
 		{"and", logicalAnd},
 		{"or", logicalOr},
@@ -13368,6 +13369,18 @@ func where(v any) (any, error) {
 		}
 	}
 	return data.NewI64(out), nil
+}
+
+func whereFilterValue(left, right any) (any, error) {
+	switch left.(type) {
+	case data.Frame, data.KeyedFrame:
+		return nil, fmt.Errorf("where filter for tables is not supported in q eval; use q.sql where")
+	}
+	indexes, err := where(right)
+	if err != nil {
+		return nil, err
+	}
+	return indexValue(left, indexes)
 }
 
 func (s *EvalState) evalWhereCompare(src string) (any, bool, error) {

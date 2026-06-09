@@ -142,3 +142,15 @@ func TestQGapValidationDyadicWordChainsUseQRightAssociativity(t *testing.T) {
 	assertEvalValue(t, "10 plus 2 times 3", int64(16))
 	assertEvalValue(t, "100 minus 20 div 5", int64(96))
 }
+
+func TestQGapValidationDyadicWhereFiltersLikeIndexWhere(t *testing.T) {
+	assertEvalArray(t, "10 20 30 40 where 1010b", data.KindI64, []any{int64(10), int64(30)})
+	assertEvalArray(t, "10 20 30 40 where 0 2 1 0", data.KindI64, []any{int64(20), int64(20), int64(30)})
+	assertEvalArray(t, `"abcd" where 1010b`, data.KindString, []any{"a", "c"})
+	assertEvalValue(t, "sum (10 20 30 40 where 10 20 30 40>20)", int64(70))
+	assertEvalValue(t, "x:til 16;m:(x mod 3)=0;(+/x where m)+count x where m", int64(51))
+	assertEvalArray(t, "(1 2;3 4;5 6) where 101b", data.KindAny, []any{
+		data.NewI64([]int64{1, 2}),
+		data.NewI64([]int64{5, 6}),
+	})
+}
