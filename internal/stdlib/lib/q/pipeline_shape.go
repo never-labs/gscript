@@ -7,6 +7,8 @@ const (
 	qPipelineShapeFamilyWhere   qPipelineShapeFamily = "where"
 	qPipelineShapeFamilyGather  qPipelineShapeFamily = "gather"
 	qPipelineShapeFamilyVector  qPipelineShapeFamily = "vector"
+	qPipelineShapeFamilyStats   qPipelineShapeFamily = "stats"
+	qPipelineShapeFamilyWindow  qPipelineShapeFamily = "window"
 )
 
 type qPipelineShapeSpec struct {
@@ -131,8 +133,47 @@ func qPipelineShapeSpecForPlan(kind qPipelineKind, variant string) (qPipelineSha
 			Transform:     variant,
 			PipelineShape: "sequence_count",
 		}, true
+	case qPipelineUnaryPrimitive:
+		if variant == "" {
+			return qPipelineShapeSpec{}, false
+		}
+		return qPipelineRuntimePrimitiveShapeSpec("runtime-unary", variant), true
+	case qPipelineDyadicPrimitive:
+		if variant == "" {
+			return qPipelineShapeSpec{}, false
+		}
+		return qPipelineRuntimePrimitiveShapeSpec("runtime-dyadic", variant), true
 	default:
 		return qPipelineShapeSpec{}, false
+	}
+}
+
+func qPipelineRuntimePrimitiveShapeSpec(prefix, verb string) qPipelineShapeSpec {
+	spec := qPipelineShapeSpec{
+		ID:            prefix + "/" + verb,
+		Transform:     verb,
+		PipelineShape: qRuntimePrimitivePipelineShape(verb),
+	}
+	switch spec.PipelineShape {
+	case "numeric_stats":
+		spec.Family = qPipelineShapeFamilyStats
+		spec.Reducer = verb
+	case "window_scan":
+		spec.Family = qPipelineShapeFamilyWindow
+	default:
+		spec.Family = qPipelineShapeFamilyVector
+	}
+	return spec
+}
+
+func qRuntimePrimitivePipelineShape(verb string) string {
+	switch verb {
+	case "svar", "sdev", "wsum", "cov", "scov", "cor":
+		return "numeric_stats"
+	case "mdev", "ema":
+		return "window_scan"
+	default:
+		return "runtime_primitive"
 	}
 }
 

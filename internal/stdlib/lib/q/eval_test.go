@@ -274,6 +274,66 @@ func TestQPipelinePlanRecognizesSequenceStringCounts(t *testing.T) {
 	}
 }
 
+func TestQPipelinePlanRecognizesRuntimePrimitiveStatsAndWindows(t *testing.T) {
+	tests := []struct {
+		expr          string
+		shape         string
+		pipelineShape string
+		transform     string
+		want          any
+	}{
+		{expr: "svar 1 2 3", shape: "runtime-unary/svar", pipelineShape: "numeric_stats", transform: "svar", want: 1.0},
+		{expr: "sdev 1 2 3", shape: "runtime-unary/sdev", pipelineShape: "numeric_stats", transform: "sdev", want: 1.0},
+		{expr: "wsum 1 2 3", shape: "runtime-unary/wsum", pipelineShape: "numeric_stats", transform: "wsum", want: int64(6)},
+		{expr: "1 2 3 wsum 10 20 30", shape: "runtime-dyadic/wsum", pipelineShape: "numeric_stats", transform: "wsum", want: 140.0},
+		{expr: "1 2 3 cov 1 2 3", shape: "runtime-dyadic/cov", pipelineShape: "numeric_stats", transform: "cov", want: float64(2) / 3},
+		{expr: "1 2 3 scov 1 2 3", shape: "runtime-dyadic/scov", pipelineShape: "numeric_stats", transform: "scov", want: 1.0},
+		{expr: "1 2 3 cor 1 2 3", shape: "runtime-dyadic/cor", pipelineShape: "numeric_stats", transform: "cor", want: 1.0},
+		{expr: "2 mdev 1 2 3", shape: "runtime-dyadic/mdev", pipelineShape: "window_scan", transform: "mdev", want: data.NewF64([]float64{0, 0.5, 0.5})},
+		{expr: "0.5 ema 1 2 3", shape: "runtime-dyadic/ema", pipelineShape: "window_scan", transform: "ema", want: data.NewF64([]float64{1, 1.5, 2.25})},
+	}
+	for _, tt := range tests {
+		t.Run(tt.shape, func(t *testing.T) {
+			ClearRuntimeKernelExecutionStats()
+			t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+			descriptor, ok := DescribeEvalPipeline(tt.expr)
+			if !ok {
+				t.Fatalf("DescribeEvalPipeline(%q) did not recognize runtime primitive", tt.expr)
+			}
+			if descriptor.Shape != tt.shape ||
+				descriptor.PipelineShape != tt.pipelineShape ||
+				descriptor.ShapeTransform != tt.transform {
+				t.Fatalf("descriptor = %#v, want shape=%q pipeline=%q transform=%q", descriptor, tt.shape, tt.pipelineShape, tt.transform)
+			}
+			out, handled, err := ExecuteEvalPipelineDescriptor(descriptor)
+			if err != nil || !handled {
+				t.Fatalf("ExecuteEvalPipelineDescriptor = %#v,%v,%v", out, handled, err)
+			}
+			if !reflect.DeepEqual(out, tt.want) {
+				t.Fatalf("ExecuteEvalPipelineDescriptor output = %#v, want %#v", out, tt.want)
+			}
+
+			seenPipeline := false
+			seenPrimitive := tt.pipelineShape == "numeric_stats" || tt.pipelineShape == "window_scan"
+			for _, stat := range RuntimeKernelExecutionStats() {
+				if stat.Outcome == "fallback" || stat.Outcome == "error" {
+					t.Fatalf("unexpected runtime fallback/error: %#v all=%#v", stat, RuntimeKernelExecutionStats())
+				}
+				if stat.Kernel == "QPipelinePlan" && stat.Shape == tt.shape && stat.Outcome == "hit" {
+					seenPipeline = true
+				}
+				if stat.Kernel == "QRuntimePrimitive" && stat.Outcome == "hit" {
+					seenPrimitive = true
+				}
+			}
+			if !seenPipeline || !seenPrimitive {
+				t.Fatalf("missing runtime primitive stats: pipeline=%v primitive=%v all=%#v", seenPipeline, seenPrimitive, RuntimeKernelExecutionStats())
+			}
+		})
+	}
+}
+
 func TestQPipelineShapeRegistryStabilizesExpressionPlans(t *testing.T) {
 	tests := []struct {
 		name      string

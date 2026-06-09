@@ -31,6 +31,8 @@ const (
 	qPipelineCountRunningScan
 	qPipelineLastRunningScan
 	qPipelineCountSequencePrimitive
+	qPipelineUnaryPrimitive
+	qPipelineDyadicPrimitive
 )
 
 type qPipelinePlan struct {
@@ -205,6 +207,9 @@ func qPipelinePlanCandidate(src string) bool {
 	if strings.HasPrefix(src, "where ") && wordBoundary(src, 0, len("where")) {
 		return true
 	}
+	if qPipelineRuntimePrimitiveCandidate(src) {
+		return true
+	}
 	return false
 }
 
@@ -216,6 +221,9 @@ func buildQPipelinePlan(src string) qPipelinePlan {
 	withSource := func(plan qPipelinePlan) qPipelinePlan {
 		plan.source = src
 		return plan
+	}
+	if plan, ok := buildQPipelineRuntimePrimitivePlan(src); ok {
+		return qPipelinePlanWithBindingPlans(withSource(plan))
 	}
 	if strings.HasPrefix(src, "+/") {
 		right := strings.TrimSpace(src[2:])
@@ -386,6 +394,144 @@ func buildQPipelineCountSequencePlan(src string) (qPipelinePlan, bool) {
 		}, true
 	}
 	return qPipelinePlan{}, false
+}
+
+func qPipelineRuntimePrimitiveCandidate(src string) bool {
+	if !qPipelineRuntimePrimitiveTopLevelEligible(src) {
+		return false
+	}
+	if _, _, ok := qPipelineRuntimePrimitivePrefix(src); ok {
+		return true
+	}
+	if name, args, ok := qPipelineRuntimePrimitiveCall(src); ok {
+		return qPipelineRuntimePrimitiveCallArity(name, len(args))
+	}
+	for _, word := range qPipelineRuntimeDyadicPrimitiveVerbs() {
+		if _, _, ok := splitTopLevelWord(src, word); ok {
+			return true
+		}
+	}
+	return false
+}
+
+func buildQPipelineRuntimePrimitivePlan(src string) (qPipelinePlan, bool) {
+	src = strings.TrimSpace(src)
+	if !qPipelineRuntimePrimitiveTopLevelEligible(src) {
+		return qPipelinePlan{}, false
+	}
+	if name, arg, ok := qPipelineRuntimePrimitivePrefix(src); ok {
+		plan := qPipelineShapePlan(qPipelineUnaryPrimitive, name)
+		plan.compareOp = name
+		plan.reductionInput = arg
+		return plan, true
+	}
+	if name, args, ok := qPipelineRuntimePrimitiveCall(src); ok && qPipelineRuntimePrimitiveCallArity(name, len(args)) {
+		switch len(args) {
+		case 1:
+			plan := qPipelineShapePlan(qPipelineUnaryPrimitive, name)
+			plan.compareOp = name
+			plan.reductionInput = strings.TrimSpace(args[0])
+			return plan, plan.reductionInput != ""
+		case 2:
+			plan := qPipelineShapePlan(qPipelineDyadicPrimitive, name)
+			plan.compareOp = name
+			plan.leftExpr = strings.TrimSpace(args[0])
+			plan.rightExpr = strings.TrimSpace(args[1])
+			return plan, plan.leftExpr != "" && plan.rightExpr != ""
+		default:
+			return qPipelinePlan{}, false
+		}
+	}
+	for _, word := range qPipelineRuntimeDyadicPrimitiveVerbs() {
+		left, right, ok := splitTopLevelWord(src, word)
+		if !ok {
+			continue
+		}
+		left = strings.TrimSpace(left)
+		right = strings.TrimSpace(right)
+		if left == "" || right == "" {
+			return qPipelinePlan{}, false
+		}
+		plan := qPipelineShapePlan(qPipelineDyadicPrimitive, word)
+		plan.compareOp = word
+		plan.leftExpr = left
+		plan.rightExpr = right
+		return plan, true
+	}
+	return qPipelinePlan{}, false
+}
+
+func qPipelineRuntimePrimitiveTopLevelEligible(src string) bool {
+	src = strings.TrimSpace(src)
+	if src == "" {
+		return false
+	}
+	for _, prefix := range []string{"+/", "sum ", "count ", "last ", "where "} {
+		if strings.HasPrefix(src, prefix) {
+			return false
+		}
+	}
+	return true
+}
+
+func qPipelineRuntimePrimitivePrefix(src string) (name, arg string, ok bool) {
+	for _, word := range qPipelineRuntimeUnaryPrimitiveVerbs() {
+		prefix := word + " "
+		if strings.HasPrefix(src, prefix) && wordBoundary(src, 0, len(word)) {
+			arg = strings.TrimSpace(src[len(prefix):])
+			return word, arg, arg != ""
+		}
+	}
+	return "", "", false
+}
+
+func qPipelineRuntimePrimitiveCall(src string) (string, []string, bool) {
+	args, ok := qFunctionCallArgs(src)
+	if !ok {
+		return "", nil, false
+	}
+	name := strings.TrimSpace(src[:strings.Index(src, "[")])
+	if !qPipelineRuntimePrimitiveVerb(name) {
+		return "", nil, false
+	}
+	return name, args, true
+}
+
+func qPipelineRuntimePrimitiveCallArity(name string, n int) bool {
+	name = strings.TrimSpace(name)
+	switch name {
+	case "svar", "sdev":
+		return n == 1
+	case "mdev", "ema", "cov", "scov", "cor":
+		return n == 2
+	case "wsum":
+		return n == 1 || n == 2
+	default:
+		return false
+	}
+}
+
+func qPipelineRuntimeUnaryPrimitiveVerbs() []string {
+	return []string{"svar", "sdev", "wsum"}
+}
+
+func qPipelineRuntimeDyadicPrimitiveVerbs() []string {
+	return []string{"mdev", "ema", "wsum", "cov", "scov", "cor"}
+}
+
+func qPipelineRuntimePrimitiveVerb(name string) bool {
+	name = strings.TrimSpace(name)
+	for _, word := range qPipelineRuntimeUnaryPrimitiveVerbs() {
+		if name == word {
+			return true
+		}
+	}
+	for _, word := range qPipelineRuntimeDyadicPrimitiveVerbs() {
+		if name == word {
+			return true
+		}
+	}
+	return false
 }
 
 func buildQPipelineSumMovingWindowPlan(src string) (qPipelinePlan, bool) {
@@ -750,6 +896,8 @@ func (s *EvalState) evalQPipelinePlan(plan qPipelinePlan) (any, bool, error) {
 		out, handled, err = s.evalQPipelineLastRunningScan(plan)
 	case qPipelineCountSequencePrimitive:
 		out, handled, err = s.evalQPipelineCountSequencePrimitive(plan)
+	case qPipelineUnaryPrimitive, qPipelineDyadicPrimitive:
+		out, handled, err = s.evalQPipelineRuntimePrimitive(plan)
 	default:
 		recordRuntimeKernelExecution("QPipelinePlan", shape, "fallback", RuntimeFallbackPlannerUnhandled)
 		return nil, false, nil

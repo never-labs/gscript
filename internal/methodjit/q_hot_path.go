@@ -177,6 +177,10 @@ type qEvalHotPlan struct {
 	Kernel         string
 	Shape          string
 	PipelineShape  string
+	ShapeFamily    string
+	ShapeReducer   string
+	ShapeSelector  string
+	ShapeTransform string
 	Backend        string
 	Detail         string
 	Kind           string

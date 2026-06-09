@@ -386,7 +386,20 @@ func qPipelinePlanFromEvalDescriptor(descriptor EvalPipelineDescriptor) (qPipeli
 		plan.kind = qPipelineCountSequencePrimitive
 		plan.compareOp = strings.TrimPrefix(shape, "sequence-count/")
 	default:
-		return qPipelinePlan{}, false
+		switch {
+		case strings.HasPrefix(shape, "runtime-unary/"):
+			plan.kind = qPipelineUnaryPrimitive
+			if plan.compareOp == "" {
+				plan.compareOp = strings.TrimPrefix(shape, "runtime-unary/")
+			}
+		case strings.HasPrefix(shape, "runtime-dyadic/"):
+			plan.kind = qPipelineDyadicPrimitive
+			if plan.compareOp == "" {
+				plan.compareOp = strings.TrimPrefix(shape, "runtime-dyadic/")
+			}
+		default:
+			return qPipelinePlan{}, false
+		}
 	}
 	if plan.comparePrefix == "" {
 		plan.comparePrefix = shape

@@ -18,6 +18,10 @@ type QEvalPipelineDescriptor struct {
 	Kernel         string
 	Shape          string
 	PipelineShape  string
+	ShapeFamily    string
+	ShapeReducer   string
+	ShapeSelector  string
+	ShapeTransform string
 	Source         string
 	Backend        string
 	Detail         string
@@ -64,6 +68,10 @@ func (p qEvalPipelineBackendPlan) methodDescriptor() QEvalPipelineDescriptor {
 		Kernel:         descriptor.Kernel,
 		Shape:          descriptor.Shape,
 		PipelineShape:  descriptor.PipelineShape,
+		ShapeFamily:    descriptor.ShapeFamily,
+		ShapeReducer:   descriptor.ShapeReducer,
+		ShapeSelector:  descriptor.ShapeSelector,
+		ShapeTransform: descriptor.ShapeTransform,
 		Source:         descriptor.Source,
 		Backend:        p.plan.Backend,
 		Detail:         p.plan.Detail,
@@ -115,6 +123,10 @@ func qEvalRuntimePipelinePlan(source string) (qEvalHotPlan, bool) {
 		Kernel:         descriptor.Kernel,
 		Shape:          descriptor.Shape,
 		PipelineShape:  descriptor.PipelineShape,
+		ShapeFamily:    descriptor.ShapeFamily,
+		ShapeReducer:   descriptor.ShapeReducer,
+		ShapeSelector:  descriptor.ShapeSelector,
+		ShapeTransform: descriptor.ShapeTransform,
 		Backend:        descriptor.Backend,
 		Detail:         descriptor.Detail,
 		Kind:           descriptor.Kind,
@@ -441,6 +453,10 @@ func qEvalPipelineDescriptorFromRef(ref QEvalPipelinePlanRef) (stdq.EvalPipeline
 		Kernel:         ref.Kernel,
 		Shape:          ref.Shape,
 		PipelineShape:  ref.PipelineShape,
+		ShapeFamily:    ref.ShapeFamily,
+		ShapeReducer:   ref.ShapeReducer,
+		ShapeSelector:  ref.ShapeSelector,
+		ShapeTransform: ref.ShapeTransform,
 		Terminal:       ref.Terminal,
 		Assignments:    decodeQEvalPipelineAssignments(ref.AssignmentText),
 		ValueExpr:      ref.ValueExpr,

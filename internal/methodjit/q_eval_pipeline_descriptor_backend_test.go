@@ -53,6 +53,44 @@ func TestQEvalPipelineRuntimeBackendPrefersBackendPlanOverSourcePlanner(t *testi
 	}
 }
 
+func TestQEvalPipelineRuntimeBackendExecutesStatsPrimitiveBackendPlan(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		src  string
+		want float64
+	}{
+		{name: "weighted_sum", src: "1 2 3 wsum 10 20 30", want: 140},
+		{name: "correlation", src: "1 2 3 cor 1 2 3", want: 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ref := qEvalPipelineDescriptorBackendTestRef(t, tc.src)
+			if ref.Kernel != "QPipelinePlan" || ref.Shape == "" || ref.PipelineShape != "numeric_stats" {
+				t.Fatalf("ref = %+v, want numeric stats q pipeline", ref)
+			}
+			backend := newQRuntimeEvalPipelineBackend([]QEvalPipelinePlanRef{ref})
+			backendPlanCalls := 0
+			backend.executeBackendPlan = func(plan stdq.EvalPipelineBackendPlan) (any, bool, error) {
+				backendPlanCalls++
+				return stdq.ExecuteEvalPipelineBackendPlan(plan)
+			}
+			backend.executeSource = func(source string) (any, bool, error) {
+				return nil, false, errors.New("source planner fallback should not execute")
+			}
+
+			value, handled, err := executeQEvalPipelinePlanValue(backend, ref)
+			if err != nil {
+				t.Fatalf("executeQEvalPipelinePlanValue: %v", err)
+			}
+			if !handled || !value.IsFloat() || value.Float() != tc.want {
+				t.Fatalf("executeQEvalPipelinePlanValue = %v handled %v, want float %v handled", value, handled, tc.want)
+			}
+			if backendPlanCalls != 1 {
+				t.Fatalf("backend plan calls = %d, want 1", backendPlanCalls)
+			}
+		})
+	}
+}
+
 func TestCompiledFunctionUsesPredecodedQEvalPipelineBackend(t *testing.T) {
 	ref := qEvalPipelineDescriptorBackendTestRef(t, "x:til 8192;y:x+1;idx:where (x mod 4)=1;+/y[idx]")
 	cf := &CompiledFunction{
@@ -205,6 +243,10 @@ func qEvalPipelineDescriptorBackendTestRef(tb testing.TB, source string) QEvalPi
 		Kernel:         descriptor.Kernel,
 		Shape:          descriptor.Shape,
 		PipelineShape:  descriptor.PipelineShape,
+		ShapeFamily:    descriptor.ShapeFamily,
+		ShapeReducer:   descriptor.ShapeReducer,
+		ShapeSelector:  descriptor.ShapeSelector,
+		ShapeTransform: descriptor.ShapeTransform,
 		Backend:        descriptor.Backend,
 		Detail:         descriptor.Detail,
 		Kind:           descriptor.Kind,

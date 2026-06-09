@@ -37,6 +37,10 @@ type QEvalPipelinePlanRef struct {
 	Kernel         string
 	Shape          string
 	PipelineShape  string
+	ShapeFamily    string
+	ShapeReducer   string
+	ShapeSelector  string
+	ShapeTransform string
 	Source         string
 	Backend        string
 	Kind           string
@@ -124,6 +128,10 @@ func (fn *Function) addQEvalPipelinePlan(source string, plan qEvalHotPlan) QEval
 		Kernel:         plan.Kernel,
 		Shape:          plan.Shape,
 		PipelineShape:  plan.PipelineShape,
+		ShapeFamily:    plan.ShapeFamily,
+		ShapeReducer:   plan.ShapeReducer,
+		ShapeSelector:  plan.ShapeSelector,
+		ShapeTransform: plan.ShapeTransform,
 		Source:         source,
 		Backend:        plan.Backend,
 		Kind:           plan.Kind,
