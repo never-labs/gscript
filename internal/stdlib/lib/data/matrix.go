@@ -327,6 +327,29 @@ func TryMatrixRowNumericSumCount(value Matrix, row int) (any, bool, error) {
 	return nil, false, nil
 }
 
+// TryMatrixCellNumericPlusCount returns matrix[row,col]+count(matrix) without
+// materializing a row view. q count on a matrix/list-of-lists is the row count.
+func TryMatrixCellNumericPlusCount(value Matrix, row, col int) (any, bool, error) {
+	if value == nil {
+		return nil, false, nil
+	}
+	shape := value.Shape()
+	if len(shape) != 2 {
+		return nil, false, nil
+	}
+	cell, handled, err := TryMatrixCellIndex(value, row, col)
+	if err != nil || !handled {
+		return nil, handled, err
+	}
+	if cellI, ok := coerceInt64Exact(cell); ok {
+		return cellI + int64(shape[0]), true, nil
+	}
+	if cellF, ok := numeric(cell); ok {
+		return cellF + float64(shape[0]), true, nil
+	}
+	return nil, false, nil
+}
+
 // MatrixMultiplyNumeric multiplies two numeric two-dimensional matrices. The
 // f64 result keeps the semantic layer simple while leaving a single replacement
 // point for future typed BLAS-style kernels.

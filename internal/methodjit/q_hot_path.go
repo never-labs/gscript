@@ -194,6 +194,7 @@ type qEvalHotPlan struct {
 	MaskBinding    string
 	RowValueExpr   string
 	RowIndexExpr   string
+	ColIndexExpr   string
 	CallableExpr   string
 	DyadicOp       string
 	ScalarExpr     string

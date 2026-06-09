@@ -15,6 +15,7 @@ const (
 	qScriptPipelineSequenceEdgeSum     qScriptPipelineKind = "sequence-edge-reduce/sum-first-last"
 	qScriptPipelineSumPlusDyadicFloat  qScriptPipelineKind = "multi-reduce/sum-plus-dyadic-float-sum"
 	qScriptPipelineMatrixRowSumCount   qScriptPipelineKind = "matrix-row-reduce/sum-count"
+	qScriptPipelineMatrixCellPlusCount qScriptPipelineKind = "matrix-cell-reduce/cell-plus-count"
 	qScriptPipelineCallableDotSumRight qScriptPipelineKind = "callable-dot/sum-plus-right"
 	qScriptPipelineApplyScalarAt       qScriptPipelineKind = "apply-index/scalar-at"
 	qScriptPipelineApplyScalarDot      qScriptPipelineKind = "apply-index/scalar-dot"
@@ -38,8 +39,10 @@ type qScriptPipelineDescriptor struct {
 	maskPlan          qScriptBindingPlan
 	rowValueExpr      string
 	rowIndexExpr      string
+	colIndexExpr      string
 	rowValuePlan      qScriptBindingPlan
 	rowIndexPlan      qScriptBindingPlan
+	colIndexPlan      qScriptBindingPlan
 	callableExpr      string
 	callableBinding   string
 	dyadicOp          string
@@ -109,6 +112,7 @@ func buildQScriptPipelineDescriptor(statements []qScriptStatement) (*qScriptPipe
 	descriptor.maskPlan = buildQScriptBindingPlanForRHS(descriptor.maskExpr, nil)
 	descriptor.rowValuePlan = buildQScriptBindingPlanForRHS(descriptor.rowValueExpr, nil)
 	descriptor.rowIndexPlan = buildQScriptBindingPlanForRHS(descriptor.rowIndexExpr, nil)
+	descriptor.colIndexPlan = buildQScriptBindingPlanForRHS(descriptor.colIndexExpr, nil)
 	descriptor.scalarPlan = buildQScriptBindingPlanForRHS(descriptor.scalarExpr, nil)
 	descriptor.moduloMaskPlan = qScriptPipelineModuloMaskPlan(descriptor.maskExpr)
 	descriptor.shapeText = descriptor.shape()
@@ -147,6 +151,9 @@ func describeQScriptPipelineTerminal(src string, bindings map[string]string) (qS
 		}, true
 	}
 	if descriptor, ok := qScriptPipelineSumPlusDyadicFloatDescriptor(src, bindings); ok {
+		return descriptor, true
+	}
+	if descriptor, ok := qScriptPipelineMatrixCellPlusCountDescriptor(src, bindings); ok {
 		return descriptor, true
 	}
 	if valueExpr, ok := qScriptPipelineSumCountReduceValue(src); ok {
@@ -357,6 +364,86 @@ func qScriptPipelineDyadicFloatReducerTermFor(src string) (qScriptPipelineDyadic
 	return qScriptPipelineDyadicFloatReducerTerm{}, false
 }
 
+func qScriptPipelineMatrixCellPlusCountDescriptor(src string, bindings map[string]string) (qScriptPipelineDescriptor, bool) {
+	terms := qScriptPipelinePlusTerms(src)
+	if len(terms) != 2 {
+		return qScriptPipelineDescriptor{}, false
+	}
+	var cell qScriptPipelineMatrixCellTerm
+	var countExpr string
+	for _, term := range terms {
+		if parsed, ok := qScriptPipelineMatrixCellTermFor(term, bindings); ok {
+			if cell.matrixExpr != "" {
+				return qScriptPipelineDescriptor{}, false
+			}
+			cell = parsed
+			continue
+		}
+		if expr, ok := qScriptPipelineCountTerm(term); ok {
+			if countExpr != "" {
+				return qScriptPipelineDescriptor{}, false
+			}
+			countExpr = expr
+			continue
+		}
+		return qScriptPipelineDescriptor{}, false
+	}
+	if cell.matrixExpr == "" || countExpr == "" || countExpr != cell.matrixExpr {
+		return qScriptPipelineDescriptor{}, false
+	}
+	return qScriptPipelineDescriptor{
+		kind:         qScriptPipelineMatrixCellPlusCount,
+		valueExpr:    cell.matrixExpr,
+		valueBinding: qScriptPipelineBinding(cell.matrixExpr, bindings),
+		rowValueExpr: cell.matrixExpr,
+		rowIndexExpr: cell.rowExpr,
+		colIndexExpr: cell.colExpr,
+	}, true
+}
+
+type qScriptPipelineMatrixCellTerm struct {
+	matrixExpr string
+	rowExpr    string
+	colExpr    string
+}
+
+func qScriptPipelineMatrixCellTermFor(src string, bindings map[string]string) (qScriptPipelineMatrixCellTerm, bool) {
+	src = stripEnclosingParens(strings.TrimSpace(src))
+	plan, ok := buildQPipelineApplyPathIndexPlan(src)
+	if !ok || plan.compareOp != "dot" {
+		return qScriptPipelineMatrixCellTerm{}, false
+	}
+	rowExpr, colExpr, ok := qScriptPipelinePathIndexPair(plan.indexExpr)
+	if !ok {
+		return qScriptPipelineMatrixCellTerm{}, false
+	}
+	matrixExpr := strings.TrimSpace(plan.valueExpr)
+	if matrixExpr == "" {
+		return qScriptPipelineMatrixCellTerm{}, false
+	}
+	if !qScriptPipelineSimpleName(matrixExpr) && qScriptPipelineBinding(matrixExpr, bindings) == "" {
+		return qScriptPipelineMatrixCellTerm{}, false
+	}
+	return qScriptPipelineMatrixCellTerm{matrixExpr: matrixExpr, rowExpr: rowExpr, colExpr: colExpr}, true
+}
+
+func qScriptPipelinePathIndexPair(src string) (string, string, bool) {
+	left, right, ok := splitQScriptPrefixDyadicArgs(src)
+	return left, right, ok
+}
+
+func qScriptPipelineCountTerm(src string) (string, bool) {
+	src = stripEnclosingParens(strings.TrimSpace(src))
+	if !strings.HasPrefix(src, "count") || !wordBoundary(src, 0, len("count")) {
+		return "", false
+	}
+	name := strings.TrimSpace(src[len("count"):])
+	if !qScriptPipelineSimpleName(name) {
+		return "", false
+	}
+	return name, true
+}
+
 func qScriptPipelinePlusTerms(src string) []string {
 	src = stripEnclosingParens(strings.TrimSpace(src))
 	if left, right, ok := splitTopLevelOperator(src, "+"); ok {
@@ -485,6 +572,18 @@ func (s *EvalState) tryEvalQScriptPipeline(descriptor *qScriptPipelineDescriptor
 	}
 	if descriptor.kind == qScriptPipelineMatrixRowSumCount {
 		out, handled, err := s.evalQScriptMatrixRowSumCountPipeline(descriptor)
+		switch {
+		case err != nil:
+			recordRuntimeKernelExecution("QScriptPipelinePlan", shape, "error", "runtime_error")
+		case handled:
+			recordRuntimeKernelExecution("QScriptPipelinePlan", shape, "hit", "typed_pipeline")
+		default:
+			recordRuntimeKernelExecution("QScriptPipelinePlan", shape, "fallback", "unsupported_runtime_shape")
+		}
+		return out, handled, err
+	}
+	if descriptor.kind == qScriptPipelineMatrixCellPlusCount {
+		out, handled, err := s.evalQScriptMatrixCellPlusCountPipeline(descriptor)
 		switch {
 		case err != nil:
 			recordRuntimeKernelExecution("QScriptPipelinePlan", shape, "error", "runtime_error")
@@ -641,6 +740,59 @@ func (s *EvalState) evalQScriptMatrixRowSumCountPipeline(descriptor *qScriptPipe
 	shape := qMatrixIndexShape(matrix, 1) + "/sum-count"
 	out, handled, err := data.TryMatrixRowNumericSumCount(matrix, indexes[0])
 	return qTypedRuntimeResultReason("MatrixRowSumCount", shape, RuntimeFallbackUnsupportedType, out, handled, err)
+}
+
+func (s *EvalState) evalQScriptMatrixCellPlusCountPipeline(descriptor *qScriptPipelineDescriptor) (any, bool, error) {
+	for _, assignment := range descriptor.assignments {
+		value, handled, err := s.evalQScriptBindingPlan(&assignment.binding)
+		if err != nil {
+			return nil, true, err
+		}
+		if !handled {
+			value, err = s.evalCachedOrString(assignment.rhs, assignment.valueExpr, &assignment.binding, nil)
+			if err != nil {
+				return nil, true, err
+			}
+		}
+		s.env[s.resolveAssignmentName(assignment.name)] = value
+	}
+	matrixValue, handled, err := s.evalQScriptBindingPlan(&descriptor.rowValuePlan)
+	if err != nil {
+		return nil, true, err
+	}
+	if !handled {
+		return nil, false, nil
+	}
+	matrix, ok := matrixValue.(data.Matrix)
+	if !ok {
+		return nil, false, nil
+	}
+	row, handled, err := s.evalQScriptScalarIndexPlan(&descriptor.rowIndexPlan)
+	if err != nil || !handled {
+		return nil, handled, err
+	}
+	col, handled, err := s.evalQScriptScalarIndexPlan(&descriptor.colIndexPlan)
+	if err != nil || !handled {
+		return nil, handled, err
+	}
+	shape := qMatrixIndexShape(matrix, 2) + "/cell-plus-count"
+	out, handled, err := data.TryMatrixCellNumericPlusCount(matrix, row, col)
+	return qTypedRuntimeResultReason("MatrixCellPlusCount", shape, RuntimeFallbackUnsupportedType, out, handled, err)
+}
+
+func (s *EvalState) evalQScriptScalarIndexPlan(plan *qScriptBindingPlan) (int, bool, error) {
+	value, handled, err := s.evalQScriptBindingPlan(plan)
+	if err != nil || !handled {
+		return 0, handled, err
+	}
+	indexes, scalar, err := indexInts(value)
+	if err != nil {
+		return 0, true, err
+	}
+	if !scalar || len(indexes) != 1 {
+		return 0, false, nil
+	}
+	return indexes[0], true, nil
 }
 
 func (s *EvalState) evalQScriptCallableDotSumPlusRightPipeline(descriptor *qScriptPipelineDescriptor) (any, bool, error) {

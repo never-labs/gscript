@@ -36,6 +36,7 @@ type QEvalPipelineDescriptor struct {
 	MaskBinding    string
 	RowValueExpr   string
 	RowIndexExpr   string
+	ColIndexExpr   string
 	CallableExpr   string
 	DyadicOp       string
 	ScalarExpr     string
@@ -92,6 +93,7 @@ func (p qEvalPipelineBackendPlan) methodDescriptor() QEvalPipelineDescriptor {
 		MaskBinding:    descriptor.MaskBinding,
 		RowValueExpr:   descriptor.RowValueExpr,
 		RowIndexExpr:   descriptor.RowIndexExpr,
+		ColIndexExpr:   descriptor.ColIndexExpr,
 		CallableExpr:   descriptor.CallableExpr,
 		DyadicOp:       descriptor.DyadicOp,
 		ScalarExpr:     descriptor.ScalarExpr,
@@ -152,6 +154,7 @@ func qEvalRuntimePipelinePlan(source string) (qEvalHotPlan, bool) {
 		MaskBinding:    descriptor.MaskBinding,
 		RowValueExpr:   descriptor.RowValueExpr,
 		RowIndexExpr:   descriptor.RowIndexExpr,
+		ColIndexExpr:   descriptor.ColIndexExpr,
 		CallableExpr:   descriptor.CallableExpr,
 		DyadicOp:       descriptor.DyadicOp,
 		ScalarExpr:     descriptor.ScalarExpr,
@@ -527,6 +530,7 @@ func qEvalPipelineDescriptorFromRef(ref QEvalPipelinePlanRef) (stdq.EvalPipeline
 		MaskBinding:    ref.MaskBinding,
 		RowValueExpr:   ref.RowValueExpr,
 		RowIndexExpr:   ref.RowIndexExpr,
+		ColIndexExpr:   ref.ColIndexExpr,
 		CallableExpr:   ref.CallableExpr,
 		DyadicOp:       ref.DyadicOp,
 		ScalarExpr:     ref.ScalarExpr,

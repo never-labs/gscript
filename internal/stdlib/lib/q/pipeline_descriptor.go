@@ -41,6 +41,7 @@ type EvalPipelineDescriptor struct {
 	MaskBinding  string
 	RowValueExpr string
 	RowIndexExpr string
+	ColIndexExpr string
 	CallableExpr string
 	DyadicOp     string
 	ScalarExpr   string
@@ -296,6 +297,7 @@ func evalScriptPipelineDescriptor(source string, d *qScriptPipelineDescriptor) E
 		MaskBinding:   strings.TrimSpace(d.maskBinding),
 		RowValueExpr:  strings.TrimSpace(d.rowValueExpr),
 		RowIndexExpr:  strings.TrimSpace(d.rowIndexExpr),
+		ColIndexExpr:  strings.TrimSpace(d.colIndexExpr),
 		CallableExpr:  strings.TrimSpace(d.callableExpr),
 		DyadicOp:      strings.TrimSpace(d.dyadicOp),
 		ScalarExpr:    strings.TrimSpace(d.scalarExpr),
@@ -469,6 +471,7 @@ func qScriptPipelineDescriptorFromEvalDescriptor(descriptor EvalPipelineDescript
 		maskBinding:  strings.TrimSpace(descriptor.MaskBinding),
 		rowValueExpr: strings.TrimSpace(descriptor.RowValueExpr),
 		rowIndexExpr: strings.TrimSpace(descriptor.RowIndexExpr),
+		colIndexExpr: strings.TrimSpace(descriptor.ColIndexExpr),
 		callableExpr: strings.TrimSpace(descriptor.CallableExpr),
 		dyadicOp:     strings.TrimSpace(descriptor.DyadicOp),
 		scalarExpr:   strings.TrimSpace(descriptor.ScalarExpr),
@@ -481,6 +484,8 @@ func qScriptPipelineDescriptorFromEvalDescriptor(descriptor EvalPipelineDescript
 		out.kind = qScriptPipelineSumPlusDyadicFloat
 	case strings.Contains(shape, "matrix-row-reduce/sum-count"):
 		out.kind = qScriptPipelineMatrixRowSumCount
+	case strings.Contains(shape, "matrix-cell-reduce/cell-plus-count"):
+		out.kind = qScriptPipelineMatrixCellPlusCount
 	case strings.Contains(shape, "callable-dot/sum-plus-right"):
 		out.kind = qScriptPipelineCallableDotSumRight
 	case strings.Contains(shape, "apply-index/scalar-at"):
@@ -544,6 +549,7 @@ func qScriptPipelineDescriptorFromEvalDescriptor(descriptor EvalPipelineDescript
 	out.maskPlan = buildQScriptBindingPlanForRHS(out.maskExpr, nil)
 	out.rowValuePlan = buildQScriptBindingPlanForRHS(out.rowValueExpr, nil)
 	out.rowIndexPlan = buildQScriptBindingPlanForRHS(out.rowIndexExpr, nil)
+	out.colIndexPlan = buildQScriptBindingPlanForRHS(out.colIndexExpr, nil)
 	out.scalarPlan = buildQScriptBindingPlanForRHS(out.scalarExpr, nil)
 	out.moduloMaskPlan = qScriptPipelineModuloMaskPlan(out.maskExpr)
 	if len(descriptor.Assignments) > 0 {

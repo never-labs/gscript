@@ -492,6 +492,7 @@ func qEvalPipelineDescriptorBackendTestRef(tb testing.TB, source string) QEvalPi
 		MaskBinding:    descriptor.MaskBinding,
 		RowValueExpr:   descriptor.RowValueExpr,
 		RowIndexExpr:   descriptor.RowIndexExpr,
+		ColIndexExpr:   descriptor.ColIndexExpr,
 		CallableExpr:   descriptor.CallableExpr,
 		DyadicOp:       descriptor.DyadicOp,
 		ScalarExpr:     descriptor.ScalarExpr,

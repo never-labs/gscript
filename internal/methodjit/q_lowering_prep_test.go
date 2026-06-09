@@ -5949,6 +5949,18 @@ func TestQEvalPipelinePlannerCopiesFusedDescriptorFields(t *testing.T) {
 		t.Fatalf("matrix descriptor = %+v, want row sum-count fields", matrix)
 	}
 
+	cell, ok := qRuntimeEvalPipelinePlanner{}.DescribeQEvalPipeline("m:2 4#til 8;(m . 1 2)+count m")
+	if !ok {
+		t.Fatalf("DescribeQEvalPipeline did not recognize matrix cell script pipeline")
+	}
+	if cell.Kind != "script" ||
+		cell.Shape != "script-pipeline/matrix-cell-reduce/cell-plus-count/assignments" ||
+		cell.RowValueExpr != "m" ||
+		cell.RowIndexExpr != "1" ||
+		cell.ColIndexExpr != "2" {
+		t.Fatalf("matrix cell descriptor = %+v, want cell plus count fields", cell)
+	}
+
 	callable, ok := qRuntimeEvalPipelinePlanner{}.DescribeQEvalPipeline("f:{(+/x)+y};.[f;(til 8;10)]")
 	if !ok {
 		t.Fatalf("DescribeQEvalPipeline did not recognize callable-dot script pipeline")
