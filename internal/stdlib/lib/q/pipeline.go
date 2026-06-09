@@ -593,10 +593,14 @@ func (s *EvalState) evalQPipelineSumWhereMask(plan qPipelinePlan) (any, bool, er
 	if !ok {
 		return nil, false, nil
 	}
-	out, handled, err := data.TryTypedNumericSumWhereMask(array, mask)
 	shape := "where-reduce/" + string(array.Kind()) + "/" + string(mask.Kind())
-	recordRuntimeKernelProbe("ArrayWhereReduceSum", shape, handled, err)
-	return out, handled, err
+	return evalQTypedRuntimeKernel(qTypedRuntimeKernel[any]{
+		kernel: "ArrayWhereReduceSum",
+		shape:  shape,
+		call: func() (any, bool, error) {
+			return data.TryTypedNumericSumWhereMask(array, mask)
+		},
+	})
 }
 
 func (s *EvalState) evalQPipelineSumWhereIndex(plan qPipelinePlan) (any, bool, error) {
@@ -629,9 +633,14 @@ func (s *EvalState) evalQPipelineSumWhereIndex(plan qPipelinePlan) (any, bool, e
 	}
 	mask, ok := maskValue.(data.Array)
 	if ok {
-		out, handled, err := data.TryTypedNumericSumWhereMask(array, mask)
 		shape := "where-index-reduce/" + string(array.Kind()) + "/" + string(mask.Kind())
-		recordRuntimeKernelProbe("ArrayWhereReduceSum", shape, handled, err)
+		out, handled, err := evalQTypedRuntimeKernel(qTypedRuntimeKernel[any]{
+			kernel: "ArrayWhereReduceSum",
+			shape:  shape,
+			call: func() (any, bool, error) {
+				return data.TryTypedNumericSumWhereMask(array, mask)
+			},
+		})
 		if err != nil || handled {
 			return out, handled, err
 		}
@@ -668,9 +677,14 @@ func (s *EvalState) evalQPipelineCompareIndexStatsForMask(maskExpr string) (coun
 	if !ok {
 		return 0, 0, false, nil
 	}
-	count, sum, handled, err = data.TryTypedCompareIndexStatsI64(array, dataOp, scalar)
 	shape := "where-index-stats/" + op + "/" + string(array.Kind()) + "/" + string(qRuntimeKernelOperandKind(scalar, nil))
-	recordRuntimeKernelProbe("ArrayWhereCompareStats", shape, handled, err)
+	count, sum, handled, err = evalQTypedRuntimeKernel2(qTypedRuntimeKernel2[int64, int64]{
+		kernel: "ArrayWhereCompareStats",
+		shape:  shape,
+		call: func() (int64, int64, bool, error) {
+			return data.TryTypedCompareIndexStatsI64(array, dataOp, scalar)
+		},
+	})
 	return count, sum, handled, err
 }
 
@@ -724,15 +738,19 @@ func qPipelineGatherReduceSum(array, indexes data.Array) (any, bool, error) {
 			return view.sum, true, nil
 		}
 	}
-	out, handled, err := data.TryTypedNumericSumByI64Indexes(array, indexes)
 	shape := ""
 	if array.Kind() == data.KindI64 && indexes.Kind() == data.KindI64 {
 		shape = "gather-reduce/i64/i64"
 	} else {
 		shape = "gather-reduce/" + string(array.Kind()) + "/" + string(indexes.Kind())
 	}
-	recordRuntimeKernelProbe("ArrayGatherReduceSum", shape, handled, err)
-	return out, handled, err
+	return evalQTypedRuntimeKernel(qTypedRuntimeKernel[any]{
+		kernel: "ArrayGatherReduceSum",
+		shape:  shape,
+		call: func() (any, bool, error) {
+			return data.TryTypedNumericSumByI64Indexes(array, indexes)
+		},
+	})
 }
 
 func qPipelineGatherReduceSumWithPlanStats(plan qPipelinePlan, array, indexes data.Array) (any, bool, error) {
@@ -744,14 +762,19 @@ func qPipelineGatherReduceSumWithPlanStats(plan qPipelinePlan, array, indexes da
 
 func qPipelineWhereReduceSumWithPlanStats(plan qPipelinePlan, array, mask data.Array) (any, bool, error) {
 	recordRuntimeKernelExecution("QPipelinePlan", plan.shape, "attempt", "attempt")
-	out, handled, err := data.TryTypedNumericSumWhereMask(array, mask)
 	shape := ""
 	if array.Kind() == data.KindI64 && mask.Kind() == data.KindBool {
 		shape = "where-reduce/i64/bool"
 	} else {
 		shape = "where-reduce/" + string(array.Kind()) + "/" + string(mask.Kind())
 	}
-	recordRuntimeKernelProbe("ArrayWhereReduceSum", shape, handled, err)
+	out, handled, err := evalQTypedRuntimeKernel(qTypedRuntimeKernel[any]{
+		kernel: "ArrayWhereReduceSum",
+		shape:  shape,
+		call: func() (any, bool, error) {
+			return data.TryTypedNumericSumWhereMask(array, mask)
+		},
+	})
 	recordQPipelinePlanOutcome(plan, handled, err)
 	return out, handled, err
 }
@@ -776,9 +799,13 @@ func (s *EvalState) evalQPipelineSumWhereCompare(plan qPipelinePlan) (any, bool,
 	if err != nil || !handled {
 		return nil, handled, err
 	}
-	out, handled, err := data.TryTypedNumericSum(indexes)
-	recordRuntimeKernelProbe("ArrayWhereCompareSum", "index-sum/"+string(indexes.Kind()), handled, err)
-	return out, handled, err
+	return evalQTypedRuntimeKernel(qTypedRuntimeKernel[any]{
+		kernel: "ArrayWhereCompareSum",
+		shape:  "index-sum/" + string(indexes.Kind()),
+		call: func() (any, bool, error) {
+			return data.TryTypedNumericSum(indexes)
+		},
+	})
 }
 
 func (s *EvalState) evalQPipelineCountWhereCompare(plan qPipelinePlan) (any, bool, error) {
@@ -822,9 +849,14 @@ func (s *EvalState) evalQPipelineWhereModuloCompareIndexes(plan qPipelinePlan) (
 	if err != nil || !handled {
 		return nil, handled, err
 	}
-	out, handled, err := data.TryTypedModuloCompareIndexesI64(array, modulus, dataOp, target)
 	shape := plan.comparePrefix + "/" + plan.compareOp + "/" + string(array.Kind()) + "/" + string(qRuntimeKernelOperandKind(modulus, nil)) + "/" + string(qRuntimeKernelOperandKind(target, nil))
-	recordRuntimeKernelProbe("ArrayModuloCompare", shape, handled, err)
+	out, handled, err := evalQTypedRuntimeKernel(qTypedRuntimeKernel[data.Array]{
+		kernel: "ArrayModuloCompare",
+		shape:  shape,
+		call: func() (data.Array, bool, error) {
+			return data.TryTypedModuloCompareIndexesI64(array, modulus, dataOp, target)
+		},
+	})
 	if err != nil || !handled {
 		return nil, handled, err
 	}
@@ -836,9 +868,14 @@ func (s *EvalState) evalQPipelineWhereModuloCompareIndexStats(plan qPipelinePlan
 	if err != nil || !handled {
 		return 0, 0, handled, err
 	}
-	count, sum, handled, err = data.TryTypedModuloCompareIndexStatsI64(array, modulus, dataOp, target)
 	shape := plan.comparePrefix + "-stats/" + plan.compareOp + "/" + string(array.Kind()) + "/" + string(qRuntimeKernelOperandKind(modulus, nil)) + "/" + string(qRuntimeKernelOperandKind(target, nil))
-	recordRuntimeKernelProbe("ArrayModuloCompareStats", shape, handled, err)
+	count, sum, handled, err = evalQTypedRuntimeKernel2(qTypedRuntimeKernel2[int64, int64]{
+		kernel: "ArrayModuloCompareStats",
+		shape:  shape,
+		call: func() (int64, int64, bool, error) {
+			return data.TryTypedModuloCompareIndexStatsI64(array, modulus, dataOp, target)
+		},
+	})
 	if err != nil || !handled {
 		return 0, 0, handled, err
 	}
@@ -850,9 +887,14 @@ func (s *EvalState) evalQPipelineModuloCompareValueSum(plan qPipelinePlan, value
 	if err != nil || !handled {
 		return nil, handled, err
 	}
-	out, handled, err := data.TryTypedNumericSumWhereModuloCompare(values, array, modulus, dataOp, target)
 	shape := "where-mod-reduce/" + string(values.Kind()) + "/" + string(array.Kind()) + "/" + string(qRuntimeKernelOperandKind(modulus, nil)) + "/" + string(qRuntimeKernelOperandKind(target, nil))
-	recordRuntimeKernelProbe("ArrayModuloCompareReduceSum", shape, handled, err)
+	out, handled, err := evalQTypedRuntimeKernel(qTypedRuntimeKernel[any]{
+		kernel: "ArrayModuloCompareReduceSum",
+		shape:  shape,
+		call: func() (any, bool, error) {
+			return data.TryTypedNumericSumWhereModuloCompare(values, array, modulus, dataOp, target)
+		},
+	})
 	if err != nil || !handled {
 		return nil, handled, err
 	}
@@ -915,8 +957,13 @@ func (s *EvalState) evalQPipelineWhereCompareIndexStats(plan qPipelinePlan) (cou
 			return 0, 0, ok, err
 		}
 		shape := "within-to-index-" + strings.TrimPrefix(plan.comparePrefix, "compare-to-index-") + "-stats/" + string(array.Kind()) + "/" + string(qRuntimeKernelOperandKind(low, nil)) + "/" + string(qRuntimeKernelOperandKind(high, nil))
-		count, sum, handled, err = data.TryTypedWithinIndexStatsI64(array, low, high, true)
-		recordRuntimeKernelProbe("ArrayWhereWithinStats", shape, handled, err)
+		count, sum, handled, err = evalQTypedRuntimeKernel2(qTypedRuntimeKernel2[int64, int64]{
+			kernel: "ArrayWhereWithinStats",
+			shape:  shape,
+			call: func() (int64, int64, bool, error) {
+				return data.TryTypedWithinIndexStatsI64(array, low, high, true)
+			},
+		})
 		if err != nil || !handled {
 			return 0, 0, handled, err
 		}
@@ -927,8 +974,13 @@ func (s *EvalState) evalQPipelineWhereCompareIndexStats(plan qPipelinePlan) (cou
 		return 0, 0, false, nil
 	}
 	shape := plan.comparePrefix + "-stats/" + plan.compareOp + "/" + string(array.Kind()) + "/" + string(qRuntimeKernelOperandKind(scalar, nil))
-	count, sum, handled, err = data.TryTypedCompareIndexStatsI64(array, dataOp, scalar)
-	recordRuntimeKernelProbe("ArrayWhereCompareStats", shape, handled, err)
+	count, sum, handled, err = evalQTypedRuntimeKernel2(qTypedRuntimeKernel2[int64, int64]{
+		kernel: "ArrayWhereCompareStats",
+		shape:  shape,
+		call: func() (int64, int64, bool, error) {
+			return data.TryTypedCompareIndexStatsI64(array, dataOp, scalar)
+		},
+	})
 	if err != nil || !handled {
 		return 0, 0, handled, err
 	}
@@ -946,8 +998,13 @@ func (s *EvalState) evalQPipelineWhereCompareCount(plan qPipelinePlan) (count in
 			return 0, ok, err
 		}
 		shape := "within-count/" + string(array.Kind()) + "/" + string(qRuntimeKernelOperandKind(low, nil)) + "/" + string(qRuntimeKernelOperandKind(high, nil))
-		count, handled, err = data.TryTypedWithinCount(array, low, high, true)
-		recordRuntimeKernelProbe("ArrayWhereWithinCount", shape, handled, err)
+		count, handled, err = evalQTypedRuntimeKernel(qTypedRuntimeKernel[int64]{
+			kernel: "ArrayWhereWithinCount",
+			shape:  shape,
+			call: func() (int64, bool, error) {
+				return data.TryTypedWithinCount(array, low, high, true)
+			},
+		})
 		if err != nil || !handled {
 			return 0, handled, err
 		}
@@ -958,8 +1015,13 @@ func (s *EvalState) evalQPipelineWhereCompareCount(plan qPipelinePlan) (count in
 		return 0, false, nil
 	}
 	shape := "compare-count/" + plan.compareOp + "/" + string(array.Kind()) + "/" + string(qRuntimeKernelOperandKind(scalar, nil))
-	count, handled, err = data.TryTypedCompareCount(array, dataOp, scalar)
-	recordRuntimeKernelProbe("ArrayWhereCompareCount", shape, handled, err)
+	count, handled, err = evalQTypedRuntimeKernel(qTypedRuntimeKernel[int64]{
+		kernel: "ArrayWhereCompareCount",
+		shape:  shape,
+		call: func() (int64, bool, error) {
+			return data.TryTypedCompareCount(array, dataOp, scalar)
+		},
+	})
 	if err != nil || !handled {
 		return 0, handled, err
 	}
@@ -977,8 +1039,13 @@ func (s *EvalState) evalQPipelineWhereCompareIndexesArray(plan qPipelinePlan) (d
 			return nil, ok, err
 		}
 		shape := "within-to-index/" + string(array.Kind()) + "/" + string(qRuntimeKernelOperandKind(low, nil)) + "/" + string(qRuntimeKernelOperandKind(high, nil))
-		out, handled, err := data.TryTypedWithinIndexesI64(array, low, high, true)
-		recordRuntimeKernelProbe("ArrayWhereWithin", shape, handled, err)
+		out, handled, err := evalQTypedRuntimeKernel(qTypedRuntimeKernel[data.Array]{
+			kernel: "ArrayWhereWithin",
+			shape:  shape,
+			call: func() (data.Array, bool, error) {
+				return data.TryTypedWithinIndexesI64(array, low, high, true)
+			},
+		})
 		if err != nil || !handled {
 			return nil, handled, err
 		}
@@ -989,8 +1056,13 @@ func (s *EvalState) evalQPipelineWhereCompareIndexesArray(plan qPipelinePlan) (d
 		return nil, false, nil
 	}
 	shape := plan.comparePrefix + "/" + plan.compareOp + "/" + string(array.Kind()) + "/" + string(qRuntimeKernelOperandKind(scalar, nil))
-	out, handled, err := data.TryTypedCompareIndexesI64(array, dataOp, scalar)
-	recordRuntimeKernelProbe("ArrayWhereCompare", shape, handled, err)
+	out, handled, err := evalQTypedRuntimeKernel(qTypedRuntimeKernel[data.Array]{
+		kernel: "ArrayWhereCompare",
+		shape:  shape,
+		call: func() (data.Array, bool, error) {
+			return data.TryTypedCompareIndexesI64(array, dataOp, scalar)
+		},
+	})
 	if err != nil || !handled {
 		return nil, handled, err
 	}
@@ -1024,13 +1096,13 @@ func (s *EvalState) evalQPipelineSumDeltas(plan qPipelinePlan) (any, bool, error
 		return out, true, err
 	}
 	shape := "vector-reduce/sum-deltas/" + string(array.Kind())
-	if out, handled, err := data.TryTypedDeltasSum(array); err != nil || handled {
-		recordRuntimeKernelProbe("ArrayDeltasSum", shape, handled, err)
-		return out, handled, err
-	} else {
-		recordRuntimeKernelProbe("ArrayDeltasSum", shape, handled, err)
-	}
-	return nil, false, nil
+	return evalQTypedRuntimeKernel(qTypedRuntimeKernel[any]{
+		kernel: "ArrayDeltasSum",
+		shape:  shape,
+		call: func() (any, bool, error) {
+			return data.TryTypedDeltasSum(array)
+		},
+	})
 }
 
 func (s *EvalState) evalQPipelineSumBin(plan qPipelinePlan) (any, bool, error) {
@@ -1046,10 +1118,14 @@ func (s *EvalState) evalQPipelineSumBin(plan qPipelinePlan) (any, bool, error) {
 	if err != nil {
 		return nil, true, err
 	}
-	out, handled, err := data.TryTypedBinSum(domain, query)
 	shape := "bin-reduce/sum/" + string(domain.Kind()) + "/" + string(qRuntimeKernelOperandKind(query, nil))
-	recordRuntimeKernelProbe("ArrayBinReduceSum", shape, handled, err)
-	return out, handled, err
+	return evalQTypedRuntimeKernel(qTypedRuntimeKernel[any]{
+		kernel: "ArrayBinReduceSum",
+		shape:  shape,
+		call: func() (any, bool, error) {
+			return data.TryTypedBinSum(domain, query)
+		},
+	})
 }
 
 func (s *EvalState) evalQPipelineSumVectorExpr(plan qPipelinePlan) (any, bool, error) {
@@ -1064,10 +1140,15 @@ func (s *EvalState) evalQPipelineSumVectorExpr(plan qPipelinePlan) (any, bool, e
 	if !ok {
 		return nil, false, nil
 	}
-	out, handled, err := data.TryTypedNumericSum(array)
 	shape := "vector-reduce/sum-expr/" + string(array.Kind())
-	recordRuntimeKernelProbe("ArraySumExpr", shape, handled, err)
-	return out, handled, err
+	return evalQTypedRuntimeKernel(qTypedRuntimeKernel[any]{
+		kernel:         "ArraySumExpr",
+		shape:          shape,
+		fallbackReason: RuntimeFallbackUnsupportedType,
+		call: func() (any, bool, error) {
+			return data.TryTypedNumericSum(array)
+		},
+	})
 }
 
 func (s *EvalState) evalQPipelineSumMovingWindow(plan qPipelinePlan) (any, bool, error) {
@@ -1087,6 +1168,7 @@ func (s *EvalState) evalQPipelineSumMovingWindow(plan qPipelinePlan) (any, bool,
 	if !ok {
 		return nil, false, nil
 	}
+	shape := "vector-reduce/sum-" + plan.compareOp + "/" + string(array.Kind())
 	var (
 		out     any
 		handled bool
@@ -1105,8 +1187,7 @@ func (s *EvalState) evalQPipelineSumMovingWindow(plan qPipelinePlan) (any, bool,
 	default:
 		return nil, false, nil
 	}
-	shape := "vector-reduce/sum-" + plan.compareOp + "/" + string(array.Kind())
-	recordRuntimeKernelProbe("ArrayMovingWindowSum", shape, handled, err)
+	recordQTypedRuntimeKernel("ArrayMovingWindowSum", shape, handled, err)
 	return out, handled, err
 }
 
@@ -1129,13 +1210,13 @@ func (s *EvalState) evalQPipelineCountRunningScan(plan qPipelinePlan) (any, bool
 	case "sums", "prds", "avgs":
 		if !qKindIsNumeric(array.Kind()) {
 			err := fmt.Errorf("%s expects a numeric vector", plan.compareOp)
-			recordRuntimeKernelProbe(kernel, shape, false, err)
+			recordQTypedRuntimeKernel(kernel, shape, false, err)
 			return nil, true, err
 		}
 	case "mins", "maxs":
 		if !qTypedCompareKindOK(array.Kind()) {
 			err := fmt.Errorf("%s expects an ordered vector", plan.compareOp)
-			recordRuntimeKernelProbe(kernel, shape, false, err)
+			recordQTypedRuntimeKernel(kernel, shape, false, err)
 			return nil, true, err
 		}
 	default:
@@ -1153,7 +1234,7 @@ func (s *EvalState) evalQPipelineCountRunningScan(plan qPipelinePlan) (any, bool
 	case "avgs":
 		kernel = "ArrayCountAvgs"
 	}
-	recordRuntimeKernelProbe(kernel, shape, true, nil)
+	recordQTypedRuntimeKernel(kernel, shape, true, nil)
 	return int64(array.Len()), true, nil
 }
 
@@ -1167,7 +1248,7 @@ func (s *EvalState) evalQPipelineCountVectorExpr(plan qPipelinePlan) (any, bool,
 		return nil, false, nil
 	}
 	shape := "vector-count/expr/" + string(array.Kind())
-	recordRuntimeKernelProbe("ArrayCountExpr", shape, true, nil)
+	recordQTypedRuntimeKernel("ArrayCountExpr", shape, true, nil)
 	return int64(array.Len()), true, nil
 }
 
@@ -1181,10 +1262,14 @@ func (s *EvalState) evalQPipelineCountDistinct(plan qPipelinePlan) (any, bool, e
 		out, err := count(value)
 		return out, true, err
 	}
-	out, handled, err := data.TryTypedDistinctCount(array)
 	shape := "distinct-count/" + string(array.Kind())
-	recordRuntimeKernelProbe("ArrayDistinctCount", shape, handled, err)
-	return out, handled, err
+	return evalQTypedRuntimeKernel(qTypedRuntimeKernel[any]{
+		kernel: "ArrayDistinctCount",
+		shape:  shape,
+		call: func() (any, bool, error) {
+			return data.TryTypedDistinctCount(array)
+		},
+	})
 }
 
 func (s *EvalState) evalQPipelineCountWhereIn(plan qPipelinePlan) (any, bool, error) {
@@ -1204,10 +1289,14 @@ func (s *EvalState) evalQPipelineCountWhereIn(plan qPipelinePlan) (any, bool, er
 	if err != nil {
 		return nil, true, err
 	}
-	out, handled, err := data.TryTypedInCount(array, values)
 	shape := "in-count/" + string(array.Kind()) + "/" + string(qRuntimeKernelOperandKind(right, nil))
-	recordRuntimeKernelProbe("ArrayInCount", shape, handled, err)
-	return out, handled, err
+	return evalQTypedRuntimeKernel(qTypedRuntimeKernel[any]{
+		kernel: "ArrayInCount",
+		shape:  shape,
+		call: func() (any, bool, error) {
+			return data.TryTypedInCount(array, values)
+		},
+	})
 }
 
 func (s *EvalState) evalQPipelinePlannedExpr(src string, plan *qScriptBindingPlan) (any, error) {
