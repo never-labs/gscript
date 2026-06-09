@@ -4488,6 +4488,9 @@ func joinOnWithOptions(left, right Frame, keepUnmatchedLeft bool, opts JoinOptio
 	if err := validateJoinKeys(left, right, keys); err != nil {
 		return Frame{}, err
 	}
+	if out, handled, err := tryAlignedSingleColumnJoinOn(left, right, keepUnmatchedLeft, opts, keys); handled || err != nil {
+		return out, err
+	}
 
 	leftIndexes, rightIndexes, ok, err := joinIndexesWithOptions(left, right, keepUnmatchedLeft, opts, keys)
 	if err != nil {
@@ -4512,7 +4515,7 @@ func joinOnWithOptions(left, right Frame, keepUnmatchedLeft bool, opts JoinOptio
 		usedNames[name] = struct{}{}
 	}
 	for _, name := range leftNames {
-		cols = append(cols, Column{Name: name, Data: left.columns[name].Gather(leftIndexes)})
+		cols = append(cols, Column{Name: name, Data: joinGather(left.columns[name], leftIndexes)})
 	}
 
 	rightKeys := make(map[Symbol]struct{}, len(keys))
@@ -4525,13 +4528,199 @@ func joinOnWithOptions(left, right Frame, keepUnmatchedLeft bool, opts JoinOptio
 		}
 		outName := rightJoinColumnName(name, usedNames)
 		if keepUnmatchedLeft {
-			cols = append(cols, Column{Name: outName, Data: gatherOptional(right.columns[name], rightIndexes)})
+			cols = append(cols, Column{Name: outName, Data: joinGatherOptional(right.columns[name], rightIndexes)})
 		} else {
-			cols = append(cols, Column{Name: outName, Data: right.columns[name].Gather(rightIndexes)})
+			cols = append(cols, Column{Name: outName, Data: joinGather(right.columns[name], rightIndexes)})
 		}
 		usedNames[outName] = struct{}{}
 	}
 	return newFrameTrusted(cols...)
+}
+
+func tryAlignedSingleColumnJoinOn(left, right Frame, keepUnmatchedLeft bool, opts JoinOptions, keys []JoinKey) (Frame, bool, error) {
+	if len(keys) != 1 || opts.LimitN > 0 || len(opts.OrderBy) > 0 {
+		return Frame{}, false, nil
+	}
+	leftKey, ok := left.Column(keys[0].Left)
+	if !ok {
+		return Frame{}, true, fmt.Errorf("join left key column %q does not exist", keys[0].Left)
+	}
+	rightKey, ok := right.Column(keys[0].Right)
+	if !ok {
+		return Frame{}, true, fmt.Errorf("join right key column %q does not exist", keys[0].Right)
+	}
+	leftIndexes, rightIndexes, ok := alignedJoinIndexArrays(leftKey, rightKey)
+	if !ok {
+		return Frame{}, false, nil
+	}
+
+	leftNames := joinOutputLeftColumns(left, opts.LeftColumns)
+	rightNames := joinOutputRightColumns(right, opts.RightColumns)
+	cols := make([]Column, 0, len(leftNames)+len(rightNames))
+	usedNames := make(map[Symbol]struct{}, len(left.schema.names)+len(right.schema.names))
+	for _, name := range left.schema.names {
+		usedNames[name] = struct{}{}
+	}
+	for _, name := range leftNames {
+		cols = append(cols, Column{Name: name, Data: joinGatherByIndexArray(left.columns[name], leftIndexes)})
+	}
+
+	rightKeys := map[Symbol]struct{}{keys[0].Right: {}}
+	for _, name := range rightNames {
+		if _, isJoinKey := rightKeys[name]; isJoinKey {
+			continue
+		}
+		outName := rightJoinColumnName(name, usedNames)
+		cols = append(cols, Column{Name: outName, Data: joinGatherByIndexArray(right.columns[name], rightIndexes)})
+		usedNames[outName] = struct{}{}
+	}
+	_ = keepUnmatchedLeft
+	frame, err := newFrameTrusted(cols...)
+	return frame, true, err
+}
+
+func alignedJoinIndexArrays(left, right Array) (Array, Array, bool) {
+	left = unwrapAttributedArray(left)
+	right = unwrapAttributedArray(right)
+	if left.Kind() != right.Kind() || left.Len() != right.Len() {
+		return nil, nil, false
+	}
+	if left.Len() == 0 {
+		empty := i64RangeArray{len: 0}
+		return empty, empty, true
+	}
+	if !arraysEqualUniqueAtRows(left, right) {
+		return nil, nil, false
+	}
+	indexes := i64RangeArray{start: 0, step: 1, len: left.Len()}
+	return indexes, indexes, true
+}
+
+func arraysEqualUniqueAtRows(left, right Array) bool {
+	switch l := left.(type) {
+	case columnArray[bool]:
+		r, ok := right.(columnArray[bool])
+		return ok && slicesEqualUnique(l.data, r.data)
+	case columnArray[int8]:
+		r, ok := right.(columnArray[int8])
+		return ok && slicesEqualStrictlyOrdered(l.data, r.data)
+	case columnArray[int16]:
+		r, ok := right.(columnArray[int16])
+		return ok && slicesEqualStrictlyOrdered(l.data, r.data)
+	case columnArray[int32]:
+		r, ok := right.(columnArray[int32])
+		return ok && slicesEqualStrictlyOrdered(l.data, r.data)
+	case columnArray[int64]:
+		r, ok := right.(columnArray[int64])
+		return ok && slicesEqualStrictlyOrdered(l.data, r.data)
+	case columnArray[uint8]:
+		r, ok := right.(columnArray[uint8])
+		return ok && slicesEqualStrictlyOrdered(l.data, r.data)
+	case columnArray[uint16]:
+		r, ok := right.(columnArray[uint16])
+		return ok && slicesEqualStrictlyOrdered(l.data, r.data)
+	case columnArray[uint32]:
+		r, ok := right.(columnArray[uint32])
+		return ok && slicesEqualStrictlyOrdered(l.data, r.data)
+	case columnArray[uint64]:
+		r, ok := right.(columnArray[uint64])
+		return ok && slicesEqualStrictlyOrdered(l.data, r.data)
+	case columnArray[float32]:
+		r, ok := right.(columnArray[float32])
+		return ok && slicesEqualStrictlyOrdered(l.data, r.data)
+	case columnArray[float64]:
+		r, ok := right.(columnArray[float64])
+		return ok && slicesEqualStrictlyOrdered(l.data, r.data)
+	case columnArray[string]:
+		r, ok := right.(columnArray[string])
+		return ok && slicesEqualStrictlyOrdered(l.data, r.data)
+	case columnArray[Symbol]:
+		r, ok := right.(columnArray[Symbol])
+		return ok && slicesEqualStrictlyOrdered(l.data, r.data)
+	case columnArray[Month]:
+		r, ok := right.(columnArray[Month])
+		return ok && slicesEqualStrictlyOrdered(l.data, r.data)
+	case columnArray[Date]:
+		r, ok := right.(columnArray[Date])
+		return ok && slicesEqualStrictlyOrdered(l.data, r.data)
+	case columnArray[DateTime]:
+		r, ok := right.(columnArray[DateTime])
+		return ok && slicesEqualStrictlyOrdered(l.data, r.data)
+	case columnArray[Timespan]:
+		r, ok := right.(columnArray[Timespan])
+		return ok && slicesEqualStrictlyOrdered(l.data, r.data)
+	case columnArray[Minute]:
+		r, ok := right.(columnArray[Minute])
+		return ok && slicesEqualStrictlyOrdered(l.data, r.data)
+	case columnArray[Second]:
+		r, ok := right.(columnArray[Second])
+		return ok && slicesEqualStrictlyOrdered(l.data, r.data)
+	case columnArray[Time]:
+		r, ok := right.(columnArray[Time])
+		return ok && slicesEqualStrictlyOrdered(l.data, r.data)
+	case columnArray[Timestamp]:
+		r, ok := right.(columnArray[Timestamp])
+		return ok && slicesEqualStrictlyOrdered(l.data, r.data)
+	case i64RangeArray:
+		r, ok := right.(i64RangeArray)
+		return ok && l.start == r.start && l.step == r.step && l.len == r.len && l.step != 0
+	default:
+		return false
+	}
+}
+
+func slicesEqualUnique[T comparable](left, right []T) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	seen := make(map[T]struct{}, len(left))
+	for i, value := range left {
+		if right[i] != value {
+			return false
+		}
+		if _, ok := seen[value]; ok {
+			return false
+		}
+		seen[value] = struct{}{}
+	}
+	return true
+}
+
+type joinOrderedScalar interface {
+	~int8 | ~int16 | ~int32 | ~int64 |
+		~uint8 | ~uint16 | ~uint32 | ~uint64 |
+		~float32 | ~float64 | ~string
+}
+
+func slicesEqualStrictlyOrdered[T joinOrderedScalar](left, right []T) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	switch len(left) {
+	case 0:
+		return true
+	case 1:
+		return left[0] == right[0]
+	}
+	if left[0] != right[0] || left[1] != right[1] || left[0] == left[1] {
+		return false
+	}
+	ascending := left[0] < left[1]
+	for i := 2; i < len(left); i++ {
+		if left[i] != right[i] {
+			return false
+		}
+		if ascending {
+			if left[i-1] >= left[i] {
+				return false
+			}
+			continue
+		}
+		if left[i-1] <= left[i] {
+			return false
+		}
+	}
+	return true
 }
 
 func joinIndexesWithOptions(left, right Frame, keepUnmatchedLeft bool, opts JoinOptions, keys []JoinKey) ([]int, []int, bool, error) {
@@ -5035,7 +5224,7 @@ func AsofJoinOnWithOptions(left, right Frame, opts AsofJoinOptions) (Frame, erro
 	for _, name := range left.schema.names {
 		col := left.columns[name]
 		if opts.PreserveRightTime && name == timeKey.Left {
-			col = gatherOptional(right.columns[timeKey.Right], rightIndexes)
+			col = joinGatherOptional(right.columns[timeKey.Right], rightIndexes)
 		}
 		cols = append(cols, Column{Name: name, Data: col})
 		usedNames[name] = struct{}{}
@@ -5051,7 +5240,7 @@ func AsofJoinOnWithOptions(left, right Frame, opts AsofJoinOptions) (Frame, erro
 			continue
 		}
 		outName := rightJoinColumnName(name, usedNames)
-		cols = append(cols, Column{Name: outName, Data: gatherOptional(right.columns[name], rightIndexes)})
+		cols = append(cols, Column{Name: outName, Data: joinGatherOptional(right.columns[name], rightIndexes)})
 		usedNames[outName] = struct{}{}
 	}
 	return NewFrame(cols...)
@@ -10821,6 +11010,62 @@ func isAsofTimeKind(kind Kind) bool {
 
 func gatherOptional(array Array, indexes []int) Array {
 	return typedKernels.GatherOptional(array, indexes)
+}
+
+func joinGather(array Array, indexes []int) Array {
+	if indexArray, ok := i64RangeIndexArrayFromInts(indexes); ok {
+		return joinGatherByIndexArray(array, indexArray)
+	}
+	return array.Gather(indexes)
+}
+
+func joinGatherByIndexArray(array Array, indexArray Array) Array {
+	if out, handled, err := TryGatherByI64IndexArray(array, indexArray); err == nil && handled {
+		return out
+	}
+	indexes, handled, err := TryTypedI64Indexes(indexArray)
+	if err == nil && handled {
+		return array.Gather(indexes)
+	}
+	values := indexArray.Values()
+	indexes = make([]int, len(values))
+	for i, value := range values {
+		indexes[i] = int(value.(int64))
+	}
+	return array.Gather(indexes)
+}
+
+func joinGatherOptional(array Array, indexes []int) Array {
+	if allIndexesPresent(indexes) {
+		return joinGather(array, indexes)
+	}
+	return typedKernels.GatherOptional(array, indexes)
+}
+
+func allIndexesPresent(indexes []int) bool {
+	for _, row := range indexes {
+		if row < 0 {
+			return false
+		}
+	}
+	return true
+}
+
+func i64RangeIndexArrayFromInts(indexes []int) (Array, bool) {
+	switch len(indexes) {
+	case 0:
+		return i64RangeArray{len: 0}, true
+	case 1:
+		return i64RangeArray{start: int64(indexes[0]), step: 1, len: 1}, true
+	}
+	first := indexes[0]
+	step := indexes[1] - indexes[0]
+	for i := 2; i < len(indexes); i++ {
+		if indexes[i]-indexes[i-1] != step {
+			return nil, false
+		}
+	}
+	return i64RangeArray{start: int64(first), step: int64(step), len: len(indexes)}, true
 }
 
 func takeArray(array Array, n int) Array {

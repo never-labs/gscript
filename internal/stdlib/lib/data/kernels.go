@@ -4272,14 +4272,21 @@ func singleColumnTypedJoinIndexes(left, right Array, keepUnmatchedLeft bool) ([]
 }
 
 func singleColumnTypedJoinIndexesFor[T comparable](left columnArray[T], right Array, keepUnmatchedLeft bool) ([]int, []int, bool, error) {
+	indexRowsByKey, hasIndexRowsByKey := typedRowsByKeyForArray[T](right)
 	right = unwrapAttributedArray(right)
 	r, ok := right.(columnArray[T])
 	if !ok {
 		return nil, nil, false, nil
 	}
-	rowsByKey := make(map[T][]int, len(r.data))
-	for row, value := range r.data {
-		rowsByKey[value] = append(rowsByKey[value], row)
+	if leftIndexes, rightIndexes, ok := alignedTypedJoinIndexes(left.data, r.data); ok {
+		return leftIndexes, rightIndexes, true, nil
+	}
+	rowsByKey := indexRowsByKey
+	if !hasIndexRowsByKey {
+		rowsByKey = make(map[T][]int, len(r.data))
+		for row, value := range r.data {
+			rowsByKey[value] = append(rowsByKey[value], row)
+		}
 	}
 	leftIndexes := make([]int, 0, len(left.data))
 	rightIndexes := make([]int, 0, len(left.data))
@@ -4296,6 +4303,23 @@ func singleColumnTypedJoinIndexesFor[T comparable](left columnArray[T], right Ar
 		}
 	}
 	return leftIndexes, rightIndexes, true, nil
+}
+
+func alignedTypedJoinIndexes[T comparable](left, right []T) ([]int, []int, bool) {
+	if len(left) != len(right) {
+		return nil, nil, false
+	}
+	seen := make(map[T]struct{}, len(left))
+	for row, value := range left {
+		if right[row] != value {
+			return nil, nil, false
+		}
+		if _, ok := seen[value]; ok {
+			return nil, nil, false
+		}
+		seen[value] = struct{}{}
+	}
+	return allIndexes(len(left)), allIndexes(len(right)), true
 }
 
 func unwrapAttributedArray(array Array) Array {

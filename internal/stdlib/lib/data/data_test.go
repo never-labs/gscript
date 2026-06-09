@@ -5306,6 +5306,61 @@ func TestJoinSingleColumnTypedPathDoesNotRequireGroupedIndex(t *testing.T) {
 	}
 }
 
+func TestJoinOutputReusesTypedRangeIndexes(t *testing.T) {
+	left := mustFrame(t,
+		Column{Name: "id", Data: NewI64([]int64{10, 11, 12, 13})},
+		Column{Name: "qty", Data: NewI64Range(100, 1, 4)},
+	)
+	right := mustFrame(t,
+		Column{Name: "id", Data: NewI64([]int64{10, 11, 12, 13})},
+		Column{Name: "px", Data: NewI64Range(200, 2, 4)},
+	)
+
+	got, err := InnerJoin(left, right, "id")
+	if err != nil {
+		t.Fatalf("InnerJoin returned error: %v", err)
+	}
+	assertColumnValues(t, got, "qty", []any{int64(100), int64(101), int64(102), int64(103)})
+	assertColumnValues(t, got, "px", []any{int64(200), int64(202), int64(204), int64(206)})
+	if col := mustColumn(t, got, "qty"); !isI64RangeArray(col) {
+		t.Fatalf("joined qty column = %T, want lazy i64 range", col)
+	}
+	if col := mustColumn(t, got, "px"); !isI64RangeArray(col) {
+		t.Fatalf("joined px column = %T, want lazy i64 range", col)
+	}
+}
+
+func TestAsofJoinOutputReusesTypedRangeIndexes(t *testing.T) {
+	left := mustFrame(t,
+		Column{Name: "ts", Data: NewI64([]int64{1, 2, 3, 4})},
+		Column{Name: "qty", Data: NewI64Range(10, 10, 4)},
+	)
+	right := mustFrame(t,
+		Column{Name: "ts", Data: NewI64([]int64{1, 2, 3, 4})},
+		Column{Name: "bid", Data: NewI64Range(100, 5, 4)},
+	)
+
+	got, err := AsofJoin(left, right, "ts")
+	if err != nil {
+		t.Fatalf("AsofJoin returned error: %v", err)
+	}
+	assertColumnValues(t, got, "bid", []any{int64(100), int64(105), int64(110), int64(115)})
+	if col := mustColumn(t, got, "bid"); !isI64RangeArray(col) {
+		t.Fatalf("asof bid column = %T, want lazy i64 range", col)
+	}
+}
+
+func isI64RangeArray(array Array) bool {
+	switch a := array.(type) {
+	case i64RangeArray:
+		return true
+	case attributedArray:
+		return isI64RangeArray(a.array)
+	default:
+		return false
+	}
+}
+
 func TestKeyedJoinUsesRightLatestValueRows(t *testing.T) {
 	left := mustFrame(t,
 		NewColumn("sym", []any{Symbol("AAPL"), Symbol("MSFT"), Symbol("TSLA")}),
@@ -6321,7 +6376,7 @@ func mustFrame(t testing.TB, cols ...Column) Frame {
 	return frame
 }
 
-func mustColumn(t *testing.T, frame Frame, name Symbol) Array {
+func mustColumn(t testing.TB, frame Frame, name Symbol) Array {
 	t.Helper()
 	col, ok := frame.Column(name)
 	if !ok {
@@ -6446,6 +6501,37 @@ func BenchmarkExecTypedRangeFilterProjection(b *testing.B) {
 		}
 		if out.Len() != rows/2 {
 			b.Fatalf("Exec output len = %d, want %d", out.Len(), rows/2)
+		}
+	}
+}
+
+func BenchmarkJoinTypedRangeIndexReuse(b *testing.B) {
+	const rows = 100000
+	ids := make([]int64, rows)
+	for i := 0; i < rows; i++ {
+		ids[i] = int64(i)
+	}
+	left := mustFrame(b,
+		Column{Name: "id", Data: NewI64(ids)},
+		Column{Name: "qty", Data: NewI64Range(0, 1, rows)},
+	)
+	right := mustFrame(b,
+		Column{Name: "id", Data: NewI64(ids)},
+		Column{Name: "px", Data: NewI64Range(1000, 2, rows)},
+	)
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		out, err := InnerJoin(left, right, "id")
+		if err != nil {
+			b.Fatalf("InnerJoin returned error: %v", err)
+		}
+		if out.Len() != rows {
+			b.Fatalf("join output len = %d, want %d", out.Len(), rows)
+		}
+		if col := mustColumn(b, out, "px"); !isI64RangeArray(col) {
+			b.Fatalf("joined px column = %T, want lazy i64 range", col)
 		}
 	}
 }
