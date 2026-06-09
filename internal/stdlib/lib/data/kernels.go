@@ -2449,6 +2449,14 @@ func i64ScalarDyadicApplySum(array i64ScalarDyadicArray, sourceSum int64, length
 }
 
 func typedIntegerSumWhereMask(array, mask Array) (any, bool, error) {
+	if rows, ok := boolMaskContiguousTrueRows(mask); ok {
+		if rows.len == 0 {
+			return NullValue, true, nil
+		}
+		if sum, handled, err := typedIntegerSumContiguousRange(array, rows); err != nil || handled {
+			return sum, handled, err
+		}
+	}
 	var total int64
 	count := 0
 	if err := forEachTypedBoolMask(mask, func(row int) error {
@@ -2468,6 +2476,55 @@ func typedIntegerSumWhereMask(array, mask Array) (any, bool, error) {
 		return NullValue, true, nil
 	}
 	return total, true, nil
+}
+
+func boolMaskContiguousTrueRows(mask Array) (i64RangeArray, bool) {
+	switch a := mask.(type) {
+	case attributedArray:
+		return boolMaskContiguousTrueRows(a.array)
+	case i64RangeCompareMask:
+		low, high, ok := compareMaskValueInterval(a)
+		if !ok {
+			return i64RangeArray{}, false
+		}
+		return i64RangeIntervalRows(a.values, low, high)
+	case boolLogicalMask:
+		if a.op != "and" || a.leftIsScalar || a.rightIsScalar {
+			return i64RangeArray{}, false
+		}
+		left, leftOK := a.left.(i64RangeCompareMask)
+		right, rightOK := a.right.(i64RangeCompareMask)
+		if !leftOK || !rightOK || !sameI64Range(left.values, right.values) {
+			return i64RangeArray{}, false
+		}
+		leftLow, leftHigh, ok := compareMaskValueInterval(left)
+		if !ok {
+			return i64RangeArray{}, false
+		}
+		rightLow, rightHigh, ok := compareMaskValueInterval(right)
+		if !ok {
+			return i64RangeArray{}, false
+		}
+		return i64RangeIntervalRows(left.values, maxInt64Value(leftLow, rightLow), minInt64Value(leftHigh, rightHigh))
+	default:
+		return i64RangeArray{}, false
+	}
+}
+
+func i64RangeIntervalRows(values i64RangeArray, low, high int64) (i64RangeArray, bool) {
+	if values.step != 1 {
+		return i64RangeArray{}, false
+	}
+	if values.len <= 0 || low > high {
+		return i64RangeArray{len: 0}, true
+	}
+	last := values.start + int64(values.len-1)
+	startValue := maxInt64Value(values.start, low)
+	endValue := minInt64Value(last, high)
+	if startValue > endValue {
+		return i64RangeArray{len: 0}, true
+	}
+	return i64RangeArray{start: startValue - values.start, step: 1, len: int(endValue - startValue + 1)}, true
 }
 
 func forEachTypedI64Index(indexes Array, limit int, fn func(row int) error) error {

@@ -715,6 +715,18 @@ func TestEvalScriptWarmBindingsKeepFastAndSemanticPathsSeparate(t *testing.T) {
 	}
 	assertStateEvalValue(t, state, "dates:9#2026.06.06 2026.06.07 2026.06.08;count where dates>=2026.06.07", int64(6))
 
+	dropPlan := state.qPipelinePlan("sum drop 4 x")
+	if dropPlan.kind != qPipelineSumVectorExpr || dropPlan.reductionPlan.kind == qScriptBindingInvalid {
+		t.Fatalf("drop transform pipeline missing warm binding: %#v", dropPlan)
+	}
+	assertStateEvalValue(t, state, "x:til 16;sum drop 4 x", int64(114))
+
+	rotatePlan := state.qPipelinePlan("sum 5 rotate x")
+	if rotatePlan.kind != qPipelineSumVectorExpr || rotatePlan.reductionPlan.kind == qScriptBindingInvalid {
+		t.Fatalf("rotate transform pipeline missing warm binding: %#v", rotatePlan)
+	}
+	assertStateEvalValue(t, state, "x:til 16;sum 5 rotate x", int64(120))
+
 	for _, src := range []string{
 		"`sym$`AAPL`MSFT",
 		"`s#10 20 30",

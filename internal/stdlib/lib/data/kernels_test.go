@@ -2662,6 +2662,25 @@ func TestTypedNumericUnaryBinaryAndAggregates(t *testing.T) {
 	if !ok || value != int64(9) {
 		t.Fatalf("TryTypedNumericSumWhereMask = %v, %v; want 9, true", value, ok)
 	}
+	ge, handled, err := TryTypedDyadic(OpGE, NewI64Range(0, 1, 10), int64(2))
+	if err != nil || !handled {
+		t.Fatalf("TryTypedDyadic range >= scalar = %T, %v, %v; want handled", ge, handled, err)
+	}
+	lt, handled, err := TryTypedDyadic(OpLT, NewI64Range(0, 1, 10), int64(6))
+	if err != nil || !handled {
+		t.Fatalf("TryTypedDyadic range < scalar = %T, %v, %v; want handled", lt, handled, err)
+	}
+	intervalMask, handled, err := TryTypedBoolLogical("and", ge, lt)
+	if err != nil || !handled {
+		t.Fatalf("TryTypedBoolLogical range interval mask = %T, %v, %v; want handled", intervalMask, handled, err)
+	}
+	value, ok, err = TryTypedNumericSumWhereMask(NewI64Range(7, 3, 10), intervalMask)
+	if err != nil {
+		t.Fatalf("TryTypedNumericSumWhereMask range interval returned error: %v", err)
+	}
+	if !ok || value != int64(70) {
+		t.Fatalf("TryTypedNumericSumWhereMask range interval = %v, %v; want 70, true", value, ok)
+	}
 	value, ok, err = TryTypedNumericSumWhereMask(NewF64([]float64{1.5, 2.5, 3.5}), NewBool([]bool{true, false, true}))
 	if err != nil {
 		t.Fatalf("TryTypedNumericSumWhereMask f64 returned error: %v", err)
@@ -2763,7 +2782,7 @@ func TestTypedNumericUnaryBinaryAndAggregates(t *testing.T) {
 		t.Fatalf("Max = %v, %v, %v; want b, true, true", max, has, ok)
 	}
 
-	min, handled, has, err := TryTypedMinMax(NewI64Range(10, -2, 4), false)
+	min, handled, has, err = TryTypedMinMax(NewI64Range(10, -2, 4), false)
 	if err != nil {
 		t.Fatalf("TryTypedMinMax range min returned error: %v", err)
 	}

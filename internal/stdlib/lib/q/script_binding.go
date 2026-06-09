@@ -27,6 +27,8 @@ type qScriptBindingPlan struct {
 	items   []qScriptBindingPlan
 	left    *qScriptBindingPlan
 	right   *qScriptBindingPlan
+	cached  bool
+	cache   any
 }
 
 func buildQScriptBindingPlan(expr Expr) qScriptBindingPlan {
@@ -109,6 +111,9 @@ func buildQScriptBindingPlanForRHS(src string, expr Expr) qScriptBindingPlan {
 	if plan := buildQScriptPrefixBindingPlan(src); plan.kind != qScriptBindingInvalid {
 		return plan
 	}
+	if plan := buildQScriptTransformBindingPlan(src); plan.kind != qScriptBindingInvalid {
+		return plan
+	}
 	if expr == nil {
 		parsed, ok, err := parseValueExpr(src)
 		if err != nil || !ok {
@@ -121,6 +126,89 @@ func buildQScriptBindingPlanForRHS(src string, expr Expr) qScriptBindingPlan {
 		return plan
 	}
 	return qScriptBindingPlan{}
+}
+
+func buildQScriptTransformBindingPlan(src string) qScriptBindingPlan {
+	src = strings.TrimSpace(src)
+	if src == "" {
+		return qScriptBindingPlan{}
+	}
+	if strings.HasPrefix(src, "drop ") && wordBoundary(src, 0, len("drop")) {
+		countExpr, valueExpr, ok := splitQScriptPrefixDyadicArgs(strings.TrimSpace(src[len("drop "):]))
+		if !ok {
+			return qScriptBindingPlan{}
+		}
+		countPlan := buildQScriptScalarLiteralBindingPlan(countExpr)
+		if countPlan.kind == qScriptBindingInvalid {
+			return qScriptBindingPlan{}
+		}
+		valuePlan := buildQScriptBindingPlanForRHS(valueExpr, nil)
+		if valuePlan.kind == qScriptBindingInvalid {
+			return qScriptBindingPlan{}
+		}
+		return qScriptBindingBinaryPlan("drop", countPlan, valuePlan)
+	}
+	if left, right, ok := splitTopLevelWord(src, "rotate"); ok {
+		countPlan := buildQScriptScalarLiteralBindingPlan(left)
+		if countPlan.kind == qScriptBindingInvalid {
+			return qScriptBindingPlan{}
+		}
+		valuePlan := buildQScriptBindingPlanForRHS(right, nil)
+		if valuePlan.kind == qScriptBindingInvalid {
+			return qScriptBindingPlan{}
+		}
+		return qScriptBindingBinaryPlan("rotate", countPlan, valuePlan)
+	}
+	return qScriptBindingPlan{}
+}
+
+func splitQScriptPrefixDyadicArgs(src string) (string, string, bool) {
+	src = strings.TrimSpace(src)
+	if src == "" {
+		return "", "", false
+	}
+	parenDepth := 0
+	bracketDepth := 0
+	braceDepth := 0
+	inString := false
+	for i := 0; i < len(src); i++ {
+		ch := src[i]
+		if inString {
+			if ch == '\\' {
+				i++
+				continue
+			}
+			if ch == '"' {
+				inString = false
+			}
+			continue
+		}
+		switch ch {
+		case '"':
+			inString = true
+		case '`':
+			i = qSymbolLiteralEnd(src, i) - 1
+		case '(':
+			parenDepth++
+		case ')':
+			parenDepth--
+		case '[':
+			bracketDepth++
+		case ']':
+			bracketDepth--
+		case '{':
+			braceDepth++
+		case '}':
+			braceDepth--
+		case ' ', '\t', '\n', '\r':
+			if parenDepth == 0 && bracketDepth == 0 && braceDepth == 0 {
+				left := strings.TrimSpace(src[:i])
+				right := strings.TrimSpace(src[i+1:])
+				return left, right, left != "" && right != ""
+			}
+		}
+	}
+	return "", "", false
 }
 
 func buildQScriptPrefixBindingPlan(src string) qScriptBindingPlan {
@@ -200,6 +288,15 @@ func (s *EvalState) evalQScriptBindingPlan(plan *qScriptBindingPlan) (any, bool,
 	if plan == nil {
 		return nil, false, nil
 	}
+	if plan.cached {
+		return plan.cache, true, nil
+	}
+	cacheable := qScriptBindingPlanCacheable(plan)
+	var (
+		value   any
+		handled bool
+		err     error
+	)
 	switch plan.kind {
 	case qScriptBindingInvalid:
 		return nil, false, nil
@@ -221,11 +318,14 @@ func (s *EvalState) evalQScriptBindingPlan(plan *qScriptBindingPlan) (any, bool,
 			values[i] = value
 		}
 		out, err := evalValueVector(values)
-		return out, true, err
+		value, handled = out, true
+		if err != nil {
+			return value, handled, err
+		}
 	case qScriptBindingUnary:
-		return s.evalQScriptUnaryBinding(plan)
+		value, handled, err = s.evalQScriptUnaryBinding(plan)
 	case qScriptBindingBinary:
-		return s.evalQScriptBinaryBinding(plan)
+		value, handled, err = s.evalQScriptBinaryBinding(plan)
 	case qScriptBindingIndex:
 		collection, handled, err := s.evalQScriptBindingPlan(plan.left)
 		if err != nil || !handled {
@@ -237,13 +337,25 @@ func (s *EvalState) evalQScriptBindingPlan(plan *qScriptBindingPlan) (any, bool,
 		}
 		if isCallable(collection) {
 			out, err := s.applyCallable(collection, []any{index})
-			return out, true, err
+			value, handled = out, true
+			if err != nil {
+				return value, handled, err
+			}
+			break
 		}
 		out, err := indexValue(collection, index)
-		return out, true, err
+		value, handled = out, true
+		if err != nil {
+			return value, handled, err
+		}
 	default:
 		return nil, false, nil
 	}
+	if cacheable && handled && err == nil {
+		plan.cache = value
+		plan.cached = true
+	}
+	return value, handled, err
 }
 
 func (s *EvalState) evalQScriptUnaryBinding(plan *qScriptBindingPlan) (any, bool, error) {
@@ -300,6 +412,18 @@ func (s *EvalState) evalQScriptBinaryBinding(plan *qScriptBindingPlan) (any, boo
 		out, err := take(int(n), right)
 		return out, true, err
 	}
+	if plan.op == "drop" {
+		n, ok := integerValue(left)
+		if !ok || int64(int(n)) != n {
+			return nil, true, fmt.Errorf("drop expects an integer count")
+		}
+		out, err := drop(int(n), right)
+		return out, true, err
+	}
+	if plan.op == "rotate" {
+		out, err := rotateValue(left, right)
+		return out, true, err
+	}
 	if plan.op == "and" || plan.op == "or" {
 		if out, handled, err := data.TryTypedBoolLogical(plan.op, left, right); err != nil || handled {
 			recordRuntimeKernelProbe("ArrayBoolLogical", qScriptBoolLogicalShape(plan.op), handled, err)
@@ -350,6 +474,31 @@ func (s *EvalState) evalQScriptBinaryBinding(plan *qScriptBindingPlan) (any, boo
 	}
 	out, err := evalValueBinary(plan.op, left, right)
 	return out, true, err
+}
+
+func qScriptBindingPlanCacheable(plan *qScriptBindingPlan) bool {
+	if plan == nil {
+		return false
+	}
+	switch plan.kind {
+	case qScriptBindingInvalid, qScriptBindingName:
+		return false
+	case qScriptBindingLiteral:
+		return true
+	case qScriptBindingVector:
+		for i := range plan.items {
+			if !qScriptBindingPlanCacheable(&plan.items[i]) {
+				return false
+			}
+		}
+		return true
+	case qScriptBindingUnary:
+		return qScriptBindingPlanCacheable(plan.left)
+	case qScriptBindingBinary, qScriptBindingIndex:
+		return qScriptBindingPlanCacheable(plan.left) && qScriptBindingPlanCacheable(plan.right)
+	default:
+		return false
+	}
 }
 
 func qScriptBoolLogicalShape(op string) string {

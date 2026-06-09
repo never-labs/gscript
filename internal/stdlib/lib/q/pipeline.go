@@ -495,9 +495,11 @@ func (s *EvalState) evalQPipelineSumGatherIndexes(plan qPipelinePlan) (any, bool
 
 func qPipelineGatherReduceSum(array, indexes data.Array) (any, bool, error) {
 	out, handled, err := data.TryTypedNumericSumByI64Indexes(array, indexes)
-	shape := "gather-reduce/" + string(array.Kind()) + "/" + string(indexes.Kind())
+	shape := ""
 	if array.Kind() == data.KindI64 && indexes.Kind() == data.KindI64 {
 		shape = "gather-reduce/i64/i64"
+	} else {
+		shape = "gather-reduce/" + string(array.Kind()) + "/" + string(indexes.Kind())
 	}
 	recordRuntimeKernelProbe("ArrayGatherReduceSum", shape, handled, err)
 	return out, handled, err
@@ -513,9 +515,11 @@ func qPipelineGatherReduceSumWithPlanStats(plan qPipelinePlan, array, indexes da
 func qPipelineWhereReduceSumWithPlanStats(plan qPipelinePlan, array, mask data.Array) (any, bool, error) {
 	recordRuntimeKernelExecution("QPipelinePlan", plan.shape, "attempt", "attempt")
 	out, handled, err := data.TryTypedNumericSumWhereMask(array, mask)
-	shape := "where-reduce/" + string(array.Kind()) + "/" + string(mask.Kind())
+	shape := ""
 	if array.Kind() == data.KindI64 && mask.Kind() == data.KindBool {
 		shape = "where-reduce/i64/bool"
+	} else {
+		shape = "where-reduce/" + string(array.Kind()) + "/" + string(mask.Kind())
 	}
 	recordRuntimeKernelProbe("ArrayWhereReduceSum", shape, handled, err)
 	recordQPipelinePlanOutcome(plan, handled, err)
