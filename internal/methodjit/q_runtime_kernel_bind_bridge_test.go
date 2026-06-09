@@ -51,15 +51,16 @@ func TestQKernelDescriptorCacheStatsMapToBindRuntimeStats(t *testing.T) {
 		},
 	}, func(stat QKernelDescriptorCacheStat) stdbind.QRuntimeKernelDescriptorCacheStat {
 		return stdbind.QRuntimeKernelDescriptorCacheStat{
-			Source:     stat.Source,
-			Kernel:     stat.Kernel,
-			Shape:      stat.Shape,
-			Route:      stat.Route,
-			SchemaHash: stat.SchemaHash,
-			Entries:    stat.Entries,
-			Hits:       stat.Hits,
-			Misses:     stat.Misses,
-			Evictions:  stat.Evictions,
+			Source:        stat.Source,
+			Kernel:        stat.Kernel,
+			Shape:         stat.Shape,
+			PipelineShape: stat.PipelineShape,
+			Route:         stat.Route,
+			SchemaHash:    stat.SchemaHash,
+			Entries:       stat.Entries,
+			Hits:          stat.Hits,
+			Misses:        stat.Misses,
+			Evictions:     stat.Evictions,
 		}
 	})
 	if len(stats) != 1 {

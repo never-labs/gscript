@@ -12,27 +12,29 @@ type qRuntimeKernelExecutionExternalStatForTest struct {
 }
 
 type qRuntimeKernelDescriptorCacheExternalStatForTest struct {
-	Source     string
-	Kernel     string
-	Shape      string
-	Route      string
-	SchemaHash string
-	Entries    uint64
-	Hits       uint64
-	Misses     uint64
-	Evictions  uint64
+	Source        string
+	Kernel        string
+	Shape         string
+	PipelineShape string
+	Route         string
+	SchemaHash    string
+	Entries       uint64
+	Hits          uint64
+	Misses        uint64
+	Evictions     uint64
 }
 
 type qRuntimeKernelLoweringExternalStatForTest struct {
-	Source       string
-	Kind         string
-	Kernel       string
-	Shape        string
-	Route        string
-	Outcome      string
-	ReasonFamily string
-	ReasonCode   string
-	Count        uint64
+	Source        string
+	Kind          string
+	Kernel        string
+	Shape         string
+	PipelineShape string
+	Route         string
+	Outcome       string
+	ReasonFamily  string
+	ReasonCode    string
+	Count         uint64
 }
 
 func qRuntimeKernelExecutionExternalStatToBindForTest(stat qRuntimeKernelExecutionExternalStatForTest) QRuntimeKernelExecutionStat {
@@ -48,29 +50,31 @@ func qRuntimeKernelExecutionExternalStatToBindForTest(stat qRuntimeKernelExecuti
 
 func qRuntimeKernelDescriptorCacheExternalStatToBindForTest(stat qRuntimeKernelDescriptorCacheExternalStatForTest) QRuntimeKernelDescriptorCacheStat {
 	return QRuntimeKernelDescriptorCacheStat{
-		Source:     stat.Source,
-		Kernel:     stat.Kernel,
-		Shape:      stat.Shape,
-		Route:      stat.Route,
-		SchemaHash: stat.SchemaHash,
-		Entries:    stat.Entries,
-		Hits:       stat.Hits,
-		Misses:     stat.Misses,
-		Evictions:  stat.Evictions,
+		Source:        stat.Source,
+		Kernel:        stat.Kernel,
+		Shape:         stat.Shape,
+		PipelineShape: stat.PipelineShape,
+		Route:         stat.Route,
+		SchemaHash:    stat.SchemaHash,
+		Entries:       stat.Entries,
+		Hits:          stat.Hits,
+		Misses:        stat.Misses,
+		Evictions:     stat.Evictions,
 	}
 }
 
 func qRuntimeKernelLoweringExternalStatToBindForTest(stat qRuntimeKernelLoweringExternalStatForTest) QRuntimeKernelLoweringStat {
 	return QRuntimeKernelLoweringStat{
-		Source:       stat.Source,
-		Kind:         stat.Kind,
-		Kernel:       stat.Kernel,
-		Shape:        stat.Shape,
-		Route:        stat.Route,
-		Outcome:      stat.Outcome,
-		ReasonFamily: stat.ReasonFamily,
-		ReasonCode:   stat.ReasonCode,
-		Count:        stat.Count,
+		Source:        stat.Source,
+		Kind:          stat.Kind,
+		Kernel:        stat.Kernel,
+		Shape:         stat.Shape,
+		PipelineShape: stat.PipelineShape,
+		Route:         stat.Route,
+		Outcome:       stat.Outcome,
+		ReasonFamily:  stat.ReasonFamily,
+		ReasonCode:    stat.ReasonCode,
+		Count:         stat.Count,
 	}
 }
 

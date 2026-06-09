@@ -91,28 +91,30 @@ type QFrameRuntimeKernel struct {
 // QKernelDescriptor is the normalized MethodJIT q kernel observation. Summary
 // rows are derived from descriptors so new runtime routes do not fork taxonomy.
 type QKernelDescriptor struct {
-	Source       string
-	Kind         string
-	Kernel       string
-	Shape        string
-	Route        string
-	Outcome      string
-	ReasonFamily string
-	ReasonCode   string
+	Source        string
+	Kind          string
+	Kernel        string
+	Shape         string
+	PipelineShape string
+	Route         string
+	Outcome       string
+	ReasonFamily  string
+	ReasonCode    string
 }
 
 // QKernelDescriptorJSONRow is the stable external row shape for q kernel
 // descriptors. Use QKernelDescriptorJSONRows instead of relying on Go field
 // names when exporting diagnostics.
 type QKernelDescriptorJSONRow struct {
-	Source       string `json:"source"`
-	Kind         string `json:"kind"`
-	Kernel       string `json:"kernel"`
-	Shape        string `json:"shape"`
-	Route        string `json:"route"`
-	Outcome      string `json:"outcome"`
-	ReasonFamily string `json:"reason_family,omitempty"`
-	ReasonCode   string `json:"reason_code,omitempty"`
+	Source        string `json:"source"`
+	Kind          string `json:"kind"`
+	Kernel        string `json:"kernel"`
+	Shape         string `json:"shape"`
+	PipelineShape string `json:"pipeline_shape,omitempty"`
+	Route         string `json:"route"`
+	Outcome       string `json:"outcome"`
+	ReasonFamily  string `json:"reason_family,omitempty"`
+	ReasonCode    string `json:"reason_code,omitempty"`
 }
 
 // QKernelExecutionStat records observed q typed-runtime kernel execution. It
@@ -130,15 +132,16 @@ type QKernelExecutionStat struct {
 // QKernelDescriptorCacheStat records schema-stable descriptor cache behavior
 // for q typed-runtime kernels observed during native execution.
 type QKernelDescriptorCacheStat struct {
-	Source     string
-	Kernel     string
-	Shape      string
-	Route      string
-	SchemaHash string
-	Entries    uint64
-	Hits       uint64
-	Misses     uint64
-	Evictions  uint64
+	Source        string
+	Kernel        string
+	Shape         string
+	PipelineShape string
+	Route         string
+	SchemaHash    string
+	Entries       uint64
+	Hits          uint64
+	Misses        uint64
+	Evictions     uint64
 }
 
 // QKernelExecutionStatJSONRow is the stable external row shape for raw q
@@ -477,12 +480,13 @@ func BuildQKernelDescriptors(vectorKernels []QVectorRuntimeKernel, framePrimitiv
 			shape = "unknown"
 		}
 		out = append(out, QKernelDescriptor{
-			Source:  "methodjit_q_vector_runtime",
-			Kind:    "runtime_kernel",
-			Kernel:  kernel.Kernel,
-			Shape:   shape,
-			Route:   "typed_runtime_op_exit",
-			Outcome: "supported",
+			Source:        "methodjit_q_vector_runtime",
+			Kind:          "runtime_kernel",
+			Kernel:        kernel.Kernel,
+			Shape:         shape,
+			PipelineShape: shape,
+			Route:         "typed_runtime_op_exit",
+			Outcome:       "supported",
 		})
 	}
 	for _, kernel := range framePrimitiveKernels {
@@ -491,12 +495,13 @@ func BuildQKernelDescriptors(vectorKernels []QVectorRuntimeKernel, framePrimitiv
 			shape = "unknown"
 		}
 		out = append(out, QKernelDescriptor{
-			Source:  "methodjit_q_frame_runtime",
-			Kind:    "runtime_kernel",
-			Kernel:  kernel.Kernel,
-			Shape:   shape,
-			Route:   "typed_runtime_op_exit",
-			Outcome: "supported",
+			Source:        "methodjit_q_frame_runtime",
+			Kind:          "runtime_kernel",
+			Kernel:        kernel.Kernel,
+			Shape:         shape,
+			PipelineShape: shape,
+			Route:         "typed_runtime_op_exit",
+			Outcome:       "supported",
 		})
 	}
 	for _, spec := range frameKernels {
@@ -505,12 +510,13 @@ func BuildQKernelDescriptors(vectorKernels []QVectorRuntimeKernel, framePrimitiv
 			shape = "unknown"
 		}
 		out = append(out, QKernelDescriptor{
-			Source:  "methodjit_q_frame_runtime",
-			Kind:    "runtime_kernel",
-			Kernel:  "QFrameSelectColumn",
-			Shape:   shape,
-			Route:   "typed_runtime_op_exit",
-			Outcome: "supported",
+			Source:        "methodjit_q_frame_runtime",
+			Kind:          "runtime_kernel",
+			Kernel:        "QFrameSelectColumn",
+			Shape:         shape,
+			PipelineShape: shape,
+			Route:         "typed_runtime_op_exit",
+			Outcome:       "supported",
 		})
 	}
 	for _, remark := range remarks {
@@ -543,14 +549,15 @@ func BuildQKernelDescriptors(vectorKernels []QVectorRuntimeKernel, framePrimitiv
 			kernel = remarkKernel
 		}
 		out = append(out, QKernelDescriptor{
-			Source:       source,
-			Kind:         qLoweringRemarkFieldOrDefault(remark, "kind", "fallback"),
-			Kernel:       kernel,
-			Shape:        qQueryLoweringFallbackShapeFromRemark(remark),
-			Route:        qLoweringRemarkFieldOrDefault(remark, "route", "lowering"),
-			Outcome:      qLoweringRemarkFieldOrDefault(remark, "outcome", "fallback"),
-			ReasonFamily: qLoweringRemarkFieldOrDefault(remark, "reason_family", "lowering"),
-			ReasonCode:   reason,
+			Source:        source,
+			Kind:          qLoweringRemarkFieldOrDefault(remark, "kind", "fallback"),
+			Kernel:        kernel,
+			Shape:         qQueryLoweringFallbackShapeFromRemark(remark),
+			PipelineShape: qLoweringRemarkFieldOrDefault(remark, "pipeline_shape", ""),
+			Route:         qLoweringRemarkFieldOrDefault(remark, "route", "lowering"),
+			Outcome:       qLoweringRemarkFieldOrDefault(remark, "outcome", "fallback"),
+			ReasonFamily:  qLoweringRemarkFieldOrDefault(remark, "reason_family", "lowering"),
+			ReasonCode:    reason,
 		})
 	}
 	if len(out) == 0 {
@@ -568,6 +575,9 @@ func BuildQKernelDescriptors(vectorKernels []QVectorRuntimeKernel, framePrimitiv
 		}
 		if out[i].Shape != out[j].Shape {
 			return out[i].Shape < out[j].Shape
+		}
+		if out[i].PipelineShape != out[j].PipelineShape {
+			return out[i].PipelineShape < out[j].PipelineShape
 		}
 		if out[i].Route != out[j].Route {
 			return out[i].Route < out[j].Route
@@ -675,14 +685,15 @@ func QKernelDescriptorJSONRows(rows []QKernelDescriptor) []QKernelDescriptorJSON
 	out := make([]QKernelDescriptorJSONRow, 0, len(rows))
 	for _, row := range rows {
 		out = append(out, QKernelDescriptorJSONRow{
-			Source:       row.Source,
-			Kind:         row.Kind,
-			Kernel:       row.Kernel,
-			Shape:        row.Shape,
-			Route:        row.Route,
-			Outcome:      row.Outcome,
-			ReasonFamily: row.ReasonFamily,
-			ReasonCode:   row.ReasonCode,
+			Source:        row.Source,
+			Kind:          row.Kind,
+			Kernel:        row.Kernel,
+			Shape:         row.Shape,
+			PipelineShape: row.PipelineShape,
+			Route:         row.Route,
+			Outcome:       row.Outcome,
+			ReasonFamily:  row.ReasonFamily,
+			ReasonCode:    row.ReasonCode,
 		})
 	}
 	return out
@@ -2909,6 +2920,9 @@ func formatQKernelDescriptors(rows []QKernelDescriptor) string {
 		if row.Outcome != "" {
 			fmt.Fprintf(&b, " outcome=%s", row.Outcome)
 		}
+		if row.PipelineShape != "" {
+			fmt.Fprintf(&b, " pipeline_shape=%s", row.PipelineShape)
+		}
 		if row.ReasonFamily != "" {
 			fmt.Fprintf(&b, " reason_family=%s", row.ReasonFamily)
 		}
@@ -2940,8 +2954,8 @@ func formatQKernelDescriptorCacheStats(rows []QKernelDescriptorCacheStat) string
 	var b strings.Builder
 	fmt.Fprintf(&b, "%d descriptor cache row(s)\n", len(rows))
 	for i, row := range rows {
-		fmt.Fprintf(&b, "  [%d] source=%s kernel=%s shape=%s route=%s schema_hash=%s entries=%d hits=%d misses=%d evictions=%d\n",
-			i, row.Source, row.Kernel, row.Shape, row.Route, row.SchemaHash, row.Entries, row.Hits, row.Misses, row.Evictions)
+		fmt.Fprintf(&b, "  [%d] source=%s kernel=%s shape=%s pipeline_shape=%s route=%s schema_hash=%s entries=%d hits=%d misses=%d evictions=%d\n",
+			i, row.Source, row.Kernel, row.Shape, row.PipelineShape, row.Route, row.SchemaHash, row.Entries, row.Hits, row.Misses, row.Evictions)
 	}
 	return b.String()
 }

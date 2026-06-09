@@ -133,6 +133,10 @@ func (cf *CompiledFunction) recordQKernelExecutionForFrame(source, kernel, shape
 }
 
 func (cf *CompiledFunction) recordQKernelExecutionWithSchema(source, kernel, shape, route, outcome, schemaHash string) {
+	cf.recordQKernelExecutionWithPipelineShape(source, kernel, shape, "", route, outcome, schemaHash)
+}
+
+func (cf *CompiledFunction) recordQKernelExecutionWithPipelineShape(source, kernel, shape, pipelineShape, route, outcome, schemaHash string) {
 	if cf == nil {
 		return
 	}
@@ -144,6 +148,9 @@ func (cf *CompiledFunction) recordQKernelExecutionWithSchema(source, kernel, sha
 	}
 	if shape == "" {
 		shape = "unknown"
+	}
+	if pipelineShape == "" {
+		pipelineShape = "unknown"
 	}
 	if route == "" {
 		route = "unknown"
@@ -168,11 +175,12 @@ func (cf *CompiledFunction) recordQKernelExecutionWithSchema(source, kernel, sha
 	cf.qKernelStats[key]++
 	cf.qKernelStatsMu.Unlock()
 	cf.recordQKernelDescriptorCacheLookup(qKernelDescriptorCacheKey{
-		source:     source,
-		kernel:     kernel,
-		shape:      shape,
-		route:      route,
-		schemaHash: schemaHash,
+		source:        source,
+		kernel:        kernel,
+		shape:         shape,
+		pipelineShape: pipelineShape,
+		route:         route,
+		schemaHash:    schemaHash,
 	})
 }
 
@@ -185,11 +193,12 @@ func qKernelSchemaHashForValue(v runtime.Value) string {
 }
 
 type qKernelDescriptorCacheKey struct {
-	source     string
-	kernel     string
-	shape      string
-	route      string
-	schemaHash string
+	source        string
+	kernel        string
+	shape         string
+	pipelineShape string
+	route         string
+	schemaHash    string
 }
 
 type qKernelDescriptorCacheCounters struct {
@@ -243,6 +252,9 @@ func (cf *CompiledFunction) QKernelDescriptorCacheStats() []QKernelDescriptorCac
 		if keys[i].shape != keys[j].shape {
 			return keys[i].shape < keys[j].shape
 		}
+		if keys[i].pipelineShape != keys[j].pipelineShape {
+			return keys[i].pipelineShape < keys[j].pipelineShape
+		}
 		if keys[i].route != keys[j].route {
 			return keys[i].route < keys[j].route
 		}
@@ -256,15 +268,16 @@ func (cf *CompiledFunction) QKernelDescriptorCacheStats() []QKernelDescriptorCac
 			entries = 1
 		}
 		out = append(out, QKernelDescriptorCacheStat{
-			Source:     key.source,
-			Kernel:     key.kernel,
-			Shape:      key.shape,
-			Route:      key.route,
-			SchemaHash: key.schemaHash,
-			Entries:    entries,
-			Hits:       counters.hits,
-			Misses:     counters.misses,
-			Evictions:  counters.evictions,
+			Source:        key.source,
+			Kernel:        key.kernel,
+			Shape:         key.shape,
+			PipelineShape: key.pipelineShape,
+			Route:         key.route,
+			SchemaHash:    key.schemaHash,
+			Entries:       entries,
+			Hits:          counters.hits,
+			Misses:        counters.misses,
+			Evictions:     counters.evictions,
 		})
 	}
 	return out

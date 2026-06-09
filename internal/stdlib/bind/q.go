@@ -141,30 +141,32 @@ type QRuntimeKernelExecutionStat struct {
 // QRuntimeKernelDescriptorCacheStat is the q.cache_stats-facing shape for
 // MethodJIT schema-stable q runtime descriptor cache accounting.
 type QRuntimeKernelDescriptorCacheStat struct {
-	Source     string
-	Kernel     string
-	Shape      string
-	Route      string
-	SchemaHash string
-	Entries    uint64
-	Hits       uint64
-	Misses     uint64
-	Evictions  uint64
+	Source        string
+	Kernel        string
+	Shape         string
+	PipelineShape string
+	Route         string
+	SchemaHash    string
+	Entries       uint64
+	Hits          uint64
+	Misses        uint64
+	Evictions     uint64
 }
 
 // QRuntimeKernelLoweringStat is the q.cache_stats-facing shape for MethodJIT
 // q typed-runtime kernel lowering fallbacks. These rows explain why a hot-path
 // shape did not become a typed runtime kernel.
 type QRuntimeKernelLoweringStat struct {
-	Source       string
-	Kind         string
-	Kernel       string
-	Shape        string
-	Route        string
-	Outcome      string
-	ReasonFamily string
-	ReasonCode   string
-	Count        uint64
+	Source        string
+	Kind          string
+	Kernel        string
+	Shape         string
+	PipelineShape string
+	Route         string
+	Outcome       string
+	ReasonFamily  string
+	ReasonCode    string
+	Count         uint64
 }
 
 type qRuntimeKernelExecutionShapeStat struct {
@@ -190,12 +192,13 @@ type qRuntimeKernelExecutionRouteStat struct {
 }
 
 type qRuntimeKernelDescriptorCacheShapeStat struct {
-	Source    string
-	Shape     string
-	Entries   uint64
-	Hits      uint64
-	Misses    uint64
-	Evictions uint64
+	Source        string
+	Shape         string
+	PipelineShape string
+	Entries       uint64
+	Hits          uint64
+	Misses        uint64
+	Evictions     uint64
 }
 
 type qRuntimeKernelDescriptorCacheKernelStat struct {
@@ -208,13 +211,14 @@ type qRuntimeKernelDescriptorCacheKernelStat struct {
 }
 
 type qRuntimeKernelLoweringShapeStat struct {
-	Source       string
-	Kind         string
-	Shape        string
-	Outcome      string
-	ReasonFamily string
-	ReasonCode   string
-	Count        uint64
+	Source        string
+	Kind          string
+	Shape         string
+	PipelineShape string
+	Outcome       string
+	ReasonFamily  string
+	ReasonCode    string
+	Count         uint64
 }
 
 type qRuntimeKernelLoweringKernelStat struct {
@@ -236,15 +240,16 @@ type qRuntimeKernelLoweringReasonStat struct {
 }
 
 type qRuntimeKernelLoweringReasonShapeStat struct {
-	Source       string
-	Kind         string
-	Kernel       string
-	Shape        string
-	Route        string
-	Outcome      string
-	ReasonFamily string
-	ReasonCode   string
-	Count        uint64
+	Source        string
+	Kind          string
+	Kernel        string
+	Shape         string
+	PipelineShape string
+	Route         string
+	Outcome       string
+	ReasonFamily  string
+	ReasonCode    string
+	Count         uint64
 }
 
 type qRuntimeKernelLoweringRouteStat struct {
@@ -3907,11 +3912,12 @@ func qRuntimeKernelDescriptorCacheStatsSnapshot() []QRuntimeKernelDescriptorCach
 		return nil
 	}
 	type statKey struct {
-		source     string
-		kernel     string
-		shape      string
-		route      string
-		schemaHash string
+		source        string
+		kernel        string
+		shape         string
+		pipelineShape string
+		route         string
+		schemaHash    string
 	}
 	counts := make(map[statKey]QRuntimeKernelDescriptorCacheStat, len(stats))
 	for _, stat := range stats {
@@ -3919,16 +3925,18 @@ func qRuntimeKernelDescriptorCacheStatsSnapshot() []QRuntimeKernelDescriptorCach
 			continue
 		}
 		key := statKey{
-			source:     qNormalizeRuntimeKernelStatPart(stat.Source),
-			kernel:     qNormalizeRuntimeKernelStatPart(stat.Kernel),
-			shape:      qNormalizeRuntimeKernelStatPart(stat.Shape),
-			route:      qNormalizeRuntimeKernelStatPart(stat.Route),
-			schemaHash: qNormalizeRuntimeKernelStatPart(stat.SchemaHash),
+			source:        qNormalizeRuntimeKernelStatPart(stat.Source),
+			kernel:        qNormalizeRuntimeKernelStatPart(stat.Kernel),
+			shape:         qNormalizeRuntimeKernelStatPart(stat.Shape),
+			pipelineShape: qNormalizeRuntimeKernelStatPart(stat.PipelineShape),
+			route:         qNormalizeRuntimeKernelStatPart(stat.Route),
+			schemaHash:    qNormalizeRuntimeKernelStatPart(stat.SchemaHash),
 		}
 		row := counts[key]
 		row.Source = key.source
 		row.Kernel = key.kernel
 		row.Shape = key.shape
+		row.PipelineShape = key.pipelineShape
 		row.Route = key.route
 		row.SchemaHash = key.schemaHash
 		row.Entries += stat.Entries
@@ -3953,6 +3961,9 @@ func qRuntimeKernelDescriptorCacheStatsSnapshot() []QRuntimeKernelDescriptorCach
 		}
 		if out[i].Shape != out[j].Shape {
 			return out[i].Shape < out[j].Shape
+		}
+		if out[i].PipelineShape != out[j].PipelineShape {
+			return out[i].PipelineShape < out[j].PipelineShape
 		}
 		if out[i].Route != out[j].Route {
 			return out[i].Route < out[j].Route
@@ -4009,14 +4020,15 @@ func qRuntimeKernelLoweringStatsSnapshot() []QRuntimeKernelLoweringStat {
 		return nil
 	}
 	type statKey struct {
-		source       string
-		kind         string
-		kernel       string
-		shape        string
-		route        string
-		outcome      string
-		reasonFamily string
-		reasonCode   string
+		source        string
+		kind          string
+		kernel        string
+		shape         string
+		pipelineShape string
+		route         string
+		outcome       string
+		reasonFamily  string
+		reasonCode    string
 	}
 	counts := make(map[statKey]uint64, len(stats))
 	for _, stat := range stats {
@@ -4026,14 +4038,15 @@ func qRuntimeKernelLoweringStatsSnapshot() []QRuntimeKernelLoweringStat {
 		kind := qNormalizeRuntimeKernelLoweringKind(stat.Kind)
 		outcome := qNormalizeRuntimeKernelLoweringOutcome(stat.Outcome, kind)
 		key := statKey{
-			source:       qNormalizeRuntimeKernelStatPart(stat.Source),
-			kind:         kind,
-			kernel:       qNormalizeRuntimeKernelStatPart(stat.Kernel),
-			shape:        qNormalizeRuntimeKernelStatPart(stat.Shape),
-			route:        qNormalizeRuntimeKernelLoweringRoute(stat.Route, kind),
-			outcome:      outcome,
-			reasonFamily: qNormalizeRuntimeKernelLoweringReasonFamily(stat.ReasonFamily, outcome),
-			reasonCode:   qNormalizeRuntimeKernelLoweringReasonCode(stat.ReasonCode, outcome),
+			source:        qNormalizeRuntimeKernelStatPart(stat.Source),
+			kind:          kind,
+			kernel:        qNormalizeRuntimeKernelStatPart(stat.Kernel),
+			shape:         qNormalizeRuntimeKernelStatPart(stat.Shape),
+			pipelineShape: qNormalizeRuntimeKernelStatPart(stat.PipelineShape),
+			route:         qNormalizeRuntimeKernelLoweringRoute(stat.Route, kind),
+			outcome:       outcome,
+			reasonFamily:  qNormalizeRuntimeKernelLoweringReasonFamily(stat.ReasonFamily, outcome),
+			reasonCode:    qNormalizeRuntimeKernelLoweringReasonCode(stat.ReasonCode, outcome),
 		}
 		counts[key] += stat.Count
 	}
@@ -4043,15 +4056,16 @@ func qRuntimeKernelLoweringStatsSnapshot() []QRuntimeKernelLoweringStat {
 	out := make([]QRuntimeKernelLoweringStat, 0, len(counts))
 	for key, count := range counts {
 		out = append(out, QRuntimeKernelLoweringStat{
-			Source:       key.source,
-			Kind:         key.kind,
-			Kernel:       key.kernel,
-			Shape:        key.shape,
-			Route:        key.route,
-			Outcome:      key.outcome,
-			ReasonFamily: key.reasonFamily,
-			ReasonCode:   key.reasonCode,
-			Count:        count,
+			Source:        key.source,
+			Kind:          key.kind,
+			Kernel:        key.kernel,
+			Shape:         key.shape,
+			PipelineShape: key.pipelineShape,
+			Route:         key.route,
+			Outcome:       key.outcome,
+			ReasonFamily:  key.reasonFamily,
+			ReasonCode:    key.reasonCode,
+			Count:         count,
 		})
 	}
 	sort.Slice(out, func(i, j int) bool {
@@ -4067,6 +4081,9 @@ func qRuntimeKernelLoweringStatsSnapshot() []QRuntimeKernelLoweringStat {
 		}
 		if a.Shape != b.Shape {
 			return a.Shape < b.Shape
+		}
+		if a.PipelineShape != b.PipelineShape {
+			return a.PipelineShape < b.PipelineShape
 		}
 		if a.Route != b.Route {
 			return a.Route < b.Route
@@ -4149,6 +4166,7 @@ func qRuntimeKernelDescriptorCacheStatsTable(stats []QRuntimeKernelDescriptorCac
 		row.RawSetString("source", StringValue(stat.Source))
 		row.RawSetString("kernel", StringValue(stat.Kernel))
 		row.RawSetString("shape", StringValue(stat.Shape))
+		row.RawSetString("pipeline_shape", StringValue(stat.PipelineShape))
 		row.RawSetString("route", StringValue(stat.Route))
 		row.RawSetString("schema_hash", StringValue(stat.SchemaHash))
 		row.RawSetString("entries", qUint64IntValue(stat.Entries))
@@ -4168,6 +4186,7 @@ func qRuntimeKernelLoweringStatsTable(stats []QRuntimeKernelLoweringStat) *Table
 		row.RawSetString("kind", StringValue(stat.Kind))
 		row.RawSetString("kernel", StringValue(stat.Kernel))
 		row.RawSetString("shape", StringValue(stat.Shape))
+		row.RawSetString("pipeline_shape", StringValue(stat.PipelineShape))
 		row.RawSetString("route", StringValue(stat.Route))
 		row.RawSetString("outcome", StringValue(stat.Outcome))
 		row.RawSetString("reason_family", StringValue(stat.ReasonFamily))
@@ -4447,15 +4466,17 @@ func qRuntimeKernelExecutionKernelStatsTable(stats []qRuntimeKernelExecutionKern
 
 func qRuntimeKernelDescriptorCacheShapeStats(stats []QRuntimeKernelDescriptorCacheStat) []qRuntimeKernelDescriptorCacheShapeStat {
 	type shapeKey struct {
-		source string
-		shape  string
+		source        string
+		shape         string
+		pipelineShape string
 	}
 	counts := make(map[shapeKey]qRuntimeKernelDescriptorCacheShapeStat, len(stats))
 	for _, stat := range stats {
-		key := shapeKey{source: stat.Source, shape: stat.Shape}
+		key := shapeKey{source: stat.Source, shape: stat.Shape, pipelineShape: stat.PipelineShape}
 		row := counts[key]
 		row.Source = key.source
 		row.Shape = key.shape
+		row.PipelineShape = key.pipelineShape
 		row.Entries += stat.Entries
 		row.Hits += stat.Hits
 		row.Misses += stat.Misses
@@ -4474,7 +4495,10 @@ func qRuntimeKernelDescriptorCacheShapeStats(stats []QRuntimeKernelDescriptorCac
 		if a.Source != b.Source {
 			return a.Source < b.Source
 		}
-		return a.Shape < b.Shape
+		if a.Shape != b.Shape {
+			return a.Shape < b.Shape
+		}
+		return a.PipelineShape < b.PipelineShape
 	})
 	return out
 }
@@ -4485,6 +4509,7 @@ func qRuntimeKernelDescriptorCacheShapeStatsTable(stats []qRuntimeKernelDescript
 		row := NewTable()
 		row.RawSetString("source", StringValue(stat.Source))
 		row.RawSetString("shape", StringValue(stat.Shape))
+		row.RawSetString("pipeline_shape", StringValue(stat.PipelineShape))
 		row.RawSetString("entries", qUint64IntValue(stat.Entries))
 		row.RawSetString("hits", qUint64IntValue(stat.Hits))
 		row.RawSetString("misses", qUint64IntValue(stat.Misses))
@@ -4611,35 +4636,38 @@ func qRuntimeKernelExecutionRouteStatsTable(stats []qRuntimeKernelExecutionRoute
 
 func qRuntimeKernelLoweringShapeStats(stats []QRuntimeKernelLoweringStat) []qRuntimeKernelLoweringShapeStat {
 	type shapeKey struct {
-		source       string
-		kind         string
-		shape        string
-		outcome      string
-		reasonFamily string
-		reasonCode   string
+		source        string
+		kind          string
+		shape         string
+		pipelineShape string
+		outcome       string
+		reasonFamily  string
+		reasonCode    string
 	}
 	counts := make(map[shapeKey]uint64, len(stats))
 	for _, stat := range stats {
 		key := shapeKey{
-			source:       stat.Source,
-			kind:         stat.Kind,
-			shape:        stat.Shape,
-			outcome:      stat.Outcome,
-			reasonFamily: stat.ReasonFamily,
-			reasonCode:   stat.ReasonCode,
+			source:        stat.Source,
+			kind:          stat.Kind,
+			shape:         stat.Shape,
+			pipelineShape: stat.PipelineShape,
+			outcome:       stat.Outcome,
+			reasonFamily:  stat.ReasonFamily,
+			reasonCode:    stat.ReasonCode,
 		}
 		counts[key] += stat.Count
 	}
 	out := make([]qRuntimeKernelLoweringShapeStat, 0, len(counts))
 	for key, count := range counts {
 		out = append(out, qRuntimeKernelLoweringShapeStat{
-			Source:       key.source,
-			Kind:         key.kind,
-			Shape:        key.shape,
-			Outcome:      key.outcome,
-			ReasonFamily: key.reasonFamily,
-			ReasonCode:   key.reasonCode,
-			Count:        count,
+			Source:        key.source,
+			Kind:          key.kind,
+			Shape:         key.shape,
+			PipelineShape: key.pipelineShape,
+			Outcome:       key.outcome,
+			ReasonFamily:  key.reasonFamily,
+			ReasonCode:    key.reasonCode,
+			Count:         count,
 		})
 	}
 	sort.Slice(out, func(i, j int) bool {
@@ -4655,6 +4683,9 @@ func qRuntimeKernelLoweringShapeStats(stats []QRuntimeKernelLoweringStat) []qRun
 		}
 		if a.Shape != b.Shape {
 			return a.Shape < b.Shape
+		}
+		if a.PipelineShape != b.PipelineShape {
+			return a.PipelineShape < b.PipelineShape
 		}
 		if a.Outcome != b.Outcome {
 			return a.Outcome < b.Outcome
@@ -4674,6 +4705,7 @@ func qRuntimeKernelLoweringShapeStatsTable(stats []qRuntimeKernelLoweringShapeSt
 		row.RawSetString("source", StringValue(stat.Source))
 		row.RawSetString("kind", StringValue(stat.Kind))
 		row.RawSetString("shape", StringValue(stat.Shape))
+		row.RawSetString("pipeline_shape", StringValue(stat.PipelineShape))
 		row.RawSetString("outcome", StringValue(stat.Outcome))
 		row.RawSetString("reason_family", StringValue(stat.ReasonFamily))
 		row.RawSetString("reason_code", StringValue(stat.ReasonCode))
@@ -4841,14 +4873,15 @@ func qRuntimeKernelLoweringReasonShapeStatsForShape(stats []QRuntimeKernelLoweri
 
 func qRuntimeKernelLoweringReasonShapeStatsForExplainFilter(stats []QRuntimeKernelLoweringStat, filter qRuntimeKernelExplainFilter) []qRuntimeKernelLoweringReasonShapeStat {
 	type reasonShapeKey struct {
-		source       string
-		kind         string
-		kernel       string
-		shape        string
-		route        string
-		outcome      string
-		reasonFamily string
-		reasonCode   string
+		source        string
+		kind          string
+		kernel        string
+		shape         string
+		pipelineShape string
+		route         string
+		outcome       string
+		reasonFamily  string
+		reasonCode    string
 	}
 	counts := make(map[reasonShapeKey]uint64, len(stats))
 	for _, stat := range stats {
@@ -4859,29 +4892,31 @@ func qRuntimeKernelLoweringReasonShapeStatsForExplainFilter(stats []QRuntimeKern
 			continue
 		}
 		key := reasonShapeKey{
-			source:       stat.Source,
-			kind:         stat.Kind,
-			kernel:       stat.Kernel,
-			shape:        stat.Shape,
-			route:        stat.Route,
-			outcome:      stat.Outcome,
-			reasonFamily: stat.ReasonFamily,
-			reasonCode:   stat.ReasonCode,
+			source:        stat.Source,
+			kind:          stat.Kind,
+			kernel:        stat.Kernel,
+			shape:         stat.Shape,
+			pipelineShape: stat.PipelineShape,
+			route:         stat.Route,
+			outcome:       stat.Outcome,
+			reasonFamily:  stat.ReasonFamily,
+			reasonCode:    stat.ReasonCode,
 		}
 		counts[key] += stat.Count
 	}
 	out := make([]qRuntimeKernelLoweringReasonShapeStat, 0, len(counts))
 	for key, count := range counts {
 		out = append(out, qRuntimeKernelLoweringReasonShapeStat{
-			Source:       key.source,
-			Kind:         key.kind,
-			Kernel:       key.kernel,
-			Shape:        key.shape,
-			Route:        key.route,
-			Outcome:      key.outcome,
-			ReasonFamily: key.reasonFamily,
-			ReasonCode:   key.reasonCode,
-			Count:        count,
+			Source:        key.source,
+			Kind:          key.kind,
+			Kernel:        key.kernel,
+			Shape:         key.shape,
+			PipelineShape: key.pipelineShape,
+			Route:         key.route,
+			Outcome:       key.outcome,
+			ReasonFamily:  key.reasonFamily,
+			ReasonCode:    key.reasonCode,
+			Count:         count,
 		})
 	}
 	sort.Slice(out, func(i, j int) bool {
@@ -4900,6 +4935,9 @@ func qRuntimeKernelLoweringReasonShapeStatsForExplainFilter(stats []QRuntimeKern
 		}
 		if a.Shape != b.Shape {
 			return a.Shape < b.Shape
+		}
+		if a.PipelineShape != b.PipelineShape {
+			return a.PipelineShape < b.PipelineShape
 		}
 		if a.Route != b.Route {
 			return a.Route < b.Route
@@ -4923,6 +4961,7 @@ func qRuntimeKernelLoweringReasonShapeStatsTable(stats []qRuntimeKernelLoweringR
 		row.RawSetString("kind", StringValue(stat.Kind))
 		row.RawSetString("kernel", StringValue(stat.Kernel))
 		row.RawSetString("shape", StringValue(stat.Shape))
+		row.RawSetString("pipeline_shape", StringValue(stat.PipelineShape))
 		row.RawSetString("route", StringValue(stat.Route))
 		row.RawSetString("outcome", StringValue(stat.Outcome))
 		row.RawSetString("reason_family", StringValue(stat.ReasonFamily))

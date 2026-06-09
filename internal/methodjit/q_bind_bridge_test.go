@@ -136,15 +136,16 @@ func TestQRuntimeKernelLoweringStatsProviderMapsMethodJITFallbacks(t *testing.T)
 			return qbind.QRuntimeKernelLoweringStat{}, false
 		}
 		return qbind.QRuntimeKernelLoweringStat{
-			Source:       stat.Source,
-			Kind:         stat.Kind,
-			Kernel:       stat.Kernel,
-			Shape:        stat.Shape,
-			Route:        stat.Route,
-			Outcome:      stat.Outcome,
-			ReasonFamily: stat.ReasonFamily,
-			ReasonCode:   stat.ReasonCode,
-			Count:        1,
+			Source:        stat.Source,
+			Kind:          stat.Kind,
+			Kernel:        stat.Kernel,
+			Shape:         stat.Shape,
+			PipelineShape: stat.PipelineShape,
+			Route:         stat.Route,
+			Outcome:       stat.Outcome,
+			ReasonFamily:  stat.ReasonFamily,
+			ReasonCode:    stat.ReasonCode,
+			Count:         1,
 		}, true
 	})
 	defer restore()
@@ -231,15 +232,16 @@ func TestQRuntimeKernelDescriptorCacheStatsProviderMapsMethodJITSchemaStats(t *t
 		return report.QKernelDescriptorCacheStats
 	}, func(stat QKernelDescriptorCacheStat) qbind.QRuntimeKernelDescriptorCacheStat {
 		return qbind.QRuntimeKernelDescriptorCacheStat{
-			Source:     stat.Source,
-			Kernel:     stat.Kernel,
-			Shape:      stat.Shape,
-			Route:      stat.Route,
-			SchemaHash: stat.SchemaHash,
-			Entries:    stat.Entries,
-			Hits:       stat.Hits,
-			Misses:     stat.Misses,
-			Evictions:  stat.Evictions,
+			Source:        stat.Source,
+			Kernel:        stat.Kernel,
+			Shape:         stat.Shape,
+			PipelineShape: stat.PipelineShape,
+			Route:         stat.Route,
+			SchemaHash:    stat.SchemaHash,
+			Entries:       stat.Entries,
+			Hits:          stat.Hits,
+			Misses:        stat.Misses,
+			Evictions:     stat.Evictions,
 		}
 	})
 	defer restore()
@@ -257,6 +259,66 @@ func TestQRuntimeKernelDescriptorCacheStatsProviderMapsMethodJITSchemaStats(t *t
 	})
 	qBindAssertIntField(t, stat, "entries", 1)
 	qBindAssertIntField(t, stat, "misses", 1)
+}
+
+func TestQSQLKernelPipelineShapeHandoffFeedsMethodJITDescriptorStats(t *testing.T) {
+	ref := QSQLKernelPipelineRef{
+		Shape:         "where=1|select=2|by=0|order=1|limit=bounded",
+		PipelineShape: "scan=frame|where=compare_mask:column_literal|filter=index|project=typed_binary:1|order=post_project:1|limit=bounded",
+		SchemaHash:    "qsql-schema-a",
+	}
+	descriptor := QSQLKernelRuntimeDescriptor(ref)
+	if descriptor.Source != QSQLKernelRuntimeSource || descriptor.Kernel != QSQLKernelName || descriptor.PipelineShape != ref.PipelineShape {
+		t.Fatalf("QSQLKernelRuntimeDescriptor = %+v, want qSQL runtime descriptor with pipeline shape", descriptor)
+	}
+	cf := &CompiledFunction{}
+	cf.RecordQSQLKernelDescriptorCacheLookup(ref)
+	cf.RecordQSQLKernelDescriptorCacheLookup(ref)
+	stats := cf.QKernelDescriptorCacheStats()
+	if len(stats) != 1 {
+		t.Fatalf("QKernelDescriptorCacheStats = %+v, want one qSQL pipeline row", stats)
+	}
+	stat := stats[0]
+	if stat.Source != QSQLKernelRuntimeSource || stat.Kernel != QSQLKernelName ||
+		stat.Shape != ref.Shape || stat.PipelineShape != ref.PipelineShape ||
+		stat.Route != QSQLKernelRuntimeRoute || stat.SchemaHash != ref.SchemaHash ||
+		stat.Entries != 1 || stat.Hits != 1 || stat.Misses != 1 {
+		t.Fatalf("qSQL descriptor cache stat = %+v, want stable shape/pipeline/schema hit-miss row", stat)
+	}
+
+	restore := qbind.SetMappedQRuntimeKernelDescriptorCacheStatsProvider(func() []QKernelDescriptorCacheStat {
+		return stats
+	}, func(stat QKernelDescriptorCacheStat) qbind.QRuntimeKernelDescriptorCacheStat {
+		return qbind.QRuntimeKernelDescriptorCacheStat{
+			Source:        stat.Source,
+			Kernel:        stat.Kernel,
+			Shape:         stat.Shape,
+			PipelineShape: stat.PipelineShape,
+			Route:         stat.Route,
+			SchemaHash:    stat.SchemaHash,
+			Entries:       stat.Entries,
+			Hits:          stat.Hits,
+			Misses:        stat.Misses,
+			Evictions:     stat.Evictions,
+		}
+	})
+	defer restore()
+
+	row := qBindCacheStatsRow(t, qBindCacheStats(t), "q_runtime_kernel_descriptor_cache")
+	qBindAssertIntField(t, row, "entries", 1)
+	qBindAssertIntField(t, row, "hits", 1)
+	qBindAssertIntField(t, row, "misses", 1)
+	nested := qBindNestedRowByFields(t, row, "stats", map[string]string{
+		"source":         QSQLKernelRuntimeSource,
+		"kernel":         QSQLKernelName,
+		"shape":          ref.Shape,
+		"pipeline_shape": ref.PipelineShape,
+		"route":          QSQLKernelRuntimeRoute,
+		"schema_hash":    ref.SchemaHash,
+	})
+	qBindAssertIntField(t, nested, "entries", 1)
+	qBindAssertIntField(t, nested, "hits", 1)
+	qBindAssertIntField(t, nested, "misses", 1)
 }
 
 func qMethodJITBridgeFrame(t *testing.T) *runtime.Table {

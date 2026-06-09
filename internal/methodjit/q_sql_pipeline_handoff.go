@@ -1,0 +1,125 @@
+//go:build darwin && arm64
+
+package methodjit
+
+const (
+	QSQLKernelRuntimeSource  = "methodjit_qsql_kernel_runtime"
+	QSQLKernelLoweringSource = "methodjit_qsql_kernel_lowering"
+	QSQLKernelName           = "QSQLQueryKernel"
+	QSQLKernelRuntimeRoute   = "typed_runtime_qsql_kernel"
+	QSQLKernelLoweringRoute  = "lowering"
+)
+
+// QSQLKernelPipelineRef is MethodJIT's stable metadata-only handoff for qSQL
+// column pipelines. The q frontend/data layer owns parsing and
+// QueryKernelPlanPipelineShape; MethodJIT only keeps enough schema-stable
+// identity to diagnose, cache, and later lower the shape to typed runtime code.
+type QSQLKernelPipelineRef struct {
+	Kernel        string
+	Shape         string
+	PipelineShape string
+	Route         string
+	SchemaHash    string
+}
+
+func (ref QSQLKernelPipelineRef) normalized(source string) QSQLKernelPipelineRef {
+	if source == "" {
+		source = QSQLKernelRuntimeSource
+	}
+	if ref.Kernel == "" {
+		ref.Kernel = QSQLKernelName
+	}
+	if ref.Shape == "" {
+		ref.Shape = "unknown"
+	}
+	if ref.PipelineShape == "" {
+		ref.PipelineShape = "unknown"
+	}
+	if ref.Route == "" {
+		ref.Route = QSQLKernelRuntimeRoute
+	}
+	if ref.SchemaHash == "" {
+		ref.SchemaHash = "unknown"
+	}
+	return ref
+}
+
+// QSQLKernelRuntimeDescriptor returns a normalized descriptor row for a qSQL
+// pipeline that is ready to be called through a typed runtime/JIT backend.
+func QSQLKernelRuntimeDescriptor(ref QSQLKernelPipelineRef) QKernelDescriptor {
+	ref = ref.normalized(QSQLKernelRuntimeSource)
+	return QKernelDescriptor{
+		Source:        QSQLKernelRuntimeSource,
+		Kind:          "runtime_kernel",
+		Kernel:        ref.Kernel,
+		Shape:         ref.Shape,
+		PipelineShape: ref.PipelineShape,
+		Route:         ref.Route,
+		Outcome:       "supported",
+	}
+}
+
+// QSQLKernelLoweringDescriptor returns a normalized lowering decision row. Use
+// reason fields for unsupported qSQL shapes so cache_stats can quantify and
+// retire fallback families over time.
+func QSQLKernelLoweringDescriptor(ref QSQLKernelPipelineRef, outcome, reasonFamily, reasonCode string) QKernelDescriptor {
+	ref = ref.normalized(QSQLKernelLoweringSource)
+	if ref.Route == QSQLKernelRuntimeRoute {
+		ref.Route = QSQLKernelLoweringRoute
+	}
+	if outcome == "" {
+		outcome = "fallback"
+	}
+	if reasonFamily == "" {
+		reasonFamily = "lowering"
+	}
+	return QKernelDescriptor{
+		Source:        QSQLKernelLoweringSource,
+		Kind:          "fallback",
+		Kernel:        ref.Kernel,
+		Shape:         ref.Shape,
+		PipelineShape: ref.PipelineShape,
+		Route:         ref.Route,
+		Outcome:       outcome,
+		ReasonFamily:  reasonFamily,
+		ReasonCode:    reasonCode,
+	}
+}
+
+// QSQLKernelDescriptorCacheStat packages schema-stable qSQL kernel cache
+// counters with both semantic shape and column-pipeline shape. It mirrors the
+// runtime descriptor cache stat row without requiring bind to import MethodJIT.
+func QSQLKernelDescriptorCacheStat(ref QSQLKernelPipelineRef, entries, hits, misses, evictions uint64) QKernelDescriptorCacheStat {
+	ref = ref.normalized(QSQLKernelRuntimeSource)
+	return QKernelDescriptorCacheStat{
+		Source:        QSQLKernelRuntimeSource,
+		Kernel:        ref.Kernel,
+		Shape:         ref.Shape,
+		PipelineShape: ref.PipelineShape,
+		Route:         ref.Route,
+		SchemaHash:    ref.SchemaHash,
+		Entries:       entries,
+		Hits:          hits,
+		Misses:        misses,
+		Evictions:     evictions,
+	}
+}
+
+// RecordQSQLKernelDescriptorCacheLookup records a qSQL typed-runtime handoff
+// lookup on a compiled function. This is intentionally metadata-only: it does
+// not execute qSQL, but it gives the future qSQL JIT backend the same
+// observable descriptor-cache channel as existing q runtime kernels.
+func (cf *CompiledFunction) RecordQSQLKernelDescriptorCacheLookup(ref QSQLKernelPipelineRef) {
+	if cf == nil {
+		return
+	}
+	ref = ref.normalized(QSQLKernelRuntimeSource)
+	cf.recordQKernelDescriptorCacheLookup(qKernelDescriptorCacheKey{
+		source:        QSQLKernelRuntimeSource,
+		kernel:        ref.Kernel,
+		shape:         ref.Shape,
+		pipelineShape: ref.PipelineShape,
+		route:         ref.Route,
+		schemaHash:    ref.SchemaHash,
+	})
+}
