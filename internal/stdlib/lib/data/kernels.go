@@ -13160,29 +13160,35 @@ func i64ScalarDyadicWholeRangeSum(array i64ScalarDyadicArray) (int64, bool) {
 	if array.op != OpMod || array.scalarLeft || array.scalar <= 0 {
 		return 0, false
 	}
-	rangeSource, ok := array.source.(i64RangeArray)
-	if !ok {
+	switch source := array.source.(type) {
+	case i64RangeArray:
+		if source.step == 1 {
+			return i64RangePositiveModSum(source.start, array.len, array.scalar), true
+		}
+		return i64RangePositiveModStepSum(source.start, source.step, array.len, array.scalar)
+	case i64ScalarDyadicArray:
+		return i64NestedPositiveModSum(source, 0, array.len, array.scalar)
+	default:
 		return 0, false
 	}
-	if rangeSource.step == 1 {
-		return i64RangePositiveModSum(rangeSource.start, array.len, array.scalar), true
-	}
-	return i64RangePositiveModStepSum(rangeSource.start, rangeSource.step, array.len, array.scalar)
 }
 
 func i64ScalarDyadicModuloRangeSum(array i64ScalarDyadicArray, start, length int) (int64, bool) {
 	if array.op != OpMod || array.scalarLeft || array.scalar <= 0 || length < 0 {
 		return 0, false
 	}
-	rangeSource, ok := array.source.(i64RangeArray)
-	if !ok {
+	switch source := array.source.(type) {
+	case i64RangeArray:
+		startValue := source.start + int64(start)*source.step
+		if source.step == 1 {
+			return i64RangePositiveModSum(startValue, length, array.scalar), true
+		}
+		return i64RangePositiveModStepSum(startValue, source.step, length, array.scalar)
+	case i64ScalarDyadicArray:
+		return i64NestedPositiveModSum(source, start, length, array.scalar)
+	default:
 		return 0, false
 	}
-	startValue := rangeSource.start + int64(start)*rangeSource.step
-	if rangeSource.step == 1 {
-		return i64RangePositiveModSum(startValue, length, array.scalar), true
-	}
-	return i64RangePositiveModStepSum(startValue, rangeSource.step, length, array.scalar)
 }
 
 func i64RangePositiveModSum(start int64, length int, modulus int64) int64 {
@@ -13238,6 +13244,48 @@ func i64RangePositiveModStepSum(start, step int64, length int, modulus int64) (i
 	for i := int64(0); i < rem; i++ {
 		sum += value
 		value = (value + step) % modulus
+	}
+	return sum, true
+}
+
+func i64NestedPositiveModSum(source i64ScalarDyadicArray, start, length int, outerModulus int64) (int64, bool) {
+	if source.op != OpMod || source.scalarLeft || source.scalar <= 0 || outerModulus <= 0 || length < 0 {
+		return 0, false
+	}
+	rangeSource, ok := source.source.(i64RangeArray)
+	if !ok {
+		return 0, false
+	}
+	startValue := rangeSource.start + int64(start)*rangeSource.step
+	return i64NestedPositiveModStepSum(startValue, rangeSource.step, length, source.scalar, outerModulus)
+}
+
+func i64NestedPositiveModStepSum(start, step int64, length int, innerModulus, outerModulus int64) (int64, bool) {
+	if length <= 0 {
+		return 0, true
+	}
+	if innerModulus <= 0 || outerModulus <= 0 {
+		return 0, false
+	}
+	period := innerModulus / gcdInt64(step, innerModulus)
+	if period <= 0 || period > 1<<20 {
+		return 0, false
+	}
+	var periodSum int64
+	value := qPositiveMod(start, innerModulus)
+	step = qPositiveMod(step, innerModulus)
+	for i := int64(0); i < period; i++ {
+		periodSum += qPositiveMod(value, outerModulus)
+		value = (value + step) % innerModulus
+	}
+	n := int64(length)
+	full := n / period
+	rem := n % period
+	sum := full * periodSum
+	value = qPositiveMod(start, innerModulus)
+	for i := int64(0); i < rem; i++ {
+		sum += qPositiveMod(value, outerModulus)
+		value = (value + step) % innerModulus
 	}
 	return sum, true
 }

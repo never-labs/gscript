@@ -2953,6 +2953,18 @@ func TestTypedNumericUnaryBinaryAndAggregates(t *testing.T) {
 			t.Fatalf("%s sum = %v,%v; want %d,true", tt.name, sum, ok, tt.want)
 		}
 	}
+	innerMod, ok, err := TryTypedIntegerDyadic(OpMod, NewI64Range(0, 1, 12), int64(5))
+	if err != nil || !ok {
+		t.Fatalf("nested inner mod handled=%v err=%v; want true,nil", ok, err)
+	}
+	outerMod, ok, err := TryTypedIntegerDyadic(OpMod, innerMod, int64(2))
+	if err != nil || !ok {
+		t.Fatalf("nested outer mod handled=%v err=%v; want true,nil", ok, err)
+	}
+	nestedSum, ok, err := TryTypedNumericSum(outerMod.(Array))
+	if err != nil || !ok || nestedSum != int64(5) {
+		t.Fatalf("nested mod sum = %v,%v,%v; want 5,true,nil", nestedSum, ok, err)
+	}
 	xrank, ok, err := TryTypedXrank(4, NewI64Range(0, 1, 9))
 	if err != nil {
 		t.Fatalf("TryTypedXrank til returned error: %v", err)
