@@ -3471,7 +3471,6 @@ func TestEvalDeltasRecordsTypedRuntimeKernel(t *testing.T) {
 	assertEvalValue(t, "sum deltas 1 0N 3", int64(1))
 	seenDeltas := false
 	seenDeltasSum := false
-	seenDeltasSumFallback := false
 	for _, stat := range RuntimeKernelExecutionStats() {
 		if stat.Kernel == "ArrayDeltas" && stat.Outcome == "hit" && stat.Count > 0 {
 			seenDeltas = true
@@ -3479,12 +3478,9 @@ func TestEvalDeltasRecordsTypedRuntimeKernel(t *testing.T) {
 		if stat.Kernel == "ArrayDeltasSum" && stat.Shape == "vector-reduce/sum-deltas/i64" && stat.Outcome == "hit" && stat.Count > 0 {
 			seenDeltasSum = true
 		}
-		if stat.Kernel == "ArrayDeltasSum" && stat.Outcome == "fallback" && stat.Count > 0 {
-			seenDeltasSumFallback = true
-		}
 	}
-	if !seenDeltas || !seenDeltasSum || !seenDeltasSumFallback {
-		t.Fatalf("missing deltas runtime stats: deltas=%v deltasSum=%v fallback=%v stats=%#v", seenDeltas, seenDeltasSum, seenDeltasSumFallback, RuntimeKernelExecutionStats())
+	if !seenDeltas || !seenDeltasSum {
+		t.Fatalf("missing deltas runtime stats: deltas=%v deltasSum=%v stats=%#v", seenDeltas, seenDeltasSum, RuntimeKernelExecutionStats())
 	}
 }
 
@@ -4121,9 +4117,21 @@ func assertEvalArray(t *testing.T, src string, kind data.Kind, want []any) {
 	if array.Kind() != kind {
 		t.Fatalf("Eval(%q) kind = %s, want %s", src, array.Kind(), kind)
 	}
-	if values := array.Values(); !reflect.DeepEqual(values, want) {
+	if values := normalizeNestedArrayValues(array.Values()); !reflect.DeepEqual(values, normalizeNestedArrayValues(want)) {
 		t.Fatalf("Eval(%q) values = %#v, want %#v", src, values, want)
 	}
+}
+
+func normalizeNestedArrayValues(values []any) []any {
+	out := make([]any, len(values))
+	for i, value := range values {
+		if array, ok := value.(data.Array); ok {
+			out[i] = normalizeNestedArrayValues(array.Values())
+			continue
+		}
+		out[i] = value
+	}
+	return out
 }
 
 func assertEvalErrorContains(t *testing.T, src string, want string) {

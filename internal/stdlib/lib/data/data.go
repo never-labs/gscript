@@ -517,6 +517,15 @@ type i64SparseAmendArray struct {
 	values  []int64
 }
 
+type shiftedArray struct {
+	source Array
+	offset int
+}
+
+type filledArray struct {
+	source Array
+}
+
 type encodedArray struct {
 	kind   Kind
 	domain []any
@@ -1215,6 +1224,105 @@ func (a tiledArray) Gather(indexes []int) Array {
 		out[i] = value
 	}
 	return nullableArray{kind: a.Kind(), data: out}
+}
+
+func (a shiftedArray) Kind() Kind { return a.source.Kind() }
+
+func (a shiftedArray) Len() int { return a.source.Len() }
+
+func (a shiftedArray) At(row int) (any, bool) {
+	if row < 0 || row >= a.Len() {
+		return nil, false
+	}
+	sourceRow := row + a.offset
+	if sourceRow < 0 || sourceRow >= a.source.Len() {
+		return NullValue, true
+	}
+	value, ok := a.source.At(sourceRow)
+	if !ok {
+		return nil, false
+	}
+	if IsNull(value) {
+		return NullValue, true
+	}
+	return value, true
+}
+
+func (a shiftedArray) Values() []any {
+	out := make([]any, a.Len())
+	for row := range out {
+		value, ok := a.At(row)
+		if !ok {
+			panic(fmt.Sprintf("data shifted row %d out of range", row))
+		}
+		out[row] = value
+	}
+	return out
+}
+
+func (a shiftedArray) Gather(indexes []int) Array {
+	out := make([]any, len(indexes))
+	for i, row := range indexes {
+		value, ok := a.At(row)
+		if !ok {
+			panic(fmt.Sprintf("data shifted gather index %d out of range", row))
+		}
+		out[i] = value
+	}
+	return nullableArray{kind: a.Kind(), data: out}
+}
+
+func (a filledArray) Kind() Kind { return a.source.Kind() }
+
+func (a filledArray) Len() int { return a.source.Len() }
+
+func (a filledArray) At(row int) (any, bool) {
+	if row < 0 || row >= a.Len() {
+		return nil, false
+	}
+	var last any
+	hasLast := false
+	for i := 0; i <= row; i++ {
+		value, ok := a.source.At(i)
+		if !ok {
+			return nil, false
+		}
+		if IsNull(value) {
+			continue
+		}
+		last = value
+		hasLast = true
+	}
+	if !hasLast {
+		return NullValue, true
+	}
+	return last, true
+}
+
+func (a filledArray) Values() []any {
+	out := make([]any, a.Len())
+	var last any
+	hasLast := false
+	for row := range out {
+		value, ok := a.source.At(row)
+		if !ok {
+			panic(fmt.Sprintf("data filled row %d out of range", row))
+		}
+		if !IsNull(value) {
+			last = value
+			hasLast = true
+		}
+		if hasLast {
+			out[row] = last
+		} else {
+			out[row] = NullValue
+		}
+	}
+	return out
+}
+
+func (a filledArray) Gather(indexes []int) Array {
+	return nullableArray{kind: a.Kind(), data: a.Values()}.Gather(indexes)
 }
 
 func (a encodedArray) Kind() Kind { return a.kind }
@@ -5965,16 +6073,14 @@ func (e VectorTransformExpr) intArg(frame Frame) (int, error) {
 }
 
 func vectorPrev(values Array) Array {
-	out := make([]any, values.Len())
-	for i := 0; i < values.Len(); i++ {
-		if i == 0 {
-			out[i] = NullForKind(values.Kind())
-			continue
-		}
-		v, _ := values.At(i - 1)
-		out[i] = v
+	return shiftedArray{source: values, offset: -1}
+}
+
+func TryTypedPrev(values Array) (Array, bool, error) {
+	if values == nil {
+		return nil, true, fmt.Errorf("prev values must be non-nil")
 	}
-	return InferArray(out)
+	return vectorPrev(values), true, nil
 }
 
 func (a i64SparseAmendArray) Kind() Kind { return KindI64 }
@@ -6025,30 +6131,25 @@ func (a i64SparseAmendArray) i64At(row int) (int64, bool, error) {
 }
 
 func vectorNext(values Array) Array {
-	out := make([]any, values.Len())
-	for i := 0; i < values.Len(); i++ {
-		if i == values.Len()-1 {
-			out[i] = NullForKind(values.Kind())
-			continue
-		}
-		v, _ := values.At(i + 1)
-		out[i] = v
+	return shiftedArray{source: values, offset: 1}
+}
+
+func TryTypedNext(values Array) (Array, bool, error) {
+	if values == nil {
+		return nil, true, fmt.Errorf("next values must be non-nil")
 	}
-	return InferArray(out)
+	return vectorNext(values), true, nil
 }
 
 func vectorXPrev(values Array, offset int) Array {
-	out := make([]any, values.Len())
-	for i := 0; i < values.Len(); i++ {
-		source := i - offset
-		if source < 0 || source >= values.Len() {
-			out[i] = NullForKind(values.Kind())
-			continue
-		}
-		v, _ := values.At(source)
-		out[i] = v
+	return shiftedArray{source: values, offset: -offset}
+}
+
+func TryTypedXPrev(values Array, offset int) (Array, bool, error) {
+	if values == nil {
+		return nil, true, fmt.Errorf("xprev values must be non-nil")
 	}
-	return InferArray(out)
+	return vectorXPrev(values, offset), true, nil
 }
 
 func vectorDeltas(values Array) (Array, error) {
@@ -6096,24 +6197,14 @@ func vectorRatios(values Array) (Array, error) {
 }
 
 func vectorFills(values Array) Array {
-	out := make([]any, values.Len())
-	var last any
-	hasLast := false
-	for i := 0; i < values.Len(); i++ {
-		v, _ := values.At(i)
-		if IsNull(v) {
-			if hasLast {
-				out[i] = last
-			} else {
-				out[i] = NullForKind(values.Kind())
-			}
-			continue
-		}
-		out[i] = v
-		last = v
-		hasLast = true
+	return filledArray{source: values}
+}
+
+func TryTypedFills(values Array) (Array, bool, error) {
+	if values == nil {
+		return nil, true, fmt.Errorf("fills values must be non-nil")
 	}
-	return InferArray(out)
+	return vectorFills(values), true, nil
 }
 
 func vectorRunningNumeric(values Array, fn string) (Array, error) {

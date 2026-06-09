@@ -2027,6 +2027,9 @@ func (s *EvalState) eval(src string) (any, error) {
 		if out, handled, err := s.tryEvalCountReverse(strings.TrimSpace(src[len("count "):])); err != nil || handled {
 			return out, err
 		}
+		if out, handled, err := s.tryEvalCountLengthPreservingTransform(strings.TrimSpace(src[len("count "):])); err != nil || handled {
+			return out, err
+		}
 		if out, handled, err := s.tryEvalCountRunningScan(strings.TrimSpace(src[len("count "):])); err != nil || handled {
 			return out, err
 		}
@@ -4889,6 +4892,43 @@ func (s *EvalState) tryEvalCountReverse(src string) (any, bool, error) {
 	}
 	recordRuntimeKernelProbe("ArrayCountReverse", "count-reverse/"+string(qRuntimeKernelOperandKind(value, nil)), true, nil)
 	return out, true, nil
+}
+
+func (s *EvalState) tryEvalCountLengthPreservingTransform(src string) (any, bool, error) {
+	src = stripEnclosingParens(strings.TrimSpace(src))
+	for _, transform := range []struct {
+		word    string
+		kernel  string
+		kindOK  func(data.Kind) bool
+		verbErr string
+	}{
+		{"prior ", "ArrayCountPrev", nil, ""},
+		{"prev ", "ArrayCountPrev", nil, ""},
+		{"next ", "ArrayCountNext", nil, ""},
+		{"fills ", "ArrayCountFills", nil, ""},
+		{"deltas ", "ArrayCountDeltas", qKindIsNumeric, "deltas expects a numeric vector"},
+	} {
+		if !strings.HasPrefix(src, transform.word) || !wordBoundary(src, 0, len(strings.TrimSpace(transform.word))) {
+			continue
+		}
+		value, err := s.eval(strings.TrimSpace(src[len(transform.word):]))
+		if err != nil {
+			return nil, true, err
+		}
+		array, ok := value.(data.Array)
+		if !ok {
+			return nil, false, nil
+		}
+		shape := "vector-count/" + strings.TrimSpace(transform.word) + "/" + string(array.Kind())
+		if transform.kindOK != nil && !transform.kindOK(array.Kind()) {
+			err := fmt.Errorf("%s", transform.verbErr)
+			recordRuntimeKernelProbe(transform.kernel, shape, false, err)
+			return nil, true, err
+		}
+		recordRuntimeKernelProbe(transform.kernel, shape, true, nil)
+		return int64(array.Len()), true, nil
+	}
+	return nil, false, nil
 }
 
 func (s *EvalState) tryEvalSumWhereCompare(src string) (any, bool, error) {
@@ -11789,6 +11829,10 @@ func prev(v any) (any, error) {
 	if !ok {
 		return data.NullValue, nil
 	}
+	if out, handled, err := data.TryTypedPrev(array); err != nil || handled {
+		recordRuntimeKernelProbe("ArrayPrev", "vector-shift/prev/"+string(array.Kind()), handled, err)
+		return out, err
+	}
 	values := array.Values()
 	out := make([]any, len(values))
 	if len(out) == 0 {
@@ -11803,6 +11847,10 @@ func nextValue(v any) (any, error) {
 	array, ok := v.(data.Array)
 	if !ok {
 		return data.NullValue, nil
+	}
+	if out, handled, err := data.TryTypedNext(array); err != nil || handled {
+		recordRuntimeKernelProbe("ArrayNext", "vector-shift/next/"+string(array.Kind()), handled, err)
+		return out, err
 	}
 	values := array.Values()
 	out := make([]any, len(values))
@@ -11827,6 +11875,10 @@ func xprev(width any, v any) (any, error) {
 		return data.NullValue, nil
 	}
 	n := int(n64)
+	if out, handled, err := data.TryTypedXPrev(array, n); err != nil || handled {
+		recordRuntimeKernelProbe("ArrayXPrev", "vector-shift/xprev/"+string(array.Kind()), handled, err)
+		return out, err
+	}
 	values := array.Values()
 	out := make([]any, len(values))
 	for i := range out {
@@ -11913,6 +11965,10 @@ func fills(v any) (any, error) {
 	array, ok := v.(data.Array)
 	if !ok {
 		return v, nil
+	}
+	if out, handled, err := data.TryTypedFills(array); err != nil || handled {
+		recordRuntimeKernelProbe("ArrayFills", "vector-scan/fills/"+string(array.Kind()), handled, err)
+		return out, err
 	}
 	values := array.Values()
 	out := make([]any, len(values))

@@ -3017,6 +3017,8 @@ func (k typedKernelRegistry) NumericSumValue(array Array) (any, bool, error) {
 		return i64ScalarDyadicRunningSumSum(a)
 	case i64SparseAmendArray:
 		return i64SparseAmendSum(a)
+	case filledArray:
+		return filledNumericSumValue(a)
 	case i64FillArray:
 		return a.sum(), true, nil
 	case fbyI64BroadcastArray:
@@ -3441,10 +3443,30 @@ func TryTypedDeltas(array Array) (Array, bool, error) {
 	switch a := array.(type) {
 	case attributedArray:
 		return TryTypedDeltas(a.array)
+	case columnArray[int8]:
+		return deltasSignedTypedSlice(a.kind, a.data), true, nil
+	case columnArray[int16]:
+		return deltasSignedTypedSlice(a.kind, a.data), true, nil
+	case columnArray[int32]:
+		return deltasSignedTypedSlice(a.kind, a.data), true, nil
 	case columnArray[int64]:
 		return deltasI64Slice(a.data), true, nil
 	case i64RangeArray:
 		return deltasI64Range(a), true, nil
+	case columnArray[uint8]:
+		return deltasUnsignedSlice(a.data), true, nil
+	case columnArray[uint16]:
+		return deltasUnsignedSlice(a.data), true, nil
+	case columnArray[uint32]:
+		return deltasUnsignedSlice(a.data), true, nil
+	case columnArray[uint64]:
+		return deltasUnsignedSlice(a.data), true, nil
+	case columnArray[float32]:
+		return deltasFloatSlice(a.data), true, nil
+	case columnArray[float64]:
+		return deltasFloatSlice(a.data), true, nil
+	case nullableArray:
+		return deltasNullableArray(a)
 	default:
 		return nil, false, nil
 	}
@@ -3487,6 +3509,8 @@ func TryTypedDeltasSum(array Array) (any, bool, error) {
 			return NullValue, true, nil
 		}
 		return a.start + float64(a.len-1)*a.step, true, nil
+	case nullableArray:
+		return deltasNullableSum(a)
 	default:
 		return nil, false, nil
 	}
@@ -8187,6 +8211,42 @@ func deltasI64Slice(values []int64) Array {
 	return columnArray[int64]{kind: KindI64, data: out}
 }
 
+func deltasSignedTypedSlice[T signedScalar](kind Kind, values []T) Array {
+	out := make([]T, len(values))
+	for i, value := range values {
+		if i == 0 {
+			out[i] = value
+			continue
+		}
+		out[i] = T(int64(value) - int64(values[i-1]))
+	}
+	return columnArray[T]{kind: kind, data: out}
+}
+
+func deltasUnsignedSlice[T unsignedScalar](values []T) Array {
+	out := make([]int64, len(values))
+	for i, value := range values {
+		if i == 0 {
+			out[i] = int64(value)
+			continue
+		}
+		out[i] = int64(value) - int64(values[i-1])
+	}
+	return newI64Trusted(out)
+}
+
+func deltasFloatSlice[T floatScalar](values []T) Array {
+	out := make([]float64, len(values))
+	for i, value := range values {
+		if i == 0 {
+			out[i] = float64(value)
+			continue
+		}
+		out[i] = float64(value) - float64(values[i-1])
+	}
+	return newF64Trusted(out)
+}
+
 func deltasI64Range(values i64RangeArray) Array {
 	out := make([]int64, values.len)
 	if values.len == 0 {
@@ -8197,6 +8257,232 @@ func deltasI64Range(values i64RangeArray) Array {
 		out[i] = values.step
 	}
 	return columnArray[int64]{kind: KindI64, data: out}
+}
+
+func deltasNullableArray(values nullableArray) (Array, bool, error) {
+	out := make([]any, len(values.data))
+	hasFloat := false
+	for row, current := range values.data {
+		if row == 0 {
+			if IsNull(current) {
+				out[row] = NullValue
+				continue
+			}
+			value := current
+			if values.kind != "" && values.kind != KindAny && values.kind != KindNull {
+				normalized, err := normalizeScalarForKind(values.kind, current, row)
+				if err != nil {
+					return nil, false, nil
+				}
+				value = normalized
+			}
+			hasFloat = !integerLikeKind(values.kind)
+			out[row] = value
+			continue
+		}
+		previous := values.data[row-1]
+		if IsNull(current) || IsNull(previous) {
+			out[row] = NullValue
+			continue
+		}
+		value, ok := normalizeNullableDeltaValue(values.kind, current, previous)
+		if !ok {
+			return nil, false, nil
+		}
+		if _, ok := numeric(value); ok && !integerLikeKind(values.kind) {
+			hasFloat = true
+		}
+		out[row] = value
+	}
+	if hasFloat {
+		return nullableArray{kind: KindF64, data: out}, true, nil
+	}
+	if values.kind != "" && values.kind != KindAny && values.kind != KindNull {
+		return nullableArray{kind: values.kind, data: out}, true, nil
+	}
+	return nullableArray{kind: KindI64, data: out}, true, nil
+}
+
+func normalizeNullableDeltaValue(kind Kind, current, previous any) (any, bool) {
+	switch kind {
+	case KindI8:
+		currentI, ok := coerceInt64Exact(current)
+		if !ok {
+			return nil, false
+		}
+		previousI, ok := coerceInt64Exact(previous)
+		if !ok {
+			return nil, false
+		}
+		return int8(currentI - previousI), true
+	case KindI16:
+		currentI, ok := coerceInt64Exact(current)
+		if !ok {
+			return nil, false
+		}
+		previousI, ok := coerceInt64Exact(previous)
+		if !ok {
+			return nil, false
+		}
+		return int16(currentI - previousI), true
+	case KindI32:
+		currentI, ok := coerceInt64Exact(current)
+		if !ok {
+			return nil, false
+		}
+		previousI, ok := coerceInt64Exact(previous)
+		if !ok {
+			return nil, false
+		}
+		return int32(currentI - previousI), true
+	case KindI64:
+		currentI, ok := coerceInt64Exact(current)
+		if !ok {
+			return nil, false
+		}
+		previousI, ok := coerceInt64Exact(previous)
+		if !ok {
+			return nil, false
+		}
+		return currentI - previousI, true
+	case KindF32:
+		currentF, ok := numeric(current)
+		if !ok {
+			return nil, false
+		}
+		previousF, ok := numeric(previous)
+		if !ok {
+			return nil, false
+		}
+		return float32(currentF - previousF), true
+	case KindF64:
+		currentF, ok := numeric(current)
+		if !ok {
+			return nil, false
+		}
+		previousF, ok := numeric(previous)
+		if !ok {
+			return nil, false
+		}
+		return currentF - previousF, true
+	default:
+		currentI, currentIOK := coerceInt64Exact(current)
+		previousI, previousIOK := coerceInt64Exact(previous)
+		if currentIOK && previousIOK {
+			return currentI - previousI, true
+		}
+		currentF, currentFOK := numeric(current)
+		previousF, previousFOK := numeric(previous)
+		if currentFOK && previousFOK {
+			return currentF - previousF, true
+		}
+		return nil, false
+	}
+}
+
+func integerLikeKind(kind Kind) bool {
+	switch kind {
+	case KindI8, KindI16, KindI32, KindI64, KindU8, KindU16, KindU32, KindU64:
+		return true
+	default:
+		return false
+	}
+}
+
+func deltasNullableSum(values nullableArray) (any, bool, error) {
+	var totalI int64
+	var totalF float64
+	hasFloat := false
+	for row, current := range values.data {
+		if IsNull(current) {
+			continue
+		}
+		if row == 0 {
+			if n, ok := coerceInt64Exact(current); ok && !hasFloat {
+				totalI += n
+				totalF += float64(n)
+				continue
+			}
+			n, ok := numeric(current)
+			if !ok {
+				return nil, false, nil
+			}
+			hasFloat = true
+			totalF += n
+			continue
+		}
+		previous := values.data[row-1]
+		if IsNull(previous) {
+			continue
+		}
+		if !hasFloat {
+			currentI, currentOK := coerceInt64Exact(current)
+			previousI, previousOK := coerceInt64Exact(previous)
+			if currentOK && previousOK {
+				delta := currentI - previousI
+				totalI += delta
+				totalF += float64(delta)
+				continue
+			}
+		}
+		currentF, currentOK := numeric(current)
+		previousF, previousOK := numeric(previous)
+		if !currentOK || !previousOK {
+			return nil, false, nil
+		}
+		hasFloat = true
+		totalF += currentF - previousF
+	}
+	if hasFloat {
+		return totalF, true, nil
+	}
+	return totalI, true, nil
+}
+
+func filledNumericSumValue(values filledArray) (any, bool, error) {
+	var totalI int64
+	var totalF float64
+	var lastI int64
+	var lastF float64
+	hasLast := false
+	hasFloat := false
+	for row := 0; row < values.source.Len(); row++ {
+		value, ok := values.source.At(row)
+		if !ok {
+			return nil, true, fmt.Errorf("filled row %d out of range", row)
+		}
+		if !IsNull(value) {
+			if n, ok := coerceInt64Exact(value); ok && !hasFloat {
+				lastI = n
+				lastF = float64(n)
+				hasLast = true
+			} else {
+				n, ok := numeric(value)
+				if !ok {
+					return nil, false, nil
+				}
+				if !hasFloat {
+					totalF = float64(totalI)
+					hasFloat = true
+				}
+				lastF = n
+				hasLast = true
+			}
+		}
+		if !hasLast {
+			continue
+		}
+		if hasFloat {
+			totalF += lastF
+		} else {
+			totalI += lastI
+			totalF += lastF
+		}
+	}
+	if hasFloat {
+		return totalF, true, nil
+	}
+	return totalI, true, nil
 }
 
 func lastSignedDeltasSum[T signedScalar](values []T) any {

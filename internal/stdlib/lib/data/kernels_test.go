@@ -2857,8 +2857,8 @@ func TestTypedNumericUnaryBinaryAndAggregates(t *testing.T) {
 		t.Fatalf("TryTypedDeltasSum empty = %v, %v, %v; want null, true, nil", value, ok, err)
 	}
 	value, ok, err = TryTypedDeltasSum(NewColumn("x", []any{int64(1), NullValue, int64(3)}).Data)
-	if err != nil || ok || value != nil {
-		t.Fatalf("TryTypedDeltasSum nullable = %v, %v, %v; want nil, false, nil", value, ok, err)
+	if err != nil || !ok || value != int64(1) {
+		t.Fatalf("TryTypedDeltasSum nullable = %v, %v, %v; want 1, true, nil", value, ok, err)
 	}
 
 }
