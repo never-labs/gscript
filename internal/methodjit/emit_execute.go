@@ -1290,6 +1290,25 @@ func (cf *CompiledFunction) executeOpExit(ctx *ExecContext, regs []runtime.Value
 		cf.recordQKernelExecution("methodjit_q_vector_runtime", "QVectorGatherReduce", "gather/vector-reduce", "typed_runtime_op_exit", "success")
 		regs[slot] = out
 
+	case OpQEvalPipelinePlan:
+		if slot >= len(regs) {
+			return fmt.Errorf("QEvalPipelinePlan op-exit out of register range")
+		}
+		out, handled, err := cf.ExecuteQEvalPipelinePlanValue(int(aux))
+		shape := "q-eval/pipeline-plan"
+		if ref, ok := qEvalPipelinePlanRefByID(cf.QEvalPipelinePlans, int(aux)); ok && ref.Shape != "" {
+			shape = ref.Shape
+		}
+		if err != nil || !handled {
+			cf.recordQKernelExecution("methodjit_q_eval_runtime", "QEvalPipelinePlan", shape, "typed_runtime_op_exit", "error")
+			if err != nil {
+				return err
+			}
+			return fmt.Errorf("QEvalPipelinePlan op-exit plan %d was not handled", aux)
+		}
+		cf.recordQKernelExecution("methodjit_q_eval_runtime", "QEvalPipelinePlan", shape, "typed_runtime_op_exit", "success")
+		regs[slot] = out
+
 	case OpVectorScan:
 		if arg1 >= len(regs) || slot >= len(regs) {
 			return fmt.Errorf("VectorScan op-exit out of register range")

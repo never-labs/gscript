@@ -242,6 +242,10 @@ const (
 	// Fused q/vector typed runtime-kernel primitive. Args = [vector, indexes],
 	// Aux = runtime DenseArrayReduceOp; computes gather then reduce.
 	OpQVectorGatherReduce
+	// q.eval typed runtime pipeline primitive. Args = [], Aux =
+	// Function.QEvalPipelinePlans index. Interpreter/runtime paths execute the
+	// referenced plan through the q pipeline backend.
+	OpQEvalPipelinePlan
 	OpGetField // Args[0].field; Aux = constant pool index for field name
 	// OpGetFieldNumToFloat fuses Args[0].field with numeric widening.
 	// It preserves NumToFloat semantics: int and float fields become raw

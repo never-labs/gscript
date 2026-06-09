@@ -5849,6 +5849,25 @@ func TestQEvalHotPlanRecognizesConstantVectorWhereReduce(t *testing.T) {
 	assertQKernelDescriptor(t, descriptors, "methodjit_q_eval_lowering", "runtime_kernel", "QScriptPipelinePlan", "script-pipeline/where-reduce/sum/assignments", "hot_plan", "supported", "")
 }
 
+func TestQEvalPipelineLoweringExecutesInInterpreter(t *testing.T) {
+	fn := BuildGraph(qEvalHotPlanConstProto("x:til 64;y:x+1;idx:where x>10;+/y[idx]"))
+	fn.Remarks = &OptimizationRemarks{}
+	lowered, err := QEvalPipelineLoweringPass(fn)
+	if err != nil {
+		t.Fatalf("QEvalPipelineLoweringPass: %v", err)
+	}
+	if counts := countOps(lowered); counts[OpQEvalPipelinePlan] != 1 || counts[OpCall] != 0 {
+		t.Fatalf("op counts after q eval pipeline lowering: QEvalPipelinePlan=%d OpCall=%d\n%s", counts[OpQEvalPipelinePlan], counts[OpCall], Print(lowered))
+	}
+	out, err := Interpret(lowered, nil)
+	if err != nil {
+		t.Fatalf("Interpret lowered q eval pipeline: %v", err)
+	}
+	if len(out) != 1 || !out[0].IsInt() || out[0].Int() != 2014 {
+		t.Fatalf("Interpret lowered q eval pipeline = %#v, want int 2014", out)
+	}
+}
+
 func TestQEvalPipelinePlannerUsesQRuntimeDescriptor(t *testing.T) {
 	descriptor, ok := qRuntimeEvalPipelinePlanner{}.DescribeQEvalPipeline("x:til 64;y:x+1;idx:where x>10;+/y[idx]")
 	if !ok {

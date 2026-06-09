@@ -375,6 +375,7 @@ func tier2FinalCallModules(specializationGlobals map[string]*vm.FuncProto) []Tie
 		tier2PassModuleWithCtxUpdates("RangeAnalysis (post-final-call)", Tier2PhaseFinalCall, nil, rangeAnalysisFacts(), RangeAnalysisPassCtx),
 		tier2PassModuleWith("QQueryHotPath", Tier2PhaseFinalCall, nil, nil, QQueryHotPathRemarkPass),
 		tier2PassModuleWith("QEvalHotPlan", Tier2PhaseFinalCall, nil, nil, QEvalHotPlanRemarkPass),
+		tier2PassModuleWith("QEvalPipelineLowering", Tier2PhaseFinalCall, nil, nil, QEvalPipelineLoweringPass),
 		tier2PassModuleWith("QQueryNativeLowering", Tier2PhaseFinalCall, nil, nil, QQueryNativeLoweringPass),
 	}
 	if os.Getenv("LEIA_FIELD_SHAPE_SPLIT") == "1" {

@@ -1255,6 +1255,17 @@ func (s *interpState) execInstr(instr *Instr, block *Block) ([]runtime.Value, bo
 		}
 		s.values[instr.ID] = out
 
+	case OpQEvalPipelinePlan:
+		cf := &CompiledFunction{QEvalPipelinePlans: s.fn.QEvalPipelinePlans}
+		out, handled, err := cf.ExecuteQEvalPipelinePlanValue(int(instr.Aux))
+		if err != nil {
+			return nil, false, err
+		}
+		if !handled {
+			return nil, false, fmt.Errorf("IR interpreter: q eval pipeline plan %d was not handled", instr.Aux)
+		}
+		s.values[instr.ID] = out
+
 	case OpVectorScan:
 		out, err := executeVectorScanValue(s.val(instr.Args[0]))
 		if err != nil {

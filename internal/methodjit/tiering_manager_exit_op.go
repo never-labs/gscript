@@ -664,6 +664,29 @@ func (tm *TieringManager) executeOpExit(ctx *ExecContext, regs []runtime.Value, 
 		}
 		regs[absSlot] = out
 
+	case OpQEvalPipelinePlan:
+		if absSlot >= len(regs) {
+			return fmt.Errorf("QEvalPipelinePlan op-exit out of register range")
+		}
+		cf, _ := tm.tier2CompiledFor(proto)
+		if cf == nil {
+			return fmt.Errorf("QEvalPipelinePlan op-exit missing compiled function")
+		}
+		out, handled, err := cf.ExecuteQEvalPipelinePlanValue(int(aux))
+		shape := "q-eval/pipeline-plan"
+		if ref, ok := qEvalPipelinePlanRefByID(cf.QEvalPipelinePlans, int(aux)); ok && ref.Shape != "" {
+			shape = ref.Shape
+		}
+		if err != nil || !handled {
+			cf.recordQKernelExecution("methodjit_q_eval_runtime", "QEvalPipelinePlan", shape, "typed_runtime_op_exit", "error")
+			if err != nil {
+				return err
+			}
+			return fmt.Errorf("QEvalPipelinePlan op-exit plan %d was not handled", aux)
+		}
+		cf.recordQKernelExecution("methodjit_q_eval_runtime", "QEvalPipelinePlan", shape, "typed_runtime_op_exit", "success")
+		regs[absSlot] = out
+
 	case OpVectorScan:
 		if absArg1 >= len(regs) || absSlot >= len(regs) {
 			return fmt.Errorf("VectorScan op-exit out of register range")

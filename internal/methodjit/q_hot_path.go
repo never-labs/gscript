@@ -1181,6 +1181,56 @@ func QEvalHotPlanRemarkPass(fn *Function) (*Function, error) {
 	return fn, nil
 }
 
+// QEvalPipelineLoweringPass rewrites constant q.eval hot plans to a backend
+// plan op. The op keeps fallback explicit: dynamic or unsupported q.eval calls
+// remain as OpCall and continue through the normal call path.
+func QEvalPipelineLoweringPass(fn *Function) (*Function, error) {
+	if fn == nil {
+		return fn, nil
+	}
+	for _, block := range fn.Blocks {
+		if block == nil {
+			continue
+		}
+		for _, instr := range block.Instrs {
+			if instr == nil || instr.Op != OpCall || !qCallIsQEvalEntrypoint(fn, instr) {
+				continue
+			}
+			source, ok := qCallEvalSourceString(fn, instr)
+			if !ok {
+				continue
+			}
+			plan, _, ok := qClassifyEvalHotPlan(source)
+			if !ok {
+				continue
+			}
+			ref := fn.addQEvalPipelinePlan(source, plan)
+			if !ref.Valid() {
+				continue
+			}
+			instr.Op = OpQEvalPipelinePlan
+			instr.Type = TypeAny
+			instr.Args = nil
+			instr.Aux = int64(ref.ID)
+			instr.Aux2 = 0
+			blockID, valueID := qRemarkLocation(instr)
+			functionRemarks(fn).AddWithFields("QEvalPipelineLowering", "changed", blockID, valueID, OpQEvalPipelinePlan,
+				fmt.Sprintf("lowered constant q.eval source to typed pipeline plan id=%d shape=%s", ref.ID, ref.Shape),
+				map[string]string{
+					"kind":           "runtime_kernel",
+					"kernel":         ref.Kernel,
+					"shape":          ref.Shape,
+					"pipeline_shape": ref.PipelineShape,
+					"route":          "typed_pipeline_op",
+					"outcome":        "lowered",
+					"backend":        ref.Backend,
+					"plan_id":        strconv.Itoa(ref.ID),
+				})
+		}
+	}
+	return fn, nil
+}
+
 func qEvalHotPlanSupportedRemark(fn *Function, call *Instr, plan qEvalHotPlan, ref QEvalPipelinePlanRef) {
 	blockID, valueID := qRemarkLocation(call)
 	fields := map[string]string{
