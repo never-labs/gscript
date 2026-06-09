@@ -22,6 +22,7 @@ const (
 	qScriptPipelineMatrixCellPlusCount  qScriptPipelineKind = "matrix-cell-reduce/cell-plus-count"
 	qScriptPipelineCallableDotSumRight  qScriptPipelineKind = "callable-dot/sum-plus-right"
 	qScriptPipelineCallableDotSumCount  qScriptPipelineKind = "callable-dot/sum-plus-count-right"
+	qScriptPipelineCallableOverScanSum  qScriptPipelineKind = "callable-over/scan-sum-count"
 	qScriptPipelineApplyScalarAt        qScriptPipelineKind = "apply-index/scalar-at"
 	qScriptPipelineApplyScalarDot       qScriptPipelineKind = "apply-index/scalar-dot"
 	qScriptPipelineApplyPathDot         qScriptPipelineKind = "apply-index/path-dot"
@@ -110,9 +111,6 @@ func buildQScriptPipelineDescriptor(statements []qScriptStatement) (*qScriptPipe
 	bindings := make(map[string]string, len(compact)-1)
 	for _, stmt := range compact[:len(compact)-1] {
 		if stmt.assign == "" || stmt.rhs == "" {
-			return nil, false
-		}
-		if _, _, ok := parseDeferredScan(stmt.rhs); ok {
 			return nil, false
 		}
 		assignments = append(assignments, qScriptPipelineAssignment{name: stmt.assign, rhs: stmt.rhs, valueExpr: stmt.valueExpr, binding: stmt.bindingPlan})
@@ -209,6 +207,9 @@ func describeQScriptPipelineTerminal(src string, bindings map[string]string) (qS
 		}
 	}
 	if descriptor, ok := qScriptPipelineCallableDotSumPlusRight(src, bindings); ok {
+		return descriptor, true
+	}
+	if descriptor, ok := qScriptPipelineCallableOverScanSumDescriptor(src, bindings); ok {
 		return descriptor, true
 	}
 	if !strings.HasPrefix(src, "+/") {
@@ -412,6 +413,92 @@ func qScriptPipelineCallableDotSumPlusRight(src string, bindings map[string]stri
 		indexBinding:    qScriptPipelineBinding(rightExpr, bindings),
 		includeCount:    fastPlan.kind == qLambdaFastSumPlusCountRight,
 	}, true
+}
+
+func qScriptPipelineCallableOverScanSumDescriptor(src string, bindings map[string]string) (qScriptPipelineDescriptor, bool) {
+	terms := qScriptPipelinePlusTerms(src)
+	if len(terms) != 3 {
+		return qScriptPipelineDescriptor{}, false
+	}
+	var sourceName string
+	var initialExpr string
+	var scanName string
+	seenOver := false
+	seenLast := false
+	seenCount := false
+	for _, term := range terms {
+		if fnSrc, initSrc, valueSrc, ok := parseCallableOverApplication(term); ok {
+			if seenOver || initSrc == "" || valueSrc == "" || !qScriptPipelineCallableAddExpr(fnSrc, bindings) {
+				return qScriptPipelineDescriptor{}, false
+			}
+			sourceName = strings.TrimSpace(valueSrc)
+			initialExpr = strings.TrimSpace(initSrc)
+			seenOver = true
+			continue
+		}
+		if name, ok := qScriptPipelineUnaryNameTerm(term, "last"); ok {
+			if seenLast {
+				return qScriptPipelineDescriptor{}, false
+			}
+			scanName = name
+			seenLast = true
+			continue
+		}
+		if name, ok := qScriptPipelineUnaryNameTerm(term, "count"); ok {
+			if seenCount {
+				return qScriptPipelineDescriptor{}, false
+			}
+			if scanName != "" && scanName != name {
+				return qScriptPipelineDescriptor{}, false
+			}
+			scanName = name
+			seenCount = true
+			continue
+		}
+		return qScriptPipelineDescriptor{}, false
+	}
+	if !seenOver || !seenLast || !seenCount || sourceName == "" || scanName == "" {
+		return qScriptPipelineDescriptor{}, false
+	}
+	scanRHS := strings.TrimSpace(bindings[scanName])
+	if !strings.HasPrefix(scanRHS, "+\\") {
+		return qScriptPipelineDescriptor{}, false
+	}
+	scanSource := strings.TrimSpace(scanRHS[len("+\\"):])
+	if scanSource != sourceName {
+		return qScriptPipelineDescriptor{}, false
+	}
+	return qScriptPipelineDescriptor{
+		kind:         qScriptPipelineCallableOverScanSum,
+		valueExpr:    sourceName,
+		valueBinding: qScriptPipelineBinding(sourceName, bindings),
+		scalarExpr:   initialExpr,
+	}, true
+}
+
+func qScriptPipelineCallableAddExpr(src string, bindings map[string]string) bool {
+	src = strings.TrimSpace(src)
+	if bound := strings.TrimSpace(bindings[src]); bound != "" {
+		src = bound
+	}
+	if strings.HasPrefix(src, "{") && strings.HasSuffix(src, "}") {
+		body := strings.TrimSpace(src[1 : len(src)-1])
+		plan, ok := qLambdaFastPlanFor(body)
+		return ok && plan.kind == qLambdaFastDyadic && plan.op == '+'
+	}
+	return src == "+"
+}
+
+func qScriptPipelineUnaryNameTerm(src, word string) (string, bool) {
+	src = stripEnclosingParens(strings.TrimSpace(src))
+	if !strings.HasPrefix(src, word) || !wordBoundary(src, 0, len(word)) {
+		return "", false
+	}
+	name := strings.TrimSpace(src[len(word):])
+	if !qScriptPipelineSimpleName(name) {
+		return "", false
+	}
+	return name, true
 }
 
 func qScriptPipelineSequenceEdgeReduceValue(src string) (string, bool) {
@@ -912,6 +999,11 @@ func (s *EvalState) tryEvalQScriptPipeline(descriptor *qScriptPipelineDescriptor
 		recordQScriptPipelineResult(shape, handled, err)
 		return out, handled, err
 	}
+	if descriptor.kind == qScriptPipelineCallableOverScanSum {
+		out, handled, err := s.evalQScriptCallableOverScanSumPipeline(descriptor)
+		recordQScriptPipelineResult(shape, handled, err)
+		return out, handled, err
+	}
 	terminal := &descriptor.terminalPlan
 	if terminal.kind == qPipelineInvalid {
 		recordRuntimeKernelExecution("QScriptPipelinePlan", shape, "fallback", RuntimeFallbackPlannerUnhandled)
@@ -1288,6 +1380,64 @@ func (s *EvalState) evalQScriptCallableDotSumPlusRightPipeline(descriptor *qScri
 		return nil, true, err
 	}
 	out, err := applyDyadic('+', sumValue, right)
+	return out, true, err
+}
+
+func (s *EvalState) evalQScriptCallableOverScanSumPipeline(descriptor *qScriptPipelineDescriptor) (any, bool, error) {
+	resolver := func(name string) (*qScriptBindingPlan, bool, error) {
+		for i := range descriptor.assignments {
+			if descriptor.assignments[i].name == name {
+				if descriptor.assignments[i].binding.kind == qScriptBindingInvalid {
+					descriptor.assignments[i].binding = buildQScriptBindingPlanForRHS(descriptor.assignments[i].rhs, descriptor.assignments[i].valueExpr)
+				}
+				return &descriptor.assignments[i].binding, true, nil
+			}
+		}
+		return nil, false, nil
+	}
+	value, handled, err := s.evalQScriptBindingPlanWithResolver(&descriptor.valuePlan, resolver)
+	if err != nil {
+		return nil, true, err
+	}
+	if !handled {
+		for i := range descriptor.assignments {
+			if descriptor.assignments[i].name != strings.TrimSpace(descriptor.valueExpr) {
+				continue
+			}
+			value, err = s.evalCachedOrString(descriptor.assignments[i].rhs, descriptor.assignments[i].valueExpr, &descriptor.assignments[i].binding, nil)
+			if err != nil {
+				return nil, true, err
+			}
+			handled = true
+			break
+		}
+	}
+	if !handled {
+		return nil, false, nil
+	}
+	array, ok := value.(data.Array)
+	if !ok {
+		return nil, false, nil
+	}
+	initial, handled, err := s.evalQScriptBindingPlan(&descriptor.scalarPlan)
+	if err != nil || !handled {
+		return nil, handled, err
+	}
+	shape := "callable-over/scan-sum-count/" + string(array.Kind())
+	sumValue, handled, err := data.TryTypedNumericSum(array)
+	sumValue, handled, err = qTypedRuntimeResultReason("CallableOverScanSum", shape, RuntimeFallbackUnsupportedType, sumValue, handled, err)
+	if err != nil || !handled {
+		return nil, handled, err
+	}
+	out, err := applyDyadic('+', initial, sumValue)
+	if err != nil {
+		return nil, true, err
+	}
+	out, err = applyDyadic('+', out, sumValue)
+	if err != nil {
+		return nil, true, err
+	}
+	out, err = applyDyadic('+', out, int64(array.Len()))
 	return out, true, err
 }
 

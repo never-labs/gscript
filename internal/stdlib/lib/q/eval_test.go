@@ -4562,6 +4562,24 @@ func TestEvalSortRankReducerBundleRecordsTypedRuntimeKernel(t *testing.T) {
 	}
 }
 
+func TestEvalCallableOverScanSumPipelineRecordsTypedRuntimeKernel(t *testing.T) {
+	ClearRuntimeKernelExecutionStats()
+	t.Cleanup(ClearRuntimeKernelExecutionStats)
+	assertEvalValue(t, "x:1+til 8;s:+\\x;({x+y}/[10;x])+last s+count s", int64(90))
+	seen := false
+	for _, stat := range RuntimeKernelExecutionStats() {
+		if stat.Outcome == "fallback" || stat.Outcome == "error" {
+			t.Fatalf("unexpected callable-over scan fallback/error: %#v all=%#v", stat, RuntimeKernelExecutionStats())
+		}
+		if stat.Kernel == "CallableOverScanSum" && stat.Outcome == "hit" && stat.Count > 0 {
+			seen = true
+		}
+	}
+	if !seen {
+		t.Fatalf("missing CallableOverScanSum hit: %#v", RuntimeKernelExecutionStats())
+	}
+}
+
 func TestQSortRankReducerPlusTerms(t *testing.T) {
 	terms := qSortRankReducerPlusTerms("(+/iasc 3 1 2 1)+(+/rank `x`a`b`z`c)+(first asc 3 1 2)+(first desc 3 1 2)")
 	want := []string{"+/iasc 3 1 2 1", "+/rank `x`a`b`z`c", "first asc 3 1 2", "first desc 3 1 2"}

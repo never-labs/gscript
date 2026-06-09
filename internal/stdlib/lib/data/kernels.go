@@ -1232,11 +1232,50 @@ func TryTypedInIndexesI64(array Array, values []any) (Array, bool, error) {
 // TryTypedInIndexStatsI64 returns the selected row count and row-index sum for
 // a typed membership predicate without materializing a boolean mask.
 func TryTypedInIndexStatsI64(array Array, values []any) (count, sum int64, handled bool, err error) {
-	indexes, handled, err := TryTypedInIndexesI64(array, values)
-	if err != nil || !handled {
-		return 0, 0, handled, err
+	if array == nil {
+		return 0, 0, true, fmt.Errorf("in index stats array is nil")
 	}
-	return int64(indexes.Len()), i64IndexArraySum(indexes), true, nil
+	switch a := array.(type) {
+	case attributedArray:
+		return TryTypedInIndexStatsI64(a.array, values)
+	case tiledArray:
+		sourceLen := a.source.Len()
+		if sourceLen == 0 || a.len == 0 {
+			return 0, 0, true, nil
+		}
+		sourceIndexes, handled, err := TryTypedInIndexesI64(a.source, values)
+		if err != nil || !handled {
+			return 0, 0, handled, err
+		}
+		rows, handled, err := TryTypedI64Indexes(sourceIndexes)
+		if err != nil || !handled {
+			return 0, 0, handled, err
+		}
+		if len(rows) == 0 {
+			return 0, 0, true, nil
+		}
+		matches := make([]bool, sourceLen)
+		for _, sourceRow := range rows {
+			residue := (sourceRow - a.start) % sourceLen
+			if residue < 0 {
+				residue += sourceLen
+			}
+			matches[residue] = true
+		}
+		for row := 0; row < a.len; row++ {
+			if matches[row%sourceLen] {
+				count++
+				sum += int64(row)
+			}
+		}
+		return count, sum, true, nil
+	default:
+		indexes, handled, err := TryTypedInIndexesI64(array, values)
+		if err != nil || !handled {
+			return 0, 0, handled, err
+		}
+		return int64(indexes.Len()), i64IndexArraySum(indexes), true, nil
+	}
 }
 
 func intIndexesToI64Array(indexes []int) Array {
