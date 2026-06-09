@@ -95,6 +95,10 @@ func (s *EvalState) tryEvalDotApplyPlan(src string) (any, bool, error) {
 			return nil, true, err
 		}
 		if plan.tupleArgs {
+			if array, ok := arg.(data.Array); ok {
+				out, err := s.applyCallableArrayArgs(fn, array)
+				return out, true, err
+			}
 			out, err := s.applyCallable(fn, qApplyArgs(arg))
 			return out, true, err
 		}
@@ -232,6 +236,9 @@ func (s *EvalState) applyOrIndexValue(mode qApplyIndexMode, target, arg any) (an
 		if mode == qApplyIndexAt {
 			return s.applyCallable(target, []any{arg})
 		}
+		if array, ok := arg.(data.Array); ok {
+			return s.applyCallableArrayArgs(target, array)
+		}
 		return s.applyCallable(target, qApplyArgs(arg))
 	}
 	if mode == qApplyIndexDot {
@@ -245,6 +252,73 @@ func qApplyArgs(arg any) []any {
 		return array.Values()
 	}
 	return []any{arg}
+}
+
+func (s *EvalState) applyCallableArrayArgs(fn any, args data.Array) (any, error) {
+	arity := args.Len()
+	shape := qCallableArrayArgsShape(args.Kind(), arity)
+	recordRuntimeKernelExecution("ArrayCallableArgs", shape, "attempt", "attempt")
+	var out any
+	var err error
+	switch arity {
+	case 0:
+		out, err = s.applyCallable(fn, nil)
+	case 1:
+		arg0, ok := args.At(0)
+		if !ok {
+			err = fmt.Errorf("argument 0 out of range")
+			break
+		}
+		out, err = s.applyCallable1(fn, arg0)
+	case 2:
+		arg0, ok := args.At(0)
+		if !ok {
+			err = fmt.Errorf("argument 0 out of range")
+			break
+		}
+		arg1, ok := args.At(1)
+		if !ok {
+			err = fmt.Errorf("argument 1 out of range")
+			break
+		}
+		out, err = s.applyCallable2(fn, arg0, arg1)
+	case 3:
+		arg0, ok := args.At(0)
+		if !ok {
+			err = fmt.Errorf("argument 0 out of range")
+			break
+		}
+		arg1, ok := args.At(1)
+		if !ok {
+			err = fmt.Errorf("argument 1 out of range")
+			break
+		}
+		arg2, ok := args.At(2)
+		if !ok {
+			err = fmt.Errorf("argument 2 out of range")
+			break
+		}
+		out, err = s.applyCallable3(fn, arg0, arg1, arg2)
+	default:
+		out, err = s.applyCallable(fn, args.Values())
+	}
+	if err != nil {
+		recordRuntimeKernelExecution("ArrayCallableArgs", shape, "error", "runtime_error")
+		return nil, err
+	}
+	if arity <= 3 {
+		recordRuntimeKernelExecution("ArrayCallableArgs", shape, "hit", "typed_apply_args")
+	} else {
+		recordRuntimeKernelExecution("ArrayCallableArgs", shape, "fallback", "unsupported_arity")
+	}
+	return out, nil
+}
+
+func qCallableArrayArgsShape(kind data.Kind, arity int) string {
+	if arity > 3 {
+		return "apply-index/dot-args/" + string(kind) + "/arity-many"
+	}
+	return "apply-index/dot-args/" + string(kind) + "/arity-" + strconv.Itoa(arity)
 }
 
 func (s *EvalState) tryEvalScalarApplyIndexFastPath(src string) (any, bool, error) {

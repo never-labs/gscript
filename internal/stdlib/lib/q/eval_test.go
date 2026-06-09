@@ -3735,7 +3735,7 @@ func TestEvalWhereGatherReduceCompositeMaskStats(t *testing.T) {
 		if stat.Outcome == "fallback" || stat.Outcome == "error" {
 			t.Fatalf("unexpected runtime fallback/error for composite where gather reduce: %#v stats=%#v", stat, RuntimeKernelExecutionStats())
 		}
-		if stat.Kernel == "QPipelinePlan" && stat.Shape == "gather-reduce/sum" && stat.Outcome == "hit" && stat.Count > 0 {
+		if stat.Kernel == "QPipelinePlan" && stat.Shape == "gather-reduce/sum" && stat.PipelineShape == "gather_reduce" && stat.Outcome == "hit" && stat.Count > 0 {
 			seenPipelinePlan = true
 		}
 		if stat.Kernel == "ArrayGatherReduceSum" && stat.Shape == "gather-reduce/i64/i64" && stat.Outcome == "hit" && stat.Count > 0 {

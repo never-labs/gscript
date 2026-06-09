@@ -89,6 +89,41 @@ func TestQDotApplyPlanCachesCallableArgs(t *testing.T) {
 	}
 }
 
+func TestQDotApplyArrayArgsRecordsTypedRuntimeKernel(t *testing.T) {
+	state := NewEvalState(nil)
+	if _, err := state.Eval("f:{x+y};g:{[a;b;c]a+b+c}"); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	ClearRuntimeKernelExecutionStats()
+	t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+	if got, err := state.Eval(".[f;100 23]"); err != nil || got != int64(123) {
+		t.Fatalf(".[f;100 23] = %v, %v; want 123,nil", got, err)
+	}
+	if got, err := state.Eval("g . (1;2;3)"); err != nil || got != int64(6) {
+		t.Fatalf("g . (1;2;3) = %v, %v; want 6,nil", got, err)
+	}
+
+	var hits uint64
+	for _, stat := range RuntimeKernelExecutionStats() {
+		if stat.Kernel != "ArrayCallableArgs" {
+			continue
+		}
+		if stat.Outcome == "fallback" || stat.Outcome == "error" {
+			t.Fatalf("unexpected callable array args fallback/error: %#v stats=%#v", stat, RuntimeKernelExecutionStats())
+		}
+		if stat.Outcome == "hit" && stat.ReasonCode == "typed_apply_args" && strings.HasPrefix(stat.Shape, "apply-index/dot-args/") {
+			hits += stat.Count
+			if stat.PipelineShape != "apply_index" {
+				t.Fatalf("callable array args pipeline shape = %q, want apply_index; stat=%#v", stat.PipelineShape, stat)
+			}
+		}
+	}
+	if hits != 2 {
+		t.Fatalf("ArrayCallableArgs hits=%d; stats=%#v", hits, RuntimeKernelExecutionStats())
+	}
+}
+
 func TestQMatrixCellLiteralDotIndexFastPathRecordsTypedRuntimeKernel(t *testing.T) {
 	state := NewEvalState(nil)
 	if _, err := state.Eval("m:2 4#til 8"); err != nil {

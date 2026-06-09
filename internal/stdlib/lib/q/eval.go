@@ -437,6 +437,11 @@ func runtimeKernelStringHash(value string) uintptr {
 
 func qRuntimeKernelPipelineShape(kernel, shape string) string {
 	switch {
+	case kernel == "QPipelinePlan":
+		if planShape := qRuntimeKernelQPipelinePlanShape(shape); planShape != "" {
+			return planShape
+		}
+		return qRuntimeKernelPipelineShape("", shape)
 	case strings.HasPrefix(shape, "gather-reduce/"):
 		return "where_gather_reduce"
 	case strings.HasPrefix(shape, "script-pipeline/"):
@@ -519,6 +524,50 @@ func qRuntimeKernelPipelineShape(kernel, shape string) string {
 		return "kernel/" + kernel
 	default:
 		return "unknown"
+	}
+}
+
+func qRuntimeKernelQPipelinePlanShape(shape string) string {
+	switch shape {
+	case "where-reduce/sum", "where-index-reduce/sum",
+		"compare-to-index-sum", "compare-to-index-count",
+		"compare-to-index-sum-mod", "compare-to-index-count-mod":
+		return "mask_reduce"
+	case "gather-reduce/sum":
+		return "gather_reduce"
+	case "compare-to-index", "compare-to-index-mod":
+		return "compare_index"
+	case "vector-reduce/sum-deltas", "vector-reduce/sum-expr",
+		"vector-reduce/sum-dyadic-min", "vector-reduce/sum-dyadic-max",
+		"vector-reduce/sum-dyadic-float-xexp", "vector-reduce/sum-dyadic-float-xlog",
+		"vector-reduce/sum-reverse", "vector-reduce/sum-rotate",
+		"vector-reduce/sum-sublist", "vector-reduce/sum-ratios",
+		"vector-reduce/sum-raze", "vector-reduce/sum-msum",
+		"vector-reduce/sum-mavg", "vector-reduce/sum-mcount",
+		"vector-reduce/sum-mmin", "vector-reduce/sum-mmax":
+		return "vector_reduce"
+	case "vector-count/expr", "vector-count/sums", "vector-count/prds",
+		"vector-count/mins", "vector-count/maxs", "vector-count/avgs",
+		"vector-last/sums", "vector-last/prds", "vector-last/mins",
+		"vector-last/maxs", "vector-last/avgs":
+		return "vector_scan"
+	case "sequence-count/trim", "sequence-count/ltrim", "sequence-count/rtrim",
+		"sequence-count/cross", "sequence-count/cut", "sequence-count/sublist",
+		"sequence-count/raze", "sequence-count/value":
+		return "sequence_count"
+	case "bin-reduce/sum":
+		return "search_index_reduce"
+	case "apply-index/scalar-at", "apply-index/scalar-dot", "apply-index/path-dot":
+		return "apply_index"
+	default:
+		switch {
+		case strings.HasPrefix(shape, "runtime-unary/"):
+			return qRuntimePrimitivePipelineShape(strings.TrimPrefix(shape, "runtime-unary/"))
+		case strings.HasPrefix(shape, "runtime-dyadic/"):
+			return qRuntimePrimitivePipelineShape(strings.TrimPrefix(shape, "runtime-dyadic/"))
+		default:
+			return ""
+		}
 	}
 }
 
@@ -6987,6 +7036,16 @@ func (s *EvalState) applyCallableIndex(fn any, argSrc string) (any, error) {
 	if hasMissing {
 		return qProjection{fn: fn, args: args}, nil
 	}
+	switch len(args) {
+	case 0:
+		return s.applyCallable(fn, nil)
+	case 1:
+		return s.applyCallable1(fn, args[0].value)
+	case 2:
+		return s.applyCallable2(fn, args[0].value, args[1].value)
+	case 3:
+		return s.applyCallable3(fn, args[0].value, args[1].value, args[2].value)
+	}
 	values := make([]any, len(args))
 	for i, arg := range args {
 		values[i] = arg.value
@@ -7083,6 +7142,17 @@ func (s *EvalState) applyCallable2(fn any, left, right any) (any, error) {
 		return s.applyCallable(f, []any{left, right})
 	default:
 		return s.applyCallable(fn, []any{left, right})
+	}
+}
+
+func (s *EvalState) applyCallable3(fn any, arg0, arg1, arg2 any) (any, error) {
+	switch f := fn.(type) {
+	case qLambda:
+		return s.applyLambda(f, []any{arg0, arg1, arg2})
+	case qProjection:
+		return s.applyCallable(f, []any{arg0, arg1, arg2})
+	default:
+		return s.applyCallable(fn, []any{arg0, arg1, arg2})
 	}
 }
 
