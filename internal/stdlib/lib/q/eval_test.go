@@ -1147,6 +1147,86 @@ func TestEvalGlobalPipelineBindingCacheKeysByOperandKind(t *testing.T) {
 	}
 }
 
+func TestEvalGlobalPipelineBindingCacheMoreShapes(t *testing.T) {
+	cases := []struct {
+		name string
+		src  string
+		i64  any
+		f64  any
+		envI map[string]any
+		envF map[string]any
+	}{
+		{
+			name: "count vector expr",
+			src:  "count 4#v",
+			i64:  int64(4),
+			f64:  int64(4),
+			envI: map[string]any{"v": data.NewI64([]int64{1, 2, 3})},
+			envF: map[string]any{"v": data.NewF64([]float64{1.5, 2.5, 3.5})},
+		},
+		{
+			name: "count where compare",
+			src:  "count where v>threshold",
+			i64:  int64(2),
+			f64:  int64(2),
+			envI: map[string]any{"v": data.NewI64([]int64{1, 2, 3, 4}), "threshold": int64(2)},
+			envF: map[string]any{"v": data.NewF64([]float64{1.5, 2.5, 3.5, 4.5}), "threshold": 2.5},
+		},
+		{
+			name: "sum where compare",
+			src:  "+/where v>threshold",
+			i64:  int64(5),
+			f64:  int64(5),
+			envI: map[string]any{"v": data.NewI64([]int64{1, 2, 3, 4}), "threshold": int64(2)},
+			envF: map[string]any{"v": data.NewF64([]float64{1.5, 2.5, 3.5, 4.5}), "threshold": 2.5},
+		},
+		{
+			name: "sum moving window",
+			src:  "+/2 msum v",
+			i64:  int64(9),
+			f64:  11.5,
+			envI: map[string]any{"v": data.NewI64([]int64{1, 2, 3})},
+			envF: map[string]any{"v": data.NewF64([]float64{1.5, 2.5, 3.5})},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ClearEvalPlanCaches()
+			t.Cleanup(ClearEvalPlanCaches)
+
+			if got, err := EvalWithEnv(tc.src, tc.envI); err != nil || !reflect.DeepEqual(got, tc.i64) {
+				t.Fatalf("cold i64 EvalWithEnv returned %#v, %v; want %#v,nil", got, err, tc.i64)
+			}
+			afterI64 := EvalPlanCacheStatsSnapshot()
+			if afterI64.PipelineBindingMisses == 0 || afterI64.PipelineBindingStores == 0 || afterI64.PipelineBindingEntries != 1 {
+				t.Fatalf("cold i64 eval did not populate typed pipeline binding cache: %#v", afterI64)
+			}
+
+			if got, err := EvalWithEnv(tc.src, tc.envF); err != nil || !reflect.DeepEqual(got, tc.f64) {
+				t.Fatalf("cold f64 EvalWithEnv returned %#v, %v; want %#v,nil", got, err, tc.f64)
+			}
+			afterF64 := EvalPlanCacheStatsSnapshot()
+			if afterF64.PipelineBindingEntries != 2 {
+				t.Fatalf("typed pipeline binding cache reused i64 binding for f64: before=%#v after=%#v", afterI64, afterF64)
+			}
+			if afterF64.PipelineBindingMisses <= afterI64.PipelineBindingMisses {
+				t.Fatalf("f64 eval did not record a distinct binding miss: before=%#v after=%#v", afterI64, afterF64)
+			}
+
+			if got, err := EvalWithEnv(tc.src, tc.envI); err != nil || !reflect.DeepEqual(got, tc.i64) {
+				t.Fatalf("warm i64 EvalWithEnv returned %#v, %v; want %#v,nil", got, err, tc.i64)
+			}
+			afterWarmI64 := EvalPlanCacheStatsSnapshot()
+			if afterWarmI64.PipelineBindingHits <= afterF64.PipelineBindingHits {
+				t.Fatalf("warm i64 eval did not hit typed pipeline binding cache: before=%#v after=%#v", afterF64, afterWarmI64)
+			}
+			if afterWarmI64.PipelineBindingEntries != afterF64.PipelineBindingEntries {
+				t.Fatalf("warm i64 eval changed binding cache entries: before=%#v after=%#v", afterF64, afterWarmI64)
+			}
+		})
+	}
+}
+
 func TestEvalStatePipelinePlanCachePreservesEnvironmentSemantics(t *testing.T) {
 	ClearRuntimeKernelExecutionStats()
 	t.Cleanup(ClearRuntimeKernelExecutionStats)
