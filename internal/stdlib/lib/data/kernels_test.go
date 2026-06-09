@@ -112,12 +112,34 @@ func TestNumericAnalyticsStatsWindows(t *testing.T) {
 	if got, want := mdev.Values(), []any{0.0, 0.5, 0.5}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("NumericMovingStdDev values = %#v, want %#v", got, want)
 	}
+	if mdev.Kind() != KindF64 {
+		t.Fatalf("NumericMovingStdDev kind = %s, want %s", mdev.Kind(), KindF64)
+	}
 	ema, handled, err := NumericExponentialMovingAverage(values, 0.5)
 	if err != nil || !handled {
 		t.Fatalf("NumericExponentialMovingAverage returned %#v,%v,%v", ema, handled, err)
 	}
 	if got, want := ema.Values(), []any{1.0, 1.5, 2.25}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("NumericExponentialMovingAverage values = %#v, want %#v", got, want)
+	}
+	if ema.Kind() != KindF64 {
+		t.Fatalf("NumericExponentialMovingAverage kind = %s, want %s", ema.Kind(), KindF64)
+	}
+
+	nullable := NewColumn("x", []any{1.0, NullValue, 3.0}).Data
+	nullableMdev, handled, err := NumericMovingStdDev(nullable, 2, false)
+	if err != nil || !handled {
+		t.Fatalf("NumericMovingStdDev nullable returned %#v,%v,%v", nullableMdev, handled, err)
+	}
+	if got, want := nullableMdev.Values(), []any{0.0, 0.0, 0.0}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("NumericMovingStdDev nullable values = %#v, want %#v", got, want)
+	}
+	nullableEMA, handled, err := NumericExponentialMovingAverage(nullable, 0.5)
+	if err != nil || !handled {
+		t.Fatalf("NumericExponentialMovingAverage nullable returned %#v,%v,%v", nullableEMA, handled, err)
+	}
+	if got, want := nullableEMA.Values(), []any{1.0, NullValue, 2.0}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("NumericExponentialMovingAverage nullable values = %#v, want %#v", got, want)
 	}
 }
 

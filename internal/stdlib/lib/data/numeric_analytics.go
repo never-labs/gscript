@@ -221,7 +221,8 @@ func NumericMovingStdDev(array Array, width int, sample bool) (Array, bool, erro
 	if !isNumericArray(array) {
 		return nil, false, nil
 	}
-	out := make([]any, array.Len())
+	out := make([]float64, array.Len())
+	var nullable []any
 	var moments NumericMoments
 	for row := 0; row < array.Len(); row++ {
 		value, ok, err := typedKernels.NumericAt(array, row)
@@ -246,12 +247,20 @@ func NumericMovingStdDev(array Array, width int, sample bool) (Array, bool, erro
 		}
 		variance, ok := NumericVarianceFromMoments(moments, sample)
 		if !ok {
-			out[row] = NullValue
+			nullable = ensureNumericNullableOutput(nullable, out, row)
+			nullable[row] = NullValue
 		} else {
-			out[row] = math.Sqrt(variance)
+			value := math.Sqrt(variance)
+			out[row] = value
+			if nullable != nil {
+				nullable[row] = value
+			}
 		}
 	}
-	return NewColumn("_", out).Data, true, nil
+	if nullable != nil {
+		return NewColumn("_", nullable).Data, true, nil
+	}
+	return newF64Trusted(out), true, nil
 }
 
 func NumericExponentialMovingAverage(array Array, alpha float64) (Array, bool, error) {
@@ -261,7 +270,8 @@ func NumericExponentialMovingAverage(array Array, alpha float64) (Array, bool, e
 	if !isNumericArray(array) {
 		return nil, false, nil
 	}
-	out := make([]any, array.Len())
+	out := make([]float64, array.Len())
+	var nullable []any
 	var prev float64
 	hasPrev := false
 	for row := 0; row < array.Len(); row++ {
@@ -270,7 +280,8 @@ func NumericExponentialMovingAverage(array Array, alpha float64) (Array, bool, e
 			return nil, true, err
 		}
 		if !ok {
-			out[row] = NullValue
+			nullable = ensureNumericNullableOutput(nullable, out, row)
+			nullable[row] = NullValue
 			continue
 		}
 		if !hasPrev {
@@ -280,6 +291,23 @@ func NumericExponentialMovingAverage(array Array, alpha float64) (Array, bool, e
 			prev = alpha*value + (1-alpha)*prev
 		}
 		out[row] = prev
+		if nullable != nil {
+			nullable[row] = prev
+		}
 	}
-	return NewColumn("_", out).Data, true, nil
+	if nullable != nil {
+		return NewColumn("_", nullable).Data, true, nil
+	}
+	return newF64Trusted(out), true, nil
+}
+
+func ensureNumericNullableOutput(nullable []any, values []float64, filled int) []any {
+	if nullable != nil {
+		return nullable
+	}
+	nullable = make([]any, len(values))
+	for i := 0; i < filled; i++ {
+		nullable[i] = values[i]
+	}
+	return nullable
 }
