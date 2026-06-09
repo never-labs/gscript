@@ -1788,40 +1788,7 @@ func TryTypedQNumericDyadicFloat(op string, left, right any) (Array, bool, error
 	if err != nil {
 		return nil, true, err
 	}
-	out := make([]float64, length)
-	var nulls []any
-	for row := 0; row < length; row++ {
-		leftValue, leftOK, err := numericDyadicFloatOperandAt(left, leftArray, leftIsArray, row, length)
-		if err != nil {
-			return nil, true, err
-		}
-		rightValue, rightOK, err := numericDyadicFloatOperandAt(right, rightArray, rightIsArray, row, length)
-		if err != nil {
-			return nil, true, err
-		}
-		if !leftOK || !rightOK {
-			if nulls == nil {
-				nulls = make([]any, length)
-				for i := 0; i < row; i++ {
-					nulls[i] = out[i]
-				}
-			}
-			nulls[row] = NullValue
-			continue
-		}
-		value, err := applyNumericDyadicFloatNumbers(op, leftValue, rightValue)
-		if err != nil {
-			return nil, true, err
-		}
-		out[row] = value
-		if nulls != nil {
-			nulls[row] = value
-		}
-	}
-	if nulls != nil {
-		return newNullableArray(KindF64, nulls), true, nil
-	}
-	return newF64Trusted(out), true, nil
+	return f64NumericDyadicArray{op: op, left: left, right: right, len: length}, true, nil
 }
 
 func TryTypedQNumericDyadicFloatSum(op string, left, right any) (any, bool, error) {
@@ -6839,6 +6806,8 @@ func (typedKernelRegistry) NumericAt(array Array, row int) (float64, bool, error
 		return numericI64RangeAt(a, row)
 	case f64RangeArray:
 		return numericF64RangeAt(a, row)
+	case f64NumericDyadicArray:
+		return a.f64At(row)
 	case f64BucketArray:
 		return a.f64At(row)
 	case i64RunningSumArray:
@@ -6970,7 +6939,8 @@ func isNumericArray(array Array) bool {
 		columnArray[uint8], columnArray[uint16], columnArray[uint32], columnArray[uint64],
 		columnArray[float32], columnArray[float64], i64RangeArray, f64RangeArray,
 		i64RunningSumArray, f64RunningSumArray, i64SegmentArray, i64ProductArray,
-		i64ScalarDyadicArray, i64ScalarDyadicRunningSumArray, i64BucketArray, i64XrankArray, f64BucketArray:
+		i64ScalarDyadicArray, i64ScalarDyadicRunningSumArray, f64NumericDyadicArray,
+		i64BucketArray, i64XrankArray, f64BucketArray:
 		return true
 	case nullableArray:
 		for i := 0; i < array.Len(); i++ {
@@ -10557,8 +10527,96 @@ type i64ScalarDyadicArray struct {
 	len        int
 }
 
+type f64NumericDyadicArray struct {
+	op    string
+	left  any
+	right any
+	len   int
+}
+
 type i64ScalarDyadicRunningSumArray struct {
 	source i64ScalarDyadicArray
+}
+
+func (a f64NumericDyadicArray) Kind() Kind { return KindF64 }
+
+func (a f64NumericDyadicArray) Len() int { return a.len }
+
+func (a f64NumericDyadicArray) At(row int) (any, bool) {
+	value, ok, err := a.f64At(row)
+	if err != nil {
+		return nil, false
+	}
+	if !ok {
+		return NullValue, true
+	}
+	return value, true
+}
+
+func (a f64NumericDyadicArray) Values() []any {
+	out := make([]any, a.len)
+	for row := range out {
+		value, ok, err := a.f64At(row)
+		if err != nil {
+			panic(fmt.Sprintf("data f64 dyadic row %d out of range", row))
+		}
+		if !ok {
+			out[row] = NullValue
+			continue
+		}
+		out[row] = value
+	}
+	return out
+}
+
+func (a f64NumericDyadicArray) Gather(indexes []int) Array {
+	out := make([]float64, len(indexes))
+	var nullable []any
+	for i, row := range indexes {
+		value, ok, err := a.f64At(row)
+		if err != nil {
+			panic(fmt.Sprintf("data f64 dyadic gather row %d out of range", row))
+		}
+		if !ok {
+			if nullable == nil {
+				nullable = make([]any, len(indexes))
+				for j := 0; j < i; j++ {
+					nullable[j] = out[j]
+				}
+			}
+			nullable[i] = NullValue
+			continue
+		}
+		out[i] = value
+		if nullable != nil {
+			nullable[i] = value
+		}
+	}
+	if nullable != nil {
+		return newNullableArray(KindF64, nullable)
+	}
+	return newF64Trusted(out)
+}
+
+func (a f64NumericDyadicArray) f64At(row int) (float64, bool, error) {
+	if row < 0 || row >= a.len {
+		return 0, false, fmt.Errorf("array row %d out of range", row)
+	}
+	leftArray, leftIsArray := a.left.(Array)
+	rightArray, rightIsArray := a.right.(Array)
+	leftValue, leftOK, err := numericDyadicFloatOperandAt(a.left, leftArray, leftIsArray, row, a.len)
+	if err != nil || !leftOK {
+		return 0, leftOK, err
+	}
+	rightValue, rightOK, err := numericDyadicFloatOperandAt(a.right, rightArray, rightIsArray, row, a.len)
+	if err != nil || !rightOK {
+		return 0, rightOK, err
+	}
+	value, err := applyNumericDyadicFloatNumbers(a.op, leftValue, rightValue)
+	if err != nil {
+		return 0, false, err
+	}
+	return value, true, nil
 }
 
 func (a i64ScalarDyadicArray) Kind() Kind { return KindI64 }

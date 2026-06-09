@@ -2391,6 +2391,9 @@ func TestTypedNumericUnaryBinaryAndAggregates(t *testing.T) {
 	if err != nil || !ok {
 		t.Fatalf("TryTypedQNumericDyadicFloat xexp array-array = %#v,%v,%v; want handled nil error", typedXexp, ok, err)
 	}
+	if _, lazy := typedXexp.(f64NumericDyadicArray); !lazy {
+		t.Fatalf("TryTypedQNumericDyadicFloat xexp returned %T, want lazy f64NumericDyadicArray", typedXexp)
+	}
 	if got, want := typedXexp.Values(), []any{8.0, 9.0}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("TryTypedQNumericDyadicFloat xexp values = %v, want %v", got, want)
 	}
