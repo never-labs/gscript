@@ -2568,6 +2568,8 @@ func TryTypedWithinIndexesI64(array Array, low, high any, highClosed bool) (Arra
 			return nil, handled, err
 		}
 		return newI64PeriodicIndexArray(int64(a.source.Len()), residues, a.len), true, nil
+	case nullableArray:
+		return typedWithinNullableIndexesI64(a, low, high, highClosed)
 	default:
 		indexes, ok := typedKernels.WithinIndexes(a, low, high, highClosed, nil)
 		if !ok {
@@ -2753,6 +2755,27 @@ func typedWithinTiledResidues(array tiledArray, low, high any, highClosed bool) 
 		}
 	}
 	return residues, true, nil
+}
+
+func typedWithinNullableIndexesI64(array nullableArray, low, high any, highClosed bool) (Array, bool, error) {
+	out := make([]int64, 0)
+	for row, value := range array.data {
+		if IsNull(value) {
+			continue
+		}
+		lowCmp, ok := compareSameKind(value, low)
+		if !ok {
+			return nil, false, nil
+		}
+		highCmp, ok := compareSameKind(value, high)
+		if !ok {
+			return nil, false, nil
+		}
+		if lowCmp >= 0 && (highCmp < 0 || (highClosed && highCmp == 0)) {
+			out = append(out, int64(row))
+		}
+	}
+	return newI64Trusted(out), true, nil
 }
 
 func compareScalarDyadicIndexStats(array i64ScalarDyadicArray, op Op, value any) (count, sum int64, handled bool, err error) {

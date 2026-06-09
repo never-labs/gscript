@@ -314,6 +314,21 @@ func TestTryTypedWithinIndexStatsBucketViews(t *testing.T) {
 	}
 }
 
+func TestTryTypedWithinIndexesNullableTemporal(t *testing.T) {
+	dates := newNullableArray(KindDate, []any{DateFromDays(10), DateFromDays(11), NullValue, DateFromDays(12), DateFromDays(13)})
+	indexes, handled, err := TryTypedWithinIndexesI64(dates, DateFromDays(11), DateFromDays(12), true)
+	if err != nil || !handled {
+		t.Fatalf("TryTypedWithinIndexesI64 nullable dates handled=%v err=%v; want true,nil", handled, err)
+	}
+	if got, want := indexes.Values(), []any{int64(1), int64(3)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("nullable date within indexes = %v, want %v", got, want)
+	}
+	count, sum, handled, err := TryTypedWithinIndexStatsI64(dates, DateFromDays(11), DateFromDays(12), true)
+	if err != nil || !handled || count != 2 || sum != 4 {
+		t.Fatalf("nullable date within stats = %d,%d,%v,%v; want 2,4,true,nil", count, sum, handled, err)
+	}
+}
+
 func TestTryTypedCastIntegerArrays(t *testing.T) {
 	shorts, handled, err := TryTypedCast(KindI16, NewI64Range(0, 2, 4))
 	if err != nil {
