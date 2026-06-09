@@ -199,6 +199,57 @@ func TestQEvalPipelineRuntimeBackendExecutesFusedRuntimeShapes(t *testing.T) {
 	}
 }
 
+func TestQEvalPipelineRuntimeBackendPrefersExecutablePlanByDefault(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		src         string
+		wantInt     int64
+		wantFloat   float64
+		floatResult bool
+	}{
+		{name: "sequence_sum_reverse", src: "+/reverse 8#til 4", wantInt: 12},
+		{name: "sequence_sum_ratios", src: "+/ratios 2 4 8 16", wantFloat: 8, floatResult: true},
+		{name: "apply_scalar_at", src: "x:10 20 30;x@1", wantInt: 20},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ref := qEvalPipelineDescriptorBackendTestRef(t, tc.src)
+			backend := newQRuntimeEvalPipelineBackend([]QEvalPipelinePlanRef{ref})
+			executableCalls := 0
+			backend.executeExecutable = func(plan stdq.EvalPipelineExecutablePlan) (any, bool, error) {
+				executableCalls++
+				return stdq.NewEvalState(nil).ExecuteEvalPipelineExecutablePlan(plan)
+			}
+			backend.executeBackendPlan = func(plan stdq.EvalPipelineBackendPlan) (any, bool, error) {
+				return nil, false, errors.New("backend plan fallback should not execute")
+			}
+			backend.executeDescriptor = func(descriptor stdq.EvalPipelineDescriptor) (any, bool, error) {
+				return nil, false, errors.New("descriptor fallback should not execute")
+			}
+			backend.executeSource = func(source string) (any, bool, error) {
+				return nil, false, errors.New("source planner fallback should not execute")
+			}
+
+			value, handled, err := executeQEvalPipelinePlanValue(backend, ref)
+			if err != nil {
+				t.Fatalf("executeQEvalPipelinePlanValue: %v", err)
+			}
+			if !handled {
+				t.Fatalf("executeQEvalPipelinePlanValue handled=false")
+			}
+			if tc.floatResult {
+				if !value.IsFloat() || value.Float() != tc.wantFloat {
+					t.Fatalf("executeQEvalPipelinePlanValue = %v, want float %v", value, tc.wantFloat)
+				}
+			} else if !value.IsInt() || value.Int() != tc.wantInt {
+				t.Fatalf("executeQEvalPipelinePlanValue = %v, want int %d", value, tc.wantInt)
+			}
+			if executableCalls != 1 {
+				t.Fatalf("executable calls = %d, want 1", executableCalls)
+			}
+		})
+	}
+}
+
 func TestQEvalPipelineLoweringRecognizesMathRuntimePrimitive(t *testing.T) {
 	for _, tc := range []struct {
 		name  string
