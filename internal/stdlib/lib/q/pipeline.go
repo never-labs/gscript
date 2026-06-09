@@ -2,6 +2,7 @@ package q
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/never-labs/leia/internal/stdlib/lib/data"
@@ -25,6 +26,7 @@ const (
 	qPipelineSumVectorExpr
 	qPipelineSumDyadicMinMax
 	qPipelineSumDyadicFloatMath
+	qPipelineSumSequenceTransform
 	qPipelineCountVectorExpr
 	qPipelineCountDistinct
 	qPipelineCountWhereIn
@@ -267,6 +269,9 @@ func buildQPipelinePlan(src string) qPipelinePlan {
 		if plan, ok := buildQPipelineSumDyadicFloatMathPlan(right); ok {
 			return qPipelinePlanWithBindingPlans(withSource(plan))
 		}
+		if plan, ok := buildQPipelineSumSequenceTransformPlan(right); ok {
+			return qPipelinePlanWithBindingPlans(withSource(plan))
+		}
 		if qPipelineVectorTransformExprCandidate(right) {
 			plan := qPipelineShapePlan(qPipelineSumVectorExpr, "")
 			plan.reductionInput = right
@@ -288,6 +293,9 @@ func buildQPipelinePlan(src string) qPipelinePlan {
 			return qPipelinePlanWithBindingPlans(withSource(plan))
 		}
 		if plan, ok := buildQPipelineSumDyadicFloatMathPlan(inputExpr); ok {
+			return qPipelinePlanWithBindingPlans(withSource(plan))
+		}
+		if plan, ok := buildQPipelineSumSequenceTransformPlan(inputExpr); ok {
 			return qPipelinePlanWithBindingPlans(withSource(plan))
 		}
 		if input, ok := qPipelineRazeInput(inputExpr); ok {
@@ -380,6 +388,47 @@ func buildQPipelineApplyScalarIndexPlan(src string) (qPipelinePlan, bool) {
 		valueExpr: apply.target,
 		indexExpr: fmt.Sprintf("%d", apply.index),
 	}, true
+}
+
+func buildQPipelineSumSequenceTransformPlan(src string) (qPipelinePlan, bool) {
+	transform, leftExpr, valueExpr, ok := qPipelineSequenceTransformInput(src)
+	if !ok {
+		return qPipelinePlan{}, false
+	}
+	plan := qPipelineShapePlan(qPipelineSumSequenceTransform, transform)
+	plan.compareOp = transform
+	plan.leftExpr = leftExpr
+	plan.reductionInput = valueExpr
+	return plan, true
+}
+
+func qPipelineSequenceTransformInput(src string) (transform, leftExpr, valueExpr string, ok bool) {
+	src = stripEnclosingParens(strings.TrimSpace(src))
+	for _, spec := range []struct {
+		prefix    string
+		transform string
+	}{
+		{"reverse ", data.SequenceTransformReverse},
+		{"ratios ", data.SequenceTransformRatios},
+	} {
+		if strings.HasPrefix(src, spec.prefix) && wordBoundary(src, 0, len(strings.TrimSpace(spec.prefix))) {
+			arg := strings.TrimSpace(src[len(spec.prefix):])
+			return spec.transform, "", arg, arg != ""
+		}
+	}
+	if left, right, found := splitTopLevelWord(src, "rotate"); found {
+		return data.SequenceTransformRotate, strings.TrimSpace(left), strings.TrimSpace(right), strings.TrimSpace(left) != "" && strings.TrimSpace(right) != ""
+	}
+	if args, found := qFunctionCallArgs(src); found && strings.TrimSpace(src[:strings.Index(src, "[")]) == "sublist" {
+		if len(args) != 2 {
+			return "", "", "", false
+		}
+		return data.SequenceTransformSublist, strings.TrimSpace(args[0]), strings.TrimSpace(args[1]), strings.TrimSpace(args[0]) != "" && strings.TrimSpace(args[1]) != ""
+	}
+	if left, right, found := splitTopLevelWord(src, "sublist"); found {
+		return data.SequenceTransformSublist, strings.TrimSpace(left), strings.TrimSpace(right), strings.TrimSpace(left) != "" && strings.TrimSpace(right) != ""
+	}
+	return "", "", "", false
 }
 
 func buildQPipelineCountSequencePlan(src string) (qPipelinePlan, bool) {
@@ -1045,6 +1094,8 @@ func (s *EvalState) evalQPipelinePlan(plan qPipelinePlan) (any, bool, error) {
 		out, handled, err = s.evalQPipelineSumDyadicMinMax(plan)
 	case qPipelineSumDyadicFloatMath:
 		out, handled, err = s.evalQPipelineSumDyadicFloatMath(plan)
+	case qPipelineSumSequenceTransform:
+		out, handled, err = s.evalQPipelineSumSequenceTransform(plan)
 	case qPipelineCountVectorExpr:
 		out, handled, err = s.evalQPipelineCountVectorExpr(plan)
 	case qPipelineCountDistinct:
@@ -1108,6 +1159,86 @@ func (s *EvalState) evalQPipelineApplyScalarIndex(plan qPipelinePlan) (any, bool
 		return nil, true, err
 	}
 	return out, true, nil
+}
+
+func (s *EvalState) evalQPipelineSumSequenceTransform(plan qPipelinePlan) (any, bool, error) {
+	var left any
+	var leftOK bool
+	if plan.leftExpr != "" {
+		var err error
+		left, err = s.evalQPipelinePlannedExpr(plan.leftExpr, &plan.leftPlan)
+		if err != nil {
+			return nil, true, err
+		}
+		leftOK = true
+	}
+	args, err := s.evalQPipelineSequenceTransformArgs(plan, left, leftOK)
+	if err != nil {
+		return nil, true, err
+	}
+	value, err := s.evalQPipelinePlannedExpr(plan.reductionInput, &plan.reductionPlan)
+	if err != nil {
+		return nil, true, err
+	}
+	shape := "vector-reduce/sum-" + plan.compareOp + "/" + string(qRuntimeKernelOperandKind(value, nil))
+	if len(args) > 0 {
+		shape += "/args-" + strconv.Itoa(len(args))
+	}
+	operands := []qPipelineOperandFingerprint{
+		qPipelineOperandFingerprintForValue(qPipelineOperandReduction, value),
+	}
+	if leftOK {
+		operands = append([]qPipelineOperandFingerprint{qPipelineOperandFingerprintForValue(qPipelineOperandLeft, left)}, operands...)
+	}
+	bindingKey := qPipelineBindingKey(plan, operands)
+	if bound, ok := qGlobalPipelineBindingCacheProbe(bindingKey); ok {
+		return evalQPipelineSumSequenceTransformBound(plan, bound, args, value)
+	}
+	bound := qPipelineBoundPlan{
+		key:            bindingKey,
+		resultClass:    "array",
+		resultKind:     qRuntimeKernelOperandKind(value, nil),
+		kernel:         "SequenceTransformSum",
+		kernelShape:    shape,
+		fallbackReason: RuntimeFallbackUnsupportedType,
+	}
+	qGlobalPipelineBindingCacheStore(bound)
+	return evalQPipelineSumSequenceTransformBound(plan, bound, args, value)
+}
+
+func evalQPipelineSumSequenceTransformBound(plan qPipelinePlan, bound qPipelineBoundPlan, args []int, value any) (any, bool, error) {
+	if qRuntimeKernelOperandKind(value, nil) != bound.resultKind {
+		return nil, false, nil
+	}
+	return evalQTypedRuntimeKernel(qTypedRuntimeKernel[any]{
+		kernel:         "SequenceTransformSum",
+		shape:          bound.kernelShape,
+		fallbackReason: bound.fallbackReason,
+		call: func() (any, bool, error) {
+			return data.TryTypedSequenceTransformNumericSum(plan.compareOp, args, value)
+		},
+	})
+}
+
+func (s *EvalState) evalQPipelineSequenceTransformArgs(plan qPipelinePlan, left any, leftOK bool) ([]int, error) {
+	switch plan.compareOp {
+	case data.SequenceTransformRotate:
+		if !leftOK {
+			return nil, fmt.Errorf("rotate expects an integer count")
+		}
+		n, ok := integerValue(left)
+		if !ok || int64(int(n)) != n {
+			return nil, fmt.Errorf("rotate expects an integer count")
+		}
+		return []int{int(n)}, nil
+	case data.SequenceTransformSublist:
+		if !leftOK {
+			return nil, fmt.Errorf("sublist expects integer indexes")
+		}
+		return qIntegerIndexes("sublist", left)
+	default:
+		return nil, nil
+	}
 }
 
 func (s *EvalState) evalQPipelineSumRaze(plan qPipelinePlan) (any, bool, error) {

@@ -209,7 +209,7 @@ func TestQPipelinePlanCachesBoundModuloMaskPlan(t *testing.T) {
 
 func TestQPipelinePlanRecognizesGenericVectorReduceAndCount(t *testing.T) {
 	sumPlan := buildQPipelinePlan("sum reverse 8#til 4")
-	if sumPlan.kind != qPipelineSumVectorExpr || sumPlan.shape != "vector-reduce/sum-expr" || sumPlan.reductionInput != "reverse 8#til 4" {
+	if sumPlan.kind != qPipelineSumSequenceTransform || sumPlan.shape != "vector-reduce/sum-reverse" || sumPlan.reductionInput != "8#til 4" {
 		t.Fatalf("sum vector expr plan = %#v", sumPlan)
 	}
 	countPlan := buildQPipelinePlan("count 8#til 4")
@@ -500,10 +500,10 @@ func TestQPipelineShapeRegistryStabilizesExpressionPlans(t *testing.T) {
 		{
 			name:      "vector transform reduce",
 			source:    "sum reverse 8#til 4",
-			shape:     "vector-reduce/sum-expr",
+			shape:     "vector-reduce/sum-reverse",
 			family:    qPipelineShapeFamilyVector,
 			reducer:   "sum",
-			transform: "expr",
+			transform: "reverse",
 			pipeline:  "vector_reduce",
 		},
 		{
@@ -762,12 +762,12 @@ func TestDescribeEvalPipelineExposesReadOnlyRuntimeDescriptor(t *testing.T) {
 	if !ok {
 		t.Fatalf("DescribeEvalPipeline did not recognize generic vector sum pipeline")
 	}
-	if descriptor.Shape != "vector-reduce/sum-expr" ||
+	if descriptor.Shape != "vector-reduce/sum-reverse" ||
 		descriptor.PipelineShape != "vector_reduce" ||
 		descriptor.ShapeFamily != "vector" ||
 		descriptor.ShapeReducer != "sum" ||
-		descriptor.ShapeTransform != "expr" ||
-		descriptor.ReductionInput != "reverse 8#til 4" {
+		descriptor.ShapeTransform != "reverse" ||
+		descriptor.ReductionInput != "8#til 4" {
 		t.Fatalf("generic sum descriptor = %#v", descriptor)
 	}
 	if got, handled, err := ExecuteEvalPipelineDescriptor(descriptor); err != nil || !handled || got != int64(12) {
@@ -1233,7 +1233,7 @@ func TestEvalScriptWarmBindingsKeepFastAndSemanticPathsSeparate(t *testing.T) {
 	assertStateEvalValue(t, state, "x:til 16;sum drop 4 x", int64(114))
 
 	rotatePlan := state.qPipelinePlan("sum 5 rotate x")
-	if rotatePlan.kind != qPipelineSumVectorExpr || rotatePlan.reductionPlan.kind == qScriptBindingInvalid {
+	if rotatePlan.kind != qPipelineSumSequenceTransform || rotatePlan.leftPlan.kind == qScriptBindingInvalid || rotatePlan.reductionPlan.kind == qScriptBindingInvalid {
 		t.Fatalf("rotate transform pipeline missing warm binding: %#v", rotatePlan)
 	}
 	assertStateEvalValue(t, state, "x:til 16;sum 5 rotate x", int64(120))
@@ -3130,7 +3130,7 @@ func TestEvalWhereRecordsTypedRuntimeKernel(t *testing.T) {
 		if stat.Kernel == "ArraySortIndexes" && stat.Shape == "sort-index/i64/asc" && stat.Outcome == "hit" && stat.ReasonCode == "typed_kernel" && stat.Count > 0 {
 			seenSortIndexes = true
 		}
-		if stat.Kernel == "ArrayCountReverse" && stat.Shape == "count-reverse/string" && stat.Outcome == "hit" && stat.ReasonCode == "typed_kernel" && stat.Count > 0 {
+		if stat.Kernel == "SequenceTransformCount" && stat.Shape == "reverse-count/string" && stat.Outcome == "hit" && stat.ReasonCode == "typed_kernel" && stat.Count > 0 {
 			seenCountReverse = true
 		}
 		if stat.Kernel == "ArrayGatherI64Indexes" && stat.Shape == "gather/i64/i64" && stat.Outcome == "hit" && stat.ReasonCode == "typed_kernel" && stat.Count > 0 {
@@ -4406,6 +4406,46 @@ func TestEvalDeltasRecordsTypedRuntimeKernel(t *testing.T) {
 	}
 	if !seenDeltas || !seenDeltasSum {
 		t.Fatalf("missing deltas runtime stats: deltas=%v deltasSum=%v stats=%#v", seenDeltas, seenDeltasSum, RuntimeKernelExecutionStats())
+	}
+}
+
+func TestEvalSequenceTransformSumAndCountRecordsRuntimeKernel(t *testing.T) {
+	cases := []struct {
+		name string
+		expr string
+		want any
+	}{
+		{name: "reverse_sum", expr: "+/reverse til 8", want: int64(28)},
+		{name: "rotate_sum", expr: "+/3 rotate til 8", want: int64(28)},
+		{name: "sublist_sum", expr: "+/2 4 sublist til 8", want: int64(14)},
+		{name: "ratios_sum", expr: "+/ratios 2 4 8 16", want: float64(8)},
+		{name: "reverse_count", expr: "count reverse til 8", want: int64(8)},
+		{name: "ratios_count", expr: "count ratios 2 4 8 16", want: int64(4)},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ClearRuntimeKernelExecutionStats()
+			t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+			assertEvalValue(t, tc.expr, tc.want)
+
+			seen := false
+			for _, stat := range RuntimeKernelExecutionStats() {
+				if stat.Outcome == "fallback" || stat.Outcome == "error" {
+					t.Fatalf("unexpected sequence transform fallback/error: %#v all=%#v", stat, RuntimeKernelExecutionStats())
+				}
+				if stat.Kernel == "SequenceTransformSum" && stat.Outcome == "hit" {
+					seen = true
+				}
+				if stat.Kernel == "SequenceTransformCount" && stat.Outcome == "hit" {
+					seen = true
+				}
+			}
+			if !seen {
+				t.Fatalf("missing sequence transform runtime stat: %#v", RuntimeKernelExecutionStats())
+			}
+		})
 	}
 }
 

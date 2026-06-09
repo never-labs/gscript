@@ -7248,3 +7248,46 @@ func TestMatrixReshapeTransposeAndMultiply(t *testing.T) {
 		}
 	}
 }
+
+func TestSequenceTransformRuntimeHelpers(t *testing.T) {
+	values := NewI64Range(1, 1, 8)
+
+	count, handled, err := SequenceTransformCount(SequenceTransformReverse, nil, values)
+	if err != nil || !handled || count != 8 {
+		t.Fatalf("SequenceTransformCount reverse = %d,%v,%v; want 8,true,nil", count, handled, err)
+	}
+
+	sum, handled, err := TryTypedSequenceTransformNumericSum(SequenceTransformReverse, nil, values)
+	if err != nil || !handled || sum != int64(36) {
+		t.Fatalf("TryTypedSequenceTransformNumericSum reverse = %#v,%v,%v; want 36,true,nil", sum, handled, err)
+	}
+
+	sum, handled, err = TryTypedSequenceTransformNumericSum(SequenceTransformRotate, []int{3}, values)
+	if err != nil || !handled || sum != int64(36) {
+		t.Fatalf("TryTypedSequenceTransformNumericSum rotate = %#v,%v,%v; want 36,true,nil", sum, handled, err)
+	}
+
+	sum, handled, err = TryTypedSequenceTransformNumericSum(SequenceTransformSublist, []int{2, 4}, values)
+	if err != nil || !handled || sum != int64(18) {
+		t.Fatalf("TryTypedSequenceTransformNumericSum sublist = %#v,%v,%v; want 18,true,nil", sum, handled, err)
+	}
+
+	ratioSum, handled, err := TryTypedSequenceTransformNumericSum(SequenceTransformRatios, nil, NewI64([]int64{2, 4, 8, 16}))
+	if err != nil || !handled || ratioSum != float64(8) {
+		t.Fatalf("TryTypedSequenceTransformNumericSum ratios = %#v,%v,%v; want 8,true,nil", ratioSum, handled, err)
+	}
+
+	cut, err := Cut([]int{0, 3, 6}, values)
+	if err != nil {
+		t.Fatalf("Cut range returned error: %v", err)
+	}
+	segments := cut.(Array)
+	first, _ := segments.At(0)
+	if got, want := first.(Array).Values(), []any{int64(1), int64(2), int64(3)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("cut first segment = %#v, want %#v", got, want)
+	}
+	razeSum, handled, err := TryTypedSequenceTransformNumericSum(SequenceTransformRaze, nil, segments)
+	if err != nil || !handled || razeSum != int64(36) {
+		t.Fatalf("TryTypedSequenceTransformNumericSum raze cut = %#v,%v,%v; want 36,true,nil", razeSum, handled, err)
+	}
+}

@@ -2,6 +2,16 @@ package data
 
 import "fmt"
 
+const (
+	SequenceTransformReverse = "reverse"
+	SequenceTransformRotate  = "rotate"
+	SequenceTransformSublist = "sublist"
+	SequenceTransformCut     = "cut"
+	SequenceTransformRaze    = "raze"
+	SequenceTransformDeltas  = "deltas"
+	SequenceTransformRatios  = "ratios"
+)
+
 // SequenceItems exposes scalar-or-array inputs as a flat item slice for
 // language frontends that support scalar extension over list operations.
 func SequenceItems(value any) []any {
@@ -53,6 +63,112 @@ func RazeCount(value any) (int64, bool, error) {
 		return count, true, nil
 	default:
 		return 0, false, nil
+	}
+}
+
+// SequenceTransformCount returns the output length for list transforms whose
+// count can be computed without materializing the transformed value.
+func SequenceTransformCount(transform string, args []int, value any) (int64, bool, error) {
+	switch transform {
+	case SequenceTransformReverse, SequenceTransformRotate, SequenceTransformDeltas, SequenceTransformRatios:
+		switch x := value.(type) {
+		case Array:
+			if (transform == SequenceTransformDeltas || transform == SequenceTransformRatios) && !isNumericArray(x) {
+				return 0, false, nil
+			}
+			return int64(x.Len()), true, nil
+		case Frame:
+			return int64(x.Len()), true, nil
+		case string:
+			return int64(len([]rune(x))), true, nil
+		default:
+			if transform == SequenceTransformDeltas || transform == SequenceTransformRatios {
+				if IsNull(value) {
+					return 1, true, nil
+				}
+				if _, ok := numeric(value); ok {
+					return 1, true, nil
+				}
+				return 0, false, nil
+			}
+			return 1, true, nil
+		}
+	case SequenceTransformSublist:
+		switch len(args) {
+		case 1:
+			return TakeRepeatCount(args[0], value), true, nil
+		case 2:
+			out, err := SublistCount(args[0], args[1], value)
+			return out, err == nil, err
+		default:
+			return 0, true, fmt.Errorf("sublist expects count or start count")
+		}
+	case SequenceTransformCut:
+		out, err := CutCount(args, value)
+		return out, err == nil, err
+	case SequenceTransformRaze:
+		return RazeCount(value)
+	default:
+		return 0, false, nil
+	}
+}
+
+// TryTypedSequenceTransformNumericSum reduces common list transforms directly
+// through reusable runtime primitives. It is intentionally transform-oriented
+// so q and Leia frontends can share the same view/reduce behavior.
+func TryTypedSequenceTransformNumericSum(transform string, args []int, value any) (any, bool, error) {
+	switch transform {
+	case SequenceTransformReverse:
+		array, ok := value.(Array)
+		if !ok {
+			return nil, false, nil
+		}
+		return TryTypedNumericSum(array)
+	case SequenceTransformRotate:
+		if len(args) != 1 {
+			return nil, true, fmt.Errorf("rotate expects an integer count")
+		}
+		array, ok := value.(Array)
+		if !ok {
+			return nil, false, nil
+		}
+		return TryTypedNumericSum(array)
+	case SequenceTransformSublist:
+		array, ok := value.(Array)
+		if !ok {
+			return nil, false, nil
+		}
+		var sliced Array
+		var err error
+		switch len(args) {
+		case 1:
+			sliced, err = TakeRepeat(array, args[0])
+		case 2:
+			start, count := boundedStartCount(array.Len(), args[0], args[1])
+			sliced, err = Slice(array, start, count)
+		default:
+			return nil, true, fmt.Errorf("sublist expects count or start count")
+		}
+		if err != nil {
+			return nil, true, err
+		}
+		return TryTypedNumericSum(sliced)
+	case SequenceTransformRaze:
+		return TryTypedNestedNumericSum(value)
+	case SequenceTransformDeltas:
+		array, ok := value.(Array)
+		if !ok {
+			return nil, false, nil
+		}
+		return TryTypedDeltasSum(array)
+	case SequenceTransformRatios:
+		array, ok := value.(Array)
+		if !ok {
+			return nil, false, nil
+		}
+		return TryTypedRatiosSum(array)
+	default:
+		return nil, false, nil
 	}
 }
 
@@ -127,7 +243,8 @@ func Cut(indexes []int, value any) (any, error) {
 			if i+1 < len(indexes) {
 				end = indexes[i+1]
 			}
-			part, err := Gather(x, SegmentIndexes(x.Len(), start, end))
+			start, end = boundedSegment(x.Len(), start, end)
+			part, err := Slice(x, start, end-start)
 			if err != nil {
 				return nil, err
 			}
@@ -224,7 +341,40 @@ func SublistCount(start, count int, value any) (int64, error) {
 	}
 }
 
+func TakeRepeatCount(n int, value any) int64 {
+	if n == 0 {
+		return 0
+	}
+	switch x := value.(type) {
+	case Array:
+		if x.Len() == 0 {
+			return 0
+		}
+	case Frame:
+		if x.Len() == 0 {
+			return 0
+		}
+	case string:
+		if len([]rune(x)) == 0 {
+			return 0
+		}
+	}
+	if n < 0 {
+		n = -n
+	}
+	return int64(n)
+}
+
 func SegmentIndexes(length, start, end int) []int {
+	start, end = boundedSegment(length, start, end)
+	indexes := make([]int, end-start)
+	for i := range indexes {
+		indexes[i] = start + i
+	}
+	return indexes
+}
+
+func boundedSegment(length, start, end int) (int, int) {
 	if start < 0 {
 		start = 0
 	}
@@ -237,11 +387,7 @@ func SegmentIndexes(length, start, end int) []int {
 	if end > length {
 		end = length
 	}
-	indexes := make([]int, end-start)
-	for i := range indexes {
-		indexes[i] = start + i
-	}
-	return indexes
+	return start, end
 }
 
 func boundedStartCount(length, start, count int) (int, int) {
