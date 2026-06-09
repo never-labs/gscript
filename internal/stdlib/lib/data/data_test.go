@@ -4100,6 +4100,30 @@ func TestTryTypedSortIndexSumI64(t *testing.T) {
 	}
 }
 
+func TestTryTypedRankSumAndSortedEdge(t *testing.T) {
+	rankSum, ok, err := TryTypedRankSumI64(NewSymbols([]string{"x", "a", "b", "z", "c"}))
+	if err != nil || !ok {
+		t.Fatalf("TryTypedRankSumI64 handled=%v err=%v; want true,nil", ok, err)
+	}
+	if want := int64(10); rankSum != want {
+		t.Fatalf("rank sum = %d, want %d", rankSum, want)
+	}
+	firstAsc, ok, err := TryTypedSortedEdge(NewI64([]int64{3, 1, 2}), false, false)
+	if err != nil || !ok {
+		t.Fatalf("TryTypedSortedEdge first asc handled=%v err=%v; want true,nil", ok, err)
+	}
+	if firstAsc != int64(1) {
+		t.Fatalf("first asc = %#v, want 1", firstAsc)
+	}
+	firstDesc, ok, err := TryTypedSortedEdge(NewI64([]int64{3, 1, 2}), true, false)
+	if err != nil || !ok {
+		t.Fatalf("TryTypedSortedEdge first desc handled=%v err=%v; want true,nil", ok, err)
+	}
+	if firstDesc != int64(3) {
+		t.Fatalf("first desc = %#v, want 3", firstDesc)
+	}
+}
+
 func TestTryTypedSortIndexesNullableTemporalAndRankRange(t *testing.T) {
 	dates := NewColumn("d", []any{Date(2), NullForKind(KindDate), Date(1)}).Data
 	indexes, ok, err := TryTypedSortIndexesI64(dates, false)

@@ -5086,6 +5086,106 @@ func TryTypedSortIndexSumI64(array Array, descending bool) (int64, bool, error) 
 	}
 }
 
+// TryTypedRankSumI64 reduces +/rank directly. q rank produces a permutation of
+// row positions for supported sortable arrays, so the sum is invariant.
+func TryTypedRankSumI64(array Array) (int64, bool, error) {
+	if array == nil {
+		return 0, true, fmt.Errorf("rank sum array is nil")
+	}
+	if _, handled, err := TryTypedSortIndexSumI64(array, false); err != nil || !handled {
+		return 0, handled, err
+	}
+	return arithmeticSeriesSum(array.Len()), true, nil
+}
+
+// TryTypedSortedEdge returns first/last asc/desc without materializing the
+// sorted vector. It keeps the sort-index semantics, including typed temporal
+// null ordering, but gathers only one row.
+func TryTypedSortedEdge(array Array, descending bool, last bool) (any, bool, error) {
+	if array == nil {
+		return nil, true, fmt.Errorf("sorted edge array is nil")
+	}
+	if array.Len() == 0 {
+		return NullValue, true, nil
+	}
+	wantMax := descending != last
+	switch a := array.(type) {
+	case attributedArray:
+		return TryTypedSortedEdge(a.array, descending, last)
+	case i64RangeArray:
+		row := 0
+		if (a.step >= 0 && wantMax) || (a.step < 0 && !wantMax) {
+			row = a.len - 1
+		}
+		return a.start + int64(row)*a.step, true, nil
+	case columnArray[int64]:
+		return typedSortedEdgeBy(a.data, wantMax, compareTypedSigned[int64]), true, nil
+	case columnArray[string]:
+		return typedSortedEdgeBy(a.data, wantMax, compareString), true, nil
+	case columnArray[Symbol]:
+		return typedSortedEdgeBy(a.data, wantMax, func(left, right Symbol) int {
+			return compareString(string(left), string(right))
+		}), true, nil
+	case columnArray[Month]:
+		return typedSortedEdgeBy(a.data, wantMax, compareTypedSigned[Month]), true, nil
+	case columnArray[Date]:
+		return typedSortedEdgeBy(a.data, wantMax, compareTypedSigned[Date]), true, nil
+	case columnArray[DateTime]:
+		return typedSortedEdgeBy(a.data, wantMax, compareTypedSigned[DateTime]), true, nil
+	case columnArray[Timespan]:
+		return typedSortedEdgeBy(a.data, wantMax, compareTypedSigned[Timespan]), true, nil
+	case columnArray[Minute]:
+		return typedSortedEdgeBy(a.data, wantMax, compareTypedSigned[Minute]), true, nil
+	case columnArray[Second]:
+		return typedSortedEdgeBy(a.data, wantMax, compareTypedSigned[Second]), true, nil
+	case columnArray[Time]:
+		return typedSortedEdgeBy(a.data, wantMax, compareTypedSigned[Time]), true, nil
+	case columnArray[Timestamp]:
+		return typedSortedEdgeBy(a.data, wantMax, compareTypedSigned[Timestamp]), true, nil
+	}
+	indexes, handled, err := TryTypedSortIndexesI64(array, descending)
+	if err != nil || !handled {
+		return nil, handled, err
+	}
+	row := 0
+	if last {
+		row = indexes.Len() - 1
+	}
+	value, ok := indexes.At(row)
+	if !ok {
+		return nil, true, fmt.Errorf("sorted edge index %d out of bounds", row)
+	}
+	var rawIndex int64
+	switch x := value.(type) {
+	case int64:
+		rawIndex = x
+	case int:
+		rawIndex = int64(x)
+	default:
+		return nil, true, fmt.Errorf("sorted edge index has type %T", value)
+	}
+	index, err := checkedI64Index(rawIndex)
+	if err != nil {
+		return nil, true, err
+	}
+	out, ok := array.At(index)
+	if !ok {
+		return nil, true, fmt.Errorf("sorted edge row %d out of bounds", index)
+	}
+	return out, true, nil
+}
+
+func typedSortedEdgeBy[T any](values []T, wantMax bool, compare func(T, T) int) T {
+	best := values[0]
+	for _, value := range values[1:] {
+		cmp := compare(value, best)
+		if (wantMax && cmp > 0) || (!wantMax && cmp < 0) {
+			best = value
+		}
+	}
+	return best
+}
+
 func arithmeticSeriesSum(n int) int64 {
 	if n <= 1 {
 		return 0

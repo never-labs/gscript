@@ -4520,6 +4520,40 @@ func TestEvalSortAndSortIndexes(t *testing.T) {
 	assertEvalArray(t, "rank 2026.06.07 0Nd 2026.06.06", data.KindI64, []any{int64(2), int64(0), int64(1)})
 }
 
+func TestEvalSortRankReducerBundleRecordsTypedRuntimeKernel(t *testing.T) {
+	ClearRuntimeKernelExecutionStats()
+	t.Cleanup(ClearRuntimeKernelExecutionStats)
+	assertEvalValue(t, "(+/iasc 3 1 2 1)+(+/rank `x`a`b`z`c)+(first asc 3 1 2)+(first desc 3 1 2)", int64(20))
+	seenBundle := false
+	seenRank := false
+	seenEdge := false
+	for _, stat := range RuntimeKernelExecutionStats() {
+		if stat.Outcome == "fallback" || stat.Outcome == "error" {
+			t.Fatalf("unexpected sort/rank reducer fallback/error: %#v all=%#v", stat, RuntimeKernelExecutionStats())
+		}
+		if stat.Kernel == "SortRankReducerBundle" && stat.Outcome == "hit" && stat.ReasonCode == "typed_kernel" {
+			seenBundle = true
+		}
+		if stat.Kernel == "ArrayRankSum" && stat.Outcome == "hit" && stat.Shape == "rank-sum/symbol" {
+			seenRank = true
+		}
+		if stat.Kernel == "ArraySortedEdge" && stat.Outcome == "hit" && strings.HasPrefix(stat.Shape, "sort-edge/i64/") {
+			seenEdge = true
+		}
+	}
+	if !seenBundle || !seenRank || !seenEdge {
+		t.Fatalf("missing sort/rank reducer stats: bundle=%v rank=%v edge=%v all=%#v", seenBundle, seenRank, seenEdge, RuntimeKernelExecutionStats())
+	}
+}
+
+func TestQSortRankReducerPlusTerms(t *testing.T) {
+	terms := qSortRankReducerPlusTerms("(+/iasc 3 1 2 1)+(+/rank `x`a`b`z`c)+(first asc 3 1 2)+(first desc 3 1 2)")
+	want := []string{"+/iasc 3 1 2 1", "+/rank `x`a`b`z`c", "first asc 3 1 2", "first desc 3 1 2"}
+	if !reflect.DeepEqual(terms, want) {
+		t.Fatalf("terms = %#v, want %#v", terms, want)
+	}
+}
+
 func TestEvalConditionalSpecialForms(t *testing.T) {
 	assertEvalValue(t, "$[1;2;3]", int64(2))
 	assertEvalValue(t, "$[0;2;3]", int64(3))

@@ -486,6 +486,11 @@ func qRuntimeKernelPipelineShape(kernel, shape string) string {
 		return "apply_index"
 	case strings.HasPrefix(shape, "and/"), strings.HasPrefix(shape, "or/"):
 		return "mask_combine"
+	case strings.HasPrefix(shape, "sort-rank-reducer-bundle/"),
+		strings.HasPrefix(shape, "sort-index-sum/"),
+		strings.HasPrefix(shape, "rank-sum/"),
+		strings.HasPrefix(shape, "sort-edge/"):
+		return "sort_gather"
 	case strings.HasPrefix(shape, "sort-index/"):
 		return "sort_index"
 	case strings.HasPrefix(shape, "sort-gather/"):
@@ -873,12 +878,14 @@ const (
 	qEvalFastInvalid qEvalFastPlanKind = iota
 	qEvalFastPipeline
 	qEvalFastScalarApplyIndex
+	qEvalFastSortRankReducerBundle
 )
 
 type qEvalFastPlan struct {
-	kind        qEvalFastPlanKind
-	pipeline    qPipelinePlan
-	scalarIndex qScalarApplyIndexPlan
+	kind           qEvalFastPlanKind
+	pipeline       qPipelinePlan
+	scalarIndex    qScalarApplyIndexPlan
+	sortRankSource string
 }
 
 type qScriptExecutableKind uint8
@@ -1588,6 +1595,9 @@ func buildQEvalFastPlan(src string) qEvalFastPlan {
 	if scalar, ok := buildScalarApplyIndexPlan(src); ok {
 		return qEvalFastPlan{kind: qEvalFastScalarApplyIndex, scalarIndex: scalar}
 	}
+	if qSortRankReducerBundleCandidate(src) {
+		return qEvalFastPlan{kind: qEvalFastSortRankReducerBundle, sortRankSource: src}
+	}
 	if qPipelinePlanCandidate(src) {
 		if qPipelinePlanGlobalCacheable(src) {
 			if pipeline, ok := qGlobalPipelinePlanCacheProbe(src); ok {
@@ -1620,6 +1630,8 @@ func (s *EvalState) evalQFastPlan(plan *qEvalFastPlan) (any, bool, error) {
 			return nil, false, nil
 		}
 		return scalarApplyIndexPlanValue(plan.scalarIndex, target)
+	case qEvalFastSortRankReducerBundle:
+		return s.tryEvalSortRankReducerBundle(plan.sortRankSource)
 	default:
 		return nil, false, nil
 	}
@@ -2208,6 +2220,9 @@ func (s *EvalState) eval(src string) (any, error) {
 	if out, ok, err := s.evalControlSpecialForm(src); ok || err != nil {
 		return out, err
 	}
+	if out, handled, err := s.tryEvalSortRankReducerBundle(src); err != nil || handled {
+		return out, err
+	}
 	if plan := s.qPipelinePlan(src); plan.kind != qPipelineInvalid {
 		if out, handled, err := s.evalQPipelinePlan(&plan); err != nil || handled {
 			return out, err
@@ -2405,6 +2420,9 @@ func (s *EvalState) eval(src string) (any, error) {
 		if out, handled, err := s.tryEvalSortIndexSum(right); err != nil || handled {
 			return out, err
 		}
+		if out, handled, err := s.tryEvalRankSum(right); err != nil || handled {
+			return out, err
+		}
 		if out, handled, err := s.tryEvalTypedDyadicFloatSum(right); err != nil || handled {
 			return out, err
 		}
@@ -2523,6 +2541,9 @@ func (s *EvalState) eval(src string) (any, error) {
 		if out, handled, err := s.tryEvalLastCallableScan(lastInput); err != nil || handled {
 			return out, err
 		}
+	}
+	if out, handled, err := s.tryEvalSortedEdge(src); err != nil || handled {
+		return out, err
 	}
 	for _, prefix := range []struct {
 		word string
@@ -4909,6 +4930,206 @@ func (s *EvalState) tryEvalSortIndexSum(src string) (any, bool, error) {
 		return out, true, err
 	}
 	return nil, false, nil
+}
+
+func (s *EvalState) tryEvalRankSum(src string) (any, bool, error) {
+	if !strings.HasPrefix(src, "rank ") {
+		return nil, false, nil
+	}
+	arg := strings.TrimSpace(src[len("rank "):])
+	if arg == "" {
+		return nil, false, nil
+	}
+	value, err := s.eval(arg)
+	if err != nil {
+		return nil, true, err
+	}
+	array, ok := value.(data.Array)
+	if !ok {
+		return int64(0), true, nil
+	}
+	shape := "rank-sum/" + string(array.Kind())
+	out, handled, err := data.TryTypedRankSumI64(array)
+	out, handled, err = qTypedRuntimeResultReason("ArrayRankSum", shape, RuntimeFallbackUnsupportedType, out, handled, err)
+	if err != nil || handled {
+		return out, true, err
+	}
+	return nil, false, nil
+}
+
+func (s *EvalState) tryEvalSortedEdge(src string) (any, bool, error) {
+	edge := ""
+	rest := ""
+	switch {
+	case strings.HasPrefix(src, "first ") && wordBoundary(src, 0, len("first")):
+		edge = "first"
+		rest = strings.TrimSpace(src[len("first "):])
+	case strings.HasPrefix(src, "last ") && wordBoundary(src, 0, len("last")):
+		edge = "last"
+		rest = strings.TrimSpace(src[len("last "):])
+	default:
+		return nil, false, nil
+	}
+	descending := false
+	arg := ""
+	switch {
+	case strings.HasPrefix(rest, "asc ") && wordBoundary(rest, 0, len("asc")):
+		arg = strings.TrimSpace(rest[len("asc "):])
+	case strings.HasPrefix(rest, "desc ") && wordBoundary(rest, 0, len("desc")):
+		descending = true
+		arg = strings.TrimSpace(rest[len("desc "):])
+	default:
+		return nil, false, nil
+	}
+	if arg == "" {
+		return nil, false, nil
+	}
+	value, err := s.eval(arg)
+	if err != nil {
+		return nil, true, err
+	}
+	array, ok := value.(data.Array)
+	if !ok {
+		return nil, false, nil
+	}
+	order := "asc"
+	if descending {
+		order = "desc"
+	}
+	shape := "sort-edge/" + string(array.Kind()) + "/" + order + "/" + edge
+	out, handled, err := data.TryTypedSortedEdge(array, descending, edge == "last")
+	out, handled, err = qTypedRuntimeResultReason("ArraySortedEdge", shape, RuntimeFallbackUnsupportedType, out, handled, err)
+	if err != nil || handled {
+		return out, handled, err
+	}
+	return nil, false, nil
+}
+
+func (s *EvalState) tryEvalSortRankReducerBundle(src string) (any, bool, error) {
+	terms := qSortRankReducerPlusTerms(src)
+	if len(terms) < 2 {
+		return nil, false, nil
+	}
+	var out any = int64(0)
+	for _, term := range terms {
+		value, handled, err := s.evalSortRankReducerTerm(term)
+		if err != nil {
+			recordRuntimeKernelProbeReason("SortRankReducerBundle", "sort-rank-reducer-bundle/"+strconv.Itoa(len(terms)), false, err, RuntimeFallbackUnsupportedType)
+			return nil, true, err
+		}
+		if !handled {
+			return nil, false, nil
+		}
+		out, err = applyDyadic('+', out, value)
+		if err != nil {
+			recordRuntimeKernelProbeReason("SortRankReducerBundle", "sort-rank-reducer-bundle/"+strconv.Itoa(len(terms)), false, err, RuntimeFallbackUnsupportedType)
+			return nil, true, err
+		}
+	}
+	recordRuntimeKernelProbeReason("SortRankReducerBundle", "sort-rank-reducer-bundle/"+strconv.Itoa(len(terms)), true, nil, RuntimeFallbackUnsupportedType)
+	return out, true, nil
+}
+
+func (s *EvalState) evalSortRankReducerTerm(src string) (any, bool, error) {
+	src = stripEnclosingParens(strings.TrimSpace(src))
+	if strings.HasPrefix(src, "+/") {
+		body := strings.TrimSpace(src[len("+/"):])
+		if out, handled, err := s.tryEvalSortIndexSum(body); err != nil || handled {
+			return out, handled, err
+		}
+		if out, handled, err := s.tryEvalRankSum(body); err != nil || handled {
+			return out, handled, err
+		}
+		return nil, false, nil
+	}
+	return s.tryEvalSortedEdge(src)
+}
+
+func qSortRankReducerPlusTerms(src string) []string {
+	src = stripEnclosingParens(strings.TrimSpace(src))
+	if src == "" {
+		return nil
+	}
+	parenDepth := 0
+	bracketDepth := 0
+	braceDepth := 0
+	inString := false
+	for i := 0; i < len(src); i++ {
+		ch := src[i]
+		if inString {
+			if ch == '\\' {
+				i++
+				continue
+			}
+			if ch == '"' {
+				inString = false
+			}
+			continue
+		}
+		switch ch {
+		case '"':
+			inString = true
+		case '(':
+			parenDepth++
+		case ')':
+			parenDepth--
+		case '[':
+			bracketDepth++
+		case ']':
+			bracketDepth--
+		case '{':
+			braceDepth++
+		case '}':
+			braceDepth--
+		case '+':
+			if parenDepth != 0 || bracketDepth != 0 || braceDepth != 0 || isSign(src, i) {
+				continue
+			}
+			if i+1 < len(src) && (src[i+1] == '/' || src[i+1] == '\\' || src[i+1] == '\'') {
+				continue
+			}
+			left := strings.TrimSpace(src[:i])
+			right := strings.TrimSpace(src[i+1:])
+			if left == "" || right == "" {
+				continue
+			}
+			terms := qSortRankReducerPlusTerms(left)
+			terms = append(terms, qSortRankReducerPlusTerms(right)...)
+			return terms
+		}
+	}
+	return []string{src}
+}
+
+func qSortRankReducerBundleCandidate(src string) bool {
+	terms := qSortRankReducerPlusTerms(src)
+	if len(terms) < 2 {
+		return false
+	}
+	for _, term := range terms {
+		if !qSortRankReducerTermCandidate(term) {
+			return false
+		}
+	}
+	return true
+}
+
+func qSortRankReducerTermCandidate(src string) bool {
+	src = stripEnclosingParens(strings.TrimSpace(src))
+	if strings.HasPrefix(src, "+/") {
+		body := strings.TrimSpace(src[len("+/"):])
+		return strings.HasPrefix(body, "iasc ") ||
+			strings.HasPrefix(body, "idesc ") ||
+			strings.HasPrefix(body, "rank ")
+	}
+	for _, edge := range []string{"first ", "last "} {
+		if !strings.HasPrefix(src, edge) {
+			continue
+		}
+		body := strings.TrimSpace(src[len(edge):])
+		return strings.HasPrefix(body, "asc ") || strings.HasPrefix(body, "desc ")
+	}
+	return false
 }
 
 func (s *EvalState) tryEvalTypedUnarySum(src string) (any, bool, error) {
