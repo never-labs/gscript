@@ -2251,14 +2251,14 @@ func TryTypedCast(kind Kind, array Array) (Array, bool, error) {
 	case attributedArray:
 		return TryTypedCast(kind, a.array)
 	}
-	if !isIntegerArray(array) {
+	if !isIntegerArray(array) && !isNumericArray(array) {
 		return nil, false, nil
 	}
 	switch kind {
 	case KindI16:
 		out := make([]int16, array.Len())
 		for row := 0; row < array.Len(); row++ {
-			value, ok, err := integerArrayAt(array, row)
+			value, ok, err := numericArrayTruncatedIntegerAt(array, row)
 			if err != nil {
 				return nil, true, err
 			}
@@ -2274,7 +2274,7 @@ func TryTypedCast(kind Kind, array Array) (Array, bool, error) {
 	case KindI32:
 		out := make([]int32, array.Len())
 		for row := 0; row < array.Len(); row++ {
-			value, ok, err := integerArrayAt(array, row)
+			value, ok, err := numericArrayTruncatedIntegerAt(array, row)
 			if err != nil {
 				return nil, true, err
 			}
@@ -2290,7 +2290,7 @@ func TryTypedCast(kind Kind, array Array) (Array, bool, error) {
 	case KindI64:
 		out := make([]int64, array.Len())
 		for row := 0; row < array.Len(); row++ {
-			value, ok, err := integerArrayAt(array, row)
+			value, ok, err := numericArrayTruncatedIntegerAt(array, row)
 			if err != nil {
 				return nil, true, err
 			}
@@ -2306,7 +2306,7 @@ func TryTypedCast(kind Kind, array Array) (Array, bool, error) {
 		}
 		out := make([]float64, array.Len())
 		for row := 0; row < array.Len(); row++ {
-			value, ok, err := integerArrayAt(array, row)
+			value, ok, err := typedKernels.NumericAt(array, row)
 			if err != nil {
 				return nil, true, err
 			}
@@ -2319,6 +2319,20 @@ func TryTypedCast(kind Kind, array Array) (Array, bool, error) {
 	default:
 		return nil, false, nil
 	}
+}
+
+func numericArrayTruncatedIntegerAt(array Array, row int) (int64, bool, error) {
+	if isIntegerArray(array) {
+		return integerArrayAt(array, row)
+	}
+	value, ok, err := typedKernels.NumericAt(array, row)
+	if err != nil || !ok {
+		return 0, ok, err
+	}
+	if math.IsNaN(value) || math.IsInf(value, 0) || value < -9223372036854775808.0 || value >= 9223372036854775808.0 {
+		return 0, false, nil
+	}
+	return int64(value), true, nil
 }
 
 func aggregateIndexedNumericValue(agg aggregateInput, row int) (float64, bool, error) {
