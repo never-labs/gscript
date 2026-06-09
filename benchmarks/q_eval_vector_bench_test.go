@@ -880,7 +880,512 @@ func buildQEvalVectorCases() []qEvalVectorCase {
 		},
 	)
 
+	cases = appendQEvalExpressionCombinationCases(cases)
 	return appendQEvalSemanticCoverageCases(cases)
+}
+
+func appendQEvalExpressionCombinationCases(cases []qEvalVectorCase) []qEvalVectorCase {
+	combos := []qEvalVectorCase{
+		{
+			name:   "VectorModuloBucketSum",
+			tags:   []string{"numeric-vector", "word-dyadic", "sum"},
+			matrix: []string{"numeric-arithmetic:int-vector:hot"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("x:til %d;+/x mod 17", rows)
+			},
+			goFn: func(rows int) int64 {
+				var sum int64
+				for i := 0; i < rows; i++ {
+					sum += int64(i % 17)
+				}
+				return sum
+			},
+		},
+		{
+			name:   "VectorMinMaxDyadicEnvelope",
+			tags:   []string{"numeric-vector", "min-max", "sum"},
+			matrix: []string{"numeric-arithmetic:int-vector:hot", "aggregate:running-prd-min-max-avg:vector"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("x:til %d;y:reverse x;(+/x min y)+(+/x max y)", rows)
+			},
+			goFn: func(rows int) int64 {
+				var sum int64
+				for i := 0; i < rows; i++ {
+					x := int64(i)
+					y := int64(rows - 1 - i)
+					if x < y {
+						sum += x + y
+					} else {
+						sum += y + x
+					}
+				}
+				return sum
+			},
+		},
+		{
+			name:   "ModuloEqMaskCount",
+			tags:   []string{"where", "composite-compare", "word-dyadic"},
+			matrix: []string{"compare:int-vector:where"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("x:til %d;count where (x mod 4)=2", rows)
+			},
+			goFn: func(rows int) int64 {
+				var count int64
+				for i := 0; i < rows; i++ {
+					if i%4 == 2 {
+						count++
+					}
+				}
+				return count
+			},
+		},
+		{
+			name:   "ModuloNeMaskCount",
+			tags:   []string{"where", "composite-compare", "word-dyadic"},
+			matrix: []string{"compare:int-vector:where"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("x:til %d;count where (x mod 5)<>3", rows)
+			},
+			goFn: func(rows int) int64 {
+				var count int64
+				for i := 0; i < rows; i++ {
+					if i%5 != 3 {
+						count++
+					}
+				}
+				return count
+			},
+		},
+		{
+			name:   "ModuloBandWhereIndexSum",
+			tags:   []string{"where", "boolean-logical", "composite-compare", "word-dyadic"},
+			matrix: []string{"compare:int-vector:where"},
+			shapes: []string{"logical:mask-composition:row-scaled"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("x:til %d;m:x mod 10;idx:where (m>=3) and m<8;+/idx", rows)
+			},
+			goFn: func(rows int) int64 {
+				var sum int64
+				for i := 0; i < rows; i++ {
+					m := i % 10
+					if m >= 3 && m < 8 {
+						sum += int64(i)
+					}
+				}
+				return sum
+			},
+		},
+		{
+			name:   "WhereModuloGatherProjectionSum",
+			tags:   []string{"where", "projection", "numeric-vector", "sum", "word-dyadic"},
+			matrix: []string{"compare:int-vector:where"},
+			shapes: []string{"index:gather-after-where:row-scaled"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("x:til %d;y:(x*2)+1;idx:where (x mod 3)=0;+/y[idx]", rows)
+			},
+			goFn: func(rows int) int64 {
+				var sum int64
+				for i := 0; i < rows; i++ {
+					if i%3 == 0 {
+						sum += int64(i*2 + 1)
+					}
+				}
+				return sum
+			},
+		},
+		{
+			name:   "WhereModuloOrMaskCount",
+			tags:   []string{"where", "boolean-logical", "word-dyadic"},
+			matrix: []string{"compare:int-vector:where"},
+			shapes: []string{"logical:mask-composition:row-scaled"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("x:til %d;count where ((x mod 7)=0) or (x mod 11)=0", rows)
+			},
+			goFn: func(rows int) int64 {
+				var count int64
+				for i := 0; i < rows; i++ {
+					if i%7 == 0 || i%11 == 0 {
+						count++
+					}
+				}
+				return count
+			},
+		},
+		{
+			name: "TakeCycleBeyondLengthSum",
+			tags: []string{"take", "sum"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("x:til %d;a:%d#x;+/a", rows, rows+128)
+			},
+			goFn: func(rows int) int64 {
+				var sum int64
+				for i := 0; i < rows+128; i++ {
+					sum += int64(i % rows)
+				}
+				return sum
+			},
+		},
+		{
+			name: "ReverseWhereGatherHeadSum",
+			tags: []string{"reverse", "where", "projection", "sum"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("x:til %d;r:reverse x;idx:where r<128;+/r[idx]", rows)
+			},
+			goFn: func(rows int) int64 {
+				var sum int64
+				for value := 0; value < 128 && value < rows; value++ {
+					sum += int64(value)
+				}
+				return sum
+			},
+		},
+		{
+			name: "RotateWhereHeadCount",
+			tags: []string{"rotate", "where", "composite-compare"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("x:til %d;r:3 rotate x;count where r<10", rows)
+			},
+			goFn: func(rows int) int64 {
+				var count int64
+				for i := 0; i < rows; i++ {
+					if (3+i)%rows < 10 {
+						count++
+					}
+				}
+				return count
+			},
+		},
+		{
+			name: "SumsTailChecksum",
+			tags: []string{"sums", "adverb-over-scan", "sum"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("x:til %d;s:sums x;last s+count s", rows)
+			},
+			goFn: func(rows int) int64 {
+				return int64(rows-1)*int64(rows)/2 + int64(rows)
+			},
+		},
+		{
+			name: "ScanPlusTailChecksum",
+			tags: []string{"adverb-over-scan", "sum"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("x:til %d;s:+\\x;last s+count s", rows)
+			},
+			goFn: func(rows int) int64 {
+				return int64(rows-1)*int64(rows)/2 + int64(rows)
+			},
+		},
+		{
+			name:   "RunningMinMaxTailEnvelope",
+			tags:   []string{"running-aggregate", "min-max"},
+			matrix: []string{"aggregate:running-prd-min-max-avg:vector"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("x:til %d;(last mins x)+(last maxs reverse x)+(last maxs x)", rows)
+			},
+			goFn: func(rows int) int64 {
+				return int64(2 * (rows - 1))
+			},
+		},
+		{
+			name:   "AvgsTailChecksum",
+			tags:   []string{"running-aggregate", "avg-var-dev-med"},
+			matrix: []string{"aggregate:running-prd-min-max-avg:vector"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("x:til %d;last avgs x", rows)
+			},
+			goFn: func(rows int) int64 {
+				return int64(float64(rows-1) / 2)
+			},
+		},
+		{
+			name: "ProductOnesRowScaled",
+			tags: []string{"product", "running-aggregate"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("prd %d#1", rows)
+			},
+			goFn: func(rows int) int64 {
+				return 1
+			},
+		},
+		{
+			name: "MovingCount32Sum",
+			tags: []string{"moving-window"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("x:til %d;+/32 mcount x", rows)
+			},
+			goFn: func(rows int) int64 {
+				var sum int64
+				for i := 0; i < rows; i++ {
+					window := i + 1
+					if window > 32 {
+						window = 32
+					}
+					sum += int64(window)
+				}
+				return sum
+			},
+		},
+		{
+			name: "MovingMinMax32Envelope",
+			tags: []string{"moving-window", "min-max"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("x:1+til %d;(+/32 mmin x)+(+/32 mmax x)", rows)
+			},
+			goFn: func(rows int) int64 {
+				var sum int64
+				for i := 0; i < rows; i++ {
+					window := i + 1
+					if window > 32 {
+						window = 32
+					}
+					sum += int64(i-window+2) + int64(i+1)
+				}
+				return sum
+			},
+		},
+		{
+			name:   "SymbolEqualityMaskCount",
+			tags:   []string{"symbol", "where", "composite-compare"},
+			matrix: []string{"compare:symbol-vector:where"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("syms:%d#`AAPL`MSFT`NVDA`AAPL`AMD;count where syms=`AAPL", rows)
+			},
+			goFn: func(rows int) int64 {
+				var count int64
+				for i := 0; i < rows; i++ {
+					if i%5 == 0 || i%5 == 3 {
+						count++
+					}
+				}
+				return count
+			},
+		},
+		{
+			name:   "SymbolNotEqualMaskCount",
+			tags:   []string{"symbol", "where", "composite-compare"},
+			matrix: []string{"compare:symbol-vector:where"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("syms:%d#`AAPL`MSFT`NVDA`AAPL`AMD;count where syms<>`AAPL", rows)
+			},
+			goFn: func(rows int) int64 {
+				var count int64
+				for i := 0; i < rows; i++ {
+					if i%5 != 0 && i%5 != 3 {
+						count++
+					}
+				}
+				return count
+			},
+		},
+		{
+			name:   "StringUpperSymbolCount",
+			tags:   []string{"string", "symbol"},
+			matrix: []string{"compare:string-vector:where"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("syms:%d#`aapl`msft`nvda;count upper string syms", rows)
+			},
+			goFn: func(rows int) int64 {
+				return int64(rows)
+			},
+		},
+		{
+			name:   "TemporalDateCompareMaskCount",
+			tags:   []string{"temporal", "where", "composite-compare"},
+			matrix: []string{"compare:temporal-vector:where"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("dates:%d#2026.06.06 2026.06.07 2026.06.08;count where dates>=2026.06.07", rows)
+			},
+			goFn: func(rows int) int64 {
+				var count int64
+				for i := 0; i < rows; i++ {
+					if i%3 != 0 {
+						count++
+					}
+				}
+				return count
+			},
+		},
+		{
+			name: "TemporalTimeCompareMaskCount",
+			tags: []string{"temporal", "where", "composite-compare"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("times:%d#09:30 09:31 09:32 09:33;count where times within 09:31 09:32", rows)
+			},
+			goFn: func(rows int) int64 {
+				var count int64
+				for i := 0; i < rows; i++ {
+					if i%4 == 1 || i%4 == 2 {
+						count++
+					}
+				}
+				return count
+			},
+		},
+		{
+			name:   "TypedIntCastRoundTripSum",
+			tags:   []string{"typed-suffix", "cast", "promotion", "sum"},
+			matrix: []string{"cast:typed-numeric:scalar-vector"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("x:til %d;+/`long$`int$x", rows)
+			},
+			goFn: func(rows int) int64 {
+				return int64(rows-1) * int64(rows) / 2
+			},
+		},
+		{
+			name:   "FloatCastCount",
+			tags:   []string{"cast", "promotion", "numeric-vector", "sum"},
+			matrix: []string{"cast:typed-numeric:scalar-vector", "numeric-arithmetic:float-vector:hot"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("x:(til %d)*0.5;count `float$x", rows)
+			},
+			goFn: func(rows int) int64 {
+				return int64(rows)
+			},
+		},
+		{
+			name:   "TypedNullFillSum",
+			tags:   []string{"typed-null", "fill", "null-verb", "sum"},
+			matrix: []string{"numeric-arithmetic:typed-null:hot", "list:prev-next-deltas-fills:typed-null"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("x:%d#0N 1 2 0N;y:99^x;+/y", rows)
+			},
+			goFn: func(rows int) int64 {
+				var sum int64
+				for i := 0; i < rows; i++ {
+					switch i % 4 {
+					case 0, 3:
+						sum += 99
+					case 1:
+						sum++
+					case 2:
+						sum += 2
+					}
+				}
+				return sum
+			},
+		},
+		{
+			name:   "PrevNextDeltasCountsRowScaled",
+			tags:   []string{"adverb-each-prior", "typed-null"},
+			matrix: []string{"list:prev-next-deltas-fills:typed-null"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("x:til %d;(count prev x)+(count next x)+(count deltas x)", rows)
+			},
+			goFn: func(rows int) int64 {
+				return int64(rows * 3)
+			},
+		},
+		{
+			name:   "FillsNullPatternSum",
+			tags:   []string{"fill", "typed-null", "sum"},
+			matrix: []string{"list:prev-next-deltas-fills:typed-null"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("x:%d#0N 1 0N 2;+/fills x", rows)
+			},
+			goFn: func(rows int) int64 {
+				var sum, last int64
+				for i := 0; i < rows; i++ {
+					switch i % 4 {
+					case 1:
+						last = 1
+					case 3:
+						last = 2
+					}
+					sum += last
+				}
+				return sum
+			},
+		},
+		{
+			name:   "EachPriorMinusRowScaled",
+			tags:   []string{"adverb-each-prior", "sum"},
+			matrix: []string{"adverb:each-prior:vector"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("x:til %d;+/ -':x", rows)
+			},
+			goFn: func(rows int) int64 {
+				if rows <= 0 {
+					return 0
+				}
+				return int64(rows - 1)
+			},
+		},
+		{
+			name:   "DistinctModuloCount",
+			tags:   []string{"distinct", "word-dyadic"},
+			matrix: []string{"set:int-vector:union-inter-except"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("x:til %d;count distinct x mod 257", rows)
+			},
+			goFn: func(rows int) int64 {
+				if rows < 257 {
+					return int64(rows)
+				}
+				return 257
+			},
+		},
+		{
+			name:   "GroupModuloBucketCount",
+			tags:   []string{"group", "word-dyadic"},
+			matrix: []string{"aggregate:running-prd-min-max-avg:vector"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("x:til %d;count group x mod 64", rows)
+			},
+			goFn: func(rows int) int64 {
+				if rows < 64 {
+					return int64(rows)
+				}
+				return 64
+			},
+		},
+		{
+			name:   "FindModuloPatternSum",
+			tags:   []string{"find-bin", "word-dyadic", "sum"},
+			matrix: []string{"search:bin-binr-find:vector"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("x:(til %d) mod 4;+/0 1 2 3?x", rows)
+			},
+			goFn: func(rows int) int64 {
+				var sum int64
+				for i := 0; i < rows; i++ {
+					sum += int64(i % 4)
+				}
+				return sum
+			},
+		},
+		{
+			name:   "BinAscendingProbeSum",
+			tags:   []string{"find-bin", "sum"},
+			matrix: []string{"search:bin-binr-find:vector"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("x:10*til %d;probe:til %d;+/x bin probe", rows, rows)
+			},
+			goFn: func(rows int) int64 {
+				var sum int64
+				for probe := 0; probe < rows; probe++ {
+					sum += int64(probe / 10)
+				}
+				return sum
+			},
+		},
+		{
+			name:   "XrankModuloBucketsSum",
+			tags:   []string{"bin-within-xrank", "word-dyadic", "sum"},
+			matrix: []string{"sort:int-vector:index-rank"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("x:(til %d) mod 100;+/10 xrank x", rows)
+			},
+			goFn: func(rows int) int64 {
+				var sum int64
+				for i := 0; i < rows; i++ {
+					sum += int64((i % 100) / 10)
+				}
+				return sum
+			},
+		},
+	}
+	return append(cases, combos...)
 }
 
 func appendQEvalSemanticCoverageCases(cases []qEvalVectorCase) []qEvalVectorCase {
@@ -1284,8 +1789,8 @@ func appendQEvalSemanticCoverageCases(cases []qEvalVectorCase) []qEvalVectorCase
 }
 
 func TestQEvalVectorBenchmarkExpressions(t *testing.T) {
-	if len(qEvalVectorCases) < 50 {
-		t.Fatalf("q.eval benchmark coverage too small: got %d cases, want at least 50", len(qEvalVectorCases))
+	if len(qEvalVectorCases) < 140 {
+		t.Fatalf("q.eval benchmark coverage too small: got %d cases, want at least 140", len(qEvalVectorCases))
 	}
 	eval := qEvalVectorEval(t)
 	for _, tc := range qEvalVectorCases {

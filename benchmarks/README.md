@@ -188,12 +188,11 @@ go test ./benchmarks -run '^$' \
 
 It intentionally separates qSQL from ordinary `q.eval` list/vector/math/adverb
 workloads. `q.eval` now has hand-written Go baselines and warm/cold cache
-measurements for vector arithmetic/reduce, compare/where, list slice/reduce, and
-math map shapes. The remaining known gap is not timing collection but
-instrumentation:
-qSQL bind benchmarks expose `kernel_hit_pct` and `fallbacks/op`, while ordinary
-`q.eval` currently exposes eval-cache behavior but not per-shape typed runtime
-kernel hit/fallback counters through a benchmark-safe public API.
+measurements for vector arithmetic/reduce, compare/where, list slice/reduce,
+adverb/running/moving aggregate, symbol/string/temporal, typed/null/cast, and
+composition shapes. qSQL bind benchmarks expose `kernel_hit_pct` and
+`fallbacks/op`; ordinary `q.eval` session benchmarks also report
+`typed_kernel_*` counters where runtime kernel instrumentation is available.
 
 Read the q performance baseline through these ratios:
 
@@ -202,19 +201,20 @@ Read the q performance baseline through these ratios:
 | Current Leia vs old Leia | `benchmarks/q_columnar_suite.sh` reports current worktree vs clean `HEAD`; compare `Current`, `HEAD`, and `HEAD delta` |
 | Current Leia vs hand-written Go | compare `BenchmarkQSQLBind...` rows with `BenchmarkQSQLNativeGo...` rows for qSQL; compare `BenchmarkQSessionEvalVectorWarmExecution/...` with `BenchmarkQEvalVectorGoBaseline/...` for ordinary q compute |
 | Warm vs cold | compare `BenchmarkQSQLBindRunSQLWarmCache...` with `BenchmarkQSQLBindRunSQLColdCache...` |
-| Typed kernel hit/fallback rate | use `kernel_hit_pct`, `template_hit_pct`, `aligned_hit_pct`, and `fallbacks/op` in the bind benchmark output |
+| Typed kernel hit/fallback rate | use `kernel_hit_pct`, `template_hit_pct`, `aligned_hit_pct`, and `fallbacks/op` in bind benchmark output; use `typed_kernel_hit_pct` and `typed_kernel_fallbacks/op` in ordinary q session rows |
 | Allocation pressure | use `B/op` and `allocs/op`; q columnar hot paths should trend toward low per-row allocation |
 
 ## q.eval Vector/List Compute
 
 `benchmarks/q_eval_vector_bench_test.go` covers ordinary q expressions outside
-qSQL. This suite is the main non-qSQL q performance matrix and now has 88 cases
-plus a required coverage-tag gate. It spans numeric vector arithmetic, typed
-suffix/null/cast/promotion behavior, compare masks to `where`, selectivity
-changes, `take`/`drop`/`cut`/`reverse`/`rotate`, reductions, adverbs,
-list/set verbs, dictionaries and amend/upsert, symbols/enums, temporal values,
-table/keyed-table transforms, safe system commands, and loopback IPC. Each
-shape has four benchmark rows:
+qSQL. This suite is the main non-qSQL q performance matrix and now has 151 cases
+plus required coverage-tag, matrix, and semantic-shape gates. It spans numeric
+vector arithmetic, typed suffix/null/cast/promotion behavior, compare masks to
+`where`, selectivity changes, `take`/`drop`/`cut`/`reverse`/`rotate`,
+reductions, adverbs, running and moving aggregates, list/set/search verbs,
+dictionaries and amend/upsert, symbols/enums, string transforms, temporal
+values, table/keyed-table transforms, safe system commands, and loopback IPC.
+Each shape has four benchmark rows:
 
 | Row | Signal |
 |---|---|

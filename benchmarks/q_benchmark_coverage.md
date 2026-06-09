@@ -38,11 +38,11 @@ benchmark set. These categories should drive benchmark case growth.
 
 | Category | Evidence in tests | Benchmark status |
 |---|---|---|
-| Numeric atoms/vectors | numeric literals, typed numeric suffixes, casts, dyadic ops, promotion, null propagation, percent divide | Covered by q.eval coverage tags; still needs more per-type performance depth |
+| Numeric atoms/vectors | numeric literals, typed numeric suffixes, casts, dyadic ops, promotion, null propagation, percent divide | Covered by q.eval coverage tags and expression-combination cases; still needs deeper full type x null matrix coverage |
 | Boolean masks and `where` | bool vectors, compare masks, scalar comparisons, comma where as and, logical `&`/`|` | Covered by q.eval coverage tags and 0/1/50/99/100% value-gather-reduce selectivity cases; compound qSQL predicate depth remains open |
-| Adverbs | each, each-prior, each-left/right, over, scan, verb adverbs, function projections | Covered by q.eval coverage tags; more complex list-of-lists cases should be added |
-| Reductions and scans | `sum`, `sums`, `+/`, `+\`, `min`, `max`, `count`, `avg`, `var`, `dev`, `med`, `wavg` | Covered by q.eval coverage tags except deeper `wavg`/null/type matrix |
-| Set/list verbs | `distinct`, `group`, `where`, `reverse`, `prev`, `next`, `deltas`, `fills`, `enlist`, `raze`, `cut`, `drop`, sort indexes | Covered at category level; needs exhaustive verb-by-type matrix |
+| Adverbs | each, each-prior, each-left/right, over, scan, verb adverbs, function projections | Covered by q.eval coverage tags and row-scaled scan/each-prior cases; more complex list-of-lists cases should be added |
+| Reductions and scans | `sum`, `sums`, `+/`, `+\`, `min`, `max`, `count`, `avg`, `var`, `dev`, `med`, `wavg` | Covered by q.eval coverage tags including running/moving aggregates; deeper `wavg`/null/type matrix remains open |
+| Set/list verbs | `distinct`, `group`, `where`, `reverse`, `prev`, `next`, `deltas`, `fills`, `enlist`, `raze`, `cut`, `drop`, sort indexes | Covered by q.eval coverage tags and expression-combination cases; needs exhaustive verb-by-type matrix |
 | Dicts | symbol dictionaries, nested dictionaries, lookup, `keys`, `value`, amend/upsert | Covered at category level; keyed/table nested hot paths need more rows |
 | Table literals | `flip`, native table literal, qSQL-style table literal, keyed table literals | Covered at category level; large table materialization cases need more rows |
 | Keyed tables | `xkey`, lookup, keyed amend/upsert, key/value/cols/meta APIs | Covered at category level; lookup/amend/upsert hot paths need direct Go baselines |
@@ -53,7 +53,7 @@ benchmark set. These categories should drive benchmark case growth.
 | qSQL grouped analytics | `by`, computed keys, `xbar`, aggregate aliases, extended aggregates | Partially covered; needs more aggregate/key/type combinations |
 | qSQL joins | inner, left, asof variants, union, plus, window joins, chained joins, aliased keys | Asof/join subsets covered; window/union/plus/chained joins need benchmark rows |
 | qSQL mutation | update, delete, insert, upsert, grouped mutation, keyed mutation | Semantics covered; benchmark coverage is limited |
-| Cache/fallback/runtime stats | plan cache, query kernel cache, schema-stable keys, explain/fallback stats | qSQL benchmark metrics exist; q.eval typed kernel/fallback stats need benchmark-readable rows |
+| Cache/fallback/runtime stats | plan cache, query kernel cache, schema-stable keys, explain/fallback stats | qSQL benchmark metrics exist; q.eval session rows emit typed-kernel attempt/hit/fallback/error counters where runtime instrumentation is available |
 | IPC/system/session | loopback IPC, safe system commands, session state | Not core to in-memory analytics performance; benchmark only if it becomes a product target |
 
 ## Current Benchmark Case Dimensions
@@ -95,7 +95,7 @@ from the original five ordinary q cases and four columnar script cases:
 
 | Target | Minimum breadth |
 |---|---|
-| `q.eval` ordinary compute | 88 cases with a required coverage-tag gate across vector arithmetic, typed/null/cast/promotion, where/selectivity, slice/reorder, adverb, dict, symbol, temporal, table-verb, IPC, and safe-system shapes |
+| `q.eval` ordinary compute | 140+ cases with required coverage-tag, matrix, and semantic-shape gates across vector arithmetic, typed/null/cast/promotion, where/selectivity, slice/reorder, adverb, running/moving aggregate, set/search/list, dict, symbol/string, temporal, table-verb, IPC, and safe-system shapes |
 | qSQL Go benchmarks | 25+ rows across select, group, join, mutation, cache, and direct-runtime baselines |
 | q columnar script suite | 40+ script-level cases drawn from market data, rollup, join, keyed state, and vector/adverb projects |
 | Metrics per case | `ns/op`, `B/op`, `allocs/op`, warm/cold ratio, Go ratio where practical, typed-kernel/fallback stats where available |
@@ -108,8 +108,8 @@ analytics examples under `benchmarks/data`.
 
 | Gap | Why it matters |
 |---|---|
-| q.eval typed kernel hit/fallback metrics are not yet benchmark-readable per case | We can time q.eval operations, but cannot fully explain whether runtime kernels or interpreter fallback dominated |
-| q.eval coverage is category-complete but not yet exhaustive by operation x type x null x shape matrix | The new tag gate prevents missing whole expression families; the next round must enumerate complex combinations and per-type variants |
+| q.eval typed kernel hit/fallback metrics are available only where runtime instrumentation has shape labels | Session benchmark rows report typed-kernel counters, but uninstrumented expression families still need runtime-side shape labels to explain fallback pressure |
+| q.eval coverage is category-complete but not yet exhaustive by operation x type x null x shape matrix | The tag/matrix/shape gates prevent missing whole expression families; the next round must enumerate full per-type and null-combination variants |
 | qSQL cold/warm coverage is select-heavy | Group, join, mutation, and temporal shapes also need cold/warm cache rows |
 | Join benchmarks need more variants | Asof is important, but inner/left/window/union/plus/chained joins exercise different runtime costs |
 | Mutation benchmarks are thin | Update/delete/upsert are core table analytics operations and interact with keyed frames and schema-stable cache |
