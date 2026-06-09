@@ -2767,6 +2767,70 @@ func appendQEvalTaskDListMathMatrixApplyIndexCases(cases []qEvalVectorCase) []qE
 			},
 		},
 		{
+			name:   "TaskDListReverseDirectSum",
+			tags:   []string{"reverse", "sum", "numeric-vector"},
+			matrix: []string{"list:cut-raze-enlist:nested", "numeric-arithmetic:int-vector:hot"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("x:til %d;+/reverse x", rows)
+			},
+			goFn: func(rows int) int64 {
+				var total int64
+				for i := rows - 1; i >= 0; i-- {
+					total += int64(i)
+				}
+				return total
+			},
+		},
+		{
+			name:   "TaskDListRotateDirectSum",
+			tags:   []string{"rotate", "sum", "numeric-vector"},
+			matrix: []string{"list:cut-raze-enlist:nested", "numeric-arithmetic:int-vector:hot"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("x:til %d;+/257 rotate x", rows)
+			},
+			goFn: func(rows int) int64 {
+				shift := 257 % rows
+				var total int64
+				for i := 0; i < rows; i++ {
+					total += int64((shift + i) % rows)
+				}
+				return total
+			},
+		},
+		{
+			name:   "TaskDListSublistDirectSum",
+			tags:   []string{"cut", "sublist", "sum", "numeric-vector"},
+			matrix: []string{"list:sublist-cross-cut:string-bool", "list:cut-raze-enlist:nested"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("x:til %d;+/128 1024 sublist x", rows)
+			},
+			goFn: func(rows int) int64 {
+				var total int64
+				for i := 128; i < 128+1024 && i < rows; i++ {
+					total += int64(i)
+				}
+				return total
+			},
+		},
+		{
+			name:   "TaskDListRatiosDirectSum",
+			tags:   []string{"adverb-each-prior", "numeric-vector", "sum"},
+			matrix: []string{"list:prev-next-deltas-fills:typed-null", "membership:in-differ-ratios:vector"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("x:2 xexp ((til %d) mod 8);+/ratios x", rows)
+			},
+			goFn: func(rows int) int64 {
+				var total float64
+				prev := math.Pow(2, float64((rows-1)%8))
+				for i := 0; i < rows; i++ {
+					v := math.Pow(2, float64(i%8))
+					total += v / prev
+					prev = v
+				}
+				return int64(total)
+			},
+		},
+		{
 			name:   "TaskDMatrixReshapeRazeSum",
 			tags:   []string{"matrix-reshape", "raze", "sum"},
 			matrix: []string{"matrix:reshape-flip:vector", "list:cut-raze-enlist:nested"},
