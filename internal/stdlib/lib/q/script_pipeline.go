@@ -744,6 +744,9 @@ func (s *EvalState) evalQScriptMatrixRowSumCountPipeline(descriptor *qScriptPipe
 
 func (s *EvalState) evalQScriptMatrixCellPlusCountPipeline(descriptor *qScriptPipelineDescriptor) (any, bool, error) {
 	for _, assignment := range descriptor.assignments {
+		if strings.TrimSpace(descriptor.rowValueExpr) == assignment.name {
+			continue
+		}
 		value, handled, err := s.evalQScriptBindingPlan(&assignment.binding)
 		if err != nil {
 			return nil, true, err
@@ -756,17 +759,6 @@ func (s *EvalState) evalQScriptMatrixCellPlusCountPipeline(descriptor *qScriptPi
 		}
 		s.env[s.resolveAssignmentName(assignment.name)] = value
 	}
-	matrixValue, handled, err := s.evalQScriptBindingPlan(&descriptor.rowValuePlan)
-	if err != nil {
-		return nil, true, err
-	}
-	if !handled {
-		return nil, false, nil
-	}
-	matrix, ok := matrixValue.(data.Matrix)
-	if !ok {
-		return nil, false, nil
-	}
 	row, handled, err := s.evalQScriptScalarIndexPlan(&descriptor.rowIndexPlan)
 	if err != nil || !handled {
 		return nil, handled, err
@@ -775,9 +767,75 @@ func (s *EvalState) evalQScriptMatrixCellPlusCountPipeline(descriptor *qScriptPi
 	if err != nil || !handled {
 		return nil, handled, err
 	}
+	if assignment, ok := qScriptPipelineAssignmentByName(descriptor, descriptor.rowValueExpr); ok {
+		if out, handled, err := s.evalQScriptReshapedMatrixCellPlusCount(&assignment.binding, row, col); err != nil || handled {
+			return out, handled, err
+		}
+	}
+	matrixValue, handled, err := s.evalQScriptBindingPlan(&descriptor.rowValuePlan)
+	if err != nil {
+		return nil, true, err
+	}
+	if !handled {
+		if err := s.evalQScriptPipelineDeferredAssignment(descriptor, descriptor.rowValueExpr); err != nil {
+			return nil, true, err
+		}
+		matrixValue, handled, err = s.evalQScriptBindingPlan(&descriptor.rowValuePlan)
+		if err != nil {
+			return nil, true, err
+		}
+	}
+	if !handled {
+		return nil, false, nil
+	}
+	matrix, ok := matrixValue.(data.Matrix)
+	if !ok {
+		return nil, false, nil
+	}
 	shape := qMatrixIndexShape(matrix, 2) + "/cell-plus-count"
 	out, handled, err := data.TryMatrixCellNumericPlusCount(matrix, row, col)
 	return qTypedRuntimeResultReason("MatrixCellPlusCount", shape, RuntimeFallbackUnsupportedType, out, handled, err)
+}
+
+func qScriptPipelineAssignmentByName(descriptor *qScriptPipelineDescriptor, name string) (qScriptPipelineAssignment, bool) {
+	name = strings.TrimSpace(name)
+	if descriptor == nil || name == "" {
+		return qScriptPipelineAssignment{}, false
+	}
+	for _, assignment := range descriptor.assignments {
+		if assignment.name == name {
+			return assignment, true
+		}
+	}
+	return qScriptPipelineAssignment{}, false
+}
+
+func (s *EvalState) evalQScriptReshapedMatrixCellPlusCount(plan *qScriptBindingPlan, row, col int) (any, bool, error) {
+	if plan == nil || plan.kind != qScriptBindingBinary || plan.op != "#" || plan.left == nil || plan.right == nil {
+		return nil, false, nil
+	}
+	shapeValue, handled, err := s.evalQScriptBindingPlan(plan.left)
+	if err != nil || !handled {
+		return nil, handled, err
+	}
+	shape, err := qReshapeShape(shapeValue)
+	if err != nil {
+		return nil, true, err
+	}
+	if len(shape) != 2 {
+		return nil, false, nil
+	}
+	sourceValue, handled, err := s.evalQScriptBindingPlan(plan.right)
+	if err != nil || !handled {
+		return nil, handled, err
+	}
+	source, ok := sourceValue.(data.Array)
+	if !ok {
+		return nil, false, nil
+	}
+	kernelShape := "matrix-reshape-dot/" + qRuntimeCardinalityShape(shape[0]) + "x" + qRuntimeCardinalityShape(shape[1]) + "/2-indexes/cell-plus-count"
+	out, handled, err := data.TryReshapedMatrixCellNumericPlusCount(shape, source, row, col)
+	return qTypedRuntimeResultReason("MatrixCellPlusCount", kernelShape, RuntimeFallbackUnsupportedType, out, handled, err)
 }
 
 func (s *EvalState) evalQScriptScalarIndexPlan(plan *qScriptBindingPlan) (int, bool, error) {

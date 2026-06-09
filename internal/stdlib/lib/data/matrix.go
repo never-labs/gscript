@@ -350,6 +350,38 @@ func TryMatrixCellNumericPlusCount(value Matrix, row, col int) (any, bool, error
 	return nil, false, nil
 }
 
+// TryReshapedMatrixCellNumericPlusCount computes (shape#source)[row,col]+count
+// for a two-dimensional reshape without constructing the matrix view.
+func TryReshapedMatrixCellNumericPlusCount(shape []int, source Array, row, col int) (any, bool, error) {
+	if source == nil {
+		return nil, false, nil
+	}
+	if len(shape) != 2 {
+		return nil, false, nil
+	}
+	rows, cols := shape[0], shape[1]
+	if rows < 0 || cols < 0 {
+		return nil, true, fmt.Errorf("reshape dimension must be non-negative")
+	}
+	if row < 0 || col < 0 || row >= rows || col >= cols {
+		return nil, true, fmt.Errorf("matrix cell index %d %d out of range", row, col)
+	}
+	if source.Len() == 0 {
+		return nil, true, fmt.Errorf("index %d out of range", row*cols+col)
+	}
+	cell, handled, err := arrayScalarAt(source, (row*cols+col)%source.Len())
+	if err != nil || !handled {
+		return nil, handled, err
+	}
+	if cellI, ok := coerceInt64Exact(cell); ok {
+		return cellI + int64(rows), true, nil
+	}
+	if cellF, ok := numeric(cell); ok {
+		return cellF + float64(rows), true, nil
+	}
+	return nil, false, nil
+}
+
 // MatrixMultiplyNumeric multiplies two numeric two-dimensional matrices. The
 // f64 result keeps the semantic layer simple while leaving a single replacement
 // point for future typed BLAS-style kernels.
