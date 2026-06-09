@@ -4475,14 +4475,14 @@ func (s *EvalState) tryEvalTypedUnarySum(src string) (any, bool, error) {
 		return nil, true, err
 	}
 	if array, ok := value.(data.Array); ok {
-		if out, handled, err := data.TryTypedQNumericUnarySum(op, array); err != nil || handled {
-			recordRuntimeKernelProbe("ArrayNumericUnarySum", "vector-reduce/sum-"+op+"/"+string(array.Kind()), handled, err)
+		shape := "vector-reduce/sum-" + op + "/" + string(array.Kind())
+		out, handled, err := data.TryTypedQNumericUnarySum(op, array)
+		out, handled, err = qTypedRuntimeResult("ArrayNumericUnarySum", shape, out, handled, err)
+		if err != nil || handled {
 			if err != nil {
 				return nil, true, fmt.Errorf("sum %s: %w", op, err)
 			}
 			return out, true, nil
-		} else {
-			recordRuntimeKernelProbe("ArrayNumericUnarySum", "vector-reduce/sum-"+op+"/"+string(array.Kind()), handled, err)
 		}
 	}
 	fn, ok := lookupUnaryVerb(op)
@@ -4510,7 +4510,8 @@ func (s *EvalState) tryEvalTypedUnaryDyadicSum(unaryOp, src string) (any, bool, 
 	if err != nil {
 		return nil, true, err
 	}
-	if out, handled, err := data.TryTypedQNumericUnaryDyadicSum(unaryOp, data.Op(string(dyadicOp)), left, right); err != nil || handled {
+	out, handled, err := data.TryTypedQNumericUnaryDyadicSum(unaryOp, data.Op(string(dyadicOp)), left, right)
+	if err != nil || handled {
 		shape := "vector-reduce/sum-" + unaryOp + "-dyadic-" + string(dyadicOp)
 		if array, ok := left.(data.Array); ok {
 			shape += "/left-" + string(array.Kind())
@@ -4518,13 +4519,13 @@ func (s *EvalState) tryEvalTypedUnaryDyadicSum(unaryOp, src string) (any, bool, 
 		if array, ok := right.(data.Array); ok {
 			shape += "/right-" + string(array.Kind())
 		}
-		recordRuntimeKernelProbe("ArrayNumericUnaryDyadicSum", shape, handled, err)
+		out, handled, err = qTypedRuntimeResult("ArrayNumericUnaryDyadicSum", shape, out, handled, err)
 		if err != nil {
 			return nil, true, fmt.Errorf("sum %s %s: %w", unaryOp, string(dyadicOp), err)
 		}
 		return out, true, nil
 	} else {
-		recordRuntimeKernelProbe("ArrayNumericUnaryDyadicSum", "vector-reduce/sum-"+unaryOp+"-dyadic-"+string(dyadicOp), handled, err)
+		_, _, _ = qTypedRuntimeResult("ArrayNumericUnaryDyadicSum", "vector-reduce/sum-"+unaryOp+"-dyadic-"+string(dyadicOp), out, handled, err)
 	}
 	return nil, false, nil
 }
@@ -5079,12 +5080,12 @@ func (s *EvalState) tryEvalSumWhereCompare(src string) (any, bool, error) {
 	if err != nil || !handled {
 		return nil, handled, err
 	}
+	shape := "index-sum/" + string(indexes.Kind())
 	out, handled, err := data.TryTypedNumericSum(indexes)
+	out, handled, err = qTypedRuntimeResult("ArrayWhereCompareSum", shape, out, handled, err)
 	if err != nil || handled {
-		recordRuntimeKernelProbe("ArrayWhereCompareSum", "index-sum/"+string(indexes.Kind()), handled, err)
 		return out, true, err
 	}
-	recordRuntimeKernelProbe("ArrayWhereCompareSum", "index-sum/"+string(indexes.Kind()), handled, err)
 	return nil, false, nil
 }
 
@@ -5385,14 +5386,14 @@ func (s *EvalState) tryEvalCountWhereNull(src string) (any, bool, error) {
 		}
 		return int64(0), true, nil
 	}
-	if out, handled, err := data.TryTypedNullCount(array); err != nil || handled {
-		recordRuntimeKernelProbe("ArrayNullCount", "null-count/"+string(array.Kind()), handled, err)
+	shape := "null-count/" + string(array.Kind())
+	out, handled, err := data.TryTypedNullCount(array)
+	out, handled, err = qTypedRuntimeResult("ArrayNullCount", shape, out, handled, err)
+	if err != nil || handled {
 		if err != nil {
 			return nil, true, err
 		}
 		return out, true, nil
-	} else {
-		recordRuntimeKernelProbe("ArrayNullCount", "null-count/"+string(array.Kind()), handled, err)
 	}
 	nulls, err := nullValue(value)
 	if err != nil {
@@ -5402,8 +5403,8 @@ func (s *EvalState) tryEvalCountWhereNull(src string) (any, bool, error) {
 	if err != nil {
 		return nil, true, err
 	}
-	out, err := count(indexes)
-	return out, true, err
+	fallbackOut, err := count(indexes)
+	return fallbackOut, true, err
 }
 
 func (s *EvalState) tryEvalCountFrameMetadata(src string) (any, bool, error) {
@@ -5516,7 +5517,7 @@ func (s *EvalState) tryEvalCountWhereMask(src string) (any, bool, error) {
 		return nil, false, nil
 	}
 	out, handled, err := data.TryTypedTrueCount(array)
-	recordRuntimeKernelProbe("ArrayTrueCount", "true-count/"+string(array.Kind()), handled, err)
+	out, handled, err = qTypedRuntimeResult("ArrayTrueCount", "true-count/"+string(array.Kind()), out, handled, err)
 	if err != nil {
 		return nil, true, err
 	}
@@ -9196,13 +9197,13 @@ func applyCompositeDyadic(op string, left, right any) (any, error) {
 				recordRuntimeKernelExecution("ArrayDyadicCompare", shape, "attempt", "attempt")
 				recordRuntimeKernelExecution("ArrayDyadicCompare", shape, "fallback", RuntimeFallbackUnsupportedType)
 			} else if out, handled, err := qTryTypedCompareMask(dataOp, left, right, la, ra); err != nil || handled {
-				recordRuntimeKernelProbe("ArrayDyadicCompare", shape, handled, err)
+				out, handled, err = qTypedRuntimeResult("ArrayDyadicCompare", shape, out, handled, err)
 				if err != nil {
 					return nil, err
 				}
 				return out, nil
 			} else {
-				recordRuntimeKernelProbe("ArrayDyadicCompare", shape, handled, err)
+				_, _, _ = qTypedRuntimeResult("ArrayDyadicCompare", shape, out, handled, err)
 			}
 		} else if out, err := data.ApplyBinary(dataOp, left, right); err == nil {
 			return out, nil
@@ -9285,7 +9286,7 @@ func applyVectorDyadic(op byte, left, right any, la, ra data.Array) (data.Array,
 		if la == nil && ra != nil {
 			out, handled, err := data.TryTypedScalarFill(left, ra)
 			shape := "scalar-fill/" + string(qRuntimeKernelOperandKind(left, nil)) + "/" + string(ra.Kind())
-			recordRuntimeKernelProbe("ArrayScalarFill", shape, handled, err)
+			out, handled, err = qTypedRuntimeResult("ArrayScalarFill", shape, out, handled, err)
 			if err != nil {
 				return nil, err
 			}
@@ -9296,7 +9297,7 @@ func applyVectorDyadic(op byte, left, right any, la, ra data.Array) (data.Array,
 		if la != nil && ra == nil {
 			out, handled, err := data.TryTypedScalarFill(right, la)
 			shape := "scalar-fill/" + string(qRuntimeKernelOperandKind(right, nil)) + "/" + string(la.Kind())
-			recordRuntimeKernelProbe("ArrayScalarFill", shape, handled, err)
+			out, handled, err = qTypedRuntimeResult("ArrayScalarFill", shape, out, handled, err)
 			if err != nil {
 				return nil, err
 			}
@@ -9316,7 +9317,7 @@ func applyVectorDyadic(op byte, left, right any, la, ra data.Array) (data.Array,
 			recordRuntimeKernelExecution("ArrayDyadicArithmetic", shape, "attempt", "attempt")
 			recordRuntimeKernelExecution("ArrayDyadicArithmetic", shape, "fallback", RuntimeFallbackUnsupportedType)
 		} else if out, handled, err := qTryTypedArithmeticDyadic(dataOp, typedLeft, typedRight); err != nil || handled {
-			recordRuntimeKernelProbe("ArrayDyadicArithmetic", shape, handled, err)
+			out, handled, err = qTypedRuntimeResult("ArrayDyadicArithmetic", shape, out, handled, err)
 			if err != nil {
 				return nil, err
 			}
@@ -9324,7 +9325,7 @@ func applyVectorDyadic(op byte, left, right any, la, ra data.Array) (data.Array,
 				return array, nil
 			}
 		} else {
-			recordRuntimeKernelProbe("ArrayDyadicArithmetic", shape, handled, err)
+			_, _, _ = qTypedRuntimeResult("ArrayDyadicArithmetic", shape, out, handled, err)
 		}
 	}
 	if dataOp, ok := qDataComparisonOp(op); ok {
@@ -9333,7 +9334,7 @@ func applyVectorDyadic(op byte, left, right any, la, ra data.Array) (data.Array,
 			recordRuntimeKernelExecution("ArrayDyadicCompare", shape, "attempt", "attempt")
 			recordRuntimeKernelExecution("ArrayDyadicCompare", shape, "fallback", RuntimeFallbackUnsupportedType)
 		} else if out, handled, err := qTryTypedCompareMask(dataOp, left, right, la, ra); err != nil || handled {
-			recordRuntimeKernelProbe("ArrayDyadicCompare", shape, handled, err)
+			out, handled, err = qTypedRuntimeResult("ArrayDyadicCompare", shape, out, handled, err)
 			if err != nil {
 				return nil, err
 			}
@@ -9341,7 +9342,7 @@ func applyVectorDyadic(op byte, left, right any, la, ra data.Array) (data.Array,
 				return array, nil
 			}
 		} else {
-			recordRuntimeKernelProbe("ArrayDyadicCompare", shape, handled, err)
+			_, _, _ = qTypedRuntimeResult("ArrayDyadicCompare", shape, out, handled, err)
 		}
 	}
 	out := make([]any, n)
@@ -10064,14 +10065,14 @@ func sum(v any) (any, error) {
 	if array.Len() == 0 {
 		return data.NullValue, nil
 	}
-	if out, handled, err := data.TryTypedNumericSum(array); err != nil || handled {
-		recordRuntimeKernelProbe("ArraySum", "vector-reduce/sum/"+string(array.Kind()), handled, err)
+	shape := "vector-reduce/sum/" + string(array.Kind())
+	out, handled, err := data.TryTypedNumericSum(array)
+	out, handled, err = qTypedRuntimeResultReason("ArraySum", shape, RuntimeFallbackUnsupportedType, out, handled, err)
+	if err != nil || handled {
 		if err != nil {
 			return nil, err
 		}
 		return out, nil
-	} else {
-		recordRuntimeKernelProbeReason("ArraySum", "vector-reduce/sum/"+string(array.Kind()), handled, err, RuntimeFallbackUnsupportedType)
 	}
 	totalI := int64(0)
 	totalF := float64(0)
@@ -10114,14 +10115,14 @@ func avg(v any) (any, error) {
 	if !ok {
 		return nil, fmt.Errorf("avg expects a numeric vector")
 	}
-	if out, handled, err := data.TryTypedNumericAvg(array); err != nil || handled {
-		recordRuntimeKernelProbe("ArrayAvg", "vector-reduce/avg/"+string(array.Kind()), handled, err)
+	shape := "vector-reduce/avg/" + string(array.Kind())
+	out, handled, err := data.TryTypedNumericAvg(array)
+	out, handled, err = qTypedRuntimeResultReason("ArrayAvg", shape, RuntimeFallbackUnsupportedType, out, handled, err)
+	if err != nil || handled {
 		if err != nil {
 			return nil, err
 		}
 		return out, nil
-	} else {
-		recordRuntimeKernelProbeReason("ArrayAvg", "vector-reduce/avg/"+string(array.Kind()), handled, err, RuntimeFallbackUnsupportedType)
 	}
 	total := float64(0)
 	count := 0
@@ -10308,14 +10309,14 @@ func prd(v any) (any, error) {
 	if array.Len() == 0 {
 		return data.NullValue, nil
 	}
-	if out, handled, err := data.TryTypedNumericProduct(array); err != nil || handled {
-		recordRuntimeKernelProbe("ArrayProduct", "vector-reduce/product/"+string(array.Kind()), handled, err)
+	shape := "vector-reduce/product/" + string(array.Kind())
+	out, handled, err := data.TryTypedNumericProduct(array)
+	out, handled, err = qTypedRuntimeResult("ArrayProduct", shape, out, handled, err)
+	if err != nil || handled {
 		if err != nil {
 			return nil, err
 		}
 		return out, nil
-	} else {
-		recordRuntimeKernelProbe("ArrayProduct", "vector-reduce/product/"+string(array.Kind()), handled, err)
 	}
 	totalI := int64(1)
 	totalF := float64(1)
@@ -10363,14 +10364,14 @@ func sums(v any) (any, error) {
 	if !ok {
 		return nil, fmt.Errorf("sums expects a numeric vector")
 	}
-	if out, handled, err := data.TryTypedNumericSums(array); err != nil || handled {
-		recordRuntimeKernelProbe("ArraySums", "vector-scan/sum/"+string(array.Kind()), handled, err)
+	shape := "vector-scan/sum/" + string(array.Kind())
+	typedOut, handled, err := data.TryTypedNumericSums(array)
+	typedOut, handled, err = qTypedRuntimeResult("ArraySums", shape, typedOut, handled, err)
+	if err != nil || handled {
 		if err != nil {
 			return nil, err
 		}
-		return out, nil
-	} else {
-		recordRuntimeKernelProbe("ArraySums", "vector-scan/sum/"+string(array.Kind()), handled, err)
+		return typedOut, nil
 	}
 	out := make([]any, array.Len())
 	totalI := int64(0)
@@ -10434,14 +10435,14 @@ func prds(v any) (any, error) {
 	if !ok {
 		return nil, fmt.Errorf("prds expects a numeric vector")
 	}
-	if out, handled, err := data.TryTypedNumericProducts(array); err != nil || handled {
-		recordRuntimeKernelProbe("ArrayProducts", "vector-scan/product/"+string(array.Kind()), handled, err)
+	shape := "vector-scan/product/" + string(array.Kind())
+	typedOut, handled, err := data.TryTypedNumericProducts(array)
+	typedOut, handled, err = qTypedRuntimeResult("ArrayProducts", shape, typedOut, handled, err)
+	if err != nil || handled {
 		if err != nil {
 			return nil, err
 		}
-		return out, nil
-	} else {
-		recordRuntimeKernelProbe("ArrayProducts", "vector-scan/product/"+string(array.Kind()), handled, err)
+		return typedOut, nil
 	}
 	out := make([]any, array.Len())
 	totalI := int64(1)
@@ -10731,14 +10732,14 @@ func mapNumericUnary(name string, v any, fn func(float64, bool) any) (any, error
 	if !ok {
 		return nil, fmt.Errorf("%s expects a numeric value or vector", name)
 	}
-	if typed, handled, err := data.TryTypedQNumericUnary(name, array); err != nil || handled {
-		recordRuntimeKernelProbe("ArrayNumericUnary", "vector-unary/"+name+"/"+string(array.Kind()), handled, err)
+	shape := "vector-unary/" + name + "/" + string(array.Kind())
+	typed, handled, err := data.TryTypedQNumericUnary(name, array)
+	typed, handled, err = qTypedRuntimeResult("ArrayNumericUnary", shape, typed, handled, err)
+	if err != nil || handled {
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", name, err)
 		}
 		return typed, nil
-	} else {
-		recordRuntimeKernelProbe("ArrayNumericUnary", "vector-unary/"+name+"/"+string(array.Kind()), handled, err)
 	}
 	out := make([]any, array.Len())
 	hasFloat := false
