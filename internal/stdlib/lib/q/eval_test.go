@@ -340,6 +340,34 @@ func TestExecuteEvalPipelineRunsOnlyRecognizedRuntimePlans(t *testing.T) {
 	}
 }
 
+func TestExecuteEvalPipelineDescriptorRestoresModuloScriptSubPlan(t *testing.T) {
+	ClearRuntimeKernelExecutionStats()
+	t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+	descriptor, ok := DescribeEvalPipeline("x:til 128;y:(x*2)+1;idx:where (x mod 3)=0;+/y[idx]")
+	if !ok {
+		t.Fatalf("DescribeEvalPipeline did not recognize modulo script pipeline")
+	}
+	got, handled, err := ExecuteEvalPipelineDescriptor(descriptor)
+	if err != nil || !handled || got != int64(5461) {
+		t.Fatalf("ExecuteEvalPipelineDescriptor = %#v,%v,%v; want 5461,true,nil", got, handled, err)
+	}
+
+	seenReduce := false
+	seenGather := false
+	for _, stat := range RuntimeKernelExecutionStats() {
+		if stat.Kernel == "ArrayModuloCompareReduceSum" && stat.Outcome == "hit" && stat.Count > 0 {
+			seenReduce = true
+		}
+		if stat.Kernel == "ArrayGatherReduceSum" && stat.Outcome == "hit" && stat.Count > 0 {
+			seenGather = true
+		}
+	}
+	if !seenReduce || seenGather {
+		t.Fatalf("descriptor script stats reduce=%v gather=%v all=%#v", seenReduce, seenGather, RuntimeKernelExecutionStats())
+	}
+}
+
 func TestEvalNumericReductionBundleRecordsTypedRuntimeKernel(t *testing.T) {
 	ClearRuntimeKernelExecutionStats()
 	t.Cleanup(ClearRuntimeKernelExecutionStats)

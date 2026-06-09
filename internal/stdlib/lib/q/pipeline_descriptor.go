@@ -264,6 +264,7 @@ func qScriptPipelineDescriptorFromEvalDescriptor(descriptor EvalPipelineDescript
 	out.valuePlan = buildQScriptBindingPlanForRHS(out.valueExpr, nil)
 	out.indexPlan = buildQScriptBindingPlanForRHS(out.indexExpr, nil)
 	out.maskPlan = buildQScriptBindingPlanForRHS(out.maskExpr, nil)
+	out.moduloMaskPlan = qScriptPipelineModuloMaskPlan(out.maskExpr)
 	if len(descriptor.Assignments) > 0 {
 		out.assignments = make([]qScriptPipelineAssignment, 0, len(descriptor.Assignments))
 		for _, assignment := range descriptor.Assignments {
