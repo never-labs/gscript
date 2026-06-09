@@ -31,9 +31,11 @@ const (
 )
 
 type qPipelinePlan struct {
+	source         string
 	kind           qPipelineKind
 	shape          string
 	shapeSpec      qPipelineShapeSpec
+	operands       []qPipelineOperandPlan
 	valueExpr      string
 	valuePlan      qScriptBindingPlan
 	indexExpr      string
@@ -55,6 +57,48 @@ type qPipelinePlan struct {
 	reductionInput string
 	reductionPlan  qScriptBindingPlan
 	moduloMaskPlan *qPipelinePlan
+}
+
+type qPipelineOperandRole string
+
+const (
+	qPipelineOperandValue     qPipelineOperandRole = "value"
+	qPipelineOperandIndex     qPipelineOperandRole = "index"
+	qPipelineOperandMask      qPipelineOperandRole = "mask"
+	qPipelineOperandLeft      qPipelineOperandRole = "left"
+	qPipelineOperandRight     qPipelineOperandRole = "right"
+	qPipelineOperandMod       qPipelineOperandRole = "mod"
+	qPipelineOperandModulus   qPipelineOperandRole = "modulus"
+	qPipelineOperandModTarget qPipelineOperandRole = "mod_target"
+	qPipelineOperandReduction qPipelineOperandRole = "reduction"
+)
+
+type qPipelineOperandPlan struct {
+	role qPipelineOperandRole
+	expr string
+	plan qScriptBindingPlan
+}
+
+type qPipelineOperandFingerprint struct {
+	role  qPipelineOperandRole
+	kind  data.Kind
+	class string
+}
+
+type qPipelineBindingCacheKey struct {
+	source      string
+	kind        qPipelineKind
+	shape       string
+	fingerprint string
+}
+
+type qPipelineBoundPlan struct {
+	key            qPipelineBindingCacheKey
+	resultClass    string
+	resultKind     data.Kind
+	kernel         string
+	kernelShape    string
+	fallbackReason string
 }
 
 func (s *EvalState) qPipelinePlan(src string) qPipelinePlan {
@@ -163,64 +207,68 @@ func buildQPipelinePlan(src string) qPipelinePlan {
 	if src == "" {
 		return qPipelinePlan{}
 	}
+	withSource := func(plan qPipelinePlan) qPipelinePlan {
+		plan.source = src
+		return plan
+	}
 	if strings.HasPrefix(src, "+/") {
 		right := strings.TrimSpace(src[2:])
 		if right == "" {
 			return qPipelinePlan{}
 		}
 		if plan, ok := buildQPipelineSumGatherPlan(right); ok {
-			return qPipelinePlanWithBindingPlans(plan)
+			return qPipelinePlanWithBindingPlans(withSource(plan))
 		}
 		if plan, ok := buildQPipelineSumBinPlan(right); ok {
-			return qPipelinePlanWithBindingPlans(plan)
+			return qPipelinePlanWithBindingPlans(withSource(plan))
 		}
 		if plan, ok := buildQPipelineWhereComparePlan(right, qPipelineSumWhereCompare, "compare-to-index-sum"); ok {
-			return qPipelinePlanWithBindingPlans(plan)
+			return qPipelinePlanWithBindingPlans(withSource(plan))
 		}
 		if input, ok := qPipelineDeltasInput(right); ok {
-			return qPipelinePlanWithBindingPlans(qPipelinePlan{kind: qPipelineSumDeltas, shape: "vector-reduce/sum-deltas", reductionInput: input})
+			return qPipelinePlanWithBindingPlans(withSource(qPipelinePlan{kind: qPipelineSumDeltas, shape: "vector-reduce/sum-deltas", reductionInput: input}))
 		}
 		if plan, ok := buildQPipelineSumMovingWindowPlan(right); ok {
-			return qPipelinePlanWithBindingPlans(plan)
+			return qPipelinePlanWithBindingPlans(withSource(plan))
 		}
 		if qPipelineVectorTransformExprCandidate(right) {
 			plan := qPipelineShapePlan(qPipelineSumVectorExpr, "")
 			plan.reductionInput = right
-			return qPipelinePlanWithBindingPlans(plan)
+			return qPipelinePlanWithBindingPlans(withSource(plan))
 		}
 		return qPipelinePlan{}
 	}
 	if strings.HasPrefix(src, "sum ") && wordBoundary(src, 0, len("sum")) {
 		inputExpr := strings.TrimSpace(src[len("sum "):])
 		if input, ok := qPipelineDeltasInput(inputExpr); ok {
-			return qPipelinePlanWithBindingPlans(qPipelinePlan{kind: qPipelineSumDeltas, shape: "vector-reduce/sum-deltas", reductionInput: input})
+			return qPipelinePlanWithBindingPlans(withSource(qPipelinePlan{kind: qPipelineSumDeltas, shape: "vector-reduce/sum-deltas", reductionInput: input}))
 		}
 		if plan, ok := buildQPipelineSumMovingWindowPlan(inputExpr); ok {
-			return qPipelinePlanWithBindingPlans(plan)
+			return qPipelinePlanWithBindingPlans(withSource(plan))
 		}
 		if qPipelineVectorTransformExprCandidate(inputExpr) {
 			plan := qPipelineShapePlan(qPipelineSumVectorExpr, "")
 			plan.reductionInput = inputExpr
-			return qPipelinePlanWithBindingPlans(plan)
+			return qPipelinePlanWithBindingPlans(withSource(plan))
 		}
 		return qPipelinePlan{}
 	}
 	if strings.HasPrefix(src, "count ") && wordBoundary(src, 0, len("count")) {
 		inputExpr := strings.TrimSpace(src[len("count "):])
 		if plan, ok := buildQPipelineWhereComparePlan(inputExpr, qPipelineCountWhereCompare, "compare-to-index-count"); ok {
-			return qPipelinePlanWithBindingPlans(plan)
+			return qPipelinePlanWithBindingPlans(withSource(plan))
 		}
 		if plan, ok := buildQPipelineWhereInPlan(inputExpr, qPipelineCountWhereIn, "in-count"); ok {
-			return qPipelinePlanWithBindingPlans(plan)
+			return qPipelinePlanWithBindingPlans(withSource(plan))
 		}
 		if strings.HasPrefix(inputExpr, "distinct ") && wordBoundary(inputExpr, 0, len("distinct")) {
 			arg := strings.TrimSpace(inputExpr[len("distinct "):])
 			if arg != "" {
-				return qPipelinePlanWithBindingPlans(qPipelinePlan{kind: qPipelineCountDistinct, shape: "distinct-count", reductionInput: arg})
+				return qPipelinePlanWithBindingPlans(withSource(qPipelinePlan{kind: qPipelineCountDistinct, shape: "distinct-count", reductionInput: arg}))
 			}
 		}
 		if scan, arg, ok := qPipelineRunningScanInput(inputExpr); ok {
-			return qPipelinePlanWithBindingPlans(qPipelinePlan{kind: qPipelineCountRunningScan, shape: "vector-count/" + scan, compareOp: scan, reductionInput: arg})
+			return qPipelinePlanWithBindingPlans(withSource(qPipelinePlan{kind: qPipelineCountRunningScan, shape: "vector-count/" + scan, compareOp: scan, reductionInput: arg}))
 		}
 		if strings.HasPrefix(inputExpr, "where ") && wordBoundary(inputExpr, 0, len("where")) {
 			return qPipelinePlan{}
@@ -231,13 +279,13 @@ func buildQPipelinePlan(src string) qPipelinePlan {
 		if qPipelineVectorTransformExprCandidate(inputExpr) {
 			plan := qPipelineShapePlan(qPipelineCountVectorExpr, "")
 			plan.reductionInput = inputExpr
-			return qPipelinePlanWithBindingPlans(plan)
+			return qPipelinePlanWithBindingPlans(withSource(plan))
 		}
 		return qPipelinePlan{}
 	}
 	if strings.HasPrefix(src, "where ") && wordBoundary(src, 0, len("where")) {
 		if plan, ok := buildQPipelineWhereComparePlan(src, qPipelineWhereCompareIndexes, "compare-to-index"); ok {
-			return qPipelinePlanWithBindingPlans(plan)
+			return qPipelinePlanWithBindingPlans(withSource(plan))
 		}
 	}
 	return qPipelinePlan{}
@@ -298,33 +346,42 @@ func qPipelinePlanWithBindingPlans(plan qPipelinePlan) qPipelinePlan {
 	}
 	if plan.valueExpr != "" {
 		plan.valuePlan = buildQPipelineBindingPlan(plan.valueExpr)
+		plan.operands = append(plan.operands, qPipelineOperandPlan{role: qPipelineOperandValue, expr: plan.valueExpr, plan: plan.valuePlan})
 	}
 	if plan.indexExpr != "" {
 		plan.indexPlan = buildQPipelineBindingPlan(plan.indexExpr)
+		plan.operands = append(plan.operands, qPipelineOperandPlan{role: qPipelineOperandIndex, expr: plan.indexExpr, plan: plan.indexPlan})
 	}
 	if plan.maskExpr != "" {
 		plan.maskPlan = buildQPipelineBindingPlan(plan.maskExpr)
+		plan.operands = append(plan.operands, qPipelineOperandPlan{role: qPipelineOperandMask, expr: plan.maskExpr, plan: plan.maskPlan})
 		if modPlan, ok := qPipelineModuloComparePlanFromMask(plan.maskExpr); ok {
 			plan.moduloMaskPlan = &modPlan
 		}
 	}
 	if plan.leftExpr != "" {
 		plan.leftPlan = buildQPipelineBindingPlan(plan.leftExpr)
+		plan.operands = append(plan.operands, qPipelineOperandPlan{role: qPipelineOperandLeft, expr: plan.leftExpr, plan: plan.leftPlan})
 	}
 	if plan.rightExpr != "" {
 		plan.rightPlan = buildQPipelineBindingPlan(plan.rightExpr)
+		plan.operands = append(plan.operands, qPipelineOperandPlan{role: qPipelineOperandRight, expr: plan.rightExpr, plan: plan.rightPlan})
 	}
 	if plan.modExpr != "" {
 		plan.modPlan = buildQPipelineBindingPlan(plan.modExpr)
+		plan.operands = append(plan.operands, qPipelineOperandPlan{role: qPipelineOperandMod, expr: plan.modExpr, plan: plan.modPlan})
 	}
 	if plan.modulusExpr != "" {
 		plan.modulusPlan = buildQPipelineBindingPlan(plan.modulusExpr)
+		plan.operands = append(plan.operands, qPipelineOperandPlan{role: qPipelineOperandModulus, expr: plan.modulusExpr, plan: plan.modulusPlan})
 	}
 	if plan.modTargetExpr != "" {
 		plan.modTargetPlan = buildQPipelineBindingPlan(plan.modTargetExpr)
+		plan.operands = append(plan.operands, qPipelineOperandPlan{role: qPipelineOperandModTarget, expr: plan.modTargetExpr, plan: plan.modTargetPlan})
 	}
 	if plan.reductionInput != "" {
 		plan.reductionPlan = buildQPipelineBindingPlan(plan.reductionInput)
+		plan.operands = append(plan.operands, qPipelineOperandPlan{role: qPipelineOperandReduction, expr: plan.reductionInput, plan: plan.reductionPlan})
 	}
 	return plan
 }
@@ -1112,7 +1169,18 @@ func (s *EvalState) evalQPipelineSumVectorExpr(plan qPipelinePlan) (any, bool, e
 	if err != nil {
 		return nil, true, err
 	}
+	bindingKey := qPipelineBindingKey(plan, []qPipelineOperandFingerprint{
+		qPipelineOperandFingerprintForValue(qPipelineOperandReduction, value),
+	})
+	if bound, ok := qGlobalPipelineBindingCacheProbe(bindingKey); ok {
+		return s.evalQPipelineSumVectorExprBound(bound, value)
+	}
 	if _, ok := numeric(value); ok {
+		qGlobalPipelineBindingCacheStore(qPipelineBoundPlan{
+			key:         bindingKey,
+			resultClass: "scalar",
+			resultKind:  qRuntimeKernelOperandKind(value, nil),
+		})
 		return value, true, nil
 	}
 	array, ok := value.(data.Array)
@@ -1120,10 +1188,33 @@ func (s *EvalState) evalQPipelineSumVectorExpr(plan qPipelinePlan) (any, bool, e
 		return nil, false, nil
 	}
 	shape := "vector-reduce/sum-expr/" + string(array.Kind())
+	bound := qPipelineBoundPlan{
+		key:            bindingKey,
+		resultClass:    "array",
+		resultKind:     array.Kind(),
+		kernel:         "ArraySumExpr",
+		kernelShape:    shape,
+		fallbackReason: RuntimeFallbackUnsupportedType,
+	}
+	qGlobalPipelineBindingCacheStore(bound)
+	return s.evalQPipelineSumVectorExprBound(bound, value)
+}
+
+func (s *EvalState) evalQPipelineSumVectorExprBound(bound qPipelineBoundPlan, value any) (any, bool, error) {
+	if bound.resultClass == "scalar" {
+		if _, ok := numeric(value); !ok {
+			return nil, false, nil
+		}
+		return value, true, nil
+	}
+	array, ok := value.(data.Array)
+	if !ok || array.Kind() != bound.resultKind {
+		return nil, false, nil
+	}
 	return evalQTypedRuntimeKernel(qTypedRuntimeKernel[any]{
 		kernel:         "ArraySumExpr",
-		shape:          shape,
-		fallbackReason: RuntimeFallbackUnsupportedType,
+		shape:          bound.kernelShape,
+		fallbackReason: bound.fallbackReason,
 		call: func() (any, bool, error) {
 			return data.TryTypedNumericSum(array)
 		},
@@ -1285,4 +1376,82 @@ func (s *EvalState) evalQPipelinePlannedExpr(src string, plan *qScriptBindingPla
 		}
 	}
 	return s.eval(src)
+}
+
+func qPipelineOperandFingerprintForValue(role qPipelineOperandRole, value any) qPipelineOperandFingerprint {
+	if array, ok := value.(data.Array); ok {
+		return qPipelineOperandFingerprint{role: role, kind: array.Kind(), class: "array"}
+	}
+	if _, ok := numeric(value); ok {
+		return qPipelineOperandFingerprint{role: role, kind: qRuntimeKernelOperandKind(value, nil), class: "scalar"}
+	}
+	if _, ok := value.(data.Frame); ok {
+		return qPipelineOperandFingerprint{role: role, kind: data.KindAny, class: "frame"}
+	}
+	if _, ok := value.(data.KeyedFrame); ok {
+		return qPipelineOperandFingerprint{role: role, kind: data.KindAny, class: "keyed_frame"}
+	}
+	return qPipelineOperandFingerprint{role: role, kind: qRuntimeKernelOperandKind(value, nil), class: "value"}
+}
+
+func qPipelineBindingKey(plan qPipelinePlan, operands []qPipelineOperandFingerprint) qPipelineBindingCacheKey {
+	source := plan.source
+	if source == "" {
+		source = plan.shape
+	}
+	var b strings.Builder
+	for i, operand := range operands {
+		if i > 0 {
+			b.WriteByte('|')
+		}
+		b.WriteString(string(operand.role))
+		b.WriteByte(':')
+		b.WriteString(operand.class)
+		b.WriteByte(':')
+		b.WriteString(string(operand.kind))
+	}
+	return qPipelineBindingCacheKey{
+		source:      source,
+		kind:        plan.kind,
+		shape:       plan.shape,
+		fingerprint: b.String(),
+	}
+}
+
+func qGlobalPipelineBindingCacheProbe(key qPipelineBindingCacheKey) (qPipelineBoundPlan, bool) {
+	if key.source == "" || key.fingerprint == "" {
+		return qPipelineBoundPlan{}, false
+	}
+	qGlobalScriptPlanCacheMu.Lock()
+	bound, ok := qGlobalPipelineBindingCache[key]
+	if ok {
+		qGlobalScriptPlanStats.PipelineBindingHits++
+	} else {
+		qGlobalScriptPlanStats.PipelineBindingMisses++
+	}
+	qGlobalScriptPlanCacheMu.Unlock()
+	if !ok {
+		return qPipelineBoundPlan{}, false
+	}
+	return bound, true
+}
+
+func qGlobalPipelineBindingCacheStore(bound qPipelineBoundPlan) {
+	key := bound.key
+	if key.source == "" || key.fingerprint == "" {
+		return
+	}
+	qGlobalScriptPlanCacheMu.Lock()
+	if _, ok := qGlobalPipelineBindingCache[key]; !ok {
+		qGlobalPipelineBindingCacheOrder = append(qGlobalPipelineBindingCacheOrder, key)
+	}
+	qGlobalPipelineBindingCache[key] = bound
+	qGlobalScriptPlanStats.PipelineBindingStores++
+	for len(qGlobalPipelineBindingCacheOrder) > qGlobalPipelineBindingCacheLimit {
+		evict := qGlobalPipelineBindingCacheOrder[0]
+		qGlobalPipelineBindingCacheOrder = qGlobalPipelineBindingCacheOrder[1:]
+		delete(qGlobalPipelineBindingCache, evict)
+		qGlobalScriptPlanStats.PipelineBindingEvictions++
+	}
+	qGlobalScriptPlanCacheMu.Unlock()
 }

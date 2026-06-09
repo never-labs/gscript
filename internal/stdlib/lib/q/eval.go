@@ -559,30 +559,38 @@ type EvalState struct {
 
 const qGlobalScriptPlanCacheLimit = 512
 const qGlobalPipelinePlanCacheLimit = 512
+const qGlobalPipelineBindingCacheLimit = 1024
 
 // EvalPlanCacheStats reports process-wide q.eval plan-cache observability.
 // The cached artifacts are schema-free q expression plans keyed only by the
 // normalized source text; executable mutable state is cloned before use.
 type EvalPlanCacheStats struct {
-	ScriptEntries     int
-	ScriptHits        uint64
-	ScriptMisses      uint64
-	ScriptStores      uint64
-	ScriptEvictions   uint64
-	PipelineEntries   int
-	PipelineHits      uint64
-	PipelineMisses    uint64
-	PipelineStores    uint64
-	PipelineEvictions uint64
+	ScriptEntries            int
+	ScriptHits               uint64
+	ScriptMisses             uint64
+	ScriptStores             uint64
+	ScriptEvictions          uint64
+	PipelineEntries          int
+	PipelineHits             uint64
+	PipelineMisses           uint64
+	PipelineStores           uint64
+	PipelineEvictions        uint64
+	PipelineBindingEntries   int
+	PipelineBindingHits      uint64
+	PipelineBindingMisses    uint64
+	PipelineBindingStores    uint64
+	PipelineBindingEvictions uint64
 }
 
 var (
-	qGlobalScriptPlanCacheMu      sync.Mutex
-	qGlobalScriptPlanCache        = make(map[string]qScriptPlan)
-	qGlobalScriptPlanCacheOrder   []string
-	qGlobalPipelinePlanCache      = make(map[string]qPipelinePlan)
-	qGlobalPipelinePlanCacheOrder []string
-	qGlobalScriptPlanStats        EvalPlanCacheStats
+	qGlobalScriptPlanCacheMu         sync.Mutex
+	qGlobalScriptPlanCache           = make(map[string]qScriptPlan)
+	qGlobalScriptPlanCacheOrder      []string
+	qGlobalPipelinePlanCache         = make(map[string]qPipelinePlan)
+	qGlobalPipelinePlanCacheOrder    []string
+	qGlobalPipelineBindingCache      = make(map[qPipelineBindingCacheKey]qPipelineBoundPlan)
+	qGlobalPipelineBindingCacheOrder []qPipelineBindingCacheKey
+	qGlobalScriptPlanStats           EvalPlanCacheStats
 )
 
 func NewEvalState(env map[string]any) *EvalState {
@@ -809,6 +817,7 @@ func EvalPlanCacheStatsSnapshot() EvalPlanCacheStats {
 	stats := qGlobalScriptPlanStats
 	stats.ScriptEntries = len(qGlobalScriptPlanCache)
 	stats.PipelineEntries = len(qGlobalPipelinePlanCache)
+	stats.PipelineBindingEntries = len(qGlobalPipelineBindingCache)
 	qGlobalScriptPlanCacheMu.Unlock()
 	return stats
 }
@@ -816,7 +825,7 @@ func EvalPlanCacheStatsSnapshot() EvalPlanCacheStats {
 // EvalPlanCacheLimit returns the aggregate bounded capacity of q.eval plan
 // caches exposed through bind's q.cache_stats table.
 func EvalPlanCacheLimit() int {
-	return qGlobalScriptPlanCacheLimit + qGlobalPipelinePlanCacheLimit
+	return qGlobalScriptPlanCacheLimit + qGlobalPipelinePlanCacheLimit + qGlobalPipelineBindingCacheLimit
 }
 
 // ClearEvalPlanCaches resets process-wide q.eval parse/plan caches.
@@ -826,6 +835,8 @@ func ClearEvalPlanCaches() {
 	qGlobalScriptPlanCacheOrder = nil
 	qGlobalPipelinePlanCache = make(map[string]qPipelinePlan)
 	qGlobalPipelinePlanCacheOrder = nil
+	qGlobalPipelineBindingCache = make(map[qPipelineBindingCacheKey]qPipelineBoundPlan)
+	qGlobalPipelineBindingCacheOrder = nil
 	qGlobalScriptPlanStats = EvalPlanCacheStats{}
 	qGlobalScriptPlanCacheMu.Unlock()
 }
@@ -901,6 +912,13 @@ func cloneQScriptPipelineDescriptor(in *qScriptPipelineDescriptor) *qScriptPipel
 
 func cloneQPipelinePlan(in qPipelinePlan) qPipelinePlan {
 	out := in
+	if len(in.operands) > 0 {
+		out.operands = make([]qPipelineOperandPlan, len(in.operands))
+		for i := range in.operands {
+			out.operands[i] = in.operands[i]
+			out.operands[i].plan = cloneQScriptBindingPlan(in.operands[i].plan)
+		}
+	}
 	out.valuePlan = cloneQScriptBindingPlan(in.valuePlan)
 	out.indexPlan = cloneQScriptBindingPlan(in.indexPlan)
 	out.maskPlan = cloneQScriptBindingPlan(in.maskPlan)

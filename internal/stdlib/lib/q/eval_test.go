@@ -1042,6 +1042,44 @@ func TestEvalGlobalPipelinePlanCachePreservesEnvironmentSemantics(t *testing.T) 
 	}
 }
 
+func TestEvalGlobalPipelineBindingCacheKeysByOperandKind(t *testing.T) {
+	ClearEvalPlanCaches()
+	t.Cleanup(ClearEvalPlanCaches)
+
+	src := "sum reverse v"
+	envI64 := map[string]any{"v": data.NewI64([]int64{1, 2, 3})}
+	if got, err := EvalWithEnv(src, envI64); err != nil || got != int64(6) {
+		t.Fatalf("first i64 EvalWithEnv returned %#v, %v; want 6,nil", got, err)
+	}
+	afterI64 := EvalPlanCacheStatsSnapshot()
+	if afterI64.PipelineBindingMisses == 0 || afterI64.PipelineBindingStores == 0 || afterI64.PipelineBindingEntries != 1 {
+		t.Fatalf("i64 eval did not populate typed pipeline binding cache: %#v", afterI64)
+	}
+
+	envF64 := map[string]any{"v": data.NewF64([]float64{1.5, 2.5, 3.5})}
+	if got, err := EvalWithEnv(src, envF64); err != nil || got != 7.5 {
+		t.Fatalf("f64 EvalWithEnv returned %#v, %v; want 7.5,nil", got, err)
+	}
+	afterF64 := EvalPlanCacheStatsSnapshot()
+	if afterF64.PipelineBindingEntries != 2 {
+		t.Fatalf("typed pipeline binding cache reused i64 binding for f64: before=%#v after=%#v", afterI64, afterF64)
+	}
+	if afterF64.PipelineBindingMisses <= afterI64.PipelineBindingMisses {
+		t.Fatalf("f64 eval did not record a distinct binding miss: before=%#v after=%#v", afterI64, afterF64)
+	}
+
+	if got, err := EvalWithEnv(src, envI64); err != nil || got != int64(6) {
+		t.Fatalf("warm i64 EvalWithEnv returned %#v, %v; want 6,nil", got, err)
+	}
+	afterWarmI64 := EvalPlanCacheStatsSnapshot()
+	if afterWarmI64.PipelineBindingHits <= afterF64.PipelineBindingHits {
+		t.Fatalf("warm i64 eval did not hit typed pipeline binding cache: before=%#v after=%#v", afterF64, afterWarmI64)
+	}
+	if afterWarmI64.PipelineBindingEntries != afterF64.PipelineBindingEntries {
+		t.Fatalf("warm i64 eval changed binding cache entries: before=%#v after=%#v", afterF64, afterWarmI64)
+	}
+}
+
 func TestEvalStatePipelinePlanCachePreservesEnvironmentSemantics(t *testing.T) {
 	ClearRuntimeKernelExecutionStats()
 	t.Cleanup(ClearRuntimeKernelExecutionStats)
