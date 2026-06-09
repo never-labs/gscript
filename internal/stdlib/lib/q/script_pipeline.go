@@ -1489,7 +1489,6 @@ func (s *EvalState) evalQScriptGatherSumCountWhereIndexPipeline(descriptor *qScr
 		if !ok {
 			return nil, false, nil
 		}
-		recordRuntimeKernelExecution("QScriptPipelinePlan", descriptor.shape(), "hit", "typed_pipeline")
 		return out, true, nil
 	}
 	left, right, err := s.evalQPipelineCompareOperands(&plan)
@@ -1536,7 +1535,6 @@ func (s *EvalState) evalQScriptGatherSumCountWhereIndexPipeline(descriptor *qScr
 	if !ok {
 		return nil, false, nil
 	}
-	recordRuntimeKernelExecution("QScriptPipelinePlan", descriptor.shape(), "hit", "typed_pipeline")
 	return out, true, nil
 }
 
