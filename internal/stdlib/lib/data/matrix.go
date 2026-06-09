@@ -620,23 +620,32 @@ func MatrixMultiplyNumeric(left, right Matrix) (Array, error) {
 	if leftShape[1] != rightShape[0] {
 		return nil, fmt.Errorf("matrix multiply shape %dx%d cannot conform to %dx%d", leftShape[0], leftShape[1], rightShape[0], rightShape[1])
 	}
+	if leftMatrix, ok := left.(matrixArray); ok {
+		if rightMatrix, ok := right.(matrixArray); ok {
+			out, handled, err := matrixMultiplyNumericFlat(leftMatrix, rightMatrix, leftShape, rightShape)
+			if err != nil || handled {
+				return out, err
+			}
+		}
+	}
 	out := make([]float64, leftShape[0]*rightShape[1])
 	for row := 0; row < leftShape[0]; row++ {
 		for col := 0; col < rightShape[1]; col++ {
 			sum := float64(0)
 			for inner := 0; inner < leftShape[1]; inner++ {
-				lv, ok := left.Cell(row, inner)
-				if !ok {
-					return nil, fmt.Errorf("matrix multiply left cell %d,%d out of range", row, inner)
+				ln, lok, err := matrixCellNumeric(left, row, inner)
+				if err != nil || !lok {
+					if err == nil {
+						err = fmt.Errorf("matrix multiply expects numeric cells")
+					}
+					return nil, err
 				}
-				rv, ok := right.Cell(inner, col)
-				if !ok {
-					return nil, fmt.Errorf("matrix multiply right cell %d,%d out of range", inner, col)
-				}
-				ln, lok := numeric(lv)
-				rn, rok := numeric(rv)
-				if !lok || !rok {
-					return nil, fmt.Errorf("matrix multiply expects numeric cells")
+				rn, rok, err := matrixCellNumeric(right, inner, col)
+				if err != nil || !rok {
+					if err == nil {
+						err = fmt.Errorf("matrix multiply expects numeric cells")
+					}
+					return nil, err
 				}
 				sum += ln * rn
 			}
@@ -644,6 +653,37 @@ func MatrixMultiplyNumeric(left, right Matrix) (Array, error) {
 		}
 	}
 	return matrixArray{shape: []int{leftShape[0], rightShape[1]}, data: NewF64(out)}, nil
+}
+
+func matrixMultiplyNumericFlat(left, right matrixArray, leftShape, rightShape []int) (Array, bool, error) {
+	leftCols := leftShape[1]
+	rightCols := rightShape[1]
+	out := make([]float64, leftShape[0]*rightCols)
+	for row := 0; row < leftShape[0]; row++ {
+		leftRowOffset := row * leftCols
+		for col := 0; col < rightCols; col++ {
+			var total float64
+			for inner := 0; inner < leftCols; inner++ {
+				leftValue, ok, err := typedKernels.NumericAt(left.data, leftRowOffset+inner)
+				if err != nil || !ok {
+					if err == nil {
+						err = fmt.Errorf("matrix multiply expects numeric cells")
+					}
+					return nil, ok, err
+				}
+				rightValue, ok, err := typedKernels.NumericAt(right.data, inner*rightCols+col)
+				if err != nil || !ok {
+					if err == nil {
+						err = fmt.Errorf("matrix multiply expects numeric cells")
+					}
+					return nil, ok, err
+				}
+				total += leftValue * rightValue
+			}
+			out[row*rightCols+col] = total
+		}
+	}
+	return matrixArray{shape: []int{leftShape[0], rightShape[1]}, data: NewF64(out)}, true, nil
 }
 
 // MatrixMultiplyNumericSum computes sum(raze mmu[left;right]) without
@@ -660,28 +700,27 @@ func MatrixMultiplyNumericSum(left, right Matrix) (float64, bool, error) {
 	if leftShape[1] != rightShape[0] {
 		return 0, false, fmt.Errorf("matrix multiply shape %dx%d cannot conform to %dx%d", leftShape[0], leftShape[1], rightShape[0], rightShape[1])
 	}
-	if leftMatrix, ok := left.(matrixArray); ok {
-		if rightMatrix, ok := right.(matrixArray); ok {
-			return matrixMultiplyNumericSumFlat(leftMatrix, rightMatrix, leftShape, rightShape)
-		}
+	if total, handled, err := matrixMultiplyNumericSumBySums(left, right, leftShape, rightShape); err != nil || handled {
+		return total, handled, err
 	}
 	var total float64
 	for row := 0; row < leftShape[0]; row++ {
 		for col := 0; col < rightShape[1]; col++ {
 			var cell float64
 			for inner := 0; inner < leftShape[1]; inner++ {
-				lv, ok := left.Cell(row, inner)
-				if !ok {
-					return 0, false, fmt.Errorf("matrix multiply left cell %d,%d out of range", row, inner)
+				ln, lok, err := matrixCellNumeric(left, row, inner)
+				if err != nil || !lok {
+					if err == nil {
+						err = fmt.Errorf("matrix multiply expects numeric cells")
+					}
+					return 0, false, err
 				}
-				rv, ok := right.Cell(inner, col)
-				if !ok {
-					return 0, false, fmt.Errorf("matrix multiply right cell %d,%d out of range", inner, col)
-				}
-				ln, lok := numeric(lv)
-				rn, rok := numeric(rv)
-				if !lok || !rok {
-					return 0, false, fmt.Errorf("matrix multiply expects numeric cells")
+				rn, rok, err := matrixCellNumeric(right, inner, col)
+				if err != nil || !rok {
+					if err == nil {
+						err = fmt.Errorf("matrix multiply expects numeric cells")
+					}
+					return 0, false, err
 				}
 				cell += ln * rn
 			}
@@ -691,35 +730,62 @@ func MatrixMultiplyNumericSum(left, right Matrix) (float64, bool, error) {
 	return total, true, nil
 }
 
-func matrixMultiplyNumericSumFlat(left, right matrixArray, leftShape, rightShape []int) (float64, bool, error) {
-	leftCols := leftShape[1]
-	rightCols := rightShape[1]
-	var total float64
+func matrixMultiplyNumericSumBySums(left, right Matrix, leftShape, rightShape []int) (float64, bool, error) {
+	innerLen := leftShape[1]
+	leftColumnSums := make([]float64, innerLen)
 	for row := 0; row < leftShape[0]; row++ {
-		leftRowOffset := row * leftCols
-		for col := 0; col < rightCols; col++ {
-			var cell float64
-			for inner := 0; inner < leftCols; inner++ {
-				leftValue, ok, err := typedKernels.NumericAt(left.data, leftRowOffset+inner)
-				if err != nil || !ok {
-					if err == nil {
-						err = fmt.Errorf("matrix multiply expects numeric cells")
-					}
-					return 0, ok, err
+		for inner := 0; inner < innerLen; inner++ {
+			value, ok, err := matrixCellNumeric(left, row, inner)
+			if err != nil || !ok {
+				if err == nil {
+					err = fmt.Errorf("matrix multiply expects numeric cells")
 				}
-				rightValue, ok, err := typedKernels.NumericAt(right.data, inner*rightCols+col)
-				if err != nil || !ok {
-					if err == nil {
-						err = fmt.Errorf("matrix multiply expects numeric cells")
-					}
-					return 0, ok, err
-				}
-				cell += leftValue * rightValue
+				return 0, ok, err
 			}
-			total += cell
+			leftColumnSums[inner] += value
 		}
 	}
+	var total float64
+	for inner := 0; inner < innerLen; inner++ {
+		var rightRowSum float64
+		for col := 0; col < rightShape[1]; col++ {
+			value, ok, err := matrixCellNumeric(right, inner, col)
+			if err != nil || !ok {
+				if err == nil {
+					err = fmt.Errorf("matrix multiply expects numeric cells")
+				}
+				return 0, ok, err
+			}
+			rightRowSum += value
+		}
+		total += leftColumnSums[inner] * rightRowSum
+	}
 	return total, true, nil
+}
+
+func matrixCellNumeric(matrix Matrix, row, col int) (float64, bool, error) {
+	switch m := matrix.(type) {
+	case matrixArray:
+		if len(m.shape) != 2 || row < 0 || col < 0 || row >= m.shape[0] || col >= m.shape[1] {
+			return 0, false, fmt.Errorf("matrix cell %d,%d out of range", row, col)
+		}
+		return typedKernels.NumericAt(m.data, row*m.shape[1]+col)
+	case transposedMatrixArray:
+		if row < 0 || col < 0 || row >= m.rows || col >= m.cols {
+			return 0, false, fmt.Errorf("matrix cell %d,%d out of range", row, col)
+		}
+		return matrixCellNumeric(m.source, col, row)
+	default:
+		value, ok := matrix.Cell(row, col)
+		if !ok {
+			return 0, false, fmt.Errorf("matrix cell %d,%d out of range", row, col)
+		}
+		n, ok := numeric(value)
+		if !ok {
+			return 0, false, nil
+		}
+		return n, true, nil
+	}
 }
 
 // MatrixInverseNumeric inverts a numeric square matrix with Gauss-Jordan

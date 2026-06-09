@@ -346,6 +346,45 @@ func TestQPipelinePlanRecognizesRazeSumAndCounts(t *testing.T) {
 	}
 }
 
+func TestQPipelinePlanRecognizesMatrixMultiplyRazeSum(t *testing.T) {
+	ClearRuntimeKernelExecutionStats()
+	t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+	expr := "+/raze mmu[(2 3#1 2 3 4 5 6);(3 2#10 20 30 40 50 60)]"
+	descriptor, ok := DescribeEvalPipeline(expr)
+	if !ok {
+		t.Fatalf("DescribeEvalPipeline(%q) did not recognize matrix multiply sum", expr)
+	}
+	if descriptor.Shape != "vector-reduce/sum-raze" ||
+		descriptor.PipelineShape != "vector_reduce" ||
+		descriptor.ShapeReducer != "sum" ||
+		descriptor.ShapeTransform != "raze" {
+		t.Fatalf("descriptor = %#v, want sum raze vector pipeline", descriptor)
+	}
+	out, handled, err := ExecuteEvalPipelineDescriptor(descriptor)
+	if err != nil || !handled || out != 1630.0 {
+		t.Fatalf("ExecuteEvalPipelineDescriptor = %#v,%v,%v; want 1630,true,nil", out, handled, err)
+	}
+	assertEvalValue(t, expr, 1630.0)
+
+	seenPipeline := false
+	seenKernel := false
+	for _, stat := range RuntimeKernelExecutionStats() {
+		if stat.Outcome == "fallback" || stat.Outcome == "error" {
+			t.Fatalf("unexpected matrix multiply sum fallback/error: %#v all=%#v", stat, RuntimeKernelExecutionStats())
+		}
+		if stat.Kernel == "QPipelinePlan" && stat.Shape == "vector-reduce/sum-raze" && stat.Outcome == "hit" {
+			seenPipeline = true
+		}
+		if stat.Kernel == "MatrixMultiplySum" && stat.Outcome == "hit" && stat.ReasonCode == "typed_kernel" {
+			seenKernel = true
+		}
+	}
+	if !seenPipeline || !seenKernel {
+		t.Fatalf("missing matrix multiply pipeline/kernel stats: pipeline=%v kernel=%v all=%#v", seenPipeline, seenKernel, RuntimeKernelExecutionStats())
+	}
+}
+
 func TestQPipelinePlanRecognizesScalarApplyIndex(t *testing.T) {
 	if plan, ok := buildQPipelineApplyPathIndexPlan("m . 1 2"); !ok ||
 		plan.shape != "apply-index/path-dot" ||

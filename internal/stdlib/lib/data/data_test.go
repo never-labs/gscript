@@ -7748,6 +7748,23 @@ func TestMatrixReshapeTransposeAndMultiply(t *testing.T) {
 	if got, ok := pm.Cell(1, 1); !ok || got != 640.0 {
 		t.Fatalf("product cell 1,1 = %#v ok %v, want 640", got, ok)
 	}
+	productSum, handled, err := MatrixMultiplyNumericSum(matrix, right.(Matrix))
+	if err != nil || !handled || productSum != 1630.0 {
+		t.Fatalf("MatrixMultiplyNumericSum = %#v,%v,%v; want 1630,true,nil", productSum, handled, err)
+	}
+
+	leftTransposed, err := TransposeMatrix(matrix)
+	if err != nil {
+		t.Fatalf("TransposeMatrix(left) returned error: %v", err)
+	}
+	transposedRight, err := ReshapeArray([]int{2, 3}, NewI64([]int64{1, 2, 3, 4, 5, 6}))
+	if err != nil {
+		t.Fatalf("transposed right reshape returned error: %v", err)
+	}
+	transposedProductSum, handled, err := MatrixMultiplyNumericSum(leftTransposed.(Matrix), transposedRight.(Matrix))
+	if err != nil || !handled || transposedProductSum != 261.0 {
+		t.Fatalf("MatrixMultiplyNumericSum(transposed) = %#v,%v,%v; want 261,true,nil", transposedProductSum, handled, err)
+	}
 
 	inverse, err := MatrixInverseNumeric(matrixArray{
 		shape: []int{2, 2},
