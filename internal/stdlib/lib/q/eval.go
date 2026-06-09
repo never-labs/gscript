@@ -11012,52 +11012,31 @@ func absValue(v any) (any, error) {
 }
 
 func sqrtValue(v any) (any, error) {
-	return mapNumericUnary("sqrt", v, func(n float64, _ bool) any {
-		return math.Sqrt(n)
-	})
+	return qDataNumericUnary(data.NumericUnarySqrt, v)
 }
 
 func logValue(v any) (any, error) {
-	return mapNumericUnary("log", v, func(n float64, _ bool) any {
-		return math.Log(n)
-	})
+	return qDataNumericUnary(data.NumericUnaryLog, v)
 }
 
 func expValue(v any) (any, error) {
-	return mapNumericUnary("exp", v, func(n float64, _ bool) any {
-		return math.Exp(n)
-	})
+	return qDataNumericUnary(data.NumericUnaryExp, v)
 }
 
 func reciprocalValue(v any) (any, error) {
-	return mapNumericUnary("reciprocal", v, func(n float64, _ bool) any {
-		return 1 / n
-	})
+	return qDataNumericUnary(data.NumericUnaryRecip, v)
 }
 
 func signumValue(v any) (any, error) {
-	return mapNumericUnary("signum", v, func(n float64, _ bool) any {
-		switch {
-		case n < 0:
-			return int64(-1)
-		case n > 0:
-			return int64(1)
-		default:
-			return int64(0)
-		}
-	})
+	return qDataNumericUnary(data.NumericUnarySignum, v)
 }
 
 func floorValue(v any) (any, error) {
-	return mapNumericUnary("floor", v, func(n float64, _ bool) any {
-		return int64(math.Floor(n))
-	})
+	return qDataNumericUnary(data.NumericUnaryFloor, v)
 }
 
 func ceilingValue(v any) (any, error) {
-	return mapNumericUnary("ceiling", v, func(n float64, _ bool) any {
-		return int64(math.Ceil(n))
-	})
+	return qDataNumericUnary(data.NumericUnaryCeiling, v)
 }
 
 func mapNumericUnary(name string, v any, fn func(float64, bool) any) (any, error) {

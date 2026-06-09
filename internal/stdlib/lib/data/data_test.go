@@ -2367,6 +2367,7 @@ func TestQueryComputedProjection(t *testing.T) {
 func TestQueryVectorTransformProjection(t *testing.T) {
 	frame := mustFrame(t,
 		NewColumn("v", []any{2, 4, 0, 8}),
+		NewColumn("zero_one", []any{0, 1, 0, 1}),
 		NewColumn("maybe", []any{NullValue, 3, NullValue, 5}),
 	)
 
@@ -2387,6 +2388,12 @@ func TestQueryVectorTransformProjection(t *testing.T) {
 			{Name: "sqrt", Expr: VectorTransformExpr{Func: "sqrt", Expr: ColumnRef{Name: "v"}}},
 			{Name: "log", Expr: VectorTransformExpr{Func: "log", Expr: ColumnRef{Name: "v"}}},
 			{Name: "exp", Expr: VectorTransformExpr{Func: "exp", Expr: ColumnRef{Name: "v"}}},
+			{Name: "sin", Expr: VectorTransformExpr{Func: "sin", Expr: ColumnRef{Name: "v"}}},
+			{Name: "cos", Expr: VectorTransformExpr{Func: "cos", Expr: ColumnRef{Name: "v"}}},
+			{Name: "tan", Expr: VectorTransformExpr{Func: "tan", Expr: ColumnRef{Name: "v"}}},
+			{Name: "asin", Expr: VectorTransformExpr{Func: "asin", Expr: ColumnRef{Name: "zero_one"}}},
+			{Name: "acos", Expr: VectorTransformExpr{Func: "acos", Expr: ColumnRef{Name: "zero_one"}}},
+			{Name: "atan", Expr: VectorTransformExpr{Func: "atan", Expr: ColumnRef{Name: "zero_one"}}},
 			{Name: "reciprocal", Expr: VectorTransformExpr{Func: "reciprocal", Expr: ColumnRef{Name: "v"}}},
 			{Name: "signum", Expr: VectorTransformExpr{Func: "signum", Expr: ColumnRef{Name: "v"}}},
 			{Name: "floor", Expr: VectorTransformExpr{Func: "floor", Expr: ColumnRef{Name: "maybe"}}},
@@ -2412,6 +2419,12 @@ func TestQueryVectorTransformProjection(t *testing.T) {
 	assertColumnValues(t, got, "sqrt", []any{math.Sqrt(2), 2.0, 0.0, math.Sqrt(8)})
 	assertColumnValues(t, got, "log", []any{math.Log(2), math.Log(4), math.Inf(-1), math.Log(8)})
 	assertColumnValues(t, got, "exp", []any{math.Exp(2), math.Exp(4), 1.0, math.Exp(8)})
+	assertColumnValues(t, got, "sin", []any{math.Sin(2), math.Sin(4), 0.0, math.Sin(8)})
+	assertColumnValues(t, got, "cos", []any{math.Cos(2), math.Cos(4), 1.0, math.Cos(8)})
+	assertColumnValues(t, got, "tan", []any{math.Tan(2), math.Tan(4), 0.0, math.Tan(8)})
+	assertColumnValues(t, got, "asin", []any{0.0, math.Pi / 2, 0.0, math.Pi / 2})
+	assertColumnValues(t, got, "acos", []any{math.Pi / 2, 0.0, math.Pi / 2, 0.0})
+	assertColumnValues(t, got, "atan", []any{0.0, math.Pi / 4, 0.0, math.Pi / 4})
 	assertColumnValues(t, got, "reciprocal", []any{0.5, 0.25, math.Inf(1), 0.125})
 	assertColumnValues(t, got, "signum", []any{1.0, 1.0, 0.0, 1.0})
 	assertColumnValues(t, got, "floor", []any{NullValue, 3.0, NullValue, 5.0})

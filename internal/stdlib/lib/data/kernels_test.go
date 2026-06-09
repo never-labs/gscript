@@ -2314,6 +2314,18 @@ func TestTypedNumericUnaryBinaryAndAggregates(t *testing.T) {
 		t.Fatalf("sqrt NumericUnary values = %v, want %v", got, want)
 	}
 
+	sine, ok, err := typedKernels.NumericUnary(NumericUnarySin, NewF64([]float64{0, math.Pi / 2}))
+	if err != nil {
+		t.Fatalf("sin NumericUnary returned error: %v", err)
+	}
+	if !ok {
+		t.Fatal("sin NumericUnary did not match numeric column")
+	}
+	gotSin := sine.Values()
+	if len(gotSin) != 2 || gotSin[0].(float64) != 0 || math.Abs(gotSin[1].(float64)-1) > 1e-12 {
+		t.Fatalf("sin NumericUnary values = %v, want [0 1]", gotSin)
+	}
+
 	logged, ok, err := typedKernels.NumericUnary(NumericUnaryLog, NewF64([]float64{1, math.E}))
 	if err != nil {
 		t.Fatalf("log NumericUnary returned error: %v", err)
@@ -2332,6 +2344,22 @@ func TestTypedNumericUnaryBinaryAndAggregates(t *testing.T) {
 	}
 	if !ok {
 		t.Fatal("exp NumericUnary did not match numeric column")
+	}
+
+	xexp, ok, err := ApplyNumericDyadicFloat(NumericDyadicXExp, NewI64([]int64{2, 3}), int64(3))
+	if err != nil || !ok {
+		t.Fatalf("ApplyNumericDyadicFloat xexp = %#v,%v,%v; want handled nil error", xexp, ok, err)
+	}
+	if got, want := xexp.(Array).Values(), []any{8.0, 27.0}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("ApplyNumericDyadicFloat xexp values = %v, want %v", got, want)
+	}
+
+	xlog, ok, err := ApplyNumericDyadicFloat(NumericDyadicXLog, int64(2), NewColumn("x", []any{8, NullValue}).Data)
+	if err != nil || !ok {
+		t.Fatalf("ApplyNumericDyadicFloat xlog = %#v,%v,%v; want handled nil error", xlog, ok, err)
+	}
+	if got, want := xlog.(Array).Values(), []any{3.0, NullValue}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("ApplyNumericDyadicFloat xlog values = %v, want %v", got, want)
 	}
 	gotExp := exponent.Values()
 	if len(gotExp) != 2 || gotExp[0].(float64) != 1 || math.Abs(gotExp[1].(float64)-math.E) > 1e-12 {

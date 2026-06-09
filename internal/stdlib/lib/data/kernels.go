@@ -18,10 +18,19 @@ const (
 	NumericUnarySqrt    = "sqrt"
 	NumericUnaryLog     = "log"
 	NumericUnaryExp     = "exp"
+	NumericUnarySin     = "sin"
+	NumericUnaryCos     = "cos"
+	NumericUnaryTan     = "tan"
+	NumericUnaryAsin    = "asin"
+	NumericUnaryAcos    = "acos"
+	NumericUnaryAtan    = "atan"
 	NumericUnaryRecip   = "reciprocal"
 	NumericUnarySignum  = "signum"
 	NumericUnaryFloor   = "floor"
 	NumericUnaryCeiling = "ceiling"
+
+	NumericDyadicXExp = "xexp"
+	NumericDyadicXLog = "xlog"
 )
 
 func compareMaskTyped(array Array, op Op, value any, out []bool) bool {
@@ -1623,6 +1632,191 @@ func (typedKernelRegistry) NumericUnary(op string, array Array) (Array, bool, er
 		return numericUnaryNullable(op, a.data)
 	default:
 		return nil, false, nil
+	}
+}
+
+func ApplyNumericUnaryValue(op string, value any) (any, bool, error) {
+	if array, ok := value.(Array); ok {
+		switch op {
+		case NumericUnarySignum, NumericUnaryFloor, NumericUnaryCeiling:
+			return applyNumericUnaryArray(op, array)
+		}
+		if out, handled, err := typedKernels.NumericUnary(op, array); err != nil || handled {
+			return out, handled, err
+		}
+		return applyNumericUnaryArray(op, array)
+	}
+	if IsNull(value) {
+		return NullValue, true, nil
+	}
+	n, ok := numeric(value)
+	if !ok {
+		return nil, false, nil
+	}
+	result, err := applyNumericUnaryFloat(op, n)
+	if err != nil {
+		return nil, true, err
+	}
+	switch op {
+	case NumericUnaryNeg:
+		if i, ok := integerValue(value); ok {
+			return -i, true, nil
+		}
+	case NumericUnaryAbs:
+		if i, ok := integerValue(value); ok {
+			if i < 0 {
+				i = -i
+			}
+			return i, true, nil
+		}
+	case NumericUnarySignum, NumericUnaryFloor, NumericUnaryCeiling:
+		return int64(result), true, nil
+	}
+	return result, true, nil
+}
+
+func applyNumericUnaryArray(op string, array Array) (any, bool, error) {
+	out := make([]float64, array.Len())
+	nulls := make([]any, array.Len())
+	hasNull := false
+	for i := 0; i < array.Len(); i++ {
+		item, ok := array.At(i)
+		if !ok {
+			return nil, true, fmt.Errorf("%s row %d out of range", op, i)
+		}
+		value, handled, err := ApplyNumericUnaryValue(op, item)
+		if err != nil || !handled {
+			return nil, handled, err
+		}
+		if IsNull(value) {
+			hasNull = true
+			nulls[i] = NullValue
+			continue
+		}
+		n, ok := numeric(value)
+		if !ok {
+			return nil, false, nil
+		}
+		out[i] = n
+		nulls[i] = n
+	}
+	switch op {
+	case NumericUnarySignum, NumericUnaryFloor, NumericUnaryCeiling:
+		if hasNull {
+			return newNullableArray(KindI64, nulls), true, nil
+		}
+		ints := make([]int64, len(out))
+		for i, value := range out {
+			ints[i] = int64(value)
+		}
+		return newI64Trusted(ints), true, nil
+	default:
+		if hasNull {
+			return newNullableArray(KindF64, nulls), true, nil
+		}
+		return newF64Trusted(out), true, nil
+	}
+}
+
+func ApplyNumericDyadicFloat(op string, left, right any) (any, bool, error) {
+	leftArray, leftIsArray := left.(Array)
+	rightArray, rightIsArray := right.(Array)
+	if !leftIsArray && !rightIsArray {
+		return applyNumericDyadicFloatValue(op, left, right)
+	}
+	n, err := numericDyadicLength(op, leftArray, rightArray)
+	if err != nil {
+		return nil, true, err
+	}
+	out := make([]float64, n)
+	nulls := make([]any, n)
+	hasNull := false
+	for i := 0; i < n; i++ {
+		lv := left
+		if leftIsArray {
+			row := numericDyadicBroadcastRow(leftArray, i)
+			var ok bool
+			lv, ok = leftArray.At(row)
+			if !ok {
+				return nil, true, fmt.Errorf("%s left row %d out of range", op, row)
+			}
+		}
+		rv := right
+		if rightIsArray {
+			row := numericDyadicBroadcastRow(rightArray, i)
+			var ok bool
+			rv, ok = rightArray.At(row)
+			if !ok {
+				return nil, true, fmt.Errorf("%s right row %d out of range", op, row)
+			}
+		}
+		value, ok, err := applyNumericDyadicFloatValue(op, lv, rv)
+		if err != nil || !ok {
+			return nil, ok, err
+		}
+		if IsNull(value) {
+			hasNull = true
+			nulls[i] = NullValue
+			continue
+		}
+		f, ok := value.(float64)
+		if !ok {
+			return nil, true, fmt.Errorf("%s expects numeric operands", op)
+		}
+		out[i] = f
+		nulls[i] = f
+	}
+	if hasNull {
+		return newNullableArray(KindF64, nulls), true, nil
+	}
+	return newF64Trusted(out), true, nil
+}
+
+func numericDyadicLength(name string, left, right Array) (int, error) {
+	switch {
+	case left != nil && right != nil:
+		switch {
+		case left.Len() == right.Len():
+			return left.Len(), nil
+		case left.Len() == 1:
+			return right.Len(), nil
+		case right.Len() == 1:
+			return left.Len(), nil
+		default:
+			return 0, fmt.Errorf("%s vector length mismatch", name)
+		}
+	case left != nil:
+		return left.Len(), nil
+	case right != nil:
+		return right.Len(), nil
+	default:
+		return 0, nil
+	}
+}
+
+func numericDyadicBroadcastRow(array Array, row int) int {
+	if array.Len() == 1 {
+		return 0
+	}
+	return row
+}
+
+func applyNumericDyadicFloatValue(op string, left, right any) (any, bool, error) {
+	if IsNull(left) || IsNull(right) {
+		return NullValue, true, nil
+	}
+	ln, lok := numeric(left)
+	rn, rok := numeric(right)
+	if !lok || !rok {
+		return nil, false, nil
+	}
+	switch op {
+	case NumericDyadicXExp:
+		return math.Pow(ln, rn), true, nil
+	case NumericDyadicXLog:
+		return math.Log(rn) / math.Log(ln), true, nil
+	default:
+		return nil, true, fmt.Errorf("unsupported numeric dyadic float kernel %q", op)
 	}
 }
 
@@ -7634,7 +7828,7 @@ func qNumericUnaryIntegerArray(op string, array Array) (Array, bool, error) {
 			}
 		}
 		return newI64Trusted(out), true, nil
-	case NumericUnaryExp, NumericUnaryRecip:
+	case NumericUnarySqrt, NumericUnaryLog, NumericUnaryExp, NumericUnarySin, NumericUnaryCos, NumericUnaryTan, NumericUnaryAsin, NumericUnaryAcos, NumericUnaryAtan, NumericUnaryRecip:
 		out := make([]float64, array.Len())
 		for i := range out {
 			value, ok, err := integerArrayAt(array, i)
@@ -7644,12 +7838,11 @@ func qNumericUnaryIntegerArray(op string, array Array) (Array, bool, error) {
 			if !ok {
 				return nil, false, nil
 			}
-			switch op {
-			case NumericUnaryExp:
-				out[i] = math.Exp(float64(value))
-			case NumericUnaryRecip:
-				out[i] = 1 / float64(value)
+			result, err := applyNumericUnaryFloat(op, float64(value))
+			if err != nil {
+				return nil, true, err
 			}
+			out[i] = result
 		}
 		return newF64Trusted(out), true, nil
 	default:
@@ -7671,16 +7864,14 @@ func qNumericUnaryFloatSlice[T floatScalar](op string, values []T) (Array, bool,
 			out[i] = math.Abs(float64(value))
 		}
 		return newF64Trusted(out), true, nil
-	case NumericUnaryExp:
+	case NumericUnarySqrt, NumericUnaryLog, NumericUnaryExp, NumericUnarySin, NumericUnaryCos, NumericUnaryTan, NumericUnaryAsin, NumericUnaryAcos, NumericUnaryAtan, NumericUnaryRecip:
 		out := make([]float64, len(values))
 		for i, value := range values {
-			out[i] = math.Exp(float64(value))
-		}
-		return newF64Trusted(out), true, nil
-	case NumericUnaryRecip:
-		out := make([]float64, len(values))
-		for i, value := range values {
-			out[i] = 1 / float64(value)
+			result, err := applyNumericUnaryFloat(op, float64(value))
+			if err != nil {
+				return nil, true, err
+			}
+			out[i] = result
 		}
 		return newF64Trusted(out), true, nil
 	case NumericUnarySignum:
@@ -7715,7 +7906,7 @@ func qNumericUnaryFloatSlice[T floatScalar](op string, values []T) (Array, bool,
 
 func qNumericUnaryFloatArray(op string, array Array) (Array, bool, error) {
 	switch op {
-	case NumericUnaryNeg, NumericUnaryAbs, NumericUnaryExp, NumericUnaryRecip:
+	case NumericUnaryNeg, NumericUnaryAbs, NumericUnarySqrt, NumericUnaryLog, NumericUnaryExp, NumericUnarySin, NumericUnaryCos, NumericUnaryTan, NumericUnaryAsin, NumericUnaryAcos, NumericUnaryAtan, NumericUnaryRecip:
 		out := make([]float64, array.Len())
 		for i := range out {
 			value, ok, err := numericAt(array, i)
@@ -7725,16 +7916,11 @@ func qNumericUnaryFloatArray(op string, array Array) (Array, bool, error) {
 			if !ok {
 				return nil, false, nil
 			}
-			switch op {
-			case NumericUnaryNeg:
-				out[i] = -value
-			case NumericUnaryAbs:
-				out[i] = math.Abs(value)
-			case NumericUnaryExp:
-				out[i] = math.Exp(value)
-			case NumericUnaryRecip:
-				out[i] = 1 / value
+			result, err := applyNumericUnaryFloat(op, value)
+			if err != nil {
+				return nil, true, err
 			}
+			out[i] = result
 		}
 		return newF64Trusted(out), true, nil
 	case NumericUnarySignum, NumericUnaryFloor, NumericUnaryCeiling:
@@ -8638,6 +8824,18 @@ func applyNumericUnaryFloat(op string, value float64) (float64, error) {
 		return math.Log(value), nil
 	case NumericUnaryExp:
 		return math.Exp(value), nil
+	case NumericUnarySin:
+		return math.Sin(value), nil
+	case NumericUnaryCos:
+		return math.Cos(value), nil
+	case NumericUnaryTan:
+		return math.Tan(value), nil
+	case NumericUnaryAsin:
+		return math.Asin(value), nil
+	case NumericUnaryAcos:
+		return math.Acos(value), nil
+	case NumericUnaryAtan:
+		return math.Atan(value), nil
 	case NumericUnaryRecip:
 		return 1 / value, nil
 	case NumericUnarySignum:

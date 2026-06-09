@@ -6449,7 +6449,7 @@ func (e VectorTransformExpr) EvalRows(frame Frame, indexes []int) (Array, error)
 			return out, nil
 		}
 		return rankArray(values)
-	case "abs", "neg", "sqrt", "log", "exp", "reciprocal", "signum", "floor", "ceiling":
+	case "abs", "neg", "sqrt", "log", "exp", "sin", "cos", "tan", "asin", "acos", "atan", "reciprocal", "signum", "floor", "ceiling":
 		out, ok, err := typedKernels.NumericUnary(e.Func, values)
 		if err != nil {
 			return nil, err
@@ -11316,6 +11316,29 @@ func numeric(v any) (float64, bool) {
 		return n, true
 	case float32:
 		return float64(n), true
+	default:
+		return 0, false
+	}
+}
+
+func integerValue(v any) (int64, bool) {
+	switch n := v.(type) {
+	case int:
+		return int64(n), true
+	case int8:
+		return int64(n), true
+	case int16:
+		return int64(n), true
+	case int32:
+		return int64(n), true
+	case int64:
+		return n, true
+	case uint8:
+		return int64(n), true
+	case uint16:
+		return int64(n), true
+	case uint32:
+		return int64(n), true
 	default:
 		return 0, false
 	}
