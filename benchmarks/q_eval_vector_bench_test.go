@@ -263,6 +263,9 @@ var qEvalRequiredCoverageTags = []string{
 	"null-verb",
 	"safe-system",
 	"ipc-loopback",
+	"math-transcendental",
+	"matrix-reshape",
+	"apply-index",
 }
 
 var qEvalRequiredMatrixCoverage = []string{
@@ -296,6 +299,9 @@ var qEvalRequiredMatrixCoverage = []string{
 	"table:xkey-xgroup-ungroup:keyed-frame",
 	"temporal:xbar:bucket",
 	"ipc:loopback:session",
+	"math:transcendental-vector:hot",
+	"matrix:reshape-flip:vector",
+	"apply-index:list-dict-callable:hot",
 }
 
 var qEvalRequiredSemanticShapes = []string{
@@ -321,6 +327,9 @@ var qEvalRequiredPipelineCategories = []string{
 	"sort_gather",
 	"ordinary_list_adverb",
 	"vector_numeric",
+	"math_transcendental",
+	"matrix_reshape",
+	"apply_index",
 }
 
 func buildQEvalVectorCases() []qEvalVectorCase {
@@ -1068,6 +1077,7 @@ func buildQEvalVectorCases() []qEvalVectorCase {
 
 	cases = appendQEvalExpressionCombinationCases(cases)
 	cases = appendQEvalOrdinaryExpressionCoverageCases(cases)
+	cases = appendQEvalTaskDListMathMatrixApplyIndexCases(cases)
 	return appendQEvalSemanticCoverageCases(cases)
 }
 
@@ -2611,6 +2621,277 @@ func appendQEvalDeepExpressionCombinationCases(cases []qEvalVectorCase) []qEvalV
 	return cases
 }
 
+func appendQEvalTaskDListMathMatrixApplyIndexCases(cases []qEvalVectorCase) []qEvalVectorCase {
+	taskD := []qEvalVectorCase{
+		{
+			name:   "TaskDMathSqrtLogVectorSum",
+			tags:   []string{"math-transcendental", "numeric-monad", "numeric-vector", "sum"},
+			matrix: []string{"math:transcendental-vector:hot", "numeric-arithmetic:float-vector:hot"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("x:1+til %d;(+/sqrt x)+(+/log x)", rows)
+			},
+			goFn: func(rows int) int64 {
+				var total float64
+				for i := 1; i <= rows; i++ {
+					x := float64(i)
+					total += math.Sqrt(x) + math.Log(x)
+				}
+				return int64(total)
+			},
+		},
+		{
+			name:   "TaskDMathTrigVectorEnvelope",
+			tags:   []string{"math-transcendental", "numeric-monad", "numeric-vector", "sum"},
+			matrix: []string{"math:transcendental-vector:hot", "numeric-arithmetic:float-vector:hot"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("x:(til %d) mod 8;(+/sin x)+(+/cos x)+(+/tan x)", rows)
+			},
+			goFn: func(rows int) int64 {
+				var total float64
+				for i := 0; i < rows; i++ {
+					x := float64(i % 8)
+					total += math.Sin(x) + math.Cos(x) + math.Tan(x)
+				}
+				return int64(total)
+			},
+		},
+		{
+			name:   "TaskDMathInverseTrigVectorEnvelope",
+			tags:   []string{"math-transcendental", "numeric-monad", "numeric-vector", "sum"},
+			matrix: []string{"math:transcendental-vector:hot", "numeric-arithmetic:float-vector:hot"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("x:((til %d) mod 5)%%10;(+/asin x)+(+/acos x)+(+/atan x)", rows)
+			},
+			goFn: func(rows int) int64 {
+				var total float64
+				for i := 0; i < rows; i++ {
+					x := float64(i%5) / 10
+					total += math.Asin(x) + math.Acos(x) + math.Atan(x)
+				}
+				return int64(total)
+			},
+		},
+		{
+			name:   "TaskDMathXexpXlogVectorEnvelope",
+			tags:   []string{"math-transcendental", "word-dyadic", "numeric-vector", "sum"},
+			matrix: []string{"math:transcendental-vector:hot", "numeric-arithmetic:float-vector:hot"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("x:(til %d) mod 8;y:2 xexp x;(+/y)+(+/2 xlog y)", rows)
+			},
+			goFn: func(rows int) int64 {
+				var total float64
+				for i := 0; i < rows; i++ {
+					x := float64(i % 8)
+					y := math.Pow(2, x)
+					total += y + math.Log(y)/math.Log(2)
+				}
+				return int64(total)
+			},
+		},
+		{
+			name:   "TaskDListRazeNestedRowScaled",
+			tags:   []string{"raze", "enlist", "reverse", "sum"},
+			matrix: []string{"list:cut-raze-enlist:nested"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("x:til %d;a:(x;reverse x;32#x);(+/raze a)+count a", rows)
+			},
+			goFn: func(rows int) int64 {
+				var total int64
+				for i := 0; i < rows; i++ {
+					total += int64(i)
+				}
+				for i := rows - 1; i >= 0; i-- {
+					total += int64(i)
+				}
+				for i := 0; i < 32; i++ {
+					total += int64(i % rows)
+				}
+				return total + 3
+			},
+		},
+		{
+			name:   "TaskDListCutRazeVariableBins",
+			tags:   []string{"cut", "raze", "sum"},
+			matrix: []string{"list:cut-raze-enlist:nested"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("x:til %d;g:0 128 1024 4096 cut x;(+/raze g)+count g", rows)
+			},
+			goFn: func(rows int) int64 {
+				var total int64
+				for i := 0; i < rows; i++ {
+					total += int64(i)
+				}
+				return total + 4
+			},
+		},
+		{
+			name:   "TaskDListSublistRotateReverse",
+			tags:   []string{"cut", "rotate", "reverse", "sum"},
+			matrix: []string{"list:sublist-cross-cut:string-bool", "list:cut-raze-enlist:nested"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("x:til %d;r:17 rotate x;y:128 sublist reverse r;(+/y)+first y+last y", rows)
+			},
+			goFn: func(rows int) int64 {
+				shift := 17 % rows
+				var total, first, last int64
+				for i := 0; i < 128; i++ {
+					value := int64((shift + rows - 1 - i) % rows)
+					if i == 0 {
+						first = value
+					}
+					if i == 127 {
+						last = value
+					}
+					total += value
+				}
+				return total + first + last
+			},
+		},
+		{
+			name:   "TaskDListRatiosCountAndSum",
+			tags:   []string{"adverb-each-prior", "numeric-vector", "sum"},
+			matrix: []string{"list:prev-next-deltas-fills:typed-null", "membership:in-differ-ratios:vector"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("x:1+til %d;(count ratios x)+(+/deltas x)", rows)
+			},
+			goFn: func(rows int) int64 {
+				var deltaSum int64
+				for i := 1; i <= rows; i++ {
+					if i == 1 {
+						deltaSum += int64(i)
+					} else {
+						deltaSum++
+					}
+				}
+				return int64(rows) + deltaSum
+			},
+		},
+		{
+			name:   "TaskDMatrixReshapeRazeSum",
+			tags:   []string{"matrix-reshape", "raze", "sum"},
+			matrix: []string{"matrix:reshape-flip:vector", "list:cut-raze-enlist:nested"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("m:2 %d#til %d;(+/raze m)+count m", rows/2, rows)
+			},
+			goFn: func(rows int) int64 {
+				var total int64
+				for i := 0; i < rows; i++ {
+					total += int64(i)
+				}
+				return total + 2
+			},
+		},
+		{
+			name:   "TaskDMatrixFlipRazeSum",
+			tags:   []string{"matrix-reshape", "raze", "sum"},
+			matrix: []string{"matrix:reshape-flip:vector", "list:cut-raze-enlist:nested"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("m:2 %d#til %d;t:flip m;(+/raze t)+count t", rows/2, rows)
+			},
+			goFn: func(rows int) int64 {
+				var total int64
+				for i := 0; i < rows; i++ {
+					total += int64(i)
+				}
+				return total + int64(rows/2)
+			},
+		},
+		{
+			name:   "TaskDMatrixDotRowIndexSum",
+			tags:   []string{"matrix-reshape", "apply-index", "sum"},
+			matrix: []string{"matrix:reshape-flip:vector", "apply-index:list-dict-callable:hot"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("m:2 %d#til %d;row:m . 1;(+/row)+count row", rows/2, rows)
+			},
+			goFn: func(rows int) int64 {
+				var total int64
+				for i := rows / 2; i < rows; i++ {
+					total += int64(i)
+				}
+				return total + int64(rows/2)
+			},
+		},
+		{
+			name:   "TaskDMatrixDotCellIndex",
+			tags:   []string{"matrix-reshape", "apply-index"},
+			matrix: []string{"matrix:reshape-flip:vector", "apply-index:list-dict-callable:hot"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("m:2 %d#til %d;(m . 1 10)+count m", rows/2, rows)
+			},
+			goFn: func(rows int) int64 {
+				qEvalVectorAnyBenchSink = qEvalVectorGoBaselineInput
+				return qEvalVectorGoBaselineInput[rows/2+10] + 2
+			},
+		},
+		{
+			name:   "TaskDApplyAtScalarAndVector",
+			tags:   []string{"apply-index", "where", "projection", "sum"},
+			matrix: []string{"apply-index:list-dict-callable:hot", "compare:int-vector:where"},
+			shapes: []string{"index:gather-after-where:row-scaled"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("x:til %d;idx:where (x mod 257)=0;(x@10)+(x@20)+(x@30)+count idx", rows)
+			},
+			goFn: func(rows int) int64 {
+				var count int64
+				for i := 0; i < rows; i++ {
+					if i%257 == 0 {
+						count++
+					}
+				}
+				return 10 + 20 + 30 + count
+			},
+		},
+		{
+			name:   "TaskDApplyDotScalarProbe",
+			tags:   []string{"apply-index", "projection"},
+			matrix: []string{"apply-index:list-dict-callable:hot"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("x:til %d;(x . 10)+(x . 20)+(x . 30)+count x", rows)
+			},
+			goFn: func(rows int) int64 {
+				values := make([]int64, rows)
+				for i := range values {
+					values[i] = int64(i)
+				}
+				qEvalVectorAnyBenchSink = values
+				return values[10] + values[20] + values[30] + int64(len(values))
+			},
+		},
+		{
+			name:   "TaskDApplyFunctionDotArgs",
+			tags:   []string{"apply-index", "projection", "sum"},
+			matrix: []string{"apply-index:list-dict-callable:hot"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("f:{(+/x)+y};.[f;(til %d;10)]", rows)
+			},
+			goFn: func(rows int) int64 {
+				var total int64
+				for i := 0; i < rows; i++ {
+					total += int64(i)
+				}
+				return total + 10
+			},
+		},
+		{
+			name:   "TaskDApplyAtRepeatedScalarProbe",
+			tags:   []string{"apply-index", "projection"},
+			matrix: []string{"apply-index:list-dict-callable:hot"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("x:til %d;(x@100)+(x@200)+(x@300)+count x", rows)
+			},
+			goFn: func(rows int) int64 {
+				values := make([]int64, rows)
+				for i := range values {
+					values[i] = int64(i)
+				}
+				qEvalVectorAnyBenchSink = values
+				return values[100] + values[200] + values[300] + int64(len(values))
+			},
+		},
+	}
+	return append(cases, taskD...)
+}
+
 func qPositiveMod(v, mod int64) int64 {
 	out := v % mod
 	if out < 0 {
@@ -3568,6 +3849,15 @@ func qEvalVectorPipelineCategories(tc qEvalVectorCase) []string {
 		strings.Contains(name, "dyadic") || strings.Contains(name, "minmax") || strings.Contains(name, "signum") ||
 		strings.Contains(name, "reciprocal") {
 		add("vector_numeric")
+	}
+	if hasTag("math-transcendental") || hasMatrixPrefix("math:") || strings.Contains(name, "math") {
+		add("math_transcendental")
+	}
+	if hasTag("matrix-reshape") || hasMatrixPrefix("matrix:") || strings.Contains(name, "matrix") {
+		add("matrix_reshape")
+	}
+	if hasTag("apply-index") || hasMatrixPrefix("apply-index:") || strings.Contains(name, "apply") {
+		add("apply_index")
 	}
 	out := make([]string, 0, len(seen))
 	for category := range seen {
