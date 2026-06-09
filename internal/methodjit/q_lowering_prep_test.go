@@ -5827,8 +5827,13 @@ func TestQEvalHotPlanRecognizesConstantVectorWhereReduce(t *testing.T) {
 		t.Fatalf("QEvalPipelinePlans = %+v, want one plan ref", fn.QEvalPipelinePlans)
 	}
 	ref := fn.QEvalPipelinePlans[0]
-	if !ref.Valid() || ref.ID != 0 || ref.Kernel != "QEvalWhereReduce" || ref.Shape != "where/vector-reduce" || ref.Backend != "q_pipeline_typed_runtime" {
-		t.Fatalf("QEvalPipelinePlans[0] = %+v, want valid QEvalWhereReduce plan ref", ref)
+	if !ref.Valid() ||
+		ref.ID != 0 ||
+		ref.Kernel != "QScriptPipelinePlan" ||
+		ref.Shape != "script-pipeline/where-reduce/sum/assignments" ||
+		ref.PipelineShape != "script_pipeline" ||
+		ref.Backend != "q_pipeline_typed_runtime" {
+		t.Fatalf("QEvalPipelinePlans[0] = %+v, want valid q runtime script pipeline plan ref", ref)
 	}
 	backend := newQEvalPipelineStaticBackend("test_q_eval_pipeline", fn.QEvalPipelinePlans)
 	if plan, ok := backend.LookupQEvalPipelinePlan(ref); !ok || plan.Ref() != ref {
@@ -5841,17 +5846,32 @@ func TestQEvalHotPlanRecognizesConstantVectorWhereReduce(t *testing.T) {
 		t.Fatalf("QEvalPipelinePlans after second pass = %+v, want one reused plan ref", fn.QEvalPipelinePlans)
 	}
 	descriptors := BuildQKernelDescriptors(nil, nil, nil, fn.Remarks.List())
-	assertQKernelDescriptor(t, descriptors, "methodjit_q_eval_lowering", "runtime_kernel", "QEvalWhereReduce", "where/vector-reduce", "hot_plan", "supported", "")
+	assertQKernelDescriptor(t, descriptors, "methodjit_q_eval_lowering", "runtime_kernel", "QScriptPipelinePlan", "script-pipeline/where-reduce/sum/assignments", "hot_plan", "supported", "")
+}
+
+func TestQEvalPipelinePlannerUsesQRuntimeDescriptor(t *testing.T) {
+	descriptor, ok := qRuntimeEvalPipelinePlanner{}.DescribeQEvalPipeline("x:til 64;y:x+1;idx:where x>10;+/y[idx]")
+	if !ok {
+		t.Fatalf("DescribeQEvalPipeline did not recognize q runtime pipeline")
+	}
+	if descriptor.Kernel != "QScriptPipelinePlan" ||
+		descriptor.Shape != "script-pipeline/where-index-reduce/sum/assignments" ||
+		descriptor.PipelineShape != "script_pipeline" ||
+		descriptor.Backend != qEvalPipelineTypedRuntimeBackend ||
+		!strings.Contains(descriptor.Detail, "script") {
+		t.Fatalf("descriptor = %+v, want q runtime script pipeline handoff", descriptor)
+	}
 }
 
 func TestQEvalPipelinePlanRefsCopyToCompiledFunction(t *testing.T) {
 	fn := &Function{
 		QEvalPipelinePlans: []QEvalPipelinePlanRef{{
-			ID:      0,
-			Kernel:  "QEvalVectorReduce",
-			Shape:   "vector-reduce/sum",
-			Source:  "+/til rows",
-			Backend: "q_pipeline_typed_runtime",
+			ID:            0,
+			Kernel:        "QEvalVectorReduce",
+			Shape:         "vector-reduce/sum",
+			PipelineShape: "vector_reduce",
+			Source:        "+/til rows",
+			Backend:       "q_pipeline_typed_runtime",
 		}},
 	}
 	cf := &CompiledFunction{QEvalPipelinePlans: fn.QEvalPipelinePlans}

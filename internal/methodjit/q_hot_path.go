@@ -174,9 +174,11 @@ type QKernelExecutionRouteSummaryJSONRow struct {
 }
 
 type qEvalHotPlan struct {
-	Kernel string
-	Shape  string
-	Detail string
+	Kernel        string
+	Shape         string
+	PipelineShape string
+	Backend       string
+	Detail        string
 }
 
 // QKernelShapeSummary is a source-stable row for joining MethodJIT q kernel
@@ -1191,6 +1193,9 @@ func qEvalHotPlanSupportedRemark(fn *Function, call *Instr, plan qEvalHotPlan, r
 	if plan.Detail != "" {
 		fields["detail"] = plan.Detail
 	}
+	if plan.PipelineShape != "" {
+		fields["pipeline_shape"] = plan.PipelineShape
+	}
 	if ref.Valid() {
 		fields["plan_id"] = strconv.Itoa(ref.ID)
 		fields["backend"] = ref.Backend
@@ -1239,29 +1244,42 @@ func qClassifyEvalHotPlan(source string) (qEvalHotPlan, string, bool) {
 	if trimmed == "" {
 		return qEvalHotPlan{}, qEvalHotPlanFallbackEmptySource, false
 	}
+	if plan, ok := qEvalRuntimePipelinePlan(trimmed); ok {
+		return plan, "", true
+	}
 	expr := qEvalFinalExpression(trimmed)
 	normalized := strings.ToLower(strings.Join(strings.Fields(expr), " "))
 	switch {
 	case normalized == "":
 		return qEvalHotPlan{}, qEvalHotPlanFallbackEmptySource, false
 	case strings.Contains(normalized, " where ") && qEvalLooksLikeReduce(normalized):
-		return qEvalHotPlan{Kernel: "QEvalWhereReduce", Shape: "where/vector-reduce", Detail: "source=constant"}, "", true
+		return qEvalHeuristicHotPlan("QEvalWhereReduce", "where/vector-reduce"), "", true
 	case qEvalLooksLikeReduce(normalized):
-		return qEvalHotPlan{Kernel: "QEvalVectorReduce", Shape: "vector-reduce/" + qEvalReduceOpName(normalized), Detail: "source=constant"}, "", true
+		return qEvalHeuristicHotPlan("QEvalVectorReduce", "vector-reduce/"+qEvalReduceOpName(normalized)), "", true
 	case strings.Contains(normalized, "+\\") || strings.HasPrefix(normalized, "sums "):
-		return qEvalHotPlan{Kernel: "QEvalVectorScan", Shape: "vector-scan/sum", Detail: "source=constant"}, "", true
+		return qEvalHeuristicHotPlan("QEvalVectorScan", "vector-scan/sum"), "", true
 	case strings.Contains(normalized, "-':") || strings.HasPrefix(normalized, "deltas "):
-		return qEvalHotPlan{Kernel: "QEvalVectorScan", Shape: "vector-scan/deltas", Detail: "source=constant"}, "", true
+		return qEvalHeuristicHotPlan("QEvalVectorScan", "vector-scan/deltas"), "", true
 	case strings.Contains(normalized, " rotate "):
-		return qEvalHotPlan{Kernel: "QEvalVectorTransform", Shape: "vector-transform/rotate", Detail: "source=constant"}, "", true
+		return qEvalHeuristicHotPlan("QEvalVectorTransform", "vector-transform/rotate"), "", true
 	case strings.HasPrefix(normalized, "reverse "):
-		return qEvalHotPlan{Kernel: "QEvalVectorTransform", Shape: "vector-transform/reverse", Detail: "source=constant"}, "", true
+		return qEvalHeuristicHotPlan("QEvalVectorTransform", "vector-transform/reverse"), "", true
 	case strings.HasPrefix(normalized, "where ") || strings.Contains(normalized, " where "):
-		return qEvalHotPlan{Kernel: "QEvalWhere", Shape: "mask-to-index", Detail: "source=constant"}, "", true
+		return qEvalHeuristicHotPlan("QEvalWhere", "mask-to-index"), "", true
 	case qEvalLooksLikeVectorDyadic(normalized):
-		return qEvalHotPlan{Kernel: "QEvalVectorDyadic", Shape: "vector-dyadic", Detail: "source=constant"}, "", true
+		return qEvalHeuristicHotPlan("QEvalVectorDyadic", "vector-dyadic"), "", true
 	default:
 		return qEvalHotPlan{}, qEvalHotPlanFallbackUnsupportedShape, false
+	}
+}
+
+func qEvalHeuristicHotPlan(kernel, shape string) qEvalHotPlan {
+	return qEvalHotPlan{
+		Kernel:        kernel,
+		Shape:         shape,
+		Backend:       "methodjit_q_eval_heuristic",
+		Detail:        "source=constant",
+		PipelineShape: "",
 	}
 }
 

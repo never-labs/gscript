@@ -22,15 +22,16 @@ type QEvalPipelinePlan interface {
 // QEvalPipelinePlanRef is the compact, compile-time plan handle stored on the
 // IR Function and copied into CompiledFunction for future execution lowering.
 type QEvalPipelinePlanRef struct {
-	ID      int
-	Kernel  string
-	Shape   string
-	Source  string
-	Backend string
+	ID            int
+	Kernel        string
+	Shape         string
+	PipelineShape string
+	Source        string
+	Backend       string
 }
 
 func (r QEvalPipelinePlanRef) Valid() bool {
-	return r.ID >= 0 && r.Kernel != "" && r.Shape != ""
+	return r.ID >= 0 && r.Kernel != "" && r.Shape != "" && r.Backend != ""
 }
 
 type qEvalPipelineStaticPlan struct {
@@ -77,16 +78,17 @@ func (fn *Function) addQEvalPipelinePlan(source string, plan qEvalHotPlan) QEval
 		return QEvalPipelinePlanRef{ID: -1}
 	}
 	for _, ref := range fn.QEvalPipelinePlans {
-		if ref.Source == source && ref.Kernel == plan.Kernel && ref.Shape == plan.Shape {
+		if ref.Source == source && ref.Kernel == plan.Kernel && ref.Shape == plan.Shape && ref.Backend == plan.Backend {
 			return ref
 		}
 	}
 	ref := QEvalPipelinePlanRef{
-		ID:      len(fn.QEvalPipelinePlans),
-		Kernel:  plan.Kernel,
-		Shape:   plan.Shape,
-		Source:  source,
-		Backend: "q_pipeline_typed_runtime",
+		ID:            len(fn.QEvalPipelinePlans),
+		Kernel:        plan.Kernel,
+		Shape:         plan.Shape,
+		PipelineShape: plan.PipelineShape,
+		Source:        source,
+		Backend:       plan.Backend,
 	}
 	fn.QEvalPipelinePlans = append(fn.QEvalPipelinePlans, ref)
 	return ref
@@ -106,7 +108,7 @@ func formatQEvalPipelinePlanRefs(refs []QEvalPipelinePlanRef) string {
 	}
 	out := fmt.Sprintf("%d q.eval pipeline plan(s)\n", len(refs))
 	for i, ref := range refs {
-		out += fmt.Sprintf("  [%d] id=%d kernel=%s shape=%s backend=%s\n", i, ref.ID, ref.Kernel, ref.Shape, ref.Backend)
+		out += fmt.Sprintf("  [%d] id=%d kernel=%s shape=%s pipeline_shape=%s backend=%s\n", i, ref.ID, ref.Kernel, ref.Shape, ref.PipelineShape, ref.Backend)
 	}
 	return out
 }

@@ -228,6 +228,8 @@ func qRuntimeKernelPipelineShape(kernel, shape string) string {
 		return "script_pipeline"
 	case strings.HasPrefix(shape, "where-reduce/"), strings.HasPrefix(shape, "where-index-reduce/"):
 		return "mask_reduce"
+	case shape == "compare-to-index-sum", shape == "compare-to-index-count":
+		return "mask_reduce"
 	case strings.HasPrefix(shape, "compare-to-index-count-sum-stats/"), strings.HasPrefix(shape, "compare-to-index-count-stats/"), strings.HasPrefix(shape, "compare-to-index-sum-stats/"):
 		return "compare_index_stats"
 	case strings.HasPrefix(shape, "compare-to-index/"):

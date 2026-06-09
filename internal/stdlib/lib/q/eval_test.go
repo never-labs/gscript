@@ -196,6 +196,44 @@ func TestQScriptPipelinePlannerRecordsRuntimeStats(t *testing.T) {
 	}
 }
 
+func TestDescribeEvalPipelineExposesReadOnlyRuntimeDescriptor(t *testing.T) {
+	descriptor, ok := DescribeEvalPipeline("x:til 64;y:(x*3)+7;idx:where x>8;+/y[idx]")
+	if !ok {
+		t.Fatalf("DescribeEvalPipeline did not recognize script pipeline")
+	}
+	if descriptor.Kind != "script" ||
+		descriptor.Kernel != "QScriptPipelinePlan" ||
+		descriptor.Shape != "script-pipeline/where-index-reduce/sum/assignments" ||
+		descriptor.PipelineShape != "script_pipeline" {
+		t.Fatalf("descriptor identity = kind %q kernel %q shape %q pipeline %q, want script QScriptPipelinePlan where-index shape",
+			descriptor.Kind, descriptor.Kernel, descriptor.Shape, descriptor.PipelineShape)
+	}
+	if got, want := len(descriptor.Assignments), 3; got != want {
+		t.Fatalf("assignment count = %d, want %d", got, want)
+	}
+	if descriptor.ValueExpr != "y" || descriptor.ValueBinding != "(x*3)+7" {
+		t.Fatalf("value descriptor = expr %q binding %q, want y/(x*3)+7", descriptor.ValueExpr, descriptor.ValueBinding)
+	}
+	if descriptor.IndexExpr != "idx" || descriptor.IndexBinding != "where x>8" || descriptor.MaskExpr != "x>8" {
+		t.Fatalf("index/mask descriptor = index %q binding %q mask %q, want idx/where x>8/x>8",
+			descriptor.IndexExpr, descriptor.IndexBinding, descriptor.MaskExpr)
+	}
+
+	descriptor, ok = DescribeEvalPipeline("+/where x>8")
+	if !ok {
+		t.Fatalf("DescribeEvalPipeline did not recognize expression pipeline")
+	}
+	if descriptor.Kind != "expression" ||
+		descriptor.Kernel != "QPipelinePlan" ||
+		descriptor.Shape != "compare-to-index-sum" ||
+		descriptor.PipelineShape != "mask_reduce" ||
+		descriptor.LeftExpr != "x" ||
+		descriptor.RightExpr != "8" ||
+		descriptor.CompareOp != ">" {
+		t.Fatalf("expression descriptor = %#v, want compare-to-index-sum mask_reduce x > 8", descriptor)
+	}
+}
+
 func TestEvalNumericReductionBundleRecordsTypedRuntimeKernel(t *testing.T) {
 	ClearRuntimeKernelExecutionStats()
 	t.Cleanup(ClearRuntimeKernelExecutionStats)
