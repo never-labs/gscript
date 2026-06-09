@@ -10141,6 +10141,20 @@ func (s *EvalState) dictAmendFunction(d EvalDict, key any, fn any, value any) (E
 }
 
 func (s *EvalState) vectorAmendFunction(array data.Array, key any, fn any, value any) (data.Array, error) {
+	if isCallableAdd(fn) {
+		if indexArray, ok := key.(data.Array); ok {
+			shape := "amend-add-index-array/" + string(array.Kind()) + "/" + string(indexArray.Kind()) + "/" + string(qKindOfValue(value))
+			if typed, handled, err := data.TryTypedAmendAddIndexArray(array, indexArray, value); err != nil || handled {
+				recordRuntimeKernelProbe("ArrayAmendAddIndexArray", shape, handled, err)
+				if err != nil {
+					return nil, err
+				}
+				return typed, nil
+			} else {
+				recordRuntimeKernelProbe("ArrayAmendAddIndexArray", shape, handled, err)
+			}
+		}
+	}
 	indexes, _, err := indexInts(key)
 	if err != nil {
 		return nil, err

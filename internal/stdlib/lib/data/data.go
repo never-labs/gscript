@@ -3560,6 +3560,87 @@ func TryTypedAmendAddIndexes(array Array, indexes []int, values any) (Array, boo
 	}
 }
 
+// TryTypedAmendAddIndexArray applies @[array; indexArray; +; values] without
+// first materializing the index vector as a Go []int.
+func TryTypedAmendAddIndexArray(array Array, indexes Array, values any) (Array, bool, error) {
+	if array == nil {
+		return nil, true, fmt.Errorf("amend array is nil")
+	}
+	if indexes == nil {
+		return nil, true, fmt.Errorf("amend indexes are nil")
+	}
+	switch array.Kind() {
+	case KindI64:
+		out := make([]int64, array.Len())
+		for row := range out {
+			value, ok, err := integerArrayAt(array, row)
+			if err != nil {
+				return nil, true, err
+			}
+			if !ok {
+				return nil, false, nil
+			}
+			out[row] = value
+		}
+		for row := 0; row < indexes.Len(); row++ {
+			index, ok, err := i64IndexArrayAt(indexes, row)
+			if err != nil {
+				return nil, true, err
+			}
+			if !ok {
+				return nil, false, nil
+			}
+			if index < 0 || index >= len(out) {
+				return nil, true, fmt.Errorf("amend index %d out of range", index)
+			}
+			value, ok, err := typedAmendAddI64ValueAt(values, row, indexes.Len())
+			if err != nil {
+				return nil, true, err
+			}
+			if !ok {
+				return nil, false, nil
+			}
+			out[index] += value
+		}
+		return newI64Trusted(out), true, nil
+	case KindF64:
+		out := make([]float64, array.Len())
+		for row := range out {
+			value, ok, err := typedAmendAddF64ArrayAt(array, row)
+			if err != nil {
+				return nil, true, err
+			}
+			if !ok {
+				return nil, false, nil
+			}
+			out[row] = value
+		}
+		for row := 0; row < indexes.Len(); row++ {
+			index, ok, err := i64IndexArrayAt(indexes, row)
+			if err != nil {
+				return nil, true, err
+			}
+			if !ok {
+				return nil, false, nil
+			}
+			if index < 0 || index >= len(out) {
+				return nil, true, fmt.Errorf("amend index %d out of range", index)
+			}
+			value, ok, err := typedAmendAddF64ValueAt(values, row, indexes.Len())
+			if err != nil {
+				return nil, true, err
+			}
+			if !ok {
+				return nil, false, nil
+			}
+			out[index] += value
+		}
+		return newF64Trusted(out), true, nil
+	default:
+		return nil, false, nil
+	}
+}
+
 func tryTypedSparseI64AmendAdd(array Array, indexes []int, values any) (Array, bool, error) {
 	const maxSparseAmendAddIndexes = 256
 	if !isDenseIntegerArray(array) || len(indexes) == 0 || len(indexes) > maxSparseAmendAddIndexes || len(indexes)*4 > array.Len() {

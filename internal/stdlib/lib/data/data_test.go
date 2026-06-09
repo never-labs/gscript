@@ -4078,6 +4078,16 @@ func TestTryTypedAmendAddIndexesI64AccumulatesRepeatedIndexes(t *testing.T) {
 	}
 }
 
+func TestTryTypedAmendAddIndexArrayI64AccumulatesRepeatedIndexes(t *testing.T) {
+	amended, handled, err := TryTypedAmendAddIndexArray(NewI64Range(0, 1, 6), NewI64([]int64{2, 4, 2}), NewI64([]int64{10, 40, 3}))
+	if err != nil || !handled {
+		t.Fatalf("TryTypedAmendAddIndexArray handled=%v err=%v; want true,nil", handled, err)
+	}
+	if got, want := amended.Values(), []any{int64(0), int64(1), int64(15), int64(3), int64(44), int64(5)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("amend-add index array values = %#v, want %#v", got, want)
+	}
+}
+
 func TestTryTypedAmendAddIndexesI64UsesSparseOverlay(t *testing.T) {
 	amended, handled, err := TryTypedAmendAddIndexes(NewI64Range(0, 1, 16), []int{2, 4, 7}, NewI64([]int64{20, 40, 70}))
 	if err != nil || !handled {

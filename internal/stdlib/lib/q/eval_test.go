@@ -146,11 +146,14 @@ func TestEvalFunctionalAmendAddUsesTypedIndexedAccumulation(t *testing.T) {
 	assertEvalArray(t, "x:6#0;@[x;2 4 2;+;10 40 3]", data.KindI64, []any{int64(0), int64(0), int64(13), int64(0), int64(40), int64(0)})
 
 	for _, stat := range RuntimeKernelExecutionStats() {
+		if stat.Kernel == "ArrayAmendAddIndexArray" && stat.Shape == "amend-add-index-array/i64/i64/i64" && stat.Outcome == "hit" && stat.ReasonCode == "typed_kernel" && stat.Count > 0 {
+			return
+		}
 		if stat.Kernel == "ArrayAmendAddIndexes" && stat.Shape == "amend-add-indexes/i64/i64" && stat.Outcome == "hit" && stat.ReasonCode == "typed_kernel" && stat.Count > 0 {
 			return
 		}
 	}
-	t.Fatalf("missing ArrayAmendAddIndexes hit: %#v", RuntimeKernelExecutionStats())
+	t.Fatalf("missing ArrayAmendAddIndexArray hit: %#v", RuntimeKernelExecutionStats())
 }
 
 func TestQScriptPipelinePlannerDescribesAssignmentTerminalWhereIndexReduce(t *testing.T) {
@@ -3972,6 +3975,9 @@ func TestEvalWhereRecordsTypedRuntimeKernel(t *testing.T) {
 			seenLastCallableScan = true
 		}
 		if stat.Kernel == "ArrayAmendIndexes" && stat.Shape == "amend-indexes/i64" && stat.Outcome == "hit" && stat.ReasonCode == "typed_kernel" && stat.Count > 0 {
+			seenAmend = true
+		}
+		if stat.Kernel == "ArrayAmendAddIndexArray" && stat.Shape == "amend-add-index-array/i64/i64/i64" && stat.Outcome == "hit" && stat.ReasonCode == "typed_kernel" && stat.Count > 0 {
 			seenAmend = true
 		}
 		if stat.Kernel == "ArrayAmendAddIndexes" && stat.Shape == "amend-add-indexes/i64/i64" && stat.Outcome == "hit" && stat.ReasonCode == "typed_kernel" && stat.Count > 0 {
