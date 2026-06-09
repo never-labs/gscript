@@ -183,6 +183,70 @@ func qEvalVectorGoBaselineMatrixCellProbe(matrixRows, cols, cellIndex int, value
 	return values[offset] + int64(matrixRows)
 }
 
+func qEvalVectorMatrixMmuSide(rows int) int {
+	side := rows / 512
+	if side < 4 {
+		return 4
+	}
+	if side > 32 {
+		return 32
+	}
+	return side
+}
+
+//go:noinline
+func qEvalVectorGoBaselineMatrixMmuInv(rows int) int64 {
+	side := qEvalVectorMatrixMmuSide(rows)
+	n := side * side
+	left := make([]float64, n)
+	right := make([]float64, n)
+	for i := 0; i < n; i++ {
+		left[i] = float64(i + 1)
+		right[i] = float64(1 + (i % 17))
+	}
+	var total float64
+	for row := 0; row < side; row++ {
+		for col := 0; col < side; col++ {
+			var cell float64
+			for inner := 0; inner < side; inner++ {
+				cell += left[row*side+inner] * right[inner*side+col]
+			}
+			total += cell
+		}
+	}
+	qEvalVectorAnyBenchSink = []any{left, right}
+	qEvalVectorFloatBenchSink = total
+	return int64(total + 2)
+}
+
+func qEvalVectorCrossSide(rows int) int {
+	side := rows / 64
+	if side < 32 {
+		return 32
+	}
+	if side > 256 {
+		return 256
+	}
+	return side
+}
+
+//go:noinline
+func qEvalVectorGoBaselineCrossApplyIndex(rows int) int64 {
+	side := qEvalVectorCrossSide(rows)
+	pairs := make([][2]int64, 0, side*side)
+	for left := int64(0); left < int64(side); left++ {
+		for right := int64(0); right < int64(side); right++ {
+			pairs = append(pairs, [2]int64{left, right})
+		}
+	}
+	firstIndex := side + 3
+	lastIndex := len(pairs) - 1
+	a := pairs[firstIndex]
+	b := pairs[lastIndex]
+	qEvalVectorAnyBenchSink = pairs
+	return int64(len(pairs)) + a[0] + a[1] + b[0] + b[1]
+}
+
 //go:noinline
 func qEvalVectorGoBaselineSortRankTypeMatrix(values []int64) int64 {
 	ints := []int64{3, 1, 2, 1}
@@ -3290,29 +3354,12 @@ func appendQEvalTaskDListMathMatrixApplyIndexCases(cases []qEvalVectorCase) []qE
 			tags:   []string{"matrix-reshape", "sum"},
 			matrix: []string{"matrix:reshape-flip:vector", "numeric-arithmetic:float-vector:hot"},
 			expr: func(rows int) string {
-				return "(+/raze mmu[(2 2#1 2 3 4);(2 2#5 6 7 8)])+(+/raze inv 2 2#1 0 0 1)"
+				side := qEvalVectorMatrixMmuSide(rows)
+				n := side * side
+				return fmt.Sprintf("a:%d %d#1+til %d;b:%d %d#1+((til %d) mod 17);(+/raze mmu[a;b])+(+/raze inv 2 2#1 0 0 1)", side, side, n, side, side, n)
 			},
 			goFn: func(rows int) int64 {
-				a := [2][2]float64{{1, 2}, {3, 4}}
-				b := [2][2]float64{{5, 6}, {7, 8}}
-				var total float64
-				for i := 0; i < 2; i++ {
-					for j := 0; j < 2; j++ {
-						var cell float64
-						for k := 0; k < 2; k++ {
-							cell += a[i][k] * b[k][j]
-						}
-						total += cell
-					}
-				}
-				identityInverse := [2][2]float64{{1, 0}, {0, 1}}
-				for i := 0; i < 2; i++ {
-					for j := 0; j < 2; j++ {
-						total += identityInverse[i][j]
-					}
-				}
-				qEvalVectorFloatBenchSink = total
-				return int64(total)
+				return qEvalVectorGoBaselineMatrixMmuInv(rows)
 			},
 		},
 		{
@@ -3356,19 +3403,11 @@ func appendQEvalTaskDListMathMatrixApplyIndexCases(cases []qEvalVectorCase) []qE
 			tags:   []string{"apply-index", "projection", "sum"},
 			matrix: []string{"apply-index:list-dict-callable:hot", "list:sublist-cross-cut:string-bool"},
 			expr: func(rows int) string {
-				return "p:(til 32) cross til 32;a:p@10;b:p . 100;(count p)+(+/a)+(+/b)"
+				side := qEvalVectorCrossSide(rows)
+				return fmt.Sprintf("n:%d;p:(til n) cross til n;a:p@%d;b:p . %d;(count p)+(+/a)+(+/b)", side, side+3, side*side-1)
 			},
 			goFn: func(rows int) int64 {
-				pairs := make([][2]int64, 0, 32*32)
-				for left := int64(0); left < 32; left++ {
-					for right := int64(0); right < 32; right++ {
-						pairs = append(pairs, [2]int64{left, right})
-					}
-				}
-				a := pairs[10]
-				b := pairs[100]
-				qEvalVectorAnyBenchSink = pairs
-				return int64(len(pairs)) + a[0] + a[1] + b[0] + b[1]
+				return qEvalVectorGoBaselineCrossApplyIndex(rows)
 			},
 		},
 		{
@@ -4544,6 +4583,8 @@ func TestQEvalVectorTargetGoBaselinesDoRealWork(t *testing.T) {
 		"ListCrossCountEnvelope":            {},
 		"StringTrimCountEnvelope":           {},
 		"BooleanWhereLiteralCountEnvelope":  {},
+		"TaskDMatrixMmuInvEnvelope":         {},
+		"TaskDCrossApplyIndexChecksum":      {},
 	}
 	for _, tc := range qEvalVectorCases {
 		if _, ok := targets[tc.name]; !ok {
