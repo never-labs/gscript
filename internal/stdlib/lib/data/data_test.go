@@ -3996,6 +3996,56 @@ func TestTryTypedSortIndexesI64(t *testing.T) {
 	}
 }
 
+func TestTryTypedSortIndexesI64TiledStable(t *testing.T) {
+	symbols, err := TakeRepeat(NewSymbols([]string{"b", "a", "b", "c"}), 10)
+	if err != nil {
+		t.Fatalf("TakeRepeat symbols returned error: %v", err)
+	}
+	indexes, ok, err := TryTypedSortIndexesI64(symbols, false)
+	if err != nil || !ok {
+		t.Fatalf("TryTypedSortIndexesI64 tiled symbols handled=%v err=%v; want true,nil", ok, err)
+	}
+	if got, want := indexes.Values(), []any{int64(1), int64(5), int64(9), int64(0), int64(2), int64(4), int64(6), int64(8), int64(3), int64(7)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("tiled symbol sort indexes = %#v, want %#v", got, want)
+	}
+
+	desc, ok, err := TryTypedSortIndexesI64(symbols, true)
+	if err != nil || !ok {
+		t.Fatalf("TryTypedSortIndexesI64 tiled symbols desc handled=%v err=%v; want true,nil", ok, err)
+	}
+	if got, want := desc.Values(), []any{int64(3), int64(7), int64(0), int64(2), int64(4), int64(6), int64(8), int64(1), int64(5), int64(9)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("tiled symbol desc sort indexes = %#v, want %#v", got, want)
+	}
+
+	rotated, err := Slice(symbols, 1, 8)
+	if err != nil {
+		t.Fatalf("Slice tiled symbols returned error: %v", err)
+	}
+	rotatedIndexes, ok, err := TryTypedSortIndexesI64(rotated, false)
+	if err != nil || !ok {
+		t.Fatalf("TryTypedSortIndexesI64 rotated tiled symbols handled=%v err=%v; want true,nil", ok, err)
+	}
+	if got, want := rotatedIndexes.Values(), []any{int64(0), int64(4), int64(1), int64(3), int64(5), int64(7), int64(2), int64(6)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("rotated tiled symbol sort indexes = %#v, want %#v", got, want)
+	}
+}
+
+func TestTryTypedSortIndexSumI64(t *testing.T) {
+	symbols, err := TakeRepeat(NewSymbols([]string{"b", "a", "b", "c"}), 10)
+	if err != nil {
+		t.Fatalf("TakeRepeat symbols returned error: %v", err)
+	}
+	for _, descending := range []bool{false, true} {
+		sum, ok, err := TryTypedSortIndexSumI64(symbols, descending)
+		if err != nil || !ok {
+			t.Fatalf("TryTypedSortIndexSumI64 descending=%v handled=%v err=%v; want true,nil", descending, ok, err)
+		}
+		if want := int64(45); sum != want {
+			t.Fatalf("TryTypedSortIndexSumI64 descending=%v = %d, want %d", descending, sum, want)
+		}
+	}
+}
+
 func TestTryTypedSortIndexesNullableTemporalAndRankRange(t *testing.T) {
 	dates := NewColumn("d", []any{Date(2), NullForKind(KindDate), Date(1)}).Data
 	indexes, ok, err := TryTypedSortIndexesI64(dates, false)

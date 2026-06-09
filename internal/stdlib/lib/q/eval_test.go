@@ -4342,6 +4342,8 @@ func TestEvalSortAndSortIndexes(t *testing.T) {
 	assertEvalArray(t, "idesc 42", data.KindI64, []any{int64(0)})
 	assertEvalArray(t, "rank 42", data.KindI64, []any{int64(0)})
 	assertEvalArray(t, "iasc `MSFT`AAPL`AAPL", data.KindI64, []any{int64(1), int64(2), int64(0)})
+	assertEvalValue(t, "s:10#`b`a`b`c;+/iasc s", int64(45))
+	assertEvalValue(t, "s:10#`b`a`b`c;+/idesc s", int64(45))
 	assertEvalArray(t, "rank `x`a`b`z`c", data.KindI64, []any{int64(3), int64(0), int64(1), int64(4), int64(2)})
 
 	assertEvalArray(t, "asc 10.5 9 10", data.KindF64, []any{9.0, 10.0, 10.5})

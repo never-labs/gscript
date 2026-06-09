@@ -4787,6 +4787,8 @@ func TryTypedSortIndexesI64(array Array, descending bool) (Array, bool, error) {
 	switch a := array.(type) {
 	case attributedArray:
 		return TryTypedSortIndexesI64(a.array, descending)
+	case tiledArray:
+		return typedSortIndexesTiled(a, descending)
 	case nullableArray:
 		return typedSortRowIndexesByArray(a, descending), true, nil
 	case columnArray[int64]:
@@ -4828,6 +4830,105 @@ func TryTypedSortIndexesI64(array Array, descending bool) (Array, bool, error) {
 	default:
 		return nil, false, nil
 	}
+}
+
+// TryTypedSortIndexSumI64 reduces iasc/idesc directly. The sum of a stable
+// permutation's row indexes is invariant, so supported sortable arrays do not
+// need to materialize the index vector before a +/ reduction.
+func TryTypedSortIndexSumI64(array Array, descending bool) (int64, bool, error) {
+	if array == nil {
+		return 0, true, fmt.Errorf("sort index sum array is nil")
+	}
+	switch a := array.(type) {
+	case attributedArray:
+		return TryTypedSortIndexSumI64(a.array, descending)
+	case tiledArray:
+		if a.len > 0 && a.source.Len() == 0 {
+			return 0, true, fmt.Errorf("sort index tiled source is empty")
+		}
+		if _, handled, err := TryTypedSortIndexSumI64(a.source, descending); err != nil || !handled {
+			return 0, handled, err
+		}
+		return arithmeticSeriesSum(a.len), true, nil
+	case nullableArray,
+		columnArray[int64],
+		i64RangeArray,
+		columnArray[string],
+		columnArray[Symbol],
+		columnArray[Month],
+		columnArray[Date],
+		columnArray[DateTime],
+		columnArray[Timespan],
+		columnArray[Minute],
+		columnArray[Second],
+		columnArray[Time],
+		columnArray[Timestamp]:
+		return arithmeticSeriesSum(array.Len()), true, nil
+	default:
+		return 0, false, nil
+	}
+}
+
+func arithmeticSeriesSum(n int) int64 {
+	if n <= 1 {
+		return 0
+	}
+	count := int64(n)
+	return count * (count - 1) / 2
+}
+
+func typedSortIndexesTiled(array tiledArray, descending bool) (Array, bool, error) {
+	if array.len == 0 {
+		return NewI64Range(0, 1, 0), true, nil
+	}
+	sourceLen := array.source.Len()
+	if sourceLen == 0 {
+		return nil, true, fmt.Errorf("sort index tiled source is empty")
+	}
+	if sourceLen == 1 {
+		return NewI64Range(0, 1, array.len), true, nil
+	}
+	offsets := make([]int, sourceLen)
+	for i := range offsets {
+		offsets[i] = i
+	}
+	sort.SliceStable(offsets, func(i, j int) bool {
+		left := (array.start + offsets[i]) % sourceLen
+		right := (array.start + offsets[j]) % sourceLen
+		cmp := compareArrayRows(array.source, left, right)
+		if descending {
+			return cmp > 0
+		}
+		return cmp < 0
+	})
+	out := make([]int64, 0, array.len)
+	fullCycles := array.len / sourceLen
+	remainder := array.len % sourceLen
+	for groupStart := 0; groupStart < len(offsets); {
+		groupEnd := groupStart + 1
+		for groupEnd < len(offsets) {
+			left := (array.start + offsets[groupStart]) % sourceLen
+			right := (array.start + offsets[groupEnd]) % sourceLen
+			if compareArrayRows(array.source, left, right) != 0 {
+				break
+			}
+			groupEnd++
+		}
+		for cycle := 0; cycle < fullCycles; cycle++ {
+			base := cycle * sourceLen
+			for _, offset := range offsets[groupStart:groupEnd] {
+				out = append(out, int64(base+offset))
+			}
+		}
+		base := fullCycles * sourceLen
+		for _, offset := range offsets[groupStart:groupEnd] {
+			if offset < remainder {
+				out = append(out, int64(base+offset))
+			}
+		}
+		groupStart = groupEnd
+	}
+	return newI64Trusted(out), true, nil
 }
 
 // TryTypedRankI64 returns q rank positions for typed arrays without boxing the
