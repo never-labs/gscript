@@ -9155,7 +9155,7 @@ func numericIntegerDyadic(op Op, left, right any, length int) (Array, bool, erro
 	if out, ok := numericIntegerDyadicRange(op, left, right, length); ok {
 		return out, true, nil
 	}
-	if out, ok, err := numericIntegerDyadicTiledScalar(op, left, right); ok || err != nil {
+	if out, ok, err := numericIntegerDyadicArrayScalar(op, left, right, length); ok || err != nil {
 		return out, ok, err
 	}
 	values := make([]int64, length)
@@ -9215,44 +9215,38 @@ func numericIntegerDyadic(op Op, left, right any, length int) (Array, bool, erro
 	return columnArray[int64]{kind: KindI64, data: values}, true, nil
 }
 
-func numericIntegerDyadicTiledScalar(op Op, left, right any) (Array, bool, error) {
+func numericIntegerDyadicArrayScalar(op Op, left, right any, length int) (Array, bool, error) {
 	leftArray, leftIsArray := left.(Array)
 	rightArray, rightIsArray := right.(Array)
 	switch {
 	case leftIsArray && !rightIsArray:
-		tiled, ok := unwrapTiledArray(leftArray)
-		if !ok {
+		if leftArray.Len() != length || !isDenseIntegerArray(leftArray) {
 			return nil, false, nil
 		}
 		scalar, ok := integerScalarValue(right)
 		if !ok {
 			return nil, false, nil
 		}
-		return applyI64TiledScalar(op, tiled, scalar, false)
+		return applyI64ArrayScalar(op, leftArray, scalar, false)
 	case rightIsArray && !leftIsArray:
-		tiled, ok := unwrapTiledArray(rightArray)
-		if !ok {
+		if rightArray.Len() != length || !isDenseIntegerArray(rightArray) {
 			return nil, false, nil
 		}
 		scalar, ok := integerScalarValue(left)
 		if !ok {
 			return nil, false, nil
 		}
-		return applyI64TiledScalar(op, tiled, scalar, true)
+		return applyI64ArrayScalar(op, rightArray, scalar, true)
 	default:
 		return nil, false, nil
 	}
 }
 
-func applyI64TiledScalar(op Op, values tiledArray, scalar int64, scalarLeft bool) (Array, bool, error) {
-	sourceLen := values.source.Len()
-	if sourceLen == 0 {
+func applyI64ArrayScalar(op Op, values Array, scalar int64, scalarLeft bool) (Array, bool, error) {
+	if values.Len() == 0 || op == OpMod && (!scalarLeft && scalar == 0 || scalarLeft) {
 		return nil, false, nil
 	}
-	if op == OpMod && !scalarLeft && scalar == 0 {
-		return nil, false, nil
-	}
-	return i64ScalarDyadicArray{source: values, op: op, scalar: scalar, scalarLeft: scalarLeft, len: values.len}, true, nil
+	return i64ScalarDyadicArray{source: values, op: op, scalar: scalar, scalarLeft: scalarLeft, len: values.Len()}, true, nil
 }
 
 func qModInt64(left, right int64) int64 {

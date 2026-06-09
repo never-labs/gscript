@@ -2904,6 +2904,19 @@ func TestTypedNumericUnaryBinaryAndAggregates(t *testing.T) {
 	if got, want := modTiled.(Array).Values(), []any{int64(0), int64(1), int64(0), int64(1), int64(0), int64(1), int64(0), int64(1), int64(0), int64(1)}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("TryTypedIntegerDyadic tiled mod values = %v, want %v", got, want)
 	}
+	modColumn, ok, err := TryTypedIntegerDyadic(OpMod, NewI64([]int64{0, 1, 2, 3, 4}), int64(3))
+	if err != nil {
+		t.Fatalf("TryTypedIntegerDyadic column mod returned error: %v", err)
+	}
+	if !ok {
+		t.Fatal("TryTypedIntegerDyadic column mod did not match")
+	}
+	if _, ok := modColumn.(i64ScalarDyadicArray); !ok {
+		t.Fatalf("TryTypedIntegerDyadic column mod returned %T, want i64ScalarDyadicArray", modColumn)
+	}
+	if got, want := modColumn.(Array).Values(), []any{int64(0), int64(1), int64(2), int64(0), int64(1)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("TryTypedIntegerDyadic column mod values = %v, want %v", got, want)
+	}
 	negativeMod, ok, err := TryTypedIntegerDyadic(OpMod, NewI64([]int64{-3, -2, -1, 0, 1}), int64(2))
 	if err != nil {
 		t.Fatalf("TryTypedIntegerDyadic negative mod returned error: %v", err)
