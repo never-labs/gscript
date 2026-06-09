@@ -861,7 +861,9 @@ func TestEvalTypedCasts(t *testing.T) {
 	assertEvalValue(t, "`long$1", int64(1))
 	assertEvalValue(t, "`real$1.25", float32(1.25))
 	assertEvalValue(t, "`float$1", float64(1))
+	assertEvalValue(t, "$\"AAPL\"", data.Symbol("AAPL"))
 	assertEvalValue(t, "`symbol$\"AAPL\"", data.Symbol("AAPL"))
+	assertEvalValue(t, "`$\"AAPL\"", data.Symbol("AAPL"))
 	assertEvalValue(t, "`string$`AAPL", "AAPL")
 
 	assertEvalArray(t, "`int$1 2 0N", data.KindI32, []any{int32(1), int32(2), data.NullValue})
@@ -885,20 +887,36 @@ func TestEvalTypedCasts(t *testing.T) {
 	assertEvalValue(t, "type p$0N", int64(-12))
 	assertEvalValue(t, "s$\"AAPL\"", data.Symbol("AAPL"))
 	assertEvalValue(t, "c$`AAPL", "AAPL")
+	assertEvalValue(t, "\"J\"$\"42\"", int64(42))
+	assertEvalValue(t, "\"I\"$\"42\"", int32(42))
+	assertEvalValue(t, "\"F\"$\"3.5\"", float64(3.5))
+	assertEvalValue(t, "\"E\"$\"3.5\"", float32(3.5))
+	assertEvalValue(t, "long$\"42\"", int64(42))
+	assertEvalValue(t, "int$\"42\"", int32(42))
+	assertEvalValue(t, "float$\"3.5\"", float64(3.5))
 	assertEvalValue(t, "p$\"1970-01-02T00:00:00.000000001Z\"", data.Timestamp(86_400_000_000_001))
 	assertEvalArray(t, "b$1 0 0N", data.KindBool, []any{true, false, data.NullValue})
 	assertEvalArray(t, "x$1 2 0N", data.KindU8, []any{uint8(1), uint8(2), data.NullValue})
 	assertEvalArray(t, "c$`a`b", data.KindString, []any{"a", "b"})
 	assertEvalArray(t, "i$1 2 0N", data.KindI32, []any{int32(1), int32(2), data.NullValue})
+	assertEvalArray(t, "I$(\"1\";\"2\")", data.KindI32, []any{int32(1), int32(2)})
 	assertEvalArray(t, "f$1 2 0Ni", data.KindF64, []any{1.0, 2.0, data.NullValue})
+	assertEvalArray(t, "float$(\"1.5\";\"2.25\")", data.KindF64, []any{1.5, 2.25})
 	assertEvalArray(t, "e$1 2 0Nf", data.KindF32, []any{float32(1), float32(2), data.NullValue})
+	assertEvalArray(t, "$(\"AAPL\";\"MSFT\")", data.KindSymbol, []any{data.Symbol("AAPL"), data.Symbol("MSFT")})
 	assertEvalArray(t, "`date$\"2026-06-06\" \"2026-06-07\"", data.KindDate, []any{
 		data.DateFromDays(20610),
 		data.DateFromDays(20611),
 	})
+	assertEvalArray(t, "`venue$`XNYS`XNAS`XNYS", data.KindSymbol, []any{
+		data.Symbol("XNYS"),
+		data.Symbol("XNAS"),
+		data.Symbol("XNYS"),
+	})
 
 	assertEvalErrorContains(t, "`short$40000", "q cast")
 	assertEvalErrorContains(t, "`int$1.5", "q cast")
+	assertEvalErrorContains(t, "\"I\"$\"42.5\"", "q cast")
 }
 
 func TestEvalDictionaryLookup(t *testing.T) {
