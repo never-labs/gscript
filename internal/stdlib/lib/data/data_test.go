@@ -7151,6 +7151,14 @@ func TestMatrixReshapeTransposeAndMultiply(t *testing.T) {
 	if got, want := gatheredRow.Values(), []any{int64(3), int64(1)}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("matrix row gather values = %#v, want %#v", got, want)
 	}
+	cell, handled, err := TryMatrixCellIndex(matrix, 1, 2)
+	if err != nil || !handled || cell != int64(6) {
+		t.Fatalf("TryMatrixCellIndex = %#v,%v,%v; want 6,true,nil", cell, handled, err)
+	}
+	rowSum, handled, err := TryMatrixRowNumericSum(matrix, 1)
+	if err != nil || !handled || rowSum != int64(15) {
+		t.Fatalf("TryMatrixRowNumericSum = %#v,%v,%v; want 15,true,nil", rowSum, handled, err)
+	}
 
 	transposed, err := TransposeMatrix(matrix)
 	if err != nil {
@@ -7159,6 +7167,10 @@ func TestMatrixReshapeTransposeAndMultiply(t *testing.T) {
 	tm := transposed.(Matrix)
 	if got, want := tm.Shape(), []int{3, 2}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("transpose shape = %#v, want %#v", got, want)
+	}
+	transposedCell, handled, err := TryMatrixCellIndex(tm, 2, 1)
+	if err != nil || !handled || transposedCell != int64(6) {
+		t.Fatalf("TryMatrixCellIndex(transposed) = %#v,%v,%v; want 6,true,nil", transposedCell, handled, err)
 	}
 	if got, ok := tm.Cell(2, 1); !ok || got != int64(6) {
 		t.Fatalf("transpose cell 2,1 = %#v ok %v, want 6", got, ok)

@@ -63,6 +63,35 @@ func TestQMatrixRowIndexRecordsTypedRuntimeKernel(t *testing.T) {
 	}
 }
 
+func TestQMatrixCellLiteralDotIndexFastPathRecordsTypedRuntimeKernel(t *testing.T) {
+	state := NewEvalState(nil)
+	if _, err := state.Eval("m:2 4#til 8"); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	ClearRuntimeKernelExecutionStats()
+	t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+	if got, err := state.Eval("m . 1 2"); err != nil || got != int64(6) {
+		t.Fatalf("m . 1 2 = %v, %v; want 6,nil", got, err)
+	}
+	if got, err := state.Eval("(m . 1 2)+count m"); err != nil || got != int64(8) {
+		t.Fatalf("(m . 1 2)+count m = %v, %v; want 8,nil", got, err)
+	}
+
+	seenCell := false
+	for _, stat := range RuntimeKernelExecutionStats() {
+		if stat.Outcome == "fallback" || stat.Outcome == "error" {
+			t.Fatalf("unexpected matrix cell runtime fallback/error: %#v stats=%#v", stat, RuntimeKernelExecutionStats())
+		}
+		if stat.Kernel == "MatrixIndex" && stat.Outcome == "hit" && stat.ReasonCode == "typed_kernel" && strings.HasPrefix(stat.Shape, "matrix-dot/") {
+			seenCell = true
+		}
+	}
+	if !seenCell {
+		t.Fatalf("missing matrix cell typed runtime stats: %#v", RuntimeKernelExecutionStats())
+	}
+}
+
 func TestQApplyIndexScalarFastPathRecordsRuntimeStats(t *testing.T) {
 	state := NewEvalState(nil)
 	if _, err := state.Eval("x:til 256;s:\"abcd\";m:2 4#til 8"); err != nil {

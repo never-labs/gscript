@@ -153,6 +153,102 @@ func TryRowArrayIndex(value Array, row int) (Array, bool, error) {
 	return rowArray, true, nil
 }
 
+// TryMatrixCellIndex returns a single matrix cell without materializing row
+// arrays or routing through generic nested indexing.
+func TryMatrixCellIndex(value Matrix, row, col int) (any, bool, error) {
+	if value == nil {
+		return nil, false, nil
+	}
+	if row < 0 || col < 0 {
+		return nil, true, fmt.Errorf("matrix cell index must be non-negative")
+	}
+	if cell, ok, err := tryMatrixCellIndexDirect(value, row, col); ok || err != nil {
+		return cell, ok, err
+	}
+	cell, ok := value.Cell(row, col)
+	if !ok {
+		return nil, true, fmt.Errorf("matrix cell index %d %d out of range", row, col)
+	}
+	return cell, true, nil
+}
+
+func tryMatrixCellIndexDirect(value Matrix, row, col int) (any, bool, error) {
+	switch matrix := value.(type) {
+	case matrixArray:
+		if len(matrix.shape) != 2 || row >= matrix.shape[0] || col >= matrix.shape[1] {
+			return nil, true, fmt.Errorf("matrix cell index %d %d out of range", row, col)
+		}
+		return arrayScalarAt(matrix.data, row*matrix.shape[1]+col)
+	case transposedMatrixArray:
+		if row >= matrix.rows || col >= matrix.cols {
+			return nil, true, fmt.Errorf("matrix cell index %d %d out of range", row, col)
+		}
+		return TryMatrixCellIndex(matrix.source, col, row)
+	default:
+		return nil, false, nil
+	}
+}
+
+func arrayScalarAt(array Array, index int) (any, bool, error) {
+	if array == nil {
+		return nil, true, fmt.Errorf("array is nil")
+	}
+	if index < 0 || index >= array.Len() {
+		return nil, true, fmt.Errorf("index %d out of range", index)
+	}
+	switch a := array.(type) {
+	case attributedArray:
+		return arrayScalarAt(a.array, index)
+	case columnArray[int8]:
+		return int64(a.data[index]), true, nil
+	case columnArray[int16]:
+		return int64(a.data[index]), true, nil
+	case columnArray[int32]:
+		return int64(a.data[index]), true, nil
+	case columnArray[int64]:
+		return a.data[index], true, nil
+	case columnArray[uint8]:
+		return int64(a.data[index]), true, nil
+	case columnArray[uint16]:
+		return int64(a.data[index]), true, nil
+	case columnArray[uint32]:
+		return int64(a.data[index]), true, nil
+	case columnArray[uint64]:
+		value := a.data[index]
+		if value <= uint64(1<<63-1) {
+			return int64(value), true, nil
+		}
+		return value, true, nil
+	case columnArray[float32]:
+		return float64(a.data[index]), true, nil
+	case columnArray[float64]:
+		return a.data[index], true, nil
+	case i64RangeArray:
+		return a.start + int64(index)*a.step, true, nil
+	case f64RangeArray:
+		return a.start + float64(index)*a.step, true, nil
+	default:
+		value, ok := array.At(index)
+		if !ok {
+			return nil, true, fmt.Errorf("index %d out of range", index)
+		}
+		return value, true, nil
+	}
+}
+
+// TryMatrixRowNumericSum reduces a matrix row through the typed runtime path.
+// It is shared by q matrix indexing and generic Leia/data callers.
+func TryMatrixRowNumericSum(value Matrix, row int) (any, bool, error) {
+	if value == nil {
+		return nil, false, nil
+	}
+	rowArray, ok := value.RowArray(row)
+	if !ok {
+		return nil, true, fmt.Errorf("matrix row index %d out of range", row)
+	}
+	return typedKernels.NumericSumValue(rowArray)
+}
+
 // MatrixMultiplyNumeric multiplies two numeric two-dimensional matrices. The
 // f64 result keeps the semantic layer simple while leaving a single replacement
 // point for future typed BLAS-style kernels.

@@ -376,6 +376,9 @@ func buildQPipelineApplyScalarIndexPlan(src string) (qPipelinePlan, bool) {
 	if !ok {
 		return qPipelinePlan{}, false
 	}
+	if !apply.scalar || len(apply.indexes) != 1 {
+		return qPipelinePlan{}, false
+	}
 	op := "at"
 	if apply.mode == qApplyIndexDot {
 		op = "dot"

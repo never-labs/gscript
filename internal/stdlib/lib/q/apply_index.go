@@ -16,9 +16,11 @@ const (
 )
 
 type qScalarApplyIndexPlan struct {
-	mode   qApplyIndexMode
-	target string
-	index  int
+	mode    qApplyIndexMode
+	target  string
+	index   int
+	indexes []int
+	scalar  bool
 }
 
 func (s *EvalState) evalApplyIndexForm(src string) (any, bool, error) {
@@ -130,7 +132,7 @@ func (s *EvalState) tryEvalScalarApplyIndexFastPath(src string) (any, bool, erro
 	if !ok || isCallable(target) {
 		return nil, false, nil
 	}
-	return scalarIndexValue(plan.mode, target, plan.index)
+	return scalarApplyIndexPlanValue(plan, target)
 }
 
 func (s *EvalState) scalarApplyIndexPlan(src string) (qScalarApplyIndexPlan, bool) {
@@ -171,11 +173,15 @@ func scalarApplyIndexPlanFromParts(mode qApplyIndexMode, left, right string) (qS
 	if !isQAssignmentName(target) {
 		return qScalarApplyIndexPlan{}, false
 	}
-	index, ok := parseScalarIndexLiteral(strings.TrimSpace(right))
+	indexes, scalar, ok := parseIndexLiteralPath(strings.TrimSpace(right))
 	if !ok {
 		return qScalarApplyIndexPlan{}, false
 	}
-	return qScalarApplyIndexPlan{mode: mode, target: target, index: index}, true
+	index := 0
+	if len(indexes) > 0 {
+		index = indexes[0]
+	}
+	return qScalarApplyIndexPlan{mode: mode, target: target, index: index, indexes: indexes, scalar: scalar}, true
 }
 
 func parseScalarIndexLiteral(src string) (int, bool) {
@@ -187,6 +193,59 @@ func parseScalarIndexLiteral(src string) (int, bool) {
 		return 0, false
 	}
 	return int(n), true
+}
+
+func parseIndexLiteralPath(src string) ([]int, bool, bool) {
+	if index, ok := parseScalarIndexLiteral(src); ok {
+		return []int{index}, true, true
+	}
+	if src == "" || strings.ContainsAny(src, ".;()[]{}") {
+		return nil, false, false
+	}
+	fields := strings.Fields(src)
+	if len(fields) <= 1 {
+		return nil, false, false
+	}
+	indexes := make([]int, len(fields))
+	for i, field := range fields {
+		if field == "" || field[0] == '-' {
+			return nil, false, false
+		}
+		n, err := strconv.ParseInt(field, 10, 0)
+		if err != nil || n < 0 {
+			return nil, false, false
+		}
+		indexes[i] = int(n)
+	}
+	return indexes, false, true
+}
+
+func scalarApplyIndexPlanValue(plan qScalarApplyIndexPlan, target any) (any, bool, error) {
+	if plan.scalar || len(plan.indexes) == 1 {
+		return scalarIndexValue(plan.mode, target, plan.index)
+	}
+	if plan.mode == qApplyIndexDot {
+		if matrix, ok := target.(data.Matrix); ok && len(plan.indexes) == 2 {
+			shape := qMatrixIndexShape(matrix, len(plan.indexes))
+			cell, handled, err := data.TryMatrixCellIndex(matrix, plan.indexes[0], plan.indexes[1])
+			if err != nil || !handled {
+				if err == nil {
+					err = fmt.Errorf("index %d %d out of range", plan.indexes[0], plan.indexes[1])
+				}
+				recordRuntimeKernelProbe("MatrixIndex", shape, true, err)
+				return nil, true, err
+			}
+			out, handled, err := qTypedRuntimeResult("MatrixIndex", shape, cell, true, nil)
+			if err != nil {
+				return nil, true, err
+			}
+			if handled {
+				return out, true, nil
+			}
+			return cell, true, nil
+		}
+	}
+	return nil, false, nil
 }
 
 func scalarIndexValue(mode qApplyIndexMode, target any, row int) (any, bool, error) {
@@ -248,7 +307,7 @@ func dotIndexValue(target any, path any) (any, error) {
 			recordRuntimeKernelProbe("MatrixIndex", "matrix-dot/path-error", false, err)
 			return nil, err
 		}
-		shape := fmt.Sprintf("matrix-dot/%dx%d/%d-indexes", qMatrixRows(matrix), qMatrixCols(matrix), len(indexes))
+		shape := qMatrixIndexShape(matrix, len(indexes))
 		switch {
 		case scalar:
 			row, ok := matrix.RowArray(indexes[0])
@@ -266,9 +325,11 @@ func dotIndexValue(target any, path any) (any, error) {
 			}
 			return row, nil
 		case len(indexes) == 2:
-			cell, ok := matrix.Cell(indexes[0], indexes[1])
-			if !ok {
-				err := fmt.Errorf("index %d %d out of range", indexes[0], indexes[1])
+			cell, handled, err := data.TryMatrixCellIndex(matrix, indexes[0], indexes[1])
+			if err != nil || !handled {
+				if err == nil {
+					err = fmt.Errorf("index %d %d out of range", indexes[0], indexes[1])
+				}
 				recordRuntimeKernelProbe("MatrixIndex", shape, true, err)
 				return nil, err
 			}
@@ -294,6 +355,10 @@ func dotIndexValue(target any, path any) (any, error) {
 		return current, nil
 	}
 	return indexValue(target, path)
+}
+
+func qMatrixIndexShape(matrix data.Matrix, indexes int) string {
+	return fmt.Sprintf("matrix-dot/%dx%d/%d-indexes", qMatrixRows(matrix), qMatrixCols(matrix), indexes)
 }
 
 func qMatrixRows(matrix data.Matrix) int {

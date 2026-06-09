@@ -4505,6 +4505,26 @@ func TestEvalSequenceTransformSumAndCountRecordsRuntimeKernel(t *testing.T) {
 	}
 }
 
+func TestEvalSequenceCompositeReducerAddChainStats(t *testing.T) {
+	ClearRuntimeKernelExecutionStats()
+	t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+	assertEvalValue(t, "x:til 1024;r:17 rotate x;y:128 sublist reverse r;(+/y)+first y+last y", int64(108513))
+
+	seenSum := false
+	for _, stat := range RuntimeKernelExecutionStats() {
+		if stat.Outcome == "fallback" || stat.Outcome == "error" {
+			t.Fatalf("unexpected sequence composite fallback/error: %#v all=%#v", stat, RuntimeKernelExecutionStats())
+		}
+		if stat.Kernel == "ArraySum" && stat.Shape == "vector-reduce/sum/i64" && stat.Outcome == "hit" {
+			seenSum = true
+		}
+	}
+	if !seenSum {
+		t.Fatalf("missing sequence composite sum runtime stat: %#v", RuntimeKernelExecutionStats())
+	}
+}
+
 func TestEvalXcolsReordersTableAndDictionaryColumns(t *testing.T) {
 	got, err := Eval("`price`sym xcols flip `sym`price`size!(`AAPL`MSFT;100 101;10 20)")
 	if err != nil {

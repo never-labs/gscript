@@ -1546,7 +1546,7 @@ func (s *EvalState) evalQFastPlan(plan *qEvalFastPlan) (any, bool, error) {
 		if !ok || isCallable(target) {
 			return nil, false, nil
 		}
-		return scalarIndexValue(plan.scalarIndex.mode, target, plan.scalarIndex.index)
+		return scalarApplyIndexPlanValue(plan.scalarIndex, target)
 	default:
 		return nil, false, nil
 	}
@@ -5000,6 +5000,9 @@ func (s *EvalState) tryEvalScalarAddChain(src string) (any, bool, error) {
 			return nil, false, nil
 		}
 	}
+	if out, handled, err := s.tryEvalNamedScalarReducerAddChain(terms); err != nil || handled {
+		return out, handled, err
+	}
 	var acc any
 	for i, term := range terms {
 		value, err := s.evalScalarAddChainTerm(term)
@@ -5022,6 +5025,86 @@ func (s *EvalState) tryEvalScalarAddChain(src string) (any, bool, error) {
 	return acc, true, nil
 }
 
+func (s *EvalState) tryEvalNamedScalarReducerAddChain(terms []string) (any, bool, error) {
+	if len(terms) < 2 {
+		return nil, false, nil
+	}
+	name := ""
+	reducers := make([]string, 0, len(terms))
+	for _, term := range terms {
+		reducer, arg, ok := namedScalarReducerTerm(term)
+		if !ok {
+			return nil, false, nil
+		}
+		if name == "" {
+			name = arg
+		} else if name != arg {
+			return nil, false, nil
+		}
+		reducers = append(reducers, reducer)
+	}
+	value, ok := s.lookupName(name)
+	if !ok || isCallable(value) {
+		return nil, false, nil
+	}
+	var acc any
+	for i, reducer := range reducers {
+		part, err := namedScalarReducerValue(reducer, value)
+		if err != nil {
+			return nil, true, err
+		}
+		if i == 0 {
+			acc = part
+			continue
+		}
+		if out, ok := addScalarNumericFast(acc, part); ok {
+			acc = out
+			continue
+		}
+		out, err := applyDyadic('+', acc, part)
+		if err != nil {
+			return nil, true, err
+		}
+		acc = out
+	}
+	return acc, true, nil
+}
+
+func namedScalarReducerTerm(src string) (reducer, name string, ok bool) {
+	src = strings.TrimSpace(stripEnclosingParens(src))
+	if strings.HasPrefix(src, "+/") {
+		name = strings.TrimSpace(src[len("+/"):])
+		if isQAssignmentName(name) {
+			return "sum", name, true
+		}
+		return "", "", false
+	}
+	for _, word := range []string{"sum", "first", "last", "count"} {
+		if strings.HasPrefix(src, word) && wordBoundary(src, 0, len(word)) {
+			name = strings.TrimSpace(src[len(word):])
+			if isQAssignmentName(name) {
+				return word, name, true
+			}
+		}
+	}
+	return "", "", false
+}
+
+func namedScalarReducerValue(reducer string, value any) (any, error) {
+	switch reducer {
+	case "sum":
+		return sum(value)
+	case "first":
+		return first(value)
+	case "last":
+		return last(value)
+	case "count":
+		return count(value)
+	default:
+		return nil, fmt.Errorf("unsupported scalar reducer %q", reducer)
+	}
+}
+
 func (s *EvalState) evalScalarAddChainTerm(src string) (any, error) {
 	src = strings.TrimSpace(stripEnclosingParens(src))
 	if src == "" {
@@ -5036,7 +5119,7 @@ func (s *EvalState) evalScalarAddChainTerm(src string) (any, error) {
 		if scalar, ok := buildScalarApplyIndexPlan(src); ok {
 			target, found := s.lookupName(scalar.target)
 			if found && !isCallable(target) {
-				if value, handled, err := scalarIndexValue(scalar.mode, target, scalar.index); err != nil || handled {
+				if value, handled, err := scalarApplyIndexPlanValue(scalar, target); err != nil || handled {
 					return value, err
 				}
 			}
