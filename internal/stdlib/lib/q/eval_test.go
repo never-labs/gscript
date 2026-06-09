@@ -758,20 +758,38 @@ func TestDescribeEvalPipelineExposesReadOnlyRuntimeDescriptor(t *testing.T) {
 		descriptor.CompareOp != ">" {
 		t.Fatalf("expression descriptor = %#v, want compare-to-index-sum mask_reduce x > 8", descriptor)
 	}
-	descriptor, ok = DescribeEvalPipeline("sum reverse 8#til 4")
-	if !ok {
-		t.Fatalf("DescribeEvalPipeline did not recognize generic vector sum pipeline")
-	}
-	if descriptor.Shape != "vector-reduce/sum-reverse" ||
-		descriptor.PipelineShape != "vector_reduce" ||
-		descriptor.ShapeFamily != "vector" ||
-		descriptor.ShapeReducer != "sum" ||
-		descriptor.ShapeTransform != "reverse" ||
-		descriptor.ReductionInput != "8#til 4" {
-		t.Fatalf("generic sum descriptor = %#v", descriptor)
-	}
-	if got, handled, err := ExecuteEvalPipelineDescriptor(descriptor); err != nil || !handled || got != int64(12) {
-		t.Fatalf("ExecuteEvalPipelineDescriptor generic sum = %#v,%v,%v; want 12,true,nil", got, handled, err)
+	for _, tc := range []struct {
+		name           string
+		expr           string
+		shape          string
+		transform      string
+		leftExpr       string
+		reductionInput string
+		want           any
+	}{
+		{name: "reverse", expr: "sum reverse 8#til 4", shape: "vector-reduce/sum-reverse", transform: "reverse", reductionInput: "8#til 4", want: int64(12)},
+		{name: "rotate", expr: "+/2 rotate 8#til 4", shape: "vector-reduce/sum-rotate", transform: "rotate", leftExpr: "2", reductionInput: "8#til 4", want: int64(12)},
+		{name: "sublist", expr: "+/2 4 sublist 1+til 8", shape: "vector-reduce/sum-sublist", transform: "sublist", leftExpr: "2 4", reductionInput: "1+til 8", want: int64(18)},
+		{name: "ratios", expr: "+/ratios 2 4 8 16", shape: "vector-reduce/sum-ratios", transform: "ratios", reductionInput: "2 4 8 16", want: float64(8)},
+	} {
+		t.Run("sequence_transform_sum_descriptor_"+tc.name, func(t *testing.T) {
+			descriptor, ok = DescribeEvalPipeline(tc.expr)
+			if !ok {
+				t.Fatalf("DescribeEvalPipeline did not recognize generic vector sum pipeline")
+			}
+			if descriptor.Shape != tc.shape ||
+				descriptor.PipelineShape != "vector_reduce" ||
+				descriptor.ShapeFamily != "vector" ||
+				descriptor.ShapeReducer != "sum" ||
+				descriptor.ShapeTransform != tc.transform ||
+				descriptor.LeftExpr != tc.leftExpr ||
+				descriptor.ReductionInput != tc.reductionInput {
+				t.Fatalf("generic sum descriptor = %#v", descriptor)
+			}
+			if got, handled, err := ExecuteEvalPipelineDescriptor(descriptor); err != nil || !handled || got != tc.want {
+				t.Fatalf("ExecuteEvalPipelineDescriptor generic sum = %#v,%v,%v; want %#v,true,nil", got, handled, err, tc.want)
+			}
+		})
 	}
 
 	descriptor, ok = DescribeEvalPipeline("+/x min y")

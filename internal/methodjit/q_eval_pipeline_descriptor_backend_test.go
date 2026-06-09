@@ -151,6 +151,10 @@ func TestQEvalPipelineRuntimeBackendExecutesFusedRuntimeShapes(t *testing.T) {
 		{name: "sum_raze", src: "+/raze 2 3#til 6", shape: "vector-reduce/sum-raze", pipelineShape: "vector_reduce", wantInt: 15},
 		{name: "sum_dyadic_xexp", src: "+/2 xexp 0 1 2 3", shape: "vector-reduce/sum-dyadic-float-xexp", pipelineShape: "vector_reduce", wantFloat: 15, floatResult: true},
 		{name: "sum_dyadic_xlog", src: "+/2 xlog 2 4 8", shape: "vector-reduce/sum-dyadic-float-xlog", pipelineShape: "vector_reduce", wantFloat: 6, floatResult: true},
+		{name: "sum_reverse", src: "+/reverse 8#til 4", shape: "vector-reduce/sum-reverse", pipelineShape: "vector_reduce", wantInt: 12},
+		{name: "sum_rotate", src: "+/2 rotate 8#til 4", shape: "vector-reduce/sum-rotate", pipelineShape: "vector_reduce", wantInt: 12},
+		{name: "sum_sublist", src: "+/2 4 sublist 1+til 8", shape: "vector-reduce/sum-sublist", pipelineShape: "vector_reduce", wantInt: 18},
+		{name: "sum_ratios", src: "+/ratios 2 4 8 16", shape: "vector-reduce/sum-ratios", pipelineShape: "vector_reduce", wantFloat: 8, floatResult: true},
 		{name: "scalar_at_script", src: "x:10 20 30;x@1", shape: "script-pipeline/apply-index/scalar-at/assignments", pipelineShape: "script_pipeline", wantInt: 20},
 		{name: "scalar_dot_script", src: "x:10 20 30;x . 2", shape: "script-pipeline/apply-index/scalar-dot/assignments", pipelineShape: "script_pipeline", wantInt: 30},
 	} {
@@ -233,6 +237,10 @@ func TestQEvalPipelineLoweringRecognizesFusedRuntimeShapes(t *testing.T) {
 	}{
 		{name: "sum_raze", src: "+/raze 2 3#til 6", shape: "vector-reduce/sum-raze", pipelineShape: "vector_reduce"},
 		{name: "sum_dyadic_xexp", src: "+/2 xexp 0 1 2 3", shape: "vector-reduce/sum-dyadic-float-xexp", pipelineShape: "vector_reduce"},
+		{name: "sum_reverse", src: "+/reverse 8#til 4", shape: "vector-reduce/sum-reverse", pipelineShape: "vector_reduce"},
+		{name: "sum_rotate", src: "+/2 rotate 8#til 4", shape: "vector-reduce/sum-rotate", pipelineShape: "vector_reduce"},
+		{name: "sum_sublist", src: "+/2 4 sublist 1+til 8", shape: "vector-reduce/sum-sublist", pipelineShape: "vector_reduce"},
+		{name: "sum_ratios", src: "+/ratios 2 4 8 16", shape: "vector-reduce/sum-ratios", pipelineShape: "vector_reduce"},
 		{name: "scalar_at_script", src: "x:10 20 30;x@1", shape: "script-pipeline/apply-index/scalar-at/assignments", pipelineShape: "script_pipeline"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
