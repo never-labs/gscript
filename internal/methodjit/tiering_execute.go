@@ -472,10 +472,15 @@ func (tm *TieringManager) executeTier2WithResultBuffer(cf *CompiledFunction, reg
 			continue
 
 		case ExitQEvalPipelinePlan:
-			site := cf.exitResumeCheckSite(ctx)
-			before, err := exitCheck.checkBefore(ctx, site, regs, base, protoNameForCheck(proto))
-			if err != nil {
-				return nil, err
+			site := (*exitResumeCheckSite)(nil)
+			var before map[int]runtime.Value
+			var err error
+			if exitCheck != nil {
+				site = cf.exitResumeCheckSite(ctx)
+				before, err = exitCheck.checkBefore(ctx, site, regs, base, protoNameForCheck(proto))
+				if err != nil {
+					return nil, err
+				}
 			}
 			if tm.perfStatsEnabled {
 				start := time.Now()
@@ -488,11 +493,20 @@ func (tm *TieringManager) executeTier2WithResultBuffer(cf *CompiledFunction, reg
 				return nil, fmt.Errorf("tier2: q eval pipeline exit: %w", err)
 			}
 			resyncRegs()
-			if err := exitCheck.checkAfter(site, before, regs, base, protoNameForCheck(proto)); err != nil {
-				return nil, err
+			if exitCheck != nil {
+				if err := exitCheck.checkAfter(site, before, regs, base, protoNameForCheck(proto)); err != nil {
+					return nil, err
+				}
 			}
 			opID := int(ctx.OpExitID)
-			resumeOff, ok := cf.resumeOffset(opID, ctx.ResumeNumericPass != 0)
+			if cf.qEvalPipelineTerminalReturn(opID) {
+				mergeTier2CallCacheFeedback(proto, cf)
+				if midRunRefreshDeferred {
+					tm.retireStaleTier2AfterFeedback(proto, cf)
+				}
+				return runtime.ReuseValueSlice1(retBuf, regs[base+int(ctx.OpExitSlot)]), nil
+			}
+			resumeOff, ok := cf.qEvalPipelineResumeOffset(opID, ctx.ResumeNumericPass != 0)
 			if !ok {
 				return nil, fmt.Errorf("tier2: no resume for q eval pipeline %d", opID)
 			}

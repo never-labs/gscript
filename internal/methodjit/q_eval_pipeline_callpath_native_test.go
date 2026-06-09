@@ -97,6 +97,32 @@ func TestQEvalPipelinePlanCodegenUsesDedicatedExitKind(t *testing.T) {
 	})
 }
 
+func TestQEvalPipelineTerminalReturnTable(t *testing.T) {
+	ref := qEvalPipelineDescriptorBackendTestRef(t, "+/til 16")
+	fn := &Function{QEvalPipelinePlans: []QEvalPipelinePlanRef{ref}}
+	b := &Block{ID: 0, defs: make(map[int]*Value)}
+	plan := &Instr{ID: fn.newValueID(), Op: OpQEvalPipelinePlan, Type: TypeAny, Aux: int64(ref.ID), Block: b}
+	ret := &Instr{ID: fn.newValueID(), Op: OpReturn, Type: TypeUnknown, Args: []*Value{plan.Value()}, Block: b}
+	b.Instrs = []*Instr{plan, ret}
+	fn.Entry = b
+	fn.Blocks = []*Block{b}
+
+	table := qEvalPipelineTerminalReturnTable(fn)
+	if plan.ID >= len(table) || !table[plan.ID] {
+		t.Fatalf("qEvalPipelineTerminalReturnTable[%d] = false, want true", plan.ID)
+	}
+
+	b.Instrs = []*Instr{
+		plan,
+		{ID: fn.newValueID(), Op: OpAdd, Type: TypeInt, Args: []*Value{plan.Value(), plan.Value()}, Block: b},
+		ret,
+	}
+	table = qEvalPipelineTerminalReturnTable(fn)
+	if plan.ID < len(table) && table[plan.ID] {
+		t.Fatalf("qEvalPipelineTerminalReturnTable marked non-terminal plan %d", plan.ID)
+	}
+}
+
 func BenchmarkQEvalPipelineNativeExitCallpath(b *testing.B) {
 	for _, tc := range []struct {
 		name string

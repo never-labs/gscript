@@ -642,6 +642,22 @@ type CompiledFunction struct {
 	// the hot path while preserving the older backend fallback.
 	QEvalPipelinePlanHelpers []qEvalPipelinePlanHelper
 
+	// QEvalPipelineResumeOffsets keeps q.eval pipeline native-exit resume
+	// offsets indexed by OpQEvalPipelinePlan instruction ID. This avoids a
+	// generic map lookup on the fixed q pipeline helper path.
+	QEvalPipelineResumeOffsets        []int
+	QEvalPipelineNumericResumeOffsets []int
+
+	// QEvalPipelineTerminalReturns marks q.eval pipeline instructions whose
+	// only remaining work is returning the helper result. Those exits can
+	// complete the call directly without re-entering native code.
+	QEvalPipelineTerminalReturns []bool
+
+	// QEvalPipelinePlanStats keeps lock-free execution counters for q.eval
+	// pipeline helpers. Diagnostic snapshots fold these back into the public
+	// QKernelExecutionStats rows.
+	QEvalPipelinePlanStats []qEvalPipelinePlanExecutionCounters
+
 	// QVectorRuntimeKernelShapesByID keeps q vector runtime-kernel shape
 	// metadata alive for op-exit execution stats.
 	QVectorRuntimeKernelShapesByID map[int]string

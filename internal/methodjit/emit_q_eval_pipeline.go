@@ -18,8 +18,9 @@ func (ec *emitContext) emitQEvalPipelinePlanNativeExit(instr *Instr) {
 		ec.nextSlot++
 	}
 
-	ec.recordExitResumeCheckSite(instr, ExitQEvalPipelinePlan, []int{resultSlot}, exitResumeCheckOptions{})
-	ec.emitStoreAllActiveRegs()
+	gprLive, fprLive := ec.computeLiveAcrossCall(instr)
+	ec.recordExitResumeCheckSiteWithLive(instr, ExitQEvalPipelinePlan, ec.exitResumeCheckLiveSlots(gprLive, fprLive), []int{resultSlot}, exitResumeCheckOptions{})
+	ec.emitSpillSelectiveForCall(gprLive, fprLive)
 
 	asm.LoadImm64(jit.X0, int64(resultSlot))
 	asm.STR(jit.X0, mRegCtx, execCtxOffOpExitSlot)
@@ -42,7 +43,7 @@ func (ec *emitContext) emitQEvalPipelinePlanNativeExit(instr *Instr) {
 	continueLabel := ec.passLabel(fmt.Sprintf("q_eval_pipeline_continue_%d", instr.ID))
 	asm.Label(continueLabel)
 
-	ec.emitReloadAllActiveRegs()
+	ec.emitReloadSelectiveForCall(gprLive, fprLive)
 	asm.LDR(jit.X0, mRegRegs, slotOffset(resultSlot))
 	ec.storeResultNB(jit.X0, instr.ID)
 

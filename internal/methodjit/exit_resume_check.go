@@ -235,6 +235,8 @@ func (cf *CompiledFunction) exitResumeCheckSite(ctx *ExecContext) *exitResumeChe
 		id = int(ctx.TableExitID)
 	case ExitOpExit:
 		id = int(ctx.OpExitID)
+	case ExitQEvalPipelinePlan:
+		id = int(ctx.OpExitID)
 	default:
 		return nil
 	}

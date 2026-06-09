@@ -39,6 +39,9 @@ func (cf *CompiledFunction) recordQEvalPipelinePlanExecutionWithRoute(id int, ro
 	if cf == nil {
 		return
 	}
+	if cf.recordQEvalPipelinePlanExecutionCounter(id, route, outcome) {
+		return
+	}
 	cf.recordQKernelExecution(
 		"methodjit_q_eval_runtime",
 		"QEvalPipelinePlan",
@@ -46,6 +49,34 @@ func (cf *CompiledFunction) recordQEvalPipelinePlanExecutionWithRoute(id int, ro
 		route,
 		outcome,
 	)
+}
+
+func (cf *CompiledFunction) recordQEvalPipelinePlanExecutionCounter(id int, route, outcome string) bool {
+	if cf == nil || id < 0 || id >= len(cf.QEvalPipelinePlanStats) {
+		return false
+	}
+	counter := &cf.QEvalPipelinePlanStats[id]
+	switch route {
+	case "typed_runtime_native_exit":
+		if outcome == "success" {
+			counter.nativeSuccess.Add(1)
+			return true
+		}
+		if outcome == "error" {
+			counter.nativeError.Add(1)
+			return true
+		}
+	case "typed_runtime_op_exit":
+		if outcome == "success" {
+			counter.opSuccess.Add(1)
+			return true
+		}
+		if outcome == "error" {
+			counter.opError.Add(1)
+			return true
+		}
+	}
+	return false
 }
 
 func qVectorRuntimeKernelShapesByID(fn *Function) map[int]string {
@@ -235,12 +266,20 @@ func (cf *CompiledFunction) QKernelExecutionStats() []QKernelExecutionStat {
 		return nil
 	}
 	cf.qKernelStatsMu.Lock()
-	defer cf.qKernelStatsMu.Unlock()
-	if len(cf.qKernelStats) == 0 {
+	merged := make(map[qKernelExecutionKey]uint64, len(cf.qKernelStats)+len(cf.QEvalPipelinePlanStats)*4)
+	for key, count := range cf.qKernelStats {
+		if count != 0 {
+			merged[key] += count
+		}
+	}
+	cf.qKernelStatsMu.Unlock()
+
+	cf.appendQEvalPipelinePlanExecutionStats(merged)
+	if len(merged) == 0 {
 		return nil
 	}
-	keys := make([]qKernelExecutionKey, 0, len(cf.qKernelStats))
-	for key := range cf.qKernelStats {
+	keys := make([]qKernelExecutionKey, 0, len(merged))
+	for key := range merged {
 		keys = append(keys, key)
 	}
 	sort.Slice(keys, func(i, j int) bool {
@@ -266,10 +305,37 @@ func (cf *CompiledFunction) QKernelExecutionStats() []QKernelExecutionStat {
 			Shape:   key.shape,
 			Route:   key.route,
 			Outcome: key.outcome,
-			Count:   cf.qKernelStats[key],
+			Count:   merged[key],
 		})
 	}
 	return out
+}
+
+func (cf *CompiledFunction) appendQEvalPipelinePlanExecutionStats(out map[qKernelExecutionKey]uint64) {
+	if cf == nil || len(cf.QEvalPipelinePlanStats) == 0 {
+		return
+	}
+	for id := range cf.QEvalPipelinePlanStats {
+		counter := &cf.QEvalPipelinePlanStats[id]
+		shape := qEvalPipelinePlanExecutionShape(cf.QEvalPipelinePlans, id)
+		appendQEvalPipelinePlanCounter(out, shape, "typed_runtime_native_exit", "success", counter.nativeSuccess.Load())
+		appendQEvalPipelinePlanCounter(out, shape, "typed_runtime_native_exit", "error", counter.nativeError.Load())
+		appendQEvalPipelinePlanCounter(out, shape, "typed_runtime_op_exit", "success", counter.opSuccess.Load())
+		appendQEvalPipelinePlanCounter(out, shape, "typed_runtime_op_exit", "error", counter.opError.Load())
+	}
+}
+
+func appendQEvalPipelinePlanCounter(out map[qKernelExecutionKey]uint64, shape, route, outcome string, count uint64) {
+	if count == 0 {
+		return
+	}
+	out[qKernelExecutionKey{
+		source:  "methodjit_q_eval_runtime",
+		kernel:  "QEvalPipelinePlan",
+		shape:   shape,
+		route:   route,
+		outcome: outcome,
+	}] += count
 }
 
 func qFrameSelectColumnExecutionShape(specs []QFrameSelectColumnSpec, specIdx int) string {

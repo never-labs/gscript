@@ -207,19 +207,31 @@ func (cf *CompiledFunction) Execute(args []runtime.Value) ([]runtime.Value, erro
 			continue
 
 		case ExitQEvalPipelinePlan:
-			site := cf.exitResumeCheckSite(&ctx)
-			before, err := exitCheck.checkBefore(&ctx, site, regs, 0, protoNameForCheck(cf.Proto))
-			if err != nil {
-				return nil, err
+			site := (*exitResumeCheckSite)(nil)
+			var before map[int]runtime.Value
+			var err error
+			if exitCheck != nil {
+				site = cf.exitResumeCheckSite(&ctx)
+				before, err = exitCheck.checkBefore(&ctx, site, regs, 0, protoNameForCheck(cf.Proto))
+				if err != nil {
+					return nil, err
+				}
 			}
-			if err := cf.executeQEvalPipelinePlanExit(&ctx, regs, 0, "typed_runtime_native_exit"); err != nil {
+			planID := int(ctx.OpExitAux)
+			absSlot := int(ctx.OpExitSlot)
+			if err := cf.executeQEvalPipelinePlanSlot(planID, absSlot, regs, "typed_runtime_native_exit"); err != nil {
 				return nil, fmt.Errorf("methodjit: q eval pipeline exit error: %w", err)
 			}
-			if err := exitCheck.checkAfter(site, before, regs, 0, protoNameForCheck(cf.Proto)); err != nil {
-				return nil, err
+			if exitCheck != nil {
+				if err := exitCheck.checkAfter(site, before, regs, 0, protoNameForCheck(cf.Proto)); err != nil {
+					return nil, err
+				}
 			}
 			opID := int(ctx.OpExitID)
-			resumeOff, ok := cf.resumeOffset(opID, ctx.ResumeNumericPass != 0)
+			if cf.qEvalPipelineTerminalReturn(opID) {
+				return []runtime.Value{regs[absSlot]}, nil
+			}
+			resumeOff, ok := cf.qEvalPipelineResumeOffset(opID, ctx.ResumeNumericPass != 0)
 			if !ok {
 				return nil, fmt.Errorf("methodjit: no resume address for q eval pipeline ID %d", opID)
 			}

@@ -2,6 +2,7 @@ package methodjit
 
 import (
 	"fmt"
+	"sync/atomic"
 
 	"github.com/never-labs/leia/internal/runtime"
 )
@@ -63,6 +64,13 @@ func (r QEvalPipelinePlanRef) Valid() bool {
 
 type qEvalPipelineStaticPlan struct {
 	ref QEvalPipelinePlanRef
+}
+
+type qEvalPipelinePlanExecutionCounters struct {
+	nativeSuccess atomic.Uint64
+	nativeError   atomic.Uint64
+	opSuccess     atomic.Uint64
+	opError       atomic.Uint64
 }
 
 func (p qEvalPipelineStaticPlan) Ref() QEvalPipelinePlanRef {
@@ -183,21 +191,7 @@ func (cf *CompiledFunction) executeQEvalPipelinePlanExit(ctx *ExecContext, regs 
 		return fmt.Errorf("QEvalPipelinePlan exit missing compiled function")
 	}
 	absSlot := base + int(ctx.OpExitSlot)
-	if absSlot < 0 || absSlot >= len(regs) {
-		return fmt.Errorf("QEvalPipelinePlan exit out of register range")
-	}
-	planID := int(ctx.OpExitAux)
-	out, handled, err := cf.ExecuteQEvalPipelinePlanValue(planID)
-	if err != nil || !handled {
-		cf.recordQEvalPipelinePlanExecutionWithRoute(planID, route, "error")
-		if err != nil {
-			return err
-		}
-		return fmt.Errorf("QEvalPipelinePlan exit plan %d was not handled", planID)
-	}
-	cf.recordQEvalPipelinePlanExecutionWithRoute(planID, route, "success")
-	regs[absSlot] = out
-	return nil
+	return cf.executeQEvalPipelinePlanSlot(int(ctx.OpExitAux), absSlot, regs, route)
 }
 
 func executeQEvalPipelinePlanValue(backend QEvalPipelineBackend, ref QEvalPipelinePlanRef) (runtime.Value, bool, error) {
@@ -227,6 +221,131 @@ func qEvalPipelinePlanExecutionShape(refs []QEvalPipelinePlanRef, id int) string
 		return ref.Shape
 	}
 	return "q-eval/pipeline-plan"
+}
+
+func qEvalPipelineResumeOffsetTable(fn *Function, offsets map[int]int) []int {
+	if fn == nil || len(fn.QEvalPipelinePlans) == 0 || len(offsets) == 0 {
+		return nil
+	}
+	maxID := -1
+	for _, block := range fn.Blocks {
+		if block == nil {
+			continue
+		}
+		for _, instr := range block.Instrs {
+			if instr != nil && instr.Op == OpQEvalPipelinePlan && instr.ID > maxID {
+				maxID = instr.ID
+			}
+		}
+	}
+	if maxID < 0 {
+		return nil
+	}
+	table := make([]int, maxID+1)
+	for i := range table {
+		table[i] = -1
+	}
+	for _, block := range fn.Blocks {
+		if block == nil {
+			continue
+		}
+		for _, instr := range block.Instrs {
+			if instr == nil || instr.Op != OpQEvalPipelinePlan {
+				continue
+			}
+			if off, ok := offsets[instr.ID]; ok {
+				table[instr.ID] = off
+			}
+		}
+	}
+	return table
+}
+
+func qEvalPipelineTerminalReturnTable(fn *Function) []bool {
+	if fn == nil || len(fn.QEvalPipelinePlans) == 0 {
+		return nil
+	}
+	maxID := -1
+	for _, block := range fn.Blocks {
+		if block == nil {
+			continue
+		}
+		for _, instr := range block.Instrs {
+			if instr != nil && instr.Op == OpQEvalPipelinePlan && instr.ID > maxID {
+				maxID = instr.ID
+			}
+		}
+	}
+	if maxID < 0 {
+		return nil
+	}
+	table := make([]bool, maxID+1)
+	for _, block := range fn.Blocks {
+		if block == nil {
+			continue
+		}
+		for i, instr := range block.Instrs {
+			if instr == nil || instr.Op != OpQEvalPipelinePlan || instr.ID < 0 || instr.ID >= len(table) {
+				continue
+			}
+			if i+1 != len(block.Instrs)-1 {
+				continue
+			}
+			ret := block.Instrs[i+1]
+			if ret == nil || ret.Op != OpReturn || len(ret.Args) != 1 || ret.Args[0] == nil {
+				continue
+			}
+			table[instr.ID] = ret.Args[0].ID == instr.ID
+		}
+	}
+	return table
+}
+
+func newQEvalPipelinePlanExecutionCounters(refs []QEvalPipelinePlanRef) []qEvalPipelinePlanExecutionCounters {
+	if len(refs) == 0 {
+		return nil
+	}
+	return make([]qEvalPipelinePlanExecutionCounters, len(refs))
+}
+
+func (cf *CompiledFunction) qEvalPipelineResumeOffset(instrID int, numericPass bool) (int, bool) {
+	if cf == nil || instrID < 0 {
+		return 0, false
+	}
+	var table []int
+	if numericPass {
+		table = cf.QEvalPipelineNumericResumeOffsets
+	} else {
+		table = cf.QEvalPipelineResumeOffsets
+	}
+	if instrID < len(table) && table[instrID] >= 0 {
+		return table[instrID], true
+	}
+	return cf.resumeOffset(instrID, numericPass)
+}
+
+func (cf *CompiledFunction) qEvalPipelineTerminalReturn(instrID int) bool {
+	if cf == nil || instrID < 0 || instrID >= len(cf.QEvalPipelineTerminalReturns) {
+		return false
+	}
+	return cf.QEvalPipelineTerminalReturns[instrID]
+}
+
+func (cf *CompiledFunction) executeQEvalPipelinePlanSlot(planID, absSlot int, regs []runtime.Value, route string) error {
+	if absSlot < 0 || absSlot >= len(regs) {
+		return fmt.Errorf("QEvalPipelinePlan exit out of register range")
+	}
+	out, handled, err := cf.ExecuteQEvalPipelinePlanValue(planID)
+	if err != nil || !handled {
+		cf.recordQEvalPipelinePlanExecutionWithRoute(planID, route, "error")
+		if err != nil {
+			return err
+		}
+		return fmt.Errorf("QEvalPipelinePlan exit plan %d was not handled", planID)
+	}
+	cf.recordQEvalPipelinePlanExecutionWithRoute(planID, route, "success")
+	regs[absSlot] = out
+	return nil
 }
 
 func qEvalPipelineRuntimeValue(v any) (runtime.Value, error) {
