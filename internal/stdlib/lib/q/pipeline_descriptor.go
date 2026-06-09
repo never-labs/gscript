@@ -52,6 +52,29 @@ func DescribeEvalPipeline(source string) (EvalPipelineDescriptor, bool) {
 	return EvalPipelineDescriptor{}, false
 }
 
+// ExecuteEvalPipeline executes source only when the q runtime pipeline planner
+// recognizes it. It is the execution-side counterpart to DescribeEvalPipeline:
+// callers such as MethodJIT can try the typed pipeline backend without falling
+// back through the full q evaluator. The returned handled flag is false when no
+// pipeline shape is available.
+func ExecuteEvalPipeline(source string) (any, bool, error) {
+	state := NewEvalState(nil)
+	return state.executeEvalPipeline(strings.TrimSpace(source))
+}
+
+func (s *EvalState) executeEvalPipeline(source string) (any, bool, error) {
+	if source == "" {
+		return nil, false, nil
+	}
+	if plan := s.qScriptPlan(source); plan.scriptPipeline != nil {
+		return s.tryEvalQScriptPipeline(plan.scriptPipeline)
+	}
+	if plan := s.qPipelinePlan(source); plan.kind != qPipelineInvalid {
+		return s.evalQPipelinePlan(plan)
+	}
+	return nil, false, nil
+}
+
 func evalScriptPipelineDescriptor(source string, d *qScriptPipelineDescriptor) EvalPipelineDescriptor {
 	out := EvalPipelineDescriptor{
 		Source:        source,

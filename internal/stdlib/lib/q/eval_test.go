@@ -258,6 +258,24 @@ func TestDescribeEvalPipelineExposesReadOnlyRuntimeDescriptor(t *testing.T) {
 	}
 }
 
+func TestExecuteEvalPipelineRunsOnlyRecognizedRuntimePlans(t *testing.T) {
+	ClearRuntimeKernelExecutionStats()
+	t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+	got, handled, err := ExecuteEvalPipeline("x:til 16;y:x*3;idx:where (x>=4) and x<8;+/y[idx]")
+	if err != nil || !handled || got != int64(66) {
+		t.Fatalf("ExecuteEvalPipeline script = %#v, %v, %v; want 66,true,nil", got, handled, err)
+	}
+	got, handled, err = ExecuteEvalPipeline("+/deltas til 8")
+	if err != nil || !handled || got != int64(7) {
+		t.Fatalf("ExecuteEvalPipeline expression = %#v, %v, %v; want 7,true,nil", got, handled, err)
+	}
+	got, handled, err = ExecuteEvalPipeline("1+2")
+	if err != nil || handled || got != nil {
+		t.Fatalf("ExecuteEvalPipeline unsupported = %#v, %v, %v; want nil,false,nil", got, handled, err)
+	}
+}
+
 func TestEvalNumericReductionBundleRecordsTypedRuntimeKernel(t *testing.T) {
 	ClearRuntimeKernelExecutionStats()
 	t.Cleanup(ClearRuntimeKernelExecutionStats)
