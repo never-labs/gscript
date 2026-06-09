@@ -6440,6 +6440,15 @@ func (e VectorTransformExpr) EvalRows(frame Frame, indexes []int) (Array, error)
 			}
 		}
 		return NewBool(mask), nil
+	case "rank":
+		out, handled, err := TryTypedRankI64(values)
+		if err != nil {
+			return nil, err
+		}
+		if handled {
+			return out, nil
+		}
+		return rankArray(values)
 	case "abs", "neg", "sqrt", "log", "exp", "reciprocal", "signum", "floor", "ceiling":
 		out, ok, err := typedKernels.NumericUnary(e.Func, values)
 		if err != nil {
@@ -6482,6 +6491,29 @@ func (e VectorTransformExpr) EvalRows(frame Frame, indexes []int) (Array, error)
 	default:
 		return nil, fmt.Errorf("unsupported vector transform %q", e.Func)
 	}
+}
+
+func rankArray(values Array) (Array, error) {
+	indexes := make([]int, values.Len())
+	for i := range indexes {
+		indexes[i] = i
+	}
+	sort.SliceStable(indexes, func(i, j int) bool {
+		left, ok := values.At(indexes[i])
+		if !ok {
+			return false
+		}
+		right, ok := values.At(indexes[j])
+		if !ok {
+			return true
+		}
+		return compare(left, right) < 0
+	})
+	out := make([]int64, len(indexes))
+	for sortedPosition, originalIndex := range indexes {
+		out[originalIndex] = int64(sortedPosition)
+	}
+	return newI64Trusted(out), nil
 }
 
 func (e VectorTransformExpr) intArg(frame Frame) (int, error) {

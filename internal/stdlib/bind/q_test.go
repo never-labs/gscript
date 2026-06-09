@@ -804,6 +804,97 @@ func TestQSQLResultKeepsNativeFrameFacade(t *testing.T) {
 	}
 }
 
+func TestQSQLProjectionAndByVerbExpressionsExecute(t *testing.T) {
+	frame, err := data.NewFrame(
+		data.Column{Name: "sym", Data: data.NewSymbols([]string{"AAPL", "AAPL", "MSFT", "MSFT"})},
+		data.Column{Name: "px", Data: data.NewF64([]float64{30, 10, 20, 40})},
+		data.Column{Name: "qty", Data: data.NewI64([]int64{5, 7, 11, 13})},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	frameValue, err := qDataFrameValue(frame)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ranked, err := qRunSQL("q.sql", qSQLArgsResult{
+		frameValue: frameValue,
+		source:     "select r:rank px from trades",
+	})
+	if err != nil {
+		t.Fatalf("q.sql rank projection: %v", err)
+	}
+	rankedFrame, err := qDataFrameFromValue(ranked, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	rankCol, ok := rankedFrame.Column("r")
+	if !ok {
+		t.Fatal("rank projection missing r column")
+	}
+	if got, want := rankCol.Values(), []any{int64(2), int64(0), int64(1), int64(3)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("rank projection values = %v, want %v", got, want)
+	}
+
+	bucketed, err := qRunSQL("q.sql", qSQLArgsResult{
+		frameValue: frameValue,
+		source:     "select total:sum qty by g:20 xbar px from trades order by g asc",
+	})
+	if err != nil {
+		t.Fatalf("q.sql xbar by expression: %v", err)
+	}
+	bucketedFrame, err := qDataFrameFromValue(bucketed, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	gCol, ok := bucketedFrame.Column("g")
+	if !ok {
+		t.Fatal("xbar by result missing g column")
+	}
+	if got, want := gCol.Values(), []any{0.0, 20.0, 40.0}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("xbar by groups = %v, want %v", got, want)
+	}
+	totalCol, ok := bucketedFrame.Column("total")
+	if !ok {
+		t.Fatal("xbar by result missing total column")
+	}
+	gotTotals := totalCol.Values()
+	wantTotals := []int64{7, 16, 13}
+	if len(gotTotals) != len(wantTotals) {
+		t.Fatalf("xbar by totals = %v, want %v", gotTotals, wantTotals)
+	}
+	for i, want := range wantTotals {
+		got, ok := qTestIntegralValue(gotTotals[i])
+		if !ok || got != want {
+			t.Fatalf("xbar by total[%d] = %#v, want %d", i, gotTotals[i], want)
+		}
+	}
+}
+
+func qTestIntegralValue(v any) (int64, bool) {
+	switch x := v.(type) {
+	case int:
+		return int64(x), true
+	case int8:
+		return int64(x), true
+	case int16:
+		return int64(x), true
+	case int32:
+		return int64(x), true
+	case int64:
+		return x, true
+	case float32:
+		i := int64(x)
+		return i, float32(i) == x
+	case float64:
+		i := int64(x)
+		return i, float64(i) == x
+	default:
+		return 0, false
+	}
+}
+
 func TestQSQLChainedJoinsExecuteInOrder(t *testing.T) {
 	interp := runWithQAndSOA(t, `
 trades := data.frame({
