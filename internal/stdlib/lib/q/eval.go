@@ -10145,6 +10145,18 @@ func (s *EvalState) vectorAmendFunction(array data.Array, key any, fn any, value
 	if err != nil {
 		return nil, err
 	}
+	if isCallableAdd(fn) {
+		shape := "amend-add-indexes/" + string(array.Kind()) + "/" + string(qKindOfValue(value))
+		if typed, handled, err := data.TryTypedAmendAddIndexes(array, indexes, value); err != nil || handled {
+			recordRuntimeKernelProbe("ArrayAmendAddIndexes", shape, handled, err)
+			if err != nil {
+				return nil, err
+			}
+			return typed, nil
+		} else {
+			recordRuntimeKernelProbe("ArrayAmendAddIndexes", shape, handled, err)
+		}
+	}
 	values, err := amendInputValues(value, len(indexes))
 	if err != nil {
 		return nil, err

@@ -5430,6 +5430,8 @@ func (typedKernelRegistry) FbySum(values, groups Array) (Array, bool, error) {
 		return fbySumIntegral(v.data, values.Kind(), groups)
 	case i64RangeArray:
 		return fbySumI64Range(v, groups)
+	case i64SparseAmendArray:
+		return fbySumI64SparseAmend(v, groups)
 	case columnArray[uint8]:
 		return fbySumIntegral(v.data, values.Kind(), groups)
 	case columnArray[uint16]:
@@ -5445,6 +5447,9 @@ func (typedKernelRegistry) FbySum(values, groups Array) (Array, bool, error) {
 	case nullableArray:
 		return fbySumNullable(v, groups)
 	default:
+		if isDenseIntegerArray(values) {
+			return fbySumIntegerArray(values, groups)
+		}
 		return nil, false, nil
 	}
 }
@@ -5463,6 +5468,8 @@ func (typedKernelRegistry) FbySumTotal(values, groups Array) (any, bool, error) 
 		return fbySumTotalIntegral(v.data, groups)
 	case i64RangeArray:
 		return fbySumTotalI64Range(v, groups)
+	case i64SparseAmendArray:
+		return fbySumTotalI64SparseAmend(v, groups)
 	case columnArray[uint8]:
 		return fbySumTotalIntegral(v.data, groups)
 	case columnArray[uint16]:
@@ -5476,6 +5483,9 @@ func (typedKernelRegistry) FbySumTotal(values, groups Array) (any, bool, error) 
 	case columnArray[float64]:
 		return fbySumTotalFloat(v.data, groups)
 	default:
+		if isDenseIntegerArray(values) {
+			return fbySumTotalIntegerArray(values, groups)
+		}
 		return nil, false, nil
 	}
 }
@@ -6493,6 +6503,7 @@ func (a f64FillArray) sum() float64 {
 type fbyI64BroadcastArray struct {
 	rowGroups []int
 	sums      []int64
+	counts    []int64
 	len       int
 }
 
@@ -6510,10 +6521,11 @@ func (a fbyI64BroadcastArray) Kind() Kind { return KindI64 }
 func (a fbyI64BroadcastArray) Len() int { return a.len }
 
 func (a fbyI64BroadcastArray) At(row int) (any, bool) {
-	if row < 0 || row >= a.len {
+	value, ok, err := a.i64At(row)
+	if err != nil || !ok {
 		return nil, false
 	}
-	return a.sums[a.rowGroups[row]], true
+	return value, true
 }
 
 func (a fbyI64BroadcastArray) Values() []any {
@@ -6527,22 +6539,26 @@ func (a fbyI64BroadcastArray) Values() []any {
 func (a fbyI64BroadcastArray) Gather(indexes []int) Array {
 	out := make([]int64, len(indexes))
 	for i, row := range indexes {
-		if row < 0 || row >= a.len {
+		value, ok, err := a.i64At(row)
+		if err != nil || !ok {
 			panic(fmt.Sprintf("data fby gather index %d out of range", row))
 		}
-		out[i] = a.sums[a.rowGroups[row]]
+		out[i] = value
 	}
 	return newI64Trusted(out)
 }
 
-func (a fbyI64BroadcastArray) total() int64 {
-	counts := make([]int64, len(a.sums))
-	for _, group := range a.rowGroups {
-		counts[group]++
+func (a fbyI64BroadcastArray) i64At(row int) (int64, bool, error) {
+	if row < 0 || row >= a.len {
+		return 0, false, fmt.Errorf("array row %d out of range", row)
 	}
+	return a.sums[a.rowGroups[row]], true, nil
+}
+
+func (a fbyI64BroadcastArray) total() int64 {
 	var total int64
 	for group, sum := range a.sums {
-		total += sum * counts[group]
+		total += sum * a.counts[group]
 	}
 	return total
 }
@@ -6552,10 +6568,11 @@ func (a fbyI64TiledBroadcastArray) Kind() Kind { return KindI64 }
 func (a fbyI64TiledBroadcastArray) Len() int { return a.len }
 
 func (a fbyI64TiledBroadcastArray) At(row int) (any, bool) {
-	if row < 0 || row >= a.len || a.sourceLen <= 0 {
+	value, ok, err := a.i64At(row)
+	if err != nil || !ok {
 		return nil, false
 	}
-	return a.sums[a.sourceGroups[(a.start+row)%a.sourceLen]], true
+	return value, true
 }
 
 func (a fbyI64TiledBroadcastArray) Values() []any {
@@ -6569,12 +6586,20 @@ func (a fbyI64TiledBroadcastArray) Values() []any {
 func (a fbyI64TiledBroadcastArray) Gather(indexes []int) Array {
 	out := make([]int64, len(indexes))
 	for i, row := range indexes {
-		if row < 0 || row >= a.len || a.sourceLen <= 0 {
+		value, ok, err := a.i64At(row)
+		if err != nil || !ok {
 			panic(fmt.Sprintf("data fby gather index %d out of range", row))
 		}
-		out[i] = a.sums[a.sourceGroups[(a.start+row)%a.sourceLen]]
+		out[i] = value
 	}
 	return newI64Trusted(out)
+}
+
+func (a fbyI64TiledBroadcastArray) i64At(row int) (int64, bool, error) {
+	if row < 0 || row >= a.len || a.sourceLen <= 0 {
+		return 0, false, fmt.Errorf("array row %d out of range", row)
+	}
+	return a.sums[a.sourceGroups[(a.start+row)%a.sourceLen]], true, nil
 }
 
 func (a fbyI64TiledBroadcastArray) total() int64 {
@@ -6588,6 +6613,7 @@ func (a fbyI64TiledBroadcastArray) total() int64 {
 type fbyF64BroadcastArray struct {
 	rowGroups []int
 	sums      []float64
+	counts    []int64
 	len       int
 }
 
@@ -6605,10 +6631,11 @@ func (a fbyF64BroadcastArray) Kind() Kind { return KindF64 }
 func (a fbyF64BroadcastArray) Len() int { return a.len }
 
 func (a fbyF64BroadcastArray) At(row int) (any, bool) {
-	if row < 0 || row >= a.len {
+	value, ok, err := a.f64At(row)
+	if err != nil || !ok {
 		return nil, false
 	}
-	return a.sums[a.rowGroups[row]], true
+	return value, true
 }
 
 func (a fbyF64BroadcastArray) Values() []any {
@@ -6622,22 +6649,26 @@ func (a fbyF64BroadcastArray) Values() []any {
 func (a fbyF64BroadcastArray) Gather(indexes []int) Array {
 	out := make([]float64, len(indexes))
 	for i, row := range indexes {
-		if row < 0 || row >= a.len {
+		value, ok, err := a.f64At(row)
+		if err != nil || !ok {
 			panic(fmt.Sprintf("data fby gather index %d out of range", row))
 		}
-		out[i] = a.sums[a.rowGroups[row]]
+		out[i] = value
 	}
 	return newF64Trusted(out)
 }
 
-func (a fbyF64BroadcastArray) total() float64 {
-	counts := make([]int64, len(a.sums))
-	for _, group := range a.rowGroups {
-		counts[group]++
+func (a fbyF64BroadcastArray) f64At(row int) (float64, bool, error) {
+	if row < 0 || row >= a.len {
+		return 0, false, fmt.Errorf("array row %d out of range", row)
 	}
+	return a.sums[a.rowGroups[row]], true, nil
+}
+
+func (a fbyF64BroadcastArray) total() float64 {
 	var total float64
 	for group, sum := range a.sums {
-		total += sum * float64(counts[group])
+		total += sum * float64(a.counts[group])
 	}
 	return total
 }
@@ -6647,10 +6678,11 @@ func (a fbyF64TiledBroadcastArray) Kind() Kind { return KindF64 }
 func (a fbyF64TiledBroadcastArray) Len() int { return a.len }
 
 func (a fbyF64TiledBroadcastArray) At(row int) (any, bool) {
-	if row < 0 || row >= a.len || a.sourceLen <= 0 {
+	value, ok, err := a.f64At(row)
+	if err != nil || !ok {
 		return nil, false
 	}
-	return a.sums[a.sourceGroups[(a.start+row)%a.sourceLen]], true
+	return value, true
 }
 
 func (a fbyF64TiledBroadcastArray) Values() []any {
@@ -6664,12 +6696,20 @@ func (a fbyF64TiledBroadcastArray) Values() []any {
 func (a fbyF64TiledBroadcastArray) Gather(indexes []int) Array {
 	out := make([]float64, len(indexes))
 	for i, row := range indexes {
-		if row < 0 || row >= a.len || a.sourceLen <= 0 {
+		value, ok, err := a.f64At(row)
+		if err != nil || !ok {
 			panic(fmt.Sprintf("data fby gather index %d out of range", row))
 		}
-		out[i] = a.sums[a.sourceGroups[(a.start+row)%a.sourceLen]]
+		out[i] = value
 	}
 	return newF64Trusted(out)
+}
+
+func (a fbyF64TiledBroadcastArray) f64At(row int) (float64, bool, error) {
+	if row < 0 || row >= a.len || a.sourceLen <= 0 {
+		return 0, false, fmt.Errorf("array row %d out of range", row)
+	}
+	return a.sums[a.sourceGroups[(a.start+row)%a.sourceLen]], true, nil
 }
 
 func (a fbyF64TiledBroadcastArray) total() float64 {
@@ -6755,11 +6795,14 @@ func fbySumIntegral[T signedScalar | unsignedScalar](values []T, valueKind Kind,
 		return nil, true, err
 	}
 	sums := make([]int64, groupCount)
+	counts := make([]int64, groupCount)
 	for row, value := range values {
-		sums[rowGroups[row]] += int64(value)
+		group := rowGroups[row]
+		sums[group] += int64(value)
+		counts[group]++
 	}
 	_ = valueKind
-	return fbyI64BroadcastArray{rowGroups: rowGroups, sums: sums, len: len(values)}, true, nil
+	return fbyI64BroadcastArray{rowGroups: rowGroups, sums: sums, counts: counts, len: len(values)}, true, nil
 }
 
 func fbySumI64Range(values i64RangeArray, groups Array) (Array, bool, error) {
@@ -6774,7 +6817,22 @@ func fbySumI64Range(values i64RangeArray, groups Array) (Array, bool, error) {
 	for row, group := range rowGroups {
 		sums[group] += values.start + int64(row)*values.step
 	}
-	return fbyI64BroadcastArray{rowGroups: rowGroups, sums: sums, len: values.len}, true, nil
+	return fbyI64BroadcastArray{rowGroups: rowGroups, sums: sums, counts: fbyGroupCounts(rowGroups, groupCount), len: values.len}, true, nil
+}
+
+func fbySumI64SparseAmend(values i64SparseAmendArray, groups Array) (Array, bool, error) {
+	rowGroups, groupCount, err := fbyGroupIDs(groups)
+	if err != nil {
+		return nil, true, err
+	}
+	if len(rowGroups) != values.Len() {
+		return nil, true, fmt.Errorf("fby group length %d does not match value length %d", len(rowGroups), values.Len())
+	}
+	sums, _, handled, err := fbySparseAmendGroupSums(values, rowGroups, groupCount)
+	if err != nil || !handled {
+		return nil, handled, err
+	}
+	return fbyI64BroadcastArray{rowGroups: rowGroups, sums: sums, counts: fbyGroupCounts(rowGroups, groupCount), len: values.Len()}, true, nil
 }
 
 func fbySumFloat[T floatScalar](values []T, valueKind Kind, groups Array) (Array, bool, error) {
@@ -6786,11 +6844,108 @@ func fbySumFloat[T floatScalar](values []T, valueKind Kind, groups Array) (Array
 		return nil, true, err
 	}
 	sums := make([]float64, groupCount)
+	counts := make([]int64, groupCount)
 	for row, value := range values {
-		sums[rowGroups[row]] += float64(value)
+		group := rowGroups[row]
+		sums[group] += float64(value)
+		counts[group]++
 	}
 	_ = valueKind
-	return fbyF64BroadcastArray{rowGroups: rowGroups, sums: sums, len: len(values)}, true, nil
+	return fbyF64BroadcastArray{rowGroups: rowGroups, sums: sums, counts: counts, len: len(values)}, true, nil
+}
+
+func fbySumIntegerArray(values Array, groups Array) (Array, bool, error) {
+	rowGroups, groupCount, err := fbyGroupIDs(groups)
+	if err != nil {
+		return nil, true, err
+	}
+	sums := make([]int64, groupCount)
+	counts := make([]int64, groupCount)
+	for row, group := range rowGroups {
+		value, ok, err := integerArrayAt(values, row)
+		if err != nil {
+			return nil, true, err
+		}
+		if !ok {
+			return nil, false, nil
+		}
+		sums[group] += value
+		counts[group]++
+	}
+	return fbyI64BroadcastArray{rowGroups: rowGroups, sums: sums, counts: counts, len: values.Len()}, true, nil
+}
+
+func fbySumTotalI64SparseAmend(values i64SparseAmendArray, groups Array) (any, bool, error) {
+	rowGroups, groupCount, err := fbyGroupIDs(groups)
+	if err != nil {
+		return nil, true, err
+	}
+	if len(rowGroups) != values.Len() {
+		return nil, true, fmt.Errorf("fby group length %d does not match value length %d", len(rowGroups), values.Len())
+	}
+	sums, counts, handled, err := fbySparseAmendGroupSums(values, rowGroups, groupCount)
+	if err != nil || !handled {
+		return nil, handled, err
+	}
+	var total int64
+	for group, sum := range sums {
+		total += sum * counts[group]
+	}
+	return total, true, nil
+}
+
+func fbySumTotalIntegerArray(values Array, groups Array) (any, bool, error) {
+	lookup, groupCount, ok, err := fbyGroupLookup(groups)
+	if err != nil || !ok {
+		return nil, ok, err
+	}
+	sums := make([]int64, groupCount)
+	counts := make([]int64, groupCount)
+	for row := 0; row < values.Len(); row++ {
+		group, err := lookup(row)
+		if err != nil {
+			return nil, true, err
+		}
+		value, ok, err := integerArrayAt(values, row)
+		if err != nil {
+			return nil, true, err
+		}
+		if !ok {
+			return nil, false, nil
+		}
+		sums[group] += value
+		counts[group]++
+	}
+	var total int64
+	for group, sum := range sums {
+		total += sum * counts[group]
+	}
+	return total, true, nil
+}
+
+func fbySparseAmendGroupSums(values i64SparseAmendArray, rowGroups []int, groupCount int) ([]int64, []int64, bool, error) {
+	sums := make([]int64, groupCount)
+	counts := make([]int64, groupCount)
+	for row, group := range rowGroups {
+		value, ok, err := integerArrayAt(values.source, row)
+		if err != nil || !ok {
+			return nil, nil, ok, err
+		}
+		sums[group] += value
+		counts[group]++
+	}
+	for i, row := range values.indexes {
+		if row < 0 || row >= len(rowGroups) {
+			return nil, nil, true, fmt.Errorf("amend index %d out of range", row)
+		}
+		old, ok, err := integerArrayAt(values.source, row)
+		if err != nil || !ok {
+			return nil, nil, ok, err
+		}
+		group := rowGroups[row]
+		sums[group] += values.values[i] - old
+	}
+	return sums, counts, true, nil
 }
 
 func fbySumIntegralTiled[T signedScalar | unsignedScalar](values []T, groups Array) (Array, bool, error) {
@@ -6836,6 +6991,14 @@ func fbySumFloatTiled[T floatScalar](values []T, groups Array) (Array, bool, err
 		counts[group]++
 	}
 	return fbyF64TiledBroadcastArray{sourceGroups: sourceGroups, sums: sums, counts: counts, start: start, sourceLen: sourceLen, len: len(values)}, true, nil
+}
+
+func fbyGroupCounts(rowGroups []int, groupCount int) []int64 {
+	counts := make([]int64, groupCount)
+	for _, group := range rowGroups {
+		counts[group]++
+	}
+	return counts
 }
 
 func fbySumNullable(values nullableArray, groups Array) (Array, bool, error) {
@@ -6966,6 +7129,8 @@ func fbyGroupIDs(groups Array) ([]int, int, error) {
 		return fbyGroupIDsComparable(g.data)
 	case columnArray[int64]:
 		return fbyGroupIDsComparable(g.data)
+	case i64BucketArray:
+		return fbyGroupIDsI64Computed(g)
 	case columnArray[uint8]:
 		return fbyGroupIDsComparable(g.data)
 	case columnArray[uint16]:
@@ -6995,6 +7160,9 @@ func fbyGroupIDs(groups Array) ([]int, int, error) {
 	case columnArray[Timestamp]:
 		return fbyGroupIDsComparable(g.data)
 	}
+	if isDenseIntegerArray(groups) {
+		return fbyGroupIDsIntegerArray(groups)
+	}
 	rowGroups := make([]int, groups.Len())
 	groupIDs := make(map[string]int)
 	for row := 0; row < groups.Len(); row++ {
@@ -7007,6 +7175,51 @@ func fbyGroupIDs(groups Array) ([]int, int, error) {
 		if !ok {
 			id = len(groupIDs)
 			groupIDs[key] = id
+		}
+		rowGroups[row] = id
+	}
+	return rowGroups, len(groupIDs), nil
+}
+
+func fbyGroupIDsIntegerArray(groups Array) ([]int, int, error) {
+	rowGroups := make([]int, groups.Len())
+	groupIDs := make(map[int64]int)
+	for row := 0; row < groups.Len(); row++ {
+		value, ok, err := integerArrayAt(groups, row)
+		if err != nil {
+			return nil, 0, err
+		}
+		if !ok {
+			return nil, 0, fmt.Errorf("fby integer group row %d is null", row)
+		}
+		id, ok := groupIDs[value]
+		if !ok {
+			id = len(groupIDs)
+			groupIDs[value] = id
+		}
+		rowGroups[row] = id
+	}
+	return rowGroups, len(groupIDs), nil
+}
+
+func fbyGroupIDsI64Computed(values interface {
+	Len() int
+	i64At(int) (int64, bool, error)
+}) ([]int, int, error) {
+	rowGroups := make([]int, values.Len())
+	groupIDs := make(map[int64]int)
+	for row := 0; row < values.Len(); row++ {
+		value, ok, err := values.i64At(row)
+		if err != nil {
+			return nil, 0, err
+		}
+		if !ok {
+			return nil, 0, fmt.Errorf("fby group row %d out of range", row)
+		}
+		id, ok := groupIDs[value]
+		if !ok {
+			id = len(groupIDs)
+			groupIDs[value] = id
 		}
 		rowGroups[row] = id
 	}
@@ -8621,12 +8834,34 @@ func (typedKernelRegistry) NumericAt(array Array, row int) (float64, bool, error
 	switch a := array.(type) {
 	case attributedArray:
 		return typedKernels.NumericAt(a.array, row)
+	case indexedArray:
+		index, ok, err := i64IndexArrayAt(a.indexes, row)
+		if err != nil || !ok {
+			return 0, ok, err
+		}
+		return typedKernels.NumericAt(a.source, index)
 	case i64SparseAmendArray:
 		value, ok, err := a.i64At(row)
 		if err != nil || !ok {
 			return 0, ok, err
 		}
 		return float64(value), true, nil
+	case fbyI64BroadcastArray:
+		value, ok, err := a.i64At(row)
+		if err != nil || !ok {
+			return 0, ok, err
+		}
+		return float64(value), true, nil
+	case fbyI64TiledBroadcastArray:
+		value, ok, err := a.i64At(row)
+		if err != nil || !ok {
+			return 0, ok, err
+		}
+		return float64(value), true, nil
+	case fbyF64BroadcastArray:
+		return a.f64At(row)
+	case fbyF64TiledBroadcastArray:
+		return a.f64At(row)
 	case i64ScalarDyadicArray:
 		value, ok, err := a.i64At(row)
 		if err != nil || !ok {
@@ -8785,12 +9020,15 @@ func isNumericArray(array Array) bool {
 		return isNumericArray(a.array)
 	case tiledArray:
 		return isNumericArray(a.source)
+	case indexedArray:
+		return isNumericArray(a.source)
 	case columnArray[int8], columnArray[int16], columnArray[int32], columnArray[int64],
 		columnArray[uint8], columnArray[uint16], columnArray[uint32], columnArray[uint64],
 		columnArray[float32], columnArray[float64], i64RangeArray, f64RangeArray,
 		i64RunningSumArray, f64RunningSumArray, i64SegmentArray, i64ProductArray,
 		i64ScalarDyadicArray, i64ScalarDyadicRunningSumArray, f64NumericDyadicArray,
-		i64BucketArray, i64XrankArray, f64BucketArray:
+		i64BucketArray, i64XrankArray, i64FillArray, f64BucketArray,
+		fbyI64BroadcastArray, fbyI64TiledBroadcastArray, fbyF64BroadcastArray, fbyF64TiledBroadcastArray:
 		return true
 	case nullableArray:
 		for i := 0; i < array.Len(); i++ {
@@ -9254,6 +9492,8 @@ func isIntegerArray(array Array) bool {
 		return isIntegerArray(a.array)
 	case tiledArray:
 		return isIntegerArray(a.source)
+	case indexedArray:
+		return isIntegerArray(a.source)
 	case i64SparseAmendArray:
 		return true
 	case i64ScalarDyadicArray:
@@ -9262,7 +9502,8 @@ func isIntegerArray(array Array) bool {
 		return true
 	case columnArray[int8], columnArray[int16], columnArray[int32], columnArray[int64],
 		columnArray[uint8], columnArray[uint16], columnArray[uint32], columnArray[uint64],
-		i64RangeArray, i64RunningSumArray, i64SegmentArray, i64PeriodicIndexArray, i64ProductArray, i64BucketArray, i64XrankArray:
+		i64RangeArray, i64RunningSumArray, i64SegmentArray, i64PeriodicIndexArray, i64ProductArray, i64BucketArray, i64XrankArray, i64FillArray,
+		fbyI64BroadcastArray, fbyI64TiledBroadcastArray:
 		return true
 	case matrixRowArray:
 		return isIntegerArray(a.matrix.data)
@@ -9298,6 +9539,8 @@ func isDenseIntegerArray(array Array) bool {
 		return isDenseIntegerArray(a.array)
 	case tiledArray:
 		return isDenseIntegerArray(a.source)
+	case indexedArray:
+		return isDenseIntegerArray(a.source)
 	case i64SparseAmendArray:
 		return true
 	case i64ScalarDyadicArray:
@@ -9306,7 +9549,8 @@ func isDenseIntegerArray(array Array) bool {
 		return true
 	case columnArray[int8], columnArray[int16], columnArray[int32], columnArray[int64],
 		columnArray[uint8], columnArray[uint16], columnArray[uint32], columnArray[uint64],
-		i64RangeArray, i64RunningSumArray, i64SegmentArray, i64PeriodicIndexArray, i64ProductArray, i64BucketArray, i64XrankArray:
+		i64RangeArray, i64RunningSumArray, i64SegmentArray, i64PeriodicIndexArray, i64ProductArray, i64BucketArray, i64XrankArray, i64FillArray,
+		fbyI64BroadcastArray, fbyI64TiledBroadcastArray:
 		return true
 	case matrixRowArray:
 		return isDenseIntegerArray(a.matrix.data)
@@ -9340,7 +9584,17 @@ func integerArrayAt(array Array, row int) (int64, bool, error) {
 	switch a := array.(type) {
 	case attributedArray:
 		return integerArrayAt(a.array, row)
+	case indexedArray:
+		index, ok, err := i64IndexArrayAt(a.indexes, row)
+		if err != nil || !ok {
+			return 0, ok, err
+		}
+		return integerArrayAt(a.source, index)
 	case i64SparseAmendArray:
+		return a.i64At(row)
+	case fbyI64BroadcastArray:
+		return a.i64At(row)
+	case fbyI64TiledBroadcastArray:
 		return a.i64At(row)
 	case i64BucketArray:
 		return a.i64At(row)

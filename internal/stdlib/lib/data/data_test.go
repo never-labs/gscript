@@ -4031,6 +4031,58 @@ func TestTryTypedFbySumTotalAndGroupCount(t *testing.T) {
 	}
 }
 
+func TestTryTypedFbySumUsesComputedI64BucketGroups(t *testing.T) {
+	values := NewI64([]int64{10, 20, 30, 40, 50, 60})
+	buckets := i64BucketArray{source: NewI64([]int64{20, 25, 49, 50, 74, 75}), width: 25, len: 6}
+	out, ok, err := TryTypedFbySum(values, buckets)
+	if err != nil || !ok {
+		t.Fatalf("TryTypedFbySum bucket handled=%v err=%v; want true,nil", ok, err)
+	}
+	if got, want := out.Values(), []any{int64(10), int64(50), int64(50), int64(90), int64(90), int64(60)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("bucket fby sum values = %#v, want %#v", got, want)
+	}
+	total, ok, err := TryTypedFbySumTotal(values, buckets)
+	if err != nil || !ok {
+		t.Fatalf("TryTypedFbySumTotal bucket handled=%v err=%v; want true,nil", ok, err)
+	}
+	if total != int64(350) {
+		t.Fatalf("TryTypedFbySumTotal bucket = %#v, want 350", total)
+	}
+}
+
+func TestTryTypedAmendAddIndexesI64AccumulatesRepeatedIndexes(t *testing.T) {
+	amended, handled, err := TryTypedAmendAddIndexes(NewI64Range(0, 1, 6), []int{2, 4, 2}, NewI64([]int64{10, 40, 3}))
+	if err != nil || !handled {
+		t.Fatalf("TryTypedAmendAddIndexes handled=%v err=%v; want true,nil", handled, err)
+	}
+	if got, want := amended.Values(), []any{int64(0), int64(1), int64(15), int64(3), int64(44), int64(5)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("amend-add values = %#v, want %#v", got, want)
+	}
+}
+
+func TestTryTypedAmendAddIndexesI64UsesSparseOverlay(t *testing.T) {
+	amended, handled, err := TryTypedAmendAddIndexes(NewI64Range(0, 1, 16), []int{2, 4, 7}, NewI64([]int64{20, 40, 70}))
+	if err != nil || !handled {
+		t.Fatalf("TryTypedAmendAddIndexes handled=%v err=%v; want true,nil", handled, err)
+	}
+	if _, ok := amended.(i64SparseAmendArray); !ok {
+		t.Fatalf("TryTypedAmendAddIndexes returned %T, want i64SparseAmendArray", amended)
+	}
+	if got, want := amended.Values(), []any{int64(0), int64(1), int64(22), int64(3), int64(44), int64(5), int64(6), int64(77), int64(8), int64(9), int64(10), int64(11), int64(12), int64(13), int64(14), int64(15)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("sparse amend-add values = %#v, want %#v", got, want)
+	}
+}
+
+func TestTryTypedAmendAddIndexesF64Scalar(t *testing.T) {
+	amended, handled, err := TryTypedAmendAddIndexes(NewF64([]float64{1.5, 2.5, 3.5}), []int{2}, 0.5)
+	if err != nil || !handled {
+		t.Fatalf("TryTypedAmendAddIndexes handled=%v err=%v; want true,nil", handled, err)
+	}
+	if got, want := amended.Values(), []any{float64(1.5), float64(2.5), float64(4)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("amend-add f64 values = %#v, want %#v", got, want)
+	}
+}
+
 func TestTryTypedBoolLogical(t *testing.T) {
 	out, ok, err := TryTypedBoolLogical("and", NewBool([]bool{true, false, true}), NewBool([]bool{true, true, false}))
 	if err != nil || !ok {

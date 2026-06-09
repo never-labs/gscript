@@ -3493,6 +3493,164 @@ func TryTypedAmendIndexes(array Array, indexes []int, values []any) (Array, bool
 	}
 }
 
+// TryTypedAmendAddIndexes applies @[array; indexes; +; values] as a typed
+// indexed accumulation. Repeated indexes are accumulated in q order.
+func TryTypedAmendAddIndexes(array Array, indexes []int, values any) (Array, bool, error) {
+	if array == nil {
+		return nil, true, fmt.Errorf("amend array is nil")
+	}
+	switch array.Kind() {
+	case KindI64:
+		if out, ok, err := tryTypedSparseI64AmendAdd(array, indexes, values); ok || err != nil {
+			return out, ok, err
+		}
+		out := make([]int64, array.Len())
+		for row := range out {
+			value, ok, err := integerArrayAt(array, row)
+			if err != nil {
+				return nil, true, err
+			}
+			if !ok {
+				return nil, false, nil
+			}
+			out[row] = value
+		}
+		for row, index := range indexes {
+			if index < 0 || index >= len(out) {
+				return nil, true, fmt.Errorf("amend index %d out of range", index)
+			}
+			value, ok, err := typedAmendAddI64ValueAt(values, row, len(indexes))
+			if err != nil {
+				return nil, true, err
+			}
+			if !ok {
+				return nil, false, nil
+			}
+			out[index] += value
+		}
+		return newI64Trusted(out), true, nil
+	case KindF64:
+		out := make([]float64, array.Len())
+		for row := range out {
+			value, ok, err := typedAmendAddF64ArrayAt(array, row)
+			if err != nil {
+				return nil, true, err
+			}
+			if !ok {
+				return nil, false, nil
+			}
+			out[row] = value
+		}
+		for row, index := range indexes {
+			if index < 0 || index >= len(out) {
+				return nil, true, fmt.Errorf("amend index %d out of range", index)
+			}
+			value, ok, err := typedAmendAddF64ValueAt(values, row, len(indexes))
+			if err != nil {
+				return nil, true, err
+			}
+			if !ok {
+				return nil, false, nil
+			}
+			out[index] += value
+		}
+		return newF64Trusted(out), true, nil
+	default:
+		return nil, false, nil
+	}
+}
+
+func tryTypedSparseI64AmendAdd(array Array, indexes []int, values any) (Array, bool, error) {
+	const maxSparseAmendAddIndexes = 256
+	if !isDenseIntegerArray(array) || len(indexes) == 0 || len(indexes) > maxSparseAmendAddIndexes || len(indexes)*4 > array.Len() {
+		return nil, false, nil
+	}
+	nextValues := make([]int64, len(indexes))
+	prev := -1
+	for i, index := range indexes {
+		if index < 0 || index >= array.Len() {
+			return nil, true, fmt.Errorf("amend index %d out of range", index)
+		}
+		if index <= prev {
+			return nil, false, nil
+		}
+		prev = index
+		old, ok, err := integerArrayAt(array, index)
+		if err != nil {
+			return nil, true, err
+		}
+		if !ok {
+			return nil, false, nil
+		}
+		add, ok, err := typedAmendAddI64ValueAt(values, i, len(indexes))
+		if err != nil {
+			return nil, true, err
+		}
+		if !ok {
+			return nil, false, nil
+		}
+		nextValues[i] = old + add
+	}
+	return i64SparseAmendArray{
+		source:  array,
+		indexes: append([]int(nil), indexes...),
+		values:  nextValues,
+	}, true, nil
+}
+
+func typedAmendAddI64ValueAt(values any, row int, count int) (int64, bool, error) {
+	if count == 1 {
+		value, err := normalizeScalarForKind(KindI64, values, row)
+		if err != nil {
+			return 0, true, err
+		}
+		next, ok := value.(int64)
+		return next, ok, nil
+	}
+	array, ok := values.(Array)
+	if !ok {
+		return 0, false, nil
+	}
+	if array.Len() != count {
+		return 0, true, fmt.Errorf("amend value length mismatch")
+	}
+	return integerArrayAt(array, row)
+}
+
+func typedAmendAddF64ValueAt(values any, row int, count int) (float64, bool, error) {
+	if count == 1 {
+		value, err := normalizeScalarForKind(KindF64, values, row)
+		if err != nil {
+			return 0, true, err
+		}
+		next, ok := value.(float64)
+		return next, ok, nil
+	}
+	array, ok := values.(Array)
+	if !ok {
+		return 0, false, nil
+	}
+	if array.Len() != count {
+		return 0, true, fmt.Errorf("amend value length mismatch")
+	}
+	return typedAmendAddF64ArrayAt(array, row)
+}
+
+func typedAmendAddF64ArrayAt(array Array, row int) (float64, bool, error) {
+	value, ok := array.At(row)
+	if !ok {
+		return 0, false, fmt.Errorf("array row %d out of range", row)
+	}
+	if IsNull(value) {
+		return 0, false, nil
+	}
+	next, ok := numeric(value)
+	if !ok {
+		return 0, false, nil
+	}
+	return next, true, nil
+}
+
 func tryTypedSparseI64Amend(array Array, indexes []int, values []any) (Array, bool, error) {
 	if !isDenseIntegerArray(array) || len(indexes) == 0 || len(indexes)*4 > array.Len() {
 		return nil, false, nil
