@@ -2556,7 +2556,22 @@ func newF64DyadicScalarReducer(op string, scalar float64, scalarLeft bool) (f64D
 	switch op {
 	case NumericDyadicXExp:
 		if scalarLeft {
-			return f64DyadicScalarReducer{}, false
+			switch scalar {
+			case 2:
+				return f64DyadicScalarReducer{apply: math.Exp2}, true
+			case 1:
+				return f64DyadicScalarReducer{apply: func(float64) float64 {
+					return 1
+				}}, true
+			default:
+				if scalar <= 0 {
+					return f64DyadicScalarReducer{}, false
+				}
+				logBase := math.Log(scalar)
+				return f64DyadicScalarReducer{apply: func(value float64) float64 {
+					return math.Exp(logBase * value)
+				}}, true
+			}
 		}
 		switch scalar {
 		case 2:
@@ -2635,15 +2650,7 @@ func f64DyadicScalarProducerSumFast(producer f64NumericProducer, reducer f64Dyad
 		}
 		return total, true, nil
 	case f64I64ScalarDyadicProducer:
-		var total float64
-		for row := 0; row < p.values.len; row++ {
-			value, ok, err := p.values.i64At(row)
-			if err != nil || !ok {
-				return 0, true, err
-			}
-			total += reducer.apply(float64(value))
-		}
-		return total, true, nil
+		return f64DyadicScalarReducerI64ScalarDyadicSum(p.values, reducer)
 	case f64DyadicProducer:
 		return f64DyadicScalarNestedProducerSumFast(p, reducer)
 	default:
@@ -2674,6 +2681,8 @@ func f64DyadicScalarProducerRatiosSumFast(producer f64NumericProducer, reducer f
 	case f64DyadicProducer:
 		total, err := f64DyadicScalarNestedProducerRatiosSumFast(p, reducer)
 		return total, true, err
+	case f64I64ScalarDyadicProducer:
+		return f64DyadicScalarReducerI64ScalarDyadicRatiosSum(p.values, reducer)
 	default:
 		return 0, false, nil
 	}
@@ -2693,6 +2702,115 @@ func f64DyadicScalarReducerSumFloat[T floatScalar](values []T, reducer f64Dyadic
 		total += reducer.apply(float64(value))
 	}
 	return total
+}
+
+func f64DyadicScalarReducerI64ScalarDyadicSum(values i64ScalarDyadicArray, reducer f64DyadicScalarReducer) (float64, bool, error) {
+	source, ok := values.source.(i64RangeArray)
+	if !ok || source.len != values.len {
+		var total float64
+		for row := 0; row < values.len; row++ {
+			value, ok, err := values.i64At(row)
+			if err != nil || !ok {
+				return 0, true, err
+			}
+			total += reducer.apply(float64(value))
+		}
+		return total, true, nil
+	}
+	var total float64
+	for row := 0; row < values.len; row++ {
+		value, err := f64I64ScalarDyadicRangeValue(source, values, row)
+		if err != nil {
+			return 0, true, err
+		}
+		total += reducer.apply(value)
+	}
+	return total, true, nil
+}
+
+func f64DyadicScalarReducerI64ScalarDyadicRatiosSum(values i64ScalarDyadicArray, reducer f64DyadicScalarReducer) (float64, bool, error) {
+	if total, handled := f64DyadicScalarReducerI64ModuloRangeRatiosSum(values, reducer); handled {
+		return total, true, nil
+	}
+	source, isRange := values.source.(i64RangeArray)
+	var total float64
+	var previous float64
+	var hasPrevious bool
+	for row := 0; row < values.len; row++ {
+		var value float64
+		if isRange && source.len == values.len {
+			rangeValue, err := f64I64ScalarDyadicRangeValue(source, values, row)
+			if err != nil {
+				return 0, true, err
+			}
+			value = rangeValue
+		} else {
+			current, ok, err := values.i64At(row)
+			if err != nil || !ok {
+				return 0, true, err
+			}
+			value = float64(current)
+		}
+		current := reducer.apply(value)
+		if !hasPrevious {
+			total += current
+		} else {
+			total += current / previous
+		}
+		previous = current
+		hasPrevious = true
+	}
+	return total, true, nil
+}
+
+func f64DyadicScalarReducerI64ModuloRangeRatiosSum(values i64ScalarDyadicArray, reducer f64DyadicScalarReducer) (float64, bool) {
+	if values.op != OpMod || values.scalarLeft || values.scalar <= 0 || values.len <= 0 {
+		return 0, false
+	}
+	source, ok := values.source.(i64RangeArray)
+	if !ok || source.step != 1 || source.len != values.len {
+		return 0, false
+	}
+	modulus := values.scalar
+	if int64(int(modulus)) != modulus {
+		return 0, false
+	}
+	remaining := values.len
+	previousResidue := qPositiveMod(source.start, modulus)
+	previous := reducer.apply(float64(previousResidue))
+	total := previous
+	remaining--
+	if remaining == 0 {
+		return total, true
+	}
+	period := int(modulus)
+	if period <= 0 {
+		return 0, false
+	}
+	cycleSum := 0.0
+	residue := (previousResidue + 1) % modulus
+	cyclePrevious := previous
+	for i := 0; i < period; i++ {
+		current := reducer.apply(float64(residue))
+		cycleSum += current / cyclePrevious
+		cyclePrevious = current
+		residue = (residue + 1) % modulus
+	}
+	fullCycles := remaining / period
+	if fullCycles > 0 {
+		total += float64(fullCycles) * cycleSum
+		remaining -= fullCycles * period
+		previous = cyclePrevious
+		previousResidue = qPositiveMod(source.start+int64(fullCycles*period), modulus)
+	}
+	residue = (previousResidue + 1) % modulus
+	for i := 0; i < remaining; i++ {
+		current := reducer.apply(float64(residue))
+		total += current / previous
+		previous = current
+		residue = (residue + 1) % modulus
+	}
+	return total, true
 }
 
 func f64DyadicScalarNestedProducerSumFast(producer f64DyadicProducer, reducer f64DyadicScalarReducer) (float64, bool, error) {

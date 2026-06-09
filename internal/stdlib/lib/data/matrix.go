@@ -382,6 +382,50 @@ func TryReshapedMatrixCellNumericPlusCount(shape []int, source Array, row, col i
 	return nil, false, nil
 }
 
+// TryReshapedMatrixRowNumericSumCount reduces sum((shape#source)[row])+count
+// for a two-dimensional reshape without constructing the matrix or row views.
+func TryReshapedMatrixRowNumericSumCount(shape []int, source Array, row int) (any, bool, error) {
+	if source == nil {
+		return nil, false, nil
+	}
+	if len(shape) != 2 {
+		return nil, false, nil
+	}
+	rows, cols := shape[0], shape[1]
+	if rows < 0 || cols < 0 {
+		return nil, true, fmt.Errorf("reshape dimension must be non-negative")
+	}
+	if row < 0 || row >= rows {
+		return nil, true, fmt.Errorf("matrix row index %d out of range", row)
+	}
+	if source.Len() == 0 && cols > 0 {
+		return nil, true, fmt.Errorf("matrix row index %d out of range", row)
+	}
+	var totalFloat float64
+	var totalInt int64
+	integer := true
+	for col := 0; col < cols; col++ {
+		value, handled, err := arrayScalarAt(source, (row*cols+col)%source.Len())
+		if err != nil || !handled {
+			return nil, handled, err
+		}
+		n, ok := numeric(value)
+		if !ok {
+			return nil, false, nil
+		}
+		totalFloat += n
+		if intValue, ok := coerceInt64Exact(value); ok && integer {
+			totalInt += intValue
+			continue
+		}
+		integer = false
+	}
+	if integer {
+		return totalInt + int64(cols), true, nil
+	}
+	return totalFloat + float64(cols), true, nil
+}
+
 // MatrixMultiplyNumeric multiplies two numeric two-dimensional matrices. The
 // f64 result keeps the semantic layer simple while leaving a single replacement
 // point for future typed BLAS-style kernels.

@@ -3373,6 +3373,34 @@ func TestF64NumericProducerDirectReductions(t *testing.T) {
 	if got, want := ratiosSum.(float64), 1.0+2.0+2.0+2.0+0.125+2.0+2.0+2.0; math.Abs(got-want) > 1e-12 {
 		t.Fatalf("TryTypedRatiosSum lazy = %v, want %v", got, want)
 	}
+
+	offsetScaled, ok := applyI64RangeScalar(OpMod, i64RangeArray{start: 3, step: 1, len: 37}, 5, false)
+	if !ok {
+		t.Fatal("applyI64RangeScalar offset mod did not return typed array")
+	}
+	offsetLazy, handled, err := TryTypedQNumericDyadicFloat(NumericDyadicXExp, int64(2), offsetScaled)
+	if err != nil || !handled {
+		t.Fatalf("TryTypedQNumericDyadicFloat offset lazy = %#v,%v,%v; want handled nil error", offsetLazy, handled, err)
+	}
+	offsetRatiosSum, handled, err := TryTypedRatiosSum(offsetLazy)
+	if err != nil || !handled {
+		t.Fatalf("TryTypedRatiosSum offset lazy = %#v,%v,%v; want handled nil error", offsetRatiosSum, handled, err)
+	}
+	var expectedOffsetRatios float64
+	var previous float64
+	for row := 0; row < 37; row++ {
+		residue := qPositiveMod(3+int64(row), 5)
+		current := math.Exp2(float64(residue))
+		if row == 0 {
+			expectedOffsetRatios += current
+		} else {
+			expectedOffsetRatios += current / previous
+		}
+		previous = current
+	}
+	if got := offsetRatiosSum.(float64); math.Abs(got-expectedOffsetRatios) > 1e-12 {
+		t.Fatalf("TryTypedRatiosSum offset lazy = %v, want %v", got, expectedOffsetRatios)
+	}
 }
 
 func TestTypedDyadicBroadcastPromotionAndNullPropagation(t *testing.T) {

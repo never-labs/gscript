@@ -545,65 +545,29 @@ func (s *EvalState) tryEvalQScriptPipeline(descriptor *qScriptPipelineDescriptor
 		return nil, false, nil
 	}
 	shape := descriptor.shape()
-	recordRuntimeKernelExecution("QScriptPipelinePlan", shape, "attempt", "attempt")
 	if descriptor.kind == qScriptPipelineSequenceEdgeSum {
 		out, handled, err := s.evalQScriptSequenceEdgeSumPipeline(descriptor)
-		switch {
-		case err != nil:
-			recordRuntimeKernelExecution("QScriptPipelinePlan", shape, "error", "runtime_error")
-		case handled:
-			recordRuntimeKernelExecution("QScriptPipelinePlan", shape, "hit", "typed_pipeline")
-		default:
-			recordRuntimeKernelExecution("QScriptPipelinePlan", shape, "fallback", "unsupported_runtime_shape")
-		}
+		recordQScriptPipelineResult(shape, handled, err)
 		return out, handled, err
 	}
 	if descriptor.kind == qScriptPipelineSumPlusDyadicFloat {
 		out, handled, err := s.evalQScriptSumPlusDyadicFloatPipeline(descriptor)
-		switch {
-		case err != nil:
-			recordRuntimeKernelExecution("QScriptPipelinePlan", shape, "error", "runtime_error")
-		case handled:
-			recordRuntimeKernelExecution("QScriptPipelinePlan", shape, "hit", "typed_pipeline")
-		default:
-			recordRuntimeKernelExecution("QScriptPipelinePlan", shape, "fallback", "unsupported_runtime_shape")
-		}
+		recordQScriptPipelineResult(shape, handled, err)
 		return out, handled, err
 	}
 	if descriptor.kind == qScriptPipelineMatrixRowSumCount {
 		out, handled, err := s.evalQScriptMatrixRowSumCountPipeline(descriptor)
-		switch {
-		case err != nil:
-			recordRuntimeKernelExecution("QScriptPipelinePlan", shape, "error", "runtime_error")
-		case handled:
-			recordRuntimeKernelExecution("QScriptPipelinePlan", shape, "hit", "typed_pipeline")
-		default:
-			recordRuntimeKernelExecution("QScriptPipelinePlan", shape, "fallback", "unsupported_runtime_shape")
-		}
+		recordQScriptPipelineResult(shape, handled, err)
 		return out, handled, err
 	}
 	if descriptor.kind == qScriptPipelineMatrixCellPlusCount {
 		out, handled, err := s.evalQScriptMatrixCellPlusCountPipeline(descriptor)
-		switch {
-		case err != nil:
-			recordRuntimeKernelExecution("QScriptPipelinePlan", shape, "error", "runtime_error")
-		case handled:
-			recordRuntimeKernelExecution("QScriptPipelinePlan", shape, "hit", "typed_pipeline")
-		default:
-			recordRuntimeKernelExecution("QScriptPipelinePlan", shape, "fallback", "unsupported_runtime_shape")
-		}
+		recordQScriptPipelineResult(shape, handled, err)
 		return out, handled, err
 	}
 	if descriptor.kind == qScriptPipelineCallableDotSumRight {
 		out, handled, err := s.evalQScriptCallableDotSumPlusRightPipeline(descriptor)
-		switch {
-		case err != nil:
-			recordRuntimeKernelExecution("QScriptPipelinePlan", shape, "error", "runtime_error")
-		case handled:
-			recordRuntimeKernelExecution("QScriptPipelinePlan", shape, "hit", "typed_pipeline")
-		default:
-			recordRuntimeKernelExecution("QScriptPipelinePlan", shape, "fallback", "unsupported_runtime_shape")
-		}
+		recordQScriptPipelineResult(shape, handled, err)
 		return out, handled, err
 	}
 	terminal := descriptor.terminalPlan
@@ -631,15 +595,12 @@ func (s *EvalState) tryEvalQScriptPipeline(descriptor *qScriptPipelineDescriptor
 		s.env[s.resolveAssignmentName(assignment.name)] = value
 	}
 	out, handled, err := s.evalQScriptTerminalPipeline(descriptor, terminal)
-	switch {
-	case err != nil:
-		recordRuntimeKernelExecution("QScriptPipelinePlan", shape, "error", "runtime_error")
-	case handled:
-		recordRuntimeKernelExecution("QScriptPipelinePlan", shape, "hit", "typed_pipeline")
-	default:
-		recordRuntimeKernelExecution("QScriptPipelinePlan", shape, "fallback", "unsupported_runtime_shape")
-	}
+	recordQScriptPipelineResult(shape, handled, err)
 	return out, handled, err
+}
+
+func recordQScriptPipelineResult(shape string, handled bool, err error) {
+	recordRuntimeKernelProbeReason("QScriptPipelinePlan", shape, handled, err, RuntimeFallbackUnsupportedShape)
 }
 
 func (s *EvalState) evalQScriptSumPlusDyadicFloatPipeline(descriptor *qScriptPipelineDescriptor) (any, bool, error) {
@@ -696,8 +657,17 @@ func (s *EvalState) evalQScriptSumPlusDyadicFloatPipeline(descriptor *qScriptPip
 }
 
 func (s *EvalState) evalQScriptMatrixRowSumCountPipeline(descriptor *qScriptPipelineDescriptor) (any, bool, error) {
+	if assignment, ok := qScriptPipelineAssignmentByName(descriptor, descriptor.rowValueExpr); ok {
+		row, handled, err := s.evalQScriptScalarIndexPlan(&descriptor.rowIndexPlan)
+		if err != nil || !handled {
+			return nil, handled, err
+		}
+		if out, handled, err := s.evalQScriptReshapedMatrixRowSumCount(&assignment.binding, row); err != nil || handled {
+			return out, handled, err
+		}
+	}
 	for _, assignment := range descriptor.assignments {
-		if strings.TrimSpace(descriptor.valueExpr) == assignment.name {
+		if strings.TrimSpace(descriptor.valueExpr) == assignment.name || strings.TrimSpace(descriptor.rowValueExpr) == assignment.name {
 			continue
 		}
 		value, handled, err := s.evalQScriptBindingPlan(&assignment.binding)
@@ -740,6 +710,34 @@ func (s *EvalState) evalQScriptMatrixRowSumCountPipeline(descriptor *qScriptPipe
 	shape := qMatrixIndexShape(matrix, 1) + "/sum-count"
 	out, handled, err := data.TryMatrixRowNumericSumCount(matrix, indexes[0])
 	return qTypedRuntimeResultReason("MatrixRowSumCount", shape, RuntimeFallbackUnsupportedType, out, handled, err)
+}
+
+func (s *EvalState) evalQScriptReshapedMatrixRowSumCount(plan *qScriptBindingPlan, row int) (any, bool, error) {
+	if plan == nil || plan.kind != qScriptBindingBinary || plan.op != "#" || plan.left == nil || plan.right == nil {
+		return nil, false, nil
+	}
+	shapeValue, handled, err := s.evalQScriptBindingPlan(plan.left)
+	if err != nil || !handled {
+		return nil, handled, err
+	}
+	shape, err := qReshapeShape(shapeValue)
+	if err != nil {
+		return nil, true, err
+	}
+	if len(shape) != 2 {
+		return nil, false, nil
+	}
+	sourceValue, handled, err := s.evalQScriptBindingPlan(plan.right)
+	if err != nil || !handled {
+		return nil, handled, err
+	}
+	source, ok := sourceValue.(data.Array)
+	if !ok {
+		return nil, false, nil
+	}
+	kernelShape := "matrix-dot/reshape/" + qRuntimeCardinalityShape(shape[0]) + "x" + qRuntimeCardinalityShape(shape[1]) + "/1-index/sum-count"
+	out, handled, err := data.TryReshapedMatrixRowNumericSumCount(shape, source, row)
+	return qTypedRuntimeResultReason("MatrixRowSumCount", kernelShape, RuntimeFallbackUnsupportedType, out, handled, err)
 }
 
 func (s *EvalState) evalQScriptMatrixCellPlusCountPipeline(descriptor *qScriptPipelineDescriptor) (any, bool, error) {
@@ -893,23 +891,7 @@ func (s *EvalState) evalQScriptCallableDotSumPlusRightPipeline(descriptor *qScri
 }
 
 func (s *EvalState) evalQScriptSequenceEdgeSumPipeline(descriptor *qScriptPipelineDescriptor) (any, bool, error) {
-	for _, assignment := range descriptor.assignments {
-		if strings.TrimSpace(descriptor.valueExpr) == assignment.name {
-			continue
-		}
-		value, handled, err := s.evalQScriptBindingPlan(&assignment.binding)
-		if err != nil {
-			return nil, true, err
-		}
-		if !handled {
-			value, err = s.evalCachedOrString(assignment.rhs, assignment.valueExpr, &assignment.binding, nil)
-			if err != nil {
-				return nil, true, err
-			}
-		}
-		s.env[s.resolveAssignmentName(assignment.name)] = value
-	}
-	value, handled, err := s.evalQScriptBindingPlan(&descriptor.valuePlan)
+	value, handled, err := s.evalQScriptBindingPlanWithResolver(&descriptor.valuePlan, qScriptPipelineBindingResolver(descriptor))
 	if err != nil {
 		return nil, true, err
 	}
@@ -933,6 +915,24 @@ func (s *EvalState) evalQScriptSequenceEdgeSumPipeline(descriptor *qScriptPipeli
 	out, handled, err := data.TryTypedNumericSumFirstLast(array)
 	out, handled, err = qTypedRuntimeResultReason("SequenceEdgeReduce", shape, RuntimeFallbackUnsupportedType, out, handled, err)
 	return out, handled, err
+}
+
+func qScriptPipelineBindingResolver(descriptor *qScriptPipelineDescriptor) qScriptBindingNameResolver {
+	if descriptor == nil || len(descriptor.assignments) == 0 {
+		return nil
+	}
+	return func(name string) (*qScriptBindingPlan, bool, error) {
+		name = strings.TrimSpace(name)
+		if name == "" {
+			return nil, false, nil
+		}
+		for i := range descriptor.assignments {
+			if descriptor.assignments[i].name == name && descriptor.assignments[i].binding.kind != qScriptBindingInvalid {
+				return &descriptor.assignments[i].binding, true, nil
+			}
+		}
+		return nil, false, nil
+	}
 }
 
 func (s *EvalState) evalQScriptTerminalPipeline(descriptor *qScriptPipelineDescriptor, terminal qPipelinePlan) (any, bool, error) {

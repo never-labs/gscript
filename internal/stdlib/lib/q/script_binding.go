@@ -33,6 +33,8 @@ type qScriptBindingPlan struct {
 	cache          any
 }
 
+type qScriptBindingNameResolver func(name string) (*qScriptBindingPlan, bool, error)
+
 func buildQScriptBindingPlan(expr Expr) qScriptBindingPlan {
 	switch x := expr.(type) {
 	case nil:
@@ -161,6 +163,13 @@ func buildQScriptTransformBindingPlan(src string) qScriptBindingPlan {
 	if src == "" {
 		return qScriptBindingPlan{}
 	}
+	if strings.HasPrefix(src, "reverse ") && wordBoundary(src, 0, len("reverse")) {
+		valuePlan := buildQScriptBindingPlanForRHS(strings.TrimSpace(src[len("reverse "):]), nil)
+		if valuePlan.kind == qScriptBindingInvalid {
+			return qScriptBindingPlan{}
+		}
+		return qScriptBindingPlan{kind: qScriptBindingUnary, op: "reverse", left: &valuePlan}
+	}
 	if strings.HasPrefix(src, "drop ") && wordBoundary(src, 0, len("drop")) {
 		countExpr, valueExpr, ok := splitQScriptPrefixDyadicArgs(strings.TrimSpace(src[len("drop "):]))
 		if !ok {
@@ -177,7 +186,7 @@ func buildQScriptTransformBindingPlan(src string) qScriptBindingPlan {
 		return qScriptBindingBinaryPlan("drop", countPlan, valuePlan)
 	}
 	if left, right, ok := splitTopLevelWord(src, "rotate"); ok {
-		countPlan := buildQScriptScalarLiteralBindingPlan(left)
+		countPlan := buildQScriptBindingPlanForRHS(left, nil)
 		if countPlan.kind == qScriptBindingInvalid {
 			return qScriptBindingPlan{}
 		}
@@ -186,6 +195,17 @@ func buildQScriptTransformBindingPlan(src string) qScriptBindingPlan {
 			return qScriptBindingPlan{}
 		}
 		return qScriptBindingBinaryPlan("rotate", countPlan, valuePlan)
+	}
+	if left, right, ok := splitTopLevelWord(src, "sublist"); ok {
+		indexPlan := buildQScriptBindingPlanForRHS(left, nil)
+		if indexPlan.kind == qScriptBindingInvalid {
+			return qScriptBindingPlan{}
+		}
+		valuePlan := buildQScriptBindingPlanForRHS(right, nil)
+		if valuePlan.kind == qScriptBindingInvalid {
+			return qScriptBindingPlan{}
+		}
+		return qScriptBindingBinaryPlan("sublist", indexPlan, valuePlan)
 	}
 	return qScriptBindingPlan{}
 }
@@ -294,7 +314,14 @@ func buildQScriptRangeBindingPlan(src string) qScriptBindingPlan {
 }
 
 func buildQScriptScalarLiteralBindingPlan(src string) qScriptBindingPlan {
-	expr, ok, err := parseValueExpr(strings.TrimSpace(src))
+	src = strings.TrimSpace(src)
+	if value, _, err := parseNumberOrBool(src); err == nil {
+		plan := qScriptBindingPlan{kind: qScriptBindingLiteral, literal: value}
+		if _, ok := integerValue(plan.literal); ok {
+			return plan
+		}
+	}
+	expr, ok, err := parseValueExpr(src)
 	if err != nil || !ok {
 		return qScriptBindingPlan{}
 	}
@@ -313,6 +340,10 @@ func qScriptBindingBinaryPlan(op string, left, right qScriptBindingPlan) qScript
 }
 
 func (s *EvalState) evalQScriptBindingPlan(plan *qScriptBindingPlan) (any, bool, error) {
+	return s.evalQScriptBindingPlanWithResolver(plan, nil)
+}
+
+func (s *EvalState) evalQScriptBindingPlanWithResolver(plan *qScriptBindingPlan, resolver qScriptBindingNameResolver) (any, bool, error) {
 	if plan == nil {
 		return nil, false, nil
 	}
@@ -331,6 +362,15 @@ func (s *EvalState) evalQScriptBindingPlan(plan *qScriptBindingPlan) (any, bool,
 	case qScriptBindingLiteral:
 		return plan.literal, true, nil
 	case qScriptBindingName:
+		if resolver != nil {
+			resolved, ok, err := resolver(plan.name)
+			if err != nil || ok {
+				if err != nil || resolved == nil {
+					return nil, ok, err
+				}
+				return s.evalQScriptBindingPlanWithResolver(resolved, resolver)
+			}
+		}
 		value, ok := s.lookupName(plan.name)
 		if !ok {
 			return nil, false, nil
@@ -339,7 +379,7 @@ func (s *EvalState) evalQScriptBindingPlan(plan *qScriptBindingPlan) (any, bool,
 	case qScriptBindingVector:
 		values := make([]any, len(plan.items))
 		for i := range plan.items {
-			value, handled, err := s.evalQScriptBindingPlan(&plan.items[i])
+			value, handled, err := s.evalQScriptBindingPlanWithResolver(&plan.items[i], resolver)
 			if err != nil || !handled {
 				return nil, handled, err
 			}
@@ -351,15 +391,15 @@ func (s *EvalState) evalQScriptBindingPlan(plan *qScriptBindingPlan) (any, bool,
 			return value, handled, err
 		}
 	case qScriptBindingUnary:
-		value, handled, err = s.evalQScriptUnaryBinding(plan)
+		value, handled, err = s.evalQScriptUnaryBinding(plan, resolver)
 	case qScriptBindingBinary:
-		value, handled, err = s.evalQScriptBinaryBinding(plan)
+		value, handled, err = s.evalQScriptBinaryBinding(plan, resolver)
 	case qScriptBindingIndex:
-		collection, handled, err := s.evalQScriptBindingPlan(plan.left)
+		collection, handled, err := s.evalQScriptBindingPlanWithResolver(plan.left, resolver)
 		if err != nil || !handled {
 			return nil, handled, err
 		}
-		index, handled, err := s.evalQScriptBindingPlan(plan.right)
+		index, handled, err := s.evalQScriptBindingPlanWithResolver(plan.right, resolver)
 		if err != nil || !handled {
 			return nil, handled, err
 		}
@@ -386,13 +426,13 @@ func (s *EvalState) evalQScriptBindingPlan(plan *qScriptBindingPlan) (any, bool,
 	return value, handled, err
 }
 
-func (s *EvalState) evalQScriptUnaryBinding(plan *qScriptBindingPlan) (any, bool, error) {
+func (s *EvalState) evalQScriptUnaryBinding(plan *qScriptBindingPlan, resolver qScriptBindingNameResolver) (any, bool, error) {
 	if plan.op == "where" && plan.left != nil && plan.left.kind == qScriptBindingBinary && plan.left.op == "within" {
-		left, handled, err := s.evalQScriptBindingPlan(plan.left.left)
+		left, handled, err := s.evalQScriptBindingPlanWithResolver(plan.left.left, resolver)
 		if err != nil || !handled {
 			return nil, handled, err
 		}
-		right, handled, err := s.evalQScriptBindingPlan(plan.left.right)
+		right, handled, err := s.evalQScriptBindingPlanWithResolver(plan.left.right, resolver)
 		if err != nil || !handled {
 			return nil, handled, err
 		}
@@ -407,7 +447,7 @@ func (s *EvalState) evalQScriptUnaryBinding(plan *qScriptBindingPlan) (any, bool
 			return out, true, err
 		}
 	}
-	arg, handled, err := s.evalQScriptBindingPlan(plan.left)
+	arg, handled, err := s.evalQScriptBindingPlanWithResolver(plan.left, resolver)
 	if err != nil || !handled {
 		return nil, handled, err
 	}
@@ -443,12 +483,12 @@ func (s *EvalState) evalQScriptUnaryBinding(plan *qScriptBindingPlan) (any, bool
 	return out, true, err
 }
 
-func (s *EvalState) evalQScriptBinaryBinding(plan *qScriptBindingPlan) (any, bool, error) {
-	left, handled, err := s.evalQScriptBindingPlan(plan.left)
+func (s *EvalState) evalQScriptBinaryBinding(plan *qScriptBindingPlan, resolver qScriptBindingNameResolver) (any, bool, error) {
+	left, handled, err := s.evalQScriptBindingPlanWithResolver(plan.left, resolver)
 	if err != nil || !handled {
 		return nil, handled, err
 	}
-	right, handled, err := s.evalQScriptBindingPlan(plan.right)
+	right, handled, err := s.evalQScriptBindingPlanWithResolver(plan.right, resolver)
 	if err != nil || !handled {
 		return nil, handled, err
 	}
@@ -474,6 +514,10 @@ func (s *EvalState) evalQScriptBinaryBinding(plan *qScriptBindingPlan) (any, boo
 	}
 	if plan.op == "rotate" {
 		out, err := rotateValue(left, right)
+		return out, true, err
+	}
+	if plan.op == "sublist" {
+		out, err := qSublistValue(left, right)
 		return out, true, err
 	}
 	if plan.op == "and" || plan.op == "or" {
