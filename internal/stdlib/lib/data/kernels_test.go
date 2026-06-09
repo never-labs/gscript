@@ -2748,6 +2748,27 @@ func TestTypedNumericUnaryBinaryAndAggregates(t *testing.T) {
 		t.Fatalf("TryTypedNumericSums range values = %v, want %v", got, want)
 	}
 
+	modValues, ok, err := TryTypedIntegerDyadic(OpMod, NewI64Range(0, 1, 8), int64(3))
+	if err != nil {
+		t.Fatalf("TryTypedIntegerDyadic range mod scalar returned error: %v", err)
+	}
+	if !ok {
+		t.Fatal("TryTypedIntegerDyadic range mod scalar was not handled")
+	}
+	modScan, ok, err := TryTypedNumericSums(modValues.(Array))
+	if err != nil {
+		t.Fatalf("TryTypedNumericSums lazy dyadic returned error: %v", err)
+	}
+	if !ok || modScan.Kind() != KindI64 {
+		t.Fatalf("TryTypedNumericSums lazy dyadic kind = %s, %v; want i64, true", modScan.Kind(), ok)
+	}
+	if _, ok := modScan.(i64ScalarDyadicRunningSumArray); !ok {
+		t.Fatalf("TryTypedNumericSums lazy dyadic returned %T, want i64ScalarDyadicRunningSumArray", modScan)
+	}
+	if got, want := modScan.Values(), []any{int64(0), int64(1), int64(3), int64(3), int64(4), int64(6), int64(6), int64(7)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("TryTypedNumericSums lazy dyadic values = %v, want %v", got, want)
+	}
+
 	total, count, ok, err = typedKernels.NumericSumRows(NewI64Range(10, 2, 5), []int{4, 0, 2})
 	if err != nil {
 		t.Fatalf("range NumericSumRows returned error: %v", err)

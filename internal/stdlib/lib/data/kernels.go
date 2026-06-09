@@ -3008,6 +3008,8 @@ func (k typedKernelRegistry) NumericSumValue(array Array) (any, bool, error) {
 		return i64RangeSum(a), true, nil
 	case i64ScalarDyadicArray:
 		return i64ScalarDyadicSum(a)
+	case i64ScalarDyadicRunningSumArray:
+		return i64ScalarDyadicRunningSumSum(a)
 	case i64SparseAmendArray:
 		return i64SparseAmendSum(a)
 	case i64FillArray:
@@ -3499,6 +3501,8 @@ func (k typedKernelRegistry) NumericSums(array Array) (Array, bool, error) {
 		return numericSumsInteger(a.data), true, nil
 	case i64RangeArray:
 		return i64RunningSumArray{source: a}, true, nil
+	case i64ScalarDyadicArray:
+		return i64ScalarDyadicRunningSumArray{source: a}, true, nil
 	case f64RangeArray:
 		return f64RunningSumArray{source: a}, true, nil
 	case columnArray[uint8]:
@@ -5635,6 +5639,12 @@ func (typedKernelRegistry) NumericAt(array Array, row int) (float64, bool, error
 			return 0, ok, err
 		}
 		return float64(value), true, nil
+	case i64ScalarDyadicRunningSumArray:
+		value, ok, err := a.i64At(row)
+		if err != nil || !ok {
+			return 0, ok, err
+		}
+		return float64(value), true, nil
 	case tiledArray:
 		if row < 0 || row >= a.len || a.source.Len() == 0 {
 			return 0, false, fmt.Errorf("array row %d out of range", row)
@@ -5769,7 +5779,7 @@ func isNumericArray(array Array) bool {
 		columnArray[uint8], columnArray[uint16], columnArray[uint32], columnArray[uint64],
 		columnArray[float32], columnArray[float64], i64RangeArray, f64RangeArray,
 		i64RunningSumArray, f64RunningSumArray, i64SegmentArray, i64ProductArray,
-		i64ScalarDyadicArray:
+		i64ScalarDyadicArray, i64ScalarDyadicRunningSumArray:
 		return true
 	case nullableArray:
 		for i := 0; i < array.Len(); i++ {
@@ -6129,6 +6139,8 @@ func isIntegerArray(array Array) bool {
 		return true
 	case i64ScalarDyadicArray:
 		return true
+	case i64ScalarDyadicRunningSumArray:
+		return true
 	case columnArray[int8], columnArray[int16], columnArray[int32], columnArray[int64],
 		columnArray[uint8], columnArray[uint16], columnArray[uint32], columnArray[uint64],
 		i64RangeArray, i64RunningSumArray, i64SegmentArray, i64PeriodicIndexArray, i64ProductArray:
@@ -6161,6 +6173,8 @@ func isDenseIntegerArray(array Array) bool {
 	case i64SparseAmendArray:
 		return true
 	case i64ScalarDyadicArray:
+		return true
+	case i64ScalarDyadicRunningSumArray:
 		return true
 	case columnArray[int8], columnArray[int16], columnArray[int32], columnArray[int64],
 		columnArray[uint8], columnArray[uint16], columnArray[uint32], columnArray[uint64],
@@ -6215,6 +6229,8 @@ func integerArrayAt(array Array, row int) (int64, bool, error) {
 			return 0, false, fmt.Errorf("array row %d out of range", row)
 		}
 		return value, true, nil
+	case i64ScalarDyadicRunningSumArray:
+		return a.i64At(row)
 	case i64SegmentArray:
 		value, ok := a.i64At(row)
 		if !ok {
@@ -8640,6 +8656,10 @@ type i64ScalarDyadicArray struct {
 	len        int
 }
 
+type i64ScalarDyadicRunningSumArray struct {
+	source i64ScalarDyadicArray
+}
+
 func (a i64ScalarDyadicArray) Kind() Kind { return KindI64 }
 
 func (a i64ScalarDyadicArray) Len() int { return a.len }
@@ -8687,23 +8707,91 @@ func (a i64ScalarDyadicArray) i64At(row int) (int64, bool, error) {
 	return applyI64ScalarDyadicValue(a.op, value, a.scalar, a.scalarLeft)
 }
 
+func (a i64ScalarDyadicRunningSumArray) Kind() Kind { return KindI64 }
+
+func (a i64ScalarDyadicRunningSumArray) Len() int { return a.source.len }
+
+func (a i64ScalarDyadicRunningSumArray) At(row int) (any, bool) {
+	value, ok, err := a.i64At(row)
+	if err != nil || !ok {
+		return nil, false
+	}
+	return value, true
+}
+
+func (a i64ScalarDyadicRunningSumArray) Values() []any {
+	out := make([]any, a.Len())
+	for row := range out {
+		value, ok, err := a.i64At(row)
+		if err != nil || !ok {
+			panic(fmt.Sprintf("data scalar dyadic running sum row %d out of range", row))
+		}
+		out[row] = value
+	}
+	return out
+}
+
+func (a i64ScalarDyadicRunningSumArray) Gather(indexes []int) Array {
+	out := make([]int64, len(indexes))
+	for i, row := range indexes {
+		value, ok, err := a.i64At(row)
+		if err != nil || !ok {
+			panic(fmt.Sprintf("data scalar dyadic running sum gather row %d out of range", row))
+		}
+		out[i] = value
+	}
+	return newI64Trusted(out)
+}
+
+func (a i64ScalarDyadicRunningSumArray) i64At(row int) (int64, bool, error) {
+	if row < 0 || row >= a.source.len {
+		return 0, false, fmt.Errorf("running sum row %d out of range", row)
+	}
+	return i64ScalarDyadicRangeSumI64(a.source, 0, row+1)
+}
+
+func i64ScalarDyadicRunningSumSum(array i64ScalarDyadicRunningSumArray) (int64, bool, error) {
+	var total int64
+	for row := 0; row < array.Len(); row++ {
+		value, ok, err := array.i64At(row)
+		if err != nil || !ok {
+			return 0, ok, err
+		}
+		total += value
+	}
+	return total, true, nil
+}
+
 func i64ScalarDyadicRangeSum(array i64ScalarDyadicArray, start, length int) (any, bool, error) {
 	if length == 0 {
 		return NullValue, true, nil
+	}
+	if out, handled, err := i64ScalarDyadicRangeSumI64(array, start, length); handled || err != nil {
+		return out, handled, err
+	}
+	return nil, false, nil
+}
+
+func i64ScalarDyadicRangeSumI64(array i64ScalarDyadicArray, start, length int) (int64, bool, error) {
+	if length == 0 {
+		return 0, true, nil
 	}
 	if start == 0 && length == array.len {
 		if out, handled := i64ScalarDyadicWholeRangeSum(array); handled {
 			return out, true, nil
 		}
 	}
+	if out, handled := i64ScalarDyadicModuloRangeSum(array, start, length); handled {
+		return out, true, nil
+	}
 	sourceRows := i64RangeArray{start: int64(start), step: 1, len: length}
 	sourceSumValue, handled, err := typedIntegerSumContiguousRange(array.source, sourceRows)
 	if err != nil || !handled {
-		return nil, handled, err
+		return 0, handled, err
 	}
 	sourceSum, ok := sourceSumValue.(int64)
 	if !ok {
-		return nil, false, nil
+		return 0, false, nil
 	}
 	n := int64(length)
 	switch array.op {
@@ -8720,7 +8808,7 @@ func i64ScalarDyadicRangeSum(array i64ScalarDyadicArray, start, length int) (any
 	case OpMul:
 		return sourceSum * array.scalar, true, nil
 	default:
-		return nil, false, nil
+		return 0, false, nil
 	}
 }
 
@@ -8743,6 +8831,17 @@ func i64ScalarDyadicWholeRangeSum(array i64ScalarDyadicArray) (int64, bool) {
 		return 0, false
 	}
 	return i64RangePositiveModSum(rangeSource.start, array.len, array.scalar), true
+}
+
+func i64ScalarDyadicModuloRangeSum(array i64ScalarDyadicArray, start, length int) (int64, bool) {
+	if array.op != OpMod || array.scalarLeft || array.scalar <= 0 || length < 0 {
+		return 0, false
+	}
+	rangeSource, ok := array.source.(i64RangeArray)
+	if !ok || rangeSource.step != 1 {
+		return 0, false
+	}
+	return i64RangePositiveModSum(rangeSource.start+int64(start), length, array.scalar), true
 }
 
 func i64RangePositiveModSum(start int64, length int, modulus int64) int64 {

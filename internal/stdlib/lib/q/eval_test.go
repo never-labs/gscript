@@ -469,6 +469,7 @@ func TestEvalDeferredScanAssignmentTerminalLast(t *testing.T) {
 	assertEvalValue(t, "x:5 4 0N 7;m:maxs x;last m", int64(7))
 	assertEvalValue(t, "x:1 2 0N 5;a:avgs x;last a", float64(8)/3)
 	assertEvalArray(t, "x:1 2 3;scan:+\\x;scan", data.KindI64, []any{int64(1), int64(3), int64(6)})
+	assertEvalValue(t, "x:(til 8) mod 3;scan:+\\x;last scan+count scan", int64(15))
 	assertEvalValue(t, "x:1+til 8;scan:+\\x;scan:10 20;last scan", int64(20))
 
 	seen := false
