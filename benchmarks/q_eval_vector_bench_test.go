@@ -1870,6 +1870,488 @@ func appendQEvalOrdinaryExpressionCoverageCases(cases []qEvalVectorCase) []qEval
 		)
 	}
 
+	return appendQEvalDeepExpressionCombinationCases(cases)
+}
+
+func appendQEvalDeepExpressionCombinationCases(cases []qEvalVectorCase) []qEvalVectorCase {
+	for _, p := range []struct {
+		name  string
+		scale int64
+		bias  int64
+		mod   int64
+	}{
+		{"A", 2, 7, 5},
+		{"B", 3, -11, 7},
+		{"C", 5, 13, 11},
+		{"D", 9, -17, 13},
+	} {
+		p := p
+		cases = append(cases,
+			qEvalVectorCase{
+				name:   "DeepNumericAffineModuloWhere" + p.name,
+				tags:   []string{"numeric-vector", "where", "word-dyadic", "sum"},
+				matrix: []string{"numeric-arithmetic:int-vector:hot", "compare:int-vector:where"},
+				shapes: []string{"where:gather-reduce-selectivity:row-scaled"},
+				expr: func(rows int) string {
+					return fmt.Sprintf("x:til %d;y:(x*%d)+%d;idx:where (y mod %d)>1;(+/y[idx])+count idx", rows, p.scale, p.bias, p.mod)
+				},
+				goFn: func(rows int) int64 {
+					var sum, count int64
+					for i := int64(0); i < int64(rows); i++ {
+						y := i*p.scale + p.bias
+						if qPositiveMod(y, p.mod) > 1 {
+							sum += y
+							count++
+						}
+					}
+					return sum + count
+				},
+			},
+			qEvalVectorCase{
+				name:   "DeepNumericFloorCeilingEnvelope" + p.name,
+				tags:   []string{"numeric-vector", "numeric-monad", "sum", "promotion"},
+				matrix: []string{"numeric-arithmetic:float-vector:hot"},
+				expr: func(rows int) string {
+					return fmt.Sprintf("x:(til %d)*0.25;y:x+%d.5;(+/floor y)+(+/ceiling y)+count y", rows, p.scale)
+				},
+				goFn: func(rows int) int64 {
+					var floors, ceilings int64
+					for i := 0; i < rows; i++ {
+						y := float64(i)*0.25 + float64(p.scale) + 0.5
+						floors += int64(math.Floor(y))
+						ceilings += int64(math.Ceil(y))
+					}
+					return floors + ceilings + int64(rows)
+				},
+			},
+			qEvalVectorCase{
+				name:   "DeepNumericSignumNotMask" + p.name,
+				tags:   []string{"numeric-vector", "numeric-monad", "where", "boolean-logical"},
+				matrix: []string{"numeric-arithmetic:int-vector:hot", "compare:int-vector:where"},
+				shapes: []string{"logical:mask-composition:row-scaled"},
+				expr: func(rows int) string {
+					return fmt.Sprintf("x:(til %d) mod %d;m:x mod 2;(+/m)+count where not m", rows, p.mod)
+				},
+				goFn: func(rows int) int64 {
+					var sum, notCount int64
+					for i := 0; i < rows; i++ {
+						x := int64(i) % p.mod
+						sum += x % 2
+						if x%2 == 0 {
+							notCount++
+						}
+					}
+					return sum + notCount
+				},
+			},
+		)
+	}
+
+	for _, p := range []struct {
+		name  string
+		take  int
+		drop  int
+		shift int
+	}{
+		{"Small", 17, 3, 5},
+		{"Medium", 257, 128, 31},
+		{"Wide", 1025, 513, 257},
+		{"Cycle", 9000, 1024, 997},
+	} {
+		p := p
+		cases = append(cases,
+			qEvalVectorCase{
+				name:   "DeepTakeDropRotateSum" + p.name,
+				tags:   []string{"take", "drop", "rotate", "sum"},
+				matrix: []string{"list:cut-raze-enlist:nested"},
+				shapes: []string{"pipeline:vector-transform-reduce:sum"},
+				expr: func(rows int) string {
+					return fmt.Sprintf("x:til %d;r:%d rotate x;y:%d#drop %d r;(+/y)+first y+last y", rows, p.shift, p.take, p.drop)
+				},
+				goFn: func(rows int) int64 {
+					shift := p.shift % rows
+					rotatedLen := rows - p.drop
+					var sum, first, last int64
+					for i := 0; i < p.take; i++ {
+						value := int64((shift + p.drop + (i % rotatedLen)) % rows)
+						if i == 0 {
+							first = value
+						}
+						if i == p.take-1 {
+							last = value
+						}
+						sum += value
+					}
+					return sum + first + last
+				},
+			},
+			qEvalVectorCase{
+				name:   "DeepReverseWhereWindowCount" + p.name,
+				tags:   []string{"reverse", "where", "composite-compare", "boolean-logical"},
+				matrix: []string{"compare:int-vector:where"},
+				shapes: []string{"logical:mask-composition:row-scaled"},
+				expr: func(rows int) string {
+					lo := rows / 4
+					hi := lo + p.take%1024
+					return fmt.Sprintf("x:reverse til %d;count where (x>=%d) and x<%d", rows, lo, hi)
+				},
+				goFn: func(rows int) int64 {
+					lo := rows / 4
+					hi := lo + p.take%1024
+					var count int64
+					for i := rows - 1; i >= 0; i-- {
+						if i >= lo && i < hi {
+							count++
+						}
+					}
+					return count
+				},
+			},
+			qEvalVectorCase{
+				name:   "DeepRotateModuloGatherSum" + p.name,
+				tags:   []string{"rotate", "where", "projection", "word-dyadic", "sum"},
+				matrix: []string{"compare:int-vector:where"},
+				shapes: []string{"index:gather-after-where:row-scaled"},
+				expr: func(rows int) string {
+					return fmt.Sprintf("x:%d rotate til %d;idx:where (x mod 9)=4;(+/x[idx])+count idx", p.shift, rows)
+				},
+				goFn: func(rows int) int64 {
+					shift := p.shift % rows
+					var sum, count int64
+					for i := 0; i < rows; i++ {
+						value := int64((shift + i) % rows)
+						if value%9 == 4 {
+							sum += value
+							count++
+						}
+					}
+					return sum + count
+				},
+			},
+		)
+	}
+
+	for _, p := range []struct {
+		name  string
+		width int64
+		lo    int64
+		hi    int64
+	}{
+		{"Fine", 5, 100, 250},
+		{"Ten", 10, 1000, 2000},
+		{"Minute", 60, 1800, 3600},
+		{"Kilo", 1000, 2000, 6000},
+	} {
+		p := p
+		cases = append(cases,
+			qEvalVectorCase{
+				name:   "DeepXbarWithinCount" + p.name,
+				tags:   []string{"xbar", "bin-within-xrank", "where"},
+				matrix: []string{"temporal:xbar:bucket", "compare:int-vector:where"},
+				expr: func(rows int) string {
+					return fmt.Sprintf("x:til %d;b:%d xbar x;count where b within %d %d", rows, p.width, p.lo, p.hi)
+				},
+				goFn: func(rows int) int64 {
+					var count int64
+					for i := int64(0); i < int64(rows); i++ {
+						bucket := floorBucket(i, p.width)
+						if bucket >= p.lo && bucket <= p.hi {
+							count++
+						}
+					}
+					return count
+				},
+			},
+			qEvalVectorCase{
+				name:   "DeepBinBucketProbeSum" + p.name,
+				tags:   []string{"find-bin", "xbar", "sum"},
+				matrix: []string{"search:bin-binr-find:vector"},
+				expr: func(rows int) string {
+					return fmt.Sprintf("x:%d*til %d;p:til %d;+/x bin p", p.width, rows, rows)
+				},
+				goFn: func(rows int) int64 {
+					var sum int64
+					for probe := int64(0); probe < int64(rows); probe++ {
+						sum += probe / p.width
+					}
+					return sum
+				},
+			},
+			qEvalVectorCase{
+				name:   "DeepXrankModuloSum" + p.name,
+				tags:   []string{"bin-within-xrank", "word-dyadic", "sum"},
+				matrix: []string{"sort:int-vector:index-rank"},
+				expr: func(rows int) string {
+					return fmt.Sprintf("x:(til %d) mod %d;count 10 xrank x", rows, p.width*10)
+				},
+				goFn: func(rows int) int64 {
+					return int64(rows)
+				},
+			},
+		)
+	}
+
+	for _, p := range []struct {
+		name    string
+		pattern string
+		width   int
+		aHits   map[int]bool
+		inHits  map[int]bool
+	}{
+		{"Tech", "`aapl`msft`amd`nvda`amzn", 5, map[int]bool{0: true, 2: true, 4: true}, map[int]bool{0: true, 2: true}},
+		{"Venue", "`xnys`xnas`bats`arcx`edgx", 5, map[int]bool{3: true}, map[int]bool{0: true, 2: true}},
+		{"Side", "`buy`sell`hold`buy`sell", 5, map[int]bool{}, map[int]bool{0: true, 3: true}},
+	} {
+		p := p
+		cases = append(cases,
+			qEvalVectorCase{
+				name:   "DeepStringUpperLikeCount" + p.name,
+				tags:   []string{"string", "symbol", "match-like", "where"},
+				matrix: []string{"compare:string-vector:where"},
+				shapes: []string{"string:symbol-string-like:row-scaled"},
+				expr: func(rows int) string {
+					return fmt.Sprintf("syms:%d#%s;names:upper string syms;count where names like \"A*\"", rows, p.pattern)
+				},
+				goFn: func(rows int) int64 {
+					return qPatternCount(rows, p.width, p.aHits)
+				},
+			},
+			qEvalVectorCase{
+				name:   "DeepSymbolMembershipProjection" + p.name,
+				tags:   []string{"symbol", "membership", "where", "projection", "sum"},
+				matrix: []string{"compare:symbol-vector:where", "membership:in-differ-ratios:vector"},
+				shapes: []string{"membership:symbol-filter:row-scaled"},
+				expr: func(rows int) string {
+					return fmt.Sprintf("syms:%d#%s;v:til %d;idx:where syms in `aapl`amd`xnys`bats`buy;(+/v[idx])+count idx", rows, p.pattern, rows)
+				},
+				goFn: func(rows int) int64 {
+					var sum, count int64
+					for i := 0; i < rows; i++ {
+						if p.inHits[i%p.width] {
+							sum += int64(i)
+							count++
+						}
+					}
+					return sum + count
+				},
+			},
+			qEvalVectorCase{
+				name:   "DeepSymbolDistinctAfterRotate" + p.name,
+				tags:   []string{"symbol", "distinct", "rotate"},
+				matrix: []string{"set:symbol-vector:union-inter-except"},
+				expr: func(rows int) string {
+					return fmt.Sprintf("syms:%d#%s;count distinct 17 rotate syms", rows, p.pattern)
+				},
+				goFn: func(rows int) int64 {
+					seen := make(map[int]struct{}, p.width)
+					for i := 0; i < p.width; i++ {
+						seen[i] = struct{}{}
+					}
+					if p.name == "Side" {
+						return 3
+					}
+					return int64(len(seen))
+				},
+			},
+		)
+	}
+
+	for _, p := range []struct {
+		name   string
+		values string
+		pred   string
+		hit    func(i int) bool
+		width  int
+	}{
+		{"DateWindow", "2026.06.01 2026.06.02 2026.06.03 2026.06.04", "d within 2026.06.02 2026.06.03", func(i int) bool { return i%4 == 1 || i%4 == 2 }, 4},
+		{"MonthWindow", "2026.06m 2026.07m 2026.08m 2026.09m", "d within 2026.07m 2026.08m", func(i int) bool { return i%4 == 1 || i%4 == 2 }, 4},
+		{"TimeGE", "09:30 09:31 09:32 09:33 09:34", "d>=09:32", func(i int) bool { return i%5 >= 2 }, 5},
+	} {
+		p := p
+		cases = append(cases,
+			qEvalVectorCase{
+				name:   "DeepTemporalWhereProjection" + p.name,
+				tags:   []string{"temporal", "where", "projection", "sum"},
+				matrix: []string{"compare:temporal-vector:where"},
+				expr: func(rows int) string {
+					return fmt.Sprintf("d:%d#%s;v:til %d;idx:where %s;(+/v[idx])+count idx", rows, p.values, rows, p.pred)
+				},
+				goFn: func(rows int) int64 {
+					var sum, count int64
+					for i := 0; i < rows; i++ {
+						if p.hit(i) {
+							sum += int64(i)
+							count++
+						}
+					}
+					return sum + count
+				},
+			},
+			qEvalVectorCase{
+				name:   "DeepTemporalReverseCount" + p.name,
+				tags:   []string{"temporal", "reverse", "where"},
+				matrix: []string{"compare:temporal-vector:where"},
+				expr: func(rows int) string {
+					return fmt.Sprintf("d:reverse %d#%s;count where %s", rows, p.values, p.pred)
+				},
+				goFn: func(rows int) int64 {
+					var count int64
+					for i := rows - 1; i >= 0; i-- {
+						if p.hit(i) {
+							count++
+						}
+					}
+					return count
+				},
+			},
+		)
+	}
+
+	for _, p := range []struct {
+		name   string
+		values string
+		fill   int64
+		width  int
+		nulls  map[int]bool
+		value  func(i int) int64
+	}{
+		{"Ints", "0Ni 1i 2i 0Ni 4i", 8, 5, map[int]bool{0: true, 3: true}, func(i int) int64 { return int64([]int{8, 1, 2, 8, 4}[i%5]) }},
+		{"Longs", "0Nj 10 20 30 0Nj", 6, 5, map[int]bool{0: true, 4: true}, func(i int) int64 { return int64([]int{6, 10, 20, 30, 6}[i%5]) }},
+	} {
+		p := p
+		cases = append(cases,
+			qEvalVectorCase{
+				name:   "DeepNullFillWhereSum" + p.name,
+				tags:   []string{"typed-null", "fill", "where", "sum"},
+				matrix: []string{"numeric-arithmetic:typed-null:hot", "list:prev-next-deltas-fills:typed-null"},
+				shapes: []string{"null:fill-arithmetic-where:row-scaled"},
+				expr: func(rows int) string {
+					return fmt.Sprintf("x:%d#%s;y:%d^x;(+/y)+count where null x", rows, p.values, p.fill)
+				},
+				goFn: func(rows int) int64 {
+					var sum, nulls int64
+					for i := 0; i < rows; i++ {
+						value := p.value(i)
+						sum += value
+						if p.nulls[i%p.width] {
+							nulls++
+						}
+					}
+					return sum + nulls
+				},
+			},
+			qEvalVectorCase{
+				name:   "DeepDeltasFillsChecksum" + p.name,
+				tags:   []string{"adverb-each-prior", "fill", "typed-null", "sum"},
+				matrix: []string{"list:prev-next-deltas-fills:typed-null"},
+				expr: func(rows int) string {
+					return fmt.Sprintf("x:%d#%s;(+/fills x)+count deltas fills x", rows, p.values)
+				},
+				goFn: func(rows int) int64 {
+					var sum, last int64
+					haveLast := false
+					raw := make([]int64, p.width)
+					isNull := make([]bool, p.width)
+					for i := 0; i < p.width; i++ {
+						isNull[i] = p.nulls[i]
+						if !isNull[i] {
+							raw[i] = p.value(i)
+						}
+					}
+					for i := 0; i < rows; i++ {
+						pos := i % p.width
+						if !isNull[pos] {
+							last = raw[pos]
+							haveLast = true
+						}
+						if haveLast {
+							sum += last
+						}
+					}
+					return sum + int64(rows)
+				},
+			},
+		)
+	}
+
+	cases = append(cases,
+		qEvalVectorCase{
+			name:   "DeepAdverbEachLeftRightChecksum",
+			tags:   []string{"adverb-each", "adverb-each-left-right", "sum"},
+			matrix: []string{"adverb:dyadic-each:vector", "adverb:each-left-right:vector"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("x:til %d;(+/100-\\:x)+(+/x-/:100)", rows)
+			},
+			goFn: func(rows int) int64 {
+				var sum int64
+				for i := 0; i < rows; i++ {
+					sum += 100 - int64(i)
+					sum += int64(i) - 100
+				}
+				return sum
+			},
+		},
+		qEvalVectorCase{
+			name:   "DeepAdverbEachPairwiseArithmetic",
+			tags:   []string{"adverb-each", "numeric-vector", "sum"},
+			matrix: []string{"adverb:dyadic-each:vector"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("x:til %d;y:(x*2)+1;+/x+'y", rows)
+			},
+			goFn: func(rows int) int64 {
+				var sum int64
+				for i := 0; i < rows; i++ {
+					sum += int64(i) + int64(i*2+1)
+				}
+				return sum
+			},
+		},
+		qEvalVectorCase{
+			name:   "DeepOverScanProjectionChecksum",
+			tags:   []string{"adverb-over-scan", "projection", "sum"},
+			matrix: []string{"adverb:over-scan:projection"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("x:1+til %d;s:+\\x;({x+y}/[10;x])+last s+count s", rows)
+			},
+			goFn: func(rows int) int64 {
+				var sum int64 = 10
+				var scan int64
+				for i := 1; i <= rows; i++ {
+					sum += int64(i)
+					scan += int64(i)
+				}
+				return sum + scan + int64(rows)
+			},
+		},
+		qEvalVectorCase{
+			name:   "DeepSetUnionInterExceptSymbols",
+			tags:   []string{"set-verb", "symbol", "membership"},
+			matrix: []string{"set:symbol-vector:union-inter-except"},
+			expr: func(rows int) string {
+				return "(count `a`b`c`a union `b`d`e)+(count `a`b`c`a inter `c`a`x)+(count `a`b`c`a except `b`x)+(count where `a`b`c`d in `a`d)"
+			},
+			goFn: func(rows int) int64 {
+				return 5 + 2 + 3 + 2
+			},
+		},
+		qEvalVectorCase{
+			name:   "DeepSortRankGatherChecksum",
+			tags:   []string{"table-sort", "projection", "sum"},
+			matrix: []string{"sort:int-vector:index-rank"},
+			shapes: []string{"sort:index-gather:row-scaled"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("x:(%d-1)-til %d;idx:iasc x;y:x[idx];(+/rank y)+first y+last y", rows, rows)
+			},
+			goFn: func(rows int) int64 {
+				var rankSum int64
+				for i := 0; i < rows; i++ {
+					rankSum += int64(i)
+				}
+				return rankSum + int64(0) + int64(rows-1)
+			},
+		},
+	)
+
 	return cases
 }
 
