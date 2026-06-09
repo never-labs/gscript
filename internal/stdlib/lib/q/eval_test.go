@@ -1038,7 +1038,7 @@ func TestEvalTypedCasts(t *testing.T) {
 	})
 
 	assertEvalErrorContains(t, "`short$40000", "q cast")
-	assertEvalErrorContains(t, "`int$1.5", "q cast")
+	assertEvalValue(t, "`int$1.5", int32(1))
 	assertEvalErrorContains(t, "\"I\"$\"42.5\"", "q cast")
 }
 
@@ -3886,9 +3886,30 @@ func TestEvalConditionalSpecialForms(t *testing.T) {
 	assertEvalValue(t, "$[0;2;3]", int64(3))
 	assertEvalValue(t, "?[1;2;3]", int64(2))
 	assertEvalValue(t, "?[0;2;3]", int64(3))
+	assertEvalValue(t, "a:$[1;2;3];a+10", int64(12))
+	assertEvalValue(t, "a:?[0;2;3];a+10", int64(13))
+	assertEvalValue(t, "$[1;$[0;9;8];3]", int64(8))
+	assertEvalValue(t, "?[0;2;?[1;4;5]]", int64(4))
 	assertEvalValue(t, "f:{$[x>0;1;-1]};f[2]", int64(1))
 	assertEvalValue(t, "f:{?[x>0;1;-1]};f[-2]", int64(-1))
+	assertEvalValue(t, "f:{[x]a:$[x>0;1;2];a+10};f[-2]", int64(12))
+	assertEvalValue(t, "f:{[x;y]$[x>y;x;y]};f[2;5]", int64(5))
+	assertEvalValue(t, "f:{[x;y]x+y};f[$[1;2;3];?[0;4;5]]", int64(7))
 	assertEvalValue(t, "$[1;42;1%0]", int64(42))
+}
+
+func TestQSemicolonSplitRespectsNestedBracketForms(t *testing.T) {
+	got := splitQScriptStatements("a:$[1;2;3];b:?[0;4;5];a+b")
+	want := []string{"a:$[1;2;3]", "b:?[0;4;5]", "a+b"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("script statements = %#v, want %#v", got, want)
+	}
+
+	got = splitQBracketFormArgs("x>0;$[y;1;2];?[z;3;4]")
+	want = []string{"x>0", "$[y;1;2]", "?[z;3;4]"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("bracket args = %#v, want %#v", got, want)
+	}
 }
 
 func TestEvalControlSpecialForms(t *testing.T) {

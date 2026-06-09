@@ -615,10 +615,7 @@ func EvalSourceCacheable(src string) bool {
 	}
 	scan := qEvalCacheScanText(src)
 	lower := strings.ToLower(scan)
-	parts := splitTopLevelDelim(lower, ';')
-	if len(parts) == 0 {
-		parts = []string{lower}
-	}
+	parts := splitQScriptStatements(lower)
 	for _, part := range parts {
 		part = strings.TrimSpace(part)
 		if part == "" {
@@ -842,10 +839,7 @@ func ClearEvalPlanCaches() {
 }
 
 func buildQScriptPlan(src string) qScriptPlan {
-	parts := splitTopLevelDelim(src, ';')
-	if len(parts) == 0 {
-		parts = []string{strings.TrimSpace(src)}
-	}
+	parts := splitQScriptStatements(src)
 	statements := make([]qScriptStatement, 0, len(parts))
 	deferScanCandidates := false
 	for _, part := range parts {
@@ -1415,7 +1409,7 @@ func (s *EvalState) evalConditionalSpecialForm(src string) (any, bool, error) {
 	if len(src) < 4 || (src[0] != '$' && src[0] != '?') || src[1] != '[' || src[len(src)-1] != ']' {
 		return nil, false, nil
 	}
-	args := splitTopLevelDelim(src[2:len(src)-1], ';')
+	args := splitQBracketFormArgs(src[2 : len(src)-1])
 	if len(args) != 3 {
 		return nil, true, fmt.Errorf("%c[] conditional expects three arguments", src[0])
 	}
@@ -1442,7 +1436,7 @@ func (s *EvalState) evalControlSpecialForm(src string) (any, bool, error) {
 	}
 	switch name {
 	case "if":
-		args := splitTopLevelDelim(inner, ';')
+		args := splitQBracketFormArgs(inner)
 		if len(args) != 2 {
 			return nil, true, fmt.Errorf("if[] expects condition and body")
 		}
@@ -1460,7 +1454,7 @@ func (s *EvalState) evalControlSpecialForm(src string) (any, bool, error) {
 		out, err := s.evalScript(args[1])
 		return out, true, err
 	case "do":
-		args := splitTopLevelDelim(inner, ';')
+		args := splitQBracketFormArgs(inner)
 		if len(args) != 2 {
 			return nil, true, fmt.Errorf("do[] expects count and body")
 		}
@@ -1481,7 +1475,7 @@ func (s *EvalState) evalControlSpecialForm(src string) (any, bool, error) {
 		}
 		return out, true, nil
 	case "while":
-		args := splitTopLevelDelim(inner, ';')
+		args := splitQBracketFormArgs(inner)
 		if len(args) != 2 {
 			return nil, true, fmt.Errorf("while[] expects condition and body")
 		}
@@ -3453,6 +3447,22 @@ func splitTopLevelDelim(src string, sep byte) []string {
 		return nil
 	}
 	parts = append(parts, strings.TrimSpace(src[start:]))
+	return parts
+}
+
+func splitQScriptStatements(src string) []string {
+	parts := splitTopLevelDelim(src, ';')
+	if len(parts) == 0 {
+		return []string{strings.TrimSpace(src)}
+	}
+	return parts
+}
+
+func splitQBracketFormArgs(src string) []string {
+	parts := splitTopLevelDelim(src, ';')
+	if parts == nil {
+		return []string{strings.TrimSpace(src)}
+	}
 	return parts
 }
 
@@ -6475,10 +6485,7 @@ func (s *EvalState) applyCallableIndex(fn any, argSrc string) (any, error) {
 }
 
 func (s *EvalState) parseCallableArgs(src string) ([]projectionArg, bool, error) {
-	parts := splitTopLevelDelim(src, ';')
-	if parts == nil {
-		parts = []string{strings.TrimSpace(src)}
-	}
+	parts := splitQBracketFormArgs(src)
 	args := make([]projectionArg, len(parts))
 	hasMissing := false
 	for i, part := range parts {
@@ -6837,9 +6844,9 @@ func lambdaSignature(src string) ([]string, string, error) {
 			return nil, "", fmt.Errorf("lambda parameter list is not closed")
 		}
 		paramSrc := strings.TrimSpace(src[1:end])
-		parts := splitTopLevelDelim(paramSrc, ';')
-		if parts == nil && paramSrc != "" {
-			parts = []string{paramSrc}
+		parts := []string(nil)
+		if paramSrc != "" {
+			parts = splitQBracketFormArgs(paramSrc)
 		}
 		params := make([]string, 0, len(parts))
 		for _, part := range parts {
@@ -8088,7 +8095,7 @@ func (s *EvalState) evalAmend(src string) (any, error) {
 		return nil, fmt.Errorf("amend expects @[dict;key;op;value]")
 	}
 	inner := strings.TrimSpace(src[2 : len(src)-1])
-	parts := splitTopLevelDelim(inner, ';')
+	parts := splitQBracketFormArgs(inner)
 	if len(parts) != 4 {
 		return nil, fmt.Errorf("amend expects @[dict;key;op;value]")
 	}
@@ -8119,7 +8126,7 @@ func (s *EvalState) evalDotAmend(src string) (any, error) {
 		return nil, fmt.Errorf("dot amend expects .[dict;path;op;value]")
 	}
 	inner := strings.TrimSpace(src[2 : len(src)-1])
-	parts := splitTopLevelDelim(inner, ';')
+	parts := splitQBracketFormArgs(inner)
 	if len(parts) != 4 {
 		return nil, fmt.Errorf("dot amend expects .[dict;path;op;value]")
 	}
