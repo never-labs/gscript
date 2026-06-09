@@ -891,7 +891,23 @@ func (s *EvalState) evalQScriptCallableDotSumPlusRightPipeline(descriptor *qScri
 }
 
 func (s *EvalState) evalQScriptSequenceEdgeSumPipeline(descriptor *qScriptPipelineDescriptor) (any, bool, error) {
-	value, handled, err := s.evalQScriptBindingPlanWithResolver(&descriptor.valuePlan, qScriptPipelineBindingResolver(descriptor))
+	for _, assignment := range descriptor.assignments {
+		if strings.TrimSpace(descriptor.valueExpr) == assignment.name {
+			continue
+		}
+		value, handled, err := s.evalQScriptBindingPlan(&assignment.binding)
+		if err != nil {
+			return nil, true, err
+		}
+		if !handled {
+			value, err = s.evalCachedOrString(assignment.rhs, assignment.valueExpr, &assignment.binding, nil)
+			if err != nil {
+				return nil, true, err
+			}
+		}
+		s.env[s.resolveAssignmentName(assignment.name)] = value
+	}
+	value, handled, err := s.evalQScriptBindingPlan(&descriptor.valuePlan)
 	if err != nil {
 		return nil, true, err
 	}
@@ -915,24 +931,6 @@ func (s *EvalState) evalQScriptSequenceEdgeSumPipeline(descriptor *qScriptPipeli
 	out, handled, err := data.TryTypedNumericSumFirstLast(array)
 	out, handled, err = qTypedRuntimeResultReason("SequenceEdgeReduce", shape, RuntimeFallbackUnsupportedType, out, handled, err)
 	return out, handled, err
-}
-
-func qScriptPipelineBindingResolver(descriptor *qScriptPipelineDescriptor) qScriptBindingNameResolver {
-	if descriptor == nil || len(descriptor.assignments) == 0 {
-		return nil
-	}
-	return func(name string) (*qScriptBindingPlan, bool, error) {
-		name = strings.TrimSpace(name)
-		if name == "" {
-			return nil, false, nil
-		}
-		for i := range descriptor.assignments {
-			if descriptor.assignments[i].name == name && descriptor.assignments[i].binding.kind != qScriptBindingInvalid {
-				return &descriptor.assignments[i].binding, true, nil
-			}
-		}
-		return nil, false, nil
-	}
 }
 
 func (s *EvalState) evalQScriptTerminalPipeline(descriptor *qScriptPipelineDescriptor, terminal qPipelinePlan) (any, bool, error) {

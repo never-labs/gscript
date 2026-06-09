@@ -401,6 +401,18 @@ func TryReshapedMatrixRowNumericSumCount(shape []int, source Array, row int) (an
 	if source.Len() == 0 && cols > 0 {
 		return nil, true, fmt.Errorf("matrix row index %d out of range", row)
 	}
+	if source.Len() >= row*cols+cols {
+		switch values := source.(type) {
+		case i64RangeArray:
+			first := values.start + int64(row*cols)*values.step
+			total := int64(cols) * (2*first + int64(cols-1)*values.step) / 2
+			return total + int64(cols), true, nil
+		case f64RangeArray:
+			first := values.start + float64(row*cols)*values.step
+			total := float64(cols) * (2*first + float64(cols-1)*values.step) / 2
+			return total + float64(cols), true, nil
+		}
+	}
 	var totalFloat float64
 	var totalInt int64
 	integer := true

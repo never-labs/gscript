@@ -12,6 +12,12 @@ const (
 	SequenceTransformRatios  = "ratios"
 )
 
+type SequenceTransformStep struct {
+	Transform string
+	Args      [2]int
+	ArgCount  int
+}
+
 // SequenceItems exposes scalar-or-array inputs as a flat item slice for
 // language frontends that support scalar extension over list operations.
 func SequenceItems(value any) []any {
@@ -170,6 +176,151 @@ func TryTypedSequenceTransformNumericSum(transform string, args []int, value any
 	default:
 		return nil, false, nil
 	}
+}
+
+// TryTypedSequenceTransformChainNumericSumFirstLast reduces
+// sum(chain(value))+first(chain(value))+last(chain(value)) for index-only list
+// transforms without constructing intermediate views. The primitive is shared by
+// q and Leia frontends that lower expression DAGs to sequence pipeline shapes.
+func TryTypedSequenceTransformChainNumericSumFirstLast(steps []SequenceTransformStep, value any) (any, bool, error) {
+	array, ok := value.(Array)
+	if !ok || len(steps) == 0 {
+		return nil, false, nil
+	}
+	if len(steps) > 8 {
+		return nil, false, nil
+	}
+	var lengths [9]int
+	lengths[0] = array.Len()
+	for i, step := range steps {
+		next, handled, err := sequenceTransformStepLength(lengths[i], step)
+		if err != nil || !handled {
+			return nil, handled, err
+		}
+		lengths[i+1] = next
+	}
+	finalLen := lengths[len(steps)]
+	if finalLen == 0 {
+		return nil, false, nil
+	}
+	if isIntegerArray(array) {
+		var total int64
+		var first int64
+		var last int64
+		for row := 0; row < finalLen; row++ {
+			sourceRow, ok, err := sequenceTransformSourceRow(row, steps, lengths)
+			if err != nil || !ok {
+				return nil, ok, err
+			}
+			value, ok, err := integerArrayAt(array, sourceRow)
+			if err != nil || !ok {
+				return nil, ok, err
+			}
+			if row == 0 {
+				first = value
+			}
+			if row == finalLen-1 {
+				last = value
+			}
+			total += value
+		}
+		return total + first + last, true, nil
+	}
+	var total float64
+	var first float64
+	var last float64
+	for row := 0; row < finalLen; row++ {
+		sourceRow, ok, err := sequenceTransformSourceRow(row, steps, lengths)
+		if err != nil || !ok {
+			return nil, ok, err
+		}
+		raw, ok := array.At(sourceRow)
+		if !ok {
+			return nil, false, fmt.Errorf("array row %d out of range", sourceRow)
+		}
+		value, ok := numeric(raw)
+		if !ok {
+			return nil, false, nil
+		}
+		if row == 0 {
+			first = value
+		}
+		if row == finalLen-1 {
+			last = value
+		}
+		total += value
+	}
+	return total + first + last, true, nil
+}
+
+func sequenceTransformStepLength(length int, step SequenceTransformStep) (int, bool, error) {
+	switch step.Transform {
+	case SequenceTransformReverse, SequenceTransformRotate:
+		return length, true, nil
+	case SequenceTransformSublist:
+		switch step.ArgCount {
+		case 1:
+			if length == 0 || step.Args[0] == 0 {
+				return 0, true, nil
+			}
+			count := step.Args[0]
+			if count < 0 {
+				count = -count
+			}
+			return count, true, nil
+		case 2:
+			if step.Args[0] < 0 || step.Args[1] < 0 {
+				return 0, true, fmt.Errorf("sublist expects non-negative start and count")
+			}
+			_, count := boundedStartCount(length, step.Args[0], step.Args[1])
+			return count, true, nil
+		default:
+			return 0, true, fmt.Errorf("sublist expects count or start count")
+		}
+	default:
+		return 0, false, nil
+	}
+}
+
+func sequenceTransformSourceRow(row int, steps []SequenceTransformStep, lengths [9]int) (int, bool, error) {
+	for i := len(steps) - 1; i >= 0; i-- {
+		step := steps[i]
+		prevLen := lengths[i]
+		if prevLen == 0 {
+			return 0, false, nil
+		}
+		switch step.Transform {
+		case SequenceTransformReverse:
+			row = prevLen - 1 - row
+		case SequenceTransformRotate:
+			shift := step.Args[0] % prevLen
+			if shift < 0 {
+				shift += prevLen
+			}
+			row = (shift + row) % prevLen
+		case SequenceTransformSublist:
+			switch step.ArgCount {
+			case 1:
+				start := 0
+				if step.Args[0] < 0 {
+					count := -step.Args[0]
+					start = prevLen - count%prevLen
+					if start == prevLen {
+						start = 0
+					}
+				}
+				row = (start + row) % prevLen
+			case 2:
+				start, _ := boundedStartCount(prevLen, step.Args[0], step.Args[1])
+				row = start + row
+			default:
+				return 0, false, fmt.Errorf("sublist expects count or start count")
+			}
+		default:
+			return 0, false, nil
+		}
+	}
+	return row, true, nil
 }
 
 // FlattenNestedArray returns a lazy raze view for matrices and nested arrays.

@@ -2609,6 +2609,21 @@ func TestTypedNumericUnaryBinaryAndAggregates(t *testing.T) {
 		t.Fatalf("TryTypedNumericSumFirstLast sequence view = %v (%T), want %v", got, got, want)
 	}
 
+	chainComposite, ok, err := TryTypedSequenceTransformChainNumericSumFirstLast([]SequenceTransformStep{
+		{Transform: SequenceTransformRotate, Args: [2]int{17}, ArgCount: 1},
+		{Transform: SequenceTransformReverse},
+		{Transform: SequenceTransformSublist, Args: [2]int{128}, ArgCount: 1},
+	}, NewI64Range(0, 1, 1024))
+	if err != nil {
+		t.Fatalf("TryTypedSequenceTransformChainNumericSumFirstLast returned error: %v", err)
+	}
+	if !ok {
+		t.Fatal("TryTypedSequenceTransformChainNumericSumFirstLast was not handled")
+	}
+	if got, want := chainComposite, int64(108513); got != want {
+		t.Fatalf("TryTypedSequenceTransformChainNumericSumFirstLast = %v (%T), want %v", got, got, want)
+	}
+
 	tiledFloats, err := TakeRepeat(NewF64([]float64{0, 1.5}), 7)
 	if err != nil {
 		t.Fatalf("Take tiled floats returned error: %v", err)

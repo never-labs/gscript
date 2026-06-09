@@ -3955,6 +3955,9 @@ func splitTopLevelOperator(src, op string) (string, string, bool) {
 			braceDepth--
 		default:
 			if parenDepth == 0 && bracketDepth == 0 && braceDepth == 0 && strings.HasPrefix(src[i:], op) {
+				if len(op) == 1 && (op == "+" || op == "-") && isSign(src, i) {
+					continue
+				}
 				left := strings.TrimSpace(src[:i])
 				right := strings.TrimSpace(src[i+len(op):])
 				return left, right, left != "" && right != ""
