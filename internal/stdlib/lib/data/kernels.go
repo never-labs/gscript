@@ -867,6 +867,8 @@ func TryTypedTrueCount(mask Array) (int64, bool, error) {
 		return TryTypedTrueCount(a.array)
 	case i64RangeCompareMask:
 		return a.trueCount(), true, nil
+	case i64ScalarDyadicCompareMask:
+		return a.trueCount()
 	case boolLogicalMask:
 		return a.trueCount()
 	case notMask:
@@ -5091,6 +5093,9 @@ func compareDyadic(op Op, left, right any, length int) (Array, bool, error) {
 	if out, ok := compareI64RangeScalarDyadic(op, left, right, length); ok {
 		return out, true, nil
 	}
+	if out, ok := compareI64ScalarDyadicScalarDyadic(op, left, right, length); ok {
+		return out, true, nil
+	}
 	out := make([]bool, length)
 	for i := 0; i < length; i++ {
 		lv, ok, err := operandAt(left, i)
@@ -5122,6 +5127,80 @@ func compareDyadic(op Op, left, right any, length int) (Array, bool, error) {
 		out[i] = keep
 	}
 	return newBoolTrusted(out), true, nil
+}
+
+type i64ScalarDyadicCompareMask struct {
+	values     i64ScalarDyadicArray
+	op         Op
+	scalar     int64
+	scalarLeft bool
+}
+
+func (a i64ScalarDyadicCompareMask) Kind() Kind { return KindBool }
+
+func (a i64ScalarDyadicCompareMask) Len() int { return a.values.len }
+
+func (a i64ScalarDyadicCompareMask) At(row int) (any, bool) {
+	if row < 0 || row >= a.values.len {
+		return nil, false
+	}
+	value, ok, err := a.valueAt(row)
+	if err != nil || !ok {
+		return nil, false
+	}
+	return value, true
+}
+
+func (a i64ScalarDyadicCompareMask) Values() []any {
+	out := make([]any, a.values.len)
+	for row := range out {
+		value, ok, err := a.valueAt(row)
+		if err != nil || !ok {
+			panic(fmt.Sprintf("data scalar dyadic compare row %d out of range", row))
+		}
+		out[row] = value
+	}
+	return out
+}
+
+func (a i64ScalarDyadicCompareMask) Gather(indexes []int) Array {
+	out := make([]bool, len(indexes))
+	for i, row := range indexes {
+		if row < 0 || row >= a.values.len {
+			panic(fmt.Sprintf("data scalar dyadic compare gather index %d out of range", row))
+		}
+		value, ok, err := a.valueAt(row)
+		if err != nil || !ok {
+			panic(fmt.Sprintf("data scalar dyadic compare row %d out of range", row))
+		}
+		out[i] = value
+	}
+	return newBoolTrusted(out)
+}
+
+func (a i64ScalarDyadicCompareMask) valueAt(row int) (bool, bool, error) {
+	value, ok, err := a.values.i64At(row)
+	if err != nil || !ok {
+		return false, ok, err
+	}
+	if a.scalarLeft {
+		return boolCompare(a.op, a.scalar == value, compareInt64(a.scalar, value)), true, nil
+	}
+	return boolCompare(a.op, value == a.scalar, compareInt64(value, a.scalar)), true, nil
+}
+
+func (a i64ScalarDyadicCompareMask) trueCount() (int64, bool, error) {
+	var count int64
+	for row := 0; row < a.values.len; row++ {
+		keep, ok, err := a.valueAt(row)
+		if err != nil || !ok {
+			return 0, ok, err
+		}
+		if keep {
+			count++
+		}
+	}
+	return count, true, nil
 }
 
 type i64RangeCompareMask struct {
@@ -5177,6 +5256,27 @@ func (a i64RangeCompareMask) trueCount() int64 {
 		}
 	}
 	return count
+}
+
+func compareI64ScalarDyadicScalarDyadic(op Op, left, right any, length int) (Array, bool) {
+	leftValues, leftOK := left.(i64ScalarDyadicArray)
+	rightValues, rightOK := right.(i64ScalarDyadicArray)
+	leftScalar, leftScalarOK := integerScalarValue(left)
+	rightScalar, rightScalarOK := integerScalarValue(right)
+	switch {
+	case leftOK && rightScalarOK:
+		if leftValues.len != length {
+			return nil, false
+		}
+		return i64ScalarDyadicCompareMask{values: leftValues, op: op, scalar: rightScalar}, true
+	case leftScalarOK && rightOK:
+		if rightValues.len != length {
+			return nil, false
+		}
+		return i64ScalarDyadicCompareMask{values: rightValues, op: op, scalar: leftScalar, scalarLeft: true}, true
+	default:
+		return nil, false
+	}
 }
 
 func compareI64RangeScalarDyadic(op Op, left, right any, length int) (Array, bool) {
@@ -7754,6 +7854,11 @@ func boolArrayAt(array Array, row int) (bool, bool, error) {
 			return false, true, fmt.Errorf("logical row %d out of range", row)
 		}
 		return a.valueAt(row), true, nil
+	case i64ScalarDyadicCompareMask:
+		if row < 0 || row >= a.Len() {
+			return false, true, fmt.Errorf("logical row %d out of range", row)
+		}
+		return a.valueAt(row)
 	case boolLogicalMask:
 		return a.valueAt(row)
 	case notMask:
