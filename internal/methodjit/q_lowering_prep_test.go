@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/never-labs/leia/internal/runtime"
+	stdq "github.com/never-labs/leia/internal/stdlib/lib/q"
 	"github.com/never-labs/leia/internal/vm"
 )
 
@@ -5882,6 +5883,49 @@ func TestQEvalPipelinePlannerUsesQRuntimeDescriptor(t *testing.T) {
 	}
 }
 
+func TestQEvalPipelinePlannerCopiesFusedDescriptorFields(t *testing.T) {
+	bin, ok := qRuntimeEvalPipelinePlanner{}.DescribeQEvalPipeline("+/til 8 bin til 8")
+	if !ok {
+		t.Fatalf("DescribeQEvalPipeline did not recognize bin reduce pipeline")
+	}
+	if bin.Kind != "expression" ||
+		bin.Kernel != "QPipelinePlan" ||
+		bin.Shape != "bin-reduce/sum" ||
+		bin.LeftExpr != "til 8" ||
+		bin.RightExpr != "til 8" {
+		t.Fatalf("bin descriptor = %+v, want expression bin-reduce fields", bin)
+	}
+
+	modulo, ok := qRuntimeEvalPipelinePlanner{}.DescribeQEvalPipeline("count where (til 64 mod 4)=1")
+	if !ok {
+		t.Fatalf("DescribeQEvalPipeline did not recognize modulo count pipeline")
+	}
+	if modulo.Kind != "expression" ||
+		modulo.Kernel != "QPipelinePlan" ||
+		modulo.Shape != "compare-to-index-count-mod" ||
+		modulo.ModExpr != "til 64" ||
+		modulo.ModulusExpr != "4" ||
+		modulo.ModTargetExpr != "1" ||
+		modulo.CompareOp != "=" {
+		t.Fatalf("modulo descriptor = %+v, want expression modulo fields", modulo)
+	}
+
+	script, ok := qRuntimeEvalPipelinePlanner{}.DescribeQEvalPipeline("x:til 64;y:x+1;idx:where (x mod 4)=1;+/y[idx]")
+	if !ok {
+		t.Fatalf("DescribeQEvalPipeline did not recognize modulo script pipeline")
+	}
+	if script.Kind != "script" ||
+		script.Shape != "script-pipeline/where-index-reduce/sum/assignments" ||
+		script.ValueExpr != "y" ||
+		script.ValueBinding != "x+1" ||
+		script.IndexExpr != "idx" ||
+		script.IndexBinding != "where (x mod 4)=1" ||
+		script.MaskExpr != "(x mod 4)=1" ||
+		!strings.Contains(script.AssignmentText, "idx") {
+		t.Fatalf("script descriptor = %+v, want script modulo gather-reduce fields", script)
+	}
+}
+
 func TestQEvalPipelineRuntimeBackendExecutesTypedPlanRef(t *testing.T) {
 	ref := QEvalPipelinePlanRef{
 		ID:            0,
@@ -5898,6 +5942,62 @@ func TestQEvalPipelineRuntimeBackendExecutesTypedPlanRef(t *testing.T) {
 	}
 	if !handled || !value.IsInt() || value.Int() != 2014 {
 		t.Fatalf("executeQEvalPipelinePlanValue = %v handled %v, want int 2014 handled", value, handled)
+	}
+}
+
+func TestQEvalPipelineRuntimeBackendExecutesDescriptorPlanRef(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		src  string
+		want int64
+	}{
+		{name: "bin_reduce_sum", src: "+/til 8 bin til 8", want: 28},
+		{name: "modulo_where_count", src: "count where (til 64 mod 4)=1", want: 16},
+		{name: "script_modulo_gather_reduce", src: "x:til 64;y:x+1;idx:where (x mod 4)=1;+/y[idx]", want: 512},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			descriptor, ok := qRuntimeEvalPipelinePlanner{}.DescribeQEvalPipeline(tc.src)
+			if !ok {
+				t.Fatalf("DescribeQEvalPipeline(%q) did not recognize pipeline", tc.src)
+			}
+			plan := qEvalHotPlan{
+				Kernel:         descriptor.Kernel,
+				Shape:          descriptor.Shape,
+				PipelineShape:  descriptor.PipelineShape,
+				Backend:        descriptor.Backend,
+				Detail:         descriptor.Detail,
+				Kind:           descriptor.Kind,
+				Terminal:       descriptor.Terminal,
+				AssignmentText: descriptor.AssignmentText,
+				ValueExpr:      descriptor.ValueExpr,
+				ValueBinding:   descriptor.ValueBinding,
+				IndexExpr:      descriptor.IndexExpr,
+				IndexBinding:   descriptor.IndexBinding,
+				MaskExpr:       descriptor.MaskExpr,
+				MaskBinding:    descriptor.MaskBinding,
+				LeftExpr:       descriptor.LeftExpr,
+				RightExpr:      descriptor.RightExpr,
+				CompareOp:      descriptor.CompareOp,
+				ComparePrefix:  descriptor.ComparePrefix,
+				ModExpr:        descriptor.ModExpr,
+				ModulusExpr:    descriptor.ModulusExpr,
+				ModTargetExpr:  descriptor.ModTargetExpr,
+				ReductionInput: descriptor.ReductionInput,
+			}
+			fn := &Function{}
+			ref := fn.addQEvalPipelinePlan("not a q pipeline", plan)
+			backend := newQRuntimeEvalPipelineBackend(fn.QEvalPipelinePlans)
+			value, handled, err := executeQEvalPipelinePlanValue(backend, ref)
+			if err != nil {
+				t.Fatalf("executeQEvalPipelinePlanValue: %v", err)
+			}
+			if !handled || !value.IsInt() || value.Int() != tc.want {
+				t.Fatalf("executeQEvalPipelinePlanValue = %v handled %v, want int %d handled", value, handled, tc.want)
+			}
+			if _, oldHandled, err := stdq.ExecuteEvalPipeline(ref.Source); err != nil || oldHandled {
+				t.Fatalf("source fallback unexpectedly handled ref.Source=%q: handled=%v err=%v", ref.Source, oldHandled, err)
+			}
+		})
 	}
 }
 

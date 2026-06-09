@@ -32,12 +32,29 @@ type QEvalPipelinePlan interface {
 // QEvalPipelinePlanRef is the compact, compile-time plan handle stored on the
 // IR Function and copied into CompiledFunction for future execution lowering.
 type QEvalPipelinePlanRef struct {
-	ID            int
-	Kernel        string
-	Shape         string
-	PipelineShape string
-	Source        string
-	Backend       string
+	ID             int
+	Kernel         string
+	Shape          string
+	PipelineShape  string
+	Source         string
+	Backend        string
+	Kind           string
+	Terminal       string
+	AssignmentText string
+	ValueExpr      string
+	ValueBinding   string
+	IndexExpr      string
+	IndexBinding   string
+	MaskExpr       string
+	MaskBinding    string
+	LeftExpr       string
+	RightExpr      string
+	CompareOp      string
+	ComparePrefix  string
+	ModExpr        string
+	ModulusExpr    string
+	ModTargetExpr  string
+	ReductionInput string
 }
 
 func (r QEvalPipelinePlanRef) Valid() bool {
@@ -93,12 +110,29 @@ func (fn *Function) addQEvalPipelinePlan(source string, plan qEvalHotPlan) QEval
 		}
 	}
 	ref := QEvalPipelinePlanRef{
-		ID:            len(fn.QEvalPipelinePlans),
-		Kernel:        plan.Kernel,
-		Shape:         plan.Shape,
-		PipelineShape: plan.PipelineShape,
-		Source:        source,
-		Backend:       plan.Backend,
+		ID:             len(fn.QEvalPipelinePlans),
+		Kernel:         plan.Kernel,
+		Shape:          plan.Shape,
+		PipelineShape:  plan.PipelineShape,
+		Source:         source,
+		Backend:        plan.Backend,
+		Kind:           plan.Kind,
+		Terminal:       plan.Terminal,
+		AssignmentText: plan.AssignmentText,
+		ValueExpr:      plan.ValueExpr,
+		ValueBinding:   plan.ValueBinding,
+		IndexExpr:      plan.IndexExpr,
+		IndexBinding:   plan.IndexBinding,
+		MaskExpr:       plan.MaskExpr,
+		MaskBinding:    plan.MaskBinding,
+		LeftExpr:       plan.LeftExpr,
+		RightExpr:      plan.RightExpr,
+		CompareOp:      plan.CompareOp,
+		ComparePrefix:  plan.ComparePrefix,
+		ModExpr:        plan.ModExpr,
+		ModulusExpr:    plan.ModulusExpr,
+		ModTargetExpr:  plan.ModTargetExpr,
+		ReductionInput: plan.ReductionInput,
 	}
 	fn.QEvalPipelinePlans = append(fn.QEvalPipelinePlans, ref)
 	return ref

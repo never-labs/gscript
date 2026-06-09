@@ -174,11 +174,28 @@ type QKernelExecutionRouteSummaryJSONRow struct {
 }
 
 type qEvalHotPlan struct {
-	Kernel        string
-	Shape         string
-	PipelineShape string
-	Backend       string
-	Detail        string
+	Kernel         string
+	Shape          string
+	PipelineShape  string
+	Backend        string
+	Detail         string
+	Kind           string
+	Terminal       string
+	AssignmentText string
+	ValueExpr      string
+	ValueBinding   string
+	IndexExpr      string
+	IndexBinding   string
+	MaskExpr       string
+	MaskBinding    string
+	LeftExpr       string
+	RightExpr      string
+	CompareOp      string
+	ComparePrefix  string
+	ModExpr        string
+	ModulusExpr    string
+	ModTargetExpr  string
+	ReductionInput string
 }
 
 // QKernelShapeSummary is a source-stable row for joining MethodJIT q kernel
