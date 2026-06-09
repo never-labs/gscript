@@ -70,11 +70,7 @@ func qSublistValue(left, right any) (any, error) {
 	case 1:
 		return take(args[0], right)
 	case 2:
-		sliced, err := drop(args[0], right)
-		if err != nil {
-			return nil, err
-		}
-		return take(args[1], sliced)
+		return data.Sublist(args[0], args[1], right)
 	default:
 		return nil, fmt.Errorf("sublist expects count or start count")
 	}

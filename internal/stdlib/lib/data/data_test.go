@@ -65,6 +65,58 @@ func TestSequenceCutArrayStringAndFrame(t *testing.T) {
 	}
 }
 
+func TestSequenceSublistArrayStringAndFrame(t *testing.T) {
+	got, err := Sublist(1, 3, NewI64([]int64{10, 20, 30, 40, 50}))
+	if err != nil {
+		t.Fatalf("Sublist array returned error: %v", err)
+	}
+	if values := got.(Array).Values(); !reflect.DeepEqual(values, []any{int64(20), int64(30), int64(40)}) {
+		t.Fatalf("Sublist array = %#v", values)
+	}
+
+	got, err = Sublist(1, 8, NewI64Range(10, 10, 4))
+	if err != nil {
+		t.Fatalf("Sublist range returned error: %v", err)
+	}
+	if values := got.(Array).Values(); !reflect.DeepEqual(values, []any{int64(20), int64(30), int64(40)}) {
+		t.Fatalf("Sublist range = %#v", values)
+	}
+
+	text, err := Sublist(1, 2, "åßcd")
+	if err != nil {
+		t.Fatalf("Sublist string returned error: %v", err)
+	}
+	if text != "ßc" {
+		t.Fatalf("Sublist string = %q, want ßc", text)
+	}
+
+	frame, err := NewFrame(
+		Column{Name: "sym", Data: NewSymbols([]string{"AAPL", "MSFT", "NVDA"})},
+		Column{Name: "qty", Data: NewI64([]int64{10, 20, 30})},
+	)
+	if err != nil {
+		t.Fatalf("NewFrame returned error: %v", err)
+	}
+	frameValue, err := Sublist(1, 2, frame)
+	if err != nil {
+		t.Fatalf("Sublist frame returned error: %v", err)
+	}
+	slicedFrame, ok := frameValue.(Frame)
+	if !ok {
+		t.Fatalf("Sublist frame = %#v, want Frame", frameValue)
+	}
+	if slicedFrame.Len() != 2 {
+		t.Fatalf("Sublist frame len = %d, want 2", slicedFrame.Len())
+	}
+	if values := slicedFrame.columns[Symbol("sym")].Values(); !reflect.DeepEqual(values, []any{Symbol("MSFT"), Symbol("NVDA")}) {
+		t.Fatalf("Sublist frame sym values = %#v", values)
+	}
+
+	if _, err := Sublist(-1, 1, NewI64([]int64{1})); err == nil {
+		t.Fatalf("Sublist negative start succeeded")
+	}
+}
+
 func TestSequenceCrossAndItems(t *testing.T) {
 	got := Cross(NewSymbols([]string{"a", "b"}), NewI64([]int64{1, 2, 3}))
 	if got.Len() != 6 {

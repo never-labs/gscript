@@ -79,6 +79,29 @@ func Cut(indexes []int, value any) (any, error) {
 	}
 }
 
+// Sublist returns a contiguous slice using q's start/count convention. It is a
+// reusable runtime primitive for q and Leia frontends that need list slicing
+// without materializing an intermediate drop result.
+func Sublist(start, count int, value any) (any, error) {
+	if start < 0 || count < 0 {
+		return nil, fmt.Errorf("sublist expects non-negative start and count")
+	}
+	switch x := value.(type) {
+	case Array:
+		start, count = boundedStartCount(x.Len(), start, count)
+		return Slice(x, start, count)
+	case string:
+		runes := []rune(x)
+		start, count = boundedStartCount(len(runes), start, count)
+		return string(runes[start : start+count]), nil
+	case Frame:
+		start, count = boundedStartCount(x.Len(), start, count)
+		return GatherFrame(x, SegmentIndexes(x.Len(), start, start+count))
+	default:
+		return nil, fmt.Errorf("sublist expects an array, string, or frame")
+	}
+}
+
 func SegmentIndexes(length, start, end int) []int {
 	if start < 0 {
 		start = 0
@@ -97,4 +120,14 @@ func SegmentIndexes(length, start, end int) []int {
 		indexes[i] = start + i
 	}
 	return indexes
+}
+
+func boundedStartCount(length, start, count int) (int, int) {
+	if start > length {
+		start = length
+	}
+	if count > length-start {
+		count = length - start
+	}
+	return start, count
 }
