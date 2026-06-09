@@ -84,6 +84,17 @@ func qPipelineShapeSpecForPlan(kind qPipelineKind, variant string) (qPipelineSha
 			Transform:     "dyadic-float-" + variant,
 			PipelineShape: "vector_reduce",
 		}, true
+	case qPipelineSumSequenceTransform:
+		if variant == "" {
+			return qPipelineShapeSpec{}, false
+		}
+		return qPipelineShapeSpec{
+			ID:            "vector-reduce/sum-" + variant,
+			Family:        qPipelineShapeFamilyVector,
+			Reducer:       "sum",
+			Transform:     variant,
+			PipelineShape: "vector_reduce",
+		}, true
 	case qPipelineSumRaze:
 		return qPipelineShapeSpec{
 			ID:            "vector-reduce/sum-raze",

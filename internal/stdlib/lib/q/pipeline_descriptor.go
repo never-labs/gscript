@@ -383,6 +383,18 @@ func qPipelinePlanFromEvalDescriptor(descriptor EvalPipelineDescriptor) (qPipeli
 	case "vector-reduce/sum-dyadic-float-xlog":
 		plan.kind = qPipelineSumDyadicFloatMath
 		plan.compareOp = data.NumericDyadicXLog
+	case "vector-reduce/sum-reverse":
+		plan.kind = qPipelineSumSequenceTransform
+		plan.compareOp = data.SequenceTransformReverse
+	case "vector-reduce/sum-rotate":
+		plan.kind = qPipelineSumSequenceTransform
+		plan.compareOp = data.SequenceTransformRotate
+	case "vector-reduce/sum-sublist":
+		plan.kind = qPipelineSumSequenceTransform
+		plan.compareOp = data.SequenceTransformSublist
+	case "vector-reduce/sum-ratios":
+		plan.kind = qPipelineSumSequenceTransform
+		plan.compareOp = data.SequenceTransformRatios
 	case "vector-reduce/sum-raze":
 		plan.kind = qPipelineSumRaze
 	case "vector-count/expr":

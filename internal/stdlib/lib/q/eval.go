@@ -2131,6 +2131,9 @@ func (s *EvalState) eval(src string) (any, error) {
 		if out, handled, err := s.tryEvalSumWhereCompare(right); err != nil || handled {
 			return out, err
 		}
+		if out, handled, err := s.tryEvalSequenceTransformSum(right); err != nil || handled {
+			return out, err
+		}
 		if out, handled, err := s.tryEvalSumDeltas(right); err != nil || handled {
 			return out, err
 		}
@@ -2225,10 +2228,10 @@ func (s *EvalState) eval(src string) (any, error) {
 		if out, handled, err := s.tryEvalCountFby(strings.TrimSpace(src[len("count "):])); err != nil || handled {
 			return out, err
 		}
-		if out, handled, err := s.tryEvalCountReverse(strings.TrimSpace(src[len("count "):])); err != nil || handled {
+		if out, handled, err := s.tryEvalCountSequencePrimitive(strings.TrimSpace(src[len("count "):])); err != nil || handled {
 			return out, err
 		}
-		if out, handled, err := s.tryEvalCountSequencePrimitive(strings.TrimSpace(src[len("count "):])); err != nil || handled {
+		if out, handled, err := s.tryEvalCountReverse(strings.TrimSpace(src[len("count "):])); err != nil || handled {
 			return out, err
 		}
 		if out, handled, err := s.tryEvalCountLengthPreservingTransform(strings.TrimSpace(src[len("count "):])); err != nil || handled {
@@ -4402,6 +4405,9 @@ func (s *EvalState) evalAdverb(expr adverbExpr) (any, error) {
 		if out, handled, err := s.tryEvalSumFby(expr.right); err != nil || handled {
 			return out, err
 		}
+		if out, handled, err := s.tryEvalSequenceTransformSum(expr.right); err != nil || handled {
+			return out, err
+		}
 		if out, handled, err := s.tryEvalSumDeltas(expr.right); err != nil || handled {
 			return out, err
 		}
@@ -4508,6 +4514,81 @@ func (s *EvalState) tryEvalTypedDyadicFloatSum(src string) (any, bool, error) {
 		return out, handled, nil
 	}
 	return nil, false, nil
+}
+
+func (s *EvalState) tryEvalSequenceTransformSum(src string) (any, bool, error) {
+	transform, args, valueExpr, ok, err := s.sequenceTransformExpr(src)
+	if err != nil || !ok {
+		return nil, ok, err
+	}
+	value, err := s.eval(valueExpr)
+	if err != nil {
+		return nil, true, err
+	}
+	out, handled, err := data.TryTypedSequenceTransformNumericSum(transform, args, value)
+	shape := "vector-reduce/sum-" + transform + "/" + string(qRuntimeKernelOperandKind(value, nil))
+	if len(args) > 0 {
+		shape += "/args-" + strconv.Itoa(len(args))
+	}
+	out, handled, err = qTypedRuntimeResultReason("SequenceTransformSum", shape, RuntimeFallbackUnsupportedType, out, handled, err)
+	if err != nil {
+		return nil, true, err
+	}
+	return out, handled, nil
+}
+
+func (s *EvalState) sequenceTransformExpr(src string) (string, []int, string, bool, error) {
+	src = stripEnclosingParens(strings.TrimSpace(src))
+	for _, spec := range []struct {
+		prefix    string
+		transform string
+	}{
+		{"reverse ", data.SequenceTransformReverse},
+		{"raze ", data.SequenceTransformRaze},
+		{"deltas ", data.SequenceTransformDeltas},
+		{"ratios ", data.SequenceTransformRatios},
+	} {
+		if strings.HasPrefix(src, spec.prefix) && wordBoundary(src, 0, len(strings.TrimSpace(spec.prefix))) {
+			arg := strings.TrimSpace(src[len(spec.prefix):])
+			if arg == "" {
+				return "", nil, "", false, nil
+			}
+			return spec.transform, nil, arg, true, nil
+		}
+	}
+	if leftExpr, rightExpr, ok := splitTopLevelWord(src, "rotate"); ok {
+		left, err := s.eval(leftExpr)
+		if err != nil {
+			return "", nil, "", true, err
+		}
+		n, ok := integerValue(left)
+		if !ok || int64(int(n)) != n {
+			return "", nil, "", true, fmt.Errorf("rotate expects an integer count")
+		}
+		return data.SequenceTransformRotate, []int{int(n)}, rightExpr, true, nil
+	}
+	var leftExpr, rightExpr string
+	if args, ok := qFunctionCallArgs(src); ok && strings.TrimSpace(src[:strings.Index(src, "[")]) == "sublist" {
+		if len(args) != 2 {
+			return "", nil, "", true, fmt.Errorf("sublist expects 2 arguments")
+		}
+		leftExpr, rightExpr = args[0], args[1]
+	} else {
+		var ok bool
+		leftExpr, rightExpr, ok = splitTopLevelWord(src, "sublist")
+		if !ok {
+			return "", nil, "", false, nil
+		}
+	}
+	left, err := s.eval(leftExpr)
+	if err != nil {
+		return "", nil, "", true, err
+	}
+	indexes, err := qIntegerIndexes("sublist", left)
+	if err != nil {
+		return "", nil, "", true, err
+	}
+	return data.SequenceTransformSublist, indexes, rightExpr, true, nil
 }
 
 func (s *EvalState) tryEvalTypedUnarySum(src string) (any, bool, error) {
@@ -5084,6 +5165,9 @@ func (s *EvalState) tryEvalCountReverse(src string) (any, bool, error) {
 
 func (s *EvalState) tryEvalCountSequencePrimitive(src string) (any, bool, error) {
 	src = stripEnclosingParens(strings.TrimSpace(src))
+	if out, handled, err := s.tryEvalCountSequenceTransform(src); err != nil || handled {
+		return out, handled, err
+	}
 	if out, handled, err := s.tryEvalCountStringTransform(src); err != nil || handled {
 		return out, handled, err
 	}
@@ -5094,6 +5178,27 @@ func (s *EvalState) tryEvalCountSequencePrimitive(src string) (any, bool, error)
 		return out, handled, err
 	}
 	if out, handled, err := s.tryEvalCountSublist(src); err != nil || handled {
+		return out, handled, err
+	}
+	return nil, false, nil
+}
+
+func (s *EvalState) tryEvalCountSequenceTransform(src string) (any, bool, error) {
+	transform, args, valueExpr, ok, err := s.sequenceTransformExpr(src)
+	if err != nil || !ok {
+		return nil, ok, err
+	}
+	value, err := s.eval(valueExpr)
+	if err != nil {
+		return nil, true, err
+	}
+	out, handled, err := data.SequenceTransformCount(transform, args, value)
+	shape := transform + "-count/" + string(qRuntimeKernelOperandKind(value, nil))
+	if len(args) > 0 {
+		shape += "/args-" + strconv.Itoa(len(args))
+	}
+	recordRuntimeKernelProbe("SequenceTransformCount", shape, handled && err == nil, err)
+	if err != nil || handled {
 		return out, handled, err
 	}
 	return nil, false, nil
@@ -5274,6 +5379,7 @@ func (s *EvalState) tryEvalCountLengthPreservingTransform(src string) (any, bool
 		{"next ", "ArrayCountNext", nil, ""},
 		{"fills ", "ArrayCountFills", nil, ""},
 		{"deltas ", "ArrayCountDeltas", qKindIsNumeric, "deltas expects a numeric vector"},
+		{"ratios ", "ArrayCountRatios", qKindIsNumeric, "ratios expects a numeric vector"},
 	} {
 		if !strings.HasPrefix(src, transform.word) || !wordBoundary(src, 0, len(strings.TrimSpace(transform.word))) {
 			continue

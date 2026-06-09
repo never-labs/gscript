@@ -4343,6 +4343,47 @@ func TryTypedDeltasSum(array Array) (any, bool, error) {
 	}
 }
 
+// TryTypedRatiosSum applies sum ratios x without materializing the ratio
+// vector. q ratios preserve the first non-null item and divide each subsequent
+// item by its previous row; sum ignores null ratio rows.
+func TryTypedRatiosSum(array Array) (any, bool, error) {
+	switch a := array.(type) {
+	case attributedArray:
+		return TryTypedRatiosSum(a.array)
+	}
+	if !isNumericArray(array) {
+		return nil, false, nil
+	}
+	var total float64
+	var previous any
+	for row := 0; row < array.Len(); row++ {
+		item, ok := array.At(row)
+		if !ok {
+			return nil, true, fmt.Errorf("ratios row %d out of range", row)
+		}
+		if IsNull(item) {
+			previous = item
+			continue
+		}
+		current, ok := numeric(item)
+		if !ok {
+			return nil, false, nil
+		}
+		if row == 0 || IsNull(previous) {
+			total += current
+			previous = item
+			continue
+		}
+		prev, ok := numeric(previous)
+		if !ok {
+			return nil, false, nil
+		}
+		total += current / prev
+		previous = item
+	}
+	return total, true, nil
+}
+
 func (k typedKernelRegistry) NumericSums(array Array) (Array, bool, error) {
 	switch a := array.(type) {
 	case attributedArray:
