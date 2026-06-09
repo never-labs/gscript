@@ -46,6 +46,7 @@ type qPipelinePlan struct {
 	modTargetPlan  qScriptBindingPlan
 	reductionInput string
 	reductionPlan  qScriptBindingPlan
+	moduloMaskPlan *qPipelinePlan
 }
 
 func (s *EvalState) qPipelinePlan(src string) qPipelinePlan {
@@ -155,6 +156,9 @@ func qPipelinePlanWithBindingPlans(plan qPipelinePlan) qPipelinePlan {
 	}
 	if plan.maskExpr != "" {
 		plan.maskPlan = buildQScriptBindingPlanForRHS(plan.maskExpr, nil)
+		if modPlan, ok := qPipelineModuloComparePlanFromMask(plan.maskExpr); ok {
+			plan.moduloMaskPlan = &modPlan
+		}
 	}
 	if plan.leftExpr != "" {
 		plan.leftPlan = buildQScriptBindingPlanForRHS(plan.leftExpr, nil)
@@ -386,9 +390,8 @@ func (s *EvalState) evalQPipelineSumWhereIndex(plan qPipelinePlan) (any, bool, e
 	if !ok {
 		return nil, false, nil
 	}
-	if modPlan, ok := qPipelineModuloComparePlanFromMask(plan.maskExpr); ok {
-		qPipelinePlanWithBindingPlansInPlace(&modPlan)
-		if out, handled, err := s.evalQPipelineModuloCompareValueSum(modPlan, array); err != nil || handled {
+	if plan.moduloMaskPlan != nil {
+		if out, handled, err := s.evalQPipelineModuloCompareValueSum(*plan.moduloMaskPlan, array); err != nil || handled {
 			return out, handled, err
 		}
 	}
@@ -590,7 +593,11 @@ func (s *EvalState) evalQPipelineModuloCompareOperands(plan qPipelinePlan) (data
 
 func qPipelineModuloComparePlanFromMask(maskExpr string) (qPipelinePlan, bool) {
 	src := "where " + strings.TrimSpace(maskExpr)
-	return buildQPipelineWhereModuloComparePlanFromWhere(src, qPipelineWhereCompareIndexes, "compare-to-index")
+	plan, ok := buildQPipelineWhereModuloComparePlanFromWhere(src, qPipelineWhereCompareIndexes, "compare-to-index")
+	if !ok {
+		return qPipelinePlan{}, false
+	}
+	return qPipelinePlanWithBindingPlans(plan), true
 }
 
 func buildQPipelineWhereModuloComparePlanFromWhere(src string, kind qPipelineKind, prefix string) (qPipelinePlan, bool) {
@@ -651,10 +658,6 @@ func (s *EvalState) evalQPipelineCompareOperands(plan qPipelinePlan) (any, any, 
 		return nil, nil, err
 	}
 	return left, right, nil
-}
-
-func qPipelinePlanWithBindingPlansInPlace(plan *qPipelinePlan) {
-	*plan = qPipelinePlanWithBindingPlans(*plan)
 }
 
 func (s *EvalState) evalQPipelineSumDeltas(plan qPipelinePlan) (any, bool, error) {

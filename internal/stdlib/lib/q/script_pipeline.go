@@ -31,6 +31,7 @@ type qScriptPipelineDescriptor struct {
 	maskPlan          qScriptBindingPlan
 	terminalUsesWhere bool
 	terminalPlan      qPipelinePlan
+	moduloMaskPlan    *qPipelinePlan
 }
 
 type qScriptPipelineAssignment struct {
@@ -89,6 +90,7 @@ func buildQScriptPipelineDescriptor(statements []qScriptStatement) (*qScriptPipe
 	descriptor.valuePlan = buildQScriptBindingPlanForRHS(descriptor.valueExpr, nil)
 	descriptor.indexPlan = buildQScriptBindingPlanForRHS(descriptor.indexExpr, nil)
 	descriptor.maskPlan = buildQScriptBindingPlanForRHS(descriptor.maskExpr, nil)
+	descriptor.moduloMaskPlan = qScriptPipelineModuloMaskPlan(descriptor.maskExpr)
 	descriptor.shapeText = descriptor.shape()
 	return &descriptor, true
 }
@@ -210,9 +212,8 @@ func (s *EvalState) evalQScriptTerminalPipeline(descriptor *qScriptPipelineDescr
 		if !ok {
 			return nil, false, nil
 		}
-		if modPlan, ok := qPipelineModuloComparePlanFromMask(descriptor.maskExpr); ok {
-			qPipelinePlanWithBindingPlansInPlace(&modPlan)
-			if out, handled, err := s.evalQPipelineModuloCompareValueSum(modPlan, array); err != nil || handled {
+		if descriptor.moduloMaskPlan != nil {
+			if out, handled, err := s.evalQPipelineModuloCompareValueSum(*descriptor.moduloMaskPlan, array); err != nil || handled {
 				return out, handled, err
 			}
 		}
@@ -262,9 +263,8 @@ func (s *EvalState) evalQScriptTerminalPipeline(descriptor *qScriptPipelineDescr
 			return nil, false, nil
 		}
 		if descriptor.kind == qScriptPipelineWhereIndexReduceSum {
-			if modPlan, ok := qPipelineModuloComparePlanFromMask(descriptor.maskExpr); ok {
-				qPipelinePlanWithBindingPlansInPlace(&modPlan)
-				if out, handled, err := s.evalQPipelineModuloCompareValueSum(modPlan, array); err != nil || handled {
+			if descriptor.moduloMaskPlan != nil {
+				if out, handled, err := s.evalQPipelineModuloCompareValueSum(*descriptor.moduloMaskPlan, array); err != nil || handled {
 					return out, handled, err
 				}
 			}
@@ -326,8 +326,18 @@ func qScriptPipelineCanDeferAssignment(descriptor *qScriptPipelineDescriptor, as
 	if strings.TrimSpace(descriptor.indexExpr) != assignment.name {
 		return false
 	}
-	_, ok := qPipelineModuloComparePlanFromMask(descriptor.maskExpr)
-	return ok
+	return descriptor.moduloMaskPlan != nil
+}
+
+func qScriptPipelineModuloMaskPlan(maskExpr string) *qPipelinePlan {
+	if maskExpr == "" {
+		return nil
+	}
+	plan, ok := qPipelineModuloComparePlanFromMask(maskExpr)
+	if !ok {
+		return nil
+	}
+	return &plan
 }
 
 func (s *EvalState) evalQScriptPipelineDeferredAssignment(descriptor *qScriptPipelineDescriptor, name string) error {

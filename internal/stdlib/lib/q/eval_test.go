@@ -149,6 +149,52 @@ func TestQPipelineModuloComparePlanFromMask(t *testing.T) {
 	if plan.kind != qPipelineWhereModuloCompareIndexes || plan.modExpr != "x" || plan.modulusExpr != "3" || plan.modTargetExpr != "0" || plan.compareOp != "=" {
 		t.Fatalf("modulo compare plan = %#v", plan)
 	}
+	if plan.modPlan.kind == qScriptBindingInvalid || plan.modulusPlan.kind == qScriptBindingInvalid || plan.modTargetPlan.kind == qScriptBindingInvalid {
+		t.Fatalf("modulo compare plan was not bound: %#v", plan)
+	}
+}
+
+func TestQPipelinePlanCachesBoundModuloMaskPlan(t *testing.T) {
+	state := NewEvalState(nil)
+	plan := state.qPipelinePlan("+/y[where (x mod 3)=0]")
+	if plan.kind != qPipelineSumWhereIndex {
+		t.Fatalf("pipeline kind = %v, want qPipelineSumWhereIndex", plan.kind)
+	}
+	if plan.moduloMaskPlan == nil {
+		t.Fatalf("modulo mask sub-plan was not cached: %#v", plan)
+	}
+	if plan.moduloMaskPlan.modPlan.kind == qScriptBindingInvalid ||
+		plan.moduloMaskPlan.modulusPlan.kind == qScriptBindingInvalid ||
+		plan.moduloMaskPlan.modTargetPlan.kind == qScriptBindingInvalid {
+		t.Fatalf("modulo mask sub-plan was not bound: %#v", plan.moduloMaskPlan)
+	}
+
+	cached := state.qPipelinePlan("+/y[where (x mod 3)=0]")
+	if cached.moduloMaskPlan == nil || cached.moduloMaskPlan.modExpr != "x" {
+		t.Fatalf("cached modulo mask sub-plan missing: %#v", cached)
+	}
+}
+
+func TestQScriptPipelineCachesBoundModuloMaskPlan(t *testing.T) {
+	plan := buildQScriptPlan("x:til 12;y:x*2;idx:where (x mod 3)=0;+/y[idx]")
+	if plan.scriptPipeline == nil {
+		t.Fatalf("script pipeline descriptor missing")
+	}
+	d := plan.scriptPipeline
+	if d.kind != qScriptPipelineWhereIndexReduceSum {
+		t.Fatalf("pipeline kind = %q, want %q", d.kind, qScriptPipelineWhereIndexReduceSum)
+	}
+	if d.moduloMaskPlan == nil {
+		t.Fatalf("modulo mask sub-plan was not cached: %#v", d)
+	}
+	if d.moduloMaskPlan.modPlan.kind == qScriptBindingInvalid ||
+		d.moduloMaskPlan.modulusPlan.kind == qScriptBindingInvalid ||
+		d.moduloMaskPlan.modTargetPlan.kind == qScriptBindingInvalid {
+		t.Fatalf("modulo mask sub-plan was not bound: %#v", d.moduloMaskPlan)
+	}
+	if len(d.assignments) == 0 || !qScriptPipelineCanDeferAssignment(d, d.assignments[len(d.assignments)-1]) {
+		t.Fatalf("script pipeline did not use cached modulo sub-plan for deferred assignment: %#v", d.assignments)
+	}
 }
 
 func TestQScriptPipelinePlannerDescribesTerminalWhereReduce(t *testing.T) {
