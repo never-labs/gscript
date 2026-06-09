@@ -109,6 +109,24 @@ func TestTryTypedCompareIndexesI64(t *testing.T) {
 		t.Fatalf("TryTypedCompareIndexesI64 symbol values = %#v", values)
 	}
 
+	modRange, ok, err := TryTypedIntegerDyadic(OpMod, NewI64Range(0, 1, 12), int64(4))
+	if err != nil {
+		t.Fatalf("TryTypedIntegerDyadic range mod returned error: %v", err)
+	}
+	if !ok {
+		t.Fatal("TryTypedIntegerDyadic range mod did not handle")
+	}
+	got, handled, err = TryTypedCompareIndexesI64(modRange.(Array), OpEQ, int64(2))
+	if err != nil {
+		t.Fatalf("TryTypedCompareIndexesI64 lazy mod returned error: %v", err)
+	}
+	if !handled {
+		t.Fatal("TryTypedCompareIndexesI64 lazy mod did not handle")
+	}
+	if values := got.Values(); !reflect.DeepEqual(values, []any{int64(2), int64(6), int64(10)}) {
+		t.Fatalf("TryTypedCompareIndexesI64 lazy mod values = %#v", values)
+	}
+
 	got, handled, err = TryTypedCompareIndexesI64(NewI64Range(math.MaxInt64-1, 1, 4), OpLT, int64(0))
 	if err != nil {
 		t.Fatalf("TryTypedCompareIndexesI64 wrapped ascending returned error: %v", err)
@@ -210,6 +228,24 @@ func TestTryTypedCompareIndexStatsI64(t *testing.T) {
 	}
 	if count != 2 || sum != 1 {
 		t.Fatalf("TryTypedCompareIndexStatsI64 symbol = count %d sum %d; want 2, 1", count, sum)
+	}
+
+	modRange, ok, err := TryTypedIntegerDyadic(OpMod, NewI64Range(0, 1, 12), int64(4))
+	if err != nil {
+		t.Fatalf("TryTypedIntegerDyadic range mod returned error: %v", err)
+	}
+	if !ok {
+		t.Fatal("TryTypedIntegerDyadic range mod did not handle")
+	}
+	count, sum, handled, err = TryTypedCompareIndexStatsI64(modRange.(Array), OpEQ, int64(2))
+	if err != nil {
+		t.Fatalf("TryTypedCompareIndexStatsI64 lazy mod returned error: %v", err)
+	}
+	if !handled {
+		t.Fatal("TryTypedCompareIndexStatsI64 lazy mod did not handle")
+	}
+	if count != 3 || sum != 18 {
+		t.Fatalf("TryTypedCompareIndexStatsI64 lazy mod = count %d sum %d; want 3, 18", count, sum)
 	}
 
 	tiledDates, err := TakeRepeat(NewDate([]Date{

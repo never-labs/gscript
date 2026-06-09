@@ -1739,6 +1739,9 @@ func TryTypedCompareIndexesI64(array Array, op Op, value any) (Array, bool, erro
 	if out, ok := typedCompareIndexRangeI64(array, op, value); ok {
 		return out, true, nil
 	}
+	if out, ok, err := typedCompareScalarDyadicIndexesI64(array, op, value); ok || err != nil {
+		return out, ok, err
+	}
 	if out, ok, err := typedCompareTiledIndexesI64(array, op, value); ok || err != nil {
 		return out, ok, err
 	}
@@ -1774,9 +1777,54 @@ func TryTypedCompareIndexStatsI64(array Array, op Op, value any) (count, sum int
 		return int64(indexes.Len()), i64IndexArraySum(indexes), true, nil
 	case tiledArray:
 		return compareTiledIndexStats(a, op, value)
+	case i64ScalarDyadicArray:
+		return compareScalarDyadicIndexStats(a, op, value)
 	default:
 		return typedCompareIndexStatsI64(a, op, value)
 	}
+}
+
+func typedCompareScalarDyadicIndexesI64(array Array, op Op, value any) (Array, bool, error) {
+	values, ok := array.(i64ScalarDyadicArray)
+	if !ok {
+		if attributed, ok := array.(attributedArray); ok {
+			return typedCompareScalarDyadicIndexesI64(attributed.array, op, value)
+		}
+		return nil, false, nil
+	}
+	target, ok := coerceInt64Exact(value)
+	if !ok {
+		return nil, false, nil
+	}
+	out := make([]int64, 0)
+	for row := 0; row < values.len; row++ {
+		item, ok, err := values.i64At(row)
+		if err != nil || !ok {
+			return nil, ok, err
+		}
+		if boolCompare(op, item == target, compareInt64(item, target)) {
+			out = append(out, int64(row))
+		}
+	}
+	return newI64Trusted(out), true, nil
+}
+
+func compareScalarDyadicIndexStats(array i64ScalarDyadicArray, op Op, value any) (count, sum int64, handled bool, err error) {
+	target, ok := coerceInt64Exact(value)
+	if !ok {
+		return 0, 0, false, nil
+	}
+	for row := 0; row < array.len; row++ {
+		item, ok, err := array.i64At(row)
+		if err != nil || !ok {
+			return 0, 0, ok, err
+		}
+		if boolCompare(op, item == target, compareInt64(item, target)) {
+			count++
+			sum += int64(row)
+		}
+	}
+	return count, sum, true, nil
 }
 
 func typedCompareTiledIndexesI64(array Array, op Op, value any) (Array, bool, error) {
