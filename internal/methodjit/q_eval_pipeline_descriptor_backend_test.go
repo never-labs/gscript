@@ -10,7 +10,7 @@ import (
 
 var qEvalPipelineDescriptorBenchmarkSink runtime.Value
 
-func TestQEvalPipelineRuntimeBackendPrefersDescriptorOverSourcePlanner(t *testing.T) {
+func TestQEvalPipelineRuntimeBackendPrefersBackendPlanOverSourcePlanner(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		src  string
@@ -23,14 +23,14 @@ func TestQEvalPipelineRuntimeBackendPrefersDescriptorOverSourcePlanner(t *testin
 		t.Run(tc.name, func(t *testing.T) {
 			ref := qEvalPipelineDescriptorBackendTestRef(t, tc.src)
 			backend := newQRuntimeEvalPipelineBackend([]QEvalPipelinePlanRef{ref})
-			descriptorCalls := 0
+			backendPlanCalls := 0
 			sourceCalls := 0
-			backend.executeDescriptor = func(descriptor stdq.EvalPipelineDescriptor) (any, bool, error) {
-				descriptorCalls++
-				if descriptor.Source != "not a q pipeline" {
-					t.Fatalf("descriptor Source = %q, want preserved ref source sentinel", descriptor.Source)
+			backend.executeBackendPlan = func(plan stdq.EvalPipelineBackendPlan) (any, bool, error) {
+				backendPlanCalls++
+				if plan.Descriptor.Source != "not a q pipeline" {
+					t.Fatalf("backend plan Source = %q, want preserved ref source sentinel", plan.Descriptor.Source)
 				}
-				return stdq.ExecuteEvalPipelineDescriptor(descriptor)
+				return stdq.ExecuteEvalPipelineBackendPlan(plan)
 			}
 			backend.executeSource = func(source string) (any, bool, error) {
 				sourceCalls++
@@ -44,8 +44,8 @@ func TestQEvalPipelineRuntimeBackendPrefersDescriptorOverSourcePlanner(t *testin
 			if !handled || !value.IsInt() || value.Int() != tc.want {
 				t.Fatalf("executeQEvalPipelinePlanValue = %v handled %v, want int %d handled", value, handled, tc.want)
 			}
-			if descriptorCalls != 1 || sourceCalls != 0 {
-				t.Fatalf("descriptor/source calls = %d/%d, want 1/0", descriptorCalls, sourceCalls)
+			if backendPlanCalls != 1 || sourceCalls != 0 {
+				t.Fatalf("backend plan/source calls = %d/%d, want 1/0", backendPlanCalls, sourceCalls)
 			}
 		})
 	}
@@ -57,10 +57,10 @@ func TestCompiledFunctionUsesPredecodedQEvalPipelineBackend(t *testing.T) {
 		QEvalPipelinePlans:   []QEvalPipelinePlanRef{ref},
 		QEvalPipelineBackend: newQRuntimeEvalPipelineBackend([]QEvalPipelinePlanRef{ref}),
 	}
-	descriptorCalls := 0
-	cf.QEvalPipelineBackend.executeDescriptor = func(descriptor stdq.EvalPipelineDescriptor) (any, bool, error) {
-		descriptorCalls++
-		return stdq.ExecuteEvalPipelineDescriptor(descriptor)
+	backendPlanCalls := 0
+	cf.QEvalPipelineBackend.executeBackendPlan = func(plan stdq.EvalPipelineBackendPlan) (any, bool, error) {
+		backendPlanCalls++
+		return stdq.ExecuteEvalPipelineBackendPlan(plan)
 	}
 	cf.QEvalPipelineBackend.executeSource = func(source string) (any, bool, error) {
 		return nil, false, errors.New("source planner fallback should not execute")
@@ -73,18 +73,18 @@ func TestCompiledFunctionUsesPredecodedQEvalPipelineBackend(t *testing.T) {
 	if !handled || !value.IsInt() || value.Int() != 8388608 {
 		t.Fatalf("ExecuteQEvalPipelinePlanValue = %v handled %v, want int 8388608 handled", value, handled)
 	}
-	if descriptorCalls != 1 {
-		t.Fatalf("descriptor calls = %d, want compiled function backend to be reused", descriptorCalls)
+	if backendPlanCalls != 1 {
+		t.Fatalf("backend plan calls = %d, want compiled function backend to be reused", backendPlanCalls)
 	}
 }
 
 func TestCompiledFunctionUsesQEvalPipelineHelperSlot(t *testing.T) {
 	ref := qEvalPipelineDescriptorBackendTestRef(t, "count where (til 64 mod 4)=1")
 	backend := newQRuntimeEvalPipelineBackend([]QEvalPipelinePlanRef{ref})
-	descriptorCalls := 0
-	backend.executeDescriptor = func(descriptor stdq.EvalPipelineDescriptor) (any, bool, error) {
-		descriptorCalls++
-		return stdq.ExecuteEvalPipelineDescriptor(descriptor)
+	backendPlanCalls := 0
+	backend.executeBackendPlan = func(plan stdq.EvalPipelineBackendPlan) (any, bool, error) {
+		backendPlanCalls++
+		return stdq.ExecuteEvalPipelineBackendPlan(plan)
 	}
 	backend.executeSource = func(source string) (any, bool, error) {
 		return nil, false, errors.New("source planner fallback should not execute")
@@ -102,8 +102,8 @@ func TestCompiledFunctionUsesQEvalPipelineHelperSlot(t *testing.T) {
 	if !handled || !value.IsInt() || value.Int() != 16 {
 		t.Fatalf("ExecuteQEvalPipelinePlanValue = %v handled %v, want int 16 handled", value, handled)
 	}
-	if descriptorCalls != 1 {
-		t.Fatalf("descriptor calls = %d, want helper slot execution", descriptorCalls)
+	if backendPlanCalls != 1 {
+		t.Fatalf("backend plan calls = %d, want helper slot execution", backendPlanCalls)
 	}
 }
 
@@ -123,7 +123,7 @@ func TestQEvalPipelineHelperReusableEvalStateRequiresSourceBackedDefaultRuntime(
 	}
 
 	customBackend := newQRuntimeEvalPipelineBackend([]QEvalPipelinePlanRef{sourceRef})
-	customBackend.executeDescriptor = func(descriptor stdq.EvalPipelineDescriptor) (any, bool, error) {
+	customBackend.executeBackendPlan = func(plan stdq.EvalPipelineBackendPlan) (any, bool, error) {
 		return int64(16), true, nil
 	}
 	customHelpers := newQEvalPipelinePlanHelpers([]QEvalPipelinePlanRef{sourceRef}, customBackend)
@@ -141,7 +141,7 @@ func BenchmarkQEvalPipelineDescriptorBackend(b *testing.B) {
 		{name: "ModuloWhereCount", src: "count where (til 8192 mod 4)=1"},
 		{name: "ScriptModuloGatherReduce", src: "x:til 8192;y:x+1;idx:where (x mod 4)=1;+/y[idx]"},
 	} {
-		b.Run("DescriptorBackend/"+tc.name, func(b *testing.B) {
+		b.Run("BackendPlan/"+tc.name, func(b *testing.B) {
 			ref := qEvalPipelineDescriptorBackendTestRef(b, tc.src)
 			cf := &CompiledFunction{
 				QEvalPipelinePlans:   []QEvalPipelinePlanRef{ref},

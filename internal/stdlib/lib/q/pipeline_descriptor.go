@@ -2,6 +2,8 @@ package q
 
 import "strings"
 
+const EvalPipelineTypedRuntimeBackend = "q_pipeline_typed_runtime"
+
 // EvalPipelineAssignment describes one assignment that participates in a q
 // script-level pipeline descriptor. It is metadata-only: values remain owned by
 // EvalState and the runtime evaluator.
@@ -44,6 +46,40 @@ type EvalPipelineDescriptor struct {
 	ReductionInput string
 }
 
+// EvalPipelineBackendPlan is the stable q-side handoff consumed by MethodJIT.
+// It keeps backend identity, diagnostics, and the executable descriptor behind
+// one API so JIT lowering does not need to rediscover q source strings or
+// duplicate planner shape logic.
+type EvalPipelineBackendPlan struct {
+	Backend    string
+	Detail     string
+	Descriptor EvalPipelineDescriptor
+}
+
+func (p EvalPipelineBackendPlan) Valid() bool {
+	return p.Backend != "" && p.Descriptor.Kind != "" && p.Descriptor.Kernel != "" && p.Descriptor.Shape != ""
+}
+
+func (p EvalPipelineBackendPlan) Kind() string {
+	return p.Descriptor.Kind
+}
+
+func (p EvalPipelineBackendPlan) Kernel() string {
+	return p.Descriptor.Kernel
+}
+
+func (p EvalPipelineBackendPlan) Shape() string {
+	return p.Descriptor.Shape
+}
+
+func (p EvalPipelineBackendPlan) PipelineShape() string {
+	return p.Descriptor.PipelineShape
+}
+
+func (p EvalPipelineBackendPlan) Source() string {
+	return p.Descriptor.Source
+}
+
 // DescribeEvalPipeline returns the stable descriptor for a q source string
 // when the runtime planner can recognize it as a typed pipeline candidate.
 func DescribeEvalPipeline(source string) (EvalPipelineDescriptor, bool) {
@@ -58,6 +94,21 @@ func DescribeEvalPipeline(source string) (EvalPipelineDescriptor, bool) {
 		return evalExpressionPipelineDescriptor(source, plan), true
 	}
 	return EvalPipelineDescriptor{}, false
+}
+
+// DescribeEvalPipelineBackendPlan returns the q typed-runtime backend plan for
+// source. MethodJIT should prefer this API over interpreting descriptor shape
+// strings itself.
+func DescribeEvalPipelineBackendPlan(source string) (EvalPipelineBackendPlan, bool) {
+	descriptor, ok := DescribeEvalPipeline(source)
+	if !ok {
+		return EvalPipelineBackendPlan{}, false
+	}
+	return EvalPipelineBackendPlan{
+		Backend:    EvalPipelineTypedRuntimeBackend,
+		Detail:     "kind=" + descriptor.Kind,
+		Descriptor: descriptor,
+	}, true
 }
 
 // ExecuteEvalPipeline executes source only when the q runtime pipeline planner
@@ -87,6 +138,21 @@ func ExecuteEvalPipelineDescriptor(descriptor EvalPipelineDescriptor) (any, bool
 func ExecuteEvalPipelineDescriptorWithEnv(descriptor EvalPipelineDescriptor, env map[string]any) (any, bool, error) {
 	state := NewEvalState(env)
 	return state.executeEvalPipelineDescriptor(descriptor)
+}
+
+// ExecuteEvalPipelineBackendPlan executes a plan returned by
+// DescribeEvalPipelineBackendPlan without asking MethodJIT to understand q
+// shape strings.
+func ExecuteEvalPipelineBackendPlan(plan EvalPipelineBackendPlan) (any, bool, error) {
+	return ExecuteEvalPipelineBackendPlanWithEnv(plan, nil)
+}
+
+func ExecuteEvalPipelineBackendPlanWithEnv(plan EvalPipelineBackendPlan, env map[string]any) (any, bool, error) {
+	if !plan.Valid() || plan.Backend != EvalPipelineTypedRuntimeBackend {
+		return nil, false, nil
+	}
+	state := NewEvalState(env)
+	return state.executeEvalPipelineDescriptor(plan.Descriptor)
 }
 
 func (s *EvalState) executeEvalPipeline(source string) (any, bool, error) {
