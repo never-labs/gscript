@@ -75,6 +75,20 @@ matrix of q-language operations:
 | Symbols | symbol vector compare, distinct/group/sort, attribute-marked vectors |
 | Temporal lists | date/time/timestamp/timespan compare, xbar bucket, typed null propagation |
 
+The ordinary q suite now includes a supported-expression breadth layer for
+non-qSQL analytics expressions. These cases intentionally stay inside currently
+executable q semantics and compare every Leia row with a hand-written Go
+baseline:
+
+| Dimension | Added benchmark shapes |
+|---|---|
+| Arithmetic and math | `div`, `mod`, `abs`, `neg`, `signum`, `floor`, `ceiling`, `reciprocal` over row-scaled vectors |
+| Aggregation and windows | `avg`, `med`, `prd`, `prds`, `sums`, `mins`, `maxs`, `avgs`, `msum`, `mavg`, `mcount`, `wavg` |
+| List transforms | `reverse`, `rotate`, `drop`, `take`, `sublist`, `cut`, `raze`, first/last checksums |
+| Apply/index | supported scalar `@`, bracket gather `x[idx]`, and callable `.[f;args]` |
+| Matrix/reshape | vector-left reshape, row/cell dot index, row reduction checksums |
+| String/symbol | `string`, `upper`, `lower`, `like`, `distinct`, `group`, symbol sort indexes |
+
 The qSQL benchmark suite should become a matrix rather than a small set of
 representative queries:
 

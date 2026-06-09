@@ -1078,6 +1078,7 @@ func buildQEvalVectorCases() []qEvalVectorCase {
 	cases = appendQEvalExpressionCombinationCases(cases)
 	cases = appendQEvalOrdinaryExpressionCoverageCases(cases)
 	cases = appendQEvalTaskDListMathMatrixApplyIndexCases(cases)
+	cases = appendQEvalSupportedExpressionBreadthCases(cases)
 	return appendQEvalSemanticCoverageCases(cases)
 }
 
@@ -2954,6 +2955,378 @@ func appendQEvalTaskDListMathMatrixApplyIndexCases(cases []qEvalVectorCase) []qE
 		},
 	}
 	return append(cases, taskD...)
+}
+
+func appendQEvalSupportedExpressionBreadthCases(cases []qEvalVectorCase) []qEvalVectorCase {
+	for _, p := range []struct {
+		name string
+		mod  int64
+		bias int64
+	}{
+		{"Mod3Bias1", 3, 1},
+		{"Mod5Bias2", 5, 2},
+		{"Mod7Bias4", 7, 4},
+		{"Mod11Bias6", 11, 6},
+	} {
+		p := p
+		cases = append(cases,
+			qEvalVectorCase{
+				name:   "BreadthArithmeticDivModEnvelope" + p.name,
+				tags:   []string{"numeric-vector", "word-dyadic", "sum"},
+				matrix: []string{"numeric-arithmetic:int-vector:hot"},
+				expr: func(rows int) string {
+					return fmt.Sprintf("x:til %d;y:x+%d;(+/y div %d)+(+/y mod %d)+count y", rows, p.bias, p.mod, p.mod)
+				},
+				goFn: func(rows int) int64 {
+					var total int64
+					for i := int64(0); i < int64(rows); i++ {
+						y := i + p.bias
+						total += y/p.mod + qPositiveMod(y, p.mod)
+					}
+					return total + int64(rows)
+				},
+			},
+			qEvalVectorCase{
+				name:   "BreadthArithmeticAbsNegSignum" + p.name,
+				tags:   []string{"numeric-vector", "numeric-monad", "sum"},
+				matrix: []string{"numeric-arithmetic:int-vector:hot"},
+				expr: func(rows int) string {
+					return fmt.Sprintf("x:(til %d)-%d;(+/abs x)+(+/neg x)+(+/signum x)", rows, rows/2)
+				},
+				goFn: func(rows int) int64 {
+					var total int64
+					offset := int64(rows / 2)
+					for i := int64(0); i < int64(rows); i++ {
+						x := i - offset
+						if x < 0 {
+							total -= x
+						} else {
+							total += x
+						}
+						total -= x
+						switch {
+						case x < 0:
+							total--
+						case x > 0:
+							total++
+						}
+					}
+					return total
+				},
+			},
+			qEvalVectorCase{
+				name:   "BreadthFloatFloorCeilingReciprocal" + p.name,
+				tags:   []string{"numeric-vector", "numeric-monad", "promotion", "sum"},
+				matrix: []string{"numeric-arithmetic:float-vector:hot"},
+				expr: func(rows int) string {
+					return fmt.Sprintf("x:1+(til %d)%%%d;(+/floor x)+(+/ceiling x)+(+/reciprocal x)", rows, p.mod)
+				},
+				goFn: func(rows int) int64 {
+					var total float64
+					for i := 0; i < rows; i++ {
+						x := 1 + float64(i)/float64(p.mod)
+						total += math.Floor(x) + math.Ceil(x) + 1/x
+					}
+					return int64(total)
+				},
+			},
+		)
+	}
+
+	for _, p := range []struct {
+		name string
+		expr string
+		goFn func(rows int) int64
+	}{
+		{
+			name: "BreadthAggregateAvgMedRange",
+			expr: "x:1+til %d;(avg x)+(med x)+(min x)+(max x)+count x",
+			goFn: func(rows int) int64 {
+				return int64(float64(rows+1)/2) + int64(rows/2+1) + 1 + int64(rows) + int64(rows)
+			},
+		},
+		{
+			name: "BreadthAggregateProductOnesAndWavg",
+			expr: "x:%d#1;(prd x)+(count prds x)+(wavg[1 2 3;10 20 30])",
+			goFn: func(rows int) int64 {
+				return 1 + int64(rows) + 23
+			},
+		},
+		{
+			name: "BreadthRunningMinMaxAvgEnvelope",
+			expr: "x:1+til %d;(last sums x)+(last mins x)+(last maxs x)+(last avgs x)",
+			goFn: func(rows int) int64 {
+				sum := int64(rows) * int64(rows+1) / 2
+				return sum + 1 + int64(rows) + int64(float64(rows+1)/2)
+			},
+		},
+		{
+			name: "BreadthMovingWindowEnvelope",
+			expr: "x:1+til %d;(+/5 msum x)+(+/5 mavg x)+(+/5 mcount x)",
+			goFn: func(rows int) int64 {
+				var sumWindow int64
+				var avgWindow float64
+				var countWindow int64
+				for i := 0; i < rows; i++ {
+					start := i - 4
+					if start < 0 {
+						start = 0
+					}
+					var window int64
+					for j := start; j <= i; j++ {
+						window += int64(j + 1)
+					}
+					width := int64(i - start + 1)
+					sumWindow += window
+					avgWindow += float64(window) / float64(width)
+					countWindow += width
+				}
+				return sumWindow + int64(avgWindow) + countWindow
+			},
+		},
+	} {
+		p := p
+		cases = append(cases, qEvalVectorCase{
+			name:   p.name,
+			tags:   []string{"sum", "avg-var-dev-med", "running-aggregate", "moving-window", "weighted-aggregate"},
+			matrix: []string{"aggregate:running-prd-min-max-avg:vector", "aggregate:wavg-xprev:vector"},
+			expr: func(rows int) string {
+				return fmt.Sprintf(p.expr, rows)
+			},
+			goFn: p.goFn,
+		})
+	}
+
+	for _, p := range []struct {
+		name  string
+		take  int
+		drop  int
+		shift int
+	}{
+		{"Short", 32, 3, 5},
+		{"Mid", 511, 17, 97},
+		{"Long", 2048, 257, 1021},
+		{"Cycle", 9001, 1024, 2049},
+	} {
+		p := p
+		cases = append(cases,
+			qEvalVectorCase{
+				name:   "BreadthListFirstLastReverseRotate" + p.name,
+				tags:   []string{"first", "reverse", "rotate", "sum"},
+				matrix: []string{"list:cut-raze-enlist:nested"},
+				expr: func(rows int) string {
+					return fmt.Sprintf("x:til %d;y:%d rotate reverse x;first y+last y+(+/y)", rows, p.shift)
+				},
+				goFn: func(rows int) int64 {
+					shift := p.shift % rows
+					var first, last, sum int64
+					for i := 0; i < rows; i++ {
+						reverseIndex := (shift + i) % rows
+						value := int64(rows - 1 - reverseIndex)
+						if i == 0 {
+							first = value
+						}
+						if i == rows-1 {
+							last = value
+						}
+						sum += value
+					}
+					return first + last + sum
+				},
+			},
+			qEvalVectorCase{
+				name:   "BreadthListDropTakeSublist" + p.name,
+				tags:   []string{"drop", "take", "cut", "sum"},
+				matrix: []string{"list:sublist-cross-cut:string-bool", "list:cut-raze-enlist:nested"},
+				expr: func(rows int) string {
+					return fmt.Sprintf("x:til %d;y:%d#drop %d x;z:%d sublist y;(+/z)+count z", rows, p.take, p.drop, p.take/2)
+				},
+				goFn: func(rows int) int64 {
+					length := rows - p.drop
+					sub := p.take / 2
+					var sum int64
+					for i := 0; i < sub; i++ {
+						sum += int64(p.drop + (i % length))
+					}
+					return sum + int64(sub)
+				},
+			},
+			qEvalVectorCase{
+				name:   "BreadthListCutRazeChecksum" + p.name,
+				tags:   []string{"cut", "raze", "sum"},
+				matrix: []string{"list:cut-raze-enlist:nested"},
+				expr: func(rows int) string {
+					a := p.drop
+					b := p.drop + p.take/2
+					c := p.drop + p.take
+					if c >= rows {
+						c = rows - 1
+					}
+					return fmt.Sprintf("x:til %d;g:%d %d %d cut x;(+/raze g)+count g", rows, a, b, c)
+				},
+				goFn: func(rows int) int64 {
+					var sum int64
+					for i := p.drop; i < rows; i++ {
+						sum += int64(i)
+					}
+					return sum + 3
+				},
+			},
+		)
+	}
+
+	for _, p := range []struct {
+		name  string
+		width int
+	}{
+		{"Tiny", 4},
+		{"Small", 8},
+		{"Medium", 16},
+		{"Wide", 32},
+	} {
+		p := p
+		cases = append(cases,
+			qEvalVectorCase{
+				name:   "BreadthApplyAtGather" + p.name,
+				tags:   []string{"apply-index", "projection", "sum"},
+				matrix: []string{"apply-index:list-dict-callable:hot"},
+				expr: func(rows int) string {
+					return fmt.Sprintf("x:til %d;(x@%d)+(x@%d)+(x@%d)+count x", rows, p.width, p.width*2, p.width*3)
+				},
+				goFn: func(rows int) int64 {
+					return int64(p.width+p.width*2+p.width*3) + int64(rows)
+				},
+			},
+			qEvalVectorCase{
+				name:   "BreadthApplyBracketGather" + p.name,
+				tags:   []string{"apply-index", "projection", "sum"},
+				matrix: []string{"apply-index:list-dict-callable:hot"},
+				expr: func(rows int) string {
+					return fmt.Sprintf("x:til %d;idx:%d*til %d;(+/x[idx])+count idx", rows, p.width, rows/p.width)
+				},
+				goFn: func(rows int) int64 {
+					n := rows / p.width
+					var sum int64
+					for i := 0; i < n; i++ {
+						sum += int64(p.width * i)
+					}
+					return sum + int64(n)
+				},
+			},
+			qEvalVectorCase{
+				name:   "BreadthCallableDotApply" + p.name,
+				tags:   []string{"apply-index", "projection", "sum"},
+				matrix: []string{"apply-index:list-dict-callable:hot"},
+				expr: func(rows int) string {
+					return fmt.Sprintf("f:{(+/x)+count y};.[f;(til %d;%d#1)]", rows, p.width)
+				},
+				goFn: func(rows int) int64 {
+					return int64(rows-1)*int64(rows)/2 + int64(p.width)
+				},
+			},
+		)
+	}
+
+	for _, p := range []struct {
+		name string
+		rows int
+		cols int
+	}{
+		{"TwoByN", 2, 4096},
+		{"FourByN", 4, 2048},
+		{"EightByN", 8, 1024},
+	} {
+		p := p
+		cellIndex := p.cols / 2
+		cases = append(cases,
+			qEvalVectorCase{
+				name:   "BreadthMatrixReshapeRowSum" + p.name,
+				tags:   []string{"matrix-reshape", "apply-index", "sum"},
+				matrix: []string{"matrix:reshape-flip:vector", "apply-index:list-dict-callable:hot"},
+				expr: func(rows int) string {
+					total := p.rows * p.cols
+					return fmt.Sprintf("m:%d %d#til %d;r:m . %d;(+/r)+count r", p.rows, p.cols, total, p.rows-1)
+				},
+				goFn: func(rows int) int64 {
+					start := (p.rows - 1) * p.cols
+					var sum int64
+					for i := 0; i < p.cols; i++ {
+						sum += int64(start + i)
+					}
+					return sum + int64(p.cols)
+				},
+			},
+			qEvalVectorCase{
+				name:   "BreadthMatrixReshapeCellProbe" + p.name,
+				tags:   []string{"matrix-reshape", "apply-index"},
+				matrix: []string{"matrix:reshape-flip:vector", "apply-index:list-dict-callable:hot"},
+				expr: func(rows int) string {
+					total := p.rows * p.cols
+					return fmt.Sprintf("m:%d %d#til %d;(m . %d %d)+count m", p.rows, p.cols, total, p.rows-1, cellIndex)
+				},
+				goFn: func(rows int) int64 {
+					return int64((p.rows-1)*p.cols+cellIndex) + int64(p.rows)
+				},
+			},
+		)
+	}
+
+	for _, p := range []struct {
+		name    string
+		pattern string
+		order   []int
+		width   int
+		hits    map[int]bool
+	}{
+		{"SymbolsA", "`aapl`msft`amd`nvda", []int{0, 2, 1, 3}, 4, map[int]bool{0: true, 2: true}},
+		{"SymbolsN", "`ibm`orcl`nvda`tsla`nflx", []int{0, 4, 2, 1, 3}, 5, map[int]bool{}},
+		{"VenuesX", "`xnys`xnas`bats`arcx", []int{3, 2, 1, 0}, 4, map[int]bool{3: true}},
+	} {
+		p := p
+		cases = append(cases,
+			qEvalVectorCase{
+				name:   "BreadthStringUpperLowerLike" + p.name,
+				tags:   []string{"string", "symbol", "match-like", "where"},
+				matrix: []string{"compare:string-vector:where", "compare:symbol-vector:where"},
+				shapes: []string{"string:symbol-string-like:row-scaled"},
+				expr: func(rows int) string {
+					return fmt.Sprintf("s:%d#%s;u:upper string s;l:lower u;(count where u like \"A*\")+(count l)", rows, p.pattern)
+				},
+				goFn: func(rows int) int64 {
+					return qPatternCount(rows, p.width, p.hits) + int64(rows)
+				},
+			},
+			qEvalVectorCase{
+				name:   "BreadthSymbolDistinctGroupSort" + p.name,
+				tags:   []string{"symbol", "distinct", "group", "table-sort"},
+				matrix: []string{"set:symbol-vector:union-inter-except", "sort:symbol-vector:index-rank"},
+				expr: func(rows int) string {
+					return fmt.Sprintf("s:%d#%s;(count distinct s)+(count group s)+(+/iasc s)", rows, p.pattern)
+				},
+				goFn: func(rows int) int64 {
+					indexes := make([]int, rows)
+					for i := range indexes {
+						indexes[i] = i
+					}
+					sort.SliceStable(indexes, func(i, j int) bool {
+						left := p.order[indexes[i]%p.width]
+						right := p.order[indexes[j]%p.width]
+						if left == right {
+							return indexes[i] < indexes[j]
+						}
+						return left < right
+					})
+					var sum int64
+					for _, idx := range indexes {
+						sum += int64(idx)
+					}
+					return int64(p.width) + int64(p.width) + sum
+				},
+			},
+		)
+	}
+
+	return cases
 }
 
 func qPositiveMod(v, mod int64) int64 {
