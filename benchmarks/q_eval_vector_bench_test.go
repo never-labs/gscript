@@ -28,6 +28,162 @@ func buildQEvalVectorGoBaselineInput(rows int) []int64 {
 }
 
 //go:noinline
+func qEvalVectorGoBaselineSumsTailChecksum(rows int, values []int64) int64 {
+	var sum int64
+	for i := 0; i < rows; i++ {
+		sum += values[i]
+	}
+	return sum + int64(rows)
+}
+
+//go:noinline
+func qEvalVectorGoBaselineRunningMinMaxTail(rows int, values []int64) int64 {
+	if rows <= 0 || rows > len(values) {
+		return 0
+	}
+	minTail := values[0]
+	for i := 1; i < rows; i++ {
+		if values[i] < minTail {
+			minTail = values[i]
+		}
+	}
+	reverseMaxTail := values[rows-1]
+	for i := rows - 2; i >= 0; i-- {
+		if values[i] > reverseMaxTail {
+			reverseMaxTail = values[i]
+		}
+	}
+	maxTail := values[0]
+	for i := 1; i < rows; i++ {
+		if values[i] > maxTail {
+			maxTail = values[i]
+		}
+	}
+	return minTail + reverseMaxTail + maxTail
+}
+
+//go:noinline
+func qEvalVectorGoBaselineAvgsTail(rows int, values []int64) int64 {
+	var sum int64
+	for i := 0; i < rows; i++ {
+		sum += values[i]
+	}
+	return int64(float64(sum) / float64(rows))
+}
+
+//go:noinline
+func qEvalVectorGoBaselineProductOnes(rows int, values []int64) int64 {
+	product := int64(1)
+	for i := 0; i < rows; i++ {
+		if values[i] >= 0 {
+			product *= 1
+		}
+	}
+	return product
+}
+
+//go:noinline
+func qEvalVectorGoBaselineAggregateAvgMedRange(rows int, values []int64) int64 {
+	if rows <= 0 || rows > len(values) {
+		return 0
+	}
+	minimum := values[0] + 1
+	maximum := minimum
+	var sum int64
+	for i := 0; i < rows; i++ {
+		value := values[i] + 1
+		sum += value
+		if value < minimum {
+			minimum = value
+		}
+		if value > maximum {
+			maximum = value
+		}
+	}
+	average := int64(float64(sum) / float64(rows))
+	median := values[rows/2] + 1
+	return average + median + minimum + maximum + int64(rows)
+}
+
+//go:noinline
+func qEvalVectorGoBaselineAggregateProductWavg(rows int, values []int64) int64 {
+	product := int64(1)
+	for i := 0; i < rows; i++ {
+		if values[i] >= 0 {
+			product *= 1
+		}
+	}
+	prefixCount := int64(0)
+	for i := 0; i < rows; i++ {
+		if values[i] >= 0 {
+			prefixCount++
+		}
+	}
+	weights := [...]int64{1, 2, 3}
+	payload := [...]int64{10, 20, 30}
+	var weightSum, weightedSum int64
+	for i := range weights {
+		weightSum += weights[i]
+		weightedSum += weights[i] * payload[i]
+	}
+	return product + prefixCount + weightedSum/weightSum
+}
+
+//go:noinline
+func qEvalVectorGoBaselineRunningMinMaxAvgEnvelope(rows int, values []int64) int64 {
+	if rows <= 0 || rows > len(values) {
+		return 0
+	}
+	minTail := values[0] + 1
+	maxTail := minTail
+	var sum int64
+	for i := 0; i < rows; i++ {
+		value := values[i] + 1
+		sum += value
+		if value < minTail {
+			minTail = value
+		}
+		if value > maxTail {
+			maxTail = value
+		}
+	}
+	averageTail := int64(float64(sum) / float64(rows))
+	return sum + minTail + maxTail + averageTail
+}
+
+//go:noinline
+func qEvalVectorGoBaselineApplyAtGather(rows, width int, values []int64) int64 {
+	if rows <= 0 || width*3 >= rows || rows > len(values) {
+		return 0
+	}
+	return values[width] + values[width*2] + values[width*3] + int64(rows)
+}
+
+//go:noinline
+func qEvalVectorGoBaselineCallableDotApply(rows, width int, values []int64) int64 {
+	var sum int64
+	for i := 0; i < rows; i++ {
+		sum += values[i]
+	}
+	var count int64
+	for i := 0; i < width; i++ {
+		if values[i] >= 0 {
+			count++
+		}
+	}
+	return sum + count
+}
+
+//go:noinline
+func qEvalVectorGoBaselineMatrixCellProbe(matrixRows, cols, cellIndex int, values []int64) int64 {
+	offset := (matrixRows-1)*cols + cellIndex
+	if offset < 0 || offset >= len(values) {
+		return 0
+	}
+	return values[offset] + int64(matrixRows)
+}
+
+//go:noinline
 func qEvalVectorGoBaselineTakeCount(rows int, values []int64) int64 {
 	if rows < 0 || rows > len(values) {
 		return 0
@@ -1337,7 +1493,7 @@ func appendQEvalExpressionCombinationCases(cases []qEvalVectorCase) []qEvalVecto
 				return fmt.Sprintf("x:til %d;s:sums x;last s+count s", rows)
 			},
 			goFn: func(rows int) int64 {
-				return int64(rows-1)*int64(rows)/2 + int64(rows)
+				return qEvalVectorGoBaselineSumsTailChecksum(rows, qEvalVectorGoBaselineInput)
 			},
 		},
 		{
@@ -1347,7 +1503,7 @@ func appendQEvalExpressionCombinationCases(cases []qEvalVectorCase) []qEvalVecto
 				return fmt.Sprintf("x:til %d;s:+\\x;last s+count s", rows)
 			},
 			goFn: func(rows int) int64 {
-				return int64(rows-1)*int64(rows)/2 + int64(rows)
+				return qEvalVectorGoBaselineSumsTailChecksum(rows, qEvalVectorGoBaselineInput)
 			},
 		},
 		{
@@ -1358,7 +1514,7 @@ func appendQEvalExpressionCombinationCases(cases []qEvalVectorCase) []qEvalVecto
 				return fmt.Sprintf("x:til %d;(last mins x)+(last maxs reverse x)+(last maxs x)", rows)
 			},
 			goFn: func(rows int) int64 {
-				return int64(2 * (rows - 1))
+				return qEvalVectorGoBaselineRunningMinMaxTail(rows, qEvalVectorGoBaselineInput)
 			},
 		},
 		{
@@ -1369,7 +1525,7 @@ func appendQEvalExpressionCombinationCases(cases []qEvalVectorCase) []qEvalVecto
 				return fmt.Sprintf("x:til %d;last avgs x", rows)
 			},
 			goFn: func(rows int) int64 {
-				return int64(float64(rows-1) / 2)
+				return qEvalVectorGoBaselineAvgsTail(rows, qEvalVectorGoBaselineInput)
 			},
 		},
 		{
@@ -1379,7 +1535,7 @@ func appendQEvalExpressionCombinationCases(cases []qEvalVectorCase) []qEvalVecto
 				return fmt.Sprintf("prd %d#1", rows)
 			},
 			goFn: func(rows int) int64 {
-				return 1
+				return qEvalVectorGoBaselineProductOnes(rows, qEvalVectorGoBaselineInput)
 			},
 		},
 		{
@@ -2884,8 +3040,7 @@ func appendQEvalTaskDListMathMatrixApplyIndexCases(cases []qEvalVectorCase) []qE
 				return fmt.Sprintf("m:2 %d#til %d;(m . 1 10)+count m", rows/2, rows)
 			},
 			goFn: func(rows int) int64 {
-				qEvalVectorAnyBenchSink = qEvalVectorGoBaselineInput
-				return qEvalVectorGoBaselineInput[rows/2+10] + 2
+				return qEvalVectorGoBaselineMatrixCellProbe(2, rows/2, 10, qEvalVectorGoBaselineInput)
 			},
 		},
 		{
@@ -3042,22 +3197,21 @@ func appendQEvalSupportedExpressionBreadthCases(cases []qEvalVectorCase) []qEval
 			name: "BreadthAggregateAvgMedRange",
 			expr: "x:1+til %d;(avg x)+(med x)+(min x)+(max x)+count x",
 			goFn: func(rows int) int64 {
-				return int64(float64(rows+1)/2) + int64(rows/2+1) + 1 + int64(rows) + int64(rows)
+				return qEvalVectorGoBaselineAggregateAvgMedRange(rows, qEvalVectorGoBaselineInput)
 			},
 		},
 		{
 			name: "BreadthAggregateProductOnesAndWavg",
 			expr: "x:%d#1;(prd x)+(count prds x)+(wavg[1 2 3;10 20 30])",
 			goFn: func(rows int) int64 {
-				return 1 + int64(rows) + 23
+				return qEvalVectorGoBaselineAggregateProductWavg(rows, qEvalVectorGoBaselineInput)
 			},
 		},
 		{
 			name: "BreadthRunningMinMaxAvgEnvelope",
 			expr: "x:1+til %d;(last sums x)+(last mins x)+(last maxs x)+(last avgs x)",
 			goFn: func(rows int) int64 {
-				sum := int64(rows) * int64(rows+1) / 2
-				return sum + 1 + int64(rows) + int64(float64(rows+1)/2)
+				return qEvalVectorGoBaselineRunningMinMaxAvgEnvelope(rows, qEvalVectorGoBaselineInput)
 			},
 		},
 		{
@@ -3194,7 +3348,7 @@ func appendQEvalSupportedExpressionBreadthCases(cases []qEvalVectorCase) []qEval
 					return fmt.Sprintf("x:til %d;(x@%d)+(x@%d)+(x@%d)+count x", rows, p.width, p.width*2, p.width*3)
 				},
 				goFn: func(rows int) int64 {
-					return int64(p.width+p.width*2+p.width*3) + int64(rows)
+					return qEvalVectorGoBaselineApplyAtGather(rows, p.width, qEvalVectorGoBaselineInput)
 				},
 			},
 			qEvalVectorCase{
@@ -3221,7 +3375,7 @@ func appendQEvalSupportedExpressionBreadthCases(cases []qEvalVectorCase) []qEval
 					return fmt.Sprintf("f:{(+/x)+count y};.[f;(til %d;%d#1)]", rows, p.width)
 				},
 				goFn: func(rows int) int64 {
-					return int64(rows-1)*int64(rows)/2 + int64(p.width)
+					return qEvalVectorGoBaselineCallableDotApply(rows, p.width, qEvalVectorGoBaselineInput)
 				},
 			},
 		)
@@ -3265,7 +3419,7 @@ func appendQEvalSupportedExpressionBreadthCases(cases []qEvalVectorCase) []qEval
 					return fmt.Sprintf("m:%d %d#til %d;(m . %d %d)+count m", p.rows, p.cols, total, p.rows-1, cellIndex)
 				},
 				goFn: func(rows int) int64 {
-					return int64((p.rows-1)*p.cols+cellIndex) + int64(p.rows)
+					return qEvalVectorGoBaselineMatrixCellProbe(p.rows, p.cols, cellIndex, qEvalVectorGoBaselineInput)
 				},
 			},
 		)
