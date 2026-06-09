@@ -146,7 +146,7 @@ func BenchmarkQEvalPipelineNativeExitCallpath(b *testing.B) {
 			}
 		})
 		b.Run("GoHandlerNativeExit/"+tc.name, func(b *testing.B) {
-			ref := qEvalPipelineDescriptorBackendTestRef(b, tc.src)
+			ref := qEvalPipelineSourceBackedTestRef(b, tc.src)
 			cf := &CompiledFunction{
 				QEvalPipelinePlans:   []QEvalPipelinePlanRef{ref},
 				QEvalPipelineBackend: newQRuntimeEvalPipelineBackend([]QEvalPipelinePlanRef{ref}),
@@ -163,7 +163,7 @@ func BenchmarkQEvalPipelineNativeExitCallpath(b *testing.B) {
 			}
 		})
 		b.Run("GoHandlerHelperSlot/"+tc.name, func(b *testing.B) {
-			ref := qEvalPipelineDescriptorBackendTestRef(b, tc.src)
+			ref := qEvalPipelineSourceBackedTestRef(b, tc.src)
 			backend := newQRuntimeEvalPipelineBackend([]QEvalPipelinePlanRef{ref})
 			cf := &CompiledFunction{
 				QEvalPipelinePlans:       []QEvalPipelinePlanRef{ref},
@@ -182,7 +182,7 @@ func BenchmarkQEvalPipelineNativeExitCallpath(b *testing.B) {
 			}
 		})
 		b.Run("GoHandlerOpExit/"+tc.name, func(b *testing.B) {
-			ref := qEvalPipelineDescriptorBackendTestRef(b, tc.src)
+			ref := qEvalPipelineSourceBackedTestRef(b, tc.src)
 			cf := &CompiledFunction{
 				QEvalPipelinePlans:   []QEvalPipelinePlanRef{ref},
 				QEvalPipelineBackend: newQRuntimeEvalPipelineBackend([]QEvalPipelinePlanRef{ref}),
@@ -212,6 +212,7 @@ func compileQEvalPipelineNativeExitBenchmark(tb testing.TB, source string) *Comp
 	}
 	ref := qEvalPipelineDescriptorBackendTestRef(tb, source)
 	ref.ID = 0
+	ref.Source = source
 	fn.QEvalPipelinePlans = []QEvalPipelinePlanRef{ref}
 	b := &Block{ID: 0, defs: make(map[int]*Value)}
 	plan := &Instr{ID: fn.newValueID(), Op: OpQEvalPipelinePlan, Type: TypeAny, Aux: int64(ref.ID), Block: b}

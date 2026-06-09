@@ -107,6 +107,31 @@ func TestCompiledFunctionUsesQEvalPipelineHelperSlot(t *testing.T) {
 	}
 }
 
+func TestQEvalPipelineHelperReusableEvalStateRequiresSourceBackedDefaultRuntime(t *testing.T) {
+	sourceRef := qEvalPipelineSourceBackedTestRef(t, "count where (til 64 mod 4)=1")
+	sourceBackend := newQRuntimeEvalPipelineBackend([]QEvalPipelinePlanRef{sourceRef})
+	sourceHelpers := newQEvalPipelinePlanHelpers([]QEvalPipelinePlanRef{sourceRef}, sourceBackend)
+	if len(sourceHelpers) != 1 || sourceHelpers[0].evalState == nil {
+		t.Fatalf("source-backed helper evalState = %+v, want reusable eval state", sourceHelpers)
+	}
+
+	descriptorRef := qEvalPipelineDescriptorBackendTestRef(t, "count where (til 64 mod 4)=1")
+	descriptorBackend := newQRuntimeEvalPipelineBackend([]QEvalPipelinePlanRef{descriptorRef})
+	descriptorHelpers := newQEvalPipelinePlanHelpers([]QEvalPipelinePlanRef{descriptorRef}, descriptorBackend)
+	if len(descriptorHelpers) != 1 || descriptorHelpers[0].evalState != nil {
+		t.Fatalf("descriptor-only helper evalState = %+v, want nil", descriptorHelpers)
+	}
+
+	customBackend := newQRuntimeEvalPipelineBackend([]QEvalPipelinePlanRef{sourceRef})
+	customBackend.executeDescriptor = func(descriptor stdq.EvalPipelineDescriptor) (any, bool, error) {
+		return int64(16), true, nil
+	}
+	customHelpers := newQEvalPipelinePlanHelpers([]QEvalPipelinePlanRef{sourceRef}, customBackend)
+	if len(customHelpers) != 1 || customHelpers[0].evalState != nil {
+		t.Fatalf("custom executor helper evalState = %+v, want nil", customHelpers)
+	}
+}
+
 func BenchmarkQEvalPipelineDescriptorBackend(b *testing.B) {
 	for _, tc := range []struct {
 		name string
@@ -200,4 +225,11 @@ func qEvalPipelineDescriptorBackendTestRef(tb testing.TB, source string) QEvalPi
 	}
 	fn := &Function{}
 	return fn.addQEvalPipelinePlan("not a q pipeline", plan)
+}
+
+func qEvalPipelineSourceBackedTestRef(tb testing.TB, source string) QEvalPipelinePlanRef {
+	tb.Helper()
+	ref := qEvalPipelineDescriptorBackendTestRef(tb, source)
+	ref.Source = source
+	return ref
 }

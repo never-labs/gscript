@@ -169,11 +169,8 @@ func (cf *CompiledFunction) ExecuteQEvalPipelinePlanValue(id int) (runtime.Value
 	if cf == nil {
 		return runtime.NilValue(), false, nil
 	}
-	if id >= 0 && id < len(cf.QEvalPipelinePlanHelpers) {
-		helper := cf.QEvalPipelinePlanHelpers[id]
-		if helper.validForID(id) {
-			return helper.execute()
-		}
+	if helper := cf.qEvalPipelinePlanHelper(id); helper != nil {
+		return helper.execute()
 	}
 	ref, ok := qEvalPipelinePlanRefByID(cf.QEvalPipelinePlans, id)
 	if !ok {
@@ -214,6 +211,17 @@ func executeQEvalPipelinePlanValue(backend QEvalPipelineBackend, ref QEvalPipeli
 		return runtime.NilValue(), false, err
 	}
 	return value, true, nil
+}
+
+func (cf *CompiledFunction) qEvalPipelinePlanHelper(id int) *qEvalPipelinePlanHelper {
+	if cf == nil || id < 0 || id >= len(cf.QEvalPipelinePlanHelpers) {
+		return nil
+	}
+	helper := &cf.QEvalPipelinePlanHelpers[id]
+	if !helper.validForID(id) {
+		return nil
+	}
+	return helper
 }
 
 func qEvalPipelinePlanExecutionShape(refs []QEvalPipelinePlanRef, id int) string {
@@ -334,6 +342,19 @@ func (cf *CompiledFunction) qEvalPipelineTerminalReturn(instrID int) bool {
 func (cf *CompiledFunction) executeQEvalPipelinePlanSlot(planID, absSlot int, regs []runtime.Value, route string) error {
 	if absSlot < 0 || absSlot >= len(regs) {
 		return fmt.Errorf("QEvalPipelinePlan exit out of register range")
+	}
+	if helper := cf.qEvalPipelinePlanHelper(planID); helper != nil {
+		out, handled, err := helper.execute()
+		if err != nil || !handled {
+			cf.recordQEvalPipelinePlanExecutionWithRoute(planID, route, "error")
+			if err != nil {
+				return err
+			}
+			return fmt.Errorf("QEvalPipelinePlan exit plan %d was not handled", planID)
+		}
+		cf.recordQEvalPipelinePlanExecutionWithRoute(planID, route, "success")
+		regs[absSlot] = out
+		return nil
 	}
 	out, handled, err := cf.ExecuteQEvalPipelinePlanValue(planID)
 	if err != nil || !handled {

@@ -1,7 +1,9 @@
 package methodjit
 
 import (
+	"reflect"
 	"strings"
+	"sync"
 
 	"github.com/never-labs/leia/internal/runtime"
 	stdq "github.com/never-labs/leia/internal/stdlib/lib/q"
@@ -121,6 +123,8 @@ type qEvalPipelinePlanHelper struct {
 	ref               QEvalPipelinePlanRef
 	descriptor        stdq.EvalPipelineDescriptor
 	hasDescriptor     bool
+	evalState         *stdq.EvalState
+	evalStateMu       sync.Mutex
 	executeDescriptor func(stdq.EvalPipelineDescriptor) (any, bool, error)
 	executeSource     func(string) (any, bool, error)
 }
@@ -157,6 +161,7 @@ func newQEvalPipelinePlanHelpers(refs []QEvalPipelinePlanRef, backend qRuntimeEv
 			ref:               ref,
 			descriptor:        descriptor,
 			hasDescriptor:     hasDescriptor,
+			evalState:         qEvalPipelineReusableEvalState(ref, backend),
 			executeDescriptor: backend.executeDescriptor,
 			executeSource:     backend.executeSource,
 		}
@@ -164,13 +169,60 @@ func newQEvalPipelinePlanHelpers(refs []QEvalPipelinePlanRef, backend qRuntimeEv
 	return helpers
 }
 
-func (h qEvalPipelinePlanHelper) validForID(id int) bool {
-	return h.ref.ID == id && h.ref.Valid() && h.ref.Backend == qEvalPipelineTypedRuntimeBackend
+func qEvalPipelineReusableEvalState(ref QEvalPipelinePlanRef, backend qRuntimeEvalPipelineBackend) *stdq.EvalState {
+	if !ref.Valid() || ref.Source == "" || !stdq.EvalSourceCacheable(ref.Source) {
+		return nil
+	}
+	descriptor, ok := qRuntimeEvalPipelinePlanner{}.DescribeQEvalPipeline(ref.Source)
+	if !ok || descriptor.Kind != ref.Kind || descriptor.Shape != ref.Shape || descriptor.PipelineShape != ref.PipelineShape {
+		return nil
+	}
+	if backend.executeDescriptor != nil && !sameQEvalPipelineDescriptorExecutor(backend.executeDescriptor, stdq.ExecuteEvalPipelineDescriptor) {
+		return nil
+	}
+	if backend.executeSource != nil && !sameQEvalPipelineSourceExecutor(backend.executeSource, stdq.ExecuteEvalPipeline) {
+		return nil
+	}
+	return stdq.NewEvalState(nil)
 }
 
-func (h qEvalPipelinePlanHelper) execute() (runtime.Value, bool, error) {
+func sameQEvalPipelineDescriptorExecutor(a, b func(stdq.EvalPipelineDescriptor) (any, bool, error)) bool {
+	if a == nil || b == nil {
+		return false
+	}
+	return reflect.ValueOf(a).Pointer() == reflect.ValueOf(b).Pointer()
+}
+
+func sameQEvalPipelineSourceExecutor(a, b func(string) (any, bool, error)) bool {
+	if a == nil || b == nil {
+		return false
+	}
+	return reflect.ValueOf(a).Pointer() == reflect.ValueOf(b).Pointer()
+}
+
+func (h *qEvalPipelinePlanHelper) validForID(id int) bool {
+	return h != nil && h.ref.ID == id && h.ref.Valid() && h.ref.Backend == qEvalPipelineTypedRuntimeBackend
+}
+
+func (h *qEvalPipelinePlanHelper) execute() (runtime.Value, bool, error) {
+	if h == nil {
+		return runtime.NilValue(), false, nil
+	}
 	if !h.ref.Valid() || h.ref.Backend != qEvalPipelineTypedRuntimeBackend {
 		return runtime.NilValue(), false, nil
+	}
+	if h.evalState != nil {
+		h.evalStateMu.Lock()
+		out, err := h.evalState.Eval(h.ref.Source)
+		h.evalStateMu.Unlock()
+		if err != nil {
+			return runtime.NilValue(), true, err
+		}
+		value, err := qEvalPipelineRuntimeValue(out)
+		if err != nil {
+			return runtime.NilValue(), false, err
+		}
+		return value, true, nil
 	}
 	var (
 		out     any
