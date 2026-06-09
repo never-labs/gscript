@@ -1278,7 +1278,65 @@ func appendQEvalExpressionCombinationCases(cases []qEvalVectorCase) []qEvalVecto
 				return fmt.Sprintf("x:til %d;(count 100 sublist x)+(count 0 100 200 cut x)+(count (til 16) cross til 16)+(count trim %d#\" AAPL \")+(count where 101001b)", rows, rows)
 			},
 			goFn: func(rows int) int64 {
-				return int64(100 + 2 + 256 + rows + 3)
+				return int64(100+3+256+3) + qEvalRepeatedTrimmedStringLen(rows, " AAPL ")
+			},
+		},
+		{
+			name:   "ListSublistCountEnvelope",
+			tags:   []string{"cut", "projection"},
+			matrix: []string{"list:sublist-cross-cut:string-bool"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("x:til %d;count 100 sublist x", rows)
+			},
+			goFn: func(rows int) int64 {
+				if rows < 100 {
+					return int64(rows)
+				}
+				return 100
+			},
+		},
+		{
+			name:   "ListCutCountEnvelope",
+			tags:   []string{"cut", "projection"},
+			matrix: []string{"list:sublist-cross-cut:string-bool"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("x:til %d;count 0 100 200 cut x", rows)
+			},
+			goFn: func(rows int) int64 {
+				return 3
+			},
+		},
+		{
+			name:   "ListCrossCountEnvelope",
+			tags:   []string{"projection"},
+			matrix: []string{"list:sublist-cross-cut:string-bool"},
+			expr: func(rows int) string {
+				return "count (til 16) cross til 16"
+			},
+			goFn: func(rows int) int64 {
+				return 256
+			},
+		},
+		{
+			name:   "StringTrimCountEnvelope",
+			tags:   []string{"string", "projection"},
+			matrix: []string{"list:sublist-cross-cut:string-bool"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("count trim %d#\" AAPL \"", rows)
+			},
+			goFn: func(rows int) int64 {
+				return qEvalRepeatedTrimmedStringLen(rows, " AAPL ")
+			},
+		},
+		{
+			name:   "BooleanWhereLiteralCountEnvelope",
+			tags:   []string{"boolean-logical", "where", "projection"},
+			matrix: []string{"list:sublist-cross-cut:string-bool"},
+			expr: func(rows int) string {
+				return "count where 101001b"
+			},
+			goFn: func(rows int) int64 {
+				return 3
 			},
 		},
 		{
@@ -2415,6 +2473,31 @@ func qPatternCount(rows, width int, hits map[int]bool) int64 {
 	return count
 }
 
+func qEvalRepeatedTrimmedStringLen(rows int, pattern string) int64 {
+	if rows <= 0 || pattern == "" {
+		return 0
+	}
+	at := func(i int) byte { return pattern[i%len(pattern)] }
+	start := 0
+	for start < rows && qEvalIsASCIISpace(at(start)) {
+		start++
+	}
+	end := rows - 1
+	for end >= start && qEvalIsASCIISpace(at(end)) {
+		end--
+	}
+	return int64(end - start + 1)
+}
+
+func qEvalIsASCIISpace(ch byte) bool {
+	switch ch {
+	case ' ', '\t', '\n', '\r', '\v', '\f':
+		return true
+	default:
+		return false
+	}
+}
+
 func appendQEvalSemanticCoverageCases(cases []qEvalVectorCase) []qEvalVectorCase {
 	coverage := []qEvalVectorCase{
 		{
@@ -2830,6 +2913,48 @@ func TestQEvalVectorBenchmarkExpressions(t *testing.T) {
 	}
 }
 
+func TestQEvalVectorListStringBooleanFallbackCharacterization(t *testing.T) {
+	eval := qEvalVectorEval(t)
+	rows := qEvalVectorRows
+	cases := []struct {
+		name string
+		src  string
+		want int64
+	}{
+		{
+			name: "combined",
+			src:  fmt.Sprintf("x:til %d;(count 100 sublist x)+(count 0 100 200 cut x)+(count (til 16) cross til 16)+(count trim %d#\" AAPL \")+(count where 101001b)", rows, rows),
+			want: 100 + 3 + 256 + qEvalRepeatedTrimmedStringLen(rows, " AAPL ") + 3,
+		},
+		{name: "sublist", src: fmt.Sprintf("x:til %d;count 100 sublist x", rows), want: 100},
+		{name: "cut", src: fmt.Sprintf("x:til %d;count 0 100 200 cut x", rows), want: 3},
+		{name: "cross", src: "count (til 16) cross til 16", want: 256},
+		{name: "trim", src: fmt.Sprintf("count trim %d#\" AAPL \"", rows), want: qEvalRepeatedTrimmedStringLen(rows, " AAPL ")},
+		{name: "where", src: "count where 101001b", want: 3},
+	}
+
+	fallbacks := make(map[string]uint64)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			stdq.ClearRuntimeKernelExecutionStats()
+			got := qEvalVectorRun(t, eval, tc.src)
+			if got != tc.want {
+				t.Fatalf("q.eval checksum = %d, want %d", got, tc.want)
+			}
+			fallbacks[tc.name] = qEvalVectorRuntimeFallbackCount()
+			t.Logf("runtime stats: %#v", stdq.RuntimeKernelExecutionStats())
+		})
+	}
+	stdq.ClearRuntimeKernelExecutionStats()
+
+	if fallbacks["sublist"] != 0 || fallbacks["cut"] != 0 || fallbacks["cross"] != 0 || fallbacks["where"] != 0 {
+		t.Fatalf("unexpected split primitive fallback counts: %#v", fallbacks)
+	}
+	if fallbacks["combined"] > fallbacks["trim"] {
+		t.Fatalf("combined fallback count = %d exceeds trim fallback count = %d; split fallback counts=%#v", fallbacks["combined"], fallbacks["trim"], fallbacks)
+	}
+}
+
 func TestQEvalVectorBenchmarkCoverageTags(t *testing.T) {
 	covered := make(map[string][]string)
 	matrixCovered := make(map[string][]string)
@@ -3044,6 +3169,16 @@ func qEvalVectorReportRuntimeKernelStats(b *testing.B) {
 		b.ReportMetric(float64(len(pipelineShapes)), "typed_pipeline_shapes")
 		b.ReportMetric(float64(len(fallbackPipelineShapes)), "typed_pipeline_fallback_shapes")
 	}
+}
+
+func qEvalVectorRuntimeFallbackCount() uint64 {
+	var fallbacks uint64
+	for _, stat := range stdq.RuntimeKernelExecutionStats() {
+		if stat.Outcome == "fallback" || stat.Outcome == "error" {
+			fallbacks += stat.Count
+		}
+	}
+	return fallbacks
 }
 
 func qEvalVectorReportPipelineCategories(b *testing.B, tc qEvalVectorCase) {
