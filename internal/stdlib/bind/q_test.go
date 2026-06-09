@@ -4601,6 +4601,33 @@ func TestQEvalFastArg1ExecutesAndSharesCache(t *testing.T) {
 	}
 }
 
+func TestQSessionEvalFastArg1KeepsWorkspaceState(t *testing.T) {
+	sessionFn := BuildQ().RawGetString("session").GoFunction()
+	if sessionFn == nil {
+		t.Fatal("q.session function missing")
+	}
+	out, err := sessionFn.Fn(nil)
+	if err != nil {
+		t.Fatalf("q.session: %v", err)
+	}
+	if len(out) != 1 || !out[0].IsTable() {
+		t.Fatalf("q.session returned %#v, want one table", out)
+	}
+	eval := out[0].Table().RawGetString("eval").GoFunction()
+	if eval == nil || eval.FastArg1 == nil {
+		t.Fatalf("q.session.eval FastArg1 missing: %#v", eval)
+	}
+	if _, err := eval.FastArg1(IntValue(1)); err == nil {
+		t.Fatal("q.session.eval FastArg1 accepted non-string source")
+	}
+	if got, err := eval.FastArg1(StringValue("x:41")); err != nil || !got.IsInt() || got.Int() != 41 {
+		t.Fatalf("q.session.eval assignment = %s,%v; want 41,nil", got.String(), err)
+	}
+	if got, err := eval.FastArg1(StringValue("x+1")); err != nil || !got.IsInt() || got.Int() != 42 {
+		t.Fatalf("q.session.eval readback = %s,%v; want 42,nil", got.String(), err)
+	}
+}
+
 func TestQSQLArgs2MatchesTwoArgumentSemantics(t *testing.T) {
 	frame := TableValue(NewTable())
 	source := StringValue("select sym from trades")

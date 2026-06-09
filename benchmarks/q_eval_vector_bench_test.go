@@ -4663,6 +4663,13 @@ func qSessionEvalVectorEval(tb testing.TB) *bind.GoFunction {
 
 func qEvalVectorRun(tb testing.TB, eval *bind.GoFunction, src string) int64 {
 	tb.Helper()
+	if eval.FastArg1 != nil {
+		out, err := eval.FastArg1(bind.StringValue(src))
+		if err != nil {
+			tb.Fatalf("q.eval(%q): %v", src, err)
+		}
+		return qEvalVectorInt64(tb, out)
+	}
 	out, err := eval.Fn([]bind.Value{bind.StringValue(src)})
 	if err != nil {
 		tb.Fatalf("q.eval(%q): %v", src, err)

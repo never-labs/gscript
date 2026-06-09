@@ -247,7 +247,14 @@ func (s *EvalState) ExecuteEvalPipelineBackendPlan(plan EvalPipelineBackendPlan)
 // ExecuteEvalPipelineExecutablePlan executes an opaque predecoded plan using
 // this EvalState's caches and environment.
 func (s *EvalState) ExecuteEvalPipelineExecutablePlan(plan EvalPipelineExecutablePlan) (any, bool, error) {
-	if s == nil || !plan.Valid() {
+	return s.ExecuteEvalPipelineExecutablePlanRef(&plan)
+}
+
+// ExecuteEvalPipelineExecutablePlanRef executes an opaque predecoded plan
+// without copying the plan payload. Hot session/JIT call paths should prefer
+// this form when they already own a stable executable plan.
+func (s *EvalState) ExecuteEvalPipelineExecutablePlanRef(plan *EvalPipelineExecutablePlan) (any, bool, error) {
+	if s == nil || plan == nil || !plan.Valid() {
 		return nil, false, nil
 	}
 	switch plan.kind {

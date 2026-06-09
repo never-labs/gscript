@@ -1089,7 +1089,7 @@ func (s *EvalState) evalQScriptExecutablePlan(plan *qScriptExecutablePlan) (any,
 		out, err := s.evalCachedOrString(stmt.src, stmt.valueExpr, &stmt.bindingPlan, &stmt.fastPlan)
 		return out, true, err
 	case qScriptExecutablePipelineBackend:
-		return s.ExecuteEvalPipelineExecutablePlan(plan.pipeline)
+		return s.ExecuteEvalPipelineExecutablePlanRef(&plan.pipeline)
 	default:
 		return nil, false, nil
 	}

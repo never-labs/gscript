@@ -9,7 +9,7 @@ const evalSessionPlanCacheLimit = 512
 // artifacts for repeated ordinary q eval source.
 type EvalSession struct {
 	state *EvalState
-	cache map[string]evalSessionPlan
+	cache map[string]*evalSessionPlan
 	order []string
 }
 
@@ -35,15 +35,15 @@ func (s *EvalSession) Eval(source string) (any, error) {
 	}
 	source = strings.TrimSpace(source)
 	entry := s.plan(source)
-	if entry.executable.Valid() {
-		if out, handled, err := s.state.ExecuteEvalPipelineExecutablePlan(entry.executable); err != nil || handled {
+	if entry != nil && entry.executable.Valid() {
+		if out, handled, err := s.state.ExecuteEvalPipelineExecutablePlanRef(&entry.executable); err != nil || handled {
 			return out, err
 		}
 	}
 	return s.state.evalScriptPlan(entry.script)
 }
 
-func (s *EvalSession) plan(source string) evalSessionPlan {
+func (s *EvalSession) plan(source string) *evalSessionPlan {
 	if s.cache != nil {
 		if entry, ok := s.cache[source]; ok {
 			return entry
@@ -54,9 +54,9 @@ func (s *EvalSession) plan(source string) evalSessionPlan {
 	return entry
 }
 
-func (s *EvalSession) buildPlan(source string) evalSessionPlan {
+func (s *EvalSession) buildPlan(source string) *evalSessionPlan {
 	plan := s.state.qScriptPlan(source)
-	entry := evalSessionPlan{source: source, script: plan}
+	entry := &evalSessionPlan{source: source, script: plan}
 	if plan.scriptPipeline == nil {
 		return entry
 	}
@@ -73,14 +73,14 @@ func (s *EvalSession) buildPlan(source string) evalSessionPlan {
 	return entry
 }
 
-func (s *EvalSession) rememberPlan(source string, entry evalSessionPlan) {
+func (s *EvalSession) rememberPlan(source string, entry *evalSessionPlan) {
 	if source == "" {
 		return
 	}
 	if s.cache == nil {
-		s.cache = make(map[string]evalSessionPlan, 16)
+		s.cache = make(map[string]*evalSessionPlan, 16)
 	} else if len(s.cache) >= evalSessionPlanCacheLimit {
-		s.cache = make(map[string]evalSessionPlan, 16)
+		s.cache = make(map[string]*evalSessionPlan, 16)
 		s.order = s.order[:0]
 	}
 	if _, ok := s.cache[source]; !ok {

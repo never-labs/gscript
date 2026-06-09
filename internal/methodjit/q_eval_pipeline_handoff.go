@@ -339,7 +339,7 @@ func (h *qEvalPipelinePlanHelper) execute() (runtime.Value, bool, error) {
 			err     error
 		)
 		if h.hasExecutablePlan {
-			out, handled, err = h.evalState.ExecuteEvalPipelineExecutablePlan(h.executablePlan)
+			out, handled, err = h.evalState.ExecuteEvalPipelineExecutablePlanRef(&h.executablePlan)
 		} else if h.hasBackendPlan {
 			out, handled, err = h.evalState.ExecuteEvalPipelineBackendPlan(h.backendPlan)
 		} else if h.hasDescriptor {
@@ -485,7 +485,7 @@ func (b qRuntimeEvalPipelineBackend) executeEvalPipelineExecutablePlan(plan stdq
 	if b.executeExecutable != nil {
 		return b.executeExecutable(plan)
 	}
-	return stdq.NewEvalState(nil).ExecuteEvalPipelineExecutablePlan(plan)
+	return stdq.NewEvalState(nil).ExecuteEvalPipelineExecutablePlanRef(&plan)
 }
 
 func (b qRuntimeEvalPipelineBackend) executeEvalPipelineDescriptor(descriptor stdq.EvalPipelineDescriptor) (any, bool, error) {

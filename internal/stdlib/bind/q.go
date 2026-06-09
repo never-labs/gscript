@@ -1048,24 +1048,34 @@ func qEvalSymbolicSource(src string) (Value, error) {
 func qSessionValue() *Table {
 	session := stdq.NewEvalSession(nil)
 	var mu sync.Mutex
+	evalValue := func(src Value) (Value, error) {
+		if !src.IsString() {
+			return NilValue(), fmt.Errorf("q.session.eval: argument 1 must be a q source string")
+		}
+		mu.Lock()
+		out, err := session.Eval(src.Str())
+		mu.Unlock()
+		if err != nil {
+			return NilValue(), fmt.Errorf("q session: %w", err)
+		}
+		v, err := qEvalValueToValue(out)
+		if err != nil {
+			return NilValue(), fmt.Errorf("q session: %w", err)
+		}
+		return v, nil
+	}
 	t := NewTable()
 	t.RawSetString("kind", StringValue("q_session"))
 	t.RawSetString("eval", FunctionValue(&GoFunction{Name: "q.session.eval", Fn: func(args []Value) ([]Value, error) {
 		if len(args) < 1 || !args[0].IsString() {
 			return nil, fmt.Errorf("q.session.eval: argument 1 must be a q source string")
 		}
-		mu.Lock()
-		out, err := session.Eval(args[0].Str())
-		mu.Unlock()
+		v, err := evalValue(args[0])
 		if err != nil {
-			return nil, fmt.Errorf("q session: %w", err)
-		}
-		v, err := qEvalValueToValue(out)
-		if err != nil {
-			return nil, fmt.Errorf("q session: %w", err)
+			return nil, err
 		}
 		return []Value{v}, nil
-	}}))
+	}, FastArg1: evalValue}))
 	return t
 }
 

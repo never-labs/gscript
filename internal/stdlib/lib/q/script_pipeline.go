@@ -1668,13 +1668,26 @@ func (s *EvalState) evalQScriptCallableOverScanSumPipeline(descriptor *qScriptPi
 }
 
 type qScriptNumericSummary struct {
-	kind  data.Kind
-	count int64
-	sum   any
+	kind   data.Kind
+	count  int64
+	sum    any
+	sumI64 int64
+	sumF64 float64
+	hasI64 bool
+	hasF64 bool
 }
 
 func (s *EvalState) evalQScriptCallableOverScanSumSummary(initial any, summary qScriptNumericSummary, shapeSuffix string) (any, bool, error) {
-	shape := "callable-over/scan-sum-count/" + shapeSuffix
+	shape := qCallableOverScanSumShape(shapeSuffix)
+	if summary.kind == data.KindI64 && summary.hasI64 {
+		sumValue, handled, err := qTypedRuntimeResultReason("CallableOverScanSum", shape, RuntimeFallbackUnsupportedType, summary.sumI64, true, nil)
+		if err != nil || !handled {
+			return nil, handled, err
+		}
+		if initialValue, ok := integerValue(initial); ok {
+			return initialValue + sumValue + sumValue + summary.count, true, nil
+		}
+	}
 	sumValue, handled, err := qTypedRuntimeResultReason("CallableOverScanSum", shape, RuntimeFallbackUnsupportedType, summary.sum, true, nil)
 	if err != nil || !handled {
 		return nil, handled, err
@@ -1692,6 +1705,17 @@ func (s *EvalState) evalQScriptCallableOverScanSumSummary(initial any, summary q
 	}
 	out, err = applyDyadic('+', out, summary.count)
 	return out, true, err
+}
+
+func qCallableOverScanSumShape(shapeSuffix string) string {
+	switch shapeSuffix {
+	case "summary/i64":
+		return "callable-over/scan-sum-count/summary/i64"
+	case "summary/f64":
+		return "callable-over/scan-sum-count/summary/f64"
+	default:
+		return "callable-over/scan-sum-count/" + shapeSuffix
+	}
 }
 
 func (s *EvalState) evalQScriptNumericSummaryWithResolver(plan *qScriptBindingPlan, resolver qScriptBindingNameResolver) (qScriptNumericSummary, bool, error) {
@@ -1726,7 +1750,8 @@ func (s *EvalState) evalQScriptNumericSummaryWithResolver(plan *qScriptBindingPl
 		if !ok || n < 0 {
 			return qScriptNumericSummary{}, false, nil
 		}
-		return qScriptNumericSummary{kind: data.KindI64, count: n, sum: qArithmeticSeriesSumI64(0, 1, n)}, true, nil
+		sum := qArithmeticSeriesSumI64(0, 1, n)
+		return qScriptNumericSummary{kind: data.KindI64, count: n, sum: sum, sumI64: sum, hasI64: true}, true, nil
 	case qScriptBindingBinary:
 		if plan.op != "+" && plan.op != "-" && plan.op != "*" {
 			return qScriptNumericSummary{}, false, nil
@@ -1784,17 +1809,29 @@ func qNumericSummaryFromValue(value any) (qScriptNumericSummary, bool, error) {
 	if err != nil || !handled {
 		return qScriptNumericSummary{}, handled, err
 	}
-	return qScriptNumericSummary{kind: array.Kind(), count: int64(array.Len()), sum: sum}, true, nil
+	summary := qScriptNumericSummary{kind: array.Kind(), count: int64(array.Len()), sum: sum}
+	switch v := sum.(type) {
+	case int64:
+		summary.sumI64 = v
+		summary.hasI64 = true
+	case int:
+		summary.sumI64 = int64(v)
+		summary.hasI64 = true
+	case float64:
+		summary.sumF64 = v
+		summary.hasF64 = true
+	case float32:
+		summary.sumF64 = float64(v)
+		summary.hasF64 = true
+	}
+	return summary, true, nil
 }
 
 func qScriptNumericSummaryApplyScalar(summary qScriptNumericSummary, scalar any, scalarLeft bool, op string) (qScriptNumericSummary, bool, error) {
-	if summary.kind != data.KindI64 {
+	if summary.kind != data.KindI64 || !summary.hasI64 {
 		return qScriptNumericSummary{}, false, nil
 	}
-	sum, ok := integerValue(summary.sum)
-	if !ok {
-		return qScriptNumericSummary{}, false, nil
-	}
+	sum := summary.sumI64
 	n := summary.count
 	scalarI64, ok := integerValue(scalar)
 	if !ok {
@@ -1815,6 +1852,8 @@ func qScriptNumericSummaryApplyScalar(summary qScriptNumericSummary, scalar any,
 		return qScriptNumericSummary{}, false, nil
 	}
 	summary.sum = sum
+	summary.sumI64 = sum
+	summary.hasI64 = true
 	return summary, true, nil
 }
 
