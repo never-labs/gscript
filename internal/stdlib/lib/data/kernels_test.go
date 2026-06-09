@@ -2691,7 +2691,31 @@ func TestTypedNumericUnaryBinaryAndAggregates(t *testing.T) {
 			if got != want {
 				t.Fatalf("TryTypedSequenceTransformChainNumericSumFirstLast = %#v, want %#v", got, want)
 			}
+			wantSum, ok, err := TryTypedNumericSum(wantArray)
+			if err != nil || !ok {
+				t.Fatalf("TryTypedNumericSum oracle = %#v,%v,%v", wantSum, ok, err)
+			}
+			wantSumCount := wantSum.(int64) + int64(wantArray.Len())
+			gotSumCount, ok, err := TryTypedSequenceTransformChainNumericSumCount(tc.steps, tc.source)
+			if err != nil || !ok {
+				t.Fatalf("TryTypedSequenceTransformChainNumericSumCount = %#v,%v,%v", gotSumCount, ok, err)
+			}
+			if gotSumCount != wantSumCount {
+				t.Fatalf("TryTypedSequenceTransformChainNumericSumCount = %#v, want %#v", gotSumCount, wantSumCount)
+			}
 		})
+	}
+
+	dropTakeSumCount, ok, err := TryTypedSequenceTransformChainNumericSumCount([]SequenceTransformStep{
+		{Transform: SequenceTransformDrop, Args: [2]int{128}, ArgCount: 1},
+		{Transform: SequenceTransformSublist, Args: [2]int{1024}, ArgCount: 1},
+		{Transform: SequenceTransformSublist, Args: [2]int{512}, ArgCount: 1},
+	}, NewI64Range(0, 1, 4096))
+	if err != nil || !ok {
+		t.Fatalf("TryTypedSequenceTransformChainNumericSumCount drop/take/sublist = %#v,%v,%v", dropTakeSumCount, ok, err)
+	}
+	if got, want := dropTakeSumCount, int64(196864); got != want {
+		t.Fatalf("TryTypedSequenceTransformChainNumericSumCount drop/take/sublist = %#v, want %#v", got, want)
 	}
 
 	tiledFloats, err := TakeRepeat(NewF64([]float64{0, 1.5}), 7)

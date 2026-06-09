@@ -724,6 +724,63 @@ func TestQScriptPipelinePlannerDescribesSequenceEdgeReduce(t *testing.T) {
 	}
 }
 
+func TestQScriptPipelinePlannerDescribesSequenceSumCountReduce(t *testing.T) {
+	src := "x:til 4096;y:1024#drop 128 x;z:512 sublist y;(+/z)+count z"
+	plan := buildQScriptPlan(src)
+	if plan.scriptPipeline == nil {
+		t.Fatalf("script pipeline descriptor missing")
+	}
+	d := plan.scriptPipeline
+	if d.kind != qScriptPipelineSequenceSumCount {
+		t.Fatalf("pipeline kind = %q, want %q", d.kind, qScriptPipelineSequenceSumCount)
+	}
+	if d.sequenceValueExpr != "x" ||
+		qScriptPipelineSequenceTransformName(d.sequenceSteps) != "drop.sublist.sublist" ||
+		encodeQScriptPipelineSequenceTransformSteps(d.sequenceSteps) != "drop:128|sublist:1024|sublist:512" ||
+		encodeQScriptPipelineNames(d.sequenceBindings) != "y\x1fz" {
+		t.Fatalf("sequence sum-count descriptor = base %q steps %#v names %#v", d.sequenceValueExpr, d.sequenceSteps, d.sequenceBindings)
+	}
+	if got, want := d.shape(), "script-pipeline/sequence-reduce/sum-count-transform-chain/assignments"; got != want {
+		t.Fatalf("shape = %q, want %q", got, want)
+	}
+	assertEvalValue(t, src, int64(196864))
+	descriptor, ok := DescribeEvalPipeline(src)
+	if !ok {
+		t.Fatalf("DescribeEvalPipeline(%q) did not recognize sequence sum-count pipeline", src)
+	}
+	out, handled, err := ExecuteEvalPipelineDescriptor(descriptor)
+	if err != nil || !handled || out != int64(196864) {
+		t.Fatalf("ExecuteEvalPipelineDescriptor sequence sum-count = %#v,%v,%v; want 196864,true,nil", out, handled, err)
+	}
+}
+
+func TestQScriptPipelinePlannerDescribesGatherSumCountReduce(t *testing.T) {
+	src := "x:til 4096;idx:32*til 128;(+/x[idx])+count idx"
+	plan := buildQScriptPlan(src)
+	if plan.scriptPipeline == nil {
+		t.Fatalf("script pipeline descriptor missing")
+	}
+	d := plan.scriptPipeline
+	if d.kind != qScriptPipelineGatherReduceSumCount {
+		t.Fatalf("pipeline kind = %q, want %q", d.kind, qScriptPipelineGatherReduceSumCount)
+	}
+	if d.valueExpr != "x" || d.indexExpr != "idx" || d.indexBinding != "32*til 128" {
+		t.Fatalf("gather sum-count descriptor = value %q index %q binding %q", d.valueExpr, d.indexExpr, d.indexBinding)
+	}
+	if got, want := d.shape(), "script-pipeline/gather-reduce/sum-count/assignments"; got != want {
+		t.Fatalf("shape = %q, want %q", got, want)
+	}
+	assertEvalValue(t, src, int64(260224))
+	descriptor, ok := DescribeEvalPipeline(src)
+	if !ok {
+		t.Fatalf("DescribeEvalPipeline(%q) did not recognize gather sum-count pipeline", src)
+	}
+	out, handled, err := ExecuteEvalPipelineDescriptor(descriptor)
+	if err != nil || !handled || out != int64(260224) {
+		t.Fatalf("ExecuteEvalPipelineDescriptor gather sum-count = %#v,%v,%v; want 260224,true,nil", out, handled, err)
+	}
+}
+
 func TestQScriptPipelinePlannerDescribesSumPlusDyadicFloat(t *testing.T) {
 	src := "x:(til 8) mod 4;y:2 xexp x;(+/y)+(+/2 xlog y)"
 	plan := buildQScriptPlan(src)

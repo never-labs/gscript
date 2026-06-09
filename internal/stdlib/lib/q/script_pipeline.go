@@ -10,19 +10,21 @@ import (
 type qScriptPipelineKind string
 
 const (
-	qScriptPipelineWhereReduceSum      qScriptPipelineKind = "where-reduce/sum"
-	qScriptPipelineWhereIndexReduceSum qScriptPipelineKind = "where-index-reduce/sum"
-	qScriptPipelineGatherReduceSum     qScriptPipelineKind = "gather-reduce/sum"
-	qScriptPipelineSequenceEdgeSum     qScriptPipelineKind = "sequence-edge-reduce/sum-first-last"
-	qScriptPipelineSumPlusDyadicFloat  qScriptPipelineKind = "multi-reduce/sum-plus-dyadic-float-sum"
-	qScriptPipelineIntegerDivModReduce qScriptPipelineKind = "multi-reduce/integer-divmod-sum-count"
-	qScriptPipelineMatrixRowSumCount   qScriptPipelineKind = "matrix-row-reduce/sum-count"
-	qScriptPipelineMatrixCellPlusCount qScriptPipelineKind = "matrix-cell-reduce/cell-plus-count"
-	qScriptPipelineCallableDotSumRight qScriptPipelineKind = "callable-dot/sum-plus-right"
-	qScriptPipelineApplyScalarAt       qScriptPipelineKind = "apply-index/scalar-at"
-	qScriptPipelineApplyScalarDot      qScriptPipelineKind = "apply-index/scalar-dot"
-	qScriptPipelineApplyPathDot        qScriptPipelineKind = "apply-index/path-dot"
-	qScriptPipelineUnsupported         qScriptPipelineKind = ""
+	qScriptPipelineWhereReduceSum       qScriptPipelineKind = "where-reduce/sum"
+	qScriptPipelineWhereIndexReduceSum  qScriptPipelineKind = "where-index-reduce/sum"
+	qScriptPipelineGatherReduceSum      qScriptPipelineKind = "gather-reduce/sum"
+	qScriptPipelineGatherReduceSumCount qScriptPipelineKind = "gather-reduce/sum-count"
+	qScriptPipelineSequenceEdgeSum      qScriptPipelineKind = "sequence-edge-reduce/sum-first-last"
+	qScriptPipelineSequenceSumCount     qScriptPipelineKind = "sequence-reduce/sum-count"
+	qScriptPipelineSumPlusDyadicFloat   qScriptPipelineKind = "multi-reduce/sum-plus-dyadic-float-sum"
+	qScriptPipelineIntegerDivModReduce  qScriptPipelineKind = "multi-reduce/integer-divmod-sum-count"
+	qScriptPipelineMatrixRowSumCount    qScriptPipelineKind = "matrix-row-reduce/sum-count"
+	qScriptPipelineMatrixCellPlusCount  qScriptPipelineKind = "matrix-cell-reduce/cell-plus-count"
+	qScriptPipelineCallableDotSumRight  qScriptPipelineKind = "callable-dot/sum-plus-right"
+	qScriptPipelineApplyScalarAt        qScriptPipelineKind = "apply-index/scalar-at"
+	qScriptPipelineApplyScalarDot       qScriptPipelineKind = "apply-index/scalar-dot"
+	qScriptPipelineApplyPathDot         qScriptPipelineKind = "apply-index/path-dot"
+	qScriptPipelineUnsupported          qScriptPipelineKind = ""
 )
 
 type qScriptPipelineDescriptor struct {
@@ -76,7 +78,7 @@ func (d qScriptPipelineDescriptor) shape() string {
 	if d.kind == qScriptPipelineUnsupported {
 		return "script-pipeline/unsupported"
 	}
-	if d.kind == qScriptPipelineSequenceEdgeSum && len(d.sequenceSteps) > 0 {
+	if (d.kind == qScriptPipelineSequenceEdgeSum || d.kind == qScriptPipelineSequenceSumCount) && len(d.sequenceSteps) > 0 {
 		if len(d.assignments) == 0 {
 			return "script-pipeline/" + string(d.kind) + "-transform-chain/direct"
 		}
@@ -175,6 +177,12 @@ func describeQScriptPipelineTerminal(src string, bindings map[string]string) (qS
 			valueExpr:    valueExpr,
 			valueBinding: qScriptPipelineBinding(valueExpr, bindings),
 		}, true
+	}
+	if descriptor, ok := qScriptPipelineSequenceSumCountDescriptor(src, bindings); ok {
+		return descriptor, true
+	}
+	if descriptor, ok := qScriptPipelineGatherSumCountDescriptor(src, bindings); ok {
+		return descriptor, true
 	}
 	if descriptor, ok := qScriptPipelineSumPlusDyadicFloatDescriptor(src, bindings); ok {
 		return descriptor, true
@@ -293,6 +301,21 @@ func qScriptPipelineSequenceTransformStep(src string) (data.SequenceTransformSte
 			return data.SequenceTransformStep{}, "", false
 		}
 		return data.SequenceTransformStep{Transform: data.SequenceTransformReverse}, valueExpr, true
+	}
+	if strings.HasPrefix(src, "drop ") && wordBoundary(src, 0, len("drop")) {
+		countExpr, valueExpr, ok := splitQScriptPrefixDyadicArgs(strings.TrimSpace(src[len("drop "):]))
+		n, staticOK := qScriptPipelineStaticInt(countExpr)
+		if !ok || !staticOK || strings.TrimSpace(valueExpr) == "" {
+			return data.SequenceTransformStep{}, "", false
+		}
+		return data.SequenceTransformStep{Transform: data.SequenceTransformDrop, Args: [2]int{n}, ArgCount: 1}, strings.TrimSpace(valueExpr), true
+	}
+	if left, right, ok := splitTopLevelOperator(src, "#"); ok {
+		n, staticOK := qScriptPipelineStaticInt(left)
+		if !staticOK || strings.HasPrefix(strings.TrimSpace(left), "`") || strings.TrimSpace(right) == "" {
+			return data.SequenceTransformStep{}, "", false
+		}
+		return data.SequenceTransformStep{Transform: data.SequenceTransformSublist, Args: [2]int{n}, ArgCount: 1}, strings.TrimSpace(right), true
 	}
 	if left, right, ok := splitTopLevelWord(src, "rotate"); ok {
 		n, ok := qScriptPipelineStaticInt(left)
@@ -431,6 +454,84 @@ func qScriptPipelineSumCountReduceValue(src string) (string, bool) {
 		seen[kind] = true
 	}
 	return value, value != "" && seen["sum"] && seen["count"]
+}
+
+func qScriptPipelineSequenceSumCountDescriptor(src string, bindings map[string]string) (qScriptPipelineDescriptor, bool) {
+	valueExpr, ok := qScriptPipelineSumCountReduceValue(src)
+	if !ok {
+		return qScriptPipelineDescriptor{}, false
+	}
+	baseExpr, steps, chainBindings, chainOK := qScriptPipelineSequenceTransformChain(valueExpr, bindings)
+	if !chainOK || len(steps) == 0 {
+		return qScriptPipelineDescriptor{}, false
+	}
+	return qScriptPipelineDescriptor{
+		kind:              qScriptPipelineSequenceSumCount,
+		valueExpr:         valueExpr,
+		valueBinding:      qScriptPipelineBinding(valueExpr, bindings),
+		sequenceValueExpr: baseExpr,
+		sequenceSteps:     steps,
+		sequenceBindings:  chainBindings,
+		includeCount:      true,
+	}, true
+}
+
+func qScriptPipelineGatherSumCountDescriptor(src string, bindings map[string]string) (qScriptPipelineDescriptor, bool) {
+	terms := qScriptPipelinePlusTerms(src)
+	if len(terms) != 2 {
+		return qScriptPipelineDescriptor{}, false
+	}
+	var valueExpr string
+	var indexExpr string
+	var countExpr string
+	for _, term := range terms {
+		if expr, ok := qScriptPipelineCountTerm(term); ok {
+			if countExpr != "" {
+				return qScriptPipelineDescriptor{}, false
+			}
+			countExpr = expr
+			continue
+		}
+		gatherValue, gatherIndex, ok := qScriptPipelineGatherSumTerm(term)
+		if !ok {
+			return qScriptPipelineDescriptor{}, false
+		}
+		if valueExpr != "" {
+			return qScriptPipelineDescriptor{}, false
+		}
+		valueExpr = gatherValue
+		indexExpr = gatherIndex
+	}
+	if valueExpr == "" || indexExpr == "" || countExpr == "" || strings.TrimSpace(countExpr) != strings.TrimSpace(indexExpr) {
+		return qScriptPipelineDescriptor{}, false
+	}
+	if _, ok := qScriptPipelineIndexMaskExpr(indexExpr, bindings); ok {
+		return qScriptPipelineDescriptor{}, false
+	}
+	return qScriptPipelineDescriptor{
+		kind:         qScriptPipelineGatherReduceSumCount,
+		valueExpr:    valueExpr,
+		valueBinding: qScriptPipelineBinding(valueExpr, bindings),
+		indexExpr:    indexExpr,
+		indexBinding: qScriptPipelineBinding(indexExpr, bindings),
+		includeCount: true,
+	}, true
+}
+
+func qScriptPipelineGatherSumTerm(src string) (string, string, bool) {
+	src = stripEnclosingParens(strings.TrimSpace(src))
+	if strings.HasPrefix(src, "+/") {
+		src = strings.TrimSpace(src[len("+/"):])
+	} else if strings.HasPrefix(src, "sum") && wordBoundary(src, 0, len("sum")) {
+		src = strings.TrimSpace(src[len("sum"):])
+	} else {
+		return "", "", false
+	}
+	valueExpr, indexExpr, ok := findPostfixIndex(src)
+	if !ok {
+		return "", "", false
+	}
+	return strings.TrimSpace(valueExpr), strings.TrimSpace(indexExpr), valueExpr != "" && indexExpr != ""
 }
 
 func qScriptPipelineSumPlusDyadicFloatDescriptor(src string, bindings map[string]string) (qScriptPipelineDescriptor, bool) {
@@ -768,6 +869,16 @@ func (s *EvalState) tryEvalQScriptPipeline(descriptor *qScriptPipelineDescriptor
 	shape := descriptor.shape()
 	if descriptor.kind == qScriptPipelineSequenceEdgeSum {
 		out, handled, err := s.evalQScriptSequenceEdgeSumPipeline(descriptor)
+		recordQScriptPipelineResult(shape, handled, err)
+		return out, handled, err
+	}
+	if descriptor.kind == qScriptPipelineSequenceSumCount {
+		out, handled, err := s.evalQScriptSequenceTransformChainSumCountPipeline(descriptor)
+		recordQScriptPipelineResult(shape, handled, err)
+		return out, handled, err
+	}
+	if descriptor.kind == qScriptPipelineGatherReduceSumCount {
+		out, handled, err := s.evalQScriptGatherSumCountPipeline(descriptor)
 		recordQScriptPipelineResult(shape, handled, err)
 		return out, handled, err
 	}
@@ -1247,6 +1358,117 @@ func (s *EvalState) evalQScriptSequenceTransformChainEdgeSumPipeline(descriptor 
 	return out, handled, err
 }
 
+func (s *EvalState) evalQScriptSequenceTransformChainSumCountPipeline(descriptor *qScriptPipelineDescriptor) (any, bool, error) {
+	for _, assignment := range descriptor.assignments {
+		if qScriptPipelineNameIn(descriptor.sequenceBindings, assignment.name) {
+			continue
+		}
+		value, handled, err := s.evalQScriptBindingPlan(&assignment.binding)
+		if err != nil {
+			return nil, true, err
+		}
+		if !handled {
+			value, err = s.evalCachedOrString(assignment.rhs, assignment.valueExpr, &assignment.binding, nil)
+			if err != nil {
+				return nil, true, err
+			}
+		}
+		s.env[s.resolveAssignmentName(assignment.name)] = value
+	}
+	value, handled, err := s.evalQScriptBindingPlan(&descriptor.sequenceValuePlan)
+	if err != nil || !handled {
+		return nil, handled, err
+	}
+	shape := "vector-transform-chain/sum-count/" + qScriptPipelineSequenceTransformName(descriptor.sequenceSteps) + "/" + string(qRuntimeKernelOperandKind(value, nil))
+	out, handled, err := data.TryTypedSequenceTransformChainNumericSumCount(descriptor.sequenceSteps, value)
+	out, handled, err = qTypedRuntimeResultReason("SequenceTransformChainSumCount", shape, RuntimeFallbackUnsupportedType, out, handled, err)
+	return out, handled, err
+}
+
+func (s *EvalState) evalQScriptGatherSumCountPipeline(descriptor *qScriptPipelineDescriptor) (any, bool, error) {
+	for _, assignment := range descriptor.assignments {
+		name := strings.TrimSpace(assignment.name)
+		if name == strings.TrimSpace(descriptor.valueExpr) || name == strings.TrimSpace(descriptor.indexExpr) {
+			continue
+		}
+		value, handled, err := s.evalQScriptBindingPlan(&assignment.binding)
+		if err != nil {
+			return nil, true, err
+		}
+		if !handled {
+			value, err = s.evalCachedOrString(assignment.rhs, assignment.valueExpr, &assignment.binding, nil)
+			if err != nil {
+				return nil, true, err
+			}
+		}
+		s.env[s.resolveAssignmentName(assignment.name)] = value
+	}
+	value, handled, err := s.evalQScriptBindingPlan(&descriptor.valuePlan)
+	if err != nil {
+		return nil, true, err
+	}
+	if !handled {
+		if err := s.evalQScriptPipelineDeferredAssignment(descriptor, descriptor.valueExpr); err != nil {
+			return nil, true, err
+		}
+		value, handled, err = s.evalQScriptBindingPlan(&descriptor.valuePlan)
+		if err != nil || !handled {
+			return nil, handled, err
+		}
+	}
+	array, ok := value.(data.Array)
+	if !ok {
+		return nil, false, nil
+	}
+	index, handled, err := s.evalQScriptBindingPlan(&descriptor.indexPlan)
+	if err != nil {
+		return nil, true, err
+	}
+	if !handled {
+		if err := s.evalQScriptPipelineDeferredAssignment(descriptor, descriptor.indexExpr); err != nil {
+			return nil, true, err
+		}
+		index, handled, err = s.evalQScriptBindingPlan(&descriptor.indexPlan)
+		if err != nil || !handled {
+			return nil, handled, err
+		}
+	}
+	indexes, ok := index.(data.Array)
+	if !ok {
+		return nil, false, nil
+	}
+	shape := "gather-reduce/sum-count/" + string(array.Kind()) + "/" + string(indexes.Kind())
+	sumValue, handled, err := data.TryTypedNumericSumByI64Indexes(array, indexes)
+	sumValue, handled, err = qTypedRuntimeResultReason("ArrayGatherSumCount", shape, RuntimeFallbackUnsupportedType, sumValue, handled, err)
+	if err != nil || !handled {
+		return sumValue, handled, err
+	}
+	out, ok := dataNumericAddCount(sumValue, indexes.Len())
+	if !ok {
+		return nil, false, nil
+	}
+	return out, true, nil
+}
+
+func dataNumericAddCount(value any, count int) (any, bool) {
+	switch x := value.(type) {
+	case int64:
+		return x + int64(count), true
+	case int:
+		return int64(x) + int64(count), true
+	case float64:
+		return x + float64(count), true
+	case float32:
+		return float64(x) + float64(count), true
+	default:
+		n, ok := numeric(value)
+		if !ok {
+			return nil, false
+		}
+		return n + float64(count), true
+	}
+}
+
 func qScriptPipelineNameIn(names []string, target string) bool {
 	target = strings.TrimSpace(target)
 	if target == "" {
@@ -1271,6 +1493,8 @@ func qScriptPipelineSequenceTransformName(steps []data.SequenceTransformStep) st
 			parts = append(parts, "reverse")
 		case data.SequenceTransformRotate:
 			parts = append(parts, "rotate")
+		case data.SequenceTransformDrop:
+			parts = append(parts, "drop")
 		case data.SequenceTransformSublist:
 			parts = append(parts, "sublist")
 		default:
@@ -1329,6 +1553,10 @@ func decodeQScriptPipelineSequenceTransformSteps(text string) ([]data.SequenceTr
 				return nil, false
 			}
 		case data.SequenceTransformRotate:
+			if step.ArgCount != 1 {
+				return nil, false
+			}
+		case data.SequenceTransformDrop:
 			if step.ArgCount != 1 {
 				return nil, false
 			}

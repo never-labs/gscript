@@ -5,6 +5,7 @@ import "fmt"
 const (
 	SequenceTransformReverse = "reverse"
 	SequenceTransformRotate  = "rotate"
+	SequenceTransformDrop    = "drop"
 	SequenceTransformSublist = "sublist"
 	SequenceTransformCut     = "cut"
 	SequenceTransformRaze    = "raze"
@@ -258,6 +259,71 @@ func TryTypedSequenceTransformChainNumericSumFirstLast(steps []SequenceTransform
 	return total + first + last, true, nil
 }
 
+// TryTypedSequenceTransformChainNumericSumCount reduces
+// sum(chain(value))+count(chain(value)) for index-only list transforms without
+// constructing intermediate views. It is the sum/count sibling of the edge
+// reducer above and gives q/Leia frontends one reusable backend shape for
+// take/drop/sublist-style analytics.
+func TryTypedSequenceTransformChainNumericSumCount(steps []SequenceTransformStep, value any) (any, bool, error) {
+	array, ok := value.(Array)
+	if !ok || len(steps) == 0 {
+		return nil, false, nil
+	}
+	if len(steps) > 8 {
+		return nil, false, nil
+	}
+	var lengths [9]int
+	lengths[0] = array.Len()
+	for i, step := range steps {
+		next, handled, err := sequenceTransformStepLength(lengths[i], step)
+		if err != nil || !handled {
+			return nil, handled, err
+		}
+		lengths[i+1] = next
+	}
+	finalLen := lengths[len(steps)]
+	if finalLen == 0 {
+		return NullValue, true, nil
+	}
+	if values, ok := array.(i64RangeArray); ok {
+		if total, handled := sequenceTransformChainI64RangeSumCount(steps, lengths, values, finalLen); handled {
+			return total, true, nil
+		}
+	}
+	if isIntegerArray(array) {
+		var total int64
+		for row := 0; row < finalLen; row++ {
+			sourceRow, ok, err := sequenceTransformSourceRow(row, steps, lengths)
+			if err != nil || !ok {
+				return nil, ok, err
+			}
+			value, ok, err := integerArrayAt(array, sourceRow)
+			if err != nil || !ok {
+				return nil, ok, err
+			}
+			total += value
+		}
+		return total + int64(finalLen), true, nil
+	}
+	var total float64
+	for row := 0; row < finalLen; row++ {
+		sourceRow, ok, err := sequenceTransformSourceRow(row, steps, lengths)
+		if err != nil || !ok {
+			return nil, ok, err
+		}
+		raw, ok := array.At(sourceRow)
+		if !ok {
+			return nil, false, fmt.Errorf("array row %d out of range", sourceRow)
+		}
+		value, ok := numeric(raw)
+		if !ok {
+			return nil, false, nil
+		}
+		total += value
+	}
+	return total + float64(finalLen), true, nil
+}
+
 func sequenceTransformChainI64RangeSumFirstLast(steps []SequenceTransformStep, lengths [9]int, values i64RangeArray, finalLen int) (int64, bool) {
 	if values.len != lengths[0] || finalLen <= 0 {
 		return 0, false
@@ -280,6 +346,13 @@ func sequenceTransformChainI64RangeSumFirstLast(steps []SequenceTransformStep, l
 				shift += prevLen
 			}
 			offset += int64(shift)
+		case SequenceTransformDrop:
+			if step.ArgCount != 1 {
+				return 0, false
+			}
+			if step.Args[0] > 0 {
+				offset += int64(step.Args[0])
+			}
 		case SequenceTransformSublist:
 			switch step.ArgCount {
 			case 1:
@@ -303,19 +376,98 @@ func sequenceTransformChainI64RangeSumFirstLast(steps []SequenceTransformStep, l
 		}
 	}
 	baseLen := int64(values.len)
-	firstRow := positiveModInt64(offset, baseLen)
-	lastRow := positiveModInt64(offset+stride*int64(finalLen-1), baseLen)
 	if sequenceAffineRowsNoWrap(offset, stride, finalLen, baseLen) {
+		firstRow := offset
+		lastRow := offset + stride*int64(finalLen-1)
 		rowSum := int64(finalLen) * (2*firstRow + int64(finalLen-1)*stride) / 2
 		total := int64(finalLen)*values.start + values.step*rowSum
 		return total + (values.start + values.step*firstRow) + (values.start + values.step*lastRow), true
 	}
 	var total int64
 	for row := 0; row < finalLen; row++ {
-		sourceRow := positiveModInt64(offset+stride*int64(row), baseLen)
-		total += values.start + values.step*sourceRow
+		sourceRow, ok, err := sequenceTransformSourceRow(row, steps, lengths)
+		if err != nil || !ok {
+			return 0, false
+		}
+		total += values.start + values.step*int64(sourceRow)
 	}
-	return total + (values.start + values.step*firstRow) + (values.start + values.step*lastRow), true
+	firstRow, ok, err := sequenceTransformSourceRow(0, steps, lengths)
+	if err != nil || !ok {
+		return 0, false
+	}
+	lastRow, ok, err := sequenceTransformSourceRow(finalLen-1, steps, lengths)
+	if err != nil || !ok {
+		return 0, false
+	}
+	return total + (values.start + values.step*int64(firstRow)) + (values.start + values.step*int64(lastRow)), true
+}
+
+func sequenceTransformChainI64RangeSumCount(steps []SequenceTransformStep, lengths [9]int, values i64RangeArray, finalLen int) (int64, bool) {
+	if values.len != lengths[0] || finalLen <= 0 {
+		return 0, false
+	}
+	offset := int64(0)
+	stride := int64(1)
+	for i := len(steps) - 1; i >= 0; i-- {
+		step := steps[i]
+		prevLen := lengths[i]
+		if prevLen <= 0 {
+			return 0, false
+		}
+		switch step.Transform {
+		case SequenceTransformReverse:
+			offset = int64(prevLen-1) - offset
+			stride = -stride
+		case SequenceTransformRotate:
+			shift := step.Args[0] % prevLen
+			if shift < 0 {
+				shift += prevLen
+			}
+			offset += int64(shift)
+		case SequenceTransformDrop:
+			if step.ArgCount != 1 {
+				return 0, false
+			}
+			if step.Args[0] > 0 {
+				offset += int64(step.Args[0])
+			}
+		case SequenceTransformSublist:
+			switch step.ArgCount {
+			case 1:
+				start := 0
+				if step.Args[0] < 0 {
+					count := -step.Args[0]
+					start = prevLen - count%prevLen
+					if start == prevLen {
+						start = 0
+					}
+				}
+				offset += int64(start)
+			case 2:
+				start, _ := boundedStartCount(prevLen, step.Args[0], step.Args[1])
+				offset += int64(start)
+			default:
+				return 0, false
+			}
+		default:
+			return 0, false
+		}
+	}
+	baseLen := int64(values.len)
+	var rowSum int64
+	if sequenceAffineRowsNoWrap(offset, stride, finalLen, baseLen) {
+		firstRow := offset
+		rowSum = int64(finalLen) * (2*firstRow + int64(finalLen-1)*stride) / 2
+	} else {
+		for row := 0; row < finalLen; row++ {
+			sourceRow, ok, err := sequenceTransformSourceRow(row, steps, lengths)
+			if err != nil || !ok {
+				return 0, false
+			}
+			rowSum += int64(sourceRow)
+		}
+	}
+	return int64(finalLen)*values.start + values.step*rowSum + int64(finalLen), true
 }
 
 func sequenceAffineRowsNoWrap(offset, stride int64, length int, modulus int64) bool {
@@ -345,6 +497,18 @@ func sequenceTransformStepLength(length int, step SequenceTransformStep) (int, b
 	switch step.Transform {
 	case SequenceTransformReverse, SequenceTransformRotate:
 		return length, true, nil
+	case SequenceTransformDrop:
+		if step.ArgCount != 1 {
+			return 0, true, fmt.Errorf("drop expects an integer count")
+		}
+		n := step.Args[0]
+		if n < 0 {
+			n = -n
+		}
+		if n >= length {
+			return 0, true, nil
+		}
+		return length - n, true, nil
 	case SequenceTransformSublist:
 		switch step.ArgCount {
 		case 1:
@@ -386,6 +550,13 @@ func sequenceTransformSourceRow(row int, steps []SequenceTransformStep, lengths 
 				shift += prevLen
 			}
 			row = (shift + row) % prevLen
+		case SequenceTransformDrop:
+			if step.ArgCount != 1 {
+				return 0, false, fmt.Errorf("drop expects an integer count")
+			}
+			if step.Args[0] > 0 {
+				row += step.Args[0]
+			}
 		case SequenceTransformSublist:
 			switch step.ArgCount {
 			case 1:

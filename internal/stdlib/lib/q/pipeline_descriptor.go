@@ -327,9 +327,13 @@ func evalScriptPipelineDescriptor(source string, d *qScriptPipelineDescriptor) E
 			})
 		}
 	}
-	if out.ShapeFamily == "" && d.kind == qScriptPipelineSequenceEdgeSum {
+	if out.ShapeFamily == "" && (d.kind == qScriptPipelineSequenceEdgeSum || d.kind == qScriptPipelineSequenceSumCount) {
 		out.ShapeFamily = "sequence_edge"
-		out.ShapeReducer = "sum_first_last"
+		if d.kind == qScriptPipelineSequenceSumCount {
+			out.ShapeReducer = "sum_count"
+		} else {
+			out.ShapeReducer = "sum_first_last"
+		}
 		if len(d.sequenceSteps) > 0 {
 			out.ShapeTransform = qScriptPipelineSequenceTransformName(d.sequenceSteps)
 		}
@@ -519,6 +523,16 @@ func qScriptPipelineDescriptorFromEvalDescriptor(descriptor EvalPipelineDescript
 	switch {
 	case strings.Contains(shape, "sequence-edge-reduce/sum-first-last"):
 		out.kind = qScriptPipelineSequenceEdgeSum
+	case strings.Contains(shape, "sequence-reduce/sum-count"):
+		out.kind = qScriptPipelineSequenceSumCount
+	case strings.Contains(shape, "gather-reduce/sum-count"):
+		out.kind = qScriptPipelineGatherReduceSumCount
+		out.terminalPlan = qPipelinePlanWithBindingPlans(qPipelinePlan{
+			kind:      qPipelineSumGatherIndexes,
+			shape:     "gather-reduce/sum-count",
+			valueExpr: out.valueExpr,
+			indexExpr: out.indexExpr,
+		})
 	case strings.Contains(shape, "multi-reduce/sum-plus-dyadic-float-sum"):
 		out.kind = qScriptPipelineSumPlusDyadicFloat
 	case strings.Contains(shape, "multi-reduce/integer-divmod-sum-count"):
