@@ -240,13 +240,18 @@ python3 benchmarks/q_perf_report.py \
 ## q.eval Vector/List Compute
 
 `benchmarks/q_eval_vector_bench_test.go` covers ordinary q expressions outside
-qSQL. This suite is the main non-qSQL q performance matrix and now has 151 cases
+qSQL. This suite is the main non-qSQL q performance matrix and now has 235 cases
 plus required coverage-tag, matrix, and semantic-shape gates. It spans numeric
 vector arithmetic, typed suffix/null/cast/promotion behavior, compare masks to
 `where`, selectivity changes, `take`/`drop`/`cut`/`reverse`/`rotate`,
 reductions, adverbs, running and moving aggregates, list/set/search verbs,
 dictionaries and amend/upsert, symbols/enums, string transforms, temporal
 values, table/keyed-table transforms, safe system commands, and loopback IPC.
+The expanded ordinary-expression matrix adds parameterized non-SQL combinations
+for `take`/`drop`/`reverse`/`rotate`, arithmetic map/reduce/scan, modulo
+where/filter/project, symbol filters, temporal filters, and null/fill/cast
+shapes. Every case is checked against a same-semantics Go checksum before it is
+benchmarked.
 Each shape has four benchmark rows:
 
 | Row | Signal |

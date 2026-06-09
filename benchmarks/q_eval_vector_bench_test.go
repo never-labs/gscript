@@ -881,6 +881,7 @@ func buildQEvalVectorCases() []qEvalVectorCase {
 	)
 
 	cases = appendQEvalExpressionCombinationCases(cases)
+	cases = appendQEvalOrdinaryExpressionCoverageCases(cases)
 	return appendQEvalSemanticCoverageCases(cases)
 }
 
@@ -1388,6 +1389,412 @@ func appendQEvalExpressionCombinationCases(cases []qEvalVectorCase) []qEvalVecto
 	return append(cases, combos...)
 }
 
+func appendQEvalOrdinaryExpressionCoverageCases(cases []qEvalVectorCase) []qEvalVectorCase {
+	for _, p := range []struct {
+		name string
+		mul  int64
+		add  int64
+		mod  int64
+	}{
+		{"DenseA", 2, 1, 3},
+		{"DenseB", 3, -7, 5},
+		{"DenseC", 5, 11, 7},
+		{"DenseD", 9, -13, 11},
+		{"DenseE", 17, 19, 13},
+		{"DenseF", 31, -29, 17},
+	} {
+		p := p
+		cases = append(cases,
+			qEvalVectorCase{
+				name:   "OrdinaryArithmeticMapReduce" + p.name,
+				tags:   []string{"numeric-vector", "word-dyadic", "sum"},
+				matrix: []string{"numeric-arithmetic:int-vector:hot"},
+				expr: func(rows int) string {
+					return fmt.Sprintf("x:til %d;y:(x*%d)+%d;(+/y)+(+/y mod %d)", rows, p.mul, p.add, p.mod)
+				},
+				goFn: func(rows int) int64 {
+					var sum int64
+					for i := int64(0); i < int64(rows); i++ {
+						y := i*p.mul + p.add
+						sum += y + qPositiveMod(y, p.mod)
+					}
+					return sum
+				},
+			},
+			qEvalVectorCase{
+				name:   "OrdinaryArithmeticWhereProject" + p.name,
+				tags:   []string{"numeric-vector", "where", "projection", "word-dyadic", "sum"},
+				matrix: []string{"numeric-arithmetic:int-vector:hot", "compare:int-vector:where"},
+				shapes: []string{"index:gather-after-where:row-scaled"},
+				expr: func(rows int) string {
+					return fmt.Sprintf("x:til %d;y:(x*%d)+%d;idx:where (x mod %d)=0;(+/y[idx])+count idx", rows, p.mul, p.add, p.mod)
+				},
+				goFn: func(rows int) int64 {
+					var sum, count int64
+					for i := int64(0); i < int64(rows); i++ {
+						if i%p.mod == 0 {
+							sum += i*p.mul + p.add
+							count++
+						}
+					}
+					return sum + count
+				},
+			},
+			qEvalVectorCase{
+				name:   "OrdinaryArithmeticScanTail" + p.name,
+				tags:   []string{"numeric-vector", "adverb-over-scan", "sums", "sum"},
+				matrix: []string{"adverb:over-scan:projection", "aggregate:running-prd-min-max-avg:vector"},
+				expr: func(rows int) string {
+					return fmt.Sprintf("x:(til %d) mod %d;s:+\\x;last s+count s", rows, p.mod)
+				},
+				goFn: func(rows int) int64 {
+					var last int64
+					for i := 0; i < rows; i++ {
+						last += int64(i) % p.mod
+					}
+					return last + int64(rows)
+				},
+			},
+		)
+	}
+
+	for _, n := range []int{3, 7, 16, 31, 64, 127, 256, 513, 1024, 2049} {
+		n := n
+		cases = append(cases,
+			qEvalVectorCase{
+				name:   fmt.Sprintf("OrdinaryTakeReverseHead%d", n),
+				tags:   []string{"take", "reverse", "sum"},
+				matrix: []string{"list:cut-raze-enlist:nested"},
+				expr: func(rows int) string {
+					return fmt.Sprintf("x:til %d;a:%d#reverse x;(+/a)+first a+last a", rows, n)
+				},
+				goFn: func(rows int) int64 {
+					var sum, first, last int64
+					for i := 0; i < n; i++ {
+						value := int64(rows - 1 - (i % rows))
+						if i == 0 {
+							first = value
+						}
+						if i == n-1 {
+							last = value
+						}
+						sum += value
+					}
+					return sum + first + last
+				},
+			},
+			qEvalVectorCase{
+				name:   fmt.Sprintf("OrdinaryDropThenTake%d", n),
+				tags:   []string{"drop", "take", "projection", "sum"},
+				matrix: []string{"list:cut-raze-enlist:nested"},
+				expr: func(rows int) string {
+					drop := n % (rows / 2)
+					take := n % 257
+					if take == 0 {
+						take = 1
+					}
+					return fmt.Sprintf("x:til %d;y:drop %d x;a:%d#y;(+/a)+count a", rows, drop, take)
+				},
+				goFn: func(rows int) int64 {
+					drop := n % (rows / 2)
+					take := n % 257
+					if take == 0 {
+						take = 1
+					}
+					length := rows - drop
+					var sum int64
+					for i := 0; i < take; i++ {
+						sum += int64(drop + (i % length))
+					}
+					return sum + int64(take)
+				},
+			},
+			qEvalVectorCase{
+				name:   fmt.Sprintf("OrdinaryRotateFilter%d", n),
+				tags:   []string{"rotate", "where", "composite-compare"},
+				matrix: []string{"compare:int-vector:where"},
+				expr: func(rows int) string {
+					shift := n % 997
+					return fmt.Sprintf("x:til %d;r:%d rotate x;count where (r>=%d) and r<%d", rows, shift, rows/3, rows/3+128)
+				},
+				goFn: func(rows int) int64 {
+					shift := n % 997
+					var count int64
+					for i := 0; i < rows; i++ {
+						value := (shift + i) % rows
+						if value >= rows/3 && value < rows/3+128 {
+							count++
+						}
+					}
+					return count
+				},
+			},
+		)
+	}
+
+	for _, p := range []struct {
+		name string
+		mod  int
+		lo   int
+		hi   int
+	}{
+		{"BandA", 5, 1, 4},
+		{"BandB", 7, 2, 6},
+		{"BandC", 11, 3, 9},
+		{"BandD", 13, 4, 12},
+		{"BandE", 17, 5, 15},
+		{"BandF", 19, 7, 18},
+	} {
+		p := p
+		cases = append(cases,
+			qEvalVectorCase{
+				name:   "OrdinaryModuloBandCount" + p.name,
+				tags:   []string{"where", "boolean-logical", "composite-compare", "word-dyadic"},
+				matrix: []string{"compare:int-vector:where"},
+				shapes: []string{"logical:mask-composition:row-scaled"},
+				expr: func(rows int) string {
+					return fmt.Sprintf("x:til %d;m:x mod %d;count where (m>=%d) and m<%d", rows, p.mod, p.lo, p.hi)
+				},
+				goFn: func(rows int) int64 {
+					var count int64
+					for i := 0; i < rows; i++ {
+						m := i % p.mod
+						if m >= p.lo && m < p.hi {
+							count++
+						}
+					}
+					return count
+				},
+			},
+			qEvalVectorCase{
+				name:   "OrdinaryModuloBandGatherSum" + p.name,
+				tags:   []string{"where", "projection", "numeric-vector", "sum", "word-dyadic"},
+				matrix: []string{"compare:int-vector:where"},
+				shapes: []string{"where:gather-reduce-selectivity:row-scaled"},
+				expr: func(rows int) string {
+					return fmt.Sprintf("x:til %d;y:(x*3)+1;m:x mod %d;idx:where (m>=%d) and m<%d;+/y[idx]", rows, p.mod, p.lo, p.hi)
+				},
+				goFn: func(rows int) int64 {
+					var sum int64
+					for i := 0; i < rows; i++ {
+						m := i % p.mod
+						if m >= p.lo && m < p.hi {
+							sum += int64(i*3 + 1)
+						}
+					}
+					return sum
+				},
+			},
+		)
+	}
+
+	for _, p := range []struct {
+		name    string
+		pattern string
+		needle  string
+		hits    map[int]bool
+	}{
+		{"TechAAPL", "`AAPL`MSFT`NVDA`AAPL`AMD", "`AAPL", map[int]bool{0: true, 3: true}},
+		{"TechMSFT", "`AAPL`MSFT`NVDA`AAPL`AMD", "`MSFT", map[int]bool{1: true}},
+		{"VenuesXNYS", "`xnys`xnas`bats`xnys`arcx", "`xnys", map[int]bool{0: true, 3: true}},
+		{"VenuesBATS", "`xnys`xnas`bats`xnys`arcx", "`bats", map[int]bool{2: true}},
+		{"SidesBuy", "`buy`sell`buy`hold", "`buy", map[int]bool{0: true, 2: true}},
+		{"SidesSell", "`buy`sell`buy`hold", "`sell", map[int]bool{1: true}},
+	} {
+		p := p
+		cases = append(cases,
+			qEvalVectorCase{
+				name:   "OrdinarySymbolEqualityWhere" + p.name,
+				tags:   []string{"symbol", "where", "composite-compare"},
+				matrix: []string{"compare:symbol-vector:where"},
+				expr: func(rows int) string {
+					return fmt.Sprintf("syms:%d#%s;count where syms=%s", rows, p.pattern, p.needle)
+				},
+				goFn: func(rows int) int64 {
+					width := len(p.hits)
+					switch p.name {
+					case "SidesBuy", "SidesSell":
+						width = 4
+					default:
+						width = 5
+					}
+					var count int64
+					for i := 0; i < rows; i++ {
+						if p.hits[i%width] {
+							count++
+						}
+					}
+					return count
+				},
+			},
+			qEvalVectorCase{
+				name:   "OrdinarySymbolFilterProjection" + p.name,
+				tags:   []string{"symbol", "where", "projection", "membership"},
+				matrix: []string{"compare:symbol-vector:where", "membership:in-differ-ratios:vector"},
+				shapes: []string{"membership:symbol-filter:row-scaled"},
+				expr: func(rows int) string {
+					return fmt.Sprintf("syms:%d#%s;px:til %d;idx:where syms=%s;(+/px[idx])+count idx", rows, p.pattern, rows, p.needle)
+				},
+				goFn: func(rows int) int64 {
+					width := len(p.hits)
+					switch p.name {
+					case "SidesBuy", "SidesSell":
+						width = 4
+					default:
+						width = 5
+					}
+					var sum, count int64
+					for i := 0; i < rows; i++ {
+						if p.hits[i%width] {
+							sum += int64(i)
+							count++
+						}
+					}
+					return sum + count
+				},
+			},
+		)
+	}
+
+	for _, p := range []struct {
+		name      string
+		values    string
+		predicate string
+		hit       func(i int) bool
+	}{
+		{"DateGE", "2026.06.06 2026.06.07 2026.06.08", "dates>=2026.06.07", func(i int) bool { return i%3 != 0 }},
+		{"DateEQ", "2026.06.06 2026.06.07 2026.06.08", "dates=2026.06.08", func(i int) bool { return i%3 == 2 }},
+		{"TimeWithin", "09:30 09:31 09:32 09:33", "dates within 09:31 09:32", func(i int) bool { return i%4 == 1 || i%4 == 2 }},
+	} {
+		p := p
+		cases = append(cases,
+			qEvalVectorCase{
+				name:   "OrdinaryTemporalCompareCount" + p.name,
+				tags:   []string{"temporal", "where", "composite-compare"},
+				matrix: []string{"compare:temporal-vector:where"},
+				expr: func(rows int) string {
+					return fmt.Sprintf("dates:%d#%s;count where %s", rows, p.values, p.predicate)
+				},
+				goFn: func(rows int) int64 {
+					var count int64
+					for i := 0; i < rows; i++ {
+						if p.hit(i) {
+							count++
+						}
+					}
+					return count
+				},
+			},
+			qEvalVectorCase{
+				name:   "OrdinaryTemporalFilterProjection" + p.name,
+				tags:   []string{"temporal", "where", "projection", "sum"},
+				matrix: []string{"compare:temporal-vector:where"},
+				expr: func(rows int) string {
+					return fmt.Sprintf("dates:%d#%s;v:til %d;idx:where %s;(+/v[idx])+count idx", rows, p.values, rows, p.predicate)
+				},
+				goFn: func(rows int) int64 {
+					var sum, count int64
+					for i := 0; i < rows; i++ {
+						if p.hit(i) {
+							sum += int64(i)
+							count++
+						}
+					}
+					return sum + count
+				},
+			},
+		)
+	}
+
+	for _, p := range []struct {
+		name    string
+		values  string
+		fill    int64
+		sum     func(rows int) int64
+		nulls   func(rows int) int64
+		castTag string
+	}{
+		{"IntNulls", "0N 1 2 0N", 9, func(rows int) int64 {
+			var sum int64
+			for i := 0; i < rows; i++ {
+				if i%4 == 0 || i%4 == 3 {
+					sum += 9
+				} else {
+					sum += int64(i % 4)
+				}
+			}
+			return sum
+		}, func(rows int) int64 { return qPatternCount(rows, 4, map[int]bool{0: true, 3: true}) }, "typed-null"},
+		{"ShortCast", "1 2 3 4", 0, func(rows int) int64 {
+			var sum int64
+			for i := 0; i < rows; i++ {
+				sum += int64(i%4 + 1)
+			}
+			return sum
+		}, func(rows int) int64 { return 0 }, "cast"},
+		{"FloatNulls", "0Nf 1.5 2.5 0Nf", 7, func(rows int) int64 {
+			var sum float64
+			for i := 0; i < rows; i++ {
+				switch i % 4 {
+				case 0, 3:
+					sum += 7
+				case 1:
+					sum += 1.5
+				case 2:
+					sum += 2.5
+				}
+			}
+			return int64(sum)
+		}, func(rows int) int64 { return qPatternCount(rows, 4, map[int]bool{0: true, 3: true}) }, "typed-null"},
+	} {
+		p := p
+		cases = append(cases,
+			qEvalVectorCase{
+				name:   "OrdinaryNullFillSum" + p.name,
+				tags:   []string{p.castTag, "fill", "null-verb", "sum"},
+				matrix: []string{"numeric-arithmetic:typed-null:hot", "list:prev-next-deltas-fills:typed-null"},
+				expr: func(rows int) string {
+					return fmt.Sprintf("x:%d#%s;y:%d^x;(+/y)+count where null x", rows, p.values, p.fill)
+				},
+				goFn: func(rows int) int64 {
+					return p.sum(rows) + p.nulls(rows)
+				},
+			},
+			qEvalVectorCase{
+				name:   "OrdinaryNullFillsCount" + p.name,
+				tags:   []string{p.castTag, "fill", "typed-null"},
+				matrix: []string{"list:prev-next-deltas-fills:typed-null"},
+				expr: func(rows int) string {
+					return fmt.Sprintf("x:%d#%s;count fills x", rows, p.values)
+				},
+				goFn: func(rows int) int64 {
+					return int64(rows)
+				},
+			},
+		)
+	}
+
+	return cases
+}
+
+func qPositiveMod(v, mod int64) int64 {
+	out := v % mod
+	if out < 0 {
+		out += mod
+	}
+	return out
+}
+
+func qPatternCount(rows, width int, hits map[int]bool) int64 {
+	var count int64
+	for i := 0; i < rows; i++ {
+		if hits[i%width] {
+			count++
+		}
+	}
+	return count
+}
+
 func appendQEvalSemanticCoverageCases(cases []qEvalVectorCase) []qEvalVectorCase {
 	coverage := []qEvalVectorCase{
 		{
@@ -1789,8 +2196,8 @@ func appendQEvalSemanticCoverageCases(cases []qEvalVectorCase) []qEvalVectorCase
 }
 
 func TestQEvalVectorBenchmarkExpressions(t *testing.T) {
-	if len(qEvalVectorCases) < 140 {
-		t.Fatalf("q.eval benchmark coverage too small: got %d cases, want at least 140", len(qEvalVectorCases))
+	if len(qEvalVectorCases) < 220 {
+		t.Fatalf("q.eval benchmark coverage too small: got %d cases, want at least 220", len(qEvalVectorCases))
 	}
 	eval := qEvalVectorEval(t)
 	for _, tc := range qEvalVectorCases {

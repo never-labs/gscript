@@ -95,7 +95,7 @@ from the original five ordinary q cases and four columnar script cases:
 
 | Target | Minimum breadth |
 |---|---|
-| `q.eval` ordinary compute | 140+ cases with required coverage-tag, matrix, and semantic-shape gates across vector arithmetic, typed/null/cast/promotion, where/selectivity, slice/reorder, adverb, running/moving aggregate, set/search/list, dict, symbol/string, temporal, table-verb, IPC, and safe-system shapes |
+| `q.eval` ordinary compute | 220+ cases with required coverage-tag, matrix, and semantic-shape gates across vector arithmetic, typed/null/cast/promotion, where/selectivity, slice/reorder, adverb, running/moving aggregate, set/search/list, dict, symbol/string, temporal, table-verb, IPC, and safe-system shapes |
 | qSQL Go benchmarks | 25+ rows across select, group, join, mutation, cache, and direct-runtime baselines |
 | q columnar script suite | 40+ script-level cases drawn from market data, rollup, join, keyed state, and vector/adverb projects |
 | Metrics per case | `ns/op`, `B/op`, `allocs/op`, warm/cold ratio, Go ratio where practical, typed-kernel/fallback stats where available |
