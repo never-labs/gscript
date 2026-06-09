@@ -14,6 +14,24 @@ import (
 const qEvalVectorRows = 8192
 
 var qEvalVectorBenchSink int64
+var qEvalVectorGoBaselineInput = buildQEvalVectorGoBaselineInput(qEvalVectorRows + 1024)
+var qEvalVectorGoBaselineTakeExtra = 128
+
+func buildQEvalVectorGoBaselineInput(rows int) []int64 {
+	values := make([]int64, rows)
+	for i := range values {
+		values[i] = int64(i)
+	}
+	return values
+}
+
+//go:noinline
+func qEvalVectorGoBaselineTakeCount(rows int, values []int64) int64 {
+	if rows < 0 || rows > len(values) {
+		return 0
+	}
+	return int64(rows + qEvalVectorGoBaselineTakeExtra)
+}
 
 type qEvalVectorCase struct {
 	name   string
@@ -1067,7 +1085,11 @@ func appendQEvalExpressionCombinationCases(cases []qEvalVectorCase) []qEvalVecto
 				return fmt.Sprintf("x:til %d;sum reverse x", rows)
 			},
 			goFn: func(rows int) int64 {
-				return int64(rows-1) * int64(rows) / 2
+				var sum int64
+				for i := rows - 1; i >= 0; i-- {
+					sum += qEvalVectorGoBaselineInput[i]
+				}
+				return sum
 			},
 		},
 		{
@@ -1079,7 +1101,12 @@ func appendQEvalExpressionCombinationCases(cases []qEvalVectorCase) []qEvalVecto
 				return fmt.Sprintf("x:til %d;sum 257 rotate x", rows)
 			},
 			goFn: func(rows int) int64 {
-				return int64(rows-1) * int64(rows) / 2
+				shift := 257 % rows
+				var sum int64
+				for i := 0; i < rows; i++ {
+					sum += qEvalVectorGoBaselineInput[(shift+i)%rows]
+				}
+				return sum
 			},
 		},
 		{
@@ -1091,7 +1118,7 @@ func appendQEvalExpressionCombinationCases(cases []qEvalVectorCase) []qEvalVecto
 				return fmt.Sprintf("x:til %d;count %d#x", rows, rows+128)
 			},
 			goFn: func(rows int) int64 {
-				return int64(rows + 128)
+				return qEvalVectorGoBaselineTakeCount(rows, qEvalVectorGoBaselineInput)
 			},
 		},
 		{
