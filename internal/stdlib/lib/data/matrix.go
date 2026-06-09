@@ -242,11 +242,89 @@ func TryMatrixRowNumericSum(value Matrix, row int) (any, bool, error) {
 	if value == nil {
 		return nil, false, nil
 	}
+	if sum, handled, err := tryMatrixRowNumericSumDirect(value, row); handled || err != nil {
+		return sum, handled, err
+	}
 	rowArray, ok := value.RowArray(row)
 	if !ok {
 		return nil, true, fmt.Errorf("matrix row index %d out of range", row)
 	}
 	return typedKernels.NumericSumValue(rowArray)
+}
+
+func tryMatrixRowNumericSumDirect(value Matrix, row int) (any, bool, error) {
+	switch matrix := value.(type) {
+	case matrixArray:
+		return numericSumMatrixRowDirect(matrix, row)
+	case transposedMatrixArray:
+		return numericSumTransposedMatrixRowDirect(matrix, row)
+	default:
+		return nil, false, nil
+	}
+}
+
+func numericSumTransposedMatrixRowDirect(matrix transposedMatrixArray, row int) (any, bool, error) {
+	if row < 0 || row >= matrix.rows {
+		return nil, true, fmt.Errorf("matrix row index %d out of range", row)
+	}
+	switch source := matrix.source.(type) {
+	case matrixArray:
+		if len(source.shape) != 2 || row >= source.shape[1] {
+			return nil, true, fmt.Errorf("matrix row index %d out of range", row)
+		}
+		var totalFloat float64
+		var totalInt int64
+		integer := true
+		for sourceRow := 0; sourceRow < source.shape[0]; sourceRow++ {
+			value, handled, err := arrayScalarAt(source.data, sourceRow*source.shape[1]+row)
+			if err != nil || !handled {
+				return nil, handled, err
+			}
+			n, ok := numeric(value)
+			if !ok {
+				return nil, false, nil
+			}
+			totalFloat += n
+			if intValue, ok := coerceInt64Exact(value); ok && integer {
+				totalInt += intValue
+				continue
+			}
+			integer = false
+		}
+		if integer {
+			return totalInt, true, nil
+		}
+		return totalFloat, true, nil
+	default:
+		return nil, false, nil
+	}
+}
+
+// TryMatrixRowNumericSumCount reduces sum(row)+count(row) without exposing the
+// row view to language frontends. It is a small but reusable matrix-row
+// primitive for q/Leia/JIT pipeline backends.
+func TryMatrixRowNumericSumCount(value Matrix, row int) (any, bool, error) {
+	if value == nil {
+		return nil, false, nil
+	}
+	shape := value.Shape()
+	if len(shape) != 2 {
+		return nil, false, nil
+	}
+	if row < 0 || row >= shape[0] {
+		return nil, true, fmt.Errorf("matrix row index %d out of range", row)
+	}
+	sum, handled, err := TryMatrixRowNumericSum(value, row)
+	if err != nil || !handled {
+		return nil, handled, err
+	}
+	if sumI, ok := coerceInt64Exact(sum); ok {
+		return sumI + int64(shape[1]), true, nil
+	}
+	if sumF, ok := numeric(sum); ok {
+		return sumF + float64(shape[1]), true, nil
+	}
+	return nil, false, nil
 }
 
 // MatrixMultiplyNumeric multiplies two numeric two-dimensional matrices. The

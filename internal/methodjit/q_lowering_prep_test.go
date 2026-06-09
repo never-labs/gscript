@@ -5924,6 +5924,42 @@ func TestQEvalPipelinePlannerCopiesFusedDescriptorFields(t *testing.T) {
 		!strings.Contains(script.AssignmentText, "idx") {
 		t.Fatalf("script descriptor = %+v, want script modulo gather-reduce fields", script)
 	}
+
+	dyadic, ok := qRuntimeEvalPipelinePlanner{}.DescribeQEvalPipeline("x:til 8;(+/x)+sum 2 xlog x")
+	if !ok {
+		t.Fatalf("DescribeQEvalPipeline did not recognize dyadic-float script pipeline")
+	}
+	if dyadic.Kind != "script" ||
+		dyadic.Shape != "script-pipeline/multi-reduce/sum-plus-dyadic-float-sum/assignments" ||
+		dyadic.ValueExpr != "x" ||
+		dyadic.DyadicOp != "xlog" ||
+		dyadic.ScalarExpr != "2" ||
+		!dyadic.ScalarLeft {
+		t.Fatalf("dyadic descriptor = %+v, want fused dyadic-float fields", dyadic)
+	}
+
+	matrix, ok := qRuntimeEvalPipelinePlanner{}.DescribeQEvalPipeline("m:2 4#til 8;row:m . 1;(+/row)+count row")
+	if !ok {
+		t.Fatalf("DescribeQEvalPipeline did not recognize matrix row script pipeline")
+	}
+	if matrix.Kind != "script" ||
+		matrix.Shape != "script-pipeline/matrix-row-reduce/sum-count/assignments" ||
+		matrix.RowValueExpr != "m" ||
+		matrix.RowIndexExpr != "1" {
+		t.Fatalf("matrix descriptor = %+v, want row sum-count fields", matrix)
+	}
+
+	callable, ok := qRuntimeEvalPipelinePlanner{}.DescribeQEvalPipeline("f:{(+/x)+y};.[f;(til 8;10)]")
+	if !ok {
+		t.Fatalf("DescribeQEvalPipeline did not recognize callable-dot script pipeline")
+	}
+	if callable.Kind != "script" ||
+		callable.Shape != "script-pipeline/callable-dot/sum-plus-right/assignments" ||
+		callable.CallableExpr != "f" ||
+		callable.ValueExpr != "til 8" ||
+		callable.IndexExpr != "10" {
+		t.Fatalf("callable descriptor = %+v, want callable-dot fields", callable)
+	}
 }
 
 func TestQEvalPipelineRuntimeBackendExecutesTypedPlanRef(t *testing.T) {

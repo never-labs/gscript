@@ -23,6 +23,15 @@ type qScalarApplyIndexPlan struct {
 	scalar  bool
 }
 
+type qDotApplyPlan struct {
+	fnExpr      string
+	argExprs    []string
+	argPlans    []qScriptBindingPlan
+	tupleArgs   bool
+	valid       bool
+	unsupported bool
+}
+
 func (s *EvalState) evalApplyIndexForm(src string) (any, bool, error) {
 	if out, ok, err := s.tryEvalScalarApplyIndexFastPath(src); ok || err != nil {
 		return out, ok, err
@@ -42,6 +51,9 @@ func (s *EvalState) evalApplyIndexForm(src string) (any, bool, error) {
 }
 
 func (s *EvalState) evalDotApplyOrAmend(src string) (any, bool, error) {
+	if out, handled, err := s.tryEvalDotApplyPlan(src); handled || err != nil {
+		return out, true, err
+	}
 	inner := strings.TrimSpace(src[2 : len(src)-1])
 	parts := splitTopLevelDelim(inner, ';')
 	switch len(parts) {
@@ -62,6 +74,118 @@ func (s *EvalState) evalDotApplyOrAmend(src string) (any, bool, error) {
 	default:
 		return nil, true, fmt.Errorf("dot apply expects .[fn;args] or .[dict;path;op;value]")
 	}
+}
+
+func (s *EvalState) tryEvalDotApplyPlan(src string) (any, bool, error) {
+	plan, ok := s.dotApplyPlan(src)
+	if !ok {
+		return nil, false, nil
+	}
+	fn, err := s.eval(plan.fnExpr)
+	if err != nil {
+		return nil, true, err
+	}
+	switch len(plan.argExprs) {
+	case 0:
+		out, err := s.applyCallable(fn, nil)
+		return out, true, err
+	case 1:
+		arg, err := s.evalDotApplyPlanArg(&plan, 0)
+		if err != nil {
+			return nil, true, err
+		}
+		if plan.tupleArgs {
+			out, err := s.applyCallable(fn, qApplyArgs(arg))
+			return out, true, err
+		}
+		out, err := s.applyCallable1(fn, arg)
+		return out, true, err
+	case 2:
+		left, err := s.evalDotApplyPlanArg(&plan, 0)
+		if err != nil {
+			return nil, true, err
+		}
+		right, err := s.evalDotApplyPlanArg(&plan, 1)
+		if err != nil {
+			return nil, true, err
+		}
+		out, err := s.applyCallable2(fn, left, right)
+		return out, true, err
+	default:
+		args := make([]any, len(plan.argExprs))
+		for i := range plan.argExprs {
+			value, err := s.evalDotApplyPlanArg(&plan, i)
+			if err != nil {
+				return nil, true, err
+			}
+			args[i] = value
+		}
+		out, err := s.applyCallable(fn, args)
+		return out, true, err
+	}
+}
+
+func (s *EvalState) evalDotApplyPlanArg(plan *qDotApplyPlan, index int) (any, error) {
+	if index < len(plan.argPlans) {
+		if value, handled, err := s.evalQScriptBindingPlan(&plan.argPlans[index]); err != nil || handled {
+			return value, err
+		}
+	}
+	return s.eval(plan.argExprs[index])
+}
+
+func (s *EvalState) dotApplyPlan(src string) (qDotApplyPlan, bool) {
+	src = strings.TrimSpace(src)
+	if src == "" {
+		return qDotApplyPlan{}, false
+	}
+	if s.dotApplyCache != nil {
+		if plan, ok := s.dotApplyCache[src]; ok {
+			return plan, plan.valid
+		}
+	}
+	plan := buildDotApplyPlan(src)
+	if s.dotApplyCache == nil {
+		s.dotApplyCache = make(map[string]qDotApplyPlan, 16)
+	} else if len(s.dotApplyCache) >= 128 {
+		s.dotApplyCache = make(map[string]qDotApplyPlan, 16)
+	}
+	s.dotApplyCache[src] = plan
+	return plan, plan.valid
+}
+
+func buildDotApplyPlan(src string) qDotApplyPlan {
+	if !strings.HasPrefix(src, ".[") || !strings.HasSuffix(src, "]") {
+		return qDotApplyPlan{unsupported: true}
+	}
+	inner := strings.TrimSpace(src[2 : len(src)-1])
+	parts := splitTopLevelDelim(inner, ';')
+	if len(parts) != 2 {
+		return qDotApplyPlan{unsupported: true}
+	}
+	plan := qDotApplyPlan{fnExpr: strings.TrimSpace(parts[0]), valid: true}
+	argSrc := strings.TrimSpace(parts[1])
+	if argSrc == "()" {
+		return plan
+	}
+	if enclosed(argSrc, '(', ')') {
+		tuple := strings.TrimSpace(argSrc[1 : len(argSrc)-1])
+		argParts := splitTopLevelDelim(tuple, ';')
+		if len(argParts) > 1 {
+			plan.argExprs = make([]string, len(argParts))
+			plan.argPlans = make([]qScriptBindingPlan, len(argParts))
+			for i, part := range argParts {
+				expr := strings.TrimSpace(part)
+				plan.argExprs[i] = expr
+				plan.argPlans[i] = buildQScriptWarmBindingPlan(expr, nil)
+			}
+			return plan
+		}
+	}
+	plan.argExprs = []string{argSrc}
+	plan.argPlans = []qScriptBindingPlan{buildQScriptWarmBindingPlan(argSrc, nil)}
+	plan.tupleArgs = true
+	return plan
 }
 
 func (s *EvalState) evalDotApplyArgs(src string) ([]any, error) {

@@ -39,6 +39,12 @@ type EvalPipelineDescriptor struct {
 	IndexBinding string
 	MaskExpr     string
 	MaskBinding  string
+	RowValueExpr string
+	RowIndexExpr string
+	CallableExpr string
+	DyadicOp     string
+	ScalarExpr   string
+	ScalarLeft   bool
 
 	LeftExpr       string
 	RightExpr      string
@@ -288,6 +294,12 @@ func evalScriptPipelineDescriptor(source string, d *qScriptPipelineDescriptor) E
 		IndexBinding:  strings.TrimSpace(d.indexBinding),
 		MaskExpr:      strings.TrimSpace(d.maskExpr),
 		MaskBinding:   strings.TrimSpace(d.maskBinding),
+		RowValueExpr:  strings.TrimSpace(d.rowValueExpr),
+		RowIndexExpr:  strings.TrimSpace(d.rowIndexExpr),
+		CallableExpr:  strings.TrimSpace(d.callableExpr),
+		DyadicOp:      strings.TrimSpace(d.dyadicOp),
+		ScalarExpr:    strings.TrimSpace(d.scalarExpr),
+		ScalarLeft:    d.scalarLeft,
 	}
 	if len(d.assignments) > 0 {
 		out.Assignments = make([]EvalPipelineAssignment, 0, len(d.assignments))
@@ -455,10 +467,22 @@ func qScriptPipelineDescriptorFromEvalDescriptor(descriptor EvalPipelineDescript
 		indexBinding: strings.TrimSpace(descriptor.IndexBinding),
 		maskExpr:     strings.TrimSpace(descriptor.MaskExpr),
 		maskBinding:  strings.TrimSpace(descriptor.MaskBinding),
+		rowValueExpr: strings.TrimSpace(descriptor.RowValueExpr),
+		rowIndexExpr: strings.TrimSpace(descriptor.RowIndexExpr),
+		callableExpr: strings.TrimSpace(descriptor.CallableExpr),
+		dyadicOp:     strings.TrimSpace(descriptor.DyadicOp),
+		scalarExpr:   strings.TrimSpace(descriptor.ScalarExpr),
+		scalarLeft:   descriptor.ScalarLeft,
 	}
 	switch {
 	case strings.Contains(shape, "sequence-edge-reduce/sum-first-last"):
 		out.kind = qScriptPipelineSequenceEdgeSum
+	case strings.Contains(shape, "multi-reduce/sum-plus-dyadic-float-sum"):
+		out.kind = qScriptPipelineSumPlusDyadicFloat
+	case strings.Contains(shape, "matrix-row-reduce/sum-count"):
+		out.kind = qScriptPipelineMatrixRowSumCount
+	case strings.Contains(shape, "callable-dot/sum-plus-right"):
+		out.kind = qScriptPipelineCallableDotSumRight
 	case strings.Contains(shape, "apply-index/scalar-at"):
 		out.kind = qScriptPipelineApplyScalarAt
 		out.terminalPlan = qPipelinePlanWithBindingPlans(qPipelinePlan{
@@ -518,6 +542,9 @@ func qScriptPipelineDescriptorFromEvalDescriptor(descriptor EvalPipelineDescript
 	out.valuePlan = buildQScriptBindingPlanForRHS(out.valueExpr, nil)
 	out.indexPlan = buildQScriptBindingPlanForRHS(out.indexExpr, nil)
 	out.maskPlan = buildQScriptBindingPlanForRHS(out.maskExpr, nil)
+	out.rowValuePlan = buildQScriptBindingPlanForRHS(out.rowValueExpr, nil)
+	out.rowIndexPlan = buildQScriptBindingPlanForRHS(out.rowIndexExpr, nil)
+	out.scalarPlan = buildQScriptBindingPlanForRHS(out.scalarExpr, nil)
 	out.moduloMaskPlan = qScriptPipelineModuloMaskPlan(out.maskExpr)
 	if len(descriptor.Assignments) > 0 {
 		out.assignments = make([]qScriptPipelineAssignment, 0, len(descriptor.Assignments))

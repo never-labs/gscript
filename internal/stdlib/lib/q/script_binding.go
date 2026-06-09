@@ -116,6 +116,9 @@ func buildQScriptBindingPlanForRHS(src string, expr Expr) qScriptBindingPlan {
 	if plan := buildQScriptTransformBindingPlan(src); plan.kind != qScriptBindingInvalid {
 		return plan
 	}
+	if plan := buildQScriptReshapeBindingPlan(src); plan.kind != qScriptBindingInvalid {
+		return plan
+	}
 	if expr == nil {
 		parsed, ok, err := parseValueExpr(src)
 		if err != nil || !ok {
@@ -128,6 +131,26 @@ func buildQScriptBindingPlanForRHS(src string, expr Expr) qScriptBindingPlan {
 		return plan
 	}
 	return qScriptBindingPlan{}
+}
+
+func buildQScriptReshapeBindingPlan(src string) qScriptBindingPlan {
+	src = strings.TrimSpace(src)
+	if src == "" {
+		return qScriptBindingPlan{}
+	}
+	leftExpr, rightExpr, ok := splitTopLevelOperator(src, "#")
+	if !ok {
+		return qScriptBindingPlan{}
+	}
+	left := buildQScriptBindingPlanForRHS(leftExpr, nil)
+	if left.kind == qScriptBindingInvalid {
+		return qScriptBindingPlan{}
+	}
+	right := buildQScriptBindingPlanForRHS(rightExpr, nil)
+	if right.kind == qScriptBindingInvalid {
+		return qScriptBindingPlan{}
+	}
+	return qScriptBindingBinaryPlan("#", left, right)
 }
 
 func buildQScriptTransformBindingPlan(src string) qScriptBindingPlan {
@@ -427,6 +450,10 @@ func (s *EvalState) evalQScriptBinaryBinding(plan *qScriptBindingPlan) (any, boo
 		return nil, handled, err
 	}
 	if plan.op == "#" {
+		if _, ok := left.(data.Array); ok {
+			out, err := reshapeValue(left, right)
+			return out, true, err
+		}
 		n, ok := integerValue(left)
 		if !ok || int64(int(n)) != n {
 			return nil, true, fmt.Errorf("# left operand must be an integer count")

@@ -52,6 +52,12 @@ type QEvalPipelinePlanRef struct {
 	IndexBinding   string
 	MaskExpr       string
 	MaskBinding    string
+	RowValueExpr   string
+	RowIndexExpr   string
+	CallableExpr   string
+	DyadicOp       string
+	ScalarExpr     string
+	ScalarLeft     bool
 	LeftExpr       string
 	RightExpr      string
 	CompareOp      string
@@ -143,6 +149,12 @@ func (fn *Function) addQEvalPipelinePlan(source string, plan qEvalHotPlan) QEval
 		IndexBinding:   plan.IndexBinding,
 		MaskExpr:       plan.MaskExpr,
 		MaskBinding:    plan.MaskBinding,
+		RowValueExpr:   plan.RowValueExpr,
+		RowIndexExpr:   plan.RowIndexExpr,
+		CallableExpr:   plan.CallableExpr,
+		DyadicOp:       plan.DyadicOp,
+		ScalarExpr:     plan.ScalarExpr,
+		ScalarLeft:     plan.ScalarLeft,
 		LeftExpr:       plan.LeftExpr,
 		RightExpr:      plan.RightExpr,
 		CompareOp:      plan.CompareOp,

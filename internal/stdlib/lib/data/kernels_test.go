@@ -3303,6 +3303,13 @@ func TestF64NumericProducerDirectReductions(t *testing.T) {
 	if nestedSum != 6 {
 		t.Fatalf("nested NumericDyadicFloatBound.Sum = %v, want 6", nestedSum)
 	}
+	fusedSum, handled, err := TryTypedNumericSumPlusScalarDyadicFloatSum(bound.Array(), NumericDyadicXLog, int64(2), true)
+	if err != nil || !handled {
+		t.Fatalf("TryTypedNumericSumPlusScalarDyadicFloatSum = %#v,%v,%v; want handled nil error", fusedSum, handled, err)
+	}
+	if fusedSum != 21.0 {
+		t.Fatalf("TryTypedNumericSumPlusScalarDyadicFloatSum = %v, want 21", fusedSum)
+	}
 
 	columnProducer, err := newF64NumericProducer(NewF64([]float64{2, 4, 8, 16}), 4)
 	if err != nil {

@@ -31,6 +31,19 @@ type qLambda struct {
 	namespace string
 }
 
+type qLambdaFastKind uint8
+
+const (
+	qLambdaFastInvalid qLambdaFastKind = iota
+	qLambdaFastDyadic
+	qLambdaFastSumPlusRight
+)
+
+type qLambdaFastPlan struct {
+	kind qLambdaFastKind
+	op   byte
+}
+
 type qProjection struct {
 	fn   any
 	args []projectionArg
@@ -606,6 +619,7 @@ type EvalState struct {
 	valueExprCache       map[string]Expr
 	pipelineCache        map[string]qPipelinePlan
 	applyIndexCache      map[string]qScalarApplyIndexPlan
+	dotApplyCache        map[string]qDotApplyPlan
 	deferScanAssignments map[string]bool
 }
 
@@ -742,8 +756,7 @@ func (s *EvalState) evalScript(src string) (any, error) {
 		}
 	}
 	if plan.scriptPipeline != nil {
-		descriptor := cloneQScriptPipelineDescriptor(plan.scriptPipeline)
-		if out, handled, err := s.tryEvalQScriptPipeline(descriptor); err != nil || handled {
+		if out, handled, err := s.tryEvalQScriptPipeline(plan.scriptPipeline); err != nil || handled {
 			return out, err
 		}
 	}
@@ -1046,6 +1059,9 @@ func cloneQScriptPipelineDescriptor(in *qScriptPipelineDescriptor) *qScriptPipel
 	out.valuePlan = cloneQScriptBindingPlan(in.valuePlan)
 	out.indexPlan = cloneQScriptBindingPlan(in.indexPlan)
 	out.maskPlan = cloneQScriptBindingPlan(in.maskPlan)
+	out.rowValuePlan = cloneQScriptBindingPlan(in.rowValuePlan)
+	out.rowIndexPlan = cloneQScriptBindingPlan(in.rowIndexPlan)
+	out.scalarPlan = cloneQScriptBindingPlan(in.scalarPlan)
 	out.terminalPlan = cloneQPipelinePlan(in.terminalPlan)
 	if in.moduloMaskPlan != nil {
 		plan := cloneQPipelinePlan(*in.moduloMaskPlan)
@@ -7039,6 +7055,32 @@ func (s *EvalState) applyCallable(fn any, args []any) (any, error) {
 	}
 }
 
+func (s *EvalState) applyCallable1(fn any, arg any) (any, error) {
+	switch f := fn.(type) {
+	case qLambda:
+		return s.applyLambda1(f, arg)
+	case qUnaryFunction:
+		return f.fn(arg)
+	case qProjection:
+		return s.applyCallable(f, []any{arg})
+	default:
+		return s.applyCallable(fn, []any{arg})
+	}
+}
+
+func (s *EvalState) applyCallable2(fn any, left, right any) (any, error) {
+	switch f := fn.(type) {
+	case qLambda:
+		return s.applyLambda2(f, left, right)
+	case qDyadicFunction:
+		return f.fn(left, right)
+	case qProjection:
+		return s.applyCallable(f, []any{left, right})
+	default:
+		return s.applyCallable(fn, []any{left, right})
+	}
+}
+
 func (s *EvalState) applyIPCHandle(h *qIPCHandle, args []any) (any, error) {
 	if h == nil || h.session == nil {
 		return nil, fmt.Errorf("q IPC handle is closed")
@@ -7323,6 +7365,93 @@ func (s *EvalState) applyLambda(fn qLambda, args []any) (any, error) {
 		state.env[state.resolveAssignmentName(params[i])] = arg
 	}
 	return state.Eval(body)
+}
+
+func (s *EvalState) applyLambda1(fn qLambda, arg any) (any, error) {
+	return s.applyLambda(fn, []any{arg})
+}
+
+func (s *EvalState) applyLambda2(fn qLambda, left, right any) (any, error) {
+	if plan, ok := qLambdaFastPlanFor(fn.body); ok {
+		switch plan.kind {
+		case qLambdaFastDyadic:
+			return applyDyadic(plan.op, left, right)
+		case qLambdaFastSumPlusRight:
+			sumValue, err := sum(left)
+			if err != nil {
+				return nil, err
+			}
+			return applyDyadic('+', sumValue, right)
+		}
+	}
+	return s.applyLambda(fn, []any{left, right})
+}
+
+func qLambdaFastPlanFor(src string) (qLambdaFastPlan, bool) {
+	params, body, err := lambdaSignature(src)
+	if err != nil || len(params) < 2 {
+		return qLambdaFastPlan{}, false
+	}
+	body = stripEnclosingParens(strings.TrimSpace(body))
+	if op, ok := qLambdaFastDyadicOp(body, params[0], params[1]); ok {
+		return qLambdaFastPlan{kind: qLambdaFastDyadic, op: op}, true
+	}
+	if qLambdaFastSumPlusParam(body, params[0], params[1]) {
+		return qLambdaFastPlan{kind: qLambdaFastSumPlusRight}, true
+	}
+	return qLambdaFastPlan{}, false
+}
+
+func qLambdaFastDyadicOp(body, leftParam, rightParam string) (byte, bool) {
+	for _, candidate := range []struct {
+		token string
+		op    byte
+		word  bool
+	}{
+		{token: "+", op: '+'},
+		{token: "-", op: '-'},
+		{token: "*", op: '*'},
+		{token: "%", op: '%'},
+		{token: "mod", op: 'r', word: true},
+		{token: "div", op: 'd', word: true},
+	} {
+		var left, right string
+		var ok bool
+		if candidate.word {
+			left, right, ok = splitTopLevelWord(body, candidate.token)
+		} else {
+			left, right, ok = splitTopLevelOperator(body, candidate.token)
+		}
+		if !ok {
+			continue
+		}
+		if stripEnclosingParens(left) == leftParam && stripEnclosingParens(right) == rightParam {
+			return candidate.op, true
+		}
+	}
+	return 0, false
+}
+
+func qLambdaFastSumPlusParam(body, sumParam, rightParam string) bool {
+	left, right, ok := splitTopLevelOperator(body, "+")
+	if !ok {
+		return false
+	}
+	left = stripEnclosingParens(left)
+	right = stripEnclosingParens(right)
+	return (qLambdaFastSumTerm(left, sumParam) && right == rightParam) ||
+		(qLambdaFastSumTerm(right, sumParam) && left == rightParam)
+}
+
+func qLambdaFastSumTerm(src, param string) bool {
+	src = stripEnclosingParens(strings.TrimSpace(src))
+	if strings.HasPrefix(src, "+/") {
+		return stripEnclosingParens(strings.TrimSpace(src[len("+/"):])) == param
+	}
+	if strings.HasPrefix(src, "sum") && wordBoundary(src, 0, len("sum")) {
+		return stripEnclosingParens(strings.TrimSpace(src[len("sum"):])) == param
+	}
+	return false
 }
 
 func lambdaSignature(src string) ([]string, string, error) {

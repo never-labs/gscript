@@ -34,6 +34,12 @@ type QEvalPipelineDescriptor struct {
 	IndexBinding   string
 	MaskExpr       string
 	MaskBinding    string
+	RowValueExpr   string
+	RowIndexExpr   string
+	CallableExpr   string
+	DyadicOp       string
+	ScalarExpr     string
+	ScalarLeft     bool
 	LeftExpr       string
 	RightExpr      string
 	CompareOp      string
@@ -84,6 +90,12 @@ func (p qEvalPipelineBackendPlan) methodDescriptor() QEvalPipelineDescriptor {
 		IndexBinding:   descriptor.IndexBinding,
 		MaskExpr:       descriptor.MaskExpr,
 		MaskBinding:    descriptor.MaskBinding,
+		RowValueExpr:   descriptor.RowValueExpr,
+		RowIndexExpr:   descriptor.RowIndexExpr,
+		CallableExpr:   descriptor.CallableExpr,
+		DyadicOp:       descriptor.DyadicOp,
+		ScalarExpr:     descriptor.ScalarExpr,
+		ScalarLeft:     descriptor.ScalarLeft,
 		LeftExpr:       descriptor.LeftExpr,
 		RightExpr:      descriptor.RightExpr,
 		CompareOp:      descriptor.CompareOp,
@@ -138,6 +150,12 @@ func qEvalRuntimePipelinePlan(source string) (qEvalHotPlan, bool) {
 		IndexBinding:   descriptor.IndexBinding,
 		MaskExpr:       descriptor.MaskExpr,
 		MaskBinding:    descriptor.MaskBinding,
+		RowValueExpr:   descriptor.RowValueExpr,
+		RowIndexExpr:   descriptor.RowIndexExpr,
+		CallableExpr:   descriptor.CallableExpr,
+		DyadicOp:       descriptor.DyadicOp,
+		ScalarExpr:     descriptor.ScalarExpr,
+		ScalarLeft:     descriptor.ScalarLeft,
 		LeftExpr:       descriptor.LeftExpr,
 		RightExpr:      descriptor.RightExpr,
 		CompareOp:      descriptor.CompareOp,
@@ -507,6 +525,12 @@ func qEvalPipelineDescriptorFromRef(ref QEvalPipelinePlanRef) (stdq.EvalPipeline
 		IndexBinding:   ref.IndexBinding,
 		MaskExpr:       ref.MaskExpr,
 		MaskBinding:    ref.MaskBinding,
+		RowValueExpr:   ref.RowValueExpr,
+		RowIndexExpr:   ref.RowIndexExpr,
+		CallableExpr:   ref.CallableExpr,
+		DyadicOp:       ref.DyadicOp,
+		ScalarExpr:     ref.ScalarExpr,
+		ScalarLeft:     ref.ScalarLeft,
 		LeftExpr:       ref.LeftExpr,
 		RightExpr:      ref.RightExpr,
 		CompareOp:      ref.CompareOp,

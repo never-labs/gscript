@@ -712,6 +712,94 @@ func TestQScriptPipelinePlannerDescribesSequenceEdgeReduce(t *testing.T) {
 	}
 }
 
+func TestQScriptPipelinePlannerDescribesSumPlusDyadicFloat(t *testing.T) {
+	src := "x:(til 8) mod 4;y:2 xexp x;(+/y)+(+/2 xlog y)"
+	plan := buildQScriptPlan(src)
+	if plan.scriptPipeline == nil {
+		t.Fatalf("script pipeline descriptor missing")
+	}
+	d := plan.scriptPipeline
+	if d.kind != qScriptPipelineSumPlusDyadicFloat {
+		t.Fatalf("pipeline kind = %q, want %q", d.kind, qScriptPipelineSumPlusDyadicFloat)
+	}
+	if d.valueExpr != "y" || d.valueBinding != "2 xexp x" || d.dyadicOp != "xlog" || d.scalarExpr != "2" || !d.scalarLeft {
+		t.Fatalf("sum-plus-dyadic descriptor = value %q binding %q op %q scalar %q scalarLeft %v",
+			d.valueExpr, d.valueBinding, d.dyadicOp, d.scalarExpr, d.scalarLeft)
+	}
+	descriptor, ok := DescribeEvalPipeline(src)
+	if !ok {
+		t.Fatalf("DescribeEvalPipeline(%q) did not recognize sum-plus-dyadic pipeline", src)
+	}
+	if descriptor.DyadicOp != "xlog" || descriptor.ScalarExpr != "2" || !descriptor.ScalarLeft {
+		t.Fatalf("descriptor dyadic fields = %#v", descriptor)
+	}
+	out, handled, err := ExecuteEvalPipelineDescriptor(descriptor)
+	if err != nil || !handled || out != 42.0 {
+		t.Fatalf("ExecuteEvalPipelineDescriptor sum-plus-dyadic = %#v,%v,%v; want 42,true,nil", out, handled, err)
+	}
+	assertEvalValue(t, src, 42.0)
+}
+
+func TestQScriptPipelinePlannerDescribesMatrixRowSumCount(t *testing.T) {
+	src := "m:2 4#til 8;row:m . 1;(+/row)+count row"
+	plan := buildQScriptPlan(src)
+	if plan.scriptPipeline == nil {
+		t.Fatalf("script pipeline descriptor missing")
+	}
+	d := plan.scriptPipeline
+	if d.kind != qScriptPipelineMatrixRowSumCount {
+		t.Fatalf("pipeline kind = %q, want %q", d.kind, qScriptPipelineMatrixRowSumCount)
+	}
+	if d.valueExpr != "row" || d.valueBinding != "m . 1" || d.rowValueExpr != "m" || d.rowIndexExpr != "1" {
+		t.Fatalf("matrix row descriptor = value %q binding %q rowValue %q rowIndex %q", d.valueExpr, d.valueBinding, d.rowValueExpr, d.rowIndexExpr)
+	}
+	if got, want := d.shape(), "script-pipeline/matrix-row-reduce/sum-count/assignments"; got != want {
+		t.Fatalf("shape = %q, want %q", got, want)
+	}
+	descriptor, ok := DescribeEvalPipeline(src)
+	if !ok {
+		t.Fatalf("DescribeEvalPipeline(%q) did not recognize matrix row sum-count pipeline", src)
+	}
+	if descriptor.RowValueExpr != "m" || descriptor.RowIndexExpr != "1" {
+		t.Fatalf("descriptor row fields = %q/%q, want m/1", descriptor.RowValueExpr, descriptor.RowIndexExpr)
+	}
+	out, handled, err := ExecuteEvalPipelineDescriptor(descriptor)
+	if err != nil || !handled || out != int64(26) {
+		t.Fatalf("ExecuteEvalPipelineDescriptor matrix row sum-count = %#v,%v,%v; want 26,true,nil", out, handled, err)
+	}
+	assertEvalValue(t, src, int64(26))
+}
+
+func TestQScriptPipelinePlannerDescribesCallableDotSumPlusRight(t *testing.T) {
+	src := "f:{(+/x)+y};.[f;(til 8;10)]"
+	plan := buildQScriptPlan(src)
+	if plan.scriptPipeline == nil {
+		t.Fatalf("script pipeline descriptor missing")
+	}
+	d := plan.scriptPipeline
+	if d.kind != qScriptPipelineCallableDotSumRight {
+		t.Fatalf("pipeline kind = %q, want %q", d.kind, qScriptPipelineCallableDotSumRight)
+	}
+	if d.callableExpr != "f" || d.valueExpr != "til 8" || d.indexExpr != "10" {
+		t.Fatalf("callable descriptor = callable %q value %q index %q", d.callableExpr, d.valueExpr, d.indexExpr)
+	}
+	if got, want := d.shape(), "script-pipeline/callable-dot/sum-plus-right/assignments"; got != want {
+		t.Fatalf("shape = %q, want %q", got, want)
+	}
+	descriptor, ok := DescribeEvalPipeline(src)
+	if !ok {
+		t.Fatalf("DescribeEvalPipeline(%q) did not recognize callable dot pipeline", src)
+	}
+	if descriptor.CallableExpr != "f" || descriptor.ValueExpr != "til 8" || descriptor.IndexExpr != "10" {
+		t.Fatalf("descriptor = %#v, want callable f value til 8 index 10", descriptor)
+	}
+	out, handled, err := ExecuteEvalPipelineDescriptor(descriptor)
+	if err != nil || !handled || out != int64(38) {
+		t.Fatalf("ExecuteEvalPipelineDescriptor callable dot = %#v,%v,%v; want 38,true,nil", out, handled, err)
+	}
+	assertEvalValue(t, src, int64(38))
+}
+
 func TestQScriptPipelinePlannerRecordsRuntimeStats(t *testing.T) {
 	ClearRuntimeKernelExecutionStats()
 	t.Cleanup(ClearRuntimeKernelExecutionStats)

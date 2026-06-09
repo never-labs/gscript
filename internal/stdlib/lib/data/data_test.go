@@ -7159,6 +7159,10 @@ func TestMatrixReshapeTransposeAndMultiply(t *testing.T) {
 	if err != nil || !handled || rowSum != int64(15) {
 		t.Fatalf("TryMatrixRowNumericSum = %#v,%v,%v; want 15,true,nil", rowSum, handled, err)
 	}
+	rowSumCount, handled, err := TryMatrixRowNumericSumCount(matrix, 1)
+	if err != nil || !handled || rowSumCount != int64(18) {
+		t.Fatalf("TryMatrixRowNumericSumCount = %#v,%v,%v; want 18,true,nil", rowSumCount, handled, err)
+	}
 
 	transposed, err := TransposeMatrix(matrix)
 	if err != nil {

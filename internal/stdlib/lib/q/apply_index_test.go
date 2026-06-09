@@ -28,7 +28,12 @@ func TestQApplyIndexCoreSemantics(t *testing.T) {
 		assertEvalValue(t, ".[+;(1;2)]", int64(3))
 		assertEvalValue(t, ".[+;1 2]", int64(3))
 		assertEvalValue(t, ".[{x+y};(2;3)]", int64(5))
+		assertEvalValue(t, ".[{[a;b] a + b};(2;3)]", int64(5))
 		assertEvalValue(t, ".[{42};()]", int64(42))
+		assertEvalValue(t, "f:{(+/x)+y};.[f;(til 8;10)]", int64(38))
+		assertEvalValue(t, "f:{[xs;n]sum xs+n};.[f;(til 8;10)]", int64(38))
+		assertEvalValue(t, "f:{y+(+/x)};.[f;(til 8;10)]", int64(38))
+		assertEvalValue(t, "a:10;f:{x+a};a:20;.[f;(1)]", int64(11))
 	})
 
 	t.Run("amend forms remain functional", func(t *testing.T) {
@@ -47,6 +52,7 @@ func TestQMatrixRowIndexRecordsTypedRuntimeKernel(t *testing.T) {
 
 	seenRowIndex := false
 	seenRowSum := false
+	seenRowSumCount := false
 	for _, stat := range RuntimeKernelExecutionStats() {
 		if stat.Outcome == "fallback" || stat.Outcome == "error" {
 			t.Fatalf("unexpected matrix row runtime fallback/error: %#v stats=%#v", stat, RuntimeKernelExecutionStats())
@@ -57,9 +63,29 @@ func TestQMatrixRowIndexRecordsTypedRuntimeKernel(t *testing.T) {
 		if stat.Kernel == "ArraySum" && stat.Outcome == "hit" && stat.ReasonCode == "typed_kernel" && strings.HasPrefix(stat.Shape, "vector-reduce/sum/i64") {
 			seenRowSum = true
 		}
+		if stat.Kernel == "MatrixRowSumCount" && stat.Outcome == "hit" && stat.ReasonCode == "typed_kernel" && strings.HasPrefix(stat.Shape, "matrix-dot/") {
+			seenRowSumCount = true
+		}
 	}
-	if !seenRowIndex || !seenRowSum {
-		t.Fatalf("missing matrix row typed runtime stats: rowIndex=%v rowSum=%v stats=%#v", seenRowIndex, seenRowSum, RuntimeKernelExecutionStats())
+	if !seenRowSumCount && (!seenRowIndex || !seenRowSum) {
+		t.Fatalf("missing matrix row typed runtime stats: rowIndex=%v rowSum=%v rowSumCount=%v stats=%#v", seenRowIndex, seenRowSum, seenRowSumCount, RuntimeKernelExecutionStats())
+	}
+}
+
+func TestQDotApplyPlanCachesCallableArgs(t *testing.T) {
+	state := NewEvalState(nil)
+	if got, err := state.Eval("f:{x+y};.[f;(100;23)]"); err != nil || got != int64(123) {
+		t.Fatalf("first dot apply = %#v, %v; want 123,nil", got, err)
+	}
+	if got, err := state.Eval("f:{x+y};.[f;(100;23)]"); err != nil || got != int64(123) {
+		t.Fatalf("warm dot apply = %#v, %v; want 123,nil", got, err)
+	}
+	if len(state.dotApplyCache) == 0 {
+		t.Fatal("dot apply plan cache was not populated")
+	}
+	plan := state.dotApplyCache[".[f;(100;23)]"]
+	if !plan.valid || len(plan.argExprs) != 2 {
+		t.Fatalf("dot apply plan = %#v, want valid two-arg plan", plan)
 	}
 }
 
