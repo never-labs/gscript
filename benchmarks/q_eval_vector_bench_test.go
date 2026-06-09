@@ -184,6 +184,115 @@ func qEvalVectorGoBaselineMatrixCellProbe(matrixRows, cols, cellIndex int, value
 }
 
 //go:noinline
+func qEvalVectorGoBaselineSortRankTypeMatrix(values []int64) int64 {
+	ints := []int64{3, 1, 2, 1}
+	ascIdx := sortedIndexI64ForQEvalVectorGoBaseline(ints, true)
+	descIdx := sortedIndexI64ForQEvalVectorGoBaseline(ints, false)
+	rankVals := rankI64ForQEvalVectorGoBaseline([]int64{2, 7, 3, 2, 5})
+	ascVals := append([]int64(nil), []int64{3, 1, 2}...)
+	descVals := append([]int64(nil), ascVals...)
+	sort.Slice(ascVals, func(i, j int) bool { return ascVals[i] < ascVals[j] })
+	sort.Slice(descVals, func(i, j int) bool { return descVals[i] > descVals[j] })
+	symbolIdx := sortedIndexStringForQEvalVectorGoBaseline([]string{"MSFT", "AAPL", "AAPL"}, true)
+	symbolRank := rankStringForQEvalVectorGoBaseline([]string{"x", "a", "b", "z", "c"})
+	dateIdx := sortedIndexI64ForQEvalVectorGoBaseline([]int64{20260607, math.MinInt64, 20260606}, true)
+	dateRank := rankI64ForQEvalVectorGoBaseline([]int64{20260607, math.MinInt64, 20260606})
+	return sumIntSliceForQEvalVectorGoBaseline(ascIdx) +
+		sumIntSliceForQEvalVectorGoBaseline(descIdx) +
+		sumIntSliceForQEvalVectorGoBaseline(rankVals) +
+		ascVals[0] + descVals[0] +
+		sumIntSliceForQEvalVectorGoBaseline(symbolIdx) +
+		sumIntSliceForQEvalVectorGoBaseline(symbolRank) +
+		sumIntSliceForQEvalVectorGoBaseline(dateIdx) +
+		sumIntSliceForQEvalVectorGoBaseline(dateRank) +
+		values[0]*0
+}
+
+//go:noinline
+func qEvalVectorGoBaselineTemporalTypedXbarAndSort(values []int64) int64 {
+	dates := []int64{20260606, math.MinInt64, 20260607}
+	var dateCount int64
+	for range dates {
+		dateCount++
+	}
+	times := []int64{9*60*60 + 30*60, 9*60*60 + 30*60 + 59, 9*60*60 + 31*60}
+	var bucketCount int64
+	for _, t := range times {
+		_ = (t / 60) * 60
+		bucketCount++
+	}
+	var whereCount int64
+	for _, d := range []int64{20260606, 20260607} {
+		if d >= 20260607 {
+			whereCount++
+		}
+	}
+	return dateCount + bucketCount + whereCount + values[0]*0
+}
+
+func sortedIndexI64ForQEvalVectorGoBaseline(values []int64, asc bool) []int64 {
+	idx := make([]int, len(values))
+	for i := range idx {
+		idx[i] = i
+	}
+	sort.SliceStable(idx, func(i, j int) bool {
+		if asc {
+			return values[idx[i]] < values[idx[j]]
+		}
+		return values[idx[i]] > values[idx[j]]
+	})
+	out := make([]int64, len(idx))
+	for i, v := range idx {
+		out[i] = int64(v)
+	}
+	return out
+}
+
+func sortedIndexStringForQEvalVectorGoBaseline(values []string, asc bool) []int64 {
+	idx := make([]int, len(values))
+	for i := range idx {
+		idx[i] = i
+	}
+	sort.SliceStable(idx, func(i, j int) bool {
+		if asc {
+			return values[idx[i]] < values[idx[j]]
+		}
+		return values[idx[i]] > values[idx[j]]
+	})
+	out := make([]int64, len(idx))
+	for i, v := range idx {
+		out[i] = int64(v)
+	}
+	return out
+}
+
+func rankI64ForQEvalVectorGoBaseline(values []int64) []int64 {
+	idx := sortedIndexI64ForQEvalVectorGoBaseline(values, true)
+	out := make([]int64, len(values))
+	for rank, original := range idx {
+		out[original] = int64(rank)
+	}
+	return out
+}
+
+func rankStringForQEvalVectorGoBaseline(values []string) []int64 {
+	idx := sortedIndexStringForQEvalVectorGoBaseline(values, true)
+	out := make([]int64, len(values))
+	for rank, original := range idx {
+		out[original] = int64(rank)
+	}
+	return out
+}
+
+func sumIntSliceForQEvalVectorGoBaseline(values []int64) int64 {
+	var sum int64
+	for _, value := range values {
+		sum += value
+	}
+	return sum
+}
+
+//go:noinline
 func qEvalVectorGoBaselineTakeCount(rows int, values []int64) int64 {
 	if rows < 0 || rows > len(values) {
 		return 0
@@ -3782,7 +3891,7 @@ func appendQEvalSemanticCoverageCases(cases []qEvalVectorCase) []qEvalVectorCase
 				return "(+/iasc 3 1 2 1)+(+/idesc 3 1 2 1)+(+/rank 2 7 3 2 5)+(first asc 3 1 2)+(first desc 3 1 2)+(+/iasc `MSFT`AAPL`AAPL)+(+/rank `x`a`b`z`c)+(+/iasc 2026.06.07 0Nd 2026.06.06)+(+/rank 2026.06.07 0Nd 2026.06.06)"
 			},
 			goFn: func(rows int) int64 {
-				return 6 + 6 + 10 + 1 + 3 + 3 + 10 + 3 + 3
+				return qEvalVectorGoBaselineSortRankTypeMatrix(qEvalVectorGoBaselineInput)
 			},
 		},
 		{
@@ -3826,7 +3935,7 @@ func appendQEvalSemanticCoverageCases(cases []qEvalVectorCase) []qEvalVectorCase
 				return "(count 2026.06.06 0Nd 2026.06.07)+(count 00:01 xbar 09:30 09:30:59 09:31:00)+(count where 2026.06.06 2026.06.07>=2026.06.07)"
 			},
 			goFn: func(rows int) int64 {
-				return 3 + 3 + 1
+				return qEvalVectorGoBaselineTemporalTypedXbarAndSort(qEvalVectorGoBaselineInput)
 			},
 		},
 		{
