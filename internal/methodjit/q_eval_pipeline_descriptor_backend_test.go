@@ -254,6 +254,54 @@ func TestQEvalPipelineRuntimeBackendPrefersExecutablePlanByDefault(t *testing.T)
 	}
 }
 
+func TestQEvalPipelinePlanRefPreservesCallableDotCountDescriptor(t *testing.T) {
+	ref := qEvalPipelineDescriptorBackendTestRef(t, "f:{(+/x)+count y};.[f;(til 8;10#1)]")
+	if !ref.IncludeCount || ref.CallableExpr != "f" || ref.ValueExpr != "til 8" || ref.IndexExpr != "10#1" {
+		t.Fatalf("plan ref = %+v, want callable/count descriptor fields", ref)
+	}
+	descriptor, ok := qEvalPipelineDescriptorFromRef(ref)
+	if !ok {
+		t.Fatalf("qEvalPipelineDescriptorFromRef returned false")
+	}
+	if !descriptor.IncludeCount || descriptor.CallableExpr != "f" || descriptor.ValueExpr != "til 8" || descriptor.IndexExpr != "10#1" {
+		t.Fatalf("descriptor from ref = %+v, want callable/count descriptor fields", descriptor)
+	}
+
+	executable, ok := stdq.CompileEvalPipelineBackendPlan(stdq.EvalPipelineBackendPlan{
+		Backend:    qEvalPipelineTypedRuntimeBackend,
+		Detail:     "kind=" + descriptor.Kind,
+		Descriptor: descriptor,
+	})
+	if !ok {
+		t.Fatalf("CompileEvalPipelineBackendPlan failed for callable-dot count descriptor")
+	}
+	out, handled, err := stdq.NewEvalState(nil).ExecuteEvalPipelineExecutablePlan(executable)
+	if err != nil || !handled || out != int64(38) {
+		t.Fatalf("ExecuteEvalPipelineExecutablePlan = %#v,%v,%v; want 38,true,nil", out, handled, err)
+	}
+}
+
+func TestCompiledFunctionHelperExecutesCallableDotCountExecutablePlan(t *testing.T) {
+	ref := qEvalPipelineDescriptorBackendTestRef(t, "f:{(+/x)+count y};.[f;(til 8;10#1)]")
+	backend := newQRuntimeEvalPipelineBackend([]QEvalPipelinePlanRef{ref})
+	cf := &CompiledFunction{
+		QEvalPipelinePlans:       []QEvalPipelinePlanRef{ref},
+		QEvalPipelineBackend:     qRuntimeEvalPipelineBackend{},
+		QEvalPipelinePlanHelpers: newQEvalPipelinePlanHelpers([]QEvalPipelinePlanRef{ref}, backend),
+	}
+	if len(cf.QEvalPipelinePlanHelpers) != 1 || !cf.QEvalPipelinePlanHelpers[0].hasExecutablePlan {
+		t.Fatalf("compiled helpers = %+v, want executable helper", cf.QEvalPipelinePlanHelpers)
+	}
+
+	value, handled, err := cf.ExecuteQEvalPipelinePlanValue(ref.ID)
+	if err != nil {
+		t.Fatalf("ExecuteQEvalPipelinePlanValue: %v", err)
+	}
+	if !handled || !value.IsInt() || value.Int() != 38 {
+		t.Fatalf("ExecuteQEvalPipelinePlanValue = %v handled %v, want int 38 handled", value, handled)
+	}
+}
+
 func TestQEvalPipelineLoweringRecognizesMathRuntimePrimitive(t *testing.T) {
 	for _, tc := range []struct {
 		name  string
@@ -498,6 +546,7 @@ func qEvalPipelineDescriptorBackendTestRef(tb testing.TB, source string) QEvalPi
 		DyadicOp:               descriptor.DyadicOp,
 		ScalarExpr:             descriptor.ScalarExpr,
 		ScalarLeft:             descriptor.ScalarLeft,
+		IncludeCount:           descriptor.IncludeCount,
 		SequenceValueExpr:      descriptor.SequenceValueExpr,
 		SequenceTransformChain: descriptor.SequenceTransformChain,
 		SequenceTransformNames: descriptor.SequenceTransformNames,

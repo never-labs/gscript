@@ -59,6 +59,7 @@ type QEvalPipelinePlanRef struct {
 	DyadicOp               string
 	ScalarExpr             string
 	ScalarLeft             bool
+	IncludeCount           bool
 	SequenceValueExpr      string
 	SequenceTransformChain string
 	SequenceTransformNames string
@@ -160,6 +161,7 @@ func (fn *Function) addQEvalPipelinePlan(source string, plan qEvalHotPlan) QEval
 		DyadicOp:               plan.DyadicOp,
 		ScalarExpr:             plan.ScalarExpr,
 		ScalarLeft:             plan.ScalarLeft,
+		IncludeCount:           plan.IncludeCount,
 		SequenceValueExpr:      plan.SequenceValueExpr,
 		SequenceTransformChain: plan.SequenceTransformChain,
 		SequenceTransformNames: plan.SequenceTransformNames,

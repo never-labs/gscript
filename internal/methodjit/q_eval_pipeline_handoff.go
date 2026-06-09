@@ -547,6 +547,7 @@ func qEvalPipelineDescriptorFromRef(ref QEvalPipelinePlanRef) (stdq.EvalPipeline
 		DyadicOp:               ref.DyadicOp,
 		ScalarExpr:             ref.ScalarExpr,
 		ScalarLeft:             ref.ScalarLeft,
+		IncludeCount:           ref.IncludeCount,
 		SequenceValueExpr:      ref.SequenceValueExpr,
 		SequenceTransformChain: ref.SequenceTransformChain,
 		SequenceTransformNames: ref.SequenceTransformNames,
