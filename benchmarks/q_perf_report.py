@@ -108,6 +108,25 @@ class RuntimeMetricRow:
 
 
 @dataclass
+class GatePolicy:
+    max_leia_go_ratio: float
+    min_typed_hit_pct: float
+    max_typed_fallbacks_op: float
+    max_pipeline_fallback_shapes: float
+    max_allocs_op: float
+
+
+@dataclass
+class GateCheck:
+    signal: str
+    benchmark: str
+    value: float | None
+    threshold: str
+    status: str
+    note: str = ""
+
+
+@dataclass
 class QEvalComputeCoverage:
     session_case_count: int
     go_baseline_case_count: int
@@ -320,6 +339,16 @@ def build_runtime_metric_rows(rows: dict[str, BenchRow]) -> list[RuntimeMetricRo
     return out
 
 
+def build_fallback_shape_rows(rows: dict[str, BenchRow]) -> list[RuntimeMetricRow]:
+    return [
+        row
+        for row in build_runtime_metric_rows(rows)
+        if (row.typed_pipeline_fallback_shapes or 0) > 0
+        or (row.typed_kernel_fallbacks_op or 0) > 0
+        or (row.fallbacks_op or 0) > 0
+    ]
+
+
 def qeval_cases(rows: dict[str, BenchRow], prefix: str) -> set[str]:
     marker = prefix + "/"
     return {name.removeprefix(marker) for name in rows if name.startswith(marker)}
@@ -450,6 +479,93 @@ def build_ratios(rows: dict[str, BenchRow]) -> list[RatioRow]:
     return ratios
 
 
+def ratio_gate_checks(rows: dict[str, BenchRow], policy: GatePolicy) -> list[GateCheck]:
+    checks: list[GateCheck] = []
+    for item in build_ratios(rows):
+        if "Go" not in item.denominator:
+            continue
+        if item.ratio is None:
+            checks.append(
+                GateCheck(
+                    signal="leia_go_ratio",
+                    benchmark=item.numerator,
+                    value=None,
+                    threshold=f"<= {policy.max_leia_go_ratio:g}",
+                    status="skip",
+                    note=item.note or "missing or untrusted denominator",
+                )
+            )
+            continue
+        checks.append(
+            GateCheck(
+                signal="leia_go_ratio",
+                benchmark=item.numerator,
+                value=item.ratio,
+                threshold=f"<= {policy.max_leia_go_ratio:g}",
+                status="pass" if item.ratio <= policy.max_leia_go_ratio else "fail",
+                note=item.note,
+            )
+        )
+    return checks
+
+
+def runtime_gate_checks(rows: dict[str, BenchRow], policy: GatePolicy) -> list[GateCheck]:
+    checks: list[GateCheck] = []
+    for item in build_runtime_metric_rows(rows):
+        if item.typed_kernel_hit_pct is not None:
+            checks.append(
+                GateCheck(
+                    signal="typed_hit_pct",
+                    benchmark=item.benchmark,
+                    value=item.typed_kernel_hit_pct,
+                    threshold=f">= {policy.min_typed_hit_pct:g}",
+                    status="pass" if item.typed_kernel_hit_pct >= policy.min_typed_hit_pct else "fail",
+                )
+            )
+        fallback_value = item.typed_kernel_fallbacks_op
+        if fallback_value is None:
+            fallback_value = item.fallbacks_op
+        if fallback_value is not None:
+            checks.append(
+                GateCheck(
+                    signal="fallbacks_op",
+                    benchmark=item.benchmark,
+                    value=fallback_value,
+                    threshold=f"<= {policy.max_typed_fallbacks_op:g}",
+                    status="pass" if fallback_value <= policy.max_typed_fallbacks_op else "fail",
+                )
+            )
+        if item.typed_pipeline_fallback_shapes is not None:
+            checks.append(
+                GateCheck(
+                    signal="pipeline_fallback_shapes",
+                    benchmark=item.benchmark,
+                    value=item.typed_pipeline_fallback_shapes,
+                    threshold=f"<= {policy.max_pipeline_fallback_shapes:g}",
+                    status="pass" if item.typed_pipeline_fallback_shapes <= policy.max_pipeline_fallback_shapes else "fail",
+                )
+            )
+        if item.allocs_op is not None:
+            checks.append(
+                GateCheck(
+                    signal="allocs_op",
+                    benchmark=item.benchmark,
+                    value=item.allocs_op,
+                    threshold=f"<= {policy.max_allocs_op:g}",
+                    status="pass" if item.allocs_op <= policy.max_allocs_op else "fail",
+                )
+            )
+    return checks
+
+
+def build_gate_checks(rows: dict[str, BenchRow], policy: GatePolicy) -> list[GateCheck]:
+    return ratio_gate_checks(rows, policy) + runtime_gate_checks(rows, policy)
+
+
+def gate_failed(checks: list[GateCheck]) -> bool:
+    return any(check.status == "fail" for check in checks)
+
+
 def metric_present(rows: dict[str, BenchRow], names: list[str], metric: str) -> bool:
     return any(metric in rows.get(name, BenchRow(name, 0, 0)).metrics for name in names)
 
@@ -518,13 +634,20 @@ def format_metric(value: float | None, digits: int) -> str:
     return f"{value:.{digits}f}"
 
 
-def markdown_report(rows: dict[str, BenchRow], commands: list[CommandResult], current_vs_old: list[CurrentVsOldRow] | None = None) -> str:
+def markdown_report(
+    rows: dict[str, BenchRow],
+    commands: list[CommandResult],
+    current_vs_old: list[CurrentVsOldRow] | None = None,
+    gate_checks: list[GateCheck] | None = None,
+) -> str:
     current_vs_old = current_vs_old or []
+    gate_checks = gate_checks or []
     coverage = build_coverage(rows, current_vs_old)
     qsql_coverage = build_qsql_benchmark_coverage(rows)
     qeval_compute = build_qeval_compute_coverage(rows)
     ratios = build_ratios(rows)
     runtime_metrics = build_runtime_metric_rows(rows)
+    fallback_shapes = build_fallback_shape_rows(rows)
     lines = [
         "# q Performance Completeness Report",
         "",
@@ -562,6 +685,24 @@ def markdown_report(rows: dict[str, BenchRow], commands: list[CommandResult], cu
             )
     else:
         lines.append("| missing | missing | missing | missing | missing | provide `--timing-json` |")
+    lines.extend(
+        [
+            "",
+            "## Gate Summary",
+            "",
+            "| Status | Signal | Benchmark | Value | Threshold | Note |",
+            "|---|---|---|---:|---:|---|",
+        ]
+    )
+    if gate_checks:
+        for item in gate_checks:
+            value = "missing" if item.value is None else f"{item.value:.3f}"
+            lines.append(
+                f"| {item.status} | {item.signal} | {item.benchmark} | "
+                f"{value} | {item.threshold} | {item.note} |"
+            )
+    else:
+        lines.append("| not-run | missing | missing | missing | run with `--check` to enforce thresholds |  |")
     lines.extend(
         [
             "",
@@ -656,6 +797,25 @@ def markdown_report(rows: dict[str, BenchRow], commands: list[CommandResult], cu
     lines.extend(
         [
             "",
+            "## Fallback Shape Summary",
+            "",
+            "| Benchmark | fallbacks/op | typed_kernel_fallbacks/op | typed_pipeline_fallback_shapes |",
+            "|---|---:|---:|---:|",
+        ]
+    )
+    if fallback_shapes:
+        for item in fallback_shapes:
+            lines.append(
+                f"| {item.benchmark} | "
+                f"{format_metric(item.fallbacks_op, 3)} | "
+                f"{format_metric(item.typed_kernel_fallbacks_op, 3)} | "
+                f"{format_metric(item.typed_pipeline_fallback_shapes, 0)} |"
+            )
+    else:
+        lines.append("| none | 0 | 0 | 0 |")
+    lines.extend(
+        [
+            "",
             "## Raw Benchmarks",
             "",
             "| Benchmark | ns/op | B/op | allocs/op | kernel_hit_pct | fallbacks/op | typed_kernel_hit_pct | typed_kernel_fallbacks/op | typed_pipeline_shapes | typed_pipeline_fallback_shapes |",
@@ -695,6 +855,12 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--markdown", type=Path, default=Path("benchmarks/data/q_perf_report_latest.md"))
     parser.add_argument("--from-output", type=Path, action="append", default=[], help="Parse existing go test output instead of running commands.")
     parser.add_argument("--timing-json", type=Path, action="append", default=[], help="Include current-vs-old rows from timing_compare.py JSON output.")
+    parser.add_argument("--check", action="store_true", help="Fail if q benchmark ratios or runtime metrics miss the configured thresholds.")
+    parser.add_argument("--max-leia-go-ratio", type=float, default=5.0)
+    parser.add_argument("--min-typed-hit-pct", type=float, default=95.0)
+    parser.add_argument("--max-typed-fallbacks-op", type=float, default=0.0)
+    parser.add_argument("--max-pipeline-fallback-shapes", type=float, default=0.0)
+    parser.add_argument("--max-allocs-op", type=float, default=64.0)
     args = parser.parse_args(argv)
 
     commands: list[CommandResult] = []
@@ -737,6 +903,14 @@ def main(argv: list[str]) -> int:
     for path in args.timing_json:
         current_vs_old.extend(parse_timing_compare_json(path))
 
+    policy = GatePolicy(
+        max_leia_go_ratio=args.max_leia_go_ratio,
+        min_typed_hit_pct=args.min_typed_hit_pct,
+        max_typed_fallbacks_op=args.max_typed_fallbacks_op,
+        max_pipeline_fallback_shapes=args.max_pipeline_fallback_shapes,
+        max_allocs_op=args.max_allocs_op,
+    )
+    gate_checks = build_gate_checks(rows, policy) if args.check else []
     payload = {
         "commands": [asdict(command) for command in commands],
         "benchmarks": {name: asdict(row) for name, row in sorted(rows.items())},
@@ -746,12 +920,15 @@ def main(argv: list[str]) -> int:
         "qsql_benchmark_coverage": asdict(build_qsql_benchmark_coverage(rows)),
         "q_eval_compute_coverage": asdict(build_qeval_compute_coverage(rows)),
         "ratios": [asdict(row) for row in build_ratios(rows)],
+        "fallback_shape_summary": [asdict(row) for row in build_fallback_shape_rows(rows)],
+        "gate_policy": asdict(policy),
+        "gate": [asdict(row) for row in gate_checks],
     }
 
     args.json.parent.mkdir(parents=True, exist_ok=True)
     args.markdown.parent.mkdir(parents=True, exist_ok=True)
     args.json.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
-    args.markdown.write_text(markdown_report(rows, commands, current_vs_old))
+    args.markdown.write_text(markdown_report(rows, commands, current_vs_old, gate_checks))
 
     for command in commands:
         if command.exit_code != 0:
@@ -765,6 +942,10 @@ def main(argv: list[str]) -> int:
                 return command.exit_code
     print(f"wrote {args.markdown}")
     print(f"wrote {args.json}")
+    if args.check and gate_failed(gate_checks):
+        failed = sum(1 for check in gate_checks if check.status == "fail")
+        print(f"q performance gate failed: {failed} checks failed", file=sys.stderr)
+        return 2
     return 0
 
 

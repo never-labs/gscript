@@ -204,6 +204,39 @@ Read the q performance baseline through these ratios:
 | Typed kernel hit/fallback rate | use `kernel_hit_pct`, `template_hit_pct`, `aligned_hit_pct`, and `fallbacks/op` in bind benchmark output; use `typed_kernel_hit_pct` and `typed_kernel_fallbacks/op` in ordinary q session rows |
 | Allocation pressure | use `B/op` and `allocs/op`; q columnar hot paths should trend toward low per-row allocation |
 
+Generate a machine-readable q performance report from the focused qSQL and
+ordinary q benchmark rows:
+
+```bash
+python3 benchmarks/q_perf_report.py --benchtime=100x
+```
+
+The report writes `benchmarks/data/q_perf_report_latest.md` and
+`benchmarks/data/q_perf_report_latest.json`, including Leia-vs-Go ratios,
+warm/cold ratios, typed kernel hit/fallback counters, allocation metrics, and
+fallback shape summary rows.
+
+Use `--check` to turn the same report into a performance gate:
+
+```bash
+python3 benchmarks/q_perf_report.py \
+  --benchtime=100x \
+  --check \
+  --max-leia-go-ratio=5 \
+  --min-typed-hit-pct=95 \
+  --max-typed-fallbacks-op=0 \
+  --max-pipeline-fallback-shapes=0 \
+  --max-allocs-op=64
+```
+
+For quick iteration on saved `go test -bench` output, skip rerunning benchmarks:
+
+```bash
+python3 benchmarks/q_perf_report.py \
+  --from-output /tmp/qbench.txt \
+  --check
+```
+
 ## q.eval Vector/List Compute
 
 `benchmarks/q_eval_vector_bench_test.go` covers ordinary q expressions outside

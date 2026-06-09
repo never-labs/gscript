@@ -1,4 +1,6 @@
 import json
+import contextlib
+import io
 import tempfile
 import unittest
 from pathlib import Path
@@ -14,6 +16,11 @@ BenchmarkQEvalVectorResultCacheWarm/MaskWhere-16         100  500 ns/op  64 B/op
 BenchmarkQEvalVectorCold/MaskWhere-16                    100  2500 ns/op  512 B/op  12 allocs/op
 BenchmarkQSessionEvalVectorWarmExecution/MaskWhere-16    100  2000 ns/op  256 B/op  8 allocs/op  100.0 typed_kernel_hit_pct  1 typed_kernel_attempts/op  1 typed_kernel_hits/op  0 typed_kernel_fallbacks/op  0 typed_kernel_errors/op  2 typed_pipeline_shapes  0 typed_pipeline_fallback_shapes
 BenchmarkQEvalVectorGoBaseline/MaskWhere-16              100  1000 ns/op  0 B/op  0 allocs/op
+"""
+
+SAMPLE_WITH_FALLBACK = """
+BenchmarkQSessionEvalVectorWarmExecution/FallbackShape-16    100  9000 ns/op  2048 B/op  90 allocs/op  80.0 typed_kernel_hit_pct  1 typed_kernel_attempts/op  0.8 typed_kernel_hits/op  0.2 typed_kernel_fallbacks/op  0 typed_kernel_errors/op  2 typed_pipeline_shapes  1 typed_pipeline_fallback_shapes
+BenchmarkQEvalVectorGoBaseline/FallbackShape-16              100  1000 ns/op  0 B/op  0 allocs/op
 """
 
 TIMING_PAYLOAD = {
@@ -91,6 +98,31 @@ class QPerfReportTest(unittest.TestCase):
         self.assertEqual(qeval.typed_pipeline_shapes, 2)
         self.assertEqual(qeval.typed_pipeline_fallback_shapes, 0)
 
+    def test_gate_checks_cover_ratio_hit_rate_fallback_and_allocs(self):
+        rows = report.parse_go_benchmarks(SAMPLE + SAMPLE_WITH_FALLBACK)
+        policy = report.GatePolicy(
+            max_leia_go_ratio=5,
+            min_typed_hit_pct=95,
+            max_typed_fallbacks_op=0,
+            max_pipeline_fallback_shapes=0,
+            max_allocs_op=64,
+        )
+        checks = report.build_gate_checks(rows, policy)
+        failed = {(check.signal, check.benchmark) for check in checks if check.status == "fail"}
+
+        self.assertIn(("leia_go_ratio", "BenchmarkQSessionEvalVectorWarmExecution/FallbackShape"), failed)
+        self.assertIn(("typed_hit_pct", "BenchmarkQSessionEvalVectorWarmExecution/FallbackShape"), failed)
+        self.assertIn(("fallbacks_op", "BenchmarkQSessionEvalVectorWarmExecution/FallbackShape"), failed)
+        self.assertIn(("pipeline_fallback_shapes", "BenchmarkQSessionEvalVectorWarmExecution/FallbackShape"), failed)
+        self.assertIn(("allocs_op", "BenchmarkQSessionEvalVectorWarmExecution/FallbackShape"), failed)
+        self.assertTrue(report.gate_failed(checks))
+
+    def test_fallback_shape_summary_filters_only_rows_with_fallback_pressure(self):
+        rows = report.parse_go_benchmarks(SAMPLE + SAMPLE_WITH_FALLBACK)
+        fallback_rows = report.build_fallback_shape_rows(rows)
+
+        self.assertEqual([row.benchmark for row in fallback_rows], ["BenchmarkQSessionEvalVectorWarmExecution/FallbackShape"])
+
     def test_qsql_benchmark_coverage_reports_missing_expected_rows(self):
         rows = report.parse_go_benchmarks(SAMPLE)
         coverage = report.build_qsql_benchmark_coverage(rows)
@@ -110,12 +142,13 @@ class QPerfReportTest(unittest.TestCase):
             json_path = td_path / "report.json"
             md_path = td_path / "report.md"
 
-            code = report.main([
-                "--from-output", str(out),
-                "--timing-json", str(timing),
-                "--json", str(json_path),
-                "--markdown", str(md_path),
-            ])
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                code = report.main([
+                    "--from-output", str(out),
+                    "--timing-json", str(timing),
+                    "--json", str(json_path),
+                    "--markdown", str(md_path),
+                ])
 
             self.assertEqual(code, 0)
             payload = json.loads(json_path.read_text())
@@ -123,9 +156,33 @@ class QPerfReportTest(unittest.TestCase):
             self.assertIn("qsql_benchmark_coverage", payload)
             self.assertEqual(payload["current_vs_old"][0]["ratio"], 0.5)
             self.assertIn("runtime_metrics", payload)
+            self.assertIn("fallback_shape_summary", payload)
+            self.assertIn("gate_policy", payload)
             markdown = md_path.read_text()
             self.assertIn("q Performance Completeness Report", markdown)
             self.assertIn("Current vs Old Leia", markdown)
+            self.assertIn("Gate Summary", markdown)
+
+    def test_main_check_returns_nonzero_for_gate_failures(self):
+        with tempfile.TemporaryDirectory() as td:
+            td_path = Path(td)
+            out = td_path / "bench.txt"
+            out.write_text(SAMPLE_WITH_FALLBACK)
+            json_path = td_path / "report.json"
+            md_path = td_path / "report.md"
+
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                code = report.main([
+                    "--from-output", str(out),
+                    "--json", str(json_path),
+                    "--markdown", str(md_path),
+                    "--check",
+                ])
+
+            self.assertEqual(code, 2)
+            payload = json.loads(json_path.read_text())
+            self.assertTrue(any(row["status"] == "fail" for row in payload["gate"]))
+            self.assertIn("Fallback Shape Summary", md_path.read_text())
 
 
 if __name__ == "__main__":
