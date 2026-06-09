@@ -86,6 +86,20 @@ func NumericWeightedSum(weights, values any) (any, bool, error) {
 		}
 		return w * v, true, nil
 	}
+	if weightIsArray && !isNumericArray(weightArray) {
+		return nil, false, nil
+	}
+	if valueIsArray && !isNumericArray(valueArray) {
+		return nil, false, nil
+	}
+	weightScalar, weightScalarNull, ok := numericWeightedScalar(weights, !weightIsArray)
+	if !ok {
+		return nil, false, nil
+	}
+	valueScalar, valueScalarNull, ok := numericWeightedScalar(values, !valueIsArray)
+	if !ok {
+		return nil, false, nil
+	}
 	length := 1
 	if weightIsArray {
 		length = weightArray.Len()
@@ -98,33 +112,41 @@ func NumericWeightedSum(weights, values any) (any, bool, error) {
 	}
 	total := float64(0)
 	for row := 0; row < length; row++ {
-		weight := weights
+		weight := weightScalar
+		weightOK := !weightScalarNull
 		if weightIsArray {
-			var ok bool
-			weight, ok = weightArray.At(row)
-			if !ok {
-				return nil, true, fmt.Errorf("weighted sum weight row %d out of range", row)
+			var err error
+			weight, weightOK, err = typedKernels.NumericAt(weightArray, row)
+			if err != nil {
+				return nil, true, err
 			}
 		}
-		value := values
+		value := valueScalar
+		valueOK := !valueScalarNull
 		if valueIsArray {
-			var ok bool
-			value, ok = valueArray.At(row)
-			if !ok {
-				return nil, true, fmt.Errorf("weighted sum value row %d out of range", row)
+			var err error
+			value, valueOK, err = typedKernels.NumericAt(valueArray, row)
+			if err != nil {
+				return nil, true, err
 			}
 		}
-		if IsNull(weight) || IsNull(value) {
+		if !weightOK || !valueOK {
 			continue
 		}
-		w, wok := numeric(weight)
-		v, vok := numeric(value)
-		if !wok || !vok {
-			return nil, false, nil
-		}
-		total += w * v
+		total += weight * value
 	}
 	return total, true, nil
+}
+
+func numericWeightedScalar(value any, required bool) (float64, bool, bool) {
+	if !required {
+		return 0, false, true
+	}
+	if IsNull(value) {
+		return 0, true, true
+	}
+	n, ok := numeric(value)
+	return n, false, ok
 }
 
 func NumericArrayCovariance(left, right Array, sample bool) (any, bool, error) {

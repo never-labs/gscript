@@ -97,6 +97,17 @@ func TestNumericAnalyticsStatsWindows(t *testing.T) {
 	if err != nil || !handled || wsum != 140.0 {
 		t.Fatalf("NumericWeightedSum = %#v,%v,%v, want 140,true,nil", wsum, handled, err)
 	}
+	wsum, handled, err = NumericWeightedSum(int64(2), NewI64([]int64{10, 20, 30}))
+	if err != nil || !handled || wsum != 120.0 {
+		t.Fatalf("NumericWeightedSum scalar broadcast = %#v,%v,%v, want 120,true,nil", wsum, handled, err)
+	}
+	wsum, handled, err = NumericWeightedSum(NewColumn("w", []any{int64(1), NullValue, int64(3)}).Data, NewI64([]int64{10, 20, 30}))
+	if err != nil || !handled || wsum != 100.0 {
+		t.Fatalf("NumericWeightedSum nullable = %#v,%v,%v, want 100,true,nil", wsum, handled, err)
+	}
+	if _, handled, err := NumericWeightedSum(NewString([]string{"a"}), NewI64([]int64{1})); err != nil || handled {
+		t.Fatalf("NumericWeightedSum string handled=%v err=%v, want false,nil", handled, err)
+	}
 	cov, handled, err := NumericArrayCovariance(values, values, false)
 	if err != nil || !handled || cov != float64(2)/3 {
 		t.Fatalf("NumericArrayCovariance = %#v,%v,%v, want 2/3,true,nil", cov, handled, err)
