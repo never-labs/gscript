@@ -11,6 +11,9 @@ func TestQGapValidationConditionalsApplyIndexAndCasts(t *testing.T) {
 	assertEvalValue(t, "$[1;42;1%0]", int64(42))
 	assertEvalValue(t, "?[1;42;1%0]", int64(42))
 	assertEvalValue(t, "f:{$[x>0;1;-1]};f[-2]", int64(-1))
+	assertEvalValue(t, "f:{[x]y:$[x>0;10;20];y+1};f[-2]", int64(21))
+	assertEvalValue(t, "f:{[x]y:?[x>0;10;20];y+1};f[2]", int64(11))
+	assertEvalValue(t, "a:$[1;2;1%0];b:?[0;1%0;3];a+b", int64(5))
 	assertEvalValue(t, "i:0;while[i<3;i:i+1];i", int64(3))
 	assertEvalValue(t, "i:0;while[i<3;i+:1];i", int64(3))
 
@@ -27,6 +30,7 @@ func TestQGapValidationConditionalsApplyIndexAndCasts(t *testing.T) {
 	assertEvalValue(t, "`long$3.7", int64(3))
 	assertEvalValue(t, "`int$-3.7", int32(-3))
 	assertEvalArray(t, "`long$1.2 2.8 -3.7", data.KindI64, []any{int64(1), int64(2), int64(-3)})
+	assertEvalArray(t, "`int$1.2 -2.8 3.0", data.KindI32, []any{int32(1), int32(-2), int32(3)})
 }
 
 func TestQGapValidationBooleanVectorLiterals(t *testing.T) {

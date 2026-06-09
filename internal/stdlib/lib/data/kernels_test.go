@@ -315,6 +315,28 @@ func TestTryTypedCastIntegerArrays(t *testing.T) {
 		t.Fatalf("TryTypedCast f64 i32 values = %#v, want %#v", got, want)
 	}
 
+	longs, handled, err := TryTypedCast(KindI64, NewF64([]float64{1.9, -2.9, 3.0}))
+	if err != nil {
+		t.Fatalf("TryTypedCast i64 f64 returned error: %v", err)
+	}
+	if !handled {
+		t.Fatal("TryTypedCast i64 f64 did not handle numeric array")
+	}
+	if got, want := longs.Values(), []any{int64(1), int64(-2), int64(3)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("TryTypedCast i64 f64 values = %#v, want %#v", got, want)
+	}
+
+	ints, handled, err := TryTypedCast(KindI32, NewF32([]float32{1.2, -3.7}))
+	if err != nil {
+		t.Fatalf("TryTypedCast i32 f32 returned error: %v", err)
+	}
+	if !handled {
+		t.Fatal("TryTypedCast i32 f32 did not handle numeric array")
+	}
+	if got, want := ints.Values(), []any{int32(1), int32(-3)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("TryTypedCast i32 f32 values = %#v, want %#v", got, want)
+	}
+
 	floatRange, handled, err := TryTypedCast(KindF64, NewI64Range(0, 2, 4))
 	if err != nil {
 		t.Fatalf("TryTypedCast f64 range returned error: %v", err)
@@ -331,6 +353,9 @@ func TestTryTypedCastIntegerArrays(t *testing.T) {
 
 	if _, handled, err := TryTypedCast(KindI16, NewI64([]int64{32768})); !handled || err == nil {
 		t.Fatalf("TryTypedCast i16 overflow handled=%v err=%v, want handled error", handled, err)
+	}
+	if _, handled, err := TryTypedCast(KindI64, NewF64([]float64{math.Inf(1)})); handled || err != nil {
+		t.Fatalf("TryTypedCast i64 inf handled=%v err=%v, want unsupported nil error", handled, err)
 	}
 }
 
