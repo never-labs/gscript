@@ -284,6 +284,7 @@ func TestQPipelinePlanRecognizesRazeSumAndCounts(t *testing.T) {
 		kernel        string
 	}{
 		{expr: "+/raze 2 3#til 6", shape: "vector-reduce/sum-raze", pipelineShape: "vector_reduce", transform: "raze", want: int64(15), kernel: "ArrayNestedRazeSum"},
+		{expr: "+/raze flip 2 3#til 6", shape: "vector-reduce/sum-raze", pipelineShape: "vector_reduce", transform: "raze", want: int64(15), kernel: "ArrayNestedRazeSum"},
 		{expr: "+/raze[(til 6;reverse til 6;3#til 6)]", shape: "vector-reduce/sum-raze", pipelineShape: "vector_reduce", transform: "raze", want: int64(33), kernel: "ArrayNestedRazeSum"},
 		{expr: "count raze 2 3#til 6", shape: "sequence-count/raze", pipelineShape: "sequence_count", transform: "raze", want: int64(6), kernel: "SequenceRazeCount"},
 		{expr: "count 2 3#til 6", shape: "sequence-count/value", pipelineShape: "sequence_count", transform: "value", want: int64(2), kernel: "SequenceValueCount"},
