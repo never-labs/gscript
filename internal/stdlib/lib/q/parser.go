@@ -1141,7 +1141,8 @@ func qPrefixFunction(name string) bool {
 	switch strings.ToLower(name) {
 	case "sum", "avg", "var", "dev", "med", "wavg", "count", "min", "max", "first", "last", "distinct",
 		"prev", "next", "deltas", "fills", "ratios", "sums", "prds", "mins", "maxs", "avgs",
-		"abs", "neg", "sqrt", "log", "exp", "reciprocal", "signum", "floor", "ceiling", "null", "rank":
+		"abs", "neg", "sqrt", "log", "exp", "sin", "cos", "tan", "asin", "acos", "atan",
+		"reciprocal", "signum", "floor", "ceiling", "null", "rank":
 		return true
 	default:
 		return false

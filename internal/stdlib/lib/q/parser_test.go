@@ -2364,6 +2364,12 @@ func TestLowerTimeSeriesProjectionCallsToDataExpressions(t *testing.T) {
 		{sql: "select root_qty:sqrt qty from trades", want: "sqrt"},
 		{sql: "select log_qty:log qty from trades", want: "log"},
 		{sql: "select exp_qty:exp qty from trades", want: "exp"},
+		{sql: "select sin_qty:sin qty from trades", want: "sin"},
+		{sql: "select cos_qty:cos qty from trades", want: "cos"},
+		{sql: "select tan_qty:tan qty from trades", want: "tan"},
+		{sql: "select asin_qty:asin qty from trades", want: "asin"},
+		{sql: "select acos_qty:acos qty from trades", want: "acos"},
+		{sql: "select atan_qty:atan qty from trades", want: "atan"},
 		{sql: "select inv_qty:reciprocal qty from trades", want: "reciprocal"},
 		{sql: "select dir:signum signed_qty from trades", want: "signum"},
 		{sql: "select bucket:floor price from trades", want: "floor"},
@@ -2595,6 +2601,40 @@ func TestLoweredNumericUnaryProjectionWhereAndOrderExecute(t *testing.T) {
 	assertColumnValue(t, out, "log_qty", 1, math.Log(9))
 	assertColumnValue(t, out, "exp_qty", 1, math.Exp(9))
 	assertColumnValue(t, out, "inv_qty", 1, 1.0/9.0)
+}
+
+func TestLoweredTrigUnaryProjectionWhereAndOrderExecute(t *testing.T) {
+	query := mustParse(t, "select sym,s:sin theta,c:cos theta,t:tan theta,a:asin ratio,ac:acos ratio,at:atan theta from trades where cos theta>0 order by sin theta desc")
+	lowered, err := Lower(query)
+	if err != nil {
+		t.Fatalf("Lower returned error: %v", err)
+	}
+	lowered.Plan.Source = mustFrame(t,
+		data.NewColumn("sym", []any{data.Symbol("AAPL"), data.Symbol("MSFT"), data.Symbol("NVDA")}),
+		data.NewColumn("theta", []any{float64(0), math.Pi / 6, math.Pi}),
+		data.NewColumn("ratio", []any{float64(0), float64(0.5), float64(1)}),
+	)
+	out, err := lowered.Plan.Exec()
+	if err != nil {
+		t.Fatalf("Exec returned error: %v", err)
+	}
+	if out.Len() != 2 {
+		t.Fatalf("out len = %d, want 2", out.Len())
+	}
+	assertColumnValue(t, out, "sym", 0, data.Symbol("MSFT"))
+	assertFloatNear(t, out, "s", 0, math.Sin(math.Pi/6))
+	assertFloatNear(t, out, "c", 0, math.Cos(math.Pi/6))
+	assertFloatNear(t, out, "t", 0, math.Tan(math.Pi/6))
+	assertFloatNear(t, out, "a", 0, math.Asin(0.5))
+	assertFloatNear(t, out, "ac", 0, math.Acos(0.5))
+	assertFloatNear(t, out, "at", 0, math.Atan(math.Pi/6))
+	assertColumnValue(t, out, "sym", 1, data.Symbol("AAPL"))
+	assertFloatNear(t, out, "s", 1, 0)
+	assertFloatNear(t, out, "c", 1, 1)
+	assertFloatNear(t, out, "t", 1, 0)
+	assertFloatNear(t, out, "a", 1, 0)
+	assertFloatNear(t, out, "ac", 1, math.Pi/2)
+	assertFloatNear(t, out, "at", 1, 0)
 }
 
 func TestLoweredRoundingUnaryProjectionWhereAndOrderExecute(t *testing.T) {
@@ -2949,6 +2989,25 @@ func assertColumnValue(t *testing.T, frame data.Frame, name data.Symbol, row int
 	}
 	if got != want {
 		t.Fatalf("%s[%d] = %#v, want %#v", name, row, got, want)
+	}
+}
+
+func assertFloatNear(t *testing.T, frame data.Frame, name data.Symbol, row int, want float64) {
+	t.Helper()
+	col, ok := frame.Column(name)
+	if !ok {
+		t.Fatalf("missing column %q", name)
+	}
+	got, ok := col.At(row)
+	if !ok {
+		t.Fatalf("missing row %d in column %q", row, name)
+	}
+	value, ok := got.(float64)
+	if !ok {
+		t.Fatalf("%s[%d] = %#v, want float64 near %v", name, row, got, want)
+	}
+	if math.Abs(value-want) > 1e-12 {
+		t.Fatalf("%s[%d] = %.17g, want %.17g", name, row, value, want)
 	}
 }
 

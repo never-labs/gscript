@@ -979,7 +979,8 @@ func lowerConditional(arg Expr) (data.Expr, error) {
 func qVectorPrefixFunction(name string) bool {
 	switch strings.ToLower(name) {
 	case "prev", "next", "deltas", "fills", "ratios", "sums", "prds", "mins", "maxs", "avgs",
-		"abs", "neg", "sqrt", "log", "exp", "reciprocal", "signum", "floor", "ceiling", "null", "rank":
+		"abs", "neg", "sqrt", "log", "exp", "sin", "cos", "tan", "asin", "acos", "atan",
+		"reciprocal", "signum", "floor", "ceiling", "null", "rank":
 		return true
 	default:
 		return false
