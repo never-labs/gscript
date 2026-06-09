@@ -552,6 +552,12 @@ type encodedArray struct {
 	codes  []int32
 }
 
+type indexedArray struct {
+	source  Array
+	indexes Array
+	len     int
+}
+
 // EncodedArrayInfo exposes dictionary-encoded column storage. The decoded
 // values remain visible through Array.At and Array.Values; consumers that can
 // exploit categorical storage can inspect the stable domain and row codes.
@@ -745,6 +751,38 @@ func (a columnArray[T]) Gather(indexes []int) Array {
 		out[i] = a.data[row]
 	}
 	return columnArray[T]{kind: a.kind, data: out}
+}
+
+func (a indexedArray) Kind() Kind { return a.source.Kind() }
+
+func (a indexedArray) Len() int { return a.len }
+
+func (a indexedArray) At(row int) (any, bool) {
+	index, ok, err := i64IndexArrayAt(a.indexes, row)
+	if err != nil || !ok {
+		return nil, false
+	}
+	return a.source.At(index)
+}
+
+func (a indexedArray) Values() []any {
+	out := make([]any, a.len)
+	for row := range out {
+		value, ok := a.At(row)
+		if !ok {
+			panic(fmt.Sprintf("indexed array row %d out of range", row))
+		}
+		out[row] = value
+	}
+	return out
+}
+
+func (a indexedArray) Gather(indexes []int) Array {
+	return indexedArray{
+		source:  a.source,
+		indexes: a.indexes.Gather(indexes),
+		len:     len(indexes),
+	}
 }
 
 func (a i64RangeArray) Kind() Kind { return KindI64 }
@@ -2424,6 +2462,9 @@ func TryTypedCompareIndexesI64(array Array, op Op, value any) (Array, bool, erro
 	if out, ok, err := typedCompareContiguousIndexesI64(array, op, value); ok || err != nil {
 		return out, ok, err
 	}
+	if out, ok, err := typedCompareSegmentedIndexesI64(array, op, value); ok || err != nil {
+		return out, ok, err
+	}
 	if out, ok, err := typedCompareScalarDyadicIndexesI64(array, op, value); ok || err != nil {
 		return out, ok, err
 	}
@@ -3093,6 +3134,12 @@ func TryGatherByI64IndexArray(array Array, indexes Array) (Array, bool, error) {
 	if out, ok, err := tryGatherRangeByI64IndexArray(array, indexes); ok || err != nil {
 		return out, ok, err
 	}
+	if ok, err := validateI64IndexArray(indexes, array.Len()); err != nil || ok {
+		if err != nil {
+			return nil, true, err
+		}
+		return indexedArray{source: array, indexes: indexes, len: indexes.Len()}, true, nil
+	}
 	rows, handled, err := TryTypedI64Indexes(indexes)
 	if err != nil || !handled {
 		return nil, handled, err
@@ -3243,6 +3290,89 @@ func validateI64IndexRange(indexes i64RangeArray, length int) error {
 		return fmt.Errorf("index range %d..%d out of bounds for length %d", lo, hi, length)
 	}
 	return nil
+}
+
+func validateI64IndexArray(indexes Array, length int) (bool, error) {
+	switch idx := indexes.(type) {
+	case attributedArray:
+		return validateI64IndexArray(idx.array, length)
+	case i64RangeArray:
+		if err := validateI64IndexRange(idx, length); err != nil {
+			return true, err
+		}
+		return true, nil
+	case i64SegmentArray:
+		for _, segment := range idx.segments {
+			if err := validateI64IndexRange(segment, length); err != nil {
+				return true, err
+			}
+		}
+		return true, nil
+	case i64PeriodicIndexArray:
+		for i := 0; i < idx.len; i++ {
+			value, ok := idx.i64At(i)
+			if !ok {
+				return true, fmt.Errorf("index vector row %d out of range", i)
+			}
+			if value < 0 || value >= int64(length) {
+				return true, fmt.Errorf("index vector row %d value %d outside length %d", i, value, length)
+			}
+		}
+		return true, nil
+	case columnArray[int64]:
+		for i, value := range idx.data {
+			if value < 0 || value >= int64(length) {
+				return true, fmt.Errorf("index vector row %d value %d outside length %d", i, value, length)
+			}
+		}
+		return true, nil
+	default:
+		return false, nil
+	}
+}
+
+func i64IndexArrayAt(indexes Array, row int) (int, bool, error) {
+	switch idx := indexes.(type) {
+	case attributedArray:
+		return i64IndexArrayAt(idx.array, row)
+	case i64RangeArray:
+		if row < 0 || row >= idx.len {
+			return 0, false, nil
+		}
+		out, err := checkedI64Index(idx.start + int64(row)*idx.step)
+		return out, err == nil, err
+	case i64SegmentArray:
+		value, ok := idx.i64At(row)
+		if !ok {
+			return 0, false, nil
+		}
+		out, err := checkedI64Index(value)
+		return out, err == nil, err
+	case i64PeriodicIndexArray:
+		value, ok := idx.i64At(row)
+		if !ok {
+			return 0, false, nil
+		}
+		out, err := checkedI64Index(value)
+		return out, err == nil, err
+	case columnArray[int64]:
+		if row < 0 || row >= len(idx.data) {
+			return 0, false, nil
+		}
+		out, err := checkedI64Index(idx.data[row])
+		return out, err == nil, err
+	default:
+		value, ok := indexes.At(row)
+		if !ok {
+			return 0, false, nil
+		}
+		n, ok := coerceInt64Exact(value)
+		if !ok {
+			return 0, false, fmt.Errorf("index vector row %d is %T, want i64", row, value)
+		}
+		out, err := checkedI64Index(n)
+		return out, err == nil, err
+	}
 }
 
 // TryTypedI64Indexes converts typed i64 index arrays to []int without boxing.
@@ -3451,6 +3581,42 @@ func typedCompareContiguousIndexesI64(array Array, op Op, value any) (Array, boo
 	}
 }
 
+func typedCompareSegmentedIndexesI64(array Array, op Op, value any) (Array, bool, error) {
+	switch a := array.(type) {
+	case attributedArray:
+		return typedCompareSegmentedIndexesI64(a.array, op, value)
+	case columnArray[int64]:
+		target, ok := coerceInt64Exact(value)
+		return compareSegmentedSignedIndexesI64(a.data, target, ok, op)
+	case columnArray[Month]:
+		target, ok := value.(Month)
+		return compareSegmentedSignedIndexesI64(a.data, target, ok, op)
+	case columnArray[Date]:
+		target, ok := value.(Date)
+		return compareSegmentedSignedIndexesI64(a.data, target, ok, op)
+	case columnArray[DateTime]:
+		target, ok := value.(DateTime)
+		return compareSegmentedSignedIndexesI64(a.data, target, ok, op)
+	case columnArray[Timespan]:
+		target, ok := value.(Timespan)
+		return compareSegmentedSignedIndexesI64(a.data, target, ok, op)
+	case columnArray[Minute]:
+		target, ok := value.(Minute)
+		return compareSegmentedSignedIndexesI64(a.data, target, ok, op)
+	case columnArray[Second]:
+		target, ok := value.(Second)
+		return compareSegmentedSignedIndexesI64(a.data, target, ok, op)
+	case columnArray[Time]:
+		target, ok := value.(Time)
+		return compareSegmentedSignedIndexesI64(a.data, target, ok, op)
+	case columnArray[Timestamp]:
+		target, ok := value.(Timestamp)
+		return compareSegmentedSignedIndexesI64(a.data, target, ok, op)
+	default:
+		return nil, false, nil
+	}
+}
+
 func compareContiguousSignedIndexesI64[T signedScalar](values []T, target T, ok bool, op Op) (Array, bool, error) {
 	if !ok {
 		return nil, false, nil
@@ -3478,6 +3644,42 @@ func compareContiguousSignedIndexesI64[T signedScalar](values []T, target T, ok 
 		return i64RangeArray{len: 0}, true, nil
 	}
 	return i64RangeArray{start: int64(start), step: 1, len: end - start + 1}, true, nil
+}
+
+func compareSegmentedSignedIndexesI64[T signedScalar](values []T, target T, ok bool, op Op) (Array, bool, error) {
+	if !ok {
+		return nil, false, nil
+	}
+	segments := make([]i64RangeArray, 0, 8)
+	start := -1
+	matches := 0
+	for row, value := range values {
+		keep := boolCompare(op, int64(value) == int64(target), compareInt64(int64(value), int64(target)))
+		if keep {
+			matches++
+			if start < 0 {
+				start = row
+			}
+			continue
+		}
+		if start >= 0 {
+			segments = append(segments, i64RangeArray{start: int64(start), step: 1, len: row - start})
+			start = -1
+		}
+	}
+	if start >= 0 {
+		segments = append(segments, i64RangeArray{start: int64(start), step: 1, len: len(values) - start})
+	}
+	if matches == 0 {
+		return i64RangeArray{len: 0}, true, nil
+	}
+	if len(segments) <= 1 {
+		return nil, false, nil
+	}
+	if len(segments)*3 > matches {
+		return nil, false, nil
+	}
+	return newI64SegmentArray(segments...), true, nil
 }
 
 func compareI64RangeIndexArray(values i64RangeArray, op Op, target int64) (Array, bool) {
@@ -7505,6 +7707,9 @@ func Exec(frame Frame, plan QueryPlan) (Frame, error) {
 	if out, ok, err := execTypedFilterProject(frame, plan); ok || err != nil {
 		return out, err
 	}
+	if out, ok, err := execTypedGroupedProjectionProject(frame, plan); ok || err != nil {
+		return out, err
+	}
 	indexes, err := filterIndexes(frame, plan.Where)
 	if err != nil {
 		return Frame{}, err
@@ -7559,6 +7764,25 @@ func Exec(frame Frame, plan QueryPlan) (Frame, error) {
 func execTypedFilterProject(frame Frame, plan QueryPlan) (Frame, bool, error) {
 	if plan.Distinct || plan.PreProjectOrder || plan.LimitN >= 0 || len(plan.OrderBy) > 0 ||
 		len(plan.By) > 0 || len(plan.ByExprs) > 0 || len(plan.Aggregates) > 0 {
+		return Frame{}, false, nil
+	}
+	indexes, ok, err := typedFilterIndexArray(frame, plan.Where)
+	if err != nil || !ok {
+		return Frame{}, ok, err
+	}
+	out, err := execProjectByI64IndexArray(frame, indexes, plan.Select)
+	return out, true, err
+}
+
+func execTypedGroupedProjectionProject(frame Frame, plan QueryPlan) (Frame, bool, error) {
+	if plan.Distinct || plan.PreProjectOrder || plan.LimitN >= 0 || len(plan.OrderBy) > 0 ||
+		len(plan.Aggregates) > 0 || len(plan.Select) == 0 {
+		return Frame{}, false, nil
+	}
+	if len(plan.By) == 0 && len(plan.ByExprs) == 0 {
+		return Frame{}, false, nil
+	}
+	if selectItemsNeedGroupedRows(plan.Select) {
 		return Frame{}, false, nil
 	}
 	indexes, ok, err := typedFilterIndexArray(frame, plan.Where)
@@ -8272,6 +8496,15 @@ func execProjectByI64IndexArray(frame Frame, indexes Array, items []SelectItem) 
 			cols = append(cols, Column{Name: item.Name, Data: array})
 			continue
 		}
+		if !allRows {
+			if array, ok, err := evalExprByI64IndexArray(frame, indexes, item.Expr); ok || err != nil {
+				if err != nil {
+					return Frame{}, err
+				}
+				cols = append(cols, Column{Name: item.Name, Data: array})
+				continue
+			}
+		}
 		if array, ok, err := evalExprArray(frame, item.Expr); ok || err != nil {
 			if err != nil {
 				return Frame{}, err
@@ -8310,6 +8543,56 @@ func execProjectByI64IndexArray(frame Frame, indexes Array, items []SelectItem) 
 		cols = append(cols, NewColumn(item.Name, values))
 	}
 	return newFrameTrusted(cols...)
+}
+
+func evalExprByI64IndexArray(frame Frame, indexes Array, expr Expr) (Array, bool, error) {
+	switch e := expr.(type) {
+	case ColumnRef:
+		col, ok := frame.Column(e.Name)
+		if !ok {
+			return nil, true, fmt.Errorf("unknown column %q", e.Name)
+		}
+		return TryGatherByI64IndexArray(col, indexes)
+	case Binary:
+		return evalBinaryByI64IndexArray(frame, indexes, e)
+	default:
+		return nil, false, nil
+	}
+}
+
+func evalBinaryByI64IndexArray(frame Frame, indexes Array, expr Binary) (Array, bool, error) {
+	left, lok, err := evalDyadicOperandByI64IndexArray(frame, indexes, expr.Left)
+	if err != nil || !lok {
+		return nil, lok, err
+	}
+	right, rok, err := evalDyadicOperandByI64IndexArray(frame, indexes, expr.Right)
+	if err != nil || !rok {
+		return nil, rok, err
+	}
+	out, ok, err := typedKernels.Dyadic(expr.Op, left, right)
+	if err != nil || !ok {
+		return nil, ok, err
+	}
+	array, ok := out.(Array)
+	if !ok {
+		return nil, false, nil
+	}
+	return array, true, nil
+}
+
+func evalDyadicOperandByI64IndexArray(frame Frame, indexes Array, expr Expr) (any, bool, error) {
+	switch e := expr.(type) {
+	case ColumnRef:
+		col, ok := frame.Column(e.Name)
+		if !ok {
+			return nil, true, fmt.Errorf("unknown column %q", e.Name)
+		}
+		return TryGatherByI64IndexArray(col, indexes)
+	case Literal:
+		return e.Value, true, nil
+	default:
+		return nil, false, nil
+	}
 }
 
 // TryGatherFrameByI64IndexArray gathers frame rows with a typed i64 index
@@ -8763,7 +9046,7 @@ func queryIndexesArray(indexes []int, frameLen int) Array {
 	for i, row := range indexes {
 		values[i] = int64(row)
 	}
-	return NewI64(values)
+	return newI64Trusted(values)
 }
 
 func groupIndexForSingleColumn(frame Frame, byInputs []groupInput) (ArrayIndex, bool, error) {

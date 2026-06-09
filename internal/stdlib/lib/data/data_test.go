@@ -3580,6 +3580,80 @@ func TestQueryKernelGroupedProjectionWithoutAggregatesSkipsGroupBuildForRowLocal
 	assertColumnValues(t, got, "notional", []any{2020.0, 2400.0, 2460.0, 4800.0})
 }
 
+func TestQueryKernelTypedFilterProjectionUsesIndexedViews(t *testing.T) {
+	const rows = 200
+	syms := make([]string, rows)
+	qty := make([]int64, rows)
+	price := make([]float64, rows)
+	for i := 0; i < rows; i++ {
+		if i%2 == 0 {
+			syms[i] = "AAPL"
+		} else {
+			syms[i] = "MSFT"
+		}
+		qty[i] = int64(i % 100)
+		price[i] = float64(i) * 0.25
+	}
+	frame := mustFrame(t,
+		Column{Name: "sym", Data: NewSymbols(syms)},
+		Column{Name: "qty", Data: NewI64(qty)},
+		Column{Name: "price", Data: NewF64(price)},
+	)
+	plan := QueryPlan{
+		Source: frame,
+		Where:  Binary{Op: OpGE, Left: ColumnRef{Name: "qty"}, Right: Literal{Value: int64(50)}},
+		Select: []SelectItem{
+			{Name: "sym", Expr: ColumnRef{Name: "sym"}},
+			{Name: "notional", Expr: Binary{Op: OpMul, Left: ColumnRef{Name: "qty"}, Right: ColumnRef{Name: "price"}}},
+		},
+		LimitN: -1,
+	}
+	kernel, ok, err := CompileQueryKernel(frame, plan)
+	if err != nil || !ok {
+		t.Fatalf("CompileQueryKernel typed filter projection = %v,%v", ok, err)
+	}
+	got, err := kernel.Exec(frame)
+	if err != nil {
+		t.Fatalf("QueryKernel Exec returned error: %v", err)
+	}
+	if got.Len() != 100 {
+		t.Fatalf("QueryKernel output len = %d, want 100", got.Len())
+	}
+	if _, ok := mustColumn(t, got, "sym").(indexedArray); !ok {
+		t.Fatalf("sym projection column = %T, want indexedArray view", mustColumn(t, got, "sym"))
+	}
+	sym0, ok := mustColumn(t, got, "sym").At(0)
+	if !ok || sym0 != Symbol("AAPL") {
+		t.Fatalf("sym[0] = %v,%v, want AAPL,true", sym0, ok)
+	}
+	notional0, ok := mustColumn(t, got, "notional").At(0)
+	if !ok || notional0 != 625.0 {
+		t.Fatalf("notional[0] = %v,%v, want 625,true", notional0, ok)
+	}
+	notionalLast, ok := mustColumn(t, got, "notional").At(got.Len() - 1)
+	if !ok || notionalLast != 4925.25 {
+		t.Fatalf("notional[last] = %v,%v, want 4925.25,true", notionalLast, ok)
+	}
+}
+
+func TestTypedCompareIndexesUsesSegmentsForRepeatedRuns(t *testing.T) {
+	values := NewI64([]int64{
+		0, 1, 2, 3, 4,
+		0, 1, 2, 3, 4,
+		0, 1, 2, 3, 4,
+	})
+	indexes, ok, err := TryTypedCompareIndexesI64(values, OpGE, int64(2))
+	if err != nil || !ok {
+		t.Fatalf("TryTypedCompareIndexesI64 = %T,%v,%v", indexes, ok, err)
+	}
+	if _, ok := indexes.(i64SegmentArray); !ok {
+		t.Fatalf("indexes = %T, want i64SegmentArray", indexes)
+	}
+	if got := indexes.Values(); !reflect.DeepEqual(got, []any{int64(2), int64(3), int64(4), int64(7), int64(8), int64(9), int64(12), int64(13), int64(14)}) {
+		t.Fatalf("indexes values = %#v", got)
+	}
+}
+
 func TestQueryDistinctRows(t *testing.T) {
 	frame := mustFrame(t,
 		NewColumn("sym", []any{Symbol("a"), Symbol("b"), Symbol("a"), Symbol("a")}),

@@ -3283,6 +3283,14 @@ func applyNumericDyadicFloatValue(op string, left, right any) (any, bool, error)
 
 func applyNumericDyadicFloatNumbers(op string, left, right float64) (float64, error) {
 	switch op {
+	case string(OpAdd):
+		return left + right, nil
+	case string(OpSub):
+		return left - right, nil
+	case string(OpMul):
+		return left * right, nil
+	case string(OpDiv):
+		return left / right, nil
 	case NumericDyadicXExp:
 		return math.Pow(left, right), nil
 	case NumericDyadicXLog:
@@ -3304,6 +3312,14 @@ func numericDyadicFloatFuncForXLog(left, right float64) float64 {
 
 func numericDyadicFloatFunc(op string) (f64DyadicFunc, bool) {
 	switch op {
+	case string(OpAdd):
+		return func(left, right float64) float64 { return left + right }, true
+	case string(OpSub):
+		return func(left, right float64) float64 { return left - right }, true
+	case string(OpMul):
+		return func(left, right float64) float64 { return left * right }, true
+	case string(OpDiv):
+		return func(left, right float64) float64 { return left / right }, true
 	case NumericDyadicXExp:
 		return numericDyadicFloatFuncForXExp, true
 	case NumericDyadicXLog:
@@ -8788,6 +8804,12 @@ func isNumericArray(array Array) bool {
 func numericDyadic(op Op, left, right any, length int) (Array, bool, error) {
 	if out, ok := numericDyadicRange(op, left, right, length); ok {
 		return out, true, nil
+	}
+	if bound, ok, err := BindNumericDyadicFloat(string(op), left, right); ok || err != nil {
+		if err != nil {
+			return nil, true, err
+		}
+		return bound.Array(), true, nil
 	}
 	values := make([]float64, length)
 	var nullable []any

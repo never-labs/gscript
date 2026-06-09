@@ -1973,6 +1973,12 @@ func (k *QueryKernel) Exec(frame Frame) (Frame, error) {
 	}
 	plan := k.plan
 	plan.Source = frame
+	if out, ok, err := execTypedFilterProject(frame, plan); ok || err != nil {
+		return out, err
+	}
+	if out, ok, err := execTypedGroupedProjectionProject(frame, plan); ok || err != nil {
+		return out, err
+	}
 	if out, ok, err := execGroupedFilteredWhere(frame, plan); ok || err != nil {
 		if err != nil {
 			return Frame{}, err
