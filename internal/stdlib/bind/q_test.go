@@ -5237,6 +5237,100 @@ func TestQExplainReportsQueryKernelVisibility(t *testing.T) {
 	}
 }
 
+func TestQSQLGroupedAggregateExposesColumnarKernelPipeline(t *testing.T) {
+	qSQLResetPlanCachesForTest()
+
+	frame, err := data.NewFrame(
+		data.Column{Name: "sym", Data: data.NewSymbols([]string{"AAPL", "MSFT", "AAPL", "NVDA", "MSFT", "AAPL"})},
+		data.Column{Name: "active", Data: data.NewBool([]bool{true, true, false, true, true, true})},
+		data.Column{Name: "price", Data: data.NewF64([]float64{100, 80, 210, 190, 120, 101})},
+		data.Column{Name: "size", Data: data.NewI64([]int64{10, 20, 30, 40, 50, 60})},
+	)
+	if err != nil {
+		t.Fatalf("frame: %v", err)
+	}
+	frameValue, err := qDataFrameValue(frame)
+	if err != nil {
+		t.Fatalf("frame value: %v", err)
+	}
+	query := "select notional:sum price*size,fills:count i by sym from trades where active=true,price>=100"
+	wantShape := "grouped_aggregate|where=logical|by=computed|aggregate=computed"
+	wantPipelineShape := "scan=frame|where=bool_mask(bool_mask:logical_and)|filter=index|group=key_expr(column_load:1)|aggregate=computed_reduce(reduce:count:1,reduce:sum:1,typed_binary:1)|project=column_load(column_load:all)"
+
+	explained, err := qExplainSQL(qSQLArgsResult{frameValue: frameValue, source: query})
+	if err != nil {
+		t.Fatalf("explain q.sql grouped aggregate: %v", err)
+	}
+	table := explained.Table()
+	if got := table.RawGetString("kernel_supported"); !got.IsBool() || !got.Bool() {
+		t.Fatalf("kernel_supported = %v, want true", got)
+	}
+	if got := table.RawGetString("kernel_cached"); !got.IsBool() || got.Bool() {
+		t.Fatalf("kernel_cached before execution = %v, want false", got)
+	}
+	if got := table.RawGetString("kernel_reason"); !got.IsString() ||
+		!strings.Contains(got.Str(), "grouped aggregate path") ||
+		!strings.Contains(got.Str(), "indexed single-column grouped mixed aggregate fast path") {
+		t.Fatalf("kernel_reason = %v, want grouped aggregate columnar path details", got)
+	}
+	if got := table.RawGetString("kernel_shape"); !got.IsString() || got.Str() != wantShape {
+		t.Fatalf("kernel_shape = %v, want %q", got, wantShape)
+	}
+	if got := table.RawGetString("kernel_pipeline_shape"); !got.IsString() || got.Str() != wantPipelineShape {
+		t.Fatalf("kernel_pipeline_shape = %v, want %q", got, wantPipelineShape)
+	}
+	cacheKey := table.RawGetString("kernel_cache_key")
+	if !cacheKey.IsString() || cacheKey.Str() == "" {
+		t.Fatalf("kernel_cache_key = %v, want stable non-empty key", cacheKey)
+	}
+	planFingerprint := table.RawGetString("kernel_plan_fingerprint")
+	if !planFingerprint.IsString() || planFingerprint.Str() == "" {
+		t.Fatalf("kernel_plan_fingerprint = %v, want stable non-empty fingerprint", planFingerprint)
+	}
+
+	out, err := qRunSQL("q.sql", qSQLArgsResult{frameValue: frameValue, source: query})
+	if err != nil {
+		t.Fatalf("q.sql grouped aggregate: %v", err)
+	}
+	rows := out.Table()
+	if rows == nil || rows.Length() != 3 {
+		t.Fatalf("q.sql grouped aggregate rows = %v, want 3 rows", rows)
+	}
+	if _, err := qRunSQL("q.sql", qSQLArgsResult{frameValue: frameValue, source: query}); err != nil {
+		t.Fatalf("q.sql grouped aggregate cached run: %v", err)
+	}
+
+	after, err := qExplainSQL(qSQLArgsResult{frameValue: frameValue, source: query})
+	if err != nil {
+		t.Fatalf("explain q.sql grouped aggregate after execution: %v", err)
+	}
+	afterTable := after.Table()
+	if got := afterTable.RawGetString("kernel_cached"); !got.IsBool() || !got.Bool() {
+		t.Fatalf("kernel_cached after execution = %v, want true", got)
+	}
+	if got := afterTable.RawGetString("kernel_shape"); !got.IsString() || got.Str() != wantShape {
+		t.Fatalf("cached kernel_shape = %v, want %q", got, wantShape)
+	}
+	if got := afterTable.RawGetString("kernel_pipeline_shape"); !got.IsString() || got.Str() != wantPipelineShape {
+		t.Fatalf("cached kernel_pipeline_shape = %v, want %q", got, wantPipelineShape)
+	}
+
+	stats := qSQLPlanCacheStatsSnapshot()
+	if stats.KernelHits == 0 || stats.KernelMisses == 0 {
+		t.Fatalf("qSQL kernel cache stats = %+v, want at least one miss and one hit", stats)
+	}
+	found := false
+	for _, key := range stats.KernelKeys {
+		if key.Shape == wantShape && key.PipelineShape == wantPipelineShape && key.Hits > 0 {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("qSQL kernel key stats = %+v, want grouped aggregate shape hit", stats.KernelKeys)
+	}
+}
+
 func TestQExplainReportsVectorTransformKernelVisibility(t *testing.T) {
 	qSQLResetPlanCachesForTest()
 
