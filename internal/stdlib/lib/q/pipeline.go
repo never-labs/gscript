@@ -1492,6 +1492,9 @@ func (s *EvalState) evalQPipelineSequenceTransformArgs(plan *qPipelinePlan, left
 }
 
 func (s *EvalState) evalQPipelineSumRaze(plan *qPipelinePlan) (any, bool, error) {
+	if out, handled, err := s.tryEvalQPipelineMatrixOpSumRaze(plan.reductionInput); err != nil || handled {
+		return out, handled, err
+	}
 	value, err := s.evalQPipelinePlannedExpr(plan.reductionInput, &plan.reductionPlan)
 	if err != nil {
 		return nil, true, err
@@ -1505,6 +1508,60 @@ func (s *EvalState) evalQPipelineSumRaze(plan *qPipelinePlan) (any, bool, error)
 			return data.TryTypedNestedNumericSum(value)
 		},
 	})
+}
+
+func (s *EvalState) tryEvalQPipelineMatrixOpSumRaze(input string) (any, bool, error) {
+	input = stripEnclosingParens(strings.TrimSpace(input))
+	if args, ok := qFunctionCallArgs(input); ok && strings.TrimSpace(input[:strings.Index(input, "[")]) == "mmu" {
+		if len(args) != 2 {
+			return nil, true, fmt.Errorf("mmu expects 2 arguments")
+		}
+		left, err := s.eval(strings.TrimSpace(args[0]))
+		if err != nil {
+			return nil, true, err
+		}
+		right, err := s.eval(strings.TrimSpace(args[1]))
+		if err != nil {
+			return nil, true, err
+		}
+		leftMatrix, ok, err := qMatrixValue(left)
+		if err != nil || !ok {
+			return nil, ok, err
+		}
+		rightMatrix, ok, err := qMatrixValue(right)
+		if err != nil || !ok {
+			return nil, ok, err
+		}
+		shape := "matrix-reduce/sum-mmu/" + qMatrixIndexShape(leftMatrix, 2)
+		return evalQTypedRuntimeKernel(qTypedRuntimeKernel[any]{
+			kernel:         "MatrixMultiplySum",
+			shape:          shape,
+			fallbackReason: RuntimeFallbackUnsupportedType,
+			call: func() (any, bool, error) {
+				return data.MatrixMultiplyNumericSum(leftMatrix, rightMatrix)
+			},
+		})
+	}
+	if strings.HasPrefix(input, "inv ") && wordBoundary(input, 0, len("inv")) {
+		value, err := s.eval(strings.TrimSpace(input[len("inv "):]))
+		if err != nil {
+			return nil, true, err
+		}
+		matrix, ok, err := qMatrixValue(value)
+		if err != nil || !ok {
+			return nil, ok, err
+		}
+		shape := "matrix-reduce/sum-inv/" + qMatrixIndexShape(matrix, 2)
+		return evalQTypedRuntimeKernel(qTypedRuntimeKernel[any]{
+			kernel:         "MatrixInverseSum",
+			shape:          shape,
+			fallbackReason: RuntimeFallbackUnsupportedType,
+			call: func() (any, bool, error) {
+				return data.MatrixInverseNumericSum(matrix)
+			},
+		})
+	}
+	return nil, false, nil
 }
 
 func (s *EvalState) evalQPipelineSumWhereMask(plan *qPipelinePlan) (any, bool, error) {

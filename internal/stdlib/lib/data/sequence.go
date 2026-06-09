@@ -28,6 +28,19 @@ func SequenceItems(value any) []any {
 	return []any{value}
 }
 
+func sequenceItemAt(value any, index int) (any, bool) {
+	if index < 0 {
+		return nil, false
+	}
+	if array, ok := value.(Array); ok {
+		return array.At(index)
+	}
+	if index == 0 {
+		return value, true
+	}
+	return nil, false
+}
+
 // SequenceCount returns the logical element count for reusable sequence-like
 // values. Scalars count as one item, while strings count runes because they are
 // list-like character sequences in q/Leia frontends.
@@ -917,15 +930,12 @@ func TryTypedNestedNumericSum(value any) (any, bool, error) {
 // Cross returns the Cartesian product of two scalar-or-array values. The
 // product rows are two-item arrays so callers can preserve tuple-like shape.
 func Cross(left, right any) Array {
-	leftValues := SequenceItems(left)
-	rightValues := SequenceItems(right)
-	out := make([]any, 0, len(leftValues)*len(rightValues))
-	for _, l := range leftValues {
-		for _, r := range rightValues {
-			out = append(out, NewAny([]any{l, r}))
-		}
+	return crossArray{
+		left:     left,
+		right:    right,
+		leftLen:  int(sequenceItemsCount(left)),
+		rightLen: int(sequenceItemsCount(right)),
 	}
-	return NewAny(out)
 }
 
 // CrossCount returns the row count of Cross without materializing tuple rows.
@@ -1123,6 +1133,18 @@ type nestedSum struct {
 	hasFloat bool
 }
 
+type crossArray struct {
+	left     any
+	right    any
+	leftLen  int
+	rightLen int
+}
+
+type crossPairArray struct {
+	left  any
+	right any
+}
+
 func (a flattenArray) Kind() Kind { return a.kind }
 
 func (a flattenArray) Len() int { return a.len }
@@ -1178,6 +1200,87 @@ func (a flattenArray) Gather(indexes []int) Array {
 		value, ok := a.At(index)
 		if !ok {
 			panic(fmt.Sprintf("data flatten gather row %d out of range", index))
+		}
+		out[i] = value
+	}
+	return InferArray(out)
+}
+
+func (a crossArray) Kind() Kind { return KindAny }
+
+func (a crossArray) Len() int {
+	if a.leftLen <= 0 || a.rightLen <= 0 {
+		return 0
+	}
+	return a.leftLen * a.rightLen
+}
+
+func (a crossArray) At(index int) (any, bool) {
+	if index < 0 || index >= a.Len() || a.rightLen <= 0 {
+		return nil, false
+	}
+	leftIndex := index / a.rightLen
+	rightIndex := index % a.rightLen
+	left, ok := sequenceItemAt(a.left, leftIndex)
+	if !ok {
+		return nil, false
+	}
+	right, ok := sequenceItemAt(a.right, rightIndex)
+	if !ok {
+		return nil, false
+	}
+	return crossPairArray{left: left, right: right}, true
+}
+
+func (a crossArray) Values() []any {
+	out := make([]any, a.Len())
+	for row := range out {
+		value, ok := a.At(row)
+		if !ok {
+			panic(fmt.Sprintf("data cross row %d out of range", row))
+		}
+		out[row] = value
+	}
+	return out
+}
+
+func (a crossArray) Gather(indexes []int) Array {
+	out := make([]any, len(indexes))
+	for i, index := range indexes {
+		value, ok := a.At(index)
+		if !ok {
+			panic(fmt.Sprintf("data cross gather row %d out of range", index))
+		}
+		out[i] = value
+	}
+	return NewAny(out)
+}
+
+func (a crossPairArray) Kind() Kind { return KindAny }
+
+func (a crossPairArray) Len() int { return 2 }
+
+func (a crossPairArray) At(index int) (any, bool) {
+	switch index {
+	case 0:
+		return a.left, true
+	case 1:
+		return a.right, true
+	default:
+		return nil, false
+	}
+}
+
+func (a crossPairArray) Values() []any {
+	return []any{a.left, a.right}
+}
+
+func (a crossPairArray) Gather(indexes []int) Array {
+	out := make([]any, len(indexes))
+	for i, index := range indexes {
+		value, ok := a.At(index)
+		if !ok {
+			panic(fmt.Sprintf("data cross pair gather row %d out of range", index))
 		}
 		out[i] = value
 	}

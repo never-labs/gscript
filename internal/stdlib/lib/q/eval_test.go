@@ -1015,6 +1015,36 @@ func TestQScriptPipelinePlannerDescribesMatrixRowSumCount(t *testing.T) {
 	assertEvalValue(t, src, int64(26))
 }
 
+func TestQScriptPipelinePlannerDescribesMatrixRowsSumCount(t *testing.T) {
+	src := "m:4 8#til 32;t:flip m;(+/(t . 0))+(+/(t . 7))+count t"
+	plan := buildQScriptPlan(src)
+	if plan.scriptPipeline == nil {
+		t.Fatalf("script pipeline descriptor missing")
+	}
+	d := plan.scriptPipeline
+	if d.kind != qScriptPipelineMatrixRowsSumCount {
+		t.Fatalf("pipeline kind = %q, want %q", d.kind, qScriptPipelineMatrixRowsSumCount)
+	}
+	if d.rowValueExpr != "t" || d.rowIndexExpr != "0" || d.indexExpr != "7" {
+		t.Fatalf("matrix rows descriptor = matrix %q row %q rows %q", d.rowValueExpr, d.rowIndexExpr, d.indexExpr)
+	}
+	if got, want := d.shape(), "script-pipeline/matrix-rows-reduce/sum-plus-count/assignments"; got != want {
+		t.Fatalf("shape = %q, want %q", got, want)
+	}
+	descriptor, ok := DescribeEvalPipeline(src)
+	if !ok {
+		t.Fatalf("DescribeEvalPipeline(%q) did not recognize matrix rows sum-count pipeline", src)
+	}
+	if descriptor.RowValueExpr != "t" || descriptor.RowIndexExpr != "0" || descriptor.IndexExpr != "7" {
+		t.Fatalf("descriptor matrix fields = %q/%q/%q, want t/0/7", descriptor.RowValueExpr, descriptor.RowIndexExpr, descriptor.IndexExpr)
+	}
+	out, handled, err := ExecuteEvalPipelineDescriptor(descriptor)
+	if err != nil || !handled || out != int64(132) {
+		t.Fatalf("ExecuteEvalPipelineDescriptor matrix rows sum-count = %#v,%v,%v; want 132,true,nil", out, handled, err)
+	}
+	assertEvalValue(t, src, int64(132))
+}
+
 func TestQScriptPipelinePlannerDescribesMatrixCellPlusCount(t *testing.T) {
 	for _, src := range []string{
 		"m:2 4#til 8;(m . 1 2)+count m",
@@ -1049,6 +1079,33 @@ func TestQScriptPipelinePlannerDescribesMatrixCellPlusCount(t *testing.T) {
 			assertEvalValue(t, src, int64(8))
 		})
 	}
+}
+
+func TestQScriptPipelinePlannerDescribesMatrixNestedCellCount(t *testing.T) {
+	src := "m:3 4#1 2 3 4 5;t:flip m;(+/raze t)+(m . 2 3)+count t"
+	plan := buildQScriptPlan(src)
+	if plan.scriptPipeline == nil {
+		t.Fatalf("script pipeline descriptor missing")
+	}
+	d := plan.scriptPipeline
+	if d.kind != qScriptPipelineMatrixNestedCell {
+		t.Fatalf("pipeline kind = %q, want %q", d.kind, qScriptPipelineMatrixNestedCell)
+	}
+	if d.valueExpr != "t" || d.rowValueExpr != "m" || d.indexExpr != "t" || d.rowIndexExpr != "2" || d.colIndexExpr != "3" {
+		t.Fatalf("matrix nested descriptor = value %q rowValue %q count %q row %q col %q", d.valueExpr, d.rowValueExpr, d.indexExpr, d.rowIndexExpr, d.colIndexExpr)
+	}
+	if got, want := d.shape(), "script-pipeline/matrix-nested-reduce/sum-cell-count/assignments"; got != want {
+		t.Fatalf("shape = %q, want %q", got, want)
+	}
+	descriptor, ok := DescribeEvalPipeline(src)
+	if !ok {
+		t.Fatalf("DescribeEvalPipeline(%q) did not recognize matrix nested cell pipeline", src)
+	}
+	out, handled, err := ExecuteEvalPipelineDescriptor(descriptor)
+	if err != nil || !handled || out != int64(39) {
+		t.Fatalf("ExecuteEvalPipelineDescriptor matrix nested cell = %#v,%v,%v; want 39,true,nil", out, handled, err)
+	}
+	assertEvalValue(t, src, int64(39))
 }
 
 func TestQScriptPipelinePlannerDescribesCallableDotSumPlusRight(t *testing.T) {

@@ -5641,6 +5641,8 @@ func (k typedKernelRegistry) NumericSumValue(array Array) (any, bool, error) {
 		return i64PeriodicIndexSum(a), true, nil
 	case i64ProductArray:
 		return i64ProductSum(a), true, nil
+	case crossPairArray:
+		return numericSumCrossPairValue(a)
 	case matrixRowArray:
 		return numericSumMatrixRowValue(a)
 	case transposedMatrixRowArray:
@@ -11056,6 +11058,23 @@ func numericSumRowArrayValue(array Array) (any, bool, error) {
 		sum += value
 	}
 	return sum, true, nil
+}
+
+func numericSumCrossPairValue(pair crossPairArray) (any, bool, error) {
+	leftInt, leftIsInt := coerceInt64Exact(pair.left)
+	rightInt, rightIsInt := coerceInt64Exact(pair.right)
+	if leftIsInt && rightIsInt {
+		return leftInt + rightInt, true, nil
+	}
+	left, ok := numeric(pair.left)
+	if !ok {
+		return nil, false, nil
+	}
+	right, ok := numeric(pair.right)
+	if !ok {
+		return nil, false, nil
+	}
+	return left + right, true, nil
 }
 
 func numericSumIntegerArray(array Array) int64 {

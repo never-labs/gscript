@@ -588,8 +588,12 @@ func qScriptPipelineDescriptorFromEvalDescriptor(descriptor EvalPipelineDescript
 		out.kind = qScriptPipelineIntegerDivModReduce
 	case strings.Contains(shape, "matrix-row-reduce/sum-count"):
 		out.kind = qScriptPipelineMatrixRowSumCount
+	case strings.Contains(shape, "matrix-rows-reduce/sum-plus-count"):
+		out.kind = qScriptPipelineMatrixRowsSumCount
 	case strings.Contains(shape, "matrix-cell-reduce/cell-plus-count"):
 		out.kind = qScriptPipelineMatrixCellPlusCount
+	case strings.Contains(shape, "matrix-nested-reduce/sum-cell-count"):
+		out.kind = qScriptPipelineMatrixNestedCell
 	case strings.Contains(shape, "callable-dot/sum-plus-count-right"):
 		out.kind = qScriptPipelineCallableDotSumCount
 		out.includeCount = true

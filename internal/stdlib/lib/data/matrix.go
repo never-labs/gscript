@@ -340,6 +340,82 @@ func TryMatrixRowNumericSumCount(value Matrix, row int) (any, bool, error) {
 	return nil, false, nil
 }
 
+// TryMatrixRowsNumericSumPlusCount reduces the sum of one or more matrix rows
+// plus count(matrix) without materializing row views. It is intentionally
+// matrix-oriented so q, Leia, and JIT backends can share the same primitive.
+func TryMatrixRowsNumericSumPlusCount(value Matrix, rows ...int) (any, bool, error) {
+	if value == nil {
+		return nil, false, nil
+	}
+	shape := value.Shape()
+	if len(shape) != 2 {
+		return nil, false, nil
+	}
+	var totalInt int64
+	var totalFloat float64
+	integer := true
+	for _, row := range rows {
+		if row < 0 || row >= shape[0] {
+			return nil, true, fmt.Errorf("matrix row index %d out of range", row)
+		}
+		sum, handled, err := TryMatrixRowNumericSum(value, row)
+		if err != nil || !handled {
+			return nil, handled, err
+		}
+		if sumI, ok := coerceInt64Exact(sum); ok && integer {
+			totalInt += sumI
+			totalFloat += float64(sumI)
+			continue
+		}
+		sumF, ok := numeric(sum)
+		if !ok {
+			return nil, false, nil
+		}
+		integer = false
+		totalFloat += sumF
+	}
+	if integer {
+		return totalInt + int64(shape[0]), true, nil
+	}
+	return totalFloat + float64(shape[0]), true, nil
+}
+
+// TryMatrixNestedSumCellPlusCount computes sum(raze sumMatrix)+cell(cellMatrix)
+// +count(countMatrix) through typed matrix views. The three inputs are separate
+// on purpose: frontends can fuse expressions involving transpose or alias
+// bindings without requiring them to be the same object.
+func TryMatrixNestedSumCellPlusCount(sumMatrix Matrix, cellMatrix Matrix, countMatrix Matrix, row, col int) (any, bool, error) {
+	if sumMatrix == nil || cellMatrix == nil || countMatrix == nil {
+		return nil, false, nil
+	}
+	sum, handled, err := TryTypedNestedNumericSum(sumMatrix)
+	if err != nil || !handled {
+		return nil, handled, err
+	}
+	cell, handled, err := TryMatrixCellIndex(cellMatrix, row, col)
+	if err != nil || !handled {
+		return nil, handled, err
+	}
+	countShape := countMatrix.Shape()
+	if len(countShape) != 2 {
+		return nil, false, nil
+	}
+	if sumI, ok := coerceInt64Exact(sum); ok {
+		if cellI, ok := coerceInt64Exact(cell); ok {
+			return sumI + cellI + int64(countShape[0]), true, nil
+		}
+	}
+	sumF, ok := numeric(sum)
+	if !ok {
+		return nil, false, nil
+	}
+	cellF, ok := numeric(cell)
+	if !ok {
+		return nil, false, nil
+	}
+	return sumF + cellF + float64(countShape[0]), true, nil
+}
+
 // TryMatrixCellNumericPlusCount returns matrix[row,col]+count(matrix) without
 // materializing a row view. q count on a matrix/list-of-lists is the row count.
 func TryMatrixCellNumericPlusCount(value Matrix, row, col int) (any, bool, error) {
@@ -492,6 +568,46 @@ func MatrixMultiplyNumeric(left, right Matrix) (Array, error) {
 	return matrixArray{shape: []int{leftShape[0], rightShape[1]}, data: NewF64(out)}, nil
 }
 
+// MatrixMultiplyNumericSum computes sum(raze mmu[left;right]) without
+// materializing the product matrix.
+func MatrixMultiplyNumericSum(left, right Matrix) (float64, bool, error) {
+	if left == nil || right == nil {
+		return 0, false, fmt.Errorf("matrix multiply expects two matrices")
+	}
+	leftShape := left.Shape()
+	rightShape := right.Shape()
+	if len(leftShape) != 2 || len(rightShape) != 2 {
+		return 0, false, fmt.Errorf("matrix multiply expects two-dimensional matrices")
+	}
+	if leftShape[1] != rightShape[0] {
+		return 0, false, fmt.Errorf("matrix multiply shape %dx%d cannot conform to %dx%d", leftShape[0], leftShape[1], rightShape[0], rightShape[1])
+	}
+	var total float64
+	for row := 0; row < leftShape[0]; row++ {
+		for col := 0; col < rightShape[1]; col++ {
+			var cell float64
+			for inner := 0; inner < leftShape[1]; inner++ {
+				lv, ok := left.Cell(row, inner)
+				if !ok {
+					return 0, false, fmt.Errorf("matrix multiply left cell %d,%d out of range", row, inner)
+				}
+				rv, ok := right.Cell(inner, col)
+				if !ok {
+					return 0, false, fmt.Errorf("matrix multiply right cell %d,%d out of range", inner, col)
+				}
+				ln, lok := numeric(lv)
+				rn, rok := numeric(rv)
+				if !lok || !rok {
+					return 0, false, fmt.Errorf("matrix multiply expects numeric cells")
+				}
+				cell += ln * rn
+			}
+			total += cell
+		}
+	}
+	return total, true, nil
+}
+
 // MatrixInverseNumeric inverts a numeric square matrix with Gauss-Jordan
 // elimination. It is intentionally centralized here so future typed kernels can
 // replace the implementation without changing q eval semantics.
@@ -565,6 +681,82 @@ func MatrixInverseNumeric(matrix Matrix) (Array, error) {
 		copy(out[row*n:(row+1)*n], aug[row*2*n+n:row*2*n+2*n])
 	}
 	return matrixArray{shape: []int{n, n}, data: NewF64(out)}, nil
+}
+
+// MatrixInverseNumericSum computes sum(raze inv matrix). It keeps the
+// elimination work buffer but avoids allocating the final matrix value.
+func MatrixInverseNumericSum(matrix Matrix) (float64, bool, error) {
+	if matrix == nil {
+		return 0, false, fmt.Errorf("matrix inverse expects a matrix")
+	}
+	shape := matrix.Shape()
+	if len(shape) != 2 {
+		return 0, false, fmt.Errorf("matrix inverse expects a two-dimensional matrix")
+	}
+	n := shape[0]
+	if n != shape[1] {
+		return 0, false, fmt.Errorf("matrix inverse expects a square matrix, got %dx%d", shape[0], shape[1])
+	}
+	if n == 0 {
+		return 0, true, nil
+	}
+	aug := make([]float64, n*2*n)
+	for row := 0; row < n; row++ {
+		for col := 0; col < n; col++ {
+			value, ok := matrix.Cell(row, col)
+			if !ok {
+				return 0, false, fmt.Errorf("matrix inverse cell %d,%d out of range", row, col)
+			}
+			num, ok := numeric(value)
+			if !ok {
+				return 0, false, fmt.Errorf("matrix inverse expects numeric cells")
+			}
+			aug[row*2*n+col] = num
+		}
+		aug[row*2*n+n+row] = 1
+	}
+	for col := 0; col < n; col++ {
+		pivotRow := col
+		pivotAbs := math.Abs(aug[pivotRow*2*n+col])
+		for row := col + 1; row < n; row++ {
+			candidate := math.Abs(aug[row*2*n+col])
+			if candidate > pivotAbs {
+				pivotAbs = candidate
+				pivotRow = row
+			}
+		}
+		if pivotAbs == 0 {
+			return 0, false, fmt.Errorf("matrix inverse expects a non-singular matrix")
+		}
+		if pivotRow != col {
+			for j := 0; j < 2*n; j++ {
+				aug[col*2*n+j], aug[pivotRow*2*n+j] = aug[pivotRow*2*n+j], aug[col*2*n+j]
+			}
+		}
+		pivot := aug[col*2*n+col]
+		for j := 0; j < 2*n; j++ {
+			aug[col*2*n+j] /= pivot
+		}
+		for row := 0; row < n; row++ {
+			if row == col {
+				continue
+			}
+			factor := aug[row*2*n+col]
+			if factor == 0 {
+				continue
+			}
+			for j := 0; j < 2*n; j++ {
+				aug[row*2*n+j] -= factor * aug[col*2*n+j]
+			}
+		}
+	}
+	var total float64
+	for row := 0; row < n; row++ {
+		for col := 0; col < n; col++ {
+			total += aug[row*2*n+n+col]
+		}
+	}
+	return total, true, nil
 }
 
 func (m matrixArray) Kind() Kind { return KindAny }
