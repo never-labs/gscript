@@ -8048,6 +8048,40 @@ func execProjectByI64IndexArray(frame Frame, indexes Array, items []SelectItem) 
 	return newFrameTrusted(cols...)
 }
 
+// TryGatherFrameByI64IndexArray gathers frame rows with a typed i64 index
+// vector, preserving lazy column/index views when the column kernels support it.
+func TryGatherFrameByI64IndexArray(frame Frame, indexes Array) (Frame, bool, error) {
+	if indexes == nil {
+		return Frame{}, true, fmt.Errorf("frame gather index vector is nil")
+	}
+	if indexes.Kind() != KindI64 {
+		return Frame{}, false, nil
+	}
+	out, err := execProjectByI64IndexArray(frame, indexes, nil)
+	return out, true, err
+}
+
+// TrySortFrameByColumns sorts frames through typed sort-index and gather
+// kernels for common single-column qSQL/q table order paths.
+func TrySortFrameByColumns(frame Frame, names []Symbol, descending bool) (Frame, bool, error) {
+	if len(names) != 1 {
+		return Frame{}, false, nil
+	}
+	col, ok := frame.Column(names[0])
+	if !ok {
+		return Frame{}, true, fmt.Errorf("sort column %q does not exist", names[0])
+	}
+	indexes, handled, err := TryTypedSortIndexesI64(col, descending)
+	if err != nil || !handled {
+		return Frame{}, handled, err
+	}
+	out, gathered, err := TryGatherFrameByI64IndexArray(frame, indexes)
+	if err != nil || !gathered {
+		return Frame{}, gathered, err
+	}
+	return out, true, nil
+}
+
 func i64IndexArrayCoversAllRows(indexes Array, rows int) bool {
 	switch idx := indexes.(type) {
 	case attributedArray:

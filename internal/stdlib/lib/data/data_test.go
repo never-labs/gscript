@@ -3723,6 +3723,46 @@ func TestTryTypedSortIndexesI64(t *testing.T) {
 	}
 }
 
+func TestTryTypedSortIndexesNullableTemporalAndRankRange(t *testing.T) {
+	dates := NewColumn("d", []any{Date(2), NullForKind(KindDate), Date(1)}).Data
+	indexes, ok, err := TryTypedSortIndexesI64(dates, false)
+	if err != nil || !ok {
+		t.Fatalf("nullable date sort handled=%v err=%v; want true,nil", ok, err)
+	}
+	if got, want := indexes.Values(), []any{int64(1), int64(2), int64(0)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("nullable date sort indexes = %#v, want %#v", got, want)
+	}
+	rank, ok, err := TryTypedRankI64(NewI64Range(4, -1, 5))
+	if err != nil || !ok {
+		t.Fatalf("range rank handled=%v err=%v; want true,nil", ok, err)
+	}
+	if got, want := rank.Values(), []any{int64(4), int64(3), int64(2), int64(1), int64(0)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("range rank = %#v, want %#v", got, want)
+	}
+}
+
+func TestTrySortFrameByColumnsUsesTypedGather(t *testing.T) {
+	frame, err := NewFrame(
+		NewColumn("sym", []any{"MSFT", "AAPL"}),
+		NewColumn("price", []any{int64(101), int64(80)}),
+	)
+	if err != nil {
+		t.Fatalf("NewFrame returned error: %v", err)
+	}
+	sorted, ok, err := TrySortFrameByColumns(frame, []Symbol{"price"}, false)
+	if err != nil || !ok {
+		t.Fatalf("TrySortFrameByColumns handled=%v err=%v; want true,nil", ok, err)
+	}
+	price, _ := sorted.Column("price")
+	if got, want := price.Values(), []any{int64(80), int64(101)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("sorted price = %#v, want %#v", got, want)
+	}
+	sym, _ := sorted.Column("sym")
+	if got, want := sym.Values(), []any{"AAPL", "MSFT"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("sorted sym = %#v, want %#v", got, want)
+	}
+}
+
 func TestTryTypedStringCastAndCasePreserveTiledArrays(t *testing.T) {
 	repeated := takeRepeatMust(t, NewSymbols([]string{"aapl", "msft", "amd", "ask"}), 10)
 	cast, handled, err := TryTypedStringCast(repeated)

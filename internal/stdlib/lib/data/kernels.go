@@ -2924,6 +2924,10 @@ func TryTypedSortIndexesI64(array Array, descending bool) (Array, bool, error) {
 	switch a := array.(type) {
 	case attributedArray:
 		return TryTypedSortIndexesI64(a.array, descending)
+	case nullableArray:
+		return typedSortRowIndexesByArray(a, descending), true, nil
+	case columnArray[int64]:
+		return typedSortIndexesBy(a.data, descending, compareTypedSigned[int64]), true, nil
 	case i64RangeArray:
 		if a.len == 0 {
 			return NewI64Range(0, 1, 0), true, nil
@@ -2936,8 +2940,110 @@ func TryTypedSortIndexesI64(array Array, descending bool) (Array, bool, error) {
 			return NewI64Range(int64(a.len-1), -1, a.len), true, nil
 		}
 		return NewI64Range(0, 1, a.len), true, nil
+	case columnArray[string]:
+		return typedSortIndexesBy(a.data, descending, compareString), true, nil
+	case columnArray[Symbol]:
+		return typedSortIndexesBy(a.data, descending, func(left, right Symbol) int {
+			return compareString(string(left), string(right))
+		}), true, nil
+	case columnArray[Month]:
+		return typedSortIndexesBy(a.data, descending, compareTypedSigned[Month]), true, nil
+	case columnArray[Date]:
+		return typedSortIndexesBy(a.data, descending, compareTypedSigned[Date]), true, nil
+	case columnArray[DateTime]:
+		return typedSortIndexesBy(a.data, descending, compareTypedSigned[DateTime]), true, nil
+	case columnArray[Timespan]:
+		return typedSortIndexesBy(a.data, descending, compareTypedSigned[Timespan]), true, nil
+	case columnArray[Minute]:
+		return typedSortIndexesBy(a.data, descending, compareTypedSigned[Minute]), true, nil
+	case columnArray[Second]:
+		return typedSortIndexesBy(a.data, descending, compareTypedSigned[Second]), true, nil
+	case columnArray[Time]:
+		return typedSortIndexesBy(a.data, descending, compareTypedSigned[Time]), true, nil
+	case columnArray[Timestamp]:
+		return typedSortIndexesBy(a.data, descending, compareTypedSigned[Timestamp]), true, nil
 	default:
 		return nil, false, nil
+	}
+}
+
+// TryTypedRankI64 returns q rank positions for typed arrays without boxing the
+// source values through []any.
+func TryTypedRankI64(array Array) (Array, bool, error) {
+	if array == nil {
+		return nil, true, fmt.Errorf("rank array is nil")
+	}
+	switch a := array.(type) {
+	case attributedArray:
+		return TryTypedRankI64(a.array)
+	case i64RangeArray:
+		if a.len == 0 {
+			return NewI64Range(0, 1, 0), true, nil
+		}
+		if a.step >= 0 {
+			return NewI64Range(0, 1, a.len), true, nil
+		}
+		return NewI64Range(int64(a.len-1), -1, a.len), true, nil
+	}
+	indexes, handled, err := TryTypedSortIndexesI64(array, false)
+	if err != nil || !handled {
+		return nil, handled, err
+	}
+	rows, handled, err := TryTypedI64Indexes(indexes)
+	if err != nil || !handled {
+		return nil, handled, err
+	}
+	out := make([]int64, len(rows))
+	for sortedPosition, originalIndex := range rows {
+		out[originalIndex] = int64(sortedPosition)
+	}
+	return newI64Trusted(out), true, nil
+}
+
+func typedSortIndexesBy[T any](values []T, descending bool, compare func(T, T) int) Array {
+	if len(values) == 0 {
+		return NewI64Range(0, 1, 0)
+	}
+	indexes := make([]int64, len(values))
+	for i := range indexes {
+		indexes[i] = int64(i)
+	}
+	sort.SliceStable(indexes, func(i, j int) bool {
+		cmp := compare(values[int(indexes[i])], values[int(indexes[j])])
+		if descending {
+			return cmp > 0
+		}
+		return cmp < 0
+	})
+	return newI64Trusted(indexes)
+}
+
+func typedSortRowIndexesByArray(array Array, descending bool) Array {
+	if array.Len() == 0 {
+		return NewI64Range(0, 1, 0)
+	}
+	indexes := make([]int64, array.Len())
+	for i := range indexes {
+		indexes[i] = int64(i)
+	}
+	sort.SliceStable(indexes, func(i, j int) bool {
+		cmp := compareArrayRows(array, int(indexes[i]), int(indexes[j]))
+		if descending {
+			return cmp > 0
+		}
+		return cmp < 0
+	})
+	return newI64Trusted(indexes)
+}
+
+func compareTypedSigned[T signedScalar](left, right T) int {
+	switch {
+	case left < right:
+		return -1
+	case left > right:
+		return 1
+	default:
+		return 0
 	}
 }
 

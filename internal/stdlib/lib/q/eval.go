@@ -455,6 +455,10 @@ func qRuntimeKernelPipelineShape(kernel, shape string) string {
 		return "mask_combine"
 	case strings.HasPrefix(shape, "sort-index/"):
 		return "sort_index"
+	case strings.HasPrefix(shape, "sort-gather/"):
+		return "sort_gather"
+	case strings.HasPrefix(shape, "rank/"):
+		return "rank"
 	case strings.HasPrefix(shape, "fby-"), strings.Contains(shape, "/fby-"):
 		return "group_aggregate"
 	case strings.HasPrefix(shape, "like-count/"), strings.HasPrefix(shape, "in-count/"):
@@ -10730,6 +10734,14 @@ func xsort(left any, right any, descending bool) (any, error) {
 }
 
 func sortFrameByColumns(frame data.Frame, names []data.Symbol, descending bool) (data.Frame, error) {
+	if out, handled, err := data.TrySortFrameByColumns(frame, names, descending); err != nil || handled {
+		shape := "frame-gather/sort/" + qRuntimeCardinalityShape(frame.Len()) + "/cols-" + strconv.Itoa(len(frame.Schema().Names()))
+		recordRuntimeFramePrimitive("FrameGather", shape, err)
+		if err != nil {
+			return data.Frame{}, err
+		}
+		return out, nil
+	}
 	bound := make([]data.Array, len(names))
 	for i, name := range names {
 		col, ok := frame.Column(name)
@@ -11767,6 +11779,21 @@ func asc(v any) (any, error) {
 	if !ok {
 		return v, nil
 	}
+	if indexes, handled, err := data.TryTypedSortIndexesI64(array, false); err != nil || handled {
+		shape := "sort-gather/" + string(array.Kind()) + "/asc"
+		recordRuntimeKernelProbe("ArraySortGather", shape, handled, err)
+		if err != nil {
+			return nil, err
+		}
+		out, gathered, err := data.TryGatherByI64IndexArray(array, indexes)
+		recordRuntimeKernelProbe("ArrayGatherI64Indexes", "gather/"+string(array.Kind())+"/"+string(indexes.Kind()), gathered, err)
+		if err != nil {
+			return nil, err
+		}
+		if gathered {
+			return out, nil
+		}
+	}
 	indexes, err := sortedIndexes(array, false)
 	if err != nil {
 		return nil, err
@@ -11778,6 +11805,21 @@ func desc(v any) (any, error) {
 	array, ok := v.(data.Array)
 	if !ok {
 		return v, nil
+	}
+	if indexes, handled, err := data.TryTypedSortIndexesI64(array, true); err != nil || handled {
+		shape := "sort-gather/" + string(array.Kind()) + "/desc"
+		recordRuntimeKernelProbe("ArraySortGather", shape, handled, err)
+		if err != nil {
+			return nil, err
+		}
+		out, gathered, err := data.TryGatherByI64IndexArray(array, indexes)
+		recordRuntimeKernelProbe("ArrayGatherI64Indexes", "gather/"+string(array.Kind())+"/"+string(indexes.Kind()), gathered, err)
+		if err != nil {
+			return nil, err
+		}
+		if gathered {
+			return out, nil
+		}
 	}
 	indexes, err := sortedIndexes(array, true)
 	if err != nil {
@@ -11798,6 +11840,13 @@ func rank(v any) (any, error) {
 	array, ok := v.(data.Array)
 	if !ok {
 		return data.NewI64([]int64{0}), nil
+	}
+	if out, handled, err := data.TryTypedRankI64(array); err != nil || handled {
+		recordRuntimeKernelProbe("ArrayRank", "rank/"+string(array.Kind()), handled, err)
+		if err != nil {
+			return nil, err
+		}
+		return out, nil
 	}
 	indexes, err := sortedIndexes(array, false)
 	if err != nil {
