@@ -22,6 +22,32 @@ type QSQLKernelPipelineRef struct {
 	SchemaHash    string
 }
 
+// QSQLKernelBackendPlan is the executable-backend contract for a qSQL column
+// pipeline. It intentionally carries only stable identity and execution route;
+// the data runtime owns the frame-bound QueryKernel and may attach it behind an
+// implementation-specific executor.
+type QSQLKernelBackendPlan struct {
+	Backend string
+	Detail  string
+	Ref     QSQLKernelPipelineRef
+}
+
+func (plan QSQLKernelBackendPlan) Valid() bool {
+	ref := plan.Ref.normalized(QSQLKernelRuntimeSource)
+	return plan.Backend != "" &&
+		ref.Kernel != "" &&
+		ref.Shape != "" &&
+		ref.PipelineShape != "" &&
+		ref.Route != ""
+}
+
+// QSQLKernelBackendExecutor is the narrow MethodJIT hook a qSQL typed runtime
+// backend must satisfy. The executor receives a schema-stable backend plan and
+// owns any frame/query-kernel lookup needed to run it.
+type QSQLKernelBackendExecutor interface {
+	ExecuteQSQLKernelBackendPlan(QSQLKernelBackendPlan) (any, bool, error)
+}
+
 func (ref QSQLKernelPipelineRef) normalized(source string) QSQLKernelPipelineRef {
 	if source == "" {
 		source = QSQLKernelRuntimeSource
@@ -44,6 +70,19 @@ func (ref QSQLKernelPipelineRef) normalized(source string) QSQLKernelPipelineRef
 	return ref
 }
 
+// QSQLKernelRuntimeBackendPlan normalizes a qSQL pipeline handoff into the same
+// plan-shaped boundary used by q.eval runtime pipelines. This is the stable
+// MethodJIT/JIT-backend attachment point; it does not require MethodJIT to own
+// qSQL frame execution.
+func QSQLKernelRuntimeBackendPlan(ref QSQLKernelPipelineRef) QSQLKernelBackendPlan {
+	ref = ref.normalized(QSQLKernelRuntimeSource)
+	return QSQLKernelBackendPlan{
+		Backend: QSQLKernelRuntimeRoute,
+		Detail:  "kernel=" + ref.Kernel + "|shape=" + ref.Shape + "|pipeline=" + ref.PipelineShape,
+		Ref:     ref,
+	}
+}
+
 // QSQLKernelRuntimeDescriptor returns a normalized descriptor row for a qSQL
 // pipeline that is ready to be called through a typed runtime/JIT backend.
 func QSQLKernelRuntimeDescriptor(ref QSQLKernelPipelineRef) QKernelDescriptor {
@@ -57,6 +96,16 @@ func QSQLKernelRuntimeDescriptor(ref QSQLKernelPipelineRef) QKernelDescriptor {
 		Route:         ref.Route,
 		Outcome:       "supported",
 	}
+}
+
+// QSQLKernelRuntimeDescriptorFromBackendPlan returns the diagnostic descriptor
+// for a backend plan after enforcing the route selected by the executor.
+func QSQLKernelRuntimeDescriptorFromBackendPlan(plan QSQLKernelBackendPlan) QKernelDescriptor {
+	ref := plan.Ref.normalized(QSQLKernelRuntimeSource)
+	if plan.Backend != "" {
+		ref.Route = plan.Backend
+	}
+	return QSQLKernelRuntimeDescriptor(ref)
 }
 
 // QSQLKernelLoweringDescriptor returns a normalized lowering decision row. Use
