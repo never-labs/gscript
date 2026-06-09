@@ -3660,6 +3660,13 @@ func TestEvalConditionalSpecialForms(t *testing.T) {
 	assertEvalValue(t, "$[1;42;1%0]", int64(42))
 }
 
+func TestEvalControlSpecialForms(t *testing.T) {
+	assertEvalValue(t, "a:0;if[1;a:42];a", int64(42))
+	assertEvalValue(t, "a:0;if[0;a:42];a", int64(0))
+	assertEvalValue(t, "a:0;do[3;a:a+2];a", int64(6))
+	assertEvalValue(t, "i:0;while[i<3;i:i+1];i", int64(3))
+}
+
 func TestEvalSqrtLogUnaryVerbs(t *testing.T) {
 	assertEvalValue(t, "sqrt 4", 2.0)
 	assertEvalValue(t, "log 1", 0.0)

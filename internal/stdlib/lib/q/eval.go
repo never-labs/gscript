@@ -1407,7 +1407,7 @@ func (s *EvalState) evalConditionalSpecialForm(src string) (any, bool, error) {
 	if len(src) < 4 || (src[0] != '$' && src[0] != '?') || src[1] != '[' || src[len(src)-1] != ']' {
 		return nil, false, nil
 	}
-	args := splitTopLevel(src[2:len(src)-1], ';')
+	args := splitTopLevelDelim(src[2:len(src)-1], ';')
 	if len(args) != 3 {
 		return nil, true, fmt.Errorf("%c[] conditional expects three arguments", src[0])
 	}
@@ -1425,6 +1425,95 @@ func (s *EvalState) evalConditionalSpecialForm(src string) (any, bool, error) {
 	}
 	out, err := s.eval(args[2])
 	return out, true, err
+}
+
+func (s *EvalState) evalControlSpecialForm(src string) (any, bool, error) {
+	name, inner, ok := parseNamedBracketForm(src)
+	if !ok {
+		return nil, false, nil
+	}
+	switch name {
+	case "if":
+		args := splitTopLevelDelim(inner, ';')
+		if len(args) != 2 {
+			return nil, true, fmt.Errorf("if[] expects condition and body")
+		}
+		cond, err := s.eval(args[0])
+		if err != nil {
+			return nil, true, err
+		}
+		truth, err := boolValue(cond)
+		if err != nil {
+			return nil, true, err
+		}
+		if !truth {
+			return data.NullValue, true, nil
+		}
+		out, err := s.evalScript(args[1])
+		return out, true, err
+	case "do":
+		args := splitTopLevelDelim(inner, ';')
+		if len(args) != 2 {
+			return nil, true, fmt.Errorf("do[] expects count and body")
+		}
+		countValue, err := s.eval(args[0])
+		if err != nil {
+			return nil, true, err
+		}
+		count, ok := integerValue(countValue)
+		if !ok || count < 0 {
+			return nil, true, fmt.Errorf("do[] count must be a non-negative integer")
+		}
+		var out any = data.NullValue
+		for i := int64(0); i < count; i++ {
+			out, err = s.evalScript(args[1])
+			if err != nil {
+				return nil, true, err
+			}
+		}
+		return out, true, nil
+	case "while":
+		args := splitTopLevelDelim(inner, ';')
+		if len(args) != 2 {
+			return nil, true, fmt.Errorf("while[] expects condition and body")
+		}
+		var out any = data.NullValue
+		for {
+			cond, err := s.eval(args[0])
+			if err != nil {
+				return nil, true, err
+			}
+			truth, err := boolValue(cond)
+			if err != nil {
+				return nil, true, err
+			}
+			if !truth {
+				return out, true, nil
+			}
+			out, err = s.evalScript(args[1])
+			if err != nil {
+				return nil, true, err
+			}
+		}
+	default:
+		return nil, false, nil
+	}
+}
+
+func parseNamedBracketForm(src string) (string, string, bool) {
+	src = strings.TrimSpace(src)
+	open := strings.IndexByte(src, '[')
+	if open <= 0 || src[len(src)-1] != ']' {
+		return "", "", false
+	}
+	name := strings.ToLower(strings.TrimSpace(src[:open]))
+	if name != "if" && name != "do" && name != "while" {
+		return "", "", false
+	}
+	if !enclosed(src[open:], '[', ']') {
+		return "", "", false
+	}
+	return name, strings.TrimSpace(src[open+1 : len(src)-1]), true
 }
 
 func parseDeferredScan(src string) (name, arg string, ok bool) {
@@ -1842,6 +1931,9 @@ func (s *EvalState) eval(src string) (any, error) {
 		return nil, fmt.Errorf("empty q expression")
 	}
 	if out, ok, err := s.evalConditionalSpecialForm(src); ok || err != nil {
+		return out, err
+	}
+	if out, ok, err := s.evalControlSpecialForm(src); ok || err != nil {
 		return out, err
 	}
 	if plan := s.qPipelinePlan(src); plan.kind != qPipelineInvalid {
