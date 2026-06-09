@@ -14,6 +14,7 @@ const (
 	qScriptPipelineWhereIndexReduceSum  qScriptPipelineKind = "where-index-reduce/sum"
 	qScriptPipelineGatherReduceSum      qScriptPipelineKind = "gather-reduce/sum"
 	qScriptPipelineGatherReduceSumCount qScriptPipelineKind = "gather-reduce/sum-count"
+	qScriptPipelineIndexExprSumCount    qScriptPipelineKind = "index-expr-reduce/sum-count"
 	qScriptPipelineSequenceEdgeSum      qScriptPipelineKind = "sequence-edge-reduce/sum-first-last"
 	qScriptPipelineSequenceSumCount     qScriptPipelineKind = "sequence-reduce/sum-count"
 	qScriptPipelineSumPlusDyadicFloat   qScriptPipelineKind = "multi-reduce/sum-plus-dyadic-float-sum"
@@ -60,6 +61,8 @@ type qScriptPipelineDescriptor struct {
 	scalarPlan        qScriptBindingPlan
 	scalarLeft        bool
 	integerTerms      []qScriptPipelineIntegerDivModTerm
+	indexExprPlan     data.I64IndexExpr
+	indexReducers     []data.I64IndexExprReducer
 	includeCount      bool
 	sequenceValueExpr string
 	sequenceValuePlan qScriptBindingPlan
@@ -202,6 +205,9 @@ func describeQScriptPipelineTerminal(src string, bindings map[string]string) (qS
 		}, true
 	}
 	if descriptor, ok := qScriptPipelineSequenceSumCountDescriptor(src, bindings); ok {
+		return descriptor, true
+	}
+	if descriptor, ok := qScriptPipelineIndexExprSumCountDescriptor(src, bindings); ok {
 		return descriptor, true
 	}
 	if descriptor, ok := qScriptPipelineGatherSumCountDescriptor(src, bindings); ok {
@@ -838,6 +844,245 @@ func qScriptPipelineGatherSumCountDescriptor(src string, bindings map[string]str
 	}, true
 }
 
+func qScriptPipelineIndexExprSumCountDescriptor(src string, bindings map[string]string) (qScriptPipelineDescriptor, bool) {
+	terms := qScriptPipelinePlusTerms(src)
+	if len(terms) < 2 {
+		return qScriptPipelineDescriptor{}, false
+	}
+	sumExprs := make([]string, 0, len(terms))
+	var indexExpr string
+	var includeCount bool
+	for _, term := range terms {
+		if expr, ok := qScriptPipelineCountTerm(term); ok {
+			if indexExpr != "" && indexExpr != expr {
+				return qScriptPipelineDescriptor{}, false
+			}
+			indexExpr = expr
+			includeCount = true
+			continue
+		}
+		expr, ok := qScriptPipelineSumExprTerm(term)
+		if !ok {
+			return qScriptPipelineDescriptor{}, false
+		}
+		sumExprs = append(sumExprs, expr)
+	}
+	if len(sumExprs) == 0 || indexExpr == "" || !includeCount {
+		return qScriptPipelineDescriptor{}, false
+	}
+	indexBinding := qScriptPipelineBinding(indexExpr, bindings)
+	if _, ok := directWhereMaskExpr(indexBinding); !ok {
+		return qScriptPipelineDescriptor{}, false
+	}
+	reducers := make([]data.I64IndexExprReducer, 0, len(sumExprs)+1)
+	for _, sumExpr := range sumExprs {
+		exprPlan, ok := qScriptPipelineI64IndexExprPlan(sumExpr, indexExpr, bindings, nil)
+		if !ok {
+			return qScriptPipelineDescriptor{}, false
+		}
+		reducers = append(reducers, data.I64IndexExprReducer{Kind: data.I64IndexExprReducerSum, Expr: exprPlan})
+	}
+	reducers = append(reducers, data.I64IndexExprReducer{Kind: data.I64IndexExprReducerCount})
+	shapeTerm := "sum-count"
+	if len(sumExprs) > 1 {
+		shapeTerm = "sum" + strconv.Itoa(len(sumExprs)) + "-count"
+	}
+	return qScriptPipelineDescriptor{
+		kind:          qScriptPipelineIndexExprSumCount,
+		shapeText:     "script-pipeline/index-expr-reduce/" + shapeTerm + "/assignments",
+		valueExpr:     strings.Join(sumExprs, "+"),
+		indexExpr:     indexExpr,
+		indexBinding:  indexBinding,
+		indexExprPlan: reducers[0].Expr,
+		indexReducers: reducers,
+		includeCount:  true,
+	}, true
+}
+
+func qScriptPipelineSumExprTerm(src string) (string, bool) {
+	src = stripEnclosingParens(strings.TrimSpace(src))
+	if strings.HasPrefix(src, "+/") {
+		expr := strings.TrimSpace(src[len("+/"):])
+		return expr, expr != ""
+	}
+	if strings.HasPrefix(src, "sum") && wordBoundary(src, 0, len("sum")) {
+		expr := strings.TrimSpace(src[len("sum"):])
+		return expr, expr != ""
+	}
+	return "", false
+}
+
+func qScriptPipelineI64IndexExprPlan(src, indexName string, bindings map[string]string, seen map[string]bool) (data.I64IndexExpr, bool) {
+	src = stripEnclosingParens(strings.TrimSpace(src))
+	indexName = strings.TrimSpace(indexName)
+	if src == "" || indexName == "" {
+		return data.I64IndexExpr{}, false
+	}
+	if src == indexName {
+		return data.I64IndexExpr{Op: data.I64IndexExprIndex}, true
+	}
+	if qScriptPipelineSimpleName(src) {
+		bound := strings.TrimSpace(bindings[src])
+		if bound == "" {
+			return data.I64IndexExpr{}, false
+		}
+		if seen == nil {
+			seen = make(map[string]bool, len(bindings))
+		}
+		if seen[src] {
+			return data.I64IndexExpr{}, false
+		}
+		seen[src] = true
+		return qScriptPipelineI64IndexExprPlan(bound, indexName, bindings, seen)
+	}
+	if n, ok := qScriptPipelineStaticInt(src); ok {
+		return data.I64IndexExpr{Op: data.I64IndexExprConst, Value: int64(n)}, true
+	}
+	if n, ok := qScriptPipelineRepeatedIndexConstant(src, indexName); ok {
+		return data.I64IndexExpr{Op: data.I64IndexExprConst, Value: int64(n)}, true
+	}
+	if widthExpr, valueExpr, ok := splitTopLevelWord(src, "xbar"); ok {
+		width, widthOK := qScriptPipelineStaticInt(widthExpr)
+		if !widthOK || width <= 0 {
+			return data.I64IndexExpr{}, false
+		}
+		valuePlan, ok := qScriptPipelineI64IndexExprPlan(valueExpr, indexName, bindings, cloneBoolMap(seen))
+		if !ok {
+			return data.I64IndexExpr{}, false
+		}
+		return data.I64IndexExpr{Op: data.I64IndexExprXbar, Value: int64(width), Left: &valuePlan}, true
+	}
+	for _, spec := range []struct {
+		op   string
+		kind data.I64IndexExprOp
+	}{
+		{"+", data.I64IndexExprAdd},
+		{"-", data.I64IndexExprSub},
+	} {
+		left, right, ok := splitTopLevelOperator(src, spec.op)
+		if !ok || strings.TrimSpace(left) == "" || strings.TrimSpace(right) == "" {
+			continue
+		}
+		leftPlan, rightPlan, ok := qScriptPipelineI64IndexExprOperands(left, right, indexName, bindings, seen)
+		if !ok {
+			return data.I64IndexExpr{}, false
+		}
+		return data.I64IndexExpr{Op: spec.kind, Left: &leftPlan, Right: &rightPlan}, true
+	}
+	for _, spec := range []struct {
+		op   string
+		kind data.I64IndexExprOp
+	}{
+		{"*", data.I64IndexExprMul},
+		{"div", data.I64IndexExprDiv},
+		{"mod", data.I64IndexExprMod},
+	} {
+		var left, right string
+		var ok bool
+		if spec.op == "*" {
+			left, right, ok = splitTopLevelOperator(src, spec.op)
+		} else {
+			left, right, ok = splitTopLevelWord(src, spec.op)
+		}
+		if !ok || strings.TrimSpace(left) == "" || strings.TrimSpace(right) == "" {
+			continue
+		}
+		leftPlan, rightPlan, ok := qScriptPipelineI64IndexExprOperands(left, right, indexName, bindings, seen)
+		if !ok {
+			return data.I64IndexExpr{}, false
+		}
+		return data.I64IndexExpr{Op: spec.kind, Left: &leftPlan, Right: &rightPlan}, true
+	}
+	return data.I64IndexExpr{}, false
+}
+
+func qScriptPipelineRepeatedIndexConstant(src, indexName string) (int, bool) {
+	left, right, ok := splitTopLevelOperator(stripEnclosingParens(strings.TrimSpace(src)), "#")
+	if !ok {
+		return 0, false
+	}
+	countName, ok := qScriptPipelineCountTerm(left)
+	if !ok || strings.TrimSpace(countName) != strings.TrimSpace(indexName) {
+		return 0, false
+	}
+	value, ok := qScriptPipelineStaticInt(right)
+	return value, ok
+}
+
+func qScriptPipelineI64IndexExprOperands(left, right, indexName string, bindings map[string]string, seen map[string]bool) (data.I64IndexExpr, data.I64IndexExpr, bool) {
+	leftPlan, ok := qScriptPipelineI64IndexExprPlan(left, indexName, bindings, cloneBoolMap(seen))
+	if !ok {
+		return data.I64IndexExpr{}, data.I64IndexExpr{}, false
+	}
+	rightPlan, ok := qScriptPipelineI64IndexExprPlan(right, indexName, bindings, cloneBoolMap(seen))
+	if !ok {
+		return data.I64IndexExpr{}, data.I64IndexExpr{}, false
+	}
+	return leftPlan, rightPlan, true
+}
+
+func cloneBoolMap(in map[string]bool) map[string]bool {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make(map[string]bool, len(in))
+	for key, value := range in {
+		out[key] = value
+	}
+	return out
+}
+
+func qScriptPipelineI64IndexExprDependsOnName(src, name, indexName string, bindings map[string]string, seen map[string]bool) bool {
+	src = stripEnclosingParens(strings.TrimSpace(src))
+	name = strings.TrimSpace(name)
+	if src == "" || name == "" {
+		return false
+	}
+	if src == name {
+		return true
+	}
+	if src == indexName {
+		return false
+	}
+	if qScriptPipelineSimpleName(src) {
+		bound := strings.TrimSpace(bindings[src])
+		if bound == "" {
+			return false
+		}
+		if seen == nil {
+			seen = make(map[string]bool, len(bindings))
+		}
+		if seen[src] {
+			return false
+		}
+		seen[src] = true
+		return qScriptPipelineI64IndexExprDependsOnName(bound, name, indexName, bindings, seen)
+	}
+	for _, op := range []string{"+", "-", "*"} {
+		left, right, ok := splitTopLevelOperator(src, op)
+		if ok && (qScriptPipelineI64IndexExprDependsOnName(left, name, indexName, bindings, cloneBoolMap(seen)) ||
+			qScriptPipelineI64IndexExprDependsOnName(right, name, indexName, bindings, cloneBoolMap(seen))) {
+			return true
+		}
+	}
+	for _, op := range []string{"div", "mod"} {
+		left, right, ok := splitTopLevelWord(src, op)
+		if ok && (qScriptPipelineI64IndexExprDependsOnName(left, name, indexName, bindings, cloneBoolMap(seen)) ||
+			qScriptPipelineI64IndexExprDependsOnName(right, name, indexName, bindings, cloneBoolMap(seen))) {
+			return true
+		}
+	}
+	if left, right, ok := splitTopLevelWord(src, "xbar"); ok {
+		return qScriptPipelineI64IndexExprDependsOnName(left, name, indexName, bindings, cloneBoolMap(seen)) ||
+			qScriptPipelineI64IndexExprDependsOnName(right, name, indexName, bindings, cloneBoolMap(seen))
+	}
+	if left, right, ok := splitTopLevelOperator(src, "#"); ok {
+		return qScriptPipelineI64IndexExprDependsOnName(left, name, indexName, bindings, cloneBoolMap(seen)) ||
+			qScriptPipelineI64IndexExprDependsOnName(right, name, indexName, bindings, cloneBoolMap(seen))
+	}
+	return false
+}
+
 func qScriptPipelineGatherSumTerm(src string) (string, string, bool) {
 	src = stripEnclosingParens(strings.TrimSpace(src))
 	if strings.HasPrefix(src, "+/") {
@@ -1318,6 +1563,11 @@ func (s *EvalState) tryEvalQScriptPipeline(descriptor *qScriptPipelineDescriptor
 	}
 	if descriptor.kind == qScriptPipelineGatherReduceSumCount {
 		out, handled, err := s.evalQScriptGatherSumCountPipeline(descriptor)
+		recordQScriptPipelineResult(shape, handled, err)
+		return out, handled, err
+	}
+	if descriptor.kind == qScriptPipelineIndexExprSumCount {
+		out, handled, err := s.evalQScriptIndexExprSumCountPipeline(descriptor)
 		recordQScriptPipelineResult(shape, handled, err)
 		return out, handled, err
 	}
@@ -2405,6 +2655,66 @@ func (s *EvalState) evalQScriptGatherSumCountPipeline(descriptor *qScriptPipelin
 		return nil, false, nil
 	}
 	return out, true, nil
+}
+
+func (s *EvalState) evalQScriptIndexExprSumCountPipeline(descriptor *qScriptPipelineDescriptor) (any, bool, error) {
+	bindings := make(map[string]string, len(descriptor.assignments))
+	for _, assignment := range descriptor.assignments {
+		bindings[assignment.name] = assignment.rhs
+	}
+	for _, assignment := range descriptor.assignments {
+		name := strings.TrimSpace(assignment.name)
+		if name == strings.TrimSpace(descriptor.indexExpr) ||
+			qScriptPipelineI64IndexExprDependsOnName(descriptor.valueExpr, name, descriptor.indexExpr, bindings, nil) {
+			continue
+		}
+		value, handled, err := s.evalQScriptBindingPlan(&assignment.binding)
+		if err != nil {
+			return nil, true, err
+		}
+		if !handled {
+			value, err = s.evalCachedOrString(assignment.rhs, assignment.valueExpr, &assignment.binding, nil)
+			if err != nil {
+				return nil, true, err
+			}
+		}
+		s.env[s.resolveAssignmentName(assignment.name)] = value
+	}
+	index, handled, err := s.evalQScriptBindingPlan(&descriptor.indexPlan)
+	if err != nil {
+		return nil, true, err
+	}
+	if !handled {
+		if err := s.evalQScriptPipelineDeferredAssignment(descriptor, descriptor.indexExpr); err != nil {
+			return nil, true, err
+		}
+		index, handled, err = s.evalQScriptBindingPlan(&descriptor.indexPlan)
+		if err != nil || !handled {
+			return nil, handled, err
+		}
+	}
+	indexes, ok := index.(data.Array)
+	if !ok {
+		return nil, false, nil
+	}
+	reducers := descriptor.indexReducers
+	if len(reducers) == 0 {
+		reducers = []data.I64IndexExprReducer{{Kind: data.I64IndexExprReducerSum, Expr: descriptor.indexExprPlan}}
+		if descriptor.includeCount {
+			reducers = append(reducers, data.I64IndexExprReducer{Kind: data.I64IndexExprReducerCount})
+		}
+	}
+	shape := "index-expr-reduce/reducers/" + string(indexes.Kind()) + "/" + strconv.Itoa(len(reducers))
+	values, handled, err := data.TryTypedI64IndexExprReducers(indexes, reducers)
+	values, handled, err = qTypedRuntimeResult("ArrayIndexExprReducers", shape, values, handled, err)
+	if err != nil || !handled {
+		return values, handled, err
+	}
+	var total int64
+	for _, value := range values {
+		total += value
+	}
+	return total, true, nil
 }
 
 func (s *EvalState) evalQScriptGatherSumCountWhereIndexPipeline(descriptor *qScriptPipelineDescriptor, array data.Array) (any, bool, error) {

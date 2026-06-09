@@ -935,6 +935,61 @@ func TestQScriptPipelinePlannerDescribesTerminalGatherReduce(t *testing.T) {
 	}
 }
 
+func TestQScriptPipelinePlannerDescribesIndexExprSumCount(t *testing.T) {
+	plan := buildQScriptPlan("x:til 16;idx:where (x>=4) and x<8;pxi:10+(idx mod 5);szi:1+(idx mod 3);(+/(pxi*szi))+count idx")
+	if plan.scriptPipeline == nil {
+		t.Fatalf("script pipeline descriptor missing")
+	}
+	d := plan.scriptPipeline
+	if d.kind != qScriptPipelineIndexExprSumCount {
+		t.Fatalf("pipeline kind = %q, want %q", d.kind, qScriptPipelineIndexExprSumCount)
+	}
+	if d.indexExpr != "idx" || d.indexBinding != "where (x>=4) and x<8" {
+		t.Fatalf("index descriptor = expr %q binding %q, want idx/where", d.indexExpr, d.indexBinding)
+	}
+	if stripEnclosingParens(d.valueExpr) != "pxi*szi" {
+		t.Fatalf("value expr = %q, want pxi*szi", d.valueExpr)
+	}
+	if got, want := d.shape(), "script-pipeline/index-expr-reduce/sum-count/assignments"; got != want {
+		t.Fatalf("shape = %q, want %q", got, want)
+	}
+}
+
+func TestQScriptPipelinePlannerDescribesIndexExprMultiReducers(t *testing.T) {
+	plan := buildQScriptPlan("x:til 16;idx:where x>=8;pxi:10+(idx mod 5);szi:1+(idx mod 3);(+/(pxi*szi))+(+/pxi)+count idx")
+	if plan.scriptPipeline == nil {
+		t.Fatalf("script pipeline descriptor missing")
+	}
+	d := plan.scriptPipeline
+	if d.kind != qScriptPipelineIndexExprSumCount {
+		t.Fatalf("pipeline kind = %q, want %q", d.kind, qScriptPipelineIndexExprSumCount)
+	}
+	if len(d.indexReducers) != 3 {
+		t.Fatalf("index reducer count = %d, want 3", len(d.indexReducers))
+	}
+	if got, want := d.shape(), "script-pipeline/index-expr-reduce/sum2-count/assignments"; got != want {
+		t.Fatalf("shape = %q, want %q", got, want)
+	}
+}
+
+func TestQScriptPipelinePlannerDescribesIndexExprComputedProjectionReducers(t *testing.T) {
+	src := "px:100+((til 16) mod 90);sz:1+((til 16) mod 64);idx:where sz>=8;pxi:100+(idx mod 90);szi:1+(idx mod 64);(+/(pxi*szi))+(+/(count idx)#2)+(+/10 xbar pxi)+count idx"
+	plan := buildQScriptPlan(src)
+	if plan.scriptPipeline == nil {
+		t.Fatalf("script pipeline descriptor missing")
+	}
+	d := plan.scriptPipeline
+	if d.kind != qScriptPipelineIndexExprSumCount {
+		t.Fatalf("pipeline kind = %q, want %q", d.kind, qScriptPipelineIndexExprSumCount)
+	}
+	if len(d.indexReducers) != 4 {
+		t.Fatalf("index reducer count = %d, want 4", len(d.indexReducers))
+	}
+	if got, want := d.shape(), "script-pipeline/index-expr-reduce/sum3-count/assignments"; got != want {
+		t.Fatalf("shape = %q, want %q", got, want)
+	}
+}
+
 func TestQScriptPipelinePlannerDescribesSequenceEdgeReduce(t *testing.T) {
 	src := "x:til 1024;r:17 rotate x;y:128 sublist reverse r;(+/y)+first y+last y"
 	plan := buildQScriptPlan(src)
@@ -1631,6 +1686,55 @@ func TestExecuteEvalPipelineDescriptorRestoresModuloScriptSubPlan(t *testing.T) 
 	if !seenReduce || seenGather {
 		t.Fatalf("descriptor script stats reduce=%v gather=%v all=%#v", seenReduce, seenGather, RuntimeKernelExecutionStats())
 	}
+}
+
+func TestExecuteEvalPipelineUsesIndexExprReducer(t *testing.T) {
+	ClearRuntimeKernelExecutionStats()
+	t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+	got, handled, err := ExecuteEvalPipeline("x:til 16;idx:where (x>=4) and x<8;pxi:10+(idx mod 5);szi:1+(idx mod 3);(+/(pxi*szi))+count idx")
+	if err != nil || !handled || got != int64(97) {
+		t.Fatalf("ExecuteEvalPipeline index expr = %#v,%v,%v; want 97,true,nil", got, handled, err)
+	}
+	for _, stat := range RuntimeKernelExecutionStats() {
+		if stat.Kernel == "ArrayIndexExprReducers" && stat.Outcome == "hit" && stat.Count > 0 {
+			return
+		}
+	}
+	t.Fatalf("missing ArrayIndexExprReducers hit: %#v", RuntimeKernelExecutionStats())
+}
+
+func TestExecuteEvalPipelineUsesIndexExprMultiReducers(t *testing.T) {
+	ClearRuntimeKernelExecutionStats()
+	t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+	got, handled, err := ExecuteEvalPipeline("x:til 16;idx:where x>=8;pxi:10+(idx mod 5);szi:1+(idx mod 3);(+/(pxi*szi))+(+/pxi)+count idx")
+	if err != nil || !handled || got != int64(301) {
+		t.Fatalf("ExecuteEvalPipeline index expr multi reducers = %#v,%v,%v; want 301,true,nil", got, handled, err)
+	}
+	for _, stat := range RuntimeKernelExecutionStats() {
+		if stat.Kernel == "ArrayIndexExprReducers" && stat.Shape == "index-expr-reduce/reducers/i64/3" && stat.Outcome == "hit" && stat.Count > 0 {
+			return
+		}
+	}
+	t.Fatalf("missing ArrayIndexExprReducers multi hit: %#v", RuntimeKernelExecutionStats())
+}
+
+func TestExecuteEvalPipelineUsesIndexExprComputedProjectionReducers(t *testing.T) {
+	ClearRuntimeKernelExecutionStats()
+	t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+	src := "px:100+((til 16) mod 90);sz:1+((til 16) mod 64);idx:where sz>=8;pxi:100+(idx mod 90);szi:1+(idx mod 64);(+/(pxi*szi))+(+/(count idx)#2)+(+/10 xbar pxi)+count idx"
+	got, handled, err := ExecuteEvalPipeline(src)
+	if err != nil || !handled || got != int64(13035) {
+		t.Fatalf("ExecuteEvalPipeline computed projection reducers = %#v,%v,%v; want 13035,true,nil", got, handled, err)
+	}
+	for _, stat := range RuntimeKernelExecutionStats() {
+		if stat.Kernel == "ArrayIndexExprReducers" && stat.Shape == "index-expr-reduce/reducers/i64/4" && stat.Outcome == "hit" && stat.Count > 0 {
+			return
+		}
+	}
+	t.Fatalf("missing ArrayIndexExprReducers computed projection hit: %#v", RuntimeKernelExecutionStats())
 }
 
 func TestEvalNumericReductionBundleRecordsTypedRuntimeKernel(t *testing.T) {

@@ -4068,6 +4068,49 @@ func TestTryTypedFbySumUsesComputedI64BucketGroups(t *testing.T) {
 	}
 }
 
+func TestTryTypedI64IndexExprSumCount(t *testing.T) {
+	leftMod := testI64IndexExpr(I64IndexExprMod, I64IndexExpr{Op: I64IndexExprIndex}, I64IndexExpr{Op: I64IndexExprConst, Value: 5})
+	left := testI64IndexExpr(I64IndexExprAdd, I64IndexExpr{Op: I64IndexExprConst, Value: 10}, leftMod)
+	rightMod := testI64IndexExpr(I64IndexExprMod, I64IndexExpr{Op: I64IndexExprIndex}, I64IndexExpr{Op: I64IndexExprConst, Value: 3})
+	right := testI64IndexExpr(I64IndexExprAdd, I64IndexExpr{Op: I64IndexExprConst, Value: 1}, rightMod)
+	expr := testI64IndexExpr(I64IndexExprMul, left, right)
+
+	got, handled, err := TryTypedI64IndexExprSumCount(NewI64([]int64{2, 4, 7}), expr, true)
+	if err != nil || !handled {
+		t.Fatalf("TryTypedI64IndexExprSumCount handled=%v err=%v; want true,nil", handled, err)
+	}
+	if got != int64(91) {
+		t.Fatalf("TryTypedI64IndexExprSumCount = %d, want 91", got)
+	}
+}
+
+func TestTryTypedI64IndexExprReducers(t *testing.T) {
+	mod5 := testI64IndexExpr(I64IndexExprMod, I64IndexExpr{Op: I64IndexExprIndex}, I64IndexExpr{Op: I64IndexExprConst, Value: 5})
+	px := testI64IndexExpr(I64IndexExprAdd, I64IndexExpr{Op: I64IndexExprConst, Value: 10}, mod5)
+	mod3 := testI64IndexExpr(I64IndexExprMod, I64IndexExpr{Op: I64IndexExprIndex}, I64IndexExpr{Op: I64IndexExprConst, Value: 3})
+	sz := testI64IndexExpr(I64IndexExprAdd, I64IndexExpr{Op: I64IndexExprConst, Value: 1}, mod3)
+	notional := testI64IndexExpr(I64IndexExprMul, px, sz)
+	bucket := testI64IndexExpr(I64IndexExprSub, px, I64IndexExpr{Op: I64IndexExprConst, Value: 10})
+	xbar := I64IndexExpr{Op: I64IndexExprXbar, Value: 5, Left: &px}
+
+	got, handled, err := TryTypedI64IndexExprReducers(NewI64([]int64{2, 4, 7}), []I64IndexExprReducer{
+		{Kind: I64IndexExprReducerSum, Expr: notional},
+		{Kind: I64IndexExprReducerSum, Expr: bucket},
+		{Kind: I64IndexExprReducerSum, Expr: xbar},
+		{Kind: I64IndexExprReducerCount},
+	})
+	if err != nil || !handled {
+		t.Fatalf("TryTypedI64IndexExprReducers handled=%v err=%v; want true,nil", handled, err)
+	}
+	if want := []int64{88, 8, 30, 3}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("TryTypedI64IndexExprReducers = %#v, want %#v", got, want)
+	}
+}
+
+func testI64IndexExpr(op I64IndexExprOp, left, right I64IndexExpr) I64IndexExpr {
+	return I64IndexExpr{Op: op, Left: &left, Right: &right}
+}
+
 func TestTryTypedAmendAddIndexesI64AccumulatesRepeatedIndexes(t *testing.T) {
 	amended, handled, err := TryTypedAmendAddIndexes(NewI64Range(0, 1, 6), []int{2, 4, 2}, NewI64([]int64{10, 40, 3}))
 	if err != nil || !handled {

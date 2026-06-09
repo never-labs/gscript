@@ -12,6 +12,38 @@ type typedKernelRegistry struct{}
 
 var typedKernels typedKernelRegistry
 
+type I64IndexExprOp uint8
+
+const (
+	I64IndexExprConst I64IndexExprOp = iota
+	I64IndexExprIndex
+	I64IndexExprAdd
+	I64IndexExprSub
+	I64IndexExprMul
+	I64IndexExprDiv
+	I64IndexExprMod
+	I64IndexExprXbar
+)
+
+type I64IndexExpr struct {
+	Op    I64IndexExprOp
+	Value int64
+	Left  *I64IndexExpr
+	Right *I64IndexExpr
+}
+
+type I64IndexExprReducerKind uint8
+
+const (
+	I64IndexExprReducerSum I64IndexExprReducerKind = iota
+	I64IndexExprReducerCount
+)
+
+type I64IndexExprReducer struct {
+	Kind I64IndexExprReducerKind
+	Expr I64IndexExpr
+}
+
 const (
 	NumericUnaryNeg     = "neg"
 	NumericUnaryAbs     = "abs"
@@ -3930,11 +3962,13 @@ func (typedKernelRegistry) NumericSum(array Array) (float64, int64, bool, error)
 	switch a := array.(type) {
 	case attributedArray:
 		return typedKernels.NumericSum(a.array)
+	case indexedArray:
+		return numericSumIndexed(a)
 	case tiledArray:
 		if sum, count, handled, err := numericSumTiled(a); handled || err != nil {
 			return sum, count, handled, err
 		}
-		return 0, 0, false, nil
+		return numericSumByAccess(a)
 	case columnArray[int8]:
 		return numericSumSlice(a.data)
 	case columnArray[int16]:
@@ -4011,8 +4045,52 @@ func (typedKernelRegistry) NumericSum(array Array) (float64, int64, bool, error)
 		}
 		return sum, count, true, nil
 	default:
+		return numericSumByAccess(array)
+	}
+}
+
+func numericSumByAccess(array Array) (float64, int64, bool, error) {
+	if array == nil || !isNumericArray(array) {
 		return 0, 0, false, nil
 	}
+	var sum float64
+	var count int64
+	for row := 0; row < array.Len(); row++ {
+		value, ok, err := typedKernels.NumericAt(array, row)
+		if err != nil {
+			return 0, 0, true, err
+		}
+		if !ok {
+			continue
+		}
+		sum += value
+		count++
+	}
+	return sum, count, true, nil
+}
+
+func numericSumIndexed(array indexedArray) (float64, int64, bool, error) {
+	if !isNumericArray(array.source) {
+		return 0, 0, false, nil
+	}
+	var sum float64
+	var count int64
+	for row := 0; row < array.len; row++ {
+		index, ok, err := i64IndexArrayAt(array.indexes, row)
+		if err != nil || !ok {
+			return 0, 0, ok, err
+		}
+		value, ok, err := typedKernels.NumericAt(array.source, index)
+		if err != nil {
+			return 0, 0, true, err
+		}
+		if !ok {
+			continue
+		}
+		sum += value
+		count++
+	}
+	return sum, count, true, nil
 }
 
 func numericSumTiled(array tiledArray) (float64, int64, bool, error) {
@@ -4402,6 +4480,145 @@ func TryTypedNumericSumCountWhereWithin(values, predicate Array, low, high any, 
 		return nil, 0, false, nil
 	}
 	return sum, count, true, err
+}
+
+func TryTypedI64IndexExprReducers(indexes Array, reducers []I64IndexExprReducer) ([]int64, bool, error) {
+	if indexes == nil {
+		return nil, true, fmt.Errorf("index expression indexes must be non-nil")
+	}
+	if indexes.Kind() != KindI64 {
+		return nil, true, fmt.Errorf("index expression indexes kind is %s, want %s", indexes.Kind(), KindI64)
+	}
+	if len(reducers) == 0 {
+		return nil, false, nil
+	}
+	for _, reducer := range reducers {
+		switch reducer.Kind {
+		case I64IndexExprReducerSum:
+			if !i64IndexExprValid(reducer.Expr) {
+				return nil, false, nil
+			}
+		case I64IndexExprReducerCount:
+		default:
+			return nil, false, nil
+		}
+	}
+	out := make([]int64, len(reducers))
+	if err := forEachTypedI64Index(indexes, int(^uint(0)>>1), func(index int) error {
+		for i, reducer := range reducers {
+			switch reducer.Kind {
+			case I64IndexExprReducerSum:
+				value, err := evalI64IndexExpr(reducer.Expr, int64(index))
+				if err != nil {
+					return err
+				}
+				out[i] += value
+			case I64IndexExprReducerCount:
+				out[i]++
+			}
+		}
+		return nil
+	}); err != nil {
+		return nil, true, err
+	}
+	return out, true, nil
+}
+
+func TryTypedI64IndexExprSumCount(indexes Array, expr I64IndexExpr, includeCount bool) (int64, bool, error) {
+	reducers := []I64IndexExprReducer{{Kind: I64IndexExprReducerSum, Expr: expr}}
+	if includeCount {
+		reducers = append(reducers, I64IndexExprReducer{Kind: I64IndexExprReducerCount})
+	}
+	values, handled, err := TryTypedI64IndexExprReducers(indexes, reducers)
+	if err != nil || !handled {
+		return 0, handled, err
+	}
+	var total int64
+	for _, value := range values {
+		total += value
+	}
+	return total, true, nil
+}
+
+func i64IndexExprValid(expr I64IndexExpr) bool {
+	switch expr.Op {
+	case I64IndexExprConst, I64IndexExprIndex:
+		return true
+	case I64IndexExprAdd, I64IndexExprSub, I64IndexExprMul, I64IndexExprDiv, I64IndexExprMod:
+		return expr.Left != nil && expr.Right != nil && i64IndexExprValid(*expr.Left) && i64IndexExprValid(*expr.Right)
+	case I64IndexExprXbar:
+		return expr.Value > 0 && expr.Left != nil && i64IndexExprValid(*expr.Left)
+	default:
+		return false
+	}
+}
+
+func evalI64IndexExpr(expr I64IndexExpr, index int64) (int64, error) {
+	switch expr.Op {
+	case I64IndexExprConst:
+		return expr.Value, nil
+	case I64IndexExprIndex:
+		return index, nil
+	case I64IndexExprAdd:
+		left, right, err := evalI64IndexExprOperands(expr, index)
+		if err != nil {
+			return 0, err
+		}
+		return left + right, nil
+	case I64IndexExprSub:
+		left, right, err := evalI64IndexExprOperands(expr, index)
+		if err != nil {
+			return 0, err
+		}
+		return left - right, nil
+	case I64IndexExprMul:
+		left, right, err := evalI64IndexExprOperands(expr, index)
+		if err != nil {
+			return 0, err
+		}
+		return left * right, nil
+	case I64IndexExprDiv:
+		left, right, err := evalI64IndexExprOperands(expr, index)
+		if err != nil {
+			return 0, err
+		}
+		if right == 0 {
+			return 0, fmt.Errorf("integer index expression divide by zero")
+		}
+		return left / right, nil
+	case I64IndexExprMod:
+		left, right, err := evalI64IndexExprOperands(expr, index)
+		if err != nil {
+			return 0, err
+		}
+		if right == 0 {
+			return 0, fmt.Errorf("integer index expression modulo by zero")
+		}
+		return left % right, nil
+	case I64IndexExprXbar:
+		value, err := evalI64IndexExpr(*expr.Left, index)
+		if err != nil {
+			return 0, err
+		}
+		if expr.Value <= 0 {
+			return 0, fmt.Errorf("integer index expression xbar width must be positive")
+		}
+		return floorInt64(value, expr.Value), nil
+	default:
+		return 0, fmt.Errorf("unsupported integer index expression op %d", expr.Op)
+	}
+}
+
+func evalI64IndexExprOperands(expr I64IndexExpr, index int64) (int64, int64, error) {
+	left, err := evalI64IndexExpr(*expr.Left, index)
+	if err != nil {
+		return 0, 0, err
+	}
+	right, err := evalI64IndexExpr(*expr.Right, index)
+	if err != nil {
+		return 0, 0, err
+	}
+	return left, right, nil
 }
 
 func typedNumericSumCountWherePredicate(values Array, pred rowPredicate) (any, int64, error) {
@@ -5724,7 +5941,7 @@ func (k typedKernelRegistry) NumericSumValue(array Array) (any, bool, error) {
 		if value, handled, err := numericSumTiledIntegerValue(a); handled || err != nil {
 			return value, handled, err
 		}
-		return nil, false, nil
+		return numericSumValueByAccess(a)
 	case columnArray[int8]:
 		return numericSumIntegerValue(a.data), true, nil
 	case columnArray[int16]:
@@ -5740,7 +5957,10 @@ func (k typedKernelRegistry) NumericSumValue(array Array) (any, bool, error) {
 	case i64XrankArray:
 		return i64XrankSum(a)
 	case i64ScalarDyadicArray:
-		return i64ScalarDyadicSum(a)
+		if value, handled, err := i64ScalarDyadicSum(a); err != nil || handled {
+			return value, handled, err
+		}
+		return numericSumValueByAccess(a)
 	case i64ScalarDyadicRunningSumArray:
 		return i64ScalarDyadicRunningSumSum(a)
 	case i64SparseAmendArray:
@@ -5818,8 +6038,41 @@ func (k typedKernelRegistry) NumericSumValue(array Array) (any, bool, error) {
 		}
 		return sumI, true, nil
 	default:
+		return numericSumValueByAccess(array)
+	}
+}
+
+func numericSumValueByAccess(array Array) (any, bool, error) {
+	if array == nil {
 		return nil, false, nil
 	}
+	if isIntegerArray(array) {
+		var total int64
+		for row := 0; row < array.Len(); row++ {
+			value, ok, err := integerArrayAt(array, row)
+			if err != nil {
+				return nil, true, err
+			}
+			if ok {
+				total += value
+			}
+		}
+		return total, true, nil
+	}
+	if isNumericArray(array) {
+		var total float64
+		for row := 0; row < array.Len(); row++ {
+			value, ok, err := typedKernels.NumericAt(array, row)
+			if err != nil {
+				return nil, true, err
+			}
+			if ok {
+				total += value
+			}
+		}
+		return total, true, nil
+	}
+	return nil, false, nil
 }
 
 func numericSumTiledIntegerValue(array tiledArray) (any, bool, error) {

@@ -785,6 +785,10 @@ func (a indexedArray) Gather(indexes []int) Array {
 	}
 }
 
+func (a indexedArray) ArrayMetadata() ArrayMetadata {
+	return ArrayMetadataOf(a.source).cloneWithRebuiltIndexes(a)
+}
+
 func (a i64RangeArray) Kind() Kind { return KindI64 }
 
 func (a i64RangeArray) Len() int { return a.len }
@@ -1917,7 +1921,12 @@ func Reverse(array Array) (Array, bool, error) {
 		}
 		return newI64SegmentArray(segments...), true, nil
 	default:
-		return nil, false, nil
+		length := array.Len()
+		return indexedArray{
+			source:  array,
+			indexes: i64RangeArray{start: int64(length - 1), step: -1, len: length},
+			len:     length,
+		}, true, nil
 	}
 }
 
@@ -2547,6 +2556,8 @@ func TryTypedWithinIndexesI64(array Array, low, high any, highClosed bool) (Arra
 	switch a := array.(type) {
 	case attributedArray:
 		return TryTypedWithinIndexesI64(a.array, low, high, highClosed)
+	case indexedArray:
+		return typedWithinIndexedIndexesI64(a, low, high, highClosed)
 	case i64RangeArray:
 		lowI, lowOK := coerceInt64Exact(low)
 		highI, highOK := coerceInt64Exact(high)
@@ -2597,6 +2608,8 @@ func TryTypedWithinIndexStatsI64(array Array, low, high any, highClosed bool) (c
 	switch a := array.(type) {
 	case attributedArray:
 		return TryTypedWithinIndexStatsI64(a.array, low, high, highClosed)
+	case indexedArray:
+		return typedWithinIndexedIndexStatsI64(a, low, high, highClosed)
 	case i64BucketArray:
 		return withinI64BucketIndexStats(a, low, high, highClosed)
 	case f64BucketArray:
@@ -2615,6 +2628,48 @@ func TryTypedWithinIndexStatsI64(array Array, low, high any, highClosed bool) (c
 		}
 		return int64(indexes.Len()), i64IndexArraySum(indexes), true, nil
 	}
+}
+
+func typedWithinIndexedIndexesI64(array indexedArray, low, high any, highClosed bool) (Array, bool, error) {
+	if array.len == 0 {
+		return i64RangeArray{len: 0}, true, nil
+	}
+	out := make([]int64, 0)
+	for row := 0; row < array.len; row++ {
+		value, ok := array.At(row)
+		if !ok {
+			return nil, true, fmt.Errorf("within indexed row %d out of range", row)
+		}
+		if typedWithinScalar(value, low, high, highClosed) {
+			out = append(out, int64(row))
+		}
+	}
+	return newI64Trusted(out), true, nil
+}
+
+func typedWithinIndexedIndexStatsI64(array indexedArray, low, high any, highClosed bool) (count, sum int64, handled bool, err error) {
+	for row := 0; row < array.len; row++ {
+		value, ok := array.At(row)
+		if !ok {
+			return 0, 0, true, fmt.Errorf("within indexed row %d out of range", row)
+		}
+		if typedWithinScalar(value, low, high, highClosed) {
+			count++
+			sum += int64(row)
+		}
+	}
+	return count, sum, true, nil
+}
+
+func typedWithinScalar(value, low, high any, highClosed bool) bool {
+	if IsNull(value) || IsNull(low) || IsNull(high) {
+		return false
+	}
+	if compare(value, low) < 0 {
+		return false
+	}
+	cmpHigh := compare(value, high)
+	return cmpHigh < 0 || (highClosed && cmpHigh == 0)
 }
 
 func withinI64BucketIndexStats(array i64BucketArray, low, high any, highClosed bool) (count, sum int64, handled bool, err error) {

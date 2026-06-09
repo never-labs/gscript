@@ -2030,6 +2030,22 @@ func TestTypedCompareIndexesAndNullMasks(t *testing.T) {
 	if err != nil || !handled || count != 4 || sum != 18 {
 		t.Fatalf("TryTypedWithinIndexStatsI64 range = count %d sum %d handled %v err %v; want 4,18,true,nil", count, sum, handled, err)
 	}
+	reversedDatesAny, handled, err := Reverse(NewDate([]Date{Date(1), Date(2), Date(3), Date(4)}))
+	if err != nil || !handled {
+		t.Fatalf("Reverse date column = %T,%v,%v; want handled", reversedDatesAny, handled, err)
+	}
+	reversedDates := reversedDatesAny.(Array)
+	indexArray, handled, err = TryTypedWithinIndexesI64(reversedDates, Date(2), Date(3), true)
+	if err != nil || !handled {
+		t.Fatalf("TryTypedWithinIndexesI64 indexed date = %T,%v,%v; want handled", indexArray, handled, err)
+	}
+	if got, want := indexArray.Values(), []any{int64(1), int64(2)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("TryTypedWithinIndexesI64 indexed date values = %v, want %v", got, want)
+	}
+	count, sum, handled, err = TryTypedWithinIndexStatsI64(reversedDates, Date(2), Date(3), true)
+	if err != nil || !handled || count != 2 || sum != 3 {
+		t.Fatalf("TryTypedWithinIndexStatsI64 indexed date = count %d sum %d handled %v err %v; want 2,3,true,nil", count, sum, handled, err)
+	}
 
 	encoded := NewEncodedSymbols([]Symbol{"AAPL", "MSFT", "AAPL", "NVDA"})
 	indexes, ok = typedKernels.CompareIndexes(encoded, OpEQ, "AAPL", nil)
@@ -3311,6 +3327,23 @@ func TestTypedNumericUnaryBinaryAndAggregates(t *testing.T) {
 	}
 	if want := int64(8192 * 8191 / 2); !ok || value != want {
 		t.Fatalf("TryTypedNumericSum range = %v, %v; want %d, true", value, ok, want)
+	}
+
+	nestedScaled, ok, err := TryTypedIntegerDyadic(OpMul, NewI64Range(0, 1, 16), int64(3))
+	if err != nil || !ok {
+		t.Fatalf("TryTypedIntegerDyadic scaled range = %T,%v,%v; want handled", nestedScaled, ok, err)
+	}
+	nestedAffine, ok, err := TryTypedIntegerDyadic(OpAdd, nestedScaled.(Array), int64(-7))
+	if err != nil || !ok {
+		t.Fatalf("TryTypedIntegerDyadic affine range = %T,%v,%v; want handled", nestedAffine, ok, err)
+	}
+	nestedMod, ok, err := TryTypedIntegerDyadic(OpMod, nestedAffine.(Array), int64(5))
+	if err != nil || !ok {
+		t.Fatalf("TryTypedIntegerDyadic nested mod = %T,%v,%v; want handled", nestedMod, ok, err)
+	}
+	value, ok, err = TryTypedNumericSum(nestedMod.(Array))
+	if err != nil || !ok || value != int64(33) {
+		t.Fatalf("TryTypedNumericSum nested scalar dyadic mod = %v,%v,%v; want 33,true,nil", value, ok, err)
 	}
 
 	value, ok, err = TryTypedNumericSumByI64Indexes(NewI64Range(0, 1, 8), NewI64([]int64{2, 4, 6}))
