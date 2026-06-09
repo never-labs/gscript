@@ -2616,6 +2616,34 @@ func TestTypedNumericUnaryBinaryAndAggregates(t *testing.T) {
 		t.Fatalf("TryTypedQNumericUnarySum floor = %v, %v; want 2, true", value, ok)
 	}
 
+	lazyFloat, ok, err := typedKernels.Dyadic(OpAdd, NewI64Range(0, 1, 4), float64(0.25))
+	if err != nil {
+		t.Fatalf("Dyadic range+float returned error: %v", err)
+	}
+	if !ok {
+		t.Fatal("Dyadic range+float did not match numeric range scalar")
+	}
+	if _, ok := lazyFloat.(f64RangeArray); !ok {
+		t.Fatalf("Dyadic range+float returned %T, want f64RangeArray", lazyFloat)
+	}
+	lazyFloor, ok, err := TryTypedQNumericUnary(NumericUnaryFloor, lazyFloat.(Array))
+	if err != nil {
+		t.Fatalf("TryTypedQNumericUnary floor lazy f64 range returned error: %v", err)
+	}
+	if !ok {
+		t.Fatal("TryTypedQNumericUnary floor lazy f64 range did not match")
+	}
+	if got, want := lazyFloor.Values(), []any{int64(0), int64(1), int64(2), int64(3)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("TryTypedQNumericUnary floor lazy f64 range = %v, want %v", got, want)
+	}
+	value, ok, err = TryTypedQNumericUnarySum(NumericUnaryCeiling, lazyFloat.(Array))
+	if err != nil {
+		t.Fatalf("TryTypedQNumericUnarySum ceiling lazy f64 range returned error: %v", err)
+	}
+	if !ok || value != int64(10) {
+		t.Fatalf("TryTypedQNumericUnarySum ceiling lazy f64 range = %v, %v; want 10, true", value, ok)
+	}
+
 	value, ok, err = TryTypedQNumericUnaryDyadicSum(NumericUnaryAbs, OpMul, int64(-1), NewI64([]int64{1, 2, 3}))
 	if err != nil {
 		t.Fatalf("TryTypedQNumericUnaryDyadicSum abs scalar*array returned error: %v", err)

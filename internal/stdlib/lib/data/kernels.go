@@ -1630,6 +1630,12 @@ func TryTypedQNumericUnary(op string, array Array) (Array, bool, error) {
 	switch a := array.(type) {
 	case attributedArray:
 		return TryTypedQNumericUnary(op, a.array)
+	case f64RangeArray:
+		return qNumericUnaryFloatArray(op, a)
+	case f64RunningSumArray:
+		return qNumericUnaryFloatArray(op, a)
+	case f64BucketArray:
+		return qNumericUnaryFloatArray(op, a)
 	case columnArray[float32]:
 		return qNumericUnaryFloatSlice(op, a.data)
 	case columnArray[float64]:
@@ -1653,6 +1659,12 @@ func TryTypedQNumericUnarySum(op string, array Array) (any, bool, error) {
 		if out, ok := qNumericUnarySumI64Range(op, a); ok {
 			return out, true, nil
 		}
+	case f64RangeArray:
+		return qNumericUnarySumFloatArray(op, a)
+	case f64RunningSumArray:
+		return qNumericUnarySumFloatArray(op, a)
+	case f64BucketArray:
+		return qNumericUnarySumFloatArray(op, a)
 	case columnArray[float32]:
 		return qNumericUnarySumFloatSlice(op, a.data)
 	case columnArray[float64]:
@@ -7701,6 +7713,60 @@ func qNumericUnaryFloatSlice[T floatScalar](op string, values []T) (Array, bool,
 	}
 }
 
+func qNumericUnaryFloatArray(op string, array Array) (Array, bool, error) {
+	switch op {
+	case NumericUnaryNeg, NumericUnaryAbs, NumericUnaryExp, NumericUnaryRecip:
+		out := make([]float64, array.Len())
+		for i := range out {
+			value, ok, err := numericAt(array, i)
+			if err != nil {
+				return nil, true, err
+			}
+			if !ok {
+				return nil, false, nil
+			}
+			switch op {
+			case NumericUnaryNeg:
+				out[i] = -value
+			case NumericUnaryAbs:
+				out[i] = math.Abs(value)
+			case NumericUnaryExp:
+				out[i] = math.Exp(value)
+			case NumericUnaryRecip:
+				out[i] = 1 / value
+			}
+		}
+		return newF64Trusted(out), true, nil
+	case NumericUnarySignum, NumericUnaryFloor, NumericUnaryCeiling:
+		out := make([]int64, array.Len())
+		for i := range out {
+			value, ok, err := numericAt(array, i)
+			if err != nil {
+				return nil, true, err
+			}
+			if !ok {
+				return nil, false, nil
+			}
+			switch op {
+			case NumericUnarySignum:
+				switch {
+				case value < 0:
+					out[i] = -1
+				case value > 0:
+					out[i] = 1
+				}
+			case NumericUnaryFloor:
+				out[i] = int64(math.Floor(value))
+			case NumericUnaryCeiling:
+				out[i] = int64(math.Ceil(value))
+			}
+		}
+		return newI64Trusted(out), true, nil
+	default:
+		return nil, false, nil
+	}
+}
+
 func qNumericUnarySumIntegerArray(op string, array Array) (any, bool, error) {
 	const minInt64 = -1 << 63
 	switch op {
@@ -7831,6 +7897,60 @@ func qNumericUnarySumFloatSlice[T floatScalar](op string, values []T) (any, bool
 		var sum int64
 		for _, value := range values {
 			sum += int64(math.Ceil(float64(value)))
+		}
+		return sum, true, nil
+	default:
+		return nil, false, nil
+	}
+}
+
+func qNumericUnarySumFloatArray(op string, array Array) (any, bool, error) {
+	switch op {
+	case NumericUnaryNeg, NumericUnaryAbs, NumericUnaryExp, NumericUnaryRecip:
+		var sum float64
+		for i := 0; i < array.Len(); i++ {
+			value, ok, err := numericAt(array, i)
+			if err != nil {
+				return nil, true, err
+			}
+			if !ok {
+				return nil, false, nil
+			}
+			switch op {
+			case NumericUnaryNeg:
+				sum -= value
+			case NumericUnaryAbs:
+				sum += math.Abs(value)
+			case NumericUnaryExp:
+				sum += math.Exp(value)
+			case NumericUnaryRecip:
+				sum += 1 / value
+			}
+		}
+		return sum, true, nil
+	case NumericUnarySignum, NumericUnaryFloor, NumericUnaryCeiling:
+		var sum int64
+		for i := 0; i < array.Len(); i++ {
+			value, ok, err := numericAt(array, i)
+			if err != nil {
+				return nil, true, err
+			}
+			if !ok {
+				return nil, false, nil
+			}
+			switch op {
+			case NumericUnarySignum:
+				switch {
+				case value < 0:
+					sum--
+				case value > 0:
+					sum++
+				}
+			case NumericUnaryFloor:
+				sum += int64(math.Floor(value))
+			case NumericUnaryCeiling:
+				sum += int64(math.Ceil(value))
+			}
 		}
 		return sum, true, nil
 	default:

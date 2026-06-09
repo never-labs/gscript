@@ -3060,7 +3060,8 @@ func qEvalVectorRuntimeFallbackReportForCases(tb testing.TB, eval *bind.GoFuncti
 			if stat.Outcome != "fallback" && stat.Outcome != "error" {
 				continue
 			}
-			for _, category := range categories {
+			statCategories := qEvalVectorRuntimeFallbackCategories(categories, stat)
+			for _, category := range statCategories {
 				key := qEvalVectorRuntimeFallbackKey{
 					category:      category,
 					pipelineShape: qEvalRuntimeStatField(stat.PipelineShape),
@@ -3074,6 +3075,20 @@ func qEvalVectorRuntimeFallbackReportForCases(tb testing.TB, eval *bind.GoFuncti
 	}
 	stdq.ClearRuntimeKernelExecutionStats()
 	return report
+}
+
+func qEvalVectorRuntimeFallbackCategories(categories []string, stat stdq.RuntimeKernelExecutionStat) []string {
+	if len(categories) != 1 || categories[0] != "uncategorized" {
+		return categories
+	}
+	shape := qEvalRuntimeStatField(stat.PipelineShape)
+	kernel := qEvalRuntimeStatField(stat.Kernel)
+	if strings.HasPrefix(shape, "vector_reduce") || strings.HasPrefix(shape, "vector_unary") ||
+		strings.HasPrefix(shape, "vector_map") || kernel == "ArraySum" ||
+		strings.HasPrefix(kernel, "ArrayNumeric") {
+		return []string{"vector_numeric"}
+	}
+	return categories
 }
 
 func qEvalVectorRuntimeFallbackReport(tb testing.TB, eval *bind.GoFunction, rows int) qEvalVectorRuntimeFallbackSummary {
