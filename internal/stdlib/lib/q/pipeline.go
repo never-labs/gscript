@@ -61,7 +61,16 @@ func (s *EvalState) qPipelinePlan(src string) qPipelinePlan {
 			return plan
 		}
 	}
+	if qPipelinePlanGlobalCacheable(src) {
+		if plan, ok := qGlobalPipelinePlanCacheProbe(src); ok {
+			s.rememberQPipelinePlan(src, plan)
+			return plan
+		}
+	}
 	plan := buildQPipelinePlan(src)
+	if qPipelinePlanGlobalCacheable(src) {
+		qGlobalPipelinePlanCacheStore(src, plan)
+	}
 	if s.pipelineCache == nil {
 		s.pipelineCache = make(map[string]qPipelinePlan, 32)
 	} else if len(s.pipelineCache) >= 512 {
@@ -69,6 +78,44 @@ func (s *EvalState) qPipelinePlan(src string) qPipelinePlan {
 	}
 	s.pipelineCache[src] = plan
 	return plan
+}
+
+func qPipelinePlanGlobalCacheable(src string) bool {
+	return EvalSourceCacheable(src)
+}
+
+func qGlobalPipelinePlanCacheProbe(src string) (qPipelinePlan, bool) {
+	qGlobalScriptPlanCacheMu.Lock()
+	plan, ok := qGlobalPipelinePlanCache[src]
+	if ok {
+		qGlobalScriptPlanStats.PipelineHits++
+	} else {
+		qGlobalScriptPlanStats.PipelineMisses++
+	}
+	qGlobalScriptPlanCacheMu.Unlock()
+	if !ok {
+		return qPipelinePlan{}, false
+	}
+	return cloneQPipelinePlan(plan), true
+}
+
+func qGlobalPipelinePlanCacheStore(src string, plan qPipelinePlan) {
+	if src == "" || plan.kind == qPipelineInvalid {
+		return
+	}
+	qGlobalScriptPlanCacheMu.Lock()
+	if _, ok := qGlobalPipelinePlanCache[src]; !ok {
+		qGlobalPipelinePlanCacheOrder = append(qGlobalPipelinePlanCacheOrder, src)
+	}
+	qGlobalPipelinePlanCache[src] = cloneQPipelinePlan(plan)
+	qGlobalScriptPlanStats.PipelineStores++
+	for len(qGlobalPipelinePlanCacheOrder) > qGlobalPipelinePlanCacheLimit {
+		evict := qGlobalPipelinePlanCacheOrder[0]
+		qGlobalPipelinePlanCacheOrder = qGlobalPipelinePlanCacheOrder[1:]
+		delete(qGlobalPipelinePlanCache, evict)
+		qGlobalScriptPlanStats.PipelineEvictions++
+	}
+	qGlobalScriptPlanCacheMu.Unlock()
 }
 
 func (s *EvalState) rememberQPipelinePlan(src string, plan qPipelinePlan) {

@@ -888,6 +888,53 @@ func TestEvalStateScriptPlanCachePreservesEnvironmentSemantics(t *testing.T) {
 	}
 }
 
+func TestEvalGlobalScriptPlanCachePreservesEnvironmentSemantics(t *testing.T) {
+	ClearEvalPlanCaches()
+	t.Cleanup(ClearEvalPlanCaches)
+
+	src := "x:a+1;y:x*2;y"
+	if got, err := EvalWithEnv(src, map[string]any{"a": int64(10)}); err != nil || got != int64(22) {
+		t.Fatalf("first EvalWithEnv returned %#v, %v; want 22,nil", got, err)
+	}
+	afterCold := EvalPlanCacheStatsSnapshot()
+	if afterCold.ScriptMisses == 0 || afterCold.ScriptEntries == 0 {
+		t.Fatalf("cold eval did not populate global script cache: %#v", afterCold)
+	}
+	if got, err := EvalWithEnv(src, map[string]any{"a": int64(20)}); err != nil || got != int64(42) {
+		t.Fatalf("warm EvalWithEnv returned %#v, %v; want 42,nil", got, err)
+	}
+	afterWarm := EvalPlanCacheStatsSnapshot()
+	if afterWarm.ScriptHits <= afterCold.ScriptHits {
+		t.Fatalf("warm eval did not hit global script cache: before=%#v after=%#v", afterCold, afterWarm)
+	}
+	if afterWarm.ScriptEntries != afterCold.ScriptEntries {
+		t.Fatalf("warm eval changed script cache entries: before=%#v after=%#v", afterCold, afterWarm)
+	}
+}
+
+func TestEvalGlobalPipelinePlanCachePreservesEnvironmentSemantics(t *testing.T) {
+	ClearEvalPlanCaches()
+	t.Cleanup(ClearEvalPlanCaches)
+
+	src := "+/v where v>threshold"
+	env1 := map[string]any{"v": data.NewI64([]int64{1, 2, 3, 4}), "threshold": int64(2)}
+	if got, err := EvalWithEnv(src, env1); err != nil || got != int64(7) {
+		t.Fatalf("first pipeline EvalWithEnv returned %#v, %v; want 7,nil", got, err)
+	}
+	afterCold := EvalPlanCacheStatsSnapshot()
+	if afterCold.PipelineMisses == 0 || afterCold.PipelineEntries == 0 {
+		t.Fatalf("cold eval did not populate global pipeline cache: %#v", afterCold)
+	}
+	env2 := map[string]any{"v": data.NewI64([]int64{10, 20, 30}), "threshold": int64(15)}
+	if got, err := EvalWithEnv(src, env2); err != nil || got != int64(50) {
+		t.Fatalf("warm pipeline EvalWithEnv returned %#v, %v; want 50,nil", got, err)
+	}
+	afterWarm := EvalPlanCacheStatsSnapshot()
+	if afterWarm.PipelineHits <= afterCold.PipelineHits {
+		t.Fatalf("warm eval did not hit global pipeline cache: before=%#v after=%#v", afterCold, afterWarm)
+	}
+}
+
 func TestEvalStatePipelinePlanCachePreservesEnvironmentSemantics(t *testing.T) {
 	ClearRuntimeKernelExecutionStats()
 	t.Cleanup(ClearRuntimeKernelExecutionStats)

@@ -519,6 +519,34 @@ type EvalState struct {
 	deferScanAssignments map[string]bool
 }
 
+const qGlobalScriptPlanCacheLimit = 512
+const qGlobalPipelinePlanCacheLimit = 512
+
+// EvalPlanCacheStats reports process-wide q.eval plan-cache observability.
+// The cached artifacts are schema-free q expression plans keyed only by the
+// normalized source text; executable mutable state is cloned before use.
+type EvalPlanCacheStats struct {
+	ScriptEntries     int
+	ScriptHits        uint64
+	ScriptMisses      uint64
+	ScriptStores      uint64
+	ScriptEvictions   uint64
+	PipelineEntries   int
+	PipelineHits      uint64
+	PipelineMisses    uint64
+	PipelineStores    uint64
+	PipelineEvictions uint64
+}
+
+var (
+	qGlobalScriptPlanCacheMu      sync.Mutex
+	qGlobalScriptPlanCache        = make(map[string]qScriptPlan)
+	qGlobalScriptPlanCacheOrder   []string
+	qGlobalPipelinePlanCache      = make(map[string]qPipelinePlan)
+	qGlobalPipelinePlanCacheOrder []string
+	qGlobalScriptPlanStats        EvalPlanCacheStats
+)
+
 func NewEvalState(env map[string]any) *EvalState {
 	return &EvalState{env: cloneEnv(env), namespace: "."}
 }
@@ -669,19 +697,99 @@ type qScriptStatement struct {
 }
 
 func (s *EvalState) qScriptPlan(src string) qScriptPlan {
+	src = strings.TrimSpace(src)
 	if s.scriptCache != nil {
 		if plan, ok := s.scriptCache[src]; ok {
 			return plan
 		}
 	}
+	if qScriptPlanGlobalCacheable(src) {
+		if plan, ok := qGlobalScriptPlanCacheProbe(src); ok {
+			s.rememberQScriptPlan(src, plan)
+			return plan
+		}
+	}
 	plan := buildQScriptPlan(src)
+	if qScriptPlanGlobalCacheable(src) {
+		qGlobalScriptPlanCacheStore(src, plan)
+	}
+	s.rememberQScriptPlan(src, plan)
+	return plan
+}
+
+func (s *EvalState) rememberQScriptPlan(src string, plan qScriptPlan) {
 	if s.scriptCache == nil {
 		s.scriptCache = make(map[string]qScriptPlan, 16)
 	} else if len(s.scriptCache) >= 256 {
 		s.scriptCache = make(map[string]qScriptPlan, 16)
 	}
 	s.scriptCache[src] = plan
-	return plan
+}
+
+func qScriptPlanGlobalCacheable(src string) bool {
+	return EvalSourceCacheable(src)
+}
+
+func qGlobalScriptPlanCacheProbe(src string) (qScriptPlan, bool) {
+	qGlobalScriptPlanCacheMu.Lock()
+	plan, ok := qGlobalScriptPlanCache[src]
+	if ok {
+		qGlobalScriptPlanStats.ScriptHits++
+	} else {
+		qGlobalScriptPlanStats.ScriptMisses++
+	}
+	qGlobalScriptPlanCacheMu.Unlock()
+	if !ok {
+		return qScriptPlan{}, false
+	}
+	return cloneQScriptPlan(plan), true
+}
+
+func qGlobalScriptPlanCacheStore(src string, plan qScriptPlan) {
+	if src == "" {
+		return
+	}
+	qGlobalScriptPlanCacheMu.Lock()
+	if _, ok := qGlobalScriptPlanCache[src]; !ok {
+		qGlobalScriptPlanCacheOrder = append(qGlobalScriptPlanCacheOrder, src)
+	}
+	qGlobalScriptPlanCache[src] = cloneQScriptPlan(plan)
+	qGlobalScriptPlanStats.ScriptStores++
+	for len(qGlobalScriptPlanCacheOrder) > qGlobalScriptPlanCacheLimit {
+		evict := qGlobalScriptPlanCacheOrder[0]
+		qGlobalScriptPlanCacheOrder = qGlobalScriptPlanCacheOrder[1:]
+		delete(qGlobalScriptPlanCache, evict)
+		qGlobalScriptPlanStats.ScriptEvictions++
+	}
+	qGlobalScriptPlanCacheMu.Unlock()
+}
+
+// EvalPlanCacheStatsSnapshot returns a stable snapshot of process-wide q.eval
+// parse/plan cache state.
+func EvalPlanCacheStatsSnapshot() EvalPlanCacheStats {
+	qGlobalScriptPlanCacheMu.Lock()
+	stats := qGlobalScriptPlanStats
+	stats.ScriptEntries = len(qGlobalScriptPlanCache)
+	stats.PipelineEntries = len(qGlobalPipelinePlanCache)
+	qGlobalScriptPlanCacheMu.Unlock()
+	return stats
+}
+
+// EvalPlanCacheLimit returns the aggregate bounded capacity of q.eval plan
+// caches exposed through bind's q.cache_stats table.
+func EvalPlanCacheLimit() int {
+	return qGlobalScriptPlanCacheLimit + qGlobalPipelinePlanCacheLimit
+}
+
+// ClearEvalPlanCaches resets process-wide q.eval parse/plan caches.
+func ClearEvalPlanCaches() {
+	qGlobalScriptPlanCacheMu.Lock()
+	qGlobalScriptPlanCache = make(map[string]qScriptPlan)
+	qGlobalScriptPlanCacheOrder = nil
+	qGlobalPipelinePlanCache = make(map[string]qPipelinePlan)
+	qGlobalPipelinePlanCacheOrder = nil
+	qGlobalScriptPlanStats = EvalPlanCacheStats{}
+	qGlobalScriptPlanCacheMu.Unlock()
 }
 
 func buildQScriptPlan(src string) qScriptPlan {
@@ -709,6 +817,87 @@ func buildQScriptPlan(src string) qScriptPlan {
 	}
 	pipeline, _ := buildQScriptPipelineDescriptor(statements)
 	return qScriptPlan{statements: statements, deferScanCandidates: deferScanCandidates, scriptPipeline: pipeline}
+}
+
+func cloneQScriptPlan(plan qScriptPlan) qScriptPlan {
+	out := qScriptPlan{
+		deferScanCandidates: plan.deferScanCandidates,
+		scriptPipeline:      cloneQScriptPipelineDescriptor(plan.scriptPipeline),
+	}
+	if len(plan.statements) > 0 {
+		out.statements = make([]qScriptStatement, len(plan.statements))
+		for i := range plan.statements {
+			out.statements[i] = cloneQScriptStatement(plan.statements[i])
+		}
+	}
+	return out
+}
+
+func cloneQScriptStatement(stmt qScriptStatement) qScriptStatement {
+	stmt.bindingPlan = cloneQScriptBindingPlan(stmt.bindingPlan)
+	return stmt
+}
+
+func cloneQScriptPipelineDescriptor(in *qScriptPipelineDescriptor) *qScriptPipelineDescriptor {
+	if in == nil {
+		return nil
+	}
+	out := *in
+	out.valuePlan = cloneQScriptBindingPlan(in.valuePlan)
+	out.indexPlan = cloneQScriptBindingPlan(in.indexPlan)
+	out.maskPlan = cloneQScriptBindingPlan(in.maskPlan)
+	out.terminalPlan = cloneQPipelinePlan(in.terminalPlan)
+	if in.moduloMaskPlan != nil {
+		plan := cloneQPipelinePlan(*in.moduloMaskPlan)
+		out.moduloMaskPlan = &plan
+	}
+	if len(in.assignments) > 0 {
+		out.assignments = make([]qScriptPipelineAssignment, len(in.assignments))
+		for i := range in.assignments {
+			out.assignments[i] = in.assignments[i]
+			out.assignments[i].binding = cloneQScriptBindingPlan(in.assignments[i].binding)
+		}
+	}
+	return &out
+}
+
+func cloneQPipelinePlan(in qPipelinePlan) qPipelinePlan {
+	out := in
+	out.valuePlan = cloneQScriptBindingPlan(in.valuePlan)
+	out.indexPlan = cloneQScriptBindingPlan(in.indexPlan)
+	out.maskPlan = cloneQScriptBindingPlan(in.maskPlan)
+	out.leftPlan = cloneQScriptBindingPlan(in.leftPlan)
+	out.rightPlan = cloneQScriptBindingPlan(in.rightPlan)
+	out.modPlan = cloneQScriptBindingPlan(in.modPlan)
+	out.modulusPlan = cloneQScriptBindingPlan(in.modulusPlan)
+	out.modTargetPlan = cloneQScriptBindingPlan(in.modTargetPlan)
+	out.reductionPlan = cloneQScriptBindingPlan(in.reductionPlan)
+	if in.moduloMaskPlan != nil {
+		plan := cloneQPipelinePlan(*in.moduloMaskPlan)
+		out.moduloMaskPlan = &plan
+	}
+	return out
+}
+
+func cloneQScriptBindingPlan(in qScriptBindingPlan) qScriptBindingPlan {
+	out := in
+	out.cached = false
+	out.cache = nil
+	if len(in.items) > 0 {
+		out.items = make([]qScriptBindingPlan, len(in.items))
+		for i := range in.items {
+			out.items[i] = cloneQScriptBindingPlan(in.items[i])
+		}
+	}
+	if in.left != nil {
+		left := cloneQScriptBindingPlan(*in.left)
+		out.left = &left
+	}
+	if in.right != nil {
+		right := cloneQScriptBindingPlan(*in.right)
+		out.right = &right
+	}
+	return out
 }
 
 func qScriptBindingPlanTextEligible(src string) bool {

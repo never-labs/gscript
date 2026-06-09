@@ -3624,7 +3624,7 @@ func qCacheStatsTable() *Table {
 	queryKernelShapeStats := qQueryKernelSupportCacheShapeStatsLocked()
 	qQueryKernelSupportCacheMu.Unlock()
 
-	rows := NewAppendArrayTable(8)
+	rows := NewAppendArrayTable(10)
 	rows.RawSetInt(1, TableValue(qCacheStatsRow(
 		"qsql_template",
 		templateEntries,
@@ -3688,6 +3688,27 @@ func qCacheStatsTable() *Table {
 	)
 	evalStatsRow.RawSetString("stats_domain", StringValue(qStatsDomainEvalCache))
 	rows.RawSetInt(9, TableValue(evalStatsRow))
+	evalPlanStats := stdq.EvalPlanCacheStatsSnapshot()
+	evalPlanEntries := evalPlanStats.ScriptEntries + evalPlanStats.PipelineEntries
+	evalPlanHits := evalPlanStats.ScriptHits + evalPlanStats.PipelineHits
+	evalPlanMisses := evalPlanStats.ScriptMisses + evalPlanStats.PipelineMisses
+	evalPlanEvictions := evalPlanStats.ScriptEvictions + evalPlanStats.PipelineEvictions
+	evalPlanStatsRow := qCacheStatsRow(
+		"q_eval_plan",
+		evalPlanEntries,
+		qUint64Int(evalPlanHits),
+		qUint64Int(evalPlanMisses),
+		qUint64Int(evalPlanEvictions),
+		stdq.EvalPlanCacheLimit(),
+	)
+	evalPlanStatsRow.RawSetString("stats_domain", StringValue(qStatsDomainEvalCache))
+	evalPlanStatsRow.RawSetString("script_entries", IntValue(int64(evalPlanStats.ScriptEntries)))
+	evalPlanStatsRow.RawSetString("pipeline_entries", IntValue(int64(evalPlanStats.PipelineEntries)))
+	evalPlanStatsRow.RawSetString("script_hits", qUint64IntValue(evalPlanStats.ScriptHits))
+	evalPlanStatsRow.RawSetString("script_misses", qUint64IntValue(evalPlanStats.ScriptMisses))
+	evalPlanStatsRow.RawSetString("pipeline_hits", qUint64IntValue(evalPlanStats.PipelineHits))
+	evalPlanStatsRow.RawSetString("pipeline_misses", qUint64IntValue(evalPlanStats.PipelineMisses))
+	rows.RawSetInt(10, TableValue(evalPlanStatsRow))
 	return rows
 }
 
@@ -5939,6 +5960,7 @@ func qClearCaches() {
 	qFallbackCounters = qFallbackStats{}
 	qFallbackStatsMu.Unlock()
 
+	stdq.ClearEvalPlanCaches()
 	stdq.ClearRuntimeKernelExecutionStats()
 }
 
