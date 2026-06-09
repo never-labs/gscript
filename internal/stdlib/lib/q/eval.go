@@ -677,9 +677,7 @@ func buildQScriptPlan(src string) qScriptPlan {
 			stmt.assign = name
 			stmt.rhs = rhs
 			stmt.valueExpr = parseCachedValueExpr(rhs)
-			if qScriptBindingPlanTextEligible(rhs) {
-				stmt.bindingPlan = buildQScriptBindingPlanForRHS(rhs, stmt.valueExpr)
-			}
+			stmt.bindingPlan = buildQScriptWarmBindingPlan(rhs, stmt.valueExpr)
 			if _, _, ok := parseDeferredScan(rhs); ok {
 				deferScanCandidates = true
 			}
@@ -705,6 +703,18 @@ func qScriptBindingPlanTextEligible(src string) bool {
 			return false
 		}
 	}
+	if strings.HasPrefix(src, "-0") {
+		return false
+	}
+	if _, ok := lookupUnaryVerb(src); ok {
+		return false
+	}
+	if _, ok := lookupDyadicVerbFunc(src); ok {
+		return false
+	}
+	if _, ok := findAdverb(src); ok {
+		return false
+	}
 	return true
 }
 
@@ -722,18 +732,31 @@ func parseCachedValueExpr(src string) Expr {
 	return expr
 }
 
+func buildQScriptWarmBindingPlan(src string, expr Expr) qScriptBindingPlan {
+	if plan := buildQScriptRangeBindingPlan(src); plan.kind != qScriptBindingInvalid {
+		return plan
+	}
+	if expr != nil {
+		return buildQScriptBindingPlanForRHS(src, expr)
+	}
+	if qScriptBindingPlanTextEligible(src) {
+		return buildQScriptBindingPlanForRHS(src, nil)
+	}
+	return buildQScriptPrefixBindingPlan(src)
+}
+
 func cachedValueExprTextEligible(src string) bool {
 	src = strings.TrimSpace(src)
 	if src == "" {
 		return true
 	}
-	if strings.ContainsAny(src, "`'\\/#$\"") {
+	if strings.ContainsAny(src, "`'\\/$\"") {
 		return false
 	}
 	if strings.Contains(src, "0W") || strings.Contains(src, "0w") {
 		return false
 	}
-	if !isQArithmeticText(src) {
+	if !isQArithmeticText(src) && !strings.Contains(src, "#") && !looksLikeTemporalVector(src) {
 		return false
 	}
 	if !isQIdentStart(src[0]) {
@@ -777,6 +800,9 @@ func cachedValueExprEligible(expr Expr) bool {
 		case "and", "or", "in", "within", "=", "<", ">", "<=", ">=", "<>", "~":
 			return false
 		}
+		if x.Op != "#" && cachedValueExprContainsTemporal(x) {
+			return false
+		}
 		return cachedValueExprEligible(x.Left) && cachedValueExprEligible(x.Right)
 	case Call:
 		switch strings.ToLower(x.Func) {
@@ -785,7 +811,12 @@ func cachedValueExprEligible(expr Expr) bool {
 		}
 		return cachedValueExprEligible(x.Arg)
 	case Vector:
-		return false
+		for _, item := range x.Items {
+			if !cachedValueExprEligible(item) {
+				return false
+			}
+		}
+		return true
 	case DictExpr:
 		return cachedValueExprEligible(x.Keys) && cachedValueExprEligible(x.Values)
 	case IndexExpr:
@@ -805,6 +836,39 @@ func cachedValueExprEligible(expr Expr) bool {
 	default:
 		return true
 	}
+}
+
+func cachedValueExprContainsTemporal(expr Expr) bool {
+	switch x := expr.(type) {
+	case Temporal, TypedNull:
+		return true
+	case Binary:
+		return cachedValueExprContainsTemporal(x.Left) || cachedValueExprContainsTemporal(x.Right)
+	case Call:
+		return cachedValueExprContainsTemporal(x.Arg)
+	case Vector:
+		for _, item := range x.Items {
+			if cachedValueExprContainsTemporal(item) {
+				return true
+			}
+		}
+	case DictExpr:
+		return cachedValueExprContainsTemporal(x.Keys) || cachedValueExprContainsTemporal(x.Values)
+	case IndexExpr:
+		return cachedValueExprContainsTemporal(x.Expr) || cachedValueExprContainsTemporal(x.Index)
+	case Flip:
+		for _, column := range x.Keys {
+			if cachedValueExprContainsTemporal(column.Expr) {
+				return true
+			}
+		}
+		for _, column := range x.Columns {
+			if cachedValueExprContainsTemporal(column.Expr) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (s *EvalState) evalScriptStatement(stmt qScriptStatement) (any, error) {
@@ -2135,6 +2199,12 @@ func evalValueBinary(op string, left, right any) (any, error) {
 		return applyCompositeDyadic(op, left, right)
 	case "~":
 		return matchValue(left, right), nil
+	case "#":
+		n, ok := integerValue(left)
+		if !ok || int64(int(n)) != n {
+			return nil, fmt.Errorf("# left operand must be an integer count")
+		}
+		return take(int(n), right)
 	}
 	if op == "-" && isNumericZero(left) {
 		if value, ok := negateTypedNumeric(right); ok {

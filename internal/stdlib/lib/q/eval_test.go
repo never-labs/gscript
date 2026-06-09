@@ -657,6 +657,41 @@ func TestEvalParsedValueExprUsesScriptBindings(t *testing.T) {
 	assertEvalValue(t, "x:10;y:20;x<y", true)
 }
 
+func TestEvalScriptWarmBindingsKeepFastAndSemanticPathsSeparate(t *testing.T) {
+	state := NewEvalState(nil)
+
+	rangePlan := state.qScriptPlan("x:10*til 8;probe:til 80;+/x bin probe")
+	if len(rangePlan.statements) != 3 {
+		t.Fatalf("range script statements = %d, want 3", len(rangePlan.statements))
+	}
+	if rangePlan.statements[0].bindingPlan.kind == qScriptBindingInvalid ||
+		rangePlan.statements[1].bindingPlan.kind == qScriptBindingInvalid {
+		t.Fatalf("range assignments missing warm bindings: %#v", rangePlan.statements)
+	}
+	assertStateEvalValue(t, state, "x:10*til 8;probe:til 80;+/x bin probe", int64(280))
+	assertStateEvalValue(t, state, "x:10*til 8;probe:til 80;+/x bin probe", int64(280))
+
+	takePlan := state.qScriptPlan("dates:9#2026.06.06 2026.06.07 2026.06.08;count where dates>=2026.06.07")
+	if len(takePlan.statements) != 2 || takePlan.statements[0].bindingPlan.kind == qScriptBindingInvalid {
+		t.Fatalf("temporal take assignment missing warm binding: %#v", takePlan.statements)
+	}
+	assertStateEvalValue(t, state, "dates:9#2026.06.06 2026.06.07 2026.06.08;count where dates>=2026.06.07", int64(6))
+
+	for _, src := range []string{
+		"`sym$`AAPL`MSFT",
+		"`s#10 20 30",
+		"-0D00:01:00",
+	} {
+		plan := state.qScriptPlan(src)
+		if len(plan.statements) != 1 {
+			t.Fatalf("%q statements = %d, want 1", src, len(plan.statements))
+		}
+		if plan.statements[0].bindingPlan.kind != qScriptBindingInvalid {
+			t.Fatalf("%q should stay on semantic string path, got warm binding %#v", src, plan.statements[0].bindingPlan)
+		}
+	}
+}
+
 func TestEvalLogicalDyadicSymbols(t *testing.T) {
 	assertEvalArray(t, "1 0 1 & 1 1 0", data.KindBool, []any{true, false, false})
 	assertEvalArray(t, "1 0 1 | 0 1 0", data.KindBool, []any{true, true, true})

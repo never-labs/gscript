@@ -59,11 +59,25 @@ func buildQScriptBindingPlan(expr Expr) qScriptBindingPlan {
 		return qScriptBindingPlan{kind: qScriptBindingName, name: x.Name}
 	case Vector:
 		items := make([]qScriptBindingPlan, len(x.Items))
+		literals := make([]any, len(x.Items))
+		allLiterals := true
 		for i, item := range x.Items {
 			items[i] = buildQScriptBindingPlan(item)
 			if items[i].kind == qScriptBindingInvalid {
 				return qScriptBindingPlan{}
 			}
+			if items[i].kind != qScriptBindingLiteral {
+				allLiterals = false
+				continue
+			}
+			literals[i] = items[i].literal
+		}
+		if allLiterals {
+			value, err := evalValueVector(literals)
+			if err != nil {
+				return qScriptBindingPlan{}
+			}
+			return qScriptBindingPlan{kind: qScriptBindingLiteral, literal: value}
 		}
 		return qScriptBindingPlan{kind: qScriptBindingVector, items: items}
 	case Call:
@@ -136,6 +150,50 @@ func buildQScriptPrefixBindingPlan(src string) qScriptBindingPlan {
 		return qScriptBindingPlan{kind: qScriptBindingUnary, op: "where", left: &argPlan}
 	}
 	return qScriptBindingPlan{}
+}
+
+func buildQScriptRangeBindingPlan(src string) qScriptBindingPlan {
+	src = strings.TrimSpace(src)
+	if src == "" {
+		return qScriptBindingPlan{}
+	}
+	if plan := buildQScriptPrefixBindingPlan(src); plan.kind != qScriptBindingInvalid {
+		return plan
+	}
+	left, right, ok := splitTopLevelOperator(src, "*")
+	if !ok {
+		return qScriptBindingPlan{}
+	}
+	if til := buildQScriptPrefixBindingPlan(right); til.kind != qScriptBindingInvalid {
+		if scalar := buildQScriptScalarLiteralBindingPlan(left); scalar.kind != qScriptBindingInvalid {
+			return qScriptBindingBinaryPlan("*", scalar, til)
+		}
+	}
+	if til := buildQScriptPrefixBindingPlan(left); til.kind != qScriptBindingInvalid {
+		if scalar := buildQScriptScalarLiteralBindingPlan(right); scalar.kind != qScriptBindingInvalid {
+			return qScriptBindingBinaryPlan("*", til, scalar)
+		}
+	}
+	return qScriptBindingPlan{}
+}
+
+func buildQScriptScalarLiteralBindingPlan(src string) qScriptBindingPlan {
+	expr, ok, err := parseValueExpr(strings.TrimSpace(src))
+	if err != nil || !ok {
+		return qScriptBindingPlan{}
+	}
+	plan := buildQScriptBindingPlan(expr)
+	if plan.kind != qScriptBindingLiteral {
+		return qScriptBindingPlan{}
+	}
+	if _, ok := integerValue(plan.literal); !ok {
+		return qScriptBindingPlan{}
+	}
+	return plan
+}
+
+func qScriptBindingBinaryPlan(op string, left, right qScriptBindingPlan) qScriptBindingPlan {
+	return qScriptBindingPlan{kind: qScriptBindingBinary, op: op, left: &left, right: &right}
 }
 
 func (s *EvalState) evalQScriptBindingPlan(plan *qScriptBindingPlan) (any, bool, error) {
@@ -233,6 +291,14 @@ func (s *EvalState) evalQScriptBinaryBinding(plan *qScriptBindingPlan) (any, boo
 	right, handled, err := s.evalQScriptBindingPlan(plan.right)
 	if err != nil || !handled {
 		return nil, handled, err
+	}
+	if plan.op == "#" {
+		n, ok := integerValue(left)
+		if !ok || int64(int(n)) != n {
+			return nil, true, fmt.Errorf("# left operand must be an integer count")
+		}
+		out, err := take(int(n), right)
+		return out, true, err
 	}
 	if plan.op == "and" || plan.op == "or" {
 		if out, handled, err := data.TryTypedBoolLogical(plan.op, left, right); err != nil || handled {

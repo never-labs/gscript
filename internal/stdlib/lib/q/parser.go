@@ -1176,6 +1176,8 @@ func precedence(op string) int {
 		return 10
 	case "*", "/", "%":
 		return 30
+	case "#":
+		return 25
 	case "+", "-":
 		return 20
 	case "=", "<", ">", "<=", ">=", "<>":
