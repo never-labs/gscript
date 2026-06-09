@@ -39,6 +39,8 @@ func TestQGapValidationBooleanVectorLiterals(t *testing.T) {
 	assertEvalArray(t, "0 1b", data.KindBool, []any{false, true})
 	assertEvalArray(t, "1 0 1b", data.KindBool, []any{true, false, true})
 	assertEvalArray(t, "where 101b", data.KindI64, []any{int64(0), int64(2)})
+	assertEvalArray(t, "m:1 0 1b;where m", data.KindI64, []any{int64(0), int64(2)})
+	assertEvalArray(t, "{where x}[101b]", data.KindI64, []any{int64(0), int64(2)})
 }
 
 func TestQGapValidationReshapeMatrixAndFlip(t *testing.T) {
@@ -79,4 +81,30 @@ func TestQGapValidationReshapeMatrixAndFlip(t *testing.T) {
 		data.NewF64([]float64{1, 0}),
 		data.NewF64([]float64{0, 1}),
 	})
+}
+
+func TestQGapValidationApplyIndexReshapeMatrixCompositions(t *testing.T) {
+	assertEvalValue(t, "m:2 3#til 6;(+/(m@1))+(m . 0 2)", int64(14))
+	assertEvalValue(t, "m:2 3#til 6;t:flip m;(+/(t . 2))+count t", int64(10))
+	assertEvalValue(t, "d:`a`b!(10;2 2#1 2 3 4);d . (`b;1;0)", int64(3))
+	assertEvalValue(t, ".[{(+/raze x)+x . 1 2};enlist 2 3#til 6]", int64(20))
+	assertEvalArray(t, "flip 3 2#1 2 3", data.KindAny, []any{
+		data.NewI64([]int64{1, 3, 2}),
+		data.NewI64([]int64{2, 1, 3}),
+	})
+	assertEvalValue(t, "m:2 3#1 2 3 4;s:+/raze flip m;s+m . 1 1", int64(14))
+}
+
+func TestQGapValidationStringAndListVerbCompositions(t *testing.T) {
+	assertEvalValue(t, `f:{trim x};f["  AAPL  "]`, "AAPL")
+	assertEvalValue(t, "sym:`AAPL;\",\" sv (string sym;\"MSFT\";upper trim \" nvda \")", "AAPL,MSFT,NVDA")
+	assertEvalArray(t, `"," vs ("," sv ("AAPL";"MSFT";"NVDA"))`, data.KindString, []any{"AAPL", "MSFT", "NVDA"})
+	assertEvalArray(t, `where 1<"banana" ss "an"`, data.KindI64, []any{int64(1)})
+	assertEvalValue(t, `s:" a-b-c ";trim s ssr ("-";":")`, "a:b:c")
+	assertEvalValue(t, `ssr["," sv ("AAPL";"MSFT");",";"|"]`, "AAPL|MSFT")
+
+	assertEvalArray(t, "raze cut[0 2;10 20 30 40]", data.KindI64, []any{int64(10), int64(20), int64(30), int64(40)})
+	assertEvalArray(t, "raze 0 2 cut 10 20 30 40", data.KindI64, []any{int64(10), int64(20), int64(30), int64(40)})
+	assertEvalArray(t, "reverse sublist[1 3;10 20 30 40 50]", data.KindI64, []any{int64(40), int64(30), int64(20)})
+	assertEvalValue(t, "count (1 2 cross `a`b)[where 1010b]", int64(2))
 }
