@@ -3481,6 +3481,10 @@ func TryTypedQNumericUnary(op string, array Array) (Array, bool, error) {
 	switch a := array.(type) {
 	case attributedArray:
 		return TryTypedQNumericUnary(op, a.array)
+	case nullableArray:
+		if qNumericUnaryReturnsFloat(op) {
+			return numericUnaryNullable(op, a.data)
+		}
 	case f64RangeArray:
 		return qNumericUnaryFloatArray(op, a)
 	case f64RunningSumArray:
@@ -3493,6 +3497,9 @@ func TryTypedQNumericUnary(op string, array Array) (Array, bool, error) {
 		return qNumericUnaryFloatSlice(op, a.data)
 	}
 	if !isDenseIntegerArray(array) {
+		if qNumericUnaryReturnsFloat(op) && isNumericArray(array) {
+			return qNumericUnaryFloatArray(op, array)
+		}
 		return nil, false, nil
 	}
 	return qNumericUnaryIntegerArray(op, array)
@@ -3522,6 +3529,9 @@ func TryTypedQNumericUnarySum(op string, array Array) (any, bool, error) {
 		return qNumericUnarySumFloatSlice(op, a.data)
 	}
 	if !isDenseIntegerArray(array) {
+		if qNumericUnaryReturnsFloat(op) && isNumericArray(array) {
+			return qNumericUnarySumFloatArray(op, array)
+		}
 		return nil, false, nil
 	}
 	return qNumericUnarySumIntegerArray(op, array)
@@ -10701,6 +10711,15 @@ func qNumericUnaryFloatArray(op string, array Array) (Array, bool, error) {
 	}
 }
 
+func qNumericUnaryReturnsFloat(op string) bool {
+	switch op {
+	case NumericUnarySqrt, NumericUnaryLog, NumericUnaryExp, NumericUnarySin, NumericUnaryCos, NumericUnaryTan, NumericUnaryAsin, NumericUnaryAcos, NumericUnaryAtan, NumericUnaryRecip:
+		return true
+	default:
+		return false
+	}
+}
+
 func qNumericUnarySumIntegerArray(op string, array Array) (any, bool, error) {
 	const minInt64 = -1 << 63
 	switch op {
@@ -10789,16 +10808,14 @@ func qNumericUnarySumFloatSlice[T floatScalar](op string, values []T) (any, bool
 			sum += math.Abs(float64(value))
 		}
 		return sum, true, nil
-	case NumericUnaryExp:
+	case NumericUnarySqrt, NumericUnaryLog, NumericUnaryExp, NumericUnarySin, NumericUnaryCos, NumericUnaryTan, NumericUnaryAsin, NumericUnaryAcos, NumericUnaryAtan, NumericUnaryRecip:
 		var sum float64
 		for _, value := range values {
-			sum += math.Exp(float64(value))
-		}
-		return sum, true, nil
-	case NumericUnaryRecip:
-		var sum float64
-		for _, value := range values {
-			sum += 1 / float64(value)
+			out, err := applyNumericUnaryFloat(op, float64(value))
+			if err != nil {
+				return nil, true, err
+			}
+			sum += out
 		}
 		return sum, true, nil
 	case NumericUnarySignum:
@@ -10831,7 +10848,7 @@ func qNumericUnarySumFloatSlice[T floatScalar](op string, values []T) (any, bool
 
 func qNumericUnarySumFloatArray(op string, array Array) (any, bool, error) {
 	switch op {
-	case NumericUnaryNeg, NumericUnaryAbs, NumericUnaryExp, NumericUnaryRecip:
+	case NumericUnaryNeg, NumericUnaryAbs, NumericUnarySqrt, NumericUnaryLog, NumericUnaryExp, NumericUnarySin, NumericUnaryCos, NumericUnaryTan, NumericUnaryAsin, NumericUnaryAcos, NumericUnaryAtan, NumericUnaryRecip:
 		var sum float64
 		for i := 0; i < array.Len(); i++ {
 			value, ok, err := numericAt(array, i)
@@ -10846,10 +10863,12 @@ func qNumericUnarySumFloatArray(op string, array Array) (any, bool, error) {
 				sum -= value
 			case NumericUnaryAbs:
 				sum += math.Abs(value)
-			case NumericUnaryExp:
-				sum += math.Exp(value)
-			case NumericUnaryRecip:
-				sum += 1 / value
+			default:
+				out, err := applyNumericUnaryFloat(op, value)
+				if err != nil {
+					return nil, true, err
+				}
+				sum += out
 			}
 		}
 		return sum, true, nil
@@ -10885,7 +10904,7 @@ func qNumericUnarySumFloatArray(op string, array Array) (any, bool, error) {
 
 func qNumericUnaryTiledSumReturnsFloat(op string, source Array) bool {
 	switch op {
-	case NumericUnaryExp, NumericUnaryRecip:
+	case NumericUnarySqrt, NumericUnaryLog, NumericUnaryExp, NumericUnarySin, NumericUnaryCos, NumericUnaryTan, NumericUnaryAsin, NumericUnaryAcos, NumericUnaryAtan, NumericUnaryRecip:
 		return true
 	case NumericUnaryNeg, NumericUnaryAbs:
 		return !isDenseIntegerArray(source)
@@ -10921,10 +10940,12 @@ func qNumericUnaryFloatSumWindow(op string, array Array, start, count int) (floa
 			sum -= value
 		case NumericUnaryAbs:
 			sum += math.Abs(value)
-		case NumericUnaryExp:
-			sum += math.Exp(value)
-		case NumericUnaryRecip:
-			sum += 1 / value
+		case NumericUnarySqrt, NumericUnaryLog, NumericUnaryExp, NumericUnarySin, NumericUnaryCos, NumericUnaryTan, NumericUnaryAsin, NumericUnaryAcos, NumericUnaryAtan, NumericUnaryRecip:
+			out, err := applyNumericUnaryFloat(op, value)
+			if err != nil {
+				return 0, true, err
+			}
+			sum += out
 		default:
 			return 0, false, nil
 		}

@@ -4354,6 +4354,47 @@ func TestEvalDyadicFloatReduceUsesTypedPipeline(t *testing.T) {
 	}
 }
 
+func TestEvalTranscendentalUnarySumsUseTypedRuntime(t *testing.T) {
+	tests := []struct {
+		expr string
+		want float64
+	}{
+		{expr: "+/sqrt 1 4 9 16", want: 10},
+		{expr: "+/log 1 2.718281828459045 7.38905609893065", want: 3},
+		{expr: "+/sin 0 1.5707963267948966 3.141592653589793", want: 1},
+		{expr: "+/cos 0 1.5707963267948966 3.141592653589793", want: 0},
+		{expr: "+/tan 0 0.25 0.5", want: math.Tan(0) + math.Tan(0.25) + math.Tan(0.5)},
+		{expr: "+/asin -0.5 0 0.5", want: 0},
+		{expr: "+/acos -0.5 0 0.5", want: math.Acos(-0.5) + math.Acos(0) + math.Acos(0.5)},
+		{expr: "+/atan -1 0 1", want: 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.expr, func(t *testing.T) {
+			ClearRuntimeKernelExecutionStats()
+			got, err := Eval(tt.expr)
+			if err != nil {
+				t.Fatalf("Eval(%q) returned error: %v", tt.expr, err)
+			}
+			value, ok := got.(float64)
+			if !ok || math.Abs(value-tt.want) > 1e-12 {
+				t.Fatalf("Eval(%q) = %#v (%T), want %.17g", tt.expr, got, got, tt.want)
+			}
+			seen := false
+			for _, stat := range RuntimeKernelExecutionStats() {
+				if stat.Outcome == "fallback" || stat.Outcome == "error" {
+					t.Fatalf("unexpected unary math reduce fallback/error: %#v stats=%#v", stat, RuntimeKernelExecutionStats())
+				}
+				if stat.Kernel == "ArrayNumericUnarySum" && stat.Outcome == "hit" {
+					seen = true
+				}
+			}
+			if !seen {
+				t.Fatalf("missing ArrayNumericUnarySum hit: %#v", RuntimeKernelExecutionStats())
+			}
+		})
+	}
+}
+
 func TestEvalFusesDyadicFloatMathSumDescriptor(t *testing.T) {
 	tests := []struct {
 		expr  string

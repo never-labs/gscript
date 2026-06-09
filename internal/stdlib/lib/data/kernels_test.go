@@ -2613,6 +2613,45 @@ func TestTypedNumericUnaryBinaryAndAggregates(t *testing.T) {
 		t.Fatalf("TryTypedQNumericUnary floor values = %v, want %v", got, want)
 	}
 
+	transcendentalSums := []struct {
+		op     string
+		values []float64
+		fn     func(float64) float64
+	}{
+		{op: NumericUnarySqrt, values: []float64{1, 4, 9, 16}, fn: math.Sqrt},
+		{op: NumericUnaryLog, values: []float64{1, math.E, math.E * math.E}, fn: math.Log},
+		{op: NumericUnarySin, values: []float64{0, math.Pi / 2, math.Pi}, fn: math.Sin},
+		{op: NumericUnaryCos, values: []float64{0, math.Pi / 2, math.Pi}, fn: math.Cos},
+		{op: NumericUnaryTan, values: []float64{0, 0.25, 0.5}, fn: math.Tan},
+		{op: NumericUnaryAsin, values: []float64{-0.5, 0, 0.5}, fn: math.Asin},
+		{op: NumericUnaryAcos, values: []float64{-0.5, 0, 0.5}, fn: math.Acos},
+		{op: NumericUnaryAtan, values: []float64{-1, 0, 1}, fn: math.Atan},
+	}
+	for _, tt := range transcendentalSums {
+		t.Run("transcendental_sum_"+tt.op, func(t *testing.T) {
+			base := NewF64(tt.values)
+			indexed := indexedArray{source: base, indexes: NewI64([]int64{int64(len(tt.values) - 1), 0, 1}), len: 3}
+			tiled := tiledArray{source: base, start: 1, len: len(tt.values)*2 + 1}
+			for name, array := range map[string]Array{"base": base, "indexed": indexed, "tiled": tiled} {
+				got, ok, err := TryTypedQNumericUnarySum(tt.op, array)
+				if err != nil || !ok {
+					t.Fatalf("%s TryTypedQNumericUnarySum(%s) = %#v,%v,%v; want handled", name, tt.op, got, ok, err)
+				}
+				var want float64
+				for i := 0; i < array.Len(); i++ {
+					value, ok, err := numericAt(array, i)
+					if err != nil || !ok {
+						t.Fatalf("%s numericAt row %d = %v,%v,%v", name, i, value, ok, err)
+					}
+					want += tt.fn(value)
+				}
+				if math.Abs(got.(float64)-want) > 1e-12 {
+					t.Fatalf("%s TryTypedQNumericUnarySum(%s) = %.17g, want %.17g", name, tt.op, got.(float64), want)
+				}
+			}
+		})
+	}
+
 	tiledInts, err := TakeRepeat(NewI64([]int64{-2, 0, 3}), 10)
 	if err != nil {
 		t.Fatalf("Take tiled ints returned error: %v", err)
