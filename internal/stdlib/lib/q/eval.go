@@ -2380,6 +2380,7 @@ func (s *EvalState) eval(src string) (any, error) {
 		{"mmax", mmax},
 		{"xprev", xprev},
 		{"xrank", xrank},
+		{"mmu", matrixMultiplyValue},
 		{"xcols", xcols},
 		{"xkey", xkey},
 		{"xgroup", xgroup},
@@ -2451,15 +2452,23 @@ func (s *EvalState) eval(src string) (any, error) {
 			}
 			return attributeVector(marker, v)
 		}
-		n, err := parseTakeCount(strings.TrimSpace(src[:hash]))
-		if err != nil {
-			return nil, err
-		}
+		leftSrc := strings.TrimSpace(src[:hash])
 		v, err := s.eval(strings.TrimSpace(src[hash+1:]))
 		if err != nil {
 			return nil, err
 		}
-		return take(n, v)
+		leftValue, err := s.eval(leftSrc)
+		if err != nil {
+			return nil, err
+		}
+		if _, ok := leftValue.(data.Array); ok {
+			return reshapeValue(leftValue, v)
+		}
+		n, ok := integerValue(leftValue)
+		if !ok || int64(int(n)) != n {
+			return nil, fmt.Errorf("# left operand must be an integer count")
+		}
+		return take(int(n), v)
 	}
 	if underscore := findTopLevel(src, "_"); underscore >= 0 {
 		left, err := s.eval(strings.TrimSpace(src[:underscore]))
@@ -2536,6 +2545,13 @@ func (s *EvalState) eval(src string) (any, error) {
 	}
 	if out, handled, err := s.tryEvalFirstLastDyadic(src); err != nil || handled {
 		return out, err
+	}
+	if strings.HasPrefix(src, "flip ") {
+		v, err := s.eval(strings.TrimSpace(src[len("flip "):]))
+		if err != nil {
+			return nil, err
+		}
+		return flip(v)
 	}
 	if idx, op, ok := findDyadic(src); ok {
 		left, err := s.eval(strings.TrimSpace(src[:idx]))
@@ -2762,6 +2778,9 @@ func evalValueBinary(op string, left, right any) (any, error) {
 	case "~":
 		return matchValue(left, right), nil
 	case "#":
+		if _, ok := left.(data.Array); ok {
+			return reshapeValue(left, right)
+		}
 		n, ok := integerValue(left)
 		if !ok || int64(int(n)) != n {
 			return nil, fmt.Errorf("# left operand must be an integer count")
@@ -5979,6 +5998,8 @@ func lookupDyadicVerbFunc(verb string) (func(any, any) (any, error), bool) {
 		return xdesc, true
 	case "rotate":
 		return rotateValue, true
+	case "mmu":
+		return matrixMultiplyValue, true
 	case "wavg":
 		return wavg, true
 	case "within":
@@ -8777,17 +8798,23 @@ func keyedTable(keys any, values any) (data.KeyedFrame, bool, error) {
 	return keyed, true, nil
 }
 
-func flip(v any) (data.Frame, error) {
+func flip(v any) (any, error) {
+	if matrix, ok, err := qMatrixValue(v); ok || err != nil {
+		if err != nil {
+			return nil, err
+		}
+		return data.TransposeMatrix(matrix)
+	}
 	if _, ok := v.(data.KeyedFrame); ok {
-		return data.Frame{}, fmt.Errorf("flip expects a plain dictionary, got keyed table")
+		return nil, fmt.Errorf("flip expects a plain dictionary, got keyed table")
 	}
 	d, ok := v.(EvalDict)
 	if !ok {
-		return data.Frame{}, fmt.Errorf("flip expects a dictionary")
+		return nil, fmt.Errorf("flip expects a dictionary")
 	}
 	keys, err := dictSymbolKeys(d)
 	if err != nil {
-		return data.Frame{}, fmt.Errorf("flip expects symbol column names: %w", err)
+		return nil, fmt.Errorf("flip expects symbol column names: %w", err)
 	}
 	values := make(map[data.Symbol]any, len(d.Keys))
 	for i, key := range keys {
@@ -8795,7 +8822,7 @@ func flip(v any) (data.Frame, error) {
 	}
 	rows, _, err := flipRowCountFromDict(keys, values)
 	if err != nil {
-		return data.Frame{}, err
+		return nil, err
 	}
 	cols := make([]data.Column, 0, len(keys))
 	for _, name := range keys {
@@ -8810,6 +8837,116 @@ func flip(v any) (data.Frame, error) {
 		cols = append(cols, data.Column{Name: name, Data: array})
 	}
 	return data.NewFrame(cols...)
+}
+
+func reshapeValue(shapeValue, value any) (any, error) {
+	shape, err := qReshapeShape(shapeValue)
+	if err != nil {
+		return nil, err
+	}
+	var source data.Array
+	switch x := value.(type) {
+	case data.Array:
+		source = x
+	case string:
+		chars := make([]string, 0, len(x))
+		for _, r := range x {
+			chars = append(chars, string(r))
+		}
+		source = data.NewString(chars)
+	default:
+		source = inferQArray([]any{x}, qKindOfValue(x))
+	}
+	return data.ReshapeArray(shape, source)
+}
+
+func matrixMultiplyValue(left, right any) (any, error) {
+	leftMatrix, ok, err := qMatrixValue(left)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, fmt.Errorf("mmu left operand must be a matrix")
+	}
+	rightMatrix, ok, err := qMatrixValue(right)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, fmt.Errorf("mmu right operand must be a matrix")
+	}
+	return data.MatrixMultiplyNumeric(leftMatrix, rightMatrix)
+}
+
+func qReshapeShape(value any) ([]int, error) {
+	array, ok := value.(data.Array)
+	if !ok {
+		n, ok := integerValue(value)
+		if !ok || int64(int(n)) != n {
+			return nil, fmt.Errorf("# left operand must be an integer count")
+		}
+		return []int{int(n)}, nil
+	}
+	if array.Len() == 0 {
+		return nil, fmt.Errorf("reshape expects at least one dimension")
+	}
+	out := make([]int, array.Len())
+	for i := 0; i < array.Len(); i++ {
+		item, ok := array.At(i)
+		if !ok {
+			return nil, fmt.Errorf("reshape dimension row %d out of range", i)
+		}
+		n, ok := integerValue(item)
+		if !ok || int64(int(n)) != n {
+			return nil, fmt.Errorf("reshape dimension %d must be an integer", i)
+		}
+		if n < 0 {
+			return nil, fmt.Errorf("reshape dimension %d must be non-negative", i)
+		}
+		out[i] = int(n)
+	}
+	return out, nil
+}
+
+func qMatrixValue(value any) (data.Matrix, bool, error) {
+	if matrix, ok := value.(data.Matrix); ok {
+		return matrix, true, nil
+	}
+	outer, ok := value.(data.Array)
+	if !ok {
+		return nil, false, nil
+	}
+	rows := outer.Len()
+	if rows == 0 {
+		return nil, false, nil
+	}
+	var cols int
+	flat := make([]any, 0)
+	for row := 0; row < rows; row++ {
+		item, ok := outer.At(row)
+		if !ok {
+			return nil, true, fmt.Errorf("matrix row %d out of range", row)
+		}
+		rowArray, ok := item.(data.Array)
+		if !ok {
+			return nil, false, nil
+		}
+		if row == 0 {
+			cols = rowArray.Len()
+		} else if rowArray.Len() != cols {
+			return nil, true, fmt.Errorf("matrix row %d length %d does not match %d", row, rowArray.Len(), cols)
+		}
+		flat = append(flat, rowArray.Values()...)
+	}
+	reshaped, err := data.ReshapeArray([]int{rows, cols}, inferQArray(flat))
+	if err != nil {
+		return nil, true, err
+	}
+	matrix, ok := reshaped.(data.Matrix)
+	if !ok {
+		return nil, true, fmt.Errorf("matrix reshape did not produce matrix")
+	}
+	return matrix, true, nil
 }
 
 func flipRowCount(v any) (rows int, cols int, err error) {

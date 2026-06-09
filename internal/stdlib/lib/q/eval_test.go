@@ -2724,6 +2724,28 @@ func TestEvalCountSumSumsTakeWhereAndPlusAdverbs(t *testing.T) {
 	})
 	assertEvalArray(t, "take 0 10 20 30", data.KindI64, []any{})
 	assertEvalArray(t, "4#1", data.KindI64, []any{int64(1), int64(1), int64(1), int64(1)})
+	assertEvalArray(t, "2 3#1 2 3 4 5 6", data.KindAny, []any{
+		data.NewI64([]int64{1, 2, 3}),
+		data.NewI64([]int64{4, 5, 6}),
+	})
+	assertEvalArray(t, "2 3#1 2 3 4", data.KindAny, []any{
+		data.NewI64([]int64{1, 2, 3}),
+		data.NewI64([]int64{4, 1, 2}),
+	})
+	assertEvalArray(t, "flip 2 3#1 2 3 4 5 6", data.KindAny, []any{
+		data.NewI64([]int64{1, 4}),
+		data.NewI64([]int64{2, 5}),
+		data.NewI64([]int64{3, 6}),
+	})
+	assertEvalArray(t, "flip (1 2 3;4 5 6)", data.KindAny, []any{
+		data.NewI64([]int64{1, 4}),
+		data.NewI64([]int64{2, 5}),
+		data.NewI64([]int64{3, 6}),
+	})
+	assertEvalArray(t, "(2 3#1 2 3 4 5 6) mmu 3 2#10 20 30 40 50 60", data.KindAny, []any{
+		data.NewF64([]float64{220, 280}),
+		data.NewF64([]float64{490, 640}),
+	})
 	assertEvalArray(t, "take 3 `AAPL", data.KindSymbol, []any{data.Symbol("AAPL"), data.Symbol("AAPL"), data.Symbol("AAPL")})
 	assertEvalValue(t, `take 5 "ab"`, "ababa")
 	assertEvalValue(t, `take -5 "ab"`, "babab")

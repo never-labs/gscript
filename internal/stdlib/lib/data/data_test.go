@@ -6851,3 +6851,52 @@ func BenchmarkFilterIndexesEncodedSymbolCompare(b *testing.B) {
 		}
 	}
 }
+
+func TestMatrixReshapeTransposeAndMultiply(t *testing.T) {
+	reshaped, err := ReshapeArray([]int{2, 3}, NewI64([]int64{1, 2, 3, 4, 5, 6}))
+	if err != nil {
+		t.Fatalf("ReshapeArray returned error: %v", err)
+	}
+	matrix, ok := reshaped.(Matrix)
+	if !ok {
+		t.Fatalf("ReshapeArray = %T, want Matrix", reshaped)
+	}
+	if got, want := matrix.Shape(), []int{2, 3}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("matrix shape = %#v, want %#v", got, want)
+	}
+	if got, ok := matrix.Cell(1, 2); !ok || got != int64(6) {
+		t.Fatalf("matrix cell 1,2 = %#v ok %v, want 6", got, ok)
+	}
+	row, ok := matrix.RowArray(0)
+	if !ok || !reflect.DeepEqual(row.Values(), []any{int64(1), int64(2), int64(3)}) {
+		t.Fatalf("matrix row 0 = %#v ok %v", row, ok)
+	}
+
+	transposed, err := TransposeMatrix(matrix)
+	if err != nil {
+		t.Fatalf("TransposeMatrix returned error: %v", err)
+	}
+	tm := transposed.(Matrix)
+	if got, want := tm.Shape(), []int{3, 2}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("transpose shape = %#v, want %#v", got, want)
+	}
+	if got, ok := tm.Cell(2, 1); !ok || got != int64(6) {
+		t.Fatalf("transpose cell 2,1 = %#v ok %v, want 6", got, ok)
+	}
+
+	right, err := ReshapeArray([]int{3, 2}, NewI64([]int64{10, 20, 30, 40, 50, 60}))
+	if err != nil {
+		t.Fatalf("right reshape returned error: %v", err)
+	}
+	product, err := MatrixMultiplyNumeric(matrix, right.(Matrix))
+	if err != nil {
+		t.Fatalf("MatrixMultiplyNumeric returned error: %v", err)
+	}
+	pm := product.(Matrix)
+	if got, want := pm.Shape(), []int{2, 2}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("product shape = %#v, want %#v", got, want)
+	}
+	if got, ok := pm.Cell(1, 1); !ok || got != 640.0 {
+		t.Fatalf("product cell 1,1 = %#v ok %v, want 640", got, ok)
+	}
+}
