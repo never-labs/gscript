@@ -487,6 +487,14 @@ type i64SegmentArray struct {
 	len      int
 }
 
+type i64PeriodicIndexArray struct {
+	period       int64
+	residues     []int64
+	tailResidues []int64
+	fullCycles   int64
+	len          int
+}
+
 type i64ProductArray struct {
 	left  i64RangeArray
 	right i64RangeArray
@@ -854,6 +862,96 @@ func (a i64SegmentArray) gatherRange(indexes []int) (Array, bool) {
 		current, ok := a.i64At(row)
 		if !ok {
 			panic(fmt.Sprintf("data segment gather index %d out of range", row))
+		}
+		if current-prev != step {
+			return nil, false
+		}
+		prev = current
+	}
+	return i64RangeArray{start: first, step: step, len: len(indexes)}, true
+}
+
+func (a i64PeriodicIndexArray) Kind() Kind { return KindI64 }
+
+func (a i64PeriodicIndexArray) Len() int { return a.len }
+
+func (a i64PeriodicIndexArray) At(row int) (any, bool) {
+	value, ok := a.i64At(row)
+	if !ok {
+		return nil, false
+	}
+	return value, true
+}
+
+func (a i64PeriodicIndexArray) i64At(row int) (int64, bool) {
+	if row < 0 || row >= a.len || a.period <= 0 || len(a.residues) == 0 {
+		return 0, false
+	}
+	fullLen := int(a.fullCycles) * len(a.residues)
+	if row < fullLen {
+		cycle := row / len(a.residues)
+		offset := row % len(a.residues)
+		return int64(cycle)*a.period + a.residues[offset], true
+	}
+	tailRow := row - fullLen
+	if tailRow < 0 || tailRow >= len(a.tailResidues) {
+		return 0, false
+	}
+	return a.fullCycles*a.period + a.tailResidues[tailRow], true
+}
+
+func (a i64PeriodicIndexArray) Values() []any {
+	out := make([]any, a.len)
+	for row := range out {
+		value, ok := a.i64At(row)
+		if !ok {
+			panic(fmt.Sprintf("data periodic index row %d out of range", row))
+		}
+		out[row] = value
+	}
+	return out
+}
+
+func (a i64PeriodicIndexArray) Gather(indexes []int) Array {
+	if gathered, ok := a.gatherRange(indexes); ok {
+		return gathered
+	}
+	out := make([]int64, len(indexes))
+	for i, row := range indexes {
+		value, ok := a.i64At(row)
+		if !ok {
+			panic(fmt.Sprintf("data periodic index gather row %d out of range", row))
+		}
+		out[i] = value
+	}
+	return newI64Trusted(out)
+}
+
+func (a i64PeriodicIndexArray) gatherRange(indexes []int) (Array, bool) {
+	switch len(indexes) {
+	case 0:
+		return i64RangeArray{len: 0}, true
+	case 1:
+		value, ok := a.i64At(indexes[0])
+		if !ok {
+			panic(fmt.Sprintf("data periodic index gather row %d out of range", indexes[0]))
+		}
+		return i64RangeArray{start: value, step: 1, len: 1}, true
+	}
+	first, ok := a.i64At(indexes[0])
+	if !ok {
+		panic(fmt.Sprintf("data periodic index gather row %d out of range", indexes[0]))
+	}
+	second, ok := a.i64At(indexes[1])
+	if !ok {
+		panic(fmt.Sprintf("data periodic index gather row %d out of range", indexes[1]))
+	}
+	step := second - first
+	prev := second
+	for _, row := range indexes[2:] {
+		current, ok := a.i64At(row)
+		if !ok {
+			panic(fmt.Sprintf("data periodic index gather row %d out of range", row))
 		}
 		if current-prev != step {
 			return nil, false
@@ -1611,6 +1709,8 @@ func typedWhereMaskIndexArray(mask Array) (Array, bool, error) {
 		return typedWhereMaskIndexArray(a.array)
 	case i64RangeCompareMask:
 		return i64RangeCompareMaskIndexArray(a)
+	case i64ScalarDyadicCompareMask:
+		return i64ScalarDyadicCompareMaskIndexArray(a)
 	case boolLogicalMask:
 		return boolLogicalMaskIndexArray(a)
 	default:
@@ -1619,6 +1719,9 @@ func typedWhereMaskIndexArray(mask Array) (Array, bool, error) {
 }
 
 func boolLogicalMaskIndexArray(mask boolLogicalMask) (Array, bool, error) {
+	if out, ok := boolLogicalModuloCompareMaskIndexArray(mask); ok {
+		return out, true, nil
+	}
 	if mask.op != "and" || mask.leftIsScalar || mask.rightIsScalar {
 		return nil, false, nil
 	}
@@ -1647,6 +1750,164 @@ func i64RangeCompareMaskIndexArray(mask i64RangeCompareMask) (Array, bool, error
 		return nil, false, nil
 	}
 	return i64RangeIntervalIndexArray(mask.values, low, high), true, nil
+}
+
+func i64ScalarDyadicCompareMaskIndexArray(mask i64ScalarDyadicCompareMask) (Array, bool, error) {
+	plan, ok := i64ScalarDyadicCompareModuloPlan(mask)
+	if !ok {
+		return nil, false, nil
+	}
+	return i64ModuloComparePlanIndexArray(plan), true, nil
+}
+
+func i64ModuloComparePlanIndexArray(plan i64ModuloComparePlan) Array {
+	if plan.length <= 0 {
+		return i64RangeArray{len: 0}
+	}
+	if plan.op == OpEQ {
+		return i64ModuloCompareEqualIndexArray(plan, plan.scalar)
+	}
+	count, ok := plan.trueCount()
+	if !ok || count <= 0 {
+		return i64RangeArray{len: 0}
+	}
+	if count == int64(plan.length) {
+		return i64RangeArray{start: 0, step: 1, len: plan.length}
+	}
+	if plan.op == OpNE {
+		return i64ModuloCompareNotEqualIndexArray(plan, plan.scalar)
+	}
+	if plan.modulus <= 65536 {
+		residues := make([]int64, 0)
+		for row := int64(0); row < plan.modulus; row++ {
+			if plan.valueAtRow(int(row)) {
+				residues = append(residues, row)
+			}
+		}
+		return newI64PeriodicIndexArray(plan.modulus, residues, plan.length)
+	}
+	return i64ModuloComparePlanIndexArrayByRuns(plan)
+}
+
+func i64ModuloComparePlanIndexArrayByRuns(plan i64ModuloComparePlan) Array {
+	segments := make([]i64RangeArray, 0)
+	for row := 0; row < plan.length; {
+		if !plan.valueAtRow(row) {
+			row++
+			continue
+		}
+		start := row
+		row++
+		for row < plan.length && plan.valueAtRow(row) {
+			row++
+		}
+		segments = append(segments, i64RangeArray{start: int64(start), step: 1, len: row - start})
+	}
+	return newI64SegmentArray(segments...)
+}
+
+func i64ModuloCompareEqualIndexArray(plan i64ModuloComparePlan, target int64) Array {
+	if target < 0 || target >= plan.modulus || plan.length <= 0 {
+		return i64RangeArray{len: 0}
+	}
+	first := qPositiveMod(target-plan.startResidue, plan.modulus)
+	if first >= int64(plan.length) {
+		return i64RangeArray{len: 0}
+	}
+	length := int((int64(plan.length)-first-1)/plan.modulus) + 1
+	return i64RangeArray{start: first, step: plan.modulus, len: length}
+}
+
+func i64ModuloCompareNotEqualIndexArray(plan i64ModuloComparePlan, target int64) Array {
+	if plan.modulus <= 65536 {
+		excluded := i64ModuloCompareEqualIndexArray(i64ModuloComparePlan{
+			startResidue: plan.startResidue,
+			modulus:      plan.modulus,
+			length:       int(plan.modulus),
+			op:           OpEQ,
+			scalar:       target,
+		}, target)
+		excludedRange, ok := excluded.(i64RangeArray)
+		if !ok || excludedRange.len == 0 {
+			return i64RangeArray{start: 0, step: 1, len: plan.length}
+		}
+		residues := make([]int64, 0, int(plan.modulus)-1)
+		excludedRow := excludedRange.start
+		for row := int64(0); row < plan.modulus; row++ {
+			if row != excludedRow {
+				residues = append(residues, row)
+			}
+		}
+		return newI64PeriodicIndexArray(plan.modulus, residues, plan.length)
+	}
+	equalIndexes := i64ModuloCompareEqualIndexArray(plan, target)
+	equalRange, ok := equalIndexes.(i64RangeArray)
+	if !ok || equalRange.len == 0 {
+		return i64RangeArray{start: 0, step: 1, len: plan.length}
+	}
+	segments := make([]i64RangeArray, 0, equalRange.len+1)
+	next := int64(0)
+	for i := 0; i < equalRange.len; i++ {
+		row := equalRange.start + int64(i)*equalRange.step
+		if row > next {
+			segments = append(segments, i64RangeArray{start: next, step: 1, len: int(row - next)})
+		}
+		next = row + 1
+	}
+	if next < int64(plan.length) {
+		segments = append(segments, i64RangeArray{start: next, step: 1, len: int(int64(plan.length) - next)})
+	}
+	return newI64SegmentArray(segments...)
+}
+
+func boolLogicalModuloCompareMaskIndexArray(mask boolLogicalMask) (Array, bool) {
+	plan, ok := boolLogicalModuloComparePlan(mask)
+	if !ok {
+		return nil, false
+	}
+	count, ok := plan.trueCount()
+	if !ok || count <= 0 {
+		return i64RangeArray{len: 0}, true
+	}
+	if count == int64(plan.length) {
+		return i64RangeArray{start: 0, step: 1, len: plan.length}, true
+	}
+	if plan.period <= 65536 {
+		residues := make([]int64, 0)
+		for row := int64(0); row < plan.period; row++ {
+			left := plan.left.valueAtRow(int(row))
+			right := plan.right.valueAtRow(int(row))
+			if applyBoolLogical(plan.op, left, right) {
+				residues = append(residues, row)
+			}
+		}
+		return newI64PeriodicIndexArray(plan.period, residues, plan.length), true
+	}
+	return boolLogicalModuloCompareMaskIndexArrayByRuns(plan), true
+}
+
+func boolLogicalModuloCompareMaskIndexArrayByRuns(plan boolLogicalModuloPlan) Array {
+	segments := make([]i64RangeArray, 0)
+	for row := 0; row < plan.length; {
+		left := plan.left.valueAtRow(row)
+		right := plan.right.valueAtRow(row)
+		if !applyBoolLogical(plan.op, left, right) {
+			row++
+			continue
+		}
+		start := row
+		row++
+		for row < plan.length {
+			left = plan.left.valueAtRow(row)
+			right = plan.right.valueAtRow(row)
+			if !applyBoolLogical(plan.op, left, right) {
+				break
+			}
+			row++
+		}
+		segments = append(segments, i64RangeArray{start: int64(start), step: 1, len: row - start})
+	}
+	return newI64SegmentArray(segments...)
 }
 
 func i64RangeIntervalIndexArray(values i64RangeArray, low, high int64) Array {
@@ -2118,6 +2379,8 @@ func i64IndexArraySum(array Array) int64 {
 		return i64RangeSum(a)
 	case i64SegmentArray:
 		return i64SegmentSum(a)
+	case i64PeriodicIndexArray:
+		return i64PeriodicIndexSum(a)
 	default:
 		var total int64
 		for row := 0; row < array.Len(); row++ {
@@ -5451,6 +5714,60 @@ func newI64SegmentArray(segments ...i64RangeArray) Array {
 		return out.segments[0]
 	}
 	return out
+}
+
+func newI64PeriodicIndexArray(period int64, residues []int64, sourceLen int) Array {
+	if period <= 0 || sourceLen <= 0 || len(residues) == 0 {
+		return i64RangeArray{len: 0}
+	}
+	residues = append([]int64(nil), residues...)
+	sort.Slice(residues, func(i, j int) bool { return residues[i] < residues[j] })
+	unique := residues[:0]
+	for _, residue := range residues {
+		if residue < 0 || residue >= period {
+			continue
+		}
+		if len(unique) == 0 || unique[len(unique)-1] != residue {
+			unique = append(unique, residue)
+		}
+	}
+	if len(unique) == 0 {
+		return i64RangeArray{len: 0}
+	}
+	residues = append([]int64(nil), unique...)
+	fullCycles := int64(sourceLen) / period
+	remainder := int64(sourceLen) % period
+	tail := make([]int64, 0, len(residues))
+	for _, residue := range residues {
+		if residue < remainder {
+			tail = append(tail, residue)
+		}
+	}
+	length64 := fullCycles*int64(len(residues)) + int64(len(tail))
+	if length64 == 0 {
+		return i64RangeArray{len: 0}
+	}
+	if length64 != int64(int(length64)) {
+		values := make([]int64, 0)
+		for cycle := int64(0); cycle < fullCycles; cycle++ {
+			base := cycle * period
+			for _, residue := range residues {
+				values = append(values, base+residue)
+			}
+		}
+		base := fullCycles * period
+		for _, residue := range tail {
+			values = append(values, base+residue)
+		}
+		return newI64Trusted(values)
+	}
+	return i64PeriodicIndexArray{
+		period:       period,
+		residues:     residues,
+		tailResidues: tail,
+		fullCycles:   fullCycles,
+		len:          int(length64),
+	}
 }
 
 func promotedNullForBinary(left, right any) any {

@@ -52,6 +52,115 @@ func TestTryTypedWhereMaskI64(t *testing.T) {
 	}
 }
 
+func TestTryTypedWhereMaskI64UsesLazyModuloCompare(t *testing.T) {
+	mod, handled, err := TryTypedIntegerDyadic(OpMod, NewI64Range(0, 1, 20), int64(5))
+	if err != nil || !handled {
+		t.Fatalf("mod range handled=%v err=%v; want true,nil", handled, err)
+	}
+	maskValue, handled, err := TryTypedDyadic(OpEQ, mod, int64(2))
+	if err != nil || !handled {
+		t.Fatalf("mod compare handled=%v err=%v; want true,nil", handled, err)
+	}
+	mask := maskValue.(Array)
+	if _, ok := mask.(i64ScalarDyadicCompareMask); !ok {
+		t.Fatalf("mod compare returned %T, want lazy i64ScalarDyadicCompareMask", mask)
+	}
+	if count, handled, err := TryTypedTrueCount(mask); err != nil || !handled || count != 4 {
+		t.Fatalf("mod compare true count = %d,%v,%v; want 4,true,nil", count, handled, err)
+	}
+	indexes, handled, err := TryTypedWhereMaskI64(mask)
+	if err != nil || !handled {
+		t.Fatalf("mod compare where handled=%v err=%v; want true,nil", handled, err)
+	}
+	if got, want := indexes.Values(), []any{int64(2), int64(7), int64(12), int64(17)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("mod compare where = %#v, want %#v", got, want)
+	}
+	if _, ok := indexes.(i64RangeArray); !ok {
+		t.Fatalf("mod compare where returned %T, want lazy i64RangeArray", indexes)
+	}
+
+	notMaskValue, handled, err := TryTypedDyadic(OpNE, mod, int64(2))
+	if err != nil || !handled {
+		t.Fatalf("mod not-equal compare handled=%v err=%v; want true,nil", handled, err)
+	}
+	notIndexes, handled, err := TryTypedWhereMaskI64(notMaskValue.(Array))
+	if err != nil || !handled {
+		t.Fatalf("mod not-equal where handled=%v err=%v; want true,nil", handled, err)
+	}
+	if got, want := notIndexes.Values(), []any{int64(0), int64(1), int64(3), int64(4), int64(5), int64(6), int64(8), int64(9), int64(10), int64(11), int64(13), int64(14), int64(15), int64(16), int64(18), int64(19)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("mod not-equal where = %#v, want %#v", got, want)
+	}
+	if _, ok := notIndexes.(i64PeriodicIndexArray); !ok {
+		t.Fatalf("mod not-equal where returned %T, want lazy i64PeriodicIndexArray", notIndexes)
+	}
+}
+
+func TestTryTypedWhereMaskI64UsesLazyModuloLogicalMask(t *testing.T) {
+	mod, handled, err := TryTypedIntegerDyadic(OpMod, NewI64Range(0, 1, 18), int64(6))
+	if err != nil || !handled {
+		t.Fatalf("mod range handled=%v err=%v; want true,nil", handled, err)
+	}
+	lower, handled, err := TryTypedDyadic(OpGT, mod, int64(1))
+	if err != nil || !handled {
+		t.Fatalf("mod lower compare handled=%v err=%v; want true,nil", handled, err)
+	}
+	upper, handled, err := TryTypedDyadic(OpLT, mod, int64(4))
+	if err != nil || !handled {
+		t.Fatalf("mod upper compare handled=%v err=%v; want true,nil", handled, err)
+	}
+	band, handled, err := TryTypedBoolLogical("and", lower, upper)
+	if err != nil || !handled {
+		t.Fatalf("mod logical band handled=%v err=%v; want true,nil", handled, err)
+	}
+	if count, handled, err := TryTypedTrueCount(band); err != nil || !handled || count != 6 {
+		t.Fatalf("mod logical band true count = %d,%v,%v; want 6,true,nil", count, handled, err)
+	}
+	indexes, handled, err := TryTypedWhereMaskI64(band)
+	if err != nil || !handled {
+		t.Fatalf("mod logical band where handled=%v err=%v; want true,nil", handled, err)
+	}
+	if got, want := indexes.Values(), []any{int64(2), int64(3), int64(8), int64(9), int64(14), int64(15)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("mod logical band where = %#v, want %#v", got, want)
+	}
+	if _, ok := indexes.(i64PeriodicIndexArray); !ok {
+		t.Fatalf("mod logical band where returned %T, want lazy i64PeriodicIndexArray", indexes)
+	}
+
+	mod7, handled, err := TryTypedIntegerDyadic(OpMod, NewI64Range(0, 1, 24), int64(7))
+	if err != nil || !handled {
+		t.Fatalf("mod7 handled=%v err=%v; want true,nil", handled, err)
+	}
+	mod11, handled, err := TryTypedIntegerDyadic(OpMod, NewI64Range(0, 1, 24), int64(11))
+	if err != nil || !handled {
+		t.Fatalf("mod11 handled=%v err=%v; want true,nil", handled, err)
+	}
+	eq7, handled, err := TryTypedDyadic(OpEQ, mod7, int64(0))
+	if err != nil || !handled {
+		t.Fatalf("mod7 compare handled=%v err=%v; want true,nil", handled, err)
+	}
+	eq11, handled, err := TryTypedDyadic(OpEQ, mod11, int64(0))
+	if err != nil || !handled {
+		t.Fatalf("mod11 compare handled=%v err=%v; want true,nil", handled, err)
+	}
+	either, handled, err := TryTypedBoolLogical("or", eq7, eq11)
+	if err != nil || !handled {
+		t.Fatalf("mixed-period modulo or handled=%v err=%v; want true,nil", handled, err)
+	}
+	if count, handled, err := TryTypedTrueCount(either); err != nil || !handled || count != 6 {
+		t.Fatalf("mixed-period modulo or true count = %d,%v,%v; want 6,true,nil", count, handled, err)
+	}
+	eitherIndexes, handled, err := TryTypedWhereMaskI64(either)
+	if err != nil || !handled {
+		t.Fatalf("mixed-period modulo or where handled=%v err=%v; want true,nil", handled, err)
+	}
+	if got, want := eitherIndexes.Values(), []any{int64(0), int64(7), int64(11), int64(14), int64(21), int64(22)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("mixed-period modulo or where = %#v, want %#v", got, want)
+	}
+	if _, ok := eitherIndexes.(i64PeriodicIndexArray); !ok {
+		t.Fatalf("mixed-period modulo or where returned %T, want lazy i64PeriodicIndexArray", eitherIndexes)
+	}
+}
+
 func TestTryTypedCompareIndexesI64(t *testing.T) {
 	got, handled, err := TryTypedCompareIndexesI64(NewI64Range(0, 1, 6), OpGE, int64(3))
 	if err != nil {

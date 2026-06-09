@@ -2613,6 +2613,8 @@ func (k typedKernelRegistry) NumericSumValue(array Array) (any, bool, error) {
 		return f64RunningSumSum(a), true, nil
 	case i64SegmentArray:
 		return i64SegmentSum(a), true, nil
+	case i64PeriodicIndexArray:
+		return i64PeriodicIndexSum(a), true, nil
 	case i64ProductArray:
 		return i64ProductSum(a), true, nil
 	case columnArray[uint8]:
@@ -4832,6 +4834,12 @@ func (typedKernelRegistry) NumericAt(array Array, row int) (float64, bool, error
 		return value, true, nil
 	case i64SegmentArray:
 		return numericI64SegmentAt(a, row)
+	case i64PeriodicIndexArray:
+		value, ok := a.i64At(row)
+		if !ok {
+			return 0, false, fmt.Errorf("array row %d out of range", row)
+		}
+		return float64(value), true, nil
 	case i64ProductArray:
 		return numericI64ProductAt(a, row)
 	case columnArray[uint8]:
@@ -5291,7 +5299,7 @@ func isIntegerArray(array Array) bool {
 		return true
 	case columnArray[int8], columnArray[int16], columnArray[int32], columnArray[int64],
 		columnArray[uint8], columnArray[uint16], columnArray[uint32], columnArray[uint64],
-		i64RangeArray, i64RunningSumArray, i64SegmentArray, i64ProductArray:
+		i64RangeArray, i64RunningSumArray, i64SegmentArray, i64PeriodicIndexArray, i64ProductArray:
 		return true
 	case nullableArray:
 		for i := 0; i < array.Len(); i++ {
@@ -5324,7 +5332,7 @@ func isDenseIntegerArray(array Array) bool {
 		return true
 	case columnArray[int8], columnArray[int16], columnArray[int32], columnArray[int64],
 		columnArray[uint8], columnArray[uint16], columnArray[uint32], columnArray[uint64],
-		i64RangeArray, i64RunningSumArray, i64SegmentArray, i64ProductArray:
+		i64RangeArray, i64RunningSumArray, i64SegmentArray, i64PeriodicIndexArray, i64ProductArray:
 		return true
 	default:
 		return false
@@ -5376,6 +5384,12 @@ func integerArrayAt(array Array, row int) (int64, bool, error) {
 		}
 		return value, true, nil
 	case i64SegmentArray:
+		value, ok := a.i64At(row)
+		if !ok {
+			return 0, false, fmt.Errorf("array row %d out of range", row)
+		}
+		return value, true, nil
+	case i64PeriodicIndexArray:
 		value, ok := a.i64At(row)
 		if !ok {
 			return 0, false, fmt.Errorf("array row %d out of range", row)
@@ -5547,6 +5561,9 @@ func (a i64ScalarDyadicCompareMask) valueAt(row int) (bool, bool, error) {
 }
 
 func (a i64ScalarDyadicCompareMask) trueCount() (int64, bool, error) {
+	if count, ok := i64ScalarDyadicCompareMaskTrueCount(a); ok {
+		return count, true, nil
+	}
 	var count int64
 	for row := 0; row < a.values.len; row++ {
 		keep, ok, err := a.valueAt(row)
@@ -5558,6 +5575,15 @@ func (a i64ScalarDyadicCompareMask) trueCount() (int64, bool, error) {
 		}
 	}
 	return count, true, nil
+}
+
+func i64ScalarDyadicCompareMaskTrueCount(mask i64ScalarDyadicCompareMask) (int64, bool) {
+	plan, ok := i64ScalarDyadicCompareModuloPlan(mask)
+	if !ok {
+		return 0, false
+	}
+	count, ok := plan.trueCount()
+	return count, ok
 }
 
 type i64RangeCompareMask struct {
@@ -6911,6 +6937,24 @@ func i64SegmentSum(values i64SegmentArray) int64 {
 	return sum
 }
 
+func i64PeriodicIndexSum(values i64PeriodicIndexArray) int64 {
+	if values.len == 0 || values.period <= 0 || len(values.residues) == 0 {
+		return 0
+	}
+	var residueSum int64
+	for _, residue := range values.residues {
+		residueSum += residue
+	}
+	residueCount := int64(len(values.residues))
+	full := values.fullCycles
+	sum := full*residueSum + values.period*residueCount*full*(full-1)/2
+	base := full * values.period
+	for _, residue := range values.tailResidues {
+		sum += base + residue
+	}
+	return sum
+}
+
 func i64ProductSum(values i64ProductArray) int64 {
 	if sum, ok := i64ProductRangeSum(values); ok {
 		return sum
@@ -7904,6 +7948,123 @@ func qPositiveMod(value, modulus int64) int64 {
 	return out
 }
 
+type i64ModuloComparePlan struct {
+	startResidue int64
+	modulus      int64
+	length       int
+	op           Op
+	scalar       int64
+	scalarLeft   bool
+}
+
+func i64ScalarDyadicCompareModuloPlan(mask i64ScalarDyadicCompareMask) (i64ModuloComparePlan, bool) {
+	values := mask.values
+	if values.op != OpMod || values.scalarLeft || values.scalar <= 0 || values.len <= 0 {
+		return i64ModuloComparePlan{}, false
+	}
+	source, ok := values.source.(i64RangeArray)
+	if !ok || source.step != 1 {
+		return i64ModuloComparePlan{}, false
+	}
+	return i64ModuloComparePlan{
+		startResidue: qPositiveMod(source.start, values.scalar),
+		modulus:      values.scalar,
+		length:       values.len,
+		op:           mask.op,
+		scalar:       mask.scalar,
+		scalarLeft:   mask.scalarLeft,
+	}, true
+}
+
+func (p i64ModuloComparePlan) trueCount() (int64, bool) {
+	if p.length <= 0 {
+		return 0, true
+	}
+	if p.op == OpEQ || p.op == OpNE {
+		eq := p.countEqualResidue(p.scalar)
+		if p.op == OpEQ {
+			return eq, true
+		}
+		return int64(p.length) - eq, true
+	}
+	low, high, ok := p.residueInterval()
+	if !ok {
+		return 0, false
+	}
+	return p.countResidueInterval(low, high), true
+}
+
+func (p i64ModuloComparePlan) countEqualResidue(target int64) int64 {
+	if target < 0 || target >= p.modulus || p.length <= 0 {
+		return 0
+	}
+	first := qPositiveMod(target-p.startResidue, p.modulus)
+	if first >= int64(p.length) {
+		return 0
+	}
+	return 1 + (int64(p.length)-first-1)/p.modulus
+}
+
+func (p i64ModuloComparePlan) countResidueInterval(low, high int64) int64 {
+	if low < 0 {
+		low = 0
+	}
+	if high >= p.modulus {
+		high = p.modulus - 1
+	}
+	if low > high || p.length <= 0 {
+		return 0
+	}
+	periodCount := high - low + 1
+	n := int64(p.length)
+	full := n / p.modulus
+	rem := n % p.modulus
+	count := full * periodCount
+	for row := int64(0); row < rem; row++ {
+		residue := (p.startResidue + row) % p.modulus
+		if residue >= low && residue <= high {
+			count++
+		}
+	}
+	return count
+}
+
+func (p i64ModuloComparePlan) residueInterval() (int64, int64, bool) {
+	op := p.op
+	if p.scalarLeft {
+		switch op {
+		case OpLT:
+			op = OpGT
+		case OpLE:
+			op = OpGE
+		case OpGT:
+			op = OpLT
+		case OpGE:
+			op = OpLE
+		}
+	}
+	switch op {
+	case OpGT:
+		return p.scalar + 1, p.modulus - 1, true
+	case OpGE:
+		return p.scalar, p.modulus - 1, true
+	case OpLT:
+		return 0, p.scalar - 1, true
+	case OpLE:
+		return 0, p.scalar, true
+	default:
+		return 0, 0, false
+	}
+}
+
+func (p i64ModuloComparePlan) valueAtRow(row int) bool {
+	residue := (p.startResidue + int64(row)) % p.modulus
+	if p.scalarLeft {
+		return boolCompare(p.op, p.scalar == residue, compareInt64(p.scalar, residue))
+	}
+	return boolCompare(p.op, residue == p.scalar, compareInt64(residue, p.scalar))
+}
+
 func (a notMask) Kind() Kind { return KindBool }
 
 func (a notMask) Len() int { return a.array.Len() }
@@ -8044,6 +8205,9 @@ func (a boolLogicalMask) trueCount() (int64, bool, error) {
 	if count, ok := a.rangeCompareTrueCount(); ok {
 		return count, true, nil
 	}
+	if count, ok := a.moduloCompareTrueCount(); ok {
+		return count, true, nil
+	}
 	var count int64
 	for row := 0; row < a.len; row++ {
 		value, ok, err := a.valueAt(row)
@@ -8084,6 +8248,92 @@ func (a boolLogicalMask) rangeCompareTrueCount() (int64, bool) {
 		return leftCount + rightCount - intersect, true
 	}
 	return 0, false
+}
+
+func (a boolLogicalMask) moduloCompareTrueCount() (int64, bool) {
+	plan, ok := boolLogicalModuloComparePlan(a)
+	if !ok {
+		return 0, false
+	}
+	return plan.trueCount()
+}
+
+type boolLogicalModuloPlan struct {
+	left   i64ModuloComparePlan
+	right  i64ModuloComparePlan
+	op     string
+	period int64
+	length int
+}
+
+func boolLogicalModuloComparePlan(mask boolLogicalMask) (boolLogicalModuloPlan, bool) {
+	if mask.leftIsScalar || mask.rightIsScalar {
+		return boolLogicalModuloPlan{}, false
+	}
+	leftMask, leftOK := mask.left.(i64ScalarDyadicCompareMask)
+	rightMask, rightOK := mask.right.(i64ScalarDyadicCompareMask)
+	if !leftOK || !rightOK || mask.len <= 0 {
+		return boolLogicalModuloPlan{}, false
+	}
+	left, leftOK := i64ScalarDyadicCompareModuloPlan(leftMask)
+	right, rightOK := i64ScalarDyadicCompareModuloPlan(rightMask)
+	if !leftOK || !rightOK || left.length != right.length || left.length != mask.len {
+		return boolLogicalModuloPlan{}, false
+	}
+	period, ok := lcmInt64(left.modulus, right.modulus)
+	if !ok || period > 65536 {
+		return boolLogicalModuloPlan{}, false
+	}
+	return boolLogicalModuloPlan{left: left, right: right, op: mask.op, period: period, length: mask.len}, true
+}
+
+func (p boolLogicalModuloPlan) trueCount() (int64, bool) {
+	if p.length <= 0 {
+		return 0, true
+	}
+	var periodCount int64
+	for offset := int64(0); offset < p.period; offset++ {
+		row := int(offset)
+		left := p.left.valueAtRow(row)
+		right := p.right.valueAtRow(row)
+		if applyBoolLogical(p.op, left, right) {
+			periodCount++
+		}
+	}
+	n := int64(p.length)
+	full := n / p.period
+	rem := n % p.period
+	count := full * periodCount
+	for row := int64(0); row < rem; row++ {
+		left := p.left.valueAtRow(int(row))
+		right := p.right.valueAtRow(int(row))
+		if applyBoolLogical(p.op, left, right) {
+			count++
+		}
+	}
+	return count, true
+}
+
+func lcmInt64(left, right int64) (int64, bool) {
+	if left <= 0 || right <= 0 {
+		return 0, false
+	}
+	g := gcdInt64(left, right)
+	div := left / g
+	if div > math.MaxInt64/right {
+		return 0, false
+	}
+	return div * right, true
+}
+
+func gcdInt64(left, right int64) int64 {
+	for right != 0 {
+		left, right = right, left%right
+	}
+	if left < 0 {
+		return -left
+	}
+	return left
 }
 
 func sameI64Range(left, right i64RangeArray) bool {
