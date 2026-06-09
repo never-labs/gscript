@@ -12,6 +12,8 @@ const (
 	qScriptPipelineWhereReduceSum      qScriptPipelineKind = "where-reduce/sum"
 	qScriptPipelineWhereIndexReduceSum qScriptPipelineKind = "where-index-reduce/sum"
 	qScriptPipelineGatherReduceSum     qScriptPipelineKind = "gather-reduce/sum"
+	qScriptPipelineApplyScalarAt       qScriptPipelineKind = "apply-index/scalar-at"
+	qScriptPipelineApplyScalarDot      qScriptPipelineKind = "apply-index/scalar-dot"
 	qScriptPipelineUnsupported         qScriptPipelineKind = ""
 )
 
@@ -97,6 +99,19 @@ func buildQScriptPipelineDescriptor(statements []qScriptStatement) (*qScriptPipe
 
 func describeQScriptPipelineTerminal(src string, bindings map[string]string) (qScriptPipelineDescriptor, bool) {
 	src = strings.TrimSpace(src)
+	if plan, ok := buildQPipelineApplyScalarIndexPlan(src); ok {
+		kind := qScriptPipelineApplyScalarAt
+		if plan.compareOp == "dot" {
+			kind = qScriptPipelineApplyScalarDot
+		}
+		return qScriptPipelineDescriptor{
+			kind:         kind,
+			valueExpr:    plan.valueExpr,
+			valueBinding: qScriptPipelineBinding(plan.valueExpr, bindings),
+			indexExpr:    plan.indexExpr,
+			indexBinding: qScriptPipelineBinding(plan.indexExpr, bindings),
+		}, true
+	}
 	if !strings.HasPrefix(src, "+/") {
 		return qScriptPipelineDescriptor{}, false
 	}
@@ -200,6 +215,8 @@ func (s *EvalState) tryEvalQScriptPipeline(descriptor *qScriptPipelineDescriptor
 
 func (s *EvalState) evalQScriptTerminalPipeline(descriptor *qScriptPipelineDescriptor, terminal qPipelinePlan) (any, bool, error) {
 	switch terminal.kind {
+	case qPipelineApplyScalarIndex:
+		return s.evalQPipelinePlan(terminal)
 	case qPipelineSumWhereIndex:
 		value, handled, err := s.evalQScriptBindingPlan(&descriptor.valuePlan)
 		if err != nil {

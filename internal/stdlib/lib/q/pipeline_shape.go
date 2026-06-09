@@ -9,6 +9,7 @@ const (
 	qPipelineShapeFamilyVector  qPipelineShapeFamily = "vector"
 	qPipelineShapeFamilyStats   qPipelineShapeFamily = "stats"
 	qPipelineShapeFamilyWindow  qPipelineShapeFamily = "window"
+	qPipelineShapeFamilyApply   qPipelineShapeFamily = "apply"
 )
 
 type qPipelineShapeSpec struct {
@@ -162,6 +163,17 @@ func qPipelineShapeSpecForPlan(kind qPipelineKind, variant string) (qPipelineSha
 			return qPipelineShapeSpec{}, false
 		}
 		return qPipelineRuntimePrimitiveShapeSpec("runtime-dyadic", variant), true
+	case qPipelineApplyScalarIndex:
+		if variant == "" {
+			return qPipelineShapeSpec{}, false
+		}
+		return qPipelineShapeSpec{
+			ID:            "apply-index/scalar-" + variant,
+			Family:        qPipelineShapeFamilyApply,
+			Selector:      "scalar",
+			Transform:     variant,
+			PipelineShape: "apply_index",
+		}, true
 	default:
 		return qPipelineShapeSpec{}, false
 	}
