@@ -971,11 +971,22 @@ func buildQPipelineBindingPlan(src string) qScriptBindingPlan {
 }
 
 func qPipelineCastEnvelopeCandidate(src string) bool {
+	src = strings.TrimSpace(src)
+	if src == "" || !strings.Contains(src, "$") {
+		return false
+	}
+	if !strings.Contains(src, "+") && !strings.HasPrefix(src, "count ") && !strings.HasPrefix(src, "string ") {
+		return false
+	}
 	_, ok := buildQPipelineCastEnvelopePlan(src)
 	return ok
 }
 
 func buildQPipelineCastEnvelopePlan(src string) (qPipelinePlan, bool) {
+	src = strings.TrimSpace(src)
+	if src == "" || !strings.Contains(src, "$") {
+		return qPipelinePlan{}, false
+	}
 	terms := qScriptPipelinePlusTerms(src)
 	if len(terms) == 0 {
 		return qPipelinePlan{}, false
