@@ -477,6 +477,7 @@ func CompileWithOptions(fn *Function, alloc *RegAllocation, opts CompileOptions)
 		callCache = make([]uint64, tier2CallCacheStrideWords*ec.nextCallCacheIndex)
 	}
 
+	qEvalPipelineBackend := newQRuntimeEvalPipelineBackend(fn.QEvalPipelinePlans)
 	return &CompiledFunction{
 		Code:                           cb,
 		Proto:                          fn.Proto,
@@ -510,7 +511,8 @@ func CompileWithOptions(fn *Function, alloc *RegAllocation, opts CompileOptions)
 		StringSplitSubSpecs:            fn.StringSplitSubSpecs,
 		QFrameSelectColumnSpecs:        fn.QFrameSelectColumnSpecs,
 		QEvalPipelinePlans:             fn.QEvalPipelinePlans,
-		QEvalPipelineBackend:           newQRuntimeEvalPipelineBackend(fn.QEvalPipelinePlans),
+		QEvalPipelineBackend:           qEvalPipelineBackend,
+		QEvalPipelinePlanHelpers:       newQEvalPipelinePlanHelpers(fn.QEvalPipelinePlans, qEvalPipelineBackend),
 		QVectorRuntimeKernelShapesByID: qVectorRuntimeKernelShapesByID(fn),
 		CallSiteNoResultRuntimeSpecializationBatches: functionCallFacts(fn).CallSiteNoResultRuntimeSpecializationBatchMap(),
 		RecordArrayLoopCaches:                        fn.RecordArrayLoopCaches,

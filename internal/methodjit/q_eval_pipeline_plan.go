@@ -161,6 +161,12 @@ func (cf *CompiledFunction) ExecuteQEvalPipelinePlanValue(id int) (runtime.Value
 	if cf == nil {
 		return runtime.NilValue(), false, nil
 	}
+	if id >= 0 && id < len(cf.QEvalPipelinePlanHelpers) {
+		helper := cf.QEvalPipelinePlanHelpers[id]
+		if helper.validForID(id) {
+			return helper.execute()
+		}
+	}
 	ref, ok := qEvalPipelinePlanRefByID(cf.QEvalPipelinePlans, id)
 	if !ok {
 		return runtime.NilValue(), false, nil

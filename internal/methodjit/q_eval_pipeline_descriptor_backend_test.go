@@ -78,6 +78,35 @@ func TestCompiledFunctionUsesPredecodedQEvalPipelineBackend(t *testing.T) {
 	}
 }
 
+func TestCompiledFunctionUsesQEvalPipelineHelperSlot(t *testing.T) {
+	ref := qEvalPipelineDescriptorBackendTestRef(t, "count where (til 64 mod 4)=1")
+	backend := newQRuntimeEvalPipelineBackend([]QEvalPipelinePlanRef{ref})
+	descriptorCalls := 0
+	backend.executeDescriptor = func(descriptor stdq.EvalPipelineDescriptor) (any, bool, error) {
+		descriptorCalls++
+		return stdq.ExecuteEvalPipelineDescriptor(descriptor)
+	}
+	backend.executeSource = func(source string) (any, bool, error) {
+		return nil, false, errors.New("source planner fallback should not execute")
+	}
+	cf := &CompiledFunction{
+		QEvalPipelinePlans:       []QEvalPipelinePlanRef{ref},
+		QEvalPipelineBackend:     qRuntimeEvalPipelineBackend{},
+		QEvalPipelinePlanHelpers: newQEvalPipelinePlanHelpers([]QEvalPipelinePlanRef{ref}, backend),
+	}
+
+	value, handled, err := cf.ExecuteQEvalPipelinePlanValue(ref.ID)
+	if err != nil {
+		t.Fatalf("ExecuteQEvalPipelinePlanValue: %v", err)
+	}
+	if !handled || !value.IsInt() || value.Int() != 16 {
+		t.Fatalf("ExecuteQEvalPipelinePlanValue = %v handled %v, want int 16 handled", value, handled)
+	}
+	if descriptorCalls != 1 {
+		t.Fatalf("descriptor calls = %d, want helper slot execution", descriptorCalls)
+	}
+}
+
 func BenchmarkQEvalPipelineDescriptorBackend(b *testing.B) {
 	for _, tc := range []struct {
 		name string
@@ -99,6 +128,24 @@ func BenchmarkQEvalPipelineDescriptorBackend(b *testing.B) {
 				value, handled, err := cf.ExecuteQEvalPipelinePlanValue(ref.ID)
 				if err != nil || !handled {
 					b.Fatalf("executeQEvalPipelinePlanValue handled=%v err=%v", handled, err)
+				}
+				qEvalPipelineDescriptorBenchmarkSink = value
+			}
+		})
+		b.Run("HelperSlot/"+tc.name, func(b *testing.B) {
+			ref := qEvalPipelineDescriptorBackendTestRef(b, tc.src)
+			backend := newQRuntimeEvalPipelineBackend([]QEvalPipelinePlanRef{ref})
+			cf := &CompiledFunction{
+				QEvalPipelinePlans:       []QEvalPipelinePlanRef{ref},
+				QEvalPipelineBackend:     backend,
+				QEvalPipelinePlanHelpers: newQEvalPipelinePlanHelpers([]QEvalPipelinePlanRef{ref}, backend),
+			}
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				value, handled, err := cf.ExecuteQEvalPipelinePlanValue(ref.ID)
+				if err != nil || !handled {
+					b.Fatalf("ExecuteQEvalPipelinePlanValue handled=%v err=%v", handled, err)
 				}
 				qEvalPipelineDescriptorBenchmarkSink = value
 			}

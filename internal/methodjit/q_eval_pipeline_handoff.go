@@ -3,6 +3,7 @@ package methodjit
 import (
 	"strings"
 
+	"github.com/never-labs/leia/internal/runtime"
 	stdq "github.com/never-labs/leia/internal/stdlib/lib/q"
 )
 
@@ -116,6 +117,14 @@ type qRuntimeEvalPipelineBackend struct {
 	executeSource     func(string) (any, bool, error)
 }
 
+type qEvalPipelinePlanHelper struct {
+	ref               QEvalPipelinePlanRef
+	descriptor        stdq.EvalPipelineDescriptor
+	hasDescriptor     bool
+	executeDescriptor func(stdq.EvalPipelineDescriptor) (any, bool, error)
+	executeSource     func(string) (any, bool, error)
+}
+
 func newQRuntimeEvalPipelineBackend(refs []QEvalPipelinePlanRef) qRuntimeEvalPipelineBackend {
 	descriptorByID := make(map[int]stdq.EvalPipelineDescriptor, len(refs))
 	for _, ref := range refs {
@@ -129,6 +138,66 @@ func newQRuntimeEvalPipelineBackend(refs []QEvalPipelinePlanRef) qRuntimeEvalPip
 		executeDescriptor: stdq.ExecuteEvalPipelineDescriptor,
 		executeSource:     stdq.ExecuteEvalPipeline,
 	}
+}
+
+func newQEvalPipelinePlanHelpers(refs []QEvalPipelinePlanRef, backend qRuntimeEvalPipelineBackend) []qEvalPipelinePlanHelper {
+	if len(refs) == 0 {
+		return nil
+	}
+	helpers := make([]qEvalPipelinePlanHelper, len(refs))
+	for _, ref := range refs {
+		if !ref.Valid() || ref.ID < 0 || ref.ID >= len(helpers) || ref.Backend != qEvalPipelineTypedRuntimeBackend {
+			continue
+		}
+		if _, ok := backend.LookupQEvalPipelinePlan(ref); !ok {
+			continue
+		}
+		descriptor, hasDescriptor := backend.lookupDescriptor(ref)
+		helpers[ref.ID] = qEvalPipelinePlanHelper{
+			ref:               ref,
+			descriptor:        descriptor,
+			hasDescriptor:     hasDescriptor,
+			executeDescriptor: backend.executeDescriptor,
+			executeSource:     backend.executeSource,
+		}
+	}
+	return helpers
+}
+
+func (h qEvalPipelinePlanHelper) validForID(id int) bool {
+	return h.ref.ID == id && h.ref.Valid() && h.ref.Backend == qEvalPipelineTypedRuntimeBackend
+}
+
+func (h qEvalPipelinePlanHelper) execute() (runtime.Value, bool, error) {
+	if !h.ref.Valid() || h.ref.Backend != qEvalPipelineTypedRuntimeBackend {
+		return runtime.NilValue(), false, nil
+	}
+	var (
+		out     any
+		handled bool
+		err     error
+	)
+	if h.hasDescriptor {
+		execute := h.executeDescriptor
+		if execute == nil {
+			execute = stdq.ExecuteEvalPipelineDescriptor
+		}
+		out, handled, err = execute(h.descriptor)
+	} else {
+		execute := h.executeSource
+		if execute == nil {
+			execute = stdq.ExecuteEvalPipeline
+		}
+		out, handled, err = execute(h.ref.Source)
+	}
+	if err != nil || !handled {
+		return runtime.NilValue(), handled, err
+	}
+	value, err := qEvalPipelineRuntimeValue(out)
+	if err != nil {
+		return runtime.NilValue(), false, err
+	}
+	return value, true, nil
 }
 
 func (b qRuntimeEvalPipelineBackend) BackendName() string {

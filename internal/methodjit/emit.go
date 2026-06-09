@@ -637,6 +637,11 @@ type CompiledFunction struct {
 	// q.eval typed pipeline op-exit execution.
 	QEvalPipelineBackend qRuntimeEvalPipelineBackend
 
+	// QEvalPipelinePlanHelpers keeps direct id-indexed helpers for q.eval
+	// pipeline exits. It avoids per-execution ref/backend/descriptor lookup on
+	// the hot path while preserving the older backend fallback.
+	QEvalPipelinePlanHelpers []qEvalPipelinePlanHelper
+
 	// QVectorRuntimeKernelShapesByID keeps q vector runtime-kernel shape
 	// metadata alive for op-exit execution stats.
 	QVectorRuntimeKernelShapesByID map[int]string

@@ -75,6 +75,9 @@ func TestQEvalPipelinePlanCodegenUsesDedicatedExitKind(t *testing.T) {
 			t.Fatalf("Compile: %v", err)
 		}
 		defer cf.Code.Free()
+		if len(cf.QEvalPipelinePlanHelpers) != 1 || !cf.QEvalPipelinePlanHelpers[0].validForID(ref.ID) {
+			t.Fatalf("compiled q eval pipeline helpers = %+v, want valid helper for plan %d", cf.QEvalPipelinePlanHelpers, ref.ID)
+		}
 
 		site, ok := cf.ExitResumeCheck.Sites[exitResumeCheckKey{InstrID: plan.ID, ExitCode: ExitQEvalPipelinePlan}]
 		if !ok {
@@ -121,6 +124,25 @@ func BenchmarkQEvalPipelineNativeExitCallpath(b *testing.B) {
 			cf := &CompiledFunction{
 				QEvalPipelinePlans:   []QEvalPipelinePlanRef{ref},
 				QEvalPipelineBackend: newQRuntimeEvalPipelineBackend([]QEvalPipelinePlanRef{ref}),
+			}
+			regs := []runtime.Value{runtime.NilValue()}
+			ctx := &ExecContext{OpExitSlot: 0, OpExitAux: int64(ref.ID)}
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				if err := cf.executeQEvalPipelinePlanExit(ctx, regs, 0, "typed_runtime_native_exit"); err != nil {
+					b.Fatalf("executeQEvalPipelinePlanExit: %v", err)
+				}
+				qEvalPipelineDescriptorBenchmarkSink = regs[0]
+			}
+		})
+		b.Run("GoHandlerHelperSlot/"+tc.name, func(b *testing.B) {
+			ref := qEvalPipelineDescriptorBackendTestRef(b, tc.src)
+			backend := newQRuntimeEvalPipelineBackend([]QEvalPipelinePlanRef{ref})
+			cf := &CompiledFunction{
+				QEvalPipelinePlans:       []QEvalPipelinePlanRef{ref},
+				QEvalPipelineBackend:     backend,
+				QEvalPipelinePlanHelpers: newQEvalPipelinePlanHelpers([]QEvalPipelinePlanRef{ref}, backend),
 			}
 			regs := []runtime.Value{runtime.NilValue()}
 			ctx := &ExecContext{OpExitSlot: 0, OpExitAux: int64(ref.ID)}
