@@ -14,6 +14,8 @@ import (
 const qEvalVectorRows = 8192
 
 var qEvalVectorBenchSink int64
+var qEvalVectorFloatBenchSink float64
+var qEvalVectorAnyBenchSink any
 var qEvalVectorGoBaselineInput = buildQEvalVectorGoBaselineInput(qEvalVectorRows + 1024)
 var qEvalVectorGoBaselineTakeExtra = 128
 
@@ -31,6 +33,163 @@ func qEvalVectorGoBaselineTakeCount(rows int, values []int64) int64 {
 		return 0
 	}
 	return int64(rows + qEvalVectorGoBaselineTakeExtra)
+}
+
+//go:noinline
+func qEvalVectorGoBaselineMovingStdDevEmaCount(rows int, alpha float64, width int) int64 {
+	values := make([]float64, rows)
+	mdev := make([]float64, rows)
+	ema := make([]float64, rows)
+	var emaPrev float64
+	var checksum float64
+	for i := 0; i < rows; i++ {
+		values[i] = float64(i + 1)
+		if i == 0 {
+			emaPrev = values[i]
+		} else {
+			emaPrev = alpha*values[i] + (1-alpha)*emaPrev
+		}
+		ema[i] = emaPrev
+		start := i - width + 1
+		if start < 0 {
+			start = 0
+		}
+		n := float64(i - start + 1)
+		var sum, sumSq float64
+		for j := start; j <= i; j++ {
+			sum += values[j]
+			sumSq += values[j] * values[j]
+		}
+		mean := sum / n
+		variance := sumSq/n - mean*mean
+		if variance < 0 {
+			variance = 0
+		}
+		mdev[i] = math.Sqrt(variance)
+		checksum += mdev[i] + ema[i]
+	}
+	qEvalVectorFloatBenchSink = checksum
+	return int64(len(mdev) + len(ema))
+}
+
+//go:noinline
+func qEvalVectorGoBaselineSampleStatsCorrelationCount(rows int) int64 {
+	x := make([]float64, rows)
+	y := make([]float64, rows)
+	var sumX, sumY, sumYWeighted float64
+	for i := 0; i < rows; i++ {
+		x[i] = float64(i + 1)
+		y[i] = x[i] * 2
+		sumX += x[i]
+		sumY += y[i]
+		sumYWeighted += x[i] * y[i]
+	}
+	n := float64(rows)
+	meanX := sumX / n
+	meanY := sumY / n
+	var sumDX2, sumDY2, sumDXDY float64
+	for i := 0; i < rows; i++ {
+		dx := x[i] - meanX
+		dy := y[i] - meanY
+		sumDX2 += dx * dx
+		sumDY2 += dy * dy
+		sumDXDY += dx * dy
+	}
+	svar := sumDX2 / (n - 1)
+	sdev := math.Sqrt(svar)
+	cov := sumDXDY / n
+	scov := sumDXDY / (n - 1)
+	cor := sumDXDY / math.Sqrt(sumDX2*sumDY2)
+	qEvalVectorFloatBenchSink = svar + sdev + cov + scov + cor + sumYWeighted
+	return 6
+}
+
+//go:noinline
+func qEvalVectorGoBaselineSublistCount(rows int) int64 {
+	x := make([]int64, rows)
+	for i := range x {
+		x[i] = int64(i)
+	}
+	sublist := x
+	if len(sublist) > 100 {
+		sublist = sublist[:100]
+	}
+	return int64(len(sublist))
+}
+
+//go:noinline
+func qEvalVectorGoBaselineCutCount(rows int) int64 {
+	x := make([]int64, rows)
+	for i := range x {
+		x[i] = int64(i)
+	}
+	cutPoints := []int{0, 100, 200}
+	cutCount := 0
+	for i := 0; i < len(cutPoints); i++ {
+		start := cutPoints[i]
+		end := len(x)
+		if i+1 < len(cutPoints) {
+			end = cutPoints[i+1]
+		}
+		if start < 0 {
+			start = 0
+		}
+		if end > len(x) {
+			end = len(x)
+		}
+		if end < start {
+			end = start
+		}
+		qEvalVectorBenchSink += int64(len(x[start:end]))
+		cutCount++
+	}
+	return int64(cutCount)
+}
+
+//go:noinline
+func qEvalVectorGoBaselineCrossCount() int64 {
+	pairs := make([][2]int64, 0, 16*16)
+	for i := int64(0); i < 16; i++ {
+		for j := int64(0); j < 16; j++ {
+			pairs = append(pairs, [2]int64{i, j})
+		}
+	}
+	qEvalVectorAnyBenchSink = pairs
+	return int64(len(pairs))
+}
+
+//go:noinline
+func qEvalVectorGoBaselineStringTrimCount(rows int) int64 {
+	pattern := " AAPL "
+	spacePadded := make([]byte, rows)
+	for i := 0; i < rows; i++ {
+		spacePadded[i] = pattern[i%len(pattern)]
+	}
+	trimmed := strings.TrimSpace(string(spacePadded))
+	qEvalVectorFloatBenchSink = float64(len(trimmed))
+	return int64(len(trimmed))
+}
+
+//go:noinline
+func qEvalVectorGoBaselineBooleanWhereLiteralCount() int64 {
+	mask := []bool{true, false, true, false, false, true}
+	indexes := make([]int64, 0, len(mask))
+	for i, value := range mask {
+		if value {
+			indexes = append(indexes, int64(i))
+		}
+	}
+	qEvalVectorAnyBenchSink = indexes
+	return int64(len(indexes))
+}
+
+//go:noinline
+func qEvalVectorGoBaselineListStringBooleanCount(rows int) int64 {
+	return qEvalVectorGoBaselineSublistCount(rows) +
+		qEvalVectorGoBaselineCutCount(rows) +
+		qEvalVectorGoBaselineCrossCount() +
+		qEvalVectorGoBaselineStringTrimCount(rows) +
+		qEvalVectorGoBaselineBooleanWhereLiteralCount()
 }
 
 type qEvalVectorCase struct {
@@ -1256,7 +1415,7 @@ func appendQEvalExpressionCombinationCases(cases []qEvalVectorCase) []qEvalVecto
 				return fmt.Sprintf("x:1+til %d;(count 32 mdev x)+(count 0.25 ema x)", rows)
 			},
 			goFn: func(rows int) int64 {
-				return int64(rows * 2)
+				return qEvalVectorGoBaselineMovingStdDevEmaCount(rows, 0.25, 32)
 			},
 		},
 		{
@@ -1267,7 +1426,7 @@ func appendQEvalExpressionCombinationCases(cases []qEvalVectorCase) []qEvalVecto
 				return fmt.Sprintf("x:1+til %d;y:x*2;count (svar x;sdev x;x cov y;x scov y;x cor y;x wsum y)", rows)
 			},
 			goFn: func(rows int) int64 {
-				return 6
+				return qEvalVectorGoBaselineSampleStatsCorrelationCount(rows)
 			},
 		},
 		{
@@ -1278,7 +1437,7 @@ func appendQEvalExpressionCombinationCases(cases []qEvalVectorCase) []qEvalVecto
 				return fmt.Sprintf("x:til %d;(count 100 sublist x)+(count 0 100 200 cut x)+(count (til 16) cross til 16)+(count trim %d#\" AAPL \")+(count where 101001b)", rows, rows)
 			},
 			goFn: func(rows int) int64 {
-				return int64(100+3+256+3) + qEvalRepeatedTrimmedStringLen(rows, " AAPL ")
+				return qEvalVectorGoBaselineListStringBooleanCount(rows)
 			},
 		},
 		{
@@ -1289,10 +1448,7 @@ func appendQEvalExpressionCombinationCases(cases []qEvalVectorCase) []qEvalVecto
 				return fmt.Sprintf("x:til %d;count 100 sublist x", rows)
 			},
 			goFn: func(rows int) int64 {
-				if rows < 100 {
-					return int64(rows)
-				}
-				return 100
+				return qEvalVectorGoBaselineSublistCount(rows)
 			},
 		},
 		{
@@ -1303,7 +1459,7 @@ func appendQEvalExpressionCombinationCases(cases []qEvalVectorCase) []qEvalVecto
 				return fmt.Sprintf("x:til %d;count 0 100 200 cut x", rows)
 			},
 			goFn: func(rows int) int64 {
-				return 3
+				return qEvalVectorGoBaselineCutCount(rows)
 			},
 		},
 		{
@@ -1314,7 +1470,7 @@ func appendQEvalExpressionCombinationCases(cases []qEvalVectorCase) []qEvalVecto
 				return "count (til 16) cross til 16"
 			},
 			goFn: func(rows int) int64 {
-				return 256
+				return qEvalVectorGoBaselineCrossCount()
 			},
 		},
 		{
@@ -1325,7 +1481,7 @@ func appendQEvalExpressionCombinationCases(cases []qEvalVectorCase) []qEvalVecto
 				return fmt.Sprintf("count trim %d#\" AAPL \"", rows)
 			},
 			goFn: func(rows int) int64 {
-				return qEvalRepeatedTrimmedStringLen(rows, " AAPL ")
+				return qEvalVectorGoBaselineStringTrimCount(rows)
 			},
 		},
 		{
@@ -1336,7 +1492,7 @@ func appendQEvalExpressionCombinationCases(cases []qEvalVectorCase) []qEvalVecto
 				return "count where 101001b"
 			},
 			goFn: func(rows int) int64 {
-				return 3
+				return qEvalVectorGoBaselineBooleanWhereLiteralCount()
 			},
 		},
 		{
@@ -3023,6 +3179,39 @@ func TestQEvalVectorRuntimeFallbackReport(t *testing.T) {
 	}
 	for _, line := range report.LogLines(10) {
 		t.Log(line)
+	}
+}
+
+func TestQEvalVectorTargetGoBaselinesDoRealWork(t *testing.T) {
+	targets := map[string]struct{}{
+		"MovingStdDevEma32Envelope":         {},
+		"SampleStatsCorrelationEnvelope":    {},
+		"ListStringBooleanCoverageEnvelope": {},
+		"ListSublistCountEnvelope":          {},
+		"ListCutCountEnvelope":              {},
+		"ListCrossCountEnvelope":            {},
+		"StringTrimCountEnvelope":           {},
+		"BooleanWhereLiteralCountEnvelope":  {},
+	}
+	for _, tc := range qEvalVectorCases {
+		if _, ok := targets[tc.name]; !ok {
+			continue
+		}
+		allocs := testing.AllocsPerRun(1, func() {
+			qEvalVectorBenchSink = tc.goFn(qEvalVectorRows)
+		})
+		if allocs == 0 {
+			t.Fatalf("%s Go baseline performed no allocations; it likely regressed to a constant-folded correctness oracle", tc.name)
+		}
+		delete(targets, tc.name)
+	}
+	if len(targets) > 0 {
+		missing := make([]string, 0, len(targets))
+		for name := range targets {
+			missing = append(missing, name)
+		}
+		sort.Strings(missing)
+		t.Fatalf("missing target q.eval Go baseline cases: %s", strings.Join(missing, ", "))
 	}
 }
 

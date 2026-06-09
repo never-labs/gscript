@@ -96,3 +96,30 @@ func BenchmarkEvalWithEnvPipelinePlanCacheWarm(b *testing.B) {
 	b.StopTimer()
 	b.ReportMetric(float64(b.N)/time.Since(start).Seconds(), "eval/s")
 }
+
+func BenchmarkEvalWithEnvRuntimePrimitivePipelineWarm(b *testing.B) {
+	ClearEvalPlanCaches()
+	defer ClearEvalPlanCaches()
+
+	const src = "(w wsum v)+(v cor y)+(count 32 mdev v)"
+	env := map[string]any{
+		"v": data.NewI64Range(1, 1, 8192),
+		"w": data.NewI64Range(1, 1, 8192),
+		"y": data.NewI64Range(2, 2, 8192),
+	}
+	if _, err := EvalWithEnv(src, env); err != nil {
+		b.Fatalf("warm EvalWithEnv runtime primitive setup: %v", err)
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+	start := time.Now()
+	for i := 0; i < b.N; i++ {
+		out, err := EvalWithEnv(src, env)
+		if err != nil {
+			b.Fatalf("EvalWithEnv runtime primitive warm: %v", err)
+		}
+		qEvalPlanBenchSink = out
+	}
+	b.StopTimer()
+	b.ReportMetric(float64(b.N)/time.Since(start).Seconds(), "eval/s")
+}
