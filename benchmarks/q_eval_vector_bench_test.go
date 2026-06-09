@@ -476,11 +476,12 @@ func qEvalVectorGoBaselineCutCount(rows int) int64 {
 }
 
 //go:noinline
-func qEvalVectorGoBaselineCrossCount() int64 {
-	pairs := make([][2]int64, 0, 16*16)
-	for i := int64(0); i < 16; i++ {
-		for j := int64(0); j < 16; j++ {
-			pairs = append(pairs, [2]int64{i, j})
+func qEvalVectorGoBaselineCrossCount(rows int) int64 {
+	side := qEvalVectorCrossSide(rows)
+	pairs := make([][2]int64, 0, side*side)
+	for left := 0; left < side; left++ {
+		for right := 0; right < side; right++ {
+			pairs = append(pairs, [2]int64{int64(left), int64(right)})
 		}
 	}
 	qEvalVectorAnyBenchSink = pairs
@@ -516,7 +517,7 @@ func qEvalVectorGoBaselineBooleanWhereLiteralCount() int64 {
 func qEvalVectorGoBaselineListStringBooleanCount(rows int) int64 {
 	return qEvalVectorGoBaselineSublistCount(rows) +
 		qEvalVectorGoBaselineCutCount(rows) +
-		qEvalVectorGoBaselineCrossCount() +
+		qEvalVectorGoBaselineCrossCount(rows) +
 		qEvalVectorGoBaselineStringTrimCount(rows) +
 		qEvalVectorGoBaselineBooleanWhereLiteralCount()
 }
@@ -1772,10 +1773,11 @@ func appendQEvalExpressionCombinationCases(cases []qEvalVectorCase) []qEvalVecto
 		},
 		{
 			name:   "ListStringBooleanCoverageEnvelope",
-			tags:   []string{"cut", "string", "boolean-logical", "projection"},
+			tags:   []string{"sublist", "cut", "cross", "string", "boolean-logical", "projection"},
 			matrix: []string{"list:sublist-cross-cut:string-bool"},
 			expr: func(rows int) string {
-				return fmt.Sprintf("x:til %d;(count 100 sublist x)+(count 0 100 200 cut x)+(count (til 16) cross til 16)+(count trim %d#\" AAPL \")+(count where 101001b)", rows, rows)
+				side := qEvalVectorCrossSide(rows)
+				return fmt.Sprintf("x:til %d;(count 100 sublist x)+(count 0 100 200 cut x)+(count (til %d) cross til %d)+(count trim %d#\" AAPL \")+(count where 101001b)", rows, side, side, rows)
 			},
 			goFn: func(rows int) int64 {
 				return qEvalVectorGoBaselineListStringBooleanCount(rows)
@@ -1805,13 +1807,14 @@ func appendQEvalExpressionCombinationCases(cases []qEvalVectorCase) []qEvalVecto
 		},
 		{
 			name:   "ListCrossCountEnvelope",
-			tags:   []string{"projection"},
+			tags:   []string{"cross", "projection"},
 			matrix: []string{"list:sublist-cross-cut:string-bool"},
 			expr: func(rows int) string {
-				return "count (til 16) cross til 16"
+				side := qEvalVectorCrossSide(rows)
+				return fmt.Sprintf("count (til %d) cross til %d", side, side)
 			},
 			goFn: func(rows int) int64 {
-				return qEvalVectorGoBaselineCrossCount()
+				return qEvalVectorGoBaselineCrossCount(rows)
 			},
 		},
 		{
@@ -4470,12 +4473,12 @@ func TestQEvalVectorListStringBooleanFallbackCharacterization(t *testing.T) {
 	}{
 		{
 			name: "combined",
-			src:  fmt.Sprintf("x:til %d;(count 100 sublist x)+(count 0 100 200 cut x)+(count (til 16) cross til 16)+(count trim %d#\" AAPL \")+(count where 101001b)", rows, rows),
-			want: 100 + 3 + 256 + qEvalRepeatedTrimmedStringLen(rows, " AAPL ") + 3,
+			src:  fmt.Sprintf("x:til %d;(count 100 sublist x)+(count 0 100 200 cut x)+(count (til %d) cross til %d)+(count trim %d#\" AAPL \")+(count where 101001b)", rows, qEvalVectorCrossSide(rows), qEvalVectorCrossSide(rows), rows),
+			want: 100 + 3 + qEvalVectorGoBaselineCrossCount(rows) + qEvalRepeatedTrimmedStringLen(rows, " AAPL ") + 3,
 		},
 		{name: "sublist", src: fmt.Sprintf("x:til %d;count 100 sublist x", rows), want: 100},
 		{name: "cut", src: fmt.Sprintf("x:til %d;count 0 100 200 cut x", rows), want: 3},
-		{name: "cross", src: "count (til 16) cross til 16", want: 256},
+		{name: "cross", src: fmt.Sprintf("count (til %d) cross til %d", qEvalVectorCrossSide(rows), qEvalVectorCrossSide(rows)), want: qEvalVectorGoBaselineCrossCount(rows)},
 		{name: "trim", src: fmt.Sprintf("count trim %d#\" AAPL \"", rows), want: qEvalRepeatedTrimmedStringLen(rows, " AAPL ")},
 		{name: "where", src: "count where 101001b", want: 3},
 	}
@@ -4586,15 +4589,39 @@ func TestQEvalVectorTargetGoBaselinesDoRealWork(t *testing.T) {
 		"TaskDMatrixMmuInvEnvelope":         {},
 		"TaskDCrossApplyIndexChecksum":      {},
 	}
+	rowScaledTargets := map[string]struct{}{
+		"ListStringBooleanCoverageEnvelope": {},
+		"ListCrossCountEnvelope":            {},
+		"TaskDMatrixMmuInvEnvelope":         {},
+		"TaskDCrossApplyIndexChecksum":      {},
+	}
+	allocationTargets := map[string]struct{}{
+		"MovingStdDevEma32Envelope":         {},
+		"SampleStatsCorrelationEnvelope":    {},
+		"ListStringBooleanCoverageEnvelope": {},
+		"ListSublistCountEnvelope":          {},
+		"ListCutCountEnvelope":              {},
+		"StringTrimCountEnvelope":           {},
+		"BooleanWhereLiteralCountEnvelope":  {},
+		"TaskDMatrixMmuInvEnvelope":         {},
+		"TaskDCrossApplyIndexChecksum":      {},
+	}
 	for _, tc := range qEvalVectorCases {
 		if _, ok := targets[tc.name]; !ok {
 			continue
 		}
-		allocs := testing.AllocsPerRun(1, func() {
-			qEvalVectorBenchSink = tc.goFn(qEvalVectorRows)
-		})
-		if allocs == 0 {
-			t.Fatalf("%s Go baseline performed no allocations; it likely regressed to a constant-folded correctness oracle", tc.name)
+		if _, ok := rowScaledTargets[tc.name]; ok {
+			if got, smaller := tc.goFn(qEvalVectorRows), tc.goFn(qEvalVectorRows/2); got == smaller {
+				t.Fatalf("%s Go baseline returned the same result for different row counts: %d", tc.name, got)
+			}
+		}
+		if _, ok := allocationTargets[tc.name]; ok {
+			allocs := testing.AllocsPerRun(1, func() {
+				qEvalVectorBenchSink = tc.goFn(qEvalVectorRows)
+			})
+			if allocs == 0 {
+				t.Fatalf("%s Go baseline performed no allocations; it likely regressed to a constant-folded correctness oracle", tc.name)
+			}
 		}
 		delete(targets, tc.name)
 	}
