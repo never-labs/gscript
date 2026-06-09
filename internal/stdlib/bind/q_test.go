@@ -4666,6 +4666,11 @@ func TestQExplainReportsQueryKernelVisibility(t *testing.T) {
 	if !kernelShape.IsString() || kernelShape.Str() != "post_project_ordered_projection|where=typed_column_literal|projection=typed_binary|order=post_project:1|limit=bounded" {
 		t.Fatalf("kernel_shape before = %v, want stable filtered ordered projection shape", kernelShape)
 	}
+	kernelPipelineShape := beforeTable.RawGetString("kernel_pipeline_shape")
+	wantKernelPipelineShape := "scan=frame|where=compare_mask:column_literal|filter=index|project=typed_binary:1|order=post_project:1|limit=bounded"
+	if !kernelPipelineShape.IsString() || kernelPipelineShape.Str() != wantKernelPipelineShape {
+		t.Fatalf("kernel_pipeline_shape before = %v, want %q", kernelPipelineShape, wantKernelPipelineShape)
+	}
 	if got := beforeTable.RawGetString("source_bridge"); !got.IsString() || got.Str() != "frame_native" {
 		t.Fatalf("source_bridge before = %v, want frame_native", got)
 	}
@@ -4829,6 +4834,9 @@ func TestQExplainReportsQueryKernelVisibility(t *testing.T) {
 	}
 	if got := afterTable.RawGetString("kernel_shape"); !got.IsString() || got.Str() != kernelShape.Str() {
 		t.Fatalf("kernel_shape after = %v, want cached shape %q", got, kernelShape.Str())
+	}
+	if got := afterTable.RawGetString("kernel_pipeline_shape"); !got.IsString() || got.Str() != kernelPipelineShape.Str() {
+		t.Fatalf("kernel_pipeline_shape after = %v, want cached pipeline shape %q", got, kernelPipelineShape.Str())
 	}
 	restoreStats := SetQRuntimeKernelExecutionStatsProvider(func() []QRuntimeKernelExecutionStat {
 		return []QRuntimeKernelExecutionStat{
@@ -5052,14 +5060,14 @@ func TestQExplainReportsQueryKernelVisibility(t *testing.T) {
 	if len(keyJSONRows) != 1 {
 		t.Fatalf("QSQLKernelCacheKeyStatJSONRows = %+v, want one row", keyJSONRows)
 	}
-	if got := keyJSONRows[0]; got.Key != cacheKey.Str() || got.Namespace != query || got.Kind != "kernel" || got.SchemaHash != frame.SchemaFingerprint() || got.PlanFingerprint != planFingerprint.Str() || got.Shape != kernelShape.Str() || got.Hits != 1 || got.Misses != 1 || got.Evictions != 0 {
+	if got := keyJSONRows[0]; got.Key != cacheKey.Str() || got.Namespace != query || got.Kind != "kernel" || got.SchemaHash != frame.SchemaFingerprint() || got.PlanFingerprint != planFingerprint.Str() || got.Shape != kernelShape.Str() || got.PipelineShape != kernelPipelineShape.Str() || got.Hits != 1 || got.Misses != 1 || got.Evictions != 0 {
 		t.Fatalf("QSQLKernelCacheKeyStatJSONRows[0] = %+v, want stable qsql kernel key row", got)
 	}
 	keyJSON, err := json.Marshal(keyJSONRows)
 	if err != nil {
 		t.Fatalf("marshal QSQLKernelCacheKeyStatJSONRows: %v", err)
 	}
-	if !strings.Contains(string(keyJSON), `"schema_hash"`) || !strings.Contains(string(keyJSON), `"plan_fingerprint"`) || strings.Contains(string(keyJSON), "SchemaHash") || strings.Contains(string(keyJSON), "PlanFingerprint") {
+	if !strings.Contains(string(keyJSON), `"schema_hash"`) || !strings.Contains(string(keyJSON), `"plan_fingerprint"`) || !strings.Contains(string(keyJSON), `"pipeline_shape"`) || strings.Contains(string(keyJSON), "SchemaHash") || strings.Contains(string(keyJSON), "PlanFingerprint") {
 		t.Fatalf("QSQLKernelCacheKeyStatJSONRows JSON = %s, want snake_case stable fields", keyJSON)
 	}
 	cacheRows := qCacheStatsTable()
@@ -5081,6 +5089,7 @@ func TestQExplainReportsQueryKernelVisibility(t *testing.T) {
 		"schema_hash":      frame.SchemaFingerprint(),
 		"plan_fingerprint": planFingerprint.Str(),
 		"shape":            kernelShape.Str(),
+		"pipeline_shape":   kernelPipelineShape.Str(),
 	} {
 		if got := keyRow.RawGetString(field); !got.IsString() || got.Str() != want {
 			t.Fatalf("qsql_kernel keys[1].%s = %v, want %q", field, got, want)
@@ -5095,7 +5104,7 @@ func TestQExplainReportsQueryKernelVisibility(t *testing.T) {
 	if len(shapeRows) != 1 {
 		t.Fatalf("qsql_kernel shapes = %+v, want one shape row", shapeRows)
 	}
-	if got := shapeRows[0]; got.Shape != kernelShape.Str() || got.SchemaHash != frame.SchemaFingerprint() || got.Count != 1 || got.Hits != 1 || got.Misses != 1 || got.Evictions != 0 {
+	if got := shapeRows[0]; got.Shape != kernelShape.Str() || got.PipelineShape != kernelPipelineShape.Str() || got.SchemaHash != frame.SchemaFingerprint() || got.Count != 1 || got.Hits != 1 || got.Misses != 1 || got.Evictions != 0 {
 		t.Fatalf("qsql_kernel shape aggregate = %+v, want shape %q schema %q count=1 hits=1 misses=1 evictions=0", got, kernelShape.Str(), frame.SchemaFingerprint())
 	}
 }
@@ -7055,12 +7064,13 @@ func qTestQueryKernelShapeCount(rows []qQueryKernelShapeRow, supported bool, rea
 }
 
 type qKernelShapeRow struct {
-	Shape      string
-	SchemaHash string
-	Count      int64
-	Hits       int64
-	Misses     int64
-	Evictions  int64
+	Shape         string
+	PipelineShape string
+	SchemaHash    string
+	Count         int64
+	Hits          int64
+	Misses        int64
+	Evictions     int64
 }
 
 func qTestKernelShapeRows(t *testing.T, tbl *Table) []qKernelShapeRow {
@@ -7075,21 +7085,23 @@ func qTestKernelShapeRows(t *testing.T, tbl *Table) []qKernelShapeRow {
 			t.Fatalf("qsql_kernel shape row %d is nil", i)
 		}
 		shape := row.RawGetString("shape")
+		pipelineShape := row.RawGetString("pipeline_shape")
 		schemaHash := row.RawGetString("schema_hash")
 		count := row.RawGetString("count")
 		hits := row.RawGetString("hits")
 		misses := row.RawGetString("misses")
 		evictions := row.RawGetString("evictions")
-		if !shape.IsString() || !schemaHash.IsString() || !count.IsInt() || !hits.IsInt() || !misses.IsInt() || !evictions.IsInt() {
+		if !shape.IsString() || !pipelineShape.IsString() || !schemaHash.IsString() || !count.IsInt() || !hits.IsInt() || !misses.IsInt() || !evictions.IsInt() {
 			t.Fatalf("qsql_kernel shape row %d malformed: %#v", i, row)
 		}
 		rows = append(rows, qKernelShapeRow{
-			Shape:      shape.Str(),
-			SchemaHash: schemaHash.Str(),
-			Count:      count.Int(),
-			Hits:       hits.Int(),
-			Misses:     misses.Int(),
-			Evictions:  evictions.Int(),
+			Shape:         shape.Str(),
+			PipelineShape: pipelineShape.Str(),
+			SchemaHash:    schemaHash.Str(),
+			Count:         count.Int(),
+			Hits:          hits.Int(),
+			Misses:        misses.Int(),
+			Evictions:     evictions.Int(),
 		})
 	}
 	return rows

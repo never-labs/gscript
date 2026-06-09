@@ -17,10 +17,11 @@ import (
 // The kernel stores a source-free plan so it can be reused across frames with
 // the same schema and compatible literal bindings.
 type QueryKernel struct {
-	plan   QueryPlan
-	schema Schema
-	reason string
-	shape  string
+	plan          QueryPlan
+	schema        Schema
+	reason        string
+	shape         string
+	pipelineShape string
 }
 
 // SchemaStableCacheKeyParts is the decoded representation of cache keys built
@@ -550,7 +551,13 @@ func CompileQueryKernel(frame Frame, plan QueryPlan) (*QueryKernel, bool, error)
 	if frameReason := queryKernelFrameReason(frame, compiled); frameReason != "" {
 		reason = frameReason
 	}
-	return &QueryKernel{plan: compiled, schema: frame.Schema(), reason: reason, shape: QueryKernelPlanShape(compiled)}, true, nil
+	return &QueryKernel{
+		plan:          compiled,
+		schema:        frame.Schema(),
+		reason:        reason,
+		shape:         QueryKernelPlanShape(compiled),
+		pipelineShape: QueryKernelPlanPipelineShape(compiled),
+	}, true, nil
 }
 
 func cloneQueryKernelPlan(plan QueryPlan) QueryPlan {
@@ -943,6 +950,17 @@ func (k *QueryKernel) Shape() string {
 	return k.shape
 }
 
+// PipelineShape returns the stable column-pipeline lowering shape captured at
+// compile time. Unlike Shape, this describes the backend stages that a typed
+// runtime/JIT path can lower to, such as column loads, compare masks, filters
+// and projections.
+func (k *QueryKernel) PipelineShape() string {
+	if k == nil {
+		return ""
+	}
+	return k.pipelineShape
+}
+
 func queryKernelFrameReason(frame Frame, plan QueryPlan) string {
 	if len(plan.By)+len(plan.ByExprs) > 0 && len(plan.Aggregates) > 0 {
 		byInputs, err := bindGroupInputs(frame, groupByItems(plan))
@@ -984,6 +1002,36 @@ func QueryKernelPlanShape(plan QueryPlan) string {
 		return path
 	}
 	return path + "|" + strings.Join(detail, "|")
+}
+
+// QueryKernelPlanPipelineShape returns a stable, low-cardinality description of
+// the columnar pipeline implied by a QueryPlan. The string intentionally omits
+// column names and literal values so it is reusable across schema-stable qSQL
+// cache entries and can be consumed by typed runtime/JIT backends.
+func QueryKernelPlanPipelineShape(plan QueryPlan) string {
+	stages := []string{"scan=frame"}
+	if where := queryKernelWherePipelineShape(plan.Where); where != "" {
+		stages = append(stages, "where="+where, "filter=index")
+	}
+	if by := queryKernelGroupPipelineShape(plan); by != "" {
+		stages = append(stages, "group="+by)
+	}
+	if aggregate := queryKernelAggregatePipelineShape(plan); aggregate != "" {
+		stages = append(stages, "aggregate="+aggregate)
+	}
+	if projection := queryKernelProjectionPipelineShape(plan); projection != "" {
+		stages = append(stages, "project="+projection)
+	}
+	if len(plan.OrderBy) > 0 {
+		stages = append(stages, "order="+queryKernelOrderShape(plan))
+	}
+	if plan.Distinct {
+		stages = append(stages, "distinct=rows")
+	}
+	if plan.LimitN >= 0 {
+		stages = append(stages, "limit=bounded")
+	}
+	return strings.Join(stages, "|")
 }
 
 func queryKernelPlanPath(plan QueryPlan) string {
@@ -1131,6 +1179,43 @@ func queryKernelWhereShape(expr Expr) string {
 	}
 }
 
+func queryKernelWherePipelineShape(expr Expr) string {
+	switch e := expr.(type) {
+	case nil:
+		return ""
+	case Binary:
+		if _, _, _, ok := binaryColumnLiteral(e); ok && isComparisonOp(e.Op) {
+			return "compare_mask:column_literal"
+		}
+		if isComparisonOp(e.Op) {
+			return "compare_mask:computed"
+		}
+		return "bool_mask:binary"
+	case Within:
+		if _, ok := e.Expr.(ColumnRef); ok {
+			return "compare_mask:within_column"
+		}
+		return "compare_mask:within_computed"
+	case In:
+		if _, ok := e.Expr.(ColumnRef); ok {
+			return "compare_mask:in_column"
+		}
+		return "compare_mask:in_computed"
+	case Logical:
+		return "bool_mask:logical_" + e.Op
+	case Not:
+		return "bool_mask:not"
+	case Conditional:
+		return "bool_mask:conditional"
+	case ColumnRef:
+		return "bool_mask:column_load"
+	case Literal:
+		return "bool_mask:literal"
+	default:
+		return "bool_mask:computed"
+	}
+}
+
 func queryKernelByReasonDetail(plan QueryPlan) string {
 	if len(plan.ByExprs) == 0 {
 		return ""
@@ -1163,6 +1248,23 @@ func queryKernelByShape(plan QueryPlan) string {
 		return "columns_bucketed"
 	}
 	return "bucketed"
+}
+
+func queryKernelGroupPipelineShape(plan QueryPlan) string {
+	columnCount := len(plan.By)
+	exprOps := make(map[string]int, len(plan.ByExprs))
+	for _, item := range plan.ByExprs {
+		exprOps[queryKernelExprPipelineOp(item.Expr)]++
+	}
+	parts := make([]string, 0, 2)
+	if columnCount > 0 {
+		parts = append(parts, fmt.Sprintf("column_load:%d", columnCount))
+	}
+	parts = appendPipelineOpCounts(parts, exprOps)
+	if len(parts) == 0 {
+		return ""
+	}
+	return strings.Join(parts, ",")
 }
 
 func queryKernelAggregateReasonDetail(plan QueryPlan) string {
@@ -1217,6 +1319,23 @@ func queryKernelAggregateShape(plan QueryPlan) string {
 	default:
 		return "computed"
 	}
+}
+
+func queryKernelAggregatePipelineShape(plan QueryPlan) string {
+	if len(plan.Aggregates) == 0 {
+		return ""
+	}
+	ops := make(map[string]int, len(plan.Aggregates)*2)
+	for _, agg := range plan.Aggregates {
+		ops["reduce:"+agg.Func]++
+		if agg.Func != "count" {
+			ops[queryKernelExprPipelineOp(agg.Expr)]++
+		}
+		if agg.Weight != nil {
+			ops["weight:"+queryKernelExprPipelineOp(agg.Weight)]++
+		}
+	}
+	return strings.Join(appendPipelineOpCounts(nil, ops), ",")
 }
 
 func queryKernelProjectionReasonDetail(plan QueryPlan) string {
@@ -1325,6 +1444,67 @@ func queryKernelProjectionShape(plan QueryPlan) string {
 	default:
 		return ""
 	}
+}
+
+func queryKernelProjectionPipelineShape(plan QueryPlan) string {
+	if len(plan.Select) == 0 {
+		return "column_load:all"
+	}
+	ops := make(map[string]int, len(plan.Select))
+	for _, item := range plan.Select {
+		ops[queryKernelExprPipelineOp(item.Expr)]++
+	}
+	return strings.Join(appendPipelineOpCounts(nil, ops), ",")
+}
+
+func queryKernelExprPipelineOp(expr Expr) string {
+	switch e := expr.(type) {
+	case nil:
+		return "none"
+	case ColumnRef:
+		return "column_load"
+	case Literal:
+		return "literal"
+	case Binary:
+		if _, _, _, ok := binaryColumnLiteral(e); ok && isComparisonOp(e.Op) {
+			return "compare_mask"
+		}
+		if isComparisonOp(e.Op) {
+			return "compare_mask_computed"
+		}
+		return "typed_binary"
+	case Conditional:
+		return "where_select"
+	case Logical, Not:
+		return "bool_mask"
+	case In:
+		return "compare_mask_in"
+	case Within:
+		return "compare_mask_within"
+	case BucketFloorExpr:
+		return "bucket"
+	case ListAggregateExpr:
+		return "list_reduce:" + e.Func
+	case VectorTransformExpr:
+		return "vector_transform:" + e.Func
+	default:
+		return "computed"
+	}
+}
+
+func appendPipelineOpCounts(parts []string, counts map[string]int) []string {
+	if len(counts) == 0 {
+		return parts
+	}
+	keys := make([]string, 0, len(counts))
+	for key := range counts {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		parts = append(parts, fmt.Sprintf("%s:%d", key, counts[key]))
+	}
+	return parts
 }
 
 func queryKernelOrderShape(plan QueryPlan) string {

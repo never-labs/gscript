@@ -1792,6 +1792,12 @@ func TestQueryKernelSupportReasonClassifiesHotExpressionPaths(t *testing.T) {
 	if got, want := QueryKernelPlanShape(changedLiteral), QueryKernelPlanShape(base); got != want {
 		t.Fatalf("QueryKernelPlanShape changed with literal value: got %q, want %q", got, want)
 	}
+	if got, want := QueryKernelPlanPipelineShape(changedLiteral), QueryKernelPlanPipelineShape(base); got != want {
+		t.Fatalf("QueryKernelPlanPipelineShape changed with literal value: got %q, want %q", got, want)
+	}
+	if got, want := QueryKernelPlanPipelineShape(base), "scan=frame|where=compare_mask:column_literal|filter=index|project=typed_binary:1"; got != want {
+		t.Fatalf("QueryKernelPlanPipelineShape = %q, want %q", got, want)
+	}
 }
 
 func TestQueryKernelPlanShapeAggregatesFingerprintSplitPlans(t *testing.T) {
@@ -1829,6 +1835,9 @@ func TestQueryKernelPlanShapeAggregatesFingerprintSplitPlans(t *testing.T) {
 		if got, want := kernel.Shape(), QueryKernelPlanShape(base); got != want {
 			t.Fatalf("%s kernel shape = %q, want %q", name, got, want)
 		}
+		if got, want := kernel.PipelineShape(), QueryKernelPlanPipelineShape(base); got != want {
+			t.Fatalf("%s kernel pipeline shape = %q, want %q", name, got, want)
+		}
 	}
 }
 
@@ -1862,9 +1871,19 @@ func TestQueryKernelPlanShapeClassifiesCompositePaths(t *testing.T) {
 	if got := kernel.Shape(); got != want {
 		t.Fatalf("compiled kernel shape = %q, want %q", got, want)
 	}
+	wantPipeline := "scan=frame|group=column_load:1|project=where_select:1|order=post_project:1|distinct=rows|limit=bounded"
+	if got := QueryKernelPlanPipelineShape(plan); got != wantPipeline {
+		t.Fatalf("QueryKernelPlanPipelineShape = %q, want %q", got, wantPipeline)
+	}
+	if got := kernel.PipelineShape(); got != wantPipeline {
+		t.Fatalf("compiled kernel pipeline shape = %q, want %q", got, wantPipeline)
+	}
 	var nilKernel *QueryKernel
 	if got := nilKernel.Shape(); got != "" {
 		t.Fatalf("nil kernel shape = %q, want empty", got)
+	}
+	if got := nilKernel.PipelineShape(); got != "" {
+		t.Fatalf("nil kernel pipeline shape = %q, want empty", got)
 	}
 }
 

@@ -92,11 +92,12 @@ type qSQLPlanCacheStats struct {
 }
 
 type qSQLKernelCacheKeyStats struct {
-	Key       string
-	Shape     string
-	Hits      int
-	Misses    int
-	Evictions int
+	Key           string
+	Shape         string
+	PipelineShape string
+	Hits          int
+	Misses        int
+	Evictions     int
 }
 
 // QSQLKernelCacheKeyStatJSONRow is the stable external row shape for qSQL
@@ -108,18 +109,20 @@ type QSQLKernelCacheKeyStatJSONRow struct {
 	SchemaHash      string `json:"schema_hash"`
 	PlanFingerprint string `json:"plan_fingerprint"`
 	Shape           string `json:"shape"`
+	PipelineShape   string `json:"pipeline_shape"`
 	Hits            int    `json:"hits"`
 	Misses          int    `json:"misses"`
 	Evictions       int    `json:"evictions"`
 }
 
 type qSQLKernelShapeStat struct {
-	Shape      string
-	SchemaHash string
-	Count      int
-	Hits       int
-	Misses     int
-	Evictions  int
+	Shape         string
+	PipelineShape string
+	SchemaHash    string
+	Count         int
+	Hits          int
+	Misses        int
+	Evictions     int
 }
 
 // QRuntimeKernelExecutionStat is the q.cache_stats-facing shape for MethodJIT
@@ -287,11 +290,12 @@ type QQueryKernelSupportKeyStatJSONRow struct {
 }
 
 type qSQLKernelDecisionKeyStat struct {
-	Key          string
-	Shape        string
-	ReasonCode   string
-	ReasonFamily string
-	Count        int
+	Key           string
+	Shape         string
+	PipelineShape string
+	ReasonCode    string
+	ReasonFamily  string
+	Count         int
 }
 
 // QSQLKernelDecisionKeyStatJSONRow is the stable external row shape for qSQL
@@ -303,6 +307,7 @@ type QSQLKernelDecisionKeyStatJSONRow struct {
 	SchemaHash      string `json:"schema_hash"`
 	PlanFingerprint string `json:"plan_fingerprint"`
 	Shape           string `json:"shape"`
+	PipelineShape   string `json:"pipeline_shape"`
 	ReasonFamily    string `json:"reason_family"`
 	ReasonCode      string `json:"reason_code"`
 	Count           int    `json:"count"`
@@ -426,11 +431,12 @@ type qSQLKernelDecisionReasonStat struct {
 }
 
 type qSQLKernelDecisionShapeStat struct {
-	Shape        string
-	SchemaHash   string
-	ReasonCode   string
-	ReasonFamily string
-	Count        int
+	Shape         string
+	PipelineShape string
+	SchemaHash    string
+	ReasonCode    string
+	ReasonFamily  string
+	Count         int
 }
 
 type qEvalCacheStats struct {
@@ -525,18 +531,19 @@ var (
 	qSQLTemplateOrder   []string
 	qSQLTemplateStats   qSQLPlanCacheStats
 
-	qSQLAlignedPlanCacheMu     sync.Mutex
-	qSQLAlignedPlanCache       = make(map[string]data.QueryPlan)
-	qSQLAlignedPlanOrder       []string
-	qSQLAlignedMutationCache   = make(map[string]*stdq.MutationPlan)
-	qSQLAlignedMutationOrder   []string
-	qSQLKernelCache            = make(map[string]*data.QueryKernel)
-	qSQLKernelOrder            []string
-	qSQLKernelUnsupported      = make(map[string]string)
-	qSQLKernelUnsupportedShape = make(map[string]string)
-	qSQLKernelUnsupportedOrder []string
-	qSQLKernelStatsByKey       = make(map[string]*qSQLKernelCacheKeyStats)
-	qSQLAlignedStats           qSQLPlanCacheStats
+	qSQLAlignedPlanCacheMu             sync.Mutex
+	qSQLAlignedPlanCache               = make(map[string]data.QueryPlan)
+	qSQLAlignedPlanOrder               []string
+	qSQLAlignedMutationCache           = make(map[string]*stdq.MutationPlan)
+	qSQLAlignedMutationOrder           []string
+	qSQLKernelCache                    = make(map[string]*data.QueryKernel)
+	qSQLKernelOrder                    []string
+	qSQLKernelUnsupported              = make(map[string]string)
+	qSQLKernelUnsupportedShape         = make(map[string]string)
+	qSQLKernelUnsupportedPipelineShape = make(map[string]string)
+	qSQLKernelUnsupportedOrder         []string
+	qSQLKernelStatsByKey               = make(map[string]*qSQLKernelCacheKeyStats)
+	qSQLAlignedStats                   qSQLPlanCacheStats
 
 	qEvalCacheMu    sync.Mutex
 	qEvalCache      = make(map[string]any)
@@ -2414,6 +2421,7 @@ func qExplainSQL(args qSQLArgsResult) (Value, error) {
 	out.RawSetString("kernel_cache_schema_match", BoolValue(qExplainKernelCacheSchemaMatches(kernelInfo)))
 	out.RawSetString("kernel_plan_fingerprint", StringValue(kernelInfo.planFingerprint))
 	out.RawSetString("kernel_shape", StringValue(kernelInfo.shape))
+	out.RawSetString("kernel_pipeline_shape", StringValue(kernelInfo.pipelineShape))
 	out.RawSetString("kernel_reason_code", StringValue(kernelInfo.reasonCode))
 	out.RawSetString("kernel_reason", StringValue(kernelInfo.reason))
 	out.RawSetString("kernel_execution_stats_domain", StringValue(qStatsDomainJITExecution))
@@ -2438,6 +2446,7 @@ type qExplainKernelResult struct {
 	cacheSchemaHash string
 	planFingerprint string
 	shape           string
+	pipelineShape   string
 	supported       bool
 	cached          bool
 	decisionCached  bool
@@ -2848,6 +2857,7 @@ func qExplainKernelInfo(args qSQLArgsResult, tmpl qSQLPlanTemplate) qExplainKern
 	cachedKernel, cached := qSQLKernelCache[kernelKey]
 	unsupportedReason, unsupportedCached := qSQLKernelUnsupported[kernelKey]
 	unsupportedShape := qSQLKernelUnsupportedShape[kernelKey]
+	unsupportedPipelineShape := qSQLKernelUnsupportedPipelineShape[kernelKey]
 	qSQLAlignedPlanCacheMu.Unlock()
 	if cached {
 		reason := cachedKernel.Reason()
@@ -2855,22 +2865,24 @@ func qExplainKernelInfo(args qSQLArgsResult, tmpl qSQLPlanTemplate) qExplainKern
 			reason = qKernelReasonSupported
 		}
 		shape := ""
+		pipelineShape := ""
 		if cachedKernel != nil {
 			shape = cachedKernel.Shape()
+			pipelineShape = cachedKernel.PipelineShape()
 		}
-		return qExplainKernelResult{schema: frame.Schema(), schemaHash: schemaHash, cacheKey: kernelKey, cacheNamespace: kernelKeyInfo.Namespace, cacheKind: kernelKeyInfo.Kind, cacheSchemaHash: kernelKeyInfo.SchemaHash, planFingerprint: planFingerprint, shape: shape, supported: true, cached: true, decisionCached: true, reasonCode: qKernelReasonSupported, reason: reason}
+		return qExplainKernelResult{schema: frame.Schema(), schemaHash: schemaHash, cacheKey: kernelKey, cacheNamespace: kernelKeyInfo.Namespace, cacheKind: kernelKeyInfo.Kind, cacheSchemaHash: kernelKeyInfo.SchemaHash, planFingerprint: planFingerprint, shape: shape, pipelineShape: pipelineShape, supported: true, cached: true, decisionCached: true, reasonCode: qKernelReasonSupported, reason: reason}
 	}
 	if unsupportedCached {
-		return qExplainKernelResult{schema: frame.Schema(), schemaHash: schemaHash, cacheKey: kernelKey, cacheNamespace: kernelKeyInfo.Namespace, cacheKind: kernelKeyInfo.Kind, cacheSchemaHash: kernelKeyInfo.SchemaHash, planFingerprint: planFingerprint, shape: unsupportedShape, cached: false, decisionCached: true, reasonCode: stdq.KernelFallbackReasonCode(unsupportedReason), reason: unsupportedReason}
+		return qExplainKernelResult{schema: frame.Schema(), schemaHash: schemaHash, cacheKey: kernelKey, cacheNamespace: kernelKeyInfo.Namespace, cacheKind: kernelKeyInfo.Kind, cacheSchemaHash: kernelKeyInfo.SchemaHash, planFingerprint: planFingerprint, shape: unsupportedShape, pipelineShape: unsupportedPipelineShape, cached: false, decisionCached: true, reasonCode: stdq.KernelFallbackReasonCode(unsupportedReason), reason: unsupportedReason}
 	}
 	supported, reason, err := data.QueryKernelCompileReason(frame, plan)
 	if err != nil {
 		return qExplainKernelResult{schema: frame.Schema(), schemaHash: schemaHash, cacheKey: kernelKey, cacheNamespace: kernelKeyInfo.Namespace, cacheKind: kernelKeyInfo.Kind, cacheSchemaHash: kernelKeyInfo.SchemaHash, planFingerprint: planFingerprint, cached: cached, decisionCached: cached, reasonCode: qKernelReasonCompileError, reason: err.Error()}
 	}
 	if !supported {
-		return qExplainKernelResult{schema: frame.Schema(), schemaHash: schemaHash, cacheKey: kernelKey, cacheNamespace: kernelKeyInfo.Namespace, cacheKind: kernelKeyInfo.Kind, cacheSchemaHash: kernelKeyInfo.SchemaHash, planFingerprint: planFingerprint, shape: data.QueryKernelPlanShape(plan), cached: cached, decisionCached: cached, reasonCode: stdq.KernelFallbackReasonCode(reason), reason: reason}
+		return qExplainKernelResult{schema: frame.Schema(), schemaHash: schemaHash, cacheKey: kernelKey, cacheNamespace: kernelKeyInfo.Namespace, cacheKind: kernelKeyInfo.Kind, cacheSchemaHash: kernelKeyInfo.SchemaHash, planFingerprint: planFingerprint, shape: data.QueryKernelPlanShape(plan), pipelineShape: data.QueryKernelPlanPipelineShape(plan), cached: cached, decisionCached: cached, reasonCode: stdq.KernelFallbackReasonCode(reason), reason: reason}
 	}
-	return qExplainKernelResult{schema: frame.Schema(), schemaHash: schemaHash, cacheKey: kernelKey, cacheNamespace: kernelKeyInfo.Namespace, cacheKind: kernelKeyInfo.Kind, cacheSchemaHash: kernelKeyInfo.SchemaHash, planFingerprint: planFingerprint, shape: data.QueryKernelPlanShape(plan), supported: true, cached: cached, decisionCached: cached, reasonCode: qKernelReasonSupported, reason: reason}
+	return qExplainKernelResult{schema: frame.Schema(), schemaHash: schemaHash, cacheKey: kernelKey, cacheNamespace: kernelKeyInfo.Namespace, cacheKind: kernelKeyInfo.Kind, cacheSchemaHash: kernelKeyInfo.SchemaHash, planFingerprint: planFingerprint, shape: data.QueryKernelPlanShape(plan), pipelineShape: data.QueryKernelPlanPipelineShape(plan), supported: true, cached: cached, decisionCached: cached, reasonCode: qKernelReasonSupported, reason: reason}
 }
 
 func qSQLKernelCacheKeyInfo(key string) data.SchemaStableCacheKeyParts {
@@ -3327,7 +3339,7 @@ func qSQLKernelForFrame(src string, plan data.QueryPlan, frame data.Frame) (*dat
 			_, reason = data.QueryKernelSupportReason(plan)
 			qSQLAlignedPlanCacheMu.Lock()
 			qSQLAlignedStats.KernelDecisionMisses++
-			qSQLKernelUnsupportedStoreLocked(key, reason, data.QueryKernelPlanShape(plan))
+			qSQLKernelUnsupportedStoreLocked(key, reason, data.QueryKernelPlanShape(plan), data.QueryKernelPlanPipelineShape(plan))
 			qSQLAlignedPlanCacheMu.Unlock()
 		}
 		return nil, ok, reason, err
@@ -3521,7 +3533,9 @@ func qSQLKernelCacheStoreLocked(key string, kernel *data.QueryKernel) {
 	}
 	qSQLKernelCache[key] = kernel
 	if kernel != nil {
-		qSQLKernelStatsForKeyLocked(key).Shape = kernel.Shape()
+		stats := qSQLKernelStatsForKeyLocked(key)
+		stats.Shape = kernel.Shape()
+		stats.PipelineShape = kernel.PipelineShape()
 	}
 	for len(qSQLKernelOrder) > qSQLPlanCacheLimit {
 		evict := qSQLKernelOrder[0]
@@ -3532,7 +3546,7 @@ func qSQLKernelCacheStoreLocked(key string, kernel *data.QueryKernel) {
 	}
 }
 
-func qSQLKernelUnsupportedStoreLocked(key, reason, shape string) {
+func qSQLKernelUnsupportedStoreLocked(key, reason, shape, pipelineShape string) {
 	if key == "" || reason == "" {
 		return
 	}
@@ -3541,11 +3555,13 @@ func qSQLKernelUnsupportedStoreLocked(key, reason, shape string) {
 	}
 	qSQLKernelUnsupported[key] = reason
 	qSQLKernelUnsupportedShape[key] = shape
+	qSQLKernelUnsupportedPipelineShape[key] = pipelineShape
 	for len(qSQLKernelUnsupportedOrder) > qSQLPlanCacheLimit {
 		evict := qSQLKernelUnsupportedOrder[0]
 		qSQLKernelUnsupportedOrder = qSQLKernelUnsupportedOrder[1:]
 		delete(qSQLKernelUnsupported, evict)
 		delete(qSQLKernelUnsupportedShape, evict)
+		delete(qSQLKernelUnsupportedPipelineShape, evict)
 		qSQLAlignedStats.KernelDecisionEvictions++
 	}
 }
@@ -5211,8 +5227,9 @@ func qSQLKernelShapeStats(stats []qSQLKernelCacheKeyStats) []qSQLKernelShapeStat
 		return nil
 	}
 	type shapeSchemaKey struct {
-		shape      string
-		schemaHash string
+		shape         string
+		pipelineShape string
+		schemaHash    string
 	}
 	counts := make(map[shapeSchemaKey]*qSQLKernelShapeStat)
 	for _, stat := range stats {
@@ -5220,15 +5237,19 @@ func qSQLKernelShapeStats(stats []qSQLKernelCacheKeyStats) []qSQLKernelShapeStat
 		if shape == "" {
 			shape = "unknown"
 		}
+		pipelineShape := stat.PipelineShape
+		if pipelineShape == "" {
+			pipelineShape = "unknown"
+		}
 		info := qSQLKernelCacheKeyInfo(stat.Key)
 		schemaHash := info.SchemaHash
 		if schemaHash == "" {
 			schemaHash = "unknown"
 		}
-		key := shapeSchemaKey{shape: shape, schemaHash: schemaHash}
+		key := shapeSchemaKey{shape: shape, pipelineShape: pipelineShape, schemaHash: schemaHash}
 		shapeStat := counts[key]
 		if shapeStat == nil {
-			shapeStat = &qSQLKernelShapeStat{Shape: shape, SchemaHash: schemaHash}
+			shapeStat = &qSQLKernelShapeStat{Shape: shape, PipelineShape: pipelineShape, SchemaHash: schemaHash}
 			counts[key] = shapeStat
 		}
 		shapeStat.Count++
@@ -5254,6 +5275,9 @@ func qSQLKernelShapeStats(stats []qSQLKernelCacheKeyStats) []qSQLKernelShapeStat
 		if a.Shape != b.Shape {
 			return a.Shape < b.Shape
 		}
+		if a.PipelineShape != b.PipelineShape {
+			return a.PipelineShape < b.PipelineShape
+		}
 		return a.SchemaHash < b.SchemaHash
 	})
 	return out
@@ -5264,6 +5288,7 @@ func qKernelShapeStatsTable(stats []qSQLKernelShapeStat) *Table {
 	for i, stat := range stats {
 		row := NewTable()
 		row.RawSetString("shape", StringValue(stat.Shape))
+		row.RawSetString("pipeline_shape", StringValue(stat.PipelineShape))
 		row.RawSetString("schema_hash", StringValue(stat.SchemaHash))
 		row.RawSetString("count", IntValue(int64(stat.Count)))
 		row.RawSetString("hits", IntValue(int64(stat.Hits)))
@@ -5290,6 +5315,7 @@ func QSQLKernelCacheKeyStatJSONRows(stats []qSQLKernelCacheKeyStats) []QSQLKerne
 			SchemaHash:      info.SchemaHash,
 			PlanFingerprint: qSQLKernelCacheKeyPlanFingerprint(info),
 			Shape:           stat.Shape,
+			PipelineShape:   stat.PipelineShape,
 			Hits:            stat.Hits,
 			Misses:          stat.Misses,
 			Evictions:       stat.Evictions,
@@ -5309,6 +5335,7 @@ func qKernelCacheKeyStatsTable(stats []qSQLKernelCacheKeyStats) *Table {
 		row.RawSetString("schema_hash", StringValue(info.SchemaHash))
 		row.RawSetString("plan_fingerprint", StringValue(qSQLKernelCacheKeyPlanFingerprint(info)))
 		row.RawSetString("shape", StringValue(stat.Shape))
+		row.RawSetString("pipeline_shape", StringValue(stat.PipelineShape))
 		row.RawSetString("hits", IntValue(int64(stat.Hits)))
 		row.RawSetString("misses", IntValue(int64(stat.Misses)))
 		row.RawSetString("evictions", IntValue(int64(stat.Evictions)))
@@ -5332,12 +5359,17 @@ func qSQLKernelDecisionKeyStatsSnapshotLocked() []qSQLKernelDecisionKeyStat {
 		if shape == "" {
 			shape = "unknown"
 		}
+		pipelineShape := qSQLKernelUnsupportedPipelineShape[key]
+		if pipelineShape == "" {
+			pipelineShape = "unknown"
+		}
 		out = append(out, qSQLKernelDecisionKeyStat{
-			Key:          key,
-			Shape:        shape,
-			ReasonCode:   reasonCode,
-			ReasonFamily: qFallbackReasonFamilyForDetail(qFallbackKernelUnsupported, reasonCode, reason),
-			Count:        1,
+			Key:           key,
+			Shape:         shape,
+			PipelineShape: pipelineShape,
+			ReasonCode:    reasonCode,
+			ReasonFamily:  qFallbackReasonFamilyForDetail(qFallbackKernelUnsupported, reasonCode, reason),
+			Count:         1,
 		})
 	}
 	sort.Slice(out, func(i, j int) bool {
@@ -5360,12 +5392,17 @@ func qSQLKernelDecisionShapeStatsLocked(keys []qSQLKernelDecisionKeyStat) []qSQL
 		if shape == "" {
 			shape = "unknown"
 		}
+		pipelineShape := key.PipelineShape
+		if pipelineShape == "" {
+			pipelineShape = "unknown"
+		}
 		info := qSQLKernelCacheKeyInfo(key.Key)
 		counts[qSQLKernelDecisionShapeStat{
-			Shape:        shape,
-			SchemaHash:   info.SchemaHash,
-			ReasonCode:   key.ReasonCode,
-			ReasonFamily: key.ReasonFamily,
+			Shape:         shape,
+			PipelineShape: pipelineShape,
+			SchemaHash:    info.SchemaHash,
+			ReasonCode:    key.ReasonCode,
+			ReasonFamily:  key.ReasonFamily,
 		}] += key.Count
 	}
 	out := make([]qSQLKernelDecisionShapeStat, 0, len(counts))
@@ -5386,6 +5423,9 @@ func qSQLKernelDecisionShapeStatsLocked(keys []qSQLKernelDecisionKeyStat) []qSQL
 		}
 		if a.SchemaHash != b.SchemaHash {
 			return a.SchemaHash < b.SchemaHash
+		}
+		if a.PipelineShape != b.PipelineShape {
+			return a.PipelineShape < b.PipelineShape
 		}
 		return a.Shape < b.Shape
 	})
@@ -5429,6 +5469,7 @@ func qKernelDecisionKeyStatsTable(stats []qSQLKernelDecisionKeyStat) *Table {
 		row.RawSetString("schema_hash", StringValue(info.SchemaHash))
 		row.RawSetString("plan_fingerprint", StringValue(qSQLKernelCacheKeyPlanFingerprint(info)))
 		row.RawSetString("shape", StringValue(stat.Shape))
+		row.RawSetString("pipeline_shape", StringValue(stat.PipelineShape))
 		row.RawSetString("reason_family", StringValue(stat.ReasonFamily))
 		row.RawSetString("reason_code", StringValue(stat.ReasonCode))
 		row.RawSetString("count", IntValue(int64(stat.Count)))
@@ -5453,6 +5494,7 @@ func QSQLKernelDecisionKeyStatJSONRows(stats []qSQLKernelDecisionKeyStat) []QSQL
 			SchemaHash:      info.SchemaHash,
 			PlanFingerprint: qSQLKernelCacheKeyPlanFingerprint(info),
 			Shape:           stat.Shape,
+			PipelineShape:   stat.PipelineShape,
 			ReasonFamily:    stat.ReasonFamily,
 			ReasonCode:      stat.ReasonCode,
 			Count:           stat.Count,
@@ -5480,6 +5522,7 @@ func qKernelDecisionShapeStatsTable(stats []qSQLKernelDecisionShapeStat) *Table 
 		row.RawSetString("reason_family", StringValue(stat.ReasonFamily))
 		row.RawSetString("reason_code", StringValue(stat.ReasonCode))
 		row.RawSetString("shape", StringValue(stat.Shape))
+		row.RawSetString("pipeline_shape", StringValue(stat.PipelineShape))
 		row.RawSetString("schema_hash", StringValue(stat.SchemaHash))
 		row.RawSetString("count", IntValue(int64(stat.Count)))
 		rows.RawSetInt(int64(i+1), TableValue(row))
@@ -5938,6 +5981,7 @@ func qClearCaches() {
 	qSQLKernelOrder = nil
 	qSQLKernelUnsupported = make(map[string]string)
 	qSQLKernelUnsupportedShape = make(map[string]string)
+	qSQLKernelUnsupportedPipelineShape = make(map[string]string)
 	qSQLKernelUnsupportedOrder = nil
 	qSQLKernelStatsByKey = make(map[string]*qSQLKernelCacheKeyStats)
 	qSQLAlignedStats = qSQLPlanCacheStats{}
