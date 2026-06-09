@@ -1672,6 +1672,36 @@ func newFrame(cols []Column, cloneColumns bool) (Frame, error) {
 
 func (f Frame) Len() int { return f.rows }
 
+// FrameColumnNames returns the frame's column names without touching row data.
+func FrameColumnNames(frame Frame) []Symbol {
+	return frame.schema.Names()
+}
+
+// FrameColumnKinds returns the frame's column kinds in schema order without
+// cloning the full schema map.
+func FrameColumnKinds(frame Frame) []Kind {
+	kinds := make([]Kind, len(frame.schema.names))
+	for i, name := range frame.schema.names {
+		kinds[i] = frame.schema.kinds[name]
+	}
+	return kinds
+}
+
+// FrameColumnAttributes returns the first q-style attribute recorded for each
+// column, or the zero symbol when a column has no attribute.
+func FrameColumnAttributes(frame Frame) []Symbol {
+	attrs := make([]Symbol, len(frame.schema.names))
+	for i, name := range frame.schema.names {
+		if column := frame.columns[name]; column != nil {
+			metadata := ArrayMetadataOf(column)
+			if len(metadata.Attributes) > 0 {
+				attrs[i] = metadata.Attributes[0]
+			}
+		}
+	}
+	return attrs
+}
+
 func (f Frame) Schema() Schema {
 	kinds := make(map[Symbol]Kind, len(f.schema.kinds))
 	for name, kind := range f.schema.kinds {
@@ -1718,7 +1748,7 @@ func (f Frame) Gather(indexes []int) (Frame, error) {
 	for _, name := range f.schema.names {
 		cols = append(cols, Column{Name: name, Data: f.columns[name].Gather(indexes)})
 	}
-	return NewFrame(cols...)
+	return newFrameTrusted(cols...)
 }
 
 func Gather(array Array, indexes []int) (Array, error) {
@@ -1945,7 +1975,45 @@ func SelectFrameColumns(frame Frame, names ...Symbol) (Frame, error) {
 		cols = append(cols, Column{Name: name, Data: col})
 		seen[name] = struct{}{}
 	}
-	return NewFrame(cols...)
+	return newFrameTrusted(cols...)
+}
+
+// ReorderFrameColumns implements q xcols-style projection: requested columns
+// are moved to the front and unspecified columns keep their original order.
+func ReorderFrameColumns(frame Frame, requested ...Symbol) (Frame, error) {
+	order, err := reorderFrameColumnOrder(frame.schema.names, requested)
+	if err != nil {
+		return Frame{}, err
+	}
+	return SelectFrameColumns(frame, order...)
+}
+
+func reorderFrameColumnOrder(existing []Symbol, requested []Symbol) ([]Symbol, error) {
+	seenExisting := make(map[Symbol]struct{}, len(existing))
+	for _, name := range existing {
+		seenExisting[name] = struct{}{}
+	}
+	seenRequested := make(map[Symbol]struct{}, len(requested))
+	order := make([]Symbol, 0, len(existing))
+	for _, name := range requested {
+		if name == "" {
+			return nil, fmt.Errorf("xcols column name must not be empty")
+		}
+		if _, ok := seenExisting[name]; !ok {
+			return nil, fmt.Errorf("xcols column %q does not exist", name)
+		}
+		if _, ok := seenRequested[name]; ok {
+			return nil, fmt.Errorf("xcols column %q is duplicated", name)
+		}
+		seenRequested[name] = struct{}{}
+		order = append(order, name)
+	}
+	for _, name := range existing {
+		if _, ok := seenRequested[name]; !ok {
+			order = append(order, name)
+		}
+	}
+	return order, nil
 }
 
 func SameSchema(left, right Frame) bool {
@@ -4573,6 +4641,55 @@ func (k KeyedFrame) Frame() Frame {
 		panic(err)
 	}
 	return frame
+}
+
+// KeyedFrameColumnNames returns the underlying table's column names without
+// cloning row data.
+func KeyedFrameColumnNames(keyed KeyedFrame) []Symbol {
+	return keyed.frame.schema.Names()
+}
+
+// KeyedFrameColumnKinds returns the underlying table's column kinds in schema
+// order without cloning row data.
+func KeyedFrameColumnKinds(keyed KeyedFrame) []Kind {
+	return FrameColumnKinds(keyed.frame)
+}
+
+// KeyedFrameColumnAttributes returns the underlying table's first column
+// attributes in schema order without cloning row data.
+func KeyedFrameColumnAttributes(keyed KeyedFrame) []Symbol {
+	return FrameColumnAttributes(keyed.frame)
+}
+
+// KeyedFrameLen returns the underlying row count without cloning row data.
+func KeyedFrameLen(keyed KeyedFrame) int {
+	return keyed.frame.Len()
+}
+
+// ReorderKeyedFrameColumns reorders the underlying table columns while
+// preserving the existing key columns and keyed index sidecar.
+func ReorderKeyedFrameColumns(keyed KeyedFrame, requested ...Symbol) (KeyedFrame, error) {
+	frame, err := ReorderFrameColumns(keyed.frame, requested...)
+	if err != nil {
+		return KeyedFrame{}, err
+	}
+	return newKeyedFrameWithIndex(frame, keyed.keys, keyed.rowsByKey)
+}
+
+// XGroupKeyed groups a keyed frame's underlying table without first cloning it.
+func XGroupKeyed(keyed KeyedFrame, keys ...Symbol) (KeyedFrame, error) {
+	return XGroup(keyed.frame, keys...)
+}
+
+// UngroupKeyedFrame expands a keyed frame's underlying table without first
+// cloning it.
+func UngroupKeyedFrame(keyed KeyedFrame) (Frame, error) {
+	return Ungroup(keyed.frame)
+}
+
+// KeyByKeyed retargets a keyed frame's key columns without cloning row data.
+func KeyByKeyed(keyed KeyedFrame, keys ...Symbol) (KeyedFrame, error) {
+	return KeyBy(keyed.frame, keys...)
 }
 
 func (k KeyedFrame) ValueFrame() (Frame, error) {
@@ -9465,6 +9582,29 @@ func orderFrameLimit(frame Frame, specs []OrderSpec, limit int) (Frame, error) {
 		return Frame{}, err
 	}
 	return frame.Gather(indexes)
+}
+
+// SortFrameByColumns orders a frame by named columns using the same typed
+// ordering path as qSQL order-by.
+func SortFrameByColumns(frame Frame, names []Symbol, descending bool) (Frame, error) {
+	if len(names) == 0 {
+		return frame.Gather(allIndexes(frame.Len()))
+	}
+	specs := make([]OrderSpec, len(names))
+	for i, name := range names {
+		specs[i] = OrderSpec{Column: name, Desc: descending}
+	}
+	return orderFrame(frame, specs)
+}
+
+// SortKeyedFrameByColumns orders the underlying frame without first cloning it,
+// then rebuilds the keyed sidecar for the sorted frame.
+func SortKeyedFrameByColumns(keyed KeyedFrame, names []Symbol, descending bool) (KeyedFrame, error) {
+	frame, err := SortFrameByColumns(keyed.frame, names, descending)
+	if err != nil {
+		return KeyedFrame{}, err
+	}
+	return KeyBy(frame, keyed.keys...)
 }
 
 func orderIndexes(frame Frame, indexes []int, specs []OrderSpec) ([]int, error) {

@@ -481,6 +481,18 @@ func qRuntimeKernelPipelineShape(kernel, shape string) string {
 		return "vector_map"
 	case strings.HasPrefix(shape, "frame-gather/"):
 		return "frame_gather"
+	case strings.HasPrefix(shape, "frame-sort/"):
+		return "frame_sort"
+	case strings.HasPrefix(shape, "frame-reorder/"):
+		return "frame_reorder"
+	case strings.HasPrefix(shape, "frame-group/"):
+		return "frame_group"
+	case strings.HasPrefix(shape, "frame-ungroup/"):
+		return "frame_ungroup"
+	case strings.HasPrefix(shape, "frame-key/"):
+		return "frame_key"
+	case strings.HasPrefix(shape, "frame-meta/"):
+		return "frame_metadata"
 	case kernel != "":
 		return "kernel/" + kernel
 	default:
@@ -489,7 +501,15 @@ func qRuntimeKernelPipelineShape(kernel, shape string) string {
 }
 
 func qFrameGatherShape(op string, frame data.Frame, indexes []int) string {
-	return "frame-gather/" + op + "/" + qRuntimeCardinalityShape(len(indexes)) + "/cols-" + strconv.Itoa(len(frame.Schema().Names()))
+	return "frame-gather/" + op + "/" + qRuntimeCardinalityShape(len(indexes)) + "/cols-" + strconv.Itoa(len(data.FrameColumnNames(frame)))
+}
+
+func qFrameMetadataShape(op string, rows int, cols int) string {
+	return "frame-meta/" + op + "/" + qRuntimeCardinalityShape(rows) + "/cols-" + strconv.Itoa(cols)
+}
+
+func qRecordFrameMetadataPrimitive(op string, rows int, cols int, err error) {
+	recordRuntimeFramePrimitive("FrameMetadata", qFrameMetadataShape(op, rows, cols), err)
 }
 
 func qRuntimeCardinalityShape(n int) string {
@@ -2021,6 +2041,12 @@ func (s *EvalState) eval(src string) (any, error) {
 		return s.evalDrop(strings.TrimSpace(src[len("drop "):]))
 	}
 	if strings.HasPrefix(src, "count ") {
+		if out, handled, err := s.tryEvalCountFrameMetadata(strings.TrimSpace(src[len("count "):])); err != nil || handled {
+			return out, err
+		}
+		if out, handled, err := s.tryEvalCountFlip(strings.TrimSpace(src[len("count "):])); err != nil || handled {
+			return out, err
+		}
 		if out, handled, err := s.tryEvalCountGroup(strings.TrimSpace(src[len("count "):])); err != nil || handled {
 			return out, err
 		}
@@ -5319,6 +5345,103 @@ func (s *EvalState) tryEvalCountWhereNull(src string) (any, bool, error) {
 	}
 	out, err := count(indexes)
 	return out, true, err
+}
+
+func (s *EvalState) tryEvalCountFrameMetadata(src string) (any, bool, error) {
+	src = stripEnclosingParens(strings.TrimSpace(src))
+	op := ""
+	arg := ""
+	switch {
+	case strings.HasPrefix(src, "cols "):
+		op = "cols"
+		arg = strings.TrimSpace(src[len("cols "):])
+	case strings.HasPrefix(src, "meta "):
+		op = "meta"
+		arg = strings.TrimSpace(src[len("meta "):])
+	default:
+		return nil, false, nil
+	}
+	names, rows, handled, err := s.tryEvalFrameColumnNamesExpr(arg)
+	if !handled {
+		return nil, false, nil
+	}
+	recordRuntimeFramePrimitive("FrameMetadata", "frame-meta/count-"+op+"/"+qRuntimeCardinalityShape(rows)+"/cols-"+strconv.Itoa(len(names)), err)
+	if err != nil {
+		return nil, true, err
+	}
+	return int64(len(names)), true, nil
+}
+
+func (s *EvalState) tryEvalFrameColumnNamesExpr(src string) ([]data.Symbol, int, bool, error) {
+	src = stripEnclosingParens(strings.TrimSpace(src))
+	if strings.HasPrefix(src, "flip ") {
+		value, err := s.eval(strings.TrimSpace(src[len("flip "):]))
+		if err != nil {
+			return nil, 0, true, err
+		}
+		names, rows, err := flipColumnNamesAndRows(value)
+		return names, rows, true, err
+	}
+	for _, word := range []string{"xcols", "xasc", "xdesc", "xkey", "xgroup"} {
+		leftExpr, rightExpr, ok := splitTopLevelWord(src, word)
+		if !ok {
+			continue
+		}
+		requestedValue, err := s.eval(leftExpr)
+		if err != nil {
+			return nil, 0, true, err
+		}
+		requested, err := qColumnNameList(requestedValue)
+		if err != nil {
+			return nil, 0, true, fmt.Errorf("%s: %w", word, err)
+		}
+		names, rows, handled, err := s.tryEvalFrameColumnNamesExpr(rightExpr)
+		if !handled || err != nil {
+			return names, rows, handled, err
+		}
+		switch word {
+		case "xcols":
+			order, err := xcolsOrder(names, requested)
+			if err != nil {
+				return nil, 0, true, err
+			}
+			return order, rows, true, nil
+		default:
+			if err := qValidateFrameColumns(names, requested, word); err != nil {
+				return nil, 0, true, err
+			}
+			return names, rows, true, nil
+		}
+	}
+	value, err := s.eval(src)
+	if err != nil {
+		return nil, 0, true, err
+	}
+	switch x := value.(type) {
+	case data.Frame:
+		return data.FrameColumnNames(x), x.Len(), true, nil
+	case data.KeyedFrame:
+		return data.KeyedFrameColumnNames(x), data.KeyedFrameLen(x), true, nil
+	default:
+		return nil, 0, false, nil
+	}
+}
+
+func (s *EvalState) tryEvalCountFlip(src string) (any, bool, error) {
+	src = stripEnclosingParens(strings.TrimSpace(src))
+	if !strings.HasPrefix(src, "flip ") {
+		return nil, false, nil
+	}
+	value, err := s.eval(strings.TrimSpace(src[len("flip "):]))
+	if err != nil {
+		return nil, true, err
+	}
+	rows, cols, err := flipRowCount(value)
+	recordRuntimeFramePrimitive("FrameMetadata", "frame-meta/count-flip/"+qRuntimeCardinalityShape(rows)+"/cols-"+strconv.Itoa(cols), err)
+	if err != nil {
+		return nil, true, err
+	}
+	return int64(rows), true, nil
 }
 
 func (s *EvalState) tryEvalCountWhereMask(src string) (any, bool, error) {
@@ -8690,11 +8813,9 @@ func flip(v any) (data.Frame, error) {
 	for i, key := range keys {
 		values[key] = d.Values[i]
 	}
-	rows := 1
-	for _, name := range keys {
-		if array, ok := values[name].(data.Array); ok && array.Len() > rows {
-			rows = array.Len()
-		}
+	rows, _, err := flipRowCountFromDict(keys, values)
+	if err != nil {
+		return data.Frame{}, err
 	}
 	cols := make([]data.Column, 0, len(keys))
 	for _, name := range keys {
@@ -8709,6 +8830,80 @@ func flip(v any) (data.Frame, error) {
 		cols = append(cols, data.Column{Name: name, Data: array})
 	}
 	return data.NewFrame(cols...)
+}
+
+func flipRowCount(v any) (rows int, cols int, err error) {
+	if _, ok := v.(data.KeyedFrame); ok {
+		return 0, 0, fmt.Errorf("flip expects a plain dictionary, got keyed table")
+	}
+	d, ok := v.(EvalDict)
+	if !ok {
+		return 0, 0, fmt.Errorf("flip expects a dictionary")
+	}
+	keys, err := dictSymbolKeys(d)
+	if err != nil {
+		return 0, 0, fmt.Errorf("flip expects symbol column names: %w", err)
+	}
+	values := make(map[data.Symbol]any, len(d.Keys))
+	for i, key := range keys {
+		values[key] = d.Values[i]
+	}
+	rows, _, err = flipRowCountFromDict(keys, values)
+	return rows, len(keys), err
+}
+
+func flipColumnNamesAndRows(v any) ([]data.Symbol, int, error) {
+	if _, ok := v.(data.KeyedFrame); ok {
+		return nil, 0, fmt.Errorf("flip expects a plain dictionary, got keyed table")
+	}
+	d, ok := v.(EvalDict)
+	if !ok {
+		return nil, 0, fmt.Errorf("flip expects a dictionary")
+	}
+	keys, err := dictSymbolKeys(d)
+	if err != nil {
+		return nil, 0, fmt.Errorf("flip expects symbol column names: %w", err)
+	}
+	values := make(map[data.Symbol]any, len(d.Keys))
+	for i, key := range keys {
+		values[key] = d.Values[i]
+	}
+	rows, _, err := flipRowCountFromDict(keys, values)
+	if err != nil {
+		return nil, 0, err
+	}
+	return keys, rows, nil
+}
+
+func flipRowCountFromDict(keys []data.Symbol, values map[data.Symbol]any) (int, int, error) {
+	rows := 1
+	for _, name := range keys {
+		if array, ok := values[name].(data.Array); ok && array.Len() > rows {
+			rows = array.Len()
+		}
+	}
+	for _, name := range keys {
+		if array, ok := values[name].(data.Array); ok && array.Len() != rows && array.Len() != 1 {
+			return 0, 0, fmt.Errorf("flip column %q length %d cannot conform to row count %d", name, array.Len(), rows)
+		}
+	}
+	return rows, len(keys), nil
+}
+
+func qValidateFrameColumns(existing []data.Symbol, requested []data.Symbol, op string) error {
+	seen := make(map[data.Symbol]struct{}, len(existing))
+	for _, name := range existing {
+		seen[name] = struct{}{}
+	}
+	for _, name := range requested {
+		if name == "" {
+			return fmt.Errorf("%s column name must not be empty", op)
+		}
+		if _, ok := seen[name]; !ok {
+			return fmt.Errorf("%s column %q does not exist", op, name)
+		}
+	}
+	return nil
 }
 
 func applyDyadic(op byte, left, right any) (any, error) {
@@ -9592,7 +9787,11 @@ func count(v any) (any, error) {
 	case data.Array:
 		return int64(x.Len()), nil
 	case data.Frame:
+		qRecordFrameMetadataPrimitive("count", x.Len(), len(data.FrameColumnNames(x)), nil)
 		return int64(x.Len()), nil
+	case data.KeyedFrame:
+		qRecordFrameMetadataPrimitive("count", data.KeyedFrameLen(x), len(data.KeyedFrameColumnNames(x)), nil)
+		return int64(data.KeyedFrameLen(x)), nil
 	case EvalDict:
 		return int64(len(x.Keys)), nil
 	case string:
@@ -10627,9 +10826,13 @@ func value(v any) (any, error) {
 func cols(v any) (any, error) {
 	switch x := v.(type) {
 	case data.Frame:
-		return symbolArray(x.Schema().Names()), nil
+		names := data.FrameColumnNames(x)
+		qRecordFrameMetadataPrimitive("cols", x.Len(), len(names), nil)
+		return symbolArray(names), nil
 	case data.KeyedFrame:
-		return symbolArray(x.Frame().Schema().Names()), nil
+		names := data.KeyedFrameColumnNames(x)
+		qRecordFrameMetadataPrimitive("cols", data.KeyedFrameLen(x), len(names), nil)
+		return symbolArray(names), nil
 	case EvalDict:
 		keys, err := dictSymbolKeys(x)
 		if err != nil {
@@ -10648,13 +10851,13 @@ func xcols(left any, right any) (any, error) {
 	}
 	switch x := right.(type) {
 	case data.Frame:
-		return reorderFrameColumns(x, names)
+		out, err := data.ReorderFrameColumns(x, names...)
+		recordRuntimeFramePrimitive("FrameReorder", "frame-reorder/xcols/"+qRuntimeCardinalityShape(x.Len())+"/cols-"+strconv.Itoa(len(data.FrameColumnNames(x))), err)
+		return out, err
 	case data.KeyedFrame:
-		frame, err := reorderFrameColumns(x.Frame(), names)
-		if err != nil {
-			return nil, err
-		}
-		return data.KeyBy(frame, x.Keys()...)
+		out, err := data.ReorderKeyedFrameColumns(x, names...)
+		recordRuntimeFramePrimitive("FrameReorder", "frame-reorder/xcols-keyed/"+qRuntimeCardinalityShape(data.KeyedFrameLen(x))+"/cols-"+strconv.Itoa(len(data.KeyedFrameColumnNames(x))), err)
+		return out, err
 	case EvalDict:
 		return reorderDictColumns(x, names)
 	default:
@@ -10669,9 +10872,13 @@ func xgroup(left any, right any) (any, error) {
 	}
 	switch x := right.(type) {
 	case data.Frame:
-		return data.XGroup(x, names...)
+		out, err := data.XGroup(x, names...)
+		recordRuntimeFramePrimitive("FrameGroup", "frame-group/xgroup/"+qRuntimeCardinalityShape(x.Len())+"/cols-"+strconv.Itoa(len(data.FrameColumnNames(x))), err)
+		return out, err
 	case data.KeyedFrame:
-		return data.XGroup(x.Frame(), names...)
+		out, err := data.XGroupKeyed(x, names...)
+		recordRuntimeFramePrimitive("FrameGroup", "frame-group/xgroup-keyed/"+qRuntimeCardinalityShape(data.KeyedFrameLen(x))+"/cols-"+strconv.Itoa(len(data.KeyedFrameColumnNames(x))), err)
+		return out, err
 	default:
 		return nil, fmt.Errorf("xgroup expects a table")
 	}
@@ -10687,9 +10894,13 @@ func xkey(left any, right any) (any, error) {
 	}
 	switch x := right.(type) {
 	case data.Frame:
-		return data.KeyBy(x, names...)
+		out, err := data.KeyBy(x, names...)
+		recordRuntimeFramePrimitive("FrameKey", "frame-key/xkey/"+qRuntimeCardinalityShape(x.Len())+"/cols-"+strconv.Itoa(len(data.FrameColumnNames(x))), err)
+		return out, err
 	case data.KeyedFrame:
-		return data.KeyBy(x.Frame(), names...)
+		out, err := data.KeyByKeyed(x, names...)
+		recordRuntimeFramePrimitive("FrameKey", "frame-key/xkey-keyed/"+qRuntimeCardinalityShape(data.KeyedFrameLen(x))+"/cols-"+strconv.Itoa(len(data.KeyedFrameColumnNames(x))), err)
+		return out, err
 	default:
 		return nil, fmt.Errorf("xkey expects a table")
 	}
@@ -10698,9 +10909,13 @@ func xkey(left any, right any) (any, error) {
 func ungroup(v any) (any, error) {
 	switch x := v.(type) {
 	case data.Frame:
-		return data.Ungroup(x)
+		out, err := data.Ungroup(x)
+		recordRuntimeFramePrimitive("FrameUngroup", "frame-ungroup/"+qRuntimeCardinalityShape(x.Len())+"/cols-"+strconv.Itoa(len(data.FrameColumnNames(x))), err)
+		return out, err
 	case data.KeyedFrame:
-		return data.Ungroup(x.Frame())
+		out, err := data.UngroupKeyedFrame(x)
+		recordRuntimeFramePrimitive("FrameUngroup", "frame-ungroup/keyed/"+qRuntimeCardinalityShape(data.KeyedFrameLen(x))+"/cols-"+strconv.Itoa(len(data.KeyedFrameColumnNames(x))), err)
+		return out, err
 	default:
 		return nil, fmt.Errorf("ungroup expects a table")
 	}
@@ -10721,13 +10936,21 @@ func xsort(left any, right any, descending bool) (any, error) {
 	}
 	switch x := right.(type) {
 	case data.Frame:
-		return sortFrameByColumns(x, names, descending)
-	case data.KeyedFrame:
-		frame, err := sortFrameByColumns(x.Frame(), names, descending)
-		if err != nil {
-			return nil, err
+		out, err := data.SortFrameByColumns(x, names, descending)
+		op := "xasc"
+		if descending {
+			op = "xdesc"
 		}
-		return data.KeyBy(frame, x.Keys()...)
+		recordRuntimeFramePrimitive("FrameSort", "frame-sort/"+op+"/"+qRuntimeCardinalityShape(x.Len())+"/cols-"+strconv.Itoa(len(data.FrameColumnNames(x))), err)
+		return out, err
+	case data.KeyedFrame:
+		out, err := data.SortKeyedFrameByColumns(x, names, descending)
+		op := "xasc-keyed"
+		if descending {
+			op = "xdesc-keyed"
+		}
+		recordRuntimeFramePrimitive("FrameSort", "frame-sort/"+op+"/"+qRuntimeCardinalityShape(data.KeyedFrameLen(x))+"/cols-"+strconv.Itoa(len(data.KeyedFrameColumnNames(x))), err)
+		return out, err
 	default:
 		return nil, fmt.Errorf("xsort expects a table")
 	}
@@ -10900,34 +11123,40 @@ func meta(v any) (any, error) {
 			Values: []any{x.domain, typ, int64(x.Len())},
 		}, nil
 	}
-	var frame data.Frame
+	var names []data.Symbol
+	var kinds []data.Kind
+	var columnAttrs []data.Symbol
+	rows := 0
 	switch x := v.(type) {
 	case data.Frame:
-		frame = x
+		names = data.FrameColumnNames(x)
+		kinds = data.FrameColumnKinds(x)
+		columnAttrs = data.FrameColumnAttributes(x)
+		rows = x.Len()
 	case data.KeyedFrame:
-		frame = x.Frame()
+		names = data.KeyedFrameColumnNames(x)
+		kinds = data.KeyedFrameColumnKinds(x)
+		columnAttrs = data.KeyedFrameColumnAttributes(x)
+		rows = data.KeyedFrameLen(x)
 	default:
 		return nil, fmt.Errorf("meta expects a table")
 	}
-	names := frame.Schema().Names()
 	typeNames := make([]string, len(names))
 	attributes := make([]any, len(names))
-	for i, name := range names {
-		kind, _ := frame.Schema().Kind(name)
-		typeNames[i] = string(kind)
+	for i := range names {
+		typeNames[i] = string(kinds[i])
 		attributes[i] = data.NullValue
-		if column, ok := frame.Column(name); ok {
-			metadata := data.ArrayMetadataOf(column)
-			if len(metadata.Attributes) > 0 {
-				attributes[i] = metadata.Attributes[0]
-			}
+		if i < len(columnAttrs) && columnAttrs[i] != "" {
+			attributes[i] = columnAttrs[i]
 		}
 	}
-	return data.NewFrame(
+	out, err := data.NewFrame(
 		data.Column{Name: "c", Data: symbolArray(names)},
 		data.Column{Name: "t", Data: data.NewString(typeNames)},
 		data.Column{Name: "a", Data: data.NewAny(attributes)},
 	)
+	qRecordFrameMetadataPrimitive("meta", rows, len(names), err)
+	return out, err
 }
 
 func attrValue(v any) (any, error) {

@@ -2574,22 +2574,17 @@ func TestEvalFrameRuntimePrimitivesRecordStats(t *testing.T) {
 
 	seen := map[string]bool{}
 	for _, stat := range RuntimeKernelExecutionStats() {
-		if stat.Kernel != "FrameGather" ||
-			stat.Route != "frame_runtime_primitive" ||
-			stat.PipelineShape != "frame_gather" ||
-			stat.Outcome != "hit" ||
-			stat.ReasonCode != "frame_runtime" ||
-			stat.Count == 0 {
+		if stat.Route != "frame_runtime_primitive" || stat.Outcome != "hit" || stat.ReasonCode != "frame_runtime" || stat.Count == 0 {
 			continue
 		}
 		switch {
-		case strings.HasPrefix(stat.Shape, "frame-gather/take/"):
+		case stat.Kernel == "FrameGather" && stat.PipelineShape == "frame_gather" && strings.HasPrefix(stat.Shape, "frame-gather/take/"):
 			seen["take"] = true
-		case strings.HasPrefix(stat.Shape, "frame-gather/drop/"):
+		case stat.Kernel == "FrameGather" && stat.PipelineShape == "frame_gather" && strings.HasPrefix(stat.Shape, "frame-gather/drop/"):
 			seen["drop"] = true
-		case strings.HasPrefix(stat.Shape, "frame-gather/rotate/"):
+		case stat.Kernel == "FrameGather" && stat.PipelineShape == "frame_gather" && strings.HasPrefix(stat.Shape, "frame-gather/rotate/"):
 			seen["rotate"] = true
-		case strings.HasPrefix(stat.Shape, "frame-gather/sort/"):
+		case stat.Kernel == "FrameSort" && stat.PipelineShape == "frame_sort" && strings.HasPrefix(stat.Shape, "frame-sort/xasc/"):
 			seen["sort"] = true
 		}
 	}
