@@ -1333,12 +1333,14 @@ func TestEvalGroup(t *testing.T) {
 
 func TestEvalTemporalLiteralsAndTypedNullVectors(t *testing.T) {
 	assertEvalValue(t, "2024.01", data.MonthFromMonths(648))
+	assertEvalValue(t, "2024.01m", data.MonthFromMonths(648))
 	assertEvalValue(t, "2024.01.02", data.DateFromDays(19724))
 	assertEvalValue(t, "2024-01-02", data.DateFromDays(19724))
 	assertEvalValue(t, "1970.01.02T00:00:00.000000001", data.DateTimeFromUnixNanos(86_400_000_000_001))
 	assertEvalValue(t, "1D00:00:00.000000001", data.TimespanFromNanos(86_400_000_000_001))
 	assertEvalValue(t, "-0D00:01:00", data.TimespanFromNanos(-60*1_000_000_000))
 	assertEvalValue(t, "string 2024.01", "2024.01")
+	assertEvalValue(t, "string 2024.01m", "2024.01")
 	assertEvalValue(t, "string 1970.01.02T00:00:00.000000001", "1970-01-02T00:00:00.000000001")
 	assertEvalValue(t, "string 1D00:00:00.000000001", "1D00:00:00.000000001")
 	assertEvalValue(t, "string -0D00:01:00", "-0D00:01:00")
@@ -1371,6 +1373,7 @@ func TestEvalTemporalLiteralsAndTypedNullVectors(t *testing.T) {
 	assertEvalArray(t, "0Nc \"a\" \"b\"", data.KindString, []any{data.NullValue, "a", "b"})
 	assertEvalArray(t, "0Np 0Np", data.KindTimestamp, []any{data.NullValue, data.NullValue})
 	assertEvalArray(t, "0Nm 2024.01 2024.02", data.KindMonth, []any{data.NullValue, data.Month(648), data.Month(649)})
+	assertEvalArray(t, "0Nm 2024.01m 2024.02m", data.KindMonth, []any{data.NullValue, data.Month(648), data.Month(649)})
 	assertEvalArray(t, "2024-01-02 0Nd 2024.01.03", data.KindDate, []any{data.DateFromDays(19724), data.NullValue, data.DateFromDays(19725)})
 	assertEvalArray(t, "0Nd 2024.01.02", data.KindDate, []any{data.NullValue, data.Date(19724)})
 	assertEvalArray(t, "0Nz 1970.01.02T00:00:00.000000001", data.KindDateTime, []any{data.NullValue, data.DateTime(86_400_000_000_001)})

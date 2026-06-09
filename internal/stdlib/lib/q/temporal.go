@@ -326,6 +326,7 @@ func typedNullTokenForKind(kind string) string {
 }
 
 func parseQMonth(text string) (data.Month, error) {
+	text = normalizeQMonthText(text)
 	parts := strings.Split(text, ".")
 	if len(parts) == 1 {
 		parts = strings.Split(text, "-")
@@ -342,6 +343,13 @@ func parseQMonth(text string) (data.Month, error) {
 		return 0, fmt.Errorf("invalid q month %q", text)
 	}
 	return data.MonthFromMonths(int64(year-1970)*12 + int64(month-1)), nil
+}
+
+func normalizeQMonthText(text string) string {
+	if len(text) > 0 && text[len(text)-1] == 'm' {
+		return text[:len(text)-1]
+	}
+	return text
 }
 
 func parseQDate(text string) (time.Time, error) {

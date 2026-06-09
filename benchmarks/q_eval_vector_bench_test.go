@@ -1759,6 +1759,7 @@ func appendQEvalOrdinaryExpressionCoverageCases(cases []qEvalVectorCase) []qEval
 	}{
 		{"DateGE", "2026.06.06 2026.06.07 2026.06.08", "dates>=2026.06.07", func(i int) bool { return i%3 != 0 }},
 		{"DateEQ", "2026.06.06 2026.06.07 2026.06.08", "dates=2026.06.08", func(i int) bool { return i%3 == 2 }},
+		{"MonthSuffixGE", "2026.06m 2026.07m 2026.08m", "dates>=2026.07m", func(i int) bool { return i%3 != 0 }},
 		{"TimeWithin", "09:30 09:31 09:32 09:33", "dates within 09:31 09:32", func(i int) bool { return i%4 == 1 || i%4 == 2 }},
 	} {
 		p := p

@@ -117,10 +117,11 @@ numeric_nulls := q.eval("0Nh 0Ni 0Nj 0Ne")
 check("q typed numeric null literals", q.count(numeric_nulls) == 4 && data.is_null(numeric_nulls[1]) && data.is_null(numeric_nulls[2]) && data.is_null(numeric_nulls[3]) && data.is_null(numeric_nulls[4]))
 
 month_null := q.eval("0Nm 2024.01")
+month_suffix := q.eval("2024.01m 2024.02m")
 minute_null := q.eval("0Nu 09:30")
 second_null := q.eval("0Nv 09:30:00")
 ok, err = pcall(q.eval, "0Nm 0Nu 0Nv")
-check("q month minute second null literals are supported by kind", data.is_null(month_null[1]) && month_null[2] == "2024.01" && data.is_null(minute_null[1]) && minute_null[2] == "09:30" && data.is_null(second_null[1]) && second_null[2] == "09:30:00" && ok == false && contains(err, "mixed temporal"))
+check("q month minute second null literals are supported by kind", data.is_null(month_null[1]) && month_null[2] == "2024.01" && month_suffix[1] == "2024.01" && month_suffix[2] == "2024.02" && data.is_null(minute_null[1]) && minute_null[2] == "09:30" && data.is_null(second_null[1]) && second_null[2] == "09:30:00" && ok == false && contains(err, "mixed temporal"))
 
 threshold := 100.0
 captured := q.sql("select sym,price from trades where price>threshold", {trades: trades, threshold: threshold})

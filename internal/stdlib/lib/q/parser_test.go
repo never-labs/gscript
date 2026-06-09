@@ -962,6 +962,7 @@ func TestParseTemporalComparisonsAndTypedNulls(t *testing.T) {
 		right any
 	}{
 		{`select price from trades where month=2024.01`, Temporal{Kind: "month", Text: "2024.01"}},
+		{`select price from trades where month=2024.01m`, Temporal{Kind: "month", Text: "2024.01m"}},
 		{`select price from trades where date=2024.01.02`, Temporal{Kind: "date", Text: "2024.01.02"}},
 		{`select price from trades where dt=2024.01.02T09:30:00.001`, Temporal{Kind: "datetime", Text: "2024.01.02T09:30:00.001"}},
 		{`select price from trades where span=1D09:30:00.001`, Temporal{Kind: "timespan", Text: "1D09:30:00.001"}},
