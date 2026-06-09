@@ -25,8 +25,9 @@ type qScriptPipelineDescriptor struct {
 }
 
 type qScriptPipelineAssignment struct {
-	name string
-	rhs  string
+	name      string
+	rhs       string
+	valueExpr Expr
 }
 
 func (d qScriptPipelineDescriptor) shape() string {
@@ -59,7 +60,7 @@ func buildQScriptPipelineDescriptor(statements []qScriptStatement) (*qScriptPipe
 		if stmt.assign == "" || stmt.rhs == "" {
 			return nil, false
 		}
-		assignments = append(assignments, qScriptPipelineAssignment{name: stmt.assign, rhs: stmt.rhs})
+		assignments = append(assignments, qScriptPipelineAssignment{name: stmt.assign, rhs: stmt.rhs, valueExpr: stmt.valueExpr})
 		bindings[stmt.assign] = stmt.rhs
 	}
 	descriptor, ok := describeQScriptPipelineTerminal(terminal.src, bindings)
@@ -130,4 +131,35 @@ func qScriptPipelineBinding(expr string, bindings map[string]string) string {
 		return rhs
 	}
 	return ""
+}
+
+func (s *EvalState) tryEvalQScriptPipeline(descriptor *qScriptPipelineDescriptor) (any, bool, error) {
+	if descriptor == nil || descriptor.kind == qScriptPipelineUnsupported {
+		return nil, false, nil
+	}
+	shape := descriptor.shape()
+	recordRuntimeKernelExecution("QScriptPipelinePlan", shape, "attempt", "attempt")
+	terminal := s.qPipelinePlan(descriptor.terminal)
+	if terminal.kind == qPipelineInvalid {
+		recordRuntimeKernelExecution("QScriptPipelinePlan", shape, "fallback", "unsupported_runtime_shape")
+		return nil, false, nil
+	}
+	for _, assignment := range descriptor.assignments {
+		value, err := s.evalCachedOrString(assignment.rhs, assignment.valueExpr)
+		if err != nil {
+			recordRuntimeKernelExecution("QScriptPipelinePlan", shape, "error", "runtime_error")
+			return nil, true, err
+		}
+		s.env[s.resolveAssignmentName(assignment.name)] = value
+	}
+	out, handled, err := s.evalQPipelinePlan(terminal)
+	switch {
+	case err != nil:
+		recordRuntimeKernelExecution("QScriptPipelinePlan", shape, "error", "runtime_error")
+	case handled:
+		recordRuntimeKernelExecution("QScriptPipelinePlan", shape, "hit", "typed_pipeline")
+	default:
+		recordRuntimeKernelExecution("QScriptPipelinePlan", shape, "fallback", "unsupported_runtime_shape")
+	}
+	return out, handled, err
 }

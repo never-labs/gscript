@@ -356,7 +356,9 @@ func (s *EvalState) Eval(src string) (any, error) {
 func (s *EvalState) evalScript(src string) (any, error) {
 	plan := s.qScriptPlan(src)
 	if plan.scriptPipeline != nil {
-		recordRuntimeKernelProbe("QScriptPipelinePlan", plan.scriptPipeline.shape(), true, nil)
+		if out, handled, err := s.tryEvalQScriptPipeline(plan.scriptPipeline); err != nil || handled {
+			return out, err
+		}
 	}
 	previousDeferredScans := s.deferScanAssignments
 	if len(plan.statements) > 1 && plan.deferScanCandidates {
