@@ -3732,6 +3732,24 @@ func TestEvalSqrtLogUnaryVerbs(t *testing.T) {
 	assertEvalArray(t, "sqrt 4 9 16", data.KindF64, []any{2.0, 3.0, 4.0})
 }
 
+func TestEvalAdditionalMathVerbs(t *testing.T) {
+	assertEvalValue(t, "sin 0", 0.0)
+	assertEvalValue(t, "cos 0", 1.0)
+	assertEvalValue(t, "tan 0", 0.0)
+	assertEvalValue(t, "asin 0", 0.0)
+	assertEvalValue(t, "acos 1", 0.0)
+	assertEvalValue(t, "atan 0", 0.0)
+	assertEvalArray(t, "sin 0 0N 0", data.KindF64, []any{0.0, data.NullValue, 0.0})
+
+	assertEvalValue(t, "2 xexp 3", 8.0)
+	assertEvalValue(t, "xexp[2;3]", 8.0)
+	assertEvalValue(t, "2 xlog 8", 3.0)
+	assertEvalValue(t, "xlog[2;8]", 3.0)
+	assertEvalArray(t, "2 3 xexp 3", data.KindF64, []any{8.0, 27.0})
+	assertEvalArray(t, "2 xexp 3 4", data.KindF64, []any{8.0, 16.0})
+	assertEvalArray(t, "2 0N 4 xexp 3 3 0N", data.KindF64, []any{8.0, data.NullValue, data.NullValue})
+}
+
 func TestEvalSortSupportsDataStringArrays(t *testing.T) {
 	got, err := asc(data.NewString([]string{"beta", "alpha", "gamma"}))
 	if err != nil {

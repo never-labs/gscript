@@ -2290,6 +2290,12 @@ func (s *EvalState) eval(src string) (any, error) {
 		{"sqrt ", sqrtValue},
 		{"log ", logValue},
 		{"exp ", expValue},
+		{"sin ", sinValue},
+		{"cos ", cosValue},
+		{"tan ", tanValue},
+		{"asin ", asinValue},
+		{"acos ", acosValue},
+		{"atan ", atanValue},
 		{"reciprocal ", reciprocalValue},
 		{"signum ", signumValue},
 		{"floor ", floorValue},
@@ -2402,6 +2408,8 @@ func (s *EvalState) eval(src string) (any, error) {
 		{"divide", dyadicVerbFunc('%')},
 		{"div", dyadicVerbFunc('d')},
 		{"mod", modValue},
+		{"xexp", xexpValue},
+		{"xlog", xlogValue},
 		{"fill", dyadicVerbFunc('^')},
 		{"match", func(left, right any) (any, error) { return matchValue(left, right), nil }},
 		{"like", likeValue},
@@ -6030,6 +6038,10 @@ func lookupDyadicVerbFunc(verb string) (func(any, any) (any, error), bool) {
 		return rotateValue, true
 	case "mmu":
 		return matrixMultiplyValue, true
+	case "xexp":
+		return xexpValue, true
+	case "xlog":
+		return xlogValue, true
 	case "wavg":
 		return wavg, true
 	case "within":
@@ -6141,6 +6153,18 @@ func lookupUnaryVerb(verb string) (func(any) (any, error), bool) {
 		return logValue, true
 	case "exp":
 		return expValue, true
+	case "sin":
+		return sinValue, true
+	case "cos":
+		return cosValue, true
+	case "tan":
+		return tanValue, true
+	case "asin":
+		return asinValue, true
+	case "acos":
+		return acosValue, true
+	case "atan":
+		return atanValue, true
 	case "reciprocal":
 		return reciprocalValue, true
 	case "signum":
