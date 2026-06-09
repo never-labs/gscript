@@ -3218,6 +3218,182 @@ func appendQEvalTaskDListMathMatrixApplyIndexCases(cases []qEvalVectorCase) []qE
 				return values[100] + values[200] + values[300] + int64(len(values))
 			},
 		},
+		{
+			name:   "TaskDStringSearchReplaceJoinRowScaled",
+			tags:   []string{"string", "symbol", "match-like"},
+			matrix: []string{"compare:string-vector:where", "compare:symbol-vector:where", "list:sublist-cross-cut:string-bool"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("x:%d#`AAPL`MSFT`AMD`NVDA;s:\",\" sv string x;(count \",\" vs s)+(count s ss \"A\")+(count ssr[s;\"A\";\"Z\"])", rows)
+			},
+			goFn: func(rows int) int64 {
+				values := []string{"AAPL", "MSFT", "AMD", "NVDA"}
+				parts := make([]string, rows)
+				for i := range parts {
+					parts[i] = values[i%len(values)]
+				}
+				joined := strings.Join(parts, ",")
+				split := strings.Split(joined, ",")
+				var hits int64
+				for offset := strings.Index(joined, "A"); offset >= 0; {
+					hits++
+					next := strings.Index(joined[offset+1:], "A")
+					if next < 0 {
+						break
+					}
+					offset += next + 1
+				}
+				replaced := strings.ReplaceAll(joined, "A", "Z")
+				qEvalVectorAnyBenchSink = []any{split, replaced}
+				return int64(len(split)) + hits + int64(len(replaced))
+			},
+		},
+		{
+			name:   "TaskDBooleanVectorLiteralWhereProjection",
+			tags:   []string{"boolean-logical", "where", "projection", "sum"},
+			matrix: []string{"compare:int-vector:where", "list:sublist-cross-cut:string-bool"},
+			shapes: []string{"index:gather-after-where:row-scaled", "logical:mask-composition:row-scaled"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("m:%d#101001b;x:til %d;idx:where m;(+/x[idx])+count idx", rows, rows)
+			},
+			goFn: func(rows int) int64 {
+				hit := [...]bool{true, false, true, false, false, true}
+				var sum, count int64
+				for i := 0; i < rows; i++ {
+					if hit[i%len(hit)] {
+						sum += int64(i)
+						count++
+					}
+				}
+				return sum + count
+			},
+		},
+		{
+			name:   "TaskDMatrixFlipColumnRowChecksum",
+			tags:   []string{"matrix-reshape", "apply-index", "sum"},
+			matrix: []string{"matrix:reshape-flip:vector", "apply-index:list-dict-callable:hot"},
+			expr: func(rows int) string {
+				cols := rows / 4
+				return fmt.Sprintf("m:4 %d#til %d;t:flip m;(+/(t . 0))+(+/(t . %d))+count t", cols, rows, cols-1)
+			},
+			goFn: func(rows int) int64 {
+				cols := rows / 4
+				var firstCol, lastCol int64
+				for r := 0; r < 4; r++ {
+					firstCol += int64(r * cols)
+					lastCol += int64(r*cols + cols - 1)
+				}
+				return firstCol + lastCol + int64(cols)
+			},
+		},
+		{
+			name:   "TaskDMatrixMmuInvEnvelope",
+			tags:   []string{"matrix-reshape", "sum"},
+			matrix: []string{"matrix:reshape-flip:vector", "numeric-arithmetic:float-vector:hot"},
+			expr: func(rows int) string {
+				return "(+/raze mmu[(2 2#1 2 3 4);(2 2#5 6 7 8)])+(+/raze inv 2 2#1 0 0 1)"
+			},
+			goFn: func(rows int) int64 {
+				a := [2][2]float64{{1, 2}, {3, 4}}
+				b := [2][2]float64{{5, 6}, {7, 8}}
+				var total float64
+				for i := 0; i < 2; i++ {
+					for j := 0; j < 2; j++ {
+						var cell float64
+						for k := 0; k < 2; k++ {
+							cell += a[i][k] * b[k][j]
+						}
+						total += cell
+					}
+				}
+				identityInverse := [2][2]float64{{1, 0}, {0, 1}}
+				for i := 0; i < 2; i++ {
+					for j := 0; j < 2; j++ {
+						total += identityInverse[i][j]
+					}
+				}
+				qEvalVectorFloatBenchSink = total
+				return int64(total)
+			},
+		},
+		{
+			name:   "TaskDCastSymbolNumericEnvelope",
+			tags:   []string{"cast", "symbol", "string"},
+			matrix: []string{"cast:symbol-numeric:string"},
+			expr: func(rows int) string {
+				return "(`long$3.7)+(\"J\"$\"42\")+(\"I\"$\"17\")+(count `$\"AAPL\")+(count string `$\"MSFT\")"
+			},
+			goFn: func(rows int) int64 {
+				longValue := int64(math.Trunc(3.7))
+				jValue := int64(42)
+				iValue := int64(17)
+				symbol := string([]byte{'A', 'A', 'P', 'L'})
+				symbolText := string([]byte{'M', 'S', 'F', 'T'})
+				qEvalVectorAnyBenchSink = []string{symbol, symbolText}
+				return longValue + jValue + iValue + int64(len([]string{symbol})) + int64(len(symbolText))
+			},
+		},
+		{
+			name:   "TaskDApplyDotFunctionGatherArgs",
+			tags:   []string{"apply-index", "where", "projection", "sum"},
+			matrix: []string{"apply-index:list-dict-callable:hot", "compare:int-vector:where"},
+			shapes: []string{"index:gather-after-where:row-scaled"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("x:til %d;idx:where (x mod 257)=0;f:{(+/x[y])+count y};.[f;(x;idx)]", rows)
+			},
+			goFn: func(rows int) int64 {
+				var sum, count int64
+				for i := 0; i < rows; i++ {
+					if i%257 == 0 {
+						sum += int64(i)
+						count++
+					}
+				}
+				return sum + count
+			},
+		},
+		{
+			name:   "TaskDCrossApplyIndexChecksum",
+			tags:   []string{"apply-index", "projection", "sum"},
+			matrix: []string{"apply-index:list-dict-callable:hot", "list:sublist-cross-cut:string-bool"},
+			expr: func(rows int) string {
+				return "p:(til 32) cross til 32;a:p@10;b:p . 100;(count p)+(+/a)+(+/b)"
+			},
+			goFn: func(rows int) int64 {
+				pairs := make([][2]int64, 0, 32*32)
+				for left := int64(0); left < 32; left++ {
+					for right := int64(0); right < 32; right++ {
+						pairs = append(pairs, [2]int64{left, right})
+					}
+				}
+				a := pairs[10]
+				b := pairs[100]
+				qEvalVectorAnyBenchSink = pairs
+				return int64(len(pairs)) + a[0] + a[1] + b[0] + b[1]
+			},
+		},
+		{
+			name:   "TaskDReshapeCycleFillFlipChecksum",
+			tags:   []string{"matrix-reshape", "apply-index", "sum"},
+			matrix: []string{"matrix:reshape-flip:vector", "apply-index:list-dict-callable:hot"},
+			expr: func(rows int) string {
+				return "m:3 4#1 2 3 4 5;t:flip m;(+/raze t)+(m . 2 3)+count t"
+			},
+			goFn: func(rows int) int64 {
+				source := []int64{1, 2, 3, 4, 5}
+				matrix := make([][]int64, 3)
+				var total int64
+				for r := 0; r < 3; r++ {
+					matrix[r] = make([]int64, 4)
+					for c := 0; c < 4; c++ {
+						value := source[(r*4+c)%len(source)]
+						matrix[r][c] = value
+						total += value
+					}
+				}
+				qEvalVectorAnyBenchSink = matrix
+				return total + matrix[2][3] + 4
+			},
+		},
 	}
 	return append(cases, taskD...)
 }
