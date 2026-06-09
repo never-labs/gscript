@@ -1402,6 +1402,31 @@ func (s *EvalState) tryEvalDeferredScanAssignment(src string) (any, bool, error)
 	return qScanView{name: name, source: array}, true, nil
 }
 
+func (s *EvalState) evalConditionalSpecialForm(src string) (any, bool, error) {
+	src = strings.TrimSpace(src)
+	if len(src) < 4 || (src[0] != '$' && src[0] != '?') || src[1] != '[' || src[len(src)-1] != ']' {
+		return nil, false, nil
+	}
+	args := splitTopLevel(src[2:len(src)-1], ';')
+	if len(args) != 3 {
+		return nil, true, fmt.Errorf("%c[] conditional expects three arguments", src[0])
+	}
+	cond, err := s.eval(args[0])
+	if err != nil {
+		return nil, true, err
+	}
+	truth, err := boolValue(cond)
+	if err != nil {
+		return nil, true, err
+	}
+	if truth {
+		out, err := s.eval(args[1])
+		return out, true, err
+	}
+	out, err := s.eval(args[2])
+	return out, true, err
+}
+
 func parseDeferredScan(src string) (name, arg string, ok bool) {
 	src = stripEnclosingParens(strings.TrimSpace(src))
 	for _, scan := range []struct {
@@ -1816,6 +1841,9 @@ func (s *EvalState) eval(src string) (any, error) {
 	if src == "" {
 		return nil, fmt.Errorf("empty q expression")
 	}
+	if out, ok, err := s.evalConditionalSpecialForm(src); ok || err != nil {
+		return out, err
+	}
 	if plan := s.qPipelinePlan(src); plan.kind != qPipelineInvalid {
 		if out, handled, err := s.evalQPipelinePlan(plan); err != nil || handled {
 			return out, err
@@ -2159,6 +2187,8 @@ func (s *EvalState) eval(src string) (any, error) {
 		{"rank ", rank},
 		{"neg ", negValue},
 		{"abs ", absValue},
+		{"sqrt ", sqrtValue},
+		{"log ", logValue},
 		{"exp ", expValue},
 		{"reciprocal ", reciprocalValue},
 		{"signum ", signumValue},
@@ -6168,6 +6198,10 @@ func lookupUnaryVerb(verb string) (func(any) (any, error), bool) {
 		return negValue, true
 	case "abs":
 		return absValue, true
+	case "sqrt":
+		return sqrtValue, true
+	case "log":
+		return logValue, true
 	case "exp":
 		return expValue, true
 	case "reciprocal":
@@ -10680,6 +10714,18 @@ func absValue(v any) (any, error) {
 			return int64(n)
 		}
 		return n
+	})
+}
+
+func sqrtValue(v any) (any, error) {
+	return mapNumericUnary("sqrt", v, func(n float64, _ bool) any {
+		return math.Sqrt(n)
+	})
+}
+
+func logValue(v any) (any, error) {
+	return mapNumericUnary("log", v, func(n float64, _ bool) any {
+		return math.Log(n)
 	})
 }
 

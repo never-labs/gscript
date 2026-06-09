@@ -1141,7 +1141,7 @@ func qPrefixFunction(name string) bool {
 	switch strings.ToLower(name) {
 	case "sum", "avg", "var", "dev", "med", "wavg", "count", "min", "max", "first", "last", "distinct",
 		"prev", "next", "deltas", "fills", "ratios", "sums", "prds", "mins", "maxs", "avgs",
-		"abs", "neg", "sqrt", "log", "exp", "reciprocal", "signum", "floor", "ceiling", "null":
+		"abs", "neg", "sqrt", "log", "exp", "reciprocal", "signum", "floor", "ceiling", "null", "rank":
 		return true
 	default:
 		return false
@@ -1150,7 +1150,7 @@ func qPrefixFunction(name string) bool {
 
 func qSQLDyadicFunction(name string) bool {
 	switch strings.ToLower(name) {
-	case "xprev", "msum", "mavg", "mcount", "mmin", "mmax":
+	case "xbar", "xprev", "msum", "mavg", "mcount", "mmin", "mmax":
 		return true
 	default:
 		return false

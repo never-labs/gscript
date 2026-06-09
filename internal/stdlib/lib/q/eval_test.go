@@ -3650,6 +3650,22 @@ func TestEvalSortAndSortIndexes(t *testing.T) {
 	assertEvalArray(t, "rank 2026.06.07 0Nd 2026.06.06", data.KindI64, []any{int64(2), int64(0), int64(1)})
 }
 
+func TestEvalConditionalSpecialForms(t *testing.T) {
+	assertEvalValue(t, "$[1;2;3]", int64(2))
+	assertEvalValue(t, "$[0;2;3]", int64(3))
+	assertEvalValue(t, "?[1;2;3]", int64(2))
+	assertEvalValue(t, "?[0;2;3]", int64(3))
+	assertEvalValue(t, "f:{$[x>0;1;-1]};f[2]", int64(1))
+	assertEvalValue(t, "f:{?[x>0;1;-1]};f[-2]", int64(-1))
+	assertEvalValue(t, "$[1;42;1%0]", int64(42))
+}
+
+func TestEvalSqrtLogUnaryVerbs(t *testing.T) {
+	assertEvalValue(t, "sqrt 4", 2.0)
+	assertEvalValue(t, "log 1", 0.0)
+	assertEvalArray(t, "sqrt 4 9 16", data.KindF64, []any{2.0, 3.0, 4.0})
+}
+
 func TestEvalSortSupportsDataStringArrays(t *testing.T) {
 	got, err := asc(data.NewString([]string{"beta", "alpha", "gamma"}))
 	if err != nil {

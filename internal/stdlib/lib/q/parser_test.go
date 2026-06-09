@@ -2330,6 +2330,7 @@ func TestLowerTimeSeriesProjectionCallsToDataExpressions(t *testing.T) {
 		sql  string
 		want string
 	}{
+		{sql: "select r:rank qty from trades", want: "rank"},
 		{sql: "select neg_qty:neg signed_qty from trades", want: "neg"},
 		{sql: "select root_qty:sqrt qty from trades", want: "sqrt"},
 		{sql: "select log_qty:log qty from trades", want: "log"},
@@ -2357,6 +2358,15 @@ func TestLowerTimeSeriesProjectionCallsToDataExpressions(t *testing.T) {
 	transform, ok = xprev.Plan.Select[0].Expr.(data.VectorTransformExpr)
 	if !ok || transform.Func != "xprev" || transform.Arg == nil {
 		t.Fatalf("xprev expr = %#v, want xprev vector transform with arg", xprev.Plan.Select[0].Expr)
+	}
+
+	xbar, err := Lower(mustParse(t, "select qty by g:2 xbar price from trades"))
+	if err != nil {
+		t.Fatalf("Lower xbar returned error: %v", err)
+	}
+	bucket, ok := xbar.Plan.ByExprs[0].Expr.(data.BucketFloorExpr)
+	if !ok || bucket.Interval != int64(2) {
+		t.Fatalf("xbar by expr = %#v, want bucket floor interval 2", xbar.Plan.ByExprs[0].Expr)
 	}
 
 	moving, err := Lower(mustParse(t, "select ma:3 mavg price from trades"))

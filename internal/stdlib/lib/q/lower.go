@@ -979,7 +979,7 @@ func lowerConditional(arg Expr) (data.Expr, error) {
 func qVectorPrefixFunction(name string) bool {
 	switch strings.ToLower(name) {
 	case "prev", "next", "deltas", "fills", "ratios", "sums", "prds", "mins", "maxs", "avgs",
-		"abs", "neg", "sqrt", "log", "exp", "reciprocal", "signum", "floor", "ceiling", "null":
+		"abs", "neg", "sqrt", "log", "exp", "reciprocal", "signum", "floor", "ceiling", "null", "rank":
 		return true
 	default:
 		return false
@@ -1000,6 +1000,9 @@ func lowerTimeSeriesDyadicCall(funcName string, arg Expr) (data.Expr, error) {
 		return nil, err
 	}
 	name := strings.ToLower(funcName)
+	if name == "xbar" {
+		return lowerXbar(arg)
+	}
 	if name == "xprev" {
 		return data.VectorTransformExpr{Func: name, Arg: left, Expr: right}, nil
 	}
