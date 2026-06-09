@@ -2113,6 +2113,62 @@ func TestTypedNumericSumByI64IndexesConsumesLazyIntegerViews(t *testing.T) {
 	}
 }
 
+func TestTypedNumericSumCountWhereCompareConsumesLazyIntegerPredicate(t *testing.T) {
+	base := NewI64Range(0, 1, 16)
+	scaled, handled, err := TryTypedIntegerDyadic(OpMul, base, int64(3))
+	if err != nil || !handled {
+		t.Fatalf("typed multiply handled=%v err=%v", handled, err)
+	}
+	affine, handled, err := TryTypedIntegerDyadic(OpAdd, scaled, int64(7))
+	if err != nil || !handled {
+		t.Fatalf("typed add handled=%v err=%v", handled, err)
+	}
+	predicate, handled, err := TryTypedIntegerDyadic(OpMod, affine, int64(5))
+	if err != nil || !handled {
+		t.Fatalf("typed modulo handled=%v err=%v", handled, err)
+	}
+
+	sum, count, handled, err := TryTypedNumericSumCountWhereCompare(affine.(Array), predicate.(Array), OpGT, int64(1))
+	if err != nil || !handled {
+		t.Fatalf("typed where sum-count handled=%v err=%v", handled, err)
+	}
+	if sum != int64(304) || count != 10 {
+		t.Fatalf("typed where sum-count = sum %v count %d, want 304 10", sum, count)
+	}
+}
+
+func TestTypedNumericSumCountWhereCompareConsumesLazyFloatPredicate(t *testing.T) {
+	base := NewI64Range(0, 1, 16)
+	scaled, handled, err := typedKernels.Dyadic(OpMul, base, float64(2))
+	if err != nil || !handled {
+		t.Fatalf("typed multiply handled=%v err=%v", handled, err)
+	}
+	affine, handled, err := typedKernels.Dyadic(OpAdd, scaled, float64(7))
+	if err != nil || !handled {
+		t.Fatalf("typed add handled=%v err=%v", handled, err)
+	}
+	predicate, handled, err := typedKernels.Dyadic(OpMod, affine, float64(5))
+	if err != nil || !handled {
+		t.Fatalf("typed modulo handled=%v err=%v", handled, err)
+	}
+
+	gatherSum, handled, err := TryTypedNumericSumByI64Indexes(affine.(Array), NewI64Range(0, 1, 16))
+	if err != nil || !handled {
+		t.Fatalf("typed float indexed sum handled=%v err=%v", handled, err)
+	}
+	if gatherSum != float64(352) {
+		t.Fatalf("typed float indexed sum = %v, want 352", gatherSum)
+	}
+
+	sum, count, handled, err := TryTypedNumericSumCountWhereCompare(affine.(Array), predicate.(Array), OpGT, int64(1))
+	if err != nil || !handled {
+		t.Fatalf("typed float where sum-count handled=%v err=%v", handled, err)
+	}
+	if sum != float64(214) || count != 10 {
+		t.Fatalf("typed float where sum-count = sum %v count %d, want 214 10", sum, count)
+	}
+}
+
 func TestTypedInIndexesScansNonIndexedColumns(t *testing.T) {
 	indexes, ok := typedKernels.InIndexes(NewI32([]int32{10, 20, 30, 20, 40}), []any{int64(20), int32(40)}, nil)
 	if !ok {

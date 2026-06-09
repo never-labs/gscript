@@ -1776,6 +1776,30 @@ func TestExecuteEvalPipelineUsesIndexExprComputedProjectionReducers(t *testing.T
 	t.Fatalf("missing ArrayIndexExprReducers computed projection hit: %#v", RuntimeKernelExecutionStats())
 }
 
+func TestExecuteEvalPipelineUsesWhereGatherSumCountWithLazyPredicate(t *testing.T) {
+	ClearRuntimeKernelExecutionStats()
+	t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+	src := "x:til 8192;y:(x*2)+7;idx:where (y mod 5)>1;(+/y[idx])+count idx"
+	got, handled, err := ExecuteEvalPipeline(src)
+	if err != nil || !handled || got != int64(40306284) {
+		t.Fatalf("ExecuteEvalPipeline lazy predicate gather sum-count = %#v,%v,%v; want 40306284,true,nil", got, handled, err)
+	}
+	seen := false
+	for _, stat := range RuntimeKernelExecutionStats() {
+		if stat.Outcome == "fallback" || stat.Outcome == "error" {
+			t.Fatalf("unexpected lazy predicate gather sum-count fallback/error: %#v all=%#v", stat, RuntimeKernelExecutionStats())
+		}
+		if stat.Kernel == "ArrayWhereGatherSumCount" && strings.HasPrefix(stat.Shape, "where-index-reduce/sum-count/") &&
+			stat.Outcome == "hit" && stat.Count > 0 {
+			seen = true
+		}
+	}
+	if !seen {
+		t.Fatalf("missing ArrayWhereGatherSumCount hit: %#v", RuntimeKernelExecutionStats())
+	}
+}
+
 func TestEvalNumericReductionBundleRecordsTypedRuntimeKernel(t *testing.T) {
 	ClearRuntimeKernelExecutionStats()
 	t.Cleanup(ClearRuntimeKernelExecutionStats)

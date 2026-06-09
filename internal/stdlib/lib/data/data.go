@@ -8594,8 +8594,38 @@ func typedCompareRowPredicate(array Array, op Op, value any) (rowPredicate, bool
 		target, ok := value.(Timestamp)
 		return compareSignedRowPredicate(a.data, target, ok, op)
 	default:
+		return compareArrayCarrierRowPredicate(array, value, op)
+	}
+}
+
+func compareArrayCarrierRowPredicate(array Array, value any, op Op) (rowPredicate, bool, error) {
+	if array == nil || !typedCompareKindCanHandle(array.Kind()) {
 		return nil, false, nil
 	}
+	target := normalizeScalar(array.Kind(), value)
+	if !typedCompareCarrierTargetCompatible(array.Kind(), target) {
+		return nil, false, nil
+	}
+	return func(row int) bool {
+		left, ok := array.At(row)
+		if !ok {
+			return false
+		}
+		if IsNull(left) || IsNull(target) {
+			equal := IsNull(left) && IsNull(target)
+			switch op {
+			case OpEQ, OpNE:
+				return boolCompare(op, equal, 0)
+			default:
+				return false
+			}
+		}
+		cmp, ok := compareSameKind(left, target)
+		if !ok {
+			return false
+		}
+		return boolCompare(op, cmp == 0, cmp)
+	}, true, nil
 }
 
 func compareBoolRowPredicate(values []bool, target bool, ok bool, op Op) (rowPredicate, bool, error) {
