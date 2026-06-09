@@ -426,6 +426,9 @@ func matrixElementKind(matrix Matrix) Kind {
 func nestedNumericSum(value any) (nestedSum, bool, error) {
 	switch x := value.(type) {
 	case Matrix:
+		if source, ok := x.(interface{ SourceMatrix() Matrix }); ok {
+			return nestedNumericSum(source.SourceMatrix())
+		}
 		if m, ok := x.(matrixArray); ok {
 			return nestedNumericArraySum(m.data)
 		}

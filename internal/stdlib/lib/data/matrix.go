@@ -37,6 +37,10 @@ type transposedMatrixRowArray struct {
 	row    int
 }
 
+func (m transposedMatrixArray) SourceMatrix() Matrix {
+	return m.source
+}
+
 // ReshapeArray returns a q-style reshape view. Scalar shapes behave like take;
 // two-dimensional shapes are represented as a matrix/list-of-lists value.
 func ReshapeArray(shape []int, source Array) (Array, error) {

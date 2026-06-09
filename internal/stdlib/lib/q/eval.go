@@ -453,6 +453,8 @@ func qRuntimeKernelPipelineShape(kernel, shape string) string {
 		return "gather"
 	case strings.HasPrefix(shape, "matrix-row/"):
 		return "matrix_row_index"
+	case strings.HasPrefix(shape, "scalar-index/"):
+		return "apply_index"
 	case strings.HasPrefix(shape, "and/"), strings.HasPrefix(shape, "or/"):
 		return "mask_combine"
 	case strings.HasPrefix(shape, "sort-index/"):
@@ -556,6 +558,7 @@ type EvalState struct {
 	scriptCache          map[string]qScriptPlan
 	valueExprCache       map[string]Expr
 	pipelineCache        map[string]qPipelinePlan
+	applyIndexCache      map[string]qScalarApplyIndexPlan
 	deferScanAssignments map[string]bool
 }
 

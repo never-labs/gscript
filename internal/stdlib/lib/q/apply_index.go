@@ -2,6 +2,7 @@ package q
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/never-labs/leia/internal/stdlib/lib/data"
@@ -14,7 +15,16 @@ const (
 	qApplyIndexDot
 )
 
+type qScalarApplyIndexPlan struct {
+	mode   qApplyIndexMode
+	target string
+	index  int
+}
+
 func (s *EvalState) evalApplyIndexForm(src string) (any, bool, error) {
+	if out, ok, err := s.tryEvalScalarApplyIndexFastPath(src); ok || err != nil {
+		return out, ok, err
+	}
 	if strings.HasPrefix(src, ".[") && strings.HasSuffix(src, "]") {
 		return s.evalDotApplyOrAmend(src)
 	}
@@ -53,6 +63,25 @@ func (s *EvalState) evalDotApplyOrAmend(src string) (any, bool, error) {
 }
 
 func (s *EvalState) evalDotApplyArgs(src string) ([]any, error) {
+	src = strings.TrimSpace(src)
+	if src == "()" {
+		return nil, nil
+	}
+	if enclosed(src, '(', ')') {
+		inner := strings.TrimSpace(src[1 : len(src)-1])
+		parts := splitTopLevelDelim(inner, ';')
+		if len(parts) > 1 {
+			args := make([]any, len(parts))
+			for i, part := range parts {
+				value, err := s.eval(part)
+				if err != nil {
+					return nil, err
+				}
+				args[i] = value
+			}
+			return args, nil
+		}
+	}
 	value, err := s.eval(src)
 	if err != nil {
 		return nil, err
@@ -87,12 +116,116 @@ func (s *EvalState) applyOrIndexValue(mode qApplyIndexMode, target, arg any) (an
 
 func qApplyArgs(arg any) []any {
 	if array, ok := arg.(data.Array); ok {
-		items := array.Values()
-		out := make([]any, len(items))
-		copy(out, items)
-		return out
+		return array.Values()
 	}
 	return []any{arg}
+}
+
+func (s *EvalState) tryEvalScalarApplyIndexFastPath(src string) (any, bool, error) {
+	plan, ok := s.scalarApplyIndexPlan(src)
+	if !ok {
+		return nil, false, nil
+	}
+	target, ok := s.lookupName(plan.target)
+	if !ok || isCallable(target) {
+		return nil, false, nil
+	}
+	return scalarIndexValue(plan.mode, target, plan.index)
+}
+
+func (s *EvalState) scalarApplyIndexPlan(src string) (qScalarApplyIndexPlan, bool) {
+	src = strings.TrimSpace(src)
+	if src == "" {
+		return qScalarApplyIndexPlan{}, false
+	}
+	if s.applyIndexCache != nil {
+		if plan, ok := s.applyIndexCache[src]; ok {
+			return plan, true
+		}
+	}
+	plan, ok := buildScalarApplyIndexPlan(src)
+	if !ok {
+		return qScalarApplyIndexPlan{}, false
+	}
+	if s.applyIndexCache == nil {
+		s.applyIndexCache = make(map[string]qScalarApplyIndexPlan, 16)
+	} else if len(s.applyIndexCache) >= 128 {
+		s.applyIndexCache = make(map[string]qScalarApplyIndexPlan, 16)
+	}
+	s.applyIndexCache[src] = plan
+	return plan, true
+}
+
+func buildScalarApplyIndexPlan(src string) (qScalarApplyIndexPlan, bool) {
+	if left, right, ok := splitTopLevelOperator(src, "@"); ok {
+		return scalarApplyIndexPlanFromParts(qApplyIndexAt, left, right)
+	}
+	if left, right, ok := splitTopLevelDotApply(src); ok {
+		return scalarApplyIndexPlanFromParts(qApplyIndexDot, left, right)
+	}
+	return qScalarApplyIndexPlan{}, false
+}
+
+func scalarApplyIndexPlanFromParts(mode qApplyIndexMode, left, right string) (qScalarApplyIndexPlan, bool) {
+	target := strings.TrimSpace(left)
+	if !isQAssignmentName(target) {
+		return qScalarApplyIndexPlan{}, false
+	}
+	index, ok := parseScalarIndexLiteral(strings.TrimSpace(right))
+	if !ok {
+		return qScalarApplyIndexPlan{}, false
+	}
+	return qScalarApplyIndexPlan{mode: mode, target: target, index: index}, true
+}
+
+func parseScalarIndexLiteral(src string) (int, bool) {
+	if src == "" || src[0] == '-' || strings.ContainsAny(src, " \t\r\n.") {
+		return 0, false
+	}
+	n, err := strconv.ParseInt(src, 10, 0)
+	if err != nil || n < 0 {
+		return 0, false
+	}
+	return int(n), true
+}
+
+func scalarIndexValue(mode qApplyIndexMode, target any, row int) (any, bool, error) {
+	switch x := target.(type) {
+	case data.Matrix:
+		return nil, false, nil
+	case data.Array:
+		shape := qScalarApplyIndexShape(mode, string(x.Kind()))
+		recordRuntimeKernelExecution("ArrayScalarIndex", shape, "attempt", "attempt")
+		value, ok := x.At(row)
+		if !ok {
+			err := fmt.Errorf("index %d out of range", row)
+			recordRuntimeKernelExecution("ArrayScalarIndex", shape, "error", "runtime_error")
+			return nil, true, err
+		}
+		recordRuntimeKernelExecution("ArrayScalarIndex", shape, "hit", "typed_scalar_index")
+		return value, true, nil
+	case string:
+		shape := qScalarApplyIndexShape(mode, string(data.KindString))
+		recordRuntimeKernelExecution("StringScalarIndex", shape, "attempt", "attempt")
+		runes := []rune(x)
+		if row < 0 || row >= len(runes) {
+			err := fmt.Errorf("index %d out of range", row)
+			recordRuntimeKernelExecution("StringScalarIndex", shape, "error", "runtime_error")
+			return nil, true, err
+		}
+		recordRuntimeKernelExecution("StringScalarIndex", shape, "hit", "typed_scalar_index")
+		return string(runes[row]), true, nil
+	default:
+		return nil, false, nil
+	}
+}
+
+func qScalarApplyIndexShape(mode qApplyIndexMode, kind string) string {
+	op := "at"
+	if mode == qApplyIndexDot {
+		op = "dot"
+	}
+	return "scalar-index/" + op + "/" + kind
 }
 
 func dotIndexValue(target any, path any) (any, error) {

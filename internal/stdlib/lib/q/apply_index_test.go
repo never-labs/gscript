@@ -62,3 +62,46 @@ func TestQMatrixRowIndexRecordsTypedRuntimeKernel(t *testing.T) {
 		t.Fatalf("missing matrix row typed runtime stats: rowIndex=%v rowSum=%v stats=%#v", seenRowIndex, seenRowSum, RuntimeKernelExecutionStats())
 	}
 }
+
+func TestQApplyIndexScalarFastPathRecordsRuntimeStats(t *testing.T) {
+	state := NewEvalState(nil)
+	if _, err := state.Eval("x:til 256;s:\"abcd\";m:2 4#til 8"); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	ClearRuntimeKernelExecutionStats()
+	t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+	if got, err := state.Eval("x@100"); err != nil || got != int64(100) {
+		t.Fatalf("x@100 = %v, %v; want 100, nil", got, err)
+	}
+	if got, err := state.Eval("x . 101"); err != nil || got != int64(101) {
+		t.Fatalf("x . 101 = %v, %v; want 101, nil", got, err)
+	}
+	if got, err := state.Eval("s@2"); err != nil || got != "c" {
+		t.Fatalf("s@2 = %v, %v; want c, nil", got, err)
+	}
+	if got, err := state.Eval("m@1"); err != nil {
+		t.Fatalf("m@1 returned error: %v", err)
+	} else if row, ok := got.(data.Array); !ok || row.Len() != 4 {
+		t.Fatalf("m@1 = %#v, want row array len 4", got)
+	}
+
+	var scalarHits, matrixHits uint64
+	for _, stat := range RuntimeKernelExecutionStats() {
+		if (stat.Kernel == "ArrayScalarIndex" || stat.Kernel == "StringScalarIndex") && stat.Outcome == "hit" {
+			scalarHits += stat.Count
+			if stat.PipelineShape != "apply_index" {
+				t.Fatalf("scalar index pipeline shape = %q, want apply_index; stat=%#v", stat.PipelineShape, stat)
+			}
+		}
+		if stat.Kernel == "ArrayMatrixRowIndex" && stat.Outcome == "hit" {
+			matrixHits += stat.Count
+		}
+		if stat.Outcome == "fallback" || stat.Outcome == "error" {
+			t.Fatalf("unexpected scalar index fallback/error: %#v all=%#v", stat, RuntimeKernelExecutionStats())
+		}
+	}
+	if scalarHits != 3 || matrixHits != 1 {
+		t.Fatalf("scalar hits=%d matrix hits=%d; stats=%#v", scalarHits, matrixHits, RuntimeKernelExecutionStats())
+	}
+}

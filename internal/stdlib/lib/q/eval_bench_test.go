@@ -123,3 +123,69 @@ func BenchmarkEvalWithEnvRuntimePrimitivePipelineWarm(b *testing.B) {
 	b.StopTimer()
 	b.ReportMetric(float64(b.N)/time.Since(start).Seconds(), "eval/s")
 }
+
+func BenchmarkEvalApplyIndexScalarFastPathWarm(b *testing.B) {
+	cases := []struct {
+		name  string
+		setup string
+		expr  string
+	}{
+		{name: "AtScalar", setup: "x:til 8192", expr: "x@100"},
+		{name: "DotScalar", setup: "x:til 8192", expr: "x . 100"},
+		{name: "DotApplyArgs", setup: "f:{x+y}", expr: ".[f;(100;23)]"},
+	}
+	for _, tt := range cases {
+		b.Run(tt.name, func(b *testing.B) {
+			state := NewEvalState(nil)
+			if _, err := state.Eval(tt.setup); err != nil {
+				b.Fatalf("setup %q: %v", tt.setup, err)
+			}
+			if _, err := state.Eval(tt.expr); err != nil {
+				b.Fatalf("warm %q: %v", tt.expr, err)
+			}
+			ClearRuntimeKernelExecutionStats()
+			b.ReportAllocs()
+			b.ResetTimer()
+			start := time.Now()
+			for i := 0; i < b.N; i++ {
+				out, err := state.Eval(tt.expr)
+				if err != nil {
+					b.Fatalf("Eval %q: %v", tt.expr, err)
+				}
+				qEvalPlanBenchSink = out
+			}
+			b.StopTimer()
+			b.ReportMetric(float64(b.N)/time.Since(start).Seconds(), "eval/s")
+			qEvalReportScalarIndexStats(b)
+		})
+	}
+}
+
+func qEvalReportScalarIndexStats(b *testing.B) {
+	b.Helper()
+	var attempts, hits, fallbacks, errors uint64
+	for _, stat := range RuntimeKernelExecutionStats() {
+		if stat.Kernel != "ArrayScalarIndex" && stat.Kernel != "StringScalarIndex" {
+			continue
+		}
+		switch stat.Outcome {
+		case "attempt":
+			attempts += stat.Count
+		case "hit":
+			hits += stat.Count
+		case "fallback":
+			fallbacks += stat.Count
+		case "error":
+			errors += stat.Count
+		}
+	}
+	if attempts > 0 {
+		b.ReportMetric(100*float64(hits)/float64(attempts), "scalar_index_hit_pct")
+	}
+	if b.N > 0 {
+		b.ReportMetric(float64(attempts)/float64(b.N), "scalar_index_attempts/op")
+		b.ReportMetric(float64(hits)/float64(b.N), "scalar_index_hits/op")
+		b.ReportMetric(float64(fallbacks)/float64(b.N), "scalar_index_fallbacks/op")
+		b.ReportMetric(float64(errors)/float64(b.N), "scalar_index_errors/op")
+	}
+}

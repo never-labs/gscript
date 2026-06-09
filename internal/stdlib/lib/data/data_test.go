@@ -7174,6 +7174,23 @@ func TestMatrixReshapeTransposeAndMultiply(t *testing.T) {
 	if got, want := gatheredTransposedRow.Values(), []any{int64(6), int64(3)}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("transpose row gather values = %#v, want %#v", got, want)
 	}
+	flattenedTranspose, handled, err := FlattenNestedArray(tm)
+	if err != nil || !handled {
+		t.Fatalf("FlattenNestedArray(transpose) returned %#v,%v,%v; want handled nil error", flattenedTranspose, handled, err)
+	}
+	if got, want := flattenedTranspose.Kind(), KindI64; got != want {
+		t.Fatalf("flatten transpose kind = %s, want %s", got, want)
+	}
+	if got, want := flattenedTranspose.Values(), []any{int64(1), int64(4), int64(2), int64(5), int64(3), int64(6)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("flatten transpose values = %#v, want transpose-order flat values %#v", got, want)
+	}
+	transposedSum, handled, err := TryTypedNestedNumericSum(transposed)
+	if err != nil || !handled {
+		t.Fatalf("TryTypedNestedNumericSum transposed = %#v,%v,%v; want handled nil error", transposedSum, handled, err)
+	}
+	if got, want := transposedSum, int64(21); got != want {
+		t.Fatalf("TryTypedNestedNumericSum transposed = %#v, want %#v", got, want)
+	}
 
 	fromRows, ok, err := MatrixFromRows(NewAny([]any{
 		NewI64([]int64{1, 2}),
