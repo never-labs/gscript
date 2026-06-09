@@ -7486,6 +7486,35 @@ func TestMatrixReshapeTransposeAndMultiply(t *testing.T) {
 		t.Fatalf("MatrixFromRows ragged rows = ok %v err %v; want ok true and error", ok, err)
 	}
 
+	nd, err := ReshapeArray([]int{2, 3, 4}, NewI64Range(0, 1, 24))
+	if err != nil {
+		t.Fatalf("N-D ReshapeArray returned error: %v", err)
+	}
+	if _, ok := nd.(Matrix); ok {
+		t.Fatalf("N-D reshape top-level = %T, must not masquerade as 2D Matrix", nd)
+	}
+	if got, want := nd.Len(), 2; got != want {
+		t.Fatalf("N-D top len = %d, want %d", got, want)
+	}
+	planeValue, ok := nd.At(1)
+	if !ok {
+		t.Fatal("N-D plane 1 missing")
+	}
+	plane, ok := planeValue.(Matrix)
+	if !ok {
+		t.Fatalf("N-D plane = %T, want Matrix", planeValue)
+	}
+	if got, want := plane.Shape(), []int{3, 4}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("N-D plane shape = %#v, want %#v", got, want)
+	}
+	if got, ok := plane.Cell(2, 3); !ok || got != int64(23) {
+		t.Fatalf("N-D plane cell 2,3 = %#v ok %v, want 23", got, ok)
+	}
+	row, ok = plane.RowArray(1)
+	if !ok || !reflect.DeepEqual(row.Values(), []any{int64(16), int64(17), int64(18), int64(19)}) {
+		t.Fatalf("N-D plane row 1 = %#v ok %v", row, ok)
+	}
+
 	right, err := ReshapeArray([]int{3, 2}, NewI64([]int64{10, 20, 30, 40, 50, 60}))
 	if err != nil {
 		t.Fatalf("right reshape returned error: %v", err)

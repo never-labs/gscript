@@ -93,6 +93,27 @@ func TestQGapValidationApplyIndexReshapeMatrixCompositions(t *testing.T) {
 		data.NewI64([]int64{2, 1, 3}),
 	})
 	assertEvalValue(t, "m:2 3#1 2 3 4;s:+/raze flip m;s+m . 1 1", int64(14))
+	assertEvalValue(t, "t:2 3 4#til 24;t . (1;2;3)", int64(23))
+	assertEvalArray(t, "t:2 3 4#til 24;raze t", data.KindAny, []any{
+		data.NewI64([]int64{0, 1, 2, 3}),
+		data.NewI64([]int64{4, 5, 6, 7}),
+		data.NewI64([]int64{8, 9, 10, 11}),
+		data.NewI64([]int64{12, 13, 14, 15}),
+		data.NewI64([]int64{16, 17, 18, 19}),
+		data.NewI64([]int64{20, 21, 22, 23}),
+	})
+	assertEvalArray(t, "t:2 3 4#til 24;raze (t@1)", data.KindI64, []any{
+		int64(12), int64(13), int64(14), int64(15),
+		int64(16), int64(17), int64(18), int64(19),
+		int64(20), int64(21), int64(22), int64(23),
+	})
+	assertEvalArray(t, "t:2 3 4#til 24;flip (t@1)", data.KindAny, []any{
+		data.NewI64([]int64{12, 16, 20}),
+		data.NewI64([]int64{13, 17, 21}),
+		data.NewI64([]int64{14, 18, 22}),
+		data.NewI64([]int64{15, 19, 23}),
+	})
+	assertEvalValue(t, "t:2 3 4#til 24;(+/raze raze t)+t . (0;1;2)", int64(282))
 }
 
 func TestQGapValidationStringAndListVerbCompositions(t *testing.T) {

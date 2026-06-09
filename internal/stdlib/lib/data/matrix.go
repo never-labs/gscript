@@ -37,12 +37,25 @@ type transposedMatrixRowArray struct {
 	row    int
 }
 
+type ndArrayView struct {
+	shape  []int
+	data   Array
+	offset int
+}
+
+type ndMatrixView struct {
+	shape  []int
+	data   Array
+	offset int
+}
+
 func (m transposedMatrixArray) SourceMatrix() Matrix {
 	return m.source
 }
 
 // ReshapeArray returns a q-style reshape view. Scalar shapes behave like take;
-// two-dimensional shapes are represented as a matrix/list-of-lists value.
+// two-dimensional shapes are represented as a matrix/list-of-lists value, and
+// higher-dimensional shapes are represented as nested row-major views.
 func ReshapeArray(shape []int, source Array) (Array, error) {
 	if source == nil {
 		return nil, fmt.Errorf("reshape source is nil")
@@ -65,10 +78,10 @@ func ReshapeArray(shape []int, source Array) (Array, error) {
 	if len(dims) == 1 {
 		return values, nil
 	}
-	if len(dims) != 2 {
-		return nil, fmt.Errorf("reshape currently supports one or two dimensions, got %d", len(dims))
+	if len(dims) == 2 {
+		return matrixArray{shape: dims, data: values}, nil
 	}
-	return matrixArray{shape: dims, data: values}, nil
+	return ndArrayView{shape: dims, data: values}, nil
 }
 
 // TransposeMatrix returns a view over a rectangular matrix/list-of-lists value.
@@ -740,4 +753,129 @@ func (r transposedMatrixRowArray) Gather(indexes []int) Array {
 		out[i] = value
 	}
 	return InferArray(out)
+}
+
+func (v ndArrayView) Kind() Kind {
+	if len(v.shape) == 1 {
+		return v.data.Kind()
+	}
+	return KindAny
+}
+
+func (v ndArrayView) Len() int {
+	if len(v.shape) == 0 {
+		return 0
+	}
+	return v.shape[0]
+}
+
+func (v ndArrayView) At(row int) (any, bool) {
+	if row < 0 || row >= v.Len() {
+		return nil, false
+	}
+	if len(v.shape) == 1 {
+		value, handled, err := arrayScalarAt(v.data, v.offset+row)
+		return value, handled && err == nil
+	}
+	stride := reshapeStride(v.shape[1:])
+	nextShape := append([]int(nil), v.shape[1:]...)
+	if len(nextShape) == 2 {
+		return ndMatrixView{
+			shape:  nextShape,
+			data:   v.data,
+			offset: v.offset + row*stride,
+		}, true
+	}
+	return ndArrayView{
+		shape:  nextShape,
+		data:   v.data,
+		offset: v.offset + row*stride,
+	}, true
+}
+
+func (v ndArrayView) Values() []any {
+	out := make([]any, v.Len())
+	for row := range out {
+		value, ok := v.At(row)
+		if !ok {
+			panic(fmt.Sprintf("data nd reshape row %d out of range", row))
+		}
+		out[row] = value
+	}
+	return out
+}
+
+func (v ndArrayView) Gather(indexes []int) Array {
+	out := make([]any, len(indexes))
+	for i, row := range indexes {
+		value, ok := v.At(row)
+		if !ok {
+			panic(fmt.Sprintf("data nd reshape gather row %d out of range", row))
+		}
+		out[i] = value
+	}
+	return NewAny(out)
+}
+
+func (v ndMatrixView) Kind() Kind { return KindAny }
+
+func (v ndMatrixView) Len() int { return v.shape[0] }
+
+func (v ndMatrixView) At(row int) (any, bool) {
+	return v.RowArray(row)
+}
+
+func (v ndMatrixView) Values() []any {
+	out := make([]any, v.Len())
+	for row := range out {
+		value, ok := v.At(row)
+		if !ok {
+			panic(fmt.Sprintf("data nd matrix row %d out of range", row))
+		}
+		out[row] = value
+	}
+	return out
+}
+
+func (v ndMatrixView) Gather(indexes []int) Array {
+	out := make([]any, len(indexes))
+	for i, row := range indexes {
+		value, ok := v.At(row)
+		if !ok {
+			panic(fmt.Sprintf("data nd matrix gather row %d out of range", row))
+		}
+		out[i] = value
+	}
+	return NewAny(out)
+}
+
+func (v ndMatrixView) Shape() []int {
+	return append([]int(nil), v.shape...)
+}
+
+func (v ndMatrixView) Cell(row, col int) (any, bool) {
+	if len(v.shape) != 2 || row < 0 || col < 0 || row >= v.shape[0] || col >= v.shape[1] {
+		return nil, false
+	}
+	value, handled, err := arrayScalarAt(v.data, v.offset+row*v.shape[1]+col)
+	return value, handled && err == nil
+}
+
+func (v ndMatrixView) RowArray(row int) (Array, bool) {
+	if len(v.shape) != 2 || row < 0 || row >= v.shape[0] {
+		return nil, false
+	}
+	return ndArrayView{
+		shape:  []int{v.shape[1]},
+		data:   v.data,
+		offset: v.offset + row*v.shape[1],
+	}, true
+}
+
+func reshapeStride(shape []int) int {
+	stride := 1
+	for _, dim := range shape {
+		stride *= dim
+	}
+	return stride
 }
