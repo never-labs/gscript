@@ -2492,6 +2492,72 @@ func TestQueryGroupByUsesSingleColumnAttributeIndexForKeys(t *testing.T) {
 	assertColumnValues(t, got, "n", []any{int64(3), int64(2)})
 }
 
+func TestQueryGroupByTypedAggregateFrameSupportsSymbolAndIntKeys(t *testing.T) {
+	frame := mustFrame(t,
+		Column{Name: "sym", Data: NewSymbols([]string{"AAPL", "MSFT", "AAPL", "NVDA", "MSFT"})},
+		Column{Name: "bucket", Data: NewI64([]int64{1, 2, 1, 2, 2})},
+		Column{Name: "qty", Data: NewI64([]int64{10, 20, 30, 40, 50})},
+		Column{Name: "px", Data: NewF64([]float64{100, 101, 102, 103, 104})},
+	)
+	symbolPlan := QueryPlan{
+		By: []Symbol{"sym"},
+		Aggregates: []Aggregate{
+			{Name: "qty", Func: "sum", Expr: ColumnRef{Name: "qty"}},
+			{Name: "n", Func: "count"},
+			{Name: "min_px", Func: "min", Expr: ColumnRef{Name: "px"}},
+			{Name: "max_px", Func: "max", Expr: ColumnRef{Name: "px"}},
+		},
+		LimitN: -1,
+	}
+	kernel, ok, err := CompileQueryKernel(frame, symbolPlan)
+	if err != nil || !ok {
+		t.Fatalf("CompileQueryKernel symbol grouped aggregate = %v,%v", ok, err)
+	}
+	got, err := kernel.Exec(frame)
+	if err != nil {
+		t.Fatalf("kernel Exec symbol grouped aggregate returned error: %v", err)
+	}
+	assertColumnValues(t, got, "sym", []any{Symbol("AAPL"), Symbol("MSFT"), Symbol("NVDA")})
+	assertColumnValues(t, got, "qty", []any{40.0, 70.0, 40.0})
+	assertColumnValues(t, got, "n", []any{int64(2), int64(2), int64(1)})
+	assertColumnValues(t, got, "min_px", []any{100.0, 101.0, 103.0})
+	assertColumnValues(t, got, "max_px", []any{102.0, 104.0, 103.0})
+	if col, _ := got.Column("sym"); col.Kind() != KindSymbol {
+		t.Fatalf("symbol key kind = %s, want %s", col.Kind(), KindSymbol)
+	}
+	if col, _ := got.Column("n"); col.Kind() != KindI64 {
+		t.Fatalf("count kind = %s, want %s", col.Kind(), KindI64)
+	}
+	if col, _ := got.Column("qty"); col.Kind() != KindF64 {
+		t.Fatalf("sum kind = %s, want %s", col.Kind(), KindF64)
+	}
+
+	intPlan := QueryPlan{
+		By: []Symbol{"bucket"},
+		Aggregates: []Aggregate{
+			{Name: "qty", Func: "sum", Expr: ColumnRef{Name: "qty"}},
+			{Name: "min_px", Func: "min", Expr: ColumnRef{Name: "px"}},
+			{Name: "max_px", Func: "max", Expr: ColumnRef{Name: "px"}},
+		},
+		LimitN: -1,
+	}
+	kernel, ok, err = CompileQueryKernel(frame, intPlan)
+	if err != nil || !ok {
+		t.Fatalf("CompileQueryKernel int grouped aggregate = %v,%v", ok, err)
+	}
+	got, err = kernel.Exec(frame)
+	if err != nil {
+		t.Fatalf("kernel Exec int grouped aggregate returned error: %v", err)
+	}
+	assertColumnValues(t, got, "bucket", []any{int64(1), int64(2)})
+	assertColumnValues(t, got, "qty", []any{40.0, 110.0})
+	assertColumnValues(t, got, "min_px", []any{100.0, 101.0})
+	assertColumnValues(t, got, "max_px", []any{102.0, 104.0})
+	if col, _ := got.Column("bucket"); col.Kind() != KindI64 {
+		t.Fatalf("int key kind = %s, want %s", col.Kind(), KindI64)
+	}
+}
+
 func TestQueryGroupByCachesSingleColumnGroupedIndex(t *testing.T) {
 	frame := mustFrame(t,
 		Column{Name: "sym", Data: NewSymbols([]string{"AAPL", "MSFT", "AAPL", "NVDA", "MSFT"})},

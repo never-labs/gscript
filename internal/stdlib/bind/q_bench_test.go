@@ -94,6 +94,10 @@ var qSQLBenchmarkCases = []qSQLBenchmarkCase{
 		tags: []string{"native-go", "group", "aggregate", "computed-aggregate", "symbol-key"},
 	},
 	{
+		name: "BenchmarkQSQLDataRuntimeGroupByAggregate",
+		tags: []string{"data-runtime", "group", "aggregate", "computed-aggregate", "symbol-key", "query-kernel"},
+	},
+	{
 		name: "BenchmarkQSQLNativeGoJoin",
 		tags: []string{"native-go", "join", "inner-join", "symbol-key", "order", "take"},
 	},
@@ -516,6 +520,60 @@ func BenchmarkQSQLNativeGoGroupByAggregate(b *testing.B) {
 	start := time.Now()
 	for i := 0; i < b.N; i++ {
 		qSQLNativeBenchSink = qSQLNativeGroupByAggregate(trades)
+	}
+	b.StopTimer()
+	qSQLBindBenchReportRows(b, rows, start)
+}
+
+func BenchmarkQSQLDataRuntimeGroupByAggregate(b *testing.B) {
+	const rows = 8192
+	frame := qSQLBindBenchTradesFrame(b, rows)
+	plan := data.QueryPlan{
+		Where: data.Logical{
+			Op: "and",
+			Left: data.Binary{
+				Op:    data.OpEQ,
+				Left:  data.ColumnRef{Name: "active"},
+				Right: data.Literal{Value: true},
+			},
+			Right: data.Binary{
+				Op:    data.OpGE,
+				Left:  data.ColumnRef{Name: "price"},
+				Right: data.Literal{Value: float64(100)},
+			},
+		},
+		By: []data.Symbol{"sym"},
+		Aggregates: []data.Aggregate{
+			{
+				Name: "notional",
+				Func: "sum",
+				Expr: data.Binary{
+					Op:    data.OpMul,
+					Left:  data.ColumnRef{Name: "price"},
+					Right: data.ColumnRef{Name: "size"},
+				},
+			},
+			{Name: "fills", Func: "count"},
+		},
+		LimitN: -1,
+	}
+	kernel, ok, err := data.CompileQueryKernel(frame, plan)
+	if err != nil || !ok {
+		b.Fatalf("CompileQueryKernel = %v, %v", ok, err)
+	}
+	if _, err := kernel.Exec(frame); err != nil {
+		b.Fatalf("warm QueryKernel Exec: %v", err)
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	start := time.Now()
+	for i := 0; i < b.N; i++ {
+		out, err := kernel.Exec(frame)
+		if err != nil {
+			b.Fatalf("QueryKernel Exec: %v", err)
+		}
+		qSQLDataFrameBenchSink = out
 	}
 	b.StopTimer()
 	qSQLBindBenchReportRows(b, rows, start)

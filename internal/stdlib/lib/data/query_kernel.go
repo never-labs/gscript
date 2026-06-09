@@ -947,7 +947,7 @@ func queryKernelFrameReason(frame Frame, plan QueryPlan) string {
 	if len(plan.By)+len(plan.ByExprs) > 0 && len(plan.Aggregates) > 0 {
 		byInputs, err := bindGroupInputs(frame, groupByItems(plan))
 		if err == nil && len(byInputs) == 1 && byInputs[0].column != nil && queryPlanAggregatesAreIndexedMixedFastPath(plan) {
-			return "data query kernel supported: indexed single-column grouped mixed aggregate fast path"
+			return "data query kernel supported: grouped aggregate path (indexed single-column grouped mixed aggregate fast path)"
 		}
 	}
 	return ""
@@ -1364,7 +1364,17 @@ func queryPlanAggregatesAreIndexedMixedFastPath(plan QueryPlan) bool {
 		switch agg.Func {
 		case "count":
 		case "sum", "avg", "min", "max":
-			if _, ok := agg.Expr.(ColumnRef); !ok {
+			if _, ok := agg.Expr.(ColumnRef); ok {
+				break
+			}
+			if bin, ok := agg.Expr.(Binary); ok && isNumericBinaryAggregateOp(bin.Op) {
+				_, leftOK := bin.Left.(ColumnRef)
+				_, rightOK := bin.Right.(ColumnRef)
+				if leftOK && rightOK {
+					break
+				}
+			}
+			{
 				return false
 			}
 		default:

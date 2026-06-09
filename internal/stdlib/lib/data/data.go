@@ -7643,6 +7643,9 @@ func aggregateInputsAllCount(aggs []aggregateInput) bool {
 }
 
 func execGroupedFromArrayIndex(frame Frame, byInputs []groupInput, aggs []aggregateInput, index ArrayIndex) (Frame, error) {
+	if out, ok, err := execTypedGroupedAggregateFrame(frame, byInputs, aggs, index, allIndexes(len(index.Rows)), nil, nil); ok || err != nil {
+		return out, err
+	}
 	if states, ok, err := typedKernels.GroupAggregateStates(index, aggs); ok || err != nil {
 		if err != nil {
 			return Frame{}, err
@@ -7687,6 +7690,9 @@ func execGroupedFromArrayIndex(frame Frame, byInputs []groupInput, aggs []aggreg
 }
 
 func execGroupedFromFilteredArrayIndex(frame Frame, byInputs []groupInput, aggs []aggregateInput, index ArrayIndex, indexes []int) (Frame, bool, error) {
+	if out, handled, err := execTypedGroupedAggregateFrame(frame, byInputs, aggs, index, nil, indexes, nil); handled || err != nil {
+		return out, handled, err
+	}
 	if out, ok, err := execSimpleFilteredGroupedAggregates(frame, byInputs, aggs, index, indexes, nil); ok || err != nil {
 		return out, ok, err
 	}
@@ -7730,6 +7736,9 @@ func execGroupedFromFilteredPredicateIndex(frame Frame, byInputs []groupInput, a
 	if predicate == nil || !groupAggregatesSupportedByTypedIndex(aggs) {
 		return Frame{}, false, nil
 	}
+	if out, handled, err := execTypedGroupedAggregateFrame(frame, byInputs, aggs, index, nil, nil, predicate); handled || err != nil {
+		return out, handled, err
+	}
 	if out, ok, err := execSimpleFilteredGroupedAggregates(frame, byInputs, aggs, index, nil, predicate); ok || err != nil {
 		return out, ok, err
 	}
@@ -7772,6 +7781,302 @@ func execGroupedFromFilteredPredicateIndex(frame Frame, byInputs []groupInput, a
 	}
 	out, err := buildGroupedAggregateFrame(frame, byInputs, aggs, states, groupOrder)
 	return out, true, err
+}
+
+type typedGroupedAggregateAccumulator struct {
+	input  aggregateInput
+	sum    []float64
+	count  []int64
+	value  []any
+	hasVal []bool
+}
+
+func execTypedGroupedAggregateFrame(frame Frame, byInputs []groupInput, aggs []aggregateInput, index ArrayIndex, groupOrder []int, indexes []int, predicate rowPredicate) (Frame, bool, error) {
+	if len(byInputs) != 1 || len(aggs) == 0 || len(groupOrder) > len(index.Rows) {
+		return Frame{}, false, nil
+	}
+	keyKind := byInputs[0].keyKind()
+	if !isTypedGroupedAggregateKeyKind(keyKind) || !typedGroupedAggregateInputsSupported(aggs) {
+		return Frame{}, false, nil
+	}
+	accumulators := make([]typedGroupedAggregateAccumulator, len(aggs))
+	for i, agg := range aggs {
+		accumulators[i] = typedGroupedAggregateAccumulator{
+			input: agg,
+			sum:   make([]float64, len(index.Rows)),
+			count: make([]int64, len(index.Rows)),
+		}
+		if agg.Func == "min" || agg.Func == "max" {
+			accumulators[i].value = make([]any, len(index.Rows))
+			accumulators[i].hasVal = make([]bool, len(index.Rows))
+		}
+	}
+	seen := []bool(nil)
+	if indexes != nil || predicate != nil {
+		seen = make([]bool, len(index.Rows))
+		groupOrder = make([]int, 0, len(index.Rows))
+	} else if groupOrder == nil {
+		groupOrder = allIndexes(len(index.Rows))
+	}
+	accumulate := func(group, row int) error {
+		if group < 0 || group >= len(index.Rows) {
+			return fmt.Errorf("group %d out of range", group)
+		}
+		if seen != nil && !seen[group] {
+			seen[group] = true
+			groupOrder = append(groupOrder, group)
+		}
+		for i := range accumulators {
+			acc := &accumulators[i]
+			agg := acc.input
+			switch agg.Func {
+			case "count":
+				acc.count[group]++
+			case "sum":
+				value, ok, err := aggregateIndexedNumericValue(agg, row)
+				if err != nil {
+					return err
+				}
+				if ok {
+					acc.sum[group] += value
+					acc.count[group]++
+				}
+			case "min", "max":
+				value, err := agg.value(frame, row)
+				if err != nil {
+					return err
+				}
+				if IsNull(value) {
+					continue
+				}
+				if !acc.hasVal[group] ||
+					(agg.Func == "min" && compare(value, acc.value[group]) < 0) ||
+					(agg.Func == "max" && compare(value, acc.value[group]) > 0) {
+					acc.value[group] = value
+					acc.hasVal[group] = true
+				}
+			default:
+				return fmt.Errorf("unsupported aggregate %q", agg.Func)
+			}
+		}
+		return nil
+	}
+	if predicate != nil {
+		rowToGroup, err := rowToGroupFromIndex(index)
+		if err != nil {
+			return Frame{}, true, err
+		}
+		for row := 0; row < frame.Len(); row++ {
+			if !predicate(row) {
+				continue
+			}
+			if row < 0 || row >= len(rowToGroup) {
+				return Frame{}, true, fmt.Errorf("filter row %d out of range for grouped index", row)
+			}
+			if err := accumulate(rowToGroup[row], row); err != nil {
+				return Frame{}, true, err
+			}
+		}
+	} else if indexes != nil {
+		rowToGroup, err := rowToGroupFromIndex(index)
+		if err != nil {
+			return Frame{}, true, err
+		}
+		for _, row := range indexes {
+			if row < 0 || row >= len(rowToGroup) {
+				return Frame{}, true, fmt.Errorf("filter row %d out of range for grouped index", row)
+			}
+			if err := accumulate(rowToGroup[row], row); err != nil {
+				return Frame{}, true, err
+			}
+		}
+	} else {
+		for group, rows := range index.Rows {
+			for _, row := range rows {
+				if err := accumulate(group, row); err != nil {
+					return Frame{}, true, err
+				}
+			}
+		}
+	}
+
+	cols := make([]Column, 0, 1+len(aggs))
+	keyColumn, ok, err := typedGroupedAggregateKeyColumn(byInputs[0].Name, keyKind, index.Keys, groupOrder)
+	if err != nil || !ok {
+		return Frame{}, ok, err
+	}
+	cols = append(cols, keyColumn)
+	for _, acc := range accumulators {
+		column, err := typedGroupedAggregateOutputColumn(frame, acc, groupOrder)
+		if err != nil {
+			return Frame{}, true, err
+		}
+		cols = append(cols, column)
+	}
+	out, err := newFrameTrusted(cols...)
+	return out, true, err
+}
+
+func isTypedGroupedAggregateKeyKind(kind Kind) bool {
+	switch kind {
+	case KindSymbol, KindString, KindI8, KindI16, KindI32, KindI64:
+		return true
+	default:
+		return false
+	}
+}
+
+func typedGroupedAggregateInputsSupported(aggs []aggregateInput) bool {
+	for _, agg := range aggs {
+		if agg.Weight != nil {
+			return false
+		}
+		switch agg.Func {
+		case "count":
+		case "sum":
+			if agg.column != nil && isNumericArray(agg.column) {
+				continue
+			}
+			if agg.leftColumn != nil && agg.rightColumn != nil && isNumericArray(agg.leftColumn) && isNumericArray(agg.rightColumn) {
+				continue
+			}
+			return false
+		case "min", "max":
+			if agg.column == nil || !isTypedMinMaxArray(agg.column) {
+				return false
+			}
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+func typedGroupedAggregateKeyColumn(name Symbol, kind Kind, keys []any, order []int) (Column, bool, error) {
+	switch kind {
+	case KindSymbol:
+		values := make([]Symbol, len(order))
+		for row, group := range order {
+			value, ok := keys[group].(Symbol)
+			if !ok {
+				if text, textOK := keys[group].(string); textOK {
+					value, ok = Symbol(text), true
+				}
+			}
+			if !ok {
+				return Column{}, true, fmt.Errorf("group key %d must be symbol-compatible, got %T", group, keys[group])
+			}
+			values[row] = value
+		}
+		return Column{Name: name, Data: columnArray[Symbol]{kind: KindSymbol, data: values}}, true, nil
+	case KindString:
+		values := make([]string, len(order))
+		for row, group := range order {
+			value, ok := keys[group].(string)
+			if !ok {
+				if sym, symOK := keys[group].(Symbol); symOK {
+					value, ok = string(sym), true
+				}
+			}
+			if !ok {
+				return Column{}, true, fmt.Errorf("group key %d must be string-compatible, got %T", group, keys[group])
+			}
+			values[row] = value
+		}
+		return Column{Name: name, Data: columnArray[string]{kind: KindString, data: values}}, true, nil
+	case KindI8:
+		values := make([]int8, len(order))
+		for row, group := range order {
+			value, ok := signedGroupKey[int8](keys[group])
+			if !ok {
+				return Column{}, true, fmt.Errorf("group key %d must be i8-compatible, got %T", group, keys[group])
+			}
+			values[row] = value
+		}
+		return Column{Name: name, Data: columnArray[int8]{kind: KindI8, data: values}}, true, nil
+	case KindI16:
+		values := make([]int16, len(order))
+		for row, group := range order {
+			value, ok := signedGroupKey[int16](keys[group])
+			if !ok {
+				return Column{}, true, fmt.Errorf("group key %d must be i16-compatible, got %T", group, keys[group])
+			}
+			values[row] = value
+		}
+		return Column{Name: name, Data: columnArray[int16]{kind: KindI16, data: values}}, true, nil
+	case KindI32:
+		values := make([]int32, len(order))
+		for row, group := range order {
+			value, ok := signedGroupKey[int32](keys[group])
+			if !ok {
+				return Column{}, true, fmt.Errorf("group key %d must be i32-compatible, got %T", group, keys[group])
+			}
+			values[row] = value
+		}
+		return Column{Name: name, Data: columnArray[int32]{kind: KindI32, data: values}}, true, nil
+	case KindI64:
+		values := make([]int64, len(order))
+		for row, group := range order {
+			value, ok := signedGroupKey[int64](keys[group])
+			if !ok {
+				return Column{}, true, fmt.Errorf("group key %d must be i64-compatible, got %T", group, keys[group])
+			}
+			values[row] = value
+		}
+		return Column{Name: name, Data: columnArray[int64]{kind: KindI64, data: values}}, true, nil
+	default:
+		return Column{}, false, nil
+	}
+}
+
+func signedGroupKey[T signedScalar](value any) (T, bool) {
+	switch v := value.(type) {
+	case int:
+		return T(v), true
+	case int8:
+		return T(v), true
+	case int16:
+		return T(v), true
+	case int32:
+		return T(v), true
+	case int64:
+		return T(v), true
+	default:
+		return 0, false
+	}
+}
+
+func typedGroupedAggregateOutputColumn(frame Frame, acc typedGroupedAggregateAccumulator, order []int) (Column, error) {
+	agg := acc.input.Aggregate
+	switch agg.Func {
+	case "count":
+		values := make([]int64, len(order))
+		for row, group := range order {
+			values[row] = acc.count[group]
+		}
+		return Column{Name: agg.Name, Data: columnArray[int64]{kind: KindI64, data: values}}, nil
+	case "sum":
+		values := make([]float64, len(order))
+		for row, group := range order {
+			values[row] = acc.sum[group]
+		}
+		return Column{Name: agg.Name, Data: columnArray[float64]{kind: KindF64, data: values}}, nil
+	case "min", "max":
+		values := make([]any, len(order))
+		for row, group := range order {
+			if acc.hasVal[group] {
+				values[row] = acc.value[group]
+			} else {
+				values[row] = NullValue
+			}
+		}
+		if kind, ok := aggregateOutputKind(frame, agg); ok {
+			return columnWithKind(agg.Name, kind, values)
+		}
+		return NewColumn(agg.Name, values), nil
+	default:
+		return Column{}, fmt.Errorf("unsupported aggregate %q", agg.Func)
+	}
 }
 
 type simpleGroupedAggregate struct {

@@ -173,6 +173,7 @@ QSQL_EXPECTED_BENCHMARKS = {
     "BenchmarkQSQLBindRunSQLWarmCacheDeleteWhere",
     "BenchmarkQSQLNativeGoSelectWhereProject",
     "BenchmarkQSQLNativeGoGroupByAggregate",
+    "BenchmarkQSQLDataRuntimeGroupByAggregate",
     "BenchmarkQSQLNativeGoJoin",
     "BenchmarkQSQLNativeGoJoinTopK",
     "BenchmarkQSQLNativeGoJoinTopKMaterialized",
