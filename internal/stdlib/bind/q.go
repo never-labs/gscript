@@ -1046,7 +1046,7 @@ func qEvalSymbolicSource(src string) (Value, error) {
 }
 
 func qSessionValue() *Table {
-	state := stdq.NewEvalState(nil)
+	session := stdq.NewEvalSession(nil)
 	var mu sync.Mutex
 	t := NewTable()
 	t.RawSetString("kind", StringValue("q_session"))
@@ -1055,7 +1055,7 @@ func qSessionValue() *Table {
 			return nil, fmt.Errorf("q.session.eval: argument 1 must be a q source string")
 		}
 		mu.Lock()
-		out, err := state.Eval(args[0].Str())
+		out, err := session.Eval(args[0].Str())
 		mu.Unlock()
 		if err != nil {
 			return nil, fmt.Errorf("q session: %w", err)

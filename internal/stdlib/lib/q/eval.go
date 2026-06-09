@@ -810,6 +810,10 @@ func (s *EvalState) Eval(src string) (any, error) {
 
 func (s *EvalState) evalScript(src string) (any, error) {
 	plan := s.qScriptPlan(src)
+	return s.evalScriptPlan(plan)
+}
+
+func (s *EvalState) evalScriptPlan(plan qScriptPlan) (any, error) {
 	if plan.executable != nil {
 		if out, handled, err := s.evalQScriptExecutablePlan(plan.executable); err != nil || handled {
 			return out, err
@@ -10983,6 +10987,26 @@ func applyDyadic(op byte, left, right any) (any, error) {
 	default:
 		return nil, fmt.Errorf("operator %q is not supported", string(op))
 	}
+}
+
+func applyScalarNumericAdd4(a, b, c, d any) (any, bool) {
+	if ai, ok := integerValue(a); ok {
+		if bi, ok := integerValue(b); ok {
+			if ci, ok := integerValue(c); ok {
+				if di, ok := integerValue(d); ok {
+					return ai + bi + ci + di, true
+				}
+			}
+		}
+	}
+	af, aok := numeric(a)
+	bf, bok := numeric(b)
+	cf, cok := numeric(c)
+	df, dok := numeric(d)
+	if !aok || !bok || !cok || !dok {
+		return nil, false
+	}
+	return af + bf + cf + df, true
 }
 
 func hasTypedNullKind(v any) bool {

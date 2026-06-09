@@ -1805,6 +1805,41 @@ func TestEvalScriptExecutablePipelineBackendWarmPath(t *testing.T) {
 	}
 }
 
+func TestEvalSessionWarmCachePreservesEnvironmentSemantics(t *testing.T) {
+	session := NewEvalSession(map[string]any{
+		"v":         data.NewI64([]int64{1, 2, 3, 4, 5}),
+		"threshold": int64(2),
+	})
+	src := "idx:where v>threshold;+/v[idx]"
+	if got, err := session.Eval(src); err != nil || got != int64(12) {
+		t.Fatalf("cold session Eval returned %#v, %v; want 12,nil", got, err)
+	}
+	entry, ok := session.cache[strings.TrimSpace(src)]
+	if !ok {
+		t.Fatal("session plan cache was not populated")
+	}
+	if !entry.executable.Valid() || entry.descriptor.Kind != "script" || entry.backend.Backend != EvalPipelineTypedRuntimeBackend {
+		t.Fatalf("session cached entry = %#v, want script descriptor/backend executable", entry)
+	}
+	session.state.env["threshold"] = int64(3)
+	if got, err := session.Eval(src); err != nil || got != int64(9) {
+		t.Fatalf("warm session Eval returned %#v, %v; want 9,nil", got, err)
+	}
+}
+
+func TestEvalSessionWarmCacheDoesNotPoisonErrorPath(t *testing.T) {
+	session := NewEvalSession(nil)
+	if _, err := session.Eval("x+"); err == nil {
+		t.Fatal("cold invalid session Eval succeeded, want error")
+	}
+	if _, err := session.Eval("x+"); err == nil {
+		t.Fatal("warm invalid session Eval succeeded, want error")
+	}
+	if got, err := session.Eval("x:41;x+1"); err != nil || got != int64(42) {
+		t.Fatalf("valid session Eval after error returned %#v, %v; want 42,nil", got, err)
+	}
+}
+
 func TestEvalGlobalScriptPlanCachePreservesEnvironmentSemantics(t *testing.T) {
 	ClearEvalPlanCaches()
 	t.Cleanup(ClearEvalPlanCaches)
@@ -4624,16 +4659,23 @@ func TestEvalCallableOverScanSumPipelineRecordsTypedRuntimeKernel(t *testing.T) 
 	t.Cleanup(ClearRuntimeKernelExecutionStats)
 	assertEvalValue(t, "x:1+til 8;s:+\\x;({x+y}/[10;x])+last s+count s", int64(90))
 	seen := false
+	seenSummary := false
 	for _, stat := range RuntimeKernelExecutionStats() {
 		if stat.Outcome == "fallback" || stat.Outcome == "error" {
 			t.Fatalf("unexpected callable-over scan fallback/error: %#v all=%#v", stat, RuntimeKernelExecutionStats())
 		}
 		if stat.Kernel == "CallableOverScanSum" && stat.Outcome == "hit" && stat.Count > 0 {
 			seen = true
+			if strings.Contains(stat.Shape, "summary/i64") {
+				seenSummary = true
+			}
 		}
 	}
 	if !seen {
 		t.Fatalf("missing CallableOverScanSum hit: %#v", RuntimeKernelExecutionStats())
+	}
+	if !seenSummary {
+		t.Fatalf("missing CallableOverScanSum summary hit: %#v", RuntimeKernelExecutionStats())
 	}
 }
 

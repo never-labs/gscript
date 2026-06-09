@@ -296,15 +296,19 @@ func buildQScriptRangeBindingPlan(src string) qScriptBindingPlan {
 	if plan := buildQScriptPrefixBindingPlan(src); plan.kind != qScriptBindingInvalid {
 		return plan
 	}
-	if left, right, ok := splitTopLevelOperator(src, "+"); ok {
+	for _, op := range []string{"+", "-"} {
+		left, right, ok := splitTopLevelOperator(src, op)
+		if !ok {
+			continue
+		}
 		if til := buildQScriptPrefixBindingPlan(right); til.kind != qScriptBindingInvalid {
 			if scalar := buildQScriptScalarLiteralBindingPlan(left); scalar.kind != qScriptBindingInvalid {
-				return qScriptBindingBinaryPlan("+", scalar, til)
+				return qScriptBindingBinaryPlan(op, scalar, til)
 			}
 		}
 		if til := buildQScriptPrefixBindingPlan(left); til.kind != qScriptBindingInvalid {
 			if scalar := buildQScriptScalarLiteralBindingPlan(right); scalar.kind != qScriptBindingInvalid {
-				return qScriptBindingBinaryPlan("+", til, scalar)
+				return qScriptBindingBinaryPlan(op, til, scalar)
 			}
 		}
 	}
