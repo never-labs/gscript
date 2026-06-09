@@ -3456,6 +3456,78 @@ func TryTypedNumericSum(array Array) (any, bool, error) {
 	return typedKernels.NumericSumValue(array)
 }
 
+// TryTypedNumericSumFirstLast reduces sum(array)+first(array)+last(array)
+// without materializing intermediate sequence views. It is intentionally
+// array-oriented so language frontends can reuse it for recognized reducer
+// chains over lazy sequence transforms.
+func TryTypedNumericSumFirstLast(array Array) (any, bool, error) {
+	if array == nil {
+		return nil, true, fmt.Errorf("sum-first-last array is nil")
+	}
+	if array.Len() == 0 {
+		return nil, false, nil
+	}
+	sum, handled, err := typedKernels.NumericSumValue(array)
+	if err != nil || !handled {
+		return nil, handled, err
+	}
+	first, ok, err := numericEdgeValue(array, 0)
+	if err != nil || !ok {
+		return nil, ok, err
+	}
+	last, ok, err := numericEdgeValue(array, array.Len()-1)
+	if err != nil || !ok {
+		return nil, ok, err
+	}
+	if total, ok := numericAdd3(sum, first, last); ok {
+		return total, true, nil
+	}
+	return nil, false, nil
+}
+
+func numericEdgeValue(array Array, row int) (any, bool, error) {
+	if isIntegerArray(array) {
+		value, ok, err := integerArrayAt(array, row)
+		if err != nil || !ok {
+			return nil, ok, err
+		}
+		return value, true, nil
+	}
+	value, ok := array.At(row)
+	if !ok {
+		return nil, false, fmt.Errorf("array row %d out of range", row)
+	}
+	if IsNull(value) {
+		return nil, false, nil
+	}
+	if _, ok := numeric(value); !ok {
+		return nil, false, nil
+	}
+	return value, true, nil
+}
+
+func numericAdd3(a, b, c any) (any, bool) {
+	ai, aInt := coerceInt64Exact(a)
+	bi, bInt := coerceInt64Exact(b)
+	ci, cInt := coerceInt64Exact(c)
+	if aInt && bInt && cInt {
+		return ai + bi + ci, true
+	}
+	af, ok := numeric(a)
+	if !ok {
+		return nil, false
+	}
+	bf, ok := numeric(b)
+	if !ok {
+		return nil, false
+	}
+	cf, ok := numeric(c)
+	if !ok {
+		return nil, false
+	}
+	return af + bf + cf, true
+}
+
 // TryTypedBinSum reduces q's `domain bin query` result directly. It preserves
 // the scalar result shape of sum while avoiding the intermediate i64 bin vector.
 func TryTypedBinSum(domain Array, query any) (any, bool, error) {

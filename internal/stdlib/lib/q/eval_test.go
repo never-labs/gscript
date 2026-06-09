@@ -330,6 +330,12 @@ func TestQPipelinePlanRecognizesRazeSumAndCounts(t *testing.T) {
 }
 
 func TestQPipelinePlanRecognizesScalarApplyIndex(t *testing.T) {
+	if plan, ok := buildQPipelineApplyPathIndexPlan("m . 1 2"); !ok ||
+		plan.shape != "apply-index/path-dot" ||
+		plan.valueExpr != "m" ||
+		plan.indexExpr != "1 2" {
+		t.Fatalf("buildQPipelineApplyPathIndexPlan = %#v,%v; want path-dot m 1 2", plan, ok)
+	}
 	tests := []struct {
 		expr          string
 		shape         string
@@ -341,6 +347,7 @@ func TestQPipelinePlanRecognizesScalarApplyIndex(t *testing.T) {
 		{expr: "x:10 20 30;x@1", shape: "script-pipeline/apply-index/scalar-at/assignments", valueExpr: "x", indexExpr: "1", want: int64(20), pipelineShape: "script_pipeline"},
 		{expr: "x:10 20 30;x . 2", shape: "script-pipeline/apply-index/scalar-dot/assignments", valueExpr: "x", indexExpr: "2", want: int64(30), pipelineShape: "script_pipeline"},
 		{expr: "m:2 3#til 6;m . 1", shape: "script-pipeline/apply-index/scalar-dot/assignments", valueExpr: "m", indexExpr: "1", want: data.NewI64([]int64{3, 4, 5}), pipelineShape: "script_pipeline"},
+		{expr: "m:2 3#til 6;m . 1 2", shape: "script-pipeline/apply-index/path-dot/assignments", valueExpr: "m", indexExpr: "1 2", want: int64(5), pipelineShape: "script_pipeline"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.expr, func(t *testing.T) {
@@ -349,7 +356,8 @@ func TestQPipelinePlanRecognizesScalarApplyIndex(t *testing.T) {
 
 			descriptor, ok := DescribeEvalPipeline(tt.expr)
 			if !ok {
-				t.Fatalf("DescribeEvalPipeline(%q) did not recognize scalar apply-index", tt.expr)
+				plan := buildQScriptPlan(tt.expr)
+				t.Fatalf("DescribeEvalPipeline(%q) did not recognize scalar apply-index; scriptPipeline=%#v statements=%#v", tt.expr, plan.scriptPipeline, plan.statements)
 			}
 			if descriptor.Shape != tt.shape ||
 				descriptor.PipelineShape != tt.pipelineShape ||
@@ -675,6 +683,32 @@ func TestQScriptPipelinePlannerDescribesTerminalGatherReduce(t *testing.T) {
 	}
 	if got, want := d.shape(), "script-pipeline/gather-reduce/sum/assignments"; got != want {
 		t.Fatalf("shape = %q, want %q", got, want)
+	}
+}
+
+func TestQScriptPipelinePlannerDescribesSequenceEdgeReduce(t *testing.T) {
+	src := "x:til 1024;r:17 rotate x;y:128 sublist reverse r;(+/y)+first y+last y"
+	plan := buildQScriptPlan(src)
+	if plan.scriptPipeline == nil {
+		t.Fatalf("script pipeline descriptor missing")
+	}
+	d := plan.scriptPipeline
+	if d.kind != qScriptPipelineSequenceEdgeSum {
+		t.Fatalf("pipeline kind = %q, want %q", d.kind, qScriptPipelineSequenceEdgeSum)
+	}
+	if d.valueExpr != "y" || d.valueBinding != "128 sublist reverse r" {
+		t.Fatalf("value descriptor = expr %q binding %q, want y/128 sublist reverse r", d.valueExpr, d.valueBinding)
+	}
+	if got, want := d.shape(), "script-pipeline/sequence-edge-reduce/sum-first-last/assignments"; got != want {
+		t.Fatalf("shape = %q, want %q", got, want)
+	}
+	descriptor, ok := DescribeEvalPipeline(src)
+	if !ok {
+		t.Fatalf("DescribeEvalPipeline(%q) did not recognize sequence edge pipeline", src)
+	}
+	out, handled, err := ExecuteEvalPipelineDescriptor(descriptor)
+	if err != nil || !handled || out != int64(108513) {
+		t.Fatalf("ExecuteEvalPipelineDescriptor sequence edge = %#v,%v,%v; want 108513,true,nil", out, handled, err)
 	}
 }
 
@@ -4511,17 +4545,25 @@ func TestEvalSequenceCompositeReducerAddChainStats(t *testing.T) {
 
 	assertEvalValue(t, "x:til 1024;r:17 rotate x;y:128 sublist reverse r;(+/y)+first y+last y", int64(108513))
 
+	seenPipeline := false
+	seenComposite := false
 	seenSum := false
 	for _, stat := range RuntimeKernelExecutionStats() {
 		if stat.Outcome == "fallback" || stat.Outcome == "error" {
 			t.Fatalf("unexpected sequence composite fallback/error: %#v all=%#v", stat, RuntimeKernelExecutionStats())
 		}
+		if stat.Kernel == "QScriptPipelinePlan" && stat.Shape == "script-pipeline/sequence-edge-reduce/sum-first-last/assignments" && stat.Outcome == "hit" {
+			seenPipeline = true
+		}
+		if stat.Kernel == "SequenceEdgeReduce" && stat.Shape == "vector-reduce/sum-first-last/i64" && stat.Outcome == "hit" {
+			seenComposite = true
+		}
 		if stat.Kernel == "ArraySum" && stat.Shape == "vector-reduce/sum/i64" && stat.Outcome == "hit" {
 			seenSum = true
 		}
 	}
-	if !seenSum {
-		t.Fatalf("missing sequence composite sum runtime stat: %#v", RuntimeKernelExecutionStats())
+	if !seenPipeline || !seenComposite {
+		t.Fatalf("missing sequence composite runtime stats: pipeline=%v composite=%v sum=%v stats=%#v", seenPipeline, seenComposite, seenSum, RuntimeKernelExecutionStats())
 	}
 }
 

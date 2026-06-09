@@ -416,6 +416,9 @@ func qPipelinePlanFromEvalDescriptor(descriptor EvalPipelineDescriptor) (qPipeli
 	case "apply-index/scalar-dot":
 		plan.kind = qPipelineApplyScalarIndex
 		plan.compareOp = "dot"
+	case "apply-index/path-dot":
+		plan.kind = qPipelineApplyScalarIndex
+		plan.compareOp = "dot"
 	default:
 		switch {
 		case strings.HasPrefix(shape, "runtime-unary/"):
@@ -454,6 +457,8 @@ func qScriptPipelineDescriptorFromEvalDescriptor(descriptor EvalPipelineDescript
 		maskBinding:  strings.TrimSpace(descriptor.MaskBinding),
 	}
 	switch {
+	case strings.Contains(shape, "sequence-edge-reduce/sum-first-last"):
+		out.kind = qScriptPipelineSequenceEdgeSum
 	case strings.Contains(shape, "apply-index/scalar-at"):
 		out.kind = qScriptPipelineApplyScalarAt
 		out.terminalPlan = qPipelinePlanWithBindingPlans(qPipelinePlan{
@@ -468,6 +473,15 @@ func qScriptPipelineDescriptorFromEvalDescriptor(descriptor EvalPipelineDescript
 		out.terminalPlan = qPipelinePlanWithBindingPlans(qPipelinePlan{
 			kind:      qPipelineApplyScalarIndex,
 			shape:     "apply-index/scalar-dot",
+			compareOp: "dot",
+			valueExpr: out.valueExpr,
+			indexExpr: out.indexExpr,
+		})
+	case strings.Contains(shape, "apply-index/path-dot"):
+		out.kind = qScriptPipelineApplyPathDot
+		out.terminalPlan = qPipelinePlanWithBindingPlans(qPipelinePlan{
+			kind:      qPipelineApplyScalarIndex,
+			shape:     "apply-index/path-dot",
 			compareOp: "dot",
 			valueExpr: out.valueExpr,
 			indexExpr: out.indexExpr,

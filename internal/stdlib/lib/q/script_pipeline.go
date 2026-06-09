@@ -12,8 +12,10 @@ const (
 	qScriptPipelineWhereReduceSum      qScriptPipelineKind = "where-reduce/sum"
 	qScriptPipelineWhereIndexReduceSum qScriptPipelineKind = "where-index-reduce/sum"
 	qScriptPipelineGatherReduceSum     qScriptPipelineKind = "gather-reduce/sum"
+	qScriptPipelineSequenceEdgeSum     qScriptPipelineKind = "sequence-edge-reduce/sum-first-last"
 	qScriptPipelineApplyScalarAt       qScriptPipelineKind = "apply-index/scalar-at"
 	qScriptPipelineApplyScalarDot      qScriptPipelineKind = "apply-index/scalar-dot"
+	qScriptPipelineApplyPathDot        qScriptPipelineKind = "apply-index/path-dot"
 	qScriptPipelineUnsupported         qScriptPipelineKind = ""
 )
 
@@ -112,6 +114,22 @@ func describeQScriptPipelineTerminal(src string, bindings map[string]string) (qS
 			indexBinding: qScriptPipelineBinding(plan.indexExpr, bindings),
 		}, true
 	}
+	if plan, ok := buildQPipelineApplyPathIndexPlan(src); ok {
+		return qScriptPipelineDescriptor{
+			kind:         qScriptPipelineApplyPathDot,
+			valueExpr:    plan.valueExpr,
+			valueBinding: qScriptPipelineBinding(plan.valueExpr, bindings),
+			indexExpr:    plan.indexExpr,
+			indexBinding: qScriptPipelineBinding(plan.indexExpr, bindings),
+		}, true
+	}
+	if valueExpr, ok := qScriptPipelineSequenceEdgeReduceValue(src); ok {
+		return qScriptPipelineDescriptor{
+			kind:         qScriptPipelineSequenceEdgeSum,
+			valueExpr:    valueExpr,
+			valueBinding: qScriptPipelineBinding(valueExpr, bindings),
+		}, true
+	}
 	if !strings.HasPrefix(src, "+/") {
 		return qScriptPipelineDescriptor{}, false
 	}
@@ -149,6 +167,79 @@ func describeQScriptPipelineTerminal(src string, bindings map[string]string) (qS
 	return d, true
 }
 
+func qScriptPipelineSequenceEdgeReduceValue(src string) (string, bool) {
+	terms := qScriptPipelinePlusTerms(src)
+	if len(terms) != 3 {
+		return "", false
+	}
+	var value string
+	seen := map[string]bool{"sum": false, "first": false, "last": false}
+	for _, term := range terms {
+		kind, name, ok := qScriptPipelineSequenceReducerTerm(term)
+		if !ok {
+			return "", false
+		}
+		if value == "" {
+			value = name
+		} else if value != name {
+			return "", false
+		}
+		if seen[kind] {
+			return "", false
+		}
+		seen[kind] = true
+	}
+	return value, value != "" && seen["sum"] && seen["first"] && seen["last"]
+}
+
+func qScriptPipelinePlusTerms(src string) []string {
+	src = stripEnclosingParens(strings.TrimSpace(src))
+	if left, right, ok := splitTopLevelOperator(src, "+"); ok {
+		terms := qScriptPipelinePlusTerms(left)
+		terms = append(terms, qScriptPipelinePlusTerms(right)...)
+		return terms
+	}
+	if src == "" {
+		return nil
+	}
+	return []string{src}
+}
+
+func qScriptPipelineSequenceReducerTerm(src string) (string, string, bool) {
+	src = stripEnclosingParens(strings.TrimSpace(src))
+	if strings.HasPrefix(src, "+/") {
+		name := strings.TrimSpace(src[len("+/"):])
+		if qScriptPipelineSimpleName(name) {
+			return "sum", name, true
+		}
+		return "", "", false
+	}
+	for _, kind := range []string{"sum", "first", "last"} {
+		if !strings.HasPrefix(src, kind) || !wordBoundary(src, 0, len(kind)) {
+			continue
+		}
+		name := strings.TrimSpace(src[len(kind):])
+		if qScriptPipelineSimpleName(name) {
+			return kind, name, true
+		}
+		return "", "", false
+	}
+	return "", "", false
+}
+
+func qScriptPipelineSimpleName(src string) bool {
+	src = strings.TrimSpace(src)
+	if src == "" || !isQIdentStart(src[0]) {
+		return false
+	}
+	for i := 1; i < len(src); i++ {
+		if !isQIdentRest(src[i]) {
+			return false
+		}
+	}
+	return true
+}
+
 func qScriptPipelineIndexMaskExpr(indexExpr string, bindings map[string]string) (string, bool) {
 	if maskExpr, ok := directWhereMaskExpr(indexExpr); ok {
 		return maskExpr, true
@@ -177,6 +268,18 @@ func (s *EvalState) tryEvalQScriptPipeline(descriptor *qScriptPipelineDescriptor
 	}
 	shape := descriptor.shape()
 	recordRuntimeKernelExecution("QScriptPipelinePlan", shape, "attempt", "attempt")
+	if descriptor.kind == qScriptPipelineSequenceEdgeSum {
+		out, handled, err := s.evalQScriptSequenceEdgeSumPipeline(descriptor)
+		switch {
+		case err != nil:
+			recordRuntimeKernelExecution("QScriptPipelinePlan", shape, "error", "runtime_error")
+		case handled:
+			recordRuntimeKernelExecution("QScriptPipelinePlan", shape, "hit", "typed_pipeline")
+		default:
+			recordRuntimeKernelExecution("QScriptPipelinePlan", shape, "fallback", "unsupported_runtime_shape")
+		}
+		return out, handled, err
+	}
 	terminal := descriptor.terminalPlan
 	if terminal.kind == qPipelineInvalid {
 		recordRuntimeKernelExecution("QScriptPipelinePlan", shape, "fallback", RuntimeFallbackPlannerUnhandled)
@@ -210,6 +313,49 @@ func (s *EvalState) tryEvalQScriptPipeline(descriptor *qScriptPipelineDescriptor
 	default:
 		recordRuntimeKernelExecution("QScriptPipelinePlan", shape, "fallback", "unsupported_runtime_shape")
 	}
+	return out, handled, err
+}
+
+func (s *EvalState) evalQScriptSequenceEdgeSumPipeline(descriptor *qScriptPipelineDescriptor) (any, bool, error) {
+	for _, assignment := range descriptor.assignments {
+		if strings.TrimSpace(descriptor.valueExpr) == assignment.name {
+			continue
+		}
+		value, handled, err := s.evalQScriptBindingPlan(&assignment.binding)
+		if err != nil {
+			return nil, true, err
+		}
+		if !handled {
+			value, err = s.evalCachedOrString(assignment.rhs, assignment.valueExpr, &assignment.binding, nil)
+			if err != nil {
+				return nil, true, err
+			}
+		}
+		s.env[s.resolveAssignmentName(assignment.name)] = value
+	}
+	value, handled, err := s.evalQScriptBindingPlan(&descriptor.valuePlan)
+	if err != nil {
+		return nil, true, err
+	}
+	if !handled {
+		if err := s.evalQScriptPipelineDeferredAssignment(descriptor, descriptor.valueExpr); err != nil {
+			return nil, true, err
+		}
+		value, handled, err = s.evalQScriptBindingPlan(&descriptor.valuePlan)
+		if err != nil {
+			return nil, true, err
+		}
+	}
+	if !handled {
+		return nil, false, nil
+	}
+	array, ok := value.(data.Array)
+	if !ok {
+		return nil, false, nil
+	}
+	shape := "vector-reduce/sum-first-last/" + string(array.Kind())
+	out, handled, err := data.TryTypedNumericSumFirstLast(array)
+	out, handled, err = qTypedRuntimeResultReason("SequenceEdgeReduce", shape, RuntimeFallbackUnsupportedType, out, handled, err)
 	return out, handled, err
 }
 

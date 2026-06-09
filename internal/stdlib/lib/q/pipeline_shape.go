@@ -178,6 +178,15 @@ func qPipelineShapeSpecForPlan(kind qPipelineKind, variant string) (qPipelineSha
 		if variant == "" {
 			return qPipelineShapeSpec{}, false
 		}
+		if variant == "path-dot" {
+			return qPipelineShapeSpec{
+				ID:            "apply-index/path-dot",
+				Family:        qPipelineShapeFamilyApply,
+				Selector:      "path",
+				Transform:     "dot",
+				PipelineShape: "apply_index",
+			}, true
+		}
 		return qPipelineShapeSpec{
 			ID:            "apply-index/scalar-" + variant,
 			Family:        qPipelineShapeFamilyApply,

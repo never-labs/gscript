@@ -2580,6 +2580,35 @@ func TestTypedNumericUnaryBinaryAndAggregates(t *testing.T) {
 		t.Fatalf("TryTypedNumericSum rotated tiled range = %v (%T), want %v", got, got, want)
 	}
 
+	rotatedView, ok, err := TryTypedRotate(NewI64Range(0, 1, 1024), 17)
+	if err != nil {
+		t.Fatalf("TryTypedRotate range returned error: %v", err)
+	}
+	if !ok {
+		t.Fatal("TryTypedRotate range was not handled")
+	}
+	reversedRotated, ok, err := Reverse(rotatedView)
+	if err != nil {
+		t.Fatalf("Reverse rotated range returned error: %v", err)
+	}
+	if !ok {
+		t.Fatal("Reverse rotated range was not handled")
+	}
+	window, err := Slice(reversedRotated, 0, 128)
+	if err != nil {
+		t.Fatalf("Slice reversed rotated range returned error: %v", err)
+	}
+	composite, ok, err := TryTypedNumericSumFirstLast(window)
+	if err != nil {
+		t.Fatalf("TryTypedNumericSumFirstLast sequence view returned error: %v", err)
+	}
+	if !ok {
+		t.Fatal("TryTypedNumericSumFirstLast sequence view was not handled")
+	}
+	if got, want := composite, int64(108513); got != want {
+		t.Fatalf("TryTypedNumericSumFirstLast sequence view = %v (%T), want %v", got, got, want)
+	}
+
 	tiledFloats, err := TakeRepeat(NewF64([]float64{0, 1.5}), 7)
 	if err != nil {
 		t.Fatalf("Take tiled floats returned error: %v", err)
