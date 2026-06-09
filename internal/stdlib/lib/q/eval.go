@@ -689,6 +689,11 @@ func (s *EvalState) Eval(src string) (any, error) {
 
 func (s *EvalState) evalScript(src string) (any, error) {
 	plan := s.qScriptPlan(src)
+	if plan.executable != nil {
+		if out, handled, err := s.evalQScriptExecutablePlan(plan.executable); err != nil || handled {
+			return out, err
+		}
+	}
 	if plan.scriptPipeline != nil {
 		if out, handled, err := s.tryEvalQScriptPipeline(plan.scriptPipeline); err != nil || handled {
 			return out, err
@@ -734,6 +739,7 @@ type qScriptPlan struct {
 	statements          []qScriptStatement
 	deferScanCandidates bool
 	scriptPipeline      *qScriptPipelineDescriptor
+	executable          *qScriptExecutablePlan
 }
 
 type qScriptStatement struct {
@@ -757,6 +763,18 @@ type qEvalFastPlan struct {
 	kind        qEvalFastPlanKind
 	pipeline    qPipelinePlan
 	scalarIndex qScalarApplyIndexPlan
+}
+
+type qScriptExecutableKind uint8
+
+const (
+	qScriptExecutableInvalid qScriptExecutableKind = iota
+	qScriptExecutableSingleStatement
+)
+
+type qScriptExecutablePlan struct {
+	kind      qScriptExecutableKind
+	statement qScriptStatement
 }
 
 func (s *EvalState) qScriptPlan(src string) qScriptPlan {
@@ -900,13 +918,44 @@ func buildQScriptPlan(src string) qScriptPlan {
 		statements = append(statements, stmt)
 	}
 	pipeline, _ := buildQScriptPipelineDescriptor(statements)
-	return qScriptPlan{statements: statements, deferScanCandidates: deferScanCandidates, scriptPipeline: pipeline}
+	plan := qScriptPlan{statements: statements, deferScanCandidates: deferScanCandidates, scriptPipeline: pipeline}
+	plan.executable = buildQScriptExecutablePlan(plan)
+	return plan
+}
+
+func buildQScriptExecutablePlan(plan qScriptPlan) *qScriptExecutablePlan {
+	if plan.deferScanCandidates || len(plan.statements) != 1 {
+		return nil
+	}
+	stmt := plan.statements[0]
+	if stmt.assign != "" || stmt.src == "" {
+		return nil
+	}
+	if stmt.bindingPlan.kind == qScriptBindingInvalid && stmt.fastPlan.kind == qEvalFastInvalid && stmt.valueExpr == nil {
+		return nil
+	}
+	return &qScriptExecutablePlan{kind: qScriptExecutableSingleStatement, statement: cloneQScriptStatement(stmt)}
+}
+
+func (s *EvalState) evalQScriptExecutablePlan(plan *qScriptExecutablePlan) (any, bool, error) {
+	if plan == nil {
+		return nil, false, nil
+	}
+	switch plan.kind {
+	case qScriptExecutableSingleStatement:
+		stmt := plan.statement
+		out, err := s.evalCachedOrString(stmt.src, stmt.valueExpr, &stmt.bindingPlan, &stmt.fastPlan)
+		return out, true, err
+	default:
+		return nil, false, nil
+	}
 }
 
 func cloneQScriptPlan(plan qScriptPlan) qScriptPlan {
 	out := qScriptPlan{
 		deferScanCandidates: plan.deferScanCandidates,
 		scriptPipeline:      cloneQScriptPipelineDescriptor(plan.scriptPipeline),
+		executable:          cloneQScriptExecutablePlan(plan.executable),
 	}
 	if len(plan.statements) > 0 {
 		out.statements = make([]qScriptStatement, len(plan.statements))
@@ -915,6 +964,15 @@ func cloneQScriptPlan(plan qScriptPlan) qScriptPlan {
 		}
 	}
 	return out
+}
+
+func cloneQScriptExecutablePlan(in *qScriptExecutablePlan) *qScriptExecutablePlan {
+	if in == nil {
+		return nil
+	}
+	out := *in
+	out.statement = cloneQScriptStatement(in.statement)
+	return &out
 }
 
 func cloneQScriptStatement(stmt qScriptStatement) qScriptStatement {
