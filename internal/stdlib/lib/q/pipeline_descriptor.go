@@ -398,6 +398,12 @@ func qPipelinePlanFromEvalDescriptor(descriptor EvalPipelineDescriptor) (qPipeli
 		"sequence-count/raze", "sequence-count/value":
 		plan.kind = qPipelineCountSequencePrimitive
 		plan.compareOp = strings.TrimPrefix(shape, "sequence-count/")
+	case "apply-index/scalar-at":
+		plan.kind = qPipelineApplyScalarIndex
+		plan.compareOp = "at"
+	case "apply-index/scalar-dot":
+		plan.kind = qPipelineApplyScalarIndex
+		plan.compareOp = "dot"
 	default:
 		switch {
 		case strings.HasPrefix(shape, "runtime-unary/"):
@@ -436,6 +442,24 @@ func qScriptPipelineDescriptorFromEvalDescriptor(descriptor EvalPipelineDescript
 		maskBinding:  strings.TrimSpace(descriptor.MaskBinding),
 	}
 	switch {
+	case strings.Contains(shape, "apply-index/scalar-at"):
+		out.kind = qScriptPipelineApplyScalarAt
+		out.terminalPlan = qPipelinePlanWithBindingPlans(qPipelinePlan{
+			kind:      qPipelineApplyScalarIndex,
+			shape:     "apply-index/scalar-at",
+			compareOp: "at",
+			valueExpr: out.valueExpr,
+			indexExpr: out.indexExpr,
+		})
+	case strings.Contains(shape, "apply-index/scalar-dot"):
+		out.kind = qScriptPipelineApplyScalarDot
+		out.terminalPlan = qPipelinePlanWithBindingPlans(qPipelinePlan{
+			kind:      qPipelineApplyScalarIndex,
+			shape:     "apply-index/scalar-dot",
+			compareOp: "dot",
+			valueExpr: out.valueExpr,
+			indexExpr: out.indexExpr,
+		})
 	case strings.Contains(shape, "where-index-reduce/sum"):
 		out.kind = qScriptPipelineWhereIndexReduceSum
 		out.terminalPlan = qPipelinePlanWithBindingPlans(qPipelinePlan{

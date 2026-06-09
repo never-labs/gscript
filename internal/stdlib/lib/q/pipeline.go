@@ -35,6 +35,7 @@ const (
 	qPipelineSumRaze
 	qPipelineUnaryPrimitive
 	qPipelineDyadicPrimitive
+	qPipelineApplyScalarIndex
 )
 
 type qPipelinePlan struct {
@@ -212,6 +213,9 @@ func qPipelinePlanCandidate(src string) bool {
 	if qPipelineRuntimePrimitiveCandidate(src) {
 		return true
 	}
+	if qPipelineApplyScalarIndexCandidate(src) {
+		return true
+	}
 	return false
 }
 
@@ -225,6 +229,9 @@ func buildQPipelinePlan(src string) qPipelinePlan {
 		return plan
 	}
 	if plan, ok := buildQPipelineRuntimePrimitivePlan(src); ok {
+		return qPipelinePlanWithBindingPlans(withSource(plan))
+	}
+	if plan, ok := buildQPipelineApplyScalarIndexPlan(src); ok {
 		return qPipelinePlanWithBindingPlans(withSource(plan))
 	}
 	if strings.HasPrefix(src, "+/") {
@@ -350,6 +357,29 @@ func buildQPipelinePlan(src string) qPipelinePlan {
 		}
 	}
 	return qPipelinePlan{}
+}
+
+func qPipelineApplyScalarIndexCandidate(src string) bool {
+	_, ok := buildScalarApplyIndexPlan(src)
+	return ok
+}
+
+func buildQPipelineApplyScalarIndexPlan(src string) (qPipelinePlan, bool) {
+	apply, ok := buildScalarApplyIndexPlan(src)
+	if !ok {
+		return qPipelinePlan{}, false
+	}
+	op := "at"
+	if apply.mode == qApplyIndexDot {
+		op = "dot"
+	}
+	return qPipelinePlan{
+		kind:      qPipelineApplyScalarIndex,
+		shape:     "apply-index/scalar-" + op,
+		compareOp: op,
+		valueExpr: apply.target,
+		indexExpr: fmt.Sprintf("%d", apply.index),
+	}, true
 }
 
 func buildQPipelineCountSequencePlan(src string) (qPipelinePlan, bool) {
@@ -1033,6 +1063,8 @@ func (s *EvalState) evalQPipelinePlan(plan qPipelinePlan) (any, bool, error) {
 		out, handled, err = s.evalQPipelineSumRaze(plan)
 	case qPipelineUnaryPrimitive, qPipelineDyadicPrimitive:
 		out, handled, err = s.evalQPipelineRuntimePrimitive(plan)
+	case qPipelineApplyScalarIndex:
+		out, handled, err = s.evalQPipelineApplyScalarIndex(plan)
 	default:
 		recordRuntimeKernelExecution("QPipelinePlan", shape, "fallback", RuntimeFallbackPlannerUnhandled)
 		return nil, false, nil
@@ -1046,6 +1078,36 @@ func (s *EvalState) evalQPipelinePlan(plan qPipelinePlan) (any, bool, error) {
 		recordRuntimeKernelExecution("QPipelinePlan", shape, "fallback", "unsupported_runtime_shape")
 	}
 	return out, handled, err
+}
+
+func (s *EvalState) evalQPipelineApplyScalarIndex(plan qPipelinePlan) (any, bool, error) {
+	target, err := s.evalQPipelinePlannedExpr(plan.valueExpr, &plan.valuePlan)
+	if err != nil {
+		return nil, true, err
+	}
+	indexValue, err := s.evalQPipelinePlannedExpr(plan.indexExpr, &plan.indexPlan)
+	if err != nil {
+		return nil, true, err
+	}
+	indexes, scalar, err := indexInts(indexValue)
+	if err != nil {
+		return nil, true, err
+	}
+	if !scalar || len(indexes) != 1 {
+		return nil, false, nil
+	}
+	mode := qApplyIndexAt
+	if plan.compareOp == "dot" {
+		mode = qApplyIndexDot
+	}
+	if out, handled, err := scalarIndexValue(mode, target, indexes[0]); err != nil || handled {
+		return out, handled, err
+	}
+	out, err := s.applyOrIndexValue(mode, target, indexValue)
+	if err != nil {
+		return nil, true, err
+	}
+	return out, true, nil
 }
 
 func (s *EvalState) evalQPipelineSumRaze(plan qPipelinePlan) (any, bool, error) {

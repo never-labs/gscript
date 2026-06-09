@@ -138,6 +138,63 @@ func TestQEvalPipelineRuntimeBackendExecutesMathPrimitiveBackendPlan(t *testing.
 	}
 }
 
+func TestQEvalPipelineRuntimeBackendExecutesFusedRuntimeShapes(t *testing.T) {
+	for _, tc := range []struct {
+		name          string
+		src           string
+		shape         string
+		pipelineShape string
+		wantInt       int64
+		wantFloat     float64
+		floatResult   bool
+	}{
+		{name: "sum_raze", src: "+/raze 2 3#til 6", shape: "vector-reduce/sum-raze", pipelineShape: "vector_reduce", wantInt: 15},
+		{name: "sum_dyadic_xexp", src: "+/2 xexp 0 1 2 3", shape: "vector-reduce/sum-dyadic-float-xexp", pipelineShape: "vector_reduce", wantFloat: 15, floatResult: true},
+		{name: "sum_dyadic_xlog", src: "+/2 xlog 2 4 8", shape: "vector-reduce/sum-dyadic-float-xlog", pipelineShape: "vector_reduce", wantFloat: 6, floatResult: true},
+		{name: "scalar_at_script", src: "x:10 20 30;x@1", shape: "script-pipeline/apply-index/scalar-at/assignments", pipelineShape: "script_pipeline", wantInt: 20},
+		{name: "scalar_dot_script", src: "x:10 20 30;x . 2", shape: "script-pipeline/apply-index/scalar-dot/assignments", pipelineShape: "script_pipeline", wantInt: 30},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ref := qEvalPipelineDescriptorBackendTestRef(t, tc.src)
+			if ref.Kernel == "" ||
+				ref.Shape != tc.shape ||
+				ref.PipelineShape != tc.pipelineShape ||
+				ref.Backend != qEvalPipelineTypedRuntimeBackend {
+				t.Fatalf("ref = %+v, want shape=%q pipeline=%q typed backend", ref, tc.shape, tc.pipelineShape)
+			}
+			backend := newQRuntimeEvalPipelineBackend([]QEvalPipelinePlanRef{ref})
+			backendPlanCalls := 0
+			sourceCalls := 0
+			backend.executeBackendPlan = func(plan stdq.EvalPipelineBackendPlan) (any, bool, error) {
+				backendPlanCalls++
+				return stdq.ExecuteEvalPipelineBackendPlan(plan)
+			}
+			backend.executeSource = func(source string) (any, bool, error) {
+				sourceCalls++
+				return nil, false, errors.New("source planner fallback should not execute")
+			}
+
+			value, handled, err := executeQEvalPipelinePlanValue(backend, ref)
+			if err != nil {
+				t.Fatalf("executeQEvalPipelinePlanValue: %v", err)
+			}
+			if !handled {
+				t.Fatalf("executeQEvalPipelinePlanValue handled=false")
+			}
+			if tc.floatResult {
+				if !value.IsFloat() || value.Float() != tc.wantFloat {
+					t.Fatalf("executeQEvalPipelinePlanValue = %v, want float %v", value, tc.wantFloat)
+				}
+			} else if !value.IsInt() || value.Int() != tc.wantInt {
+				t.Fatalf("executeQEvalPipelinePlanValue = %v, want int %d", value, tc.wantInt)
+			}
+			if backendPlanCalls != 1 || sourceCalls != 0 {
+				t.Fatalf("backend plan/source calls = %d/%d, want 1/0", backendPlanCalls, sourceCalls)
+			}
+		})
+	}
+}
+
 func TestQEvalPipelineLoweringRecognizesMathRuntimePrimitive(t *testing.T) {
 	for _, tc := range []struct {
 		name  string
@@ -162,6 +219,37 @@ func TestQEvalPipelineLoweringRecognizesMathRuntimePrimitive(t *testing.T) {
 			ref := lowered.QEvalPipelinePlans[0]
 			if ref.Shape != tc.shape || ref.PipelineShape != "numeric_math" || ref.Backend != qEvalPipelineTypedRuntimeBackend {
 				t.Fatalf("lowered ref = %+v, want typed numeric math backend shape %q", ref, tc.shape)
+			}
+		})
+	}
+}
+
+func TestQEvalPipelineLoweringRecognizesFusedRuntimeShapes(t *testing.T) {
+	for _, tc := range []struct {
+		name          string
+		src           string
+		shape         string
+		pipelineShape string
+	}{
+		{name: "sum_raze", src: "+/raze 2 3#til 6", shape: "vector-reduce/sum-raze", pipelineShape: "vector_reduce"},
+		{name: "sum_dyadic_xexp", src: "+/2 xexp 0 1 2 3", shape: "vector-reduce/sum-dyadic-float-xexp", pipelineShape: "vector_reduce"},
+		{name: "scalar_at_script", src: "x:10 20 30;x@1", shape: "script-pipeline/apply-index/scalar-at/assignments", pipelineShape: "script_pipeline"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			fn := BuildGraph(qEvalPipelineDescriptorBackendConstProto(tc.src))
+			lowered, err := QEvalPipelineLoweringPass(fn)
+			if err != nil {
+				t.Fatalf("QEvalPipelineLoweringPass: %v", err)
+			}
+			if counts := countOps(lowered); counts[OpQEvalPipelinePlan] != 1 || counts[OpCall] != 0 {
+				t.Fatalf("op counts after q eval pipeline lowering: QEvalPipelinePlan=%d OpCall=%d\n%s", counts[OpQEvalPipelinePlan], counts[OpCall], Print(lowered))
+			}
+			if len(lowered.QEvalPipelinePlans) != 1 {
+				t.Fatalf("QEvalPipelinePlans = %+v, want one fused runtime plan", lowered.QEvalPipelinePlans)
+			}
+			ref := lowered.QEvalPipelinePlans[0]
+			if ref.Shape != tc.shape || ref.PipelineShape != tc.pipelineShape || ref.Backend != qEvalPipelineTypedRuntimeBackend {
+				t.Fatalf("lowered ref = %+v, want typed backend shape=%q pipeline=%q", ref, tc.shape, tc.pipelineShape)
 			}
 		})
 	}
@@ -256,6 +344,9 @@ func BenchmarkQEvalPipelineDescriptorBackend(b *testing.B) {
 		{name: "BinReduceSum", src: "+/til 8192 bin til 8192"},
 		{name: "ModuloWhereCount", src: "count where (til 8192 mod 4)=1"},
 		{name: "ScriptModuloGatherReduce", src: "x:til 8192;y:x+1;idx:where (x mod 4)=1;+/y[idx]"},
+		{name: "SumRaze", src: "+/raze 128 64#til 8192"},
+		{name: "SumDyadicXExp", src: "+/2 xexp til 16"},
+		{name: "ScalarApplyIndex", src: "x:til 8192;x@4096"},
 	} {
 		b.Run("BackendPlan/"+tc.name, func(b *testing.B) {
 			ref := qEvalPipelineDescriptorBackendTestRef(b, tc.src)

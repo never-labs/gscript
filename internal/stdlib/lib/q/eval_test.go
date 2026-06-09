@@ -329,6 +329,74 @@ func TestQPipelinePlanRecognizesRazeSumAndCounts(t *testing.T) {
 	}
 }
 
+func TestQPipelinePlanRecognizesScalarApplyIndex(t *testing.T) {
+	tests := []struct {
+		expr          string
+		shape         string
+		valueExpr     string
+		indexExpr     string
+		want          any
+		pipelineShape string
+	}{
+		{expr: "x:10 20 30;x@1", shape: "script-pipeline/apply-index/scalar-at/assignments", valueExpr: "x", indexExpr: "1", want: int64(20), pipelineShape: "script_pipeline"},
+		{expr: "x:10 20 30;x . 2", shape: "script-pipeline/apply-index/scalar-dot/assignments", valueExpr: "x", indexExpr: "2", want: int64(30), pipelineShape: "script_pipeline"},
+		{expr: "m:2 3#til 6;m . 1", shape: "script-pipeline/apply-index/scalar-dot/assignments", valueExpr: "m", indexExpr: "1", want: data.NewI64([]int64{3, 4, 5}), pipelineShape: "script_pipeline"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.expr, func(t *testing.T) {
+			ClearRuntimeKernelExecutionStats()
+			t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+			descriptor, ok := DescribeEvalPipeline(tt.expr)
+			if !ok {
+				t.Fatalf("DescribeEvalPipeline(%q) did not recognize scalar apply-index", tt.expr)
+			}
+			if descriptor.Shape != tt.shape ||
+				descriptor.PipelineShape != tt.pipelineShape ||
+				descriptor.ValueExpr != tt.valueExpr ||
+				descriptor.IndexExpr != tt.indexExpr {
+				t.Fatalf("descriptor = %#v, want shape=%q value=%q index=%q", descriptor, tt.shape, tt.valueExpr, tt.indexExpr)
+			}
+			out, handled, err := ExecuteEvalPipelineDescriptor(descriptor)
+			if err != nil || !handled {
+				t.Fatalf("ExecuteEvalPipelineDescriptor = %#v,%v,%v", out, handled, err)
+			}
+			if !qEvalPipelineTestValueEqual(out, tt.want) {
+				t.Fatalf("ExecuteEvalPipelineDescriptor output = %#v, want %#v", out, tt.want)
+			}
+
+			seenPipeline := false
+			seenApplyKernel := false
+			for _, stat := range RuntimeKernelExecutionStats() {
+				if stat.Outcome == "fallback" || stat.Outcome == "error" {
+					t.Fatalf("unexpected scalar apply-index fallback/error: %#v all=%#v", stat, RuntimeKernelExecutionStats())
+				}
+				if stat.Kernel == "QScriptPipelinePlan" && stat.Shape == tt.shape && stat.Outcome == "hit" {
+					seenPipeline = true
+				}
+				if (stat.Kernel == "ArrayScalarIndex" || stat.Kernel == "ArrayMatrixRowIndex" || stat.Kernel == "MatrixIndex") && stat.Outcome == "hit" {
+					seenApplyKernel = true
+				}
+			}
+			if !seenPipeline || !seenApplyKernel {
+				t.Fatalf("missing apply-index pipeline/kernel stats: pipeline=%v kernel=%v all=%#v", seenPipeline, seenApplyKernel, RuntimeKernelExecutionStats())
+			}
+		})
+	}
+}
+
+func qEvalPipelineTestValueEqual(got, want any) bool {
+	if gotArray, ok := got.(data.Array); ok {
+		wantArray, ok := want.(data.Array)
+		if !ok {
+			return false
+		}
+		return gotArray.Kind() == wantArray.Kind() &&
+			reflect.DeepEqual(normalizeNestedArrayValues(gotArray.Values()), normalizeNestedArrayValues(wantArray.Values()))
+	}
+	return reflect.DeepEqual(got, want)
+}
+
 func TestQPipelinePlanRecognizesRuntimePrimitiveStatsAndWindows(t *testing.T) {
 	tests := []struct {
 		expr          string
