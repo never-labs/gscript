@@ -3771,6 +3771,8 @@ func (k typedKernelRegistry) NumericSumValue(array Array) (any, bool, error) {
 		return a.total(), true, nil
 	case f64RangeArray:
 		return f64RangeSum(a), true, nil
+	case f64NumericDyadicArray:
+		return f64NumericDyadicSum(a)
 	case f64BucketArray:
 		return f64BucketSum(a)
 	case f64FillArray:
@@ -10617,6 +10619,20 @@ func (a f64NumericDyadicArray) f64At(row int) (float64, bool, error) {
 		return 0, false, err
 	}
 	return value, true, nil
+}
+
+func f64NumericDyadicSum(array f64NumericDyadicArray) (any, bool, error) {
+	var total float64
+	for row := 0; row < array.len; row++ {
+		value, ok, err := array.f64At(row)
+		if err != nil {
+			return nil, true, err
+		}
+		if ok {
+			total += value
+		}
+	}
+	return total, true, nil
 }
 
 func (a i64ScalarDyadicArray) Kind() Kind { return KindI64 }
