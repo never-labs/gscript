@@ -2409,6 +2409,8 @@ func TestEvalWhereRecordsTypedRuntimeKernel(t *testing.T) {
 	assertEvalValue(t, "x:til 8;y:(x*3)+7;idx:where x>=4;+/y[idx]", int64(94))
 	assertEvalValue(t, "x:til 8;y:(x*3)+7;+/y[where x>=4]", int64(94))
 	assertEvalValue(t, "x:til 8;y:(x*3)+7;+/y where x>=4", int64(94))
+	assertEvalValue(t, "syms:8#`AAPL`MSFT`NVDA`AAPL;px:til 8;idx:where syms=`AAPL;(+/px[idx])+count idx", int64(18))
+	assertEvalValue(t, "count distinct 8#`AAPL`MSFT`AAPL`NVDA", int64(3))
 	assertEvalValue(t, "x:til 8;y:(x*3)+7;lo:0;hi:4;idx:where (x>=lo) and x<hi;+/y[idx]", int64(46))
 	assertEvalValue(t, "x:reverse til 8;idx:iasc x;+/x[idx]", int64(28))
 	assertEvalArray(t, "sum 1 2 3 4 fby `a`a`b`b", data.KindI64, []any{int64(3), int64(3), int64(7), int64(7)})
@@ -2444,6 +2446,9 @@ func TestEvalWhereRecordsTypedRuntimeKernel(t *testing.T) {
 	seenCountFby := false
 	seenGatherReduce := false
 	seenWhereReduce := false
+	seenCompareIndexView := false
+	seenCompareIndexViewReduce := false
+	seenDistinctCount := false
 	for _, stat := range RuntimeKernelExecutionStats() {
 		if stat.Kernel == "ArrayWhereCompare" && stat.Shape == "compare-to-index/>=/i64/i64" && stat.Outcome == "hit" && stat.ReasonCode == "typed_kernel" && stat.Count > 0 {
 			seenWhereCompare = true
@@ -2514,9 +2519,18 @@ func TestEvalWhereRecordsTypedRuntimeKernel(t *testing.T) {
 		if stat.Kernel == "ArrayWhereReduceSum" && strings.HasPrefix(stat.Shape, "where") && stat.Outcome == "hit" && stat.ReasonCode == "typed_kernel" && stat.Count > 0 {
 			seenWhereReduce = true
 		}
+		if stat.Kernel == "ArrayWhereCompareIndexView" && strings.HasPrefix(stat.Shape, "compare-to-index-view/=/symbol/symbol") && stat.Outcome == "hit" && stat.ReasonCode == "typed_kernel" && stat.Count > 0 {
+			seenCompareIndexView = true
+		}
+		if stat.Kernel == "ArrayGatherReduceSum" && stat.Shape == "gather-reduce/i64-range/compare-index-view" && stat.Outcome == "hit" && stat.ReasonCode == "typed_kernel" && stat.Count > 0 {
+			seenCompareIndexViewReduce = true
+		}
+		if stat.Kernel == "ArrayDistinctCount" && stat.Shape == "distinct-count/symbol" && stat.Outcome == "hit" && stat.ReasonCode == "typed_kernel" && stat.Count > 0 {
+			seenDistinctCount = true
+		}
 	}
-	if !seenWhereCompare || !seenWhereMask || !seenLikeCount || !seenInCount || !seenBoolLogical || !seenTrueCount || !seenScalarFill || !seenSortIndexes || !seenCountReverse || !seenGather || !seenFbySum || !seenLastCallableScan || !seenAmend || !seenEachCountDistinct || !seenWhereCompareStats || !seenWhereCompareCountSum || !seenCountSums || !seenCountMins || !seenCountMaxs || !seenCountAvgs || !seenCountFby || !seenGatherReduce || !seenWhereReduce {
-		t.Fatalf("missing where typed runtime stats: compare=%v mask=%v like=%v in=%v logical=%v trueCount=%v scalarFill=%v sortIndexes=%v reverse=%v gather=%v fbySum=%v lastScan=%v amend=%v eachDistinct=%v compareStats=%v compareCountSum=%v countSums=%v countMins=%v countMaxs=%v countAvgs=%v countFby=%v gatherReduce=%v whereReduce=%v stats=%#v", seenWhereCompare, seenWhereMask, seenLikeCount, seenInCount, seenBoolLogical, seenTrueCount, seenScalarFill, seenSortIndexes, seenCountReverse, seenGather, seenFbySum, seenLastCallableScan, seenAmend, seenEachCountDistinct, seenWhereCompareStats, seenWhereCompareCountSum, seenCountSums, seenCountMins, seenCountMaxs, seenCountAvgs, seenCountFby, seenGatherReduce, seenWhereReduce, RuntimeKernelExecutionStats())
+	if !seenWhereCompare || !seenWhereMask || !seenLikeCount || !seenInCount || !seenBoolLogical || !seenTrueCount || !seenScalarFill || !seenSortIndexes || !seenCountReverse || !seenGather || !seenFbySum || !seenLastCallableScan || !seenAmend || !seenEachCountDistinct || !seenWhereCompareStats || !seenWhereCompareCountSum || !seenCountSums || !seenCountMins || !seenCountMaxs || !seenCountAvgs || !seenCountFby || !seenGatherReduce || !seenWhereReduce || !seenCompareIndexView || !seenCompareIndexViewReduce || !seenDistinctCount {
+		t.Fatalf("missing where typed runtime stats: compare=%v mask=%v like=%v in=%v logical=%v trueCount=%v scalarFill=%v sortIndexes=%v reverse=%v gather=%v fbySum=%v lastScan=%v amend=%v eachDistinct=%v compareStats=%v compareCountSum=%v countSums=%v countMins=%v countMaxs=%v countAvgs=%v countFby=%v gatherReduce=%v whereReduce=%v compareIndexView=%v compareIndexViewReduce=%v distinctCount=%v stats=%#v", seenWhereCompare, seenWhereMask, seenLikeCount, seenInCount, seenBoolLogical, seenTrueCount, seenScalarFill, seenSortIndexes, seenCountReverse, seenGather, seenFbySum, seenLastCallableScan, seenAmend, seenEachCountDistinct, seenWhereCompareStats, seenWhereCompareCountSum, seenCountSums, seenCountMins, seenCountMaxs, seenCountAvgs, seenCountFby, seenGatherReduce, seenWhereReduce, seenCompareIndexView, seenCompareIndexViewReduce, seenDistinctCount, RuntimeKernelExecutionStats())
 	}
 }
 

@@ -81,6 +81,14 @@ type qScanView struct {
 	source data.Array
 }
 
+type qCompareIndexStatsView struct {
+	source data.Array
+	op     data.Op
+	scalar any
+	count  int64
+	sum    int64
+}
+
 // RuntimeKernelExecutionStat reports q.eval typed-runtime primitive execution.
 // The shape matches bind's q.cache_stats runtime-kernel rows without importing
 // bind into the q evaluator.
@@ -1101,6 +1109,12 @@ func (s *EvalState) evalScriptStatement(stmt qScriptStatement) (any, error) {
 			return nil, err
 		}
 	}
+	if !handled && stmt.assign != "" {
+		v, handled, err = s.tryEvalCompareIndexStatsAssignment(target)
+		if err != nil {
+			return nil, err
+		}
+	}
 	if !handled {
 		v, err = s.evalCachedOrString(target, stmt.valueExpr, &stmt.bindingPlan)
 	}
@@ -1111,6 +1125,41 @@ func (s *EvalState) evalScriptStatement(stmt qScriptStatement) (any, error) {
 		s.env[s.resolveAssignmentName(stmt.assign)] = v
 	}
 	return v, nil
+}
+
+func (s *EvalState) tryEvalCompareIndexStatsAssignment(src string) (any, bool, error) {
+	if !strings.HasPrefix(strings.TrimSpace(src), "where ") {
+		return nil, false, nil
+	}
+	plan, ok := buildQPipelineWhereComparePlan(src, qPipelineWhereCompareIndexes, "compare-to-index")
+	if !ok {
+		return nil, false, nil
+	}
+	if plan.kind != qPipelineWhereCompareIndexes {
+		return nil, false, nil
+	}
+	plan = qPipelinePlanWithBindingPlans(plan)
+	left, right, err := s.evalQPipelineCompareOperands(plan)
+	if err != nil {
+		return nil, true, err
+	}
+	array, scalar, dataOp, ok := qWhereCompareOperands(left, right, plan.compareOp)
+	if !ok {
+		return nil, false, nil
+	}
+	if array.Kind() != data.KindSymbol && array.Kind() != data.KindString {
+		return nil, false, nil
+	}
+	count, sum, handled, err := data.TryTypedCompareIndexStatsI64(array, dataOp, scalar)
+	shape := "compare-to-index-view/" + plan.compareOp + "/" + string(array.Kind()) + "/" + string(qRuntimeKernelOperandKind(scalar, nil))
+	recordRuntimeKernelProbe("ArrayWhereCompareIndexView", shape, handled, err)
+	if err != nil || !handled {
+		return nil, handled, err
+	}
+	if count > int64(int(count)) {
+		return nil, true, fmt.Errorf("where index count %d exceeds int range", count)
+	}
+	return qCompareIndexStatsView{source: array, op: dataOp, scalar: scalar, count: count, sum: sum}, true, nil
 }
 
 func deferredScanAssignments(statements []qScriptStatement, state *EvalState) map[string]bool {
@@ -1410,6 +1459,113 @@ func (v qScanView) terminal() (any, error) {
 		return avg(v.source)
 	default:
 		return v.prefixAt(v.Len() - 1)
+	}
+}
+
+func (v qCompareIndexStatsView) Kind() data.Kind { return data.KindI64 }
+
+func (v qCompareIndexStatsView) Len() int { return int(v.count) }
+
+func (v qCompareIndexStatsView) At(row int) (any, bool) {
+	if row < 0 || row >= v.Len() {
+		return nil, false
+	}
+	seen := 0
+	for sourceRow := 0; sourceRow < v.source.Len(); sourceRow++ {
+		value, ok := v.source.At(sourceRow)
+		if !ok {
+			return nil, false
+		}
+		if qCompareIndexStatsValueMatches(value, v.op, v.scalar) {
+			if seen == row {
+				return int64(sourceRow), true
+			}
+			seen++
+		}
+	}
+	return nil, false
+}
+
+func (v qCompareIndexStatsView) Values() []any {
+	out := make([]any, 0, v.Len())
+	for sourceRow := 0; sourceRow < v.source.Len(); sourceRow++ {
+		value, ok := v.source.At(sourceRow)
+		if !ok {
+			panic(fmt.Sprintf("q compare index view source row %d out of range", sourceRow))
+		}
+		if qCompareIndexStatsValueMatches(value, v.op, v.scalar) {
+			out = append(out, int64(sourceRow))
+		}
+	}
+	return out
+}
+
+func (v qCompareIndexStatsView) Gather(indexes []int) data.Array {
+	out := make([]int64, len(indexes))
+	for i, index := range indexes {
+		value, ok := v.At(index)
+		if !ok {
+			panic(fmt.Sprintf("q compare index view gather row %d out of range", index))
+		}
+		out[i] = value.(int64)
+	}
+	return data.NewI64(out)
+}
+
+func qCompareIndexStatsValueMatches(value any, op data.Op, scalar any) bool {
+	cmp, ok := qCompareIndexStatsCompare(value, scalar)
+	if !ok {
+		return false
+	}
+	return qBoolCompareDataOp(op, cmp == 0, cmp)
+}
+
+func qCompareIndexStatsCompare(left, right any) (int, bool) {
+	if l, ok := integerValue(left); ok {
+		if r, ok := integerValue(right); ok {
+			return compareInt64(l, r), true
+		}
+	}
+	if l, ok := numeric(left); ok {
+		if r, ok := numeric(right); ok {
+			return compareFloat(l, r), true
+		}
+	}
+	if l, ok := qComparableString(left); ok {
+		if r, ok := qComparableString(right); ok {
+			return strings.Compare(l, r), true
+		}
+	}
+	return 0, false
+}
+
+func qComparableString(value any) (string, bool) {
+	switch x := value.(type) {
+	case string:
+		return x, true
+	case data.Symbol:
+		return string(x), true
+	default:
+		return "", false
+	}
+}
+
+func qBoolCompareDataOp(op data.Op, equal bool, cmp int) bool {
+	switch op {
+	case data.OpEQ:
+		return equal
+	case data.OpNE:
+		return !equal
+	case data.OpLT:
+		return cmp < 0
+	case data.OpLE:
+		return cmp <= 0
+	case data.OpGT:
+		return cmp > 0
+	case data.OpGE:
+		return cmp >= 0
+	default:
+		return false
 	}
 }
 

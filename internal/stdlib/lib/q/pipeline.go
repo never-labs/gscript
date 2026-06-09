@@ -23,6 +23,8 @@ const (
 	qPipelineSumBin
 	qPipelineSumVectorExpr
 	qPipelineCountVectorExpr
+	qPipelineCountDistinct
+	qPipelineCountWhereIn
 )
 
 type qPipelinePlan struct {
@@ -194,6 +196,15 @@ func buildQPipelinePlan(src string) qPipelinePlan {
 		if plan, ok := buildQPipelineWhereComparePlan(inputExpr, qPipelineCountWhereCompare, "compare-to-index-count"); ok {
 			return qPipelinePlanWithBindingPlans(plan)
 		}
+		if plan, ok := buildQPipelineWhereInPlan(inputExpr, qPipelineCountWhereIn, "in-count"); ok {
+			return qPipelinePlanWithBindingPlans(plan)
+		}
+		if strings.HasPrefix(inputExpr, "distinct ") && wordBoundary(inputExpr, 0, len("distinct")) {
+			arg := strings.TrimSpace(inputExpr[len("distinct "):])
+			if arg != "" {
+				return qPipelinePlanWithBindingPlans(qPipelinePlan{kind: qPipelineCountDistinct, shape: "distinct-count", reductionInput: arg})
+			}
+		}
 		if strings.HasPrefix(inputExpr, "where ") && wordBoundary(inputExpr, 0, len("where")) {
 			return qPipelinePlan{}
 		}
@@ -215,36 +226,45 @@ func buildQPipelinePlan(src string) qPipelinePlan {
 
 func qPipelinePlanWithBindingPlans(plan qPipelinePlan) qPipelinePlan {
 	if plan.valueExpr != "" {
-		plan.valuePlan = buildQScriptBindingPlanForRHS(plan.valueExpr, nil)
+		plan.valuePlan = buildQPipelineBindingPlan(plan.valueExpr)
 	}
 	if plan.indexExpr != "" {
-		plan.indexPlan = buildQScriptBindingPlanForRHS(plan.indexExpr, nil)
+		plan.indexPlan = buildQPipelineBindingPlan(plan.indexExpr)
 	}
 	if plan.maskExpr != "" {
-		plan.maskPlan = buildQScriptBindingPlanForRHS(plan.maskExpr, nil)
+		plan.maskPlan = buildQPipelineBindingPlan(plan.maskExpr)
 		if modPlan, ok := qPipelineModuloComparePlanFromMask(plan.maskExpr); ok {
 			plan.moduloMaskPlan = &modPlan
 		}
 	}
 	if plan.leftExpr != "" {
-		plan.leftPlan = buildQScriptBindingPlanForRHS(plan.leftExpr, nil)
+		plan.leftPlan = buildQPipelineBindingPlan(plan.leftExpr)
 	}
 	if plan.rightExpr != "" {
-		plan.rightPlan = buildQScriptBindingPlanForRHS(plan.rightExpr, nil)
+		plan.rightPlan = buildQPipelineBindingPlan(plan.rightExpr)
 	}
 	if plan.modExpr != "" {
-		plan.modPlan = buildQScriptBindingPlanForRHS(plan.modExpr, nil)
+		plan.modPlan = buildQPipelineBindingPlan(plan.modExpr)
 	}
 	if plan.modulusExpr != "" {
-		plan.modulusPlan = buildQScriptBindingPlanForRHS(plan.modulusExpr, nil)
+		plan.modulusPlan = buildQPipelineBindingPlan(plan.modulusExpr)
 	}
 	if plan.modTargetExpr != "" {
-		plan.modTargetPlan = buildQScriptBindingPlanForRHS(plan.modTargetExpr, nil)
+		plan.modTargetPlan = buildQPipelineBindingPlan(plan.modTargetExpr)
 	}
 	if plan.reductionInput != "" {
-		plan.reductionPlan = buildQScriptBindingPlanForRHS(plan.reductionInput, nil)
+		plan.reductionPlan = buildQPipelineBindingPlan(plan.reductionInput)
 	}
 	return plan
+}
+
+func buildQPipelineBindingPlan(src string) qScriptBindingPlan {
+	if expr, ok, err := parseValueExpr(src); err == nil && ok {
+		if plan := buildQScriptBindingPlanForRHS(src, expr); plan.kind != qScriptBindingInvalid {
+			return plan
+		}
+	}
+	return buildQScriptBindingPlanForRHS(src, nil)
 }
 
 func qPipelineVectorTransformExprCandidate(src string) bool {
@@ -349,6 +369,29 @@ func buildQPipelineWhereComparePlan(src string, kind qPipelineKind, prefix strin
 	}, true
 }
 
+func buildQPipelineWhereInPlan(src string, kind qPipelineKind, prefix string) (qPipelinePlan, bool) {
+	src = strings.TrimSpace(src)
+	if !strings.HasPrefix(src, "where ") || !wordBoundary(src, 0, len("where")) {
+		return qPipelinePlan{}, false
+	}
+	arg := strings.TrimSpace(src[len("where "):])
+	leftExpr, rightExpr, ok := splitTopLevelWord(arg, "in")
+	if !ok {
+		return qPipelinePlan{}, false
+	}
+	leftExpr = strings.TrimSpace(leftExpr)
+	rightExpr = strings.TrimSpace(rightExpr)
+	if leftExpr == "" || rightExpr == "" {
+		return qPipelinePlan{}, false
+	}
+	return qPipelinePlan{
+		kind:      kind,
+		shape:     prefix,
+		leftExpr:  leftExpr,
+		rightExpr: rightExpr,
+	}, true
+}
+
 func buildQPipelineWhereModuloComparePlan(leftExpr, rightExpr, op string, kind qPipelineKind, prefix string) (qPipelinePlan, bool) {
 	dataOp, ok := qDataCompareOpString(op)
 	if !ok || (dataOp != data.OpEQ && dataOp != data.OpNE) {
@@ -450,6 +493,10 @@ func (s *EvalState) evalQPipelinePlan(plan qPipelinePlan) (any, bool, error) {
 		out, handled, err = s.evalQPipelineSumVectorExpr(plan)
 	case qPipelineCountVectorExpr:
 		out, handled, err = s.evalQPipelineCountVectorExpr(plan)
+	case qPipelineCountDistinct:
+		out, handled, err = s.evalQPipelineCountDistinct(plan)
+	case qPipelineCountWhereIn:
+		out, handled, err = s.evalQPipelineCountWhereIn(plan)
 	default:
 		recordRuntimeKernelExecution("QPipelinePlan", plan.shape, "fallback", RuntimeFallbackPlannerUnhandled)
 		return nil, false, nil
@@ -502,6 +549,16 @@ func (s *EvalState) evalQPipelineSumWhereIndex(plan qPipelinePlan) (any, bool, e
 			return out, handled, err
 		}
 	}
+	if array.Kind() == data.KindI64 && isIdentityI64RangeArray(array) {
+		count, sum, handled, err := s.evalQPipelineCompareIndexStatsForMask(plan.maskExpr)
+		if err != nil || handled {
+			if handled {
+				recordRuntimeKernelProbe("ArrayWhereCompareRangeReduceSum", "where-index-reduce/i64-range/compare-stats", handled, err)
+			}
+			return sum, handled, err
+		}
+		_ = count
+	}
 	maskValue, err := s.evalQPipelinePlannedExpr(plan.maskExpr, &plan.maskPlan)
 	if err != nil {
 		return nil, true, err
@@ -526,6 +583,56 @@ func (s *EvalState) evalQPipelineSumWhereIndex(plan qPipelinePlan) (any, bool, e
 	return qPipelineGatherReduceSum(array, indexes)
 }
 
+func (s *EvalState) evalQPipelineCompareIndexStatsForMask(maskExpr string) (count, sum int64, handled bool, err error) {
+	leftExpr, rightExpr, op, ok := splitWhereCompareExpr(strings.TrimSpace(maskExpr))
+	if !ok {
+		return 0, 0, false, nil
+	}
+	dataOp, ok := qDataCompareOpString(op)
+	if !ok {
+		return 0, 0, false, nil
+	}
+	left, err := s.evalQPipelinePlannedExpr(leftExpr, nil)
+	if err != nil {
+		return 0, 0, true, err
+	}
+	right, err := s.evalQPipelinePlannedExpr(rightExpr, nil)
+	if err != nil {
+		return 0, 0, true, err
+	}
+	array, scalar, dataOp, ok := qWhereCompareOperands(left, right, op)
+	if !ok {
+		return 0, 0, false, nil
+	}
+	count, sum, handled, err = data.TryTypedCompareIndexStatsI64(array, dataOp, scalar)
+	shape := "where-index-stats/" + op + "/" + string(array.Kind()) + "/" + string(qRuntimeKernelOperandKind(scalar, nil))
+	recordRuntimeKernelProbe("ArrayWhereCompareStats", shape, handled, err)
+	return count, sum, handled, err
+}
+
+func isIdentityI64RangeArray(array data.Array) bool {
+	if array == nil || array.Kind() != data.KindI64 {
+		return false
+	}
+	if array.Len() == 0 {
+		return true
+	}
+	first, ok := array.At(0)
+	if !ok {
+		return false
+	}
+	firstI, ok := integerValue(first)
+	if !ok || firstI != 0 {
+		return false
+	}
+	last, ok := array.At(array.Len() - 1)
+	if !ok {
+		return false
+	}
+	lastI, ok := integerValue(last)
+	return ok && lastI == int64(array.Len()-1)
+}
+
 func (s *EvalState) evalQPipelineSumGatherIndexes(plan qPipelinePlan) (any, bool, error) {
 	value, err := s.evalQPipelinePlannedExpr(plan.valueExpr, &plan.valuePlan)
 	if err != nil {
@@ -547,6 +654,12 @@ func (s *EvalState) evalQPipelineSumGatherIndexes(plan qPipelinePlan) (any, bool
 }
 
 func qPipelineGatherReduceSum(array, indexes data.Array) (any, bool, error) {
+	if isIdentityI64RangeArray(array) {
+		if view, ok := indexes.(qCompareIndexStatsView); ok {
+			recordRuntimeKernelProbe("ArrayGatherReduceSum", "gather-reduce/i64-range/compare-index-view", true, nil)
+			return view.sum, true, nil
+		}
+	}
 	out, handled, err := data.TryTypedNumericSumByI64Indexes(array, indexes)
 	shape := ""
 	if array.Kind() == data.KindI64 && indexes.Kind() == data.KindI64 {
@@ -905,6 +1018,45 @@ func (s *EvalState) evalQPipelineCountVectorExpr(plan qPipelinePlan) (any, bool,
 	shape := "vector-count/expr/" + string(array.Kind())
 	recordRuntimeKernelProbe("ArrayCountExpr", shape, true, nil)
 	return int64(array.Len()), true, nil
+}
+
+func (s *EvalState) evalQPipelineCountDistinct(plan qPipelinePlan) (any, bool, error) {
+	value, err := s.evalQPipelinePlannedExpr(plan.reductionInput, &plan.reductionPlan)
+	if err != nil {
+		return nil, true, err
+	}
+	array, ok := value.(data.Array)
+	if !ok {
+		out, err := count(value)
+		return out, true, err
+	}
+	out, handled, err := data.TryTypedDistinctCount(array)
+	shape := "distinct-count/" + string(array.Kind())
+	recordRuntimeKernelProbe("ArrayDistinctCount", shape, handled, err)
+	return out, handled, err
+}
+
+func (s *EvalState) evalQPipelineCountWhereIn(plan qPipelinePlan) (any, bool, error) {
+	left, err := s.evalQPipelinePlannedExpr(plan.leftExpr, &plan.leftPlan)
+	if err != nil {
+		return nil, true, err
+	}
+	array, ok := left.(data.Array)
+	if !ok {
+		return nil, false, nil
+	}
+	right, err := s.evalQPipelinePlannedExpr(plan.rightExpr, &plan.rightPlan)
+	if err != nil {
+		return nil, true, err
+	}
+	values, err := setItems(right)
+	if err != nil {
+		return nil, true, err
+	}
+	out, handled, err := data.TryTypedInCount(array, values)
+	shape := "in-count/" + string(array.Kind()) + "/" + string(qRuntimeKernelOperandKind(right, nil))
+	recordRuntimeKernelProbe("ArrayInCount", shape, handled, err)
+	return out, handled, err
 }
 
 func (s *EvalState) evalQPipelinePlannedExpr(src string, plan *qScriptBindingPlan) (any, error) {
