@@ -386,6 +386,32 @@ func TestTryTypedCompareIndexStatsI64(t *testing.T) {
 	if got, want := tiledIndexes.Values(), []any{int64(1), int64(2), int64(4), int64(5), int64(7), int64(8)}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("TryTypedCompareIndexesI64 tiled date = %#v, want %#v", got, want)
 	}
+
+	rotatedDates, err := Slice(tiledDates, 1, 7)
+	if err != nil {
+		t.Fatalf("Slice tiled date returned error: %v", err)
+	}
+	count, sum, handled, err = TryTypedCompareIndexStatsI64(rotatedDates, OpGE, DateFromDays(20611))
+	if err != nil {
+		t.Fatalf("TryTypedCompareIndexStatsI64 rotated tiled date returned error: %v", err)
+	}
+	if !handled {
+		t.Fatal("TryTypedCompareIndexStatsI64 rotated tiled date did not handle typed compare")
+	}
+	if count != 5 || sum != 14 {
+		t.Fatalf("TryTypedCompareIndexStatsI64 rotated tiled date = count %d sum %d; want 5, 14", count, sum)
+	}
+
+	count, handled, err = TryTypedCompareCount(rotatedDates, OpGE, DateFromDays(20611))
+	if err != nil {
+		t.Fatalf("TryTypedCompareCount rotated tiled date returned error: %v", err)
+	}
+	if !handled {
+		t.Fatal("TryTypedCompareCount rotated tiled date did not handle typed compare")
+	}
+	if count != 5 {
+		t.Fatalf("TryTypedCompareCount rotated tiled date = %d; want 5", count)
+	}
 }
 
 func TestNewI64RangeArraySemantics(t *testing.T) {

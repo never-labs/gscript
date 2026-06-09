@@ -8502,6 +8502,44 @@ func i64ScalarDyadicCompareModuloPlan(mask i64ScalarDyadicCompareMask) (i64Modul
 	}, true
 }
 
+func i64ModuloComparePlanForArray(array Array, modulus int64, op Op, target int64) (i64ModuloComparePlan, bool) {
+	if modulus <= 0 {
+		return i64ModuloComparePlan{}, false
+	}
+	switch a := array.(type) {
+	case attributedArray:
+		return i64ModuloComparePlanForArray(a.array, modulus, op, target)
+	case i64RangeArray:
+		if a.step != 1 || a.len <= 0 {
+			return i64ModuloComparePlan{}, false
+		}
+		return i64ModuloComparePlan{
+			startResidue: qPositiveMod(a.start, modulus),
+			modulus:      modulus,
+			length:       a.len,
+			op:           op,
+			scalar:       target,
+		}, true
+	case i64ScalarDyadicArray:
+		if a.op != OpMod || a.scalarLeft || a.scalar != modulus || a.len <= 0 {
+			return i64ModuloComparePlan{}, false
+		}
+		source, ok := a.source.(i64RangeArray)
+		if !ok || source.step != 1 {
+			return i64ModuloComparePlan{}, false
+		}
+		return i64ModuloComparePlan{
+			startResidue: qPositiveMod(source.start, modulus),
+			modulus:      modulus,
+			length:       a.len,
+			op:           op,
+			scalar:       target,
+		}, true
+	default:
+		return i64ModuloComparePlan{}, false
+	}
+}
+
 func (p i64ModuloComparePlan) trueCount() (int64, bool) {
 	if p.length <= 0 {
 		return 0, true

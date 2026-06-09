@@ -2045,6 +2045,23 @@ func TryTypedCompareIndexStatsI64(array Array, op Op, value any) (count, sum int
 	}
 }
 
+// TryTypedCompareCount returns the number of rows selected by an array/scalar
+// comparison without materializing a mask or index vector.
+func TryTypedCompareCount(array Array, op Op, value any) (count int64, handled bool, err error) {
+	if array == nil {
+		return 0, true, fmt.Errorf("compare array is nil")
+	}
+	switch a := array.(type) {
+	case attributedArray:
+		return TryTypedCompareCount(a.array, op, value)
+	case tiledArray:
+		return compareTiledCount(a, op, value)
+	default:
+		count, _, handled, err := TryTypedCompareIndexStatsI64(a, op, value)
+		return count, handled, err
+	}
+}
+
 func typedCompareScalarDyadicIndexesI64(array Array, op Op, value any) (Array, bool, error) {
 	values, ok := array.(i64ScalarDyadicArray)
 	if !ok {
@@ -2123,18 +2140,57 @@ func compareTiledIndexStats(array tiledArray, op Op, value any) (count, sum int6
 	if array.source.Len() == 0 || array.len == 0 {
 		return 0, 0, true, nil
 	}
-	for row := 0; row < array.len; row++ {
-		sourceRow := (array.start + row) % array.source.Len()
+	period := array.source.Len()
+	for sourceRow := 0; sourceRow < period; sourceRow++ {
 		sourceValue, ok := array.source.At(sourceRow)
 		if !ok {
 			return 0, 0, true, fmt.Errorf("tiled compare source row %d out of range", sourceRow)
 		}
-		if compareTiledValue(sourceValue, op, value) {
-			count++
-			sum += int64(row)
+		if !compareTiledValue(sourceValue, op, value) {
+			continue
 		}
+		first := positiveModInt(sourceRow-array.start, period)
+		if first >= array.len {
+			continue
+		}
+		hits := int64(1 + (array.len-1-first)/period)
+		count += hits
+		sum += hits*int64(first) + int64(period)*hits*(hits-1)/2
 	}
 	return count, sum, true, nil
+}
+
+func compareTiledCount(array tiledArray, op Op, value any) (count int64, handled bool, err error) {
+	if !typedCompareTiledCanHandle(array.source, op, value) {
+		return 0, false, nil
+	}
+	if array.source.Len() == 0 || array.len == 0 {
+		return 0, true, nil
+	}
+	period := array.source.Len()
+	for sourceRow := 0; sourceRow < period; sourceRow++ {
+		sourceValue, ok := array.source.At(sourceRow)
+		if !ok {
+			return 0, true, fmt.Errorf("tiled compare source row %d out of range", sourceRow)
+		}
+		if !compareTiledValue(sourceValue, op, value) {
+			continue
+		}
+		first := positiveModInt(sourceRow-array.start, period)
+		if first >= array.len {
+			continue
+		}
+		count += int64(1 + (array.len-1-first)/period)
+	}
+	return count, true, nil
+}
+
+func positiveModInt(value, modulus int) int {
+	out := value % modulus
+	if out < 0 {
+		out += modulus
+	}
+	return out
 }
 
 func typedCompareTiledCanHandle(source Array, op Op, value any) bool {

@@ -77,7 +77,7 @@ func buildQScriptPipelineDescriptor(statements []qScriptStatement) (*qScriptPipe
 		if _, _, ok := parseDeferredScan(stmt.rhs); ok {
 			return nil, false
 		}
-		assignments = append(assignments, qScriptPipelineAssignment{name: stmt.assign, rhs: stmt.rhs, valueExpr: stmt.valueExpr, binding: buildQScriptBindingPlanForRHS(stmt.rhs, stmt.valueExpr)})
+		assignments = append(assignments, qScriptPipelineAssignment{name: stmt.assign, rhs: stmt.rhs, valueExpr: stmt.valueExpr, binding: stmt.bindingPlan})
 		bindings[stmt.assign] = stmt.rhs
 	}
 	descriptor, ok := describeQScriptPipelineTerminal(terminal.src, bindings)
@@ -178,7 +178,7 @@ func (s *EvalState) tryEvalQScriptPipeline(descriptor *qScriptPipelineDescriptor
 			return nil, true, err
 		}
 		if !handled {
-			value, err = s.evalCachedOrString(assignment.rhs, assignment.valueExpr)
+			value, err = s.evalCachedOrString(assignment.rhs, assignment.valueExpr, &assignment.binding)
 			if err != nil {
 				recordRuntimeKernelExecution("QScriptPipelinePlan", shape, "error", "runtime_error")
 				return nil, true, err
@@ -357,7 +357,7 @@ func (s *EvalState) evalQScriptPipelineDeferredAssignment(descriptor *qScriptPip
 			return err
 		}
 		if !handled {
-			value, err = s.evalCachedOrString(assignment.rhs, assignment.valueExpr)
+			value, err = s.evalCachedOrString(assignment.rhs, assignment.valueExpr, &assignment.binding)
 			if err != nil {
 				return err
 			}

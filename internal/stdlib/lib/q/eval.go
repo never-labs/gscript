@@ -400,6 +400,8 @@ func qRuntimeKernelPipelineShape(kernel, shape string) string {
 		return "mask_reduce"
 	case shape == "compare-to-index-sum", shape == "compare-to-index-count", strings.HasPrefix(shape, "compare-to-index-sum/"), strings.HasPrefix(shape, "compare-to-index-count/"):
 		return "mask_reduce"
+	case strings.HasPrefix(shape, "compare-count/"):
+		return "compare_count"
 	case strings.HasPrefix(shape, "compare-to-index-count-sum-stats/"), strings.HasPrefix(shape, "compare-to-index-count-stats/"), strings.HasPrefix(shape, "compare-to-index-sum-stats/"):
 		return "compare_index_stats"
 	case strings.HasPrefix(shape, "compare-to-index/"):
@@ -638,10 +640,11 @@ type qScriptPlan struct {
 }
 
 type qScriptStatement struct {
-	src       string
-	assign    string
-	rhs       string
-	valueExpr Expr
+	src         string
+	assign      string
+	rhs         string
+	valueExpr   Expr
+	bindingPlan qScriptBindingPlan
 }
 
 func (s *EvalState) qScriptPlan(src string) qScriptPlan {
@@ -674,6 +677,9 @@ func buildQScriptPlan(src string) qScriptPlan {
 			stmt.assign = name
 			stmt.rhs = rhs
 			stmt.valueExpr = parseCachedValueExpr(rhs)
+			if qScriptBindingPlanTextEligible(rhs) {
+				stmt.bindingPlan = buildQScriptBindingPlanForRHS(rhs, stmt.valueExpr)
+			}
 			if _, _, ok := parseDeferredScan(rhs); ok {
 				deferScanCandidates = true
 			}
@@ -684,6 +690,22 @@ func buildQScriptPlan(src string) qScriptPlan {
 	}
 	pipeline, _ := buildQScriptPipelineDescriptor(statements)
 	return qScriptPlan{statements: statements, deferScanCandidates: deferScanCandidates, scriptPipeline: pipeline}
+}
+
+func qScriptBindingPlanTextEligible(src string) bool {
+	src = strings.TrimSpace(src)
+	if src == "" {
+		return false
+	}
+	if strings.ContainsAny(src, "`'\\\"") {
+		return false
+	}
+	for _, marker := range []string{"0W", "0w", "0N", "0n"} {
+		if strings.Contains(src, marker) {
+			return false
+		}
+	}
+	return true
 }
 
 func parseCachedValueExpr(src string) Expr {
@@ -800,7 +822,7 @@ func (s *EvalState) evalScriptStatement(stmt qScriptStatement) (any, error) {
 		}
 	}
 	if !handled {
-		v, err = s.evalCachedOrString(target, stmt.valueExpr)
+		v, err = s.evalCachedOrString(target, stmt.valueExpr, &stmt.bindingPlan)
 	}
 	if err != nil {
 		return nil, err
@@ -963,7 +985,16 @@ func numericReductionStatsValue(stats data.NumericStats, op string) any {
 	}
 }
 
-func (s *EvalState) evalCachedOrString(src string, expr Expr) (any, error) {
+func (s *EvalState) evalCachedOrString(src string, expr Expr, bindingPlan *qScriptBindingPlan) (any, error) {
+	if bindingPlan != nil && bindingPlan.kind != qScriptBindingInvalid {
+		value, handled, err := s.evalQScriptBindingPlan(bindingPlan)
+		if err != nil {
+			return nil, err
+		}
+		if handled {
+			return value, nil
+		}
+	}
 	if expr != nil {
 		value, err := s.evalValueExpr(expr)
 		if err == nil {
@@ -4313,7 +4344,11 @@ func (s *EvalState) tryEvalCountDistinct(src string) (any, bool, error) {
 }
 
 func (s *EvalState) tryEvalCountWhereCompare(src string) (any, bool, error) {
-	count, _, handled, err := s.tryEvalWhereCompareIndexStats(src, "compare-to-index-count")
+	count, handled, err := s.tryEvalWhereCompareCount(src, "compare-count")
+	if err != nil || handled {
+		return count, handled, err
+	}
+	count, _, handled, err = s.tryEvalWhereCompareIndexStats(src, "compare-to-index-count")
 	if err != nil || handled {
 		return count, handled, err
 	}
@@ -4576,6 +4611,36 @@ func (s *EvalState) tryEvalWhereCompareIndexStats(src, shapePrefix string) (coun
 		return 0, 0, handled, err
 	}
 	return count, sum, true, nil
+}
+
+func (s *EvalState) tryEvalWhereCompareCount(src, shapePrefix string) (count int64, handled bool, err error) {
+	if !strings.HasPrefix(src, "where ") {
+		return 0, false, nil
+	}
+	arg := strings.TrimSpace(src[len("where "):])
+	leftExpr, rightExpr, op, ok := splitWhereCompareExpr(arg)
+	if !ok {
+		return 0, false, nil
+	}
+	left, err := s.eval(leftExpr)
+	if err != nil {
+		return 0, true, err
+	}
+	right, err := s.eval(rightExpr)
+	if err != nil {
+		return 0, true, err
+	}
+	array, scalar, dataOp, ok := qWhereCompareOperands(left, right, op)
+	if !ok {
+		return 0, false, nil
+	}
+	shape := shapePrefix + "/" + op + "/" + string(array.Kind()) + "/" + string(qRuntimeKernelOperandKind(scalar, nil))
+	count, handled, err = data.TryTypedCompareCount(array, dataOp, scalar)
+	recordRuntimeKernelProbe("ArrayWhereCompareCount", shape, handled, err)
+	if err != nil || !handled {
+		return 0, handled, err
+	}
+	return count, true, nil
 }
 
 func (s *EvalState) tryEvalWhereCompareIndexes(src, shapePrefix string) (data.Array, bool, error) {

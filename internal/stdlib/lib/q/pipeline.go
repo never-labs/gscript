@@ -494,7 +494,11 @@ func (s *EvalState) evalQPipelineSumWhereCompare(plan qPipelinePlan) (any, bool,
 }
 
 func (s *EvalState) evalQPipelineCountWhereCompare(plan qPipelinePlan) (any, bool, error) {
-	count, _, handled, err := s.evalQPipelineWhereCompareIndexStats(plan)
+	count, handled, err := s.evalQPipelineWhereCompareCount(plan)
+	if err != nil || handled {
+		return count, handled, err
+	}
+	count, _, handled, err = s.evalQPipelineWhereCompareIndexStats(plan)
 	if err != nil || handled {
 		return count, handled, err
 	}
@@ -628,6 +632,24 @@ func (s *EvalState) evalQPipelineWhereCompareIndexStats(plan qPipelinePlan) (cou
 		return 0, 0, handled, err
 	}
 	return count, sum, true, nil
+}
+
+func (s *EvalState) evalQPipelineWhereCompareCount(plan qPipelinePlan) (count int64, handled bool, err error) {
+	left, right, err := s.evalQPipelineCompareOperands(plan)
+	if err != nil {
+		return 0, true, err
+	}
+	array, scalar, dataOp, ok := qWhereCompareOperands(left, right, plan.compareOp)
+	if !ok {
+		return 0, false, nil
+	}
+	shape := "compare-count/" + plan.compareOp + "/" + string(array.Kind()) + "/" + string(qRuntimeKernelOperandKind(scalar, nil))
+	count, handled, err = data.TryTypedCompareCount(array, dataOp, scalar)
+	recordRuntimeKernelProbe("ArrayWhereCompareCount", shape, handled, err)
+	if err != nil || !handled {
+		return 0, handled, err
+	}
+	return count, true, nil
 }
 
 func (s *EvalState) evalQPipelineWhereCompareIndexesArray(plan qPipelinePlan) (data.Array, bool, error) {
