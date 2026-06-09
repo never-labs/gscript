@@ -155,6 +155,8 @@ func qPipelineRuntimePrimitiveShapeSpec(prefix, verb string) qPipelineShapeSpec 
 		PipelineShape: qRuntimePrimitivePipelineShape(verb),
 	}
 	switch spec.PipelineShape {
+	case "numeric_math":
+		spec.Family = qPipelineShapeFamilyVector
 	case "numeric_stats":
 		spec.Family = qPipelineShapeFamilyStats
 		spec.Reducer = verb
@@ -168,6 +170,8 @@ func qPipelineRuntimePrimitiveShapeSpec(prefix, verb string) qPipelineShapeSpec 
 
 func qRuntimePrimitivePipelineShape(verb string) string {
 	switch verb {
+	case "sqrt", "log", "exp", "sin", "cos", "tan", "asin", "acos", "atan", "reciprocal", "signum", "floor", "ceiling", "xexp", "xlog":
+		return "numeric_math"
 	case "svar", "sdev", "wsum", "cov", "scov", "cor":
 		return "numeric_stats"
 	case "mdev", "ema":

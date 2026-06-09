@@ -6,6 +6,7 @@ import (
 
 	"github.com/never-labs/leia/internal/runtime"
 	stdq "github.com/never-labs/leia/internal/stdlib/lib/q"
+	"github.com/never-labs/leia/internal/vm"
 )
 
 var qEvalPipelineDescriptorBenchmarkSink runtime.Value
@@ -86,6 +87,81 @@ func TestQEvalPipelineRuntimeBackendExecutesStatsPrimitiveBackendPlan(t *testing
 			}
 			if backendPlanCalls != 1 {
 				t.Fatalf("backend plan calls = %d, want 1", backendPlanCalls)
+			}
+		})
+	}
+}
+
+func TestQEvalPipelineRuntimeBackendExecutesMathPrimitiveBackendPlan(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		src   string
+		shape string
+		want  float64
+	}{
+		{name: "sqrt_prefix", src: "sqrt 9", shape: "runtime-unary/sqrt", want: 3},
+		{name: "xexp_infix", src: "2 xexp 3", shape: "runtime-dyadic/xexp", want: 8},
+		{name: "xlog_call", src: "xlog[2;8]", shape: "runtime-dyadic/xlog", want: 3},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ref := qEvalPipelineDescriptorBackendTestRef(t, tc.src)
+			if ref.Kernel != "QPipelinePlan" ||
+				ref.Shape != tc.shape ||
+				ref.PipelineShape != "numeric_math" ||
+				ref.ShapeFamily != "vector" ||
+				ref.ShapeTransform == "" {
+				t.Fatalf("ref = %+v, want numeric math q pipeline shape %q", ref, tc.shape)
+			}
+			backend := newQRuntimeEvalPipelineBackend([]QEvalPipelinePlanRef{ref})
+			backendPlanCalls := 0
+			sourceCalls := 0
+			backend.executeBackendPlan = func(plan stdq.EvalPipelineBackendPlan) (any, bool, error) {
+				backendPlanCalls++
+				return stdq.ExecuteEvalPipelineBackendPlan(plan)
+			}
+			backend.executeSource = func(source string) (any, bool, error) {
+				sourceCalls++
+				return nil, false, errors.New("source planner fallback should not execute")
+			}
+
+			value, handled, err := executeQEvalPipelinePlanValue(backend, ref)
+			if err != nil {
+				t.Fatalf("executeQEvalPipelinePlanValue: %v", err)
+			}
+			if !handled || !value.IsFloat() || value.Float() != tc.want {
+				t.Fatalf("executeQEvalPipelinePlanValue = %v handled %v, want float %v handled", value, handled, tc.want)
+			}
+			if backendPlanCalls != 1 || sourceCalls != 0 {
+				t.Fatalf("backend plan/source calls = %d/%d, want 1/0", backendPlanCalls, sourceCalls)
+			}
+		})
+	}
+}
+
+func TestQEvalPipelineLoweringRecognizesMathRuntimePrimitive(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		src   string
+		shape string
+	}{
+		{name: "sqrt_prefix", src: "sqrt 9", shape: "runtime-unary/sqrt"},
+		{name: "xexp_infix", src: "2 xexp 3", shape: "runtime-dyadic/xexp"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			fn := BuildGraph(qEvalPipelineDescriptorBackendConstProto(tc.src))
+			lowered, err := QEvalPipelineLoweringPass(fn)
+			if err != nil {
+				t.Fatalf("QEvalPipelineLoweringPass: %v", err)
+			}
+			if counts := countOps(lowered); counts[OpQEvalPipelinePlan] != 1 || counts[OpCall] != 0 {
+				t.Fatalf("op counts after q eval pipeline lowering: QEvalPipelinePlan=%d OpCall=%d\n%s", counts[OpQEvalPipelinePlan], counts[OpCall], Print(lowered))
+			}
+			if len(lowered.QEvalPipelinePlans) != 1 {
+				t.Fatalf("QEvalPipelinePlans = %+v, want one math primitive plan", lowered.QEvalPipelinePlans)
+			}
+			ref := lowered.QEvalPipelinePlans[0]
+			if ref.Shape != tc.shape || ref.PipelineShape != "numeric_math" || ref.Backend != qEvalPipelineTypedRuntimeBackend {
+				t.Fatalf("lowered ref = %+v, want typed numeric math backend shape %q", ref, tc.shape)
 			}
 		})
 	}
@@ -276,4 +352,23 @@ func qEvalPipelineSourceBackedTestRef(tb testing.TB, source string) QEvalPipelin
 	ref := qEvalPipelineDescriptorBackendTestRef(tb, source)
 	ref.Source = source
 	return ref
+}
+
+func qEvalPipelineDescriptorBackendConstProto(source string) *vm.FuncProto {
+	return &vm.FuncProto{
+		Name:     "q_eval_pipeline_descriptor_backend_const",
+		MaxStack: 2,
+		Constants: []runtime.Value{
+			runtime.StringValue("q"),
+			runtime.StringValue("eval"),
+			runtime.StringValue(source),
+		},
+		Code: []uint32{
+			vm.EncodeABx(vm.OP_GETGLOBAL, 0, 0),
+			vm.EncodeABC(vm.OP_GETFIELD, 0, 0, 1),
+			vm.EncodeABx(vm.OP_LOADK, 1, 2),
+			vm.EncodeABC(vm.OP_CALL, 0, 2, 2),
+			vm.EncodeABC(vm.OP_RETURN, 0, 2, 0),
+		},
+	}
 }

@@ -285,6 +285,13 @@ func TestQPipelinePlanRecognizesRuntimePrimitiveStatsAndWindows(t *testing.T) {
 		{expr: "svar 1 2 3", shape: "runtime-unary/svar", pipelineShape: "numeric_stats", transform: "svar", want: 1.0},
 		{expr: "sdev 1 2 3", shape: "runtime-unary/sdev", pipelineShape: "numeric_stats", transform: "sdev", want: 1.0},
 		{expr: "wsum 1 2 3", shape: "runtime-unary/wsum", pipelineShape: "numeric_stats", transform: "wsum", want: int64(6)},
+		{expr: "sqrt 4 9 16", shape: "runtime-unary/sqrt", pipelineShape: "numeric_math", transform: "sqrt", want: data.NewF64([]float64{2, 3, 4})},
+		{expr: "sin 0", shape: "runtime-unary/sin", pipelineShape: "numeric_math", transform: "sin", want: 0.0},
+		{expr: "signum -2 0 3", shape: "runtime-unary/signum", pipelineShape: "numeric_math", transform: "signum", want: data.NewI64([]int64{-1, 0, 1})},
+		{expr: "floor 1.9", shape: "runtime-unary/floor", pipelineShape: "numeric_math", transform: "floor", want: int64(1)},
+		{expr: "ceiling 1.1", shape: "runtime-unary/ceiling", pipelineShape: "numeric_math", transform: "ceiling", want: int64(2)},
+		{expr: "2 xexp 3 4", shape: "runtime-dyadic/xexp", pipelineShape: "numeric_math", transform: "xexp", want: data.NewF64([]float64{8, 16})},
+		{expr: "2 xlog 8", shape: "runtime-dyadic/xlog", pipelineShape: "numeric_math", transform: "xlog", want: 3.0},
 		{expr: "1 2 3 wsum 10 20 30", shape: "runtime-dyadic/wsum", pipelineShape: "numeric_stats", transform: "wsum", want: 140.0},
 		{expr: "1 2 3 cov 1 2 3", shape: "runtime-dyadic/cov", pipelineShape: "numeric_stats", transform: "cov", want: float64(2) / 3},
 		{expr: "1 2 3 scov 1 2 3", shape: "runtime-dyadic/scov", pipelineShape: "numeric_stats", transform: "scov", want: 1.0},
@@ -331,6 +338,10 @@ func TestQPipelinePlanRecognizesRuntimePrimitiveStatsAndWindows(t *testing.T) {
 				t.Fatalf("missing runtime primitive stats: pipeline=%v primitive=%v all=%#v", seenPipeline, seenPrimitive, RuntimeKernelExecutionStats())
 			}
 		})
+	}
+
+	if descriptor, ok := DescribeEvalPipeline("floor 1.9 -1.2 0N"); ok {
+		t.Fatalf("compound prefix expression unexpectedly recognized as runtime primitive: %#v", descriptor)
 	}
 }
 

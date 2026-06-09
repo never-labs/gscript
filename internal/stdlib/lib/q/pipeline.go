@@ -479,10 +479,56 @@ func qPipelineRuntimePrimitivePrefix(src string) (name, arg string, ok bool) {
 		prefix := word + " "
 		if strings.HasPrefix(src, prefix) && wordBoundary(src, 0, len(word)) {
 			arg = strings.TrimSpace(src[len(prefix):])
-			return word, arg, arg != ""
+			return word, arg, qPipelineRuntimePrimitiveSimpleUnaryArg(arg)
 		}
 	}
 	return "", "", false
+}
+
+func qPipelineRuntimePrimitiveSimpleUnaryArg(arg string) bool {
+	arg = strings.TrimSpace(arg)
+	if arg == "" {
+		return false
+	}
+	if strings.Contains(arg, ";") {
+		return false
+	}
+	for _, op := range []string{"+", "*", "%"} {
+		if strings.Contains(arg, op) {
+			return false
+		}
+	}
+	for i, r := range arg {
+		if r != '-' {
+			continue
+		}
+		if i == 0 {
+			continue
+		}
+		prev := previousNonSpaceByte(arg, i)
+		if prev == 0 || strings.ContainsRune("([{;", rune(prev)) {
+			continue
+		}
+		return false
+	}
+	for _, word := range qPipelineRuntimeDyadicPrimitiveVerbs() {
+		if _, _, ok := splitTopLevelWord(arg, word); ok {
+			return false
+		}
+	}
+	return true
+}
+
+func previousNonSpaceByte(s string, before int) byte {
+	if before > len(s) {
+		before = len(s)
+	}
+	for i := before - 1; i >= 0; i-- {
+		if s[i] != ' ' && s[i] != '\t' && s[i] != '\n' && s[i] != '\r' {
+			return s[i]
+		}
+	}
+	return 0
 }
 
 func qPipelineRuntimePrimitiveCall(src string) (string, []string, bool) {
@@ -500,9 +546,10 @@ func qPipelineRuntimePrimitiveCall(src string) (string, []string, bool) {
 func qPipelineRuntimePrimitiveCallArity(name string, n int) bool {
 	name = strings.TrimSpace(name)
 	switch name {
-	case "svar", "sdev":
+	case "sqrt", "log", "exp", "sin", "cos", "tan", "asin", "acos", "atan", "reciprocal", "signum", "floor", "ceiling",
+		"svar", "sdev":
 		return n == 1
-	case "mdev", "ema", "cov", "scov", "cor":
+	case "xexp", "xlog", "mdev", "ema", "cov", "scov", "cor":
 		return n == 2
 	case "wsum":
 		return n == 1 || n == 2
@@ -512,11 +559,14 @@ func qPipelineRuntimePrimitiveCallArity(name string, n int) bool {
 }
 
 func qPipelineRuntimeUnaryPrimitiveVerbs() []string {
-	return []string{"svar", "sdev", "wsum"}
+	return []string{
+		"sqrt", "log", "exp", "sin", "cos", "tan", "asin", "acos", "atan", "reciprocal", "signum", "floor", "ceiling",
+		"svar", "sdev", "wsum",
+	}
 }
 
 func qPipelineRuntimeDyadicPrimitiveVerbs() []string {
-	return []string{"mdev", "ema", "wsum", "cov", "scov", "cor"}
+	return []string{"xexp", "xlog", "mdev", "ema", "wsum", "cov", "scov", "cor"}
 }
 
 func qPipelineRuntimePrimitiveVerb(name string) bool {
