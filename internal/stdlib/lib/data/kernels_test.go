@@ -2623,6 +2623,76 @@ func TestTypedNumericUnaryBinaryAndAggregates(t *testing.T) {
 	if got, want := chainComposite, int64(108513); got != want {
 		t.Fatalf("TryTypedSequenceTransformChainNumericSumFirstLast = %v (%T), want %v", got, got, want)
 	}
+	for _, tc := range []struct {
+		name   string
+		source Array
+		steps  []SequenceTransformStep
+	}{
+		{
+			name:   "non_zero_range_reverse_rotate_sublist",
+			source: NewI64Range(10, 3, 37),
+			steps: []SequenceTransformStep{
+				{Transform: SequenceTransformReverse},
+				{Transform: SequenceTransformRotate, Args: [2]int{-9}, ArgCount: 1},
+				{Transform: SequenceTransformSublist, Args: [2]int{4, 19}, ArgCount: 2},
+			},
+		},
+		{
+			name:   "wrapped_rotate_sublist_count",
+			source: NewI64Range(-20, 2, 23),
+			steps: []SequenceTransformStep{
+				{Transform: SequenceTransformRotate, Args: [2]int{17}, ArgCount: 1},
+				{Transform: SequenceTransformSublist, Args: [2]int{15}, ArgCount: 1},
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			wantArray := tc.source
+			for _, step := range tc.steps {
+				var err error
+				switch step.Transform {
+				case SequenceTransformReverse:
+					var handled bool
+					wantArray, handled, err = Reverse(wantArray)
+					if err != nil || !handled {
+						t.Fatalf("Reverse oracle = %T,%v,%v", wantArray, handled, err)
+					}
+				case SequenceTransformRotate:
+					var handled bool
+					wantArray, handled, err = TryTypedRotate(wantArray, step.Args[0])
+					if err != nil || !handled {
+						t.Fatalf("TryTypedRotate oracle = %T,%v,%v", wantArray, handled, err)
+					}
+				case SequenceTransformSublist:
+					switch step.ArgCount {
+					case 1:
+						wantArray, err = TakeRepeat(wantArray, step.Args[0])
+					case 2:
+						start, count := boundedStartCount(wantArray.Len(), step.Args[0], step.Args[1])
+						wantArray, err = Slice(wantArray, start, count)
+					default:
+						t.Fatalf("bad sublist arg count %d", step.ArgCount)
+					}
+					if err != nil {
+						t.Fatalf("sublist oracle: %v", err)
+					}
+				default:
+					t.Fatalf("unexpected transform %q", step.Transform)
+				}
+			}
+			want, ok, err := TryTypedNumericSumFirstLast(wantArray)
+			if err != nil || !ok {
+				t.Fatalf("TryTypedNumericSumFirstLast oracle = %#v,%v,%v", want, ok, err)
+			}
+			got, ok, err := TryTypedSequenceTransformChainNumericSumFirstLast(tc.steps, tc.source)
+			if err != nil || !ok {
+				t.Fatalf("TryTypedSequenceTransformChainNumericSumFirstLast = %#v,%v,%v", got, ok, err)
+			}
+			if got != want {
+				t.Fatalf("TryTypedSequenceTransformChainNumericSumFirstLast = %#v, want %#v", got, want)
+			}
+		})
+	}
 
 	tiledFloats, err := TakeRepeat(NewF64([]float64{0, 1.5}), 7)
 	if err != nil {

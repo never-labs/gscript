@@ -54,6 +54,7 @@ type qScriptPipelineDescriptor struct {
 	integerTerms      []qScriptPipelineIntegerDivModTerm
 	includeCount      bool
 	sequenceValueExpr string
+	sequenceValuePlan qScriptBindingPlan
 	sequenceSteps     []data.SequenceTransformStep
 	sequenceBindings  []string
 	terminalUsesWhere bool
@@ -127,6 +128,7 @@ func buildQScriptPipelineDescriptor(statements []qScriptStatement) (*qScriptPipe
 	descriptor.rowIndexPlan = buildQScriptBindingPlanForRHS(descriptor.rowIndexExpr, nil)
 	descriptor.colIndexPlan = buildQScriptBindingPlanForRHS(descriptor.colIndexExpr, nil)
 	descriptor.scalarPlan = buildQScriptBindingPlanForRHS(descriptor.scalarExpr, nil)
+	descriptor.sequenceValuePlan = buildQScriptBindingPlanForRHS(descriptor.sequenceValueExpr, nil)
 	descriptor.moduloMaskPlan = qScriptPipelineModuloMaskPlan(descriptor.maskExpr)
 	descriptor.shapeText = descriptor.shape()
 	return &descriptor, true
@@ -1216,9 +1218,8 @@ func (s *EvalState) evalQScriptSequenceEdgeSumPipeline(descriptor *qScriptPipeli
 }
 
 func (s *EvalState) evalQScriptSequenceTransformChainEdgeSumPipeline(descriptor *qScriptPipelineDescriptor) (any, bool, error) {
-	skip := qScriptPipelineNameSet(descriptor.sequenceBindings)
 	for _, assignment := range descriptor.assignments {
-		if skip[assignment.name] {
+		if qScriptPipelineNameIn(descriptor.sequenceBindings, assignment.name) {
 			continue
 		}
 		value, handled, err := s.evalQScriptBindingPlan(&assignment.binding)
@@ -1233,8 +1234,7 @@ func (s *EvalState) evalQScriptSequenceTransformChainEdgeSumPipeline(descriptor 
 		}
 		s.env[s.resolveAssignmentName(assignment.name)] = value
 	}
-	basePlan := buildQScriptBindingPlanForRHS(descriptor.sequenceValueExpr, nil)
-	value, handled, err := s.evalQScriptBindingPlan(&basePlan)
+	value, handled, err := s.evalQScriptBindingPlan(&descriptor.sequenceValuePlan)
 	if err != nil {
 		return nil, true, err
 	}
@@ -1247,15 +1247,17 @@ func (s *EvalState) evalQScriptSequenceTransformChainEdgeSumPipeline(descriptor 
 	return out, handled, err
 }
 
-func qScriptPipelineNameSet(names []string) map[string]bool {
-	out := make(map[string]bool, len(names))
+func qScriptPipelineNameIn(names []string, target string) bool {
+	target = strings.TrimSpace(target)
+	if target == "" {
+		return false
+	}
 	for _, name := range names {
-		name = strings.TrimSpace(name)
-		if name != "" {
-			out[name] = true
+		if strings.TrimSpace(name) == target {
+			return true
 		}
 	}
-	return out
+	return false
 }
 
 func qScriptPipelineSequenceTransformName(steps []data.SequenceTransformStep) string {

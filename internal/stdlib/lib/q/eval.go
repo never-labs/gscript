@@ -1063,6 +1063,7 @@ func cloneQScriptPipelineDescriptor(in *qScriptPipelineDescriptor) *qScriptPipel
 	out.rowIndexPlan = cloneQScriptBindingPlan(in.rowIndexPlan)
 	out.colIndexPlan = cloneQScriptBindingPlan(in.colIndexPlan)
 	out.scalarPlan = cloneQScriptBindingPlan(in.scalarPlan)
+	out.sequenceValuePlan = cloneQScriptBindingPlan(in.sequenceValuePlan)
 	out.terminalPlan = cloneQPipelinePlan(in.terminalPlan)
 	if in.moduloMaskPlan != nil {
 		plan := cloneQPipelinePlan(*in.moduloMaskPlan)

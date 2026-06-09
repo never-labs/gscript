@@ -592,6 +592,7 @@ func qScriptPipelineDescriptorFromEvalDescriptor(descriptor EvalPipelineDescript
 	out.rowIndexPlan = buildQScriptBindingPlanForRHS(out.rowIndexExpr, nil)
 	out.colIndexPlan = buildQScriptBindingPlanForRHS(out.colIndexExpr, nil)
 	out.scalarPlan = buildQScriptBindingPlanForRHS(out.scalarExpr, nil)
+	out.sequenceValuePlan = buildQScriptBindingPlanForRHS(out.sequenceValueExpr, nil)
 	out.moduloMaskPlan = qScriptPipelineModuloMaskPlan(out.maskExpr)
 	if len(descriptor.IntegerTerms) > 0 {
 		out.integerTerms = make([]qScriptPipelineIntegerDivModTerm, 0, len(descriptor.IntegerTerms))
