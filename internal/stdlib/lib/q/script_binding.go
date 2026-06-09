@@ -20,15 +20,17 @@ const (
 )
 
 type qScriptBindingPlan struct {
-	kind    qScriptBindingKind
-	op      string
-	name    string
-	literal any
-	items   []qScriptBindingPlan
-	left    *qScriptBindingPlan
-	right   *qScriptBindingPlan
-	cached  bool
-	cache   any
+	kind           qScriptBindingKind
+	op             string
+	name           string
+	literal        any
+	items          []qScriptBindingPlan
+	left           *qScriptBindingPlan
+	right          *qScriptBindingPlan
+	cacheableKnown bool
+	cacheable      bool
+	cached         bool
+	cache          any
 }
 
 func buildQScriptBindingPlan(expr Expr) qScriptBindingPlan {
@@ -500,25 +502,33 @@ func qScriptBindingPlanCacheable(plan *qScriptBindingPlan) bool {
 	if plan == nil {
 		return false
 	}
+	if plan.cacheableKnown {
+		return plan.cacheable
+	}
+	cacheable := false
 	switch plan.kind {
 	case qScriptBindingInvalid, qScriptBindingName:
-		return false
+		cacheable = false
 	case qScriptBindingLiteral:
-		return true
+		cacheable = true
 	case qScriptBindingVector:
+		cacheable = true
 		for i := range plan.items {
 			if !qScriptBindingPlanCacheable(&plan.items[i]) {
-				return false
+				cacheable = false
+				break
 			}
 		}
-		return true
 	case qScriptBindingUnary:
-		return qScriptBindingPlanCacheable(plan.left)
+		cacheable = qScriptBindingPlanCacheable(plan.left)
 	case qScriptBindingBinary, qScriptBindingIndex:
-		return qScriptBindingPlanCacheable(plan.left) && qScriptBindingPlanCacheable(plan.right)
+		cacheable = qScriptBindingPlanCacheable(plan.left) && qScriptBindingPlanCacheable(plan.right)
 	default:
-		return false
+		cacheable = false
 	}
+	plan.cacheable = cacheable
+	plan.cacheableKnown = true
+	return cacheable
 }
 
 func qScriptBoolLogicalShape(op string) string {
