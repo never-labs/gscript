@@ -4890,13 +4890,9 @@ func (s *EvalState) tryEvalCountGroup(src string) (any, bool, error) {
 	if !ok {
 		return nil, false, nil
 	}
-	out, handled, err := evalQTypedRuntimeKernel(qTypedRuntimeKernel[int64]{
-		kernel: "ArrayGroupCount",
-		shape:  "group-count/" + string(array.Kind()),
-		call: func() (int64, bool, error) {
-			return data.TryTypedGroupCount(array)
-		},
-	})
+	shape := "group-count/" + string(array.Kind())
+	out, handled, err := data.TryTypedGroupCount(array)
+	out, handled, err = qTypedRuntimeResult("ArrayGroupCount", shape, out, handled, err)
 	if err != nil || handled {
 		return out, true, err
 	}

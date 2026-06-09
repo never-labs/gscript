@@ -594,13 +594,8 @@ func (s *EvalState) evalQPipelineSumWhereMask(plan qPipelinePlan) (any, bool, er
 		return nil, false, nil
 	}
 	shape := "where-reduce/" + string(array.Kind()) + "/" + string(mask.Kind())
-	return evalQTypedRuntimeKernel(qTypedRuntimeKernel[any]{
-		kernel: "ArrayWhereReduceSum",
-		shape:  shape,
-		call: func() (any, bool, error) {
-			return data.TryTypedNumericSumWhereMask(array, mask)
-		},
-	})
+	out, handled, err := data.TryTypedNumericSumWhereMask(array, mask)
+	return qTypedRuntimeResult("ArrayWhereReduceSum", shape, out, handled, err)
 }
 
 func (s *EvalState) evalQPipelineSumWhereIndex(plan qPipelinePlan) (any, bool, error) {
@@ -634,13 +629,8 @@ func (s *EvalState) evalQPipelineSumWhereIndex(plan qPipelinePlan) (any, bool, e
 	mask, ok := maskValue.(data.Array)
 	if ok {
 		shape := "where-index-reduce/" + string(array.Kind()) + "/" + string(mask.Kind())
-		out, handled, err := evalQTypedRuntimeKernel(qTypedRuntimeKernel[any]{
-			kernel: "ArrayWhereReduceSum",
-			shape:  shape,
-			call: func() (any, bool, error) {
-				return data.TryTypedNumericSumWhereMask(array, mask)
-			},
-		})
+		out, handled, err := data.TryTypedNumericSumWhereMask(array, mask)
+		out, handled, err = qTypedRuntimeResult("ArrayWhereReduceSum", shape, out, handled, err)
 		if err != nil || handled {
 			return out, handled, err
 		}
@@ -678,13 +668,8 @@ func (s *EvalState) evalQPipelineCompareIndexStatsForMask(maskExpr string) (coun
 		return 0, 0, false, nil
 	}
 	shape := "where-index-stats/" + op + "/" + string(array.Kind()) + "/" + string(qRuntimeKernelOperandKind(scalar, nil))
-	count, sum, handled, err = evalQTypedRuntimeKernel2(qTypedRuntimeKernel2[int64, int64]{
-		kernel: "ArrayWhereCompareStats",
-		shape:  shape,
-		call: func() (int64, int64, bool, error) {
-			return data.TryTypedCompareIndexStatsI64(array, dataOp, scalar)
-		},
-	})
+	count, sum, handled, err = data.TryTypedCompareIndexStatsI64(array, dataOp, scalar)
+	count, sum, handled, err = qTypedRuntimeResult2("ArrayWhereCompareStats", shape, count, sum, handled, err)
 	return count, sum, handled, err
 }
 
@@ -744,13 +729,8 @@ func qPipelineGatherReduceSum(array, indexes data.Array) (any, bool, error) {
 	} else {
 		shape = "gather-reduce/" + string(array.Kind()) + "/" + string(indexes.Kind())
 	}
-	return evalQTypedRuntimeKernel(qTypedRuntimeKernel[any]{
-		kernel: "ArrayGatherReduceSum",
-		shape:  shape,
-		call: func() (any, bool, error) {
-			return data.TryTypedNumericSumByI64Indexes(array, indexes)
-		},
-	})
+	out, handled, err := data.TryTypedNumericSumByI64Indexes(array, indexes)
+	return qTypedRuntimeResult("ArrayGatherReduceSum", shape, out, handled, err)
 }
 
 func qPipelineGatherReduceSumWithPlanStats(plan qPipelinePlan, array, indexes data.Array) (any, bool, error) {
@@ -768,13 +748,8 @@ func qPipelineWhereReduceSumWithPlanStats(plan qPipelinePlan, array, mask data.A
 	} else {
 		shape = "where-reduce/" + string(array.Kind()) + "/" + string(mask.Kind())
 	}
-	out, handled, err := evalQTypedRuntimeKernel(qTypedRuntimeKernel[any]{
-		kernel: "ArrayWhereReduceSum",
-		shape:  shape,
-		call: func() (any, bool, error) {
-			return data.TryTypedNumericSumWhereMask(array, mask)
-		},
-	})
+	out, handled, err := data.TryTypedNumericSumWhereMask(array, mask)
+	out, handled, err = qTypedRuntimeResult("ArrayWhereReduceSum", shape, out, handled, err)
 	recordQPipelinePlanOutcome(plan, handled, err)
 	return out, handled, err
 }
@@ -869,13 +844,8 @@ func (s *EvalState) evalQPipelineWhereModuloCompareIndexStats(plan qPipelinePlan
 		return 0, 0, handled, err
 	}
 	shape := plan.comparePrefix + "-stats/" + plan.compareOp + "/" + string(array.Kind()) + "/" + string(qRuntimeKernelOperandKind(modulus, nil)) + "/" + string(qRuntimeKernelOperandKind(target, nil))
-	count, sum, handled, err = evalQTypedRuntimeKernel2(qTypedRuntimeKernel2[int64, int64]{
-		kernel: "ArrayModuloCompareStats",
-		shape:  shape,
-		call: func() (int64, int64, bool, error) {
-			return data.TryTypedModuloCompareIndexStatsI64(array, modulus, dataOp, target)
-		},
-	})
+	count, sum, handled, err = data.TryTypedModuloCompareIndexStatsI64(array, modulus, dataOp, target)
+	count, sum, handled, err = qTypedRuntimeResult2("ArrayModuloCompareStats", shape, count, sum, handled, err)
 	if err != nil || !handled {
 		return 0, 0, handled, err
 	}
