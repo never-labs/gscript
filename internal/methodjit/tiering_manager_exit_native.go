@@ -405,8 +405,14 @@ func (tm *TieringManager) resumeNativeTier2CalleeExit(ctx *ExecContext, cf *Comp
 				return runtime.NilValue(), fmt.Errorf("callee q eval pipeline exit: %w", err)
 			}
 			currentRegs = tm.callVM.Regs()
+			if cf.qEvalPipelineTerminalReturn(int(ctx.OpExitID)) {
+				if midRunRefreshDeferred {
+					tm.retireStaleTier2AfterFeedback(proto, cf)
+				}
+				return currentRegs[base+int(ctx.OpExitSlot)], nil
+			}
 			resumeMark := tm.tier2PerfStart()
-			resumeOff, ok := cf.resumeOffset(int(ctx.OpExitID), ctx.ResumeNumericPass != 0)
+			resumeOff, ok := cf.qEvalPipelineResumeOffset(int(ctx.OpExitID), ctx.ResumeNumericPass != 0)
 			if !ok {
 				return runtime.NilValue(), fmt.Errorf("callee q eval pipeline exit: no resume for %d", ctx.OpExitID)
 			}
