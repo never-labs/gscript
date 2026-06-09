@@ -1926,6 +1926,18 @@ type f64DyadicProducer struct {
 	len   int
 }
 
+type f64DyadicEvalCache struct {
+	entries [16]f64DyadicEvalCacheEntry
+	next    int
+}
+
+type f64DyadicEvalCacheEntry struct {
+	left  float64
+	right float64
+	value float64
+	valid bool
+}
+
 func newF64NumericProducer(value any, length int) (f64NumericProducer, error) {
 	if array, ok := value.(Array); ok {
 		producer, err := newF64NumericArrayProducer(array)
@@ -2123,6 +2135,38 @@ func (p f64DyadicProducer) f64At(row int) (float64, bool, error) {
 		return 0, rightOK, err
 	}
 	return p.apply(leftValue, rightValue), true, nil
+}
+
+func (p f64DyadicProducer) f64AtCached(row int, cache *f64DyadicEvalCache) (float64, bool, error) {
+	if cache == nil {
+		return p.f64At(row)
+	}
+	if row < 0 || row >= p.len {
+		return 0, false, fmt.Errorf("array row %d out of range", row)
+	}
+	leftValue, leftOK, err := p.left.f64At(row)
+	if err != nil || !leftOK {
+		return 0, leftOK, err
+	}
+	rightValue, rightOK, err := p.right.f64At(row)
+	if err != nil || !rightOK {
+		return 0, rightOK, err
+	}
+	return cache.apply(p.apply, leftValue, rightValue), true, nil
+}
+
+func (c *f64DyadicEvalCache) apply(apply f64DyadicFunc, left, right float64) float64 {
+	for i := range c.entries {
+		entry := c.entries[i]
+		if entry.valid && entry.left == left && entry.right == right {
+			return entry.value
+		}
+	}
+	value := apply(left, right)
+	slot := c.next & (len(c.entries) - 1)
+	c.entries[slot] = f64DyadicEvalCacheEntry{left: left, right: right, value: value, valid: true}
+	c.next++
+	return value
 }
 
 func numericDyadicLength(name string, left, right Array) (int, error) {
@@ -4637,6 +4681,9 @@ func TryTypedRatiosSum(array Array) (any, bool, error) {
 	producer, err := newF64NumericProducer(array, array.Len())
 	if err != nil {
 		return nil, true, err
+	}
+	if dyadic, ok := producer.(f64DyadicProducer); ok {
+		return f64DyadicRatiosSum(dyadic)
 	}
 	var total float64
 	var previous float64
@@ -10923,15 +10970,49 @@ func (a f64NumericDyadicArray) f64At(row int) (float64, bool, error) {
 }
 
 func f64NumericDyadicSum(array f64NumericDyadicArray) (any, bool, error) {
+	producer, err := newF64NumericDyadicProducer(array)
+	if err != nil {
+		return nil, true, err
+	}
+	return f64DyadicProducerSum(producer)
+}
+
+func f64DyadicProducerSum(producer f64DyadicProducer) (any, bool, error) {
 	var total float64
-	for row := 0; row < array.len; row++ {
-		value, ok, err := array.f64At(row)
+	var cache f64DyadicEvalCache
+	for row := 0; row < producer.len; row++ {
+		value, ok, err := producer.f64AtCached(row, &cache)
 		if err != nil {
 			return nil, true, err
 		}
 		if ok {
 			total += value
 		}
+	}
+	return total, true, nil
+}
+
+func f64DyadicRatiosSum(producer f64DyadicProducer) (any, bool, error) {
+	var total float64
+	var previous float64
+	var hasPrevious bool
+	var cache f64DyadicEvalCache
+	for row := 0; row < producer.len; row++ {
+		current, ok, err := producer.f64AtCached(row, &cache)
+		if err != nil {
+			return nil, true, err
+		}
+		if !ok {
+			hasPrevious = false
+			continue
+		}
+		if !hasPrevious {
+			total += current
+		} else {
+			total += current / previous
+		}
+		previous = current
+		hasPrevious = true
 	}
 	return total, true, nil
 }

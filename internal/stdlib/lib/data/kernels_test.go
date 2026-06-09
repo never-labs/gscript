@@ -2420,6 +2420,13 @@ func TestTypedNumericUnaryBinaryAndAggregates(t *testing.T) {
 	if got, want := xexpSum.(float64), 15.0; got != want {
 		t.Fatalf("TryTypedQNumericDyadicFloatSum xexp = %v, want %v", got, want)
 	}
+	lazyPow, ok, err := TryTypedQNumericDyadicFloat(NumericDyadicXExp, int64(2), NewI64([]int64{0, 1, 2, 3, 0, 1, 2, 3}))
+	if err != nil || !ok {
+		t.Fatalf("TryTypedQNumericDyadicFloat repeated xexp = %#v,%v,%v; want handled nil error", lazyPow, ok, err)
+	}
+	if sum, ok, err := TryTypedRatiosSum(lazyPow); err != nil || !ok || sum != 13.125 {
+		t.Fatalf("TryTypedRatiosSum lazy repeated xexp = %#v,%v,%v; want 13.125,true,nil", sum, ok, err)
+	}
 
 	xlogSum, ok, err := TryTypedQNumericDyadicFloatSum(NumericDyadicXLog, int64(2), NewColumn("x", []any{2, 4, 8, NullValue}).Data)
 	if err != nil || !ok {
