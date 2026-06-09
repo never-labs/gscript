@@ -1788,6 +1788,9 @@ func TryTypedQNumericDyadicFloat(op string, left, right any) (Array, bool, error
 	if err != nil {
 		return nil, true, err
 	}
+	if _, ok := numericDyadicFloatFunc(op); !ok {
+		return nil, true, fmt.Errorf("unsupported numeric dyadic float kernel %q", op)
+	}
 	return f64NumericDyadicArray{op: op, left: left, right: right, len: length}, true, nil
 }
 
@@ -1804,27 +1807,35 @@ func TryTypedQNumericDyadicFloatSum(op string, left, right any) (any, bool, erro
 	if err != nil {
 		return nil, true, err
 	}
+	apply, ok := numericDyadicFloatFunc(op)
+	if !ok {
+		return nil, true, fmt.Errorf("unsupported numeric dyadic float kernel %q", op)
+	}
+	leftProducer, err := newF64NumericProducer(left, length)
+	if err != nil {
+		return nil, true, err
+	}
+	rightProducer, err := newF64NumericProducer(right, length)
+	if err != nil {
+		return nil, true, err
+	}
 	var sum float64
 	for row := 0; row < length; row++ {
-		leftValue, leftOK, err := numericDyadicFloatOperandAt(left, leftArray, leftIsArray, row, length)
+		leftValue, leftOK, err := leftProducer.f64At(row)
 		if err != nil {
 			return nil, true, err
 		}
 		if !leftOK {
 			continue
 		}
-		rightValue, rightOK, err := numericDyadicFloatOperandAt(right, rightArray, rightIsArray, row, length)
+		rightValue, rightOK, err := rightProducer.f64At(row)
 		if err != nil {
 			return nil, true, err
 		}
 		if !rightOK {
 			continue
 		}
-		value, err := applyNumericDyadicFloatNumbers(op, leftValue, rightValue)
-		if err != nil {
-			return nil, true, err
-		}
-		sum += value
+		sum += apply(leftValue, rightValue)
 	}
 	return sum, true, nil
 }
@@ -1847,6 +1858,271 @@ func numericDyadicFloatOperandAt(value any, array Array, isArray bool, row, leng
 		return 0, false, fmt.Errorf("typed numeric dyadic float operand row %d is %T, want numeric", row, value)
 	}
 	return n, true, nil
+}
+
+type f64NumericProducer interface {
+	Len() int
+	f64At(row int) (float64, bool, error)
+}
+
+type f64NullProducer struct {
+	len int
+}
+
+type f64ScalarProducer struct {
+	value float64
+	len   int
+}
+
+type f64BroadcastProducer struct {
+	source f64NumericProducer
+	len    int
+}
+
+type f64ArrayProducer struct {
+	array Array
+}
+
+type f64I8ColumnProducer struct {
+	data []int8
+}
+
+type f64I16ColumnProducer struct {
+	data []int16
+}
+
+type f64I32ColumnProducer struct {
+	data []int32
+}
+
+type f64I64ColumnProducer struct {
+	data []int64
+}
+
+type f64F32ColumnProducer struct {
+	data []float32
+}
+
+type f64F64ColumnProducer struct {
+	data []float64
+}
+
+type f64I64RangeProducer struct {
+	values i64RangeArray
+}
+
+type f64F64RangeProducer struct {
+	values f64RangeArray
+}
+
+type f64I64ScalarDyadicProducer struct {
+	values i64ScalarDyadicArray
+}
+
+type f64DyadicProducer struct {
+	left  f64NumericProducer
+	right f64NumericProducer
+	apply f64DyadicFunc
+	len   int
+}
+
+func newF64NumericProducer(value any, length int) (f64NumericProducer, error) {
+	if array, ok := value.(Array); ok {
+		producer, err := newF64NumericArrayProducer(array)
+		if err != nil {
+			return nil, err
+		}
+		if array.Len() == 1 && length != 1 {
+			return f64BroadcastProducer{source: producer, len: length}, nil
+		}
+		return producer, nil
+	}
+	if IsNull(value) {
+		return f64NullProducer{len: length}, nil
+	}
+	n, ok := numeric(value)
+	if !ok {
+		return nil, fmt.Errorf("typed numeric producer operand is %T, want numeric", value)
+	}
+	return f64ScalarProducer{value: n, len: length}, nil
+}
+
+func newF64NumericArrayProducer(array Array) (f64NumericProducer, error) {
+	switch a := array.(type) {
+	case attributedArray:
+		return newF64NumericArrayProducer(a.array)
+	case columnArray[int8]:
+		return f64I8ColumnProducer{data: a.data}, nil
+	case columnArray[int16]:
+		return f64I16ColumnProducer{data: a.data}, nil
+	case columnArray[int32]:
+		return f64I32ColumnProducer{data: a.data}, nil
+	case columnArray[int64]:
+		return f64I64ColumnProducer{data: a.data}, nil
+	case columnArray[float32]:
+		return f64F32ColumnProducer{data: a.data}, nil
+	case columnArray[float64]:
+		return f64F64ColumnProducer{data: a.data}, nil
+	case i64RangeArray:
+		return f64I64RangeProducer{values: a}, nil
+	case f64RangeArray:
+		return f64F64RangeProducer{values: a}, nil
+	case i64ScalarDyadicArray:
+		return f64I64ScalarDyadicProducer{values: a}, nil
+	case f64NumericDyadicArray:
+		producer, err := newF64NumericDyadicProducer(a)
+		if err != nil {
+			return nil, err
+		}
+		return producer, nil
+	default:
+		if !isNumericArray(array) {
+			return nil, fmt.Errorf("typed numeric producer operand is %s, want numeric", array.Kind())
+		}
+		return f64ArrayProducer{array: array}, nil
+	}
+}
+
+func (p f64NullProducer) Len() int { return p.len }
+
+func (p f64NullProducer) f64At(row int) (float64, bool, error) {
+	if row < 0 || row >= p.len {
+		return 0, false, fmt.Errorf("array row %d out of range", row)
+	}
+	return 0, false, nil
+}
+
+func (p f64ScalarProducer) Len() int { return p.len }
+
+func (p f64ScalarProducer) f64At(row int) (float64, bool, error) {
+	if row < 0 || row >= p.len {
+		return 0, false, fmt.Errorf("array row %d out of range", row)
+	}
+	return p.value, true, nil
+}
+
+func (p f64BroadcastProducer) Len() int { return p.len }
+
+func (p f64BroadcastProducer) f64At(row int) (float64, bool, error) {
+	if row < 0 || row >= p.len {
+		return 0, false, fmt.Errorf("array row %d out of range", row)
+	}
+	return p.source.f64At(0)
+}
+
+func (p f64ArrayProducer) Len() int { return p.array.Len() }
+
+func (p f64ArrayProducer) f64At(row int) (float64, bool, error) {
+	return typedKernels.NumericAt(p.array, row)
+}
+
+func (p f64I8ColumnProducer) Len() int { return len(p.data) }
+
+func (p f64I8ColumnProducer) f64At(row int) (float64, bool, error) {
+	if row < 0 || row >= len(p.data) {
+		return 0, false, fmt.Errorf("array row %d out of range", row)
+	}
+	return float64(p.data[row]), true, nil
+}
+
+func (p f64I16ColumnProducer) Len() int { return len(p.data) }
+
+func (p f64I16ColumnProducer) f64At(row int) (float64, bool, error) {
+	if row < 0 || row >= len(p.data) {
+		return 0, false, fmt.Errorf("array row %d out of range", row)
+	}
+	return float64(p.data[row]), true, nil
+}
+
+func (p f64I32ColumnProducer) Len() int { return len(p.data) }
+
+func (p f64I32ColumnProducer) f64At(row int) (float64, bool, error) {
+	if row < 0 || row >= len(p.data) {
+		return 0, false, fmt.Errorf("array row %d out of range", row)
+	}
+	return float64(p.data[row]), true, nil
+}
+
+func (p f64I64ColumnProducer) Len() int { return len(p.data) }
+
+func (p f64I64ColumnProducer) f64At(row int) (float64, bool, error) {
+	if row < 0 || row >= len(p.data) {
+		return 0, false, fmt.Errorf("array row %d out of range", row)
+	}
+	return float64(p.data[row]), true, nil
+}
+
+func (p f64F32ColumnProducer) Len() int { return len(p.data) }
+
+func (p f64F32ColumnProducer) f64At(row int) (float64, bool, error) {
+	if row < 0 || row >= len(p.data) {
+		return 0, false, fmt.Errorf("array row %d out of range", row)
+	}
+	return float64(p.data[row]), true, nil
+}
+
+func (p f64F64ColumnProducer) Len() int { return len(p.data) }
+
+func (p f64F64ColumnProducer) f64At(row int) (float64, bool, error) {
+	if row < 0 || row >= len(p.data) {
+		return 0, false, fmt.Errorf("array row %d out of range", row)
+	}
+	return p.data[row], true, nil
+}
+
+func (p f64I64RangeProducer) Len() int { return p.values.len }
+
+func (p f64I64RangeProducer) f64At(row int) (float64, bool, error) {
+	return numericI64RangeAt(p.values, row)
+}
+
+func (p f64F64RangeProducer) Len() int { return p.values.len }
+
+func (p f64F64RangeProducer) f64At(row int) (float64, bool, error) {
+	return numericF64RangeAt(p.values, row)
+}
+
+func (p f64I64ScalarDyadicProducer) Len() int { return p.values.len }
+
+func (p f64I64ScalarDyadicProducer) f64At(row int) (float64, bool, error) {
+	value, ok, err := p.values.i64At(row)
+	if err != nil || !ok {
+		return 0, ok, err
+	}
+	return float64(value), true, nil
+}
+
+func newF64NumericDyadicProducer(array f64NumericDyadicArray) (f64DyadicProducer, error) {
+	apply, ok := numericDyadicFloatFunc(array.op)
+	if !ok {
+		return f64DyadicProducer{}, fmt.Errorf("unsupported numeric dyadic float kernel %q", array.op)
+	}
+	leftProducer, err := newF64NumericProducer(array.left, array.len)
+	if err != nil {
+		return f64DyadicProducer{}, err
+	}
+	rightProducer, err := newF64NumericProducer(array.right, array.len)
+	if err != nil {
+		return f64DyadicProducer{}, err
+	}
+	return f64DyadicProducer{left: leftProducer, right: rightProducer, apply: apply, len: array.len}, nil
+}
+
+func (p f64DyadicProducer) Len() int { return p.len }
+
+func (p f64DyadicProducer) f64At(row int) (float64, bool, error) {
+	if row < 0 || row >= p.len {
+		return 0, false, fmt.Errorf("array row %d out of range", row)
+	}
+	leftValue, leftOK, err := p.left.f64At(row)
+	if err != nil || !leftOK {
+		return 0, leftOK, err
+	}
+	rightValue, rightOK, err := p.right.f64At(row)
+	if err != nil || !rightOK {
+		return 0, rightOK, err
+	}
+	return p.apply(leftValue, rightValue), true, nil
 }
 
 func numericDyadicLength(name string, left, right Array) (int, error) {
@@ -1902,6 +2178,27 @@ func applyNumericDyadicFloatNumbers(op string, left, right float64) (float64, er
 		return math.Log(right) / math.Log(left), nil
 	default:
 		return 0, fmt.Errorf("unsupported numeric dyadic float kernel %q", op)
+	}
+}
+
+type f64DyadicFunc func(left, right float64) float64
+
+func numericDyadicFloatFuncForXExp(left, right float64) float64 {
+	return math.Pow(left, right)
+}
+
+func numericDyadicFloatFuncForXLog(left, right float64) float64 {
+	return math.Log(right) / math.Log(left)
+}
+
+func numericDyadicFloatFunc(op string) (f64DyadicFunc, bool) {
+	switch op {
+	case NumericDyadicXExp:
+		return numericDyadicFloatFuncForXExp, true
+	case NumericDyadicXLog:
+		return numericDyadicFloatFuncForXLog, true
+	default:
+		return nil, false
 	}
 }
 
@@ -4335,11 +4632,15 @@ func TryTypedRatiosSum(array Array) (any, bool, error) {
 	if !isNumericArray(array) {
 		return nil, false, nil
 	}
+	producer, err := newF64NumericProducer(array, array.Len())
+	if err != nil {
+		return nil, true, err
+	}
 	var total float64
 	var previous float64
 	var hasPrevious bool
 	for row := 0; row < array.Len(); row++ {
-		current, ok, err := typedKernels.NumericAt(array, row)
+		current, ok, err := producer.f64At(row)
 		if err != nil {
 			return nil, true, err
 		}
