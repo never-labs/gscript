@@ -2277,6 +2277,9 @@ func (s *EvalState) eval(src string) (any, error) {
 		{"avg ", avg},
 		{"var ", varValue},
 		{"dev ", devValue},
+		{"svar ", svarValue},
+		{"sdev ", sdevValue},
+		{"wsum ", wsumUnaryValue},
 		{"med ", medValue},
 		{"min ", minValue},
 		{"max ", maxValue},
@@ -2403,6 +2406,8 @@ func (s *EvalState) eval(src string) (any, error) {
 		{"mcount", mcount},
 		{"mmin", mmin},
 		{"mmax", mmax},
+		{"mdev", mdevValue},
+		{"ema", emaValue},
 		{"xprev", xprev},
 		{"xrank", xrank},
 		{"mmu", matrixMultiplyValue},
@@ -2438,6 +2443,10 @@ func (s *EvalState) eval(src string) (any, error) {
 		{"min", dyadicVerbFunc('m')},
 		{"max", dyadicVerbFunc('M')},
 		{"wavg", wavg},
+		{"wsum", wsumValue},
+		{"cov", covValue},
+		{"scov", scovValue},
+		{"cor", corValue},
 		{"left", dyadicVerbFunc('L')},
 		{"right", dyadicVerbFunc('R')},
 		{"within", within},
@@ -6039,6 +6048,10 @@ func lookupDyadicVerbFunc(verb string) (func(any, any) (any, error), bool) {
 		return mmin, true
 	case "mmax":
 		return mmax, true
+	case "mdev":
+		return mdevValue, true
+	case "ema":
+		return emaValue, true
 	case "xprev":
 		return xprev, true
 	case "xcols":
@@ -6075,6 +6088,14 @@ func lookupDyadicVerbFunc(verb string) (func(any, any) (any, error), bool) {
 		return xlogValue, true
 	case "wavg":
 		return wavg, true
+	case "wsum":
+		return wsumValue, true
+	case "cov":
+		return covValue, true
+	case "scov":
+		return scovValue, true
+	case "cor":
+		return corValue, true
 	case "within":
 		return within, true
 	case "like":
@@ -6148,6 +6169,12 @@ func lookupUnaryVerb(verb string) (func(any) (any, error), bool) {
 		return varValue, true
 	case "dev":
 		return devValue, true
+	case "svar":
+		return svarValue, true
+	case "sdev":
+		return sdevValue, true
+	case "wsum":
+		return wsumUnaryValue, true
 	case "med":
 		return medValue, true
 	case "prd":

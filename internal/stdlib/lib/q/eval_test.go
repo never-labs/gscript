@@ -3779,6 +3779,22 @@ func TestEvalSqrtLogUnaryVerbs(t *testing.T) {
 	assertEvalArray(t, "sqrt 4 9 16", data.KindF64, []any{2.0, 3.0, 4.0})
 }
 
+func TestEvalStatsWindowVerbs(t *testing.T) {
+	assertEvalValue(t, "svar 1 2 3", 1.0)
+	assertEvalValue(t, "sdev 1 2 3", 1.0)
+	assertEvalValue(t, "wsum 1 2 3", int64(6))
+	assertEvalValue(t, "1 2 3 wsum 10 20 30", 140.0)
+	assertEvalValue(t, "wsum[1 2 3;10 20 30]", 140.0)
+	assertEvalValue(t, "1 2 3 cov 1 2 3", float64(2)/3)
+	assertEvalValue(t, "1 2 3 scov 1 2 3", 1.0)
+	assertEvalValue(t, "1 2 3 cor 1 2 3", 1.0)
+	assertEvalArray(t, "2 mdev 1 2 3", data.KindF64, []any{0.0, 0.5, 0.5})
+	assertEvalArray(t, "mdev[2;1 2 3]", data.KindF64, []any{0.0, 0.5, 0.5})
+	assertEvalArray(t, "0.5 ema 1 2 3", data.KindF64, []any{1.0, 1.5, 2.25})
+	assertEvalArray(t, "ema[0.5;1 2 3]", data.KindF64, []any{1.0, 1.5, 2.25})
+	assertEvalErrorContains(t, "1 2 cov `a`b", "numeric vectors")
+}
+
 func TestEvalAdditionalMathVerbs(t *testing.T) {
 	assertEvalValue(t, "sin 0", 0.0)
 	assertEvalValue(t, "cos 0", 1.0)

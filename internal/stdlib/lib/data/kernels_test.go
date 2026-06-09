@@ -83,6 +83,44 @@ func TestTryTypedNumericStatsIntegerAndFloat(t *testing.T) {
 	}
 }
 
+func TestNumericAnalyticsStatsWindows(t *testing.T) {
+	values := NewF64([]float64{1, 2, 3})
+	variance, handled, err := NumericArrayVariance(values, true)
+	if err != nil || !handled || variance != 1.0 {
+		t.Fatalf("NumericArrayVariance = %#v,%v,%v, want 1,true,nil", variance, handled, err)
+	}
+	stddev, handled, err := NumericArrayStdDev(values, true)
+	if err != nil || !handled || stddev != 1.0 {
+		t.Fatalf("NumericArrayStdDev = %#v,%v,%v, want 1,true,nil", stddev, handled, err)
+	}
+	wsum, handled, err := NumericWeightedSum(NewI64([]int64{1, 2, 3}), NewI64([]int64{10, 20, 30}))
+	if err != nil || !handled || wsum != 140.0 {
+		t.Fatalf("NumericWeightedSum = %#v,%v,%v, want 140,true,nil", wsum, handled, err)
+	}
+	cov, handled, err := NumericArrayCovariance(values, values, false)
+	if err != nil || !handled || cov != float64(2)/3 {
+		t.Fatalf("NumericArrayCovariance = %#v,%v,%v, want 2/3,true,nil", cov, handled, err)
+	}
+	cor, handled, err := NumericArrayCorrelation(values, values)
+	if err != nil || !handled || cor != 1.0 {
+		t.Fatalf("NumericArrayCorrelation = %#v,%v,%v, want 1,true,nil", cor, handled, err)
+	}
+	mdev, handled, err := NumericMovingStdDev(values, 2, false)
+	if err != nil || !handled {
+		t.Fatalf("NumericMovingStdDev returned %#v,%v,%v", mdev, handled, err)
+	}
+	if got, want := mdev.Values(), []any{0.0, 0.5, 0.5}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("NumericMovingStdDev values = %#v, want %#v", got, want)
+	}
+	ema, handled, err := NumericExponentialMovingAverage(values, 0.5)
+	if err != nil || !handled {
+		t.Fatalf("NumericExponentialMovingAverage returned %#v,%v,%v", ema, handled, err)
+	}
+	if got, want := ema.Values(), []any{1.0, 1.5, 2.25}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("NumericExponentialMovingAverage values = %#v, want %#v", got, want)
+	}
+}
+
 func TestTypedCompareMaskOperatorsAndBounds(t *testing.T) {
 	tests := []struct {
 		name  string
