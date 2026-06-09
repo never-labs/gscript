@@ -1411,6 +1411,7 @@ func buildQEvalVectorCases() []qEvalVectorCase {
 	cases = appendQEvalExpressionCombinationCases(cases)
 	cases = appendQEvalOrdinaryExpressionCoverageCases(cases)
 	cases = appendQEvalTaskDListMathMatrixApplyIndexCases(cases)
+	cases = appendQEvalTaskDColumnarAnalyticsWorkloadCases(cases)
 	cases = appendQEvalTaskDSemanticEnvelopeCases(cases)
 	cases = appendQEvalSupportedExpressionBreadthCases(cases)
 	return appendQEvalSemanticCoverageCases(cases)
@@ -3629,6 +3630,165 @@ func appendQEvalTaskDSemanticEnvelopeCases(cases []qEvalVectorCase) []qEvalVecto
 		},
 	}
 	return append(cases, taskD...)
+}
+
+func appendQEvalTaskDColumnarAnalyticsWorkloadCases(cases []qEvalVectorCase) []qEvalVectorCase {
+	workloads := []qEvalVectorCase{
+		{
+			name:   "TaskDColumnarSelectWhereByNotional",
+			tags:   []string{"table-literal", "where", "projection", "group", "sum", "symbol"},
+			matrix: []string{"table:literal-meta-cols:frame", "compare:int-vector:where", "aggregate:running-prd-min-max-avg:vector"},
+			shapes: []string{"where:gather-reduce-selectivity:row-scaled", "group:fby-aggregate:row-scaled"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("px:100+((til %d) mod 80);sz:1+((til %d) mod 50);sym:%d#`AAPL`MSFT`NVDA`TSLA;idx:where px>=140;vals:(100+(idx mod 80))*(1+(idx mod 50));n:@[%d#0;idx;+;vals];s:sum n fby sym;(+/s)+count idx", rows, rows, rows, rows)
+			},
+			goFn: func(rows int) int64 {
+				var groupSums, groupCounts [4]int64
+				var selected int64
+				for i := 0; i < rows; i++ {
+					groupCounts[i%4]++
+					px := int64(100 + i%80)
+					if px < 140 {
+						continue
+					}
+					sz := int64(1 + i%50)
+					group := i % 4
+					groupSums[group] += px * sz
+					selected++
+				}
+				var total int64
+				for group := range groupSums {
+					total += groupSums[group] * groupCounts[group]
+				}
+				return total + selected
+			},
+		},
+		{
+			name:   "TaskDColumnarComputedProjectionBucket",
+			tags:   []string{"where", "projection", "xbar", "sum", "numeric-vector"},
+			matrix: []string{"numeric-arithmetic:int-vector:hot", "compare:int-vector:where", "temporal:xbar:bucket"},
+			shapes: []string{"where:gather-reduce-selectivity:row-scaled"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("px:100+((til %d) mod 90);sz:1+((til %d) mod 64);idx:where sz>=32;pxi:100+(idx mod 90);szi:1+(idx mod 64);(+/(pxi*szi))+(+/(count idx)#2)+(+/10 xbar pxi)+count idx", rows, rows)
+			},
+			goFn: func(rows int) int64 {
+				var notional, spread, bucket, count int64
+				for i := 0; i < rows; i++ {
+					px := int64(100 + i%90)
+					sz := int64(1 + i%64)
+					if sz < 32 {
+						continue
+					}
+					notional += px * sz
+					spread += 2
+					bucket += floorBucket(px, 10)
+					count++
+				}
+				return notional + spread + bucket + count
+			},
+		},
+		{
+			name:   "TaskDColumnarNullAwareGroupNotional",
+			tags:   []string{"typed-null", "null-verb", "fill", "where", "group", "sum", "symbol"},
+			matrix: []string{"numeric-arithmetic:typed-null:hot", "list:prev-next-deltas-fills:typed-null", "aggregate:running-prd-min-max-avg:vector"},
+			shapes: []string{"null:fill-arithmetic-where:row-scaled", "group:fby-aggregate:row-scaled"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("px:%d#100 0Ni 105 110 0Ni 115;sz:1+((til %d) mod 20);sym:%d#`AAPL`MSFT`NVDA`TSLA;clean:0^px;idx:where not null px;vals:(clean[idx])*(1+(idx mod 20));n:@[%d#0;idx;+;vals];s:sum n fby sym;(+/s)+count where null px", rows, rows, rows, rows)
+			},
+			goFn: func(rows int) int64 {
+				values := []int64{100, 0, 105, 110, 0, 115}
+				nulls := map[int]bool{1: true, 4: true}
+				var groupSums, groupCounts [4]int64
+				var nullCount int64
+				for i := 0; i < rows; i++ {
+					groupCounts[i%4]++
+					slot := i % len(values)
+					if nulls[slot] {
+						nullCount++
+						continue
+					}
+					sz := int64(1 + i%20)
+					group := i % 4
+					groupSums[group] += values[slot] * sz
+				}
+				var total int64
+				for group := range groupSums {
+					total += groupSums[group] * groupCounts[group]
+				}
+				return total + nullCount
+			},
+		},
+		{
+			name:   "TaskDColumnarWhereWindowNotional",
+			tags:   []string{"where", "projection", "moving-window", "sum", "avg-var-dev-med"},
+			matrix: []string{"compare:int-vector:where", "aggregate:running-prd-min-max-avg:vector"},
+			shapes: []string{"where:gather-reduce-selectivity:row-scaled", "moving:sum-avg:row-scaled"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("px:100+((til %d) mod 50);sz:1+((til %d) mod 32);idx:where (px>=120) and (sz>=10);vals:(100+(idx mod 50))*(1+(idx mod 32));v:@[%d#0;idx;+;vals];(+/16 msum v)+(+/16 mavg v)+count idx", rows, rows, rows)
+			},
+			goFn: func(rows int) int64 {
+				values := make([]int64, 0, rows)
+				var selected int64
+				for i := 0; i < rows; i++ {
+					px := int64(100 + i%50)
+					sz := int64(1 + i%32)
+					value := int64(0)
+					if px >= 120 && sz >= 10 {
+						value = px * sz
+						selected++
+					}
+					values = append(values, value)
+				}
+				var msumTotal int64
+				var mavgTotal float64
+				for i := range values {
+					start := i - 15
+					if start < 0 {
+						start = 0
+					}
+					var window int64
+					for j := start; j <= i; j++ {
+						window += values[j]
+					}
+					msumTotal += window
+					mavgTotal += float64(window) / float64(i-start+1)
+				}
+				qEvalVectorFloatBenchSink = mavgTotal
+				return msumTotal + int64(mavgTotal) + selected
+			},
+		},
+		{
+			name:   "TaskDColumnarSymbolBucketPipeline",
+			tags:   []string{"membership", "where", "projection", "xbar", "group", "sum", "symbol"},
+			matrix: []string{"membership:in-differ-ratios:vector", "compare:symbol-vector:where", "temporal:xbar:bucket"},
+			shapes: []string{"membership:symbol-filter:row-scaled", "group:fby-aggregate:row-scaled"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("px:90+((til %d) mod 120);sz:1+((til %d) mod 40);sym:%d#`AAPL`MSFT`NVDA`TSLA;bucket:25 xbar px;idx:where (sym in `AAPL`MSFT) and (px within 120 180);vals:(90+(idx mod 120))*(1+(idx mod 40));n:@[%d#0;idx;+;vals];s:sum n fby bucket;(+/s)+count idx", rows, rows, rows, rows)
+			},
+			goFn: func(rows int) int64 {
+				groupSums := map[int64]int64{}
+				groupCounts := map[int64]int64{}
+				var selected int64
+				for i := 0; i < rows; i++ {
+					px := int64(90 + i%120)
+					bucket := floorBucket(px, 25)
+					groupCounts[bucket]++
+					if !(i%4 == 0 || i%4 == 1) || px < 120 || px > 180 {
+						continue
+					}
+					sz := int64(1 + i%40)
+					groupSums[bucket] += px * sz
+					selected++
+				}
+				var total int64
+				for bucket, sum := range groupSums {
+					total += sum * groupCounts[bucket]
+				}
+				return total + selected
+			},
+		},
+	}
+	return append(cases, workloads...)
 }
 
 func appendQEvalSupportedExpressionBreadthCases(cases []qEvalVectorCase) []qEvalVectorCase {
