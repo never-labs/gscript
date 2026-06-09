@@ -1186,6 +1186,17 @@ func TryTypedInCount(array Array, values []any) (int64, bool, error) {
 	return typedInCount(array, values)
 }
 
+// TryTypedInMask returns a boolean membership mask for typed arrays. It shares
+// the same membership coercion rules as TryTypedInCount and TryTypedInIndexesI64
+// so expression eval, where planning, and future JIT lowering can target the
+// same runtime primitive with different result carriers.
+func TryTypedInMask(array Array, values []any) (Array, bool, error) {
+	if array == nil {
+		return nil, true, fmt.Errorf("in mask array is nil")
+	}
+	return typedInMask(array, values)
+}
+
 // TryTypedInIndexesI64 returns q-style row indexes selected by a typed
 // membership predicate without materializing a boolean mask.
 func TryTypedInIndexesI64(array Array, values []any) (Array, bool, error) {
@@ -1339,6 +1350,111 @@ func TryTypedBoolLogical(op string, left, right any) (Array, bool, error) {
 		return nil, false, nil
 	}
 	return boolLogicalMask{op: op, leftScalar: lv, leftIsScalar: true, right: rightArray, len: length}, true, nil
+}
+
+func typedInMask(array Array, values []any) (Array, bool, error) {
+	switch a := array.(type) {
+	case attributedArray:
+		return typedInMask(a.array, values)
+	case encodedArray:
+		codes := make(map[int32]struct{}, len(values))
+		for _, value := range values {
+			code, ok := encodedComparableCode(a, value)
+			if !ok {
+				return nil, false, nil
+			}
+			codes[code] = struct{}{}
+		}
+		out := make([]bool, len(a.codes))
+		for row, code := range a.codes {
+			_, out[row] = codes[code]
+		}
+		return newBoolTrusted(out), true, nil
+	case tiledArray:
+		sourceMask, handled, err := typedInMask(a.source, values)
+		if err != nil || !handled {
+			return nil, handled, err
+		}
+		return tiledArray{source: sourceMask, start: a.start, len: a.len}, true, nil
+	case columnArray[bool]:
+		values = normalizeMembershipValues(array.Kind(), values)
+		set, ok := boolMembership(values)
+		return membershipBoolMask(a.data, set, ok), ok, nil
+	case columnArray[int8]:
+		values = normalizeMembershipValues(array.Kind(), values)
+		set, ok := signedMembership[int8](values)
+		return membershipSignedMask(a.data, set, ok), ok, nil
+	case columnArray[int16]:
+		values = normalizeMembershipValues(array.Kind(), values)
+		set, ok := signedMembership[int16](values)
+		return membershipSignedMask(a.data, set, ok), ok, nil
+	case columnArray[int32]:
+		values = normalizeMembershipValues(array.Kind(), values)
+		set, ok := signedMembership[int32](values)
+		return membershipSignedMask(a.data, set, ok), ok, nil
+	case columnArray[int64]:
+		values = normalizeMembershipValues(array.Kind(), values)
+		set, ok := int64Membership(values)
+		return membershipSignedMask(a.data, set, ok), ok, nil
+	case columnArray[uint8]:
+		values = normalizeMembershipValues(array.Kind(), values)
+		set, ok := unsignedMembership[uint8](values)
+		return membershipUnsignedMask(a.data, set, ok), ok, nil
+	case columnArray[uint16]:
+		values = normalizeMembershipValues(array.Kind(), values)
+		set, ok := unsignedMembership[uint16](values)
+		return membershipUnsignedMask(a.data, set, ok), ok, nil
+	case columnArray[uint32]:
+		values = normalizeMembershipValues(array.Kind(), values)
+		set, ok := unsignedMembership[uint32](values)
+		return membershipUnsignedMask(a.data, set, ok), ok, nil
+	case columnArray[uint64]:
+		values = normalizeMembershipValues(array.Kind(), values)
+		set, ok := unsignedMembership[uint64](values)
+		return membershipUnsignedMask(a.data, set, ok), ok, nil
+	case columnArray[string]:
+		values = normalizeMembershipValues(array.Kind(), values)
+		set, ok := stringMembership(values)
+		return membershipStringMask(a.data, set, ok), ok, nil
+	case columnArray[Symbol]:
+		values = normalizeMembershipValues(array.Kind(), values)
+		set, ok := symbolMembership(values)
+		return membershipSymbolMask(a.data, set, ok), ok, nil
+	case columnArray[Month]:
+		values = normalizeMembershipValues(array.Kind(), values)
+		set, ok := exactMembership[Month](values)
+		return membershipSignedMask(a.data, set, ok), ok, nil
+	case columnArray[Date]:
+		values = normalizeMembershipValues(array.Kind(), values)
+		set, ok := exactMembership[Date](values)
+		return membershipSignedMask(a.data, set, ok), ok, nil
+	case columnArray[DateTime]:
+		values = normalizeMembershipValues(array.Kind(), values)
+		set, ok := exactMembership[DateTime](values)
+		return membershipSignedMask(a.data, set, ok), ok, nil
+	case columnArray[Timespan]:
+		values = normalizeMembershipValues(array.Kind(), values)
+		set, ok := exactMembership[Timespan](values)
+		return membershipSignedMask(a.data, set, ok), ok, nil
+	case columnArray[Minute]:
+		values = normalizeMembershipValues(array.Kind(), values)
+		set, ok := exactMembership[Minute](values)
+		return membershipSignedMask(a.data, set, ok), ok, nil
+	case columnArray[Second]:
+		values = normalizeMembershipValues(array.Kind(), values)
+		set, ok := exactMembership[Second](values)
+		return membershipSignedMask(a.data, set, ok), ok, nil
+	case columnArray[Time]:
+		values = normalizeMembershipValues(array.Kind(), values)
+		set, ok := exactMembership[Time](values)
+		return membershipSignedMask(a.data, set, ok), ok, nil
+	case columnArray[Timestamp]:
+		values = normalizeMembershipValues(array.Kind(), values)
+		set, ok := exactMembership[Timestamp](values)
+		return membershipSignedMask(a.data, set, ok), ok, nil
+	default:
+		return nil, false, nil
+	}
 }
 
 func typedInCount(array Array, values []any) (int64, bool, error) {
@@ -13831,6 +13947,61 @@ func countMembershipSymbol(values []Symbol, set map[Symbol]struct{}, ok bool) in
 		}
 	}
 	return count
+}
+
+func membershipBoolMask(values []bool, set map[bool]struct{}, ok bool) Array {
+	if !ok {
+		return nil
+	}
+	out := make([]bool, len(values))
+	for row, value := range values {
+		_, out[row] = set[value]
+	}
+	return newBoolTrusted(out)
+}
+
+func membershipSignedMask[T signedScalar](values []T, set map[T]struct{}, ok bool) Array {
+	if !ok {
+		return nil
+	}
+	out := make([]bool, len(values))
+	for row, value := range values {
+		_, out[row] = set[value]
+	}
+	return newBoolTrusted(out)
+}
+
+func membershipUnsignedMask[T unsignedScalar](values []T, set map[T]struct{}, ok bool) Array {
+	if !ok {
+		return nil
+	}
+	out := make([]bool, len(values))
+	for row, value := range values {
+		_, out[row] = set[value]
+	}
+	return newBoolTrusted(out)
+}
+
+func membershipStringMask(values []string, set map[string]struct{}, ok bool) Array {
+	if !ok {
+		return nil
+	}
+	out := make([]bool, len(values))
+	for row, value := range values {
+		_, out[row] = set[value]
+	}
+	return newBoolTrusted(out)
+}
+
+func membershipSymbolMask(values []Symbol, set map[Symbol]struct{}, ok bool) Array {
+	if !ok {
+		return nil
+	}
+	out := make([]bool, len(values))
+	for row, value := range values {
+		_, out[row] = set[value]
+	}
+	return newBoolTrusted(out)
 }
 
 func membershipBoolIndexes(values []bool, set map[bool]struct{}, ok bool, out []int) ([]int, bool) {

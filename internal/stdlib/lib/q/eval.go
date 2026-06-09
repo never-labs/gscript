@@ -13792,6 +13792,18 @@ func findQueryValues(v any) ([]any, bool, error) {
 
 func membership(left, right any) (any, error) {
 	if leftArray, ok := left.(data.Array); ok {
+		values, _, err := findQueryValues(right)
+		if err == nil {
+			mask, handled, err := data.TryTypedInMask(leftArray, values)
+			shape := "in-mask/" + string(leftArray.Kind()) + "/" + string(qRuntimeKernelOperandKind(right, nil))
+			recordRuntimeKernelProbe("ArrayInMask", shape, handled, err)
+			if err != nil {
+				return nil, err
+			}
+			if handled {
+				return mask, nil
+			}
+		}
 		out := make([]bool, leftArray.Len())
 		for i := 0; i < leftArray.Len(); i++ {
 			value, ok := leftArray.At(i)

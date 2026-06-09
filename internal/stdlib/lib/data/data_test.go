@@ -3989,6 +3989,24 @@ func TestTryTypedInCount(t *testing.T) {
 	if count, sum, ok, err := TryTypedInIndexStatsI64(repeated, []any{Symbol("AAPL"), "MSFT"}); err != nil || !ok || count != 6 || sum != 27 {
 		t.Fatalf("tiled symbol in stats = %d,%d,%v,%v; want 6,27,true,nil", count, sum, ok, err)
 	}
+
+	mask, ok, err := TryTypedInMask(NewSymbols([]string{"AAPL", "MSFT", "NVDA", "AAPL"}), []any{"NVDA", Symbol("AAPL")})
+	if err != nil || !ok {
+		t.Fatalf("symbol in mask handled=%v err=%v; want true,nil", ok, err)
+	}
+	if got, want := mask.Values(), []any{true, false, true, true}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("symbol in mask = %v, want %v", got, want)
+	}
+	repeatedMask, ok, err := TryTypedInMask(repeated, []any{Symbol("AAPL"), "MSFT"})
+	if err != nil || !ok {
+		t.Fatalf("tiled symbol in mask handled=%v err=%v; want true,nil", ok, err)
+	}
+	if _, ok := repeatedMask.(tiledArray); !ok {
+		t.Fatalf("tiled symbol in mask returned %T, want tiledArray", repeatedMask)
+	}
+	if got, want := repeatedMask.Values(), []any{true, true, false, false, true, true, false, false, true, true}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("tiled symbol in mask = %v, want %v", got, want)
+	}
 }
 
 func TestTryTypedFbySum(t *testing.T) {
