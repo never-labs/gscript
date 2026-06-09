@@ -1384,6 +1384,21 @@ func TestEvalStateScriptPlanCachePreservesEnvironmentSemantics(t *testing.T) {
 	}
 }
 
+func TestEvalScriptExecutableSingleStatementPreservesEnvironmentSemantics(t *testing.T) {
+	state := NewEvalState(map[string]any{"x": data.NewI64([]int64{10, 20, 30})})
+	if got, err := state.Eval("x@1"); err != nil || got != int64(20) {
+		t.Fatalf("first executable Eval returned %#v, %v; want 20,nil", got, err)
+	}
+	plan := state.scriptCache["x@1"]
+	if plan.executable == nil || plan.executable.kind != qScriptExecutableSingleStatement {
+		t.Fatalf("cached plan executable = %#v, want single-statement executable", plan.executable)
+	}
+	state.env["x"] = data.NewI64([]int64{100, 200, 300})
+	if got, err := state.Eval("x@1"); err != nil || got != int64(200) {
+		t.Fatalf("warm executable Eval returned %#v, %v; want 200,nil", got, err)
+	}
+}
+
 func TestEvalGlobalScriptPlanCachePreservesEnvironmentSemantics(t *testing.T) {
 	ClearEvalPlanCaches()
 	t.Cleanup(ClearEvalPlanCaches)
