@@ -1446,6 +1446,29 @@ func TestEvalGlobalPipelinePlanCachePreservesEnvironmentSemantics(t *testing.T) 
 	}
 }
 
+func TestEvalGlobalScriptPipelinePlanCachePreservesEnvironmentSemantics(t *testing.T) {
+	ClearEvalPlanCaches()
+	t.Cleanup(ClearEvalPlanCaches)
+
+	src := "i:where v>threshold;+/v[i]"
+	env1 := map[string]any{"v": data.NewI64([]int64{1, 2, 3, 4}), "threshold": int64(2)}
+	if got, err := EvalWithEnv(src, env1); err != nil || got != int64(7) {
+		t.Fatalf("first script-pipeline EvalWithEnv returned %#v, %v; want 7,nil", got, err)
+	}
+	afterCold := EvalPlanCacheStatsSnapshot()
+	if afterCold.ScriptMisses == 0 || afterCold.ScriptEntries == 0 {
+		t.Fatalf("cold eval did not populate global script cache: %#v", afterCold)
+	}
+	env2 := map[string]any{"v": data.NewI64([]int64{10, 20, 30}), "threshold": int64(15)}
+	if got, err := EvalWithEnv(src, env2); err != nil || got != int64(50) {
+		t.Fatalf("warm script-pipeline EvalWithEnv returned %#v, %v; want 50,nil", got, err)
+	}
+	afterWarm := EvalPlanCacheStatsSnapshot()
+	if afterWarm.ScriptHits <= afterCold.ScriptHits {
+		t.Fatalf("warm eval did not hit global script cache: before=%#v after=%#v", afterCold, afterWarm)
+	}
+}
+
 func TestEvalGlobalPipelineBindingCacheKeysByOperandKind(t *testing.T) {
 	ClearEvalPlanCaches()
 	t.Cleanup(ClearEvalPlanCaches)

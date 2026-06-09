@@ -601,6 +601,7 @@ type EvalState struct {
 	env                  map[string]any
 	port                 int64
 	namespace            string
+	oneShot              bool
 	scriptCache          map[string]qScriptPlan
 	valueExprCache       map[string]Expr
 	pipelineCache        map[string]qPipelinePlan
@@ -653,7 +654,7 @@ func Eval(src string) (any, error) {
 }
 
 func EvalWithEnv(src string, env map[string]any) (any, error) {
-	return NewEvalState(env).Eval(src)
+	return (&EvalState{env: cloneEnv(env), namespace: ".", oneShot: true}).Eval(src)
 }
 
 // EvalSourceCacheable reports whether src is safe for callers to memoize across
@@ -741,7 +742,8 @@ func (s *EvalState) evalScript(src string) (any, error) {
 		}
 	}
 	if plan.scriptPipeline != nil {
-		if out, handled, err := s.tryEvalQScriptPipeline(plan.scriptPipeline); err != nil || handled {
+		descriptor := cloneQScriptPipelineDescriptor(plan.scriptPipeline)
+		if out, handled, err := s.tryEvalQScriptPipeline(descriptor); err != nil || handled {
 			return out, err
 		}
 	}
@@ -845,6 +847,9 @@ func (s *EvalState) qScriptPlan(src string) qScriptPlan {
 }
 
 func (s *EvalState) rememberQScriptPlan(src string, plan qScriptPlan) {
+	if s.oneShot {
+		return
+	}
 	if s.scriptCache == nil {
 		s.scriptCache = make(map[string]qScriptPlan, 16)
 	} else if len(s.scriptCache) >= 256 {
@@ -870,7 +875,7 @@ func qGlobalScriptPlanCacheProbe(src string) (qScriptPlan, bool) {
 		return qScriptPlan{}, false
 	}
 	qRecordScriptPlanFastPipelineCacheHits(plan)
-	return cloneQScriptPlan(plan), true
+	return plan, true
 }
 
 func qRecordScriptPlanFastPipelineCacheHits(plan qScriptPlan) {
@@ -890,7 +895,7 @@ func qGlobalScriptPlanCacheStore(src string, plan qScriptPlan) {
 	if _, ok := qGlobalScriptPlanCache[src]; !ok {
 		qGlobalScriptPlanCacheOrder = append(qGlobalScriptPlanCacheOrder, src)
 	}
-	qGlobalScriptPlanCache[src] = cloneQScriptPlan(plan)
+	qGlobalScriptPlanCache[src] = plan
 	qGlobalScriptPlanStats.ScriptStores++
 	for len(qGlobalScriptPlanCacheOrder) > qGlobalScriptPlanCacheLimit {
 		evict := qGlobalScriptPlanCacheOrder[0]
@@ -980,7 +985,7 @@ func buildQScriptExecutablePlan(plan qScriptPlan) *qScriptExecutablePlan {
 	if stmt.bindingPlan.kind == qScriptBindingInvalid && stmt.fastPlan.kind == qEvalFastInvalid && stmt.valueExpr == nil {
 		return nil
 	}
-	return &qScriptExecutablePlan{kind: qScriptExecutableSingleStatement, statement: cloneQScriptStatement(stmt)}
+	return &qScriptExecutablePlan{kind: qScriptExecutableSingleStatement, statement: stmt}
 }
 
 func (s *EvalState) evalQScriptExecutablePlan(plan *qScriptExecutablePlan) (any, bool, error) {
