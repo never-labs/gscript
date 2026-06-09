@@ -68,6 +68,14 @@ func qPipelineShapeSpecForPlan(kind qPipelineKind, variant string) (qPipelineSha
 			Transform:     "expr",
 			PipelineShape: "vector_scan",
 		}, true
+	case qPipelineSumDeltas:
+		return qPipelineShapeSpec{
+			ID:            "vector-reduce/sum-deltas",
+			Family:        qPipelineShapeFamilyVector,
+			Reducer:       "sum",
+			Transform:     "deltas",
+			PipelineShape: "vector_reduce",
+		}, true
 	case qPipelineSumMovingWindow:
 		if variant == "" {
 			return qPipelineShapeSpec{}, false
@@ -87,6 +95,17 @@ func qPipelineShapeSpecForPlan(kind qPipelineKind, variant string) (qPipelineSha
 			ID:            "vector-count/" + variant,
 			Family:        qPipelineShapeFamilyVector,
 			Reducer:       "count",
+			Transform:     variant,
+			PipelineShape: "vector_scan",
+		}, true
+	case qPipelineLastRunningScan:
+		if variant == "" {
+			return qPipelineShapeSpec{}, false
+		}
+		return qPipelineShapeSpec{
+			ID:            "vector-last/" + variant,
+			Family:        qPipelineShapeFamilyVector,
+			Reducer:       "last",
 			Transform:     variant,
 			PipelineShape: "vector_scan",
 		}, true

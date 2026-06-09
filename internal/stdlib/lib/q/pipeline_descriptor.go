@@ -290,6 +290,8 @@ func qPipelinePlanFromEvalDescriptor(descriptor EvalPipelineDescriptor) (qPipeli
 		plan.kind = qPipelineSumMovingWindow
 	case "vector-count/sums", "vector-count/prds", "vector-count/mins", "vector-count/maxs", "vector-count/avgs":
 		plan.kind = qPipelineCountRunningScan
+	case "vector-last/sums", "vector-last/prds", "vector-last/mins", "vector-last/maxs", "vector-last/avgs":
+		plan.kind = qPipelineLastRunningScan
 	default:
 		return qPipelinePlan{}, false
 	}

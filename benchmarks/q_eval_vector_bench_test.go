@@ -673,7 +673,7 @@ func buildQEvalVectorCases() []qEvalVectorCase {
 		},
 		qEvalVectorCase{
 			name:   "AdverbInitialOverScanProducts",
-			tags:   []string{"adverb-over-scan", "sum", "sums", "product"},
+			tags:   []string{"adverb-over-scan", "sum", "sums", "product", "pipeline-vector-last-scan"},
 			matrix: []string{"adverb:over-scan:projection", "aggregate:running-prd-min-max-avg:vector"},
 			shapes: []string{"adverb:initial-over-scan:row-scaled"},
 			expr: func(rows int) string {
@@ -1182,7 +1182,7 @@ func appendQEvalExpressionCombinationCases(cases []qEvalVectorCase) []qEvalVecto
 		},
 		{
 			name:   "RunningMinMaxTailEnvelope",
-			tags:   []string{"running-aggregate", "min-max"},
+			tags:   []string{"running-aggregate", "min-max", "pipeline-vector-last-scan"},
 			matrix: []string{"aggregate:running-prd-min-max-avg:vector"},
 			expr: func(rows int) string {
 				return fmt.Sprintf("x:til %d;(last mins x)+(last maxs reverse x)+(last maxs x)", rows)
@@ -1193,7 +1193,7 @@ func appendQEvalExpressionCombinationCases(cases []qEvalVectorCase) []qEvalVecto
 		},
 		{
 			name:   "AvgsTailChecksum",
-			tags:   []string{"running-aggregate", "avg-var-dev-med"},
+			tags:   []string{"running-aggregate", "avg-var-dev-med", "pipeline-vector-last-scan"},
 			matrix: []string{"aggregate:running-prd-min-max-avg:vector"},
 			expr: func(rows int) string {
 				return fmt.Sprintf("x:til %d;last avgs x", rows)
@@ -2500,7 +2500,7 @@ func appendQEvalSemanticCoverageCases(cases []qEvalVectorCase) []qEvalVectorCase
 		},
 		{
 			name:   "RunningAggregateProductMatrix",
-			tags:   []string{"running-aggregate", "product", "avg-var-dev-med", "min-max"},
+			tags:   []string{"running-aggregate", "product", "avg-var-dev-med", "min-max", "pipeline-vector-last-scan"},
 			matrix: []string{"aggregate:running-prd-min-max-avg:vector"},
 			expr: func(rows int) string {
 				return fmt.Sprintf("x:1+til %d;p:%d#1 1 1 1;(prd p)+(count prds p)+(last mins x)+(last maxs x)+(last avgs x)", rows, rows)

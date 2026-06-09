@@ -28,6 +28,7 @@ const (
 	qPipelineCountWhereIn
 	qPipelineSumMovingWindow
 	qPipelineCountRunningScan
+	qPipelineLastRunningScan
 )
 
 type qPipelinePlan struct {
@@ -196,6 +197,9 @@ func qPipelinePlanCandidate(src string) bool {
 	if strings.HasPrefix(src, "count ") && wordBoundary(src, 0, len("count")) {
 		return true
 	}
+	if strings.HasPrefix(src, "last ") && wordBoundary(src, 0, len("last")) {
+		return true
+	}
 	if strings.HasPrefix(src, "where ") && wordBoundary(src, 0, len("where")) {
 		return true
 	}
@@ -226,7 +230,9 @@ func buildQPipelinePlan(src string) qPipelinePlan {
 			return qPipelinePlanWithBindingPlans(withSource(plan))
 		}
 		if input, ok := qPipelineDeltasInput(right); ok {
-			return qPipelinePlanWithBindingPlans(withSource(qPipelinePlan{kind: qPipelineSumDeltas, shape: "vector-reduce/sum-deltas", reductionInput: input}))
+			plan := qPipelineShapePlan(qPipelineSumDeltas, "")
+			plan.reductionInput = input
+			return qPipelinePlanWithBindingPlans(withSource(plan))
 		}
 		if plan, ok := buildQPipelineSumMovingWindowPlan(right); ok {
 			return qPipelinePlanWithBindingPlans(withSource(plan))
@@ -241,7 +247,9 @@ func buildQPipelinePlan(src string) qPipelinePlan {
 	if strings.HasPrefix(src, "sum ") && wordBoundary(src, 0, len("sum")) {
 		inputExpr := strings.TrimSpace(src[len("sum "):])
 		if input, ok := qPipelineDeltasInput(inputExpr); ok {
-			return qPipelinePlanWithBindingPlans(withSource(qPipelinePlan{kind: qPipelineSumDeltas, shape: "vector-reduce/sum-deltas", reductionInput: input}))
+			plan := qPipelineShapePlan(qPipelineSumDeltas, "")
+			plan.reductionInput = input
+			return qPipelinePlanWithBindingPlans(withSource(plan))
 		}
 		if plan, ok := buildQPipelineSumMovingWindowPlan(inputExpr); ok {
 			return qPipelinePlanWithBindingPlans(withSource(plan))
@@ -279,6 +287,16 @@ func buildQPipelinePlan(src string) qPipelinePlan {
 		if qPipelineVectorTransformExprCandidate(inputExpr) {
 			plan := qPipelineShapePlan(qPipelineCountVectorExpr, "")
 			plan.reductionInput = inputExpr
+			return qPipelinePlanWithBindingPlans(withSource(plan))
+		}
+		return qPipelinePlan{}
+	}
+	if strings.HasPrefix(src, "last ") && wordBoundary(src, 0, len("last")) {
+		inputExpr := strings.TrimSpace(src[len("last "):])
+		if scan, arg, ok := qPipelineRunningScanInput(inputExpr); ok {
+			plan := qPipelineShapePlan(qPipelineLastRunningScan, scan)
+			plan.compareOp = scan
+			plan.reductionInput = arg
 			return qPipelinePlanWithBindingPlans(withSource(plan))
 		}
 		return qPipelinePlan{}
@@ -626,6 +644,8 @@ func (s *EvalState) evalQPipelinePlan(plan qPipelinePlan) (any, bool, error) {
 		out, handled, err = s.evalQPipelineSumMovingWindow(plan)
 	case qPipelineCountRunningScan:
 		out, handled, err = s.evalQPipelineCountRunningScan(plan)
+	case qPipelineLastRunningScan:
+		out, handled, err = s.evalQPipelineLastRunningScan(plan)
 	default:
 		recordRuntimeKernelExecution("QPipelinePlan", shape, "fallback", RuntimeFallbackPlannerUnhandled)
 		return nil, false, nil
@@ -1306,6 +1326,59 @@ func (s *EvalState) evalQPipelineCountRunningScan(plan qPipelinePlan) (any, bool
 	}
 	recordQTypedRuntimeKernel(kernel, shape, true, nil)
 	return int64(array.Len()), true, nil
+}
+
+func (s *EvalState) evalQPipelineLastRunningScan(plan qPipelinePlan) (any, bool, error) {
+	value, err := s.evalQPipelinePlannedExpr(plan.reductionInput, &plan.reductionPlan)
+	if err != nil {
+		return nil, true, err
+	}
+	if array, ok := value.(data.Array); ok {
+		if array.Len() == 0 {
+			return nil, false, nil
+		}
+		if err := qValidateRunningScanKind(plan.compareOp, array.Kind()); err != nil {
+			recordRuntimeKernelProbe("ArrayLastScan", "vector-last/"+plan.compareOp+"/"+string(array.Kind()), false, err)
+			return nil, true, err
+		}
+		recordRuntimeKernelProbe("ArrayLastScan", "vector-last/"+plan.compareOp+"/"+string(array.Kind()), true, nil)
+	}
+	out, err := qLastRunningScanValue(plan.compareOp, value)
+	if err != nil {
+		return nil, true, err
+	}
+	return out, true, nil
+}
+
+func qValidateRunningScanKind(scan string, kind data.Kind) error {
+	switch scan {
+	case "sums", "prds", "avgs":
+		if !qKindIsNumeric(kind) {
+			return fmt.Errorf("%s expects a numeric vector", scan)
+		}
+	case "mins", "maxs":
+		if !qTypedCompareKindOK(kind) {
+			return fmt.Errorf("%s expects an ordered vector", scan)
+		}
+	}
+	return nil
+}
+
+func qLastRunningScanValue(scan string, value any) (any, error) {
+	switch scan {
+	case "sums":
+		return sum(value)
+	case "prds":
+		return prd(value)
+	case "mins":
+		return minValue(value)
+	case "maxs":
+		return maxValue(value)
+	case "avgs":
+		return avg(value)
+	default:
+		return nil, fmt.Errorf("unsupported running scan %q", scan)
+	}
 }
 
 func (s *EvalState) evalQPipelineCountVectorExpr(plan qPipelinePlan) (any, bool, error) {

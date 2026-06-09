@@ -267,6 +267,24 @@ func TestQPipelineShapeRegistryStabilizesExpressionPlans(t *testing.T) {
 			transform: "expr",
 			pipeline:  "vector_scan",
 		},
+		{
+			name:      "deltas reduce",
+			source:    "sum deltas til 8",
+			shape:     "vector-reduce/sum-deltas",
+			family:    qPipelineShapeFamilyVector,
+			reducer:   "sum",
+			transform: "deltas",
+			pipeline:  "vector_reduce",
+		},
+		{
+			name:      "running scan terminal",
+			source:    "last sums til 8",
+			shape:     "vector-last/sums",
+			family:    qPipelineShapeFamilyVector,
+			reducer:   "last",
+			transform: "sums",
+			pipeline:  "vector_scan",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -284,6 +302,55 @@ func TestQPipelineShapeRegistryStabilizesExpressionPlans(t *testing.T) {
 			}
 			if plan.stableShape() != tt.shape || plan.stablePipelineShape() != tt.pipeline {
 				t.Fatalf("plan stable shape = %q/%q, want %q/%q", plan.stableShape(), plan.stablePipelineShape(), tt.shape, tt.pipeline)
+			}
+		})
+	}
+}
+
+func TestQPipelineLastRunningScanEvalAndDescriptor(t *testing.T) {
+	tests := []struct {
+		expr string
+		want any
+	}{
+		{"last sums 1 2 3 4", int64(10)},
+		{"last prds 2 3 4", int64(24)},
+		{"last mins 9 3 5", int64(3)},
+		{"last maxs 9 3 5", int64(9)},
+		{"last avgs 2 4 9", 5.0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.expr, func(t *testing.T) {
+			ClearRuntimeKernelExecutionStats()
+			t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+			assertEvalValue(t, tt.expr, tt.want)
+			descriptor, ok := DescribeEvalPipeline(tt.expr)
+			if !ok {
+				t.Fatalf("DescribeEvalPipeline(%q) did not recognize running last", tt.expr)
+			}
+			if descriptor.ShapeFamily != "vector" || descriptor.ShapeReducer != "last" || descriptor.ShapeTransform == "" || descriptor.PipelineShape != "vector_scan" {
+				t.Fatalf("descriptor = %#v, want vector last scan", descriptor)
+			}
+			out, handled, err := ExecuteEvalPipelineDescriptor(descriptor)
+			if err != nil || !handled {
+				t.Fatalf("ExecuteEvalPipelineDescriptor = %v,%v,%v", out, handled, err)
+			}
+			if !reflect.DeepEqual(out, tt.want) {
+				t.Fatalf("ExecuteEvalPipelineDescriptor output = %#v, want %#v", out, tt.want)
+			}
+
+			seenPipeline := false
+			seenLastScan := false
+			for _, stat := range RuntimeKernelExecutionStats() {
+				if stat.Kernel == "QPipelinePlan" && stat.Shape == descriptor.Shape && stat.Outcome == "hit" && stat.Count > 0 {
+					seenPipeline = true
+				}
+				if stat.Kernel == "ArrayLastScan" && stat.Outcome == "hit" && stat.Count > 0 {
+					seenLastScan = true
+				}
+			}
+			if !seenPipeline || !seenLastScan {
+				t.Fatalf("missing runtime stats: pipeline=%v lastScan=%v stats=%#v", seenPipeline, seenLastScan, RuntimeKernelExecutionStats())
 			}
 		})
 	}
