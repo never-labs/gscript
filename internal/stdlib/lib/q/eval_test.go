@@ -196,6 +196,30 @@ func TestQScriptPipelinePlannerRecordsRuntimeStats(t *testing.T) {
 	}
 }
 
+func TestQScriptPipelineDirectExecutionPreservesAssignments(t *testing.T) {
+	ClearRuntimeKernelExecutionStats()
+	t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+	state := NewEvalState(nil)
+	assertStateEvalValue(t, state, "x:til 16;y:x*3;idx:where (x>=4) and x<8;+/y[idx]", int64(66))
+	assertStateEvalArray(t, state, "idx", data.KindI64, []any{int64(4), int64(5), int64(6), int64(7)})
+	assertStateEvalValue(t, state, "+/y[idx]", int64(66))
+
+	seenScriptHit := false
+	seenPipelineHit := false
+	for _, stat := range RuntimeKernelExecutionStats() {
+		if stat.Kernel == "QScriptPipelinePlan" && stat.Outcome == "hit" && stat.Count > 0 {
+			seenScriptHit = true
+		}
+		if stat.Kernel == "QPipelinePlan" && stat.Outcome == "hit" && stat.Count > 0 {
+			seenPipelineHit = true
+		}
+	}
+	if !seenScriptHit || !seenPipelineHit {
+		t.Fatalf("missing direct script pipeline hits: script=%v pipeline=%v stats=%#v", seenScriptHit, seenPipelineHit, RuntimeKernelExecutionStats())
+	}
+}
+
 func TestDescribeEvalPipelineExposesReadOnlyRuntimeDescriptor(t *testing.T) {
 	descriptor, ok := DescribeEvalPipeline("x:til 64;y:(x*3)+7;idx:where x>8;+/y[idx]")
 	if !ok {

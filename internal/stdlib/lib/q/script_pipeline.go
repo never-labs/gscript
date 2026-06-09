@@ -60,6 +60,9 @@ func buildQScriptPipelineDescriptor(statements []qScriptStatement) (*qScriptPipe
 		if stmt.assign == "" || stmt.rhs == "" {
 			return nil, false
 		}
+		if _, _, ok := parseDeferredScan(stmt.rhs); ok {
+			return nil, false
+		}
 		assignments = append(assignments, qScriptPipelineAssignment{name: stmt.assign, rhs: stmt.rhs, valueExpr: stmt.valueExpr})
 		bindings[stmt.assign] = stmt.rhs
 	}
