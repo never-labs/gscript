@@ -633,6 +633,10 @@ type CompiledFunction struct {
 	// typed pipeline op-exit/native lowering.
 	QEvalPipelinePlans []QEvalPipelinePlanRef
 
+	// QEvalPipelineBackend keeps predecoded descriptor handoff metadata for
+	// q.eval typed pipeline op-exit execution.
+	QEvalPipelineBackend qRuntimeEvalPipelineBackend
+
 	// QVectorRuntimeKernelShapesByID keeps q vector runtime-kernel shape
 	// metadata alive for op-exit execution stats.
 	QVectorRuntimeKernelShapesByID map[int]string

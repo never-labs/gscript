@@ -165,7 +165,10 @@ func (cf *CompiledFunction) ExecuteQEvalPipelinePlanValue(id int) (runtime.Value
 	if !ok {
 		return runtime.NilValue(), false, nil
 	}
-	backend := newQRuntimeEvalPipelineBackend(cf.QEvalPipelinePlans)
+	backend := cf.QEvalPipelineBackend
+	if !backend.hasPlans() {
+		backend = newQRuntimeEvalPipelineBackend(cf.QEvalPipelinePlans)
+	}
 	return executeQEvalPipelinePlanValue(backend, ref)
 }
 
