@@ -222,23 +222,27 @@ func NumericMovingStdDev(array Array, width int, sample bool) (Array, bool, erro
 		return nil, false, nil
 	}
 	out := make([]any, array.Len())
+	var moments NumericMoments
 	for row := 0; row < array.Len(); row++ {
-		start := row - width + 1
-		if start < 0 {
-			start = 0
+		value, ok, err := typedKernels.NumericAt(array, row)
+		if err != nil {
+			return nil, true, err
 		}
-		var moments NumericMoments
-		for i := start; i <= row; i++ {
-			value, ok, err := typedKernels.NumericAt(array, i)
-			if err != nil {
-				return nil, true, err
-			}
-			if !ok {
-				continue
-			}
+		if ok {
 			moments.Sum += value
 			moments.SumSquares += value * value
 			moments.Count++
+		}
+		if remove := row - width; remove >= 0 {
+			value, ok, err := typedKernels.NumericAt(array, remove)
+			if err != nil {
+				return nil, true, err
+			}
+			if ok {
+				moments.Sum -= value
+				moments.SumSquares -= value * value
+				moments.Count--
+			}
 		}
 		variance, ok := NumericVarianceFromMoments(moments, sample)
 		if !ok {

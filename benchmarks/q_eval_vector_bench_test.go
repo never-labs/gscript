@@ -1249,6 +1249,39 @@ func appendQEvalExpressionCombinationCases(cases []qEvalVectorCase) []qEvalVecto
 			},
 		},
 		{
+			name:   "MovingStdDevEma32Envelope",
+			tags:   []string{"moving-window", "avg-var-dev-med", "numeric-vector"},
+			matrix: []string{"aggregate:mdev-ema:vector"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("x:1+til %d;(count 32 mdev x)+(count 0.25 ema x)", rows)
+			},
+			goFn: func(rows int) int64 {
+				return int64(rows * 2)
+			},
+		},
+		{
+			name:   "SampleStatsCorrelationEnvelope",
+			tags:   []string{"avg-var-dev-med", "weighted-aggregate", "numeric-vector"},
+			matrix: []string{"aggregate:sample-cov-cor-wsum:vector"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("x:1+til %d;y:x*2;count (svar x;sdev x;x cov y;x scov y;x cor y;x wsum y)", rows)
+			},
+			goFn: func(rows int) int64 {
+				return 6
+			},
+		},
+		{
+			name:   "ListStringBooleanCoverageEnvelope",
+			tags:   []string{"cut", "string", "boolean-logical", "projection"},
+			matrix: []string{"list:sublist-cross-cut:string-bool"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("x:til %d;(count 100 sublist x)+(count 0 100 200 cut x)+(count (til 16) cross til 16)+(count trim %d#\" AAPL \")+(count where 101001b)", rows, rows)
+			},
+			goFn: func(rows int) int64 {
+				return int64(100 + 2 + 256 + rows + 3)
+			},
+		},
+		{
 			name:   "SymbolEqualityMaskCount",
 			tags:   []string{"symbol", "where", "composite-compare"},
 			matrix: []string{"compare:symbol-vector:where"},
@@ -3206,8 +3239,10 @@ func qEvalVectorPipelineCategories(tc qEvalVectorCase) []string {
 		strings.Contains(name, "adverb") || strings.Contains(name, "list") || strings.Contains(name, "deltas") {
 		add("ordinary_list_adverb")
 	}
-	if hasShapePrefix("verb:") || hasMatrixPrefix("numeric:") || strings.Contains(name, "numeric") || strings.Contains(name, "dyadic") ||
-		strings.Contains(name, "minmax") || strings.Contains(name, "signum") || strings.Contains(name, "reciprocal") {
+	if hasTag("numeric-vector") || hasTag("weighted-aggregate") || hasShapePrefix("verb:") ||
+		hasMatrixPrefix("numeric:") || hasMatrixPrefix("aggregate:") || strings.Contains(name, "numeric") ||
+		strings.Contains(name, "dyadic") || strings.Contains(name, "minmax") || strings.Contains(name, "signum") ||
+		strings.Contains(name, "reciprocal") {
 		add("vector_numeric")
 	}
 	out := make([]string, 0, len(seen))
