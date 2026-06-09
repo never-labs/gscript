@@ -1069,6 +1069,52 @@ func TestQScriptPipelinePlannerDescribesCallableOverScanSum(t *testing.T) {
 	assertEvalValue(t, src, int64(90))
 }
 
+func TestQScriptPipelinePlannerDescribesStringJoinCounts(t *testing.T) {
+	src := "x:8#`AAPL`MSFT`AMD`NVDA;s:\",\" sv string x;(count \",\" vs s)+(count s ss \"A\")+(count ssr[s;\"A\";\"Z\"])"
+	plan := buildQScriptPlan(src)
+	if plan.scriptPipeline == nil {
+		t.Fatalf("script pipeline descriptor missing")
+	}
+	d := plan.scriptPipeline
+	if d.kind != qScriptPipelineStringJoinCounts {
+		t.Fatalf("pipeline kind = %q, want %q", d.kind, qScriptPipelineStringJoinCounts)
+	}
+	if d.valueExpr != "x" || d.valueBinding != "8#`AAPL`MSFT`AMD`NVDA" || d.indexExpr != "s" || d.maskExpr != "\",\"" || d.rowValueExpr != "\"A\"" || d.scalarExpr != "\"A\"" || d.dyadicOp != "\"Z\"" {
+		t.Fatalf("string descriptor = %#v", d)
+	}
+	if got, want := d.shape(), "script-pipeline/string-join/counts/assignments"; got != want {
+		t.Fatalf("shape = %q, want %q", got, want)
+	}
+	descriptor, ok := DescribeEvalPipeline(src)
+	if !ok {
+		t.Fatalf("DescribeEvalPipeline(%q) did not recognize string join counts pipeline", src)
+	}
+	out, handled, err := ExecuteEvalPipelineDescriptor(descriptor)
+	if err != nil || !handled || out != int64(53) {
+		t.Fatalf("ExecuteEvalPipelineDescriptor string join counts = %#v,%v,%v; want 53,true,nil", out, handled, err)
+	}
+	executable, ok := CompileEvalPipelineBackendPlan(EvalPipelineBackendPlan{
+		Backend:    EvalPipelineTypedRuntimeBackend,
+		Detail:     "kind=" + descriptor.Kind,
+		Descriptor: descriptor,
+	})
+	if !ok {
+		t.Fatalf("CompileEvalPipelineBackendPlan failed for string join counts descriptor")
+	}
+	out, handled, err = NewEvalState(nil).ExecuteEvalPipelineExecutablePlan(executable)
+	if err != nil || !handled || out != int64(53) {
+		t.Fatalf("ExecuteEvalPipelineExecutablePlan string join counts = %#v,%v,%v; want 53,true,nil", out, handled, err)
+	}
+	ClearRuntimeKernelExecutionStats()
+	t.Cleanup(ClearRuntimeKernelExecutionStats)
+	assertEvalValue(t, src, int64(53))
+	for _, stat := range RuntimeKernelExecutionStats() {
+		if stat.Outcome == "fallback" || stat.Outcome == "error" {
+			t.Fatalf("unexpected string join counts fallback/error: %#v all=%#v", stat, RuntimeKernelExecutionStats())
+		}
+	}
+}
+
 func TestQScriptPipelinePlannerRecordsRuntimeStats(t *testing.T) {
 	ClearRuntimeKernelExecutionStats()
 	t.Cleanup(ClearRuntimeKernelExecutionStats)

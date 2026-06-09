@@ -549,6 +549,8 @@ func qScriptPipelineDescriptorFromEvalDescriptor(descriptor EvalPipelineDescript
 		out.kind = qScriptPipelineCallableDotSumRight
 	case strings.Contains(shape, "callable-over/scan-sum-count"):
 		out.kind = qScriptPipelineCallableOverScanSum
+	case strings.Contains(shape, "string-join/counts"):
+		out.kind = qScriptPipelineStringJoinCounts
 	case strings.Contains(shape, "apply-index/scalar-at"):
 		out.kind = qScriptPipelineApplyScalarAt
 		out.terminalPlan = qPipelinePlanWithBindingPlans(qPipelinePlan{
@@ -608,6 +610,9 @@ func qScriptPipelineDescriptorFromEvalDescriptor(descriptor EvalPipelineDescript
 	out.valuePlan = buildQScriptBindingPlanForRHS(out.valueExpr, nil)
 	if out.kind == qScriptPipelineCallableOverScanSum && strings.TrimSpace(out.valueBinding) != "" {
 		out.valuePlan = buildQScriptWarmBindingPlan(out.valueBinding, parseCachedValueExpr(out.valueBinding))
+	}
+	if out.kind == qScriptPipelineStringJoinCounts {
+		qScriptPipelineHoistStringJoinCounts(&out)
 	}
 	out.indexPlan = buildQScriptBindingPlanForRHS(out.indexExpr, nil)
 	out.maskPlan = buildQScriptBindingPlanForRHS(out.maskExpr, nil)

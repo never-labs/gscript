@@ -1164,6 +1164,9 @@ func cloneQScriptPipelineDescriptor(in *qScriptPipelineDescriptor) *qScriptPipel
 			out.assignments[i].binding = cloneQScriptBindingPlan(in.assignments[i].binding)
 		}
 	}
+	if len(in.stringValues) > 0 {
+		out.stringValues = append([]string(nil), in.stringValues...)
+	}
 	return &out
 }
 

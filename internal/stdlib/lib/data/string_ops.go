@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 )
 
 // StringScalar normalizes Leia/q string-like scalars for reusable string
@@ -137,6 +138,124 @@ func StringSplit(sep, text string) Array {
 		return NewString(parts)
 	}
 	return NewString(strings.Split(text, sep))
+}
+
+type RepeatedStringJoinCounts struct {
+	SplitCount       int64
+	SearchCount      int64
+	ReplaceResultLen int64
+}
+
+func RepeatedStringJoinCountSummary(values []string, count int, sep, search, old, repl string) (RepeatedStringJoinCounts, bool) {
+	if count < 0 || len(values) == 0 {
+		return RepeatedStringJoinCounts{}, false
+	}
+	joinedRunes := repeatedJoinedRuneLen(values, count, sep)
+	splitCount := int64(1)
+	if sep == "" {
+		splitCount = joinedRunes
+	} else if joinedRunes == 0 {
+		splitCount = 1
+	} else {
+		splitCount = repeatedJoinedOccurrenceCount(values, count, sep, sep) + 1
+	}
+	searchCount := repeatedJoinedOccurrenceCount(values, count, sep, search)
+	replaceCount := repeatedJoinedOccurrenceCount(values, count, sep, old)
+	replaceLen := joinedRunes + replaceCount*(int64(utf8.RuneCountInString(repl))-int64(utf8.RuneCountInString(old)))
+	return RepeatedStringJoinCounts{
+		SplitCount:       splitCount,
+		SearchCount:      searchCount,
+		ReplaceResultLen: replaceLen,
+	}, true
+}
+
+func repeatedJoinedRuneLen(values []string, count int, sep string) int64 {
+	if count <= 0 {
+		return 0
+	}
+	var total int64
+	for i := 0; i < count; i++ {
+		if i > 0 {
+			total += int64(utf8.RuneCountInString(sep))
+		}
+		total += int64(utf8.RuneCountInString(values[i%len(values)]))
+	}
+	return total
+}
+
+func repeatedJoinedOccurrenceCount(values []string, count int, sep, needle string) int64 {
+	if count <= 0 || needle == "" {
+		return 0
+	}
+	if r, ok := singleRune(needle); ok {
+		return repeatedJoinedSingleRuneCount(values, count, sep, r)
+	}
+	pattern := []rune(needle)
+	fail := kmpFailure(pattern)
+	var hits int64
+	matched := 0
+	feed := func(text string) {
+		for _, r := range text {
+			for matched > 0 && r != pattern[matched] {
+				matched = fail[matched-1]
+			}
+			if r == pattern[matched] {
+				matched++
+				if matched == len(pattern) {
+					hits++
+					matched = 0
+				}
+			}
+		}
+	}
+	for i := 0; i < count; i++ {
+		if i > 0 {
+			feed(sep)
+		}
+		feed(values[i%len(values)])
+	}
+	return hits
+}
+
+func singleRune(text string) (rune, bool) {
+	r, size := utf8.DecodeRuneInString(text)
+	if r == utf8.RuneError && size == 0 {
+		return 0, false
+	}
+	return r, size == len(text)
+}
+
+func repeatedJoinedSingleRuneCount(values []string, count int, sep string, needle rune) int64 {
+	var hits int64
+	feed := func(text string) {
+		for _, r := range text {
+			if r == needle {
+				hits++
+			}
+		}
+	}
+	for i := 0; i < count; i++ {
+		if i > 0 {
+			feed(sep)
+		}
+		feed(values[i%len(values)])
+	}
+	return hits
+}
+
+func kmpFailure(pattern []rune) []int {
+	fail := make([]int, len(pattern))
+	for i := 1; i < len(pattern); i++ {
+		j := fail[i-1]
+		for j > 0 && pattern[i] != pattern[j] {
+			j = fail[j-1]
+		}
+		if pattern[i] == pattern[j] {
+			j++
+		}
+		fail[i] = j
+	}
+	return fail
 }
 
 func transformStringCount(name string, value any, fn func(string) string) (int64, error) {

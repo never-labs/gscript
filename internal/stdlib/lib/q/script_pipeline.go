@@ -23,6 +23,7 @@ const (
 	qScriptPipelineCallableDotSumRight  qScriptPipelineKind = "callable-dot/sum-plus-right"
 	qScriptPipelineCallableDotSumCount  qScriptPipelineKind = "callable-dot/sum-plus-count-right"
 	qScriptPipelineCallableOverScanSum  qScriptPipelineKind = "callable-over/scan-sum-count"
+	qScriptPipelineStringJoinCounts     qScriptPipelineKind = "string-join/counts"
 	qScriptPipelineApplyScalarAt        qScriptPipelineKind = "apply-index/scalar-at"
 	qScriptPipelineApplyScalarDot       qScriptPipelineKind = "apply-index/scalar-dot"
 	qScriptPipelineApplyPathDot         qScriptPipelineKind = "apply-index/path-dot"
@@ -62,6 +63,12 @@ type qScriptPipelineDescriptor struct {
 	sequenceSteps     []data.SequenceTransformStep
 	sequenceBindings  []string
 	sequenceShapeName string
+	stringValues      []string
+	stringRepeatCount int
+	stringSep         string
+	stringSearch      string
+	stringReplaceOld  string
+	stringReplaceNew  string
 	terminalUsesWhere bool
 	terminalPlan      qPipelinePlan
 	moduloMaskPlan    *qPipelinePlan
@@ -213,6 +220,9 @@ func describeQScriptPipelineTerminal(src string, bindings map[string]string) (qS
 		return descriptor, true
 	}
 	if descriptor, ok := qScriptPipelineCallableOverScanSumDescriptor(src, bindings); ok {
+		return descriptor, true
+	}
+	if descriptor, ok := qScriptPipelineStringJoinCountsDescriptor(src, bindings); ok {
 		return descriptor, true
 	}
 	if !strings.HasPrefix(src, "+/") {
@@ -502,6 +512,203 @@ func qScriptPipelineUnaryNameTerm(src, word string) (string, bool) {
 		return "", false
 	}
 	return name, true
+}
+
+func qScriptPipelineStringJoinCountsDescriptor(src string, bindings map[string]string) (qScriptPipelineDescriptor, bool) {
+	terms := qScriptPipelinePlusTerms(src)
+	if len(terms) != 3 {
+		return qScriptPipelineDescriptor{}, false
+	}
+	var joinedName string
+	var splitSepExpr string
+	var searchNeedleExpr string
+	var replaceOldExpr string
+	var replaceNewExpr string
+	seenSplit := false
+	seenSearch := false
+	seenReplace := false
+	for _, term := range terms {
+		if sepExpr, name, ok := qScriptPipelineCountSplitTerm(term); ok {
+			if seenSplit {
+				return qScriptPipelineDescriptor{}, false
+			}
+			joinedName = qScriptPipelineMergeStringJoinName(joinedName, name)
+			if joinedName == "" {
+				return qScriptPipelineDescriptor{}, false
+			}
+			splitSepExpr = sepExpr
+			seenSplit = true
+			continue
+		}
+		if name, needleExpr, ok := qScriptPipelineCountSearchTerm(term); ok {
+			if seenSearch {
+				return qScriptPipelineDescriptor{}, false
+			}
+			joinedName = qScriptPipelineMergeStringJoinName(joinedName, name)
+			if joinedName == "" {
+				return qScriptPipelineDescriptor{}, false
+			}
+			searchNeedleExpr = needleExpr
+			seenSearch = true
+			continue
+		}
+		if name, oldExpr, newExpr, ok := qScriptPipelineCountReplaceTerm(term); ok {
+			if seenReplace {
+				return qScriptPipelineDescriptor{}, false
+			}
+			joinedName = qScriptPipelineMergeStringJoinName(joinedName, name)
+			if joinedName == "" {
+				return qScriptPipelineDescriptor{}, false
+			}
+			replaceOldExpr = oldExpr
+			replaceNewExpr = newExpr
+			seenReplace = true
+			continue
+		}
+		return qScriptPipelineDescriptor{}, false
+	}
+	if !seenSplit || !seenSearch || !seenReplace || joinedName == "" {
+		return qScriptPipelineDescriptor{}, false
+	}
+	joinRHS := strings.TrimSpace(bindings[joinedName])
+	sepExpr, sourceExpr, ok := qScriptPipelineStringJoinSource(joinRHS)
+	if !ok || strings.TrimSpace(sepExpr) != strings.TrimSpace(splitSepExpr) {
+		return qScriptPipelineDescriptor{}, false
+	}
+	sourceName := strings.TrimSpace(sourceExpr)
+	if !qScriptPipelineSimpleName(sourceName) || strings.TrimSpace(bindings[sourceName]) == "" {
+		return qScriptPipelineDescriptor{}, false
+	}
+	descriptor := qScriptPipelineDescriptor{
+		kind:         qScriptPipelineStringJoinCounts,
+		valueExpr:    sourceName,
+		valueBinding: qScriptPipelineBinding(sourceName, bindings),
+		indexExpr:    joinedName,
+		maskExpr:     splitSepExpr,
+		rowValueExpr: searchNeedleExpr,
+		scalarExpr:   replaceOldExpr,
+		dyadicOp:     replaceNewExpr,
+	}
+	qScriptPipelineHoistStringJoinCounts(&descriptor)
+	return descriptor, true
+}
+
+func qScriptPipelineMergeStringJoinName(current, next string) string {
+	next = strings.TrimSpace(next)
+	if current == "" {
+		return next
+	}
+	if current != next {
+		return ""
+	}
+	return current
+}
+
+func qScriptPipelineCountSplitTerm(src string) (string, string, bool) {
+	expr, ok := qScriptPipelineCountTermExpr(src)
+	if !ok {
+		return "", "", false
+	}
+	left, right, ok := splitTopLevelWord(expr, "vs")
+	if !ok || !qScriptPipelineSimpleName(strings.TrimSpace(right)) {
+		return "", "", false
+	}
+	return strings.TrimSpace(left), strings.TrimSpace(right), true
+}
+
+func qScriptPipelineCountSearchTerm(src string) (string, string, bool) {
+	expr, ok := qScriptPipelineCountTermExpr(src)
+	if !ok {
+		return "", "", false
+	}
+	left, right, ok := splitTopLevelWord(expr, "ss")
+	if !ok || !qScriptPipelineSimpleName(strings.TrimSpace(left)) {
+		return "", "", false
+	}
+	return strings.TrimSpace(left), strings.TrimSpace(right), true
+}
+
+func qScriptPipelineCountReplaceTerm(src string) (string, string, string, bool) {
+	expr, ok := qScriptPipelineCountTermExpr(src)
+	if !ok {
+		return "", "", "", false
+	}
+	args, ok := qFunctionCallArgs(expr)
+	if !ok || !strings.HasPrefix(strings.TrimSpace(expr), "ssr[") || len(args) != 3 {
+		return "", "", "", false
+	}
+	name := strings.TrimSpace(args[0])
+	if !qScriptPipelineSimpleName(name) {
+		return "", "", "", false
+	}
+	return name, strings.TrimSpace(args[1]), strings.TrimSpace(args[2]), true
+}
+
+func qScriptPipelineCountTermExpr(src string) (string, bool) {
+	src = stripEnclosingParens(strings.TrimSpace(src))
+	if strings.HasPrefix(src, "count") && wordBoundary(src, 0, len("count")) {
+		body := strings.TrimSpace(src[len("count"):])
+		return stripEnclosingParens(body), body != ""
+	}
+	if strings.HasPrefix(src, "#") {
+		body := strings.TrimSpace(src[len("#"):])
+		return stripEnclosingParens(body), body != ""
+	}
+	return "", false
+}
+
+func qScriptPipelineStringJoinSource(src string) (string, string, bool) {
+	left, right, ok := splitTopLevelWord(stripEnclosingParens(strings.TrimSpace(src)), "sv")
+	if !ok {
+		return "", "", false
+	}
+	right = stripEnclosingParens(strings.TrimSpace(right))
+	if !strings.HasPrefix(right, "string") || !wordBoundary(right, 0, len("string")) {
+		return "", "", false
+	}
+	source := strings.TrimSpace(right[len("string"):])
+	if source == "" {
+		return "", "", false
+	}
+	return strings.TrimSpace(left), source, true
+}
+
+func qScriptPipelineHoistStringJoinCounts(descriptor *qScriptPipelineDescriptor) {
+	values, count, ok := qScriptPipelineRepeatedStringValues(descriptor.valueBinding)
+	if !ok {
+		return
+	}
+	sep, ok := qScriptPipelineStaticString("sv", descriptor.maskExpr)
+	if !ok {
+		return
+	}
+	search, ok := qScriptPipelineStaticString("ss", descriptor.rowValueExpr)
+	if !ok {
+		return
+	}
+	old, ok := qScriptPipelineStaticString("ssr", descriptor.scalarExpr)
+	if !ok {
+		return
+	}
+	repl, ok := qScriptPipelineStaticString("ssr", descriptor.dyadicOp)
+	if !ok {
+		return
+	}
+	descriptor.stringValues = values
+	descriptor.stringRepeatCount = count
+	descriptor.stringSep = sep
+	descriptor.stringSearch = search
+	descriptor.stringReplaceOld = old
+	descriptor.stringReplaceNew = repl
+}
+
+func qScriptPipelineStaticString(name, src string) (string, bool) {
+	value, ok := qScriptPipelineStaticValue(src)
+	if !ok {
+		return "", false
+	}
+	text, err := qStringOperand(name, value)
+	return text, err == nil
 }
 
 func qScriptPipelineSequenceEdgeReduceValue(src string) (string, bool) {
@@ -1004,6 +1211,11 @@ func (s *EvalState) tryEvalQScriptPipeline(descriptor *qScriptPipelineDescriptor
 	}
 	if descriptor.kind == qScriptPipelineCallableOverScanSum {
 		out, handled, err := s.evalQScriptCallableOverScanSumPipeline(descriptor)
+		recordQScriptPipelineResult(shape, handled, err)
+		return out, handled, err
+	}
+	if descriptor.kind == qScriptPipelineStringJoinCounts {
+		out, handled, err := s.evalQScriptStringJoinCountsPipeline(descriptor)
 		recordQScriptPipelineResult(shape, handled, err)
 		return out, handled, err
 	}
@@ -1611,6 +1823,65 @@ func qArithmeticSeriesSumI64(start, step, count int64) int64 {
 		return 0
 	}
 	return count * (2*start + (count-1)*step) / 2
+}
+
+func (s *EvalState) evalQScriptStringJoinCountsPipeline(descriptor *qScriptPipelineDescriptor) (any, bool, error) {
+	values := descriptor.stringValues
+	count := descriptor.stringRepeatCount
+	sep := descriptor.stringSep
+	search := descriptor.stringSearch
+	old := descriptor.stringReplaceOld
+	repl := descriptor.stringReplaceNew
+	if len(values) == 0 {
+		qScriptPipelineHoistStringJoinCounts(descriptor)
+		values = descriptor.stringValues
+		count = descriptor.stringRepeatCount
+		sep = descriptor.stringSep
+		search = descriptor.stringSearch
+		old = descriptor.stringReplaceOld
+		repl = descriptor.stringReplaceNew
+		if len(values) == 0 {
+			return nil, false, nil
+		}
+	}
+	out, ok := data.RepeatedStringJoinCountSummary(values, count, sep, search, old, repl)
+	if !ok {
+		return nil, false, nil
+	}
+	return out.SplitCount + out.SearchCount + out.ReplaceResultLen, true, nil
+}
+
+func qScriptPipelineRepeatedStringValues(src string) ([]string, int, bool) {
+	left, right, ok := splitTopLevelOperator(stripEnclosingParens(strings.TrimSpace(src)), "#")
+	if !ok {
+		return nil, 0, false
+	}
+	count, ok := qScriptPipelineStaticInt(left)
+	if !ok || count < 0 {
+		return nil, 0, false
+	}
+	value, ok := qScriptPipelineStaticValue(right)
+	if !ok {
+		return nil, 0, false
+	}
+	items := data.SequenceItems(value)
+	if len(items) == 0 {
+		if text, err := qStringOperand("string repeat", value); err == nil {
+			items = []any{text}
+		}
+	}
+	values := make([]string, 0, len(items))
+	for _, item := range items {
+		text, err := qStringOperand("string repeat", item)
+		if err != nil {
+			return nil, 0, false
+		}
+		values = append(values, text)
+	}
+	if len(values) == 0 {
+		return nil, 0, false
+	}
+	return values, count, true
 }
 
 func (s *EvalState) evalQScriptSequenceEdgeSumPipeline(descriptor *qScriptPipelineDescriptor) (any, bool, error) {

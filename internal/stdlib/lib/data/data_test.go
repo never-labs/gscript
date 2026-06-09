@@ -217,6 +217,12 @@ func TestReusableStringHelpers(t *testing.T) {
 	if values := StringSplit("", "åß").Values(); !reflect.DeepEqual(values, []any{"å", "ß"}) {
 		t.Fatalf("StringSplit runes = %#v", values)
 	}
+	if got, ok := RepeatedStringJoinCountSummary([]string{"AAPL", "MSFT", "AMD", "NVDA"}, 8, ",", "A", "A", "Z"); !ok || got.SplitCount != 8 || got.SearchCount != 8 || got.ReplaceResultLen != 37 {
+		t.Fatalf("RepeatedStringJoinCountSummary single rune = %#v,%v; want split 8 search 8 replaceLen 37,true", got, ok)
+	}
+	if got, ok := RepeatedStringJoinCountSummary([]string{"ab", "ca"}, 3, "x", "bxc", "bxc", "YY"); !ok || got.SplitCount != 3 || got.SearchCount != 1 || got.ReplaceResultLen != 7 {
+		t.Fatalf("RepeatedStringJoinCountSummary cross segment = %#v,%v; want split 3 search 1 replaceLen 7,true", got, ok)
+	}
 
 	if got, err := TrimmedStringCount("  åß \t"); err != nil || got != 2 {
 		t.Fatalf("TrimmedStringCount scalar = %d,%v; want 2,nil", got, err)
