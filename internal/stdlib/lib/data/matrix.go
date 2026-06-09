@@ -380,6 +380,84 @@ func TryMatrixRowsNumericSumPlusCount(value Matrix, rows ...int) (any, bool, err
 	return totalFloat + float64(shape[0]), true, nil
 }
 
+// TryTransposedReshapedMatrixRowsNumericSumPlusCount reduces rows from
+// transpose(shape#source) plus count(transpose(shape#source)) without
+// constructing either matrix view. This is the column projection form of a
+// matrix row reducer and is shared by q script pipelines and future JIT
+// backends.
+func TryTransposedReshapedMatrixRowsNumericSumPlusCount(shape []int, source Array, rows ...int) (any, bool, error) {
+	if source == nil {
+		return nil, false, nil
+	}
+	if len(shape) != 2 {
+		return nil, false, nil
+	}
+	sourceRows, sourceCols := shape[0], shape[1]
+	if sourceRows < 0 || sourceCols < 0 {
+		return nil, true, fmt.Errorf("reshape dimension must be non-negative")
+	}
+	for _, row := range rows {
+		if row < 0 || row >= sourceCols {
+			return nil, true, fmt.Errorf("matrix row index %d out of range", row)
+		}
+	}
+	if source.Len() == 0 && sourceRows*sourceCols > 0 {
+		return nil, true, fmt.Errorf("matrix source is empty")
+	}
+	var totalInt int64
+	var totalFloat float64
+	integer := true
+	if source.Len() >= sourceRows*sourceCols {
+		switch values := source.(type) {
+		case i64RangeArray:
+			for _, row := range rows {
+				segment := i64RangeArray{
+					start: values.start + int64(row)*values.step,
+					step:  int64(sourceCols) * values.step,
+					len:   sourceRows,
+				}
+				sum := i64RangeSum(segment)
+				totalInt += sum
+				totalFloat += float64(sum)
+			}
+			return totalInt + int64(sourceCols), true, nil
+		case f64RangeArray:
+			for _, row := range rows {
+				segment := f64RangeArray{
+					start: values.start + float64(row)*values.step,
+					step:  float64(sourceCols) * values.step,
+					len:   sourceRows,
+				}
+				totalFloat += f64RangeSum(segment)
+			}
+			return totalFloat + float64(sourceCols), true, nil
+		}
+	}
+	for _, row := range rows {
+		for sourceRow := 0; sourceRow < sourceRows; sourceRow++ {
+			sourceIndex := sourceRow*sourceCols + row
+			value, handled, err := arrayScalarAt(source, sourceIndex%source.Len())
+			if err != nil || !handled {
+				return nil, handled, err
+			}
+			n, ok := numeric(value)
+			if !ok {
+				return nil, false, nil
+			}
+			totalFloat += n
+			if intValue, ok := coerceInt64Exact(value); ok && integer {
+				totalInt += intValue
+				continue
+			}
+			integer = false
+		}
+	}
+	if integer {
+		return totalInt + int64(sourceCols), true, nil
+	}
+	return totalFloat + float64(sourceCols), true, nil
+}
+
 // TryMatrixNestedSumCellPlusCount computes sum(raze sumMatrix)+cell(cellMatrix)
 // +count(countMatrix) through typed matrix views. The three inputs are separate
 // on purpose: frontends can fuse expressions involving transpose or alias

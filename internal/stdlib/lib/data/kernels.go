@@ -5664,7 +5664,7 @@ func (k typedKernelRegistry) NumericSumValue(array Array) (any, bool, error) {
 	case matrixRowArray:
 		return numericSumMatrixRowValue(a)
 	case transposedMatrixRowArray:
-		return numericSumRowArrayValue(a)
+		return numericSumTransposedMatrixRowValue(a)
 	case columnArray[uint8]:
 		return numericSumUnsignedValue(a.data), true, nil
 	case columnArray[uint16]:
@@ -9644,6 +9644,32 @@ func integerArrayAt(array Array, row int) (int64, bool, error) {
 			return 0, false, fmt.Errorf("array row %d out of range", row)
 		}
 		return value, true, nil
+	case matrixRowArray:
+		if row < 0 || row >= a.Len() {
+			return 0, false, fmt.Errorf("array row %d out of range", row)
+		}
+		value, ok := a.matrix.Cell(a.row, row)
+		if !ok {
+			return 0, false, fmt.Errorf("array row %d out of range", row)
+		}
+		n, ok := integerScalarValue(value)
+		if !ok {
+			return 0, false, fmt.Errorf("typed integer operand row %d is %T, want integer", row, value)
+		}
+		return n, true, nil
+	case transposedMatrixRowArray:
+		if row < 0 || row >= a.Len() {
+			return 0, false, fmt.Errorf("array row %d out of range", row)
+		}
+		value, ok := a.matrix.Cell(a.row, row)
+		if !ok {
+			return 0, false, fmt.Errorf("array row %d out of range", row)
+		}
+		n, ok := integerScalarValue(value)
+		if !ok {
+			return 0, false, fmt.Errorf("typed integer operand row %d is %T, want integer", row, value)
+		}
+		return n, true, nil
 	case columnArray[uint8]:
 		return integerColumnAt(a.data, row)
 	case columnArray[uint16]:
@@ -11239,6 +11265,13 @@ func numericSumIntegerValue[T signedScalar](values []T) int64 {
 
 func numericSumMatrixRowValue(row matrixRowArray) (any, bool, error) {
 	if sum, handled, err := numericSumMatrixRowDirect(row.matrix, row.row); handled || err != nil {
+		return sum, handled, err
+	}
+	return numericSumRowArrayValue(row)
+}
+
+func numericSumTransposedMatrixRowValue(row transposedMatrixRowArray) (any, bool, error) {
+	if sum, handled, err := numericSumTransposedMatrixRowDirect(row.matrix, row.row); handled || err != nil {
 		return sum, handled, err
 	}
 	return numericSumRowArrayValue(row)

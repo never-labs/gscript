@@ -7505,6 +7505,10 @@ func TestMatrixReshapeTransposeAndMultiply(t *testing.T) {
 	if got, want := gatheredTransposedRow.Values(), []any{int64(6), int64(3)}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("transpose row gather values = %#v, want %#v", got, want)
 	}
+	transposedRowSum, handled, err := TryTypedNumericSum(transposedRow)
+	if err != nil || !handled || transposedRowSum != int64(9) {
+		t.Fatalf("TryTypedNumericSum(transposed row) = %#v,%v,%v; want 9,true,nil", transposedRowSum, handled, err)
+	}
 	flattenedTranspose, handled, err := FlattenNestedArray(tm)
 	if err != nil || !handled {
 		t.Fatalf("FlattenNestedArray(transpose) returned %#v,%v,%v; want handled nil error", flattenedTranspose, handled, err)

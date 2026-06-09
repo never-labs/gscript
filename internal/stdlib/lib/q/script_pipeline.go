@@ -1564,6 +1564,9 @@ func (s *EvalState) evalQScriptMatrixRowSumCountPipeline(descriptor *qScriptPipe
 }
 
 func (s *EvalState) evalQScriptMatrixRowsSumCountPipeline(descriptor *qScriptPipelineDescriptor) (any, bool, error) {
+	if out, handled, err := s.evalQScriptTransposedReshapedMatrixRowsSumCountPipeline(descriptor); err != nil || handled {
+		return out, handled, err
+	}
 	for _, assignment := range descriptor.assignments {
 		value, handled, err := s.evalQScriptBindingPlan(&assignment.binding)
 		if err != nil {
@@ -1604,6 +1607,75 @@ func (s *EvalState) evalQScriptMatrixRowsSumCountPipeline(descriptor *qScriptPip
 	shape := qMatrixIndexShape(matrix, len(rows)) + "/rows-sum-count"
 	out, handled, err := data.TryMatrixRowsNumericSumPlusCount(matrix, rows...)
 	return qTypedRuntimeResultReason("MatrixRowsSumCount", shape, RuntimeFallbackUnsupportedType, out, handled, err)
+}
+
+func (s *EvalState) evalQScriptTransposedReshapedMatrixRowsSumCountPipeline(descriptor *qScriptPipelineDescriptor) (any, bool, error) {
+	if descriptor == nil || strings.TrimSpace(descriptor.rowValueExpr) == "" {
+		return nil, false, nil
+	}
+	flipAssignment, ok := qScriptPipelineAssignmentByName(descriptor, descriptor.rowValueExpr)
+	if !ok || flipAssignment.binding.kind != qScriptBindingUnary || flipAssignment.binding.op != "flip" || flipAssignment.binding.left == nil || flipAssignment.binding.left.kind != qScriptBindingName {
+		return nil, false, nil
+	}
+	sourceName := flipAssignment.binding.left.name
+	reshapeAssignment, ok := qScriptPipelineAssignmentByName(descriptor, sourceName)
+	if !ok || reshapeAssignment.binding.kind != qScriptBindingBinary || reshapeAssignment.binding.op != "#" || reshapeAssignment.binding.left == nil || reshapeAssignment.binding.right == nil {
+		return nil, false, nil
+	}
+	rows, handled, err := s.evalQScriptMatrixRowsSumCountRows(descriptor)
+	if err != nil || !handled {
+		return nil, handled, err
+	}
+	resolver := qScriptPipelineAssignmentResolver(descriptor)
+	shapeValue, handled, err := s.evalQScriptBindingPlanWithResolver(reshapeAssignment.binding.left, resolver)
+	if err != nil || !handled {
+		return nil, handled, err
+	}
+	matrixShape, err := qReshapeShape(shapeValue)
+	if err != nil {
+		return nil, true, err
+	}
+	if len(matrixShape) != 2 {
+		return nil, false, nil
+	}
+	sourceValue, handled, err := s.evalQScriptBindingPlanWithResolver(reshapeAssignment.binding.right, resolver)
+	if err != nil || !handled {
+		return nil, handled, err
+	}
+	source, ok := sourceValue.(data.Array)
+	if !ok {
+		return nil, false, nil
+	}
+	shape := "matrix-dot/reshape-transpose/" + qRuntimeCardinalityShape(matrixShape[0]) + "x" + qRuntimeCardinalityShape(matrixShape[1]) + "/" + strconv.Itoa(len(rows)) + "-rows-sum-count"
+	out, handled, err := data.TryTransposedReshapedMatrixRowsNumericSumPlusCount(matrixShape, source, rows...)
+	return qTypedRuntimeResultReason("MatrixRowsSumCount", shape, RuntimeFallbackUnsupportedType, out, handled, err)
+}
+
+func (s *EvalState) evalQScriptMatrixRowsSumCountRows(descriptor *qScriptPipelineDescriptor) ([]int, bool, error) {
+	rowExprs := append([]string{descriptor.rowIndexExpr}, strings.Fields(descriptor.indexExpr)...)
+	if len(rowExprs) < 2 {
+		return nil, false, nil
+	}
+	rows := make([]int, 0, len(rowExprs))
+	for _, expr := range rowExprs {
+		plan := buildQScriptBindingPlanForRHS(expr, nil)
+		row, handled, err := s.evalQScriptScalarIndexPlan(&plan)
+		if err != nil || !handled {
+			return nil, handled, err
+		}
+		rows = append(rows, row)
+	}
+	return rows, true, nil
+}
+
+func qScriptPipelineAssignmentResolver(descriptor *qScriptPipelineDescriptor) qScriptBindingNameResolver {
+	return func(name string) (*qScriptBindingPlan, bool, error) {
+		assignment, ok := qScriptPipelineAssignmentByName(descriptor, name)
+		if !ok {
+			return nil, false, nil
+		}
+		return &assignment.binding, true, nil
+	}
 }
 
 func (s *EvalState) evalQScriptReshapedMatrixRowSumCount(plan *qScriptBindingPlan, row int) (any, bool, error) {

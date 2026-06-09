@@ -1128,6 +1128,14 @@ func TestQScriptPipelinePlannerDescribesMatrixRowsSumCount(t *testing.T) {
 	if d.rowValueExpr != "t" || d.rowIndexExpr != "0" || d.indexExpr != "7" {
 		t.Fatalf("matrix rows descriptor = matrix %q row %q rows %q", d.rowValueExpr, d.rowIndexExpr, d.indexExpr)
 	}
+	flipAssignment, ok := qScriptPipelineAssignmentByName(d, "t")
+	if !ok || flipAssignment.binding.kind != qScriptBindingUnary || flipAssignment.binding.op != "flip" {
+		t.Fatalf("transpose assignment binding = %#v ok %v, want unary flip", flipAssignment.binding, ok)
+	}
+	reshapeAssignment, ok := qScriptPipelineAssignmentByName(d, "m")
+	if !ok || reshapeAssignment.binding.kind != qScriptBindingBinary || reshapeAssignment.binding.op != "#" {
+		t.Fatalf("reshape assignment binding = %#v ok %v, want binary reshape", reshapeAssignment.binding, ok)
+	}
 	if got, want := d.shape(), "script-pipeline/matrix-rows-reduce/sum-plus-count/assignments"; got != want {
 		t.Fatalf("shape = %q, want %q", got, want)
 	}

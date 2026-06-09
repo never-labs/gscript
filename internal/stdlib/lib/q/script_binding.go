@@ -170,6 +170,13 @@ func buildQScriptTransformBindingPlan(src string) qScriptBindingPlan {
 		}
 		return qScriptBindingPlan{kind: qScriptBindingUnary, op: "reverse", left: &valuePlan}
 	}
+	if strings.HasPrefix(src, "flip ") && wordBoundary(src, 0, len("flip")) {
+		valuePlan := buildQScriptBindingPlanForRHS(strings.TrimSpace(src[len("flip "):]), nil)
+		if valuePlan.kind == qScriptBindingInvalid {
+			return qScriptBindingPlan{}
+		}
+		return qScriptBindingPlan{kind: qScriptBindingUnary, op: "flip", left: &valuePlan}
+	}
 	if strings.HasPrefix(src, "drop ") && wordBoundary(src, 0, len("drop")) {
 		countExpr, valueExpr, ok := splitQScriptPrefixDyadicArgs(strings.TrimSpace(src[len("drop "):]))
 		if !ok {
