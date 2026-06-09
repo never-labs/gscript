@@ -207,6 +207,10 @@ func qPipelinePlanFromEvalDescriptor(descriptor EvalPipelineDescriptor) (qPipeli
 		plan.kind = qPipelineSumDeltas
 	case "bin-reduce/sum":
 		plan.kind = qPipelineSumBin
+	case "vector-reduce/sum-expr":
+		plan.kind = qPipelineSumVectorExpr
+	case "vector-count/expr":
+		plan.kind = qPipelineCountVectorExpr
 	default:
 		return qPipelinePlan{}, false
 	}

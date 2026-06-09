@@ -21,6 +21,8 @@ const (
 	qPipelineWhereModuloCompareIndexes
 	qPipelineSumDeltas
 	qPipelineSumBin
+	qPipelineSumVectorExpr
+	qPipelineCountVectorExpr
 )
 
 type qPipelinePlan struct {
@@ -125,17 +127,34 @@ func buildQPipelinePlan(src string) qPipelinePlan {
 		if input, ok := qPipelineDeltasInput(right); ok {
 			return qPipelinePlanWithBindingPlans(qPipelinePlan{kind: qPipelineSumDeltas, shape: "vector-reduce/sum-deltas", reductionInput: input})
 		}
+		if qPipelineVectorTransformExprCandidate(right) {
+			return qPipelinePlanWithBindingPlans(qPipelinePlan{kind: qPipelineSumVectorExpr, shape: "vector-reduce/sum-expr", reductionInput: right})
+		}
 		return qPipelinePlan{}
 	}
 	if strings.HasPrefix(src, "sum ") && wordBoundary(src, 0, len("sum")) {
-		if input, ok := qPipelineDeltasInput(strings.TrimSpace(src[len("sum "):])); ok {
+		inputExpr := strings.TrimSpace(src[len("sum "):])
+		if input, ok := qPipelineDeltasInput(inputExpr); ok {
 			return qPipelinePlanWithBindingPlans(qPipelinePlan{kind: qPipelineSumDeltas, shape: "vector-reduce/sum-deltas", reductionInput: input})
+		}
+		if qPipelineVectorTransformExprCandidate(inputExpr) {
+			return qPipelinePlanWithBindingPlans(qPipelinePlan{kind: qPipelineSumVectorExpr, shape: "vector-reduce/sum-expr", reductionInput: inputExpr})
 		}
 		return qPipelinePlan{}
 	}
 	if strings.HasPrefix(src, "count ") && wordBoundary(src, 0, len("count")) {
-		if plan, ok := buildQPipelineWhereComparePlan(strings.TrimSpace(src[len("count "):]), qPipelineCountWhereCompare, "compare-to-index-count"); ok {
+		inputExpr := strings.TrimSpace(src[len("count "):])
+		if plan, ok := buildQPipelineWhereComparePlan(inputExpr, qPipelineCountWhereCompare, "compare-to-index-count"); ok {
 			return qPipelinePlanWithBindingPlans(plan)
+		}
+		if strings.HasPrefix(inputExpr, "where ") && wordBoundary(inputExpr, 0, len("where")) {
+			return qPipelinePlan{}
+		}
+		if strings.HasPrefix(inputExpr, "reverse ") && wordBoundary(inputExpr, 0, len("reverse")) {
+			return qPipelinePlan{}
+		}
+		if qPipelineVectorTransformExprCandidate(inputExpr) {
+			return qPipelinePlanWithBindingPlans(qPipelinePlan{kind: qPipelineCountVectorExpr, shape: "vector-count/expr", reductionInput: inputExpr})
 		}
 		return qPipelinePlan{}
 	}
@@ -179,6 +198,37 @@ func qPipelinePlanWithBindingPlans(plan qPipelinePlan) qPipelinePlan {
 		plan.reductionPlan = buildQScriptBindingPlanForRHS(plan.reductionInput, nil)
 	}
 	return plan
+}
+
+func qPipelineVectorTransformExprCandidate(src string) bool {
+	src = stripEnclosingParens(strings.TrimSpace(src))
+	if src == "" {
+		return false
+	}
+	for _, prefix := range []string{
+		"reverse ",
+		"til ",
+		"drop ",
+	} {
+		if strings.HasPrefix(src, prefix) && wordBoundary(src, 0, len(strings.TrimSpace(prefix))) {
+			return true
+		}
+	}
+	for _, word := range []string{"rotate", "where", "bin", "xbar"} {
+		if _, _, ok := splitTopLevelWord(src, word); ok {
+			return true
+		}
+	}
+	if len(splitTopLevel(src, '#')) > 1 {
+		return true
+	}
+	if len(splitTopLevel(src, '_')) > 1 {
+		return true
+	}
+	if _, _, ok := findPostfixIndex(src); ok {
+		return true
+	}
+	return false
 }
 
 func buildQPipelineSumGatherPlan(src string) (qPipelinePlan, bool) {
@@ -344,6 +394,10 @@ func (s *EvalState) evalQPipelinePlan(plan qPipelinePlan) (any, bool, error) {
 		out, handled, err = s.evalQPipelineSumDeltas(plan)
 	case qPipelineSumBin:
 		out, handled, err = s.evalQPipelineSumBin(plan)
+	case qPipelineSumVectorExpr:
+		out, handled, err = s.evalQPipelineSumVectorExpr(plan)
+	case qPipelineCountVectorExpr:
+		out, handled, err = s.evalQPipelineCountVectorExpr(plan)
 	default:
 		return nil, false, nil
 	}
@@ -723,6 +777,38 @@ func (s *EvalState) evalQPipelineSumBin(plan qPipelinePlan) (any, bool, error) {
 	shape := "bin-reduce/sum/" + string(domain.Kind()) + "/" + string(qRuntimeKernelOperandKind(query, nil))
 	recordRuntimeKernelProbe("ArrayBinReduceSum", shape, handled, err)
 	return out, handled, err
+}
+
+func (s *EvalState) evalQPipelineSumVectorExpr(plan qPipelinePlan) (any, bool, error) {
+	value, err := s.evalQPipelinePlannedExpr(plan.reductionInput, &plan.reductionPlan)
+	if err != nil {
+		return nil, true, err
+	}
+	if _, ok := numeric(value); ok {
+		return value, true, nil
+	}
+	array, ok := value.(data.Array)
+	if !ok {
+		return nil, false, nil
+	}
+	out, handled, err := data.TryTypedNumericSum(array)
+	shape := "vector-reduce/sum-expr/" + string(array.Kind())
+	recordRuntimeKernelProbe("ArraySumExpr", shape, handled, err)
+	return out, handled, err
+}
+
+func (s *EvalState) evalQPipelineCountVectorExpr(plan qPipelinePlan) (any, bool, error) {
+	value, err := s.evalQPipelinePlannedExpr(plan.reductionInput, &plan.reductionPlan)
+	if err != nil {
+		return nil, true, err
+	}
+	array, ok := value.(data.Array)
+	if !ok {
+		return nil, false, nil
+	}
+	shape := "vector-count/expr/" + string(array.Kind())
+	recordRuntimeKernelProbe("ArrayCountExpr", shape, true, nil)
+	return int64(array.Len()), true, nil
 }
 
 func (s *EvalState) evalQPipelinePlannedExpr(src string, plan *qScriptBindingPlan) (any, error) {

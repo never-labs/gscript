@@ -175,6 +175,19 @@ func TestQPipelinePlanCachesBoundModuloMaskPlan(t *testing.T) {
 	}
 }
 
+func TestQPipelinePlanRecognizesGenericVectorReduceAndCount(t *testing.T) {
+	sumPlan := buildQPipelinePlan("sum reverse 8#til 4")
+	if sumPlan.kind != qPipelineSumVectorExpr || sumPlan.shape != "vector-reduce/sum-expr" || sumPlan.reductionInput != "reverse 8#til 4" {
+		t.Fatalf("sum vector expr plan = %#v", sumPlan)
+	}
+	countPlan := buildQPipelinePlan("count 8#til 4")
+	if countPlan.kind != qPipelineCountVectorExpr || countPlan.shape != "vector-count/expr" || countPlan.reductionInput != "8#til 4" {
+		t.Fatalf("count vector expr plan = %#v", countPlan)
+	}
+	assertEvalValue(t, "sum reverse 8#til 4", int64(12))
+	assertEvalValue(t, "count 8#til 4", int64(8))
+}
+
 func TestQScriptPipelineCachesBoundModuloMaskPlan(t *testing.T) {
 	plan := buildQScriptPlan("x:til 12;y:x*2;idx:where (x mod 3)=0;+/y[idx]")
 	if plan.scriptPipeline == nil {
@@ -319,6 +332,31 @@ func TestDescribeEvalPipelineExposesReadOnlyRuntimeDescriptor(t *testing.T) {
 		descriptor.RightExpr != "8" ||
 		descriptor.CompareOp != ">" {
 		t.Fatalf("expression descriptor = %#v, want compare-to-index-sum mask_reduce x > 8", descriptor)
+	}
+	descriptor, ok = DescribeEvalPipeline("sum reverse 8#til 4")
+	if !ok {
+		t.Fatalf("DescribeEvalPipeline did not recognize generic vector sum pipeline")
+	}
+	if descriptor.Shape != "vector-reduce/sum-expr" ||
+		descriptor.PipelineShape != "vector_reduce" ||
+		descriptor.ReductionInput != "reverse 8#til 4" {
+		t.Fatalf("generic sum descriptor = %#v", descriptor)
+	}
+	if got, handled, err := ExecuteEvalPipelineDescriptor(descriptor); err != nil || !handled || got != int64(12) {
+		t.Fatalf("ExecuteEvalPipelineDescriptor generic sum = %#v,%v,%v; want 12,true,nil", got, handled, err)
+	}
+
+	descriptor, ok = DescribeEvalPipeline("count 8#til 4")
+	if !ok {
+		t.Fatalf("DescribeEvalPipeline did not recognize generic vector count pipeline")
+	}
+	if descriptor.Shape != "vector-count/expr" ||
+		descriptor.PipelineShape != "vector_scan" ||
+		descriptor.ReductionInput != "8#til 4" {
+		t.Fatalf("generic count descriptor = %#v", descriptor)
+	}
+	if got, handled, err := ExecuteEvalPipelineDescriptor(descriptor); err != nil || !handled || got != int64(8) {
+		t.Fatalf("ExecuteEvalPipelineDescriptor generic count = %#v,%v,%v; want 8,true,nil", got, handled, err)
 	}
 }
 

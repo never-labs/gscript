@@ -2276,6 +2276,18 @@ func TestTypedNumericUnaryBinaryAndAggregates(t *testing.T) {
 		t.Fatalf("TryTypedQNumericUnarySum rotated tiled abs = %v (%T), want %v", got, got, want)
 	}
 
+	rotatedRange := tiledArray{source: NewI64Range(10, 2, 5), start: 3, len: 12}
+	rotatedRangeSum, ok, err := TryTypedNumericSum(rotatedRange)
+	if err != nil {
+		t.Fatalf("TryTypedNumericSum rotated tiled range returned error: %v", err)
+	}
+	if !ok {
+		t.Fatal("TryTypedNumericSum rotated tiled range did not match integer tiled array")
+	}
+	if got, want := rotatedRangeSum, int64(174); got != want {
+		t.Fatalf("TryTypedNumericSum rotated tiled range = %v (%T), want %v", got, got, want)
+	}
+
 	tiledFloats, err := TakeRepeat(NewF64([]float64{0, 1.5}), 7)
 	if err != nil {
 		t.Fatalf("Take tiled floats returned error: %v", err)

@@ -1027,6 +1027,74 @@ func appendQEvalExpressionCombinationCases(cases []qEvalVectorCase) []qEvalVecto
 			},
 		},
 		{
+			name:   "DirectTakeCycleSum",
+			tags:   []string{"take", "sum", "numeric-vector"},
+			matrix: []string{"numeric-arithmetic:int-vector:hot"},
+			shapes: []string{"pipeline:vector-transform-reduce:sum"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("x:til %d;sum %d#x", rows, rows+128)
+			},
+			goFn: func(rows int) int64 {
+				var sum int64
+				for i := 0; i < rows+128; i++ {
+					sum += int64(i % rows)
+				}
+				return sum
+			},
+		},
+		{
+			name:   "DirectDropPrefixSum",
+			tags:   []string{"drop", "sum", "numeric-vector"},
+			matrix: []string{"numeric-arithmetic:int-vector:hot"},
+			shapes: []string{"pipeline:vector-transform-reduce:sum"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("x:til %d;sum drop 128 x", rows)
+			},
+			goFn: func(rows int) int64 {
+				var sum int64
+				for i := 128; i < rows; i++ {
+					sum += int64(i)
+				}
+				return sum
+			},
+		},
+		{
+			name:   "DirectReverseSum",
+			tags:   []string{"reverse", "sum", "numeric-vector"},
+			matrix: []string{"numeric-arithmetic:int-vector:hot"},
+			shapes: []string{"pipeline:vector-transform-reduce:sum"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("x:til %d;sum reverse x", rows)
+			},
+			goFn: func(rows int) int64 {
+				return int64(rows-1) * int64(rows) / 2
+			},
+		},
+		{
+			name:   "DirectRotateSum",
+			tags:   []string{"rotate", "sum", "numeric-vector"},
+			matrix: []string{"numeric-arithmetic:int-vector:hot"},
+			shapes: []string{"pipeline:vector-transform-reduce:sum"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("x:til %d;sum 257 rotate x", rows)
+			},
+			goFn: func(rows int) int64 {
+				return int64(rows-1) * int64(rows) / 2
+			},
+		},
+		{
+			name:   "DirectTakeCount",
+			tags:   []string{"take", "count", "numeric-vector"},
+			matrix: []string{"numeric-arithmetic:int-vector:hot"},
+			shapes: []string{"pipeline:vector-transform-count"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("x:til %d;count %d#x", rows, rows+128)
+			},
+			goFn: func(rows int) int64 {
+				return int64(rows + 128)
+			},
+		},
+		{
 			name: "ReverseWhereGatherHeadSum",
 			tags: []string{"reverse", "where", "projection", "sum"},
 			expr: func(rows int) string {

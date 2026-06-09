@@ -1870,16 +1870,8 @@ func (typedKernelRegistry) NumericSum(array Array) (float64, int64, bool, error)
 	case attributedArray:
 		return typedKernels.NumericSum(a.array)
 	case tiledArray:
-		if isIntegerArray(a) {
-			sum := int64(0)
-			for row := 0; row < a.Len(); row++ {
-				value, ok, err := integerArrayAt(a, row)
-				if err != nil || !ok {
-					return 0, 0, ok, err
-				}
-				sum += value
-			}
-			return float64(sum), int64(a.Len()), true, nil
+		if sum, count, handled, err := numericSumTiled(a); handled || err != nil {
+			return sum, count, handled, err
 		}
 		return 0, 0, false, nil
 	case columnArray[int8]:
@@ -1947,6 +1939,106 @@ func (typedKernelRegistry) NumericSum(array Array) (float64, int64, bool, error)
 	default:
 		return 0, 0, false, nil
 	}
+}
+
+func numericSumTiled(array tiledArray) (float64, int64, bool, error) {
+	if array.len == 0 {
+		return 0, 0, true, nil
+	}
+	sourceLen := array.source.Len()
+	if sourceLen == 0 {
+		return 0, 0, true, nil
+	}
+	if source, ok := array.source.(i64RangeArray); ok {
+		return float64(tiledI64RangeSum(source, array.start, array.len)), int64(array.len), true, nil
+	}
+	if source, ok := array.source.(attributedArray); ok {
+		return numericSumTiled(tiledArray{source: source.array, start: array.start, len: array.len})
+	}
+	if !isNumericArray(array.source) {
+		return 0, 0, false, nil
+	}
+	fullCycles := array.len / sourceLen
+	remainder := array.len % sourceLen
+	periodSum, periodCount, ok, err := numericSumWindow(array.source, array.start, sourceLen)
+	if err != nil || !ok {
+		return 0, 0, ok, err
+	}
+	tailSum, tailCount, ok, err := numericSumWindow(array.source, array.start, remainder)
+	if err != nil || !ok {
+		return 0, 0, ok, err
+	}
+	return periodSum*float64(fullCycles) + tailSum, periodCount*int64(fullCycles) + tailCount, true, nil
+}
+
+func numericSumWindow(array Array, start, length int) (float64, int64, bool, error) {
+	if length == 0 {
+		return 0, 0, true, nil
+	}
+	sourceLen := array.Len()
+	if sourceLen == 0 {
+		return 0, 0, true, nil
+	}
+	var sum float64
+	var count int64
+	for offset := 0; offset < length; offset++ {
+		row := start + offset
+		if row >= sourceLen {
+			row %= sourceLen
+		}
+		value, ok, err := typedKernels.NumericAt(array, row)
+		if err != nil {
+			return 0, 0, true, err
+		}
+		if ok {
+			sum += value
+			count++
+		}
+	}
+	return sum, count, true, nil
+}
+
+func tiledI64RangeSum(source i64RangeArray, start, length int) int64 {
+	if length <= 0 || source.len <= 0 {
+		return 0
+	}
+	sourceLen := source.len
+	if start < 0 {
+		start %= sourceLen
+		if start < 0 {
+			start += sourceLen
+		}
+	}
+	start %= sourceLen
+	fullCycles := length / sourceLen
+	remainder := length % sourceLen
+	sum := i64RangeSum(source) * int64(fullCycles)
+	return sum + i64RangeCyclicWindowSum(source, start, remainder)
+}
+
+func i64RangeCyclicWindowSum(source i64RangeArray, start, length int) int64 {
+	if length <= 0 {
+		return 0
+	}
+	firstLen := length
+	if firstLen > source.len-start {
+		firstLen = source.len - start
+	}
+	first := i64RangeArray{
+		start: source.start + int64(start)*source.step,
+		step:  source.step,
+		len:   firstLen,
+	}
+	sum := i64RangeSum(first)
+	if firstLen == length {
+		return sum
+	}
+	second := i64RangeArray{
+		start: source.start,
+		step:  source.step,
+		len:   length - firstLen,
+	}
+	return sum + i64RangeSum(second)
 }
 
 // TryTypedNumericSum applies the shared typed numeric reduction kernel and
@@ -2843,8 +2935,8 @@ func (k typedKernelRegistry) NumericSumValue(array Array) (any, bool, error) {
 	case attributedArray:
 		return k.NumericSumValue(a.array)
 	case tiledArray:
-		if isIntegerArray(a) {
-			return numericSumIntegerArray(a), true, nil
+		if value, handled, err := numericSumTiledIntegerValue(a); handled || err != nil {
+			return value, handled, err
 		}
 		return nil, false, nil
 	case columnArray[int8]:
@@ -2920,6 +3012,59 @@ func (k typedKernelRegistry) NumericSumValue(array Array) (any, bool, error) {
 	default:
 		return nil, false, nil
 	}
+}
+
+func numericSumTiledIntegerValue(array tiledArray) (any, bool, error) {
+	if array.len == 0 {
+		return int64(0), true, nil
+	}
+	switch source := array.source.(type) {
+	case attributedArray:
+		return numericSumTiledIntegerValue(tiledArray{source: source.array, start: array.start, len: array.len})
+	case i64RangeArray:
+		return tiledI64RangeSum(source, array.start, array.len), true, nil
+	}
+	if !isIntegerArray(array.source) {
+		return nil, false, nil
+	}
+	sourceLen := array.source.Len()
+	if sourceLen == 0 {
+		return int64(0), true, nil
+	}
+	fullCycles := array.len / sourceLen
+	remainder := array.len % sourceLen
+	period, ok, err := integerSumWindow(array.source, array.start, sourceLen)
+	if err != nil || !ok {
+		return nil, ok, err
+	}
+	tail, ok, err := integerSumWindow(array.source, array.start, remainder)
+	if err != nil || !ok {
+		return nil, ok, err
+	}
+	return period*int64(fullCycles) + tail, true, nil
+}
+
+func integerSumWindow(array Array, start, length int) (int64, bool, error) {
+	if length == 0 {
+		return 0, true, nil
+	}
+	sourceLen := array.Len()
+	if sourceLen == 0 {
+		return 0, true, nil
+	}
+	var sum int64
+	for offset := 0; offset < length; offset++ {
+		row := start + offset
+		if row >= sourceLen {
+			row %= sourceLen
+		}
+		value, ok, err := integerArrayAt(array, row)
+		if err != nil || !ok {
+			return 0, ok, err
+		}
+		sum += value
+	}
+	return sum, true, nil
 }
 
 // TryTypedNumericSums applies the shared typed numeric scan kernel for q sums
